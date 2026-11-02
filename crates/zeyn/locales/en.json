@@ -175,6 +175,37 @@
     },
     "ui": {
       "resize": "Resize panes",
+      "palette": {
+        "open": "Commands",
+        "label": "Command palette",
+        "placeholder": "Type a command or a screen name",
+        "empty": "No matching commands.",
+        "count": "{n} commands",
+        "recent": "Recently used",
+        "app": "Commands",
+        "screen": "This screen",
+        "go": "Go to",
+        "done": "Done.",
+        "hint": "Up and Down to move, Enter to run, Escape to close."
+      },
+      "toolbox": {
+        "selected": "{tool} selected"
+      },
+      "dock": {
+        "left": "Left",
+        "right": "Right",
+        "bottom": "Bottom",
+        "center": "Center",
+        "options": "Panel options",
+        "move": "Move to {area}",
+        "close": "Close {panel}",
+        "show": "Show {panel}",
+        "moved": "{panel} moved to {area}.",
+        "closed": "{panel} closed.",
+        "shown": "{panel} shown.",
+        "empty": "No open panels. Open one from the panel options.",
+        "resize": "Resize the {area} area"
+      },
       "loading": "Loading…",
       "load_failed": "Could not load this part. Try again.",
       "date": {

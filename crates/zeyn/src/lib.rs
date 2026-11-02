@@ -255,6 +255,7 @@
 
 mod action;
 mod api;
+mod command;
 pub mod audit;
 mod ctx;
 mod feature;
@@ -301,6 +302,7 @@ pub use action::GridQuery;
 pub use grid::{Grid, GridColumn, GridMode};
 pub use i18n::{I18n, NumberFormat, Text};
 pub use menu::ContextMenu;
+pub use command::{Command, RESERVED_SHORTCUTS, normalize_shortcut};
 pub use model::{__rules, Entity, Field, FieldError, FieldMeta, Model, Rule, Valid, ValidationErrors};
 pub use platform::{
     Config, ConfigSource, EnvSource, FixedLicense, JsonFileSource, License, LicenseSource, Licensed, PerTenant, Secret,
@@ -341,10 +343,10 @@ pub use serde_json as __serde_json;
 pub mod prelude {
     pub use crate::ui::{
         ActionButton, Alert, Audio, Badge, Breadcrumb, Card, Chart, Control, DateOptions, DescriptionList, EmptyState, LookupItem, LookupQuery,
-        Panel, Progress, Row, Skeleton, Split, Stack, Tabs, Timeline, Tree, TreeItem, TreeQuery, Video,
+        Dock, MenuBar, Panel, Progress, PropertyInspector, Row, Skeleton, Split, Stack, StatusBar, Tabs, Timeline, Toolbox, Tree, TreeItem, TreeQuery, Video,
     };
     pub use crate::{
-        Action, ContextMenu, Ctx, Currency, Date, DateTime, Effect, Tone, LocalDateTime, Time, TimeZone, Entity, Error, Export, Feature, Field, Form, DataGrid, DataMode, DataQuery,
+        Action, Command, ContextMenu, Ctx, Currency, Date, DateTime, Effect, Tone, LocalDateTime, Time, TimeZone, Entity, Error, Export, Feature, Field, Form, DataGrid, DataMode, DataQuery,
         GuardResult, Icon, Identity, Licensed, Model, Secret, Tenant, TenantRequired, Money, Node, Page, Paging, Result, RowStyle, Screen, ScreenDef, Service,
         SignedIn, Text, Import, TransitionRequest, Transitions, UiCtx, Valid, ValidationErrors, Window, Workflow, action, choice, entity,
         model, params, screen, t,

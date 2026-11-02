@@ -37,6 +37,7 @@ const CSS: &str = include_str!("../assets/zeyn.css");
 const NAV: &str = include_str!("../assets/nav.js");
 
 mod ui;
+mod pro;
 const CSP: &str = "default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
 
 /// Finds out who is calling, usually from a session cookie or an `Authorization` header.
@@ -949,6 +950,9 @@ impl App {
                 problems.push(format!("home screen `{home}` is not registered or has no route"));
             }
         }
+        let commands: Vec<(&str, &crate::command::Command)> =
+            self.features.iter().flat_map(|f| f.commands().iter().map(move |c| (f.name(), c))).collect();
+        problems.extend(crate::command::problems(&commands, false));
         problems.dedup();
         if problems.is_empty() { Ok(()) } else { Err(problems) }
     }
@@ -983,6 +987,7 @@ impl App {
                         "screen": i.screen,
                     })).collect::<Vec<_>>(),
                 })).collect::<Vec<_>>(),
+                "commands": f.commands().iter().map(crate::command::Command::schema).collect::<Vec<_>>(),
             })).collect::<Vec<_>>(),
             "missing_translations": self.i18n.missing_keys(),
             "problems": self.check().err().unwrap_or_default(),
@@ -1089,7 +1094,7 @@ impl App {
             .route("/_zeyn/timezone", post(set_time_zone))
             .route("/_zeyn/tools", get(tools))
             .route("/_zeyn/mcp", post(mcp));
-        let router = media::routes(ui::routes(session::routes(data::routes(ops::routes(router)))))
+        let router = pro::routes(media::routes(ui::routes(session::routes(data::routes(ops::routes(router))))))
             .fallback(not_found)
             .layer(axum::middleware::from_fn_with_state(state.clone(), guard_request))
             .layer(axum::middleware::map_response(security_headers))
@@ -1525,12 +1530,13 @@ impl AppState {
             ));
         }
         let app = r.text(&self.name);
+        let (palette, commands) = pro::shell_parts(self, ctx, &r);
         format!(
-            r##"<!doctype html><html lang="{lang}"{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css">{theme_link}<script type="module" src="{base}/_zeyn/zeyn.js"></script><script type="module" src="{base}/_zeyn/nav.js"></script>{components}{extra}</head><body><a class="z-skip" href="#z-main">{skip}</a><div class="z-app"><nav class="z-nav" aria-label="{menu}"><p class="z-app-name">{app}</p>{nav}</nav><main class="z-main" id="z-main">{main}</main></div><div class="z-toasts" role="status" aria-live="polite"></div></body></html>"##,
+            r##"<!doctype html><html lang="{lang}"{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css">{theme_link}<script type="module" src="{base}/_zeyn/zeyn.js"></script><script type="module" src="{base}/_zeyn/nav.js"></script>{components}{extra}</head><body><a class="z-skip" href="#z-main">{skip}</a><div class="z-app"><nav class="z-nav" aria-label="{menu}"><p class="z-app-name">{app}</p>{palette}{nav}</nav><main class="z-main" id="z-main">{main}</main></div><div class="z-toasts" role="status" aria-live="polite"></div>{commands}</body></html>"##,
             lang = escape(ctx.locale()),
             tz = escape(ctx.time_zone().name()),
             base = escape(&self.prefix),
-            components = format!("{}{}", ui::head(&escape(&self.prefix)), media::head(&escape(&self.prefix))),
+            components = format!("{}{}{}", ui::head(&escape(&self.prefix)), media::head(&escape(&self.prefix)), pro::head(&escape(&self.prefix))),
             scheme = self.theme.as_ref().and_then(|t| t.scheme).unwrap_or("light dark"),
             html_attrs = format!(
                 "{}{}",
@@ -1570,7 +1576,7 @@ fn asset(body: &'static str, content_type: &'static str) -> Response {
 /// IP rules and rate limits, before any handler runs.
 async fn guard_request(State(st): State<Arc<AppState>>, req: axum::extract::Request, next: axum::middleware::Next) -> Response {
     let path = req.uri().path().to_string();
-    if path == "/_zeyn/zeyn.js" || path == "/_zeyn/zeyn.css" || path == "/_zeyn/nav.js" || path == "/_zeyn/theme.css" || path == "/favicon.ico" || ops::is_asset(&path) || ui::ASSETS.contains(&path.as_str()) || media::ASSETS.contains(&path.as_str()) {
+    if path == "/_zeyn/zeyn.js" || path == "/_zeyn/zeyn.css" || path == "/_zeyn/nav.js" || path == "/_zeyn/theme.css" || path == "/favicon.ico" || ops::is_asset(&path) || ui::ASSETS.contains(&path.as_str()) || media::ASSETS.contains(&path.as_str()) || pro::ASSETS.contains(&path.as_str()) {
         return next.run(req).await;
     }
     ops::delay(&st, &path).await;

@@ -10,6 +10,7 @@ mod gallery;
 mod media;
 mod overview;
 mod people;
+mod pro;
 mod sales;
 mod stock;
 mod wide;
@@ -82,6 +83,7 @@ async fn main() -> std::io::Result<()> {
         .feature(gallery::feature())
         .feature(ui::feature())
         .feature(media::feature())
+        .feature(pro::feature())
         .serve(&addr)
         .await
 }

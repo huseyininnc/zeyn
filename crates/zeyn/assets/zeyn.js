@@ -3245,3 +3245,15 @@ document.addEventListener('zeyn:content', (e) => {
   initGrids(e.detail);
   syncAgentTools();
 });
+
+/**
+ * Lets other scripts (the command palette, menu bars) run effects and screen menu items through
+ * the runtime: `detail` is `{effects, source}`, `{screen, item}` with a screen root element, or
+ * `{error}` for an error toast.
+ */
+document.addEventListener('zeyn:run', (e) => {
+  const { effects, source, screen, item, error } = e.detail ?? {};
+  if (error) toast(String(error), 'error');
+  else if (screen instanceof Element && item != null) runScreenItem(screen, String(item));
+  else runEffects(Array.isArray(effects) ? effects : [], source);
+});

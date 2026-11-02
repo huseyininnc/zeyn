@@ -276,3 +276,52 @@ Effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":".
 | `POST /_zeyn/media/position` | `{ source, id, at }` with the CSRF header saves it: `204`, `422` for a bad position. |
 
 The player dispatches the cancelable `zeyn:media-adaptive` event (`{ media, kind, url, hls, dash }`) on its root before falling back to progressive files; a streaming library calls `preventDefault()` to take over.
+
+## 8. Desktop class shell
+
+`/_zeyn/pro.js` and `/_zeyn/pro.css` load after the component library. Like the runtime they need no sign in.
+
+### 8.1 Commands and the palette
+
+Commands are declared in Rust (`Command::open`, `Command::navigate`, `Command::effect`, `Command::action`) and registered with `Feature::command`. The shell renders one hidden button per command the user may run (feature guards pass and the command's access allows it) inside `div[data-zeyn-commands]`:
+
+| Attribute | Meaning |
+|---|---|
+| `data-zeyn-command` | Command id |
+| `data-zeyn-effect` | Effect of an effect command, run by the runtime on click |
+| `data-zeyn-command-run` | Id of an action command, run with `POST /_zeyn/command` |
+| `aria-keyshortcuts` | Normalized shortcut (`Control+Alt+N`); the runtime's shortcut handling clicks the button |
+| `data-hint`, `data-icon` | Shortcut as shown to users, icon name |
+| `data-text-*` on the container | Localized palette texts |
+
+`App::check` refuses shortcuts that cannot be read, single character shortcuts (WCAG 2.1.4), the palette's own keys (`Control+Shift+P`, `F1`) and shortcuts or ids used by two commands.
+
+Ctrl+Shift+P (Command+Shift+P on macOS) and F1 open the palette, also from `button[data-zeyn-palette-open]` in the menu. It is a modal `<dialog>` with an ARIA combobox and listbox. It lists the app's commands, the toolbar buttons, menu bar commands and context menu items of the current screen (the top window when one is open) and the screens in the menu. Matching is fuzzy and ignores case and accents; the eight most recently run commands come first (`localStorage` key `zeyn.palette.recent`). Escape closes it and focus returns to where it was.
+
+| Endpoint | Body | Answer |
+|---|---|---|
+| `POST /_zeyn/command` | `{ command }` | Runs an action command with the input fixed on the server: CSRF, feature guards, the action's permission and the interceptors. `{ effects }`; `404` for unknown ids and effect commands |
+
+The runtime listens to `zeyn:run` on `document` so other scripts run work through it: `{ effects, source }` runs effects, `{ screen, item }` runs a screen context menu item, `{ error }` shows an error toast.
+
+### 8.2 Menu bar, toolbox, property inspector, status bar
+
+| Markup | Behavior |
+|---|---|
+| `ul[role=menubar][data-zeyn-menubar]` | W3C APG menubar. Top items are `button[role=menuitem][aria-haspopup=menu]` with a roving tab stop; each controls a `ul[role=menu]` that is `hidden` while closed. Items carry the command attributes of 8.1. Left and Right move between menus, Down, Enter and Space open, Up opens at the last item, Home and End jump, a letter moves to the next item starting with it, Escape closes and returns to the bar, Tab and a click outside close. Menus and items the user may not run are not rendered. |
+| `div[role=toolbar][aria-orientation=vertical][data-zeyn-toolbox]` | Toggle group of `button.z-tool[aria-pressed]`. Arrows, Home and End move the roving tab stop; a click, Enter or Space turns one tool on, sends `zeyn:tool` (`detail.tool`) and writes `data-text-selected` into the status bar. |
+| `section.z-inspector` | A form with `Form::section` groups (`details.z-form-section` with `role=group` bodies) saved through `POST /_zeyn/form` at the inspector's node path. Sections holding failing fields open before the browser's checks and after a `422`. |
+| `div[data-zeyn-statusbar]` | Items at the start and end and `[data-zeyn-status-live]` (`role=status`, `aria-live=polite`). `zeyn:status` (`detail.text`) from any element of the screen replaces the live text. |
+
+### 8.3 Docking panels
+
+`div.z-dock[data-zeyn-dock]` is a grid of four `section.z-dock-area[data-area]` (`left`, `center`, `bottom`, `right`) and three `div.z-dock-bar[role=separator][data-edge]` dividers. Sizes are the custom properties `--z-dock-left`, `--z-dock-right` (percent of the width) and `--z-dock-bottom` (percent of the height), 10 to 60. Each area has a `role=tablist` of draggable `button.z-dock-tab[data-panel]`, an options button and `role=tabpanel` panels holding the child nodes (paths as in any container; they never change when a panel moves). Side areas without open panels are hidden.
+
+Keyboard: Left and Right (mirrored in right to left pages), Home and End move between the open tabs of an area; Delete closes the focused panel; Shift+F10 or the context menu key opens the area's options (move to another area, close, show closed panels); arrows on a divider resize by 5 percent, Home and End go to the limits. A menu bar entry made with `MenuList::panels` lists every panel as a `menuitemcheckbox`. Changes are announced in `[data-zeyn-dock-live]`.
+
+| Endpoint | Body | Answer |
+|---|---|---|
+| `POST /_zeyn/dock` | `{ screen, params, node, save: false }` | `{ layout }`: the signed in user's saved layout or `null` |
+| `POST /_zeyn/dock` | `{ screen, params, node, save: true, layout }` | `204`; `layout: null` deletes it |
+
+`layout` is `{ sizes: { left, right, bottom }, panels: [{ id, area, open, active }] }` in tab order. The server checks CSRF, the screen's access and the feature's guards, keeps only the dock's own panels (each once) and clamps the sizes, then stores it in the app's view store (`App::datagrid_views`) under the tenant, screen and node. Without a store the endpoint answers `404` and without a user `403`; the browser then keeps the layout in `localStorage`.
