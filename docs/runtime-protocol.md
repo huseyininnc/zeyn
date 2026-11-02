@@ -1,6 +1,6 @@
 # Runtime Protocol
 
-Status: draft, implemented by `zeyn::server` and `assets/zeyn.js`.
+Status: draft, implemented by `zeyn::server` and `assets/zeyn/*.js` (served as `/_zeyn/zeyn.js`).
 
 This is the contract between the Zeyn server and the browser runtime. Screens are rendered on the server. The browser runtime is a small script that sends user actions to the server and applies what comes back. Application code never writes JavaScript.
 

@@ -48,7 +48,29 @@ mod mail;
 
 pub use ops::{build_id, probe};
 
-const JS: &str = include_str!("../assets/zeyn.js");
+/// The browser runtime, served as one script at `/_zeyn/zeyn.js` so a page makes one request. The
+/// source is one file per concern under `assets/zeyn/`, joined here in this order (later parts
+/// use functions and constants of earlier ones):
+///
+/// - `core.js`: constants, requests, toasts, effects, windows
+/// - `grid.js`: grid setup, loading, paging and virtual scrolling
+/// - `grid-rows.js`: selection, bulk actions, inline edits, row items
+/// - `grid-columns.js`: sort, saved views, header, pinning, resizing, column and context menus
+/// - `grid-filters.js`: filter controls
+/// - `grid-cells.js`: row details, cell ranges, copy and paste, column windowing, branches,
+///   row keyboard
+/// - `page.js`: shortcuts, forms, export, language, time zone and theme, WebMCP tools
+/// - `events.js`: event delegation on `document` and start up
+const JS: &str = concat!(
+    include_str!("../assets/zeyn/core.js"),
+    include_str!("../assets/zeyn/grid.js"),
+    include_str!("../assets/zeyn/grid-rows.js"),
+    include_str!("../assets/zeyn/grid-columns.js"),
+    include_str!("../assets/zeyn/grid-filters.js"),
+    include_str!("../assets/zeyn/grid-cells.js"),
+    include_str!("../assets/zeyn/page.js"),
+    include_str!("../assets/zeyn/events.js"),
+);
 const CSS: &str = include_str!("../assets/zeyn.css");
 const NAV: &str = include_str!("../assets/nav.js");
 

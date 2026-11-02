@@ -1,6 +1,6 @@
 # Data Grid
 
-Status: implemented by `zeyn::DataGrid`, the grid endpoints in `zeyn::server` and `assets/zeyn.js`.
+Status: implemented by `zeyn::DataGrid`, the grid endpoints in `zeyn::server` and `assets/zeyn/*.js` (served as `/_zeyn/zeyn.js`).
 
 The grid is rendered on the server. Its rows come from an action that takes a `DataQuery` and
 returns `Page<E>`. The browser runtime asks for pages, sends what the user does (sort, filter,
