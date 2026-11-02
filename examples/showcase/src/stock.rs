@@ -216,6 +216,7 @@ pub fn product_list() -> Screen {
                 .check_icon()
                 .editable()
                 .edit_with(save_product)
+                .exportable()
                 .row_action(t!("stock.restock"), restock_product, |p| p.id)
                 .bulk_action(t!("stock.deactivate"), deactivate_products, Product::id)
                 .row_menu(|p| {

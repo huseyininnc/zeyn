@@ -1004,6 +1004,7 @@ impl App {
             .route("/_zeyn/grid/bulk", post(grid_bulk_call))
             .route("/_zeyn/menu", post(menu_call))
             .route("/_zeyn/grid/edit", post(grid_edit_call))
+            .route("/_zeyn/grid/export", get(grid_export))
             .route("/_zeyn/form", post(form_call))
             .route("/_zeyn/locale", post(set_locale))
             .route("/_zeyn/timezone", post(set_time_zone))
@@ -1650,6 +1651,26 @@ struct GridCall {
 }
 
 #[derive(Deserialize)]
+struct ExportQuery {
+    screen: String,
+    params: Option<String>,
+    node: usize,
+    /// JSON of `{ "sort": [...], "filters": [...], "columns": [...] }`, all optional.
+    q: Option<String>,
+}
+
+/// Body of a streamed export: chunks from a channel.
+struct Chunks(tokio::sync::mpsc::Receiver<Result<axum::body::Bytes, std::io::Error>>);
+
+impl futures_core::Stream for Chunks {
+    type Item = Result<axum::body::Bytes, std::io::Error>;
+
+    fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Option<Self::Item>> {
+        self.0.poll_recv(cx)
+    }
+}
+
+#[derive(Deserialize)]
 struct EditCall {
     screen: String,
     #[serde(default)]
@@ -1977,6 +1998,93 @@ async fn grid_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Js
         Ok(body) => axum::Json(body).into_response(),
         Err(f) => st.error_response(&ctx, f),
     }
+}
+
+/// Streams every row that matches the filters as CSV, page by page through the grid's action,
+/// in the user's column layout and language, up to the grid's export limit. Needs the grid's
+/// read access and its export access; interceptors see the call.
+async fn grid_export(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Query<ExportQuery>) -> Response {
+    let ctx = st.licensed(st.ctx(&headers)).await;
+    let opened = async {
+        let params = match &q.params {
+            None => Json::Null,
+            Some(p) => serde_json::from_str(p).map_err(|_| Failure::App(Error::NotFound))?,
+        };
+        let spec: Json = match &q.q {
+            None => Json::Null,
+            Some(s) if s.len() <= 64 * 1024 => serde_json::from_str(s).map_err(|_| Failure::App(Error::NotFound))?,
+            Some(_) => return Err(Failure::App(Error::NotFound)),
+        };
+        let (_, entry, screen) = st.open(&ctx, &q.screen, params).await?;
+        let grid = screen.nodes().get(q.node).and_then(|n| n.grid()).ok_or(Failure::App(Error::NotFound))?;
+        let access = grid.export_access().ok_or(Failure::App(Error::NotFound))?;
+        if !ctx.identity().can(&grid.action().access) || !ctx.identity().can(&access) {
+            return Err(Failure::App(Error::Forbidden));
+        }
+        let info = Call { kind: CallKind::Grid, screen: entry.meta.name, action: Some(grid.action()), via_agent: ctx.via_agent() };
+        st.before(&ctx, &info)?;
+        Ok((entry, screen, spec, info))
+    }
+    .await;
+    let (entry, screen, spec, info) = match opened {
+        Ok(v) => v,
+        Err(f) => return st.error_response(&ctx, f),
+    };
+    let view: Option<DataGridView> = serde_json::from_value(json!({ "columns": spec.get("columns").cloned().unwrap_or(json!([])) })).ok();
+    let mut query: GridQuery = serde_json::from_value(json!({
+        "sort": spec.get("sort").cloned().unwrap_or(json!([])),
+        "filters": spec.get("filters").cloned().unwrap_or(json!([])),
+    }))
+    .unwrap_or_default();
+    query.with_total = false;
+    let name = entry.meta.name;
+    let node = q.node;
+    let (tx, rx) = tokio::sync::mpsc::channel(4);
+    let state = st.clone();
+    tokio::spawn(async move {
+        let started = Instant::now();
+        let Some(grid) = screen.nodes().get(node).and_then(|n| n.grid()) else { return };
+        let view = view.map(|v| grid.clean_view(v));
+        let r = Render::new(name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity());
+        let head = format!("\u{feff}{}", grid.csv_head(&r, view.as_ref()));
+        if tx.send(Ok(head.into())).await.is_err() {
+            return;
+        }
+        let limit = grid.export_limit();
+        let mut sent = 0usize;
+        let mut outcome: Result<(), Failure> = Ok(());
+        while sent < limit {
+            let size = (limit - sent).min(crate::action::MAX_PAGE_SIZE as usize) as u32;
+            let mut q = query.clone();
+            q.page = crate::action::PageRequest::Offset { offset: sent as u64, limit: size };
+            let mut page = match state.timed(grid.fetch(ctx.clone(), q)).await {
+                Ok(p) => p,
+                Err(f) => {
+                    outcome = Err(f);
+                    let _ = tx.send(Err(std::io::Error::other("export failed"))).await;
+                    break;
+                }
+            };
+            page.view = view.clone();
+            let n = page.count;
+            if n > 0 && tx.send(Ok(grid.csv_rows(&page, &r).into())).await.is_err() {
+                break;
+            }
+            sent += n;
+            if n < size as usize {
+                break;
+            }
+        }
+        state.after(&ctx, &info, started, &outcome);
+    });
+    let mut response = axum::body::Body::from_stream(Chunks(rx)).into_response();
+    let h = response.headers_mut();
+    h.insert(header::CONTENT_TYPE, HeaderValue::from_static("text/csv; charset=utf-8"));
+    h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    if let Ok(v) = HeaderValue::from_str(&format!("attachment; filename=\"{name}.csv\"")) {
+        h.insert(header::CONTENT_DISPOSITION, v);
+    }
+    response
 }
 
 async fn grid_edit_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(call): axum::Json<EditCall>) -> Response {

@@ -196,6 +196,29 @@ pub trait GridSource: Send + Sync {
         None
     }
 
+    /// Who may export the whole filtered result as CSV; `None` when the grid offers no export.
+    fn export_access(&self) -> Option<crate::action::Access> {
+        None
+    }
+
+    /// Most rows one export may hold.
+    fn export_limit(&self) -> usize {
+        0
+    }
+
+    /// Header line of a CSV export in a view, with the user's labels.
+    fn csv_head(&self, r: &Render, view: Option<&crate::grid::DataGridView>) -> String {
+        let _ = (r, view);
+        String::new()
+    }
+
+    /// CSV lines of a loaded page in its view: values as the user reads them, in the user's
+    /// language, with spreadsheet formulas defused.
+    fn csv_rows(&self, page: &LoadedPage, r: &Render) -> String {
+        let _ = (page, r);
+        String::new()
+    }
+
     /// Builds the call of a row item (`a0` for the first row action) from the loaded row with
     /// this key. `None` when the row is not there or the item does not exist for it.
     fn row_call(&self, page: &LoadedPage, key: &str, item: &str) -> Option<RowCall> {

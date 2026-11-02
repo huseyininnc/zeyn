@@ -378,6 +378,45 @@ pub struct Grid<E: Model> {
     bulk: Vec<BulkDef>,
     row_menu: Option<MenuFn<E>>,
     save: Option<SaveDef<E>>,
+    export: Option<(crate::action::Access, usize)>,
+}
+
+/// Most rows a CSV export holds unless the grid sets another limit.
+pub const DEFAULT_EXPORT_LIMIT: usize = 100_000;
+
+/// Quotes one CSV cell (RFC 4180) and defuses spreadsheet formulas in text that is not a number.
+fn csv_cell(value: &str) -> String {
+    let numeric = |s: &str| !s.is_empty() && s.chars().all(|c| c.is_ascii_digit() || ".,- +".contains(c));
+    let mut v = value.to_string();
+    if v.starts_with(['=', '+', '-', '@', '\t', '\r']) && !numeric(&v) {
+        v.insert(0, '\'');
+    }
+    if v.contains([',', '"', '\r', '\n']) { format!("\"{}\"", v.replace('"', "\"\"")) } else { v }
+}
+
+/// A value as plain text the user reads: money with the symbol, dates in the locale, choices by
+/// label, yes and no in the user's language.
+fn plain(value: &Value, kind: &FieldKind, r: &Render) -> String {
+    match value {
+        Value::Null => String::new(),
+        Value::Bool(b) => r.i18n.text(r.locale, &Text::key(if *b { "zeyn.yes" } else { "zeyn.no" })),
+        Value::Int(n) => n.to_string(),
+        Value::Text(s) => s.clone(),
+        Value::Money(m) => m.format(r.locale),
+        Value::Date(d) => d.format(r.locale),
+        Value::Time(t) => t.format(r.locale),
+        Value::LocalDateTime(l) => l.format(r.locale),
+        Value::DateTime(d) => d.format(r.tz, r.locale),
+        Value::Decimal(x) => format!("{x:.2}"),
+        Value::Choice(c) => match kind {
+            FieldKind::Choice(options) => options
+                .iter()
+                .find(|o| o.value == *c)
+                .map(|o| r.i18n.text(r.locale, &Text::key_or(o.key, o.label)))
+                .unwrap_or_else(|| c.to_string()),
+            _ => c.to_string(),
+        },
+    }
 }
 
 type SaveRun<E> = Box<dyn Fn(Valid<E>) -> Box<dyn FnOnce(Ctx) -> BoxFuture<Result<()>> + Send> + Send + Sync>;
@@ -417,7 +456,31 @@ impl<E: Model> Grid<E> {
             bulk: Vec::new(),
             row_menu: None,
             save: None,
+            export: None,
         }
+    }
+
+    /// Lets users export every row that matches their filters as CSV, in their column layout and
+    /// language. The server pages through the grid's action and streams the file, up to
+    /// [`DEFAULT_EXPORT_LIMIT`] rows. Exporting needs the grid's read access. The toolbar's
+    /// `Export::Csv` button uses this export when the grid has it.
+    pub fn exportable(mut self) -> Self {
+        self.export = Some((self.action.access, DEFAULT_EXPORT_LIMIT));
+        self
+    }
+
+    /// Like `exportable`, but exporting also needs `permission`.
+    pub fn export_permission(mut self, permission: &'static str) -> Self {
+        let limit = self.export.map_or(DEFAULT_EXPORT_LIMIT, |e| e.1);
+        self.export = Some((crate::action::Access::Permission(permission), limit));
+        self
+    }
+
+    /// Most rows one export may hold; bigger results are cut there. At most 1,000,000.
+    pub fn export_limit(mut self, rows: usize) -> Self {
+        let access = self.export.map_or(self.action.access, |e| e.0);
+        self.export = Some((access, rows.clamp(1, 1_000_000)));
+        self
     }
 
     /// Lets users edit cells of the columns marked `editable()` in place, saved with `save`, an
@@ -865,6 +928,9 @@ impl<E: Model> Grid<E> {
         if page.is_some_and(|p| p.saved_views) {
             out.push_str(r#" data-zeyn-views="server""#);
         }
+        if self.export.is_some_and(|e| r.can(&e.0)) {
+            out.push_str(r#" data-zeyn-export="csv""#);
+        }
         if self.can_edit(r) {
             if let Some(v) = E::fields().iter().find(|f| f.version) {
                 out.push_str(&format!(r#" data-zeyn-version-field="{}""#, v.name));
@@ -1037,6 +1103,39 @@ impl<E: Model> GridSource for Grid<E> {
             .downcast_ref::<Vec<E>>()
             .map(|rows| rows.iter().filter_map(|r| r.value_at(i)).filter_map(|v| serde_json::to_value(v).ok()).collect())
             .unwrap_or_default()
+    }
+
+    fn export_access(&self) -> Option<crate::action::Access> {
+        self.export.map(|e| e.0)
+    }
+
+    fn export_limit(&self) -> usize {
+        self.export.map_or(0, |e| e.1)
+    }
+
+    fn csv_head(&self, r: &Render, view: Option<&DataGridView>) -> String {
+        let cols = self.layout(view);
+        let line: Vec<String> =
+            cols.iter().map(|s| csv_cell(&r.i18n.text(r.locale, &self.columns[s.index].meta.label_text()))).collect();
+        format!("{}\r\n", line.join(","))
+    }
+
+    fn csv_rows(&self, page: &LoadedPage, r: &Render) -> String {
+        let cols = self.layout(page.view.as_ref());
+        let Some(rows) = page.items.downcast_ref::<Vec<E>>() else { return String::new() };
+        let mut out = String::new();
+        for row in rows {
+            let line: Vec<String> = cols
+                .iter()
+                .map(|s| {
+                    let c = &self.columns[s.index];
+                    csv_cell(&plain(&(c.value)(row), &c.meta.kind, r))
+                })
+                .collect();
+            out.push_str(&line.join(","));
+            out.push_str("\r\n");
+        }
+        out
     }
 
     fn edit_call(
@@ -1441,6 +1540,10 @@ impl<E: Model, T> GridColumn<E, T> {
 
     pub fn row_menu(self, menu: impl Fn(&E) -> crate::menu::ContextMenu + Send + Sync + 'static) -> Grid<E> {
         self.grid.row_menu(menu)
+    }
+
+    pub fn exportable(self) -> Grid<E> {
+        self.grid.exportable()
     }
 
     pub fn edit_with<A>(self, save: A) -> Grid<E>

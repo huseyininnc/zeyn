@@ -525,6 +525,7 @@ name = "zeyn"
 version = "0.0.1"
 dependencies = [
  "axum",
+ "futures-core",
  "getrandom",
  "http-body-util",
  "serde",

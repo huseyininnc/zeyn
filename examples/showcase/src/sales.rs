@@ -129,10 +129,11 @@ pub fn today() -> Screen {
 
 #[screen(route = "/archive", permission = "sales.order.read")]
 pub fn archive() -> Screen {
-    Screen::new(t!("sales.archive")).body(
+    Screen::new(t!("sales.archive")).toolbar(|t| t.export(Export::Csv)).body(
         Grid::of(search_archive)
             .mode(GridMode::Server)
             .paging(Paging::virtual_scroll())
+            .exportable()
             .column(Order::id)
             .width(110)
             .column(Order::placed_at)

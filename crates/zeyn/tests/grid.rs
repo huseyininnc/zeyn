@@ -873,3 +873,71 @@ async fn inline_edit_refuses_read_only_and_unknown_columns_and_missing_permissio
     let row = store.0.read().unwrap()[2].clone();
     assert_eq!((row.note.as_str(), row.qty, row.code.as_str()), ("note 3", 3, "C-03"));
 }
+
+#[screen(route = "/export", permission = "items.read")]
+pub fn export_list() -> Screen {
+    Screen::new("Export")
+        .body(Grid::of(search).paging(Paging::pages(5)).column(Item::code).filter().column(Item::kind).column(Item::price).column(Item::active).exportable())
+        .body(Grid::of(search).column(Item::code).done().export_permission("items.export").export_limit(7))
+        .body(Grid::of(search).column(Item::code))
+}
+
+fn export_router(identity: Identity) -> (Router, Store) {
+    let store = Store::seeded();
+    store.0.write().unwrap()[0].code = "=HYPERLINK(\"x\")".into();
+    let router = App::new("Test")
+        .service(store.clone())
+        .i18n(I18n::new("en").catalog("tr", r#"{ "Item": { "code": "Kod" }, "Kind": { "Tool": "Alet" } }"#).unwrap())
+        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .feature(Feature::new("items").screen(export_list))
+        .router()
+        .unwrap();
+    (router, store)
+}
+
+fn export_get(node: usize, q: serde_json::Value, locale: &str) -> Request<Body> {
+    let q = q.to_string();
+    let enc: String = q.bytes().map(|b| if b.is_ascii_alphanumeric() { (b as char).to_string() } else { format!("%{b:02X}") }).collect();
+    Request::get(format!("/_zeyn/grid/export?screen=export_list&node={node}&q={enc}"))
+        .header("x-user", "1")
+        .header(header::COOKIE, format!("zeyn_locale={locale}"))
+        .body(Body::empty())
+        .unwrap()
+}
+
+#[tokio::test]
+async fn export_streams_every_matching_row_in_the_users_layout_and_language() {
+    let (router, _) = export_router(reader());
+    let q = serde_json::json!({ "filters": [{ "field": "code", "starts_with": "C-1" }], "sort": [{ "field": "price", "desc": true }], "columns": [{ "field": "price" }, { "field": "code" }, { "field": "kind" }, { "field": "nope" }] });
+    let r = send(&router, export_get(0, q, "tr")).await;
+    assert_eq!(r.status, StatusCode::OK);
+    assert!(r.headers.get(header::CONTENT_TYPE).unwrap().to_str().unwrap().starts_with("text/csv"));
+    assert!(r.headers.get(header::CONTENT_DISPOSITION).unwrap().to_str().unwrap().contains("export_list.csv"));
+    let lines: Vec<&str> = r.body.trim_start_matches('\u{feff}').lines().collect();
+    assert_eq!(lines[0], "Price,Kod,Kind");
+    assert_eq!(lines.len(), 11, "every C-1x row, not only the first page of 5");
+    assert_eq!(lines[1], "\"190,00 ₺\",C-19,Part");
+    assert!(lines.iter().any(|l| l.ends_with(",Alet")));
+}
+
+#[tokio::test]
+async fn export_defuses_formulas_and_respects_the_limit_and_permissions() {
+    let (router, _) = export_router(reader());
+    let r = send(&router, export_get(0, serde_json::json!({}), "en")).await;
+    assert!(r.body.contains("\"'=HYPERLINK(\"\"x\"\")\""), "{}", &r.body[..200]);
+    assert_eq!(send(&router, export_get(1, serde_json::json!({}), "en")).await.status, StatusCode::FORBIDDEN);
+    assert_eq!(send(&router, export_get(2, serde_json::json!({}), "en")).await.status, StatusCode::NOT_FOUND);
+    let (router, _) = export_router(Identity::user("x").with_permissions(["items.read", "items.export"]));
+    let r = send(&router, export_get(1, serde_json::json!({}), "en")).await;
+    assert_eq!(r.status, StatusCode::OK);
+    assert_eq!(r.body.lines().count(), 8, "header and the limit of 7 rows");
+    let (router, _) = export_router(Identity::user("x"));
+    assert_eq!(send(&router, export_get(0, serde_json::json!({}), "en")).await.status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn exportable_grids_tell_the_runtime() {
+    let (router, _) = export_router(reader());
+    let r = send(&router, get("/export")).await;
+    assert_eq!(r.body.matches(r#"data-zeyn-export="csv""#).count(), 1, "the second needs items.export");
+}

@@ -2004,6 +2004,21 @@ async function submitForm(form, submitter) {
   }
 }
 
+/**
+ * Downloads the whole filtered result from `GET /_zeyn/grid/export`, which streams it page by
+ * page. Sends the sort, filters and column layout the user sees.
+ */
+function exportServer(grid) {
+  const s = grids.get(grid);
+  const a = address(grid);
+  const q = JSON.stringify({ sort: s?.sort ?? [], filters: s ? filterList(s) : [], columns: s?.columns ?? [] });
+  const params = a.params == null ? '' : `&params=${encodeURIComponent(JSON.stringify(a.params))}`;
+  const link = document.createElement('a');
+  link.href = `${BASE}/_zeyn/grid/export?screen=${encodeURIComponent(a.screen)}&node=${a.node}${params}&q=${encodeURIComponent(q)}`;
+  link.download = '';
+  link.click();
+}
+
 /** Quotes one CSV cell (RFC 4180) and defuses spreadsheet formulas in non numeric text. */
 function csvCell(value) {
   let v = value;
@@ -2013,6 +2028,8 @@ function csvCell(value) {
 
 /** Downloads the rows loaded in the screen's first grid as CSV; XLSX is not available yet. */
 function exportGrid(button) {
+  const first = screenOf(button)?.querySelector('[data-zeyn-grid]');
+  if (button.dataset.zeynExport === 'csv' && first?.dataset.zeynExport === 'csv') return exportServer(first);
   if (button.dataset.zeynExport === 'xlsx') return toast('XLSX export is not available yet.');
   const screen = screenOf(button);
   const grid = screen?.querySelector('[data-zeyn-grid]');
