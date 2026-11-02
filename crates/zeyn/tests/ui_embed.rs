@@ -1,5 +1,5 @@
-//! Content from other sites: `Embed` frames, the `#[rule(embed)]` field rule, and the content
-//! security policy they read.
+//! Content from other sites: `Embed` frames, the `#[rule(embed)]` field rule, `Image`,
+//! `ExternalLink`, and the content security policy they read.
 
 use axum::body::Body;
 use axum::http::{Request, header};
@@ -7,7 +7,7 @@ use http_body_util::BodyExt;
 use std::sync::Arc;
 use tower::ServiceExt;
 use zeyn::prelude::*;
-use zeyn::ui::{EMBED_SANDBOX, Embed, EmbedPermission};
+use zeyn::ui::{EMBED_SANDBOX, Embed, EmbedPermission, ExternalLink, Image};
 use zeyn::{Component, Csp, Identity, Render, Rule, Services, embed_url};
 
 fn ctx(csp: Csp) -> Ctx {
@@ -175,4 +175,58 @@ async fn api_inputs_with_an_unlisted_embed_host_are_refused() {
     assert_ne!(refused.status(), 200);
     let body = String::from_utf8(refused.into_body().collect().await.unwrap().to_bytes().to_vec()).unwrap();
     assert!(body.contains("evil.example.com"), "{body}");
+}
+
+#[test]
+fn images_render_with_size_alt_and_async_decoding() {
+    let img = Image::new("https://i.example.com/logo.png").alt("Northwind logo").size(240, 80).lazy().srcset([
+        ("https://i.example.com/logo@2x.png", "2x"),
+        ("https://other.test/logo@3x.png", "3x"),
+        ("https://i.example.com/a.png", "2x, https://other.test/b.png 3x"),
+        ("https://i.example.com/w.png", "800w"),
+    ]);
+    let out = html(&img, &ctx(frames()));
+    assert!(out.starts_with(r#"<img class="z-image" src="https://i.example.com/logo.png" alt="Northwind logo" width="240" height="80" decoding="async" loading="lazy""#), "{out}");
+    assert!(out.contains(r#"srcset="https://i.example.com/logo@2x.png 2x, https://i.example.com/w.png 800w" sizes="(max-width: 240px) 100vw, 240px""#), "{out}");
+    assert!(!out.contains("other.test"), "{out}");
+    let local = html(&Image::new("/static/logo.png").size(10, 10).alt("Logo"), &ctx(Csp::new()));
+    assert!(local.contains(r#"src="/static/logo.png""#) && !local.contains("loading=") && !local.contains("srcset"));
+}
+
+#[test]
+fn images_from_unlisted_hosts_show_their_alt_text() {
+    for src in [
+        "https://other.test/x.png",
+        "http://i.example.com/x.png",
+        "javascript:alert(1)",
+        "//other.test/x.png",
+        "data:image/svg+xml,<svg onload=alert(1)>",
+    ] {
+        let out = html(&Image::new(src).alt("A <b>chart</b>").size(10, 10), &ctx(frames()));
+        assert_eq!(
+            out, r#"<span class="z-image-blocked" data-testid="s.image">A &lt;b&gt;chart&lt;/b&gt;</span>"#,
+            "{src}"
+        );
+    }
+}
+
+#[test]
+fn external_links_never_hand_over_the_window() {
+    let r = Render::english("s");
+    let plain = ExternalLink::new("https://example.com/help", "Help").html(&r);
+    assert_eq!(
+        plain,
+        r#"<a class="z-link-external" href="https://example.com/help" rel="noopener noreferrer" data-testid="s.link">Help<span class="z-sr-only"> (external site)</span><span class="z-link-external-icon" aria-hidden="true">&#8599;</span></a>"#
+    );
+    let user = ExternalLink::new("https://example.org/?a=1&b=2", "Site").user_content().new_tab().html(&r);
+    assert!(user.contains(r#"href="https://example.org/?a=1&amp;b=2""#), "{user}");
+    assert!(user.contains(r#"rel="noopener noreferrer nofollow ugc" target="_blank""#), "{user}");
+    assert!(user.contains("(external site, opens in a new tab)"));
+    for bad in ["javascript:alert(1)", "data:text/html,x", "/local", "https://", "https://a b.test"] {
+        let out = ExternalLink::new(bad, "x").html(&r);
+        assert_eq!(out, r#"<span class="z-link-text">x</span>"#, "{bad}");
+    }
+    let tr = zeyn::I18n::builtin();
+    let out = ExternalLink::new("https://example.com", "Yardım").new_tab().html(&Render::new("s", "tr", tr));
+    assert!(out.contains("(dış site, yeni sekmede açılır)"), "{out}");
 }

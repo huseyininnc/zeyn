@@ -324,6 +324,10 @@
       "empty": "Nothing here yet.",
       "breadcrumb": "Breadcrumb",
       "dismiss": "Dismiss",
+      "link": {
+        "external": "external site",
+        "external_new_tab": "external site, opens in a new tab"
+      },
       "embed": {
         "blocked": "{title} cannot be shown here: its site is not on the list of sites this app may embed.",
         "load": "Load {title}",

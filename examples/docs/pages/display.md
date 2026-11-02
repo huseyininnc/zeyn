@@ -95,6 +95,33 @@ pub struct Video {
 }
 ```
 
+## Image
+
+`Image` needs its alt text and its size; without `.alt(...)` and `.size(width, height)` it cannot be placed and the compiler says so. The size keeps the space while the file loads, so the page does not move.
+
+```rust
+Image::new("https://images.example.com/logo.png")
+    .alt(t!("brand.logo"))
+    .size(240, 80)
+    .lazy()
+    .srcset([("https://images.example.com/logo@2x.png", "2x")])
+```
+
+- `src` is a path on the app (`/static/logo.png`) or an `https` address on a host of the app's `img-src` (`App::csp(|c| c.img_src([...]))`). Any other image is not rendered and its alt text is shown instead, so the browser never logs a blocked request.
+- Every image gets `decoding="async"`; `.lazy()` adds `loading="lazy"` for images below the fold. `srcset` takes density (`2x`) or width (`800w`) descriptors; entries on other hosts or with other descriptors are left out. Width descriptors add `sizes` from the image width.
+- A purely decorative image takes an empty alt text: `.alt(Text::from(""))`.
+
+## ExternalLink
+
+`ExternalLink::new(url, text)` links to another site with `rel="noopener noreferrer"`, so the other site gets neither the page address nor a handle on the window. Screen readers hear "external site" after the text; an arrow marks it visually.
+
+```rust
+ExternalLink::new("https://example.com/help", t!("help.center")).new_tab()
+ExternalLink::new(customer.website.clone(), t!("customer.website")).user_content()
+```
+
+`.user_content()` adds `nofollow ugc` for addresses users typed. `.new_tab()` opens a new tab and says so to screen readers; links stay in the same tab unless set. Only `https` and `http` addresses become links; anything else, such as `javascript:`, is shown as plain text.
+
 ## Tooltip, popover and busy overlay
 
 A tooltip is a short description of one control: `ActionButton::tip(text)`, `ToolButton::tip(text)` in a screen toolbar and `Form::tip(field, text)`, which adds an info button after the field's label. The text is the control's `aria-describedby`, so screen readers hear it with the control. It shows after a short hover and at once on focus, stays while the pointer is over it (WCAG 1.4.13), hides with Escape without moving focus, and shows on touch after a long press (a tap on the info button). A tooltip never carries information the user must have: put that in the label, the field's rules or the page.

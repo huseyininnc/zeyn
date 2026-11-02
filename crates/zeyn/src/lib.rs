@@ -500,9 +500,9 @@ pub mod prelude {
     pub use crate::Agents;
     pub use crate::ui::{
         ActionButton, Alert, Audio, Badge, Breadcrumb, Busy, Card, Chart, Control, DateOptions, DescriptionList, Dock,
-        Embed, EmbedPermission, EmptyState, Kpi, LookupItem, LookupQuery, MenuBar, MenuButton, Panel, Popover,
-        Progress, PropertyInspector, Row, Skeleton, Split, Stack, StatusBar, Tabs, Timeline, Toolbox, Tree, TreeItem,
-        TreeQuery, Video,
+        Embed, EmbedPermission, EmptyState, ExternalLink, Image, Kpi, LookupItem, LookupQuery, MenuBar, MenuButton,
+        Panel, Popover, Progress, PropertyInspector, Row, Skeleton, Split, Stack, StatusBar, Tabs, Timeline, Toolbox,
+        Tree, TreeItem, TreeQuery, Video,
     };
     pub use crate::{
         Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime, Decimal, Effect,

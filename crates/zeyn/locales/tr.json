@@ -324,6 +324,10 @@
       "empty": "Henüz kayıt yok.",
       "breadcrumb": "Konum",
       "dismiss": "Kapat",
+      "link": {
+        "external": "dış site",
+        "external_new_tab": "dış site, yeni sekmede açılır"
+      },
       "embed": {
         "blocked": "{title} burada gösterilemiyor: sitesi bu uygulamanın gömebileceği siteler listesinde yok.",
         "load": "{title} içeriğini yükle",

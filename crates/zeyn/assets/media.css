@@ -420,3 +420,23 @@
   outline: 2px solid var(--z-focus);
   outline-offset: -4px;
 }
+
+.z-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--z-radius);
+}
+
+.z-image-blocked {
+  display: inline-block;
+  padding: var(--z-space) calc(var(--z-space) * 2);
+  border: 1px dashed var(--z-border-strong);
+  border-radius: var(--z-radius);
+  color: var(--z-text-muted);
+}
+
+.z-link-external-icon {
+  margin-inline-start: 0.15em;
+  font-size: 0.85em;
+}
