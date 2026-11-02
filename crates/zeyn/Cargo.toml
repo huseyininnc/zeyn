@@ -135,5 +135,13 @@ name = "accounts"
 required-features = ["accounts"]
 
 [[test]]
+name = "accounts_passkeys"
+required-features = ["accounts"]
+
+[[test]]
+name = "accounts_sql"
+required-features = ["accounts", "postgres"]
+
+[[test]]
 name = "mail"
 required-features = ["email"]

@@ -566,6 +566,22 @@ async fn sign_in_attempts_are_rate_limited_per_account() {
 }
 
 #[tokio::test]
+async fn external_logins_link_sign_in_and_never_unlink_the_last_way_in() {
+    let a = accounts();
+    let mut linked = a.users().create(User::new("ext@example.com").with_email("ext@example.com"), None).await.unwrap();
+    let login = accounts::UserLogin { provider: "keycloak".into(), provider_key: "sub-42".into(), display_name: None };
+    a.users().add_login(&mut linked, login.clone()).await.unwrap();
+    let mut other = user(&a, "other@example.com").await;
+    assert!(a.users().add_login(&mut other, login).await.is_err(), "one provider key belongs to one user");
+    assert_eq!(a.sign_in().external_login_sign_in("keycloak", "sub-42", false).await.unwrap(), SignInResult::Succeeded);
+    assert_eq!(a.sign_in().external_login_sign_in("keycloak", "sub-unknown", false).await.unwrap(), SignInResult::Failed);
+    assert!(a.users().remove_login(&mut linked, "keycloak", "sub-42").await.is_err(), "the last way to sign in stays");
+    a.users().add_password(&mut linked, "Another-123").await.unwrap();
+    a.users().remove_login(&mut linked, "keycloak", "sub-42").await.unwrap();
+    assert!(a.users().find_by_login("keycloak", "sub-42").await.unwrap().is_none());
+}
+
+#[tokio::test]
 async fn manage_info_never_returns_hashes_or_stamps() {
     let a = accounts();
     let u = user(&a, "info@example.com").await;
