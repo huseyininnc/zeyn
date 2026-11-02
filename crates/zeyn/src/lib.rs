@@ -173,6 +173,7 @@ mod screen;
 #[cfg(feature = "server")]
 mod security;
 mod time;
+pub mod ui;
 #[cfg(feature = "server")]
 pub mod server;
 mod value;
@@ -223,6 +224,7 @@ pub use serde_json as __serde_json;
 
 /// Everything application code needs: `use zeyn::prelude::*;`
 pub mod prelude {
+    pub use crate::ui::{Card, Panel, Row, Split, Stack, Tabs};
     pub use crate::{
         Action, Ctx, Currency, Date, DateTime, Effect, LocalDateTime, Time, TimeZone, Entity, Error, Export, Feature, Field, Form, Grid, GridMode, GridQuery,
         GuardResult, Icon, Identity, Licensed, Model, Secret, Tenant, TenantRequired, Money, Node, Page, Paging, Result, RowStyle, Screen, ScreenDef, Service,

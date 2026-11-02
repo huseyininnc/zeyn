@@ -57,11 +57,15 @@ pub struct Render<'a> {
     pub i18n: &'a crate::i18n::I18n,
     /// Zone in which moments (`DateTime`) are shown.
     pub tz: crate::time::TimeZone,
+    /// Path of the node being rendered, such as `1.0.2`; empty outside a node.
+    pub path: &'a str,
+    /// First pages of grids loaded before rendering, by node path.
+    pub loaded: Option<&'a std::collections::HashMap<String, crate::screen::LoadedPage>>,
 }
 
 impl<'a> Render<'a> {
     pub fn new(scope: &'a str, locale: &'a str, i18n: &'a crate::i18n::I18n) -> Self {
-        Self { scope, locale, i18n, tz: crate::time::TimeZone::UTC }
+        Self { scope, locale, i18n, tz: crate::time::TimeZone::UTC, path: "", loaded: None }
     }
 
     pub fn with_tz(mut self, tz: crate::time::TimeZone) -> Self {
@@ -71,7 +75,7 @@ impl<'a> Render<'a> {
 
     /// English with the built in catalogs. For tests and tools.
     pub fn english(scope: &'a str) -> Render<'a> {
-        Render { scope, locale: "en", i18n: crate::i18n::I18n::builtin(), tz: crate::time::TimeZone::UTC }
+        Render::new(scope, "en", crate::i18n::I18n::builtin())
     }
 
     /// Resolves a text and escapes it for HTML.

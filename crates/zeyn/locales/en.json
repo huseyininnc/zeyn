@@ -13,7 +13,8 @@
       "min": "{label} must be at least {n}.",
       "max": "{label} must be at most {n}.",
       "format": "{label} has an invalid value.",
-      "skipped_time": "{label}: this time does not exist in your time zone because the clocks changed."
+      "skipped_time": "{label}: this time does not exist in your time zone because the clocks changed.",
+      "line": "Line {n}: {message}"
     },
     "error": {
       "forbidden": "You are not allowed to do this.",
@@ -35,9 +36,41 @@
       "range_total": "{from}-{to} of {total}",
       "loaded": "{count} rows loaded",
       "empty": "No records.",
-      "filter": {"filter": "Filter {label}", "from": "From", "to": "To", "all": "All", "contains": "Contains", "starts_with": "Starts with", "equals": "Equals", "match": "Match", "selected": "{n} selected", "clear": "Clear filter", "sorted": "Sort order {n}"},
-      "menu": {"options": "Column options: {label}", "resize": "Resize {label}", "sort_asc": "Sort ascending", "sort_desc": "Sort descending", "sort_clear": "Clear sort", "pin_start": "Pin to start", "pin_end": "Pin to end", "unpin": "Unpin", "move_prev": "Move left", "move_next": "Move right", "hide": "Hide column", "columns": "Columns", "reset": "Reset view"},
-      "agg": { "sum": "Sum", "avg": "Average", "min": "Min", "max": "Max", "count": "Count" }
+      "filter": {
+        "filter": "Filter {label}",
+        "from": "From",
+        "to": "To",
+        "all": "All",
+        "contains": "Contains",
+        "starts_with": "Starts with",
+        "equals": "Equals",
+        "match": "Match",
+        "selected": "{n} selected",
+        "clear": "Clear filter",
+        "sorted": "Sort order {n}"
+      },
+      "menu": {
+        "options": "Column options: {label}",
+        "resize": "Resize {label}",
+        "sort_asc": "Sort ascending",
+        "sort_desc": "Sort descending",
+        "sort_clear": "Clear sort",
+        "pin_start": "Pin to start",
+        "pin_end": "Pin to end",
+        "unpin": "Unpin",
+        "move_prev": "Move left",
+        "move_next": "Move right",
+        "hide": "Hide column",
+        "columns": "Columns",
+        "reset": "Reset view"
+      },
+      "agg": {
+        "sum": "Sum",
+        "avg": "Average",
+        "min": "Min",
+        "max": "Max",
+        "count": "Count"
+      }
     },
     "export": {
       "xlsx": "Export to Excel",
@@ -49,6 +82,61 @@
       "language": "Language",
       "time_zone": "Time zone",
       "time_zone_auto": "Automatic (this device)"
+    },
+    "ui": {
+      "resize": "Resize panes",
+      "loading": "Loading…",
+      "load_failed": "Could not load this part. Try again.",
+      "date": {
+        "open": "Choose date",
+        "dialog": "Choose a date",
+        "prev_month": "Previous month",
+        "next_month": "Next month",
+        "prev_year": "Previous year",
+        "next_year": "Next year",
+        "today": "Today",
+        "format": "Format: {format}"
+      },
+      "lookup": {
+        "open": "Show options",
+        "no_results": "No matches.",
+        "results": "{count} results",
+        "remove": "Remove {label}",
+        "more": "Show more",
+        "selected": "Selected"
+      },
+      "lines": {
+        "add": "Add line",
+        "remove": "Remove line {n}",
+        "up": "Move line {n} up",
+        "down": "Move line {n} down",
+        "row": "Line {n}",
+        "total": "Total",
+        "actions": "Actions",
+        "empty": "No lines yet."
+      },
+      "confirm": {
+        "title": "Please confirm",
+        "ok": "Confirm",
+        "cancel": "Cancel"
+      },
+      "empty": "Nothing here yet.",
+      "breadcrumb": "Breadcrumb",
+      "dismiss": "Dismiss",
+      "steps": {
+        "progress": "Step {n} of {total}",
+        "next": "Next",
+        "back": "Back",
+        "done": "Completed",
+        "current": "Current step"
+      },
+      "chart": {
+        "data": "Show data",
+        "table": "Data for {title}"
+      },
+      "tree": {
+        "empty": "No items."
+      }
     }
   }
 }

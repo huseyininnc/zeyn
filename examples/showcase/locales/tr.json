@@ -7,7 +7,8 @@
     "stock": "Stok",
     "sales": "Satış",
     "people": "İnsan kaynakları",
-    "gallery": "Bileşenler"
+    "gallery": "Bileşenler",
+    "ui": "Bileşen kütüphanesi"
   },
   "dashboard": {
     "title": "Genel bakış",
@@ -101,5 +102,19 @@
     "Low": "Düşük",
     "Normal": "Normal",
     "High": "Yüksek"
+  },
+  "ui": {
+    "layout": "Yerleşim",
+    "card_orders": "Siparişler",
+    "card_stock": "Stok",
+    "card_people": "Personel",
+    "card_hint": "Kartlar ilgili içeriği bir arada tutar",
+    "card_detail": "Seçili ürün",
+    "panel_products": "Ürünler",
+    "panel_collapsed": "Diğer ayrıntılar",
+    "tabs_label": "Ürün görünümleri",
+    "tab_all": "Tüm ürünler",
+    "tab_split": "Bölünmüş görünüm",
+    "tab_columns": "İki sütun"
   }
 }

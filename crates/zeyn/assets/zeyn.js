@@ -97,10 +97,10 @@ function paramsOf(screen) {
   }
 }
 
-/** Returns the node index of the closest `[data-zeyn-node]`, or `null`. */
+/** Returns the node path (`"0"`, `"1.0.2"`) of the closest `[data-zeyn-node]`, or `null`. */
 function nodeOf(el) {
   const node = el.closest('[data-zeyn-node]');
-  return node ? Number(node.dataset.zeynNode) : null;
+  return node ? node.dataset.zeynNode : null;
 }
 
 /** Common request fields: screen name, params and node of an element. */

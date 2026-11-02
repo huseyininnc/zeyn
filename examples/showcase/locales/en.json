@@ -7,7 +7,8 @@
     "stock": "Stock",
     "sales": "Sales",
     "people": "People",
-    "gallery": "Components"
+    "gallery": "Components",
+    "ui": "Component library"
   },
   "dashboard": {
     "title": "Overview",
@@ -101,5 +102,19 @@
     "Low": "Low",
     "Normal": "Normal",
     "High": "High"
+  },
+  "ui": {
+    "layout": "Layout",
+    "card_orders": "Orders",
+    "card_stock": "Stock",
+    "card_people": "People",
+    "card_hint": "Cards group related content",
+    "card_detail": "Selected product",
+    "panel_products": "Products",
+    "panel_collapsed": "More details",
+    "tabs_label": "Product views",
+    "tab_all": "All products",
+    "tab_split": "Split view",
+    "tab_columns": "Two columns"
   }
 }

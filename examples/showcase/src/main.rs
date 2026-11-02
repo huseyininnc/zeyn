@@ -11,6 +11,7 @@ mod overview;
 mod people;
 mod sales;
 mod stock;
+mod ui;
 
 use std::time::Duration;
 use zeyn::prelude::*;
@@ -73,6 +74,7 @@ async fn main() -> std::io::Result<()> {
         .feature(sales::feature())
         .feature(people::feature())
         .feature(gallery::feature())
+        .feature(ui::feature())
         .serve(&addr)
         .await
 }

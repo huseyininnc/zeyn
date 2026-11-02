@@ -1,0 +1,265 @@
+/**
+ * Zeyn component library styles.
+ *
+ * Loaded after zeyn.css and read only its tokens (docs/theming.md), so themes, dark mode and
+ * density apply here too. Inline styles in the markup only set custom properties:
+ * --z-flex (row column weight), --z-stack-gap, --z-split, --z-progress.
+ */
+
+:root {
+  --z-chart-1: #0f6674;
+  --z-chart-2: #b35a00;
+  --z-chart-3: #5b4bb7;
+  --z-chart-4: #2e7d32;
+  --z-chart-5: #b0306a;
+  --z-chart-6: #4a5866;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --z-chart-1: #5cc4d1;
+    --z-chart-2: #f0a95a;
+    --z-chart-3: #a99cf0;
+    --z-chart-4: #7fcf86;
+    --z-chart-5: #ee86b5;
+    --z-chart-6: #aeb9c4;
+  }
+}
+
+:root[data-theme="dark"] {
+  --z-chart-1: #5cc4d1;
+  --z-chart-2: #f0a95a;
+  --z-chart-3: #a99cf0;
+  --z-chart-4: #7fcf86;
+  --z-chart-5: #ee86b5;
+  --z-chart-6: #aeb9c4;
+}
+
+/* Layout ------------------------------------------------------------------------------------ */
+
+.z-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--z-gap);
+  align-items: flex-start;
+}
+
+.z-col {
+  flex: var(--z-flex, 1) 1 18rem;
+  min-width: 0;
+}
+
+.z-stack {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--z-space) * var(--z-stack-gap, 3));
+  min-width: 0;
+}
+
+.z-panel,
+.z-card {
+  background: var(--z-surface);
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius-lg);
+  min-width: 0;
+}
+
+.z-panel-head {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--z-space) * 2);
+  padding: calc(var(--z-space) * 2) calc(var(--z-space) * 3);
+  border-bottom: 1px solid var(--z-border);
+  flex-wrap: wrap;
+}
+
+.z-panel-head .z-toolbar {
+  margin: 0 0 0 auto;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.z-panel-title {
+  margin: 0;
+  font-size: var(--z-font-size);
+  font-weight: 600;
+}
+
+.z-panel-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--z-space) * 1.5);
+  min-height: 24px;
+  padding: 0 calc(var(--z-space) * 1);
+  margin-left: calc(var(--z-space) * -1);
+  border: 0;
+  border-radius: var(--z-radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.z-panel-toggle:hover { background: var(--z-hover); }
+
+.z-chevron {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translate(-2px, -2px);
+  transition: transform 0.15s;
+}
+
+[aria-expanded="false"] > .z-chevron { transform: rotate(-45deg); }
+
+.z-panel-head:has([aria-expanded="false"]) { border-bottom-color: transparent; }
+
+.z-panel-body,
+.z-card {
+  padding: calc(var(--z-space) * 3);
+}
+
+.z-panel-body > .z-node + .z-node,
+.z-card > .z-node + .z-node { margin-top: var(--z-gap); }
+
+.z-card-title {
+  margin: 0 0 calc(var(--z-space) * 2);
+  font-size: var(--z-font-size);
+  font-weight: 600;
+}
+
+.z-tabs { min-width: 0; }
+
+.z-tablist {
+  display: flex;
+  gap: calc(var(--z-space) * 1);
+  border-bottom: 1px solid var(--z-border);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+.z-tab {
+  position: relative;
+  min-height: var(--z-control);
+  padding: 0 calc(var(--z-space) * 3);
+  border: 0;
+  background: none;
+  color: var(--z-text-muted);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.z-tab:hover { color: var(--z-text); background: var(--z-hover); }
+
+.z-tab[aria-selected="true"] {
+  color: var(--z-accent);
+  font-weight: 600;
+}
+
+.z-tab[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--z-accent);
+}
+
+.z-tab:focus-visible { outline-offset: -2px; }
+
+.z-tabpanel { padding-top: var(--z-gap); }
+
+.z-tabpanel:focus-visible {
+  outline: 2px solid var(--z-focus);
+  outline-offset: 2px;
+  border-radius: var(--z-radius-sm);
+}
+
+.z-tabpanel[aria-busy="true"] { min-height: 6rem; }
+
+.z-split {
+  display: flex;
+  min-height: 16rem;
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius-lg);
+  background: var(--z-surface);
+  overflow: hidden;
+}
+
+.z-split-pane {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: calc(var(--z-space) * 3);
+}
+
+.z-split > .z-split-pane:first-child { flex: 0 0 var(--z-split, 40%); }
+
+.z-split > .z-split-pane:last-child { flex: 1 1 0; }
+
+.z-split-bar {
+  flex: 0 0 auto;
+  width: 8px;
+  cursor: col-resize;
+  background: var(--z-surface-2);
+  border-inline: 1px solid var(--z-border);
+  position: relative;
+  touch-action: none;
+}
+
+.z-split-bar::after {
+  content: "";
+  position: absolute;
+  inset: 50% 2px auto;
+  height: 24px;
+  transform: translateY(-50%);
+  border-inline: 1px solid var(--z-border-strong);
+}
+
+.z-split-bar:hover,
+.z-split-bar[data-dragging] { background: var(--z-hover); }
+
+.z-split-bar:focus-visible {
+  outline: 2px solid var(--z-focus);
+  outline-offset: -2px;
+}
+
+.z-split-v { flex-direction: column; min-height: 24rem; }
+
+.z-split-v .z-split-bar {
+  width: auto;
+  height: 8px;
+  cursor: row-resize;
+  border-inline: 0;
+  border-block: 1px solid var(--z-border);
+}
+
+.z-split-v .z-split-bar::after {
+  inset: 2px auto 2px 50%;
+  width: 24px;
+  height: auto;
+  transform: translateX(-50%);
+  border-inline: 0;
+  border-block: 1px solid var(--z-border-strong);
+}
+
+@media (max-width: 640px) {
+  .z-split { flex-direction: column; }
+  .z-split > .z-split-pane:first-child { flex-basis: auto; }
+  .z-split-bar { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .z-chevron { transition: none; }
+}
+
+@media (forced-colors: active) {
+  .z-tab[aria-selected="true"]::after { background: Highlight; }
+  .z-split-bar { border-color: CanvasText; }
+}

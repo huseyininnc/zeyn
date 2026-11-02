@@ -13,7 +13,8 @@
       "min": "{label} en az {n} olmalıdır.",
       "max": "{label} en fazla {n} olabilir.",
       "format": "{label} geçersiz bir değer içeriyor.",
-      "skipped_time": "{label}: bu saat, saat değişikliği nedeniyle sizin saat diliminizde yok."
+      "skipped_time": "{label}: bu saat, saat değişikliği nedeniyle sizin saat diliminizde yok.",
+      "line": "Satır {n}: {message}"
     },
     "error": {
       "forbidden": "Bu işlem için yetkiniz yok.",
@@ -35,9 +36,41 @@
       "range_total": "{from}-{to} / {total}",
       "loaded": "{count} satır yüklendi",
       "empty": "Kayıt yok.",
-      "filter": {"filter": "{label} filtresi", "from": "En az", "to": "En çok", "all": "Tümü", "contains": "İçerir", "starts_with": "İle başlar", "equals": "Eşittir", "match": "Eşleşme", "selected": "{n} seçili", "clear": "Filtreyi temizle", "sorted": "Sıralama {n}"},
-      "menu": {"options": "Kolon seçenekleri: {label}", "resize": "{label} genişliği", "sort_asc": "Artan sırala", "sort_desc": "Azalan sırala", "sort_clear": "Sıralamayı kaldır", "pin_start": "Başa sabitle", "pin_end": "Sona sabitle", "unpin": "Sabitlemeyi kaldır", "move_prev": "Sola taşı", "move_next": "Sağa taşı", "hide": "Kolonu gizle", "columns": "Kolonlar", "reset": "Görünümü sıfırla"},
-      "agg": { "sum": "Toplam", "avg": "Ortalama", "min": "En az", "max": "En çok", "count": "Adet" }
+      "filter": {
+        "filter": "{label} filtresi",
+        "from": "En az",
+        "to": "En çok",
+        "all": "Tümü",
+        "contains": "İçerir",
+        "starts_with": "İle başlar",
+        "equals": "Eşittir",
+        "match": "Eşleşme",
+        "selected": "{n} seçili",
+        "clear": "Filtreyi temizle",
+        "sorted": "Sıralama {n}"
+      },
+      "menu": {
+        "options": "Kolon seçenekleri: {label}",
+        "resize": "{label} genişliği",
+        "sort_asc": "Artan sırala",
+        "sort_desc": "Azalan sırala",
+        "sort_clear": "Sıralamayı kaldır",
+        "pin_start": "Başa sabitle",
+        "pin_end": "Sona sabitle",
+        "unpin": "Sabitlemeyi kaldır",
+        "move_prev": "Sola taşı",
+        "move_next": "Sağa taşı",
+        "hide": "Kolonu gizle",
+        "columns": "Kolonlar",
+        "reset": "Görünümü sıfırla"
+      },
+      "agg": {
+        "sum": "Toplam",
+        "avg": "Ortalama",
+        "min": "En az",
+        "max": "En çok",
+        "count": "Adet"
+      }
     },
     "export": {
       "xlsx": "Excel'e aktar",
@@ -49,6 +82,61 @@
       "language": "Dil",
       "time_zone": "Saat dilimi",
       "time_zone_auto": "Otomatik (bu cihaz)"
+    },
+    "ui": {
+      "resize": "Bölmeleri yeniden boyutlandır",
+      "loading": "Yükleniyor…",
+      "load_failed": "Bu bölüm yüklenemedi. Tekrar deneyin.",
+      "date": {
+        "open": "Tarih seç",
+        "dialog": "Bir tarih seçin",
+        "prev_month": "Önceki ay",
+        "next_month": "Sonraki ay",
+        "prev_year": "Önceki yıl",
+        "next_year": "Sonraki yıl",
+        "today": "Bugün",
+        "format": "Biçim: {format}"
+      },
+      "lookup": {
+        "open": "Seçenekleri göster",
+        "no_results": "Eşleşen kayıt yok.",
+        "results": "{count} sonuç",
+        "remove": "{label} kaldır",
+        "more": "Daha fazla göster",
+        "selected": "Seçilenler"
+      },
+      "lines": {
+        "add": "Satır ekle",
+        "remove": "{n}. satırı sil",
+        "up": "{n}. satırı yukarı taşı",
+        "down": "{n}. satırı aşağı taşı",
+        "row": "Satır {n}",
+        "total": "Toplam",
+        "actions": "İşlemler",
+        "empty": "Henüz satır yok."
+      },
+      "confirm": {
+        "title": "Lütfen onaylayın",
+        "ok": "Onayla",
+        "cancel": "Vazgeç"
+      },
+      "empty": "Henüz kayıt yok.",
+      "breadcrumb": "Konum",
+      "dismiss": "Kapat",
+      "steps": {
+        "progress": "Adım {n} / {total}",
+        "next": "İleri",
+        "back": "Geri",
+        "done": "Tamamlandı",
+        "current": "Geçerli adım"
+      },
+      "chart": {
+        "data": "Verileri göster",
+        "table": "{title} verileri"
+      },
+      "tree": {
+        "empty": "Kayıt yok."
+      }
     }
   }
 }
