@@ -31,7 +31,7 @@ Which page answers what:
 | Actions, errors, APIs | `language/actions` (`actions.md`), `guides/api` (`api.md`) |
 | Screens, toolbar, windows, params | `language/screens` (`screens.md`) |
 | What happens after a click: toast, navigate, open window | `language/effects` (`effects.md`) |
-| Forms, validation, conflicts | `language/forms` (`forms.md`) |
+| Forms, validation, conflicts, file uploads | `language/forms` (`forms.md`) |
 | DataGrid (columns, filters, totals, paging, export, editing) | `language/datagrid`, `language/datagrid-reference` (`datagrid.md`, `docs/grid.md`) |
 | Texts and translations | `language/texts` (`texts.md`) |
 | Layouts, controls, pickers, lines editor, display, tree, charts | `components/*` (`layouts.md`, `controls.md`, `lines.md`, `display.md`, `data.md`) |

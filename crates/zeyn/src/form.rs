@@ -77,6 +77,7 @@ pub struct Form<M: Model> {
     controls: Vec<(&'static str, Control)>,
     lookups: Vec<(&'static str, Box<dyn DataSource>, bool)>,
     lines: Vec<(&'static str, Box<dyn LinesEditor>)>,
+    files: Vec<(&'static str, crate::files::FileRules, bool)>,
 }
 
 impl<M: Model> Form<M> {
@@ -96,6 +97,7 @@ impl<M: Model> Form<M> {
             controls: Vec::new(),
             lookups: Vec::new(),
             lines: Vec::new(),
+            files: Vec::new(),
         }
     }
 
@@ -106,7 +108,15 @@ impl<M: Model> Form<M> {
             .filter(|i| !M::fields()[*i].version)
             .map(|i| FormItem::Field(FormField::at(i)))
             .collect();
-        Self { model, items, options: Vec::new(), controls: Vec::new(), lookups: Vec::new(), lines: Vec::new() }
+        Self {
+            model,
+            items,
+            options: Vec::new(),
+            controls: Vec::new(),
+            lookups: Vec::new(),
+            lines: Vec::new(),
+            files: Vec::new(),
+        }
     }
 
     pub fn field<T: FieldType + 'static>(mut self, field: Field<M, T>) -> Self {
@@ -237,6 +247,28 @@ impl<M: Model> Form<M> {
         self.items.push(FormItem::Field(FormField::of(field)));
         self.lines.push((field.meta().name, Box::new(build(Lines::new()))));
         self
+    }
+
+    /// Adds a file field edited with an upload control: drag and drop or a file picker, progress,
+    /// cancel and retry, previews for images. Files go to the store registered with the same
+    /// `rules` on the feature ([`Feature::files`](crate::Feature::files)), which checks size,
+    /// type and permission again on the server. A `Vec<File>` field takes up to
+    /// `rules.files()` files.
+    ///
+    /// ```ignore
+    /// Form::of(ticket).file(Ticket::attachments, ATTACHMENTS)
+    /// ```
+    pub fn file<T>(mut self, field: Field<M, T>, rules: crate::files::FileRules) -> Self
+    where
+        T: FieldType + crate::files::UploadValue + 'static,
+    {
+        self.items.push(FormItem::Field(FormField::of(field)));
+        self.files.push((field.meta().name, rules, T::MANY));
+        self
+    }
+
+    fn files_of(&self, name: &str) -> Option<(crate::files::FileRules, bool)> {
+        self.files.iter().find(|(n, _, _)| *n == name).map(|(_, r, many)| (*r, *many))
     }
 
     fn lines_of(&self, name: &str) -> Option<&dyn LinesEditor> {
@@ -451,6 +483,22 @@ impl<M: Model> Form<M> {
                 errors.errors.push(FieldError { field: meta.name, rule: Rule::Custom, message });
             }
         }
+        if !self.files.is_empty() {
+            let object = serde_json::to_value(model).unwrap_or(Json::Null);
+            for (name, rules, many) in &self.files {
+                let count = object.get(*name).and_then(Json::as_array).map_or(0, Vec::len);
+                let Some(meta) = M::fields().iter().find(|m| m.name == *name) else { continue };
+                if *many && count > rules.files() as usize && !unreadable.contains(name) {
+                    errors.errors.push(FieldError {
+                        field: meta.name,
+                        rule: Rule::Custom,
+                        message: Text::key("zeyn.files.too_many")
+                            .arg("label", meta.label_text())
+                            .arg("n", rules.files().to_string()),
+                    });
+                }
+            }
+        }
         for item in &self.items {
             let FormItem::Range(from, to) = item else { continue };
             let (a, b) = (value_of(from.meta.name), value_of(to.meta.name));
@@ -586,6 +634,9 @@ pub(crate) fn parse_value(
     if let FieldKind::Bool = meta.kind {
         return raw.as_bool().map(Json::Bool).ok_or(Unreadable::Format);
     }
+    if let FieldKind::Custom { editor: editor @ ("file" | "files") } = meta.kind {
+        return crate::files::parse_files(raw, editor == "files", meta.optional).ok_or(Unreadable::Format);
+    }
     let text = match raw {
         Json::String(s) => s.clone(),
         Json::Number(n) => n.to_string(),
@@ -688,6 +739,12 @@ fn render_field<M: Model>(out: &mut String, r: &Render, f: &FormField<M>, form: 
     if let Some(editor) = form.lines_of(m.name) {
         let current = serde_json::to_value(&form.model).ok().and_then(|v| v.get(m.name).cloned()).unwrap_or(Json::Null);
         editor.render(out, r, m, &current);
+        out.push_str(&format!(r#"<p class="z-field-error" id="{id}-error" aria-live="polite"></p></div>"#));
+        return;
+    }
+    if let Some((rules, many)) = form.files_of(m.name) {
+        let current = serde_json::to_value(&form.model).ok().and_then(|v| v.get(m.name).cloned()).unwrap_or(Json::Null);
+        crate::files::render_upload(out, r, m, &id, &rules, many, &current);
         out.push_str(&format!(r#"<p class="z-field-error" id="{id}-error" aria-live="polite"></p></div>"#));
         return;
     }
@@ -802,6 +859,15 @@ where
                     ),
                 ),
                 FieldKind::Custom { editor: "ids" } => ("string", "Ids separated by commas.".to_string()),
+                FieldKind::Custom { editor: "file" } => (
+                    "string",
+                    "A file uploaded before, as JSON {\"id\",\"name\",\"size\",\"type\"}; models cannot upload."
+                        .to_string(),
+                ),
+                FieldKind::Custom { editor: "files" } => (
+                    "string",
+                    "Files uploaded before, as a JSON list of {\"id\",\"name\",\"size\",\"type\"}.".to_string(),
+                ),
                 FieldKind::Text | FieldKind::Custom { .. } => ("string", String::new()),
                 FieldKind::Date => ("string", "Date as YYYY-MM-DD.".to_string()),
                 FieldKind::Time => ("string", "Time as HH:MM.".to_string()),

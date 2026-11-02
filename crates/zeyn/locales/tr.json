@@ -332,7 +332,21 @@
         "table": "{title} verileri",
         "summary_bar": "{items} kategoride {series} seri gösteren sütun grafiği. En yüksek: {max}, {value}.",
         "summary_line": "{items} noktada {series} seri gösteren çizgi grafiği. En yüksek: {max}, {value}.",
-        "summary_donut": "{items} parçalı halka grafiği. En büyük: {max}, {value}."
+        "summary_donut": "{items} parçalı halka grafiği. En büyük: {max}, {value}.",
+        "role": "grafik",
+        "summary_stacked_bar": "{items} kategoride {series} seri gösteren yığılmış sütun grafiği. En yüksek toplam: {max}, {value}.",
+        "summary_area": "{items} noktada {series} seri gösteren alan grafiği. En yüksek: {max}, {value}.",
+        "summary_combo": "{items} kategoride {series} seri gösteren sütun ve çizgi grafiği. En yüksek: {max}, {value}.",
+        "summary_scatter": "{series} grupta {items} nokta gösteren dağılım grafiği.",
+        "summary_gauge": "{min} ile {max} arasında {value} gösteren gösterge. Hedef: {target}.",
+        "summary_funnel": "{items} aşamalı huni. En büyük: {max}, {value}.",
+        "gauge_point": "{value} / {max}",
+        "sparkline": "{n} değerlik eğilim: {first} ile başlıyor, {last} ile bitiyor, en düşük {low}, en yüksek {high}",
+        "bullet": "{value}, hedef {target}",
+        "value": "Değer",
+        "min": "En az",
+        "max": "En çok",
+        "target": "Hedef"
       },
       "tree": {
         "empty": "Kayıt yok."
@@ -378,6 +392,27 @@
         "warning": "Uyarı",
         "danger": "Hata",
         "brand": "Not"
+      },
+      "upload": {
+        "drop": "Dosyaları buraya bırakın ya da seçin.",
+        "hint": "{types}, en fazla {max}.",
+        "hint_many": "{types}, her biri en fazla {max}, en çok {n} dosya.",
+        "list": "Dosyalar",
+        "uploading": "{name} yükleniyor: yüzde {pct}",
+        "uploaded": "{name} yüklendi.",
+        "failed": "{name} yüklenemedi: {reason}",
+        "canceled": "{name} yüklemesi iptal edildi.",
+        "removed": "{name} kaldırıldı.",
+        "cancel": "İptal",
+        "retry": "Yeniden dene",
+        "remove": "Kaldır",
+        "remove_name": "{name} dosyasını kaldır"
+      },
+      "kpi": {
+        "up": "Önceki döneme göre yüzde {pct} artış",
+        "down": "Önceki döneme göre yüzde {pct} düşüş",
+        "flat": "Önceki döneme göre değişiklik yok",
+        "target": "Hedef {target}, yüzde {pct} ulaşıldı"
       }
     },
     "date": {
@@ -653,6 +688,15 @@
           "html": "<p>Oturum açma kodunuz <strong>{code}</strong>. Birkaç dakika geçerlidir.</p>"
         }
       }
+    },
+    "files": {
+      "too_large": "Dosya çok büyük. İzin verilen en büyük dosya {max}.",
+      "too_many": "{label} en fazla {n} dosya alır.",
+      "type": "Bu dosya türü kabul edilmiyor ya da içeriği adıyla uyuşmuyor.",
+      "refused": "Dosya güvenlik denetiminden geçmedi.",
+      "aborted": "Yükleme dosyanın tamamı gelmeden durdu. Yeniden deneyin.",
+      "empty": "Dosya boş.",
+      "store_full": "Bu dosya için yer kalmadı."
     }
   },
   "AccountLogin": {

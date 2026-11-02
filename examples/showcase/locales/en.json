@@ -15,7 +15,9 @@
     "media": "Media",
     "pro": "Desktop shell",
     "assistant": "Assistant",
-    "islands": "Islands"
+    "islands": "Islands",
+    "uploads": "Files",
+    "charts": "Charts"
   },
   "dashboard": {
     "title": "Overview",
@@ -391,5 +393,46 @@
     "try_orders": "Show me today's orders in İzmir",
     "try_archive": "Archive product NW-0003",
     "try_low": "Show products low on stock"
+  },
+  "uploads": {
+    "title": "Support ticket",
+    "card": "New ticket with files",
+    "save": "Save ticket",
+    "saved": "Ticket saved with {n} files."
+  },
+  "Ticket": {
+    "title": "Title",
+    "contract": "Signed contract",
+    "attachments": "Attachments"
+  },
+  "charts": {
+    "title": "Charts and key figures",
+    "revenue": "Revenue this month",
+    "wait": "Average wait",
+    "minutes": "min",
+    "returns": "Returns",
+    "channels": "Sales by channel",
+    "shop": "Shop",
+    "web": "Web",
+    "margin": "Sales and margin",
+    "sales": "Sales",
+    "margin_pct": "Margin %",
+    "visits": "Visits",
+    "price_units": "Price against units sold",
+    "tea": "Tea",
+    "coffee": "Coffee",
+    "capacity": "Warehouse capacity used",
+    "funnel": "Checkout funnel",
+    "people": "People",
+    "f_visits": "Visited",
+    "f_carts": "Added to cart",
+    "f_orders": "Ordered",
+    "f_paid": "Paid",
+    "reps": "Sales reps against the 80,000 target"
+  },
+  "Rep": {
+    "name": "Name",
+    "sales": "Sales",
+    "weeks": "Last 12 weeks"
   }
 }

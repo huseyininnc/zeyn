@@ -1,15 +1,25 @@
-//! Charts drawn on the server as SVG: bar, line and donut. Each chart has a title, a text
-//! summary for screen readers, a legend, and its numbers as a table under "Show data". Colors
-//! come from the `--z-chart-1` to `--z-chart-6` tokens, so they follow the theme.
+//! Charts drawn on the server as SVG: bar, stacked bar, line, area, combined bar and line,
+//! scatter, donut, gauge and funnel. Each chart has a title, a text summary for screen readers,
+//! a legend, and its numbers as a table under "Show data". Every data point is a mark that the
+//! keyboard reaches (one tab stop, arrow keys between marks, see `charts.js`) with its label and
+//! value as its name; hover and focus show the same text in a tooltip. Colors come from the
+//! `--z-chart-1` to `--z-chart-6` tokens, so they follow the theme.
+//!
+//! Sparklines and bullets are small SVGs for grid cells ([`SparklineCell`], [`BulletCell`]) and
+//! the [`Kpi`] card.
 
 use super::{dom_id, layout::into_node};
+use crate::grid::CellRenderer;
 use crate::i18n::{NumberFormat, Text};
 use crate::render::{Render, escape};
 use crate::screen::{Component, Node};
+use crate::value::{FieldKind, FieldType, SupportsSum, Value};
 use serde::Serialize;
 use serde_json::{Value as Json, json};
+use std::fmt::Write as _;
 
 into_node!(Chart);
+into_node!(Kpi);
 
 const W: f64 = 640.0;
 const H: f64 = 260.0;
@@ -23,9 +33,27 @@ const BOTTOM: f64 = 32.0;
 #[serde(rename_all = "snake_case")]
 pub enum ChartKind {
     Bar,
+    /// Bars of every series stacked on one another per label.
+    StackedBar,
     Line,
+    /// Lines with the space under them filled.
+    Area,
+    /// Bars, with the series added by [`Chart::line_series`] drawn as lines.
+    Combo,
+    /// Points placed by two numbers, from [`Chart::points`].
+    Scatter,
     /// One series as parts of a whole.
     Donut,
+    /// One value on a half circle between a minimum and a maximum.
+    Gauge,
+    /// One series as stages that narrow, such as visits, carts and orders.
+    Funnel,
+}
+
+struct Series {
+    name: Text,
+    values: Vec<f64>,
+    line: bool,
 }
 
 /// A chart with data from the screen.
@@ -35,34 +63,121 @@ pub enum ChartKind {
 /// let c = Chart::bar("Sales").labels(["Jan", "Feb"]).series("2025", [120.0, 80.0]);
 /// let mut out = String::new();
 /// zeyn::Component::render(&c, &mut out, &zeyn::Render::english("s"));
-/// assert!(out.contains(r#"role="img""#));
+/// assert!(out.contains(r#"aria-label="Jan, 2025: 120""#));
 /// ```
 pub struct Chart {
     kind: ChartKind,
     title: Text,
     labels: Vec<Text>,
-    series: Vec<(Text, Vec<f64>)>,
+    series: Vec<Series>,
+    points: Vec<(Text, Vec<(f64, f64)>)>,
     decimals: u8,
+    right_axis: bool,
+    range: (f64, f64),
+    target: Option<f64>,
+}
+
+fn finite(v: f64) -> f64 {
+    if v.is_finite() { v } else { 0.0 }
+}
+
+/// A number in the locale's format with `decimals` decimals.
+pub(crate) fn format_number(v: f64, decimals: u8, locale: &str) -> String {
+    let f = NumberFormat::for_locale(locale);
+    let text = format!("{:.*}", decimals as usize, v.abs());
+    let (whole, frac) = text.split_once('.').unwrap_or((&text, ""));
+    let mut grouped = String::with_capacity(whole.len() + 4);
+    for (i, c) in whole.chars().enumerate() {
+        if i > 0 && (whole.len() - i) % 3 == 0 {
+            grouped.push(f.group);
+        }
+        grouped.push(c);
+    }
+    let sign = if v < 0.0 && text.bytes().any(|b| (b'1'..=b'9').contains(&b)) { "-" } else { "" };
+    if frac.is_empty() { format!("{sign}{grouped}") } else { format!("{sign}{grouped}{}{frac}", f.decimal) }
+}
+
+/// A round top for an axis and the number of steps up to it: steps of 1, 2 or 5 times a power
+/// of ten, at most five of them.
+fn nice(max: f64) -> (f64, u32) {
+    if max <= 0.0 || !max.is_finite() {
+        return (1.0, 1);
+    }
+    let power = 10f64.powf((max / 5.0).log10().floor());
+    let step = [1.0, 2.0, 5.0, 10.0].iter().map(|m| m * power).find(|s| (max / s).ceil() <= 5.0).unwrap_or(max);
+    let ticks = (max / step).ceil().max(1.0) as u32;
+    (step * ticks as f64, ticks)
+}
+
+/// Attributes of a mark the keyboard reaches: one tab stop for the chart, a name for screen
+/// readers and the tooltip.
+fn mark(first: &mut bool, label: &str) -> String {
+    let tab = if std::mem::take(first) { "0" } else { "-1" };
+    format!(r#" tabindex="{tab}" role="img" aria-label="{label}" data-zeyn-tip="{label}""#)
 }
 
 impl Chart {
     fn new(kind: ChartKind, title: impl Into<Text>) -> Self {
-        Self { kind, title: title.into(), labels: Vec::new(), series: Vec::new(), decimals: 0 }
+        Self {
+            kind,
+            title: title.into(),
+            labels: Vec::new(),
+            series: Vec::new(),
+            points: Vec::new(),
+            decimals: 0,
+            right_axis: false,
+            range: (0.0, 100.0),
+            target: None,
+        }
     }
 
     pub fn bar(title: impl Into<Text>) -> Self {
         Self::new(ChartKind::Bar, title)
     }
 
+    pub fn stacked_bar(title: impl Into<Text>) -> Self {
+        Self::new(ChartKind::StackedBar, title)
+    }
+
     pub fn line(title: impl Into<Text>) -> Self {
         Self::new(ChartKind::Line, title)
+    }
+
+    pub fn area(title: impl Into<Text>) -> Self {
+        Self::new(ChartKind::Area, title)
+    }
+
+    /// Bars from [`Chart::series`] with lines from [`Chart::line_series`] over them.
+    ///
+    /// ```ignore
+    /// Chart::combo("Sales and margin").labels(months).series("Sales", sales)
+    ///     .line_series("Margin %", margin).right_axis()
+    /// ```
+    pub fn combo(title: impl Into<Text>) -> Self {
+        Self::new(ChartKind::Combo, title)
+    }
+
+    /// Points from [`Chart::points`], placed by their x and y.
+    pub fn scatter(title: impl Into<Text>) -> Self {
+        Self::new(ChartKind::Scatter, title)
     }
 
     pub fn donut(title: impl Into<Text>) -> Self {
         Self::new(ChartKind::Donut, title)
     }
 
-    /// Category names along the bottom, or the parts of a donut.
+    /// One value between the ends of [`Chart::range`] (0 to 100 unless set). The value is the
+    /// first one of the first series; [`Chart::value`] sets it.
+    pub fn gauge(title: impl Into<Text>) -> Self {
+        Self::new(ChartKind::Gauge, title)
+    }
+
+    /// Stages of the first series, each with its share of the first stage.
+    pub fn funnel(title: impl Into<Text>) -> Self {
+        Self::new(ChartKind::Funnel, title)
+    }
+
+    /// Category names along the bottom, or the parts of a donut or a funnel.
     pub fn labels<I, T>(mut self, labels: I) -> Self
     where
         I: IntoIterator<Item = T>,
@@ -72,9 +187,48 @@ impl Chart {
         self
     }
 
-    /// A named series, one value per label. A donut uses the first series only.
+    /// A named series, one value per label. A donut, gauge and funnel use the first series only.
     pub fn series(mut self, name: impl Into<Text>, values: impl IntoIterator<Item = f64>) -> Self {
-        self.series.push((name.into(), values.into_iter().map(|v| if v.is_finite() { v } else { 0.0 }).collect()));
+        self.series.push(Series { name: name.into(), values: values.into_iter().map(finite).collect(), line: false });
+        self
+    }
+
+    /// A series drawn as a line over the bars of a [`Chart::combo`].
+    pub fn line_series(mut self, name: impl Into<Text>, values: impl IntoIterator<Item = f64>) -> Self {
+        self.series.push(Series { name: name.into(), values: values.into_iter().map(finite).collect(), line: true });
+        self
+    }
+
+    /// Gives the lines of a combo chart their own scale on the right.
+    pub fn right_axis(mut self) -> Self {
+        self.right_axis = true;
+        self
+    }
+
+    /// A named group of `(x, y)` points for a scatter chart.
+    pub fn points(mut self, name: impl Into<Text>, points: impl IntoIterator<Item = (f64, f64)>) -> Self {
+        self.points.push((name.into(), points.into_iter().map(|(x, y)| (finite(x), finite(y))).collect()));
+        self
+    }
+
+    /// The value of a gauge.
+    pub fn value(self, value: f64) -> Self {
+        let name = self.title.clone();
+        let mut c = self;
+        c.series = vec![Series { name, values: vec![finite(value)], line: false }];
+        c
+    }
+
+    /// The ends of a gauge.
+    pub fn range(mut self, min: f64, max: f64) -> Self {
+        let (min, max) = (finite(min), finite(max));
+        self.range = if max > min { (min, max) } else { (min, min + 1.0) };
+        self
+    }
+
+    /// A target marked on a gauge.
+    pub fn target(mut self, target: f64) -> Self {
+        self.target = Some(finite(target));
         self
     }
 
@@ -85,173 +239,469 @@ impl Chart {
     }
 
     fn num(&self, v: f64, locale: &str) -> String {
-        let f = NumberFormat::for_locale(locale);
-        let text = format!("{:.*}", self.decimals as usize, v.abs());
-        let (whole, frac) = text.split_once('.').unwrap_or((&text, ""));
-        let mut grouped = String::new();
-        for (i, c) in whole.chars().enumerate() {
-            if i > 0 && (whole.len() - i) % 3 == 0 {
-                grouped.push(f.group);
-            }
-            grouped.push(c);
-        }
-        let sign = if v < 0.0 { "-" } else { "" };
-        if frac.is_empty() { format!("{sign}{grouped}") } else { format!("{sign}{grouped}{}{frac}", f.decimal) }
+        format_number(v, self.decimals, locale)
     }
 
-    fn value(&self, s: usize, i: usize) -> f64 {
-        self.series.get(s).and_then(|(_, v)| v.get(i)).copied().unwrap_or(0.0)
+    fn value_at(&self, s: usize, i: usize) -> f64 {
+        self.series.get(s).and_then(|x| x.values.get(i)).copied().unwrap_or(0.0)
     }
 
-    /// A round top for the value axis and the number of steps up to it: steps of 1, 2 or 5 times
-    /// a power of ten, at most five of them.
-    fn scale(&self) -> (f64, u32) {
-        let max = self.series.iter().flat_map(|(_, v)| v.iter().copied()).fold(0.0_f64, f64::max);
-        if max <= 0.0 {
-            return (1.0, 1);
-        }
-        let power = 10f64.powf((max / 5.0).log10().floor());
-        let step = [1.0, 2.0, 5.0, 10.0].iter().map(|m| m * power).find(|s| (max / s).ceil() <= 5.0).unwrap_or(max);
-        let ticks = (max / step).ceil().max(1.0) as u32;
-        (step * ticks as f64, ticks)
+    fn label(&self, r: &Render, i: usize) -> String {
+        self.labels.get(i).map(|l| r.text(l)).unwrap_or_default()
     }
 
-    fn axes(&self, out: &mut String, r: &Render, (max, ticks): (f64, u32)) {
+    fn step(&self) -> f64 {
+        (W - LEFT - self.right()) / self.labels.len().max(1) as f64
+    }
+
+    fn right(&self) -> f64 {
+        if self.kind == ChartKind::Combo && self.right_axis { LEFT } else { RIGHT }
+    }
+
+    fn y_axis(&self, out: &mut String, r: &Render, (max, ticks): (f64, u32), x: f64, anchor: &str, grid: bool) {
         let plot_h = H - TOP - BOTTOM;
         for k in 0..=ticks {
             let v = max * k as f64 / ticks as f64;
             let y = TOP + plot_h - plot_h * k as f64 / ticks as f64;
-            out.push_str(&format!(
-                r#"<line class="z-chart-grid" x1="{LEFT}" x2="{}" y1="{y:.1}" y2="{y:.1}"/><text class="z-chart-axis" x="{}" y="{:.1}" text-anchor="end">{}</text>"#,
-                W - RIGHT,
-                LEFT - 8.0,
+            if grid {
+                let _ = write!(
+                    out,
+                    r#"<line class="z-chart-grid" x1="{LEFT}" x2="{}" y1="{y:.1}" y2="{y:.1}"/>"#,
+                    W - self.right()
+                );
+            }
+            let _ = write!(
+                out,
+                r#"<text class="z-chart-axis" x="{x}" y="{:.1}" text-anchor="{anchor}">{}</text>"#,
                 y + 4.0,
                 escape(&self.num(v, r.locale))
-            ));
+            );
         }
-        let n = self.labels.len().max(1) as f64;
-        let step = (W - LEFT - RIGHT) / n;
+    }
+
+    fn x_labels(&self, out: &mut String, r: &Render) {
+        let step = self.step();
         for (i, label) in self.labels.iter().enumerate() {
             let x = LEFT + step * (i as f64 + 0.5);
-            out.push_str(&format!(
+            let _ = write!(
+                out,
                 r#"<text class="z-chart-axis" x="{x:.1}" y="{}" text-anchor="middle">{}</text>"#,
                 H - 10.0,
                 r.text(label)
-            ));
+            );
         }
     }
 
-    fn bars(&self, out: &mut String, r: &Render) {
-        let scale = self.scale();
-        let max = scale.0;
-        self.axes(out, r, scale);
+    fn max_of(&self, line: bool) -> f64 {
+        self.series.iter().filter(|s| s.line == line).flat_map(|s| s.values.iter().copied()).fold(0.0_f64, f64::max)
+    }
+
+    fn point_label(&self, r: &Render, s: usize, i: usize, v: f64) -> String {
+        let name = self.series.get(s).map(|x| r.text(&x.name)).unwrap_or_default();
+        format!("{}, {name}: {}", self.label(r, i), escape(&self.num(v, r.locale)))
+    }
+
+    fn bars(&self, out: &mut String, r: &Render, first: &mut bool) {
+        let combo = self.kind == ChartKind::Combo;
+        let bar_max =
+            if combo && !self.right_axis { self.max_of(false).max(self.max_of(true)) } else { self.max_of(false) };
+        let scale = nice(bar_max);
+        self.y_axis(out, r, scale, LEFT - 8.0, "end", true);
+        self.x_labels(out, r);
         let plot_h = H - TOP - BOTTOM;
-        let n = self.labels.len().max(1);
-        let step = (W - LEFT - RIGHT) / n as f64;
-        let count = self.series.len().max(1) as f64;
-        let width = step * 0.7 / count;
-        for i in 0..n {
-            for (s, (name, _)) in self.series.iter().enumerate() {
-                let v = self.value(s, i).max(0.0);
-                let h = plot_h * v / max;
-                let x = LEFT + step * i as f64 + step * 0.15 + width * s as f64;
-                out.push_str(&format!(
-                    r#"<rect class="z-chart-bar z-series-{}" x="{x:.1}" y="{:.1}" width="{:.1}" height="{h:.1}" rx="2"><title>{}, {}: {}</title></rect>"#,
+        let step = self.step();
+        let bars: Vec<usize> = (0..self.series.len()).filter(|s| !self.series[*s].line).collect();
+        let width = step * 0.7 / bars.len().max(1) as f64;
+        for i in 0..self.labels.len() {
+            for (k, s) in bars.iter().enumerate() {
+                let v = self.value_at(*s, i).max(0.0);
+                let h = plot_h * v / scale.0;
+                let x = LEFT + step * i as f64 + step * 0.15 + width * k as f64;
+                let _ = write!(
+                    out,
+                    r#"<rect class="z-chart-bar z-chart-mark z-series-{}" x="{x:.1}" y="{:.1}" width="{:.1}" height="{h:.1}" rx="2" data-s="{s}" data-i="{i}"{}/>"#,
                     s % 6,
                     TOP + plot_h - h,
                     (width - 2.0).max(1.0),
-                    self.labels.get(i).map(|l| r.text(l)).unwrap_or_default(),
-                    r.text(name),
-                    escape(&self.num(v, r.locale))
-                ));
+                    mark(first, &self.point_label(r, *s, i, v))
+                );
+            }
+        }
+        if combo {
+            let line_scale = if self.right_axis { nice(self.max_of(true)) } else { scale };
+            if self.right_axis {
+                self.y_axis(out, r, line_scale, W - self.right() + 8.0, "start", false);
+            }
+            for s in (0..self.series.len()).filter(|s| self.series[*s].line) {
+                self.polyline(out, r, s, line_scale.0, false, first);
             }
         }
     }
 
-    fn lines(&self, out: &mut String, r: &Render) {
-        let scale = self.scale();
-        let max = scale.0;
-        self.axes(out, r, scale);
+    fn stacked(&self, out: &mut String, r: &Render, first: &mut bool) {
+        let n = self.labels.len();
+        let totals: Vec<f64> =
+            (0..n).map(|i| (0..self.series.len()).map(|s| self.value_at(s, i).max(0.0)).sum()).collect();
+        let scale = nice(totals.iter().copied().fold(0.0, f64::max));
+        self.y_axis(out, r, scale, LEFT - 8.0, "end", true);
+        self.x_labels(out, r);
         let plot_h = H - TOP - BOTTOM;
-        let n = self.labels.len().max(1);
-        let step = (W - LEFT - RIGHT) / n as f64;
-        for (s, (name, values)) in self.series.iter().enumerate() {
-            let points: Vec<(f64, f64)> = (0..n.min(values.len()))
-                .map(|i| (LEFT + step * (i as f64 + 0.5), TOP + plot_h - plot_h * values[i].max(0.0) / max))
-                .collect();
-            let path: Vec<String> = points.iter().map(|(x, y)| format!("{x:.1},{y:.1}")).collect();
-            out.push_str(&format!(
-                r#"<polyline class="z-chart-line z-series-{}" points="{}"/>"#,
-                s % 6,
-                path.join(" ")
-            ));
-            for (i, (x, y)) in points.iter().enumerate() {
-                out.push_str(&format!(
-                    r#"<circle class="z-chart-point z-series-{}" cx="{x:.1}" cy="{y:.1}" r="4"><title>{}, {}: {}</title></circle>"#,
+        let step = self.step();
+        for i in 0..n {
+            let mut base = 0.0;
+            for s in 0..self.series.len() {
+                let v = self.value_at(s, i).max(0.0);
+                let h = plot_h * v / scale.0;
+                let y = TOP + plot_h - plot_h * base / scale.0 - h;
+                base += v;
+                let _ = write!(
+                    out,
+                    r#"<rect class="z-chart-bar z-chart-mark z-series-{}" x="{:.1}" y="{y:.1}" width="{:.1}" height="{h:.1}" data-s="{s}" data-i="{i}"{}/>"#,
                     s % 6,
-                    self.labels.get(i).map(|l| r.text(l)).unwrap_or_default(),
-                    r.text(name),
-                    escape(&self.num(values[i], r.locale))
-                ));
+                    LEFT + step * i as f64 + step * 0.2,
+                    step * 0.6,
+                    mark(first, &self.point_label(r, s, i, v))
+                );
             }
         }
     }
 
-    fn ring(&self, out: &mut String, r: &Render) {
+    fn polyline(&self, out: &mut String, r: &Render, s: usize, max: f64, fill: bool, first: &mut bool) {
+        let plot_h = H - TOP - BOTTOM;
+        let step = self.step();
+        let values = &self.series[s].values;
+        let points: Vec<(f64, f64)> = (0..self.labels.len().min(values.len()))
+            .map(|i| (LEFT + step * (i as f64 + 0.5), TOP + plot_h - plot_h * values[i].max(0.0) / max))
+            .collect();
+        let path: Vec<String> = points.iter().map(|(x, y)| format!("{x:.1},{y:.1}")).collect();
+        if fill {
+            if let (Some((x0, _)), Some((x1, _))) = (points.first(), points.last()) {
+                let base = TOP + plot_h;
+                let _ = write!(
+                    out,
+                    r#"<polygon class="z-chart-area z-series-{}" points="{x0:.1},{base:.1} {} {x1:.1},{base:.1}"/>"#,
+                    s % 6,
+                    path.join(" ")
+                );
+            }
+        }
+        let _ = write!(out, r#"<polyline class="z-chart-line z-series-{}" points="{}"/>"#, s % 6, path.join(" "));
+        for (i, (x, y)) in points.iter().enumerate() {
+            let _ = write!(
+                out,
+                r#"<circle class="z-chart-point z-chart-mark z-series-{}" cx="{x:.1}" cy="{y:.1}" r="4" data-s="{s}" data-i="{i}"{}/>"#,
+                s % 6,
+                mark(first, &self.point_label(r, s, i, values[i]))
+            );
+        }
+    }
+
+    fn lines(&self, out: &mut String, r: &Render, first: &mut bool) {
+        let scale = nice(self.max_of(false));
+        self.y_axis(out, r, scale, LEFT - 8.0, "end", true);
+        self.x_labels(out, r);
+        for s in 0..self.series.len() {
+            self.polyline(out, r, s, scale.0, self.kind == ChartKind::Area, first);
+        }
+    }
+
+    fn scatter_plot(&self, out: &mut String, r: &Render, first: &mut bool) {
+        let all = || self.points.iter().flat_map(|(_, p)| p.iter());
+        let y_scale = nice(all().map(|p| p.1).fold(0.0, f64::max));
+        let (x_max, x_ticks) = nice(all().map(|p| p.0).fold(0.0, f64::max));
+        self.y_axis(out, r, y_scale, LEFT - 8.0, "end", true);
+        let plot_w = W - LEFT - RIGHT;
+        let plot_h = H - TOP - BOTTOM;
+        for k in 0..=x_ticks {
+            let v = x_max * k as f64 / x_ticks as f64;
+            let _ = write!(
+                out,
+                r#"<text class="z-chart-axis" x="{:.1}" y="{}" text-anchor="middle">{}</text>"#,
+                LEFT + plot_w * k as f64 / x_ticks as f64,
+                H - 10.0,
+                escape(&self.num(v, r.locale))
+            );
+        }
+        for (s, (name, points)) in self.points.iter().enumerate() {
+            for (i, (x, y)) in points.iter().enumerate() {
+                let cx = LEFT + plot_w * x.max(0.0) / x_max;
+                let cy = TOP + plot_h - plot_h * y.max(0.0) / y_scale.0;
+                let label = format!(
+                    "{}: {}, {}",
+                    r.text(name),
+                    escape(&self.num(*x, r.locale)),
+                    escape(&self.num(*y, r.locale))
+                );
+                let _ = write!(
+                    out,
+                    r#"<circle class="z-chart-dot z-chart-mark z-series-{}" cx="{cx:.1}" cy="{cy:.1}" r="5" data-s="{s}" data-i="{i}"{}/>"#,
+                    s % 6,
+                    mark(first, &label)
+                );
+            }
+        }
+    }
+
+    fn ring(&self, out: &mut String, r: &Render, first: &mut bool) {
         let values: Vec<f64> =
-            self.series.first().map(|(_, v)| v.iter().map(|x| x.max(0.0)).collect()).unwrap_or_default();
+            self.series.first().map(|s| s.values.iter().map(|x| x.max(0.0)).collect()).unwrap_or_default();
         let total: f64 = values.iter().sum();
         let (cx, cy, radius) = (W / 2.0, H / 2.0, 90.0);
         let circumference = 2.0 * std::f64::consts::PI * radius;
-        out.push_str(&format!(r#"<circle class="z-chart-track" cx="{cx}" cy="{cy}" r="{radius}"/>"#));
+        let _ = write!(out, r#"<circle class="z-chart-track" cx="{cx}" cy="{cy}" r="{radius}"/>"#);
         let mut offset = 0.0;
         for (i, v) in values.iter().enumerate() {
             if total <= 0.0 || *v <= 0.0 {
                 continue;
             }
             let len = circumference * v / total;
-            out.push_str(&format!(
-                r#"<circle class="z-chart-slice z-series-{}" cx="{cx}" cy="{cy}" r="{radius}" stroke-dasharray="{len:.2} {:.2}" stroke-dashoffset="{:.2}" transform="rotate(-90 {cx} {cy})"><title>{}: {} ({:.0}%)</title></circle>"#,
+            let label =
+                format!("{}: {} ({:.0}%)", self.label(r, i), escape(&self.num(*v, r.locale)), v * 100.0 / total);
+            let _ = write!(
+                out,
+                r#"<circle class="z-chart-slice z-chart-mark z-series-{}" cx="{cx}" cy="{cy}" r="{radius}" stroke-dasharray="{len:.2} {:.2}" stroke-dashoffset="{:.2}" transform="rotate(-90 {cx} {cy})" data-s="0" data-i="{i}"{}/>"#,
                 i % 6,
                 circumference - len,
                 -offset,
-                self.labels.get(i).map(|l| r.text(l)).unwrap_or_default(),
-                escape(&self.num(*v, r.locale)),
-                v * 100.0 / total
-            ));
+                mark(first, &label)
+            );
             offset += len;
         }
-        out.push_str(&format!(
+        let _ = write!(
+            out,
             r#"<text class="z-chart-total" x="{cx}" y="{}" text-anchor="middle">{}</text>"#,
             cy + 8.0,
             escape(&self.num(total, r.locale))
-        ));
+        );
+    }
+
+    fn gauge_value(&self) -> f64 {
+        self.value_at(0, 0)
+    }
+
+    fn dial(&self, out: &mut String, r: &Render, first: &mut bool) {
+        let (min, max) = self.range;
+        let v = self.gauge_value();
+        let share = ((v - min) / (max - min)).clamp(0.0, 1.0);
+        let (cx, cy, radius) = (W / 2.0, H - 40.0, 160.0);
+        let arc = format!("M {:.1} {cy:.1} A {radius} {radius} 0 0 1 {:.1} {cy:.1}", cx - radius, cx + radius);
+        let _ = write!(out, r#"<path class="z-chart-gauge-track" d="{arc}" pathLength="100"/>"#);
+        let label = r.text(
+            &Text::key("zeyn.ui.chart.gauge_point")
+                .arg("value", self.num(v, r.locale))
+                .arg("max", self.num(max, r.locale)),
+        );
+        let _ = write!(
+            out,
+            r#"<path class="z-chart-gauge-value z-chart-mark z-series-0" d="{arc}" pathLength="100" stroke-dasharray="{:.2} 100" data-s="0" data-i="0"{}/>"#,
+            share * 100.0,
+            mark(first, &label)
+        );
+        if let Some(t) = self.target {
+            let a = std::f64::consts::PI * (1.0 - ((t - min) / (max - min)).clamp(0.0, 1.0));
+            let (c, s) = (a.cos(), -a.sin());
+            let _ = write!(
+                out,
+                r#"<line class="z-chart-target" x1="{:.1}" y1="{:.1}" x2="{:.1}" y2="{:.1}"/>"#,
+                cx + c * (radius - 26.0),
+                cy + s * (radius - 26.0),
+                cx + c * (radius + 26.0),
+                cy + s * (radius + 26.0)
+            );
+        }
+        let _ = write!(
+            out,
+            r#"<text class="z-chart-total" x="{cx}" y="{:.1}" text-anchor="middle">{}</text><text class="z-chart-axis" x="{:.1}" y="{:.1}" text-anchor="middle">{}</text><text class="z-chart-axis" x="{:.1}" y="{:.1}" text-anchor="middle">{}</text>"#,
+            cy - 10.0,
+            escape(&self.num(v, r.locale)),
+            cx - radius,
+            cy + 24.0,
+            escape(&self.num(min, r.locale)),
+            cx + radius,
+            cy + 24.0,
+            escape(&self.num(max, r.locale)),
+        );
+    }
+
+    fn stages(&self, out: &mut String, r: &Render, first: &mut bool) {
+        let values: Vec<f64> =
+            self.series.first().map(|s| s.values.iter().map(|x| x.max(0.0)).collect()).unwrap_or_default();
+        let top = values.iter().copied().fold(0.0, f64::max);
+        let n = self.labels.len().max(1) as f64;
+        let row = (H - TOP * 2.0) / n;
+        let full = W - 2.0 * 180.0;
+        let lead = values.first().copied().unwrap_or(0.0);
+        for (i, label) in self.labels.iter().enumerate() {
+            let v = values.get(i).copied().unwrap_or(0.0);
+            let w = if top > 0.0 { (full * v / top).max(2.0) } else { 2.0 };
+            let y = TOP + row * i as f64;
+            let pct = if lead > 0.0 { v * 100.0 / lead } else { 0.0 };
+            let text = format!("{}: {} ({:.0}%)", r.text(label), escape(&self.num(v, r.locale)), pct);
+            let _ = write!(
+                out,
+                r#"<rect class="z-chart-bar z-chart-mark z-series-{}" x="{:.1}" y="{:.1}" width="{w:.1}" height="{:.1}" rx="3" data-s="0" data-i="{i}"{}/><text class="z-chart-axis" x="{:.1}" y="{:.1}" text-anchor="end">{}</text><text class="z-chart-axis" x="{:.1}" y="{:.1}">{} ({:.0}%)</text>"#,
+                i % 6,
+                (W - w) / 2.0,
+                y + 2.0,
+                (row - 4.0).max(2.0),
+                mark(first, &text),
+                (W - w) / 2.0 - 8.0,
+                y + row / 2.0 + 4.0,
+                r.text(label),
+                (W + w) / 2.0 + 8.0,
+                y + row / 2.0 + 4.0,
+                escape(&self.num(v, r.locale)),
+                pct
+            );
+        }
     }
 
     /// A sentence describing the data, for screen readers.
     fn summary(&self, r: &Render) -> String {
+        let name = match self.kind {
+            ChartKind::Bar => "bar",
+            ChartKind::StackedBar => "stacked_bar",
+            ChartKind::Line => "line",
+            ChartKind::Area => "area",
+            ChartKind::Combo => "combo",
+            ChartKind::Scatter => "scatter",
+            ChartKind::Donut => "donut",
+            ChartKind::Gauge => "gauge",
+            ChartKind::Funnel => "funnel",
+        };
+        let key = Text::key(format!("zeyn.ui.chart.summary_{name}"));
+        match self.kind {
+            ChartKind::Gauge => {
+                let v = self.gauge_value();
+                let target = self.target.map(|t| self.num(t, r.locale)).unwrap_or_default();
+                return r.text(
+                    &key.arg("value", self.num(v, r.locale))
+                        .arg("min", self.num(self.range.0, r.locale))
+                        .arg("max", self.num(self.range.1, r.locale))
+                        .arg("target", target),
+                );
+            }
+            ChartKind::Scatter => {
+                let count: usize = self.points.iter().map(|(_, p)| p.len()).sum();
+                return r.text(&key.arg("items", count.to_string()).arg("series", self.points.len().to_string()));
+            }
+            _ => {}
+        }
         let mut best: Option<(f64, String)> = None;
-        for (name, values) in &self.series {
-            for (i, v) in values.iter().enumerate() {
-                if best.as_ref().is_none_or(|(b, _)| v > b) {
-                    let label = self.labels.get(i).map(|l| r.i18n.text(r.locale, l)).unwrap_or_default();
-                    let who =
-                        if self.series.len() > 1 { format!("{label}, {}", r.i18n.text(r.locale, name)) } else { label };
-                    best = Some((*v, who));
+        let stacked = self.kind == ChartKind::StackedBar;
+        if stacked {
+            for i in 0..self.labels.len() {
+                let total: f64 = (0..self.series.len()).map(|s| self.value_at(s, i).max(0.0)).sum();
+                if best.as_ref().is_none_or(|(b, _)| total > *b) {
+                    best = Some((total, self.labels.get(i).map(|l| r.i18n.text(r.locale, l)).unwrap_or_default()));
+                }
+            }
+        } else {
+            for s in &self.series {
+                for (i, v) in s.values.iter().enumerate() {
+                    if best.as_ref().is_none_or(|(b, _)| v > b) {
+                        let label = self.labels.get(i).map(|l| r.i18n.text(r.locale, l)).unwrap_or_default();
+                        let who = if self.series.len() > 1 {
+                            format!("{label}, {}", r.i18n.text(r.locale, &s.name))
+                        } else {
+                            label
+                        };
+                        best = Some((*v, who));
+                    }
                 }
             }
         }
-        let kind = match self.kind {
-            ChartKind::Bar => "bar",
-            ChartKind::Line => "line",
-            ChartKind::Donut => "donut",
-        };
-        let text = Text::key(format!("zeyn.ui.chart.summary_{kind}"))
+        let text = key
             .arg("items", self.labels.len().to_string())
             .arg("series", self.series.len().to_string())
             .arg("max", best.as_ref().map(|(_, w)| w.clone()).unwrap_or_default())
             .arg("value", best.map(|(v, _)| self.num(v, r.locale)).unwrap_or_default());
         r.text(&text)
+    }
+
+    fn legend(&self, out: &mut String, r: &Render) {
+        let names: Vec<(usize, &Text, bool)> = match self.kind {
+            ChartKind::Donut | ChartKind::Funnel => {
+                self.labels.iter().enumerate().map(|(i, l)| (i, l, false)).collect()
+            }
+            ChartKind::Gauge => Vec::new(),
+            ChartKind::Scatter => self.points.iter().enumerate().map(|(i, (n, _))| (i, n, false)).collect(),
+            _ => self.series.iter().enumerate().map(|(i, s)| (i, &s.name, s.line)).collect(),
+        };
+        if names.is_empty() {
+            return;
+        }
+        out.push_str(r#"<ul class="z-chart-legend">"#);
+        for (i, name, line) in names {
+            let shape = if line { " z-chart-swatch-line" } else { "" };
+            let _ = write!(
+                out,
+                r#"<li><span class="z-chart-swatch{shape} z-series-{}" aria-hidden="true"></span>{}</li>"#,
+                i % 6,
+                r.text(name)
+            );
+        }
+        out.push_str("</ul>");
+    }
+
+    fn table(&self, out: &mut String, r: &Render) {
+        let _ = write!(
+            out,
+            r#"<details class="z-chart-data"><summary>{}</summary><table class="z-chart-table"><caption class="z-sr-only">{}</caption><thead><tr>"#,
+            r.text(&Text::key("zeyn.ui.chart.data")),
+            r.text(&Text::key("zeyn.ui.chart.table").arg("title", self.title.clone()))
+        );
+        let th = |out: &mut String, t: &str| {
+            let _ = write!(out, r#"<th scope="col" class="z-num">{t}</th>"#);
+        };
+        let num = |v: f64| escape(&self.num(v, r.locale));
+        match self.kind {
+            ChartKind::Scatter => {
+                out.push_str(r#"<th scope="col"></th>"#);
+                th(out, "x");
+                th(out, "y");
+                out.push_str("</tr></thead><tbody>");
+                for (name, points) in &self.points {
+                    for (x, y) in points {
+                        let _ = write!(
+                            out,
+                            r#"<tr><th scope="row">{}</th><td class="z-num">{}</td><td class="z-num">{}</td></tr>"#,
+                            r.text(name),
+                            num(*x),
+                            num(*y)
+                        );
+                    }
+                }
+            }
+            ChartKind::Gauge => {
+                for k in ["value", "min", "max", "target"] {
+                    th(out, &r.text(&Text::key(format!("zeyn.ui.chart.{k}"))));
+                }
+                let _ = write!(
+                    out,
+                    r#"</tr></thead><tbody><tr><td class="z-num">{}</td><td class="z-num">{}</td><td class="z-num">{}</td><td class="z-num">{}</td></tr>"#,
+                    num(self.gauge_value()),
+                    num(self.range.0),
+                    num(self.range.1),
+                    self.target.map(num).unwrap_or_default()
+                );
+            }
+            _ => {
+                out.push_str(r#"<th scope="col"></th>"#);
+                for s in &self.series {
+                    th(out, &r.text(&s.name));
+                }
+                out.push_str("</tr></thead><tbody>");
+                for (i, label) in self.labels.iter().enumerate() {
+                    let _ = write!(out, r#"<tr><th scope="row">{}</th>"#, r.text(label));
+                    for s in 0..self.series.len() {
+                        let _ = write!(out, r#"<td class="z-num">{}</td>"#, num(self.value_at(s, i)));
+                    }
+                    out.push_str("</tr>");
+                }
+            }
+        }
+        out.push_str("</tbody></table></details>");
     }
 }
 
@@ -259,49 +709,310 @@ impl Component for Chart {
     fn render(&self, out: &mut String, r: &Render) {
         let id = dom_id(r, "chart");
         let title = r.text(&self.title);
-        out.push_str(&format!(
-            r#"<figure class="z-chart"><figcaption class="z-chart-title" id="{id}-title">{title}</figcaption><svg class="z-chart-svg" viewBox="0 0 {W} {H}" role="img" aria-labelledby="{id}-title {id}-desc" focusable="false"><desc id="{id}-desc">{}</desc>"#,
+        let _ = write!(
+            out,
+            r#"<figure class="z-chart" data-zeyn-chart><figcaption class="z-chart-title" id="{id}-title">{title}</figcaption><svg class="z-chart-svg" viewBox="0 0 {W} {H}" role="group" aria-roledescription="{}" aria-labelledby="{id}-title {id}-desc" focusable="false"><desc id="{id}-desc">{}</desc>"#,
+            r.text(&Text::key("zeyn.ui.chart.role")),
             self.summary(r)
-        ));
+        );
+        let mut first = true;
         match self.kind {
-            ChartKind::Bar => self.bars(out, r),
-            ChartKind::Line => self.lines(out, r),
-            ChartKind::Donut => self.ring(out, r),
+            ChartKind::Bar | ChartKind::Combo => self.bars(out, r, &mut first),
+            ChartKind::StackedBar => self.stacked(out, r, &mut first),
+            ChartKind::Line | ChartKind::Area => self.lines(out, r, &mut first),
+            ChartKind::Scatter => self.scatter_plot(out, r, &mut first),
+            ChartKind::Donut => self.ring(out, r, &mut first),
+            ChartKind::Gauge => self.dial(out, r, &mut first),
+            ChartKind::Funnel => self.stages(out, r, &mut first),
         }
-        out.push_str(r#"</svg><ul class="z-chart-legend">"#);
-        let names: Vec<&Text> = if self.kind == ChartKind::Donut {
-            self.labels.iter().collect()
-        } else {
-            self.series.iter().map(|(n, _)| n).collect()
-        };
-        for (i, name) in names.iter().enumerate() {
-            out.push_str(&format!(
-                r#"<li><span class="z-chart-swatch z-series-{}" aria-hidden="true"></span>{}</li>"#,
-                i % 6,
-                r.text(name)
-            ));
-        }
-        out.push_str(&format!(
-            r#"</ul><details class="z-chart-data"><summary>{}</summary><table class="z-chart-table"><caption class="z-sr-only">{}</caption><thead><tr><th scope="col"></th>"#,
-            r.text(&Text::key("zeyn.ui.chart.data")),
-            r.text(&Text::key("zeyn.ui.chart.table").arg("title", self.title.clone()))
-        ));
-        for (name, _) in &self.series {
-            out.push_str(&format!(r#"<th scope="col" class="z-num">{}</th>"#, r.text(name)));
-        }
-        out.push_str("</tr></thead><tbody>");
-        for (i, label) in self.labels.iter().enumerate() {
-            out.push_str(&format!(r#"<tr><th scope="row">{}</th>"#, r.text(label)));
-            for s in 0..self.series.len() {
-                out.push_str(&format!(r#"<td class="z-num">{}</td>"#, escape(&self.num(self.value(s, i), r.locale))));
-            }
-            out.push_str("</tr>");
-        }
-        out.push_str("</tbody></table></details></figure>");
+        out.push_str(r#"</svg><div class="z-chart-tip" aria-hidden="true" hidden></div>"#);
+        self.legend(out, r);
+        self.table(out, r);
+        out.push_str("</figure>");
     }
 
     fn schema(&self) -> Json {
-        let series: Vec<Json> = self.series.iter().map(|(n, v)| json!({ "name": n, "values": v })).collect();
-        json!({ "type": "chart", "kind": self.kind, "title": self.title, "labels": self.labels, "series": series })
+        let series: Vec<Json> =
+            self.series.iter().map(|s| json!({ "name": s.name, "values": s.values, "line": s.line })).collect();
+        let points: Vec<Json> = self.points.iter().map(|(n, p)| json!({ "name": n, "points": p })).collect();
+        json!({
+            "type": "chart",
+            "kind": self.kind,
+            "title": self.title,
+            "labels": self.labels,
+            "series": series,
+            "points": points,
+            "range": [self.range.0, self.range.1],
+            "target": self.target,
+        })
+    }
+}
+
+/// A series of numbers kept in one field, such as the last weeks of sales of a product, for
+/// sparkline cells. Stored as JSON.
+impl FieldType for Vec<f64> {
+    const KIND: FieldKind = FieldKind::Custom { editor: "series" };
+
+    fn to_value(&self) -> Value {
+        let parts: Vec<String> = self.iter().map(|v| v.to_string()).collect();
+        Value::Text(parts.join(" "))
+    }
+
+    fn __is_empty(&self) -> bool {
+        self.is_empty()
+    }
+}
+
+/// A sparkline: a line of `values` in a small box, with the first, last, lowest and highest
+/// value as its name. Cheap enough for a grid cell on every row.
+pub(crate) fn sparkline(out: &mut String, values: &[f64], r: &Render, decimals: u8) {
+    const SW: f64 = 80.0;
+    const SH: f64 = 20.0;
+    let values: Vec<f64> = values.iter().copied().map(finite).collect();
+    if values.is_empty() {
+        return;
+    }
+    let (lo, hi) = values.iter().fold((f64::MAX, f64::MIN), |(a, b), v| (a.min(*v), b.max(*v)));
+    let span = if hi > lo { hi - lo } else { 1.0 };
+    let n = values.len();
+    let dx = if n > 1 { (SW - 4.0) / (n - 1) as f64 } else { 0.0 };
+    let f = |v: f64| format_number(v, decimals, r.locale);
+    let label = r.text(
+        &Text::key("zeyn.ui.chart.sparkline")
+            .arg("n", n.to_string())
+            .arg("first", f(values[0]))
+            .arg("last", f(values[n - 1]))
+            .arg("low", f(lo))
+            .arg("high", f(hi)),
+    );
+    let _ = write!(
+        out,
+        r#"<svg class="z-spark" viewBox="0 0 {SW} {SH}" role="img" aria-label="{label}"><polyline points=""#
+    );
+    let mut last = (0.0, 0.0);
+    for (i, v) in values.iter().enumerate() {
+        let (x, y) = (2.0 + dx * i as f64, SH - 2.0 - (SH - 4.0) * (v - lo) / span);
+        let _ = write!(out, "{}{x:.1},{y:.1}", if i > 0 { " " } else { "" });
+        last = (x, y);
+    }
+    let _ = write!(out, r#""/><circle cx="{:.1}" cy="{:.1}" r="2"/></svg>"#, last.0, last.1);
+}
+
+/// Draws a `Vec<f64>` column as a sparkline.
+///
+/// ```ignore
+/// DataGrid::of(search_products).column(Product::trend).cell(SparklineCell::new())
+/// ```
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SparklineCell {
+    decimals: u8,
+}
+
+impl SparklineCell {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Decimals of the numbers in the sparkline's name, 0 to 4.
+    pub fn decimals(mut self, n: u8) -> Self {
+        self.decimals = n.min(4);
+        self
+    }
+}
+
+impl CellRenderer<Vec<f64>> for SparklineCell {
+    fn render(&self, value: &Vec<f64>, r: &Render) -> String {
+        let mut out = String::with_capacity(64 + value.len() * 12);
+        sparkline(&mut out, value, r, self.decimals);
+        out
+    }
+}
+
+/// Draws a number column as a bullet: a bar for the value against a target mark, with the
+/// number beside it. Compiles only on numeric and money columns; money is compared in major
+/// units.
+///
+/// ```ignore
+/// DataGrid::of(search_reps).column(Rep::sales).cell(BulletCell::new(80_000.0, 100_000.0))
+/// ```
+#[derive(Clone, Copy, Debug)]
+pub struct BulletCell {
+    target: f64,
+    max: f64,
+}
+
+impl BulletCell {
+    /// A bullet up to `max` with a mark at `target`.
+    pub fn new(target: f64, max: f64) -> Self {
+        Self { target: finite(target), max: if finite(max) > 0.0 { max } else { 1.0 } }
+    }
+}
+
+impl<T: FieldType + SupportsSum> CellRenderer<T> for BulletCell {
+    fn render(&self, value: &T, r: &Render) -> String {
+        let v = value.to_value();
+        let (amount, plain) = match &v {
+            Value::Int(n) => (*n as f64, format_number(*n as f64, 0, r.locale)),
+            Value::Money(m) => (m.minor as f64 / 100.0, m.format(r.locale)),
+            _ => return String::new(),
+        };
+        let pct = |x: f64| (x / self.max * 100.0).clamp(0.0, 100.0);
+        let shown = escape(&plain);
+        let label = r.text(
+            &Text::key("zeyn.ui.chart.bullet")
+                .arg("value", plain)
+                .arg("target", format_number(self.target, 0, r.locale)),
+        );
+        format!(
+            r#"<span class="z-bullet"><svg class="z-bullet-svg" viewBox="0 0 100 12" preserveAspectRatio="none" role="img" aria-label="{label}"><rect class="z-bullet-track" width="100" height="12"/><rect class="z-bullet-bar" y="3" width="{:.1}" height="6"/><rect class="z-bullet-target" x="{:.1}" y="0" width="1.5" height="12"/></svg><span class="z-bullet-text">{shown}</span></span>"#,
+            pct(amount),
+            (pct(self.target) - 0.75).max(0.0)
+        )
+    }
+}
+
+/// Which way a change of a [`Kpi`] is good.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Better {
+    #[default]
+    Higher,
+    Lower,
+}
+
+/// A key figure: a value, its change against the previous period with a direction, a target and
+/// a sparkline of recent values.
+///
+/// ```
+/// use zeyn::ui::Kpi;
+/// let k = Kpi::new("Revenue", 1234.5).decimals(1).delta(12.5).target(1500.0).trend([1.0, 3.0, 2.0]);
+/// let mut out = String::new();
+/// zeyn::Component::render(&k, &mut out, &zeyn::Render::english("s"));
+/// assert!(out.contains("1,234.5") && out.contains("Up 12.5%"));
+/// ```
+pub struct Kpi {
+    title: Text,
+    value: f64,
+    decimals: u8,
+    unit: Option<Text>,
+    delta: Option<f64>,
+    better: Better,
+    target: Option<f64>,
+    trend: Vec<f64>,
+}
+
+impl Kpi {
+    pub fn new(title: impl Into<Text>, value: f64) -> Self {
+        Self {
+            title: title.into(),
+            value: finite(value),
+            decimals: 0,
+            unit: None,
+            delta: None,
+            better: Better::Higher,
+            target: None,
+            trend: Vec::new(),
+        }
+    }
+
+    /// Decimals of the value and the target, 0 to 4.
+    pub fn decimals(mut self, n: u8) -> Self {
+        self.decimals = n.min(4);
+        self
+    }
+
+    /// A unit shown after the value, such as `kg` or `%`.
+    pub fn unit(mut self, unit: impl Into<Text>) -> Self {
+        self.unit = Some(unit.into());
+        self
+    }
+
+    /// Change against the previous period, in percent.
+    pub fn delta(mut self, percent: f64) -> Self {
+        self.delta = Some(finite(percent));
+        self
+    }
+
+    /// Lower values are better (costs, wait times): a fall is shown as good.
+    pub fn lower_is_better(mut self) -> Self {
+        self.better = Better::Lower;
+        self
+    }
+
+    pub fn target(mut self, target: f64) -> Self {
+        self.target = Some(finite(target));
+        self
+    }
+
+    /// Recent values, oldest first, drawn as a sparkline.
+    pub fn trend(mut self, values: impl IntoIterator<Item = f64>) -> Self {
+        self.trend = values.into_iter().map(finite).collect();
+        self
+    }
+}
+
+impl Component for Kpi {
+    fn render(&self, out: &mut String, r: &Render) {
+        let id = dom_id(r, "kpi");
+        let unit = self
+            .unit
+            .as_ref()
+            .map(|u| format!(r#" <span class="z-kpi-unit">{}</span>"#, r.text(u)))
+            .unwrap_or_default();
+        let _ = write!(
+            out,
+            r#"<div class="z-kpi" role="group" aria-labelledby="{id}-title"><p class="z-kpi-title" id="{id}-title">{}</p><p class="z-kpi-value">{}{unit}</p>"#,
+            r.text(&self.title),
+            escape(&format_number(self.value, self.decimals, r.locale))
+        );
+        if let Some(d) = self.delta {
+            let (dir, arrow) = if d > 0.0 {
+                ("up", "\u{25b2}")
+            } else if d < 0.0 {
+                ("down", "\u{25bc}")
+            } else {
+                ("flat", "\u{25cf}")
+            };
+            let good = match (dir, self.better) {
+                ("flat", _) => "neutral",
+                ("up", Better::Higher) | ("down", Better::Lower) => "good",
+                _ => "bad",
+            };
+            let _ = write!(
+                out,
+                r#"<p class="z-kpi-delta z-kpi-{good}"><span aria-hidden="true">{arrow}</span> {}</p>"#,
+                r.text(&Text::key(format!("zeyn.ui.kpi.{dir}")).arg("pct", format_number(d.abs(), 1, r.locale)))
+            );
+        }
+        if let Some(t) = self.target {
+            let share = if t != 0.0 { self.value / t * 100.0 } else { 0.0 };
+            let _ = write!(
+                out,
+                r#"<p class="z-kpi-target">{}</p>"#,
+                r.text(
+                    &Text::key("zeyn.ui.kpi.target")
+                        .arg("target", format_number(t, self.decimals, r.locale))
+                        .arg("pct", format_number(share, 0, r.locale))
+                )
+            );
+        }
+        if !self.trend.is_empty() {
+            out.push_str(r#"<div class="z-kpi-trend">"#);
+            sparkline(out, &self.trend, r, self.decimals);
+            out.push_str("</div>");
+        }
+        out.push_str("</div>");
+    }
+
+    fn schema(&self) -> Json {
+        json!({
+            "type": "kpi",
+            "title": self.title,
+            "value": self.value,
+            "delta": self.delta,
+            "better": self.better,
+            "target": self.target,
+            "trend": self.trend,
+        })
     }
 }

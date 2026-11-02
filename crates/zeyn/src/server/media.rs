@@ -91,7 +91,7 @@ async fn media_file(
 
 /// The response for an opened media file and the request's `Range`, `If-Range` and
 /// `If-None-Match` headers.
-fn respond(media: Media, headers: &HeaderMap) -> Response {
+pub(super) fn respond(media: Media, headers: &HeaderMap) -> Response {
     let read = |name: header::HeaderName| headers.get(name).and_then(|v| v.to_str().ok());
     let etag = media.etag.as_ref().map(|t| format!("\"{t}\""));
     let len = media.len;

@@ -1,0 +1,97 @@
+/* Chart marks, tooltips, sparklines, bullets and KPI cards. Base chart styles are in
+   components.css; colors come from the theme tokens. */
+
+.z-chart { position: relative; }
+
+.z-chart-mark { cursor: default; }
+
+.z-chart-mark:focus { outline: none; }
+
+.z-chart-mark:focus-visible { outline: 2px solid var(--z-focus); outline-offset: 2px; }
+
+.z-chart-bar.z-chart-mark:focus-visible,
+.z-chart-point.z-chart-mark:focus-visible,
+.z-chart-dot.z-chart-mark:focus-visible { stroke: var(--z-text); stroke-width: 2; }
+
+.z-chart-dot { fill: var(--z-series); fill-opacity: 0.85; stroke: var(--z-surface); stroke-width: 1; }
+
+.z-chart-area { fill: var(--z-series); fill-opacity: 0.18; stroke: none; }
+
+.z-chart-gauge-track { fill: none; stroke: var(--z-surface-2); stroke-width: 34; }
+
+.z-chart-gauge-value { fill: none; stroke: var(--z-series); stroke-width: 34; }
+
+.z-chart-target { stroke: var(--z-text); stroke-width: 3; }
+
+.z-chart-swatch-line { height: 3px; border-radius: 2px; }
+
+.z-chart-tip {
+  position: absolute;
+  z-index: 5;
+  max-width: 16rem;
+  padding: 4px calc(var(--z-space) * 2);
+  border: 1px solid var(--z-border-strong);
+  border-radius: var(--z-radius);
+  background: var(--z-surface);
+  color: var(--z-text);
+  font-size: var(--z-font-size-sm);
+  box-shadow: 0 2px 8px hsl(var(--z-shadow-color) / var(--z-shadow-strength));
+  pointer-events: none;
+}
+
+.z-chart-tip[hidden] { display: none; }
+
+.z-spark { display: block; width: 80px; height: 20px; overflow: visible; }
+
+.z-spark polyline { fill: none; stroke: var(--z-chart-1); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+
+.z-spark circle { fill: var(--z-chart-1); }
+
+.z-bullet { display: inline-flex; align-items: center; gap: calc(var(--z-space) * 2); min-width: 0; }
+
+.z-bullet-svg { display: block; width: 80px; height: 12px; }
+
+.z-bullet-track { fill: var(--z-surface-2); stroke: var(--z-border-strong); stroke-width: 0.5; vector-effect: non-scaling-stroke; }
+
+.z-bullet-bar { fill: var(--z-chart-1); }
+
+.z-bullet-target { fill: var(--z-text); }
+
+.z-bullet-text { font-variant-numeric: tabular-nums; }
+
+.z-kpi {
+  display: grid;
+  gap: var(--z-space);
+  min-width: 0;
+  padding: calc(var(--z-space) * 3);
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius);
+  background: var(--z-surface);
+}
+
+.z-kpi p { margin: 0; }
+
+.z-kpi-title { color: var(--z-text-muted); font-size: var(--z-font-size-sm); overflow-wrap: anywhere; }
+
+.z-kpi-value { font-size: 1.75rem; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+.z-kpi-unit { font-size: 1rem; font-weight: 500; color: var(--z-text-muted); }
+
+.z-kpi-delta { font-size: var(--z-font-size-sm); font-weight: 600; }
+
+.z-kpi-good { color: var(--z-success); }
+
+.z-kpi-bad { color: var(--z-danger); }
+
+.z-kpi-neutral { color: var(--z-text-muted); }
+
+.z-kpi-target { color: var(--z-text-muted); font-size: var(--z-font-size-sm); }
+
+.z-kpi-trend .z-spark { width: 100%; max-width: 12rem; height: 28px; }
+
+@media (forced-colors: active) {
+  .z-chart-mark:focus-visible { outline-color: Highlight; }
+  .z-chart-dot, .z-chart-gauge-value, .z-spark polyline, .z-bullet-bar { forced-color-adjust: none; fill: CanvasText; stroke: CanvasText; }
+  .z-chart-gauge-value, .z-spark polyline { fill: none; }
+  .z-chart-tip { border-color: CanvasText; }
+}
