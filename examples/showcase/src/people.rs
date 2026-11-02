@@ -3,6 +3,7 @@
 
 use std::sync::{Arc, RwLock};
 use zeyn::prelude::*;
+use zeyn::{Mail, Mailer};
 
 /// A leave request. Leave data can reveal health information, so reads are audited.
 #[entity(table = "leave_requests", validate = check_days, sensitive)]
@@ -112,13 +113,18 @@ pub async fn save_leave(request: Valid<LeaveRequest>, store: LeaveStore, ctx: Ct
     Ok(saved.id)
 }
 
-/// Moves a request through its workflow.
+/// Moves a request through its workflow and tells the manager by e-mail. The mail is only
+/// queued here; a background job sends it.
 #[action(permission = "people.leave.request", audit)]
-pub async fn move_leave(request: TransitionRequest<LeaveRequestId>, store: LeaveStore, ctx: Ctx) -> Result<LeaveState> {
-    let mut rows = store.0.write().map_err(|_| Error::Internal("leave store lock".into()))?;
-    let row = rows.iter_mut().find(|r| r.id == request.id).ok_or(Error::NotFound)?;
-    row.state = leave_flow().apply(&ctx, row.state, &request.transition, request.comment.as_deref())?;
-    Ok(row.state)
+pub async fn move_leave(request: TransitionRequest<LeaveRequestId>, store: LeaveStore, mailer: Mailer, ctx: Ctx) -> Result<LeaveState> {
+    let (state, manager, employee) = {
+        let mut rows = store.0.write().map_err(|_| Error::Internal("leave store lock".into()))?;
+        let row = rows.iter_mut().find(|r| r.id == request.id).ok_or(Error::NotFound)?;
+        row.state = leave_flow().apply(&ctx, row.state, &request.transition, request.comment.as_deref())?;
+        (row.state, row.manager_email.clone(), row.employee.clone())
+    };
+    mailer.send(&ctx, Mail::transition(&ctx, &manager, &employee)?)?;
+    Ok(state)
 }
 
 /// Imports leave requests from a CSV file as drafts.

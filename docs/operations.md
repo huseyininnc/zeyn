@@ -1,7 +1,7 @@
 # Operations
 
 Running a Zeyn app in production: time zone data, signed licenses, shared state for several
-servers, and logs and traces.
+servers, logs and traces, PDF documents and e-mail.
 
 ## Time zones
 
@@ -143,3 +143,99 @@ The framework reports through `tracing`. It never prints by itself.
   trace level subscriber and checks that no masked value appears. Two things stay with the app:
   paths are recorded, so do not put personal data in routes, and `Error::Internal` messages are
   logged as written.
+
+## PDF documents
+
+The `pdf` Cargo feature renders PDF documents from [Typst](https://typst.app) templates. It is off
+by default because Typst is large (see the numbers below).
+
+```rust
+const INVOICE: PdfTemplate = PdfTemplate::new("invoice", include_str!("../templates/invoice.typ"));
+
+#[action(permission = "sales.order.read")]
+pub async fn invoice_data(p: OrderParams, store: Orders, ctx: Ctx) -> Result<InvoiceData> { ... }
+
+Screen::window("Order").body(PdfLink::new("Print invoice", INVOICE, invoice_data, params))
+
+App::new("Shop").service(Pdf::from_config(&config)?)
+```
+
+- `PdfLink` puts a download button on a screen. `GET /_zeyn/pdf` opens the screen with its
+  access checks, runs the action for the user (its permission and interceptors apply, the call
+  kind is `Document`) and renders the template with what the action returns. Users who may not
+  run the action do not see the button.
+- Grids with `exportable()` also print a list report from the toolbar's `Export::Pdf`
+  (`GET /_zeyn/grid/export?format=pdf`): the user's columns, labels, filters and sort, numbers
+  aligned right, a repeated header row and page numbers. A report holds at most 2,000 rows
+  (`MAX_PDF_ROWS`, or the grid's export limit when smaller) and says so when rows were left out.
+- **Data never becomes Typst code.** The action's output is serialized to JSON and the template
+  reads it as `data` (the renderer binds `#let data = json("/data.json")` before the template).
+  Values such as `#panic()`, `]` or `$x$` are printed as text; a test checks this. Templates can
+  read nothing else: no files, no packages.
+- Rendering runs on a blocking thread. At most `pdf.max_concurrent` documents (1 to 64; two by
+  default, one on a single CPU) render at the same time; the rest wait for a slot. Typst's
+  memoization cache is emptied after each document, so memory goes back down.
+
+| Key | Meaning |
+|---|---|
+| `pdf.fonts` | A directory of extra `.ttf`, `.otf`, `.ttc` or `.otc` fonts, read once at start |
+| `pdf.max_concurrent` | Documents rendered at the same time |
+
+Fonts: Libertinus Serif (regular, bold, italic, bold italic; SIL Open Font License) is embedded and
+covers Turkish; DejaVu Sans Mono is embedded as the fallback for signs Libertinus lacks, such as
+`₺`. Their licenses are in `crates/zeyn/assets/fonts`. There is no math font; add one with
+`pdf.fonts` if templates set equations.
+
+Measured on Windows (release build, x86_64):
+
+| | Result |
+|---|---|
+| Binary size | 5.5 MB without `pdf`, about 46 MB with it (Typst adds about 39 MB, the fonts 1.6 MB) |
+| A one page document | 4 to 7 ms, under 1 MB of heap while rendering, 10 KB file |
+| A list report of 1,000 rows (25 pages) | 0.54 to 0.74 s, 51 MB peak heap while rendering, 0 kept after, 0.87 MB file |
+| First document after start | About 42 MB of heap stays for Typst's own lazily built tables |
+| Fonts | 0.25 MB of heap for the font index |
+
+A debug build is about ten times slower (a 2,000 row report took 71 s in the showcase).
+
+## E-mail
+
+The `email` Cargo feature sends notifications with [lettre](https://lettre.rs).
+
+```rust
+let mailer = Mailer::from_config(&config)?;
+App::new("People").mailer(mailer)
+
+#[action(permission = "people.leave.request", audit)]
+pub async fn move_leave(r: TransitionRequest<LeaveRequestId>, store: Leaves, mailer: Mailer, ctx: Ctx) -> Result<LeaveState> {
+    let state = leave_flow().apply(&ctx, current, &r.transition, r.comment.as_deref())?;
+    mailer.send(&ctx, Mail::transition(&ctx, &manager_email, &employee)?)?;
+    Ok(state)
+}
+```
+
+- `Mailer::send` renders the message and puts it in an in memory queue (at most 10,000
+  messages), then returns. The `zeyn.mail` background job sends the queue at once, tries failed
+  messages again with backoff (five times from ten seconds unless `Mailer::retry` says otherwise)
+  and looks at the queue every minute. A message is dropped, with an error in the log, after eight
+  failed tries. Like every job, a queue that has not been sent when the process stops is lost;
+  durable delivery needs the database backed queue of the data layer.
+- Messages come from the i18n catalogs: `<template>.subject`, `<template>.text` and optionally
+  `<template>.html`, with `{name}` arguments. The recipient's language is the sender's unless
+  `Mail::locale` sets it. Every message has a plain text and an HTML part; in the HTML part every
+  argument is escaped, and without an `.html` entry the HTML is the escaped text. Line breaks are
+  removed from subjects, and addresses are parsed, so data cannot add headers or recipients.
+- `Mail::transition` writes the move the call just made with `Workflow::apply` (record, from, to,
+  who and the comment) with the built in `zeyn.mail.transition` template. The showcase tells the
+  manager when a leave request moves.
+
+| Key | Meaning |
+|---|---|
+| `mail.from` | Sender, such as `Northwind <no-reply@example.com>` (required) |
+| `mail.transport` | `smtp`, `file` (an `.eml` file per message, for development and tests) or `log` (a log line with the number of recipients and the size, never addresses or content; the default) |
+| `mail.smtp.host`, `mail.smtp.port` | The SMTP server |
+| `mail.smtp.tls` | `starttls` (default), `tls` (implicit TLS, usually port 465) or `none` (local relays only) |
+| `mail.smtp.user`, `mail.smtp.password` | Credentials; read the password from a secret source such as the environment |
+| `mail.file.dir` | Directory of the `file` transport |
+
+TLS uses rustls with the Mozilla root certificates (`webpki-roots`).

@@ -27,6 +27,12 @@ islands = ["server", "dep:zeyn-island", "tokio/fs"]
 # WebSocket rooms with Y-CRDT documents and change topics (`realtime::Realtime`, `ui::Live`).
 # Off by default: requests stay stateless unless an app turns this on.
 realtime = ["server", "axum/ws", "dep:yrs", "dep:futures-util", "futures-util/sink"]
+# Grid export to XLSX and XLSX import.
+xlsx = ["dep:rust_xlsxwriter", "dep:calamine", "dep:zip"]
+# PDF documents from Typst templates, and grid export to PDF.
+pdf = ["server", "dep:typst", "dep:typst-layout", "dep:typst-pdf"]
+# E-mail notifications over SMTP, sent from a background job.
+email = ["server", "dep:lettre"]
 
 [dependencies]
 zeyn-macros = { path = "../zeyn-macros", version = "0.0.2" }
@@ -57,6 +63,13 @@ base64 = { version = "0.22", optional = true }
 futures-util = { version = "0.3", default-features = false, optional = true }
 oracle = { version = "0.6", optional = true }
 yrs = { version = "0.28", optional = true }
+rust_xlsxwriter = { version = "0.102", default-features = false, features = ["constant_memory"], optional = true }
+calamine = { version = "0.38", default-features = false, optional = true }
+zip = { version = "9", default-features = false, features = ["deflate"], optional = true }
+typst = { version = "0.15", optional = true }
+typst-layout = { version = "0.15", optional = true }
+typst-pdf = { version = "0.15", optional = true }
+lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "pool", "hostname", "tokio1", "tokio1-rustls-tls", "file-transport"], optional = true }
 
 [dev-dependencies]
 ed25519-dalek = { version = "3", default-features = false }
@@ -69,6 +82,9 @@ tracing-subscriber = { version = "0.3", default-features = false, features = ["s
 tokio-tungstenite = "0.29"
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
 yrs = "0.28"
+calamine = { version = "0.38", default-features = false }
+rust_xlsxwriter = { version = "0.102", default-features = false }
+zip = { version = "9", default-features = false, features = ["deflate"] }
 
 [[test]]
 name = "assistant"
@@ -89,3 +105,23 @@ required-features = ["islands"]
 [[test]]
 name = "realtime"
 required-features = ["realtime"]
+
+[[test]]
+name = "xlsx"
+required-features = ["xlsx"]
+
+[[test]]
+name = "xlsx_memory"
+required-features = ["xlsx"]
+
+[[test]]
+name = "pdf"
+required-features = ["pdf"]
+
+[[test]]
+name = "pdf_measure"
+required-features = ["pdf"]
+
+[[test]]
+name = "mail"
+required-features = ["email"]

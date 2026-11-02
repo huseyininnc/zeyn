@@ -42,7 +42,7 @@ impl Plugin for CompanyStandard {
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     let defaults = StaticSource(
-        [("time.zone", "Europe/Istanbul"), ("server.addr", "127.0.0.1:3002")]
+        [("time.zone", "Europe/Istanbul"), ("server.addr", "127.0.0.1:3002"), ("mail.from", "Northwind <no-reply@northwind.test>")]
             .into_iter()
             .map(|(k, v)| (k.to_string(), v.to_string()))
             .collect(),
@@ -66,6 +66,9 @@ async fn main() -> std::io::Result<()> {
 
     let assistant = assistant::assistant(&config)?;
     let diagrams = islands::DiagramStore::default();
+    let mailer = zeyn::Mailer::from_config(&config).map_err(|e| std::io::Error::other(format!("{e:?}")))?;
+    #[cfg(feature = "pdf")]
+    let pdf = zeyn::Pdf::from_config(&config).map_err(|e| std::io::Error::other(format!("{e:?}")))?;
     let mut app = App::new(t!("app.name"))
         .plugin(CompanyStandard { config })
         .theme(Theme::new().radius(6))
@@ -85,6 +88,7 @@ async fn main() -> std::io::Result<()> {
         .service(islands::CounterStore::default())
         .service(diagrams.clone())
         .realtime(islands::realtime(diagrams))
+        .mailer(mailer)
         .datagrid_views(MemoryViewStore::default())
         .service(people::LeaveStore::seeded(TimeZone::UTC.today(DateTime::now())))
         .auth(DevAuth::superuser("Demo User"))
@@ -103,6 +107,10 @@ async fn main() -> std::io::Result<()> {
         .feature(islands::feature())
         .feature(assistant::feature())
         .islands(concat!(env!("CARGO_MANIFEST_DIR"), "/dist/islands"));
+    #[cfg(feature = "pdf")]
+    {
+        app = app.service(pdf);
+    }
     if let Some(a) = assistant {
         app = app.assistant(a);
     }

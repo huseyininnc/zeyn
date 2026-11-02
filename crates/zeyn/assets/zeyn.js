@@ -2879,16 +2879,26 @@ async function submitForm(form, submitter) {
 }
 
 /**
- * Downloads the whole filtered result from `GET /_zeyn/grid/export`, which streams it page by
- * page. Sends the sort, filters and column layout the user sees.
+ * Downloads the whole filtered result from `GET /_zeyn/grid/export` as CSV or XLSX, which the
+ * server builds page by page. Sends the sort, filters and column layout the user sees.
  */
-function exportServer(grid) {
+function exportServer(grid, format) {
   const s = grids.get(grid);
   const a = address(grid);
   const q = JSON.stringify({ sort: s?.sort ?? [], filters: s ? filterList(s) : [], columns: s?.columns ?? [] });
   const params = a.params == null ? '' : `&params=${encodeURIComponent(JSON.stringify(a.params))}`;
   const link = document.createElement('a');
-  link.href = `${BASE}/_zeyn/grid/export?screen=${encodeURIComponent(a.screen)}&node=${a.node}${params}&q=${encodeURIComponent(q)}`;
+  link.href = `${BASE}/_zeyn/grid/export?screen=${encodeURIComponent(a.screen)}&node=${a.node}${params}&format=${format}&q=${encodeURIComponent(q)}`;
+  link.download = '';
+  link.click();
+}
+
+/** Downloads the PDF document of a `PdfLink` from `GET /_zeyn/pdf`; the page stays where it is. */
+function downloadPdf(button) {
+  const a = address(button);
+  const params = a.params == null ? '' : `&params=${encodeURIComponent(JSON.stringify(a.params))}`;
+  const link = document.createElement('a');
+  link.href = `${BASE}/_zeyn/pdf?screen=${encodeURIComponent(a.screen)}&node=${a.node}${params}`;
   link.download = '';
   link.click();
 }
@@ -2900,11 +2910,15 @@ function csvCell(value) {
   return /[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
 }
 
-/** Downloads the rows loaded in the screen's first grid as CSV; XLSX is not available yet. */
+/**
+ * Exports the screen's first grid. Grids the server exports send every matching row in the
+ * requested format; otherwise the loaded rows are saved as CSV (XLSX and PDF need the server).
+ */
 function exportGrid(button) {
   const first = screenOf(button)?.querySelector('[data-zeyn-grid]');
-  if (button.dataset.zeynExport === 'csv' && first?.dataset.zeynExportable === 'csv') return exportServer(first);
-  if (button.dataset.zeynExport === 'xlsx') return toast('XLSX export is not available yet.');
+  const format = button.dataset.zeynExport;
+  if ((first?.dataset.zeynExportable ?? '').split(' ').includes(format)) return exportServer(first, format);
+  if (format !== 'csv') return toast(`${format.toUpperCase()} export is not available.`);
   const screen = screenOf(button);
   const grid = screen?.querySelector('[data-zeyn-grid]');
   if (!grid) return;
@@ -3102,6 +3116,7 @@ document.addEventListener('click', (e) => {
   if ((el = t.closest('[data-zeyn-page]'))) return loadGrid(el.closest('[data-zeyn-grid]'), el.dataset.zeynPage === 'prev' ? 'prev' : 'next');
   if ((el = t.closest('[data-zeyn-more] button'))) return loadGrid(el.closest('[data-zeyn-grid]'), 'more');
   if ((el = t.closest('[data-zeyn-export]'))) return exportGrid(el);
+  if ((el = t.closest('[data-zeyn-pdf]'))) return downloadPdf(el);
   if ((el = t.closest('[data-zeyn-close]'))) return el.closest('dialog')?.close();
   if ((el = t.closest('button[data-zeyn-effect], a[data-zeyn-effect]'))) {
     e.preventDefault();

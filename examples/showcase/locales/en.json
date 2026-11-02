@@ -39,6 +39,19 @@
   "sales": {
     "today": "Today's orders",
     "archive": "Order archive",
+    "invoice": {
+      "print": "Print invoice",
+      "title": "Invoice",
+      "number": "Invoice no",
+      "date": "Date",
+      "customer": "Bill to",
+      "code": "Code",
+      "product": "Product",
+      "quantity": "Qty",
+      "price": "Unit price",
+      "amount": "Amount",
+      "total": "Total"
+    },
     "order_lines": "Lines of order {id}",
     "by_city": "Orders by city"
   },

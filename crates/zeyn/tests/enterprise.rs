@@ -915,7 +915,7 @@ async fn csv_rows_are_validated_with_the_model_rules_and_only_valid_rows_are_imp
     let audit = MemoryAudit::default();
     let router = import_app(importer(), audit.clone(), store.clone());
     let page = send(&router, get("/import")).await;
-    assert!(page.body.contains(r#"accept=".csv,text/csv""#) && page.body.contains("Name, Credit"));
+    assert!(page.body.contains(r#"accept=".csv,text/csv"#) && page.body.contains("Name, Credit"));
 
     let csv = "\u{feff}NAME;credit\r\nŞirin Gıda A.Ş.;1250.50\r\n;10\r\n=HYPERLINK(\"x\");abc\r\n";
     let r = send(&router, import_call(0, csv, false)).await;

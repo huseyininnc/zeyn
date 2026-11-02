@@ -614,6 +614,16 @@ hooks.push(async (res, input, init) => {
 
 const MAX_CSV_BYTES = 8 * 1024 * 1024;
 
+/** Reads a binary file (an XLSX workbook) as base64 for `POST /_zeyn/import`. */
+function readBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).slice(String(reader.result).indexOf(',') + 1));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
 /**
  * Reads a CSV file as text: UTF-8 when it is valid UTF-8, otherwise Windows-1254, the code page
  * spreadsheet programs often save Turkish text in.
@@ -674,9 +684,9 @@ document.addEventListener('change', async (e) => {
     return;
   }
   status.textContent = t('import.reading');
-  const csv = await readCsv(file);
-  imports.set(box, { csv, name: file.name.replace(/\.[^.]*$/, '') });
-  showImport(box, await post('/_zeyn/import', { ...address(box), csv, commit: false }));
+  const content = /\.xlsx$/i.test(file.name) ? { xlsx: await readBase64(file) } : { csv: await readCsv(file) };
+  imports.set(box, { content, name: file.name.replace(/\.[^.]*$/, '') });
+  showImport(box, await post('/_zeyn/import', { ...address(box), ...content, commit: false }));
 });
 
 document.addEventListener('click', async (e) => {
@@ -695,7 +705,7 @@ document.addEventListener('click', async (e) => {
     return;
   }
   el.disabled = true;
-  const r = await post('/_zeyn/import', { ...address(box), csv: state.csv, commit: true });
+  const r = await post('/_zeyn/import', { ...address(box), ...state.content, commit: true });
   showImport(box, r);
   if (r.ok) {
     box.querySelector('input[type="file"]').value = '';

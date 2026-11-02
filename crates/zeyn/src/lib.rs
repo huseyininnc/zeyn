@@ -334,6 +334,12 @@ pub mod server;
 pub mod sql;
 mod value;
 mod workflow;
+#[cfg(feature = "xlsx")]
+mod xlsx;
+#[cfg(feature = "pdf")]
+mod pdf;
+#[cfg(feature = "email")]
+mod mail;
 
 pub use action::{
     Access, Action, ActionMeta, Ai, Aggregate, AggregateRequest, Cursor, DEFAULT_PAGE_SIZE, Error, Filter, DataQuery, MAX_FILTERS,
@@ -347,7 +353,7 @@ pub use ctx::{BoxFuture, Ctx, Dep, Identity, Inject, IntoScreen, Outcome, Servic
 pub use feature::{Feature, Guard, GuardResult, Menu, MenuGroup, MenuItem, Route, ScreenEntry, SignedIn};
 pub use form::{Form, FormAction, FormRow, SubmitForm};
 pub use grid::{
-    BulkAction, COLUMN_WIDTH, CellRenderer, DEFAULT_EXPORT_LIMIT, MAX_BULK, ColumnView, DataGrid, DataGridColumn, Tone, DataMode, DataGridView, DataGridViewStore, MAX_PINNED, MAX_SORT, MemoryViewStore, Paging,
+    BulkAction, COLUMN_WIDTH, CellRenderer, DEFAULT_EXPORT_LIMIT, ExportColumn, MAX_BULK, ColumnView, DataGrid, DataGridColumn, Tone, DataMode, DataGridView, DataGridViewStore, MAX_PINNED, MAX_SORT, MemoryViewStore, Paging,
     Pin, RowStyle, position_cursor, total,
 };
 #[allow(deprecated)]
@@ -402,7 +408,13 @@ pub use value::{
     SupportsText,
     Value,
 };
-pub use import::{CsvError, Checked, DEFAULT_MAX_ROWS, HARD_MAX_ROWS, Import, ImportSource, MAX_CSV_BYTES, RowError, check_csv, error_report, parse_csv};
+pub use import::{CsvError, Checked, DEFAULT_MAX_ROWS, HARD_MAX_ROWS, Import, ImportFile, ImportSource, MAX_CSV_BYTES, RowError, check_csv, check_file, error_report, parse_csv};
+#[cfg(feature = "xlsx")]
+pub use xlsx::{MAX_XLSX_BYTES, XlsxReadError, XlsxSheet};
+#[cfg(feature = "email")]
+pub use mail::{MAIL_JOB, MAX_ATTEMPTS, MAX_QUEUED, Mail, Mailer};
+#[cfg(feature = "pdf")]
+pub use pdf::{MAX_PDF_DATA, MAX_PDF_ROWS, Pdf, PdfLink, PdfSource, PdfTemplate};
 pub use media::{ByteRange, MAX_MEDIA_ID, MAX_POSITION_SECONDS, MEDIA_CHUNK, Media, MediaEntry, MediaReader, MediaSource, media_type, valid_media_id};
 pub use workflow::{MAX_COMMENT, Transition, TransitionRecord, TransitionRequest, Transitions, Workflow, WorkflowState};
 pub use zeyn_macros::{action, choice, entity, model, params, screen, t};

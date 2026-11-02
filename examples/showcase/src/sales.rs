@@ -5,6 +5,8 @@
 use crate::stock::{ProductParams, ProductStore, Product, ProductId, product_editor};
 use zeyn::prelude::*;
 use zeyn::{Cursor, PageRequest};
+#[cfg(feature = "pdf")]
+use zeyn::{PdfLink, PdfTemplate};
 
 /// A sales order.
 #[entity(table = "orders")]
@@ -209,11 +211,88 @@ pub fn orders_by_city() -> Screen {
     )
 }
 
+/// Invoice of an order, printed from `templates/invoice.typ`.
+#[cfg(feature = "pdf")]
+const INVOICE: PdfTemplate = PdfTemplate::new("invoice", include_str!("../templates/invoice.typ"));
+
+/// One printed invoice line; every value is already text in the user's language.
+#[cfg(feature = "pdf")]
+#[derive(serde::Serialize)]
+pub struct InvoiceLine {
+    pub code: String,
+    pub product: String,
+    pub quantity: String,
+    pub price: String,
+    pub amount: String,
+}
+
+/// What the invoice template reads as `data`.
+#[cfg(feature = "pdf")]
+#[derive(serde::Serialize)]
+pub struct InvoiceData {
+    pub lang: String,
+    pub title: String,
+    pub seller: String,
+    pub seller_address: String,
+    pub number_label: String,
+    pub number: String,
+    pub date_label: String,
+    pub date: String,
+    pub customer_label: String,
+    pub customer: String,
+    pub city: String,
+    pub columns: Vec<String>,
+    pub lines: Vec<InvoiceLine>,
+    pub total_label: String,
+    pub total: String,
+}
+
+/// The data of an order's invoice, in the user's language and time zone.
+#[cfg(feature = "pdf")]
+#[action(permission = "sales.order.read")]
+pub async fn invoice_data(p: OrderParams, store: ProductStore, ctx: Ctx) -> Result<InvoiceData> {
+    let n = p.id.0 as u64;
+    let o = order(n, ctx.now(), 0);
+    let lines = order_lines_of(n, &store.all()?);
+    let locale = ctx.locale().to_string();
+    let total = Money::tl(lines.iter().map(|l| l.amount.minor).sum());
+    let t = |key: &str| ctx.t(&Text::key(key.to_string()));
+    Ok(InvoiceData {
+        lang: locale.chars().take(2).collect(),
+        title: t("sales.invoice.title"),
+        seller: "Northwind Operations".into(),
+        seller_address: "Kordon 12, İzmir".into(),
+        number_label: t("sales.invoice.number"),
+        number: format!("INV-{n:07}"),
+        date_label: t("sales.invoice.date"),
+        date: ctx.today().format(&locale),
+        customer_label: t("sales.invoice.customer"),
+        customer: o.customer,
+        city: o.city,
+        columns: ["code", "product", "quantity", "price", "amount"].iter().map(|c| t(&format!("sales.invoice.{c}"))).collect(),
+        lines: lines
+            .iter()
+            .map(|l| InvoiceLine {
+                code: l.product_id.0.to_string(),
+                product: l.product.clone(),
+                quantity: l.quantity.to_string(),
+                price: l.price.format(&locale),
+                amount: l.amount.format(&locale),
+            })
+            .collect(),
+        total_label: t("sales.invoice.total"),
+        total: total.format(&locale),
+    })
+}
+
 /// The lines of one order, shown when a row of today's orders opens. Each line opens the product
 /// editor in turn.
 #[screen(permission = "sales.order.read")]
 pub fn order_lines(params: OrderParams) -> Screen {
-    Screen::window(t!("sales.order_lines", id = params.id.0.to_string())).body(
+    let screen = Screen::window(t!("sales.order_lines", id = params.id.0.to_string()));
+    #[cfg(feature = "pdf")]
+    let screen = screen.body(PdfLink::new(t!("sales.invoice.print"), INVOICE, invoice_data, params.clone()));
+    screen.body(
         DataGrid::of(search_lines)
             .scope(OrderLine::order_id, params.id)
             .paging(Paging::none())
@@ -235,7 +314,10 @@ pub fn order_lines(params: OrderParams) -> Screen {
 
 #[screen(route = "/archive", permission = "sales.order.read")]
 pub fn archive() -> Screen {
-    Screen::new(t!("sales.archive")).toolbar(|t| t.export(Export::Csv)).body(
+    Screen::new(t!("sales.archive")).toolbar(|t| {
+        let t = t.export(Export::Csv).export(Export::Xlsx);
+        if cfg!(feature = "pdf") { t.export(Export::Pdf) } else { t }
+    }).body(
         DataGrid::of(search_archive)
             .mode(DataMode::Server)
             .paging(Paging::virtual_scroll())

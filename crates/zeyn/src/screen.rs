@@ -252,7 +252,7 @@ pub trait GridSource: Send + Sync {
         None
     }
 
-    /// Who may export the whole filtered result as CSV; `None` when the grid offers no export.
+    /// Who may export the whole filtered result; `None` when the grid offers no export.
     fn export_access(&self) -> Option<crate::action::Access> {
         None
     }
@@ -273,6 +273,25 @@ pub trait GridSource: Send + Sync {
     fn csv_rows(&self, page: &LoadedPage, r: &Render) -> String {
         let _ = (page, r);
         String::new()
+    }
+
+    /// Columns of a typed export (XLSX) in a view: labels in the user's language and widths.
+    fn export_columns(&self, r: &Render, view: Option<&crate::grid::DataGridView>) -> Vec<crate::grid::ExportColumn> {
+        let _ = (r, view);
+        Vec::new()
+    }
+
+    /// Typed values of a loaded page in its view, one row per item: choices as the user's labels
+    /// and exact moments as wall clock time in the user's time zone. Everything else keeps its type.
+    fn export_values(&self, page: &LoadedPage, r: &Render) -> Vec<Vec<crate::value::Value>> {
+        let _ = (page, r);
+        Vec::new()
+    }
+
+    /// Cells of a loaded page in its view as the user reads them, for printed exports (PDF).
+    fn export_text(&self, page: &LoadedPage, r: &Render) -> Vec<Vec<String>> {
+        let _ = (page, r);
+        Vec::new()
     }
 
     /// Builds the call of a row item (`a0` for the first row action) from the loaded row with
@@ -334,6 +353,12 @@ pub trait Component: Send + Sync {
         None
     }
 
+    /// A PDF document, for components that download one (see [`crate::PdfLink`]).
+    #[cfg(feature = "pdf")]
+    fn pdf(&self) -> Option<&dyn crate::pdf::PdfSource> {
+        None
+    }
+
     /// Nodes held by a container. Child `i` of the node at path `p` has the path `p.i`.
     fn children(&self) -> &[Node] {
         &[]
@@ -380,6 +405,11 @@ impl Node {
 
     pub fn import(&self) -> Option<&dyn crate::import::ImportSource> {
         self.0.import()
+    }
+
+    #[cfg(feature = "pdf")]
+    pub fn pdf(&self) -> Option<&dyn crate::pdf::PdfSource> {
+        self.0.pdf()
     }
 
     pub fn children(&self) -> &[Node] {
@@ -439,6 +469,8 @@ impl Icon {
 pub enum Export {
     Xlsx,
     Csv,
+    /// A list report, with the `pdf` Cargo feature.
+    Pdf,
 }
 
 impl Export {
@@ -446,6 +478,7 @@ impl Export {
         match self {
             Export::Xlsx => "xlsx",
             Export::Csv => "csv",
+            Export::Pdf => "pdf",
         }
     }
 }

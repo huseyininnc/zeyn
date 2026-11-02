@@ -50,6 +50,8 @@
     },
     "import": {
       "file": "CSV file",
+      "file_any": "CSV or Excel file",
+      "bad_file": "The file could not be read as an Excel workbook.",
       "hint": "The first row names the columns: {columns}. Values are separated by commas or semicolons. At most {max} rows.",
       "summary": "{total} rows read: {valid} valid, {invalid} with errors.",
       "commit": "Import valid rows",
@@ -68,6 +70,13 @@
       "report_field": "Field",
       "report_message": "Message",
       "reading": "Reading the file..."
+    },
+    "mail": {
+      "transition": {
+        "subject": "{record}: {to}",
+        "text": "{record} moved from {from} to {to} ({move}) by {by}.\n\n{comment}",
+        "html": "<p><strong>{record}</strong> moved from {from} to <strong>{to}</strong> ({move}) by {by}.</p><p>{comment}</p>"
+      }
     },
     "workflow": {
       "state": "State",
@@ -190,7 +199,9 @@
     },
     "export": {
       "xlsx": "Export to Excel",
-      "csv": "Export to CSV"
+      "csv": "Export to CSV",
+      "pdf": "Export to PDF",
+      "pdf_cut": "Only the first {max} rows are printed."
     },
     "shell": {
       "skip": "Skip to content",

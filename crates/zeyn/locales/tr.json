@@ -50,6 +50,8 @@
     },
     "import": {
       "file": "CSV dosyası",
+      "file_any": "CSV ya da Excel dosyası",
+      "bad_file": "Dosya bir Excel çalışma kitabı olarak okunamadı.",
       "hint": "İlk satır sütun adlarıdır: {columns}. Değerler virgül ya da noktalı virgülle ayrılır. En fazla {max} satır.",
       "summary": "{total} satır okundu: {valid} geçerli, {invalid} hatalı.",
       "commit": "Geçerli satırları aktar",
@@ -68,6 +70,13 @@
       "report_field": "Alan",
       "report_message": "Mesaj",
       "reading": "Dosya okunuyor..."
+    },
+    "mail": {
+      "transition": {
+        "subject": "{record}: {to}",
+        "text": "{record}, {by} tarafından {from} durumundan {to} durumuna taşındı ({move}).\n\n{comment}",
+        "html": "<p><strong>{record}</strong>, {by} tarafından {from} durumundan <strong>{to}</strong> durumuna taşındı ({move}).</p><p>{comment}</p>"
+      }
     },
     "workflow": {
       "state": "Durum",
@@ -190,7 +199,9 @@
     },
     "export": {
       "xlsx": "Excel'e aktar",
-      "csv": "CSV'ye aktar"
+      "csv": "CSV'ye aktar",
+      "pdf": "PDF'e aktar",
+      "pdf_cut": "Yalnızca ilk {max} satır yazdırıldı."
     },
     "shell": {
       "skip": "İçeriğe geç",

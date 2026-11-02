@@ -180,6 +180,7 @@ pub fn product_list() -> Screen {
                 .shortcut("Ctrl+N")
                 .opens(product_editor, ProductParams { id: None })
                 .export(Export::Csv)
+                .export(Export::Xlsx)
         })
         .body(
             DataGrid::of(search_products)
