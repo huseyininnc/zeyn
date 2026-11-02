@@ -501,6 +501,8 @@ pub mod prelude {
     #[cfg(feature = "server")]
     #[allow(deprecated)]
     pub use crate::Agents;
+    #[cfg(feature = "markdown")]
+    pub use crate::ui::Markdown;
     pub use crate::ui::{
         ActionButton, Alert, Audio, Badge, Breadcrumb, Busy, Card, Chart, Control, DateOptions, DescriptionList, Dock,
         EmptyState, Kpi, LookupItem, LookupQuery, MenuBar, MenuButton, Panel, Popover, Progress, PropertyInspector,

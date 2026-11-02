@@ -68,6 +68,22 @@ ActionButton::new(t!("docs.live.count"), count_samples, ())
 
 @live action
 
+## Markdown
+
+`Markdown::new(text)` shows formatted text, such as a comment, a product description or help. The text is a string or a locale key. It needs the `markdown` feature (`zeyn = { features = ["markdown"] }`), which adds no dependencies.
+
+```rust
+Markdown::new(product.description.clone())
+Markdown::new(t!("help.import")).trusted()
+```
+
+- Headings, paragraphs, lists, tables, code blocks, quotes, rules, inline code, links, images, bold and italic.
+- Raw HTML is never passed through: `<script>` shows up as text, and code blocks are escaped too.
+- Links may only point to `http`, `https`, `mailto`, an anchor or a relative path. Others, such as `javascript:` or `data:`, keep only their label. User links get `rel="noopener noreferrer nofollow ugc"`.
+- Images load only from the app itself (a relative path); other images show their alt text.
+- `.trusted()` is for text the app wrote: headings get ids for links to them and links lose `nofollow ugc`. The escaping and the link rules stay the same.
+- Text over 64 KB (`MAX_MARKDOWN`) is cut, and nesting is capped, so hostile input stays cheap to render.
+
 ## Tooltip, popover and busy overlay
 
 A tooltip is a short description of one control: `ActionButton::tip(text)`, `ToolButton::tip(text)` in a screen toolbar and `Form::tip(field, text)`, which adds an info button after the field's label. The text is the control's `aria-describedby`, so screen readers hear it with the control. It shows after a short hover and at once on focus, stays while the pointer is over it (WCAG 1.4.13), hides with Escape without moving focus, and shows on touch after a long press (a tap on the info button). A tooltip never carries information the user must have: put that in the label, the field's rules or the page.
