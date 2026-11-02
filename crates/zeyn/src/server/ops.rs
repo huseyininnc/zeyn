@@ -403,5 +403,15 @@ pub(super) fn head(st: &AppState, ctx: &Ctx) -> String {
         build = escape(build_id()),
         session = super::session::head(st, ctx),
         base = escape(&st.prefix),
-    )
+    ) + &accounts_head(st)
+}
+
+/// The passkey script of the accounts system, when it is on.
+fn accounts_head(st: &AppState) -> String {
+    #[cfg(feature = "accounts")]
+    if st.sign_in.accounts.is_some() {
+        return format!(r#"<script type="module" src="{}/_zeyn/account/accounts.js"></script>"#, escape(&st.prefix));
+    }
+    let _ = st;
+    String::new()
 }

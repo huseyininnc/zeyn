@@ -209,6 +209,15 @@ async function runEffect(effect, source) {
       if (!ask('zeyn:navigate', { url })) location.assign(url);
       return;
     }
+    case 'go': {
+      const url = new URL(effect.url ?? '/', location.href);
+      if (url.origin !== location.origin) return;
+      if (effect.frame) {
+        history.pushState({ zeyn: true }, '', url.href);
+        if (!ask('zeyn:refresh-page')) location.assign(url.href);
+      } else if (!ask('zeyn:navigate', { url: url.href })) location.assign(url.href);
+      return;
+    }
     case 'toast':
       return toast(effect.message ?? '');
     case 'close_and_refresh':

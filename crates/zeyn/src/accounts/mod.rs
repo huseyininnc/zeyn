@@ -38,7 +38,7 @@ pub use signin::{SignInManager, SignInResult, TwoFactorKind};
 pub use sql::{SqlAccountStore, create_tables};
 pub use store::{AccountStore, MemoryAccountStore};
 pub use tokens::Purpose;
-pub use ui::{AccountsUi, feature, ui};
+pub use ui::{AccountsUi, ROLES_WRITE, USERS_READ, USERS_WRITE, feature, ui};
 
 
 use crate::ctx::{BoxFuture, Ctx, Service};

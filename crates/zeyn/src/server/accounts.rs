@@ -680,7 +680,7 @@ fn take_ceremony(accounts: &Accounts, op: &str) -> Option<PasskeyState> {
 }
 
 /// Options for signing in with a passkey; the browser offers the site's passkeys.
-pub(crate) fn passkey_request_options(accounts: &Accounts, st: &AppState) -> Result<Json> {
+fn passkey_request_options(accounts: &Accounts, st: &AppState) -> Result<Json> {
     let party = party(accounts, st).ok_or(Error::NotFound)?;
     let challenge = start_ceremony(accounts, "get", None)?;
     Ok(passkey::request_options(&accounts.settings().passkeys, &party, &challenge, &[]))
@@ -707,7 +707,7 @@ struct PasskeyRequest {
 }
 
 /// Verifies a passkey sign in and signs the user in. Returns the user's id.
-pub(crate) async fn passkey_sign_in(accounts: &Accounts, st: &AppState, credential: &str, remember: bool) -> Result<(SignInResult, String)> {
+async fn passkey_sign_in(accounts: &Accounts, st: &AppState, credential: &str, remember: bool) -> Result<(SignInResult, String)> {
     let party = party(accounts, st).ok_or(Error::NotFound)?;
     let state = take_ceremony(accounts, "get").ok_or_else(|| crate::accounts::denied("passkey_expired"))?;
     let credential: Json = serde_json::from_str(credential).map_err(|_| crate::accounts::denied("passkey_invalid"))?;
@@ -736,7 +736,7 @@ async fn passkey_login(State(st): State<Arc<AppState>>, headers: HeaderMap, Quer
 }
 
 /// Options for adding a passkey to the signed in user.
-pub(crate) async fn passkey_creation_options(accounts: &Accounts, st: &AppState, user: &User) -> Result<Json> {
+async fn passkey_creation_options(accounts: &Accounts, st: &AppState, user: &User) -> Result<Json> {
     let party = party(accounts, st).ok_or(Error::NotFound)?;
     let existing = accounts.users().passkeys(user).await?;
     let challenge = start_ceremony(accounts, "create", Some(user.id.clone()))?;
@@ -756,7 +756,7 @@ async fn passkey_creation(State(st): State<Arc<AppState>>, headers: HeaderMap) -
 }
 
 /// Verifies and stores a new passkey of the signed in user.
-pub(crate) async fn passkey_register(accounts: &Accounts, st: &AppState, user: &mut User, credential: &str, name: Option<String>) -> Result<crate::accounts::Passkey> {
+async fn passkey_register(accounts: &Accounts, st: &AppState, user: &mut User, credential: &str, name: Option<String>) -> Result<crate::accounts::Passkey> {
     let party = party(accounts, st).ok_or(Error::NotFound)?;
     let state = take_ceremony(accounts, "create").filter(|s| s.user.as_deref() == Some(user.id.as_str())).ok_or_else(|| crate::accounts::denied("passkey_expired"))?;
     let credential: Json = serde_json::from_str(credential).map_err(|_| crate::accounts::denied("passkey_invalid"))?;

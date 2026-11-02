@@ -426,6 +426,295 @@
       "audio_too_large": "The recording is too long.",
       "token_limit": "You have reached the assistant's usage limit for now. Try again later.",
       "too_many_steps": "I stopped because this took too many steps. Try a simpler request."
+    },
+    "accounts": {
+      "login": {
+        "title": "Sign in",
+        "submit": "Sign in",
+        "passkey": "Sign in with a passkey",
+        "external": "Or sign in with",
+        "with": "Sign in with",
+        "forgot": "Forgot your password?",
+        "resend": "Resend the confirmation e-mail",
+        "register": "Create an account"
+      },
+      "register": {
+        "title": "Create an account",
+        "submit": "Create account",
+        "login": "Back to sign in"
+      },
+      "check_email": {
+        "title": "Check your e-mail",
+        "body": "If the address can receive mail from us, a message with the next step is on its way. The link in it works for one day."
+      },
+      "forgot": {
+        "title": "Forgot your password?",
+        "intro": "Enter your e-mail address. If it belongs to a confirmed account, we send you a link to choose a new password.",
+        "submit": "Send the link"
+      },
+      "resend": {
+        "title": "Resend the confirmation e-mail",
+        "submit": "Send again"
+      },
+      "reset": {
+        "title": "Choose a new password",
+        "submit": "Save the new password"
+      },
+      "confirm": {
+        "title": "Confirm your e-mail",
+        "done": "Thank you, your e-mail address is confirmed.",
+        "failed": "This link does not work. It may have expired, been used already or replaced by a newer one."
+      },
+      "two_factor": {
+        "title": "Two step sign in",
+        "intro": "Enter the code from your authenticator app.",
+        "submit": "Verify",
+        "email_intro": "Or get a code by e-mail.",
+        "send_email": "Send me a code",
+        "sent": "The code is on its way.",
+        "submit_email": "Verify the e-mail code",
+        "use_recovery": "Use a recovery code instead",
+        "on": "Two step sign in is on.",
+        "codes_left": "Recovery codes left: {n}",
+        "new_codes": "New recovery codes",
+        "new_codes_confirm": "Your current recovery codes will stop working. Continue?",
+        "forget": "Forget this browser",
+        "disable": "Turn off",
+        "disable_confirm": "Turn off two step sign in? Your account will be easier to break into.",
+        "reset_key": "Reset the authenticator key",
+        "reset_key_confirm": "Your authenticator app will stop working for this account until you set it up again. Continue?",
+        "setup": "Scan the QR code with an authenticator app, or type the key, then enter the six digit code it shows.",
+        "qr": "QR code for your authenticator app",
+        "manual": "Key:",
+        "enable": "Turn on"
+      },
+      "recovery": {
+        "title": "Sign in with a recovery code",
+        "intro": "Each recovery code works once.",
+        "submit": "Sign in"
+      },
+      "lockout": {
+        "title": "Account locked",
+        "body": "This account is locked for a while after too many failed attempts. Try again later, or reset your password."
+      },
+      "denied": {
+        "title": "Access denied",
+        "body": "You do not have access to this page."
+      },
+      "logout": {
+        "title": "Sign out",
+        "body": "Sign out of this browser?",
+        "submit": "Sign out"
+      },
+      "manage": {
+        "title": "Account settings",
+        "profile": "Profile",
+        "email": "E-mail",
+        "password": "Password",
+        "two_factor": "Two step sign in",
+        "passkeys": "Passkeys",
+        "logins": "External logins",
+        "personal_data": "Personal data"
+      },
+      "save": "Save",
+      "saved": "Saved.",
+      "email": {
+        "current": "Your e-mail address:",
+        "confirmed": "confirmed",
+        "unconfirmed": "not confirmed",
+        "send_verification": "Send the confirmation e-mail",
+        "sent": "Check your inbox for a confirmation link.",
+        "change": "Change e-mail"
+      },
+      "password": {
+        "submit": "Save password",
+        "changed": "Your password was changed. Other sessions are signed out."
+      },
+      "codes": {
+        "title": "Recovery codes",
+        "keep": "Keep these codes in a safe place. Each one works once, and they are shown only now.",
+        "gone": "Recovery codes are shown only once, right after they are made.",
+        "back": "Back to two step sign in"
+      },
+      "passkeys": {
+        "intro": "A passkey signs you in with your device's screen lock, without a password.",
+        "none": "You have no passkeys yet.",
+        "remove": "Remove",
+        "remove_confirm": "Remove this passkey?",
+        "name": "Name for a new passkey",
+        "add": "Add a passkey",
+        "added": "The passkey was added.",
+        "failed": "The passkey did not work. Try again.",
+        "unsupported": "This browser does not support passkeys."
+      },
+      "logins": {
+        "none": "No external logins are linked.",
+        "remove": "Unlink",
+        "remove_confirm": "Unlink this login?",
+        "add": "Link"
+      },
+      "data": {
+        "intro": "Download everything this account stores about you, or delete the account.",
+        "download": "Download my data",
+        "delete_warning": "Deleting your account removes your data for good. This cannot be undone.",
+        "delete": "Delete my account"
+      },
+      "admin": {
+        "menu": "Accounts",
+        "users": "Users",
+        "roles": "Roles",
+        "lock": "Lock",
+        "unlock": "Unlock",
+        "reset": "Send reset link",
+        "delete_role": "Delete",
+        "create_role": "Add role"
+      },
+      "external": {
+        "title": "Finish signing in",
+        "intro": "You signed in with",
+        "submit": "Create my account"
+      },
+      "notice": {
+        "confirmed": "Your e-mail address is confirmed. You can sign in.",
+        "reset": "Your password was reset. Sign in with the new one.",
+        "signed_out": "You are signed out.",
+        "deleted": "Your account was deleted.",
+        "check_email": "Check your e-mail for the next step."
+      },
+      "error": {
+        "invalid_user_name": "This user name is not valid.",
+        "duplicate_user_name": "This name is taken.",
+        "invalid_email": "Enter a valid e-mail address.",
+        "duplicate_email": "This e-mail address is taken.",
+        "invalid_phone": "Enter a valid phone number.",
+        "password_too_short": "Use at least {n} characters.",
+        "password_too_long": "Use at most {n} bytes.",
+        "password_requires_non_alphanumeric": "Use at least one character that is not a letter or digit.",
+        "password_requires_digit": "Use at least one digit (0 to 9).",
+        "password_requires_lower": "Use at least one lower case letter (a to z).",
+        "password_requires_upper": "Use at least one upper case letter (A to Z).",
+        "password_requires_unique_chars": "Use at least {n} different characters.",
+        "password_breached": "This password appears in known data breaches. Choose another one.",
+        "user_already_has_password": "This account has a password already.",
+        "password_mismatch": "The password is wrong.",
+        "invalid_token": "This link does not work. It may have expired or been used already.",
+        "invalid_code": "The code is wrong or expired.",
+        "lockout_not_enabled": "Lockout is off for this user.",
+        "login_already_associated": "This login belongs to another account.",
+        "last_login": "This is your last way to sign in. Add a password or another login first.",
+        "invalid_role_name": "This role name is not valid.",
+        "duplicate_role_name": "This role exists already.",
+        "rate_limited": "Too many attempts. Wait a few minutes and try again.",
+        "two_factor_expired": "The sign in took too long. Start again.",
+        "two_factor_unavailable": "This way of getting a code is not available.",
+        "passkey_invalid": "The passkey could not be verified.",
+        "passkey_expired": "The passkey request expired. Try again.",
+        "passkey_registered": "This passkey is registered already.",
+        "not_allowed": "Confirm your e-mail address before you sign in.",
+        "invalid_login": "The user name or password is wrong.",
+        "password_confirm_mismatch": "The passwords do not match.",
+        "invalid_recovery_code": "The recovery code is wrong or used.",
+        "email_unchanged": "This is your current address.",
+        "unknown_role": "One of these roles does not exist.",
+        "external_expired": "The external sign in took too long. Start again.",
+        "external_email_taken": "An account with this e-mail exists. Sign in to it and link the provider from your account settings.",
+        "external": "The external sign in did not work.",
+        "old_password_required": "Enter your current password.",
+        "cannot_reset_shared_key_and_enable": "Reset the key first, then turn two step sign in on with a code from the new key.",
+        "requires_two_factor": "Enter a code from your authenticator app.",
+        "invalid_two_factor_code": "The code is wrong."
+      },
+      "mail": {
+        "confirm": {
+          "subject": "Confirm your e-mail address",
+          "text": "Open this link to confirm your e-mail address:\n\n{link}\n\nThe link works for one day. If you did not create an account, ignore this message.",
+          "html": "<p>Open this link to confirm your e-mail address:</p><p><a href=\"{link}\">Confirm my e-mail address</a></p><p>The link works for one day. If you did not create an account, ignore this message.</p>"
+        },
+        "reset": {
+          "subject": "Reset your password",
+          "text": "Open this link to choose a new password:\n\n{link}\n\nThe link works for one day. If you did not ask for it, ignore this message.",
+          "html": "<p>Open this link to choose a new password:</p><p><a href=\"{link}\">Choose a new password</a></p><p>The link works for one day. If you did not ask for it, ignore this message.</p>"
+        },
+        "change": {
+          "subject": "Confirm your new e-mail address",
+          "text": "Open this link to use this address for your account:\n\n{link}\n\nIf you did not ask for this change, ignore this message.",
+          "html": "<p>Open this link to use this address for your account:</p><p><a href=\"{link}\">Confirm the new address</a></p><p>If you did not ask for this change, ignore this message.</p>"
+        },
+        "exists": {
+          "subject": "You already have an account",
+          "text": "Someone tried to create an account with this address, which has one already. Sign in here:\n\n{link}\n\nIf you forgot your password, use the password reset on that page.",
+          "html": "<p>Someone tried to create an account with this address, which has one already.</p><p><a href=\"{link}\">Sign in</a></p><p>If you forgot your password, use the password reset on that page.</p>"
+        },
+        "code": {
+          "subject": "Your sign in code",
+          "text": "Your sign in code is {code}. It works for a few minutes.",
+          "html": "<p>Your sign in code is <strong>{code}</strong>. It works for a few minutes.</p>"
+        }
+      }
     }
+  },
+  "AccountLogin": {
+    "user_name": "E-mail or user name",
+    "password": "Password",
+    "remember_me": "Remember me"
+  },
+  "AccountRegister": {
+    "email": "E-mail",
+    "password": "Password",
+    "confirm_password": "Confirm password"
+  },
+  "AccountEmailOnly": {
+    "email": "E-mail"
+  },
+  "AccountReset": {
+    "password": "New password",
+    "confirm_password": "Confirm the new password",
+    "user": "User",
+    "code": "Code"
+  },
+  "AccountCode": {
+    "code": "Code",
+    "remember_machine": "Remember this browser",
+    "return_to": "Return to"
+  },
+  "AccountRecovery": {
+    "code": "Recovery code",
+    "return_to": "Return to"
+  },
+  "AccountProfile": {
+    "user_name": "User name",
+    "phone_number": "Phone number"
+  },
+  "AccountNewEmail": {
+    "new_email": "New e-mail"
+  },
+  "AccountPassword": {
+    "old_password": "Current password",
+    "new_password": "New password",
+    "confirm_password": "Confirm the new password"
+  },
+  "AccountDelete": {
+    "password": "Password"
+  },
+  "AccountUserRow": {
+    "id": "Id",
+    "user_name": "User name",
+    "email": "E-mail",
+    "email_confirmed": "Confirmed",
+    "two_factor": "Two step",
+    "locked": "Locked",
+    "roles": "Roles"
+  },
+  "AccountUserRoles": {
+    "id": "Id",
+    "roles": "Roles (comma separated)"
+  },
+  "AccountRoleRow": {
+    "id": "Id",
+    "name": "Name",
+    "permissions": "Permissions (comma separated)"
+  },
+  "AccountExternal": {
+    "email": "E-mail"
   }
 }

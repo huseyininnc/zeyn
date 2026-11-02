@@ -426,6 +426,295 @@
       "audio_too_large": "Kayıt çok uzun.",
       "token_limit": "Asistanın şimdilik kullanım sınırına ulaştınız. Daha sonra tekrar deneyin.",
       "too_many_steps": "Çok fazla adım sürdüğü için durdum. Daha basit bir istek deneyin."
+    },
+    "accounts": {
+      "login": {
+        "title": "Oturum aç",
+        "submit": "Oturum aç",
+        "passkey": "Geçiş anahtarıyla oturum aç",
+        "external": "Ya da şununla oturum açın",
+        "with": "Şununla oturum aç:",
+        "forgot": "Parolanızı mı unuttunuz?",
+        "resend": "Onay e-postasını yeniden gönder",
+        "register": "Hesap oluştur"
+      },
+      "register": {
+        "title": "Hesap oluştur",
+        "submit": "Hesabı oluştur",
+        "login": "Oturum açmaya dön"
+      },
+      "check_email": {
+        "title": "E-postanızı kontrol edin",
+        "body": "Adres bizden e-posta alabiliyorsa sonraki adımı anlatan bir ileti yola çıktı. İçindeki bağlantı bir gün geçerlidir."
+      },
+      "forgot": {
+        "title": "Parolanızı mı unuttunuz?",
+        "intro": "E-posta adresinizi yazın. Onaylı bir hesaba aitse yeni parola seçmeniz için bir bağlantı göndeririz.",
+        "submit": "Bağlantıyı gönder"
+      },
+      "resend": {
+        "title": "Onay e-postasını yeniden gönder",
+        "submit": "Yeniden gönder"
+      },
+      "reset": {
+        "title": "Yeni parola seçin",
+        "submit": "Yeni parolayı kaydet"
+      },
+      "confirm": {
+        "title": "E-postanızı onaylayın",
+        "done": "Teşekkürler, e-posta adresiniz onaylandı.",
+        "failed": "Bu bağlantı çalışmıyor. Süresi dolmuş, kullanılmış ya da yenisiyle değişmiş olabilir."
+      },
+      "two_factor": {
+        "title": "İki adımlı oturum açma",
+        "intro": "Doğrulama uygulamanızdaki kodu yazın.",
+        "submit": "Doğrula",
+        "email_intro": "Ya da kodu e-postayla alın.",
+        "send_email": "Bana kod gönder",
+        "sent": "Kod yola çıktı.",
+        "submit_email": "E-posta kodunu doğrula",
+        "use_recovery": "Bunun yerine kurtarma kodu kullan",
+        "on": "İki adımlı oturum açma açık.",
+        "codes_left": "Kalan kurtarma kodu: {n}",
+        "new_codes": "Yeni kurtarma kodları",
+        "new_codes_confirm": "Şimdiki kurtarma kodlarınız çalışmayı bırakacak. Devam edilsin mi?",
+        "forget": "Bu tarayıcıyı unut",
+        "disable": "Kapat",
+        "disable_confirm": "İki adımlı oturum açma kapatılsın mı? Hesabınız daha kolay ele geçirilebilir.",
+        "reset_key": "Doğrulama anahtarını sıfırla",
+        "reset_key_confirm": "Yeniden kurana kadar doğrulama uygulamanız bu hesap için çalışmaz. Devam edilsin mi?",
+        "setup": "QR kodu bir doğrulama uygulamasıyla okutun ya da anahtarı yazın, sonra gösterdiği altı haneli kodu girin.",
+        "qr": "Doğrulama uygulamanız için QR kod",
+        "manual": "Anahtar:",
+        "enable": "Aç"
+      },
+      "recovery": {
+        "title": "Kurtarma koduyla oturum aç",
+        "intro": "Her kurtarma kodu bir kez çalışır.",
+        "submit": "Oturum aç"
+      },
+      "lockout": {
+        "title": "Hesap kilitlendi",
+        "body": "Çok sayıda hatalı denemeden sonra bu hesap bir süre kilitli kalır. Daha sonra yeniden deneyin ya da parolanızı sıfırlayın."
+      },
+      "denied": {
+        "title": "Erişim engellendi",
+        "body": "Bu sayfaya erişiminiz yok."
+      },
+      "logout": {
+        "title": "Oturumu kapat",
+        "body": "Bu tarayıcıdaki oturum kapatılsın mı?",
+        "submit": "Oturumu kapat"
+      },
+      "manage": {
+        "title": "Hesap ayarları",
+        "profile": "Profil",
+        "email": "E-posta",
+        "password": "Parola",
+        "two_factor": "İki adımlı oturum açma",
+        "passkeys": "Geçiş anahtarları",
+        "logins": "Dış oturumlar",
+        "personal_data": "Kişisel veriler"
+      },
+      "save": "Kaydet",
+      "saved": "Kaydedildi.",
+      "email": {
+        "current": "E-posta adresiniz:",
+        "confirmed": "onaylı",
+        "unconfirmed": "onaylanmadı",
+        "send_verification": "Onay e-postasını gönder",
+        "sent": "Onay bağlantısı için gelen kutunuza bakın.",
+        "change": "E-postayı değiştir"
+      },
+      "password": {
+        "submit": "Parolayı kaydet",
+        "changed": "Parolanız değişti. Diğer oturumlar kapatıldı."
+      },
+      "codes": {
+        "title": "Kurtarma kodları",
+        "keep": "Bu kodları güvenli bir yerde saklayın. Her biri bir kez çalışır ve yalnızca şimdi gösterilir.",
+        "gone": "Kurtarma kodları yalnızca üretildikleri anda bir kez gösterilir.",
+        "back": "İki adımlı oturum açmaya dön"
+      },
+      "passkeys": {
+        "intro": "Geçiş anahtarı, parola olmadan cihazınızın ekran kilidiyle oturum açtırır.",
+        "none": "Henüz geçiş anahtarınız yok.",
+        "remove": "Kaldır",
+        "remove_confirm": "Bu geçiş anahtarı kaldırılsın mı?",
+        "name": "Yeni geçiş anahtarının adı",
+        "add": "Geçiş anahtarı ekle",
+        "added": "Geçiş anahtarı eklendi.",
+        "failed": "Geçiş anahtarı çalışmadı. Yeniden deneyin.",
+        "unsupported": "Bu tarayıcı geçiş anahtarlarını desteklemiyor."
+      },
+      "logins": {
+        "none": "Bağlı dış oturum yok.",
+        "remove": "Bağlantıyı kaldır",
+        "remove_confirm": "Bu oturumun bağlantısı kaldırılsın mı?",
+        "add": "Bağla"
+      },
+      "data": {
+        "intro": "Bu hesabın sizinle ilgili sakladığı her şeyi indirin ya da hesabı silin.",
+        "download": "Verilerimi indir",
+        "delete_warning": "Hesabınızı silmek verilerinizi kalıcı olarak kaldırır. Bu geri alınamaz.",
+        "delete": "Hesabımı sil"
+      },
+      "admin": {
+        "menu": "Hesaplar",
+        "users": "Kullanıcılar",
+        "roles": "Roller",
+        "lock": "Kilitle",
+        "unlock": "Kilidi aç",
+        "reset": "Sıfırlama bağlantısı gönder",
+        "delete_role": "Sil",
+        "create_role": "Rol ekle"
+      },
+      "external": {
+        "title": "Oturum açmayı tamamlayın",
+        "intro": "Şununla oturum açtınız:",
+        "submit": "Hesabımı oluştur"
+      },
+      "notice": {
+        "confirmed": "E-posta adresiniz onaylandı. Oturum açabilirsiniz.",
+        "reset": "Parolanız sıfırlandı. Yenisiyle oturum açın.",
+        "signed_out": "Oturumunuz kapatıldı.",
+        "deleted": "Hesabınız silindi.",
+        "check_email": "Sonraki adım için e-postanıza bakın."
+      },
+      "error": {
+        "invalid_user_name": "Bu kullanıcı adı geçerli değil.",
+        "duplicate_user_name": "Bu ad alınmış.",
+        "invalid_email": "Geçerli bir e-posta adresi yazın.",
+        "duplicate_email": "Bu e-posta adresi alınmış.",
+        "invalid_phone": "Geçerli bir telefon numarası yazın.",
+        "password_too_short": "En az {n} karakter kullanın.",
+        "password_too_long": "En çok {n} bayt kullanın.",
+        "password_requires_non_alphanumeric": "Harf ya da rakam olmayan en az bir karakter kullanın.",
+        "password_requires_digit": "En az bir rakam (0 ile 9) kullanın.",
+        "password_requires_lower": "En az bir küçük harf (a ile z) kullanın.",
+        "password_requires_upper": "En az bir büyük harf (A ile Z) kullanın.",
+        "password_requires_unique_chars": "En az {n} farklı karakter kullanın.",
+        "password_breached": "Bu parola bilinen veri sızıntılarında geçiyor. Başka bir parola seçin.",
+        "user_already_has_password": "Bu hesabın zaten bir parolası var.",
+        "password_mismatch": "Parola yanlış.",
+        "invalid_token": "Bu bağlantı çalışmıyor. Süresi dolmuş ya da kullanılmış olabilir.",
+        "invalid_code": "Kod yanlış ya da süresi dolmuş.",
+        "lockout_not_enabled": "Bu kullanıcı için kilitleme kapalı.",
+        "login_already_associated": "Bu oturum başka bir hesaba ait.",
+        "last_login": "Oturum açmanın son yolu bu. Önce bir parola ya da başka bir oturum ekleyin.",
+        "invalid_role_name": "Bu rol adı geçerli değil.",
+        "duplicate_role_name": "Bu rol zaten var.",
+        "rate_limited": "Çok fazla deneme. Birkaç dakika bekleyip yeniden deneyin.",
+        "two_factor_expired": "Oturum açma çok uzun sürdü. Baştan başlayın.",
+        "two_factor_unavailable": "Kodu bu yolla almak mümkün değil.",
+        "passkey_invalid": "Geçiş anahtarı doğrulanamadı.",
+        "passkey_expired": "Geçiş anahtarı isteğinin süresi doldu. Yeniden deneyin.",
+        "passkey_registered": "Bu geçiş anahtarı zaten kayıtlı.",
+        "not_allowed": "Oturum açmadan önce e-posta adresinizi onaylayın.",
+        "invalid_login": "Kullanıcı adı ya da parola yanlış.",
+        "password_confirm_mismatch": "Parolalar aynı değil.",
+        "invalid_recovery_code": "Kurtarma kodu yanlış ya da kullanılmış.",
+        "email_unchanged": "Bu zaten şimdiki adresiniz.",
+        "unknown_role": "Bu rollerden biri yok.",
+        "external_expired": "Dış oturum açma çok uzun sürdü. Baştan başlayın.",
+        "external_email_taken": "Bu e-postayla bir hesap var. O hesapla oturum açıp sağlayıcıyı hesap ayarlarından bağlayın.",
+        "external": "Dış oturum açma çalışmadı.",
+        "old_password_required": "Şimdiki parolanızı yazın.",
+        "cannot_reset_shared_key_and_enable": "Önce anahtarı sıfırlayın, sonra yeni anahtarın koduyla iki adımlı oturum açmayı açın.",
+        "requires_two_factor": "Doğrulama uygulamanızdaki kodu yazın.",
+        "invalid_two_factor_code": "Kod yanlış."
+      },
+      "mail": {
+        "confirm": {
+          "subject": "E-posta adresinizi onaylayın",
+          "text": "E-posta adresinizi onaylamak için bu bağlantıyı açın:\n\n{link}\n\nBağlantı bir gün geçerlidir. Hesap oluşturmadıysanız bu iletiyi yok sayın.",
+          "html": "<p>E-posta adresinizi onaylamak için bu bağlantıyı açın:</p><p><a href=\"{link}\">E-posta adresimi onayla</a></p><p>Bağlantı bir gün geçerlidir. Hesap oluşturmadıysanız bu iletiyi yok sayın.</p>"
+        },
+        "reset": {
+          "subject": "Parolanızı sıfırlayın",
+          "text": "Yeni parola seçmek için bu bağlantıyı açın:\n\n{link}\n\nBağlantı bir gün geçerlidir. Siz istemediyseniz bu iletiyi yok sayın.",
+          "html": "<p>Yeni parola seçmek için bu bağlantıyı açın:</p><p><a href=\"{link}\">Yeni parola seç</a></p><p>Bağlantı bir gün geçerlidir. Siz istemediyseniz bu iletiyi yok sayın.</p>"
+        },
+        "change": {
+          "subject": "Yeni e-posta adresinizi onaylayın",
+          "text": "Bu adresi hesabınızda kullanmak için bağlantıyı açın:\n\n{link}\n\nBu değişikliği siz istemediyseniz iletiyi yok sayın.",
+          "html": "<p>Bu adresi hesabınızda kullanmak için bağlantıyı açın:</p><p><a href=\"{link}\">Yeni adresi onayla</a></p><p>Bu değişikliği siz istemediyseniz iletiyi yok sayın.</p>"
+        },
+        "exists": {
+          "subject": "Zaten bir hesabınız var",
+          "text": "Biri bu adresle hesap oluşturmayı denedi, ancak adresin zaten bir hesabı var. Buradan oturum açın:\n\n{link}\n\nParolanızı unuttuysanız o sayfadaki parola sıfırlamayı kullanın.",
+          "html": "<p>Biri bu adresle hesap oluşturmayı denedi, ancak adresin zaten bir hesabı var.</p><p><a href=\"{link}\">Oturum aç</a></p><p>Parolanızı unuttuysanız o sayfadaki parola sıfırlamayı kullanın.</p>"
+        },
+        "code": {
+          "subject": "Oturum açma kodunuz",
+          "text": "Oturum açma kodunuz {code}. Birkaç dakika geçerlidir.",
+          "html": "<p>Oturum açma kodunuz <strong>{code}</strong>. Birkaç dakika geçerlidir.</p>"
+        }
+      }
     }
+  },
+  "AccountLogin": {
+    "user_name": "E-posta ya da kullanıcı adı",
+    "password": "Parola",
+    "remember_me": "Beni hatırla"
+  },
+  "AccountRegister": {
+    "email": "E-posta",
+    "password": "Parola",
+    "confirm_password": "Parola tekrar"
+  },
+  "AccountEmailOnly": {
+    "email": "E-posta"
+  },
+  "AccountReset": {
+    "password": "Yeni parola",
+    "confirm_password": "Yeni parola tekrar",
+    "user": "Kullanıcı",
+    "code": "Kod"
+  },
+  "AccountCode": {
+    "code": "Kod",
+    "remember_machine": "Bu tarayıcıyı hatırla",
+    "return_to": "Dönüş"
+  },
+  "AccountRecovery": {
+    "code": "Kurtarma kodu",
+    "return_to": "Dönüş"
+  },
+  "AccountProfile": {
+    "user_name": "Kullanıcı adı",
+    "phone_number": "Telefon numarası"
+  },
+  "AccountNewEmail": {
+    "new_email": "Yeni e-posta"
+  },
+  "AccountPassword": {
+    "old_password": "Şimdiki parola",
+    "new_password": "Yeni parola",
+    "confirm_password": "Yeni parola tekrar"
+  },
+  "AccountDelete": {
+    "password": "Parola"
+  },
+  "AccountUserRow": {
+    "id": "Kimlik",
+    "user_name": "Kullanıcı adı",
+    "email": "E-posta",
+    "email_confirmed": "Onaylı",
+    "two_factor": "İki adım",
+    "locked": "Kilitli",
+    "roles": "Roller"
+  },
+  "AccountUserRoles": {
+    "id": "Kimlik",
+    "roles": "Roller (virgülle ayrılmış)"
+  },
+  "AccountRoleRow": {
+    "id": "Kimlik",
+    "name": "Ad",
+    "permissions": "İzinler (virgülle ayrılmış)"
+  },
+  "AccountExternal": {
+    "email": "E-posta"
   }
 }

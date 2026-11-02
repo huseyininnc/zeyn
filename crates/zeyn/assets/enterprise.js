@@ -287,7 +287,7 @@ function draftFields(form) {
       !el.disabled &&
       !el.readOnly &&
       !el.hidden &&
-      !el.matches('[data-zeyn-masked], [type="password"], [type="file"], [type="hidden"], button, fieldset, output'),
+      !el.matches('[data-zeyn-masked], [type="password"], [autocomplete="one-time-code"], [type="file"], [type="hidden"], button, fieldset, output'),
   );
 }
 

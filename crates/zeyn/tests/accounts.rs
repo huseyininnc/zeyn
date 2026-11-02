@@ -53,7 +53,65 @@ pub async fn whoami(_unit: (), ctx: Ctx) -> Result<String> {
 }
 
 fn app(accounts: Accounts) -> Router {
-    App::new("T").accounts(accounts).feature(Feature::new("crm").screen(home).api(whoami)).router().unwrap()
+    App::new("T").accounts(accounts).feature(Feature::new("crm").screen(home).api(whoami)).feature(accounts::ui().admin(true).build()).router().unwrap()
+}
+
+fn form(screen: &str, params: Json, node: &str, values: Json, cookies: &str) -> Request<Body> {
+    post("/_zeyn/form", json!({ "screen": screen, "params": params, "node": node, "values": values }), cookies)
+}
+
+#[tokio::test]
+async fn the_sign_in_screen_signs_in_without_a_page_load_and_only_goes_to_local_paths() {
+    let a = accounts();
+    user(&a, "ui@example.com").await;
+    let router = app(a.clone());
+    let page = send(&router, get("/account/login", "")).await;
+    assert_eq!(page.status, StatusCode::OK);
+    assert!(page.body.contains(r#"type="password" autocomplete="current-password""#), "password input");
+    assert!(page.body.contains("/_zeyn/account/accounts.js"));
+    let ok = send(&router, form("account_login", json!({ "return_to": "/home" }), "0.0", json!({ "user_name": "ui@example.com", "password": PASSWORD }), "")).await;
+    assert_eq!(ok.status, StatusCode::OK, "{}", ok.body);
+    assert!(ok.body.contains(r#""effect":"go""#) && ok.body.contains(r#""url":"/home""#) && ok.body.contains(r#""frame":true"#), "{}", ok.body);
+    assert!(ok.cookie("zeyn_account").is_some_and(|c| !c.is_empty()));
+    let evil = send(&router, form("account_login", json!({ "return_to": "//evil.example/x" }), "0.0", json!({ "user_name": "ui@example.com", "password": PASSWORD }), "")).await;
+    assert!(evil.body.contains(r#""url":"/""#) && !evil.body.contains("evil.example"), "{}", evil.body);
+    let wrong = send(&router, form("account_login", json!({}), "0.0", json!({ "user_name": "ui@example.com", "password": "nope" }), "")).await;
+    assert!(wrong.cookie("zeyn_account").is_none());
+    assert!(wrong.body.contains("wrong"), "{}", wrong.body);
+}
+
+#[tokio::test]
+async fn manage_screens_need_a_session_and_admin_screens_a_permission() {
+    let a = accounts();
+    user(&a, "m@example.com").await;
+    let router = app(a.clone());
+    let out = send(&router, get("/account/manage", "")).await;
+    assert!(out.status.is_redirection(), "{}", out.status);
+    let login = send(&router, post("/_zeyn/account/login?useCookies=true", json!({ "email": "m@example.com", "password": PASSWORD }), "")).await;
+    let session = format!("zeyn_account={}", login.cookie("zeyn_account").unwrap());
+    for path in ["/account/manage", "/account/manage/email", "/account/manage/password", "/account/manage/two-factor", "/account/manage/passkeys", "/account/manage/logins", "/account/manage/personal-data"] {
+        let r = send(&router, get(path, &session)).await;
+        assert_eq!(r.status, StatusCode::OK, "{path}");
+        assert!(!r.body.contains("argon2"), "{path}");
+    }
+    let qr = send(&router, get("/account/manage/two-factor", &session)).await;
+    assert!(qr.body.contains("<svg") && qr.body.contains("z-totp-key"));
+    let admin = send(&router, get("/account/admin/users", &session)).await;
+    assert_ne!(admin.status, StatusCode::OK, "admin screens need accounts.users.read");
+}
+
+#[tokio::test]
+async fn every_account_screen_renders_in_both_languages() {
+    let a = accounts();
+    let router = app(a.clone());
+    let r = send(&router, get("/account/login?return_to=%2Fhome", "")).await;
+    assert!(r.body.contains("Sign in") && r.body.contains("Password") && r.body.contains(r#"data-return="/home""#));
+    let tr = zeyn::I18n::new("en");
+    assert_eq!(tr.text("tr", &Text::key("zeyn.accounts.login.title")), "Oturum aç");
+    assert_eq!(tr.text("tr", &Text::key("AccountLogin.password")), "Parola");
+    for path in ["/account/register", "/account/forgot-password", "/account/resend-confirmation", "/account/lockout", "/account/access-denied", "/account/check-email", "/account/logout", "/account/login-recovery", "/account/login-2fa", "/account/reset-password", "/account/confirm-email"] {
+        assert_eq!(send(&router, get(path, "")).await.status, StatusCode::OK, "{path}");
+    }
 }
 
 struct Reply {

@@ -27,7 +27,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 mod auth;
 #[cfg(feature = "accounts")]
-mod accounts;
+pub(crate) mod accounts;
 mod data;
 mod media;
 mod ops;
@@ -1334,11 +1334,15 @@ impl From<Error> for Failure {
 #[derive(Deserialize)]
 struct ParamsQuery {
     params: Option<String>,
+    /// `?return_to=` as sign in redirects and the session runtime send it; it becomes the
+    /// params `{"return_to": ...}` of a page opened without `params`.
+    return_to: Option<String>,
 }
 
 impl ParamsQuery {
     fn value(&self) -> Result<Json, Failure> {
         match &self.params {
+            None if self.return_to.is_some() => Ok(json!({ "return_to": self.return_to })),
             None => Ok(Json::Null),
             Some(p) => serde_json::from_str(p).map_err(|_| Failure::App(Error::NotFound)),
         }
@@ -3013,7 +3017,7 @@ async fn tools(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Qu
     if !st.mcp.browser {
         return st.error_response(&ctx, Failure::App(Error::NotFound));
     }
-    let params = match (ParamsQuery { params: q.params }).value() {
+    let params = match (ParamsQuery { params: q.params, return_to: None }).value() {
         Ok(p) => p,
         Err(f) => return st.error_response(&ctx, f),
     };
