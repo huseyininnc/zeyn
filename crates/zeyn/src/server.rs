@@ -1732,6 +1732,16 @@ impl AppState {
 }
 
 /// `inventory/`, `/inventory` and `/inventory/` all become `/inventory`; `/` and empty become empty.
+/// The grid at `node` of an opened screen, after the grid's read access. Every grid endpoint
+/// that addresses a grid starts here, so none can skip the check.
+fn grid_at<'s>(ctx: &Ctx, screen: &'s Screen, node: &NodePath) -> Result<&'s dyn GridSource, Failure> {
+    let grid = screen.node(node).and_then(|n| n.grid()).ok_or(Failure::App(Error::NotFound))?;
+    if !ctx.identity().can(&grid.action().access) {
+        return Err(Failure::App(Error::Forbidden));
+    }
+    Ok(grid)
+}
+
 fn normalize_base(path: &str) -> String {
     let trimmed = path.trim().trim_matches('/');
     if trimmed.is_empty() { String::new() } else { format!("/{trimmed}") }
@@ -2133,11 +2143,8 @@ impl AppState {
             return Err(Failure::App(Error::NotFound));
         }
         let (_, entry, screen) = self.open(ctx, &call.screen, call.params).await?;
-        let grid = screen.node(&call.node).and_then(|n| n.grid()).ok_or(Failure::App(Error::NotFound))?;
+        let grid = grid_at(ctx, &screen, &call.node)?;
         let action = grid.action();
-        if !ctx.identity().can(&action.access) {
-            return Err(Failure::App(Error::Forbidden));
-        }
         let info = Call { kind: CallKind::DataGrid, screen: entry.meta.name, action: Some(action), via_agent: ctx.via_agent() };
         let mut query = call.query;
         crate::privacy::strip_masked(&mut query, grid.fields(), ctx);
@@ -2164,10 +2171,7 @@ impl AppState {
         let store = self.views.as_ref().ok_or(Failure::App(Error::NotFound))?;
         let user = ctx.identity().user.clone().ok_or(Failure::App(Error::Forbidden))?;
         let (_, entry, screen) = self.open(ctx, &call.screen, call.params).await?;
-        let grid = screen.node(&call.node).and_then(|n| n.grid()).ok_or(Failure::App(Error::NotFound))?;
-        if !ctx.identity().can(&grid.action().access) {
-            return Err(Failure::App(Error::Forbidden));
-        }
+        let grid = grid_at(ctx, &screen, &call.node)?;
         let view = call.view.map(|v| grid.clean_view(v));
         self.timed(store.save(&user, &Self::view_key(ctx, entry.meta.name, &call.node), view)).await
     }
@@ -2180,10 +2184,7 @@ impl AppState {
             return Err(Failure::App(Error::NotFound));
         }
         let (_, entry, screen) = self.open(ctx, &call.screen, call.params).await?;
-        let grid = screen.node(&call.node).and_then(|n| n.grid()).ok_or(Failure::App(Error::NotFound))?;
-        if !ctx.identity().can(&grid.action().access) {
-            return Err(Failure::App(Error::Forbidden));
-        }
+        let grid = grid_at(ctx, &screen, &call.node)?;
         let page = self.timed(grid.find_row(ctx.clone(), call.key.clone())).await?;
         let row = grid.row_call(&page, &call.key, &call.item).ok_or(Failure::App(Error::NotFound))?;
         if !ctx.identity().can(&row.meta.access) {
@@ -2203,10 +2204,7 @@ impl AppState {
             return Err(Failure::App(Error::NotFound));
         }
         let (_, entry, screen) = self.open(ctx, &call.screen, call.params).await?;
-        let grid = screen.node(&call.node).and_then(|n| n.grid()).ok_or(Failure::App(Error::NotFound))?;
-        if !ctx.identity().can(&grid.action().access) {
-            return Err(Failure::App(Error::Forbidden));
-        }
+        let grid = grid_at(ctx, &screen, &call.node)?;
         let page = self.timed(grid.find_row(ctx.clone(), call.key.clone())).await?;
         let save = grid.edit_call(&page, &call.key, &call.values, ctx.locale(), ctx.time_zone())?;
         if !ctx.identity().can(&save.meta.access) {
@@ -2244,10 +2242,7 @@ impl AppState {
         use crate::grid::MAX_BULK;
         let too_many = || Failure::App(Error::Denied(Text::key("zeyn.grid.too_many").arg("n", MAX_BULK.to_string())));
         let (_, entry, screen) = self.open(ctx, &call.screen, call.params).await?;
-        let grid = screen.node(&call.node).and_then(|n| n.grid()).ok_or(Failure::App(Error::NotFound))?;
-        if !ctx.identity().can(&grid.action().access) {
-            return Err(Failure::App(Error::Forbidden));
-        }
+        let grid = grid_at(ctx, &screen, &call.node)?;
         let meta = grid.bulk_meta(call.action).ok_or(Failure::App(Error::NotFound))?;
         if !ctx.identity().can(&meta.access) {
             return Err(Failure::App(Error::Forbidden));
