@@ -13,7 +13,9 @@ pub struct NoteParams {
 #[screen(route = "/", permission = "notes.note.read")]
 pub fn note_list() -> Screen {
     Screen::new(t!("notes.list"))
-        .toolbar(|t| t.button(t!("notes.new")).icon(Icon::Plus).shortcut("Ctrl+N").opens(note_editor, NoteParams { id: None }))
+        .toolbar(|t| {
+            t.button(t!("notes.new")).icon(Icon::Plus).shortcut("Ctrl+N").opens(note_editor, NoteParams { id: None })
+        })
         .body(
             Grid::auto(search_notes)
                 .mode(GridMode::Server)
@@ -28,8 +30,10 @@ pub fn note_editor(params: NoteParams, store: NoteStore) -> Result<Screen> {
         Some(id) => store.get(id)?,
         None => Note::default(),
     };
-    Ok(Screen::window(t!("notes.editor")).body(Form::auto(note).submit(t!("notes.save"), save_note).on_success(|_, ui| {
-        ui.toast(t!("notes.saved"));
-        ui.close_and_refresh();
-    })))
+    Ok(Screen::window(t!("notes.editor")).body(Form::auto(note).submit(t!("notes.save"), save_note).on_success(
+        |_, ui| {
+            ui.toast(t!("notes.saved"));
+            ui.close_and_refresh();
+        },
+    )))
 }

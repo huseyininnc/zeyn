@@ -3,8 +3,8 @@
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use tower::ServiceExt;
-use zeyn::prelude::*;
 use zeyn::I18n;
+use zeyn::prelude::*;
 
 fn app() -> App {
     let i18n = I18n::new("en").catalogs({{crate}}::CATALOGS).unwrap();

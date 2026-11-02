@@ -14,7 +14,5 @@
 pub mod customers;
 
 /// Texts of this library in every language it ships. Load them before the app's own catalogs.
-pub const CATALOGS: &[(&str, &str)] = &[
-    ("en", include_str!("../locales/en.json")),
-    ("tr", include_str!("../locales/tr.json")),
-];
+pub const CATALOGS: &[(&str, &str)] =
+    &[("en", include_str!("../locales/en.json")), ("tr", include_str!("../locales/tr.json"))];
