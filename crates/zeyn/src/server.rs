@@ -585,6 +585,7 @@ pub struct App {
     deny: Vec<IpRange>,
     allow: Vec<IpRange>,
     setup_problems: Vec<String>,
+    extras: ops::Extras,
 }
 
 impl App {
@@ -620,6 +621,7 @@ impl App {
             deny: Vec::new(),
             allow: Vec::new(),
             setup_problems: Vec::new(),
+            extras: ops::Extras::default(),
         }
     }
 
@@ -971,6 +973,7 @@ impl App {
             api_docs: self.api_docs,
             prefix: url_prefix,
             theme: self.theme,
+            extras: self.extras,
         });
         let mut router = Router::new();
         for f in &state.features {
@@ -1091,6 +1094,7 @@ struct AppState {
     api_docs: Option<ApiDocs>,
     prefix: String,
     theme: Option<Theme>,
+    extras: ops::Extras,
 }
 
 /// Decodes `%XX` sequences in a cookie value.
@@ -1470,8 +1474,12 @@ async fn guard_request(State(st): State<Arc<AppState>>, req: axum::extract::Requ
     let peer = req.extensions().get::<axum::extract::ConnectInfo<std::net::SocketAddr>>().map(|c| c.0.ip());
     let forwarded = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok());
     let ip = client_ip(peer, forwarded, &st.trusted);
+    let probe = ops::is_probe(&path);
     let blocked = match ip {
-        Some(ip) => st.deny.iter().any(|r| r.contains(ip)) || (!st.allow.is_empty() && !st.allow.iter().any(|r| r.contains(ip))),
+        Some(ip) => {
+            st.deny.iter().any(|r| r.contains(ip))
+                || (!st.allow.is_empty() && !st.allow.iter().any(|r| r.contains(ip)) && !(probe && st.extras.probe_ip(ip)))
+        }
         None => !st.allow.is_empty(),
     };
     if blocked {
@@ -1480,7 +1488,7 @@ async fn guard_request(State(st): State<Arc<AppState>>, req: axum::extract::Requ
     }
     let is_write = req.method() == axum::http::Method::POST
         && (path == "/_zeyn/form" || path == "/_zeyn/mcp" || path.starts_with(&format!("{}/", st.api_prefix)));
-    let limits = [(st.rate, "all"), (if is_write { st.write_rate } else { None }, "write")];
+    let limits = if probe { [(None, "all"), (None, "write")] } else { [(st.rate, "all"), (if is_write { st.write_rate } else { None }, "write")] };
     for (limit, scope) in limits {
         let Some(limit) = limit else { continue };
         let ip_key = ip.map(|i| i.to_string()).unwrap_or_else(|| "unknown".into());

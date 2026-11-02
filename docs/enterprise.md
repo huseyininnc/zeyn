@@ -144,3 +144,15 @@ pub async fn move_leave(req: TransitionRequest<LeaveRequestId>, store: LeaveStor
   are never kept. The draft keeps the row version it was typed on, so saving a draft of a record
   someone changed in the meantime is refused as a conflict. A successful save clears the draft;
   drafts older than a day are dropped. `sessionStorage` lives only in that browser tab.
+
+## Health checks
+
+- `GET /_zeyn/health` answers `200 ok` while the process runs. Use it for liveness.
+- `GET /_zeyn/ready` runs every check added with `App::readiness(name, check)` at the same time,
+  five seconds each, and answers `200 {"status":"ready"}` or
+  `503 {"status":"not_ready","failed":["database"]}`. Only check names are shown, never errors.
+- Both live under `base_path` (`/billing/_zeyn/health`), answer with `Cache-Control: no-store`
+  and need no sign in.
+- They are never rate limited, so a busy probe cannot lock itself out and restart a healthy app.
+- IP rules still apply: `deny_ips` always, `allow_only_ips` too unless the probe address is listed
+  in `App::probe_ips([...])`, which opens only these two endpoints to it.

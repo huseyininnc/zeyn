@@ -697,3 +697,60 @@ async fn every_response_carries_the_build_id_that_the_page_was_built_with() {
     assert_eq!(js.status, StatusCode::OK);
     assert!(js.body.contains("x-zeyn-build"));
 }
+
+fn from(path: &str, ip: &str) -> Request<Body> {
+    let mut req = Request::get(path).body(Body::empty()).unwrap();
+    let addr: std::net::SocketAddr = format!("{ip}:5000").parse().unwrap();
+    req.extensions_mut().insert(axum::extract::ConnectInfo(addr));
+    req
+}
+
+#[tokio::test]
+async fn health_is_always_up_and_ready_reports_failed_checks_by_name_only() {
+    let db_up = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let flag = db_up.clone();
+    let router = App::new("T")
+        .base_path("/billing")
+        .readiness("database", move || {
+            let up = flag.load(std::sync::atomic::Ordering::SeqCst);
+            async move { up }
+        })
+        .readiness("slow", || async {
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            true
+        })
+        .feature(Feature::new("x").screen(overview))
+        .router()
+        .unwrap();
+    let r = send(&router, Request::get("/billing/_zeyn/health").body(Body::empty()).unwrap()).await;
+    assert_eq!((r.status, r.body.as_str()), (StatusCode::OK, "ok"));
+    assert_eq!(r.headers.get(header::CACHE_CONTROL).unwrap(), "no-store");
+    let r = send(&router, Request::get("/billing/_zeyn/ready").body(Body::empty()).unwrap()).await;
+    assert_eq!(r.status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(r.json(), serde_json::json!({ "status": "not_ready", "failed": ["database"] }));
+    db_up.store(true, std::sync::atomic::Ordering::SeqCst);
+    let r = send(&router, Request::get("/billing/_zeyn/ready").body(Body::empty()).unwrap()).await;
+    assert_eq!(r.status, StatusCode::OK);
+    assert_eq!(send(&router, Request::get("/_zeyn/health").body(Body::empty()).unwrap()).await.status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn probes_skip_rate_limits_but_not_ip_rules_unless_allowed() {
+    let app = || {
+        App::new("T")
+            .rate_limit(RateLimit::per_ip(1, std::time::Duration::from_secs(60)))
+            .allow_only_ips(["10.0.0.0/8"])
+            .deny_ips(["10.9.9.9"])
+            .feature(Feature::new("x").screen(overview))
+    };
+    let router = app().router().unwrap();
+    for _ in 0..5 {
+        assert_eq!(send(&router, from("/_zeyn/health", "10.1.1.1")).await.status, StatusCode::OK);
+    }
+    assert_eq!(send(&router, from("/_zeyn/health", "192.168.1.5")).await.status, StatusCode::FORBIDDEN);
+
+    let router = app().probe_ips(["192.168.1.0/24", "10.9.9.9"]).router().unwrap();
+    assert_eq!(send(&router, from("/_zeyn/ready", "192.168.1.5")).await.status, StatusCode::OK);
+    assert_eq!(send(&router, from("/overview", "192.168.1.5")).await.status, StatusCode::FORBIDDEN, "probe addresses only reach the probes");
+    assert_eq!(send(&router, from("/_zeyn/health", "10.9.9.9")).await.status, StatusCode::FORBIDDEN, "denied stays denied");
+}

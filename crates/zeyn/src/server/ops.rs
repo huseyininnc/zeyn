@@ -1,6 +1,14 @@
 //! Runtime assets and page head additions for the enterprise features.
 
-use super::{AppState, asset};
+use super::{App, AppState, asset};
+use crate::ctx::BoxFuture;
+use crate::security::IpRange;
+use axum::extract::State;
+use axum::http::{StatusCode, header};
+use axum::response::IntoResponse;
+use serde_json::json;
+use std::future::Future;
+use std::time::Duration;
 use crate::ctx::Ctx;
 use crate::i18n::Text;
 use crate::render::{attr, escape};
@@ -18,8 +26,99 @@ pub(super) fn is_asset(path: &str) -> bool {
     path == "/_zeyn/enterprise.js" || path == "/_zeyn/enterprise.css"
 }
 
+type Check = Arc<dyn Fn() -> BoxFuture<bool> + Send + Sync>;
+
+/// App settings of the enterprise features.
+#[derive(Default)]
+pub(super) struct Extras {
+    readiness: Vec<(&'static str, Check)>,
+    probe_ips: Vec<IpRange>,
+}
+
+impl Extras {
+    /// Whether an address may reach the health endpoints despite `allow_only_ips`.
+    pub(super) fn probe_ip(&self, ip: std::net::IpAddr) -> bool {
+        self.probe_ips.iter().any(|r| r.contains(ip))
+    }
+}
+
+/// Longest time one readiness check may take before it counts as failed.
+const CHECK_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// `/_zeyn/health` and `/_zeyn/ready`: never rate limited; IP rules apply (see `App::probe_ips`).
+pub(super) fn is_probe(path: &str) -> bool {
+    path == "/_zeyn/health" || path == "/_zeyn/ready"
+}
+
+impl App {
+    /// Adds a readiness check, such as a database ping. `GET /_zeyn/ready` answers `200` when every
+    /// check returns `true` within five seconds, otherwise `503` with the names of the failed
+    /// checks. Check names are shown to anyone who can reach the endpoint; keep them plain
+    /// (`database`, `license`) and never put secrets in them.
+    ///
+    /// ```ignore
+    /// App::new("Billing").readiness("database", move || { let pool = pool.clone(); async move { pool.ping().await.is_ok() } })
+    /// ```
+    pub fn readiness<F, Fut>(mut self, name: &'static str, check: F) -> Self
+    where
+        F: Fn() -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = bool> + Send + 'static,
+    {
+        self.extras.readiness.push((name, Arc::new(move || Box::pin(check()))));
+        self
+    }
+
+    /// Addresses of probes (a load balancer, an orchestrator) that may reach `/_zeyn/health` and
+    /// `/_zeyn/ready` even when `allow_only_ips` would refuse them. Denied addresses stay denied.
+    pub fn probe_ips<I, S>(mut self, ranges: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        self.extras.probe_ips = self.ranges("probe_ips", ranges);
+        self
+    }
+}
+
+fn no_store(mut r: Response) -> Response {
+    r.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    r
+}
+
+/// Liveness: the process runs and answers.
+async fn health() -> Response {
+    no_store(([(header::CONTENT_TYPE, "text/plain; charset=utf-8")], "ok").into_response())
+}
+
+/// Readiness: every registered check passed. Failed checks are named; their errors are not shown.
+async fn ready(State(st): State<Arc<AppState>>) -> Response {
+    let tasks: Vec<_> = st
+        .extras
+        .readiness
+        .iter()
+        .map(|(name, check)| {
+            let fut = check();
+            (*name, tokio::spawn(async move { tokio::time::timeout(CHECK_TIMEOUT, fut).await.unwrap_or(false) }))
+        })
+        .collect();
+    let mut failed = Vec::new();
+    for (name, task) in tasks {
+        if !task.await.unwrap_or(false) {
+            failed.push(name);
+        }
+    }
+    let r = if failed.is_empty() {
+        (StatusCode::OK, axum::Json(json!({ "status": "ready" }))).into_response()
+    } else {
+        (StatusCode::SERVICE_UNAVAILABLE, axum::Json(json!({ "status": "not_ready", "failed": failed }))).into_response()
+    };
+    no_store(r)
+}
+
 pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
     router
+        .route("/_zeyn/health", get(health))
+        .route("/_zeyn/ready", get(ready))
         .route("/_zeyn/enterprise.js", get(|| async { asset(JS, "text/javascript; charset=utf-8") }))
         .route("/_zeyn/enterprise.css", get(|| async { asset(CSS, "text/css; charset=utf-8") }))
 }
