@@ -87,6 +87,7 @@
       "internal": "Beklenmeyen bir hata oluştu.",
       "csrf": "Oturumunuzun süresi doldu. Sayfayı yenileyin.",
       "license": "Lisansınız bu işlemi kapsamıyor. Yöneticinize başvurun.",
+      "license_expired": "Lisansınızın süresi doldu. Yenilemek için yöneticinize başvurun.",
       "tenant": "Bu adres tanınan bir kuruma ait değil.",
       "rate_limited": "Çok fazla istek gönderildi. Biraz sonra tekrar deneyin."
     },

@@ -308,6 +308,8 @@ pub use platform::{
     Config, ConfigSource, EnvSource, FixedLicense, JsonFileSource, License, LicenseSource, Licensed, PerTenant, Secret,
     StaticSource, Tenant, TenantRequired,
 };
+#[cfg(feature = "signed-licenses")]
+pub use platform::{LicenseError, SignedLicenseFile};
 pub use render::Render;
 pub use time::{Date, DateTime, LocalDateTime, LocalTimeError, Time, TimeZone};
 pub use time::{DateWords, range_presets};

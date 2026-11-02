@@ -9,6 +9,7 @@ repository.workspace = true
 [features]
 default = ["server"]
 server = ["dep:axum", "dep:tokio", "dep:getrandom", "dep:tower-http", "dep:futures-core"]
+signed-licenses = ["dep:ed25519-dalek"]
 
 [dependencies]
 zeyn-macros = { path = "../zeyn-macros", version = "0.0.2" }
@@ -20,8 +21,10 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time",
 futures-core = { version = "0.3", optional = true }
 getrandom = { version = "0.2", optional = true }
 tower-http = { version = "0.6", features = ["cors"], optional = true }
+ed25519-dalek = { version = "3", default-features = false, optional = true }
 
 [dev-dependencies]
+ed25519-dalek = { version = "3", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }

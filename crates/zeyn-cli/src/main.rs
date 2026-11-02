@@ -5,6 +5,8 @@ use std::io::{BufRead, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
+mod license;
+
 const TEMPLATES: &[(&str, &str)] = &[
     ("Cargo.toml", include_str!("../templates/Cargo.toml.tmpl")),
     ("AGENTS.md", include_str!("../templates/AGENTS.md.tmpl")),
@@ -63,6 +65,12 @@ Usage:
   zeyn check [--fix]                      compile and report structural problems and missing translations;
                                           --fix first rewrites renamed Zeyn APIs in src, tests and examples
   zeyn mcp                                MCP server on stdio for AI agents
+  zeyn license keygen [--out <file>]      new license signing key pair; the private key goes to
+                                          zeyn-license.key, the public key to embed is printed
+  zeyn license sign <json> [--key <file>] [--out <file>]
+                                          sign a license (a JSON file or inline JSON with holder,
+                                          valid_until, modules, max_users); key from --key,
+                                          ZEYN_LICENSE_KEY or zeyn-license.key
 ";
 
 fn main() -> ExitCode {
@@ -77,6 +85,15 @@ fn main() -> ExitCode {
             if report.contains("error") { Err("the app has problems".into()) } else { Ok(()) }
         }),
         ["mcp"] => mcp(),
+        ["license", "keygen", rest @ ..] => {
+            license::keygen(Path::new(flag(rest, "--out").unwrap_or(license::DEFAULT_KEY))).map(|m| print!("{m}"))
+        }
+        ["license", "sign", json, rest @ ..] => license::sign(json, flag(rest, "--key").map(Path::new)).and_then(|signed| {
+            match flag(rest, "--out") {
+                Some(out) => std::fs::write(out, signed + "\n").map_err(|e| format!("{out}: {e}")),
+                None => Ok(println!("{signed}")),
+            }
+        }),
         _ => {
             print!("{HELP}");
             Ok(())

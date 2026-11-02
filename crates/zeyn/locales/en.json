@@ -87,6 +87,7 @@
       "internal": "An unexpected error occurred.",
       "csrf": "Your session expired. Reload the page.",
       "license": "Your license does not cover this. Contact your administrator.",
+      "license_expired": "Your license has expired. Contact your administrator to renew it.",
       "tenant": "This address does not belong to a known organization.",
       "rate_limited": "Too many requests. Try again in a moment."
     },
