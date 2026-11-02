@@ -8,7 +8,7 @@ use crate::render::escape;
 use crate::ui::ISLAND_MARKER;
 use axum::Router;
 use axum::extract::{Path, State};
-use axum::http::{HeaderValue, StatusCode, header};
+use axum::http::{StatusCode, header};
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::get;
 use serde_json::{Map, Value as Json};
@@ -20,7 +20,8 @@ const JS: &str = include_str!("../../assets/islands.js");
 const LOADER: &str = "/_zeyn/islands.js";
 const FILES: &str = "/_zeyn/islands/";
 
-/// The policy of a page that holds an island. It is the default policy plus `'wasm-unsafe-eval'`
+/// The policy of a page that holds an island when the app has no `App::csp`; otherwise
+/// `Csp::header(true)` builds it once at startup. It is the default policy plus `'wasm-unsafe-eval'`
 /// in `script-src`, which lets the page compile WebAssembly modules. It still refuses `eval`,
 /// `new Function` and inline scripts, and modules still come only from the app's own origin.
 pub(super) const CSP: &str = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
@@ -113,7 +114,7 @@ pub(super) fn page(st: &AppState, page: String, screen: &str) -> Response {
         escape(&st.prefix)
     );
     let mut r = Html(page.replacen("</head>", &head, 1)).into_response();
-    r.headers_mut().insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static(CSP));
+    r.headers_mut().insert(header::CONTENT_SECURITY_POLICY, st.island_csp.clone());
     r
 }
 

@@ -345,6 +345,7 @@ pub mod audit;
 #[cfg(feature = "server")]
 pub mod auth;
 mod command;
+mod csp;
 mod ctx;
 mod decimal;
 mod feature;
@@ -405,6 +406,7 @@ pub use command::{
     normalize_shortcut,
 };
 pub use command::{MAX_SEARCH_HITS, MAX_SEARCH_QUERY, Search, SearchHit};
+pub use csp::{Csp, MAX_EMBED_URL, TRACKING_PARAMS, embed_url};
 pub use ctx::{BoxFuture, Ctx, Dep, Identity, Inject, IntoScreen, Outcome, Service, Services};
 pub use decimal::{DEFAULT_PRECISION, DEFAULT_SCALE, Decimal, MAX_PRECISION, MAX_SCALE};
 pub use feature::{Feature, Guard, GuardResult, Menu, MenuGroup, MenuItem, Route, ScreenEntry, SignedIn};

@@ -3,9 +3,9 @@
 
 use super::*;
 
-/// Content security policy of every response that does not set its own: no inline scripts, no
-/// framing, everything from this origin.
-const CSP: &str = "default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
+/// Content security policy of an app without `App::csp`: no inline scripts, no framing,
+/// everything from this origin. [`crate::csp::Csp::header`] builds the same text.
+pub(super) const DEFAULT_CSP: &str = "default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
 
 /// Framework endpoints whose `POST` changes data or runs an action. They count against the
 /// write limit (`App::write_limit`) besides the general one. A new endpoint that writes, runs an
@@ -195,10 +195,10 @@ pub(super) async fn trace_request(req: axum::extract::Request, next: axum::middl
     response
 }
 
-/// Security headers on every response.
-pub(super) async fn security_headers(mut response: Response) -> Response {
+/// Security headers on every response. The policy is the one built at startup from `App::csp`.
+pub(super) async fn security_headers(State(st): State<Arc<AppState>>, mut response: Response) -> Response {
     let h = response.headers_mut();
-    h.entry(header::CONTENT_SECURITY_POLICY).or_insert(HeaderValue::from_static(CSP));
+    h.entry(header::CONTENT_SECURITY_POLICY).or_insert_with(|| st.csp_header.clone());
     h.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
     h.insert(header::REFERRER_POLICY, HeaderValue::from_static("same-origin"));
     h.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));

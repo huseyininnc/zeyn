@@ -651,6 +651,7 @@ pub struct App {
     mcp: Mcp,
     home: Option<&'static str>,
     llms_txt: Option<&'static str>,
+    csp: crate::csp::Csp,
     time: TimePolicy,
     fixed_now: Option<DateTime>,
     zone_picker: bool,
@@ -699,6 +700,7 @@ impl App {
             mcp: Mcp::off(),
             home: None,
             llms_txt: None,
+            csp: crate::csp::Csp::new(),
             time: TimePolicy::User { default: TimeZone::UTC },
             fixed_now: None,
             zone_picker: false,
@@ -960,6 +962,18 @@ impl App {
         self
     }
 
+    /// Opens the page's content security policy for named `https` hosts, per directive. See
+    /// [`crate::Csp`] for what is accepted; `App::check` reports anything else.
+    ///
+    /// ```
+    /// # use zeyn::App;
+    /// let app = App::new("Shop").csp(|c| c.frame_src(["https://www.youtube-nocookie.com"]));
+    /// ```
+    pub fn csp(mut self, policy: impl FnOnce(crate::csp::Csp) -> crate::csp::Csp) -> Self {
+        self.csp = policy(std::mem::take(&mut self.csp));
+        self
+    }
+
     /// Applies a plugin. Settings made after this line override the plugin's.
     pub fn plugin(self, plugin: impl Plugin) -> Self {
         plugin.install(self)
@@ -1030,6 +1044,7 @@ impl App {
     pub fn check(&self) -> Result<(), Vec<String>> {
         let mut problems = self.setup_problems.clone();
         problems.extend(self.dev_auth_check());
+        problems.extend(self.csp.problems().iter().cloned());
         let mut paths: HashMap<String, &str> = HashMap::new();
         let mut names: HashMap<&str, &str> = HashMap::new();
         for f in &self.features {
@@ -1194,6 +1209,11 @@ impl App {
             timeout: self.timeout,
             secure_cookies: self.secure_cookies,
             mcp: self.mcp,
+            csp_header: HeaderValue::from_str(&self.csp.header(false))
+                .unwrap_or(HeaderValue::from_static(guard::DEFAULT_CSP)),
+            #[cfg(feature = "islands")]
+            island_csp: HeaderValue::from_str(&self.csp.header(true)).unwrap_or(HeaderValue::from_static(islands::CSP)),
+            csp: Arc::new(self.csp),
             time: self.time,
             fixed_now: self.fixed_now,
             zone_picker: self.zone_picker,
@@ -1305,7 +1325,7 @@ impl App {
         let router = auth::layers(router, &state);
         let router = router
             .layer(axum::middleware::from_fn_with_state(state.clone(), guard::guard_request))
-            .layer(axum::middleware::map_response(guard::security_headers))
+            .layer(axum::middleware::map_response_with_state(state.clone(), guard::security_headers))
             .layer(axum::middleware::map_response(ops::stamp))
             .layer(axum::middleware::from_fn(guard::trace_request))
             .with_state(state);
@@ -1383,6 +1403,12 @@ struct AppState {
     timeout: Duration,
     secure_cookies: bool,
     mcp: Mcp,
+    /// The `Content-Security-Policy` of every page, built once from `App::csp`.
+    csp_header: HeaderValue,
+    /// The same policy for pages that hold a WASM island.
+    #[cfg(feature = "islands")]
+    island_csp: HeaderValue,
+    csp: Arc<crate::csp::Csp>,
     time: TimePolicy,
     fixed_now: Option<DateTime>,
     zone_picker: bool,
@@ -1554,6 +1580,7 @@ impl AppState {
             self.config.clone(),
             self.look.pick(cookie(headers, "zeyn_theme")),
             self.extras.session.reauth_within,
+            self.csp.clone(),
         );
         data::read_reason(&ctx, headers);
         match self.fixed_now {
