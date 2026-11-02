@@ -140,10 +140,7 @@ async fn node_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Js
         let (_, entry, screen) = st.open(&ctx, &call.screen, call.params).await?;
         let node = screen.node(&call.node).ok_or(Failure::App(Error::NotFound))?;
         let loaded = st.preload(&ctx, screen.walk_from(&call.node), entry.meta.name).await;
-        let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n())
-            .with_tz(ctx.time_zone())
-            .with_identity(ctx.identity())
-            .with_ctx(&ctx);
+        let r = super::user_render(entry.meta.name, &ctx);
         let r = Render { loaded: Some(&loaded), ..r };
         let mut out = String::new();
         crate::ui::render_node(&mut out, &r, call.node.as_str(), node);

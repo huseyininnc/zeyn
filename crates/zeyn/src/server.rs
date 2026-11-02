@@ -1732,6 +1732,12 @@ impl AppState {
 }
 
 /// `inventory/`, `/inventory` and `/inventory/` all become `/inventory`; `/` and empty become empty.
+/// Renders for the request's user: their language, time zone and permissions, with masked fields
+/// masked and reads of sensitive rows recorded for the audit.
+fn user_render<'a>(scope: &'a str, ctx: &'a Ctx) -> Render<'a> {
+    Render::new(scope, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity()).with_ctx(ctx)
+}
+
 /// The grid at `node` of an opened screen, after the grid's read access. Every grid endpoint
 /// that addresses a grid starts here, so none can skip the check.
 fn grid_at<'s>(ctx: &Ctx, screen: &'s Screen, node: &NodePath) -> Result<&'s dyn GridSource, Failure> {
@@ -1898,7 +1904,7 @@ async fn page(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Que
         let (_, entry, screen) = st.open(&ctx, name, params.clone()).await?;
         data::note_screen_read(&ctx, &entry.meta, &params);
         let loaded = st.preload(&ctx, screen.walk(), name).await;
-        let r = Render::new(name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity()).with_ctx(&ctx);
+        let r = user_render(name, &ctx);
         let html = screen.render(&r, &entry.meta, &params, &loaded);
         Ok::<_, Failure>((ctx.t(screen.title()), html))
     }
@@ -1977,7 +1983,7 @@ async fn screen_fragment(
         let (_, entry, screen) = st.open(&ctx, name, params.clone()).await?;
         data::note_screen_read(&ctx, &entry.meta, &params);
         let loaded = st.preload(&ctx, screen.walk(), entry.meta.name).await;
-        let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity()).with_ctx(&ctx);
+        let r = user_render(entry.meta.name, &ctx);
         Ok::<_, Failure>(screen.render(&r, &entry.meta, &params, &loaded))
     }
     .await;
@@ -2151,7 +2157,7 @@ impl AppState {
         self.intercept(ctx, &info, move || async move {
             let mut page = self.timed(grid.fetch_at(ctx.clone(), query, call.path)).await?;
             page.view = call.view.map(|v| grid.clean_view(v));
-            let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity()).with_ctx(ctx);
+            let r = user_render(entry.meta.name, ctx);
             Ok(json!({
                 "head": call.head.then(|| grid.head_html(&r, page.view.as_ref())),
                 "rows": grid.rows_html(&page, &r),
@@ -2215,7 +2221,7 @@ impl AppState {
         result?;
         let mut page = self.timed(grid.find_row(ctx.clone(), call.key.clone())).await?;
         page.view = call.view.map(|v| grid.clean_view(v));
-        let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity()).with_ctx(ctx);
+        let r = user_render(entry.meta.name, ctx);
         Ok(json!({ "row": grid.row_html(&page, &call.key, &r) }))
     }
 
@@ -2298,7 +2304,7 @@ impl AppState {
         let info = Call { kind: CallKind::Form, screen: entry.meta.name, action: Some(action), via_agent: ctx.via_agent() };
         let result = self.intercept(ctx, &info, || self.timed(form.submit(ctx.clone(), call.values))).await;
         let effects = result?;
-        let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity()).with_ctx(ctx);
+        let r = user_render(entry.meta.name, ctx);
         Ok(json!({ "effects": effects.iter().map(|e| e.to_json(&r)).collect::<Vec<_>>() }))
     }
 
