@@ -291,3 +291,12 @@ Ctrl+Shift+P (Command+Shift+P on macOS) and F1 open the palette, also from `butt
 | `POST /_zeyn/command` | `{ command }` | Runs an action command with the input fixed on the server: CSRF, feature guards, the action's permission and the interceptors. `{ effects }`; `404` for unknown ids and effect commands |
 
 The runtime listens to `zeyn:run` on `document` so other scripts run work through it: `{ effects, source }` runs effects, `{ screen, item }` runs a screen context menu item, `{ error }` shows an error toast.
+
+### 8.2 Menu bar, toolbox, property inspector, status bar
+
+| Markup | Behavior |
+|---|---|
+| `ul[role=menubar][data-zeyn-menubar]` | W3C APG menubar. Top items are `button[role=menuitem][aria-haspopup=menu]` with a roving tab stop; each controls a `ul[role=menu]` that is `hidden` while closed. Items carry the command attributes of 8.1. Left and Right move between menus, Down, Enter and Space open, Up opens at the last item, Home and End jump, a letter moves to the next item starting with it, Escape closes and returns to the bar, Tab and a click outside close. Menus and items the user may not run are not rendered. |
+| `div[role=toolbar][aria-orientation=vertical][data-zeyn-toolbox]` | Toggle group of `button.z-tool[aria-pressed]`. Arrows, Home and End move the roving tab stop; a click, Enter or Space turns one tool on, sends `zeyn:tool` (`detail.tool`) and writes `data-text-selected` into the status bar. |
+| `section.z-inspector` | A form with `Form::section` groups (`details.z-form-section` with `role=group` bodies) saved through `POST /_zeyn/form` at the inspector's node path. Sections holding failing fields open before the browser's checks and after a `422`. |
+| `div[data-zeyn-statusbar]` | Items at the start and end and `[data-zeyn-status-live]` (`role=status`, `aria-live=polite`). `zeyn:status` (`detail.text`) from any element of the screen replaces the live text. |

@@ -188,6 +188,9 @@
         "done": "Tamamlandı.",
         "hint": "Yukarı ve aşağı oklarla gezinin, Enter ile çalıştırın, Escape ile kapatın."
       },
+      "toolbox": {
+        "selected": "{tool} seçildi"
+      },
       "loading": "Yükleniyor…",
       "load_failed": "Bu bölüm yüklenemedi. Tekrar deneyin.",
       "date": {

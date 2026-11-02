@@ -1,5 +1,6 @@
 /**
- * Zeyn desktop class shell styles: command palette.
+ * Zeyn desktop class shell styles: command palette, menu bar, toolbox, property inspector and
+ * status bar.
  *
  * Loaded after components.css and read only the theme tokens (docs/theming.md), so themes,
  * dark mode and density apply here too.
@@ -125,4 +126,196 @@ dialog.z-palette::backdrop { background: var(--z-backdrop); }
 
 @media (forced-colors: active) {
   .z-palette-option[aria-selected="true"] { outline: 2px solid Highlight; }
+  .z-tool[aria-pressed="true"] { outline: 2px solid Highlight; }
 }
+
+/* Menu bar ----------------------------------------------------------------------------------- */
+
+.z-menubar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 2px;
+  margin: 0;
+  padding: 2px;
+  list-style: none;
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius);
+  background: var(--z-surface);
+}
+
+.z-menubar-top { position: relative; }
+
+.z-menubar-item {
+  min-height: calc(var(--z-control) - 4px);
+  padding: 0 calc(var(--z-space) * 3);
+  border: 0;
+  border-radius: var(--z-radius-sm);
+  background: none;
+  color: var(--z-text);
+  font: inherit;
+  font-size: var(--z-font-size-sm);
+  cursor: pointer;
+}
+
+.z-menubar-item:hover,
+.z-menubar-item[aria-expanded="true"] { background: var(--z-hover); }
+
+.z-menubar-item:focus-visible { outline: 2px solid var(--z-focus); outline-offset: -2px; }
+
+.z-menubar-menu {
+  position: absolute;
+  inset-inline-start: 0;
+  top: calc(100% + 4px);
+  z-index: 30;
+  width: max-content;
+  max-width: min(28rem, calc(100vw - 32px));
+  white-space: nowrap;
+  margin: 0;
+  list-style: none;
+  background: var(--z-surface);
+  color: var(--z-text);
+  border: 1px solid var(--z-border-strong);
+  border-radius: var(--z-radius);
+  box-shadow: var(--z-shadow-2);
+  font-size: var(--z-font-size-sm);
+}
+
+.z-menubar-menu[hidden] { display: none; }
+
+.z-menubar-menu > li { display: block; }
+
+/* Toolbox ------------------------------------------------------------------------------------ */
+
+.z-toolbox {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius);
+  background: var(--z-surface);
+}
+
+.z-col:has(> .z-node > .z-toolbox:only-child) { flex: 0 0 auto; }
+
+.z-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--z-control);
+  height: var(--z-control);
+  border: 1px solid transparent;
+  border-radius: var(--z-radius-sm);
+  background: none;
+  color: var(--z-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.z-tool:hover { background: var(--z-hover); }
+
+.z-tool[aria-pressed="true"] {
+  background: var(--z-brand-subtle);
+  border-color: var(--z-accent);
+  color: var(--z-accent);
+}
+
+.z-tool:focus-visible { outline: 2px solid var(--z-focus); outline-offset: 1px; }
+
+/* Property inspector and form sections ------------------------------------------------------- */
+
+.z-inspector {
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius);
+  background: var(--z-surface);
+  font-size: var(--z-font-size-sm);
+}
+
+.z-inspector-title {
+  margin: 0;
+  padding: calc(var(--z-space) * 2) calc(var(--z-space) * 3);
+  border-bottom: 1px solid var(--z-border);
+  background: var(--z-surface-2);
+  font-size: var(--z-font-size-sm);
+  font-weight: 600;
+}
+
+.z-inspector .z-form { max-width: none; gap: 0; padding: 0 0 calc(var(--z-space) * 2); }
+
+.z-inspector .z-form-section-body { gap: calc(var(--z-space) * 2); padding: calc(var(--z-space) * 2) calc(var(--z-space) * 3); }
+
+.z-inspector .z-field:not(:has(> input[type="checkbox"])) {
+  display: grid;
+  grid-template-columns: minmax(5rem, 38%) minmax(0, 1fr);
+  align-items: center;
+  column-gap: calc(var(--z-space) * 2);
+}
+
+.z-inspector .z-field > .z-field-error { grid-column: 2; }
+
+.z-inspector .z-form-row { gap: calc(var(--z-space) * 2); grid-template-columns: 1fr; }
+
+.z-inspector .z-form-actions { padding: calc(var(--z-space) * 2) calc(var(--z-space) * 3) 0; }
+
+.z-form-section { border-top: 1px solid var(--z-border); }
+
+.z-form-section:first-child { border-top: 0; }
+
+.z-form-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 calc(var(--z-space) * 3);
+  color: var(--z-text);
+  font-size: var(--z-font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  list-style: none;
+}
+
+.z-form-section-title::-webkit-details-marker { display: none; }
+
+.z-form-section-title::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 120ms linear;
+}
+
+.z-form-section[open] > .z-form-section-title::before { transform: rotate(45deg); }
+
+.z-form-section-title:focus-visible { outline: 2px solid var(--z-focus); outline-offset: -2px; }
+
+.z-form-section-body { display: flex; flex-direction: column; gap: calc(var(--z-space) * 4); padding-bottom: calc(var(--z-space) * 3); }
+
+/* Status bar --------------------------------------------------------------------------------- */
+
+.z-statusbar {
+  display: flex;
+  justify-content: space-between;
+  gap: calc(var(--z-space) * 4);
+  min-height: 26px;
+  padding: 0 calc(var(--z-space) * 3);
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius-sm);
+  background: var(--z-surface-2);
+  color: var(--z-text-muted);
+  font-size: var(--z-font-size-xs);
+}
+
+.z-statusbar-start,
+.z-statusbar-end { display: flex; align-items: center; gap: calc(var(--z-space) * 4); min-width: 0; }
+
+.z-statusbar-item { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.z-statusbar-live { color: var(--z-text); }
+
+.z-statusbar-live:empty { display: none; }

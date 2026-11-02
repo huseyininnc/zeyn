@@ -41,14 +41,81 @@ pub fn palette() -> Screen {
         )
 }
 
+/// A shape on the designer canvas, edited in the property inspector.
+#[model]
+pub struct Shape {
+    #[rule(required, max_len = 40)]
+    pub name: String,
+    #[rule(min = 0, max = 2000)]
+    pub x: i64,
+    #[rule(min = 0, max = 2000)]
+    pub y: i64,
+    #[rule(min = 1, max = 2000)]
+    pub width: i64,
+    #[rule(min = 1, max = 2000)]
+    pub height: i64,
+    pub visible: bool,
+}
+
+#[action(public)]
+pub async fn save_shape(shape: Valid<Shape>) -> Result<Shape> {
+    Ok(shape.into_inner())
+}
+
+/// The designer's menu bar: the same commands the palette lists.
+fn menubar() -> MenuBar {
+    MenuBar::new(t!("pro.menubar"))
+        .menu(t!("pro.menu_file"), |m| m.command(new_product()).separator().command(restock()))
+        .menu(t!("pro.menu_go"), |m| m.command(go_products()))
+        .menu(t!("pro.menu_help"), |m| m.command(hello()))
+}
+
+#[screen(route = "/designer", permission = "stock.product.read")]
+pub fn designer() -> Screen {
+    let shape = Shape { name: "Header".into(), x: 40, y: 24, width: 640, height: 80, visible: true };
+    Screen::new(t!("pro.designer")).body(
+        Stack::new()
+            .gap(2)
+            .add(menubar())
+            .add(
+                Row::new()
+                    .col(
+                        Toolbox::new(t!("pro.tools"))
+                            .tool("select", t!("pro.tool_select"), Some(Icon::Search))
+                            .tool("draw", t!("pro.tool_draw"), Some(Icon::Edit))
+                            .tool("box", t!("pro.tool_box"), Some(Icon::Box))
+                            .tool("text", t!("pro.tool_text"), None),
+                    )
+                    .col(Card::new().title(t!("pro.canvas")).add(Alert::new(Tone::Neutral, t!("pro.canvas_hint"))))
+                    .col(
+                        PropertyInspector::new(
+                            t!("pro.properties"),
+                            Form::of(shape)
+                                .section(t!("pro.section_general"))
+                                .field(Shape::name)
+                                .field(Shape::visible)
+                                .section(t!("pro.section_position"))
+                                .row(|r| r.field(Shape::x).field(Shape::y))
+                                .section(t!("pro.section_size"))
+                                .row(|r| r.field(Shape::width).field(Shape::height))
+                                .submit(t!("pro.apply"), save_shape)
+                                .on_success(|_, ui| ui.toast(t!("pro.applied"))),
+                        ),
+                    ),
+            )
+            .add(StatusBar::new(t!("pro.status")).left(t!("pro.status_ready")).live(t!("pro.status_hint")).right("100%").right("UTF-8")),
+    )
+}
+
 pub fn feature() -> Feature {
     Feature::new("pro")
         .route_prefix("/pro")
         .guard(SignedIn)
         .screen(palette)
+        .screen(designer)
         .command(new_product())
         .command(restock())
         .command(go_products())
         .command(hello())
-        .menu(|m| m.group(t!("menu.pro"), Icon::Search).item(t!("pro.palette"), palette))
+        .menu(|m| m.group(t!("menu.pro"), Icon::Search).item(t!("pro.palette"), palette).item(t!("pro.designer"), designer))
 }

@@ -341,7 +341,7 @@ pub use serde_json as __serde_json;
 pub mod prelude {
     pub use crate::ui::{
         ActionButton, Alert, Badge, Breadcrumb, Card, Chart, Control, DateOptions, DescriptionList, EmptyState, LookupItem, LookupQuery,
-        Panel, Progress, Row, Skeleton, Split, Stack, Tabs, Timeline, Tree, TreeItem, TreeQuery,
+        MenuBar, Panel, Progress, PropertyInspector, Row, Skeleton, Split, Stack, StatusBar, Tabs, Timeline, Toolbox, Tree, TreeItem, TreeQuery,
     };
     pub use crate::{
         Action, Command, ContextMenu, Ctx, Currency, Date, DateTime, Effect, Tone, LocalDateTime, Time, TimeZone, Entity, Error, Export, Feature, Field, Form, DataGrid, DataMode, DataQuery,

@@ -46,6 +46,8 @@ enum FormItem<M> {
     Range(FormField<M>, FormField<M>),
     /// Starts a step of a stepped form.
     Step(Text),
+    /// Starts a titled, foldable group of fields.
+    Section(Text),
 }
 
 /// Fields placed side by side.
@@ -132,12 +134,25 @@ impl<M: Model> Form<M> {
         self
     }
 
+    /// Starts a section: the fields added after it, up to the next section or step, sit under a
+    /// title the user can fold away. Used by property inspectors to group many fields.
+    ///
+    /// ```ignore
+    /// Form::of(shape).section("Position").row(|r| r.field(Shape::x).field(Shape::y))
+    ///     .section("Look").field(Shape::fill)
+    /// ```
+    pub fn section(mut self, title: impl Into<Text>) -> Self {
+        self.items.push(FormItem::Section(title.into()));
+        self
+    }
+
     /// Field names of each step, in order. Empty when the form has no steps.
     pub fn steps(&self) -> Vec<Vec<&'static str>> {
         let mut steps: Vec<Vec<&'static str>> = Vec::new();
         for item in &self.items {
             match item {
                 FormItem::Step(_) => steps.push(Vec::new()),
+                FormItem::Section(_) => {}
                 FormItem::Field(f) => steps.last_mut().into_iter().for_each(|s| s.push(f.meta.name)),
                 FormItem::Row(fs) => steps.last_mut().into_iter().for_each(|s| s.extend(fs.iter().map(|f| f.meta.name))),
                 FormItem::Range(a, b) => steps.last_mut().into_iter().for_each(|s| s.extend([a.meta.name, b.meta.name])),
@@ -237,7 +252,7 @@ impl<M: Model> Form<M> {
             FormItem::Field(f) => std::slice::from_ref(f).iter(),
             FormItem::Row(fs) => fs.iter(),
             FormItem::Range(a, _) => std::slice::from_ref(a).iter(),
-            FormItem::Step(_) => [].iter(),
+            FormItem::Step(_) | FormItem::Section(_) => [].iter(),
         })
         .chain(self.items.iter().filter_map(|item| match item {
             FormItem::Range(_, b) => Some(b),
@@ -266,8 +281,20 @@ impl<M: Model> Form<M> {
         }
         let mut step = 0usize;
         let mut open = false;
+        let mut section = false;
         for item in &self.items {
+            if section && matches!(item, FormItem::Step(_) | FormItem::Section(_)) {
+                out.push_str("</div></details>");
+                section = false;
+            }
             match item {
+                FormItem::Section(title) => {
+                    let title = r.text(title);
+                    out.push_str(&format!(
+                        r#"<details class="z-form-section" open><summary class="z-form-section-title">{title}</summary><div class="z-form-section-body" role="group" aria-label="{title}">"#
+                    ));
+                    section = true;
+                }
                 FormItem::Step(title) => {
                     if open {
                         out.push_str("</fieldset>");
@@ -295,6 +322,9 @@ impl<M: Model> Form<M> {
                 }
             }
         }
+        if section {
+            out.push_str("</div></details>");
+        }
         if open {
             out.push_str("</fieldset>");
         }
@@ -316,6 +346,10 @@ impl<M: Model> Form<M> {
                 FormItem::Range(a, b) => vec![a, b],
                 FormItem::Step(title) => {
                     list.push(json!({ "row": row, "step": title }));
+                    Vec::new()
+                }
+                FormItem::Section(title) => {
+                    list.push(json!({ "row": row, "section": title }));
                     Vec::new()
                 }
             };

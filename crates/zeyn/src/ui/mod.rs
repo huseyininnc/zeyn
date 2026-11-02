@@ -10,10 +10,12 @@ mod date;
 mod layout;
 mod lines;
 mod lookup;
+mod shell;
 mod tree;
 mod widgets;
 
 pub use layout::{Card, Panel, Row, Split, Stack, Tabs};
+pub use shell::{MenuBar, MenuList, PropertyInspector, StatusBar, Toolbox};
 
 pub use chart::{Chart, ChartKind};
 pub use controls::Control;

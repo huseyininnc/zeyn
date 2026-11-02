@@ -49,6 +49,45 @@ fn hello() -> Command {
     Command::effect("orders.hello", "Say hello", Effect::Toast { message: "Hello".into() })
 }
 
+#[model]
+pub struct Shape {
+    #[rule(required, max_len = 10)]
+    pub name: String,
+    #[rule(min = 1, max = 100)]
+    pub width: i64,
+}
+
+#[action(permission = "orders.write")]
+pub async fn save_shape(shape: Valid<Shape>, counter: Counter) -> Result<Shape> {
+    counter.0.fetch_add(1, Ordering::SeqCst);
+    Ok(shape.into_inner())
+}
+
+#[screen(route = "/designer", permission = "orders.read")]
+pub fn designer() -> Screen {
+    Screen::new("Designer")
+        .body(
+            MenuBar::new("Main")
+                .menu("File", |m| m.separator().command(new_order()).separator().command(archive()).separator())
+                .menu("Admin", |m| m.command(archive()))
+                .menu("Help", |m| m.command(hello())),
+        )
+        .body(
+            Row::new()
+                .col(Toolbox::new("Tools").tool("select", "Select", Some(Icon::Search)).tool("text", "Text", None).selected("text"))
+                .col(PropertyInspector::new(
+                    "Properties",
+                    Form::of(Shape { name: "A".into(), width: 5 })
+                        .section("General")
+                        .field(Shape::name)
+                        .section("Size")
+                        .field(Shape::width)
+                        .submit("Apply", save_shape),
+                )),
+        )
+        .body(StatusBar::new("Status").left("Ready").live("Pick a tool").right("100%"))
+}
+
 fn denied(_: &Ctx) -> GuardResult {
     GuardResult::Deny("No".into())
 }
@@ -61,7 +100,15 @@ fn app(counter: Counter) -> Router {
             let perms: Vec<String> = h.get("x-perms")?.to_str().ok()?.split(',').map(String::from).collect();
             Some(Identity::user("u").with_permissions(perms))
         })
-        .feature(Feature::new("orders").screen(orders).screen(order_form).command(new_order()).command(archive()).command(hello()))
+        .feature(
+            Feature::new("orders")
+                .screen(orders)
+                .screen(order_form)
+                .screen(designer)
+                .command(new_order())
+                .command(archive())
+                .command(hello()),
+        )
         .feature(
             Feature::new("hidden")
                 .guard(denied)
@@ -193,4 +240,59 @@ fn shortcuts_shared_across_features_are_reported_by_the_app_check() {
     assert_eq!(problems.len(), 1, "{problems:?}");
     assert!(problems[0].contains("both use the shortcut `Control+J` (in `a` and `b`)"), "{problems:?}");
     assert!(app.router().is_err(), "the app does not start");
+}
+
+#[tokio::test]
+async fn menubar_follows_the_apg_pattern_and_leaves_out_commands_the_user_may_not_run() {
+    let router = app(Counter::default());
+    let (status, html) = send(&router, get("/designer", "orders.read")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(html.contains(r#"<ul class="z-menubar" role="menubar" aria-label="Main" data-zeyn-menubar data-testid="designer.menubar">"#));
+    assert!(!html.contains(">File</button>"), "a menu with nothing the user may run is left out");
+    assert!(!html.contains(">Admin</button>"));
+    assert!(html.contains(
+        r#"<button type="button" role="menuitem" class="z-menubar-item" id="designer-menubar-0-0" aria-haspopup="menu" aria-expanded="false" aria-controls="designer-menubar-0-0-menu" tabindex="0">Help</button><ul role="menu" class="z-menu z-menubar-menu" id="designer-menubar-0-0-menu" aria-labelledby="designer-menubar-0-0" hidden>"#
+    ));
+    assert!(html.contains(r#"role="menuitem" class="z-menu-item" tabindex="-1" data-testid="designer.menubar.orders.hello" data-zeyn-command="orders.hello""#));
+
+    let (_, html) = send(&router, get("/designer", "orders.read,orders.write,orders.admin")).await;
+    let file = html.split(">File</button>").nth(1).unwrap().split("</ul>").next().unwrap();
+    assert_eq!(file.matches(r#"role="separator""#).count(), 1, "leading, doubled and trailing separators are dropped: {file}");
+    assert!(file.contains(r#"<span class="z-menu-label">New order</span><span class="z-menu-hint" aria-hidden="true">Ctrl+Alt+N</span>"#));
+    assert!(file.contains(r#"data-zeyn-command-run="orders.archive""#));
+    assert!(html.contains(r#"tabindex="-1">Admin</button>"#), "only the first top item is a tab stop");
+}
+
+#[tokio::test]
+async fn toolbox_status_bar_and_inspector_sections_render_their_aria() {
+    let router = app(Counter::default());
+    let (_, html) = send(&router, get("/designer", "orders.read")).await;
+    assert!(html.contains(r#"<div class="z-toolbox" role="toolbar" aria-orientation="vertical" aria-label="Tools" data-zeyn-toolbox data-text-selected="{tool} selected""#));
+    assert!(html.contains(r#"aria-pressed="false" tabindex="-1" data-tool="select" aria-label="Select""#));
+    assert!(html.contains(r#"aria-pressed="true" tabindex="0" data-tool="text" aria-label="Text" title="Text" data-testid="designer.tool.text"><span aria-hidden="true">T</span>"#));
+    assert!(html.contains(r#"<section class="z-inspector" aria-labelledby="designer-inspector-1-1-title"><h2 class="z-inspector-title" id="designer-inspector-1-1-title">Properties</h2><form"#));
+    assert!(html.contains(r#"<details class="z-form-section" open><summary class="z-form-section-title">General</summary><div class="z-form-section-body" role="group" aria-label="General">"#));
+    assert_eq!(html.matches("<details").count(), 2);
+    assert_eq!(html.matches("</details>").count(), 2);
+    assert!(html.contains(r#"role="status" aria-live="polite" data-zeyn-status-live>Pick a tool</span></div><div class="z-statusbar-end"><span class="z-statusbar-item">100%</span>"#));
+    let schema = designer::run().schema(&designer::META).to_string();
+    for t in ["\"menubar\"", "\"toolbox\"", "\"property_inspector\"", "\"statusbar\"", "\"section\":\"Size\""] {
+        assert!(schema.contains(t), "{t} missing in {schema}");
+    }
+}
+
+#[tokio::test]
+async fn inspector_saves_through_the_form_endpoint_with_validation_and_permission() {
+    let counter = Counter::default();
+    let router = app(counter.clone());
+    let call = |values: serde_json::Value| serde_json::json!({ "screen": "designer", "node": "1.1", "values": values });
+    let (status, _) = send(&router, post("/_zeyn/form", "orders.read", call(serde_json::json!({ "name": "B", "width": "7" })))).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "saving needs orders.write");
+    let (status, body) = send(&router, post("/_zeyn/form", "orders.read,orders.write", call(serde_json::json!({ "name": "", "width": "500" })))).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+    assert!(body.contains(r#""field":"name""#) && body.contains(r#""field":"width""#), "{body}");
+    assert_eq!(counter.0.load(Ordering::SeqCst), 0);
+    let (status, body) = send(&router, post("/_zeyn/form", "orders.read,orders.write", call(serde_json::json!({ "name": "B", "width": "7" })))).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(counter.0.load(Ordering::SeqCst), 1);
 }

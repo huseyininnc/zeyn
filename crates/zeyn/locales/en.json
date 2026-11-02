@@ -188,6 +188,9 @@
         "done": "Done.",
         "hint": "Up and Down to move, Enter to run, Escape to close."
       },
+      "toolbox": {
+        "selected": "{tool} selected"
+      },
       "loading": "Loading…",
       "load_failed": "Could not load this part. Try again.",
       "date": {

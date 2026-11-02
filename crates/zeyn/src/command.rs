@@ -152,6 +152,10 @@ impl Command {
         &self.label
     }
 
+    pub fn icon_of(&self) -> Option<Icon> {
+        self.icon
+    }
+
     /// The shortcut as declared.
     pub fn keys(&self) -> Option<&str> {
         self.shortcut.as_deref()
