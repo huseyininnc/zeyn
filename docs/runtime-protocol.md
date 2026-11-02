@@ -264,3 +264,15 @@ All are `POST` with JSON and the CSRF header, and check the screen's access and 
 | `zeyn:effect` | `document` | An effect the runtime does not know: `{ effect, source, run }`. `run(next)` runs another effect. Used by `confirm`. |
 
 Effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":"...","then":{...}}` asks in a modal alert dialog and runs `then` only after the user confirms.
+
+### 7.4 Media
+
+`Video` and `Audio` are served by `/_zeyn/media.js` and `/_zeyn/media.css`, linked after the component library. See `docs/media.md`.
+
+| Endpoint | Does |
+|---|---|
+| `GET /_zeyn/media/{source}/{id}` | A file of a registered media source with range requests: `200`, `206`, `304`, `416`. |
+| `GET /_zeyn/media/position?source=&id=` | `{ at, kept }`, where the signed in user stopped; `kept` is `false` when the source keeps no positions (the player then uses local storage). |
+| `POST /_zeyn/media/position` | `{ source, id, at }` with the CSRF header saves it: `204`, `422` for a bad position. |
+
+The player dispatches the cancelable `zeyn:media-adaptive` event (`{ media, kind, url, hls, dash }`) on its root before falling back to progressive files; a streaming library calls `preventDefault()` to take over.

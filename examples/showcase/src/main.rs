@@ -7,6 +7,7 @@
 //! Run: `cargo run --offline -p zeyn-example-showcase`, then open http://127.0.0.1:3002
 
 mod gallery;
+mod media;
 mod overview;
 mod people;
 mod sales;
@@ -80,6 +81,7 @@ async fn main() -> std::io::Result<()> {
         .feature(people::feature())
         .feature(gallery::feature())
         .feature(ui::feature())
+        .feature(media::feature())
         .serve(&addr)
         .await
 }

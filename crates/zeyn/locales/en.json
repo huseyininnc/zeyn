@@ -276,6 +276,29 @@
       "text": {
         "count": "{n} of {max} characters"
       },
+      "media": {
+        "video_player": "Video player",
+        "audio_player": "Audio player",
+        "play": "Play",
+        "pause": "Pause",
+        "seek": "Seek",
+        "volume": "Volume",
+        "mute": "Mute",
+        "unmute": "Unmute",
+        "time_of": "{current} of {total}",
+        "speed": "Playback speed",
+        "speed_value": "Playback speed: {value}",
+        "captions": "Captions",
+        "captions_language": "Caption language",
+        "captions_on": "Captions on: {label}",
+        "captions_off": "Off",
+        "pip": "Picture in picture",
+        "fullscreen": "Full screen",
+        "exit_fullscreen": "Exit full screen",
+        "resumed": "Resuming at {time}",
+        "failed": "This media could not be played.",
+        "bad_position": "The play position is not valid."
+      },
       "tone": {
         "neutral": "Note",
         "info": "Information",

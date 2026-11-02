@@ -8,7 +8,8 @@
     "sales": "Satış",
     "people": "İnsan kaynakları",
     "gallery": "Bileşenler",
-    "ui": "Bileşen kütüphanesi"
+    "ui": "Bileşen kütüphanesi",
+    "media": "Medya"
   },
   "dashboard": {
     "title": "Genel bakış",
@@ -270,5 +271,18 @@
     "start": "Başlayabileceği tarih",
     "remote": "Uzaktan çalışma",
     "motivation": "Neden biz?"
+  },
+  "media": {
+    "title": "Medya kitaplığı",
+    "films": "Filmler",
+    "songs": "Şarkılar",
+    "harbor": "Şafakta liman",
+    "harbor_sub": "Kısa film, 8 saniye",
+    "zoom": "Derin yakınlaşma",
+    "zoom_sub": "Kısa film, 6 saniye",
+    "dawn": "Şafak gamı",
+    "tide": "Gelgit",
+    "lanterns": "Fenerler",
+    "artist": "Northwind Topluluğu"
   }
 }

@@ -10,6 +10,7 @@ mod date;
 mod layout;
 mod lines;
 mod lookup;
+mod media;
 mod tree;
 mod widgets;
 
@@ -19,6 +20,7 @@ pub use chart::{Chart, ChartKind};
 pub use controls::Control;
 pub use date::DateOptions;
 pub use lines::{Lines, MAX_LINES};
+pub use media::{Audio, PLAYBACK_SPEEDS, Video};
 pub use tree::{MAX_TREE_CHILDREN, Tree, TreeItem, TreeQuery};
 pub use widgets::{ActionButton, Alert, Badge, Breadcrumb, DescriptionList, DescriptionOf, EmptyState, Progress, Skeleton, Timeline};
 pub(crate) use lines::LinesEditor;

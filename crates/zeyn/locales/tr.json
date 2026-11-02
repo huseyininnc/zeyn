@@ -276,6 +276,29 @@
       "text": {
         "count": "{n} / {max} karakter"
       },
+      "media": {
+        "video_player": "Video oynatıcı",
+        "audio_player": "Ses oynatıcı",
+        "play": "Oynat",
+        "pause": "Duraklat",
+        "seek": "Konum",
+        "volume": "Ses düzeyi",
+        "mute": "Sesi kapat",
+        "unmute": "Sesi aç",
+        "time_of": "{current} / {total}",
+        "speed": "Oynatma hızı",
+        "speed_value": "Oynatma hızı: {value}",
+        "captions": "Altyazı",
+        "captions_language": "Altyazı dili",
+        "captions_on": "Altyazı açık: {label}",
+        "captions_off": "Kapalı",
+        "pip": "Resim içinde resim",
+        "fullscreen": "Tam ekran",
+        "exit_fullscreen": "Tam ekrandan çık",
+        "resumed": "{time} konumundan devam ediliyor",
+        "failed": "Bu medya oynatılamadı.",
+        "bad_position": "Oynatma konumu geçerli değil."
+      },
       "tone": {
         "neutral": "Not",
         "info": "Bilgi",

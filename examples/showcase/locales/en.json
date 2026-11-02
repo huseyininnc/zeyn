@@ -8,7 +8,8 @@
     "sales": "Sales",
     "people": "People",
     "gallery": "Components",
-    "ui": "Component library"
+    "ui": "Component library",
+    "media": "Media"
   },
   "dashboard": {
     "title": "Overview",
@@ -270,5 +271,18 @@
     "start": "Can start on",
     "remote": "Remote work",
     "motivation": "Why us?"
+  },
+  "media": {
+    "title": "Media library",
+    "films": "Films",
+    "songs": "Songs",
+    "harbor": "Harbor at dawn",
+    "harbor_sub": "Short film, 8 seconds",
+    "zoom": "Deep zoom",
+    "zoom_sub": "Short film, 6 seconds",
+    "dawn": "Dawn scale",
+    "tide": "Tide",
+    "lanterns": "Lanterns",
+    "artist": "Northwind Ensemble"
   }
 }

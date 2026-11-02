@@ -1,0 +1,80 @@
+# Media
+
+Zeyn serves media files with HTTP range requests and plays them in the `Video` and `Audio` components. The native `<video>` and `<audio>` elements do the decoding; Zeyn draws its own accessible controls on top.
+
+## Serving files
+
+Register a `MediaSource` on a feature with a permission:
+
+```rust
+Feature::new("library")
+    .media("films", "library.watch", FilmFolder::new())
+    .media("music", "library.listen", SongTable::new())
+```
+
+The browser fetches `GET /_zeyn/media/{source}/{id}`. Before the source sees anything, the server:
+
+1. refuses ids that are not 1 to 128 of `A-Z a-z 0-9 - _ .`, start with a dot or contain `..` (`404`);
+2. checks the source's permission (`403`) and the feature's guards;
+3. runs the interceptors (`CallKind::Media`, with the source name in `screen`).
+
+`open(ctx, id)` looks the id up in the app's own catalog and returns a `Media`: `Media::file(path)` for a file on disk (type from the extension, entity tag from size and modification time), `Media::bytes(data, type)` for data in memory, or `Media::new(reader, len, type)` for any `Read + Seek`. The id is a name, never a path: build the path from your lookup, not from the id.
+
+Responses:
+
+| Request | Answer |
+|---|---|
+| no `Range`, another unit, or several ranges | `200` with the whole file |
+| `bytes=a-b`, `bytes=a-`, `bytes=-n` | `206` with `Content-Range: bytes a-b/len` |
+| a bytes range that is malformed or starts past the end | `416` with `Content-Range: bytes */len` |
+| `If-Range` that does not match the entity tag | `200` with the whole file |
+| `If-None-Match` that matches the entity tag | `304` |
+
+Every answer has `Accept-Ranges: bytes`, `Cache-Control: private, no-cache` and `X-Content-Type-Options: nosniff`. Only audio, video, raster images, WebVTT and streaming playlists are served inline; any other type (HTML, SVG, scripts) is sent as `application/octet-stream` with `Content-Disposition: attachment`, so a file can never run as a page of the app. Files are read in 64 KiB chunks on the blocking pool with at most four chunks queued, so memory stays flat for any file size and a client that leaves stops the read. Rate limits apply as for other requests; media reads are not writes.
+
+The content security policy needs no change: `default-src 'self'` already allows media from the app. An adaptive streaming library that uses Media Source Extensions needs `blob:` in `media-src`, which Zeyn does not add.
+
+## Players
+
+```rust
+Video::new("films", t!("films.harbor"))
+    .subtitle(t!("films.harbor_sub"))
+    .file("harbor.webm")
+    .file("harbor.mp4")
+    .hls("harbor.m3u8")
+    .poster("harbor.jpg")
+    .captions("harbor.en.vtt", "en", "English")
+    .captions("harbor.tr.vtt", "tr", "Türkçe")
+
+Audio::new("music", t!("songs.dawn")).subtitle(t!("songs.artist")).file("dawn.mp3")
+```
+
+Controls: play and pause, a seek slider, the time, mute, a volume slider, a playback speed menu, a captions button and (with more than one captions file) a language menu, and for video picture in picture (where the browser supports it) and full screen. Sliders follow the WAI-ARIA slider pattern: arrows move 5 seconds (or 5 percent of volume), Page Up and Page Down move a tenth, Home and End go to the ends. Menus follow the menu button pattern. While focus is inside a player, `k` or Space plays and pauses, `j` and `l` jump 10 seconds, `m` mutes, `c` toggles captions and `f` toggles full screen; the keys do nothing elsewhere on the page.
+
+Captions are WebVTT files served by the same source. The player draws the active cue as plain text (cue markup is dropped), over the picture for video and under the title for audio, so captions look the same in every browser and in full screen.
+
+## Resume
+
+The player saves where the user stopped: every 15 seconds while playing, on pause, when the page is hidden or closed, and `0` when the media ends. It resumes when the saved point is more than 5 seconds from either end.
+
+- When the source implements `position` and `save_position`, positions go to the server: `GET /_zeyn/media/position?source=&id=` answers `{"at": seconds, "kept": true}`, and `POST /_zeyn/media/position` with `{source, id, at}` saves (`204`). Both check the id, the permission and the guards and need a signed in user; the POST also needs the CSRF header and counts as a write for rate limits. Positions over `MAX_POSITION_SECONDS` or below zero are `422`.
+- Otherwise (the source's default methods, or an anonymous user) the read answers `{"at": null, "kept": false}` and the player keeps the position in the browser's local storage under `zeyn.media.{source}/{id}`. Storage errors (private windows, blocked storage) are ignored.
+
+Server positions are the better choice for signed in users: they follow the user to every device and the app can read them for a "continue watching" row. Local storage needs no code but stays on one browser and is shared by everyone who uses it.
+
+## HLS and DASH
+
+`hls(id)` and `dash(id)` add an adaptive stream. Safari plays HLS natively, so it uses the playlist. Other browsers need a JavaScript library (such as hls.js or dash.js), which Zeyn does not ship. Before falling back to the progressive files, the player dispatches a cancelable `zeyn:media-adaptive` event on its root:
+
+```js
+document.addEventListener('zeyn:media-adaptive', (e) => {
+  const { media, kind, url } = e.detail;
+  if (kind !== 'hls' || !window.Hls?.isSupported()) return;
+  e.preventDefault();
+  const hls = new window.Hls();
+  hls.loadSource(url);
+  hls.attachMedia(media);
+});
+```
+
+Load that script from a file of your app (inline scripts are blocked by the content security policy). When no listener calls `preventDefault()`, the `file` entries play in order. Playlist and segment files are served by the same source, so their relative URLs work as long as their ids are listed in it.
