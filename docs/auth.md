@@ -143,7 +143,8 @@ the `x-zeyn-csrf` header, whatever cookie signs the user in.
 `refresh_tokens(true)` keeps the refresh token in the cookie. When the tokens expire, the next
 request refreshes them before it runs and sends the renewed cookie back. A refused refresh (the
 user was disabled or signed out at the provider) ends the session. Without refresh tokens a
-session lasts `session_lifetime`, whatever happens at the provider.
+session lasts `session_lifetime`, whatever happens at the provider. The refresh runs as one layer
+over the whole app, so every route is covered, also those of optional features.
 
 If the provider rotates refresh tokens and revokes the old one at once, two requests that refresh
 at the same moment can sign the user out. Keep rotation off or allow reuse for a short time.

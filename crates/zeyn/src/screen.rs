@@ -347,6 +347,11 @@ pub trait GridSource: Send + Sync {
         &[]
     }
 
+    /// Name of the row model when it is `#[sensitive]`, so exports are audited.
+    fn sensitive_model(&self) -> Option<&'static str> {
+        None
+    }
+
     /// The raw value of a masked field of the row with this key, for an audited reveal.
     fn reveal(&self, _ctx: Ctx, _key: String, _field: String) -> BoxFuture<Result<Option<crate::privacy::Revealed>>> {
         Box::pin(async { Ok(None) })

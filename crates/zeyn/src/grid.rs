@@ -1702,6 +1702,10 @@ impl<E: Model> GridSource for DataGrid<E> {
         E::fields()
     }
 
+    fn sensitive_model(&self) -> Option<&'static str> {
+        E::SENSITIVE.then_some(E::NAME)
+    }
+
     fn reveal(&self, ctx: Ctx, key: String, field: String) -> BoxFuture<Result<Option<crate::privacy::Revealed>>> {
         crate::privacy::grid_reveal::<E>(self.fetch, ctx, key, field)
     }

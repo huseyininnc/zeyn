@@ -297,6 +297,9 @@ pub enum CallKind {
     Media,
     /// A PDF document rendered from an action's data.
     Document,
+    /// A live channel opened (a WebSocket handshake); `screen` holds the document kind, or is
+    /// empty for change topics.
+    Live,
 }
 
 /// What is being called.
@@ -365,6 +368,9 @@ pub struct AuditEntry {
     /// Workflow move: name, from, to and the user's comment.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transition: Option<crate::workflow::TransitionRecord>,
+    /// Export of sensitive records: model, format, row count and query.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub export: Option<crate::audit::ExportRecord>,
 }
 
 /// Where audit records go.
@@ -415,7 +421,8 @@ impl<S: AuditSink> Interceptor for AuditLog<S> {
             || call.action.is_some_and(|a| a.audit)
             || !trail.revealed.is_empty()
             || !trail.reads.is_empty()
-            || trail.transition.is_some();
+            || trail.transition.is_some()
+            || trail.export.is_some();
         if !audited {
             return;
         }
@@ -427,6 +434,7 @@ impl<S: AuditSink> Interceptor for AuditLog<S> {
             reads: trail.reads,
             reason: trail.reason,
             transition: trail.transition,
+            export: trail.export,
             at_unix_ms: SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0),
             user: ctx.identity().user.clone(),
             kind: call.kind,
@@ -1268,6 +1276,7 @@ impl App {
         } else {
             router
         };
+        let router = auth::layers(router, &state);
         let router = router
             .layer(axum::middleware::from_fn_with_state(state.clone(), guard::guard_request))
             .layer(axum::middleware::map_response(guard::security_headers))
@@ -1604,6 +1613,16 @@ impl AppState {
             i.before(ctx, call)?;
         }
         Ok(())
+    }
+
+    #[cfg_attr(not(feature = "realtime"), allow(dead_code))]
+    /// Runs the interceptors for a call that runs no application code itself, such as a socket
+    /// handshake: `before`, then `after` with its outcome.
+    fn admit_call(&self, ctx: &Ctx, call: &Call) -> Result<(), Failure> {
+        let started = Instant::now();
+        let checked = self.before(ctx, call);
+        self.after(ctx, call, started, &checked);
+        checked
     }
 
     /// Runs `work` between the interceptors' `before` and `after`, so no endpoint can run

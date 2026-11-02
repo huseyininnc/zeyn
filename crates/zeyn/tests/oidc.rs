@@ -198,7 +198,7 @@ pub fn home() -> Screen {
 
 #[screen(route = "/vault", permission = "crm.read")]
 pub fn vault() -> Screen {
-    Screen::new("Vault")
+    Screen::new("Vault").body(Alert::info("Vault contents"))
 }
 
 #[screen(route = "/payroll", permission = "crm.read")]
@@ -482,6 +482,16 @@ async fn step_up_sends_the_user_back_to_the_provider_with_acr_values() {
     let r = send(&router, get_with("/_zeyn/screen/vault", &cookie)).await;
     assert_eq!(r.status, StatusCode::UNAUTHORIZED);
     assert!(r.body.contains("mfa_required"), "{}", r.body);
+    let token = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    let node = Request::post("/_zeyn/node")
+        .header(header::COOKIE, format!("{cookie}; zeyn_csrf={token}"))
+        .header("x-zeyn-csrf", token)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(json!({ "screen": "vault", "node": "0" }).to_string()))
+        .unwrap();
+    let r = send(&router, node).await;
+    assert_eq!(r.status, StatusCode::UNAUTHORIZED, "lazy parts of a screen run the interceptors too");
+    assert!(!r.body.contains("Vault contents"), "{}", r.body);
 
     let (flow, q, _) = start(&router, "/_zeyn/auth/login?mfa=1&return_to=%2Fvault").await;
     assert_eq!(q["acr_values"], "2");
@@ -554,6 +564,18 @@ async fn refresh_tokens_renew_the_session_and_a_refused_refresh_signs_out() {
     assert_ne!(renewed, value);
 
     idp.refresh_ok.store(false, Ordering::SeqCst);
+    let token = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    let keepalive = Request::post("/_zeyn/keepalive")
+        .header(header::COOKIE, format!("zeyn_session={renewed}; zeyn_csrf={token}"))
+        .header("x-zeyn-csrf", token)
+        .body(Body::empty())
+        .unwrap();
+    let r = send(&router, keepalive).await;
+    assert!(
+        r.cookie("zeyn_session").is_some_and(|c| c.contains("Max-Age=0")),
+        "every route refreshes, also those added after sign in: {:?}",
+        r.headers
+    );
     let r = send(&router, get_with("/home", &format!("zeyn_session={renewed}"))).await;
     assert_eq!(r.status, StatusCode::SEE_OTHER, "refused refresh: signed out");
     assert!(r.cookie("zeyn_session").unwrap().contains("Max-Age=0"));

@@ -19,6 +19,18 @@ pub fn home() -> Screen {
     Screen::new("Home")
 }
 
+/// Refuses live channels to the user `blocked`, as a suspended account check would.
+struct Suspended;
+
+impl zeyn::Interceptor for Suspended {
+    fn before(&self, ctx: &Ctx, call: &zeyn::Call) -> Result<()> {
+        if call.kind == zeyn::CallKind::Live && ctx.identity().user.as_deref() == Some("blocked") {
+            return Err(Error::Forbidden);
+        }
+        Ok(())
+    }
+}
+
 async fn start(limits: Limits) -> (SocketAddr, Hub, MemoryDocStore) {
     let store = MemoryDocStore::default();
     let realtime = Realtime::new()
@@ -34,6 +46,7 @@ async fn start(limits: Limits) -> (SocketAddr, Hub, MemoryDocStore) {
             Some(Identity::user(user).with_permissions(perms.iter().copied()))
         })
         .feature(Feature::new("notes").screen(home))
+        .interceptor(Suspended)
         .realtime(realtime);
     let router = app.router().unwrap();
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -115,6 +128,16 @@ async fn handshakes_need_origin_token_user_and_a_declared_document() {
         403
     );
     assert!(open(addr, &doc_path("a"), "ayse", true, &here).await.is_ok());
+}
+
+#[tokio::test]
+async fn live_channels_run_the_interceptors() {
+    let (addr, _, _) = start(Limits::default()).await;
+    let here = format!("http://{addr}");
+    assert_eq!(status(open(addr, &doc_path("a"), "blocked", true, &here).await.unwrap_err()), 403);
+    let topics = format!("/_zeyn/live/topics?t=orders&csrf={TOKEN}");
+    assert_eq!(status(open(addr, &topics, "blocked", false, &here).await.unwrap_err()), 403);
+    assert!(open(addr, &topics, "ayse", false, &here).await.is_ok());
 }
 
 #[tokio::test]

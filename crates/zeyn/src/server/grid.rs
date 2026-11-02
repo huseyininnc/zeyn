@@ -147,7 +147,7 @@ async fn grid_export(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(
             Some(s) if s.len() <= 64 * 1024 => serde_json::from_str(s).map_err(|_| Failure::App(Error::NotFound))?,
             Some(_) => return Err(Failure::App(Error::NotFound)),
         };
-        let (_, entry, screen) = st.open(&ctx, &q.screen, params).await?;
+        let (_, entry, screen) = st.open(&ctx, &q.screen, params.clone()).await?;
         let grid = screen.node(&q.node).and_then(|n| n.grid()).ok_or(Failure::App(Error::NotFound))?;
         let access = grid.export_access().ok_or(Failure::App(Error::NotFound))?;
         if !ctx.identity().can(&grid.action().access) || !ctx.identity().can(&access) {
@@ -164,6 +164,7 @@ async fn grid_export(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(
             st.after(&ctx, &info, Instant::now(), &checked);
         }
         checked?;
+        data::note_screen_read(&ctx, &entry.meta, &params);
         Ok((entry, screen, spec, info))
     }
     .await;
@@ -193,7 +194,7 @@ async fn grid_export(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(
             return;
         };
         let view = view.map(|v| grid.clean_view(v));
-        let r = Render::new(name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity());
+        let r = user_render(name, &ctx);
         #[cfg(feature = "xlsx")]
         let sheet = xlsx.then(|| {
             xlsx::XlsxSink::open(grid.export_columns(&r, view.as_ref()), ctx.locale().to_string(), tx.clone())
@@ -245,6 +246,7 @@ async fn grid_export(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(
         {
             tracing::warn!("XLSX export did not finish: {e}");
         }
+        note_export(&ctx, grid, if xlsx { "xlsx" } else { "csv" }, sent, &query);
         state.after(&ctx, &info, started, &outcome);
     });
     let mut response = axum::body::Body::from_stream(Chunks(rx)).into_response();
@@ -260,6 +262,17 @@ async fn grid_export(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(
         h.insert(header::CONTENT_DISPOSITION, v);
     }
     response
+}
+
+/// Records an export of a sensitive grid in the call's audit trail: once, with the row count and
+/// the query, so exports cost nothing per row.
+pub(super) fn note_export(ctx: &Ctx, grid: &dyn GridSource, format: &'static str, rows: usize, query: &DataQuery) {
+    if let Some(model) = grid.sensitive_model() {
+        let query = json!({ "sort": query.sort, "filters": query.filters });
+        ctx.update_trail(|t| {
+            t.export = Some(crate::audit::ExportRecord { model, format, rows: rows as u64, query });
+        });
+    }
 }
 
 async fn grid_edit_call(

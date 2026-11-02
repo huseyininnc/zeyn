@@ -93,18 +93,24 @@ pub(super) fn adjust(st: &AppState, headers: &HeaderMap, identity: &mut Identity
     let _ = (st, headers, identity);
 }
 
+/// Layers that must see every request, whatever route it goes to: the OIDC token refresh. Applied
+/// once over the whole router, so routes added later are covered too.
+pub(super) fn layers(router: Router<Arc<AppState>>, st: &Arc<AppState>) -> Router<Arc<AppState>> {
+    #[cfg(feature = "oidc")]
+    if st.sign_in.oidc.as_ref().is_some_and(|o| o.refresh) {
+        return router.layer(axum::middleware::from_fn_with_state(st.clone(), oidc::refresh));
+    }
+    let _ = st;
+    router
+}
+
 pub(super) fn routes(router: Router<Arc<AppState>>, st: &Arc<AppState>) -> Router<Arc<AppState>> {
     #[cfg(feature = "oidc")]
     let router = if st.sign_in.oidc.is_some() {
-        let router = router
+        router
             .route("/_zeyn/auth/login", get(oidc::login))
             .route("/_zeyn/auth/callback", get(oidc::callback))
-            .route("/_zeyn/auth/logout", get(oidc::logout));
-        if st.sign_in.oidc.as_ref().is_some_and(|o| o.refresh) {
-            router.layer(axum::middleware::from_fn_with_state(st.clone(), oidc::refresh))
-        } else {
-            router
-        }
+            .route("/_zeyn/auth/logout", get(oidc::logout))
     } else {
         router
     };

@@ -332,6 +332,21 @@ async fn read_only_lists_no_writes_and_refuses_them() {
     assert_eq!(r.status, StatusCode::FORBIDDEN);
 }
 
+/// Closes the `customers` screen, as an office hours rule would.
+struct Closed;
+
+impl zeyn::Interceptor for Closed {
+    fn before(&self, _ctx: &Ctx, call: &zeyn::Call) -> Result<()> {
+        if call.screen == "customers" { Err(Error::Forbidden) } else { Ok(()) }
+    }
+}
+
+#[tokio::test]
+async fn browser_tool_lists_run_the_interceptors() {
+    let router = app(Some(Mcp::on()), MemoryAudit::default()).interceptor(Closed).router().unwrap();
+    assert_eq!(send(&router, get("/_zeyn/tools?screen=customers")).await.status, StatusCode::FORBIDDEN);
+}
+
 #[tokio::test]
 async fn each_door_can_be_closed_on_its_own() {
     let browser_only = router(Some(Mcp::on().server(false)));

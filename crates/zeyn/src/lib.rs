@@ -354,7 +354,7 @@ pub use action::{
 pub use api::{ApiEntry, ApiInput, ApiOutput, ApiResult, model_schema};
 #[cfg(feature = "assistant")]
 pub use assistant::Assistant;
-pub use audit::{FieldChange, FieldRef, RecordRef, Trail};
+pub use audit::{ExportRecord, FieldChange, FieldRef, RecordRef, Trail};
 #[cfg(feature = "server")]
 pub use auth::RequireMfa;
 #[cfg(feature = "oidc")]

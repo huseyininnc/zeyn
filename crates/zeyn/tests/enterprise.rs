@@ -508,7 +508,14 @@ pub async fn get_case(id: i64, store: Cases) -> Result<Case> {
 
 #[screen(route = "/cases", permission = "cases.read")]
 pub fn cases() -> Screen {
-    Screen::new("Cases").body(DataGrid::of(find_cases).column(Case::subject))
+    Screen::new("Cases").body(DataGrid::of(find_cases).column(Case::subject).done().exportable())
+}
+
+#[screen(route = "/cases-tabs", permission = "cases.read")]
+pub fn case_tabs() -> Screen {
+    Screen::new("Case tabs").body(
+        Tabs::new("Sections").tab("Summary", Card::new()).tab("Cases", DataGrid::of(find_cases).column(Case::subject)),
+    )
 }
 
 #[screen(permission = "cases.read")]
@@ -542,6 +549,7 @@ fn cases_app(identity: Identity, audit: MemoryAudit) -> Router {
             Feature::new("cases")
                 .screen(cases)
                 .screen(case)
+                .screen(case_tabs)
                 .screen(case_file)
                 .screen(other_file)
                 .screen(overview)
@@ -583,6 +591,40 @@ async fn showing_a_sensitive_record_writes_a_read_record() {
     assert_eq!(ids(1), [("Case", "2".to_string())]);
     assert_eq!(ids(2), [("Case", "1".to_string())]);
     assert!(e.iter().all(|x| x.at_unix_ms > 0));
+}
+
+#[tokio::test]
+async fn lazy_tabs_go_through_interceptors_and_record_reads() {
+    let audit = MemoryAudit::default();
+    let router = cases_app(case_reader(), audit.clone());
+    let page = send(&router, get("/cases-tabs")).await;
+    let lazy = page.body.split(r#"data-zeyn-lazy=""#).nth(1).and_then(|r| r.split('"').next()).unwrap().to_string();
+    let r = send(&router, post("/_zeyn/node", serde_json::json!({ "screen": "case_tabs", "node": lazy }))).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    let e = audit.entries();
+    assert_eq!(e.len(), 1, "{e:?}");
+    assert_eq!(e[0].kind, zeyn::CallKind::Screen);
+    assert_eq!(e[0].reads.len(), 2);
+}
+
+#[tokio::test]
+async fn exports_of_sensitive_records_write_one_audit_record_with_the_row_count() {
+    let audit = MemoryAudit::default();
+    let router = cases_app(case_reader(), audit.clone());
+    let q = query_string(serde_json::json!({ "filters": [] }));
+    let r = send(&router, get(&format!("/_zeyn/grid/export?screen=cases&node=0&q={q}"))).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    assert!(r.body.contains("Subject 2"));
+    let e = audit.entries();
+    assert_eq!(e.len(), 1, "{e:?}");
+    let export = e[0].export.as_ref().expect("an export record");
+    assert_eq!((export.model, export.format, export.rows), ("Case", "csv", 2));
+    assert!(e[0].reads.is_empty(), "no read per row");
+
+    let audit = MemoryAudit::default();
+    let router = hr_app(clerk(), audit.clone());
+    send(&router, get("/_zeyn/grid/export?screen=people&node=0")).await;
+    assert!(audit.entries().is_empty(), "exports of other models are not audited");
 }
 
 #[tokio::test]

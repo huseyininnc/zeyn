@@ -97,6 +97,12 @@ Who saw which personal data, and when, is recorded as well as who changed it.
   request. The reason is kept for 15 minutes in an `HttpOnly`, `SameSite=Strict` cookie, only
   opens the screen it was given for and is written in `reason` of every audit record of that
   screen. Agents and API clients cannot give a reason, so they cannot open such screens.
+- Exports (CSV, XLSX, PDF) of a grid over a sensitive model write one audit record per file with
+  `export` set: the model, the format, the number of rows and the sort and filters asked for.
+  They do not list every row in `reads`, so a large export stays cheap; exports of other models
+  cost nothing extra. Exporting from a `sensitive` or `reason` screen also records the screen read.
+- Lazy parts of a screen (`POST /_zeyn/node`, used by lazy tabs) run the interceptors and record
+  reads exactly like opening the screen.
 - `ctx.record_read(&record)` records a read from application code.
 - Read records are written by `AuditLog` for any call, page loads included, as soon as a sensitive
   record was shown. Without an audit interceptor nothing is recorded; apps that hold personal

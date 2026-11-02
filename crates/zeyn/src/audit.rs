@@ -31,6 +31,18 @@ impl RecordRef {
     }
 }
 
+/// An export of a list of sensitive records: one record per file, with the number of rows and
+/// the sort and filters the user asked for, instead of one read per row.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ExportRecord {
+    pub model: &'static str,
+    /// `csv`, `xlsx` or `pdf`.
+    pub format: &'static str,
+    pub rows: u64,
+    /// `{ "sort": [...], "filters": [...] }` as asked.
+    pub query: serde_json::Value,
+}
+
 /// One field of one record, such as a revealed masked value.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct FieldRef {
@@ -55,6 +67,8 @@ pub struct Trail {
     pub reason: Option<String>,
     /// A workflow move made by the call.
     pub transition: Option<crate::workflow::TransitionRecord>,
+    /// An export of sensitive records made by the call.
+    pub export: Option<ExportRecord>,
     /// Reason the user gave, with the screen it was given for. Checked by the server.
     #[serde(skip)]
     pub(crate) given_reason: Option<(String, String)>,

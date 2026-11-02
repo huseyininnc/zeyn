@@ -228,7 +228,7 @@ struct ToolsQuery {
 }
 
 async fn tools(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Query<ToolsQuery>) -> Response {
-    let ctx = st.ctx(&headers);
+    let ctx = st.licensed(st.ctx(&headers)).await;
     if !st.mcp.browser {
         return st.error_response(&ctx, Failure::App(Error::NotFound));
     }
@@ -236,7 +236,11 @@ async fn tools(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Qu
         Ok(p) => p,
         Err(f) => return st.error_response(&ctx, f),
     };
-    match st.screen_tools(&ctx, &q.screen, params, st.mcp.writes).await {
+    let Some((&name, _)) = st.screens.get_key_value(q.screen.as_str()) else {
+        return st.error_response(&ctx, Failure::App(Error::NotFound));
+    };
+    let info = Call { kind: CallKind::Screen, screen: name, action: None, via_agent: true };
+    match st.intercept(&ctx, &info, || st.screen_tools(&ctx, name, params, st.mcp.writes)).await {
         Ok(list) => axum::Json(json!({
             "tools": list.iter().map(Tool::listing).collect::<Vec<_>>(),
             "texts": {
