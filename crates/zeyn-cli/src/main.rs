@@ -60,7 +60,8 @@ Usage:
   zeyn new <name> --lib [--zeyn-path <path>]   create a shared library (models, features, texts) for several apps
   zeyn g feature <name>                   add src/features/<name> with models, store, actions and screens
   zeyn routes                             list features, screens, routes, APIs and access
-  zeyn check                              compile and report structural problems and missing translations
+  zeyn check [--fix]                      compile and report structural problems and missing translations;
+                                          --fix first rewrites renamed Zeyn APIs in src, tests and examples
   zeyn mcp                                MCP server on stdio for AI agents
 ";
 
@@ -71,7 +72,7 @@ fn main() -> ExitCode {
         ["new", name, rest @ ..] => new_project(name, flag(rest, "--zeyn-path"), rest.contains(&"--lib")),
         ["g" | "generate", "feature", name] => new_feature(Path::new("."), name).map(|m| println!("{m}")),
         ["routes"] => describe(Path::new(".")).map(|d| print!("{}", routes_table(&d))),
-        ["check"] => check(Path::new(".")).and_then(|report| {
+        ["check", rest @ ..] => fix_if(Path::new("."), rest.contains(&"--fix")).and_then(|fixed| check(Path::new(".")).map(|r| fixed + &r)).and_then(|report| {
             print!("{report}");
             if report.contains("error") { Err("the app has problems".into()) } else { Ok(()) }
         }),
@@ -219,6 +220,122 @@ fn routes_table(d: &Value) -> String {
     out
 }
 
+/// Zeyn names that changed, old to new. `zeyn check --fix` rewrites them.
+const RENAMES: &[(&str, &str)] = &[
+    ("GridQuery", "DataQuery"),
+    ("GridMode", "DataMode"),
+    ("GridColumn", "DataGridColumn"),
+    ("Grid", "DataGrid"),
+];
+
+/// Runs [`fix_renames`] when asked and describes what changed.
+fn fix_if(root: &Path, fix: bool) -> Result<String, String> {
+    if !fix {
+        return Ok(String::new());
+    }
+    let changed = fix_renames(root)?;
+    Ok(changed.iter().map(|(path, n)| format!("fixed: {n} renamed names in {}\n", path.display())).collect())
+}
+
+/// Rewrites renamed Zeyn names in the `.rs` files under `src`, `tests` and `examples`.
+fn fix_renames(root: &Path) -> Result<Vec<(PathBuf, usize)>, String> {
+    let mut files = Vec::new();
+    for dir in ["src", "tests", "examples"] {
+        rust_files(&root.join(dir), &mut files);
+    }
+    let mut changed = Vec::new();
+    for path in files {
+        let text = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+        let (fixed, n) = rename_idents(&text, RENAMES);
+        if n > 0 {
+            std::fs::write(&path, fixed).map_err(|e| format!("{}: {e}", path.display()))?;
+            changed.push((path, n));
+        }
+    }
+    Ok(changed)
+}
+
+fn rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
+    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            if path.file_name().is_some_and(|n| n != "target") {
+                rust_files(&path, out);
+            }
+        } else if path.extension().is_some_and(|e| e == "rs") {
+            out.push(path);
+        }
+    }
+}
+
+/// Replaces whole identifiers outside string and char literals. Comments are rewritten too, so
+/// doc examples follow. Returns the text and how many identifiers changed.
+fn rename_idents(text: &str, renames: &[(&str, &str)]) -> (String, usize) {
+    let chars: Vec<char> = text.chars().collect();
+    let mut out = String::with_capacity(text.len());
+    let mut count = 0;
+    let mut i = 0;
+    while i < chars.len() {
+        let c = chars[i];
+        if c == '"' || (c == 'r' && matches!(chars.get(i + 1), Some('"' | '#')) && !ident_before(&chars, i)) {
+            let end = string_end(&chars, i);
+            out.extend(&chars[i..end]);
+            i = end;
+        } else if c == '\'' && chars.get(i + 2) == Some(&'\'') {
+            out.extend(&chars[i..i + 3]);
+            i += 3;
+        } else if c.is_alphabetic() || c == '_' {
+            let start = i;
+            while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_') {
+                i += 1;
+            }
+            let word: String = chars[start..i].iter().collect();
+            match renames.iter().find(|(old, _)| *old == word) {
+                Some((_, new)) => {
+                    out.push_str(new);
+                    count += 1;
+                }
+                None => out.push_str(&word),
+            }
+        } else {
+            out.push(c);
+            i += 1;
+        }
+    }
+    (out, count)
+}
+
+fn ident_before(chars: &[char], i: usize) -> bool {
+    i > 0 && (chars[i - 1].is_alphanumeric() || chars[i - 1] == '_')
+}
+
+/// End (exclusive) of the string literal starting at `i`: `"..."` with escapes, or `r#"..."#`.
+fn string_end(chars: &[char], i: usize) -> usize {
+    let mut j = i;
+    let mut hashes = 0;
+    let raw = chars[j] == 'r';
+    if raw {
+        j += 1;
+        while chars.get(j) == Some(&'#') {
+            hashes += 1;
+            j += 1;
+        }
+        if chars.get(j) != Some(&'"') {
+            return i + 1;
+        }
+    }
+    j += 1;
+    while j < chars.len() {
+        match chars[j] {
+            '\\' if !raw => j += 2,
+            '"' if (1..=hashes).all(|h| chars.get(j + h) == Some(&'#')) => return j + 1 + hashes,
+            _ => j += 1,
+        }
+    }
+    chars.len()
+}
+
 /// Compiles, then reports structural problems and missing translations.
 fn check(root: &Path) -> Result<String, String> {
     let out = Command::new("cargo")
@@ -252,7 +369,7 @@ fn tools() -> Value {
     json!([
         tool("zeyn_docs", "Zeyn framework reference. Topics: rules (project rules for agents), language (how to write models, actions, screens, forms, grids), protocol (browser runtime protocol), architecture.", json!({ "topic": { "type": "string", "enum": ["rules", "language", "protocol", "architecture"] } }), &["topic"]),
         tool("zeyn_describe", "Describe the app in the current directory: features, screens, routes, access, APIs, problems and missing translations.", json!({}), &[]),
-        tool("zeyn_check", "Compile the app and report compiler errors, structural problems and missing translations.", json!({}), &[]),
+        tool("zeyn_check", "Compile the app and report compiler errors, structural problems and missing translations. With fix: true, first rewrite renamed Zeyn APIs (Grid to DataGrid and others).", json!({ "fix": { "type": "boolean" } }), &[]),
         tool("zeyn_test", "Run cargo test and return the end of the output.", json!({}), &[]),
         tool("zeyn_new_feature", "Create src/features/<name> with models, actions and screens and register the module.", json!({ "name": { "type": "string", "description": "lower case, digits and _" } }), &["name"]),
     ])
@@ -266,7 +383,7 @@ fn call_tool(name: &str, args: &Value) -> Result<String, String> {
             DOCS.iter().find(|(t, _)| *t == topic).map(|(_, d)| d.to_string()).ok_or_else(|| format!("unknown topic `{topic}`"))
         }
         "zeyn_describe" => describe(root).map(|d| serde_json::to_string_pretty(&d).unwrap_or_default()),
-        "zeyn_check" => check(root),
+        "zeyn_check" => fix_if(root, args["fix"].as_bool().unwrap_or(false)).and_then(|fixed| check(root).map(|r| fixed + &r)),
         "zeyn_test" => {
             let out = Command::new("cargo").args(["test", "--quiet"]).current_dir(root).output().map_err(|e| e.to_string())?;
             let text = format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
@@ -317,6 +434,23 @@ fn mcp() -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn renames_identifiers_but_not_strings_or_longer_names() {
+        let src = r##"use zeyn::{Grid, GridQuery};
+/// `Grid::of(find)` shows rows.
+fn list(q: GridQuery) -> Grid<P> { Grid::of(find).mode(GridMode::Server).title("Grid") }
+struct MyGrid; impl GridSource for MyGrid {}
+const RAW: &str = r#"Grid "quoted" Grid"#; const C: char = 'G';"##;
+        let (out, n) = super::rename_idents(src, super::RENAMES);
+        assert_eq!(n, 7, "{out}");
+        assert!(out.contains("use zeyn::{DataGrid, DataQuery};"));
+        assert!(out.contains("/// `DataGrid::of(find)` shows rows."));
+        assert!(out.contains("fn list(q: DataQuery) -> DataGrid<P> { DataGrid::of(find).mode(DataMode::Server).title(\"Grid\") }"));
+        assert!(out.contains("struct MyGrid; impl GridSource for MyGrid {}"));
+        assert!(out.contains(r##"r#"Grid "quoted" Grid"#"##));
+        assert_eq!(super::rename_idents(&out, super::RENAMES).1, 0, "a second run changes nothing");
+    }
+
     use super::*;
 
     #[test]
