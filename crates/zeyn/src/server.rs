@@ -1784,10 +1784,40 @@ fn is_island_asset(path: &str) -> bool {
     }
 }
 
+/// Framework endpoints whose `POST` changes data or runs an action. They count against the
+/// write limit (`App::write_limit`) besides the general one. A new endpoint that writes, runs an
+/// action or costs money goes here. Published API actions and the assistant are matched by prefix.
+const WRITE_PATHS: [&str; 12] = [
+    "/_zeyn/form",
+    "/_zeyn/import",
+    "/_zeyn/mcp",
+    "/_zeyn/menu",
+    "/_zeyn/grid/edit",
+    "/_zeyn/grid/run",
+    "/_zeyn/grid/bulk",
+    "/_zeyn/grid/view",
+    "/_zeyn/command",
+    "/_zeyn/dock",
+    "/_zeyn/theme",
+    "/_zeyn/media/position",
+];
+
+/// Whether a path is a static asset of the runtime, served without IP rules, rate limits or sign
+/// in so that error and sign in pages still load their scripts and styles.
+fn is_public_asset(path: &str) -> bool {
+    matches!(path, "/_zeyn/zeyn.js" | "/_zeyn/zeyn.css" | "/_zeyn/nav.js" | "/_zeyn/theme.css" | "/favicon.ico")
+        || ops::is_asset(path)
+        || ui::ASSETS.contains(&path)
+        || media::ASSETS.contains(&path)
+        || pro::ASSETS.contains(&path)
+        || is_assistant_asset(path)
+        || is_island_asset(path)
+}
+
 /// IP rules and rate limits, before any handler runs.
 async fn guard_request(State(st): State<Arc<AppState>>, req: axum::extract::Request, next: axum::middleware::Next) -> Response {
     let path = req.uri().path().to_string();
-    if path == "/_zeyn/zeyn.js" || path == "/_zeyn/zeyn.css" || path == "/_zeyn/nav.js" || path == "/_zeyn/theme.css" || path == "/favicon.ico" || ops::is_asset(&path) || ui::ASSETS.contains(&path.as_str()) || media::ASSETS.contains(&path.as_str()) || pro::ASSETS.contains(&path.as_str()) || is_assistant_asset(&path) || is_island_asset(&path) {
+    if is_public_asset(&path) {
         return next.run(req).await;
     }
     ops::delay(&st, &path).await;
@@ -1811,7 +1841,7 @@ async fn guard_request(State(st): State<Arc<AppState>>, req: axum::extract::Requ
         return problem(&ctx, Failure::App(Error::Forbidden));
     }
     let is_write = req.method() == axum::http::Method::POST
-        && (matches!(path.as_str(), "/_zeyn/form" | "/_zeyn/import" | "/_zeyn/mcp" | "/_zeyn/menu" | "/_zeyn/grid/edit" | "/_zeyn/grid/run" | "/_zeyn/grid/bulk" | "/_zeyn/grid/view" | "/_zeyn/command" | "/_zeyn/dock" | "/_zeyn/theme" | "/_zeyn/media/position")
+        && (WRITE_PATHS.contains(&path.as_str())
             || path.starts_with("/_zeyn/assistant/")
             || path.starts_with(&format!("{}/", st.api_prefix)));
     let limits = if probe { [(None, "all"), (None, "write")] } else { [(st.rate, "all"), (if is_write { st.write_rate } else { None }, "write")] };
