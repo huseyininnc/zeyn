@@ -1883,7 +1883,7 @@ struct ExportQuery {
 }
 
 /// Body of a streamed export: chunks from a channel.
-struct Chunks(tokio::sync::mpsc::Receiver<Result<axum::body::Bytes, std::io::Error>>);
+pub(super) struct Chunks(pub(super) tokio::sync::mpsc::Receiver<Result<axum::body::Bytes, std::io::Error>>);
 
 impl futures_core::Stream for Chunks {
     type Item = Result<axum::body::Bytes, std::io::Error>;

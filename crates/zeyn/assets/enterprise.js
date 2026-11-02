@@ -237,7 +237,7 @@ let noticeShown = false;
  * when, and form entries survive the reload as drafts.
  */
 function newVersion() {
-  if (noticeShown) return;
+  if (noticeShown || document.querySelector('meta[name="zeyn-dev"]')) return;
   noticeShown = true;
   const bar = document.createElement('div');
   bar.className = 'z-notice';

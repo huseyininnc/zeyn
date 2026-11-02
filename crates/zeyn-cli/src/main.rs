@@ -1,5 +1,7 @@
 //! `zeyn`: new projects, generators, checks and an MCP server for AI agents.
 
+mod dev;
+
 use serde_json::{Value, json};
 use std::io::{BufRead, Write};
 use std::path::{Path, PathBuf};
@@ -74,6 +76,8 @@ Usage:
   zeyn routes                             list features, screens, routes, APIs and access
   zeyn check [--fix]                      compile and report structural problems and missing translations;
                                           --fix first rewrites renamed Zeyn APIs in src, tests and examples
+  zeyn dev                                run the app, rebuild and restart on every change; the browser
+                                          follows without a page reload
   zeyn mcp                                MCP server on stdio for AI agents
 ";
 
@@ -88,6 +92,7 @@ fn main() -> ExitCode {
             print!("{report}");
             if report.contains("error") { Err("the app has problems".into()) } else { Ok(()) }
         }),
+        ["dev"] => dev::run(Path::new(".")),
         ["mcp"] => mcp(),
         _ => {
             print!("{HELP}");

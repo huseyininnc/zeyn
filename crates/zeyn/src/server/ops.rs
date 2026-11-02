@@ -20,10 +20,42 @@ use std::sync::{Arc, OnceLock};
 
 const JS: &str = include_str!("../../assets/enterprise.js");
 const CSS: &str = include_str!("../../assets/enterprise.css");
+const DEV_JS: &str = include_str!("../../assets/dev.js");
+
+/// Development mode, set by `zeyn dev` with `ZEYN_DEV=1`: the page follows rebuilds without a
+/// page load. Read once; never set it in production.
+pub(super) fn dev_mode() -> bool {
+    static ON: OnceLock<bool> = OnceLock::new();
+    *ON.get_or_init(|| std::env::var("ZEYN_DEV").is_ok_and(|v| v == "1"))
+}
+
+/// `GET /_zeyn/dev/events` in development: one `build` event with this binary's build id, then a
+/// comment every 15 seconds to keep the connection open. When the server restarts the browser
+/// reconnects (after 300 ms) and compares the build id.
+async fn dev_events() -> Response {
+    let (tx, rx) = tokio::sync::mpsc::channel(1);
+    tokio::spawn(async move {
+        let first = format!("retry: 300\nevent: build\ndata: {}\n\n", build_id());
+        if tx.send(Ok(first.into())).await.is_err() {
+            return;
+        }
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(15)).await;
+            if tx.send(Ok(": ping\n\n".into())).await.is_err() {
+                return;
+            }
+        }
+    });
+    let mut response = axum::body::Body::from_stream(super::Chunks(rx)).into_response();
+    let h = response.headers_mut();
+    h.insert(header::CONTENT_TYPE, HeaderValue::from_static("text/event-stream"));
+    h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    response
+}
 
 /// Static assets that skip IP rules and rate limits like the other runtime files.
 pub(super) fn is_asset(path: &str) -> bool {
-    path == "/_zeyn/enterprise.js" || path == "/_zeyn/enterprise.css"
+    path == "/_zeyn/enterprise.js" || path == "/_zeyn/enterprise.css" || path == "/_zeyn/dev.js"
 }
 
 type Check = Arc<dyn Fn() -> BoxFuture<bool> + Send + Sync>;
@@ -238,12 +270,19 @@ async fn ready(State(st): State<Arc<AppState>>) -> Response {
 }
 
 pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
-    router
+    let router = router
         .route("/_zeyn/health", get(health))
         .route("/_zeyn/ready", get(ready))
         .route("/_zeyn/jobs", get(jobs_status))
         .route("/_zeyn/enterprise.js", get(|| async { asset(JS, "text/javascript; charset=utf-8") }))
-        .route("/_zeyn/enterprise.css", get(|| async { asset(CSS, "text/css; charset=utf-8") }))
+        .route("/_zeyn/enterprise.css", get(|| async { asset(CSS, "text/css; charset=utf-8") }));
+    if dev_mode() {
+        router
+            .route("/_zeyn/dev.js", get(|| async { asset(DEV_JS, "text/javascript; charset=utf-8") }))
+            .route("/_zeyn/dev/events", get(dev_events))
+    } else {
+        router
+    }
 }
 
 /// Asks a running app at `addr` whether it is alive (`GET /_zeyn/health`), for container health
@@ -347,7 +386,12 @@ pub(super) fn head(st: &AppState, ctx: &Ctx) -> String {
     let texts: serde_json::Map<String, serde_json::Value> =
         TEXTS.iter().map(|k| (k.to_string(), ctx.t(&Text::key(format!("zeyn.{k}"))).into())).collect();
     format!(
-        r#"{session}<meta name="zeyn-build" content="{build}"><meta name="zeyn-texts" content="{texts}"><link rel="stylesheet" href="{base}/_zeyn/enterprise.css"><script type="module" src="{base}/_zeyn/enterprise.js"></script>"#,
+        r#"{session}<meta name="zeyn-build" content="{build}"><meta name="zeyn-texts" content="{texts}"><link rel="stylesheet" href="{base}/_zeyn/enterprise.css"><script type="module" src="{base}/_zeyn/enterprise.js"></script>{dev}"#,
+        dev = if dev_mode() {
+            format!(r#"<meta name="zeyn-dev" content="1"><script type="module" src="{}/_zeyn/dev.js"></script>"#, escape(&st.prefix))
+        } else {
+            String::new()
+        },
         texts = attr(&texts),
         build = escape(build_id()),
         session = super::session::head(st, ctx),
