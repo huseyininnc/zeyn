@@ -1,0 +1,28 @@
+{
+  "docs": {
+    "app": "Zeyn belgeleri",
+    "missing": "Bu sayfa yok.",
+    "on_this_page": "Bu sayfada",
+    "pager": "Önceki ve sonraki sayfa",
+    "previous": "Önceki",
+    "next": "Sonraki",
+    "group": {
+      "start": "Başlarken",
+      "language": "Dil",
+      "components": "Bileşenler",
+      "guides": "Kılavuzlar",
+      "reference": "Başvuru"
+    },
+    "live": {
+      "label": "Canlı örnek",
+      "send": "Gönder",
+      "sent": "Gönderildi. Hiçbir şey saklanmadı.",
+      "book": "Ayır",
+      "booked": "Ayrıldı. Hiçbir şey saklanmadı.",
+      "save": "Kaydet",
+      "saved": "Kaydedildi. Hiçbir şey saklanmadı.",
+      "count": "Ürünleri say",
+      "counted": "{n} ürün."
+    }
+  }
+}

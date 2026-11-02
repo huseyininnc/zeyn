@@ -1,0 +1,28 @@
+{
+  "docs": {
+    "app": "Zeyn docs",
+    "missing": "This page does not exist.",
+    "on_this_page": "On this page",
+    "pager": "Previous and next page",
+    "previous": "Previous",
+    "next": "Next",
+    "group": {
+      "start": "Getting started",
+      "language": "Language",
+      "components": "Components",
+      "guides": "Guides",
+      "reference": "Reference"
+    },
+    "live": {
+      "label": "Live example",
+      "send": "Send",
+      "sent": "Sent. Nothing was stored.",
+      "book": "Book",
+      "booked": "Booked. Nothing was stored.",
+      "save": "Save",
+      "saved": "Saved. Nothing was stored.",
+      "count": "Count products",
+      "counted": "{n} products."
+    }
+  }
+}

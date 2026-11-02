@@ -24,17 +24,41 @@ Rules for the override file:
 - Load it after `zeyn.css`, so equal selectors win by order.
 - Set the base tokens in section 2. The derived tokens in section 3 follow automatically. Override a derived token only when the computed value does not work for your brand.
 
-### Light and dark
+### Light, dark and app themes
 
-The theme follows the operating system setting. Two attributes on `<html>` force one theme:
+Every app has a theme picker in the menu, next to the language picker. It offers System (follows `prefers-color-scheme`), Light, Dark and any theme the app defines:
+
+```rust
+App::new("Billing")
+    .theme(Theme::new().brand("#7a2448").radius(6))
+    .themes([
+        Theme::light(),
+        Theme::dark(),
+        Theme::named("sand", [("--z-bg", "#f5f1ea"), ("--z-surface", "#fffdf8")]).label(t!("theme.sand")),
+    ])
+    .default_theme("system")
+```
+
+- `App::theme` is the organization's look and applies under every theme.
+- `App::themes` lists what users can choose. Without it the list is Light and Dark. System is offered when both are in the list. `Theme::named(...)` builds on the light theme; `.dark_base()` builds it on the dark one.
+- `App::default_theme` is the theme of users who have not chosen. `system` unless set.
+- `App::theme_picker(false)` hides the picker; everyone gets the default theme.
+- A single theme locks the app: `.themes([Theme::named("acme", tokens)])` or `.theme(Theme::dark())`.
+
+Tokens are checked when the app starts. `App::check` (and so `router` and `serve`) reports unknown token names, values that could leave their declaration (`;`, braces, `\`, `<`, `>`, `url(`), bad theme names, an unknown default theme, and every color pair of section 5 that a theme pushes below WCAG 2.2 AA. Only `#rgb` and `#rrggbb` values can be checked for contrast; other color syntax is trusted.
+
+All themes are served in one stylesheet, `/_zeyn/theme.css`, built once at startup and loaded after the kit's stylesheets. The choice is stored in the `zeyn_theme` cookie and, for a signed in user in an app with a view store (`App::datagrid_views`), in that store, so it follows the user to a new device. The server renders the theme on `<html>`, so the first paint is already right and no inline script is needed:
 
 | Markup | Result |
 |---|---|
-| `<html>` | Follows `prefers-color-scheme` |
+| `<html>` | System: follows `prefers-color-scheme` |
 | `<html data-theme="light">` | Always light |
 | `<html data-theme="dark">` | Always dark |
+| `<html data-theme="light" data-zeyn-theme="sand">` | The app theme `sand`, on the light theme |
 
-To give the dark theme its own values, repeat the selectors the kit uses:
+Changing the theme in the picker only changes these attributes and the `color-scheme` meta, then calls `POST /_zeyn/theme`. Nothing reloads.
+
+To give the dark theme its own values in a hand written override file, repeat the selectors the kit uses:
 
 ```css
 @media (prefers-color-scheme: dark) {

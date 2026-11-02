@@ -69,14 +69,17 @@ async function visit(url, push) {
   }
   const html = await res.text();
   const finalUrl = new URL(res.url || url.href);
+  if (url.hash && !finalUrl.hash) finalUrl.hash = url.hash;
   if (push) history.pushState({ zeyn: true }, '', finalUrl.href);
   const title = res.headers.get('x-zeyn-title');
   if (title) document.title = decodeURIComponent(title);
   main.innerHTML = html;
   main.removeAttribute('aria-busy');
   markCurrent(finalUrl);
-  window.scrollTo(0, 0);
   announce(main);
+  const target = finalUrl.hash && document.getElementById(decodeURIComponent(finalUrl.hash.slice(1)));
+  if (target) target.scrollIntoView();
+  else window.scrollTo(0, 0);
   document.dispatchEvent(new CustomEvent('zeyn:content', { detail: main }));
 }
 

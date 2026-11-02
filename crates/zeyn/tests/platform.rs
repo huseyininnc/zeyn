@@ -416,7 +416,7 @@ async fn apps_can_live_under_a_base_path() {
 #[tokio::test]
 async fn themes_are_served_as_a_stylesheet_and_reject_css_injection() {
     let r = App::new("T")
-        .theme(Theme::new().brand("#7a2448").font("Inter, system-ui").radius(40).compact().dark())
+        .theme(Theme::dark().brand("#7a2448").font("Inter, system-ui").radius(40).compact())
         .feature(Feature::new("s").screen(pos))
         .router()
         .unwrap();
@@ -432,6 +432,6 @@ async fn themes_are_served_as_a_stylesheet_and_reject_css_injection() {
         .feature(Feature::new("s").screen(pos))
         .router()
         .unwrap();
-    assert_eq!(get(&evil, "/_zeyn/theme.css", &[]).await.2.trim(), ":root{}");
+    assert_eq!(get(&evil, "/_zeyn/theme.css", &[]).await.2.trim(), "");
     assert_eq!(get(&evil, "/favicon.ico", &[]).await.0, StatusCode::NO_CONTENT);
 }

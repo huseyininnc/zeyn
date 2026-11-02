@@ -67,6 +67,15 @@ async fn main() -> std::io::Result<()> {
     let mut app = App::new(t!("app.name"))
         .plugin(CompanyStandard { config })
         .theme(Theme::new().radius(6))
+        .themes([
+            Theme::light(),
+            Theme::dark(),
+            Theme::named(
+                "sand",
+                [("--z-brand", "#8a4b14"), ("--z-bg", "#f3eee4"), ("--z-surface", "#fffdf8"), ("--z-surface-2", "#f8f3ea"), ("--z-hover", "#efe7d8"), ("--z-border", "#e0d6c3")],
+            )
+            .label(t!("theme.sand")),
+        ])
         .idle_timeout(Duration::from_secs(idle))
         .idle_warning(Duration::from_secs((idle / 2).min(60)))
         .i18n(i18n)

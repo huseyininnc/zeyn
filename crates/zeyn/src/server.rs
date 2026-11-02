@@ -30,6 +30,9 @@ mod media;
 mod ops;
 mod session;
 mod telemetry;
+mod theme;
+
+pub use theme::Theme;
 
 pub use ops::{build_id, probe};
 
@@ -526,83 +529,6 @@ fn base64_decode(s: &str) -> Option<Vec<u8>> {
     Some(out)
 }
 
-/// An organization's look: brand color, fonts, corner radius and density. Values are checked so
-/// a theme can never inject CSS.
-///
-/// ```ignore
-/// App::new("Billing").theme(Theme::new().brand("#7a2448").font("Inter, system-ui, sans-serif").radius(4).compact())
-/// ```
-#[derive(Clone, Debug, Default)]
-pub struct Theme {
-    brand: Option<String>,
-    font: Option<String>,
-    radius: Option<u8>,
-    compact: bool,
-    scheme: Option<&'static str>,
-}
-
-impl Theme {
-    pub fn new() -> Self {
-        Theme::default()
-    }
-
-    /// Brand color as `#rgb` or `#rrggbb`. Other values are ignored.
-    pub fn brand(mut self, color: &str) -> Self {
-        let hex = color.strip_prefix('#').unwrap_or("");
-        if matches!(hex.len(), 3 | 6) && hex.chars().all(|c| c.is_ascii_hexdigit()) {
-            self.brand = Some(format!("#{hex}"));
-        }
-        self
-    }
-
-    /// Font stack, such as `Inter, system-ui, sans-serif`. Fonts must be installed or served by
-    /// the app; only letters, digits, spaces, commas, hyphens and quotes are allowed.
-    pub fn font(mut self, stack: &str) -> Self {
-        if !stack.is_empty() && stack.len() <= 200 && stack.chars().all(|c| c.is_alphanumeric() || " ,-'\"".contains(c)) {
-            self.font = Some(stack.to_string());
-        }
-        self
-    }
-
-    /// Corner radius in pixels, 0 to 12.
-    pub fn radius(mut self, px: u8) -> Self {
-        self.radius = Some(px.min(12));
-        self
-    }
-
-    /// Tighter spacing for very dense screens.
-    pub fn compact(mut self) -> Self {
-        self.compact = true;
-        self
-    }
-
-    /// Always light, whatever the user's system prefers.
-    pub fn light(mut self) -> Self {
-        self.scheme = Some("light");
-        self
-    }
-
-    /// Always dark, whatever the user's system prefers.
-    pub fn dark(mut self) -> Self {
-        self.scheme = Some("dark");
-        self
-    }
-
-    fn css(&self) -> String {
-        let mut vars = String::new();
-        if let Some(b) = &self.brand {
-            vars.push_str(&format!("--z-brand:{b};"));
-        }
-        if let Some(f) = &self.font {
-            vars.push_str(&format!("--z-font:{f};"));
-        }
-        if let Some(r) = self.radius {
-            vars.push_str(&format!("--z-radius:{r}px;"));
-        }
-        format!(":root{{{vars}}}\n")
-    }
-}
-
 /// A reusable bundle of app settings: a company's login, configuration sources, license server,
 /// audit sink, interceptors, services and features, shipped as one crate and added in one line.
 ///
@@ -677,6 +603,7 @@ pub struct App {
     extras: ops::Extras,
     #[cfg(feature = "assistant")]
     assistant: Option<Arc<crate::assistant::Assistant>>,
+    looks: theme::Settings,
 }
 
 impl App {
@@ -717,6 +644,7 @@ impl App {
             extras: ops::Extras::default(),
             #[cfg(feature = "assistant")]
             assistant: None,
+            looks: theme::Settings::default(),
         }
     }
 
@@ -1035,6 +963,7 @@ impl App {
         let commands: Vec<(&str, &crate::command::Command)> =
             self.features.iter().flat_map(|f| f.commands().iter().map(move |c| (f.name(), c))).collect();
         problems.extend(crate::command::problems(&commands, false));
+        problems.extend(self.theme_problems());
         problems.dedup();
         if problems.is_empty() { Ok(()) } else { Err(problems) }
     }
@@ -1092,6 +1021,7 @@ impl App {
                 screens.insert(s.meta.name, (fi, *s));
             }
         }
+        let look = self.look();
         let state = Arc::new(AppState {
             name: self.name,
             i18n: Arc::new(self.i18n),
@@ -1120,7 +1050,7 @@ impl App {
             allow: self.allow,
             api_docs: self.api_docs,
             prefix: url_prefix,
-            theme: self.theme,
+            look,
             views: self.views,
             native_menu: self.native_menu,
             extras: self.extras,
@@ -1184,7 +1114,7 @@ impl App {
             .route("/_zeyn/mcp", post(mcp));
         #[cfg(feature = "assistant")]
         let router = assistant::routes(router);
-        let router = pro::routes(media::routes(ui::routes(session::routes(data::routes(ops::routes(router))))))
+        let router = theme::routes(pro::routes(media::routes(ui::routes(session::routes(data::routes(ops::routes(router)))))))
             .fallback(not_found)
             .layer(axum::middleware::from_fn_with_state(state.clone(), guard_request))
             .layer(axum::middleware::map_response(security_headers))
@@ -1272,7 +1202,7 @@ struct AppState {
     allow: Vec<IpRange>,
     api_docs: Option<ApiDocs>,
     prefix: String,
-    theme: Option<Theme>,
+    look: theme::Look,
     views: Option<Arc<dyn crate::grid::DataGridViewStore>>,
     native_menu: bool,
     extras: ops::Extras,
@@ -1386,7 +1316,8 @@ impl AppState {
         let ctx = Ctx::new(identity, locale, self.services.clone(), self.i18n.clone())
             .with_time_zone(tz)
             .with_tenant(tenant)
-            .with_config(self.config.clone());
+            .with_config(self.config.clone())
+            .with_theme(self.look.pick(cookie(headers, "zeyn_theme")));
         data::read_reason(&ctx, headers);
         match self.fixed_now {
             Some(now) => ctx.with_now(now),
@@ -1656,6 +1587,8 @@ impl AppState {
                 r.text(&Text::key("zeyn.shell.language"))
             ));
         }
+        let theme = ctx.theme().unwrap_or("system");
+        nav.push_str(&self.look.picker(&r, theme));
         if self.zone_picker && matches!(self.time, TimePolicy::User { .. }) {
             let current = ctx.time_zone().name();
             let auto = r.text(&Text::key("zeyn.shell.time_zone_auto"));
@@ -1670,6 +1603,7 @@ impl AppState {
                 r.text(&Text::key("zeyn.shell.time_zone"))
             ));
         }
+        let (theme_attrs, scheme) = self.look.html(theme);
         let app = r.text(&self.name);
         let (palette, commands) = pro::shell_parts(self, ctx, &r);
         #[cfg(feature = "assistant")]
@@ -1677,28 +1611,16 @@ impl AppState {
         #[cfg(not(feature = "assistant"))]
         let (ai_head, ai_launcher) = (String::new(), String::new());
         format!(
-            r##"<!doctype html><html lang="{lang}"{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css">{theme_link}<script type="module" src="{base}/_zeyn/zeyn.js"></script><script type="module" src="{base}/_zeyn/nav.js"></script>{components}{extra}</head><body><a class="z-skip" href="#z-main">{skip}</a><div class="z-app"><nav class="z-nav" aria-label="{menu}"><p class="z-app-name">{app}</p>{palette}{nav}</nav><main class="z-main" id="z-main">{main}</main></div><div class="z-toasts" role="status" aria-live="polite"></div>{commands}{ai_launcher}</body></html>"##,
+            r##"<!doctype html><html lang="{lang}"{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css"><script type="module" src="{base}/_zeyn/zeyn.js"></script><script type="module" src="{base}/_zeyn/nav.js"></script>{components}{theme_link}{extra}</head><body><a class="z-skip" href="#z-main">{skip}</a><div class="z-app"><nav class="z-nav" aria-label="{menu}"><p class="z-app-name">{app}</p>{palette}{nav}</nav><main class="z-main" id="z-main">{main}</main></div><div class="z-toasts" role="status" aria-live="polite"></div>{commands}{ai_launcher}</body></html>"##,
             lang = escape(ctx.locale()),
             tz = escape(ctx.time_zone().name()),
             base = escape(&self.prefix),
             components = format!("{}{}{}{ai_head}", ui::head(&escape(&self.prefix)), media::head(&escape(&self.prefix)), pro::head(&escape(&self.prefix))),
-            scheme = self.theme.as_ref().and_then(|t| t.scheme).unwrap_or("light dark"),
-            html_attrs = format!(
-                "{}{}",
-                match &self.theme {
-                    Some(t) => format!(
-                        "{}{}",
-                        t.scheme.map(|s| format!(r#" data-theme="{s}""#)).unwrap_or_default(),
-                        if t.compact { r#" data-density="compact""# } else { "" }
-                    ),
-                    None => String::new(),
-                },
-                if self.native_menu { "" } else { r#" data-zeyn-native-menu="off""# }
-            ),
-            theme_link = if self.theme.is_some() {
-                format!(r#"<link rel="stylesheet" href="{}/_zeyn/theme.css">"#, escape(&self.prefix))
-            } else {
+            html_attrs = format!("{theme_attrs}{}", if self.native_menu { "" } else { r#" data-zeyn-native-menu="off""# }),
+            theme_link = if self.look.css.is_empty() {
                 String::new()
+            } else {
+                format!(r#"<link rel="stylesheet" href="{}/_zeyn/theme.css">"#, escape(&self.prefix))
             },
             title = escape(title),
             extra = ops::head(self, ctx),
@@ -1814,7 +1736,7 @@ async fn trace_request(req: axum::extract::Request, next: axum::middleware::Next
 }
 
 async fn theme_css(State(st): State<Arc<AppState>>) -> Response {
-    let css = st.theme.as_ref().map(Theme::css).unwrap_or_default();
+    let css = st.look.css.clone();
     ([(header::CONTENT_TYPE, "text/css; charset=utf-8"), (header::CACHE_CONTROL, "no-cache")], css).into_response()
 }
 
@@ -1836,6 +1758,7 @@ fn with_cookie(mut response: Response, cookie: Option<String>) -> Response {
 
 async fn page(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Query<ParamsQuery>, name: &'static str) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
+    let (ctx, theme_cookie) = theme::remember(&st, ctx, &headers).await;
     let (csrf, set) = st.csrf(&headers);
     let started = Instant::now();
     let call = Call { kind: CallKind::Page, screen: name, action: None, via_agent: false };
@@ -1875,7 +1798,7 @@ async fn page(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Que
         Err(Failure::Status(_, "reason_required", _)) => data::reason_page(&st, &ctx, name, &csrf),
         Err(f) => st.error_page(&ctx, f, &csrf),
     };
-    with_cookie(response, set)
+    with_cookie(with_cookie(response, set), theme_cookie)
 }
 
 async fn screen_fragment(

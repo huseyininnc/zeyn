@@ -1,4 +1,7 @@
 {
+  "theme": {
+    "sand": "Sand"
+  },
   "app": {
     "name": "Northwind Operations"
   },

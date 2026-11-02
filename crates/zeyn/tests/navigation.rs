@@ -37,7 +37,7 @@ async fn full_pages_set_the_color_scheme_before_css_loads_and_include_navigation
     let (_, _, body) = get(&app(None), "/one", false).await;
     assert!(body.contains(r#"<meta name="color-scheme" content="light dark">"#));
     assert!(body.contains(r#"<script type="module" src="/_zeyn/nav.js"></script>"#));
-    let (_, _, dark) = get(&app(Some(Theme::new().dark())), "/one", false).await;
+    let (_, _, dark) = get(&app(Some(Theme::dark())), "/one", false).await;
     assert!(dark.contains(r#"<meta name="color-scheme" content="dark">"#));
 }
 

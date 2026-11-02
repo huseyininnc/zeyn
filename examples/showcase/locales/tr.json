@@ -1,4 +1,7 @@
 {
+  "theme": {
+    "sand": "Kum"
+  },
   "app": {
     "name": "Northwind Operasyon"
   },

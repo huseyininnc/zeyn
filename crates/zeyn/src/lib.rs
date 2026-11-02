@@ -352,6 +352,7 @@ pub use grid::{Grid, GridColumn, GridMode};
 pub use i18n::{I18n, NumberFormat, Text};
 pub use menu::ContextMenu;
 pub use command::{Command, RESERVED_SHORTCUTS, normalize_shortcut};
+pub use command::{MAX_SEARCH_HITS, MAX_SEARCH_QUERY, Search, SearchHit};
 pub use model::{__rules, Entity, Field, FieldError, FieldMeta, Model, Rule, Valid, ValidationErrors};
 pub use platform::{
     Config, ConfigSource, EnvSource, FixedLicense, JsonFileSource, License, LicenseSource, Licensed, PerTenant, Secret,

@@ -121,6 +121,7 @@ pub struct Feature {
     apis: Vec<ApiEntry>,
     media: Vec<crate::media::MediaEntry>,
     commands: Vec<crate::command::Command>,
+    searches: Vec<crate::command::Search>,
 }
 
 impl Feature {
@@ -133,6 +134,7 @@ impl Feature {
             menu: Vec::new(),
             apis: Vec::new(),
             commands: Vec::new(),
+            searches: Vec::new(),
             media: Vec::new(),
         }
     }
@@ -146,6 +148,21 @@ impl Feature {
 
     pub fn commands(&self) -> &[crate::command::Command] {
         &self.commands
+    }
+
+    /// Adds a server search to the command palette: as the user types, the palette calls the
+    /// action with the query (after the feature's guards and the action's permission) and lists
+    /// the hits under the commands. Choosing a hit opens its page without a reload.
+    pub fn search<A>(mut self, action: A) -> Self
+    where
+        A: crate::action::Action<Input = String, Output = crate::action::Result<Vec<crate::command::SearchHit>>>,
+    {
+        self.searches.push(crate::command::Search::of(action));
+        self
+    }
+
+    pub fn searches(&self) -> &[crate::command::Search] {
+        &self.searches
     }
 
     /// Publishes an action as `POST /api/v1/{feature}/{action}`. Callers need an `Authorization`

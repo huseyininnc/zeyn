@@ -228,7 +228,7 @@ function rank(items, query) {
 function drawPalette() {
   const p = palette;
   const t = texts();
-  p.shown = rank(p.items, p.input.value);
+  p.shown = [...rank(p.items, p.input.value), ...p.found].slice(0, SHOWN_MAX);
   p.active = p.shown.length ? 0 : -1;
   p.list.replaceChildren();
   p.shown.forEach((item, i) => {
@@ -289,18 +289,57 @@ function openPalette() {
   const hint = make('p', 'z-palette-hint', { id: 'z-palette-hint', text: t.textHint ?? '' });
   dialog.append(input, list, hint, live);
   document.body.append(dialog);
-  palette = { dialog, input, list, live, items: collect(), shown: [], active: -1, opener: document.activeElement };
+  palette = { dialog, input, list, live, items: collect(), found: [], shown: [], active: -1, opener: document.activeElement };
   dialog.addEventListener('close', () => {
     if (palette?.dialog === dialog) closePalette();
   });
   dialog.addEventListener('click', (e) => {
     if (e.target === dialog) closePalette();
   });
-  input.addEventListener('input', drawPalette);
+  input.addEventListener('input', () => {
+    drawPalette();
+    searchServer();
+  });
   input.addEventListener('keydown', paletteKey);
   dialog.showModal();
   drawPalette();
   input.focus();
+}
+
+/** Waits this long after the last key before asking the server (`POST /_zeyn/search`). */
+const SEARCH_DELAY = 150;
+let searchTimer = 0;
+let searchSeq = 0;
+
+/**
+ * Runs the app's palette searches (`Feature::search`) for the current query and lists their hits
+ * under the commands. Only the answer to the latest query is drawn.
+ */
+function searchServer() {
+  const p = palette;
+  clearTimeout(searchTimer);
+  if (!p || !document.querySelector('[data-zeyn-commands][data-search]')) return;
+  const query = p.input.value.trim();
+  const seq = ++searchSeq;
+  if (query.length < 2) {
+    if (p.found.length) {
+      p.found = [];
+      drawPalette();
+    }
+    return;
+  }
+  searchTimer = setTimeout(async () => {
+    const r = await post('/_zeyn/search', { query });
+    if (seq !== searchSeq || palette !== p || !r.ok) return;
+    p.found = (r.data?.hits ?? []).map((h) => ({ key: `search:${h.url}`, label: h.label, group: h.group, run: () => go(h.url) }));
+    drawPalette();
+  }, SEARCH_DELAY);
+}
+
+/** Opens an app path through nav.js (`zeyn:navigate`), or with a page load without it. */
+function go(url) {
+  const href = BASE + url;
+  if (document.dispatchEvent(new CustomEvent('zeyn:navigate', { detail: { url: href }, cancelable: true }))) location.assign(href);
 }
 
 /** Closes the palette right away and puts focus back where it was before it opened. */

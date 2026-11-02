@@ -136,6 +136,7 @@ struct CtxInner {
     i18n: Arc<I18n>,
     via_agent: bool,
     trail: Arc<Mutex<crate::audit::Trail>>,
+    theme: Option<Arc<str>>,
 }
 
 /// Request context: identity, language and services. Cheap to clone. Actions and screens may take
@@ -157,6 +158,7 @@ impl Ctx {
             i18n,
             via_agent: false,
             trail: Arc::default(),
+            theme: None,
         }))
     }
 
@@ -168,6 +170,17 @@ impl Ctx {
     /// Same context with a fixed clock. For tests.
     pub fn with_now(&self, now: DateTime) -> Self {
         self.rebuild(|i| i.now = Some(now))
+    }
+
+    /// Same context shown in another theme (`system`, `light`, `dark` or an app theme).
+    pub fn with_theme(&self, theme: Arc<str>) -> Self {
+        self.rebuild(|i| i.theme = Some(theme))
+    }
+
+    /// The theme the page is shown in: `system`, `light`, `dark` or the name of an app theme.
+    /// `None` outside a request, such as in tests that build a context by hand.
+    pub fn theme(&self) -> Option<&str> {
+        self.0.theme.as_deref()
     }
 
     fn rebuild(&self, change: impl FnOnce(&mut CtxInner)) -> Self {
@@ -184,6 +197,7 @@ impl Ctx {
             i18n: i.i18n.clone(),
             via_agent: i.via_agent,
             trail: i.trail.clone(),
+            theme: i.theme.clone(),
         };
         change(&mut inner);
         Ctx(Arc::new(inner))
