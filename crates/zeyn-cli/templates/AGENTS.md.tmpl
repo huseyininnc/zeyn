@@ -42,7 +42,7 @@ tests/                   tests that drive the app through its router
    times at a place `LocalDateTime`. Never store a calendar day as a moment. Use `ctx.now()` and
    `ctx.today()`; never the system clock.
 6. Money uses `Money` (integer minor units). Never `f64` for money.
-7. Lists take a `GridQuery` and return `Page<Model>`. Never return unbounded lists.
+7. Lists take a `DataQuery` and return `Page<Model>`. Never return unbounded lists.
 8. A new screen is registered in its feature's `mod.rs`; a new feature in `src/app.rs`.
 9. Do not write HTML, CSS or JavaScript. If a component is missing, write a `Component`.
 10. Keep secrets in configuration (`config.secret("key")`), never in code or logs.
@@ -80,7 +80,7 @@ Field types: `String`, `i32`, `i64`, `bool`, `Money`, `Date`, `Time`, `DateTime`
 
 ```rust
 #[action(permission = "sales.order.read")]
-pub async fn search_orders(q: GridQuery, store: OrderStore) -> Result<Page<Order>> { Ok(q.apply(store.all()?)) }
+pub async fn search_orders(q: DataQuery, store: OrderStore) -> Result<Page<Order>> { Ok(q.apply(store.all()?)) }
 
 #[action(permission = "sales.order.write", audit)]
 pub async fn save_order(order: Valid<Order>, store: OrderStore) -> Result<Order> { store.save(order.into_inner()) }
@@ -97,7 +97,7 @@ Field error from code: `errors.add(Order::code, t!("orders.code_taken"))`.
 pub fn order_list() -> Screen {
     Screen::new(t!("orders.title"))
         .toolbar(|t| t.button(t!("orders.new")).icon(Icon::Plus).shortcut("Ctrl+N").opens(order_editor, EditParams { id: None }))
-        .body(Grid::of(search_orders).mode(GridMode::Server).column(Order::code).width(120).filter().column(Order::total).sum()
+        .body(DataGrid::of(search_orders).mode(DataMode::Server).column(Order::code).width(120).filter().column(Order::total).sum()
             .on_open(|o| Window::open(order_editor, EditParams { id: Some(o.id) })))
 }
 
@@ -111,9 +111,9 @@ pub fn order_editor(params: EditParams, store: OrderStore) -> Result<Screen> {
 ```
 
 - Several `.body(...)` calls place several components on one screen.
-- Quick versions: `Grid::auto(action)` (all columns), `Form::auto(model)` (all fields).
-- Grid paging: `Paging::pages(25)` (default 50), `Paging::infinite(100)`, `Paging::virtual_scroll()` for very large lists, `Paging::none()`.
-- Grid extras: `.row_style(|r| Some(RowStyle::Warning))`, `.flex(1)`, `.width(px)`.
+- Quick versions: `DataGrid::auto(action)` (all columns), `Form::auto(model)` (all fields).
+- DataGrid paging: `Paging::pages(25)` (default 50), `Paging::infinite(100)`, `Paging::virtual_scroll()` for very large lists, `Paging::none()`.
+- DataGrid extras: `.row_style(|r| Some(RowStyle::Warning))`, `.flex(1)`, `.width(px)`.
 - Screens without params: `fn x()` or `fn x(_: (), ctx: Ctx)` when something is injected.
 
 ### Features and the app
@@ -148,4 +148,4 @@ impl Service for OrderStore {}
 - New field: add it to the struct with rules, add `Model.field` labels to every locale, add `.field(...)` to the form and `.column(...)` to the list.
 - New permission: name it `feature.resource.verb` in the macro; grant it in the authenticator or identity provider.
 - Publish an action as JSON API: `.api(action)` on the feature; calls need an `Authorization` header.
-- Long lists: never return all rows; take `GridQuery`, return `Page<M>`.
+- Long lists: never return all rows; take `DataQuery`, return `Page<M>`.

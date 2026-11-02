@@ -166,8 +166,8 @@ fn new_feature(root: &Path, name: &str) -> Result<String, String> {
     let files = [
         ("mod.rs", format!("//! {model}.\n\npub mod actions;\npub mod models;\npub mod screens;\n\nuse zeyn::prelude::*;\n\npub fn feature() -> Feature {{\n    Feature::new(\"{name}\")\n        .route_prefix(\"/{name}\")\n        .guard(SignedIn)\n        .screen(screens::{name}_list)\n}}\n")),
         ("models.rs", format!("use zeyn::prelude::*;\n\n/// A {name} record.\n#[entity(table = \"{name}\")]\npub struct {model} {{\n    #[key]\n    pub id: {model}Id,\n    #[rule(required, max_len = 120)]\n    pub name: String,\n    #[version]\n    pub version: i64,\n}}\n")),
-        ("actions.rs", format!("use super::models::{model};\nuse zeyn::prelude::*;\n\n/// Records for the list. Replace the empty page with your store or database.\n#[action(permission = \"{name}.record.read\")]\npub async fn search_{name}(q: GridQuery) -> Result<Page<{model}>> {{\n    Ok(q.apply(Vec::new()))\n}}\n")),
-        ("screens.rs", format!("use super::actions::search_{name};\nuse zeyn::prelude::*;\n\n/// List screen.\n#[screen(route = \"/\", permission = \"{name}.record.read\")]\npub fn {name}_list() -> Screen {{\n    Screen::new(\"{model}\").body(Grid::auto(search_{name}).mode(GridMode::Server))\n}}\n")),
+        ("actions.rs", format!("use super::models::{model};\nuse zeyn::prelude::*;\n\n/// Records for the list. Replace the empty page with your store or database.\n#[action(permission = \"{name}.record.read\")]\npub async fn search_{name}(q: DataQuery) -> Result<Page<{model}>> {{\n    Ok(q.apply(Vec::new()))\n}}\n")),
+        ("screens.rs", format!("use super::actions::search_{name};\nuse zeyn::prelude::*;\n\n/// List screen.\n#[screen(route = \"/\", permission = \"{name}.record.read\")]\npub fn {name}_list() -> Screen {{\n    Screen::new(\"{model}\").body(DataGrid::auto(search_{name}).mode(DataMode::Server))\n}}\n")),
     ];
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     for (file, body) in files {

@@ -21,8 +21,8 @@ pub fn product_list() -> Screen {
                 .export(Export::Csv)
         })
         .body(
-            Grid::of(search_products)
-                .mode(GridMode::Server)
+            DataGrid::of(search_products)
+                .mode(DataMode::Server)
                 .paging(Paging::pages(25))
                 .column(Product::code)
                 .width(120)

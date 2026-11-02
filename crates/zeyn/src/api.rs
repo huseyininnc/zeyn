@@ -1,6 +1,6 @@
 //! Actions published as JSON API endpoints, with an OpenAPI description built from the models.
 
-use crate::action::{Action, ActionMeta, Error, GridQuery, Page, Result};
+use crate::action::{Action, ActionMeta, Error, DataQuery, Page, Result};
 use crate::ctx::{BoxFuture, Ctx, Dep};
 use crate::model::{FieldMeta, Model, Valid, ValidationErrors};
 use crate::value::FieldKind;
@@ -70,7 +70,7 @@ fn field_schema(f: &FieldMeta) -> Json {
 /// Types an API action can take as input.
 #[diagnostic::on_unimplemented(
     message = "`{Self}` cannot be the input of an API action",
-    note = "API inputs are `Valid<M>`, `GridQuery`, `()`, numbers, strings, booleans, entity ids or `#[params]` types"
+    note = "API inputs are `Valid<M>`, `DataQuery`, `()`, numbers, strings, booleans, entity ids or `#[params]` types"
 )]
 pub trait ApiInput: Sized + Send + 'static {
     fn schema() -> Json;
@@ -125,7 +125,7 @@ serde_input! {
     i32 => json!({ "type": "integer" }),
     bool => json!({ "type": "boolean" }),
     String => json!({ "type": "string" }),
-    GridQuery => json!({ "type": "object", "description": "Paging, sort and filters. See the runtime protocol." }),
+    DataQuery => json!({ "type": "object", "description": "Paging, sort and filters. See the runtime protocol." }),
 }
 
 /// Types an API action can return inside `Result`.

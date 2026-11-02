@@ -63,7 +63,7 @@ pub fn order_lines_of(n: u64, products: &[Product]) -> Vec<OrderLine> {
 /// Lines of the order named by the grid's scope filter on `order_id`, as a database would read
 /// `WHERE order_id = ?`. Without that filter there are no lines.
 #[action(permission = "sales.order.read")]
-pub async fn search_lines(q: GridQuery, store: ProductStore) -> Result<Page<OrderLine>> {
+pub async fn search_lines(q: DataQuery, store: ProductStore) -> Result<Page<OrderLine>> {
     let order = q.filters.iter().find(|f| f.field == "order_id").and_then(|f| f.from.as_deref()?.parse::<u64>().ok());
     let Some(n) = order else { return Ok(Page::default()) };
     Ok(q.apply(order_lines_of(n, &store.all()?)))
@@ -110,12 +110,12 @@ pub fn todays_orders(ctx: &Ctx) -> Vec<Order> {
 }
 
 #[action(permission = "sales.order.read")]
-pub async fn search_today(q: GridQuery, ctx: Ctx) -> Result<Page<Order>> {
+pub async fn search_today(q: DataQuery, ctx: Ctx) -> Result<Page<Order>> {
     Ok(q.apply(todays_orders(&ctx)))
 }
 
 #[action(permission = "sales.order.read")]
-pub async fn search_archive(q: GridQuery, ctx: Ctx) -> Result<Page<Order>> {
+pub async fn search_archive(q: DataQuery, ctx: Ctx) -> Result<Page<Order>> {
     let desc = q.sort.first().is_none_or(|s| !(s.field == "id" && !s.desc));
     let offset = match &q.page {
         PageRequest::Offset { offset, .. } => *offset,
@@ -149,8 +149,8 @@ fn muted_if_cancelled(o: &Order) -> Option<RowStyle> {
 #[screen(route = "/today", permission = "sales.order.read")]
 pub fn today() -> Screen {
     Screen::new(t!("sales.today")).body(
-        Grid::of(search_today)
-            .mode(GridMode::Server)
+        DataGrid::of(search_today)
+            .mode(DataMode::Server)
             .paging(Paging::pages(20))
             .column(Order::id)
             .width(110)
@@ -184,8 +184,8 @@ pub fn today() -> Screen {
 #[screen(route = "/by-city", permission = "sales.order.read")]
 pub fn orders_by_city() -> Screen {
     Screen::new(t!("sales.by_city")).body(
-        Grid::of(search_today)
-            .mode(GridMode::Server)
+        DataGrid::of(search_today)
+            .mode(DataMode::Server)
             .paging(Paging::pages(20))
             .group_by(Order::city)
             .group_by(Order::status)
@@ -214,7 +214,7 @@ pub fn orders_by_city() -> Screen {
 #[screen(permission = "sales.order.read")]
 pub fn order_lines(params: OrderParams) -> Screen {
     Screen::window(t!("sales.order_lines", id = params.id.0.to_string())).body(
-        Grid::of(search_lines)
+        DataGrid::of(search_lines)
             .scope(OrderLine::order_id, params.id)
             .paging(Paging::none())
             .column(OrderLine::product_id)
@@ -236,8 +236,8 @@ pub fn order_lines(params: OrderParams) -> Screen {
 #[screen(route = "/archive", permission = "sales.order.read")]
 pub fn archive() -> Screen {
     Screen::new(t!("sales.archive")).toolbar(|t| t.export(Export::Csv)).body(
-        Grid::of(search_archive)
-            .mode(GridMode::Server)
+        DataGrid::of(search_archive)
+            .mode(DataMode::Server)
             .paging(Paging::virtual_scroll())
             .exportable()
             .column(Order::id)

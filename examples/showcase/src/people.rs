@@ -141,7 +141,7 @@ pub fn leave_import() -> Screen {
 }
 
 #[action(permission = "people.leave.request")]
-pub async fn search_leaves(q: GridQuery, store: LeaveStore) -> Result<Page<LeaveRequest>> {
+pub async fn search_leaves(q: DataQuery, store: LeaveStore) -> Result<Page<LeaveRequest>> {
     let rows = store.0.read().map_err(|_| Error::Internal("leave store lock".into()))?.clone();
     Ok(q.apply(rows))
 }
@@ -222,7 +222,7 @@ pub fn employees() -> Vec<Employee> {
 }
 
 #[action(permission = "people.org.read")]
-pub async fn search_employees(q: GridQuery) -> Result<Page<Employee>> {
+pub async fn search_employees(q: DataQuery) -> Result<Page<Employee>> {
     Ok(q.apply(employees()))
 }
 
@@ -230,8 +230,8 @@ pub async fn search_employees(q: GridQuery) -> Result<Page<Employee>> {
 #[screen(route = "/org", permission = "people.org.read")]
 pub fn org_chart() -> Screen {
     Screen::new(t!("people.org")).body(
-        Grid::of(search_employees)
-            .mode(GridMode::Server)
+        DataGrid::of(search_employees)
+            .mode(DataMode::Server)
             .paging(Paging::pages(25))
             .tree(Employee::manager_id)
             .column(Employee::name)
@@ -250,7 +250,7 @@ pub fn org_chart() -> Screen {
 #[screen(route = "/leaves", permission = "people.leave.request")]
 pub fn leaves() -> Screen {
     Screen::new(t!("people.requests")).body(
-        Grid::of(search_leaves)
+        DataGrid::of(search_leaves)
             .column(LeaveRequest::employee)
             .filter()
             .column(LeaveRequest::manager_email)

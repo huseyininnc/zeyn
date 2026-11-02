@@ -119,7 +119,7 @@ impl ProductStore {
 
 /// Products for lists and the API: filter, sort and page.
 #[action(permission = "stock.product.read")]
-pub async fn search_products(q: GridQuery, store: ProductStore) -> Result<Page<Product>> {
+pub async fn search_products(q: DataQuery, store: ProductStore) -> Result<Page<Product>> {
     Ok(q.apply(store.all()?))
 }
 
@@ -175,8 +175,8 @@ pub fn product_list() -> Screen {
                 .export(Export::Csv)
         })
         .body(
-            Grid::of(search_products)
-                .mode(GridMode::Server)
+            DataGrid::of(search_products)
+                .mode(DataMode::Server)
                 .paging(Paging::pages(25))
                 .column(Product::code)
                 .width(120)

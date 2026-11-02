@@ -1,5 +1,5 @@
 use crate::action::{
-    Action, ActionMeta, Aggregate, AggregateRequest, Cursor, DEFAULT_PAGE_SIZE, Filter, GridQuery, MAX_FILTER_CHOICES,
+    Action, ActionMeta, Aggregate, AggregateRequest, Cursor, DEFAULT_PAGE_SIZE, Filter, DataQuery, MAX_FILTER_CHOICES,
     MAX_FILTER_TEXT, MAX_FILTERS, MAX_PAGE_SIZE, Page, PageRequest, Result, Sort, Total,
 };
 use serde::Deserialize;
@@ -23,7 +23,7 @@ use std::marker::PhantomData;
 /// Where sorting and filtering happen.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub enum GridMode {
+pub enum DataMode {
     /// Data comes to the client once; sorting and filtering run in the browser.
     #[default]
     Client,
@@ -31,11 +31,11 @@ pub enum GridMode {
     Server,
 }
 
-impl GridMode {
+impl DataMode {
     fn code(self) -> &'static str {
         match self {
-            GridMode::Client => "client",
-            GridMode::Server => "server",
+            DataMode::Client => "client",
+            DataMode::Server => "server",
         }
     }
 }
@@ -266,7 +266,7 @@ impl Tone {
 /// or [`Render::value`]. Exports and copy use the plain value, not this HTML.
 ///
 /// ```ignore
-/// Grid::of(search_products).column(Product::code).cell(|code: &String, _r: &Render| {
+/// DataGrid::of(search_products).column(Product::code).cell(|code: &String, _r: &Render| {
 ///     format!("<code>{}</code>", zeyn::render::escape(code))
 /// })
 /// ```
@@ -345,7 +345,7 @@ fn key_text(value: &Value) -> String {
 type ValueFn<E> = Box<dyn Fn(&E) -> Value + Send + Sync>;
 type StyleFn<E> = Box<dyn Fn(&E) -> Option<RowStyle> + Send + Sync>;
 type OpenFn<E> = Box<dyn Fn(&E) -> Effect + Send + Sync>;
-type FetchFn<E> = fn(Ctx, GridQuery) -> BoxFuture<Result<Page<E>>>;
+type FetchFn<E> = fn(Ctx, DataQuery) -> BoxFuture<Result<Page<E>>>;
 
 struct Column<E> {
     meta: &'static FieldMeta,
@@ -360,16 +360,28 @@ struct Column<E> {
     editable: bool,
 }
 
-/// Data grid. Its data source is an action that takes a `GridQuery` and returns `Page<E>`.
+/// Old name of [`DataGrid`]; kept for one release.
+#[deprecated(since = "0.0.2", note = "renamed to `DataGrid`; `zeyn check --fix` rewrites it")]
+pub type Grid<E> = DataGrid<E>;
+
+/// Old name of [`DataGridColumn`]; kept for one release.
+#[deprecated(since = "0.0.2", note = "renamed to `DataGridColumn`; `zeyn check --fix` rewrites it")]
+pub type GridColumn<E, T> = DataGridColumn<E, T>;
+
+/// Old name of [`DataMode`]; kept for one release.
+#[deprecated(since = "0.0.2", note = "renamed to `DataMode`; `zeyn check --fix` rewrites it")]
+pub type GridMode = DataMode;
+
+/// Data grid. Its data source is an action that takes a `DataQuery` and returns `Page<E>`.
 ///
 /// Example:
 /// ```ignore
-/// Grid::of(search_products).column(Product::code).width(120).filter()
+/// DataGrid::of(search_products).column(Product::code).width(120).filter()
 /// ```
-pub struct Grid<E: Model> {
+pub struct DataGrid<E: Model> {
     action: ActionMeta,
     fetch: FetchFn<E>,
-    mode: GridMode,
+    mode: DataMode,
     paging: Paging,
     columns: Vec<Column<E>>,
     row_style: Option<StyleFn<E>>,
@@ -486,24 +498,24 @@ struct SaveDef<E: Model> {
 
 type MenuFn<E> = Box<dyn Fn(&E) -> crate::menu::ContextMenu + Send + Sync>;
 
-fn fetch_via<A, E>(ctx: Ctx, query: GridQuery) -> BoxFuture<Result<Page<E>>>
+fn fetch_via<A, E>(ctx: Ctx, query: DataQuery) -> BoxFuture<Result<Page<E>>>
 where
-    A: Action<Input = GridQuery, Output = Result<Page<E>>>,
+    A: Action<Input = DataQuery, Output = Result<Page<E>>>,
     E: Model,
 {
     Box::pin(async move { A::call(ctx, query).await? })
 }
 
-impl<E: Model> Grid<E> {
-    /// Grid that loads its rows from the given action.
+impl<E: Model> DataGrid<E> {
+    /// DataGrid that loads its rows from the given action.
     pub fn of<A>(_source: A) -> Self
     where
-        A: Action<Input = GridQuery, Output = Result<Page<E>>>,
+        A: Action<Input = DataQuery, Output = Result<Page<E>>>,
     {
         Self {
             action: A::META,
             fetch: fetch_via::<A, E>,
-            mode: GridMode::default(),
+            mode: DataMode::default(),
             paging: Paging::default(),
             columns: Vec::new(),
             row_style: None,
@@ -524,8 +536,8 @@ impl<E: Model> Grid<E> {
     /// Groups rows by `field` on the server; call again to group inside each group. The grid
     /// shows a header row per group with its value, row count and the column totals over the
     /// group, and loads a group's rows (or subgroups) when the user opens it, a page at a time.
-    /// The top level pages over groups. The grid's action answers `GridQuery::group` with
-    /// `Page::groups`; `GridQuery::apply` does it for in memory data. Virtual grids do not group.
+    /// The top level pages over groups. The grid's action answers `DataQuery::group` with
+    /// `Page::groups`; `DataQuery::apply` does it for in memory data. Virtual grids do not group.
     pub fn group_by<T: FieldType>(mut self, field: Field<E, T>) -> Self {
         let meta = field.meta();
         if !self.group_by.iter().any(|m| m.name == meta.name) {
@@ -573,7 +585,7 @@ impl<E: Model> Grid<E> {
 
     /// Keeps only the rows whose `field` equals `value`, on every request, whatever the client
     /// sends: `.scope(OrderLine::order_id, params.id)` for the lines of one order. The filter goes
-    /// first in `GridQuery::filters`, so a data layer that reads the filters keeps it. Text
+    /// first in `DataQuery::filters`, so a data layer that reads the filters keeps it. Text
     /// compares ignoring case.
     pub fn scope<T: FieldType>(mut self, field: Field<E, T>, value: T) -> Self {
         self.scope.push(key_filter(field.meta(), value_key(&value.to_value()).as_deref()));
@@ -593,7 +605,7 @@ impl<E: Model> Grid<E> {
     }
 
     /// Puts the grid's scope filters in front of the client's.
-    fn scoped(&self, query: &mut GridQuery) {
+    fn scoped(&self, query: &mut DataQuery) {
         if !self.scope.is_empty() {
             query.filters.splice(0..0, self.scope.iter().cloned());
         }
@@ -658,11 +670,11 @@ impl<E: Model> Grid<E> {
         self
     }
 
-    /// Grid with a column for every field of the model except the row version, in declaration
+    /// DataGrid with a column for every field of the model except the row version, in declaration
     /// order, and filter boxes on text and choice columns. The quickest list for a simple model.
     pub fn auto<A>(source: A) -> Self
     where
-        A: Action<Input = GridQuery, Output = Result<Page<E>>>,
+        A: Action<Input = DataQuery, Output = Result<Page<E>>>,
     {
         let mut grid = Self::of(source);
         for (i, meta) in E::fields().iter().enumerate().filter(|(_, m)| !m.version) {
@@ -683,7 +695,7 @@ impl<E: Model> Grid<E> {
         grid
     }
 
-    pub fn mode(mut self, mode: GridMode) -> Self {
+    pub fn mode(mut self, mode: DataMode) -> Self {
         self.mode = mode;
         self
     }
@@ -695,7 +707,7 @@ impl<E: Model> Grid<E> {
     }
 
     /// Adds a column. The following settings (`width`, `filter`...) apply to it.
-    pub fn column<T: FieldType + 'static>(mut self, field: Field<E, T>) -> GridColumn<E, T> {
+    pub fn column<T: FieldType + 'static>(mut self, field: Field<E, T>) -> DataGridColumn<E, T> {
         self.columns.push(Column {
             meta: field.meta(),
             value: Box::new(move |e| field.get(e).to_value()),
@@ -708,7 +720,7 @@ impl<E: Model> Grid<E> {
             cell: None,
             editable: false,
         });
-        GridColumn { grid: self, field, _type: PhantomData }
+        DataGridColumn { grid: self, field, _type: PhantomData }
     }
 
     /// Picks a highlight per row.
@@ -847,7 +859,7 @@ impl<E: Model> Grid<E> {
             .into_iter()
             .map(|s| ColumnView { field: self.columns[s.index].meta.name.to_string(), width: s.width, pin: s.pin })
             .collect();
-        let mut query = GridQuery { sort: view.sort, filters: view.filters, ..GridQuery::default() };
+        let mut query = DataQuery { sort: view.sort, filters: view.filters, ..DataQuery::default() };
         self.allow(&mut query);
         query.filters.retain(|f| {
             let short = |s: &Option<String>| s.as_deref().is_none_or(|t| t.chars().count() <= MAX_FILTER_TEXT);
@@ -863,7 +875,7 @@ impl<E: Model> Grid<E> {
     }
 
     /// Keeps the totals, filters and sort keys this grid offers, within the limits.
-    fn allow(&self, query: &mut GridQuery) {
+    fn allow(&self, query: &mut DataQuery) {
         let allowed = self.aggregate_requests();
         query.aggregates.retain(|a| allowed.contains(a));
         query.aggregates.dedup();
@@ -1262,7 +1274,7 @@ impl<E: Model> Grid<E> {
     /// keys become filters in front of the client's; a tree also asks which of the loaded rows
     /// have children (one grouped query on the parent field) and, at the top, the totals over
     /// every matching row.
-    fn fetch_nested(&self, ctx: Ctx, mut query: GridQuery, path: Vec<Option<String>>) -> BoxFuture<Result<LoadedPage>> {
+    fn fetch_nested(&self, ctx: Ctx, mut query: DataQuery, path: Vec<Option<String>>) -> BoxFuture<Result<LoadedPage>> {
         use crate::action::Error;
         self.allow(&mut query);
         query.time_zone = ctx.time_zone();
@@ -1299,12 +1311,12 @@ impl<E: Model> Grid<E> {
         let scope = self.scope.clone();
         Box::pin(async move {
             let grouped = query.group.is_some();
-            let totals_query = (parent.is_some() && depth == 0 && !query.aggregates.is_empty()).then(|| GridQuery {
+            let totals_query = (parent.is_some() && depth == 0 && !query.aggregates.is_empty()).then(|| DataQuery {
                 page: PageRequest::Offset { offset: 0, limit: 1 },
                 filters: scope.iter().cloned().chain(user.iter().cloned()).collect(),
                 aggregates: query.aggregates.clone(),
                 time_zone: query.time_zone,
-                ..GridQuery::default()
+                ..DataQuery::default()
             });
             let page = fetch(ctx.clone(), query.clone()).await?;
             let mut parents = Vec::new();
@@ -1314,12 +1326,12 @@ impl<E: Model> Grid<E> {
                     let mut filters = scope.clone();
                     filters.extend(user.iter().cloned());
                     filters.push(Filter::any_of(parent.name, keys));
-                    let ask = GridQuery {
+                    let ask = DataQuery {
                         page: PageRequest::Offset { offset: 0, limit: MAX_PAGE_SIZE },
                         filters,
                         group: Some(parent.name.to_string()),
                         time_zone: query.time_zone,
-                        ..GridQuery::default()
+                        ..DataQuery::default()
                     };
                     parents = fetch(ctx.clone(), ask).await?.groups.iter().filter_map(|g| value_key(&g.value)).collect();
                 }
@@ -1346,23 +1358,23 @@ impl<E: Model> Grid<E> {
     }
 }
 
-impl<E: Model> GridSource for Grid<E> {
+impl<E: Model> GridSource for DataGrid<E> {
     fn action(&self) -> ActionMeta {
         self.action
     }
 
-    fn first_query(&self, view: Option<&DataGridView>) -> GridQuery {
+    fn first_query(&self, view: Option<&DataGridView>) -> DataQuery {
         let page = match self.paging {
             Paging::Infinite { batch } => PageRequest::After { cursor: None, limit: batch },
             other => PageRequest::Offset { offset: 0, limit: other.size() },
         };
-        GridQuery {
+        DataQuery {
             page,
             with_total: !matches!(self.paging, Paging::Infinite { .. }),
             aggregates: self.aggregate_requests(),
             sort: view.map(|v| v.sort.clone()).unwrap_or_default(),
             filters: view.map(|v| v.filters.clone()).unwrap_or_default(),
-            ..GridQuery::default()
+            ..DataQuery::default()
         }
     }
 
@@ -1383,11 +1395,11 @@ impl<E: Model> GridSource for Grid<E> {
             FieldKind::Id | FieldKind::Integer => Filter::range(meta.name, Some(&key), Some(&key)),
             _ => Filter { field: meta.name.to_string(), equals: Some(key), ..Filter::default() },
         };
-        let mut query = GridQuery {
+        let mut query = DataQuery {
             page: PageRequest::Offset { offset: 0, limit: 5 },
             filters: vec![filter],
             time_zone: ctx.time_zone(),
-            ..GridQuery::default()
+            ..DataQuery::default()
         };
         self.scoped(&mut query);
         let fetch = self.fetch;
@@ -1510,7 +1522,7 @@ impl<E: Model> GridSource for Grid<E> {
         Some(RowCall { meta: action.meta, run: (action.run)(row) })
     }
 
-    fn fetch(&self, ctx: Ctx, mut query: GridQuery) -> BoxFuture<Result<LoadedPage>> {
+    fn fetch(&self, ctx: Ctx, mut query: DataQuery) -> BoxFuture<Result<LoadedPage>> {
         self.allow(&mut query);
         self.scoped(&mut query);
         query.time_zone = ctx.time_zone();
@@ -1538,7 +1550,7 @@ impl<E: Model> GridSource for Grid<E> {
         })
     }
 
-    fn fetch_at(&self, ctx: Ctx, query: GridQuery, path: Vec<Option<String>>) -> BoxFuture<Result<LoadedPage>> {
+    fn fetch_at(&self, ctx: Ctx, query: DataQuery, path: Vec<Option<String>>) -> BoxFuture<Result<LoadedPage>> {
         if self.nested() { self.fetch_nested(ctx, query, path) } else { self.fetch(ctx, query) }
     }
 
@@ -1624,7 +1636,7 @@ impl<E: Model> GridSource for Grid<E> {
     }
 }
 
-impl<E: Model> Component for Grid<E> {
+impl<E: Model> Component for DataGrid<E> {
     fn render(&self, out: &mut String, r: &Render) {
         self.render_with(out, r, None);
     }
@@ -1660,16 +1672,16 @@ impl<E: Model> Component for Grid<E> {
     }
 }
 
-/// Configures the last added column. Grid methods can be called from here too.
-pub struct GridColumn<E: Model, T> {
-    grid: Grid<E>,
+/// Configures the last added column. DataGrid methods can be called from here too.
+pub struct DataGridColumn<E: Model, T> {
+    grid: DataGrid<E>,
     field: Field<E, T>,
     _type: PhantomData<fn() -> T>,
 }
 
-impl<E: Model, T> GridColumn<E, T> {
+impl<E: Model, T> DataGridColumn<E, T> {
     fn last(&mut self) -> &mut Column<E> {
-        self.grid.columns.last_mut().expect("GridColumn always has a column")
+        self.grid.columns.last_mut().expect("DataGridColumn always has a column")
     }
 
     /// Fixed width in pixels.
@@ -1750,7 +1762,7 @@ impl<E: Model, T> GridColumn<E, T> {
         self
     }
 
-    /// Lets users edit this column in place when the grid has a save action (`Grid::edit_with`).
+    /// Lets users edit this column in place when the grid has a save action (`DataGrid::edit_with`).
     /// Keys, read only fields and row versions never become editable; the server refuses
     /// values for them.
     pub fn editable(mut self) -> Self {
@@ -1856,27 +1868,27 @@ impl<E: Model, T> GridColumn<E, T> {
         self.aggregate(Aggregate::Count)
     }
 
-    pub fn column<U: FieldType + 'static>(self, field: Field<E, U>) -> GridColumn<E, U> {
+    pub fn column<U: FieldType + 'static>(self, field: Field<E, U>) -> DataGridColumn<E, U> {
         self.grid.column(field)
     }
 
-    pub fn mode(self, mode: GridMode) -> Grid<E> {
+    pub fn mode(self, mode: DataMode) -> DataGrid<E> {
         self.grid.mode(mode)
     }
 
-    pub fn paging(self, paging: Paging) -> Grid<E> {
+    pub fn paging(self, paging: Paging) -> DataGrid<E> {
         self.grid.paging(paging)
     }
 
-    pub fn row_style(self, style: impl Fn(&E) -> Option<RowStyle> + Send + Sync + 'static) -> Grid<E> {
+    pub fn row_style(self, style: impl Fn(&E) -> Option<RowStyle> + Send + Sync + 'static) -> DataGrid<E> {
         self.grid.row_style(style)
     }
 
-    pub fn on_open(self, open: impl Fn(&E) -> Effect + Send + Sync + 'static) -> Grid<E> {
+    pub fn on_open(self, open: impl Fn(&E) -> Effect + Send + Sync + 'static) -> DataGrid<E> {
         self.grid.on_open(open)
     }
 
-    pub fn row_action<A>(self, label: impl Into<Text>, action: A, input: impl Fn(&E) -> A::Input + Send + Sync + 'static) -> Grid<E>
+    pub fn row_action<A>(self, label: impl Into<Text>, action: A, input: impl Fn(&E) -> A::Input + Send + Sync + 'static) -> DataGrid<E>
     where
         A: Action,
         A::Output: Outcome,
@@ -1884,19 +1896,19 @@ impl<E: Model, T> GridColumn<E, T> {
         self.grid.row_action(label, action, input)
     }
 
-    pub fn selectable(self) -> Grid<E> {
+    pub fn selectable(self) -> DataGrid<E> {
         self.grid.selectable()
     }
 
-    pub fn row_menu(self, menu: impl Fn(&E) -> crate::menu::ContextMenu + Send + Sync + 'static) -> Grid<E> {
+    pub fn row_menu(self, menu: impl Fn(&E) -> crate::menu::ContextMenu + Send + Sync + 'static) -> DataGrid<E> {
         self.grid.row_menu(menu)
     }
 
-    pub fn exportable(self) -> Grid<E> {
+    pub fn exportable(self) -> DataGrid<E> {
         self.grid.exportable()
     }
 
-    pub fn edit_with<A>(self, save: A) -> Grid<E>
+    pub fn edit_with<A>(self, save: A) -> DataGrid<E>
     where
         A: crate::form::FormAction<E> + Action<Input = Valid<E>>,
         A::Output: Outcome,
@@ -1904,7 +1916,7 @@ impl<E: Model, T> GridColumn<E, T> {
         self.grid.edit_with(save)
     }
 
-    pub fn bulk_action<A, K>(self, label: impl Into<Text>, action: A, key: Field<E, K>) -> Grid<E>
+    pub fn bulk_action<A, K>(self, label: impl Into<Text>, action: A, key: Field<E, K>) -> DataGrid<E>
     where
         A: BulkAction<K> + Action<Input = Vec<K>>,
         A::Output: Outcome,
@@ -1913,19 +1925,19 @@ impl<E: Model, T> GridColumn<E, T> {
         self.grid.bulk_action(label, action, key)
     }
 
-    pub fn detail<S: ScreenDef>(self, detail: impl Fn(&E) -> (S, S::Params) + Send + Sync + 'static) -> Grid<E> {
+    pub fn detail<S: ScreenDef>(self, detail: impl Fn(&E) -> (S, S::Params) + Send + Sync + 'static) -> DataGrid<E> {
         self.grid.detail(detail)
     }
 
-    pub fn scope<U: FieldType>(self, field: Field<E, U>, value: U) -> Grid<E> {
+    pub fn scope<U: FieldType>(self, field: Field<E, U>, value: U) -> DataGrid<E> {
         self.grid.scope(field, value)
     }
 
-    pub fn group_by<U: FieldType>(self, field: Field<E, U>) -> Grid<E> {
+    pub fn group_by<U: FieldType>(self, field: Field<E, U>) -> DataGrid<E> {
         self.grid.group_by(field)
     }
 
-    pub fn tree<K: FieldType>(self, parent: Field<E, Option<K>>) -> Grid<E>
+    pub fn tree<K: FieldType>(self, parent: Field<E, Option<K>>) -> DataGrid<E>
     where
         Option<K>: FieldType,
     {
@@ -1933,25 +1945,25 @@ impl<E: Model, T> GridColumn<E, T> {
     }
 
     /// Returns the grid.
-    pub fn done(self) -> Grid<E> {
+    pub fn done(self) -> DataGrid<E> {
         self.grid
     }
 }
 
-impl<E: Model, T> From<GridColumn<E, T>> for Grid<E> {
-    fn from(c: GridColumn<E, T>) -> Self {
+impl<E: Model, T> From<DataGridColumn<E, T>> for DataGrid<E> {
+    fn from(c: DataGridColumn<E, T>) -> Self {
         c.grid
     }
 }
 
-impl<E: Model> From<Grid<E>> for Node {
-    fn from(g: Grid<E>) -> Self {
+impl<E: Model> From<DataGrid<E>> for Node {
+    fn from(g: DataGrid<E>) -> Self {
         Node::new(g)
     }
 }
 
-impl<E: Model, T> From<GridColumn<E, T>> for Node {
-    fn from(c: GridColumn<E, T>) -> Self {
+impl<E: Model, T> From<DataGridColumn<E, T>> for Node {
+    fn from(c: DataGridColumn<E, T>) -> Self {
         Node::new(c.grid)
     }
 }
@@ -2265,7 +2277,7 @@ pub fn total(values: impl Iterator<Item = Value>, op: Aggregate) -> Option<Value
     }
 }
 
-impl GridQuery {
+impl DataQuery {
     /// Filters, sorts and pages an in memory list. Meant for small data, samples and tests;
     /// databases do this in SQL. Unknown field names and unreadable filter values are ignored,
     /// and at most [`MAX_FILTERS`] filters and [`MAX_SORT`] sort keys are used. Sorting always ends with the

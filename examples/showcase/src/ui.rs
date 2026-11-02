@@ -4,7 +4,7 @@ use crate::stock::{Product, search_products};
 use zeyn::prelude::*;
 
 fn products() -> Node {
-    Grid::of(search_products)
+    DataGrid::of(search_products)
         .paging(Paging::pages(8))
         .column(Product::code)
         .width(110)

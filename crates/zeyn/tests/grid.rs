@@ -1,4 +1,4 @@
-//! Grid features end to end: totals, filters, sorting, views, row actions, selection, editing
+//! DataGrid features end to end: totals, filters, sorting, views, row actions, selection, editing
 //! and export, through the HTTP endpoints with permissions.
 
 use axum::Router;
@@ -69,14 +69,14 @@ impl Store {
 }
 
 #[action(permission = "items.read")]
-pub async fn search(q: GridQuery, store: Store) -> Result<Page<Item>> {
+pub async fn search(q: DataQuery, store: Store) -> Result<Page<Item>> {
     Ok(q.apply(store.0.read().unwrap().clone()))
 }
 
 #[screen(route = "/items", permission = "items.read")]
 pub fn list() -> Screen {
     Screen::new("Items").body(
-        Grid::of(search)
+        DataGrid::of(search)
             .paging(Paging::pages(5))
             .column(Item::code)
             .filter()
@@ -161,7 +161,7 @@ fn agg(field: &str, op: Aggregate) -> AggregateRequest {
     AggregateRequest { field: field.into(), op }
 }
 
-fn query(json: serde_json::Value) -> GridQuery {
+fn query(json: serde_json::Value) -> DataQuery {
     serde_json::from_value(json).unwrap()
 }
 
@@ -194,7 +194,7 @@ fn totals_cover_every_filtered_row_not_only_the_page() {
 
 #[test]
 fn totals_ignore_unknown_fields_and_ops_that_do_not_fit() {
-    let mut q = GridQuery::default();
+    let mut q = DataQuery::default();
     q.aggregates = vec![agg("nope", Aggregate::Sum), agg("code", Aggregate::Sum), agg("code", Aggregate::Count)];
     let page = q.apply((1..=3).map(item).collect());
     assert_eq!(page.totals.len(), 1);
@@ -277,7 +277,7 @@ fn codes(page: &Page<Item>) -> Vec<String> {
 }
 
 fn filtered(filters: Vec<zeyn::Filter>) -> Page<Item> {
-    let q = GridQuery { filters, page: zeyn::PageRequest::Offset { offset: 0, limit: 100 }, ..GridQuery::default() };
+    let q = DataQuery { filters, page: zeyn::PageRequest::Offset { offset: 0, limit: 100 }, ..DataQuery::default() };
     q.apply((1..=20).map(item).collect())
 }
 
@@ -304,7 +304,7 @@ fn moment_date_filters_use_the_users_whole_day() {
     use zeyn::Filter;
     let at = DateTime::parse("2026-03-01T22:30:00Z").unwrap();
     let rows = vec![Event { id: EventId(1), at }];
-    let mut q = GridQuery { filters: vec![Filter::range("at", Some("2026-03-02"), Some("2026-03-02"))], ..GridQuery::default() };
+    let mut q = DataQuery { filters: vec![Filter::range("at", Some("2026-03-02"), Some("2026-03-02"))], ..DataQuery::default() };
     assert_eq!(q.apply(rows.clone()).items.len(), 0);
     q.time_zone = TimeZone::named("Europe/Istanbul").unwrap();
     assert_eq!(q.apply(rows.clone()).items.len(), 1);
@@ -328,7 +328,7 @@ fn choices_booleans_and_text_operators() {
 
 #[test]
 fn old_contains_filters_still_read() {
-    let q: GridQuery = query(serde_json::json!({ "filters": [{ "field": "code", "contains": "C-2" }] }));
+    let q: DataQuery = query(serde_json::json!({ "filters": [{ "field": "code", "contains": "C-2" }] }));
     assert_eq!(codes(&q.apply((1..=20).map(item).collect())), ["C-20"]);
 }
 
@@ -477,7 +477,7 @@ async fn grid_endpoint_renders_rows_and_header_in_the_requested_layout() {
 #[test]
 fn at_most_three_columns_stay_pinned_per_side() {
     use zeyn::{DataGridView, GridSource};
-    let grid = Grid::of(search).column(Item::code).column(Item::kind).column(Item::price).column(Item::qty).column(Item::added).done();
+    let grid = DataGrid::of(search).column(Item::code).column(Item::kind).column(Item::price).column(Item::qty).column(Item::added).done();
     let columns: Vec<serde_json::Value> =
         ["code", "kind", "price", "qty", "added"].iter().map(|f| serde_json::json!({ "field": f, "pin": "start" })).collect();
     let view: DataGridView = serde_json::from_value(serde_json::json!({ "columns": columns })).unwrap();
@@ -500,7 +500,7 @@ pub async fn bump(id: ItemId, store: Store) -> Result<()> {
 #[screen(route = "/act", permission = "items.read")]
 pub fn act() -> Screen {
     Screen::new("Act").body(
-        Grid::of(search)
+        DataGrid::of(search)
             .column(Item::code)
             .column(Item::kind)
             .badge(|k| match k {
@@ -592,7 +592,7 @@ pub async fn deactivate(ids: Vec<ItemId>, store: Store) -> Result<usize> {
 #[screen(route = "/pick", permission = "items.read")]
 pub fn pick() -> Screen {
     Screen::new("Pick").body(
-        Grid::of(search).paging(Paging::pages(5)).column(Item::code).column(Item::kind).filter().column(Item::active).bulk_action(
+        DataGrid::of(search).paging(Paging::pages(5)).column(Item::code).column(Item::kind).filter().column(Item::active).bulk_action(
             "Deactivate",
             deactivate,
             Item::id,
@@ -690,7 +690,7 @@ pub async fn bump_all(_: (), store: Store) -> Result<()> {
 pub fn menus() -> Screen {
     Screen::new("Menus")
         .context_menu(ContextMenu::new().item("Open", Effect::Toast { message: "hi".into() }).action("Bump all", bump_all, ()))
-        .body(Grid::of(search).paging(Paging::pages(5)).column(Item::code).column(Item::qty).row_menu(|i| {
+        .body(DataGrid::of(search).paging(Paging::pages(5)).column(Item::code).column(Item::qty).row_menu(|i| {
             ContextMenu::new()
                 .item("Toast", Effect::Toast { message: "x".into() })
                 .separator()
@@ -789,7 +789,7 @@ pub async fn save_item(item: Valid<Item>, store: Store) -> Result<Item> {
 #[screen(route = "/edit", permission = "items.read")]
 pub fn edit_list() -> Screen {
     Screen::new("Edit").body(
-        Grid::of(search)
+        DataGrid::of(search)
             .paging(Paging::pages(5))
             .column(Item::code)
             .editable()
@@ -877,9 +877,9 @@ async fn inline_edit_refuses_read_only_and_unknown_columns_and_missing_permissio
 #[screen(route = "/export", permission = "items.read")]
 pub fn export_list() -> Screen {
     Screen::new("Export")
-        .body(Grid::of(search).paging(Paging::pages(5)).column(Item::code).filter().column(Item::kind).column(Item::price).column(Item::active).exportable())
-        .body(Grid::of(search).column(Item::code).done().export_permission("items.export").export_limit(7))
-        .body(Grid::of(search).column(Item::code))
+        .body(DataGrid::of(search).paging(Paging::pages(5)).column(Item::code).filter().column(Item::kind).column(Item::price).column(Item::active).exportable())
+        .body(DataGrid::of(search).column(Item::code).done().export_permission("items.export").export_limit(7))
+        .body(DataGrid::of(search).column(Item::code))
 }
 
 fn export_router(identity: Identity) -> (Router, Store) {
@@ -951,13 +951,13 @@ pub struct ItemParams {
 #[screen(route = "/master", permission = "items.read")]
 pub fn master() -> Screen {
     Screen::new("Master")
-        .body(Grid::of(search).paging(Paging::pages(3)).column(Item::code).detail(|i| (item_detail, ItemParams { id: i.id })))
-        .body(Grid::of(search).paging(Paging::virtual_scroll()).column(Item::code).detail(|i| (item_detail, ItemParams { id: i.id })))
+        .body(DataGrid::of(search).paging(Paging::pages(3)).column(Item::code).detail(|i| (item_detail, ItemParams { id: i.id })))
+        .body(DataGrid::of(search).paging(Paging::virtual_scroll()).column(Item::code).detail(|i| (item_detail, ItemParams { id: i.id })))
 }
 
 #[screen(permission = "items.detail")]
 pub fn item_detail(params: ItemParams) -> Screen {
-    Screen::window("Detail").body(Grid::of(search).scope(Item::id, params.id).column(Item::code).column(Item::qty))
+    Screen::window("Detail").body(DataGrid::of(search).scope(Item::id, params.id).column(Item::code).column(Item::qty))
 }
 
 fn master_router(identity: Identity) -> Router {
@@ -1005,8 +1005,8 @@ async fn detail_screens_check_their_permission_and_keep_their_scope() {
 #[test]
 fn blank_filters_keep_empty_or_set_values() {
     let rows: Vec<Item> = (1..=20).map(item).collect();
-    let empty = GridQuery { filters: vec![zeyn::Filter::blank("due", true)], ..GridQuery::default() }.apply(rows.clone());
-    let set = GridQuery { filters: vec![zeyn::Filter::blank("due", false)], ..GridQuery::default() }.apply(rows);
+    let empty = DataQuery { filters: vec![zeyn::Filter::blank("due", true)], ..DataQuery::default() }.apply(rows.clone());
+    let set = DataQuery { filters: vec![zeyn::Filter::blank("due", false)], ..DataQuery::default() }.apply(rows);
     assert_eq!((empty.total, set.total), (Some(15), Some(5)));
 }
 
@@ -1022,7 +1022,7 @@ fn apply_groups_rows_with_counts_totals_sort_and_paging() {
     assert_eq!(seen, [(Value::Choice("Tool"), 6), (Value::Choice("Part"), 7)]);
     assert_eq!(page.groups[0].totals[0].value, Value::Int(3 + 6 + 9 + 12 + 15 + 18));
     assert!(page.next.is_some());
-    let mut q = GridQuery::default();
+    let mut q = DataQuery::default();
     q.group = Some("due".into());
     let page = q.apply(rows);
     assert_eq!((page.groups[0].value.clone(), page.groups[0].count), (Value::Null, 15), "empty values form one group, first");
@@ -1031,14 +1031,14 @@ fn apply_groups_rows_with_counts_totals_sort_and_paging() {
 #[test]
 fn any_of_matches_keys() {
     let rows: Vec<Item> = (1..=20).map(item).collect();
-    let page = GridQuery { filters: vec![zeyn::Filter::any_of("id", ["3", "7", "99"])], ..GridQuery::default() }.apply(rows);
+    let page = DataQuery { filters: vec![zeyn::Filter::any_of("id", ["3", "7", "99"])], ..DataQuery::default() }.apply(rows);
     assert_eq!(codes(&page), ["C-03", "C-07"]);
 }
 
 #[screen(route = "/grouped", permission = "items.read")]
 pub fn grouped() -> Screen {
     Screen::new("Grouped").body(
-        Grid::of(search).paging(Paging::pages(2)).group_by(Item::kind).group_by(Item::active).column(Item::code).column(Item::qty).sum(),
+        DataGrid::of(search).paging(Paging::pages(2)).group_by(Item::kind).group_by(Item::active).column(Item::code).column(Item::qty).sum(),
     )
 }
 
@@ -1052,7 +1052,7 @@ pub struct Node {
 }
 
 #[action(permission = "items.read")]
-pub async fn search_nodes(q: GridQuery) -> Result<Page<Node>> {
+pub async fn search_nodes(q: DataQuery) -> Result<Page<Node>> {
     let parent = |i: i64| match i {
         1 | 2 => None,
         3..=5 => Some(NodeId(1)),
@@ -1063,7 +1063,7 @@ pub async fn search_nodes(q: GridQuery) -> Result<Page<Node>> {
 
 #[screen(route = "/tree", permission = "items.read")]
 pub fn tree() -> Screen {
-    Screen::new("Tree").body(Grid::of(search_nodes).paging(Paging::pages(2)).tree(Node::parent).column(Node::name))
+    Screen::new("Tree").body(DataGrid::of(search_nodes).paging(Paging::pages(2)).tree(Node::parent).column(Node::name))
 }
 
 fn nested_router(identity: Identity) -> Router {

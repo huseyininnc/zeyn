@@ -4,7 +4,7 @@ use zeyn::prelude::*;
 
 /// Notes for the list and the API.
 #[action(permission = "notes.note.read")]
-pub async fn search_notes(q: GridQuery, store: NoteStore) -> Result<Page<Note>> {
+pub async fn search_notes(q: DataQuery, store: NoteStore) -> Result<Page<Note>> {
     Ok(q.apply(store.all()?))
 }
 

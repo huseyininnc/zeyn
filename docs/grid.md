@@ -1,15 +1,15 @@
 # Data Grid
 
-Status: implemented by `zeyn::Grid`, the grid endpoints in `zeyn::server` and `assets/zeyn.js`.
+Status: implemented by `zeyn::DataGrid`, the grid endpoints in `zeyn::server` and `assets/zeyn.js`.
 
-The grid is rendered on the server. Its rows come from an action that takes a `GridQuery` and
+The grid is rendered on the server. Its rows come from an action that takes a `DataQuery` and
 returns `Page<E>`. The browser runtime asks for pages, sends what the user does (sort, filter,
 layout, edits, actions) and puts the HTML it gets back in place. Every call checks permissions on
 the server, and nothing the client sends is trusted.
 
 ```rust
-Grid::of(search_products)
-    .mode(GridMode::Server)
+DataGrid::of(search_products)
+    .mode(DataMode::Server)
     .paging(Paging::pages(25))
     .column(Product::code).width(120).pin_start().filter()
         .link(|p| Window::open(product_editor, ProductParams { id: Some(p.id) }))
@@ -36,7 +36,7 @@ Grid::of(search_products)
 moments, `count()` on every column. Using them on another type does not compile. The totals cover
 every row that matches the filters, not only the page.
 
-`GridQuery::apply` computes them for in memory data. A data layer that pages in SQL reads
+`DataQuery::apply` computes them for in memory data. A data layer that pages in SQL reads
 `query.aggregates` and adds `Page::with_total(field, op, value)` from one aggregate query. The grid
 keeps only the totals its columns declare, so a client cannot ask for others. Totals are formatted
 on the server in the user's language. Averages of whole numbers have two decimals
@@ -133,14 +133,14 @@ as `422` and show in their cells.
 when the user opens it:
 
 ```rust
-Grid::of(search_today)
+DataGrid::of(search_today)
     .column(Order::id)
     .detail(|o| (order_lines, OrderParams { id: o.id }))
 
 #[screen(permission = "sales.order.read")]
 pub fn order_lines(params: OrderParams) -> Screen {
     Screen::window(t!("sales.order_lines", id = params.id.0.to_string())).body(
-        Grid::of(search_lines)
+        DataGrid::of(search_lines)
             .scope(OrderLine::order_id, params.id)
             .column(OrderLine::product)
             .column(OrderLine::amount).sum()
@@ -156,7 +156,7 @@ permission again when the detail loads. The params travel through the browser as
 so the detail screen must check that the user may see the record they name.
 
 `scope(field, value)` keeps a grid to the rows whose `field` equals `value` on every request. The
-filter goes first in `GridQuery::filters` and the client cannot remove it, so a nested grid stays
+filter goes first in `DataQuery::filters` and the client cannot remove it, so a nested grid stays
 on its parent row whatever the browser sends. A data layer that builds SQL from the filters reads
 it like any other (`Filter::range` with equal bounds for numbers and dates, `equals` for text,
 `any_of` for choices, `is` for yes/no, `blank` for empty values).
@@ -172,7 +172,7 @@ not show expanders. Use pages or infinite paging for grids with details.
 `group_by(field)` groups rows on the server; call it again to group inside each group:
 
 ```rust
-Grid::of(search_today)
+DataGrid::of(search_today)
     .paging(Paging::pages(20))
     .group_by(Order::city)
     .group_by(Order::status)
@@ -186,9 +186,9 @@ removes them. The top level pages over groups, so the pager counts groups. The f
 totals over every matching row. Rows inside groups keep everything else: editing, row actions,
 menus, selection and details.
 
-The data layer answers `GridQuery::group`: when it is set, it returns `Page::groups` (value, count
+The data layer answers `DataQuery::group`: when it is set, it returns `Page::groups` (value, count
 and the totals the query asks for, per group) sorted by the value in the direction of the sort key
-on that field, paged like rows, with `total` counting groups. `GridQuery::apply` does this for in
+on that field, paged like rows, with `total` counting groups. `DataQuery::apply` does this for in
 memory data; SQL uses `GROUP BY`. `group` is set by the grid and never read from the client. The
 client sends only the path of group values it opens; the server checks its length and turns each
 value into a filter on that group's column, in front of the user's filters (`blank` for the empty
@@ -200,7 +200,7 @@ group).
 top, and the children of a row loaded when it opens, a page at a time, to at most 32 levels.
 
 ```rust
-Grid::of(search_employees)
+DataGrid::of(search_employees)
     .tree(Employee::manager_id)
     .column(Employee::name)
     .column(Employee::salary).sum()
@@ -208,7 +208,7 @@ Grid::of(search_employees)
 
 The first column carries the indent and the button. To know which rows have children, the grid
 asks its action once more per page: the rows whose parent is one of the page's keys, grouped by the
-parent field (`Filter::any_of` on keys and `GridQuery::group`). Filters and sorting apply on every
+parent field (`Filter::any_of` on keys and `DataQuery::group`). Filters and sorting apply on every
 level; the footer totals cover every matching row. Tree grids do not group and show no row
 details. After an inline edit the row keeps its place in the tree.
 

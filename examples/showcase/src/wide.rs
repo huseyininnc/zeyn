@@ -146,7 +146,7 @@ fn reading(n: u64) -> Reading {
 }
 
 #[action(permission = "stock.product.read")]
-pub async fn search_readings(q: GridQuery) -> Result<Page<Reading>> {
+pub async fn search_readings(q: DataQuery) -> Result<Page<Reading>> {
     let offset = match &q.page {
         PageRequest::Offset { offset, .. } => *offset,
         PageRequest::After { cursor, .. } => cursor.as_ref().and_then(|c| c.0.parse().ok()).unwrap_or(0),
@@ -162,8 +162,8 @@ pub async fn search_readings(q: GridQuery) -> Result<Page<Reading>> {
 #[screen(route = "/wide", permission = "stock.product.read")]
 pub fn wide() -> Screen {
     Screen::new(t!("gallery.wide")).body(
-        Grid::of(search_readings)
-            .mode(GridMode::Server)
+        DataGrid::of(search_readings)
+            .mode(DataMode::Server)
             .paging(Paging::virtual_scroll())
             .column(Reading::id)
             .width(90)

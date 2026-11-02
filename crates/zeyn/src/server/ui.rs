@@ -170,7 +170,7 @@ async fn data_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Js
         if !ctx.identity().can(&action.access) {
             return Err(Failure::App(Error::Forbidden));
         }
-        let info = Call { kind: CallKind::Grid, screen: entry.meta.name, action: Some(action), via_agent: ctx.via_agent() };
+        let info = Call { kind: CallKind::DataGrid, screen: entry.meta.name, action: Some(action), via_agent: ctx.via_agent() };
         let started = Instant::now();
         let result = async {
             st.before(&ctx, &info)?;

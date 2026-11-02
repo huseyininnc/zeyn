@@ -120,11 +120,11 @@ pub struct Page<M> {
     /// Where the next batch starts. `None` means there is nothing more.
     pub next: Option<Cursor>,
     /// Column totals over the whole filtered result, not only this page. Filled for the
-    /// aggregates the query asked for ([`GridQuery::aggregates`]).
+    /// aggregates the query asked for ([`DataQuery::aggregates`]).
     #[serde(default, skip_deserializing, skip_serializing_if = "Vec::is_empty")]
     pub totals: Vec<Total>,
     /// Groups of rows, filled instead of `items` when the query asks for them
-    /// ([`GridQuery::group`]). `total` and `next` then count groups.
+    /// ([`DataQuery::group`]). `total` and `next` then count groups.
     #[serde(default, skip_deserializing, skip_serializing_if = "Vec::is_empty")]
     pub groups: Vec<Group>,
 }
@@ -170,7 +170,7 @@ impl<M: Clone> Page<M> {
     /// Pages an in memory list. Meant for small data, samples and tests; databases page in SQL.
     ///
     /// The cursor here is a row position, which is only stable because the list does not change.
-    pub fn from_slice(all: &[M], query: &GridQuery) -> Self {
+    pub fn from_slice(all: &[M], query: &DataQuery) -> Self {
         let limit = query.limit() as usize;
         let start = match &query.page {
             PageRequest::Offset { offset, .. } => usize::try_from(*offset).unwrap_or(usize::MAX),
@@ -199,9 +199,13 @@ impl Default for PageRequest {
     }
 }
 
+/// Old name of [`DataQuery`]; kept for one release.
+#[deprecated(since = "0.0.2", note = "renamed to `DataQuery`; `zeyn check --fix` rewrites it")]
+pub type GridQuery = DataQuery;
+
 /// Query a grid sends to the server.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct GridQuery {
+pub struct DataQuery {
     #[serde(default)]
     pub page: PageRequest,
     #[serde(default)]
@@ -227,7 +231,7 @@ pub struct GridQuery {
     pub group: Option<String>,
 }
 
-impl GridQuery {
+impl DataQuery {
     /// Requested page size, kept between 1 and [`MAX_PAGE_SIZE`]. Never use the raw value.
     pub fn limit(&self) -> u32 {
         let raw = match &self.page {

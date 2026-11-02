@@ -80,7 +80,7 @@ fn fn_types(f: &ItemFn, kind: &str) -> syn::Result<(Ts, Ts)> {
 
 /// Turns a function into a unit struct of the same name with a `run` method.
 ///
-/// `fn search_products(q: GridQuery)` becomes `struct search_products;` and `search_products::run(q)`.
+/// `fn search_products(q: DataQuery)` becomes `struct search_products;` and `search_products::run(q)`.
 fn unit_and_run(f: &ItemFn) -> Ts {
     let ItemFn { attrs, vis, sig, block } = f;
     let name = &sig.ident;

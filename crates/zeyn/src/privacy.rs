@@ -3,7 +3,7 @@
 //! Masking happens on the server. A masked value leaves the server only as its masked text, unless
 //! the user has the field's unmask permission and asks to see it; that reveal is audited.
 
-use crate::action::{Access, Filter, GridQuery, Page, PageRequest, Result};
+use crate::action::{Access, Filter, DataQuery, Page, PageRequest, Result};
 use crate::audit::{RecordRef, plain};
 use crate::ctx::{BoxFuture, Ctx};
 use crate::i18n::Text;
@@ -101,17 +101,17 @@ pub fn reveal_in<M: Model>(model: &M, field: &str) -> Option<Revealed> {
 /// Finds a row by key through a grid's data action and reveals one of its masked fields. The
 /// action is asked for rows whose key contains `key` and the exact match is taken.
 pub(crate) fn grid_reveal<E: Model>(
-    fetch: fn(Ctx, GridQuery) -> BoxFuture<Result<Page<E>>>,
+    fetch: fn(Ctx, DataQuery) -> BoxFuture<Result<Page<E>>>,
     ctx: Ctx,
     key: String,
     field: String,
 ) -> BoxFuture<Result<Option<Revealed>>> {
     Box::pin(async move {
         let Some(key_meta) = E::fields().iter().find(|m| m.key) else { return Ok(None) };
-        let query = GridQuery {
+        let query = DataQuery {
             page: PageRequest::Offset { offset: 0, limit: crate::action::MAX_PAGE_SIZE },
             filters: vec![Filter::any_of(key_meta.name, [key.clone()])],
-            ..GridQuery::default()
+            ..DataQuery::default()
         };
         let page = fetch(ctx, query).await?;
         Ok(page
@@ -124,7 +124,7 @@ pub(crate) fn grid_reveal<E: Model>(
 
 /// Removes filters and sorts on masked fields the user may not reveal, so a value cannot be
 /// guessed by searching for it.
-pub(crate) fn strip_masked(query: &mut GridQuery, fields: &[FieldMeta], ctx: &Ctx) {
+pub(crate) fn strip_masked(query: &mut DataQuery, fields: &[FieldMeta], ctx: &Ctx) {
     let hidden = |name: &str| fields.iter().any(|m| m.name == name && !can_unmask(Some(ctx), m));
     query.filters.retain(|f| !hidden(&f.field));
     query.sort.retain(|s| !hidden(&s.field));
@@ -142,7 +142,7 @@ fn reveal_button(r: &Render, meta: &FieldMeta, key: Option<&str>) -> String {
     )
 }
 
-/// Grid cell of a masked field: the masked text and, for users who may, a reveal button.
+/// DataGrid cell of a masked field: the masked text and, for users who may, a reveal button.
 pub(crate) fn cell<E: Model>(r: &Render, meta: &FieldMeta, value: &Value, row: &E) -> String {
     let text = plain(value).map(|v| masked_text(meta, &v)).unwrap_or_default();
     let key = RecordRef::of(row).id;

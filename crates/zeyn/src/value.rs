@@ -311,7 +311,7 @@ impl SupportsMinMaxTotal for DateTime {}
 impl SupportsMinMaxTotal for LocalDateTime {}
 impl<T: SupportsMinMaxTotal> SupportsMinMaxTotal for Option<T> {}
 
-/// Enums made with `#[choice]`. Grid badges work only on them.
+/// Enums made with `#[choice]`. DataGrid badges work only on them.
 #[diagnostic::on_unimplemented(
     message = "`badge()` cannot be used on a `{Self}` column",
     label = "not a `#[choice]` enum",

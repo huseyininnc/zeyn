@@ -15,8 +15,8 @@ pub fn customer_list() -> Screen {
     Screen::new(t!("customers.list"))
         .toolbar(|t| t.button(t!("customers.new")).icon(Icon::Plus).opens(customer_editor, CustomerParams { id: None }))
         .body(
-            Grid::auto(search_customers)
-                .mode(GridMode::Server)
+            DataGrid::auto(search_customers)
+                .mode(DataMode::Server)
                 .on_open(|c| Window::open(customer_editor, CustomerParams { id: Some(c.id) })),
         )
 }

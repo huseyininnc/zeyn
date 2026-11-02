@@ -89,8 +89,8 @@ pub fn fields(_: (), ctx: Ctx) -> Screen {
 #[screen(route = "/infinite", permission = "stock.product.read")]
 pub fn infinite() -> Screen {
     Screen::new(t!("gallery.infinite")).body(
-        Grid::of(search_products)
-            .mode(GridMode::Server)
+        DataGrid::of(search_products)
+            .mode(DataMode::Server)
             .paging(Paging::infinite(30))
             .column(Product::code)
             .width(120)
@@ -106,7 +106,7 @@ pub fn infinite() -> Screen {
 }
 
 #[action(permission = "stock.product.read")]
-pub async fn top_products(q: GridQuery, store: crate::stock::ProductStore) -> Result<Page<Product>> {
+pub async fn top_products(q: DataQuery, store: crate::stock::ProductStore) -> Result<Page<Product>> {
     let mut all = store.all()?;
     all.sort_by(|a, b| b.price.minor.cmp(&a.price.minor));
     all.truncate(8);
@@ -116,8 +116,8 @@ pub async fn top_products(q: GridQuery, store: crate::stock::ProductStore) -> Re
 #[screen(route = "/compact", permission = "stock.product.read")]
 pub fn compact() -> Screen {
     Screen::new(t!("gallery.compact"))
-        .body(Grid::of(top_products).paging(Paging::none()).column(Product::name).flex(1).column(Product::price).width(160))
-        .body(Grid::auto(search_products).mode(GridMode::Server).paging(Paging::pages(10)))
+        .body(DataGrid::of(top_products).paging(Paging::none()).column(Product::name).flex(1).column(Product::price).width(160))
+        .body(DataGrid::auto(search_products).mode(DataMode::Server).paging(Paging::pages(10)))
 }
 
 pub fn feature() -> Feature {

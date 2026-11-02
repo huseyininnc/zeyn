@@ -24,7 +24,7 @@ pub struct Store(Arc<RwLock<Vec<Item>>>);
 impl Service for Store {}
 
 #[action(permission = "items.read")]
-pub async fn search_items(q: GridQuery, store: Store) -> Result<Page<Item>> {
+pub async fn search_items(q: DataQuery, store: Store) -> Result<Page<Item>> {
     Ok(q.apply(store.0.read().unwrap().clone()))
 }
 
@@ -35,7 +35,7 @@ pub async fn save_item(item: Valid<Item>, store: Store) -> Result<Item> {
 }
 
 fn grid() -> Node {
-    Grid::of(search_items).paging(Paging::pages(5)).column(Item::code).into()
+    DataGrid::of(search_items).paging(Paging::pages(5)).column(Item::code).into()
 }
 
 #[screen(route = "/layout", permission = "items.read")]
@@ -44,7 +44,7 @@ pub fn layout() -> Screen {
         .body(Panel::new("Intro").collapsible().add(Card::new().title("Note")))
         .body(
             Tabs::new("Sections")
-                .tab("Grid", Row::new().col(grid()).weight(2).col(Stack::new().add(Card::new())))
+                .tab("DataGrid", Row::new().col(grid()).weight(2).col(Stack::new().add(Card::new())))
                 .tab("Form", Form::of(Item::default()).field(Item::code).submit("Save", save_item))
                 .tab("Later", Split::new(grid(), Card::new().title("Detail")).ratio(30)),
         )

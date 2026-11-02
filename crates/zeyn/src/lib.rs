@@ -16,13 +16,13 @@
 //! }
 //!
 //! #[action(permission = "stock.product.read")]
-//! pub async fn search_products(_q: GridQuery) -> Result<Page<Product>> {
+//! pub async fn search_products(_q: DataQuery) -> Result<Page<Product>> {
 //!     Ok(Page::default())
 //! }
 //!
 //! #[screen(route = "/products", permission = "stock.product.read")]
 //! pub fn product_list() -> Screen {
-//!     Screen::new("Products").body(Grid::of(search_products).column(Product::code).filter())
+//!     Screen::new("Products").body(DataGrid::of(search_products).column(Product::code).filter())
 //! }
 //! ```
 //!
@@ -62,7 +62,7 @@
 //! }
 //!
 //! #[action(permission = "stock.product.read")]
-//! pub async fn search_products(_q: GridQuery) -> Result<Page<Product>> { Ok(Page::default()) }
+//! pub async fn search_products(_q: DataQuery) -> Result<Page<Product>> { Ok(Page::default()) }
 //!
 //! fn form() -> Node {
 //!     Form::of(Product::default()).field(Product::code).submit("Save", search_products).into()
@@ -82,9 +82,9 @@
 //! }
 //!
 //! #[action(permission = "stock.product.read")]
-//! pub async fn search_products(_q: GridQuery) -> Result<Page<Product>> { Ok(Page::default()) }
+//! pub async fn search_products(_q: DataQuery) -> Result<Page<Product>> { Ok(Page::default()) }
 //!
-//! fn grid() -> Node { Grid::of(search_products).column(Product::code).sum().into() }
+//! fn grid() -> Node { DataGrid::of(search_products).column(Product::code).sum().into() }
 //! ```
 //!
 //! An average on a text column, and a minimum on a yes/no column:
@@ -100,9 +100,9 @@
 //! }
 //!
 //! #[action(permission = "stock.product.read")]
-//! pub async fn search_products(_q: GridQuery) -> Result<Page<Product>> { Ok(Page::default()) }
+//! pub async fn search_products(_q: DataQuery) -> Result<Page<Product>> { Ok(Page::default()) }
 //!
-//! fn grid() -> Node { Grid::of(search_products).column(Product::code).avg().into() }
+//! fn grid() -> Node { DataGrid::of(search_products).column(Product::code).avg().into() }
 //! ```
 //!
 //! ```compile_fail
@@ -116,9 +116,9 @@
 //! }
 //!
 //! #[action(permission = "stock.product.read")]
-//! pub async fn search_products(_q: GridQuery) -> Result<Page<Product>> { Ok(Page::default()) }
+//! pub async fn search_products(_q: DataQuery) -> Result<Page<Product>> { Ok(Page::default()) }
 //!
-//! fn grid() -> Node { Grid::of(search_products).column(Product::active).min().into() }
+//! fn grid() -> Node { DataGrid::of(search_products).column(Product::active).min().into() }
 //! ```
 //!
 //! A badge on a column that is not a `#[choice]` enum:
@@ -135,9 +135,9 @@
 //! }
 //!
 //! #[action(permission = "stock.product.read")]
-//! pub async fn search_products(_q: GridQuery) -> Result<Page<Product>> { Ok(Page::default()) }
+//! pub async fn search_products(_q: DataQuery) -> Result<Page<Product>> { Ok(Page::default()) }
 //!
-//! fn grid() -> Node { Grid::of(search_products).column(Product::code).badge(|_| Tone::Info).into() }
+//! fn grid() -> Node { DataGrid::of(search_products).column(Product::code).badge(|_| Tone::Info).into() }
 //! ```
 //!
 //! A row action whose input is not built from the row the way the action takes it:
@@ -153,12 +153,12 @@
 //! }
 //!
 //! #[action(permission = "stock.product.read")]
-//! pub async fn search_products(_q: GridQuery) -> Result<Page<Product>> { Ok(Page::default()) }
+//! pub async fn search_products(_q: DataQuery) -> Result<Page<Product>> { Ok(Page::default()) }
 //!
 //! #[action(permission = "stock.product.write")]
 //! pub async fn archive_product(_id: ProductId) -> Result<()> { Ok(()) }
 //!
-//! fn grid() -> Node { Grid::of(search_products).column(Product::code).row_action("Archive", archive_product, |p| p.code.clone()).into() }
+//! fn grid() -> Node { DataGrid::of(search_products).column(Product::code).row_action("Archive", archive_product, |p| p.code.clone()).into() }
 //! ```
 //!
 //! A bulk action whose input does not hold keys of the given key field:
@@ -174,12 +174,12 @@
 //! }
 //!
 //! #[action(permission = "stock.product.read")]
-//! pub async fn search_products(_q: GridQuery) -> Result<Page<Product>> { Ok(Page::default()) }
+//! pub async fn search_products(_q: DataQuery) -> Result<Page<Product>> { Ok(Page::default()) }
 //!
 //! #[action(permission = "stock.product.write")]
 //! pub async fn archive_products(_codes: Vec<String>) -> Result<()> { Ok(()) }
 //!
-//! fn grid() -> Node { Grid::of(search_products).column(Product::code).bulk_action("Archive", archive_products, Product::id).into() }
+//! fn grid() -> Node { DataGrid::of(search_products).column(Product::code).bulk_action("Archive", archive_products, Product::id).into() }
 //! ```
 //!
 //! An inline edit save action that does not take `Valid<M>`:
@@ -195,12 +195,12 @@
 //! }
 //!
 //! #[action(permission = "stock.product.read")]
-//! pub async fn search_products(_q: GridQuery) -> Result<Page<Product>> { Ok(Page::default()) }
+//! pub async fn search_products(_q: DataQuery) -> Result<Page<Product>> { Ok(Page::default()) }
 //!
 //! #[action(permission = "stock.product.write")]
 //! pub async fn save_code(_p: Product) -> Result<()> { Ok(()) }
 //!
-//! fn grid() -> Node { Grid::of(search_products).column(Product::code).editable().edit_with(save_code).into() }
+//! fn grid() -> Node { DataGrid::of(search_products).column(Product::code).editable().edit_with(save_code).into() }
 //! ```
 //!
 //! A menu item for a screen without a route:
@@ -280,7 +280,7 @@ mod value;
 mod workflow;
 
 pub use action::{
-    Access, Action, ActionMeta, Aggregate, AggregateRequest, Cursor, DEFAULT_PAGE_SIZE, Error, Filter, GridQuery, MAX_FILTERS,
+    Access, Action, ActionMeta, Aggregate, AggregateRequest, Cursor, DEFAULT_PAGE_SIZE, Error, Filter, DataQuery, MAX_FILTERS,
     MAX_FILTER_CHOICES, MAX_FILTER_TEXT, MAX_PAGE_SIZE, Page, PageRequest,
     Result, Sort, Total,
 };
@@ -291,9 +291,13 @@ pub use ctx::{BoxFuture, Ctx, Dep, Identity, Inject, IntoScreen, Outcome, Servic
 pub use feature::{Feature, Guard, GuardResult, Menu, MenuGroup, MenuItem, Route, ScreenEntry, SignedIn};
 pub use form::{Form, FormAction, FormRow, SubmitForm};
 pub use grid::{
-    BulkAction, COLUMN_WIDTH, CellRenderer, DEFAULT_EXPORT_LIMIT, MAX_BULK, ColumnView, Grid, GridColumn, Tone, GridMode, DataGridView, DataGridViewStore, MAX_PINNED, MAX_SORT, MemoryViewStore, Paging,
+    BulkAction, COLUMN_WIDTH, CellRenderer, DEFAULT_EXPORT_LIMIT, MAX_BULK, ColumnView, DataGrid, DataGridColumn, Tone, DataMode, DataGridView, DataGridViewStore, MAX_PINNED, MAX_SORT, MemoryViewStore, Paging,
     Pin, RowStyle, position_cursor, total,
 };
+#[allow(deprecated)]
+pub use action::GridQuery;
+#[allow(deprecated)]
+pub use grid::{Grid, GridColumn, GridMode};
 pub use i18n::{I18n, NumberFormat, Text};
 pub use menu::ContextMenu;
 pub use model::{__rules, Entity, Field, FieldError, FieldMeta, Model, Rule, Valid, ValidationErrors};
@@ -338,11 +342,13 @@ pub mod prelude {
         Panel, Progress, Row, Skeleton, Split, Stack, Tabs, Timeline, Tree, TreeItem, TreeQuery,
     };
     pub use crate::{
-        Action, ContextMenu, Ctx, Currency, Date, DateTime, Effect, Tone, LocalDateTime, Time, TimeZone, Entity, Error, Export, Feature, Field, Form, Grid, GridMode, GridQuery,
+        Action, ContextMenu, Ctx, Currency, Date, DateTime, Effect, Tone, LocalDateTime, Time, TimeZone, Entity, Error, Export, Feature, Field, Form, DataGrid, DataMode, DataQuery,
         GuardResult, Icon, Identity, Licensed, Model, Secret, Tenant, TenantRequired, Money, Node, Page, Paging, Result, RowStyle, Screen, ScreenDef, Service,
         SignedIn, Text, Import, TransitionRequest, Transitions, UiCtx, Valid, ValidationErrors, Window, Workflow, action, choice, entity,
         model, params, screen, t,
     };
+    #[allow(deprecated)]
+    pub use crate::{Grid, GridMode, GridQuery};
     #[cfg(feature = "server")]
     pub use crate::{
         Agents, ApiDocs, App, AuditLog, DevAuth, MemoryAudit, Plugin, RateLimit, StaticCredentials, StderrAudit, Theme,

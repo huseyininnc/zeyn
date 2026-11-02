@@ -47,7 +47,7 @@ impl Customers {
 }
 
 #[action(permission = "crm.read")]
-pub async fn find_customers(q: GridQuery, store: Customers) -> Result<Page<Customer>> {
+pub async fn find_customers(q: DataQuery, store: Customers) -> Result<Page<Customer>> {
     Ok(q.apply(store.0.read().unwrap().clone()))
 }
 
@@ -73,7 +73,7 @@ pub struct CustomerParams {
 
 #[screen(route = "/customers", permission = "crm.read")]
 pub fn customers() -> Screen {
-    Screen::new("Customers").body(Grid::of(find_customers).column(Customer::name).column(Customer::credit))
+    Screen::new("Customers").body(DataGrid::of(find_customers).column(Customer::name).column(Customer::credit))
 }
 
 #[screen(permission = "crm.write")]
@@ -228,7 +228,7 @@ impl People {
 }
 
 #[action(permission = "hr.read")]
-pub async fn find_people(q: GridQuery, store: People) -> Result<Page<Person>> {
+pub async fn find_people(q: DataQuery, store: People) -> Result<Page<Person>> {
     Ok(q.apply(store.0.read().unwrap().clone()))
 }
 
@@ -250,7 +250,7 @@ pub async fn save_person(p: Valid<Person>, store: People) -> Result<Person> {
 #[screen(route = "/people", permission = "hr.read")]
 pub fn people() -> Screen {
     Screen::new("People").body(
-        Grid::of(find_people).column(Person::name).filter().column(Person::national_id).filter().column(Person::email),
+        DataGrid::of(find_people).column(Person::name).filter().column(Person::national_id).filter().column(Person::email),
     )
 }
 
@@ -265,7 +265,7 @@ pub fn person(params: CustomerParams, store: People) -> Result<Screen> {
 #[screen(route = "/people-tabs", permission = "hr.read")]
 pub fn people_tabs() -> Screen {
     Screen::new("People tabs").body(
-        Tabs::new("Sections").tab("Summary", Card::new()).tab("People", Grid::of(find_people).column(Person::name).column(Person::national_id)),
+        Tabs::new("Sections").tab("Summary", Card::new()).tab("People", DataGrid::of(find_people).column(Person::name).column(Person::national_id)),
     )
 }
 
@@ -399,7 +399,7 @@ pub struct Cases(Vec<Case>);
 impl Service for Cases {}
 
 #[action(permission = "cases.read")]
-pub async fn find_cases(q: GridQuery, store: Cases) -> Result<Page<Case>> {
+pub async fn find_cases(q: DataQuery, store: Cases) -> Result<Page<Case>> {
     Ok(q.apply(store.0.clone()))
 }
 
@@ -410,7 +410,7 @@ pub async fn get_case(id: i64, store: Cases) -> Result<Case> {
 
 #[screen(route = "/cases", permission = "cases.read")]
 pub fn cases() -> Screen {
-    Screen::new("Cases").body(Grid::of(find_cases).column(Case::subject))
+    Screen::new("Cases").body(DataGrid::of(find_cases).column(Case::subject))
 }
 
 #[screen(permission = "cases.read")]
@@ -421,7 +421,7 @@ pub fn case(params: CustomerParams, store: Cases) -> Result<Screen> {
 
 #[screen(route = "/cases/open", permission = "cases.read", reason)]
 pub fn case_file() -> Screen {
-    Screen::new("Case file").body(Grid::of(find_cases).column(Case::subject))
+    Screen::new("Case file").body(DataGrid::of(find_cases).column(Case::subject))
 }
 
 #[screen(route = "/cases/other", permission = "cases.read", reason)]
@@ -1098,7 +1098,7 @@ mod jobs {
 
 #[test]
 fn masked_values_never_reach_html_through_custom_cells_or_inline_editing() {
-    let grid = Grid::of(find_people)
+    let grid = DataGrid::of(find_people)
         .column(Person::name)
         .column(Person::national_id)
         .editable()

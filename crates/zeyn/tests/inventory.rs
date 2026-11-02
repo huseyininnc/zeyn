@@ -32,7 +32,7 @@ pub enum Unit {
 }
 
 #[action(permission = "stock.product.read")]
-pub async fn search_products(_q: GridQuery) -> Result<Page<Product>> {
+pub async fn search_products(_q: DataQuery) -> Result<Page<Product>> {
     Ok(Page::new(vec![sample()]).total(1))
 }
 
@@ -69,9 +69,9 @@ pub fn product_list() -> Screen {
         .body(product_grid())
 }
 
-fn product_grid() -> Grid<Product> {
-    Grid::of(search_products)
-        .mode(GridMode::Server)
+fn product_grid() -> DataGrid<Product> {
+    DataGrid::of(search_products)
+        .mode(DataMode::Server)
         .column(Product::code)
         .width(120)
         .filter()
@@ -461,9 +461,9 @@ fn page_sizes_are_bounded() {
     assert_eq!(Paging::pages(0), Paging::Pages { size: 1 });
     assert_eq!(Paging::infinite(10_000), Paging::Infinite { batch: zeyn::MAX_PAGE_SIZE });
 
-    let greedy: GridQuery = serde_json::from_str(r#"{"page":{"type":"offset","offset":0,"limit":4000000000}}"#).unwrap();
+    let greedy: DataQuery = serde_json::from_str(r#"{"page":{"type":"offset","offset":0,"limit":4000000000}}"#).unwrap();
     assert_eq!(greedy.limit(), zeyn::MAX_PAGE_SIZE);
-    let empty: GridQuery = serde_json::from_str("{}").unwrap();
+    let empty: DataQuery = serde_json::from_str("{}").unwrap();
     assert_eq!(empty.limit(), zeyn::DEFAULT_PAGE_SIZE);
 }
 
@@ -471,30 +471,30 @@ fn page_sizes_are_bounded() {
 fn in_memory_paging_by_offset_and_cursor() {
     let all: Vec<i64> = (1..=7).collect();
 
-    let q = GridQuery { page: PageRequest::Offset { offset: 5, limit: 3 }, ..Default::default() };
+    let q = DataQuery { page: PageRequest::Offset { offset: 5, limit: 3 }, ..Default::default() };
     let p = Page::from_slice(&all, &q);
     assert_eq!(p.items, [6, 7]);
     assert_eq!(p.total, Some(7));
     assert_eq!(p.next, None);
 
-    let q = GridQuery { page: PageRequest::After { cursor: None, limit: 3 }, ..Default::default() };
+    let q = DataQuery { page: PageRequest::After { cursor: None, limit: 3 }, ..Default::default() };
     let first = Page::from_slice(&all, &q);
     assert_eq!(first.items, [1, 2, 3]);
-    let q = GridQuery { page: PageRequest::After { cursor: first.next.clone(), limit: 3 }, ..Default::default() };
+    let q = DataQuery { page: PageRequest::After { cursor: first.next.clone(), limit: 3 }, ..Default::default() };
     let second = Page::from_slice(&all, &q);
     assert_eq!(second.items, [4, 5, 6]);
     assert_eq!(second.next, Some(Cursor("6".into())));
 
-    let q = GridQuery { page: PageRequest::Offset { offset: u64::MAX, limit: 3 }, ..Default::default() };
+    let q = DataQuery { page: PageRequest::Offset { offset: u64::MAX, limit: 3 }, ..Default::default() };
     assert!(Page::from_slice(&all, &q).items.is_empty());
-    let q = GridQuery { page: PageRequest::After { cursor: Some(Cursor("junk".into())), limit: 2 }, ..Default::default() };
+    let q = DataQuery { page: PageRequest::After { cursor: Some(Cursor("junk".into())), limit: 2 }, ..Default::default() };
     assert_eq!(Page::from_slice(&all, &q).items, [1, 2]);
 }
 
 #[test]
 fn auto_grid_has_every_field_and_filters_text() {
     let mut out = String::new();
-    Grid::auto(search_products).render(&mut out, &Render::english("p"));
+    DataGrid::auto(search_products).render(&mut out, &Render::english("p"));
     for f in ["id", "code", "name", "unit", "price", "stock", "active"] {
         assert!(out.contains(&format!(r#"data-field="{f}""#)), "{f}");
     }

@@ -2,7 +2,7 @@
 //!
 //! The protocol is described in `docs/runtime-protocol.md`.
 
-use crate::action::{ActionMeta, Error, GridQuery};
+use crate::action::{ActionMeta, Error, DataQuery};
 use crate::ctx::{Ctx, Identity, Service, Services};
 use crate::feature::{Feature, ScreenEntry};
 use crate::i18n::{I18n, Text};
@@ -221,7 +221,7 @@ impl Authenticator for DevAuth {
 pub enum CallKind {
     Page,
     Screen,
-    Grid,
+    DataGrid,
     Form,
     Api,
     /// A masked value shown in full on request.
@@ -1740,7 +1740,7 @@ struct GridCall {
     params: Json,
     node: NodePath,
     #[serde(default)]
-    query: GridQuery,
+    query: DataQuery,
     /// Column layout to render the rows in.
     #[serde(default)]
     view: Option<DataGridView>,
@@ -1809,7 +1809,7 @@ struct BulkCall {
     #[serde(default)]
     all: bool,
     #[serde(default)]
-    query: GridQuery,
+    query: DataQuery,
 }
 
 #[derive(Deserialize)]
@@ -1857,7 +1857,7 @@ impl AppState {
         if !ctx.identity().can(&action.access) {
             return Err(Failure::App(Error::Forbidden));
         }
-        let info = Call { kind: CallKind::Grid, screen: entry.meta.name, action: Some(action), via_agent: ctx.via_agent() };
+        let info = Call { kind: CallKind::DataGrid, screen: entry.meta.name, action: Some(action), via_agent: ctx.via_agent() };
         let started = Instant::now();
         let mut query = call.query;
         crate::privacy::strip_masked(&mut query, grid.fields(), ctx);
@@ -1912,7 +1912,7 @@ impl AppState {
         if !ctx.identity().can(&row.meta.access) {
             return Err(Failure::App(Error::Forbidden));
         }
-        let info = Call { kind: CallKind::Grid, screen: entry.meta.name, action: Some(row.meta), via_agent: ctx.via_agent() };
+        let info = Call { kind: CallKind::DataGrid, screen: entry.meta.name, action: Some(row.meta), via_agent: ctx.via_agent() };
         let started = Instant::now();
         let result = async {
             self.before(ctx, &info)?;
@@ -2025,7 +2025,7 @@ impl AppState {
         }
         let count = keys.len();
         let run = grid.bulk_call(call.action, keys).ok_or(Failure::App(Error::NotFound))?;
-        let info = Call { kind: CallKind::Grid, screen: entry.meta.name, action: Some(run.meta), via_agent: ctx.via_agent() };
+        let info = Call { kind: CallKind::DataGrid, screen: entry.meta.name, action: Some(run.meta), via_agent: ctx.via_agent() };
         let started = Instant::now();
         let result = async {
             self.before(ctx, &info)?;
@@ -2129,7 +2129,7 @@ async fn grid_export(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(
         if !ctx.identity().can(&grid.action().access) || !ctx.identity().can(&access) {
             return Err(Failure::App(Error::Forbidden));
         }
-        let info = Call { kind: CallKind::Grid, screen: entry.meta.name, action: Some(grid.action()), via_agent: ctx.via_agent() };
+        let info = Call { kind: CallKind::DataGrid, screen: entry.meta.name, action: Some(grid.action()), via_agent: ctx.via_agent() };
         st.before(&ctx, &info)?;
         Ok((entry, screen, spec, info))
     }
@@ -2139,7 +2139,7 @@ async fn grid_export(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(
         Err(f) => return st.error_response(&ctx, f),
     };
     let view: Option<DataGridView> = serde_json::from_value(json!({ "columns": spec.get("columns").cloned().unwrap_or(json!([])) })).ok();
-    let mut query: GridQuery = serde_json::from_value(json!({
+    let mut query: DataQuery = serde_json::from_value(json!({
         "sort": spec.get("sort").cloned().unwrap_or(json!([])),
         "filters": spec.get("filters").cloned().unwrap_or(json!([])),
     }))
@@ -2594,7 +2594,7 @@ async fn call_tool(st: &AppState, ctx: &Ctx, name: &str, args: Json) -> Result<J
     let node = NodePath::parse(&node.replace('-', ".")).ok_or(Failure::App(Error::NotFound))?;
     match kind {
         "search" => {
-            let query: GridQuery = serde_json::from_value(args).map_err(|_| Failure::App(Error::NotFound))?;
+            let query: DataQuery = serde_json::from_value(args).map_err(|_| Failure::App(Error::NotFound))?;
             st.run_grid(ctx, GridCall { screen: screen.to_string(), params: Json::Null, node, query, view: None, head: false, path: Vec::new() }).await
         }
         _ => {

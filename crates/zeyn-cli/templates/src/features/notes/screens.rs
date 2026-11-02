@@ -17,8 +17,8 @@ pub fn note_list() -> Screen {
             t.button(t!("notes.new")).icon(Icon::Plus).shortcut("Ctrl+N").opens(note_editor, NoteParams { id: None })
         })
         .body(
-            Grid::auto(search_notes)
-                .mode(GridMode::Server)
+            DataGrid::auto(search_notes)
+                .mode(DataMode::Server)
                 .on_open(|n| Window::open(note_editor, NoteParams { id: Some(n.id) })),
         )
 }

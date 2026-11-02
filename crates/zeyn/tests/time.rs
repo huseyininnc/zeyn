@@ -198,7 +198,7 @@ fn grid_sorts_dates_chronologically() {
         Appointment { day: Date::new(2023, 12, 31).unwrap(), ..Default::default() },
         Appointment { day: Date::new(2024, 1, 15).unwrap(), ..Default::default() },
     ];
-    let q: GridQuery = serde_json::from_str(r#"{"sort":[{"field":"day","desc":false}]}"#).unwrap();
+    let q: DataQuery = serde_json::from_str(r#"{"sort":[{"field":"day","desc":false}]}"#).unwrap();
     let days: Vec<String> = q.apply(rows).items.iter().map(|a| a.day.to_string()).collect();
     assert_eq!(days, ["2023-12-31", "2024-01-15", "2024-03-01"]);
 }

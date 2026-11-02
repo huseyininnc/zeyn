@@ -48,7 +48,7 @@ fn order(n: u64) -> Order {
 }
 
 #[action(permission = "sales.order.read")]
-pub async fn search_orders(q: GridQuery) -> Result<Page<Order>> {
+pub async fn search_orders(q: DataQuery) -> Result<Page<Order>> {
     let desc = q.sort.first().is_some_and(|s| s.field == "id" && s.desc);
     let offset = match &q.page {
         PageRequest::Offset { offset, .. } => *offset,
@@ -64,8 +64,8 @@ pub async fn search_orders(q: GridQuery) -> Result<Page<Order>> {
 #[screen(route = "/orders", permission = "sales.order.read")]
 pub fn order_list() -> Screen {
     Screen::new(t!("orders.title")).body(
-        Grid::of(search_orders)
-            .mode(GridMode::Server)
+        DataGrid::of(search_orders)
+            .mode(DataMode::Server)
             .paging(Paging::virtual_scroll())
             .column(Order::id)
             .width(110)

@@ -42,7 +42,7 @@ impl Store {
 }
 
 #[action(permission = "stock.read")]
-pub async fn search(q: GridQuery, store: Store) -> Result<Page<Product>> {
+pub async fn search(q: DataQuery, store: Store) -> Result<Page<Product>> {
     Ok(q.apply(store.0.read().unwrap().clone()))
 }
 
@@ -66,7 +66,7 @@ pub struct EditParams {
 
 #[screen(route = "/products", permission = "stock.read")]
 pub fn list() -> Screen {
-    Screen::new("Products").body(Grid::of(search).paging(Paging::pages(10)).column(Product::code).filter().column(Product::price))
+    Screen::new("Products").body(DataGrid::of(search).paging(Paging::pages(10)).column(Product::code).filter().column(Product::price))
 }
 
 #[screen(permission = "stock.write")]

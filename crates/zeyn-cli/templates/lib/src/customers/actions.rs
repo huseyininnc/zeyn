@@ -4,7 +4,7 @@ use zeyn::prelude::*;
 
 /// Customers for lists and the API.
 #[action(permission = "customers.customer.read")]
-pub async fn search_customers(q: GridQuery, store: CustomerStore) -> Result<Page<Customer>> {
+pub async fn search_customers(q: DataQuery, store: CustomerStore) -> Result<Page<Customer>> {
     Ok(q.apply(store.all()?))
 }
 

@@ -1,4 +1,4 @@
-use crate::action::{Access, ActionMeta, Cursor, GridQuery, Result};
+use crate::action::{Access, ActionMeta, Cursor, DataQuery, Result};
 use crate::ctx::{BoxFuture, Ctx, Dep};
 use crate::i18n::Text;
 use crate::render::{Render, attr, slug};
@@ -159,13 +159,13 @@ pub struct RowCall {
     pub run: Box<dyn FnOnce(Ctx) -> BoxFuture<Result<()>> + Send>,
 }
 
-/// A component that loads rows through an action. Implemented by `Grid`.
+/// A component that loads rows through an action. Implemented by `DataGrid`.
 pub trait GridSource: Send + Sync {
     fn action(&self) -> ActionMeta;
 
     /// Query for the first page, as the grid's paging asks for it, with the sort and filters of
     /// a saved view.
-    fn first_query(&self, view: Option<&crate::grid::DataGridView>) -> GridQuery;
+    fn first_query(&self, view: Option<&crate::grid::DataGridView>) -> DataQuery;
 
     /// Cleans a view sent by a client so only the grid's own columns, sort keys and filters remain.
     fn clean_view(&self, view: crate::grid::DataGridView) -> crate::grid::DataGridView;
@@ -173,12 +173,12 @@ pub trait GridSource: Send + Sync {
     /// Header row for a view.
     fn head_html(&self, r: &Render, view: Option<&crate::grid::DataGridView>) -> String;
 
-    fn fetch(&self, ctx: Ctx, query: GridQuery) -> BoxFuture<Result<LoadedPage>>;
+    fn fetch(&self, ctx: Ctx, query: DataQuery) -> BoxFuture<Result<LoadedPage>>;
 
     /// Loads rows as the user sees them: in a grouped or tree grid, the groups or rows under
     /// `path` (group values or ancestor keys from the client, checked here). Flat grids ignore
     /// `path`. Exports and bulk actions use [`GridSource::fetch`], which never groups.
-    fn fetch_at(&self, ctx: Ctx, query: GridQuery, path: Vec<Option<String>>) -> BoxFuture<Result<LoadedPage>> {
+    fn fetch_at(&self, ctx: Ctx, query: DataQuery, path: Vec<Option<String>>) -> BoxFuture<Result<LoadedPage>> {
         let _ = path;
         self.fetch(ctx, query)
     }
