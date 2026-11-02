@@ -215,7 +215,11 @@
       "theme": "Tema",
       "theme_system": "Sistem",
       "theme_light": "Açık",
-      "theme_dark": "Koyu"
+      "theme_dark": "Koyu",
+      "site": {
+        "sign_in": "Giriş yap",
+        "sign_out": "Çıkış yap"
+      }
     },
     "ui": {
       "resize": "Bölmeleri yeniden boyutlandır",

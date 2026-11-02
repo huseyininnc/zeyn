@@ -26,7 +26,25 @@
     "products": "Products",
     "low_stock": "Low stock",
     "orders_today": "Orders today",
-    "revenue_today": "Revenue today"
+    "revenue_today": "Revenue today",
+    "shop": "The public shop",
+    "shop_text": "The same app also serves a public catalog in the site shell: a top menu and a footer instead of the side menu.",
+    "open_shop": "Open the shop"
+  },
+  "shop": {
+    "menu": { "home": "Home", "help": "Help" },
+    "home": {
+      "title": "Northwind Market",
+      "lead": "Fresh from the warehouse",
+      "text": "Tea, coffee, oils and dry goods from the Northwind stock, for everyone to browse.",
+      "panel": "Work screens",
+      "panel_text": "Staff screens open in the app shell with the side menu. Switching shells does not reload the page.",
+      "open_panel": "Open the overview"
+    },
+    "delivery": { "title": "Delivery", "text": "Orders placed before 14:00 leave the warehouse the same day." },
+    "returns": { "title": "Returns", "text": "Unopened goods can be returned within 14 days." },
+    "about": { "title": "About us", "text": "Northwind is a sample company. Its shop shows the site shell of Zeyn." },
+    "footer": { "company": "Company", "panel": "Staff overview", "note": "Northwind Market is a demo built with Zeyn." }
   },
   "stock": {
     "edit": "Edit",

@@ -372,6 +372,7 @@ mod screen;
 mod security;
 #[cfg(feature = "server")]
 pub mod server;
+mod site;
 /// Data layer for SQL databases (`postgres` and `oracle` features).
 #[cfg(any(feature = "postgres", feature = "oracle"))]
 pub mod sql;
@@ -471,6 +472,7 @@ pub use server::{
     DevAuth, ForwardAuth, HeaderTenant, Interceptor, Mcp, MemoryAudit, Plugin, READY_CACHE, StaticCredentials,
     StderrAudit, SubdomainTenant, TenantResolver, Theme, TimePolicy, probe,
 };
+pub use site::{FooterColumn, Shell, SiteFooter, SiteHeader, SiteShell};
 pub use time::{Date, DateTime, LocalDateTime, LocalTimeError, Time, TimeZone};
 pub use time::{DateWords, range_presets};
 #[doc(hidden)]
@@ -505,8 +507,9 @@ pub mod prelude {
         Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime, Decimal, Effect,
         Entity, Error, Export, Feature, Field, File, FileRules, FileType, Form, GuardResult, Icon, Identity, Import,
         Licensed, LocalDateTime, Model, Money, Node, Page, Paging, Result, RowStyle, Screen, ScreenDef, Secret,
-        Service, SignedIn, Tenant, TenantRequired, Text, Time, TimeZone, Toast, Tone, TransitionRequest, Transitions,
-        UiCtx, Valid, ValidationErrors, Window, Workflow, action, choice, entity, model, params, screen, t,
+        Service, Shell, SignedIn, Tenant, TenantRequired, Text, Time, TimeZone, Toast, Tone, TransitionRequest,
+        Transitions, UiCtx, Valid, ValidationErrors, Window, Workflow, action, choice, entity, model, params, screen,
+        t,
     };
     #[cfg(feature = "server")]
     pub use crate::{

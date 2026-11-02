@@ -38,12 +38,15 @@ pub fn overview(_: (), store: ProductStore, ctx: Ctx) -> Result<Screen> {
     let low = products.iter().filter(|p| p.stock < 10).count();
     let orders = todays_orders(&ctx);
     let revenue = Money::tl(orders.iter().map(|o| o.amount.minor).sum());
-    Ok(Screen::new(t!("dashboard.title")).body(Stats(vec![
-        (t!("dashboard.products"), products.len().to_string()),
-        (t!("dashboard.low_stock"), low.to_string()),
-        (t!("dashboard.orders_today"), orders.len().to_string()),
-        (t!("dashboard.revenue_today"), revenue.format(ctx.locale())),
-    ])))
+    Ok(Screen::new(t!("dashboard.title"))
+        .body(Stats(vec![
+            (t!("dashboard.products"), products.len().to_string()),
+            (t!("dashboard.low_stock"), low.to_string()),
+            (t!("dashboard.orders_today"), orders.len().to_string()),
+            (t!("dashboard.revenue_today"), revenue.format(ctx.locale())),
+        ]))
+        .body(zeyn::ui::Alert::info(t!("dashboard.shop_text")).title(t!("dashboard.shop")))
+        .body(crate::shop::ShellLink(t!("dashboard.open_shop"), "shop_home")))
 }
 
 pub fn feature() -> Feature {

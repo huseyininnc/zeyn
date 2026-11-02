@@ -85,6 +85,7 @@ mod islands;
 mod pro;
 #[cfg(feature = "realtime")]
 pub mod realtime;
+mod site;
 mod ui;
 
 /// Finds out who is calling, usually from a session cookie or an `Authorization` header.
@@ -1092,6 +1093,23 @@ impl App {
                 }
             }
         }
+        for f in &self.features {
+            let Some(shell) = f.site_shell() else { continue };
+            for screen in shell.linked_screens() {
+                if !names.contains_key(screen) {
+                    problems.push(format!(
+                        "feature `{}`: the site footer links to screen `{screen}`, which is not registered",
+                        f.name()
+                    ));
+                }
+            }
+            for url in shell.bad_urls() {
+                problems.push(format!(
+                    "feature `{}`: the site footer link `{url}` is not a path, https, http or mailto address",
+                    f.name()
+                ));
+            }
+        }
         if let Some(home) = self.home {
             if !self.features.iter().any(|f| f.screens().iter().any(|s| s.meta.name == home && s.meta.route.is_some()))
             {
@@ -1291,7 +1309,7 @@ impl App {
         let router = realtime::routes(router);
         #[cfg(feature = "pdf")]
         let router = pdf::routes(router);
-        let router = charts::routes(files::routes(router));
+        let router = site::routes(charts::routes(files::routes(router)));
         let router = theme::routes(pro::routes(media::routes(ui::routes(session::routes(data::routes(ops::routes(
             agent::routes(grid::routes(router)),
         )))))))
@@ -1829,12 +1847,18 @@ impl AppState {
         (status, Html(self.shell(ctx, csrf, &ctx.t(&message), &body, None))).into_response()
     }
 
-    /// Full page around a screen: menu, language selector, toasts and assets.
-    fn shell(&self, ctx: &Ctx, csrf: &str, title: &str, main: &str, current: Option<&str>) -> String {
-        let r = Render::new("shell", ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity());
-        let mut nav = String::new();
+    /// Menu links of the features in one shell (the site shell when `site`) whose guards the user
+    /// passes, per group: the group's icon, its label and its `<li>` links.
+    fn menu_links(
+        &self,
+        ctx: &Ctx,
+        r: &Render,
+        current: Option<&str>,
+        site: bool,
+    ) -> Vec<(String, String, Vec<String>)> {
+        let mut groups = Vec::new();
         for f in &self.features {
-            if f.check_guards(ctx).is_err() {
+            if f.site_shell().is_some() != site || f.check_guards(ctx).is_err() {
                 continue;
             }
             for g in f.menu_groups() {
@@ -1856,62 +1880,63 @@ impl AppState {
                     })
                     .collect();
                 if !items.is_empty() {
-                    nav.push_str(&format!(
-                        r#"<div class="z-nav-group"><h2>{}{}</h2><ul>{}</ul></div>"#,
-                        g.icon.html(),
-                        r.text(&g.label),
-                        items.join("")
-                    ));
+                    groups.push((g.icon.html(), r.text(&g.label), items));
                 }
             }
         }
+        groups
+    }
+
+    /// The language picker, when the app has more than one language.
+    fn locale_picker(&self, ctx: &Ctx, r: &Render) -> String {
         let locales = self.i18n.locales();
-        if locales.len() > 1 {
-            let options: String = locales
-                .iter()
-                .map(|l| {
-                    let selected = if l == ctx.locale() { " selected" } else { "" };
-                    let name = self.i18n.lookup(l, "zeyn.locale.name").unwrap_or(l);
-                    format!(r#"<option value="{}"{selected}>{}</option>"#, escape(l), escape(name))
-                })
-                .collect();
-            nav.push_str(&format!(
-                r#"<div class="z-locale"><span id="z-locale-label">{}</span><div class="z-select" data-text-none=""><select id="z-locale" data-zeyn-locale>{options}</select></div></div>"#,
-                r.text(&Text::key("zeyn.shell.language"))
-            ));
+        if locales.len() < 2 {
+            return String::new();
         }
+        let options: String = locales
+            .iter()
+            .map(|l| {
+                let selected = if l == ctx.locale() { " selected" } else { "" };
+                let name = self.i18n.lookup(l, "zeyn.locale.name").unwrap_or(l);
+                format!(r#"<option value="{}"{selected}>{}</option>"#, escape(l), escape(name))
+            })
+            .collect();
+        format!(
+            r#"<div class="z-locale"><span id="z-locale-label">{}</span><div class="z-select" data-text-none=""><select id="z-locale" data-zeyn-locale>{options}</select></div></div>"#,
+            r.text(&Text::key("zeyn.shell.language"))
+        )
+    }
+
+    /// Full page around a screen: the app shell (side menu) or, for screens of a feature that
+    /// chose it, the site shell; toasts and assets.
+    fn shell(&self, ctx: &Ctx, csrf: &str, title: &str, main: &str, current: Option<&str>) -> String {
+        let r = Render::new("shell", ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity());
+        let site_shell = current
+            .and_then(|n| self.screens.get(n))
+            .and_then(|(fi, _)| self.features[*fi].site_shell().map(|s| (*fi, s)));
         let theme = ctx.theme().unwrap_or("system");
-        nav.push_str(&self.look.picker(&r, theme));
-        if self.zone_picker && matches!(self.time, TimePolicy::User { .. }) {
-            let current = ctx.time_zone().name();
-            let auto = r.text(&Text::key("zeyn.shell.time_zone_auto"));
-            let mut options = format!(r#"<option value="">{auto}</option>"#);
-            let listed = TimeZone::names().any(|n| n == current);
-            for name in TimeZone::names().chain((!listed).then_some(current)) {
-                let selected = if name == current { " selected" } else { "" };
-                options.push_str(&format!(r#"<option value="{name}"{selected}>{}</option>"#, name.replace('_', " ")));
-            }
-            nav.push_str(&format!(
-                r#"<div class="z-locale"><span id="z-timezone-label">{}</span><div class="z-select" data-text-none="{auto}"><select id="z-timezone" data-zeyn-timezone>{options}</select></div></div>"#,
-                r.text(&Text::key("zeyn.shell.time_zone"))
-            ));
-        }
-        let (theme_attrs, scheme) = self.look.html(theme);
         let app = r.text(&self.name);
         let (palette, commands) = pro::shell_parts(self, ctx, &r);
+        let (frame, site_head) = match site_shell {
+            Some((fi, shell)) => {
+                (site::frame(self, ctx, &r, shell, fi, main, current), site::head(&escape(&self.prefix)))
+            }
+            None => (self.app_frame(ctx, &r, theme, &app, &palette, main, current), String::new()),
+        };
+        let (theme_attrs, scheme) = self.look.html(theme);
         #[cfg(feature = "assistant")]
         let (ai_head, ai_launcher) =
             (assistant::head(self, ctx, &escape(&self.prefix)), assistant::launcher(self, ctx, &r));
         #[cfg(not(feature = "assistant"))]
         let (ai_head, ai_launcher) = (String::new(), String::new());
         format!(
-            r##"<!doctype html><html lang="{lang}"{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css"><script type="module" src="{base}/_zeyn/zeyn.js"></script><script type="module" src="{base}/_zeyn/nav.js"></script>{components}{theme_link}{extra}</head><body><a class="z-skip" href="#z-main">{skip}</a><div class="z-app"><nav class="z-nav" aria-label="{menu}"><p class="z-app-name">{app}</p>{palette}{nav}</nav><main class="z-main" id="z-main">{main}</main></div><div class="z-toasts" role="status" aria-live="polite" data-text-dismiss="{dismiss}"></div>{commands}{ai_launcher}</body></html>"##,
+            r##"<!doctype html><html lang="{lang}"{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css"><script type="module" src="{base}/_zeyn/zeyn.js"></script><script type="module" src="{base}/_zeyn/nav.js"></script>{components}{theme_link}{extra}</head><body><a class="z-skip" href="#z-main">{skip}</a>{frame}<div class="z-toasts" role="status" aria-live="polite" data-text-dismiss="{dismiss}"></div>{commands}{ai_launcher}</body></html>"##,
             lang = escape(ctx.locale()),
             csrf = escape(csrf),
             tz = escape(ctx.time_zone().name()),
             base = escape(&self.prefix),
             components = format!(
-                "{}{}{}{}{}{ai_head}",
+                "{}{}{}{}{}{site_head}{ai_head}",
                 ui::head(&escape(&self.prefix)),
                 media::head(&escape(&self.prefix)),
                 pro::head(&escape(&self.prefix)),
@@ -1928,8 +1953,50 @@ impl AppState {
             title = escape(title),
             extra = ops::head(self, ctx),
             skip = r.text(&Text::key("zeyn.shell.skip")),
-            menu = r.text(&Text::key("zeyn.shell.menu")),
             dismiss = r.text(&Text::key("zeyn.ui.toast.dismiss")),
+        )
+    }
+
+    /// The app shell: a side menu with the app's name, the palette button, the menus of the
+    /// features without a site shell and the pickers, beside the screen.
+    #[allow(clippy::too_many_arguments)]
+    fn app_frame(
+        &self,
+        ctx: &Ctx,
+        r: &Render,
+        theme: &str,
+        app: &str,
+        palette: &str,
+        main: &str,
+        current: Option<&str>,
+    ) -> String {
+        let r = *r;
+        let mut nav = String::new();
+        for (icon, label, items) in self.menu_links(ctx, &r, current, false) {
+            nav.push_str(&format!(
+                r#"<div class="z-nav-group"><h2>{icon}{label}</h2><ul>{}</ul></div>"#,
+                items.join("")
+            ));
+        }
+        nav.push_str(&self.locale_picker(ctx, &r));
+        nav.push_str(&self.look.picker(&r, theme));
+        if self.zone_picker && matches!(self.time, TimePolicy::User { .. }) {
+            let current = ctx.time_zone().name();
+            let auto = r.text(&Text::key("zeyn.shell.time_zone_auto"));
+            let mut options = format!(r#"<option value="">{auto}</option>"#);
+            let listed = TimeZone::names().any(|n| n == current);
+            for name in TimeZone::names().chain((!listed).then_some(current)) {
+                let selected = if name == current { " selected" } else { "" };
+                options.push_str(&format!(r#"<option value="{name}"{selected}>{}</option>"#, name.replace('_', " ")));
+            }
+            nav.push_str(&format!(
+                r#"<div class="z-locale"><span id="z-timezone-label">{}</span><div class="z-select" data-text-none="{auto}"><select id="z-timezone" data-zeyn-timezone>{options}</select></div></div>"#,
+                r.text(&Text::key("zeyn.shell.time_zone"))
+            ));
+        }
+        format!(
+            r#"<div class="z-app" data-zeyn-shell="app"><nav class="z-nav" aria-label="{menu}"><p class="z-app-name">{app}</p>{palette}{nav}</nav><main class="z-main" id="z-main">{main}</main></div>"#,
+            menu = r.text(&Text::key("zeyn.shell.menu")),
         )
     }
 }
@@ -1996,6 +2063,8 @@ async fn page(
             let mut r = Html(html).into_response();
             let h = r.headers_mut();
             h.insert("x-zeyn-partial", HeaderValue::from_static("1"));
+            let site = st.screens.get(name).is_some_and(|(fi, _)| st.features[*fi].site_shell().is_some());
+            h.insert("x-zeyn-shell", HeaderValue::from_static(if site { "site" } else { "app" }));
             if let Ok(v) = HeaderValue::from_str(&encode(&full)) {
                 h.insert("x-zeyn-title", v);
             }
