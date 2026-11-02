@@ -349,7 +349,7 @@ fn list_screen_renders() {
     assert!(html.contains(
         r#"<th scope="col" data-field="code" aria-sort="none" style="width:120px;" data-filter="true">Code</th>"#
     ));
-    assert!(html.contains(r#"data-sum="stock""#));
+    assert!(html.contains(r#"data-field="stock" data-agg="sum""#));
     assert!(html.contains("&quot;screen&quot;:&quot;product_form&quot;"));
 }
 

@@ -93,6 +93,14 @@ impl<'a> Render<'a> {
             (Value::Bool(true), _) => self.text(&Text::key("zeyn.yes")),
             (Value::Bool(false), _) => self.text(&Text::key("zeyn.no")),
             (Value::Int(n), _) => n.to_string(),
+            (Value::Decimal(x), _) => {
+                let hundredths = (x * 100.0).round();
+                if hundredths.is_finite() {
+                    escape(&crate::value::Money::new(hundredths as i64, Default::default()).format_plain(self.locale))
+                } else {
+                    String::new()
+                }
+            }
             (Value::Text(s), _) => escape(s),
             (Value::Money(m), _) => escape(&m.format(self.locale)),
             (Value::Date(d), _) => format!(r#"<time datetime="{d}">{}</time>"#, d.format(self.locale)),

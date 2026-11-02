@@ -46,6 +46,9 @@ pub enum Value {
     DateTime(DateTime),
     LocalDateTime(LocalDateTime),
     Choice(&'static str),
+    /// A computed number with a fraction, such as the average of a whole number column.
+    /// Shown with two decimals in the user's locale. Never a model field.
+    Decimal(f64),
 }
 
 /// Currency.
@@ -285,6 +288,22 @@ impl<T: FieldType> FieldType for Option<T> {
     }
 }
 
+/// Column types that accept `min()` and `max()` totals in a grid.
+#[diagnostic::on_unimplemented(
+    message = "`min()` and `max()` cannot be used on a `{Self}` column",
+    label = "values of this column have no order that makes a useful total",
+    note = "`min()` and `max()` work on i32, i64, Money, Date, Time, DateTime, LocalDateTime and their Option forms"
+)]
+pub trait SupportsMinMaxTotal {}
+impl SupportsMinMaxTotal for i32 {}
+impl SupportsMinMaxTotal for i64 {}
+impl SupportsMinMaxTotal for Money {}
+impl SupportsMinMaxTotal for Date {}
+impl SupportsMinMaxTotal for Time {}
+impl SupportsMinMaxTotal for DateTime {}
+impl SupportsMinMaxTotal for LocalDateTime {}
+impl<T: SupportsMinMaxTotal> SupportsMinMaxTotal for Option<T> {}
+
 /// Types that accept the `required` rule.
 #[diagnostic::on_unimplemented(
     message = "the `required` rule cannot be used on `{Self}`",
@@ -319,9 +338,9 @@ impl<T: SupportsMinMax> SupportsMinMax for Option<T> {}
 
 /// Column types that accept `sum()` in a grid.
 #[diagnostic::on_unimplemented(
-    message = "`sum()` cannot be used on a `{Self}` column",
+    message = "`sum()` and `avg()` cannot be used on a `{Self}` column",
     label = "not a numeric column",
-    note = "`sum()` works on i32, i64, Money and their Option forms"
+    note = "`sum()` and `avg()` work on i32, i64, Money and their Option forms; use `count()` for other columns"
 )]
 pub trait SupportsSum {}
 impl SupportsSum for i32 {}

@@ -107,6 +107,8 @@ pub struct LoadedPage {
     pub total: Option<u64>,
     pub next: Option<Cursor>,
     pub offset: u64,
+    /// Column totals over the whole filtered result.
+    pub totals: Vec<crate::action::Total>,
 }
 
 /// A component that loads rows through an action. Implemented by `Grid`.
@@ -120,6 +122,10 @@ pub trait GridSource: Send + Sync {
 
     /// Rows of a loaded page as HTML.
     fn rows_html(&self, page: &LoadedPage, r: &Render) -> String;
+
+    /// Footer row with the totals of a loaded page, or `None` when the grid has no totals or the
+    /// page carries none (the client keeps the footer it has).
+    fn foot_html(&self, page: &LoadedPage, r: &Render) -> Option<String>;
 
     /// Renders the grid with its first page already in place.
     fn render_loaded(&self, out: &mut String, r: &Render, page: &LoadedPage);

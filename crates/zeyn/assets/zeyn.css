@@ -747,6 +747,18 @@ th[aria-sort="descending"] .z-sort::after {
   border-bottom: 0;
 }
 
+.z-grid tfoot td[data-agg] { white-space: nowrap; }
+
+.z-agg { display: inline-flex; align-items: baseline; gap: 0.35em; }
+
+.z-agg + .z-agg { margin-inline-start: 1em; }
+
+.z-agg-label {
+  color: var(--z-text-muted);
+  font-size: var(--z-font-size-xs);
+  font-weight: 500;
+}
+
 .z-grid[aria-busy="true"] tbody { opacity: 0.6; }
 
 .z-pager {

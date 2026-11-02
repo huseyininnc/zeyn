@@ -87,6 +87,40 @@
 //! fn grid() -> Node { Grid::of(search_products).column(Product::code).sum().into() }
 //! ```
 //!
+//! An average on a text column, and a minimum on a yes/no column:
+//!
+//! ```compile_fail
+//! use zeyn::prelude::*;
+//!
+//! #[entity(table = "products")]
+//! pub struct Product {
+//!     #[key]
+//!     pub id: ProductId,
+//!     pub code: String,
+//! }
+//!
+//! #[action(permission = "stock.product.read")]
+//! pub async fn search_products(_q: GridQuery) -> Result<Page<Product>> { Ok(Page::default()) }
+//!
+//! fn grid() -> Node { Grid::of(search_products).column(Product::code).avg().into() }
+//! ```
+//!
+//! ```compile_fail
+//! use zeyn::prelude::*;
+//!
+//! #[entity(table = "products")]
+//! pub struct Product {
+//!     #[key]
+//!     pub id: ProductId,
+//!     pub active: bool,
+//! }
+//!
+//! #[action(permission = "stock.product.read")]
+//! pub async fn search_products(_q: GridQuery) -> Result<Page<Product>> { Ok(Page::default()) }
+//!
+//! fn grid() -> Node { Grid::of(search_products).column(Product::active).min().into() }
+//! ```
+//!
 //! A menu item for a screen without a route:
 //!
 //! ```compile_fail
@@ -144,14 +178,14 @@ pub mod server;
 mod value;
 
 pub use action::{
-    Access, Action, ActionMeta, Cursor, DEFAULT_PAGE_SIZE, Error, Filter, GridQuery, MAX_PAGE_SIZE, Page, PageRequest,
-    Result, Sort,
+    Access, Action, ActionMeta, Aggregate, AggregateRequest, Cursor, DEFAULT_PAGE_SIZE, Error, Filter, GridQuery, MAX_PAGE_SIZE, Page, PageRequest,
+    Result, Sort, Total,
 };
 pub use api::{ApiEntry, ApiInput, ApiOutput, ApiResult, model_schema};
 pub use ctx::{BoxFuture, Ctx, Dep, Identity, Inject, IntoScreen, Outcome, Service, Services};
 pub use feature::{Feature, Guard, GuardResult, Menu, MenuGroup, MenuItem, Route, ScreenEntry, SignedIn};
 pub use form::{Form, FormAction, FormRow, SubmitForm};
-pub use grid::{Grid, GridColumn, GridMode, Paging, RowStyle, position_cursor};
+pub use grid::{Grid, GridColumn, GridMode, Paging, RowStyle, position_cursor, total};
 pub use i18n::{I18n, NumberFormat, Text};
 pub use model::{__rules, Entity, Field, FieldError, FieldMeta, Model, Rule, Valid, ValidationErrors};
 pub use platform::{
@@ -172,7 +206,8 @@ pub use screen::{
     ToolButton, Toolbar, UiCtx, Window,
 };
 pub use value::{
-    ChoiceOption, Currency, FieldKind, FieldType, Money, SupportsMinMax, SupportsRequired, SupportsSum, SupportsText,
+    ChoiceOption, Currency, FieldKind, FieldType, Money, SupportsMinMax, SupportsMinMaxTotal, SupportsRequired, SupportsSum,
+    SupportsText,
     Value,
 };
 pub use zeyn_macros::{action, choice, entity, model, params, screen, t};

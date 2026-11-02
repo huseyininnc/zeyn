@@ -1,10 +1,13 @@
-use crate::action::{Action, ActionMeta, Cursor, DEFAULT_PAGE_SIZE, GridQuery, MAX_PAGE_SIZE, Page, PageRequest, Result};
+use crate::action::{
+    Action, ActionMeta, Aggregate, AggregateRequest, Cursor, DEFAULT_PAGE_SIZE, GridQuery, MAX_PAGE_SIZE, Page, PageRequest,
+    Result, Total,
+};
 use crate::ctx::{BoxFuture, Ctx};
 use crate::i18n::Text;
 use crate::model::{Field, FieldMeta, Model};
 use crate::render::{Render, attr, escape};
 use crate::screen::{Component, Effect, GridSource, LoadedPage, Node};
-use crate::value::{FieldType, SupportsSum, Value};
+use crate::value::{FieldKind, FieldType, Money, SupportsMinMaxTotal, SupportsSum, Value};
 use serde::Serialize;
 use serde_json::json;
 use std::cmp::Ordering;
@@ -142,7 +145,7 @@ struct Column<E> {
     width: Option<u32>,
     flex: Option<u32>,
     filter: bool,
-    sum: bool,
+    aggregates: Vec<Aggregate>,
 }
 
 /// Data grid. Its data source is an action that takes a `GridQuery` and returns `Page<E>`.
@@ -201,7 +204,7 @@ impl<E: Model> Grid<E> {
                 width: None,
                 flex: None,
                 filter,
-                sum: false,
+                aggregates: Vec::new(),
             });
         }
         grid
@@ -226,7 +229,7 @@ impl<E: Model> Grid<E> {
             width: None,
             flex: None,
             filter: false,
-            sum: false,
+            aggregates: Vec::new(),
         });
         GridColumn { grid: self, _type: PhantomData }
     }
@@ -325,16 +328,10 @@ impl<E: Model> Grid<E> {
             out.push_str(&self.rows_html_erased(p, r));
         }
         out.push_str("</tbody>");
-        if self.columns.iter().any(|c| c.sum) {
-            out.push_str("<tfoot><tr>");
-            for c in &self.columns {
-                if c.sum {
-                    out.push_str(&format!(r#"<td class="z-num" data-sum="{}"></td>"#, c.meta.name));
-                } else {
-                    out.push_str("<td></td>");
-                }
-            }
-            out.push_str("</tr></tfoot>");
+        if self.columns.iter().any(|c| !c.aggregates.is_empty()) {
+            out.push_str("<tfoot data-zeyn-foot>");
+            out.push_str(&self.foot_row(r, page.map(|p| p.totals.as_slice()).unwrap_or_default()));
+            out.push_str("</tfoot>");
         }
         out.push_str("</table>");
         match self.paging {
@@ -356,6 +353,45 @@ impl<E: Model> Grid<E> {
         out.push_str("</div>");
     }
 
+    /// Footer row with one cell per column. Cells of columns with totals carry `data-field` and
+    /// `data-agg` (space separated ops) and show each total with its localized name.
+    fn foot_row(&self, r: &Render, totals: &[Total]) -> String {
+        let mut out = String::from("<tr>");
+        for c in &self.columns {
+            if c.aggregates.is_empty() {
+                out.push_str("<td></td>");
+                continue;
+            }
+            let ops: Vec<&str> = c.aggregates.iter().map(|a| a.code()).collect();
+            let num = matches!(c.meta.kind, FieldKind::Integer | FieldKind::Money);
+            let class = if num { r#" class="z-num""# } else { "" };
+            out.push_str(&format!(r#"<td{class} data-field="{}" data-agg="{}">"#, c.meta.name, ops.join(" ")));
+            for op in &c.aggregates {
+                let value = totals
+                    .iter()
+                    .find(|t| t.field == c.meta.name && t.op == *op)
+                    .map(|t| r.value(&t.value, &c.meta.kind))
+                    .unwrap_or_default();
+                out.push_str(&format!(
+                    r#"<span class="z-agg" data-op="{}"><span class="z-agg-label">{}</span> <span class="z-agg-value">{value}</span></span>"#,
+                    op.code(),
+                    r.text(&Text::key(format!("zeyn.grid.agg.{}", op.code()))),
+                ));
+            }
+            out.push_str("</td>");
+        }
+        out.push_str("</tr>");
+        out
+    }
+
+    /// Totals the columns declare, as a query asks for them.
+    fn aggregate_requests(&self) -> Vec<AggregateRequest> {
+        self.columns
+            .iter()
+            .flat_map(|c| c.aggregates.iter().map(|op| AggregateRequest { field: c.meta.name.to_string(), op: *op }))
+            .collect()
+    }
+
     fn rows_html_erased(&self, page: &LoadedPage, r: &Render) -> String {
         page.items.downcast_ref::<Vec<E>>().map(|rows| self.rows(rows, r)).unwrap_or_default()
     }
@@ -371,10 +407,18 @@ impl<E: Model> GridSource for Grid<E> {
             Paging::Infinite { batch } => PageRequest::After { cursor: None, limit: batch },
             other => PageRequest::Offset { offset: 0, limit: other.size() },
         };
-        GridQuery { page, with_total: !matches!(self.paging, Paging::Infinite { .. }), ..GridQuery::default() }
+        GridQuery {
+            page,
+            with_total: !matches!(self.paging, Paging::Infinite { .. }),
+            aggregates: self.aggregate_requests(),
+            ..GridQuery::default()
+        }
     }
 
-    fn fetch(&self, ctx: Ctx, query: GridQuery) -> BoxFuture<Result<LoadedPage>> {
+    fn fetch(&self, ctx: Ctx, mut query: GridQuery) -> BoxFuture<Result<LoadedPage>> {
+        let allowed = self.aggregate_requests();
+        query.aggregates.retain(|a| allowed.contains(a));
+        query.aggregates.dedup();
         let fetch = self.fetch;
         let offset = match &query.page {
             PageRequest::Offset { offset, .. } => *offset,
@@ -387,6 +431,7 @@ impl<E: Model> GridSource for Grid<E> {
                 total: page.total,
                 next: page.next,
                 offset,
+                totals: page.totals,
                 items: Box::new(page.items),
             })
         })
@@ -398,6 +443,11 @@ impl<E: Model> GridSource for Grid<E> {
 
     fn render_loaded(&self, out: &mut String, r: &Render, page: &LoadedPage) {
         self.render_with(out, r, Some(page));
+    }
+
+    fn foot_html(&self, page: &LoadedPage, r: &Render) -> Option<String> {
+        let has = self.columns.iter().any(|c| !c.aggregates.is_empty());
+        (has && !page.totals.is_empty()).then(|| self.foot_row(r, &page.totals))
     }
 
     fn tool_schema(&self) -> serde_json::Value {
@@ -433,7 +483,19 @@ impl<E: Model> GridSource for Grid<E> {
                         "required": ["field", "contains"]
                     }
                 },
-                "with_total": { "type": "boolean" }
+                "with_total": { "type": "boolean" },
+                "aggregates": {
+                    "type": "array",
+                    "description": "Column totals over all matching rows. Only the totals the grid shows are computed.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "field": { "type": "string", "enum": fields },
+                            "op": { "type": "string", "enum": ["sum", "avg", "min", "max", "count"] }
+                        },
+                        "required": ["field", "op"]
+                    }
+                }
             }
         })
     }
@@ -459,7 +521,7 @@ impl<E: Model> Component for Grid<E> {
                 "width": c.width,
                 "flex": c.flex,
                 "filter": c.filter,
-                "sum": c.sum,
+                "aggregates": c.aggregates,
             })).collect::<Vec<_>>(),
         })
     }
@@ -498,13 +560,50 @@ impl<E: Model, T> GridColumn<E, T> {
         self
     }
 
-    /// Shows the column total in the footer. Compiles only on numeric and money columns.
-    pub fn sum(mut self) -> Self
+    fn aggregate(mut self, op: Aggregate) -> Self {
+        let column = self.last();
+        if !column.aggregates.contains(&op) {
+            column.aggregates.push(op);
+        }
+        self
+    }
+
+    /// Shows the column total in the footer, computed on the server over every matching row.
+    /// Compiles only on numeric and money columns.
+    pub fn sum(self) -> Self
     where
         T: SupportsSum,
     {
-        self.last().sum = true;
-        self
+        self.aggregate(Aggregate::Sum)
+    }
+
+    /// Shows the column average in the footer. Compiles only on numeric and money columns.
+    pub fn avg(self) -> Self
+    where
+        T: SupportsSum,
+    {
+        self.aggregate(Aggregate::Avg)
+    }
+
+    /// Shows the smallest value in the footer. Compiles on numbers, money, dates and times.
+    pub fn min(self) -> Self
+    where
+        T: SupportsMinMaxTotal,
+    {
+        self.aggregate(Aggregate::Min)
+    }
+
+    /// Shows the largest value in the footer. Compiles on numbers, money, dates and times.
+    pub fn max(self) -> Self
+    where
+        T: SupportsMinMaxTotal,
+    {
+        self.aggregate(Aggregate::Max)
+    }
+
+    /// Shows how many matching rows have a value in this column. Works on every column.
+    pub fn count(self) -> Self {
+        self.aggregate(Aggregate::Count)
     }
 
     pub fn column<U: FieldType + 'static>(self, field: Field<E, U>) -> GridColumn<E, U> {
@@ -564,6 +663,7 @@ fn filter_text(value: &Value) -> String {
         Value::Time(t) => t.to_string(),
         Value::DateTime(d) => d.to_string(),
         Value::LocalDateTime(l) => l.to_string(),
+        Value::Decimal(x) => x.to_string(),
     }
 }
 
@@ -581,7 +681,46 @@ fn compare(a: &Value, b: &Value) -> Ordering {
         (Value::Time(x), Value::Time(y)) => x.cmp(y),
         (Value::DateTime(x), Value::DateTime(y)) => x.cmp(y),
         (Value::LocalDateTime(x), Value::LocalDateTime(y)) => x.cmp(y),
+        (Value::Decimal(x), Value::Decimal(y)) => x.total_cmp(y),
         _ => Ordering::Equal,
+    }
+}
+
+/// Computes one total over a column's values. Nulls are skipped. `None` when the op does not fit
+/// the values (a sum of text, or money in different currencies). Money averages round half away
+/// from zero to the smallest unit.
+pub fn total(values: impl Iterator<Item = Value>, op: Aggregate) -> Option<Value> {
+    let values = values.filter(|v| *v != Value::Null);
+    match op {
+        Aggregate::Count => Some(Value::Int(values.count() as i64)),
+        Aggregate::Min => values.min_by(compare),
+        Aggregate::Max => values.max_by(compare),
+        Aggregate::Sum | Aggregate::Avg => {
+            let (mut sum, mut n, mut currency, mut money) = (0i128, 0i128, None, false);
+            for v in values {
+                match v {
+                    Value::Int(x) => sum += i128::from(x),
+                    Value::Money(m) => {
+                        if currency.is_some_and(|c| c != m.currency) {
+                            return None;
+                        }
+                        currency = Some(m.currency);
+                        money = true;
+                        sum += i128::from(m.minor);
+                    }
+                    _ => return None,
+                }
+                n += 1;
+            }
+            let clamp = |x: i128| x.clamp(i128::from(i64::MIN), i128::from(i64::MAX)) as i64;
+            let wrap = |x: i64| if money { Value::Money(Money::new(x, currency.unwrap_or_default())) } else { Value::Int(x) };
+            match op {
+                Aggregate::Sum => Some(wrap(clamp(sum))),
+                _ if n == 0 => Some(Value::Null),
+                _ if money => Some(wrap(clamp((2 * sum + sum.signum() * n) / (2 * n)))),
+                _ => Some(Value::Decimal(sum as f64 / n as f64)),
+            }
+        }
     }
 }
 
@@ -622,6 +761,15 @@ impl GridQuery {
             Ordering::Equal
         });
         let mut page = Page::from_slice(&rows, self);
+        page.totals = self
+            .aggregates
+            .iter()
+            .filter_map(|a| {
+                let i = index(&a.field)?;
+                let value = total(rows.iter().filter_map(|r| r.value_at(i)), a.op)?;
+                Some(Total { field: a.field.clone(), op: a.op, value })
+            })
+            .collect();
         if !self.with_total && matches!(self.page, PageRequest::After { .. }) {
             page.total = None;
         }

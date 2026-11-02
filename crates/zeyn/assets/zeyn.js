@@ -375,9 +375,10 @@ async function loadGrid(grid, kind) {
   const seq = ++s.seq;
   s.loading = true;
   grid.setAttribute('aria-busy', 'true');
+  const totals = kind === 'reset' || kind === 'reload' || (infinite && !append);
   const r = await post(BASE + '/_zeyn/grid', {
     ...address(grid),
-    query: { page, sort: s.sort ? [s.sort] : [], filters, with_total: !infinite },
+    query: { page, sort: s.sort ? [s.sort] : [], filters, with_total: !infinite, aggregates: totals ? aggregatesOf(grid) : [] },
   });
   if (seq !== s.seq) return;
   s.loading = false;
@@ -395,8 +396,25 @@ async function loadGrid(grid, kind) {
   s.count = body.rows.length;
   s.total = r.data.total ?? null;
   s.next = r.data.count === 0 && append ? null : (r.data.next ?? null);
+  applyFoot(grid, r.data.foot);
   roving(grid, hadFocus);
   updateChrome(grid, append);
+}
+
+/**
+ * Totals the grid footer shows, as `{field, op}` requests, read from `tfoot td[data-agg]`.
+ * The server keeps only the ones the grid declares.
+ */
+function aggregatesOf(grid) {
+  return [...grid.querySelectorAll('tfoot td[data-agg]')].flatMap((td) =>
+    td.dataset.agg.split(/\s+/).filter(Boolean).map((op) => ({ field: td.dataset.field, op })),
+  );
+}
+
+/** Replaces the footer row with server rendered totals, when the response has them. */
+function applyFoot(grid, html) {
+  const foot = grid.querySelector('tfoot[data-zeyn-foot]');
+  if (foot && typeof html === 'string') foot.innerHTML = html;
 }
 
 /** Applies the roving tabindex: the active row gets 0, the others -1. */
@@ -650,7 +668,10 @@ async function fetchBlock(grid, s, b) {
   const page = { type: 'offset', offset: b * s.size, limit: s.size };
   const r = await post(
     BASE + '/_zeyn/grid',
-    { ...address(grid), query: { page, sort: s.sort ? [s.sort] : [], filters, with_total: withTotal } },
+    {
+      ...address(grid),
+      query: { page, sort: s.sort ? [s.sort] : [], filters, with_total: withTotal, aggregates: withTotal ? aggregatesOf(grid) : [] },
+    },
     { signal: controller.signal },
   );
   if (s.inflight.get(b) === controller) s.inflight.delete(b);
@@ -664,6 +685,7 @@ async function fetchBlock(grid, s, b) {
   s.cache.set(b, [...t.content.querySelectorAll('tr')].map((tr, k) => prepRow(s, tr, b * s.size + k)));
   s.stale.delete(b);
   while (s.cache.size > V_CACHE) s.cache.delete(s.cache.keys().next().value);
+  applyFoot(grid, r.data.foot);
   if (withTotal && r.data.total != null) {
     s.total = r.data.total;
     s.needTotal = false;

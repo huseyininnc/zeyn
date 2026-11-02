@@ -34,7 +34,8 @@
       "range": "{from}-{to}",
       "range_total": "{from}-{to} / {total}",
       "loaded": "{count} satır yüklendi",
-      "empty": "Kayıt yok."
+      "empty": "Kayıt yok.",
+      "agg": { "sum": "Toplam", "avg": "Ortalama", "min": "En az", "max": "En çok", "count": "Adet" }
     },
     "export": {
       "xlsx": "Excel'e aktar",

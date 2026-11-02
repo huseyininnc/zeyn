@@ -34,7 +34,8 @@
       "range": "{from}-{to}",
       "range_total": "{from}-{to} of {total}",
       "loaded": "{count} rows loaded",
-      "empty": "No records."
+      "empty": "No records.",
+      "agg": { "sum": "Sum", "avg": "Average", "min": "Min", "max": "Max", "count": "Count" }
     },
     "export": {
       "xlsx": "Export to Excel",

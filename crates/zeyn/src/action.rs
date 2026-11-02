@@ -1,6 +1,7 @@
 use crate::ctx::{BoxFuture, Ctx, Dep};
 use crate::i18n::Text;
 use crate::model::ValidationErrors;
+use crate::value::Value;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -116,17 +117,27 @@ pub struct Page<M> {
     pub total: Option<u64>,
     /// Where the next batch starts. `None` means there is nothing more.
     pub next: Option<Cursor>,
+    /// Column totals over the whole filtered result, not only this page. Filled for the
+    /// aggregates the query asked for ([`GridQuery::aggregates`]).
+    #[serde(default, skip_deserializing, skip_serializing_if = "Vec::is_empty")]
+    pub totals: Vec<Total>,
 }
 
 impl<M> Default for Page<M> {
     fn default() -> Self {
-        Self { items: Vec::new(), total: None, next: None }
+        Self { items: Vec::new(), total: None, next: None, totals: Vec::new() }
     }
 }
 
 impl<M> Page<M> {
     pub fn new(items: Vec<M>) -> Self {
-        Self { items, total: None, next: None }
+        Self { items, total: None, next: None, totals: Vec::new() }
+    }
+
+    /// Adds a column total. Data layers that page in SQL compute totals with one aggregate query.
+    pub fn with_total(mut self, field: impl Into<String>, op: Aggregate, value: Value) -> Self {
+        self.totals.push(Total { field: field.into(), op, value });
+        self
     }
 
     pub fn total(mut self, total: u64) -> Self {
@@ -185,6 +196,10 @@ pub struct GridQuery {
     /// Whether the client needs the total count. Infinite scroll usually does not.
     #[serde(default)]
     pub with_total: bool,
+    /// Column totals to compute over the whole filtered result. The grid keeps only the ones
+    /// its columns declare, so a client cannot ask for others.
+    #[serde(default)]
+    pub aggregates: Vec<AggregateRequest>,
 }
 
 impl GridQuery {
@@ -195,6 +210,46 @@ impl GridQuery {
         };
         raw.clamp(1, MAX_PAGE_SIZE)
     }
+}
+
+/// Kind of column total.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Aggregate {
+    Sum,
+    Avg,
+    Min,
+    Max,
+    /// Number of rows with a value in the column.
+    Count,
+}
+
+impl Aggregate {
+    /// Short code: `sum`, `avg`, `min`, `max`, `count`. Also the catalog key suffix `zeyn.grid.agg.*`.
+    pub fn code(self) -> &'static str {
+        match self {
+            Aggregate::Sum => "sum",
+            Aggregate::Avg => "avg",
+            Aggregate::Min => "min",
+            Aggregate::Max => "max",
+            Aggregate::Count => "count",
+        }
+    }
+}
+
+/// One column total asked for by a grid query.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AggregateRequest {
+    pub field: String,
+    pub op: Aggregate,
+}
+
+/// One computed column total.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct Total {
+    pub field: String,
+    pub op: Aggregate,
+    pub value: Value,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
