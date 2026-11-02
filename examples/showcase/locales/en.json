@@ -21,6 +21,12 @@
 ,
     "inputs": "Inputs"
   },
+  "errors": {
+    "not_found": "Page not found",
+    "not_found_text": "This address leads nowhere. It may have moved, or the record was removed.",
+    "server": "Something went wrong",
+    "server_text": "The server could not finish this request. Please try again in a moment."
+  },
   "dashboard": {
     "title": "Overview",
     "products": "Products",
@@ -29,6 +35,7 @@
     "revenue_today": "Revenue today"
   },
   "stock": {
+    "product_title": "Product {code}",
     "edit": "Edit",
     "restock_low": "Restock everything below 10",
     "deactivate": "Mark inactive",

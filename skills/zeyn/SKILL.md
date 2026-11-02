@@ -164,6 +164,9 @@ What to remember:
 - The first argument of an action is its input; of a screen, its params (`#[params]` struct or
   `_: ()`). Every other argument is injected: `Ctx` or a registered `Service`.
 - A screen with a `route` is a page; without one it opens as a window.
+- Path params: `#[screen(route = "/orders/{id}", ...)]` binds `{id}` to the params field `id`
+  (integers, entity keys, `String`, `Slug`). `Slug::from_title("Çay Bardağı")` is `cay-bardagi`.
+  Return `Err(Error::NotFound)` for a missing record, `Screen::moved_to(screen, params)` for a 301.
 - Errors: `Error::NotFound`, `Error::Forbidden`, `Error::Conflict` (stale row version),
   `Error::Denied(t!("..."))`, `Error::Validation(errors)`, `Error::Internal("for the log")`.
 - Quick screens: `DataGrid::auto(action)` and `Form::auto(model)`.

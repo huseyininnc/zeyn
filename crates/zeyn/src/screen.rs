@@ -45,6 +45,163 @@ pub trait ScreenDef: Copy + Send + Sync + 'static {
 
     /// Builds the screen with injected arguments. Access is checked by the caller.
     fn build(ctx: Ctx, params: Self::Params) -> BoxFuture<Result<Screen>>;
+
+    /// Reads path segment `field` of the route (`{id}` in `/orders/{id}`) as the JSON value of
+    /// that params field, or `None` when it does not parse (the request answers 404). Generated
+    /// by `#[screen]` for routes with segments.
+    fn path_value(field: &str, raw: &str) -> Option<serde_json::Value> {
+        let _ = (field, raw);
+        None
+    }
+}
+
+/// A params field type that can be a path segment of a route, such as `id` in `/orders/{id}`.
+/// A segment only parses in the one form the framework writes it in (`7`, not `+7` or `007`),
+/// so each record has one address.
+///
+/// A field whose type cannot be a segment does not compile:
+///
+/// ```compile_fail
+/// use zeyn::prelude::*;
+///
+/// #[params]
+/// pub struct DayParams {
+///     pub day: Vec<String>,
+/// }
+///
+/// #[screen(route = "/days/{day}", public)]
+/// pub fn day(_p: DayParams) -> Screen {
+///     Screen::new("Day")
+/// }
+/// ```
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` cannot be a route path segment",
+    label = "this route names a params field of type `{Self}`",
+    note = "path segments take integers (`i64`, `u32`, ...), entity keys (`ProductId`), `String` or `zeyn::Slug`; take the field out of the route and it travels in the JSON `params` query instead"
+)]
+pub trait PathValue: Serialize + Sized {
+    /// Parses a decoded segment. `None` answers 404.
+    fn from_segment(raw: &str) -> Option<Self>;
+}
+
+macro_rules! path_ints {
+    ($($t:ty),*) => {$(
+        impl PathValue for $t {
+            fn from_segment(raw: &str) -> Option<Self> {
+                raw.parse::<$t>().ok().filter(|v| v.to_string() == raw)
+            }
+        }
+    )*};
+}
+
+path_ints!(i8, i16, i32, i64, u8, u16, u32, u64, usize);
+
+impl PathValue for String {
+    fn from_segment(raw: &str) -> Option<Self> {
+        (!raw.is_empty() && raw != "." && raw != ".." && raw.len() <= MAX_SEGMENT).then(|| raw.to_string())
+    }
+}
+
+/// Longest path segment value read or written, in bytes.
+pub const MAX_SEGMENT: usize = 256;
+
+#[doc(hidden)]
+/// Reads a segment as the type of the params field `field` points to. The closure is never
+/// called; it only names the field, so a missing field is a compile error at the route.
+pub fn __path_value<P, T: PathValue>(raw: &str, field: impl Fn(&P) -> &T) -> Option<serde_json::Value> {
+    let _ = field;
+    T::from_segment(raw).and_then(|v| serde_json::to_value(v).ok())
+}
+
+/// Names of the path segments of a route: `["slug", "n"]` for `/catalog/{slug}/{n}`.
+pub(crate) fn route_segments(route: &str) -> impl Iterator<Item = &str> {
+    route.split('/').filter_map(|s| s.strip_prefix('{').and_then(|s| s.strip_suffix('}')))
+}
+
+/// Whether a route has path segments. Usable in constant checks.
+pub const fn route_has_segments(route: Option<&str>) -> bool {
+    let Some(route) = route else { return false };
+    let bytes = route.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'{' {
+            return true;
+        }
+        i += 1;
+    }
+    false
+}
+
+/// URL of a screen at `path` (its route with the feature prefix) with these params: path segments
+/// filled from the params fields of the same name, the other fields in the JSON `params` query.
+/// `None` when a segment's field is missing or not a number or a usable string.
+///
+/// ```
+/// use serde_json::json;
+/// use zeyn::screen_url;
+/// assert_eq!(screen_url("/orders/{id}", &json!({ "id": 42, "tab": "lines" })).unwrap(), "/orders/42?params=%7B%22tab%22%3A%22lines%22%7D");
+/// assert_eq!(screen_url("/catalog/{slug}/{n}", &json!({ "slug": "cay-bardagi", "n": 2 })).unwrap(), "/catalog/cay-bardagi/2");
+/// assert_eq!(screen_url("/orders", &json!({ "q": 1 })).unwrap(), "/orders?params=%7B%22q%22%3A1%7D");
+/// assert_eq!(screen_url("/orders/{id}", &json!({})), None);
+/// ```
+pub fn screen_url(path: &str, params: &serde_json::Value) -> Option<String> {
+    if !route_has_segments(Some(path)) {
+        return Some(if params.is_null() { path.to_string() } else { format!("{path}?params={}", encode(&params.to_string())) });
+    }
+    let fields = params.as_object()?;
+    let mut out = String::with_capacity(path.len() + 16);
+    for (i, part) in path.split('/').enumerate() {
+        if i > 0 {
+            out.push('/');
+        }
+        match part.strip_prefix('{').and_then(|p| p.strip_suffix('}')) {
+            Some(name) => {
+                let value = match fields.get(name)? {
+                    serde_json::Value::Number(n) => n.to_string(),
+                    serde_json::Value::String(s) => String::from_segment(s)?,
+                    _ => return None,
+                };
+                out.push_str(&encode(&value));
+            }
+            None => out.push_str(part),
+        }
+    }
+    let segments: Vec<&str> = route_segments(path).collect();
+    let rest: serde_json::Map<String, serde_json::Value> =
+        fields.iter().filter(|(k, _)| !segments.contains(&k.as_str())).map(|(k, v)| (k.clone(), v.clone())).collect();
+    if !rest.is_empty() {
+        out.push_str("?params=");
+        out.push_str(&encode(&serde_json::Value::Object(rest).to_string()));
+    }
+    Some(out)
+}
+
+/// Full paths (feature prefix, no base path) of the routed screens of a running app, so links
+/// rendered for a request use the path form. Kept by the server as a service on every request.
+#[derive(Clone, Default)]
+pub(crate) struct Routes(pub(crate) std::sync::Arc<HashMap<&'static str, String>>);
+
+impl crate::ctx::Service for Routes {}
+
+impl Routes {
+    /// App path of `screen` with `params`, without the base path; see [`screen_url`].
+    pub(crate) fn href(r: &Render, screen: &str, params: &serde_json::Value) -> Option<String> {
+        let routes = r.ctx?.service::<Routes>()?;
+        screen_url(routes.0.get(screen)?, params)
+    }
+}
+
+/// Percent encodes a path segment or query value. Dots are encoded too, so a segment never looks
+/// like a file name to the browser runtime.
+fn encode(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for b in s.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'~' => out.push(b as char),
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
 }
 
 /// What the client does after a user interaction.
@@ -777,12 +934,31 @@ pub struct Screen {
     toolbar: Option<Toolbar>,
     body: Vec<Node>,
     menu: Option<crate::menu::ContextMenu>,
+    moved: Option<(&'static str, serde_json::Value)>,
 }
 
 impl Screen {
     /// Full page screen.
     pub fn new(title: impl Into<Text>) -> Self {
-        Self { title: title.into(), kind: ScreenKind::Page, toolbar: None, body: Vec::new(), menu: None }
+        Self { title: title.into(), kind: ScreenKind::Page, toolbar: None, body: Vec::new(), menu: None, moved: None }
+    }
+
+    /// Answers that this page lives at another screen's address now: the browser gets a permanent
+    /// redirect (301) there, such as from an old slug to the current one. Params of the wrong type
+    /// do not compile. To answer that nothing is there, return `Err(Error::NotFound)` instead.
+    ///
+    /// ```ignore
+    /// if p.slug != product.slug {
+    ///     return Ok(Screen::moved_to(product_page, ProductParams { slug: product.slug, n: p.n }));
+    /// }
+    /// ```
+    pub fn moved_to<S: ScreenDef>(_screen: S, params: S::Params) -> Self {
+        Self { moved: Some((S::META.name, params_json(&params))), ..Self::new("") }
+    }
+
+    /// Screen and params of [`Screen::moved_to`], if this screen moved.
+    pub(crate) fn take_moved(&mut self) -> Option<(&'static str, serde_json::Value)> {
+        self.moved.take()
     }
 
     /// Screen opened as a window.

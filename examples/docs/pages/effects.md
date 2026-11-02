@@ -15,6 +15,8 @@ Effects are what the browser does after a click or a successful action: open a w
 
 Params are typed: an effect for a screen with the wrong params does not compile.
 
+`Effect::navigate` to a screen whose route has path segments (see [Params in the path](screens.md)) lands on the path form, such as `/orders/42`; the params that are not in the path go in the `params` query.
+
 ## After an action
 
 Forms and action buttons take an `on_success` handler. It receives the action's result and a `UiCtx` that collects effects:

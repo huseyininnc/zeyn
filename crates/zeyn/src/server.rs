@@ -650,6 +650,7 @@ pub struct App {
     secure_cookies: bool,
     mcp: Mcp,
     home: Option<&'static str>,
+    errors: ErrorScreens,
     llms_txt: Option<&'static str>,
     time: TimePolicy,
     fixed_now: Option<DateTime>,
@@ -698,6 +699,7 @@ impl App {
             secure_cookies: false,
             mcp: Mcp::off(),
             home: None,
+            errors: ErrorScreens::default(),
             llms_txt: None,
             time: TimePolicy::User { default: TimeZone::UTC },
             fixed_now: None,
@@ -948,6 +950,31 @@ impl App {
         self
     }
 
+    /// Screen shown inside the shell, with status 404, for unknown paths and for screens that
+    /// answer `Error::NotFound`. It takes no params and never learns what was asked for; make it
+    /// `public` so everyone sees it. Without one, a short built in message is shown.
+    ///
+    /// ```
+    /// use zeyn::prelude::*;
+    ///
+    /// #[screen(public)]
+    /// pub fn missing() -> Screen { Screen::new("Nothing here") }
+    ///
+    /// let app = App::new("Shop").not_found(missing);
+    /// ```
+    pub fn not_found<S: ScreenDef<Params = ()>>(mut self, _screen: S) -> Self {
+        self.errors.not_found = Some(crate::feature::ScreenEntry::of::<S>());
+        self
+    }
+
+    /// Screen shown inside the shell, with status 500 (or 504 for a timeout), when a handler
+    /// fails or panics. The error's details are logged on the server and never reach it or the
+    /// client. Without one, a short built in message is shown.
+    pub fn server_error<S: ScreenDef<Params = ()>>(mut self, _screen: S) -> Self {
+        self.errors.server_error = Some(crate::feature::ScreenEntry::of::<S>());
+        self
+    }
+
     /// Serves `text` at `/llms.txt` (see llmstxt.org): a short Markdown guide for language models
     /// that read the site. Only public facts belong here; it is served to everyone.
     ///
@@ -1047,7 +1074,9 @@ impl App {
                     }
                 }
                 if let Some(path) = f.path_of(&s.meta) {
-                    if let Some(other) = paths.insert(path.clone(), s.meta.name) {
+                    let shape: String =
+                        path.split('/').map(|p| if p.starts_with('{') { "{}" } else { p }).collect::<Vec<_>>().join("/");
+                    if let Some(other) = paths.insert(shape, s.meta.name) {
                         if other != s.meta.name {
                             problems.push(format!("route `{path}` is used by screens `{other}` and `{}`", s.meta.name));
                         }
@@ -1092,10 +1121,29 @@ impl App {
                 }
             }
         }
+        for s in [self.errors.not_found, self.errors.server_error].into_iter().flatten() {
+            for dep in (s.deps)() {
+                if !self.services.contains(dep.id) {
+                    problems.push(format!(
+                        "error screen `{}` needs service `{}`, which is not registered
+  = help: add `.service(...)` to the App",
+                        s.meta.name, dep.name
+                    ));
+                }
+            }
+        }
         if let Some(home) = self.home {
             if !self.features.iter().any(|f| f.screens().iter().any(|s| s.meta.name == home && s.meta.route.is_some()))
             {
                 problems.push(format!("home screen `{home}` is not registered or has no route"));
+            }
+            if self.features.iter().flat_map(|f| f.screens()).any(|s| {
+                s.meta.name == home && crate::screen::route_has_segments(s.meta.route)
+            }) {
+                problems.push(format!(
+                    "home screen `{home}` has path segments in its route
+  = help: `/` cannot fill them; make a screen without segments the home screen"
+                ));
             }
         }
         let commands: Vec<(&str, &crate::command::Command)> =
@@ -1169,11 +1217,16 @@ impl App {
         let url_prefix = self.public_path.clone().unwrap_or_else(|| self.base_path.clone());
         auth::resolve(&mut self.sign_in, &url_prefix, &mut self.login_url);
         let mut screens = HashMap::new();
+        let mut routes = HashMap::new();
         for (fi, f) in self.features.iter().enumerate() {
             for s in f.screens() {
                 screens.insert(s.meta.name, (fi, *s));
+                if let Some(path) = f.path_of(&s.meta) {
+                    routes.insert(s.meta.name, path);
+                }
             }
         }
+        self.services.insert(crate::screen::Routes(Arc::new(routes)));
         let look = self.look();
         #[cfg(feature = "islands")]
         let islands = self.islands_dir.as_deref().and_then(|dir| match islands::Islands::load(dir, &url_prefix) {
@@ -1184,6 +1237,7 @@ impl App {
             }
         });
         let state = Arc::new(AppState {
+            errors: self.errors,
             name: self.name,
             i18n: Arc::new(self.i18n),
             services: Arc::new(self.services),
@@ -1231,10 +1285,25 @@ impl App {
             for s in f.screens() {
                 if let Some(path) = f.path_of(&s.meta) {
                     let name = s.meta.name;
-                    router = router.route(
-                        &path,
-                        get(move |st: State<Arc<AppState>>, h: HeaderMap, q: Query<ParamsQuery>| page(st, h, q, name)),
-                    );
+                    router = if crate::screen::route_has_segments(Some(&path)) {
+                        router.route(
+                            &path,
+                            get(
+                                move |st: State<Arc<AppState>>,
+                                      h: HeaderMap,
+                                      uri: axum::http::Uri,
+                                      Path(segments): Path<Vec<(String, String)>>,
+                                      q: Query<ParamsQuery>| page(st, h, uri, segments, q, name),
+                            ),
+                        )
+                    } else {
+                        router.route(
+                            &path,
+                            get(move |st: State<Arc<AppState>>, h: HeaderMap, uri: axum::http::Uri, q: Query<ParamsQuery>| {
+                                page(st, h, uri, Vec::new(), q, name)
+                            }),
+                        )
+                    };
                 }
             }
         }
@@ -1304,6 +1373,7 @@ impl App {
         };
         let router = auth::layers(router, &state);
         let router = router
+            .layer(axum::middleware::from_fn_with_state(state.clone(), catch_panics))
             .layer(axum::middleware::from_fn_with_state(state.clone(), guard::guard_request))
             .layer(axum::middleware::map_response(guard::security_headers))
             .layer(axum::middleware::map_response(ops::stamp))
@@ -1373,6 +1443,7 @@ impl App {
 }
 
 struct AppState {
+    errors: ErrorScreens,
     name: Text,
     i18n: Arc<I18n>,
     services: Arc<Services>,
@@ -1433,12 +1504,21 @@ fn percent_decode(s: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
+/// The app's own screens for 404 and server errors (`App::not_found`, `App::server_error`).
+#[derive(Clone, Copy, Default)]
+struct ErrorScreens {
+    not_found: Option<ScreenEntry>,
+    server_error: Option<ScreenEntry>,
+}
+
 /// Failure of a call: an application error, a timeout, or a refusal with its own status and code
 /// that the runtime acts on (such as `reason_required`).
 enum Failure {
     App(Error),
     Timeout,
     Status(StatusCode, &'static str, Text),
+    /// The screen answered [`Screen::moved_to`]: a permanent redirect to this screen and params.
+    Moved(&'static str, Json),
 }
 
 impl From<Error> for Failure {
@@ -1512,6 +1592,31 @@ impl AppState {
     /// URL of an app path, with the base path in front.
     fn url(&self, path: &str) -> String {
         format!("{}{path}", self.prefix)
+    }
+
+    /// URL of a routed screen with these params, in the path form when its route has segments
+    /// (see [`crate::screen_url`]). `None` for an unknown screen, one without a route, or params
+    /// that do not fill the route's segments.
+    fn page_url(&self, screen: &str, params: &Json) -> Option<String> {
+        let (fi, entry) = self.screens.get(screen)?;
+        let path = self.features[*fi].path_of(&entry.meta)?;
+        crate::screen::screen_url(&path, params).map(|u| self.url(&u))
+    }
+
+    /// Params of a page request: the JSON `params` query with the route's path segments read
+    /// into the fields of the same name. A segment that does not parse answers 404.
+    fn with_segments(&self, screen: &str, params: Json, segments: &[(String, String)]) -> Result<Json, Failure> {
+        if segments.is_empty() {
+            return Ok(params);
+        }
+        let (_, entry) = self.screens.get(screen).ok_or(Failure::App(Error::NotFound))?;
+        let mut params = if params.is_null() { Json::Object(Map::new()) } else { params };
+        let fields = params.as_object_mut().ok_or(Failure::App(Error::NotFound))?;
+        for (name, raw) in segments {
+            let value = (entry.path_value)(name, raw).ok_or(Failure::App(Error::NotFound))?;
+            fields.insert(name.clone(), value);
+        }
+        Ok(params)
     }
 
     /// Cookie `Path` attribute for this app.
@@ -1632,10 +1737,13 @@ impl AppState {
         feature.check_guards(ctx)?;
         data::check_reason(ctx, &entry.meta)?;
         let only_return_to = params.as_object().is_some_and(|o| o.len() == 1 && o.contains_key("return_to"));
-        let screen = match self.timed((entry.build)(ctx.clone(), params)).await {
+        let mut screen = match self.timed((entry.build)(ctx.clone(), params)).await {
             Err(_) if only_return_to => self.timed((entry.build)(ctx.clone(), Json::Null)).await?,
             other => other?,
         };
+        if let Some((to, params)) = screen.take_moved() {
+            return Err(Failure::Moved(to, params));
+        }
         Ok((feature, entry, screen))
     }
 
@@ -1699,6 +1807,7 @@ impl AppState {
                 Err(Failure::Timeout) => Some("timeout"),
                 Err(Failure::App(e)) => Some(e.code()),
                 Err(Failure::Status(_, code, _)) => Some(*code),
+                Err(Failure::Moved(..)) => Some("moved"),
             },
             duration: started.elapsed(),
         };
@@ -1779,6 +1888,7 @@ impl AppState {
         let (status, code, message) = match &failure {
             Failure::Timeout => (StatusCode::GATEWAY_TIMEOUT, "timeout", Text::key("zeyn.error.timeout")),
             Failure::Status(status, code, message) => (*status, *code, message.clone()),
+            Failure::Moved(..) => (StatusCode::NOT_FOUND, "not_found", Text::key("zeyn.error.not_found")),
             Failure::App(e) => {
                 let status = match e {
                     Error::Forbidden | Error::Denied(_) => StatusCode::FORBIDDEN,
@@ -1804,10 +1914,20 @@ impl AppState {
         (status, axum::Json(json!({ "error": code, "message": ctx.t(&message) }))).into_response()
     }
 
+    /// The built in error page in the shell, for sign in flows. Pages use [`Self::error_screen`].
+    #[cfg(any(feature = "oidc", feature = "totp"))]
     fn error_page(&self, ctx: &Ctx, failure: Failure, csrf: &str) -> Response {
-        let (status, message) = match failure {
+        let (status, message) = Self::page_status(failure);
+        let (title, body) = Self::builtin_error(ctx, &message);
+        (status, Html(self.shell(ctx, csrf, &title, &body, None))).into_response()
+    }
+
+    /// Status and message of a failed page. Internal details are logged here and go no further.
+    fn page_status(failure: Failure) -> (StatusCode, Text) {
+        match failure {
             Failure::Timeout => (StatusCode::GATEWAY_TIMEOUT, Text::key("zeyn.error.timeout")),
             Failure::Status(status, _, message) => (status, message),
+            Failure::Moved(..) => (StatusCode::NOT_FOUND, Text::key("zeyn.error.not_found")),
             Failure::App(e) => {
                 let status = match &e {
                     Error::Forbidden | Error::Denied(_) => StatusCode::FORBIDDEN,
@@ -1821,12 +1941,57 @@ impl AppState {
                 };
                 (status, e.message())
             }
-        };
+        }
+    }
+
+    /// Title and body of the built in error page: the message alone.
+    fn builtin_error(ctx: &Ctx, message: &Text) -> (String, String) {
+        let title = ctx.t(message);
         let body = format!(
             r#"<section class="z-screen z-error" aria-labelledby="z-error-title"><h1 id="z-error-title">{}</h1></section>"#,
-            escape(&ctx.t(&message))
+            escape(&title)
         );
-        (status, Html(self.shell(ctx, csrf, &ctx.t(&message), &body, None))).into_response()
+        (title, body)
+    }
+
+    /// The error page of a page request: the app's screen for 404 or server errors
+    /// (`App::not_found`, `App::server_error`) when it has one the user may open, else the built
+    /// in message. A partial request gets only the screen, so the runtime swaps it in without a
+    /// page load; a full request gets it inside the shell. Both carry the failure's status.
+    async fn error_screen(&self, ctx: &Ctx, failure: Failure, csrf: &str, partial: bool) -> Response {
+        let (status, message) = Self::page_status(failure);
+        let entry = match status {
+            StatusCode::NOT_FOUND => self.errors.not_found,
+            s if s.is_server_error() => self.errors.server_error,
+            _ => None,
+        };
+        let own = match entry {
+            Some(e) if ctx.identity().can(&e.meta.access) => self.render_error_screen(ctx, e).await,
+            _ => None,
+        };
+        let (title, body) = own.unwrap_or_else(|| Self::builtin_error(ctx, &message));
+        let mut response = if partial {
+            partial_response(&format!("{title} · {}", ctx.t(&self.name)), body)
+        } else {
+            Html(self.shell(ctx, csrf, &title, &body, None)).into_response()
+        };
+        *response.status_mut() = status;
+        response
+    }
+
+    /// Builds and renders an error screen; `None` when it fails or panics itself, so the built in
+    /// message is shown instead of a second error.
+    async fn render_error_screen(&self, ctx: &Ctx, entry: ScreenEntry) -> Option<(String, String)> {
+        let built = catch_panic(self.timed((entry.build)(ctx.clone(), Json::Null))).await;
+        let Ok(Ok(screen)) = built else {
+            tracing::error!("error screen `{}` failed", entry.meta.name);
+            return None;
+        };
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let r = user_render(entry.meta.name, ctx);
+            (ctx.t(screen.title()), screen.render(&r, &entry.meta, &Json::Null, &HashMap::new()))
+        }))
+        .ok()
     }
 
     /// Full page around a screen: menu, language selector, toasts and assets.
@@ -1965,6 +2130,8 @@ fn with_cookie(mut response: Response, cookie: Option<String>) -> Response {
 async fn page(
     State(st): State<Arc<AppState>>,
     headers: HeaderMap,
+    uri: axum::http::Uri,
+    segments: Vec<(String, String)>,
     Query(q): Query<ParamsQuery>,
     name: &'static str,
 ) -> Response {
@@ -1974,7 +2141,7 @@ async fn page(
     let started = Instant::now();
     let call = Call { kind: CallKind::Page, screen: name, action: None, via_agent: false };
     let result = async {
-        let params = q.value()?;
+        let params = st.with_segments(name, q.value()?, &segments)?;
         st.before(&ctx, &call)?;
         let (_, entry, screen) = st.open(&ctx, name, params.clone()).await?;
         data::note_screen_read(&ctx, &entry.meta, &params);
@@ -1993,14 +2160,10 @@ async fn page(
             let holds_island = islands::holds(&st, &html);
             #[cfg(feature = "realtime")]
             let holds_live = realtime::holds(&st, &html);
-            let mut r = Html(html).into_response();
+            #[allow(unused_mut)]
+            let mut r = partial_response(&full, html);
+            #[cfg(any(feature = "islands", feature = "realtime"))]
             let h = r.headers_mut();
-            h.insert("x-zeyn-partial", HeaderValue::from_static("1"));
-            if let Ok(v) = HeaderValue::from_str(&encode(&full)) {
-                h.insert("x-zeyn-title", v);
-            }
-            h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
-            h.insert(header::VARY, HeaderValue::from_static("x-zeyn-partial"));
             #[cfg(feature = "islands")]
             if holds_island {
                 h.insert("x-zeyn-islands", HeaderValue::from_static("1"));
@@ -2025,29 +2188,23 @@ async fn page(
         Err(Failure::App(Error::Forbidden | Error::Denied(_)))
             if !ctx.identity().is_signed_in() && st.login_url.is_some() =>
         {
-            let here = st
-                .screens
-                .get(name)
-                .and_then(|(fi, e)| st.features[*fi].path_of(&e.meta))
-                .map(|p| st.url(&p))
-                .unwrap_or_default();
+            let here = st.url(uri.path_and_query().map_or(uri.path(), |p| p.as_str()));
             let target = st.login_url.clone().unwrap_or_default();
             let sep = if target.contains('?') { '&' } else { '?' };
             Redirect::to(&format!("{target}{sep}return_to={}", encode(&here))).into_response()
         }
         Err(Failure::Status(_, "mfa_required", _)) if st.sign_in.mfa_url.is_some() => {
-            let here = st
-                .screens
-                .get(name)
-                .and_then(|(fi, e)| st.features[*fi].path_of(&e.meta))
-                .map(|p| st.url(&p))
-                .unwrap_or_default();
+            let here = st.url(uri.path_and_query().map_or(uri.path(), |p| p.as_str()));
             let target = st.sign_in.mfa_url.clone().unwrap_or_default();
             let sep = if target.contains('?') { '&' } else { '?' };
             Redirect::to(&format!("{target}{sep}return_to={}", encode(&here))).into_response()
         }
         Err(Failure::Status(_, "reason_required", _)) => data::reason_page(&st, &ctx, name, &csrf),
-        Err(f) => st.error_page(&ctx, f, &csrf),
+        Err(Failure::Moved(to, params)) => match st.page_url(to, &params) {
+            Some(url) => (StatusCode::MOVED_PERMANENTLY, [(header::LOCATION, url)]).into_response(),
+            None => st.error_screen(&ctx, Failure::App(Error::NotFound), &csrf, partial).await,
+        },
+        Err(f) => st.error_screen(&ctx, f, &csrf, partial).await,
     };
     with_cookie(with_cookie(response, set), theme_cookie)
 }
@@ -2091,15 +2248,46 @@ async fn route_redirect(
     let Some((fi, entry)) = st.screens.get(name.as_str()) else {
         return st.error_response(&ctx, Failure::App(Error::NotFound));
     };
-    let Some(path) = st.features[*fi].path_of(&entry.meta) else {
+    if st.features[*fi].path_of(&entry.meta).is_none() {
         return st.error_response(&ctx, Failure::App(Error::NotFound));
+    }
+    let params = match &q.params {
+        Some(p) => match serde_json::from_str::<Json>(p) {
+            Ok(v) => v,
+            Err(_) => return st.error_response(&ctx, Failure::App(Error::NotFound)),
+        },
+        None => Json::Null,
     };
-    let path = st.url(&path);
-    let target = match &q.params {
-        Some(p) => format!("{path}?params={}", encode(p)),
-        None => path,
-    };
-    Redirect::to(&target).into_response()
+    match st.page_url(entry.meta.name, &params) {
+        Some(target) => Redirect::to(&target).into_response(),
+        None => st.error_response(&ctx, Failure::App(Error::NotFound)),
+    }
+}
+
+/// A screen answering a partial request: its HTML with the page title for the runtime, never cached.
+fn partial_response(full_title: &str, html: String) -> Response {
+    let mut r = Html(html).into_response();
+    let h = r.headers_mut();
+    h.insert("x-zeyn-partial", HeaderValue::from_static("1"));
+    if let Ok(v) = HeaderValue::from_str(&encode(full_title)) {
+        h.insert("x-zeyn-title", v);
+    }
+    h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    h.insert(header::VARY, HeaderValue::from_static("x-zeyn-partial"));
+    r
+}
+
+/// Runs a future and turns a panic while it is polled into `Err`, without boxing it.
+async fn catch_panic<F: Future>(fut: F) -> std::thread::Result<F::Output> {
+    let mut fut = std::pin::pin!(fut);
+    std::future::poll_fn(|cx| {
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| fut.as_mut().poll(cx))) {
+            Ok(std::task::Poll::Ready(v)) => std::task::Poll::Ready(Ok(v)),
+            Ok(std::task::Poll::Pending) => std::task::Poll::Pending,
+            Err(e) => std::task::Poll::Ready(Err(e)),
+        }
+    })
+    .await
 }
 
 /// Percent encodes a query value.
@@ -2255,6 +2443,7 @@ fn problem(ctx: &Ctx, failure: Failure) -> Response {
     let (status, code, message) = match &failure {
         Failure::Timeout => (StatusCode::GATEWAY_TIMEOUT, "timeout", Text::key("zeyn.error.timeout")),
         Failure::Status(status, code, message) => (*status, *code, message.clone()),
+        Failure::Moved(..) => (StatusCode::NOT_FOUND, "not_found", Text::key("zeyn.error.not_found")),
         Failure::App(e) => (
             match e {
                 Error::Forbidden | Error::Denied(_) => StatusCode::FORBIDDEN,
@@ -2322,5 +2511,35 @@ async fn set_time_zone(
 async fn not_found(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
     let ctx = st.ctx(&headers);
     let (csrf, set) = st.csrf(&headers);
-    with_cookie(st.error_page(&ctx, Failure::App(Error::NotFound), &csrf), set)
+    let partial = headers.get("x-zeyn-partial").is_some_and(|v| v == "1");
+    with_cookie(st.error_screen(&ctx, Failure::App(Error::NotFound), &csrf, partial).await, set)
+}
+
+/// Turns a panic in any handler into a 500 without details: the app's server error page for a
+/// page request, the JSON error for framework endpoints and the API. The panic message stays in
+/// the server log.
+async fn catch_panics(
+    State(st): State<Arc<AppState>>,
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> Response {
+    let headers = req.headers().clone();
+    let page = req.method() == axum::http::Method::GET && {
+        let path = req.uri().path();
+        !path.contains("/_zeyn/") && !path.starts_with(&st.api_prefix)
+    };
+    match catch_panic(next.run(req)).await {
+        Ok(response) => response,
+        Err(_) => {
+            tracing::error!("a request handler panicked");
+            let ctx = st.ctx(&headers);
+            let failure = Failure::App(Error::Internal("a request handler panicked".into()));
+            if !page {
+                return st.error_response(&ctx, failure);
+            }
+            let (csrf, set) = st.csrf(&headers);
+            let partial = headers.get("x-zeyn-partial").is_some_and(|v| v == "1");
+            with_cookie(st.error_screen(&ctx, failure, &csrf, partial).await, set)
+        }
+    }
 }

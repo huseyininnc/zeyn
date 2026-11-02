@@ -13,12 +13,17 @@ const BASE = (document.querySelector('meta[name="zeyn-base"]')?.content ?? '').r
 
 let controller = null;
 
-/** Whether a URL is a screen of this app that can be loaded without a full page load. */
+/**
+ * Whether a URL is a screen of this app that can be loaded without a full page load: an app path
+ * that does not look like a file (the server writes dots in path segments as `%2E`), or a
+ * `/_zeyn/route/` link, which redirects to the screen's path.
+ */
 function isScreenUrl(url) {
   if (url.origin !== location.origin) return false;
   const path = url.pathname;
   if (BASE && path !== BASE && !path.startsWith(`${BASE}/`)) return false;
   const local = path.slice(BASE.length) || '/';
+  if (local.startsWith('/_zeyn/route/')) return true;
   return !local.startsWith('/_zeyn/') && !local.startsWith('/api/') && !/\.[a-z0-9]+$/i.test(local);
 }
 

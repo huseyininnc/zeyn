@@ -118,6 +118,7 @@ fn failure_text(ctx: &Ctx, f: &Failure) -> String {
         }
         Failure::App(e) => ctx.t(&e.message()),
         Failure::Status(_, _, message) => ctx.t(message),
+        Failure::Moved(..) => ctx.t(&Text::key("zeyn.error.not_found")),
     }
 }
 
@@ -474,7 +475,8 @@ fn result_text(ctx: &Ctx, tool: &Tool, result: Result<Json, Failure>, limit: usi
     )
 }
 
-/// Screens the model may open for the user: routed, offered to models, allowed for the user.
+/// Screens the model may open for the user: routed without path segments (a model cannot fill
+/// them), offered to models, allowed for the user.
 fn screens_for(st: &AppState, ctx: &Ctx) -> Vec<(&'static str, String, String)> {
     let mut list = Vec::new();
     for f in &st.features {
@@ -485,7 +487,9 @@ fn screens_for(st: &AppState, ctx: &Ctx) -> Vec<(&'static str, String, String)> 
             if !s.meta.ai.offered || !ctx.identity().can(&s.meta.access) {
                 continue;
             }
-            let Some(path) = f.path_of(&s.meta) else { continue };
+            let Some(path) = f.path_of(&s.meta).filter(|p| !crate::screen::route_has_segments(Some(p))) else {
+                continue;
+            };
             let label = f
                 .menu_groups()
                 .iter()

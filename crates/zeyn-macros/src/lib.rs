@@ -365,6 +365,10 @@ fn expand_screen(
     let (params, _) = fn_types(f, "screen")?;
     let name = &f.sig.ident;
     let access = access.tokens("screen", name)?;
+    let path_value = match route {
+        Some(r) => path_value_fn(r, &params, params.to_string().replace(char::is_whitespace, "") == "()")?,
+        None => quote!(),
+    };
     let route = match route {
         Some(r) if !r.value().starts_with('/') => {
             return Err(syn::Error::new(r.span(), "a screen route must start with `/`"));
@@ -394,11 +398,67 @@ fn expand_screen(
                 #deps
             }
 
+            #path_value
+
             fn build(ctx: ::zeyn::Ctx, input: Self::Params) -> ::zeyn::BoxFuture<::zeyn::Result<::zeyn::Screen>> {
                 ::std::boxed::Box::pin(async move {
                     #binds
                     ::zeyn::IntoScreen::into_screen(#call)
                 })
+            }
+        }
+    })
+}
+
+/// `ScreenDef::path_value` for a route with path segments (`/orders/{id}`): each segment names a
+/// params field and reads as that field's type. Nothing for a route without segments.
+fn path_value_fn(route: &LitStr, params: &Ts, no_params: bool) -> syn::Result<Ts> {
+    let value = route.value();
+    let mut names: Vec<String> = Vec::new();
+    for seg in value.split('/').filter(|s| s.contains('{') || s.contains('}')) {
+        let name = seg.strip_prefix('{').and_then(|s| s.strip_suffix('}')).filter(|n| syn::parse_str::<Ident>(n).is_ok());
+        let Some(name) = name else {
+            return Err(syn::Error::new(
+                route.span(),
+                format!(
+                    "route segment `{seg}` must be a whole segment `{{field}}` that names a field of the screen's params
+  = help: write `/orders/{{id}}` with a field `id` in the `#[params]` struct; wildcards and partial segments such as `{{a}}-{{b}}` are not supported"
+                ),
+            ));
+        };
+        if names.iter().any(|n| n == name) {
+            return Err(syn::Error::new(
+                route.span(),
+                format!("route names `{{{name}}}` twice
+  = help: each path segment binds a different params field"),
+            ));
+        }
+        names.push(name.to_string());
+    }
+    if names.is_empty() {
+        return Ok(quote!());
+    }
+    if no_params {
+        return Err(syn::Error::new(
+            route.span(),
+            format!(
+                "route `{value}` has path segments but the screen takes no params
+  = help: add a `#[params]` struct with a field `{}` and take it as the screen's first argument",
+                names[0]
+            ),
+        ));
+    }
+    let arms = names.iter().map(|n| {
+        let field = Ident::new(n, route.span());
+        quote_spanned! {route.span()=>
+            #n => ::zeyn::__path_value(raw, |p: &#params| &p.#field),
+        }
+    });
+    Ok(quote! {
+        fn path_value(field: &str, raw: &str) -> ::core::option::Option<::zeyn::__serde_json::Value> {
+            match field {
+                #(#arms)*
+                _ => ::core::option::Option::None,
             }
         }
     })
@@ -860,6 +920,12 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
             }
 
             impl ::zeyn::ui::LookupValue for #id_name {}
+
+            impl ::zeyn::PathValue for #id_name {
+                fn from_segment(raw: &str) -> ::core::option::Option<Self> {
+                    <i64 as ::zeyn::PathValue>::from_segment(raw).map(#id_name)
+                }
+            }
 
             impl ::zeyn::ApiInput for #id_name {
                 fn schema() -> ::zeyn::__serde_json::Value {
