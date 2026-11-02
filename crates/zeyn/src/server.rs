@@ -1816,19 +1816,20 @@ fn is_public_asset(path: &str) -> bool {
 
 /// IP rules and rate limits, before any handler runs.
 async fn guard_request(State(st): State<Arc<AppState>>, req: axum::extract::Request, next: axum::middleware::Next) -> Response {
-    let path = req.uri().path().to_string();
-    if is_public_asset(&path) {
+    if is_public_asset(req.uri().path()) {
         return next.run(req).await;
     }
-    ops::delay(&st, &path).await;
-    if let Some(ready) = st.auth.as_ref().and_then(|a| a.prepare(req.headers())) {
+    let (parts, body) = req.into_parts();
+    let path = parts.uri.path();
+    let headers = &parts.headers;
+    ops::delay(&st, path).await;
+    if let Some(ready) = st.auth.as_ref().and_then(|a| a.prepare(headers)) {
         ready.await;
     }
-    let headers = req.headers().clone();
-    let peer = req.extensions().get::<axum::extract::ConnectInfo<std::net::SocketAddr>>().map(|c| c.0.ip());
+    let peer = parts.extensions.get::<axum::extract::ConnectInfo<std::net::SocketAddr>>().map(|c| c.0.ip());
     let forwarded = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok());
     let ip = client_ip(peer, forwarded, &st.trusted);
-    let probe = ops::is_probe(&path);
+    let probe = ops::is_probe(path);
     let blocked = match ip {
         Some(ip) => {
             st.deny.iter().any(|r| r.contains(ip))
@@ -1837,26 +1838,26 @@ async fn guard_request(State(st): State<Arc<AppState>>, req: axum::extract::Requ
         None => !st.allow.is_empty(),
     };
     if blocked {
-        let ctx = st.ctx(&headers);
+        let ctx = st.ctx(headers);
         return problem(&ctx, Failure::App(Error::Forbidden));
     }
-    let is_write = req.method() == axum::http::Method::POST
-        && (WRITE_PATHS.contains(&path.as_str())
+    let is_write = parts.method == axum::http::Method::POST
+        && (WRITE_PATHS.contains(&path)
             || path.starts_with("/_zeyn/assistant/")
-            || path.starts_with(&format!("{}/", st.api_prefix)));
+            || path.strip_prefix(st.api_prefix.as_str()).is_some_and(|rest| rest.starts_with('/')));
     let limits = if probe { [(None, "all"), (None, "write")] } else { [(st.rate, "all"), (if is_write { st.write_rate } else { None }, "write")] };
     for (limit, scope) in limits {
         let Some(limit) = limit else { continue };
         let ip_key = ip.map(|i| i.to_string()).unwrap_or_else(|| "unknown".into());
         let key = match limit.key {
             RateKey::Ip => format!("{scope}:ip:{ip_key}"),
-            RateKey::User => match st.auth.as_ref().and_then(|a| a.authenticate(&headers)).and_then(|i| i.user) {
+            RateKey::User => match st.auth.as_ref().and_then(|a| a.authenticate(headers)).and_then(|i| i.user) {
                 Some(user) => format!("{scope}:user:{user}"),
                 None => format!("{scope}:ip:{ip_key}"),
             },
         };
         if let Err(wait) = st.rate_store.take(&key, &limit).await {
-            let ctx = st.ctx(&headers);
+            let ctx = st.ctx(headers);
             let mut response = problem(&ctx, Failure::App(Error::Denied(Text::key("zeyn.error.rate_limited"))));
             *response.status_mut() = StatusCode::TOO_MANY_REQUESTS;
             if let Some(body) = response.headers_mut().get_mut(header::CONTENT_TYPE) {
@@ -1869,7 +1870,7 @@ async fn guard_request(State(st): State<Arc<AppState>>, req: axum::extract::Requ
             return response;
         }
     }
-    next.run(req).await
+    next.run(axum::extract::Request::from_parts(parts, body)).await
 }
 
 /// One `request` span per request: method, path without the query string, status and duration,
