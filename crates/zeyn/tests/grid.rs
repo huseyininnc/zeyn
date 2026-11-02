@@ -1189,3 +1189,33 @@ async fn grid_writes_count_against_the_write_limit() {
     let r = send(&router, post("/_zeyn/grid", serde_json::json!({ "screen": "edit_list", "node": 0 }))).await;
     assert_eq!(r.status, StatusCode::OK, "reading rows is not a write");
 }
+
+/// Refuses every call in `before` and counts the calls `after` sees.
+#[derive(Clone, Default)]
+struct RefuseAll(Arc<RwLock<Vec<bool>>>);
+
+impl zeyn::Interceptor for RefuseAll {
+    fn before(&self, _ctx: &Ctx, _call: &zeyn::server::Call) -> Result<()> {
+        Err(Error::Forbidden)
+    }
+
+    fn after(&self, _ctx: &Ctx, _call: &zeyn::server::Call, outcome: &zeyn::server::CallOutcome) {
+        self.0.write().unwrap().push(outcome.ok);
+    }
+}
+
+#[tokio::test]
+async fn an_export_refused_by_an_interceptor_still_reaches_its_after() {
+    let refuse = RefuseAll::default();
+    let identity = reader();
+    let router = App::new("Test")
+        .service(Store::seeded())
+        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .interceptor(refuse.clone())
+        .feature(Feature::new("items").screen(export_list))
+        .router()
+        .unwrap();
+    let r = send(&router, export_get(0, serde_json::json!({}), "en")).await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN);
+    assert_eq!(*refuse.0.read().unwrap(), [false], "audit interceptors record the refused export");
+}

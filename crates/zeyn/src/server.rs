@@ -2558,7 +2558,11 @@ async fn grid_export(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(
             return Err(Failure::App(Error::Forbidden));
         }
         let info = Call { kind: CallKind::DataGrid, screen: entry.meta.name, action: Some(grid.action()), via_agent: ctx.via_agent() };
-        st.before(&ctx, &info)?;
+        let checked = st.before(&ctx, &info);
+        if checked.is_err() {
+            st.after(&ctx, &info, Instant::now(), &checked);
+        }
+        checked?;
         Ok((entry, screen, spec, info))
     }
     .await;
