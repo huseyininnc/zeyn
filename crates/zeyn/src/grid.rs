@@ -2044,7 +2044,7 @@ fn grid_texts(r: &Render) -> serde_json::Value {
 
 /// A comparable bound or value for range filters. Numbers and money compare in hundredths.
 #[derive(Clone, Copy, PartialEq, PartialOrd)]
-enum Key {
+pub(crate) enum Key {
     Num(i128),
     Date(Date),
     Time(Time),
@@ -2120,14 +2120,14 @@ fn bound(kind: &FieldKind, raw: &str, tz: TimeZone, upper: bool) -> Option<Key> 
     }
 }
 
-enum TextOp {
+pub(crate) enum TextOp {
     Contains,
     StartsWith,
     Equals,
 }
 
 /// One condition of a filter, read once before the rows are scanned.
-enum Cond {
+pub(crate) enum Cond {
     Text(usize, TextOp, String),
     Range(usize, Option<Key>, Option<Key>),
     AnyOf(usize, Vec<String>),
@@ -2139,7 +2139,7 @@ enum Cond {
 impl Cond {
     /// Reads the conditions of one filter. Unknown fields, unreadable values and conditions that
     /// do not fit the column kind are dropped.
-    fn read(f: &Filter, fields: &[crate::model::FieldMeta], tz: TimeZone, out: &mut Vec<Cond>) {
+    pub(crate) fn read(f: &Filter, fields: &[crate::model::FieldMeta], tz: TimeZone, out: &mut Vec<Cond>) {
         let Some(i) = fields.iter().position(|m| m.name == f.field) else { return };
         let kind = &fields[i].kind;
         let text = |s: &str| {

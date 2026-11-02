@@ -9,6 +9,8 @@ repository.workspace = true
 [features]
 default = ["server"]
 server = ["dep:axum", "dep:tokio", "dep:getrandom", "dep:tower-http", "dep:futures-core"]
+# Data layer (`zeyn::sql`). Apps without a database enable neither and pay nothing.
+postgres = ["dep:sqlx", "dep:base64", "dep:tokio", "dep:futures-core", "dep:futures-util"]
 
 [dependencies]
 zeyn-macros = { path = "../zeyn-macros", version = "0.0.2" }
@@ -19,6 +21,9 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time",
 futures-core = { version = "0.3", optional = true }
 getrandom = { version = "0.2", optional = true }
 tower-http = { version = "0.6", features = ["cors"], optional = true }
+sqlx = { version = "0.9", default-features = false, features = ["postgres", "runtime-tokio", "migrate"], optional = true }
+base64 = { version = "0.22", optional = true }
+futures-util = { version = "0.3", default-features = false, optional = true }
 
 [dev-dependencies]
 serde = { version = "1", features = ["derive"] }
