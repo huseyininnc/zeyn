@@ -5,6 +5,11 @@
     },
     "yes": "Yes",
     "no": "No",
+    "privacy": {
+      "reveal": "Show {label}",
+      "revealed": "The value is shown. This was recorded.",
+      "reveal_failed": "The value could not be shown."
+    },
     "validation": {
       "required": "{label} is required.",
       "min_len": "{label} must be at least {n} characters.",

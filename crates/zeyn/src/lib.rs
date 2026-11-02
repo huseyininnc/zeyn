@@ -119,6 +119,18 @@
 //! }
 //! ```
 //!
+//! A mask on a field that is not text:
+//!
+//! ```compile_fail
+//! use zeyn::prelude::*;
+//!
+//! #[model]
+//! pub struct Card {
+//!     #[mask(last4)]
+//!     pub number: i64,
+//! }
+//! ```
+//!
 //! ## Extension points
 //!
 //! - [`Component`]: any type that renders HTML and describes itself in the schema can go on a screen.
@@ -135,6 +147,7 @@ mod grid;
 mod i18n;
 mod model;
 mod platform;
+mod privacy;
 pub mod render;
 mod screen;
 #[cfg(feature = "server")]
@@ -148,7 +161,8 @@ pub use action::{
     Access, Action, ActionMeta, Cursor, DEFAULT_PAGE_SIZE, Error, Filter, GridQuery, MAX_PAGE_SIZE, Page, PageRequest,
     Result, Sort,
 };
-pub use audit::{FieldChange, RecordRef, Trail};
+pub use audit::{FieldChange, FieldRef, RecordRef, Trail};
+pub use privacy::{MaskStyle, Masking, Revealed, can_unmask, masked_text, reveal_in};
 pub use api::{ApiEntry, ApiInput, ApiOutput, ApiResult, model_schema};
 pub use ctx::{BoxFuture, Ctx, Dep, Identity, Inject, IntoScreen, Outcome, Service, Services};
 pub use feature::{Feature, Guard, GuardResult, Menu, MenuGroup, MenuItem, Route, ScreenEntry, SignedIn};

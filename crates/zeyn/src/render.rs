@@ -57,11 +57,20 @@ pub struct Render<'a> {
     pub i18n: &'a crate::i18n::I18n,
     /// Zone in which moments (`DateTime`) are shown.
     pub tz: crate::time::TimeZone,
+    /// The request, when rendering for a user: decides who may reveal masked values and records
+    /// reads of sensitive records. `None` treats the viewer as having no permissions.
+    pub ctx: Option<&'a crate::ctx::Ctx>,
 }
 
 impl<'a> Render<'a> {
     pub fn new(scope: &'a str, locale: &'a str, i18n: &'a crate::i18n::I18n) -> Self {
-        Self { scope, locale, i18n, tz: crate::time::TimeZone::UTC }
+        Self { scope, locale, i18n, tz: crate::time::TimeZone::UTC, ctx: None }
+    }
+
+    /// Renders for the user of this request.
+    pub fn with_ctx(mut self, ctx: &'a crate::ctx::Ctx) -> Self {
+        self.ctx = Some(ctx);
+        self
     }
 
     pub fn with_tz(mut self, tz: crate::time::TimeZone) -> Self {
@@ -71,7 +80,7 @@ impl<'a> Render<'a> {
 
     /// English with the built in catalogs. For tests and tools.
     pub fn english(scope: &'a str) -> Render<'a> {
-        Render { scope, locale: "en", i18n: crate::i18n::I18n::builtin(), tz: crate::time::TimeZone::UTC }
+        Render { scope, locale: "en", i18n: crate::i18n::I18n::builtin(), tz: crate::time::TimeZone::UTC, ctx: None }
     }
 
     /// Resolves a text and escapes it for HTML.

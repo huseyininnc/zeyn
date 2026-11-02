@@ -267,7 +267,11 @@ impl<E: Model> Grid<E> {
             for c in &self.columns {
                 let value = (c.value)(row);
                 let class = if matches!(value, Value::Int(_) | Value::Money(_)) { r#" class="z-num""# } else { "" };
-                out.push_str(&format!("<td{class}>{}</td>", r.value(&value, &c.meta.kind)));
+                let shown = match c.meta.mask {
+                    Some(_) => crate::privacy::cell(r, c.meta, &value, row),
+                    None => r.value(&value, &c.meta.kind),
+                };
+                out.push_str(&format!("<td{class}>{shown}</td>"));
             }
             out.push_str("</tr>");
         }
@@ -398,6 +402,14 @@ impl<E: Model> GridSource for Grid<E> {
 
     fn render_loaded(&self, out: &mut String, r: &Render, page: &LoadedPage) {
         self.render_with(out, r, Some(page));
+    }
+
+    fn fields(&self) -> &'static [FieldMeta] {
+        E::fields()
+    }
+
+    fn reveal(&self, ctx: Ctx, key: String, field: String) -> BoxFuture<Result<Option<crate::privacy::Revealed>>> {
+        crate::privacy::grid_reveal::<E>(self.fetch, ctx, key, field)
     }
 
     fn tool_schema(&self) -> serde_json::Value {

@@ -5,6 +5,11 @@
     },
     "yes": "Evet",
     "no": "Hayır",
+    "privacy": {
+      "reveal": "{label} göster",
+      "revealed": "Değer gösterildi. Bu işlem kayda alındı.",
+      "reveal_failed": "Değer gösterilemedi."
+    },
     "validation": {
       "required": "{label} alanı zorunludur.",
       "min_len": "{label} en az {n} karakter olmalıdır.",

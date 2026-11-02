@@ -53,6 +53,8 @@ pub struct FieldMeta {
     /// Row version for optimistic concurrency. Sent back by the client so a stale save is detected.
     pub version: bool,
     pub optional: bool,
+    /// Set by `#[mask(...)]`: the value is shown masked unless the user may reveal it.
+    pub mask: Option<crate::privacy::Masking>,
 }
 
 impl FieldMeta {

@@ -403,6 +403,10 @@ fn parse_model_args(attr: TokenStream, allow_table: bool) -> syn::Result<ModelAr
 /// Field rules: `required`, `min_len = N`, `max_len = N`, `email`, `min = N`, `max = N`.
 /// Rules that involve several fields go in a function given with `validate = ...`.
 ///
+/// Text fields with personal data can be masked: `#[mask(last4)]`, `#[mask(email)]` or
+/// `#[mask]` (nothing shown). Users with `<model>.<field>.unmask` (or the permission given with
+/// `#[mask(last4, permission = "...")]`) may reveal the value; every reveal is audited.
+///
 /// ```ignore
 /// #[model(validate = check_dates)]
 /// pub struct LeaveRequest {
@@ -439,6 +443,22 @@ pub fn entity(attr: TokenStream, item: TokenStream) -> TokenStream {
     let original = quote!(#s);
     let result = parse_model_args(attr, true).and_then(|args| expand_model(s, args, true));
     or_error(result, original)
+}
+
+/// `LeaveRequest` -> `leave_request`.
+fn snake_case(name: &str) -> String {
+    let mut out = String::with_capacity(name.len() + 4);
+    for (i, c) in name.chars().enumerate() {
+        if c.is_ascii_uppercase() {
+            if i > 0 {
+                out.push('_');
+            }
+            out.push(c.to_ascii_lowercase());
+        } else {
+            out.push(c);
+        }
+    }
+    out
 }
 
 /// `unit_price` -> `Unit price`.
@@ -480,6 +500,7 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
         let mut readonly = false;
         let mut version = false;
         let mut label: Option<LitStr> = None;
+        let mut mask = quote!(::core::option::Option::None);
         let mut rules = Vec::new();
         let mut keep = Vec::new();
 
@@ -493,6 +514,32 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
                 checks.push(quote_spanned!(ty.span()=> ::zeyn::__rules::version::<#ty>();));
             } else if a.path().is_ident("label") {
                 label = Some(a.parse_args()?);
+            } else if a.path().is_ident("mask") {
+                let mut style = quote!(::zeyn::MaskStyle::Full);
+                let mut permission: Option<LitStr> = None;
+                if !matches!(a.meta, syn::Meta::Path(_)) {
+                    a.parse_nested_meta(|m| {
+                        if m.path.is_ident("last4") {
+                            style = quote!(::zeyn::MaskStyle::LastFour);
+                        } else if m.path.is_ident("email") {
+                            style = quote!(::zeyn::MaskStyle::Email);
+                        } else if m.path.is_ident("full") {
+                            style = quote!(::zeyn::MaskStyle::Full);
+                        } else if m.path.is_ident("permission") {
+                            let p: LitStr = m.value()?.parse()?;
+                            check_permission(&p)?;
+                            permission = Some(p);
+                        } else {
+                            return Err(m.error("unknown mask option\n  = help: expected `last4`, `email`, `full` or `permission = \"...\"`"));
+                        }
+                        Ok(())
+                    })?;
+                }
+                let permission = permission
+                    .map(|p| p.value())
+                    .unwrap_or_else(|| format!("{}.{}.unmask", snake_case(&name.to_string()), fname_str));
+                checks.push(quote_spanned!(ty.span()=> ::zeyn::__rules::text::<#ty>();));
+                mask = quote!(::core::option::Option::Some(::zeyn::Masking { style: #style, permission: #permission }));
             } else if a.path().is_ident("rule") {
                 a.parse_nested_meta(|m| {
                     let text_check = quote_spanned!(ty.span()=> ::zeyn::__rules::text::<#ty>(););
@@ -559,6 +606,7 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
                 readonly: #readonly,
                 version: #version,
                 optional: <#ty as ::zeyn::FieldType>::OPTIONAL,
+                mask: #mask,
             }
         });
         getters.push(quote! {

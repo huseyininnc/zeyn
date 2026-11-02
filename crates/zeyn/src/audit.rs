@@ -31,6 +31,14 @@ impl RecordRef {
     }
 }
 
+/// One field of one record, such as a revealed masked value.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct FieldRef {
+    pub model: &'static str,
+    pub id: Option<String>,
+    pub field: &'static str,
+}
+
 /// What a call did to data. Collected on the request context; read by audit interceptors.
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct Trail {
@@ -38,6 +46,8 @@ pub struct Trail {
     pub record: Option<RecordRef>,
     /// Fields that changed, in declaration order.
     pub changes: Vec<FieldChange>,
+    /// Masked values the user was shown in full.
+    pub revealed: Vec<FieldRef>,
 }
 
 /// A value as a plain, language independent string. `None` for an empty value.
@@ -67,7 +77,7 @@ pub fn plain(value: &Value) -> Option<String> {
 }
 
 /// Fields whose value differs between the loaded record and the saved one. Row versions are left
-/// out.
+/// out; masked fields are reported masked.
 pub fn diff<M: Model>(old: &M, new: &M) -> Vec<FieldChange> {
     M::fields()
         .iter()
@@ -78,7 +88,8 @@ pub fn diff<M: Model>(old: &M, new: &M) -> Vec<FieldChange> {
             if a == b {
                 return None;
             }
-            Some(FieldChange { field: meta.name, old: plain(&a), new: plain(&b) })
+            let shown = |v: &Value| plain(v).map(|s| crate::privacy::masked_text(meta, &s));
+            Some(FieldChange { field: meta.name, old: shown(&a), new: shown(&b) })
         })
         .collect()
 }

@@ -23,6 +23,9 @@ use std::future::Future;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+mod data;
+mod ops;
+
 const JS: &str = include_str!("../assets/zeyn.js");
 const CSS: &str = include_str!("../assets/zeyn.css");
 const CSP: &str = "default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
@@ -199,6 +202,8 @@ pub enum CallKind {
     Grid,
     Form,
     Api,
+    /// A masked value shown in full on request.
+    Reveal,
 }
 
 /// What is being called.
@@ -250,6 +255,9 @@ pub struct AuditEntry {
     /// Changed fields with old and new values. Old values come from the record the server loaded.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub changes: Vec<crate::audit::FieldChange>,
+    /// Masked values the user was shown in full.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub revealed: Vec<crate::audit::FieldRef>,
 }
 
 /// Where audit records go.
@@ -291,15 +299,19 @@ pub struct AuditLog<S: AuditSink>(pub S);
 
 impl<S: AuditSink> Interceptor for AuditLog<S> {
     fn after(&self, ctx: &Ctx, call: &Call, outcome: &CallOutcome) {
-        let audited = call.kind == CallKind::Form || call.action.is_some_and(|a| a.audit);
+        let trail = ctx.trail();
+        let audited = call.kind == CallKind::Form
+            || call.kind == CallKind::Reveal
+            || call.action.is_some_and(|a| a.audit)
+            || !trail.revealed.is_empty();
         if !audited {
             return;
         }
-        let trail = ctx.trail();
         self.0.record(AuditEntry {
             model: trail.record.as_ref().map(|r| r.model),
             record: trail.record.and_then(|r| r.id),
             changes: trail.changes,
+            revealed: trail.revealed,
             at_unix_ms: SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0),
             user: ctx.identity().user.clone(),
             kind: call.kind,
@@ -990,7 +1002,8 @@ impl App {
             .route("/_zeyn/locale", post(set_locale))
             .route("/_zeyn/timezone", post(set_time_zone))
             .route("/_zeyn/tools", get(tools))
-            .route("/_zeyn/mcp", post(mcp))
+            .route("/_zeyn/mcp", post(mcp));
+        let router = data::routes(ops::routes(router))
             .fallback(not_found)
             .layer(axum::middleware::from_fn_with_state(state.clone(), guard_request))
             .layer(axum::middleware::map_response(security_headers))
@@ -1388,7 +1401,7 @@ impl AppState {
         }
         let app = r.text(&self.name);
         format!(
-            r##"<!doctype html><html lang="{lang}"{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css">{theme_link}<script type="module" src="{base}/_zeyn/zeyn.js"></script></head><body><a class="z-skip" href="#z-main">{skip}</a><div class="z-app"><nav class="z-nav" aria-label="{menu}"><p class="z-app-name">{app}</p>{nav}</nav><main class="z-main" id="z-main">{main}</main></div><div class="z-toasts" role="status" aria-live="polite"></div></body></html>"##,
+            r##"<!doctype html><html lang="{lang}"{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css">{theme_link}<script type="module" src="{base}/_zeyn/zeyn.js"></script>{extra}</head><body><a class="z-skip" href="#z-main">{skip}</a><div class="z-app"><nav class="z-nav" aria-label="{menu}"><p class="z-app-name">{app}</p>{nav}</nav><main class="z-main" id="z-main">{main}</main></div><div class="z-toasts" role="status" aria-live="polite"></div></body></html>"##,
             lang = escape(ctx.locale()),
             tz = escape(ctx.time_zone().name()),
             base = escape(&self.prefix),
@@ -1406,6 +1419,7 @@ impl AppState {
                 String::new()
             },
             title = escape(title),
+            extra = ops::head(self, ctx),
             skip = r.text(&Text::key("zeyn.shell.skip")),
             menu = r.text(&Text::key("zeyn.shell.menu")),
         )
@@ -1425,7 +1439,7 @@ fn asset(body: &'static str, content_type: &'static str) -> Response {
 /// IP rules and rate limits, before any handler runs.
 async fn guard_request(State(st): State<Arc<AppState>>, req: axum::extract::Request, next: axum::middleware::Next) -> Response {
     let path = req.uri().path().to_string();
-    if path == "/_zeyn/zeyn.js" || path == "/_zeyn/zeyn.css" || path == "/_zeyn/theme.css" || path == "/favicon.ico" {
+    if path == "/_zeyn/zeyn.js" || path == "/_zeyn/zeyn.css" || path == "/_zeyn/theme.css" || path == "/favicon.ico" || ops::is_asset(&path) {
         return next.run(req).await;
     }
     let headers = req.headers().clone();
@@ -1501,7 +1515,7 @@ async fn page(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Que
         st.before(&ctx, &call)?;
         let (_, entry, screen) = st.open(&ctx, name, params.clone()).await?;
         let loaded = st.preload(&ctx, &screen).await;
-        let r = Render::new(name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone());
+        let r = Render::new(name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_ctx(&ctx);
         let html = screen.render(&r, &entry.meta, &params, &loaded);
         Ok::<_, Failure>((ctx.t(screen.title()), html))
     }
@@ -1531,7 +1545,7 @@ async fn screen_fragment(
         let params = q.value()?;
         let (_, entry, screen) = st.open(&ctx, &name, params.clone()).await?;
         let loaded = st.preload(&ctx, &screen).await;
-        let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone());
+        let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_ctx(&ctx);
         Ok::<_, Failure>(screen.render(&r, &entry.meta, &params, &loaded))
     }
     .await;
@@ -1604,14 +1618,16 @@ impl AppState {
         }
         let info = Call { kind: CallKind::Grid, screen: entry.meta.name, action: Some(action), via_agent: ctx.via_agent() };
         let started = Instant::now();
+        let mut query = call.query;
+        crate::privacy::strip_masked(&mut query, grid.fields(), ctx);
         let result = async {
             self.before(ctx, &info)?;
-            self.timed(grid.fetch(ctx.clone(), call.query)).await
+            self.timed(grid.fetch(ctx.clone(), query)).await
         }
         .await;
         self.after(ctx, &info, started, &result);
         let page = result?;
-        let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone());
+        let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_ctx(ctx);
         Ok(json!({
             "rows": grid.rows_html(&page, &r),
             "count": page.count,
@@ -1640,7 +1656,7 @@ impl AppState {
         .await;
         self.after(ctx, &info, started, &result);
         let effects = result?;
-        let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone());
+        let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_ctx(ctx);
         Ok(json!({ "effects": effects.iter().map(|e| e.to_json(&r)).collect::<Vec<_>>() }))
     }
 

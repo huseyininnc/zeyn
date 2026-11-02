@@ -131,11 +131,19 @@ serde_input! {
 /// Types an API action can return inside `Result`.
 pub trait ApiOutput: Serialize + Send + 'static {
     fn schema() -> Json;
+
+    /// Masks masked fields of the serialized output for users who may not reveal them, and
+    /// records reveals and sensitive reads for the audit log.
+    fn protect(_value: &mut Json, _ctx: &Ctx) {}
 }
 
 impl<M: Model> ApiOutput for M {
     fn schema() -> Json {
         model_schema::<M>()
+    }
+
+    fn protect(value: &mut Json, ctx: &Ctx) {
+        crate::privacy::protect_object::<M>(value, ctx);
     }
 }
 
@@ -151,11 +159,23 @@ impl<M: Model> ApiOutput for Page<M> {
             "required": ["items"]
         })
     }
+
+    fn protect(value: &mut Json, ctx: &Ctx) {
+        if let Some(items) = value.get_mut("items").and_then(Json::as_array_mut) {
+            items.iter_mut().for_each(|item| crate::privacy::protect_object::<M>(item, ctx));
+        }
+    }
 }
 
 impl<M: Model> ApiOutput for Vec<M> {
     fn schema() -> Json {
         json!({ "type": "array", "items": model_schema::<M>() })
+    }
+
+    fn protect(value: &mut Json, ctx: &Ctx) {
+        if let Some(items) = value.as_array_mut() {
+            items.iter_mut().for_each(|item| crate::privacy::protect_object::<M>(item, ctx));
+        }
     }
 }
 
@@ -184,6 +204,9 @@ plain_output! {
 pub trait ApiResult: Send + 'static {
     fn schema() -> Json;
     fn into_json(self) -> Result<Json>;
+
+    /// See [`ApiOutput::protect`].
+    fn protect(_value: &mut Json, _ctx: &Ctx) {}
 }
 
 impl<T: ApiOutput> ApiResult for Result<T> {
@@ -194,6 +217,10 @@ impl<T: ApiOutput> ApiResult for Result<T> {
     fn into_json(self) -> Result<Json> {
         let value = self?;
         serde_json::to_value(value).map_err(|e| Error::Internal(format!("response could not be serialized: {e}")))
+    }
+
+    fn protect(value: &mut Json, ctx: &Ctx) {
+        T::protect(value, ctx);
     }
 }
 
@@ -220,7 +247,9 @@ where
                 t.record.get_or_insert(record);
             });
         }
-        A::call(ctx, input).await?.into_json()
+        let mut value = A::call(ctx.clone(), input).await?.into_json()?;
+        <A::Output as ApiResult>::protect(&mut value, &ctx);
+        Ok(value)
     })
 }
 
