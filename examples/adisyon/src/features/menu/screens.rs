@@ -5,9 +5,10 @@ use zeyn::prelude::*;
 /// The menu with prices and stock, edited in place. Rows close to running out are highlighted.
 #[screen(route = "/menu", permission = "pos.menu")]
 pub fn menu_list() -> Screen {
-    Screen::new(t!("menu.list")).body(
+    Screen::new(t!("menu.list")).toolbar(|t| t.export(Export::Csv)).body(
         DataGrid::of(find_menu)
             .mode(DataMode::Server)
+            .exportable()
             .row_style(|m: &MenuItem| (m.stock < 5).then_some(RowStyle::Warning))
             .column(MenuItem::name)
             .filter()

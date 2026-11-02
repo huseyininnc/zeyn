@@ -4,9 +4,17 @@ version = "0.0.0"
 edition = "2024"
 publish = false
 
+[features]
+# Desktop build: one exe in the system WebView (`zeyn build-desktop`, see docs/desktop.md).
+desktop = ["dep:zeyn-desktop", "dep:winresource"]
+
 [dependencies]
 zeyn = { path = "../../crates/zeyn" }
+zeyn-desktop = { path = "../../crates/zeyn-desktop", optional = true }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+
+[build-dependencies]
+winresource = { version = "0.1", optional = true, default-features = false }
 
 [dev-dependencies]
 axum = "0.8"
