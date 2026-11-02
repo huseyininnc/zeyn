@@ -347,7 +347,7 @@ fn list_screen_renders() {
     assert!(html.contains(r#"data-zeyn-action="search_products""#));
     assert!(html.contains(r#"data-zeyn-mode="server""#));
     assert!(html.contains(
-        r#"<th scope="col" data-field="code" aria-sort="none" style="width:120px;" data-filter="true">Code</th>"#
+        r#"<th scope="col" data-field="code" aria-sort="none" style="width:120px;" data-filter="text">Code</th>"#
     ));
     assert!(html.contains(r#"data-field="stock" data-agg="sum""#));
     assert!(html.contains("&quot;screen&quot;:&quot;product_form&quot;"));
@@ -498,6 +498,6 @@ fn auto_grid_has_every_field_and_filters_text() {
     for f in ["id", "code", "name", "unit", "price", "stock", "active"] {
         assert!(out.contains(&format!(r#"data-field="{f}""#)), "{f}");
     }
-    assert!(out.contains(r#"data-field="name" aria-sort="none" data-filter="true""#));
+    assert!(out.contains(r#"data-field="name" aria-sort="none" data-filter="text""#));
     assert!(!out.contains(r#"data-field="price" aria-sort="none" data-filter"#));
 }

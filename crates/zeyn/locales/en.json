@@ -35,6 +35,7 @@
       "range_total": "{from}-{to} of {total}",
       "loaded": "{count} rows loaded",
       "empty": "No records.",
+      "filter": {"filter": "Filter {label}", "from": "From", "to": "To", "all": "All", "contains": "Contains", "starts_with": "Starts with", "equals": "Equals", "match": "Match", "selected": "{n} selected", "clear": "Clear filter", "sorted": "Sort order {n}"},
       "agg": { "sum": "Sum", "avg": "Average", "min": "Min", "max": "Max", "count": "Count" }
     },
     "export": {

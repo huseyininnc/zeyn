@@ -263,3 +263,129 @@ async fn grid_endpoint_needs_the_read_permission() {
     assert_eq!(r.status, StatusCode::FORBIDDEN);
     let _ = r.headers;
 }
+
+/// Event with a moment, for time zone filters.
+#[entity(table = "events")]
+pub struct Event {
+    #[key]
+    pub id: EventId,
+    pub at: DateTime,
+}
+
+fn codes(page: &Page<Item>) -> Vec<String> {
+    page.items.iter().map(|i| i.code.clone()).collect()
+}
+
+fn filtered(filters: Vec<zeyn::Filter>) -> Page<Item> {
+    let q = GridQuery { filters, page: zeyn::PageRequest::Offset { offset: 0, limit: 100 }, ..GridQuery::default() };
+    q.apply((1..=20).map(item).collect())
+}
+
+#[test]
+fn number_and_money_ranges_are_inclusive_and_open_ended() {
+    use zeyn::Filter;
+    assert_eq!(codes(&filtered(vec![Filter::range("qty", Some("18"), None)])), ["C-18", "C-19", "C-20"]);
+    assert_eq!(codes(&filtered(vec![Filter::range("price", Some("10"), Some("30.00"))])), ["C-01", "C-02", "C-03"]);
+    assert_eq!(filtered(vec![Filter::range("price", Some("10,5"), Some("20"))]).items.len(), 1);
+    assert_eq!(filtered(vec![Filter::range("qty", Some("abc"), Some("1e9"))]).items.len(), 20);
+}
+
+#[test]
+fn date_ranges_and_optional_dates() {
+    use zeyn::Filter;
+    let page = filtered(vec![Filter::range("added", Some("2026-01-05"), Some("2026-01-07"))]);
+    assert_eq!(codes(&page), ["C-05", "C-06", "C-07"]);
+    let page = filtered(vec![Filter::range("due", None, Some("2026-03-08"))]);
+    assert_eq!(codes(&page), ["C-04", "C-08"]);
+}
+
+#[test]
+fn moment_date_filters_use_the_users_whole_day() {
+    use zeyn::Filter;
+    let at = DateTime::parse("2026-03-01T22:30:00Z").unwrap();
+    let rows = vec![Event { id: EventId(1), at }];
+    let mut q = GridQuery { filters: vec![Filter::range("at", Some("2026-03-02"), Some("2026-03-02"))], ..GridQuery::default() };
+    assert_eq!(q.apply(rows.clone()).items.len(), 0);
+    q.time_zone = TimeZone::named("Europe/Istanbul").unwrap();
+    assert_eq!(q.apply(rows.clone()).items.len(), 1);
+    q.filters = vec![Filter::range("at", Some("2026-03-02T01:00"), Some("2026-03-02T01:30"))];
+    assert_eq!(q.apply(rows).items.len(), 1);
+}
+
+#[test]
+fn choices_booleans_and_text_operators() {
+    use zeyn::Filter;
+    assert_eq!(filtered(vec![Filter::any_of("kind", ["Tool", "nope"])]).items.len(), 6);
+    assert_eq!(filtered(vec![Filter::any_of("kind", ["nope"])]).items.len(), 0);
+    assert_eq!(filtered(vec![Filter::is("active", true)]).items.len(), 10);
+    let starts = Filter { field: "code".into(), starts_with: Some("c-1".into()), ..Filter::default() };
+    assert_eq!(filtered(vec![starts]).items.len(), 10);
+    let equals = Filter { field: "code".into(), equals: Some("C-07".into()), ..Filter::default() };
+    assert_eq!(codes(&filtered(vec![equals])), ["C-07"]);
+    let too_long = Filter::contains("code", "x".repeat(zeyn::MAX_FILTER_TEXT + 1));
+    assert_eq!(filtered(vec![too_long]).items.len(), 20);
+}
+
+#[test]
+fn old_contains_filters_still_read() {
+    let q: GridQuery = query(serde_json::json!({ "filters": [{ "field": "code", "contains": "C-2" }] }));
+    assert_eq!(codes(&q.apply((1..=20).map(item).collect())), ["C-20"]);
+}
+
+fn grid_call(query: serde_json::Value) -> serde_json::Value {
+    serde_json::json!({ "screen": "list", "node": 0, "query": query })
+}
+
+#[tokio::test]
+async fn grid_endpoint_reads_typed_filters() {
+    let q = serde_json::json!({
+        "with_total": true,
+        "filters": [
+            { "field": "kind", "any_of": ["Part", "Food"] },
+            { "field": "price", "from": "50", "to": "150" },
+            { "field": "active", "is": true }
+        ]
+    });
+    let r = send(&router(reader()), post("/_zeyn/grid", grid_call(q))).await;
+    assert_eq!(r.status, StatusCode::OK);
+    assert_eq!(r.json()["total"], 3, "{}", r.body);
+}
+
+#[tokio::test]
+async fn grid_endpoint_ignores_filters_and_sorts_on_fields_it_does_not_offer() {
+    let q = serde_json::json!({
+        "with_total": true,
+        "filters": [{ "field": "note", "contains": "note 1" }, { "field": "qty", "from": "1" }, { "field": "secret", "contains": "x" }],
+        "sort": [{ "field": "note", "desc": true }]
+    });
+    let r = send(&router(reader()), post("/_zeyn/grid", grid_call(q))).await;
+    assert_eq!(r.status, StatusCode::OK);
+    let j = r.json();
+    assert_eq!(j["total"], 20);
+    let rows = j["rows"].as_str().unwrap();
+    assert!(rows.find("C-01").unwrap() < rows.find("C-02").unwrap());
+}
+
+#[tokio::test]
+async fn grid_endpoint_sorts_by_several_columns() {
+    let q = serde_json::json!({
+        "page": { "type": "offset", "offset": 0, "limit": 4 },
+        "sort": [{ "field": "kind", "desc": false }, { "field": "qty", "desc": true }]
+    });
+    let r = send(&router(reader()), post("/_zeyn/grid", grid_call(q))).await;
+    let rows = r.json()["rows"].as_str().unwrap().to_string();
+    let order: Vec<usize> = ["C-20", "C-17", "C-14", "C-11"].iter().map(|c| rows.find(c).unwrap()).collect();
+    assert!(order.windows(2).all(|w| w[0] < w[1]), "{rows}");
+}
+
+#[tokio::test]
+async fn header_names_filter_kinds_and_localized_choices() {
+    let req = Request::get("/items").header("x-user", "1").header(header::COOKIE, "zeyn_locale=tr").body(Body::empty()).unwrap();
+    let r = send(&router(reader()), req).await;
+    assert!(r.body.contains(r#"data-field="price" aria-sort="none" data-filter="money""#), "{}", r.body);
+    assert!(r.body.contains(r#"data-filter="choice" data-options=""#));
+    assert!(r.body.contains(r#"data-filter="bool""#));
+    assert!(r.body.contains(r#"data-filter="date""#));
+    assert!(r.body.contains("data-zeyn-texts="));
+    assert!(r.body.contains("Tümü"));
+}

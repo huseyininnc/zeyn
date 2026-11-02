@@ -1,7 +1,8 @@
 use crate::action::{
-    Action, ActionMeta, Aggregate, AggregateRequest, Cursor, DEFAULT_PAGE_SIZE, GridQuery, MAX_PAGE_SIZE, Page, PageRequest,
-    Result, Total,
+    Action, ActionMeta, Aggregate, AggregateRequest, Cursor, DEFAULT_PAGE_SIZE, Filter, GridQuery, MAX_FILTER_CHOICES,
+    MAX_FILTER_TEXT, MAX_FILTERS, MAX_PAGE_SIZE, Page, PageRequest, Result, Total,
 };
+use crate::time::{Date, DateTime, LocalDateTime, Time, TimeZone};
 use crate::ctx::{BoxFuture, Ctx};
 use crate::i18n::Text;
 use crate::model::{Field, FieldMeta, Model};
@@ -303,6 +304,7 @@ impl<E: Model> Grid<E> {
                 out.push_str(&format!(r#" data-zeyn-next="{}""#, escape(&n.0)));
             }
         }
+        out.push_str(&format!(r#" data-zeyn-texts="{}""#, attr(&grid_texts(r))));
         out.push_str(r#"><table role="grid"><thead><tr>"#);
         for c in &self.columns {
             let mut style = String::new();
@@ -319,7 +321,14 @@ impl<E: Model> Grid<E> {
                 out.push_str(&format!(r#" style="{style}""#));
             }
             if c.filter {
-                out.push_str(r#" data-filter="true""#);
+                out.push_str(&format!(r#" data-filter="{}""#, filter_kind(&c.meta.kind)));
+                if let FieldKind::Choice(options) = c.meta.kind {
+                    let list: Vec<serde_json::Value> = options
+                        .iter()
+                        .map(|o| json!({ "value": o.value, "label": r.i18n.text(r.locale, &Text::key_or(o.key, o.label)) }))
+                        .collect();
+                    out.push_str(&format!(r#" data-options="{}""#, attr(&list)));
+                }
             }
             out.push_str(&format!(">{}</th>", r.label(c.meta)));
         }
@@ -370,7 +379,10 @@ impl<E: Model> Grid<E> {
                 let value = totals
                     .iter()
                     .find(|t| t.field == c.meta.name && t.op == *op)
-                    .map(|t| r.value(&t.value, &c.meta.kind))
+                    .map(|t| match t.value {
+                        Value::Int(n) => grouped(n, r.locale),
+                        ref v => r.value(v, &c.meta.kind),
+                    })
                     .unwrap_or_default();
                 out.push_str(&format!(
                     r#"<span class="z-agg" data-op="{}"><span class="z-agg-label">{}</span> <span class="z-agg-value">{value}</span></span>"#,
@@ -419,6 +431,17 @@ impl<E: Model> GridSource for Grid<E> {
         let allowed = self.aggregate_requests();
         query.aggregates.retain(|a| allowed.contains(a));
         query.aggregates.dedup();
+        let shown = |name: &str| self.columns.iter().any(|c| c.meta.name == name);
+        let filterable = |name: &str| self.columns.iter().any(|c| c.filter && c.meta.name == name);
+        query.filters.retain(|f| filterable(&f.field) && !f.is_empty());
+        query.filters.truncate(MAX_FILTERS);
+        let mut seen = Vec::new();
+        query.sort.retain(|s| shown(&s.field) && !seen.contains(&s.field) && {
+            seen.push(s.field.clone());
+            true
+        });
+        query.sort.truncate(MAX_SORT);
+        query.time_zone = ctx.time_zone();
         let fetch = self.fetch;
         let offset = match &query.page {
             PageRequest::Offset { offset, .. } => *offset,
@@ -477,10 +500,20 @@ impl<E: Model> GridSource for Grid<E> {
                 },
                 "filters": {
                     "type": "array",
+                    "description": "Every set condition must hold. Numbers as 1234.56, dates as YYYY-MM-DD (a whole day in the user's time zone for moments), times as HH:MM.",
                     "items": {
                         "type": "object",
-                        "properties": { "field": { "type": "string", "enum": filterable }, "contains": { "type": "string" } },
-                        "required": ["field", "contains"]
+                        "properties": {
+                            "field": { "type": "string", "enum": filterable },
+                            "contains": { "type": "string" },
+                            "starts_with": { "type": "string" },
+                            "equals": { "type": "string" },
+                            "from": { "type": "string" },
+                            "to": { "type": "string" },
+                            "any_of": { "type": "array", "items": { "type": "string" } },
+                            "is": { "type": "boolean" }
+                        },
+                        "required": ["field"]
                     }
                 },
                 "with_total": { "type": "boolean" },
@@ -650,6 +683,214 @@ impl<E: Model, T> From<GridColumn<E, T>> for Node {
     }
 }
 
+/// Whole number with the locale's group separator: `4.680` in `tr`, `4,680` in `en`.
+fn grouped(n: i64, locale: &str) -> String {
+    match n.checked_mul(100) {
+        Some(h) => {
+            let text = Money::new(h, Default::default()).format_plain(locale);
+            text[..text.len() - 3].to_string()
+        }
+        None => n.to_string(),
+    }
+}
+
+/// Most sort keys one query may carry.
+pub const MAX_SORT: usize = 4;
+
+/// Filter input the runtime shows for a column kind.
+fn filter_kind(kind: &FieldKind) -> &'static str {
+    match kind {
+        FieldKind::Integer | FieldKind::Id => "number",
+        FieldKind::Money => "money",
+        FieldKind::Date => "date",
+        FieldKind::DateTime | FieldKind::LocalDateTime => "datetime",
+        FieldKind::Time => "time",
+        FieldKind::Choice(_) => "choice",
+        FieldKind::Bool => "bool",
+        FieldKind::Text | FieldKind::Custom { .. } => "text",
+    }
+}
+
+/// Localized texts the runtime needs for grid controls, sent once on the grid root.
+fn grid_texts(r: &Render) -> serde_json::Value {
+    let keys = [
+        "filter", "from", "to", "all", "contains", "starts_with", "equals", "match", "selected", "clear", "sorted",
+    ];
+    let mut map = serde_json::Map::new();
+    for k in keys {
+        map.insert(k.to_string(), json!(r.i18n.text(r.locale, &Text::key(format!("zeyn.grid.filter.{k}")))));
+    }
+    map.insert("yes".into(), json!(r.i18n.text(r.locale, &Text::key("zeyn.yes"))));
+    map.insert("no".into(), json!(r.i18n.text(r.locale, &Text::key("zeyn.no"))));
+    serde_json::Value::Object(map)
+}
+
+/// A comparable bound or value for range filters. Numbers and money compare in hundredths.
+#[derive(Clone, Copy, PartialEq, PartialOrd)]
+enum Key {
+    Num(i128),
+    Date(Date),
+    Time(Time),
+    Moment(DateTime),
+    Local(LocalDateTime),
+}
+
+impl Key {
+    fn of(value: &Value) -> Option<Key> {
+        Some(match value {
+            Value::Int(x) => Key::Num(i128::from(*x) * 100),
+            Value::Money(m) => Key::Num(i128::from(m.minor)),
+            Value::Date(d) => Key::Date(*d),
+            Value::Time(t) => Key::Time(*t),
+            Value::DateTime(d) => Key::Moment(*d),
+            Value::LocalDateTime(l) => Key::Local(*l),
+            _ => return None,
+        })
+    }
+
+    fn same_kind(&self, other: &Key) -> bool {
+        std::mem::discriminant(self) == std::mem::discriminant(other)
+    }
+}
+
+/// Reads `1234.56` (or `1234,56`) as hundredths. At most two decimals.
+fn hundredths(s: &str) -> Option<i128> {
+    let s = s.trim();
+    let (negative, digits) = match s.strip_prefix('-') {
+        Some(rest) => (true, rest),
+        None => (false, s),
+    };
+    let (major, minor) = match digits.split_once(['.', ',']) {
+        Some((a, b)) => (a, b),
+        None => (digits, ""),
+    };
+    let ok = |p: &str| p.chars().all(|c| c.is_ascii_digit());
+    if major.is_empty() || major.len() > 30 || minor.len() > 2 || !ok(major) || !ok(minor) {
+        return None;
+    }
+    let value = major.parse::<i128>().ok()? * 100 + format!("{minor:0<2}").parse::<i128>().ok()?;
+    Some(if negative { -value } else { value })
+}
+
+/// Midnight starting `date` in `tz`; when the clocks skip midnight, the first hour that exists.
+fn day_start(date: Date, tz: TimeZone) -> Option<DateTime> {
+    (0..3u8).find_map(|h| DateTime::from_local(LocalDateTime::new(date, Time::new(h, 0, 0)?), tz).ok())
+}
+
+/// Reads one range bound for a column kind. `upper` widens a date to the end of that day.
+fn bound(kind: &FieldKind, raw: &str, tz: TimeZone, upper: bool) -> Option<Key> {
+    let s = raw.trim();
+    if s.is_empty() || s.chars().count() > MAX_FILTER_TEXT {
+        return None;
+    }
+    match kind {
+        FieldKind::Integer | FieldKind::Id | FieldKind::Money => hundredths(s).map(Key::Num),
+        FieldKind::Date => Date::parse(s).map(Key::Date),
+        FieldKind::Time => Time::parse(s).map(Key::Time),
+        FieldKind::LocalDateTime => match Date::parse(s) {
+            Some(d) if upper => Some(Key::Local(LocalDateTime::new(d, Time::new(23, 59, 59)?))),
+            Some(d) => Some(Key::Local(LocalDateTime::new(d, Time::default()))),
+            None => LocalDateTime::parse(s).map(Key::Local),
+        },
+        FieldKind::DateTime => match Date::parse(s) {
+            Some(d) if upper => day_start(d.add_days(1)?, tz).map(|m| Key::Moment(m.add_ms(-1))),
+            Some(d) => day_start(d, tz).map(Key::Moment),
+            None => DateTime::parse(s)
+                .or_else(|| LocalDateTime::parse(s).and_then(|l| DateTime::from_local(l, tz).ok()))
+                .map(Key::Moment),
+        },
+        _ => None,
+    }
+}
+
+enum TextOp {
+    Contains,
+    StartsWith,
+    Equals,
+}
+
+/// One condition of a filter, read once before the rows are scanned.
+enum Cond {
+    Text(usize, TextOp, String),
+    Range(usize, Option<Key>, Option<Key>),
+    AnyOf(usize, Vec<String>),
+    Is(usize, bool),
+}
+
+impl Cond {
+    /// Reads the conditions of one filter. Unknown fields, unreadable values and conditions that
+    /// do not fit the column kind are dropped.
+    fn read(f: &Filter, fields: &[crate::model::FieldMeta], tz: TimeZone, out: &mut Vec<Cond>) {
+        let Some(i) = fields.iter().position(|m| m.name == f.field) else { return };
+        let kind = &fields[i].kind;
+        let text = |s: &str| {
+            let t = s.trim();
+            (!t.is_empty() && t.chars().count() <= MAX_FILTER_TEXT).then(|| t.to_lowercase())
+        };
+        if let Some(t) = text(&f.contains) {
+            out.push(Cond::Text(i, TextOp::Contains, t));
+        }
+        let textual = matches!(kind, FieldKind::Text | FieldKind::Custom { .. } | FieldKind::Choice(_));
+        if textual {
+            if let Some(t) = f.starts_with.as_deref().and_then(text) {
+                out.push(Cond::Text(i, TextOp::StartsWith, t));
+            }
+            if let Some(t) = f.equals.as_deref().and_then(text) {
+                out.push(Cond::Text(i, TextOp::Equals, t));
+            }
+        }
+        let lo = f.from.as_deref().and_then(|s| bound(kind, s, tz, false));
+        let hi = f.to.as_deref().and_then(|s| bound(kind, s, tz, true));
+        if lo.is_some() || hi.is_some() {
+            out.push(Cond::Range(i, lo, hi));
+        }
+        if let FieldKind::Choice(options) = kind {
+            let wanted: Vec<String> = f
+                .any_of
+                .iter()
+                .take(MAX_FILTER_CHOICES)
+                .filter(|v| options.iter().any(|o| o.value == v.as_str()))
+                .cloned()
+                .collect();
+            if !f.any_of.is_empty() {
+                out.push(Cond::AnyOf(i, wanted));
+            }
+        }
+        if let (FieldKind::Bool, Some(b)) = (kind, f.is) {
+            out.push(Cond::Is(i, b));
+        }
+    }
+
+    fn holds<M: Model>(&self, row: &M) -> bool {
+        let value = |i: &usize| row.value_at(*i).unwrap_or(Value::Null);
+        match self {
+            Cond::Text(i, op, needle) => {
+                let v = value(i);
+                if v == Value::Null {
+                    return false;
+                }
+                let hay = filter_text(&v);
+                match op {
+                    TextOp::Contains => hay.contains(needle.as_str()),
+                    TextOp::StartsWith => hay.starts_with(needle.as_str()),
+                    TextOp::Equals => hay == *needle,
+                }
+            }
+            Cond::Range(i, lo, hi) => {
+                let Some(k) = Key::of(&value(i)) else { return false };
+                let above = lo.is_none_or(|lo| lo.same_kind(&k) && k >= lo);
+                let below = hi.is_none_or(|hi| hi.same_kind(&k) && k <= hi);
+                above && below
+            }
+            Cond::AnyOf(i, wanted) => match value(i) {
+                Value::Choice(c) => wanted.iter().any(|w| w == c),
+                _ => false,
+            },
+            Cond::Is(i, b) => value(i) == Value::Bool(*b),
+        }
+    }
+}
+
 /// Text used to filter a value: what the user sees, lower cased.
 fn filter_text(value: &Value) -> String {
     match value {
@@ -726,26 +967,19 @@ pub fn total(values: impl Iterator<Item = Value>, op: Aggregate) -> Option<Value
 
 impl GridQuery {
     /// Filters, sorts and pages an in memory list. Meant for small data, samples and tests;
-    /// databases do this in SQL. Unknown field names are ignored. Sorting always ends with the
+    /// databases do this in SQL. Unknown field names and unreadable filter values are ignored,
+    /// and at most [`MAX_FILTERS`] filters and [`MAX_SORT`] sort keys are used. Sorting always ends with the
     /// key field so pages are stable.
     pub fn apply<M: Model>(&self, rows: Vec<M>) -> Page<M> {
         let fields = M::fields();
         let index = |name: &str| fields.iter().position(|f| f.name == name);
-        let filters: Vec<(usize, String)> = self
-            .filters
-            .iter()
-            .filter(|f| !f.contains.trim().is_empty())
-            .filter_map(|f| index(&f.field).map(|i| (i, f.contains.trim().to_lowercase())))
-            .collect();
-        let mut rows: Vec<M> = rows
-            .into_iter()
-            .filter(|row| {
-                filters.iter().all(|(i, needle)| {
-                    row.value_at(*i).map(|v| filter_text(&v).contains(needle.as_str())).unwrap_or(false)
-                })
-            })
-            .collect();
-        let mut order: Vec<(usize, bool)> = self.sort.iter().filter_map(|s| index(&s.field).map(|i| (i, s.desc))).collect();
+        let mut conds = Vec::new();
+        for f in self.filters.iter().take(MAX_FILTERS) {
+            Cond::read(f, fields, self.time_zone, &mut conds);
+        }
+        let mut rows: Vec<M> = rows.into_iter().filter(|row| conds.iter().all(|c| c.holds(row))).collect();
+        let mut order: Vec<(usize, bool)> =
+            self.sort.iter().take(MAX_SORT).filter_map(|s| index(&s.field).map(|i| (i, s.desc))).collect();
         if let Some(key) = fields.iter().position(|f| f.key) {
             order.push((key, false));
         }

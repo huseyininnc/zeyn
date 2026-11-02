@@ -290,7 +290,7 @@ function initGrids(root) {
 function initGrid(grid) {
   if (grids.has(grid)) return;
   const d = grid.dataset;
-  const sorted = grid.querySelector('thead th[aria-sort="ascending"], thead th[aria-sort="descending"]');
+  const sorted = [...grid.querySelectorAll('thead th[aria-sort="ascending"], thead th[aria-sort="descending"]')];
   const state = {
     paging: d.zeynPaging || 'pages',
     size: Number(d.zeynPageSize) || 50,
@@ -298,8 +298,9 @@ function initGrid(grid) {
     total: num(d.zeynTotal),
     next: str(d.zeynNext),
     count: rows(grid).length,
-    sort: sorted ? { field: sorted.dataset.field, desc: sorted.getAttribute('aria-sort') === 'descending' } : null,
+    sort: sorted.map((th) => ({ field: th.dataset.field, desc: th.getAttribute('aria-sort') === 'descending' })),
     filters: {},
+    texts: textsOf(grid),
     seq: 0,
     timer: 0,
     active: 0,
@@ -317,21 +318,12 @@ function initGrid(grid) {
     button.append(...th.childNodes);
     th.append(button);
   }
-  if (head && grid.querySelector('thead th[data-filter="true"]')) {
+  if (head && grid.querySelector('thead th[data-filter]')) {
     const row = document.createElement('tr');
     row.className = 'z-filter-row';
     for (const th of head.cells) {
       const cell = document.createElement('td');
-      if (th.dataset.filter === 'true') {
-        const input = document.createElement('input');
-        input.type = 'search';
-        input.className = 'z-filter';
-        input.id = `z-filter-${++uid}`;
-        input.autocomplete = 'off';
-        input.dataset.zeynFilter = th.dataset.field;
-        input.setAttribute('aria-label', `Filter ${th.textContent.trim()}`);
-        cell.append(input);
-      }
+      if (th.dataset.filter) filterControls(cell, th, state.texts);
       row.append(cell);
     }
     head.after(row);
@@ -369,16 +361,14 @@ async function loadGrid(grid, kind) {
   const page = infinite
     ? { type: 'after', cursor: append ? s.next : null, limit: s.size }
     : { type: 'offset', offset, limit: s.size };
-  const filters = Object.entries(s.filters)
-    .filter(([, v]) => v)
-    .map(([field, contains]) => ({ field, contains }));
+  const filters = filterList(s);
   const seq = ++s.seq;
   s.loading = true;
   grid.setAttribute('aria-busy', 'true');
   const totals = kind === 'reset' || kind === 'reload' || (infinite && !append);
   const r = await post(BASE + '/_zeyn/grid', {
     ...address(grid),
-    query: { page, sort: s.sort ? [s.sort] : [], filters, with_total: !infinite, aggregates: totals ? aggregatesOf(grid) : [] },
+    query: { page, sort: s.sort, filters, with_total: !infinite, aggregates: totals ? aggregatesOf(grid) : [] },
   });
   if (seq !== s.seq) return;
   s.loading = false;
@@ -662,15 +652,13 @@ async function fetchBlock(grid, s, b) {
   s.inflight.set(b, controller);
   const gen = s.gen;
   const withTotal = s.needTotal;
-  const filters = Object.entries(s.filters)
-    .filter(([, v]) => v)
-    .map(([field, contains]) => ({ field, contains }));
+  const filters = filterList(s);
   const page = { type: 'offset', offset: b * s.size, limit: s.size };
   const r = await post(
     BASE + '/_zeyn/grid',
     {
       ...address(grid),
-      query: { page, sort: s.sort ? [s.sort] : [], filters, with_total: withTotal, aggregates: withTotal ? aggregatesOf(grid) : [] },
+      query: { page, sort: s.sort, filters, with_total: withTotal, aggregates: withTotal ? aggregatesOf(grid) : [] },
     },
     { signal: controller.signal },
   );
@@ -744,28 +732,206 @@ function virtualKey(e, grid) {
   return true;
 }
 
-/** Cycles the sort of a column: none, ascending, descending. */
-function toggleSort(button) {
+/**
+ * Cycles the sort of a column: none, ascending, descending. A plain click sorts by this column
+ * only; Shift+click adds it to the sort keys (or changes or removes it there), up to four keys.
+ */
+function toggleSort(button, additive) {
   const th = button.closest('th');
   const grid = th.closest('[data-zeyn-grid]');
   const s = grids.get(grid);
   if (!s) return;
-  const order = { none: 'ascending', ascending: 'descending', descending: 'none' };
-  const next = order[th.getAttribute('aria-sort')] ?? 'ascending';
-  grid.querySelectorAll('thead th[aria-sort]').forEach((h) => h.setAttribute('aria-sort', 'none'));
-  th.setAttribute('aria-sort', next);
-  s.sort = next === 'none' ? null : { field: th.dataset.field, desc: next === 'descending' };
+  const field = th.dataset.field;
+  const current = s.sort.find((k) => k.field === field);
+  const next = !current ? { field, desc: false } : !current.desc ? { field, desc: true } : null;
+  if (additive) {
+    const rest = s.sort.filter((k) => k.field !== field);
+    s.sort = next ? (current ? s.sort.map((k) => (k.field === field ? next : k)) : [...rest, next].slice(-4)) : rest;
+  } else s.sort = next ? [next] : [];
+  showSort(grid, s);
   loadGrid(grid, 'reset');
 }
 
-/** Debounces a filter box and reloads the grid from the start. */
-function onFilter(input) {
-  const grid = input.closest('[data-zeyn-grid]');
-  const s = grids.get(grid);
+/** Sets `aria-sort` on every header and the sort order badge when several keys are active. */
+function showSort(grid, s) {
+  for (const th of grid.querySelectorAll('thead th[data-field]')) {
+    const i = s.sort.findIndex((k) => k.field === th.dataset.field);
+    th.setAttribute('aria-sort', i < 0 ? 'none' : s.sort[i].desc ? 'descending' : 'ascending');
+    th.querySelector('.z-sort-order')?.remove();
+    if (i < 0 || s.sort.length < 2) continue;
+    const badge = document.createElement('span');
+    badge.className = 'z-sort-order';
+    const label = document.createElement('span');
+    label.className = 'z-sr-only';
+    label.textContent = fill(s.texts.sorted || 'Sort order {n}', { n: i + 1 });
+    const number = document.createElement('span');
+    number.setAttribute('aria-hidden', 'true');
+    number.textContent = String(i + 1);
+    badge.append(label, number);
+    th.querySelector('.z-sort')?.append(badge);
+  }
+}
+
+/** Reads the localized grid texts from `data-zeyn-texts`. */
+function textsOf(grid) {
+  try {
+    return JSON.parse(grid.dataset.zeynTexts || '{}');
+  } catch {
+    return {};
+  }
+}
+
+/** Creates an element with a class and optional attributes. */
+function make(tag, className, attrs = {}) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+  return node;
+}
+
+/**
+ * Builds the filter controls of one column in its filter row cell, by `th[data-filter]`:
+ * `text` (match kind and text), `number`, `money`, `date`, `datetime`, `time` (from and to),
+ * `choice` (a button opening a checkbox list) and `bool` (all, yes, no).
+ */
+function filterControls(cell, th, t) {
+  const kind = th.dataset.filter;
+  const label = th.textContent.trim();
+  const name = fill(t.filter || 'Filter {label}', { label });
+  cell.className = 'z-filter-cell';
+  cell.dataset.field = th.dataset.field;
+  cell.dataset.kind = kind;
+  const input = (type, bound, text) => {
+    const i = make('input', 'z-filter', { type, autocomplete: 'off', 'aria-label': `${name}: ${text}` });
+    i.id = `z-filter-${++uid}`;
+    i.dataset.bound = bound;
+    if (type === 'number') {
+      i.step = 'any';
+      i.inputMode = 'decimal';
+    }
+    if (type !== 'date' && type !== 'time') i.placeholder = text;
+    return i;
+  };
+  if (kind === 'text') {
+    const wrap = make('div', 'z-filter-pair');
+    const op = make('select', 'z-filter z-filter-op', { 'aria-label': `${name}: ${t.match || 'Match'}` });
+    op.dataset.bound = 'op';
+    for (const k of ['contains', 'starts_with', 'equals']) op.append(new Option(t[k] || k, k));
+    const text = make('input', 'z-filter', { type: 'search', autocomplete: 'off', 'aria-label': name });
+    text.id = `z-filter-${++uid}`;
+    text.dataset.bound = 'text';
+    wrap.append(op, text);
+    cell.append(wrap);
+  } else if (kind === 'choice') {
+    let options = [];
+    try {
+      options = JSON.parse(th.dataset.options || '[]');
+    } catch {
+      options = [];
+    }
+    const id = `z-choice-${++uid}`;
+    const button = make('button', 'z-filter z-filter-choice', {
+      type: 'button',
+      'aria-haspopup': 'true',
+      'aria-expanded': 'false',
+      'aria-controls': id,
+      'aria-label': name,
+      popovertarget: id,
+    });
+    button.dataset.zeynChoice = '';
+    button.textContent = t.all || 'All';
+    const panel = make('div', 'z-popover z-choice-panel', { id, role: 'group', 'aria-label': name, popover: 'auto' });
+    for (const o of options) {
+      const row = make('label', 'z-check');
+      const box = make('input', '', { type: 'checkbox' });
+      box.value = o.value;
+      box.dataset.bound = 'choice';
+      row.append(box, document.createTextNode(o.label));
+      panel.append(row);
+    }
+    panel.addEventListener('toggle', (e) => {
+      button.setAttribute('aria-expanded', String(e.newState === 'open'));
+      if (e.newState === 'open') {
+        place(panel, button);
+        panel.querySelector('input')?.focus();
+      } else if (panel.contains(document.activeElement) || document.activeElement === document.body) button.focus();
+    });
+    cell.append(button, panel);
+  } else if (kind === 'bool') {
+    const select = make('select', 'z-filter', { 'aria-label': name });
+    select.dataset.bound = 'is';
+    select.append(new Option(t.all || 'All', ''), new Option(t.yes || 'Yes', 'true'), new Option(t.no || 'No', 'false'));
+    cell.append(select);
+  } else {
+    const type = { number: 'number', money: 'number', date: 'date', datetime: 'date', time: 'time' }[kind] ?? 'search';
+    const wrap = make('div', 'z-filter-pair z-filter-range');
+    wrap.append(input(type, 'from', t.from || 'From'), input(type, 'to', t.to || 'To'));
+    cell.append(wrap);
+  }
+}
+
+/** Places a popover under its button, inside the viewport, at the inline start edge. */
+function place(panel, button) {
+  const r = button.getBoundingClientRect();
+  const rtl = getComputedStyle(button).direction === 'rtl';
+  const width = panel.offsetWidth;
+  const left = rtl ? r.right - width : r.left;
+  panel.style.left = `${Math.max(4, Math.min(left, innerWidth - width - 4))}px`;
+  const below = r.bottom + 2;
+  panel.style.top = `${below + panel.offsetHeight > innerHeight ? Math.max(4, r.top - panel.offsetHeight - 2) : below}px`;
+}
+
+/** Reads the controls of a filter cell into a filter object without `field`; `null` when empty. */
+function readFilter(cell) {
+  const get = (bound) => cell.querySelector(`[data-bound="${bound}"]`);
+  const f = {};
+  switch (cell.dataset.kind) {
+    case 'text': {
+      const text = get('text').value.trim();
+      if (text) f[get('op').value] = text;
+      break;
+    }
+    case 'choice': {
+      const picked = [...cell.querySelectorAll('[data-bound="choice"]:checked')].map((b) => b.value);
+      if (picked.length) f.any_of = picked;
+      break;
+    }
+    case 'bool':
+      if (get('is').value) f.is = get('is').value === 'true';
+      break;
+    default:
+      for (const b of ['from', 'to']) if (get(b)?.value) f[b] = get(b).value;
+  }
+  return Object.keys(f).length ? f : null;
+}
+
+/** Updates the label of a choice filter button: all, the one picked, or how many. */
+function choiceLabel(cell, t) {
+  const button = cell.querySelector('[data-zeyn-choice]');
+  if (!button) return;
+  const picked = [...cell.querySelectorAll('[data-bound="choice"]:checked')];
+  button.textContent =
+    picked.length === 0 ? t.all || 'All' : picked.length === 1 ? picked[0].parentElement.textContent : fill(t.selected || '{n} selected', { n: picked.length });
+  button.classList.toggle('z-active', picked.length > 0);
+}
+
+/** Active filters as the query sends them. */
+function filterList(s) {
+  return Object.entries(s.filters)
+    .filter(([, f]) => f)
+    .map(([field, f]) => ({ field, ...f }));
+}
+
+/** Debounces a filter control and reloads the grid from the start. */
+function onFilter(control) {
+  const cell = control.closest('.z-filter-cell');
+  const grid = cell?.closest('[data-zeyn-grid]');
+  const s = grid && grids.get(grid);
   if (!s) return;
+  if (cell.dataset.kind === 'choice') choiceLabel(cell, s.texts);
   clearTimeout(s.timer);
   s.timer = setTimeout(() => {
-    s.filters[input.dataset.zeynFilter] = input.value.trim();
+    s.filters[cell.dataset.field] = readFilter(cell);
     loadGrid(grid, 'reset');
   }, FILTER_DELAY_MS);
 }
@@ -1061,7 +1227,7 @@ document.addEventListener('click', (e) => {
   const t = e.target instanceof Element ? e.target : null;
   if (!t) return;
   let el;
-  if ((el = t.closest('button.z-sort'))) return toggleSort(el);
+  if ((el = t.closest('button.z-sort'))) return toggleSort(el, e.shiftKey);
   if ((el = t.closest('[data-zeyn-page]'))) return loadGrid(el.closest('[data-zeyn-grid]'), el.dataset.zeynPage === 'prev' ? 'prev' : 'next');
   if ((el = t.closest('[data-zeyn-more] button'))) return loadGrid(el.closest('[data-zeyn-grid]'), 'more');
   if ((el = t.closest('[data-zeyn-export]'))) return exportGrid(el);
@@ -1102,7 +1268,7 @@ document.addEventListener('submit', (e) => {
 document.addEventListener('input', (e) => {
   const t = e.target;
   if (!(t instanceof Element)) return;
-  if (t.matches('input[data-zeyn-filter]')) return onFilter(t);
+  if (t.closest('.z-filter-cell')) return onFilter(t);
   if (t.getAttribute('aria-invalid') === 'true') {
     t.removeAttribute('aria-invalid');
     const box = t.id && document.getElementById(`${t.id}-error`);

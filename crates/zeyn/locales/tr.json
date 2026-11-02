@@ -35,6 +35,7 @@
       "range_total": "{from}-{to} / {total}",
       "loaded": "{count} satır yüklendi",
       "empty": "Kayıt yok.",
+      "filter": {"filter": "{label} filtresi", "from": "En az", "to": "En çok", "all": "Tümü", "contains": "İçerir", "starts_with": "İle başlar", "equals": "Eşittir", "match": "Eşleşme", "selected": "{n} seçili", "clear": "Filtreyi temizle", "sorted": "Sıralama {n}"},
       "agg": { "sum": "Toplam", "avg": "Ortalama", "min": "En az", "max": "En çok", "count": "Adet" }
     },
     "export": {

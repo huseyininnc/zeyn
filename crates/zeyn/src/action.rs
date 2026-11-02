@@ -200,6 +200,10 @@ pub struct GridQuery {
     /// its columns declare, so a client cannot ask for others.
     #[serde(default)]
     pub aggregates: Vec<AggregateRequest>,
+    /// Zone in which date filters on `DateTime` columns are read. Set by the server from the
+    /// user's settings, never taken from the client.
+    #[serde(skip)]
+    pub time_zone: crate::time::TimeZone,
 }
 
 impl GridQuery {
@@ -258,9 +262,86 @@ pub struct Sort {
     pub desc: bool,
 }
 
-/// Text contains filter.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+/// Most filters one query may carry; the rest are dropped.
+pub const MAX_FILTERS: usize = 32;
+/// Longest filter text in characters; longer conditions are ignored.
+pub const MAX_FILTER_TEXT: usize = 200;
+/// Most choices one `any_of` condition may list; the rest are dropped.
+pub const MAX_FILTER_CHOICES: usize = 100;
+
+/// Column filter. Every condition that is set must hold; unset conditions are ignored.
+///
+/// Values arrive as strings in a fixed machine form, whatever the user's language: numbers and
+/// money as `1234.56`, dates as `2026-03-31`, times as `14:30`, moments as a date (a whole day in
+/// the user's time zone) or `2026-03-31T14:30`. A value that cannot be read is ignored.
+///
+/// ```
+/// use zeyn::Filter;
+/// let f = Filter::range("price", Some("10"), Some("99.90"));
+/// assert_eq!(f.from.as_deref(), Some("10"));
+/// let json = serde_json::json!({ "field": "code", "contains": "tea" });
+/// assert_eq!(serde_json::from_value::<Filter>(json).unwrap(), Filter::contains("code", "tea"));
+/// ```
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Filter {
     pub field: String,
+    /// Text the shown value contains, ignoring case. Works on every column.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub contains: String,
+    /// Text the value starts with, ignoring case. Text and choice columns.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub starts_with: Option<String>,
+    /// Text equal to the value, ignoring case. Text and choice columns.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub equals: Option<String>,
+    /// Lower bound, inclusive. Numbers, money, dates, times and moments.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from: Option<String>,
+    /// Upper bound, inclusive (a date bound on a moment column covers the whole day).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to: Option<String>,
+    /// Choice values to keep. Empty means no condition.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub any_of: Vec<String>,
+    /// Yes/no columns: keep rows whose value is this.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is: Option<bool>,
+}
+
+impl Filter {
+    /// Rows whose shown value contains `text`, ignoring case.
+    pub fn contains(field: impl Into<String>, text: impl Into<String>) -> Self {
+        Self { field: field.into(), contains: text.into(), ..Self::default() }
+    }
+
+    /// Rows whose value is between `from` and `to`, both inclusive; either may be open.
+    pub fn range(field: impl Into<String>, from: Option<&str>, to: Option<&str>) -> Self {
+        Self { field: field.into(), from: from.map(Into::into), to: to.map(Into::into), ..Self::default() }
+    }
+
+    /// Rows whose choice is one of `values`.
+    pub fn any_of<I, S>(field: impl Into<String>, values: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        Self { field: field.into(), any_of: values.into_iter().map(Into::into).collect(), ..Self::default() }
+    }
+
+    /// Rows whose yes/no value is `value`.
+    pub fn is(field: impl Into<String>, value: bool) -> Self {
+        Self { field: field.into(), is: Some(value), ..Self::default() }
+    }
+
+    /// Whether the filter sets no condition at all.
+    pub fn is_empty(&self) -> bool {
+        let blank = |s: &Option<String>| s.as_deref().is_none_or(|v| v.trim().is_empty());
+        self.contains.trim().is_empty()
+            && blank(&self.starts_with)
+            && blank(&self.equals)
+            && blank(&self.from)
+            && blank(&self.to)
+            && self.any_of.is_empty()
+            && self.is.is_none()
+    }
 }
