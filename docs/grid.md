@@ -167,6 +167,53 @@ Closing removes it, so it loads fresh the next time.
 Virtual grids keep every row at one fixed height so any position can be reached at once; they do
 not show expanders. Use pages or infinite paging for grids with details.
 
+## Grouping
+
+`group_by(field)` groups rows on the server; call it again to group inside each group:
+
+```rust
+Grid::of(search_today)
+    .paging(Paging::pages(20))
+    .group_by(Order::city)
+    .group_by(Order::status)
+    .column(Order::amount).sum().avg()
+```
+
+The grid shows a header row per group with the column label, the value, the row count and every
+column total over that group, under its column. Opening a group (its button, or Right and Left)
+loads its subgroups or rows, one page at a time with a "Load more" row when more remain; closing
+removes them. The top level pages over groups, so the pager counts groups. The footer keeps the
+totals over every matching row. Rows inside groups keep everything else: editing, row actions,
+menus, selection and details.
+
+The data layer answers `GridQuery::group`: when it is set, it returns `Page::groups` (value, count
+and the totals the query asks for, per group) sorted by the value in the direction of the sort key
+on that field, paged like rows, with `total` counting groups. `GridQuery::apply` does this for in
+memory data; SQL uses `GROUP BY`. `group` is set by the grid and never read from the client. The
+client sends only the path of group values it opens; the server checks its length and turns each
+value into a filter on that group's column, in front of the user's filters (`blank` for the empty
+group).
+
+## Tree data
+
+`tree(Model::parent)` shows rows as a tree by an optional parent key: rows without a parent at the
+top, and the children of a row loaded when it opens, a page at a time, to at most 32 levels.
+
+```rust
+Grid::of(search_employees)
+    .tree(Employee::manager_id)
+    .column(Employee::name)
+    .column(Employee::salary).sum()
+```
+
+The first column carries the indent and the button. To know which rows have children, the grid
+asks its action once more per page: the rows whose parent is one of the page's keys, grouped by the
+parent field (`Filter::any_of` on keys and `GridQuery::group`). Filters and sorting apply on every
+level; the footer totals cover every matching row. Tree grids do not group and show no row
+details. After an inline edit the row keeps its place in the tree.
+
+Virtual grids neither group nor show trees, since every row there has one fixed height.
+
 ## Export
 
 `exportable()` (and optionally `export_permission(...)`, `export_limit(n)`) lets the toolbar's

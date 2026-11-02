@@ -66,7 +66,9 @@ Each body item is wrapped in a node element. The index is the address used by th
 | `data-zeyn-key`, `data-zeyn-version`, `data-zeyn-menu` | `tr` | Row key, row version, context menu items |
 | `data-v` | `td` | Input value of an editable cell |
 | `data-zeyn-detail`, `aria-expanded` | `tr` | Detail screen of the row as `{screen, params}`; whether it is open |
-| `data-zeyn-expand` | button in a row | Opens or closes the row's detail |
+| `data-zeyn-expand` | button in a row | Opens or closes the row's detail, group or children |
+| `data-zeyn-level`, `aria-level`, `data-zeyn-path` | `tr` in a `treegrid` | Depth (0 at the top) in a grouped or tree grid; the path of group values or ancestor keys to send when the row opens |
+| `z-group` | `tr` | A group header row; `z-branch-more` is a "Load more" row of a branch |
 | `data-zeyn-run` | button in a row | Row item to run (`a0` is the first row action) |
 | `data-agg` | `tfoot td` | Totals the column shows (`sum avg min max count`) |
 | `data-zeyn-bulk` | div before the grid | Selection bar with `data-zeyn-bulk-run` buttons |
@@ -131,6 +133,8 @@ Response `200`:
 `foot` is the totals row when totals were asked for, otherwise `null`.
 
 `total` and `next` may be `null`. The runtime replaces the rows for paged grids and appends them for infinite scroll.
+
+Grouped and tree grids (`<table role="treegrid">`) send `path` with `POST /_zeyn/grid` to load a branch: the group values (or ancestor keys) of the row being opened, as found in its `data-zeyn-path`. The response has the same shape; `rows` holds group rows or rows one level deeper, and `total` counts them. The runtime puts them after the opened row and removes every deeper row that follows it when the row closes. A path longer than the grid's group levels (or 32 in a tree) is `404`.
 
 ### 4.2.1 More grid endpoints
 

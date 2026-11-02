@@ -1107,6 +1107,7 @@ async function sendEdit(grid, tr, values) {
   const fresh = t.content.querySelector('tr');
   if (!fresh) return null;
   if (tr.dataset.zeynIndex != null) prepRow(s, fresh, Number(tr.dataset.zeynIndex));
+  keepBranch(tr, fresh);
   tr.replaceWith(fresh);
   if (s?.cache) {
     for (const block of s.cache.values()) {
@@ -1118,6 +1119,24 @@ async function sendEdit(grid, tr, values) {
   relativeTimes(fresh);
   syncSelection(grid);
   return fresh;
+}
+
+/**
+ * Carries the place of a row in a grouped or tree grid over to its fresh copy from the server,
+ * which is rendered as a top row: level, path, open state and the tree toggle.
+ */
+function keepBranch(tr, fresh) {
+  for (const a of ['aria-level', 'data-zeyn-level', 'data-zeyn-path', 'aria-expanded']) {
+    if (tr.hasAttribute(a)) fresh.setAttribute(a, tr.getAttribute(a));
+  }
+  const old = tr.querySelector(':scope > .z-tree-cell');
+  const cell = fresh.querySelector(':scope > .z-tree-cell > .z-tree');
+  if (!old || !cell) return;
+  const src = old._orig != null ? Object.assign(document.createElement('td'), { innerHTML: old._orig }) : old;
+  const tree = src.querySelector('.z-tree');
+  if (!tree) return;
+  cell.style.cssText = tree.style.cssText;
+  if (tree.firstElementChild) cell.firstElementChild?.replaceWith(tree.firstElementChild);
 }
 
 /** Saves a row in edit mode and offers to undo the change. */
@@ -1955,6 +1974,7 @@ async function toggleDetail(tr, open = tr.getAttribute('aria-expanded') !== 'tru
   const t = s?.texts ?? {};
   const label = tr.querySelector(':scope > td:not(.z-expand):not(.z-select)')?.textContent.trim() ?? '';
   const row = make('tr', 'z-detail');
+  if (tr.dataset.zeynLevel != null) row.dataset.zeynLevel = tr.dataset.zeynLevel;
   const cell = make('td');
   cell.colSpan = own(grid, 'thead tr')?.cells.length ?? 1;
   const box = make('div', 'z-detail-body', { role: 'region', 'aria-label': `${t.details || 'Details'}: ${label}`, 'aria-busy': 'true' });
@@ -1999,17 +2019,120 @@ async function toggleDetail(tr, open = tr.getAttribute('aria-expanded') !== 'tru
   relativeTimes(box);
 }
 
+/** Level of a row in a grouped or tree grid (`data-zeyn-level`); -1 in flat grids. */
+function levelOf(tr) {
+  return tr?.dataset.zeynLevel != null ? Number(tr.dataset.zeynLevel) : -1;
+}
+
+/** Removes the rows under a group or tree row: every following row deeper than it. */
+function collapseBranch(tr) {
+  const level = levelOf(tr);
+  const inside = [];
+  for (let n = tr.nextElementSibling; n && levelOf(n) > level; n = n.nextElementSibling) inside.push(n);
+  const focused = inside.some((n) => n.contains(document.activeElement));
+  for (const n of inside) n.remove();
+  if (focused) tr.focus();
+}
+
+/**
+ * Opens or closes a group row or a tree row (`data-zeyn-path`). Opening loads the first page of
+ * its subgroups, rows or children right under it; closing removes them.
+ */
+async function toggleBranch(tr, open = tr.getAttribute('aria-expanded') !== 'true') {
+  const grid = tr.closest('[data-zeyn-grid]');
+  tr.setAttribute('aria-expanded', String(open));
+  tr.querySelector('[data-zeyn-expand]')?.setAttribute('aria-expanded', String(open));
+  collapseBranch(tr);
+  if (!open) return;
+  let path;
+  try {
+    path = JSON.parse(tr.dataset.zeynPath);
+  } catch {
+    return;
+  }
+  await loadBranch(grid, tr, levelOf(tr) + 1, path, 0);
+}
+
+/**
+ * Loads one page of a branch with `POST /_zeyn/grid` and `path`, and puts the rows after
+ * `anchor`. When more remain, a row with a "Load more" button follows them.
+ */
+async function loadBranch(grid, anchor, level, path, offset) {
+  const s = grids.get(grid);
+  if (!s) return;
+  anchor.setAttribute('aria-busy', 'true');
+  const r = await post(BASE + '/_zeyn/grid', {
+    ...address(grid),
+    path,
+    query: { page: { type: 'offset', offset, limit: s.size }, sort: s.sort, filters: filterList(s), with_total: true, aggregates: [] },
+    view: s.columns ? { columns: s.columns } : null,
+  });
+  anchor.removeAttribute('aria-busy');
+  if (!r.ok || !r.data || !anchor.isConnected) return;
+  const t = document.createElement('template');
+  t.innerHTML = `<table><tbody>${r.data.rows ?? ''}</tbody></table>`;
+  const fresh = [...t.content.querySelectorAll('tbody > tr')];
+  const shown = offset + (r.data.count ?? fresh.length);
+  if (r.data.total != null && shown < r.data.total) {
+    const more = make('tr', 'z-branch-more', { 'data-zeyn-level': String(level), 'aria-level': String(level + 1) });
+    more.dataset.zeynPath = JSON.stringify(path);
+    more.dataset.zeynOffset = String(shown);
+    const cell = make('td');
+    cell.colSpan = own(grid, 'thead tr')?.cells.length ?? 1;
+    const button = make('button', 'z-link', { type: 'button', 'data-zeyn-branch-more': '', tabindex: '-1' });
+    button.textContent = `${s.texts.load_more || 'Load more'} (${fmt(shown)} / ${fmt(r.data.total)})`;
+    cell.append(button);
+    more.append(cell);
+    fresh.push(more);
+  }
+  anchor.after(...fresh);
+  roving(grid, false);
+}
+
+/** Loads the next page of a branch in place of its "Load more" row. */
+async function moreBranch(button) {
+  const row = button.closest('tr');
+  const grid = row.closest('[data-zeyn-grid]');
+  const anchor = row.previousElementSibling;
+  let path;
+  try {
+    path = JSON.parse(row.dataset.zeynPath);
+  } catch {
+    return;
+  }
+  row.remove();
+  await loadBranch(grid, anchor, levelOf(row), path, Number(row.dataset.zeynOffset) || 0);
+  const next = anchor.nextElementSibling;
+  if (next && !next.classList.contains('z-detail')) activate(next, true);
+}
+
 /** Handles arrow keys, Home, End and Enter on a grid row. Returns true when handled. */
 function rowKey(e, tr) {
   const list = rows(tr.closest('[data-zeyn-grid]'));
-  if (tr.dataset.zeynDetail && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+  if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
     const rtl = getComputedStyle(tr).direction === 'rtl';
     const open = (e.key === 'ArrowRight') !== rtl;
-    if (open !== (tr.getAttribute('aria-expanded') === 'true')) {
+    const branch = tr.dataset.zeynPath != null || tr.dataset.zeynDetail != null;
+    if (branch && open !== (tr.getAttribute('aria-expanded') === 'true')) {
       e.preventDefault();
-      toggleDetail(tr, open);
+      if (tr.dataset.zeynPath != null) toggleBranch(tr, open);
+      else toggleDetail(tr, open);
       return true;
     }
+    if (!open && levelOf(tr) > 0) {
+      const i = list.indexOf(tr);
+      const parent = list.slice(0, i).reverse().find((r) => levelOf(r) < levelOf(tr));
+      if (parent) {
+        e.preventDefault();
+        activate(parent, true);
+        return true;
+      }
+    }
+  }
+  if (e.key === 'Enter' && tr.classList.contains('z-branch-more')) {
+    e.preventDefault();
+    tr.querySelector('[data-zeyn-branch-more]')?.click();
+    return true;
   }
   const i = list.indexOf(tr);
   const target = { ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: list.length - 1 }[e.key];
@@ -2333,7 +2456,11 @@ document.addEventListener('click', (e) => {
     return bulkBar(grid)?.querySelector('[data-zeyn-select-clear]')?.focus();
   }
   if ((el = t.closest('[data-zeyn-select-clear]'))) return clearSelection(gridOfBar(el));
-  if ((el = t.closest('[data-zeyn-expand]'))) return toggleDetail(el.closest('tr'));
+  if ((el = t.closest('[data-zeyn-expand]'))) {
+    const tr = el.closest('tr');
+    return tr.dataset.zeynPath != null ? toggleBranch(tr) : toggleDetail(tr);
+  }
+  if ((el = t.closest('[data-zeyn-branch-more]'))) return moreBranch(el);
   if ((el = t.closest('[data-zeyn-bulk-run]'))) return runBulk(el);
   if ((el = t.closest('.z-menu-item'))) return runMenuItem(el);
   if ((el = t.closest('button[data-zeyn-run]'))) return runRowItem(el);

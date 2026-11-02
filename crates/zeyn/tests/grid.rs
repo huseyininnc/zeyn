@@ -1009,3 +1009,110 @@ fn blank_filters_keep_empty_or_set_values() {
     let set = GridQuery { filters: vec![zeyn::Filter::blank("due", false)], ..GridQuery::default() }.apply(rows);
     assert_eq!((empty.total, set.total), (Some(15), Some(5)));
 }
+
+#[test]
+fn apply_groups_rows_with_counts_totals_sort_and_paging() {
+    let rows: Vec<Item> = (1..=20).map(item).collect();
+    let mut q = query(serde_json::json!({ "page": { "type": "offset", "offset": 0, "limit": 2 }, "sort": [{ "field": "kind", "desc": true }], "aggregates": [{ "field": "qty", "op": "sum" }] }));
+    q.group = Some("kind".into());
+    let page = q.apply(rows.clone());
+    assert!(page.items.is_empty());
+    assert_eq!(page.total, Some(3));
+    let seen: Vec<(Value, u64)> = page.groups.iter().map(|g| (g.value.clone(), g.count)).collect();
+    assert_eq!(seen, [(Value::Choice("Tool"), 6), (Value::Choice("Part"), 7)]);
+    assert_eq!(page.groups[0].totals[0].value, Value::Int(3 + 6 + 9 + 12 + 15 + 18));
+    assert!(page.next.is_some());
+    let mut q = GridQuery::default();
+    q.group = Some("due".into());
+    let page = q.apply(rows);
+    assert_eq!((page.groups[0].value.clone(), page.groups[0].count), (Value::Null, 15), "empty values form one group, first");
+}
+
+#[test]
+fn any_of_matches_keys() {
+    let rows: Vec<Item> = (1..=20).map(item).collect();
+    let page = GridQuery { filters: vec![zeyn::Filter::any_of("id", ["3", "7", "99"])], ..GridQuery::default() }.apply(rows);
+    assert_eq!(codes(&page), ["C-03", "C-07"]);
+}
+
+#[screen(route = "/grouped", permission = "items.read")]
+pub fn grouped() -> Screen {
+    Screen::new("Grouped").body(
+        Grid::of(search).paging(Paging::pages(2)).group_by(Item::kind).group_by(Item::active).column(Item::code).column(Item::qty).sum(),
+    )
+}
+
+/// A node of a tree.
+#[entity(table = "nodes")]
+pub struct Node {
+    #[key]
+    pub id: NodeId,
+    pub name: String,
+    pub parent: Option<NodeId>,
+}
+
+#[action(permission = "items.read")]
+pub async fn search_nodes(q: GridQuery) -> Result<Page<Node>> {
+    let parent = |i: i64| match i {
+        1 | 2 => None,
+        3..=5 => Some(NodeId(1)),
+        _ => Some(NodeId(3)),
+    };
+    Ok(q.apply((1..=8).map(|i| Node { id: NodeId(i), name: format!("N{i}"), parent: parent(i) }).collect()))
+}
+
+#[screen(route = "/tree", permission = "items.read")]
+pub fn tree() -> Screen {
+    Screen::new("Tree").body(Grid::of(search_nodes).paging(Paging::pages(2)).tree(Node::parent).column(Node::name))
+}
+
+fn nested_router(identity: Identity) -> Router {
+    App::new("Test")
+        .service(Store::seeded())
+        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .feature(Feature::new("items").screen(grouped).screen(tree))
+        .router()
+        .unwrap()
+}
+
+fn branch(screen: &str, path: serde_json::Value) -> Request<Body> {
+    post("/_zeyn/grid", serde_json::json!({ "screen": screen, "node": 0, "path": path, "query": { "page": { "type": "offset", "offset": 0, "limit": 2 }, "with_total": true } }))
+}
+
+#[tokio::test]
+async fn grouped_grids_page_over_groups_and_open_them_level_by_level() {
+    let router = nested_router(reader());
+    let r = send(&router, get("/grouped")).await;
+    assert!(r.body.contains(r#"<table role="treegrid""#));
+    assert!(r.body.contains(r#"<tr class="z-group" aria-level="1" data-zeyn-level="0" aria-expanded="false" data-zeyn-path="[&quot;Food&quot;]"><td colspan="1">"#), "{}", r.body);
+    assert!(r.body.contains("7 rows") && r.body.contains(r#"data-zeyn-total="3""#));
+    let r = send(&router, branch("grouped", serde_json::json!(["Tool"]))).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    let rows = r.json()["rows"].as_str().unwrap().to_string();
+    assert!(rows.contains(r#"data-zeyn-path="[&quot;Tool&quot;,&quot;false&quot;]""#) && rows.contains(r#"aria-level="2""#), "{rows}");
+    assert_eq!(r.json()["total"], 2);
+    let r = send(&router, branch("grouped", serde_json::json!(["Tool", "true"]))).await;
+    let rows = r.json()["rows"].as_str().unwrap().to_string();
+    assert!(rows.contains(r#"<tr aria-level="3" data-zeyn-level="2" data-zeyn-key="6">"#), "{rows}");
+    assert_eq!(r.json()["total"], 3, "tools 6, 12, 18 are active");
+    assert_eq!(send(&router, branch("grouped", serde_json::json!(["Tool", "true", "x"]))).await.status, StatusCode::NOT_FOUND);
+    let long: Vec<&str> = vec!["a"; 33];
+    assert_eq!(send(&router, branch("grouped", serde_json::json!(long))).await.status, StatusCode::NOT_FOUND);
+    let router = nested_router(Identity::user("n"));
+    assert_eq!(send(&router, branch("grouped", serde_json::json!(["Tool"]))).await.status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn tree_grids_show_top_rows_and_load_children_lazily() {
+    let router = nested_router(reader());
+    let r = send(&router, get("/tree")).await;
+    assert!(r.body.contains(r#"<tr aria-level="1" data-zeyn-level="0" aria-expanded="false" data-zeyn-path="[&quot;1&quot;]" data-zeyn-key="1">"#), "{}", r.body);
+    assert!(r.body.contains(r#"<tr aria-level="1" data-zeyn-level="0" data-zeyn-key="2"><td class="z-tree-cell"><span class="z-tree" style="--z-level:0"><span class="z-tree-spacer""#), "N2 has no children");
+    let r = send(&router, branch("tree", serde_json::json!(["1"]))).await;
+    let rows = r.json()["rows"].as_str().unwrap().to_string();
+    assert_eq!(r.json()["total"], 3);
+    assert!(rows.contains(r#"data-zeyn-path="[&quot;1&quot;,&quot;3&quot;]" data-zeyn-key="3""#) && !rows.contains("N5"), "{rows}");
+    let r = send(&router, branch("tree", serde_json::json!(["1", "3"]))).await;
+    assert_eq!(r.json()["total"], 3, "6, 7 and 8 report to 3");
+    assert_eq!(send(&router, branch("tree", serde_json::json!([null]))).await.status, StatusCode::NOT_FOUND);
+}

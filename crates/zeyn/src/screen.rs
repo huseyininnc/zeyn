@@ -113,6 +113,14 @@ pub struct LoadedPage {
     pub view: Option<crate::grid::DataGridView>,
     /// Whether the user's view changes are saved on the server.
     pub saved_views: bool,
+    /// How deep these rows sit in a grouped or tree grid; 0 at the top.
+    pub depth: usize,
+    /// Group values or ancestor keys leading to these rows, in the fixed machine form.
+    pub path: Vec<Option<String>>,
+    /// Groups instead of rows, when the grid groups at this depth.
+    pub groups: Option<Vec<crate::action::Group>>,
+    /// Keys of the rows that have children, in a tree grid.
+    pub parents: Vec<String>,
 }
 
 /// An action call built on the server for one row or menu item, ready to run.
@@ -136,6 +144,14 @@ pub trait GridSource: Send + Sync {
     fn head_html(&self, r: &Render, view: Option<&crate::grid::DataGridView>) -> String;
 
     fn fetch(&self, ctx: Ctx, query: GridQuery) -> BoxFuture<Result<LoadedPage>>;
+
+    /// Loads rows as the user sees them: in a grouped or tree grid, the groups or rows under
+    /// `path` (group values or ancestor keys from the client, checked here). Flat grids ignore
+    /// `path`. Exports and bulk actions use [`GridSource::fetch`], which never groups.
+    fn fetch_at(&self, ctx: Ctx, query: GridQuery, path: Vec<Option<String>>) -> BoxFuture<Result<LoadedPage>> {
+        let _ = path;
+        self.fetch(ctx, query)
+    }
 
     /// Rows of a loaded page as HTML.
     fn rows_html(&self, page: &LoadedPage, r: &Render) -> String;

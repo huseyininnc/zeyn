@@ -1309,7 +1309,7 @@ impl AppState {
                 continue;
             }
             let view = self.saved_view(ctx, grid, name, i).await;
-            if let Ok(mut page) = self.timed(grid.fetch(ctx.clone(), grid.first_query(view.as_ref()))).await {
+            if let Ok(mut page) = self.timed(grid.fetch_at(ctx.clone(), grid.first_query(view.as_ref()), Vec::new())).await {
                 page.view = view;
                 page.saved_views = saved;
                 loaded.insert(i, page);
@@ -1648,6 +1648,9 @@ struct GridCall {
     /// Whether to send the header row back too (after the layout changed).
     #[serde(default)]
     head: bool,
+    /// Group values or ancestor keys of the branch to load in a grouped or tree grid.
+    #[serde(default)]
+    path: Vec<Option<String>>,
 }
 
 #[derive(Deserialize)]
@@ -1746,6 +1749,9 @@ struct FormCall {
 
 impl AppState {
     async fn run_grid(&self, ctx: &Ctx, call: GridCall) -> Result<Json, Failure> {
+        if call.path.len() > 32 || call.path.iter().flatten().any(|k| k.len() > 200) {
+            return Err(Failure::App(Error::NotFound));
+        }
         let (_, entry, screen) = self.open(ctx, &call.screen, call.params).await?;
         let grid = screen.nodes().get(call.node).and_then(|n| n.grid()).ok_or(Failure::App(Error::NotFound))?;
         let action = grid.action();
@@ -1756,7 +1762,7 @@ impl AppState {
         let started = Instant::now();
         let result = async {
             self.before(ctx, &info)?;
-            self.timed(grid.fetch(ctx.clone(), call.query)).await
+            self.timed(grid.fetch_at(ctx.clone(), call.query, call.path)).await
         }
         .await;
         self.after(ctx, &info, started, &result);
@@ -2485,7 +2491,7 @@ async fn call_tool(st: &AppState, ctx: &Ctx, name: &str, args: Json) -> Result<J
     match kind {
         "search" => {
             let query: GridQuery = serde_json::from_value(args).map_err(|_| Failure::App(Error::NotFound))?;
-            st.run_grid(ctx, GridCall { screen: screen.to_string(), params: Json::Null, node, query, view: None, head: false }).await
+            st.run_grid(ctx, GridCall { screen: screen.to_string(), params: Json::Null, node, query, view: None, head: false, path: Vec::new() }).await
         }
         _ => {
             let values = args.as_object().cloned().unwrap_or_default();

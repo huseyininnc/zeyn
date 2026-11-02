@@ -180,6 +180,35 @@ pub fn today() -> Screen {
     )
 }
 
+/// Today's orders grouped by city and then by status, with counts and totals per group.
+#[screen(route = "/by-city", permission = "sales.order.read")]
+pub fn orders_by_city() -> Screen {
+    Screen::new(t!("sales.by_city")).body(
+        Grid::of(search_today)
+            .mode(GridMode::Server)
+            .paging(Paging::pages(20))
+            .group_by(Order::city)
+            .group_by(Order::status)
+            .column(Order::id)
+            .width(110)
+            .column(Order::customer)
+            .flex(2)
+            .filter()
+            .column(Order::placed_at)
+            .width(200)
+            .relative_time()
+            .column(Order::amount)
+            .width(260)
+            .filter()
+            .sum()
+            .avg()
+            .column(Order::status)
+            .width(130)
+            .badge(status_tone)
+            .detail(|o| (order_lines, OrderParams { id: o.id })),
+    )
+}
+
 /// The lines of one order, shown when a row of today's orders opens. Each line opens the product
 /// editor in turn.
 #[screen(permission = "sales.order.read")]
@@ -233,10 +262,12 @@ pub fn feature() -> Feature {
         .guard(SignedIn)
         .screen(today)
         .screen(order_lines)
+        .screen(orders_by_city)
         .screen(archive)
         .menu(|m| {
             m.group(t!("menu.sales"), Icon::Cart)
                 .item(t!("sales.today"), today)
+                .item(t!("sales.by_city"), orders_by_city)
                 .item(t!("sales.archive"), archive)
         })
 }

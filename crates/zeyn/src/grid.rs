@@ -381,6 +381,19 @@ pub struct Grid<E: Model> {
     export: Option<(crate::action::Access, usize)>,
     detail: Option<DetailDef<E>>,
     scope: Vec<Filter>,
+    group_by: Vec<&'static FieldMeta>,
+    tree: Option<&'static FieldMeta>,
+}
+
+/// Most levels a tree grid opens.
+pub const MAX_TREE_DEPTH: usize = 32;
+
+/// Where rows sit in a grouped or tree grid.
+#[derive(Default)]
+struct Branch<'a> {
+    depth: usize,
+    path: &'a [Option<String>],
+    parents: &'a [String],
 }
 
 type ParamsFn<E> = Box<dyn Fn(&E) -> serde_json::Value + Send + Sync>;
@@ -430,6 +443,11 @@ fn csv_cell(value: &str) -> String {
         v.insert(0, '\'');
     }
     if v.contains([',', '"', '\r', '\n']) { format!("\"{}\"", v.replace('"', "\"\"")) } else { v }
+}
+
+/// A value as the user reads it, escaped for HTML.
+fn plain_html(value: &Value, kind: &FieldKind, r: &Render) -> String {
+    escape(&plain(value, kind, r))
 }
 
 /// A value as plain text the user reads: money with the symbol, dates in the locale, choices by
@@ -497,7 +515,40 @@ impl<E: Model> Grid<E> {
             export: None,
             detail: None,
             scope: Vec::new(),
+            group_by: Vec::new(),
+            tree: None,
         }
+    }
+
+    /// Groups rows by `field` on the server; call again to group inside each group. The grid
+    /// shows a header row per group with its value, row count and the column totals over the
+    /// group, and loads a group's rows (or subgroups) when the user opens it, a page at a time.
+    /// The top level pages over groups. The grid's action answers `GridQuery::group` with
+    /// `Page::groups`; `GridQuery::apply` does it for in memory data. Virtual grids do not group.
+    pub fn group_by<T: FieldType>(mut self, field: Field<E, T>) -> Self {
+        let meta = field.meta();
+        if !self.group_by.iter().any(|m| m.name == meta.name) {
+            self.group_by.push(meta);
+        }
+        self
+    }
+
+    /// Shows rows as a tree by their parent key: rows whose `parent` is empty at the top, and the
+    /// children of a row loaded when the user opens it, a page at a time, to any depth (at most
+    /// [`MAX_TREE_DEPTH`]). The parent field must be optional; empty means a top row. Filters and
+    /// sorting apply at every level, totals cover every matching row. Tree grids do not group
+    /// and show no row details; virtual grids show no tree.
+    pub fn tree<K: FieldType>(mut self, parent: Field<E, Option<K>>) -> Self
+    where
+        Option<K>: FieldType,
+    {
+        self.tree = Some(parent.meta());
+        self
+    }
+
+    /// Whether rows are grouped or in a tree.
+    fn nested(&self) -> bool {
+        !matches!(self.paging, Paging::Virtual { .. }) && (self.tree.is_some() || !self.group_by.is_empty())
     }
 
     /// Lets every row expand into a screen built from the row, loaded only when the user opens
@@ -530,7 +581,9 @@ impl<E: Model> Grid<E> {
 
     /// Whether rows show the detail expander for this page's user.
     fn expandable(&self, r: &Render) -> bool {
-        !matches!(self.paging, Paging::Virtual { .. }) && self.detail.as_ref().is_some_and(|d| r.can(&d.access))
+        !matches!(self.paging, Paging::Virtual { .. })
+            && !(self.nested() && self.tree.is_some())
+            && self.detail.as_ref().is_some_and(|d| r.can(&d.access))
     }
 
     /// Cells before the first data column: the detail expander and the selection box.
@@ -740,7 +793,7 @@ impl<E: Model> Grid<E> {
 
     /// Renders rows as HTML in English. For tests and tools; the server uses the user's language.
     pub fn rows_html(&self, rows: &[E]) -> String {
-        self.rows(rows, &Render::english("grid"), &self.layout(None))
+        self.rows(rows, &Render::english("grid"), &self.layout(None), &Branch::default())
     }
 
     /// Shown columns for a view: the view's columns that exist, in its order, with starts pinned
@@ -898,10 +951,31 @@ impl<E: Model> Grid<E> {
         out
     }
 
-    fn rows(&self, rows: &[E], r: &Render, cols: &[Shown]) -> String {
+    fn rows(&self, rows: &[E], r: &Render, cols: &[Shown], b: &Branch) -> String {
         let mut out = String::new();
+        let nested = self.nested();
+        let tree = nested && self.tree.is_some();
         for row in rows {
             out.push_str("<tr");
+            let mut toggle = String::new();
+            if nested {
+                out.push_str(&format!(r#" aria-level="{}" data-zeyn-level="{}""#, b.depth + 1, b.depth));
+            }
+            if tree {
+                let key = Self::key_index().and_then(|i| row.value_at(i)).and_then(|v| value_key(&v));
+                toggle = match key.filter(|k| b.parents.contains(k) && b.depth + 1 < MAX_TREE_DEPTH) {
+                    Some(k) => {
+                        let mut path = b.path.to_vec();
+                        path.push(Some(k));
+                        out.push_str(&format!(r#" aria-expanded="false" data-zeyn-path="{}""#, attr(&path)));
+                        format!(
+                            r#"<button type="button" class="z-expander" data-zeyn-expand aria-expanded="false" aria-label="{}" tabindex="-1"></button>"#,
+                            r.text(&Text::key("zeyn.grid.children"))
+                        )
+                    }
+                    None => r#"<span class="z-tree-spacer" aria-hidden="true"></span>"#.to_string(),
+                };
+            }
             if let Some(style) = self.row_style.as_ref().and_then(|f| f(row)) {
                 out.push_str(&format!(r#" class="{}""#, style.css()));
             }
@@ -941,14 +1015,24 @@ impl<E: Model> Grid<E> {
                     r.text(&Text::key("zeyn.grid.select_row"))
                 ));
             }
-            for s in cols {
+            for (n, s) in cols.iter().enumerate() {
                 let c = &self.columns[s.index];
                 let value = (c.value)(row);
-                let class = if matches!(value, Value::Int(_) | Value::Money(_)) { r#" class="z-num""# } else { "" };
-                let content = match &c.cell {
+                let num = matches!(value, Value::Int(_) | Value::Money(_));
+                let first = tree && n == 0;
+                let class = match (num, first) {
+                    (true, true) => r#" class="z-num z-tree-cell""#,
+                    (true, false) => r#" class="z-num""#,
+                    (false, true) => r#" class="z-tree-cell""#,
+                    (false, false) => "",
+                };
+                let mut content = match &c.cell {
                     Some(cell) => cell(row, r),
                     None => r.value(&value, &c.meta.kind),
                 };
+                if first {
+                    content = format!(r#"<span class="z-tree" style="--z-level:{}">{toggle}<span>{content}</span></span>"#, b.depth);
+                }
                 if edit && c.editable && !c.meta.readonly && !c.meta.key && !c.meta.version {
                     let v = crate::form::edit_value(&value, r.locale, r.tz);
                     out.push_str(&format!(r#"<td{class} data-v="{}">{content}</td>"#, escape(&v)));
@@ -1039,7 +1123,8 @@ impl<E: Model> Grid<E> {
             }
         }
         out.push_str(&format!(
-            r#"><table role="grid" aria-colcount="{}"><thead>{}</thead><tbody data-zeyn-rows>"#,
+            r#"><table role="{}" aria-colcount="{}"><thead>{}</thead><tbody data-zeyn-rows>"#,
+            if self.nested() { "treegrid" } else { "grid" },
             self.columns.len() + usize::from(!self.row_actions.is_empty()) + self.lead(r),
             self.head_row(r, &cols)
         ));
@@ -1080,35 +1165,74 @@ impl<E: Model> Grid<E> {
             out.push_str("<td></td>");
         }
         for c in cols.iter().map(|s| &self.columns[s.index]) {
-            if c.aggregates.is_empty() {
-                out.push_str("<td></td>");
-                continue;
-            }
-            let ops: Vec<&str> = c.aggregates.iter().map(|a| a.code()).collect();
-            let num = matches!(c.meta.kind, FieldKind::Integer | FieldKind::Money);
-            let class = if num { r#" class="z-num""# } else { "" };
-            out.push_str(&format!(r#"<td{class} data-field="{}" data-agg="{}">"#, c.meta.name, ops.join(" ")));
-            for op in &c.aggregates {
-                let value = totals
-                    .iter()
-                    .find(|t| t.field == c.meta.name && t.op == *op)
-                    .map(|t| match t.value {
-                        Value::Int(n) => grouped(n, r.locale),
-                        ref v => r.value(v, &c.meta.kind),
-                    })
-                    .unwrap_or_default();
-                out.push_str(&format!(
-                    r#"<span class="z-agg" data-op="{}"><span class="z-agg-label">{}</span> <span class="z-agg-value">{value}</span></span>"#,
-                    op.code(),
-                    r.text(&Text::key(format!("zeyn.grid.agg.{}", op.code()))),
-                ));
-            }
-            out.push_str("</td>");
+            out.push_str(&self.total_cell(c, totals, r));
         }
         if !self.row_actions.is_empty() {
             out.push_str("<td></td>");
         }
         out.push_str("</tr>");
+        out
+    }
+
+    /// The cell of one column with its totals, or an empty cell.
+    fn total_cell(&self, c: &Column<E>, totals: &[Total], r: &Render) -> String {
+        if c.aggregates.is_empty() {
+            return "<td></td>".to_string();
+        }
+        let ops: Vec<&str> = c.aggregates.iter().map(|a| a.code()).collect();
+        let num = matches!(c.meta.kind, FieldKind::Integer | FieldKind::Money);
+        let class = if num { r#" class="z-num""# } else { "" };
+        let mut out = format!(r#"<td{class} data-field="{}" data-agg="{}">"#, c.meta.name, ops.join(" "));
+        for op in &c.aggregates {
+            let value = totals
+                .iter()
+                .find(|t| t.field == c.meta.name && t.op == *op)
+                .map(|t| match t.value {
+                    Value::Int(n) => grouped(n, r.locale),
+                    ref v => r.value(v, &c.meta.kind),
+                })
+                .unwrap_or_default();
+            out.push_str(&format!(
+                r#"<span class="z-agg" data-op="{}"><span class="z-agg-label">{}</span> <span class="z-agg-value">{value}</span></span>"#,
+                op.code(),
+                r.text(&Text::key(format!("zeyn.grid.agg.{}", op.code()))),
+            ));
+        }
+        out.push_str("</td>");
+        out
+    }
+
+    /// Header rows of groups at `depth`: the expander, column label, value and row count span
+    /// the columns up to the first one with totals; the totals of each group follow under their
+    /// columns.
+    fn group_rows(&self, groups: &[crate::action::Group], r: &Render, cols: &[Shown], depth: usize, path: &[Option<String>]) -> String {
+        let Some(meta) = self.group_by.get(depth) else { return String::new() };
+        let lead = self.lead(r);
+        let first = cols.iter().position(|s| !self.columns[s.index].aggregates.is_empty()).unwrap_or(cols.len());
+        let mut out = String::new();
+        for g in groups {
+            let mut here = path.to_vec();
+            here.push(value_key(&g.value));
+            let shown = match g.value {
+                Value::Null => r.text(&Text::key("zeyn.grid.blank")),
+                ref v => plain_html(v, &meta.kind, r),
+            };
+            let label = r.label(meta);
+            let count = r.text(&Text::key("zeyn.grid.group_count").arg("n", grouped(g.count as i64, r.locale)));
+            out.push_str(&format!(
+                r#"<tr class="z-group" aria-level="{level}" data-zeyn-level="{depth}" aria-expanded="false" data-zeyn-path="{}"><td colspan="{}"><span class="z-group-head" style="--z-level:{depth}"><button type="button" class="z-expander" data-zeyn-expand aria-expanded="false" aria-label="{label}: {shown}" tabindex="-1"></button><span class="z-group-label">{label}: <strong>{shown}</strong></span> <span class="z-group-count">{count}</span></span></td>"#,
+                attr(&here),
+                (lead + first).max(1),
+                level = depth + 1,
+            ));
+            for s in &cols[first..] {
+                out.push_str(&self.total_cell(&self.columns[s.index], &g.totals, r));
+            }
+            if !self.row_actions.is_empty() {
+                out.push_str("<td></td>");
+            }
+            out.push_str("</tr>");
+        }
         out
     }
 
@@ -1122,7 +1246,98 @@ impl<E: Model> Grid<E> {
 
     fn rows_html_erased(&self, page: &LoadedPage, r: &Render) -> String {
         let cols = self.layout(page.view.as_ref());
-        page.items.downcast_ref::<Vec<E>>().map(|rows| self.rows(rows, r, &cols)).unwrap_or_default()
+        if let Some(groups) = &page.groups {
+            return self.group_rows(groups, r, &cols, page.depth, &page.path);
+        }
+        let branch = Branch { depth: page.depth, path: &page.path, parents: &page.parents };
+        page.items.downcast_ref::<Vec<E>>().map(|rows| self.rows(rows, r, &cols, &branch)).unwrap_or_default()
+    }
+
+    /// Loads the groups or rows under `path` of a grouped or tree grid. Group values and parent
+    /// keys become filters in front of the client's; a tree also asks which of the loaded rows
+    /// have children (one grouped query on the parent field) and, at the top, the totals over
+    /// every matching row.
+    fn fetch_nested(&self, ctx: Ctx, mut query: GridQuery, path: Vec<Option<String>>) -> BoxFuture<Result<LoadedPage>> {
+        use crate::action::Error;
+        self.allow(&mut query);
+        query.time_zone = ctx.time_zone();
+        let depth = path.len();
+        let mut fixed = self.scope.clone();
+        let user = query.filters.clone();
+        match self.tree {
+            Some(parent) => {
+                if depth >= MAX_TREE_DEPTH || path.iter().any(Option::is_none) {
+                    return Box::pin(async { Err(Error::NotFound) });
+                }
+                fixed.push(key_filter(parent, path.last().cloned().flatten().as_deref()));
+            }
+            None => {
+                if depth > self.group_by.len() {
+                    return Box::pin(async { Err(Error::NotFound) });
+                }
+                for (meta, key) in self.group_by.iter().zip(&path) {
+                    fixed.push(key_filter(meta, key.as_deref()));
+                }
+                if let Some(meta) = self.group_by.get(depth) {
+                    query.group = Some(meta.name.to_string());
+                    query.aggregates = self.aggregate_requests();
+                }
+            }
+        }
+        query.filters.splice(0..0, fixed);
+        let offset = match &query.page {
+            PageRequest::Offset { offset, .. } => *offset,
+            PageRequest::After { .. } => 0,
+        };
+        let fetch = self.fetch;
+        let parent = self.tree;
+        let scope = self.scope.clone();
+        Box::pin(async move {
+            let grouped = query.group.is_some();
+            let totals_query = (parent.is_some() && depth == 0 && !query.aggregates.is_empty()).then(|| GridQuery {
+                page: PageRequest::Offset { offset: 0, limit: 1 },
+                filters: scope.iter().cloned().chain(user.iter().cloned()).collect(),
+                aggregates: query.aggregates.clone(),
+                time_zone: query.time_zone,
+                ..GridQuery::default()
+            });
+            let page = fetch(ctx.clone(), query.clone()).await?;
+            let mut parents = Vec::new();
+            if let (Some(parent), Some(ki)) = (parent, Self::key_index()) {
+                let keys: Vec<String> = page.items.iter().filter_map(|row| row.value_at(ki)).filter_map(|v| value_key(&v)).collect();
+                if !keys.is_empty() {
+                    let mut filters = scope.clone();
+                    filters.extend(user.iter().cloned());
+                    filters.push(Filter::any_of(parent.name, keys));
+                    let ask = GridQuery {
+                        page: PageRequest::Offset { offset: 0, limit: MAX_PAGE_SIZE },
+                        filters,
+                        group: Some(parent.name.to_string()),
+                        time_zone: query.time_zone,
+                        ..GridQuery::default()
+                    };
+                    parents = fetch(ctx.clone(), ask).await?.groups.iter().filter_map(|g| value_key(&g.value)).collect();
+                }
+            }
+            let totals = match totals_query {
+                Some(q) => fetch(ctx, q).await?.totals,
+                None => page.totals,
+            };
+            Ok(LoadedPage {
+                count: if grouped { page.groups.len() } else { page.items.len() },
+                total: page.total,
+                next: page.next,
+                offset,
+                totals,
+                items: Box::new(page.items),
+                view: None,
+                saved_views: false,
+                depth,
+                path,
+                groups: grouped.then_some(page.groups),
+                parents,
+            })
+        })
     }
 }
 
@@ -1182,6 +1397,10 @@ impl<E: Model> GridSource for Grid<E> {
                 items: Box::new(page.items),
                 view: None,
                 saved_views: false,
+                depth: 0,
+                path: Vec::new(),
+                groups: None,
+                parents: Vec::new(),
             })
         })
     }
@@ -1271,7 +1490,7 @@ impl<E: Model> GridSource for Grid<E> {
         let i = Self::key_index()?;
         let rows = page.items.downcast_ref::<Vec<E>>()?;
         let row = rows.iter().find(|row| row.value_at(i).is_some_and(|v| key_text(&v) == key))?;
-        Some(self.rows(std::slice::from_ref(row), r, &self.layout(page.view.as_ref())))
+        Some(self.rows(std::slice::from_ref(row), r, &self.layout(page.view.as_ref()), &Branch::default()))
     }
 
     fn row_call(&self, page: &LoadedPage, key: &str, item: &str) -> Option<RowCall> {
@@ -1306,8 +1525,16 @@ impl<E: Model> GridSource for Grid<E> {
                 items: Box::new(page.items),
                 view: None,
                 saved_views: false,
+                depth: 0,
+                path: Vec::new(),
+                groups: None,
+                parents: Vec::new(),
             })
         })
+    }
+
+    fn fetch_at(&self, ctx: Ctx, query: GridQuery, path: Vec<Option<String>>) -> BoxFuture<Result<LoadedPage>> {
+        if self.nested() { self.fetch_nested(ctx, query, path) } else { self.fetch(ctx, query) }
     }
 
     fn rows_html(&self, page: &LoadedPage, r: &Render) -> String {
@@ -1410,6 +1637,8 @@ impl<E: Model> Component for Grid<E> {
             })).collect::<Vec<_>>(),
             "row_actions": self.row_actions.iter().map(|a| json!({ "label": a.label, "action": a.meta })).collect::<Vec<_>>(),
             "detail": self.detail.as_ref().map(|d| d.screen),
+            "group_by": self.group_by.iter().map(|m| m.name).collect::<Vec<_>>(),
+            "tree": self.tree.map(|m| m.name),
         })
     }
 
@@ -1679,6 +1908,17 @@ impl<E: Model, T> GridColumn<E, T> {
         self.grid.scope(field, value)
     }
 
+    pub fn group_by<U: FieldType>(self, field: Field<E, U>) -> Grid<E> {
+        self.grid.group_by(field)
+    }
+
+    pub fn tree<K: FieldType>(self, parent: Field<E, Option<K>>) -> Grid<E>
+    where
+        Option<K>: FieldType,
+    {
+        self.grid.tree(parent)
+    }
+
     /// Returns the grid.
     pub fn done(self) -> Grid<E> {
         self.grid
@@ -1748,7 +1988,7 @@ fn grid_texts(r: &Render) -> serde_json::Value {
         map.insert(format!("menu_{k}"), json!(r.i18n.text(r.locale, &Text::key(format!("zeyn.grid.menu.{k}")))));
     }
     map.insert("done".into(), json!(r.i18n.text(r.locale, &Text::key("zeyn.grid.done"))));
-    for k in ["saved", "undo", "undone", "empty", "error", "retry", "copied", "details", "loading"] {
+    for k in ["saved", "undo", "undone", "empty", "error", "retry", "copied", "details", "loading", "load_more"] {
         map.insert(k.into(), json!(r.i18n.text(r.locale, &Text::key(format!("zeyn.grid.{k}")))));
     }
     map.insert("yes".into(), json!(r.i18n.text(r.locale, &Text::key("zeyn.yes"))));
@@ -1847,6 +2087,7 @@ enum Cond {
     AnyOf(usize, Vec<String>),
     Is(usize, bool),
     Blank(usize, bool),
+    AnyKey(usize, Vec<String>),
 }
 
 impl Cond {
@@ -1875,6 +2116,9 @@ impl Cond {
         let hi = f.to.as_deref().and_then(|s| bound(kind, s, tz, true));
         if lo.is_some() || hi.is_some() {
             out.push(Cond::Range(i, lo, hi));
+        }
+        if matches!(kind, FieldKind::Id | FieldKind::Integer | FieldKind::Text | FieldKind::Custom { .. }) && !f.any_of.is_empty() {
+            out.push(Cond::AnyKey(i, f.any_of.iter().take(MAX_PAGE_SIZE as usize).cloned().collect()));
         }
         if let FieldKind::Choice(options) = kind {
             let wanted: Vec<String> = f
@@ -1923,6 +2167,10 @@ impl Cond {
             },
             Cond::Is(i, b) => value(i) == Value::Bool(*b),
             Cond::Blank(i, b) => (value(i) == Value::Null) == *b,
+            Cond::AnyKey(i, keys) => {
+                let v = value(i);
+                v != Value::Null && keys.contains(&key_text(&v))
+            }
         }
     }
 }
@@ -2040,6 +2288,43 @@ impl GridQuery {
                 Some(Total { field: a.field.clone(), op: a.op, value })
             })
             .collect();
+        if let Some(gi) = self.group.as_deref().and_then(index) {
+            let desc = self.sort.iter().any(|s| s.desc && Some(gi) == index(&s.field));
+            let mut sorted: Vec<&M> = rows.iter().collect();
+            sorted.sort_by(|a, b| {
+                let o = compare(&a.value_at(gi).unwrap_or(Value::Null), &b.value_at(gi).unwrap_or(Value::Null));
+                if desc { o.reverse() } else { o }
+            });
+            let mut buckets: Vec<(Value, Vec<&M>)> = Vec::new();
+            for row in sorted {
+                let v = row.value_at(gi).unwrap_or(Value::Null);
+                match buckets.last_mut() {
+                    Some((g, list)) if *g == v => list.push(row),
+                    _ => buckets.push((v, vec![row])),
+                }
+            }
+            let all: Vec<crate::action::Group> = buckets
+                .into_iter()
+                .map(|(value, list)| crate::action::Group {
+                    value,
+                    count: list.len() as u64,
+                    totals: self
+                        .aggregates
+                        .iter()
+                        .filter_map(|a| {
+                            let i = index(&a.field)?;
+                            let value = total(list.iter().filter_map(|r| r.value_at(i)), a.op)?;
+                            Some(Total { field: a.field.clone(), op: a.op, value })
+                        })
+                        .collect(),
+                })
+                .collect();
+            let groups = Page::from_slice(&all, self);
+            page.items.clear();
+            page.total = groups.total;
+            page.next = groups.next;
+            page.groups = groups.items;
+        }
         if !self.with_total && matches!(self.page, PageRequest::After { .. }) {
             page.total = None;
         }

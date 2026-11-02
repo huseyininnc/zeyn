@@ -68,11 +68,84 @@ pub fn leave(_: (), ctx: Ctx) -> Screen {
     )
 }
 
+/// A person in the organization chart.
+#[entity(table = "employees")]
+pub struct Employee {
+    #[key]
+    pub id: EmployeeId,
+    pub name: String,
+    pub title: String,
+    pub manager_id: Option<EmployeeId>,
+    pub salary: Money,
+}
+
+const FIRST: [&str; 12] = ["Ada", "Can", "Elif", "Mert", "Zeynep", "Ömer", "İpek", "Deniz", "Selin", "Kaan", "Derya", "Emre"];
+const LAST: [&str; 9] = ["Yılmaz", "Demir", "Şahin", "Kaya", "Arslan", "Çelik", "Aydın", "Koç", "Öztürk"];
+
+/// The organization: one chief, five directors, four managers under each and six people under
+/// every manager, 146 people in all.
+pub fn employees() -> Vec<Employee> {
+    let mut all = Vec::new();
+    let mut add = |id: i64, manager: Option<i64>, title: &str, salary: i64| {
+        all.push(Employee {
+            id: EmployeeId(id),
+            name: format!("{} {}", FIRST[(id % 12) as usize], LAST[(id * 7 % 9) as usize]),
+            title: title.to_string(),
+            manager_id: manager.map(EmployeeId),
+            salary: Money::tl(salary + id * 1_300),
+        })
+    };
+    add(1, None, "Chief executive", 9_000_000);
+    let mut next = 2;
+    for _ in 0..5 {
+        let director = next;
+        add(director, Some(1), "Director", 5_200_000);
+        next += 1;
+        for _ in 0..4 {
+            let manager = next;
+            add(manager, Some(director), "Manager", 3_400_000);
+            next += 1;
+            for _ in 0..6 {
+                add(next, Some(manager), "Specialist", 2_100_000);
+                next += 1;
+            }
+        }
+    }
+    all
+}
+
+#[action(permission = "people.org.read")]
+pub async fn search_employees(q: GridQuery) -> Result<Page<Employee>> {
+    Ok(q.apply(employees()))
+}
+
+/// The organization chart as a tree: open a person to see who reports to them.
+#[screen(route = "/org", permission = "people.org.read")]
+pub fn org_chart() -> Screen {
+    Screen::new(t!("people.org")).body(
+        Grid::of(search_employees)
+            .mode(GridMode::Server)
+            .paging(Paging::pages(25))
+            .tree(Employee::manager_id)
+            .column(Employee::name)
+            .flex(2)
+            .filter()
+            .column(Employee::title)
+            .flex(1)
+            .filter()
+            .column(Employee::salary)
+            .width(240)
+            .sum()
+            .avg(),
+    )
+}
+
 pub fn feature() -> Feature {
     Feature::new("people")
         .route_prefix("/people")
         .guard(SignedIn)
         .guard(Licensed::module("people"))
         .screen(leave)
-        .menu(|m| m.group(t!("menu.people"), Icon::Edit).item(t!("people.leave"), leave))
+        .screen(org_chart)
+        .menu(|m| m.group(t!("menu.people"), Icon::Edit).item(t!("people.leave"), leave).item(t!("people.org"), org_chart))
 }

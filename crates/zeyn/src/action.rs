@@ -121,17 +121,30 @@ pub struct Page<M> {
     /// aggregates the query asked for ([`GridQuery::aggregates`]).
     #[serde(default, skip_deserializing, skip_serializing_if = "Vec::is_empty")]
     pub totals: Vec<Total>,
+    /// Groups of rows, filled instead of `items` when the query asks for them
+    /// ([`GridQuery::group`]). `total` and `next` then count groups.
+    #[serde(default, skip_deserializing, skip_serializing_if = "Vec::is_empty")]
+    pub groups: Vec<Group>,
+}
+
+/// One group of rows that share a value: the value, how many rows have it and the totals the
+/// query asked for over those rows.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct Group {
+    pub value: Value,
+    pub count: u64,
+    pub totals: Vec<Total>,
 }
 
 impl<M> Default for Page<M> {
     fn default() -> Self {
-        Self { items: Vec::new(), total: None, next: None, totals: Vec::new() }
+        Self { items: Vec::new(), total: None, next: None, totals: Vec::new(), groups: Vec::new() }
     }
 }
 
 impl<M> Page<M> {
     pub fn new(items: Vec<M>) -> Self {
-        Self { items, total: None, next: None, totals: Vec::new() }
+        Self { items, total: None, next: None, totals: Vec::new(), groups: Vec::new() }
     }
 
     /// Adds a column total. Data layers that page in SQL compute totals with one aggregate query.
@@ -204,6 +217,12 @@ pub struct GridQuery {
     /// user's settings, never taken from the client.
     #[serde(skip)]
     pub time_zone: crate::time::TimeZone,
+    /// When set, the data layer returns groups of the matching rows by this field in
+    /// [`Page::groups`] (value, row count and the asked totals per group), sorted by the value in
+    /// the direction of the sort key on that field, and paged like rows; `items` stays empty.
+    /// SQL data layers answer with `GROUP BY`. Set by the grid, never taken from the client.
+    #[serde(skip)]
+    pub group: Option<String>,
 }
 
 impl GridQuery {

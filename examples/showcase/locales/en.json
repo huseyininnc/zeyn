@@ -31,14 +31,22 @@
   "sales": {
     "today": "Today's orders",
     "archive": "Order archive",
-    "order_lines": "Lines of order {id}"
+    "order_lines": "Lines of order {id}",
+    "by_city": "Orders by city"
   },
   "people": {
+    "org": "Organization chart",
     "leave": "Leave request",
     "send": "Send request",
     "sent": "Your request for {days} days was sent.",
     "ends_before_start": "The last day cannot be before the first day.",
     "too_long": "A single request can cover at most 30 days."
+  },
+  "Employee": {
+    "name": "Name",
+    "title": "Title",
+    "manager_id": "Manager",
+    "salary": "Salary"
   },
   "Product": {
     "code": "Code",

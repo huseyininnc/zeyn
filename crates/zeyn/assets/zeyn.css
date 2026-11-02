@@ -1210,6 +1210,29 @@ th[aria-sort="descending"] .z-sort::after {
 .z-grid tbody tr.z-row-danger:hover > td,
 .z-grid tbody tr.z-row-success:hover > td { background: color-mix(in oklab, var(--z-hover) 50%, transparent); }
 
+/* Grouping and trees: group header rows, indented tree cells and "Load more" rows. */
+
+.z-grid tbody tr.z-group:nth-child(n) > td { background: var(--z-surface-2); }
+
+.z-grid tbody tr.z-group:hover > td { background: var(--z-hover); }
+
+.z-grid tbody tr.z-group > td:not(:first-child) { position: static; }
+
+.z-group-head,
+.z-tree {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-inline-start: calc(var(--z-level, 0) * 20px);
+  white-space: nowrap;
+}
+
+.z-group-count { color: var(--z-text-muted); }
+
+.z-tree-spacer { flex: none; width: 24px; }
+
+.z-grid tbody tr.z-branch-more > td { padding-inline-start: calc(var(--z-space) * 12); }
+
 /* Master detail: the expander column and the row that holds an opened detail screen. */
 
 .z-grid th.z-expand-col,
