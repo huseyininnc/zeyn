@@ -9,7 +9,7 @@ rendered on the server, a small runtime in the browser applies changes, and app 
 HTML, CSS or JavaScript.
 
 If you are writing an app *with* Zeyn rather than changing Zeyn itself, read
-[`skills/zeyn/SKILL.md`](skills/zeyn/SKILL.md) instead. `zeyn new` copies it into every project.
+[`skills/zeyn/SKILL.md`](skills/zeyn/SKILL.md) instead. `zeyn new` copies it into every project. The CLI ships a copy in `crates/zeyn-cli/embedded/`; a test fails until you copy your change there.
 
 ## Read before you change anything
 
