@@ -1097,6 +1097,20 @@ th[aria-sort="descending"] .z-sort::after {
   cursor: pointer;
 }
 
+.z-grid-state {
+  position: sticky;
+  inset-inline-start: 0;
+  width: var(--z-view-w, 100%);
+  box-sizing: border-box;
+  padding: calc(var(--z-space) * 8) calc(var(--z-space) * 4);
+  color: var(--z-text-muted);
+  text-align: center;
+}
+
+.z-grid-state[data-kind="error"] { color: var(--z-danger); }
+
+.z-grid-state[hidden] { display: none; }
+
 .z-sort-order {
   display: inline-grid;
   place-items: center;

@@ -344,6 +344,7 @@ function initGrid(grid) {
     pinOffsets(grid);
   }).observe(grid);
 
+  if (!rows(grid).length && grid.dataset.zeynOffset != null) gridState(grid, 'empty');
   if (state.paging === 'virtual') return initVirtual(grid, state);
   const more = grid.querySelector('[data-zeyn-more]');
   if (state.paging === 'infinite' && more && 'IntersectionObserver' in window) {
@@ -391,7 +392,10 @@ async function loadGrid(grid, kind) {
   if (seq !== s.seq) return;
   s.loading = false;
   grid.removeAttribute('aria-busy');
-  if (!r.ok || !r.data) return;
+  if (!r.ok || !r.data) {
+    if (!append) gridState(grid, 'error');
+    return;
+  }
   if (typeof r.data.head === 'string') applyHead(grid, s, r.data.head);
 
   const body = grid.querySelector('[data-zeyn-rows]');
@@ -406,6 +410,7 @@ async function loadGrid(grid, kind) {
   s.total = r.data.total ?? null;
   s.next = r.data.count === 0 && append ? null : (r.data.next ?? null);
   applyFoot(grid, r.data.foot);
+  gridState(grid, s.count ? null : 'empty');
   roving(grid, hadFocus);
   updateChrome(grid, append);
 }
@@ -438,6 +443,32 @@ function applyFoot(grid, html) {
  */
 function rowControls(tr, on) {
   for (const c of tr.querySelectorAll('button, a[href], input')) c.tabIndex = on ? 0 : -1;
+}
+
+/**
+ * Shows the empty or error state of a grid under its header, or hides it (`kind` null). The
+ * error state has a retry button that reloads the grid.
+ */
+function gridState(grid, kind) {
+  let box = grid.querySelector(':scope > .z-grid-state');
+  if (!kind) {
+    if (box) box.hidden = true;
+    return;
+  }
+  const t = grids.get(grid)?.texts ?? {};
+  if (!box) {
+    box = make('div', 'z-grid-state', { role: 'status' });
+    grid.querySelector('table')?.after(box);
+  }
+  box.hidden = false;
+  box.dataset.kind = kind;
+  box.replaceChildren(document.createTextNode(kind === 'error' ? t.error || 'The rows could not be loaded.' : t.empty || 'No records.'));
+  if (kind === 'error') {
+    const retry = make('button', 'z-button', { type: 'button' });
+    retry.textContent = t.retry || 'Try again';
+    retry.addEventListener('click', () => loadGrid(grid, 'reload'));
+    box.append(' ', retry);
+  }
 }
 
 /** Applies the roving tabindex: the active row gets 0, the others -1. */
@@ -716,6 +747,7 @@ async function fetchBlock(grid, s, b) {
   if (gen !== s.gen || controller.signal.aborted) return;
   if (!r.ok || !r.data) {
     s.failed.add(b);
+    if (!s.cache.size) gridState(grid, 'error');
     return;
   }
   if (head && typeof r.data.head === 'string') {
@@ -732,6 +764,7 @@ async function fetchBlock(grid, s, b) {
   if (withTotal && r.data.total != null) {
     s.total = r.data.total;
     s.needTotal = false;
+    gridState(grid, s.total ? null : 'empty');
   }
   s.version++;
   scheduleVirtual(grid);
@@ -2029,7 +2062,7 @@ function csvCell(value) {
 /** Downloads the rows loaded in the screen's first grid as CSV; XLSX is not available yet. */
 function exportGrid(button) {
   const first = screenOf(button)?.querySelector('[data-zeyn-grid]');
-  if (button.dataset.zeynExport === 'csv' && first?.dataset.zeynExport === 'csv') return exportServer(first);
+  if (button.dataset.zeynExport === 'csv' && first?.dataset.zeynExportable === 'csv') return exportServer(first);
   if (button.dataset.zeynExport === 'xlsx') return toast('XLSX export is not available yet.');
   const screen = screenOf(button);
   const grid = screen?.querySelector('[data-zeyn-grid]');

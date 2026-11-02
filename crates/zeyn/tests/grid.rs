@@ -939,5 +939,5 @@ async fn export_defuses_formulas_and_respects_the_limit_and_permissions() {
 async fn exportable_grids_tell_the_runtime() {
     let (router, _) = export_router(reader());
     let r = send(&router, get("/export")).await;
-    assert_eq!(r.body.matches(r#"data-zeyn-export="csv""#).count(), 1, "the second needs items.export");
+    assert_eq!(r.body.matches(r#"data-zeyn-exportable="csv""#).count(), 1, "the second needs items.export");
 }

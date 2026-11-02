@@ -929,7 +929,7 @@ impl<E: Model> Grid<E> {
             out.push_str(r#" data-zeyn-views="server""#);
         }
         if self.export.is_some_and(|e| r.can(&e.0)) {
-            out.push_str(r#" data-zeyn-export="csv""#);
+            out.push_str(r#" data-zeyn-exportable="csv""#);
         }
         if self.can_edit(r) {
             if let Some(v) = E::fields().iter().find(|f| f.version) {
@@ -1632,7 +1632,7 @@ fn grid_texts(r: &Render) -> serde_json::Value {
         map.insert(format!("menu_{k}"), json!(r.i18n.text(r.locale, &Text::key(format!("zeyn.grid.menu.{k}")))));
     }
     map.insert("done".into(), json!(r.i18n.text(r.locale, &Text::key("zeyn.grid.done"))));
-    for k in ["saved", "undo", "undone"] {
+    for k in ["saved", "undo", "undone", "empty", "error", "retry"] {
         map.insert(k.into(), json!(r.i18n.text(r.locale, &Text::key(format!("zeyn.grid.{k}")))));
     }
     map.insert("yes".into(), json!(r.i18n.text(r.locale, &Text::key("zeyn.yes"))));
