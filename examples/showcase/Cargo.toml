@@ -5,6 +5,11 @@ edition = "2024"
 publish = false
 license = "MIT OR Apache-2.0"
 
+[features]
+# Invoice and list report PDFs. Off by default: Typst is large, and turning it on in the
+# workspace links it into every test binary. Run with `cargo run -p zeyn-example-showcase --features pdf`.
+pdf = ["zeyn/pdf"]
+
 [dependencies]
 zeyn = { path = "../../crates/zeyn", features = ["assistant", "xlsx"] }
 serde = { version = "1", features = ["derive"] }

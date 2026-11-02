@@ -64,6 +64,8 @@ async fn main() -> std::io::Result<()> {
     };
 
     let assistant = assistant::assistant(&config)?;
+    #[cfg(feature = "pdf")]
+    let pdf = zeyn::Pdf::from_config(&config).map_err(|e| std::io::Error::other(format!("{e:?}")))?;
     let mut app = App::new(t!("app.name"))
         .plugin(CompanyStandard { config })
         .theme(Theme::new().radius(6))
@@ -87,6 +89,10 @@ async fn main() -> std::io::Result<()> {
         .feature(media::feature())
         .feature(pro::feature())
         .feature(assistant::feature());
+    #[cfg(feature = "pdf")]
+    {
+        app = app.service(pdf);
+    }
     if let Some(a) = assistant {
         app = app.assistant(a);
     }

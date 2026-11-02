@@ -1,7 +1,7 @@
 # Operations
 
 Running a Zeyn app in production: time zone data, signed licenses, shared state for several
-servers, and logs and traces.
+servers, logs and traces, and PDF documents.
 
 ## Time zones
 
@@ -143,3 +143,57 @@ The framework reports through `tracing`. It never prints by itself.
   trace level subscriber and checks that no masked value appears. Two things stay with the app:
   paths are recorded, so do not put personal data in routes, and `Error::Internal` messages are
   logged as written.
+
+## PDF documents
+
+The `pdf` Cargo feature renders PDF documents from [Typst](https://typst.app) templates. It is off
+by default because Typst is large (see the numbers below).
+
+```rust
+const INVOICE: PdfTemplate = PdfTemplate::new("invoice", include_str!("../templates/invoice.typ"));
+
+#[action(permission = "sales.order.read")]
+pub async fn invoice_data(p: OrderParams, store: Orders, ctx: Ctx) -> Result<InvoiceData> { ... }
+
+Screen::window("Order").body(PdfLink::new("Print invoice", INVOICE, invoice_data, params))
+
+App::new("Shop").service(Pdf::from_config(&config)?)
+```
+
+- `PdfLink` puts a download button on a screen. `GET /_zeyn/pdf` opens the screen with its
+  access checks, runs the action for the user (its permission and interceptors apply, the call
+  kind is `Document`) and renders the template with what the action returns. Users who may not
+  run the action do not see the button.
+- Grids with `exportable()` also print a list report from the toolbar's `Export::Pdf`
+  (`GET /_zeyn/grid/export?format=pdf`): the user's columns, labels, filters and sort, numbers
+  aligned right, a repeated header row and page numbers. A report holds at most 2,000 rows
+  (`MAX_PDF_ROWS`, or the grid's export limit when smaller) and says so when rows were left out.
+- **Data never becomes Typst code.** The action's output is serialized to JSON and the template
+  reads it as `data` (the renderer binds `#let data = json("/data.json")` before the template).
+  Values such as `#panic()`, `]` or `$x$` are printed as text; a test checks this. Templates can
+  read nothing else: no files, no packages.
+- Rendering runs on a blocking thread. At most `pdf.max_concurrent` documents (1 to 64; two by
+  default, one on a single CPU) render at the same time; the rest wait for a slot. Typst's
+  memoization cache is emptied after each document, so memory goes back down.
+
+| Key | Meaning |
+|---|---|
+| `pdf.fonts` | A directory of extra `.ttf`, `.otf`, `.ttc` or `.otc` fonts, read once at start |
+| `pdf.max_concurrent` | Documents rendered at the same time |
+
+Fonts: Libertinus Serif (regular, bold, italic, bold italic; SIL Open Font License) is embedded and
+covers Turkish; DejaVu Sans Mono is embedded as the fallback for signs Libertinus lacks, such as
+`₺`. Their licenses are in `crates/zeyn/assets/fonts`. There is no math font; add one with
+`pdf.fonts` if templates set equations.
+
+Measured on Windows (release build, x86_64):
+
+| | Result |
+|---|---|
+| Binary size | 5.5 MB without `pdf`, about 46 MB with it (Typst adds about 39 MB, the fonts 1.6 MB) |
+| A one page document | 4 to 7 ms, under 1 MB of heap while rendering, 10 KB file |
+| A list report of 1,000 rows (25 pages) | 0.54 to 0.74 s, 51 MB peak heap while rendering, 0 kept after, 0.87 MB file |
+| First document after start | About 42 MB of heap stays for Typst's own lazily built tables |
+| Fonts | 0.25 MB of heap for the font index |
+
+A debug build is about ten times slower (a 2,000 row report took 71 s in the showcase).

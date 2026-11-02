@@ -35,6 +35,19 @@
   "sales": {
     "today": "Bugünkü siparişler",
     "archive": "Sipariş arşivi",
+    "invoice": {
+      "print": "Faturayı yazdır",
+      "title": "Fatura",
+      "number": "Fatura no",
+      "date": "Tarih",
+      "customer": "Alıcı",
+      "code": "Kod",
+      "product": "Ürün",
+      "quantity": "Adet",
+      "price": "Birim fiyat",
+      "amount": "Tutar",
+      "total": "Toplam"
+    },
     "order_lines": "{id} numaralı siparişin kalemleri",
     "by_city": "Şehre göre siparişler"
   },

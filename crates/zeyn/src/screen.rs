@@ -288,6 +288,12 @@ pub trait GridSource: Send + Sync {
         Vec::new()
     }
 
+    /// Cells of a loaded page in its view as the user reads them, for printed exports (PDF).
+    fn export_text(&self, page: &LoadedPage, r: &Render) -> Vec<Vec<String>> {
+        let _ = (page, r);
+        Vec::new()
+    }
+
     /// Builds the call of a row item (`a0` for the first row action) from the loaded row with
     /// this key. `None` when the row is not there or the item does not exist for it.
     fn row_call(&self, page: &LoadedPage, key: &str, item: &str) -> Option<RowCall> {
@@ -347,6 +353,12 @@ pub trait Component: Send + Sync {
         None
     }
 
+    /// A PDF document, for components that download one (see [`crate::PdfLink`]).
+    #[cfg(feature = "pdf")]
+    fn pdf(&self) -> Option<&dyn crate::pdf::PdfSource> {
+        None
+    }
+
     /// Nodes held by a container. Child `i` of the node at path `p` has the path `p.i`.
     fn children(&self) -> &[Node] {
         &[]
@@ -393,6 +405,11 @@ impl Node {
 
     pub fn import(&self) -> Option<&dyn crate::import::ImportSource> {
         self.0.import()
+    }
+
+    #[cfg(feature = "pdf")]
+    pub fn pdf(&self) -> Option<&dyn crate::pdf::PdfSource> {
+        self.0.pdf()
     }
 
     pub fn children(&self) -> &[Node] {
@@ -452,6 +469,8 @@ impl Icon {
 pub enum Export {
     Xlsx,
     Csv,
+    /// A list report, with the `pdf` Cargo feature.
+    Pdf,
 }
 
 impl Export {
@@ -459,6 +478,7 @@ impl Export {
         match self {
             Export::Xlsx => "xlsx",
             Export::Csv => "csv",
+            Export::Pdf => "pdf",
         }
     }
 }

@@ -168,7 +168,9 @@
     },
     "export": {
       "xlsx": "Export to Excel",
-      "csv": "Export to CSV"
+      "csv": "Export to CSV",
+      "pdf": "Export to PDF",
+      "pdf_cut": "Only the first {max} rows are printed."
     },
     "shell": {
       "skip": "Skip to content",

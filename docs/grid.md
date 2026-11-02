@@ -277,6 +277,9 @@ streamed to the response at the end. Exporting 100,000 rows of six columns kept 
 134 KiB while writing rows (the same after 10,000 and after 100,000 rows) and 460 KiB while
 zipping; the file was 3.4 MB.
 
+With the `pdf` Cargo feature, `Export::Pdf` prints the same rows as a list report (at most 2,000
+rows); see [PDF documents](operations.md#pdf-documents).
+
 ## Selection
 
 `selectable()` (implied by `bulk_action`) adds a checkbox column. Shift selects a range, Space

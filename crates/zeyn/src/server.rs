@@ -32,6 +32,8 @@ mod session;
 mod telemetry;
 #[cfg(feature = "xlsx")]
 mod xlsx;
+#[cfg(feature = "pdf")]
+mod pdf;
 
 pub use ops::{build_id, probe};
 
@@ -237,6 +239,8 @@ pub enum CallKind {
     Import,
     /// A media file or a saved play position; `screen` holds the media source name.
     Media,
+    /// A PDF document rendered from an action's data.
+    Document,
 }
 
 /// What is being called.
@@ -1186,6 +1190,8 @@ impl App {
             .route("/_zeyn/mcp", post(mcp));
         #[cfg(feature = "assistant")]
         let router = assistant::routes(router);
+        #[cfg(feature = "pdf")]
+        let router = pdf::routes(router);
         let router = pro::routes(media::routes(ui::routes(session::routes(data::routes(ops::routes(router))))))
             .fallback(not_found)
             .layer(axum::middleware::from_fn_with_state(state.clone(), guard_request))
@@ -2501,13 +2507,16 @@ async fn grid_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Js
 
 /// Streams every row that matches the filters as CSV (or XLSX with the `xlsx` feature), page by
 /// page through the grid's action, in the user's column layout and language, up to the grid's
-/// export limit. Needs the grid's read access and its export access; interceptors see the call.
+/// export limit. With the `pdf` feature, `format=pdf` prints a list report instead. Needs the
+/// grid's read access and its export access; interceptors see the call.
 async fn grid_export(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Query<ExportQuery>) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     let xlsx = match q.format.as_deref() {
         None | Some("csv") => false,
         #[cfg(feature = "xlsx")]
         Some("xlsx") => true,
+        #[cfg(feature = "pdf")]
+        Some("pdf") => false,
         Some(_) => return st.error_response(&ctx, Failure::App(Error::NotFound)),
     };
     let opened = async {
@@ -2542,6 +2551,10 @@ async fn grid_export(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(
     }))
     .unwrap_or_default();
     query.with_total = false;
+    #[cfg(feature = "pdf")]
+    if q.format.as_deref() == Some("pdf") {
+        return pdf::grid_report(&st, &ctx, entry.meta.name, &screen, &q.node, view, query, &info).await;
+    }
     let name = entry.meta.name;
     let node = q.node;
     let (tx, rx) = tokio::sync::mpsc::channel(4);

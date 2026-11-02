@@ -451,6 +451,8 @@ fn key_filter(meta: &FieldMeta, key: Option<&str>) -> Filter {
 pub struct ExportColumn {
     pub label: String,
     pub width: Option<u32>,
+    /// Whether the column holds numbers or money, which printed exports align right.
+    pub numeric: bool,
 }
 
 /// Most rows an export holds unless the grid sets another limit.
@@ -1158,7 +1160,12 @@ impl<E: Model> DataGrid<E> {
             out.push_str(r#" data-zeyn-views="server""#);
         }
         if self.export.is_some_and(|e| r.can(&e.0)) {
-            out.push_str(if cfg!(feature = "xlsx") { r#" data-zeyn-exportable="csv xlsx""# } else { r#" data-zeyn-exportable="csv""# });
+            out.push_str(match (cfg!(feature = "xlsx"), cfg!(feature = "pdf")) {
+                (true, true) => r#" data-zeyn-exportable="csv xlsx pdf""#,
+                (true, false) => r#" data-zeyn-exportable="csv xlsx""#,
+                (false, true) => r#" data-zeyn-exportable="csv pdf""#,
+                (false, false) => r#" data-zeyn-exportable="csv""#,
+            });
         }
         if self.can_edit(r) {
             if let Some(v) = E::fields().iter().find(|f| f.version) {
@@ -1510,7 +1517,27 @@ impl<E: Model> GridSource for DataGrid<E> {
     fn export_columns(&self, r: &Render, view: Option<&DataGridView>) -> Vec<ExportColumn> {
         self.layout(view)
             .iter()
-            .map(|s| ExportColumn { label: r.i18n.text(r.locale, &self.columns[s.index].meta.label_text()), width: s.width })
+            .map(|s| {
+                let meta = &self.columns[s.index].meta;
+                let numeric = matches!(meta.kind, FieldKind::Integer | FieldKind::Money) && meta.mask.is_none();
+                ExportColumn { label: r.i18n.text(r.locale, &meta.label_text()), width: s.width, numeric }
+            })
+            .collect()
+    }
+
+    fn export_text(&self, page: &LoadedPage, r: &Render) -> Vec<Vec<String>> {
+        let cols = self.layout(page.view.as_ref());
+        let Some(rows) = page.items.downcast_ref::<Vec<E>>() else { return Vec::new() };
+        rows.iter()
+            .map(|row| {
+                cols.iter()
+                    .map(|s| {
+                        let c = &self.columns[s.index];
+                        let v = (c.value)(row);
+                        if c.meta.mask.is_some() { masked(c.meta, &v) } else { plain(&v, &c.meta.kind, r) }
+                    })
+                    .collect()
+            })
             .collect()
     }
 

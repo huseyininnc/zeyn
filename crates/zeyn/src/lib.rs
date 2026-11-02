@@ -331,6 +331,8 @@ mod value;
 mod workflow;
 #[cfg(feature = "xlsx")]
 mod xlsx;
+#[cfg(feature = "pdf")]
+mod pdf;
 
 pub use action::{
     Access, Action, ActionMeta, Ai, Aggregate, AggregateRequest, Cursor, DEFAULT_PAGE_SIZE, Error, Filter, DataQuery, MAX_FILTERS,
@@ -392,6 +394,8 @@ pub use value::{
 pub use import::{CsvError, Checked, DEFAULT_MAX_ROWS, HARD_MAX_ROWS, Import, ImportFile, ImportSource, MAX_CSV_BYTES, RowError, check_csv, check_file, error_report, parse_csv};
 #[cfg(feature = "xlsx")]
 pub use xlsx::{MAX_XLSX_BYTES, XlsxReadError, XlsxSheet};
+#[cfg(feature = "pdf")]
+pub use pdf::{MAX_PDF_DATA, MAX_PDF_ROWS, Pdf, PdfLink, PdfSource, PdfTemplate};
 pub use media::{ByteRange, MAX_MEDIA_ID, MAX_POSITION_SECONDS, MEDIA_CHUNK, Media, MediaEntry, MediaReader, MediaSource, media_type, valid_media_id};
 pub use workflow::{MAX_COMMENT, Transition, TransitionRecord, TransitionRequest, Transitions, Workflow, WorkflowState};
 pub use zeyn_macros::{action, choice, entity, model, params, screen, t};

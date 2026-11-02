@@ -2889,6 +2889,16 @@ function exportServer(grid, format) {
   link.click();
 }
 
+/** Downloads the PDF document of a `PdfLink` from `GET /_zeyn/pdf`; the page stays where it is. */
+function downloadPdf(button) {
+  const a = address(button);
+  const params = a.params == null ? '' : `&params=${encodeURIComponent(JSON.stringify(a.params))}`;
+  const link = document.createElement('a');
+  link.href = `${BASE}/_zeyn/pdf?screen=${encodeURIComponent(a.screen)}&node=${a.node}${params}`;
+  link.download = '';
+  link.click();
+}
+
 /** Quotes one CSV cell (RFC 4180) and defuses spreadsheet formulas in non numeric text. */
 function csvCell(value) {
   let v = value;
@@ -2898,13 +2908,13 @@ function csvCell(value) {
 
 /**
  * Exports the screen's first grid. Grids the server exports send every matching row in the
- * requested format; otherwise the loaded rows are saved as CSV (XLSX needs the server).
+ * requested format; otherwise the loaded rows are saved as CSV (XLSX and PDF need the server).
  */
 function exportGrid(button) {
   const first = screenOf(button)?.querySelector('[data-zeyn-grid]');
   const format = button.dataset.zeynExport;
   if ((first?.dataset.zeynExportable ?? '').split(' ').includes(format)) return exportServer(first, format);
-  if (format === 'xlsx') return toast('XLSX export is not available yet.');
+  if (format !== 'csv') return toast(`${format.toUpperCase()} export is not available.`);
   const screen = screenOf(button);
   const grid = screen?.querySelector('[data-zeyn-grid]');
   if (!grid) return;
@@ -3084,6 +3094,7 @@ document.addEventListener('click', (e) => {
   if ((el = t.closest('[data-zeyn-page]'))) return loadGrid(el.closest('[data-zeyn-grid]'), el.dataset.zeynPage === 'prev' ? 'prev' : 'next');
   if ((el = t.closest('[data-zeyn-more] button'))) return loadGrid(el.closest('[data-zeyn-grid]'), 'more');
   if ((el = t.closest('[data-zeyn-export]'))) return exportGrid(el);
+  if ((el = t.closest('[data-zeyn-pdf]'))) return downloadPdf(el);
   if ((el = t.closest('[data-zeyn-close]'))) return el.closest('dialog')?.close();
   if ((el = t.closest('button[data-zeyn-effect], a[data-zeyn-effect]'))) {
     e.preventDefault();

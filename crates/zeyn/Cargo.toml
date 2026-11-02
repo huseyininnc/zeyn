@@ -16,6 +16,8 @@ otel = ["server", "dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemet
 assistant = ["server", "dep:reqwest", "dep:rustls"]
 # Grid export to XLSX and XLSX import.
 xlsx = ["dep:rust_xlsxwriter", "dep:calamine", "dep:zip"]
+# PDF documents from Typst templates, and grid export to PDF.
+pdf = ["server", "dep:typst", "dep:typst-layout", "dep:typst-pdf"]
 
 [dependencies]
 zeyn-macros = { path = "../zeyn-macros", version = "0.0.2" }
@@ -40,6 +42,9 @@ tracing-opentelemetry = { version = "0.34", default-features = false, optional =
 rust_xlsxwriter = { version = "0.102", default-features = false, features = ["constant_memory"], optional = true }
 calamine = { version = "0.38", default-features = false, optional = true }
 zip = { version = "9", default-features = false, features = ["deflate"], optional = true }
+typst = { version = "0.15", optional = true }
+typst-layout = { version = "0.15", optional = true }
+typst-pdf = { version = "0.15", optional = true }
 
 [dev-dependencies]
 ed25519-dalek = { version = "3", default-features = false }
@@ -64,3 +69,11 @@ required-features = ["xlsx"]
 [[test]]
 name = "xlsx_memory"
 required-features = ["xlsx"]
+
+[[test]]
+name = "pdf"
+required-features = ["pdf"]
+
+[[test]]
+name = "pdf_measure"
+required-features = ["pdf"]

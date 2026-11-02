@@ -168,7 +168,9 @@
     },
     "export": {
       "xlsx": "Excel'e aktar",
-      "csv": "CSV'ye aktar"
+      "csv": "CSV'ye aktar",
+      "pdf": "PDF'e aktar",
+      "pdf_cut": "Yalnızca ilk {max} satır yazdırıldı."
     },
     "shell": {
       "skip": "İçeriğe geç",

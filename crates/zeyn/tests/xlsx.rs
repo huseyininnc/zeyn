@@ -295,7 +295,7 @@ async fn xlsx_exports_follow_the_grid_permission_and_format_names() {
     let router = app(Parts::seeded(2));
     let page = router.clone().oneshot(Request::get("/parts").header("x-user", "1").body(Body::empty()).unwrap()).await.unwrap();
     let html = String::from_utf8(page.into_body().collect().await.unwrap().to_bytes().to_vec()).unwrap();
-    assert!(html.contains(r#"data-zeyn-exportable="csv xlsx""#));
+    assert!(html.contains(r#"data-zeyn-exportable="csv xlsx"#));
     assert!(html.contains(".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
     let req = Request::get("/_zeyn/grid/export?screen=parts&node=0&format=pdf").header("x-user", "1").body(Body::empty()).unwrap();
     assert_eq!(router.clone().oneshot(req).await.unwrap().status(), StatusCode::NOT_FOUND);

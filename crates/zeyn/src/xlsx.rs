@@ -67,7 +67,7 @@ impl Formats {
 ///
 /// ```
 /// use zeyn::{Money, Value, ExportColumn, XlsxSheet};
-/// let columns = [ExportColumn { label: "Price".into(), width: Some(120) }];
+/// let columns = [ExportColumn { label: "Price".into(), width: Some(120), numeric: true }];
 /// let mut sheet = XlsxSheet::new(&columns, "en").unwrap();
 /// sheet.write_rows(&[vec![Value::Money(Money::tl(1250))]]).unwrap();
 /// let mut out = Vec::new();

@@ -59,7 +59,7 @@ fn page(start: usize) -> Vec<Vec<Value>> {
 
 #[test]
 fn exporting_100k_rows_keeps_memory_flat() {
-    let columns: Vec<ExportColumn> = ["Text", "Int", "Money", "Bool", "Date", "Moment"].iter().map(|l| ExportColumn { label: l.to_string(), width: None }).collect();
+    let columns: Vec<ExportColumn> = ["Text", "Int", "Money", "Bool", "Date", "Moment"].iter().map(|l| ExportColumn { label: l.to_string(), width: None, numeric: false }).collect();
     let started = std::time::Instant::now();
     let base = LIVE.load(Ordering::Relaxed);
     let mut sheet = XlsxSheet::new(&columns, "tr").unwrap();
