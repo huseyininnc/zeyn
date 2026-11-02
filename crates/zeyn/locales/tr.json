@@ -88,7 +88,8 @@
       "csrf": "Oturumunuzun süresi doldu. Sayfayı yenileyin.",
       "license": "Lisansınız bu işlemi kapsamıyor. Yöneticinize başvurun.",
       "tenant": "Bu adres tanınan bir kuruma ait değil.",
-      "rate_limited": "Çok fazla istek gönderildi. Biraz sonra tekrar deneyin."
+      "rate_limited": "Çok fazla istek gönderildi. Biraz sonra tekrar deneyin.",
+      "confirmation_required": "Bu işlem çalışmadan önce uygulamada onayınızı bekliyor."
     },
     "grid": {
       "pagination": "Sayfalama",

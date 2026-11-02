@@ -2998,11 +2998,14 @@ async function syncAgentTools() {
   const name = screen.dataset.zeynScreen;
   const params = paramsOf(screen);
   let list;
+  let texts;
   try {
     const q = params == null ? '' : `&params=${encodeURIComponent(JSON.stringify(params))}`;
     const res = await fetch(`${BASE}/_zeyn/tools?screen=${encodeURIComponent(name)}${q}`, { credentials: 'same-origin' });
     if (!res.ok) return;
-    list = (await res.json())?.tools ?? [];
+    const body = await res.json();
+    list = body?.tools ?? [];
+    texts = body?.texts ?? {};
   } catch {
     return;
   }
@@ -3017,7 +3020,14 @@ async function syncAgentTools() {
         const r = await post(BASE + '/_zeyn/grid', { ...base, query: input }, { quiet: true });
         return { status: r.status, ...r.data, text: r.data?.rows ? rowsText(r.data.rows) : '' };
       }
-      const r = await post(BASE + '/_zeyn/form', { ...base, values: input, via_agent: true }, { quiet: true });
+      let confirmed = false;
+      if (tool.confirm) {
+        confirmed = await new Promise((resolve) => {
+          if (!ask('zeyn:confirm', { ...texts, message: tool.description, danger: true, resolve })) resolve(false);
+        });
+        if (!confirmed) return { status: 403, error: 'confirmation_required' };
+      }
+      const r = await post(BASE + '/_zeyn/form', { ...base, values: input, via_agent: true, confirmed }, { quiet: true });
       if (r.ok) await runEffects(r.data?.effects);
       return { status: r.status, ...r.data };
     };

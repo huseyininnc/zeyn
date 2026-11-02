@@ -73,7 +73,7 @@ async fn main() -> std::io::Result<()> {
         .service(people::LeaveStore::seeded(TimeZone::UTC.today(DateTime::now())))
         .auth(DevAuth::superuser("Demo User"))
         .license(FixedLicense(license), Duration::from_secs(300))
-        .agents(Agents::read_write())
+        .mcp(Mcp::on())
         .api_docs(ApiDocs::open())
         .home(overview::overview)
         .feature(overview::feature())

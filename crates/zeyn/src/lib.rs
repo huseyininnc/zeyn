@@ -247,6 +247,51 @@
 //! }
 //! ```
 //!
+//! An unknown action option (the AI options are `ai = "..."`, `ai = false` and `confirm`):
+//!
+//! ```compile_fail
+//! use zeyn::prelude::*;
+//!
+//! #[action(permission = "stock.product.write", ai_hidden)]
+//! pub async fn archive_product(_code: String) -> Result<()> { Ok(()) }
+//! ```
+//!
+//! `ai = true`, which is already the default:
+//!
+//! ```compile_fail
+//! use zeyn::prelude::*;
+//!
+//! #[action(permission = "stock.product.write", ai = true)]
+//! pub async fn archive_product(_code: String) -> Result<()> { Ok(()) }
+//! ```
+//!
+//! Empty guidance for models:
+//!
+//! ```compile_fail
+//! use zeyn::prelude::*;
+//!
+//! #[action(permission = "stock.product.write", ai = " ")]
+//! pub async fn archive_product(_code: String) -> Result<()> { Ok(()) }
+//! ```
+//!
+//! `confirm` on an action that models never see:
+//!
+//! ```compile_fail
+//! use zeyn::prelude::*;
+//!
+//! #[action(permission = "stock.product.write", ai = false, confirm)]
+//! pub async fn archive_product(_code: String) -> Result<()> { Ok(()) }
+//! ```
+//!
+//! `confirm` on a screen instead of the action that writes:
+//!
+//! ```compile_fail
+//! use zeyn::prelude::*;
+//!
+//! #[screen(route = "/products", permission = "stock.product.read", confirm)]
+//! pub fn product_list() -> Screen { Screen::new("Products") }
+//! ```
+//!
 //! ## Extension points
 //!
 //! - [`Component`]: any type that renders HTML and describes itself in the schema can go on a screen.
@@ -282,7 +327,7 @@ mod value;
 mod workflow;
 
 pub use action::{
-    Access, Action, ActionMeta, Aggregate, AggregateRequest, Cursor, DEFAULT_PAGE_SIZE, Error, Filter, DataQuery, MAX_FILTERS,
+    Access, Action, ActionMeta, Ai, Aggregate, AggregateRequest, Cursor, DEFAULT_PAGE_SIZE, Error, Filter, DataQuery, MAX_FILTERS,
     MAX_FILTER_CHOICES, MAX_FILTER_TEXT, MAX_PAGE_SIZE, Page, PageRequest,
     Result, Sort, Total,
 };
@@ -313,11 +358,14 @@ pub use time::{Date, DateTime, LocalDateTime, LocalTimeError, Time, TimeZone};
 pub use time::{DateWords, range_presets};
 #[cfg(feature = "server")]
 pub use server::{
-    Agents, ApiDocs, App, AuditLog, Authenticator, BasicCredentials, DevAuth, ForwardAuth, HeaderTenant, Interceptor, MemoryAudit, Plugin, StaticCredentials, StderrAudit,
+    ApiDocs, App, AuditLog, Authenticator, Mcp, BasicCredentials, DevAuth, ForwardAuth, HeaderTenant, Interceptor, MemoryAudit, Plugin, StaticCredentials, StderrAudit,
     SubdomainTenant, TenantResolver, Theme, TimePolicy,
 };
 #[cfg(feature = "server")]
 pub use jobs::{JobState, JobStatus, Jobs, Schedule};
+#[cfg(feature = "server")]
+#[allow(deprecated)]
+pub use server::Agents;
 #[cfg(feature = "server")]
 pub use security::{IpRange, MemoryRateStore, RateKey, RateLimit, RateStore, client_ip, parse_ranges};
 pub use screen::{
@@ -354,8 +402,11 @@ pub mod prelude {
     #[allow(deprecated)]
     pub use crate::{Grid, GridMode, GridQuery};
     #[cfg(feature = "server")]
+    #[allow(deprecated)]
+    pub use crate::Agents;
+    #[cfg(feature = "server")]
     pub use crate::{
-        Agents, ApiDocs, App, AuditLog, DevAuth, MemoryAudit, Plugin, RateLimit, StaticCredentials, StderrAudit, Theme,
+        ApiDocs, App, AuditLog, DevAuth, Mcp, MemoryAudit, Plugin, RateLimit, StaticCredentials, StderrAudit, Theme,
         TimePolicy,
     };
 }

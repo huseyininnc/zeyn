@@ -19,6 +19,7 @@ pub fn app(config: Config) -> std::io::Result<App> {
         .rate_limit(RateLimit::per_ip(600, Duration::from_secs(60)))
         .write_limit(RateLimit::per_user(60, Duration::from_secs(60)))
         .interceptor(AuditLog(StderrAudit))
+        .mcp(Mcp::read_only())
         .auth(DevAuth::superuser("developer"))
         .service(features::notes::store::NoteStore::default())
         .home(features::home::home)
