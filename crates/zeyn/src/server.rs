@@ -25,6 +25,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 const JS: &str = include_str!("../assets/zeyn.js");
 const CSS: &str = include_str!("../assets/zeyn.css");
+const NAV: &str = include_str!("../assets/nav.js");
 const CSP: &str = "default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
 
 /// Finds out who is calling, usually from a session cookie or an `Authorization` header.
@@ -968,6 +969,7 @@ impl App {
         let router = router
             .route("/_zeyn/zeyn.js", get(|| async { asset(JS, "text/javascript; charset=utf-8") }))
             .route("/_zeyn/zeyn.css", get(|| async { asset(CSS, "text/css; charset=utf-8") }))
+            .route("/_zeyn/nav.js", get(|| async { asset(NAV, "text/javascript; charset=utf-8") }))
             .route("/_zeyn/theme.css", get(theme_css))
             .route("/favicon.ico", get(|| async { StatusCode::NO_CONTENT }))
             .route("/_zeyn/screen/{screen}", get(screen_fragment))
@@ -1375,10 +1377,11 @@ impl AppState {
         }
         let app = r.text(&self.name);
         format!(
-            r##"<!doctype html><html lang="{lang}"{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css">{theme_link}<script type="module" src="{base}/_zeyn/zeyn.js"></script></head><body><a class="z-skip" href="#z-main">{skip}</a><div class="z-app"><nav class="z-nav" aria-label="{menu}"><p class="z-app-name">{app}</p>{nav}</nav><main class="z-main" id="z-main">{main}</main></div><div class="z-toasts" role="status" aria-live="polite"></div></body></html>"##,
+            r##"<!doctype html><html lang="{lang}"{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css">{theme_link}<script type="module" src="{base}/_zeyn/zeyn.js"></script><script type="module" src="{base}/_zeyn/nav.js"></script></head><body><a class="z-skip" href="#z-main">{skip}</a><div class="z-app"><nav class="z-nav" aria-label="{menu}"><p class="z-app-name">{app}</p>{nav}</nav><main class="z-main" id="z-main">{main}</main></div><div class="z-toasts" role="status" aria-live="polite"></div></body></html>"##,
             lang = escape(ctx.locale()),
             tz = escape(ctx.time_zone().name()),
             base = escape(&self.prefix),
+            scheme = self.theme.as_ref().and_then(|t| t.scheme).unwrap_or("light dark"),
             html_attrs = match &self.theme {
                 Some(t) => format!(
                     "{}{}",
@@ -1412,7 +1415,7 @@ fn asset(body: &'static str, content_type: &'static str) -> Response {
 /// IP rules and rate limits, before any handler runs.
 async fn guard_request(State(st): State<Arc<AppState>>, req: axum::extract::Request, next: axum::middleware::Next) -> Response {
     let path = req.uri().path().to_string();
-    if path == "/_zeyn/zeyn.js" || path == "/_zeyn/zeyn.css" || path == "/_zeyn/theme.css" || path == "/favicon.ico" {
+    if path == "/_zeyn/zeyn.js" || path == "/_zeyn/zeyn.css" || path == "/_zeyn/nav.js" || path == "/_zeyn/theme.css" || path == "/favicon.ico" {
         return next.run(req).await;
     }
     let headers = req.headers().clone();
@@ -1494,7 +1497,20 @@ async fn page(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Que
     }
     .await;
     st.after(&ctx, &call, started, &result);
+    let partial = headers.get("x-zeyn-partial").is_some_and(|v| v == "1");
     let response = match result {
+        Ok((title, html)) if partial => {
+            let full = format!("{title} · {}", ctx.t(&st.name));
+            let mut r = Html(html).into_response();
+            let h = r.headers_mut();
+            h.insert("x-zeyn-partial", HeaderValue::from_static("1"));
+            if let Ok(v) = HeaderValue::from_str(&encode(&full)) {
+                h.insert("x-zeyn-title", v);
+            }
+            h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+            h.insert(header::VARY, HeaderValue::from_static("x-zeyn-partial"));
+            r
+        }
         Ok((title, html)) => Html(st.shell(&ctx, &csrf, &title, &html, Some(name))).into_response(),
         Err(Failure::App(Error::Forbidden | Error::Denied(_))) if !ctx.identity().is_signed_in() && st.login_url.is_some() => {
             let here = st.screens.get(name).and_then(|(fi, e)| st.features[*fi].path_of(&e.meta)).map(|p| st.url(&p)).unwrap_or_default();
@@ -1601,6 +1617,7 @@ impl AppState {
         let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone());
         Ok(json!({
             "rows": grid.rows_html(&page, &r),
+            "foot": grid.foot_html(&page, &r),
             "count": page.count,
             "total": page.total,
             "next": page.next,

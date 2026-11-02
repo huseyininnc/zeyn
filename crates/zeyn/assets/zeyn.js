@@ -1097,3 +1097,8 @@ document.addEventListener('change', (e) => {
 syncTimeZone();
 initGrids(document);
 syncAgentTools();
+
+document.addEventListener('zeyn:content', (e) => {
+  initGrids(e.detail);
+  syncAgentTools();
+});
