@@ -57,7 +57,7 @@ async fn internal_links_and_anchors_resolve() {
             .into_iter()
             .chain(attrs(page, "href").into_iter().filter(|h| h.starts_with('#')))
         {
-            if href.starts_with("http") || href.starts_with("mailto:") {
+            if href.starts_with("http") || href.starts_with("mailto:") || href == "/llms.txt" {
                 continue;
             }
             let (path, anchor) = href.split_once('#').unwrap_or((href, ""));

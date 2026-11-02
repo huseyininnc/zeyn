@@ -74,16 +74,23 @@ pages! {
         time_i18n "/guides/time-and-languages" "time-and-languages.md" "Time and languages" "../pages/time-and-languages.md";
         security "/guides/security" "security.md" "Security" "../pages/security.md";
         accounts "/guides/accounts" "accounts.md" "User accounts" "../pages/accounts.md";
+        auth "/guides/sign-in" "auth.md" "Sign in: OIDC, JWT and MFA" "../../../docs/auth.md";
         enterprise "/guides/enterprise" "enterprise.md" "Audit, masking and jobs" "../../../docs/enterprise.md";
         api "/guides/api" "api.md" "API and OpenAPI" "../pages/api.md";
         mcp "/guides/mcp" "mcp.md" "MCP and AI agents" "../pages/mcp.md";
         database "/guides/database" "database.md" "Data and databases" "../pages/database.md";
         theming "/guides/theming" "theming.md" "Theming" "../../../docs/theming.md";
         polyrepo "/guides/polyrepo" "polyrepo.md" "Shared libraries" "../../../docs/polyrepo.md";
+        operations "/guides/operations" "operations.md" "Operations" "../../../docs/operations.md";
+        assistant "/guides/assistant" "assistant.md" "AI assistant" "../../../docs/assistant.md";
+        islands "/guides/islands" "islands.md" "WASM islands" "../../../docs/islands.md";
+        realtime "/guides/realtime" "realtime.md" "Realtime and CRDT" "../../../docs/realtime.md";
+        desktop "/guides/desktop" "desktop.md" "Desktop apps" "../../../docs/desktop.md";
     }
     "docs.group.reference" Search {
         protocol "/reference/runtime-protocol" "runtime-protocol.md" "Runtime protocol" "../../../docs/runtime-protocol.md";
-        architecture "/reference/architecture" "vision-and-architecture.md" "Architecture" "../../../docs/vision-and-architecture.md";
+        database_reference "/reference/database" "database.md" "Database reference" "../../../docs/database.md";
+        architecture "/reference/architecture" "vision-and-architecture.md" "Architecture (historical)" "../../../docs/vision-and-architecture.md";
     }
 }
 

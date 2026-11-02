@@ -98,6 +98,22 @@ pub fn catalog_page(p: CatalogParams, store: Catalog) -> Result<Screen> {
 
 Menu items, toolbar buttons and commands that open a screen the user may not open are left out of the HTML.
 
+A screen for visitors who are not signed in declares `public`. Its actions need their own access: a public screen that lists data calls a `public` action, or the list stays empty for visitors.
+
+```rust
+#[action(public)]
+pub async fn latest_products(q: DataQuery, store: ProductStore) -> Result<Page<Product>> {
+    Ok(q.apply(store.all()?))
+}
+
+#[screen(route = "/catalog", public)]
+pub fn catalog() -> Screen {
+    Screen::new(t!("catalog.title")).body(DataGrid::of(latest_products).column(Product::code).column(Product::price))
+}
+```
+
+Leaving out both `permission` and `public` is a compile error, so a screen is never open by accident.
+
 ## Toolbar and context menu
 
 ```rust
