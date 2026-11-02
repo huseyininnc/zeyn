@@ -1002,6 +1002,7 @@ pub fn export_list() -> Screen {
 fn export_router(identity: Identity) -> (Router, Store) {
     let store = Store::seeded();
     store.0.write().unwrap()[0].code = "=HYPERLINK(\"x\")".into();
+    store.0.write().unwrap()[1].code = "x;=cmd|' /C calc'!A0\t+1;-2".into();
     let router = App::new("Test")
         .service(store.clone())
         .i18n(I18n::new("en").catalog("tr", r#"{ "Item": { "code": "Kod" }, "Kind": { "Tool": "Alet" } }"#).unwrap())
@@ -1045,6 +1046,7 @@ async fn export_defuses_formulas_and_respects_the_limit_and_permissions() {
     let (router, _) = export_router(reader());
     let r = send(&router, export_get(0, serde_json::json!({}), "en")).await;
     assert!(r.body.contains("\"'=HYPERLINK(\"\"x\"\")\""), "{}", &r.body[..200]);
+    assert!(r.body.contains("\"x;'=cmd|' /C calc'!A0\t'+1;-2\""), "every part is defused: {}", &r.body[..300]);
     assert_eq!(send(&router, export_get(1, serde_json::json!({}), "en")).await.status, StatusCode::FORBIDDEN);
     assert_eq!(send(&router, export_get(2, serde_json::json!({}), "en")).await.status, StatusCode::NOT_FOUND);
     let (router, _) = export_router(Identity::user("x").with_permissions(["items.read", "items.export"]));

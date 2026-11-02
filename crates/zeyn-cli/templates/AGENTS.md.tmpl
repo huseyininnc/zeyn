@@ -10,6 +10,7 @@ runtime in the browser applies changes, and there is no JavaScript to write.
 - Develop with `zeyn dev`: it runs the app and rebuilds and restarts it on every saved change; the open browser follows without a page reload. A failed build keeps the last good server running.
 - Check the app without starting it: `zeyn check`. After a Zeyn upgrade, `zeyn check --fix` rewrites renamed APIs (deprecation warnings name them).
 - Container: `docker build -t {{name}} .` then `docker run -p 3000:3000 {{name}}` (distroless, non root, `{{name}} health` is the health check). Configure with `APP_*` variables, such as `APP_SERVER__ADDR`.
+- Sign in: debug builds use `DevAuth` (every request is a developer with full access); release builds, the container included, have no sign in until `src/app.rs` adds a real authenticator (`OidcAuth`, `JwtAuth`, `ForwardAuth` or `App::accounts`). Never move `DevAuth` out of `#[cfg(debug_assertions)]`: the framework refuses it in release builds.
 - Standards are fixed by the project files: `rustfmt.toml`, `clippy.toml` and `[lints]` in `Cargo.toml`, `.editorconfig`, `deny.toml` (licenses and advisories), `rust-toolchain.toml`. CI runs all of them; do not loosen them to make a change pass.
 - Show every route, screen, API and missing translation: `zeyn routes`
 - New feature folder: `zeyn g feature <name>`

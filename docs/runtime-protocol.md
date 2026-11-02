@@ -203,7 +203,7 @@ The shell renders a theme selector (`select[data-zeyn-theme-picker]`) unless the
 | `POST /_zeyn/reason {screen, reason}` | Reason for a screen marked `reason`; `204` with an `HttpOnly` cookie |
 | `POST /_zeyn/import {screen, params, node, csv, commit}` | CSV preview (`commit: false`) or import |
 | `POST /_zeyn/keepalive` | "Stay signed in" after the idle warning; `204` |
-| `GET /_zeyn/health`, `GET /_zeyn/ready` | Liveness and readiness; not rate limited |
+| `GET /_zeyn/health`, `GET /_zeyn/ready` | Liveness and readiness; health is not rate limited, readiness only from `probe_ips` |
 | `GET /_zeyn/jobs` | Job status for users with the jobs permission |
 
 Every response carries `x-zeyn-build`. Refusals the runtime acts on: `428 reason_required` (asks for a

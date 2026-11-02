@@ -453,6 +453,8 @@ pub(crate) struct Core {
     /// A hash of a random password, checked when no user matches so a missing account costs as
     /// much time as a wrong password.
     pub dummy_hash: String,
+    /// Users whose one time code is being checked, so a code passes once.
+    pub in_flight: crate::auth::totp::InFlight,
 }
 
 /// The accounts system of an app: its store, keys and options. Cheap to clone. Hand it to
@@ -483,6 +485,7 @@ impl Accounts {
             breached: None,
             roles: RolePermissions::default(),
             everyone: Vec::new(),
+            in_flight: Default::default(),
             public_url: None,
             dummy_hash,
         }))

@@ -3,15 +3,16 @@
 //! Masking happens on the server. A masked value leaves the server only as its masked text, unless
 //! the user has the field's unmask permission and asks to see it; that reveal is audited.
 
-use crate::action::{Access, DataQuery, Filter, Page, PageRequest, Result};
+use crate::action::{Access, DataQuery};
 use crate::audit::{RecordRef, plain};
-use crate::ctx::{BoxFuture, Ctx};
+use crate::ctx::Ctx;
 use crate::i18n::Text;
 use crate::model::{FieldMeta, Model};
 use crate::render::{Render, escape};
 use crate::value::Value;
 use serde::Serialize;
 use serde_json::Value as Json;
+use std::cell::RefCell;
 
 const DOTS: &str = "••••";
 
@@ -100,28 +101,71 @@ pub fn reveal_in<M: Model>(model: &M, field: &str) -> Option<Revealed> {
     Some(Revealed { meta, value, record: RecordRef::of(model) })
 }
 
-/// Finds a row by key through a grid's data action and reveals one of its masked fields. The
-/// action is asked for rows whose key contains `key` and the exact match is taken.
-pub(crate) fn grid_reveal<E: Model>(
-    fetch: fn(Ctx, DataQuery) -> BoxFuture<Result<Page<E>>>,
-    ctx: Ctx,
-    key: String,
-    field: String,
-) -> BoxFuture<Result<Option<Revealed>>> {
-    Box::pin(async move {
-        let Some(key_meta) = E::fields().iter().find(|m| m.key) else { return Ok(None) };
-        let query = DataQuery {
-            page: PageRequest::Offset { offset: 0, limit: crate::action::MAX_PAGE_SIZE },
-            filters: vec![Filter::any_of(key_meta.name, [key.clone()])],
-            ..DataQuery::default()
-        };
-        let page = fetch(ctx, query).await?;
-        Ok(page
-            .items
-            .iter()
-            .find(|row| RecordRef::of(*row).id.as_deref() == Some(key.as_str()))
-            .and_then(|row| reveal_in(row, &field)))
-    })
+thread_local! {
+    /// The user an output is being serialized for, while [`client_json`] runs.
+    static CLIENT: RefCell<Option<Ctx>> = const { RefCell::new(None) };
+}
+
+/// Serializes an action's output for the user behind `ctx`: masked fields of every model inside,
+/// at any depth, come out as masked text unless the user may reveal them (that reveal is
+/// recorded), and the keys of `#[sensitive]` models are recorded as reads. Outputs of any type go
+/// through this, so a data source does not need to know what it returns.
+pub(crate) fn client_json<T: Serialize>(value: &T, ctx: &Ctx) -> serde_json::Result<Json> {
+    struct Restore(Option<Ctx>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            let previous = self.0.take();
+            CLIENT.with(|c| *c.borrow_mut() = previous);
+        }
+    }
+    let _restore = Restore(CLIENT.with(|c| c.replace(Some(ctx.clone()))));
+    serde_json::to_value(value)
+}
+
+/// Serializers the model macros put on masked fields and on keys of sensitive models. They do
+/// nothing unless [`client_json`] runs.
+#[doc(hidden)]
+pub mod output {
+    use super::{CLIENT, can_unmask, masked_text};
+    use crate::audit::{FieldRef, RecordRef, plain};
+    use crate::model::FieldMeta;
+    use crate::value::{FieldType, Value};
+    use serde::{Serialize, Serializer};
+
+    /// A masked field: masked text for users who may not reveal it.
+    pub fn masked_output<T, S>(value: &T, meta: &'static FieldMeta, s: S) -> Result<S::Ok, S::Error>
+    where
+        T: Serialize + FieldType,
+        S: Serializer,
+    {
+        let hide = CLIENT.with(|c| {
+            c.borrow().as_ref().map(|ctx| {
+                let shown = can_unmask(Some(ctx), meta);
+                if shown {
+                    ctx.update_trail(|t| t.revealed.push(FieldRef { model: meta.model, id: None, field: meta.name }));
+                }
+                !shown
+            })
+        });
+        match (hide, value.to_value()) {
+            (Some(true), Value::Text(text)) => s.serialize_str(&masked_text(meta, &text)),
+            _ => value.serialize(s),
+        }
+    }
+
+    /// The key of a sensitive model: recorded as a read.
+    pub fn read_output<T, S>(value: &T, meta: &'static FieldMeta, s: S) -> Result<S::Ok, S::Error>
+    where
+        T: Serialize + FieldType,
+        S: Serializer,
+    {
+        CLIENT.with(|c| {
+            if let Some(ctx) = c.borrow().as_ref() {
+                ctx.note_read(RecordRef { model: meta.model, id: plain(&value.to_value()) });
+            }
+        });
+        value.serialize(s)
+    }
 }
 
 /// Removes filters and sorts on masked fields the user may not reveal, so a value cannot be

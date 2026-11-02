@@ -23,6 +23,7 @@ fn app(store: ProductStore) -> App {
         .i18n(i18n)
         .service(store)
         .auth(DevAuth::superuser("demo"))
+        .allow_dev_auth()
         .interceptor(AuditLog(StderrAudit))
         .mcp(Mcp::on())
         .home(stock::screens::product_list)

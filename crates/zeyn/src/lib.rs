@@ -354,7 +354,7 @@ pub use action::{
 pub use api::{ApiEntry, ApiInput, ApiOutput, ApiResult, model_schema};
 #[cfg(feature = "assistant")]
 pub use assistant::Assistant;
-pub use audit::{FieldChange, FieldRef, RecordRef, Trail};
+pub use audit::{ExportRecord, FieldChange, FieldRef, RecordRef, Trail};
 #[cfg(feature = "server")]
 pub use auth::RequireMfa;
 #[cfg(feature = "oidc")]
@@ -401,6 +401,8 @@ pub use platform::{
 };
 #[cfg(feature = "signed-licenses")]
 pub use platform::{LicenseError, SignedLicenseFile};
+#[doc(hidden)]
+pub use privacy::output as __privacy;
 pub use privacy::{MaskStyle, Masking, Revealed, can_unmask, masked_text, reveal_in};
 #[cfg(feature = "redis")]
 pub use redis_store::RedisStore;
@@ -420,8 +422,8 @@ pub use server::realtime;
 #[cfg(feature = "server")]
 pub use server::{
     ApiDocs, App, AuditEntry, AuditLog, AuditSink, Authenticator, BasicCredentials, Call, CallKind, CallOutcome,
-    DevAuth, ForwardAuth, HeaderTenant, Interceptor, Mcp, MemoryAudit, Plugin, StaticCredentials, StderrAudit,
-    SubdomainTenant, TenantResolver, Theme, TimePolicy, probe,
+    DevAuth, ForwardAuth, HeaderTenant, Interceptor, Mcp, MemoryAudit, Plugin, READY_CACHE, StaticCredentials,
+    StderrAudit, SubdomainTenant, TenantResolver, Theme, TimePolicy, probe,
 };
 pub use time::{Date, DateTime, LocalDateTime, LocalTimeError, Time, TimeZone};
 pub use time::{DateWords, range_presets};

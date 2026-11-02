@@ -52,13 +52,31 @@ pub async fn whoami(_unit: (), ctx: Ctx) -> Result<String> {
     Ok(ctx.identity().user.clone().unwrap_or_default())
 }
 
-fn app(accounts: Accounts) -> Router {
+/// The tenants of the request's user.
+#[action(permission = "admin.users")]
+pub async fn my_tenants(_unit: (), ctx: Ctx) -> Result<String> {
+    let i = ctx.identity();
+    Ok(format!("{:?} {:?}", i.tenant, i.tenants))
+}
+
+/// An action that needs a recent sign in.
+#[action(permission = "admin.users", reauth)]
+pub async fn rotate_keys(_unit: ()) -> Result<()> {
+    Ok(())
+}
+
+fn app_with(accounts: Accounts, reauth: Duration) -> Router {
     App::new("T")
         .accounts(accounts)
-        .feature(Feature::new("crm").screen(home).api(whoami))
+        .reauth_within(reauth)
+        .feature(Feature::new("crm").screen(home).api(whoami).api(my_tenants).api(rotate_keys))
         .feature(accounts::ui().admin(true).build())
         .router()
         .unwrap()
+}
+
+fn app(accounts: Accounts) -> Router {
+    app_with(accounts, Duration::from_secs(300))
 }
 
 fn form(screen: &str, params: Json, node: &str, values: Json, cookies: &str) -> Request<Body> {
@@ -634,6 +652,93 @@ async fn bearer_tokens_refresh_until_the_stamp_changes() {
     a.users().change_password(&mut u, PASSWORD, "Changed-456").await.unwrap();
     let refused = send(&router, post("/_zeyn/account/refresh", json!({ "refreshToken": t["refreshToken"] }), "")).await;
     assert_eq!(refused.status, StatusCode::UNAUTHORIZED, "a password change voids refresh tokens");
+}
+
+fn api_call(path: &str, token: &str) -> Request<Body> {
+    Request::post(path)
+        .header(header::AUTHORIZATION, format!("Bearer {token}"))
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from("null"))
+        .unwrap()
+}
+
+#[tokio::test]
+async fn refreshed_bearer_tokens_keep_the_original_sign_in_time() {
+    let a = accounts();
+    let mut u = user(&a, "fresh@example.com").await;
+    a.roles().create("admins").await.unwrap();
+    a.users().add_to_role(&mut u, "admins").await.unwrap();
+    let router = app_with(a, Duration::from_secs(1));
+    let login =
+        send(&router, post("/_zeyn/account/login", json!({ "email": "fresh@example.com", "password": PASSWORD }), ""))
+            .await;
+    let t = login.json();
+    assert_eq!(
+        send(&router, api_call("/api/v1/crm/rotate_keys", t["accessToken"].as_str().unwrap())).await.status,
+        StatusCode::OK
+    );
+    tokio::time::sleep(Duration::from_millis(1300)).await;
+    let mut refresh = t["refreshToken"].clone();
+    let mut access = String::new();
+    for _ in 0..2 {
+        let r = send(&router, post("/_zeyn/account/refresh", json!({ "refreshToken": refresh }), "")).await;
+        assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+        refresh = r.json()["refreshToken"].clone();
+        access = r.json()["accessToken"].as_str().unwrap().to_string();
+    }
+    let r = send(&router, api_call("/api/v1/crm/rotate_keys", &access)).await;
+    assert_eq!(r.status, StatusCode::UNAUTHORIZED, "a refresh is not a new sign in: {}", r.body);
+    assert!(r.body.contains("reauth_required"), "{}", r.body);
+}
+
+#[tokio::test]
+async fn tenant_claims_give_account_users_their_tenants() {
+    let a = accounts();
+    let mut u = user(&a, "multi@example.com").await;
+    a.roles().create("admins").await.unwrap();
+    a.users().add_to_role(&mut u, "admins").await.unwrap();
+    a.users().add_claim(&mut u, Claim::new("tenant", "acme")).await.unwrap();
+    a.users().add_claim(&mut u, Claim::new("tenant", "globex")).await.unwrap();
+    let router = app(a);
+    let login =
+        send(&router, post("/_zeyn/account/login", json!({ "email": "multi@example.com", "password": PASSWORD }), ""))
+            .await;
+    let token = login.json()["accessToken"].as_str().unwrap().to_string();
+    let r = send(&router, api_call("/api/v1/crm/my_tenants", &token)).await;
+    assert_eq!(r.json(), json!(r#"Some("acme") {"globex"}"#), "{}", r.body);
+}
+
+#[tokio::test]
+async fn second_factor_and_passkey_changes_need_a_recent_sign_in() {
+    let a = accounts();
+    user(&a, "old@example.com").await;
+    let router = app_with(a, Duration::ZERO);
+    let login = send(
+        &router,
+        post("/_zeyn/account/login?useCookies=true", json!({ "email": "old@example.com", "password": PASSWORD }), ""),
+    )
+    .await;
+    let session = format!("zeyn_account={}", login.cookie("zeyn_account").unwrap());
+    let status = send(&router, post("/_zeyn/account/manage/2fa", json!({}), &session)).await;
+    assert_eq!(status.status, StatusCode::OK, "{}", status.body);
+    assert!(status.json()["sharedKey"].is_null(), "the key is shown only after a recent sign in: {}", status.body);
+    for change in [
+        json!({ "resetRecoveryCodes": true }),
+        json!({ "enable": false }),
+        json!({ "resetSharedKey": true }),
+        json!({ "enable": true, "twoFactorCode": "000000" }),
+    ] {
+        let r = send(&router, post("/_zeyn/account/manage/2fa", change.clone(), &session)).await;
+        assert_eq!(r.status, StatusCode::UNAUTHORIZED, "{change}: {}", r.body);
+        assert!(r.body.contains("reauth_required"), "{}", r.body);
+    }
+    for path in ["/_zeyn/account/manage/passkeys/creationOptions", "/_zeyn/account/manage/passkeys/remove"] {
+        let r = send(&router, post(path, json!({ "credentialId": "AAAA" }), &session)).await;
+        assert_eq!(r.status, StatusCode::UNAUTHORIZED, "{path}: {}", r.body);
+    }
+    let screen = send(&router, get("/account/manage/two-factor", &session)).await;
+    assert_eq!(screen.status, StatusCode::OK, "{}", screen.body);
+    assert!(!screen.body.contains("z-totp-key") && !screen.body.contains("z-account-qr"), "{}", screen.body);
 }
 
 #[tokio::test]

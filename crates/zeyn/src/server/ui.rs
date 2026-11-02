@@ -136,7 +136,8 @@ struct DataCall {
     input: Json,
 }
 
-/// Renders one node of a screen, with the first page of its grids. Used by lazy tabs.
+/// Renders one node of a screen, with the first page of its grids. Used by lazy tabs. Runs
+/// through the interceptors and records the read like opening the screen does.
 async fn node_call(
     State(st): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -146,17 +147,23 @@ async fn node_call(
     if let Err(f) = st.check_csrf(&headers) {
         return st.error_response(&ctx, f);
     }
-    let result = async {
-        let (_, entry, screen) = st.open(&ctx, &call.screen, call.params).await?;
-        let node = screen.node(&call.node).ok_or(Failure::App(Error::NotFound))?;
-        let loaded = st.preload(&ctx, screen.walk_from(&call.node), entry.meta.name).await;
-        let r = super::user_render(entry.meta.name, &ctx);
-        let r = Render { loaded: Some(&loaded), ..r };
-        let mut out = String::new();
-        crate::ui::render_node(&mut out, &r, call.node.as_str(), node);
-        Ok::<_, Failure>(out)
-    }
-    .await;
+    let Some((&name, _)) = st.screens.get_key_value(call.screen.as_str()) else {
+        return st.error_response(&ctx, Failure::App(Error::NotFound));
+    };
+    let info = Call { kind: CallKind::Screen, screen: name, action: None, via_agent: ctx.via_agent() };
+    let result = st
+        .intercept(&ctx, &info, || async {
+            let (_, entry, screen) = st.open(&ctx, name, call.params.clone()).await?;
+            let node = screen.node(&call.node).ok_or(Failure::App(Error::NotFound))?;
+            super::data::note_screen_read(&ctx, &entry.meta, &call.params);
+            let loaded = st.preload(&ctx, screen.walk_from(&call.node), entry.meta.name).await;
+            let r = super::user_render(entry.meta.name, &ctx);
+            let r = Render { loaded: Some(&loaded), ..r };
+            let mut out = String::new();
+            crate::ui::render_node(&mut out, &r, call.node.as_str(), node);
+            Ok::<_, Failure>(out)
+        })
+        .await;
     match result {
         Ok(html) => Html(html).into_response(),
         Err(f) => st.error_response(&ctx, f),

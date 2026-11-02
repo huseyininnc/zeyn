@@ -405,7 +405,7 @@ impl<E> futures_core::Stream for RowStream<E> {
 
 impl Link {
     async fn find<E: Entity>(&mut self, d: &dyn Dialect, q: &DataQuery, cap: u64) -> Result<Page<E>> {
-        let FindPlan { main, limit, shape, count, totals } = build::plan_find::<E>(d, q, cap)?;
+        let FindPlan { main, limit, skip, shape, count, totals } = build::plan_find::<E>(d, q, cap)?;
         let fields = E::fields();
         let mut page = Page::default();
         match shape {
@@ -419,7 +419,7 @@ impl Link {
                 if items.len() > limit {
                     items.truncate(limit);
                     if let Some(last) = items.last() {
-                        page.next = Some(build::row_cursor(d, &keys, last));
+                        page.next = Some(build::next_cursor(d, &keys, last, skip, limit));
                     }
                 }
                 page.items = items;

@@ -470,14 +470,30 @@ pub struct ExportColumn {
 /// Most rows an export holds unless the grid sets another limit.
 pub const DEFAULT_EXPORT_LIMIT: usize = 100_000;
 
-/// Quotes one CSV cell (RFC 4180) and defuses spreadsheet formulas in text that is not a number.
+/// Quotes one CSV cell (RFC 4180) and defuses spreadsheet formulas in text that is not a number:
+/// at the start and after every character a spreadsheet may split cells on (`,`, `;`, tab), since
+/// the list separator depends on the reader's locale.
 fn csv_cell(value: &str) -> String {
     let numeric = |s: &str| !s.is_empty() && s.chars().all(|c| c.is_ascii_digit() || ".,- +".contains(c));
-    let mut v = value.to_string();
-    if v.starts_with(['=', '+', '-', '@', '\t', '\r']) && !numeric(&v) {
-        v.insert(0, '\'');
+    let formula = |s: &str| s.starts_with(['=', '+', '-', '@', '\t', '\r']) && !numeric(s);
+    let mut v = String::with_capacity(value.len() + 2);
+    let mut rest = value;
+    loop {
+        if formula(rest) {
+            v.push('\'');
+        }
+        match rest.find([',', ';', '\t']) {
+            Some(i) => {
+                v.push_str(&rest[..=i]);
+                rest = &rest[i + 1..];
+            }
+            None => {
+                v.push_str(rest);
+                break;
+            }
+        }
     }
-    if v.contains([',', '"', '\r', '\n']) { format!("\"{}\"", v.replace('"', "\"\"")) } else { v }
+    if v.contains([',', ';', '\t', '"', '\r', '\n']) { format!("\"{}\"", v.replace('"', "\"\"")) } else { v }
 }
 
 /// The masked text of a masked field's value, as its grid cell shows it.
@@ -566,8 +582,14 @@ impl<E: Model> DataGrid<E> {
     /// group, and loads a group's rows (or subgroups) when the user opens it, a page at a time.
     /// The top level pages over groups. The grid's action answers `DataQuery::group` with
     /// `Page::groups`; `DataQuery::apply` does it for in memory data. Virtual grids do not group.
+    /// Masked fields never group a grid, because a group shows its value: such a call is ignored
+    /// and logged.
     pub fn group_by<T: FieldType>(mut self, field: Field<E, T>) -> Self {
         let meta = field.meta();
+        if meta.mask.is_some() {
+            tracing::warn!("grid of `{}` cannot group by the masked field `{}`; ignored", E::NAME, meta.name);
+            return self;
+        }
         if !self.group_by.iter().any(|m| m.name == meta.name) {
             self.group_by.push(meta);
         }
@@ -903,7 +925,7 @@ impl<E: Model> DataGrid<E> {
             .map(|s| ColumnView { field: self.columns[s.index].meta.name.to_string(), width: s.width, pin: s.pin })
             .collect();
         let mut query = DataQuery { sort: view.sort, filters: view.filters, ..DataQuery::default() };
-        self.allow(&mut query);
+        self.allow(&mut query, None);
         query.filters.retain(|f| {
             let short = |s: &Option<String>| s.as_deref().is_none_or(|t| t.chars().count() <= MAX_FILTER_TEXT);
             f.contains.chars().count() <= MAX_FILTER_TEXT
@@ -917,8 +939,13 @@ impl<E: Model> DataGrid<E> {
         DataGridView { columns, sort: query.sort, filters: query.filters }
     }
 
-    /// Keeps the totals, filters and sort keys this grid offers, within the limits.
-    fn allow(&self, query: &mut DataQuery) {
+    /// Keeps the totals, filters and sort keys this grid offers, within the limits. With a ctx,
+    /// filters and sorts on masked fields the user may not reveal go too, so every read of the
+    /// grid (pages, exports, bulk runs, saved views, agents) is cleaned the same way.
+    fn allow(&self, query: &mut DataQuery, ctx: Option<&Ctx>) {
+        if let Some(ctx) = ctx {
+            crate::privacy::strip_masked(query, E::fields(), ctx);
+        }
         let allowed = self.aggregate_requests();
         query.aggregates.retain(|a| allowed.contains(a));
         query.aggregates.dedup();
@@ -1343,7 +1370,7 @@ impl<E: Model> DataGrid<E> {
     /// every matching row.
     fn fetch_nested(&self, ctx: Ctx, mut query: DataQuery, path: Vec<Option<String>>) -> BoxFuture<Result<LoadedPage>> {
         use crate::action::Error;
-        self.allow(&mut query);
+        self.allow(&mut query, Some(&ctx));
         query.time_zone = ctx.time_zone();
         let depth = path.len();
         let mut fixed = self.scope.clone();
@@ -1643,7 +1670,7 @@ impl<E: Model> GridSource for DataGrid<E> {
     }
 
     fn fetch(&self, ctx: Ctx, mut query: DataQuery) -> BoxFuture<Result<LoadedPage>> {
-        self.allow(&mut query);
+        self.allow(&mut query, Some(&ctx));
         self.scoped(&mut query);
         query.time_zone = ctx.time_zone();
         let fetch = self.fetch;
@@ -1691,8 +1718,25 @@ impl<E: Model> GridSource for DataGrid<E> {
         E::fields()
     }
 
+    fn sensitive_model(&self) -> Option<&'static str> {
+        E::SENSITIVE.then_some(E::NAME)
+    }
+
+    /// Reveals a masked column of one row. The row is loaded like a row action's, through the
+    /// grid's scope, so only rows the grid shows can be revealed.
     fn reveal(&self, ctx: Ctx, key: String, field: String) -> BoxFuture<Result<Option<crate::privacy::Revealed>>> {
-        crate::privacy::grid_reveal::<E>(self.fetch, ctx, key, field)
+        if !self.columns.iter().any(|c| c.meta.name == field && c.meta.mask.is_some()) {
+            return Box::pin(async { Ok(None) });
+        }
+        let find = self.find_row(ctx, key.clone());
+        Box::pin(async move {
+            let page = find.await?;
+            let rows = page.items.downcast_ref::<Vec<E>>();
+            let row = rows.and_then(|rows| {
+                rows.iter().find(|r| crate::audit::RecordRef::of(*r).id.as_deref() == Some(key.as_str()))
+            });
+            Ok(row.and_then(|row| crate::privacy::reveal_in(row, &field)))
+        })
     }
 
     fn tool_schema(&self) -> serde_json::Value {

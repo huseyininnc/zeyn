@@ -69,7 +69,7 @@ return Err(errors.into());
 
 ## Tenants
 
-With `App::tenancy(resolver)` every request carries a tenant (`ctx.tenant()`), from the identity or from the host name (`SubdomainTenant`) or a header (`HeaderTenant`). A store uses it to pick a schema or filter rows; `TenantRequired` refuses requests without one.
+With `App::tenancy(resolver)` every request carries a tenant (`ctx.tenant()`), from the host name (`SubdomainTenant`) or a header (`HeaderTenant`), or the user's own tenant when the request names none. A signed in user must belong to the request's tenant (`Identity::member_of`), otherwise the request runs signed out. A store uses it to pick a schema or filter rows; `TenantRequired` refuses requests without one.
 
 ## Saved user state
 

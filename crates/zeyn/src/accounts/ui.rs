@@ -830,7 +830,7 @@ async fn new_codes(accounts: &Accounts, user: &User) -> Result<Next> {
 }
 
 /// Turns on two factor sign in with the authenticator app code shown on the screen.
-#[action(public, ai = false)]
+#[action(public, reauth, ai = false)]
 pub async fn account_enable_authenticator(input: Valid<AccountCode>, accounts: Accounts) -> Result<Next> {
     let mut user = me(&accounts).await?;
     accounts.sign_in().throttle_ip().await?;
@@ -846,7 +846,7 @@ pub async fn account_enable_authenticator(input: Valid<AccountCode>, accounts: A
 }
 
 /// Turns two factor sign in off.
-#[action(public, ai = false)]
+#[action(public, reauth, ai = false)]
 pub async fn account_disable_two_factor(_input: (), accounts: Accounts) -> Result<Next> {
     let mut user = me(&accounts).await?;
     accounts.users().set_two_factor_enabled(&mut user, false).await?;
@@ -855,7 +855,7 @@ pub async fn account_disable_two_factor(_input: (), accounts: Accounts) -> Resul
 }
 
 /// A new authenticator key: two factor is off until the app proves the new key.
-#[action(public, ai = false)]
+#[action(public, reauth, ai = false)]
 pub async fn account_reset_authenticator(_input: (), accounts: Accounts) -> Result<Next> {
     let mut user = me(&accounts).await?;
     accounts.users().set_two_factor_enabled(&mut user, false).await?;
@@ -873,14 +873,14 @@ pub async fn account_forget_browser(_input: (), accounts: Accounts) -> Result<()
 }
 
 /// Replaces the recovery codes.
-#[action(public, ai = false)]
+#[action(public, reauth, ai = false)]
 pub async fn account_new_recovery_codes(_input: (), accounts: Accounts) -> Result<Next> {
     let user = me(&accounts).await?;
     new_codes(&accounts, &user).await
 }
 
 #[screen(route = "/account/manage/two-factor", public)]
-pub async fn account_two_factor(_: (), accounts: Accounts) -> Result<Screen> {
+pub async fn account_two_factor(_: (), accounts: Accounts, ctx: Ctx) -> Result<Screen> {
     let mut user = me(&accounts).await?;
     let users = accounts.users();
     let mut body = Stack::new().add(manage_nav("/account/manage/two-factor"));
@@ -917,6 +917,11 @@ pub async fn account_two_factor(_: (), accounts: Accounts) -> Result<Screen> {
                             .on_success(next_effect),
                     ),
             );
+    } else if !ctx.signed_in_recently() {
+        let again = path("/account/login?return_to=%2Faccount%2Fmanage%2Ftwo-factor");
+        body = body.add(Alert::info(t!("zeyn.accounts.two_factor.reauth"))).add(markup(move |r| {
+            format!(r#"<p><a href="{}">{}</a></p>"#, escape(&again), tx(r, "two_factor.reauth_link"))
+        }));
     } else {
         let key = match users.authenticator_key(&user).await? {
             Some(k) => k,
@@ -969,7 +974,7 @@ pub async fn account_recovery_codes(_: (), accounts: Accounts) -> Result<Screen>
 }
 
 /// Removes a passkey by its credential id (base64url).
-#[action(public, ai = false)]
+#[action(public, reauth, ai = false)]
 pub async fn account_remove_passkey(id: String, accounts: Accounts) -> Result<Next> {
     let mut user = me(&accounts).await?;
     let raw = crate::auth::b64url_decode(&id).ok_or(Error::NotFound)?;
@@ -1032,7 +1037,7 @@ pub struct LoginRef {
 }
 
 /// Unlinks an external login, unless it is the last way to sign in.
-#[action(public, ai = false)]
+#[action(public, reauth, ai = false)]
 pub async fn account_remove_login(login: LoginRef, accounts: Accounts) -> Result<Next> {
     let mut user = me(&accounts).await?;
     accounts.users().remove_login(&mut user, &login.provider, &login.key).await?;

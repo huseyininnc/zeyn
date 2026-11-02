@@ -268,7 +268,9 @@ pub fn people() -> Screen {
             .filter()
             .column(Person::national_id)
             .filter()
-            .column(Person::email),
+            .column(Person::email)
+            .done()
+            .exportable(),
     )
 }
 
@@ -289,6 +291,22 @@ pub fn people_tabs() -> Screen {
     )
 }
 
+#[screen(route = "/person-one", permission = "hr.read")]
+pub fn person_one() -> Screen {
+    Screen::new("One person").body(
+        DataGrid::of(find_people)
+            .column(Person::name)
+            .column(Person::national_id)
+            .scope(Person::name, "Person 1".into()),
+    )
+}
+
+#[screen(route = "/people-grouped", permission = "hr.read")]
+pub fn people_grouped() -> Screen {
+    Screen::new("People grouped")
+        .body(DataGrid::of(find_people).column(Person::name).column(Person::national_id).group_by(Person::national_id))
+}
+
 fn hr_app(identity: Identity, audit: MemoryAudit) -> Router {
     App::new("Test")
         .service(People::seeded())
@@ -299,6 +317,8 @@ fn hr_app(identity: Identity, audit: MemoryAudit) -> Router {
                 .screen(people)
                 .screen(person)
                 .screen(people_tabs)
+                .screen(people_grouped)
+                .screen(person_one)
                 .api(find_people)
                 .api(get_person)
                 .api(save_person),
@@ -357,6 +377,88 @@ async fn masked_fields_cannot_be_searched_or_overwritten_without_the_permission(
     let r = send(&router, post("/_zeyn/grid", serde_json::json!({ "screen": "people", "node": 0 }))).await;
     let rows = r.json()["rows"].as_str().unwrap().to_string();
     assert!(rows.contains("Renamed") && rows.contains("•••• 8901") && rows.contains("p••••@example.com"), "{rows}");
+}
+
+fn query_string(value: serde_json::Value) -> String {
+    value
+        .to_string()
+        .bytes()
+        .map(|b| if b.is_ascii_alphanumeric() { (b as char).to_string() } else { format!("%{b:02X}") })
+        .collect()
+}
+
+#[tokio::test]
+async fn masked_fields_cannot_be_searched_or_sorted_through_the_api_or_exports() {
+    let router = hr_app(clerk(), MemoryAudit::default());
+    let probe =
+        serde_json::json!({ "filters": [{ "field": "national_id", "contains": "12345678902" }], "with_total": true });
+    let r = send(&router, api("/api/v1/hr/find_people", probe)).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    assert_eq!(r.json()["total"], 4, "a filter on a masked field must be ignored by the API");
+
+    let sorted = serde_json::json!({ "sort": [{ "field": "national_id", "desc": true }] });
+    let r = send(&router, api("/api/v1/hr/find_people", sorted)).await;
+    assert_eq!(r.json()["items"][0]["name"], "Person 1", "a sort on a masked field must be ignored by the API");
+
+    let q = query_string(serde_json::json!({ "filters": [{ "field": "national_id", "equals": "12345678902" }] }));
+    let r = send(&router, get(&format!("/_zeyn/grid/export?screen=people&node=0&q={q}"))).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    assert_eq!(r.body.trim_end().lines().count(), 5, "an export ignores filters on masked fields: {}", r.body);
+
+    let router = hr_app(officer(), MemoryAudit::default());
+    let r = send(&router, get(&format!("/_zeyn/grid/export?screen=people&node=0&q={q}"))).await;
+    assert_eq!(r.body.trim_end().lines().count(), 2, "users who may reveal can still filter: {}", r.body);
+}
+
+#[tokio::test]
+async fn reveal_only_reaches_rows_and_columns_the_grid_shows() {
+    let router = hr_app(officer(), MemoryAudit::default());
+    let ask = |key: &str, field: &str| {
+        post("/_zeyn/reveal", serde_json::json!({ "screen": "person_one", "node": 0, "field": field, "key": key }))
+    };
+    let r = send(&router, ask("1", "national_id")).await;
+    assert_eq!(r.json()["value"], "12345678901", "{}", r.body);
+    let r = send(&router, ask("2", "national_id")).await;
+    assert_ne!(r.status, StatusCode::OK, "a row outside the grid's scope: {}", r.body);
+    assert!(!r.body.contains("12345678902"));
+    let r = send(&router, ask("1", "email")).await;
+    assert_ne!(r.status, StatusCode::OK, "a column the grid does not show: {}", r.body);
+    assert!(!r.body.contains("person1@"));
+}
+
+#[tokio::test]
+async fn reveals_and_exports_count_against_the_write_limit() {
+    let identity = officer();
+    let router = App::new("Test")
+        .service(People::seeded())
+        .write_limit(zeyn::RateLimit::per_user(2, std::time::Duration::from_secs(60)))
+        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .feature(Feature::new("hr").screen(people))
+        .router()
+        .unwrap();
+    let ask = serde_json::json!({ "screen": "people", "node": 0, "field": "national_id", "key": "1" });
+    assert_eq!(send(&router, post("/_zeyn/reveal", ask.clone())).await.status, StatusCode::OK);
+    assert_eq!(send(&router, get("/_zeyn/grid/export?screen=people&node=0")).await.status, StatusCode::OK);
+    assert_eq!(send(&router, post("/_zeyn/reveal", ask)).await.status, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(
+        send(&router, get("/_zeyn/grid/export?screen=people&node=0")).await.status,
+        StatusCode::TOO_MANY_REQUESTS
+    );
+}
+
+#[tokio::test]
+async fn masked_fields_never_group_a_grid() {
+    let router = hr_app(clerk(), MemoryAudit::default());
+    let page = send(&router, get("/people-grouped")).await;
+    assert_eq!(page.status, StatusCode::OK);
+    assert!(!page.body.contains("12345678901") && !page.body.contains("z-group"), "{}", page.body);
+    assert!(page.body.contains("•••• 8901"));
+    let r = send(
+        &router,
+        post("/_zeyn/grid", serde_json::json!({ "screen": "people_grouped", "node": 0, "path": ["12345678902"] })),
+    )
+    .await;
+    assert!(!r.body.contains("12345678902"), "{}", r.body);
 }
 
 #[tokio::test]
@@ -453,7 +555,14 @@ pub async fn get_case(id: i64, store: Cases) -> Result<Case> {
 
 #[screen(route = "/cases", permission = "cases.read")]
 pub fn cases() -> Screen {
-    Screen::new("Cases").body(DataGrid::of(find_cases).column(Case::subject))
+    Screen::new("Cases").body(DataGrid::of(find_cases).column(Case::subject).done().exportable())
+}
+
+#[screen(route = "/cases-tabs", permission = "cases.read")]
+pub fn case_tabs() -> Screen {
+    Screen::new("Case tabs").body(
+        Tabs::new("Sections").tab("Summary", Card::new()).tab("Cases", DataGrid::of(find_cases).column(Case::subject)),
+    )
 }
 
 #[screen(permission = "cases.read")]
@@ -487,6 +596,7 @@ fn cases_app(identity: Identity, audit: MemoryAudit) -> Router {
             Feature::new("cases")
                 .screen(cases)
                 .screen(case)
+                .screen(case_tabs)
                 .screen(case_file)
                 .screen(other_file)
                 .screen(overview)
@@ -528,6 +638,40 @@ async fn showing_a_sensitive_record_writes_a_read_record() {
     assert_eq!(ids(1), [("Case", "2".to_string())]);
     assert_eq!(ids(2), [("Case", "1".to_string())]);
     assert!(e.iter().all(|x| x.at_unix_ms > 0));
+}
+
+#[tokio::test]
+async fn lazy_tabs_go_through_interceptors_and_record_reads() {
+    let audit = MemoryAudit::default();
+    let router = cases_app(case_reader(), audit.clone());
+    let page = send(&router, get("/cases-tabs")).await;
+    let lazy = page.body.split(r#"data-zeyn-lazy=""#).nth(1).and_then(|r| r.split('"').next()).unwrap().to_string();
+    let r = send(&router, post("/_zeyn/node", serde_json::json!({ "screen": "case_tabs", "node": lazy }))).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    let e = audit.entries();
+    assert_eq!(e.len(), 1, "{e:?}");
+    assert_eq!(e[0].kind, zeyn::CallKind::Screen);
+    assert_eq!(e[0].reads.len(), 2);
+}
+
+#[tokio::test]
+async fn exports_of_sensitive_records_write_one_audit_record_with_the_row_count() {
+    let audit = MemoryAudit::default();
+    let router = cases_app(case_reader(), audit.clone());
+    let q = query_string(serde_json::json!({ "filters": [] }));
+    let r = send(&router, get(&format!("/_zeyn/grid/export?screen=cases&node=0&q={q}"))).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    assert!(r.body.contains("Subject 2"));
+    let e = audit.entries();
+    assert_eq!(e.len(), 1, "{e:?}");
+    let export = e[0].export.as_ref().expect("an export record");
+    assert_eq!((export.model, export.format, export.rows), ("Case", "csv", 2));
+    assert!(e[0].reads.is_empty(), "no read per row");
+
+    let audit = MemoryAudit::default();
+    let router = hr_app(clerk(), audit.clone());
+    send(&router, get("/_zeyn/grid/export?screen=people&node=0")).await;
+    assert!(audit.entries().is_empty(), "exports of other models are not audited");
 }
 
 #[tokio::test]
@@ -813,6 +957,9 @@ async fn health_is_always_up_and_ready_reports_failed_checks_by_name_only() {
     assert_eq!(r.json(), serde_json::json!({ "status": "not_ready", "failed": ["database"] }));
     db_up.store(true, std::sync::atomic::Ordering::SeqCst);
     let r = send(&router, Request::get("/billing/_zeyn/ready").body(Body::empty()).unwrap()).await;
+    assert_eq!(r.status, StatusCode::SERVICE_UNAVAILABLE, "the result is reused for a short time");
+    tokio::time::sleep(zeyn::READY_CACHE + std::time::Duration::from_millis(50)).await;
+    let r = send(&router, Request::get("/billing/_zeyn/ready").body(Body::empty()).unwrap()).await;
     assert_eq!(r.status, StatusCode::OK);
     assert_eq!(
         send(&router, Request::get("/_zeyn/health").body(Body::empty()).unwrap()).await.status,
@@ -835,8 +982,17 @@ async fn probes_skip_rate_limits_but_not_ip_rules_unless_allowed() {
     }
     assert_eq!(send(&router, from("/_zeyn/health", "192.168.1.5")).await.status, StatusCode::FORBIDDEN);
 
+    assert_eq!(send(&router, from("/_zeyn/ready", "10.1.1.2")).await.status, StatusCode::OK);
+    assert_eq!(
+        send(&router, from("/_zeyn/ready", "10.1.1.2")).await.status,
+        StatusCode::TOO_MANY_REQUESTS,
+        "readiness runs checks, so it is limited unless asked from a probe address"
+    );
+
     let router = app().probe_ips(["192.168.1.0/24", "10.9.9.9"]).router().unwrap();
-    assert_eq!(send(&router, from("/_zeyn/ready", "192.168.1.5")).await.status, StatusCode::OK);
+    for _ in 0..3 {
+        assert_eq!(send(&router, from("/_zeyn/ready", "192.168.1.5")).await.status, StatusCode::OK);
+    }
     assert_eq!(
         send(&router, from("/overview", "192.168.1.5")).await.status,
         StatusCode::FORBIDDEN,

@@ -21,6 +21,32 @@ pub(crate) const ENROLL: &str = "zeyn_totp_enroll";
 /// How long an enrollment may take, in seconds.
 pub(crate) const ENROLL_TTL: i64 = 600;
 
+/// Users whose one time code is being checked right now. A code is read, checked and written
+/// back in steps; while one request of a user is between those steps, another one of the same
+/// user is refused, so one code can never pass twice in this process. Only users in flight are
+/// kept. Several app instances on one store still need a store that writes atomically.
+#[derive(Clone, Default)]
+pub(crate) struct InFlight(Arc<Mutex<std::collections::HashSet<String>>>);
+
+/// A user's turn to check a code; the next request of the user may start once it is dropped.
+pub(crate) struct Turn(InFlight, String);
+
+impl Drop for Turn {
+    fn drop(&mut self) {
+        if let Ok(mut users) = self.0.0.lock() {
+            users.remove(&self.1);
+        }
+    }
+}
+
+impl InFlight {
+    /// The turn of `user`, or `None` while another request of the user is checking a code.
+    pub(crate) fn enter(&self, user: &str) -> Option<Turn> {
+        let mut users = self.0.lock().ok()?;
+        users.insert(user.to_string()).then(|| Turn(self.clone(), user.to_string()))
+    }
+}
+
 /// A user's second factor as the store keeps it. `secret` is sealed with the app's key, so the
 /// store alone cannot produce codes; `recovery` holds keyed hashes of the unused recovery codes.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -92,6 +118,7 @@ pub struct Totp {
     pub(crate) issuer: String,
     pub(crate) lifetime: Duration,
     pub(crate) attempts: RateLimit,
+    pub(crate) in_flight: InFlight,
 }
 
 impl Totp {
@@ -105,6 +132,7 @@ impl Totp {
             issuer: "Zeyn".into(),
             lifetime: Duration::from_secs(12 * 3600),
             attempts: RateLimit::per_user(5, Duration::from_secs(300)),
+            in_flight: InFlight::default(),
         }
     }
 

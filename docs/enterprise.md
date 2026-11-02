@@ -67,8 +67,15 @@ pub struct Person {
 - Forms show masked fields as read only text. The stored value is kept on save unless the user
   may reveal it and changed it after revealing. An empty masked field is a normal input, so data
   entry staff can fill it in once without being able to read it back later.
-- Grid filters and sorts on a masked field are ignored for users who may not reveal it, so a value
-  cannot be guessed by searching. Do not add `.filter()` to masked columns.
+- Filters and sorts on a masked field are ignored for users who may not reveal it, so a value
+  cannot be guessed by searching. This holds for every read of a grid (pages, exports, bulk
+  actions over all rows, saved views, agent tools) and for API actions that take a `DataQuery`.
+  Do not add `.filter()` to masked columns.
+- Paging cursors never hold the value of a masked field. A list sorted by a masked field pages by
+  position instead of by key.
+- A grid never groups by a masked field; `group_by` on one is ignored and logged.
+- Island and other data source outputs are masked at any depth, like API output: masked fields of
+  every model inside come out as masked text, and keys of sensitive models are recorded as reads.
 - Grid reveal looks the row up through the grid's action with a filter on the key, so the action
   must honor filters on its key field.
 - `#[mask]` only compiles on `String` and `Option<String>`.
@@ -90,6 +97,12 @@ Who saw which personal data, and when, is recorded as well as who changed it.
   request. The reason is kept for 15 minutes in an `HttpOnly`, `SameSite=Strict` cookie, only
   opens the screen it was given for and is written in `reason` of every audit record of that
   screen. Agents and API clients cannot give a reason, so they cannot open such screens.
+- Exports (CSV, XLSX, PDF) of a grid over a sensitive model write one audit record per file with
+  `export` set: the model, the format, the number of rows and the sort and filters asked for.
+  They do not list every row in `reads`, so a large export stays cheap; exports of other models
+  cost nothing extra. Exporting from a `sensitive` or `reason` screen also records the screen read.
+- Lazy parts of a screen (`POST /_zeyn/node`, used by lazy tabs) run the interceptors and record
+  reads exactly like opening the screen.
 - `ctx.record_read(&record)` records a read from application code.
 - Read records are written by `AuditLog` for any call, page loads included, as soon as a sensitive
   record was shown. Without an audit interceptor nothing is recorded; apps that hold personal
@@ -153,7 +166,10 @@ pub async fn move_leave(req: TransitionRequest<LeaveRequestId>, store: LeaveStor
   `503 {"status":"not_ready","failed":["database"]}`. Only check names are shown, never errors.
 - Both live under `base_path` (`/billing/_zeyn/health`), answer with `Cache-Control: no-store`
   and need no sign in.
-- They are never rate limited, so a busy probe cannot lock itself out and restart a healthy app.
+- The readiness result is reused for one second (`READY_CACHE`), and only one request at a time
+  runs the checks, so a flood of probes cannot load the database.
+- Health is never rate limited, so a busy probe cannot lock itself out and restart a healthy app.
+  Readiness counts toward the rate limits unless it comes from a `probe_ips` address.
 - IP rules still apply: `deny_ips` always, `allow_only_ips` too unless the probe address is listed
   in `App::probe_ips([...])`, which opens only these two endpoints to it.
 
@@ -199,6 +215,11 @@ Screen::new("Import").body(Import::of(import_leaves).max_rows(1000))
   ten rows, the errors per row and a downloadable error report.
 - Parsing: byte order mark dropped, `,`, `;` or tab detected from the header line, `"` quoting with
   separators and line breaks inside, `\r\n` or `\n`.
+- Limits are checked while the file is read, not after: reading stops at the row limit, a header
+  of more than 512 cells is refused, and data rows keep at most one cell past the header (so extra
+  values are still reported). An XLSX file reads at most as many columns as the header has, its
+  header may name at most as many columns as the model can import, and a shared strings part of
+  more than 16 MB is refused before anything is unpacked.
 - Columns are matched by field name or label in any language of the app, ignoring case and Turkish
   dotted and dotless i. Unknown, read only, key and row version columns are refused.
 - Every row is read and validated exactly like a form of the model: values as a user of that

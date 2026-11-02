@@ -25,7 +25,7 @@ App::new(t!("app.name")).auth(
 )
 ```
 
-Only use `ForwardAuth` when every request goes through the proxy; anyone who can reach the app directly can send these headers. `require_header` checks a shared secret the proxy adds. `DevAuth::superuser(name)` gives every request full access for local development, and the server prints a warning when it is on.
+Only use `ForwardAuth` when every request goes through the proxy; anyone who can reach the app directly can send these headers. `require_header` checks a shared secret the proxy adds. `DevAuth::superuser(name)` gives every request full access for local development, and the server prints a warning when it is on. A release build refuses to start with it (`App::check` reports it); a demo that must run in release can call `App::allow_dev_auth()`. Apps made with `zeyn new` turn it on only in debug builds.
 
 ## Guards
 
@@ -68,7 +68,8 @@ App::new(t!("app.name"))
 ```
 
 - `rate_limit` applies to every request except static assets; `write_limit` adds a stricter one for calls that change data: form submits, grid edits, row, bulk and menu actions, commands, imports, saved grid views, dock layouts and themes, API calls, MCP calls and the assistant. Refused requests get `429` with `Retry-After`.
-- `X-Forwarded-For` is only believed from `trusted_proxies`.
+- `X-Forwarded-For` is only believed from `trusted_proxies`. Every line of the header counts, in order, and the address taken is the last one that is not a trusted proxy.
+- Reveals, island and data source calls count as writes too, and so do exports and printed documents (`GET /_zeyn/grid/export`, `GET /_zeyn/pdf`).
 - Page sizes, line counts, query lengths and upload sizes are capped on the server whatever the client sends.
 
 ## Sessions

@@ -513,3 +513,69 @@ fn oracle_identifiers_stay_within_30_characters() {
     assert!(build::ident(&V11, &"a".repeat(30)).is_ok());
     assert!(build::ident(&V11, &"a".repeat(31)).is_err());
 }
+
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+struct Holder {
+    id: i64,
+    tax_id: String,
+}
+
+static HOLDER_FIELDS: [crate::FieldMeta; 2] = [
+    crate::FieldMeta { key: true, model: "Holder", ..meta("id", crate::FieldKind::Id) },
+    crate::FieldMeta {
+        model: "Holder",
+        mask: Some(crate::Masking { style: crate::MaskStyle::LastFour, permission: "holder.tax_id.unmask" }),
+        ..meta("tax_id", crate::FieldKind::Text)
+    },
+];
+
+impl crate::Model for Holder {
+    const NAME: &'static str = "Holder";
+    fn fields() -> &'static [crate::FieldMeta] {
+        &HOLDER_FIELDS
+    }
+    fn value_at(&self, index: usize) -> Option<Value> {
+        use crate::FieldType;
+        Some(match index {
+            0 => Value::Int(self.id),
+            1 => self.tax_id.to_value(),
+            _ => return None,
+        })
+    }
+    fn validate(&self) -> std::result::Result<(), crate::ValidationErrors> {
+        Ok(())
+    }
+}
+
+impl crate::Entity for Holder {
+    const TABLE: &'static str = "holders";
+}
+
+#[test]
+fn cursors_of_orders_on_masked_fields_hold_no_values() {
+    let by_tax = DataQuery { sort: vec![Sort { field: "tax_id".into(), desc: false }], ..DataQuery::default() };
+    let plan = build::plan_find::<Holder>(&Postgres, &by_tax, 10).unwrap();
+    let Shape::Rows(keys) = plan.shape else { unreachable!() };
+    let row = Holder { id: 7, tax_id: "12345678901".into() };
+    let next = build::next_cursor(&Postgres, &keys, &row, 0, 50);
+    let text =
+        String::from_utf8(base64::Engine::decode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, &next.0).unwrap())
+            .unwrap();
+    assert!(!text.contains("12345678901") && !text.contains("8901"), "{text}");
+
+    let q = DataQuery { page: PageRequest::After { cursor: Some(next), limit: 50 }, ..by_tax.clone() };
+    let p = build::plan_find::<Holder>(&Postgres, &q, 10).unwrap();
+    assert!(!p.main.text.contains("WHERE"), "{}", p.main.text);
+    assert_eq!(p.skip, 50);
+    assert_eq!(p.main.args.last(), Some(&Arg::Int(50)));
+
+    let keyset = build::row_cursor(&Postgres, &keys, &row);
+    let forged = DataQuery { page: PageRequest::After { cursor: Some(keyset), limit: 50 }, ..by_tax };
+    assert!(build::plan_find::<Holder>(&Postgres, &forged, 10).is_err(), "a keyset cursor is refused here");
+
+    let plain = build::plan_find::<Holder>(&Postgres, &DataQuery::default(), 10).unwrap();
+    let Shape::Rows(keys) = plain.shape else { unreachable!() };
+    let next = build::next_cursor(&Postgres, &keys, &row, 0, 50);
+    let q = DataQuery { page: PageRequest::After { cursor: Some(next), limit: 50 }, ..DataQuery::default() };
+    assert!(build::plan_find::<Holder>(&Postgres, &q, 10).unwrap().main.text.contains(r#""id" > $1"#));
+}

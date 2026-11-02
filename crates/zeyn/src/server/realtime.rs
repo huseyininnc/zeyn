@@ -7,7 +7,7 @@
 //! cannot keep up is closed, never buffered without end. Rooms without clients are persisted
 //! through [`DocStore`] and dropped after [`Limits::idle`].
 
-use super::{AppState, Failure, cookie, same, valid_token};
+use super::{AppState, Call, CallKind, Failure, cookie, same, valid_token};
 use crate::action::Error;
 use crate::ctx::{BoxFuture, Ctx, Service};
 use axum::Router;
@@ -498,11 +498,15 @@ async fn doc_socket(
         hub.release_user(&user);
         st.error_response(&ctx, failure)
     };
-    let Some(kind_def) = config.kinds.get(kind.as_str()).filter(|_| valid_doc(&doc)) else {
+    let Some((&kind_name, kind_def)) = config.kinds.get_key_value(kind.as_str()).filter(|_| valid_doc(&doc)) else {
         return refuse(&hub, Failure::App(Error::NotFound));
     };
     if !ctx.identity().can(&crate::action::Access::Permission(kind_def.read)) {
         return refuse(&hub, Failure::App(Error::Forbidden));
+    }
+    let call = Call { kind: CallKind::Live, screen: kind_name, action: None, via_agent: ctx.via_agent() };
+    if let Err(f) = st.admit_call(&ctx, &call) {
+        return refuse(&hub, f);
     }
     let ws = match ws {
         Ok(ws) => ws,
@@ -661,6 +665,13 @@ async fn topic_socket(
                 hub.release_user(&user);
                 return st.error_response(&ctx, Failure::App(Error::Forbidden));
             }
+        }
+    }
+    if !topics.is_empty() {
+        let call = Call { kind: CallKind::Live, screen: "", action: None, via_agent: ctx.via_agent() };
+        if let Err(f) = st.admit_call(&ctx, &call) {
+            hub.release_user(&user);
+            return st.error_response(&ctx, f);
         }
     }
     let ws = match ws {

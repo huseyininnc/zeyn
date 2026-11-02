@@ -334,7 +334,8 @@ impl ClaimMap {
         self
     }
 
-    /// Claim with the tenant.
+    /// Claim with the user's tenant, or a list (an array or space separated) of every tenant the
+    /// user belongs to; the first is the user's own.
     pub fn tenant(mut self, claim: &str) -> Self {
         self.tenant = Some(claim.to_string());
         self
@@ -390,8 +391,6 @@ impl ClaimMap {
     /// the direct permissions, the sign in time and whether a second factor was used.
     pub(crate) fn extract(&self, claims: &Map<String, Json>) -> Option<super::Session> {
         let user = self.user.iter().find_map(|c| claims.get(c).and_then(Json::as_str)).filter(|u| !u.is_empty())?;
-        let text =
-            |c: &Option<String>| c.as_deref().and_then(|c| at(claims, c)).and_then(Json::as_str).map(str::to_string);
         let roles = strings(self.roles.as_deref().and_then(|p| at(claims, p)))
             .into_iter()
             .filter(|r| self.role_map.contains_key(r))
@@ -400,9 +399,11 @@ impl ClaimMap {
         let amr: Vec<&str> = amr.iter().map(String::as_str).collect();
         let acr = claims.get("acr").and_then(Json::as_str);
         let at_time = claims.get("auth_time").or_else(|| claims.get("iat")).and_then(Json::as_i64);
+        let mut tenants = strings(self.tenant.as_deref().and_then(|c| at(claims, c))).into_iter();
         Some(super::Session {
             user: user.to_string(),
-            tenant: text(&self.tenant),
+            tenant: tenants.next(),
+            tenants: tenants.collect(),
             time_zone: claims.get(&self.time_zone).and_then(Json::as_str).map(str::to_string),
             roles,
             permissions: strings(self.permissions.as_deref().and_then(|p| at(claims, p))),
@@ -422,6 +423,7 @@ impl ClaimMap {
             }
         }
         identity.tenant = s.tenant.clone();
+        identity.tenants.extend(s.tenants.iter().cloned());
         identity.time_zone = s.time_zone.clone();
         identity.authenticated_at = s.auth_time.and_then(|t| t.checked_mul(1000)).map(DateTime::from_unix_ms);
         identity.mfa = s.mfa;

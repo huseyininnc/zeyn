@@ -22,6 +22,7 @@ pub fn app(config: Config) -> std::io::Result<App> {
         .write_limit(RateLimit::per_user(60, Duration::from_secs(60)))
         .interceptor(AuditLog(StderrAudit))
         .auth(DevAuth::superuser("developer"))
+        .allow_dev_auth()
         .service(features::notes::store::NoteStore::default())
         .service(shared_domain::customers::CustomerStore::default())
         .home(features::home::home)

@@ -45,7 +45,10 @@ Every handshake is checked before the upgrade, in this order:
 5. **Per user limit** (`429`).
 6. Documents: a declared kind and a plain id (1 to 64 letters, digits, `-`, `_`, `.`), else `404`;
    the kind's read permission (`403`). Topics: every topic declared and its permission held (`403`).
-7. Room limits: rooms in memory and clients per room (`503` with `Retry-After`).
+7. **Interceptors:** the app's interceptors run with a call of kind `Live` (`screen` is the
+   document kind, empty for topics), so an app wide rule such as `RequireMfa` or a suspended
+   account check covers live channels too. A refusal answers with its status.
+8. Room limits: rooms in memory and clients per room (`503` with `Retry-After`).
 
 The write permission is checked once per connection: a client without it receives updates but is
 closed with `1008` the moment it sends one.

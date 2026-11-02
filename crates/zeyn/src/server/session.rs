@@ -10,7 +10,6 @@ use super::{App, AppState, Call, Failure};
 use crate::ctx::Ctx;
 use crate::i18n::Text;
 use crate::render::attr;
-use crate::time::DateTime;
 use axum::Router;
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
@@ -25,7 +24,7 @@ pub(super) struct Settings {
     idle: Option<Duration>,
     warning: Duration,
     logout_url: Option<String>,
-    reauth_within: Duration,
+    pub(super) reauth_within: Duration,
     reauth_url: Option<String>,
 }
 
@@ -84,10 +83,13 @@ pub(super) fn check_reauth(st: &AppState, ctx: &Ctx, call: &Call) -> Result<(), 
     if !call.action.is_some_and(|a| a.reauth) {
         return Ok(());
     }
-    let limit = i64::try_from(st.extras.session.reauth_within.as_millis()).unwrap_or(i64::MAX);
-    let now = DateTime::now().unix_ms();
-    let recent = ctx.identity().authenticated_at.is_some_and(|at| at.unix_ms() <= now && now - at.unix_ms() <= limit);
-    if recent {
+    let _ = st;
+    recent(ctx)
+}
+
+/// Refuses unless the user signed in within `reauth_within` (see [`Ctx::signed_in_recently`]).
+pub(super) fn recent(ctx: &Ctx) -> Result<(), Failure> {
+    if ctx.signed_in_recently() {
         Ok(())
     } else {
         Err(Failure::Status(StatusCode::UNAUTHORIZED, "reauth_required", Text::key("zeyn.session.reauth_required")))

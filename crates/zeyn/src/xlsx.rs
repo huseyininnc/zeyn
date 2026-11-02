@@ -25,6 +25,9 @@ const MAX_PARTS: usize = 1_000;
 const MAX_CELL_CHARS: usize = 32_767;
 /// Widest column an import reads; cells further right count as extra cells.
 const MAX_COLUMNS: usize = 512;
+/// Largest shared strings part accepted, unpacked: every text of a workbook is held in memory
+/// while it is read.
+const MAX_SHARED_STRINGS: u64 = 16 * 1024 * 1024;
 
 /// Number formats of one export, in the user's locale.
 struct Formats {
@@ -205,8 +208,14 @@ pub(crate) enum XlsxCell {
 }
 
 /// Header and data rows of the first worksheet: at most `max_rows` data rows, empty rows skipped.
-/// Rows are cut at [`MAX_COLUMNS`]; anything further right becomes one extra cell.
-pub(crate) fn read(bytes: &[u8], max_rows: usize) -> Result<(Vec<String>, Vec<Vec<XlsxCell>>), XlsxReadError> {
+/// The header is cut at [`MAX_COLUMNS`] and data rows at the header's width; anything further
+/// right becomes one extra cell. A header with more than `max_columns` cells ends the reading
+/// with no data rows, since no import can take it, so memory stays at rows times header width.
+pub(crate) fn read(
+    bytes: &[u8],
+    max_rows: usize,
+    max_columns: usize,
+) -> Result<(Vec<String>, Vec<Vec<XlsxCell>>), XlsxReadError> {
     if bytes.len() > MAX_XLSX_BYTES {
         return Err(XlsxReadError::TooLarge);
     }
@@ -231,9 +240,20 @@ pub(crate) fn read(bytes: &[u8], max_rows: usize) -> Result<(Vec<String>, Vec<Ve
         if current.as_ref().is_some_and(|(at, _)| *at != r) {
             let (_, row) = current.take().unwrap_or_default();
             push(&mut rows, row)?;
+            if rows.len() == 1 {
+                let header = &mut rows[0];
+                while header.last().is_some_and(|c| *c == XlsxCell::Empty) {
+                    header.pop();
+                }
+                if header.len() > max_columns {
+                    let header = rows.remove(0).into_iter().map(|c| text_of(&c)).collect();
+                    return Ok((header, Vec::new()));
+                }
+            }
         }
+        let width = rows.first().map_or(MAX_COLUMNS, Vec::len);
         let row = &mut current.get_or_insert_with(|| (r, Vec::new())).1;
-        let c = (c as usize).min(MAX_COLUMNS);
+        let c = (c as usize).min(width);
         if row.len() <= c {
             row.resize(c + 1, XlsxCell::Empty);
         }
@@ -263,7 +283,8 @@ fn check_unpacked<R: Read + Seek>(reader: R) -> Result<(), XlsxReadError> {
     for i in 0..zip.len() {
         let part = zip.by_index_raw(i).map_err(|_| XlsxReadError::Unreadable)?;
         total = total.saturating_add(part.size());
-        if total > MAX_UNPACKED {
+        let shared = part.name().is_ok_and(|n| n.eq_ignore_ascii_case("xl/sharedStrings.xml"));
+        if total > MAX_UNPACKED || (shared && part.size() > MAX_SHARED_STRINGS) {
             return Err(XlsxReadError::TooLarge);
         }
     }

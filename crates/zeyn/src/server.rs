@@ -48,7 +48,7 @@ mod pdf;
 #[cfg(feature = "xlsx")]
 mod xlsx;
 
-pub use ops::{build_id, probe};
+pub use ops::{READY_CACHE, build_id, probe};
 
 /// The browser runtime, served as one script at `/_zeyn/zeyn.js` so a page makes one request. The
 /// source is one file per concern under `assets/zeyn/`, joined here in this order (later parts
@@ -297,6 +297,9 @@ pub enum CallKind {
     Media,
     /// A PDF document rendered from an action's data.
     Document,
+    /// A live channel opened (a WebSocket handshake); `screen` holds the document kind, or is
+    /// empty for change topics.
+    Live,
 }
 
 /// What is being called.
@@ -365,6 +368,9 @@ pub struct AuditEntry {
     /// Workflow move: name, from, to and the user's comment.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transition: Option<crate::workflow::TransitionRecord>,
+    /// Export of sensitive records: model, format, row count and query.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub export: Option<crate::audit::ExportRecord>,
 }
 
 /// Where audit records go.
@@ -415,7 +421,8 @@ impl<S: AuditSink> Interceptor for AuditLog<S> {
             || call.action.is_some_and(|a| a.audit)
             || !trail.revealed.is_empty()
             || !trail.reads.is_empty()
-            || trail.transition.is_some();
+            || trail.transition.is_some()
+            || trail.export.is_some();
         if !audited {
             return;
         }
@@ -427,6 +434,7 @@ impl<S: AuditSink> Interceptor for AuditLog<S> {
             reads: trail.reads,
             reason: trail.reason,
             transition: trail.transition,
+            export: trail.export,
             at_unix_ms: SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0),
             user: ctx.identity().user.clone(),
             kind: call.kind,
@@ -880,7 +888,9 @@ impl App {
         self
     }
 
-    /// Finds the tenant of each request. An identity's own tenant wins over the resolved one.
+    /// Finds the tenant of each request. A signed in user must belong to the resolved tenant
+    /// ([`Identity::member_of`]); otherwise the request runs signed out, so public screens still
+    /// work and nothing else does. Without a resolved tenant the user's own tenant applies.
     pub fn tenancy(mut self, resolver: impl TenantResolver) -> Self {
         self.tenancy = Some(Arc::new(resolver));
         self
@@ -1000,6 +1010,7 @@ impl App {
     /// Checks routes, screen names, menus and that every service a screen needs is registered.
     pub fn check(&self) -> Result<(), Vec<String>> {
         let mut problems = self.setup_problems.clone();
+        problems.extend(self.dev_auth_check());
         let mut paths: HashMap<String, &str> = HashMap::new();
         let mut names: HashMap<&str, &str> = HashMap::new();
         for f in &self.features {
@@ -1268,6 +1279,7 @@ impl App {
         } else {
             router
         };
+        let router = auth::layers(router, &state);
         let router = router
             .layer(axum::middleware::from_fn_with_state(state.clone(), guard::guard_request))
             .layer(axum::middleware::map_response(guard::security_headers))
@@ -1489,16 +1501,27 @@ impl AppState {
                 .or_else(|| cookie(headers, "zeyn_tz").and_then(|z| TimeZone::named(&percent_decode(z))))
                 .unwrap_or(default),
         };
-        let tenant = identity
-            .tenant
-            .as_deref()
-            .and_then(Tenant::new)
-            .or_else(|| self.tenancy.as_ref().and_then(|r| r.resolve(headers)).and_then(|t| Tenant::new(&t)));
-        let ctx = Ctx::new(identity, locale, self.services.clone(), self.i18n.clone())
-            .with_time_zone(tz)
-            .with_tenant(tenant)
-            .with_config(self.config.clone())
-            .with_theme(self.look.pick(cookie(headers, "zeyn_theme")));
+        let resolved = self.tenancy.as_ref().and_then(|r| r.resolve(headers)).and_then(|t| Tenant::new(&t));
+        let tenant = match resolved {
+            Some(t) if identity.is_signed_in() && !identity.member_of(t.id()) => {
+                tracing::debug!(tenant = t.id(), "the user is not a member of the request's tenant; signed out");
+                identity = Identity::anonymous();
+                Some(t)
+            }
+            Some(t) => Some(t),
+            None => identity.tenant.as_deref().and_then(Tenant::new),
+        };
+        let ctx = Ctx::for_request(
+            identity,
+            locale.into(),
+            self.services.clone(),
+            self.i18n.clone(),
+            tz,
+            tenant,
+            self.config.clone(),
+            self.look.pick(cookie(headers, "zeyn_theme")),
+            self.extras.session.reauth_within,
+        );
         data::read_reason(&ctx, headers);
         match self.fixed_now {
             Some(now) => ctx.with_now(now),
@@ -1604,6 +1627,16 @@ impl AppState {
             i.before(ctx, call)?;
         }
         Ok(())
+    }
+
+    #[cfg_attr(not(feature = "realtime"), allow(dead_code))]
+    /// Runs the interceptors for a call that runs no application code itself, such as a socket
+    /// handshake: `before`, then `after` with its outcome.
+    fn admit_call(&self, ctx: &Ctx, call: &Call) -> Result<(), Failure> {
+        let started = Instant::now();
+        let checked = self.before(ctx, call);
+        self.after(ctx, call, started, &checked);
+        checked
     }
 
     /// Runs `work` between the interceptors' `before` and `after`, so no endpoint can run
@@ -1841,6 +1874,7 @@ impl AppState {
         format!(
             r##"<!doctype html><html lang="{lang}"{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css"><script type="module" src="{base}/_zeyn/zeyn.js"></script><script type="module" src="{base}/_zeyn/nav.js"></script>{components}{theme_link}{extra}</head><body><a class="z-skip" href="#z-main">{skip}</a><div class="z-app"><nav class="z-nav" aria-label="{menu}"><p class="z-app-name">{app}</p>{palette}{nav}</nav><main class="z-main" id="z-main">{main}</main></div><div class="z-toasts" role="status" aria-live="polite"></div>{commands}{ai_launcher}</body></html>"##,
             lang = escape(ctx.locale()),
+            csrf = escape(csrf),
             tz = escape(ctx.time_zone().name()),
             base = escape(&self.prefix),
             components = format!(

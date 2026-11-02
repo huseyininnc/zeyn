@@ -7,7 +7,6 @@ use crate::action::{DataQuery, Error};
 use crate::ctx::Ctx;
 use crate::grid::DataGridView;
 use crate::pdf::{MAX_PDF_ROWS, Pdf, PdfTemplate, lang};
-use crate::render::Render;
 use crate::screen::{GridSource, Screen};
 use crate::ui::NodePath;
 use axum::Router;
@@ -96,7 +95,7 @@ pub(super) async fn grid_report(
     let outcome = async {
         let grid: &dyn GridSource = screen.node(node).and_then(|n| n.grid()).ok_or(Failure::App(Error::NotFound))?;
         let view = view.map(|v| grid.clean_view(v));
-        let r = Render::new(name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity());
+        let r = super::user_render(name, ctx);
         let limit = grid.export_limit().min(MAX_PDF_ROWS);
         let mut rows: Vec<Vec<String>> = Vec::new();
         let mut more = false;
@@ -118,6 +117,7 @@ pub(super) async fn grid_report(
             .into_iter()
             .map(|c| json!({ "label": c.label, "numeric": c.numeric }))
             .collect();
+        super::grid::note_export(ctx, grid, "pdf", rows.len(), &query);
         let note = more.then(|| ctx.t(&crate::i18n::Text::key("zeyn.export.pdf_cut").arg("max", limit.to_string())));
         let data = json!({
             "title": ctx.t(screen.title()),

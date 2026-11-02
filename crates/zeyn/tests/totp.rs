@@ -32,7 +32,7 @@ fn app(store: MemoryTotpStore) -> Router {
     app_with(store, 50)
 }
 
-fn app_with(store: MemoryTotpStore, attempts: u32) -> Router {
+fn app_with(store: impl zeyn::TotpStore, attempts: u32) -> Router {
     App::new("T")
         .auth(|h: &HeaderMap| {
             h.get("x-user").and_then(|v| v.to_str().ok()).map(|u| Identity::user(u).with_permissions(["crm.read"]))
@@ -202,6 +202,48 @@ async fn enrolled(router: &Router, user: &str) -> (Vec<u8>, Vec<String>) {
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
     let codes = r.body.split("<li><code>").skip(1).map(|c| c[..c.find('<').unwrap()].to_string()).collect();
     (secret, codes)
+}
+
+/// A store that takes a while to read, as a database does.
+#[derive(Clone, Default)]
+struct SlowStore(MemoryTotpStore);
+
+impl zeyn::TotpStore for SlowStore {
+    fn load(&self, user: &str) -> zeyn::BoxFuture<zeyn::Result<Option<zeyn::TotpRecord>>> {
+        let inner = self.0.load(user);
+        Box::pin(async move {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            inner.await
+        })
+    }
+
+    fn save(&self, user: &str, record: zeyn::TotpRecord) -> zeyn::BoxFuture<zeyn::Result<()>> {
+        self.0.save(user, record)
+    }
+}
+
+#[tokio::test]
+async fn one_code_passes_once_even_when_sent_twice_at_the_same_time() {
+    let router = app_with(SlowStore::default(), 50);
+    let (secret, codes) = enrolled(&router, "ayse").await;
+    for code in [code(&secret, 0), codes[0].clone()] {
+        let (a, b) = tokio::join!(
+            send(&router, post("/_zeyn/auth/totp/verify", "ayse", "", CSRF, &code)),
+            send(&router, post("/_zeyn/auth/totp/verify", "ayse", "", CSRF, &code)),
+        );
+        let passed = [a.status, b.status].iter().filter(|s| **s == StatusCode::SEE_OTHER).count();
+        assert_eq!(passed, 1, "{code}: {} and {}", a.status, b.status);
+    }
+}
+
+#[tokio::test]
+async fn a_refused_csrf_token_is_never_written_into_the_page() {
+    let router = app(MemoryTotpStore::default());
+    let forged = "%22%3E%3Cmeta+http-equiv%3D%22refresh%22+content%3D%220%3Burl%3Dhttps%3A%2F%2Fevil.example%2F%22%3E";
+    let r = send(&router, post("/_zeyn/auth/totp/verify", "ayse", "", forged, "123456")).await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN);
+    assert!(!r.body.contains("http-equiv") && !r.body.contains("evil.example"), "{}", r.body);
+    assert!(r.body.contains(&format!(r#"<meta name="zeyn-csrf" content="{CSRF}">"#)), "{}", r.body);
 }
 
 #[tokio::test]

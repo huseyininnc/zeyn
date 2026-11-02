@@ -543,6 +543,7 @@ impl UserManager {
     /// Checks an authenticator app code: 30 second steps, two steps either way, and a step is
     /// accepted only once (`VerifyTwoFactorTokenAsync` with the authenticator provider).
     pub async fn verify_authenticator_code(&self, user: &User, code: &str) -> Result<bool> {
+        let Some(_turn) = self.0.0.in_flight.enter(&user.id) else { return Ok(false) };
         let Some(key) = self.authenticator_key(user).await? else { return Ok(false) };
         let Some(bytes) = tokens::base32_decode(&key) else { return Ok(false) };
         let last = self
@@ -582,6 +583,7 @@ impl UserManager {
         if code.len() > 64 {
             return Ok(false);
         }
+        let Some(_turn) = self.0.0.in_flight.enter(&user.id) else { return Ok(false) };
         let stored = self.store().token(&user.id, INTERNAL_PROVIDER, RECOVERY_CODES).await?.unwrap_or_default();
         let hash = self.0.0.keys.recovery_hash(code);
         let mut found = false;

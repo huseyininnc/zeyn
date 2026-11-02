@@ -42,6 +42,9 @@ pub(crate) struct Session {
     pub roles: Vec<String>,
     #[serde(rename = "p", default, skip_serializing_if = "Vec::is_empty")]
     pub permissions: Vec<String>,
+    /// Tenants from the user's `tenant` claims; the first is the user's own.
+    #[serde(rename = "t", default, skip_serializing_if = "Vec::is_empty")]
+    pub tenants: Vec<String>,
     /// Keyed fingerprint of the security stamp.
     #[serde(rename = "s")]
     pub stamp: String,
@@ -296,8 +299,10 @@ impl SignInManager {
     ) -> Result<Session> {
         let store = &self.0.0.store;
         let roles = store.roles_of(&user.id).await?;
+        let claims = store.claims_of(&user.id).await?;
+        let tenants: Vec<String> = claims.iter().filter(|c| c.kind == "tenant").map(|c| c.value.clone()).collect();
         let mut permissions: Vec<String> =
-            store.claims_of(&user.id).await?.into_iter().filter(|c| c.kind == "permission").map(|c| c.value).collect();
+            claims.into_iter().filter(|c| c.kind == "permission").map(|c| c.value).collect();
         for role in &roles {
             permissions.extend(
                 store.role_claims(&role.id).await?.into_iter().filter(|c| c.kind == "permission").map(|c| c.value),
@@ -311,6 +316,7 @@ impl SignInManager {
             user: user.user_name.clone(),
             roles: roles.into_iter().map(|r| r.name).collect(),
             permissions,
+            tenants,
             stamp: self.tag(user),
             auth_time,
             mfa,
@@ -531,16 +537,22 @@ impl SignInManager {
     /// Bearer tokens for the signed in user of this request, or for `user` (`/login` without
     /// cookies).
     pub(crate) async fn bearer(&self, user: &User, method: &str, mfa: bool) -> Result<AccessTokens> {
+        self.issue(user, method, mfa, now_secs()).await
+    }
+
+    /// Bearer tokens for a user who signed in at `auth_time`. Both tokens keep that time, so a
+    /// refresh never makes a sign in look more recent than it was.
+    async fn issue(&self, user: &User, method: &str, mfa: bool, auth_time: i64) -> Result<AccessTokens> {
         let o = self.0.0.options.session;
         let now = now_secs();
-        let mut s = self.session(user, false, method, mfa, now).await?;
+        let mut s = self.session(user, false, method, mfa, auth_time).await?;
         s.expires = now + o.bearer_expiration.as_secs() as i64;
         let refresh = Refresh {
             id: user.id.clone(),
             stamp: self.tag(user),
             method: method.to_string(),
             mfa,
-            auth_time: now,
+            auth_time,
             expires: now + o.refresh_expiration.as_secs() as i64,
         };
         Ok(AccessTokens {
@@ -559,12 +571,7 @@ impl SignInManager {
             return Ok(None);
         }
         let Some(user) = self.validate_security_stamp(&r.id, &r.stamp).await? else { return Ok(None) };
-        let mut tokens = self.bearer(&user, &r.method, r.mfa).await?;
-        if let Some(mut s) = self.sealer()?.open::<Session>(BEARER, &tokens.access_token) {
-            s.auth_time = r.auth_time;
-            tokens.access_token = self.sealer()?.seal(BEARER, &s);
-        }
-        Ok(Some(tokens))
+        self.issue(&user, &r.method, r.mfa, r.auth_time).await.map(Some)
     }
 
     /// The identity of a session: its user, the permissions of its roles and claims, and when and
@@ -574,6 +581,8 @@ impl SignInManager {
         identity.permissions.extend(s.permissions.iter().cloned());
         identity.permissions.extend(self.0.0.roles.of(&s.roles).cloned());
         identity.permissions.extend(self.0.0.everyone.iter().cloned());
+        identity.tenant = s.tenants.first().cloned();
+        identity.tenants.extend(s.tenants.iter().skip(1).cloned());
         identity.authenticated_at = Some(DateTime::from_unix_ms(s.auth_time.saturating_mul(1000)));
         identity.mfa = s.mfa;
         identity

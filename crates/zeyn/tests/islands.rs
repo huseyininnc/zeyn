@@ -25,13 +25,41 @@ pub async fn double(c: Count) -> Result<Count> {
     Ok(Count { value: c.value * 2 })
 }
 
+#[entity(table = "holders")]
+#[sensitive]
+pub struct Holder {
+    #[key]
+    pub id: HolderId,
+    #[mask(last4)]
+    pub tax_id: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Holders {
+    pub items: Vec<Holder>,
+}
+
+pub struct FindHolders;
+
+impl Remote for FindHolders {
+    const NAME: &'static str = "holders";
+    type Input = Count;
+    type Output = Holders;
+}
+
+#[action(permission = "count.read")]
+pub async fn find_holders(c: Count) -> Result<Holders> {
+    Ok(Holders { items: vec![Holder { id: HolderId(c.value), tax_id: "12345678901".into() }] })
+}
+
 #[screen(route = "/island", permission = "count.read")]
 pub fn with_island() -> Screen {
     Screen::new("Island").body(
         Island::new("counter")
             .props(&Count { value: 1 })
             .fallback(Alert::info("Needs JavaScript"))
-            .action::<Double, _>(double),
+            .action::<Double, _>(double)
+            .action::<FindHolders, _>(find_holders),
     )
 }
 
@@ -135,4 +163,16 @@ async fn island_calls_go_through_csrf_and_the_actions_permission() {
     assert_eq!(send(&app, call("unbound", true)).await.0, StatusCode::NOT_FOUND);
     let reader = router(&["count.read"]);
     assert_eq!(send(&reader, call("double", true)).await.0, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn island_outputs_mask_fields_at_any_depth() {
+    let reader = router(&["count.read"]);
+    let (status, _, body) = send(&reader, call("holders", true)).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert!(body.contains("•••• 8901") && !body.contains("12345678901"), "{body}");
+
+    let officer = router(&["count.read", "holder.tax_id.unmask"]);
+    let (_, _, body) = send(&officer, call("holders", true)).await;
+    assert!(body.contains("12345678901"), "{body}");
 }

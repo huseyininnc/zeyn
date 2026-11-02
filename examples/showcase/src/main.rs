@@ -127,7 +127,7 @@ async fn main() -> std::io::Result<()> {
     app = if config.get("accounts.enabled").is_some_and(|v| v == "1" || v == "true") {
         accounts(app, &config, mailer).await?
     } else {
-        app.auth(DevAuth::superuser("Demo User"))
+        app.auth(DevAuth::superuser("Demo User")).allow_dev_auth()
     };
     app.serve(&addr).await
 }
