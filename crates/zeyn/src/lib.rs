@@ -146,6 +146,8 @@ mod form;
 mod grid;
 mod i18n;
 mod import;
+#[cfg(feature = "server")]
+mod jobs;
 mod model;
 mod platform;
 mod privacy;
@@ -183,6 +185,8 @@ pub use server::{
     Agents, ApiDocs, App, AuditLog, Authenticator, BasicCredentials, DevAuth, ForwardAuth, HeaderTenant, Interceptor, MemoryAudit, Plugin, StaticCredentials, StderrAudit,
     SubdomainTenant, TenantResolver, Theme, TimePolicy,
 };
+#[cfg(feature = "server")]
+pub use jobs::{JobState, JobStatus, Jobs, Schedule};
 #[cfg(feature = "server")]
 pub use security::{IpRange, MemoryRateStore, RateKey, RateLimit, RateStore, client_ip, parse_ranges};
 pub use screen::{

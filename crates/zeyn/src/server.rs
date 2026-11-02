@@ -993,6 +993,7 @@ impl App {
             theme: self.theme,
             extras: self.extras,
         });
+        ops::start_jobs(&state);
         let mut router = Router::new();
         for f in &state.features {
             for s in f.screens() {

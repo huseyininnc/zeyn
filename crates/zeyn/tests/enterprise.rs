@@ -962,3 +962,129 @@ async fn imports_check_permission_columns_row_limits_and_all_or_nothing() {
     let r = send(&router, import_call(1, "name,credit\nGood,1\nAlso good,2", true)).await;
     assert_eq!(r.json()["imported"], 2);
 }
+
+mod jobs {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::time::Duration;
+    use zeyn::{JobState, Jobs, Schedule};
+
+    #[derive(Clone, Default)]
+    pub struct Counter(Arc<AtomicUsize>, Arc<RwLock<Vec<String>>>);
+
+    impl Service for Counter {}
+
+    #[action(permission = "ops.run")]
+    pub async fn start_rebuild(_: (), jobs: Jobs) -> Result<()> {
+        jobs.trigger("rebuild")
+    }
+
+    async fn wait_for(mut done: impl FnMut() -> bool) {
+        for _ in 0..200 {
+            if done() {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        panic!("timed out");
+    }
+
+    fn status(jobs: &Jobs, name: &str) -> zeyn::JobStatus {
+        jobs.status().into_iter().find(|s| s.name == name).unwrap()
+    }
+
+    #[tokio::test]
+    async fn interval_jobs_run_repeatedly_and_manual_jobs_run_when_an_action_triggers_them() {
+        let ticks = Counter::default();
+        let (t, r) = (ticks.clone(), ticks.clone());
+        let app = App::new("T")
+            .auth(|h: &HeaderMap| h.contains_key("x-user").then(|| Identity::user("op").with_permissions(["ops.run", "ops.jobs"])))
+            .jobs_permission("ops.jobs")
+            .job("tick", Schedule::every(Duration::from_millis(20)), move |_ctx: Ctx| {
+                let t = t.clone();
+                async move {
+                    t.0.fetch_add(1, Ordering::SeqCst);
+                    Ok(())
+                }
+            })
+            .job("rebuild", Schedule::manual(), move |ctx: Ctx| {
+                let r = r.clone();
+                async move {
+                    r.1.write().unwrap().push(ctx.identity().user.clone().unwrap_or_default());
+                    Ok(())
+                }
+            })
+            .feature(Feature::new("ops").api(start_rebuild));
+        let router = app.router().unwrap();
+        wait_for(|| ticks.0.load(Ordering::SeqCst) >= 3).await;
+        assert!(ticks.1.read().unwrap().is_empty());
+
+        let r = send(&router, api("/api/v1/ops/start_rebuild", serde_json::Value::Null)).await;
+        assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+        wait_for(|| ticks.1.read().unwrap().len() == 1).await;
+        assert_eq!(ticks.1.read().unwrap()[0], "job:rebuild");
+
+        let r = send(&router, get("/_zeyn/jobs")).await;
+        assert_eq!(r.status, StatusCode::OK);
+        let body = r.json();
+        let names: Vec<&str> = body["jobs"].as_array().unwrap().iter().map(|j| j["name"].as_str().unwrap()).collect();
+        assert_eq!(names, ["tick", "rebuild"]);
+        let r = send(&router, Request::get("/_zeyn/jobs").body(Body::empty()).unwrap()).await;
+        assert_eq!(r.status, StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn failed_runs_are_retried_with_backoff_and_errors_show_only_their_code() {
+        let jobs = Jobs::default();
+        let tries = Arc::new(AtomicUsize::new(0));
+        let t = tries.clone();
+        jobs.add("flaky", Schedule::manual().retry(3, Duration::from_millis(10)), move |_ctx: Ctx| {
+            let n = t.fetch_add(1, Ordering::SeqCst);
+            async move { if n < 2 { Err(Error::Internal("database password=secret unreachable".into())) } else { Ok(()) } }
+        });
+        jobs.add("broken", Schedule::manual().retry(1, Duration::from_millis(5)), |_ctx: Ctx| async { Err(Error::Conflict) });
+        let started = std::time::Instant::now();
+        jobs.start(|_| Ctx::for_tests(Identity::user("job"), zeyn::Services::default()));
+        jobs.trigger("flaky").unwrap();
+        jobs.trigger("broken").unwrap();
+        wait_for(|| status(&jobs, "flaky").state == JobState::Succeeded && status(&jobs, "broken").state == JobState::Failed).await;
+        assert!(started.elapsed() >= Duration::from_millis(30), "waits 10 then 20 ms between tries");
+        let s = status(&jobs, "flaky");
+        assert_eq!((s.runs, s.failures, s.last_error), (3, 2, None));
+        let b = status(&jobs, "broken");
+        assert_eq!((b.runs, b.failures, b.last_error), (2, 2, Some("conflict")));
+        assert!(!serde_json::to_string(&jobs.status()).unwrap().contains("secret"));
+        assert!(matches!(jobs.trigger("missing"), Err(Error::NotFound)));
+    }
+
+    #[tokio::test]
+    async fn concurrency_is_capped_and_shutdown_waits_for_running_jobs() {
+        let jobs = Jobs::with_limit(1);
+        let now = Arc::new(AtomicUsize::new(0));
+        let most = Arc::new(AtomicUsize::new(0));
+        let done = Arc::new(AtomicUsize::new(0));
+        for name in ["a", "b", "c"] {
+            let (now, most, done) = (now.clone(), most.clone(), done.clone());
+            jobs.add(name, Schedule::manual(), move |_ctx: Ctx| {
+                let (now, most, done) = (now.clone(), most.clone(), done.clone());
+                async move {
+                    let n = now.fetch_add(1, Ordering::SeqCst) + 1;
+                    most.fetch_max(n, Ordering::SeqCst);
+                    tokio::time::sleep(Duration::from_millis(40)).await;
+                    now.fetch_sub(1, Ordering::SeqCst);
+                    done.fetch_add(1, Ordering::SeqCst);
+                    Ok(())
+                }
+            });
+        }
+        jobs.start(|_| Ctx::for_tests(Identity::anonymous(), zeyn::Services::default()));
+        for name in ["a", "b", "c"] {
+            jobs.trigger(name).unwrap();
+        }
+        wait_for(|| done.load(Ordering::SeqCst) >= 1).await;
+        assert!(jobs.shutdown(Duration::from_secs(2)).await, "the running job finishes");
+        assert_eq!(most.load(Ordering::SeqCst), 1);
+        assert!(done.load(Ordering::SeqCst) < 3, "queued jobs do not start after shutdown");
+        assert!(matches!(jobs.trigger("a"), Err(Error::Conflict)));
+    }
+}

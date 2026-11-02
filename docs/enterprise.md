@@ -208,3 +208,29 @@ Screen::new("Import").body(Import::of(import_leaves).max_rows(1000))
   preview is trusted. Both steps need the action's permission, and the import is audited.
 - `.max_rows(n)` limits rows (5000 by default, never more than 50000). The error report defuses
   spreadsheet formulas. Masked fields are shown masked in the preview.
+
+## Background jobs
+
+```rust
+App::new("Billing")
+    .job_concurrency(2)
+    .job("send_reminders", Schedule::every(Duration::from_secs(3600)).retry(3, Duration::from_secs(30)), send_reminders)
+    .job("rebuild_index", Schedule::manual(), rebuild_index)
+    .jobs_permission("ops.jobs.read")
+    .serve_until("0.0.0.0:3000", shutdown_signal())
+```
+
+- A job is `async fn(Ctx) -> Result<()>`. Its context has the app's services, configuration and
+  default language, and the identity `job:<name>` with no permissions.
+- `Schedule::every(d)` runs every interval; `Schedule::manual()` only when triggered. Actions
+  trigger jobs through the injectable `Jobs` service: `jobs.trigger("rebuild_index")`. A job
+  triggered while it runs runs once more afterwards; a job never runs twice at the same time.
+- `.retry(times, first_delay)` tries a failed run again, doubling the wait up to ten minutes.
+- At most `job_concurrency` jobs (four by default) run at once.
+- Status (state, runs, failures, last start and end, last error code) is `jobs.status()` in code
+  and `GET /_zeyn/jobs` for users with `jobs_permission`. Error details only go to the server log.
+- `App::serve_until(addr, signal)` stops taking requests when the signal completes, lets running
+  requests finish, cancels retry waits and gives running jobs 30 seconds.
+- Jobs are in memory. Work that is waiting or running when the process stops is lost, and with
+  several servers each runs its own schedule. Durable jobs that survive restarts and run once per
+  cluster need a database backed queue, which will come with the data layer.
