@@ -1193,7 +1193,7 @@ function copyRows(grid, focused) {
   const picked = rows(grid).filter((tr) => tr.getAttribute('aria-selected') === 'true');
   const list = picked.length ? picked : focused ? [focused] : [];
   if (!list.length) return false;
-  const keep = (cell) => !cell.matches('.z-select, .z-select-col, .z-row-actions, .z-actions-col, .z-expand, .z-expand-col');
+  const keep = (cell) => !cell.matches('.z-row-select, .z-select-col, .z-row-actions, .z-actions-col, .z-expand, .z-expand-col');
   const text = (cell) =>
     (cell.textContent.trim() || cell.querySelector('[role="img"][aria-label]')?.getAttribute('aria-label') || '').replace(/[\t\r\n]+/g, ' ');
   const lines = list.map((tr) => cellsOf(tr).filter(keep).map(text).join('\t'));
@@ -1426,6 +1426,7 @@ function setupHead(grid, s) {
       row.append(cell);
     }
     head.after(row);
+    document.dispatchEvent(new CustomEvent('zeyn:content', { detail: row }));
   }
   showSort(grid, s);
   requestAnimationFrame(() => pinOffsets(grid));
@@ -1826,6 +1827,20 @@ function make(tag, className, attrs = {}) {
  * `text` (match kind and text), `number`, `money`, `date`, `datetime`, `time` (from and to),
  * `choice` (a button opening a checkbox list) and `bool` (all, yes, no).
  */
+/**
+ * Wraps a native select in the Zeyn select control; components.js turns it into a combobox and
+ * keeps the native select as the value holder. `none` is shown for the empty value.
+ */
+function zselect(select, label, none = '') {
+  select.id ||= `z-select-${++uid}`;
+  const wrap = make('div', 'z-select z-filter-select');
+  wrap.dataset.textNone = none;
+  const name = make('span', 'z-sr-only', { id: `${select.id}-label` });
+  name.textContent = label;
+  wrap.append(name, select);
+  return wrap;
+}
+
 function filterControls(cell, th, t) {
   const kind = th.dataset.filter;
   const label = th.textContent.trim();
@@ -1846,13 +1861,13 @@ function filterControls(cell, th, t) {
   };
   if (kind === 'text') {
     const wrap = make('div', 'z-filter-pair');
-    const op = make('select', 'z-filter z-filter-op', { 'aria-label': `${name}: ${t.match || 'Match'}` });
+    const op = make('select', 'z-filter z-filter-op');
     op.dataset.bound = 'op';
     for (const k of ['contains', 'starts_with', 'equals']) op.append(new Option(t[k] || k, k));
     const text = make('input', 'z-filter', { type: 'search', autocomplete: 'off', 'aria-label': name });
     text.id = `z-filter-${++uid}`;
     text.dataset.bound = 'text';
-    wrap.append(op, text);
+    wrap.append(zselect(op, `${name}: ${t.match || 'Match'}`), text);
     cell.append(wrap);
   } else if (kind === 'choice') {
     let options = [];
@@ -1890,10 +1905,10 @@ function filterControls(cell, th, t) {
     });
     cell.append(button, panel);
   } else if (kind === 'bool') {
-    const select = make('select', 'z-filter', { 'aria-label': name });
+    const select = make('select', 'z-filter');
     select.dataset.bound = 'is';
     select.append(new Option(t.all || 'All', ''), new Option(t.yes || 'Yes', 'true'), new Option(t.no || 'No', 'false'));
-    cell.append(select);
+    cell.append(zselect(select, name, t.all || 'All'));
   } else {
     const type = { number: 'number', money: 'number', date: 'text', datetime: 'text', time: 'text' }[kind] ?? 'search';
     const wrap = make('div', 'z-filter-pair z-filter-range');
@@ -2001,7 +2016,7 @@ async function toggleDetail(tr, open = tr.getAttribute('aria-expanded') !== 'tru
   }
   if (shown) return;
   const t = s?.texts ?? {};
-  const label = tr.querySelector(':scope > td:not(.z-expand):not(.z-select)')?.textContent.trim() ?? '';
+  const label = tr.querySelector(':scope > td:not(.z-expand):not(.z-row-select)')?.textContent.trim() ?? '';
   const row = make('tr', 'z-detail');
   if (tr.dataset.zeynLevel != null) row.dataset.zeynLevel = tr.dataset.zeynLevel;
   const cell = make('td');
@@ -2066,7 +2081,7 @@ function dataRow(tr) {
 function leadOf(tr) {
   let i = 0;
   const cells = cellsOf(tr);
-  while (i < cells.length && cells[i].matches('.z-expand, .z-select')) i++;
+  while (i < cells.length && cells[i].matches('.z-expand, .z-row-select')) i++;
   return i;
 }
 
@@ -3171,7 +3186,7 @@ function openContextMenu(owner, at, opener) {
                 : undefined,
           },
     );
-  openMenu(convert(items), { ...at, opener: focusBack, label: row ? owner.querySelector('td:not(.z-select)')?.textContent.trim() : owner.querySelector('h1, h2')?.textContent });
+  openMenu(convert(items), { ...at, opener: focusBack, label: row ? owner.querySelector('td:not(.z-row-select)')?.textContent.trim() : owner.querySelector('h1, h2')?.textContent });
   return true;
 }
 

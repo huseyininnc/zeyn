@@ -673,6 +673,16 @@ th[aria-sort="descending"] .z-sort::after {
 
 .z-filter-range .z-filter { min-width: 4.5rem; padding-inline: 4px; }
 
+.z-filter-select { min-width: 0; }
+.z-filter-pair .z-filter-select { flex: 0 0 auto; width: 2.75rem; }
+.z-filter-select .z-select-button {
+  min-height: max(24px, calc(var(--z-row) - 6px));
+  padding-inline: 6px;
+  gap: 2px;
+}
+.z-filter-select .z-select-value { overflow: hidden; white-space: nowrap; }
+.z-filter-pair .z-filter-select .z-select-value { color: var(--z-text-muted); }
+
 .z-filter-choice {
   display: block;
   text-align: start;
@@ -1027,9 +1037,9 @@ th[aria-sort="descending"] .z-sort::after {
  */
 
 .z-grid th.z-select-col,
-.z-grid td.z-select { width: 36px; padding-inline: 0; text-align: center; }
+.z-grid td.z-row-select { width: 36px; padding-inline: 0; text-align: center; }
 
-.z-select input,
+.z-row-select input,
 .z-select-col input { width: 16px; height: 16px; margin: 0; accent-color: var(--z-accent); cursor: pointer; }
 
 .z-grid tbody tr[aria-selected="true"] > td { background: var(--z-brand-subtle); }

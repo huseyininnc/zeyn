@@ -1494,7 +1494,7 @@ impl AppState {
                 })
                 .collect();
             nav.push_str(&format!(
-                r#"<label class="z-locale">{}<select data-zeyn-locale>{options}</select></label>"#,
+                r#"<div class="z-locale"><span id="z-locale-label">{}</span><div class="z-select" data-text-none=""><select id="z-locale" data-zeyn-locale>{options}</select></div></div>"#,
                 r.text(&Text::key("zeyn.shell.language"))
             ));
         }
@@ -1507,7 +1507,7 @@ impl AppState {
                 options.push_str(&format!(r#"<option value="{name}"{selected}>{}</option>"#, name.replace('_', " ")));
             }
             nav.push_str(&format!(
-                r#"<label class="z-locale">{}<select data-zeyn-timezone>{options}</select></label>"#,
+                r#"<div class="z-locale"><span id="z-timezone-label">{}</span><div class="z-select" data-text-none="{auto}"><select id="z-timezone" data-zeyn-timezone>{options}</select></div></div>"#,
                 r.text(&Text::key("zeyn.shell.time_zone"))
             ));
         }

@@ -630,7 +630,7 @@ async fn selectable_grid_renders_checkboxes_and_a_bar_with_permitted_actions_onl
     let (router, _) = pick_router(writer_items());
     let r = send(&router, get("/pick")).await;
     assert!(r.body.contains("data-zeyn-select-all"));
-    assert!(r.body.contains(r#"<td class="z-select"><input type="checkbox" data-zeyn-select"#));
+    assert!(r.body.contains(r#"<td class="z-row-select"><input type="checkbox" data-zeyn-select"#));
     assert!(r.body.contains(r#"data-zeyn-bulk-run="0""#));
     assert!(r.body.contains(r#"aria-colcount="4""#));
     let (router, _) = pick_router(reader());

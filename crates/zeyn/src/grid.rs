@@ -1015,7 +1015,7 @@ impl<E: Model> Grid<E> {
             }
             if self.selectable {
                 out.push_str(&format!(
-                    r#"<td class="z-select"><input type="checkbox" data-zeyn-select tabindex="-1" aria-label="{}"></td>"#,
+                    r#"<td class="z-row-select"><input type="checkbox" data-zeyn-select tabindex="-1" aria-label="{}"></td>"#,
                     r.text(&Text::key("zeyn.grid.select_row"))
                 ));
             }
