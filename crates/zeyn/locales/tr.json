@@ -191,6 +191,21 @@
       "toolbox": {
         "selected": "{tool} seçildi"
       },
+      "dock": {
+        "left": "Sol",
+        "right": "Sağ",
+        "bottom": "Alt",
+        "center": "Orta",
+        "options": "Panel seçenekleri",
+        "move": "{area} alana taşı",
+        "close": "{panel} panelini kapat",
+        "show": "{panel} panelini göster",
+        "moved": "{panel} {area} alana taşındı.",
+        "closed": "{panel} kapatıldı.",
+        "shown": "{panel} gösterildi.",
+        "empty": "Açık panel yok. Panel seçeneklerinden birini açın.",
+        "resize": "{area} alanı yeniden boyutlandır"
+      },
       "loading": "Yükleniyor…",
       "load_failed": "Bu bölüm yüklenemedi. Tekrar deneyin.",
       "date": {

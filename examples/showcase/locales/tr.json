@@ -43,7 +43,14 @@
     "applied": "Şekil güncellendi.",
     "status": "Durum",
     "status_ready": "Hazır",
-    "status_hint": "Başlamak için bir araç seçin."
+    "status_hint": "Başlamak için bir araç seçin.",
+    "workspace": "Çalışma alanı",
+    "panel_explorer": "Gezgin",
+    "panel_products": "Ürünler",
+    "panel_notes": "Notlar",
+    "panel_output": "Çıktı",
+    "dock_hint": "Bir sekmeyi başka bir alana sürükleyin ya da panel seçenekleri düğmesini kullanın. Alanları ayırıcılarla ya da ok tuşlarıyla boyutlandırın. Delete odaktaki sekmeyi kapatır; menüdeki Görünüm panelleri geri getirir. Yerleşim sizin için kaydedilir.",
+    "output_text": "Derleme uyarısız tamamlandı."
   },
   "Shape": {
     "name": "Ad",

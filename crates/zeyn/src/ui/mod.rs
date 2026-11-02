@@ -7,6 +7,7 @@
 mod chart;
 mod controls;
 mod date;
+mod dock;
 mod layout;
 mod lines;
 mod lookup;
@@ -16,6 +17,8 @@ mod widgets;
 
 pub use layout::{Card, Panel, Row, Split, Stack, Tabs};
 pub use shell::{MenuBar, MenuList, PropertyInspector, StatusBar, Toolbox};
+pub use dock::{DOCK_SIZE, Dock, DockArea, DockLayout, DockPanelState, DockSizes};
+pub(crate) use dock::panel_ids as dock_panel_ids;
 
 pub use chart::{Chart, ChartKind};
 pub use controls::Control;

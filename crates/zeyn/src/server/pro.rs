@@ -1,4 +1,5 @@
-//! Endpoints and assets of the desktop class shell: the command palette and its commands.
+//! Endpoints and assets of the desktop class shell: the command palette, its commands and dock
+//! layouts.
 //!
 //! Commands run with the same checks as menu items: CSRF, the feature's guards, the action's
 //! permission, then the interceptors.
@@ -34,6 +35,53 @@ pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
         .route("/_zeyn/pro.js", get(|| async { asset(JS, "text/javascript; charset=utf-8") }))
         .route("/_zeyn/pro.css", get(|| async { asset(CSS, "text/css; charset=utf-8") }))
         .route("/_zeyn/command", post(command_call))
+        .route("/_zeyn/dock", post(dock_call))
+}
+
+#[derive(Deserialize)]
+struct DockCall {
+    screen: String,
+    #[serde(default)]
+    params: serde_json::Value,
+    node: crate::ui::NodePath,
+    /// `false` loads the saved layout; `true` saves `layout` (`null` deletes it).
+    #[serde(default)]
+    save: bool,
+    #[serde(default)]
+    layout: Option<crate::ui::DockLayout>,
+}
+
+/// Loads or saves the signed in user's layout of a dock, in the app's view store under a key
+/// built from the tenant, the screen and the node. `404` without a store (the browser keeps the
+/// layout itself) or when the node is not a dock; `403` without a signed in user.
+async fn dock_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(call): axum::Json<DockCall>) -> Response {
+    let ctx = st.licensed(st.ctx(&headers)).await;
+    if let Err(f) = st.check_csrf(&headers) {
+        return st.error_response(&ctx, f);
+    }
+    let result = async {
+        let store = st.views.as_ref().ok_or(Failure::App(Error::NotFound))?;
+        let user = ctx.identity().user.clone().ok_or(Failure::App(Error::Forbidden))?;
+        let (_, entry, screen) = st.open(&ctx, &call.screen, call.params).await?;
+        let node = screen.node(&call.node).ok_or(Failure::App(Error::NotFound))?;
+        let known = crate::ui::dock_panel_ids(&node.schema()).ok_or(Failure::App(Error::NotFound))?;
+        let known: Vec<&str> = known.iter().map(String::as_str).collect();
+        let key = format!("{}~dock", AppState::view_key(&ctx, entry.meta.name, &call.node));
+        if call.save {
+            let view = call.layout.map(|l| l.clean(&known).to_view());
+            st.timed(store.save(&user, &key, view)).await?;
+            return Ok(None);
+        }
+        let view = st.timed(store.load(&user, &key)).await?;
+        let layout = view.as_ref().and_then(crate::ui::DockLayout::from_view).map(|l| l.clean(&known));
+        Ok(Some(json!({ "layout": layout })))
+    }
+    .await;
+    match result {
+        Ok(Some(body)) => axum::Json(body).into_response(),
+        Ok(None) => axum::http::StatusCode::NO_CONTENT.into_response(),
+        Err(f) => st.error_response(&ctx, f),
+    }
 }
 
 /// The palette button for the menu and the hidden buttons of every command the user may run,

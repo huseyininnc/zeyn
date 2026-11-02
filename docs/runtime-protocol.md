@@ -300,3 +300,16 @@ The runtime listens to `zeyn:run` on `document` so other scripts run work throug
 | `div[role=toolbar][aria-orientation=vertical][data-zeyn-toolbox]` | Toggle group of `button.z-tool[aria-pressed]`. Arrows, Home and End move the roving tab stop; a click, Enter or Space turns one tool on, sends `zeyn:tool` (`detail.tool`) and writes `data-text-selected` into the status bar. |
 | `section.z-inspector` | A form with `Form::section` groups (`details.z-form-section` with `role=group` bodies) saved through `POST /_zeyn/form` at the inspector's node path. Sections holding failing fields open before the browser's checks and after a `422`. |
 | `div[data-zeyn-statusbar]` | Items at the start and end and `[data-zeyn-status-live]` (`role=status`, `aria-live=polite`). `zeyn:status` (`detail.text`) from any element of the screen replaces the live text. |
+
+### 8.3 Docking panels
+
+`div.z-dock[data-zeyn-dock]` is a grid of four `section.z-dock-area[data-area]` (`left`, `center`, `bottom`, `right`) and three `div.z-dock-bar[role=separator][data-edge]` dividers. Sizes are the custom properties `--z-dock-left`, `--z-dock-right` (percent of the width) and `--z-dock-bottom` (percent of the height), 10 to 60. Each area has a `role=tablist` of draggable `button.z-dock-tab[data-panel]`, an options button and `role=tabpanel` panels holding the child nodes (paths as in any container; they never change when a panel moves). Side areas without open panels are hidden.
+
+Keyboard: Left and Right (mirrored in right to left pages), Home and End move between the open tabs of an area; Delete closes the focused panel; Shift+F10 or the context menu key opens the area's options (move to another area, close, show closed panels); arrows on a divider resize by 5 percent, Home and End go to the limits. A menu bar entry made with `MenuList::panels` lists every panel as a `menuitemcheckbox`. Changes are announced in `[data-zeyn-dock-live]`.
+
+| Endpoint | Body | Answer |
+|---|---|---|
+| `POST /_zeyn/dock` | `{ screen, params, node, save: false }` | `{ layout }`: the signed in user's saved layout or `null` |
+| `POST /_zeyn/dock` | `{ screen, params, node, save: true, layout }` | `204`; `layout: null` deletes it |
+
+`layout` is `{ sizes: { left, right, bottom }, panels: [{ id, area, open, active }] }` in tab order. The server checks CSRF, the screen's access and the feature's guards, keeps only the dock's own panels (each once) and clamps the sizes, then stores it in the app's view store (`App::datagrid_views`) under the tenant, screen and node. Without a store the endpoint answers `404` and without a user `403`; the browser then keeps the layout in `localStorage`.

@@ -1,6 +1,6 @@
 /**
- * Zeyn desktop class shell styles: command palette, menu bar, toolbox, property inspector and
- * status bar.
+ * Zeyn desktop class shell styles: command palette, menu bar, toolbox, property inspector,
+ * status bar and docking panels.
  *
  * Loaded after components.css and read only the theme tokens (docs/theming.md), so themes,
  * dark mode and density apply here too.
@@ -319,3 +319,160 @@ dialog.z-palette::backdrop { background: var(--z-backdrop); }
 .z-statusbar-live { color: var(--z-text); }
 
 .z-statusbar-live:empty { display: none; }
+
+/* Popup menus -------------------------------------------------------------------------------- */
+
+.z-pop-menu {
+  position: absolute;
+  inset-inline-end: 0;
+  top: calc(100% + 2px);
+  z-index: 30;
+  width: max-content;
+  max-width: min(24rem, calc(100vw - 32px));
+  margin: 0;
+  list-style: none;
+  background: var(--z-surface);
+  color: var(--z-text);
+  border: 1px solid var(--z-border-strong);
+  border-radius: var(--z-radius);
+  box-shadow: var(--z-shadow-2);
+  font-size: var(--z-font-size-sm);
+  white-space: nowrap;
+}
+
+/* Docking panels ----------------------------------------------------------------------------- */
+
+.z-dock {
+  --z-dock-left-on: 1;
+  --z-dock-right-on: 1;
+  --z-dock-bottom-on: 1;
+  display: grid;
+  grid-template-columns:
+    calc(var(--z-dock-left) * var(--z-dock-left-on)) calc(8px * var(--z-dock-left-on))
+    minmax(0, 1fr)
+    calc(8px * var(--z-dock-right-on)) calc(var(--z-dock-right) * var(--z-dock-right-on));
+  grid-template-rows: minmax(0, 1fr) calc(8px * var(--z-dock-bottom-on)) calc(var(--z-dock-bottom) * var(--z-dock-bottom-on));
+  grid-template-areas:
+    "left lbar center rbar right"
+    "left lbar hbar rbar right"
+    "left lbar bottom rbar right";
+  height: max(28rem, 72dvh);
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius-lg);
+  background: var(--z-bg);
+  overflow: hidden;
+}
+
+.z-dock-area {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--z-surface);
+}
+
+.z-dock-area[hidden] { display: none; }
+
+.z-dock-area[data-area="left"] { grid-area: left; }
+.z-dock-area[data-area="center"] { grid-area: center; }
+.z-dock-area[data-area="bottom"] { grid-area: bottom; }
+.z-dock-area[data-area="right"] { grid-area: right; }
+
+.z-dock-area.z-drop { outline: 2px dashed var(--z-focus); outline-offset: -4px; background: var(--z-brand-subtle); }
+
+.z-dock-head {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  min-height: 32px;
+  border-bottom: 1px solid var(--z-border);
+  background: var(--z-surface-2);
+}
+
+.z-dock-tabs { display: flex; flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
+
+.z-dock-tab {
+  position: relative;
+  flex: 0 0 auto;
+  padding: 0 calc(var(--z-space) * 3);
+  border: 0;
+  border-inline-end: 1px solid var(--z-border);
+  background: none;
+  color: var(--z-text-muted);
+  font: inherit;
+  font-size: var(--z-font-size-sm);
+  white-space: nowrap;
+  cursor: grab;
+}
+
+.z-dock-tab[hidden] { display: none; }
+
+.z-dock-tab:hover { color: var(--z-text); background: var(--z-hover); }
+
+.z-dock-tab[aria-selected="true"] { background: var(--z-surface); color: var(--z-text); font-weight: 600; }
+
+.z-dock-tab[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: var(--z-accent);
+}
+
+.z-dock-tab:focus-visible,
+.z-dock-options:focus-visible { outline: 2px solid var(--z-focus); outline-offset: -2px; }
+
+.z-dock-options {
+  flex: 0 0 auto;
+  width: 32px;
+  border: 0;
+  background: none;
+  color: var(--z-text-muted);
+  font: inherit;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.z-dock-options:hover,
+.z-dock-options[aria-expanded="true"] { background: var(--z-hover); color: var(--z-text); }
+
+.z-dock-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
+
+.z-dock-panel { padding: calc(var(--z-space) * 3); }
+
+.z-dock-panel:focus-visible { outline: 2px solid var(--z-focus); outline-offset: -2px; }
+
+.z-dock-area[data-empty]::after {
+  content: attr(data-empty);
+  display: block;
+  padding: calc(var(--z-space) * 6);
+  color: var(--z-text-muted);
+  text-align: center;
+}
+
+.z-dock-bar {
+  position: relative;
+  background: var(--z-surface-2);
+  touch-action: none;
+}
+
+.z-dock-bar[hidden] { display: none; }
+
+.z-dock-bar[data-edge="left"] { grid-area: lbar; cursor: col-resize; border-inline: 1px solid var(--z-border); }
+.z-dock-bar[data-edge="right"] { grid-area: rbar; cursor: col-resize; border-inline: 1px solid var(--z-border); }
+.z-dock-bar[data-edge="bottom"] { grid-area: hbar; cursor: row-resize; border-block: 1px solid var(--z-border); }
+
+.z-dock-bar:hover,
+.z-dock-bar[data-dragging] { background: var(--z-hover); }
+
+.z-dock-bar:focus-visible { outline: 2px solid var(--z-focus); outline-offset: -2px; }
+
+@media (max-width: 640px) {
+  .z-dock {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+  }
+  .z-dock-area { min-height: 12rem; }
+  .z-dock-bar { display: none; }
+}

@@ -539,6 +539,389 @@ function toolKey(e, t) {
   return true;
 }
 
+/* Small popup menus (dock panel options) ----------------------------------------------------- */
+
+/** The open popup menu: `{menu, opener}`. */
+let popMenu = null;
+
+/**
+ * Opens a menu under `opener`. Items are `{label, run, checked?}` or `{separator: true}`.
+ * Keyboard as in the menu bar: arrows, Home, End, Enter, Space, Escape and Tab.
+ */
+function openPopMenu(opener, items) {
+  closePopMenu(false);
+  const menu = make('ul', 'z-menu z-pop-menu', { role: 'menu', 'aria-label': opener.getAttribute('aria-label') ?? '' });
+  for (const item of items) {
+    if (item.separator) {
+      if (menu.lastChild && !menu.lastChild.matches('[role="separator"]')) menu.append(make('li', 'z-menu-sep', { role: 'separator' }));
+      continue;
+    }
+    const li = make('li', '', { role: 'none' });
+    const role = item.checked == null ? 'menuitem' : 'menuitemcheckbox';
+    const b = make('button', 'z-menu-item', { type: 'button', role, tabindex: '-1' });
+    if (item.checked != null) b.setAttribute('aria-checked', String(!!item.checked));
+    b.append(make('span', 'z-menu-label', { text: item.label }));
+    b.zeynRun = item.run;
+    li.append(b);
+    menu.append(li);
+  }
+  if (menu.lastChild?.matches('[role="separator"]')) menu.lastChild.remove();
+  opener.after(menu);
+  opener.setAttribute('aria-expanded', 'true');
+  popMenu = { menu, opener };
+  menu.querySelector('[role^="menuitem"]')?.focus();
+}
+
+function closePopMenu(focus = true) {
+  const p = popMenu;
+  if (!p) return;
+  popMenu = null;
+  p.menu.remove();
+  p.opener.setAttribute('aria-expanded', 'false');
+  if (focus && p.opener.isConnected) p.opener.focus();
+}
+
+function runPopItem(b) {
+  const fn = b.zeynRun;
+  closePopMenu(true);
+  fn?.();
+}
+
+/** Keys in a popup menu. Returns true when handled. */
+function popKey(e, t) {
+  if (!popMenu?.menu.contains(t)) return false;
+  const items = [...popMenu.menu.querySelectorAll('[role^="menuitem"]')];
+  const i = items.indexOf(t);
+  if (e.key === 'ArrowDown') items[(i + 1) % items.length]?.focus();
+  else if (e.key === 'ArrowUp') items[(i - 1 + items.length) % items.length]?.focus();
+  else if (e.key === 'Home') items[0]?.focus();
+  else if (e.key === 'End') items.at(-1)?.focus();
+  else if (e.key === 'Escape') closePopMenu(true);
+  else if (e.key === 'Enter' || e.key === ' ') runPopItem(t);
+  else if (e.key === 'Tab') {
+    closePopMenu(false);
+    return false;
+  } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) typeAhead(items, t, e.key)?.focus();
+  else return false;
+  e.preventDefault();
+  e.stopPropagation();
+  return true;
+}
+
+/* Docking panels ----------------------------------------------------------------------------- */
+
+const AREAS = ['left', 'center', 'bottom', 'right'];
+const DOCK_MIN = 10;
+const DOCK_MAX = 60;
+const DOCK_SAVE_MS = 400;
+const dockTimers = new WeakMap();
+
+/** Screen, params and node of a dock, as `/_zeyn/dock` expects them. */
+function dockAddress(dock) {
+  const screen = dock.closest('[data-zeyn-screen]');
+  let params = null;
+  try {
+    params = JSON.parse(screen?.dataset.zeynParams ?? 'null');
+  } catch {
+    params = null;
+  }
+  return { screen: screen?.dataset.zeynScreen ?? '', params, node: dock.closest('[data-zeyn-node]')?.dataset.zeynNode ?? '0' };
+}
+
+/** Browser storage key of a dock layout, when the server keeps none. */
+function dockStoreKey(dock) {
+  const a = dockAddress(dock);
+  return `zeyn.dock.${location.pathname}.${a.screen}#${a.node}`;
+}
+
+function areaEl(dock, area) {
+  return dock.querySelector(`:scope > .z-dock-area[data-area="${area}"]`);
+}
+
+/** Tabs of one area, or of the whole dock, in order. */
+function dockTabs(dock, area) {
+  const scope = area ? `:scope > .z-dock-area[data-area="${area}"]` : ':scope > .z-dock-area';
+  return [...dock.querySelectorAll(`${scope} > .z-dock-head > .z-dock-tabs > [role="tab"]`)];
+}
+
+function dockPanel(tab) {
+  return document.getElementById(tab.getAttribute('aria-controls'));
+}
+
+function dockTab(dock, id) {
+  return dockTabs(dock).find((t) => t.dataset.panel === id) ?? null;
+}
+
+function areaOfTab(tab) {
+  return tab.closest('.z-dock-area').dataset.area;
+}
+
+function dockTitle(tab) {
+  return tab.textContent.trim();
+}
+
+/** Announces a change in the dock's live region. */
+function dockSay(dock, key, values) {
+  const live = dock.querySelector(':scope > [data-zeyn-dock-live]');
+  if (live) live.textContent = fill(dock.dataset[`text${key[0].toUpperCase()}${key.slice(1)}`], values);
+}
+
+/** Area name as users read it. */
+function areaName(dock, area) {
+  return dock.dataset[`text${area[0].toUpperCase()}${area.slice(1)}`] ?? area;
+}
+
+/** Shows `tab`'s panel in its area and makes it the area's tab stop. */
+function selectDockTab(tab, focus = false) {
+  for (const t of dockTabs(tab.closest('.z-dock'), areaOfTab(tab))) {
+    const on = t === tab;
+    t.setAttribute('aria-selected', String(on));
+    t.tabIndex = on ? 0 : -1;
+    dockPanel(t).hidden = !on;
+  }
+  if (focus) tab.focus();
+}
+
+/**
+ * Hides side areas without open panels, makes sure each area shows one open panel and marks an
+ * empty center.
+ */
+function refreshDock(dock) {
+  for (const area of AREAS) {
+    const el = areaEl(dock, area);
+    const open = dockTabs(dock, area).filter((t) => !t.hidden);
+    if (area === 'center') {
+      if (open.length) el.removeAttribute('data-empty');
+      else el.dataset.empty = dock.dataset.textEmpty ?? '';
+    } else el.hidden = !open.length;
+    const bar = dock.querySelector(`:scope > .z-dock-bar[data-edge="${area}"]`);
+    if (bar) bar.hidden = !open.length;
+    dock.style.setProperty(`--z-dock-${area}-on`, open.length ? '1' : '0');
+    const current = open.find((t) => t.getAttribute('aria-selected') === 'true');
+    for (const t of dockTabs(dock, area)) if (t.hidden) dockPanel(t).hidden = true;
+    if (open.length) selectDockTab(current ?? open[0]);
+  }
+}
+
+function sizeOf(dock, edge) {
+  return Number.parseInt(dock.style.getPropertyValue(`--z-dock-${edge}`), 10) || 20;
+}
+
+/** Sets the share of a side area, kept within the limits. */
+function setDockSize(dock, edge, percent) {
+  const v = Math.round(Math.min(DOCK_MAX, Math.max(DOCK_MIN, percent)));
+  dock.style.setProperty(`--z-dock-${edge}`, `${v}%`);
+  dock.querySelector(`:scope > .z-dock-bar[data-edge="${edge}"]`)?.setAttribute('aria-valuenow', String(v));
+}
+
+/** The layout as the server stores it. */
+function dockLayout(dock) {
+  const panels = [];
+  for (const area of AREAS) {
+    for (const t of dockTabs(dock, area)) {
+      panels.push({ id: t.dataset.panel, area, open: !t.hidden, active: t.getAttribute('aria-selected') === 'true' && !t.hidden });
+    }
+  }
+  return { sizes: { left: sizeOf(dock, 'left'), right: sizeOf(dock, 'right'), bottom: sizeOf(dock, 'bottom') }, panels };
+}
+
+/** Moves tabs and panels into a saved layout. Unknown panels are ignored. */
+function applyDockLayout(dock, layout) {
+  if (!layout || typeof layout !== 'object') return;
+  for (const edge of ['left', 'right', 'bottom']) {
+    const v = Number(layout.sizes?.[edge]);
+    if (Number.isFinite(v)) setDockSize(dock, edge, v);
+  }
+  const active = [];
+  for (const p of Array.isArray(layout.panels) ? layout.panels : []) {
+    const tab = dockTab(dock, String(p?.id));
+    if (!tab || !AREAS.includes(p.area)) continue;
+    placeTab(dock, tab, p.area);
+    tab.hidden = !p.open;
+    if (p.active && p.open) active.push(tab);
+  }
+  for (const t of dockTabs(dock)) t.setAttribute('aria-selected', 'false');
+  for (const t of active) t.setAttribute('aria-selected', 'true');
+  refreshDock(dock);
+}
+
+/** Puts a tab and its panel at the end of an area. */
+function placeTab(dock, tab, area) {
+  const el = areaEl(dock, area);
+  el.querySelector(':scope > .z-dock-head > .z-dock-tabs').append(tab);
+  el.querySelector(':scope > .z-dock-body').append(dockPanel(tab));
+}
+
+/** Saves the layout after a short pause: on the server when it keeps layouts, else locally. */
+function saveDock(dock) {
+  clearTimeout(dockTimers.get(dock));
+  dockTimers.set(
+    dock,
+    setTimeout(async () => {
+      const layout = dockLayout(dock);
+      if (dock.dataset.store === 'server') {
+        const r = await post('/_zeyn/dock', { ...dockAddress(dock), save: true, layout });
+        if (r.ok) return;
+      }
+      store(dockStoreKey(dock), layout);
+    }, DOCK_SAVE_MS),
+  );
+}
+
+/** Moves a panel to an area, opens and shows it. */
+function moveDockPanel(dock, tab, area, focus = true) {
+  placeTab(dock, tab, area);
+  tab.hidden = false;
+  selectDockTab(tab);
+  refreshDock(dock);
+  if (focus) tab.focus();
+  dockSay(dock, 'moved', { panel: dockTitle(tab), area: areaName(dock, area) });
+  saveDock(dock);
+}
+
+/** Closes a panel; focus goes to the next open tab of its area, or to the area's options. */
+function closeDockPanel(dock, tab, focus = true) {
+  const area = areaOfTab(tab);
+  const open = dockTabs(dock, area).filter((t) => !t.hidden);
+  const next = open[open.indexOf(tab) + 1] ?? open[open.indexOf(tab) - 1];
+  tab.hidden = true;
+  tab.setAttribute('aria-selected', 'false');
+  dockPanel(tab).hidden = true;
+  if (next) selectDockTab(next);
+  refreshDock(dock);
+  if (focus) (next ?? areaEl(dock, 'center').querySelector('.z-dock-options')).focus();
+  dockSay(dock, 'closed', { panel: dockTitle(tab) });
+  saveDock(dock);
+}
+
+/** Brings a closed panel back in the area it was in. */
+function showDockPanel(dock, tab, focus = true) {
+  tab.hidden = false;
+  selectDockTab(tab);
+  refreshDock(dock);
+  if (focus) tab.focus();
+  dockSay(dock, 'shown', { panel: dockTitle(tab) });
+  saveDock(dock);
+}
+
+/** The options of an area: move or close its panel, show closed panels. */
+function openDockOptions(button) {
+  const dock = button.closest('.z-dock');
+  const area = button.closest('.z-dock-area').dataset.area;
+  const tab = dockTabs(dock, area).find((t) => !t.hidden && t.getAttribute('aria-selected') === 'true');
+  const items = [];
+  if (tab) {
+    for (const to of AREAS) {
+      if (to !== area) items.push({ label: fill(dock.dataset.textMove, { area: areaName(dock, to) }), run: () => moveDockPanel(dock, tab, to) });
+    }
+    items.push({ separator: true }, { label: fill(dock.dataset.textClose, { panel: dockTitle(tab) }), run: () => closeDockPanel(dock, tab) });
+  }
+  items.push({ separator: true });
+  for (const t of dockTabs(dock).filter((x) => x.hidden)) {
+    items.push({ label: fill(dock.dataset.textShow, { panel: dockTitle(t) }), run: () => showDockPanel(dock, t) });
+  }
+  if (items.some((i) => !i.separator)) openPopMenu(button, items);
+}
+
+/** Keys on a dock tab or divider. Returns true when handled. */
+function dockKey(e, t) {
+  const dock = t.closest('.z-dock');
+  if (t.matches('.z-dock-bar')) {
+    const edge = t.dataset.edge;
+    const grow = { left: 'ArrowRight', right: 'ArrowLeft', bottom: 'ArrowUp' }[edge];
+    const shrink = { left: 'ArrowLeft', right: 'ArrowRight', bottom: 'ArrowDown' }[edge];
+    const now = sizeOf(dock, edge);
+    if (e.key === grow) setDockSize(dock, edge, now + 5);
+    else if (e.key === shrink) setDockSize(dock, edge, now - 5);
+    else if (e.key === 'Home') setDockSize(dock, edge, DOCK_MIN);
+    else if (e.key === 'End') setDockSize(dock, edge, DOCK_MAX);
+    else return false;
+    e.preventDefault();
+    saveDock(dock);
+    return true;
+  }
+  if (!t.matches('.z-dock-tab')) return false;
+  const tabs = dockTabs(dock, areaOfTab(t)).filter((x) => !x.hidden);
+  const i = tabs.indexOf(t);
+  const rtl = getComputedStyle(dock).direction === 'rtl';
+  const next = rtl ? 'ArrowLeft' : 'ArrowRight';
+  const prev = rtl ? 'ArrowRight' : 'ArrowLeft';
+  let target = null;
+  if (e.key === next) target = tabs[(i + 1) % tabs.length];
+  else if (e.key === prev) target = tabs[(i - 1 + tabs.length) % tabs.length];
+  else if (e.key === 'Home') target = tabs[0];
+  else if (e.key === 'End') target = tabs.at(-1);
+  else if (e.key === 'Delete') closeDockPanel(dock, t);
+  else if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) openDockOptions(t.closest('.z-dock-area').querySelector('.z-dock-options'));
+  else return false;
+  e.preventDefault();
+  e.stopPropagation();
+  if (target) {
+    selectDockTab(target, true);
+    saveDock(dock);
+  }
+  return true;
+}
+
+/** Drags a divider with the pointer. */
+function dragDockBar(e, bar) {
+  const dock = bar.closest('.z-dock');
+  const edge = bar.dataset.edge;
+  bar.setPointerCapture(e.pointerId);
+  bar.dataset.dragging = '';
+  e.preventDefault();
+  bar.focus();
+  const move = (ev) => {
+    const box = dock.getBoundingClientRect();
+    const percent =
+      edge === 'left' ? ((ev.clientX - box.left) / box.width) * 100 : edge === 'right' ? ((box.right - ev.clientX) / box.width) * 100 : ((box.bottom - ev.clientY) / box.height) * 100;
+    setDockSize(dock, edge, percent);
+  };
+  const up = () => {
+    delete bar.dataset.dragging;
+    bar.removeEventListener('pointermove', move);
+    bar.removeEventListener('pointerup', up);
+    bar.removeEventListener('pointercancel', up);
+    saveDock(dock);
+  };
+  bar.addEventListener('pointermove', move);
+  bar.addEventListener('pointerup', up);
+  bar.addEventListener('pointercancel', up);
+}
+
+/** Loads saved layouts: from the server when it keeps them, else from this browser. */
+async function initDocks(root) {
+  for (const dock of root.querySelectorAll('[data-zeyn-dock]')) {
+    if (dock.zeynReady) continue;
+    dock.zeynReady = true;
+    refreshDock(dock);
+    const r = await post('/_zeyn/dock', { ...dockAddress(dock), save: false });
+    if (r.ok) {
+      dock.dataset.store = 'server';
+      applyDockLayout(dock, r.data?.layout);
+    } else applyDockLayout(dock, load(dockStoreKey(dock), null));
+  }
+}
+
+/** Fills the panels entry of a menu bar menu with the panels of the dock on its screen. */
+function fillPanels(menu) {
+  const slot = menu.querySelector(':scope > [data-zeyn-dock-panels]');
+  if (!slot) return;
+  menu.querySelectorAll(':scope > .z-dock-panels-item').forEach((li) => li.remove());
+  const dock = (menu.closest('[data-zeyn-screen]') ?? document).querySelector('[data-zeyn-dock]');
+  if (!dock) return;
+  let after = slot;
+  for (const tab of dockTabs(dock)) {
+    const li = make('li', 'z-dock-panels-item', { role: 'none' });
+    const b = make('button', 'z-menu-item', { type: 'button', role: 'menuitemcheckbox', tabindex: '-1', 'aria-checked': String(!tab.hidden) });
+    b.append(make('span', 'z-menu-label', { text: dockTitle(tab) }));
+    b.zeynDockTab = tab;
+    li.append(b);
+    after.after(li);
+    after = li;
+  }
+}
+
 /* Wiring ------------------------------------------------------------------------------------- */
 
 document.addEventListener(
@@ -554,11 +937,75 @@ document.addEventListener(
       return;
     }
     if (!t) return;
+    if (popKey(e, t)) return;
     if (t.closest('[data-zeyn-menubar]') && barKey(e, t)) return;
     if (t.matches('[data-zeyn-toolbox] .z-tool')) toolKey(e, t);
   },
   true,
 );
+
+/** Dock tabs skip closed panels, so they are handled before the generic tabs of components.js. */
+window.addEventListener(
+  'keydown',
+  (e) => {
+    const t = e.target instanceof Element ? e.target : null;
+    if (t && !e.defaultPrevented && t.matches('.z-dock-tab, .z-dock-bar') && dockKey(e, t)) e.stopPropagation();
+  },
+  true,
+);
+
+document.addEventListener('zeyn:menu-open', (e) => {
+  if (e.detail instanceof Element) fillPanels(e.detail);
+});
+
+document.addEventListener('zeyn:menu-check', (e) => {
+  const item = e.detail;
+  const tab = item?.zeynDockTab;
+  if (!tab?.isConnected) return;
+  const dock = tab.closest('.z-dock');
+  if (tab.hidden) showDockPanel(dock, tab, false);
+  else closeDockPanel(dock, tab, false);
+  item.setAttribute('aria-checked', String(!tab.hidden));
+});
+
+document.addEventListener('dragstart', (e) => {
+  const tab = e.target instanceof Element ? e.target.closest('.z-dock-tab') : null;
+  if (!tab || !e.dataTransfer) return;
+  e.dataTransfer.setData('application/x-zeyn-dock', tab.id);
+  e.dataTransfer.effectAllowed = 'move';
+});
+
+document.addEventListener('dragover', (e) => {
+  const area = e.target instanceof Element ? e.target.closest('.z-dock-area') : null;
+  if (!area || !e.dataTransfer?.types.includes('application/x-zeyn-dock')) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  for (const a of area.parentElement.querySelectorAll(':scope > .z-dock-area')) a.classList.toggle('z-drop', a === area);
+});
+
+document.addEventListener('dragleave', (e) => {
+  const area = e.target instanceof Element ? e.target.closest('.z-dock-area') : null;
+  if (area && !(e.relatedTarget instanceof Element && area.contains(e.relatedTarget))) area.classList.remove('z-drop');
+});
+
+document.addEventListener('drop', (e) => {
+  const area = e.target instanceof Element ? e.target.closest('.z-dock-area') : null;
+  const tab = document.getElementById(e.dataTransfer?.getData('application/x-zeyn-dock') ?? '');
+  document.querySelectorAll('.z-dock-area.z-drop').forEach((a) => a.classList.remove('z-drop'));
+  if (!area || !tab?.matches('.z-dock-tab') || tab.closest('.z-dock') !== area.closest('.z-dock')) return;
+  e.preventDefault();
+  moveDockPanel(area.closest('.z-dock'), tab, area.dataset.area);
+});
+
+document.addEventListener('dragend', () => document.querySelectorAll('.z-dock-area.z-drop').forEach((a) => a.classList.remove('z-drop')));
+
+document.addEventListener('zeyn:content', (e) => initDocks(e.detail instanceof Element ? e.detail : document));
+
+new MutationObserver((records) => {
+  for (const r of records) for (const n of r.addedNodes) if (n instanceof HTMLDialogElement) initDocks(n);
+}).observe(document.body, { childList: true });
+
+initDocks(document);
 
 document.addEventListener(
   'click',
@@ -585,6 +1032,16 @@ document.addEventListener('click', (e) => {
     return;
   }
   if ((el = t.closest('[data-zeyn-toolbox] .z-tool'))) return pickTool(el);
+  if ((el = t.closest('.z-pop-menu [role^="menuitem"]'))) return runPopItem(el);
+  if ((el = t.closest('.z-dock-options'))) {
+    if (popMenu?.opener === el) closePopMenu(true);
+    else openDockOptions(el);
+    return;
+  }
+  if ((el = t.closest('.z-dock-tab'))) {
+    selectDockTab(el, true);
+    return saveDock(el.closest('.z-dock'));
+  }
 });
 
 document.addEventListener('pointerover', (e) => {
@@ -596,8 +1053,12 @@ document.addEventListener('pointerover', (e) => {
 document.addEventListener(
   'pointerdown',
   (e) => {
-    const inside = e.target instanceof Element ? e.target.closest('[data-zeyn-menubar]') : null;
+    const t = e.target instanceof Element ? e.target : null;
+    const inside = t?.closest('[data-zeyn-menubar]');
     for (const bar of document.querySelectorAll('[data-zeyn-menubar]')) if (bar !== inside && barOpen(bar)) closeBarMenus(bar);
+    if (popMenu && !popMenu.menu.contains(t) && popMenu.opener !== t?.closest('.z-dock-options')) closePopMenu(false);
+    const bar = t?.closest('.z-dock-bar');
+    if (bar && e.button === 0) dragDockBar(e, bar);
   },
   true,
 );

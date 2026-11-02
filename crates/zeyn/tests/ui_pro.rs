@@ -9,7 +9,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tower::ServiceExt;
 use zeyn::prelude::*;
-use zeyn::{I18n, Identity, normalize_shortcut};
+use zeyn::ui::{DockArea, DockLayout};
+use zeyn::{I18n, Identity, MemoryViewStore, normalize_shortcut};
 
 #[derive(Clone, Default)]
 pub struct Counter(Arc<AtomicUsize>);
@@ -92,19 +93,40 @@ fn denied(_: &Ctx) -> GuardResult {
     GuardResult::Deny("No".into())
 }
 
+#[screen(route = "/work", permission = "orders.read")]
+pub fn work() -> Screen {
+    Screen::new("Work").body(
+        Stack::new().add(Card::new().title("Intro")).add(
+            Dock::new("Workspace")
+                .left("files", "Files", Card::new().title("Tree"))
+                .center("main", "Main", Card::new().title("Editor"))
+                .center("notes", "Notes", Card::new())
+                .bottom("log", "Log", Card::new())
+                .sizes(30, 5, 99),
+        ),
+    )
+}
+
 fn app(counter: Counter) -> Router {
-    App::new("Test")
+    app_with(counter, true)
+}
+
+fn app_with(counter: Counter, views: bool) -> Router {
+    let app = App::new("Test")
         .i18n(I18n::new("en"))
         .service(counter)
         .auth(|h: &HeaderMap| {
             let perms: Vec<String> = h.get("x-perms")?.to_str().ok()?.split(',').map(String::from).collect();
-            Some(Identity::user("u").with_permissions(perms))
-        })
-        .feature(
+            let user = h.get("x-user").and_then(|v| v.to_str().ok()).unwrap_or("u").to_string();
+            Some(Identity::user(user).with_permissions(perms))
+        });
+    let app = if views { app.datagrid_views(MemoryViewStore::default()) } else { app };
+    app.feature(
             Feature::new("orders")
                 .screen(orders)
                 .screen(order_form)
                 .screen(designer)
+                .screen(work)
                 .command(new_order())
                 .command(archive())
                 .command(hello()),
@@ -295,4 +317,74 @@ async fn inspector_saves_through_the_form_endpoint_with_validation_and_permissio
     let (status, body) = send(&router, post("/_zeyn/form", "orders.read,orders.write", call(serde_json::json!({ "name": "B", "width": "7" })))).await;
     assert_eq!(status, StatusCode::OK, "{body}");
     assert_eq!(counter.0.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn dock_renders_areas_tabs_and_dividers_with_node_paths() {
+    let router = app(Counter::default());
+    let (_, html) = send(&router, get("/work", "orders.read")).await;
+    assert!(html.contains(r#"<div class="z-dock" role="group" aria-label="Workspace" data-zeyn-dock="work-dock-0-1" data-testid="work.dock" style="--z-dock-left:30%;--z-dock-right:10%;--z-dock-bottom:60%""#));
+    assert!(html.contains(r#"<section class="z-dock-area" data-area="right" aria-label="Right" hidden>"#), "an area without panels starts hidden");
+    assert!(html.contains(r#"role="tab" class="z-dock-tab" id="work-dock-0-1-tab-main" aria-controls="work-dock-0-1-panel-main" aria-selected="true" tabindex="0" draggable="true" data-panel="main""#));
+    assert!(html.contains(r#"id="work-dock-0-1-tab-notes" aria-controls="work-dock-0-1-panel-notes" aria-selected="false" tabindex="-1""#));
+    assert!(html.contains(r#"role="tabpanel" id="work-dock-0-1-panel-notes" aria-labelledby="work-dock-0-1-tab-notes" tabindex="0" data-panel="notes" hidden><div class="z-node" data-zeyn-node="0.1.2">"#));
+    assert!(html.contains(r#"class="z-dock-bar" data-edge="left" role="separator" tabindex="0" aria-orientation="vertical" aria-valuenow="30" aria-valuemin="10" aria-valuemax="60" aria-label="Resize the Left area""#));
+    assert!(html.contains(r#"data-edge="bottom" role="separator" tabindex="0" aria-orientation="horizontal""#));
+    assert!(html.contains(r#"aria-haspopup="menu" aria-expanded="false" aria-label="Panel options (Center)""#));
+}
+
+fn dock_call(perms: &str, user: &str, body: serde_json::Value) -> Request<Body> {
+    let mut req = post("/_zeyn/dock", perms, body);
+    req.headers_mut().insert("x-user", user.parse().unwrap());
+    req
+}
+
+#[tokio::test]
+async fn dock_layout_is_saved_per_user_in_the_view_store_and_cleaned() {
+    let router = app(Counter::default());
+    let load = serde_json::json!({ "screen": "work", "node": "0.1" });
+    let (status, body) = send(&router, dock_call("orders.read", "ann", load.clone())).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body, r#"{"layout":null}"#);
+
+    let save = serde_json::json!({ "screen": "work", "node": "0.1", "save": true, "layout": {
+        "sizes": { "left": 3, "right": 35, "bottom": 200 },
+        "panels": [
+            { "id": "log", "area": "right", "open": true, "active": true },
+            { "id": "evil<script>", "area": "left", "open": true },
+            { "id": "files", "area": "left", "open": false },
+            { "id": "log", "area": "left", "open": true }
+        ]
+    }});
+    let (status, _) = send(&router, dock_call("orders.read", "ann", save)).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let (_, body) = send(&router, dock_call("orders.read", "ann", load.clone())).await;
+    let layout: DockLayout = serde_json::from_value(serde_json::from_str::<serde_json::Value>(&body).unwrap()["layout"].clone()).unwrap();
+    assert_eq!((layout.sizes.left, layout.sizes.right, layout.sizes.bottom), (10, 35, 60));
+    let ids: Vec<(&str, DockArea, bool)> = layout.panels.iter().map(|p| (p.id.as_str(), p.area, p.open)).collect();
+    assert_eq!(ids, [("log", DockArea::Right, true), ("files", DockArea::Left, false)], "unknown and repeated panels are dropped");
+
+    let (_, other) = send(&router, dock_call("orders.read", "bob", load.clone())).await;
+    assert_eq!(other, r#"{"layout":null}"#, "layouts are per user");
+
+    let delete = serde_json::json!({ "screen": "work", "node": "0.1", "save": true, "layout": null });
+    assert_eq!(send(&router, dock_call("orders.read", "ann", delete)).await.0, StatusCode::NO_CONTENT);
+    assert_eq!(send(&router, dock_call("orders.read", "ann", load)).await.1, r#"{"layout":null}"#);
+}
+
+#[tokio::test]
+async fn dock_endpoint_checks_csrf_access_node_and_store() {
+    let router = app(Counter::default());
+    let load = serde_json::json!({ "screen": "work", "node": "0.1" });
+    let no_csrf = Request::post("/_zeyn/dock")
+        .header("x-perms", "orders.read")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(load.to_string()))
+        .unwrap();
+    assert_eq!(send(&router, no_csrf).await.0, StatusCode::FORBIDDEN);
+    assert_eq!(send(&router, dock_call("", "ann", load.clone())).await.0, StatusCode::FORBIDDEN, "the screen needs orders.read");
+    let not_dock = serde_json::json!({ "screen": "work", "node": "0.0" });
+    assert_eq!(send(&router, dock_call("orders.read", "ann", not_dock)).await.0, StatusCode::NOT_FOUND);
+    let no_store = app_with(Counter::default(), false);
+    assert_eq!(send(&no_store, dock_call("orders.read", "ann", load)).await.0, StatusCode::NOT_FOUND, "the browser keeps the layout");
 }

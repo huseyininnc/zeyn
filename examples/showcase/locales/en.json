@@ -43,7 +43,14 @@
     "applied": "Shape updated.",
     "status": "Status",
     "status_ready": "Ready",
-    "status_hint": "Select a tool to start."
+    "status_hint": "Select a tool to start.",
+    "workspace": "Workspace",
+    "panel_explorer": "Explorer",
+    "panel_products": "Products",
+    "panel_notes": "Notes",
+    "panel_output": "Output",
+    "dock_hint": "Drag a tab to another area, or use the panel options button. Resize areas with the dividers or their arrow keys. Delete closes the focused tab; View in the menu brings panels back. The layout is saved for you.",
+    "output_text": "Build finished without warnings."
   },
   "Shape": {
     "name": "Name",

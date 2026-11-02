@@ -1,6 +1,6 @@
 //! Desktop class shell: the command palette and the commands it runs.
 
-use crate::stock::{ProductParams, product_editor, product_list, restock_low};
+use crate::stock::{Product, ProductParams, product_editor, product_list, restock_low, search_products};
 use zeyn::prelude::*;
 
 /// Opens the product editor for a new product.
@@ -107,15 +107,54 @@ pub fn designer() -> Screen {
     )
 }
 
+fn shape_inspector() -> PropertyInspector {
+    let shape = Shape { name: "Header".into(), x: 40, y: 24, width: 640, height: 80, visible: true };
+    PropertyInspector::new(
+        t!("pro.properties"),
+        Form::of(shape)
+            .section(t!("pro.section_general"))
+            .field(Shape::name)
+            .field(Shape::visible)
+            .section(t!("pro.section_size"))
+            .row(|r| r.field(Shape::width).field(Shape::height))
+            .submit(t!("pro.apply"), save_shape)
+            .on_success(|_, ui| ui.toast(t!("pro.applied"))),
+    )
+}
+
+#[screen(route = "/workspace", permission = "stock.product.read")]
+pub fn workspace() -> Screen {
+    let products = DataGrid::of(search_products).paging(Paging::pages(10)).column(Product::code).width(110).filter().column(Product::name).flex(1).column(Product::price).width(130);
+    Screen::new(t!("pro.workspace")).body(
+        Stack::new()
+            .gap(2)
+            .add(
+                MenuBar::new(t!("pro.menubar"))
+                    .menu(t!("pro.menu_file"), |m| m.command(new_product()).separator().command(restock()))
+                    .menu(t!("pro.menu_view"), |m| m.panels()),
+            )
+            .add(
+                Dock::new(t!("pro.workspace"))
+                    .left("explorer", t!("pro.panel_explorer"), Alert::new(Tone::Neutral, t!("pro.dock_hint")))
+                    .center("products", t!("pro.panel_products"), products)
+                    .center("notes", t!("pro.panel_notes"), Card::new().title(t!("pro.canvas_hint")))
+                    .bottom("output", t!("pro.panel_output"), Alert::info(t!("pro.output_text")))
+                    .right("properties", t!("pro.properties"), shape_inspector()),
+            )
+            .add(StatusBar::new(t!("pro.status")).left(t!("pro.status_ready")).right("UTF-8")),
+    )
+}
+
 pub fn feature() -> Feature {
     Feature::new("pro")
         .route_prefix("/pro")
         .guard(SignedIn)
         .screen(palette)
         .screen(designer)
+        .screen(workspace)
         .command(new_product())
         .command(restock())
         .command(go_products())
         .command(hello())
-        .menu(|m| m.group(t!("menu.pro"), Icon::Search).item(t!("pro.palette"), palette).item(t!("pro.designer"), designer))
+        .menu(|m| m.group(t!("menu.pro"), Icon::Search).item(t!("pro.palette"), palette).item(t!("pro.designer"), designer).item(t!("pro.workspace"), workspace))
 }
