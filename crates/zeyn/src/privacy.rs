@@ -68,11 +68,13 @@ pub struct Masking {
     pub permission: &'static str,
 }
 
-/// Whether the identity behind `ctx` may see the raw value of a masked field.
+/// Whether the identity behind `ctx` may see the raw value of a masked field. Never for calls
+/// made by AI agents (MCP, WebMCP, the assistant): masked values do not go to models, whatever
+/// the user may see.
 pub fn can_unmask(ctx: Option<&Ctx>, meta: &FieldMeta) -> bool {
     match meta.mask {
         None => true,
-        Some(m) => ctx.is_some_and(|c| c.identity().can(&Access::Permission(m.permission))),
+        Some(m) => ctx.is_some_and(|c| !c.via_agent() && c.identity().can(&Access::Permission(m.permission))),
     }
 }
 

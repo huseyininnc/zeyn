@@ -10,7 +10,8 @@
     "gallery": "Bileşenler",
     "ui": "Bileşen kütüphanesi",
     "media": "Medya",
-    "pro": "Masaüstü kabuğu"
+    "pro": "Masaüstü kabuğu",
+    "assistant": "Asistan"
   },
   "dashboard": {
     "title": "Genel bakış",
@@ -334,5 +335,12 @@
     "width": "Genişlik",
     "height": "Yükseklik",
     "visible": "Görünür"
+  },
+  "assistant": {
+    "title": "Asistan",
+    "intro": "Bu asistan uygulamanın kendi verileriyle yanıt verir ve sizin yetkilerinizle, sizin adınıza çalışır. Veriyi değiştiren her işlem onayınızı bekler. Demo betikli bir model kullanır; ücretsizdir ve çevrimdışı çalışır. Gerçek bir modele yalnızca ayarlarla nasıl bağlanacağı docs/assistant.md içinde anlatılıyor.",
+    "try_orders": "Bugün İzmir'den gelen siparişleri göster",
+    "try_archive": "NW-0003 ürününü arşivle",
+    "try_low": "Stoğu azalan ürünleri göster"
   }
 }

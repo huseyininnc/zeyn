@@ -325,3 +325,54 @@ Keyboard: Left and Right (mirrored in right to left pages), Home and End move be
 | `POST /_zeyn/dock` | `{ screen, params, node, save: true, layout }` | `204`; `layout: null` deletes it |
 
 `layout` is `{ sizes: { left, right, bottom }, panels: [{ id, area, open, active }] }` in tab order. The server checks CSRF, the screen's access and the feature's guards, keeps only the dock's own panels (each once) and clamps the sizes, then stores it in the app's view store (`App::datagrid_views`) under the tenant, screen and node. Without a store the endpoint answers `404` and without a user `403`; the browser then keeps the layout in `localStorage`.
+
+## 9. AI agents: MCP and WebMCP
+
+Outside AI agents reach the app through two doors, both off by default and turned on with
+`App::mcp`:
+
+| Setting | Endpoint MCP | WebMCP tools | Writes |
+|---|---|---|---|
+| `Mcp::off()` (default) | `404` | `404` | no |
+| `Mcp::read_only()` | on | on | no |
+| `Mcp::on()` | on | on | form saves and API actions that write |
+
+`.server(false)` and `.webmcp(false)` turn one door off. New projects from `zeyn new` start with
+`Mcp::read_only()`.
+
+Why off: the endpoint lets any holder of a valid `Authorization` header drive the app through a
+model, and a model can be steered by the data it reads. The framework makes every app ready for
+agents (tools are generated from the code, nothing to write), but whether an app opens that door,
+and whether agents may write, is a decision for the people who run it. Read only is one line away.
+
+### 9.1 Tools
+
+Tools are built from the app for the signed in user:
+
+- one search tool per grid (`{screen}_{node}_search`, input: a `DataQuery`) and, with writes, one
+  save tool per form (`{screen}_{node}_save`, input: the form values as typed) of every routed
+  screen that opens without params;
+- one tool per published API action (`api_{feature}_{action}`). An action whose input is a
+  `DataQuery` reads; every other API action counts as a write.
+
+The description is built from the screen title, the first paragraph of the screen's and the
+action's `///` doc comment and their `ai = "..."` guidance. Grids and forms the user may not use,
+and screens and actions marked `ai = false`, are never listed and are refused when called.
+
+`#[action(confirm)]` marks an action a model may run only after the user confirms it in the app.
+`/_zeyn/mcp` neither lists nor runs such tools (nobody on that channel can confirm). WebMCP tools
+ask in a modal dialog (`zeyn:confirm`) and then send `confirmed: true` with the form; the built in
+assistant asks in its chat (see `docs/assistant.md`).
+
+### 9.2 Endpoints
+
+| Endpoint | Does |
+|---|---|
+| `GET /_zeyn/tools?screen&params` | `{ tools: [{ name, description, inputSchema, kind, screen, node, writes, confirm }], texts }` for the screen in view. `zeyn.js` registers them with `document.modelContext` |
+| `POST /_zeyn/mcp` | JSON-RPC: `initialize`, `tools/list`, `tools/call`. Needs an `Authorization` header and a signed in user |
+| `POST /_zeyn/form` with `via_agent: true` | A WebMCP form save; needs `Mcp::on()` with WebMCP. `confirmed: true` only after the user confirmed |
+
+Every agent call runs as the user: the screen's access, guards, the action's permission,
+interceptors, rate limits and the time limit. Agent calls are always audited (`via_agent: true`)
+and masked fields are always masked for them, even when the user may reveal them. OpenAPI marks
+each operation with `x-zeyn-ai`: `false` for `ai = false`, otherwise `{ hint, confirm, writes }`.

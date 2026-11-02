@@ -78,6 +78,77 @@ fn fn_types(f: &ItemFn, kind: &str) -> syn::Result<(Ts, Ts)> {
     Ok((input, output))
 }
 
+/// AI policy options shared by actions and screens: `ai = "guidance"`, `ai = false`, `confirm`.
+#[derive(Default)]
+struct AiArgs {
+    hidden: bool,
+    hint: Option<LitStr>,
+    confirm: Option<proc_macro2::Span>,
+}
+
+impl AiArgs {
+    /// Reads the value of `ai = ...`: a string with guidance for models, or `false`.
+    fn parse_ai(&mut self, meta: &syn::meta::ParseNestedMeta) -> syn::Result<()> {
+        if self.hidden || self.hint.is_some() {
+            return Err(meta.error("`ai` is given twice"));
+        }
+        let lit: syn::Lit = meta.value()?.parse()?;
+        match lit {
+            syn::Lit::Str(s) if s.value().trim().is_empty() => Err(syn::Error::new(
+                s.span(),
+                "`ai` guidance is empty\n  = help: write a sentence for the model, or use `ai = false` to hide it from models",
+            )),
+            syn::Lit::Str(s) => {
+                self.hint = Some(s);
+                Ok(())
+            }
+            syn::Lit::Bool(b) if !b.value => {
+                self.hidden = true;
+                Ok(())
+            }
+            syn::Lit::Bool(b) => Err(syn::Error::new(
+                b.span(),
+                "`ai = true` is the default\n  = help: remove it, write `ai = \"guidance for models\"`, or use `ai = false` to hide it from models",
+            )),
+            other => Err(syn::Error::new(other.span(), "`ai` takes a string with guidance for models, or `false`")),
+        }
+    }
+
+    /// Turns the options into a `::zeyn::Ai` expression.
+    fn tokens(&self, kind: &str) -> syn::Result<Ts> {
+        if let (true, Some(span)) = (self.hidden, self.confirm) {
+            return Err(syn::Error::new(
+                span,
+                format!("a {kind} with `ai = false` is never offered to models, so `confirm` has no effect\n  = help: remove `confirm` or `ai = false`"),
+            ));
+        }
+        let offered = !self.hidden;
+        let hint = self.hint.as_ref().map(LitStr::value).unwrap_or_default();
+        let confirm = self.confirm.is_some();
+        Ok(quote!(::zeyn::Ai { offered: #offered, hint: #hint, confirm: #confirm }))
+    }
+}
+
+/// First paragraph of the item's `///` doc comment, on one line. Tools for AI models use it as
+/// their description.
+fn doc_text(attrs: &[syn::Attribute]) -> String {
+    let mut lines: Vec<String> = Vec::new();
+    for a in attrs.iter().filter(|a| a.path().is_ident("doc")) {
+        let syn::Meta::NameValue(nv) = &a.meta else { continue };
+        let syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Str(s), .. }) = &nv.value else { continue };
+        let value = s.value();
+        let line = value.trim();
+        if line.is_empty() {
+            if lines.is_empty() {
+                continue;
+            }
+            break;
+        }
+        lines.push(line.to_string());
+    }
+    lines.join(" ")
+}
+
 /// Turns a function into a unit struct of the same name with a `run` method.
 ///
 /// `fn search_products(q: DataQuery)` becomes `struct search_products;` and `search_products::run(q)`.
@@ -149,6 +220,11 @@ fn or_error(result: syn::Result<Ts>, original: Ts) -> TokenStream {
 ///
 /// The first argument is the input; every other argument is injected.
 ///
+/// Options: `permission = "..."` or `public`, `audit`, `reauth`, and for AI models
+/// `ai = "guidance"`, `ai = false` (never offered to a model) and `confirm` (a model may run it
+/// only after the user confirms in the app). The first paragraph of the doc comment becomes the
+/// description of the action's AI tools.
+///
 /// ```ignore
 /// #[action(permission = "stock.product.write", audit)]
 /// pub async fn save_product(product: Valid<Product>) -> Result<Product> { ... }
@@ -159,6 +235,7 @@ pub fn action(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut access = AccessArgs::default();
     let mut audit = false;
     let mut reauth = false;
+    let mut ai = AiArgs::default();
     let parser = syn::meta::parser(|meta| {
         if meta.path.is_ident("permission") {
             access.permission = Some(meta.value()?.parse()?);
@@ -168,20 +245,29 @@ pub fn action(attr: TokenStream, item: TokenStream) -> TokenStream {
             audit = true;
         } else if meta.path.is_ident("reauth") {
             reauth = true;
+        } else if meta.path.is_ident("ai") {
+            ai.parse_ai(&meta)?;
+        } else if meta.path.is_ident("confirm") {
+            ai.confirm = Some(meta.path.span());
         } else {
-            return Err(meta.error("unknown action option\n  = help: expected `permission = \"...\"`, `public`, `audit` or `reauth`"));
+            return Err(meta.error(
+                "unknown action option\n  = help: expected `permission = \"...\"`, `public`, `audit`, `reauth`, `ai = \"...\"`, `ai = false` or `confirm`",
+            ));
         }
         Ok(())
     });
     syn::parse_macro_input!(attr with parser);
     let original = quote!(#f);
-    or_error(expand_action(&f, &access, audit, reauth), original)
+    or_error(expand_action(&f, &access, (audit, reauth), &ai), original)
 }
 
-fn expand_action(f: &ItemFn, access: &AccessArgs, audit: bool, reauth: bool) -> syn::Result<Ts> {
+fn expand_action(f: &ItemFn, access: &AccessArgs, flags: (bool, bool), ai: &AiArgs) -> syn::Result<Ts> {
+    let (audit, reauth) = flags;
     let (input, output) = fn_types(f, "action")?;
     let name = &f.sig.ident;
     let access = access.tokens("action", name)?;
+    let ai = ai.tokens("action")?;
+    let doc = doc_text(&f.attrs);
     let name_str = name.to_string();
     let base = unit_and_run(f);
     let (binds, call, deps) = injected_call(f, "action")?;
@@ -196,6 +282,8 @@ fn expand_action(f: &ItemFn, access: &AccessArgs, audit: bool, reauth: bool) -> 
                 access: #access,
                 audit: #audit,
                 reauth: #reauth,
+                doc: #doc,
+                ai: #ai,
             };
 
             fn deps() -> ::std::vec::Vec<::zeyn::Dep> {
@@ -225,6 +313,7 @@ pub fn screen(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut route: Option<LitStr> = None;
     let mut sensitive = false;
     let mut reason = false;
+    let mut ai = AiArgs::default();
     let parser = syn::meta::parser(|meta| {
         if meta.path.is_ident("permission") {
             access.permission = Some(meta.value()?.parse()?);
@@ -236,17 +325,25 @@ pub fn screen(attr: TokenStream, item: TokenStream) -> TokenStream {
             sensitive = true;
         } else if meta.path.is_ident("reason") {
             reason = true;
+        } else if meta.path.is_ident("ai") {
+            ai.parse_ai(&meta)?;
+        } else if meta.path.is_ident("confirm") {
+            return Err(meta.error("`confirm` belongs on the action that writes\n  = help: put `confirm` on the `#[action]` that the screen's form or button runs"));
         } else {
-            return Err(meta.error("unknown screen option\n  = help: expected `route = \"/...\"`, `permission = \"...\"`, `public`, `sensitive` or `reason`"));
+            return Err(meta.error(
+                "unknown screen option\n  = help: expected `route = \"/...\"`, `permission = \"...\"`, `public`, `sensitive`, `reason`, `ai = \"...\"` or `ai = false`",
+            ));
         }
         Ok(())
     });
     syn::parse_macro_input!(attr with parser);
     let original = quote!(#f);
-    or_error(expand_screen(&f, &access, route.as_ref(), (sensitive || reason, reason)), original)
+    or_error(expand_screen(&f, &access, route.as_ref(), (sensitive || reason, reason), &ai), original)
 }
 
-fn expand_screen(f: &ItemFn, access: &AccessArgs, route: Option<&LitStr>, privacy: (bool, bool)) -> syn::Result<Ts> {
+fn expand_screen(f: &ItemFn, access: &AccessArgs, route: Option<&LitStr>, privacy: (bool, bool), ai: &AiArgs) -> syn::Result<Ts> {
+    let ai = ai.tokens("screen")?;
+    let doc = doc_text(&f.attrs);
     let (sensitive, reason) = privacy;
     if reason && access.public {
         return Err(syn::Error::new(f.sig.ident.span(), "a public screen cannot ask for a reason\n  = help: give the screen a permission"));
@@ -275,6 +372,8 @@ fn expand_screen(f: &ItemFn, access: &AccessArgs, route: Option<&LitStr>, privac
                 access: #access,
                 sensitive: #sensitive,
                 reason: #reason,
+                doc: #doc,
+                ai: #ai,
             };
 
             fn deps() -> ::std::vec::Vec<::zeyn::Dep> {

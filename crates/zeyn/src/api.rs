@@ -82,6 +82,10 @@ pub trait ApiInput: Sized + Send + 'static {
     fn record(&self) -> Option<crate::audit::RecordRef> {
         None
     }
+
+    /// Whether an action taking this input only reads. AI tools ask the user before running any
+    /// other action.
+    const READS: bool = false;
 }
 
 fn unreadable(e: serde_json::Error) -> Error {
@@ -125,7 +129,18 @@ serde_input! {
     i32 => json!({ "type": "integer" }),
     bool => json!({ "type": "boolean" }),
     String => json!({ "type": "string" }),
-    DataQuery => json!({ "type": "object", "description": "Paging, sort and filters. See the runtime protocol." }),
+}
+
+impl ApiInput for DataQuery {
+    const READS: bool = true;
+
+    fn schema() -> Json {
+        json!({ "type": "object", "description": "Paging, sort and filters. See the runtime protocol." })
+    }
+
+    fn from_json(value: Json) -> Result<Self> {
+        serde_json::from_value(value).map_err(unreadable)
+    }
 }
 
 /// Types an API action can return inside `Result`.
@@ -232,6 +247,8 @@ pub struct ApiEntry {
     pub input: fn() -> Json,
     pub output: fn() -> Json,
     pub deps: fn() -> Vec<Dep>,
+    /// The action only reads (its input is a [`DataQuery`]). AI tools treat every other action as a write.
+    pub reads: bool,
 }
 
 fn call_json<A>(ctx: Ctx, body: Json) -> BoxFuture<Result<Json>>
@@ -260,6 +277,6 @@ impl ApiEntry {
         A::Input: ApiInput,
         A::Output: ApiResult,
     {
-        ApiEntry { meta: A::META, call: call_json::<A>, input: A::Input::schema, output: A::Output::schema, deps: A::deps }
+        ApiEntry { meta: A::META, call: call_json::<A>, input: A::Input::schema, output: A::Output::schema, deps: A::deps, reads: A::Input::READS }
     }
 }

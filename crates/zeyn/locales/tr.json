@@ -88,7 +88,8 @@
       "csrf": "Oturumunuzun süresi doldu. Sayfayı yenileyin.",
       "license": "Lisansınız bu işlemi kapsamıyor. Yöneticinize başvurun.",
       "tenant": "Bu adres tanınan bir kuruma ait değil.",
-      "rate_limited": "Çok fazla istek gönderildi. Biraz sonra tekrar deneyin."
+      "rate_limited": "Çok fazla istek gönderildi. Biraz sonra tekrar deneyin.",
+      "confirmation_required": "Bu işlem çalışmadan önce uygulamada onayınızı bekliyor."
     },
     "grid": {
       "pagination": "Sayfalama",
@@ -350,6 +351,41 @@
         "month": "a, ay",
         "year": "y, yıl, yil"
       }
+    },
+    "assistant": {
+      "title": "Asistan",
+      "open": "Asistanı aç",
+      "close": "Asistanı kapat",
+      "new_chat": "Yeni sohbet",
+      "empty": "Verilerinizi sorun ya da ne yapmamı istediğinizi yazın. Sizin yetkilerinizle çalışırım ve bir şeyi değiştirmeden önce size sorarım.",
+      "suggestions": "Öneriler",
+      "message": "Mesaj",
+      "placeholder": "Bu uygulama hakkında bir şey sorun",
+      "mic": "Sesle yaz",
+      "mic_stop": "Dinlemeyi durdur",
+      "stop": "Durdur",
+      "send": "Gönder",
+      "note": "Yapay zekâ hata yapabilir. Önemli sonuçları kontrol edin.",
+      "you": "Siz",
+      "thinking": "Düşünüyor",
+      "stopped": "Durduruldu.",
+      "retry": "Tekrar dene",
+      "read_aloud": "Sesli oku",
+      "copy": "Kopyala",
+      "copied": "Kopyalandı",
+      "confirm": "Onayla",
+      "decline": "Vazgeç",
+      "confirm_title": "Bu işlemi onaylayın",
+      "confirm_question": "Asistan bunu sizin adınıza yapmak istiyor. Çalışması için onaylayın.",
+      "declined": "Vazgeçildi. Hiçbir şey değişmedi.",
+      "listening": "Dinliyor",
+      "error": "Bir sorun oluştu.",
+      "unavailable": "Asistan şu anda kullanılamıyor.",
+      "working": "Çalışıyor",
+      "too_long": "En fazla {max} karakter yazın.",
+      "audio_too_large": "Kayıt çok uzun.",
+      "token_limit": "Asistanın şimdilik kullanım sınırına ulaştınız. Daha sonra tekrar deneyin.",
+      "too_many_steps": "Çok fazla adım sürdüğü için durdum. Daha basit bir istek deneyin."
     }
   }
 }

@@ -105,7 +105,7 @@ fn app(identity: Identity, audit: MemoryAudit, agents: bool) -> App {
         .feature(Feature::new("stock").screen(list).screen(edit).screen(clock).api(search).api(save))
         .feature(Feature::new("other").guard(weekend_only).screen(closed));
     if agents {
-        app = app.agents(Agents::read_write());
+        app = app.mcp(Mcp::on());
     }
     app
 }
@@ -305,7 +305,7 @@ async fn agent_tools_are_off_by_default_and_mcp_needs_an_authorization_header() 
 
     let r = send(&router, rpc(true, serde_json::json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" }))).await;
     let names: Vec<String> = r.json()["result"]["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap().to_string()).collect();
-    assert_eq!(names, ["list_0_search"]);
+    assert_eq!(names, ["list_0_search", "api_stock_search", "api_stock_save"]);
 
     let call = serde_json::json!({ "jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": { "name": "list_0_search", "arguments": { "page": { "type": "offset", "offset": 0, "limit": 1 } } } });
     let r = send(&router, rpc(true, call)).await;

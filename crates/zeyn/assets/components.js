@@ -2343,6 +2343,18 @@ document.addEventListener('zeyn:effect', async (e) => {
   if (await confirmDialog(effect)) run?.(effect.then);
 });
 
+/**
+ * Other scripts ask the user through the same dialog: `zeyn:confirm` with
+ * `detail = { title, message, ok, cancel, danger, resolve }`. The event is canceled when handled
+ * and `resolve(true)` runs only for the confirm button.
+ */
+document.addEventListener('zeyn:confirm', (e) => {
+  const d = e.detail ?? {};
+  if (typeof d.resolve !== 'function') return;
+  e.preventDefault();
+  confirmDialog(d).then(d.resolve);
+});
+
 document.addEventListener('focusout', (e) => {
   const t = e.target;
   if (!(t instanceof Element) || !t.matches('[data-zeyn-lookup] [role="combobox"]')) return;

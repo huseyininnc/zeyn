@@ -28,6 +28,11 @@ pub struct ScreenMeta {
     pub sensitive: bool,
     /// The user must give a reason before the screen's data is shown. Implies `sensitive`.
     pub reason: bool,
+    /// First paragraph of the screen's `///` doc comment, added to its AI tool descriptions.
+    pub doc: &'static str,
+    /// AI policy from `ai = "..."` or `ai = false`. A hidden screen offers no tools and models
+    /// cannot navigate to it.
+    pub ai: crate::action::Ai,
 }
 
 /// A screen. Implemented by `#[screen]`, never written by hand.

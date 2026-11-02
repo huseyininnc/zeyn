@@ -2998,11 +2998,14 @@ async function syncAgentTools() {
   const name = screen.dataset.zeynScreen;
   const params = paramsOf(screen);
   let list;
+  let texts;
   try {
     const q = params == null ? '' : `&params=${encodeURIComponent(JSON.stringify(params))}`;
     const res = await fetch(`${BASE}/_zeyn/tools?screen=${encodeURIComponent(name)}${q}`, { credentials: 'same-origin' });
     if (!res.ok) return;
-    list = (await res.json())?.tools ?? [];
+    const body = await res.json();
+    list = body?.tools ?? [];
+    texts = body?.texts ?? {};
   } catch {
     return;
   }
@@ -3017,7 +3020,14 @@ async function syncAgentTools() {
         const r = await post(BASE + '/_zeyn/grid', { ...base, query: input }, { quiet: true });
         return { status: r.status, ...r.data, text: r.data?.rows ? rowsText(r.data.rows) : '' };
       }
-      const r = await post(BASE + '/_zeyn/form', { ...base, values: input, via_agent: true }, { quiet: true });
+      let confirmed = false;
+      if (tool.confirm) {
+        confirmed = await new Promise((resolve) => {
+          if (!ask('zeyn:confirm', { ...texts, message: tool.description, danger: true, resolve })) resolve(false);
+        });
+        if (!confirmed) return { status: 403, error: 'confirmation_required' };
+      }
+      const r = await post(BASE + '/_zeyn/form', { ...base, values: input, via_agent: true, confirmed }, { quiet: true });
       if (r.ok) await runEffects(r.data?.effects);
       return { status: r.status, ...r.data };
     };
@@ -3324,6 +3334,31 @@ document.addEventListener('zeyn:leave', () => {
 document.addEventListener('zeyn:content', (e) => {
   initGrids(e.detail);
   syncAgentTools();
+});
+
+/**
+ * Filters a grid from another script (the assistant): `detail` is `{ filters, node? }` with
+ * filters as the grid query sends them (`{ field, contains }`, `{ field, from, to }`, ...). The
+ * grid of the main screen with that node path (the first one without it) shows the filters in
+ * its header and reloads through `POST /_zeyn/grid`, where the server checks them as always.
+ */
+document.addEventListener('zeyn:filter', (e) => {
+  const { filters, node } = e.detail ?? {};
+  const all = [...document.querySelectorAll('.z-main [data-zeyn-grid]')];
+  const grid = node == null ? all[0] : all.find((g) => nodeOf(g) === String(node));
+  if (!grid || !Array.isArray(filters)) return;
+  initGrid(grid);
+  const s = grids.get(grid);
+  if (!s) return;
+  e.preventDefault();
+  s.filters = {};
+  for (const f of filters) {
+    const { field, ...rest } = f ?? {};
+    if (typeof field === 'string') s.filters[field] = rest;
+  }
+  for (const cell of grid.querySelectorAll('.z-filter-cell[data-field]')) fillFilter(cell, s.filters[cell.dataset.field], s.texts);
+  s.allMatching = false;
+  loadGrid(grid, 'reset');
 });
 
 /**

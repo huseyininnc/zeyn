@@ -19,7 +19,7 @@ fn app() -> App {
         .service(stock::store::ProductStore::seeded())
         .auth(DevAuth::superuser("demo"))
         .interceptor(AuditLog(StderrAudit))
-        .agents(Agents::read_write())
+        .mcp(Mcp::on())
         .home(stock::screens::product_list)
         .feature(stock::feature())
 }

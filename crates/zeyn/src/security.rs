@@ -44,6 +44,15 @@ impl RateLimit {
 pub trait RateStore: Send + Sync + 'static {
     /// Takes one request from the key's allowance. `Err` carries how long to wait.
     fn take(&self, key: &str, limit: &RateLimit) -> Result<(), Duration>;
+
+    /// Takes `amount` units at once, such as the tokens of a model answer. The allowance may go
+    /// below zero, so a large answer is paid in full and the next call waits. `Err` when less than
+    /// one unit is left (also with `amount` 0, which only checks). Stores that only count requests
+    /// may keep the default, which takes one unit.
+    fn charge(&self, key: &str, limit: &RateLimit, amount: u32) -> Result<(), Duration> {
+        let _ = amount;
+        self.take(key, limit)
+    }
 }
 
 /// In memory token buckets with a cap on the number of keys, so a flood of addresses cannot
@@ -75,6 +84,21 @@ impl MemoryRateStore {
 
 impl RateStore for MemoryRateStore {
     fn take(&self, key: &str, limit: &RateLimit) -> Result<(), Duration> {
+        self.bucket(key, limit, |tokens| if *tokens >= 1.0 { *tokens -= 1.0; true } else { false })
+    }
+
+    fn charge(&self, key: &str, limit: &RateLimit, amount: u32) -> Result<(), Duration> {
+        self.bucket(key, limit, |tokens| {
+            *tokens -= f64::from(amount);
+            *tokens >= 1.0
+        })
+    }
+}
+
+impl MemoryRateStore {
+    /// Refills the key's bucket and lets `use_tokens` take from it; `Err` with the wait until one
+    /// unit is back when it says no.
+    fn bucket(&self, key: &str, limit: &RateLimit, use_tokens: impl FnOnce(&mut f64) -> bool) -> Result<(), Duration> {
         let now = Instant::now();
         let capacity = f64::from(limit.requests);
         let per_sec = capacity / limit.window.as_secs_f64().max(0.001);
@@ -94,12 +118,7 @@ impl RateStore for MemoryRateStore {
         let (tokens, at) = buckets.entry(key.to_string()).or_insert((capacity, now));
         *tokens = (*tokens + now.duration_since(*at).as_secs_f64() * per_sec).min(capacity);
         *at = now;
-        if *tokens >= 1.0 {
-            *tokens -= 1.0;
-            Ok(())
-        } else {
-            Err(Duration::from_secs_f64((1.0 - *tokens) / per_sec))
-        }
+        if use_tokens(tokens) { Ok(()) } else { Err(Duration::from_secs_f64((1.0 - *tokens).max(0.0) / per_sec)) }
     }
 }
 

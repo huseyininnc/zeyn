@@ -141,6 +141,13 @@ pub async fn deactivate_products(ids: Vec<ProductId>, store: ProductStore) -> Re
     store.deactivate(&ids)
 }
 
+/// Archives a product by its code: it stays in reports but can no longer be sold.
+#[action(permission = "stock.product.write", audit, confirm, ai = "Products are named by codes such as NW-0003.")]
+pub async fn archive_product(code: String, store: ProductStore) -> Result<()> {
+    let product = store.all()?.into_iter().find(|p| p.code.eq_ignore_ascii_case(code.trim())).ok_or(Error::NotFound)?;
+    store.deactivate(&[product.id]).map(|_| ())
+}
+
 /// Adds ten units to every product with fewer than ten. From the product list's context menu.
 #[action(permission = "stock.product.write", audit)]
 pub async fn restock_low(_: (), store: ProductStore) -> Result<()> {
@@ -270,5 +277,6 @@ pub fn feature() -> Feature {
         .api(search_products)
         .api(save_product)
         .api(restock_product)
+        .api(archive_product)
         .menu(|m| m.group(t!("menu.stock"), Icon::Box).item(t!("stock.products"), product_list))
 }
