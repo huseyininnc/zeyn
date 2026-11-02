@@ -49,6 +49,8 @@ cargo run -p zeyn-cli -- new my-domain --lib   # a library of features shared by
 - Hybrid rendering: server driven pages by default, WebAssembly islands (feature `islands`) for heavy components, with typed action calls and shared Rust types (see `docs/islands.md`)
 - Optional realtime channel (feature `realtime`): WebSocket rooms with Y-CRDT documents for live editing and topics that refresh screens in place, with bounded memory (see `docs/realtime.md`)
 - Built in MCP server and llms.txt so agents can query components, validate screens and run tests
+- Instructions for AI agents: `AGENTS.md` for work on Zeyn itself, `skills/zeyn/SKILL.md` for building apps
+  with Zeyn (`zeyn new` copies it into every project)
 - Secure defaults: CSRF, CSP, role based access and audit logging in the core
 - Predictable memory use and a single binary deployment
 - A modern default UI kit, with headless components so teams can ship their own kit

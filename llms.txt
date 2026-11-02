@@ -2,8 +2,10 @@
 
 > Rust web framework for data heavy applications. Screens are rendered on the server; AI agents write the app code and people review it.
 
-- [Agent rules and framework index](crates/zeyn-cli/templates/AGENTS.md.tmpl): macros, types, screens, actions, recipes in one page
-- [Language example](docs/language-example.md): a full feature written with Zeyn
+- [Building apps with Zeyn](skills/zeyn/SKILL.md): where to read, the rules, the language in short, common mistakes, verification
+- [Working on Zeyn itself](AGENTS.md): repository map, commands and rules for contributors
+- [App rules and framework index](crates/zeyn-cli/templates/AGENTS.md.tmpl): macros, types, screens, actions, recipes in one page
+- [Language guide](examples/docs/pages/): entities, actions, screens, forms, effects, texts, DataGrid and components
 - [Runtime protocol](docs/runtime-protocol.md): how the browser runtime talks to the server
 - [Theming](docs/theming.md): design tokens
 - MCP: run `zeyn mcp` in a project for docs, checks and tests as tools
