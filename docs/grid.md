@@ -127,6 +127,46 @@ through `Form::read`, so values are read and validated as a form would. A value 
 column is refused with `403`. A stale version comes back as `409`, and validation errors come back
 as `422` and show in their cells.
 
+## Master detail
+
+`detail(|row| (screen, params))` lets every row expand into a screen built from the row, loaded only
+when the user opens it:
+
+```rust
+Grid::of(search_today)
+    .column(Order::id)
+    .detail(|o| (order_lines, OrderParams { id: o.id }))
+
+#[screen(permission = "sales.order.read")]
+pub fn order_lines(params: OrderParams) -> Screen {
+    Screen::window(t!("sales.order_lines", id = params.id.0.to_string())).body(
+        Grid::of(search_lines)
+            .scope(OrderLine::order_id, params.id)
+            .column(OrderLine::product)
+            .column(OrderLine::amount).sum()
+            .detail(|l| (product_editor, ProductParams { id: Some(l.product_id) })),
+    )
+}
+```
+
+The params are typed by the screen (`ScreenDef::Params`), so the wrong params do not compile. A
+detail is a full screen: a form, a nested grid, or a grid with its own details, to any depth. The
+expander column shows only for users who may open the screen, and the server checks the screen's
+permission again when the detail loads. The params travel through the browser as a window's do,
+so the detail screen must check that the user may see the record they name.
+
+`scope(field, value)` keeps a grid to the rows whose `field` equals `value` on every request. The
+filter goes first in `GridQuery::filters` and the client cannot remove it, so a nested grid stays
+on its parent row whatever the browser sends. A data layer that builds SQL from the filters reads
+it like any other (`Filter::range` with equal bounds for numbers and dates, `equals` for text,
+`any_of` for choices, `is` for yes/no, `blank` for empty values).
+
+The expander button, Enter on it, or Right and Left on the row open and close the detail.
+Closing removes it, so it loads fresh the next time.
+
+Virtual grids keep every row at one fixed height so any position can be reached at once; they do
+not show expanders. Use pages or infinite paging for grids with details.
+
 ## Export
 
 `exportable()` (and optionally `export_permission(...)`, `export_limit(n)`) lets the toolbar's

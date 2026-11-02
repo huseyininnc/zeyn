@@ -50,6 +50,8 @@
       "error": "The rows could not be loaded.",
       "retry": "Try again",
       "copied": "{n} rows copied.",
+      "details": "Details",
+      "loading": "Loading...",
       "filter": {"filter": "Filter {label}", "from": "From", "to": "To", "all": "All", "contains": "Contains", "starts_with": "Starts with", "equals": "Equals", "match": "Match", "selected": "{n} selected", "clear": "Clear filter", "sorted": "Sort order {n}"},
       "menu": {"options": "Column options: {label}", "resize": "Resize {label}", "sort_asc": "Sort ascending", "sort_desc": "Sort descending", "sort_clear": "Clear sort", "pin_start": "Pin to start", "pin_end": "Pin to end", "unpin": "Unpin", "move_prev": "Move left", "move_next": "Move right", "hide": "Hide column", "columns": "Columns", "filter": "Filter", "reset": "Reset view"},
       "agg": { "sum": "Sum", "avg": "Average", "min": "Min", "max": "Max", "count": "Count" }

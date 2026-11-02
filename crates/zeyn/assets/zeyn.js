@@ -287,9 +287,18 @@ async function closeAndRefresh() {
   await Promise.all([...under.querySelectorAll('[data-zeyn-grid]')].map((g) => loadGrid(g, 'reload')));
 }
 
-/** Rows currently in a grid. */
+/** Rows currently in a grid, without the rows that hold an opened detail. */
 function rows(grid) {
-  return [...(grid.querySelector('[data-zeyn-rows]')?.rows ?? [])];
+  return [...(grid.querySelector('[data-zeyn-rows]')?.rows ?? [])].filter((tr) => !tr.classList.contains('z-detail'));
+}
+
+/**
+ * The first element matching `selector` that belongs to `grid` itself, not to a grid nested in
+ * one of its detail rows.
+ */
+function own(grid, selector) {
+  for (const el of grid.querySelectorAll(selector)) if (el.closest('[data-zeyn-grid]') === grid) return el;
+  return null;
 }
 
 /** Sets up every grid inside `root`. Safe to call more than once. */
@@ -304,7 +313,7 @@ function initGrids(root) {
 function initGrid(grid) {
   if (grids.has(grid)) return;
   const d = grid.dataset;
-  const sorted = [...grid.querySelectorAll('thead th[aria-sort="ascending"], thead th[aria-sort="descending"]')];
+  const sorted = [...grid.querySelectorAll(':scope > table > thead th[aria-sort="ascending"], :scope > table > thead th[aria-sort="descending"]')];
   const saved = savedView(grid);
   const state = {
     paging: d.zeynPaging || 'pages',
@@ -346,7 +355,7 @@ function initGrid(grid) {
 
   if (!rows(grid).length && grid.dataset.zeynOffset != null) gridState(grid, 'empty');
   if (state.paging === 'virtual') return initVirtual(grid, state);
-  const more = grid.querySelector('[data-zeyn-more]');
+  const more = own(grid, '[data-zeyn-more]');
   if (state.paging === 'infinite' && more && 'IntersectionObserver' in window) {
     state.observer = new IntersectionObserver((entries) => {
       if (entries.some((e) => e.isIntersecting)) loadGrid(grid, 'more');
@@ -406,7 +415,7 @@ async function loadGrid(grid, kind) {
     if (kind !== 'reload' && !layout) s.active = 0;
   }
   s.offset = offset;
-  s.count = body.rows.length;
+  s.count = rows(grid).length;
   s.total = r.data.total ?? null;
   s.next = r.data.count === 0 && append ? null : (r.data.next ?? null);
   applyFoot(grid, r.data.foot);
@@ -420,8 +429,8 @@ async function loadGrid(grid, kind) {
  * The server keeps only the ones the grid declares.
  */
 function aggregatesOf(grid, all = false) {
-  if (all) return grid.querySelector('tfoot') ? allAggregates(grid) : [];
-  return [...grid.querySelectorAll('tfoot td[data-agg]')].flatMap((td) =>
+  if (all) return own(grid, 'tfoot') ? allAggregates(grid) : [];
+  return [...grid.querySelectorAll(':scope > table > tfoot td[data-agg]')].flatMap((td) =>
     td.dataset.agg.split(/\s+/).filter(Boolean).map((op) => ({ field: td.dataset.field, op })),
   );
 }
@@ -433,7 +442,7 @@ function allAggregates(grid) {
 
 /** Replaces the footer row with server rendered totals, when the response has them. */
 function applyFoot(grid, html) {
-  const foot = grid.querySelector('tfoot[data-zeyn-foot]');
+  const foot = own(grid, 'tfoot[data-zeyn-foot]');
   if (foot && typeof html === 'string') foot.innerHTML = html;
 }
 
@@ -487,7 +496,7 @@ function roving(grid, focus) {
 
 /** Makes a row the active one and optionally focuses it. */
 function activate(tr, focus) {
-  const list = [...tr.parentElement.rows];
+  const list = rows(tr.closest('[data-zeyn-grid]'));
   list.forEach((r) => {
     r.tabIndex = r === tr ? 0 : -1;
     rowControls(r, r === tr);
@@ -501,10 +510,10 @@ function activate(tr, focus) {
 function updateChrome(grid, announce = false) {
   const s = grids.get(grid);
   const d = grid.dataset;
-  const info = grid.querySelector('[data-zeyn-page-info]');
+  const info = own(grid, '[data-zeyn-page-info]');
   if (s.paging === 'pages') {
-    const prev = grid.querySelector('[data-zeyn-page="prev"]');
-    const next = grid.querySelector('[data-zeyn-page="next"]');
+    const prev = own(grid, '[data-zeyn-page="prev"]');
+    const next = own(grid, '[data-zeyn-page="next"]');
     const hasNext = s.total != null ? s.offset + s.count < s.total : s.next != null;
     const focused = document.activeElement;
     if (prev) prev.disabled = s.offset <= 0;
@@ -517,7 +526,7 @@ function updateChrome(grid, announce = false) {
       info.textContent = fill(template, values);
     }
   } else if (s.paging === 'infinite') {
-    const more = grid.querySelector('[data-zeyn-more]');
+    const more = own(grid, '[data-zeyn-more]');
     const button = more?.querySelector('button');
     if (button) button.hidden = s.next == null;
     if (info && announce) info.textContent = fill(d.zeynTextLoaded || '{count} rows loaded', { count: fmt(s.count) });
@@ -1136,7 +1145,7 @@ async function undoEdit(grid) {
   const s = grids.get(grid);
   const undo = s?.undo;
   if (!undo) return;
-  const tr = grid.querySelector(`[data-zeyn-rows] tr[data-zeyn-key="${CSS.escape(undo.key)}"]`);
+  const tr = grid.querySelector(`:scope > table > [data-zeyn-rows] > tr[data-zeyn-key="${CSS.escape(undo.key)}"]`);
   if (!tr) return;
   s.undo = null;
   const values = { ...undo.values };
@@ -1156,7 +1165,7 @@ function copyRows(grid, focused) {
   const picked = rows(grid).filter((tr) => tr.getAttribute('aria-selected') === 'true');
   const list = picked.length ? picked : focused ? [focused] : [];
   if (!list.length) return false;
-  const keep = (cell) => !cell.matches('.z-select, .z-select-col, .z-row-actions, .z-actions-col');
+  const keep = (cell) => !cell.matches('.z-select, .z-select-col, .z-row-actions, .z-actions-col, .z-expand, .z-expand-col');
   const text = (cell) =>
     (cell.textContent.trim() || cell.querySelector('[role="img"][aria-label]')?.getAttribute('aria-label') || '').replace(/[\t\r\n]+/g, ' ');
   const lines = list.map((tr) => [...tr.cells].filter(keep).map(text).join('\t'));
@@ -1201,7 +1210,7 @@ async function runRowItem(button, item) {
   await runEffects(r.data?.effects, button);
   toast(grids.get(grid)?.texts.done || 'Done.');
   await loadGrid(grid, 'reload');
-  const again = grid.querySelector(`[data-zeyn-rows] tr[data-zeyn-key="${CSS.escape(key)}"]`);
+  const again = grid.querySelector(`:scope > table > [data-zeyn-rows] > tr[data-zeyn-key="${CSS.escape(key)}"]`);
   if (again && (!document.activeElement || document.activeElement === document.body)) {
     activate(again, false);
     (again.querySelector(`[data-zeyn-run="${CSS.escape(item ?? button.dataset.zeynRun)}"]`) ?? again).focus();
@@ -1376,7 +1385,7 @@ function setupHead(grid, s) {
     th.append(inner, resize);
     if (th.style.width) th.dataset.userWidth = String(parseInt(th.style.width, 10));
   }
-  if (grid.querySelector('thead th[data-filter]')) {
+  if (grid.querySelector(':scope > table > thead th[data-filter]')) {
     const row = make('tr', 'z-filter-row');
     for (const th of head.cells) {
       const cell = make('td');
@@ -1550,7 +1559,7 @@ function columnMenu(grid, th) {
     {
       label: t.menu_filter || 'Filter',
       disabled: !th.dataset.filter,
-      run: () => grid.querySelector(`.z-filter-cell[data-field="${CSS.escape(field)}"] .z-filter`)?.focus(),
+      run: () => grid.querySelector(`:scope > table > thead .z-filter-cell[data-field="${CSS.escape(field)}"] .z-filter`)?.focus(),
     },
     {
       label: t.menu_columns || 'Columns',
@@ -1734,7 +1743,7 @@ function menuKey(e, button) {
 
 /** Sets `aria-sort` on every header and the sort order badge when several keys are active. */
 function showSort(grid, s) {
-  for (const th of grid.querySelectorAll('thead th[data-field]')) {
+  for (const th of grid.querySelectorAll(':scope > table > thead th[data-field]')) {
     const i = s.sort.findIndex((k) => k.field === th.dataset.field);
     th.setAttribute('aria-sort', i < 0 ? 'none' : s.sort[i].desc ? 'descending' : 'ascending');
     th.querySelector('.z-sort-order')?.remove();
@@ -1918,9 +1927,90 @@ function onFilter(control) {
   }, FILTER_DELAY_MS);
 }
 
+/**
+ * Opens or closes the detail of a row (`data-zeyn-detail`). Opening adds a row under it and
+ * loads the detail screen into it from `GET /_zeyn/screen/{screen}`; closing removes that row, so
+ * the next opening loads fresh data. Grids inside the detail are set up like any other.
+ */
+async function toggleDetail(tr, open = tr.getAttribute('aria-expanded') !== 'true') {
+  const grid = tr.closest('[data-zeyn-grid]');
+  const s = grids.get(grid);
+  let target;
+  try {
+    target = JSON.parse(tr.dataset.zeynDetail);
+  } catch {
+    return;
+  }
+  const button = tr.querySelector(':scope > td > [data-zeyn-expand]');
+  const shown = tr.nextElementSibling?.classList.contains('z-detail') ? tr.nextElementSibling : null;
+  tr.setAttribute('aria-expanded', String(open));
+  button?.setAttribute('aria-expanded', String(open));
+  if (!open) {
+    const inside = shown?.contains(document.activeElement);
+    shown?.remove();
+    if (inside) tr.focus();
+    return;
+  }
+  if (shown) return;
+  const t = s?.texts ?? {};
+  const label = tr.querySelector(':scope > td:not(.z-expand):not(.z-select)')?.textContent.trim() ?? '';
+  const row = make('tr', 'z-detail');
+  const cell = make('td');
+  cell.colSpan = own(grid, 'thead tr')?.cells.length ?? 1;
+  const box = make('div', 'z-detail-body', { role: 'region', 'aria-label': `${t.details || 'Details'}: ${label}`, 'aria-busy': 'true' });
+  box.id = `z-detail-${++uid}`;
+  box.textContent = t.loading || 'Loading...';
+  button?.setAttribute('aria-controls', box.id);
+  cell.append(box);
+  row.append(cell);
+  tr.after(row);
+  let res;
+  try {
+    res = await fetch(`${BASE}/_zeyn/screen/${encodeURIComponent(target.screen)}${paramsQuery(target.params)}`, {
+      credentials: 'same-origin',
+      headers: { accept: 'text/html' },
+    });
+  } catch {
+    res = null;
+  }
+  if (!row.isConnected) return;
+  box.removeAttribute('aria-busy');
+  if (!res?.ok) {
+    const data = res ? await readJson(res) : null;
+    box.setAttribute('role', 'alert');
+    box.textContent = data?.message || t.error || UNREACHABLE;
+    return;
+  }
+  box.innerHTML = await res.text();
+  const win = box.querySelector('[data-zeyn-screen]');
+  if (win) {
+    win.removeAttribute('role');
+    win.removeAttribute('aria-modal');
+    if (!win.hasAttribute('data-zeyn-params')) win.dataset.zeynParams = JSON.stringify(target.params ?? null);
+    const heading = win.querySelector(':scope > h1, :scope > h2');
+    if (heading) {
+      const h = make('h3');
+      h.id = heading.id;
+      h.append(...heading.childNodes);
+      heading.replaceWith(h);
+    }
+  }
+  initGrids(box);
+  relativeTimes(box);
+}
+
 /** Handles arrow keys, Home, End and Enter on a grid row. Returns true when handled. */
 function rowKey(e, tr) {
-  const list = [...tr.parentElement.rows];
+  const list = rows(tr.closest('[data-zeyn-grid]'));
+  if (tr.dataset.zeynDetail && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+    const rtl = getComputedStyle(tr).direction === 'rtl';
+    const open = (e.key === 'ArrowRight') !== rtl;
+    if (open !== (tr.getAttribute('aria-expanded') === 'true')) {
+      e.preventDefault();
+      toggleDetail(tr, open);
+      return true;
+    }
+  }
   const i = list.indexOf(tr);
   const target = { ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: list.length - 1 }[e.key];
   if (target !== undefined) {
@@ -2243,6 +2333,7 @@ document.addEventListener('click', (e) => {
     return bulkBar(grid)?.querySelector('[data-zeyn-select-clear]')?.focus();
   }
   if ((el = t.closest('[data-zeyn-select-clear]'))) return clearSelection(gridOfBar(el));
+  if ((el = t.closest('[data-zeyn-expand]'))) return toggleDetail(el.closest('tr'));
   if ((el = t.closest('[data-zeyn-bulk-run]'))) return runBulk(el);
   if ((el = t.closest('.z-menu-item'))) return runMenuItem(el);
   if ((el = t.closest('button[data-zeyn-run]'))) return runRowItem(el);

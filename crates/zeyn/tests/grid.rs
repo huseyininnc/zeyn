@@ -941,3 +941,71 @@ async fn exportable_grids_tell_the_runtime() {
     let r = send(&router, get("/export")).await;
     assert_eq!(r.body.matches(r#"data-zeyn-exportable="csv""#).count(), 1, "the second needs items.export");
 }
+
+/// Which item a detail screen shows.
+#[params]
+pub struct ItemParams {
+    pub id: ItemId,
+}
+
+#[screen(route = "/master", permission = "items.read")]
+pub fn master() -> Screen {
+    Screen::new("Master")
+        .body(Grid::of(search).paging(Paging::pages(3)).column(Item::code).detail(|i| (item_detail, ItemParams { id: i.id })))
+        .body(Grid::of(search).paging(Paging::virtual_scroll()).column(Item::code).detail(|i| (item_detail, ItemParams { id: i.id })))
+}
+
+#[screen(permission = "items.detail")]
+pub fn item_detail(params: ItemParams) -> Screen {
+    Screen::window("Detail").body(Grid::of(search).scope(Item::id, params.id).column(Item::code).column(Item::qty))
+}
+
+fn master_router(identity: Identity) -> Router {
+    App::new("Test")
+        .service(Store::seeded())
+        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .feature(Feature::new("items").screen(master).screen(item_detail))
+        .router()
+        .unwrap()
+}
+
+#[tokio::test]
+async fn rows_expand_into_a_typed_detail_screen_only_for_users_who_may_open_it() {
+    let router = master_router(Identity::user("d").with_permissions(["items.read", "items.detail"]));
+    let r = send(&router, get("/master")).await;
+    let paged = &r.body[..r.body.find(r#"data-zeyn-node="1""#).unwrap()];
+    assert!(paged.contains(r#"<th scope="col" class="z-expand-col" data-pin="start">"#), "{paged}");
+    assert!(paged.contains(r#"data-field="code" aria-sort="none" aria-colindex="2""#));
+    assert!(paged.contains(r#"aria-expanded="false" data-zeyn-detail="{&quot;params&quot;:{&quot;id&quot;:1},&quot;screen&quot;:&quot;item_detail&quot;}""#), "{paged}");
+    assert_eq!(paged.matches("data-zeyn-expand").count(), 3);
+    let virtual_grid = &r.body[r.body.find(r#"data-zeyn-node="1""#).unwrap()..];
+    assert!(!virtual_grid.contains("data-zeyn-detail") && !virtual_grid.contains("z-expand"), "virtual grids have no details");
+    let router = master_router(reader());
+    let r = send(&router, get("/master")).await;
+    assert!(!r.body.contains("data-zeyn-detail") && !r.body.contains("z-expand-col"));
+}
+
+#[tokio::test]
+async fn detail_screens_check_their_permission_and_keep_their_scope() {
+    let router = master_router(Identity::user("d").with_permissions(["items.read", "items.detail"]));
+    let r = send(&router, get("/_zeyn/screen/item_detail?params=%7B%22id%22%3A4%7D")).await;
+    assert_eq!(r.status, StatusCode::OK);
+    assert!(r.body.contains("C-04") && !r.body.contains("C-05"), "{}", r.body);
+    let mut filters: Vec<serde_json::Value> = (0..40).map(|_| serde_json::json!({ "field": "code", "contains": "C" })).collect();
+    filters.push(serde_json::json!({ "field": "id", "from": "1", "to": "20" }));
+    let call = serde_json::json!({ "screen": "item_detail", "params": { "id": 4 }, "node": 0, "query": { "page": { "type": "offset", "offset": 0, "limit": 50 }, "filters": filters } });
+    let r = send(&router, post("/_zeyn/grid", call)).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    assert_eq!(r.json()["count"], 1, "the scope stays whatever the client sends");
+    let router = master_router(reader());
+    let r = send(&router, get("/_zeyn/screen/item_detail?params=%7B%22id%22%3A4%7D")).await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN);
+}
+
+#[test]
+fn blank_filters_keep_empty_or_set_values() {
+    let rows: Vec<Item> = (1..=20).map(item).collect();
+    let empty = GridQuery { filters: vec![zeyn::Filter::blank("due", true)], ..GridQuery::default() }.apply(rows.clone());
+    let set = GridQuery { filters: vec![zeyn::Filter::blank("due", false)], ..GridQuery::default() }.apply(rows);
+    assert_eq!((empty.total, set.total), (Some(15), Some(5)));
+}

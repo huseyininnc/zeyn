@@ -10,7 +10,7 @@ use crate::ctx::{BoxFuture, Ctx};
 use crate::i18n::Text;
 use crate::model::{Field, FieldMeta, Model, Valid};
 use crate::render::{Render, attr, escape};
-use crate::screen::{Component, Effect, GridSource, LoadedPage, Node};
+use crate::screen::{Component, Effect, GridSource, LoadedPage, Node, ScreenDef};
 use crate::ctx::Outcome;
 use crate::screen::RowCall;
 use crate::screen::Icon;
@@ -379,6 +379,44 @@ pub struct Grid<E: Model> {
     row_menu: Option<MenuFn<E>>,
     save: Option<SaveDef<E>>,
     export: Option<(crate::action::Access, usize)>,
+    detail: Option<DetailDef<E>>,
+    scope: Vec<Filter>,
+}
+
+type ParamsFn<E> = Box<dyn Fn(&E) -> serde_json::Value + Send + Sync>;
+
+/// The screen a row expands into and how its params are built from the row.
+struct DetailDef<E> {
+    screen: &'static str,
+    access: crate::action::Access,
+    params: ParamsFn<E>,
+}
+
+/// A value in the fixed machine form group paths and scopes use: numbers and money as `1234.56`,
+/// dates and times in ISO form, choices by value. `None` for an empty value.
+fn value_key(value: &Value) -> Option<String> {
+    match value {
+        Value::Null => None,
+        Value::Money(m) => {
+            let a = m.minor.unsigned_abs();
+            Some(format!("{}{}.{:02}", if m.minor < 0 { "-" } else { "" }, a / 100, a % 100))
+        }
+        other => Some(key_text(other)),
+    }
+}
+
+/// Filter that keeps rows whose `meta` field equals `key` (from [`value_key`]), or is empty when
+/// `key` is `None`.
+fn key_filter(meta: &FieldMeta, key: Option<&str>) -> Filter {
+    let Some(key) = key else { return Filter::blank(meta.name, true) };
+    match meta.kind {
+        FieldKind::Text | FieldKind::Custom { .. } => {
+            Filter { field: meta.name.to_string(), equals: Some(key.to_string()), ..Filter::default() }
+        }
+        FieldKind::Choice(_) => Filter::any_of(meta.name, [key]),
+        FieldKind::Bool => Filter::is(meta.name, key == "true"),
+        _ => Filter::range(meta.name, Some(key), Some(key)),
+    }
 }
 
 /// Most rows a CSV export holds unless the grid sets another limit.
@@ -457,6 +495,53 @@ impl<E: Model> Grid<E> {
             row_menu: None,
             save: None,
             export: None,
+            detail: None,
+            scope: Vec::new(),
+        }
+    }
+
+    /// Lets every row expand into a screen built from the row, loaded only when the user opens
+    /// it: `.detail(|o: &Order| (order_lines, OrderParams { id: o.id }))`. Params of the wrong type
+    /// do not compile. The detail can hold anything a screen holds, such as another grid with its
+    /// own detail, to any depth. The expander shows only for users who may open the screen, and
+    /// the server checks the screen's permission again when it loads, as for any screen. The
+    /// params travel through the browser like a window's, so the detail screen checks that the
+    /// user may see the record they name.
+    ///
+    /// Virtual grids (`Paging::Virtual`) keep every row at one fixed height and show no expander;
+    /// use pages or infinite paging for grids with details.
+    pub fn detail<S: ScreenDef>(mut self, detail: impl Fn(&E) -> (S, S::Params) + Send + Sync + 'static) -> Self {
+        self.detail = Some(DetailDef {
+            screen: S::META.name,
+            access: S::META.access,
+            params: Box::new(move |row| serde_json::to_value(detail(row).1).unwrap_or(serde_json::Value::Null)),
+        });
+        self
+    }
+
+    /// Keeps only the rows whose `field` equals `value`, on every request, whatever the client
+    /// sends: `.scope(OrderLine::order_id, params.id)` for the lines of one order. The filter goes
+    /// first in `GridQuery::filters`, so a data layer that reads the filters keeps it. Text
+    /// compares ignoring case.
+    pub fn scope<T: FieldType>(mut self, field: Field<E, T>, value: T) -> Self {
+        self.scope.push(key_filter(field.meta(), value_key(&value.to_value()).as_deref()));
+        self
+    }
+
+    /// Whether rows show the detail expander for this page's user.
+    fn expandable(&self, r: &Render) -> bool {
+        !matches!(self.paging, Paging::Virtual { .. }) && self.detail.as_ref().is_some_and(|d| r.can(&d.access))
+    }
+
+    /// Cells before the first data column: the detail expander and the selection box.
+    fn lead(&self, r: &Render) -> usize {
+        usize::from(self.expandable(r)) + usize::from(self.selectable)
+    }
+
+    /// Puts the grid's scope filters in front of the client's.
+    fn scoped(&self, query: &mut GridQuery) {
+        if !self.scope.is_empty() {
+            query.filters.splice(0..0, self.scope.iter().cloned());
         }
     }
 
@@ -743,6 +828,12 @@ impl<E: Model> Grid<E> {
     /// Header row for the shown columns.
     fn head_row(&self, r: &Render, cols: &[Shown]) -> String {
         let mut out = String::from("<tr>");
+        if self.expandable(r) {
+            out.push_str(&format!(
+                r#"<th scope="col" class="z-expand-col" data-pin="start"><span class="z-sr-only">{}</span></th>"#,
+                r.text(&Text::key("zeyn.grid.details"))
+            ));
+        }
         if self.selectable {
             out.push_str(&format!(
                 r#"<th scope="col" class="z-select-col" data-pin="start"><input type="checkbox" data-zeyn-select-all aria-label="{}"></th>"#,
@@ -763,7 +854,7 @@ impl<E: Model> Grid<E> {
             out.push_str(&format!(
                 r#"<th scope="col"{class} data-field="{}" aria-sort="none" aria-colindex="{}""#,
                 c.meta.name,
-                pos + 1 + usize::from(self.selectable)
+                pos + 1 + self.lead(r)
             ));
             if !style.is_empty() {
                 out.push_str(&format!(r#" style="{style}""#));
@@ -799,7 +890,7 @@ impl<E: Model> Grid<E> {
         if !self.row_actions.is_empty() {
             out.push_str(&format!(
                 r#"<th scope="col" class="z-actions-col" data-pin="end" aria-colindex="{}"><span class="z-sr-only">{}</span></th>"#,
-                cols.len() + 1 + usize::from(self.selectable),
+                cols.len() + 1 + self.lead(r),
                 r.text(&Text::key("zeyn.grid.actions"))
             ));
         }
@@ -832,7 +923,18 @@ impl<E: Model> Grid<E> {
                     out.push_str(&format!(r#" data-zeyn-menu="{}""#, attr(&items)));
                 }
             }
+            let detail = self.detail.as_ref().filter(|_| self.expandable(r));
+            if let Some(d) = detail {
+                let target = json!({ "screen": d.screen, "params": (d.params)(row) });
+                out.push_str(&format!(r#" aria-expanded="false" data-zeyn-detail="{}""#, attr(&target)));
+            }
             out.push('>');
+            if detail.is_some() {
+                out.push_str(&format!(
+                    r#"<td class="z-expand"><button type="button" class="z-expander" data-zeyn-expand aria-expanded="false" aria-label="{}" tabindex="-1"></button></td>"#,
+                    r.text(&Text::key("zeyn.grid.details"))
+                ));
+            }
             if self.selectable {
                 out.push_str(&format!(
                     r#"<td class="z-select"><input type="checkbox" data-zeyn-select tabindex="-1" aria-label="{}"></td>"#,
@@ -938,7 +1040,7 @@ impl<E: Model> Grid<E> {
         }
         out.push_str(&format!(
             r#"><table role="grid" aria-colcount="{}"><thead>{}</thead><tbody data-zeyn-rows>"#,
-            self.columns.len() + usize::from(!self.row_actions.is_empty()) + usize::from(self.selectable),
+            self.columns.len() + usize::from(!self.row_actions.is_empty()) + self.lead(r),
             self.head_row(r, &cols)
         ));
         if let Some(p) = page {
@@ -973,7 +1075,10 @@ impl<E: Model> Grid<E> {
     /// Footer row with one cell per column. Cells of columns with totals carry `data-field` and
     /// `data-agg` (space separated ops) and show each total with its localized name.
     fn foot_row(&self, r: &Render, totals: &[Total], cols: &[Shown]) -> String {
-        let mut out = String::from(if self.selectable { "<tr><td></td>" } else { "<tr>" });
+        let mut out = String::from("<tr>");
+        for _ in 0..self.lead(r) {
+            out.push_str("<td></td>");
+        }
         for c in cols.iter().map(|s| &self.columns[s.index]) {
             if c.aggregates.is_empty() {
                 out.push_str("<td></td>");
@@ -1058,12 +1163,13 @@ impl<E: Model> GridSource for Grid<E> {
             FieldKind::Id | FieldKind::Integer => Filter::range(meta.name, Some(&key), Some(&key)),
             _ => Filter { field: meta.name.to_string(), equals: Some(key), ..Filter::default() },
         };
-        let query = GridQuery {
+        let mut query = GridQuery {
             page: PageRequest::Offset { offset: 0, limit: 5 },
             filters: vec![filter],
             time_zone: ctx.time_zone(),
             ..GridQuery::default()
         };
+        self.scoped(&mut query);
         let fetch = self.fetch;
         Box::pin(async move {
             let page = fetch(ctx, query).await?;
@@ -1182,6 +1288,7 @@ impl<E: Model> GridSource for Grid<E> {
 
     fn fetch(&self, ctx: Ctx, mut query: GridQuery) -> BoxFuture<Result<LoadedPage>> {
         self.allow(&mut query);
+        self.scoped(&mut query);
         query.time_zone = ctx.time_zone();
         let fetch = self.fetch;
         let offset = match &query.page {
@@ -1302,6 +1409,7 @@ impl<E: Model> Component for Grid<E> {
                 "hidden": c.hidden,
             })).collect::<Vec<_>>(),
             "row_actions": self.row_actions.iter().map(|a| json!({ "label": a.label, "action": a.meta })).collect::<Vec<_>>(),
+            "detail": self.detail.as_ref().map(|d| d.screen),
         })
     }
 
@@ -1563,6 +1671,14 @@ impl<E: Model, T> GridColumn<E, T> {
         self.grid.bulk_action(label, action, key)
     }
 
+    pub fn detail<S: ScreenDef>(self, detail: impl Fn(&E) -> (S, S::Params) + Send + Sync + 'static) -> Grid<E> {
+        self.grid.detail(detail)
+    }
+
+    pub fn scope<U: FieldType>(self, field: Field<E, U>, value: U) -> Grid<E> {
+        self.grid.scope(field, value)
+    }
+
     /// Returns the grid.
     pub fn done(self) -> Grid<E> {
         self.grid
@@ -1632,7 +1748,7 @@ fn grid_texts(r: &Render) -> serde_json::Value {
         map.insert(format!("menu_{k}"), json!(r.i18n.text(r.locale, &Text::key(format!("zeyn.grid.menu.{k}")))));
     }
     map.insert("done".into(), json!(r.i18n.text(r.locale, &Text::key("zeyn.grid.done"))));
-    for k in ["saved", "undo", "undone", "empty", "error", "retry", "copied"] {
+    for k in ["saved", "undo", "undone", "empty", "error", "retry", "copied", "details", "loading"] {
         map.insert(k.into(), json!(r.i18n.text(r.locale, &Text::key(format!("zeyn.grid.{k}")))));
     }
     map.insert("yes".into(), json!(r.i18n.text(r.locale, &Text::key("zeyn.yes"))));
@@ -1730,6 +1846,7 @@ enum Cond {
     Range(usize, Option<Key>, Option<Key>),
     AnyOf(usize, Vec<String>),
     Is(usize, bool),
+    Blank(usize, bool),
 }
 
 impl Cond {
@@ -1774,6 +1891,9 @@ impl Cond {
         if let (FieldKind::Bool, Some(b)) = (kind, f.is) {
             out.push(Cond::Is(i, b));
         }
+        if let Some(b) = f.blank {
+            out.push(Cond::Blank(i, b));
+        }
     }
 
     fn holds<M: Model>(&self, row: &M) -> bool {
@@ -1802,6 +1922,7 @@ impl Cond {
                 _ => false,
             },
             Cond::Is(i, b) => value(i) == Value::Bool(*b),
+            Cond::Blank(i, b) => (value(i) == Value::Null) == *b,
         }
     }
 }

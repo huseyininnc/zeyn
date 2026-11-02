@@ -30,7 +30,8 @@
   },
   "sales": {
     "today": "Bugünkü siparişler",
-    "archive": "Sipariş arşivi"
+    "archive": "Sipariş arşivi",
+    "order_lines": "{id} numaralı siparişin kalemleri"
   },
   "people": {
     "leave": "İzin talebi",
@@ -59,6 +60,13 @@
     "placed_at": "Sipariş zamanı",
     "amount": "Tutar",
     "status": "Durum"
+  },
+  "OrderLine": {
+    "product_id": "Ürün no",
+    "product": "Ürün",
+    "quantity": "Miktar",
+    "price": "Birim fiyat",
+    "amount": "Tutar"
   },
   "OrderStatus": {
     "Open": "Açık",

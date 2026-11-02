@@ -2,6 +2,7 @@
 //!
 //! Orders are generated from their number, so the archive uses no memory.
 
+use crate::stock::{ProductParams, ProductStore, Product, ProductId, product_editor};
 use zeyn::prelude::*;
 use zeyn::{Cursor, PageRequest};
 
@@ -15,6 +16,57 @@ pub struct Order {
     pub placed_at: DateTime,
     pub amount: Money,
     pub status: OrderStatus,
+}
+
+/// A line of a sales order.
+#[entity(table = "order_lines")]
+pub struct OrderLine {
+    #[key]
+    pub id: OrderLineId,
+    pub order_id: OrderId,
+    pub product_id: ProductId,
+    pub product: String,
+    pub quantity: i64,
+    pub price: Money,
+    pub amount: Money,
+}
+
+/// Which order the lines belong to.
+#[params]
+pub struct OrderParams {
+    pub id: OrderId,
+}
+
+/// The lines of order `n`: one to four products from the stock list, always the same for an order.
+pub fn order_lines_of(n: u64, products: &[Product]) -> Vec<OrderLine> {
+    let h = n.wrapping_mul(0xA24B_AED4_963E_E407) >> 11;
+    if products.is_empty() {
+        return Vec::new();
+    }
+    (0..1 + h % 4)
+        .map(|k| {
+            let p = &products[((h >> (k * 9)) % products.len() as u64) as usize];
+            let quantity = 1 + ((h >> (k * 5)) % 9) as i64;
+            OrderLine {
+                id: OrderLineId((n * 10 + k) as i64),
+                order_id: OrderId(n as i64),
+                product_id: p.id,
+                product: p.name.clone(),
+                quantity,
+                price: p.price,
+                amount: Money::new(p.price.minor * quantity, p.price.currency),
+            }
+        })
+        .collect()
+}
+
+/// Lines of the order named by the grid's scope filter on `order_id`, as a database would read
+/// `WHERE order_id = ?`. Without that filter there are no lines.
+#[action(permission = "sales.order.read")]
+pub async fn search_lines(q: GridQuery, store: ProductStore) -> Result<Page<OrderLine>> {
+    let order = q.filters.iter().find(|f| f.field == "order_id").and_then(|f| f.from.as_deref()?.parse::<u64>().ok());
+    let Some(n) = order else { return Ok(Page::default()) };
+    Ok(q.apply(order_lines_of(n, &store.all()?)))
 }
 
 /// Order status.
@@ -123,7 +175,32 @@ pub fn today() -> Screen {
             .width(130)
             .filter()
             .badge(status_tone)
-            .row_style(muted_if_cancelled),
+            .row_style(muted_if_cancelled)
+            .detail(|o| (order_lines, OrderParams { id: o.id })),
+    )
+}
+
+/// The lines of one order, shown when a row of today's orders opens. Each line opens the product
+/// editor in turn.
+#[screen(permission = "sales.order.read")]
+pub fn order_lines(params: OrderParams) -> Screen {
+    Screen::window(t!("sales.order_lines", id = params.id.0.to_string())).body(
+        Grid::of(search_lines)
+            .scope(OrderLine::order_id, params.id)
+            .paging(Paging::none())
+            .column(OrderLine::product_id)
+            .width(90)
+            .column(OrderLine::product)
+            .flex(1)
+            .column(OrderLine::quantity)
+            .width(110)
+            .sum()
+            .column(OrderLine::price)
+            .width(150)
+            .column(OrderLine::amount)
+            .width(170)
+            .sum()
+            .detail(|l| (product_editor, ProductParams { id: Some(l.product_id) })),
     )
 }
 
@@ -155,6 +232,7 @@ pub fn feature() -> Feature {
         .route_prefix("/sales")
         .guard(SignedIn)
         .screen(today)
+        .screen(order_lines)
         .screen(archive)
         .menu(|m| {
             m.group(t!("menu.sales"), Icon::Cart)

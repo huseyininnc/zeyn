@@ -65,6 +65,8 @@ Each body item is wrapped in a node element. The index is the address used by th
 | `data-zeyn-version-field`, `data-zeyn-exportable` | grid root | Row version field name for inline edits; `csv` when the grid can be exported |
 | `data-zeyn-key`, `data-zeyn-version`, `data-zeyn-menu` | `tr` | Row key, row version, context menu items |
 | `data-v` | `td` | Input value of an editable cell |
+| `data-zeyn-detail`, `aria-expanded` | `tr` | Detail screen of the row as `{screen, params}`; whether it is open |
+| `data-zeyn-expand` | button in a row | Opens or closes the row's detail |
 | `data-zeyn-run` | button in a row | Row item to run (`a0` is the first row action) |
 | `data-agg` | `tfoot td` | Totals the column shows (`sum avg min max count`) |
 | `data-zeyn-bulk` | div before the grid | Selection bar with `data-zeyn-bulk-run` buttons |
@@ -93,7 +95,7 @@ All `POST` requests send JSON, must carry the header `x-zeyn-csrf` with the toke
 
 ### 4.1 Screen fragment
 
-`GET /_zeyn/screen/{screen}?params={json}` returns the screen HTML only, without the page shell. Used for windows.
+`GET /_zeyn/screen/{screen}?params={json}` returns the screen HTML only, without the page shell. Used for windows and for row details: opening a row with `data-zeyn-detail` loads its screen into a new `tr.z-detail` right under it (one cell spanning the row, holding a `role="region"`), and closing removes that row. The screen's permission is checked like any screen; grids inside the detail talk to the server with the detail screen's own name and params.
 
 ### 4.2 Grid rows
 
@@ -203,7 +205,7 @@ The runtime:
 ## 6. Runtime behavior
 
 - Without JavaScript, pages still render with the first page of every grid. Forms and paging need the runtime.
-- Keyboard: arrow keys move between grid rows, Enter opens a row, Escape closes the top dialog, shortcuts from `aria-keyshortcuts` work everywhere except inside text inputs. In grids: Space selects the row, F2 edits it, Ctrl+Z undoes the last edit, Shift+F10 or the context menu key opens the menu of the row or header, Shift+click sorts by several columns.
+- Keyboard: arrow keys move between grid rows, Enter opens a row, Escape closes the top dialog, shortcuts from `aria-keyshortcuts` work everywhere except inside text inputs. In grids: Space selects the row, F2 edits it, Ctrl+Z undoes the last edit, Shift+F10 or the context menu key opens the menu of the row or header, Shift+click sorts by several columns, Right and Left (mirrored in right to left pages) open and close a row's detail.
 - Right click opens Zeyn's menu where one is defined (headers, rows with `data-zeyn-menu`, screens with `data-zeyn-menu`); everywhere else the browser's own menu stays.
 - Focus moves into a dialog when it opens and returns to the opener when it closes.
 - Client side checks (`required`, `minlength`, `maxlength`, `min`, `max`, `type="email"`) run before submit with the browser's constraint validation API. The server always validates again.

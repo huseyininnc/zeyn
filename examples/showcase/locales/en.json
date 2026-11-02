@@ -30,7 +30,8 @@
   },
   "sales": {
     "today": "Today's orders",
-    "archive": "Order archive"
+    "archive": "Order archive",
+    "order_lines": "Lines of order {id}"
   },
   "people": {
     "leave": "Leave request",
@@ -59,6 +60,13 @@
     "placed_at": "Placed at",
     "amount": "Amount",
     "status": "Status"
+  },
+  "OrderLine": {
+    "product_id": "Product no",
+    "product": "Product",
+    "quantity": "Quantity",
+    "price": "Unit price",
+    "amount": "Amount"
   },
   "OrderStatus": {
     "Open": "Open",

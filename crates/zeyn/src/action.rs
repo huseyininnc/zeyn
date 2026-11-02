@@ -306,6 +306,10 @@ pub struct Filter {
     /// Yes/no columns: keep rows whose value is this.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub is: Option<bool>,
+    /// Rows whose value is empty (`true`) or set (`false`). SQL data layers read it as
+    /// `IS NULL` and `IS NOT NULL`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub blank: Option<bool>,
 }
 
 impl Filter {
@@ -333,6 +337,11 @@ impl Filter {
         Self { field: field.into(), is: Some(value), ..Self::default() }
     }
 
+    /// Rows whose value is empty (`true`) or set (`false`).
+    pub fn blank(field: impl Into<String>, empty: bool) -> Self {
+        Self { field: field.into(), blank: Some(empty), ..Self::default() }
+    }
+
     /// Whether the filter sets no condition at all.
     pub fn is_empty(&self) -> bool {
         let blank = |s: &Option<String>| s.as_deref().is_none_or(|v| v.trim().is_empty());
@@ -343,5 +352,6 @@ impl Filter {
             && blank(&self.to)
             && self.any_of.is_empty()
             && self.is.is_none()
+            && self.blank.is_none()
     }
 }
