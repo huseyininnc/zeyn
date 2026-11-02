@@ -20,7 +20,6 @@ use serde::Deserialize;
 use serde_json::json;
 use std::io::SeekFrom;
 use std::sync::Arc;
-use std::time::Instant;
 
 const JS: &str = include_str!("../../assets/media.js");
 const CSS: &str = include_str!("../../assets/media.css");
@@ -66,14 +65,7 @@ async fn intercepted<T>(
     work: impl Future<Output = crate::Result<T>>,
 ) -> Result<T, Failure> {
     let call = Call { kind: CallKind::Media, screen: entry.name, action: None, via_agent: ctx.via_agent() };
-    let started = Instant::now();
-    let result = async {
-        st.before(ctx, &call)?;
-        st.timed(work).await
-    }
-    .await;
-    st.after(ctx, &call, started, &result);
-    result
+    st.intercept(ctx, &call, || st.timed(work)).await
 }
 
 async fn media_file(State(st): State<Arc<AppState>>, Path((source, id)): Path<(String, String)>, headers: HeaderMap) -> Response {

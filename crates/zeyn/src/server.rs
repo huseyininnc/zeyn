@@ -1497,6 +1497,25 @@ impl AppState {
         Ok(())
     }
 
+    /// Runs `work` between the interceptors' `before` and `after`, so no endpoint can run
+    /// application code without them: `before` records the call on the span, checks
+    /// re-authentication and runs every interceptor; `work` starts only when they all pass;
+    /// `after` sees the outcome, also when `before` refused the call. `work` is a closure so that
+    /// nothing it builds (form validation, an action's input) runs before the interceptors.
+    async fn intercept<T, F>(&self, ctx: &Ctx, call: &Call, work: impl FnOnce() -> F) -> Result<T, Failure>
+    where
+        F: Future<Output = Result<T, Failure>>,
+    {
+        let started = Instant::now();
+        let result = async {
+            self.before(ctx, call)?;
+            work().await
+        }
+        .await;
+        self.after(ctx, call, started, &result);
+        result
+    }
+
     fn after<T>(&self, ctx: &Ctx, call: &Call, started: Instant, result: &Result<T, Failure>) {
         let outcome = CallOutcome {
             ok: result.is_ok(),
@@ -2120,11 +2139,9 @@ impl AppState {
             return Err(Failure::App(Error::Forbidden));
         }
         let info = Call { kind: CallKind::DataGrid, screen: entry.meta.name, action: Some(action), via_agent: ctx.via_agent() };
-        let started = Instant::now();
         let mut query = call.query;
         crate::privacy::strip_masked(&mut query, grid.fields(), ctx);
-        let result = async {
-            self.before(ctx, &info)?;
+        self.intercept(ctx, &info, move || async move {
             let mut page = self.timed(grid.fetch_at(ctx.clone(), query, call.path)).await?;
             page.view = call.view.map(|v| grid.clean_view(v));
             let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity()).with_ctx(ctx);
@@ -2137,10 +2154,8 @@ impl AppState {
                 "next": page.next,
                 "offset": page.offset,
             }))
-        }
-        .await;
-        self.after(ctx, &info, started, &result);
-        result
+        })
+        .await
     }
 
     /// Saves or deletes the user's view of a grid. Needs a store, a signed in user and the grid's
@@ -2175,13 +2190,7 @@ impl AppState {
             return Err(Failure::App(Error::Forbidden));
         }
         let info = Call { kind: CallKind::DataGrid, screen: entry.meta.name, action: Some(row.meta), via_agent: ctx.via_agent() };
-        let started = Instant::now();
-        let result = async {
-            self.before(ctx, &info)?;
-            self.timed((row.run)(ctx.clone())).await
-        }
-        .await;
-        self.after(ctx, &info, started, &result);
+        let result = self.intercept(ctx, &info, || self.timed((row.run)(ctx.clone()))).await;
         result?;
         Ok(json!({ "effects": [] }))
     }
@@ -2204,13 +2213,7 @@ impl AppState {
             return Err(Failure::App(Error::Forbidden));
         }
         let info = Call { kind: CallKind::Form, screen: entry.meta.name, action: Some(save.meta), via_agent: ctx.via_agent() };
-        let started = Instant::now();
-        let result = async {
-            self.before(ctx, &info)?;
-            self.timed((save.run)(ctx.clone())).await
-        }
-        .await;
-        self.after(ctx, &info, started, &result);
+        let result = self.intercept(ctx, &info, || self.timed((save.run)(ctx.clone()))).await;
         result?;
         let mut page = self.timed(grid.find_row(ctx.clone(), call.key.clone())).await?;
         page.view = call.view.map(|v| grid.clean_view(v));
@@ -2230,13 +2233,7 @@ impl AppState {
             return Err(Failure::App(Error::Forbidden));
         }
         let info = Call { kind: CallKind::Screen, screen: entry.meta.name, action: Some(item.meta), via_agent: ctx.via_agent() };
-        let started = Instant::now();
-        let result = async {
-            self.before(ctx, &info)?;
-            self.timed((item.run)(ctx.clone())).await
-        }
-        .await;
-        self.after(ctx, &info, started, &result);
+        let result = self.intercept(ctx, &info, || self.timed((item.run)(ctx.clone()))).await;
         result?;
         Ok(json!({ "effects": [] }))
     }
@@ -2288,13 +2285,7 @@ impl AppState {
         let count = keys.len();
         let run = grid.bulk_call(call.action, keys).ok_or(Failure::App(Error::NotFound))?;
         let info = Call { kind: CallKind::DataGrid, screen: entry.meta.name, action: Some(run.meta), via_agent: ctx.via_agent() };
-        let started = Instant::now();
-        let result = async {
-            self.before(ctx, &info)?;
-            self.timed((run.run)(ctx.clone())).await
-        }
-        .await;
-        self.after(ctx, &info, started, &result);
+        let result = self.intercept(ctx, &info, || self.timed((run.run)(ctx.clone()))).await;
         result?;
         Ok(json!({ "effects": [], "count": count }))
     }
@@ -2310,13 +2301,7 @@ impl AppState {
             agent_policy(&entry.meta.ai, &action, call.confirmed)?;
         }
         let info = Call { kind: CallKind::Form, screen: entry.meta.name, action: Some(action), via_agent: ctx.via_agent() };
-        let started = Instant::now();
-        let result = async {
-            self.before(ctx, &info)?;
-            self.timed(form.submit(ctx.clone(), call.values)).await
-        }
-        .await;
-        self.after(ctx, &info, started, &result);
+        let result = self.intercept(ctx, &info, || self.timed(form.submit(ctx.clone(), call.values))).await;
         let effects = result?;
         let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity()).with_ctx(ctx);
         Ok(json!({ "effects": effects.iter().map(|e| e.to_json(&r)).collect::<Vec<_>>() }))
@@ -2457,14 +2442,7 @@ impl AppState {
         }
         feature.check_guards(ctx)?;
         let info = Call { kind: CallKind::Api, screen: "", action: Some(entry.meta), via_agent: ctx.via_agent() };
-        let started = Instant::now();
-        let outcome = async {
-            self.before(ctx, &info)?;
-            self.timed((entry.call)(ctx.clone(), input)).await
-        }
-        .await;
-        self.after(ctx, &info, started, &outcome);
-        outcome
+        self.intercept(ctx, &info, || self.timed((entry.call)(ctx.clone(), input))).await
     }
 }
 

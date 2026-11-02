@@ -20,7 +20,6 @@ use axum::routing::{get, post};
 use serde::Deserialize;
 use serde_json::Value as Json;
 use std::sync::Arc;
-use std::time::Instant;
 
 const JS: &str = include_str!("../../assets/components.js");
 const CSS: &str = include_str!("../../assets/components.css");
@@ -171,14 +170,7 @@ async fn data_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Js
             return Err(Failure::App(Error::Forbidden));
         }
         let info = Call { kind: CallKind::DataGrid, screen: entry.meta.name, action: Some(action), via_agent: ctx.via_agent() };
-        let started = Instant::now();
-        let result = async {
-            st.before(&ctx, &info)?;
-            st.timed(source.fetch(ctx.clone(), call.input)).await
-        }
-        .await;
-        st.after(&ctx, &info, started, &result);
-        result
+        st.intercept(&ctx, &info, || st.timed(source.fetch(ctx.clone(), call.input))).await
     }
     .await;
     match result {
