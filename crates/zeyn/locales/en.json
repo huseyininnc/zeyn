@@ -14,7 +14,10 @@
       "max": "{label} must be at most {n}.",
       "format": "{label} has an invalid value.",
       "skipped_time": "{label}: this time does not exist in your time zone because the clocks changed.",
-      "line": "Line {n}: {message}"
+      "line": "Line {n}: {message}",
+      "disabled_day": "{label}: this day cannot be chosen.",
+      "time_step": "{label} must be on a {n} minute step.",
+      "range_order": "{label} cannot be before {other}."
     },
     "error": {
       "forbidden": "You are not allowed to do this.",
@@ -95,7 +98,40 @@
         "prev_year": "Previous year",
         "next_year": "Next year",
         "today": "Today",
-        "format": "Format: {format}"
+        "format": "Format: {format}.",
+        "natural": "You can also type: {examples}.",
+        "natural_date": "today, +3d",
+        "natural_time": "now, 930",
+        "open_time": "Choose time",
+        "dialog_time": "Choose a time",
+        "dialog_range": "Choose a date range",
+        "month": "Choose month",
+        "year": "Choose year",
+        "months": "Months",
+        "years": "Years",
+        "now": "Now",
+        "clear": "Clear",
+        "done": "Done",
+        "hours": "Hours",
+        "minutes": "Minutes",
+        "seconds": "Seconds",
+        "period": "AM or PM",
+        "week": "Wk",
+        "week_long": "Week number",
+        "zone": "Time zone {zone}",
+        "utc": "UTC: {moment}",
+        "from": "From",
+        "to": "To",
+        "presets": {
+          "label": "Quick ranges",
+          "today": "Today",
+          "yesterday": "Yesterday",
+          "last_7_days": "Last 7 days",
+          "this_month": "This month",
+          "last_month": "Last month",
+          "this_year": "This year"
+        },
+        "invalid": "{label} could not be read."
       },
       "lookup": {
         "open": "Show options",
@@ -136,6 +172,18 @@
       },
       "tree": {
         "empty": "No items."
+      }
+    },
+    "date": {
+      "words": {
+        "today": "today",
+        "tomorrow": "tomorrow",
+        "yesterday": "yesterday",
+        "now": "now",
+        "day": "d, day, days",
+        "week": "w, week, weeks",
+        "month": "m, month, months",
+        "year": "y, year, years"
       }
     }
   }

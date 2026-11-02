@@ -4,7 +4,8 @@ use crate::i18n::Text;
 use crate::model::{Field, FieldError, FieldMeta, Model, Rule, Valid, ValidationErrors};
 use crate::render::{Render, escape};
 use crate::screen::{Component, Effect, FormSource, Node, UiCtx};
-use crate::time::{Date, DateTime, LocalDateTime, LocalTimeError, Time, TimeZone};
+use crate::time::{Date, DateTime, DateWords, LocalDateTime, LocalTimeError, Time, TimeZone};
+use crate::ui::DateOptions;
 use crate::value::{Currency, FieldKind, FieldType, Money, Value};
 use serde_json::{Map, Value as Json, json};
 use std::marker::PhantomData;
@@ -40,6 +41,8 @@ impl<M: Model> FormField<M> {
 enum FormItem<M> {
     Field(FormField<M>),
     Row(Vec<FormField<M>>),
+    /// A from and to date pair edited with one range picker.
+    Range(FormField<M>, FormField<M>),
 }
 
 /// Fields placed side by side.
@@ -63,12 +66,13 @@ impl<M: Model> FormRow<M> {
 pub struct Form<M: Model> {
     model: M,
     items: Vec<FormItem<M>>,
+    options: Vec<(&'static str, DateOptions)>,
 }
 
 impl<M: Model> Form<M> {
     /// Empty form filled with the given value. Add fields with `field` and `row`.
     pub fn of(model: M) -> Self {
-        Self { model, items: Vec::new() }
+        Self { model, items: Vec::new(), options: Vec::new() }
     }
 
     /// Form with every field of the model, in declaration order. Keys and versions become hidden
@@ -78,7 +82,7 @@ impl<M: Model> Form<M> {
             .filter(|i| !M::fields()[*i].version)
             .map(|i| FormItem::Field(FormField::at(i)))
             .collect();
-        Self { model, items }
+        Self { model, items, options: Vec::new() }
     }
 
     pub fn field<T: FieldType + 'static>(mut self, field: Field<M, T>) -> Self {
@@ -92,6 +96,31 @@ impl<M: Model> Form<M> {
         self
     }
 
+    /// A from and to pair of date fields, edited together with one range picker that offers
+    /// quick ranges (today, last 7 days, this month...). The server checks that `to` is not
+    /// before `from`.
+    pub fn range<T: FieldType + 'static>(mut self, from: Field<M, T>, to: Field<M, T>) -> Self {
+        self.items.push(FormItem::Range(FormField::of(from), FormField::of(to)));
+        self
+    }
+
+    /// Calendar and clock options of a date or time field: days that cannot be chosen, minute
+    /// steps, seconds, week numbers. They shape the picker and are checked again on the server.
+    ///
+    /// ```ignore
+    /// Form::of(visit).field(Visit::day).date_options(Visit::day, DateOptions::new().no_weekends())
+    /// ```
+    pub fn date_options<T: FieldType + 'static>(mut self, field: Field<M, T>, options: DateOptions) -> Self {
+        let name = field.meta().name;
+        self.options.retain(|(n, _)| *n != name);
+        self.options.push((name, options));
+        self
+    }
+
+    fn options_of(&self, name: &str) -> Option<&DateOptions> {
+        self.options.iter().find(|(n, _)| *n == name).map(|(_, o)| o)
+    }
+
     /// Submit button and action. Does not compile unless the action takes `Valid<M>`.
     pub fn submit<A: FormAction<M>>(self, label: impl Into<Text>, _action: A) -> SubmitForm<M, A> {
         SubmitForm { form: self, label: label.into(), on_success: None, _action: PhantomData }
@@ -101,17 +130,28 @@ impl<M: Model> Form<M> {
         self.items.iter().flat_map(|item| match item {
             FormItem::Field(f) => std::slice::from_ref(f).iter(),
             FormItem::Row(fs) => fs.iter(),
+            FormItem::Range(a, _) => std::slice::from_ref(a).iter(),
         })
+        .chain(self.items.iter().filter_map(|item| match item {
+            FormItem::Range(_, b) => Some(b),
+            _ => None,
+        }))
     }
 
     fn render_fields(&self, out: &mut String, r: &Render) {
         for item in &self.items {
             match item {
-                FormItem::Field(f) => render_field(out, r, f, &self.model),
+                FormItem::Field(f) => render_field(out, r, f, &self.model, self.options_of(f.meta.name)),
+                FormItem::Range(from, to) => crate::ui::render_range(
+                    out,
+                    r,
+                    [(from.meta, (from.value)(&self.model)), (to.meta, (to.value)(&self.model))],
+                    self.options_of(from.meta.name),
+                ),
                 FormItem::Row(fields) => {
                     out.push_str(r#"<div class="z-form-row">"#);
                     for f in fields {
-                        render_field(out, r, f, &self.model);
+                        render_field(out, r, f, &self.model, self.options_of(f.meta.name));
                     }
                     out.push_str("</div>");
                 }
@@ -132,6 +172,7 @@ impl<M: Model> Form<M> {
             let fields: Vec<&FormField<M>> = match item {
                 FormItem::Field(f) => vec![f],
                 FormItem::Row(fs) => fs.iter().collect(),
+                FormItem::Range(a, b) => vec![a, b],
             };
             for f in fields {
                 list.push(json!({ "row": row, "field": f.meta }));
@@ -147,7 +188,19 @@ impl<M: Model> Form<M> {
     /// row version. Everything else keeps the loaded value, so a client cannot change fields it was
     /// not shown or switch the record it saves.
     pub fn read(&self, values: &Map<String, Json>, locale: &str, tz: TimeZone) -> std::result::Result<Valid<M>, ValidationErrors> {
-        let (model, mut errors) = self.merge(values, locale, tz)?;
+        self.read_with(values, &Reading::new(locale, tz, DateTime::now(), &DateWords::from_i18n(crate::i18n::I18n::builtin(), locale)))
+    }
+
+    /// Like [`Form::read`] with the caller's clock and catalogs, so `today`, `+3d` and `now`
+    /// are read in the user's time zone and language.
+    pub fn read_in(&self, values: &Map<String, Json>, ctx: &Ctx) -> std::result::Result<Valid<M>, ValidationErrors> {
+        let words = DateWords::from_i18n(ctx.i18n(), ctx.locale());
+        self.read_with(values, &Reading::new(ctx.locale(), ctx.time_zone(), ctx.now(), &words))
+    }
+
+    fn read_with(&self, values: &Map<String, Json>, reading: &Reading) -> std::result::Result<Valid<M>, ValidationErrors> {
+        let (model, mut errors) = self.merge(values, reading)?;
+        self.check_pickers(&model, reading.tz, &mut errors);
         if let Err(rules) = model.validate() {
             let unreadable: Vec<&str> = errors.errors.iter().map(|e| e.field).collect();
             errors.errors.extend(rules.errors.into_iter().filter(|e| !unreadable.contains(&e.field)));
@@ -156,7 +209,40 @@ impl<M: Model> Form<M> {
         Valid::new(model)
     }
 
-    fn merge(&self, values: &Map<String, Json>, locale: &str, tz: TimeZone) -> std::result::Result<(M, ValidationErrors), ValidationErrors> {
+    /// Server side checks of picker options and ranges: days that cannot be chosen, minute
+    /// steps and a `to` before its `from`.
+    fn check_pickers(&self, model: &M, tz: TimeZone, errors: &mut ValidationErrors) {
+        let unreadable: Vec<&str> = errors.errors.iter().map(|e| e.field).collect();
+        let value_of = |name: &str| {
+            M::fields().iter().position(|m| m.name == name).and_then(|i| model.value_at(i)).unwrap_or(Value::Null)
+        };
+        for (name, options) in &self.options {
+            let Some(meta) = M::fields().iter().find(|m| m.name == *name) else { continue };
+            if unreadable.contains(name) {
+                continue;
+            }
+            if let Some(key) = options.problem(&value_of(name), tz) {
+                let mut message = Text::key(key).arg("label", meta.label_text());
+                if key == "zeyn.validation.time_step" {
+                    message = message.arg("n", options.step().to_string());
+                }
+                errors.errors.push(FieldError { field: meta.name, rule: Rule::Custom, message });
+            }
+        }
+        for item in &self.items {
+            let FormItem::Range(from, to) = item else { continue };
+            let (a, b) = (value_of(from.meta.name), value_of(to.meta.name));
+            if crate::ui::range_reversed(&a, &b) && !unreadable.contains(&to.meta.name) {
+                errors.errors.push(FieldError {
+                    field: to.meta.name,
+                    rule: Rule::Custom,
+                    message: Text::key("zeyn.validation.range_order").arg("label", to.meta.label_text()).arg("other", from.meta.label_text()),
+                });
+            }
+        }
+    }
+
+    fn merge(&self, values: &Map<String, Json>, reading: &Reading) -> std::result::Result<(M, ValidationErrors), ValidationErrors> {
         let mut object = match serde_json::to_value(&self.model) {
             Ok(Json::Object(o)) => o,
             _ => return Err(general_error()),
@@ -167,7 +253,7 @@ impl<M: Model> Form<M> {
         for meta in editable.chain(versions) {
             let Some(raw) = values.get(meta.name) else { continue };
             let current = object.get(meta.name).cloned().unwrap_or(Json::Null);
-            match parse_value(meta, raw, locale, tz, &current) {
+            match parse_value(meta, raw, reading, &current) {
                 Ok(v) => {
                     object.insert(meta.name.to_string(), v);
                 }
@@ -207,9 +293,44 @@ impl From<()> for Unreadable {
     }
 }
 
+/// What reading typed values depends on: the user's language, time zone, clock and words.
+pub(crate) struct Reading<'a> {
+    pub(crate) locale: &'a str,
+    pub(crate) tz: TimeZone,
+    pub(crate) now: LocalDateTime,
+    pub(crate) words: &'a DateWords,
+}
+
+impl<'a> Reading<'a> {
+    pub(crate) fn new(locale: &'a str, tz: TimeZone, now: DateTime, words: &'a DateWords) -> Self {
+        Reading { locale, tz, now: now.local(tz), words }
+    }
+}
+
+/// Reads a typed date, time or date time the way form fields do, for the picker's check endpoint.
+/// `Err(true)` means the wall clock time does not exist in the zone (daylight saving).
+pub(crate) fn read_moment(kind: FieldKind, text: &str, reading: &Reading) -> std::result::Result<Value, bool> {
+    let locale = reading.locale;
+    let t = text.trim();
+    match kind {
+        FieldKind::Date => Date::parse_input(t, locale, reading.now.date, reading.words).map(Value::Date).ok_or(false),
+        FieldKind::Time => Time::parse_input(t, locale, reading.now.time, reading.words).map(Value::Time).ok_or(false),
+        FieldKind::LocalDateTime => LocalDateTime::parse_input(t, locale, reading.now, reading.words).map(Value::LocalDateTime).ok_or(false),
+        FieldKind::DateTime => {
+            if let Some(exact) = DateTime::parse(t) {
+                return Ok(Value::DateTime(exact));
+            }
+            let local = LocalDateTime::parse_input(t, locale, reading.now, reading.words).ok_or(false)?;
+            DateTime::from_local(local, reading.tz).map(Value::DateTime).map_err(|LocalTimeError::Skipped| true)
+        }
+        _ => Err(false),
+    }
+}
+
 /// Reads one submitted value as the field's type. Text arrives as typed by the user; wall clock
 /// date times are read in the user's time zone.
-fn parse_value(meta: &FieldMeta, raw: &Json, locale: &str, tz: TimeZone, current: &Json) -> std::result::Result<Json, Unreadable> {
+fn parse_value(meta: &FieldMeta, raw: &Json, reading: &Reading, current: &Json) -> std::result::Result<Json, Unreadable> {
+    let locale = reading.locale;
     if let FieldKind::Bool = meta.kind {
         return raw.as_bool().map(Json::Bool).ok_or(Unreadable::Format);
     }
@@ -226,21 +347,11 @@ fn parse_value(meta: &FieldMeta, raw: &Json, locale: &str, tz: TimeZone, current
     match meta.kind {
         FieldKind::Text | FieldKind::Custom { .. } => Ok(Json::String(text)),
         FieldKind::Integer | FieldKind::Id => trimmed.parse::<i64>().map(Json::from).map_err(|_| Unreadable::Format),
-        FieldKind::Date => Date::parse_local(trimmed, locale).map(|d| Json::String(d.to_string())).ok_or(Unreadable::Format),
-        FieldKind::Time => Time::parse(trimmed).map(|t| Json::String(t.to_string())).ok_or(Unreadable::Format),
-        FieldKind::LocalDateTime => {
-            LocalDateTime::parse(trimmed).map(|l| Json::String(l.to_string())).ok_or(Unreadable::Format)
-        }
-        FieldKind::DateTime => {
-            if let Some(exact) = DateTime::parse(trimmed) {
-                return Ok(Json::String(exact.to_string()));
-            }
-            let local = LocalDateTime::parse(trimmed).ok_or(Unreadable::Format)?;
-            match DateTime::from_local(local, tz) {
-                Ok(moment) => Ok(Json::String(moment.to_string())),
-                Err(LocalTimeError::Skipped) => Err(Unreadable::SkippedTime),
-            }
-        }
+        FieldKind::Date | FieldKind::Time | FieldKind::LocalDateTime | FieldKind::DateTime => match read_moment(meta.kind, trimmed, reading) {
+            Ok(v) => serde_json::to_value(v).map_err(|_| Unreadable::Format),
+            Err(true) => Err(Unreadable::SkippedTime),
+            Err(false) => Err(Unreadable::Format),
+        },
         FieldKind::Money => {
             let currency: Currency = current
                 .get("currency")
@@ -257,7 +368,7 @@ fn parse_value(meta: &FieldMeta, raw: &Json, locale: &str, tz: TimeZone, current
 }
 
 /// Writes the input that fits the field kind, with the validation attributes the client mirrors.
-fn render_field<M>(out: &mut String, r: &Render, f: &FormField<M>, model: &M) {
+fn render_field<M>(out: &mut String, r: &Render, f: &FormField<M>, model: &M, options: Option<&DateOptions>) {
     let m = f.meta;
     let scope = r.scope;
     let value = (f.value)(model);
@@ -339,20 +450,8 @@ fn render_field<M>(out: &mut String, r: &Render, f: &FormField<M>, model: &M) {
             out.push_str(&format!(r#"<input type="{input_type}" {common}{min}{max} value="{}">"#, text(&value)));
         }
         FieldKind::Date | FieldKind::Time | FieldKind::DateTime | FieldKind::LocalDateTime => {
-            let (input_type, v) = match &value {
-                Value::Date(d) => ("date", d.to_string()),
-                Value::Time(t) => ("time", t.to_string()),
-                Value::LocalDateTime(l) => ("datetime-local", l.to_string()),
-                Value::DateTime(d) => ("datetime-local", d.local(r.tz).to_string()),
-                _ => match m.kind {
-                    FieldKind::Date => ("date", String::new()),
-                    FieldKind::Time => ("time", String::new()),
-                    _ => ("datetime-local", String::new()),
-                },
-            };
-            let step = if input_type == "date" { "" } else { r#" step="1""# };
             out.push_str(&label);
-            out.push_str(&format!(r#"<input type="{input_type}"{step} {common} value="{v}">"#));
+            crate::ui::render_date_input(out, r, m, &value, &common, &id, options);
         }
         FieldKind::Custom { editor } => {
             out.push_str(&label);
@@ -407,7 +506,7 @@ where
     }
 
     fn submit(&self, ctx: Ctx, values: Map<String, Json>) -> BoxFuture<Result<Vec<Effect>>> {
-        let valid = self.form.read(&values, ctx.locale(), ctx.time_zone());
+        let valid = self.form.read_in(&values, &ctx);
         let on_success = self.on_success.clone();
         Box::pin(async move {
             let valid = valid.map_err(Error::Validation)?;

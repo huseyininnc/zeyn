@@ -115,6 +115,18 @@
     "tabs_label": "Ürün görünümleri",
     "tab_all": "Tüm ürünler",
     "tab_split": "Bölünmüş görünüm",
-    "tab_columns": "İki sütun"
+    "tab_columns": "İki sütun",
+    "editors": "Düzenleyiciler",
+    "panel_dates": "Tarih ve saatler",
+    "book": "Ziyareti kaydet",
+    "booked": "Ziyaret kaydedildi."
+  },
+  "Visit": {
+    "day": "Ziyaret günü",
+    "arrives": "Varış saati",
+    "slot": "Muayene saati",
+    "confirmed_at": "Onay zamanı",
+    "stay_from": "Konaklama başlangıcı",
+    "stay_to": "Konaklama bitişi"
   }
 }

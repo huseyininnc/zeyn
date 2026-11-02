@@ -6,7 +6,12 @@
 use super::{AppState, Call, CallKind, Failure, asset};
 use crate::action::Error;
 use crate::render::Render;
-use crate::ui::NodePath;
+use crate::form::{Reading, read_moment};
+use crate::i18n::Text;
+use crate::time::{DateWords, range_presets};
+use crate::ui::{NodePath, input_text, picker_config};
+use crate::value::{FieldKind, Value};
+use serde_json::json;
 use axum::Router;
 use axum::extract::State;
 use axum::http::HeaderMap;
@@ -36,6 +41,74 @@ pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
         .route("/_zeyn/components.css", get(|| async { asset(CSS, "text/css; charset=utf-8") }))
         .route("/_zeyn/node", post(node_call))
         .route("/_zeyn/data", post(data_call))
+        .route("/_zeyn/parse", post(parse_call))
+}
+
+#[derive(Deserialize)]
+struct ParseCall {
+    /// `date`, `time`, `datetime`, `local` or `presets`.
+    kind: String,
+    #[serde(default)]
+    text: String,
+    /// Field label for messages; shown as text only.
+    #[serde(default)]
+    label: String,
+}
+
+/// Reads what was typed into a date or time editor the way the form will, in the user's language,
+/// zone and clock, and answers with the canonical text. The browser shows this and never computes
+/// values itself. `presets` answers today and the quick ranges in the user's zone.
+async fn parse_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(call): axum::Json<ParseCall>) -> Response {
+    let ctx = st.licensed(st.ctx(&headers)).await;
+    if let Err(f) = st.check_csrf(&headers) {
+        return st.error_response(&ctx, f);
+    }
+    let words = DateWords::from_i18n(ctx.i18n(), ctx.locale());
+    let reading = Reading::new(ctx.locale(), ctx.time_zone(), ctx.now(), &words);
+    let r = Render::new("parse", ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone());
+    if call.kind == "presets" {
+        let today = ctx.today();
+        let presets: Vec<Json> = range_presets(today)
+            .into_iter()
+            .map(|(key, from, to)| {
+                json!({ "key": key, "label": ctx.t(&Text::key(format!("zeyn.ui.date.presets.{key}"))), "from": from.to_string(), "to": to.to_string() })
+            })
+            .collect();
+        let mut config = picker_config(&r);
+        config["today"] = json!(today.to_string());
+        config["presets"] = json!(presets);
+        return axum::Json(config).into_response();
+    }
+    let kind = match call.kind.as_str() {
+        "date" => FieldKind::Date,
+        "time" => FieldKind::Time,
+        "datetime" => FieldKind::DateTime,
+        "local" => FieldKind::LocalDateTime,
+        _ => return st.error_response(&ctx, Failure::App(Error::NotFound)),
+    };
+    let label: String = call.label.chars().take(200).collect();
+    let text: String = call.text.chars().take(100).collect();
+    if text.trim().is_empty() {
+        return axum::Json(json!({ "ok": true, "text": "", "iso": "" })).into_response();
+    }
+    match read_moment(kind, &text, &reading) {
+        Ok(value) => {
+            let iso = match &value {
+                Value::DateTime(d) => d.local(ctx.time_zone()).to_string(),
+                other => serde_json::to_value(other).ok().and_then(|v| v.as_str().map(String::from)).unwrap_or_default(),
+            };
+            let utc = match &value {
+                Value::DateTime(d) => Some(d.to_string()),
+                _ => None,
+            };
+            axum::Json(json!({ "ok": true, "text": input_text(&value, &r), "iso": iso, "utc": utc, "zone": ctx.time_zone().name() }))
+                .into_response()
+        }
+        Err(skipped) => {
+            let key = if skipped { "zeyn.validation.skipped_time" } else { "zeyn.ui.date.invalid" };
+            axum::Json(json!({ "ok": false, "message": ctx.t(&Text::key(key).arg("label", label)) })).into_response()
+        }
+    }
 }
 
 #[derive(Deserialize)]

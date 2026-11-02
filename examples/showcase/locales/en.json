@@ -115,6 +115,18 @@
     "tabs_label": "Product views",
     "tab_all": "All products",
     "tab_split": "Split view",
-    "tab_columns": "Two columns"
+    "tab_columns": "Two columns",
+    "editors": "Editors",
+    "panel_dates": "Dates and times",
+    "book": "Book visit",
+    "booked": "Visit booked."
+  },
+  "Visit": {
+    "day": "Visit day",
+    "arrives": "Arrival time",
+    "slot": "Clinic slot",
+    "confirmed_at": "Confirmed at",
+    "stay_from": "Stay from",
+    "stay_to": "Stay until"
   }
 }

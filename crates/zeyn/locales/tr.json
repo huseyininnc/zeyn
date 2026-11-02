@@ -14,7 +14,10 @@
       "max": "{label} en fazla {n} olabilir.",
       "format": "{label} geçersiz bir değer içeriyor.",
       "skipped_time": "{label}: bu saat, saat değişikliği nedeniyle sizin saat diliminizde yok.",
-      "line": "Satır {n}: {message}"
+      "line": "Satır {n}: {message}",
+      "disabled_day": "{label}: bu gün seçilemez.",
+      "time_step": "{label} {n} dakikalık adımlarla girilmelidir.",
+      "range_order": "{label}, {other} tarihinden önce olamaz."
     },
     "error": {
       "forbidden": "Bu işlem için yetkiniz yok.",
@@ -95,7 +98,40 @@
         "prev_year": "Önceki yıl",
         "next_year": "Sonraki yıl",
         "today": "Bugün",
-        "format": "Biçim: {format}"
+        "format": "Biçim: {format}.",
+        "natural": "Şunları da yazabilirsiniz: {examples}.",
+        "natural_date": "bugün, +3g",
+        "natural_time": "şimdi, 930",
+        "open_time": "Saat seç",
+        "dialog_time": "Bir saat seçin",
+        "dialog_range": "Bir tarih aralığı seçin",
+        "month": "Ay seç",
+        "year": "Yıl seç",
+        "months": "Aylar",
+        "years": "Yıllar",
+        "now": "Şimdi",
+        "clear": "Temizle",
+        "done": "Tamam",
+        "hours": "Saat",
+        "minutes": "Dakika",
+        "seconds": "Saniye",
+        "period": "ÖÖ veya ÖS",
+        "week": "Hf",
+        "week_long": "Hafta numarası",
+        "zone": "Saat dilimi {zone}",
+        "utc": "UTC: {moment}",
+        "from": "Başlangıç",
+        "to": "Bitiş",
+        "presets": {
+          "label": "Hızlı aralıklar",
+          "today": "Bugün",
+          "yesterday": "Dün",
+          "last_7_days": "Son 7 gün",
+          "this_month": "Bu ay",
+          "last_month": "Geçen ay",
+          "this_year": "Bu yıl"
+        },
+        "invalid": "{label} okunamadı."
       },
       "lookup": {
         "open": "Seçenekleri göster",
@@ -136,6 +172,18 @@
       },
       "tree": {
         "empty": "Kayıt yok."
+      }
+    },
+    "date": {
+      "words": {
+        "today": "bugün, bugun",
+        "tomorrow": "yarın, yarin",
+        "yesterday": "dün, dun",
+        "now": "şimdi, simdi",
+        "day": "g, gün, gun",
+        "week": "h, hafta",
+        "month": "a, ay",
+        "year": "y, yıl, yil"
       }
     }
   }

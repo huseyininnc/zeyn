@@ -4,9 +4,13 @@
 //! index of each child below it (`"1.0.2"`). The renderer writes the path in `data-zeyn-node` and
 //! the endpoints accept it, so grids and forms inside containers keep working.
 
+mod date;
 mod layout;
 
 pub use layout::{Card, Panel, Row, Split, Stack, Tabs};
+
+pub use date::DateOptions;
+pub(crate) use date::{input_text, picker_config, range_reversed, render_date_input, render_range};
 
 use crate::action::{Action, ActionMeta, Result};
 use crate::ctx::{BoxFuture, Ctx};

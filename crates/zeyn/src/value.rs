@@ -231,6 +231,9 @@ impl FieldType for Date {
     fn to_value(&self) -> Value {
         Value::Date(*self)
     }
+    fn __compare(&self, limit: i64) -> Option<std::cmp::Ordering> {
+        Some(self.compact().cmp(&limit))
+    }
 }
 
 impl FieldType for Time {
@@ -328,12 +331,14 @@ impl SupportsText for Option<String> {}
 #[diagnostic::on_unimplemented(
     message = "the `min` and `max` rules cannot be used on `{Self}`",
     label = "not a numeric field",
-    note = "`min` and `max` work on i32, i64, Money and their Option forms; for Money the limit is in major units"
+    note = "`min` and `max` work on i32, i64, Money, Date and their Option forms; for Money the limit is in major units, for Date it is written as YYYY_MM_DD"
 )]
 pub trait SupportsMinMax {}
 impl SupportsMinMax for i32 {}
 impl SupportsMinMax for i64 {}
 impl SupportsMinMax for Money {}
+/// Dates take limits written as `YYYY_MM_DD`: `#[rule(min = 2024_01_01)]`.
+impl SupportsMinMax for Date {}
 impl<T: SupportsMinMax> SupportsMinMax for Option<T> {}
 
 /// Column types that accept `sum()` in a grid.

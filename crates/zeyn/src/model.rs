@@ -243,6 +243,14 @@ pub mod __rules {
     pub trait IsVersion {}
     impl IsVersion for i64 {}
 
+    /// A rule limit as shown in messages: dates in ISO form, numbers as they are.
+    fn limit_text(meta: &FieldMeta, n: i64) -> String {
+        match (meta.kind, crate::time::Date::from_compact(n)) {
+            (crate::value::FieldKind::Date, Some(d)) => d.to_string(),
+            _ => n.to_string(),
+        }
+    }
+
     /// Runs the field's rules and collects errors. `unique` is enforced by the database.
     pub fn validate<T: FieldType>(value: &T, meta: &FieldMeta, errors: &mut ValidationErrors) {
         let empty = value.__is_empty();
@@ -260,10 +268,10 @@ pub mod __rules {
                     Some(message("zeyn.validation.email"))
                 }
                 Rule::Min(n) if value.__compare(n) == Some(Ordering::Less) => {
-                    Some(message("zeyn.validation.min").arg("n", n.to_string()))
+                    Some(message("zeyn.validation.min").arg("n", limit_text(meta, n)))
                 }
                 Rule::Max(n) if value.__compare(n) == Some(Ordering::Greater) => {
-                    Some(message("zeyn.validation.max").arg("n", n.to_string()))
+                    Some(message("zeyn.validation.max").arg("n", limit_text(meta, n)))
                 }
                 _ => None,
             };
