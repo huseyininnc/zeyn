@@ -209,6 +209,8 @@
     "progress_import": "İçe aktarma",
     "progress_quota": "Kullanılan alan",
     "card_history": "Geçmiş",
+    "card_notes": "Notlar",
+    "notes": "Gece vardiyası **paketledi**.\n\n- *Soğuk zincir* etiketini kontrol edin\n- Teslimattan önce arayın\n\n[Rehbere](https://docs.zeynsoft.com) bakın. <script>alert(1)</script> [metin kalır](javascript:alert`1`)",
     "event_created": "Sipariş oluşturuldu",
     "event_approved": "Sipariş onaylandı",
     "event_approved_by": "Selin Aydın onayladı.",

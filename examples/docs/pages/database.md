@@ -94,3 +94,29 @@ Grid views (columns, sort, filters), dock layouts and the chosen theme can be ke
 ## Background work
 
 Imports, exports and other long work run as background jobs with progress (`Jobs`), so a request never waits for them. See [Audit, masking and jobs](enterprise.md).
+
+Jobs live in memory unless the app gives them a store. With `SqlJobStore` queued runs and the next run of every schedule are kept in the database: they survive a restart, several servers share one queue, and a lease makes sure two workers never run the same run.
+
+```rust
+let jobs = SqlJobStore::new(db.clone());
+jobs.create_tables().await?;
+
+App::new("Billing")
+    .job_store(jobs)
+    .queued_job("send_invoice", Schedule::manual().retry(5, Duration::from_secs(10)), send_invoice)
+    .job("close_day", Schedule::every(Duration::from_secs(86_400)), close_day)
+
+async fn send_invoice(ctx: Ctx, invoice_id: String) -> Result<()> { ... }
+
+#[action(permission = "billing.invoice.send")]
+pub async fn send(id: InvoiceId, jobs: Jobs) -> Result<()> {
+    jobs.enqueue("send_invoice", id.0.to_string()).await?;
+    Ok(())
+}
+```
+
+- `jobs.enqueue(name, payload)` queues a run; `enqueue_after` delays it. The payload is text of at most 4000 bytes, such as an id or small JSON.
+- A worker claims a due run with a lease of one minute and renews it while the run works. If the server stops, the run is claimed again after the lease ends; that try counts.
+- A failed try waits for the backoff, which doubles up to ten minutes, until the retries are used up. Then the run stays in the table as `failed` with its error code. A schedule never fails for good: it moves on to its next interval.
+- PostgreSQL claims with `FOR UPDATE SKIP LOCKED`, Oracle (11g and later) the same way through a select of ids. The table is `zeyn_jobs`; `create_job_tables(dialect, prefix)` gives the statements for a migration.
+- The in memory store (`MemoryJobStore`) holds at most 10,000 runs.

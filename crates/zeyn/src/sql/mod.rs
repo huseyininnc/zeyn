@@ -251,7 +251,7 @@ impl Db {
 
     /// Rows of a statement built inside the crate from fixed text and checked identifiers, such as
     /// the account store's. Values arrive only as `args`.
-    #[cfg(feature = "accounts")]
+    #[cfg(any(feature = "accounts", feature = "server"))]
     pub(crate) async fn rows(&self, sql: Sql) -> Result<Vec<Vec<Cell>>> {
         let mut rows = Vec::new();
         self.link()
@@ -265,7 +265,7 @@ impl Db {
     }
 
     /// Runs a statement built inside the crate (see [`Db::rows`]) and returns the changed rows.
-    #[cfg(feature = "accounts")]
+    #[cfg(any(feature = "accounts", feature = "server"))]
     pub(crate) async fn run(&self, sql: Sql) -> Result<u64> {
         self.link().await?.execute(sql, raw_error).await
     }
@@ -340,6 +340,38 @@ impl Db {
     }
 }
 
+/// Checks a table prefix for the crate's own tables: lower case letters, digits and `_`, at most
+/// 16 characters, not starting with a digit.
+#[cfg(any(feature = "accounts", feature = "server"))]
+pub(crate) fn checked_prefix(prefix: &str) -> Result<String> {
+    let ok = prefix.len() <= 16
+        && prefix.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+        && !prefix.starts_with(|c: char| c.is_ascii_digit());
+    if ok {
+        Ok(prefix.to_string())
+    } else {
+        Err(Error::Internal("a table prefix may hold lower case letters, digits and `_`, at most 16".into()))
+    }
+}
+
+/// SQL written inside the crate: `{p}` becomes the checked table prefix and each `?` the
+/// dialect's placeholder. Values arrive only as `args`.
+#[cfg(any(feature = "accounts", feature = "server"))]
+pub(crate) fn bind(d: &dyn Dialect, prefix: &str, template: &str, args: Vec<Arg>, cols: &[Col]) -> Sql {
+    let template = template.replace("{p}", prefix);
+    let mut text = String::with_capacity(template.len() + 16);
+    let mut n = 0;
+    for ch in template.chars() {
+        if ch == '?' {
+            n += 1;
+            d.param(&mut text, n, Cast::Plain);
+        } else {
+            text.push(ch);
+        }
+    }
+    Sql { text, args, cols: cols.to_vec() }
+}
+
 /// A transaction: the same calls as [`Db`], on one connection, committed together.
 pub struct Tx {
     db: Db,
@@ -369,6 +401,25 @@ impl Tx {
 
     pub async fn execute(&mut self, sql: &'static str, args: Vec<Arg>) -> Result<u64> {
         self.link.execute(Sql { text: sql.to_string(), args, cols: Vec::new() }, raw_error).await
+    }
+
+    /// Rows of a statement built inside the crate, on this transaction (see [`Db::rows`]).
+    #[cfg(feature = "server")]
+    pub(crate) async fn rows(&mut self, sql: Sql) -> Result<Vec<Vec<Cell>>> {
+        let mut rows = Vec::new();
+        self.link
+            .fetch(sql, raw_error, &mut |cells| {
+                rows.push(std::mem::take(cells));
+                Ok(())
+            })
+            .await?;
+        Ok(rows)
+    }
+
+    /// Runs a statement built inside the crate on this transaction and returns the changed rows.
+    #[cfg(feature = "server")]
+    pub(crate) async fn run(&mut self, sql: Sql) -> Result<u64> {
+        self.link.execute(sql, raw_error).await
     }
 
     pub async fn commit(self) -> Result<()> {

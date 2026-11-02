@@ -297,6 +297,7 @@ pub fn widgets(_: (), ctx: Ctx) -> Screen {
                                 .event(now.add_ms(-hour), t!("ui.event_shipped"), None, Tone::Neutral),
                         ),
                     )
+                    .col(Card::new().title(t!("ui.card_notes")).add(Markdown::new(t!("ui.notes"))))
                     .col(
                         Card::new()
                             .title(t!("ui.card_actions"))

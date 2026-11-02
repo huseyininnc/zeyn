@@ -176,6 +176,31 @@ impl App {
         self
     }
 
+    /// Adds a job whose queued runs carry a payload, such as a record id. Actions queue runs with
+    /// [`crate::Jobs::enqueue`]; the schedule gives the retries (and an interval, if any).
+    pub fn queued_job<F, Fut>(mut self, name: &'static str, schedule: crate::jobs::Schedule, run: F) -> Self
+    where
+        F: Fn(Ctx, String) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = crate::Result<()>> + Send + 'static,
+    {
+        let jobs = self.extras.jobs.get_or_insert_with(crate::jobs::Jobs::default).clone();
+        jobs.add_queued(name, schedule, run);
+        self.services.insert(jobs);
+        self
+    }
+
+    /// Keeps queued runs and the next run of every scheduled job in `store`, such as
+    /// `SqlJobStore`, so they survive restarts and run once across servers. In memory unless set.
+    /// Call [`App::job_concurrency`] first when you set both.
+    pub fn job_store(mut self, store: impl crate::jobs::JobStore) -> Self {
+        let jobs = self.extras.jobs.get_or_insert_with(crate::jobs::Jobs::default).clone();
+        if let Err(e) = jobs.set_store(store) {
+            self.setup_problems.push(format!("job_store: {e:?}"));
+        }
+        self.services.insert(jobs);
+        self
+    }
+
     /// Most jobs that run at the same time; four unless set. Call it before adding jobs.
     pub fn job_concurrency(mut self, limit: usize) -> Self {
         match &self.extras.jobs {

@@ -209,6 +209,8 @@
     "progress_import": "Import",
     "progress_quota": "Storage used",
     "card_history": "History",
+    "card_notes": "Notes",
+    "notes": "**Packed** by the night shift.\n\n- Check the *cold chain* label\n- Call before delivery\n\nSee [the guide](https://docs.zeynsoft.com). <script>alert(1)</script> [stays text](javascript:alert`1`)",
     "event_created": "Order created",
     "event_approved": "Order approved",
     "event_approved_by": "Approved by Selin Aydın.",

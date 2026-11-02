@@ -14,6 +14,8 @@ mod island;
 mod layout;
 mod lines;
 mod lookup;
+#[cfg(feature = "markdown")]
+mod markdown;
 mod media;
 mod menus;
 mod overlay;
@@ -24,6 +26,8 @@ mod widgets;
 pub(crate) use island::MARKER as ISLAND_MARKER;
 #[cfg(feature = "islands")]
 pub use island::{Canvas, Island, IslandLoad, Remote};
+#[cfg(feature = "markdown")]
+pub use markdown::{MAX_MARKDOWN, Markdown};
 #[cfg(feature = "realtime")]
 mod live;
 #[cfg(feature = "realtime")]

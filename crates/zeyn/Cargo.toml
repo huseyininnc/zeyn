@@ -41,6 +41,8 @@ email = ["server", "dep:lettre"]
 # passwords, purpose tokens, sealed session cookies, two factor, passkeys and a default UI.
 # Off unless an app asks for it. See docs/accounts.md.
 accounts = ["totp", "dep:argon2", "dep:base64", "dep:unicode-normalization"]
+# The `ui::Markdown` component: safe Markdown to HTML, with no dependencies.
+markdown = []
 
 [dependencies]
 zeyn-macros = { path = "../zeyn-macros", version = "0.0.3" }
@@ -137,6 +139,10 @@ required-features = ["pdf"]
 [[test]]
 name = "accounts"
 required-features = ["accounts"]
+
+[[test]]
+name = "ui_markdown"
+required-features = ["markdown"]
 
 [[test]]
 name = "accounts_passkeys"

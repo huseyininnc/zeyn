@@ -268,6 +268,42 @@ App::new("Billing")
   and `GET /_zeyn/jobs` for users with `jobs_permission`. Error details only go to the server log.
 - `App::serve_until(addr, signal)` stops taking requests when the signal completes, lets running
   requests finish, cancels retry waits and gives running jobs 30 seconds.
-- Jobs are in memory. Work that is waiting or running when the process stops is lost, and with
-  several servers each runs its own schedule. Durable jobs that survive restarts and run once per
-  cluster need a database backed queue, which will come with the data layer.
+- Without a store jobs are in memory: work that is waiting or running when the process stops is
+  lost, and with several servers each runs its own schedule.
+
+### Durable jobs
+
+```rust
+App::new("Billing")
+    .job_store(SqlJobStore::new(db))
+    .queued_job("send_invoice", Schedule::manual().retry(5, Duration::from_secs(10)), send_invoice)
+    .job("close_day", Schedule::every(Duration::from_secs(86_400)), close_day)
+
+async fn send_invoice(ctx: Ctx, invoice_id: String) -> Result<()> { ... }
+jobs.enqueue("send_invoice", "42").await?;
+```
+
+- `JobStore` holds runs: `enqueue`, `schedule`, `claim` with a lease (worker id and end time),
+  `heartbeat`, `complete` and `fail`. `MemoryJobStore` (at most 10,000 runs, the oldest failed run
+  is dropped first) is the default; `SqlJobStore` (features `postgres`, `oracle`) keeps runs in
+  `zeyn_jobs`. `create_job_tables(dialect, prefix)` gives the statements for a migration.
+- With a store set, `Schedule::every` jobs keep their next run in the store, so a restart does not
+  move it and only one server runs each interval. `trigger` queues a run there too.
+- `queued_job` jobs get the payload of each run (at most `MAX_JOB_PAYLOAD`, 4000 bytes); plain
+  jobs can be queued as well and ignore it. `enqueue_after` delays a run.
+- Claiming takes due runs of the jobs this server knows, oldest first, and holds them for
+  `JOB_LEASE` (60 seconds), renewed every 20 seconds while the run works. `complete` and `fail`
+  change a run only while the worker still holds it. A run whose worker stopped is claimed again
+  once its lease ended; the lost try counts, so a run that crashes its server ends as failed.
+- A failed try waits for the backoff (doubling, at most `MAX_BACKOFF_MS`, ten minutes) while tries
+  are left, then stays as `failed` with its error code. A schedule moves on to its next interval.
+- Workers look for due runs every `JOB_POLL` (one second) and right away after an `enqueue` on the
+  same server. Each claim takes at most as many runs as there are free job slots, so memory does
+  not grow with the queue.
+- PostgreSQL claims in one `UPDATE ... WHERE id IN (SELECT ... FOR UPDATE SKIP LOCKED) RETURNING`.
+  Oracle 11g and later selects ids with `ROWNUM` and `FOR UPDATE SKIP LOCKED` in a transaction,
+  updates them and reads them back before the commit. Oracle cannot order a locking select, so
+  due runs there are taken in no fixed order. Times are Unix milliseconds in `BIGINT` or
+  `NUMBER(19)` columns.
+- With a store, a scheduled run and a triggered run of the same job may overlap; jobs that must
+  not run twice at once should guard themselves (a row lock, for example).
