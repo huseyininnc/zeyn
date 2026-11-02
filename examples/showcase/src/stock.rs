@@ -200,7 +200,7 @@ pub fn product_list() -> Screen {
                 .width(120)
                 .pin_start()
                 .filter()
-                .link(|p| Window::open(product_editor, ProductParams { id: Some(p.id) }))
+                .link(|p| Effect::navigate(product_page, ProductPageParams { code: p.code.clone() }))
                 .column(Product::id)
                 .width(90)
                 .hidden()
@@ -256,6 +256,37 @@ pub fn product_list() -> Screen {
         )
 }
 
+/// Which product the detail page shows, by its code: `/stock/products/NW-0007`.
+#[params]
+pub struct ProductPageParams {
+    pub code: String,
+}
+
+/// Product detail page with the code in its path. An unknown code answers 404; a code in another
+/// case (`nw-0007`) moves permanently to the code as it is stored.
+#[screen(route = "/products/{code}", permission = "stock.product.read")]
+pub fn product_page(params: ProductPageParams, store: ProductStore) -> Result<Screen> {
+    let product =
+        store.all()?.into_iter().find(|p| p.code.eq_ignore_ascii_case(&params.code)).ok_or(Error::NotFound)?;
+    if product.code != params.code {
+        return Ok(Screen::moved_to(product_page, ProductPageParams { code: product.code }));
+    }
+    Ok(Screen::new(t!("stock.product_title", code = product.code))
+        .toolbar(|t| {
+            t.button(t!("stock.edit")).icon(Icon::Edit).opens(product_editor, ProductParams { id: Some(product.id) })
+        })
+        .body(Breadcrumb::new().link(t!("stock.products"), product_list, ()).current(product.code.clone()))
+        .body(
+            DescriptionList::of(&product)
+                .field(Product::code)
+                .field(Product::name)
+                .field(Product::unit)
+                .field(Product::price)
+                .field(Product::stock)
+                .field(Product::active),
+        ))
+}
+
 /// Product editor window.
 #[screen(permission = "stock.product.write")]
 pub fn product_editor(params: ProductParams, store: ProductStore) -> Result<Screen> {
@@ -284,6 +315,7 @@ pub fn feature() -> Feature {
         .route_prefix("/stock")
         .guard(SignedIn)
         .screen(product_list)
+        .screen(product_page)
         .screen(product_editor)
         .api(search_products)
         .api(save_product)

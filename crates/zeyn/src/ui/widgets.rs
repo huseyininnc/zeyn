@@ -365,10 +365,14 @@ impl Component for Breadcrumb {
             r.text(&Text::key("zeyn.ui.breadcrumb"))
         ));
         for (label, screen, params) in &self.links {
-            let query =
-                if params.is_null() { String::new() } else { format!("?params={}", encode(&params.to_string())) };
+            let href = crate::screen::Routes::href(r, screen, params).unwrap_or_else(|| {
+                let query =
+                    if params.is_null() { String::new() } else { format!("?params={}", encode(&params.to_string())) };
+                format!("/_zeyn/route/{screen}{query}")
+            });
             out.push_str(&format!(
-                r#"<li><a href="/_zeyn/route/{screen}{query}" data-zeyn-base-href>{}</a></li>"#,
+                r#"<li><a href="{}" data-zeyn-base-href>{}</a></li>"#,
+                crate::render::escape(&href),
                 r.text(label)
             ));
         }

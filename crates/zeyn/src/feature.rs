@@ -37,6 +37,12 @@ impl Menu {
     /// Adds a screen to the last group. A screen without a route cannot be added (compile error).
     pub fn item<S: ScreenDef>(mut self, label: impl Into<Text>, _screen: S) -> Self {
         const { assert!(S::META.route.is_some(), "a menu item must point to a screen that has a route") };
+        const {
+            assert!(
+                !crate::screen::route_has_segments(S::META.route),
+                "a menu item cannot point to a screen whose route has path segments; link to it from a grid or a screen with `Effect::navigate`"
+            )
+        };
         let group = self.groups.last_mut().expect("call `group` before `item`");
         group.items.push(MenuItem { label: label.into(), screen: S::META.name });
         self
@@ -101,6 +107,8 @@ pub struct ScreenEntry {
     pub meta: ScreenMeta,
     pub deps: fn() -> Vec<Dep>,
     pub build: fn(Ctx, serde_json::Value) -> BoxFuture<Result<Screen>>,
+    /// Reads a path segment of the route as a params field; see [`ScreenDef::path_value`].
+    pub path_value: fn(&str, &str) -> Option<serde_json::Value>,
 }
 
 fn build_erased<S: ScreenDef>(ctx: Ctx, params: serde_json::Value) -> BoxFuture<Result<Screen>> {
@@ -264,7 +272,7 @@ impl Feature {
 
     /// Registers a screen.
     pub fn screen<S: ScreenDef>(mut self, _screen: S) -> Self {
-        self.screens.push(ScreenEntry { meta: S::META, deps: S::deps, build: build_erased::<S> });
+        self.screens.push(ScreenEntry { meta: S::META, deps: S::deps, build: build_erased::<S>, path_value: S::path_value });
         self
     }
 

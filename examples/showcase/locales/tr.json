@@ -29,6 +29,7 @@
     "revenue_today": "Bugünkü ciro"
   },
   "stock": {
+    "product_title": "{code} ürünü",
     "edit": "Düzenle",
     "restock_low": "10 altındakilerin hepsine stok ekle",
     "deactivate": "Pasife al",

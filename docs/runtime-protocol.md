@@ -8,6 +8,8 @@ This is the contract between the Zeyn server and the browser runtime. Screens ar
 
 `GET {route}?params={json}` returns a full HTML document. `params` is the URL encoded JSON of the screen params and is omitted when the screen has none.
 
+A route with path segments, such as `/orders/{id}`, reads those params fields from the path (`/orders/42`) and the other fields from `params`. A segment value that does not parse answers 404. Values are percent encoded, dots included (`%2E`), so a screen URL never looks like a file to the runtime. A screen that answers `Screen::moved_to` gets `301 Moved Permanently` with the new URL in `Location`.
+
 ```html
 <!doctype html>
 <html lang="en">
@@ -91,7 +93,7 @@ Effects:
 | Effect | JSON | Runtime does |
 |---|---|---|
 | Open window | `{"effect":"open_window","screen":"product_form","params":{...}}` | Loads the screen (section 4.1) into a modal `<dialog>` |
-| Navigate | `{"effect":"navigate","screen":"...","params":{...}}` | Loads `/_zeyn/route/{screen}?params=` which redirects to the page |
+| Navigate | `{"effect":"navigate","screen":"...","params":{...}}` | Loads `/_zeyn/route/{screen}?params=` which redirects to the page, in the path form when its route has segments |
 | Toast | `{"effect":"toast","message":"Saved"}` | Shows a toast for 4 seconds |
 | Close and refresh | `{"effect":"close_and_refresh"}` | Closes the top dialog and reloads every grid on the screen under it |
 

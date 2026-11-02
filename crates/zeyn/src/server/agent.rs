@@ -304,6 +304,7 @@ async fn mcp(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(req
                         Failure::Timeout => ctx.t(&Text::key("zeyn.error.timeout")),
                         Failure::App(e) => ctx.t(&e.message()),
                         Failure::Status(_, _, message) => ctx.t(&message),
+                        Failure::Moved(..) => ctx.t(&Text::key("zeyn.error.not_found")),
                     };
                     reply(json!({ "content": [{ "type": "text", "text": message }], "isError": true }))
                 }

@@ -69,6 +69,29 @@
 //! }
 //! ```
 //!
+//! A route segment that names no field of the screen's params:
+//!
+//! ```compile_fail
+//! use zeyn::prelude::*;
+//!
+//! #[params]
+//! pub struct OrderParams {
+//!     pub id: i64,
+//! }
+//!
+//! #[screen(route = "/orders/{order_id}", public)]
+//! pub fn order(_p: OrderParams) -> Screen { Screen::new("Order") }
+//! ```
+//!
+//! A route with segments on a screen that takes no params:
+//!
+//! ```compile_fail
+//! use zeyn::prelude::*;
+//!
+//! #[screen(route = "/orders/{id}", public)]
+//! pub fn order() -> Screen { Screen::new("Order") }
+//! ```
+//!
 //! A total on a text column:
 //!
 //! ```compile_fail
@@ -372,6 +395,7 @@ mod screen;
 mod security;
 #[cfg(feature = "server")]
 pub mod server;
+mod slug;
 /// Data layer for SQL databases (`postgres` and `oracle` features).
 #[cfg(any(feature = "postgres", feature = "oracle"))]
 pub mod sql;
@@ -454,9 +478,11 @@ pub use privacy::{MaskStyle, Masking, Revealed, can_unmask, masked_text, reveal_
 pub use redis_store::RedisStore;
 pub use render::Render;
 pub use screen::{
-    Component, Effect, Export, FormSource, GridSource, Icon, LoadedPage, MAX_TOASTS, Node, Params, RowCall, Screen,
-    ScreenDef, ScreenMeta, Toast, ToolButton, Toolbar, UiCtx, Window,
+    Component, Effect, Export, FormSource, GridSource, Icon, LoadedPage, MAX_SEGMENT, MAX_TOASTS, Node, Params,
+    PathValue, RowCall, Screen, ScreenDef, ScreenMeta, Toast, ToolButton, Toolbar, UiCtx, Window, __path_value,
+    route_has_segments, screen_url,
 };
+pub use slug::Slug;
 #[cfg(feature = "server")]
 pub use security::{IpRange, MemoryRateStore, RateKey, RateLimit, RateStore, client_ip, parse_ranges};
 #[cfg(feature = "server")]
@@ -505,7 +531,7 @@ pub mod prelude {
         Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime, Decimal, Effect,
         Entity, Error, Export, Feature, Field, File, FileRules, FileType, Form, GuardResult, Icon, Identity, Import,
         Licensed, LocalDateTime, Model, Money, Node, Page, Paging, Result, RowStyle, Screen, ScreenDef, Secret,
-        Service, SignedIn, Tenant, TenantRequired, Text, Time, TimeZone, Toast, Tone, TransitionRequest, Transitions,
+        Service, SignedIn, Slug, Tenant, TenantRequired, Text, Time, TimeZone, Toast, Tone, TransitionRequest, Transitions,
         UiCtx, Valid, ValidationErrors, Window, Workflow, action, choice, entity, model, params, screen, t,
     };
     #[cfg(feature = "server")]

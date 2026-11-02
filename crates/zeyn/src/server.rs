@@ -1047,7 +1047,9 @@ impl App {
                     }
                 }
                 if let Some(path) = f.path_of(&s.meta) {
-                    if let Some(other) = paths.insert(path.clone(), s.meta.name) {
+                    let shape: String =
+                        path.split('/').map(|p| if p.starts_with('{') { "{}" } else { p }).collect::<Vec<_>>().join("/");
+                    if let Some(other) = paths.insert(shape, s.meta.name) {
                         if other != s.meta.name {
                             problems.push(format!("route `{path}` is used by screens `{other}` and `{}`", s.meta.name));
                         }
@@ -1096,6 +1098,14 @@ impl App {
             if !self.features.iter().any(|f| f.screens().iter().any(|s| s.meta.name == home && s.meta.route.is_some()))
             {
                 problems.push(format!("home screen `{home}` is not registered or has no route"));
+            }
+            if self.features.iter().flat_map(|f| f.screens()).any(|s| {
+                s.meta.name == home && crate::screen::route_has_segments(s.meta.route)
+            }) {
+                problems.push(format!(
+                    "home screen `{home}` has path segments in its route
+  = help: `/` cannot fill them; make a screen without segments the home screen"
+                ));
             }
         }
         let commands: Vec<(&str, &crate::command::Command)> =
@@ -1169,11 +1179,16 @@ impl App {
         let url_prefix = self.public_path.clone().unwrap_or_else(|| self.base_path.clone());
         auth::resolve(&mut self.sign_in, &url_prefix, &mut self.login_url);
         let mut screens = HashMap::new();
+        let mut routes = HashMap::new();
         for (fi, f) in self.features.iter().enumerate() {
             for s in f.screens() {
                 screens.insert(s.meta.name, (fi, *s));
+                if let Some(path) = f.path_of(&s.meta) {
+                    routes.insert(s.meta.name, path);
+                }
             }
         }
+        self.services.insert(crate::screen::Routes(Arc::new(routes)));
         let look = self.look();
         #[cfg(feature = "islands")]
         let islands = self.islands_dir.as_deref().and_then(|dir| match islands::Islands::load(dir, &url_prefix) {
@@ -1231,10 +1246,25 @@ impl App {
             for s in f.screens() {
                 if let Some(path) = f.path_of(&s.meta) {
                     let name = s.meta.name;
-                    router = router.route(
-                        &path,
-                        get(move |st: State<Arc<AppState>>, h: HeaderMap, q: Query<ParamsQuery>| page(st, h, q, name)),
-                    );
+                    router = if crate::screen::route_has_segments(Some(&path)) {
+                        router.route(
+                            &path,
+                            get(
+                                move |st: State<Arc<AppState>>,
+                                      h: HeaderMap,
+                                      uri: axum::http::Uri,
+                                      Path(segments): Path<Vec<(String, String)>>,
+                                      q: Query<ParamsQuery>| page(st, h, uri, segments, q, name),
+                            ),
+                        )
+                    } else {
+                        router.route(
+                            &path,
+                            get(move |st: State<Arc<AppState>>, h: HeaderMap, uri: axum::http::Uri, q: Query<ParamsQuery>| {
+                                page(st, h, uri, Vec::new(), q, name)
+                            }),
+                        )
+                    };
                 }
             }
         }
@@ -1439,6 +1469,8 @@ enum Failure {
     App(Error),
     Timeout,
     Status(StatusCode, &'static str, Text),
+    /// The screen answered [`Screen::moved_to`]: a permanent redirect to this screen and params.
+    Moved(&'static str, Json),
 }
 
 impl From<Error> for Failure {
@@ -1512,6 +1544,31 @@ impl AppState {
     /// URL of an app path, with the base path in front.
     fn url(&self, path: &str) -> String {
         format!("{}{path}", self.prefix)
+    }
+
+    /// URL of a routed screen with these params, in the path form when its route has segments
+    /// (see [`crate::screen_url`]). `None` for an unknown screen, one without a route, or params
+    /// that do not fill the route's segments.
+    fn page_url(&self, screen: &str, params: &Json) -> Option<String> {
+        let (fi, entry) = self.screens.get(screen)?;
+        let path = self.features[*fi].path_of(&entry.meta)?;
+        crate::screen::screen_url(&path, params).map(|u| self.url(&u))
+    }
+
+    /// Params of a page request: the JSON `params` query with the route's path segments read
+    /// into the fields of the same name. A segment that does not parse answers 404.
+    fn with_segments(&self, screen: &str, params: Json, segments: &[(String, String)]) -> Result<Json, Failure> {
+        if segments.is_empty() {
+            return Ok(params);
+        }
+        let (_, entry) = self.screens.get(screen).ok_or(Failure::App(Error::NotFound))?;
+        let mut params = if params.is_null() { Json::Object(Map::new()) } else { params };
+        let fields = params.as_object_mut().ok_or(Failure::App(Error::NotFound))?;
+        for (name, raw) in segments {
+            let value = (entry.path_value)(name, raw).ok_or(Failure::App(Error::NotFound))?;
+            fields.insert(name.clone(), value);
+        }
+        Ok(params)
     }
 
     /// Cookie `Path` attribute for this app.
@@ -1632,10 +1689,13 @@ impl AppState {
         feature.check_guards(ctx)?;
         data::check_reason(ctx, &entry.meta)?;
         let only_return_to = params.as_object().is_some_and(|o| o.len() == 1 && o.contains_key("return_to"));
-        let screen = match self.timed((entry.build)(ctx.clone(), params)).await {
+        let mut screen = match self.timed((entry.build)(ctx.clone(), params)).await {
             Err(_) if only_return_to => self.timed((entry.build)(ctx.clone(), Json::Null)).await?,
             other => other?,
         };
+        if let Some((to, params)) = screen.take_moved() {
+            return Err(Failure::Moved(to, params));
+        }
         Ok((feature, entry, screen))
     }
 
@@ -1699,6 +1759,7 @@ impl AppState {
                 Err(Failure::Timeout) => Some("timeout"),
                 Err(Failure::App(e)) => Some(e.code()),
                 Err(Failure::Status(_, code, _)) => Some(*code),
+                Err(Failure::Moved(..)) => Some("moved"),
             },
             duration: started.elapsed(),
         };
@@ -1779,6 +1840,7 @@ impl AppState {
         let (status, code, message) = match &failure {
             Failure::Timeout => (StatusCode::GATEWAY_TIMEOUT, "timeout", Text::key("zeyn.error.timeout")),
             Failure::Status(status, code, message) => (*status, *code, message.clone()),
+            Failure::Moved(..) => (StatusCode::NOT_FOUND, "not_found", Text::key("zeyn.error.not_found")),
             Failure::App(e) => {
                 let status = match e {
                     Error::Forbidden | Error::Denied(_) => StatusCode::FORBIDDEN,
@@ -1808,6 +1870,7 @@ impl AppState {
         let (status, message) = match failure {
             Failure::Timeout => (StatusCode::GATEWAY_TIMEOUT, Text::key("zeyn.error.timeout")),
             Failure::Status(status, _, message) => (status, message),
+            Failure::Moved(..) => (StatusCode::NOT_FOUND, Text::key("zeyn.error.not_found")),
             Failure::App(e) => {
                 let status = match &e {
                     Error::Forbidden | Error::Denied(_) => StatusCode::FORBIDDEN,
@@ -1965,6 +2028,8 @@ fn with_cookie(mut response: Response, cookie: Option<String>) -> Response {
 async fn page(
     State(st): State<Arc<AppState>>,
     headers: HeaderMap,
+    uri: axum::http::Uri,
+    segments: Vec<(String, String)>,
     Query(q): Query<ParamsQuery>,
     name: &'static str,
 ) -> Response {
@@ -1974,7 +2039,7 @@ async fn page(
     let started = Instant::now();
     let call = Call { kind: CallKind::Page, screen: name, action: None, via_agent: false };
     let result = async {
-        let params = q.value()?;
+        let params = st.with_segments(name, q.value()?, &segments)?;
         st.before(&ctx, &call)?;
         let (_, entry, screen) = st.open(&ctx, name, params.clone()).await?;
         data::note_screen_read(&ctx, &entry.meta, &params);
@@ -2025,28 +2090,22 @@ async fn page(
         Err(Failure::App(Error::Forbidden | Error::Denied(_)))
             if !ctx.identity().is_signed_in() && st.login_url.is_some() =>
         {
-            let here = st
-                .screens
-                .get(name)
-                .and_then(|(fi, e)| st.features[*fi].path_of(&e.meta))
-                .map(|p| st.url(&p))
-                .unwrap_or_default();
+            let here = st.url(uri.path_and_query().map_or(uri.path(), |p| p.as_str()));
             let target = st.login_url.clone().unwrap_or_default();
             let sep = if target.contains('?') { '&' } else { '?' };
             Redirect::to(&format!("{target}{sep}return_to={}", encode(&here))).into_response()
         }
         Err(Failure::Status(_, "mfa_required", _)) if st.sign_in.mfa_url.is_some() => {
-            let here = st
-                .screens
-                .get(name)
-                .and_then(|(fi, e)| st.features[*fi].path_of(&e.meta))
-                .map(|p| st.url(&p))
-                .unwrap_or_default();
+            let here = st.url(uri.path_and_query().map_or(uri.path(), |p| p.as_str()));
             let target = st.sign_in.mfa_url.clone().unwrap_or_default();
             let sep = if target.contains('?') { '&' } else { '?' };
             Redirect::to(&format!("{target}{sep}return_to={}", encode(&here))).into_response()
         }
         Err(Failure::Status(_, "reason_required", _)) => data::reason_page(&st, &ctx, name, &csrf),
+        Err(Failure::Moved(to, params)) => match st.page_url(to, &params) {
+            Some(url) => (StatusCode::MOVED_PERMANENTLY, [(header::LOCATION, url)]).into_response(),
+            None => st.error_page(&ctx, Failure::App(Error::NotFound), &csrf),
+        },
         Err(f) => st.error_page(&ctx, f, &csrf),
     };
     with_cookie(with_cookie(response, set), theme_cookie)
@@ -2091,15 +2150,20 @@ async fn route_redirect(
     let Some((fi, entry)) = st.screens.get(name.as_str()) else {
         return st.error_response(&ctx, Failure::App(Error::NotFound));
     };
-    let Some(path) = st.features[*fi].path_of(&entry.meta) else {
+    if st.features[*fi].path_of(&entry.meta).is_none() {
         return st.error_response(&ctx, Failure::App(Error::NotFound));
+    }
+    let params = match &q.params {
+        Some(p) => match serde_json::from_str::<Json>(p) {
+            Ok(v) => v,
+            Err(_) => return st.error_response(&ctx, Failure::App(Error::NotFound)),
+        },
+        None => Json::Null,
     };
-    let path = st.url(&path);
-    let target = match &q.params {
-        Some(p) => format!("{path}?params={}", encode(p)),
-        None => path,
-    };
-    Redirect::to(&target).into_response()
+    match st.page_url(entry.meta.name, &params) {
+        Some(target) => Redirect::to(&target).into_response(),
+        None => st.error_response(&ctx, Failure::App(Error::NotFound)),
+    }
 }
 
 /// Percent encodes a query value.
@@ -2255,6 +2319,7 @@ fn problem(ctx: &Ctx, failure: Failure) -> Response {
     let (status, code, message) = match &failure {
         Failure::Timeout => (StatusCode::GATEWAY_TIMEOUT, "timeout", Text::key("zeyn.error.timeout")),
         Failure::Status(status, code, message) => (*status, *code, message.clone()),
+        Failure::Moved(..) => (StatusCode::NOT_FOUND, "not_found", Text::key("zeyn.error.not_found")),
         Failure::App(e) => (
             match e {
                 Error::Forbidden | Error::Denied(_) => StatusCode::FORBIDDEN,

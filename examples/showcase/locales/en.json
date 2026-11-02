@@ -29,6 +29,7 @@
     "revenue_today": "Revenue today"
   },
   "stock": {
+    "product_title": "Product {code}",
     "edit": "Edit",
     "restock_low": "Restock everything below 10",
     "deactivate": "Mark inactive",

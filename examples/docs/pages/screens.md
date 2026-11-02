@@ -41,6 +41,52 @@ Params are typed everywhere they are used: `Window::open(product_editor, 7)` doe
 
 A screen without `route` has no URL. It opens as a window from a link, a toolbar button, a menu or a command.
 
+## Params in the path
+
+A route can name params fields as path segments. Each `{name}` binds the field of the same name and reads as that field's type:
+
+```rust
+#[params]
+pub struct OrderParams {
+    pub id: OrderId,
+    #[serde(default)]
+    pub tab: Option<String>,
+}
+
+#[screen(route = "/orders/{id}", permission = "sales.order.read")]
+pub fn order(p: OrderParams, store: OrderStore) -> Result<Screen> {
+    let order = store.get(p.id).ok_or(Error::NotFound)?;
+    Ok(Screen::new(t!("sales.order")).body(DescriptionList::new().item(t!("sales.customer"), order.customer)))
+}
+```
+
+- `/orders/42` opens order 42. Fields that are not in the path travel as before in the JSON query: `/orders/42?params={"tab":"lines"}`.
+- Segments take integers, entity keys (`OrderId`), `String` and `Slug`. A value only parses in the form the framework writes it (`7`, not `007` or `+7`); anything else answers 404.
+- A segment that names no field of the params, a route with segments on a screen without params, or a field type that cannot be a segment does not compile, and the error says what to change.
+- Several segments work the same way: `#[screen(route = "/catalog/{slug}/{n}", public)]` with `slug: Slug` and `n: u32`.
+- Links the framework writes use the path form: `Effect::navigate`, breadcrumbs, commands and `return_to` after sign in. Screens without segments keep `?params={json}`.
+- A screen with segments cannot be a menu item or the home screen, because nothing could fill them.
+- Access is checked on every request, as for any screen.
+
+### Slugs
+
+`Slug::from_title("Çay Bardağı")` is `cay-bardagi`: lowercase ASCII, words joined by `-`, Turkish letters mapped (`ı` and `İ` to `i`, `ş` to `s`, `ğ` to `g`, `ç` to `c`, `ö` to `o`, `ü` to `u`), accents of other Latin letters dropped, and anything else left out. A slug is at most 80 bytes. In a path only the canonical form parses, so `/catalog/Cay-Bardagi/1` answers 404.
+
+### Not found and moved
+
+Return `Err(Error::NotFound)` when the record is not there; the user gets the 404 page. When the address changed, for example after a product was renamed, answer with the new one. The browser gets a permanent redirect (301), and in app navigation follows it without a page load:
+
+```rust
+#[screen(route = "/catalog/{slug}/{n}", public)]
+pub fn catalog_page(p: CatalogParams, store: Catalog) -> Result<Screen> {
+    let item = store.find(p.n).ok_or(Error::NotFound)?;
+    if item.slug != p.slug {
+        return Ok(Screen::moved_to(catalog_page, CatalogParams { slug: item.slug, n: p.n }));
+    }
+    Ok(Screen::new(item.name))
+}
+```
+
 ## Access
 
 | Option | Meaning |
