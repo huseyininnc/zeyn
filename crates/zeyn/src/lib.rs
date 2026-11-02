@@ -37,6 +37,22 @@
 //! pub async fn delete_product(_id: i64) -> Result<()> { Ok(()) }
 //! ```
 //!
+//! A shared cache on a screen that is not public, and one longer than a day:
+//!
+//! ```compile_fail
+//! use zeyn::prelude::*;
+//!
+//! #[screen(permission = "stock.product.read", cache = 300)]
+//! pub fn products() -> Screen { Screen::new("Products") }
+//! ```
+//!
+//! ```compile_fail
+//! use zeyn::prelude::*;
+//!
+//! #[screen(public, cache = 100000)]
+//! pub fn about() -> Screen { Screen::new("About") }
+//! ```
+//!
 //! A text rule on a field that is not text:
 //!
 //! ```compile_fail
@@ -454,8 +470,8 @@ pub use privacy::{MaskStyle, Masking, Revealed, can_unmask, masked_text, reveal_
 pub use redis_store::RedisStore;
 pub use render::Render;
 pub use screen::{
-    Component, Effect, Export, FormSource, GridSource, Icon, LoadedPage, MAX_TOASTS, Node, Params, RowCall, Screen,
-    ScreenDef, ScreenMeta, Toast, ToolButton, Toolbar, UiCtx, Window,
+    Component, Effect, Export, FormSource, GridSource, Icon, LoadedPage, MAX_SCREEN_CACHE, MAX_TOASTS, Node, Params,
+    RowCall, Screen, ScreenDef, ScreenMeta, Toast, ToolButton, Toolbar, UiCtx, Window,
 };
 #[cfg(feature = "server")]
 pub use security::{IpRange, MemoryRateStore, RateKey, RateLimit, RateStore, client_ip, parse_ranges};

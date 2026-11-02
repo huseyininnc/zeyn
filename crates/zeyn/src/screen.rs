@@ -33,7 +33,13 @@ pub struct ScreenMeta {
     /// AI policy from `ai = "..."` or `ai = false`. A hidden screen offers no tools and models
     /// cannot navigate to it.
     pub ai: crate::action::Ai,
+    /// Seconds a shared cache may keep the page of a public screen opened without a session
+    /// (`cache = N`, at most [`MAX_SCREEN_CACHE`]); 0 sends no public cache headers.
+    pub cache: u32,
 }
+
+/// Longest `cache = N` a screen may ask for: one day.
+pub const MAX_SCREEN_CACHE: u32 = 86_400;
 
 /// A screen. Implemented by `#[screen]`, never written by hand.
 pub trait ScreenDef: Copy + Send + Sync + 'static {

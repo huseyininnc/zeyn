@@ -7,9 +7,10 @@
 const BASE = (document.querySelector('meta[name="zeyn-base"]')?.content ?? '').replace(/\/$/, '');
 const API = `${BASE}/_zeyn/account`;
 
-/** The CSRF token of the page. */
-function csrf() {
-  return document.querySelector('meta[name="zeyn-csrf"]')?.content ?? '';
+/** Returns the CSRF token of the page, or asks `zeyn.js` for one when the page came without it. */
+async function csrf() {
+  const token = document.querySelector('meta[name="zeyn-csrf"]')?.content;
+  return token || (window.zeynCsrf ? window.zeynCsrf() : '');
 }
 
 /** Base64url text to bytes. */
@@ -31,7 +32,7 @@ async function post(path, body) {
   const res = await fetch(`${API}${path}`, {
     method: 'POST',
     credentials: 'same-origin',
-    headers: { 'content-type': 'application/json', 'x-zeyn-csrf': csrf() },
+    headers: { 'content-type': 'application/json', 'x-zeyn-csrf': await csrf() },
     body: JSON.stringify(body ?? {}),
   });
   const data = await res.json().catch(() => null);

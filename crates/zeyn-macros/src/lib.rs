@@ -311,6 +311,9 @@ fn expand_action(f: &ItemFn, access: &AccessArgs, flags: (bool, bool), ai: &AiAr
 /// #[screen(route = "/products", permission = "stock.product.read")]
 /// pub fn product_list() -> Screen { ... }
 /// ```
+///
+/// `cache = N` (seconds, public screens only) lets browsers and shared caches keep the page of a
+/// request without a session.
 #[proc_macro_attribute]
 pub fn screen(attr: TokenStream, item: TokenStream) -> TokenStream {
     let f = syn::parse_macro_input!(item as ItemFn);
@@ -319,11 +322,14 @@ pub fn screen(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut sensitive = false;
     let mut reason = false;
     let mut ai = AiArgs::default();
+    let mut cache: Option<syn::LitInt> = None;
     let parser = syn::meta::parser(|meta| {
         if meta.path.is_ident("permission") {
             access.permission = Some(meta.value()?.parse()?);
         } else if meta.path.is_ident("public") {
             access.public = true;
+        } else if meta.path.is_ident("cache") {
+            cache = Some(meta.value()?.parse()?);
         } else if meta.path.is_ident("route") {
             route = Some(meta.value()?.parse()?);
         } else if meta.path.is_ident("sensitive") {
@@ -336,14 +342,38 @@ pub fn screen(attr: TokenStream, item: TokenStream) -> TokenStream {
             return Err(meta.error("`confirm` belongs on the action that writes\n  = help: put `confirm` on the `#[action]` that the screen's form or button runs"));
         } else {
             return Err(meta.error(
-                "unknown screen option\n  = help: expected `route = \"/...\"`, `permission = \"...\"`, `public`, `sensitive`, `reason`, `ai = \"...\"` or `ai = false`",
+                "unknown screen option\n  = help: expected `route = \"/...\"`, `permission = \"...\"`, `public`, `cache = 300`, `sensitive`, `reason`, `ai = \"...\"` or `ai = false`",
             ));
         }
         Ok(())
     });
     syn::parse_macro_input!(attr with parser);
     let original = quote!(#f);
-    or_error(expand_screen(&f, &access, route.as_ref(), (sensitive || reason, reason), &ai), original)
+    let cache = match screen_cache(cache.as_ref(), access.public) {
+        Ok(c) => c,
+        Err(e) => return or_error(Err(e), original),
+    };
+    or_error(expand_screen(&f, &access, route.as_ref(), (sensitive || reason, reason), &ai, cache), original)
+}
+
+/// Checks `cache = N` of a screen: only on a public screen, 1 to 86400 seconds.
+fn screen_cache(cache: Option<&syn::LitInt>, public: bool) -> syn::Result<u32> {
+    let Some(lit) = cache else { return Ok(0) };
+    if !public {
+        return Err(syn::Error::new(
+            lit.span(),
+            "`cache` is only for public screens
+  = help: add `public`, or remove `cache`; pages of signed in users are never kept in a shared cache",
+        ));
+    }
+    match lit.base10_parse::<u32>() {
+        Ok(n @ 1..=86_400) => Ok(n),
+        _ => Err(syn::Error::new(
+            lit.span(),
+            "`cache` takes seconds from 1 to 86400
+  = help: for example `cache = 300` keeps the page for five minutes",
+        )),
+    }
 }
 
 fn expand_screen(
@@ -352,6 +382,7 @@ fn expand_screen(
     route: Option<&LitStr>,
     privacy: (bool, bool),
     ai: &AiArgs,
+    cache: u32,
 ) -> syn::Result<Ts> {
     let ai = ai.tokens("screen")?;
     let doc = doc_text(&f.attrs);
@@ -388,6 +419,7 @@ fn expand_screen(
                 reason: #reason,
                 doc: #doc,
                 ai: #ai,
+                cache: #cache,
             };
 
             fn deps() -> ::std::vec::Vec<::zeyn::Dep> {

@@ -46,8 +46,14 @@ pub fn overview(_: (), store: ProductStore, ctx: Ctx) -> Result<Screen> {
     ])))
 }
 
+/// A public page for visitors: sent without cookies and kept by caches for five minutes.
+#[screen(route = "/about", public, cache = 300)]
+pub fn about() -> Screen {
+    Screen::new(t!("about.title")).body(Card::new().title(t!("about.lead")).add(Alert::info(t!("about.cache"))))
+}
+
 pub fn feature() -> Feature {
-    Feature::new("overview")
-        .screen(overview)
-        .menu(|m| m.group(t!("menu.overview"), Icon::Chart).item(t!("dashboard.title"), overview))
+    Feature::new("overview").screen(overview).screen(about).menu(|m| {
+        m.group(t!("menu.overview"), Icon::Chart).item(t!("dashboard.title"), overview).item(t!("about.title"), about)
+    })
 }

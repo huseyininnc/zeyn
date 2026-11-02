@@ -18,8 +18,10 @@ const panels = new WeakMap();
 /** Opens the launcher's panel; set when the page has a launcher. */
 let openDock = null;
 
-function csrf() {
-  return document.querySelector('meta[name="zeyn-csrf"]')?.content ?? '';
+/** Returns the CSRF token of the page, or asks `zeyn.js` for one when the page came without it. */
+async function csrf() {
+  const token = document.querySelector('meta[name="zeyn-csrf"]')?.content;
+  return token || (window.zeynCsrf ? window.zeynCsrf() : '');
 }
 
 /** Name of the screen in the main area, so the model knows where the user is. */
@@ -220,7 +222,7 @@ async function load(s) {
 /** Starts a new conversation. */
 async function clear(s) {
   if (s.busy) s.controller?.abort();
-  await fetch(`${BASE}/_zeyn/assistant/clear`, { method: 'POST', credentials: 'same-origin', headers: { 'x-zeyn-csrf': csrf() } }).catch(() => null);
+  await fetch(`${BASE}/_zeyn/assistant/clear`, { method: 'POST', credentials: 'same-origin', headers: { 'x-zeyn-csrf': await csrf() } }).catch(() => null);
   s.log.replaceChildren(el('p', 'z-assistant-empty', s.t.empty));
   s.loaded = false;
   s.chips.replaceChildren();
@@ -354,7 +356,7 @@ async function stream(s, url, body) {
     const res = await fetch(BASE + url, {
       method: 'POST',
       credentials: 'same-origin',
-      headers: { 'content-type': 'application/json', 'x-zeyn-csrf': csrf() },
+      headers: { 'content-type': 'application/json', 'x-zeyn-csrf': await csrf() },
       body: JSON.stringify(body),
       signal: s.controller.signal,
     });
@@ -472,7 +474,7 @@ async function speak(s, text, button) {
     const res = await fetch(`${BASE}/_zeyn/assistant/tts`, {
       method: 'POST',
       credentials: 'same-origin',
-      headers: { 'content-type': 'application/json', 'x-zeyn-csrf': csrf() },
+      headers: { 'content-type': 'application/json', 'x-zeyn-csrf': await csrf() },
       body: JSON.stringify({ text: plain }),
     });
     if (!res.ok) throw new Error(await errorText(res, s.t));
@@ -547,7 +549,7 @@ async function toggleMic(s) {
       const res = await fetch(`${BASE}/_zeyn/assistant/stt`, {
         method: 'POST',
         credentials: 'same-origin',
-        headers: { 'content-type': blob.type.split(';')[0], 'x-zeyn-csrf': csrf() },
+        headers: { 'content-type': blob.type.split(';')[0], 'x-zeyn-csrf': await csrf() },
         body: blob,
       });
       if (!res.ok) throw new Error(await errorText(res, s.t));

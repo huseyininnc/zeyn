@@ -121,6 +121,7 @@ async function refreshPage() {
   else document.documentElement.removeAttribute('dir');
   document.title = doc.title;
   for (const meta of doc.querySelectorAll('head meta[name]')) {
+    if (meta.name === 'zeyn-csrf' && !meta.content) continue;
     const old = document.head.querySelector(`meta[name="${CSS.escape(meta.name)}"]`);
     if (old) old.content = meta.content;
     else document.head.append(document.importNode(meta, true));

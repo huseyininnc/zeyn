@@ -46,7 +46,8 @@ A screen without `route` has no URL. It opens as a window from a link, a toolbar
 | Option | Meaning |
 |---|---|
 | `permission = "..."` | The identity needs this permission |
-| `public` | Anyone |
+| `public` | Anyone. Visitors without a session get the page without cookies (see [Public pages](public-pages.md)) |
+| `cache = 300` | Public screens only: browsers and shared caches may keep the page of a visitor without a session for this many seconds (at most 86400) |
 | `sensitive` | Opening it is recorded as a read of personal data |
 | `reason` | The user must give a reason before it opens (see [Audit, masking and jobs](enterprise.md)) |
 

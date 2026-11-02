@@ -21,6 +21,11 @@
 ,
     "inputs": "Girişler"
   },
+  "about": {
+    "title": "Northwind hakkında",
+    "lead": "Northwind Operasyon, küçük bir ticaret şirketinin stoğunu, siparişlerini ve çalışanlarını yönetir.",
+    "cache": "Bu sayfa herkese açık: ziyaretçiler onu çerezsiz alır, tarayıcılar ve önbellekler beş dakika saklar."
+  },
   "dashboard": {
     "title": "Genel bakış",
     "products": "Ürün",

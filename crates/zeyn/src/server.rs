@@ -1274,6 +1274,7 @@ impl App {
             .route("/_zeyn/nav.js", get(|| async { asset(NAV, "text/javascript; charset=utf-8") }))
             .route("/_zeyn/theme.css", get(theme_css))
             .route("/favicon.ico", get(|| async { StatusCode::NO_CONTENT }))
+            .route("/_zeyn/csrf", get(csrf_token))
             .route("/_zeyn/screen/{screen}", get(screen_fragment))
             .route("/_zeyn/route/{screen}", get(route_redirect))
             .route("/_zeyn/menu", post(menu_call))
@@ -1970,7 +1971,11 @@ async fn page(
 ) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     let (ctx, theme_cookie) = theme::remember(&st, ctx, &headers).await;
-    let (csrf, set) = st.csrf(&headers);
+    let meta = st.screens.get(name).map(|(_, e)| e.meta);
+    let open =
+        !ctx.identity().is_signed_in() && meta.is_some_and(|m| matches!(m.access, crate::action::Access::Public));
+    let (csrf, set) = if open { (String::new(), None) } else { st.csrf(&headers) };
+    let cache = meta.map_or(0, |m| m.cache.min(crate::screen::MAX_SCREEN_CACHE));
     let started = Instant::now();
     let call = Call { kind: CallKind::Page, screen: name, action: None, via_agent: false };
     let result = async {
@@ -1993,6 +1998,7 @@ async fn page(
             let holds_island = islands::holds(&st, &html);
             #[cfg(feature = "realtime")]
             let holds_live = realtime::holds(&st, &html);
+            let tag = (open && cache > 0).then(|| etag("p", &[&full, &html]));
             let mut r = Html(html).into_response();
             let h = r.headers_mut();
             h.insert("x-zeyn-partial", HeaderValue::from_static("1"));
@@ -2001,6 +2007,7 @@ async fn page(
             }
             h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
             h.insert(header::VARY, HeaderValue::from_static("x-zeyn-partial"));
+
             #[cfg(feature = "islands")]
             if holds_island {
                 h.insert("x-zeyn-islands", HeaderValue::from_static("1"));
@@ -2009,18 +2016,26 @@ async fn page(
             if holds_live {
                 h.insert("x-zeyn-live", HeaderValue::from_static("1"));
             }
-            r
+            match tag {
+                Some(tag) => public_cache(r, &headers, &tag, cache),
+                None => r,
+            }
         }
         Ok((title, html)) => {
             #[allow(unused_mut)]
             let mut page = st.shell(&ctx, &csrf, &title, &html, Some(name));
             #[cfg(feature = "realtime")]
             realtime::head(&st, &html, &mut page);
+            let tag = (open && cache > 0).then(|| etag("f", &[&page]));
             #[cfg(feature = "islands")]
             let page = islands::page(&st, page, &html);
             #[cfg(not(feature = "islands"))]
             let page = Html(page).into_response();
-            page
+            match tag {
+                Some(tag) => public_cache(page, &headers, &tag, cache),
+                None if cache > 0 => private_page(page),
+                None => page,
+            }
         }
         Err(Failure::App(Error::Forbidden | Error::Denied(_)))
             if !ctx.identity().is_signed_in() && st.login_url.is_some() =>
@@ -2050,6 +2065,66 @@ async fn page(
         Err(f) => st.error_page(&ctx, f, &csrf),
     };
     with_cookie(with_cookie(response, set), theme_cookie)
+}
+
+/// Strong ETag over the parts of a rendered body; `kind` keeps full pages and partial screens
+/// apart. The hash is SipHash with fixed keys, the same in every process of one build.
+fn etag(kind: &str, parts: &[&str]) -> String {
+    use std::hash::Hasher;
+    let mut h = std::hash::DefaultHasher::new();
+    let mut len = 0;
+    for p in parts {
+        h.write(p.as_bytes());
+        h.write_u8(0xff);
+        len += p.len();
+    }
+    format!("\"{kind}{len:x}-{:016x}\"", h.finish())
+}
+
+/// Whether `If-None-Match` names the ETag (or `*`). Weak tags compare by their value.
+fn etag_matches(headers: &HeaderMap, tag: &str) -> bool {
+    headers.get_all(header::IF_NONE_MATCH).iter().filter_map(|v| v.to_str().ok()).flat_map(|v| v.split(',')).any(|t| {
+        let t = t.trim();
+        t == "*" || t.strip_prefix("W/").unwrap_or(t) == tag
+    })
+}
+
+/// Marks the page of a public screen opened without a session as cacheable: `Cache-Control:
+/// public, max-age`, the ETag, and `Vary` on what the page is rendered from. A matching
+/// `If-None-Match` gets `304 Not Modified` without the body.
+fn public_cache(mut response: Response, headers: &HeaderMap, tag: &str, seconds: u32) -> Response {
+    let Ok(tag_value) = HeaderValue::from_str(tag) else { return private_page(response) };
+    if etag_matches(headers, tag) {
+        response = StatusCode::NOT_MODIFIED.into_response();
+    }
+    let h = response.headers_mut();
+    h.insert(header::ETAG, tag_value);
+    if let Ok(v) = HeaderValue::from_str(&format!("public, max-age={seconds}")) {
+        h.insert(header::CACHE_CONTROL, v);
+    }
+    h.insert(header::VARY, HeaderValue::from_static("x-zeyn-partial, Accept-Language, Cookie"));
+    response
+}
+
+/// A cacheable screen opened with a session: never stored.
+fn private_page(mut response: Response) -> Response {
+    response.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("private, no-store"));
+    response
+}
+
+/// `GET /_zeyn/csrf`: the CSRF token for pages that were sent without one (public screens opened
+/// without a session), setting the `zeyn_csrf` cookie when the browser has none. Only same
+/// origin requests get it.
+async fn csrf_token(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    let site = headers.get("sec-fetch-site").and_then(|v| v.to_str().ok());
+    if site.is_some_and(|s| s != "same-origin" && s != "none") {
+        let ctx = st.ctx(&headers);
+        return st.error_response(&ctx, Failure::App(Error::Forbidden));
+    }
+    let (token, set) = st.csrf(&headers);
+    let mut r = axum::Json(json!({ "token": token })).into_response();
+    r.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    with_cookie(r, set)
 }
 
 async fn screen_fragment(

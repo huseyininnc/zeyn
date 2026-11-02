@@ -21,6 +21,11 @@
 ,
     "inputs": "Inputs"
   },
+  "about": {
+    "title": "About Northwind",
+    "lead": "Northwind Operations runs stock, orders and people for a small trading company.",
+    "cache": "This page is public: visitors get it without cookies, and browsers and caches keep it for five minutes."
+  },
   "dashboard": {
     "title": "Overview",
     "products": "Products",

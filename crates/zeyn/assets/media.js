@@ -27,9 +27,10 @@ const VOLUME_STEP = 5;
 /** Player state by root element. */
 const players = new WeakMap();
 
-/** Returns the CSRF token from `meta[name=zeyn-csrf]`. */
-function csrf() {
-  return document.querySelector('meta[name="zeyn-csrf"]')?.content ?? '';
+/** Returns the CSRF token of the page, or asks `zeyn.js` for one when the page came without it. */
+async function csrf() {
+  const token = document.querySelector('meta[name="zeyn-csrf"]')?.content;
+  return token || (window.zeynCsrf ? window.zeynCsrf() : '');
 }
 
 /** Parses JSON, or returns `null`. */
@@ -330,13 +331,17 @@ function save(p, at, keepalive = false) {
     local.set(localKey(p), seconds);
     return;
   }
-  fetch(`${BASE}/_zeyn/media/position`, {
-    method: 'POST',
-    credentials: 'same-origin',
-    keepalive,
-    headers: { 'content-type': 'application/json', 'x-zeyn-csrf': csrf() },
-    body: JSON.stringify({ source: p.source, id: p.id, at: seconds }),
-  }).catch(() => {});
+  csrf()
+    .then((token) =>
+      fetch(`${BASE}/_zeyn/media/position`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        keepalive,
+        headers: { 'content-type': 'application/json', 'x-zeyn-csrf': token },
+        body: JSON.stringify({ source: p.source, id: p.id, at: seconds }),
+      }),
+    )
+    .catch(() => {});
 }
 
 /** Saves every playing player before the page goes away or is hidden. */

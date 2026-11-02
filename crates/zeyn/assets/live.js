@@ -40,6 +40,10 @@ function connect() {
   clearTimeout(timer);
   const next = wanted();
   if (next === topics && socket) return;
+  if (next && !document.querySelector('meta[name="zeyn-csrf"]')?.content && window.zeynCsrf) {
+    window.zeynCsrf().then((token) => token && connect());
+    return;
+  }
   topics = next;
   const old = socket;
   socket = null;
