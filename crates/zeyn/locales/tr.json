@@ -25,7 +25,28 @@
       "reauth_title": "Kimliğinizi doğrulayın",
       "reauth_body": "Bu işlem yakın zamanda giriş yapmış olmanızı gerektiriyor. Yeni sekmede yeniden giriş yapın, sonra buraya dönüp devam edin.",
       "reauth_open": "Yeniden giriş yap",
-      "reauth_continue": "Giriş yaptım, devam et"
+      "reauth_continue": "Giriş yaptım, devam et",
+      "mfa_title": "İkinci adım gerekiyor",
+      "mfa_body": "Bu işlem için girişin ikinci adımını tamamlamanız gerekiyor. Yeni sekmede tamamlayın, sonra buraya dönüp devam edin.",
+      "mfa_open": "Şimdi doğrula"
+    },
+    "auth": {
+      "mfa_required": "Bu işlem için doğrulama uygulamanızdaki kod gibi ikinci bir giriş adımı gerekiyor.",
+      "mfa_missing": "Giriş ikinci adımı içermiyordu. Yeniden giriş yapıp ikinci adımı tamamlayın.",
+      "failed": "Giriş yapılamadı. Yeniden deneyin.",
+      "unavailable": "Giriş şu anda kullanılamıyor. Daha sonra yeniden deneyin.",
+      "totp_title": "İki adımlı doğrulama",
+      "totp_scan": "Bu kodu bir doğrulama uygulamasıyla tarayın, sonra uygulamanın gösterdiği altı haneli kodu girin.",
+      "totp_manual": "Ya da bu anahtarı uygulamaya elle yazın:",
+      "totp_qr": "Doğrulama uygulamanız için QR kod",
+      "totp_intro": "Doğrulama uygulamanızdaki altı haneli kodu ya da kurtarma kodlarınızdan birini girin.",
+      "totp_code": "Kod",
+      "totp_verify": "Doğrula",
+      "totp_invalid": "Bu kod geçerli değil. Yeniden deneyin.",
+      "totp_rate_limited": "Çok fazla deneme yapıldı. Birkaç dakika bekleyip yeniden deneyin.",
+      "totp_recovery_title": "Kurtarma kodlarınız",
+      "totp_recovery_body": "Bu kodları güvenli bir yerde saklayın. Doğrulama uygulamanızı kaybederseniz her kod bir kez çalışır. Bir daha gösterilmeyecekler.",
+      "totp_continue": "Devam et"
     },
     "import": {
       "file": "CSV dosyası",

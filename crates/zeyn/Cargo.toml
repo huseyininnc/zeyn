@@ -18,6 +18,10 @@ assistant = ["server", "dep:reqwest", "dep:rustls"]
 postgres = ["dep:sqlx", "dep:base64", "dep:tokio", "dep:futures-core", "dep:futures-util"]
 # Oracle through ODPI-C; needs Oracle Instant Client at run time (see docs/database.md).
 oracle = ["dep:oracle", "dep:base64", "dep:tokio", "dep:futures-core"]
+# Sign in with an OpenID Connect provider and bearer JWTs for APIs and MCP. See docs/auth.md.
+oidc = ["server", "dep:reqwest", "dep:rustls", "dep:ring"]
+# Built in TOTP second factor for apps without an identity provider. See docs/auth.md.
+totp = ["server", "dep:ring", "dep:totp-rs", "dep:qrcodegen"]
 
 [dependencies]
 zeyn-macros = { path = "../zeyn-macros", version = "0.0.2" }
@@ -33,6 +37,9 @@ reqwest = { version = "0.13", default-features = false, features = ["rustls-no-p
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"], optional = true }
 ed25519-dalek = { version = "3", default-features = false, optional = true }
 redis = { version = "1", default-features = false, features = ["tokio-comp", "connection-manager", "script"], optional = true }
+ring = { version = "0.17", optional = true }
+totp-rs = { version = "6", default-features = false, features = ["std", "otpauth"], optional = true }
+qrcodegen = { version = "1.8", optional = true }
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 tracing-subscriber = { version = "0.3", default-features = false, features = ["std", "fmt", "registry"], optional = true }
 opentelemetry = { version = "0.33", default-features = false, features = ["trace"], optional = true }
@@ -56,3 +63,11 @@ tracing-subscriber = { version = "0.3", default-features = false, features = ["s
 [[test]]
 name = "assistant"
 required-features = ["assistant"]
+
+[[test]]
+name = "oidc"
+required-features = ["oidc"]
+
+[[test]]
+name = "totp"
+required-features = ["totp"]

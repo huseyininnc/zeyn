@@ -579,11 +579,15 @@ function startIdle(idle, warn) {
 if (SESSION?.idle > 0) startIdle(SESSION.idle, Math.min(SESSION.warn ?? 60, SESSION.idle));
 
 /**
- * Asks the user to sign in again for an action that needs a recent sign in, then sends the
- * request again. The sign in page opens in a new tab so the work on this page is kept.
+ * Asks the user to sign in again for an action that needs a recent sign in (or a second factor,
+ * for `mfa_required`), then sends the request again. The sign in page opens in a new tab so the
+ * work on this page is kept.
+ * @param {string} code `reauth_required` or `mfa_required`.
  * @returns {Promise<boolean>} True when the user wants to try again.
  */
-function askReauth() {
+function askReauth(code) {
+  const mfa = code === 'mfa_required';
+  const url = mfa ? SESSION?.mfa : SESSION?.reauth;
   return new Promise((resolve) => {
     const finish = (again) => {
       m.dialog.close();
@@ -591,10 +595,10 @@ function askReauth() {
       resolve(again);
     };
     const buttons = [];
-    if (SESSION?.reauth) buttons.push({ label: t('session.reauth_open'), run: () => window.open(withReturn(SESSION.reauth), '_blank', 'noopener') });
+    if (url) buttons.push({ label: t(mfa ? 'session.mfa_open' : 'session.reauth_open'), run: () => window.open(withReturn(url), '_blank', 'noopener') });
     buttons.push({ label: t('session.reauth_continue'), primary: true, run: () => finish(true) });
     buttons.push({ label: t('privacy.reason_cancel'), run: () => finish(false) });
-    const m = modal({ title: t('session.reauth_title'), body: t('session.reauth_body'), buttons, cancel: () => finish(false) });
+    const m = modal({ title: t(mfa ? 'session.mfa_title' : 'session.reauth_title'), body: t(mfa ? 'session.mfa_body' : 'session.reauth_body'), buttons, cancel: () => finish(false) });
   });
 }
 
@@ -602,9 +606,9 @@ hooks.push(async (res, input, init) => {
   if (res.status !== 401) return null;
   const data = await res.clone().json().catch(() => null);
   const code = data?.error ?? (typeof data?.type === 'string' ? data.type.split(':').pop() : null);
-  if (code !== 'reauth_required') return null;
+  if (code !== 'reauth_required' && code !== 'mfa_required') return null;
   let next = res;
-  while (next.status === 401 && (await askReauth())) next = await nativeFetch(input, init);
+  while (next.status === 401 && (await askReauth(code))) next = await nativeFetch(input, init);
   return next;
 });
 

@@ -27,6 +27,10 @@ pub struct Identity {
     /// When the user last proved who they are (signed in), as reported by the identity provider.
     /// Actions marked `reauth` need this to be recent.
     pub authenticated_at: Option<crate::time::DateTime>,
+    /// The user proved a second factor (a one time code, a security key) in this session, as the
+    /// identity provider reports it (`amr`, `acr`) or as the built in TOTP check records it.
+    /// `RequireMfa` guards need it.
+    pub mfa: bool,
 }
 
 impl Identity {

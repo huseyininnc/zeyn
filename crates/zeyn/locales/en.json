@@ -25,7 +25,28 @@
       "reauth_title": "Confirm it is you",
       "reauth_body": "This action needs a recent sign in. Sign in again in the new tab, then come back and continue.",
       "reauth_open": "Sign in again",
-      "reauth_continue": "I signed in, continue"
+      "reauth_continue": "I signed in, continue",
+      "mfa_title": "Second step needed",
+      "mfa_body": "This needs your second sign in step. Complete it in the new tab, then come back and continue.",
+      "mfa_open": "Verify now"
+    },
+    "auth": {
+      "mfa_required": "This needs a second sign in step, such as a code from your authenticator app.",
+      "mfa_missing": "The sign in did not include a second step. Sign in again and complete it.",
+      "failed": "Sign in did not work. Try again.",
+      "unavailable": "Sign in is not available right now. Try again later.",
+      "totp_title": "Two step verification",
+      "totp_scan": "Scan this code with an authenticator app, then enter the six digit code it shows.",
+      "totp_manual": "Or type this key into the app:",
+      "totp_qr": "QR code for your authenticator app",
+      "totp_intro": "Enter the six digit code from your authenticator app, or one of your recovery codes.",
+      "totp_code": "Code",
+      "totp_verify": "Verify",
+      "totp_invalid": "That code is not valid. Try again.",
+      "totp_rate_limited": "Too many attempts. Wait a few minutes, then try again.",
+      "totp_recovery_title": "Your recovery codes",
+      "totp_recovery_body": "Keep these codes somewhere safe. If you lose your authenticator app, each code works once. They are not shown again.",
+      "totp_continue": "Continue"
     },
     "import": {
       "file": "CSV file",
