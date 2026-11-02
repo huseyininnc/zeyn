@@ -34,13 +34,15 @@ pub use shell::{MenuBar, MenuList, PropertyInspector, StatusBar, Toolbox};
 
 pub use chart::{Chart, ChartKind};
 pub use controls::Control;
-pub(crate) use controls::{Slot, render_bool, render_choice, render_number, render_text};
+pub(crate) use controls::{
+    Slot, choices_text, read_choices, render_bool, render_choice, render_choices, render_number, render_text,
+};
 pub use date::DateOptions;
 pub(crate) use date::{input_text, picker_config, range_reversed, render_date_input, render_range};
 pub use inputs::{mask_example, mask_fits, mask_raw};
 pub(crate) use lines::LinesEditor;
 pub use lines::{Lines, MAX_LINES};
-pub use lookup::{LookupItem, LookupQuery, LookupValue, MAX_LOOKUP_IDS, MAX_LOOKUP_PAGE};
+pub use lookup::{LookupItem, LookupQuery, LookupValue, MAX_LOOKUP_COLUMNS, MAX_LOOKUP_IDS, MAX_LOOKUP_PAGE};
 pub(crate) use lookup::{parse_ids, render_lookup};
 pub use media::{Audio, PLAYBACK_SPEEDS, Video};
 pub use tree::{MAX_TREE_CHILDREN, Tree, TreeItem, TreeQuery};

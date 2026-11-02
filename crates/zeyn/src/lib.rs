@@ -247,6 +247,17 @@
 //! }
 //! ```
 //!
+//! A `Vec` of something that is neither a line model nor a `#[choice]` enum:
+//!
+//! ```compile_fail
+//! use zeyn::prelude::*;
+//!
+//! #[model]
+//! pub struct Tags {
+//!     pub names: Vec<String>,
+//! }
+//! ```
+//!
 //! A `mask` rule on a field that is not text:
 //!
 //! ```compile_fail
@@ -451,9 +462,11 @@ pub use server::{
 };
 pub use time::{Date, DateTime, LocalDateTime, LocalTimeError, Time, TimeZone};
 pub use time::{DateWords, range_presets};
+#[doc(hidden)]
+pub use value::__choices_value;
 pub use value::{
     ChoiceOption, ChoiceType, Currency, FieldKind, FieldType, IsBool, IsMoment, Money, SupportsMinMax,
-    SupportsMinMaxTotal, SupportsRequired, SupportsScale, SupportsSum, SupportsText, Value,
+    SupportsMinMaxTotal, SupportsRequired, SupportsScale, SupportsSum, SupportsText, Value, VecItem,
 };
 pub use workflow::{
     MAX_COMMENT, Transition, TransitionRecord, TransitionRequest, Transitions, Workflow, WorkflowState,

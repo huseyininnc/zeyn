@@ -397,7 +397,14 @@
     "fields": "Numbers, masks and passwords",
     "panel_terms": "Supplier terms",
     "save": "Save terms",
-    "saved": "Terms saved. Nothing was stored."
+    "saved": "Terms saved. Nothing was stored.",
+    "choices": "Several choices and columns",
+    "panel_campaign": "Campaign",
+    "save_campaign": "Save campaign",
+    "campaign_saved": "Campaign saved. Nothing was stored.",
+    "col_code": "Code",
+    "col_name": "Name",
+    "col_price": "Price"
   },
   "SupplierTerms": {
     "supplier": "Supplier",
@@ -407,5 +414,27 @@
     "phone": "Phone",
     "iban": "IBAN",
     "portal_password": "Portal password"
+  },
+  "Campaign": {
+    "name": "Name",
+    "channels": "Channels",
+    "regions": "Regions",
+    "product": "Product"
+  },
+  "Channel": {
+    "Email": "Email",
+    "Phone": "Phone",
+    "Sms": "Text message",
+    "Post": "Post",
+    "Courier": "Courier"
+  },
+  "Region": {
+    "Marmara": "Marmara",
+    "Aegean": "Aegean",
+    "Mediterranean": "Mediterranean",
+    "Central": "Central Anatolia",
+    "BlackSea": "Black Sea",
+    "East": "Eastern Anatolia",
+    "Southeast": "Southeastern Anatolia"
   }
 }

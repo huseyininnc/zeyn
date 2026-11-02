@@ -497,6 +497,7 @@ fn plain(value: &Value, kind: &FieldKind, r: &Render) -> String {
         Value::Null => String::new(),
         Value::Bool(b) => r.i18n.text(r.locale, &Text::key(if *b { "zeyn.yes" } else { "zeyn.no" })),
         Value::Int(n) => n.to_string(),
+        Value::Text(s) if matches!(kind, FieldKind::Choices(_)) => crate::ui::choices_text(s, kind, r),
         Value::Text(s) => s.clone(),
         Value::Money(m) => m.format(r.locale),
         Value::Date(d) => d.format(r.locale),
@@ -1824,7 +1825,7 @@ fn filter_kind(kind: &FieldKind) -> &'static str {
         FieldKind::Time => "time",
         FieldKind::Choice(_) => "choice",
         FieldKind::Bool => "bool",
-        FieldKind::Text | FieldKind::Custom { .. } => "text",
+        FieldKind::Text | FieldKind::Custom { .. } | FieldKind::Choices(_) => "text",
     }
 }
 

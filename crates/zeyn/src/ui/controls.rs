@@ -281,3 +281,75 @@ pub(crate) fn render_text(out: &mut String, r: &Render, s: &Slot) {
         }
     }
 }
+
+/// Several options of a `#[choice]`: a native multiple select (what works without JavaScript)
+/// that the runtime turns into chips and a multi select list (APG listbox, `aria-multiselectable`).
+pub(crate) fn render_choices(out: &mut String, r: &Render, s: &Slot) {
+    let FieldKind::Choices(options) = s.m.kind else { return };
+    let chosen: Vec<&str> = match s.value {
+        Value::Text(t) => t.split(',').filter(|v| !v.is_empty()).collect(),
+        _ => Vec::new(),
+    };
+    let texts = serde_json::json!({
+        "none": ui(r, "select.none"),
+        "remove": ui(r, "lookup.remove"),
+        "selected": ui(r, "lookup.selected"),
+        "count": ui(r, "multi.count"),
+        "open": ui(r, "lookup.open"),
+    });
+    out.push_str(s.label);
+    out.push_str(&format!(
+        r#"<div class="z-multi" data-zeyn-multi data-texts="{}"><select multiple size="{}" {}>"#,
+        crate::render::attr(&texts),
+        options.len().clamp(2, 8),
+        s.common
+    ));
+    for o in options {
+        let selected = if chosen.contains(&o.value) { " selected" } else { "" };
+        out.push_str(&format!(
+            r#"<option value="{}"{selected}>{}</option>"#,
+            o.value,
+            r.text(&Text::key_or(o.key, o.label))
+        ));
+    }
+    out.push_str("</select></div>");
+}
+
+/// Reads several choices sent as a JSON array or as values joined with commas. Every value must
+/// be an option; repeats are dropped. `None` when a value is unknown.
+pub(crate) fn read_choices(
+    options: &[crate::value::ChoiceOption],
+    raw: &serde_json::Value,
+) -> Option<serde_json::Value> {
+    let parts: Vec<String> = match raw {
+        serde_json::Value::Array(items) => {
+            items.iter().map(|v| v.as_str().map(str::to_string)).collect::<Option<_>>()?
+        }
+        serde_json::Value::String(s) => s.split(',').map(|p| p.trim().to_string()).filter(|p| !p.is_empty()).collect(),
+        serde_json::Value::Null => Vec::new(),
+        _ => return None,
+    };
+    let mut values: Vec<&str> = Vec::with_capacity(parts.len().min(options.len()));
+    for p in &parts {
+        let option = options.iter().find(|o| o.value == p.trim())?;
+        if !values.contains(&option.value) {
+            values.push(option.value);
+        }
+    }
+    Some(serde_json::json!(values))
+}
+
+/// Several choices as the user reads them: their labels in the user's language, joined with
+/// commas.
+pub(crate) fn choices_text(value: &str, kind: &FieldKind, r: &Render) -> String {
+    let FieldKind::Choices(options) = kind else { return value.to_string() };
+    value
+        .split(',')
+        .filter(|v| !v.is_empty())
+        .map(|v| match options.iter().find(|o| o.value == v) {
+            Some(o) => r.i18n.text(r.locale, &Text::key_or(o.key, o.label)),
+            None => v.to_string(),
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}

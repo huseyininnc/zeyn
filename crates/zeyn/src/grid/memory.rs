@@ -116,7 +116,7 @@ impl Cond {
         if let Some(t) = text(&f.contains) {
             out.push(Cond::Text(i, TextOp::Contains, t));
         }
-        let textual = matches!(kind, FieldKind::Text | FieldKind::Custom { .. } | FieldKind::Choice(_));
+        let textual = matches!(kind, FieldKind::Text | FieldKind::Choice(_)) || kind.is_json();
         if textual {
             if let Some(t) = f.starts_with.as_deref().and_then(text) {
                 out.push(Cond::Text(i, TextOp::StartsWith, t));

@@ -389,6 +389,9 @@
         "fair": "Strength: fair",
         "good": "Strength: good",
         "strong": "Strength: strong"
+      },
+      "multi": {
+        "count": "{n} selected"
       }
     },
     "date": {

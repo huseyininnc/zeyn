@@ -26,6 +26,7 @@ Form::of(Contact { quantity: 2, size: Size::Medium, ..Contact::default() })
 | `Decimal` | Exact number in the user's format, with the field's `scale` (see [Decimal input](#decimal-and-percent)) |
 | `bool` | Checkbox |
 | `#[choice]` enum | Select: a button that opens a searchable list |
+| `Vec` of a `#[choice]` enum | Multi select: chips and a list where several options are chosen |
 | `Date`, `Time`, `DateTime`, `LocalDateTime` | Date and time pickers |
 | `Vec<M>` of a model | Line editor (see [Line editor](lines.md)) |
 
@@ -54,6 +55,46 @@ pub async fn find_samples(q: LookupQuery, store: SampleStore) -> Result<Page<Loo
 ```
 
 `.lookup_many(M::f, action)` does the same for a `Vec<i64>` field and shows the chosen ones as removable tags.
+
+`.lookup_columns(M::f, action, [t!("code"), t!("name"), t!("city")])` shows several columns in the list. The search still goes to the action on the server, with its permission checked on every keystroke's search; each item gives its values with `LookupItem::cells`, in the order of the headers. `LookupQuery::apply` searches the cells too. Screen readers hear each option as "Code: C-2, Name: Mert Kaya, City: Ankara". On narrow screens the columns stack inside each option.
+
+```rust
+#[action(permission = "sales.customer.read")]
+pub async fn find_customers(q: LookupQuery, store: CustomerStore) -> Result<Page<LookupItem>> {
+    let items = store.all()?.into_iter().map(|c| LookupItem::new(c.id.0, c.name.clone()).cells([c.code, c.name, c.city]));
+    Ok(q.apply(items.collect()))
+}
+```
+
+## Multi select
+
+A `Vec` of a `#[choice]` enum is edited with a multi select: the chosen options show as chips with a remove button, and a combobox opens a list where options are turned on and off (APG listbox with `aria-multiselectable`, inside a combobox). Underneath is a native `<select multiple>`, so the field works without the runtime. The runtime posts the values joined with commas (`Email,Sms`); the server reads them one by one, refuses unknown values and drops repeats. In JSON (APIs, AI tools, the database) the field is an array of the option values.
+
+```rust
+#[model]
+pub struct Contact {
+    #[rule(required)]
+    pub channels: Vec<Channel>,
+}
+
+Form::of(contact).field(Contact::channels)
+```
+
+@live multi
+
+| Key | Does |
+|---|---|
+| Arrow Down, Arrow Up, Enter, Space | Opens the list on the closed combobox |
+| Home, End | Opens the list on the first or last option |
+| Arrow Down, Arrow Up | Moves through the open list |
+| Shift with Arrow Down or Arrow Up | Moves and turns the next option on or off |
+| Space, Enter | Turns the active option on or off; the list stays open |
+| Letters | Jump to the next option that starts with them |
+| Backspace, Delete | On the closed combobox: removes the last chosen option |
+| Escape, Alt with Arrow Up | Closes the list; focus stays on the combobox |
+| Tab | Closes the list and moves on |
+
+Ctrl+A (select all in the APG pattern) is left to the browser, as the shortcut policy requires; the chips' remove buttons are in the tab order. The list, the chips and the lookup columns need about 1.7 KB gzip of script and no request; the field is 3 nodes plus one per chosen option.
 
 ## Decimal and percent
 

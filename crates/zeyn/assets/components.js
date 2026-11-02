@@ -1165,8 +1165,14 @@ function fillListbox(items, activeValue) {
     const el = make('div', `z-option${item.more ? ' z-option-more' : ''}`, { role: 'option', id: `${list.id}-o${lb.items.length}`, 'aria-selected': String(!!item.selected) });
     if (lb.multiple && !item.more) el.append(make('span', 'z-option-check', { 'aria-hidden': 'true' }));
     const text = make('span', 'z-option-text');
-    text.append(make('span', '', { text: item.label }));
-    if (item.hint) text.append(make('span', 'z-option-hint', { text: item.hint }));
+    if (item.cells?.length && lb.columns?.length) {
+      text.className = 'z-option-cells';
+      item.cells.forEach((c) => text.append(make('span', '', { text: c })));
+      el.setAttribute('aria-label', item.cells.map((c, i) => (lb.columns[i] ? `${lb.columns[i]}: ${c}` : c)).join(', '));
+    } else {
+      text.append(make('span', '', { text: item.label }));
+      if (item.hint) text.append(make('span', 'z-option-hint', { text: item.hint }));
+    }
     el.append(text);
     el.dataset.index = String(lb.items.length);
     (item.group ? groupEl : list).append(el);
@@ -1506,6 +1512,7 @@ async function searchLookup(wrap, offset = 0, keep = []) {
       pick: (item) => pickLookup(wrap, item),
       more: () => searchLookup(wrap, lb.next, lb.items.filter((i) => !i.more)),
     });
+    lookupColumns(wrap);
     fillListbox([...keep, { note: t.loading }]);
   }
   wrap.zeynAbort?.abort();
@@ -1516,7 +1523,7 @@ async function searchLookup(wrap, offset = 0, keep = []) {
   const items = [...keep];
   for (const item of page.items ?? []) {
     wrap.zeynLabels.set(String(item.id), item.label);
-    items.push({ value: String(item.id), label: item.label, hint: item.hint, selected: chosen.has(String(item.id)) });
+    items.push({ value: String(item.id), label: item.label, hint: item.hint, cells: item.cells, selected: chosen.has(String(item.id)) });
   }
   lb.next = page.next ? Number(page.next) : null;
   if (page.next) items.push({ value: '', label: t.more, more: true });
@@ -1887,7 +1894,8 @@ function valuesOf(form) {
     if (el.type === 'checkbox') values[el.name] = el.checked;
     else if (el.type === 'radio') {
       if (el.checked) values[el.name] = el.value;
-    } else values[el.name] = el.value;
+    } else if (el.multiple) values[el.name] = [...el.selectedOptions].map((o) => o.value).join(',');
+    else values[el.name] = el.value;
   }
   return values;
 }
@@ -2595,3 +2603,203 @@ new MutationObserver((records) => {
 
 initMasks(document);
 initPasswords(document);
+
+/* Multi select ------------------------------------------------------------------------------- */
+
+/** Turns `[data-zeyn-multi]` multiple selects into chips and a combobox with a multi select list. */
+function initMultis(root) {
+  root.querySelectorAll('[data-zeyn-multi]:not([data-ready])').forEach((wrap) => {
+    const native = wrap.querySelector('select');
+    if (!native) return;
+    wrap.dataset.ready = '';
+    const t = texts(wrap);
+    const box = make('div', 'z-lookup-box z-multi-box');
+    const tags = make('ul', 'z-tags', { 'aria-label': t.selected });
+    const combo = make('div', 'z-multi-button', {
+      role: 'combobox',
+      tabindex: native.disabled ? '-1' : '0',
+      'aria-haspopup': 'listbox',
+      'aria-expanded': 'false',
+      'aria-labelledby': `${native.id}-label ${native.id}-value`,
+      'data-testid': `${native.dataset.testid ?? ''}.combobox`,
+    });
+    for (const a of ['aria-describedby', 'aria-required', 'aria-invalid']) if (native.hasAttribute(a)) combo.setAttribute(a, native.getAttribute(a));
+    if (native.required) combo.setAttribute('aria-required', 'true');
+    combo.append(make('span', 'z-select-value', { id: `${native.id}-value` }));
+    box.append(tags, combo, make('span', 'z-select-arrow', { 'aria-hidden': 'true' }));
+    wrap.prepend(box);
+    wrap.append(make('span', 'z-sr-only', { 'aria-live': 'polite' }));
+    wrap.dataset.zeynLive = '';
+    hideNative(native);
+    syncMulti(wrap);
+  });
+}
+
+/** Draws the chosen options of a multi select as chips and a count. */
+function syncMulti(wrap) {
+  const t = texts(wrap);
+  const native = wrap.querySelector('select');
+  const chosen = [...native.selectedOptions];
+  wrap.querySelector('.z-tags').replaceChildren(
+    ...chosen.map((o) => {
+      const li = make('li', 'z-tag');
+      li.append(make('span', '', { text: o.text }));
+      const remove = make('button', 'z-tag-remove', { type: 'button', 'data-multi-remove': o.value, 'aria-label': fill(t.remove, { label: o.text }) });
+      remove.append(make('span', '', { 'aria-hidden': 'true', text: '×' }));
+      li.append(remove);
+      return li;
+    }),
+  );
+  const value = wrap.querySelector('.z-select-value');
+  value.textContent = chosen.length ? fill(t.count, { n: chosen.length }) : t.none;
+  value.classList.toggle('z-placeholder', !chosen.length);
+}
+
+/** Selects or clears one option of a multi select and tells the form. */
+function setMulti(wrap, value, on) {
+  const native = wrap.querySelector('select');
+  const option = [...native.options].find((o) => o.value === value);
+  if (!option || option.selected === on) return;
+  option.selected = on;
+  native.dispatchEvent(new Event('input', { bubbles: true }));
+  native.dispatchEvent(new Event('change', { bubbles: true }));
+  syncMulti(wrap);
+  const item = lb?.items.find((i) => i.value === value);
+  if (item) {
+    item.selected = on;
+    item.el.setAttribute('aria-selected', String(on));
+  }
+  announce(wrap, fill(texts(wrap).count, { n: native.selectedOptions.length }));
+}
+
+/** Opens the list of a multi select; options stay selected as the user toggles them. */
+function openMulti(combo, where = 'first') {
+  const wrap = combo.closest('[data-zeyn-multi]');
+  const native = wrap.querySelector('select');
+  openListbox(combo, {
+    label: document.getElementById(`${native.id}-label`)?.textContent.replace('*', '').trim() ?? '',
+    multiple: true,
+    anchor: wrap.querySelector('.z-multi-box'),
+    pick: (item) => setMulti(wrap, item.value, !item.selected),
+  });
+  const items = [...native.options].map((o) => ({ value: o.value, label: o.text, selected: o.selected }));
+  fillListbox(items, native.selectedOptions[0]?.value);
+  if (where === 'last') setActive(items.length - 1);
+  if (where === 'first' && !native.selectedOptions.length) setActive(0);
+}
+
+/**
+ * Keyboard of a multi select (APG listbox with multiple selection, inside a combobox): arrows,
+ * Home and End move, Space and Enter toggle, Shift with an arrow moves and toggles, letters jump,
+ * Backspace on the closed combobox removes the last chip. Ctrl+A is the browser's and stays so.
+ */
+function multiKey(e, combo) {
+  const wrap = combo.closest('[data-zeyn-multi]');
+  const open = lb?.combo === combo;
+  if (!open) {
+    if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) {
+      e.preventDefault();
+      openMulti(combo);
+      return true;
+    }
+    if (e.key === 'Home' || e.key === 'End') {
+      e.preventDefault();
+      openMulti(combo, e.key === 'Home' ? 'first' : 'last');
+      return true;
+    }
+    if (e.key === 'Backspace' || e.key === 'Delete') {
+      const last = [...wrap.querySelector('select').selectedOptions].at(-1);
+      if (!last) return false;
+      e.preventDefault();
+      setMulti(wrap, last.value, false);
+      return true;
+    }
+    const items = [...wrap.querySelector('select').options].map((o) => ({ label: o.text }));
+    const at = typeAhead(e, items, 0);
+    if (at < 0) return false;
+    e.preventDefault();
+    openMulti(combo);
+    setActive(at);
+    return true;
+  }
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    return pickActive();
+  }
+  if (e.altKey && e.key === 'ArrowUp') {
+    e.preventDefault();
+    closePopup(true);
+    return true;
+  }
+  if (e.key === 'Tab') {
+    closePopup(false);
+    return false;
+  }
+  if (e.shiftKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+    moveActive(e);
+    return pickActive();
+  }
+  if (moveActive(e)) return true;
+  const at = typeAhead(e, lb.items, Math.max(0, lb.active));
+  if (at < 0) return false;
+  e.preventDefault();
+  setActive(at);
+  return true;
+}
+
+/* Lookup columns ----------------------------------------------------------------------------- */
+
+/** Gives the open lookup list the column headers of a multi column lookup (`data-columns`). */
+function lookupColumns(wrap) {
+  const columns = parse(wrap.dataset.columns ?? 'null');
+  if (!lb || !Array.isArray(columns) || !columns.length) return;
+  lb.columns = columns;
+  lb.panel.classList.add('z-list-columns');
+  lb.panel.style.setProperty('--z-cols', String(columns.length));
+  const head = make('div', 'z-list-head', { 'aria-hidden': 'true' });
+  columns.forEach((c) => head.append(make('span', '', { text: c })));
+  lb.panel.prepend(head);
+}
+
+/* Setup of the multi select ------------------------------------------------------------------ */
+
+initializers.push(initMultis);
+
+keyHandlers.push((e, t) => t.matches('.z-multi-button') && multiKey(e, t));
+
+clickHandlers.push((e, t) => {
+  const remove = t.closest('[data-multi-remove]');
+  if (remove) {
+    const wrap = remove.closest('[data-zeyn-multi]');
+    setMulti(wrap, remove.dataset.multiRemove, false);
+    wrap.querySelector('[role="combobox"]').focus();
+    return true;
+  }
+  const box = t.closest('.z-multi-box');
+  if (!box) return false;
+  const combo = box.querySelector('[role="combobox"]');
+  if (lb?.combo === combo) closePopup(true);
+  else {
+    combo.focus();
+    openMulti(combo);
+  }
+  return true;
+});
+
+document.addEventListener('focusin', (e) => {
+  const t = e.target;
+  if (t instanceof Element && t.matches('[data-zeyn-multi] .z-native')) t.closest('[data-zeyn-multi]').querySelector('[role="combobox"]')?.focus();
+});
+
+/** Validation marks set on the native multiple select show on its combobox. */
+new MutationObserver((records) => {
+  for (const r of records) {
+    const el = r.target;
+    if (!(el instanceof Element) || !el.matches('[data-zeyn-multi] .z-native')) continue;
+    const combo = el.closest('[data-zeyn-multi]').querySelector('[role="combobox"]');
+    if (el.getAttribute('aria-invalid') === 'true') combo?.setAttribute('aria-invalid', 'true');
+    else combo?.removeAttribute('aria-invalid');
+  }
+}).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['aria-invalid'] });
+
+initMultis(document);

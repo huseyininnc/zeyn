@@ -57,10 +57,90 @@ pub fn input_fields() -> Screen {
     )
 }
 
+/// Ways a customer agrees to be reached.
+#[choice]
+pub enum Channel {
+    Email,
+    Phone,
+    Sms,
+    Post,
+    Courier,
+}
+
+/// Regions a campaign runs in.
+#[choice]
+pub enum Region {
+    Marmara,
+    Aegean,
+    Mediterranean,
+    Central,
+    BlackSea,
+    East,
+    Southeast,
+}
+
+/// A marketing campaign with several channels, regions and a product picked from columns.
+#[model]
+pub struct Campaign {
+    #[rule(required, max_len = 80)]
+    pub name: String,
+    #[rule(required)]
+    pub channels: Vec<Channel>,
+    pub regions: Vec<Region>,
+    #[rule(required)]
+    pub product: Option<crate::stock::ProductId>,
+}
+
+#[action(public)]
+pub async fn save_campaign(campaign: Valid<Campaign>) -> Result<Campaign> {
+    Ok(campaign.into_inner())
+}
+
+/// Products with code, name and price columns.
+#[action(permission = "stock.product.read")]
+pub async fn find_product_rows(
+    q: LookupQuery,
+    store: crate::stock::ProductStore,
+    ctx: Ctx,
+) -> Result<Page<LookupItem>> {
+    let items = store
+        .all()?
+        .into_iter()
+        .map(|p| LookupItem::new(p.id.0, p.name.clone()).cells([p.code, p.name, p.price.format(ctx.locale())]))
+        .collect();
+    Ok(q.apply(items))
+}
+
+#[screen(route = "/choices", permission = "stock.product.read")]
+pub fn input_choices() -> Screen {
+    let campaign = Campaign {
+        name: "Spring tea week".into(),
+        channels: vec![Channel::Email, Channel::Sms],
+        regions: vec![Region::Marmara, Region::Aegean],
+        ..Campaign::default()
+    };
+    Screen::new(t!("inputs.choices")).body(
+        Panel::new(t!("inputs.panel_campaign")).add(
+            Form::of(campaign)
+                .field(Campaign::name)
+                .row(|r| r.field(Campaign::channels).field(Campaign::regions))
+                .lookup_columns(
+                    Campaign::product,
+                    find_product_rows,
+                    [t!("inputs.col_code"), t!("inputs.col_name"), t!("inputs.col_price")],
+                )
+                .submit(t!("inputs.save_campaign"), save_campaign)
+                .on_success(|_, ui| ui.toast(t!("inputs.campaign_saved"))),
+        ),
+    )
+}
+
 pub fn feature() -> Feature {
-    Feature::new("inputs")
-        .route_prefix("/inputs")
-        .guard(SignedIn)
-        .screen(input_fields)
-        .menu(|m| m.group(t!("menu.inputs"), Icon::Edit).item(t!("inputs.fields"), input_fields))
+    Feature::new("inputs").route_prefix("/inputs").guard(SignedIn).screen(input_fields).screen(input_choices).menu(
+        |m| {
+            m.group(t!("menu.inputs"), Icon::Edit)
+                .item(t!("inputs.fields"), input_fields)
+                .item(t!("inputs.choices"), input_choices)
+        },
+    )
 }

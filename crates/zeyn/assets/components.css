@@ -1782,3 +1782,52 @@ dialog.z-confirm::backdrop { background: var(--z-backdrop); }
   .z-strength[data-level="3"] .z-strength-bar span:nth-child(-n + 3),
   .z-strength[data-level="4"] .z-strength-bar span:nth-child(-n + 4) { background: CanvasText; }
 }
+
+/* Multi select and multi column lookups -------------------------------------------------------- */
+
+.z-multi { position: relative; min-width: 0; }
+
+.z-multi-box { cursor: pointer; }
+
+.z-multi-button {
+  display: flex;
+  flex: 1 1 8rem;
+  align-items: center;
+  min-width: 6rem;
+  min-height: calc(var(--z-control) - 6px);
+  outline: none;
+}
+
+.z-list-columns { min-width: max(var(--z-pop-min, 12rem), calc(var(--z-cols) * 9rem)); }
+
+.z-list-head,
+.z-option-cells {
+  display: grid;
+  grid-template-columns: repeat(var(--z-cols, 1), minmax(6rem, 1fr));
+  gap: calc(var(--z-space) * 3);
+  min-width: 0;
+  flex: 1;
+}
+
+.z-list-columns .z-option-cells { grid-template-columns: repeat(var(--z-cols, 1), minmax(6rem, 1fr)); }
+
+.z-option-cells > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.z-list-head {
+  position: sticky;
+  top: -4px;
+  z-index: 1;
+  padding: 6px calc(var(--z-space) * 2.5);
+  border-bottom: 1px solid var(--z-border);
+  background: var(--z-surface);
+  color: var(--z-text-muted);
+  font-size: var(--z-font-size-xs);
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .z-list-columns { min-width: 0; }
+  .z-list-head { display: none; }
+  .z-list-columns .z-option-cells { grid-template-columns: 1fr; gap: 0; }
+  .z-option-cells > span:not(:first-child) { color: var(--z-text-muted); font-size: var(--z-font-size-xs); }
+}

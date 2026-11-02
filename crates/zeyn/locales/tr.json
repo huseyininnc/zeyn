@@ -389,6 +389,9 @@
         "fair": "Güç: orta",
         "good": "Güç: iyi",
         "strong": "Güç: güçlü"
+      },
+      "multi": {
+        "count": "{n} seçili"
       }
     },
     "date": {

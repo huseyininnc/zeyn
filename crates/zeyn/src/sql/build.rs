@@ -189,7 +189,7 @@ impl Dialect for Postgres {
             FieldKind::LocalDateTime => "TIMESTAMP(0)".into(),
             FieldKind::Choice(options) => format!("VARCHAR({})", choice_len(options)),
             FieldKind::Text => max_len.map_or_else(|| "TEXT".into(), |n| format!("VARCHAR({n})")),
-            FieldKind::Custom { .. } => "TEXT".into(),
+            FieldKind::Custom { .. } | FieldKind::Choices(_) => "TEXT".into(),
         }
     }
 
@@ -324,7 +324,7 @@ impl Dialect for Oracle {
                 Some(n) if n <= 1000 => format!("VARCHAR2({n} CHAR)"),
                 _ => "VARCHAR2(4000)".into(),
             },
-            FieldKind::Custom { .. } => "CLOB".into(),
+            FieldKind::Custom { .. } | FieldKind::Choices(_) => "CLOB".into(),
         }
     }
 
@@ -622,7 +622,7 @@ pub(crate) fn order_keys(d: &dyn Dialect, fields: &[FieldMeta], q: &DataQuery) -
     let mut keys: Vec<OrderKey> = Vec::new();
     for s in q.sort.iter().take(MAX_SORT) {
         let Some(index) = fields.iter().position(|f| f.name == s.field) else { continue };
-        if matches!(fields[index].kind, FieldKind::Custom { .. }) || keys.iter().any(|k| k.index == index) {
+        if fields[index].kind.is_json() || keys.iter().any(|k| k.index == index) {
             continue;
         }
         keys.push(OrderKey { index, desc: s.desc, nullable: nullable(&fields[index]) });
@@ -816,7 +816,7 @@ pub(crate) fn read_cursor(fields: &[FieldMeta], keys: &[OrderKey], cursor: &Curs
                 (FieldKind::Decimal, _) => {
                     text(&v).and_then(|s| crate::Decimal::parse(&s)).map(|x| Arg::Text(x.sql_text()))
                 }
-                (FieldKind::Custom { .. }, _) => None,
+                (FieldKind::Custom { .. } | FieldKind::Choices(_), _) => None,
             };
             arg.ok_or_else(bad_cursor)
         })
@@ -1084,7 +1084,7 @@ pub(crate) fn is_new_key(v: &Value) -> bool {
 /// Values of custom fields, which are stored as JSON text. Serialized only when the entity has
 /// such fields.
 fn custom_json<M: Model>(row: &M) -> Option<serde_json::Map<String, serde_json::Value>> {
-    if !M::fields().iter().any(|f| matches!(f.kind, FieldKind::Custom { .. })) {
+    if !M::fields().iter().any(|f| f.kind.is_json()) {
         return None;
     }
     match serde_json::to_value(row) {
@@ -1100,7 +1100,7 @@ fn field_args<M: Model>(
     json: &Option<serde_json::Map<String, serde_json::Value>>,
 ) -> Vec<Arg> {
     let mut args = Vec::with_capacity(2);
-    if matches!(f.kind, FieldKind::Custom { .. }) {
+    if f.kind.is_json() {
         let v = json.as_ref().and_then(|m| m.get(f.name)).filter(|v| !v.is_null());
         args.push(v.map_or(Arg::Null(Col::Text), |v| Arg::Text(v.to_string())));
     } else {
@@ -1303,7 +1303,7 @@ pub fn create_table<E: Entity>(d: &dyn Dialect) -> Result<Vec<String>> {
     let mut cols = Vec::new();
     for f in E::fields() {
         let name = column(d, f)?;
-        let text_null = d.empty_is_null() && matches!(f.kind, FieldKind::Text | FieldKind::Custom { .. });
+        let text_null = d.empty_is_null() && (matches!(f.kind, FieldKind::Text) || f.kind.is_json());
         let not_null = if f.optional || text_null { "" } else { " NOT NULL" };
         if f.key && matches!(f.kind, FieldKind::Id | FieldKind::Integer) {
             cols.push(format!("{name} {} PRIMARY KEY", d.generated_key()));

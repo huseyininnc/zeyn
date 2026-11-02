@@ -397,7 +397,14 @@
     "fields": "Sayılar, maskeler ve parolalar",
     "panel_terms": "Tedarikçi koşulları",
     "save": "Koşulları kaydet",
-    "saved": "Koşullar kaydedildi. Hiçbir şey saklanmadı."
+    "saved": "Koşullar kaydedildi. Hiçbir şey saklanmadı.",
+    "choices": "Çoklu seçim ve sütunlar",
+    "panel_campaign": "Kampanya",
+    "save_campaign": "Kampanyayı kaydet",
+    "campaign_saved": "Kampanya kaydedildi. Hiçbir şey saklanmadı.",
+    "col_code": "Kod",
+    "col_name": "Ad",
+    "col_price": "Fiyat"
   },
   "SupplierTerms": {
     "supplier": "Tedarikçi",
@@ -407,5 +414,27 @@
     "phone": "Telefon",
     "iban": "IBAN",
     "portal_password": "Portal parolası"
+  },
+  "Campaign": {
+    "name": "Ad",
+    "channels": "Kanallar",
+    "regions": "Bölgeler",
+    "product": "Ürün"
+  },
+  "Channel": {
+    "Email": "E-posta",
+    "Phone": "Telefon",
+    "Sms": "SMS",
+    "Post": "Posta",
+    "Courier": "Kurye"
+  },
+  "Region": {
+    "Marmara": "Marmara",
+    "Aegean": "Ege",
+    "Mediterranean": "Akdeniz",
+    "Central": "İç Anadolu",
+    "BlackSea": "Karadeniz",
+    "East": "Doğu Anadolu",
+    "Southeast": "Güneydoğu Anadolu"
   }
 }

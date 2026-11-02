@@ -59,7 +59,8 @@ function formValues(form) {
     if (el.type === 'checkbox') values[el.name] = el.checked;
     else if (el.type === 'radio') {
       if (el.checked) values[el.name] = el.value;
-    } else values[el.name] = el.value;
+    } else if (el.multiple) values[el.name] = [...el.selectedOptions].map((o) => o.value).join(',');
+    else values[el.name] = el.value;
   }
   return values;
 }

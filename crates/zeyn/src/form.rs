@@ -76,6 +76,8 @@ pub struct Form<M: Model> {
     options: Vec<(&'static str, DateOptions)>,
     controls: Vec<(&'static str, Control)>,
     lookups: Vec<(&'static str, Box<dyn DataSource>, bool)>,
+    /// Column headers of lookups that show several columns, by field.
+    lookup_columns: Vec<(&'static str, Vec<Text>)>,
     lines: Vec<(&'static str, Box<dyn LinesEditor>)>,
 }
 
@@ -95,6 +97,7 @@ impl<M: Model> Form<M> {
             options: Vec::new(),
             controls: Vec::new(),
             lookups: Vec::new(),
+            lookup_columns: Vec::new(),
             lines: Vec::new(),
         }
     }
@@ -106,7 +109,15 @@ impl<M: Model> Form<M> {
             .filter(|i| !M::fields()[*i].version)
             .map(|i| FormItem::Field(FormField::at(i)))
             .collect();
-        Self { model, items, options: Vec::new(), controls: Vec::new(), lookups: Vec::new(), lines: Vec::new() }
+        Self {
+            model,
+            items,
+            options: Vec::new(),
+            controls: Vec::new(),
+            lookups: Vec::new(),
+            lookup_columns: Vec::new(),
+            lines: Vec::new(),
+        }
     }
 
     pub fn field<T: FieldType + 'static>(mut self, field: Field<M, T>) -> Self {
@@ -211,6 +222,26 @@ impl<M: Model> Form<M> {
         self.items.push(FormItem::Field(FormField::of(field)));
         self.lookups.push((field.meta().name, Box::new(ActionSource::<A>::new()), false));
         self
+    }
+
+    /// Adds an id field edited with a searchable combobox whose list shows several columns, such
+    /// as code, name and city. `columns` are the headers; each [`LookupItem`] gives its values
+    /// with [`LookupItem::cells`], in the same order. The search goes to `action` on the server
+    /// exactly as for [`Form::lookup`], with its permission checked on every search.
+    ///
+    /// ```ignore
+    /// Form::of(order).lookup_columns(Order::customer, find_customers, [t!("code"), t!("name"), t!("city")])
+    /// ```
+    pub fn lookup_columns<T, A, C>(mut self, field: Field<M, T>, action: A, columns: C) -> Self
+    where
+        T: FieldType + LookupValue + 'static,
+        A: Action<Input = LookupQuery, Output = Result<Page<LookupItem>>>,
+        C: IntoIterator,
+        C::Item: Into<Text>,
+    {
+        let headers: Vec<Text> = columns.into_iter().take(crate::ui::MAX_LOOKUP_COLUMNS).map(Into::into).collect();
+        self.lookup_columns.push((field.meta().name, headers));
+        self.lookup(field, action)
     }
 
     /// Adds a field of several ids edited with a searchable combobox that shows the chosen ones
@@ -586,6 +617,9 @@ pub(crate) fn parse_value(
     if let FieldKind::Bool = meta.kind {
         return raw.as_bool().map(Json::Bool).ok_or(Unreadable::Format);
     }
+    if let FieldKind::Choices(options) = meta.kind {
+        return crate::ui::read_choices(options, raw).ok_or(Unreadable::Format);
+    }
     let text = match raw {
         Json::String(s) => s.clone(),
         Json::Number(n) => n.to_string(),
@@ -629,6 +663,7 @@ pub(crate) fn parse_value(
             let money = Money::parse(trimmed, locale, currency)?;
             serde_json::to_value(money).map_err(|_| Unreadable::Format)
         }
+        FieldKind::Choices(_) => Err(Unreadable::Format),
         FieldKind::Choice(options) => options
             .iter()
             .find(|o| o.value == trimmed)
@@ -703,7 +738,8 @@ fn render_field<M: Model>(out: &mut String, r: &Render, f: &FormField<M>, form: 
         return;
     }
     if let Some((_, many)) = form.lookup_of(m.name) {
-        crate::ui::render_lookup(out, r, &slot, many);
+        let columns = form.lookup_columns.iter().find(|(n, _)| *n == m.name).map(|(_, c)| c.as_slice());
+        crate::ui::render_lookup(out, r, &slot, many, columns.unwrap_or_default());
         out.push_str(&format!(r#"<p class="z-field-error" id="{id}-error" aria-live="polite"></p></div>"#));
         return;
     }
@@ -711,6 +747,7 @@ fn render_field<M: Model>(out: &mut String, r: &Render, f: &FormField<M>, form: 
     match m.kind {
         FieldKind::Bool => crate::ui::render_bool(out, &slot),
         FieldKind::Choice(_) => crate::ui::render_choice(out, r, &slot),
+        FieldKind::Choices(_) => crate::ui::render_choices(out, r, &slot),
         FieldKind::Money | FieldKind::Integer | FieldKind::Id | FieldKind::Decimal => {
             crate::ui::render_number(out, r, &slot)
         }
@@ -815,6 +852,10 @@ where
                 FieldKind::Choice(options) => {
                     let values: Vec<&str> = options.iter().map(|o| o.value).collect();
                     ("string", format!("One of: {}.", values.join(", ")))
+                }
+                FieldKind::Choices(options) => {
+                    let values: Vec<&str> = options.iter().map(|o| o.value).collect();
+                    ("string", format!("Values separated by commas, each one of: {}.", values.join(", ")))
                 }
                 FieldKind::Text if m.mask_pattern().is_some() => (
                     "string",

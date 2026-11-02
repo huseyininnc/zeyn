@@ -128,6 +128,7 @@ impl<'a> Render<'a> {
                     String::new()
                 }
             }
+            (Value::Text(s), FieldKind::Choices(_)) => escape(&crate::ui::choices_text(s, kind, self)),
             (Value::Text(s), _) => escape(s),
             (Value::Money(m), _) => escape(&m.format(self.locale)),
             (Value::Number(d), _) => escape(&d.format(self.locale)),

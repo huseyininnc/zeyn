@@ -44,6 +44,11 @@ fn field_schema(f: &FieldMeta) -> Json {
             "properties": { "minor": { "type": "integer", "description": "Amount in the smallest unit (cents, kuruş)" }, "currency": { "type": "string", "enum": ["Try", "Usd", "Eur"] } },
             "required": ["minor", "currency"]
         }),
+        FieldKind::Choices(options) => json!({
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "type": "string", "enum": options.iter().map(|o| o.value).collect::<Vec<_>>() }
+        }),
         FieldKind::Choice(options) => {
             json!({ "type": "string", "enum": options.iter().map(|o| o.value).collect::<Vec<_>>() })
         }

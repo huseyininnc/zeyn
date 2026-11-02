@@ -491,10 +491,22 @@ fn expand_choice(mut e: ItemEnum) -> syn::Result<Ts> {
 
         impl ::zeyn::ChoiceType for #ident {}
 
+        impl #ident {
+            #[doc(hidden)]
+            pub const __ZEYN_OPTIONS: &'static [::zeyn::ChoiceOption] = &[#(#options),*];
+        }
+
         impl ::zeyn::FieldType for #ident {
-            const KIND: ::zeyn::FieldKind = ::zeyn::FieldKind::Choice(&[#(#options),*]);
+            const KIND: ::zeyn::FieldKind = ::zeyn::FieldKind::Choice(Self::__ZEYN_OPTIONS);
             fn to_value(&self) -> ::zeyn::Value {
                 ::zeyn::Value::Choice(match self { #(#arms),* })
+            }
+        }
+
+        impl ::zeyn::VecItem for #ident {
+            const VEC_KIND: ::zeyn::FieldKind = ::zeyn::FieldKind::Choices(Self::__ZEYN_OPTIONS);
+            fn __vec_value(items: &[Self]) -> ::zeyn::Value {
+                ::zeyn::__choices_value(items)
             }
         }
     })

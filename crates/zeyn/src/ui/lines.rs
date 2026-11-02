@@ -11,7 +11,7 @@ use crate::form::{Reading, Unreadable, parse_value};
 use crate::i18n::Text;
 use crate::model::{Field, FieldError, FieldMeta, Model, Rule, ValidationErrors};
 use crate::render::{Render, escape};
-use crate::value::{FieldKind, FieldType, Money, SupportsRequired, Value};
+use crate::value::{FieldKind, FieldType, Money, Value};
 use serde_json::{Map, Value as Json};
 use std::collections::BTreeMap;
 use std::marker::PhantomData;
@@ -20,19 +20,15 @@ use std::marker::PhantomData;
 pub const MAX_LINES: usize = 500;
 
 /// Lines of a parent model, edited as a table. A line model is any `#[model]` or `#[entity]`.
-impl<L: Model> FieldType for Vec<L> {
-    const KIND: FieldKind = FieldKind::Custom { editor: "lines" };
+impl<L: Model> crate::value::VecItem for L {
+    const VEC_KIND: FieldKind = FieldKind::Custom { editor: "lines" };
 
-    fn to_value(&self) -> Value {
-        Value::Int(self.len() as i64)
+    fn __vec_value(items: &[Self]) -> Value {
+        Value::Int(items.len() as i64)
     }
 
-    fn __is_empty(&self) -> bool {
-        self.is_empty()
-    }
-
-    fn __validate_items(&self, meta: &FieldMeta, errors: &mut ValidationErrors) {
-        for (row, line) in self.iter().enumerate() {
+    fn __vec_validate(items: &[Self], meta: &FieldMeta, errors: &mut ValidationErrors) {
+        for (row, line) in items.iter().enumerate() {
             let Err(problems) = line.validate() else { continue };
             for e in problems.errors {
                 errors.errors.push(FieldError {
@@ -46,8 +42,6 @@ impl<L: Model> FieldType for Vec<L> {
         }
     }
 }
-
-impl<L: Model> SupportsRequired for Vec<L> {}
 
 /// Columns of a lines table. Built in `Form::lines`.
 ///

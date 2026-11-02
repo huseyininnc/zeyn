@@ -332,6 +332,12 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
             .add(StatusBar::new("Status").left("Ready").right("UTF-8"))
             .into(),
         "inputs" => inputs(),
+        "multi" => Form::of(Reach { channels: vec![Channel::Email], ..Reach::default() })
+            .field(Reach::channels)
+            .lookup_columns(Reach::product, find_sample_rows, ["Code", "Name", "Unit"])
+            .submit(t!("docs.live.save"), save_reach)
+            .on_success(|_, ui| ui.toast(t!("docs.live.saved")))
+            .into(),
         _ => return None,
     })
 }
@@ -376,7 +382,49 @@ fn inputs() -> Node {
     .into()
 }
 
+/// How a customer wants to be reached.
+#[choice]
+pub enum Channel {
+    Email,
+    Phone,
+    #[label("Text message")]
+    Sms,
+    Post,
+}
+
+/// Contact preferences, for the multi select and the multi column lookup.
+#[model]
+pub struct Reach {
+    #[rule(required)]
+    pub channels: Vec<Channel>,
+    pub product: Option<SampleId>,
+}
+
+#[action(public)]
+pub async fn save_reach(reach: Valid<Reach>) -> Result<usize> {
+    Ok(reach.channels.len())
+}
+
+/// Sample products with code, name and unit columns.
+#[action(public)]
+pub async fn find_sample_rows(q: LookupQuery) -> Result<Page<LookupItem>> {
+    let unit = |u: Unit| match u {
+        Unit::Piece => "Piece",
+        Unit::Kg => "Kg",
+        Unit::Liter => "Liter",
+    };
+    Ok(q.apply(
+        SAMPLES
+            .iter()
+            .map(|s| {
+                LookupItem::new(s.id.0, s.name.clone()).cells([s.code.clone(), s.name.clone(), unit(s.unit).into()])
+            })
+            .collect(),
+    ))
+}
+
 /// Names of every live example, for checks and tests.
 pub const EXAMPLES: &[&str] = &[
-    "datagrid", "form", "controls", "dates", "lines", "layout", "display", "action", "tree", "chart", "shell", "inputs",
+    "datagrid", "form", "controls", "dates", "lines", "layout", "display", "action", "tree", "chart", "shell",
+    "inputs", "multi",
 ];
