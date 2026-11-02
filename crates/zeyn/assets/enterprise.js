@@ -287,7 +287,7 @@ function draftFields(form) {
       !el.disabled &&
       !el.readOnly &&
       !el.hidden &&
-      !el.matches('[data-zeyn-masked], [type="password"], [type="file"], [type="hidden"], button, fieldset, output'),
+      !el.matches('[data-zeyn-masked], [type="password"], [autocomplete="one-time-code"], [type="file"], [type="hidden"], button, fieldset, output'),
   );
 }
 
@@ -317,7 +317,7 @@ function setField(el, value) {
 /** Keeps what was typed in a form in `sessionStorage`, with the row version it was typed on. */
 function saveDraft(form) {
   const a = address(form);
-  if (!a.screen) return;
+  if (!a.screen || secretForm(form)) return;
   const values = {};
   for (const el of draftFields(form)) {
     const v = fieldValue(el);
@@ -329,6 +329,11 @@ function saveDraft(form) {
   } catch {
     return;
   }
+}
+
+/** Sign in and code forms keep no drafts at all: nothing of them is worth restoring. */
+function secretForm(form) {
+  return !!form.querySelector('[type="password"], [autocomplete="one-time-code"]');
 }
 
 function saveAllDrafts() {

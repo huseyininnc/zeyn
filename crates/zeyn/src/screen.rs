@@ -57,9 +57,25 @@ pub enum Effect {
     CloseAndRefresh,
     /// Asks the user to confirm `message`, then runs `then`. Built with [`Effect::confirm`].
     Confirm { message: Text, then: Box<Effect> },
+    /// Goes to a local path of the app. With `frame` the whole app frame (menu, title, session
+    /// settings) is loaded again, as after signing in or out; still without a page load.
+    Go { url: String, frame: bool },
 }
 
 impl Effect {
+    /// Goes to a local path of the app (see [`Effect::Go`]). Anything that is not a local path
+    /// goes to the start page, so a `return_to` from a request can never leave the app.
+    ///
+    /// ```
+    /// use zeyn::Effect;
+    /// assert_eq!(Effect::go("/orders?x=1", false), Effect::Go { url: "/orders?x=1".into(), frame: false });
+    /// assert_eq!(Effect::go("//evil.example", true), Effect::Go { url: "/".into(), frame: true });
+    /// ```
+    pub fn go(url: &str, frame: bool) -> Effect {
+        let local = url.starts_with('/') && !url.starts_with("//") && !url.contains('\\') && !url.chars().any(char::is_control) && url.len() <= 2048;
+        Effect::Go { url: if local { url.to_string() } else { "/".into() }, frame }
+    }
+
     /// Runs `then` only after the user confirms `message` in a dialog.
     ///
     /// ```

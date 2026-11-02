@@ -209,6 +209,15 @@ async function runEffect(effect, source) {
       if (!ask('zeyn:navigate', { url })) location.assign(url);
       return;
     }
+    case 'go': {
+      const url = new URL(effect.url ?? '/', location.href);
+      if (url.origin !== location.origin) return;
+      if (effect.frame) {
+        history.pushState({ zeyn: true }, '', url.href);
+        if (!ask('zeyn:refresh-page')) location.assign(url.href);
+      } else if (!ask('zeyn:navigate', { url: url.href })) location.assign(url.href);
+      return;
+    }
     case 'toast':
       return toast(effect.message ?? '');
     case 'close_and_refresh':
@@ -2786,7 +2795,7 @@ function matchesShortcut(e, combo) {
   const ctrlMeta = swap
     ? e.ctrlKey !== e.metaKey
     : e.ctrlKey === mods.has('control') && e.metaKey === mods.has('meta');
-  return e.key.toLowerCase() === key && ctrlMeta && e.shiftKey === mods.has('shift') && e.altKey === mods.has('alt');
+  return (e.key ?? '').toLowerCase() === key && ctrlMeta && e.shiftKey === mods.has('shift') && e.altKey === mods.has('alt');
 }
 
 /** Triggers the element whose `aria-keyshortcuts` matches, searching only the top dialog when one is open. */
@@ -3169,15 +3178,15 @@ document.addEventListener('keydown', (e) => {
   }
   if (t instanceof HTMLTableCellElement && t.parentElement?.parentElement?.matches('[data-zeyn-rows]')) {
     const g = t.closest('[data-zeyn-grid]');
-    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'c' && copyCells(g)) return e.preventDefault();
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key ?? '').toLowerCase() === 'c' && copyCells(g)) return e.preventDefault();
     if (cellKey(e, t)) return;
   }
-  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'c' && !typing(t) && t instanceof Element) {
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key ?? '').toLowerCase() === 'c' && !typing(t) && t instanceof Element) {
     const g = t.closest('[data-zeyn-grid]');
     const sel = window.getSelection();
     if (g && (!sel || sel.isCollapsed) && copyRows(g, t.closest('[data-zeyn-rows] > tr'))) return e.preventDefault();
   }
-  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z' && !typing(t) && t instanceof Element) {
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key ?? '').toLowerCase() === 'z' && !typing(t) && t instanceof Element) {
     const g = t.closest('[data-zeyn-grid]');
     if (g && grids.get(g)?.undo) {
       e.preventDefault();

@@ -240,6 +240,27 @@ impl Db {
         self.link().await?.delete::<E>(self.dialect(), key).await
     }
 
+    /// Rows of a statement built inside the crate from fixed text and checked identifiers, such as
+    /// the account store's. Values arrive only as `args`.
+    #[cfg(feature = "accounts")]
+    pub(crate) async fn rows(&self, sql: Sql) -> Result<Vec<Vec<Cell>>> {
+        let mut rows = Vec::new();
+        self.link()
+            .await?
+            .fetch(sql, raw_error, &mut |cells| {
+                rows.push(std::mem::take(cells));
+                Ok(())
+            })
+            .await?;
+        Ok(rows)
+    }
+
+    /// Runs a statement built inside the crate (see [`Db::rows`]) and returns the changed rows.
+    #[cfg(feature = "accounts")]
+    pub(crate) async fn run(&self, sql: Sql) -> Result<u64> {
+        self.link().await?.execute(sql, raw_error).await
+    }
+
     /// Runs a statement written by hand and returns the number of rows it changed. The SQL must
     /// be a literal, so values can only arrive as `args` (`$1`, `$2` in PostgreSQL).
     pub async fn execute(&self, sql: &'static str, args: Vec<Arg>) -> Result<u64> {

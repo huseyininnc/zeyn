@@ -32,6 +32,15 @@ pub enum Control {
     Segmented,
     /// An always open list with a search box for long `#[choice]` lists.
     Listbox,
+    /// A password input for text fields: never shown, never kept in drafts, `autocomplete` set
+    /// to `current-password`.
+    Password,
+    /// A new password input for text fields (`autocomplete="new-password"`), for sign up and
+    /// password changes.
+    NewPassword,
+    /// A one time code input for text fields: numeric keyboard, `autocomplete="one-time-code"`,
+    /// never kept in drafts.
+    OneTimeCode,
 }
 
 /// What a control needs to render one field.
@@ -174,7 +183,7 @@ pub(crate) fn render_text(out: &mut String, r: &Render, s: &Slot) {
     let minlength = s.m.min_len().map(|n| format!(r#" minlength="{n}""#)).unwrap_or_default();
     out.push_str(s.label);
     match max {
-        Some(n) if n > 255 => {
+        Some(n) if n > 255 && !matches!(s.control, Some(Control::Password | Control::NewPassword | Control::OneTimeCode)) => {
             let id = s.id;
             let common = s.common.replace(&format!(r#"aria-describedby="{id}-error""#), &format!(r#"aria-describedby="{id}-count {id}-error""#));
             let count = match s.value {
@@ -186,6 +195,13 @@ pub(crate) fn render_text(out: &mut String, r: &Render, s: &Slot) {
                 ui(r, "text.count"),
                 escape(&r.i18n.text(r.locale, &Text::key("zeyn.ui.text.count").arg("n", count.to_string()).arg("max", n.to_string())))
             ));
+        }
+        _ if s.control == Some(Control::Password) || s.control == Some(Control::NewPassword) => {
+            let auto = if s.control == Some(Control::Password) { "current-password" } else { "new-password" };
+            out.push_str(&format!(r#"<input type="password" autocomplete="{auto}" {}{minlength}{maxlength} value="">"#, s.common));
+        }
+        _ if s.control == Some(Control::OneTimeCode) => {
+            out.push_str(&format!(r#"<input type="text" inputmode="text" autocomplete="one-time-code" spellcheck="false" {}{maxlength} value="">"#, s.common));
         }
         _ => {
             let kind = if s.m.rules.contains(&crate::model::Rule::Email) { "email" } else { "text" };

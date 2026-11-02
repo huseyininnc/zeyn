@@ -70,7 +70,7 @@ async fn main() -> std::io::Result<()> {
     #[cfg(feature = "pdf")]
     let pdf = zeyn::Pdf::from_config(&config).map_err(|e| std::io::Error::other(format!("{e:?}")))?;
     let mut app = App::new(t!("app.name"))
-        .plugin(CompanyStandard { config })
+        .plugin(CompanyStandard { config: config.clone() })
         .theme(Theme::new().radius(6))
         .themes([
             Theme::light(),
@@ -88,10 +88,9 @@ async fn main() -> std::io::Result<()> {
         .service(islands::CounterStore::default())
         .service(diagrams.clone())
         .realtime(islands::realtime(diagrams))
-        .mailer(mailer)
+        .mailer(mailer.clone())
         .datagrid_views(MemoryViewStore::default())
         .service(people::LeaveStore::seeded(TimeZone::UTC.today(DateTime::now())))
-        .auth(DevAuth::superuser("Demo User"))
         .license(FixedLicense(license), Duration::from_secs(300))
         .mcp(Mcp::on())
         .api_docs(ApiDocs::open())
@@ -114,7 +113,50 @@ async fn main() -> std::io::Result<()> {
     if let Some(a) = assistant {
         app = app.assistant(a);
     }
+    app = if config.get("accounts.enabled").is_some_and(|v| v == "1" || v == "true") {
+        accounts(app, &config, mailer).await?
+    } else {
+        app.auth(DevAuth::superuser("Demo User"))
+    };
     app
         .serve(&addr)
         .await
+}
+
+/// Turns on user accounts instead of the development sign in (`NORTHWIND_ACCOUNTS__ENABLED=1`):
+/// accounts in memory, confirmation e-mail through the app's mailer, the default account screens
+/// with administration, and every signed in user may use the showcase. Set
+/// `NORTHWIND_ACCOUNTS__KEY` (32 bytes or more) and, for passkeys, `NORTHWIND_ACCOUNTS__PUBLIC_URL`
+/// (such as `http://localhost:3002`). `NORTHWIND_ACCOUNTS__ADMIN_EMAIL` and
+/// `NORTHWIND_ACCOUNTS__ADMIN_PASSWORD` add a confirmed administrator at startup.
+async fn accounts(app: App, config: &Config, mailer: zeyn::Mailer) -> std::io::Result<App> {
+    use zeyn::accounts::{self, Accounts, MailSender, MemoryAccountStore, User};
+    let fail = |e: zeyn::Error| std::io::Error::other(format!("{e:?}"));
+    let key = config.secret("accounts.key").map_err(fail)?;
+    let mut accounts = Accounts::new(MemoryAccountStore::new(), key)
+        .sender(MailSender(mailer))
+        .options(|o| o.tokens.authenticator_issuer = "Northwind".into())
+        .signed_in_permissions([
+            "people.leave.import",
+            "people.leave.request",
+            "people.org.read",
+            "sales.order.read",
+            "showcase.islands.read",
+            "showcase.islands.write",
+            "showcase.media.play",
+            "stock.product.read",
+            "stock.product.write",
+        ])
+        .role("admins", [accounts::USERS_READ, accounts::USERS_WRITE, accounts::ROLES_WRITE]);
+    if let Some(url) = config.get("accounts.public_url") {
+        accounts = accounts.public_url(url);
+    }
+    if let (Some(email), Ok(password)) = (config.get("accounts.admin_email"), config.secret("accounts.admin_password")) {
+        let mut admin = User::new(email).with_email(email);
+        admin.email_confirmed = true;
+        let mut admin = accounts.users().create(admin, Some(password.expose())).await.map_err(fail)?;
+        accounts.roles().create("admins").await.map_err(fail)?;
+        accounts.users().add_to_role(&mut admin, "admins").await.map_err(fail)?;
+    }
+    Ok(app.accounts(accounts).feature(accounts::ui().admin(true).build()))
 }
