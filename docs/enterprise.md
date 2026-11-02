@@ -67,8 +67,15 @@ pub struct Person {
 - Forms show masked fields as read only text. The stored value is kept on save unless the user
   may reveal it and changed it after revealing. An empty masked field is a normal input, so data
   entry staff can fill it in once without being able to read it back later.
-- Grid filters and sorts on a masked field are ignored for users who may not reveal it, so a value
-  cannot be guessed by searching. Do not add `.filter()` to masked columns.
+- Filters and sorts on a masked field are ignored for users who may not reveal it, so a value
+  cannot be guessed by searching. This holds for every read of a grid (pages, exports, bulk
+  actions over all rows, saved views, agent tools) and for API actions that take a `DataQuery`.
+  Do not add `.filter()` to masked columns.
+- Paging cursors never hold the value of a masked field. A list sorted by a masked field pages by
+  position instead of by key.
+- A grid never groups by a masked field; `group_by` on one is ignored and logged.
+- Island and other data source outputs are masked at any depth, like API output: masked fields of
+  every model inside come out as masked text, and keys of sensitive models are recorded as reads.
 - Grid reveal looks the row up through the grid's action with a filter on the key, so the action
   must honor filters on its key field.
 - `#[mask]` only compiles on `String` and `Option<String>`.

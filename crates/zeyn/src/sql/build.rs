@@ -718,6 +718,33 @@ struct GroupCursor {
     g: u64,
 }
 
+/// Cursor of an order with a masked sort key: the position only, so no value of the row is in it.
+#[derive(Serialize, Deserialize)]
+struct SkipCursor {
+    o: Vec<(String, bool)>,
+    s: u64,
+}
+
+fn order_of(fields: &[FieldMeta], keys: &[OrderKey]) -> Vec<(String, bool)> {
+    keys.iter().map(|k| (fields[k.index].name.to_string(), k.desc)).collect()
+}
+
+/// Whether a sort key is a masked field. Such orders page by position, because a keyset cursor
+/// would carry the raw value to the client.
+fn masked_order(fields: &[FieldMeta], keys: &[OrderKey]) -> bool {
+    keys.iter().any(|k| fields[k.index].mask.is_some())
+}
+
+/// Next cursor of a row page that starts at row `skip` and holds `limit` rows: a keyset cursor
+/// after `last`, or a position when a sort key is masked.
+pub(crate) fn next_cursor<M: Model>(d: &dyn Dialect, keys: &[OrderKey], last: &M, skip: u64, limit: usize) -> Cursor {
+    let fields = M::fields();
+    if masked_order(fields, keys) {
+        return encode(&SkipCursor { o: order_of(fields, keys), s: skip.saturating_add(limit as u64) });
+    }
+    row_cursor(d, keys, last)
+}
+
 fn encode<T: Serialize>(body: &T) -> Cursor {
     Cursor(URL_SAFE_NO_PAD.encode(serde_json::to_vec(body).unwrap_or_default()))
 }
@@ -757,8 +784,7 @@ pub(crate) fn row_cursor<M: Model>(d: &dyn Dialect, keys: &[OrderKey], row: &M) 
             Value::Decimal(_) => serde_json::Value::Null,
         })
         .collect();
-    let o = keys.iter().map(|k| (fields[k.index].name.to_string(), k.desc)).collect();
-    encode(&RowCursor { o, v })
+    encode(&RowCursor { o: order_of(fields, keys), v })
 }
 
 /// Reads a row cursor back into one bound value per sort key. A cursor made for another order, or
@@ -898,6 +924,8 @@ pub(crate) fn read_aggs(
 pub(crate) struct FindPlan {
     pub main: Sql,
     pub limit: usize,
+    /// Position of the first row of the page, for cursors that page by position.
+    pub skip: u64,
     pub shape: Shape,
     pub count: Option<Sql>,
     pub totals: Option<(Sql, Vec<Agg>)>,
@@ -971,7 +999,14 @@ pub(crate) fn plan_find<E: Entity>(d: &dyn Dialect, q: &DataQuery, count_cap: u6
         } else {
             None
         };
-        return Ok(FindPlan { main, limit, shape: Shape::Groups { field: gi, aggs, offset }, count, totals });
+        return Ok(FindPlan {
+            main,
+            limit,
+            skip: offset,
+            shape: Shape::Groups { field: gi, aggs, offset },
+            count,
+            totals,
+        });
     }
 
     let keys = order_keys(d, fields, q)?;
@@ -979,8 +1014,15 @@ pub(crate) fn plan_find<E: Entity>(d: &dyn Dialect, q: &DataQuery, count_cap: u6
     main.push("SELECT ");
     select_fields(d, &mut main, fields)?;
     let has_where = from_where::<E>(d, &mut main, q)?;
-    let offset = match &q.page {
-        PageRequest::Offset { offset, .. } => i64::try_from(*offset).unwrap_or(i64::MAX),
+    let skip = match &q.page {
+        PageRequest::Offset { offset, .. } => *offset,
+        PageRequest::After { cursor: Some(c), .. } if masked_order(fields, &keys) => {
+            let body: SkipCursor = decode(c)?;
+            if body.o != order_of(fields, &keys) {
+                return Err(bad_cursor());
+            }
+            body.s
+        }
         PageRequest::After { cursor, .. } => {
             if let Some(c) = cursor {
                 let values = read_cursor(fields, &keys, c)?;
@@ -989,6 +1031,7 @@ pub(crate) fn plan_find<E: Entity>(d: &dyn Dialect, q: &DataQuery, count_cap: u6
             0
         }
     };
+    let offset = i64::try_from(skip).unwrap_or(i64::MAX);
     push_order(d, &mut main, fields, &keys)?;
     d.page(&mut main, fetch, offset);
     let count = if q.with_total {
@@ -999,7 +1042,7 @@ pub(crate) fn plan_find<E: Entity>(d: &dyn Dialect, q: &DataQuery, count_cap: u6
     } else {
         None
     };
-    Ok(FindPlan { main, limit, shape: Shape::Rows(keys), count, totals })
+    Ok(FindPlan { main, limit, skip, shape: Shape::Rows(keys), count, totals })
 }
 
 /// `SELECT COUNT(*)` over at most `cap` rows of `inner`, so counting a huge table stays cheap.

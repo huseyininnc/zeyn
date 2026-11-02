@@ -224,8 +224,8 @@ where
     fn fetch(&self, ctx: Ctx, input: Json) -> BoxFuture<Result<Json>> {
         Box::pin(async move {
             let input: A::Input = serde_json::from_value(input).map_err(|_| crate::action::Error::NotFound)?;
-            let output = A::call(ctx, input).await??;
-            serde_json::to_value(output).map_err(|e| crate::action::Error::Internal(e.to_string()))
+            let output = A::call(ctx.clone(), input).await??;
+            crate::privacy::client_json(&output, &ctx).map_err(|e| crate::action::Error::Internal(e.to_string()))
         })
     }
 }

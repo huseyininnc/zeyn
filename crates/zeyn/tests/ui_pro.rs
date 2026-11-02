@@ -190,7 +190,9 @@ async fn commands_the_user_may_not_run_never_reach_the_html() {
             r#"aria-keyshortcuts="Control+Alt+N" data-hint="Ctrl+Alt+N" data-icon="plus">New order</button>"#
         )
     );
-    assert!(html.contains(r#"data-zeyn-command="orders.archive" data-zeyn-command-run="orders.archive" aria-keyshortcuts="Control+Alt+A""#));
+    assert!(html.contains(
+        r#"data-zeyn-command="orders.archive" data-zeyn-command-run="orders.archive" aria-keyshortcuts="Control+Alt+A""#
+    ));
     assert!(!html.contains("Secret command"));
 }
 

@@ -336,8 +336,7 @@ impl AppState {
             action: Some(action),
             via_agent: ctx.via_agent(),
         };
-        let mut query = call.query;
-        crate::privacy::strip_masked(&mut query, grid.fields(), ctx);
+        let query = call.query;
         self.intercept(ctx, &info, move || async move {
             let mut page = self.timed(grid.fetch_at(ctx.clone(), query, call.path)).await?;
             page.view = call.view.map(|v| grid.clean_view(v));

@@ -566,8 +566,14 @@ impl<E: Model> DataGrid<E> {
     /// group, and loads a group's rows (or subgroups) when the user opens it, a page at a time.
     /// The top level pages over groups. The grid's action answers `DataQuery::group` with
     /// `Page::groups`; `DataQuery::apply` does it for in memory data. Virtual grids do not group.
+    /// Masked fields never group a grid, because a group shows its value: such a call is ignored
+    /// and logged.
     pub fn group_by<T: FieldType>(mut self, field: Field<E, T>) -> Self {
         let meta = field.meta();
+        if meta.mask.is_some() {
+            tracing::warn!("grid of `{}` cannot group by the masked field `{}`; ignored", E::NAME, meta.name);
+            return self;
+        }
         if !self.group_by.iter().any(|m| m.name == meta.name) {
             self.group_by.push(meta);
         }
@@ -903,7 +909,7 @@ impl<E: Model> DataGrid<E> {
             .map(|s| ColumnView { field: self.columns[s.index].meta.name.to_string(), width: s.width, pin: s.pin })
             .collect();
         let mut query = DataQuery { sort: view.sort, filters: view.filters, ..DataQuery::default() };
-        self.allow(&mut query);
+        self.allow(&mut query, None);
         query.filters.retain(|f| {
             let short = |s: &Option<String>| s.as_deref().is_none_or(|t| t.chars().count() <= MAX_FILTER_TEXT);
             f.contains.chars().count() <= MAX_FILTER_TEXT
@@ -917,8 +923,13 @@ impl<E: Model> DataGrid<E> {
         DataGridView { columns, sort: query.sort, filters: query.filters }
     }
 
-    /// Keeps the totals, filters and sort keys this grid offers, within the limits.
-    fn allow(&self, query: &mut DataQuery) {
+    /// Keeps the totals, filters and sort keys this grid offers, within the limits. With a ctx,
+    /// filters and sorts on masked fields the user may not reveal go too, so every read of the
+    /// grid (pages, exports, bulk runs, saved views, agents) is cleaned the same way.
+    fn allow(&self, query: &mut DataQuery, ctx: Option<&Ctx>) {
+        if let Some(ctx) = ctx {
+            crate::privacy::strip_masked(query, E::fields(), ctx);
+        }
         let allowed = self.aggregate_requests();
         query.aggregates.retain(|a| allowed.contains(a));
         query.aggregates.dedup();
@@ -1343,7 +1354,7 @@ impl<E: Model> DataGrid<E> {
     /// every matching row.
     fn fetch_nested(&self, ctx: Ctx, mut query: DataQuery, path: Vec<Option<String>>) -> BoxFuture<Result<LoadedPage>> {
         use crate::action::Error;
-        self.allow(&mut query);
+        self.allow(&mut query, Some(&ctx));
         query.time_zone = ctx.time_zone();
         let depth = path.len();
         let mut fixed = self.scope.clone();
@@ -1643,7 +1654,7 @@ impl<E: Model> GridSource for DataGrid<E> {
     }
 
     fn fetch(&self, ctx: Ctx, mut query: DataQuery) -> BoxFuture<Result<LoadedPage>> {
-        self.allow(&mut query);
+        self.allow(&mut query, Some(&ctx));
         self.scoped(&mut query);
         query.time_zone = ctx.time_zone();
         let fetch = self.fetch;

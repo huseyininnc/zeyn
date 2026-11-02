@@ -636,6 +636,7 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
         let mut version = false;
         let mut label: Option<LitStr> = None;
         let mut mask = quote!(::core::option::Option::None);
+        let mut masked = false;
         let mut rules = Vec::new();
         let mut keep = Vec::new();
 
@@ -675,6 +676,7 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
                     .unwrap_or_else(|| format!("{}.{}.unmask", snake_case(&name.to_string()), fname_str));
                 checks.push(quote_spanned!(ty.span()=> ::zeyn::__rules::text::<#ty>();));
                 mask = quote!(::core::option::Option::Some(::zeyn::Masking { style: #style, permission: #permission }));
+                masked = true;
             } else if a.path().is_ident("rule") {
                 a.parse_nested_meta(|m| {
                     let text_check = quote_spanned!(ty.span()=> ::zeyn::__rules::text::<#ty>(););
@@ -712,6 +714,23 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
             } else {
                 keep.push(a);
             }
+        }
+        let guard = if masked {
+            Some((format_ident!("__zeyn_mask_{}", fname), quote!(::zeyn::__privacy::masked_output)))
+        } else if is_key && sensitive {
+            Some((format_ident!("__zeyn_read_{}", fname), quote!(::zeyn::__privacy::read_output)))
+        } else {
+            None
+        };
+        if let Some((with, call)) = guard {
+            let path = LitStr::new(&format!("{name}::{with}"), fname.span());
+            keep.push(syn::parse_quote!(#[serde(serialize_with = #path)]));
+            getters.push(quote! {
+                #[doc(hidden)]
+                fn #with<S: ::zeyn::__serde::Serializer>(value: &#ty, s: S) -> ::core::result::Result<S::Ok, S::Error> {
+                    #call(value, &Self::__ZEYN_FIELDS[#idx], s)
+                }
+            });
         }
         field.attrs = keep;
 

@@ -90,6 +90,11 @@ pub trait ApiInput: Sized + Send + 'static {
     /// Whether an action taking this input only reads. AI tools ask the user before running any
     /// other action.
     const READS: bool = false;
+
+    /// Removes the parts of the input the caller may not use on the output's fields: a
+    /// [`DataQuery`] loses filters and sorts on masked fields the user may not reveal.
+    #[doc(hidden)]
+    fn clean(&mut self, _fields: &'static [FieldMeta], _ctx: &Ctx) {}
 }
 
 fn unreadable(e: serde_json::Error) -> Error {
@@ -145,11 +150,21 @@ impl ApiInput for DataQuery {
     fn from_json(value: Json) -> Result<Self> {
         serde_json::from_value(value).map_err(unreadable)
     }
+
+    fn clean(&mut self, fields: &'static [FieldMeta], ctx: &Ctx) {
+        crate::privacy::strip_masked(self, fields, ctx);
+    }
 }
 
 /// Types an API action can return inside `Result`.
 pub trait ApiOutput: Serialize + Send + 'static {
     fn schema() -> Json;
+
+    /// Fields of the model the output holds, if any.
+    #[doc(hidden)]
+    fn fields() -> &'static [FieldMeta] {
+        &[]
+    }
 
     /// Masks masked fields of the serialized output for users who may not reveal them, and
     /// records reveals and sensitive reads for the audit log.
@@ -157,6 +172,10 @@ pub trait ApiOutput: Serialize + Send + 'static {
 }
 
 impl<M: Model> ApiOutput for M {
+    fn fields() -> &'static [FieldMeta] {
+        M::fields()
+    }
+
     fn schema() -> Json {
         model_schema::<M>()
     }
@@ -167,6 +186,10 @@ impl<M: Model> ApiOutput for M {
 }
 
 impl<M: Model> ApiOutput for Page<M> {
+    fn fields() -> &'static [FieldMeta] {
+        M::fields()
+    }
+
     fn schema() -> Json {
         json!({
             "type": "object",
@@ -187,6 +210,10 @@ impl<M: Model> ApiOutput for Page<M> {
 }
 
 impl<M: Model> ApiOutput for Vec<M> {
+    fn fields() -> &'static [FieldMeta] {
+        M::fields()
+    }
+
     fn schema() -> Json {
         json!({ "type": "array", "items": model_schema::<M>() })
     }
@@ -226,6 +253,12 @@ pub trait ApiResult: Send + 'static {
 
     /// See [`ApiOutput::protect`].
     fn protect(_value: &mut Json, _ctx: &Ctx) {}
+
+    /// See [`ApiOutput::fields`].
+    #[doc(hidden)]
+    fn fields() -> &'static [FieldMeta] {
+        &[]
+    }
 }
 
 impl<T: ApiOutput> ApiResult for Result<T> {
@@ -240,6 +273,10 @@ impl<T: ApiOutput> ApiResult for Result<T> {
 
     fn protect(value: &mut Json, ctx: &Ctx) {
         T::protect(value, ctx);
+    }
+
+    fn fields() -> &'static [FieldMeta] {
+        T::fields()
     }
 }
 
@@ -262,7 +299,8 @@ where
     A::Output: ApiResult,
 {
     Box::pin(async move {
-        let input = A::Input::from_json(body)?;
+        let mut input = A::Input::from_json(body)?;
+        input.clean(<A::Output as ApiResult>::fields(), &ctx);
         if let Some(record) = input.record() {
             ctx.update_trail(|t| {
                 t.record.get_or_insert(record);
