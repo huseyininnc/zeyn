@@ -20,7 +20,7 @@ const TEMPLATES: &[(&str, &str)] = &[
     (".gitlab-ci.yml", include_str!("../templates/gitlab-ci.yml.tmpl")),
     ("rustfmt.toml", include_str!("../templates/rustfmt.toml")),
     (".editorconfig", include_str!("../templates/editorconfig.tmpl")),
-    (".claude/skills/zeyn/SKILL.md", include_str!("../../../skills/zeyn/SKILL.md")),
+    (".claude/skills/zeyn/SKILL.md", include_str!("../embedded/SKILL.md")),
     (".gitattributes", include_str!("../templates/gitattributes.tmpl")),
     ("rust-toolchain.toml", include_str!("../templates/rust-toolchain.toml")),
     ("clippy.toml", include_str!("../templates/clippy.toml")),
@@ -50,7 +50,7 @@ const LIB_TEMPLATES: &[(&str, &str)] = &[
     (".gitlab-ci.yml", include_str!("../templates/gitlab-ci.yml.tmpl")),
     ("rustfmt.toml", include_str!("../templates/rustfmt.toml")),
     (".editorconfig", include_str!("../templates/editorconfig.tmpl")),
-    (".claude/skills/zeyn/SKILL.md", include_str!("../../../skills/zeyn/SKILL.md")),
+    (".claude/skills/zeyn/SKILL.md", include_str!("../embedded/SKILL.md")),
     (".gitattributes", include_str!("../templates/gitattributes.tmpl")),
     ("rust-toolchain.toml", include_str!("../templates/rust-toolchain.toml")),
     ("clippy.toml", include_str!("../templates/clippy.toml")),
@@ -68,9 +68,9 @@ const LIB_TEMPLATES: &[(&str, &str)] = &[
 
 const DOCS: &[(&str, &str)] = &[
     ("rules", include_str!("../templates/AGENTS.md.tmpl")),
-    ("language", include_str!("../../../docs/language-example.md")),
-    ("protocol", include_str!("../../../docs/runtime-protocol.md")),
-    ("architecture", include_str!("../../../docs/vision-and-architecture.md")),
+    ("language", include_str!("../embedded/SKILL.md")),
+    ("protocol", include_str!("../embedded/runtime-protocol.md")),
+    ("architecture", include_str!("../embedded/vision-and-architecture.md")),
 ];
 
 const HELP: &str = "zeyn: command line tool for Zeyn Framework
@@ -564,6 +564,21 @@ fn mcp() -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
+    /// The copies in `embedded/` ship with the crate; in the repository they must match the originals.
+    #[test]
+    fn embedded_copies_match_the_repository() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        for (name, original) in [
+            ("SKILL.md", "../../skills/zeyn/SKILL.md"),
+            ("runtime-protocol.md", "../../docs/runtime-protocol.md"),
+            ("vision-and-architecture.md", "../../docs/vision-and-architecture.md"),
+        ] {
+            let Ok(original) = std::fs::read_to_string(root.join(original)) else { continue };
+            let copy = std::fs::read_to_string(root.join("embedded").join(name)).unwrap();
+            assert!(copy == original, "crates/zeyn-cli/embedded/{name} is out of date: copy the file from the repository root");
+        }
+    }
+
     #[test]
     fn renames_identifiers_but_not_strings_or_longer_names() {
         let src = r##"use zeyn::{Grid, GridQuery};
