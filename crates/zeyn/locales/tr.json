@@ -5,6 +5,15 @@
     },
     "yes": "Evet",
     "no": "Hayır",
+    "deploy": {
+      "new_version": "Uygulamanın yeni bir sürümü var. Hazır olduğunuzda sayfayı yenileyin; kaydedilmemiş form girişleriniz korunur.",
+      "reload": "Şimdi yenile",
+      "later": "Sonra"
+    },
+    "draft": {
+      "restored": "Daha önce kaydetmediğiniz girişler geri yüklendi.",
+      "discard": "Girişleri at"
+    },
     "workflow": {
       "state": "Durum",
       "comment": "Açıklama",

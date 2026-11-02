@@ -131,3 +131,16 @@ pub async fn move_leave(req: TransitionRequest<LeaveRequestId>, store: LeaveStor
 - `Workflow::check` reports invalid permissions and moves declared twice from the same state;
   call it in a test.
 - The showcase leave requests use this: save as draft, submit, then approve or reject.
+
+## Safe deploys
+
+- Every response carries `x-zeyn-build`, and every page `<meta name="zeyn-build">`. The id is
+  `ZEYN_BUILD_ID` when set (letters, digits, `.`, `_`, `-`, up to 64), otherwise a hash of the
+  executable. `zeyn::server::build_id()` returns it, for logs.
+- When the runtime sees a response from another build, it shows a polite notice: a new version is
+  available, reload when ready. It never reloads by itself.
+- What users type in forms is kept in `sessionStorage` per screen, params and form, and put back
+  after a reload with a note and a button to discard it. Masked, password, file and hidden inputs
+  are never kept. The draft keeps the row version it was typed on, so saving a draft of a record
+  someone changed in the meantime is refused as a conflict. A successful save clears the draft;
+  drafts older than a day are dropped. `sessionStorage` lives only in that browser tab.

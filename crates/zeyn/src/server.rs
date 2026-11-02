@@ -26,6 +26,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 mod data;
 mod ops;
 
+pub use ops::build_id;
+
 const JS: &str = include_str!("../assets/zeyn.js");
 const CSS: &str = include_str!("../assets/zeyn.css");
 const CSP: &str = "default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
@@ -1021,6 +1023,7 @@ impl App {
             .fallback(not_found)
             .layer(axum::middleware::from_fn_with_state(state.clone(), guard_request))
             .layer(axum::middleware::map_response(security_headers))
+            .layer(axum::middleware::map_response(ops::stamp))
             .with_state(state);
         let router = if mount.is_empty() { router } else { Router::new().nest(&mount, router) };
         if cors.is_empty() {

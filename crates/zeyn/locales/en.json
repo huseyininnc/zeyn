@@ -5,6 +5,15 @@
     },
     "yes": "Yes",
     "no": "No",
+    "deploy": {
+      "new_version": "A new version of the app is available. Reload when you are ready; your unsaved form entries are kept.",
+      "reload": "Reload now",
+      "later": "Later"
+    },
+    "draft": {
+      "restored": "Your unsaved entries from before were restored.",
+      "discard": "Discard them"
+    },
     "workflow": {
       "state": "State",
       "comment": "Comment",

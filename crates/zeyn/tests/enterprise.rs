@@ -679,3 +679,21 @@ async fn empty_masked_fields_can_be_filled_in_but_not_overwritten_later() {
     let form = send(&router, get("/_zeyn/screen/person?params=%7B%22id%22%3A4%7D")).await;
     assert!(form.body.contains(r#"value="•••• 2100""#), "{}", form.body);
 }
+
+#[tokio::test]
+async fn every_response_carries_the_build_id_that_the_page_was_built_with() {
+    let router = crm_app(crm_writer(), MemoryAudit::default()).router().unwrap();
+    let page = send(&router, get("/customers")).await;
+    let id = page.headers.get("x-zeyn-build").unwrap().to_str().unwrap().to_string();
+    assert_eq!(id, zeyn::server::build_id());
+    assert!(!id.is_empty() && id.len() <= 64 && id.chars().all(|c| c.is_ascii_alphanumeric() || ".-_".contains(c)));
+    assert!(page.body.contains(&format!(r#"<meta name="zeyn-build" content="{id}">"#)));
+    assert!(page.body.contains("/_zeyn/enterprise.js"));
+    let grid = send(&router, post("/_zeyn/grid", serde_json::json!({ "screen": "customers", "node": 0 }))).await;
+    assert_eq!(grid.headers.get("x-zeyn-build").unwrap(), id.as_str());
+    let missing = send(&router, get("/nope")).await;
+    assert_eq!(missing.headers.get("x-zeyn-build").unwrap(), id.as_str());
+    let js = send(&router, Request::get("/_zeyn/enterprise.js").body(Body::empty()).unwrap()).await;
+    assert_eq!(js.status, StatusCode::OK);
+    assert!(js.body.contains("x-zeyn-build"));
+}
