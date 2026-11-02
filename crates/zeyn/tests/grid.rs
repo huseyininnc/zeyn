@@ -382,10 +382,106 @@ async fn grid_endpoint_sorts_by_several_columns() {
 async fn header_names_filter_kinds_and_localized_choices() {
     let req = Request::get("/items").header("x-user", "1").header(header::COOKIE, "zeyn_locale=tr").body(Body::empty()).unwrap();
     let r = send(&router(reader()), req).await;
-    assert!(r.body.contains(r#"data-field="price" aria-sort="none" data-filter="money""#), "{}", r.body);
+    assert!(r.body.contains(r#"data-field="price" aria-sort="none" aria-colindex="3" data-filter="money""#), "{}", r.body);
     assert!(r.body.contains(r#"data-filter="choice" data-options=""#));
     assert!(r.body.contains(r#"data-filter="bool""#));
     assert!(r.body.contains(r#"data-filter="date""#));
     assert!(r.body.contains("data-zeyn-texts="));
     assert!(r.body.contains("Tümü"));
+}
+
+fn views_router(store: zeyn::MemoryViewStore) -> Router {
+    App::new("Test")
+        .service(Store::seeded())
+        .datagrid_views(store)
+        .auth(|h: &HeaderMap| {
+            let user = h.get("x-user")?.to_str().ok()?.to_string();
+            let perms: Vec<&str> = if user == "guest" { vec![] } else { vec!["items.read"] };
+            Some(Identity::user(user).with_permissions(perms))
+        })
+        .feature(Feature::new("items").screen(list))
+        .router()
+        .unwrap()
+}
+
+fn as_user(mut req: Request<Body>, user: &str) -> Request<Body> {
+    req.headers_mut().insert("x-user", user.parse().unwrap());
+    req
+}
+
+fn save_view(view: serde_json::Value) -> serde_json::Value {
+    serde_json::json!({ "screen": "list", "node": 0, "view": view })
+}
+
+#[tokio::test]
+async fn saved_view_comes_back_on_the_next_page_load_with_its_sort_and_filters() {
+    let store = zeyn::MemoryViewStore::default();
+    let router = views_router(store.clone());
+    let view = serde_json::json!({
+        "columns": [{ "field": "qty", "width": 5000 }, { "field": "code", "pin": "start" }, { "field": "secret" }, { "field": "qty" }],
+        "sort": [{ "field": "qty", "desc": true }, { "field": "note", "desc": false }],
+        "filters": [{ "field": "kind", "any_of": ["Tool"] }, { "field": "note", "contains": "x" }]
+    });
+    let r = send(&router, as_user(post("/_zeyn/grid/view", save_view(view)), "ayse")).await;
+    assert_eq!(r.status, StatusCode::NO_CONTENT, "{}", r.body);
+
+    let page = send(&router, as_user(get("/items"), "ayse")).await;
+    assert!(page.body.contains(r#"data-zeyn-views="server""#));
+    let head = page.body.split("<thead>").nth(1).unwrap().split("</thead>").next().unwrap();
+    assert!(head.find(r#"data-field="code""#).unwrap() < head.find(r#"data-field="qty""#).unwrap());
+    assert!(head.contains(r#"data-pin="start""#));
+    assert!(head.contains("width:1200px;"), "{head}");
+    assert!(!head.contains(r#"data-field="kind""#));
+    assert!(page.body.contains(r#"data-zeyn-total="6""#), "only tools, the note filter is not offered");
+    let rows = page.body.split("<tbody data-zeyn-rows>").nth(1).unwrap();
+    assert!(rows.starts_with("<tr><td>C-18</td><td class=\"z-num\">18</td></tr>"), "{}", &rows[..120]);
+
+    let other = send(&router, as_user(get("/items"), "mert")).await;
+    assert!(!other.body.contains("data-zeyn-view="));
+    assert!(other.body.contains(r#"data-zeyn-total="20""#));
+
+    let r = send(&router, as_user(post("/_zeyn/grid/view", save_view(serde_json::Value::Null)), "ayse")).await;
+    assert_eq!(r.status, StatusCode::NO_CONTENT);
+    let page = send(&router, as_user(get("/items"), "ayse")).await;
+    assert!(!page.body.contains("data-zeyn-view="));
+}
+
+#[tokio::test]
+async fn saving_a_view_needs_a_store_a_user_and_read_access() {
+    let views = views_router(zeyn::MemoryViewStore::default());
+    let r = send(&views, as_user(post("/_zeyn/grid/view", save_view(serde_json::json!({}))), "guest")).await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN);
+    let r = send(&router(reader()), post("/_zeyn/grid/view", save_view(serde_json::json!({})))).await;
+    assert_eq!(r.status, StatusCode::NOT_FOUND);
+    let r = send(&views, as_user(post("/_zeyn/grid/view", serde_json::json!({ "screen": "list", "node": 7, "view": {} })), "ayse")).await;
+    assert_eq!(r.status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn grid_endpoint_renders_rows_and_header_in_the_requested_layout() {
+    let body = serde_json::json!({
+        "screen": "list", "node": 0, "head": true,
+        "query": { "page": { "type": "offset", "offset": 0, "limit": 1 }, "aggregates": [{ "field": "qty", "op": "sum" }, { "field": "price", "op": "sum" }] },
+        "view": { "columns": [{ "field": "price", "pin": "end" }, { "field": "qty" }, { "field": "note" }] }
+    });
+    let r = send(&router(reader()), post("/_zeyn/grid", body)).await;
+    let j = r.json();
+    assert_eq!(j["rows"], "<tr><td class=\"z-num\">1</td><td class=\"z-num\">₺10.00</td></tr>");
+    let head = j["head"].as_str().unwrap();
+    assert!(head.find("qty").unwrap() < head.find("price").unwrap());
+    assert!(head.contains(r#"data-pin="end""#));
+    let foot = j["foot"].as_str().unwrap();
+    assert!(foot.find(">210<").unwrap() < foot.find("₺2,100.00").unwrap(), "{foot}");
+}
+
+#[test]
+fn at_most_three_columns_stay_pinned_per_side() {
+    use zeyn::{DataGridView, GridSource};
+    let grid = Grid::of(search).column(Item::code).column(Item::kind).column(Item::price).column(Item::qty).column(Item::added).done();
+    let columns: Vec<serde_json::Value> =
+        ["code", "kind", "price", "qty", "added"].iter().map(|f| serde_json::json!({ "field": f, "pin": "start" })).collect();
+    let view: DataGridView = serde_json::from_value(serde_json::json!({ "columns": columns })).unwrap();
+    let clean = GridSource::clean_view(&grid, view);
+    assert_eq!(clean.columns.iter().filter(|c| c.pin.is_some()).count(), 3);
+    assert_eq!(clean.columns.len(), 5);
 }

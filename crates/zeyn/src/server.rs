@@ -7,7 +7,8 @@ use crate::ctx::{Ctx, Identity, Service, Services};
 use crate::feature::{Feature, ScreenEntry};
 use crate::i18n::{I18n, Text};
 use crate::render::{Render, attr, escape};
-use crate::screen::{LoadedPage, Screen, ScreenDef};
+use crate::grid::DataGridView;
+use crate::screen::{GridSource, LoadedPage, Screen, ScreenDef};
 use crate::platform::{Config, License, LicenseSource, Tenant};
 use crate::security::{IpRange, MemoryRateStore, RateKey, RateLimit, RateStore, client_ip, parse_ranges};
 use crate::time::{DateTime, TimeZone};
@@ -545,6 +546,7 @@ pub struct App {
     deny: Vec<IpRange>,
     allow: Vec<IpRange>,
     setup_problems: Vec<String>,
+    views: Option<Arc<dyn crate::grid::DataGridViewStore>>,
 }
 
 impl App {
@@ -580,7 +582,15 @@ impl App {
             deny: Vec::new(),
             allow: Vec::new(),
             setup_problems: Vec::new(),
+            views: None,
         }
+    }
+
+    /// Saves each signed in user's grid layout, sort and filters on the server, so they come
+    /// back on every device. Without a store the browser keeps them in `localStorage`.
+    pub fn datagrid_views(mut self, store: impl crate::grid::DataGridViewStore) -> Self {
+        self.views = Some(Arc::new(store));
+        self
     }
 
     /// The organization's look. See [`Theme`] and `docs/theming.md`.
@@ -931,6 +941,7 @@ impl App {
             api_docs: self.api_docs,
             prefix: url_prefix,
             theme: self.theme,
+            views: self.views,
         });
         let mut router = Router::new();
         for f in &state.features {
@@ -975,6 +986,7 @@ impl App {
             .route("/_zeyn/screen/{screen}", get(screen_fragment))
             .route("/_zeyn/route/{screen}", get(route_redirect))
             .route("/_zeyn/grid", post(grid_call))
+            .route("/_zeyn/grid/view", post(grid_view_call))
             .route("/_zeyn/form", post(form_call))
             .route("/_zeyn/locale", post(set_locale))
             .route("/_zeyn/timezone", post(set_time_zone))
@@ -1050,6 +1062,7 @@ struct AppState {
     api_docs: Option<ApiDocs>,
     prefix: String,
     theme: Option<Theme>,
+    views: Option<Arc<dyn crate::grid::DataGridViewStore>>,
 }
 
 /// Decodes `%XX` sequences in a cookie value.
@@ -1248,15 +1261,38 @@ impl AppState {
         }
     }
 
-    /// Loads the first page of every grid the user may read.
-    async fn preload(&self, ctx: &Ctx, screen: &Screen) -> HashMap<usize, LoadedPage> {
+    /// Key of a saved grid view: tenant, screen and node, so tenants never share views.
+    fn view_key(ctx: &Ctx, screen: &str, node: usize) -> String {
+        format!("{}:{screen}#{node}", ctx.tenant().map(|t| t.id().to_string()).unwrap_or_default())
+    }
+
+    /// The signed in user's saved view of a grid, cleaned by the grid. `None` without a store,
+    /// without a user or when nothing is saved; a failing store is logged and ignored.
+    async fn saved_view(&self, ctx: &Ctx, grid: &dyn GridSource, screen: &str, node: usize) -> Option<DataGridView> {
+        let store = self.views.as_ref()?;
+        let user = ctx.identity().user.clone()?;
+        match self.timed(store.load(&user, &Self::view_key(ctx, screen, node))).await {
+            Ok(view) => view.map(|v| grid.clean_view(v)),
+            Err(_) => {
+                eprintln!("warning: grid view store failed to load a view");
+                None
+            }
+        }
+    }
+
+    /// Loads the first page of every grid the user may read, in the user's saved view.
+    async fn preload(&self, ctx: &Ctx, screen: &Screen, name: &str) -> HashMap<usize, LoadedPage> {
         let mut loaded = HashMap::new();
+        let saved = self.views.is_some() && ctx.identity().is_signed_in();
         for (i, node) in screen.nodes().iter().enumerate() {
             let Some(grid) = node.grid() else { continue };
             if !ctx.identity().can(&grid.action().access) {
                 continue;
             }
-            if let Ok(page) = self.timed(grid.fetch(ctx.clone(), grid.first_query())).await {
+            let view = self.saved_view(ctx, grid, name, i).await;
+            if let Ok(mut page) = self.timed(grid.fetch(ctx.clone(), grid.first_query(view.as_ref()))).await {
+                page.view = view;
+                page.saved_views = saved;
                 loaded.insert(i, page);
             }
         }
@@ -1490,7 +1526,7 @@ async fn page(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Que
         let params = q.value()?;
         st.before(&ctx, &call)?;
         let (_, entry, screen) = st.open(&ctx, name, params.clone()).await?;
-        let loaded = st.preload(&ctx, &screen).await;
+        let loaded = st.preload(&ctx, &screen, name).await;
         let r = Render::new(name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone());
         let html = screen.render(&r, &entry.meta, &params, &loaded);
         Ok::<_, Failure>((ctx.t(screen.title()), html))
@@ -1533,7 +1569,7 @@ async fn screen_fragment(
     let result = async {
         let params = q.value()?;
         let (_, entry, screen) = st.open(&ctx, &name, params.clone()).await?;
-        let loaded = st.preload(&ctx, &screen).await;
+        let loaded = st.preload(&ctx, &screen, entry.meta.name).await;
         let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone());
         Ok::<_, Failure>(screen.render(&r, &entry.meta, &params, &loaded))
     }
@@ -1583,6 +1619,22 @@ struct GridCall {
     node: usize,
     #[serde(default)]
     query: GridQuery,
+    /// Column layout to render the rows in.
+    #[serde(default)]
+    view: Option<DataGridView>,
+    /// Whether to send the header row back too (after the layout changed).
+    #[serde(default)]
+    head: bool,
+}
+
+#[derive(Deserialize)]
+struct DataGridViewCall {
+    screen: String,
+    #[serde(default)]
+    params: Json,
+    node: usize,
+    /// The view to save; `null` deletes the saved view.
+    view: Option<DataGridView>,
 }
 
 #[derive(Deserialize)]
@@ -1613,9 +1665,11 @@ impl AppState {
         }
         .await;
         self.after(ctx, &info, started, &result);
-        let page = result?;
+        let mut page = result?;
+        page.view = call.view.map(|v| grid.clean_view(v));
         let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone());
         Ok(json!({
+            "head": call.head.then(|| grid.head_html(&r, page.view.as_ref())),
             "rows": grid.rows_html(&page, &r),
             "foot": grid.foot_html(&page, &r),
             "count": page.count,
@@ -1623,6 +1677,20 @@ impl AppState {
             "next": page.next,
             "offset": page.offset,
         }))
+    }
+
+    /// Saves or deletes the user's view of a grid. Needs a store, a signed in user and the grid's
+    /// read access; the view is cleaned by the grid first.
+    async fn save_view(&self, ctx: &Ctx, call: DataGridViewCall) -> Result<(), Failure> {
+        let store = self.views.as_ref().ok_or(Failure::App(Error::NotFound))?;
+        let user = ctx.identity().user.clone().ok_or(Failure::App(Error::Forbidden))?;
+        let (_, entry, screen) = self.open(ctx, &call.screen, call.params).await?;
+        let grid = screen.nodes().get(call.node).and_then(|n| n.grid()).ok_or(Failure::App(Error::NotFound))?;
+        if !ctx.identity().can(&grid.action().access) {
+            return Err(Failure::App(Error::Forbidden));
+        }
+        let view = call.view.map(|v| grid.clean_view(v));
+        self.timed(store.save(&user, &Self::view_key(ctx, entry.meta.name, call.node), view)).await
     }
 
     async fn run_form(&self, ctx: &Ctx, call: FormCall) -> Result<Json, Failure> {
@@ -1691,6 +1759,17 @@ async fn grid_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Js
     }
     match st.run_grid(&ctx, call).await {
         Ok(body) => axum::Json(body).into_response(),
+        Err(f) => st.error_response(&ctx, f),
+    }
+}
+
+async fn grid_view_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(call): axum::Json<DataGridViewCall>) -> Response {
+    let ctx = st.licensed(st.ctx(&headers)).await;
+    if let Err(f) = st.check_csrf(&headers) {
+        return st.error_response(&ctx, f);
+    }
+    match st.save_view(&ctx, call).await {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
         Err(f) => st.error_response(&ctx, f),
     }
 }
@@ -2038,7 +2117,7 @@ async fn call_tool(st: &AppState, ctx: &Ctx, name: &str, args: Json) -> Result<J
     match kind {
         "search" => {
             let query: GridQuery = serde_json::from_value(args).map_err(|_| Failure::App(Error::NotFound))?;
-            st.run_grid(ctx, GridCall { screen: screen.to_string(), params: Json::Null, node, query }).await
+            st.run_grid(ctx, GridCall { screen: screen.to_string(), params: Json::Null, node, query, view: None, head: false }).await
         }
         _ => {
             let values = args.as_object().cloned().unwrap_or_default();

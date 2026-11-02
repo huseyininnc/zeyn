@@ -14,7 +14,7 @@ mod stock;
 
 use std::time::Duration;
 use zeyn::prelude::*;
-use zeyn::{Config, EnvSource, FixedLicense, I18n, License, StaticSource};
+use zeyn::{Config, EnvSource, FixedLicense, I18n, License, MemoryViewStore, StaticSource};
 
 /// The company standard every app of the organization starts with.
 struct CompanyStandard {
@@ -62,6 +62,7 @@ async fn main() -> std::io::Result<()> {
         .theme(Theme::new().radius(6))
         .i18n(i18n)
         .service(stock::ProductStore::seeded())
+        .datagrid_views(MemoryViewStore::default())
         .auth(DevAuth::superuser("Demo User"))
         .license(FixedLicense(license), Duration::from_secs(300))
         .agents(Agents::read_write())

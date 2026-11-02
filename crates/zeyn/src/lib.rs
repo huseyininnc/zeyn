@@ -186,7 +186,10 @@ pub use api::{ApiEntry, ApiInput, ApiOutput, ApiResult, model_schema};
 pub use ctx::{BoxFuture, Ctx, Dep, Identity, Inject, IntoScreen, Outcome, Service, Services};
 pub use feature::{Feature, Guard, GuardResult, Menu, MenuGroup, MenuItem, Route, ScreenEntry, SignedIn};
 pub use form::{Form, FormAction, FormRow, SubmitForm};
-pub use grid::{Grid, GridColumn, GridMode, MAX_SORT, Paging, RowStyle, position_cursor, total};
+pub use grid::{
+    COLUMN_WIDTH, ColumnView, Grid, GridColumn, GridMode, DataGridView, DataGridViewStore, MAX_PINNED, MAX_SORT, MemoryViewStore, Paging,
+    Pin, RowStyle, position_cursor, total,
+};
 pub use i18n::{I18n, NumberFormat, Text};
 pub use model::{__rules, Entity, Field, FieldError, FieldMeta, Model, Rule, Valid, ValidationErrors};
 pub use platform::{

@@ -109,14 +109,25 @@ pub struct LoadedPage {
     pub offset: u64,
     /// Column totals over the whole filtered result.
     pub totals: Vec<crate::action::Total>,
+    /// Column layout the rows are rendered in; `None` is the grid's own layout.
+    pub view: Option<crate::grid::DataGridView>,
+    /// Whether the user's view changes are saved on the server.
+    pub saved_views: bool,
 }
 
 /// A component that loads rows through an action. Implemented by `Grid`.
 pub trait GridSource: Send + Sync {
     fn action(&self) -> ActionMeta;
 
-    /// Query for the first page, as the grid's paging asks for it.
-    fn first_query(&self) -> GridQuery;
+    /// Query for the first page, as the grid's paging asks for it, with the sort and filters of
+    /// a saved view.
+    fn first_query(&self, view: Option<&crate::grid::DataGridView>) -> GridQuery;
+
+    /// Cleans a view sent by a client so only the grid's own columns, sort keys and filters remain.
+    fn clean_view(&self, view: crate::grid::DataGridView) -> crate::grid::DataGridView;
+
+    /// Header row for a view.
+    fn head_html(&self, r: &Render, view: Option<&crate::grid::DataGridView>) -> String;
 
     fn fetch(&self, ctx: Ctx, query: GridQuery) -> BoxFuture<Result<LoadedPage>>;
 

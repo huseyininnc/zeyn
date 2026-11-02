@@ -529,6 +529,9 @@ dialog.z-dialog::backdrop { background: var(--z-backdrop); }
 
 .z-grid {
   position: relative;
+  display: grid;
+  grid-template-columns: minmax(100%, max-content);
+  align-content: start;
   max-height: max(320px, calc(100dvh - 12rem));
   overflow: auto;
   background: var(--z-surface);
@@ -709,6 +712,206 @@ th[aria-sort="descending"] .z-sort::after {
 
 .z-check:hover { background: var(--z-hover); }
 
+/**
+ * Column header: sort button, menu button and resize handle. Pinned columns use
+ * position: sticky with offsets the runtime measures; the rules have no specificity
+ * (:where) so row states (hover, focus, zebra, highlights) still paint pinned cells.
+ */
+
+.z-th {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.z-th .z-sort { flex: 1 1 auto; min-width: 0; }
+
+:where(.z-grid th) { position: relative; }
+
+.z-col-menu {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--z-radius-sm);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.z-col-menu::before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  background: currentColor;
+  -webkit-mask: var(--z-dots) center / contain no-repeat;
+  mask: var(--z-dots) center / contain no-repeat;
+  --z-dots: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Ccircle cx='6' cy='2' r='1.3'/%3E%3Ccircle cx='6' cy='6' r='1.3'/%3E%3Ccircle cx='6' cy='10' r='1.3'/%3E%3C/svg%3E");
+}
+
+.z-grid th:hover .z-col-menu,
+.z-col-menu:focus-visible,
+.z-col-menu[aria-expanded="true"] { opacity: 1; }
+
+.z-col-menu:hover { background: var(--z-hover); color: var(--z-text); }
+
+@media (hover: none) { .z-col-menu { opacity: 1; } }
+
+.z-resize {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: -4px;
+  z-index: 2;
+  width: 8px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.z-resize::after {
+  content: "";
+  position: absolute;
+  inset-block: 25%;
+  inset-inline-start: 3px;
+  width: 2px;
+  border-radius: 1px;
+  background: transparent;
+}
+
+.z-resize:hover::after,
+.z-resize:focus-visible::after,
+.z-resize.z-active::after { background: var(--z-accent); }
+
+.z-resize:focus-visible { outline: none; }
+
+.z-grid table.z-fixed { table-layout: fixed; }
+
+.z-grid .z-spacer td { position: static; }
+
+.z-grid thead { z-index: 3; }
+
+.z-grid tfoot td { z-index: 2; }
+
+:where(.z-grid[data-pin-start="1"] tr > :nth-child(-n + 1)),
+:where(.z-grid[data-pin-start="2"] tr > :nth-child(-n + 2)),
+:where(.z-grid[data-pin-start="3"] tr > :nth-child(-n + 3)),
+:where(.z-grid[data-pin-start="4"] tr > :nth-child(-n + 4)),
+:where(.z-grid[data-pin-start="5"] tr > :nth-child(-n + 5)),
+:where(.z-grid[data-pin-end="1"] tr > :nth-last-child(-n + 1)),
+:where(.z-grid[data-pin-end="2"] tr > :nth-last-child(-n + 2)),
+:where(.z-grid[data-pin-end="3"] tr > :nth-last-child(-n + 3)) {
+  position: sticky;
+  z-index: 1;
+  background-color: var(--z-surface);
+}
+
+:where(.z-grid tr > :nth-child(1)) { inset-inline-start: var(--z-ps1, 0); }
+:where(.z-grid tr > :nth-child(2)) { inset-inline-start: var(--z-ps2, 0); }
+:where(.z-grid tr > :nth-child(3)) { inset-inline-start: var(--z-ps3, 0); }
+:where(.z-grid tr > :nth-child(4)) { inset-inline-start: var(--z-ps4, 0); }
+:where(.z-grid tr > :nth-child(5)) { inset-inline-start: var(--z-ps5, 0); }
+:where(.z-grid tr > :nth-last-child(1)) { inset-inline-end: var(--z-pe1, 0); }
+:where(.z-grid tr > :nth-last-child(2)) { inset-inline-end: var(--z-pe2, 0); }
+:where(.z-grid tr > :nth-last-child(3)) { inset-inline-end: var(--z-pe3, 0); }
+
+:where(.z-grid[data-pin-start="1"] tr > :nth-child(1)),
+:where(.z-grid[data-pin-start="2"] tr > :nth-child(2)),
+:where(.z-grid[data-pin-start="3"] tr > :nth-child(3)),
+:where(.z-grid[data-pin-start="4"] tr > :nth-child(4)),
+:where(.z-grid[data-pin-start="5"] tr > :nth-child(5)) { box-shadow: inset -1px 0 0 var(--z-border-strong); }
+
+:where(.z-grid[data-pin-end="1"] tr > :nth-last-child(1)),
+:where(.z-grid[data-pin-end="2"] tr > :nth-last-child(2)),
+:where(.z-grid[data-pin-end="3"] tr > :nth-last-child(3)) { box-shadow: inset 1px 0 0 var(--z-border-strong); }
+
+:where([dir="rtl"]) :where(.z-grid[data-pin-start="1"] tr > :nth-child(1)),
+:where([dir="rtl"]) :where(.z-grid[data-pin-start="2"] tr > :nth-child(2)),
+:where([dir="rtl"]) :where(.z-grid[data-pin-start="3"] tr > :nth-child(3)),
+:where([dir="rtl"]) :where(.z-grid[data-pin-start="4"] tr > :nth-child(4)),
+:where([dir="rtl"]) :where(.z-grid[data-pin-start="5"] tr > :nth-child(5)) { box-shadow: inset 1px 0 0 var(--z-border-strong); }
+
+:where(.z-grid thead th[data-pin]),
+:where(.z-grid .z-filter-row td[data-pin]),
+:where(.z-grid tfoot td) { background-color: var(--z-surface-2); }
+
+/**
+ * Menus: column menus and context menus. Items are buttons with menu roles;
+ * the check mark shows aria-checked.
+ */
+
+.z-menu {
+  min-width: 13rem;
+  max-height: min(34rem, 90dvh);
+  padding: 4px;
+}
+
+.z-menu-item {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--z-space) * 2);
+  width: 100%;
+  min-height: 30px;
+  padding: 0 calc(var(--z-space) * 2) 0 calc(var(--z-space) * 7);
+  border: 0;
+  border-radius: var(--z-radius-sm);
+  background: transparent;
+  color: var(--z-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  position: relative;
+}
+
+.z-menu-item:hover,
+.z-menu-item:focus { background: var(--z-hover); outline: none; }
+
+.z-menu-item:focus-visible { box-shadow: inset 0 0 0 2px var(--z-focus); }
+
+.z-menu-item[aria-disabled="true"] { color: var(--z-text-muted); cursor: default; }
+
+.z-menu-item[aria-checked="true"]::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: calc(var(--z-space) * 2);
+  width: 12px;
+  height: 12px;
+  background: currentColor;
+  -webkit-mask: var(--z-check) center / contain no-repeat;
+  mask: var(--z-check) center / contain no-repeat;
+  --z-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 6.5l2.5 2.5L10 3'/%3E%3C/svg%3E");
+}
+
+.z-menu-item[aria-haspopup="menu"]::after {
+  content: "";
+  margin-inline-start: auto;
+  width: 6px;
+  height: 6px;
+  border-block-start: 1.5px solid currentColor;
+  border-inline-end: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+
+[dir="rtl"] .z-menu-item[aria-haspopup="menu"]::after { transform: rotate(-135deg); }
+
+.z-menu-label { flex: 1 1 auto; }
+
+.z-menu-hint {
+  color: var(--z-text-muted);
+  font-size: var(--z-font-size-xs);
+  font-family: var(--z-font-mono);
+}
+
+.z-menu-item .z-icon { margin-inline-start: calc(var(--z-space) * -5); }
+
+.z-menu-sep {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--z-border);
+}
+
 .z-sort-order {
   display: inline-grid;
   place-items: center;
@@ -837,7 +1040,10 @@ th[aria-sort="descending"] .z-sort::after {
 .z-pager {
   position: sticky;
   bottom: 0;
-  left: 0;
+  inset-inline-start: 0;
+  z-index: 3;
+  box-sizing: border-box;
+  width: var(--z-view-w, 100%);
   display: flex;
   align-items: center;
   justify-content: flex-end;

@@ -1,7 +1,10 @@
 use crate::action::{
     Action, ActionMeta, Aggregate, AggregateRequest, Cursor, DEFAULT_PAGE_SIZE, Filter, GridQuery, MAX_FILTER_CHOICES,
-    MAX_FILTER_TEXT, MAX_FILTERS, MAX_PAGE_SIZE, Page, PageRequest, Result, Total,
+    MAX_FILTER_TEXT, MAX_FILTERS, MAX_PAGE_SIZE, Page, PageRequest, Result, Sort, Total,
 };
+use serde::Deserialize;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use crate::time::{Date, DateTime, LocalDateTime, Time, TimeZone};
 use crate::ctx::{BoxFuture, Ctx};
 use crate::i18n::Text;
@@ -135,6 +138,98 @@ impl RowStyle {
     }
 }
 
+/// Side a column is pinned to. `Start` is the left in left to right languages.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Pin {
+    Start,
+    End,
+}
+
+impl Pin {
+    fn code(self) -> &'static str {
+        match self {
+            Pin::Start => "start",
+            Pin::End => "end",
+        }
+    }
+}
+
+/// Most columns pinned to one side.
+pub const MAX_PINNED: usize = 3;
+/// Narrowest and widest column a user may set, in pixels.
+pub const COLUMN_WIDTH: (u32, u32) = (48, 1200);
+
+/// One shown column of a view: field, width set by the user and pin.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ColumnView {
+    pub field: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pin: Option<Pin>,
+}
+
+/// How a user arranged a grid: shown columns in order with widths and pins, sort and filters.
+/// Comes from the client, so the grid cleans it with its own columns before any use.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct DataGridView {
+    /// Shown columns in order. Empty means the grid's own layout.
+    #[serde(default)]
+    pub columns: Vec<ColumnView>,
+    #[serde(default)]
+    pub sort: Vec<Sort>,
+    #[serde(default)]
+    pub filters: Vec<Filter>,
+}
+
+/// Where saved grid views live, one per user and grid. Register one with `App::datagrid_views`.
+///
+/// `grid` is a key built by the server from the tenant, the screen and the node; `user` is the
+/// signed in user. Implementations store the view as JSON in a table or a key value store.
+pub trait DataGridViewStore: Send + Sync + 'static {
+    fn load(&self, user: &str, grid: &str) -> BoxFuture<Result<Option<DataGridView>>>;
+
+    /// Saves a view, or deletes it when `view` is `None`.
+    fn save(&self, user: &str, grid: &str, view: Option<DataGridView>) -> BoxFuture<Result<()>>;
+}
+
+/// Saved views in memory, lost on restart. For development, tests and samples.
+#[derive(Clone, Default)]
+pub struct MemoryViewStore(Arc<Mutex<HashMap<(String, String), DataGridView>>>);
+
+impl DataGridViewStore for MemoryViewStore {
+    fn load(&self, user: &str, grid: &str) -> BoxFuture<Result<Option<DataGridView>>> {
+        let found = self.0.lock().map(|m| m.get(&(user.to_string(), grid.to_string())).cloned()).map_err(poisoned);
+        Box::pin(async move { found })
+    }
+
+    fn save(&self, user: &str, grid: &str, view: Option<DataGridView>) -> BoxFuture<Result<()>> {
+        let key = (user.to_string(), grid.to_string());
+        let done = self.0.lock().map(|mut m| match view {
+            Some(v) => {
+                m.insert(key, v);
+            }
+            None => {
+                m.remove(&key);
+            }
+        });
+        let done = done.map_err(poisoned);
+        Box::pin(async move { done })
+    }
+}
+
+fn poisoned<T>(_: T) -> crate::action::Error {
+    crate::action::Error::Internal("view store lock is poisoned".into())
+}
+
+/// A column as shown in one render: which column, its width and its pin.
+struct Shown {
+    index: usize,
+    width: Option<u32>,
+    pin: Option<Pin>,
+}
+
 type ValueFn<E> = Box<dyn Fn(&E) -> Value + Send + Sync>;
 type StyleFn<E> = Box<dyn Fn(&E) -> Option<RowStyle> + Send + Sync>;
 type OpenFn<E> = Box<dyn Fn(&E) -> Effect + Send + Sync>;
@@ -147,6 +242,8 @@ struct Column<E> {
     flex: Option<u32>,
     filter: bool,
     aggregates: Vec<Aggregate>,
+    pin: Option<Pin>,
+    hidden: bool,
 }
 
 /// Data grid. Its data source is an action that takes a `GridQuery` and returns `Page<E>`.
@@ -206,6 +303,8 @@ impl<E: Model> Grid<E> {
                 flex: None,
                 filter,
                 aggregates: Vec::new(),
+                pin: None,
+                hidden: false,
             });
         }
         grid
@@ -231,6 +330,8 @@ impl<E: Model> Grid<E> {
             flex: None,
             filter: false,
             aggregates: Vec::new(),
+            pin: None,
+            hidden: false,
         });
         GridColumn { grid: self, _type: PhantomData }
     }
@@ -254,10 +355,133 @@ impl<E: Model> Grid<E> {
 
     /// Renders rows as HTML in English. For tests and tools; the server uses the user's language.
     pub fn rows_html(&self, rows: &[E]) -> String {
-        self.rows(rows, &Render::english("grid"))
+        self.rows(rows, &Render::english("grid"), &self.layout(None))
     }
 
-    fn rows(&self, rows: &[E], r: &Render) -> String {
+    /// Shown columns for a view: the view's columns that exist, in its order, with starts pinned
+    /// first and ends last; or the grid's own columns without the hidden ones.
+    fn layout(&self, view: Option<&DataGridView>) -> Vec<Shown> {
+        let mut shown: Vec<Shown> = match view.filter(|v| !v.columns.is_empty()) {
+            Some(v) => {
+                let mut out: Vec<Shown> = Vec::new();
+                for cv in v.columns.iter().take(self.columns.len()) {
+                    let Some(index) = self.columns.iter().position(|c| c.meta.name == cv.field) else { continue };
+                    if out.iter().any(|s| s.index == index) {
+                        continue;
+                    }
+                    let width = cv.width.map(|w| w.clamp(COLUMN_WIDTH.0, COLUMN_WIDTH.1)).or(self.columns[index].width);
+                    out.push(Shown { index, width, pin: cv.pin });
+                }
+                out
+            }
+            None => self
+                .columns
+                .iter()
+                .enumerate()
+                .filter(|(_, c)| !c.hidden)
+                .map(|(index, c)| Shown { index, width: c.width, pin: c.pin })
+                .collect(),
+        };
+        for side in [Pin::Start, Pin::End] {
+            let mut n = 0;
+            for s in shown.iter_mut().filter(|s| s.pin == Some(side)) {
+                n += 1;
+                if n > MAX_PINNED {
+                    s.pin = None;
+                }
+            }
+        }
+        let rank = |s: &Shown| match s.pin {
+            Some(Pin::Start) => 0,
+            None => 1,
+            Some(Pin::End) => 2,
+        };
+        shown.sort_by_key(rank);
+        shown
+    }
+
+    /// Cleans a view from the client: unknown fields, repeats and out of range widths go, sort and
+    /// filters keep only what the grid allows and the limits.
+    fn clean(&self, view: DataGridView) -> DataGridView {
+        let columns = self
+            .layout(Some(&view))
+            .into_iter()
+            .map(|s| ColumnView { field: self.columns[s.index].meta.name.to_string(), width: s.width, pin: s.pin })
+            .collect();
+        let mut query = GridQuery { sort: view.sort, filters: view.filters, ..GridQuery::default() };
+        self.allow(&mut query);
+        query.filters.retain(|f| {
+            let short = |s: &Option<String>| s.as_deref().is_none_or(|t| t.chars().count() <= MAX_FILTER_TEXT);
+            f.contains.chars().count() <= MAX_FILTER_TEXT
+                && short(&f.starts_with)
+                && short(&f.equals)
+                && short(&f.from)
+                && short(&f.to)
+                && f.any_of.len() <= MAX_FILTER_CHOICES
+                && f.any_of.iter().all(|v| v.chars().count() <= MAX_FILTER_TEXT)
+        });
+        DataGridView { columns, sort: query.sort, filters: query.filters }
+    }
+
+    /// Keeps the totals, filters and sort keys this grid offers, within the limits.
+    fn allow(&self, query: &mut GridQuery) {
+        let allowed = self.aggregate_requests();
+        query.aggregates.retain(|a| allowed.contains(a));
+        query.aggregates.dedup();
+        let shown = |name: &str| self.columns.iter().any(|c| c.meta.name == name);
+        let filterable = |name: &str| self.columns.iter().any(|c| c.filter && c.meta.name == name);
+        query.filters.retain(|f| filterable(&f.field) && !f.is_empty());
+        query.filters.truncate(MAX_FILTERS);
+        let mut seen = Vec::new();
+        query.sort.retain(|s| shown(&s.field) && !seen.contains(&s.field) && {
+            seen.push(s.field.clone());
+            true
+        });
+        query.sort.truncate(MAX_SORT);
+    }
+
+    /// Header row for the shown columns.
+    fn head_row(&self, r: &Render, cols: &[Shown]) -> String {
+        let mut out = String::from("<tr>");
+        for (pos, s) in cols.iter().enumerate() {
+            let c = &self.columns[s.index];
+            let mut style = String::new();
+            if let Some(w) = s.width {
+                style.push_str(&format!("width:{w}px;"));
+            }
+            if let Some(f) = c.flex.filter(|_| s.width.is_none()) {
+                style.push_str(&format!("--z-flex:{f};"));
+            }
+            let num = matches!(c.meta.kind, FieldKind::Integer | FieldKind::Money);
+            let class = if num { r#" class="z-num""# } else { "" };
+            out.push_str(&format!(
+                r#"<th scope="col"{class} data-field="{}" aria-sort="none" aria-colindex="{}""#,
+                c.meta.name,
+                pos + 1
+            ));
+            if !style.is_empty() {
+                out.push_str(&format!(r#" style="{style}""#));
+            }
+            if let Some(p) = s.pin {
+                out.push_str(&format!(r#" data-pin="{}""#, p.code()));
+            }
+            if c.filter {
+                out.push_str(&format!(r#" data-filter="{}""#, filter_kind(&c.meta.kind)));
+                if let FieldKind::Choice(options) = c.meta.kind {
+                    let list: Vec<serde_json::Value> = options
+                        .iter()
+                        .map(|o| json!({ "value": o.value, "label": r.i18n.text(r.locale, &Text::key_or(o.key, o.label)) }))
+                        .collect();
+                    out.push_str(&format!(r#" data-options="{}""#, attr(&list)));
+                }
+            }
+            out.push_str(&format!(">{}</th>", r.label(c.meta)));
+        }
+        out.push_str("</tr>");
+        out
+    }
+
+    fn rows(&self, rows: &[E], r: &Render, cols: &[Shown]) -> String {
         let mut out = String::new();
         for row in rows {
             out.push_str("<tr");
@@ -268,7 +492,8 @@ impl<E: Model> Grid<E> {
                 out.push_str(&format!(r#" tabindex="-1" data-zeyn-effect="{}""#, attr(&effect)));
             }
             out.push('>');
-            for c in &self.columns {
+            for s in cols {
+                let c = &self.columns[s.index];
                 let value = (c.value)(row);
                 let class = if matches!(value, Value::Int(_) | Value::Money(_)) { r#" class="z-num""# } else { "" };
                 out.push_str(&format!("<td{class}>{}</td>", r.value(&value, &c.meta.kind)));
@@ -280,6 +505,8 @@ impl<E: Model> Grid<E> {
 
     fn render_with(&self, out: &mut String, r: &Render, page: Option<&LoadedPage>) {
         let scope = r.scope;
+        let view = page.and_then(|p| p.view.as_ref());
+        let cols = self.layout(view);
         let grid_text = |key: &str| r.text(&Text::key(format!("zeyn.grid.{key}")));
         out.push_str(&format!(
             r#"<div class="z-grid" data-zeyn-grid data-testid="{scope}.grid" data-zeyn-action="{}" data-zeyn-mode="{}" data-zeyn-paging="{}" data-zeyn-page-size="{}" data-zeyn-openable="{}" data-zeyn-text-range="{}" data-zeyn-text-range-total="{}" data-zeyn-text-loaded="{}""#,
@@ -305,41 +532,30 @@ impl<E: Model> Grid<E> {
             }
         }
         out.push_str(&format!(r#" data-zeyn-texts="{}""#, attr(&grid_texts(r))));
-        out.push_str(r#"><table role="grid"><thead><tr>"#);
-        for c in &self.columns {
-            let mut style = String::new();
-            if let Some(w) = c.width {
-                style.push_str(&format!("width:{w}px;"));
-            }
-            if let Some(f) = c.flex {
-                style.push_str(&format!("--z-flex:{f};"));
-            }
-            let num = matches!(c.meta.kind, crate::value::FieldKind::Integer | crate::value::FieldKind::Money);
-            let class = if num { r#" class="z-num""# } else { "" };
-            out.push_str(&format!(r#"<th scope="col"{class} data-field="{}" aria-sort="none""#, c.meta.name));
-            if !style.is_empty() {
-                out.push_str(&format!(r#" style="{style}""#));
-            }
-            if c.filter {
-                out.push_str(&format!(r#" data-filter="{}""#, filter_kind(&c.meta.kind)));
-                if let FieldKind::Choice(options) = c.meta.kind {
-                    let list: Vec<serde_json::Value> = options
-                        .iter()
-                        .map(|o| json!({ "value": o.value, "label": r.i18n.text(r.locale, &Text::key_or(o.key, o.label)) }))
-                        .collect();
-                    out.push_str(&format!(r#" data-options="{}""#, attr(&list)));
-                }
-            }
-            out.push_str(&format!(">{}</th>", r.label(c.meta)));
+        let all: Vec<serde_json::Value> = self
+            .columns
+            .iter()
+            .map(|c| json!({ "field": c.meta.name, "label": r.i18n.text(r.locale, &c.meta.label_text()), "hidden": c.hidden, "pin": c.pin, "width": c.width }))
+            .collect();
+        out.push_str(&format!(r#" data-zeyn-columns="{}""#, attr(&all)));
+        if let Some(v) = view {
+            out.push_str(&format!(r#" data-zeyn-view="{}""#, attr(v)));
         }
-        out.push_str("</tr></thead><tbody data-zeyn-rows>");
+        if page.is_some_and(|p| p.saved_views) {
+            out.push_str(r#" data-zeyn-views="server""#);
+        }
+        out.push_str(&format!(
+            r#"><table role="grid" aria-colcount="{}"><thead>{}</thead><tbody data-zeyn-rows>"#,
+            self.columns.len(),
+            self.head_row(r, &cols)
+        ));
         if let Some(p) = page {
             out.push_str(&self.rows_html_erased(p, r));
         }
         out.push_str("</tbody>");
         if self.columns.iter().any(|c| !c.aggregates.is_empty()) {
             out.push_str("<tfoot data-zeyn-foot>");
-            out.push_str(&self.foot_row(r, page.map(|p| p.totals.as_slice()).unwrap_or_default()));
+            out.push_str(&self.foot_row(r, page.map(|p| p.totals.as_slice()).unwrap_or_default(), &cols));
             out.push_str("</tfoot>");
         }
         out.push_str("</table>");
@@ -364,9 +580,9 @@ impl<E: Model> Grid<E> {
 
     /// Footer row with one cell per column. Cells of columns with totals carry `data-field` and
     /// `data-agg` (space separated ops) and show each total with its localized name.
-    fn foot_row(&self, r: &Render, totals: &[Total]) -> String {
+    fn foot_row(&self, r: &Render, totals: &[Total], cols: &[Shown]) -> String {
         let mut out = String::from("<tr>");
-        for c in &self.columns {
+        for c in cols.iter().map(|s| &self.columns[s.index]) {
             if c.aggregates.is_empty() {
                 out.push_str("<td></td>");
                 continue;
@@ -405,7 +621,8 @@ impl<E: Model> Grid<E> {
     }
 
     fn rows_html_erased(&self, page: &LoadedPage, r: &Render) -> String {
-        page.items.downcast_ref::<Vec<E>>().map(|rows| self.rows(rows, r)).unwrap_or_default()
+        let cols = self.layout(page.view.as_ref());
+        page.items.downcast_ref::<Vec<E>>().map(|rows| self.rows(rows, r, &cols)).unwrap_or_default()
     }
 }
 
@@ -414,7 +631,7 @@ impl<E: Model> GridSource for Grid<E> {
         self.action
     }
 
-    fn first_query(&self) -> GridQuery {
+    fn first_query(&self, view: Option<&DataGridView>) -> GridQuery {
         let page = match self.paging {
             Paging::Infinite { batch } => PageRequest::After { cursor: None, limit: batch },
             other => PageRequest::Offset { offset: 0, limit: other.size() },
@@ -423,24 +640,22 @@ impl<E: Model> GridSource for Grid<E> {
             page,
             with_total: !matches!(self.paging, Paging::Infinite { .. }),
             aggregates: self.aggregate_requests(),
+            sort: view.map(|v| v.sort.clone()).unwrap_or_default(),
+            filters: view.map(|v| v.filters.clone()).unwrap_or_default(),
             ..GridQuery::default()
         }
     }
 
+    fn clean_view(&self, view: DataGridView) -> DataGridView {
+        self.clean(view)
+    }
+
+    fn head_html(&self, r: &Render, view: Option<&DataGridView>) -> String {
+        self.head_row(r, &self.layout(view))
+    }
+
     fn fetch(&self, ctx: Ctx, mut query: GridQuery) -> BoxFuture<Result<LoadedPage>> {
-        let allowed = self.aggregate_requests();
-        query.aggregates.retain(|a| allowed.contains(a));
-        query.aggregates.dedup();
-        let shown = |name: &str| self.columns.iter().any(|c| c.meta.name == name);
-        let filterable = |name: &str| self.columns.iter().any(|c| c.filter && c.meta.name == name);
-        query.filters.retain(|f| filterable(&f.field) && !f.is_empty());
-        query.filters.truncate(MAX_FILTERS);
-        let mut seen = Vec::new();
-        query.sort.retain(|s| shown(&s.field) && !seen.contains(&s.field) && {
-            seen.push(s.field.clone());
-            true
-        });
-        query.sort.truncate(MAX_SORT);
+        self.allow(&mut query);
         query.time_zone = ctx.time_zone();
         let fetch = self.fetch;
         let offset = match &query.page {
@@ -456,6 +671,8 @@ impl<E: Model> GridSource for Grid<E> {
                 offset,
                 totals: page.totals,
                 items: Box::new(page.items),
+                view: None,
+                saved_views: false,
             })
         })
     }
@@ -470,7 +687,7 @@ impl<E: Model> GridSource for Grid<E> {
 
     fn foot_html(&self, page: &LoadedPage, r: &Render) -> Option<String> {
         let has = self.columns.iter().any(|c| !c.aggregates.is_empty());
-        (has && !page.totals.is_empty()).then(|| self.foot_row(r, &page.totals))
+        (has && !page.totals.is_empty()).then(|| self.foot_row(r, &page.totals, &self.layout(page.view.as_ref())))
     }
 
     fn tool_schema(&self) -> serde_json::Value {
@@ -555,6 +772,8 @@ impl<E: Model> Component for Grid<E> {
                 "flex": c.flex,
                 "filter": c.filter,
                 "aggregates": c.aggregates,
+                "pin": c.pin,
+                "hidden": c.hidden,
             })).collect::<Vec<_>>(),
         })
     }
@@ -632,6 +851,25 @@ impl<E: Model, T> GridColumn<E, T> {
         T: SupportsMinMaxTotal,
     {
         self.aggregate(Aggregate::Max)
+    }
+
+    /// Keeps the column at the start edge (left in left to right languages) while the grid
+    /// scrolls sideways. At most three columns per side stay pinned.
+    pub fn pin_start(mut self) -> Self {
+        self.last().pin = Some(Pin::Start);
+        self
+    }
+
+    /// Keeps the column at the end edge while the grid scrolls sideways.
+    pub fn pin_end(mut self) -> Self {
+        self.last().pin = Some(Pin::End);
+        self
+    }
+
+    /// Leaves the column out until the user shows it from the column menu.
+    pub fn hidden(mut self) -> Self {
+        self.last().hidden = true;
+        self
     }
 
     /// Shows how many matching rows have a value in this column. Works on every column.
@@ -719,6 +957,13 @@ fn grid_texts(r: &Render) -> serde_json::Value {
     let mut map = serde_json::Map::new();
     for k in keys {
         map.insert(k.to_string(), json!(r.i18n.text(r.locale, &Text::key(format!("zeyn.grid.filter.{k}")))));
+    }
+    let menu = [
+        "options", "resize", "sort_asc", "sort_desc", "sort_clear", "pin_start", "pin_end", "unpin", "move_prev", "move_next",
+        "hide", "columns", "reset",
+    ];
+    for k in menu {
+        map.insert(format!("menu_{k}"), json!(r.i18n.text(r.locale, &Text::key(format!("zeyn.grid.menu.{k}")))));
     }
     map.insert("yes".into(), json!(r.i18n.text(r.locale, &Text::key("zeyn.yes"))));
     map.insert("no".into(), json!(r.i18n.text(r.locale, &Text::key("zeyn.no"))));
