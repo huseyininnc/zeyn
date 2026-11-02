@@ -161,6 +161,27 @@
 //! fn grid() -> Node { Grid::of(search_products).column(Product::code).row_action("Archive", archive_product, |p| p.code.clone()).into() }
 //! ```
 //!
+//! A bulk action whose input does not hold keys of the given key field:
+//!
+//! ```compile_fail
+//! use zeyn::prelude::*;
+//!
+//! #[entity(table = "products")]
+//! pub struct Product {
+//!     #[key]
+//!     pub id: ProductId,
+//!     pub code: String,
+//! }
+//!
+//! #[action(permission = "stock.product.read")]
+//! pub async fn search_products(_q: GridQuery) -> Result<Page<Product>> { Ok(Page::default()) }
+//!
+//! #[action(permission = "stock.product.write")]
+//! pub async fn archive_products(_codes: Vec<String>) -> Result<()> { Ok(()) }
+//!
+//! fn grid() -> Node { Grid::of(search_products).column(Product::code).bulk_action("Archive", archive_products, Product::id).into() }
+//! ```
+//!
 //! A menu item for a screen without a route:
 //!
 //! ```compile_fail
@@ -227,7 +248,7 @@ pub use ctx::{BoxFuture, Ctx, Dep, Identity, Inject, IntoScreen, Outcome, Servic
 pub use feature::{Feature, Guard, GuardResult, Menu, MenuGroup, MenuItem, Route, ScreenEntry, SignedIn};
 pub use form::{Form, FormAction, FormRow, SubmitForm};
 pub use grid::{
-    COLUMN_WIDTH, CellRenderer, ColumnView, Grid, GridColumn, Tone, GridMode, DataGridView, DataGridViewStore, MAX_PINNED, MAX_SORT, MemoryViewStore, Paging,
+    BulkAction, COLUMN_WIDTH, CellRenderer, MAX_BULK, ColumnView, Grid, GridColumn, Tone, GridMode, DataGridView, DataGridViewStore, MAX_PINNED, MAX_SORT, MemoryViewStore, Paging,
     Pin, RowStyle, position_cursor, total,
 };
 pub use i18n::{I18n, NumberFormat, Text};

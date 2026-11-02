@@ -577,3 +577,97 @@ async fn row_action_is_refused_without_permission_unknown_items_or_rows() {
     let (router, _) = act_router(Identity::user("w").with_permissions(["items.write"]));
     assert_eq!(send(&router, run("7", "a0")).await.status, StatusCode::FORBIDDEN, "screen access first");
 }
+
+#[action(permission = "items.write")]
+pub async fn deactivate(ids: Vec<ItemId>, store: Store) -> Result<usize> {
+    let mut rows = store.0.write().unwrap();
+    let mut n = 0;
+    for r in rows.iter_mut().filter(|r| ids.contains(&r.id)) {
+        r.active = false;
+        n += 1;
+    }
+    Ok(n)
+}
+
+#[screen(route = "/pick", permission = "items.read")]
+pub fn pick() -> Screen {
+    Screen::new("Pick").body(
+        Grid::of(search).paging(Paging::pages(5)).column(Item::code).column(Item::kind).filter().column(Item::active).bulk_action(
+            "Deactivate",
+            deactivate,
+            Item::id,
+        ),
+    )
+}
+
+fn pick_router(identity: Identity) -> (Router, Store) {
+    let store = Store::seeded();
+    let router = App::new("Test")
+        .service(store.clone())
+        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .feature(Feature::new("items").screen(pick))
+        .router()
+        .unwrap();
+    (router, store)
+}
+
+fn bulk(body: serde_json::Value) -> Request<Body> {
+    let mut call = serde_json::json!({ "screen": "pick", "node": 0, "action": 0 });
+    call.as_object_mut().unwrap().extend(body.as_object().unwrap().clone());
+    post("/_zeyn/grid/bulk", call)
+}
+
+fn active_ids(store: &Store) -> Vec<i64> {
+    store.0.read().unwrap().iter().filter(|r| r.active).map(|r| r.id.0).collect()
+}
+
+fn writer_items() -> Identity {
+    Identity::user("w").with_permissions(["items.read", "items.write"])
+}
+
+#[tokio::test]
+async fn selectable_grid_renders_checkboxes_and_a_bar_with_permitted_actions_only() {
+    let (router, _) = pick_router(writer_items());
+    let r = send(&router, get("/pick")).await;
+    assert!(r.body.contains("data-zeyn-select-all"));
+    assert!(r.body.contains(r#"<td class="z-select"><input type="checkbox" data-zeyn-select"#));
+    assert!(r.body.contains(r#"data-zeyn-bulk-run="0""#));
+    assert!(r.body.contains(r#"aria-colcount="4""#));
+    let (router, _) = pick_router(reader());
+    let r = send(&router, get("/pick")).await;
+    assert!(r.body.contains("data-zeyn-bulk "));
+    assert!(!r.body.contains("data-zeyn-bulk-run="));
+}
+
+#[tokio::test]
+async fn bulk_action_runs_with_picked_keys() {
+    let (router, store) = pick_router(writer_items());
+    let r = send(&router, bulk(serde_json::json!({ "keys": ["2", "4", "4"] }))).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    assert_eq!(r.json()["count"], 2);
+    assert!(!active_ids(&store).contains(&2) && !active_ids(&store).contains(&4));
+    assert_eq!(active_ids(&store).len(), 8);
+}
+
+#[tokio::test]
+async fn bulk_action_on_every_matching_row_collects_keys_on_the_server() {
+    let (router, store) = pick_router(writer_items());
+    let q = serde_json::json!({ "all": true, "keys": ["1"], "query": { "filters": [{ "field": "kind", "any_of": ["Tool"] }, { "field": "note", "contains": "zzz" }] } });
+    let r = send(&router, bulk(q)).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    assert_eq!(r.json()["count"], 6, "every tool, the note filter is not offered");
+    assert_eq!(active_ids(&store), [2, 4, 8, 10, 14, 16, 20]);
+}
+
+#[tokio::test]
+async fn bulk_action_is_refused_without_permission_bad_keys_unknown_actions_or_too_many() {
+    let (router, store) = pick_router(reader());
+    assert_eq!(send(&router, bulk(serde_json::json!({ "keys": ["2"] }))).await.status, StatusCode::FORBIDDEN);
+    assert_eq!(active_ids(&store).len(), 10);
+    let (router, store) = pick_router(writer_items());
+    assert_eq!(send(&router, bulk(serde_json::json!({ "keys": ["x"] }))).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(send(&router, bulk(serde_json::json!({ "action": 3, "keys": ["2"] }))).await.status, StatusCode::NOT_FOUND);
+    let many: Vec<String> = (0..=zeyn::MAX_BULK).map(|i| i.to_string()).collect();
+    assert_eq!(send(&router, bulk(serde_json::json!({ "keys": many }))).await.status, StatusCode::FORBIDDEN);
+    assert_eq!(active_ids(&store).len(), 10);
+}

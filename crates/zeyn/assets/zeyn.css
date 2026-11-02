@@ -1022,6 +1022,34 @@ th[aria-sort="descending"] .z-sort::after {
 
 .z-row-action:disabled { opacity: 0.5; cursor: progress; }
 
+/**
+ * Row selection: checkbox column and the selection bar above the grid.
+ */
+
+.z-grid th.z-select-col,
+.z-grid td.z-select { width: 36px; padding-inline: 0; text-align: center; }
+
+.z-select input,
+.z-select-col input { width: 16px; height: 16px; margin: 0; accent-color: var(--z-accent); cursor: pointer; }
+
+.z-grid tbody tr[aria-selected="true"] td { background: var(--z-brand-subtle); }
+
+.z-bulk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--z-space) * 2);
+  margin-block-end: calc(var(--z-space) * 2);
+  padding: calc(var(--z-space) * 1.5) calc(var(--z-space) * 3);
+  border: 1px solid color-mix(in oklab, var(--z-accent) 35%, var(--z-border));
+  border-radius: var(--z-radius);
+  background: var(--z-brand-subtle);
+}
+
+.z-bulk[hidden] { display: none; }
+
+.z-bulk-count { font-weight: 600; margin-inline-end: auto; }
+
 .z-sort-order {
   display: inline-grid;
   place-items: center;

@@ -157,6 +157,31 @@ pub trait GridSource: Send + Sync {
         Box::pin(async { Err(crate::action::Error::NotFound) })
     }
 
+    /// Call of bulk action `index` with these keys; `None` when there is no such action or a key
+    /// does not read as the key type.
+    fn bulk_call(&self, index: usize, keys: Vec<serde_json::Value>) -> Option<RowCall> {
+        let _ = (index, keys);
+        None
+    }
+
+    /// Access rule of bulk action `index`.
+    fn bulk_meta(&self, index: usize) -> Option<ActionMeta> {
+        let _ = index;
+        None
+    }
+
+    /// A row key from the client as JSON of the key's type; `None` when it cannot be read.
+    fn key_json(&self, key: &str) -> Option<serde_json::Value> {
+        let _ = key;
+        None
+    }
+
+    /// Keys of the rows of a loaded page, in order.
+    fn page_keys(&self, page: &LoadedPage) -> Vec<serde_json::Value> {
+        let _ = page;
+        Vec::new()
+    }
+
     /// Builds the call of a row item (`a0` for the first row action) from the loaded row with
     /// this key. `None` when the row is not there or the item does not exist for it.
     fn row_call(&self, page: &LoadedPage, key: &str, item: &str) -> Option<RowCall> {

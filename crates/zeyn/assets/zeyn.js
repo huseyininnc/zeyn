@@ -307,6 +307,9 @@ function initGrid(grid) {
     texts: textsOf(grid),
     columns: null,
     needHead: false,
+    selected: new Set(),
+    allMatching: false,
+    lastPick: null,
     viewTimer: 0,
     seq: 0,
     timer: 0,
@@ -436,6 +439,7 @@ function roving(grid, focus) {
     rowControls(tr, i === s.active);
   });
   relativeTimes(grid);
+  syncSelection(grid);
   if (focus) list[s.active]?.focus();
 }
 
@@ -633,6 +637,7 @@ function renderVirtual(grid, focusIndex = null) {
       if (n === ref) ref = ref.nextSibling;
       else s.body.insertBefore(n, ref);
     }
+    syncSelection(grid);
     const filler = Math.max(0, height - (end - start) * s.rh);
     if (filler !== s.fillerHeight) s.filler.style.height = `${(s.fillerHeight = filler)}px`;
     const target = focused != null && s.body.querySelector(`[data-zeyn-index="${focused}"]`);
@@ -799,6 +804,129 @@ function relativeTimes(root) {
     const [unit, size] = units.find(([, n]) => Math.abs(secs) >= n) ?? ['second', 1];
     el.textContent = relativeFormat.format(Math.round(secs / size), unit);
   }
+}
+
+/** The selection bar of a grid, rendered right before it. */
+function bulkBar(grid) {
+  const bar = grid.previousElementSibling;
+  return bar?.matches('[data-zeyn-bulk]') ? bar : null;
+}
+
+/**
+ * Shows the selection on the rows in the DOM (checkbox and `aria-selected`), the header box
+ * (checked, mixed or empty) and the selection bar with its count and the offer to select every
+ * matching row.
+ */
+function syncSelection(grid) {
+  const s = grids.get(grid);
+  const bar = bulkBar(grid);
+  if (!s || !bar) return;
+  const list = rows(grid).filter((tr) => tr.dataset.zeynKey != null);
+  let on = 0;
+  for (const tr of list) {
+    const picked = s.allMatching || s.selected.has(tr.dataset.zeynKey);
+    const box = tr.querySelector('[data-zeyn-select]');
+    if (box && box.checked !== picked) box.checked = picked;
+    if (picked) on++;
+    if (picked) tr.setAttribute('aria-selected', 'true');
+    else tr.removeAttribute('aria-selected');
+  }
+  const all = grid.querySelector('[data-zeyn-select-all]');
+  if (all) {
+    all.checked = list.length > 0 && on === list.length;
+    all.indeterminate = on > 0 && on < list.length;
+  }
+  const count = s.allMatching ? s.total ?? 0 : s.selected.size;
+  bar.hidden = count === 0;
+  const d = bar.dataset;
+  bar.querySelector('.z-bulk-count').textContent = s.allMatching
+    ? fill(d.textAllSelected || 'All {total} matching rows selected', { total: fmt(s.total ?? 0) })
+    : fill(d.textSelected || '{n} selected', { n: fmt(count) });
+  const matching = bar.querySelector('[data-zeyn-select-matching]');
+  const offer = !s.allMatching && list.length > 0 && on === list.length && (s.total ?? 0) > s.selected.size;
+  matching.hidden = !offer;
+  if (offer) matching.textContent = fill(d.textAll || 'Select all {total} matching rows', { total: fmt(s.total ?? 0) });
+}
+
+/**
+ * Picks or drops a row from its checkbox. With Shift, every row between the last picked one and
+ * this one (rows in the DOM) takes the same state.
+ */
+function pickRow(box, range) {
+  const tr = box.closest('tr');
+  const grid = tr.closest('[data-zeyn-grid]');
+  const s = grids.get(grid);
+  if (!s) return;
+  const on = box.checked;
+  if (s.allMatching && !on) {
+    s.allMatching = false;
+    for (const r of rows(grid)) if (r.dataset.zeynKey != null) s.selected.add(r.dataset.zeynKey);
+  }
+  const list = rows(grid);
+  const i = list.indexOf(tr);
+  const j = range && s.lastPick != null ? list.findIndex((r) => r.dataset.zeynKey === s.lastPick) : -1;
+  const span = j < 0 ? [tr] : list.slice(Math.min(i, j), Math.max(i, j) + 1);
+  for (const r of span) {
+    const key = r.dataset.zeynKey;
+    if (key == null) continue;
+    if (on) s.selected.add(key);
+    else s.selected.delete(key);
+  }
+  s.lastPick = tr.dataset.zeynKey;
+  syncSelection(grid);
+}
+
+/** Header box: picks or drops every row in the DOM. */
+function pickPage(box) {
+  const grid = box.closest('[data-zeyn-grid]');
+  const s = grids.get(grid);
+  if (!s) return;
+  if (!box.checked) s.allMatching = false;
+  for (const r of rows(grid)) {
+    if (r.dataset.zeynKey == null) continue;
+    if (box.checked) s.selected.add(r.dataset.zeynKey);
+    else s.selected.delete(r.dataset.zeynKey);
+  }
+  syncSelection(grid);
+}
+
+/** Grid of a selection bar control. */
+function gridOfBar(el) {
+  return el.closest('[data-zeyn-bulk]')?.nextElementSibling ?? null;
+}
+
+/** Drops the selection of a grid. */
+function clearSelection(grid) {
+  const s = grids.get(grid);
+  if (!s) return;
+  s.selected.clear();
+  s.allMatching = false;
+  s.lastPick = null;
+  syncSelection(grid);
+}
+
+/**
+ * Runs a bulk action with `POST /_zeyn/grid/bulk`: the picked keys, or, when every matching row
+ * is selected, the filters so the server collects the keys itself.
+ */
+async function runBulk(button) {
+  const grid = gridOfBar(button);
+  const s = grid && grids.get(grid);
+  if (!s) return;
+  button.disabled = true;
+  const r = await post(BASE + '/_zeyn/grid/bulk', {
+    ...address(grid),
+    action: Number(button.dataset.zeynBulkRun),
+    keys: s.allMatching ? [] : [...s.selected],
+    all: s.allMatching,
+    query: { sort: s.sort, filters: filterList(s) },
+  });
+  button.disabled = false;
+  if (!r.ok) return;
+  await runEffects(r.data?.effects, button);
+  toast(s.texts.done || 'Done.');
+  clearSelection(grid);
+  await loadGrid(grid, 'reload');
 }
 
 /**
@@ -1523,6 +1651,7 @@ function onFilter(control) {
   clearTimeout(s.timer);
   s.timer = setTimeout(() => {
     s.filters[cell.dataset.field] = readFilter(cell);
+    s.allMatching = false;
     saveView(grid);
     loadGrid(grid, 'reset');
   }, FILTER_DELAY_MS);
@@ -1536,6 +1665,13 @@ function rowKey(e, tr) {
   if (target !== undefined) {
     e.preventDefault();
     if (list[target]) activate(list[target], true);
+    return true;
+  }
+  const box = tr.querySelector('[data-zeyn-select]');
+  if (e.key === ' ' && box) {
+    e.preventDefault();
+    box.checked = !box.checked;
+    pickRow(box, e.shiftKey);
     return true;
   }
   if (e.key === 'Enter' && tr.dataset.zeynEffect) {
@@ -1819,6 +1955,17 @@ document.addEventListener('click', (e) => {
   const t = e.target instanceof Element ? e.target : null;
   if (!t) return;
   let el;
+  if ((el = t.closest('input[data-zeyn-select]'))) return pickRow(el, e.shiftKey);
+  if ((el = t.closest('input[data-zeyn-select-all]'))) return pickPage(el);
+  if ((el = t.closest('[data-zeyn-select-matching]'))) {
+    const grid = gridOfBar(el);
+    const s = grids.get(grid);
+    if (s) s.allMatching = true;
+    syncSelection(grid);
+    return bulkBar(grid)?.querySelector('[data-zeyn-select-clear]')?.focus();
+  }
+  if ((el = t.closest('[data-zeyn-select-clear]'))) return clearSelection(gridOfBar(el));
+  if ((el = t.closest('[data-zeyn-bulk-run]'))) return runBulk(el);
   if ((el = t.closest('.z-menu-item'))) return runMenuItem(el);
   if ((el = t.closest('button[data-zeyn-run]'))) return runRowItem(el);
   if ((el = t.closest('button.z-sort'))) return toggleSort(el, e.shiftKey);

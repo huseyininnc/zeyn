@@ -82,6 +82,18 @@ impl ProductStore {
         Ok(())
     }
 
+    /// Marks products as inactive. Returns how many changed.
+    pub fn deactivate(&self, ids: &[ProductId]) -> Result<usize> {
+        let mut rows = self.0.write().map_err(poisoned)?;
+        let mut n = 0;
+        for p in rows.iter_mut().filter(|p| ids.contains(&p.id) && p.active) {
+            p.active = false;
+            p.version += 1;
+            n += 1;
+        }
+        Ok(n)
+    }
+
     pub fn save(&self, mut product: Product) -> Result<Product> {
         let mut rows = self.0.write().map_err(poisoned)?;
         if rows.iter().any(|p| p.code.eq_ignore_ascii_case(&product.code) && p.id != product.id) {
@@ -121,6 +133,12 @@ pub async fn save_product(product: Valid<Product>, store: ProductStore) -> Resul
 #[action(permission = "stock.product.write", audit)]
 pub async fn restock_product(id: ProductId, store: ProductStore) -> Result<()> {
     store.restock(id)
+}
+
+/// Marks the selected products as inactive. A bulk action on the product list.
+#[action(permission = "stock.product.write", audit)]
+pub async fn deactivate_products(ids: Vec<ProductId>, store: ProductStore) -> Result<usize> {
+    store.deactivate(&ids)
 }
 
 /// Which product the editor opens; `None` creates one.
@@ -178,6 +196,7 @@ pub fn product_list() -> Screen {
                 .filter()
                 .check_icon()
                 .row_action(t!("stock.restock"), restock_product, |p| p.id)
+                .bulk_action(t!("stock.deactivate"), deactivate_products, Product::id)
                 .row_style(|p| match p.stock {
                     0 => Some(RowStyle::Danger),
                     1..=9 => Some(RowStyle::Warning),

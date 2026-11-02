@@ -988,6 +988,7 @@ impl App {
             .route("/_zeyn/grid", post(grid_call))
             .route("/_zeyn/grid/view", post(grid_view_call))
             .route("/_zeyn/grid/run", post(grid_run_call))
+            .route("/_zeyn/grid/bulk", post(grid_bulk_call))
             .route("/_zeyn/form", post(form_call))
             .route("/_zeyn/locale", post(set_locale))
             .route("/_zeyn/timezone", post(set_time_zone))
@@ -1629,6 +1630,23 @@ struct GridCall {
 }
 
 #[derive(Deserialize)]
+struct BulkCall {
+    screen: String,
+    #[serde(default)]
+    params: Json,
+    node: usize,
+    action: usize,
+    /// Keys picked one by one; ignored when `all` is set.
+    #[serde(default)]
+    keys: Vec<String>,
+    /// Every row that matches `query` (its filters); the server collects the keys.
+    #[serde(default)]
+    all: bool,
+    #[serde(default)]
+    query: GridQuery,
+}
+
+#[derive(Deserialize)]
 struct RowItemCall {
     screen: String,
     #[serde(default)]
@@ -1735,6 +1753,64 @@ impl AppState {
         Ok(json!({ "effects": [] }))
     }
 
+    /// Runs a bulk action with the selected keys, or with the keys of every row matching the
+    /// filters, which the server collects through the grid's action, page by page.
+    async fn run_bulk(&self, ctx: &Ctx, mut call: BulkCall) -> Result<Json, Failure> {
+        use crate::grid::MAX_BULK;
+        let too_many = || Failure::App(Error::Denied(Text::key("zeyn.grid.too_many").arg("n", MAX_BULK.to_string())));
+        let (_, entry, screen) = self.open(ctx, &call.screen, call.params).await?;
+        let grid = screen.nodes().get(call.node).and_then(|n| n.grid()).ok_or(Failure::App(Error::NotFound))?;
+        if !ctx.identity().can(&grid.action().access) {
+            return Err(Failure::App(Error::Forbidden));
+        }
+        let meta = grid.bulk_meta(call.action).ok_or(Failure::App(Error::NotFound))?;
+        if !ctx.identity().can(&meta.access) {
+            return Err(Failure::App(Error::Forbidden));
+        }
+        let keys = if call.all {
+            let mut keys = Vec::new();
+            let mut offset = 0u64;
+            loop {
+                let mut q = call.query.clone();
+                q.page = crate::action::PageRequest::Offset { offset, limit: crate::action::MAX_PAGE_SIZE };
+                q.aggregates.clear();
+                q.with_total = false;
+                let page = self.timed(grid.fetch(ctx.clone(), q)).await?;
+                let n = page.count;
+                keys.extend(grid.page_keys(&page));
+                if keys.len() > MAX_BULK {
+                    return Err(too_many());
+                }
+                if n < crate::action::MAX_PAGE_SIZE as usize {
+                    break;
+                }
+                offset += n as u64;
+            }
+            keys
+        } else {
+            if call.keys.len() > MAX_BULK {
+                return Err(too_many());
+            }
+            call.keys.dedup();
+            call.keys.iter().map(|k| grid.key_json(k)).collect::<Option<Vec<_>>>().ok_or(Failure::App(Error::NotFound))?
+        };
+        if keys.is_empty() {
+            return Ok(json!({ "effects": [], "count": 0 }));
+        }
+        let count = keys.len();
+        let run = grid.bulk_call(call.action, keys).ok_or(Failure::App(Error::NotFound))?;
+        let info = Call { kind: CallKind::Grid, screen: entry.meta.name, action: Some(run.meta), via_agent: ctx.via_agent() };
+        let started = Instant::now();
+        let result = async {
+            self.before(ctx, &info)?;
+            self.timed((run.run)(ctx.clone())).await
+        }
+        .await;
+        self.after(ctx, &info, started, &result);
+        result?;
+        Ok(json!({ "effects": [], "count": count }))
+    }
+
     async fn run_form(&self, ctx: &Ctx, call: FormCall) -> Result<Json, Failure> {
         if call.via_agent && !self.agents.is_some_and(|a| a.writes) {
             return Err(Failure::App(Error::Forbidden));
@@ -1800,6 +1876,17 @@ async fn grid_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Js
         return st.error_response(&ctx, f);
     }
     match st.run_grid(&ctx, call).await {
+        Ok(body) => axum::Json(body).into_response(),
+        Err(f) => st.error_response(&ctx, f),
+    }
+}
+
+async fn grid_bulk_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(call): axum::Json<BulkCall>) -> Response {
+    let ctx = st.licensed(st.ctx(&headers)).await;
+    if let Err(f) = st.check_csrf(&headers) {
+        return st.error_response(&ctx, f);
+    }
+    match st.run_bulk(&ctx, call).await {
         Ok(body) => axum::Json(body).into_response(),
         Err(f) => st.error_response(&ctx, f),
     }

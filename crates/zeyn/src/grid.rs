@@ -285,6 +285,29 @@ where
 type CellFn<E> = Box<dyn Fn(&E, &Render) -> String + Send + Sync>;
 type RunFn<E> = Box<dyn Fn(&E) -> Box<dyn FnOnce(Ctx) -> BoxFuture<Result<()>> + Send> + Send + Sync>;
 
+/// Most rows one bulk action may cover; larger selections are refused.
+pub const MAX_BULK: usize = 10_000;
+
+/// Actions that take the keys of selected rows: their input is `Vec<K>`, where `K` is the type of
+/// the key field given to `bulk_action`.
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` cannot be a bulk action over `{K}` keys",
+    label = "this action's input is not `Vec<{K}>`",
+    note = "a bulk action takes the selected keys: declare its first argument as `Vec<{K}>`, the type of the key field you pass"
+)]
+pub trait BulkAction<K>: Action {}
+
+impl<K, A: Action<Input = Vec<K>>> BulkAction<K> for A {}
+
+type BulkFn = Box<dyn Fn(Vec<serde_json::Value>) -> Option<Box<dyn FnOnce(Ctx) -> BoxFuture<Result<()>> + Send>> + Send + Sync>;
+
+/// A button in the selection bar that runs an action with the selected keys.
+struct BulkDef {
+    label: Text,
+    meta: ActionMeta,
+    run: BulkFn,
+}
+
 /// A button on every row that runs an action with input built from the row.
 struct RowAction<E> {
     label: Text,
@@ -350,6 +373,8 @@ pub struct Grid<E: Model> {
     row_style: Option<StyleFn<E>>,
     on_open: Option<OpenFn<E>>,
     row_actions: Vec<RowAction<E>>,
+    selectable: bool,
+    bulk: Vec<BulkDef>,
 }
 
 fn fetch_via<A, E>(ctx: Ctx, query: GridQuery) -> BoxFuture<Result<Page<E>>>
@@ -375,6 +400,8 @@ impl<E: Model> Grid<E> {
             row_style: None,
             on_open: None,
             row_actions: Vec::new(),
+            selectable: false,
+            bulk: Vec::new(),
         }
     }
 
@@ -456,6 +483,38 @@ impl<E: Model> Grid<E> {
             icon: None,
             meta: A::META,
             run: Box::new(move |row| runner::<A>(input(row))),
+        });
+        self
+    }
+
+    /// Adds a checkbox to every row and a selection bar above the grid. Shift selects a range,
+    /// the header box selects the page, and the bar offers every row that matches the filters.
+    pub fn selectable(mut self) -> Self {
+        self.selectable = true;
+        self
+    }
+
+    /// Adds a button to the selection bar that runs `action` with the keys of the selected rows:
+    /// `.bulk_action(t!("stock.archive"), archive_products, Product::id)` where `archive_products`
+    /// takes `Vec<ProductId>`. Makes the grid selectable. The button shows only for users with the
+    /// action's permission, which the server checks again. When the user picks every matching
+    /// row, the server collects the keys itself (at most [`MAX_BULK`]). Keys picked one by one come
+    /// from the client, so the action must check that the user may change each record, as an API
+    /// action would.
+    pub fn bulk_action<A, K>(mut self, label: impl Into<Text>, _action: A, _key: Field<E, K>) -> Self
+    where
+        A: BulkAction<K> + Action<Input = Vec<K>>,
+        A::Output: Outcome,
+        K: serde::de::DeserializeOwned + Send + 'static,
+    {
+        self.selectable = true;
+        self.bulk.push(BulkDef {
+            label: label.into(),
+            meta: A::META,
+            run: Box::new(|keys| {
+                let keys: Vec<K> = keys.into_iter().map(serde_json::from_value).collect::<std::result::Result<_, _>>().ok()?;
+                Some(runner::<A>(keys))
+            }),
         });
         self
     }
@@ -568,6 +627,12 @@ impl<E: Model> Grid<E> {
     /// Header row for the shown columns.
     fn head_row(&self, r: &Render, cols: &[Shown]) -> String {
         let mut out = String::from("<tr>");
+        if self.selectable {
+            out.push_str(&format!(
+                r#"<th scope="col" class="z-select-col" data-pin="start"><input type="checkbox" data-zeyn-select-all aria-label="{}"></th>"#,
+                r.text(&Text::key("zeyn.grid.select_page"))
+            ));
+        }
         for (pos, s) in cols.iter().enumerate() {
             let c = &self.columns[s.index];
             let mut style = String::new();
@@ -582,7 +647,7 @@ impl<E: Model> Grid<E> {
             out.push_str(&format!(
                 r#"<th scope="col"{class} data-field="{}" aria-sort="none" aria-colindex="{}""#,
                 c.meta.name,
-                pos + 1
+                pos + 1 + usize::from(self.selectable)
             ));
             if !style.is_empty() {
                 out.push_str(&format!(r#" style="{style}""#));
@@ -605,7 +670,7 @@ impl<E: Model> Grid<E> {
         if !self.row_actions.is_empty() {
             out.push_str(&format!(
                 r#"<th scope="col" class="z-actions-col" data-pin="end" aria-colindex="{}"><span class="z-sr-only">{}</span></th>"#,
-                cols.len() + 1,
+                cols.len() + 1 + usize::from(self.selectable),
                 r.text(&Text::key("zeyn.grid.actions"))
             ));
         }
@@ -627,6 +692,12 @@ impl<E: Model> Grid<E> {
                 out.push_str(&format!(r#" data-zeyn-key="{}""#, escape(&key_text(&k))));
             }
             out.push('>');
+            if self.selectable {
+                out.push_str(&format!(
+                    r#"<td class="z-select"><input type="checkbox" data-zeyn-select tabindex="-1" aria-label="{}"></td>"#,
+                    r.text(&Text::key("zeyn.grid.select_row"))
+                ));
+            }
             for s in cols {
                 let c = &self.columns[s.index];
                 let value = (c.value)(row);
@@ -658,6 +729,22 @@ impl<E: Model> Grid<E> {
         let scope = r.scope;
         let view = page.and_then(|p| p.view.as_ref());
         let cols = self.layout(view);
+        if self.selectable {
+            let t = |k: &str| r.text(&Text::key(format!("zeyn.grid.{k}")));
+            out.push_str(&format!(
+                r#"<div class="z-bulk" data-zeyn-bulk data-testid="{scope}.grid.selection" data-text-selected="{}" data-text-all="{}" data-text-all-selected="{}" hidden><span class="z-bulk-count" aria-live="polite"></span><button type="button" class="z-link" data-zeyn-select-matching hidden></button>"#,
+                t("selected_count"),
+                t("select_matching"),
+                t("all_selected"),
+            ));
+            for (i, b) in self.bulk.iter().enumerate().filter(|(_, b)| r.can(&b.meta.access)) {
+                out.push_str(&format!(
+                    r#"<button type="button" class="z-button" data-zeyn-bulk-run="{i}" data-testid="{scope}.grid.bulk-{i}">{}</button>"#,
+                    r.text(&b.label)
+                ));
+            }
+            out.push_str(&format!(r#"<button type="button" class="z-button" data-zeyn-select-clear>{}</button></div>"#, t("clear_selection")));
+        }
         let grid_text = |key: &str| r.text(&Text::key(format!("zeyn.grid.{key}")));
         out.push_str(&format!(
             r#"<div class="z-grid" data-zeyn-grid data-testid="{scope}.grid" data-zeyn-action="{}" data-zeyn-mode="{}" data-zeyn-paging="{}" data-zeyn-page-size="{}" data-zeyn-openable="{}" data-zeyn-text-range="{}" data-zeyn-text-range-total="{}" data-zeyn-text-loaded="{}""#,
@@ -697,7 +784,7 @@ impl<E: Model> Grid<E> {
         }
         out.push_str(&format!(
             r#"><table role="grid" aria-colcount="{}"><thead>{}</thead><tbody data-zeyn-rows>"#,
-            self.columns.len() + usize::from(!self.row_actions.is_empty()),
+            self.columns.len() + usize::from(!self.row_actions.is_empty()) + usize::from(self.selectable),
             self.head_row(r, &cols)
         ));
         if let Some(p) = page {
@@ -732,7 +819,7 @@ impl<E: Model> Grid<E> {
     /// Footer row with one cell per column. Cells of columns with totals carry `data-field` and
     /// `data-agg` (space separated ops) and show each total with its localized name.
     fn foot_row(&self, r: &Render, totals: &[Total], cols: &[Shown]) -> String {
-        let mut out = String::from("<tr>");
+        let mut out = String::from(if self.selectable { "<tr><td></td>" } else { "<tr>" });
         for c in cols.iter().map(|s| &self.columns[s.index]) {
             if c.aggregates.is_empty() {
                 out.push_str("<td></td>");
@@ -837,6 +924,31 @@ impl<E: Model> GridSource for Grid<E> {
                 saved_views: false,
             })
         })
+    }
+
+    fn bulk_call(&self, index: usize, keys: Vec<serde_json::Value>) -> Option<RowCall> {
+        let b = self.bulk.get(index)?;
+        Some(RowCall { meta: b.meta, run: (b.run)(keys)? })
+    }
+
+    fn bulk_meta(&self, index: usize) -> Option<ActionMeta> {
+        self.bulk.get(index).map(|b| b.meta)
+    }
+
+    fn key_json(&self, key: &str) -> Option<serde_json::Value> {
+        let meta = &E::fields()[Self::key_index()?];
+        match meta.kind {
+            FieldKind::Id | FieldKind::Integer => key.parse::<i64>().ok().map(serde_json::Value::from),
+            _ => Some(serde_json::Value::String(key.to_string())),
+        }
+    }
+
+    fn page_keys(&self, page: &LoadedPage) -> Vec<serde_json::Value> {
+        let Some(i) = Self::key_index() else { return Vec::new() };
+        page.items
+            .downcast_ref::<Vec<E>>()
+            .map(|rows| rows.iter().filter_map(|r| r.value_at(i)).filter_map(|v| serde_json::to_value(v).ok()).collect())
+            .unwrap_or_default()
     }
 
     fn row_call(&self, page: &LoadedPage, key: &str, item: &str) -> Option<RowCall> {
@@ -1192,6 +1304,19 @@ impl<E: Model, T> GridColumn<E, T> {
         A::Output: Outcome,
     {
         self.grid.row_action(label, action, input)
+    }
+
+    pub fn selectable(self) -> Grid<E> {
+        self.grid.selectable()
+    }
+
+    pub fn bulk_action<A, K>(self, label: impl Into<Text>, action: A, key: Field<E, K>) -> Grid<E>
+    where
+        A: BulkAction<K> + Action<Input = Vec<K>>,
+        A::Output: Outcome,
+        K: serde::de::DeserializeOwned + Send + 'static,
+    {
+        self.grid.bulk_action(label, action, key)
     }
 
     /// Returns the grid.
