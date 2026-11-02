@@ -50,3 +50,102 @@ tests/                   tests that drive the app through its router
 ## Before you finish
 
 Run `cargo test` and `zeyn check`. Both must pass.
+
+## Framework index
+
+Everything below comes from `use zeyn::prelude::*;`. The `zeyn` MCP server has the full reference
+(`zeyn_docs` topics: `rules`, `language`, `protocol`, `architecture`).
+
+### Macros (all are attributes)
+
+| Macro | On | Example |
+|---|---|---|
+| `#[entity(table = "t")]` | struct | `#[entity(table = "orders")] pub struct Order { #[key] pub id: OrderId, ... }` creates `OrderId` and `Order::field` refs |
+| `#[model]` | struct | data that is not a table row: filters, wizard steps, form input |
+| `#[model(validate = f)]` | struct | `fn f(m: &M, errors: &mut ValidationErrors)` for rules across fields |
+| `#[choice]` | enum | unit variants only; `#[label("...")]` per variant; becomes a select |
+| `#[params]` | struct | screen params: `#[params] pub struct EditParams { pub id: Option<OrderId> }` |
+| `#[action(permission = "a.b.c")]` | async fn | first arg is the input, the rest are injected (`Ctx` or a `Service`) |
+| `#[action(..., audit)]` | async fn | also writes an audit record |
+| `#[screen(route = "/x", permission = "a.b.c")]` | fn | returns `Screen` or `Result<Screen>`; no route means it opens as a window |
+| `t!("key", name = value)` | expr | text from `locales/*.json`, checked at compile time |
+
+Field attributes: `#[key]`, `#[version]` (i64 row version), `#[readonly]`, `#[label("...")]`,
+`#[rule(required, min_len = 3, max_len = 50, email, min = 0, max = 100, unique)]`.
+
+Field types: `String`, `i32`, `i64`, `bool`, `Money`, `Date`, `Time`, `DateTime`, `LocalDateTime`,
+`#[choice]` enums, entity ids, `Option<T>` of any of them.
+
+### Actions
+
+```rust
+#[action(permission = "sales.order.read")]
+pub async fn search_orders(q: GridQuery, store: OrderStore) -> Result<Page<Order>> { Ok(q.apply(store.all()?)) }
+
+#[action(permission = "sales.order.write", audit)]
+pub async fn save_order(order: Valid<Order>, store: OrderStore) -> Result<Order> { store.save(order.into_inner()) }
+```
+
+Errors: `Error::NotFound`, `Error::Forbidden`, `Error::Conflict` (stale row version),
+`Error::Denied(t!("..."))`, `Error::Validation(errors)`, `Error::Internal("detail for the log")`.
+Field error from code: `errors.add(Order::code, t!("orders.code_taken"))`.
+
+### Screens
+
+```rust
+#[screen(route = "/orders", permission = "sales.order.read")]
+pub fn order_list() -> Screen {
+    Screen::new(t!("orders.title"))
+        .toolbar(|t| t.button(t!("orders.new")).icon(Icon::Plus).shortcut("Ctrl+N").opens(order_editor, EditParams { id: None }))
+        .body(Grid::of(search_orders).mode(GridMode::Server).column(Order::code).width(120).filter().column(Order::total).sum()
+            .on_open(|o| Window::open(order_editor, EditParams { id: Some(o.id) })))
+}
+
+#[screen(permission = "sales.order.write")]
+pub fn order_editor(params: EditParams, store: OrderStore) -> Result<Screen> {
+    let order = match params.id { Some(id) => store.get(id)?, None => Order::default() };
+    Ok(Screen::window(t!("orders.order")).body(Form::of(order).row(|r| r.field(Order::code).field(Order::status))
+        .field(Order::note).submit(t!("common.save"), save_order)
+        .on_success(|_, ui| { ui.toast(t!("orders.saved")); ui.close_and_refresh(); })))
+}
+```
+
+- Several `.body(...)` calls place several components on one screen.
+- Quick versions: `Grid::auto(action)` (all columns), `Form::auto(model)` (all fields).
+- Grid paging: `Paging::pages(25)` (default 50), `Paging::infinite(100)`, `Paging::virtual_scroll()` for very large lists, `Paging::none()`.
+- Grid extras: `.row_style(|r| Some(RowStyle::Warning))`, `.flex(1)`, `.width(px)`.
+- Screens without params: `fn x()` or `fn x(_: (), ctx: Ctx)` when something is injected.
+
+### Features and the app
+
+```rust
+pub fn feature() -> Feature {
+    Feature::new("sales").route_prefix("/sales").guard(SignedIn)
+        .screen(order_list).screen(order_editor)
+        .api(search_orders)
+        .menu(|m| m.group(t!("menu.sales"), Icon::Cart).item(t!("orders.title"), order_list))
+}
+```
+
+In `src/app.rs`: `.service(OrderStore::default())`, `.feature(features::sales::feature())`.
+Other app settings: `.auth(...)`, `.time_policy(...)`, `.rate_limit(...)`, `.api_docs(...)`,
+`.theme(Theme::new().brand("#0f6674"))`, `.base_path("/app")`, `.tenancy(...)`, `.license(...)`.
+
+### Services and context
+
+```rust
+#[derive(Clone, Default)]
+pub struct OrderStore(Arc<RwLock<Vec<Order>>>);
+impl Service for OrderStore {}
+```
+
+`Ctx` gives `ctx.identity()`, `ctx.now()`, `ctx.today()`, `ctx.time_zone()`, `ctx.locale()`,
+`ctx.config()`, `ctx.tenant()`, `ctx.license()`, `ctx.t(&text)`.
+
+### Recipes
+
+- New feature: `zeyn g feature <name>`, then `.feature(...)` in `src/app.rs`, then texts in every `locales/*.json`.
+- New field: add it to the struct with rules, add `Model.field` labels to every locale, add `.field(...)` to the form and `.column(...)` to the list.
+- New permission: name it `feature.resource.verb` in the macro; grant it in the authenticator or identity provider.
+- Publish an action as JSON API: `.api(action)` on the feature; calls need an `Authorization` header.
+- Long lists: never return all rows; take `GridQuery`, return `Page<M>`.
