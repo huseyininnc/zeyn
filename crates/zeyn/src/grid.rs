@@ -234,9 +234,10 @@ struct Shown {
 }
 
 /// Color of a badge. Tones follow the theme, so they work in light and dark mode.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Tone {
+    #[default]
     Neutral,
     Info,
     Success,
@@ -246,7 +247,7 @@ pub enum Tone {
 }
 
 impl Tone {
-    fn code(self) -> &'static str {
+    pub(crate) fn code(self) -> &'static str {
         match self {
             Tone::Neutral => "neutral",
             Tone::Info => "info",

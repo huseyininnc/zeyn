@@ -66,6 +66,16 @@ impl Date {
         self.day
     }
 
+    /// The date as the number `YYYYMMDD`, the form date limits are written in: `2024_01_05`.
+    pub fn compact(&self) -> i64 {
+        i64::from(self.year) * 10_000 + i64::from(self.month) * 100 + i64::from(self.day)
+    }
+
+    /// The date of a `YYYYMMDD` number, or `None` when it is not a valid day.
+    pub fn from_compact(n: i64) -> Option<Date> {
+        Date::new(i32::try_from(n / 10_000).ok()?, (n / 100 % 100) as u8, (n % 100) as u8)
+    }
+
     /// Days since 1970-01-01 (negative before).
     pub fn days_since_epoch(&self) -> i64 {
         let y = i64::from(self.year) - i64::from(self.month <= 2);
@@ -131,6 +141,21 @@ impl Date {
         Date::new(y.parse().ok()?, m.parse().ok()?, d.parse().ok()?)
     }
 
+    /// How a locale writes short dates: the order of the parts (`dmy`, `mdy` or `ymd`), the
+    /// separator and whether day and month are padded to two digits. Used by the date picker.
+    pub fn pattern(locale: &str) -> (&'static str, char, bool) {
+        match DateStyle::for_locale(locale) {
+            DateStyle::DayMonthYear(sep) => ("dmy", sep, true),
+            DateStyle::MonthDayYear => ("mdy", '/', false),
+            DateStyle::Iso => ("ymd", '-', true),
+        }
+    }
+
+    /// The first day of the week in a locale: 7 (Sunday) for `en-US`, 1 (Monday) elsewhere.
+    pub fn first_weekday(locale: &str) -> u8 {
+        if uses_12_hour(locale) { 7 } else { 1 }
+    }
+
     /// Short form for a locale: `05.01.2024` in `tr`, `1/5/2024` in `en-US`, `05/01/2024` in `en-GB`.
     pub fn format(&self, locale: &str) -> String {
         match DateStyle::for_locale(locale) {
@@ -145,6 +170,203 @@ impl fmt::Display for Date {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:04}-{:02}-{:02}", self.year, self.month, self.day)
     }
+}
+
+/// Words people type instead of a date or time, in one language: `bugün`, `yarın`, `+3g` in
+/// Turkish, `today`, `tomorrow`, `+3d` in English. Read from the `zeyn.date.words.*` catalog keys,
+/// each a comma separated list. English words are always understood as well.
+#[derive(Clone, Debug, Default)]
+pub struct DateWords {
+    today: Vec<String>,
+    tomorrow: Vec<String>,
+    yesterday: Vec<String>,
+    now: Vec<String>,
+    /// Units for relative input, in the order day, week, month, year.
+    units: [Vec<String>; 4],
+}
+
+impl DateWords {
+    /// Words of a locale from the catalogs, followed by the English ones.
+    pub fn from_i18n(i18n: &crate::i18n::I18n, locale: &str) -> DateWords {
+        let list = |key: &str| -> Vec<String> {
+            let mut words: Vec<String> = Vec::new();
+            for l in [locale, "en"] {
+                if let Some(text) = i18n.lookup(l, &format!("zeyn.date.words.{key}")) {
+                    for w in text.split(',').map(|w| lower(w.trim())).filter(|w| !w.is_empty()) {
+                        if !words.contains(&w) {
+                            words.push(w);
+                        }
+                    }
+                }
+            }
+            words
+        };
+        DateWords {
+            today: list("today"),
+            tomorrow: list("tomorrow"),
+            yesterday: list("yesterday"),
+            now: list("now"),
+            units: [list("day"), list("week"), list("month"), list("year")],
+        }
+    }
+
+    /// English words only, from the built in catalog.
+    pub fn english() -> DateWords {
+        DateWords::from_i18n(crate::i18n::I18n::builtin(), "en")
+    }
+
+    fn is(list: &[String], word: &str) -> bool {
+        list.iter().any(|w| w == word)
+    }
+
+    /// Unit index of a word: 0 day, 1 week, 2 month, 3 year. The locale's words come first, so
+    /// `h` is a week in Turkish (hafta).
+    fn unit(&self, word: &str) -> Option<usize> {
+        if word.is_empty() {
+            return Some(0);
+        }
+        self.units.iter().position(|list| DateWords::is(list, word))
+    }
+}
+
+/// Lower case that keeps Turkish dotted and dotless i apart: `İ` becomes `i`, `I` becomes `ı`
+/// only when the text has other Turkish letters; plain ASCII words stay ASCII.
+fn lower(s: &str) -> String {
+    let turkish = s.chars().any(|c| "çğıöşüÇĞİÖŞÜ".contains(c));
+    s.chars()
+        .flat_map(|c| match c {
+            'İ' => vec!['i'],
+            'I' if turkish => vec!['ı'],
+            c => c.to_lowercase().collect(),
+        })
+        .collect()
+}
+
+/// Splits relative input such as `+3g`, `- 2 weeks` or `+1` into sign, amount and unit word.
+fn relative(s: &str) -> Option<(i64, String)> {
+    let s = s.trim();
+    let (sign, rest) = match s.chars().next()? {
+        '+' => (1, &s[1..]),
+        '-' => (-1, &s[1..]),
+        _ => return None,
+    };
+    let rest = rest.trim_start();
+    let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
+    if digits.is_empty() || digits.len() > 4 {
+        return None;
+    }
+    let unit = lower(rest[digits.len()..].trim());
+    Some((sign * digits.parse::<i64>().ok()?, unit))
+}
+
+impl Date {
+    /// The date `months` months after this one, on the same day or the last day of a shorter month.
+    pub fn add_months(&self, months: i64) -> Option<Date> {
+        let index = i64::from(self.year) * 12 + i64::from(self.month) - 1 + months;
+        let year = i32::try_from(index.div_euclid(12)).ok()?;
+        let month = (index.rem_euclid(12) + 1) as u8;
+        Date::new(year, month, self.day.min(days_in_month(year, month)))
+    }
+
+    /// Reads what a person types into a date field. Besides the full forms of [`Date::parse_local`]:
+    ///
+    /// - Partial dates in the locale's order: `5` (day of this month), `5.1` or `1/5` (this year),
+    ///   `5.1.24` (two digit year in 2000 to 2099), digits only such as `05012024`.
+    /// - Words: `today`, `tomorrow`, `yesterday` and their translations (`bugün`, `yarın`, `dün`).
+    /// - Relative input: `+3d`, `-1w`, `+2m`, `+1y` (`+3g`, `-1h`, `+2a`, `+1y` in Turkish); a bare
+    ///   number is days.
+    ///
+    /// ```
+    /// use zeyn::{Date, DateWords};
+    /// let today = Date::new(2024, 3, 15).unwrap();
+    /// let tr = DateWords::from_i18n(zeyn::I18n::builtin(), "tr");
+    /// assert_eq!(Date::parse_input("5.1", "tr", today, &tr), Date::new(2024, 1, 5));
+    /// assert_eq!(Date::parse_input("yarın", "tr", today, &tr), Date::new(2024, 3, 16));
+    /// assert_eq!(Date::parse_input("+1h", "tr", today, &tr), Date::new(2024, 3, 22));
+    /// assert_eq!(Date::parse_input("1/5", "en-US", today, &DateWords::english()), Date::new(2024, 1, 5));
+    /// ```
+    pub fn parse_input(s: &str, locale: &str, today: Date, words: &DateWords) -> Option<Date> {
+        let s = s.trim();
+        if s.is_empty() {
+            return None;
+        }
+        if let Some(d) = Date::parse_local(s, locale) {
+            return Some(d);
+        }
+        let word = lower(s);
+        if DateWords::is(&words.today, &word) {
+            return Some(today);
+        }
+        if DateWords::is(&words.tomorrow, &word) {
+            return today.add_days(1);
+        }
+        if DateWords::is(&words.yesterday, &word) {
+            return today.add_days(-1);
+        }
+        if let Some((n, unit)) = relative(s) {
+            return match words.unit(&unit)? {
+                0 => today.add_days(n),
+                1 => today.add_days(n * 7),
+                2 => today.add_months(n),
+                _ => today.add_months(n * 12),
+            };
+        }
+        let (order, _, _) = Date::pattern(locale);
+        let parts: Vec<&str> = if s.bytes().all(|b| b.is_ascii_digit()) {
+            match (s.len(), order) {
+                (1 | 2, _) => vec![s],
+                (4, "ymd") => vec![&s[..2], &s[2..]],
+                (4, _) => vec![&s[..2], &s[2..]],
+                (6, "ymd") => vec![&s[..2], &s[2..4], &s[4..]],
+                (6, _) => vec![&s[..2], &s[2..4], &s[4..]],
+                (8, "ymd") => vec![&s[..4], &s[4..6], &s[6..]],
+                (8, _) => vec![&s[..2], &s[2..4], &s[4..]],
+                _ => return None,
+            }
+        } else {
+            s.split(['.', '/', '-', ' ']).filter(|p| !p.is_empty()).collect()
+        };
+        if parts.iter().any(|p| !p.bytes().all(|b| b.is_ascii_digit()) || p.len() > 4) {
+            return None;
+        }
+        let num = |p: &str| p.parse::<i64>().ok();
+        let year = |p: &str| match p.len() {
+            2 => num(p).map(|y| 2000 + y),
+            4 => num(p),
+            _ => None,
+        };
+        let (y, m, d) = match (order, parts.as_slice()) {
+            (_, [d]) => (i64::from(today.year), i64::from(today.month), num(d)?),
+            ("mdy", [m, d]) => (i64::from(today.year), num(m)?, num(d)?),
+            ("ymd", [m, d]) => (i64::from(today.year), num(m)?, num(d)?),
+            (_, [d, m]) => (i64::from(today.year), num(m)?, num(d)?),
+            ("mdy", [m, d, y]) => (year(y)?, num(m)?, num(d)?),
+            ("ymd", [y, m, d]) => (year(y)?, num(m)?, num(d)?),
+            (_, [d, m, y]) => (year(y)?, num(m)?, num(d)?),
+            _ => return None,
+        };
+        Date::new(i32::try_from(y).ok()?, u8::try_from(m).ok()?, u8::try_from(d).ok()?)
+    }
+}
+
+/// Ranges offered next to a date range picker, worked out from today in the user's time zone:
+/// `(key, from, to)` with keys `today`, `yesterday`, `last_7_days`, `this_month`, `last_month`,
+/// `this_year`. Labels are the `zeyn.ui.date.presets.{key}` catalog texts.
+pub fn range_presets(today: Date) -> Vec<(&'static str, Date, Date)> {
+    let first = Date::new(today.year, today.month, 1).unwrap_or(today);
+    let last_month_first = first.add_months(-1).unwrap_or(first);
+    let jan = Date::new(today.year, 1, 1).unwrap_or(today);
+    [
+        ("today", Some(today), Some(today)),
+        ("yesterday", today.add_days(-1), today.add_days(-1)),
+        ("last_7_days", today.add_days(-6), Some(today)),
+        ("this_month", Some(first), Date::new(today.year, today.month, days_in_month(today.year, today.month))),
+        ("last_month", Some(last_month_first), first.add_days(-1)),
+        ("this_year", Some(jan), Date::new(today.year, 12, 31)),
+    ]
+    .into_iter()
+    .filter_map(|(k, a, b)| Some((k, a?, b?)))
+    .collect()
 }
 
 #[derive(Clone, Copy)]
@@ -214,6 +436,79 @@ impl Time {
         }
     }
 
+    /// Whether a locale shows times on a 12 hour clock with AM and PM (`en-US`).
+    pub fn twelve_hour(locale: &str) -> bool {
+        uses_12_hour(locale)
+    }
+
+    /// Reads what a person types into a time field. Besides [`Time::parse_local`]: `14` (on the
+    /// hour), `1430` and `930` (digits only), `14.30`, `2pm`, and `now` or its translation (`şimdi`).
+    ///
+    /// ```
+    /// use zeyn::{DateWords, Time};
+    /// let now = Time::new(10, 7, 0).unwrap();
+    /// let en = DateWords::english();
+    /// assert_eq!(Time::parse_input("930", "tr", now, &en), Time::new(9, 30, 0));
+    /// assert_eq!(Time::parse_input("2pm", "en-US", now, &en), Time::new(14, 0, 0));
+    /// assert_eq!(Time::parse_input("now", "en", now, &en), Some(now));
+    /// ```
+    pub fn parse_input(s: &str, locale: &str, now: Time, words: &DateWords) -> Option<Time> {
+        let s = s.trim();
+        if DateWords::is(&words.now, &lower(s)) {
+            return Some(now);
+        }
+        if let Some(t) = Time::parse_local(&s.replace('.', ":"), locale) {
+            return Some(t);
+        }
+        let upper = s.to_ascii_uppercase().replace(' ', "");
+        let (digits, half) = match (upper.strip_suffix("AM"), upper.strip_suffix("PM")) {
+            (Some(d), _) => (d.to_string(), Some(0)),
+            (_, Some(d)) => (d.to_string(), Some(12)),
+            _ => (upper, None),
+        };
+        if digits.is_empty() || digits.len() > 4 || !digits.bytes().all(|b| b.is_ascii_digit()) {
+            return None;
+        }
+        let (h, m) = match digits.len() {
+            1 | 2 => (digits.parse::<u8>().ok()?, 0),
+            3 => (digits[..1].parse::<u8>().ok()?, digits[1..].parse::<u8>().ok()?),
+            _ => (digits[..2].parse::<u8>().ok()?, digits[2..].parse::<u8>().ok()?),
+        };
+        let hour = match half {
+            Some(add) if (1..=12).contains(&h) => h % 12 + add,
+            Some(_) => return None,
+            None => h,
+        };
+        Time::new(hour, m, 0)
+    }
+
+    /// Reads a time as typed in any locale: `14:30`, `14:30:15`, `9:05`, `2:30 PM` or `2:30 pm`.
+    pub fn parse_local(s: &str, _locale: &str) -> Option<Time> {
+        let s = s.trim();
+        let upper = s.to_ascii_uppercase();
+        let (clock, half) = match (upper.strip_suffix("AM"), upper.strip_suffix("PM")) {
+            (Some(c), _) => (c.trim_end().to_string(), Some(0)),
+            (_, Some(c)) => (c.trim_end().to_string(), Some(12)),
+            _ => (upper, None),
+        };
+        let parts: Vec<&str> = clock.split(':').collect();
+        let num = |p: &str| (!p.is_empty() && p.len() <= 2 && p.bytes().all(|b| b.is_ascii_digit())).then(|| p.parse::<u8>().ok()).flatten();
+        let (h, m, sec) = match parts[..] {
+            [h, m] => (num(h)?, num(m)?, 0),
+            [h, m, x] => (num(h)?, num(m)?, num(x)?),
+            _ => return None,
+        };
+        if parts[1].len() != 2 {
+            return None;
+        }
+        let hour = match half {
+            Some(add) if (1..=12).contains(&h) => h % 12 + add,
+            Some(_) => return None,
+            None => h,
+        };
+        Time::new(hour, m, sec)
+    }
+
     /// `14:30` in most locales, `2:30 PM` in `en-US`. Seconds are shown only when not zero.
     pub fn format(&self, locale: &str) -> String {
         let secs = if self.second > 0 { format!(":{:02}", self.second) } else { String::new() };
@@ -257,6 +552,34 @@ impl LocalDateTime {
 
     pub fn format(&self, locale: &str) -> String {
         format!("{} {}", self.date.format(locale), self.time.format(locale))
+    }
+
+    /// Reads a date and time typed in the locale's short form (`05.01.2024 14:30` in `tr`,
+    /// `1/5/2024 2:30 PM` in `en-US`) or in ISO form.
+    pub fn parse_local(s: &str, locale: &str) -> Option<LocalDateTime> {
+        if let Some(l) = LocalDateTime::parse(s) {
+            return Some(l);
+        }
+        let (d, t) = s.trim().split_once(['T', ' '])?;
+        Some(LocalDateTime { date: Date::parse_local(d, locale)?, time: Time::parse_local(t, locale)? })
+    }
+
+    /// Reads what a person types into a date and time field: a date as [`Date::parse_input`]
+    /// reads it, optionally followed by a time as [`Time::parse_input`] reads it (`yarın 9`,
+    /// `+1d 14:30`, `5.1 930`). A date alone means midnight; `now` is the current wall clock.
+    pub fn parse_input(s: &str, locale: &str, now: LocalDateTime, words: &DateWords) -> Option<LocalDateTime> {
+        let s = s.trim();
+        if let Some(l) = LocalDateTime::parse_local(s, locale) {
+            return Some(l);
+        }
+        if DateWords::is(&words.now, &lower(s)) {
+            return Some(now);
+        }
+        if let Some(date) = Date::parse_input(s, locale, now.date, words) {
+            return Some(LocalDateTime { date, time: Time::default() });
+        }
+        let (d, t) = s.split_once(['T', ' '])?;
+        Some(LocalDateTime { date: Date::parse_input(d, locale, now.date, words)?, time: Time::parse_input(t, locale, now.time, words)? })
     }
 
     fn epoch_ms(&self) -> i64 {

@@ -155,9 +155,9 @@ fn form_inputs_show_moments_in_the_users_zone_and_dates_as_they_are() {
     let mut out = String::new();
     let r = Render::english("appt").with_tz(tz("Europe/Istanbul"));
     form().render(&mut out, &r);
-    assert!(out.contains(r#"type="date" id="appt-day""#) && out.contains(r#"value="2024-01-05""#));
-    assert!(out.contains(r#"type="time" step="1" id="appt-starts""#) && out.contains(r#"value="09:00:00""#));
-    assert!(out.contains(r#"id="appt-booked_at""#) && out.contains(r#"value="2024-01-05T09:00:00""#));
+    assert!(out.contains(r#"id="appt-day""#) && out.contains(r#"value="1/5/2024""#));
+    assert!(out.contains(r#"id="appt-starts""#) && out.contains(r#"value="9:00 AM""#));
+    assert!(out.contains(r#"id="appt-booked_at""#) && out.contains(r#"value="1/5/2024 9:00 AM""#));
     assert!(out.contains(r#"id="appt-at_clinic""#));
 }
 

@@ -42,11 +42,15 @@ Every screen root carries its name and params:
 
 Windows use `class="z-window" role="dialog" aria-modal="true"` and a `--z-width` style.
 
-Each body item is wrapped in a node element. The index is the address used by the endpoints below:
+Each body item is wrapped in a node element. Its path is the address used by the endpoints below. Containers (`Row`, `Stack`, `Panel`, `Card`, `Tabs`, `Split`) wrap each child the same way, and the child's path adds its index: the third child of the first child of body item 1 is `"1.0.2"`.
 
 ```html
-<div class="z-node" data-zeyn-node="0">...</div>
+<div class="z-node" data-zeyn-node="1">
+  <div class="z-node" data-zeyn-node="1.0">...</div>
+</div>
 ```
+
+Endpoints take `node` as a dotted string or, for body items, as a plain number (`0`). Paths have at most 16 levels of digits; anything else is refused with `422`.
 
 ## 3. Attributes the runtime reads
 
@@ -230,3 +234,33 @@ The runtime:
 - Right click opens Zeyn's menu where one is defined (headers, rows with `data-zeyn-menu`, screens with `data-zeyn-menu`); everywhere else the browser's own menu stays.
 - Focus moves into a dialog when it opens and returns to the opener when it closes.
 - Client side checks (`required`, `minlength`, `maxlength`, `min`, `max`, `type="email"`) run before submit with the browser's constraint validation API. The server always validates again.
+
+## 7. Component library
+
+`zeyn::ui` components are served by two more assets, linked in the page head after the runtime: `/_zeyn/components.js` and `/_zeyn/components.css`. Like the runtime, they need no sign in.
+
+### 7.1 Endpoints
+
+All are `POST` with JSON and the CSRF header, and check the screen's access and the feature's guards first.
+
+| Endpoint | Body | Answer |
+|---|---|---|
+| `/_zeyn/node` | `{ screen, params, node }` | HTML of one node with the first page of its grids. Used by lazy tabs. |
+| `/_zeyn/data` | `{ screen, params, node, key, input }` | JSON from the data source `key` of the node: lookup options (`key` is the field name), tree children (`key` is empty), step checks (`key` is `_step`). The source's action permission is checked and the interceptors run, as for grids. Input that does not fit the action is refused with `404`. |
+| `/_zeyn/parse` | `{ kind, text, label }` | How the server reads a typed date or time in the user's language, zone and clock: `{ ok, text, iso, utc, zone }` or `{ ok: false, message }`. `kind` is `date`, `time`, `datetime`, `local` or `presets` (today and quick ranges). |
+
+### 7.2 Values the forms submit
+
+- Lookups submit ids as text: `"7"`, or `"3,7,9"` for several.
+- Lines submit `"{field}": "rows"` and one value per cell as `"{field}.{line}.{column}"`, plus `"{field}.{line}._i"`, the index of the loaded line the row came from (empty for new lines). The server rebuilds each line from its loaded line, so only shown, editable columns change.
+- Validation errors of a line use `{ "field": "lines", "rule": { "rule": "line", "value": { "row": 0, "field": "quantity" } } }`.
+
+### 7.3 Events
+
+| Event | On | Detail |
+|---|---|---|
+| `zeyn:content` | `document` | Element with new content (navigation, lazy panels). Both scripts set up what it holds. |
+| `zeyn:errors` | the form | The `422` errors, after the runtime showed them. The line editor and stepped forms use it. |
+| `zeyn:effect` | `document` | An effect the runtime does not know: `{ effect, source, run }`. `run(next)` runs another effect. Used by `confirm`. |
+
+Effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":"...","then":{...}}` asks in a modal alert dialog and runs `then` only after the user confirms.

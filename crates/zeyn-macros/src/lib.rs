@@ -680,6 +680,8 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
                 fn to_value(&self) -> ::zeyn::Value { ::zeyn::Value::Int(self.0) }
             }
 
+            impl ::zeyn::ui::LookupValue for #id_name {}
+
             impl ::zeyn::ApiInput for #id_name {
                 fn schema() -> ::zeyn::__serde_json::Value {
                     ::zeyn::__serde_json::json!({ "type": "integer", "title": stringify!(#id_name) })

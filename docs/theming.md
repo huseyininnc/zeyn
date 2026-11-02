@@ -100,7 +100,9 @@ Computed from the base tokens with `color-mix()` and relative color syntax. They
 | `--z-shadow-2` | Windows and toasts only. Grid rows never get a shadow | soft two layer shadow | darker |
 | `--z-backdrop` | Behind a modal window | `rgb(20 24 28 / 40%)` | `rgb(0 0 0 / 60%)` |
 
-Per element tokens set by the server markup: `--z-width` (window width), `--z-flex` (column share), `--z-row-height` (virtual grid row height).
+Per element tokens set by the server markup: `--z-width` (window width), `--z-flex` (column share), `--z-row-height` (virtual grid row height), and for the component library `--z-stack-gap`, `--z-split`, `--z-progress`, `--z-columns`, `--z-level` and `--z-pop-x` / `--z-pop-y` (popup position).
+
+Chart series colors are `--z-chart-1` to `--z-chart-6` in `components.css`, with lighter values in the dark theme. Each reaches 3:1 against `--z-surface`. Override them like any base token.
 
 ## 4. Choosing a brand color
 

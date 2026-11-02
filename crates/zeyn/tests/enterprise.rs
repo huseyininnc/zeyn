@@ -262,12 +262,19 @@ pub fn person(params: CustomerParams, store: People) -> Result<Screen> {
     ))
 }
 
+#[screen(route = "/people-tabs", permission = "hr.read")]
+pub fn people_tabs() -> Screen {
+    Screen::new("People tabs").body(
+        Tabs::new("Sections").tab("Summary", Card::new()).tab("People", Grid::of(find_people).column(Person::name).column(Person::national_id)),
+    )
+}
+
 fn hr_app(identity: Identity, audit: MemoryAudit) -> Router {
     App::new("Test")
         .service(People::seeded())
         .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
         .interceptor(AuditLog(audit))
-        .feature(Feature::new("hr").screen(people).screen(person).api(find_people).api(get_person).api(save_person))
+        .feature(Feature::new("hr").screen(people).screen(person).screen(people_tabs).api(find_people).api(get_person).api(save_person))
         .router()
         .unwrap()
 }
@@ -1108,4 +1115,18 @@ fn masked_values_never_reach_html_through_custom_cells_or_inline_editing() {
     assert!(!html.contains("12345678901"), "{html}");
     assert!(!html.contains("RAW:"), "{html}");
     assert!(html.contains("8901"), "{html}");
+}
+
+#[tokio::test]
+async fn lazy_tabs_mask_like_the_page_and_let_permitted_users_reveal() {
+    for (who, revealable) in [(clerk(), false), (officer(), true)] {
+        let router = hr_app(who, MemoryAudit::default());
+        let page = send(&router, get("/people-tabs")).await;
+        let lazy = page.body.split(r#"data-zeyn-lazy=""#).nth(1).and_then(|r| r.split('"').next()).expect("a lazy tab").to_string();
+        let node = send(&router, post("/_zeyn/node", serde_json::json!({ "screen": "people_tabs", "node": lazy }))).await;
+        assert_eq!(node.status, StatusCode::OK, "{}", node.body);
+        assert!(node.body.contains("•••• 8901"), "{}", node.body);
+        assert!(!node.body.contains("12345678901"));
+        assert_eq!(node.body.contains("data-zeyn-reveal"), revealable, "{}", node.body);
+    }
 }

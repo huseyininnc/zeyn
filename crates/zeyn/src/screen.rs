@@ -50,15 +50,36 @@ pub enum Effect {
     Navigate { screen: &'static str, params: serde_json::Value },
     Toast { message: Text },
     CloseAndRefresh,
+    /// Asks the user to confirm `message`, then runs `then`. Built with [`Effect::confirm`].
+    Confirm { message: Text, then: Box<Effect> },
 }
 
 impl Effect {
+    /// Runs `then` only after the user confirms `message` in a dialog.
+    ///
+    /// ```
+    /// use zeyn::Effect;
+    /// let e = Effect::confirm("Close without saving?", Effect::CloseAndRefresh);
+    /// assert!(matches!(e, Effect::Confirm { .. }));
+    /// ```
+    pub fn confirm(message: impl Into<Text>, then: Effect) -> Effect {
+        Effect::Confirm { message: message.into(), then: Box::new(then) }
+    }
+
     /// JSON sent to the client, with texts resolved in the user's language.
     pub fn to_json(&self, r: &Render) -> serde_json::Value {
         match self {
             Effect::Toast { message } => {
                 json!({ "effect": "toast", "message": r.i18n.text(r.locale, message) })
             }
+            Effect::Confirm { message, then } => json!({
+                "effect": "confirm",
+                "message": r.i18n.text(r.locale, message),
+                "title": r.i18n.text(r.locale, &Text::key("zeyn.ui.confirm.title")),
+                "ok": r.i18n.text(r.locale, &Text::key("zeyn.ui.confirm.ok")),
+                "cancel": r.i18n.text(r.locale, &Text::key("zeyn.ui.confirm.cancel")),
+                "then": then.to_json(r),
+            }),
             other => serde_json::to_value(other).unwrap_or(serde_json::Value::Null),
         }
     }
@@ -99,6 +120,11 @@ impl UiCtx {
         self.effects.push(Effect::Navigate { screen: S::META.name, params: params_json(&params) });
     }
 
+    /// Any effect, such as `Effect::confirm(...)`.
+    pub fn effect(&mut self, effect: Effect) {
+        self.effects.push(effect);
+    }
+
     pub fn into_effects(self) -> Vec<Effect> {
         self.effects
     }
@@ -106,7 +132,7 @@ impl UiCtx {
 
 /// One loaded page of grid rows, type erased.
 pub struct LoadedPage {
-    pub items: Box<dyn Any + Send>,
+    pub items: Box<dyn Any + Send + Sync>,
     pub count: usize,
     pub total: Option<u64>,
     pub next: Option<Cursor>,
@@ -297,6 +323,21 @@ pub trait Component: Send + Sync {
     fn import(&self) -> Option<&dyn crate::import::ImportSource> {
         None
     }
+
+    /// Nodes held by a container. Child `i` of the node at path `p` has the path `p.i`.
+    fn children(&self) -> &[Node] {
+        &[]
+    }
+
+    /// Children rendered with the page. Others, such as closed lazy tabs, load when first shown.
+    fn eager_children(&self) -> &[Node] {
+        self.children()
+    }
+
+    /// Data the component fetches through an action, by key (a field name for lookups).
+    fn source(&self, _key: &str) -> Option<&dyn crate::ui::DataSource> {
+        None
+    }
 }
 
 /// Type erased component: a node of the screen tree.
@@ -329,6 +370,18 @@ impl Node {
 
     pub fn import(&self) -> Option<&dyn crate::import::ImportSource> {
         self.0.import()
+    }
+
+    pub fn children(&self) -> &[Node] {
+        self.0.children()
+    }
+
+    pub fn eager_children(&self) -> &[Node] {
+        self.0.eager_children()
+    }
+
+    pub fn source(&self, key: &str) -> Option<&dyn crate::ui::DataSource> {
+        self.0.source(key)
     }
 }
 
@@ -418,7 +471,7 @@ impl Toolbar {
         self
     }
 
-    fn render(&self, out: &mut String, r: &Render, title: &str) {
+    pub(crate) fn render(&self, out: &mut String, r: &Render, title: &str) {
         let scope = r.scope;
         out.push_str(&format!(r#"<div class="z-toolbar" role="toolbar" aria-label="{title}">"#));
         for item in &self.items {
@@ -452,7 +505,7 @@ impl Toolbar {
         out.push_str("</div>");
     }
 
-    fn schema(&self) -> serde_json::Value {
+    pub(crate) fn schema(&self) -> serde_json::Value {
         self.items
             .iter()
             .map(|item| match item {
@@ -585,16 +638,16 @@ impl Screen {
         self.render(&Render::english(meta.name), meta, &serde_json::Value::Null, &HashMap::new())
     }
 
-    /// Renders the screen. `loaded` holds the first page of grids by node index.
+    /// Renders the screen. `loaded` holds the first page of grids by node path (`"0"`, `"1.2"`).
     pub fn render(
         &self,
         r: &Render,
         meta: &ScreenMeta,
         params: &serde_json::Value,
-        loaded: &HashMap<usize, LoadedPage>,
+        loaded: &HashMap<String, LoadedPage>,
     ) -> String {
         let scope = meta.name;
-        let r = Render { scope, ..*r };
+        let r = Render { scope, loaded: Some(loaded), ..*r };
         let title = r.text(&self.title);
         let params = match self.menu.as_ref().map(|m| m.to_json(&r)) {
             Some(items) if items.as_array().is_some_and(|a| !a.is_empty()) => format!(r#"{}" data-zeyn-menu="{}"#, attr(params), attr(&items)),
@@ -619,12 +672,7 @@ impl Screen {
             t.render(&mut out, &r, &title);
         }
         for (i, node) in self.body.iter().enumerate() {
-            out.push_str(&format!(r#"<div class="z-node" data-zeyn-node="{i}">"#));
-            match (node.grid(), loaded.get(&i)) {
-                (Some(grid), Some(page)) => grid.render_loaded(&mut out, &r, page),
-                _ => node.render(&mut out, &r),
-            }
-            out.push_str("</div>");
+            crate::ui::render_node(&mut out, &r, &i.to_string(), node);
         }
         out.push_str(close);
         out

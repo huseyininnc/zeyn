@@ -73,7 +73,11 @@
       "min": "{label} en az {n} olmalıdır.",
       "max": "{label} en fazla {n} olabilir.",
       "format": "{label} geçersiz bir değer içeriyor.",
-      "skipped_time": "{label}: bu saat, saat değişikliği nedeniyle sizin saat diliminizde yok."
+      "skipped_time": "{label}: bu saat, saat değişikliği nedeniyle sizin saat diliminizde yok.",
+      "line": "Satır {n}: {message}",
+      "disabled_day": "{label}: bu gün seçilemez.",
+      "time_step": "{label} {n} dakikalık adımlarla girilmelidir.",
+      "range_order": "{label}, {other} tarihinden önce olamaz."
     },
     "error": {
       "forbidden": "Bu işlem için yetkiniz yok.",
@@ -121,9 +125,42 @@
       "children": "Alt satırlar",
       "blank": "(boş)",
       "group_count": "{n} kayıt",
-      "filter": {"filter": "{label} filtresi", "from": "En az", "to": "En çok", "all": "Tümü", "contains": "İçerir", "starts_with": "İle başlar", "equals": "Eşittir", "match": "Eşleşme", "selected": "{n} seçili", "clear": "Filtreyi temizle", "sorted": "Sıralama {n}"},
-      "menu": {"options": "Kolon seçenekleri: {label}", "resize": "{label} genişliği", "sort_asc": "Artan sırala", "sort_desc": "Azalan sırala", "sort_clear": "Sıralamayı kaldır", "pin_start": "Başa sabitle", "pin_end": "Sona sabitle", "unpin": "Sabitlemeyi kaldır", "move_prev": "Sola taşı", "move_next": "Sağa taşı", "hide": "Kolonu gizle", "columns": "Kolonlar", "filter": "Filtrele", "reset": "Görünümü sıfırla"},
-      "agg": { "sum": "Toplam", "avg": "Ortalama", "min": "En az", "max": "En çok", "count": "Adet" }
+      "filter": {
+        "filter": "{label} filtresi",
+        "from": "En az",
+        "to": "En çok",
+        "all": "Tümü",
+        "contains": "İçerir",
+        "starts_with": "İle başlar",
+        "equals": "Eşittir",
+        "match": "Eşleşme",
+        "selected": "{n} seçili",
+        "clear": "Filtreyi temizle",
+        "sorted": "Sıralama {n}"
+      },
+      "menu": {
+        "options": "Kolon seçenekleri: {label}",
+        "resize": "{label} genişliği",
+        "sort_asc": "Artan sırala",
+        "sort_desc": "Azalan sırala",
+        "sort_clear": "Sıralamayı kaldır",
+        "pin_start": "Başa sabitle",
+        "pin_end": "Sona sabitle",
+        "unpin": "Sabitlemeyi kaldır",
+        "move_prev": "Sola taşı",
+        "move_next": "Sağa taşı",
+        "hide": "Kolonu gizle",
+        "columns": "Kolonlar",
+        "filter": "Filtrele",
+        "reset": "Görünümü sıfırla"
+      },
+      "agg": {
+        "sum": "Toplam",
+        "avg": "Ortalama",
+        "min": "En az",
+        "max": "En çok",
+        "count": "Adet"
+      }
     },
     "export": {
       "xlsx": "Excel'e aktar",
@@ -135,6 +172,130 @@
       "language": "Dil",
       "time_zone": "Saat dilimi",
       "time_zone_auto": "Otomatik (bu cihaz)"
+    },
+    "ui": {
+      "resize": "Bölmeleri yeniden boyutlandır",
+      "loading": "Yükleniyor…",
+      "load_failed": "Bu bölüm yüklenemedi. Tekrar deneyin.",
+      "date": {
+        "open": "Tarih seç",
+        "dialog": "Bir tarih seçin",
+        "prev_month": "Önceki ay",
+        "next_month": "Sonraki ay",
+        "prev_year": "Önceki yıl",
+        "next_year": "Sonraki yıl",
+        "today": "Bugün",
+        "format": "Biçim: {format}.",
+        "natural": "Şunları da yazabilirsiniz: {examples}.",
+        "natural_date": "bugün, +3g",
+        "natural_time": "şimdi, 930",
+        "open_time": "Saat seç",
+        "dialog_time": "Bir saat seçin",
+        "dialog_range": "Bir tarih aralığı seçin",
+        "month": "Ay seç",
+        "year": "Yıl seç",
+        "months": "Aylar",
+        "years": "Yıllar",
+        "now": "Şimdi",
+        "clear": "Temizle",
+        "done": "Tamam",
+        "hours": "Saat",
+        "minutes": "Dakika",
+        "seconds": "Saniye",
+        "period": "ÖÖ veya ÖS",
+        "week": "Hf",
+        "week_long": "Hafta numarası",
+        "zone": "Saat dilimi {zone}",
+        "utc": "UTC: {moment}",
+        "from": "Başlangıç",
+        "to": "Bitiş",
+        "presets": {
+          "label": "Hızlı aralıklar",
+          "today": "Bugün",
+          "yesterday": "Dün",
+          "last_7_days": "Son 7 gün",
+          "this_month": "Bu ay",
+          "last_month": "Geçen ay",
+          "this_year": "Bu yıl"
+        },
+        "invalid": "{label} okunamadı."
+      },
+      "lookup": {
+        "open": "Seçenekleri göster",
+        "no_results": "Eşleşen kayıt yok.",
+        "results": "{count} sonuç",
+        "remove": "{label} kaldır",
+        "more": "Daha fazla göster",
+        "selected": "Seçilenler",
+        "type_more": "Aramak için yazın."
+      },
+      "lines": {
+        "add": "Satır ekle",
+        "remove": "{n}. satırı sil",
+        "up": "{n}. satırı yukarı taşı",
+        "down": "{n}. satırı aşağı taşı",
+        "row": "Satır {n}",
+        "total": "Toplam",
+        "actions": "İşlemler",
+        "empty": "Henüz satır yok."
+      },
+      "confirm": {
+        "title": "Lütfen onaylayın",
+        "ok": "Onayla",
+        "cancel": "Vazgeç"
+      },
+      "empty": "Henüz kayıt yok.",
+      "breadcrumb": "Konum",
+      "dismiss": "Kapat",
+      "steps": {
+        "progress": "Adım {n} / {total}",
+        "next": "İleri",
+        "back": "Geri",
+        "done": "Tamamlandı",
+        "current": "Geçerli adım",
+        "label": "Adımlar"
+      },
+      "chart": {
+        "data": "Verileri göster",
+        "table": "{title} verileri",
+        "summary_bar": "{items} kategoride {series} seri gösteren sütun grafiği. En yüksek: {max}, {value}.",
+        "summary_line": "{items} noktada {series} seri gösteren çizgi grafiği. En yüksek: {max}, {value}.",
+        "summary_donut": "{items} parçalı halka grafiği. En büyük: {max}, {value}."
+      },
+      "tree": {
+        "empty": "Kayıt yok."
+      },
+      "select": {
+        "none": "Seçilmedi",
+        "search": "Listede ara"
+      },
+      "number": {
+        "up": "Artır",
+        "down": "Azalt"
+      },
+      "text": {
+        "count": "{n} / {max} karakter"
+      },
+      "tone": {
+        "neutral": "Not",
+        "info": "Bilgi",
+        "success": "Başarılı",
+        "warning": "Uyarı",
+        "danger": "Hata",
+        "brand": "Not"
+      }
+    },
+    "date": {
+      "words": {
+        "today": "bugün, bugun",
+        "tomorrow": "yarın, yarin",
+        "yesterday": "dün, dun",
+        "now": "şimdi, simdi",
+        "day": "g, gün, gun",
+        "week": "h, hafta",
+        "month": "a, ay",
+        "year": "y, yıl, yil"
+      }
     }
   }
 }

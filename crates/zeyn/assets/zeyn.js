@@ -97,10 +97,10 @@ function paramsOf(screen) {
   }
 }
 
-/** Returns the node index of the closest `[data-zeyn-node]`, or `null`. */
+/** Returns the node path (`"0"`, `"1.0.2"`) of the closest `[data-zeyn-node]`, or `null`. */
 function nodeOf(el) {
   const node = el.closest('[data-zeyn-node]');
-  return node ? Number(node.dataset.zeynNode) : null;
+  return node ? node.dataset.zeynNode : null;
 }
 
 /** Common request fields: screen name, params and node of an element. */
@@ -211,6 +211,8 @@ async function runEffect(effect, source) {
       return toast(effect.message ?? '');
     case 'close_and_refresh':
       return closeAndRefresh();
+    default:
+      document.dispatchEvent(new CustomEvent('zeyn:effect', { detail: { effect, source, run: (next) => runEffect(next, source) } }));
   }
 }
 
@@ -1893,9 +1895,10 @@ function filterControls(cell, th, t) {
     select.append(new Option(t.all || 'All', ''), new Option(t.yes || 'Yes', 'true'), new Option(t.no || 'No', 'false'));
     cell.append(select);
   } else {
-    const type = { number: 'number', money: 'number', date: 'date', datetime: 'date', time: 'time' }[kind] ?? 'search';
+    const type = { number: 'number', money: 'number', date: 'text', datetime: 'text', time: 'text' }[kind] ?? 'search';
     const wrap = make('div', 'z-filter-pair z-filter-range');
     wrap.append(input(type, 'from', t.from || 'From'), input(type, 'to', t.to || 'To'));
+    if (type === 'text') wrap.querySelectorAll('input').forEach((i) => (i.dataset.zeynFilterDate = kind === 'time' ? 'time' : 'date'));
     cell.append(wrap);
   }
 }
@@ -1930,7 +1933,11 @@ function readFilter(cell) {
       if (get('is').value) f.is = get('is').value === 'true';
       break;
     default:
-      for (const b of ['from', 'to']) if (get(b)?.value) f[b] = get(b).value;
+      for (const b of ['from', 'to']) {
+        const el = get(b);
+        const v = el?.dataset.zeynFilterDate ? el.dataset.iso : el?.value;
+        if (v) f[b] = v;
+      }
   }
   return Object.keys(f).length ? f : null;
 }
@@ -2805,6 +2812,7 @@ function showErrors(form, errors) {
     first ??= box;
   }
   first?.focus();
+  form.dispatchEvent(new CustomEvent('zeyn:errors', { bubbles: true, detail: errors }));
 }
 
 /** Validates in the browser, posts to `/_zeyn/form`, then shows errors or runs effects. */

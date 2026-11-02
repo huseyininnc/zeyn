@@ -9,6 +9,7 @@ use crate::i18n::{I18n, Text};
 use crate::render::{Render, attr, escape};
 use crate::grid::DataGridView;
 use crate::screen::{GridSource, LoadedPage, Screen, ScreenDef};
+use crate::ui::NodePath;
 use crate::platform::{Config, License, LicenseSource, Tenant};
 use crate::security::{IpRange, MemoryRateStore, RateKey, RateLimit, RateStore, client_ip, parse_ranges};
 use crate::time::{DateTime, TimeZone};
@@ -33,6 +34,8 @@ pub use ops::build_id;
 const JS: &str = include_str!("../assets/zeyn.js");
 const CSS: &str = include_str!("../assets/zeyn.css");
 const NAV: &str = include_str!("../assets/nav.js");
+
+mod ui;
 const CSP: &str = "default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
 
 /// Finds out who is calling, usually from a session cookie or an `Authorization` header.
@@ -1073,7 +1076,7 @@ impl App {
             .route("/_zeyn/timezone", post(set_time_zone))
             .route("/_zeyn/tools", get(tools))
             .route("/_zeyn/mcp", post(mcp));
-        let router = session::routes(data::routes(ops::routes(router)))
+        let router = ui::routes(session::routes(data::routes(ops::routes(router))))
             .fallback(not_found)
             .layer(axum::middleware::from_fn_with_state(state.clone(), guard_request))
             .layer(axum::middleware::map_response(security_headers))
@@ -1357,13 +1360,13 @@ impl AppState {
     }
 
     /// Key of a saved grid view: tenant, screen and node, so tenants never share views.
-    fn view_key(ctx: &Ctx, screen: &str, node: usize) -> String {
+    fn view_key(ctx: &Ctx, screen: &str, node: &NodePath) -> String {
         format!("{}:{screen}#{node}", ctx.tenant().map(|t| t.id().to_string()).unwrap_or_default())
     }
 
     /// The signed in user's saved view of a grid, cleaned by the grid. `None` without a store,
     /// without a user or when nothing is saved; a failing store is logged and ignored.
-    async fn saved_view(&self, ctx: &Ctx, grid: &dyn GridSource, screen: &str, node: usize) -> Option<DataGridView> {
+    async fn saved_view(&self, ctx: &Ctx, grid: &dyn GridSource, screen: &str, node: &NodePath) -> Option<DataGridView> {
         let store = self.views.as_ref()?;
         let user = ctx.identity().user.clone()?;
         match self.timed(store.load(&user, &Self::view_key(ctx, screen, node))).await {
@@ -1376,19 +1379,19 @@ impl AppState {
     }
 
     /// Loads the first page of every grid the user may read, in the user's saved view.
-    async fn preload(&self, ctx: &Ctx, screen: &Screen, name: &str) -> HashMap<usize, LoadedPage> {
+    async fn preload(&self, ctx: &Ctx, nodes: Vec<(NodePath, &crate::screen::Node)>, name: &str) -> HashMap<String, LoadedPage> {
         let mut loaded = HashMap::new();
         let saved = self.views.is_some() && ctx.identity().is_signed_in();
-        for (i, node) in screen.nodes().iter().enumerate() {
+        for (i, node) in nodes {
             let Some(grid) = node.grid() else { continue };
             if !ctx.identity().can(&grid.action().access) {
                 continue;
             }
-            let view = self.saved_view(ctx, grid, name, i).await;
+            let view = self.saved_view(ctx, grid, name, &i).await;
             if let Ok(mut page) = self.timed(grid.fetch_at(ctx.clone(), grid.first_query(view.as_ref()), Vec::new())).await {
                 page.view = view;
                 page.saved_views = saved;
-                loaded.insert(i, page);
+                loaded.insert(i.to_string(), page);
             }
         }
         loaded
@@ -1510,10 +1513,11 @@ impl AppState {
         }
         let app = r.text(&self.name);
         format!(
-            r##"<!doctype html><html lang="{lang}"{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css">{theme_link}<script type="module" src="{base}/_zeyn/zeyn.js"></script><script type="module" src="{base}/_zeyn/nav.js"></script>{extra}</head><body><a class="z-skip" href="#z-main">{skip}</a><div class="z-app"><nav class="z-nav" aria-label="{menu}"><p class="z-app-name">{app}</p>{nav}</nav><main class="z-main" id="z-main">{main}</main></div><div class="z-toasts" role="status" aria-live="polite"></div></body></html>"##,
+            r##"<!doctype html><html lang="{lang}"{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css">{theme_link}<script type="module" src="{base}/_zeyn/zeyn.js"></script><script type="module" src="{base}/_zeyn/nav.js"></script>{components}{extra}</head><body><a class="z-skip" href="#z-main">{skip}</a><div class="z-app"><nav class="z-nav" aria-label="{menu}"><p class="z-app-name">{app}</p>{nav}</nav><main class="z-main" id="z-main">{main}</main></div><div class="z-toasts" role="status" aria-live="polite"></div></body></html>"##,
             lang = escape(ctx.locale()),
             tz = escape(ctx.time_zone().name()),
             base = escape(&self.prefix),
+            components = ui::head(&escape(&self.prefix)),
             scheme = self.theme.as_ref().and_then(|t| t.scheme).unwrap_or("light dark"),
             html_attrs = format!(
                 "{}{}",
@@ -1553,7 +1557,7 @@ fn asset(body: &'static str, content_type: &'static str) -> Response {
 /// IP rules and rate limits, before any handler runs.
 async fn guard_request(State(st): State<Arc<AppState>>, req: axum::extract::Request, next: axum::middleware::Next) -> Response {
     let path = req.uri().path().to_string();
-    if path == "/_zeyn/zeyn.js" || path == "/_zeyn/zeyn.css" || path == "/_zeyn/nav.js" || path == "/_zeyn/theme.css" || path == "/favicon.ico" || ops::is_asset(&path) {
+    if path == "/_zeyn/zeyn.js" || path == "/_zeyn/zeyn.css" || path == "/_zeyn/nav.js" || path == "/_zeyn/theme.css" || path == "/favicon.ico" || ops::is_asset(&path) || ui::ASSETS.contains(&path.as_str()) {
         return next.run(req).await;
     }
     ops::delay(&st, &path).await;
@@ -1635,7 +1639,7 @@ async fn page(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Que
         st.before(&ctx, &call)?;
         let (_, entry, screen) = st.open(&ctx, name, params.clone()).await?;
         data::note_screen_read(&ctx, &entry.meta, &params);
-        let loaded = st.preload(&ctx, &screen, name).await;
+        let loaded = st.preload(&ctx, screen.walk(), name).await;
         let r = Render::new(name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity()).with_ctx(&ctx);
         let html = screen.render(&r, &entry.meta, &params, &loaded);
         Ok::<_, Failure>((ctx.t(screen.title()), html))
@@ -1686,7 +1690,7 @@ async fn screen_fragment(
         st.before(&ctx, &call)?;
         let (_, entry, screen) = st.open(&ctx, name, params.clone()).await?;
         data::note_screen_read(&ctx, &entry.meta, &params);
-        let loaded = st.preload(&ctx, &screen, entry.meta.name).await;
+        let loaded = st.preload(&ctx, screen.walk(), entry.meta.name).await;
         let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity()).with_ctx(&ctx);
         Ok::<_, Failure>(screen.render(&r, &entry.meta, &params, &loaded))
     }
@@ -1734,7 +1738,7 @@ struct GridCall {
     screen: String,
     #[serde(default)]
     params: Json,
-    node: usize,
+    node: NodePath,
     #[serde(default)]
     query: GridQuery,
     /// Column layout to render the rows in.
@@ -1825,7 +1829,7 @@ struct DataGridViewCall {
     screen: String,
     #[serde(default)]
     params: Json,
-    node: usize,
+    node: NodePath,
     /// The view to save; `null` deletes the saved view.
     view: Option<DataGridView>,
 }
@@ -1835,7 +1839,7 @@ struct FormCall {
     screen: String,
     #[serde(default)]
     params: Json,
-    node: usize,
+    node: NodePath,
     #[serde(default)]
     values: Map<String, Json>,
     #[serde(default)]
@@ -1848,7 +1852,7 @@ impl AppState {
             return Err(Failure::App(Error::NotFound));
         }
         let (_, entry, screen) = self.open(ctx, &call.screen, call.params).await?;
-        let grid = screen.nodes().get(call.node).and_then(|n| n.grid()).ok_or(Failure::App(Error::NotFound))?;
+        let grid = screen.node(&call.node).and_then(|n| n.grid()).ok_or(Failure::App(Error::NotFound))?;
         let action = grid.action();
         if !ctx.identity().can(&action.access) {
             return Err(Failure::App(Error::Forbidden));
@@ -1883,12 +1887,12 @@ impl AppState {
         let store = self.views.as_ref().ok_or(Failure::App(Error::NotFound))?;
         let user = ctx.identity().user.clone().ok_or(Failure::App(Error::Forbidden))?;
         let (_, entry, screen) = self.open(ctx, &call.screen, call.params).await?;
-        let grid = screen.nodes().get(call.node).and_then(|n| n.grid()).ok_or(Failure::App(Error::NotFound))?;
+        let grid = screen.node(&call.node).and_then(|n| n.grid()).ok_or(Failure::App(Error::NotFound))?;
         if !ctx.identity().can(&grid.action().access) {
             return Err(Failure::App(Error::Forbidden));
         }
         let view = call.view.map(|v| grid.clean_view(v));
-        self.timed(store.save(&user, &Self::view_key(ctx, entry.meta.name, call.node), view)).await
+        self.timed(store.save(&user, &Self::view_key(ctx, entry.meta.name, &call.node), view)).await
     }
 
     /// Runs a row item. The row is loaded again by key through the grid's action (with the
@@ -1948,7 +1952,7 @@ impl AppState {
         result?;
         let mut page = self.timed(grid.find_row(ctx.clone(), call.key.clone())).await?;
         page.view = call.view.map(|v| grid.clean_view(v));
-        let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity());
+        let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity()).with_ctx(ctx);
         Ok(json!({ "row": grid.row_html(&page, &call.key, &r) }))
     }
 
@@ -2038,7 +2042,7 @@ impl AppState {
             return Err(Failure::App(Error::Forbidden));
         }
         let (_, entry, screen) = self.open(ctx, &call.screen, call.params).await?;
-        let form = screen.nodes().get(call.node).and_then(|n| n.form()).ok_or(Failure::App(Error::NotFound))?;
+        let form = screen.node(&call.node).and_then(|n| n.form()).ok_or(Failure::App(Error::NotFound))?;
         let action = form.action();
         if !ctx.identity().can(&action.access) {
             return Err(Failure::App(Error::Forbidden));
@@ -2061,7 +2065,8 @@ impl AppState {
         let (_, entry, screen) = self.open(ctx, name, params).await?;
         let title = ctx.t(screen.title());
         let mut tools = Vec::new();
-        for (i, node) in screen.nodes().iter().enumerate() {
+        for (path, node) in screen.walk() {
+            let i = path.as_str().replace('.', "-");
             if let Some(g) = node.grid() {
                 if ctx.identity().can(&g.action().access) {
                     tools.push(json!({
@@ -2070,7 +2075,7 @@ impl AppState {
                         "inputSchema": g.tool_schema(),
                         "kind": "grid",
                         "screen": entry.meta.name,
-                        "node": i,
+                        "node": path,
                     }));
                 }
             }
@@ -2083,7 +2088,7 @@ impl AppState {
                         "inputSchema": f.tool_schema(),
                         "kind": "form",
                         "screen": entry.meta.name,
-                        "node": i,
+                        "node": path,
                     }));
                 }
             }
@@ -2586,7 +2591,7 @@ async fn call_tool(st: &AppState, ctx: &Ctx, name: &str, args: Json) -> Result<J
         .or_else(|| name.strip_suffix("_save").map(|r| (r, "save")))
         .ok_or(Failure::App(Error::NotFound))?;
     let (screen, node) = rest.rsplit_once('_').ok_or(Failure::App(Error::NotFound))?;
-    let node: usize = node.parse().map_err(|_| Failure::App(Error::NotFound))?;
+    let node = NodePath::parse(&node.replace('-', ".")).ok_or(Failure::App(Error::NotFound))?;
     match kind {
         "search" => {
             let query: GridQuery = serde_json::from_value(args).map_err(|_| Failure::App(Error::NotFound))?;
