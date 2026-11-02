@@ -14,7 +14,8 @@
     "ui": "Bileşen kütüphanesi",
     "media": "Medya",
     "pro": "Masaüstü kabuğu",
-    "assistant": "Asistan"
+    "assistant": "Asistan",
+    "islands": "Adacıklar"
   },
   "dashboard": {
     "title": "Genel bakış",
@@ -338,6 +339,15 @@
     "width": "Genişlik",
     "height": "Yükseklik",
     "visible": "Görünür"
+  },
+  "islands": {
+    "counter": "Sayaç",
+    "counter_intro": "WebAssembly olarak derlenmiş bir Rust bileşeni. Ekranı sunucu çizer; sayaç görünür olunca yüklenir ve olağan denetimlerle tipli bir eylem üzerinden kaydedilir.",
+    "fallback": "Etkileşimli sayaç burada yüklenemedi. Sayfanın geri kalanı onsuz da çalışır.",
+    "less": "Azalt",
+    "more": "Artır",
+    "save": "Kaydet",
+    "saved": "Kaydedildi: {value}"
   },
   "assistant": {
     "title": "Asistan",

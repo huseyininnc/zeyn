@@ -44,6 +44,8 @@ mod ui;
 mod pro;
 #[cfg(feature = "assistant")]
 mod assistant;
+#[cfg(feature = "islands")]
+mod islands;
 const CSP: &str = "default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
 
 /// Finds out who is calling, usually from a session cookie or an `Authorization` header.
@@ -604,6 +606,8 @@ pub struct App {
     #[cfg(feature = "assistant")]
     assistant: Option<Arc<crate::assistant::Assistant>>,
     looks: theme::Settings,
+    #[cfg(feature = "islands")]
+    islands_dir: Option<std::path::PathBuf>,
 }
 
 impl App {
@@ -645,7 +649,19 @@ impl App {
             #[cfg(feature = "assistant")]
             assistant: None,
             looks: theme::Settings::default(),
+            #[cfg(feature = "islands")]
+            islands_dir: None,
         }
+    }
+
+    /// Serves the WASM islands that `zeyn build-islands` wrote to `dir` (usually `dist/islands`).
+    /// Pages that hold an [`Island`](crate::ui::Island) get the loader and a policy that allows
+    /// WebAssembly; other pages are unchanged. When `dir` has no manifest, islands show their
+    /// fallback and the server logs a warning.
+    #[cfg(feature = "islands")]
+    pub fn islands(mut self, dir: impl Into<std::path::PathBuf>) -> Self {
+        self.islands_dir = Some(dir.into());
+        self
     }
 
     /// `false` stops the browser's own context menu everywhere except in text inputs, text areas
@@ -1022,6 +1038,14 @@ impl App {
             }
         }
         let look = self.look();
+        #[cfg(feature = "islands")]
+        let islands = self.islands_dir.as_deref().and_then(|dir| match islands::Islands::load(dir, &url_prefix) {
+            Ok(i) => Some(i),
+            Err(e) => {
+                tracing::warn!("islands are not served, so they show their fallback: {e}");
+                None
+            }
+        });
         let state = Arc::new(AppState {
             name: self.name,
             i18n: Arc::new(self.i18n),
@@ -1056,6 +1080,8 @@ impl App {
             extras: self.extras,
             #[cfg(feature = "assistant")]
             assistant: self.assistant,
+            #[cfg(feature = "islands")]
+            islands,
         });
         ops::start_jobs(&state);
         let mut router = Router::new();
@@ -1114,6 +1140,8 @@ impl App {
             .route("/_zeyn/mcp", post(mcp));
         #[cfg(feature = "assistant")]
         let router = assistant::routes(router);
+        #[cfg(feature = "islands")]
+        let router = islands::routes(router);
         let router = theme::routes(pro::routes(media::routes(ui::routes(session::routes(data::routes(ops::routes(router)))))))
             .fallback(not_found)
             .layer(axum::middleware::from_fn_with_state(state.clone(), guard_request))
@@ -1208,6 +1236,8 @@ struct AppState {
     extras: ops::Extras,
     #[cfg(feature = "assistant")]
     assistant: Option<Arc<crate::assistant::Assistant>>,
+    #[cfg(feature = "islands")]
+    islands: Option<islands::Islands>,
 }
 
 /// Decodes `%XX` sequences in a cookie value.
@@ -1651,10 +1681,21 @@ fn is_assistant_asset(path: &str) -> bool {
     }
 }
 
+/// Whether a path is the island loader or a built island file, served without sign in.
+fn is_island_asset(path: &str) -> bool {
+    #[cfg(feature = "islands")]
+    return islands::is_asset(path);
+    #[cfg(not(feature = "islands"))]
+    {
+        let _ = path;
+        false
+    }
+}
+
 /// IP rules and rate limits, before any handler runs.
 async fn guard_request(State(st): State<Arc<AppState>>, req: axum::extract::Request, next: axum::middleware::Next) -> Response {
     let path = req.uri().path().to_string();
-    if path == "/_zeyn/zeyn.js" || path == "/_zeyn/zeyn.css" || path == "/_zeyn/nav.js" || path == "/_zeyn/theme.css" || path == "/favicon.ico" || ops::is_asset(&path) || ui::ASSETS.contains(&path.as_str()) || media::ASSETS.contains(&path.as_str()) || pro::ASSETS.contains(&path.as_str()) || is_assistant_asset(&path) {
+    if path == "/_zeyn/zeyn.js" || path == "/_zeyn/zeyn.css" || path == "/_zeyn/nav.js" || path == "/_zeyn/theme.css" || path == "/favicon.ico" || ops::is_asset(&path) || ui::ASSETS.contains(&path.as_str()) || media::ASSETS.contains(&path.as_str()) || pro::ASSETS.contains(&path.as_str()) || is_assistant_asset(&path) || is_island_asset(&path) {
         return next.run(req).await;
     }
     ops::delay(&st, &path).await;
@@ -1742,7 +1783,7 @@ async fn theme_css(State(st): State<Arc<AppState>>) -> Response {
 
 async fn security_headers(mut response: Response) -> Response {
     let h = response.headers_mut();
-    h.insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static(CSP));
+    h.entry(header::CONTENT_SECURITY_POLICY).or_insert(HeaderValue::from_static(CSP));
     h.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
     h.insert(header::REFERRER_POLICY, HeaderValue::from_static("same-origin"));
     h.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
@@ -1778,6 +1819,8 @@ async fn page(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Que
     let response = match result {
         Ok((title, html)) if partial => {
             let full = format!("{title} · {}", ctx.t(&st.name));
+            #[cfg(feature = "islands")]
+            let holds_island = islands::holds(&st, &html);
             let mut r = Html(html).into_response();
             let h = r.headers_mut();
             h.insert("x-zeyn-partial", HeaderValue::from_static("1"));
@@ -1786,8 +1829,15 @@ async fn page(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Que
             }
             h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
             h.insert(header::VARY, HeaderValue::from_static("x-zeyn-partial"));
+            #[cfg(feature = "islands")]
+            if holds_island {
+                h.insert("x-zeyn-islands", HeaderValue::from_static("1"));
+            }
             r
         }
+        #[cfg(feature = "islands")]
+        Ok((title, html)) => islands::page(&st, st.shell(&ctx, &csrf, &title, &html, Some(name)), &html),
+        #[cfg(not(feature = "islands"))]
         Ok((title, html)) => Html(st.shell(&ctx, &csrf, &title, &html, Some(name))).into_response(),
         Err(Failure::App(Error::Forbidden | Error::Denied(_))) if !ctx.identity().is_signed_in() && st.login_url.is_some() => {
             let here = st.screens.get(name).and_then(|(fi, e)| st.features[*fi].path_of(&e.meta)).map(|p| st.url(&p)).unwrap_or_default();

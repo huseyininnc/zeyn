@@ -18,9 +18,12 @@ assistant = ["server", "dep:reqwest", "dep:rustls"]
 postgres = ["dep:sqlx", "dep:base64", "dep:tokio", "dep:futures-core", "dep:futures-util"]
 # Oracle through ODPI-C; needs Oracle Instant Client at run time (see docs/database.md).
 oracle = ["dep:oracle", "dep:base64", "dep:tokio", "dep:futures-core"]
+# WASM islands (`ui::Island`, `App::islands`). Pages without an island pay nothing either way.
+islands = ["server", "dep:zeyn-island", "tokio/fs"]
 
 [dependencies]
 zeyn-macros = { path = "../zeyn-macros", version = "0.0.2" }
+zeyn-island = { path = "../zeyn-island", version = "0.0.2", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 jiff = { version = "0.2", default-features = false, features = ["std", "tzdb-bundle-always"] }
@@ -56,3 +59,7 @@ tracing-subscriber = { version = "0.3", default-features = false, features = ["s
 [[test]]
 name = "assistant"
 required-features = ["assistant"]
+
+[[test]]
+name = "islands"
+required-features = ["islands"]

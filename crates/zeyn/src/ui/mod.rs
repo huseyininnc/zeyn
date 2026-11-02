@@ -15,6 +15,12 @@ mod media;
 mod shell;
 mod tree;
 mod widgets;
+#[cfg(feature = "islands")]
+mod island;
+#[cfg(feature = "islands")]
+pub use island::{Island, IslandLoad, Remote};
+#[cfg(feature = "islands")]
+pub(crate) use island::MARKER as ISLAND_MARKER;
 
 pub use layout::{Card, Panel, Row, Split, Stack, Tabs};
 pub use shell::{MenuBar, MenuList, PropertyInspector, StatusBar, Toolbox};

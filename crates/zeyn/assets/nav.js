@@ -63,7 +63,8 @@ async function visit(url, push) {
     location.assign(url.href);
     return;
   }
-  if (res.headers.get('x-zeyn-partial') !== '1') {
+  const needsIslands = res.headers.get('x-zeyn-islands') === '1' && !document.querySelector('meta[name="zeyn-islands"]');
+  if (res.headers.get('x-zeyn-partial') !== '1' || needsIslands) {
     location.assign(res.redirected ? res.url : url.href);
     return;
   }
@@ -109,7 +110,8 @@ async function refreshPage() {
   const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
   const next = doc.querySelector('.z-app');
   const current = document.querySelector('.z-app');
-  if (!res.ok || !next || !current) {
+  const needsIslands = doc.querySelector('meta[name="zeyn-islands"]') && !document.querySelector('meta[name="zeyn-islands"]');
+  if (!res.ok || !next || !current || needsIslands) {
     location.reload();
     return;
   }

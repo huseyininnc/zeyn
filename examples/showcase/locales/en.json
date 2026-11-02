@@ -14,7 +14,8 @@
     "ui": "Component library",
     "media": "Media",
     "pro": "Desktop shell",
-    "assistant": "Assistant"
+    "assistant": "Assistant",
+    "islands": "Islands"
   },
   "dashboard": {
     "title": "Overview",
@@ -338,6 +339,15 @@
     "width": "Width",
     "height": "Height",
     "visible": "Visible"
+  },
+  "islands": {
+    "counter": "Counter",
+    "counter_intro": "A Rust component compiled to WebAssembly. The server renders this screen; the counter loads when it comes into view and saves through a typed action with the usual checks.",
+    "fallback": "The interactive counter could not load here. Everything else on the page works without it.",
+    "less": "Less",
+    "more": "More",
+    "save": "Save",
+    "saved": "Saved: {value}"
   },
   "assistant": {
     "title": "Assistant",

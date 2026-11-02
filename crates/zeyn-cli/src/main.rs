@@ -1,6 +1,7 @@
 //! `zeyn`: new projects, generators, checks and an MCP server for AI agents.
 
 mod dev;
+mod islands;
 
 use serde_json::{Value, json};
 use std::io::{BufRead, Write};
@@ -80,6 +81,9 @@ Usage:
                                           --fix first rewrites renamed Zeyn APIs in src, tests and examples
   zeyn dev                                run the app, rebuild and restart on every change; the browser
                                           follows without a page reload
+  zeyn build-islands [--out <dir>] [<crate dir>...]
+                                          compile WASM islands (default: every crate in islands/)
+                                          to hashed files and a manifest in dist/islands
   zeyn mcp                                MCP server on stdio for AI agents
   zeyn license keygen [--out <file>]      new license signing key pair; the private key goes to
                                           zeyn-license.key, the public key to embed is printed
@@ -101,6 +105,7 @@ fn main() -> ExitCode {
             if report.contains("error") { Err("the app has problems".into()) } else { Ok(()) }
         }),
         ["dev"] => dev::run(Path::new(".")),
+        ["build-islands", rest @ ..] => build_islands(rest).map(|r| println!("{r}")),
         ["mcp"] => mcp(),
         ["license", "keygen", rest @ ..] => {
             license::keygen(Path::new(flag(rest, "--out").unwrap_or(license::DEFAULT_KEY))).map(|m| print!("{m}"))
@@ -123,6 +128,25 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+/// `zeyn build-islands [--out <dir>] [<crate dir>...]`.
+fn build_islands(rest: &[&str]) -> Result<String, String> {
+    let out = PathBuf::from(flag(rest, "--out").unwrap_or(islands::OUT_DIR));
+    let mut named = Vec::new();
+    let mut skip = false;
+    for a in rest {
+        if std::mem::take(&mut skip) {
+            continue;
+        }
+        if *a == "--out" {
+            skip = true;
+        } else {
+            named.push(PathBuf::from(a));
+        }
+    }
+    let crates = if named.is_empty() { islands::default_crates(Path::new(".")) } else { named };
+    islands::build(&crates, &out)
 }
 
 fn flag<'a>(rest: &[&'a str], name: &str) -> Option<&'a str> {
