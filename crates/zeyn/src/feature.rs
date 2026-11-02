@@ -111,6 +111,13 @@ pub struct ScreenEntry {
     pub path_value: fn(&str, &str) -> Option<serde_json::Value>,
 }
 
+impl ScreenEntry {
+    /// The entry of a screen, as `Feature::screen` registers it.
+    pub fn of<S: ScreenDef>() -> Self {
+        ScreenEntry { meta: S::META, deps: S::deps, build: build_erased::<S>, path_value: S::path_value }
+    }
+}
+
 fn build_erased<S: ScreenDef>(ctx: Ctx, params: serde_json::Value) -> BoxFuture<Result<Screen>> {
     match serde_json::from_value::<S::Params>(params) {
         Ok(p) => S::build(ctx, p),
@@ -272,7 +279,7 @@ impl Feature {
 
     /// Registers a screen.
     pub fn screen<S: ScreenDef>(mut self, _screen: S) -> Self {
-        self.screens.push(ScreenEntry { meta: S::META, deps: S::deps, build: build_erased::<S>, path_value: S::path_value });
+        self.screens.push(ScreenEntry::of::<S>());
         self
     }
 

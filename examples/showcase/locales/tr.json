@@ -21,6 +21,12 @@
 ,
     "inputs": "Girişler"
   },
+  "errors": {
+    "not_found": "Sayfa bulunamadı",
+    "not_found_text": "Bu adres bir yere çıkmıyor. Taşınmış ya da kayıt silinmiş olabilir.",
+    "server": "Bir şeyler ters gitti",
+    "server_text": "Sunucu bu isteği tamamlayamadı. Lütfen biraz sonra yeniden deneyin."
+  },
   "dashboard": {
     "title": "Genel bakış",
     "products": "Ürün",

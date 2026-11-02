@@ -46,6 +46,22 @@ pub fn overview(_: (), store: ProductStore, ctx: Ctx) -> Result<Screen> {
     ])))
 }
 
+/// The app's 404 page (`App::not_found`): shown for unknown paths and missing records.
+#[screen(public)]
+pub fn not_found_page() -> Screen {
+    Screen::new(t!("errors.not_found"))
+        .body(EmptyState::new(t!("errors.not_found_text")))
+        .body(Breadcrumb::new().link(t!("dashboard.title"), overview, ()).current(t!("errors.not_found")))
+}
+
+/// The app's server error page (`App::server_error`). It never sees what went wrong.
+#[screen(public)]
+pub fn server_error_page() -> Screen {
+    Screen::new(t!("errors.server"))
+        .body(EmptyState::new(t!("errors.server_text")))
+        .body(Breadcrumb::new().link(t!("dashboard.title"), overview, ()).current(t!("errors.server")))
+}
+
 pub fn feature() -> Feature {
     Feature::new("overview")
         .screen(overview)

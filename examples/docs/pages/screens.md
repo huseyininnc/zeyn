@@ -139,6 +139,24 @@ Feature::new("stock")
 
 `App::home(screen)` makes `/` open a screen.
 
+## Error pages
+
+`App::not_found(screen)` and `App::server_error(screen)` give the app its own pages for 404 and for server errors:
+
+```rust
+#[screen(public)]
+pub fn not_found_page() -> Screen {
+    Screen::new(t!("errors.not_found")).body(EmptyState::new(t!("errors.not_found_text")))
+}
+
+App::new(t!("app.name")).not_found(not_found_page).server_error(server_error_page)
+```
+
+- The 404 screen answers unknown paths and every screen that returns `Err(Error::NotFound)`, including path values that do not parse.
+- The server error screen answers `Error::Internal`, timeouts (504) and panics in handlers. The error's details go to the server log only; the screen gets no params and learns nothing about the request.
+- Both are shown inside the shell with the right status code. In app navigation gets only the screen and swaps it in without a page load. Framework endpoints and the API keep answering JSON.
+- Error screens take no params, need no route and are not part of a feature. Make them `public`: a user who may not open one, or an error screen that fails itself, gets the short built in message.
+
 ## How a screen reaches the browser
 
 The first request gets the full page: menu, screen and assets. Links inside the app then load only the screen and swap it in place, so the menu, open state and scroll position stay. The back button, new tabs and bookmarks work as with normal links.

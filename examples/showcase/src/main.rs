@@ -109,6 +109,8 @@ async fn main() -> std::io::Result<()> {
         .mcp(Mcp::on())
         .api_docs(ApiDocs::open())
         .home(overview::overview)
+        .not_found(overview::not_found_page)
+        .server_error(overview::server_error_page)
         .feature(overview::feature())
         .feature(stock::feature())
         .feature(sales::feature())

@@ -54,11 +54,92 @@ async fn partial_requests_return_only_the_screen_and_its_title() {
 }
 
 #[tokio::test]
-async fn partial_requests_that_fail_get_a_full_page_so_the_runtime_falls_back() {
+async fn partial_requests_that_fail_get_the_error_screen_alone_with_its_status() {
     let (status, headers, body) = get(&app(None), "/two", true).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
-    assert!(headers.get("x-zeyn-partial").is_none());
-    assert!(body.contains("<html"));
+    assert_eq!(headers.get("x-zeyn-partial").unwrap(), "1");
+    assert!(body.starts_with(r#"<section class="z-screen z-error""#), "{body}");
+    assert!(!body.contains("<html"));
+}
+
+#[screen(public)]
+pub fn missing() -> Screen {
+    Screen::new("Lost <here>").body(Card::new().title("Try the menu"))
+}
+
+#[screen(public)]
+pub fn broken() -> Screen {
+    Screen::new("Something broke")
+}
+
+#[screen(route = "/boom", public)]
+pub fn boom() -> Result<Screen> {
+    Err(Error::Internal("database password=hunter2 refused".into()))
+}
+
+#[screen(route = "/panic", public)]
+pub fn panics() -> Screen {
+    panic!("secret panic detail");
+}
+
+#[screen(public)]
+pub fn broken_error_screen() -> Screen {
+    panic!("the error screen itself fails");
+}
+
+fn error_app() -> axum::Router {
+    App::new("Nav")
+        .not_found(missing)
+        .server_error(broken)
+        .feature(Feature::new("n").screen(one).screen(boom).screen(panics).screen(order))
+        .router()
+        .unwrap()
+}
+
+#[tokio::test]
+async fn unknown_paths_and_missing_records_get_the_apps_404_screen_in_the_shell() {
+    let router = error_app();
+    for path in ["/nowhere", "/orders/404", "/orders/abc"] {
+        let (status, _, body) = get(&router, path, false).await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "{path}");
+        assert!(body.contains("<html") && body.contains(r#"<nav class="z-nav""#), "{path} is inside the shell");
+        assert!(body.contains("Lost &lt;here&gt;") && body.contains("Try the menu"), "{path}: {body}");
+        assert!(body.contains("<title>Lost &lt;here&gt; · Nav</title>"));
+    }
+    let (status, headers, body) = get(&router, "/nowhere", true).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(headers.get("x-zeyn-partial").unwrap(), "1");
+    assert_eq!(headers.get("x-zeyn-title").unwrap(), "Lost%20%3Chere%3E%20%C2%B7%20Nav");
+    assert!(body.starts_with(r#"<section class="z-screen" data-zeyn-screen="missing""#), "{body}");
+}
+
+#[tokio::test]
+async fn errors_and_panics_get_a_500_without_details() {
+    let router = error_app();
+    for (path, partial) in [("/boom", false), ("/boom", true), ("/panic", false), ("/panic", true)] {
+        let (status, _, body) = get(&router, path, partial).await;
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR, "{path}");
+        assert!(body.contains("Something broke"), "{path}: {body}");
+        assert!(!body.contains("hunter2") && !body.contains("secret panic") && !body.contains("database"), "{path}");
+        assert_eq!(body.contains("<html"), !partial, "{path}");
+    }
+    let (status, _, body) = get(&router, "/_zeyn/screen/panics", false).await;
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+    assert!(!body.contains("secret panic"));
+    assert!(body.contains(r#""error":"internal""#), "endpoints answer JSON: {body}");
+}
+
+#[tokio::test]
+async fn without_error_screens_or_when_they_fail_the_built_in_message_is_shown() {
+    let plain = App::new("Nav").feature(Feature::new("n").screen(boom)).router().unwrap();
+    let (status, _, body) = get(&plain, "/nowhere", false).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert!(body.contains(r#"<section class="z-screen z-error""#));
+    let failing =
+        App::new("Nav").server_error(broken_error_screen).feature(Feature::new("n").screen(boom)).router().unwrap();
+    let (status, _, body) = get(&failing, "/boom", false).await;
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+    assert!(body.contains(r#"<section class="z-screen z-error""#) && !body.contains("hunter2"));
 }
 
 #[tokio::test]

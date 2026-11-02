@@ -21,6 +21,12 @@
 ,
     "inputs": "Inputs"
   },
+  "errors": {
+    "not_found": "Page not found",
+    "not_found_text": "This address leads nowhere. It may have moved, or the record was removed.",
+    "server": "Something went wrong",
+    "server_text": "The server could not finish this request. Please try again in a moment."
+  },
   "dashboard": {
     "title": "Overview",
     "products": "Products",

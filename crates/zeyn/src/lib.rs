@@ -92,6 +92,23 @@
 //! pub fn order() -> Screen { Screen::new("Order") }
 //! ```
 //!
+//! An error screen that takes params (`App::not_found` and `App::server_error` take screens
+//! without params, since an error page learns nothing about the request):
+//!
+//! ```compile_fail
+//! use zeyn::prelude::*;
+//!
+//! #[params]
+//! pub struct OrderParams {
+//!     pub id: i64,
+//! }
+//!
+//! #[screen(route = "/orders/{id}", public)]
+//! pub fn order(_p: OrderParams) -> Screen { Screen::new("Order") }
+//!
+//! let app = App::new("Shop").not_found(order);
+//! ```
+//!
 //! A total on a text column:
 //!
 //! ```compile_fail
