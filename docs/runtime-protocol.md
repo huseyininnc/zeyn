@@ -56,7 +56,20 @@ Each body item is wrapped in a node element. The index is the address used by th
 | `aria-keyshortcuts` | button | Keyboard shortcut, for example `Control+N` |
 | `data-zeyn-export` | button | Export format of the grid on the same screen (`csv`, `xlsx`) |
 | `data-zeyn-grid` | grid root | Marks a grid; also has `data-zeyn-mode`, `data-zeyn-paging`, `data-zeyn-page-size`, `data-zeyn-total`, `data-zeyn-next`, `data-zeyn-offset` |
-| `data-field`, `aria-sort`, `data-filter` | `th` | Column field name, current sort, whether a filter box is shown |
+| `data-field`, `aria-sort`, `aria-colindex` | `th` | Column field name, current sort, position |
+| `data-filter`, `data-options` | `th` | Filter input kind (`text`, `number`, `money`, `date`, `datetime`, `time`, `choice`, `bool`) and choice options `[{value,label}]` |
+| `data-pin` | `th` | `start` or `end` for pinned columns (also the selection and row action columns) |
+| `data-edit`, `data-optional` | `th` | Input kind of an editable column, for users who may save |
+| `data-zeyn-texts`, `data-zeyn-columns`, `data-zeyn-view` | grid root | Localized control texts, every column `[{field,label,hidden,pin,width}]`, the saved view |
+| `data-zeyn-views` | grid root | `server` when views are saved on the server |
+| `data-zeyn-version-field`, `data-zeyn-exportable` | grid root | Row version field name for inline edits; `csv` when the grid can be exported |
+| `data-zeyn-key`, `data-zeyn-version`, `data-zeyn-menu` | `tr` | Row key, row version, context menu items |
+| `data-v` | `td` | Input value of an editable cell |
+| `data-zeyn-run` | button in a row | Row item to run (`a0` is the first row action) |
+| `data-agg` | `tfoot td` | Totals the column shows (`sum avg min max count`) |
+| `data-zeyn-bulk` | div before the grid | Selection bar with `data-zeyn-bulk-run` buttons |
+| `data-zeyn-menu` | screen root | Context menu of the screen |
+| `data-zeyn-native-menu="off"` | `html` | The browser's context menu is off except in text inputs |
 | `data-zeyn-rows` | `tbody` | Where rows go |
 | `data-zeyn-page` | pager button | `prev` or `next` |
 | `data-zeyn-page-info` | span | Text such as `1-50 of 230`, built from the localized templates on the grid root |
@@ -94,21 +107,39 @@ All `POST` requests send JSON, must carry the header `x-zeyn-csrf` with the toke
   "query": {
     "page": { "type": "offset", "offset": 0, "limit": 50 },
     "sort": [{ "field": "code", "desc": false }],
-    "filters": [{ "field": "name", "contains": "tea" }],
-    "with_total": true
-  }
+    "filters": [{ "field": "name", "contains": "tea" }, { "field": "price", "from": "10", "to": "99.90" }],
+    "with_total": true,
+    "aggregates": [{ "field": "price", "op": "sum" }]
+  },
+  "view": { "columns": [{ "field": "code", "width": 140, "pin": "start" }, { "field": "name" }] },
+  "head": false
 }
 ```
+
+Filters may set `contains`, `starts_with`, `equals`, `from`, `to`, `any_of` and `is` (see `docs/grid.md`). `view.columns` is the column layout to render the rows in; with `head: true` the response also has `head`, the header row.
 
 For infinite scroll `page` is `{ "type": "after", "cursor": "...", "limit": 100 }` and `cursor` is `null` for the first batch.
 
 Response `200`:
 
 ```json
-{ "rows": "<tr>...</tr>", "count": 50, "total": 230, "next": "50" }
+{ "rows": "<tr>...</tr>", "foot": "<tr>...</tr>", "head": null, "count": 50, "total": 230, "next": "50" }
 ```
 
+`foot` is the totals row when totals were asked for, otherwise `null`.
+
 `total` and `next` may be `null`. The runtime replaces the rows for paged grids and appends them for infinite scroll.
+
+### 4.2.1 More grid endpoints
+
+| Endpoint | Body | Does |
+|---|---|---|
+| `POST /_zeyn/grid/view` | `{screen, params, node, view}` | Saves the user's view (`null` deletes it). `204`; `404` without a view store |
+| `POST /_zeyn/grid/run` | `{screen, params, node, key, item}` | Runs a row item (`a0` row action, `m2.1` menu path). The server loads the row by key and builds the input. `{effects}` |
+| `POST /_zeyn/grid/bulk` | `{screen, params, node, action, keys, all, query}` | Runs a bulk action with the picked keys, or with every row matching `query.filters` when `all`. `{effects, count}` |
+| `POST /_zeyn/grid/edit` | `{screen, params, node, key, values, view}` | Saves an inline edit; `values` hold the edited columns and the row version as a form sends them. `{row}`; `403` for columns that are not editable, `409`, `422` |
+| `GET /_zeyn/grid/export` | `?screen&params&node&q={sort,filters,columns}` | Streams every matching row as CSV |
+| `POST /_zeyn/menu` | `{screen, params, item}` | Runs an action item of the screen's context menu |
 
 ### 4.3 Form submit
 
@@ -172,6 +203,7 @@ The runtime:
 ## 6. Runtime behavior
 
 - Without JavaScript, pages still render with the first page of every grid. Forms and paging need the runtime.
-- Keyboard: arrow keys move between grid rows, Enter opens a row, Escape closes the top dialog, shortcuts from `aria-keyshortcuts` work everywhere except inside text inputs.
+- Keyboard: arrow keys move between grid rows, Enter opens a row, Escape closes the top dialog, shortcuts from `aria-keyshortcuts` work everywhere except inside text inputs. In grids: Space selects the row, F2 edits it, Ctrl+Z undoes the last edit, Shift+F10 or the context menu key opens the menu of the row or header, Shift+click sorts by several columns.
+- Right click opens Zeyn's menu where one is defined (headers, rows with `data-zeyn-menu`, screens with `data-zeyn-menu`); everywhere else the browser's own menu stays.
 - Focus moves into a dialog when it opens and returns to the opener when it closes.
 - Client side checks (`required`, `minlength`, `maxlength`, `min`, `max`, `type="email"`) run before submit with the browser's constraint validation API. The server always validates again.
