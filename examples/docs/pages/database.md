@@ -35,7 +35,23 @@ A list action takes a `DataQuery` and returns `Page<M>`:
 | `time_zone` | Zone for date filters on `DateTime` columns, set by the server |
 | `group` | Group rows by a field, set by the grid |
 
-`DataQuery::apply(vec)` does all of it in memory. A store backed by SQL turns the same query into `WHERE`, `ORDER BY`, `LIMIT` and `GROUP BY`, with every value bound as a parameter. Field names come from the client: map them to known columns before they reach SQL, never paste them in. The page size is capped by the server.
+`DataQuery::apply(vec)` does all of it in memory. For a SQL database use `zeyn::sql`: `Db::find` turns the same query into `WHERE`, `ORDER BY`, `LIMIT` and `GROUP BY` for PostgreSQL or Oracle. Only the entity's own fields can be filtered or sorted, every value is bound as a parameter, and the page size is capped by the server, so client input never reaches the SQL text. Write SQL by hand only for queries `Db::find` cannot express, and then never paste a field name or value from the client into it.
+
+```toml
+zeyn = { version = "0.0.3", features = ["postgres"] }   # or ["oracle"]
+```
+
+```rust
+let db = Db::from_config(&config).await?;            // reads the secret database.url
+App::new(t!("app.name")).config(config).service(db)
+
+#[action(permission = "stock.product.read")]
+pub async fn search_products(q: DataQuery, db: Db) -> Result<Page<Product>> {
+    db.find(&q).await
+}
+```
+
+The [database reference](/reference/database) covers connection settings, Oracle, migrations, transactions, streams and the SQL each query becomes.
 
 `Page` carries the rows, the total when asked, the cursor of the next batch and the totals:
 
