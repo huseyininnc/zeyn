@@ -332,7 +332,21 @@
         "table": "Data for {title}",
         "summary_bar": "Bar chart of {series} series over {items} categories. Highest: {max}, {value}.",
         "summary_line": "Line chart of {series} series over {items} points. Highest: {max}, {value}.",
-        "summary_donut": "Donut chart of {items} parts. Largest: {max}, {value}."
+        "summary_donut": "Donut chart of {items} parts. Largest: {max}, {value}.",
+        "role": "chart",
+        "summary_stacked_bar": "Stacked bar chart of {series} series over {items} categories. Highest total: {max}, {value}.",
+        "summary_area": "Area chart of {series} series over {items} points. Highest: {max}, {value}.",
+        "summary_combo": "Bar and line chart of {series} series over {items} categories. Highest: {max}, {value}.",
+        "summary_scatter": "Scatter chart of {items} points in {series} groups.",
+        "summary_gauge": "Gauge at {value}, between {min} and {max}. Target: {target}.",
+        "summary_funnel": "Funnel of {items} stages. Largest: {max}, {value}.",
+        "gauge_point": "{value} of {max}",
+        "sparkline": "Trend of {n} values from {first} to {last}, lowest {low}, highest {high}",
+        "bullet": "{value}, target {target}",
+        "value": "Value",
+        "min": "Minimum",
+        "max": "Maximum",
+        "target": "Target"
       },
       "tree": {
         "empty": "No items."
@@ -393,6 +407,12 @@
         "retry": "Retry",
         "remove": "Remove",
         "remove_name": "Remove {name}"
+      },
+      "kpi": {
+        "up": "Up {pct}% from the previous period",
+        "down": "Down {pct}% from the previous period",
+        "flat": "No change from the previous period",
+        "target": "Target {target}, {pct}% reached"
       }
     },
     "date": {

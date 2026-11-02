@@ -35,6 +35,7 @@ fn is_public_asset(path: &str) -> bool {
         || media::ASSETS.contains(&path)
         || pro::ASSETS.contains(&path)
         || files::ASSETS.contains(&path)
+        || charts::ASSETS.contains(&path)
         || is_assistant_asset(path)
         || is_island_asset(path)
 }

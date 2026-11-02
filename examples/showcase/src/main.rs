@@ -7,6 +7,7 @@
 //! Run: `cargo run --offline -p zeyn-example-showcase`, then open http://127.0.0.1:3002
 
 mod assistant;
+mod charts;
 mod gallery;
 mod islands;
 mod media;
@@ -118,6 +119,7 @@ async fn main() -> std::io::Result<()> {
         .feature(islands::feature())
         .feature(assistant::feature())
         .feature(uploads::feature())
+        .feature(charts::feature())
         .islands(concat!(env!("CARGO_MANIFEST_DIR"), "/dist/islands"));
     #[cfg(feature = "pdf")]
     {

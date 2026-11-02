@@ -16,7 +16,8 @@
     "pro": "Masaüstü kabuğu",
     "assistant": "Asistan",
     "islands": "Adacıklar",
-    "uploads": "Dosyalar"
+    "uploads": "Dosyalar",
+    "charts": "Grafikler"
   },
   "dashboard": {
     "title": "Genel bakış",
@@ -403,5 +404,35 @@
     "title": "Başlık",
     "contract": "İmzalı sözleşme",
     "attachments": "Ekler"
+  },
+  "charts": {
+    "title": "Grafikler ve göstergeler",
+    "revenue": "Bu ayki ciro",
+    "wait": "Ortalama bekleme",
+    "minutes": "dk",
+    "returns": "İadeler",
+    "channels": "Kanala göre satış",
+    "shop": "Mağaza",
+    "web": "Web",
+    "margin": "Satış ve kâr marjı",
+    "sales": "Satış",
+    "margin_pct": "Marj %",
+    "visits": "Ziyaretler",
+    "price_units": "Fiyata göre satılan adet",
+    "tea": "Çay",
+    "coffee": "Kahve",
+    "capacity": "Kullanılan depo kapasitesi",
+    "funnel": "Ödeme hunisi",
+    "people": "Kişi",
+    "f_visits": "Ziyaret etti",
+    "f_carts": "Sepete ekledi",
+    "f_orders": "Sipariş verdi",
+    "f_paid": "Ödedi",
+    "reps": "80.000 hedefine göre satış temsilcileri"
+  },
+  "Rep": {
+    "name": "Ad",
+    "sales": "Satış",
+    "weeks": "Son 12 hafta"
   }
 }

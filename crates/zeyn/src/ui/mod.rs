@@ -31,7 +31,7 @@ pub use dock::{DOCK_SIZE, Dock, DockArea, DockLayout, DockPanelState, DockSizes}
 pub use layout::{Card, Panel, Row, Split, Stack, Tabs};
 pub use shell::{MenuBar, MenuList, PropertyInspector, StatusBar, Toolbox};
 
-pub use chart::{Chart, ChartKind};
+pub use chart::{Better, BulletCell, Chart, ChartKind, Kpi, SparklineCell};
 pub use controls::Control;
 pub(crate) use controls::{Slot, render_bool, render_choice, render_number, render_text};
 pub use date::DateOptions;

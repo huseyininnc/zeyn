@@ -31,6 +31,7 @@ mod agent;
 mod auth;
 #[cfg(feature = "assistant")]
 use agent::{Tool, ToolTarget};
+mod charts;
 mod data;
 mod files;
 mod grid;
@@ -1262,7 +1263,7 @@ impl App {
         let router = realtime::routes(router);
         #[cfg(feature = "pdf")]
         let router = pdf::routes(router);
-        let router = files::routes(router);
+        let router = charts::routes(files::routes(router));
         let router = theme::routes(pro::routes(media::routes(ui::routes(session::routes(data::routes(ops::routes(
             agent::routes(grid::routes(router)),
         )))))))
@@ -1849,11 +1850,12 @@ impl AppState {
             tz = escape(ctx.time_zone().name()),
             base = escape(&self.prefix),
             components = format!(
-                "{}{}{}{}{ai_head}",
+                "{}{}{}{}{}{ai_head}",
                 ui::head(&escape(&self.prefix)),
                 media::head(&escape(&self.prefix)),
                 pro::head(&escape(&self.prefix)),
-                files::head(&escape(&self.prefix))
+                files::head(&escape(&self.prefix)),
+                charts::head(&escape(&self.prefix))
             ),
             html_attrs =
                 format!("{theme_attrs}{}", if self.native_menu { "" } else { r#" data-zeyn-native-menu="off""# }),

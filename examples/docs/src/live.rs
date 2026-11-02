@@ -312,14 +312,38 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
             })
             .into(),
         "tree" => Tree::of(sample_tree).label("Products by unit").into(),
-        "chart" => Row::new()
-            .col(
-                Chart::bar("Sales")
-                    .labels(months())
-                    .series("2025", [120.0, 98.0, 143.0, 160.0, 151.0, 189.0])
-                    .series("2026", [131.0, 122.0, 150.0, 171.0, 166.0, 204.0]),
+        "chart" => Stack::new()
+            .add(
+                Row::new()
+                    .col(
+                        Kpi::new("Revenue", 184_250.0)
+                            .delta(12.4)
+                            .target(200_000.0)
+                            .trend([140.0, 152.0, 160.0, 184.0]),
+                    )
+                    .col(Kpi::new("Average wait", 6.5).decimals(1).unit("min").delta(-9.0).lower_is_better()),
             )
-            .col(Chart::donut("Units").labels(["Piece", "Kg", "Liter"]).series("Products", [40.0, 40.0, 40.0]))
+            .add(
+                Row::new()
+                    .col(
+                        Chart::bar("Sales")
+                            .labels(months())
+                            .series("2025", [120.0, 98.0, 143.0, 160.0, 151.0, 189.0])
+                            .series("2026", [131.0, 122.0, 150.0, 171.0, 166.0, 204.0]),
+                    )
+                    .col(Chart::donut("Units").labels(["Piece", "Kg", "Liter"]).series("Products", [40.0, 40.0, 40.0])),
+            )
+            .add(
+                Row::new()
+                    .col(
+                        Chart::combo("Sales and margin")
+                            .labels(months())
+                            .series("Sales", [120.0, 98.0, 143.0, 160.0, 151.0, 189.0])
+                            .line_series("Margin %", [18.0, 14.0, 21.0, 22.0, 19.0, 24.0])
+                            .right_axis(),
+                    )
+                    .col(Chart::gauge("Capacity").value(72.0).range(0.0, 100.0).target(85.0)),
+            )
             .into(),
         "shell" => Stack::new()
             .gap(2)

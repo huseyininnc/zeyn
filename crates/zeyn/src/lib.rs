@@ -457,8 +457,8 @@ pub mod prelude {
     pub use crate::Agents;
     pub use crate::ui::{
         ActionButton, Alert, Audio, Badge, Breadcrumb, Card, Chart, Control, DateOptions, DescriptionList, Dock,
-        EmptyState, LookupItem, LookupQuery, MenuBar, Panel, Progress, PropertyInspector, Row, Skeleton, Split, Stack,
-        StatusBar, Tabs, Timeline, Toolbox, Tree, TreeItem, TreeQuery, Video,
+        EmptyState, Kpi, LookupItem, LookupQuery, MenuBar, Panel, Progress, PropertyInspector, Row, Skeleton, Split,
+        Stack, StatusBar, Tabs, Timeline, Toolbox, Tree, TreeItem, TreeQuery, Video,
     };
     pub use crate::{
         Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime, Effect, Entity,

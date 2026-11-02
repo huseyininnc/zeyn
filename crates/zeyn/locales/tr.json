@@ -332,7 +332,21 @@
         "table": "{title} verileri",
         "summary_bar": "{items} kategoride {series} seri gösteren sütun grafiği. En yüksek: {max}, {value}.",
         "summary_line": "{items} noktada {series} seri gösteren çizgi grafiği. En yüksek: {max}, {value}.",
-        "summary_donut": "{items} parçalı halka grafiği. En büyük: {max}, {value}."
+        "summary_donut": "{items} parçalı halka grafiği. En büyük: {max}, {value}.",
+        "role": "grafik",
+        "summary_stacked_bar": "{items} kategoride {series} seri gösteren yığılmış sütun grafiği. En yüksek toplam: {max}, {value}.",
+        "summary_area": "{items} noktada {series} seri gösteren alan grafiği. En yüksek: {max}, {value}.",
+        "summary_combo": "{items} kategoride {series} seri gösteren sütun ve çizgi grafiği. En yüksek: {max}, {value}.",
+        "summary_scatter": "{series} grupta {items} nokta gösteren dağılım grafiği.",
+        "summary_gauge": "{min} ile {max} arasında {value} gösteren gösterge. Hedef: {target}.",
+        "summary_funnel": "{items} aşamalı huni. En büyük: {max}, {value}.",
+        "gauge_point": "{value} / {max}",
+        "sparkline": "{n} değerlik eğilim: {first} ile başlıyor, {last} ile bitiyor, en düşük {low}, en yüksek {high}",
+        "bullet": "{value}, hedef {target}",
+        "value": "Değer",
+        "min": "En az",
+        "max": "En çok",
+        "target": "Hedef"
       },
       "tree": {
         "empty": "Kayıt yok."
@@ -393,6 +407,12 @@
         "retry": "Yeniden dene",
         "remove": "Kaldır",
         "remove_name": "{name} dosyasını kaldır"
+      },
+      "kpi": {
+        "up": "Önceki döneme göre yüzde {pct} artış",
+        "down": "Önceki döneme göre yüzde {pct} düşüş",
+        "flat": "Önceki döneme göre değişiklik yok",
+        "target": "Hedef {target}, yüzde {pct} ulaşıldı"
       }
     },
     "date": {
