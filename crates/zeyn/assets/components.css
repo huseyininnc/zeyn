@@ -1962,3 +1962,79 @@ dialog.z-confirm::backdrop { background: var(--z-backdrop); }
   .z-busy-overlay { background: Canvas; }
   .z-spinner { border-color: CanvasText; border-top-color: Highlight; }
 }
+
+/* Menu button and split button ---------------------------------------------------------------- */
+
+.z-menu-button,
+.z-split-button { display: inline-flex; position: relative; }
+
+.z-menu-trigger { display: inline-flex; align-items: center; gap: calc(var(--z-space) * 2); }
+
+.z-menu-trigger .z-select-arrow { width: 0.4rem; height: 0.4rem; }
+
+.z-menu-trigger[aria-expanded="true"] .z-select-arrow { transform: rotate(-135deg); margin-top: 3px; }
+
+.z-split-button > .z-node,
+.z-split-button .z-action { display: contents; }
+
+.z-split-button .z-split-main { border-start-end-radius: 0; border-end-end-radius: 0; }
+
+.z-split-button .z-menu-trigger {
+  margin-inline-start: -1px;
+  padding-inline: calc(var(--z-space) * 2);
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+}
+
+.z-menu-list {
+  position: fixed;
+  z-index: 900;
+  display: grid;
+  gap: 1px;
+  min-width: 12rem;
+  max-width: calc(100vw - 16px);
+  max-height: min(24rem, 70vh);
+  overflow: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius);
+  background: var(--z-surface);
+  box-shadow: 0 6px 24px hsl(var(--z-shadow-color) / var(--z-shadow-strength));
+}
+
+.z-menu-list[hidden] { display: none; }
+
+.z-menu-list .z-node,
+.z-menu-list .z-action { display: block; }
+
+.z-menu-entry {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 calc(var(--z-space) * 3);
+  border: 0;
+  border-radius: var(--z-radius-sm);
+  background: transparent;
+  color: var(--z-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.z-menu-entry:hover,
+.z-menu-entry:focus { background: var(--z-hover); outline: none; }
+
+.z-menu-entry:focus-visible { box-shadow: inset 0 0 0 2px var(--z-focus); }
+
+.z-menu-entry:disabled { color: var(--z-text-muted); cursor: default; }
+
+@media (pointer: coarse) {
+  .z-menu-entry { min-height: 44px; }
+}
+
+@media (forced-colors: active) {
+  .z-menu-entry:focus { outline: 2px solid Highlight; }
+}

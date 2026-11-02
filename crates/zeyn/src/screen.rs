@@ -68,6 +68,13 @@ pub enum Effect {
         message: Text,
         then: Box<Effect>,
     },
+    /// A toast with a tone and an optional action button. Built with [`Toast`] and
+    /// [`UiCtx::notify`]. Danger toasts are announced at once (assertive), the others politely.
+    Notice {
+        message: Text,
+        tone: crate::grid::Tone,
+        action: Option<(Text, Box<Effect>)>,
+    },
     /// Goes to a local path of the app. With `frame` the whole app frame (menu, title, session
     /// settings) is loaded again, as after signing in or out; still without a page load.
     Go {
@@ -116,6 +123,13 @@ impl Effect {
             Effect::Toast { message } => {
                 json!({ "effect": "toast", "message": r.i18n.text(r.locale, message) })
             }
+            Effect::Notice { message, tone, action } => {
+                let mut j = json!({ "effect": "toast", "message": r.i18n.text(r.locale, message), "tone": tone });
+                if let Some((label, then)) = action {
+                    j["action"] = json!({ "label": r.i18n.text(r.locale, label), "effect": then.to_json(r) });
+                }
+                j
+            }
             Effect::Confirm { message, then } => json!({
                 "effect": "confirm",
                 "message": r.i18n.text(r.locale, message),
@@ -132,6 +146,59 @@ impl Effect {
 /// Serializes params. Cannot fail for types marked with `#[params]`.
 fn params_json<P: Params>(params: &P) -> serde_json::Value {
     serde_json::to_value(params).expect("screen params must serialize to JSON")
+}
+
+/// Most toasts the runtime shows at once; older ones make room for new ones.
+pub const MAX_TOASTS: usize = 3;
+
+/// A toast with a tone and an optional action button, for [`UiCtx::notify`].
+///
+/// ```
+/// use zeyn::{Effect, Toast};
+/// let e: Effect = Toast::success("Order saved").action("Undo", Effect::CloseAndRefresh).into();
+/// assert!(matches!(e, Effect::Notice { .. }));
+/// ```
+#[derive(Clone, Debug, PartialEq)]
+pub struct Toast {
+    message: Text,
+    tone: crate::grid::Tone,
+    action: Option<(Text, Box<Effect>)>,
+}
+
+impl Toast {
+    fn of(tone: crate::grid::Tone, message: impl Into<Text>) -> Self {
+        Toast { message: message.into(), tone, action: None }
+    }
+
+    pub fn info(message: impl Into<Text>) -> Self {
+        Self::of(crate::grid::Tone::Info, message)
+    }
+
+    pub fn success(message: impl Into<Text>) -> Self {
+        Self::of(crate::grid::Tone::Success, message)
+    }
+
+    pub fn warning(message: impl Into<Text>) -> Self {
+        Self::of(crate::grid::Tone::Warning, message)
+    }
+
+    /// An error or a loss the user must notice: announced at once and shown twice as long.
+    pub fn danger(message: impl Into<Text>) -> Self {
+        Self::of(crate::grid::Tone::Danger, message)
+    }
+
+    /// A button on the toast that runs `effect`, such as undo or opening the saved record. The
+    /// toast stays while it is hovered or holds focus, so the button can be reached.
+    pub fn action(mut self, label: impl Into<Text>, effect: Effect) -> Self {
+        self.action = Some((label.into(), Box::new(effect)));
+        self
+    }
+}
+
+impl From<Toast> for Effect {
+    fn from(t: Toast) -> Self {
+        Effect::Notice { message: t.message, tone: t.tone, action: t.action }
+    }
 }
 
 /// Window helpers.
@@ -153,6 +220,11 @@ pub struct UiCtx {
 impl UiCtx {
     pub fn toast(&mut self, message: impl Into<Text>) {
         self.effects.push(Effect::Toast { message: message.into() });
+    }
+
+    /// A toast with a tone and maybe an action button: `ui.notify(Toast::success(t!("saved")))`.
+    pub fn notify(&mut self, toast: Toast) {
+        self.effects.push(toast.into());
     }
 
     /// Closes the window and refreshes the screen that opened it.

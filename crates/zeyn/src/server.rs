@@ -1839,7 +1839,7 @@ impl AppState {
         #[cfg(not(feature = "assistant"))]
         let (ai_head, ai_launcher) = (String::new(), String::new());
         format!(
-            r##"<!doctype html><html lang="{lang}"{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css"><script type="module" src="{base}/_zeyn/zeyn.js"></script><script type="module" src="{base}/_zeyn/nav.js"></script>{components}{theme_link}{extra}</head><body><a class="z-skip" href="#z-main">{skip}</a><div class="z-app"><nav class="z-nav" aria-label="{menu}"><p class="z-app-name">{app}</p>{palette}{nav}</nav><main class="z-main" id="z-main">{main}</main></div><div class="z-toasts" role="status" aria-live="polite"></div>{commands}{ai_launcher}</body></html>"##,
+            r##"<!doctype html><html lang="{lang}"{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css"><script type="module" src="{base}/_zeyn/zeyn.js"></script><script type="module" src="{base}/_zeyn/nav.js"></script>{components}{theme_link}{extra}</head><body><a class="z-skip" href="#z-main">{skip}</a><div class="z-app"><nav class="z-nav" aria-label="{menu}"><p class="z-app-name">{app}</p>{palette}{nav}</nav><main class="z-main" id="z-main">{main}</main></div><div class="z-toasts" role="status" aria-live="polite" data-text-dismiss="{dismiss}"></div>{commands}{ai_launcher}</body></html>"##,
             lang = escape(ctx.locale()),
             tz = escape(ctx.time_zone().name()),
             base = escape(&self.prefix),
@@ -1860,6 +1860,7 @@ impl AppState {
             extra = ops::head(self, ctx),
             skip = r.text(&Text::key("zeyn.shell.skip")),
             menu = r.text(&Text::key("zeyn.shell.menu")),
+            dismiss = r.text(&Text::key("zeyn.ui.toast.dismiss")),
         )
     }
 }

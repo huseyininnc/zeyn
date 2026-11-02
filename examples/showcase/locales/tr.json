@@ -420,7 +420,19 @@
     "panel_note": "Sevkiyat notu",
     "reference_tip": "İrsaliyeye basılır; en fazla 20 karakter",
     "save_note": "Notu kaydet",
-    "note_saved": "Not kaydedildi. Hiçbir şey saklanmadı."
+    "note_saved": "Not kaydedildi. Hiçbir şey saklanmadı.",
+    "commands": "Menü düğmeleri ve bildirimler",
+    "panel_order": "SO-2026-0142 numaralı sipariş",
+    "save_draft": "Taslağı kaydet",
+    "send": "Tedarikçiye gönder",
+    "sent": "Tedarikçiye gönderildi.",
+    "save_copy": "Kopya olarak kaydet",
+    "copied": "Bir kopya kaydedildi. Hiçbir şey saklanmadı.",
+    "open_fields": "Tedarikçi koşullarını aç",
+    "more": "Diğer",
+    "archive": "Siparişi arşivle",
+    "archived": "Sipariş arşivlendi. Hiçbir şey saklanmadı.",
+    "archive_confirm": "Bu sipariş arşivlensin mi?"
   },
   "SupplierTerms": {
     "supplier": "Tedarikçi",

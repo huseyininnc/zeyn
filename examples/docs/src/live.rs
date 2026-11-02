@@ -333,6 +333,8 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
             .into(),
         "inputs" => inputs(),
         "overlay" => overlay(),
+        "menus" => menus(),
+        "toasts" => toasts(),
         "multi" => Form::of(Reach { channels: vec![Channel::Email], ..Reach::default() })
             .field(Reach::channels)
             .lookup_columns(Reach::product, find_sample_rows, ["Code", "Name", "Unit"])
@@ -459,8 +461,59 @@ fn overlay() -> Node {
         .into()
 }
 
+/// Pretends to save, for the menu and toast examples.
+#[action(public)]
+pub async fn save_sample(_: ()) -> Result<()> {
+    Ok(())
+}
+
+fn menus() -> Node {
+    Row::new()
+        .compact()
+        .col(
+            MenuButton::new(t!("docs.live.more"))
+                .action_then(t!("docs.live.count"), count_samples, (), |n, ui| {
+                    if let Ok(n) = n {
+                        ui.toast(t!("docs.live.counted", n = n));
+                    }
+                })
+                .separator()
+                .action_then(t!("docs.live.archive"), save_sample, (), |_, ui| {
+                    ui.notify(Toast::warning(t!("docs.live.archived")))
+                })
+                .confirm(t!("docs.live.archive_confirm")),
+        )
+        .col(MenuButton::split(t!("docs.live.save"), save_sample, ()).action_then(
+            t!("docs.live.save_copy"),
+            save_sample,
+            (),
+            |_, ui| ui.notify(Toast::success(t!("docs.live.saved"))),
+        ))
+        .into()
+}
+
+fn toasts() -> Node {
+    Row::new()
+        .compact()
+        .col(ActionButton::new(t!("docs.live.toast_success"), save_sample, ()).on_success(|_, ui| {
+            ui.notify(
+                Toast::success(t!("docs.live.saved"))
+                    .action(t!("docs.live.again"), Effect::Toast { message: t!("docs.live.sent") }),
+            )
+        }))
+        .col(
+            ActionButton::new(t!("docs.live.toast_warning"), save_sample, ())
+                .on_success(|_, ui| ui.notify(Toast::warning(t!("docs.live.archived")))),
+        )
+        .col(
+            ActionButton::new(t!("docs.live.toast_danger"), save_sample, ())
+                .on_success(|_, ui| ui.notify(Toast::danger(t!("docs.live.denied")))),
+        )
+        .into()
+}
+
 /// Names of every live example, for checks and tests.
 pub const EXAMPLES: &[&str] = &[
     "datagrid", "form", "controls", "dates", "lines", "layout", "display", "action", "tree", "chart", "shell",
-    "inputs", "multi", "overlay",
+    "inputs", "multi", "overlay", "menus", "toasts",
 ];

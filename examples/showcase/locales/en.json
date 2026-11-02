@@ -420,7 +420,19 @@
     "panel_note": "Shipment note",
     "reference_tip": "Printed on the waybill; up to 20 characters",
     "save_note": "Save note",
-    "note_saved": "Note saved. Nothing was stored."
+    "note_saved": "Note saved. Nothing was stored.",
+    "commands": "Menu buttons and toasts",
+    "panel_order": "Order SO-2026-0142",
+    "save_draft": "Save draft",
+    "send": "Send to supplier",
+    "sent": "Sent to the supplier.",
+    "save_copy": "Save as a copy",
+    "copied": "A copy was saved. Nothing was stored.",
+    "open_fields": "Open supplier terms",
+    "more": "More",
+    "archive": "Archive order",
+    "archived": "Order archived. Nothing was stored.",
+    "archive_confirm": "Archive this order?"
   },
   "SupplierTerms": {
     "supplier": "Supplier",

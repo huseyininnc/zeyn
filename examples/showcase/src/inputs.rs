@@ -213,6 +213,56 @@ pub fn input_overlays() -> Screen {
         )
 }
 
+/// Saves an order draft. Nothing is stored.
+#[action(permission = "stock.product.read")]
+pub async fn save_order_draft(code: String) -> Result<String> {
+    Ok(code)
+}
+
+/// Sends an order to the supplier. Needs a permission the demo user may lack.
+#[action(permission = "sales.order.send")]
+pub async fn send_to_supplier(code: String) -> Result<String> {
+    Ok(code)
+}
+
+/// Archives an order. Nothing is stored.
+#[action(permission = "stock.product.read")]
+pub async fn archive_order(code: String) -> Result<String> {
+    Ok(code)
+}
+
+#[screen(route = "/commands", permission = "stock.product.read")]
+pub fn input_commands() -> Screen {
+    let code = "SO-2026-0142".to_string();
+    Screen::new(t!("inputs.commands")).body(
+        Panel::new(t!("inputs.panel_order")).add(
+            Row::new()
+                .compact()
+                .col(
+                    MenuButton::split(t!("inputs.save_draft"), save_order_draft, code.clone())
+                        .action_then(t!("inputs.send"), send_to_supplier, code.clone(), |_, ui| {
+                            ui.notify(Toast::success(t!("inputs.sent")))
+                        })
+                        .action_then(t!("inputs.save_copy"), save_order_draft, code.clone(), |_, ui| {
+                            ui.notify(
+                                Toast::info(t!("inputs.copied"))
+                                    .action(t!("inputs.open_fields"), Effect::navigate(input_fields, ())),
+                            )
+                        }),
+                )
+                .col(
+                    MenuButton::new(t!("inputs.more"))
+                        .item(t!("inputs.open_fields"), Effect::navigate(input_fields, ()))
+                        .separator()
+                        .action_then(t!("inputs.archive"), archive_order, code, |_, ui| {
+                            ui.notify(Toast::warning(t!("inputs.archived")))
+                        })
+                        .confirm(t!("inputs.archive_confirm")),
+                ),
+        ),
+    )
+}
+
 pub fn feature() -> Feature {
     Feature::new("inputs")
         .route_prefix("/inputs")
@@ -220,10 +270,12 @@ pub fn feature() -> Feature {
         .screen(input_fields)
         .screen(input_choices)
         .screen(input_overlays)
+        .screen(input_commands)
         .menu(|m| {
             m.group(t!("menu.inputs"), Icon::Edit)
                 .item(t!("inputs.fields"), input_fields)
                 .item(t!("inputs.choices"), input_choices)
                 .item(t!("inputs.overlays"), input_overlays)
+                .item(t!("inputs.commands"), input_commands)
         })
 }

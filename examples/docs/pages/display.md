@@ -94,3 +94,32 @@ Stack::new()
 | Tab | inside the popover | Moves through its controls; leaving it closes it |
 
 The three need about 2.2 KB gzip of script and no request of their own; a tooltip is 1 node, a popover 6 plus its content, the busy overlay 3.
+
+## Drop down and split buttons
+
+`MenuButton::new(label)` opens a menu of commands; `MenuButton::split(label, action, input)` runs one action from its main part and opens the menu from its arrow. Commands are `.action(label, action, input)` (or `.action_then(...)` with effects after success), `.item(label, effect)` for effects such as opening a window, and `.separator()`. `.confirm(text)` asks before the last action command runs.
+
+```rust
+MenuButton::split(t!("orders.save"), save_draft, id)
+    .action(t!("orders.save_and_send"), save_and_send, id)
+    .separator()
+    .action(t!("orders.delete"), delete_order, id)
+    .confirm(t!("orders.delete_confirm"))
+```
+
+Action commands are nodes with their own path and post to the form endpoint like an `ActionButton`: the screen's access, the feature's guards, the action's permission, the interceptors, CSRF and the write rate limit are checked on every call, and the input stays on the server. Commands the user may not run are left out of the menu (a split button's main action is disabled instead), and the server still refuses them if called.
+
+@live menus
+
+| Key | Where | Does |
+|---|---|---|
+| Enter, Space, Arrow Down | the button | Opens the menu on the first command |
+| Arrow Up | the button | Opens the menu on the last command |
+| Arrow Down, Arrow Up | the menu | Next and previous command, wrapping |
+| Home, End | the menu | First and last command |
+| Letters | the menu | The next command that starts with them |
+| Enter, Space | a command | Runs it and closes the menu |
+| Escape | the menu | Closes it; focus returns to the button |
+| Tab | the menu | Closes it and moves on |
+
+The menu needs about 0.8 KB gzip of script and no request until a command runs; it is 4 nodes plus 2 per command.
