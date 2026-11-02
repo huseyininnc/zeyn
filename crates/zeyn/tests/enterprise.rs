@@ -754,3 +754,25 @@ async fn probes_skip_rate_limits_but_not_ip_rules_unless_allowed() {
     assert_eq!(send(&router, from("/overview", "192.168.1.5")).await.status, StatusCode::FORBIDDEN, "probe addresses only reach the probes");
     assert_eq!(send(&router, from("/_zeyn/health", "10.9.9.9")).await.status, StatusCode::FORBIDDEN, "denied stays denied");
 }
+
+#[tokio::test]
+async fn dev_latency_slows_calls_in_debug_builds_but_not_probes_or_assets() {
+    let delay = std::time::Duration::from_millis(120);
+    let router = App::new("T").dev_latency(delay).feature(Feature::new("x").screen(overview)).router().unwrap();
+    let timed = |path: &'static str| {
+        let router = router.clone();
+        async move {
+            let started = std::time::Instant::now();
+            send(&router, Request::get(path).body(Body::empty()).unwrap()).await;
+            started.elapsed()
+        }
+    };
+    let call = timed("/overview").await;
+    if cfg!(debug_assertions) {
+        assert!(call >= delay, "{call:?}");
+    } else {
+        assert!(call < delay, "release builds never delay");
+    }
+    assert!(timed("/_zeyn/health").await < delay);
+    assert!(timed("/_zeyn/zeyn.js").await < delay);
+}

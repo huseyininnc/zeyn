@@ -1050,6 +1050,10 @@ impl App {
         for (locale, key) in self.i18n.missing_keys() {
             eprintln!("warning: translation `{key}` is missing in `{locale}`");
         }
+        #[cfg(debug_assertions)]
+        if let Some(d) = self.extras.latency {
+            eprintln!("warning: every call is delayed by {} ms (dev_latency)", d.as_millis());
+        }
         if self.auth.as_ref().is_some_and(|a| a.is_development()) {
             eprintln!("warning: DevAuth is on; every request has full access. Do not use it in production.");
         }
@@ -1470,6 +1474,7 @@ async fn guard_request(State(st): State<Arc<AppState>>, req: axum::extract::Requ
     if path == "/_zeyn/zeyn.js" || path == "/_zeyn/zeyn.css" || path == "/_zeyn/theme.css" || path == "/favicon.ico" || ops::is_asset(&path) {
         return next.run(req).await;
     }
+    ops::delay(&st, &path).await;
     let headers = req.headers().clone();
     let peer = req.extensions().get::<axum::extract::ConnectInfo<std::net::SocketAddr>>().map(|c| c.0.ip());
     let forwarded = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok());

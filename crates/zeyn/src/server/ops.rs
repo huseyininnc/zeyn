@@ -33,6 +33,8 @@ type Check = Arc<dyn Fn() -> BoxFuture<bool> + Send + Sync>;
 pub(super) struct Extras {
     readiness: Vec<(&'static str, Check)>,
     probe_ips: Vec<IpRange>,
+    #[cfg(debug_assertions)]
+    pub(super) latency: Option<Duration>,
 }
 
 impl Extras {
@@ -68,6 +70,23 @@ impl App {
         self
     }
 
+    /// Delays every call by `delay` so developers feel a slow network: screens, grids, forms, API
+    /// and runtime calls, not static assets or health probes. Only in debug builds; in release
+    /// builds this does nothing and the delay code is not compiled in.
+    pub fn dev_latency(self, delay: Duration) -> Self {
+        #[cfg(debug_assertions)]
+        {
+            let mut app = self;
+            app.extras.latency = Some(delay);
+            app
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            let _ = delay;
+            self
+        }
+    }
+
     /// Addresses of probes (a load balancer, an orchestrator) that may reach `/_zeyn/health` and
     /// `/_zeyn/ready` even when `allow_only_ips` would refuse them. Denied addresses stay denied.
     pub fn probe_ips<I, S>(mut self, ranges: I) -> Self
@@ -79,6 +98,17 @@ impl App {
         self
     }
 }
+
+/// Waits for the simulated latency, if set. Compiled out of release builds.
+#[cfg(debug_assertions)]
+pub(super) async fn delay(st: &AppState, path: &str) {
+    if let Some(d) = st.extras.latency.filter(|_| !is_probe(path)) {
+        tokio::time::sleep(d).await;
+    }
+}
+
+#[cfg(not(debug_assertions))]
+pub(super) async fn delay(_st: &AppState, _path: &str) {}
 
 fn no_store(mut r: Response) -> Response {
     r.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));

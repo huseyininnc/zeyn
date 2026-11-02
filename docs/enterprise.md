@@ -156,3 +156,11 @@ pub async fn move_leave(req: TransitionRequest<LeaveRequestId>, store: LeaveStor
 - They are never rate limited, so a busy probe cannot lock itself out and restart a healthy app.
 - IP rules still apply: `deny_ips` always, `allow_only_ips` too unless the probe address is listed
   in `App::probe_ips([...])`, which opens only these two endpoints to it.
+
+## Development latency
+
+`App::dev_latency(Duration::from_millis(400))` delays every call (pages, fragments, grids, forms,
+API, MCP and runtime calls; not static assets or health probes) so developers see loading states
+and double clicks the way users on a slow network do. It works only in debug builds: in release
+builds the method does nothing and the delay code is compiled out, so leaving it in by mistake
+cannot slow production. A warning is printed at startup while it is on.
