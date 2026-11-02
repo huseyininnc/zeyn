@@ -264,6 +264,9 @@ pub struct AuditEntry {
     /// Reason the user gave for opening a screen that asks for one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
+    /// Workflow move: name, from, to and the user's comment.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transition: Option<crate::workflow::TransitionRecord>,
 }
 
 /// Where audit records go.
@@ -310,7 +313,8 @@ impl<S: AuditSink> Interceptor for AuditLog<S> {
             || call.kind == CallKind::Reveal
             || call.action.is_some_and(|a| a.audit)
             || !trail.revealed.is_empty()
-            || !trail.reads.is_empty();
+            || !trail.reads.is_empty()
+            || trail.transition.is_some();
         if !audited {
             return;
         }
@@ -321,6 +325,7 @@ impl<S: AuditSink> Interceptor for AuditLog<S> {
             revealed: trail.revealed,
             reads: trail.reads,
             reason: trail.reason,
+            transition: trail.transition,
             at_unix_ms: SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0),
             user: ctx.identity().user.clone(),
             kind: call.kind,

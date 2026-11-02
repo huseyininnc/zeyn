@@ -117,6 +117,12 @@ document.addEventListener('click', (e) => {
   reveal(el);
 });
 
+document.addEventListener('click', (e) => {
+  const button = e.target instanceof Element ? e.target.closest('button[data-zeyn-transition]') : null;
+  const field = button?.form?.elements.namedItem('transition');
+  if (field instanceof HTMLInputElement) field.value = button.dataset.zeynTransition;
+});
+
 /**
  * Sends a reason for opening a screen. Shows the server's message under the field when it is
  * refused.

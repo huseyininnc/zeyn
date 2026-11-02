@@ -156,6 +156,7 @@ mod time;
 #[cfg(feature = "server")]
 pub mod server;
 mod value;
+mod workflow;
 
 pub use action::{
     Access, Action, ActionMeta, Cursor, DEFAULT_PAGE_SIZE, Error, Filter, GridQuery, MAX_PAGE_SIZE, Page, PageRequest,
@@ -191,6 +192,7 @@ pub use value::{
     ChoiceOption, Currency, FieldKind, FieldType, Money, SupportsMinMax, SupportsRequired, SupportsSum, SupportsText,
     Value,
 };
+pub use workflow::{MAX_COMMENT, Transition, TransitionRecord, TransitionRequest, Transitions, Workflow, WorkflowState};
 pub use zeyn_macros::{action, choice, entity, model, params, screen, t};
 
 #[doc(hidden)]
@@ -203,7 +205,8 @@ pub mod prelude {
     pub use crate::{
         Action, Ctx, Currency, Date, DateTime, Effect, LocalDateTime, Time, TimeZone, Entity, Error, Export, Feature, Field, Form, Grid, GridMode, GridQuery,
         GuardResult, Icon, Identity, Licensed, Model, Secret, Tenant, TenantRequired, Money, Node, Page, Paging, Result, RowStyle, Screen, ScreenDef, Service,
-        SignedIn, Text, UiCtx, Valid, ValidationErrors, Window, action, choice, entity, model, params, screen, t,
+        SignedIn, Text, TransitionRequest, Transitions, UiCtx, Valid, ValidationErrors, Window, Workflow, action, choice, entity,
+        model, params, screen, t,
     };
     #[cfg(feature = "server")]
     pub use crate::{

@@ -65,7 +65,8 @@ pub struct Person {
 - API clients with the permission get raw values; each such field is listed in `revealed` of the
   call's audit record.
 - Forms show masked fields as read only text. The stored value is kept on save unless the user
-  may reveal it and changed it after revealing.
+  may reveal it and changed it after revealing. An empty masked field is a normal input, so data
+  entry staff can fill it in once without being able to read it back later.
 - Grid filters and sorts on a masked field are ignored for users who may not reveal it, so a value
   cannot be guessed by searching. Do not add `.filter()` to masked columns.
 - Grid reveal looks the row up through the grid's action with a filter on the key, so the action
@@ -93,3 +94,40 @@ Who saw which personal data, and when, is recorded as well as who changed it.
 - Read records are written by `AuditLog` for any call, page loads included, as soon as a sensitive
   record was shown. Without an audit interceptor nothing is recorded; apps that hold personal
   data should always register one.
+
+## Approval workflows
+
+A workflow is a small, typed state machine. States are a `#[choice]` enum; each move names its
+start and end state and the permission it needs:
+
+```rust
+#[choice]
+pub enum LeaveState { Draft, Submitted, Approved, Rejected }
+
+pub fn leave_flow() -> Workflow<LeaveState> {
+    Workflow::new()
+        .transition("submit", LeaveState::Draft, LeaveState::Submitted, "people.leave.request")
+        .transition("approve", LeaveState::Submitted, LeaveState::Approved, "people.leave.approve")
+        .transition("reject", LeaveState::Submitted, LeaveState::Rejected, "people.leave.approve")
+}
+
+#[action(permission = "people.leave.request", audit)]
+pub async fn move_leave(req: TransitionRequest<LeaveRequestId>, store: LeaveStore, ctx: Ctx) -> Result<LeaveState> {
+    let mut leave = store.get(req.id)?;
+    leave.state = leave_flow().apply(&ctx, leave.state, &req.transition, req.comment.as_deref())?;
+    store.save(leave)
+}
+```
+
+- `apply` runs on the server with the state read from the store. An unknown move is `404`, a
+  record that is no longer in the start state is `409` (someone moved it first), a missing
+  permission is `403`, a comment over 1000 characters is `422`.
+- Each move is written to the audit record in `transition`: name, from, to and comment; the user
+  and time are in the record itself.
+- `Transitions::of(flow, state, id, action)` shows the current state, an optional comment and one
+  button per move the user may make from it (`Workflow::allowed`). The record key comes from the
+  screen on the server, so a client cannot move another record. Agents see it as a form tool.
+- Button labels come from `workflow.<name>` in the catalogs; `.label(...)` sets one by hand.
+- `Workflow::check` reports invalid permissions and moves declared twice from the same state;
+  call it in a test.
+- The showcase leave requests use this: save as draft, submit, then approve or reject.

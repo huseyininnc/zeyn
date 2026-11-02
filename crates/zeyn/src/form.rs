@@ -152,8 +152,8 @@ impl<M: Model> Form<M> {
     /// row version. Everything else keeps the loaded value, so a client cannot change fields it was
     /// not shown or switch the record it saves.
     ///
-    /// Masked fields are never taken from the client here; [`Form::read_for`] takes them from
-    /// users who may reveal them.
+    /// Masked fields are only taken from the client while they are empty; [`Form::read_for`]
+    /// also takes them from users who may reveal them.
     pub fn read(&self, values: &Map<String, Json>, locale: &str, tz: TimeZone) -> std::result::Result<Valid<M>, ValidationErrors> {
         self.read_with(values, locale, tz, &|_| false)
     }
@@ -192,12 +192,14 @@ impl<M: Model> Form<M> {
             _ => return Err(general_error()),
         };
         let mut errors = ValidationErrors::default();
-        let editable = self
+        let empty = |name: &str| matches!(object.get(name), None | Some(Json::Null)) || object.get(name) == Some(&Json::String(String::new()));
+        let editable: Vec<&FieldMeta> = self
             .fields()
             .map(|f| f.meta)
-            .filter(|m| !m.key && !m.readonly && !m.version && (m.mask.is_none() || unmask(m)));
+            .filter(|m| !m.key && !m.readonly && !m.version && (m.mask.is_none() || unmask(m) || empty(m.name)))
+            .collect();
         let versions = M::fields().iter().filter(|m| m.version);
-        for meta in editable.chain(versions) {
+        for meta in editable.into_iter().chain(versions) {
             let Some(raw) = values.get(meta.name) else { continue };
             let current = object.get(meta.name).cloned().unwrap_or(Json::Null);
             match parse_value(meta, raw, locale, tz, &current) {
@@ -303,7 +305,7 @@ fn render_field<M>(out: &mut String, r: &Render, f: &FormField<M>, model: &M) {
         out.push_str(&format!(r#"<input type="hidden" name="{}" value="{v}">"#, m.name));
         return;
     }
-    if m.mask.is_some() {
+    if m.mask.is_some() && value != Value::Null && value != Value::Text(String::new()) {
         crate::privacy::form_field(out, r, m, &value);
         return;
     }

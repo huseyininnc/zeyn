@@ -53,6 +53,8 @@ pub struct Trail {
     pub reads: Vec<RecordRef>,
     /// Why the user opened a screen that asks for a reason.
     pub reason: Option<String>,
+    /// A workflow move made by the call.
+    pub transition: Option<crate::workflow::TransitionRecord>,
     /// Reason the user gave, with the screen it was given for. Checked by the server.
     #[serde(skip)]
     pub(crate) given_reason: Option<(String, String)>,

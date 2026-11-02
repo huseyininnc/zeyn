@@ -5,6 +5,11 @@
     },
     "yes": "Yes",
     "no": "No",
+    "workflow": {
+      "state": "State",
+      "comment": "Comment",
+      "done": "Done."
+    },
     "privacy": {
       "reveal": "Show {label}",
       "revealed": "The value is shown. This was recorded.",

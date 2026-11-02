@@ -209,7 +209,7 @@ impl Service for People {}
 
 impl People {
     fn seeded() -> Self {
-        let rows = (1..=3)
+        let mut rows: Vec<Person> = (1..=3)
             .map(|i| Person {
                 id: PersonId(i),
                 name: format!("Person {i}"),
@@ -218,6 +218,7 @@ impl People {
                 version: 1,
             })
             .collect();
+        rows.push(Person { id: PersonId(4), name: "New person".into(), national_id: String::new(), email: None, version: 1 });
         People(Arc::new(RwLock::new(rows)))
     }
 
@@ -305,7 +306,7 @@ async fn masked_fields_cannot_be_searched_or_overwritten_without_the_permission(
     let router = hr_app(clerk(), MemoryAudit::default());
     let probe = serde_json::json!({ "screen": "people", "node": 0, "query": { "filters": [{ "field": "national_id", "contains": "12345678902" }], "with_total": true } });
     let r = send(&router, post("/_zeyn/grid", probe)).await;
-    assert_eq!(r.json()["total"], 3, "a filter on a masked field must be ignored");
+    assert_eq!(r.json()["total"], 4, "a filter on a masked field must be ignored");
 
     let values = serde_json::json!({ "name": "Renamed", "national_id": "99999999999", "email": "x@y.z", "version": "1" });
     let r = send(&router, post("/_zeyn/form", serde_json::json!({ "screen": "person", "params": { "id": 1 }, "node": 0, "values": values }))).await;
@@ -522,4 +523,159 @@ async fn reasons_need_access_to_the_screen() {
     let r = send(&router, post("/_zeyn/reason", serde_json::json!({ "screen": "case_file", "reason": "Curious" }))).await;
     assert_eq!(r.status, StatusCode::FORBIDDEN);
     assert!(r.headers.get(header::SET_COOKIE).is_none());
+}
+
+#[choice]
+pub enum Stage {
+    Draft,
+    Submitted,
+    Approved,
+    Rejected,
+}
+
+#[entity(table = "requests")]
+pub struct Request2 {
+    #[key]
+    pub id: Request2Id,
+    pub title: String,
+    pub stage: Stage,
+}
+
+fn request_flow() -> Workflow<Stage> {
+    Workflow::new()
+        .transition("submit", Stage::Draft, Stage::Submitted, "req.submit")
+        .transition("approve", Stage::Submitted, Stage::Approved, "req.approve")
+        .transition("reject", Stage::Submitted, Stage::Rejected, "req.approve")
+}
+
+#[derive(Clone)]
+pub struct Requests(Arc<RwLock<Vec<Request2>>>);
+
+impl Service for Requests {}
+
+#[action(permission = "req.read", audit)]
+pub async fn move_request(r: TransitionRequest<Request2Id>, store: Requests, ctx: Ctx) -> Result<Stage> {
+    let mut rows = store.0.write().unwrap();
+    let row = rows.iter_mut().find(|x| x.id == r.id).ok_or(Error::NotFound)?;
+    row.stage = request_flow().apply(&ctx, row.stage, &r.transition, r.comment.as_deref())?;
+    Ok(row.stage)
+}
+
+#[screen(permission = "req.read")]
+pub fn request_view(params: CustomerParams, store: Requests) -> Result<Screen> {
+    let row = store.0.read().unwrap().iter().find(|x| x.id.0 == params.id).cloned().ok_or(Error::NotFound)?;
+    Ok(Screen::window("Request").body(Transitions::of(request_flow(), row.stage, row.id, move_request)))
+}
+
+fn requests_app(identity: Identity, audit: MemoryAudit, store: Requests) -> Router {
+    App::new("Test")
+        .service(store)
+        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .interceptor(AuditLog(audit))
+        .feature(Feature::new("req").screen(request_view))
+        .router()
+        .unwrap()
+}
+
+fn requests() -> Requests {
+    let rows = vec![
+        Request2 { id: Request2Id(1), title: "Draft one".into(), stage: Stage::Draft },
+        Request2 { id: Request2Id(2), title: "Waiting".into(), stage: Stage::Submitted },
+    ];
+    Requests(Arc::new(RwLock::new(rows)))
+}
+
+fn requester() -> Identity {
+    Identity::user("ali").with_permissions(["req.read", "req.submit"])
+}
+
+fn approver() -> Identity {
+    Identity::user("mehmet").with_permissions(["req.read", "req.approve"])
+}
+
+fn move_to(id: i64, transition: &str, comment: &str) -> Request<Body> {
+    post(
+        "/_zeyn/form",
+        serde_json::json!({ "screen": "request_view", "params": { "id": id }, "node": 0, "values": { "transition": transition, "comment": comment } }),
+    )
+}
+
+#[tokio::test]
+async fn only_the_moves_a_user_may_make_from_the_current_state_are_offered() {
+    let store = requests();
+    let view = |identity: Identity, id: u8| {
+        let router = requests_app(identity, MemoryAudit::default(), store.clone());
+        async move { send(&router, get(&format!("/_zeyn/screen/request_view?params=%7B%22id%22%3A{id}%7D"))).await.body }
+    };
+    let html = view(requester(), 1).await;
+    assert!(html.contains(r#"data-zeyn-transition="submit""#) && !html.contains("approve"), "{html}");
+    let html = view(approver(), 1).await;
+    assert!(!html.contains("data-zeyn-transition"), "{html}");
+    let html = view(approver(), 2).await;
+    assert!(html.contains(r#"data-zeyn-transition="approve""#) && html.contains(r#"data-zeyn-transition="reject""#));
+    assert!(html.contains("<strong>Submitted</strong>"));
+}
+
+#[tokio::test]
+async fn moves_are_checked_on_the_server_and_audited() {
+    let store = requests();
+    let audit = MemoryAudit::default();
+    let ali = requests_app(requester(), audit.clone(), store.clone());
+    let mehmet = requests_app(approver(), audit.clone(), store.clone());
+
+    assert_eq!(send(&ali, move_to(2, "approve", "")).await.status, StatusCode::FORBIDDEN);
+    assert_eq!(send(&mehmet, move_to(1, "approve", "")).await.status, StatusCode::CONFLICT);
+    assert_eq!(send(&mehmet, move_to(2, "archive", "")).await.status, StatusCode::NOT_FOUND);
+
+    let r = send(&ali, move_to(1, "submit", "  Please approve  ")).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    assert_eq!(r.json()["effects"][0]["message"], "Done.");
+    let r = send(&mehmet, move_to(1, "approve", "OK")).await;
+    assert_eq!(r.status, StatusCode::OK);
+    assert_eq!(send(&mehmet, move_to(1, "reject", "")).await.status, StatusCode::CONFLICT, "an approved request cannot be rejected");
+    assert_eq!(store.0.read().unwrap()[0].stage, Stage::Approved);
+
+    let done: Vec<_> = audit.entries().into_iter().filter(|e| e.ok).collect();
+    assert_eq!(done.len(), 2);
+    let t = done[0].transition.as_ref().unwrap();
+    assert_eq!((t.name, t.from.as_str(), t.to.as_str(), t.comment.as_deref()), ("submit", "Draft", "Submitted", Some("Please approve")));
+    assert_eq!(done[0].user.as_deref(), Some("ali"));
+    assert_eq!(done[1].transition.as_ref().unwrap().to, "Approved");
+    assert_eq!(done[1].user.as_deref(), Some("mehmet"));
+    assert!(audit.entries().iter().filter(|e| !e.ok).all(|e| e.transition.is_none()));
+}
+
+#[tokio::test]
+async fn long_comments_are_refused() {
+    let router = requests_app(requester(), MemoryAudit::default(), requests());
+    let r = send(&router, move_to(1, "submit", &"x".repeat(1001))).await;
+    assert_eq!(r.status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(r.json()["errors"][0]["field"], "comment");
+}
+
+#[test]
+fn workflow_definitions_are_checked() {
+    let bad = Workflow::new()
+        .transition("go", Stage::Draft, Stage::Submitted, "Bad Permission")
+        .transition("go", Stage::Draft, Stage::Approved, "req.go");
+    let problems = bad.check().unwrap_err();
+    assert!(problems.iter().any(|p| p.contains("invalid permission")));
+    assert!(problems.iter().any(|p| p.contains("declared twice")));
+    assert!(request_flow().check().is_ok());
+}
+
+#[tokio::test]
+async fn empty_masked_fields_can_be_filled_in_but_not_overwritten_later() {
+    let router = hr_app(clerk(), MemoryAudit::default());
+    let form = send(&router, get("/_zeyn/screen/person?params=%7B%22id%22%3A4%7D")).await;
+    assert!(form.body.contains(r#"name="national_id""#) && !form.body.contains("data-zeyn-masked"), "{}", form.body);
+    let values = serde_json::json!({ "name": "New person", "national_id": "98765432100", "email": "new@example.com", "version": "1" });
+    let r = send(&router, post("/_zeyn/form", serde_json::json!({ "screen": "person", "params": { "id": 4 }, "node": 0, "values": values }))).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    let form = send(&router, get("/_zeyn/screen/person?params=%7B%22id%22%3A4%7D")).await;
+    assert!(form.body.contains(r#"value="•••• 2100""#) && !form.body.contains("98765432100"), "{}", form.body);
+    let again = serde_json::json!({ "name": "New person", "national_id": "11111111111", "version": "2" });
+    send(&router, post("/_zeyn/form", serde_json::json!({ "screen": "person", "params": { "id": 4 }, "node": 0, "values": again }))).await;
+    let form = send(&router, get("/_zeyn/screen/person?params=%7B%22id%22%3A4%7D")).await;
+    assert!(form.body.contains(r#"value="•••• 2100""#), "{}", form.body);
 }

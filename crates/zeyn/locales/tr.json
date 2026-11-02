@@ -5,6 +5,11 @@
     },
     "yes": "Evet",
     "no": "Hayır",
+    "workflow": {
+      "state": "Durum",
+      "comment": "Açıklama",
+      "done": "İşlem tamamlandı."
+    },
     "privacy": {
       "reveal": "{label} göster",
       "revealed": "Değer gösterildi. Bu işlem kayda alındı.",

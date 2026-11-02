@@ -62,6 +62,7 @@ async fn main() -> std::io::Result<()> {
         .theme(Theme::new().radius(6))
         .i18n(i18n)
         .service(stock::ProductStore::seeded())
+        .service(people::LeaveStore::seeded(TimeZone::UTC.today(DateTime::now())))
         .auth(DevAuth::superuser("Demo User"))
         .license(FixedLicense(license), Duration::from_secs(300))
         .agents(Agents::read_write())
