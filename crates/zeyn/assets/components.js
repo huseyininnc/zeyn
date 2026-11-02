@@ -1080,10 +1080,621 @@ async function upgradeFilter(input) {
   }
 }
 
+/* Listbox core ------------------------------------------------------------------------------- */
+
+/**
+ * The open listbox popup: `{ combo, list, items, active, multiple, pick, more }`. Selects and
+ * lookups share it: focus stays on the combobox, `aria-activedescendant` points at the active
+ * option, and the popup core places and closes the panel.
+ */
+let lb = null;
+let listUid = 0;
+
+/** Lower case for matching in the page language, with Turkish dotted and dotless i as plain i. */
+function fold(s) {
+  return (s ?? '').toLocaleLowerCase(lang()).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ı/g, 'i');
+}
+
+/**
+ * Opens a listbox under a combobox.
+ * @param {HTMLElement} combo The element with `role="combobox"`.
+ * @param {{label: string, multiple?: boolean, pick: Function, more?: Function, anchor?: Element}} cfg
+ */
+function openListbox(combo, cfg) {
+  const id = combo.getAttribute('aria-controls') || `z-listbox-${++listUid}`;
+  const list = make('div', 'z-listbox', { role: 'listbox', id, 'aria-label': cfg.label });
+  if (cfg.multiple) list.setAttribute('aria-multiselectable', 'true');
+  const panel = make('div', 'z-list-pop');
+  panel.append(list);
+  combo.setAttribute('aria-controls', id);
+  combo.setAttribute('aria-expanded', 'true');
+  lb = { combo, list, panel, items: [], active: -1, multiple: !!cfg.multiple, pick: cfg.pick, more: cfg.more };
+  openPopup(panel, {
+    anchor: cfg.anchor ?? combo,
+    owner: combo,
+    trap: false,
+    onClose: () => {
+      combo.setAttribute('aria-expanded', 'false');
+      combo.removeAttribute('aria-activedescendant');
+      lb = null;
+    },
+  });
+  const width = (cfg.anchor ?? combo).getBoundingClientRect().width;
+  panel.style.setProperty('--z-pop-min', `${Math.round(width)}px`);
+  return lb;
+}
+
+/**
+ * Fills the open listbox. Items are `{value, label, hint?, group?, selected?, more?, note?}`;
+ * a `note` item is a plain message (no results, loading).
+ */
+function fillListbox(items, activeValue) {
+  if (!lb) return;
+  const { list } = lb;
+  list.replaceChildren();
+  lb.items = [];
+  let group = null;
+  let groupEl = null;
+  items.forEach((item) => {
+    if (item.note) {
+      list.append(make('div', 'z-list-note', { role: 'presentation', text: item.note }));
+      return;
+    }
+    if (item.group && item.group !== group) {
+      group = item.group;
+      const gid = `${list.id}-g${lb.items.length}`;
+      groupEl = make('div', 'z-list-group', { role: 'group', 'aria-labelledby': gid });
+      groupEl.append(make('div', 'z-list-group-label', { id: gid, role: 'presentation', text: group }));
+      list.append(groupEl);
+    }
+    const el = make('div', `z-option${item.more ? ' z-option-more' : ''}`, { role: 'option', id: `${list.id}-o${lb.items.length}`, 'aria-selected': String(!!item.selected) });
+    if (lb.multiple && !item.more) el.append(make('span', 'z-option-check', { 'aria-hidden': 'true' }));
+    const text = make('span', 'z-option-text');
+    text.append(make('span', '', { text: item.label }));
+    if (item.hint) text.append(make('span', 'z-option-hint', { text: item.hint }));
+    el.append(text);
+    el.dataset.index = String(lb.items.length);
+    (item.group ? groupEl : list).append(el);
+    lb.items.push({ ...item, el });
+  });
+  const start = lb.items.findIndex((i) => i.value === activeValue);
+  setActive(start >= 0 ? start : lb.items.length ? 0 : -1);
+  placePopup();
+}
+
+/** Moves the active option and keeps it in view. */
+function setActive(i) {
+  if (!lb) return;
+  lb.items.forEach((it, n) => it.el.classList.toggle('z-active', n === i));
+  lb.active = i;
+  const item = lb.items[i];
+  if (item) {
+    lb.combo.setAttribute('aria-activedescendant', item.el.id);
+    item.el.scrollIntoView({ block: 'nearest' });
+  } else lb.combo.removeAttribute('aria-activedescendant');
+}
+
+/** Picks the active option, or loads more when it is the "show more" row. */
+function pickActive() {
+  const item = lb?.items[lb.active];
+  if (!item) return false;
+  if (item.more) lb.more?.();
+  else lb.pick(item);
+  return true;
+}
+
+/** Arrow keys, Home, End, Page Up and Page Down in an open listbox. */
+function moveActive(e) {
+  if (!lb) return false;
+  const n = lb.items.length;
+  if (!n) return false;
+  const to = { ArrowDown: lb.active + 1, ArrowUp: lb.active - 1, Home: 0, End: n - 1, PageDown: lb.active + 10, PageUp: lb.active - 10 }[e.key];
+  if (to === undefined) return false;
+  e.preventDefault();
+  setActive(Math.max(0, Math.min(n - 1, to)));
+  return true;
+}
+
+/** Option clicks pick; pressing on the list keeps focus on the combobox. */
+function listboxPointer(e) {
+  if (!lb || !lb.panel.contains(e.target)) return false;
+  e.preventDefault();
+  const option = e.target.closest('[role="option"]');
+  if (option) {
+    setActive(Number(option.dataset.index));
+    pickActive();
+  }
+  return true;
+}
+
+/* Select ------------------------------------------------------------------------------------- */
+
+/** The native element under a Zeyn control, kept for forms and for pages without JavaScript. */
+function hideNative(el) {
+  el.classList.add('z-native');
+  el.tabIndex = -1;
+  el.setAttribute('aria-hidden', 'true');
+}
+
+/** Turns `[data-zeyn-select]` wrappers into ARIA select only comboboxes. */
+function initSelects(root) {
+  root.querySelectorAll('.z-select:not([data-ready])').forEach((wrap) => {
+    const native = wrap.querySelector('select');
+    if (!native) return;
+    wrap.dataset.ready = '';
+    const combo = make('div', 'z-select-button', {
+      role: 'combobox',
+      tabindex: native.disabled ? '-1' : '0',
+      'aria-haspopup': 'listbox',
+      'aria-expanded': 'false',
+      'aria-labelledby': `${native.id}-label`,
+      'data-testid': `${native.dataset.testid ?? ''}.combobox`,
+    });
+    for (const a of ['aria-describedby', 'aria-required', 'aria-invalid']) if (native.hasAttribute(a)) combo.setAttribute(a, native.getAttribute(a));
+    if (native.required) combo.setAttribute('aria-required', 'true');
+    combo.append(make('span', 'z-select-value', { id: `${native.id}-value` }), make('span', 'z-select-arrow', { 'aria-hidden': 'true' }));
+    wrap.prepend(combo);
+    hideNative(native);
+    syncSelect(wrap);
+  });
+}
+
+/** Shows the native select's chosen option in its combobox. */
+function syncSelect(wrap) {
+  const native = wrap.querySelector('select');
+  const value = wrap.querySelector('.z-select-value');
+  const option = native.selectedOptions[0];
+  value.textContent = option && option.value !== '' ? option.text : wrap.dataset.textNone;
+  value.classList.toggle('z-placeholder', !option || option.value === '');
+}
+
+/** Options of a native select as listbox items, with option groups. */
+function selectItems(native) {
+  return [...native.options].map((o) => ({ value: o.value, label: o.text, group: o.parentElement.tagName === 'OPTGROUP' ? o.parentElement.label : null, selected: o.selected }));
+}
+
+/** Opens the list of a select and makes `where` (first, last, selected) active. */
+function openSelect(combo, where = 'selected') {
+  const wrap = combo.closest('.z-select');
+  const native = wrap.querySelector('select');
+  openListbox(combo, {
+    label: document.getElementById(`${native.id}-label`)?.textContent.replace('*', '').trim() ?? '',
+    pick: (item) => {
+      native.value = item.value;
+      native.dispatchEvent(new Event('input', { bubbles: true }));
+      native.dispatchEvent(new Event('change', { bubbles: true }));
+      syncSelect(wrap);
+      closePopup(false);
+      combo.focus();
+    },
+  });
+  const items = selectItems(native);
+  fillListbox(items, native.value);
+  if (where === 'first') setActive(0);
+  if (where === 'last') setActive(items.length - 1);
+}
+
+let typed = '';
+let typedAt = 0;
+
+/** Type to jump: letters typed quickly move to the next option that starts with them. */
+function typeAhead(e, items, from) {
+  if (e.key.length !== 1 || e.key === ' ' || e.ctrlKey || e.metaKey || e.altKey || !items.length) return -1;
+  const now = Date.now();
+  typed = now - typedAt > 600 ? e.key : typed + e.key;
+  typedAt = now;
+  const repeat = [...typed].every((c) => c === typed[0]);
+  const needle = fold(repeat ? typed[0] : typed);
+  const offset = repeat || typed.length === 1 ? 1 : 0;
+  for (let k = 0; k < items.length; k++) {
+    const i = (from + offset + k) % items.length;
+    if (fold(items[i].label).startsWith(needle)) return i;
+  }
+  return -1;
+}
+
+/** Keyboard of a select combobox (ARIA select only combobox pattern). */
+function selectKey(e, combo) {
+  const open = lb?.combo === combo;
+  if (!open) {
+    if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key) || (e.altKey && e.key === 'ArrowDown')) {
+      e.preventDefault();
+      openSelect(combo);
+      return true;
+    }
+    if (e.key === 'Home' || e.key === 'End') {
+      e.preventDefault();
+      openSelect(combo, e.key === 'Home' ? 'first' : 'last');
+      return true;
+    }
+    const native = combo.closest('.z-select').querySelector('select');
+    const items = selectItems(native);
+    const at = typeAhead(e, items, Math.max(0, native.selectedIndex));
+    if (at < 0) return false;
+    e.preventDefault();
+    openSelect(combo);
+    setActive(at);
+    return true;
+  }
+  if (e.key === 'Enter' || e.key === ' ' || (e.altKey && e.key === 'ArrowUp')) {
+    e.preventDefault();
+    return pickActive();
+  }
+  if (e.key === 'Tab') {
+    pickActive();
+    return false;
+  }
+  if (moveActive(e)) return true;
+  const at = typeAhead(e, lb.items, Math.max(0, lb.active));
+  if (at < 0) return false;
+  e.preventDefault();
+  setActive(at);
+  return true;
+}
+
+/* Listbox control ---------------------------------------------------------------------------- */
+
+/** Turns `[data-zeyn-listbox]` selects into always open listboxes with a search box. */
+function initListboxes(root) {
+  root.querySelectorAll('.z-listbox-field:not([data-ready])').forEach((wrap) => {
+    const native = wrap.querySelector('select');
+    if (!native) return;
+    wrap.dataset.ready = '';
+    const id = `${native.id}-list`;
+    const list = make('div', 'z-listbox z-listbox-inline', { role: 'listbox', id, tabindex: '0', 'aria-labelledby': `${native.id}-label` });
+    for (const a of ['aria-describedby', 'aria-required', 'aria-invalid']) if (native.hasAttribute(a)) list.setAttribute(a, native.getAttribute(a));
+    [...native.options].forEach((o, i) => {
+      const el = make('div', 'z-option', { role: 'option', id: `${id}-o${i}`, 'aria-selected': String(o.selected), 'data-value': o.value });
+      el.append(make('span', 'z-option-text', { text: o.text }));
+      list.append(el);
+    });
+    if (native.options.length > 8) {
+      const search = make('input', 'z-list-search', { type: 'search', 'aria-label': wrap.dataset.textSearch, 'aria-controls': id, autocomplete: 'off', placeholder: wrap.dataset.textSearch });
+      wrap.prepend(search);
+    }
+    wrap.append(list);
+    hideNative(native);
+    const selected = list.querySelector('[aria-selected="true"]') ?? list.querySelector('[role="option"]');
+    if (selected) list.setAttribute('aria-activedescendant', selected.id);
+  });
+}
+
+/** Chooses an option of an inline listbox (selection follows focus). */
+function chooseInline(list, option) {
+  if (!option) return;
+  const native = list.closest('.z-listbox-field').querySelector('select');
+  list.querySelectorAll('[role="option"]').forEach((o) => o.setAttribute('aria-selected', String(o === option)));
+  list.setAttribute('aria-activedescendant', option.id);
+  option.scrollIntoView({ block: 'nearest' });
+  native.value = option.dataset.value;
+  native.dispatchEvent(new Event('input', { bubbles: true }));
+  native.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+/** Keyboard of an inline listbox: arrows, Home, End, Page keys and type to jump. */
+function inlineKey(e, list) {
+  const options = [...list.querySelectorAll('[role="option"]:not([hidden])')];
+  const current = options.indexOf(document.getElementById(list.getAttribute('aria-activedescendant')));
+  const to = { ArrowDown: current + 1, ArrowUp: current - 1, Home: 0, End: options.length - 1, PageDown: current + 8, PageUp: current - 8 }[e.key];
+  if (to !== undefined) {
+    e.preventDefault();
+    chooseInline(list, options[Math.max(0, Math.min(options.length - 1, to))]);
+    return true;
+  }
+  const at = typeAhead(e, options.map((o) => ({ label: o.textContent })), Math.max(0, current));
+  if (at < 0) return false;
+  e.preventDefault();
+  chooseInline(list, options[at]);
+  return true;
+}
+
+/** Filters an inline listbox by the search text. */
+function filterInline(search) {
+  const list = search.closest('.z-listbox-field').querySelector('[role="listbox"]');
+  const needle = fold(search.value.trim());
+  list.querySelectorAll('[role="option"]').forEach((o) => (o.hidden = !!needle && !fold(o.textContent).includes(needle)));
+}
+
+/* Lookup ------------------------------------------------------------------------------------- */
+
+/** Turns `[data-zeyn-lookup]` id inputs into searchable comboboxes. */
+function initLookups(root) {
+  root.querySelectorAll('[data-zeyn-lookup]:not([data-ready])').forEach((wrap) => {
+    const value = wrap.querySelector('.z-lookup-value');
+    if (!value) return;
+    wrap.dataset.ready = '';
+    const t = texts(wrap);
+    const id = value.id;
+    const box = make('div', 'z-lookup-box');
+    const tags = make('ul', 'z-tags', { 'aria-label': t.selected });
+    const combo = make('input', 'z-lookup-input', {
+      type: 'text',
+      role: 'combobox',
+      id,
+      autocomplete: 'off',
+      'aria-autocomplete': 'list',
+      'aria-expanded': 'false',
+      'aria-describedby': value.getAttribute('aria-describedby') ?? '',
+      'data-testid': `${value.dataset.testid ?? ''}.combobox`,
+    });
+    if (value.required) combo.setAttribute('aria-required', 'true');
+    if (value.readOnly) combo.readOnly = true;
+    value.removeAttribute('id');
+    hideNative(value);
+    const toggle = make('button', 'z-lookup-toggle', { type: 'button', tabindex: '-1', 'aria-label': t.open });
+    toggle.append(make('span', 'z-select-arrow', { 'aria-hidden': 'true' }));
+    box.append(tags, combo, toggle);
+    wrap.append(box, make('span', 'z-sr-only', { 'aria-live': 'polite' }));
+    wrap.dataset.zeynLive = '';
+    wrap.zeynLabels = new Map();
+    const ids = idsOf(wrap);
+    if (ids.length) {
+      fetchData(wrap, wrap.dataset.zeynLookup, { ids: ids.map(Number), limit: ids.length }).then((page) => {
+        for (const item of page?.items ?? []) wrap.zeynLabels.set(String(item.id), item.label);
+        renderLookup(wrap);
+      });
+    }
+  });
+}
+
+/** Ids held by a lookup, as strings. */
+function idsOf(wrap) {
+  return wrap.querySelector('.z-lookup-value').value.split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+/** Writes ids into the submitted input and shows them: tags for several, the label for one. */
+function setIds(wrap, ids) {
+  const value = wrap.querySelector('.z-lookup-value');
+  value.value = ids.join(',');
+  value.dispatchEvent(new Event('input', { bubbles: true }));
+  value.dispatchEvent(new Event('change', { bubbles: true }));
+  renderLookup(wrap);
+}
+
+/** Draws the chosen values of a lookup. */
+function renderLookup(wrap) {
+  const t = texts(wrap);
+  const combo = wrap.querySelector('[role="combobox"]');
+  const ids = idsOf(wrap);
+  const label = (id) => wrap.zeynLabels.get(id) ?? `#${id}`;
+  if (wrap.dataset.multiple === 'true') {
+    const tags = wrap.querySelector('.z-tags');
+    tags.replaceChildren(
+      ...ids.map((id) => {
+        const li = make('li', 'z-tag');
+        li.append(make('span', '', { text: label(id) }));
+        const remove = make('button', 'z-tag-remove', { type: 'button', 'data-remove': id, 'aria-label': fill(t.remove, { label: label(id) }) });
+        remove.append(make('span', '', { 'aria-hidden': 'true', text: '×' }));
+        li.append(remove);
+        return li;
+      }),
+    );
+  } else {
+    combo.value = ids.length ? label(ids[0]) : '';
+    combo.dataset.shown = combo.value;
+  }
+}
+
+const lookupTimers = new WeakMap();
+
+/** Searches the server for what was typed and shows a page of options. */
+async function searchLookup(wrap, offset = 0, keep = []) {
+  const combo = wrap.querySelector('[role="combobox"]');
+  const t = texts(wrap);
+  const multiple = wrap.dataset.multiple === 'true';
+  const text = multiple || combo.value !== combo.dataset.shown ? combo.value.trim() : '';
+  if (lb?.combo !== combo) {
+    openListbox(combo, {
+      label: document.getElementById(`${combo.id}-label`)?.textContent.replace('*', '').trim() ?? '',
+      multiple,
+      anchor: wrap.querySelector('.z-lookup-box'),
+      pick: (item) => pickLookup(wrap, item),
+      more: () => searchLookup(wrap, lb.next, lb.items.filter((i) => !i.more)),
+    });
+    fillListbox([...keep, { note: t.loading }]);
+  }
+  wrap.zeynAbort?.abort();
+  wrap.zeynAbort = new AbortController();
+  const page = await fetchData(wrap, wrap.dataset.zeynLookup, { text, offset, limit: 20 }, wrap.zeynAbort.signal);
+  if (!page || lb?.combo !== combo) return;
+  const chosen = new Set(idsOf(wrap));
+  const items = [...keep];
+  for (const item of page.items ?? []) {
+    wrap.zeynLabels.set(String(item.id), item.label);
+    items.push({ value: String(item.id), label: item.label, hint: item.hint, selected: chosen.has(String(item.id)) });
+  }
+  lb.next = page.next ? Number(page.next) : null;
+  if (page.next) items.push({ value: '', label: t.more, more: true });
+  if (!items.length) items.push({ note: t.no_results });
+  const active = keep.length ? items[keep.length]?.value : undefined;
+  fillListbox(items, active);
+  announce(wrap, page.total != null ? fill(t.results, { count: page.total }) : '');
+}
+
+/** Picks an option of a lookup: replaces the value, or toggles it when several are allowed. */
+function pickLookup(wrap, item) {
+  const combo = wrap.querySelector('[role="combobox"]');
+  if (wrap.dataset.multiple === 'true') {
+    const ids = idsOf(wrap);
+    const next = ids.includes(item.value) ? ids.filter((i) => i !== item.value) : [...ids, item.value];
+    setIds(wrap, next);
+    item.selected = !item.selected;
+    item.el.setAttribute('aria-selected', String(item.selected));
+    combo.focus();
+    return;
+  }
+  setIds(wrap, [item.value]);
+  closePopup(false);
+  combo.focus();
+}
+
+/** Keyboard of a lookup combobox (ARIA combobox with list autocomplete). */
+function lookupKey(e, combo) {
+  const wrap = combo.closest('[data-zeyn-lookup]');
+  const open = lb?.combo === combo;
+  if (!open && (e.key === 'ArrowDown' || (e.altKey && e.key === 'ArrowDown'))) {
+    e.preventDefault();
+    searchLookup(wrap);
+    return true;
+  }
+  if (!open) {
+    if (e.key === 'Backspace' && wrap.dataset.multiple === 'true' && !combo.value) {
+      const ids = idsOf(wrap);
+      if (ids.length) {
+        e.preventDefault();
+        setIds(wrap, ids.slice(0, -1));
+        return true;
+      }
+    }
+    return false;
+  }
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    return pickActive();
+  }
+  if (e.key === 'ArrowUp' && e.altKey) {
+    e.preventDefault();
+    closePopup(false);
+    return true;
+  }
+  if (e.key === 'Home' || e.key === 'End') return false;
+  return moveActive(e);
+}
+
+/** Restores a single lookup's label when the user leaves it without choosing; empty clears it. */
+function leaveLookup(combo) {
+  const wrap = combo.closest('[data-zeyn-lookup]');
+  if (!wrap || wrap.dataset.multiple === 'true') {
+    if (wrap) combo.value = '';
+    return;
+  }
+  if (!combo.value.trim() && idsOf(wrap).length) setIds(wrap, []);
+  else combo.value = combo.dataset.shown ?? '';
+}
+
+/* Numbers ------------------------------------------------------------------------------------ */
+
+/** Reads a number typed in the field's locale; `null` when empty or unreadable. */
+function readNumber(wrap, text) {
+  const d = wrap.dataset;
+  const plain = text.split(d.group).join('').replace(/\s/g, '').replace(d.decimal, '.');
+  if (!plain || plain === '-' || !/^-?\d*\.?\d*$/.test(plain)) return null;
+  return Number(plain);
+}
+
+/** Writes a number in the field's locale: groups and the field's decimals. */
+function writeNumber(wrap, n) {
+  const d = wrap.dataset;
+  const scale = Number(d.scale);
+  const [whole, frac] = Math.abs(n).toFixed(scale).split('.');
+  const grouped = d.grouped === 'true' ? whole.replace(/\B(?=(\d{3})+(?!\d))/g, d.group) : whole;
+  return `${n < 0 ? '-' : ''}${grouped}${frac ? d.decimal + frac : ''}`;
+}
+
+/** Formats while typing: adds group separators and keeps at most the field's decimals. */
+function formatNumber(input) {
+  const wrap = input.closest('[data-zeyn-number]');
+  const d = wrap.dataset;
+  const scale = Number(d.scale);
+  const v = input.value;
+  const caret = input.selectionStart ?? v.length;
+  const keep = (s) => s.replace(new RegExp(`[^0-9${scale ? d.decimal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : ''}-]`, 'g'), '');
+  const before = keep(v.slice(0, caret)).length;
+  let clean = keep(v);
+  const negative = clean.startsWith('-');
+  clean = clean.replace(/-/g, '');
+  let [whole, ...rest] = clean.split(d.decimal);
+  let frac = rest.join('');
+  if (scale) frac = frac.slice(0, scale);
+  whole = whole.replace(/^0+(?=\d)/, '');
+  const grouped = d.grouped === 'true' ? whole.replace(/\B(?=(\d{3})+(?!\d))/g, d.group) : whole;
+  const text = `${negative ? '-' : ''}${grouped}${clean.includes(d.decimal) && scale ? d.decimal + frac : ''}`;
+  if (text === v) return;
+  input.value = text;
+  let seen = 0;
+  let pos = 0;
+  while (pos < text.length && seen < before) {
+    if (text[pos] !== d.group) seen++;
+    pos++;
+  }
+  input.setSelectionRange(pos, pos);
+  const n = readNumber(wrap, text);
+  if (n !== null) input.setAttribute('aria-valuenow', String(n));
+  else input.removeAttribute('aria-valuenow');
+}
+
+/** Steps a number field by whole units, inside its `min` and `max`. */
+function stepNumber(input, by) {
+  if (input.readOnly || input.disabled) return;
+  const wrap = input.closest('[data-zeyn-number]');
+  const d = wrap.dataset;
+  let n = (readNumber(wrap, input.value) ?? 0) + by;
+  if (d.min !== undefined) n = Math.max(Number(d.min), n);
+  if (d.max !== undefined) n = Math.min(Number(d.max), n);
+  input.value = writeNumber(wrap, n);
+  input.setAttribute('aria-valuenow', String(n));
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+/** Arrow Up and Down step by one, Page Up and Down by ten (ARIA spinbutton). */
+function numberKey(e, input) {
+  const by = { ArrowUp: 1, ArrowDown: -1, PageUp: 10, PageDown: -10 }[e.key];
+  if (by === undefined || e.altKey) return false;
+  e.preventDefault();
+  stepNumber(input, by);
+  return true;
+}
+
+/* Text areas --------------------------------------------------------------------------------- */
+
+/** Grows a text area with its text (where CSS `field-sizing` is not supported) and updates its counter. */
+function textareaInput(area) {
+  if (!CSS.supports('field-sizing', 'content')) {
+    area.style.height = 'auto';
+    area.style.height = `${area.scrollHeight + 2}px`;
+  }
+  const counter = area.id && document.getElementById(`${area.id}-count`);
+  if (!counter) return;
+  const max = Number(counter.dataset.zeynCounter);
+  const n = [...area.value].length;
+  counter.textContent = fill(counter.dataset.text, { n, max });
+  const near = n >= max * 0.9;
+  counter.classList.toggle('z-near', near);
+  if (near) counter.setAttribute('aria-live', 'polite');
+  else counter.removeAttribute('aria-live');
+}
+
+/** Sets up text areas that grow with their text. */
+function initTextareas(root) {
+  if (CSS.supports('field-sizing', 'content')) return;
+  root.querySelectorAll('[data-zeyn-autosize]').forEach(textareaInput);
+}
+
+/* Native elements under controls ------------------------------------------------------------- */
+
+/** The visible control of a hidden native element. */
+function controlOf(native) {
+  const wrap = native.closest('.z-select, .z-listbox-field, [data-zeyn-lookup]');
+  return wrap?.querySelector('[role="combobox"], [role="listbox"]') ?? null;
+}
+
+/** Validation marks set on a hidden native element (by the runtime) show on its control. */
+new MutationObserver((records) => {
+  for (const r of records) {
+    const el = r.target;
+    if (!(el instanceof Element) || !el.classList.contains('z-native')) continue;
+    const control = controlOf(el);
+    if (!control) continue;
+    if (el.getAttribute('aria-invalid') === 'true') control.setAttribute('aria-invalid', 'true');
+    else control.removeAttribute('aria-invalid');
+  }
+}).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['aria-invalid'] });
+
 /* Setup -------------------------------------------------------------------------------------- */
 
 /** Initializers run for every root that gets new content. */
-const initializers = [restoreTabs];
+const initializers = [restoreTabs, initSelects, initListboxes, initLookups, initTextareas];
 
 /** Initializes every component inside `root`. Safe to call more than once. */
 function init(root) {
@@ -1107,6 +1718,16 @@ const keyHandlers = [
     check(t);
     return false;
   },
+  (e, t) => t.matches('.z-select-button') && selectKey(e, t),
+  (e, t) => t.matches('[data-zeyn-lookup] [role="combobox"]') && lookupKey(e, t),
+  (e, t) => t.matches('.z-listbox-inline') && inlineKey(e, t),
+  (e, t) => {
+    if (!t.matches('.z-list-search') || !['ArrowDown', 'ArrowUp'].includes(e.key)) return false;
+    const list = t.closest('.z-listbox-field').querySelector('[role="listbox"]');
+    list.focus();
+    return inlineKey(e, list);
+  },
+  (e, t) => t.matches('[data-zeyn-number] input') && numberKey(e, t),
   (e, t) => t.matches('[role="tab"]') && tabKey(e, t),
   (e, t) => t.matches('.z-split-bar') && splitKey(e, t),
 ];
@@ -1114,6 +1735,49 @@ const keyHandlers = [
 /** Click handlers, tried in order until one handles the event. */
 const clickHandlers = [
   pickerClick,
+  (e, t) => {
+    const combo = t.closest('.z-select-button');
+    if (!combo) return false;
+    if (lb?.combo === combo) closePopup(true);
+    else openSelect(combo);
+    return true;
+  },
+  (e, t) => {
+    const b = t.closest('.z-lookup-toggle');
+    if (!b) return false;
+    const wrap = b.closest('[data-zeyn-lookup]');
+    const combo = wrap.querySelector('[role="combobox"]');
+    if (lb?.combo === combo) closePopup(true);
+    else {
+      combo.focus();
+      searchLookup(wrap);
+    }
+    return true;
+  },
+  (e, t) => {
+    const b = t.closest('[data-remove]');
+    if (!b) return false;
+    const wrap = b.closest('[data-zeyn-lookup]');
+    setIds(wrap, idsOf(wrap).filter((id) => id !== b.dataset.remove));
+    wrap.querySelector('[role="combobox"]').focus();
+    return true;
+  },
+  (e, t) => {
+    const b = t.closest('[data-zeyn-step]');
+    if (!b) return false;
+    const input = b.closest('[data-zeyn-number]').querySelector('input');
+    stepNumber(input, Number(b.dataset.zeynStep));
+    input.focus();
+    return true;
+  },
+  (e, t) => {
+    const option = t.closest('.z-listbox-inline [role="option"]');
+    if (!option) return false;
+    const list = option.closest('[role="listbox"]');
+    chooseInline(list, option);
+    list.focus();
+    return true;
+  },
   (e, t) => {
     const b = t.closest('[data-zeyn-toggle]');
     return b && (togglePanel(b), true);
@@ -1164,6 +1828,31 @@ document.addEventListener(
   true,
 );
 
+document.addEventListener('input', (e) => {
+  const t = e.target;
+  if (!(t instanceof Element)) return;
+  if (t.matches('[data-zeyn-number] input') && e.inputType) formatNumber(t);
+  else if (t.matches('textarea[data-zeyn-autosize]')) textareaInput(t);
+  else if (t.matches('.z-list-search')) filterInline(t);
+  else if (t.matches('[data-zeyn-lookup] [role="combobox"]')) {
+    const wrap = t.closest('[data-zeyn-lookup]');
+    clearTimeout(lookupTimers.get(wrap));
+    lookupTimers.set(wrap, setTimeout(() => searchLookup(wrap), LOOKUP_DELAY_MS));
+  }
+});
+
+document.addEventListener('focusin', (e) => {
+  const t = e.target;
+  if (t instanceof Element && t.classList.contains('z-native')) controlOf(t)?.focus();
+});
+
+document.addEventListener('focusout', (e) => {
+  const t = e.target;
+  if (!(t instanceof Element) || !t.matches('[data-zeyn-lookup] [role="combobox"]')) return;
+  if (lb?.combo === t) closePopup(false);
+  leaveLookup(t);
+});
+
 document.addEventListener('change', (e) => {
   const t = e.target;
   if (t instanceof HTMLInputElement && t.matches('[data-zeyn-date-input]') && !picker) check(t);
@@ -1181,6 +1870,7 @@ document.addEventListener(
   'pointerdown',
   (e) => {
     const t = e.target instanceof Element ? e.target : null;
+    if (t && listboxPointer(e)) return;
     if (popup && t && !popup.panel.contains(t) && !popup.anchor.contains(t)) closePopup(false);
     const bar = t?.closest('.z-split-bar');
     if (bar && e.button === 0) dragSplit(e, bar);

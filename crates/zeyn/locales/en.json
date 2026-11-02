@@ -139,7 +139,8 @@
         "results": "{count} results",
         "remove": "Remove {label}",
         "more": "Show more",
-        "selected": "Selected"
+        "selected": "Selected",
+        "type_more": "Type to search."
       },
       "lines": {
         "add": "Add line",
@@ -172,6 +173,17 @@
       },
       "tree": {
         "empty": "No items."
+      },
+      "select": {
+        "none": "None",
+        "search": "Search the list"
+      },
+      "number": {
+        "up": "Increase",
+        "down": "Decrease"
+      },
+      "text": {
+        "count": "{n} of {max} characters"
       }
     },
     "date": {

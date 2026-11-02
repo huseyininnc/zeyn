@@ -139,7 +139,8 @@
         "results": "{count} sonuç",
         "remove": "{label} kaldır",
         "more": "Daha fazla göster",
-        "selected": "Seçilenler"
+        "selected": "Seçilenler",
+        "type_more": "Aramak için yazın."
       },
       "lines": {
         "add": "Satır ekle",
@@ -172,6 +173,17 @@
       },
       "tree": {
         "empty": "Kayıt yok."
+      },
+      "select": {
+        "none": "Seçilmedi",
+        "search": "Listede ara"
+      },
+      "number": {
+        "up": "Artır",
+        "down": "Azalt"
+      },
+      "text": {
+        "count": "{n} / {max} karakter"
       }
     },
     "date": {

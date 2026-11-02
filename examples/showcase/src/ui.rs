@@ -82,11 +82,111 @@ pub fn editors(_: (), ctx: Ctx) -> Screen {
     )
 }
 
+/// How a request is delivered.
+#[choice]
+pub enum Delivery {
+    Pickup,
+    Courier,
+    Cargo,
+}
+
+/// Package size.
+#[choice]
+pub enum Size {
+    Small,
+    Medium,
+    Large,
+}
+
+/// Warehouse city: a long list for the searchable listbox.
+#[choice]
+pub enum City {
+    Adana,
+    Ankara,
+    Antalya,
+    Bursa,
+    Eskisehir,
+    Gaziantep,
+    Istanbul,
+    Izmir,
+    Kayseri,
+    Konya,
+    Mersin,
+    Trabzon,
+}
+
+/// A stock request that uses every control.
+#[model]
+pub struct StockRequest {
+    #[rule(required)]
+    pub product: Option<crate::stock::ProductId>,
+    pub alternatives: Vec<i64>,
+    #[rule(min = 1, max = 500)]
+    pub quantity: i64,
+    #[rule(min = 0, max = 1000000)]
+    pub budget: Money,
+    pub priority: crate::gallery::Priority,
+    pub delivery: Delivery,
+    pub size: Size,
+    pub warehouse: Option<City>,
+    pub urgent: bool,
+    pub insured: bool,
+    #[rule(max_len = 500)]
+    pub note: Option<String>,
+}
+
+#[action(permission = "stock.product.read")]
+pub async fn find_products(q: LookupQuery, store: crate::stock::ProductStore) -> Result<Page<LookupItem>> {
+    let items = store.all()?.into_iter().map(|p| LookupItem::new(p.id.0, p.name).hint(p.code)).collect();
+    Ok(q.apply(items))
+}
+
+#[action(public)]
+pub async fn send_request(request: Valid<StockRequest>) -> Result<StockRequest> {
+    Ok(request.into_inner())
+}
+
+#[screen(route = "/controls", permission = "stock.product.read")]
+pub fn controls() -> Screen {
+    let request = StockRequest {
+        alternatives: vec![2, 5],
+        quantity: 12,
+        budget: Money::tl(2_500_000),
+        size: Size::Medium,
+        insured: true,
+        ..StockRequest::default()
+    };
+    Screen::new(t!("ui.controls")).body(
+        Panel::new(t!("ui.panel_request")).add(
+            Form::of(request)
+                .lookup(StockRequest::product, find_products)
+                .lookup_many(StockRequest::alternatives, find_products)
+                .row(|r| r.field(StockRequest::quantity).field(StockRequest::budget).field(StockRequest::priority))
+                .row(|r| r.field(StockRequest::delivery).field(StockRequest::size))
+                .control(StockRequest::delivery, Control::Radio)
+                .control(StockRequest::size, Control::Segmented)
+                .field(StockRequest::warehouse)
+                .control(StockRequest::warehouse, Control::Listbox)
+                .row(|r| r.field(StockRequest::urgent).field(StockRequest::insured))
+                .control(StockRequest::urgent, Control::Switch)
+                .field(StockRequest::note)
+                .submit(t!("ui.send"), send_request)
+                .on_success(|_, ui| ui.toast(t!("ui.sent"))),
+        ),
+    )
+}
+
 pub fn feature() -> Feature {
     Feature::new("ui")
         .route_prefix("/ui")
         .guard(SignedIn)
         .screen(layout)
         .screen(editors)
-        .menu(|m| m.group(t!("menu.ui"), Icon::Table).item(t!("ui.layout"), layout).item(t!("ui.editors"), editors))
+        .screen(controls)
+        .menu(|m| {
+            m.group(t!("menu.ui"), Icon::Table)
+                .item(t!("ui.layout"), layout)
+                .item(t!("ui.editors"), editors)
+                .item(t!("ui.controls"), controls)
+        })
 }

@@ -17,7 +17,7 @@ macro_rules! into_node {
         })*
     };
 }
-pub(crate) use into_node;
+
 
 into_node!(Row, Stack, Panel, Card, Tabs, Split);
 

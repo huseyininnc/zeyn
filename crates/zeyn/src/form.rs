@@ -5,7 +5,8 @@ use crate::model::{Field, FieldError, FieldMeta, Model, Rule, Valid, ValidationE
 use crate::render::{Render, escape};
 use crate::screen::{Component, Effect, FormSource, Node, UiCtx};
 use crate::time::{Date, DateTime, DateWords, LocalDateTime, LocalTimeError, Time, TimeZone};
-use crate::ui::DateOptions;
+use crate::action::Page;
+use crate::ui::{ActionSource, Control, DataSource, DateOptions, LookupItem, LookupQuery, LookupValue, Slot};
 use crate::value::{Currency, FieldKind, FieldType, Money, Value};
 use serde_json::{Map, Value as Json, json};
 use std::marker::PhantomData;
@@ -67,12 +68,14 @@ pub struct Form<M: Model> {
     model: M,
     items: Vec<FormItem<M>>,
     options: Vec<(&'static str, DateOptions)>,
+    controls: Vec<(&'static str, Control)>,
+    lookups: Vec<(&'static str, Box<dyn DataSource>, bool)>,
 }
 
 impl<M: Model> Form<M> {
     /// Empty form filled with the given value. Add fields with `field` and `row`.
     pub fn of(model: M) -> Self {
-        Self { model, items: Vec::new(), options: Vec::new() }
+        Self { model, items: Vec::new(), options: Vec::new(), controls: Vec::new(), lookups: Vec::new() }
     }
 
     /// Form with every field of the model, in declaration order. Keys and versions become hidden
@@ -82,7 +85,7 @@ impl<M: Model> Form<M> {
             .filter(|i| !M::fields()[*i].version)
             .map(|i| FormItem::Field(FormField::at(i)))
             .collect();
-        Self { model, items, options: Vec::new() }
+        Self { model, items, options: Vec::new(), controls: Vec::new(), lookups: Vec::new() }
     }
 
     pub fn field<T: FieldType + 'static>(mut self, field: Field<M, T>) -> Self {
@@ -117,6 +120,51 @@ impl<M: Model> Form<M> {
         self
     }
 
+    /// Another control than the default for a field: a switch for a `bool`, radio buttons, a
+    /// segmented control or an open list for a `#[choice]`. See [`Control`].
+    pub fn control<T: FieldType + 'static>(mut self, field: Field<M, T>, control: Control) -> Self {
+        let name = field.meta().name;
+        self.controls.retain(|(n, _)| *n != name);
+        self.controls.push((name, control));
+        self
+    }
+
+    /// Adds an id field edited with a searchable combobox. The options come from `action`, which
+    /// gets the text typed so far and returns a page of [`LookupItem`]s; the server checks the
+    /// action's permission on every search.
+    ///
+    /// ```ignore
+    /// Form::of(order).lookup(Order::customer, find_customers)
+    /// ```
+    pub fn lookup<T, A>(mut self, field: Field<M, T>, _action: A) -> Self
+    where
+        T: FieldType + LookupValue + 'static,
+        A: Action<Input = LookupQuery, Output = Result<Page<LookupItem>>>,
+    {
+        self.items.push(FormItem::Field(FormField::of(field)));
+        self.lookups.push((field.meta().name, Box::new(ActionSource::<A>::new()), false));
+        self
+    }
+
+    /// Adds a field of several ids edited with a searchable combobox that shows the chosen ones
+    /// as removable tags.
+    pub fn lookup_many<A>(mut self, field: Field<M, Vec<i64>>, _action: A) -> Self
+    where
+        A: Action<Input = LookupQuery, Output = Result<Page<LookupItem>>>,
+    {
+        self.items.push(FormItem::Field(FormField::of(field)));
+        self.lookups.push((field.meta().name, Box::new(ActionSource::<A>::new()), true));
+        self
+    }
+
+    fn control_of(&self, name: &str) -> Option<Control> {
+        self.controls.iter().find(|(n, _)| *n == name).map(|(_, c)| *c)
+    }
+
+    fn lookup_of(&self, name: &str) -> Option<(&dyn DataSource, bool)> {
+        self.lookups.iter().find(|(n, _, _)| *n == name).map(|(_, s, many)| (s.as_ref(), *many))
+    }
+
     fn options_of(&self, name: &str) -> Option<&DateOptions> {
         self.options.iter().find(|(n, _)| *n == name).map(|(_, o)| o)
     }
@@ -141,7 +189,7 @@ impl<M: Model> Form<M> {
     fn render_fields(&self, out: &mut String, r: &Render) {
         for item in &self.items {
             match item {
-                FormItem::Field(f) => render_field(out, r, f, &self.model, self.options_of(f.meta.name)),
+                FormItem::Field(f) => render_field(out, r, f, self),
                 FormItem::Range(from, to) => crate::ui::render_range(
                     out,
                     r,
@@ -151,7 +199,7 @@ impl<M: Model> Form<M> {
                 FormItem::Row(fields) => {
                     out.push_str(r#"<div class="z-form-row">"#);
                     for f in fields {
-                        render_field(out, r, f, &self.model, self.options_of(f.meta.name));
+                        render_field(out, r, f, self);
                     }
                     out.push_str("</div>");
                 }
@@ -345,8 +393,13 @@ fn parse_value(meta: &FieldMeta, raw: &Json, reading: &Reading, current: &Json) 
         return Ok(Json::Null);
     }
     match meta.kind {
+        FieldKind::Custom { editor: "ids" } => crate::ui::parse_ids(trimmed).map(|ids| Json::from(ids)).ok_or(Unreadable::Format),
         FieldKind::Text | FieldKind::Custom { .. } => Ok(Json::String(text)),
-        FieldKind::Integer | FieldKind::Id => trimmed.parse::<i64>().map(Json::from).map_err(|_| Unreadable::Format),
+        FieldKind::Integer | FieldKind::Id => {
+            let group = crate::i18n::NumberFormat::for_locale(locale).group;
+            let digits: String = trimmed.chars().filter(|c| *c != group && !c.is_whitespace()).collect();
+            digits.parse::<i64>().map(Json::from).map_err(|_| Unreadable::Format)
+        }
         FieldKind::Date | FieldKind::Time | FieldKind::LocalDateTime | FieldKind::DateTime => match read_moment(meta.kind, trimmed, reading) {
             Ok(v) => serde_json::to_value(v).map_err(|_| Unreadable::Format),
             Err(true) => Err(Unreadable::SkippedTime),
@@ -368,10 +421,11 @@ fn parse_value(meta: &FieldMeta, raw: &Json, reading: &Reading, current: &Json) 
 }
 
 /// Writes the input that fits the field kind, with the validation attributes the client mirrors.
-fn render_field<M>(out: &mut String, r: &Render, f: &FormField<M>, model: &M, options: Option<&DateOptions>) {
+fn render_field<M: Model>(out: &mut String, r: &Render, f: &FormField<M>, form: &Form<M>) {
     let m = f.meta;
     let scope = r.scope;
-    let value = (f.value)(model);
+    let value = (f.value)(&form.model);
+    let options = form.options_of(m.name);
     let id = format!("{scope}-{}", m.name);
     if m.key {
         let v = match &value {
@@ -396,59 +450,23 @@ fn render_field<M>(out: &mut String, r: &Render, f: &FormField<M>, model: &M, op
 
     out.push_str(r#"<div class="z-field">"#);
     let star = if required { r#"<span class="z-required" aria-hidden="true">*</span>"# } else { "" };
-    let label = format!(r#"<label for="{id}">{}{star}</label>"#, r.label(m));
+    let label = format!(r#"<label for="{id}" id="{id}-label">{}{star}</label>"#, r.label(m));
     let text = |v: &Value| match v {
         Value::Text(s) => escape(s),
         _ => String::new(),
     };
+    let slot = Slot { m, value: &value, common: &common, id: &id, label: &label, control: form.control_of(m.name) };
+    if let Some((_, many)) = form.lookup_of(m.name) {
+        crate::ui::render_lookup(out, r, &slot, many);
+        out.push_str(&format!(r#"<p class="z-field-error" id="{id}-error" aria-live="polite"></p></div>"#));
+        return;
+    }
 
     match m.kind {
-        FieldKind::Bool => {
-            let checked = if value == Value::Bool(true) { " checked" } else { "" };
-            out.push_str(&format!(r#"<input type="checkbox" {common}{checked}>"#));
-            out.push_str(&label);
-        }
-        FieldKind::Choice(options) => {
-            out.push_str(&label);
-            out.push_str(&format!("<select {common}>"));
-            if m.optional {
-                out.push_str(r#"<option value=""></option>"#);
-            }
-            for o in options {
-                let selected = if value == Value::Choice(o.value) { " selected" } else { "" };
-                out.push_str(&format!(
-                    r#"<option value="{}"{selected}>{}</option>"#,
-                    o.value,
-                    r.text(&Text::key_or(o.key, o.label))
-                ));
-            }
-            out.push_str("</select>");
-        }
-        FieldKind::Money => {
-            let v = match &value {
-                Value::Money(money) => money.format_plain(r.locale),
-                _ => String::new(),
-            };
-            out.push_str(&label);
-            out.push_str(&format!(r#"<input type="text" inputmode="decimal" class="z-num" {common} value="{v}">"#));
-        }
-        FieldKind::Integer | FieldKind::Id => {
-            let v = match &value {
-                Value::Int(n) => n.to_string(),
-                _ => String::new(),
-            };
-            let min = m.min().map(|n| format!(r#" min="{n}""#)).unwrap_or_default();
-            let max = m.max().map(|n| format!(r#" max="{n}""#)).unwrap_or_default();
-            out.push_str(&label);
-            out.push_str(&format!(r#"<input type="number" step="1" class="z-num" {common}{min}{max} value="{v}">"#));
-        }
-        FieldKind::Text => {
-            let max = m.max_len().map(|n| format!(r#" maxlength="{n}""#)).unwrap_or_default();
-            let min = m.min_len().map(|n| format!(r#" minlength="{n}""#)).unwrap_or_default();
-            let input_type = if m.rules.contains(&Rule::Email) { "email" } else { "text" };
-            out.push_str(&label);
-            out.push_str(&format!(r#"<input type="{input_type}" {common}{min}{max} value="{}">"#, text(&value)));
-        }
+        FieldKind::Bool => crate::ui::render_bool(out, &slot),
+        FieldKind::Choice(_) => crate::ui::render_choice(out, r, &slot),
+        FieldKind::Money | FieldKind::Integer | FieldKind::Id => crate::ui::render_number(out, r, &slot),
+        FieldKind::Text => crate::ui::render_text(out, r, &slot),
         FieldKind::Date | FieldKind::Time | FieldKind::DateTime | FieldKind::LocalDateTime => {
             out.push_str(&label);
             crate::ui::render_date_input(out, r, m, &value, &common, &id, options);
@@ -553,6 +571,10 @@ where
 }
 
 impl<M: Model> Component for Form<M> {
+    fn source(&self, key: &str) -> Option<&dyn DataSource> {
+        self.lookup_of(key).map(|(s, _)| s)
+    }
+
     fn render(&self, out: &mut String, r: &Render) {
         out.push_str(&format!(r#"<form class="z-form" data-testid="{}.form" novalidate>"#, r.scope));
         self.render_fields(out, r);
@@ -594,6 +616,10 @@ where
 
     fn form(&self) -> Option<&dyn FormSource> {
         Some(self)
+    }
+
+    fn source(&self, key: &str) -> Option<&dyn DataSource> {
+        self.form.lookup_of(key).map(|(s, _)| s)
     }
 }
 

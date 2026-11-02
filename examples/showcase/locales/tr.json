@@ -119,7 +119,11 @@
     "editors": "Düzenleyiciler",
     "panel_dates": "Tarih ve saatler",
     "book": "Ziyareti kaydet",
-    "booked": "Ziyaret kaydedildi."
+    "booked": "Ziyaret kaydedildi.",
+    "controls": "Kontroller",
+    "panel_request": "Stok talebi",
+    "send": "Talebi gönder",
+    "sent": "Talep gönderildi."
   },
   "Visit": {
     "day": "Ziyaret günü",
@@ -128,5 +132,33 @@
     "confirmed_at": "Onay zamanı",
     "stay_from": "Konaklama başlangıcı",
     "stay_to": "Konaklama bitişi"
+  },
+  "StockRequest": {
+    "product": "Ürün",
+    "alternatives": "Alternatifler",
+    "quantity": "Miktar",
+    "budget": "Bütçe",
+    "priority": "Öncelik",
+    "delivery": "Teslimat",
+    "size": "Paket boyu",
+    "warehouse": "Depo",
+    "urgent": "Acil",
+    "insured": "Sigortalı",
+    "note": "Not"
+  },
+  "Delivery": {
+    "Pickup": "Mağazadan teslim",
+    "Courier": "Kurye",
+    "Cargo": "Kargo"
+  },
+  "Size": {
+    "Small": "Küçük",
+    "Medium": "Orta",
+    "Large": "Büyük"
+  },
+  "City": {
+    "Eskisehir": "Eskişehir",
+    "Istanbul": "İstanbul",
+    "Izmir": "İzmir"
   }
 }

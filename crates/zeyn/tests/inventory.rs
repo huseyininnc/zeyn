@@ -378,7 +378,7 @@ fn form_renders() {
     assert!(html.contains(r#"data-testid="product_form.field.code" aria-describedby="product_form-code-error" required aria-required="true" maxlength="20" value="P-001""#));
     assert!(html.contains(r#"<option value="Kg" selected>Kilogram</option>"#));
     assert!(html.contains(r#"value="1,234.56""#));
-    assert!(html.contains(r#"type="checkbox" id="product_form-active""#));
+    assert!(html.contains(r#"type="checkbox" class="z-checkbox" id="product_form-active""#));
     assert!(html.contains(r#"value="Tea &lt;Rize&gt;""#));
 }
 

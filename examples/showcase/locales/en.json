@@ -119,7 +119,11 @@
     "editors": "Editors",
     "panel_dates": "Dates and times",
     "book": "Book visit",
-    "booked": "Visit booked."
+    "booked": "Visit booked.",
+    "controls": "Controls",
+    "panel_request": "Stock request",
+    "send": "Send request",
+    "sent": "Request sent."
   },
   "Visit": {
     "day": "Visit day",
@@ -128,5 +132,33 @@
     "confirmed_at": "Confirmed at",
     "stay_from": "Stay from",
     "stay_to": "Stay until"
+  },
+  "StockRequest": {
+    "product": "Product",
+    "alternatives": "Alternatives",
+    "quantity": "Quantity",
+    "budget": "Budget",
+    "priority": "Priority",
+    "delivery": "Delivery",
+    "size": "Package size",
+    "warehouse": "Warehouse",
+    "urgent": "Urgent",
+    "insured": "Insured",
+    "note": "Note"
+  },
+  "Delivery": {
+    "Pickup": "Pickup",
+    "Courier": "Courier",
+    "Cargo": "Cargo"
+  },
+  "Size": {
+    "Small": "Small",
+    "Medium": "Medium",
+    "Large": "Large"
+  },
+  "City": {
+    "Eskisehir": "Eskisehir",
+    "Istanbul": "Istanbul",
+    "Izmir": "Izmir"
   }
 }
