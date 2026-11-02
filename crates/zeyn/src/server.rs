@@ -46,6 +46,8 @@ mod pro;
 mod assistant;
 #[cfg(feature = "islands")]
 mod islands;
+#[cfg(feature = "realtime")]
+pub mod realtime;
 const CSP: &str = "default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
 
 /// Finds out who is calling, usually from a session cookie or an `Authorization` header.
@@ -608,6 +610,8 @@ pub struct App {
     looks: theme::Settings,
     #[cfg(feature = "islands")]
     islands_dir: Option<std::path::PathBuf>,
+    #[cfg(feature = "realtime")]
+    realtime: Option<realtime::Hub>,
 }
 
 impl App {
@@ -651,7 +655,19 @@ impl App {
             looks: theme::Settings::default(),
             #[cfg(feature = "islands")]
             islands_dir: None,
+            #[cfg(feature = "realtime")]
+            realtime: None,
         }
+    }
+
+    /// Turns on the realtime channel: collaborative documents and change topics over WebSocket
+    /// (see `docs/realtime.md`). The hub is also registered as a service, so actions can take
+    /// `hub: Hub` and call `hub.notify(&ctx, "topic")`.
+    #[cfg(feature = "realtime")]
+    pub fn realtime(mut self, realtime: realtime::Realtime) -> Self {
+        let hub = realtime.install();
+        self.realtime = Some(hub.clone());
+        self.service(hub)
     }
 
     /// Serves the WASM islands that `zeyn build-islands` wrote to `dir` (usually `dist/islands`).
@@ -1082,6 +1098,8 @@ impl App {
             assistant: self.assistant,
             #[cfg(feature = "islands")]
             islands,
+            #[cfg(feature = "realtime")]
+            realtime: self.realtime,
         });
         ops::start_jobs(&state);
         let mut router = Router::new();
@@ -1142,6 +1160,8 @@ impl App {
         let router = assistant::routes(router);
         #[cfg(feature = "islands")]
         let router = islands::routes(router);
+        #[cfg(feature = "realtime")]
+        let router = realtime::routes(router);
         let router = theme::routes(pro::routes(media::routes(ui::routes(session::routes(data::routes(ops::routes(router)))))))
             .fallback(not_found)
             .layer(axum::middleware::from_fn_with_state(state.clone(), guard_request))
@@ -1238,6 +1258,8 @@ struct AppState {
     assistant: Option<Arc<crate::assistant::Assistant>>,
     #[cfg(feature = "islands")]
     islands: Option<islands::Islands>,
+    #[cfg(feature = "realtime")]
+    realtime: Option<realtime::Hub>,
 }
 
 /// Decodes `%XX` sequences in a cookie value.
@@ -1681,8 +1703,13 @@ fn is_assistant_asset(path: &str) -> bool {
     }
 }
 
-/// Whether a path is the island loader or a built island file, served without sign in.
+/// Whether a path is the island loader, a built island file or the live script, served without
+/// sign in.
 fn is_island_asset(path: &str) -> bool {
+    #[cfg(feature = "realtime")]
+    if realtime::is_asset(path) {
+        return true;
+    }
     #[cfg(feature = "islands")]
     return islands::is_asset(path);
     #[cfg(not(feature = "islands"))]
@@ -1821,6 +1848,8 @@ async fn page(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Que
             let full = format!("{title} · {}", ctx.t(&st.name));
             #[cfg(feature = "islands")]
             let holds_island = islands::holds(&st, &html);
+            #[cfg(feature = "realtime")]
+            let holds_live = realtime::holds(&st, &html);
             let mut r = Html(html).into_response();
             let h = r.headers_mut();
             h.insert("x-zeyn-partial", HeaderValue::from_static("1"));
@@ -1833,12 +1862,23 @@ async fn page(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Que
             if holds_island {
                 h.insert("x-zeyn-islands", HeaderValue::from_static("1"));
             }
+            #[cfg(feature = "realtime")]
+            if holds_live {
+                h.insert("x-zeyn-live", HeaderValue::from_static("1"));
+            }
             r
         }
-        #[cfg(feature = "islands")]
-        Ok((title, html)) => islands::page(&st, st.shell(&ctx, &csrf, &title, &html, Some(name)), &html),
-        #[cfg(not(feature = "islands"))]
-        Ok((title, html)) => Html(st.shell(&ctx, &csrf, &title, &html, Some(name))).into_response(),
+        Ok((title, html)) => {
+            #[allow(unused_mut)]
+            let mut page = st.shell(&ctx, &csrf, &title, &html, Some(name));
+            #[cfg(feature = "realtime")]
+            realtime::head(&st, &html, &mut page);
+            #[cfg(feature = "islands")]
+            let page = islands::page(&st, page, &html);
+            #[cfg(not(feature = "islands"))]
+            let page = Html(page).into_response();
+            page
+        }
         Err(Failure::App(Error::Forbidden | Error::Denied(_))) if !ctx.identity().is_signed_in() && st.login_url.is_some() => {
             let here = st.screens.get(name).and_then(|(fi, e)| st.features[*fi].path_of(&e.meta)).map(|p| st.url(&p)).unwrap_or_default();
             let target = st.login_url.clone().unwrap_or_default();

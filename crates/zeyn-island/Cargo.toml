@@ -11,6 +11,8 @@ default = []
 # Browser side: `Island` and typed `call` over `fetch`. Off in crates the server shares with islands.
 client = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:web-sys"]
 # Drawing surface (`canvas::Surface`): high DPI canvas, input events, frames only on change.
+# Live documents over `/_zeyn/live` (`live::Channel`), for islands of apps with the `realtime` feature.
+realtime = ["client", "dep:js-sys", "web-sys/WebSocket", "web-sys/BinaryType", "web-sys/MessageEvent", "web-sys/CloseEvent", "web-sys/Location", "web-sys/Event"]
 canvas = ["client", "dep:js-sys", "web-sys/HtmlCanvasElement", "web-sys/HtmlElement", "web-sys/CssStyleDeclaration", "web-sys/CanvasRenderingContext2d", "web-sys/WebGl2RenderingContext", "web-sys/Event", "web-sys/EventTarget", "web-sys/MouseEvent", "web-sys/PointerEvent", "web-sys/WheelEvent", "web-sys/KeyboardEvent", "web-sys/AddEventListenerOptions", "web-sys/ResizeObserver", "web-sys/Navigator"]
 
 [dependencies]

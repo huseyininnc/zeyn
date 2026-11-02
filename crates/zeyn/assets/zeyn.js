@@ -3384,6 +3384,12 @@ document.addEventListener('zeyn:filter', (e) => {
   loadGrid(grid, 'reset');
 });
 
+/** `zeyn:reload` on an element reloads the grids inside it in place (`live.js` sends it). */
+document.addEventListener('zeyn:reload', (e) => {
+  const root = e.target instanceof Element ? e.target : document;
+  root.querySelectorAll('[data-zeyn-grid]').forEach((g) => loadGrid(g, 'reload'));
+});
+
 /**
  * Lets other scripts (the command palette, menu bars) run effects and screen menu items through
  * the runtime: `detail` is `{effects, source}`, `{screen, item}` with a screen root element, or

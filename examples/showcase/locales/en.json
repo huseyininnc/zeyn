@@ -332,6 +332,12 @@
     "dock_hint": "Drag a tab to another area, or use the panel options button. Resize areas with the dividers or their arrow keys. Delete closes the focused tab; View in the menu brings panels back. The layout is saved for you.",
     "output_text": "Build finished without warnings."
   },
+  "DiagramRow": {
+    "label": "Label",
+    "kind": "Kind",
+    "x": "X",
+    "y": "Y"
+  },
   "Shape": {
     "name": "Name",
     "x": "X",
@@ -361,7 +367,10 @@
     "kind_box": "Box",
     "kind_ellipse": "Ellipse",
     "line": "{kind} \"{label}\" at {x}, {y}, {w} by {h}",
-    "diagram_saved": "Saved {count} shapes."
+    "diagram_saved": "Saved {count} shapes.",
+    "live_on": "Live: changes are shared as you make them",
+    "live_off": "Offline: changes are kept and shared when the connection is back",
+    "stored": "Shapes stored on the server (refresh in place)"
   },
   "assistant": {
     "title": "Assistant",

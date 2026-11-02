@@ -4,9 +4,11 @@
 //! pointer. Keyboard (canvas focused): `]` and `[` select the next or previous shape, arrows move
 //! it (Shift for 10 px), Delete removes it, `+`, `-` and `0` zoom, Escape clears the selection.
 //! The toolbar buttons do the same with ordinary buttons, and the list under the canvas is the
-//! text version of the picture. Save calls the server through a typed action.
+//! text version of the picture. Save calls the server through a typed action. With `live` in the
+//! props the editor joins a Y-CRDT document over the realtime channel, so several people edit
+//! the same diagram at once.
 
-use showcase_shared::{Diagram, DiagramProps, DiagramTexts, SaveDiagram, Shape, ShapeKind};
+use showcase_shared::{Diagram, DiagramProps, DiagramTexts, SaveDiagram, Shape, ShapeKind, crdt};
 use std::cell::RefCell;
 use std::f64::consts::TAU;
 use std::rc::Rc;
@@ -14,6 +16,7 @@ use wasm_bindgen::prelude::*;
 use web_sys::{CanvasRenderingContext2d, Document, Element};
 use zeyn_island::Island;
 use zeyn_island::canvas::{Frame, Graphics, Input, Prefer, Scene, Surface};
+use zeyn_island::live::Channel;
 
 /// What the pointer is holding.
 enum Grab {
@@ -61,6 +64,8 @@ pub struct Editor {
     pan: (f64, f64),
     host: Element,
     view: View,
+    /// Runs after every change made here (not for changes from others), to share it.
+    on_edit: Option<Rc<dyn Fn(&Diagram)>>,
 }
 
 impl Editor {
@@ -83,17 +88,33 @@ impl Editor {
 
     fn changed(&self) {
         self.view.refresh(&self.diagram, self.selected);
+        if let Some(share) = &self.on_edit {
+            share(&self.diagram);
+        }
+    }
+
+    /// Takes the diagram as others left it, keeping the selected shape selected.
+    fn replace(&mut self, diagram: Diagram) {
+        let id = self.selected.and_then(|i| self.diagram.shapes.get(i)).map(|s| s.id);
+        self.diagram = diagram;
+        self.selected = id.and_then(|id| self.diagram.shapes.iter().position(|s| s.id == id));
+        self.view.refresh(&self.diagram, self.selected);
     }
 
     fn add(&mut self, kind: ShapeKind) {
         if self.diagram.shapes.len() >= showcase_shared::MAX_SHAPES {
             return;
         }
-        let id = self.diagram.shapes.iter().map(|s| s.id).max().unwrap_or(0) + 1;
+        let id = loop {
+            let id = (js_sys::Math::random() * f64::from(u32::MAX)) as u32;
+            if id > 0 && !self.diagram.shapes.iter().any(|s| s.id == id) {
+                break id;
+            }
+        };
         let n = self.diagram.shapes.len() as i32;
         let label = match kind {
-            ShapeKind::Box => format!("{} {id}", self.view.texts.kind_box),
-            ShapeKind::Ellipse => format!("{} {id}", self.view.texts.kind_ellipse),
+            ShapeKind::Box => format!("{} {}", self.view.texts.kind_box, n + 1),
+            ShapeKind::Ellipse => format!("{} {}", self.view.texts.kind_ellipse, n + 1),
         };
         self.diagram.shapes.push(Shape { id, kind, x: 40 + (n % 6) * 30, y: 40 + (n % 6) * 30, w: 140, h: 64, label });
         self.select(Some(self.diagram.shapes.len() - 1));
@@ -275,7 +296,7 @@ fn shape_path(ctx: &CanvasRenderingContext2d, s: &Shape) {
 
 thread_local! {
     /// Mounted editors by placeholder, so `unmount` can release them.
-    static MOUNTED: RefCell<Vec<(Element, Surface<Editor>)>> = const { RefCell::new(Vec::new()) };
+    static MOUNTED: RefCell<Vec<Mounted>> = const { RefCell::new(Vec::new()) };
 }
 
 fn make(doc: &Document, tag: &str, class: &str) -> Result<Element, JsValue> {
@@ -326,13 +347,16 @@ pub fn mount(root: Element) -> Result<(), JsValue> {
     heading.set_text_content(Some(&texts.summary));
     let summary = make(&doc, "ul", "")?;
     summary.set_attribute("data-testid", "diagram.summary")?;
+    let live_badge = make(&doc, "span", "")?;
+    live_badge.set_attribute("data-testid", "diagram.live")?;
+    tools.append_child(&live_badge)?;
     for part in [&tools, &stage, &status, &heading, &summary] {
         root.append_child(part)?;
     }
 
     let view = View { summary, status, texts: texts.clone() };
     view.refresh(&props.diagram, None);
-    let editor = Editor { diagram: props.diagram, selected: None, grab: None, zoom: 1.0, pan: (0.0, 0.0), host: root.clone(), view };
+    let editor = Editor { diagram: props.diagram, selected: None, grab: None, zoom: 1.0, pan: (0.0, 0.0), host: root.clone(), view, on_edit: None };
     let described = root.get_attribute("aria-describedby").unwrap_or_default();
     let surface = Surface::new(&stage, editor, Prefer::TwoD, &texts.canvas, &described, props.height.clamp(200, 1200))?;
     surface.canvas().set_attribute("aria-roledescription", &texts.canvas)?;
@@ -348,9 +372,10 @@ pub fn mount(root: Element) -> Result<(), JsValue> {
         on_click(button, move || surface.update(|e| action(e)))?;
     }
     let save = surface.clone();
+    let save_texts = texts.clone();
     on_click(&buttons[4], move || {
         let diagram = save.read(|e| e.diagram.clone());
-        let (island, save, texts) = (island.clone(), save.clone(), texts.clone());
+        let (island, save, texts) = (island.clone(), save.clone(), save_texts.clone());
         zeyn_island::spawn(async move {
             let text = match island.call::<SaveDiagram>(&diagram).await {
                 Ok(saved) => texts.saved.replace("{count}", &saved.shapes.to_string()),
@@ -359,20 +384,68 @@ pub fn mount(root: Element) -> Result<(), JsValue> {
             save.read(|e| e.view.say(&text));
         });
     })?;
-    MOUNTED.with(|m| m.borrow_mut().push((root, surface)));
+    let channel = match props.live {
+        Some(id) => Some(go_live(&surface, &id, &live_badge, &texts)?),
+        None => None,
+    };
+    MOUNTED.with(|m| m.borrow_mut().push(Mounted { root, surface, channel }));
     Ok(())
 }
 
-/// Called by the loader when the placeholder leaves the page.
+/// Joins the live document `id`: local edits go out as Y updates, edits of others come in and
+/// replace the diagram. Returns the channel, shared with the editor's `on_edit`.
+fn go_live(surface: &Surface<Editor>, id: &str, badge: &Element, texts: &Rc<DiagramTexts>) -> Result<Rc<RefCell<Option<Channel>>>, JsValue> {
+    let doc = Rc::new(crdt::Doc::new());
+    let channel: Rc<RefCell<Option<Channel>>> = Rc::default();
+    let (d, c) = (doc.clone(), channel.clone());
+    surface.update(|e| {
+        e.on_edit = Some(Rc::new(move |diagram: &Diagram| {
+            if let (Some(update), Some(ch)) = (crdt::write(&d, diagram), c.borrow().as_ref()) {
+                ch.send_update(&update);
+            }
+        }))
+    });
+    let (d, c) = (doc.clone(), channel.clone());
+    let on_open = move || {
+        if let Some(ch) = c.borrow().as_ref() {
+            ch.send_update(&crdt::state(&d));
+        }
+    };
+    let (d, s) = (doc.clone(), surface.clone());
+    let on_update = move |update: &[u8]| {
+        if crdt::apply(&d, update) {
+            let next = crdt::read(&d);
+            s.update(|e| e.replace(next));
+        }
+    };
+    let (badge, texts) = (badge.clone(), texts.clone());
+    let on_state = move |online: bool| badge.set_text_content(Some(if online { &texts.live_on } else { &texts.live_off }));
+    *channel.borrow_mut() = Some(Channel::document("diagram", id, on_open, on_update, on_state)?);
+    Ok(channel)
+}
+
+/// A mounted editor and its live channel.
+struct Mounted {
+    root: Element,
+    surface: Surface<Editor>,
+    channel: Option<Rc<RefCell<Option<Channel>>>>,
+}
+
+/// Called by the loader when the placeholder leaves the page: closes the socket, removes the
+/// listeners and breaks the editor's link to the channel so everything can be freed.
 #[wasm_bindgen]
 pub fn unmount(root: Element) {
     MOUNTED.with(|m| {
-        m.borrow_mut().retain(|(r, s)| {
-            let keep = r != &root;
-            if !keep {
-                s.destroy();
+        m.borrow_mut().retain(|item| {
+            if item.root != root {
+                return true;
             }
-            keep
+            if let Some(ch) = item.channel.as_ref().and_then(|c| c.borrow_mut().take()) {
+                ch.close();
+            }
+            item.surface.update(|e| e.on_edit = None);
+            item.surface.destroy();
+            false
         })
     });
 }

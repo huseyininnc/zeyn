@@ -49,6 +49,8 @@ pub use client::Island;
 pub use wasm_bindgen_futures::spawn_local as spawn;
 #[cfg(feature = "canvas")]
 pub mod canvas;
+#[cfg(feature = "realtime")]
+pub mod live;
 
 /// A server action an island may call, declared once in a crate both sides share.
 ///

@@ -197,6 +197,7 @@ because the island is never trusted.
 | Counter island `.wasm` (no wasm-opt) | 127.6 KB, 52.8 KB gzip |
 | Counter island glue `.js` | 18.0 KB, 4.2 KB gzip |
 | Diagram editor `.wasm` (canvas surface, no wasm-opt) | 169.4 KB, 67.8 KB gzip |
+| Diagram editor with live editing (adds `yrs`, see `docs/realtime.md`) | 408.4 KB, 144.3 KB gzip |
 | Diagram editor glue `.js` | 30.3 KB, 6.1 KB gzip |
 | Server memory per island | none; files stream from disk, props are rendered per request |
 

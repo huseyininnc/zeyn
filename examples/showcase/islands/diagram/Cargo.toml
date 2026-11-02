@@ -11,7 +11,8 @@ name = "diagram"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-showcase-shared = { path = "../../shared" }
-zeyn-island = { path = "../../../../crates/zeyn-island", features = ["canvas"] }
+showcase-shared = { path = "../../shared", features = ["crdt"] }
+zeyn-island = { path = "../../../../crates/zeyn-island", features = ["canvas", "realtime"] }
+js-sys = "0.3"
 wasm-bindgen = "=0.2.130"
 web-sys = { version = "0.3", features = ["Document", "Element", "HtmlElement", "CssStyleDeclaration", "Window", "CanvasRenderingContext2d", "TextMetrics"] }

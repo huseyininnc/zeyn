@@ -7,6 +7,9 @@
 use serde::{Deserialize, Serialize};
 use zeyn_island::Remote;
 
+#[cfg(feature = "crdt")]
+pub mod crdt;
+
 /// Props of the `counter` island.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct CounterProps {
@@ -112,6 +115,9 @@ pub struct DiagramTexts {
     pub selected: String,
     pub kind_box: String,
     pub kind_ellipse: String,
+    /// Shown while live editing is connected, and while it is not.
+    pub live_on: String,
+    pub live_off: String,
     /// `{kind} "{label}" at {x}, {y}, {w} by {h}`.
     pub line: String,
 }
@@ -121,6 +127,8 @@ pub struct DiagramTexts {
 pub struct DiagramProps {
     pub diagram: Diagram,
     pub texts: DiagramTexts,
+    /// Id of the live document to join, when the app has the realtime channel.
+    pub live: Option<String>,
     /// Canvas height in CSS pixels.
     pub height: u32,
 }

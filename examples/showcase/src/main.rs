@@ -65,6 +65,7 @@ async fn main() -> std::io::Result<()> {
     };
 
     let assistant = assistant::assistant(&config)?;
+    let diagrams = islands::DiagramStore::default();
     let mut app = App::new(t!("app.name"))
         .plugin(CompanyStandard { config })
         .theme(Theme::new().radius(6))
@@ -82,7 +83,8 @@ async fn main() -> std::io::Result<()> {
         .i18n(i18n)
         .service(stock::ProductStore::seeded())
         .service(islands::CounterStore::default())
-        .service(islands::DiagramStore::default())
+        .service(diagrams.clone())
+        .realtime(islands::realtime(diagrams))
         .datagrid_views(MemoryViewStore::default())
         .service(people::LeaveStore::seeded(TimeZone::UTC.today(DateTime::now())))
         .auth(DevAuth::superuser("Demo User"))

@@ -296,6 +296,21 @@ with `'wasm-unsafe-eval'`; other pages are unchanged. A partial answer that hold
 
 See `docs/islands.md`.
 
+### 7.6 Realtime
+
+With the `realtime` feature, `div[data-zeyn-live="topic"]` marks nodes that refresh when the server
+notifies the topic. Pages holding one link `/_zeyn/live.js`; a partial answer holding one carries
+`x-zeyn-live: 1` and `nav.js` imports the script. `zeyn:reload` on an element reloads the grids
+inside it in place.
+
+| Endpoint | Does |
+|---|---|
+| `GET /_zeyn/live/topics?t=a,b&csrf=` | WebSocket; text frames `{ "topic": "a" }` |
+| `GET /_zeyn/live/doc/{kind}/{doc}?csrf=` | WebSocket; binary frames `0x01` + Y update (v1) both ways |
+
+Handshakes check the origin, the CSRF token against the cookie, the signed in user and the
+permissions before upgrading. See `docs/realtime.md`.
+
 The player dispatches the cancelable `zeyn:media-adaptive` event (`{ media, kind, url, hls, dash }`) on its root before falling back to progressive files; a streaming library calls `preventDefault()` to take over.
 
 ## 8. Desktop class shell

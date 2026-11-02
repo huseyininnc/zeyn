@@ -382,6 +382,9 @@ pub use assistant::Assistant;
 pub use security::{IpRange, MemoryRateStore, RateKey, RateLimit, RateStore, client_ip, parse_ranges};
 #[cfg(feature = "redis")]
 pub use redis_store::RedisStore;
+/// Realtime channel: WebSocket rooms with Y-CRDT documents and change topics.
+#[cfg(feature = "realtime")]
+pub use server::realtime;
 pub use screen::{
     Component, Effect, Export, FormSource, GridSource, Icon, LoadedPage, Node, Params, RowCall, Screen, ScreenDef, ScreenMeta,
     ToolButton, Toolbar, UiCtx, Window,

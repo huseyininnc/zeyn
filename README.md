@@ -42,6 +42,7 @@ cargo run -p zeyn-cli -- new my-domain --lib   # a library of features shared by
 
 - Strong data grid that handles large datasets, in the browser or on the server
 - Hybrid rendering: server driven pages by default, WebAssembly islands (feature `islands`) for heavy components, with typed action calls and shared Rust types (see `docs/islands.md`)
+- Optional realtime channel (feature `realtime`): WebSocket rooms with Y-CRDT documents for live editing and topics that refresh screens in place, with bounded memory (see `docs/realtime.md`)
 - Built in MCP server and llms.txt so agents can query components, validate screens and run tests
 - Secure defaults: CSRF, CSP, role based access and audit logging in the core
 - Predictable memory use and a single binary deployment

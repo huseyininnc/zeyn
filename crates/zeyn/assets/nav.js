@@ -68,6 +68,7 @@ async function visit(url, push) {
     location.assign(res.redirected ? res.url : url.href);
     return;
   }
+  if (res.headers.get('x-zeyn-live') === '1') import(`${BASE}/_zeyn/live.js`);
   const html = await res.text();
   const finalUrl = new URL(res.url || url.href);
   if (url.hash && !finalUrl.hash) finalUrl.hash = url.hash;
