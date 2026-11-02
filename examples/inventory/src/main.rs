@@ -3,8 +3,9 @@
 //!
 //! Run: `cargo run -p zeyn-example-inventory`, then open http://127.0.0.1:3001
 //!
-//! Products are kept in memory by default. Set `ZEYN_DATABASE_URL` to a PostgreSQL URL to keep
-//! them in the database instead; the migrations in `migrations/` create and fill the table.
+//! Products are kept in memory by default. Set `ZEYN_DATABASE_URL` to a PostgreSQL
+//! (`postgres://...`) or Oracle (`oracle://...`) URL to keep them in that database instead; the
+//! table is created and filled on the first start.
 
 mod stock;
 

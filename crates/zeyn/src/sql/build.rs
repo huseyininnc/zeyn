@@ -89,6 +89,12 @@ pub trait Dialect: Send + Sync + 'static {
     fn after_create(&self, _table: &str) -> Result<Vec<String>> {
         Ok(Vec::new())
     }
+
+    /// Whether `INSERT` and `UPDATE` can return the written row (`RETURNING` with a select
+    /// list). Without it the row is read again after the write.
+    fn returning(&self) -> bool {
+        true
+    }
 }
 
 /// PostgreSQL 12 and later.
@@ -182,6 +188,152 @@ impl Dialect for Postgres {
 
     fn false_literal(&self) -> &'static str {
         "FALSE"
+    }
+}
+
+/// Oracle Database version the SQL must run on, like EF Core's `UseOracleSQLCompatibility`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OracleCompat {
+    /// 11g: `ROWNUM` paging and a sequence per table for keys.
+    V11,
+    /// 12c and later: `OFFSET ... FETCH` paging and identity keys.
+    V12,
+}
+
+/// Oracle Database. Identifiers are written upper case and quoted, at most 30 characters (the
+/// limit before 12.2). The empty string is NULL, so text columns are nullable and sort with NULLs.
+/// Yes/no is `NUMBER(1)`, `Time` is `VARCHAR2(8)`, moments are `TIMESTAMP(3)` in UTC.
+///
+/// ```
+/// use zeyn::sql::{Dialect, Oracle, OracleCompat};
+/// let mut out = String::new();
+/// Oracle { compat: OracleCompat::V11 }.quote(&mut out, "code");
+/// assert_eq!(out, "\"CODE\"");
+/// ```
+#[derive(Clone, Copy, Debug)]
+pub struct Oracle {
+    pub compat: OracleCompat,
+}
+
+impl Oracle {
+    /// Name of the key sequence of `table` on 11g: `<table>_seq`, written upper case.
+    pub fn sequence(table: &str) -> String {
+        format!("{table}_seq")
+    }
+}
+
+impl Dialect for Oracle {
+    fn name(&self) -> &'static str {
+        "oracle"
+    }
+
+    fn param(&self, out: &mut String, n: usize, cast: Cast) {
+        let (start, end) = match cast {
+            Cast::Plain | Cast::Int | Cast::Time => ("", ""),
+            Cast::Date => ("TO_DATE(", ", 'YYYY-MM-DD')"),
+            Cast::Moment => ("TO_TIMESTAMP(", ", 'YYYY-MM-DD\"T\"HH24:MI:SS.FF3\"Z\"')"),
+            Cast::Local => ("TO_TIMESTAMP(", ", 'YYYY-MM-DD\"T\"HH24:MI:SS')"),
+        };
+        out.push_str(start);
+        out.push(':');
+        out.push_str(&n.to_string());
+        out.push_str(end);
+    }
+
+    fn quote(&self, out: &mut String, ident: &str) {
+        out.push('"');
+        out.push_str(&ident.to_ascii_uppercase());
+        out.push('"');
+    }
+
+    fn max_ident(&self) -> usize {
+        30
+    }
+
+    fn read(&self, out: &mut String, expr: &str, cast: Cast) {
+        let (start, end) = match cast {
+            Cast::Plain | Cast::Int | Cast::Time => ("", ""),
+            Cast::Date => ("TO_CHAR(", ", 'YYYY-MM-DD')"),
+            Cast::Moment => ("TO_CHAR(CAST(", " AS TIMESTAMP(3)), 'YYYY-MM-DD\"T\"HH24:MI:SS.FF3\"Z\"')"),
+            Cast::Local => ("TO_CHAR(", ", 'YYYY-MM-DD\"T\"HH24:MI:SS')"),
+        };
+        out.push_str(start);
+        out.push_str(expr);
+        out.push_str(end);
+    }
+
+    fn float(&self, out: &mut String, expr: &str) {
+        out.push_str(expr);
+    }
+
+    fn text(&self, out: &mut String, expr: &str) {
+        out.push_str("TO_CHAR(");
+        out.push_str(expr);
+        out.push(')');
+    }
+
+    /// 12c: `OFFSET :o ROWS FETCH NEXT :n ROWS ONLY`. 11g: the `ROWNUM` wrapper, which numbers
+    /// the ordered rows and keeps the window; the outer `ORDER BY` keeps their order.
+    fn page(&self, sql: &mut Sql, limit: i64, offset: i64) {
+        match self.compat {
+            OracleCompat::V12 => {
+                sql.push(" OFFSET ");
+                sql.bind(self, Arg::Int(offset), Cast::Plain);
+                sql.push(" ROWS FETCH NEXT ");
+                sql.bind(self, Arg::Int(limit), Cast::Plain);
+                sql.push(" ROWS ONLY");
+            }
+            OracleCompat::V11 => {
+                sql.wrap("SELECT * FROM (SELECT zq.*, ROWNUM zeyn_rn FROM (", ") zq WHERE ROWNUM <= ");
+                sql.bind(self, Arg::Int(offset.saturating_add(limit)), Cast::Plain);
+                sql.push(") WHERE zeyn_rn > ");
+                sql.bind(self, Arg::Int(offset), Cast::Plain);
+                sql.push(" ORDER BY zeyn_rn");
+            }
+        }
+    }
+
+    fn empty_is_null(&self) -> bool {
+        true
+    }
+
+    fn column_type(&self, kind: &FieldKind, max_len: Option<usize>) -> String {
+        match kind {
+            FieldKind::Id | FieldKind::Integer | FieldKind::Money => "NUMBER(19)".into(),
+            FieldKind::Bool => "NUMBER(1)".into(),
+            FieldKind::Date => "DATE".into(),
+            FieldKind::Time => "VARCHAR2(8)".into(),
+            FieldKind::DateTime => "TIMESTAMP(3)".into(),
+            FieldKind::LocalDateTime => "TIMESTAMP(0)".into(),
+            FieldKind::Choice(options) => format!("VARCHAR2({} CHAR)", choice_len(options)),
+            FieldKind::Text => match max_len {
+                Some(n) if n <= 1000 => format!("VARCHAR2({n} CHAR)"),
+                _ => "VARCHAR2(4000)".into(),
+            },
+            FieldKind::Custom { .. } => "CLOB".into(),
+        }
+    }
+
+    fn generated_key(&self) -> &'static str {
+        match self.compat {
+            OracleCompat::V11 => "NUMBER(19)",
+            OracleCompat::V12 => "NUMBER(19) GENERATED BY DEFAULT ON NULL AS IDENTITY",
+        }
+    }
+
+    fn false_literal(&self) -> &'static str {
+        "0"
+    }
+
+    fn after_create(&self, table: &str) -> Result<Vec<String>> {
+        Ok(match self.compat {
+            OracleCompat::V11 => vec![format!("CREATE SEQUENCE {}", ident(self, &Oracle::sequence(table))?)],
+            OracleCompat::V12 => Vec::new(),
+        })
+    }
+
+    fn returning(&self) -> bool {
+        false
     }
 }
 

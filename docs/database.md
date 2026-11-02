@@ -1,11 +1,12 @@
 # Database
 
 `zeyn::sql` keeps entities in a SQL database. It lists them from the `DataQuery` a grid sends
-(filters, sort, pages, totals, groups) and saves them with row version checks. It is behind the
-`postgres` Cargo feature, so an app without a database compiles none of it.
+(filters, sort, pages, totals, groups) and saves them with row version checks. PostgreSQL is
+behind the `postgres` Cargo feature and Oracle behind `oracle`, so an app without a database
+compiles none of it.
 
 ```toml
-zeyn = { version = "0.0.2", features = ["postgres"] }
+zeyn = { version = "0.0.2", features = ["postgres"] }   # or ["oracle"], or both
 ```
 
 ## Setup
@@ -31,7 +32,7 @@ pub async fn save_product(p: Valid<Product>, db: Db) -> Result<Product> {
 
 | Key | Default | Meaning |
 |---|---|---|
-| `database.url` | required | `postgres://user:password@host:5432/db` |
+| `database.url` | required | `postgres://user:password@host:5432/db` or `oracle://user:password@host:1521/service` |
 | `database.max_connections` | 10 | Pool size; requests wait for a free connection |
 | `database.min_connections` | 0 | Connections kept open when idle |
 | `database.acquire_timeout_ms` | 5000 | Longest wait for a connection |
@@ -39,39 +40,93 @@ pub async fn save_product(p: Valid<Product>, db: Db) -> Result<Product> {
 | `database.statement_timeout_ms` | 30000 | Longest a statement may run; 0 keeps the server default |
 | `database.count_cap` | 1000000 | Largest total counted for a page |
 
-`Db::connect(url, PoolLimits { .. })` does the same without `Config`. Connections open lazily,
-so the app starts while the database is down and the first query reports the problem.
+`Db::connect(url, PoolLimits { .. })` does the same without `Config`. The URL scheme picks the
+driver. Characters such as `@` or `:` in an Oracle password are written percent encoded (`%40`).
 
-The `inventory` example runs on PostgreSQL when `ZEYN_DATABASE_URL` is set and in memory
-otherwise:
+PostgreSQL connections open lazily, so the app starts while the database is down and the first
+query reports the problem. Oracle asks the server for its version when it connects, unless the
+URL says which SQL to write (`?compat=11` or `?compat=12`); with `compat` set, it starts without
+the database too.
+
+The `inventory` example keeps its products in memory, or in the database `ZEYN_DATABASE_URL`
+names:
 
 ```
 docker run -d --name zeyn-pg -e POSTGRES_PASSWORD=zeyn -p 55432:5432 postgres:17-alpine
 ZEYN_DATABASE_URL=postgres://postgres:zeyn@127.0.0.1:55432/postgres cargo run -p zeyn-example-inventory
 ```
 
+## Oracle Instant Client
+
+The Oracle driver is the `oracle` crate on ODPI-C. It compiles without Oracle software, but at
+run time it loads the Oracle Client library (`oci.dll`, `libclntsh.so`). Oracle Instant Client is
+free to use:
+
+1. Download Instant Client Basic Light for your platform from Oracle's Instant Client page. On
+   Windows x64 take the zip `instantclient-basiclite-windows.x64-19.*.zip`. Version 19 connects to
+   Oracle Database 11.2 through 23ai; newer clients no longer connect to 11g.
+2. Unpack it into a folder of its own, for example `C:\oracle\instantclient_19`.
+3. Put that folder first on `PATH`, or set `ZEYN_ORACLE_CLIENT_DIR` to it. The variable wins over
+   `PATH`, which helps when another Oracle home is installed. On Linux, install the RPM or set
+   `LD_LIBRARY_PATH`; Basic Light also needs `libaio`.
+
+Without the library the first connection fails with `DPI-1047: Cannot locate a 64-bit Oracle
+Client library`.
+
+## Dialects
+
+The SQL builder is shared. A `Dialect` supplies only what differs, and `Postgres` and
+`Oracle { compat }` implement it:
+
+| | PostgreSQL | Oracle 12c and later (`V12`) | Oracle 11g (`V11`) |
+|---|---|---|---|
+| Parameters | `$1` | `:1` | `:1` |
+| Identifiers | `"code"`, up to 63 characters | `"CODE"`, up to 30 characters | `"CODE"`, up to 30 characters |
+| Pages | `LIMIT $n OFFSET $m` | `OFFSET :m ROWS FETCH NEXT :n ROWS ONLY` | `ROWNUM` window over the ordered query |
+| New keys | identity, `RETURNING` | identity, `RETURNING id INTO :n` | `<table>_seq.NEXTVAL` |
+| Read back after a write | `RETURNING` the row | read by key | read by key |
+| Yes/no | `BOOLEAN` | `NUMBER(1)` | `NUMBER(1)` |
+| Empty text | a value | NULL | NULL |
+
+`compat` follows the idea of EF Core's `UseOracleSQLCompatibility("11")`: the server version
+picks it when the URL does not. Identifiers stay within 30 characters on every Oracle version
+because 12.1 has the same limit as 11g; a longer entity or field name is an error naming it.
+
+Oracle stores the empty string as NULL. Zeyn reads a NULL in a required `String` field as `""`,
+writes text columns as nullable, and sorts and pages text as a nullable column, so cursors stay
+exact. An `Option<String>` holding `Some("")` reads back as `None`.
+
+Oracle's driver is blocking. Every call runs on Tokio's blocking threads with a connection taken
+from the bounded pool, so it never stalls the async runtime; at most `max_connections` calls run
+at once and the others wait up to `acquire_timeout_ms`.
+
 ## Tables
 
 Columns are named after the fields. Types:
 
-| Field | PostgreSQL column |
-|---|---|
-| `#[key]` entity id | `BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY` |
-| `String` | `VARCHAR(max_len)` or `TEXT` |
-| `i32`, `i64` | `BIGINT` (an `INTEGER` column works too) |
-| `bool` | `BOOLEAN` |
-| `Money` | `BIGINT` with the amount in the smallest unit, plus `<field>_currency VARCHAR(3)` (`TRY`, `USD`, `EUR`) |
-| `Date` | `DATE` |
-| `Time` | `TIME` |
-| `DateTime` | `TIMESTAMPTZ(3)` (a moment, read and written in UTC) |
-| `LocalDateTime` | `TIMESTAMP` |
-| `#[choice]` enum | `VARCHAR` holding the variant name |
-| Custom field types | `TEXT` holding JSON |
-| `Option<T>` | the same column, nullable |
+| Field | PostgreSQL | Oracle |
+|---|---|---|
+| `#[key]` entity id | `BIGINT GENERATED BY DEFAULT AS IDENTITY` | `NUMBER(19)` identity (12c+) or with a sequence (11g) |
+| `String` | `VARCHAR(max_len)` or `TEXT` | `VARCHAR2(max_len CHAR)` or `VARCHAR2(4000)`, nullable |
+| `i32`, `i64` | `BIGINT` (an `INTEGER` column works too) | `NUMBER(19)` |
+| `bool` | `BOOLEAN` | `NUMBER(1)` |
+| `Money` | `BIGINT` amount in the smallest unit, plus `<field>_currency VARCHAR(3)` | `NUMBER(19)`, plus `<field>_currency` |
+| `Date` | `DATE` | `DATE` |
+| `Time` | `TIME` | `VARCHAR2(8)` holding `HH:MM:SS` |
+| `DateTime` | `TIMESTAMPTZ(3)` | `TIMESTAMP(3)` holding UTC |
+| `LocalDateTime` | `TIMESTAMP` | `TIMESTAMP(0)` |
+| `#[choice]` enum | `VARCHAR` holding the variant name | `VARCHAR2` |
+| Custom field types | `TEXT` holding JSON | `CLOB` holding JSON |
+| `Option<T>` | the same column, nullable | the same column, nullable |
 
-`create_table::<E>(&Postgres)` (or `db.create_table::<E>()`) writes this `CREATE TABLE` for
+Currencies are stored as `TRY`, `USD` and `EUR`. Dates and times travel as ISO text and the SQL
+converts them with fixed formats (`TO_DATE(:1, 'YYYY-MM-DD')`, `to_char(...)`), so session
+settings such as `NLS_DATE_FORMAT` or the PostgreSQL time zone do not change results.
+
+`create_table::<E>(dialect)` (or `db.create_table::<E>()`) writes the `CREATE TABLE` for
 scaffolding and tests, with a constraint named `<table>_<field>_key` for every
-`#[rule(unique)]` field. Production schemas belong in migrations:
+`#[rule(unique)]` field and, on 11g, the key sequence. Production schemas belong in migrations.
+On PostgreSQL:
 
 ```rust
 db.migrate(&sqlx::migrate!("./migrations")).await?;
@@ -80,7 +135,8 @@ db.migrate_dir("./migrations").await?;
 
 The first embeds the migrations at compile time, the second reads the folder at run time.
 `sqlx::migrate!` needs `sqlx` with its `macros` and `migrate` features in the app's own
-`Cargo.toml`; `migrate_dir` needs nothing more.
+`Cargo.toml`; `migrate_dir` needs nothing more. Oracle schemas are migrated with the team's own
+tool; `create_table` gives the starting script.
 
 ## Reading
 
@@ -98,18 +154,20 @@ the same on memory data and in SQL:
 | `is` | `col = $1` |
 | `blank` | `col IS NULL`, `col IS NOT NULL` |
 
-`contains` on money and yes/no columns is ignored in SQL. Text sorts by the database collation.
+`contains` on money and yes/no columns is ignored in SQL. Text sorts by the database collation
+(Oracle: `NLS_SORT`).
 
 Every sort ends with the key, so the order is total. NULLs come first going up and last going
 down, as in memory; the `NULLS` clause is written only for nullable columns, so plain indexes
 serve the other sorts.
 
-`get(key)` reads one row and fails with `Error::NotFound` when there is none.
+`get(key)` reads one row and fails with `Error::NotFound` when there is none. Any table or view
+can be read through an entity, for example Oracle's `user_sequences`.
 
 ## Cursors
 
-Numbered pages use `LIMIT` and `OFFSET`. Infinite and virtual scroll use keyset cursors, which do
-not slow down deep into a list and do not skip or repeat rows when others are inserted:
+Numbered pages use offsets. Infinite and virtual scroll use keyset cursors, which do not slow
+down deep into a list and do not skip or repeat rows when others are inserted:
 
 ```sql
 WHERE "code" <= $1 AND (("code" < $2) OR ("code" = $3 AND "id" > $4))
@@ -127,8 +185,8 @@ Grouped pages use offsets for their cursors.
 
 ## Totals and counts
 
-`with_total` counts at most `database.count_cap` rows (`SELECT COUNT(*) FROM (... LIMIT cap)`),
-so a total over a huge table stays cheap; when the count reaches the cap, `Page::total` is the cap.
+`with_total` counts at most `database.count_cap` rows (a `COUNT(*)` over the capped query), so a
+total over a huge table stays cheap; when the count reaches the cap, `Page::total` is the cap.
 
 Column totals are one aggregate statement over every row that matches the filters. They follow
 the in memory rules: an empty sum is 0, an empty average is empty, money averages round half away
@@ -147,9 +205,9 @@ from zero, and money in more than one currency has no total.
   code changes them with SQL of its own: `db.execute("UPDATE products SET stock = stock - $1 WHERE id = $2", args)`.
   `execute` takes a string literal, so values can only arrive as parameters.
 
-A unique violation becomes a validation error on the field: the `#[rule(unique)]` field whose name
-is in the constraint name, or the only unique field. The form shows it under the input like any
-other rule. Name constraints `<table>_<column>_key`, as PostgreSQL does by default.
+A unique violation (PostgreSQL `23505`, Oracle `ORA-00001`) becomes a validation error on the
+field: the `#[rule(unique)]` field whose name is in the constraint name, or the only unique field.
+The form shows it under the input like any other rule. Name constraints `<table>_<column>_key`.
 
 ## Transactions
 
@@ -161,6 +219,7 @@ tx.commit().await?;
 ```
 
 `Tx` has the same calls as `Db` on one connection. Dropping it without `commit` rolls back.
+Calls on `Db` itself commit one by one.
 
 ## Streams
 
@@ -185,20 +244,30 @@ connection. `RowStream` implements `futures_core::Stream`.
 
 ## Performance
 
-- Statements are prepared and cached per connection.
+- Statements are prepared and cached per connection (sqlx's statement cache, Oracle's statement
+  cache of 64).
 - Rows are read into a few plain cell types and moved into the model by a serde deserializer:
   no intermediate map and no copies of the text.
-- The pool is bounded and each `find` uses one connection for its two or three statements.
+- The pools are bounded and each `find` uses one connection for its two or three statements.
+- Oracle fetches 128 rows per round trip. A page (at most 501 rows) is read on a blocking thread
+  and handed over at once; streams go row by row.
 - Streams hold at most `STREAM_BUFFER` rows.
 
 ## Tests
 
-The SQL builder has unit tests that need no database. The integration tests in
-`crates/zeyn/tests/postgres.rs` compare `Db::find` with `DataQuery::apply` over the same rows,
-walk every keyset cursor, and check saves, conflicts, unique errors, transactions, streams and
-migrations. They run when `ZEYN_TEST_PG` is set and say they were skipped otherwise:
+The SQL builder has unit tests for both dialects that need no database. The integration tests
+compare `Db::find` with `DataQuery::apply` over the same rows, walk every keyset cursor, and
+check saves, conflicts, unique errors, transactions and streams. They run when their variable
+holds one or more URLs (separated by spaces) and say they were skipped otherwise:
 
 ```
 docker run -d --name zeyn-pg -e POSTGRES_PASSWORD=zeyn -p 55432:5432 postgres:17-alpine
 ZEYN_TEST_PG=postgres://postgres:zeyn@127.0.0.1:55432/postgres cargo test -p zeyn --features postgres --test postgres
+
+docker run -d --name zeyn-ora11 -p 15211:1521 -e ORACLE_PASSWORD=zeyn -e APP_USER=zeyn -e APP_USER_PASSWORD=zeyn gvenzl/oracle-xe:11-slim
+docker run -d --name zeyn-ora21 -p 15221:1521 -e ORACLE_PASSWORD=zeyn -e APP_USER=zeyn -e APP_USER_PASSWORD=zeyn gvenzl/oracle-xe:21-slim
+ZEYN_TEST_ORACLE="oracle://zeyn:zeyn@127.0.0.1:15211/XE oracle://zeyn:zeyn@127.0.0.1:15221/XEPDB1" cargo test -p zeyn --features oracle --test oracle
 ```
+
+The Oracle containers take a few minutes to start; wait for `DATABASE IS READY TO USE!` in
+`docker logs`.

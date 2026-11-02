@@ -40,10 +40,24 @@ impl ProductStore {
         ProductStore::Memory(Arc::new(RwLock::new(products)))
     }
 
-    /// PostgreSQL store. Runs the migrations in `migrations/`, which create and fill the table.
+    /// Database store. On PostgreSQL the migrations in `migrations/` create and fill the table;
+    /// on Oracle the table is created from the entity and filled with the sample products the
+    /// first time.
     pub async fn connect(url: &str) -> Result<Self> {
         let db = Db::connect(url, PoolLimits::default()).await?;
-        db.migrate_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/migrations")).await?;
+        if db.dialect().name() == "postgres" {
+            db.migrate_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/migrations")).await?;
+        } else if db.find::<Product>(&DataQuery::default()).await.is_err() {
+            db.create_table::<Product>().await?;
+            let ProductStore::Memory(samples) = ProductStore::seeded() else { unreachable!() };
+            let samples = samples.read().map_err(poisoned)?.clone();
+            let mut tx = db.begin().await?;
+            for p in samples {
+                tx.insert(&Product { id: ProductId(0), ..p }).await?;
+            }
+            tx.execute("UPDATE products SET stock = MOD(id * 7, 40)", vec![]).await?;
+            tx.commit().await?;
+        }
         Ok(ProductStore::Sql(db))
     }
 

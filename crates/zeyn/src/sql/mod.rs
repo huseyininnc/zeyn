@@ -1,5 +1,6 @@
 //! Data layer: entities in a SQL database, listed from a [`DataQuery`] and saved with row version
-//! checks. Behind the `postgres` Cargo feature; apps without a database do not compile it.
+//! checks. Behind the `postgres` and `oracle` Cargo features; apps without a database do not
+//! compile it.
 //!
 //! ```no_run
 //! use zeyn::prelude::*;
@@ -31,10 +32,12 @@
 
 mod build;
 mod decode;
+#[cfg(feature = "oracle")]
+mod ora;
 #[cfg(feature = "postgres")]
 mod pg;
 
-pub use build::{Cast, Dialect, Postgres, Sql, create_table};
+pub use build::{Cast, Dialect, Oracle, OracleCompat, Postgres, Sql, create_table};
 pub use decode::{Arg, Cell, Col};
 
 use crate::action::{DataQuery, Error, Page, Result};
@@ -117,6 +120,8 @@ impl PoolLimits {
 enum Backend {
     #[cfg(feature = "postgres")]
     Postgres(sqlx::PgPool),
+    #[cfg(feature = "oracle")]
+    Oracle(ora::OraPool, OracleCompat),
 }
 
 struct Inner {
@@ -146,6 +151,8 @@ pub(crate) enum Link {
     Pg(sqlx::pool::PoolConnection<sqlx::Postgres>),
     #[cfg(feature = "postgres")]
     PgTx(sqlx::Transaction<'static, sqlx::Postgres>),
+    #[cfg(feature = "oracle")]
+    Ora(ora::OraLink),
 }
 
 /// How a driver error becomes a Zeyn error: unique violations name the field of `M`.
@@ -167,13 +174,21 @@ fn raw_error(unique: Option<&str>, detail: String) -> Error {
 }
 
 impl Db {
-    /// Connects to `url` (`postgres://user:password@host:5432/db`) with the given limits. The
-    /// password is never logged or put in errors.
+    /// Connects to `url` with the given limits. The password is never logged or put in errors.
+    ///
+    /// - `postgres://user:password@host:5432/db` (feature `postgres`)
+    /// - `oracle://user:password@host:1521/service` (feature `oracle`); add `?compat=11` or
+    ///   `?compat=12` to choose the SQL without asking the database for its version
     pub async fn connect(url: &str, limits: PoolLimits) -> Result<Db> {
         let scheme = url.split("://").next().unwrap_or_default();
         let (backend, dialect): (Backend, Box<dyn Dialect>) = match scheme {
             #[cfg(feature = "postgres")]
             "postgres" | "postgresql" => (Backend::Postgres(pg::connect(url, &limits).await?), Box::new(Postgres)),
+            #[cfg(feature = "oracle")]
+            "oracle" => {
+                let (pool, dialect) = ora::connect(url, &limits).await?;
+                (Backend::Oracle(pool, dialect.compat), Box::new(dialect))
+            }
             _ => return Err(Error::Internal(format!("no database driver for `{scheme}://` URLs; enable the matching Zeyn feature"))),
         };
         Ok(Db { inner: Arc::new(Inner { backend, dialect, count_cap: limits.count_cap }) })
@@ -193,6 +208,8 @@ impl Db {
         match &self.inner.backend {
             #[cfg(feature = "postgres")]
             Backend::Postgres(pool) => pool.acquire().await.map(Link::Pg).map_err(|e| Error::Internal(format!("database connection: {e}"))),
+            #[cfg(feature = "oracle")]
+            Backend::Oracle(pool, compat) => ora::OraLink::acquire(pool, *compat, false).await.map(Link::Ora),
         }
     }
 
@@ -235,6 +252,8 @@ impl Db {
         let link = match &self.inner.backend {
             #[cfg(feature = "postgres")]
             Backend::Postgres(pool) => Link::PgTx(pool.begin().await.map_err(|e| Error::Internal(format!("begin: {e}")))?),
+            #[cfg(feature = "oracle")]
+            Backend::Oracle(pool, compat) => Link::Ora(ora::OraLink::acquire(pool, *compat, true).await?),
         };
         Ok(Tx { db: self.clone(), link })
     }
@@ -251,6 +270,8 @@ impl Db {
             Ok(sql) => match &self.inner.backend {
                 #[cfg(feature = "postgres")]
                 Backend::Postgres(pool) => pg::stream::<E>(pool.clone(), sql, tx),
+                #[cfg(feature = "oracle")]
+                Backend::Oracle(pool, _) => ora::stream::<E>(pool.clone(), sql, tx),
             },
         }
         RowStream { rx }
@@ -265,10 +286,13 @@ impl Db {
     }
 
     /// Runs pending migrations, such as the ones `sqlx::migrate!("./migrations")` embeds.
+    /// PostgreSQL only.
     #[cfg(feature = "postgres")]
     pub async fn migrate(&self, migrator: &sqlx::migrate::Migrator) -> Result<()> {
         match &self.inner.backend {
             Backend::Postgres(pool) => migrator.run(pool).await.map_err(|e| Error::Internal(format!("migration: {e}"))),
+            #[cfg(feature = "oracle")]
+            Backend::Oracle(..) => Err(Error::Internal("sqlx migrations run on PostgreSQL only".into())),
         }
     }
 
@@ -420,7 +444,11 @@ impl Link {
     }
 
     async fn get<E: Entity>(&mut self, d: &dyn Dialect, key: impl FieldType) -> Result<E> {
-        self.one(build::plan_get::<E>(d, key.to_value())?).await?.ok_or(Error::NotFound)
+        self.get_by(d, key.to_value()).await
+    }
+
+    async fn get_by<E: Entity>(&mut self, d: &dyn Dialect, key: crate::value::Value) -> Result<E> {
+        self.one(build::plan_get::<E>(d, key)?).await?.ok_or(Error::NotFound)
     }
 
     async fn insert<E: Entity>(&mut self, d: &dyn Dialect, row: &E) -> Result<E> {
@@ -430,16 +458,29 @@ impl Link {
                 let sql = build::plan_insert(d, row, None, true)?;
                 self.one(sql).await?.ok_or_else(|| Error::Internal("insert returned no row".into()))
             }
+            #[cfg(feature = "oracle")]
+            Link::Ora(link) => {
+                let dialect = Oracle { compat: link.compat() };
+                let key = link.insert(&dialect, row, on_error::<E>).await?;
+                self.get_by(d, key).await
+            }
         }
     }
 
+    /// Without `RETURNING` (Oracle) the row is read again on the same connection after the
+    /// update, so a transaction sees its own write.
     async fn update<E: Entity>(&mut self, d: &dyn Dialect, row: &E) -> Result<E> {
-        let (sql, versioned) = build::plan_update(d, row, true)?;
-        match self.one(sql).await? {
-            Some(saved) => Ok(saved),
-            None if versioned => Err(Error::Conflict),
-            None => Err(Error::NotFound),
+        let returning = d.returning();
+        let (sql, versioned) = build::plan_update(d, row, returning)?;
+        let missing = if versioned { Error::Conflict } else { Error::NotFound };
+        if returning {
+            return self.one(sql).await?.ok_or(missing);
         }
+        if self.execute(sql, on_error::<E>).await? == 0 {
+            return Err(missing);
+        }
+        let key = E::fields().iter().position(|f| f.key).and_then(|i| row.value_at(i)).unwrap_or(crate::value::Value::Null);
+        self.get_by(d, key).await
     }
 
     async fn delete<E: Entity>(&mut self, d: &dyn Dialect, key: impl FieldType) -> Result<()> {
@@ -455,6 +496,8 @@ impl Link {
             Link::Pg(c) => pg::fetch(c, sql, err, each).await,
             #[cfg(feature = "postgres")]
             Link::PgTx(c) => pg::fetch(c, sql, err, each).await,
+            #[cfg(feature = "oracle")]
+            Link::Ora(c) => c.fetch(sql, err, each).await,
         }
     }
 
@@ -464,6 +507,8 @@ impl Link {
             Link::Pg(c) => pg::execute(c, sql, err).await,
             #[cfg(feature = "postgres")]
             Link::PgTx(c) => pg::execute(c, sql, err).await,
+            #[cfg(feature = "oracle")]
+            Link::Ora(c) => c.execute(sql, err).await,
         }
     }
 
@@ -473,6 +518,8 @@ impl Link {
             Link::PgTx(t) => t.commit().await.map_err(|e| Error::Internal(format!("commit: {e}"))),
             #[cfg(feature = "postgres")]
             Link::Pg(_) => Ok(()),
+            #[cfg(feature = "oracle")]
+            Link::Ora(c) => c.commit().await,
         }
     }
 
@@ -482,6 +529,8 @@ impl Link {
             Link::PgTx(t) => t.rollback().await.map_err(|e| Error::Internal(format!("rollback: {e}"))),
             #[cfg(feature = "postgres")]
             Link::Pg(_) => Ok(()),
+            #[cfg(feature = "oracle")]
+            Link::Ora(c) => c.rollback().await,
         }
     }
 }
