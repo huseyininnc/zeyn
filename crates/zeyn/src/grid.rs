@@ -470,14 +470,30 @@ pub struct ExportColumn {
 /// Most rows an export holds unless the grid sets another limit.
 pub const DEFAULT_EXPORT_LIMIT: usize = 100_000;
 
-/// Quotes one CSV cell (RFC 4180) and defuses spreadsheet formulas in text that is not a number.
+/// Quotes one CSV cell (RFC 4180) and defuses spreadsheet formulas in text that is not a number:
+/// at the start and after every character a spreadsheet may split cells on (`,`, `;`, tab), since
+/// the list separator depends on the reader's locale.
 fn csv_cell(value: &str) -> String {
     let numeric = |s: &str| !s.is_empty() && s.chars().all(|c| c.is_ascii_digit() || ".,- +".contains(c));
-    let mut v = value.to_string();
-    if v.starts_with(['=', '+', '-', '@', '\t', '\r']) && !numeric(&v) {
-        v.insert(0, '\'');
+    let formula = |s: &str| s.starts_with(['=', '+', '-', '@', '\t', '\r']) && !numeric(s);
+    let mut v = String::with_capacity(value.len() + 2);
+    let mut rest = value;
+    loop {
+        if formula(rest) {
+            v.push('\'');
+        }
+        match rest.find([',', ';', '\t']) {
+            Some(i) => {
+                v.push_str(&rest[..=i]);
+                rest = &rest[i + 1..];
+            }
+            None => {
+                v.push_str(rest);
+                break;
+            }
+        }
     }
-    if v.contains([',', '"', '\r', '\n']) { format!("\"{}\"", v.replace('"', "\"\"")) } else { v }
+    if v.contains([',', ';', '\t', '"', '\r', '\n']) { format!("\"{}\"", v.replace('"', "\"\"")) } else { v }
 }
 
 /// The masked text of a masked field's value, as its grid cell shows it.
@@ -1706,8 +1722,21 @@ impl<E: Model> GridSource for DataGrid<E> {
         E::SENSITIVE.then_some(E::NAME)
     }
 
+    /// Reveals a masked column of one row. The row is loaded like a row action's, through the
+    /// grid's scope, so only rows the grid shows can be revealed.
     fn reveal(&self, ctx: Ctx, key: String, field: String) -> BoxFuture<Result<Option<crate::privacy::Revealed>>> {
-        crate::privacy::grid_reveal::<E>(self.fetch, ctx, key, field)
+        if !self.columns.iter().any(|c| c.meta.name == field && c.meta.mask.is_some()) {
+            return Box::pin(async { Ok(None) });
+        }
+        let find = self.find_row(ctx, key.clone());
+        Box::pin(async move {
+            let page = find.await?;
+            let rows = page.items.downcast_ref::<Vec<E>>();
+            let row = rows.and_then(|rows| {
+                rows.iter().find(|r| crate::audit::RecordRef::of(*r).id.as_deref() == Some(key.as_str()))
+            });
+            Ok(row.and_then(|row| crate::privacy::reveal_in(row, &field)))
+        })
     }
 
     fn tool_schema(&self) -> serde_json::Value {

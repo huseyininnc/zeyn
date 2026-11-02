@@ -48,7 +48,7 @@ mod pdf;
 #[cfg(feature = "xlsx")]
 mod xlsx;
 
-pub use ops::{build_id, probe};
+pub use ops::{READY_CACHE, build_id, probe};
 
 /// The browser runtime, served as one script at `/_zeyn/zeyn.js` so a page makes one request. The
 /// source is one file per concern under `assets/zeyn/`, joined here in this order (later parts
@@ -1010,6 +1010,7 @@ impl App {
     /// Checks routes, screen names, menus and that every service a screen needs is registered.
     pub fn check(&self) -> Result<(), Vec<String>> {
         let mut problems = self.setup_problems.clone();
+        problems.extend(self.dev_auth_check());
         let mut paths: HashMap<String, &str> = HashMap::new();
         let mut names: HashMap<&str, &str> = HashMap::new();
         for f in &self.features {
@@ -1873,6 +1874,7 @@ impl AppState {
         format!(
             r##"<!doctype html><html lang="{lang}"{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css"><script type="module" src="{base}/_zeyn/zeyn.js"></script><script type="module" src="{base}/_zeyn/nav.js"></script>{components}{theme_link}{extra}</head><body><a class="z-skip" href="#z-main">{skip}</a><div class="z-app"><nav class="z-nav" aria-label="{menu}"><p class="z-app-name">{app}</p>{palette}{nav}</nav><main class="z-main" id="z-main">{main}</main></div><div class="z-toasts" role="status" aria-live="polite"></div>{commands}{ai_launcher}</body></html>"##,
             lang = escape(ctx.locale()),
+            csrf = escape(csrf),
             tz = escape(ctx.time_zone().name()),
             base = escape(&self.prefix),
             components = format!(

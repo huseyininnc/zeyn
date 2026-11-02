@@ -166,7 +166,10 @@ pub async fn move_leave(req: TransitionRequest<LeaveRequestId>, store: LeaveStor
   `503 {"status":"not_ready","failed":["database"]}`. Only check names are shown, never errors.
 - Both live under `base_path` (`/billing/_zeyn/health`), answer with `Cache-Control: no-store`
   and need no sign in.
-- They are never rate limited, so a busy probe cannot lock itself out and restart a healthy app.
+- The readiness result is reused for one second (`READY_CACHE`), and only one request at a time
+  runs the checks, so a flood of probes cannot load the database.
+- Health is never rate limited, so a busy probe cannot lock itself out and restart a healthy app.
+  Readiness counts toward the rate limits unless it comes from a `probe_ips` address.
 - IP rules still apply: `deny_ips` always, `allow_only_ips` too unless the probe address is listed
   in `App::probe_ips([...])`, which opens only these two endpoints to it.
 
@@ -212,6 +215,11 @@ Screen::new("Import").body(Import::of(import_leaves).max_rows(1000))
   ten rows, the errors per row and a downloadable error report.
 - Parsing: byte order mark dropped, `,`, `;` or tab detected from the header line, `"` quoting with
   separators and line breaks inside, `\r\n` or `\n`.
+- Limits are checked while the file is read, not after: reading stops at the row limit, a header
+  of more than 512 cells is refused, and data rows keep at most one cell past the header (so extra
+  values are still reported). An XLSX file reads at most as many columns as the header has, its
+  header may name at most as many columns as the model can import, and a shared strings part of
+  more than 16 MB is refused before anything is unpacked.
 - Columns are matched by field name or label in any language of the app, ignoring case and Turkish
   dotted and dotless i. Unknown, read only, key and row version columns are refused.
 - Every row is read and validated exactly like a form of the model: values as a user of that

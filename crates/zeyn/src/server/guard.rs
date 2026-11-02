@@ -10,8 +10,10 @@ const CSP: &str = "default-src 'self'; script-src 'self'; style-src 'self'; styl
 /// Framework endpoints whose `POST` changes data or runs an action. They count against the
 /// write limit (`App::write_limit`) besides the general one. A new endpoint that writes, runs an
 /// action or costs money goes here. Published API actions and the assistant are matched by prefix.
-const WRITE_PATHS: [&str; 12] = [
+const WRITE_PATHS: [&str; 14] = [
     "/_zeyn/form",
+    "/_zeyn/reveal",
+    "/_zeyn/data",
     "/_zeyn/import",
     "/_zeyn/mcp",
     "/_zeyn/menu",
@@ -24,6 +26,10 @@ const WRITE_PATHS: [&str; 12] = [
     "/_zeyn/theme",
     "/_zeyn/media/position",
 ];
+
+/// Framework endpoints whose `GET` costs as much as a write: exports and printed documents. They
+/// count against the write limit too.
+const COSTLY_GETS: [&str; 2] = ["/_zeyn/grid/export", "/_zeyn/pdf"];
 
 /// Whether a path is a static asset of the runtime, served without IP rules, rate limits or sign
 /// in so that error and sign in pages still load their scripts and styles.
@@ -64,6 +70,24 @@ fn is_island_asset(path: &str) -> bool {
     }
 }
 
+/// Every `X-Forwarded-For` line of a request as one chain, in order. Proxies may add their own
+/// line instead of extending the last one, so reading only the first would trust the client's.
+pub(super) fn forwarded_for(headers: &HeaderMap) -> Option<std::borrow::Cow<'_, str>> {
+    let mut lines = headers.get_all("x-forwarded-for").iter().filter_map(|v| v.to_str().ok());
+    let first = lines.next()?;
+    match lines.next() {
+        None => Some(std::borrow::Cow::Borrowed(first)),
+        Some(second) => {
+            let mut chain = format!("{first},{second}");
+            for line in lines {
+                chain.push(',');
+                chain.push_str(line);
+            }
+            Some(std::borrow::Cow::Owned(chain))
+        }
+    }
+}
+
 /// IP rules and rate limits, before any handler runs.
 pub(super) async fn guard_request(
     State(st): State<Arc<AppState>>,
@@ -81,9 +105,10 @@ pub(super) async fn guard_request(
         ready.await;
     }
     let peer = parts.extensions.get::<axum::extract::ConnectInfo<std::net::SocketAddr>>().map(|c| c.0.ip());
-    let forwarded = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok());
-    let ip = client_ip(peer, forwarded, &st.trusted);
+    let forwarded = forwarded_for(headers);
+    let ip = client_ip(peer, forwarded.as_deref(), &st.trusted);
     let probe = ops::is_probe(path);
+    let unlimited = ops::probe_unlimited(&st.extras, path, ip);
     let blocked = match ip {
         Some(ip) => {
             st.deny.iter().any(|r| r.contains(ip))
@@ -97,12 +122,13 @@ pub(super) async fn guard_request(
         let ctx = st.ctx(headers);
         return problem(&ctx, Failure::App(Error::Forbidden));
     }
-    let is_write = parts.method == axum::http::Method::POST
-        && (WRITE_PATHS.contains(&path)
-            || path.starts_with("/_zeyn/assistant/")
-            || path.starts_with("/_zeyn/account/")
-            || path.strip_prefix(st.api_prefix.as_str()).is_some_and(|rest| rest.starts_with('/')));
-    let limits = if probe {
+    let is_write = (parts.method == axum::http::Method::GET && COSTLY_GETS.contains(&path))
+        || parts.method == axum::http::Method::POST
+            && (WRITE_PATHS.contains(&path)
+                || path.starts_with("/_zeyn/assistant/")
+                || path.starts_with("/_zeyn/account/")
+                || path.strip_prefix(st.api_prefix.as_str()).is_some_and(|rest| rest.starts_with('/')));
+    let limits = if unlimited {
         [(None, "all"), (None, "write")]
     } else {
         [(st.rate, "all"), (if is_write { st.write_rate } else { None }, "write")]

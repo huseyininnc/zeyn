@@ -32,6 +32,15 @@ const ACCEPT: &str = ".csv,text/csv,.xlsx,application/vnd.openxmlformats-officed
 #[cfg(not(feature = "xlsx"))]
 const ACCEPT: &str = ".csv,text/csv";
 const MAX_ERRORS_SHOWN: usize = 200;
+/// Most cells the header of a CSV import may have; wider files are refused while reading.
+pub const MAX_CSV_COLUMNS: usize = 512;
+
+/// Why reading stopped early.
+enum ParseStop {
+    Quote,
+    TooMany,
+    TooWide,
+}
 
 /// Why a CSV text could not be read at all.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -49,12 +58,38 @@ pub enum CsvError {
 /// assert_eq!(rows, vec![vec!["ad", "şehir"], vec!["Öz; Ltd", "İzmir"], vec!["a \"b\"", "x\ny"]]);
 /// ```
 pub fn parse_csv(text: &str) -> std::result::Result<Vec<Vec<String>>, CsvError> {
+    parse_limited(text, usize::MAX, usize::MAX, false).map_err(|_| CsvError::UnclosedQuote)
+}
+
+/// [`parse_csv`] that stops as soon as there are more than `max_rows` rows or the header has
+/// more than `max_cells` cells, so an oversized file costs no more than the limits allow. With
+/// `fit`, data rows keep at most one cell past the header's width: the first non empty one, so a
+/// row with extra values is still reported, and memory stays at rows times header width.
+fn parse_limited(
+    text: &str,
+    max_rows: usize,
+    max_cells: usize,
+    fit: bool,
+) -> std::result::Result<Vec<Vec<String>>, ParseStop> {
+    fn add(row: &mut Vec<String>, cell: String, width: usize, fit: bool) -> std::result::Result<(), ParseStop> {
+        if row.len() < width {
+            row.push(cell);
+        } else if !fit {
+            return Err(ParseStop::TooWide);
+        } else if row.len() == width {
+            row.push(cell);
+        } else if row[width].trim().is_empty() {
+            row[width] = cell;
+        }
+        Ok(())
+    }
     let text = text.strip_prefix('\u{feff}').unwrap_or(text);
     let sep = separator(text);
-    let mut rows = Vec::new();
+    let mut rows: Vec<Vec<String>> = Vec::new();
     let mut row = Vec::new();
     let mut cell = String::new();
     let mut quoted = false;
+    let mut width = max_cells;
     let mut chars = text.chars().peekable();
     while let Some(c) = chars.next() {
         if quoted {
@@ -70,11 +105,17 @@ pub fn parse_csv(text: &str) -> std::result::Result<Vec<Vec<String>>, CsvError> 
         }
         match c {
             '"' if cell.is_empty() => quoted = true,
-            c if c == sep => row.push(std::mem::take(&mut cell)),
+            c if c == sep => add(&mut row, std::mem::take(&mut cell), width, fit && !rows.is_empty())?,
             '\r' if chars.peek() == Some(&'\n') => {}
             '\n' | '\r' => {
-                row.push(std::mem::take(&mut cell));
+                add(&mut row, std::mem::take(&mut cell), width, fit && !rows.is_empty())?;
                 if row.iter().any(|v| !v.trim().is_empty()) {
+                    if rows.len() >= max_rows {
+                        return Err(ParseStop::TooMany);
+                    }
+                    if fit && rows.is_empty() {
+                        width = row.len();
+                    }
                     rows.push(std::mem::take(&mut row));
                 } else {
                     row.clear();
@@ -84,10 +125,13 @@ pub fn parse_csv(text: &str) -> std::result::Result<Vec<Vec<String>>, CsvError> 
         }
     }
     if quoted {
-        return Err(CsvError::UnclosedQuote);
+        return Err(ParseStop::Quote);
     }
-    row.push(cell);
+    add(&mut row, cell, width, fit && !rows.is_empty())?;
     if row.iter().any(|v| !v.trim().is_empty()) {
+        if rows.len() >= max_rows {
+            return Err(ParseStop::TooMany);
+        }
         rows.push(row);
     }
     Ok(rows)
@@ -178,13 +222,18 @@ pub fn check_csv<M: Model>(ctx: &Ctx, csv: &str, max_rows: usize) -> Result<Chec
     if csv.len() > MAX_CSV_BYTES {
         return Err(general(ctx, "too_large", &[]));
     }
-    let mut rows = parse_csv(csv).map_err(|_| general(ctx, "bad_quotes", &[]))?;
+    let too_many = || general(ctx, "too_many", &[("max", max_rows.to_string())]);
+    let mut rows = parse_limited(csv, max_rows.saturating_add(1), MAX_CSV_COLUMNS, true).map_err(|e| match e {
+        ParseStop::Quote => general(ctx, "bad_quotes", &[]),
+        ParseStop::TooMany => too_many(),
+        ParseStop::TooWide => general(ctx, "too_large", &[]),
+    })?;
     if rows.len() < 2 {
         return Err(general(ctx, "empty", &[]));
     }
     let header = rows.remove(0);
     if rows.len() > max_rows {
-        return Err(general(ctx, "too_many", &[("max", max_rows.to_string())]));
+        return Err(too_many());
     }
     let columns = columns_of::<M>(ctx, &header)?;
     Ok(check_rows(ctx, columns, rows))
@@ -198,15 +247,19 @@ pub fn check_file<M: Model>(ctx: &Ctx, file: &ImportFile, max_rows: usize) -> Re
         #[cfg(feature = "xlsx")]
         ImportFile::Xlsx(bytes) => {
             use crate::xlsx::XlsxReadError;
-            let (header, cells) = crate::xlsx::read(bytes, max_rows).map_err(|e| match e {
-                XlsxReadError::TooLarge => general(ctx, "too_large", &[]),
-                XlsxReadError::TooMany => general(ctx, "too_many", &[("max", max_rows.to_string())]),
-                XlsxReadError::Unreadable => general(ctx, "bad_file", &[]),
-            })?;
-            if cells.is_empty() {
+            let (header, cells) =
+                crate::xlsx::read(bytes, max_rows, importable::<M>().count()).map_err(|e| match e {
+                    XlsxReadError::TooLarge => general(ctx, "too_large", &[]),
+                    XlsxReadError::TooMany => general(ctx, "too_many", &[("max", max_rows.to_string())]),
+                    XlsxReadError::Unreadable => general(ctx, "bad_file", &[]),
+                })?;
+            if header.is_empty() {
                 return Err(general(ctx, "empty", &[]));
             }
             let columns = columns_of::<M>(ctx, &header)?;
+            if cells.is_empty() {
+                return Err(general(ctx, "empty", &[]));
+            }
             let locale = ctx.locale();
             let rows = cells
                 .iter()

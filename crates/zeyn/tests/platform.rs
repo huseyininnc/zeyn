@@ -364,6 +364,19 @@ async fn forwarded_for_is_believed_only_from_trusted_proxies() {
     );
     assert_eq!(r.clone().oneshot(via("203.0.113.9", "1.1.1.1")).await.unwrap().status(), StatusCode::OK);
     assert_eq!(r.clone().oneshot(via("203.0.113.9", "2.2.2.2")).await.unwrap().status(), StatusCode::TOO_MANY_REQUESTS);
+
+    let lines = |first: &str| {
+        let mut req = with_ip("/pos", "10.0.0.2", "GET");
+        req.headers_mut().append("x-forwarded-for", first.parse().unwrap());
+        req.headers_mut().append("x-forwarded-for", "198.51.100.7".parse().unwrap());
+        req
+    };
+    assert_eq!(r.clone().oneshot(lines("192.0.2.1")).await.unwrap().status(), StatusCode::OK);
+    assert_eq!(
+        r.clone().oneshot(lines("192.0.2.2")).await.unwrap().status(),
+        StatusCode::TOO_MANY_REQUESTS,
+        "the line the proxy added counts, not the one the client sent"
+    );
 }
 
 #[tokio::test]

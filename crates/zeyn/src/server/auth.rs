@@ -492,7 +492,8 @@ mod totp {
         let ctx = st.ctx(headers);
         let token_ok = cookie(headers, "zeyn_csrf").is_some_and(|c| super::super::valid_token(c) && same(c, &f.csrf));
         if !token_ok {
-            return Err(st.error_page(&ctx, Failure::App(crate::Error::Denied(Text::key("zeyn.error.csrf"))), &f.csrf));
+            let csrf = st.csrf(headers).0;
+            return Err(st.error_page(&ctx, Failure::App(crate::Error::Denied(Text::key("zeyn.error.csrf"))), &csrf));
         }
         let Some(user) = ctx.identity().user.clone() else {
             return Err(signed_out(st, headers, &format!("{}/_zeyn/auth/totp", st.prefix)));
@@ -524,6 +525,10 @@ mod totp {
             Err(r) => return r,
         };
         let back = back(&st, f.return_to.as_deref());
+        let Some(_turn) = totp.in_flight.enter(&user) else {
+            let main = render(&st, &ctx, &totp, &f.csrf, &user, &back, View::Verify { error: Some("totp_invalid") });
+            return html(&st, &ctx, &f.csrf, StatusCode::BAD_REQUEST, main);
+        };
         let mut record = match totp.store.load(&user).await {
             Ok(Some(r)) => r,
             Ok(None) => {

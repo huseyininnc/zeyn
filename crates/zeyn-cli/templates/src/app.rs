@@ -5,7 +5,10 @@ use std::time::Duration;
 use zeyn::prelude::*;
 use zeyn::{Config, I18n};
 
-/// Builds the app from its configuration.
+/// Builds the app from its configuration. Debug builds sign every request in as a developer with
+/// full access (`DevAuth`). Release builds have no sign in until a real authenticator is added
+/// (`OidcAuth`, `JwtAuth`, `ForwardAuth` or `App::accounts`), so every screen that needs a
+/// permission is refused and the API docs need the `api.docs` permission.
 pub fn app(config: Config) -> std::io::Result<App> {
     let i18n = I18n::new("en")
         .catalog("en", include_str!("../locales/en.json"))
@@ -20,13 +23,15 @@ pub fn app(config: Config) -> std::io::Result<App> {
         .write_limit(RateLimit::per_user(60, Duration::from_secs(60)))
         .interceptor(AuditLog(StderrAudit))
         .mcp(Mcp::read_only())
-        .auth(DevAuth::superuser("developer"))
         .service(features::notes::store::NoteStore::default())
         .home(features::home::home)
         .feature(features::home::feature())
         .feature(features::notes::feature());
+    if cfg!(debug_assertions) {
+        app = app.auth(DevAuth::superuser("developer"));
+    }
     if config.get("docs.mode") == Some("open") {
-        app = app.api_docs(ApiDocs::open());
+        app = app.api_docs(if cfg!(debug_assertions) { ApiDocs::open() } else { ApiDocs::permission("api.docs") });
     }
     Ok(app)
 }

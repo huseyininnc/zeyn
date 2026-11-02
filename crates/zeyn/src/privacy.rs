@@ -3,9 +3,9 @@
 //! Masking happens on the server. A masked value leaves the server only as its masked text, unless
 //! the user has the field's unmask permission and asks to see it; that reveal is audited.
 
-use crate::action::{Access, DataQuery, Filter, Page, PageRequest, Result};
+use crate::action::{Access, DataQuery};
 use crate::audit::{RecordRef, plain};
-use crate::ctx::{BoxFuture, Ctx};
+use crate::ctx::Ctx;
 use crate::i18n::Text;
 use crate::model::{FieldMeta, Model};
 use crate::render::{Render, escape};
@@ -99,30 +99,6 @@ pub fn reveal_in<M: Model>(model: &M, field: &str) -> Option<Revealed> {
     let (i, meta) = M::fields().iter().enumerate().find(|(_, m)| m.name == field && m.mask.is_some())?;
     let value = model.value_at(i).and_then(|v| plain(&v)).unwrap_or_default();
     Some(Revealed { meta, value, record: RecordRef::of(model) })
-}
-
-/// Finds a row by key through a grid's data action and reveals one of its masked fields. The
-/// action is asked for rows whose key contains `key` and the exact match is taken.
-pub(crate) fn grid_reveal<E: Model>(
-    fetch: fn(Ctx, DataQuery) -> BoxFuture<Result<Page<E>>>,
-    ctx: Ctx,
-    key: String,
-    field: String,
-) -> BoxFuture<Result<Option<Revealed>>> {
-    Box::pin(async move {
-        let Some(key_meta) = E::fields().iter().find(|m| m.key) else { return Ok(None) };
-        let query = DataQuery {
-            page: PageRequest::Offset { offset: 0, limit: crate::action::MAX_PAGE_SIZE },
-            filters: vec![Filter::any_of(key_meta.name, [key.clone()])],
-            ..DataQuery::default()
-        };
-        let page = fetch(ctx, query).await?;
-        Ok(page
-            .items
-            .iter()
-            .find(|row| RecordRef::of(*row).id.as_deref() == Some(key.as_str()))
-            .and_then(|row| reveal_in(row, &field)))
-    })
 }
 
 thread_local! {

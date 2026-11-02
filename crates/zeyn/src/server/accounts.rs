@@ -72,8 +72,8 @@ pub(super) async fn layer(
 ) -> Response {
     let Some(accounts) = st.sign_in.accounts.clone() else { return next.run(req).await };
     let peer = req.extensions().get::<axum::extract::ConnectInfo<std::net::SocketAddr>>().map(|c| c.0.ip());
-    let forwarded = req.headers().get("x-forwarded-for").and_then(|v| v.to_str().ok());
-    let ip = crate::security::client_ip(peer, forwarded, &st.trusted);
+    let forwarded = super::guard::forwarded_for(req.headers());
+    let ip = crate::security::client_ip(peer, forwarded.as_deref(), &st.trusted);
     let manager = accounts.sign_in();
     let mut out = Vec::new();
     let secure = st.secure_cookies || accounts.0.public_url.as_deref().is_some_and(|u| u.starts_with("https://"));

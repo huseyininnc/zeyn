@@ -291,6 +291,16 @@ pub fn people_tabs() -> Screen {
     )
 }
 
+#[screen(route = "/person-one", permission = "hr.read")]
+pub fn person_one() -> Screen {
+    Screen::new("One person").body(
+        DataGrid::of(find_people)
+            .column(Person::name)
+            .column(Person::national_id)
+            .scope(Person::name, "Person 1".into()),
+    )
+}
+
 #[screen(route = "/people-grouped", permission = "hr.read")]
 pub fn people_grouped() -> Screen {
     Screen::new("People grouped")
@@ -308,6 +318,7 @@ fn hr_app(identity: Identity, audit: MemoryAudit) -> Router {
                 .screen(person)
                 .screen(people_tabs)
                 .screen(people_grouped)
+                .screen(person_one)
                 .api(find_people)
                 .api(get_person)
                 .api(save_person),
@@ -397,6 +408,42 @@ async fn masked_fields_cannot_be_searched_or_sorted_through_the_api_or_exports()
     let router = hr_app(officer(), MemoryAudit::default());
     let r = send(&router, get(&format!("/_zeyn/grid/export?screen=people&node=0&q={q}"))).await;
     assert_eq!(r.body.trim_end().lines().count(), 2, "users who may reveal can still filter: {}", r.body);
+}
+
+#[tokio::test]
+async fn reveal_only_reaches_rows_and_columns_the_grid_shows() {
+    let router = hr_app(officer(), MemoryAudit::default());
+    let ask = |key: &str, field: &str| {
+        post("/_zeyn/reveal", serde_json::json!({ "screen": "person_one", "node": 0, "field": field, "key": key }))
+    };
+    let r = send(&router, ask("1", "national_id")).await;
+    assert_eq!(r.json()["value"], "12345678901", "{}", r.body);
+    let r = send(&router, ask("2", "national_id")).await;
+    assert_ne!(r.status, StatusCode::OK, "a row outside the grid's scope: {}", r.body);
+    assert!(!r.body.contains("12345678902"));
+    let r = send(&router, ask("1", "email")).await;
+    assert_ne!(r.status, StatusCode::OK, "a column the grid does not show: {}", r.body);
+    assert!(!r.body.contains("person1@"));
+}
+
+#[tokio::test]
+async fn reveals_and_exports_count_against_the_write_limit() {
+    let identity = officer();
+    let router = App::new("Test")
+        .service(People::seeded())
+        .write_limit(zeyn::RateLimit::per_user(2, std::time::Duration::from_secs(60)))
+        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .feature(Feature::new("hr").screen(people))
+        .router()
+        .unwrap();
+    let ask = serde_json::json!({ "screen": "people", "node": 0, "field": "national_id", "key": "1" });
+    assert_eq!(send(&router, post("/_zeyn/reveal", ask.clone())).await.status, StatusCode::OK);
+    assert_eq!(send(&router, get("/_zeyn/grid/export?screen=people&node=0")).await.status, StatusCode::OK);
+    assert_eq!(send(&router, post("/_zeyn/reveal", ask)).await.status, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(
+        send(&router, get("/_zeyn/grid/export?screen=people&node=0")).await.status,
+        StatusCode::TOO_MANY_REQUESTS
+    );
 }
 
 #[tokio::test]
@@ -910,6 +957,9 @@ async fn health_is_always_up_and_ready_reports_failed_checks_by_name_only() {
     assert_eq!(r.json(), serde_json::json!({ "status": "not_ready", "failed": ["database"] }));
     db_up.store(true, std::sync::atomic::Ordering::SeqCst);
     let r = send(&router, Request::get("/billing/_zeyn/ready").body(Body::empty()).unwrap()).await;
+    assert_eq!(r.status, StatusCode::SERVICE_UNAVAILABLE, "the result is reused for a short time");
+    tokio::time::sleep(zeyn::READY_CACHE + std::time::Duration::from_millis(50)).await;
+    let r = send(&router, Request::get("/billing/_zeyn/ready").body(Body::empty()).unwrap()).await;
     assert_eq!(r.status, StatusCode::OK);
     assert_eq!(
         send(&router, Request::get("/_zeyn/health").body(Body::empty()).unwrap()).await.status,
@@ -932,8 +982,17 @@ async fn probes_skip_rate_limits_but_not_ip_rules_unless_allowed() {
     }
     assert_eq!(send(&router, from("/_zeyn/health", "192.168.1.5")).await.status, StatusCode::FORBIDDEN);
 
+    assert_eq!(send(&router, from("/_zeyn/ready", "10.1.1.2")).await.status, StatusCode::OK);
+    assert_eq!(
+        send(&router, from("/_zeyn/ready", "10.1.1.2")).await.status,
+        StatusCode::TOO_MANY_REQUESTS,
+        "readiness runs checks, so it is limited unless asked from a probe address"
+    );
+
     let router = app().probe_ips(["192.168.1.0/24", "10.9.9.9"]).router().unwrap();
-    assert_eq!(send(&router, from("/_zeyn/ready", "192.168.1.5")).await.status, StatusCode::OK);
+    for _ in 0..3 {
+        assert_eq!(send(&router, from("/_zeyn/ready", "192.168.1.5")).await.status, StatusCode::OK);
+    }
     assert_eq!(
         send(&router, from("/overview", "192.168.1.5")).await.status,
         StatusCode::FORBIDDEN,

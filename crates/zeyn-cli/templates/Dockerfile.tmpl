@@ -1,6 +1,9 @@
 # syntax=docker/dockerfile:1.7
 # Build: docker build -t {{name}} .    Run: docker run -p 3000:3000 {{name}}
 # Configuration comes from config/app.json and APP_* environment variables (APP_SERVER__ADDR, ...).
+# The image is a release build: the development sign in (DevAuth) is off, so nobody is signed in
+# and every screen that needs a permission is refused until src/app.rs adds a real authenticator
+# (OidcAuth, JwtAuth, ForwardAuth or accounts). Do this before the container is reachable by others.
 
 FROM rust:1.98-slim-bookworm AS build
 WORKDIR /src

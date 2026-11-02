@@ -92,6 +92,7 @@ async fn main() -> std::io::Result<()> {
     App::new(t!("orders.title"))
         .i18n(i18n)
         .auth(DevAuth::superuser("demo"))
+        .allow_dev_auth()
         .home(order_list)
         .feature(
             Feature::new("sales")

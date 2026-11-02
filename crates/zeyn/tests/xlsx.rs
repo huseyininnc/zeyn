@@ -320,6 +320,20 @@ async fn broken_files_and_zip_bombs_are_refused() {
     let (status, j) = import(&router, &bomb, false, "en").await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     assert!(j.to_string().contains("too large"), "{j}");
+
+    let mut strings = Vec::new();
+    {
+        let mut zip = zip::ZipWriter::new(std::io::Cursor::new(&mut strings));
+        zip.start_file("xl/sharedStrings.xml", zip::write::SimpleFileOptions::default()).unwrap();
+        let chunk = "<si><t>a</t></si>".repeat(64 * 1024);
+        for _ in 0..20 {
+            zip.write_all(chunk.as_bytes()).unwrap();
+        }
+        zip.finish().unwrap();
+    }
+    let (status, j) = import(&router, &strings, false, "en").await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(j.to_string().contains("too large"), "a large shared strings part is refused before reading: {j}");
 }
 
 #[tokio::test]

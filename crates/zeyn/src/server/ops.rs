@@ -70,6 +70,20 @@ pub(super) struct Extras {
     pub(super) session: super::session::Settings,
     jobs: Option<crate::jobs::Jobs>,
     jobs_permission: Option<&'static str>,
+    /// The last readiness result and when it was taken. Requests within [`READY_CACHE`] share it,
+    /// and only one request at a time runs the checks.
+    ready: tokio::sync::Mutex<Option<(std::time::Instant, Vec<&'static str>)>>,
+    allow_dev_auth: bool,
+}
+
+/// The startup problem of a development authenticator in a release build, unless allowed.
+pub(super) fn dev_auth_problem(release: bool, development: bool, allowed: bool) -> Option<String> {
+    (release && development && !allowed).then(|| {
+        "DevAuth signs every request in with full access, so it does not run in release builds
+  = help: use a real authenticator in release builds (OidcAuth, JwtAuth, ForwardAuth or App::accounts), for example only under `#[cfg(debug_assertions)]`
+  = help: a demo that must run in a release build can call `App::allow_dev_auth()`"
+            .into()
+    })
 }
 
 impl Extras {
@@ -82,15 +96,41 @@ impl Extras {
 /// Longest time one readiness check may take before it counts as failed.
 const CHECK_TIMEOUT: Duration = Duration::from_secs(5);
 
-/// `/_zeyn/health` and `/_zeyn/ready`: never rate limited; IP rules apply (see `App::probe_ips`).
+/// How long a readiness result is reused, so a flood of probes cannot load the checked services.
+pub const READY_CACHE: Duration = Duration::from_secs(1);
+
+/// `/_zeyn/health` and `/_zeyn/ready`; IP rules apply (see `App::probe_ips`).
 pub(super) fn is_probe(path: &str) -> bool {
     path == "/_zeyn/health" || path == "/_zeyn/ready"
 }
 
+/// Whether a probe skips the rate limits: health always (it does no work), readiness only from
+/// the probe addresses, because it runs the checks.
+pub(super) fn probe_unlimited(extras: &Extras, path: &str, ip: Option<std::net::IpAddr>) -> bool {
+    path == "/_zeyn/health" || (path == "/_zeyn/ready" && ip.is_some_and(|ip| extras.probe_ip(ip)))
+}
+
 impl App {
+    /// Lets `DevAuth` (or another development authenticator) run in a release build. Only for
+    /// demos that are never reachable by others: every request gets full access.
+    pub fn allow_dev_auth(mut self) -> Self {
+        self.extras.allow_dev_auth = true;
+        self
+    }
+
+    /// The problem `check` reports for a development authenticator in this build.
+    pub(super) fn dev_auth_check(&self) -> Option<String> {
+        dev_auth_problem(
+            !cfg!(debug_assertions),
+            self.auth.as_ref().is_some_and(|a| a.is_development()),
+            self.extras.allow_dev_auth,
+        )
+    }
+
     /// Adds a readiness check, such as a database ping. `GET /_zeyn/ready` answers `200` when every
     /// check returns `true` within five seconds, otherwise `503` with the names of the failed
-    /// checks. Check names are shown to anyone who can reach the endpoint; keep them plain
+    /// checks. The result is reused for [`READY_CACHE`], and the endpoint counts toward the rate
+    /// limits except from [`App::probe_ips`]. Check names are shown to anyone who can reach the endpoint; keep them plain
     /// (`database`, `license`) and never put secrets in them.
     ///
     /// ```ignore
@@ -254,22 +294,34 @@ async fn health() -> Response {
 }
 
 /// Readiness: every registered check passed. Failed checks are named; their errors are not shown.
+/// The result is reused for [`READY_CACHE`].
 async fn ready(State(st): State<Arc<AppState>>) -> Response {
-    let tasks: Vec<_> = st
-        .extras
-        .readiness
-        .iter()
-        .map(|(name, check)| {
-            let fut = check();
-            (*name, tokio::spawn(async move { tokio::time::timeout(CHECK_TIMEOUT, fut).await.unwrap_or(false) }))
-        })
-        .collect();
-    let mut failed = Vec::new();
-    for (name, task) in tasks {
-        if !task.await.unwrap_or(false) {
-            failed.push(name);
+    let mut last = st.extras.ready.lock().await;
+    let failed = match last.as_ref() {
+        Some((at, failed)) if at.elapsed() < READY_CACHE => failed.clone(),
+        _ => {
+            let tasks: Vec<_> = st
+                .extras
+                .readiness
+                .iter()
+                .map(|(name, check)| {
+                    let fut = check();
+                    let task =
+                        tokio::spawn(async move { tokio::time::timeout(CHECK_TIMEOUT, fut).await.unwrap_or(false) });
+                    (*name, task)
+                })
+                .collect();
+            let mut failed = Vec::new();
+            for (name, task) in tasks {
+                if !task.await.unwrap_or(false) {
+                    failed.push(name);
+                }
+            }
+            *last = Some((std::time::Instant::now(), failed.clone()));
+            failed
         }
-    }
+    };
+    drop(last);
     let r = if failed.is_empty() {
         (StatusCode::OK, axum::Json(json!({ "status": "ready" }))).into_response()
     } else {
@@ -425,4 +477,17 @@ fn accounts_head(st: &AppState) -> String {
     }
     let _ = st;
     String::new()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::dev_auth_problem;
+
+    #[test]
+    fn development_sign_in_is_refused_in_release_builds_unless_allowed() {
+        assert!(dev_auth_problem(true, true, false).is_some_and(|p| p.contains("allow_dev_auth")));
+        assert!(dev_auth_problem(true, true, true).is_none());
+        assert!(dev_auth_problem(false, true, false).is_none(), "debug builds keep it");
+        assert!(dev_auth_problem(true, false, false).is_none());
+    }
 }
