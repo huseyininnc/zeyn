@@ -132,6 +132,9 @@ impl XlsxSheet {
             Value::Decimal(x) => {
                 s.write_number_with_format(row, col, *x, &f.decimal)?;
             }
+            Value::Number(d) => {
+                s.write_number(row, col, d.to_f64())?;
+            }
             Value::Money(m) => {
                 let format = &f.money[m.currency as usize];
                 s.write_number_with_format(row, col, m.minor as f64 / 100.0, format)?;

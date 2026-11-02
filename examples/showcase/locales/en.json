@@ -18,6 +18,8 @@
     "islands": "Islands",
     "uploads": "Files",
     "charts": "Charts"
+,
+    "inputs": "Inputs"
   },
   "dashboard": {
     "title": "Overview",
@@ -434,5 +436,81 @@
     "name": "Name",
     "sales": "Sales",
     "weeks": "Last 12 weeks"
+},
+  "inputs": {
+    "fields": "Numbers, masks and passwords",
+    "panel_terms": "Supplier terms",
+    "save": "Save terms",
+    "saved": "Terms saved. Nothing was stored.",
+    "choices": "Several choices and columns",
+    "panel_campaign": "Campaign",
+    "save_campaign": "Save campaign",
+    "campaign_saved": "Campaign saved. Nothing was stored.",
+    "col_code": "Code",
+    "col_name": "Name",
+    "col_price": "Price",
+    "overlays": "Tooltips, popovers and busy",
+    "new_note": "New note",
+    "new_note_tip": "Starts an empty shipment note",
+    "panel_actions": "Stock actions",
+    "count": "Count products",
+    "count_tip": "Answers at once, so no spinner shows",
+    "recount": "Recount stock",
+    "recount_tip": "Takes about two seconds; the area shows a spinner meanwhile",
+    "counted": "{n} products counted.",
+    "carrier": "Carrier rules",
+    "carrier_title": "Carrier rules",
+    "carrier_text": "Orders placed before 15:00 leave the same day. Parcels over 30 kg go by freight.",
+    "panel_note": "Shipment note",
+    "reference_tip": "Printed on the waybill; up to 20 characters",
+    "save_note": "Save note",
+    "note_saved": "Note saved. Nothing was stored.",
+    "commands": "Menu buttons and toasts",
+    "panel_order": "Order SO-2026-0142",
+    "save_draft": "Save draft",
+    "send": "Send to supplier",
+    "sent": "Sent to the supplier.",
+    "save_copy": "Save as a copy",
+    "copied": "A copy was saved. Nothing was stored.",
+    "open_fields": "Open supplier terms",
+    "more": "More",
+    "archive": "Archive order",
+    "archived": "Order archived. Nothing was stored.",
+    "archive_confirm": "Archive this order?"
+  },
+  "SupplierTerms": {
+    "supplier": "Supplier",
+    "exchange_rate": "Exchange rate",
+    "discount": "Discount",
+    "minimum_order": "Minimum order (kg)",
+    "phone": "Phone",
+    "iban": "IBAN",
+    "portal_password": "Portal password"
+  },
+  "Campaign": {
+    "name": "Name",
+    "channels": "Channels",
+    "regions": "Regions",
+    "product": "Product"
+  },
+  "Channel": {
+    "Email": "Email",
+    "Phone": "Phone",
+    "Sms": "Text message",
+    "Post": "Post",
+    "Courier": "Courier"
+  },
+  "Region": {
+    "Marmara": "Marmara",
+    "Aegean": "Aegean",
+    "Mediterranean": "Mediterranean",
+    "Central": "Central Anatolia",
+    "BlackSea": "Black Sea",
+    "East": "Eastern Anatolia",
+    "Southeast": "Southeastern Anatolia"
+  },
+  "ShipmentNote": {
+    "reference": "Reference",
+    "instructions": "Instructions"
   }
 }

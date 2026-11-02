@@ -355,10 +355,189 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
             )
             .add(StatusBar::new("Status").left("Ready").right("UTF-8"))
             .into(),
+        "inputs" => inputs(),
+        "overlay" => overlay(),
+        "menus" => menus(),
+        "toasts" => toasts(),
+        "multi" => Form::of(Reach { channels: vec![Channel::Email], ..Reach::default() })
+            .field(Reach::channels)
+            .lookup_columns(Reach::product, find_sample_rows, ["Code", "Name", "Unit"])
+            .submit(t!("docs.live.save"), save_reach)
+            .on_success(|_, ui| ui.toast(t!("docs.live.saved")))
+            .into(),
         _ => return None,
     })
 }
 
+/// Terms for the decimal, percent, masked and password example.
+#[model]
+pub struct Terms {
+    #[rule(precision = 12, scale = 4, min = 0)]
+    pub rate: Decimal,
+    #[rule(scale = 1, min = 0, max = 100)]
+    pub discount: Option<Decimal>,
+    #[rule(required, mask = "(999) 999 99 99")]
+    pub phone: String,
+    #[label("IBAN")]
+    #[rule(mask = "AA99 9999 9999 9999 9999 9999 99")]
+    pub iban: Option<String>,
+    #[rule(min_len = 10, max_len = 128)]
+    pub password: String,
+}
+
+/// Accepts valid terms and sends nothing back. Nothing is stored.
+#[action(public)]
+pub async fn save_terms(terms: Valid<Terms>) -> Result<String> {
+    Ok(terms.phone.clone())
+}
+
+/// The decimal, percent, masked and password inputs.
+fn inputs() -> Node {
+    Form::of(Terms {
+        rate: Decimal::parse("1.0825").unwrap_or_default(),
+        discount: Decimal::parse("12.5"),
+        phone: "5321234567".into(),
+        ..Terms::default()
+    })
+    .row(|r| r.field(Terms::rate).field(Terms::discount))
+    .control(Terms::discount, Control::Percent)
+    .row(|r| r.field(Terms::phone).field(Terms::iban))
+    .field(Terms::password)
+    .control(Terms::password, Control::PasswordMeter)
+    .submit(t!("docs.live.save"), save_terms)
+    .on_success(|_, ui| ui.toast(t!("docs.live.saved")))
+    .into()
+}
+
+/// How a customer wants to be reached.
+#[choice]
+pub enum Channel {
+    Email,
+    Phone,
+    #[label("Text message")]
+    Sms,
+    Post,
+}
+
+/// Contact preferences, for the multi select and the multi column lookup.
+#[model]
+pub struct Reach {
+    #[rule(required)]
+    pub channels: Vec<Channel>,
+    pub product: Option<SampleId>,
+}
+
+#[action(public)]
+pub async fn save_reach(reach: Valid<Reach>) -> Result<usize> {
+    Ok(reach.channels.len())
+}
+
+/// Sample products with code, name and unit columns.
+#[action(public)]
+pub async fn find_sample_rows(q: LookupQuery) -> Result<Page<LookupItem>> {
+    let unit = |u: Unit| match u {
+        Unit::Piece => "Piece",
+        Unit::Kg => "Kg",
+        Unit::Liter => "Liter",
+    };
+    Ok(q.apply(
+        SAMPLES
+            .iter()
+            .map(|s| {
+                LookupItem::new(s.id.0, s.name.clone()).cells([s.code.clone(), s.name.clone(), unit(s.unit).into()])
+            })
+            .collect(),
+    ))
+}
+
+/// Counts the sample products slowly, to show the busy overlay.
+#[action(public)]
+pub async fn slow_count(_: ()) -> Result<i64> {
+    tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+    Ok(SAMPLES.len() as i64)
+}
+
+fn overlay() -> Node {
+    let sample = &SAMPLES[0];
+    Row::new()
+        .compact()
+        .col(ActionButton::new(t!("docs.live.count"), count_samples, ()).tip(t!("docs.live.count_tip")).on_success(
+            |n, ui| {
+                if let Ok(n) = n {
+                    ui.toast(t!("docs.live.counted", n = n));
+                }
+            },
+        ))
+        .col(
+            Popover::new(t!("docs.live.rules")).title(t!("docs.live.rules_title")).add(
+                DescriptionList::of(sample)
+                    .field(Sample::code)
+                    .field(Sample::unit)
+                    .field(Sample::price)
+                    .field(Sample::stock),
+            ),
+        )
+        .col(Busy::new().add(ActionButton::new(t!("docs.live.slow"), slow_count, ()).on_success(|n, ui| {
+            if let Ok(n) = n {
+                ui.toast(t!("docs.live.counted", n = n));
+            }
+        })))
+        .into()
+}
+
+/// Pretends to save, for the menu and toast examples.
+#[action(public)]
+pub async fn save_sample(_: ()) -> Result<()> {
+    Ok(())
+}
+
+fn menus() -> Node {
+    Row::new()
+        .compact()
+        .col(
+            MenuButton::new(t!("docs.live.more"))
+                .action_then(t!("docs.live.count"), count_samples, (), |n, ui| {
+                    if let Ok(n) = n {
+                        ui.toast(t!("docs.live.counted", n = n));
+                    }
+                })
+                .separator()
+                .action_then(t!("docs.live.archive"), save_sample, (), |_, ui| {
+                    ui.notify(Toast::warning(t!("docs.live.archived")))
+                })
+                .confirm(t!("docs.live.archive_confirm")),
+        )
+        .col(MenuButton::split(t!("docs.live.save"), save_sample, ()).action_then(
+            t!("docs.live.save_copy"),
+            save_sample,
+            (),
+            |_, ui| ui.notify(Toast::success(t!("docs.live.saved"))),
+        ))
+        .into()
+}
+
+fn toasts() -> Node {
+    Row::new()
+        .compact()
+        .col(ActionButton::new(t!("docs.live.toast_success"), save_sample, ()).on_success(|_, ui| {
+            ui.notify(
+                Toast::success(t!("docs.live.saved"))
+                    .action(t!("docs.live.again"), Effect::Toast { message: t!("docs.live.sent") }),
+            )
+        }))
+        .col(
+            ActionButton::new(t!("docs.live.toast_warning"), save_sample, ())
+                .on_success(|_, ui| ui.notify(Toast::warning(t!("docs.live.archived")))),
+        )
+        .col(
+            ActionButton::new(t!("docs.live.toast_danger"), save_sample, ())
+                .on_success(|_, ui| ui.notify(Toast::danger(t!("docs.live.denied")))),
+        )
+        .into()
+}
+
 /// Names of every live example, for checks and tests.
-pub const EXAMPLES: &[&str] =
-    &["datagrid", "form", "controls", "dates", "lines", "layout", "display", "action", "tree", "chart", "shell"];
+pub const EXAMPLES: &[&str] = &[
+    "datagrid", "form", "controls", "dates", "lines", "layout", "display", "action", "tree", "chart", "shell",
+    "inputs", "multi", "overlay", "menus", "toasts",
+];

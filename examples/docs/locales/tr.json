@@ -22,7 +22,21 @@
       "save": "Kaydet",
       "saved": "Kaydedildi. Hiçbir şey saklanmadı.",
       "count": "Ürünleri say",
-      "counted": "{n} ürün."
+      "counted": "{n} ürün.",
+      "count_tip": "Sunucudaki tüm örnek ürünleri sayar",
+      "rules": "Ürün ayrıntıları",
+      "rules_title": "İlk örnek ürün",
+      "slow": "Yavaş say",
+      "more": "Diğer",
+      "archive": "Örnekleri arşivle",
+      "archived": "Arşivlendi. Hiçbir şey saklanmadı.",
+      "archive_confirm": "Örnek ürünler arşivlensin mi?",
+      "save_copy": "Kopya olarak kaydet",
+      "denied": "Örnek kaydedilemez.",
+      "toast_success": "Başarı bildirimi",
+      "toast_warning": "Uyarı bildirimi",
+      "toast_danger": "Hata bildirimi",
+      "again": "Yine göster"
     }
   }
 }

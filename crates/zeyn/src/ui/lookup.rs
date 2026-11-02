@@ -18,6 +18,9 @@ pub const MAX_LOOKUP_PAGE: u32 = 50;
 /// Most ids a client may ask labels for at once.
 pub const MAX_LOOKUP_IDS: usize = 100;
 
+/// Most columns a lookup list shows (see `Form::lookup_columns`).
+pub const MAX_LOOKUP_COLUMNS: usize = 6;
+
 /// What a lookup action receives: the text typed so far and the page wanted, or the ids whose
 /// labels are needed (when a form opens with values already chosen).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -64,6 +67,7 @@ impl LookupQuery {
                     needle.is_empty()
                         || fold(&i.label).contains(&needle)
                         || i.hint.as_deref().is_some_and(|h| fold(h).contains(&needle))
+                        || i.cells.iter().any(|c| fold(c).contains(&needle))
                 })
                 .collect()
         };
@@ -96,15 +100,35 @@ pub struct LookupItem {
     /// A second line such as a code or a city.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hint: Option<String>,
+    /// Values of the list's columns, for lookups made with `Form::lookup_columns`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cells: Vec<String>,
 }
 
 impl LookupItem {
     pub fn new(id: i64, label: impl Into<String>) -> Self {
-        Self { id, label: label.into(), hint: None }
+        Self { id, label: label.into(), hint: None, cells: Vec::new() }
     }
 
     pub fn hint(mut self, hint: impl Into<String>) -> Self {
         self.hint = Some(hint.into());
+        self
+    }
+
+    /// Values of the columns of a multi column lookup, in the order of its headers. At most
+    /// [`MAX_LOOKUP_COLUMNS`] are kept.
+    ///
+    /// ```
+    /// use zeyn::ui::LookupItem;
+    /// let item = LookupItem::new(7, "Ayşe Yılmaz").cells(["C-7", "Ayşe Yılmaz", "İzmir"]);
+    /// assert_eq!(item.cells.len(), 3);
+    /// ```
+    pub fn cells<I>(mut self, cells: I) -> Self
+    where
+        I: IntoIterator,
+        I::Item: Into<String>,
+    {
+        self.cells = cells.into_iter().take(MAX_LOOKUP_COLUMNS).map(Into::into).collect();
         self
     }
 }
@@ -143,7 +167,7 @@ pub(crate) fn parse_ids(text: &str) -> Option<Vec<i64>> {
 
 /// Writes a lookup: a plain text input holding the ids (what works without JavaScript and what
 /// the form submits) that the runtime turns into a searchable combobox.
-pub(crate) fn render_lookup(out: &mut String, r: &Render, s: &Slot, multiple: bool) {
+pub(crate) fn render_lookup(out: &mut String, r: &Render, s: &Slot, multiple: bool, columns: &[Text]) {
     let value = match s.value {
         Value::Int(n) => n.to_string(),
         Value::Text(t) => t.clone(),
@@ -160,9 +184,15 @@ pub(crate) fn render_lookup(out: &mut String, r: &Render, s: &Slot, multiple: bo
         "loading": r.i18n.text(r.locale, &Text::key("zeyn.ui.loading")),
         "clear": r.i18n.text(r.locale, &Text::key("zeyn.ui.date.clear")),
     });
+    let columns = if columns.is_empty() {
+        String::new()
+    } else {
+        let headers: Vec<String> = columns.iter().map(|c| r.i18n.text(r.locale, c)).collect();
+        format!(r#" data-columns="{}""#, attr(&headers))
+    };
     out.push_str(s.label);
     out.push_str(&format!(
-        r#"<div class="z-lookup" data-zeyn-lookup="{}" data-multiple="{multiple}" data-texts="{}"><input type="text" class="z-lookup-value" inputmode="numeric" autocomplete="off" {} value="{}"></div>"#,
+        r#"<div class="z-lookup" data-zeyn-lookup="{}" data-multiple="{multiple}"{columns} data-texts="{}"><input type="text" class="z-lookup-value" inputmode="numeric" autocomplete="off" {} value="{}"></div>"#,
         s.m.name,
         attr(&texts),
         s.common,

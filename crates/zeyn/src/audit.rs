@@ -87,6 +87,7 @@ pub fn plain(value: &Value) -> Option<String> {
         Value::Bool(b) => b.to_string(),
         Value::Int(n) => n.to_string(),
         Value::Decimal(d) => d.to_string(),
+        Value::Number(d) => d.to_string(),
         Value::Text(s) => s.clone(),
         Value::Money(m) => {
             let sign = if m.minor < 0 { "-" } else { "" };

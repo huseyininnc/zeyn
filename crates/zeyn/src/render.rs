@@ -128,8 +128,10 @@ impl<'a> Render<'a> {
                     String::new()
                 }
             }
+            (Value::Text(s), FieldKind::Choices(_)) => escape(&crate::ui::choices_text(s, kind, self)),
             (Value::Text(s), _) => escape(s),
             (Value::Money(m), _) => escape(&m.format(self.locale)),
+            (Value::Number(d), _) => escape(&d.format(self.locale)),
             (Value::Date(d), _) => format!(r#"<time datetime="{d}">{}</time>"#, d.format(self.locale)),
             (Value::Time(t), _) => format!(r#"<time datetime="{t}">{}</time>"#, t.format(self.locale)),
             (Value::LocalDateTime(l), _) => format!(r#"<time datetime="{l}">{}</time>"#, l.format(self.locale)),

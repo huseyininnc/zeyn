@@ -9,6 +9,7 @@
 mod assistant;
 mod charts;
 mod gallery;
+mod inputs;
 mod islands;
 mod media;
 mod overview;
@@ -120,6 +121,7 @@ async fn main() -> std::io::Result<()> {
         .feature(assistant::feature())
         .feature(uploads::feature())
         .feature(charts::feature())
+        .feature(inputs::feature())
         .islands(concat!(env!("CARGO_MANIFEST_DIR"), "/dist/islands"));
     #[cfg(feature = "pdf")]
     {

@@ -22,7 +22,21 @@
       "save": "Save",
       "saved": "Saved. Nothing was stored.",
       "count": "Count products",
-      "counted": "{n} products."
+      "counted": "{n} products.",
+      "count_tip": "Counts every sample product on the server",
+      "rules": "Product details",
+      "rules_title": "First sample product",
+      "slow": "Count slowly",
+      "more": "More",
+      "archive": "Archive samples",
+      "archived": "Archived. Nothing was stored.",
+      "archive_confirm": "Archive the sample products?",
+      "save_copy": "Save as a copy",
+      "denied": "The sample cannot be saved.",
+      "toast_success": "Success toast",
+      "toast_warning": "Warning toast",
+      "toast_danger": "Danger toast",
+      "again": "Show again"
     }
   }
 }

@@ -76,8 +76,12 @@ pub struct Form<M: Model> {
     options: Vec<(&'static str, DateOptions)>,
     controls: Vec<(&'static str, Control)>,
     lookups: Vec<(&'static str, Box<dyn DataSource>, bool)>,
+    /// Column headers of lookups that show several columns, by field.
+    lookup_columns: Vec<(&'static str, Vec<Text>)>,
     lines: Vec<(&'static str, Box<dyn LinesEditor>)>,
     files: Vec<(&'static str, crate::files::FileRules, bool)>,
+    /// Tooltips of fields, by field.
+    tips: Vec<(&'static str, Text)>,
 }
 
 impl<M: Model> Form<M> {
@@ -96,8 +100,10 @@ impl<M: Model> Form<M> {
             options: Vec::new(),
             controls: Vec::new(),
             lookups: Vec::new(),
+            lookup_columns: Vec::new(),
             lines: Vec::new(),
             files: Vec::new(),
+            tips: Vec::new(),
         }
     }
 
@@ -114,8 +120,10 @@ impl<M: Model> Form<M> {
             options: Vec::new(),
             controls: Vec::new(),
             lookups: Vec::new(),
+            lookup_columns: Vec::new(),
             lines: Vec::new(),
             files: Vec::new(),
+            tips: Vec::new(),
         }
     }
 
@@ -221,6 +229,41 @@ impl<M: Model> Form<M> {
         self.items.push(FormItem::Field(FormField::of(field)));
         self.lookups.push((field.meta().name, Box::new(ActionSource::<A>::new()), false));
         self
+    }
+
+    /// A tooltip for a field: an info button after its label shows `text` on hover, focus, tap
+    /// and long press, and the field's input is described by it for screen readers. Use it for
+    /// help such as a format or where a value comes from; the label and the rules must still say
+    /// what is required.
+    ///
+    /// ```ignore
+    /// Form::of(order).field(Order::reference).tip(Order::reference, t!("orders.reference_help"))
+    /// ```
+    pub fn tip<T: FieldType + 'static>(mut self, field: Field<M, T>, text: impl Into<Text>) -> Self {
+        let name = field.meta().name;
+        self.tips.retain(|(n, _)| *n != name);
+        self.tips.push((name, text.into()));
+        self
+    }
+
+    /// Adds an id field edited with a searchable combobox whose list shows several columns, such
+    /// as code, name and city. `columns` are the headers; each [`LookupItem`] gives its values
+    /// with [`LookupItem::cells`], in the same order. The search goes to `action` on the server
+    /// exactly as for [`Form::lookup`], with its permission checked on every search.
+    ///
+    /// ```ignore
+    /// Form::of(order).lookup_columns(Order::customer, find_customers, [t!("code"), t!("name"), t!("city")])
+    /// ```
+    pub fn lookup_columns<T, A, C>(mut self, field: Field<M, T>, action: A, columns: C) -> Self
+    where
+        T: FieldType + LookupValue + 'static,
+        A: Action<Input = LookupQuery, Output = Result<Page<LookupItem>>>,
+        C: IntoIterator,
+        C::Item: Into<Text>,
+    {
+        let headers: Vec<Text> = columns.into_iter().take(crate::ui::MAX_LOOKUP_COLUMNS).map(Into::into).collect();
+        self.lookup_columns.push((field.meta().name, headers));
+        self.lookup(field, action)
     }
 
     /// Adds a field of several ids edited with a searchable combobox that shows the chosen ones
@@ -637,6 +680,9 @@ pub(crate) fn parse_value(
     if let FieldKind::Custom { editor: editor @ ("file" | "files") } = meta.kind {
         return crate::files::parse_files(raw, editor == "files", meta.optional).ok_or(Unreadable::Format);
     }
+    if let FieldKind::Choices(options) = meta.kind {
+        return crate::ui::read_choices(options, raw).ok_or(Unreadable::Format);
+    }
     let text = match raw {
         Json::String(s) => s.clone(),
         Json::Number(n) => n.to_string(),
@@ -651,7 +697,17 @@ pub(crate) fn parse_value(
         FieldKind::Custom { editor: "ids" } => {
             crate::ui::parse_ids(trimmed).map(|ids| Json::from(ids)).ok_or(Unreadable::Format)
         }
-        FieldKind::Text | FieldKind::Custom { .. } => Ok(Json::String(text)),
+        FieldKind::Text => match meta.mask_pattern() {
+            Some(pattern) => Ok(Json::String(crate::ui::mask_raw(pattern, &text))),
+            None => Ok(Json::String(text)),
+        },
+        FieldKind::Custom { .. } => Ok(Json::String(text)),
+        FieldKind::Decimal => {
+            let (_, scale) = meta.decimal_limits();
+            let d = crate::Decimal::parse_input(trimmed, locale).ok_or(Unreadable::Format)?;
+            let d = if d.scale() < scale { d.round(scale) } else { d };
+            serde_json::to_value(d).map_err(|_| Unreadable::Format)
+        }
         FieldKind::Integer | FieldKind::Id => {
             let group = crate::i18n::NumberFormat::for_locale(locale).group;
             let digits: String = trimmed.chars().filter(|c| *c != group && !c.is_whitespace()).collect();
@@ -670,6 +726,7 @@ pub(crate) fn parse_value(
             let money = Money::parse(trimmed, locale, currency)?;
             serde_json::to_value(money).map_err(|_| Unreadable::Format)
         }
+        FieldKind::Choices(_) => Err(Unreadable::Format),
         FieldKind::Choice(options) => options
             .iter()
             .find(|o| o.value == trimmed)
@@ -695,6 +752,7 @@ pub(crate) fn edit_value(value: &Value, locale: &str, tz: TimeZone) -> String {
         Value::DateTime(d) => d.local(tz).to_string(),
         Value::Choice(c) => c.to_string(),
         Value::Decimal(x) => x.to_string(),
+        Value::Number(d) => d.format(locale),
     }
 }
 
@@ -728,9 +786,23 @@ fn render_field<M: Model>(out: &mut String, r: &Render, f: &FormField<M>, form: 
         common.push_str(" readonly");
     }
 
+    let tip = form.tips.iter().find(|(n, _)| *n == m.name).map(|(_, t)| {
+        let (attrs, html) = crate::ui::tip(r, &format!("{id}-tip"), t);
+        let about = r.text(&Text::key("zeyn.ui.tip.about").arg("label", m.label_text()));
+        (format!(r#"<button type="button" class="z-tip-button" aria-label="{about}"{attrs}><span aria-hidden="true">i</span></button>"#), html)
+    });
+    if tip.is_some() {
+        common = common.replacen(r#"aria-describedby=""#, &format!(r#"aria-describedby="{id}-tip "#), 1);
+    }
     out.push_str(r#"<div class="z-field">"#);
     let star = if required { r#"<span class="z-required" aria-hidden="true">*</span>"# } else { "" };
-    let label = format!(r#"<label for="{id}" id="{id}-label">{}{star}</label>"#, r.label(m));
+    let label = match &tip {
+        Some((button, html)) => format!(
+            r#"<span class="z-label-row"><label for="{id}" id="{id}-label">{}{star}</label>{button}</span>{html}"#,
+            r.label(m)
+        ),
+        None => format!(r#"<label for="{id}" id="{id}-label">{}{star}</label>"#, r.label(m)),
+    };
     let text = |v: &Value| match v {
         Value::Text(s) => escape(s),
         _ => String::new(),
@@ -749,7 +821,8 @@ fn render_field<M: Model>(out: &mut String, r: &Render, f: &FormField<M>, form: 
         return;
     }
     if let Some((_, many)) = form.lookup_of(m.name) {
-        crate::ui::render_lookup(out, r, &slot, many);
+        let columns = form.lookup_columns.iter().find(|(n, _)| *n == m.name).map(|(_, c)| c.as_slice());
+        crate::ui::render_lookup(out, r, &slot, many, columns.unwrap_or_default());
         out.push_str(&format!(r#"<p class="z-field-error" id="{id}-error" aria-live="polite"></p></div>"#));
         return;
     }
@@ -757,7 +830,10 @@ fn render_field<M: Model>(out: &mut String, r: &Render, f: &FormField<M>, form: 
     match m.kind {
         FieldKind::Bool => crate::ui::render_bool(out, &slot),
         FieldKind::Choice(_) => crate::ui::render_choice(out, r, &slot),
-        FieldKind::Money | FieldKind::Integer | FieldKind::Id => crate::ui::render_number(out, r, &slot),
+        FieldKind::Choices(_) => crate::ui::render_choices(out, r, &slot),
+        FieldKind::Money | FieldKind::Integer | FieldKind::Id | FieldKind::Decimal => {
+            crate::ui::render_number(out, r, &slot)
+        }
         FieldKind::Text => crate::ui::render_text(out, r, &slot),
         FieldKind::Date | FieldKind::Time | FieldKind::DateTime | FieldKind::LocalDateTime => {
             out.push_str(&label);
@@ -847,10 +923,30 @@ where
                     "string",
                     "Amount as typed by a user of the current language, for example 1.234,56 in Turkish.".to_string(),
                 ),
+                FieldKind::Decimal => {
+                    let (_, scale) = m.decimal_limits();
+                    (
+                        "string",
+                        format!(
+                            "Number as typed by a user of the current language, at most {scale} decimals, for example 1.234,5 in Turkish."
+                        ),
+                    )
+                }
                 FieldKind::Choice(options) => {
                     let values: Vec<&str> = options.iter().map(|o| o.value).collect();
                     ("string", format!("One of: {}.", values.join(", ")))
                 }
+                FieldKind::Choices(options) => {
+                    let values: Vec<&str> = options.iter().map(|o| o.value).collect();
+                    ("string", format!("Values separated by commas, each one of: {}.", values.join(", ")))
+                }
+                FieldKind::Text if m.mask_pattern().is_some() => (
+                    "string",
+                    format!(
+                        "Fills the pattern {}: 9 is a digit, a a letter, A an upper case letter, * either; send only those characters.",
+                        m.mask_pattern().unwrap_or_default()
+                    ),
+                ),
                 FieldKind::Custom { editor: "lines" } => (
                     "string",
                     format!(

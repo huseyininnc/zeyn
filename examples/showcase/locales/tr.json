@@ -18,6 +18,8 @@
     "islands": "Adacıklar",
     "uploads": "Dosyalar",
     "charts": "Grafikler"
+,
+    "inputs": "Girişler"
   },
   "dashboard": {
     "title": "Genel bakış",
@@ -434,5 +436,81 @@
     "name": "Ad",
     "sales": "Satış",
     "weeks": "Son 12 hafta"
+},
+  "inputs": {
+    "fields": "Sayılar, maskeler ve parolalar",
+    "panel_terms": "Tedarikçi koşulları",
+    "save": "Koşulları kaydet",
+    "saved": "Koşullar kaydedildi. Hiçbir şey saklanmadı.",
+    "choices": "Çoklu seçim ve sütunlar",
+    "panel_campaign": "Kampanya",
+    "save_campaign": "Kampanyayı kaydet",
+    "campaign_saved": "Kampanya kaydedildi. Hiçbir şey saklanmadı.",
+    "col_code": "Kod",
+    "col_name": "Ad",
+    "col_price": "Fiyat",
+    "overlays": "İpuçları, açılır kutular ve meşgul",
+    "new_note": "Yeni not",
+    "new_note_tip": "Boş bir sevkiyat notu başlatır",
+    "panel_actions": "Stok işlemleri",
+    "count": "Ürünleri say",
+    "count_tip": "Hemen yanıt verir, döner simge görünmez",
+    "recount": "Stoku yeniden say",
+    "recount_tip": "Yaklaşık iki saniye sürer; bu sırada alan döner simge gösterir",
+    "counted": "{n} ürün sayıldı.",
+    "carrier": "Taşıyıcı kuralları",
+    "carrier_title": "Taşıyıcı kuralları",
+    "carrier_text": "15:00'ten önce verilen siparişler aynı gün çıkar. 30 kg üstü koliler yük taşımacılığıyla gider.",
+    "panel_note": "Sevkiyat notu",
+    "reference_tip": "İrsaliyeye basılır; en fazla 20 karakter",
+    "save_note": "Notu kaydet",
+    "note_saved": "Not kaydedildi. Hiçbir şey saklanmadı.",
+    "commands": "Menü düğmeleri ve bildirimler",
+    "panel_order": "SO-2026-0142 numaralı sipariş",
+    "save_draft": "Taslağı kaydet",
+    "send": "Tedarikçiye gönder",
+    "sent": "Tedarikçiye gönderildi.",
+    "save_copy": "Kopya olarak kaydet",
+    "copied": "Bir kopya kaydedildi. Hiçbir şey saklanmadı.",
+    "open_fields": "Tedarikçi koşullarını aç",
+    "more": "Diğer",
+    "archive": "Siparişi arşivle",
+    "archived": "Sipariş arşivlendi. Hiçbir şey saklanmadı.",
+    "archive_confirm": "Bu sipariş arşivlensin mi?"
+  },
+  "SupplierTerms": {
+    "supplier": "Tedarikçi",
+    "exchange_rate": "Döviz kuru",
+    "discount": "İskonto",
+    "minimum_order": "En az sipariş (kg)",
+    "phone": "Telefon",
+    "iban": "IBAN",
+    "portal_password": "Portal parolası"
+  },
+  "Campaign": {
+    "name": "Ad",
+    "channels": "Kanallar",
+    "regions": "Bölgeler",
+    "product": "Ürün"
+  },
+  "Channel": {
+    "Email": "E-posta",
+    "Phone": "Telefon",
+    "Sms": "SMS",
+    "Post": "Posta",
+    "Courier": "Kurye"
+  },
+  "Region": {
+    "Marmara": "Marmara",
+    "Aegean": "Ege",
+    "Mediterranean": "Akdeniz",
+    "Central": "İç Anadolu",
+    "BlackSea": "Karadeniz",
+    "East": "Doğu Anadolu",
+    "Southeast": "Güneydoğu Anadolu"
+  },
+  "ShipmentNote": {
+    "reference": "Referans",
+    "instructions": "Talimatlar"
   }
 }

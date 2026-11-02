@@ -8,12 +8,15 @@ mod chart;
 mod controls;
 mod date;
 mod dock;
+pub(crate) mod inputs;
 #[cfg(feature = "islands")]
 mod island;
 mod layout;
 mod lines;
 mod lookup;
 mod media;
+mod menus;
+mod overlay;
 mod shell;
 mod tree;
 mod widgets;
@@ -33,14 +36,20 @@ pub use shell::{MenuBar, MenuList, PropertyInspector, StatusBar, Toolbox};
 
 pub use chart::{Better, BulletCell, Chart, ChartKind, Kpi, SparklineCell};
 pub use controls::Control;
-pub(crate) use controls::{Slot, render_bool, render_choice, render_number, render_text};
+pub(crate) use controls::{
+    Slot, choices_text, read_choices, render_bool, render_choice, render_choices, render_number, render_text,
+};
 pub use date::DateOptions;
 pub(crate) use date::{input_text, picker_config, range_reversed, render_date_input, render_range};
+pub use inputs::{mask_example, mask_fits, mask_raw};
 pub(crate) use lines::LinesEditor;
 pub use lines::{Lines, MAX_LINES};
-pub use lookup::{LookupItem, LookupQuery, LookupValue, MAX_LOOKUP_IDS, MAX_LOOKUP_PAGE};
+pub use lookup::{LookupItem, LookupQuery, LookupValue, MAX_LOOKUP_COLUMNS, MAX_LOOKUP_IDS, MAX_LOOKUP_PAGE};
 pub(crate) use lookup::{parse_ids, render_lookup};
 pub use media::{Audio, PLAYBACK_SPEEDS, Video};
+pub use menus::MenuButton;
+pub(crate) use overlay::tip;
+pub use overlay::{BUSY_DELAY_MS, Busy, MAX_TIP, Popover};
 pub use tree::{MAX_TREE_CHILDREN, Tree, TreeItem, TreeQuery};
 pub use widgets::{
     ActionButton, Alert, Badge, Breadcrumb, DescriptionList, DescriptionOf, EmptyState, Progress, Skeleton, Timeline,

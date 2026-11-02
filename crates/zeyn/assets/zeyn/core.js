@@ -11,6 +11,8 @@
 /** Path the app is served under, from `meta[name=zeyn-base]`; empty when served at the root. */
 const BASE = (document.querySelector('meta[name="zeyn-base"]')?.content ?? '').replace(/\/$/, '');
 const TOAST_MS = 4000;
+/** Most toasts shown at once (`MAX_TOASTS` on the server); the oldest goes first. */
+const MAX_TOASTS = 3;
 const FILTER_DELAY_MS = 300;
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -144,15 +146,23 @@ function toastRegion() {
 }
 
 /**
- * Shows a toast for four seconds. The timer pauses while the pointer is over the toast or it
- * holds focus (WCAG 2.2.1).
+ * Shows a toast for four seconds, eight for danger. The timer pauses while the pointer is over
+ * the toast or it holds focus (WCAG 2.2.1). Danger toasts are alerts, announced at once; the
+ * others are read politely by the region. At most `MAX_TOASTS` show; a new one removes the
+ * oldest. Every toast has a dismiss button.
  * @param {string} message
- * @param {'info' | 'error'} [variant]
+ * @param {'info' | 'success' | 'warning' | 'danger' | 'error' | 'neutral'} [variant]
+ * @param {{label: string, run: Function}} [action] A button on the toast.
  */
 function toast(message, variant = 'info', action = null) {
+  const tone = { error: 'danger', neutral: 'info', brand: 'info' }[variant] ?? variant;
   const el = document.createElement('div');
-  el.className = `z-toast z-toast-${variant}`;
-  el.textContent = message;
+  el.className = `z-toast z-toast-${tone}${tone === 'danger' ? ' z-toast-error' : ''}`;
+  if (tone === 'danger') el.setAttribute('role', 'alert');
+  const text = document.createElement('span');
+  text.className = 'z-toast-text';
+  text.textContent = message;
+  el.append(text);
   if (action) {
     const button = document.createElement('button');
     button.type = 'button';
@@ -164,7 +174,14 @@ function toast(message, variant = 'info', action = null) {
     });
     el.append(' ', button);
   }
-  let left = TOAST_MS;
+  const dismiss = document.createElement('button');
+  dismiss.type = 'button';
+  dismiss.className = 'z-toast-close';
+  dismiss.setAttribute('aria-label', document.querySelector('.z-toasts[data-text-dismiss]')?.dataset.textDismiss || 'Dismiss');
+  dismiss.textContent = '\u00d7';
+  dismiss.addEventListener('click', () => el.remove());
+  el.append(dismiss);
+  let left = tone === 'danger' ? TOAST_MS * 2 : TOAST_MS;
   let started = 0;
   let timer = 0;
   const run = () => {
@@ -182,7 +199,10 @@ function toast(message, variant = 'info', action = null) {
   el.addEventListener('focusin', pause);
   el.addEventListener('pointerleave', () => setTimeout(run));
   el.addEventListener('focusout', () => setTimeout(run));
-  toastRegion().append(el);
+  const region = toastRegion();
+  region.append(el);
+  const shown = region.querySelectorAll(':scope > .z-toast');
+  for (let i = 0; i < shown.length - MAX_TOASTS; i++) shown[i].remove();
   run();
 }
 
@@ -219,7 +239,11 @@ async function runEffect(effect, source) {
       return;
     }
     case 'toast':
-      return toast(effect.message ?? '');
+      return toast(
+        effect.message ?? '',
+        effect.tone ?? 'info',
+        effect.action ? { label: effect.action.label ?? '', run: () => runEffect(effect.action.effect, source) } : null,
+      );
     case 'close_and_refresh':
       return closeAndRefresh();
     default:

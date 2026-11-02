@@ -108,7 +108,10 @@
       "disabled_day": "{label}: bu gün seçilemez.",
       "time_step": "{label} {n} dakikalık adımlarla girilmelidir.",
       "range_order": "{label}, {other} tarihinden önce olamaz.",
-      "unique": "{label} başka bir kayıtta kullanılıyor."
+      "unique": "{label} başka bir kayıtta kullanılıyor.",
+      "scale": "{label} en fazla {n} ondalık basamak içerebilir.",
+      "precision": "{label} ondalık ayırıcıdan önce en fazla {n} basamak içerebilir.",
+      "mask": "{label} {pattern} biçiminde olmalı."
     },
     "error": {
       "forbidden": "Bu işlem için yetkiniz yok.",
@@ -357,7 +360,8 @@
       },
       "number": {
         "up": "Artır",
-        "down": "Azalt"
+        "down": "Azalt",
+        "percent": "yüzde"
       },
       "text": {
         "count": "{n} / {max} karakter"
@@ -413,6 +417,29 @@
         "down": "Önceki döneme göre yüzde {pct} düşüş",
         "flat": "Önceki döneme göre değişiklik yok",
         "target": "Hedef {target}, yüzde {pct} ulaşıldı"
+},
+      "password": {
+        "show": "Parolayı göster",
+        "weak": "Güç: zayıf",
+        "fair": "Güç: orta",
+        "good": "Güç: iyi",
+        "strong": "Güç: güçlü"
+      },
+      "multi": {
+        "count": "{n} seçili"
+      },
+      "popover": {
+        "close": "Kapat"
+      },
+      "busy": "Çalışıyor",
+      "tip": {
+        "about": "{label} hakkında"
+      },
+      "menu": {
+        "more": "{label} için diğer seçenekler"
+      },
+      "toast": {
+        "dismiss": "Kapat"
       }
     },
     "date": {

@@ -11,6 +11,8 @@ pub enum FieldKind {
     Text,
     Integer,
     Money,
+    /// An exact decimal number ([`crate::Decimal`]) with the `scale` and `precision` rules.
+    Decimal,
     Bool,
     Date,
     Time,
@@ -19,10 +21,20 @@ pub enum FieldKind {
     /// A wall clock date and time with no time zone.
     LocalDateTime,
     Choice(&'static [ChoiceOption]),
+    /// Several options of a `#[choice]` enum: a `Vec<T>` field, edited with a multi select.
+    Choices(&'static [ChoiceOption]),
     /// Field type defined outside Zeyn. `editor` names the client side editor that enhances the input.
     Custom {
         editor: &'static str,
     },
+}
+
+impl FieldKind {
+    /// Whether values of this kind are stored as JSON text in a database column: custom types,
+    /// line lists, id lists and several choices.
+    pub fn is_json(&self) -> bool {
+        matches!(self, FieldKind::Custom { .. } | FieldKind::Choices(_))
+    }
 }
 
 /// One option of a `#[choice]` enum.
@@ -51,6 +63,8 @@ pub enum Value {
     /// A computed number with a fraction, such as the average of a whole number column.
     /// Shown with two decimals in the user's locale. Never a model field.
     Decimal(f64),
+    /// An exact decimal number, the value of a [`crate::Decimal`] field.
+    Number(crate::Decimal),
 }
 
 /// Currency.
@@ -161,7 +175,7 @@ impl fmt::Display for Money {
 #[diagnostic::on_unimplemented(
     message = "`{Self}` cannot be used as a model field",
     label = "unsupported field type",
-    note = "supported types: String, i32, i64, bool, Money, Date, Time, DateTime, LocalDateTime, Option<T>, entity ids and `#[choice]` enums"
+    note = "supported types: String, i32, i64, bool, Money, Decimal, Date, Time, DateTime, LocalDateTime, Option<T>, entity ids, `#[choice]` enums, Vec of a `#[choice]` enum or a model, and Vec<i64>"
 )]
 pub trait FieldType {
     const KIND: FieldKind;
@@ -188,6 +202,12 @@ pub trait FieldType {
 
     #[doc(hidden)]
     fn __compare(&self, _limit: i64) -> Option<std::cmp::Ordering> {
+        None
+    }
+
+    /// The exact decimal held, for the `scale` and `precision` checks.
+    #[doc(hidden)]
+    fn __decimal(&self) -> Option<crate::Decimal> {
         None
     }
 
@@ -277,6 +297,19 @@ impl FieldType for Money {
     }
 }
 
+impl FieldType for crate::Decimal {
+    const KIND: FieldKind = FieldKind::Decimal;
+    fn to_value(&self) -> Value {
+        Value::Number(*self)
+    }
+    fn __compare(&self, limit: i64) -> Option<std::cmp::Ordering> {
+        Some(self.cmp_int(limit))
+    }
+    fn __decimal(&self) -> Option<crate::Decimal> {
+        Some(*self)
+    }
+}
+
 impl<T: FieldType> FieldType for Option<T> {
     const KIND: FieldKind = T::KIND;
     const OPTIONAL: bool = true;
@@ -292,18 +325,22 @@ impl<T: FieldType> FieldType for Option<T> {
     fn __compare(&self, limit: i64) -> Option<std::cmp::Ordering> {
         self.as_ref().and_then(|v| v.__compare(limit))
     }
+    fn __decimal(&self) -> Option<crate::Decimal> {
+        self.as_ref().and_then(T::__decimal)
+    }
 }
 
 /// Column types that accept `min()` and `max()` totals in a grid.
 #[diagnostic::on_unimplemented(
     message = "`min()` and `max()` cannot be used on a `{Self}` column",
     label = "values of this column have no order that makes a useful total",
-    note = "`min()` and `max()` work on i32, i64, Money, Date, Time, DateTime, LocalDateTime and their Option forms"
+    note = "`min()` and `max()` work on i32, i64, Money, Decimal, Date, Time, DateTime, LocalDateTime and their Option forms"
 )]
 pub trait SupportsMinMaxTotal {}
 impl SupportsMinMaxTotal for i32 {}
 impl SupportsMinMaxTotal for i64 {}
 impl SupportsMinMaxTotal for Money {}
+impl SupportsMinMaxTotal for crate::Decimal {}
 impl SupportsMinMaxTotal for Date {}
 impl SupportsMinMaxTotal for Time {}
 impl SupportsMinMaxTotal for DateTime {}
@@ -362,12 +399,13 @@ impl SupportsText for Option<String> {}
 #[diagnostic::on_unimplemented(
     message = "the `min` and `max` rules cannot be used on `{Self}`",
     label = "not a numeric field",
-    note = "`min` and `max` work on i32, i64, Money, Date and their Option forms; for Money the limit is in major units, for Date it is written as YYYY_MM_DD"
+    note = "`min` and `max` work on i32, i64, Money, Decimal, Date and their Option forms; for Money and Decimal the limit is a whole number, for Date it is written as YYYY_MM_DD"
 )]
 pub trait SupportsMinMax {}
 impl SupportsMinMax for i32 {}
 impl SupportsMinMax for i64 {}
 impl SupportsMinMax for Money {}
+impl SupportsMinMax for crate::Decimal {}
 /// Dates take limits written as `YYYY_MM_DD`: `#[rule(min = 2024_01_01)]`.
 impl SupportsMinMax for Date {}
 impl<T: SupportsMinMax> SupportsMinMax for Option<T> {}
@@ -376,10 +414,71 @@ impl<T: SupportsMinMax> SupportsMinMax for Option<T> {}
 #[diagnostic::on_unimplemented(
     message = "`sum()` and `avg()` cannot be used on a `{Self}` column",
     label = "not a numeric column",
-    note = "`sum()` and `avg()` work on i32, i64, Money and their Option forms; use `count()` for other columns"
+    note = "`sum()` and `avg()` work on i32, i64, Money, Decimal and their Option forms; use `count()` for other columns"
 )]
 pub trait SupportsSum {}
+impl SupportsSum for crate::Decimal {}
 impl SupportsSum for i32 {}
 impl SupportsSum for i64 {}
 impl SupportsSum for Money {}
 impl<T: SupportsSum> SupportsSum for Option<T> {}
+
+/// Types that accept the `scale` and `precision` rules.
+#[diagnostic::on_unimplemented(
+    message = "the `scale` and `precision` rules cannot be used on `{Self}`",
+    label = "not a decimal field",
+    note = "`scale` and `precision` work on Decimal and Option<Decimal>; Money always has two decimals"
+)]
+pub trait SupportsScale {}
+impl SupportsScale for crate::Decimal {}
+impl SupportsScale for Option<crate::Decimal> {}
+
+/// Item types a `Vec<T>` field can hold: line models (`#[model]`, `#[entity]`), edited as a lines
+/// table, and `#[choice]` enums, edited with a multi select. `Vec<i64>` holds ids for
+/// `Form::lookup_many`.
+#[diagnostic::on_unimplemented(
+    message = "`Vec<{Self}>` cannot be used as a model field",
+    label = "not a line model or a `#[choice]` enum",
+    note = "a Vec field holds lines (`Vec` of a `#[model]`), several options (`Vec` of a `#[choice]` enum) or ids (`Vec<i64>` with `Form::lookup_many`)"
+)]
+pub trait VecItem: Sized {
+    #[doc(hidden)]
+    const VEC_KIND: FieldKind;
+
+    #[doc(hidden)]
+    fn __vec_value(items: &[Self]) -> Value;
+
+    #[doc(hidden)]
+    fn __vec_validate(_items: &[Self], _meta: &crate::model::FieldMeta, _errors: &mut crate::model::ValidationErrors) {}
+}
+
+impl<L: VecItem> FieldType for Vec<L> {
+    const KIND: FieldKind = L::VEC_KIND;
+
+    fn to_value(&self) -> Value {
+        L::__vec_value(self)
+    }
+
+    fn __is_empty(&self) -> bool {
+        self.is_empty()
+    }
+
+    fn __validate_items(&self, meta: &crate::model::FieldMeta, errors: &mut crate::model::ValidationErrors) {
+        L::__vec_validate(self, meta, errors);
+    }
+}
+
+impl<L: VecItem> SupportsRequired for Vec<L> {}
+
+/// The value of several choices: their values joined with commas, `Small,Large`.
+#[doc(hidden)]
+pub fn __choices_value<T: FieldType>(items: &[T]) -> Value {
+    let values: Vec<String> = items
+        .iter()
+        .filter_map(|i| match i.to_value() {
+            Value::Choice(c) => Some(c.to_string()),
+            _ => None,
+        })
+        .collect();
+    Value::Text(values.join(","))
+}

@@ -1165,8 +1165,14 @@ function fillListbox(items, activeValue) {
     const el = make('div', `z-option${item.more ? ' z-option-more' : ''}`, { role: 'option', id: `${list.id}-o${lb.items.length}`, 'aria-selected': String(!!item.selected) });
     if (lb.multiple && !item.more) el.append(make('span', 'z-option-check', { 'aria-hidden': 'true' }));
     const text = make('span', 'z-option-text');
-    text.append(make('span', '', { text: item.label }));
-    if (item.hint) text.append(make('span', 'z-option-hint', { text: item.hint }));
+    if (item.cells?.length && lb.columns?.length) {
+      text.className = 'z-option-cells';
+      item.cells.forEach((c) => text.append(make('span', '', { text: c })));
+      el.setAttribute('aria-label', item.cells.map((c, i) => (lb.columns[i] ? `${lb.columns[i]}: ${c}` : c)).join(', '));
+    } else {
+      text.append(make('span', '', { text: item.label }));
+      if (item.hint) text.append(make('span', 'z-option-hint', { text: item.hint }));
+    }
     el.append(text);
     el.dataset.index = String(lb.items.length);
     (item.group ? groupEl : list).append(el);
@@ -1506,6 +1512,7 @@ async function searchLookup(wrap, offset = 0, keep = []) {
       pick: (item) => pickLookup(wrap, item),
       more: () => searchLookup(wrap, lb.next, lb.items.filter((i) => !i.more)),
     });
+    lookupColumns(wrap);
     fillListbox([...keep, { note: t.loading }]);
   }
   wrap.zeynAbort?.abort();
@@ -1516,7 +1523,7 @@ async function searchLookup(wrap, offset = 0, keep = []) {
   const items = [...keep];
   for (const item of page.items ?? []) {
     wrap.zeynLabels.set(String(item.id), item.label);
-    items.push({ value: String(item.id), label: item.label, hint: item.hint, selected: chosen.has(String(item.id)) });
+    items.push({ value: String(item.id), label: item.label, hint: item.hint, cells: item.cells, selected: chosen.has(String(item.id)) });
   }
   lb.next = page.next ? Number(page.next) : null;
   if (page.next) items.push({ value: '', label: t.more, more: true });
@@ -1887,7 +1894,8 @@ function valuesOf(form) {
     if (el.type === 'checkbox') values[el.name] = el.checked;
     else if (el.type === 'radio') {
       if (el.checked) values[el.name] = el.value;
-    } else values[el.name] = el.value;
+    } else if (el.multiple) values[el.name] = [...el.selectedOptions].map((o) => o.value).join(',');
+    else values[el.name] = el.value;
   }
   return values;
 }
@@ -2400,3 +2408,819 @@ new MutationObserver((records) => {
 }).observe(document.body, { childList: true });
 
 init(document);
+
+/* Masked text -------------------------------------------------------------------------------- */
+
+/** Slots and literals of a mask pattern: `9` digit, `a` letter, `A` upper case letter, `*` either. */
+function maskTokens(pattern) {
+  const out = [];
+  for (let i = 0; i < pattern.length; i++) {
+    const c = pattern[i];
+    if (c === '\\' && i + 1 < pattern.length) out.push({ lit: pattern[++i] });
+    else if ('9aA*'.includes(c)) out.push({ slot: c });
+    else out.push({ lit: c });
+  }
+  return out;
+}
+
+/** Whether a slot takes a character. */
+function slotTakes(slot, c) {
+  if (slot === '9') return /^\d$/.test(c);
+  if (slot === '*') return /^[\p{L}\p{N}]$/u.test(c);
+  return /^\p{L}$/u.test(c);
+}
+
+/** The raw characters of typed text, as the server reads them (`ui::mask_raw`). */
+function maskRaw(tokens, text) {
+  let raw = '';
+  let at = 0;
+  outer: for (const c of text) {
+    while (tokens[at]?.lit !== undefined) {
+      if (tokens[at++].lit === c) continue outer;
+    }
+    const t = tokens[at];
+    if (t && slotTakes(t.slot, c)) {
+      raw += t.slot === 'A' ? c.toLocaleUpperCase(lang()) : c;
+      at++;
+    } else if (/[\p{L}\p{N}]/u.test(c)) break;
+  }
+  return raw;
+}
+
+/** Raw characters shown through the pattern, with the literals up to the last one typed. */
+function maskFormat(tokens, raw) {
+  let out = '';
+  let i = 0;
+  for (const t of tokens) {
+    if (i >= raw.length) break;
+    if (t.lit !== undefined) out += t.lit;
+    else out += raw[i++];
+  }
+  return out;
+}
+
+/** Turns `[data-zeyn-mask]` inputs into masked inputs over the raw value the form submits. */
+function initMasks(root) {
+  root.querySelectorAll('.z-mask:not([data-ready])').forEach((wrap) => {
+    const native = wrap.querySelector('.z-mask-value');
+    if (!native) return;
+    wrap.dataset.ready = '';
+    const tokens = maskTokens(wrap.dataset.zeynMask);
+    const shown = make('input', 'z-mask-input', {
+      type: 'text',
+      id: native.id,
+      autocomplete: 'off',
+      spellcheck: 'false',
+      inputmode: native.inputMode || 'text',
+      dir: 'ltr',
+      placeholder: wrap.dataset.example ?? '',
+      'data-testid': `${native.dataset.testid ?? ''}.input`,
+    });
+    for (const a of ['aria-describedby', 'aria-required', 'aria-invalid']) if (native.hasAttribute(a)) shown.setAttribute(a, native.getAttribute(a));
+    shown.readOnly = native.readOnly;
+    shown.value = maskFormat(tokens, maskRaw(tokens, native.value));
+    native.removeAttribute('id');
+    hideNative(native);
+    wrap.prepend(shown);
+    wrap.zeynTokens = tokens;
+  });
+}
+
+/**
+ * Reformats a masked input as the user types, keeps the caret after the same raw character and
+ * writes the raw value. Backspace over a literal removes the character before it.
+ */
+function maskInput(shown, e) {
+  const wrap = shown.closest('.z-mask');
+  const tokens = wrap.zeynTokens;
+  const native = wrap.querySelector('.z-mask-value');
+  const caret = shown.selectionStart ?? shown.value.length;
+  let before = maskRaw(tokens, shown.value.slice(0, caret)).length;
+  let raw = maskRaw(tokens, shown.value);
+  if (e.inputType === 'deleteContentBackward' && raw === native.value && before > 0) {
+    raw = raw.slice(0, before - 1) + raw.slice(before);
+    before--;
+  }
+  const text = maskFormat(tokens, raw);
+  if (text !== shown.value) {
+    shown.value = text;
+    let seen = 0;
+    let pos = 0;
+    for (const t of tokens) {
+      if (seen >= before || pos >= text.length) break;
+      pos++;
+      if (t.lit === undefined) seen++;
+    }
+    shown.setSelectionRange(pos, pos);
+  }
+  if (native.value === raw) return;
+  native.value = raw;
+  native.dispatchEvent(new Event('input', { bubbles: true }));
+  native.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+/* Password ----------------------------------------------------------------------------------- */
+
+/** Shows the show and hide buttons of password inputs, which need this script. */
+function initPasswords(root) {
+  root.querySelectorAll('[data-zeyn-password]:not([data-ready])').forEach((wrap) => {
+    wrap.dataset.ready = '';
+    const button = wrap.querySelector('.z-password-toggle');
+    if (button) button.hidden = false;
+  });
+}
+
+/** Shows or hides the password (APG toggle button: the name stays, `aria-pressed` changes). */
+function togglePassword(button) {
+  const input = button.closest('[data-zeyn-password]').querySelector('input');
+  const show = button.getAttribute('aria-pressed') !== 'true';
+  input.type = show ? 'text' : 'password';
+  button.setAttribute('aria-pressed', String(show));
+}
+
+/**
+ * A rough strength from 1 (weak) to 4 (strong): length, kinds of characters and obvious
+ * patterns. Only a hint; the server's rules decide what is accepted.
+ */
+function strengthOf(pw) {
+  const len = [...pw].length;
+  const kinds = [/\p{Ll}/u, /\p{Lu}/u, /\p{N}/u, /[^\p{L}\p{N}]/u].filter((r) => r.test(pw)).length;
+  if (len < 8 || /^(.)\1*$/u.test(pw) || /^(?:password|parola|qwerty|123456|111111|abc123)/i.test(pw)) return 1;
+  return Math.min(4, 1 + (len >= 12) + (kinds >= 3) + (len >= 16 || (len >= 12 && kinds === 4)));
+}
+
+/** Updates the strength meter under a new password input. */
+function meterInput(input) {
+  const meter = document.querySelector(`[data-zeyn-strength="${CSS.escape(input.id)}"]`);
+  if (!meter) return;
+  const level = input.value ? strengthOf(input.value) : 0;
+  meter.hidden = level === 0;
+  if (meter.dataset.level === String(level)) return;
+  meter.dataset.level = String(level);
+  const levels = parse(meter.dataset.levels ?? '[]') ?? [];
+  meter.querySelector('.z-strength-text').textContent = level ? (levels[level - 1] ?? '') : '';
+}
+
+/* Setup of the inputs above ------------------------------------------------------------------ */
+
+initializers.push(initMasks, initPasswords);
+
+clickHandlers.push((e, t) => {
+  const b = t.closest('.z-password-toggle');
+  return b && (togglePassword(b), true);
+});
+
+document.addEventListener('input', (e) => {
+  const t = e.target;
+  if (!(t instanceof HTMLInputElement)) return;
+  if (t.matches('.z-mask-input')) maskInput(t, e);
+  else if (t.matches('[data-zeyn-password] input')) meterInput(t);
+});
+
+document.addEventListener('focusin', (e) => {
+  const t = e.target;
+  if (t instanceof Element && t.matches('.z-mask > .z-native')) t.parentElement.querySelector('.z-mask-input')?.focus();
+});
+
+document.addEventListener(
+  'submit',
+  (e) => {
+    for (const b of e.target.querySelectorAll?.('.z-password-toggle[aria-pressed="true"]') ?? []) togglePassword(b);
+  },
+  true,
+);
+
+/** Validation marks set on the raw input show on the masked one. */
+new MutationObserver((records) => {
+  for (const r of records) {
+    const el = r.target;
+    if (!(el instanceof Element) || !el.matches('.z-mask > .z-native')) continue;
+    const shown = el.parentElement.querySelector('.z-mask-input');
+    if (el.getAttribute('aria-invalid') === 'true') shown?.setAttribute('aria-invalid', 'true');
+    else shown?.removeAttribute('aria-invalid');
+  }
+}).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['aria-invalid'] });
+
+initMasks(document);
+initPasswords(document);
+
+/* Multi select ------------------------------------------------------------------------------- */
+
+/** Turns `[data-zeyn-multi]` multiple selects into chips and a combobox with a multi select list. */
+function initMultis(root) {
+  root.querySelectorAll('[data-zeyn-multi]:not([data-ready])').forEach((wrap) => {
+    const native = wrap.querySelector('select');
+    if (!native) return;
+    wrap.dataset.ready = '';
+    const t = texts(wrap);
+    const box = make('div', 'z-lookup-box z-multi-box');
+    const tags = make('ul', 'z-tags', { 'aria-label': t.selected });
+    const combo = make('div', 'z-multi-button', {
+      role: 'combobox',
+      tabindex: native.disabled ? '-1' : '0',
+      'aria-haspopup': 'listbox',
+      'aria-expanded': 'false',
+      'aria-labelledby': `${native.id}-label ${native.id}-value`,
+      'data-testid': `${native.dataset.testid ?? ''}.combobox`,
+    });
+    for (const a of ['aria-describedby', 'aria-required', 'aria-invalid']) if (native.hasAttribute(a)) combo.setAttribute(a, native.getAttribute(a));
+    if (native.required) combo.setAttribute('aria-required', 'true');
+    combo.append(make('span', 'z-select-value', { id: `${native.id}-value` }));
+    box.append(tags, combo, make('span', 'z-select-arrow', { 'aria-hidden': 'true' }));
+    wrap.prepend(box);
+    wrap.append(make('span', 'z-sr-only', { 'aria-live': 'polite' }));
+    wrap.dataset.zeynLive = '';
+    hideNative(native);
+    syncMulti(wrap);
+  });
+}
+
+/** Draws the chosen options of a multi select as chips and a count. */
+function syncMulti(wrap) {
+  const t = texts(wrap);
+  const native = wrap.querySelector('select');
+  const chosen = [...native.selectedOptions];
+  wrap.querySelector('.z-tags').replaceChildren(
+    ...chosen.map((o) => {
+      const li = make('li', 'z-tag');
+      li.append(make('span', '', { text: o.text }));
+      const remove = make('button', 'z-tag-remove', { type: 'button', 'data-multi-remove': o.value, 'aria-label': fill(t.remove, { label: o.text }) });
+      remove.append(make('span', '', { 'aria-hidden': 'true', text: '×' }));
+      li.append(remove);
+      return li;
+    }),
+  );
+  const value = wrap.querySelector('.z-select-value');
+  value.textContent = chosen.length ? fill(t.count, { n: chosen.length }) : t.none;
+  value.classList.toggle('z-placeholder', !chosen.length);
+}
+
+/** Selects or clears one option of a multi select and tells the form. */
+function setMulti(wrap, value, on) {
+  const native = wrap.querySelector('select');
+  const option = [...native.options].find((o) => o.value === value);
+  if (!option || option.selected === on) return;
+  option.selected = on;
+  native.dispatchEvent(new Event('input', { bubbles: true }));
+  native.dispatchEvent(new Event('change', { bubbles: true }));
+  syncMulti(wrap);
+  const item = lb?.items.find((i) => i.value === value);
+  if (item) {
+    item.selected = on;
+    item.el.setAttribute('aria-selected', String(on));
+  }
+  announce(wrap, fill(texts(wrap).count, { n: native.selectedOptions.length }));
+}
+
+/** Opens the list of a multi select; options stay selected as the user toggles them. */
+function openMulti(combo, where = 'first') {
+  const wrap = combo.closest('[data-zeyn-multi]');
+  const native = wrap.querySelector('select');
+  openListbox(combo, {
+    label: document.getElementById(`${native.id}-label`)?.textContent.replace('*', '').trim() ?? '',
+    multiple: true,
+    anchor: wrap.querySelector('.z-multi-box'),
+    pick: (item) => setMulti(wrap, item.value, !item.selected),
+  });
+  const items = [...native.options].map((o) => ({ value: o.value, label: o.text, selected: o.selected }));
+  fillListbox(items, native.selectedOptions[0]?.value);
+  if (where === 'last') setActive(items.length - 1);
+  if (where === 'first' && !native.selectedOptions.length) setActive(0);
+}
+
+/**
+ * Keyboard of a multi select (APG listbox with multiple selection, inside a combobox): arrows,
+ * Home and End move, Space and Enter toggle, Shift with an arrow moves and toggles, letters jump,
+ * Backspace on the closed combobox removes the last chip. Ctrl+A is the browser's and stays so.
+ */
+function multiKey(e, combo) {
+  const wrap = combo.closest('[data-zeyn-multi]');
+  const open = lb?.combo === combo;
+  if (!open) {
+    if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) {
+      e.preventDefault();
+      openMulti(combo);
+      return true;
+    }
+    if (e.key === 'Home' || e.key === 'End') {
+      e.preventDefault();
+      openMulti(combo, e.key === 'Home' ? 'first' : 'last');
+      return true;
+    }
+    if (e.key === 'Backspace' || e.key === 'Delete') {
+      const last = [...wrap.querySelector('select').selectedOptions].at(-1);
+      if (!last) return false;
+      e.preventDefault();
+      setMulti(wrap, last.value, false);
+      return true;
+    }
+    const items = [...wrap.querySelector('select').options].map((o) => ({ label: o.text }));
+    const at = typeAhead(e, items, 0);
+    if (at < 0) return false;
+    e.preventDefault();
+    openMulti(combo);
+    setActive(at);
+    return true;
+  }
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    return pickActive();
+  }
+  if (e.altKey && e.key === 'ArrowUp') {
+    e.preventDefault();
+    closePopup(true);
+    return true;
+  }
+  if (e.key === 'Tab') {
+    closePopup(false);
+    return false;
+  }
+  if (e.shiftKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+    moveActive(e);
+    return pickActive();
+  }
+  if (moveActive(e)) return true;
+  const at = typeAhead(e, lb.items, Math.max(0, lb.active));
+  if (at < 0) return false;
+  e.preventDefault();
+  setActive(at);
+  return true;
+}
+
+/* Lookup columns ----------------------------------------------------------------------------- */
+
+/** Gives the open lookup list the column headers of a multi column lookup (`data-columns`). */
+function lookupColumns(wrap) {
+  const columns = parse(wrap.dataset.columns ?? 'null');
+  if (!lb || !Array.isArray(columns) || !columns.length) return;
+  lb.columns = columns;
+  lb.panel.classList.add('z-list-columns');
+  lb.panel.style.setProperty('--z-cols', String(columns.length));
+  const head = make('div', 'z-list-head', { 'aria-hidden': 'true' });
+  columns.forEach((c) => head.append(make('span', '', { text: c })));
+  lb.panel.prepend(head);
+}
+
+/* Setup of the multi select ------------------------------------------------------------------ */
+
+initializers.push(initMultis);
+
+keyHandlers.push((e, t) => t.matches('.z-multi-button') && multiKey(e, t));
+
+clickHandlers.push((e, t) => {
+  const remove = t.closest('[data-multi-remove]');
+  if (remove) {
+    const wrap = remove.closest('[data-zeyn-multi]');
+    setMulti(wrap, remove.dataset.multiRemove, false);
+    wrap.querySelector('[role="combobox"]').focus();
+    return true;
+  }
+  const box = t.closest('.z-multi-box');
+  if (!box) return false;
+  const combo = box.querySelector('[role="combobox"]');
+  if (lb?.combo === combo) closePopup(true);
+  else {
+    combo.focus();
+    openMulti(combo);
+  }
+  return true;
+});
+
+document.addEventListener('focusin', (e) => {
+  const t = e.target;
+  if (t instanceof Element && t.matches('[data-zeyn-multi] .z-native')) t.closest('[data-zeyn-multi]').querySelector('[role="combobox"]')?.focus();
+});
+
+/** Validation marks set on the native multiple select show on its combobox. */
+new MutationObserver((records) => {
+  for (const r of records) {
+    const el = r.target;
+    if (!(el instanceof Element) || !el.matches('[data-zeyn-multi] .z-native')) continue;
+    const combo = el.closest('[data-zeyn-multi]').querySelector('[role="combobox"]');
+    if (el.getAttribute('aria-invalid') === 'true') combo?.setAttribute('aria-invalid', 'true');
+    else combo?.removeAttribute('aria-invalid');
+  }
+}).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['aria-invalid'] });
+
+initMultis(document);
+
+/* Tooltip ------------------------------------------------------------------------------------ */
+
+const TIP_DELAY_MS = 300;
+const LONG_PRESS_MS = 500;
+
+/** The shown tooltip `{ trigger, tip }`, its show and hide timers, and a long press in progress. */
+let tipShown = null;
+let tipTimer = 0;
+let tipHideTimer = 0;
+let pressTimer = 0;
+let pressedTip = null;
+let tipWasShown = false;
+
+/** Places a tooltip above its trigger, or below when there is no room, inside the viewport. */
+function placeTip(trigger, tip) {
+  const a = trigger.getBoundingClientRect();
+  const w = tip.offsetWidth;
+  const h = tip.offsetHeight;
+  let top = a.top - h - 6;
+  if (top < 4) top = a.bottom + 6;
+  const left = Math.max(4, Math.min(a.left + a.width / 2 - w / 2, innerWidth - w - 4));
+  tip.style.top = `${Math.round(top)}px`;
+  tip.style.left = `${Math.round(left)}px`;
+}
+
+/** Shows the tooltip of a trigger (`data-zeyn-tip` names it) and hides any other. */
+function showTip(trigger) {
+  clearTimeout(tipTimer);
+  clearTimeout(tipHideTimer);
+  const tip = document.getElementById(trigger.dataset.zeynTip);
+  if (!tip) return;
+  if (tipShown?.tip !== tip) hideTip();
+  tip.hidden = false;
+  tipShown = { trigger, tip };
+  placeTip(trigger, tip);
+}
+
+/** Hides the shown tooltip. */
+function hideTip() {
+  clearTimeout(tipTimer);
+  clearTimeout(tipHideTimer);
+  if (!tipShown) return;
+  tipShown.tip.hidden = true;
+  tipShown = null;
+}
+
+/** Hides the tooltip soon, unless the pointer moves onto it or back to its trigger (WCAG 1.4.13). */
+function hideTipSoon() {
+  clearTimeout(tipTimer);
+  clearTimeout(tipHideTimer);
+  tipHideTimer = setTimeout(hideTip, 150);
+}
+
+document.addEventListener('pointerover', (e) => {
+  const t = e.target instanceof Element ? e.target : null;
+  if (!t || e.pointerType === 'touch') return;
+  if (tipShown && (tipShown.tip.contains(t) || tipShown.trigger.contains(t))) return clearTimeout(tipHideTimer);
+  const trigger = t.closest('[data-zeyn-tip]');
+  if (!trigger) return;
+  clearTimeout(tipTimer);
+  tipTimer = setTimeout(() => showTip(trigger), tipShown ? 0 : TIP_DELAY_MS);
+});
+
+document.addEventListener('pointerout', (e) => {
+  const t = e.target instanceof Element ? e.target : null;
+  if (!t || e.pointerType === 'touch') return;
+  if (t.closest('[data-zeyn-tip]') || (tipShown && tipShown.tip.contains(t))) {
+    clearTimeout(tipTimer);
+    if (tipShown && document.activeElement !== tipShown.trigger) hideTipSoon();
+  }
+});
+
+document.addEventListener('focusin', (e) => {
+  const trigger = e.target instanceof Element ? e.target.closest('[data-zeyn-tip]') : null;
+  if (trigger) showTip(trigger);
+  else if (tipShown && !tipShown.tip.contains(e.target)) hideTip();
+});
+
+document.addEventListener('focusout', (e) => {
+  if (tipShown && e.target === tipShown.trigger) hideTip();
+});
+
+document.addEventListener(
+  'keydown',
+  (e) => {
+    if (e.key !== 'Escape' || !tipShown) return;
+    e.preventDefault();
+    e.stopPropagation();
+    hideTip();
+  },
+  true,
+);
+
+document.addEventListener(
+  'pointerdown',
+  (e) => {
+    const t = e.target instanceof Element ? e.target : null;
+    if (tipShown && t && !tipShown.tip.contains(t) && !tipShown.trigger.contains(t)) hideTip();
+    const trigger = t?.closest('[data-zeyn-tip]');
+    tipWasShown = !!trigger && tipShown?.trigger === trigger;
+    clearTimeout(pressTimer);
+    pressedTip = null;
+    if (!trigger || e.pointerType !== 'touch') return;
+    pressTimer = setTimeout(() => {
+      pressedTip = trigger;
+      showTip(trigger);
+    }, LONG_PRESS_MS);
+  },
+  true,
+);
+
+for (const type of ['pointerup', 'pointercancel']) document.addEventListener(type, () => clearTimeout(pressTimer), true);
+
+/** A long press shows the tooltip and does not also press the button; a tap on an info button toggles it. */
+document.addEventListener(
+  'click',
+  (e) => {
+    const t = e.target instanceof Element ? e.target : null;
+    const trigger = t?.closest('[data-zeyn-tip]');
+    if (pressedTip && trigger === pressedTip) {
+      pressedTip = null;
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    if (!trigger?.classList.contains('z-tip-button')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.detail > 0 ? tipWasShown : tipShown?.trigger === trigger) hideTip();
+    else showTip(trigger);
+  },
+  true,
+);
+
+document.addEventListener('contextmenu', (e) => {
+  if (pressedTip && e.target instanceof Element && e.target.closest('[data-zeyn-tip]') === pressedTip) e.preventDefault();
+});
+
+/* Popover ------------------------------------------------------------------------------------ */
+
+/** The open popover `{ button, pop }`. */
+let pop = null;
+
+/** Places an open popover below its button, or above it when there is no room below. */
+function placePopover() {
+  if (!pop) return;
+  const { button, pop: el } = pop;
+  if (NARROW.matches) {
+    el.style.removeProperty('top');
+    el.style.removeProperty('left');
+    return;
+  }
+  const a = button.getBoundingClientRect();
+  const w = el.offsetWidth;
+  const h = el.offsetHeight;
+  const below = innerHeight - a.bottom - 8;
+  const top = below < h && a.top - 8 > below ? Math.max(8, a.top - h - 4) : Math.min(a.bottom + 4, Math.max(8, innerHeight - h - 8));
+  const rtl = getComputedStyle(button).direction === 'rtl';
+  const left = Math.max(8, Math.min(rtl ? a.right - w : a.left, innerWidth - w - 8));
+  el.style.top = `${Math.round(top)}px`;
+  el.style.left = `${Math.round(left)}px`;
+}
+
+/** Opens a popover and moves focus to its first control, or to the dialog itself. */
+function openPopover(button) {
+  closePopover(false);
+  const el = document.getElementById(button.getAttribute('aria-controls'));
+  if (!el) return;
+  el.hidden = false;
+  button.setAttribute('aria-expanded', 'true');
+  pop = { button, pop: el };
+  placePopover();
+  const first = focusables(el).find((x) => !x.matches('[data-zeyn-popover-close]'));
+  (first ?? el).focus();
+}
+
+/** Closes the open popover; focus goes back to its button unless it already moved elsewhere. */
+function closePopover(returnFocus = true) {
+  if (!pop) return;
+  const { button, pop: el } = pop;
+  pop = null;
+  el.hidden = true;
+  button.setAttribute('aria-expanded', 'false');
+  if (returnFocus) button.focus();
+}
+
+clickHandlers.push((e, t) => {
+  const button = t.closest('.z-popover-button');
+  if (button) {
+    if (pop?.button === button) closePopover(true);
+    else openPopover(button);
+    return true;
+  }
+  if (t.closest('[data-zeyn-popover-close]')) {
+    closePopover(true);
+    return true;
+  }
+  return false;
+});
+
+keyHandlers.unshift((e, t) => {
+  if (e.key !== 'Escape' || !pop || popup || !(pop.pop.contains(t) || pop.button === t)) return false;
+  e.preventDefault();
+  closePopover(true);
+  return true;
+});
+
+document.addEventListener(
+  'pointerdown',
+  (e) => {
+    const t = e.target instanceof Element ? e.target : null;
+    if (!pop || !t || pop.pop.contains(t) || pop.button.contains(t) || popup?.panel.contains(t)) return;
+    closePopover(false);
+  },
+  true,
+);
+
+document.addEventListener('focusout', (e) => {
+  if (!pop || !pop.pop.contains(e.target)) return;
+  setTimeout(() => {
+    const a = document.activeElement;
+    if (pop && a && a !== document.body && !pop.pop.contains(a) && a !== pop.button && !popup?.panel.contains(a)) closePopover(false);
+  });
+});
+
+window.addEventListener('resize', placePopover);
+document.addEventListener('scroll', (e) => pop && !pop.pop.contains(e.target) && placePopover(), true);
+document.addEventListener('zeyn:leave', () => {
+  closePopover(false);
+  hideTip();
+});
+
+/* Busy overlay ------------------------------------------------------------------------------- */
+
+const BUSY_MIN_MS = 300;
+
+/** State of each busy container: `{ on, timer, shownAt }`. */
+const busyStates = new WeakMap();
+
+/**
+ * Marks a `[data-zeyn-busy]` container busy while anything inside it is `aria-busy`, and shows
+ * its overlay after the container's delay; once shown it stays at least `BUSY_MIN_MS`.
+ */
+function updateBusy(box) {
+  const s = busyStates.get(box) ?? { on: false, timer: 0, shownAt: 0 };
+  busyStates.set(box, s);
+  const busy = [...box.querySelectorAll('[aria-busy="true"]')].some((el) => el.closest('[data-zeyn-busy]') === box && el !== box);
+  const overlay = box.querySelector(':scope > .z-busy-overlay');
+  const text = overlay?.querySelector('.z-busy-text');
+  if (busy && !s.on) {
+    s.on = true;
+    box.setAttribute('aria-busy', 'true');
+    clearTimeout(s.timer);
+    s.timer = setTimeout(() => {
+      if (!overlay) return;
+      overlay.hidden = false;
+      if (text) text.textContent = text.dataset.text ?? '';
+      s.shownAt = Date.now();
+    }, Number(box.dataset.zeynBusy) || 400);
+  } else if (!busy && s.on) {
+    s.on = false;
+    box.removeAttribute('aria-busy');
+    clearTimeout(s.timer);
+    const hide = () => {
+      if (s.on || !overlay) return;
+      overlay.hidden = true;
+      if (text) text.textContent = '';
+    };
+    if (overlay && !overlay.hidden) s.timer = setTimeout(hide, Math.max(0, BUSY_MIN_MS - (Date.now() - s.shownAt)));
+  }
+}
+
+new MutationObserver((records) => {
+  for (const r of records) {
+    const el = r.target;
+    if (!(el instanceof Element) || (r.type === 'attributes' && el.matches('[data-zeyn-busy]'))) continue;
+    const box = el.closest('[data-zeyn-busy]');
+    if (box) updateBusy(box);
+  }
+}).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-busy'] });
+
+/* Menu button and split button --------------------------------------------------------------- */
+
+/** The open command menu `{ button, menu }`. */
+let cmdMenu = null;
+/** The button of the menu whose command ran last; focus goes back to it after a confirm dialog. */
+let menuOpener = null;
+
+/** Commands of a menu that can be chosen, in order. */
+function menuEntries(menu) {
+  return [...menu.querySelectorAll('[role="menuitem"]:not([disabled])')];
+}
+
+/** Places an open menu below its button, or above when there is no room, inside the viewport. */
+function placeMenu() {
+  if (!cmdMenu) return;
+  const { button, menu } = cmdMenu;
+  const a = button.getBoundingClientRect();
+  const w = menu.offsetWidth;
+  const h = menu.offsetHeight;
+  const below = innerHeight - a.bottom - 8;
+  const top = below < h && a.top - 8 > below ? Math.max(8, a.top - h - 4) : Math.min(a.bottom + 4, Math.max(8, innerHeight - h - 8));
+  const box = button.closest('.z-split-button') ?? button;
+  const b = box.getBoundingClientRect();
+  const rtl = getComputedStyle(button).direction === 'rtl';
+  const left = Math.max(8, Math.min(rtl ? b.right - w : b.left, innerWidth - w - 8));
+  menu.style.top = `${Math.round(top)}px`;
+  menu.style.left = `${Math.round(left)}px`;
+}
+
+/** Opens the menu of a menu button and focuses its first or last command. */
+function openCmdMenu(button, where = 'first') {
+  closeCmdMenu(false);
+  const menu = document.getElementById(button.getAttribute('aria-controls'));
+  if (!menu) return;
+  menu.hidden = false;
+  button.setAttribute('aria-expanded', 'true');
+  cmdMenu = { button, menu };
+  placeMenu();
+  const entries = menuEntries(menu);
+  (where === 'last' ? entries.at(-1) : entries[0])?.focus();
+}
+
+/** Closes the open menu; focus goes back to its button when asked. */
+function closeCmdMenu(returnFocus = true) {
+  if (!cmdMenu) return;
+  const { button, menu } = cmdMenu;
+  cmdMenu = null;
+  menu.hidden = true;
+  button.setAttribute('aria-expanded', 'false');
+  if (returnFocus) button.focus();
+}
+
+/** Keys of a menu button and of its open menu (APG menu button and menu patterns). */
+function cmdMenuKey(e, t) {
+  if (t.matches('.z-menu-trigger')) {
+    const where = { ArrowDown: 'first', Enter: 'first', ' ': 'first', ArrowUp: 'last' }[e.key];
+    if (!where) return false;
+    e.preventDefault();
+    openCmdMenu(t, where);
+    return true;
+  }
+  if (!cmdMenu || !t.matches('[role="menuitem"]') || !cmdMenu.menu.contains(t)) return false;
+  const entries = menuEntries(cmdMenu.menu);
+  const i = entries.indexOf(t);
+  const to = { ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: entries.length - 1 }[e.key];
+  if (to !== undefined) {
+    e.preventDefault();
+    entries[(to + entries.length) % entries.length]?.focus();
+    return true;
+  }
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    closeCmdMenu(true);
+    return true;
+  }
+  if (e.key === 'Tab') {
+    closeCmdMenu(false);
+    cmdMenu = null;
+    return false;
+  }
+  const at = typeAhead(e, entries.map((x) => ({ label: x.textContent })), Math.max(0, i));
+  if (at < 0) return false;
+  e.preventDefault();
+  entries[at].focus();
+  return true;
+}
+
+keyHandlers.unshift((e, t) => cmdMenuKey(e, t));
+
+clickHandlers.unshift((e, t) => {
+  const trigger = t.closest('.z-menu-trigger');
+  if (trigger) {
+    if (cmdMenu?.button === trigger) closeCmdMenu(true);
+    else openCmdMenu(trigger);
+    return true;
+  }
+  const entry = t.closest('.z-menu-list [role="menuitem"]');
+  if (entry && cmdMenu?.menu.contains(entry)) {
+    const button = cmdMenu.button;
+    menuOpener = button;
+    setTimeout(() => {
+      closeCmdMenu(false);
+      if (!document.activeElement || document.activeElement === document.body || cmdMenu?.menu.contains(document.activeElement)) button.focus();
+    });
+  }
+  return false;
+});
+
+document.addEventListener(
+  'pointerdown',
+  (e) => {
+    const t = e.target instanceof Element ? e.target : null;
+    if (cmdMenu && t && !cmdMenu.menu.contains(t) && !cmdMenu.button.contains(t)) closeCmdMenu(false);
+  },
+  true,
+);
+
+document.addEventListener('focusout', (e) => {
+  if (!cmdMenu || !cmdMenu.menu.contains(e.target)) return;
+  setTimeout(() => {
+    const a = document.activeElement;
+    if (cmdMenu && a && a !== document.body && !cmdMenu.menu.contains(a) && a !== cmdMenu.button && !a.closest('dialog.z-confirm')) closeCmdMenu(false);
+  });
+});
+
+window.addEventListener('resize', placeMenu);
+document.addEventListener('scroll', (e) => cmdMenu && !cmdMenu.menu.contains(e.target) && placeMenu(), true);
+document.addEventListener('zeyn:leave', () => closeCmdMenu(false));
+
+document.addEventListener(
+  'close',
+  () => {
+    setTimeout(() => {
+      if (menuOpener?.isConnected && (!document.activeElement || document.activeElement === document.body)) menuOpener.focus();
+      menuOpener = null;
+    });
+  },
+  true,
+);

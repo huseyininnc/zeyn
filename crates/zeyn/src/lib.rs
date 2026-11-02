@@ -235,6 +235,41 @@
 //! }
 //! ```
 //!
+//! A `scale` rule on a field that is not a `Decimal`:
+//!
+//! ```compile_fail
+//! use zeyn::prelude::*;
+//!
+//! #[model]
+//! pub struct Price {
+//!     #[rule(scale = 2)]
+//!     pub amount: i64,
+//! }
+//! ```
+//!
+//! A `Vec` of something that is neither a line model nor a `#[choice]` enum:
+//!
+//! ```compile_fail
+//! use zeyn::prelude::*;
+//!
+//! #[model]
+//! pub struct Tags {
+//!     pub names: Vec<String>,
+//! }
+//! ```
+//!
+//! A `mask` rule on a field that is not text:
+//!
+//! ```compile_fail
+//! use zeyn::prelude::*;
+//!
+//! #[model]
+//! pub struct Contact {
+//!     #[rule(mask = "(999) 999 99 99")]
+//!     pub phone: i64,
+//! }
+//! ```
+//!
 //! A mask on a field that is not text:
 //!
 //! ```compile_fail
@@ -311,6 +346,7 @@ pub mod audit;
 pub mod auth;
 mod command;
 mod ctx;
+mod decimal;
 mod feature;
 mod files;
 mod form;
@@ -370,6 +406,7 @@ pub use command::{
 };
 pub use command::{MAX_SEARCH_HITS, MAX_SEARCH_QUERY, Search, SearchHit};
 pub use ctx::{BoxFuture, Ctx, Dep, Identity, Inject, IntoScreen, Outcome, Service, Services};
+pub use decimal::{DEFAULT_PRECISION, DEFAULT_SCALE, Decimal, MAX_PRECISION, MAX_SCALE};
 pub use feature::{Feature, Guard, GuardResult, Menu, MenuGroup, MenuItem, Route, ScreenEntry, SignedIn};
 #[cfg(feature = "server")]
 pub use files::{
@@ -417,8 +454,8 @@ pub use privacy::{MaskStyle, Masking, Revealed, can_unmask, masked_text, reveal_
 pub use redis_store::RedisStore;
 pub use render::Render;
 pub use screen::{
-    Component, Effect, Export, FormSource, GridSource, Icon, LoadedPage, Node, Params, RowCall, Screen, ScreenDef,
-    ScreenMeta, ToolButton, Toolbar, UiCtx, Window,
+    Component, Effect, Export, FormSource, GridSource, Icon, LoadedPage, MAX_TOASTS, Node, Params, RowCall, Screen,
+    ScreenDef, ScreenMeta, Toast, ToolButton, Toolbar, UiCtx, Window,
 };
 #[cfg(feature = "server")]
 pub use security::{IpRange, MemoryRateStore, RateKey, RateLimit, RateStore, client_ip, parse_ranges};
@@ -436,9 +473,11 @@ pub use server::{
 };
 pub use time::{Date, DateTime, LocalDateTime, LocalTimeError, Time, TimeZone};
 pub use time::{DateWords, range_presets};
+#[doc(hidden)]
+pub use value::__choices_value;
 pub use value::{
     ChoiceOption, ChoiceType, Currency, FieldKind, FieldType, IsBool, IsMoment, Money, SupportsMinMax,
-    SupportsMinMaxTotal, SupportsRequired, SupportsSum, SupportsText, Value,
+    SupportsMinMaxTotal, SupportsRequired, SupportsScale, SupportsSum, SupportsText, Value, VecItem,
 };
 pub use workflow::{
     MAX_COMMENT, Transition, TransitionRecord, TransitionRequest, Transitions, Workflow, WorkflowState,
@@ -458,16 +497,16 @@ pub mod prelude {
     #[allow(deprecated)]
     pub use crate::Agents;
     pub use crate::ui::{
-        ActionButton, Alert, Audio, Badge, Breadcrumb, Card, Chart, Control, DateOptions, DescriptionList, Dock,
-        EmptyState, Kpi, LookupItem, LookupQuery, MenuBar, Panel, Progress, PropertyInspector, Row, Skeleton, Split,
-        Stack, StatusBar, Tabs, Timeline, Toolbox, Tree, TreeItem, TreeQuery, Video,
+        ActionButton, Alert, Audio, Badge, Breadcrumb, Busy, Card, Chart, Control, DateOptions, DescriptionList, Dock,
+        EmptyState, Kpi, LookupItem, LookupQuery, MenuBar, MenuButton, Panel, Popover, Progress, PropertyInspector,
+        Row, Skeleton, Split, Stack, StatusBar, Tabs, Timeline, Toolbox, Tree, TreeItem, TreeQuery, Video,
     };
     pub use crate::{
-        Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime, Effect, Entity,
-        Error, Export, Feature, Field, File, FileRules, FileType, Form, GuardResult, Icon, Identity, Import, Licensed,
-        LocalDateTime, Model, Money, Node, Page, Paging, Result, RowStyle, Screen, ScreenDef, Secret, Service,
-        SignedIn, Tenant, TenantRequired, Text, Time, TimeZone, Tone, TransitionRequest, Transitions, UiCtx, Valid,
-        ValidationErrors, Window, Workflow, action, choice, entity, model, params, screen, t,
+        Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime, Decimal, Effect,
+        Entity, Error, Export, Feature, Field, File, FileRules, FileType, Form, GuardResult, Icon, Identity, Import,
+        Licensed, LocalDateTime, Model, Money, Node, Page, Paging, Result, RowStyle, Screen, ScreenDef, Secret,
+        Service, SignedIn, Tenant, TenantRequired, Text, Time, TimeZone, Toast, Tone, TransitionRequest, Transitions,
+        UiCtx, Valid, ValidationErrors, Window, Workflow, action, choice, entity, model, params, screen, t,
     };
     #[cfg(feature = "server")]
     pub use crate::{

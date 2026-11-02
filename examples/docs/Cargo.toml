@@ -8,7 +8,7 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 zeyn = { path = "../../crates/zeyn" }
 serde_json = "1"
-tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 
 [dev-dependencies]
 axum = "0.8"

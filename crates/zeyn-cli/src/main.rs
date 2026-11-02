@@ -575,7 +575,10 @@ mod tests {
         ] {
             let Ok(original) = std::fs::read_to_string(root.join(original)) else { continue };
             let copy = std::fs::read_to_string(root.join("embedded").join(name)).unwrap();
-            assert!(copy == original, "crates/zeyn-cli/embedded/{name} is out of date: copy the file from the repository root");
+            assert!(
+                copy == original,
+                "crates/zeyn-cli/embedded/{name} is out of date: copy the file from the repository root"
+            );
         }
     }
 
