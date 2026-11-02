@@ -27,6 +27,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 mod auth;
 mod agent;
+#[cfg(feature = "assistant")]
 use agent::{Tool, ToolTarget};
 mod data;
 mod grid;
