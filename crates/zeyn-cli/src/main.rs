@@ -1,5 +1,6 @@
 //! `zeyn`: new projects, generators, checks and an MCP server for AI agents.
 
+mod desktop;
 mod dev;
 
 use serde_json::{Value, json};
@@ -80,6 +81,9 @@ Usage:
                                           --fix first rewrites renamed Zeyn APIs in src, tests and examples
   zeyn dev                                run the app, rebuild and restart on every change; the browser
                                           follows without a page reload
+  zeyn build-desktop [--package <name>] [--features <list>]
+                                          release desktop exe (feature `desktop` by default, see
+                                          docs/desktop.md), small profile, size reported
   zeyn mcp                                MCP server on stdio for AI agents
   zeyn license keygen [--out <file>]      new license signing key pair; the private key goes to
                                           zeyn-license.key, the public key to embed is printed
@@ -101,6 +105,7 @@ fn main() -> ExitCode {
             if report.contains("error") { Err("the app has problems".into()) } else { Ok(()) }
         }),
         ["dev"] => dev::run(Path::new(".")),
+        ["build-desktop", rest @ ..] => desktop::build(Path::new("."), flag(rest, "--package"), flag(rest, "--features").unwrap_or("desktop")).map(|r| print!("{r}")),
         ["mcp"] => mcp(),
         ["license", "keygen", rest @ ..] => {
             license::keygen(Path::new(flag(rest, "--out").unwrap_or(license::DEFAULT_KEY))).map(|m| print!("{m}"))

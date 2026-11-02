@@ -11,6 +11,7 @@ cargo run -p zeyn-example-showcase     # http://127.0.0.1:3002, every component 
 cargo run -p zeyn-example-big-grid     # http://127.0.0.1:3000, one million rows
 cargo run -p zeyn-example-billing      # http://127.0.0.1:3004, an app using the shared-domain library
 cargo run -p zeyn-example-docs         # http://127.0.0.1:3008, the documentation site, written with Zeyn
+cargo run -p zeyn-example-adisyon --features desktop   # the point of sale app as a desktop window
 cargo run -p zeyn-cli -- new my-app    # a new project with the standard feature structure
 cargo run -p zeyn-cli -- new my-domain --lib   # a library of features shared by several apps
 ```
@@ -39,6 +40,8 @@ cargo run -p zeyn-cli -- new my-domain --lib   # a library of features shared by
 - Field level audit, read audit with reasons, field masking, safe deploys, health checks, idle
   timeout and re authentication, CSV import, background jobs and approval workflows (see `docs/enterprise.md`)
 - Apps and shared libraries in separate repositories, GitLab CI templates (see `docs/polyrepo.md`)
+- Desktop apps: one executable in the system WebView, offline, with a guarded loopback server
+  (`zeyn-desktop`, `zeyn build-desktop`, see `docs/desktop.md`)
 
 ## Goals
 
