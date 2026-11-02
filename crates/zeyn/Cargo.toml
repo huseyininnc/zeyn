@@ -45,8 +45,8 @@ accounts = ["totp", "dep:argon2", "dep:base64", "dep:unicode-normalization"]
 markdown = []
 
 [dependencies]
-zeyn-macros = { path = "../zeyn-macros", version = "0.0.3" }
-zeyn-island = { path = "../zeyn-island", version = "0.0.3", optional = true }
+zeyn-macros = { path = "../zeyn-macros", version = "0.0.4" }
+zeyn-island = { path = "../zeyn-island", version = "0.0.4", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 jiff = { version = "0.2", default-features = false, features = ["std", "tzdb-bundle-always"] }
