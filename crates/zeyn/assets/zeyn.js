@@ -3337,6 +3337,31 @@ document.addEventListener('zeyn:content', (e) => {
 });
 
 /**
+ * Filters a grid from another script (the assistant): `detail` is `{ filters, node? }` with
+ * filters as the grid query sends them (`{ field, contains }`, `{ field, from, to }`, ...). The
+ * grid of the main screen with that node path (the first one without it) shows the filters in
+ * its header and reloads through `POST /_zeyn/grid`, where the server checks them as always.
+ */
+document.addEventListener('zeyn:filter', (e) => {
+  const { filters, node } = e.detail ?? {};
+  const all = [...document.querySelectorAll('.z-main [data-zeyn-grid]')];
+  const grid = node == null ? all[0] : all.find((g) => nodeOf(g) === String(node));
+  if (!grid || !Array.isArray(filters)) return;
+  initGrid(grid);
+  const s = grids.get(grid);
+  if (!s) return;
+  e.preventDefault();
+  s.filters = {};
+  for (const f of filters) {
+    const { field, ...rest } = f ?? {};
+    if (typeof field === 'string') s.filters[field] = rest;
+  }
+  for (const cell of grid.querySelectorAll('.z-filter-cell[data-field]')) fillFilter(cell, s.filters[cell.dataset.field], s.texts);
+  s.allMatching = false;
+  loadGrid(grid, 'reset');
+});
+
+/**
  * Lets other scripts (the command palette, menu bars) run effects and screen menu items through
  * the runtime: `detail` is `{effects, source}`, `{screen, item}` with a screen root element, or
  * `{error}` for an error toast.

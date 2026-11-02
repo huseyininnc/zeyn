@@ -38,6 +38,8 @@ const NAV: &str = include_str!("../assets/nav.js");
 
 mod ui;
 mod pro;
+#[cfg(feature = "assistant")]
+mod assistant;
 const CSP: &str = "default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
 
 /// Finds out who is calling, usually from a session cookie or an `Authorization` header.
@@ -667,6 +669,8 @@ pub struct App {
     views: Option<Arc<dyn crate::grid::DataGridViewStore>>,
     native_menu: bool,
     extras: ops::Extras,
+    #[cfg(feature = "assistant")]
+    assistant: Option<Arc<crate::assistant::Assistant>>,
 }
 
 impl App {
@@ -705,6 +709,8 @@ impl App {
             views: None,
             native_menu: true,
             extras: ops::Extras::default(),
+            #[cfg(feature = "assistant")]
+            assistant: None,
         }
     }
 
@@ -942,6 +948,15 @@ impl App {
         self
     }
 
+    /// Turns on the embedded AI assistant: a chat on every page (and wherever a screen places
+    /// `AssistantChat`) that answers with the app's own data and acts through the same tools as
+    /// MCP, as the signed in user. See `docs/assistant.md`.
+    #[cfg(feature = "assistant")]
+    pub fn assistant(mut self, assistant: crate::assistant::Assistant) -> Self {
+        self.assistant = Some(Arc::new(assistant));
+        self
+    }
+
     /// Old name of [`App::mcp`]; kept for one release.
     #[deprecated(since = "0.0.3", note = "renamed to `App::mcp`")]
     #[allow(deprecated)]
@@ -1103,6 +1118,8 @@ impl App {
             views: self.views,
             native_menu: self.native_menu,
             extras: self.extras,
+            #[cfg(feature = "assistant")]
+            assistant: self.assistant,
         });
         ops::start_jobs(&state);
         let mut router = Router::new();
@@ -1159,6 +1176,8 @@ impl App {
             .route("/_zeyn/timezone", post(set_time_zone))
             .route("/_zeyn/tools", get(tools))
             .route("/_zeyn/mcp", post(mcp));
+        #[cfg(feature = "assistant")]
+        let router = assistant::routes(router);
         let router = pro::routes(media::routes(ui::routes(session::routes(data::routes(ops::routes(router))))))
             .fallback(not_found)
             .layer(axum::middleware::from_fn_with_state(state.clone(), guard_request))
@@ -1238,6 +1257,8 @@ struct AppState {
     views: Option<Arc<dyn crate::grid::DataGridViewStore>>,
     native_menu: bool,
     extras: ops::Extras,
+    #[cfg(feature = "assistant")]
+    assistant: Option<Arc<crate::assistant::Assistant>>,
 }
 
 /// Decodes `%XX` sequences in a cookie value.
@@ -1596,12 +1617,16 @@ impl AppState {
         }
         let app = r.text(&self.name);
         let (palette, commands) = pro::shell_parts(self, ctx, &r);
+        #[cfg(feature = "assistant")]
+        let (ai_head, ai_launcher) = (assistant::head(self, ctx, &escape(&self.prefix)), assistant::launcher(self, ctx, &r));
+        #[cfg(not(feature = "assistant"))]
+        let (ai_head, ai_launcher) = (String::new(), String::new());
         format!(
-            r##"<!doctype html><html lang="{lang}"{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css">{theme_link}<script type="module" src="{base}/_zeyn/zeyn.js"></script><script type="module" src="{base}/_zeyn/nav.js"></script>{components}{extra}</head><body><a class="z-skip" href="#z-main">{skip}</a><div class="z-app"><nav class="z-nav" aria-label="{menu}"><p class="z-app-name">{app}</p>{palette}{nav}</nav><main class="z-main" id="z-main">{main}</main></div><div class="z-toasts" role="status" aria-live="polite"></div>{commands}</body></html>"##,
+            r##"<!doctype html><html lang="{lang}"{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css">{theme_link}<script type="module" src="{base}/_zeyn/zeyn.js"></script><script type="module" src="{base}/_zeyn/nav.js"></script>{components}{extra}</head><body><a class="z-skip" href="#z-main">{skip}</a><div class="z-app"><nav class="z-nav" aria-label="{menu}"><p class="z-app-name">{app}</p>{palette}{nav}</nav><main class="z-main" id="z-main">{main}</main></div><div class="z-toasts" role="status" aria-live="polite"></div>{commands}{ai_launcher}</body></html>"##,
             lang = escape(ctx.locale()),
             tz = escape(ctx.time_zone().name()),
             base = escape(&self.prefix),
-            components = format!("{}{}{}", ui::head(&escape(&self.prefix)), media::head(&escape(&self.prefix)), pro::head(&escape(&self.prefix))),
+            components = format!("{}{}{}{ai_head}", ui::head(&escape(&self.prefix)), media::head(&escape(&self.prefix)), pro::head(&escape(&self.prefix))),
             scheme = self.theme.as_ref().and_then(|t| t.scheme).unwrap_or("light dark"),
             html_attrs = format!(
                 "{}{}",
@@ -1638,10 +1663,21 @@ fn asset(body: &'static str, content_type: &'static str) -> Response {
     ([(header::CONTENT_TYPE, content_type), (header::CACHE_CONTROL, "no-cache")], body).into_response()
 }
 
+/// Whether a path is one of the assistant's assets, served without sign in like the runtime.
+fn is_assistant_asset(path: &str) -> bool {
+    #[cfg(feature = "assistant")]
+    return assistant::ASSETS.contains(&path);
+    #[cfg(not(feature = "assistant"))]
+    {
+        let _ = path;
+        false
+    }
+}
+
 /// IP rules and rate limits, before any handler runs.
 async fn guard_request(State(st): State<Arc<AppState>>, req: axum::extract::Request, next: axum::middleware::Next) -> Response {
     let path = req.uri().path().to_string();
-    if path == "/_zeyn/zeyn.js" || path == "/_zeyn/zeyn.css" || path == "/_zeyn/nav.js" || path == "/_zeyn/theme.css" || path == "/favicon.ico" || ops::is_asset(&path) || ui::ASSETS.contains(&path.as_str()) || media::ASSETS.contains(&path.as_str()) || pro::ASSETS.contains(&path.as_str()) {
+    if path == "/_zeyn/zeyn.js" || path == "/_zeyn/zeyn.css" || path == "/_zeyn/nav.js" || path == "/_zeyn/theme.css" || path == "/favicon.ico" || ops::is_asset(&path) || ui::ASSETS.contains(&path.as_str()) || media::ASSETS.contains(&path.as_str()) || pro::ASSETS.contains(&path.as_str()) || is_assistant_asset(&path) {
         return next.run(req).await;
     }
     ops::delay(&st, &path).await;
@@ -1663,6 +1699,7 @@ async fn guard_request(State(st): State<Arc<AppState>>, req: axum::extract::Requ
     }
     let is_write = req.method() == axum::http::Method::POST
         && (matches!(path.as_str(), "/_zeyn/form" | "/_zeyn/import" | "/_zeyn/mcp" | "/_zeyn/menu" | "/_zeyn/grid/edit" | "/_zeyn/grid/run" | "/_zeyn/grid/bulk" | "/_zeyn/media/position")
+            || path.starts_with("/_zeyn/assistant/")
             || path.starts_with(&format!("{}/", st.api_prefix)));
     let limits = if probe { [(None, "all"), (None, "write")] } else { [(st.rate, "all"), (if is_write { st.write_rate } else { None }, "write")] };
     for (limit, scope) in limits {

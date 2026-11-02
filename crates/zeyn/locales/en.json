@@ -351,6 +351,41 @@
         "month": "m, month, months",
         "year": "y, year, years"
       }
+    },
+    "assistant": {
+      "title": "Assistant",
+      "open": "Open the assistant",
+      "close": "Close the assistant",
+      "new_chat": "New chat",
+      "empty": "Ask about your data or tell me what to do. I work with your permissions, and I ask before I change anything.",
+      "suggestions": "Suggestions",
+      "message": "Message",
+      "placeholder": "Ask anything about this app",
+      "mic": "Speak",
+      "mic_stop": "Stop listening",
+      "stop": "Stop",
+      "send": "Send",
+      "note": "AI can make mistakes. Check important results.",
+      "you": "You",
+      "thinking": "Thinking",
+      "stopped": "Stopped.",
+      "retry": "Try again",
+      "read_aloud": "Read aloud",
+      "copy": "Copy",
+      "copied": "Copied",
+      "confirm": "Confirm",
+      "decline": "Cancel",
+      "confirm_title": "Confirm this action",
+      "confirm_question": "The assistant wants to do this as you. Confirm to let it run.",
+      "declined": "Cancelled. Nothing was changed.",
+      "listening": "Listening",
+      "error": "Something went wrong.",
+      "unavailable": "The assistant is not available.",
+      "working": "Working on it",
+      "too_long": "Write at most {max} characters.",
+      "audio_too_large": "The recording is too long.",
+      "token_limit": "You have reached the assistant's usage limit for now. Try again later.",
+      "too_many_steps": "I stopped because this took too many steps. Try a simpler request."
     }
   }
 }

@@ -299,6 +299,8 @@
 //! - Models, actions and screens from other crates are used like local ones.
 
 mod action;
+#[cfg(feature = "assistant")]
+pub mod assistant;
 mod api;
 mod command;
 pub mod audit;
@@ -366,6 +368,8 @@ pub use jobs::{JobState, JobStatus, Jobs, Schedule};
 #[cfg(feature = "server")]
 #[allow(deprecated)]
 pub use server::Agents;
+#[cfg(feature = "assistant")]
+pub use assistant::Assistant;
 #[cfg(feature = "server")]
 pub use security::{IpRange, MemoryRateStore, RateKey, RateLimit, RateStore, client_ip, parse_ranges};
 pub use screen::{

@@ -10,7 +10,8 @@
     "gallery": "Components",
     "ui": "Component library",
     "media": "Media",
-    "pro": "Desktop shell"
+    "pro": "Desktop shell",
+    "assistant": "Assistant"
   },
   "dashboard": {
     "title": "Overview",
@@ -334,5 +335,12 @@
     "width": "Width",
     "height": "Height",
     "visible": "Visible"
+  },
+  "assistant": {
+    "title": "Assistant",
+    "intro": "This assistant answers with the app's own data and acts as you, with your permissions. Anything that changes data waits for your confirmation. The demo runs a scripted model, so it costs nothing and works offline; docs/assistant.md shows how to connect a real one with configuration only.",
+    "try_orders": "Show me today's orders in İzmir",
+    "try_archive": "Archive product NW-0003",
+    "try_low": "Show products low on stock"
   }
 }

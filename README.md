@@ -25,7 +25,8 @@ cargo run -p zeyn-cli -- new my-domain --lib   # a library of features shared by
 - Security: permissions, guards, interceptors, audit log, CSRF, CSP, rate limits, IP rules, CORS
 - Single sign on through a proxy, tenants, licenses, layered configuration and secrets
 - JSON API with OpenAPI 3.1 and problem details, optional API docs with basic auth or permissions
-- MCP for agents: a project MCP server (`zeyn mcp`) and in app tools through WebMCP and `/_zeyn/mcp`
+- MCP for agents: a project MCP server (`zeyn mcp`) and in app tools through WebMCP and `/_zeyn/mcp`, opt in with `App::mcp`
+- An embedded AI assistant (feature `assistant`): any LLM, speech, pluggable history, confirmation before writes (see `docs/assistant.md`)
 - Themeable design system with light and dark themes (see `docs/theming.md`)
 - Field level audit, read audit with reasons, field masking, safe deploys, health checks, idle
   timeout and re authentication, CSV import, background jobs and approval workflows (see `docs/enterprise.md`)

@@ -6,6 +6,7 @@
 //!
 //! Run: `cargo run --offline -p zeyn-example-showcase`, then open http://127.0.0.1:3002
 
+mod assistant;
 mod gallery;
 mod media;
 mod overview;
@@ -62,7 +63,8 @@ async fn main() -> std::io::Result<()> {
         max_users: None,
     };
 
-    App::new(t!("app.name"))
+    let assistant = assistant::assistant(&config)?;
+    let mut app = App::new(t!("app.name"))
         .plugin(CompanyStandard { config })
         .theme(Theme::new().radius(6))
         .idle_timeout(Duration::from_secs(idle))
@@ -84,6 +86,11 @@ async fn main() -> std::io::Result<()> {
         .feature(ui::feature())
         .feature(media::feature())
         .feature(pro::feature())
+        .feature(assistant::feature());
+    if let Some(a) = assistant {
+        app = app.assistant(a);
+    }
+    app
         .serve(&addr)
         .await
 }
