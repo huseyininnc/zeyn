@@ -46,9 +46,9 @@ pub fn product_list() -> Screen {
 
 /// Product editor window.
 #[screen(permission = "stock.product.write")]
-pub fn product_form(params: ProductFormParams, store: ProductStore) -> Result<Screen> {
+pub async fn product_form(params: ProductFormParams, store: ProductStore) -> Result<Screen> {
     let product = match params.id {
-        Some(id) => store.get(id)?,
+        Some(id) => store.get(id).await?,
         None => Product { active: true, ..Product::default() },
     };
     Ok(Screen::window(t!("stock.product")).width(640).body(

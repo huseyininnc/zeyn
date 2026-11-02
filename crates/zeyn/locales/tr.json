@@ -77,7 +77,8 @@
       "line": "Satır {n}: {message}",
       "disabled_day": "{label}: bu gün seçilemez.",
       "time_step": "{label} {n} dakikalık adımlarla girilmelidir.",
-      "range_order": "{label}, {other} tarihinden önce olamaz."
+      "range_order": "{label}, {other} tarihinden önce olamaz.",
+      "unique": "{label} başka bir kayıtta kullanılıyor."
     },
     "error": {
       "forbidden": "Bu işlem için yetkiniz yok.",
@@ -90,7 +91,9 @@
       "license_expired": "Lisansınızın süresi doldu. Yenilemek için yöneticinize başvurun.",
       "tenant": "Bu adres tanınan bir kuruma ait değil.",
       "rate_limited": "Çok fazla istek gönderildi. Biraz sonra tekrar deneyin.",
-      "confirmation_required": "Bu işlem çalışmadan önce uygulamada onayınızı bekliyor."
+      "confirmation_required": "Bu işlem çalışmadan önce uygulamada onayınızı bekliyor.",
+      "cursor": "Liste yüklendikten sonra değişti. Yenileyip tekrar deneyin.",
+      "duplicate": "Bu kayıt zaten var."
     },
     "grid": {
       "pagination": "Sayfalama",

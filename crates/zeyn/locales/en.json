@@ -77,7 +77,8 @@
       "line": "Line {n}: {message}",
       "disabled_day": "{label}: this day cannot be chosen.",
       "time_step": "{label} must be on a {n} minute step.",
-      "range_order": "{label} cannot be before {other}."
+      "range_order": "{label} cannot be before {other}.",
+      "unique": "{label} is already used by another record."
     },
     "error": {
       "forbidden": "You are not allowed to do this.",
@@ -90,7 +91,9 @@
       "license_expired": "Your license has expired. Contact your administrator to renew it.",
       "tenant": "This address does not belong to a known organization.",
       "rate_limited": "Too many requests. Try again in a moment.",
-      "confirmation_required": "This needs your confirmation in the app before it runs."
+      "confirmation_required": "This needs your confirmation in the app before it runs.",
+      "cursor": "The list changed since it was loaded. Reload it and try again.",
+      "duplicate": "This record already exists."
     },
     "grid": {
       "pagination": "Pagination",

@@ -14,6 +14,10 @@ redis = ["server", "dep:redis"]
 otel = ["server", "dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp", "dep:tracing-opentelemetry"]
 # Embedded AI assistant with LLM and speech providers over HTTP. Off unless an app asks for it.
 assistant = ["server", "dep:reqwest", "dep:rustls"]
+# Data layer (`zeyn::sql`). Apps without a database enable neither and pay nothing.
+postgres = ["dep:sqlx", "dep:base64", "dep:tokio", "dep:futures-core", "dep:futures-util"]
+# Oracle through ODPI-C; needs Oracle Instant Client at run time (see docs/database.md).
+oracle = ["dep:oracle", "dep:base64", "dep:tokio", "dep:futures-core"]
 
 [dependencies]
 zeyn-macros = { path = "../zeyn-macros", version = "0.0.2" }
@@ -35,6 +39,10 @@ opentelemetry = { version = "0.33", default-features = false, features = ["trace
 opentelemetry_sdk = { version = "0.33", default-features = false, features = ["trace"], optional = true }
 opentelemetry-otlp = { version = "0.33", default-features = false, features = ["http-proto", "trace", "reqwest-blocking-client"], optional = true }
 tracing-opentelemetry = { version = "0.34", default-features = false, optional = true }
+sqlx = { version = "0.9", default-features = false, features = ["postgres", "runtime-tokio", "migrate"], optional = true }
+base64 = { version = "0.22", optional = true }
+futures-util = { version = "0.3", default-features = false, optional = true }
+oracle = { version = "0.6", optional = true }
 
 [dev-dependencies]
 ed25519-dalek = { version = "3", default-features = false }

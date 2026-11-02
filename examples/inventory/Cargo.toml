@@ -8,3 +8,7 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 zeyn = { path = "../../crates/zeyn" }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+
+[features]
+postgres = ["zeyn/postgres"]
+oracle = ["zeyn/oracle"]

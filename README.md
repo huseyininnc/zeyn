@@ -21,6 +21,8 @@ cargo run -p zeyn-cli -- new my-domain --lib   # a library of features shared by
 - Server rendered screens with a small browser runtime; no JavaScript to write
 - Data grid: server paging, infinite scroll, virtual scrolling over a million rows, filters, sorting, totals
 - Forms for every field type, validation shared by server, client and API, row version conflict checks
+- PostgreSQL and Oracle (11g and later) data layer behind features: grid queries in SQL, keyset
+  cursors, capped counts, totals, transactions, streams and migrations (see `docs/database.md`)
 - Dates and times without time zone bugs: `Date`, `Time`, `DateTime` (UTC), `LocalDateTime`, every
   IANA time zone with its history built in (see `docs/operations.md`)
 - English and Turkish built in, compile time checked translation keys, locale aware money and dates

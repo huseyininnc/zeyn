@@ -327,6 +327,9 @@ mod time;
 pub mod ui;
 #[cfg(feature = "server")]
 pub mod server;
+/// Data layer for SQL databases (`postgres` and `oracle` features).
+#[cfg(any(feature = "postgres", feature = "oracle"))]
+pub mod sql;
 mod value;
 mod workflow;
 
