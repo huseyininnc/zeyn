@@ -2930,6 +2930,24 @@ async function changeTimeZone(select) {
   if (r.ok && !ask('zeyn:refresh-page')) location.reload();
 }
 
+/**
+ * Applies the chosen theme at once, without a reload: the stylesheet already holds every theme,
+ * so only the attributes on `<html>` and the `color-scheme` meta change. The choice is then
+ * stored with `POST /_zeyn/theme`, which sets the `zeyn_theme` cookie the server renders from.
+ */
+async function changeTheme(select) {
+  const option = select.selectedOptions[0];
+  const root = document.documentElement;
+  const scheme = option?.dataset.scheme ?? '';
+  if (scheme) root.dataset.theme = scheme;
+  else delete root.dataset.theme;
+  if (option?.hasAttribute('data-custom')) root.dataset.zeynTheme = select.value;
+  else delete root.dataset.zeynTheme;
+  const meta = document.querySelector('meta[name="color-scheme"]');
+  if (meta) meta.content = scheme || 'light dark';
+  await post(BASE + '/_zeyn/theme', { theme: select.value });
+}
+
 /** Reads the page cookies into an object. */
 function cookies() {
   const out = {};
@@ -3310,6 +3328,7 @@ document.addEventListener('change', (e) => {
   if (!(e.target instanceof HTMLSelectElement)) return;
   if (e.target.matches('[data-zeyn-locale]')) changeLocale(e.target);
   else if (e.target.matches('[data-zeyn-timezone]')) changeTimeZone(e.target);
+  else if (e.target.matches('[data-zeyn-theme-picker]')) changeTheme(e.target);
 });
 
 syncTimeZone();

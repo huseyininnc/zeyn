@@ -189,6 +189,10 @@ The runtime shows the `message` as an error toast.
 
 The shell renders a language selector (`select[data-zeyn-locale]`) when the app has more than one locale.
 
+### 4.6 Theme
+
+The shell renders a theme selector (`select[data-zeyn-theme-picker]`) unless the app hides it or offers a single theme. Each option carries `data-scheme` (`light`, `dark`, empty for System) and app themes `data-custom`. On change the runtime sets `data-theme` and `data-zeyn-theme` on `<html>` and the `color-scheme` meta at once, then sends `POST /_zeyn/theme` with `{ "theme": "dark" }`. The server answers `204` with the `zeyn_theme` cookie, or `404` for a theme the app does not offer. Pages are rendered with the theme from that cookie, so there is no reload and no flash. See `docs/theming.md`.
+
 ### 4.7 Enterprise endpoints
 
 `enterprise.js` and `enterprise.css` load next to the runtime. Details are in `docs/enterprise.md`.

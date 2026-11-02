@@ -171,7 +171,11 @@
       "menu": "Ana menü",
       "language": "Dil",
       "time_zone": "Saat dilimi",
-      "time_zone_auto": "Otomatik (bu cihaz)"
+      "time_zone_auto": "Otomatik (bu cihaz)",
+      "theme": "Tema",
+      "theme_system": "Sistem",
+      "theme_light": "Açık",
+      "theme_dark": "Koyu"
     },
     "ui": {
       "resize": "Bölmeleri yeniden boyutlandır",

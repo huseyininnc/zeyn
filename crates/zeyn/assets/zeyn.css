@@ -1423,7 +1423,8 @@ th[aria-sort="descending"] .z-sort::after {
 .z-field select,
 .z-field textarea,
 select[data-zeyn-locale],
-select[data-zeyn-timezone] {
+select[data-zeyn-timezone],
+select[data-zeyn-theme-picker] {
   width: 100%;
   min-height: var(--z-control);
   padding: 0 calc(var(--z-space) * 2 + 2px);
@@ -1541,7 +1542,8 @@ select[data-zeyn-timezone] {
 .z-locale + .z-locale { margin-top: 0; }
 
 select[data-zeyn-locale],
-select[data-zeyn-timezone] {
+select[data-zeyn-timezone],
+select[data-zeyn-theme-picker] {
   min-height: max(24px, calc(var(--z-control) - 4px));
   font-size: var(--z-font-size-sm);
   font-weight: 400;

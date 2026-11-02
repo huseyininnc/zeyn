@@ -171,7 +171,11 @@
       "menu": "Main",
       "language": "Language",
       "time_zone": "Time zone",
-      "time_zone_auto": "Automatic (this device)"
+      "time_zone_auto": "Automatic (this device)",
+      "theme": "Theme",
+      "theme_system": "System",
+      "theme_light": "Light",
+      "theme_dark": "Dark"
     },
     "ui": {
       "resize": "Resize panes",
