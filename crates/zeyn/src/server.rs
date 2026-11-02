@@ -32,6 +32,7 @@ mod auth;
 #[cfg(feature = "assistant")]
 use agent::{Tool, ToolTarget};
 mod data;
+mod files;
 mod grid;
 mod guard;
 mod media;
@@ -297,6 +298,8 @@ pub enum CallKind {
     Media,
     /// A PDF document rendered from an action's data.
     Document,
+    /// A file uploaded to a file store; `screen` holds the store name. Downloads are `Media`.
+    Upload,
 }
 
 /// What is being called.
@@ -412,6 +415,7 @@ impl<S: AuditSink> Interceptor for AuditLog<S> {
             || call.kind == CallKind::Form
             || call.kind == CallKind::Reveal
             || call.kind == CallKind::Import
+            || call.kind == CallKind::Upload
             || call.action.is_some_and(|a| a.audit)
             || !trail.revealed.is_empty()
             || !trail.reads.is_empty()
@@ -1258,6 +1262,7 @@ impl App {
         let router = realtime::routes(router);
         #[cfg(feature = "pdf")]
         let router = pdf::routes(router);
+        let router = files::routes(router);
         let router = theme::routes(pro::routes(media::routes(ui::routes(session::routes(data::routes(ops::routes(
             agent::routes(grid::routes(router)),
         )))))))
@@ -1844,10 +1849,11 @@ impl AppState {
             tz = escape(ctx.time_zone().name()),
             base = escape(&self.prefix),
             components = format!(
-                "{}{}{}{ai_head}",
+                "{}{}{}{}{ai_head}",
                 ui::head(&escape(&self.prefix)),
                 media::head(&escape(&self.prefix)),
-                pro::head(&escape(&self.prefix))
+                pro::head(&escape(&self.prefix)),
+                files::head(&escape(&self.prefix))
             ),
             html_attrs =
                 format!("{theme_attrs}{}", if self.native_menu { "" } else { r#" data-zeyn-native-menu="off""# }),

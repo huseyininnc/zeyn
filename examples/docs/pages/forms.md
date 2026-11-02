@@ -42,3 +42,42 @@ Each field type has a default control: text inputs, number inputs, money with th
 ## Read only fields
 
 `#[readonly]` fields are shown in forms but cannot be edited, such as a stock level that only movements change.
+
+## File uploads
+
+`File`, `Option<File>` and `Vec<File>` fields hold files kept by a `FileStore`. Declare the rules once as a `const`, register the store on the feature with a permission, and use the same rules on the form:
+
+```rust
+pub const ATTACHMENTS: FileRules = FileRules::new("attachments")
+    .max_bytes(5 * 1024 * 1024)
+    .max_files(5)
+    .accept(&[FileType::Pdf, FileType::Png, FileType::Jpeg]);
+
+Feature::new("support")
+    .files(ATTACHMENTS, "support.ticket.files", DiskStore::new("data/attachments"))
+    .scan_files(MyVirusScanner)
+
+Form::of(ticket).field(Ticket::title).file(Ticket::attachments, ATTACHMENTS)
+```
+
+The control is a native file input inside a drop zone. Each file uploads on its own with a progress bar, can be canceled while it runs, retried when it failed and removed when it is done. Images show a preview made from an object URL of the chosen file. Progress and results are announced in a polite live region. The showcase has a working example at `/uploads`; this documentation site has no signed in user, so it shows no live upload.
+
+| Key | What it does |
+|---|---|
+| Tab | Moves to the file input, then to each file's download link and its Cancel, Retry or Remove button |
+| Enter or Space on the file input | Opens the system file picker (the keyboard path for drag and drop) |
+| Enter or Space on Cancel, Retry, Remove | Runs it; after Cancel focus moves to Retry, after Remove to the next file or back to the input |
+
+What the server does for `POST /_zeyn/files/{store}`:
+
+1. checks the CSRF header, the store's permission and the feature's guards, and runs the interceptors (`CallKind::Upload`, audited with the new file id); uploads count against the write limit;
+2. refuses a declared `Content-Length` over the limit (`413`), then reads the first 4 KiB and finds the type from the content; the extension must belong to the same type and the type must be in `accept`, otherwise `415`. HTML, SVG, XML and scripts are never accepted. The browser's content type is ignored;
+3. streams the rest to the store in chunks of at most 64 KiB through a channel of four, counting bytes; going over the limit, a broken connection or 30 seconds without data stops the upload and the store removes what it wrote;
+4. runs the feature's `FileScanner`; a refused file, or a scanner that fails, is deleted and the answer is `422`;
+5. answers `201` with `{id, name, size, type}`. The id is 128 random bits from the server; names are cleaned of paths and control characters.
+
+Downloads (`GET /_zeyn/files/{store}/{id}`) check the id's shape, the permission, the guards and the tenant, and go through the media serving (see `docs/media.md`): ranges, entity tags and `nosniff`. Only raster images, audio and video are inline; everything else is sent as `application/octet-stream` with `Content-Disposition: attachment`, a quoted ASCII name plus the UTF-8 name, under `Content-Security-Policy: sandbox`.
+
+`DiskStore` keeps `{id}.bin` and `{id}.json` in one folder and writes uploads to `{id}.part` first. `MemoryStore` holds files in memory with a byte cap, for tests and demos. The form value only names files: a save action that must be sure a file exists calls `store.meta(id)`, as the showcase does.
+
+Budget: a 256 MiB upload grows the server heap by about 0.4 MiB (`tests/files_memory.rs`); the control renders 10 DOM nodes plus 5 per file; `files.js` adds 12 KB raw and 4 KB gzip, `files.css` 3 KB raw and 1 KB gzip.

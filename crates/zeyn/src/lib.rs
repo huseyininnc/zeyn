@@ -312,6 +312,7 @@ pub mod auth;
 mod command;
 mod ctx;
 mod feature;
+mod files;
 mod form;
 mod grid;
 mod i18n;
@@ -370,6 +371,14 @@ pub use command::{
 pub use command::{MAX_SEARCH_HITS, MAX_SEARCH_QUERY, Search, SearchHit};
 pub use ctx::{BoxFuture, Ctx, Dep, Identity, Inject, IntoScreen, Outcome, Service, Services};
 pub use feature::{Feature, Guard, GuardResult, Menu, MenuGroup, MenuItem, Route, ScreenEntry, SignedIn};
+#[cfg(feature = "server")]
+pub use files::{
+    DiskStore, FileChunks, FileEntry, FileMeta, FileScanner, FileStore, MemoryStore, ScanVerdict, StoredFile,
+};
+pub use files::{
+    File, FileRules, FileType, MAX_FIELD_FILES, MAX_FILE_NAME, MAX_UPLOAD_BYTES, SNIFF_BYTES, UPLOAD_CHUNK,
+    UploadValue, clean_file_name, valid_file_id,
+};
 pub use form::{Form, FormAction, FormRow, SubmitForm};
 pub use grid::{
     BulkAction, COLUMN_WIDTH, CellRenderer, ColumnView, DEFAULT_EXPORT_LIMIT, DataGrid, DataGridColumn, DataGridView,
@@ -453,15 +462,15 @@ pub mod prelude {
     };
     pub use crate::{
         Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime, Effect, Entity,
-        Error, Export, Feature, Field, Form, GuardResult, Icon, Identity, Import, Licensed, LocalDateTime, Model,
-        Money, Node, Page, Paging, Result, RowStyle, Screen, ScreenDef, Secret, Service, SignedIn, Tenant,
-        TenantRequired, Text, Time, TimeZone, Tone, TransitionRequest, Transitions, UiCtx, Valid, ValidationErrors,
-        Window, Workflow, action, choice, entity, model, params, screen, t,
+        Error, Export, Feature, Field, File, FileRules, FileType, Form, GuardResult, Icon, Identity, Import, Licensed,
+        LocalDateTime, Model, Money, Node, Page, Paging, Result, RowStyle, Screen, ScreenDef, Secret, Service,
+        SignedIn, Tenant, TenantRequired, Text, Time, TimeZone, Tone, TransitionRequest, Transitions, UiCtx, Valid,
+        ValidationErrors, Window, Workflow, action, choice, entity, model, params, screen, t,
     };
     #[cfg(feature = "server")]
     pub use crate::{
-        ApiDocs, App, AuditLog, DevAuth, Mcp, MemoryAudit, Plugin, RateLimit, StaticCredentials, StderrAudit, Theme,
-        TimePolicy,
+        ApiDocs, App, AuditLog, DevAuth, DiskStore, Mcp, MemoryAudit, MemoryStore, Plugin, RateLimit,
+        StaticCredentials, StderrAudit, Theme, TimePolicy,
     };
     #[allow(deprecated)]
     pub use crate::{Grid, GridMode, GridQuery};

@@ -15,7 +15,8 @@
     "media": "Media",
     "pro": "Desktop shell",
     "assistant": "Assistant",
-    "islands": "Islands"
+    "islands": "Islands",
+    "uploads": "Files"
   },
   "dashboard": {
     "title": "Overview",
@@ -391,5 +392,16 @@
     "try_orders": "Show me today's orders in İzmir",
     "try_archive": "Archive product NW-0003",
     "try_low": "Show products low on stock"
+  },
+  "uploads": {
+    "title": "Support ticket",
+    "card": "New ticket with files",
+    "save": "Save ticket",
+    "saved": "Ticket saved with {n} files."
+  },
+  "Ticket": {
+    "title": "Title",
+    "contract": "Signed contract",
+    "attachments": "Attachments"
   }
 }

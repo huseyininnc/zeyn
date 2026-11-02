@@ -16,6 +16,7 @@ mod pro;
 mod sales;
 mod stock;
 mod ui;
+mod uploads;
 mod wide;
 
 use std::time::Duration;
@@ -116,6 +117,7 @@ async fn main() -> std::io::Result<()> {
         .feature(pro::feature())
         .feature(islands::feature())
         .feature(assistant::feature())
+        .feature(uploads::feature())
         .islands(concat!(env!("CARGO_MANIFEST_DIR"), "/dist/islands"));
     #[cfg(feature = "pdf")]
     {

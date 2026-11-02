@@ -15,7 +15,8 @@
     "media": "Medya",
     "pro": "Masaüstü kabuğu",
     "assistant": "Asistan",
-    "islands": "Adacıklar"
+    "islands": "Adacıklar",
+    "uploads": "Dosyalar"
   },
   "dashboard": {
     "title": "Genel bakış",
@@ -391,5 +392,16 @@
     "try_orders": "Bugün İzmir'den gelen siparişleri göster",
     "try_archive": "NW-0003 ürününü arşivle",
     "try_low": "Stoğu azalan ürünleri göster"
+  },
+  "uploads": {
+    "title": "Destek kaydı",
+    "card": "Dosyalı yeni kayıt",
+    "save": "Kaydı kaydet",
+    "saved": "Kayıt {n} dosyayla kaydedildi."
+  },
+  "Ticket": {
+    "title": "Başlık",
+    "contract": "İmzalı sözleşme",
+    "attachments": "Ekler"
   }
 }

@@ -5,11 +5,12 @@ use super::*;
 
 /// Content security policy of every response that does not set its own: no inline scripts, no
 /// framing, everything from this origin.
-const CSP: &str = "default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
+const CSP: &str = "default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
 
 /// Framework endpoints whose `POST` changes data or runs an action. They count against the
 /// write limit (`App::write_limit`) besides the general one. A new endpoint that writes, runs an
-/// action or costs money goes here. Published API actions and the assistant are matched by prefix.
+/// action or costs money goes here. Published API actions and the assistant are matched by prefix,
+/// and file uploads (`POST /_zeyn/files/{store}`) by `files::is_upload`.
 const WRITE_PATHS: [&str; 12] = [
     "/_zeyn/form",
     "/_zeyn/import",
@@ -33,6 +34,7 @@ fn is_public_asset(path: &str) -> bool {
         || ui::ASSETS.contains(&path)
         || media::ASSETS.contains(&path)
         || pro::ASSETS.contains(&path)
+        || files::ASSETS.contains(&path)
         || is_assistant_asset(path)
         || is_island_asset(path)
 }
@@ -99,6 +101,7 @@ pub(super) async fn guard_request(
     }
     let is_write = parts.method == axum::http::Method::POST
         && (WRITE_PATHS.contains(&path)
+            || files::is_upload(path)
             || path.starts_with("/_zeyn/assistant/")
             || path.starts_with("/_zeyn/account/")
             || path.strip_prefix(st.api_prefix.as_str()).is_some_and(|rest| rest.starts_with('/')));

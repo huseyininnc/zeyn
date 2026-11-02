@@ -23,7 +23,7 @@ const FILES: &str = "/_zeyn/islands/";
 /// The policy of a page that holds an island. It is the default policy plus `'wasm-unsafe-eval'`
 /// in `script-src`, which lets the page compile WebAssembly modules. It still refuses `eval`,
 /// `new Function` and inline scripts, and modules still come only from the app's own origin.
-pub(super) const CSP: &str = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
+pub(super) const CSP: &str = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
 
 /// Built islands read from `manifest.json` at startup. Only file names listed there are served.
 pub(crate) struct Islands {

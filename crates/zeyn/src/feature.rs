@@ -126,6 +126,10 @@ pub struct Feature {
     media: Vec<crate::media::MediaEntry>,
     commands: Vec<crate::command::Command>,
     searches: Vec<crate::command::Search>,
+    #[cfg(feature = "server")]
+    files: Vec<crate::files::FileEntry>,
+    #[cfg(feature = "server")]
+    scanner: Option<Arc<dyn crate::files::FileScanner>>,
 }
 
 impl Feature {
@@ -140,6 +144,10 @@ impl Feature {
             commands: Vec::new(),
             searches: Vec::new(),
             media: Vec::new(),
+            #[cfg(feature = "server")]
+            files: Vec::new(),
+            #[cfg(feature = "server")]
+            scanner: None,
         }
     }
 
@@ -200,6 +208,42 @@ impl Feature {
 
     pub fn media_sources(&self) -> &[crate::media::MediaEntry] {
         &self.media
+    }
+
+    /// Keeps uploads for fields with these `rules` in `store`, served at
+    /// `/_zeyn/files/{rules.store()}`. Uploading and downloading need `permission` and the
+    /// feature's guards. The store name must be unique in the app.
+    ///
+    /// ```ignore
+    /// Feature::new("crm").files(CONTRACTS, "crm.contract.write", DiskStore::new("data/contracts"))
+    /// ```
+    #[cfg(feature = "server")]
+    pub fn files(
+        mut self,
+        rules: crate::files::FileRules,
+        permission: &'static str,
+        store: impl crate::files::FileStore,
+    ) -> Self {
+        self.files.push(crate::files::FileEntry { rules, permission, store: Arc::new(store) });
+        self
+    }
+
+    #[cfg(feature = "server")]
+    pub fn file_stores(&self) -> &[crate::files::FileEntry] {
+        &self.files
+    }
+
+    /// Checks every file uploaded to this feature's stores before it is accepted, such as with a
+    /// virus scanner. A refused file is deleted and the upload fails.
+    #[cfg(feature = "server")]
+    pub fn scan_files(mut self, scanner: impl crate::files::FileScanner) -> Self {
+        self.scanner = Some(Arc::new(scanner));
+        self
+    }
+
+    #[cfg(feature = "server")]
+    pub fn file_scanner(&self) -> Option<&Arc<dyn crate::files::FileScanner>> {
+        self.scanner.as_ref()
     }
 
     pub fn name(&self) -> &'static str {

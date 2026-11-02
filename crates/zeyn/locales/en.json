@@ -378,6 +378,21 @@
         "warning": "Warning",
         "danger": "Error",
         "brand": "Note"
+      },
+      "upload": {
+        "drop": "Drop files here or choose them.",
+        "hint": "{types}, up to {max}.",
+        "hint_many": "{types}, up to {max} each, at most {n} files.",
+        "list": "Files",
+        "uploading": "Uploading {name}: {pct} percent",
+        "uploaded": "{name} uploaded.",
+        "failed": "{name} could not be uploaded: {reason}",
+        "canceled": "Upload of {name} canceled.",
+        "removed": "{name} removed.",
+        "cancel": "Cancel",
+        "retry": "Retry",
+        "remove": "Remove",
+        "remove_name": "Remove {name}"
       }
     },
     "date": {
@@ -651,6 +666,15 @@
           "html": "<p>Your sign in code is <strong>{code}</strong>. It works for a few minutes.</p>"
         }
       }
+    },
+    "files": {
+      "too_large": "The file is too large. The largest file allowed is {max}.",
+      "too_many": "{label} takes at most {n} files.",
+      "type": "This type of file is not accepted, or its content does not match its name.",
+      "refused": "The file was refused by the security check.",
+      "aborted": "The upload stopped before the whole file arrived. Try again.",
+      "empty": "The file is empty.",
+      "store_full": "There is no room left for this file."
     }
   },
   "AccountLogin": {

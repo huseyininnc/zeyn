@@ -378,6 +378,21 @@
         "warning": "Uyarı",
         "danger": "Hata",
         "brand": "Not"
+      },
+      "upload": {
+        "drop": "Dosyaları buraya bırakın ya da seçin.",
+        "hint": "{types}, en fazla {max}.",
+        "hint_many": "{types}, her biri en fazla {max}, en çok {n} dosya.",
+        "list": "Dosyalar",
+        "uploading": "{name} yükleniyor: yüzde {pct}",
+        "uploaded": "{name} yüklendi.",
+        "failed": "{name} yüklenemedi: {reason}",
+        "canceled": "{name} yüklemesi iptal edildi.",
+        "removed": "{name} kaldırıldı.",
+        "cancel": "İptal",
+        "retry": "Yeniden dene",
+        "remove": "Kaldır",
+        "remove_name": "{name} dosyasını kaldır"
       }
     },
     "date": {
@@ -651,6 +666,15 @@
           "html": "<p>Oturum açma kodunuz <strong>{code}</strong>. Birkaç dakika geçerlidir.</p>"
         }
       }
+    },
+    "files": {
+      "too_large": "Dosya çok büyük. İzin verilen en büyük dosya {max}.",
+      "too_many": "{label} en fazla {n} dosya alır.",
+      "type": "Bu dosya türü kabul edilmiyor ya da içeriği adıyla uyuşmuyor.",
+      "refused": "Dosya güvenlik denetiminden geçmedi.",
+      "aborted": "Yükleme dosyanın tamamı gelmeden durdu. Yeniden deneyin.",
+      "empty": "Dosya boş.",
+      "store_full": "Bu dosya için yer kalmadı."
     }
   },
   "AccountLogin": {
