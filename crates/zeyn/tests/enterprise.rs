@@ -855,3 +855,110 @@ async fn the_page_tells_the_runtime_about_the_idle_timeout_and_keepalive_needs_c
     let r = send(&anonymous, Request::get("/overview").body(Body::empty()).unwrap()).await;
     assert!(!r.body.contains("zeyn-session"));
 }
+
+#[test]
+fn csv_parsing_handles_bom_separators_quotes_and_turkish_text() {
+    use zeyn::{CsvError, parse_csv};
+    assert_eq!(parse_csv("a,b\n1,2").unwrap(), vec![vec!["a", "b"], vec!["1", "2"]]);
+    assert_eq!(parse_csv("\u{feff}ad;şehir\r\nÇağrı;İĞÜŞÖ\r\n\r\n").unwrap(), vec![vec!["ad", "şehir"], vec!["Çağrı", "İĞÜŞÖ"]]);
+    assert_eq!(parse_csv("a,b\n\"x, y\",\"say \"\"hi\"\"\"\n").unwrap()[1], vec!["x, y", "say \"hi\""]);
+    assert_eq!(parse_csv("a;b\n\"line1\nline2\";2").unwrap()[1], vec!["line1\nline2", "2"]);
+    assert_eq!(parse_csv("a\tb\n1\t2").unwrap()[1], vec!["1", "2"]);
+    assert_eq!(parse_csv("a,b\n\"open,2"), Err(CsvError::UnclosedQuote));
+}
+
+#[action(permission = "crm.import", audit)]
+pub async fn import_customers(rows: Vec<Valid<Customer>>, store: Customers) -> Result<usize> {
+    let mut all = store.0.write().unwrap();
+    let n = rows.len();
+    for (i, row) in rows.into_iter().enumerate() {
+        let mut c = row.into_inner();
+        c.id = CustomerId(100 + i as i64);
+        all.push(c);
+    }
+    Ok(n)
+}
+
+#[screen(route = "/import", permission = "crm.read")]
+pub fn customer_import() -> Screen {
+    Screen::new("Import").body(Import::of(import_customers).max_rows(3)).body(Import::of(import_customers).all_or_nothing())
+}
+
+fn import_app(identity: Identity, audit: MemoryAudit, store: Customers) -> Router {
+    App::new("T")
+        .service(store)
+        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .interceptor(AuditLog(audit))
+        .feature(Feature::new("crm").screen(customer_import))
+        .router()
+        .unwrap()
+}
+
+fn importer() -> Identity {
+    Identity::user("ayse").with_permissions(["crm.read", "crm.import"])
+}
+
+fn import_call(node: usize, csv: &str, commit: bool) -> Request<Body> {
+    post("/_zeyn/import", serde_json::json!({ "screen": "customer_import", "node": node, "csv": csv, "commit": commit }))
+}
+
+#[tokio::test]
+async fn csv_rows_are_validated_with_the_model_rules_and_only_valid_rows_are_imported() {
+    let store = Customers::seeded();
+    let audit = MemoryAudit::default();
+    let router = import_app(importer(), audit.clone(), store.clone());
+    let page = send(&router, get("/import")).await;
+    assert!(page.body.contains(r#"accept=".csv,text/csv""#) && page.body.contains("Name, Credit"));
+
+    let csv = "\u{feff}NAME;credit\r\nŞirin Gıda A.Ş.;1250.50\r\n;10\r\n=HYPERLINK(\"x\");abc\r\n";
+    let r = send(&router, import_call(0, csv, false)).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    let j = r.json();
+    assert_eq!((j["total"].as_u64(), j["valid"].as_u64(), j["invalid"].as_u64()), (Some(3), Some(1), Some(2)));
+    assert_eq!(j["can_import"], true);
+    assert!(j["preview"].as_str().unwrap().contains("Şirin Gıda A.Ş."));
+    assert!(j["preview"].as_str().unwrap().contains("=HYPERLINK(&quot;x&quot;)"), "preview html is escaped");
+    let fields: Vec<(u64, &str)> = j["errors"].as_array().unwrap().iter().map(|e| (e["row"].as_u64().unwrap(), e["field"].as_str().unwrap())).collect();
+    assert_eq!(fields, [(2, "name"), (3, "credit")]);
+    let report = j["report"].as_str().unwrap();
+    assert!(report.starts_with("\u{feff}Row;Field;Message\r\n"));
+    assert!(!report.lines().any(|l| l.split(';').any(|c| c.starts_with('='))), "{report}");
+    assert_eq!(store.0.read().unwrap().len(), 5, "a preview saves nothing");
+
+    let r = send(&router, import_call(0, csv, true)).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    assert_eq!((r.json()["imported"].as_u64(), r.json()["skipped"].as_u64()), (Some(1), Some(2)));
+    let rows = store.0.read().unwrap().clone();
+    assert_eq!(rows.len(), 6);
+    assert_eq!(rows[5].name, "Şirin Gıda A.Ş.");
+    assert_eq!(rows[5].credit, Money::tl(125_050));
+    let e = audit.entries();
+    assert_eq!(e.len(), 1);
+    assert_eq!(e[0].action, Some("import_customers"));
+}
+
+#[tokio::test]
+async fn imports_check_permission_columns_row_limits_and_all_or_nothing() {
+    let store = Customers::seeded();
+    let reader = import_app(Identity::user("x").with_permissions(["crm.read"]), MemoryAudit::default(), store.clone());
+    assert_eq!(send(&reader, import_call(0, "name\nA", false)).await.status, StatusCode::FORBIDDEN);
+    assert_eq!(send(&reader, import_call(0, "name\nA", true)).await.status, StatusCode::FORBIDDEN);
+
+    let router = import_app(importer(), MemoryAudit::default(), store.clone());
+    let r = send(&router, import_call(0, "name,secret\nA,1", false)).await;
+    assert_eq!(r.status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(r.body.contains("Unknown column: secret."));
+    let r = send(&router, import_call(0, "name,score\nA,1", false)).await;
+    assert_eq!(r.status, StatusCode::UNPROCESSABLE_ENTITY, "read only fields cannot be imported");
+    let r = send(&router, import_call(0, "name\nA\nB\nC\nD", false)).await;
+    assert!(r.body.contains("more than 3 rows"));
+
+    let mixed = "name,credit\nGood,1\n,2";
+    let r = send(&router, import_call(1, mixed, false)).await;
+    assert_eq!(r.json()["can_import"], false);
+    let r = send(&router, import_call(1, mixed, true)).await;
+    assert_eq!(r.status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(store.0.read().unwrap().len(), 5);
+    let r = send(&router, import_call(1, "name,credit\nGood,1\nAlso good,2", true)).await;
+    assert_eq!(r.json()["imported"], 2);
+}

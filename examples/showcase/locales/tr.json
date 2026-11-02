@@ -34,6 +34,7 @@
     "ends_before_start": "Son gün ilk günden önce olamaz.",
     "too_long": "Tek bir talep en fazla 30 günü kapsayabilir.",
     "requests": "İzin talepleri",
+    "import": "İzin taleplerini içe aktar",
     "save": "Kaydet",
     "saved_draft": "Talebiniz taslak olarak kaydedildi. Açıp onaya gönderebilirsiniz."
   },

@@ -27,6 +27,27 @@
       "reauth_open": "Yeniden giriş yap",
       "reauth_continue": "Giriş yaptım, devam et"
     },
+    "import": {
+      "file": "CSV dosyası",
+      "hint": "İlk satır sütun adlarıdır: {columns}. Değerler virgül ya da noktalı virgülle ayrılır. En fazla {max} satır.",
+      "summary": "{total} satır okundu: {valid} geçerli, {invalid} hatalı.",
+      "commit": "Geçerli satırları aktar",
+      "commit_all": "Tüm satırları aktar",
+      "report": "Hata raporunu indir",
+      "imported": "{count} satır aktarıldı, {skipped} satır atlandı.",
+      "unknown_column": "Bilinmeyen sütun: {name}.",
+      "too_many": "Dosyada {max} satırdan fazla var.",
+      "too_large": "Dosya çok büyük.",
+      "empty": "Dosyada veri satırı yok.",
+      "bad_quotes": "Dosyadaki tırnaklı bir değer kapatılmamış.",
+      "extra_cells": "Bu satırda sütun sayısından fazla değer var.",
+      "nothing_valid": "Geçerli satır olmadığı için hiçbir şey aktarılmadı.",
+      "fix_first": "Önce tüm hataları düzeltin; bu aktarım ya hep ya hiç çalışır.",
+      "report_row": "Satır",
+      "report_field": "Alan",
+      "report_message": "Mesaj",
+      "reading": "Dosya okunuyor..."
+    },
     "workflow": {
       "state": "Durum",
       "comment": "Açıklama",

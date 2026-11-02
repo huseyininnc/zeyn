@@ -121,6 +121,25 @@ pub async fn move_leave(request: TransitionRequest<LeaveRequestId>, store: Leave
     Ok(row.state)
 }
 
+/// Imports leave requests from a CSV file as drafts.
+#[action(permission = "people.leave.import", audit)]
+pub async fn import_leaves(rows: Vec<Valid<LeaveRequest>>, store: LeaveStore) -> Result<usize> {
+    let mut all = store.0.write().map_err(|_| Error::Internal("leave store lock".into()))?;
+    let count = rows.len();
+    for row in rows {
+        let mut r = row.into_inner();
+        r.id = LeaveRequestId(all.iter().map(|x| x.id.0).max().unwrap_or(0) + 1);
+        r.state = LeaveState::Draft;
+        all.push(r);
+    }
+    Ok(count)
+}
+
+#[screen(route = "/import", permission = "people.leave.import")]
+pub fn leave_import() -> Screen {
+    Screen::new(t!("people.import")).body(Import::of(import_leaves).max_rows(1000))
+}
+
 #[action(permission = "people.leave.request")]
 pub async fn search_leaves(q: GridQuery, store: LeaveStore) -> Result<Page<LeaveRequest>> {
     let rows = store.0.read().map_err(|_| Error::Internal("leave store lock".into()))?.clone();
@@ -196,5 +215,6 @@ pub fn feature() -> Feature {
         .screen(leave)
         .screen(leaves)
         .screen(leave_view)
-        .menu(|m| m.group(t!("menu.people"), Icon::Edit).item(t!("people.leave"), leave).item(t!("people.requests"), leaves))
+        .screen(leave_import)
+        .menu(|m| m.group(t!("menu.people"), Icon::Edit).item(t!("people.leave"), leave).item(t!("people.requests"), leaves).item(t!("people.import"), leave_import))
 }

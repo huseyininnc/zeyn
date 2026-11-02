@@ -221,6 +221,8 @@ pub enum CallKind {
     Api,
     /// A masked value shown in full on request.
     Reveal,
+    /// Rows imported from a CSV file.
+    Import,
 }
 
 /// What is being called.
@@ -328,6 +330,7 @@ impl<S: AuditSink> Interceptor for AuditLog<S> {
         let trail = ctx.trail();
         let audited = call.kind == CallKind::Form
             || call.kind == CallKind::Reveal
+            || call.kind == CallKind::Import
             || call.action.is_some_and(|a| a.audit)
             || !trail.revealed.is_empty()
             || !trail.reads.is_empty()
@@ -1508,7 +1511,7 @@ async fn guard_request(State(st): State<Arc<AppState>>, req: axum::extract::Requ
         return problem(&ctx, Failure::App(Error::Forbidden));
     }
     let is_write = req.method() == axum::http::Method::POST
-        && (path == "/_zeyn/form" || path == "/_zeyn/mcp" || path.starts_with(&format!("{}/", st.api_prefix)));
+        && (path == "/_zeyn/form" || path == "/_zeyn/import" || path == "/_zeyn/mcp" || path.starts_with(&format!("{}/", st.api_prefix)));
     let limits = if probe { [(None, "all"), (None, "write")] } else { [(st.rate, "all"), (if is_write { st.write_rate } else { None }, "write")] };
     for (limit, scope) in limits {
         let Some(limit) = limit else { continue };

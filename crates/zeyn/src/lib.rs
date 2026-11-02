@@ -145,6 +145,7 @@ mod feature;
 mod form;
 mod grid;
 mod i18n;
+mod import;
 mod model;
 mod platform;
 mod privacy;
@@ -192,6 +193,7 @@ pub use value::{
     ChoiceOption, Currency, FieldKind, FieldType, Money, SupportsMinMax, SupportsRequired, SupportsSum, SupportsText,
     Value,
 };
+pub use import::{CsvError, Checked, DEFAULT_MAX_ROWS, HARD_MAX_ROWS, Import, ImportSource, MAX_CSV_BYTES, RowError, check_csv, error_report, parse_csv};
 pub use workflow::{MAX_COMMENT, Transition, TransitionRecord, TransitionRequest, Transitions, Workflow, WorkflowState};
 pub use zeyn_macros::{action, choice, entity, model, params, screen, t};
 
@@ -205,7 +207,7 @@ pub mod prelude {
     pub use crate::{
         Action, Ctx, Currency, Date, DateTime, Effect, LocalDateTime, Time, TimeZone, Entity, Error, Export, Feature, Field, Form, Grid, GridMode, GridQuery,
         GuardResult, Icon, Identity, Licensed, Model, Secret, Tenant, TenantRequired, Money, Node, Page, Paging, Result, RowStyle, Screen, ScreenDef, Service,
-        SignedIn, Text, TransitionRequest, Transitions, UiCtx, Valid, ValidationErrors, Window, Workflow, action, choice, entity,
+        SignedIn, Text, Import, TransitionRequest, Transitions, UiCtx, Valid, ValidationErrors, Window, Workflow, action, choice, entity,
         model, params, screen, t,
     };
     #[cfg(feature = "server")]

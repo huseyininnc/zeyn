@@ -68,3 +68,12 @@
 @media (forced-colors: active) {
   .z-notice, .z-draft-note { border-left-color: CanvasText; }
 }
+
+.z-import { display: grid; gap: var(--z-gap); max-width: 960px; }
+.z-import-status { margin: 0; }
+.z-import-status.z-import-error { color: var(--z-danger); }
+.z-import-preview { border-collapse: collapse; width: 100%; font-size: var(--z-font-size-sm); }
+.z-import-preview th, .z-import-preview td { padding: 4px 8px; border: 1px solid var(--z-border); text-align: start; }
+.z-import-preview .z-row-danger { background: var(--z-danger-subtle); }
+.z-import-errors { margin: var(--z-gap) 0 0; padding-inline-start: 20px; color: var(--z-danger); max-height: 240px; overflow: auto; }
+[data-zeyn-import-preview] { overflow-x: auto; }

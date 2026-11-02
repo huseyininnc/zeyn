@@ -183,3 +183,28 @@ RFC 3339; `DevAuth` reports every request as freshly signed in).
   type `urn:zeyn:problem:reauth_required` on the API), whatever the client sends. The runtime asks
   the user to sign in again in a new tab (`reauth_url`, else `login_url`) and repeats the request
   when they come back, so nothing typed is lost. Identities without a sign in time never pass.
+
+## CSV import
+
+```rust
+#[action(permission = "people.leave.import", audit)]
+pub async fn import_leaves(rows: Vec<Valid<LeaveRequest>>, store: LeaveStore) -> Result<usize> { ... }
+
+Screen::new("Import").body(Import::of(import_leaves).max_rows(1000))
+```
+
+- The user picks a CSV file. The runtime reads it as UTF-8, or as Windows-1254 when it is not
+  valid UTF-8 (Turkish spreadsheets), and sends the text in a JSON body to `POST /_zeyn/import`
+  (no multipart needed; at most 8 MB). The server answers with a summary, a preview of the first
+  ten rows, the errors per row and a downloadable error report.
+- Parsing: byte order mark dropped, `,`, `;` or tab detected from the header line, `"` quoting with
+  separators and line breaks inside, `\r\n` or `\n`.
+- Columns are matched by field name or label in any language of the app, ignoring case and Turkish
+  dotted and dotless i. Unknown, read only, key and row version columns are refused.
+- Every row is read and validated exactly like a form of the model: values as a user of that
+  language types them (`1.234,56`, `05.12.2026`), the field rules and the model's own `validate`.
+- Import sends only the valid rows to the action; `.all_or_nothing()` imports nothing unless
+  every row is valid. On import the server reads and validates the file again; nothing from the
+  preview is trusted. Both steps need the action's permission, and the import is audited.
+- `.max_rows(n)` limits rows (5000 by default, never more than 50000). The error report defuses
+  spreadsheet formulas. Masked fields are shown masked in the preview.

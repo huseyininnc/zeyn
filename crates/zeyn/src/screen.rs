@@ -177,6 +177,11 @@ pub trait Component: Send + Sync {
     fn reveal(&self, _field: &str) -> Option<crate::privacy::Revealed> {
         None
     }
+
+    /// CSV import, for components that import rows (see [`crate::Import`]).
+    fn import(&self) -> Option<&dyn crate::import::ImportSource> {
+        None
+    }
 }
 
 /// Type erased component: a node of the screen tree.
@@ -205,6 +210,10 @@ impl Node {
 
     pub fn reveal(&self, field: &str) -> Option<crate::privacy::Revealed> {
         self.0.reveal(field)
+    }
+
+    pub fn import(&self) -> Option<&dyn crate::import::ImportSource> {
+        self.0.import()
     }
 }
 

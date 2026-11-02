@@ -27,6 +27,27 @@
       "reauth_open": "Sign in again",
       "reauth_continue": "I signed in, continue"
     },
+    "import": {
+      "file": "CSV file",
+      "hint": "The first row names the columns: {columns}. Values are separated by commas or semicolons. At most {max} rows.",
+      "summary": "{total} rows read: {valid} valid, {invalid} with errors.",
+      "commit": "Import valid rows",
+      "commit_all": "Import all rows",
+      "report": "Download error report",
+      "imported": "{count} rows imported, {skipped} skipped.",
+      "unknown_column": "Unknown column: {name}.",
+      "too_many": "The file has more than {max} rows.",
+      "too_large": "The file is too large.",
+      "empty": "The file has no data rows.",
+      "bad_quotes": "A quoted value in the file is not closed.",
+      "extra_cells": "This row has more values than there are columns.",
+      "nothing_valid": "No row is valid, so nothing was imported.",
+      "fix_first": "Fix every error first; this import is all or nothing.",
+      "report_row": "Row",
+      "report_field": "Field",
+      "report_message": "Message",
+      "reading": "Reading the file..."
+    },
     "workflow": {
       "state": "State",
       "comment": "Comment",

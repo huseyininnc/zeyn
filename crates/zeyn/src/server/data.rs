@@ -20,7 +20,13 @@ use std::sync::Arc;
 use std::time::Instant;
 
 pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
-    router.route("/_zeyn/reveal", post(reveal)).route("/_zeyn/reason", post(give_reason))
+    router
+        .route("/_zeyn/reveal", post(reveal))
+        .route("/_zeyn/reason", post(give_reason))
+        .route(
+            "/_zeyn/import",
+            post(import).layer(axum::extract::DefaultBodyLimit::max(crate::import::MAX_CSV_BYTES + 64 * 1024)),
+        )
 }
 
 const REASON_COOKIE: &str = "zeyn_reason";
@@ -79,6 +85,51 @@ pub(super) fn reason_page(st: &AppState, ctx: &Ctx, screen: &str, csrf: &str) ->
     let mut r = Html(st.shell(ctx, csrf, &ctx.t(&Text::key("zeyn.privacy.reason_title")), &body, Some(screen))).into_response();
     *r.status_mut() = StatusCode::PRECONDITION_REQUIRED;
     r
+}
+
+#[derive(Deserialize)]
+struct ImportCall {
+    screen: String,
+    #[serde(default)]
+    params: Json,
+    node: usize,
+    csv: String,
+    #[serde(default)]
+    commit: bool,
+}
+
+/// Previews (`commit: false`) or imports a CSV file through an import component. Both need the
+/// import action's permission; the file is read and validated again on commit.
+async fn import(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(call): axum::Json<ImportCall>) -> Response {
+    let ctx = st.licensed(st.ctx(&headers)).await;
+    if let Err(f) = st.check_csrf(&headers) {
+        return st.error_response(&ctx, f);
+    }
+    let result = async {
+        let (_, entry, screen) = st.open(&ctx, &call.screen, call.params).await?;
+        let source = screen.nodes().get(call.node).and_then(|n| n.import()).ok_or(Failure::App(Error::NotFound))?;
+        let action = source.action();
+        if !ctx.identity().can(&action.access) {
+            return Err(Failure::App(Error::Forbidden));
+        }
+        if !call.commit {
+            return source.preview(&ctx, &call.csv).map_err(Failure::App);
+        }
+        let info = Call { kind: CallKind::Import, screen: entry.meta.name, action: Some(action), via_agent: false };
+        let started = Instant::now();
+        let outcome = async {
+            st.before(&ctx, &info)?;
+            st.timed(source.commit(ctx.clone(), call.csv)).await
+        }
+        .await;
+        st.after(&ctx, &info, started, &outcome);
+        outcome
+    }
+    .await;
+    match result {
+        Ok(body) => axum::Json(body).into_response(),
+        Err(f) => st.error_response(&ctx, f),
+    }
 }
 
 #[derive(Deserialize)]

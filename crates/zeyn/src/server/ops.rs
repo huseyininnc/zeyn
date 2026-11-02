@@ -200,6 +200,8 @@ const TEXTS: &[&str] = &[
     "deploy.later",
     "draft.restored",
     "draft.discard",
+    "import.too_large",
+    "import.reading",
     "session.idle_title",
     "session.idle_body",
     "session.stay",

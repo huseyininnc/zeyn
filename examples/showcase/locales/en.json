@@ -34,6 +34,7 @@
     "ends_before_start": "The last day cannot be before the first day.",
     "too_long": "A single request can cover at most 30 days.",
     "requests": "Leave requests",
+    "import": "Import leave requests",
     "save": "Save",
     "saved_draft": "Your request was saved as a draft. Open it and submit it for approval."
   },
