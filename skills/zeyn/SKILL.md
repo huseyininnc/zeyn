@@ -40,6 +40,7 @@ Which page answers what:
 | Dates, time zones, money, languages | `guides/time-and-languages` (`time-and-languages.md`) |
 | Permissions, guards, CSRF, masking, audit | `guides/security` (`security.md`), `docs/enterprise.md` |
 | Sign in with an identity provider, JWT, MFA | `docs/auth.md` |
+| Own user accounts: registration, passwords, two factor, passkeys | `guides/accounts` (`accounts.md`, `docs/accounts.md`) |
 | Database | `guides/database` (`docs/database.md`) |
 | Themes | `guides/theming` (`docs/theming.md`) |
 | AI assistant, MCP, AI attributes | `guides/mcp` (`mcp.md`), `docs/assistant.md` |

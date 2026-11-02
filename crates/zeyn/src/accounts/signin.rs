@@ -204,7 +204,7 @@ impl SignInManager {
     pub async fn password_sign_in(&self, name: &str, password: &str, remember: bool, lockout_on_failure: bool) -> Result<SignInResult> {
         self.throttle(name).await?;
         let Some(mut user) = self.users().find_by_name_or_email(name).await? else {
-            self.users().dummy_check(password);
+            self.users().dummy_check(password).await;
             self.0.event(AccountEventKind::SignInFailed, None);
             return Ok(SignInResult::Failed);
         };
@@ -218,7 +218,7 @@ impl SignInManager {
     /// Checks the password with lockout but does not sign in (`CheckPasswordSignInAsync`).
     pub async fn check_password_sign_in(&self, user: &mut User, password: &str, lockout_on_failure: bool) -> Result<SignInResult> {
         if let Some(early) = self.pre_sign_in(user) {
-            self.users().dummy_check(password);
+            self.users().dummy_check(password).await;
             return Ok(early);
         }
         if self.users().check_password(user, password).await? {

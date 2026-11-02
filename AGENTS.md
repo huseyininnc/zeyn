@@ -25,6 +25,7 @@ them. When code and docs disagree, fix the one that is wrong in the same change.
 | Browser runtime, endpoints, events | `docs/runtime-protocol.md` |
 | Security, audit, masking, sessions, jobs, workflows | `examples/docs/pages/security.md`, `docs/enterprise.md` |
 | Sign in, JWT, OIDC, MFA | `docs/auth.md` |
+| User accounts, passwords, passkeys (feature `accounts`) | `docs/accounts.md`, `examples/docs/pages/accounts.md` |
 | Database (PostgreSQL, Oracle) | `docs/database.md` |
 | Time zones, licenses, Redis, tracing, Docker | `docs/operations.md` |
 | Themes and design tokens | `docs/theming.md` |
@@ -73,7 +74,7 @@ docs/                  design documents and guides
 ```
 cargo build --workspace
 cargo test --workspace
-cargo test -p zeyn --features assistant,oidc,totp,islands,realtime,xlsx,email   tests behind features
+cargo test -p zeyn --features assistant,oidc,totp,islands,realtime,xlsx,email,accounts   tests behind features
 cargo check -p zeyn --all-features --tests                                      everything compiles
 cargo run -p zeyn-example-showcase      http://127.0.0.1:3002, every component
 cargo run -p zeyn-example-docs          http://127.0.0.1:3008, the documentation

@@ -73,6 +73,7 @@ pages! {
     "docs.group.guides" Box {
         time_i18n "/guides/time-and-languages" "time-and-languages.md" "Time and languages" "../pages/time-and-languages.md";
         security "/guides/security" "security.md" "Security" "../pages/security.md";
+        accounts "/guides/accounts" "accounts.md" "User accounts" "../pages/accounts.md";
         enterprise "/guides/enterprise" "enterprise.md" "Audit, masking and jobs" "../../../docs/enterprise.md";
         api "/guides/api" "api.md" "API and OpenAPI" "../pages/api.md";
         mcp "/guides/mcp" "mcp.md" "MCP and AI agents" "../pages/mcp.md";

@@ -8,6 +8,7 @@ Who is calling, and how sure the app is about it. Zeyn has four ways in:
 | `JwtAuth` | APIs, MCP and service calls with `Authorization: Bearer <JWT>` | `oidc` |
 | `OidcAuth` | browser users sign in at an OpenID Connect provider | `oidc` |
 | `Totp` | a second factor for apps whose sign in has none | `totp` |
+| `App::accounts` | the app keeps its own users: passwords, two factor, passkeys (`docs/accounts.md`) | `accounts` |
 
 `RequireMfa` (always available) asks for a second factor on a feature, a screen or an action.
 The default build has none of `oidc` and `totp`, so apps that do not use them pay nothing.

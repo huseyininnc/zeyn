@@ -85,7 +85,7 @@ impl Party {
         let rest = public_url.strip_prefix("https://").or_else(|| public_url.strip_prefix("http://"))?;
         let authority = rest.split('/').next()?;
         let host = authority.rsplit_once(':').map(|(h, _)| h).unwrap_or(authority).to_ascii_lowercase();
-        if public_url.starts_with("http://") && host != "localhost" && host != "127.0.0.1" {
+        if public_url.starts_with("http://") && host != "localhost" {
             return None;
         }
         let id = match domain {

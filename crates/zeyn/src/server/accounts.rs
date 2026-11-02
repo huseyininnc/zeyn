@@ -81,7 +81,7 @@ pub(super) async fn layer(State(st): State<Arc<AppState>>, mut req: axum::extrac
         match manager.revalidate(&s).await {
             Ok(Some(renewed)) => match manager.seal_session(&renewed) {
                 Ok(v) => {
-                    let age = renewed.persistent.then(|| format!("; Max-Age={}", renewed.expires - now_secs())).unwrap_or_default();
+                    let age = if renewed.persistent { format!("; Max-Age={}", renewed.expires - now_secs()) } else { String::new() };
                     out.push(format!("{SESSION}={v}; Path={}; HttpOnly; SameSite=Lax{age}{}", st.cookie_path(), if secure { "; Secure" } else { "" }));
                     replace_cookie(req.headers_mut(), SESSION, Some(&v));
                 }
@@ -265,7 +265,7 @@ pub(crate) async fn register_user(ctx: &Ctx, accounts: &Accounts, email: &str, p
     users.validate_password(password).await?;
     let email = email.trim();
     if users.find_by_name_or_email(email).await?.is_some() {
-        let _ = accounts.settings().hasher.hash(password);
+        let _ = users.hash_password(password).await;
         let link = accounts.link("/account/login");
         accounts.0.sender.send(ctx, email, AccountMessage::AlreadyRegistered { link }).await?;
         return Ok(());

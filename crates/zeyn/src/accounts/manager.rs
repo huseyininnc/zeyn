@@ -12,6 +12,12 @@ use crate::{Error, Result};
 /// ASP.NET Core Identity.
 pub const MAX_NAME: usize = 256;
 
+/// Most password hashes computed at once. With the default Argon2id parameters (19 MiB each)
+/// hashing never holds more than about 76 MiB, whatever the number of sign ins.
+pub const MAX_HASHING: usize = 4;
+
+static HASHING: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(MAX_HASHING);
+
 /// Users: creation and validation, passwords, e-mail and phone confirmation, roles, claims,
 /// lockout, security stamps, tokens, two factor and external logins (`UserManager<TUser>`).
 /// Take it as an action argument; `App::accounts` registers it.
@@ -110,7 +116,7 @@ impl UserManager {
         self.validate(&user).await?;
         if let Some(pw) = password {
             self.validate_password(pw).await?;
-            user.password_hash = Some(self.options().hasher.hash(pw)?);
+            user.password_hash = Some(self.hash_password(pw).await?);
         }
         user.security_stamp = new_stamp();
         user.concurrency_stamp = new_stamp();
@@ -197,14 +203,14 @@ impl UserManager {
     /// parameters and saved (`CheckPasswordAsync`). Users without a password never match.
     pub async fn check_password(&self, user: &mut User, password: &str) -> Result<bool> {
         let Some(stored) = user.password_hash.clone() else {
-            let _ = self.options().hasher.verify(&self.0.0.dummy_hash, password);
+            self.dummy_check(password).await;
             return Ok(false);
         };
-        match self.options().hasher.verify(&stored, password) {
+        match self.verify_password(&stored, password).await {
             Verification::Failed => Ok(false),
             Verification::Success => Ok(true),
             Verification::SuccessRehashNeeded => {
-                user.password_hash = Some(self.options().hasher.hash(password)?);
+                user.password_hash = Some(self.hash_password(password).await?);
                 if let Err(e) = self.save(user).await {
                     tracing::warn!("password rehash not saved: {e}");
                 }
@@ -215,8 +221,24 @@ impl UserManager {
 
     /// Spends the time of one password check without a user, so a missing account answers as
     /// slowly as a wrong password.
-    pub(crate) fn dummy_check(&self, password: &str) {
-        let _ = self.options().hasher.verify(&self.0.0.dummy_hash, password);
+    pub(crate) async fn dummy_check(&self, password: &str) {
+        let dummy = self.0.0.dummy_hash.clone();
+        let _ = self.verify_password(&dummy, password).await;
+    }
+
+    /// Hashes a password off the async threads, at most [`MAX_HASHING`] at once, so a burst of
+    /// sign ins can neither stall the server nor take more than that many times the Argon2 memory.
+    pub async fn hash_password(&self, password: &str) -> Result<String> {
+        let (hasher, password) = (self.options().hasher, password.to_string());
+        let _permit = HASHING.acquire().await.map_err(|_| Error::Internal("hashing closed".into()))?;
+        tokio::task::spawn_blocking(move || hasher.hash(&password)).await.map_err(|e| Error::Internal(format!("hashing: {e}")))?
+    }
+
+    /// Checks a password against a stored hash off the async threads (see [`Self::hash_password`]).
+    pub async fn verify_password(&self, stored: &str, password: &str) -> Verification {
+        let (hasher, stored, password) = (self.options().hasher, stored.to_string(), password.to_string());
+        let Ok(_permit) = HASHING.acquire().await else { return Verification::Failed };
+        tokio::task::spawn_blocking(move || hasher.verify(&stored, &password)).await.unwrap_or(Verification::Failed)
     }
 
     pub fn has_password(&self, user: &User) -> bool {
@@ -244,7 +266,7 @@ impl UserManager {
 
     async fn set_password(&self, user: &mut User, password: &str) -> Result<()> {
         self.validate_password(password).await?;
-        user.password_hash = Some(self.options().hasher.hash(password)?);
+        user.password_hash = Some(self.hash_password(password).await?);
         user.security_stamp = new_stamp();
         self.save(user).await
     }
