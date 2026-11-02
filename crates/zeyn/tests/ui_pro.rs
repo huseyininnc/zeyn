@@ -388,3 +388,39 @@ async fn dock_endpoint_checks_csrf_access_node_and_store() {
     let no_store = app_with(Counter::default(), false);
     assert_eq!(send(&no_store, dock_call("orders.read", "ann", load)).await.0, StatusCode::NOT_FOUND, "the browser keeps the layout");
 }
+
+#[tokio::test]
+async fn commands_and_saved_layouts_count_against_the_write_limit() {
+    let router = App::new("Test")
+        .i18n(I18n::new("en"))
+        .service(Counter::default())
+        .write_limit(zeyn::RateLimit::per_user(1, std::time::Duration::from_secs(60)))
+        .auth(|h: &HeaderMap| {
+            let user = h.get("x-user")?.to_str().ok()?.to_string();
+            Some(Identity::user(user).with_permissions(["orders.read", "orders.admin"]))
+        })
+        .datagrid_views(MemoryViewStore::default())
+        .feature(Feature::new("orders").screen(orders).screen(work).command(archive()))
+        .router()
+        .unwrap();
+    let writes = [
+        ("/_zeyn/command", serde_json::json!({ "command": "orders.archive" })),
+        ("/_zeyn/grid/view", serde_json::json!({ "screen": "orders", "node": 0, "view": null })),
+        ("/_zeyn/dock", serde_json::json!({ "screen": "work", "node": "0.1", "save": true, "layout": null })),
+        ("/_zeyn/theme", serde_json::json!({ "theme": "dark" })),
+    ];
+    let as_user = |mut req: Request<Body>, user: &str| {
+        req.headers_mut().insert("x-user", user.parse().unwrap());
+        req
+    };
+    for (path, body) in writes {
+        let user = path.rsplit('/').next().unwrap();
+        send(&router, as_user(post(path, "", body.clone()), user)).await;
+        let (status, _) = send(&router, as_user(post(path, "", body), user)).await;
+        assert_eq!(status, StatusCode::TOO_MANY_REQUESTS, "{path} writes");
+    }
+    for _ in 0..2 {
+        let (status, _) = send(&router, as_user(post("/_zeyn/search", "", serde_json::json!({ "query": "x" })), "reader")).await;
+        assert_eq!(status, StatusCode::OK, "searching is not a write");
+    }
+}
