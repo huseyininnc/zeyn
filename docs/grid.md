@@ -214,6 +214,48 @@ details. After an inline edit the row keeps its place in the tree.
 
 Virtual grids neither group nor show trees, since every row there has one fixed height.
 
+## Cells: navigation, copy and paste
+
+Right on a row (or a click on a cell) puts a cell cursor in it, as in a spreadsheet. Arrow keys move
+it, Shift with an arrow (or Shift+click) grows a range, Home and End go to the ends of the row and
+Ctrl+Home and Ctrl+End to the first and last cell of the grid. Tab and Shift+Tab move along the
+row and on to the next one, and leave the grid at its ends. Left on the first cell goes back to the
+row. Enter or F2 edits an editable cell, Enter presses the only button or link of a cell, Escape
+drops the range. Cells in the range carry `aria-selected`.
+
+Ctrl+C on a cell copies the range as tab separated text, the values as the user sees them. Ctrl+C
+on a row still copies the selected rows.
+
+Ctrl+V on a cell pastes tab separated text from a spreadsheet from the cursor; one value fills the
+whole range. Only editable cells change (pasting into read only cells says so), choices may be
+pasted by label, yes and no in the user's words. Each changed row is saved through the inline edit
+path (`/_zeyn/grid/edit` with the row version), one row after another, so every row is read,
+validated and checked on the server like an inline edit; a row that fails shows its errors in its
+cells and the others are saved. More than 10 rows ask first, more than 500 are refused, and Ctrl+Z
+undoes the whole paste. Grid edits, row actions, bulk actions and menu actions count against
+`App::write_limit`, so a large paste can run into the app's write limit.
+
+## Column virtualization
+
+A grid with 40 columns or more keeps only the pinned columns and the columns in view (plus up to six
+on each side) in the page. Every column gets a fixed width, and one spacer cell stands for the
+columns left out on each side, so widths, pins and scrolling stay as they were. Rows keep their full
+list of cells, so copy, paste and editing see every column, and cells carry `aria-colindex`.
+The window moves only when a column outside it comes into view. The server still sends every
+cell of a row.
+
+Measured on the gallery's wide grid (62 columns, 100,000 rows, virtual scrolling, debug server,
+Chromium, 1400 by 900 window, 144 Hz display), with and without column virtualization:
+
+| | Cells in the page | Sideways, 60 px per frame (p50 / p95) | Down, 60 px per frame (p50 / p95) | Down, 2,000 px per frame (p50 / p95) |
+|---|---|---|---|---|
+| Without | 2,976 | 6.9 / 7.5 ms | 42.7 / 64.8 ms | 78.5 / 141 ms, 178 long tasks |
+| With | 1,056 | 7.0 / 28.8 ms | 24.6 / 41.7 ms | 28.9 / 48.9 ms, 7 long tasks |
+
+Scrolling down is about twice as fast and the page holds a third of the cells. Sideways scrolling
+was already smooth; frames where the window moves cost up to 29 ms. The rest of the cost is
+parsing blocks of 200 rows with every column, which column virtualization does not change.
+
 ## Export
 
 `exportable()` (and optionally `export_permission(...)`, `export_limit(n)`) lets the toolbar's
@@ -230,7 +272,8 @@ matching row.
 ## Accessibility
 
 The table has `role="grid"`, `aria-rowcount` (virtual grids), `aria-colcount`, `aria-colindex`
-and `aria-sort`. Rows use a roving tab stop. Buttons inside the active row are reachable with Tab.
+and `aria-sort`. Rows use a roving tab stop. Buttons inside the active row are reachable with Tab. Grouped and tree
+grids are `role="treegrid"` with `aria-level` and `aria-expanded` on rows.
 Menus use `role="menu"` with `menuitem`, `menuitemcheckbox` and `menuitemradio`, and focus returns
 to where it was. Empty and error states are announced (`role="status"`).
 

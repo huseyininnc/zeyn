@@ -127,10 +127,12 @@ pub fn feature() -> Feature {
         .screen(fields)
         .screen(infinite)
         .screen(compact)
+        .screen(crate::wide::wide)
         .menu(|m| {
             m.group(t!("menu.gallery"), Icon::Table)
                 .item(t!("gallery.fields"), fields)
                 .item(t!("gallery.infinite"), infinite)
                 .item(t!("gallery.compact"), compact)
+                .item(t!("gallery.wide"), crate::wide::wide)
         })
 }

@@ -1116,3 +1116,41 @@ async fn tree_grids_show_top_rows_and_load_children_lazily() {
     assert_eq!(r.json()["total"], 3, "6, 7 and 8 report to 3");
     assert_eq!(send(&router, branch("tree", serde_json::json!([null]))).await.status, StatusCode::NOT_FOUND);
 }
+
+#[tokio::test]
+async fn pasted_rows_are_saved_one_by_one_and_each_is_checked_on_its_own() {
+    let (router, store) = edit_router(writer_items());
+    let pastes = [
+        ("1", serde_json::json!({ "code": "P-1", "price": "1.234,50", "version": "1" }), StatusCode::OK),
+        ("2", serde_json::json!({ "code": "", "version": "1" }), StatusCode::UNPROCESSABLE_ENTITY),
+        ("3", serde_json::json!({ "code": "P-3", "qty": "99", "version": "1" }), StatusCode::FORBIDDEN),
+        ("4", serde_json::json!({ "code": "P-4", "version": "0" }), StatusCode::CONFLICT),
+    ];
+    for (key, values, status) in pastes {
+        let r = send(&router, post_as("/_zeyn/grid/edit", serde_json::json!({ "screen": "edit_list", "node": 0, "key": key, "values": values }), "tr")).await;
+        assert_eq!(r.status, status, "row {key}: {}", r.body);
+    }
+    let rows = store.0.read().unwrap().clone();
+    assert_eq!((rows[0].code.as_str(), rows[0].price), ("P-1", Money::tl(123_450)), "Turkish money as a spreadsheet copies it");
+    assert_eq!((rows[1].code.as_str(), rows[2].code.as_str(), rows[2].qty, rows[3].code.as_str()), ("C-02", "C-03", 3, "C-04"));
+}
+
+#[tokio::test]
+async fn grid_writes_count_against_the_write_limit() {
+    let store = Store::seeded();
+    let identity = writer_items();
+    let router = App::new("Test")
+        .service(store)
+        .write_limit(zeyn::RateLimit::per_user(2, std::time::Duration::from_secs(60)))
+        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .feature(Feature::new("items").screen(edit_list))
+        .router()
+        .unwrap();
+    let mut statuses = Vec::new();
+    for i in 1..=3 {
+        statuses.push(send(&router, edit(&i.to_string(), serde_json::json!({ "code": format!("W-{i}"), "version": "1" }))).await.status);
+    }
+    assert_eq!(statuses, [StatusCode::OK, StatusCode::OK, StatusCode::TOO_MANY_REQUESTS]);
+    let r = send(&router, post("/_zeyn/grid", serde_json::json!({ "screen": "edit_list", "node": 0 }))).await;
+    assert_eq!(r.status, StatusCode::OK, "reading rows is not a write");
+}

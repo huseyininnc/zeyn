@@ -1490,7 +1490,8 @@ async fn guard_request(State(st): State<Arc<AppState>>, req: axum::extract::Requ
         return problem(&ctx, Failure::App(Error::Forbidden));
     }
     let is_write = req.method() == axum::http::Method::POST
-        && (path == "/_zeyn/form" || path == "/_zeyn/mcp" || path.starts_with(&format!("{}/", st.api_prefix)));
+        && (matches!(path.as_str(), "/_zeyn/form" | "/_zeyn/mcp" | "/_zeyn/menu" | "/_zeyn/grid/edit" | "/_zeyn/grid/run" | "/_zeyn/grid/bulk")
+            || path.starts_with(&format!("{}/", st.api_prefix)));
     let limits = [(st.rate, "all"), (if is_write { st.write_rate } else { None }, "write")];
     for (limit, scope) in limits {
         let Some(limit) = limit else { continue };

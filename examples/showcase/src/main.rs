@@ -11,6 +11,7 @@ mod overview;
 mod people;
 mod sales;
 mod stock;
+mod wide;
 
 use std::time::Duration;
 use zeyn::prelude::*;

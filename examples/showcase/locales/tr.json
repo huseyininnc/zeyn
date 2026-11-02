@@ -99,7 +99,8 @@
     "check": "Kontrol et",
     "valid": "{name} için her şey geçerli.",
     "infinite": "Sonsuz kaydırma",
-    "compact": "Kısa listeler"
+    "compact": "Kısa listeler",
+    "wide": "Geniş tablo"
   },
   "Sample": {
     "full_name": "Ad soyad",

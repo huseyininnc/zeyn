@@ -1210,6 +1210,18 @@ th[aria-sort="descending"] .z-sort::after {
 .z-grid tbody tr.z-row-danger:hover > td,
 .z-grid tbody tr.z-row-success:hover > td { background: color-mix(in oklab, var(--z-hover) 50%, transparent); }
 
+/* Cell cursor, cell ranges, paste errors and column virtualization gaps. */
+
+.z-grid tbody td:focus { outline: 2px solid var(--z-accent); outline-offset: -2px; }
+
+.z-grid tbody tr:has(> td:focus) > td { background: var(--z-brand-subtle); }
+
+.z-grid tbody tr > td[aria-selected="true"] { background: color-mix(in oklab, var(--z-accent) 18%, var(--z-surface)); }
+
+.z-grid tbody tr > td[aria-invalid="true"] { box-shadow: inset 0 -2px 0 var(--z-danger); }
+
+.z-grid .z-col-gap { padding: 0; }
+
 /* Grouping and trees: group header rows, indented tree cells and "Load more" rows. */
 
 .z-grid tbody tr.z-group:nth-child(n) > td { background: var(--z-surface-2); }

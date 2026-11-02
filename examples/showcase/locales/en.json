@@ -99,7 +99,8 @@
     "check": "Check",
     "valid": "Everything is valid for {name}.",
     "infinite": "Infinite scroll",
-    "compact": "Short lists"
+    "compact": "Short lists",
+    "wide": "Wide grid"
   },
   "Sample": {
     "full_name": "Full name",
