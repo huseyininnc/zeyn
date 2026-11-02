@@ -150,7 +150,7 @@ document.addEventListener('submit', async (e) => {
   const form = e.target;
   if (!(form instanceof HTMLFormElement) || !form.matches('form[data-zeyn-reason]') || form.closest('dialog.z-reason-dialog')) return;
   e.preventDefault();
-  if (await sendReason(form, form.dataset.zeynReason)) location.reload();
+  if (await sendReason(form, form.dataset.zeynReason) && document.dispatchEvent(new CustomEvent('zeyn:refresh', { cancelable: true }))) location.reload();
 });
 
 /**

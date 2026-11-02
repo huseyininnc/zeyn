@@ -3,7 +3,8 @@
  *
  * Links inside the app load only the screen (`x-zeyn-partial: 1`) and swap the contents of
  * `#z-main`, the page title and the current menu item, without a full page load. History, the
- * back and forward buttons, new tabs and modified clicks keep working as normal links. Anything
+ * back and forward buttons, new tabs and modified clicks keep working as normal links. Before a
+ * screen is swapped, `zeyn:leave` lets other scripts close windows and popups. Anything
  * the server does not answer with a partial screen (errors, redirects to a login page, other apps)
  * falls back to a normal page load.
  */
@@ -46,6 +47,7 @@ async function visit(url, push) {
     location.assign(url.href);
     return;
   }
+  document.dispatchEvent(new CustomEvent('zeyn:leave'));
   controller?.abort();
   controller = new AbortController();
   main.setAttribute('aria-busy', 'true');
@@ -82,12 +84,68 @@ document.addEventListener('click', (e) => {
   if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
   const a = e.target.closest('a[href]');
   if (!a || a.target || a.hasAttribute('download') || a.hasAttribute('data-zeyn-reload')) return;
-  if (a.closest('dialog')) return;
   const url = new URL(a.href, location.href);
   if (!isScreenUrl(url)) return;
   if (url.pathname === location.pathname && url.search === location.search && url.hash) return;
   e.preventDefault();
   visit(url, true);
+});
+
+/**
+ * Reloads the whole app frame (menu, screen, title, language, page metadata) without a page load,
+ * after something that changes more than the screen, such as the language or the time zone.
+ */
+async function refreshPage() {
+  let res;
+  try {
+    res = await fetch(location.href, { credentials: 'same-origin' });
+  } catch {
+    location.reload();
+    return;
+  }
+  const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+  const next = doc.querySelector('.z-app');
+  const current = document.querySelector('.z-app');
+  if (!res.ok || !next || !current) {
+    location.reload();
+    return;
+  }
+  document.documentElement.lang = doc.documentElement.lang;
+  if (doc.documentElement.dir) document.documentElement.dir = doc.documentElement.dir;
+  else document.documentElement.removeAttribute('dir');
+  document.title = doc.title;
+  for (const meta of doc.querySelectorAll('head meta[name]')) {
+    const old = document.head.querySelector(`meta[name="${CSS.escape(meta.name)}"]`);
+    if (old) old.content = meta.content;
+    else document.head.append(document.importNode(meta, true));
+  }
+  const app = document.importNode(next, true);
+  current.replaceWith(app);
+  markCurrent(new URL(location.href));
+  document.dispatchEvent(new CustomEvent('zeyn:content', { detail: app }));
+}
+
+/**
+ * Other scripts ask for navigation with events instead of loading pages themselves:
+ * `zeyn:navigate` (`detail.url`, `detail.replace`) loads a screen, `zeyn:refresh` reloads the
+ * current one in place and `zeyn:refresh-page` the whole app frame. Each event is canceled when
+ * handled, so a sender without this script can fall back to a page load.
+ */
+document.addEventListener('zeyn:navigate', (e) => {
+  const url = new URL(e.detail?.url ?? location.href, location.href);
+  if (url.origin !== location.origin) return;
+  e.preventDefault();
+  visit(url, !e.detail?.replace);
+});
+
+document.addEventListener('zeyn:refresh', (e) => {
+  e.preventDefault();
+  visit(new URL(location.href), false);
+});
+
+document.addEventListener('zeyn:refresh-page', (e) => {
+  e.preventDefault();
+  refreshPage();
 });
 
 window.addEventListener('popstate', () => {

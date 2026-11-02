@@ -204,9 +204,11 @@ async function runEffect(effect, source) {
   switch (effect?.effect) {
     case 'open_window':
       return openWindow(effect.screen, effect.params, source);
-    case 'navigate':
-      location.assign(`${BASE}/_zeyn/route/${encodeURIComponent(effect.screen)}${paramsQuery(effect.params)}`);
+    case 'navigate': {
+      const url = `${BASE}/_zeyn/route/${encodeURIComponent(effect.screen)}${paramsQuery(effect.params)}`;
+      if (!ask('zeyn:navigate', { url })) location.assign(url);
       return;
+    }
     case 'toast':
       return toast(effect.message ?? '');
     case 'close_and_refresh':
@@ -214,6 +216,14 @@ async function runEffect(effect, source) {
     default:
       document.dispatchEvent(new CustomEvent('zeyn:effect', { detail: { effect, source, run: (next) => runEffect(next, source) } }));
   }
+}
+
+/**
+ * Sends a cancelable request event to nav.js (`zeyn:navigate`, `zeyn:refresh`,
+ * `zeyn:refresh-page`). Returns whether it was handled; when not, the caller loads the page.
+ */
+function ask(name, detail = {}) {
+  return !document.dispatchEvent(new CustomEvent(name, { detail, cancelable: true }));
 }
 
 /** Runs effects in order. */
@@ -2911,13 +2921,13 @@ function exportGrid(button) {
 /** Stores the chosen language with `POST /_zeyn/locale` and reloads the page. */
 async function changeLocale(select) {
   const r = await post(BASE + '/_zeyn/locale', { locale: select.value });
-  if (r.ok) location.reload();
+  if (r.ok && !ask('zeyn:refresh-page')) location.reload();
 }
 
 /** Stores a hand picked time zone (`""` = automatic) with `POST /_zeyn/timezone` and reloads. */
 async function changeTimeZone(select) {
   const r = await post(BASE + '/_zeyn/timezone', { zone: select.value });
-  if (r.ok) location.reload();
+  if (r.ok && !ask('zeyn:refresh-page')) location.reload();
 }
 
 /** Reads the page cookies into an object. */
@@ -3306,6 +3316,10 @@ syncTimeZone();
 setInterval(() => relativeTimes(document), 60_000);
 initGrids(document);
 syncAgentTools();
+
+document.addEventListener('zeyn:leave', () => {
+  for (const d of dialogs.slice().reverse()) finishDialog(d.dialog);
+});
 
 document.addEventListener('zeyn:content', (e) => {
   initGrids(e.detail);

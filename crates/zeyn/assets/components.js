@@ -2380,6 +2380,7 @@ document.addEventListener('scroll', (e) => popup && !popup.panel.contains(e.targ
 NARROW.addEventListener('change', placePopup);
 window.addEventListener('hashchange', () => restoreTabs(document));
 
+document.addEventListener('zeyn:leave', () => closePopup(false));
 document.addEventListener('zeyn:content', (e) => init(e.detail instanceof Element ? e.detail : document));
 
 new MutationObserver((records) => {
