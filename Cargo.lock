@@ -544,6 +544,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "zeyn-example-adisyon"
+version = "0.0.0"
+dependencies = [
+ "axum",
+ "http-body-util",
+ "tokio",
+ "tower",
+ "zeyn",
+]
+
+[[package]]
 name = "zeyn-example-big-grid"
 version = "0.0.0"
 dependencies = [

@@ -1,0 +1,49 @@
+{
+  "app": { "name": "Adisyon" },
+  "floor": { "title": "Floor", "free": "Free tables", "busy": "Busy tables", "open_total": "Open bills" },
+  "orders": {
+    "menu": "Service",
+    "menu_tabs": "Menu",
+    "title": "Order: {table}",
+    "remove": "Remove",
+    "send": "Send to kitchen",
+    "sent": "{n} portions sent to the kitchen.",
+    "out_of_stock": "{item} is out of stock.",
+    "already_sent": "This line is already in the kitchen.",
+    "nothing_to_send": "There is nothing new to send."
+  },
+  "kitchen": { "menu": "Kitchen", "title": "Kitchen display", "ready": "Ready" },
+  "menu": { "menu": "Menu", "list": "Menu and stock" },
+  "pay": {
+    "open": "Payment",
+    "title": "Payment: {table}",
+    "total": "Total",
+    "submit": "Close the bill",
+    "done": "Bill closed. Change: {change}",
+    "nothing_to_pay": "This table has no open bill.",
+    "send_first": "Send every line to the kitchen before closing the bill.",
+    "not_enough": "The cash received is less than the total ({total})."
+  },
+  "reports": { "menu": "Reports", "title": "Sales", "by_category": "Revenue by category", "revenue": "Revenue" },
+  "MenuItem": { "id": "No", "name": "Item", "category": "Category", "price": "Price", "stock": "Portions left", "active": "On the menu" },
+  "Category": { "Soups": "Soups", "Mains": "Mains", "Desserts": "Desserts", "Drinks": "Drinks" },
+  "DiningTable": { "id": "No", "name": "Table", "seats": "Seats", "status": "Status", "open_total": "Open bill" },
+  "TableStatus": { "Free": "Free", "Ordering": "Ordering", "Kitchen": "In the kitchen", "Served": "Served" },
+  "OrderLine": {
+    "id": "No",
+    "table": "Table",
+    "table_name": "Table",
+    "item_id": "Item no",
+    "item": "Item",
+    "quantity": "Portions",
+    "unit_price": "Unit price",
+    "amount": "Amount",
+    "status": "Status",
+    "ordered": "Ordered"
+  },
+  "LineStatus": { "New": "New", "Sent": "In the kitchen", "Ready": "Ready" },
+  "AddItem": { "table": "Table", "item": "Item" },
+  "Payment": { "table": "Table", "method": "Method", "received": "Received" },
+  "PaymentMethod": { "Cash": "Cash", "Card": "Card" },
+  "Sale": { "id": "No", "table": "Table", "at": "Closed at", "method": "Method", "items": "Portions", "total": "Total" }
+}

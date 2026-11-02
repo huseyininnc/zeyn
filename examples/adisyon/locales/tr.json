@@ -1,0 +1,49 @@
+{
+  "app": { "name": "Adisyon" },
+  "floor": { "title": "Salon", "free": "Boş masa", "busy": "Dolu masa", "open_total": "Açık hesaplar" },
+  "orders": {
+    "menu": "Servis",
+    "menu_tabs": "Menü",
+    "title": "Sipariş: {table}",
+    "remove": "Çıkar",
+    "send": "Mutfağa gönder",
+    "sent": "{n} porsiyon mutfağa gönderildi.",
+    "out_of_stock": "{item} tükendi.",
+    "already_sent": "Bu satır zaten mutfakta.",
+    "nothing_to_send": "Gönderilecek yeni bir şey yok."
+  },
+  "kitchen": { "menu": "Mutfak", "title": "Mutfak ekranı", "ready": "Hazır" },
+  "menu": { "menu": "Menü", "list": "Menü ve stok" },
+  "pay": {
+    "open": "Ödeme",
+    "title": "Ödeme: {table}",
+    "total": "Toplam",
+    "submit": "Hesabı kapat",
+    "done": "Hesap kapandı. Para üstü: {change}",
+    "nothing_to_pay": "Bu masanın açık hesabı yok.",
+    "send_first": "Hesabı kapatmadan önce tüm satırları mutfağa gönderin.",
+    "not_enough": "Alınan nakit toplamdan az ({total})."
+  },
+  "reports": { "menu": "Raporlar", "title": "Satışlar", "by_category": "Kategoriye göre ciro", "revenue": "Ciro" },
+  "MenuItem": { "id": "No", "name": "Ürün", "category": "Kategori", "price": "Fiyat", "stock": "Kalan porsiyon", "active": "Menüde" },
+  "Category": { "Soups": "Çorbalar", "Mains": "Ana yemekler", "Desserts": "Tatlılar", "Drinks": "İçecekler" },
+  "DiningTable": { "id": "No", "name": "Masa", "seats": "Kişi", "status": "Durum", "open_total": "Açık hesap" },
+  "TableStatus": { "Free": "Boş", "Ordering": "Sipariş alınıyor", "Kitchen": "Mutfakta", "Served": "Servis edildi" },
+  "OrderLine": {
+    "id": "No",
+    "table": "Masa",
+    "table_name": "Masa",
+    "item_id": "Ürün no",
+    "item": "Ürün",
+    "quantity": "Porsiyon",
+    "unit_price": "Birim fiyat",
+    "amount": "Tutar",
+    "status": "Durum",
+    "ordered": "Sipariş zamanı"
+  },
+  "LineStatus": { "New": "Yeni", "Sent": "Mutfakta", "Ready": "Hazır" },
+  "AddItem": { "table": "Masa", "item": "Ürün" },
+  "Payment": { "table": "Masa", "method": "Ödeme şekli", "received": "Alınan" },
+  "PaymentMethod": { "Cash": "Nakit", "Card": "Kart" },
+  "Sale": { "id": "No", "table": "Masa", "at": "Kapanış", "method": "Ödeme şekli", "items": "Porsiyon", "total": "Toplam" }
+}
