@@ -1364,6 +1364,11 @@ fn valid_token(t: &str) -> bool {
     t.len() == 64 && t.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
+/// Most tenants whose license is kept in memory. The tenant may come from a header or the host
+/// name, so a client can make ids up; when the cache is full, stale entries go first and, if every
+/// entry is fresh, the cache starts over.
+const MAX_LICENSES: usize = 4096;
+
 impl AppState {
     /// URL of an app path, with the base path in front.
     fn url(&self, path: &str) -> String {
@@ -1425,6 +1430,12 @@ impl AppState {
             }
         };
         if let Ok(mut c) = self.licenses.lock() {
+            if c.len() >= MAX_LICENSES && !c.contains_key(&key) {
+                c.retain(|_, (at, _)| at.elapsed() < *refresh);
+                if c.len() >= MAX_LICENSES {
+                    c.clear();
+                }
+            }
             c.insert(key, (Instant::now(), license.clone()));
         }
         ctx.with_license(license)

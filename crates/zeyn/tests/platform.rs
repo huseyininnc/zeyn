@@ -435,3 +435,33 @@ async fn themes_are_served_as_a_stylesheet_and_reject_css_injection() {
     assert_eq!(get(&evil, "/_zeyn/theme.css", &[]).await.2.trim(), "");
     assert_eq!(get(&evil, "/favicon.ico", &[]).await.0, StatusCode::NO_CONTENT);
 }
+
+struct Counting(Arc<AtomicUsize>);
+
+impl LicenseSource for Counting {
+    fn load(&self, _tenant: Option<&Tenant>) -> BoxFuture<Result<Option<License>, String>> {
+        self.0.fetch_add(1, Ordering::SeqCst);
+        Box::pin(async { Ok(Some(license((2026, 12, 31), &[]))) })
+    }
+}
+
+#[tokio::test]
+async fn the_license_cache_is_capped_when_tenants_come_from_a_header() {
+    let calls = Arc::new(AtomicUsize::new(0));
+    let r = App::new("POS")
+        .fixed_now(DateTime::parse("2026-11-02T10:00:00Z").unwrap())
+        .license(Counting(calls.clone()), Duration::from_secs(3600))
+        .tenancy(HeaderTenant("x-tenant"))
+        .feature(Feature::new("pos").guard(Licensed::any()).screen(pos))
+        .router()
+        .unwrap();
+    get(&r, "/pos", &[("x-tenant", "acme")]).await;
+    get(&r, "/pos", &[("x-tenant", "acme")]).await;
+    assert_eq!(calls.load(Ordering::SeqCst), 1, "a cached license is not loaded again");
+    for i in 0..4096 {
+        get(&r, "/pos", &[("x-tenant", &format!("t{i}"))]).await;
+    }
+    let before = calls.load(Ordering::SeqCst);
+    get(&r, "/pos", &[("x-tenant", "acme")]).await;
+    assert_eq!(calls.load(Ordering::SeqCst), before + 1, "made up tenants filled the cache, so it started over");
+}
