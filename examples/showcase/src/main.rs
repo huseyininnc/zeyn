@@ -82,6 +82,7 @@ async fn main() -> std::io::Result<()> {
         .i18n(i18n)
         .service(stock::ProductStore::seeded())
         .service(islands::CounterStore::default())
+        .service(islands::DiagramStore::default())
         .datagrid_views(MemoryViewStore::default())
         .service(people::LeaveStore::seeded(TimeZone::UTC.today(DateTime::now())))
         .auth(DevAuth::superuser("Demo User"))

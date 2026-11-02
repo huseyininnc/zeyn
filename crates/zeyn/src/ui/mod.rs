@@ -18,7 +18,7 @@ mod widgets;
 #[cfg(feature = "islands")]
 mod island;
 #[cfg(feature = "islands")]
-pub use island::{Island, IslandLoad, Remote};
+pub use island::{Canvas, Island, IslandLoad, Remote};
 #[cfg(feature = "islands")]
 pub(crate) use island::MARKER as ISLAND_MARKER;
 

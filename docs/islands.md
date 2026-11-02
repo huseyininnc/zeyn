@@ -148,7 +148,46 @@ between island and plain screens stays in place.
 The server finds islands by the attribute `data-zeyn-island="`; escaped user data can never
 produce the quote, so text typed by a user cannot turn the policy on.
 
-## 7. Performance
+## 7. Canvas surfaces
+
+`zeyn::ui::Canvas::new(name, description)` is an island for drawing. The description is required:
+a canvas is invisible to assistive technology, so the page must say what it shows and which keys
+operate it. The server renders it as a paragraph above the island and points the placeholder's
+`aria-describedby` at it.
+
+On the island side, `zeyn-island` with the `canvas` feature provides `canvas::Surface`:
+
+```rust
+let surface = Surface::new(&stage, Editor::new(..), Prefer::TwoD, &texts.canvas, &described_by, 420)?;
+surface.update(|editor| editor.add_box());   // change the scene, draw on the next frame
+```
+
+| Concern | What the surface does |
+|---|---|
+| Graphics | `Prefer::Gl` tries WebGL 2 and falls back to 2D; `webgpu_available()` tells whether `navigator.gpu` exists for scenes that set up WebGPU on `surface.canvas()` themselves |
+| High DPI | The backing store follows `devicePixelRatio` and the element size (a `ResizeObserver`); 2D drawing is pre scaled, so the scene works in CSS pixels |
+| Input | Pointer down, move and up (with pointer capture), wheel (line and page deltas turned into pixels) and keys, as `Input` values in CSS pixels |
+| Frames | `requestAnimationFrame` only after an input the scene used, an `update`, a resize, or while `Scene::animating` returns `true`. A still picture costs no CPU |
+| Defaults | An input the scene uses has its default prevented (arrows do not scroll the page); return `false` for Tab so focus can leave |
+| Clean up | `destroy()` removes listeners, the observer and the canvas; call it from `unmount` |
+
+The canvas gets `tabindex="0"`, `role="application"`, the label and `aria-describedby`.
+
+Accessibility pattern, as in the showcase diagram editor (`examples/showcase/islands/diagram`):
+
+- **Keyboard on the canvas:** `]` and `[` select shapes, arrows move them, Delete removes, `+`,
+  `-` and `0` zoom, Escape clears the selection. Keys only act while the canvas has focus.
+- **Ordinary controls:** a toolbar of buttons does the same without the canvas.
+- **Text summary:** a list under the canvas describes every shape and follows each change; a
+  `role="status"` line announces the selection and save results.
+- **Fallback:** the server renders the same summary, so users without WebAssembly still read the
+  diagram.
+
+The editor saves through `SaveDiagram`, and the server clamps what it receives
+(`Diagram::clamped`: at most 200 shapes, unique ids, labels of 40 characters, bounded coordinates)
+because the island is never trusted.
+
+## 8. Performance
 
 | What | Number |
 |---|---|
@@ -157,12 +196,14 @@ produce the quote, so text typed by a user cannot turn the policy on.
 | `/_zeyn/islands.js` loader, island pages only | 3.9 KB, 1.7 KB gzip |
 | Counter island `.wasm` (no wasm-opt) | 127.6 KB, 52.8 KB gzip |
 | Counter island glue `.js` | 18.0 KB, 4.2 KB gzip |
+| Diagram editor `.wasm` (canvas surface, no wasm-opt) | 169.4 KB, 67.8 KB gzip |
+| Diagram editor glue `.js` | 30.3 KB, 6.1 KB gzip |
 | Server memory per island | none; files stream from disk, props are rendered per request |
 
 Most of the counter's size is `serde_json` and the formatting code of `core`. Islands that share
 those pay for them once each; wasm-opt usually takes another 10 to 20 percent off.
 
-## 8. Limits
+## 9. Limits
 
 - An island inside a window (`open_window`) needs the opener page to hold the island policy; place
   windows with islands on island pages or open them as screens.

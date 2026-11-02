@@ -347,7 +347,21 @@
     "less": "Azalt",
     "more": "Artır",
     "save": "Kaydet",
-    "saved": "Kaydedildi: {value}"
+    "saved": "Kaydedildi: {value}",
+    "diagram": "Diyagram düzenleyici",
+    "diagram_help": "İşaretçiyle ya da klavyeyle düzenlenebilen bir süreç diyagramı. Bir şekli taşımak için sürükleyin, kaydırmak için arka planı sürükleyin, yakınlaştırmak için tekerleği kullanın. Tuval odaktayken: ] ve [ sonraki ya da önceki şekli seçer, ok tuşları onu taşır (Shift ile 10 piksel), Delete siler, artı, eksi ve 0 yakınlaştırır, Escape seçimi kaldırır. Araç çubuğundaki düğmeler de aynısını yapar; tuvalin altındaki liste her şekli anlatır.",
+    "add_box": "Kutu ekle",
+    "add_ellipse": "Elips ekle",
+    "remove": "Seçileni sil",
+    "next": "Sonrakini seç",
+    "tools": "Diyagram araçları",
+    "summary": "Şekiller",
+    "empty": "Diyagram boş.",
+    "selected": "Seçildi: {shape}",
+    "kind_box": "Kutu",
+    "kind_ellipse": "Elips",
+    "line": "{kind} \"{label}\", konum {x}, {y}, boyut {w} x {h}",
+    "diagram_saved": "{count} şekil kaydedildi."
   },
   "assistant": {
     "title": "Asistan",

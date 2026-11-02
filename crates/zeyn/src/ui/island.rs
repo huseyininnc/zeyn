@@ -32,6 +32,35 @@ pub enum IslandLoad {
     Idle,
 }
 
+/// A drawing surface: an island whose code draws on a `<canvas>` with
+/// `zeyn_island::canvas::Surface` (2D, or WebGL 2 when available).
+///
+/// A canvas is invisible to assistive technology, so the description is required: say what the
+/// picture shows and which keys operate it. The fallback should be the keyboard and screen reader
+/// alternative, such as a text summary or a form over the same data; it is what users without
+/// WebAssembly get too.
+///
+/// ```
+/// use zeyn::prelude::*;
+/// use zeyn::ui::Canvas;
+/// use zeyn::{Component, I18n, Render};
+///
+/// let canvas = Canvas::new("diagram", "Arrow keys move the selected shape.").label("Diagram");
+/// let mut html = String::new();
+/// canvas.render(&mut html, &Render::new("d", "en", I18n::builtin()));
+/// assert!(html.contains(r#"aria-describedby="d-island-description-""#));
+/// assert!(html.contains("Arrow keys move the selected shape."));
+/// ```
+pub struct Canvas;
+
+impl Canvas {
+    /// A canvas island named `name` (its crate's library name) with its description.
+    #[allow(clippy::new_ret_no_self)]
+    pub fn new(name: &'static str, description: impl Into<Text>) -> Island {
+        Island::new(name).description(description)
+    }
+}
+
 /// A Rust component compiled to WebAssembly, built with `zeyn build-islands`.
 ///
 /// `name` is the island crate's library name. Props are any serde type, usually from a crate the

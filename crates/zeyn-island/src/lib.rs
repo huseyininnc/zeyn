@@ -47,6 +47,8 @@ mod client;
 pub use client::Island;
 #[cfg(feature = "client")]
 pub use wasm_bindgen_futures::spawn_local as spawn;
+#[cfg(feature = "canvas")]
+pub mod canvas;
 
 /// A server action an island may call, declared once in a crate both sides share.
 ///

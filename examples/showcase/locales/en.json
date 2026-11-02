@@ -347,7 +347,21 @@
     "less": "Less",
     "more": "More",
     "save": "Save",
-    "saved": "Saved: {value}"
+    "saved": "Saved: {value}",
+    "diagram": "Diagram editor",
+    "diagram_help": "A process diagram you can edit with a pointer or the keyboard. Drag a shape to move it, drag the background to pan and use the wheel to zoom. With the canvas focused: ] and [ select the next or previous shape, arrow keys move it (Shift moves 10 pixels), Delete removes it, plus, minus and 0 zoom, Escape clears the selection. The toolbar buttons do the same, and the list under the canvas describes every shape.",
+    "add_box": "Add box",
+    "add_ellipse": "Add ellipse",
+    "remove": "Remove selected",
+    "next": "Select next",
+    "tools": "Diagram tools",
+    "summary": "Shapes",
+    "empty": "The diagram is empty.",
+    "selected": "Selected: {shape}",
+    "kind_box": "Box",
+    "kind_ellipse": "Ellipse",
+    "line": "{kind} \"{label}\" at {x}, {y}, {w} by {h}",
+    "diagram_saved": "Saved {count} shapes."
   },
   "assistant": {
     "title": "Assistant",
