@@ -14,7 +14,7 @@ pub struct NoteParams {
 pub fn note_list() -> Screen {
     Screen::new(t!("notes.list"))
         .toolbar(|t| {
-            t.button(t!("notes.new")).icon(Icon::Plus).shortcut("Ctrl+N").opens(note_editor, NoteParams { id: None })
+            t.button(t!("notes.new")).icon(Icon::Plus).shortcut("Alt+N").opens(note_editor, NoteParams { id: None })
         })
         .body(
             DataGrid::auto(search_notes)

@@ -529,6 +529,7 @@ struct ButtonSpec {
     label: Text,
     icon: Option<Icon>,
     shortcut: Option<String>,
+    override_browser: bool,
     effect: Option<Effect>,
 }
 
@@ -546,7 +547,10 @@ pub struct Toolbar {
 
 impl Toolbar {
     pub fn button(self, label: impl Into<Text>) -> ToolButton {
-        ToolButton { bar: self, spec: ButtonSpec { label: label.into(), icon: None, shortcut: None, effect: None } }
+        ToolButton {
+            bar: self,
+            spec: ButtonSpec { label: label.into(), icon: None, shortcut: None, override_browser: false, effect: None },
+        }
     }
 
     /// Export button for the grid on this screen.
@@ -566,8 +570,8 @@ impl Toolbar {
                         r#"<button type="button" class="z-button" data-testid="{scope}.toolbar.{}""#,
                         slug(&english)
                     ));
-                    if let Some(s) = &b.shortcut {
-                        out.push_str(&format!(r#" aria-keyshortcuts="{}""#, crate::render::escape(&s.replace("Ctrl", "Control"))));
+                    if let Some(keys) = b.shortcut.as_deref().and_then(|s| crate::command::usable_shortcut(s, b.override_browser)) {
+                        out.push_str(&format!(r#" aria-keyshortcuts="{}""#, crate::render::escape(&keys)));
                     }
                     if let Some(e) = &b.effect {
                         out.push_str(&format!(r#" data-zeyn-effect="{}""#, attr(e)));
@@ -618,9 +622,17 @@ impl ToolButton {
         self
     }
 
-    /// Keyboard shortcut such as `"Ctrl+N"`.
+    /// Keyboard shortcut such as `"Alt+N"`. Shortcuts the browser uses (`Ctrl+P`, `Ctrl+S`,
+    /// `F5`, ...) are not bound unless the button calls [`ToolButton::override_browser`]; ones the
+    /// browser never passes on (`Ctrl+N`, `Ctrl+T`, `Ctrl+W`) are never bound. Both are logged.
     pub fn shortcut(mut self, keys: impl Into<String>) -> Self {
         self.spec.shortcut = Some(keys.into());
+        self
+    }
+
+    /// Takes over a shortcut the browser uses, on purpose.
+    pub fn override_browser(mut self) -> Self {
+        self.spec.override_browser = true;
         self
     }
 

@@ -35,7 +35,7 @@ Feature::new("pro").command(new_product()).command(restock())
 
 ## The command palette
 
-**Ctrl+Shift+P** or **F1** opens the palette: an ARIA combobox that searches the app's commands, the toolbar and context menu of the current screen and the screens of the menu. Recently used commands come first.
+**Alt+Shift+P** opens the palette by default (`App::palette_shortcut` changes it, also to a browser key such as `Ctrl+Shift+P` on purpose): an ARIA combobox that searches the app's commands, the toolbar and context menu of the current screen and the screens of the menu. Recently used commands come first.
 
 A feature can add a server search to it. As the user types, the palette calls the action and lists its hits under the commands; choosing one opens the page in place. This site searches its own pages that way:
 

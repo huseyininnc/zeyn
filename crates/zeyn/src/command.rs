@@ -67,8 +67,146 @@ use crate::screen::{Effect, Icon, RowCall, ScreenDef, Window};
 use serde_json::{Value as Json, json};
 use std::sync::Arc;
 
-/// Shortcuts the runtime keeps for itself: they open the command palette.
-pub const RESERVED_SHORTCUTS: [&str; 2] = ["Control+Shift+P", "F1"];
+/// The default shortcut of the command palette. It is free in every common browser; apps can
+/// choose another with `App::palette_shortcut`.
+pub const PALETTE_SHORTCUT: &str = "Alt+Shift+P";
+
+/// Old name of the palette's shortcut list.
+#[deprecated(
+    since = "0.0.3",
+    note = "the palette shortcut is now `PALETTE_SHORTCUT` and can be changed with `App::palette_shortcut`"
+)]
+pub const RESERVED_SHORTCUTS: [&str; 1] = [PALETTE_SHORTCUT];
+
+/// Shortcuts browsers keep for themselves and never pass to a page: new window, new tab, close
+/// tab, switch tab, quit. A command or button with one of them would never run.
+pub const BROWSER_RESERVED: &[&str] = &[
+    "Control+N",
+    "Control+Shift+N",
+    "Control+T",
+    "Control+Shift+T",
+    "Control+W",
+    "Control+Shift+W",
+    "Control+Tab",
+    "Control+Shift+Tab",
+    "Alt+F4",
+    "Meta+N",
+    "Meta+Shift+N",
+    "Meta+T",
+    "Meta+Shift+T",
+    "Meta+W",
+    "Meta+Shift+W",
+    "Meta+Q",
+];
+
+/// Shortcuts a page can take over, but that people expect to do their browser's or the text
+/// field's job: print, save, find, address bar, history, downloads, reload, zoom, developer
+/// tools, copy and paste. Zeyn never binds them unless a command or button opts in with
+/// `override_browser()`.
+pub const BROWSER_DEFAULTS: &[&str] = &[
+    "Control+A",
+    "Control+C",
+    "Control+D",
+    "Control+E",
+    "Control+F",
+    "Control+G",
+    "Control+H",
+    "Control+J",
+    "Control+K",
+    "Control+L",
+    "Control+O",
+    "Control+P",
+    "Control+R",
+    "Control+S",
+    "Control+U",
+    "Control+V",
+    "Control+X",
+    "Control+Y",
+    "Control+Z",
+    "Control+Shift+A",
+    "Control+Shift+B",
+    "Control+Shift+C",
+    "Control+Shift+Delete",
+    "Control+Shift+E",
+    "Control+Shift+G",
+    "Control+Shift+I",
+    "Control+Shift+J",
+    "Control+Shift+K",
+    "Control+Shift+M",
+    "Control+Shift+O",
+    "Control+Shift+P",
+    "Control+Shift+R",
+    "Control+Shift+Z",
+    "Control+=",
+    "Control+-",
+    "Control+0",
+    "Control+1",
+    "Control+2",
+    "Control+3",
+    "Control+4",
+    "Control+5",
+    "Control+6",
+    "Control+7",
+    "Control+8",
+    "Control+9",
+    "Alt+D",
+    "Alt+Home",
+    "Alt+ArrowLeft",
+    "Alt+ArrowRight",
+    "F1",
+    "F3",
+    "F5",
+    "F6",
+    "F7",
+    "F10",
+    "F11",
+    "F12",
+    "Shift+F5",
+    "Control+F5",
+];
+
+/// How a shortcut collides with the browser.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BrowserShortcut {
+    /// The browser never passes it to the page.
+    Reserved,
+    /// The page can take it over, but only on purpose.
+    Default,
+}
+
+/// Whether a normalized shortcut (see [`normalize_shortcut`]) belongs to the browser.
+///
+/// ```
+/// use zeyn::{BrowserShortcut, browser_shortcut};
+/// assert_eq!(browser_shortcut("Control+N"), Some(BrowserShortcut::Reserved));
+/// assert_eq!(browser_shortcut("Control+P"), Some(BrowserShortcut::Default));
+/// assert_eq!(browser_shortcut("Alt+Shift+P"), None);
+/// ```
+pub fn browser_shortcut(keys: &str) -> Option<BrowserShortcut> {
+    if BROWSER_RESERVED.contains(&keys) {
+        Some(BrowserShortcut::Reserved)
+    } else if BROWSER_DEFAULTS.contains(&keys) {
+        Some(BrowserShortcut::Default)
+    } else {
+        None
+    }
+}
+
+/// The shortcut to bind, or `None` with the reason in the log when the browser keeps it.
+pub(crate) fn usable_shortcut(raw: &str, override_browser: bool) -> Option<String> {
+    let keys = normalize_shortcut(raw)?;
+    match browser_shortcut(&keys) {
+        Some(BrowserShortcut::Reserved) => {
+            tracing::warn!(shortcut = %keys, "the browser keeps this shortcut and never passes it to the page; it is not bound");
+            None
+        }
+        Some(BrowserShortcut::Default) if !override_browser => {
+            tracing::warn!(shortcut = %keys, "this shortcut belongs to the browser; call override_browser() to take it over");
+            None
+        }
+        _ => Some(keys),
+    }
+}
 
 type Run = Arc<dyn Fn(Ctx) -> BoxFuture<crate::action::Result<()>> + Send + Sync>;
 
@@ -87,6 +225,7 @@ pub struct Command {
     id: &'static str,
     label: Text,
     shortcut: Option<String>,
+    override_browser: bool,
     icon: Option<Icon>,
     access: Access,
     kind: Kind,
@@ -129,13 +268,20 @@ impl Command {
     }
 
     fn with(id: &'static str, label: Text, access: Access, kind: Kind) -> Self {
-        Self { id, label, shortcut: None, icon: None, access, kind }
+        Self { id, label, shortcut: None, override_browser: false, icon: None, access, kind }
     }
 
     /// Keyboard shortcut such as `"Ctrl+Shift+O"` or `"Alt+F2"`. `App::check` reports shortcuts
     /// that cannot be read, that two commands share or that the palette keeps for itself.
     pub fn shortcut(mut self, keys: impl Into<String>) -> Self {
         self.shortcut = Some(keys.into());
+        self
+    }
+
+    /// Lets the shortcut take over one the browser uses (see [`BROWSER_DEFAULTS`]), such as
+    /// `Ctrl+P`. Shortcuts the browser never passes on ([`BROWSER_RESERVED`]) stay refused.
+    pub fn override_browser(mut self) -> Self {
+        self.override_browser = true;
         self
     }
 
@@ -186,7 +332,7 @@ impl Command {
             Kind::Effect(e) => out.push_str(&format!(r#" data-zeyn-effect="{}""#, attr(&e.to_json(r)))),
             Kind::Action { .. } => out.push_str(&format!(r#" data-zeyn-command-run="{}""#, escape(self.id))),
         }
-        if let Some(keys) = self.shortcut.as_deref().and_then(normalize_shortcut) {
+        if let Some(keys) = self.shortcut.as_deref().and_then(|s| usable_shortcut(s, self.override_browser)) {
             out.push_str(&format!(r#" aria-keyshortcuts="{}""#, escape(&keys)));
         }
         out
@@ -301,7 +447,7 @@ fn character_only(keys: &str) -> bool {
 /// Problems of commands that belong together: ids that are not usable, ids or shortcuts used
 /// twice, shortcuts that cannot be read, single character shortcuts and shortcuts the palette
 /// keeps for itself. `owner` names where each command was registered, for the message.
-pub(crate) fn problems(commands: &[(&str, &Command)], check_each: bool) -> Vec<String> {
+pub(crate) fn problems(commands: &[(&str, &Command)], check_each: bool, palette: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut seen: Vec<(String, &str, &str)> = Vec::new();
     for (i, (owner, c)) in commands.iter().enumerate() {
@@ -329,11 +475,24 @@ pub(crate) fn problems(commands: &[(&str, &Command)], check_each: bool) -> Vec<S
             continue;
         };
         if check_each {
-            if RESERVED_SHORTCUTS.contains(&keys.as_str()) {
+            if keys == palette {
                 out.push(format!(
                     "command `{}` uses `{keys}`, which opens the command palette\n  = help: pick another shortcut; the palette lists the command anyway",
                     c.id
                 ));
+            }
+            match browser_shortcut(&keys) {
+                Some(BrowserShortcut::Reserved) => out.push(format!(
+                    "command `{}` uses `{keys}`, which the browser keeps and never passes to the page\n  = help: pick a free shortcut such as `Alt+Shift+{}`",
+                    c.id,
+                    keys.rsplit('+').next().unwrap_or("")
+                )),
+                Some(BrowserShortcut::Default) if !c.override_browser => out.push(format!(
+                    "command `{}` uses `{keys}`, which the browser uses (print, find, reload and the like)\n  = help: pick a free shortcut such as `Alt+Shift+{}`, or call `.override_browser()` to take it over on purpose",
+                    c.id,
+                    keys.rsplit('+').next().unwrap_or("")
+                )),
+                _ => {}
             }
             if character_only(&keys) {
                 out.push(format!(

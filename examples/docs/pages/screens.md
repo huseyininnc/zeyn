@@ -8,7 +8,7 @@ A screen is a page with a route, or a window opened over another screen. `#[scre
 #[screen(route = "/products", permission = "stock.product.read")]
 pub fn product_list() -> Screen {
     Screen::new(t!("stock.products"))
-        .toolbar(|t| t.button(t!("stock.new_product")).icon(Icon::Plus).shortcut("Ctrl+N").opens(product_editor, ProductParams { id: None }))
+        .toolbar(|t| t.button(t!("stock.new_product")).icon(Icon::Plus).shortcut("Alt+N").opens(product_editor, ProductParams { id: None }))
         .body(DataGrid::of(search_products).column(Product::code).column(Product::name).flex(1))
 }
 ```
@@ -60,7 +60,7 @@ Screen::new(t!("stock.products"))
     .context_menu(ContextMenu::new().item(t!("stock.new_product"), Window::open(product_editor, ProductParams { id: None })).action(t!("stock.restock_low"), restock_low, ()))
 ```
 
-Shortcuts like `Ctrl+N` work on the screen and are shown in the palette.
+Shortcuts like `Alt+N` work on the screen and are shown in the palette. Shortcuts the browser uses (`Ctrl+P`, `Ctrl+S`, `F5`) are not bound unless the button calls `.override_browser()`, and ones it never passes on (`Ctrl+N`, `Ctrl+T`, `Ctrl+W`) are never bound; free combinations are `Alt+Shift+<letter>` and `Ctrl+Alt+<letter>`.
 
 ## Features and the menu
 

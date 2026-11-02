@@ -16,7 +16,7 @@ pub fn product_list() -> Screen {
         .toolbar(|t| {
             t.button(t!("stock.new_product"))
                 .icon(Icon::Plus)
-                .shortcut("Ctrl+N")
+                .shortcut("Alt+N")
                 .opens(product_form, ProductFormParams { id: None })
                 .export(Export::Csv)
         })

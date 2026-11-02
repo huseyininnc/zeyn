@@ -17,7 +17,19 @@ function matchesShortcut(e, combo) {
   const ctrlMeta = swap
     ? e.ctrlKey !== e.metaKey
     : e.ctrlKey === mods.has('control') && e.metaKey === mods.has('meta');
-  return (e.key ?? '').toLowerCase() === key && ctrlMeta && e.shiftKey === mods.has('shift') && e.altKey === mods.has('alt');
+  return sameKey(e, key) && ctrlMeta && e.shiftKey === mods.has('shift') && e.altKey === mods.has('alt');
+}
+
+/**
+ * Whether the pressed key is `key` (lower case). Letters and digits also match by physical key,
+ * because Option (macOS) and AltGr turn them into other characters.
+ */
+function sameKey(e, key) {
+  if ((e.key ?? '').toLowerCase() === key) return true;
+  const code = e.code ?? '';
+  if (/^[a-z]$/.test(key)) return code === `Key${key.toUpperCase()}`;
+  if (/^[0-9]$/.test(key)) return code === `Digit${key}`;
+  return false;
 }
 
 /** Triggers the element whose `aria-keyshortcuts` matches, searching only the top dialog when one is open. */

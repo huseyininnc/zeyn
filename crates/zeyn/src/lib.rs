@@ -361,7 +361,12 @@ pub use auth::RequireMfa;
 pub use auth::{Algorithm, ClaimMap, JwtAuth, OidcAuth};
 #[cfg(feature = "totp")]
 pub use auth::{MemoryTotpStore, Totp, TotpRecord, TotpStore};
-pub use command::{Command, RESERVED_SHORTCUTS, normalize_shortcut};
+#[allow(deprecated)]
+pub use command::RESERVED_SHORTCUTS;
+pub use command::{
+    BROWSER_DEFAULTS, BROWSER_RESERVED, BrowserShortcut, Command, PALETTE_SHORTCUT, browser_shortcut,
+    normalize_shortcut,
+};
 pub use command::{MAX_SEARCH_HITS, MAX_SEARCH_QUERY, Search, SearchHit};
 pub use ctx::{BoxFuture, Ctx, Dep, Identity, Inject, IntoScreen, Outcome, Service, Services};
 pub use feature::{Feature, Guard, GuardResult, Menu, MenuGroup, MenuItem, Route, ScreenEntry, SignedIn};

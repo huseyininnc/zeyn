@@ -659,6 +659,7 @@ pub struct App {
     setup_problems: Vec<String>,
     views: Option<Arc<dyn crate::grid::DataGridViewStore>>,
     native_menu: bool,
+    palette_keys: String,
     extras: ops::Extras,
     sign_in: auth::Extras,
     #[cfg(feature = "assistant")]
@@ -705,6 +706,7 @@ impl App {
             setup_problems: Vec::new(),
             views: None,
             native_menu: true,
+            palette_keys: crate::command::PALETTE_SHORTCUT.into(),
             extras: ops::Extras::default(),
             sign_in: auth::Extras::default(),
             #[cfg(feature = "assistant")]
@@ -744,6 +746,14 @@ impl App {
     /// for it; Zeyn's own menus work either way.
     pub fn browser_context_menu(mut self, allow: bool) -> Self {
         self.native_menu = allow;
+        self
+    }
+
+    /// The shortcut that opens the command palette, `Alt+Shift+P` by default. Any shortcut works,
+    /// also one the browser uses such as `Ctrl+Shift+P` or `F1` (choosing it here is the opt in);
+    /// `App::check` refuses ones the browser never passes to the page, such as `Ctrl+T`.
+    pub fn palette_shortcut(mut self, keys: &str) -> Self {
+        self.palette_keys = keys.to_string();
         self
     }
 
@@ -1060,7 +1070,21 @@ impl App {
         }
         let commands: Vec<(&str, &crate::command::Command)> =
             self.features.iter().flat_map(|f| f.commands().iter().map(move |c| (f.name(), c))).collect();
-        problems.extend(crate::command::problems(&commands, false));
+        problems.extend(crate::command::problems(&commands, false, &self.palette_keys));
+        match crate::command::normalize_shortcut(&self.palette_keys) {
+            None => problems.push(format!(
+                "the palette shortcut `{}` cannot be read
+  = help: write modifiers and one key joined by `+`, such as `Alt+Shift+P`",
+                self.palette_keys
+            )),
+            Some(k) if crate::command::browser_shortcut(&k) == Some(crate::command::BrowserShortcut::Reserved) => {
+                problems.push(format!(
+                    "the palette shortcut `{k}` is kept by the browser and never reaches the page
+  = help: pick a free shortcut such as `Alt+Shift+P`"
+                ))
+            }
+            _ => {}
+        }
         problems.extend(self.theme_problems());
         problems.dedup();
         if problems.is_empty() { Ok(()) } else { Err(problems) }
@@ -1160,6 +1184,8 @@ impl App {
             look,
             views: self.views,
             native_menu: self.native_menu,
+            palette_keys: crate::command::normalize_shortcut(&self.palette_keys)
+                .unwrap_or_else(|| crate::command::PALETTE_SHORTCUT.into()),
             extras: self.extras,
             sign_in: self.sign_in,
             #[cfg(feature = "assistant")]
@@ -1332,6 +1358,7 @@ struct AppState {
     look: theme::Look,
     views: Option<Arc<dyn crate::grid::DataGridViewStore>>,
     native_menu: bool,
+    palette_keys: String,
     extras: ops::Extras,
     sign_in: auth::Extras,
     #[cfg(feature = "assistant")]

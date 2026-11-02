@@ -19,7 +19,7 @@ Do not guess an API. Find it in the docs, in this order:
    `language`, `protocol` or `architecture`; `zeyn_describe` lists the app's features, screens,
    routes, access and problems; `zeyn_check` compiles and reports; `zeyn_test` runs the tests.
 3. **The documentation site**: run `cargo run -p zeyn-example-docs` in the Zeyn repository and
-   open http://127.0.0.1:3008 (Ctrl+Shift+P searches). The same pages are Markdown files in
+   open http://127.0.0.1:3008 (Alt+Shift+P searches). The same pages are Markdown files in
    `examples/docs/pages/` and `docs/` of the Zeyn repository.
 
 Which page answers what:
@@ -123,7 +123,7 @@ pub async fn save_order(order: Valid<Order>, store: OrderStore) -> Result<Order>
 #[screen(route = "/", permission = "sales.order.read")]
 pub fn order_list() -> Screen {
     Screen::new(t!("orders.title"))
-        .toolbar(|t| t.button(t!("orders.new")).icon(Icon::Plus).shortcut("Ctrl+N")
+        .toolbar(|t| t.button(t!("orders.new")).icon(Icon::Plus).shortcut("Alt+N")
             .opens(order_editor, OrderParams { id: None }))
         .body(
             DataGrid::of(search_orders)

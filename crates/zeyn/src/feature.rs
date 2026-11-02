@@ -304,7 +304,7 @@ impl Feature {
             }
         }
         let commands: Vec<(&str, &crate::command::Command)> = self.commands.iter().map(|c| (self.name, c)).collect();
-        problems.extend(crate::command::problems(&commands, true));
+        problems.extend(crate::command::problems(&commands, true, crate::command::PALETTE_SHORTCUT));
         if problems.is_empty() { Ok(()) } else { Err(problems) }
     }
 }

@@ -181,13 +181,13 @@ pub fn product_list() -> Screen {
             ContextMenu::new()
                 .item(t!("stock.new_product"), Window::open(product_editor, ProductParams { id: None }))
                 .icon(Icon::Plus)
-                .shortcut("Ctrl+N")
+                .shortcut("Alt+N")
                 .action(t!("stock.restock_low"), restock_low, ()),
         )
         .toolbar(|t| {
             t.button(t!("stock.new_product"))
                 .icon(Icon::Plus)
-                .shortcut("Ctrl+N")
+                .shortcut("Alt+N")
                 .opens(product_editor, ProductParams { id: None })
                 .export(Export::Csv)
                 .export(Export::Xlsx)

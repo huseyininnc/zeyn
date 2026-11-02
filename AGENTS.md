@@ -41,7 +41,7 @@ them. When code and docs disagree, fix the one that is wrong in the same change.
 them were never built. Trust `examples/docs/pages/` and the code.
 
 The same docs run as a Zeyn app: `cargo run -p zeyn-example-docs`, then open
-http://127.0.0.1:3008. Ctrl+Shift+P searches every page.
+http://127.0.0.1:3008. Alt+Shift+P searches every page.
 
 ## Repository map
 

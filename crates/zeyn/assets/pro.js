@@ -2,7 +2,7 @@
  * Zeyn desktop class shell.
  *
  * Menu bars, toolboxes, property inspector sections and status bars, and the command palette
- * (Ctrl+Shift+P or F1): an ARIA combobox over a listbox that searches the
+ * (Alt+Shift+P by default, see `App::palette_shortcut`): an ARIA combobox over a listbox that searches the
  * app's commands, the toolbar and context menu of the current screen and the screens of the menu.
  * Commands come from the server, which leaves out those the user may not run. Effects run
  * through the runtime (`zeyn:run`), so this script never builds requests the server would not
@@ -368,10 +368,25 @@ function paletteKey(e) {
   }
 }
 
-/** True for the palette shortcut: Ctrl+Shift+P (Command on macOS) or F1. */
+/**
+ * True for the palette shortcut the server set (`App::palette_shortcut`, `Alt+Shift+P` by
+ * default), listed in `data-palette-keys`. Control means Command on macOS; letters and digits
+ * also match by physical key, because Option turns them into other characters.
+ */
 function paletteShortcut(e) {
-  if (e.key === 'F1' && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) return true;
-  return (e.key ?? '').toLowerCase() === 'p' && e.shiftKey && !e.altKey && (MAC ? e.metaKey : e.ctrlKey);
+  const keys = document.querySelector('[data-zeyn-commands]')?.dataset.paletteKeys || 'Alt+Shift+P';
+  return keys.split(' ').some((combo) => {
+    const parts = combo.split('+');
+    const key = parts.pop().toLowerCase();
+    const mods = new Set(parts.map((p) => p.toLowerCase()));
+    const ctrl = MAC && mods.has('control') && !mods.has('meta') ? e.metaKey && !e.ctrlKey : e.ctrlKey === mods.has('control') && e.metaKey === mods.has('meta');
+    const code = e.code ?? '';
+    const same =
+      (e.key ?? '').toLowerCase() === key ||
+      (/^[a-z]$/.test(key) && code === `Key${key.toUpperCase()}`) ||
+      (/^[0-9]$/.test(key) && code === `Digit${key}`);
+    return same && ctrl && e.shiftKey === mods.has('shift') && e.altKey === mods.has('alt');
+  });
 }
 
 /* Commands that run on the server ------------------------------------------------------------ */

@@ -306,7 +306,7 @@
   },
   "pro": {
     "palette": "Komut paleti",
-    "palette_title": "Ctrl+Shift+P ya da F1 tuşuna basın",
+    "palette_title": "Alt+Shift+P tuşlarına basın",
     "palette_intro": "Palet çalıştırabileceğiniz her komutu arar: uygulamanın komutları, bu ekranın araç çubuğu ve sağ tık menüsü, menüdeki her ekran. Son kullanılan komutlar önce gelir.",
     "palette_sources": "Yeni ürün için Ctrl+Alt+N, selam için Alt+H deneyin ya da sağ tık menüsü için sayfaya sağ tıklayın. Çalıştıramayacağınız komutlar tarayıcınıza hiç gönderilmez.",
     "cmd_new_product": "Yeni ürün",

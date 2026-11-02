@@ -8,7 +8,7 @@ use super::{AppState, Call, CallKind, Failure, asset};
 use crate::action::Error;
 use crate::ctx::Ctx;
 use crate::i18n::Text;
-use crate::render::Render;
+use crate::render::{Render, escape};
 use axum::Router;
 use axum::extract::State;
 use axum::http::HeaderMap;
@@ -138,16 +138,18 @@ async fn dock_call(
 /// with the palette's texts. Commands of features whose guards deny the user are left out.
 pub(super) fn shell_parts(st: &AppState, ctx: &Ctx, r: &Render) -> (String, String) {
     let t = |key: &str| r.text(&Text::key(format!("zeyn.ui.palette.{key}")));
+    let keys = escape(&st.palette_keys);
     let button = format!(
-        r#"<button type="button" class="z-palette-open" data-zeyn-palette-open aria-haspopup="dialog" aria-keyshortcuts="Control+Shift+P F1"><span class="z-icon z-icon-search" aria-hidden="true"></span><span>{}</span><kbd aria-hidden="true">Ctrl+Shift+P</kbd></button>"#,
-        t("open")
+        r#"<button type="button" class="z-palette-open" data-zeyn-palette-open aria-haspopup="dialog" aria-keyshortcuts="{keys}"><span class="z-icon z-icon-search" aria-hidden="true"></span><span>{}</span><kbd aria-hidden="true">{}</kbd></button>"#,
+        t("open"),
+        escape(&st.palette_keys.replace("Control", "Ctrl"))
     );
     let search = st
         .features
         .iter()
         .any(|f| f.check_guards(ctx).is_ok() && f.searches().iter().any(|s| ctx.identity().can(&s.meta().access)));
     let mut commands = format!(
-        r#"<div class="z-commands" hidden data-zeyn-commands{} data-text-label="{}" data-text-placeholder="{}" data-text-empty="{}" data-text-count="{}" data-text-recent="{}" data-text-app="{}" data-text-screen="{}" data-text-go="{}" data-text-done="{}" data-text-hint="{}">"#,
+        r#"<div class="z-commands" hidden data-zeyn-commands{} data-palette-keys="{keys}" data-text-label="{}" data-text-placeholder="{}" data-text-empty="{}" data-text-count="{}" data-text-recent="{}" data-text-app="{}" data-text-screen="{}" data-text-go="{}" data-text-done="{}" data-text-hint="{}">"#,
         if search { " data-search" } else { "" },
         t("label"),
         t("placeholder"),

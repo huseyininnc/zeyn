@@ -45,7 +45,7 @@ The showcase listens on `127.0.0.1:3002` and shows every component with sample d
 
 ## Finding your way
 
-- Press **Ctrl+Shift+P** (or F1) to open the command palette. Type a word and it searches every page of this site on the server.
+- Press **Alt+Shift+P** to open the command palette. Type a word and it searches every page of this site on the server.
 - *Getting started* covers the CLI and the structure of a project.
 - *Language* covers entities, actions, screens, forms, the DataGrid and texts.
 - *Components* shows each component with a live example next to its code.

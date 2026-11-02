@@ -62,7 +62,7 @@ pub fn product_list() -> Screen {
         .toolbar(|t| {
             t.button("New product")
                 .icon(Icon::Plus)
-                .shortcut("Ctrl+N")
+                .shortcut("Alt+N")
                 .opens(product_form, ProductFormParams::new_product())
                 .export(Export::Xlsx)
         })
@@ -342,7 +342,7 @@ fn list_screen_renders() {
     let html = product_list::run().html(&product_list::META);
     assert!(html.contains(r#"data-zeyn-screen="product_list""#));
     assert!(html.contains(r#"data-testid="product_list.toolbar.new-product""#));
-    assert!(html.contains(r#"aria-keyshortcuts="Control+N""#));
+    assert!(html.contains(r#"aria-keyshortcuts="Alt+N""#));
     assert!(html.contains(r#"data-testid="product_list.toolbar.export-xlsx""#));
     assert!(html.contains(r#"data-zeyn-action="search_products""#));
     assert!(html.contains(r#"data-zeyn-mode="server""#));
@@ -504,4 +504,47 @@ fn auto_grid_has_every_field_and_filters_text() {
     }
     assert!(out.contains(r#"data-field="name" aria-sort="none" aria-colindex="3" data-filter="text""#));
     assert!(!out.contains(r#"data-field="price" aria-sort="none" aria-colindex="5" data-filter"#));
+}
+
+#[test]
+fn browser_shortcuts_are_not_bound_unless_a_button_opts_in() {
+    use zeyn::{BrowserShortcut, browser_shortcut};
+    assert_eq!(browser_shortcut("Control+N"), Some(BrowserShortcut::Reserved));
+    assert_eq!(browser_shortcut("Control+Shift+P"), Some(BrowserShortcut::Default));
+    assert_eq!(browser_shortcut("F5"), Some(BrowserShortcut::Default));
+    assert_eq!(browser_shortcut("Alt+Shift+P"), None);
+    let reserved = Screen::new("x").toolbar(|t| t.button("New").shortcut("Ctrl+N")).html(&product_list::META);
+    assert!(!reserved.contains("aria-keyshortcuts"), "the browser never passes Ctrl+N on");
+    let default = Screen::new("x").toolbar(|t| t.button("Print").shortcut("Ctrl+P")).html(&product_list::META);
+    assert!(!default.contains("aria-keyshortcuts"), "Ctrl+P stays the browser's without an opt in");
+    let opted =
+        Screen::new("x").toolbar(|t| t.button("Print").shortcut("Ctrl+P").override_browser()).html(&product_list::META);
+    assert!(opted.contains(r#"aria-keyshortcuts="Control+P""#), "{opted}");
+    let tab =
+        Screen::new("x").toolbar(|t| t.button("Tab").shortcut("Ctrl+T").override_browser()).html(&product_list::META);
+    assert!(!tab.contains("aria-keyshortcuts"), "reserved shortcuts stay refused even with an opt in");
+}
+
+#[test]
+fn commands_with_browser_shortcuts_are_reported_unless_they_opt_in() {
+    use zeyn::Command;
+    let fresh =
+        Feature::new("stock").command(Command::navigate("stock.list", "List", product_list, ()).shortcut("Ctrl+F"));
+    let problems = fresh.check().unwrap_err();
+    assert!(problems.iter().any(|p| p.contains("override_browser")), "{problems:?}");
+    let opted = Feature::new("stock")
+        .command(Command::navigate("stock.list", "List", product_list, ()).shortcut("Ctrl+F").override_browser());
+    assert!(opted.check().is_ok(), "{:?}", opted.check());
+    let reserved = Feature::new("stock")
+        .command(Command::navigate("stock.list", "List", product_list, ()).shortcut("Ctrl+W").override_browser());
+    assert!(reserved.check().unwrap_err().iter().any(|p| p.contains("never passes")));
+}
+
+#[test]
+fn the_palette_shortcut_can_be_any_key_the_page_receives() {
+    assert!(App::new("x").check().is_ok(), "Alt+Shift+P by default");
+    assert!(App::new("x").palette_shortcut("Ctrl+Shift+P").check().is_ok(), "a browser key on purpose");
+    let refused = App::new("x").palette_shortcut("Ctrl+T").check().unwrap_err();
+    assert!(refused.iter().any(|p| p.contains("never reaches the page")), "{refused:?}");
+    assert!(App::new("x").palette_shortcut("Ctrl+").check().is_err());
 }

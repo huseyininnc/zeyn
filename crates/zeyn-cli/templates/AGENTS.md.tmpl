@@ -101,7 +101,7 @@ Field error from code: `errors.add(Order::code, t!("orders.code_taken"))`.
 #[screen(route = "/orders", permission = "sales.order.read")]
 pub fn order_list() -> Screen {
     Screen::new(t!("orders.title"))
-        .toolbar(|t| t.button(t!("orders.new")).icon(Icon::Plus).shortcut("Ctrl+N").opens(order_editor, EditParams { id: None }))
+        .toolbar(|t| t.button(t!("orders.new")).icon(Icon::Plus).shortcut("Alt+N").opens(order_editor, EditParams { id: None }))
         .body(DataGrid::of(search_orders).mode(DataMode::Server).column(Order::code).width(120).filter().column(Order::total).sum()
             .on_open(|o| Window::open(order_editor, EditParams { id: Some(o.id) })))
 }

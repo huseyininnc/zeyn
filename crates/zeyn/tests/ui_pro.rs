@@ -45,7 +45,7 @@ fn new_order() -> Command {
 }
 
 fn archive() -> Command {
-    Command::action("orders.archive", "Archive old orders", archive_orders, 30).shortcut("Ctrl+Shift+A")
+    Command::action("orders.archive", "Archive old orders", archive_orders, 30).shortcut("Ctrl+Alt+A")
 }
 
 fn hello() -> Command {
@@ -190,7 +190,7 @@ async fn commands_the_user_may_not_run_never_reach_the_html() {
             r#"aria-keyshortcuts="Control+Alt+N" data-hint="Ctrl+Alt+N" data-icon="plus">New order</button>"#
         )
     );
-    assert!(html.contains(r#"data-zeyn-command="orders.archive" data-zeyn-command-run="orders.archive" aria-keyshortcuts="Control+Shift+A""#));
+    assert!(html.contains(r#"data-zeyn-command="orders.archive" data-zeyn-command-run="orders.archive" aria-keyshortcuts="Control+Alt+A""#));
     assert!(!html.contains("Secret command"));
 }
 
@@ -249,14 +249,14 @@ fn problems(feature: Feature) -> Vec<String> {
 fn duplicate_and_unusable_shortcuts_are_reported_by_the_feature_check() {
     let dup = problems(
         Feature::new("f")
-            .command(hello().shortcut("Ctrl+K"))
-            .command(Command::effect("f.other", "Other", Effect::CloseAndRefresh).shortcut("control + k")),
+            .command(hello().shortcut("Ctrl+Alt+K"))
+            .command(Command::effect("f.other", "Other", Effect::CloseAndRefresh).shortcut("control + alt + k")),
     );
     assert_eq!(dup.len(), 1, "{dup:?}");
-    assert!(dup[0].contains("commands `orders.hello` and `f.other` both use the shortcut `Control+K`"), "{dup:?}");
+    assert!(dup[0].contains("commands `orders.hello` and `f.other` both use the shortcut `Control+Alt+K`"), "{dup:?}");
     assert!(dup[0].contains("= help:"));
 
-    let reserved = problems(Feature::new("f").command(hello().shortcut("Ctrl+Shift+P")));
+    let reserved = problems(Feature::new("f").command(hello().shortcut("Alt+Shift+P")));
     assert!(reserved[0].contains("opens the command palette"), "{reserved:?}");
     let single = problems(Feature::new("f").command(hello().shortcut("Shift+K")));
     assert!(single[0].contains("single character key"), "{single:?}");
@@ -274,12 +274,12 @@ fn duplicate_and_unusable_shortcuts_are_reported_by_the_feature_check() {
 
 #[test]
 fn shortcuts_shared_across_features_are_reported_by_the_app_check() {
-    let app = App::new("Test").feature(Feature::new("a").command(hello().shortcut("Ctrl+J"))).feature(
-        Feature::new("b").command(Command::effect("b.jump", "Jump", Effect::CloseAndRefresh).shortcut("Ctrl+J")),
+    let app = App::new("Test").feature(Feature::new("a").command(hello().shortcut("Ctrl+Alt+J"))).feature(
+        Feature::new("b").command(Command::effect("b.jump", "Jump", Effect::CloseAndRefresh).shortcut("Ctrl+Alt+J")),
     );
     let problems = app.check().unwrap_err();
     assert_eq!(problems.len(), 1, "{problems:?}");
-    assert!(problems[0].contains("both use the shortcut `Control+J` (in `a` and `b`)"), "{problems:?}");
+    assert!(problems[0].contains("both use the shortcut `Control+Alt+J` (in `a` and `b`)"), "{problems:?}");
     assert!(app.router().is_err(), "the app does not start");
 }
 
