@@ -7,7 +7,7 @@ use std::any::{Any, TypeId};
 use std::collections::{BTreeSet, HashMap};
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 /// Boxed future returned by generated `call` and `build` functions.
 pub type BoxFuture<T> = Pin<Box<dyn Future<Output = T> + Send + 'static>>;
@@ -24,6 +24,9 @@ pub struct Identity {
     /// Time zone from the user's profile, set by an administrator or the user. It wins over the
     /// browser's zone under `TimePolicy::User`.
     pub time_zone: Option<String>,
+    /// When the user last proved who they are (signed in), as reported by the identity provider.
+    /// Actions marked `reauth` need this to be recent.
+    pub authenticated_at: Option<crate::time::DateTime>,
 }
 
 impl Identity {
@@ -56,6 +59,11 @@ impl Identity {
 
     pub fn with_time_zone(mut self, zone: impl Into<String>) -> Self {
         self.time_zone = Some(zone.into());
+        self
+    }
+
+    pub fn with_authenticated_at(mut self, at: crate::time::DateTime) -> Self {
+        self.authenticated_at = Some(at);
         self
     }
 
@@ -127,6 +135,7 @@ struct CtxInner {
     services: Arc<Services>,
     i18n: Arc<I18n>,
     via_agent: bool,
+    trail: Arc<Mutex<crate::audit::Trail>>,
 }
 
 /// Request context: identity, language and services. Cheap to clone. Actions and screens may take
@@ -147,6 +156,7 @@ impl Ctx {
             services,
             i18n,
             via_agent: false,
+            trail: Arc::default(),
         }))
     }
 
@@ -173,6 +183,7 @@ impl Ctx {
             services: i.services.clone(),
             i18n: i.i18n.clone(),
             via_agent: i.via_agent,
+            trail: i.trail.clone(),
         };
         change(&mut inner);
         Ctx(Arc::new(inner))
@@ -248,6 +259,48 @@ impl Ctx {
 
     pub fn service<T: Service>(&self) -> Option<T> {
         self.0.services.get::<T>()
+    }
+
+    /// What this call did to data so far: the saved record and its changed fields.
+    pub fn trail(&self) -> crate::audit::Trail {
+        self.0.trail.lock().map(|t| t.clone()).unwrap_or_default()
+    }
+
+    pub(crate) fn update_trail(&self, change: impl FnOnce(&mut crate::audit::Trail)) {
+        if let Ok(mut t) = self.0.trail.lock() {
+            change(&mut t);
+        }
+    }
+
+    /// Records the fields that differ between the record as loaded from the store and as saved,
+    /// for the audit log. Call it in save actions with the record read from the database; forms do
+    /// it on their own with the record their screen loaded.
+    ///
+    /// ```ignore
+    /// let current = store.get(p.id)?;
+    /// ctx.record_changes(&current, &p);
+    /// ```
+    pub fn record_changes<M: crate::model::Model>(&self, loaded: &M, saved: &M) {
+        let changes = crate::audit::diff(loaded, saved);
+        let record = crate::audit::RecordRef::of(saved);
+        self.update_trail(|t| {
+            t.record = Some(record);
+            t.changes = changes;
+        });
+    }
+
+    /// Records that the user was shown a sensitive record, for the audit log. Forms, grids and API
+    /// output of models marked `sensitive` do this on their own.
+    pub fn record_read<M: crate::model::Model>(&self, record: &M) {
+        self.note_read(crate::audit::RecordRef::of(record));
+    }
+
+    pub(crate) fn note_read(&self, record: crate::audit::RecordRef) {
+        self.update_trail(|t| {
+            if !t.reads.contains(&record) {
+                t.reads.push(record);
+            }
+        });
     }
 
     /// Resolves a text in the request's language.

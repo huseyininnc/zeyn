@@ -5,6 +5,66 @@
     },
     "yes": "Yes",
     "no": "No",
+    "deploy": {
+      "new_version": "A new version of the app is available. Reload when you are ready; your unsaved form entries are kept.",
+      "reload": "Reload now",
+      "later": "Later"
+    },
+    "draft": {
+      "restored": "Your unsaved entries from before were restored.",
+      "discard": "Discard them"
+    },
+    "session": {
+      "idle_title": "Are you still there?",
+      "idle_body": "You will be signed out in {seconds} seconds because you have been inactive.",
+      "stay": "Stay signed in",
+      "signed_out_title": "You were signed out",
+      "signed_out_body": "You were signed out because you were inactive. Your unsaved form entries are kept in this tab.",
+      "sign_in": "Sign in again",
+      "reauth_required": "For your security, sign in again to do this.",
+      "reauth_title": "Confirm it is you",
+      "reauth_body": "This action needs a recent sign in. Sign in again in the new tab, then come back and continue.",
+      "reauth_open": "Sign in again",
+      "reauth_continue": "I signed in, continue"
+    },
+    "import": {
+      "file": "CSV file",
+      "hint": "The first row names the columns: {columns}. Values are separated by commas or semicolons. At most {max} rows.",
+      "summary": "{total} rows read: {valid} valid, {invalid} with errors.",
+      "commit": "Import valid rows",
+      "commit_all": "Import all rows",
+      "report": "Download error report",
+      "imported": "{count} rows imported, {skipped} skipped.",
+      "unknown_column": "Unknown column: {name}.",
+      "too_many": "The file has more than {max} rows.",
+      "too_large": "The file is too large.",
+      "empty": "The file has no data rows.",
+      "bad_quotes": "A quoted value in the file is not closed.",
+      "extra_cells": "This row has more values than there are columns.",
+      "nothing_valid": "No row is valid, so nothing was imported.",
+      "fix_first": "Fix every error first; this import is all or nothing.",
+      "report_row": "Row",
+      "report_field": "Field",
+      "report_message": "Message",
+      "reading": "Reading the file..."
+    },
+    "workflow": {
+      "state": "State",
+      "comment": "Comment",
+      "done": "Done."
+    },
+    "privacy": {
+      "reveal": "Show {label}",
+      "revealed": "The value is shown. This was recorded.",
+      "reveal_failed": "The value could not be shown.",
+      "reason_required": "Give a reason to open this screen.",
+      "reason_title": "Why do you need this record?",
+      "reason_explain": "This screen shows personal data. Your reason is recorded together with your name and the time.",
+      "reason_label": "Reason",
+      "reason_continue": "Continue",
+      "reason_cancel": "Cancel",
+      "reason_invalid": "Write a reason between 3 and 300 characters."
+    },
     "validation": {
       "required": "{label} is required.",
       "min_len": "{label} must be at least {n} characters.",

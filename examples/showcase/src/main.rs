@@ -46,6 +46,7 @@ async fn main() -> std::io::Result<()> {
         .await
         .map_err(std::io::Error::other)?;
     let addr = config.get("server.addr").unwrap_or("127.0.0.1:3002").to_string();
+    let idle = config.get("session.idle_seconds").and_then(|s| s.parse::<u64>().ok()).unwrap_or(1800);
 
     let i18n = I18n::new("en")
         .catalog("en", include_str!("../locales/en.json"))
@@ -61,9 +62,12 @@ async fn main() -> std::io::Result<()> {
     App::new(t!("app.name"))
         .plugin(CompanyStandard { config })
         .theme(Theme::new().radius(6))
+        .idle_timeout(Duration::from_secs(idle))
+        .idle_warning(Duration::from_secs((idle / 2).min(60)))
         .i18n(i18n)
         .service(stock::ProductStore::seeded())
         .datagrid_views(MemoryViewStore::default())
+        .service(people::LeaveStore::seeded(TimeZone::UTC.today(DateTime::now())))
         .auth(DevAuth::superuser("Demo User"))
         .license(FixedLicense(license), Duration::from_secs(300))
         .agents(Agents::read_write())

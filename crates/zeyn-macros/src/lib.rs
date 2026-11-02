@@ -158,6 +158,7 @@ pub fn action(attr: TokenStream, item: TokenStream) -> TokenStream {
     let f = syn::parse_macro_input!(item as ItemFn);
     let mut access = AccessArgs::default();
     let mut audit = false;
+    let mut reauth = false;
     let parser = syn::meta::parser(|meta| {
         if meta.path.is_ident("permission") {
             access.permission = Some(meta.value()?.parse()?);
@@ -165,17 +166,19 @@ pub fn action(attr: TokenStream, item: TokenStream) -> TokenStream {
             access.public = true;
         } else if meta.path.is_ident("audit") {
             audit = true;
+        } else if meta.path.is_ident("reauth") {
+            reauth = true;
         } else {
-            return Err(meta.error("unknown action option\n  = help: expected `permission = \"...\"`, `public` or `audit`"));
+            return Err(meta.error("unknown action option\n  = help: expected `permission = \"...\"`, `public`, `audit` or `reauth`"));
         }
         Ok(())
     });
     syn::parse_macro_input!(attr with parser);
     let original = quote!(#f);
-    or_error(expand_action(&f, &access, audit), original)
+    or_error(expand_action(&f, &access, audit, reauth), original)
 }
 
-fn expand_action(f: &ItemFn, access: &AccessArgs, audit: bool) -> syn::Result<Ts> {
+fn expand_action(f: &ItemFn, access: &AccessArgs, audit: bool, reauth: bool) -> syn::Result<Ts> {
     let (input, output) = fn_types(f, "action")?;
     let name = &f.sig.ident;
     let access = access.tokens("action", name)?;
@@ -192,6 +195,7 @@ fn expand_action(f: &ItemFn, access: &AccessArgs, audit: bool) -> syn::Result<Ts
                 name: #name_str,
                 access: #access,
                 audit: #audit,
+                reauth: #reauth,
             };
 
             fn deps() -> ::std::vec::Vec<::zeyn::Dep> {
@@ -219,6 +223,8 @@ pub fn screen(attr: TokenStream, item: TokenStream) -> TokenStream {
     let f = syn::parse_macro_input!(item as ItemFn);
     let mut access = AccessArgs::default();
     let mut route: Option<LitStr> = None;
+    let mut sensitive = false;
+    let mut reason = false;
     let parser = syn::meta::parser(|meta| {
         if meta.path.is_ident("permission") {
             access.permission = Some(meta.value()?.parse()?);
@@ -226,17 +232,25 @@ pub fn screen(attr: TokenStream, item: TokenStream) -> TokenStream {
             access.public = true;
         } else if meta.path.is_ident("route") {
             route = Some(meta.value()?.parse()?);
+        } else if meta.path.is_ident("sensitive") {
+            sensitive = true;
+        } else if meta.path.is_ident("reason") {
+            reason = true;
         } else {
-            return Err(meta.error("unknown screen option\n  = help: expected `route = \"/...\"`, `permission = \"...\"` or `public`"));
+            return Err(meta.error("unknown screen option\n  = help: expected `route = \"/...\"`, `permission = \"...\"`, `public`, `sensitive` or `reason`"));
         }
         Ok(())
     });
     syn::parse_macro_input!(attr with parser);
     let original = quote!(#f);
-    or_error(expand_screen(&f, &access, route.as_ref()), original)
+    or_error(expand_screen(&f, &access, route.as_ref(), (sensitive || reason, reason)), original)
 }
 
-fn expand_screen(f: &ItemFn, access: &AccessArgs, route: Option<&LitStr>) -> syn::Result<Ts> {
+fn expand_screen(f: &ItemFn, access: &AccessArgs, route: Option<&LitStr>, privacy: (bool, bool)) -> syn::Result<Ts> {
+    let (sensitive, reason) = privacy;
+    if reason && access.public {
+        return Err(syn::Error::new(f.sig.ident.span(), "a public screen cannot ask for a reason\n  = help: give the screen a permission"));
+    }
     let (params, _) = fn_types(f, "screen")?;
     let name = &f.sig.ident;
     let access = access.tokens("screen", name)?;
@@ -259,6 +273,8 @@ fn expand_screen(f: &ItemFn, access: &AccessArgs, route: Option<&LitStr>) -> syn
                 name: #name_str,
                 route: #route,
                 access: #access,
+                sensitive: #sensitive,
+                reason: #reason,
             };
 
             fn deps() -> ::std::vec::Vec<::zeyn::Dep> {
@@ -380,6 +396,7 @@ fn expand_choice(mut e: ItemEnum) -> syn::Result<Ts> {
 struct ModelArgs {
     table: Option<LitStr>,
     validate: Option<Path>,
+    sensitive: bool,
 }
 
 fn parse_model_args(attr: TokenStream, allow_table: bool) -> syn::Result<ModelArgs> {
@@ -389,10 +406,12 @@ fn parse_model_args(attr: TokenStream, allow_table: bool) -> syn::Result<ModelAr
             args.table = Some(meta.value()?.parse()?);
         } else if meta.path.is_ident("validate") {
             args.validate = Some(meta.value()?.parse()?);
+        } else if meta.path.is_ident("sensitive") {
+            args.sensitive = true;
         } else if allow_table {
-            return Err(meta.error("unknown entity option\n  = help: expected `table = \"...\"` or `validate = path::to::fn`"));
+            return Err(meta.error("unknown entity option\n  = help: expected `table = \"...\"`, `validate = path::to::fn` or `sensitive`"));
         } else {
-            return Err(meta.error("unknown model option\n  = help: expected `validate = path::to::fn`"));
+            return Err(meta.error("unknown model option\n  = help: expected `validate = path::to::fn` or `sensitive`"));
         }
         Ok(())
     });
@@ -404,6 +423,10 @@ fn parse_model_args(attr: TokenStream, allow_table: bool) -> syn::Result<ModelAr
 ///
 /// Field rules: `required`, `min_len = N`, `max_len = N`, `email`, `min = N`, `max = N`.
 /// Rules that involve several fields go in a function given with `validate = ...`.
+///
+/// Text fields with personal data can be masked: `#[mask(last4)]`, `#[mask(email)]` or
+/// `#[mask]` (nothing shown). Users with `<model>.<field>.unmask` (or the permission given with
+/// `#[mask(last4, permission = "...")]`) may reveal the value; every reveal is audited.
 ///
 /// ```ignore
 /// #[model(validate = check_dates)]
@@ -443,6 +466,22 @@ pub fn entity(attr: TokenStream, item: TokenStream) -> TokenStream {
     or_error(result, original)
 }
 
+/// `LeaveRequest` -> `leave_request`.
+fn snake_case(name: &str) -> String {
+    let mut out = String::with_capacity(name.len() + 4);
+    for (i, c) in name.chars().enumerate() {
+        if c.is_ascii_uppercase() {
+            if i > 0 {
+                out.push('_');
+            }
+            out.push(c.to_ascii_lowercase());
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
 /// `unit_price` -> `Unit price`.
 fn default_label(name: &str) -> String {
     let text = name.replace('_', " ");
@@ -456,6 +495,9 @@ fn default_label(name: &str) -> String {
 fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Result<Ts> {
     let name = s.ident.clone();
     let kind = if is_entity { "entity" } else { "model" };
+    let before = s.attrs.len();
+    s.attrs.retain(|a| !a.path().is_ident("sensitive"));
+    let sensitive = args.sensitive || s.attrs.len() != before;
     if !s.generics.params.is_empty() {
         return Err(syn::Error::new(s.generics.span(), format!("{kind}s cannot be generic")));
     }
@@ -482,6 +524,7 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
         let mut readonly = false;
         let mut version = false;
         let mut label: Option<LitStr> = None;
+        let mut mask = quote!(::core::option::Option::None);
         let mut rules = Vec::new();
         let mut keep = Vec::new();
 
@@ -495,6 +538,32 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
                 checks.push(quote_spanned!(ty.span()=> ::zeyn::__rules::version::<#ty>();));
             } else if a.path().is_ident("label") {
                 label = Some(a.parse_args()?);
+            } else if a.path().is_ident("mask") {
+                let mut style = quote!(::zeyn::MaskStyle::Full);
+                let mut permission: Option<LitStr> = None;
+                if !matches!(a.meta, syn::Meta::Path(_)) {
+                    a.parse_nested_meta(|m| {
+                        if m.path.is_ident("last4") {
+                            style = quote!(::zeyn::MaskStyle::LastFour);
+                        } else if m.path.is_ident("email") {
+                            style = quote!(::zeyn::MaskStyle::Email);
+                        } else if m.path.is_ident("full") {
+                            style = quote!(::zeyn::MaskStyle::Full);
+                        } else if m.path.is_ident("permission") {
+                            let p: LitStr = m.value()?.parse()?;
+                            check_permission(&p)?;
+                            permission = Some(p);
+                        } else {
+                            return Err(m.error("unknown mask option\n  = help: expected `last4`, `email`, `full` or `permission = \"...\"`"));
+                        }
+                        Ok(())
+                    })?;
+                }
+                let permission = permission
+                    .map(|p| p.value())
+                    .unwrap_or_else(|| format!("{}.{}.unmask", snake_case(&name.to_string()), fname_str));
+                checks.push(quote_spanned!(ty.span()=> ::zeyn::__rules::text::<#ty>();));
+                mask = quote!(::core::option::Option::Some(::zeyn::Masking { style: #style, permission: #permission }));
             } else if a.path().is_ident("rule") {
                 a.parse_nested_meta(|m| {
                     let text_check = quote_spanned!(ty.span()=> ::zeyn::__rules::text::<#ty>(););
@@ -561,6 +630,7 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
                 readonly: #readonly,
                 version: #version,
                 optional: <#ty as ::zeyn::FieldType>::OPTIONAL,
+                mask: #mask,
             }
         });
         getters.push(quote! {
@@ -640,6 +710,7 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
 
         impl ::zeyn::Model for #name {
             const NAME: &'static str = #name_str;
+            const SENSITIVE: bool = #sensitive;
             fn fields() -> &'static [::zeyn::FieldMeta] { Self::__ZEYN_FIELDS }
             fn value_at(&self, index: usize) -> ::core::option::Option<::zeyn::Value> {
                 match index {

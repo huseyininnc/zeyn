@@ -5,6 +5,66 @@
     },
     "yes": "Evet",
     "no": "Hayır",
+    "deploy": {
+      "new_version": "Uygulamanın yeni bir sürümü var. Hazır olduğunuzda sayfayı yenileyin; kaydedilmemiş form girişleriniz korunur.",
+      "reload": "Şimdi yenile",
+      "later": "Sonra"
+    },
+    "draft": {
+      "restored": "Daha önce kaydetmediğiniz girişler geri yüklendi.",
+      "discard": "Girişleri at"
+    },
+    "session": {
+      "idle_title": "Hâlâ orada mısınız?",
+      "idle_body": "Bir süredir işlem yapmadığınız için {seconds} saniye sonra oturumunuz kapatılacak.",
+      "stay": "Oturumu açık tut",
+      "signed_out_title": "Oturumunuz kapatıldı",
+      "signed_out_body": "Bir süredir işlem yapmadığınız için oturumunuz kapatıldı. Kaydedilmemiş form girişleriniz bu sekmede saklanıyor.",
+      "sign_in": "Yeniden giriş yap",
+      "reauth_required": "Güvenliğiniz için bu işlemden önce yeniden giriş yapın.",
+      "reauth_title": "Kimliğinizi doğrulayın",
+      "reauth_body": "Bu işlem yakın zamanda giriş yapmış olmanızı gerektiriyor. Yeni sekmede yeniden giriş yapın, sonra buraya dönüp devam edin.",
+      "reauth_open": "Yeniden giriş yap",
+      "reauth_continue": "Giriş yaptım, devam et"
+    },
+    "import": {
+      "file": "CSV dosyası",
+      "hint": "İlk satır sütun adlarıdır: {columns}. Değerler virgül ya da noktalı virgülle ayrılır. En fazla {max} satır.",
+      "summary": "{total} satır okundu: {valid} geçerli, {invalid} hatalı.",
+      "commit": "Geçerli satırları aktar",
+      "commit_all": "Tüm satırları aktar",
+      "report": "Hata raporunu indir",
+      "imported": "{count} satır aktarıldı, {skipped} satır atlandı.",
+      "unknown_column": "Bilinmeyen sütun: {name}.",
+      "too_many": "Dosyada {max} satırdan fazla var.",
+      "too_large": "Dosya çok büyük.",
+      "empty": "Dosyada veri satırı yok.",
+      "bad_quotes": "Dosyadaki tırnaklı bir değer kapatılmamış.",
+      "extra_cells": "Bu satırda sütun sayısından fazla değer var.",
+      "nothing_valid": "Geçerli satır olmadığı için hiçbir şey aktarılmadı.",
+      "fix_first": "Önce tüm hataları düzeltin; bu aktarım ya hep ya hiç çalışır.",
+      "report_row": "Satır",
+      "report_field": "Alan",
+      "report_message": "Mesaj",
+      "reading": "Dosya okunuyor..."
+    },
+    "workflow": {
+      "state": "Durum",
+      "comment": "Açıklama",
+      "done": "İşlem tamamlandı."
+    },
+    "privacy": {
+      "reveal": "{label} göster",
+      "revealed": "Değer gösterildi. Bu işlem kayda alındı.",
+      "reveal_failed": "Değer gösterilemedi.",
+      "reason_required": "Bu ekranı açmak için bir gerekçe yazın.",
+      "reason_title": "Bu kayda neden ihtiyacınız var?",
+      "reason_explain": "Bu ekran kişisel veri gösteriyor. Gerekçeniz adınız ve zamanla birlikte kayda alınır.",
+      "reason_label": "Gerekçe",
+      "reason_continue": "Devam et",
+      "reason_cancel": "Vazgeç",
+      "reason_invalid": "3 ile 300 karakter arasında bir gerekçe yazın."
+    },
     "validation": {
       "required": "{label} alanı zorunludur.",
       "min_len": "{label} en az {n} karakter olmalıdır.",

@@ -110,6 +110,11 @@ impl<M: Model> Form<M> {
     }
 
     fn render_fields(&self, out: &mut String, r: &Render) {
+        if M::SENSITIVE {
+            if let Some(ctx) = r.ctx {
+                ctx.record_read(&self.model);
+            }
+        }
         for item in &self.items {
             match item {
                 FormItem::Field(f) => render_field(out, r, f, &self.model),
@@ -151,8 +156,27 @@ impl<M: Model> Form<M> {
     /// Only fields on the form that are not keys or read only are taken from the client, plus the
     /// row version. Everything else keeps the loaded value, so a client cannot change fields it was
     /// not shown or switch the record it saves.
+    ///
+    /// Masked fields are only taken from the client while they are empty; [`Form::read_for`]
+    /// also takes them from users who may reveal them.
     pub fn read(&self, values: &Map<String, Json>, locale: &str, tz: TimeZone) -> std::result::Result<Valid<M>, ValidationErrors> {
-        let (model, mut errors) = self.merge(values, locale, tz)?;
+        self.read_with(values, locale, tz, &|_| false)
+    }
+
+    /// [`Form::read`] for the user of a request: their language and time zone, and masked fields
+    /// only when they have the field's unmask permission.
+    pub fn read_for(&self, values: &Map<String, Json>, ctx: &Ctx) -> std::result::Result<Valid<M>, ValidationErrors> {
+        self.read_with(values, ctx.locale(), ctx.time_zone(), &|m| crate::privacy::can_unmask(Some(ctx), m))
+    }
+
+    fn read_with(
+        &self,
+        values: &Map<String, Json>,
+        locale: &str,
+        tz: TimeZone,
+        unmask: &dyn Fn(&FieldMeta) -> bool,
+    ) -> std::result::Result<Valid<M>, ValidationErrors> {
+        let (model, mut errors) = self.merge(values, locale, tz, unmask)?;
         if let Err(rules) = model.validate() {
             let unreadable: Vec<&str> = errors.errors.iter().map(|e| e.field).collect();
             errors.errors.extend(rules.errors.into_iter().filter(|e| !unreadable.contains(&e.field)));
@@ -161,15 +185,26 @@ impl<M: Model> Form<M> {
         Valid::new(model)
     }
 
-    fn merge(&self, values: &Map<String, Json>, locale: &str, tz: TimeZone) -> std::result::Result<(M, ValidationErrors), ValidationErrors> {
+    fn merge(
+        &self,
+        values: &Map<String, Json>,
+        locale: &str,
+        tz: TimeZone,
+        unmask: &dyn Fn(&FieldMeta) -> bool,
+    ) -> std::result::Result<(M, ValidationErrors), ValidationErrors> {
         let mut object = match serde_json::to_value(&self.model) {
             Ok(Json::Object(o)) => o,
             _ => return Err(general_error()),
         };
         let mut errors = ValidationErrors::default();
-        let editable = self.fields().map(|f| f.meta).filter(|m| !m.key && !m.readonly && !m.version);
+        let empty = |name: &str| matches!(object.get(name), None | Some(Json::Null)) || object.get(name) == Some(&Json::String(String::new()));
+        let editable: Vec<&FieldMeta> = self
+            .fields()
+            .map(|f| f.meta)
+            .filter(|m| !m.key && !m.readonly && !m.version && (m.mask.is_none() || unmask(m) || empty(m.name)))
+            .collect();
         let versions = M::fields().iter().filter(|m| m.version);
-        for meta in editable.chain(versions) {
+        for meta in editable.into_iter().chain(versions) {
             let Some(raw) = values.get(meta.name) else { continue };
             let current = object.get(meta.name).cloned().unwrap_or(Json::Null);
             match parse_value(meta, raw, locale, tz, &current) {
@@ -292,6 +327,10 @@ fn render_field<M>(out: &mut String, r: &Render, f: &FormField<M>, model: &M) {
             _ => String::new(),
         };
         out.push_str(&format!(r#"<input type="hidden" name="{}" value="{v}">"#, m.name));
+        return;
+    }
+    if m.mask.is_some() && value != Value::Null && value != Value::Text(String::new()) {
+        crate::privacy::form_field(out, r, m, &value);
         return;
     }
 
@@ -431,7 +470,10 @@ where
     }
 
     fn submit(&self, ctx: Ctx, values: Map<String, Json>) -> BoxFuture<Result<Vec<Effect>>> {
-        let valid = self.form.read(&values, ctx.locale(), ctx.time_zone());
+        let valid = self.form.read_for(&values, &ctx);
+        if let Ok(saved) = &valid {
+            ctx.record_changes(&self.form.model, saved);
+        }
         let on_success = self.on_success.clone();
         Box::pin(async move {
             let valid = valid.map_err(Error::Validation)?;
@@ -450,7 +492,7 @@ where
     fn tool_schema(&self) -> Json {
         let mut properties = Map::new();
         let mut required = Vec::new();
-        for m in self.form.fields().map(|f| f.meta).filter(|m| !m.key && !m.readonly && !m.version) {
+        for m in self.form.fields().map(|f| f.meta).filter(|m| !m.key && !m.readonly && !m.version && m.mask.is_none()) {
             let (kind, hint) = match m.kind {
                 FieldKind::Bool => ("boolean", String::new()),
                 FieldKind::Integer | FieldKind::Id => ("string", "Whole number.".to_string()),
@@ -487,6 +529,11 @@ impl<M: Model> Component for Form<M> {
     fn schema(&self) -> Json {
         json!({ "type": "form", "model": M::NAME, "fields": self.fields_schema(), "submit": null })
     }
+
+    fn reveal(&self, field: &str) -> Option<crate::privacy::Revealed> {
+        self.fields().find(|f| f.meta.name == field)?;
+        crate::privacy::reveal_in(&self.model, field)
+    }
 }
 
 impl<M: Model, A> Component for SubmitForm<M, A>
@@ -519,6 +566,10 @@ where
 
     fn form(&self) -> Option<&dyn FormSource> {
         Some(self)
+    }
+
+    fn reveal(&self, field: &str) -> Option<crate::privacy::Revealed> {
+        self.form.reveal(field)
     }
 }
 

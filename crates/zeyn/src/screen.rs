@@ -24,6 +24,10 @@ pub struct ScreenMeta {
     pub name: &'static str,
     pub route: Option<&'static str>,
     pub access: Access,
+    /// Opening the screen is audited as a read, with its params.
+    pub sensitive: bool,
+    /// The user must give a reason before the screen's data is shown. Implies `sensitive`.
+    pub reason: bool,
 }
 
 /// A screen. Implemented by `#[screen]`, never written by hand.
@@ -241,6 +245,16 @@ pub trait GridSource: Send + Sync {
         let _ = (page, key, item);
         None
     }
+
+    /// Fields of the row model. Used to keep searches off masked fields.
+    fn fields(&self) -> &'static [crate::model::FieldMeta] {
+        &[]
+    }
+
+    /// The raw value of a masked field of the row with this key, for an audited reveal.
+    fn reveal(&self, _ctx: Ctx, _key: String, _field: String) -> BoxFuture<Result<Option<crate::privacy::Revealed>>> {
+        Box::pin(async { Ok(None) })
+    }
 }
 
 /// A component that saves data through an action. Implemented by forms with `submit`.
@@ -272,6 +286,17 @@ pub trait Component: Send + Sync {
     fn form(&self) -> Option<&dyn FormSource> {
         None
     }
+
+    /// The raw value of a masked field this component shows, for an audited reveal. The server
+    /// checks the unmask permission before sending it.
+    fn reveal(&self, _field: &str) -> Option<crate::privacy::Revealed> {
+        None
+    }
+
+    /// CSV import, for components that import rows (see [`crate::Import`]).
+    fn import(&self) -> Option<&dyn crate::import::ImportSource> {
+        None
+    }
 }
 
 /// Type erased component: a node of the screen tree.
@@ -296,6 +321,14 @@ impl Node {
 
     pub fn form(&self) -> Option<&dyn FormSource> {
         self.0.form()
+    }
+
+    pub fn reveal(&self, field: &str) -> Option<crate::privacy::Revealed> {
+        self.0.reveal(field)
+    }
+
+    pub fn import(&self) -> Option<&dyn crate::import::ImportSource> {
+        self.0.import()
     }
 }
 

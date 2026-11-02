@@ -956,6 +956,9 @@ impl<E: Model> Grid<E> {
         let nested = self.nested();
         let tree = nested && self.tree.is_some();
         for row in rows {
+            if let (true, Some(ctx)) = (E::SENSITIVE, r.ctx) {
+                ctx.record_read(row);
+            }
             out.push_str("<tr");
             let mut toggle = String::new();
             if nested {
@@ -1026,14 +1029,15 @@ impl<E: Model> Grid<E> {
                     (false, true) => r#" class="z-tree-cell""#,
                     (false, false) => "",
                 };
-                let mut content = match &c.cell {
-                    Some(cell) => cell(row, r),
-                    None => r.value(&value, &c.meta.kind),
+                let mut content = match (c.meta.mask, &c.cell) {
+                    (Some(_), _) => crate::privacy::cell(r, c.meta, &value, row),
+                    (None, Some(cell)) => cell(row, r),
+                    (None, None) => r.value(&value, &c.meta.kind),
                 };
                 if first {
                     content = format!(r#"<span class="z-tree" style="--z-level:{}">{toggle}<span>{content}</span></span>"#, b.depth);
                 }
-                if edit && c.editable && !c.meta.readonly && !c.meta.key && !c.meta.version {
+                if edit && c.editable && !c.meta.readonly && !c.meta.key && !c.meta.version && c.meta.mask.is_none() {
                     let v = crate::form::edit_value(&value, r.locale, r.tz);
                     out.push_str(&format!(r#"<td{class} data-v="{}">{content}</td>"#, escape(&v)));
                 } else {
@@ -1548,6 +1552,14 @@ impl<E: Model> GridSource for Grid<E> {
     fn foot_html(&self, page: &LoadedPage, r: &Render) -> Option<String> {
         let has = self.columns.iter().any(|c| !c.aggregates.is_empty());
         (has && !page.totals.is_empty()).then(|| self.foot_row(r, &page.totals, &self.layout(page.view.as_ref())))
+    }
+
+    fn fields(&self) -> &'static [FieldMeta] {
+        E::fields()
+    }
+
+    fn reveal(&self, ctx: Ctx, key: String, field: String) -> BoxFuture<Result<Option<crate::privacy::Revealed>>> {
+        crate::privacy::grid_reveal::<E>(self.fetch, ctx, key, field)
     }
 
     fn tool_schema(&self) -> serde_json::Value {

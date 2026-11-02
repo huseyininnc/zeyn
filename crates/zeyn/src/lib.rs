@@ -235,6 +235,18 @@
 //! }
 //! ```
 //!
+//! A mask on a field that is not text:
+//!
+//! ```compile_fail
+//! use zeyn::prelude::*;
+//!
+//! #[model]
+//! pub struct Card {
+//!     #[mask(last4)]
+//!     pub number: i64,
+//! }
+//! ```
+//!
 //! ## Extension points
 //!
 //! - [`Component`]: any type that renders HTML and describes itself in the schema can go on a screen.
@@ -243,14 +255,19 @@
 
 mod action;
 mod api;
+pub mod audit;
 mod ctx;
 mod feature;
 mod form;
 mod grid;
 mod i18n;
 mod menu;
+mod import;
+#[cfg(feature = "server")]
+mod jobs;
 mod model;
 mod platform;
+mod privacy;
 pub mod render;
 mod screen;
 #[cfg(feature = "server")]
@@ -259,12 +276,15 @@ mod time;
 #[cfg(feature = "server")]
 pub mod server;
 mod value;
+mod workflow;
 
 pub use action::{
     Access, Action, ActionMeta, Aggregate, AggregateRequest, Cursor, DEFAULT_PAGE_SIZE, Error, Filter, GridQuery, MAX_FILTERS,
     MAX_FILTER_CHOICES, MAX_FILTER_TEXT, MAX_PAGE_SIZE, Page, PageRequest,
     Result, Sort, Total,
 };
+pub use audit::{FieldChange, FieldRef, RecordRef, Trail};
+pub use privacy::{MaskStyle, Masking, Revealed, can_unmask, masked_text, reveal_in};
 pub use api::{ApiEntry, ApiInput, ApiOutput, ApiResult, model_schema};
 pub use ctx::{BoxFuture, Ctx, Dep, Identity, Inject, IntoScreen, Outcome, Service, Services};
 pub use feature::{Feature, Guard, GuardResult, Menu, MenuGroup, MenuItem, Route, ScreenEntry, SignedIn};
@@ -288,6 +308,8 @@ pub use server::{
     SubdomainTenant, TenantResolver, Theme, TimePolicy,
 };
 #[cfg(feature = "server")]
+pub use jobs::{JobState, JobStatus, Jobs, Schedule};
+#[cfg(feature = "server")]
 pub use security::{IpRange, MemoryRateStore, RateKey, RateLimit, RateStore, client_ip, parse_ranges};
 pub use screen::{
     Component, Effect, Export, FormSource, GridSource, Icon, LoadedPage, Node, Params, RowCall, Screen, ScreenDef, ScreenMeta,
@@ -298,6 +320,8 @@ pub use value::{
     SupportsText,
     Value,
 };
+pub use import::{CsvError, Checked, DEFAULT_MAX_ROWS, HARD_MAX_ROWS, Import, ImportSource, MAX_CSV_BYTES, RowError, check_csv, error_report, parse_csv};
+pub use workflow::{MAX_COMMENT, Transition, TransitionRecord, TransitionRequest, Transitions, Workflow, WorkflowState};
 pub use zeyn_macros::{action, choice, entity, model, params, screen, t};
 
 #[doc(hidden)]
@@ -310,7 +334,8 @@ pub mod prelude {
     pub use crate::{
         Action, ContextMenu, Ctx, Currency, Date, DateTime, Effect, Tone, LocalDateTime, Time, TimeZone, Entity, Error, Export, Feature, Field, Form, Grid, GridMode, GridQuery,
         GuardResult, Icon, Identity, Licensed, Model, Secret, Tenant, TenantRequired, Money, Node, Page, Paging, Result, RowStyle, Screen, ScreenDef, Service,
-        SignedIn, Text, UiCtx, Valid, ValidationErrors, Window, action, choice, entity, model, params, screen, t,
+        SignedIn, Text, Import, TransitionRequest, Transitions, UiCtx, Valid, ValidationErrors, Window, Workflow, action, choice, entity,
+        model, params, screen, t,
     };
     #[cfg(feature = "server")]
     pub use crate::{

@@ -38,9 +38,23 @@
     "org": "Organizasyon şeması",
     "leave": "İzin talebi",
     "send": "Talebi gönder",
-    "sent": "{days} günlük izin talebiniz gönderildi.",
     "ends_before_start": "Son gün ilk günden önce olamaz.",
-    "too_long": "Tek bir talep en fazla 30 günü kapsayabilir."
+    "too_long": "Tek bir talep en fazla 30 günü kapsayabilir.",
+    "requests": "İzin talepleri",
+    "import": "İzin taleplerini içe aktar",
+    "save": "Kaydet",
+    "saved_draft": "Talebiniz taslak olarak kaydedildi. Açıp onaya gönderebilirsiniz."
+  },
+  "workflow": {
+    "submit": "Onaya gönder",
+    "approve": "Onayla",
+    "reject": "Reddet"
+  },
+  "LeaveState": {
+    "Draft": "Taslak",
+    "Submitted": "Onay bekliyor",
+    "Approved": "Onaylandı",
+    "Rejected": "Reddedildi"
   },
   "Employee": {
     "name": "Ad soyad",
@@ -87,7 +101,8 @@
     "first_day": "İlk gün",
     "last_day": "Son gün",
     "kind": "Tür",
-    "note": "Not"
+    "note": "Not",
+    "state": "Durum"
   },
   "LeaveKind": {
     "Annual": "Yıllık izin",

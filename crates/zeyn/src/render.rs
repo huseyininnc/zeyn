@@ -60,11 +60,14 @@ pub struct Render<'a> {
     /// Who the page is for. Components leave out actions this identity may not run. `None` (tests
     /// and tools) shows everything; the server always sets it.
     pub identity: Option<&'a crate::ctx::Identity>,
+    /// The request, when rendering for a user: decides who may reveal masked values and records
+    /// reads of sensitive records. `None` treats the viewer as having no permissions.
+    pub ctx: Option<&'a crate::ctx::Ctx>,
 }
 
 impl<'a> Render<'a> {
     pub fn new(scope: &'a str, locale: &'a str, i18n: &'a crate::i18n::I18n) -> Self {
-        Self { scope, locale, i18n, tz: crate::time::TimeZone::UTC, identity: None }
+        Self { scope, locale, i18n, tz: crate::time::TimeZone::UTC, identity: None, ctx: None }
     }
 
     /// Sets who the page is for, so components can leave out what this user may not do.
@@ -78,6 +81,12 @@ impl<'a> Render<'a> {
         self.identity.is_none_or(|i| i.can(access))
     }
 
+    /// Renders for the user of this request.
+    pub fn with_ctx(mut self, ctx: &'a crate::ctx::Ctx) -> Self {
+        self.ctx = Some(ctx);
+        self
+    }
+
     pub fn with_tz(mut self, tz: crate::time::TimeZone) -> Self {
         self.tz = tz;
         self
@@ -85,7 +94,7 @@ impl<'a> Render<'a> {
 
     /// English with the built in catalogs. For tests and tools.
     pub fn english(scope: &'a str) -> Render<'a> {
-        Render { scope, locale: "en", i18n: crate::i18n::I18n::builtin(), tz: crate::time::TimeZone::UTC, identity: None }
+        Render { scope, locale: "en", i18n: crate::i18n::I18n::builtin(), tz: crate::time::TimeZone::UTC, identity: None, ctx: None }
     }
 
     /// Resolves a text and escapes it for HTML.

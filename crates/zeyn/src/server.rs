@@ -24,6 +24,12 @@ use std::future::Future;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+mod data;
+mod ops;
+mod session;
+
+pub use ops::build_id;
+
 const JS: &str = include_str!("../assets/zeyn.js");
 const CSS: &str = include_str!("../assets/zeyn.css");
 const NAV: &str = include_str!("../assets/nav.js");
@@ -67,13 +73,14 @@ pub struct ForwardAuth {
     groups: Option<&'static str>,
     tenant: Option<&'static str>,
     time_zone: Option<&'static str>,
+    auth_time: Option<&'static str>,
     shared: Option<(&'static str, String)>,
     roles: HashMap<String, Vec<String>>,
 }
 
 impl ForwardAuth {
     pub fn new(user_header: &'static str) -> Self {
-        ForwardAuth { user: user_header, groups: None, tenant: None, time_zone: None, shared: None, roles: HashMap::new() }
+        ForwardAuth { user: user_header, groups: None, tenant: None, time_zone: None, auth_time: None, shared: None, roles: HashMap::new() }
     }
 
     /// Header with the user's groups, comma separated.
@@ -91,6 +98,13 @@ impl ForwardAuth {
     /// Header with the user's time zone.
     pub fn time_zone(mut self, header: &'static str) -> Self {
         self.time_zone = Some(header);
+        self
+    }
+
+    /// Header with the time the user signed in, as Unix seconds or RFC 3339. Needed by actions
+    /// marked `reauth`.
+    pub fn auth_time(mut self, header: &'static str) -> Self {
+        self.auth_time = Some(header);
         self
     }
 
@@ -129,6 +143,10 @@ impl Authenticator for ForwardAuth {
         }
         identity.tenant = self.tenant.and_then(text).map(str::to_string);
         identity.time_zone = self.time_zone.and_then(text).map(str::to_string);
+        identity.authenticated_at = self.auth_time.and_then(text).and_then(|t| match t.parse::<i64>() {
+            Ok(secs) => secs.checked_mul(1000).map(DateTime::from_unix_ms),
+            Err(_) => DateTime::parse(t),
+        });
         Some(identity)
     }
 }
@@ -184,7 +202,9 @@ impl DevAuth {
 
 impl Authenticator for DevAuth {
     fn authenticate(&self, _headers: &HeaderMap) -> Option<Identity> {
-        Some(self.0.clone())
+        let mut identity = self.0.clone();
+        identity.authenticated_at.get_or_insert_with(DateTime::now);
+        Some(identity)
     }
 
     fn is_development(&self) -> bool {
@@ -201,6 +221,10 @@ pub enum CallKind {
     Grid,
     Form,
     Api,
+    /// A masked value shown in full on request.
+    Reveal,
+    /// Rows imported from a CSV file.
+    Import,
 }
 
 /// What is being called.
@@ -243,6 +267,27 @@ pub struct AuditEntry {
     pub error: Option<&'static str>,
     pub via_agent: bool,
     pub millis: u128,
+    /// Model of the saved record, such as `Product`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<&'static str>,
+    /// Key of the saved record as text.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub record: Option<String>,
+    /// Changed fields with old and new values. Old values come from the record the server loaded.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub changes: Vec<crate::audit::FieldChange>,
+    /// Masked values the user was shown in full.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub revealed: Vec<crate::audit::FieldRef>,
+    /// Sensitive records the user was shown.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub reads: Vec<crate::audit::RecordRef>,
+    /// Reason the user gave for opening a screen that asks for one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    /// Workflow move: name, from, to and the user's comment.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transition: Option<crate::workflow::TransitionRecord>,
 }
 
 /// Where audit records go.
@@ -284,11 +329,25 @@ pub struct AuditLog<S: AuditSink>(pub S);
 
 impl<S: AuditSink> Interceptor for AuditLog<S> {
     fn after(&self, ctx: &Ctx, call: &Call, outcome: &CallOutcome) {
-        let audited = call.kind == CallKind::Form || call.action.is_some_and(|a| a.audit);
+        let trail = ctx.trail();
+        let audited = call.kind == CallKind::Form
+            || call.kind == CallKind::Reveal
+            || call.kind == CallKind::Import
+            || call.action.is_some_and(|a| a.audit)
+            || !trail.revealed.is_empty()
+            || !trail.reads.is_empty()
+            || trail.transition.is_some();
         if !audited {
             return;
         }
         self.0.record(AuditEntry {
+            model: trail.record.as_ref().map(|r| r.model),
+            record: trail.record.and_then(|r| r.id),
+            changes: trail.changes,
+            revealed: trail.revealed,
+            reads: trail.reads,
+            reason: trail.reason,
+            transition: trail.transition,
             at_unix_ms: SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0),
             user: ctx.identity().user.clone(),
             kind: call.kind,
@@ -548,6 +607,7 @@ pub struct App {
     setup_problems: Vec<String>,
     views: Option<Arc<dyn crate::grid::DataGridViewStore>>,
     native_menu: bool,
+    extras: ops::Extras,
 }
 
 impl App {
@@ -585,6 +645,7 @@ impl App {
             setup_problems: Vec::new(),
             views: None,
             native_menu: true,
+            extras: ops::Extras::default(),
         }
     }
 
@@ -955,7 +1016,9 @@ impl App {
             theme: self.theme,
             views: self.views,
             native_menu: self.native_menu,
+            extras: self.extras,
         });
+        ops::start_jobs(&state);
         let mut router = Router::new();
         for f in &state.features {
             for s in f.screens() {
@@ -1009,10 +1072,12 @@ impl App {
             .route("/_zeyn/locale", post(set_locale))
             .route("/_zeyn/timezone", post(set_time_zone))
             .route("/_zeyn/tools", get(tools))
-            .route("/_zeyn/mcp", post(mcp))
+            .route("/_zeyn/mcp", post(mcp));
+        let router = session::routes(data::routes(ops::routes(router)))
             .fallback(not_found)
             .layer(axum::middleware::from_fn_with_state(state.clone(), guard_request))
             .layer(axum::middleware::map_response(security_headers))
+            .layer(axum::middleware::map_response(ops::stamp))
             .with_state(state);
         let router = if mount.is_empty() { router } else { Router::new().nest(&mount, router) };
         if cors.is_empty() {
@@ -1035,6 +1100,10 @@ impl App {
         }
         for (locale, key) in self.i18n.missing_keys() {
             eprintln!("warning: translation `{key}` is missing in `{locale}`");
+        }
+        #[cfg(debug_assertions)]
+        if let Some(d) = self.extras.latency {
+            eprintln!("warning: every call is delayed by {} ms (dev_latency)", d.as_millis());
         }
         if self.auth.as_ref().is_some_and(|a| a.is_development()) {
             eprintln!("warning: DevAuth is on; every request has full access. Do not use it in production.");
@@ -1082,6 +1151,7 @@ struct AppState {
     theme: Option<Theme>,
     views: Option<Arc<dyn crate::grid::DataGridViewStore>>,
     native_menu: bool,
+    extras: ops::Extras,
 }
 
 /// Decodes `%XX` sequences in a cookie value.
@@ -1103,10 +1173,12 @@ fn percent_decode(s: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
-/// Failure of a call: an application error or a timeout.
+/// Failure of a call: an application error, a timeout, or a refusal with its own status and code
+/// that the runtime acts on (such as `reason_required`).
 enum Failure {
     App(Error),
     Timeout,
+    Status(StatusCode, &'static str, Text),
 }
 
 impl From<Error> for Failure {
@@ -1189,6 +1261,7 @@ impl AppState {
             .with_time_zone(tz)
             .with_tenant(tenant)
             .with_config(self.config.clone());
+        data::read_reason(&ctx, headers);
         match self.fixed_now {
             Some(now) => ctx.with_now(now),
             None => ctx,
@@ -1254,11 +1327,13 @@ impl AppState {
             return Err(Failure::App(Error::Forbidden));
         }
         feature.check_guards(ctx)?;
+        data::check_reason(ctx, &entry.meta)?;
         let screen = self.timed((entry.build)(ctx.clone(), params)).await?;
         Ok((feature, entry, screen))
     }
 
     fn before(&self, ctx: &Ctx, call: &Call) -> Result<(), Failure> {
+        session::check_reauth(self, ctx, call)?;
         for i in &self.interceptors {
             i.before(ctx, call)?;
         }
@@ -1272,6 +1347,7 @@ impl AppState {
                 Ok(_) => None,
                 Err(Failure::Timeout) => Some("timeout"),
                 Err(Failure::App(e)) => Some(e.code()),
+                Err(Failure::Status(_, code, _)) => Some(*code),
             },
             duration: started.elapsed(),
         };
@@ -1321,6 +1397,7 @@ impl AppState {
     fn error_response(&self, ctx: &Ctx, failure: Failure) -> Response {
         let (status, code, message) = match &failure {
             Failure::Timeout => (StatusCode::GATEWAY_TIMEOUT, "timeout", Text::key("zeyn.error.timeout")),
+            Failure::Status(status, code, message) => (*status, *code, message.clone()),
             Failure::App(e) => {
                 let status = match e {
                     Error::Forbidden | Error::Denied(_) => StatusCode::FORBIDDEN,
@@ -1349,6 +1426,7 @@ impl AppState {
     fn error_page(&self, ctx: &Ctx, failure: Failure, csrf: &str) -> Response {
         let (status, message) = match failure {
             Failure::Timeout => (StatusCode::GATEWAY_TIMEOUT, Text::key("zeyn.error.timeout")),
+            Failure::Status(status, _, message) => (status, message),
             Failure::App(e) => {
                 let status = match &e {
                     Error::Forbidden | Error::Denied(_) => StatusCode::FORBIDDEN,
@@ -1432,7 +1510,7 @@ impl AppState {
         }
         let app = r.text(&self.name);
         format!(
-            r##"<!doctype html><html lang="{lang}"{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css">{theme_link}<script type="module" src="{base}/_zeyn/zeyn.js"></script><script type="module" src="{base}/_zeyn/nav.js"></script></head><body><a class="z-skip" href="#z-main">{skip}</a><div class="z-app"><nav class="z-nav" aria-label="{menu}"><p class="z-app-name">{app}</p>{nav}</nav><main class="z-main" id="z-main">{main}</main></div><div class="z-toasts" role="status" aria-live="polite"></div></body></html>"##,
+            r##"<!doctype html><html lang="{lang}"{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css">{theme_link}<script type="module" src="{base}/_zeyn/zeyn.js"></script><script type="module" src="{base}/_zeyn/nav.js"></script>{extra}</head><body><a class="z-skip" href="#z-main">{skip}</a><div class="z-app"><nav class="z-nav" aria-label="{menu}"><p class="z-app-name">{app}</p>{nav}</nav><main class="z-main" id="z-main">{main}</main></div><div class="z-toasts" role="status" aria-live="polite"></div></body></html>"##,
             lang = escape(ctx.locale()),
             tz = escape(ctx.time_zone().name()),
             base = escape(&self.prefix),
@@ -1455,6 +1533,7 @@ impl AppState {
                 String::new()
             },
             title = escape(title),
+            extra = ops::head(self, ctx),
             skip = r.text(&Text::key("zeyn.shell.skip")),
             menu = r.text(&Text::key("zeyn.shell.menu")),
         )
@@ -1474,15 +1553,20 @@ fn asset(body: &'static str, content_type: &'static str) -> Response {
 /// IP rules and rate limits, before any handler runs.
 async fn guard_request(State(st): State<Arc<AppState>>, req: axum::extract::Request, next: axum::middleware::Next) -> Response {
     let path = req.uri().path().to_string();
-    if path == "/_zeyn/zeyn.js" || path == "/_zeyn/zeyn.css" || path == "/_zeyn/nav.js" || path == "/_zeyn/theme.css" || path == "/favicon.ico" {
+    if path == "/_zeyn/zeyn.js" || path == "/_zeyn/zeyn.css" || path == "/_zeyn/nav.js" || path == "/_zeyn/theme.css" || path == "/favicon.ico" || ops::is_asset(&path) {
         return next.run(req).await;
     }
+    ops::delay(&st, &path).await;
     let headers = req.headers().clone();
     let peer = req.extensions().get::<axum::extract::ConnectInfo<std::net::SocketAddr>>().map(|c| c.0.ip());
     let forwarded = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok());
     let ip = client_ip(peer, forwarded, &st.trusted);
+    let probe = ops::is_probe(&path);
     let blocked = match ip {
-        Some(ip) => st.deny.iter().any(|r| r.contains(ip)) || (!st.allow.is_empty() && !st.allow.iter().any(|r| r.contains(ip))),
+        Some(ip) => {
+            st.deny.iter().any(|r| r.contains(ip))
+                || (!st.allow.is_empty() && !st.allow.iter().any(|r| r.contains(ip)) && !(probe && st.extras.probe_ip(ip)))
+        }
         None => !st.allow.is_empty(),
     };
     if blocked {
@@ -1490,9 +1574,9 @@ async fn guard_request(State(st): State<Arc<AppState>>, req: axum::extract::Requ
         return problem(&ctx, Failure::App(Error::Forbidden));
     }
     let is_write = req.method() == axum::http::Method::POST
-        && (matches!(path.as_str(), "/_zeyn/form" | "/_zeyn/mcp" | "/_zeyn/menu" | "/_zeyn/grid/edit" | "/_zeyn/grid/run" | "/_zeyn/grid/bulk")
+        && (matches!(path.as_str(), "/_zeyn/form" | "/_zeyn/import" | "/_zeyn/mcp" | "/_zeyn/menu" | "/_zeyn/grid/edit" | "/_zeyn/grid/run" | "/_zeyn/grid/bulk")
             || path.starts_with(&format!("{}/", st.api_prefix)));
-    let limits = [(st.rate, "all"), (if is_write { st.write_rate } else { None }, "write")];
+    let limits = if probe { [(None, "all"), (None, "write")] } else { [(st.rate, "all"), (if is_write { st.write_rate } else { None }, "write")] };
     for (limit, scope) in limits {
         let Some(limit) = limit else { continue };
         let ip_key = ip.map(|i| i.to_string()).unwrap_or_else(|| "unknown".into());
@@ -1550,8 +1634,9 @@ async fn page(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Que
         let params = q.value()?;
         st.before(&ctx, &call)?;
         let (_, entry, screen) = st.open(&ctx, name, params.clone()).await?;
+        data::note_screen_read(&ctx, &entry.meta, &params);
         let loaded = st.preload(&ctx, &screen, name).await;
-        let r = Render::new(name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity());
+        let r = Render::new(name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity()).with_ctx(&ctx);
         let html = screen.render(&r, &entry.meta, &params, &loaded);
         Ok::<_, Failure>((ctx.t(screen.title()), html))
     }
@@ -1578,6 +1663,7 @@ async fn page(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Que
             let sep = if target.contains('?') { '&' } else { '?' };
             Redirect::to(&format!("{target}{sep}return_to={}", encode(&here))).into_response()
         }
+        Err(Failure::Status(_, "reason_required", _)) => data::reason_page(&st, &ctx, name, &csrf),
         Err(f) => st.error_page(&ctx, f, &csrf),
     };
     with_cookie(response, set)
@@ -1590,14 +1676,22 @@ async fn screen_fragment(
     Query(q): Query<ParamsQuery>,
 ) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
+    let Some((&name, _)) = st.screens.get_key_value(name.as_str()) else {
+        return st.error_response(&ctx, Failure::App(Error::NotFound));
+    };
+    let call = Call { kind: CallKind::Screen, screen: name, action: None, via_agent: false };
+    let started = Instant::now();
     let result = async {
         let params = q.value()?;
-        let (_, entry, screen) = st.open(&ctx, &name, params.clone()).await?;
+        st.before(&ctx, &call)?;
+        let (_, entry, screen) = st.open(&ctx, name, params.clone()).await?;
+        data::note_screen_read(&ctx, &entry.meta, &params);
         let loaded = st.preload(&ctx, &screen, entry.meta.name).await;
-        let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity());
+        let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity()).with_ctx(&ctx);
         Ok::<_, Failure>(screen.render(&r, &entry.meta, &params, &loaded))
     }
     .await;
+    st.after(&ctx, &call, started, &result);
     match result {
         Ok(html) => Html(html).into_response(),
         Err(f) => st.error_response(&ctx, f),
@@ -1761,24 +1855,26 @@ impl AppState {
         }
         let info = Call { kind: CallKind::Grid, screen: entry.meta.name, action: Some(action), via_agent: ctx.via_agent() };
         let started = Instant::now();
+        let mut query = call.query;
+        crate::privacy::strip_masked(&mut query, grid.fields(), ctx);
         let result = async {
             self.before(ctx, &info)?;
-            self.timed(grid.fetch_at(ctx.clone(), call.query, call.path)).await
+            let mut page = self.timed(grid.fetch_at(ctx.clone(), query, call.path)).await?;
+            page.view = call.view.map(|v| grid.clean_view(v));
+            let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity()).with_ctx(ctx);
+            Ok(json!({
+                "head": call.head.then(|| grid.head_html(&r, page.view.as_ref())),
+                "rows": grid.rows_html(&page, &r),
+                "foot": grid.foot_html(&page, &r),
+                "count": page.count,
+                "total": page.total,
+                "next": page.next,
+                "offset": page.offset,
+            }))
         }
         .await;
         self.after(ctx, &info, started, &result);
-        let mut page = result?;
-        page.view = call.view.map(|v| grid.clean_view(v));
-        let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity());
-        Ok(json!({
-            "head": call.head.then(|| grid.head_html(&r, page.view.as_ref())),
-            "rows": grid.rows_html(&page, &r),
-            "foot": grid.foot_html(&page, &r),
-            "count": page.count,
-            "total": page.total,
-            "next": page.next,
-            "offset": page.offset,
-        }))
+        result
     }
 
     /// Saves or deletes the user's view of a grid. Needs a store, a signed in user and the grid's
@@ -1956,7 +2052,7 @@ impl AppState {
         .await;
         self.after(ctx, &info, started, &result);
         let effects = result?;
-        let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity());
+        let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity()).with_ctx(ctx);
         Ok(json!({ "effects": effects.iter().map(|e| e.to_json(&r)).collect::<Vec<_>>() }))
     }
 
@@ -2185,6 +2281,7 @@ async fn set_locale(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::J
 fn problem(ctx: &Ctx, failure: Failure) -> Response {
     let (status, code, message) = match &failure {
         Failure::Timeout => (StatusCode::GATEWAY_TIMEOUT, "timeout", Text::key("zeyn.error.timeout")),
+        Failure::Status(status, code, message) => (*status, *code, message.clone()),
         Failure::App(e) => (
             match e {
                 Error::Forbidden | Error::Denied(_) => StatusCode::FORBIDDEN,
@@ -2470,6 +2567,7 @@ async fn mcp(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(req
                     let message = match f {
                         Failure::Timeout => ctx.t(&Text::key("zeyn.error.timeout")),
                         Failure::App(e) => ctx.t(&e.message()),
+                        Failure::Status(_, _, message) => ctx.t(&message),
                     };
                     reply(json!({ "content": [{ "type": "text", "text": message }], "isError": true }))
                 }

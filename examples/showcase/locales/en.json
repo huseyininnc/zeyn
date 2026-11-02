@@ -38,9 +38,23 @@
     "org": "Organization chart",
     "leave": "Leave request",
     "send": "Send request",
-    "sent": "Your request for {days} days was sent.",
     "ends_before_start": "The last day cannot be before the first day.",
-    "too_long": "A single request can cover at most 30 days."
+    "too_long": "A single request can cover at most 30 days.",
+    "requests": "Leave requests",
+    "import": "Import leave requests",
+    "save": "Save",
+    "saved_draft": "Your request was saved as a draft. Open it and submit it for approval."
+  },
+  "workflow": {
+    "submit": "Submit for approval",
+    "approve": "Approve",
+    "reject": "Reject"
+  },
+  "LeaveState": {
+    "Draft": "Draft",
+    "Submitted": "Waiting for approval",
+    "Approved": "Approved",
+    "Rejected": "Rejected"
   },
   "Employee": {
     "name": "Name",
@@ -87,7 +101,8 @@
     "first_day": "First day",
     "last_day": "Last day",
     "kind": "Kind",
-    "note": "Note"
+    "note": "Note",
+    "state": "State"
   },
   "LeaveKind": {
     "Annual": "Annual leave",
