@@ -240,6 +240,7 @@ pub fn archive() -> Screen {
             .mode(DataMode::Server)
             .paging(Paging::virtual_scroll())
             .exportable()
+            .sort_by(Order::id, true)
             .column(Order::id)
             .width(110)
             .column(Order::placed_at)

@@ -520,12 +520,17 @@ pub fn act_nested() -> Screen {
     Screen::new("Act nested").body(Panel::new("Items").add(DataGrid::of(search).column(Item::code).row_action("Bump", bump, |i| i.id)))
 }
 
+#[screen(route = "/sorted", permission = "items.read")]
+pub fn sorted() -> Screen {
+    Screen::new("Sorted").body(DataGrid::of(search).sort_by(Item::qty, true).column(Item::code).column(Item::qty))
+}
+
 fn act_router(identity: Identity) -> (Router, Store) {
     let store = Store::seeded();
     let router = App::new("Test")
         .service(store.clone())
         .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
-        .feature(Feature::new("items").screen(act).screen(act_nested))
+        .feature(Feature::new("items").screen(act).screen(act_nested).screen(sorted))
         .router()
         .unwrap();
     (router, store)
@@ -567,6 +572,16 @@ async fn row_action_runs_with_input_built_from_the_row_on_the_server() {
     assert_eq!(store.0.read().unwrap()[6].qty, 107);
     let r = send(&router, run("7", "a0")).await;
     assert_eq!(r.status, StatusCode::FORBIDDEN, "the action's own error comes back");
+}
+
+#[tokio::test]
+async fn a_default_sort_orders_the_first_page_and_reaches_the_browser() {
+    let (router, _) = act_router(reader());
+    let r = send(&router, get("/sorted")).await;
+    assert!(r.body.contains(r#"data-zeyn-sort-default="[{&quot;field&quot;:&quot;qty&quot;,&quot;desc&quot;:true}]""#), "{}", r.body);
+    let first = r.body.find(r#"<tr data-zeyn-key="#).map(|i| &r.body[i..i + 30]).unwrap_or_default();
+    let max = Store::seeded().0.read().unwrap().iter().max_by_key(|i| i.qty).map(|i| i.id.0).unwrap();
+    assert!(first.contains(&format!(r#"data-zeyn-key="{max}""#)), "{first}");
 }
 
 #[tokio::test]

@@ -394,6 +394,7 @@ pub struct DataGrid<E: Model> {
     export: Option<(crate::action::Access, usize)>,
     detail: Option<DetailDef<E>>,
     scope: Vec<Filter>,
+    default_sort: Vec<crate::action::Sort>,
     group_by: Vec<&'static FieldMeta>,
     tree: Option<&'static FieldMeta>,
 }
@@ -528,6 +529,7 @@ impl<E: Model> DataGrid<E> {
             export: None,
             detail: None,
             scope: Vec::new(),
+            default_sort: Vec::new(),
             group_by: Vec::new(),
             tree: None,
         }
@@ -580,6 +582,15 @@ impl<E: Model> DataGrid<E> {
             access: S::META.access,
             params: Box::new(move |row| serde_json::to_value(detail(row).1).unwrap_or(serde_json::Value::Null)),
         });
+        self
+    }
+
+    /// The order rows come in before the user sorts: `.sort_by(Order::id, true)` for newest
+    /// first. The header shows it, and clicking that column only switches between ascending and
+    /// descending; other columns go back to this order on their third click. Call it again to add
+    /// further keys. The action still receives it in `DataQuery::sort`.
+    pub fn sort_by<T: FieldType>(mut self, field: Field<E, T>, desc: bool) -> Self {
+        self.default_sort.push(crate::action::Sort { field: field.meta().name.to_string(), desc });
         self
     }
 
@@ -1128,6 +1139,9 @@ impl<E: Model> DataGrid<E> {
         if let Some(v) = view {
             out.push_str(&format!(r#" data-zeyn-view="{}""#, attr(v)));
         }
+        if !self.default_sort.is_empty() {
+            out.push_str(&format!(r#" data-zeyn-sort-default="{}""#, attr(&self.default_sort)));
+        }
         if page.is_some_and(|p| p.saved_views) {
             out.push_str(r#" data-zeyn-views="server""#);
         }
@@ -1372,7 +1386,7 @@ impl<E: Model> GridSource for DataGrid<E> {
             page,
             with_total: !matches!(self.paging, Paging::Infinite { .. }),
             aggregates: self.aggregate_requests(),
-            sort: view.map(|v| v.sort.clone()).unwrap_or_default(),
+            sort: view.map(|v| v.sort.clone()).filter(|s| !s.is_empty()).unwrap_or_else(|| self.default_sort.clone()),
             filters: view.map(|v| v.filters.clone()).unwrap_or_default(),
             ..DataQuery::default()
         }
@@ -1931,6 +1945,10 @@ impl<E: Model, T> DataGridColumn<E, T> {
 
     pub fn scope<U: FieldType>(self, field: Field<E, U>, value: U) -> DataGrid<E> {
         self.grid.scope(field, value)
+    }
+
+    pub fn sort_by<U: FieldType>(self, field: Field<E, U>, desc: bool) -> DataGrid<E> {
+        self.grid.sort_by(field, desc)
     }
 
     pub fn group_by<U: FieldType>(self, field: Field<E, U>) -> DataGrid<E> {

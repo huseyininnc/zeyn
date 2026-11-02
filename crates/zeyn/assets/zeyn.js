@@ -324,7 +324,7 @@ function initGrid(grid) {
     total: num(d.zeynTotal),
     next: str(d.zeynNext),
     count: rows(grid).length,
-    sort: sorted.map((th) => ({ field: th.dataset.field, desc: th.getAttribute('aria-sort') === 'descending' })),
+    sort: sorted.length ? sorted.map((th) => ({ field: th.dataset.field, desc: th.getAttribute('aria-sort') === 'descending' })) : defaultSort(grid),
     filters: {},
     texts: textsOf(grid),
     columns: null,
@@ -341,7 +341,7 @@ function initGrid(grid) {
   };
   grids.set(grid, state);
   if (saved.view) {
-    state.sort = saved.view.sort ?? [];
+    state.sort = saved.view.sort?.length ? saved.view.sort : defaultSort(grid);
     for (const f of saved.view.filters ?? []) {
       const { field, ...rest } = f;
       state.filters[field] = rest;
@@ -1245,9 +1245,19 @@ async function runRowItem(button, item) {
   }
 }
 
+/** The grid's own sort order (`DataGrid::sort_by`), used when the user has not chosen one. */
+function defaultSort(grid) {
+  try {
+    return JSON.parse(grid.dataset.zeynSortDefault || '[]');
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Cycles the sort of a column: none, ascending, descending. A plain click sorts by this column
  * only; Shift+click adds it to the sort keys (or changes or removes it there), up to four keys.
+ * "None" means the grid's own order, so a column of that order only switches direction.
  */
 function toggleSort(button, additive) {
   const th = button.closest('th');
@@ -1256,11 +1266,13 @@ function toggleSort(button, additive) {
   if (!s) return;
   const field = th.dataset.field;
   const current = s.sort.find((k) => k.field === field);
-  const next = !current ? { field, desc: false } : !current.desc ? { field, desc: true } : null;
+  const defaults = defaultSort(grid);
+  let next = !current ? { field, desc: false } : !current.desc ? { field, desc: true } : null;
+  if (!next && !additive && defaults[0]?.field === field) next = { field, desc: !current.desc };
   if (additive) {
     const rest = s.sort.filter((k) => k.field !== field);
     s.sort = next ? (current ? s.sort.map((k) => (k.field === field ? next : k)) : [...rest, next].slice(-4)) : rest;
-  } else s.sort = next ? [next] : [];
+  } else s.sort = next ? [next] : defaults;
   showSort(grid, s);
   saveView(grid);
   loadGrid(grid, 'reset');
@@ -1354,7 +1366,7 @@ function resetView(grid) {
   const s = grids.get(grid);
   if (!s) return;
   s.columns = null;
-  s.sort = [];
+  s.sort = defaultSort(grid);
   s.filters = {};
   saveView(grid, true);
   loadGrid(grid, 'layout');
@@ -1573,6 +1585,7 @@ function columnMenu(grid, th) {
   const key = s.sort.find((k) => k.field === field);
   const sortBy = (desc) => () => {
     s.sort = desc == null ? s.sort.filter((k) => k.field !== field) : [{ field, desc }];
+    if (!s.sort.length) s.sort = defaultSort(grid);
     showSort(grid, s);
     saveView(grid);
     loadGrid(grid, 'reset');
