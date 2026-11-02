@@ -722,8 +722,9 @@ function renderVirtual(grid, focusIndex = null) {
 
   const blocks = new Set();
   for (let b = Math.floor(start / s.size); b * s.size < Math.max(end, start + 1); b++) blocks.add(b);
+  const shown = [...blocks].every((b) => s.cache.has(b));
   const ahead = s.dir > 0 ? Math.max(...blocks) + 1 : Math.min(...blocks) - 1;
-  if (ahead >= 0 && ahead * s.size < total) blocks.add(ahead);
+  if (shown && ahead >= 0 && ahead * s.size < total) blocks.add(ahead);
   for (const [b, controller] of s.inflight) {
     if (!blocks.has(b)) {
       controller.abort();
@@ -756,6 +757,8 @@ async function fetchBlock(grid, s, b) {
   const gen = s.gen;
   const withTotal = s.needTotal;
   const head = s.needHead;
+  s.needTotal = false;
+  s.needHead = false;
   const filters = filterList(s);
   const page = { type: 'offset', offset: b * s.size, limit: s.size };
   const r = await post(
@@ -769,6 +772,10 @@ async function fetchBlock(grid, s, b) {
     { signal: controller.signal },
   );
   if (s.inflight.get(b) === controller) s.inflight.delete(b);
+  if (gen === s.gen && (controller.signal.aborted || !r.ok || !r.data || (head && typeof r.data.head !== 'string'))) {
+    s.needTotal ||= withTotal;
+    s.needHead ||= head;
+  }
   if (gen !== s.gen || controller.signal.aborted) return;
   if (!r.ok || !r.data) {
     s.failed.add(b);
@@ -776,7 +783,6 @@ async function fetchBlock(grid, s, b) {
     return;
   }
   if (head && typeof r.data.head === 'string') {
-    s.needHead = false;
     applyHead(grid, s, r.data.head);
   }
   const t = document.createElement('template');
@@ -787,9 +793,9 @@ async function fetchBlock(grid, s, b) {
   s.stale.delete(b);
   while (s.cache.size > V_CACHE) s.cache.delete(s.cache.keys().next().value);
   applyFoot(grid, r.data.foot);
+  if (withTotal && r.data.total == null) s.needTotal = true;
   if (withTotal && r.data.total != null) {
     s.total = r.data.total;
-    s.needTotal = false;
     gridState(grid, s.total ? null : 'empty');
   }
   s.version++;
