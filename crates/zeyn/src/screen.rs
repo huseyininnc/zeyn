@@ -66,6 +66,11 @@ impl Effect {
         Effect::Confirm { message: message.into(), then: Box::new(then) }
     }
 
+    /// Goes to a screen in place, like a link. Params of the wrong type do not compile.
+    pub fn navigate<S: ScreenDef>(_screen: S, params: S::Params) -> Effect {
+        Effect::Navigate { screen: S::META.name, params: params_json(&params) }
+    }
+
     /// JSON sent to the client, with texts resolved in the user's language.
     pub fn to_json(&self, r: &Render) -> serde_json::Value {
         match self {

@@ -92,7 +92,7 @@ struct ImportCall {
     screen: String,
     #[serde(default)]
     params: Json,
-    node: usize,
+    node: crate::ui::NodePath,
     csv: String,
     #[serde(default)]
     commit: bool,
@@ -107,7 +107,7 @@ async fn import(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(
     }
     let result = async {
         let (_, entry, screen) = st.open(&ctx, &call.screen, call.params).await?;
-        let source = screen.nodes().get(call.node).and_then(|n| n.import()).ok_or(Failure::App(Error::NotFound))?;
+        let source = screen.node(&call.node).and_then(|n| n.import()).ok_or(Failure::App(Error::NotFound))?;
         let action = source.action();
         if !ctx.identity().can(&action.access) {
             return Err(Failure::App(Error::Forbidden));
@@ -174,7 +174,7 @@ struct RevealCall {
     screen: String,
     #[serde(default)]
     params: Json,
-    node: usize,
+    node: crate::ui::NodePath,
     field: String,
     /// Row key, for grids.
     key: Option<String>,
@@ -196,7 +196,7 @@ async fn reveal(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(
     let result = async {
         st.before(&ctx, &info)?;
         let (_, _, screen) = st.open(&ctx, screen_name, call.params).await?;
-        let node = screen.nodes().get(call.node).ok_or(Failure::App(Error::NotFound))?;
+        let node = screen.node(&call.node).ok_or(Failure::App(Error::NotFound))?;
         let found = match node.grid() {
             Some(grid) => {
                 if !ctx.identity().can(&grid.action().access) {

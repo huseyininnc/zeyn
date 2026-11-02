@@ -515,12 +515,17 @@ pub fn act() -> Screen {
     )
 }
 
+#[screen(route = "/act-nested", permission = "items.read")]
+pub fn act_nested() -> Screen {
+    Screen::new("Act nested").body(Panel::new("Items").add(DataGrid::of(search).column(Item::code).row_action("Bump", bump, |i| i.id)))
+}
+
 fn act_router(identity: Identity) -> (Router, Store) {
     let store = Store::seeded();
     let router = App::new("Test")
         .service(store.clone())
         .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
-        .feature(Feature::new("items").screen(act))
+        .feature(Feature::new("items").screen(act).screen(act_nested))
         .router()
         .unwrap();
     (router, store)
@@ -562,6 +567,21 @@ async fn row_action_runs_with_input_built_from_the_row_on_the_server() {
     assert_eq!(store.0.read().unwrap()[6].qty, 107);
     let r = send(&router, run("7", "a0")).await;
     assert_eq!(r.status, StatusCode::FORBIDDEN, "the action's own error comes back");
+}
+
+#[tokio::test]
+async fn grid_endpoints_take_node_paths_as_the_browser_sends_them() {
+    let writer = Identity::user("w").with_permissions(["items.read", "items.write"]);
+    let (router, store) = act_router(writer);
+    let top = post("/_zeyn/grid/run", serde_json::json!({ "screen": "act", "node": "0", "key": "7", "item": "a0" }));
+    assert_eq!(send(&router, top).await.status, StatusCode::OK);
+    let page = send(&router, get("/act-nested")).await;
+    assert!(page.body.contains(r#"data-zeyn-node="0.0""#), "{}", page.body);
+    let nested = post("/_zeyn/grid/run", serde_json::json!({ "screen": "act_nested", "node": "0.0", "key": "8", "item": "a0" }));
+    assert_eq!(send(&router, nested).await.status, StatusCode::OK);
+    assert_eq!((store.0.read().unwrap()[6].qty, store.0.read().unwrap()[7].qty), (107, 108));
+    let missing = post("/_zeyn/grid/run", serde_json::json!({ "screen": "act_nested", "node": "0.5", "key": "7", "item": "a0" }));
+    assert_eq!(send(&router, missing).await.status, StatusCode::NOT_FOUND);
 }
 
 #[tokio::test]

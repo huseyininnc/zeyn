@@ -1052,7 +1052,7 @@ impl App {
         let home = self.home.and_then(|name| {
             state.features.iter().find_map(|f| f.screens().iter().find(|s| s.meta.name == name).and_then(|s| f.path_of(&s.meta)))
         });
-        if let Some(path) = home {
+        if let Some(path) = home.filter(|p| p != "/") {
             let target = format!("{}{path}", state.prefix);
             router = router.route("/", get(move || async move { Redirect::to(&target) }));
         }
@@ -1756,7 +1756,7 @@ struct GridCall {
 struct ExportQuery {
     screen: String,
     params: Option<String>,
-    node: usize,
+    node: crate::ui::NodePath,
     /// JSON of `{ "sort": [...], "filters": [...], "columns": [...] }`, all optional.
     q: Option<String>,
 }
@@ -1777,7 +1777,7 @@ struct EditCall {
     screen: String,
     #[serde(default)]
     params: Json,
-    node: usize,
+    node: crate::ui::NodePath,
     key: String,
     /// Typed values of the edited cells and the row version, as a form sends them.
     values: Map<String, Json>,
@@ -1800,7 +1800,7 @@ struct BulkCall {
     screen: String,
     #[serde(default)]
     params: Json,
-    node: usize,
+    node: crate::ui::NodePath,
     action: usize,
     /// Keys picked one by one; ignored when `all` is set.
     #[serde(default)]
@@ -1817,7 +1817,7 @@ struct RowItemCall {
     screen: String,
     #[serde(default)]
     params: Json,
-    node: usize,
+    node: crate::ui::NodePath,
     /// Key of the row, as in `data-zeyn-key`.
     key: String,
     /// Which item: `a0` is the first row action.
@@ -1903,7 +1903,7 @@ impl AppState {
             return Err(Failure::App(Error::NotFound));
         }
         let (_, entry, screen) = self.open(ctx, &call.screen, call.params).await?;
-        let grid = screen.nodes().get(call.node).and_then(|n| n.grid()).ok_or(Failure::App(Error::NotFound))?;
+        let grid = screen.node(&call.node).and_then(|n| n.grid()).ok_or(Failure::App(Error::NotFound))?;
         if !ctx.identity().can(&grid.action().access) {
             return Err(Failure::App(Error::Forbidden));
         }
@@ -1932,7 +1932,7 @@ impl AppState {
             return Err(Failure::App(Error::NotFound));
         }
         let (_, entry, screen) = self.open(ctx, &call.screen, call.params).await?;
-        let grid = screen.nodes().get(call.node).and_then(|n| n.grid()).ok_or(Failure::App(Error::NotFound))?;
+        let grid = screen.node(&call.node).and_then(|n| n.grid()).ok_or(Failure::App(Error::NotFound))?;
         if !ctx.identity().can(&grid.action().access) {
             return Err(Failure::App(Error::Forbidden));
         }
@@ -1985,7 +1985,7 @@ impl AppState {
         use crate::grid::MAX_BULK;
         let too_many = || Failure::App(Error::Denied(Text::key("zeyn.grid.too_many").arg("n", MAX_BULK.to_string())));
         let (_, entry, screen) = self.open(ctx, &call.screen, call.params).await?;
-        let grid = screen.nodes().get(call.node).and_then(|n| n.grid()).ok_or(Failure::App(Error::NotFound))?;
+        let grid = screen.node(&call.node).and_then(|n| n.grid()).ok_or(Failure::App(Error::NotFound))?;
         if !ctx.identity().can(&grid.action().access) {
             return Err(Failure::App(Error::Forbidden));
         }
@@ -2124,7 +2124,7 @@ async fn grid_export(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(
             Some(_) => return Err(Failure::App(Error::NotFound)),
         };
         let (_, entry, screen) = st.open(&ctx, &q.screen, params).await?;
-        let grid = screen.nodes().get(q.node).and_then(|n| n.grid()).ok_or(Failure::App(Error::NotFound))?;
+        let grid = screen.node(&q.node).and_then(|n| n.grid()).ok_or(Failure::App(Error::NotFound))?;
         let access = grid.export_access().ok_or(Failure::App(Error::NotFound))?;
         if !ctx.identity().can(&grid.action().access) || !ctx.identity().can(&access) {
             return Err(Failure::App(Error::Forbidden));
@@ -2151,7 +2151,7 @@ async fn grid_export(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(
     let state = st.clone();
     tokio::spawn(async move {
         let started = Instant::now();
-        let Some(grid) = screen.nodes().get(node).and_then(|n| n.grid()) else { return };
+        let Some(grid) = screen.node(&node).and_then(|n| n.grid()) else { return };
         let view = view.map(|v| grid.clean_view(v));
         let r = Render::new(name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity());
         let head = format!("\u{feff}{}", grid.csv_head(&r, view.as_ref()));
