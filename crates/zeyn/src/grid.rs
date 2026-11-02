@@ -256,6 +256,9 @@ impl<E: Model> Grid<E> {
     fn rows(&self, rows: &[E], r: &Render) -> String {
         let mut out = String::new();
         for row in rows {
+            if let (true, Some(ctx)) = (E::SENSITIVE, r.ctx) {
+                ctx.record_read(row);
+            }
             out.push_str("<tr");
             if let Some(style) = self.row_style.as_ref().and_then(|f| f(row)) {
                 out.push_str(&format!(r#" class="{}""#, style.css()));

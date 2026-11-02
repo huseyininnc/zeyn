@@ -105,6 +105,11 @@ impl<M: Model> Form<M> {
     }
 
     fn render_fields(&self, out: &mut String, r: &Render) {
+        if M::SENSITIVE {
+            if let Some(ctx) = r.ctx {
+                ctx.record_read(&self.model);
+            }
+        }
         for item in &self.items {
             match item {
                 FormItem::Field(f) => render_field(out, r, f, &self.model),

@@ -48,6 +48,14 @@ pub struct Trail {
     pub changes: Vec<FieldChange>,
     /// Masked values the user was shown in full.
     pub revealed: Vec<FieldRef>,
+    /// Sensitive records the user was shown. For screens marked `sensitive` the model is the
+    /// screen name and the id its params.
+    pub reads: Vec<RecordRef>,
+    /// Why the user opened a screen that asks for a reason.
+    pub reason: Option<String>,
+    /// Reason the user gave, with the screen it was given for. Checked by the server.
+    #[serde(skip)]
+    pub(crate) given_reason: Option<(String, String)>,
 }
 
 /// A value as a plain, language independent string. `None` for an empty value.

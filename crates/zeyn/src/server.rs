@@ -258,6 +258,12 @@ pub struct AuditEntry {
     /// Masked values the user was shown in full.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub revealed: Vec<crate::audit::FieldRef>,
+    /// Sensitive records the user was shown.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub reads: Vec<crate::audit::RecordRef>,
+    /// Reason the user gave for opening a screen that asks for one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
 }
 
 /// Where audit records go.
@@ -303,7 +309,8 @@ impl<S: AuditSink> Interceptor for AuditLog<S> {
         let audited = call.kind == CallKind::Form
             || call.kind == CallKind::Reveal
             || call.action.is_some_and(|a| a.audit)
-            || !trail.revealed.is_empty();
+            || !trail.revealed.is_empty()
+            || !trail.reads.is_empty();
         if !audited {
             return;
         }
@@ -312,6 +319,8 @@ impl<S: AuditSink> Interceptor for AuditLog<S> {
             record: trail.record.and_then(|r| r.id),
             changes: trail.changes,
             revealed: trail.revealed,
+            reads: trail.reads,
+            reason: trail.reason,
             at_unix_ms: SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0),
             user: ctx.identity().user.clone(),
             kind: call.kind,
@@ -1095,10 +1104,12 @@ fn percent_decode(s: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
-/// Failure of a call: an application error or a timeout.
+/// Failure of a call: an application error, a timeout, or a refusal with its own status and code
+/// that the runtime acts on (such as `reason_required`).
 enum Failure {
     App(Error),
     Timeout,
+    Status(StatusCode, &'static str, Text),
 }
 
 impl From<Error> for Failure {
@@ -1181,6 +1192,7 @@ impl AppState {
             .with_time_zone(tz)
             .with_tenant(tenant)
             .with_config(self.config.clone());
+        data::read_reason(&ctx, headers);
         match self.fixed_now {
             Some(now) => ctx.with_now(now),
             None => ctx,
@@ -1246,6 +1258,7 @@ impl AppState {
             return Err(Failure::App(Error::Forbidden));
         }
         feature.check_guards(ctx)?;
+        data::check_reason(ctx, &entry.meta)?;
         let screen = self.timed((entry.build)(ctx.clone(), params)).await?;
         Ok((feature, entry, screen))
     }
@@ -1264,6 +1277,7 @@ impl AppState {
                 Ok(_) => None,
                 Err(Failure::Timeout) => Some("timeout"),
                 Err(Failure::App(e)) => Some(e.code()),
+                Err(Failure::Status(_, code, _)) => Some(*code),
             },
             duration: started.elapsed(),
         };
@@ -1290,6 +1304,7 @@ impl AppState {
     fn error_response(&self, ctx: &Ctx, failure: Failure) -> Response {
         let (status, code, message) = match &failure {
             Failure::Timeout => (StatusCode::GATEWAY_TIMEOUT, "timeout", Text::key("zeyn.error.timeout")),
+            Failure::Status(status, code, message) => (*status, *code, message.clone()),
             Failure::App(e) => {
                 let status = match e {
                     Error::Forbidden | Error::Denied(_) => StatusCode::FORBIDDEN,
@@ -1318,6 +1333,7 @@ impl AppState {
     fn error_page(&self, ctx: &Ctx, failure: Failure, csrf: &str) -> Response {
         let (status, message) = match failure {
             Failure::Timeout => (StatusCode::GATEWAY_TIMEOUT, Text::key("zeyn.error.timeout")),
+            Failure::Status(status, _, message) => (status, message),
             Failure::App(e) => {
                 let status = match &e {
                     Error::Forbidden | Error::Denied(_) => StatusCode::FORBIDDEN,
@@ -1514,6 +1530,7 @@ async fn page(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Que
         let params = q.value()?;
         st.before(&ctx, &call)?;
         let (_, entry, screen) = st.open(&ctx, name, params.clone()).await?;
+        data::note_screen_read(&ctx, &entry.meta, &params);
         let loaded = st.preload(&ctx, &screen).await;
         let r = Render::new(name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_ctx(&ctx);
         let html = screen.render(&r, &entry.meta, &params, &loaded);
@@ -1529,6 +1546,7 @@ async fn page(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Que
             let sep = if target.contains('?') { '&' } else { '?' };
             Redirect::to(&format!("{target}{sep}return_to={}", encode(&here))).into_response()
         }
+        Err(Failure::Status(_, "reason_required", _)) => data::reason_page(&st, &ctx, name, &csrf),
         Err(f) => st.error_page(&ctx, f, &csrf),
     };
     with_cookie(response, set)
@@ -1541,14 +1559,22 @@ async fn screen_fragment(
     Query(q): Query<ParamsQuery>,
 ) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
+    let Some((&name, _)) = st.screens.get_key_value(name.as_str()) else {
+        return st.error_response(&ctx, Failure::App(Error::NotFound));
+    };
+    let call = Call { kind: CallKind::Screen, screen: name, action: None, via_agent: false };
+    let started = Instant::now();
     let result = async {
         let params = q.value()?;
-        let (_, entry, screen) = st.open(&ctx, &name, params.clone()).await?;
+        st.before(&ctx, &call)?;
+        let (_, entry, screen) = st.open(&ctx, name, params.clone()).await?;
+        data::note_screen_read(&ctx, &entry.meta, &params);
         let loaded = st.preload(&ctx, &screen).await;
         let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_ctx(&ctx);
         Ok::<_, Failure>(screen.render(&r, &entry.meta, &params, &loaded))
     }
     .await;
+    st.after(&ctx, &call, started, &result);
     match result {
         Ok(html) => Html(html).into_response(),
         Err(f) => st.error_response(&ctx, f),
@@ -1622,19 +1648,19 @@ impl AppState {
         crate::privacy::strip_masked(&mut query, grid.fields(), ctx);
         let result = async {
             self.before(ctx, &info)?;
-            self.timed(grid.fetch(ctx.clone(), query)).await
+            let page = self.timed(grid.fetch(ctx.clone(), query)).await?;
+            let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_ctx(ctx);
+            Ok(json!({
+                "rows": grid.rows_html(&page, &r),
+                "count": page.count,
+                "total": page.total,
+                "next": page.next,
+                "offset": page.offset,
+            }))
         }
         .await;
         self.after(ctx, &info, started, &result);
-        let page = result?;
-        let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_ctx(ctx);
-        Ok(json!({
-            "rows": grid.rows_html(&page, &r),
-            "count": page.count,
-            "total": page.total,
-            "next": page.next,
-            "offset": page.offset,
-        }))
+        result
     }
 
     async fn run_form(&self, ctx: &Ctx, call: FormCall) -> Result<Json, Failure> {
@@ -1743,6 +1769,7 @@ async fn set_locale(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::J
 fn problem(ctx: &Ctx, failure: Failure) -> Response {
     let (status, code, message) = match &failure {
         Failure::Timeout => (StatusCode::GATEWAY_TIMEOUT, "timeout", Text::key("zeyn.error.timeout")),
+        Failure::Status(status, code, message) => (*status, *code, message.clone()),
         Failure::App(e) => (
             match e {
                 Error::Forbidden | Error::Denied(_) => StatusCode::FORBIDDEN,
@@ -2028,6 +2055,7 @@ async fn mcp(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(req
                     let message = match f {
                         Failure::Timeout => ctx.t(&Text::key("zeyn.error.timeout")),
                         Failure::App(e) => ctx.t(&e.message()),
+                        Failure::Status(_, _, message) => ctx.t(&message),
                     };
                     reply(json!({ "content": [{ "type": "text", "text": message }], "isError": true }))
                 }

@@ -24,6 +24,10 @@ pub struct ScreenMeta {
     pub name: &'static str,
     pub route: Option<&'static str>,
     pub access: Access,
+    /// Opening the screen is audited as a read, with its params.
+    pub sensitive: bool,
+    /// The user must give a reason before the screen's data is shown. Implies `sensitive`.
+    pub reason: bool,
 }
 
 /// A screen. Implemented by `#[screen]`, never written by hand.

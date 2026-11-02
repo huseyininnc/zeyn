@@ -376,3 +376,150 @@ async fn permitted_users_can_change_masked_fields_and_the_audit_keeps_them_maske
     let line = serde_json::to_string(&e[0]).unwrap();
     assert!(!line.contains("55555555555") && !line.contains("12345678901"));
 }
+
+#[entity(table = "cases")]
+#[sensitive]
+pub struct Case {
+    #[key]
+    pub id: CaseId,
+    pub subject: String,
+}
+
+#[derive(Clone)]
+pub struct Cases(Vec<Case>);
+
+impl Service for Cases {}
+
+#[action(permission = "cases.read")]
+pub async fn find_cases(q: GridQuery, store: Cases) -> Result<Page<Case>> {
+    Ok(q.apply(store.0.clone()))
+}
+
+#[action(permission = "cases.read")]
+pub async fn get_case(id: i64, store: Cases) -> Result<Case> {
+    store.0.iter().find(|c| c.id.0 == id).cloned().ok_or(Error::NotFound)
+}
+
+#[screen(route = "/cases", permission = "cases.read")]
+pub fn cases() -> Screen {
+    Screen::new("Cases").body(Grid::of(find_cases).column(Case::subject))
+}
+
+#[screen(permission = "cases.read")]
+pub fn case(params: CustomerParams, store: Cases) -> Result<Screen> {
+    let c = store.0.iter().find(|c| c.id.0 == params.id).cloned().ok_or(Error::NotFound)?;
+    Ok(Screen::window("Case").body(Form::of(c).field(Case::subject)))
+}
+
+#[screen(route = "/cases/open", permission = "cases.read", reason)]
+pub fn case_file() -> Screen {
+    Screen::new("Case file").body(Grid::of(find_cases).column(Case::subject))
+}
+
+#[screen(route = "/cases/other", permission = "cases.read", reason)]
+pub fn other_file() -> Screen {
+    Screen::new("Other file")
+}
+
+#[screen(route = "/overview", permission = "cases.read")]
+pub fn overview() -> Screen {
+    Screen::new("Overview")
+}
+
+fn cases_app(identity: Identity, audit: MemoryAudit) -> Router {
+    let store = Cases((1..=2).map(|i| Case { id: CaseId(i), subject: format!("Subject {i}") }).collect());
+    App::new("Test")
+        .service(store)
+        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .interceptor(AuditLog(audit))
+        .feature(
+            Feature::new("cases")
+                .screen(cases)
+                .screen(case)
+                .screen(case_file)
+                .screen(other_file)
+                .screen(overview)
+                .api(get_case),
+        )
+        .router()
+        .unwrap()
+}
+
+fn case_reader() -> Identity {
+    Identity::user("nurse").with_permissions(["cases.read"])
+}
+
+fn with_cookie(mut req: Request<Body>, cookie: &str) -> Request<Body> {
+    let existing = req.headers().get(header::COOKIE).map(|v| v.to_str().unwrap().to_string());
+    let value = match existing {
+        Some(e) => format!("{e}; {cookie}"),
+        None => cookie.to_string(),
+    };
+    req.headers_mut().insert(header::COOKIE, value.parse().unwrap());
+    req
+}
+
+#[tokio::test]
+async fn showing_a_sensitive_record_writes_a_read_record() {
+    let audit = MemoryAudit::default();
+    let router = cases_app(case_reader(), audit.clone());
+    assert_eq!(send(&router, get("/overview")).await.status, StatusCode::OK);
+    assert!(audit.entries().is_empty(), "screens without personal data are not audited");
+
+    send(&router, get("/cases")).await;
+    send(&router, get("/_zeyn/screen/case?params=%7B%22id%22%3A2%7D")).await;
+    send(&router, api("/api/v1/cases/get_case", serde_json::json!(1))).await;
+    let e = audit.entries();
+    assert_eq!(e.len(), 3);
+    let ids = |i: usize| e[i].reads.iter().map(|r| (r.model, r.id.clone().unwrap())).collect::<Vec<_>>();
+    assert_eq!(ids(0), [("Case", "1".to_string()), ("Case", "2".to_string())]);
+    assert_eq!(e[0].user.as_deref(), Some("nurse"));
+    assert_eq!(ids(1), [("Case", "2".to_string())]);
+    assert_eq!(ids(2), [("Case", "1".to_string())]);
+    assert!(e.iter().all(|x| x.at_unix_ms > 0));
+}
+
+#[tokio::test]
+async fn a_screen_that_asks_for_a_reason_shows_no_data_until_one_is_given() {
+    let audit = MemoryAudit::default();
+    let router = cases_app(case_reader(), audit.clone());
+    let r = send(&router, get("/cases/open")).await;
+    assert_eq!(r.status, StatusCode::PRECONDITION_REQUIRED);
+    assert!(r.body.contains(r#"data-zeyn-reason="case_file""#) && !r.body.contains("Subject 1"), "{}", r.body);
+    let r = send(&router, get("/_zeyn/screen/case_file")).await;
+    assert_eq!(r.status, StatusCode::PRECONDITION_REQUIRED);
+    assert_eq!(r.json()["error"], "reason_required");
+    let r = send(&router, post("/_zeyn/grid", serde_json::json!({ "screen": "case_file", "node": 0 }))).await;
+    assert_eq!(r.status, StatusCode::PRECONDITION_REQUIRED);
+    assert!(!r.body.contains("Subject"));
+
+    let r = send(&router, post("/_zeyn/reason", serde_json::json!({ "screen": "case_file", "reason": "x" }))).await;
+    assert_eq!(r.status, StatusCode::UNPROCESSABLE_ENTITY);
+    let r = send(&router, post("/_zeyn/reason", serde_json::json!({ "screen": "overview", "reason": "Checking" }))).await;
+    assert_eq!(r.status, StatusCode::NOT_FOUND);
+    let r = send(&router, post("/_zeyn/reason", serde_json::json!({ "screen": "case_file", "reason": "Hasta çağrısı #42" }))).await;
+    assert_eq!(r.status, StatusCode::NO_CONTENT);
+    let cookie = r.headers.get(header::SET_COOKIE).unwrap().to_str().unwrap().to_string();
+    assert!(cookie.contains("HttpOnly") && cookie.contains("SameSite=Strict") && cookie.contains("Max-Age=900"), "{cookie}");
+    let pair = cookie.split(';').next().unwrap().to_string();
+
+    let r = send(&router, with_cookie(get("/cases/open"), &pair)).await;
+    assert_eq!(r.status, StatusCode::OK);
+    assert!(r.body.contains("Subject 1"));
+    let r = send(&router, with_cookie(get("/cases/other"), &pair)).await;
+    assert_eq!(r.status, StatusCode::PRECONDITION_REQUIRED, "a reason only opens the screen it was given for");
+
+    let e = audit.entries();
+    let opened = e.iter().find(|x| x.ok && x.screen == "case_file").unwrap();
+    assert_eq!(opened.reason.as_deref(), Some("Hasta çağrısı #42"));
+    assert!(opened.reads.iter().any(|r| r.model == "case_file"));
+    assert!(opened.reads.iter().any(|r| r.model == "Case" && r.id.as_deref() == Some("2")));
+}
+
+#[tokio::test]
+async fn reasons_need_access_to_the_screen() {
+    let router = cases_app(Identity::user("guest"), MemoryAudit::default());
+    let r = send(&router, post("/_zeyn/reason", serde_json::json!({ "screen": "case_file", "reason": "Curious" }))).await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN);
+    assert!(r.headers.get(header::SET_COOKIE).is_none());
+}

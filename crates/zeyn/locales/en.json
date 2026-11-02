@@ -8,7 +8,14 @@
     "privacy": {
       "reveal": "Show {label}",
       "revealed": "The value is shown. This was recorded.",
-      "reveal_failed": "The value could not be shown."
+      "reveal_failed": "The value could not be shown.",
+      "reason_required": "Give a reason to open this screen.",
+      "reason_title": "Why do you need this record?",
+      "reason_explain": "This screen shows personal data. Your reason is recorded together with your name and the time.",
+      "reason_label": "Reason",
+      "reason_continue": "Continue",
+      "reason_cancel": "Cancel",
+      "reason_invalid": "Write a reason between 3 and 300 characters."
     },
     "validation": {
       "required": "{label} is required.",

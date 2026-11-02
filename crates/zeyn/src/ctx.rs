@@ -281,6 +281,20 @@ impl Ctx {
         });
     }
 
+    /// Records that the user was shown a sensitive record, for the audit log. Forms, grids and API
+    /// output of models marked `sensitive` do this on their own.
+    pub fn record_read<M: crate::model::Model>(&self, record: &M) {
+        self.note_read(crate::audit::RecordRef::of(record));
+    }
+
+    pub(crate) fn note_read(&self, record: crate::audit::RecordRef) {
+        self.update_trail(|t| {
+            if !t.reads.contains(&record) {
+                t.reads.push(record);
+            }
+        });
+    }
+
     /// Resolves a text in the request's language.
     pub fn t(&self, text: &Text) -> String {
         self.0.i18n.text(&self.0.locale, text)

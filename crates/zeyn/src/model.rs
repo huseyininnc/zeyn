@@ -9,6 +9,10 @@ use std::ops::Deref;
 pub trait Model: Clone + Default + Serialize + DeserializeOwned + Send + Sync + 'static {
     const NAME: &'static str;
 
+    /// Holds personal or otherwise sensitive data: every time a user is shown such a record, a
+    /// read is audited. Set with `#[entity(..., sensitive)]`.
+    const SENSITIVE: bool = false;
+
     fn fields() -> &'static [FieldMeta];
 
     /// Value of the field at `index` in `fields()`.

@@ -8,7 +8,14 @@
     "privacy": {
       "reveal": "{label} göster",
       "revealed": "Değer gösterildi. Bu işlem kayda alındı.",
-      "reveal_failed": "Değer gösterilemedi."
+      "reveal_failed": "Değer gösterilemedi.",
+      "reason_required": "Bu ekranı açmak için bir gerekçe yazın.",
+      "reason_title": "Bu kayda neden ihtiyacınız var?",
+      "reason_explain": "Bu ekran kişisel veri gösteriyor. Gerekçeniz adınız ve zamanla birlikte kayda alınır.",
+      "reason_label": "Gerekçe",
+      "reason_continue": "Devam et",
+      "reason_cancel": "Vazgeç",
+      "reason_invalid": "3 ile 300 karakter arasında bir gerekçe yazın."
     },
     "validation": {
       "required": "{label} alanı zorunludur.",

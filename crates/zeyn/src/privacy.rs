@@ -165,10 +165,21 @@ pub(crate) fn form_field(out: &mut String, r: &Render, meta: &FieldMeta, value: 
     ));
 }
 
+fn key_of<M: Model>(object: &serde_json::Map<String, Json>) -> Option<String> {
+    M::fields()
+        .iter()
+        .find(|m| m.key)
+        .and_then(|m| object.get(m.name))
+        .map(|v| v.as_str().map(str::to_string).unwrap_or_else(|| v.to_string()))
+}
+
 /// Masks the masked fields of one serialized model in place. Users with the unmask permission
 /// get raw values; each field they receive is recorded as revealed.
 pub(crate) fn protect_object<M: Model>(value: &mut Json, ctx: &Ctx) {
     let Some(object) = value.as_object_mut() else { return };
+    if M::SENSITIVE {
+        ctx.note_read(RecordRef { model: M::NAME, id: key_of::<M>(object) });
+    }
     let mut revealed = Vec::new();
     for meta in M::fields().iter().filter(|m| m.mask.is_some()) {
         let Some(Json::String(text)) = object.get(meta.name) else { continue };
@@ -180,11 +191,7 @@ pub(crate) fn protect_object<M: Model>(value: &mut Json, ctx: &Ctx) {
         }
     }
     if !revealed.is_empty() {
-        let id = M::fields()
-            .iter()
-            .find(|m| m.key)
-            .and_then(|m| object.get(m.name))
-            .map(|v| v.as_str().map(str::to_string).unwrap_or_else(|| v.to_string()));
+        let id = key_of::<M>(object);
         ctx.update_trail(|t| {
             for field in revealed {
                 t.revealed.push(crate::audit::FieldRef { model: M::NAME, id: id.clone(), field });

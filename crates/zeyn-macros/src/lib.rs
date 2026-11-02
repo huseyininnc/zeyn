@@ -219,6 +219,8 @@ pub fn screen(attr: TokenStream, item: TokenStream) -> TokenStream {
     let f = syn::parse_macro_input!(item as ItemFn);
     let mut access = AccessArgs::default();
     let mut route: Option<LitStr> = None;
+    let mut sensitive = false;
+    let mut reason = false;
     let parser = syn::meta::parser(|meta| {
         if meta.path.is_ident("permission") {
             access.permission = Some(meta.value()?.parse()?);
@@ -226,17 +228,25 @@ pub fn screen(attr: TokenStream, item: TokenStream) -> TokenStream {
             access.public = true;
         } else if meta.path.is_ident("route") {
             route = Some(meta.value()?.parse()?);
+        } else if meta.path.is_ident("sensitive") {
+            sensitive = true;
+        } else if meta.path.is_ident("reason") {
+            reason = true;
         } else {
-            return Err(meta.error("unknown screen option\n  = help: expected `route = \"/...\"`, `permission = \"...\"` or `public`"));
+            return Err(meta.error("unknown screen option\n  = help: expected `route = \"/...\"`, `permission = \"...\"`, `public`, `sensitive` or `reason`"));
         }
         Ok(())
     });
     syn::parse_macro_input!(attr with parser);
     let original = quote!(#f);
-    or_error(expand_screen(&f, &access, route.as_ref()), original)
+    or_error(expand_screen(&f, &access, route.as_ref(), (sensitive || reason, reason)), original)
 }
 
-fn expand_screen(f: &ItemFn, access: &AccessArgs, route: Option<&LitStr>) -> syn::Result<Ts> {
+fn expand_screen(f: &ItemFn, access: &AccessArgs, route: Option<&LitStr>, privacy: (bool, bool)) -> syn::Result<Ts> {
+    let (sensitive, reason) = privacy;
+    if reason && access.public {
+        return Err(syn::Error::new(f.sig.ident.span(), "a public screen cannot ask for a reason\n  = help: give the screen a permission"));
+    }
     let (params, _) = fn_types(f, "screen")?;
     let name = &f.sig.ident;
     let access = access.tokens("screen", name)?;
@@ -259,6 +269,8 @@ fn expand_screen(f: &ItemFn, access: &AccessArgs, route: Option<&LitStr>) -> syn
                 name: #name_str,
                 route: #route,
                 access: #access,
+                sensitive: #sensitive,
+                reason: #reason,
             };
 
             fn deps() -> ::std::vec::Vec<::zeyn::Dep> {
@@ -378,6 +390,7 @@ fn expand_choice(mut e: ItemEnum) -> syn::Result<Ts> {
 struct ModelArgs {
     table: Option<LitStr>,
     validate: Option<Path>,
+    sensitive: bool,
 }
 
 fn parse_model_args(attr: TokenStream, allow_table: bool) -> syn::Result<ModelArgs> {
@@ -387,10 +400,12 @@ fn parse_model_args(attr: TokenStream, allow_table: bool) -> syn::Result<ModelAr
             args.table = Some(meta.value()?.parse()?);
         } else if meta.path.is_ident("validate") {
             args.validate = Some(meta.value()?.parse()?);
+        } else if meta.path.is_ident("sensitive") {
+            args.sensitive = true;
         } else if allow_table {
-            return Err(meta.error("unknown entity option\n  = help: expected `table = \"...\"` or `validate = path::to::fn`"));
+            return Err(meta.error("unknown entity option\n  = help: expected `table = \"...\"`, `validate = path::to::fn` or `sensitive`"));
         } else {
-            return Err(meta.error("unknown model option\n  = help: expected `validate = path::to::fn`"));
+            return Err(meta.error("unknown model option\n  = help: expected `validate = path::to::fn` or `sensitive`"));
         }
         Ok(())
     });
@@ -474,6 +489,9 @@ fn default_label(name: &str) -> String {
 fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Result<Ts> {
     let name = s.ident.clone();
     let kind = if is_entity { "entity" } else { "model" };
+    let before = s.attrs.len();
+    s.attrs.retain(|a| !a.path().is_ident("sensitive"));
+    let sensitive = args.sensitive || s.attrs.len() != before;
     if !s.generics.params.is_empty() {
         return Err(syn::Error::new(s.generics.span(), format!("{kind}s cannot be generic")));
     }
@@ -686,6 +704,7 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
 
         impl ::zeyn::Model for #name {
             const NAME: &'static str = #name_str;
+            const SENSITIVE: bool = #sensitive;
             fn fields() -> &'static [::zeyn::FieldMeta] { Self::__ZEYN_FIELDS }
             fn value_at(&self, index: usize) -> ::core::option::Option<::zeyn::Value> {
                 match index {

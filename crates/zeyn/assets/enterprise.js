@@ -116,3 +116,108 @@ document.addEventListener('click', (e) => {
   e.stopPropagation();
   reveal(el);
 });
+
+/**
+ * Sends a reason for opening a screen. Shows the server's message under the field when it is
+ * refused.
+ * @returns {Promise<boolean>} Whether the server accepted it.
+ */
+async function sendReason(form, screen) {
+  const field = form.elements.namedItem('reason');
+  const error = form.querySelector('.z-field-error');
+  const reason = field.value.trim();
+  if (reason.length < 3 || reason.length > 300) {
+    error.textContent = t('privacy.reason_invalid');
+    field.setAttribute('aria-invalid', 'true');
+    field.focus();
+    return false;
+  }
+  const r = await post('/_zeyn/reason', { screen, reason });
+  if (r.ok) return true;
+  error.textContent = r.data?.errors?.[0]?.message || r.data?.message || t('privacy.reason_invalid');
+  field.setAttribute('aria-invalid', 'true');
+  field.focus();
+  return false;
+}
+
+document.addEventListener('submit', async (e) => {
+  const form = e.target;
+  if (!(form instanceof HTMLFormElement) || !form.matches('form[data-zeyn-reason]') || form.closest('dialog.z-reason-dialog')) return;
+  e.preventDefault();
+  if (await sendReason(form, form.dataset.zeynReason)) location.reload();
+});
+
+/**
+ * Asks for a reason in a modal dialog.
+ * @returns {Promise<boolean>} True once the server accepted a reason, false when cancelled.
+ */
+function askReason(screen) {
+  return new Promise((resolve) => {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'z-dialog z-reason-dialog';
+    dialog.setAttribute('aria-labelledby', 'z-reason-dialog-title');
+    dialog.setAttribute('aria-describedby', 'z-reason-dialog-help');
+    dialog.innerHTML = `<div class="z-window"><h2 id="z-reason-dialog-title"></h2><p id="z-reason-dialog-help"></p><form class="z-form" data-zeyn-reason novalidate><div class="z-field"><label for="z-reason-dialog-text"></label><textarea id="z-reason-dialog-text" name="reason" required aria-required="true" minlength="3" maxlength="300" rows="3" aria-describedby="z-reason-dialog-help z-reason-dialog-error"></textarea><p class="z-field-error" id="z-reason-dialog-error" aria-live="polite"></p></div><div class="z-form-actions"><button type="button" class="z-button" data-cancel></button><button type="submit" class="z-button z-primary"></button></div></form></div>`;
+    dialog.querySelector('h2').textContent = t('privacy.reason_title');
+    dialog.querySelector('p').textContent = t('privacy.reason_explain');
+    dialog.querySelector('label').textContent = t('privacy.reason_label');
+    dialog.querySelector('[data-cancel]').textContent = t('privacy.reason_cancel');
+    dialog.querySelector('[type="submit"]').textContent = t('privacy.reason_continue');
+    const opener = document.activeElement;
+    let accepted = false;
+    const form = dialog.querySelector('form');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (await sendReason(form, screen)) {
+        accepted = true;
+        dialog.close();
+      }
+    });
+    dialog.querySelector('[data-cancel]').addEventListener('click', () => dialog.close());
+    dialog.addEventListener('close', () => {
+      dialog.remove();
+      if (opener instanceof HTMLElement) opener.focus();
+      resolve(accepted);
+    });
+    document.body.append(dialog);
+    dialog.showModal();
+    dialog.querySelector('textarea').focus();
+  });
+}
+
+/** Screen a runtime request is about: from `/_zeyn/screen/{name}` or the JSON body. */
+function requestScreen(input, init) {
+  const url = typeof input === 'string' ? input : input?.url ?? '';
+  const m = /\/_zeyn\/screen\/([^/?#]+)/.exec(url);
+  if (m) return decodeURIComponent(m[1]);
+  try {
+    return JSON.parse(init?.body ?? 'null')?.screen ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Response hooks run on every `fetch` response of the page, including those of `zeyn.js`. A hook
+ * may return a replacement response, for example after asking the user for a reason and sending
+ * the request again.
+ * @type {((res: Response, input: RequestInfo, init?: RequestInit) => Promise<Response | null>)[]}
+ */
+const hooks = [];
+const nativeFetch = window.fetch.bind(window);
+window.fetch = async (input, init) => {
+  const res = await nativeFetch(input, init);
+  for (const hook of hooks) {
+    const next = await hook(res, input, init);
+    if (next) return next;
+  }
+  return res;
+};
+
+hooks.push(async (res, input, init) => {
+  if (res.status !== 428) return null;
+  const data = await res.clone().json().catch(() => null);
+  const screen = data?.error === 'reason_required' ? requestScreen(input, init) : null;
+  if (!screen || !(await askReason(screen))) return null;
+  return nativeFetch(input, init);
+});

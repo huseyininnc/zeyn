@@ -71,3 +71,25 @@ pub struct Person {
 - Grid reveal looks the row up through the grid's action with a filter on the key, so the action
   must honor filters on its key field.
 - `#[mask]` only compiles on `String` and `Option<String>`.
+
+## Sensitive record reads
+
+Who saw which personal data, and when, is recorded as well as who changed it.
+
+- `#[entity(table = "cases", sensitive)]` (or `#[sensitive]` below `#[entity]`) marks a model.
+  Every time a user is shown such a record, the call's audit record lists it in `reads`
+  (`{"model":"Case","id":"2"}`): rows of a grid page, a form, an agent tool result and API
+  output. Reads are recorded where the data is rendered, so components inside layouts count too.
+- `#[screen(..., sensitive)]` records every opening of the screen as a read whose `model` is the
+  screen name and `id` its params, for screens that show personal data not tied to one model.
+- `#[screen(..., reason)]` also asks the user why before any data is shown. The server answers
+  `428` with code `reason_required` (a page with a reason form on full page loads) to the page,
+  its fragments, grid, form and reveal calls until a reason is given. The runtime asks in a
+  dialog, sends `POST /_zeyn/reason {screen, reason}` (3 to 300 characters) and repeats the
+  request. The reason is kept for 15 minutes in an `HttpOnly`, `SameSite=Strict` cookie, only
+  opens the screen it was given for and is written in `reason` of every audit record of that
+  screen. Agents and API clients cannot give a reason, so they cannot open such screens.
+- `ctx.record_read(&record)` records a read from application code.
+- Read records are written by `AuditLog` for any call, page loads included, as soon as a sensitive
+  record was shown. Without an audit interceptor nothing is recorded; apps that hold personal
+  data should always register one.
