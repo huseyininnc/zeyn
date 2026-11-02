@@ -170,7 +170,10 @@
       },
       "chart": {
         "data": "Show data",
-        "table": "Data for {title}"
+        "table": "Data for {title}",
+        "summary_bar": "Bar chart of {series} series over {items} categories. Highest: {max}, {value}.",
+        "summary_line": "Line chart of {series} series over {items} points. Highest: {max}, {value}.",
+        "summary_donut": "Donut chart of {items} parts. Largest: {max}, {value}."
       },
       "tree": {
         "empty": "No items."

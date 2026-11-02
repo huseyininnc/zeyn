@@ -170,7 +170,10 @@
       },
       "chart": {
         "data": "Verileri göster",
-        "table": "{title} verileri"
+        "table": "{title} verileri",
+        "summary_bar": "{items} kategoride {series} seri gösteren sütun grafiği. En yüksek: {max}, {value}.",
+        "summary_line": "{items} noktada {series} seri gösteren çizgi grafiği. En yüksek: {max}, {value}.",
+        "summary_donut": "{items} parçalı halka grafiği. En büyük: {max}, {value}."
       },
       "tree": {
         "empty": "Kayıt yok."

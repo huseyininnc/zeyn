@@ -346,6 +346,47 @@ pub fn wizard() -> Screen {
     )
 }
 
+/// Products grouped by unit: units at the top, their products load when a unit opens.
+#[action(permission = "stock.product.read")]
+pub async fn product_tree(q: TreeQuery, store: crate::stock::ProductStore) -> Result<Vec<TreeItem>> {
+    use crate::stock::Unit;
+    let all = store.all()?;
+    let units = [("piece", Unit::Piece, "Piece"), ("kg", Unit::Kg, "Kilogram"), ("liter", Unit::Liter, "Liter")];
+    Ok(match q.parent.as_deref() {
+        None => units
+            .iter()
+            .map(|(id, unit, label)| {
+                let count = all.iter().filter(|p| p.unit == *unit).count();
+                TreeItem::branch(*id, *label).hint(count.to_string())
+            })
+            .collect(),
+        Some(parent) => {
+            let Some((_, unit, _)) = units.iter().find(|(id, _, _)| *id == parent) else { return Err(Error::NotFound) };
+            all.iter().filter(|p| p.unit == *unit).take(25).map(|p| TreeItem::leaf(p.id.0.to_string(), p.name.clone()).hint(p.code.clone())).collect()
+        }
+    })
+}
+
+#[screen(route = "/data", permission = "stock.product.read")]
+pub fn data() -> Screen {
+    let months = [t!("ui.m1"), t!("ui.m2"), t!("ui.m3"), t!("ui.m4"), t!("ui.m5"), t!("ui.m6")];
+    Screen::new(t!("ui.data")).body(
+        Row::new()
+            .col(Card::new().title(t!("ui.card_tree")).add(Tree::of(product_tree).label(t!("ui.card_tree"))))
+            .weight(1)
+            .col(
+                Stack::new()
+                    .add(Card::new().add(Chart::bar(t!("ui.chart_sales")).labels(months.clone()).series(t!("ui.series_2025"), [120.0, 98.0, 143.0, 160.0, 151.0, 189.0]).series(t!("ui.series_2026"), [131.0, 122.0, 150.0, 171.0, 166.0, 204.0])))
+                    .add(
+                        Row::new()
+                            .col(Card::new().add(Chart::line(t!("ui.chart_orders")).labels(months).series(t!("ui.series_orders"), [42.0, 51.0, 47.0, 63.0, 70.0, 66.0])))
+                            .col(Card::new().add(Chart::donut(t!("ui.chart_units")).labels([t!("ui.unit_piece"), t!("ui.unit_kg"), t!("ui.unit_liter")]).series(t!("ui.series_products"), [80.0, 80.0, 80.0]))),
+                    ),
+            )
+            .weight(2),
+    )
+}
+
 pub fn feature() -> Feature {
     Feature::new("ui")
         .route_prefix("/ui")
@@ -356,6 +397,7 @@ pub fn feature() -> Feature {
         .screen(invoice_form)
         .screen(widgets)
         .screen(wizard)
+        .screen(data)
         .menu(|m| {
             m.group(t!("menu.ui"), Icon::Table)
                 .item(t!("ui.layout"), layout)
@@ -364,5 +406,6 @@ pub fn feature() -> Feature {
                 .item(t!("ui.invoice"), invoice_form)
                 .item(t!("ui.widgets"), widgets)
                 .item(t!("ui.wizard"), wizard)
+                .item(t!("ui.data"), data)
         })
 }
