@@ -305,6 +305,9 @@ Ctrl+Shift+P (Command+Shift+P on macOS) and F1 open the palette, also from `butt
 | Endpoint | Body | Answer |
 |---|---|---|
 | `POST /_zeyn/command` | `{ command }` | Runs an action command with the input fixed on the server: CSRF, feature guards, the action's permission and the interceptors. `{ effects }`; `404` for unknown ids and effect commands |
+| `POST /_zeyn/search` | `{ query }` | Runs every `Feature::search` the user may run (CSRF, feature guards, the action's permission, interceptors) with the query cut at 100 characters. `{ hits: [{ label, group, url }] }`, at most 20, only app paths |
+
+When the container has `data-search`, the palette sends the query 150 ms after the last key (two characters or more) and lists the hits under the commands. Only the answer to the latest query is drawn. Choosing a hit sends `zeyn:navigate` with the base path in front of `url`; a `#anchor` in it scrolls to that element after the screen is swapped.
 
 The runtime listens to `zeyn:run` on `document` so other scripts run work through it: `{ effects, source }` runs effects, `{ screen, item }` runs a screen context menu item, `{ error }` shows an error toast.
 

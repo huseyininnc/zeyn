@@ -36,6 +36,52 @@ pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
         .route("/_zeyn/pro.css", get(|| async { asset(CSS, "text/css; charset=utf-8") }))
         .route("/_zeyn/command", post(command_call))
         .route("/_zeyn/dock", post(dock_call))
+        .route("/_zeyn/search", post(search_call))
+}
+
+#[derive(Deserialize)]
+struct SearchCall {
+    query: String,
+}
+
+/// Runs every palette search the user may run (see `Feature::search`) with the query and returns
+/// `{hits: [{label, group, url}]}`, at most `MAX_SEARCH_HITS`, in feature order. A failing search
+/// is logged and skipped so the others still answer. Hits that leave the app are dropped.
+async fn search_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(call): axum::Json<SearchCall>) -> Response {
+    let ctx = st.licensed(st.ctx(&headers)).await;
+    if let Err(f) = st.check_csrf(&headers) {
+        return st.error_response(&ctx, f);
+    }
+    let query: String = call.query.trim().chars().take(crate::command::MAX_SEARCH_QUERY).collect();
+    let mut hits = Vec::new();
+    if query.is_empty() {
+        return axum::Json(json!({ "hits": hits })).into_response();
+    }
+    for f in &st.features {
+        if f.check_guards(&ctx).is_err() {
+            continue;
+        }
+        for search in f.searches() {
+            let meta = *search.meta();
+            if !ctx.identity().can(&meta.access) {
+                continue;
+            }
+            let info = Call { kind: CallKind::Screen, screen: f.name(), action: Some(meta), via_agent: ctx.via_agent() };
+            let started = Instant::now();
+            let result = async {
+                st.before(&ctx, &info)?;
+                st.timed(search.run(ctx.clone(), query.clone())).await
+            }
+            .await;
+            st.after(&ctx, &info, started, &result);
+            match result {
+                Ok(found) => hits.extend(found.into_iter().filter(crate::command::SearchHit::is_local)),
+                Err(_) => eprintln!("warning: palette search `{}` failed", meta.name),
+            }
+        }
+    }
+    hits.truncate(crate::command::MAX_SEARCH_HITS);
+    axum::Json(json!({ "hits": hits })).into_response()
 }
 
 #[derive(Deserialize)]
@@ -92,8 +138,10 @@ pub(super) fn shell_parts(st: &AppState, ctx: &Ctx, r: &Render) -> (String, Stri
         r#"<button type="button" class="z-palette-open" data-zeyn-palette-open aria-haspopup="dialog" aria-keyshortcuts="Control+Shift+P F1"><span class="z-icon z-icon-search" aria-hidden="true"></span><span>{}</span><kbd aria-hidden="true">Ctrl+Shift+P</kbd></button>"#,
         t("open")
     );
+    let search = st.features.iter().any(|f| f.check_guards(ctx).is_ok() && f.searches().iter().any(|s| ctx.identity().can(&s.meta().access)));
     let mut commands = format!(
-        r#"<div class="z-commands" hidden data-zeyn-commands data-text-label="{}" data-text-placeholder="{}" data-text-empty="{}" data-text-count="{}" data-text-recent="{}" data-text-app="{}" data-text-screen="{}" data-text-go="{}" data-text-done="{}" data-text-hint="{}">"#,
+        r#"<div class="z-commands" hidden data-zeyn-commands{} data-text-label="{}" data-text-placeholder="{}" data-text-empty="{}" data-text-count="{}" data-text-recent="{}" data-text-app="{}" data-text-screen="{}" data-text-go="{}" data-text-done="{}" data-text-hint="{}">"#,
+        if search { " data-search" } else { "" },
         t("label"),
         t("placeholder"),
         t("empty"),

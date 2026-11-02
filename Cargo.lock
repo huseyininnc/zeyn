@@ -589,6 +589,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "zeyn-example-docs"
+version = "0.0.0"
+dependencies = [
+ "axum",
+ "http-body-util",
+ "serde_json",
+ "tokio",
+ "tower",
+ "zeyn",
+]
+
+[[package]]
 name = "zeyn-example-inventory"
 version = "0.0.0"
 dependencies = [

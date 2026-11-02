@@ -338,3 +338,73 @@ pub(crate) fn problems(commands: &[(&str, &Command)], check_each: bool) -> Vec<S
     }
     out
 }
+
+/// Longest palette search query, in characters. Longer queries are cut.
+pub const MAX_SEARCH_QUERY: usize = 100;
+
+/// Most results one palette search shows, over all features.
+pub const MAX_SEARCH_HITS: usize = 20;
+
+/// One result of a palette search: what it shows and the app path it opens, such as
+/// `/guides/theming#density`. The path is relative to the app's base path.
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct SearchHit {
+    pub label: String,
+    /// Shown next to the label, such as the page a section belongs to.
+    pub group: String,
+    pub url: String,
+}
+
+impl SearchHit {
+    pub fn new(label: impl Into<String>, group: impl Into<String>, url: impl Into<String>) -> Self {
+        SearchHit { label: label.into(), group: group.into(), url: url.into() }
+    }
+
+    /// Whether the path stays in the app: it starts with one `/` and has no backslash or control
+    /// character. Hits that do not are dropped before they reach the browser.
+    pub fn is_local(&self) -> bool {
+        self.url.starts_with('/') && !self.url.starts_with("//") && !self.url.chars().any(|c| c == '\\' || c.is_control())
+    }
+}
+
+type Find = Arc<dyn Fn(Ctx, String) -> BoxFuture<crate::action::Result<Vec<SearchHit>>> + Send + Sync>;
+
+/// A server search the command palette runs as the user types, registered with
+/// [`crate::Feature::search`]. The action takes the query and returns hits.
+///
+/// ```
+/// use zeyn::prelude::*;
+/// use zeyn::SearchHit;
+///
+/// #[action(public)]
+/// pub async fn search_help(query: String) -> Result<Vec<SearchHit>> {
+///     Ok(vec![SearchHit::new(format!("Help for {query}"), "Help", "/help")])
+/// }
+///
+/// let feature = Feature::new("help").search(search_help);
+/// assert_eq!(feature.searches().len(), 1);
+/// ```
+#[derive(Clone)]
+pub struct Search {
+    meta: ActionMeta,
+    find: Find,
+}
+
+impl Search {
+    pub fn of<A>(_action: A) -> Self
+    where
+        A: Action<Input = String, Output = crate::action::Result<Vec<SearchHit>>>,
+    {
+        let find: Find = Arc::new(|ctx, query| Box::pin(async move { A::call(ctx, query).await? }));
+        Search { meta: A::META, find }
+    }
+
+    pub fn meta(&self) -> &ActionMeta {
+        &self.meta
+    }
+
+    /// Runs the search. Access is checked by the caller.
+    pub fn run(&self, ctx: Ctx, query: String) -> BoxFuture<crate::action::Result<Vec<SearchHit>>> {
+        (self.find)(ctx, query)
+    }
+}
