@@ -50,7 +50,8 @@ fn days_in_month(y: i32, m: u8) -> u8 {
 impl Date {
     /// A valid date, or `None` for days such as February 30.
     pub fn new(year: i32, month: u8, day: u8) -> Option<Date> {
-        let valid = (1..=9999).contains(&year) && (1..=12).contains(&month) && day >= 1 && day <= days_in_month(year, month);
+        let valid =
+            (1..=9999).contains(&year) && (1..=12).contains(&month) && day >= 1 && day <= days_in_month(year, month);
         valid.then_some(Date { year, month, day })
     }
 
@@ -492,7 +493,11 @@ impl Time {
             _ => (upper, None),
         };
         let parts: Vec<&str> = clock.split(':').collect();
-        let num = |p: &str| (!p.is_empty() && p.len() <= 2 && p.bytes().all(|b| b.is_ascii_digit())).then(|| p.parse::<u8>().ok()).flatten();
+        let num = |p: &str| {
+            (!p.is_empty() && p.len() <= 2 && p.bytes().all(|b| b.is_ascii_digit()))
+                .then(|| p.parse::<u8>().ok())
+                .flatten()
+        };
         let (h, m, sec) = match parts[..] {
             [h, m] => (num(h)?, num(m)?, 0),
             [h, m, x] => (num(h)?, num(m)?, num(x)?),
@@ -579,7 +584,10 @@ impl LocalDateTime {
             return Some(LocalDateTime { date, time: Time::default() });
         }
         let (d, t) = s.split_once(['T', ' '])?;
-        Some(LocalDateTime { date: Date::parse_input(d, locale, now.date, words)?, time: Time::parse_input(t, locale, now.time, words)? })
+        Some(LocalDateTime {
+            date: Date::parse_input(d, locale, now.date, words)?,
+            time: Time::parse_input(t, locale, now.time, words)?,
+        })
     }
 
     fn epoch_ms(&self) -> i64 {
@@ -728,15 +736,61 @@ impl fmt::Debug for TimeZone {
 
 /// Common zones offered by pickers, in the order shown.
 const PICKER: &[&str] = &[
-    "UTC", "Europe/Istanbul", "Europe/Moscow", "Europe/Minsk", "Asia/Riyadh", "Asia/Baghdad", "Asia/Qatar",
-    "Asia/Dubai", "Asia/Baku", "Asia/Tbilisi", "Asia/Tashkent", "Asia/Karachi", "Asia/Kolkata", "Asia/Almaty",
-    "Asia/Bangkok", "Asia/Shanghai", "Asia/Singapore", "Asia/Tokyo", "Asia/Seoul", "Australia/Brisbane",
-    "Africa/Cairo", "Africa/Johannesburg", "Africa/Lagos", "America/Sao_Paulo", "America/Phoenix", "Europe/London",
-    "Europe/Dublin", "Europe/Lisbon", "Europe/Berlin", "Europe/Paris", "Europe/Amsterdam", "Europe/Brussels",
-    "Europe/Vienna", "Europe/Zurich", "Europe/Rome", "Europe/Madrid", "Europe/Stockholm", "Europe/Oslo",
-    "Europe/Copenhagen", "Europe/Warsaw", "Europe/Prague", "Europe/Budapest", "Europe/Belgrade", "Europe/Athens",
-    "Europe/Bucharest", "Europe/Sofia", "Europe/Helsinki", "Europe/Kyiv", "Asia/Nicosia", "America/New_York",
-    "America/Toronto", "America/Chicago", "America/Denver", "America/Los_Angeles", "America/Vancouver",
+    "UTC",
+    "Europe/Istanbul",
+    "Europe/Moscow",
+    "Europe/Minsk",
+    "Asia/Riyadh",
+    "Asia/Baghdad",
+    "Asia/Qatar",
+    "Asia/Dubai",
+    "Asia/Baku",
+    "Asia/Tbilisi",
+    "Asia/Tashkent",
+    "Asia/Karachi",
+    "Asia/Kolkata",
+    "Asia/Almaty",
+    "Asia/Bangkok",
+    "Asia/Shanghai",
+    "Asia/Singapore",
+    "Asia/Tokyo",
+    "Asia/Seoul",
+    "Australia/Brisbane",
+    "Africa/Cairo",
+    "Africa/Johannesburg",
+    "Africa/Lagos",
+    "America/Sao_Paulo",
+    "America/Phoenix",
+    "Europe/London",
+    "Europe/Dublin",
+    "Europe/Lisbon",
+    "Europe/Berlin",
+    "Europe/Paris",
+    "Europe/Amsterdam",
+    "Europe/Brussels",
+    "Europe/Vienna",
+    "Europe/Zurich",
+    "Europe/Rome",
+    "Europe/Madrid",
+    "Europe/Stockholm",
+    "Europe/Oslo",
+    "Europe/Copenhagen",
+    "Europe/Warsaw",
+    "Europe/Prague",
+    "Europe/Budapest",
+    "Europe/Belgrade",
+    "Europe/Athens",
+    "Europe/Bucharest",
+    "Europe/Sofia",
+    "Europe/Helsinki",
+    "Europe/Kyiv",
+    "Asia/Nicosia",
+    "America/New_York",
+    "America/Toronto",
+    "America/Chicago",
+    "America/Denver",
+    "America/Los_Angeles",
+    "America/Vancouver",
 ];
 
 /// Zones read from the bundled database so far. Only names the database knows are added, so
@@ -818,8 +872,16 @@ impl TimeZone {
     fn offset_seconds_of(&self, local: LocalDateTime) -> Result<i32, LocalTimeError> {
         let Zone::Iana(tz) = self.zone else { return Ok(self.offset_seconds_at(DateTime::default())) };
         let (d, t) = (local.date, local.time);
-        let civil = jiff::civil::DateTime::new(d.year as i16, d.month as i8, d.day as i8, t.hour as i8, t.minute as i8, t.second as i8, 0)
-            .map_err(|_| LocalTimeError::Skipped)?;
+        let civil = jiff::civil::DateTime::new(
+            d.year as i16,
+            d.month as i8,
+            d.day as i8,
+            t.hour as i8,
+            t.minute as i8,
+            t.second as i8,
+            0,
+        )
+        .map_err(|_| LocalTimeError::Skipped)?;
         match tz.to_ambiguous_timestamp(civil).offset() {
             jiff::tz::AmbiguousOffset::Unambiguous { offset } => Ok(offset.seconds()),
             jiff::tz::AmbiguousOffset::Gap { .. } => Err(LocalTimeError::Skipped),
@@ -834,14 +896,45 @@ impl TimeZone {
 }
 
 static FIXED: [(&str, i32); 39] = [
-    ("UTC-12:00", -720), ("UTC-11:00", -660), ("UTC-10:00", -600), ("UTC-09:30", -570), ("UTC-09:00", -540),
-    ("UTC-08:00", -480), ("UTC-07:00", -420), ("UTC-06:00", -360), ("UTC-05:00", -300), ("UTC-04:00", -240),
-    ("UTC-03:30", -210), ("UTC-03:00", -180), ("UTC-02:00", -120), ("UTC-01:00", -60), ("UTC", 0),
-    ("UTC+01:00", 60), ("UTC+02:00", 120), ("UTC+03:00", 180), ("UTC+03:30", 210), ("UTC+04:00", 240),
-    ("UTC+04:30", 270), ("UTC+05:00", 300), ("UTC+05:30", 330), ("UTC+05:45", 345), ("UTC+06:00", 360),
-    ("UTC+06:30", 390), ("UTC+07:00", 420), ("UTC+08:00", 480), ("UTC+08:45", 525), ("UTC+09:00", 540),
-    ("UTC+09:30", 570), ("UTC+10:00", 600), ("UTC+10:30", 630), ("UTC+11:00", 660), ("UTC+12:00", 720),
-    ("UTC+12:45", 765), ("UTC+13:00", 780), ("UTC+14:00", 840), ("UTC+00:00", 0),
+    ("UTC-12:00", -720),
+    ("UTC-11:00", -660),
+    ("UTC-10:00", -600),
+    ("UTC-09:30", -570),
+    ("UTC-09:00", -540),
+    ("UTC-08:00", -480),
+    ("UTC-07:00", -420),
+    ("UTC-06:00", -360),
+    ("UTC-05:00", -300),
+    ("UTC-04:00", -240),
+    ("UTC-03:30", -210),
+    ("UTC-03:00", -180),
+    ("UTC-02:00", -120),
+    ("UTC-01:00", -60),
+    ("UTC", 0),
+    ("UTC+01:00", 60),
+    ("UTC+02:00", 120),
+    ("UTC+03:00", 180),
+    ("UTC+03:30", 210),
+    ("UTC+04:00", 240),
+    ("UTC+04:30", 270),
+    ("UTC+05:00", 300),
+    ("UTC+05:30", 330),
+    ("UTC+05:45", 345),
+    ("UTC+06:00", 360),
+    ("UTC+06:30", 390),
+    ("UTC+07:00", 420),
+    ("UTC+08:00", 480),
+    ("UTC+08:45", 525),
+    ("UTC+09:00", 540),
+    ("UTC+09:30", 570),
+    ("UTC+10:00", 600),
+    ("UTC+10:30", 630),
+    ("UTC+11:00", 660),
+    ("UTC+12:00", 720),
+    ("UTC+12:45", 765),
+    ("UTC+13:00", 780),
+    ("UTC+14:00", 840),
+    ("UTC+00:00", 0),
 ];
 
 impl Default for TimeZone {

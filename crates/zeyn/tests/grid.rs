@@ -181,7 +181,8 @@ fn totals_cover_every_filtered_row_not_only_the_page() {
     ];
     let page = q.apply(rows);
     assert_eq!(page.items.len(), 2);
-    let value = |field: &str, op: Aggregate| page.totals.iter().find(|t| t.field == field && t.op == op).unwrap().value.clone();
+    let value =
+        |field: &str, op: Aggregate| page.totals.iter().find(|t| t.field == field && t.op == op).unwrap().value.clone();
     assert_eq!(value("qty", Aggregate::Sum), Value::Int(210));
     assert_eq!(value("qty", Aggregate::Avg), Value::Decimal(10.5));
     assert_eq!(value("qty", Aggregate::Min), Value::Int(1));
@@ -259,7 +260,8 @@ async fn grid_endpoint_computes_only_totals_the_grid_declares() {
 
 #[tokio::test]
 async fn grid_endpoint_needs_the_read_permission() {
-    let r = send(&router(Identity::user("x")), post("/_zeyn/grid", serde_json::json!({ "screen": "list", "node": 0 }))).await;
+    let r = send(&router(Identity::user("x")), post("/_zeyn/grid", serde_json::json!({ "screen": "list", "node": 0 })))
+        .await;
     assert_eq!(r.status, StatusCode::FORBIDDEN);
     let _ = r.headers;
 }
@@ -304,7 +306,10 @@ fn moment_date_filters_use_the_users_whole_day() {
     use zeyn::Filter;
     let at = DateTime::parse("2026-03-01T22:30:00Z").unwrap();
     let rows = vec![Event { id: EventId(1), at }];
-    let mut q = DataQuery { filters: vec![Filter::range("at", Some("2026-03-02"), Some("2026-03-02"))], ..DataQuery::default() };
+    let mut q = DataQuery {
+        filters: vec![Filter::range("at", Some("2026-03-02"), Some("2026-03-02"))],
+        ..DataQuery::default()
+    };
     assert_eq!(q.apply(rows.clone()).items.len(), 0);
     q.time_zone = TimeZone::named("Europe/Istanbul").unwrap();
     assert_eq!(q.apply(rows.clone()).items.len(), 1);
@@ -380,9 +385,17 @@ async fn grid_endpoint_sorts_by_several_columns() {
 
 #[tokio::test]
 async fn header_names_filter_kinds_and_localized_choices() {
-    let req = Request::get("/items").header("x-user", "1").header(header::COOKIE, "zeyn_locale=tr").body(Body::empty()).unwrap();
+    let req = Request::get("/items")
+        .header("x-user", "1")
+        .header(header::COOKIE, "zeyn_locale=tr")
+        .body(Body::empty())
+        .unwrap();
     let r = send(&router(reader()), req).await;
-    assert!(r.body.contains(r#"data-field="price" aria-sort="none" aria-colindex="3" data-filter="money""#), "{}", r.body);
+    assert!(
+        r.body.contains(r#"data-field="price" aria-sort="none" aria-colindex="3" data-filter="money""#),
+        "{}",
+        r.body
+    );
     assert!(r.body.contains(r#"data-filter="choice" data-options=""#));
     assert!(r.body.contains(r#"data-filter="bool""#));
     assert!(r.body.contains(r#"data-filter="date""#));
@@ -434,7 +447,11 @@ async fn saved_view_comes_back_on_the_next_page_load_with_its_sort_and_filters()
     assert!(!head.contains(r#"data-field="kind""#));
     assert!(page.body.contains(r#"data-zeyn-total="6""#), "only tools, the note filter is not offered");
     let rows = page.body.split("<tbody data-zeyn-rows>").nth(1).unwrap();
-    assert!(rows.starts_with("<tr data-zeyn-key=\"18\"><td>C-18</td><td class=\"z-num\">18</td></tr>"), "{}", &rows[..120]);
+    assert!(
+        rows.starts_with("<tr data-zeyn-key=\"18\"><td>C-18</td><td class=\"z-num\">18</td></tr>"),
+        "{}",
+        &rows[..120]
+    );
 
     let other = send(&router, as_user(get("/items"), "mert")).await;
     assert!(!other.body.contains("data-zeyn-view="));
@@ -453,7 +470,11 @@ async fn saving_a_view_needs_a_store_a_user_and_read_access() {
     assert_eq!(r.status, StatusCode::FORBIDDEN);
     let r = send(&router(reader()), post("/_zeyn/grid/view", save_view(serde_json::json!({})))).await;
     assert_eq!(r.status, StatusCode::NOT_FOUND);
-    let r = send(&views, as_user(post("/_zeyn/grid/view", serde_json::json!({ "screen": "list", "node": 7, "view": {} })), "ayse")).await;
+    let r = send(
+        &views,
+        as_user(post("/_zeyn/grid/view", serde_json::json!({ "screen": "list", "node": 7, "view": {} })), "ayse"),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::NOT_FOUND);
 }
 
@@ -477,9 +498,17 @@ async fn grid_endpoint_renders_rows_and_header_in_the_requested_layout() {
 #[test]
 fn at_most_three_columns_stay_pinned_per_side() {
     use zeyn::{DataGridView, GridSource};
-    let grid = DataGrid::of(search).column(Item::code).column(Item::kind).column(Item::price).column(Item::qty).column(Item::added).done();
-    let columns: Vec<serde_json::Value> =
-        ["code", "kind", "price", "qty", "added"].iter().map(|f| serde_json::json!({ "field": f, "pin": "start" })).collect();
+    let grid = DataGrid::of(search)
+        .column(Item::code)
+        .column(Item::kind)
+        .column(Item::price)
+        .column(Item::qty)
+        .column(Item::added)
+        .done();
+    let columns: Vec<serde_json::Value> = ["code", "kind", "price", "qty", "added"]
+        .iter()
+        .map(|f| serde_json::json!({ "field": f, "pin": "start" }))
+        .collect();
     let view: DataGridView = serde_json::from_value(serde_json::json!({ "columns": columns })).unwrap();
     let clean = GridSource::clean_view(&grid, view);
     assert_eq!(clean.columns.iter().filter(|c| c.pin.is_some()).count(), 3);
@@ -517,7 +546,11 @@ pub fn act() -> Screen {
 
 #[screen(route = "/act-nested", permission = "items.read")]
 pub fn act_nested() -> Screen {
-    Screen::new("Act nested").body(Panel::new("Items").add(DataGrid::of(search).column(Item::code).row_action("Bump", bump, |i| i.id)))
+    Screen::new("Act nested").body(Panel::new("Items").add(DataGrid::of(search).column(Item::code).row_action(
+        "Bump",
+        bump,
+        |i| i.id,
+    )))
 }
 
 #[screen(route = "/sorted", permission = "items.read")]
@@ -578,7 +611,11 @@ async fn row_action_runs_with_input_built_from_the_row_on_the_server() {
 async fn a_default_sort_orders_the_first_page_and_reaches_the_browser() {
     let (router, _) = act_router(reader());
     let r = send(&router, get("/sorted")).await;
-    assert!(r.body.contains(r#"data-zeyn-sort-default="[{&quot;field&quot;:&quot;qty&quot;,&quot;desc&quot;:true}]""#), "{}", r.body);
+    assert!(
+        r.body.contains(r#"data-zeyn-sort-default="[{&quot;field&quot;:&quot;qty&quot;,&quot;desc&quot;:true}]""#),
+        "{}",
+        r.body
+    );
     let first = r.body.find(r#"<tr data-zeyn-key="#).map(|i| &r.body[i..i + 30]).unwrap_or_default();
     let max = Store::seeded().0.read().unwrap().iter().max_by_key(|i| i.qty).map(|i| i.id.0).unwrap();
     assert!(first.contains(&format!(r#"data-zeyn-key="{max}""#)), "{first}");
@@ -592,10 +629,12 @@ async fn grid_endpoints_take_node_paths_as_the_browser_sends_them() {
     assert_eq!(send(&router, top).await.status, StatusCode::OK);
     let page = send(&router, get("/act-nested")).await;
     assert!(page.body.contains(r#"data-zeyn-node="0.0""#), "{}", page.body);
-    let nested = post("/_zeyn/grid/run", serde_json::json!({ "screen": "act_nested", "node": "0.0", "key": "8", "item": "a0" }));
+    let nested =
+        post("/_zeyn/grid/run", serde_json::json!({ "screen": "act_nested", "node": "0.0", "key": "8", "item": "a0" }));
     assert_eq!(send(&router, nested).await.status, StatusCode::OK);
     assert_eq!((store.0.read().unwrap()[6].qty, store.0.read().unwrap()[7].qty), (107, 108));
-    let missing = post("/_zeyn/grid/run", serde_json::json!({ "screen": "act_nested", "node": "0.5", "key": "7", "item": "a0" }));
+    let missing =
+        post("/_zeyn/grid/run", serde_json::json!({ "screen": "act_nested", "node": "0.5", "key": "7", "item": "a0" }));
     assert_eq!(send(&router, missing).await.status, StatusCode::NOT_FOUND);
 }
 
@@ -627,11 +666,13 @@ pub async fn deactivate(ids: Vec<ItemId>, store: Store) -> Result<usize> {
 #[screen(route = "/pick", permission = "items.read")]
 pub fn pick() -> Screen {
     Screen::new("Pick").body(
-        DataGrid::of(search).paging(Paging::pages(5)).column(Item::code).column(Item::kind).filter().column(Item::active).bulk_action(
-            "Deactivate",
-            deactivate,
-            Item::id,
-        ),
+        DataGrid::of(search)
+            .paging(Paging::pages(5))
+            .column(Item::code)
+            .column(Item::kind)
+            .filter()
+            .column(Item::active)
+            .bulk_action("Deactivate", deactivate, Item::id),
     )
 }
 
@@ -701,7 +742,10 @@ async fn bulk_action_is_refused_without_permission_bad_keys_unknown_actions_or_t
     assert_eq!(active_ids(&store).len(), 10);
     let (router, store) = pick_router(writer_items());
     assert_eq!(send(&router, bulk(serde_json::json!({ "keys": ["x"] }))).await.status, StatusCode::NOT_FOUND);
-    assert_eq!(send(&router, bulk(serde_json::json!({ "action": 3, "keys": ["2"] }))).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(
+        send(&router, bulk(serde_json::json!({ "action": 3, "keys": ["2"] }))).await.status,
+        StatusCode::NOT_FOUND
+    );
     let many: Vec<String> = (0..=zeyn::MAX_BULK).map(|i| i.to_string()).collect();
     assert_eq!(send(&router, bulk(serde_json::json!({ "keys": many }))).await.status, StatusCode::FORBIDDEN);
     assert_eq!(active_ids(&store).len(), 10);
@@ -724,7 +768,11 @@ pub async fn bump_all(_: (), store: Store) -> Result<()> {
 #[screen(route = "/menus", permission = "items.read")]
 pub fn menus() -> Screen {
     Screen::new("Menus")
-        .context_menu(ContextMenu::new().item("Open", Effect::Toast { message: "hi".into() }).action("Bump all", bump_all, ()))
+        .context_menu(ContextMenu::new().item("Open", Effect::Toast { message: "hi".into() }).action(
+            "Bump all",
+            bump_all,
+            (),
+        ))
         .body(DataGrid::of(search).paging(Paging::pages(5)).column(Item::code).column(Item::qty).row_menu(|i| {
             ContextMenu::new()
                 .item("Toast", Effect::Toast { message: "x".into() })
@@ -755,9 +803,21 @@ fn menu_run(key: &str, item: &str) -> Request<Body> {
 async fn row_menus_leave_out_items_the_user_may_not_run() {
     let (router, _) = menu_router(writer_items());
     let r = send(&router, get("/menus")).await;
-    let first = r.body.split(r#"<tr data-zeyn-key="1" data-zeyn-menu=""#).nth(1).unwrap().split('"').next().unwrap().replace("&quot;", "\"");
+    let first = r
+        .body
+        .split(r#"<tr data-zeyn-key="1" data-zeyn-menu=""#)
+        .nth(1)
+        .unwrap()
+        .split('"')
+        .next()
+        .unwrap()
+        .replace("&quot;", "\"");
     let items: serde_json::Value = serde_json::from_str(&first).unwrap();
-    assert_eq!(items.as_array().unwrap().len(), 3, "toast, separator, bump; no empty submenu, no dangling separator: {items}");
+    assert_eq!(
+        items.as_array().unwrap().len(),
+        3,
+        "toast, separator, bump; no empty submenu, no dangling separator: {items}"
+    );
     assert_eq!(items[2]["run"], "2");
     let r = send(&router, get("/menus")).await;
     assert!(r.body.contains(r#"data-zeyn-screen="menus" data-zeyn-params="null" data-zeyn-menu=""#));
@@ -861,7 +921,9 @@ async fn editable_cells_carry_input_values_only_for_users_who_may_save() {
     let r = send(&router, get("/edit")).await;
     assert!(r.body.contains(r#"data-field="code" aria-sort="none" aria-colindex="1" data-edit="text""#), "{}", r.body);
     assert!(r.body.contains(r#"data-zeyn-version-field="version""#));
-    assert!(r.body.contains(r#"<tr data-zeyn-key="1" data-zeyn-version="1"><td data-v="C-01">C-01</td><td class="z-num" data-v="10.00">"#));
+    assert!(r.body.contains(
+        r#"<tr data-zeyn-key="1" data-zeyn-version="1"><td data-v="C-01">C-01</td><td class="z-num" data-v="10.00">"#
+    ));
     assert!(!r.body.contains(r#"data-field="note" aria-sort="none" aria-colindex="4" data-edit"#), "read only");
     let (router, _) = edit_router(reader());
     let r = send(&router, get("/edit")).await;
@@ -871,11 +933,18 @@ async fn editable_cells_carry_input_values_only_for_users_who_may_save() {
 #[tokio::test]
 async fn inline_edit_saves_through_valid_and_returns_the_row() {
     let (router, store) = edit_router(writer_items());
-    let r = send(&router, edit("3", serde_json::json!({ "code": "NEW-3", "price": "12.50", "active": true, "version": "1" }))).await;
+    let r = send(
+        &router,
+        edit("3", serde_json::json!({ "code": "NEW-3", "price": "12.50", "active": true, "version": "1" })),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
     assert!(r.json()["row"].as_str().unwrap().contains(r#"data-zeyn-version="2"><td data-v="NEW-3">NEW-3</td>"#));
     let saved = store.0.read().unwrap()[2].clone();
-    assert_eq!((saved.code.as_str(), saved.price, saved.active, saved.qty, saved.version), ("NEW-3", Money::tl(1250), true, 3, 2));
+    assert_eq!(
+        (saved.code.as_str(), saved.price, saved.active, saved.qty, saved.version),
+        ("NEW-3", Money::tl(1250), true, 3, 2)
+    );
 }
 
 #[tokio::test]
@@ -883,7 +952,8 @@ async fn inline_edit_reports_validation_and_conflicts() {
     let (router, store) = edit_router(writer_items());
     let r = send(&router, edit("3", serde_json::json!({ "code": "", "price": "abc", "version": "1" }))).await;
     assert_eq!(r.status, StatusCode::UNPROCESSABLE_ENTITY);
-    let fields: Vec<String> = r.json()["errors"].as_array().unwrap().iter().map(|e| e["field"].as_str().unwrap().to_string()).collect();
+    let fields: Vec<String> =
+        r.json()["errors"].as_array().unwrap().iter().map(|e| e["field"].as_str().unwrap().to_string()).collect();
     assert_eq!(fields, ["price", "code"]);
     let r = send(&router, edit("3", serde_json::json!({ "code": "X", "version": "7" }))).await;
     assert_eq!(r.status, StatusCode::CONFLICT);
@@ -904,7 +974,10 @@ async fn inline_edit_refuses_read_only_and_unknown_columns_and_missing_permissio
     }
     assert_eq!(send(&router, edit("999", serde_json::json!({ "code": "X" }))).await.status, StatusCode::NOT_FOUND);
     let (router, _) = edit_router(reader());
-    assert_eq!(send(&router, edit("3", serde_json::json!({ "code": "X", "version": "1" }))).await.status, StatusCode::FORBIDDEN);
+    assert_eq!(
+        send(&router, edit("3", serde_json::json!({ "code": "X", "version": "1" }))).await.status,
+        StatusCode::FORBIDDEN
+    );
     let row = store.0.read().unwrap()[2].clone();
     assert_eq!((row.note.as_str(), row.qty, row.code.as_str()), ("note 3", 3, "C-03"));
 }
@@ -912,7 +985,16 @@ async fn inline_edit_refuses_read_only_and_unknown_columns_and_missing_permissio
 #[screen(route = "/export", permission = "items.read")]
 pub fn export_list() -> Screen {
     Screen::new("Export")
-        .body(DataGrid::of(search).paging(Paging::pages(5)).column(Item::code).filter().column(Item::kind).column(Item::price).column(Item::active).exportable())
+        .body(
+            DataGrid::of(search)
+                .paging(Paging::pages(5))
+                .column(Item::code)
+                .filter()
+                .column(Item::kind)
+                .column(Item::price)
+                .column(Item::active)
+                .exportable(),
+        )
         .body(DataGrid::of(search).column(Item::code).done().export_permission("items.export").export_limit(7))
         .body(DataGrid::of(search).column(Item::code))
 }
@@ -932,7 +1014,10 @@ fn export_router(identity: Identity) -> (Router, Store) {
 
 fn export_get(node: usize, q: serde_json::Value, locale: &str) -> Request<Body> {
     let q = q.to_string();
-    let enc: String = q.bytes().map(|b| if b.is_ascii_alphanumeric() { (b as char).to_string() } else { format!("%{b:02X}") }).collect();
+    let enc: String = q
+        .bytes()
+        .map(|b| if b.is_ascii_alphanumeric() { (b as char).to_string() } else { format!("%{b:02X}") })
+        .collect();
     Request::get(format!("/_zeyn/grid/export?screen=export_list&node={node}&q={enc}"))
         .header("x-user", "1")
         .header(header::COOKIE, format!("zeyn_locale={locale}"))
@@ -986,8 +1071,18 @@ pub struct ItemParams {
 #[screen(route = "/master", permission = "items.read")]
 pub fn master() -> Screen {
     Screen::new("Master")
-        .body(DataGrid::of(search).paging(Paging::pages(3)).column(Item::code).detail(|i| (item_detail, ItemParams { id: i.id })))
-        .body(DataGrid::of(search).paging(Paging::virtual_scroll()).column(Item::code).detail(|i| (item_detail, ItemParams { id: i.id })))
+        .body(
+            DataGrid::of(search)
+                .paging(Paging::pages(3))
+                .column(Item::code)
+                .detail(|i| (item_detail, ItemParams { id: i.id })),
+        )
+        .body(
+            DataGrid::of(search)
+                .paging(Paging::virtual_scroll())
+                .column(Item::code)
+                .detail(|i| (item_detail, ItemParams { id: i.id })),
+        )
 }
 
 #[screen(permission = "items.detail")]
@@ -1014,7 +1109,10 @@ async fn rows_expand_into_a_typed_detail_screen_only_for_users_who_may_open_it()
     assert!(paged.contains(r#"aria-expanded="false" data-zeyn-detail="{&quot;params&quot;:{&quot;id&quot;:1},&quot;screen&quot;:&quot;item_detail&quot;}""#), "{paged}");
     assert_eq!(paged.matches("data-zeyn-expand").count(), 3);
     let virtual_grid = &r.body[r.body.find(r#"data-zeyn-node="1""#).unwrap()..];
-    assert!(!virtual_grid.contains("data-zeyn-detail") && !virtual_grid.contains("z-expand"), "virtual grids have no details");
+    assert!(
+        !virtual_grid.contains("data-zeyn-detail") && !virtual_grid.contains("z-expand"),
+        "virtual grids have no details"
+    );
     let router = master_router(reader());
     let r = send(&router, get("/master")).await;
     assert!(!r.body.contains("data-zeyn-detail") && !r.body.contains("z-expand-col"));
@@ -1026,7 +1124,8 @@ async fn detail_screens_check_their_permission_and_keep_their_scope() {
     let r = send(&router, get("/_zeyn/screen/item_detail?params=%7B%22id%22%3A4%7D")).await;
     assert_eq!(r.status, StatusCode::OK);
     assert!(r.body.contains("C-04") && !r.body.contains("C-05"), "{}", r.body);
-    let mut filters: Vec<serde_json::Value> = (0..40).map(|_| serde_json::json!({ "field": "code", "contains": "C" })).collect();
+    let mut filters: Vec<serde_json::Value> =
+        (0..40).map(|_| serde_json::json!({ "field": "code", "contains": "C" })).collect();
     filters.push(serde_json::json!({ "field": "id", "from": "1", "to": "20" }));
     let call = serde_json::json!({ "screen": "item_detail", "params": { "id": 4 }, "node": 0, "query": { "page": { "type": "offset", "offset": 0, "limit": 50 }, "filters": filters } });
     let r = send(&router, post("/_zeyn/grid", call)).await;
@@ -1040,7 +1139,8 @@ async fn detail_screens_check_their_permission_and_keep_their_scope() {
 #[test]
 fn blank_filters_keep_empty_or_set_values() {
     let rows: Vec<Item> = (1..=20).map(item).collect();
-    let empty = DataQuery { filters: vec![zeyn::Filter::blank("due", true)], ..DataQuery::default() }.apply(rows.clone());
+    let empty =
+        DataQuery { filters: vec![zeyn::Filter::blank("due", true)], ..DataQuery::default() }.apply(rows.clone());
     let set = DataQuery { filters: vec![zeyn::Filter::blank("due", false)], ..DataQuery::default() }.apply(rows);
     assert_eq!((empty.total, set.total), (Some(15), Some(5)));
 }
@@ -1048,7 +1148,9 @@ fn blank_filters_keep_empty_or_set_values() {
 #[test]
 fn apply_groups_rows_with_counts_totals_sort_and_paging() {
     let rows: Vec<Item> = (1..=20).map(item).collect();
-    let mut q = query(serde_json::json!({ "page": { "type": "offset", "offset": 0, "limit": 2 }, "sort": [{ "field": "kind", "desc": true }], "aggregates": [{ "field": "qty", "op": "sum" }] }));
+    let mut q = query(
+        serde_json::json!({ "page": { "type": "offset", "offset": 0, "limit": 2 }, "sort": [{ "field": "kind", "desc": true }], "aggregates": [{ "field": "qty", "op": "sum" }] }),
+    );
     q.group = Some("kind".into());
     let page = q.apply(rows.clone());
     assert!(page.items.is_empty());
@@ -1060,20 +1162,31 @@ fn apply_groups_rows_with_counts_totals_sort_and_paging() {
     let mut q = DataQuery::default();
     q.group = Some("due".into());
     let page = q.apply(rows);
-    assert_eq!((page.groups[0].value.clone(), page.groups[0].count), (Value::Null, 15), "empty values form one group, first");
+    assert_eq!(
+        (page.groups[0].value.clone(), page.groups[0].count),
+        (Value::Null, 15),
+        "empty values form one group, first"
+    );
 }
 
 #[test]
 fn any_of_matches_keys() {
     let rows: Vec<Item> = (1..=20).map(item).collect();
-    let page = DataQuery { filters: vec![zeyn::Filter::any_of("id", ["3", "7", "99"])], ..DataQuery::default() }.apply(rows);
+    let page =
+        DataQuery { filters: vec![zeyn::Filter::any_of("id", ["3", "7", "99"])], ..DataQuery::default() }.apply(rows);
     assert_eq!(codes(&page), ["C-03", "C-07"]);
 }
 
 #[screen(route = "/grouped", permission = "items.read")]
 pub fn grouped() -> Screen {
     Screen::new("Grouped").body(
-        DataGrid::of(search).paging(Paging::pages(2)).group_by(Item::kind).group_by(Item::active).column(Item::code).column(Item::qty).sum(),
+        DataGrid::of(search)
+            .paging(Paging::pages(2))
+            .group_by(Item::kind)
+            .group_by(Item::active)
+            .column(Item::code)
+            .column(Item::qty)
+            .sum(),
     )
 }
 
@@ -1111,7 +1224,10 @@ fn nested_router(identity: Identity) -> Router {
 }
 
 fn branch(screen: &str, path: serde_json::Value) -> Request<Body> {
-    post("/_zeyn/grid", serde_json::json!({ "screen": screen, "node": 0, "path": path, "query": { "page": { "type": "offset", "offset": 0, "limit": 2 }, "with_total": true } }))
+    post(
+        "/_zeyn/grid",
+        serde_json::json!({ "screen": screen, "node": 0, "path": path, "query": { "page": { "type": "offset", "offset": 0, "limit": 2 }, "with_total": true } }),
+    )
 }
 
 #[tokio::test]
@@ -1124,13 +1240,19 @@ async fn grouped_grids_page_over_groups_and_open_them_level_by_level() {
     let r = send(&router, branch("grouped", serde_json::json!(["Tool"]))).await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
     let rows = r.json()["rows"].as_str().unwrap().to_string();
-    assert!(rows.contains(r#"data-zeyn-path="[&quot;Tool&quot;,&quot;false&quot;]""#) && rows.contains(r#"aria-level="2""#), "{rows}");
+    assert!(
+        rows.contains(r#"data-zeyn-path="[&quot;Tool&quot;,&quot;false&quot;]""#) && rows.contains(r#"aria-level="2""#),
+        "{rows}"
+    );
     assert_eq!(r.json()["total"], 2);
     let r = send(&router, branch("grouped", serde_json::json!(["Tool", "true"]))).await;
     let rows = r.json()["rows"].as_str().unwrap().to_string();
     assert!(rows.contains(r#"<tr aria-level="3" data-zeyn-level="2" data-zeyn-key="6">"#), "{rows}");
     assert_eq!(r.json()["total"], 3, "tools 6, 12, 18 are active");
-    assert_eq!(send(&router, branch("grouped", serde_json::json!(["Tool", "true", "x"]))).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(
+        send(&router, branch("grouped", serde_json::json!(["Tool", "true", "x"]))).await.status,
+        StatusCode::NOT_FOUND
+    );
     let long: Vec<&str> = vec!["a"; 33];
     assert_eq!(send(&router, branch("grouped", serde_json::json!(long))).await.status, StatusCode::NOT_FOUND);
     let router = nested_router(Identity::user("n"));
@@ -1146,7 +1268,10 @@ async fn tree_grids_show_top_rows_and_load_children_lazily() {
     let r = send(&router, branch("tree", serde_json::json!(["1"]))).await;
     let rows = r.json()["rows"].as_str().unwrap().to_string();
     assert_eq!(r.json()["total"], 3);
-    assert!(rows.contains(r#"data-zeyn-path="[&quot;1&quot;,&quot;3&quot;]" data-zeyn-key="3""#) && !rows.contains("N5"), "{rows}");
+    assert!(
+        rows.contains(r#"data-zeyn-path="[&quot;1&quot;,&quot;3&quot;]" data-zeyn-key="3""#) && !rows.contains("N5"),
+        "{rows}"
+    );
     let r = send(&router, branch("tree", serde_json::json!(["1", "3"]))).await;
     assert_eq!(r.json()["total"], 3, "6, 7 and 8 report to 3");
     assert_eq!(send(&router, branch("tree", serde_json::json!([null]))).await.status, StatusCode::NOT_FOUND);
@@ -1162,12 +1287,27 @@ async fn pasted_rows_are_saved_one_by_one_and_each_is_checked_on_its_own() {
         ("4", serde_json::json!({ "code": "P-4", "version": "0" }), StatusCode::CONFLICT),
     ];
     for (key, values, status) in pastes {
-        let r = send(&router, post_as("/_zeyn/grid/edit", serde_json::json!({ "screen": "edit_list", "node": 0, "key": key, "values": values }), "tr")).await;
+        let r = send(
+            &router,
+            post_as(
+                "/_zeyn/grid/edit",
+                serde_json::json!({ "screen": "edit_list", "node": 0, "key": key, "values": values }),
+                "tr",
+            ),
+        )
+        .await;
         assert_eq!(r.status, status, "row {key}: {}", r.body);
     }
     let rows = store.0.read().unwrap().clone();
-    assert_eq!((rows[0].code.as_str(), rows[0].price), ("P-1", Money::tl(123_450)), "Turkish money as a spreadsheet copies it");
-    assert_eq!((rows[1].code.as_str(), rows[2].code.as_str(), rows[2].qty, rows[3].code.as_str()), ("C-02", "C-03", 3, "C-04"));
+    assert_eq!(
+        (rows[0].code.as_str(), rows[0].price),
+        ("P-1", Money::tl(123_450)),
+        "Turkish money as a spreadsheet copies it"
+    );
+    assert_eq!(
+        (rows[1].code.as_str(), rows[2].code.as_str(), rows[2].qty, rows[3].code.as_str()),
+        ("C-02", "C-03", 3, "C-04")
+    );
 }
 
 #[tokio::test]
@@ -1183,7 +1323,11 @@ async fn grid_writes_count_against_the_write_limit() {
         .unwrap();
     let mut statuses = Vec::new();
     for i in 1..=3 {
-        statuses.push(send(&router, edit(&i.to_string(), serde_json::json!({ "code": format!("W-{i}"), "version": "1" }))).await.status);
+        statuses.push(
+            send(&router, edit(&i.to_string(), serde_json::json!({ "code": format!("W-{i}"), "version": "1" })))
+                .await
+                .status,
+        );
     }
     assert_eq!(statuses, [StatusCode::OK, StatusCode::OK, StatusCode::TOO_MANY_REQUESTS]);
     let r = send(&router, post("/_zeyn/grid", serde_json::json!({ "screen": "edit_list", "node": 0 }))).await;

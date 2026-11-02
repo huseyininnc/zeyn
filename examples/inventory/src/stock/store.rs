@@ -22,7 +22,16 @@ fn poisoned<T>(_: T) -> Error {
 impl ProductStore {
     /// Store filled with sample products.
     pub fn seeded() -> Self {
-        let names = ["Black tea", "Green tea", "Coffee beans", "Olive oil", "Honey", "Hazelnuts", "Dried apricots", "Feta cheese"];
+        let names = [
+            "Black tea",
+            "Green tea",
+            "Coffee beans",
+            "Olive oil",
+            "Honey",
+            "Hazelnuts",
+            "Dried apricots",
+            "Feta cheese",
+        ];
         let products = (1..=120)
             .map(|i| Product {
                 id: ProductId(i),
@@ -75,7 +84,9 @@ impl ProductStore {
 
     pub async fn get(&self, id: ProductId) -> Result<Product> {
         match self {
-            ProductStore::Memory(rows) => rows.read().map_err(poisoned)?.iter().find(|p| p.id == id).cloned().ok_or(Error::NotFound),
+            ProductStore::Memory(rows) => {
+                rows.read().map_err(poisoned)?.iter().find(|p| p.id == id).cloned().ok_or(Error::NotFound)
+            }
             #[cfg(any(feature = "postgres", feature = "oracle"))]
             ProductStore::Sql(db) => db.get(id).await,
         }

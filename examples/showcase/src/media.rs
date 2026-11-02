@@ -55,7 +55,10 @@ impl MediaSource for Folder {
     }
 
     fn position(&self, ctx: Ctx, id: String) -> BoxFuture<Result<Option<f64>>> {
-        let at = self.positions.as_ref().map(|p| p.lock().map(|m| m.get(&Self::user_key(&ctx, id)).copied()).unwrap_or(None));
+        let at = self
+            .positions
+            .as_ref()
+            .map(|p| p.lock().map(|m| m.get(&Self::user_key(&ctx, id)).copied()).unwrap_or(None));
         Box::pin(async move { at.ok_or(Error::NotFound) })
     }
 
@@ -84,7 +87,10 @@ struct Shelf {
 
 impl Component for Shelf {
     fn render(&self, out: &mut String, r: &Render) {
-        out.push_str(&format!(r#"<section class="z-shelf" aria-label="{0}"><h2 class="z-shelf-title">{0}</h2><ul class="z-shelf-list">"#, r.text(&self.title)));
+        out.push_str(&format!(
+            r#"<section class="z-shelf" aria-label="{0}"><h2 class="z-shelf-title">{0}</h2><ul class="z-shelf-list">"#,
+            r.text(&self.title)
+        ));
         for (key, title, subtitle, video) in &self.items {
             let effect = Effect::Navigate { screen: "media_play", params: serde_json::json!({ "item": key }) };
             let current = if *key == self.current { r#" aria-current="true""# } else { "" };
@@ -115,7 +121,11 @@ impl From<Shelf> for Node {
 fn shelf(title: &'static str, video: bool, current: &'static str) -> Shelf {
     Shelf {
         title: Text::key(title),
-        items: CATALOG.iter().filter(|i| i.video == video).map(|i| (i.key, Text::key(i.title), Text::key(i.subtitle), i.video)).collect(),
+        items: CATALOG
+            .iter()
+            .filter(|i| i.video == video)
+            .map(|i| (i.key, Text::key(i.title), Text::key(i.subtitle), i.video))
+            .collect(),
         current,
     }
 }
@@ -131,9 +141,15 @@ fn player(item: &Item) -> Node {
             .captions("harbor.en.vtt", "en", "English")
             .captions("harbor.tr.vtt", "tr", "Türkçe")
             .into(),
-        "zoom" => Video::new("films", Text::key(item.title)).subtitle(Text::key(item.subtitle)).file("zoom.mp4").poster("zoom.jpg").into(),
+        "zoom" => Video::new("films", Text::key(item.title))
+            .subtitle(Text::key(item.subtitle))
+            .file("zoom.mp4")
+            .poster("zoom.jpg")
+            .into(),
         key => {
-            let audio = Audio::new("music", Text::key(item.title)).subtitle(Text::key(item.subtitle)).file(format!("{key}.mp3"));
+            let audio = Audio::new("music", Text::key(item.title))
+                .subtitle(Text::key(item.subtitle))
+                .file(format!("{key}.mp3"));
             if key == "dawn" { audio.captions("dawn.en.vtt", "en", "English").into() } else { audio.into() }
         }
     }
@@ -142,10 +158,11 @@ fn player(item: &Item) -> Node {
 fn library_of(key: &str) -> Result<Screen> {
     let item = CATALOG.iter().find(|i| i.key == key).ok_or(Error::NotFound)?;
     Ok(Screen::new(t!("media.title")).body(
-        Row::new()
-            .col(player(item))
-            .weight(2)
-            .col(Stack::new().add(shelf("media.films", true, item.key)).add(shelf("media.songs", false, item.key))),
+        Row::new().col(player(item)).weight(2).col(Stack::new().add(shelf("media.films", true, item.key)).add(shelf(
+            "media.songs",
+            false,
+            item.key,
+        ))),
     ))
 }
 
@@ -166,11 +183,26 @@ pub fn feature() -> Feature {
             "films",
             PLAY,
             Folder {
-                files: &["harbor.webm", "harbor.mp4", "harbor.m3u8", "harbor0.ts", "harbor1.ts", "harbor.jpg", "harbor.en.vtt", "harbor.tr.vtt", "zoom.mp4", "zoom.jpg"],
+                files: &[
+                    "harbor.webm",
+                    "harbor.mp4",
+                    "harbor.m3u8",
+                    "harbor0.ts",
+                    "harbor1.ts",
+                    "harbor.jpg",
+                    "harbor.en.vtt",
+                    "harbor.tr.vtt",
+                    "zoom.mp4",
+                    "zoom.jpg",
+                ],
                 positions: Some(Arc::default()),
             },
         )
-        .media("music", PLAY, Folder { files: &["dawn.mp3", "tide.mp3", "lanterns.mp3", "dawn.en.vtt"], positions: None })
+        .media(
+            "music",
+            PLAY,
+            Folder { files: &["dawn.mp3", "tide.mp3", "lanterns.mp3", "dawn.en.vtt"], positions: None },
+        )
         .screen(media_library)
         .screen(media_play)
         .menu(|m| m.group(t!("menu.media"), Icon::Chart).item(t!("media.title"), media_library))

@@ -11,11 +11,11 @@
 
 use std::cell::{Cell, RefCell};
 use std::rc::{Rc, Weak};
-use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
+use wasm_bindgen::prelude::*;
 use web_sys::{
-    AddEventListenerOptions, CanvasRenderingContext2d, Element, Event, HtmlCanvasElement, KeyboardEvent, PointerEvent, ResizeObserver,
-    WebGl2RenderingContext, WheelEvent,
+    AddEventListenerOptions, CanvasRenderingContext2d, Element, Event, HtmlCanvasElement, KeyboardEvent, PointerEvent,
+    ResizeObserver, WebGl2RenderingContext, WheelEvent,
 };
 
 /// The context a scene draws with.
@@ -47,13 +47,36 @@ pub struct Frame {
 /// What happened on the canvas. Coordinates are CSS pixels from the canvas' top left corner.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Input {
-    Down { x: f64, y: f64, button: i16, shift: bool },
-    Move { x: f64, y: f64, pressed: bool },
-    Up { x: f64, y: f64 },
+    Down {
+        x: f64,
+        y: f64,
+        button: i16,
+        shift: bool,
+    },
+    Move {
+        x: f64,
+        y: f64,
+        pressed: bool,
+    },
+    Up {
+        x: f64,
+        y: f64,
+    },
     /// `dy` is positive when scrolling down; `ctrl` is set for pinch zoom on touchpads.
-    Wheel { x: f64, y: f64, dx: f64, dy: f64, ctrl: bool },
+    Wheel {
+        x: f64,
+        y: f64,
+        dx: f64,
+        dy: f64,
+        ctrl: bool,
+    },
     /// `key` is `KeyboardEvent.key` (`ArrowLeft`, `Delete`, `a`).
-    Key { key: String, shift: bool, ctrl: bool, alt: bool },
+    Key {
+        key: String,
+        shift: bool,
+        ctrl: bool,
+        alt: bool,
+    },
 }
 
 /// A picture and how it reacts.
@@ -103,7 +126,14 @@ impl<S: Scene> Surface<S> {
     /// Creates the canvas inside `parent`. `label` is its accessible name; `described_by` the ids
     /// of elements that describe it (the island's description and text summary). The canvas
     /// takes focus with Tab and is `height` CSS pixels high, as wide as its parent.
-    pub fn new(parent: &Element, scene: S, prefer: Prefer, label: &str, described_by: &str, height: u32) -> Result<Self, JsValue> {
+    pub fn new(
+        parent: &Element,
+        scene: S,
+        prefer: Prefer,
+        label: &str,
+        described_by: &str,
+        height: u32,
+    ) -> Result<Self, JsValue> {
         let doc = parent.owner_document().ok_or("no document")?;
         let canvas: HtmlCanvasElement = doc.create_element("canvas")?.dyn_into()?;
         canvas.set_tab_index(0);
@@ -204,7 +234,11 @@ impl<S: Scene> Surface<S> {
             });
             let options = AddEventListenerOptions::new();
             options.set_passive(false);
-            self.shared.canvas.add_event_listener_with_callback_and_add_event_listener_options(kind, cb.as_ref().unchecked_ref(), &options)?;
+            self.shared.canvas.add_event_listener_with_callback_and_add_event_listener_options(
+                kind,
+                cb.as_ref().unchecked_ref(),
+                &options,
+            )?;
             self.shared.listeners.borrow_mut().push((kind, cb));
         }
         Ok(())
@@ -213,7 +247,9 @@ impl<S: Scene> Surface<S> {
 
 fn context(canvas: &HtmlCanvasElement, prefer: Prefer) -> Result<Graphics, JsValue> {
     if prefer == Prefer::Gl {
-        if let Some(gl) = canvas.get_context("webgl2").ok().flatten().and_then(|c| c.dyn_into::<WebGl2RenderingContext>().ok()) {
+        if let Some(gl) =
+            canvas.get_context("webgl2").ok().flatten().and_then(|c| c.dyn_into::<WebGl2RenderingContext>().ok())
+        {
             return Ok(Graphics::Gl(gl));
         }
     }
@@ -225,7 +261,8 @@ fn request<S: Scene>(s: &Shared<S>) {
     if s.pending.replace(true) {
         return;
     }
-    let scheduled = web_sys::window().zip(s.raf.borrow().as_ref().map(|c| c.as_ref().unchecked_ref::<js_sys::Function>().clone()));
+    let scheduled =
+        web_sys::window().zip(s.raf.borrow().as_ref().map(|c| c.as_ref().unchecked_ref::<js_sys::Function>().clone()));
     match scheduled {
         Some((w, f)) if w.request_animation_frame(&f).is_ok() => {}
         _ => s.pending.set(false),
@@ -286,7 +323,13 @@ fn handle<S: Scene>(s: &Shared<S>, kind: &str, e: &Event) {
                 2 => f64::from(s.canvas.client_height()),
                 _ => 1.0,
             };
-            Input::Wheel { x: f64::from(w.offset_x()), y: f64::from(w.offset_y()), dx: w.delta_x() * scale, dy: w.delta_y() * scale, ctrl: w.ctrl_key() }
+            Input::Wheel {
+                x: f64::from(w.offset_x()),
+                y: f64::from(w.offset_y()),
+                dx: w.delta_x() * scale,
+                dy: w.delta_y() * scale,
+                ctrl: w.ctrl_key(),
+            }
         }
         _ => {
             let Some(k) = e.dyn_ref::<KeyboardEvent>() else { return };

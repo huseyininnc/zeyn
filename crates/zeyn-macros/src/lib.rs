@@ -24,10 +24,9 @@ impl AccessArgs {
                 Ok(quote!(::zeyn::Access::Permission(#p)))
             }
             (None, true) => Ok(quote!(::zeyn::Access::Public)),
-            (Some(p), true) => Err(syn::Error::new(
-                p.span(),
-                format!("{kind} `{name}` cannot be both `public` and have a permission"),
-            )),
+            (Some(p), true) => {
+                Err(syn::Error::new(p.span(), format!("{kind} `{name}` cannot be both `public` and have a permission")))
+            }
             (None, false) => Err(syn::Error::new(
                 name.span(),
                 format!(
@@ -43,15 +42,17 @@ fn check_permission(lit: &LitStr) -> syn::Result<()> {
     let value = lit.value();
     let parts: Vec<&str> = value.split('.').collect();
     let valid = parts.len() >= 2
-        && parts.iter().all(|p| {
-            !p.is_empty() && p.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
-        });
+        && parts
+            .iter()
+            .all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'));
     if valid {
         Ok(())
     } else {
         Err(syn::Error::new(
             lit.span(),
-            format!("invalid permission `{value}`\n  = help: use lowercase dotted names such as \"stock.product.read\""),
+            format!(
+                "invalid permission `{value}`\n  = help: use lowercase dotted names such as \"stock.product.read\""
+            ),
         ))
     }
 }
@@ -119,7 +120,9 @@ impl AiArgs {
         if let (true, Some(span)) = (self.hidden, self.confirm) {
             return Err(syn::Error::new(
                 span,
-                format!("a {kind} with `ai = false` is never offered to models, so `confirm` has no effect\n  = help: remove `confirm` or `ai = false`"),
+                format!(
+                    "a {kind} with `ai = false` is never offered to models, so `confirm` has no effect\n  = help: remove `confirm` or `ai = false`"
+                ),
             ));
         }
         let offered = !self.hidden;
@@ -190,7 +193,9 @@ fn injected_call(f: &ItemFn, kind: &str) -> syn::Result<(Ts, Ts, Ts)> {
         if matches!(**ty, Type::Reference(_)) {
             return Err(syn::Error::new(
                 ty.span(),
-                format!("injected {kind} arguments must be owned types\n  = help: take `Ctx` or the service by value; they are cheap to clone"),
+                format!(
+                    "injected {kind} arguments must be owned types\n  = help: take `Ctx` or the service by value; they are cheap to clone"
+                ),
             ));
         }
         let var = format_ident!("__zeyn_arg{}", i);
@@ -341,12 +346,21 @@ pub fn screen(attr: TokenStream, item: TokenStream) -> TokenStream {
     or_error(expand_screen(&f, &access, route.as_ref(), (sensitive || reason, reason), &ai), original)
 }
 
-fn expand_screen(f: &ItemFn, access: &AccessArgs, route: Option<&LitStr>, privacy: (bool, bool), ai: &AiArgs) -> syn::Result<Ts> {
+fn expand_screen(
+    f: &ItemFn,
+    access: &AccessArgs,
+    route: Option<&LitStr>,
+    privacy: (bool, bool),
+    ai: &AiArgs,
+) -> syn::Result<Ts> {
     let ai = ai.tokens("screen")?;
     let doc = doc_text(&f.attrs);
     let (sensitive, reason) = privacy;
     if reason && access.public {
-        return Err(syn::Error::new(f.sig.ident.span(), "a public screen cannot ask for a reason\n  = help: give the screen a permission"));
+        return Err(syn::Error::new(
+            f.sig.ident.span(),
+            "a public screen cannot ask for a reason\n  = help: give the screen a permission",
+        ));
     }
     let (params, _) = fn_types(f, "screen")?;
     let name = &f.sig.ident;
@@ -394,9 +408,7 @@ fn expand_screen(f: &ItemFn, access: &AccessArgs, route: Option<&LitStr>, privac
 #[proc_macro_attribute]
 pub fn params(attr: TokenStream, item: TokenStream) -> TokenStream {
     if !attr.is_empty() {
-        return syn::Error::new(Ts::from(attr).span(), "`#[params]` takes no options")
-            .to_compile_error()
-            .into();
+        return syn::Error::new(Ts::from(attr).span(), "`#[params]` takes no options").to_compile_error().into();
     }
     let item = syn::parse_macro_input!(item as Item);
     let ident = match &item {
@@ -432,9 +444,7 @@ pub fn params(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn choice(attr: TokenStream, item: TokenStream) -> TokenStream {
     if !attr.is_empty() {
-        return syn::Error::new(Ts::from(attr).span(), "`#[choice]` takes no options")
-            .to_compile_error()
-            .into();
+        return syn::Error::new(Ts::from(attr).span(), "`#[choice]` takes no options").to_compile_error().into();
     }
     let e = syn::parse_macro_input!(item as ItemEnum);
     let original = quote!(#e);
@@ -508,7 +518,9 @@ fn parse_model_args(attr: TokenStream, allow_table: bool) -> syn::Result<ModelAr
         } else if meta.path.is_ident("sensitive") {
             args.sensitive = true;
         } else if allow_table {
-            return Err(meta.error("unknown entity option\n  = help: expected `table = \"...\"`, `validate = path::to::fn` or `sensitive`"));
+            return Err(meta.error(
+                "unknown entity option\n  = help: expected `table = \"...\"`, `validate = path::to::fn` or `sensitive`",
+            ));
         } else {
             return Err(meta.error("unknown model option\n  = help: expected `validate = path::to::fn` or `sensitive`"));
         }
@@ -712,7 +724,10 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
             }
         }
         if is_key && !is_entity {
-            return Err(syn::Error::new(fname.span(), "`#[key]` is only allowed on entities\n  = help: use `#[entity(table = \"...\")]` for table backed data"));
+            return Err(syn::Error::new(
+                fname.span(),
+                "`#[key]` is only allowed on entities\n  = help: use `#[entity(table = \"...\")]` for table backed data",
+            ));
         }
 
         let label = label.map(|l| l.value()).unwrap_or_else(|| default_label(&fname_str));
@@ -891,7 +906,12 @@ fn expand_t(t: TArgs) -> syn::Result<Ts> {
     let span = t.key.span();
     let dir = std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default()).join("locales");
     let mut files: Vec<_> = std::fs::read_dir(&dir)
-        .map_err(|_| syn::Error::new(span, format!("t!: no `locales` folder at {}\n  = help: create locales/en.json", dir.display())))?
+        .map_err(|_| {
+            syn::Error::new(
+                span,
+                format!("t!: no `locales` folder at {}\n  = help: create locales/en.json", dir.display()),
+            )
+        })?
         .filter_map(|e| e.ok().map(|e| e.path()))
         .filter(|p| p.extension().is_some_and(|x| x == "json"))
         .collect();
@@ -902,22 +922,34 @@ fn expand_t(t: TArgs) -> syn::Result<Ts> {
     let given: std::collections::BTreeSet<String> = t.args.iter().map(|(n, _)| n.to_string()).collect();
     let mut tracked = Vec::new();
     for path in &files {
-        let text = std::fs::read_to_string(path).map_err(|e| syn::Error::new(span, format!("t!: {}: {e}", path.display())))?;
+        let text =
+            std::fs::read_to_string(path).map_err(|e| syn::Error::new(span, format!("t!: {}: {e}", path.display())))?;
         let json: serde_json::Value = serde_json::from_str(&text)
             .map_err(|e| syn::Error::new(span, format!("t!: {} is not valid JSON: {e}", path.display())))?;
         let file = path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default();
         let Some(message) = lookup_key(&json, &key) else {
-            return Err(syn::Error::new(span, format!("t!: key `{key}` is missing in locales/{file}\n  = help: add it to every file in locales/")));
+            return Err(syn::Error::new(
+                span,
+                format!("t!: key `{key}` is missing in locales/{file}\n  = help: add it to every file in locales/"),
+            ));
         };
         let wanted = placeholders(message);
         if let Some(missing) = wanted.difference(&given).next() {
-            return Err(syn::Error::new(span, format!("t!: `{key}` in locales/{file} uses {{{missing}}} but no `{missing} = ...` argument was given")));
+            return Err(syn::Error::new(
+                span,
+                format!("t!: `{key}` in locales/{file} uses {{{missing}}} but no `{missing} = ...` argument was given"),
+            ));
         }
         if let Some(extra) = given.difference(&wanted).next() {
-            return Err(syn::Error::new(span, format!("t!: argument `{extra}` is not used by `{key}` in locales/{file}")));
+            return Err(syn::Error::new(
+                span,
+                format!("t!: argument `{extra}` is not used by `{key}` in locales/{file}"),
+            ));
         }
         let p = path.to_string_lossy().to_string();
-        tracked.push(quote!(const _: &[u8] = ::core::include_bytes!(#p);));
+        tracked.push(quote!(
+            const _: &[u8] = ::core::include_bytes!(#p);
+        ));
     }
     let args = t.args.iter().map(|(n, v)| {
         let n = n.to_string();

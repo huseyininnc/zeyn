@@ -27,15 +27,18 @@ pub fn layout() -> Screen {
                     .col(Card::new().title(t!("ui.card_people"))),
             )
             .add(
-                Panel::new(t!("ui.panel_products"))
-                    .collapsible()
-                    .toolbar(|t| t.export(Export::Csv))
-                    .add(
-                        Tabs::new(t!("ui.tabs_label"))
-                            .tab(t!("ui.tab_all"), products())
-                            .tab(t!("ui.tab_split"), Split::new(products(), Card::new().title(t!("ui.card_detail"))).ratio(55))
-                            .tab(t!("ui.tab_columns"), Row::new().col(products()).weight(2).col(Card::new().title(t!("ui.card_hint")))),
-                    ),
+                Panel::new(t!("ui.panel_products")).collapsible().toolbar(|t| t.export(Export::Csv)).add(
+                    Tabs::new(t!("ui.tabs_label"))
+                        .tab(t!("ui.tab_all"), products())
+                        .tab(
+                            t!("ui.tab_split"),
+                            Split::new(products(), Card::new().title(t!("ui.card_detail"))).ratio(55),
+                        )
+                        .tab(
+                            t!("ui.tab_columns"),
+                            Row::new().col(products()).weight(2).col(Card::new().title(t!("ui.card_hint"))),
+                        ),
+                ),
             )
             .add(Panel::new(t!("ui.panel_collapsed")).collapsed().add(Card::new().title(t!("ui.card_hint")))),
     )
@@ -268,7 +271,13 @@ pub fn widgets(_: (), ctx: Ctx) -> Screen {
                                     .field(Invoice::issued)
                                     .item(t!("ui.status"), "INV-2026-0042"),
                             )
-                            .add(Row::new().compact().col(Badge::new(t!("ui.badge_paid")).tone(Tone::Success)).col(Badge::new(t!("ui.badge_overdue")).tone(Tone::Danger)).col(Badge::new(t!("ui.badge_draft"))))
+                            .add(
+                                Row::new()
+                                    .compact()
+                                    .col(Badge::new(t!("ui.badge_paid")).tone(Tone::Success))
+                                    .col(Badge::new(t!("ui.badge_overdue")).tone(Tone::Danger))
+                                    .col(Badge::new(t!("ui.badge_draft"))),
+                            )
                             .add(Progress::new(t!("ui.progress_import"), 64, 100))
                             .add(Progress::new(t!("ui.progress_quota"), 92, 100).tone(Tone::Warning)),
                     ),
@@ -279,7 +288,12 @@ pub fn widgets(_: (), ctx: Ctx) -> Screen {
                         Card::new().title(t!("ui.card_history")).add(
                             Timeline::new()
                                 .event(now.add_ms(-26 * hour), t!("ui.event_created"), None, Tone::Info)
-                                .event(now.add_ms(-5 * hour), t!("ui.event_approved"), Some(t!("ui.event_approved_by")), Tone::Success)
+                                .event(
+                                    now.add_ms(-5 * hour),
+                                    t!("ui.event_approved"),
+                                    Some(t!("ui.event_approved_by")),
+                                    Tone::Success,
+                                )
                                 .event(now.add_ms(-hour), t!("ui.event_shipped"), None, Tone::Neutral),
                         ),
                     )
@@ -297,11 +311,18 @@ pub fn widgets(_: (), ctx: Ctx) -> Screen {
                                     }),
                             )
                             .add(ActionButton::new(t!("ui.check_stock"), check_stock, ()).on_success(|_, ui| {
-                                ui.effect(Effect::confirm(t!("ui.low_stock_confirm"), Effect::Navigate { screen: "product_list", params: serde_json::Value::Null }));
+                                ui.effect(Effect::confirm(
+                                    t!("ui.low_stock_confirm"),
+                                    Effect::Navigate { screen: "product_list", params: serde_json::Value::Null },
+                                ));
                             }))
                             .add(Skeleton::lines(3)),
                     )
-                    .col(Card::new().add(EmptyState::new(t!("ui.empty_title")).text(t!("ui.empty_text")).opens(t!("ui.empty_button"), crate::stock::product_editor, crate::stock::ProductParams { id: None }))),
+                    .col(Card::new().add(EmptyState::new(t!("ui.empty_title")).text(t!("ui.empty_text")).opens(
+                        t!("ui.empty_button"),
+                        crate::stock::product_editor,
+                        crate::stock::ProductParams { id: None },
+                    ))),
             ),
     )
 }
@@ -362,7 +383,11 @@ pub async fn product_tree(q: TreeQuery, store: crate::stock::ProductStore) -> Re
             .collect(),
         Some(parent) => {
             let Some((_, unit, _)) = units.iter().find(|(id, _, _)| *id == parent) else { return Err(Error::NotFound) };
-            all.iter().filter(|p| p.unit == *unit).take(25).map(|p| TreeItem::leaf(p.id.0.to_string(), p.name.clone()).hint(p.code.clone())).collect()
+            all.iter()
+                .filter(|p| p.unit == *unit)
+                .take(25)
+                .map(|p| TreeItem::leaf(p.id.0.to_string(), p.name.clone()).hint(p.code.clone()))
+                .collect()
         }
     })
 }
@@ -376,11 +401,30 @@ pub fn data() -> Screen {
             .weight(1)
             .col(
                 Stack::new()
-                    .add(Card::new().add(Chart::bar(t!("ui.chart_sales")).labels(months.clone()).series(t!("ui.series_2025"), [120.0, 98.0, 143.0, 160.0, 151.0, 189.0]).series(t!("ui.series_2026"), [131.0, 122.0, 150.0, 171.0, 166.0, 204.0])))
+                    .add(
+                        Card::new().add(
+                            Chart::bar(t!("ui.chart_sales"))
+                                .labels(months.clone())
+                                .series(t!("ui.series_2025"), [120.0, 98.0, 143.0, 160.0, 151.0, 189.0])
+                                .series(t!("ui.series_2026"), [131.0, 122.0, 150.0, 171.0, 166.0, 204.0]),
+                        ),
+                    )
                     .add(
                         Row::new()
-                            .col(Card::new().add(Chart::line(t!("ui.chart_orders")).labels(months).series(t!("ui.series_orders"), [42.0, 51.0, 47.0, 63.0, 70.0, 66.0])))
-                            .col(Card::new().add(Chart::donut(t!("ui.chart_units")).labels([t!("ui.unit_piece"), t!("ui.unit_kg"), t!("ui.unit_liter")]).series(t!("ui.series_products"), [80.0, 80.0, 80.0]))),
+                            .col(
+                                Card::new().add(
+                                    Chart::line(t!("ui.chart_orders"))
+                                        .labels(months)
+                                        .series(t!("ui.series_orders"), [42.0, 51.0, 47.0, 63.0, 70.0, 66.0]),
+                                ),
+                            )
+                            .col(
+                                Card::new().add(
+                                    Chart::donut(t!("ui.chart_units"))
+                                        .labels([t!("ui.unit_piece"), t!("ui.unit_kg"), t!("ui.unit_liter")])
+                                        .series(t!("ui.series_products"), [80.0, 80.0, 80.0]),
+                                ),
+                            ),
                     ),
             )
             .weight(2),

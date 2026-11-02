@@ -11,8 +11,8 @@
 //! app looks up (in a table or a fixed list); it never names a file path, so a client cannot walk
 //! the file system. Files are streamed in small chunks, never read whole into memory.
 
-use crate::ctx::{BoxFuture, Ctx};
 use crate::action::{Error, Result};
+use crate::ctx::{BoxFuture, Ctx};
 use std::io::{Cursor, Read, Seek};
 use std::path::Path;
 
@@ -77,7 +77,8 @@ impl Media {
 
     /// Sets a strong entity tag (without quotes). It must change whenever the bytes change.
     pub fn etag(mut self, tag: impl Into<String>) -> Self {
-        let tag: String = tag.into().chars().filter(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.')).collect();
+        let tag: String =
+            tag.into().chars().filter(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.')).collect();
         self.etag = (!tag.is_empty()).then_some(tag);
         self
     }
@@ -183,7 +184,14 @@ pub fn media_type(name: &str) -> &'static str {
 pub(crate) fn inline_type(content_type: &str) -> bool {
     let t = content_type.split(';').next().unwrap_or("").trim().to_ascii_lowercase();
     (t.starts_with("audio/") || t.starts_with("video/") || (t.starts_with("image/") && t != "image/svg+xml"))
-        || matches!(t.as_str(), "text/vtt" | "application/vnd.apple.mpegurl" | "application/x-mpegurl" | "application/dash+xml" | "application/mp4")
+        || matches!(
+            t.as_str(),
+            "text/vtt"
+                | "application/vnd.apple.mpegurl"
+                | "application/x-mpegurl"
+                | "application/dash+xml"
+                | "application/mp4"
+        )
 }
 
 /// What a `Range` header asks for, for a body of a known length.
@@ -218,7 +226,8 @@ impl ByteRange {
             return ByteRange::Full;
         }
         let Some((a, b)) = spec.trim().split_once('-') else { return ByteRange::Unsatisfiable };
-        let num = |s: &str| (!s.is_empty() && s.bytes().all(|c| c.is_ascii_digit())).then(|| s.parse::<u64>().ok()).flatten();
+        let num =
+            |s: &str| (!s.is_empty() && s.bytes().all(|c| c.is_ascii_digit())).then(|| s.parse::<u64>().ok()).flatten();
         let (a, b) = (a.trim(), b.trim());
         match (a.is_empty(), num(a), num(b)) {
             (true, _, Some(n)) if n > 0 && len > 0 => ByteRange::Part(len.saturating_sub(n), len - 1),

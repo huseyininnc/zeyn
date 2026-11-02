@@ -155,7 +155,9 @@ impl Theme {
     /// names, unknown tokens, unsafe values and low contrast are reported by `App::check`.
     pub fn named<'a>(name: &str, tokens: impl IntoIterator<Item = (&'a str, &'a str)>) -> Self {
         let mut theme = Theme { name: Some(name.to_string()), scheme: Some("light"), ..Theme::default() };
-        let valid = !name.is_empty() && name.len() <= 32 && name.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
+        let valid = !name.is_empty()
+            && name.len() <= 32
+            && name.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
         if !valid || matches!(name, "system" | "light" | "dark") {
             theme.problems.push(format!(
                 "theme name `{name}` is not allowed\n  = help: use `a` to `z`, digits and `-` (up to 32), and not `system`, `light` or `dark`"
@@ -183,7 +185,9 @@ impl Theme {
     pub fn token(mut self, name: &str, value: &str) -> Self {
         let owner = self.name.clone().unwrap_or_else(|| "app".into());
         if !THEME_TOKENS.contains(&name) {
-            self.problems.push(format!("theme `{owner}`: `{name}` is not a theme token\n  = help: use one of the tokens in docs/theming.md"));
+            self.problems.push(format!(
+                "theme `{owner}`: `{name}` is not a theme token\n  = help: use one of the tokens in docs/theming.md"
+            ));
         } else if !safe_value(value) {
             self.problems.push(format!(
                 "theme `{owner}`: the value of `{name}` is not allowed\n  = help: use a color, length or font list without `;`, braces, `\\`, `<`, `>` or `url(`"
@@ -207,7 +211,8 @@ impl Theme {
     /// Font stack, such as `Inter, system-ui, sans-serif`. Fonts must be installed or served by
     /// the app; only letters, digits, spaces, commas, hyphens and quotes are allowed.
     pub fn font(mut self, stack: &str) -> Self {
-        if !stack.is_empty() && stack.len() <= 200 && stack.chars().all(|c| c.is_alphanumeric() || " ,-'\"".contains(c)) {
+        if !stack.is_empty() && stack.len() <= 200 && stack.chars().all(|c| c.is_alphanumeric() || " ,-'\"".contains(c))
+        {
             self.font = Some(stack.to_string());
         }
         self
@@ -384,7 +389,9 @@ impl App {
             .filter_map(|t| {
                 let name = t.name.clone()?;
                 let label = match name.as_str() {
-                    "light" | "dark" => t.label.clone().unwrap_or_else(|| Text::key(format!("zeyn.shell.theme_{name}"))),
+                    "light" | "dark" => {
+                        t.label.clone().unwrap_or_else(|| Text::key(format!("zeyn.shell.theme_{name}")))
+                    }
                     _ => t.label.clone().unwrap_or_else(|| Text::from(name.clone())),
                 };
                 Some(Choice { custom: !t.is_builtin(), name: name.into(), label, scheme: t.scheme.unwrap_or("light") })
@@ -396,7 +403,14 @@ impl App {
             None => choices.first().map(|c| c.name.clone()).unwrap_or_else(|| "system".into()),
         };
         let locked = choices.len() == 1;
-        Look { css: css.into(), picker: self.looks.picker && !locked && choices.len() > 1, system, default, choices, compact: base.compact }
+        Look {
+            css: css.into(),
+            picker: self.looks.picker && !locked && choices.len() > 1,
+            system,
+            default,
+            choices,
+            compact: base.compact,
+        }
     }
 }
 
@@ -440,7 +454,9 @@ impl Look {
     pub(super) fn html(&self, name: &str) -> (String, &'static str) {
         let density = if self.compact { r#" data-density="compact""# } else { "" };
         match self.choices.iter().find(|c| &*c.name == name) {
-            Some(c) if c.custom => (format!(r#" data-theme="{}" data-zeyn-theme="{}"{density}"#, c.scheme, escape(&c.name)), c.scheme),
+            Some(c) if c.custom => {
+                (format!(r#" data-theme="{}" data-zeyn-theme="{}"{density}"#, c.scheme, escape(&c.name)), c.scheme)
+            }
             Some(c) => (format!(r#" data-theme="{}"{density}"#, c.scheme), c.scheme),
             None => (density.to_string(), "light dark"),
         }
@@ -546,7 +562,8 @@ pub(super) async fn remember(st: &AppState, ctx: Ctx, headers: &HeaderMap) -> (C
             return (ctx, None);
         }
     };
-    let name = saved.and_then(|v| v.columns.into_iter().find_map(|c| c.field.strip_prefix(STORE_PREFIX).map(str::to_string)));
+    let name =
+        saved.and_then(|v| v.columns.into_iter().find_map(|c| c.field.strip_prefix(STORE_PREFIX).map(str::to_string)));
     match name.and_then(|n| st.look.allowed(&n)) {
         Some(theme) => {
             let c = theme_cookie(st, &theme);
@@ -569,7 +586,11 @@ struct ThemeCall {
 /// `POST /_zeyn/theme {"theme": "dark"}`: stores the choice in the `zeyn_theme` cookie and, for a
 /// signed in user in an app with a view store, in the store. `404` for a theme that is not offered
 /// or when the picker is hidden.
-async fn set_theme(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(call): axum::Json<ThemeCall>) -> Response {
+async fn set_theme(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::Json(call): axum::Json<ThemeCall>,
+) -> Response {
     let ctx = st.ctx(&headers);
     if let Err(f) = st.check_csrf(&headers) {
         return st.error_response(&ctx, f);
@@ -578,7 +599,10 @@ async fn set_theme(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Js
         return st.error_response(&ctx, Failure::App(Error::NotFound));
     };
     if let (Some(store), Some(user)) = (st.views.as_ref(), ctx.identity().user.clone()) {
-        let view = DataGridView { columns: vec![ColumnView { field: format!("{STORE_PREFIX}{theme}"), width: None, pin: None }], ..DataGridView::default() };
+        let view = DataGridView {
+            columns: vec![ColumnView { field: format!("{STORE_PREFIX}{theme}"), width: None, pin: None }],
+            ..DataGridView::default()
+        };
         if st.timed(store.save(&user, &store_key(&ctx), Some(view))).await.is_err() {
             eprintln!("warning: the view store failed to save a theme; the cookie still keeps it");
         }

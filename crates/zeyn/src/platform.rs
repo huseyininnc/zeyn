@@ -95,7 +95,8 @@ impl ConfigSource for JsonFileSource {
         let path = self.0.clone();
         Box::pin(async move {
             let text = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-            let json: serde_json::Value = serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
+            let json: serde_json::Value =
+                serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
             let mut out = HashMap::new();
             flatten("", &json, &mut out);
             Ok(out)
@@ -272,7 +273,9 @@ impl<T: Clone + Send + Sync + 'static> PerTenant<T> {
     /// The value for the request's tenant, built on first use.
     pub async fn get(&self, ctx: &Ctx) -> Result<T> {
         let tenant = ctx.tenant().cloned().ok_or(Error::Denied(Text::key("zeyn.error.tenant")))?;
-        if let Some(v) = self.cache.lock().map_err(|_| Error::Internal("tenant cache poisoned".into()))?.get(tenant.id()) {
+        if let Some(v) =
+            self.cache.lock().map_err(|_| Error::Internal("tenant cache poisoned".into()))?.get(tenant.id())
+        {
             return Ok(v.clone());
         }
         let value = (self.make)(tenant.clone(), ctx.config().clone()).await?;
@@ -464,11 +467,12 @@ impl SignedLicenseFile {
 #[cfg(feature = "signed-licenses")]
 impl LicenseSource for SignedLicenseFile {
     fn load(&self, _tenant: Option<&Tenant>) -> BoxFuture<std::result::Result<Option<License>, String>> {
-        let result = std::fs::read_to_string(&self.path).map_err(|e| format!("{}: {e}", self.path.display())).map(|text| {
-            License::from_signed(&text, self.public_key)
-                .inspect_err(|e| tracing::error!("license {} refused, the app is locked: {e}", self.path.display()))
-                .ok()
-        });
+        let result =
+            std::fs::read_to_string(&self.path).map_err(|e| format!("{}: {e}", self.path.display())).map(|text| {
+                License::from_signed(&text, self.public_key)
+                    .inspect_err(|e| tracing::error!("license {} refused, the app is locked: {e}", self.path.display()))
+                    .ok()
+            });
         Box::pin(async move { result })
     }
 }

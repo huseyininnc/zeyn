@@ -77,7 +77,10 @@ pub(crate) fn markup(r: &Render, mode: &str) -> String {
     let t = |k: &'static str| r.text(&Text::key(k));
     let id = format!("z-assistant-{mode}");
     let close = if mode == "dock" {
-        format!(r#"<button type="button" class="z-icon-button" data-zeyn-assistant-close aria-label="{0}" title="{0}">{ICON_CLOSE}</button>"#, t("zeyn.assistant.close"))
+        format!(
+            r#"<button type="button" class="z-icon-button" data-zeyn-assistant-close aria-label="{0}" title="{0}">{ICON_CLOSE}</button>"#,
+            t("zeyn.assistant.close")
+        )
     } else {
         String::new()
     };

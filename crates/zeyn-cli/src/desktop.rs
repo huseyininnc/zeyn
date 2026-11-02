@@ -13,7 +13,13 @@ const SMALL: &[&str] = &["profile.release.lto=true", "profile.release.codegen-un
 /// (see `docs/desktop.md`).
 pub fn build(dir: &Path, package: Option<&str>, features: &str) -> Result<String, String> {
     let mut cmd = Command::new("cargo");
-    cmd.current_dir(dir).args(["build", "--release", "--message-format=json-render-diagnostics", "--features", features]);
+    cmd.current_dir(dir).args([
+        "build",
+        "--release",
+        "--message-format=json-render-diagnostics",
+        "--features",
+        features,
+    ]);
     for c in SMALL {
         cmd.args(["--config", c]);
     }
@@ -41,7 +47,10 @@ fn executables(messages: &str) -> Vec<String> {
     messages
         .lines()
         .filter_map(|l| serde_json::from_str::<Value>(l).ok())
-        .filter(|m| m["reason"] == "compiler-artifact" && m["target"]["kind"].as_array().is_some_and(|k| k.iter().any(|k| k == "bin")))
+        .filter(|m| {
+            m["reason"] == "compiler-artifact"
+                && m["target"]["kind"].as_array().is_some_and(|k| k.iter().any(|k| k == "bin"))
+        })
         .filter_map(|m| m["executable"].as_str().map(str::to_string))
         .collect()
 }

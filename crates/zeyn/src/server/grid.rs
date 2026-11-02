@@ -17,15 +17,8 @@ pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
 
 /// The grid at `node` of an opened screen, after the grid's read access. Every grid endpoint
 /// that addresses a grid starts here, so none can skip the check.
-fn grid_at<'s>(
-    ctx: &Ctx,
-    screen: &'s Screen,
-    node: &NodePath,
-) -> Result<&'s dyn GridSource, Failure> {
-    let grid = screen
-        .node(node)
-        .and_then(|n| n.grid())
-        .ok_or(Failure::App(Error::NotFound))?;
+fn grid_at<'s>(ctx: &Ctx, screen: &'s Screen, node: &NodePath) -> Result<&'s dyn GridSource, Failure> {
+    let grid = screen.node(node).and_then(|n| n.grid()).ok_or(Failure::App(Error::NotFound))?;
     if !ctx.identity().can(&grid.action().access) {
         return Err(Failure::App(Error::Forbidden));
     }
@@ -134,11 +127,7 @@ async fn grid_call(
 /// page through the grid's action, in the user's column layout and language, up to the grid's
 /// export limit. With the `pdf` feature, `format=pdf` prints a list report instead. Needs the
 /// grid's read access and its export access; interceptors see the call.
-async fn grid_export(
-    State(st): State<Arc<AppState>>,
-    headers: HeaderMap,
-    Query(q): Query<ExportQuery>,
-) -> Response {
+async fn grid_export(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Query<ExportQuery>) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     let xlsx = match q.format.as_deref() {
         None | Some("csv") => false,
@@ -155,16 +144,11 @@ async fn grid_export(
         };
         let spec: Json = match &q.q {
             None => Json::Null,
-            Some(s) if s.len() <= 64 * 1024 => {
-                serde_json::from_str(s).map_err(|_| Failure::App(Error::NotFound))?
-            }
+            Some(s) if s.len() <= 64 * 1024 => serde_json::from_str(s).map_err(|_| Failure::App(Error::NotFound))?,
             Some(_) => return Err(Failure::App(Error::NotFound)),
         };
         let (_, entry, screen) = st.open(&ctx, &q.screen, params).await?;
-        let grid = screen
-            .node(&q.node)
-            .and_then(|n| n.grid())
-            .ok_or(Failure::App(Error::NotFound))?;
+        let grid = screen.node(&q.node).and_then(|n| n.grid()).ok_or(Failure::App(Error::NotFound))?;
         let access = grid.export_access().ok_or(Failure::App(Error::NotFound))?;
         if !ctx.identity().can(&grid.action().access) || !ctx.identity().can(&access) {
             return Err(Failure::App(Error::Forbidden));
@@ -187,10 +171,8 @@ async fn grid_export(
         Ok(v) => v,
         Err(f) => return st.error_response(&ctx, f),
     };
-    let view: Option<DataGridView> = serde_json::from_value(
-        json!({ "columns": spec.get("columns").cloned().unwrap_or(json!([])) }),
-    )
-    .ok();
+    let view: Option<DataGridView> =
+        serde_json::from_value(json!({ "columns": spec.get("columns").cloned().unwrap_or(json!([])) })).ok();
     let mut query: DataQuery = serde_json::from_value(json!({
         "sort": spec.get("sort").cloned().unwrap_or(json!([])),
         "filters": spec.get("filters").cloned().unwrap_or(json!([])),
@@ -199,17 +181,7 @@ async fn grid_export(
     query.with_total = false;
     #[cfg(feature = "pdf")]
     if q.format.as_deref() == Some("pdf") {
-        return pdf::grid_report(
-            &st,
-            &ctx,
-            entry.meta.name,
-            &screen,
-            &q.node,
-            view,
-            query,
-            &info,
-        )
-        .await;
+        return pdf::grid_report(&st, &ctx, entry.meta.name, &screen, &q.node, view, query, &info).await;
     }
     let name = entry.meta.name;
     let node = q.node;
@@ -221,16 +193,10 @@ async fn grid_export(
             return;
         };
         let view = view.map(|v| grid.clean_view(v));
-        let r = Render::new(name, ctx.locale(), ctx.i18n())
-            .with_tz(ctx.time_zone())
-            .with_identity(ctx.identity());
+        let r = Render::new(name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity());
         #[cfg(feature = "xlsx")]
         let sheet = xlsx.then(|| {
-            xlsx::XlsxSink::open(
-                grid.export_columns(&r, view.as_ref()),
-                ctx.locale().to_string(),
-                tx.clone(),
-            )
+            xlsx::XlsxSink::open(grid.export_columns(&r, view.as_ref()), ctx.locale().to_string(), tx.clone())
         });
         #[cfg(not(feature = "xlsx"))]
         let sheet: Option<std::convert::Infallible> = None;
@@ -246,10 +212,7 @@ async fn grid_export(
         while sent < limit {
             let size = (limit - sent).min(crate::action::MAX_PAGE_SIZE as usize) as u32;
             let mut q = query.clone();
-            q.page = crate::action::PageRequest::Offset {
-                offset: sent as u64,
-                limit: size,
-            };
+            q.page = crate::action::PageRequest::Offset { offset: sent as u64, limit: size };
             let mut page = match state.timed(grid.fetch(ctx.clone(), q)).await {
                 Ok(p) => p,
                 Err(f) => {
@@ -287,10 +250,7 @@ async fn grid_export(
     let mut response = axum::body::Body::from_stream(Chunks(rx)).into_response();
     let h = response.headers_mut();
     let (kind, ext) = if xlsx {
-        (
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "xlsx",
-        )
+        ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "xlsx")
     } else {
         ("text/csv; charset=utf-8", "csv")
     };
@@ -379,9 +339,7 @@ impl AppState {
         let mut query = call.query;
         crate::privacy::strip_masked(&mut query, grid.fields(), ctx);
         self.intercept(ctx, &info, move || async move {
-            let mut page = self
-                .timed(grid.fetch_at(ctx.clone(), query, call.path))
-                .await?;
+            let mut page = self.timed(grid.fetch_at(ctx.clone(), query, call.path)).await?;
             page.view = call.view.map(|v| grid.clean_view(v));
             let r = user_render(entry.meta.name, ctx);
             Ok(json!({
@@ -401,20 +359,11 @@ impl AppState {
     /// read access; the view is cleaned by the grid first.
     async fn save_view(&self, ctx: &Ctx, call: DataGridViewCall) -> Result<(), Failure> {
         let store = self.views.as_ref().ok_or(Failure::App(Error::NotFound))?;
-        let user = ctx
-            .identity()
-            .user
-            .clone()
-            .ok_or(Failure::App(Error::Forbidden))?;
+        let user = ctx.identity().user.clone().ok_or(Failure::App(Error::Forbidden))?;
         let (_, entry, screen) = self.open(ctx, &call.screen, call.params).await?;
         let grid = grid_at(ctx, &screen, &call.node)?;
         let view = call.view.map(|v| grid.clean_view(v));
-        self.timed(store.save(
-            &user,
-            &Self::view_key(ctx, entry.meta.name, &call.node),
-            view,
-        ))
-        .await
+        self.timed(store.save(&user, &Self::view_key(ctx, entry.meta.name, &call.node), view)).await
     }
 
     /// Runs a row item. The row is loaded again by key through the grid's action (with the
@@ -426,12 +375,8 @@ impl AppState {
         }
         let (_, entry, screen) = self.open(ctx, &call.screen, call.params).await?;
         let grid = grid_at(ctx, &screen, &call.node)?;
-        let page = self
-            .timed(grid.find_row(ctx.clone(), call.key.clone()))
-            .await?;
-        let row = grid
-            .row_call(&page, &call.key, &call.item)
-            .ok_or(Failure::App(Error::NotFound))?;
+        let page = self.timed(grid.find_row(ctx.clone(), call.key.clone())).await?;
+        let row = grid.row_call(&page, &call.key, &call.item).ok_or(Failure::App(Error::NotFound))?;
         if !ctx.identity().can(&row.meta.access) {
             return Err(Failure::App(Error::Forbidden));
         }
@@ -441,9 +386,7 @@ impl AppState {
             action: Some(row.meta),
             via_agent: ctx.via_agent(),
         };
-        let result = self
-            .intercept(ctx, &info, || self.timed((row.run)(ctx.clone())))
-            .await;
+        let result = self.intercept(ctx, &info, || self.timed((row.run)(ctx.clone()))).await;
         result?;
         Ok(json!({ "effects": [] }))
     }
@@ -457,32 +400,16 @@ impl AppState {
         }
         let (_, entry, screen) = self.open(ctx, &call.screen, call.params).await?;
         let grid = grid_at(ctx, &screen, &call.node)?;
-        let page = self
-            .timed(grid.find_row(ctx.clone(), call.key.clone()))
-            .await?;
-        let save = grid.edit_call(
-            &page,
-            &call.key,
-            &call.values,
-            ctx.locale(),
-            ctx.time_zone(),
-        )?;
+        let page = self.timed(grid.find_row(ctx.clone(), call.key.clone())).await?;
+        let save = grid.edit_call(&page, &call.key, &call.values, ctx.locale(), ctx.time_zone())?;
         if !ctx.identity().can(&save.meta.access) {
             return Err(Failure::App(Error::Forbidden));
         }
-        let info = Call {
-            kind: CallKind::Form,
-            screen: entry.meta.name,
-            action: Some(save.meta),
-            via_agent: ctx.via_agent(),
-        };
-        let result = self
-            .intercept(ctx, &info, || self.timed((save.run)(ctx.clone())))
-            .await;
+        let info =
+            Call { kind: CallKind::Form, screen: entry.meta.name, action: Some(save.meta), via_agent: ctx.via_agent() };
+        let result = self.intercept(ctx, &info, || self.timed((save.run)(ctx.clone()))).await;
         result?;
-        let mut page = self
-            .timed(grid.find_row(ctx.clone(), call.key.clone()))
-            .await?;
+        let mut page = self.timed(grid.find_row(ctx.clone(), call.key.clone())).await?;
         page.view = call.view.map(|v| grid.clean_view(v));
         let r = user_render(entry.meta.name, ctx);
         Ok(json!({ "row": grid.row_html(&page, &call.key, &r) }))
@@ -492,16 +419,10 @@ impl AppState {
     /// filters, which the server collects through the grid's action, page by page.
     async fn run_bulk(&self, ctx: &Ctx, mut call: BulkCall) -> Result<Json, Failure> {
         use crate::grid::MAX_BULK;
-        let too_many = || {
-            Failure::App(Error::Denied(
-                Text::key("zeyn.grid.too_many").arg("n", MAX_BULK.to_string()),
-            ))
-        };
+        let too_many = || Failure::App(Error::Denied(Text::key("zeyn.grid.too_many").arg("n", MAX_BULK.to_string())));
         let (_, entry, screen) = self.open(ctx, &call.screen, call.params).await?;
         let grid = grid_at(ctx, &screen, &call.node)?;
-        let meta = grid
-            .bulk_meta(call.action)
-            .ok_or(Failure::App(Error::NotFound))?;
+        let meta = grid.bulk_meta(call.action).ok_or(Failure::App(Error::NotFound))?;
         if !ctx.identity().can(&meta.access) {
             return Err(Failure::App(Error::Forbidden));
         }
@@ -510,10 +431,7 @@ impl AppState {
             let mut offset = 0u64;
             loop {
                 let mut q = call.query.clone();
-                q.page = crate::action::PageRequest::Offset {
-                    offset,
-                    limit: crate::action::MAX_PAGE_SIZE,
-                };
+                q.page = crate::action::PageRequest::Offset { offset, limit: crate::action::MAX_PAGE_SIZE };
                 q.aggregates.clear();
                 q.with_total = false;
                 let page = self.timed(grid.fetch(ctx.clone(), q)).await?;
@@ -543,18 +461,14 @@ impl AppState {
             return Ok(json!({ "effects": [], "count": 0 }));
         }
         let count = keys.len();
-        let run = grid
-            .bulk_call(call.action, keys)
-            .ok_or(Failure::App(Error::NotFound))?;
+        let run = grid.bulk_call(call.action, keys).ok_or(Failure::App(Error::NotFound))?;
         let info = Call {
             kind: CallKind::DataGrid,
             screen: entry.meta.name,
             action: Some(run.meta),
             via_agent: ctx.via_agent(),
         };
-        let result = self
-            .intercept(ctx, &info, || self.timed((run.run)(ctx.clone())))
-            .await;
+        let result = self.intercept(ctx, &info, || self.timed((run.run)(ctx.clone()))).await;
         result?;
         Ok(json!({ "effects": [], "count": count }))
     }

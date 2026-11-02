@@ -27,7 +27,12 @@ fn article(page: &str) -> &str {
 
 fn attrs<'a>(html: &'a str, name: &str) -> Vec<&'a str> {
     let pat = format!(r#"{name}=""#);
-    html.match_indices(&pat).map(|(i, _)| { let s = &html[i + pat.len()..]; &s[..s.find('"').unwrap()] }).collect()
+    html.match_indices(&pat)
+        .map(|(i, _)| {
+            let s = &html[i + pat.len()..];
+            &s[..s.find('"').unwrap()]
+        })
+        .collect()
 }
 
 #[tokio::test]
@@ -48,14 +53,24 @@ async fn internal_links_and_anchors_resolve() {
         pages.insert(p.route, get(p.route).await.1);
     }
     for (route, page) in &pages {
-        for href in attrs(article(page), "href").into_iter().chain(attrs(page, "href").into_iter().filter(|h| h.starts_with('#'))) {
+        for href in attrs(article(page), "href")
+            .into_iter()
+            .chain(attrs(page, "href").into_iter().filter(|h| h.starts_with('#')))
+        {
             if href.starts_with("http") || href.starts_with("mailto:") {
                 continue;
             }
             let (path, anchor) = href.split_once('#').unwrap_or((href, ""));
-            let target = if path.is_empty() { page } else { pages.get(path).unwrap_or_else(|| panic!("{route} links to {href}, which is not a page")) };
+            let target = if path.is_empty() {
+                page
+            } else {
+                pages.get(path).unwrap_or_else(|| panic!("{route} links to {href}, which is not a page"))
+            };
             if !anchor.is_empty() {
-                assert!(target.contains(&format!(r#"id="{anchor}""#)), "{route} links to {href}, which has no such anchor");
+                assert!(
+                    target.contains(&format!(r#"id="{anchor}""#)),
+                    "{route} links to {href}, which has no such anchor"
+                );
             }
         }
     }
@@ -72,10 +87,16 @@ async fn code_blocks_are_highlighted_and_nothing_in_an_article_is_raw_html() {
     }
     assert!(highlighted > 100, "{highlighted}");
 
-    let out = render("```rust\nlet html = \"<script>alert('x')</script>\";\n```\n\n```js\nel.innerHTML = '<img src=x onerror=alert(1)>';\n```\n", &|t| t.to_string());
+    let out = render(
+        "```rust\nlet html = \"<script>alert('x')</script>\";\n```\n\n```js\nel.innerHTML = '<img src=x onerror=alert(1)>';\n```\n",
+        &|t| t.to_string(),
+    );
     let Part::Html(html) = &out.parts[0] else { panic!() };
     assert!(!html.contains("<script") && !html.contains("<img"), "{html}");
-    assert!(html.contains(r#"<span class="z-hl-str">&quot;&lt;script&gt;alert(&#39;x&#39;)&lt;/script&gt;&quot;</span>"#), "{html}");
+    assert!(
+        html.contains(r#"<span class="z-hl-str">&quot;&lt;script&gt;alert(&#39;x&#39;)&lt;/script&gt;&quot;</span>"#),
+        "{html}"
+    );
 }
 
 #[tokio::test]

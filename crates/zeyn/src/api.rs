@@ -1,6 +1,6 @@
 //! Actions published as JSON API endpoints, with an OpenAPI description built from the models.
 
-use crate::action::{Action, ActionMeta, Error, DataQuery, Page, Result};
+use crate::action::{Action, ActionMeta, DataQuery, Error, Page, Result};
 use crate::ctx::{BoxFuture, Ctx, Dep};
 use crate::model::{FieldMeta, Model, Valid, ValidationErrors};
 use crate::value::FieldKind;
@@ -28,13 +28,17 @@ fn field_schema(f: &FieldMeta) -> Json {
         FieldKind::Date => json!({ "type": "string", "format": "date" }),
         FieldKind::Time => json!({ "type": "string", "pattern": "^\\d{2}:\\d{2}(:\\d{2})?$" }),
         FieldKind::DateTime => json!({ "type": "string", "format": "date-time" }),
-        FieldKind::LocalDateTime => json!({ "type": "string", "description": "Wall clock date and time with no time zone, YYYY-MM-DDTHH:MM:SS" }),
+        FieldKind::LocalDateTime => {
+            json!({ "type": "string", "description": "Wall clock date and time with no time zone, YYYY-MM-DDTHH:MM:SS" })
+        }
         FieldKind::Money => json!({
             "type": "object",
             "properties": { "minor": { "type": "integer", "description": "Amount in the smallest unit (cents, kuruş)" }, "currency": { "type": "string", "enum": ["Try", "Usd", "Eur"] } },
             "required": ["minor", "currency"]
         }),
-        FieldKind::Choice(options) => json!({ "type": "string", "enum": options.iter().map(|o| o.value).collect::<Vec<_>>() }),
+        FieldKind::Choice(options) => {
+            json!({ "type": "string", "enum": options.iter().map(|o| o.value).collect::<Vec<_>>() })
+        }
     };
     let o = s.as_object_mut().expect("object schema");
     o.insert("title".into(), json!(f.label));
@@ -277,6 +281,13 @@ impl ApiEntry {
         A::Input: ApiInput,
         A::Output: ApiResult,
     {
-        ApiEntry { meta: A::META, call: call_json::<A>, input: A::Input::schema, output: A::Output::schema, deps: A::deps, reads: A::Input::READS }
+        ApiEntry {
+            meta: A::META,
+            call: call_json::<A>,
+            input: A::Input::schema,
+            output: A::Output::schema,
+            deps: A::deps,
+            reads: A::Input::READS,
+        }
     }
 }

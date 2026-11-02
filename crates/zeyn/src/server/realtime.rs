@@ -11,8 +11,8 @@ use super::{AppState, Failure, cookie, same, valid_token};
 use crate::action::Error;
 use crate::ctx::{BoxFuture, Ctx, Service};
 use axum::Router;
+use axum::extract::rejection::QueryRejection;
 use axum::extract::ws::{CloseFrame, Message, WebSocket, WebSocketUpgrade};
-use axum::extract::rejection::{QueryRejection};
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
@@ -159,12 +159,26 @@ impl Default for Realtime {
 
 impl Realtime {
     pub fn new() -> Self {
-        Realtime { hub: Hub::default(), config: Config { kinds: HashMap::new(), topics: HashMap::new(), limits: Limits::default(), origins: Vec::new() } }
+        Realtime {
+            hub: Hub::default(),
+            config: Config {
+                kinds: HashMap::new(),
+                topics: HashMap::new(),
+                limits: Limits::default(),
+                origins: Vec::new(),
+            },
+        }
     }
 
     /// Collaborative documents of `kind` at `/_zeyn/live/doc/{kind}/{doc}`. Joining needs `read`;
     /// sending changes needs `write`.
-    pub fn documents(mut self, kind: &'static str, read: &'static str, write: &'static str, store: impl DocStore) -> Self {
+    pub fn documents(
+        mut self,
+        kind: &'static str,
+        read: &'static str,
+        write: &'static str,
+        store: impl DocStore,
+    ) -> Self {
         self.config.kinds.insert(kind, DocKind { read, write, store: Arc::new(store) });
         self
     }
@@ -249,7 +263,12 @@ impl Hub {
         let text = serde_json::json!({ "topic": topic }).to_string();
         if let Ok(mut topics) = self.0.topics.lock() {
             if let Some(subs) = topics.get_mut(&key) {
-                subs.retain(|(_, tx)| !matches!(tx.try_send(Message::Text(text.clone().into())), Err(mpsc::error::TrySendError::Closed(_))));
+                subs.retain(|(_, tx)| {
+                    !matches!(
+                        tx.try_send(Message::Text(text.clone().into())),
+                        Err(mpsc::error::TrySendError::Closed(_))
+                    )
+                });
             }
         }
     }
@@ -267,7 +286,8 @@ impl Hub {
     /// Persists every changed document now; rooms stay open. Also runs on shutdown paths and in
     /// tests.
     pub async fn flush(&self) {
-        let rooms: Vec<(RoomKey, Arc<Room>)> = self.0.rooms.lock().map(|r| r.iter().map(|(k, v)| (k.clone(), v.clone())).collect()).unwrap_or_default();
+        let rooms: Vec<(RoomKey, Arc<Room>)> =
+            self.0.rooms.lock().map(|r| r.iter().map(|(k, v)| (k.clone(), v.clone())).collect()).unwrap_or_default();
         for (key, room) in rooms {
             persist(&key, &room).await;
         }
@@ -348,7 +368,8 @@ impl Hub {
     }
 
     async fn sweep(&self, idle: Duration) {
-        let rooms: Vec<(RoomKey, Arc<Room>)> = self.0.rooms.lock().map(|r| r.iter().map(|(k, v)| (k.clone(), v.clone())).collect()).unwrap_or_default();
+        let rooms: Vec<(RoomKey, Arc<Room>)> =
+            self.0.rooms.lock().map(|r| r.iter().map(|(k, v)| (k.clone(), v.clone())).collect()).unwrap_or_default();
         for (key, room) in rooms {
             persist(&key, &room).await;
             let expired = room.idle_since.lock().ok().and_then(|s| *s).is_some_and(|since| since.elapsed() >= idle);
@@ -391,7 +412,8 @@ pub(super) fn is_asset(path: &str) -> bool {
 /// Adds the topic script to a full page whose screen subscribes to a topic.
 pub(super) fn head(st: &AppState, screen: &str, page: &mut String) {
     if st.realtime.is_some() && screen.contains(MARKER) {
-        let tag = format!(r#"<script type="module" src="{}{LOADER}"></script></head>"#, crate::render::escape(&st.prefix));
+        let tag =
+            format!(r#"<script type="module" src="{}{LOADER}"></script></head>"#, crate::render::escape(&st.prefix));
         *page = page.replacen("</head>", &tag, 1);
     }
 }
@@ -447,7 +469,8 @@ async fn admit(st: &AppState, headers: &HeaderMap, csrf: &str) -> Result<(Ctx, H
     };
     let user = format!("{}/{user}", ctx.tenant().map(|t| t.id()).unwrap_or(""));
     if !hub.take_user(&user, config.limits.per_user) {
-        let mut r = st.error_response(&ctx, Failure::App(Error::Denied(crate::i18n::Text::key("zeyn.error.rate_limited"))));
+        let mut r =
+            st.error_response(&ctx, Failure::App(Error::Denied(crate::i18n::Text::key("zeyn.error.rate_limited"))));
         *r.status_mut() = StatusCode::TOO_MANY_REQUESTS;
         return Err(r);
     }
@@ -542,7 +565,14 @@ fn close(code: u16, reason: &'static str) -> Message {
 
 /// One document client: sends the whole document, then relays updates both ways until the
 /// client leaves, falls silent, sends something invalid or falls behind.
-async fn run_doc(socket: WebSocket, room: &Room, id: u64, mut rx: mpsc::Receiver<Message>, can_write: bool, limits: &Limits) {
+async fn run_doc(
+    socket: WebSocket,
+    room: &Room,
+    id: u64,
+    mut rx: mpsc::Receiver<Message>,
+    can_write: bool,
+    limits: &Limits,
+) {
     let (mut sink, mut stream) = socket.split();
     let state = room.doc.transact().encode_state_as_update_v1(&StateVector::default());
     if sink.send(frame(&state)).await.is_err() {
@@ -620,7 +650,10 @@ async fn topic_socket(
     let config = hub.config().expect("checked in admit");
     let mut topics: Vec<&'static str> = Vec::new();
     for name in q.t.split(',').filter(|t| !t.is_empty()).take(16) {
-        let allowed = config.topics.get_key_value(name).filter(|(_, p)| ctx.identity().can(&crate::action::Access::Permission(p)));
+        let allowed = config
+            .topics
+            .get_key_value(name)
+            .filter(|(_, p)| ctx.identity().can(&crate::action::Access::Permission(p)));
         match allowed {
             Some((n, _)) if !topics.contains(n) => topics.push(n),
             Some(_) => {}

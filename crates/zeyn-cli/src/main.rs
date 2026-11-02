@@ -106,23 +106,28 @@ fn main() -> ExitCode {
         ["new", name, rest @ ..] => new_project(name, flag(rest, "--zeyn-path"), rest.contains(&"--lib")),
         ["g" | "generate", "feature", name] => new_feature(Path::new("."), name).map(|m| println!("{m}")),
         ["routes"] => describe(Path::new(".")).map(|d| print!("{}", routes_table(&d))),
-        ["check", rest @ ..] => fix_if(Path::new("."), rest.contains(&"--fix")).and_then(|fixed| check(Path::new(".")).map(|r| fixed + &r)).and_then(|report| {
-            print!("{report}");
-            if report.contains("error") { Err("the app has problems".into()) } else { Ok(()) }
-        }),
+        ["check", rest @ ..] => fix_if(Path::new("."), rest.contains(&"--fix"))
+            .and_then(|fixed| check(Path::new(".")).map(|r| fixed + &r))
+            .and_then(|report| {
+                print!("{report}");
+                if report.contains("error") { Err("the app has problems".into()) } else { Ok(()) }
+            }),
         ["dev"] => dev::run(Path::new(".")),
-        ["build-desktop", rest @ ..] => desktop::build(Path::new("."), flag(rest, "--package"), flag(rest, "--features").unwrap_or("desktop")).map(|r| print!("{r}")),
+        ["build-desktop", rest @ ..] => {
+            desktop::build(Path::new("."), flag(rest, "--package"), flag(rest, "--features").unwrap_or("desktop"))
+                .map(|r| print!("{r}"))
+        }
         ["build-islands", rest @ ..] => build_islands(rest).map(|r| println!("{r}")),
         ["mcp"] => mcp(),
         ["license", "keygen", rest @ ..] => {
             license::keygen(Path::new(flag(rest, "--out").unwrap_or(license::DEFAULT_KEY))).map(|m| print!("{m}"))
         }
-        ["license", "sign", json, rest @ ..] => license::sign(json, flag(rest, "--key").map(Path::new)).and_then(|signed| {
-            match flag(rest, "--out") {
+        ["license", "sign", json, rest @ ..] => {
+            license::sign(json, flag(rest, "--key").map(Path::new)).and_then(|signed| match flag(rest, "--out") {
                 Some(out) => std::fs::write(out, signed + "\n").map_err(|e| format!("{out}: {e}")),
                 None => Ok(println!("{signed}")),
-            }
-        }),
+            })
+        }
         _ => {
             print!("{HELP}");
             Ok(())
@@ -212,9 +217,13 @@ fn new_project(name: &str, zeyn_path: Option<&str>, lib: bool) -> Result<(), Str
         std::fs::write(&target, text).map_err(|e| format!("{}: {e}", target.display()))?;
     }
     if lib {
-        println!("Created library {name}/\n\n  cd {name}\n  cargo test\n\nUse it from an app: {crate_name} = {{ git = \"<repo url>\", tag = \"v0.1.0\" }}");
+        println!(
+            "Created library {name}/\n\n  cd {name}\n  cargo test\n\nUse it from an app: {crate_name} = {{ git = \"<repo url>\", tag = \"v0.1.0\" }}"
+        );
     } else {
-        println!("Created {name}/\n\n  cd {name}\n  cargo run\n\nAgents: read {name}/AGENTS.md; the zeyn MCP server is set up in .mcp.json.");
+        println!(
+            "Created {name}/\n\n  cd {name}\n  cargo run\n\nAgents: read {name}/AGENTS.md; the zeyn MCP server is set up in .mcp.json."
+        );
     }
     Ok(())
 }
@@ -230,10 +239,30 @@ fn new_feature(root: &Path, name: &str) -> Result<String, String> {
     }
     let model = title_of(name).replace(' ', "");
     let files = [
-        ("mod.rs", format!("//! {model}.\n\npub mod actions;\npub mod models;\npub mod screens;\n\nuse zeyn::prelude::*;\n\npub fn feature() -> Feature {{\n    Feature::new(\"{name}\")\n        .route_prefix(\"/{name}\")\n        .guard(SignedIn)\n        .screen(screens::{name}_list)\n}}\n")),
-        ("models.rs", format!("use zeyn::prelude::*;\n\n/// A {name} record.\n#[entity(table = \"{name}\")]\npub struct {model} {{\n    #[key]\n    pub id: {model}Id,\n    #[rule(required, max_len = 120)]\n    pub name: String,\n    #[version]\n    pub version: i64,\n}}\n")),
-        ("actions.rs", format!("use super::models::{model};\nuse zeyn::prelude::*;\n\n/// Records for the list. Replace the empty page with your store or database.\n#[action(permission = \"{name}.record.read\")]\npub async fn search_{name}(q: DataQuery) -> Result<Page<{model}>> {{\n    Ok(q.apply(Vec::new()))\n}}\n")),
-        ("screens.rs", format!("use super::actions::search_{name};\nuse zeyn::prelude::*;\n\n/// List screen.\n#[screen(route = \"/\", permission = \"{name}.record.read\")]\npub fn {name}_list() -> Screen {{\n    Screen::new(\"{model}\").body(DataGrid::auto(search_{name}).mode(DataMode::Server))\n}}\n")),
+        (
+            "mod.rs",
+            format!(
+                "//! {model}.\n\npub mod actions;\npub mod models;\npub mod screens;\n\nuse zeyn::prelude::*;\n\npub fn feature() -> Feature {{\n    Feature::new(\"{name}\")\n        .route_prefix(\"/{name}\")\n        .guard(SignedIn)\n        .screen(screens::{name}_list)\n}}\n"
+            ),
+        ),
+        (
+            "models.rs",
+            format!(
+                "use zeyn::prelude::*;\n\n/// A {name} record.\n#[entity(table = \"{name}\")]\npub struct {model} {{\n    #[key]\n    pub id: {model}Id,\n    #[rule(required, max_len = 120)]\n    pub name: String,\n    #[version]\n    pub version: i64,\n}}\n"
+            ),
+        ),
+        (
+            "actions.rs",
+            format!(
+                "use super::models::{model};\nuse zeyn::prelude::*;\n\n/// Records for the list. Replace the empty page with your store or database.\n#[action(permission = \"{name}.record.read\")]\npub async fn search_{name}(q: DataQuery) -> Result<Page<{model}>> {{\n    Ok(q.apply(Vec::new()))\n}}\n"
+            ),
+        ),
+        (
+            "screens.rs",
+            format!(
+                "use super::actions::search_{name};\nuse zeyn::prelude::*;\n\n/// List screen.\n#[screen(route = \"/\", permission = \"{name}.record.read\")]\npub fn {name}_list() -> Screen {{\n    Screen::new(\"{model}\").body(DataGrid::auto(search_{name}).mode(DataMode::Server))\n}}\n"
+            ),
+        ),
     ];
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     for (file, body) in files {
@@ -279,19 +308,19 @@ fn routes_table(d: &Value) -> String {
         }
         for a in f["apis"].as_array().into_iter().flatten() {
             let access = a["access"]["permission"].as_str().unwrap_or("public");
-            out.push_str(&format!("  api    {:<28} POST {:<27} {access}\n", a["action"].as_str().unwrap_or(""), a["path"].as_str().unwrap_or("")));
+            out.push_str(&format!(
+                "  api    {:<28} POST {:<27} {access}\n",
+                a["action"].as_str().unwrap_or(""),
+                a["path"].as_str().unwrap_or("")
+            ));
         }
     }
     out
 }
 
 /// Zeyn names that changed, old to new. `zeyn check --fix` rewrites them.
-const RENAMES: &[(&str, &str)] = &[
-    ("GridQuery", "DataQuery"),
-    ("GridMode", "DataMode"),
-    ("GridColumn", "DataGridColumn"),
-    ("Grid", "DataGrid"),
-];
+const RENAMES: &[(&str, &str)] =
+    &[("GridQuery", "DataQuery"), ("GridMode", "DataMode"), ("GridColumn", "DataGridColumn"), ("Grid", "DataGrid")];
 
 /// Runs [`fix_renames`] when asked and describes what changed.
 fn fix_if(root: &Path, fix: bool) -> Result<String, String> {
@@ -418,7 +447,11 @@ fn check(root: &Path) -> Result<String, String> {
         report.push_str(&format!("error: {}\n", p.as_str().unwrap_or("")));
     }
     for m in d["missing_translations"].as_array().into_iter().flatten() {
-        report.push_str(&format!("warning: translation `{}` is missing in `{}`\n", m[1].as_str().unwrap_or(""), m[0].as_str().unwrap_or("")));
+        report.push_str(&format!(
+            "warning: translation `{}` is missing in `{}`\n",
+            m[1].as_str().unwrap_or(""),
+            m[0].as_str().unwrap_or("")
+        ));
     }
     if report.is_empty() {
         report.push_str("ok: no problems found\n");
@@ -432,11 +465,31 @@ fn tool(name: &str, description: &str, properties: Value, required: &[&str]) -> 
 
 fn tools() -> Value {
     json!([
-        tool("zeyn_docs", "Zeyn framework reference. Topics: rules (project rules for agents), language (how to write models, actions, screens, forms, grids), protocol (browser runtime protocol), architecture.", json!({ "topic": { "type": "string", "enum": ["rules", "language", "protocol", "architecture"] } }), &["topic"]),
-        tool("zeyn_describe", "Describe the app in the current directory: features, screens, routes, access, APIs, problems and missing translations.", json!({}), &[]),
-        tool("zeyn_check", "Compile the app and report compiler errors, structural problems and missing translations. With fix: true, first rewrite renamed Zeyn APIs (Grid to DataGrid and others).", json!({ "fix": { "type": "boolean" } }), &[]),
+        tool(
+            "zeyn_docs",
+            "Zeyn framework reference. Topics: rules (project rules for agents), language (how to write models, actions, screens, forms, grids), protocol (browser runtime protocol), architecture.",
+            json!({ "topic": { "type": "string", "enum": ["rules", "language", "protocol", "architecture"] } }),
+            &["topic"]
+        ),
+        tool(
+            "zeyn_describe",
+            "Describe the app in the current directory: features, screens, routes, access, APIs, problems and missing translations.",
+            json!({}),
+            &[]
+        ),
+        tool(
+            "zeyn_check",
+            "Compile the app and report compiler errors, structural problems and missing translations. With fix: true, first rewrite renamed Zeyn APIs (Grid to DataGrid and others).",
+            json!({ "fix": { "type": "boolean" } }),
+            &[]
+        ),
         tool("zeyn_test", "Run cargo test and return the end of the output.", json!({}), &[]),
-        tool("zeyn_new_feature", "Create src/features/<name> with models, actions and screens and register the module.", json!({ "name": { "type": "string", "description": "lower case, digits and _" } }), &["name"]),
+        tool(
+            "zeyn_new_feature",
+            "Create src/features/<name> with models, actions and screens and register the module.",
+            json!({ "name": { "type": "string", "description": "lower case, digits and _" } }),
+            &["name"]
+        ),
     ])
 }
 
@@ -445,14 +498,24 @@ fn call_tool(name: &str, args: &Value) -> Result<String, String> {
     match name {
         "zeyn_docs" => {
             let topic = args["topic"].as_str().unwrap_or("rules");
-            DOCS.iter().find(|(t, _)| *t == topic).map(|(_, d)| d.to_string()).ok_or_else(|| format!("unknown topic `{topic}`"))
+            DOCS.iter()
+                .find(|(t, _)| *t == topic)
+                .map(|(_, d)| d.to_string())
+                .ok_or_else(|| format!("unknown topic `{topic}`"))
         }
         "zeyn_describe" => describe(root).map(|d| serde_json::to_string_pretty(&d).unwrap_or_default()),
-        "zeyn_check" => fix_if(root, args["fix"].as_bool().unwrap_or(false)).and_then(|fixed| check(root).map(|r| fixed + &r)),
+        "zeyn_check" => {
+            fix_if(root, args["fix"].as_bool().unwrap_or(false)).and_then(|fixed| check(root).map(|r| fixed + &r))
+        }
         "zeyn_test" => {
-            let out = Command::new("cargo").args(["test", "--quiet"]).current_dir(root).output().map_err(|e| e.to_string())?;
+            let out = Command::new("cargo")
+                .args(["test", "--quiet"])
+                .current_dir(root)
+                .output()
+                .map_err(|e| e.to_string())?;
             let text = format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
-            let tail: String = text.lines().rev().take(80).collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join("\n");
+            let tail: String =
+                text.lines().rev().take(80).collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join("\n");
             Ok(format!("{}\n{tail}", if out.status.success() { "tests passed" } else { "tests failed" }))
         }
         "zeyn_new_feature" => new_feature(root, args["name"].as_str().unwrap_or("")),
@@ -479,10 +542,12 @@ fn mcp() -> Result<(), String> {
                 "instructions": "Zeyn framework tools. Read zeyn_docs topic rules before changing code. Run zeyn_check and zeyn_test before finishing."
             }),
             "tools/list" => json!({ "tools": tools() }),
-            "tools/call" => match call_tool(req["params"]["name"].as_str().unwrap_or(""), &req["params"]["arguments"]) {
-                Ok(text) => json!({ "content": [{ "type": "text", "text": text }], "isError": false }),
-                Err(e) => json!({ "content": [{ "type": "text", "text": e }], "isError": true }),
-            },
+            "tools/call" => {
+                match call_tool(req["params"]["name"].as_str().unwrap_or(""), &req["params"]["arguments"]) {
+                    Ok(text) => json!({ "content": [{ "type": "text", "text": text }], "isError": false }),
+                    Err(e) => json!({ "content": [{ "type": "text", "text": e }], "isError": true }),
+                }
+            }
             "ping" => json!({}),
             other => {
                 let reply = json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32601, "message": format!("method `{other}` not found") } });
@@ -510,7 +575,9 @@ const RAW: &str = r#"Grid "quoted" Grid"#; const C: char = 'G';"##;
         assert_eq!(n, 7, "{out}");
         assert!(out.contains("use zeyn::{DataGrid, DataQuery};"));
         assert!(out.contains("/// `DataGrid::of(find)` shows rows."));
-        assert!(out.contains("fn list(q: DataQuery) -> DataGrid<P> { DataGrid::of(find).mode(DataMode::Server).title(\"Grid\") }"));
+        assert!(out.contains(
+            "fn list(q: DataQuery) -> DataGrid<P> { DataGrid::of(find).mode(DataMode::Server).title(\"Grid\") }"
+        ));
         assert!(out.contains("struct MyGrid; impl GridSource for MyGrid {}"));
         assert!(out.contains(r##"r#"Grid "quoted" Grid"#"##));
         assert_eq!(super::rename_idents(&out, super::RENAMES).1, 0, "a second run changes nothing");

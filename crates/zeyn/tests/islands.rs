@@ -27,7 +27,12 @@ pub async fn double(c: Count) -> Result<Count> {
 
 #[screen(route = "/island", permission = "count.read")]
 pub fn with_island() -> Screen {
-    Screen::new("Island").body(Island::new("counter").props(&Count { value: 1 }).fallback(Alert::info("Needs JavaScript")).action::<Double, _>(double))
+    Screen::new("Island").body(
+        Island::new("counter")
+            .props(&Count { value: 1 })
+            .fallback(Alert::info("Needs JavaScript"))
+            .action::<Double, _>(double),
+    )
 }
 
 #[screen(route = "/plain", permission = "count.read")]
@@ -40,11 +45,17 @@ const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789a
 fn router(permissions: &'static [&'static str]) -> Router {
     let dir = std::env::temp_dir().join(format!("zeyn-island-it-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("manifest.json"), r#"{"islands":{"counter":{"js":"counter.abc.js","wasm":"counter_bg.def.wasm"}}}"#).unwrap();
+    std::fs::write(
+        dir.join("manifest.json"),
+        r#"{"islands":{"counter":{"js":"counter.abc.js","wasm":"counter_bg.def.wasm"}}}"#,
+    )
+    .unwrap();
     std::fs::write(dir.join("counter_bg.def.wasm"), b"\0asm\x01\0\0\0").unwrap();
     std::fs::write(dir.join("secret.txt"), "no").unwrap();
     App::new("Test")
-        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| Identity::user("u").with_permissions(permissions.iter().copied())))
+        .auth(move |h: &HeaderMap| {
+            h.contains_key("x-user").then(|| Identity::user("u").with_permissions(permissions.iter().copied()))
+        })
         .feature(Feature::new("count").screen(with_island).screen(plain))
         .islands(dir)
         .router()
@@ -63,7 +74,10 @@ fn get(path: &str) -> Request<Body> {
 
 fn call(key: &str, csrf: bool) -> Request<Body> {
     let body = serde_json::json!({ "screen": "with_island", "params": null, "node": "0", "key": key, "input": { "value": 21 } });
-    let mut r = Request::post("/_zeyn/data").header("x-user", "1").header(header::CONTENT_TYPE, "application/json").header(header::COOKIE, format!("zeyn_csrf={TOKEN}"));
+    let mut r = Request::post("/_zeyn/data")
+        .header("x-user", "1")
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::COOKIE, format!("zeyn_csrf={TOKEN}"));
     if csrf {
         r = r.header("x-zeyn-csrf", TOKEN);
     }
@@ -85,21 +99,28 @@ async fn only_pages_with_an_island_get_the_loader_and_wasm_policy() {
     assert!(!csp.contains("wasm"), "{csp}");
     assert!(!body.contains("zeyn-islands") && !body.contains("islands.js"));
 
-    let partial = Request::get("/island").header("x-user", "1").header("x-zeyn-partial", "1").body(Body::empty()).unwrap();
+    let partial =
+        Request::get("/island").header("x-user", "1").header("x-zeyn-partial", "1").body(Body::empty()).unwrap();
     assert_eq!(send(&app, partial).await.1["x-zeyn-islands"], "1");
-    let partial = Request::get("/plain").header("x-user", "1").header("x-zeyn-partial", "1").body(Body::empty()).unwrap();
+    let partial =
+        Request::get("/plain").header("x-user", "1").header("x-zeyn-partial", "1").body(Body::empty()).unwrap();
     assert!(!send(&app, partial).await.1.contains_key("x-zeyn-islands"));
 }
 
 #[tokio::test]
 async fn built_files_are_served_by_manifest_name_only_and_cached() {
     let app = router(&[]);
-    let (status, headers, _) = send(&app, Request::get("/_zeyn/islands/counter_bg.def.wasm").body(Body::empty()).unwrap()).await;
+    let (status, headers, _) =
+        send(&app, Request::get("/_zeyn/islands/counter_bg.def.wasm").body(Body::empty()).unwrap()).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(headers[header::CONTENT_TYPE], "application/wasm");
     assert!(headers[header::CACHE_CONTROL].to_str().unwrap().contains("immutable"));
     for path in ["/_zeyn/islands/secret.txt", "/_zeyn/islands/manifest.json", "/_zeyn/islands/..%2Fsecret.txt"] {
-        assert_eq!(send(&app, Request::get(path).body(Body::empty()).unwrap()).await.0, StatusCode::NOT_FOUND, "{path}");
+        assert_eq!(
+            send(&app, Request::get(path).body(Body::empty()).unwrap()).await.0,
+            StatusCode::NOT_FOUND,
+            "{path}"
+        );
     }
     assert_eq!(send(&app, Request::get("/_zeyn/islands.js").body(Body::empty()).unwrap()).await.0, StatusCode::OK);
 }

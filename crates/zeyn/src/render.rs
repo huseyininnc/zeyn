@@ -133,10 +133,9 @@ impl<'a> Render<'a> {
             (Value::Date(d), _) => format!(r#"<time datetime="{d}">{}</time>"#, d.format(self.locale)),
             (Value::Time(t), _) => format!(r#"<time datetime="{t}">{}</time>"#, t.format(self.locale)),
             (Value::LocalDateTime(l), _) => format!(r#"<time datetime="{l}">{}</time>"#, l.format(self.locale)),
-            (Value::DateTime(d), _) => format!(
-                r#"<time datetime="{d}" title="{d}">{}</time>"#,
-                d.format(self.tz, self.locale)
-            ),
+            (Value::DateTime(d), _) => {
+                format!(r#"<time datetime="{d}" title="{d}">{}</time>"#, d.format(self.tz, self.locale))
+            }
             (Value::Choice(v), FieldKind::Choice(options)) => match options.iter().find(|o| o.value == *v) {
                 Some(o) => self.text(&Text::key_or(o.key, o.label)),
                 None => escape(v),

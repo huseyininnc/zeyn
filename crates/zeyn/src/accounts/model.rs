@@ -80,7 +80,8 @@ impl User {
 
     /// The app's own fields read into `X`. Missing fields take their serde defaults.
     pub fn data<X: DeserializeOwned>(&self) -> crate::Result<X> {
-        serde_json::from_value(Json::Object(self.extra.clone())).map_err(|e| crate::Error::Internal(format!("user data: {e}")))
+        serde_json::from_value(Json::Object(self.extra.clone()))
+            .map_err(|e| crate::Error::Internal(format!("user data: {e}")))
     }
 
     /// Stores the app's own fields. `X` must serialize to a JSON object.
@@ -150,7 +151,11 @@ pub struct Passkey {
 
 impl std::fmt::Debug for Passkey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Passkey").field("name", &self.name).field("created_at", &self.created_at).field("sign_count", &self.sign_count).finish_non_exhaustive()
+        f.debug_struct("Passkey")
+            .field("name", &self.name)
+            .field("created_at", &self.created_at)
+            .field("sign_count", &self.sign_count)
+            .finish_non_exhaustive()
     }
 }
 

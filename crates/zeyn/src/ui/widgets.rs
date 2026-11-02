@@ -68,7 +68,11 @@ impl Component for Alert {
         out.push_str(&format!(r#"<div class="z-callout z-tone-{tone}" data-testid="{}.alert.{tone}"><span class="z-callout-icon" aria-hidden="true"></span><div class="z-callout-body">"#, r.scope));
         let spoken = format!(r#"<span class="z-sr-only">{}: </span>"#, spoken(self.tone, r));
         match &self.title {
-            Some(t) => out.push_str(&format!(r#"<p class="z-callout-title">{spoken}{}</p><p>{}</p>"#, r.text(t), r.text(&self.text))),
+            Some(t) => out.push_str(&format!(
+                r#"<p class="z-callout-title">{spoken}{}</p><p>{}</p>"#,
+                r.text(t),
+                r.text(&self.text)
+            )),
             None => out.push_str(&format!(r#"<p>{spoken}{}</p>"#, r.text(&self.text))),
         }
         out.push_str("</div>");
@@ -179,9 +183,15 @@ impl Skeleton {
 
 impl Component for Skeleton {
     fn render(&self, out: &mut String, r: &Render) {
-        out.push_str(&format!(r#"<div class="z-skeleton" aria-busy="true"><span class="z-sr-only">{}</span>"#, r.text(&Text::key("zeyn.ui.loading"))));
+        out.push_str(&format!(
+            r#"<div class="z-skeleton" aria-busy="true"><span class="z-sr-only">{}</span>"#,
+            r.text(&Text::key("zeyn.ui.loading"))
+        ));
         for i in 0..self.lines {
-            out.push_str(&format!(r#"<span class="z-skeleton-line" aria-hidden="true" style="--z-skeleton-width:{}%"></span>"#, 100 - (i as u32 * 17) % 45));
+            out.push_str(&format!(
+                r#"<span class="z-skeleton-line" aria-hidden="true" style="--z-skeleton-width:{}%"></span>"#,
+                100 - (i as u32 * 17) % 45
+            ));
         }
         out.push_str("</div>");
     }
@@ -307,7 +317,11 @@ impl Component for DescriptionList {
         out.push_str(&format!(r#"<dl class="z-details" style="--z-columns:{}">"#, self.columns));
         for (label, value, kind) in &self.items {
             let shown = r.value(value, kind);
-            let shown = if shown.is_empty() { r#"<span class="z-muted" aria-label="-">&#8212;</span>"#.to_string() } else { shown };
+            let shown = if shown.is_empty() {
+                r#"<span class="z-muted" aria-label="-">&#8212;</span>"#.to_string()
+            } else {
+                shown
+            };
             out.push_str(&format!(r#"<div class="z-details-item"><dt>{}</dt><dd>{shown}</dd></div>"#, r.text(label)));
         }
         out.push_str("</dl>");
@@ -346,10 +360,17 @@ impl Breadcrumb {
 
 impl Component for Breadcrumb {
     fn render(&self, out: &mut String, r: &Render) {
-        out.push_str(&format!(r#"<nav class="z-breadcrumb" aria-label="{}"><ol>"#, r.text(&Text::key("zeyn.ui.breadcrumb"))));
+        out.push_str(&format!(
+            r#"<nav class="z-breadcrumb" aria-label="{}"><ol>"#,
+            r.text(&Text::key("zeyn.ui.breadcrumb"))
+        ));
         for (label, screen, params) in &self.links {
-            let query = if params.is_null() { String::new() } else { format!("?params={}", encode(&params.to_string())) };
-            out.push_str(&format!(r#"<li><a href="/_zeyn/route/{screen}{query}" data-zeyn-base-href>{}</a></li>"#, r.text(label)));
+            let query =
+                if params.is_null() { String::new() } else { format!("?params={}", encode(&params.to_string())) };
+            out.push_str(&format!(
+                r#"<li><a href="/_zeyn/route/{screen}{query}" data-zeyn-base-href>{}</a></li>"#,
+                r.text(label)
+            ));
         }
         if let Some(c) = &self.current {
             out.push_str(&format!(r#"<li><span aria-current="page">{}</span></li>"#, r.text(c)));
@@ -358,7 +379,8 @@ impl Component for Breadcrumb {
     }
 
     fn schema(&self) -> Json {
-        let links: Vec<Json> = self.links.iter().map(|(l, s, p)| json!({ "label": l, "screen": s, "params": p })).collect();
+        let links: Vec<Json> =
+            self.links.iter().map(|(l, s, p)| json!({ "label": l, "screen": s, "params": p })).collect();
         json!({ "type": "breadcrumb", "links": links, "current": self.current })
     }
 }
@@ -414,7 +436,11 @@ impl Component for Timeline {
     }
 
     fn schema(&self) -> Json {
-        let events: Vec<Json> = self.events.iter().map(|(w, t, d, tone)| json!({ "when": w, "title": t, "detail": d, "tone": tone })).collect();
+        let events: Vec<Json> = self
+            .events
+            .iter()
+            .map(|(w, t, d, tone)| json!({ "when": w, "title": t, "detail": d, "tone": tone }))
+            .collect();
         json!({ "type": "timeline", "events": events })
     }
 }

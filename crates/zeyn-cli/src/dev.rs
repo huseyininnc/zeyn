@@ -128,7 +128,10 @@ fn build(root: &Path) -> Result<Option<PathBuf>, String> {
                 continue;
             }
             let Some(path) = msg["executable"].as_str() else { continue };
-            let ours = msg["manifest_path"].as_str().and_then(|m| std::fs::canonicalize(m).ok()).is_some_and(|m| m == manifest);
+            let ours = msg["manifest_path"]
+                .as_str()
+                .and_then(|m| std::fs::canonicalize(m).ok())
+                .is_some_and(|m| m == manifest);
             if ours {
                 exe = Some(PathBuf::from(path));
             }
@@ -154,9 +157,5 @@ fn start(root: &Path, exe: &Path, generation: &mut u32) -> Result<Child, String>
     let name = format!("run-{generation}{}", std::env::consts::EXE_SUFFIX);
     let copy = dir.join(name);
     std::fs::copy(exe, &copy).map_err(|e| format!("{}: {e}", copy.display()))?;
-    Command::new(&copy)
-        .current_dir(root)
-        .env("ZEYN_DEV", "1")
-        .spawn()
-        .map_err(|e| format!("{}: {e}", copy.display()))
+    Command::new(&copy).current_dir(root).env("ZEYN_DEV", "1").spawn().map_err(|e| format!("{}: {e}", copy.display()))
 }

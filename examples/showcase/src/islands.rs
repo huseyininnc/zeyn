@@ -3,7 +3,10 @@
 //! Build them with `zeyn build-islands` in `examples/showcase` (or `zeyn dev`). Without the build
 //! the screens still work and show each island's fallback.
 
-use showcase_shared::{Count, CounterProps, CounterTexts, Diagram, DiagramProps, DiagramTexts, SaveCount, SaveDiagram, Saved, Shape, ShapeKind, crdt};
+use showcase_shared::{
+    Count, CounterProps, CounterTexts, Diagram, DiagramProps, DiagramTexts, SaveCount, SaveDiagram, Saved, Shape,
+    ShapeKind, crdt,
+};
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, RwLock};
 use zeyn::prelude::*;
@@ -103,7 +106,11 @@ struct DiagramDocs {
 impl DocStore for DiagramDocs {
     fn load(&self, key: RoomKey) -> BoxFuture<Result<Option<Vec<u8>>>> {
         let state = (key.doc == "main").then(|| {
-            self.state.read().ok().and_then(|s| s.clone()).unwrap_or_else(|| crdt::state(&crdt::from_diagram(&self.store.get())))
+            self.state
+                .read()
+                .ok()
+                .and_then(|s| s.clone())
+                .unwrap_or_else(|| crdt::state(&crdt::from_diagram(&self.store.get())))
         });
         Box::pin(async move { state.map(Some).ok_or(Error::NotFound) })
     }
@@ -165,7 +172,15 @@ fn diagram_texts(ctx: &Ctx) -> DiagramTexts {
         kind_ellipse: t("kind_ellipse"),
         live_on: t("live_on"),
         live_off: t("live_off"),
-        line: ctx.t(&t!("islands.line", kind = "{kind}", label = "{label}", x = "{x}", y = "{y}", w = "{w}", h = "{h}")),
+        line: ctx.t(&t!(
+            "islands.line",
+            kind = "{kind}",
+            label = "{label}",
+            x = "{x}",
+            y = "{y}",
+            w = "{w}",
+            h = "{h}"
+        )),
     }
 }
 
@@ -207,7 +222,13 @@ pub fn island_diagram(_: (), store: DiagramStore, ctx: Ctx) -> Screen {
             .add(
                 Panel::new(t!("islands.stored")).add(
                     Live::new("diagram").add(
-                        DataGrid::of(diagram_rows).paging(Paging::pages(10)).column(DiagramRow::label).flex(1).column(DiagramRow::kind).column(DiagramRow::x).column(DiagramRow::y),
+                        DataGrid::of(diagram_rows)
+                            .paging(Paging::pages(10))
+                            .column(DiagramRow::label)
+                            .flex(1)
+                            .column(DiagramRow::kind)
+                            .column(DiagramRow::x)
+                            .column(DiagramRow::y),
                     ),
                 ),
             ),
@@ -215,9 +236,9 @@ pub fn island_diagram(_: (), store: DiagramStore, ctx: Ctx) -> Screen {
 }
 
 pub fn feature() -> Feature {
-    Feature::new("islands")
-        .route_prefix("/islands")
-        .screen(island_counter)
-        .screen(island_diagram)
-        .menu(|m| m.group(t!("menu.islands"), Icon::Chart).item(t!("islands.counter"), island_counter).item(t!("islands.diagram"), island_diagram))
+    Feature::new("islands").route_prefix("/islands").screen(island_counter).screen(island_diagram).menu(|m| {
+        m.group(t!("menu.islands"), Icon::Chart)
+            .item(t!("islands.counter"), island_counter)
+            .item(t!("islands.diagram"), island_diagram)
+    })
 }

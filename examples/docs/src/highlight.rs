@@ -8,15 +8,52 @@
 use zeyn::render::escape;
 
 const RUST: &[&str] = &[
-    "as", "async", "await", "break", "const", "continue", "crate", "dyn", "else", "enum", "extern", "false", "fn", "for", "if", "impl", "in", "let", "loop",
-    "match", "mod", "move", "mut", "pub", "ref", "return", "self", "Self", "static", "struct", "super", "trait", "true", "type", "unsafe", "use", "where",
-    "while",
+    "as", "async", "await", "break", "const", "continue", "crate", "dyn", "else", "enum", "extern", "false", "fn",
+    "for", "if", "impl", "in", "let", "loop", "match", "mod", "move", "mut", "pub", "ref", "return", "self", "Self",
+    "static", "struct", "super", "trait", "true", "type", "unsafe", "use", "where", "while",
 ];
 
 const JS: &[&str] = &[
-    "async", "await", "break", "case", "catch", "class", "const", "continue", "default", "delete", "do", "else", "export", "extends", "false", "finally",
-    "for", "function", "if", "import", "in", "instanceof", "let", "new", "null", "of", "return", "static", "super", "switch", "this", "throw", "true", "try",
-    "typeof", "undefined", "var", "void", "while", "yield",
+    "async",
+    "await",
+    "break",
+    "case",
+    "catch",
+    "class",
+    "const",
+    "continue",
+    "default",
+    "delete",
+    "do",
+    "else",
+    "export",
+    "extends",
+    "false",
+    "finally",
+    "for",
+    "function",
+    "if",
+    "import",
+    "in",
+    "instanceof",
+    "let",
+    "new",
+    "null",
+    "of",
+    "return",
+    "static",
+    "super",
+    "switch",
+    "this",
+    "throw",
+    "true",
+    "try",
+    "typeof",
+    "undefined",
+    "var",
+    "void",
+    "while",
+    "yield",
 ];
 
 const JSON: &[&str] = &["true", "false", "null"];
@@ -156,7 +193,11 @@ impl Tokens {
                 i = end;
                 continue;
             }
-            if self.lang == Lang::Rust && c == 'r' && (self.at(i, "r\"") || self.at(i, "r#\"")) && (i == 0 || !ident_char(self.chars[i - 1])) {
+            if self.lang == Lang::Rust
+                && c == 'r'
+                && (self.at(i, "r\"") || self.at(i, "r#\""))
+                && (i == 0 || !ident_char(self.chars[i - 1]))
+            {
                 let hashes = self.chars[i + 1..].iter().take_while(|c| **c == '#').count();
                 let close: String = std::iter::once('"').chain(std::iter::repeat_n('#', hashes)).collect();
                 let start = i + 2 + hashes;
@@ -165,16 +206,24 @@ impl Tokens {
                 i = end;
                 continue;
             }
-            if c == '"' || (c == '\'' && matches!(self.lang, Lang::Js | Lang::Shell | Lang::Toml)) || (c == '`' && self.lang == Lang::Js) {
+            if c == '"'
+                || (c == '\'' && matches!(self.lang, Lang::Js | Lang::Shell | Lang::Toml))
+                || (c == '`' && self.lang == Lang::Js)
+            {
                 let end = self.string_end(i, c);
                 let next = self.chars[end..].iter().find(|c| !c.is_whitespace());
-                let key = (self.lang == Lang::Json && next == Some(&':')) || (self.lang == Lang::Toml && self.line_start(i) && next == Some(&'='));
+                let key = (self.lang == Lang::Json && next == Some(&':'))
+                    || (self.lang == Lang::Toml && self.line_start(i) && next == Some(&'='));
                 self.span(if key { "key" } else { "str" }, i, end);
                 i = end;
                 continue;
             }
             if c == '\'' && self.lang == Lang::Rust {
-                let close = if self.chars.get(i + 1) == Some(&'\\') { (i + 2..(i + 12).min(n)).find(|&k| self.chars[k] == '\'') } else { (self.chars.get(i + 2) == Some(&'\'')).then_some(i + 2) };
+                let close = if self.chars.get(i + 1) == Some(&'\\') {
+                    (i + 2..(i + 12).min(n)).find(|&k| self.chars[k] == '\'')
+                } else {
+                    (self.chars.get(i + 2) == Some(&'\'')).then_some(i + 2)
+                };
                 if let Some(end) = close {
                     self.span("str", i, end + 1);
                     i = end + 1;
@@ -182,7 +231,12 @@ impl Tokens {
                 }
             }
             if c.is_ascii_digit() && (i == 0 || !ident_char(self.chars[i - 1])) {
-                let end = (i..n).find(|&k| !(ident_char(self.chars[k]) || (self.chars[k] == '.' && self.chars.get(k + 1).is_some_and(char::is_ascii_digit)))).unwrap_or(n);
+                let end = (i..n)
+                    .find(|&k| {
+                        !(ident_char(self.chars[k])
+                            || (self.chars[k] == '.' && self.chars.get(k + 1).is_some_and(char::is_ascii_digit)))
+                    })
+                    .unwrap_or(n);
                 self.span("num", i, end);
                 i = end;
                 continue;
@@ -200,7 +254,11 @@ impl Tokens {
                 continue;
             }
             if ident_char(c) {
-                let end = (i..n).find(|&k| !(ident_char(self.chars[k]) || (self.lang == Lang::Shell && matches!(self.chars[k], '-' | '.')))).unwrap_or(n);
+                let end = (i..n)
+                    .find(|&k| {
+                        !(ident_char(self.chars[k]) || (self.lang == Lang::Shell && matches!(self.chars[k], '-' | '.')))
+                    })
+                    .unwrap_or(n);
                 let word: String = self.chars[i..end].iter().collect();
                 let next = self.chars[end..].iter().find(|c| !c.is_whitespace() || **c == '\n').copied();
                 let class = if self.lang.keywords().contains(&word.as_str()) {
@@ -250,7 +308,10 @@ mod tests {
     #[test]
     fn json_keys_toml_tables_and_shell_commands() {
         let j = highlight("json", r#"{ "a": "b", "n": 1, "ok": true }"#);
-        assert!(j.contains(r#"<span class="z-hl-key">&quot;a&quot;</span>: <span class="z-hl-str">&quot;b&quot;</span>"#), "{j}");
+        assert!(
+            j.contains(r#"<span class="z-hl-key">&quot;a&quot;</span>: <span class="z-hl-str">&quot;b&quot;</span>"#),
+            "{j}"
+        );
         assert!(j.contains(r#"<span class="z-hl-kw">true</span>"#));
         let t = highlight("toml", "[dependencies]\nzeyn = { path = \"x\" } # local");
         assert!(t.starts_with(r#"<span class="z-hl-kw">[dependencies]</span>"#), "{t}");

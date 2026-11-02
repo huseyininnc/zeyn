@@ -38,7 +38,9 @@ impl<L: Model> FieldType for Vec<L> {
                 errors.errors.push(FieldError {
                     field: meta.name,
                     rule: Rule::Line { row: row as u32, field: e.field },
-                    message: Text::key("zeyn.validation.line").arg("n", (row + 1).to_string()).arg("message", e.message),
+                    message: Text::key("zeyn.validation.line")
+                        .arg("n", (row + 1).to_string())
+                        .arg("message", e.message),
                 });
             }
         }
@@ -106,7 +108,13 @@ pub(crate) trait LinesEditor: Send + Sync {
     fn render(&self, out: &mut String, r: &Render, meta: &FieldMeta, current: &Json);
 
     /// Rebuilds the lines from the submitted cells. `None` when the form did not include them.
-    fn read(&self, values: &Map<String, Json>, meta: &FieldMeta, reading: &Reading, current: &Json) -> Option<(Json, Vec<FieldError>)>;
+    fn read(
+        &self,
+        values: &Map<String, Json>,
+        meta: &FieldMeta,
+        reading: &Reading,
+        current: &Json,
+    ) -> Option<(Json, Vec<FieldError>)>;
 
     fn schema(&self) -> Json;
 }
@@ -133,12 +141,19 @@ impl<L: Model> LinesEditor for Lines<L> {
         for &c in &self.columns {
             let m = &L::fields()[c];
             let numeric = matches!(m.kind, FieldKind::Integer | FieldKind::Money);
-            out.push_str(&format!(r#"<th scope="col"{}>{}</th>"#, if numeric { r#" class="z-num""# } else { "" }, r.label(m)));
+            out.push_str(&format!(
+                r#"<th scope="col"{}>{}</th>"#,
+                if numeric { r#" class="z-num""# } else { "" },
+                r.label(m)
+            ));
         }
         if self.total.is_some() {
             out.push_str(&format!(r#"<th scope="col" class="z-num">{}</th>"#, t("total")));
         }
-        out.push_str(&format!(r#"<th scope="col" class="z-lines-actions"><span class="z-sr-only">{}</span></th></tr></thead><tbody>"#, t("actions")));
+        out.push_str(&format!(
+            r#"<th scope="col" class="z-lines-actions"><span class="z-sr-only">{}</span></th></tr></thead><tbody>"#,
+            t("actions")
+        ));
         let mut sum: Option<Money> = None;
         for (i, line) in lines.iter().enumerate() {
             self.row(out, r, name, &id, i, Some(i), Some(line));
@@ -167,7 +182,13 @@ impl<L: Model> LinesEditor for Lines<L> {
         ));
     }
 
-    fn read(&self, values: &Map<String, Json>, meta: &FieldMeta, reading: &Reading, current: &Json) -> Option<(Json, Vec<FieldError>)> {
+    fn read(
+        &self,
+        values: &Map<String, Json>,
+        meta: &FieldMeta,
+        reading: &Reading,
+        current: &Json,
+    ) -> Option<(Json, Vec<FieldError>)> {
         values.get(meta.name)?;
         let prefix = format!("{}.", meta.name);
         let mut rows: BTreeMap<usize, Map<String, Json>> = BTreeMap::new();
@@ -189,7 +210,11 @@ impl<L: Model> LinesEditor for Lines<L> {
         let mut out = Vec::new();
         let mut errors = Vec::new();
         for (n, cells) in rows.values().enumerate() {
-            let origin = cells.get("_i").and_then(|v| v.as_str()).and_then(|s| s.parse::<usize>().ok()).filter(|i| *i < loaded.len() && !used[*i]);
+            let origin = cells
+                .get("_i")
+                .and_then(|v| v.as_str())
+                .and_then(|s| s.parse::<usize>().ok())
+                .filter(|i| *i < loaded.len() && !used[*i]);
             if let Some(i) = origin {
                 used[i] = true;
             }
@@ -235,14 +260,27 @@ impl<L: Model> LinesEditor for Lines<L> {
 }
 
 fn too_many(meta: &FieldMeta) -> FieldError {
-    FieldError { field: meta.name, rule: Rule::MaxLen(MAX_LINES), message: Text::key("zeyn.validation.max_len").arg("label", meta.label_text()).arg("n", MAX_LINES.to_string()) }
+    FieldError {
+        field: meta.name,
+        rule: Rule::MaxLen(MAX_LINES),
+        message: Text::key("zeyn.validation.max_len").arg("label", meta.label_text()).arg("n", MAX_LINES.to_string()),
+    }
 }
 
 impl<L: Model> Lines<L> {
     /// One table row. `origin` is the index of the loaded line it shows; `None` for new lines
     /// and for the template row.
     #[allow(clippy::too_many_arguments)]
-    fn row(&self, out: &mut String, r: &Render, name: &str, id: &str, i: usize, origin: Option<usize>, line: Option<&L>) {
+    fn row(
+        &self,
+        out: &mut String,
+        r: &Render,
+        name: &str,
+        id: &str,
+        i: usize,
+        origin: Option<usize>,
+        line: Option<&L>,
+    ) {
         let n = i + 1;
         let row_label = r.i18n.text(r.locale, &Text::key("zeyn.ui.lines.row").arg("n", n.to_string()));
         out.push_str(&format!(
@@ -282,7 +320,8 @@ impl<L: Model> Lines<L> {
             let total = line.and_then(|l| self.line_total(l)).map(|m| m.format_plain(r.locale)).unwrap_or_default();
             out.push_str(&format!(r#"<td class="z-num z-lines-total" data-zeyn-line-total>{}</td>"#, escape(&total)));
         }
-        let t = |k: &str| escape(&r.i18n.text(r.locale, &Text::key(format!("zeyn.ui.lines.{k}")).arg("n", n.to_string())));
+        let t =
+            |k: &str| escape(&r.i18n.text(r.locale, &Text::key(format!("zeyn.ui.lines.{k}")).arg("n", n.to_string())));
         out.push_str(&format!(
             r#"<td class="z-lines-actions"><button type="button" class="z-icon-button" data-zeyn-line-move="-1" aria-label="{}"><span aria-hidden="true">&#8593;</span></button><button type="button" class="z-icon-button" data-zeyn-line-move="1" aria-label="{}"><span aria-hidden="true">&#8595;</span></button><button type="button" class="z-icon-button z-danger" data-zeyn-line-remove aria-label="{}"><span class="z-icon z-icon-delete" aria-hidden="true"></span></button></td></tr>"#,
             t("up"),

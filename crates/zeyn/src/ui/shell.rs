@@ -96,7 +96,10 @@ fn menu_items(list: &MenuList, r: &Render) -> Vec<String> {
                 if !r.can(&c.access()) {
                     continue;
                 }
-                let hint = c.hint().map(|h| format!(r#"<span class="z-menu-hint" aria-hidden="true">{}</span>"#, escape(&h))).unwrap_or_default();
+                let hint = c
+                    .hint()
+                    .map(|h| format!(r#"<span class="z-menu-hint" aria-hidden="true">{}</span>"#, escape(&h)))
+                    .unwrap_or_default();
                 out.push(format!(
                     r#"<li role="none"><button type="button" role="menuitem" class="z-menu-item" tabindex="-1" data-testid="{}.menubar.{}"{}>{}<span class="z-menu-label">{}</span>{hint}</button></li>"#,
                     r.scope,
@@ -118,8 +121,12 @@ fn menu_items(list: &MenuList, r: &Render) -> Vec<String> {
 impl Component for MenuBar {
     fn render(&self, out: &mut String, r: &Render) {
         let id = dom_id(r, "menubar");
-        let menus: Vec<(String, Vec<String>)> =
-            self.menus.iter().map(|(t, l)| (r.text(t), menu_items(l, r))).filter(|(_, items)| !items.is_empty()).collect();
+        let menus: Vec<(String, Vec<String>)> = self
+            .menus
+            .iter()
+            .map(|(t, l)| (r.text(t), menu_items(l, r)))
+            .filter(|(_, items)| !items.is_empty())
+            .collect();
         out.push_str(&format!(
             r#"<ul class="z-menubar" role="menubar" aria-label="{}" data-zeyn-menubar data-testid="{}.menubar">"#,
             r.text(&self.label),
@@ -199,7 +206,10 @@ impl Component for Toolbox {
             let pressed = on == Some(*id);
             let face = match icon {
                 Some(i) => i.html(),
-                None => format!(r#"<span aria-hidden="true">{}</span>"#, escape(&label.chars().next().map(String::from).unwrap_or_default())),
+                None => format!(
+                    r#"<span aria-hidden="true">{}</span>"#,
+                    escape(&label.chars().next().map(String::from).unwrap_or_default())
+                ),
             };
             out.push_str(&format!(
                 r#"<button type="button" class="z-tool" aria-pressed="{pressed}" tabindex="{}" data-tool="{}" aria-label="{label}" title="{label}" data-testid="{}.tool.{}">{face}</button>"#,
@@ -213,7 +223,8 @@ impl Component for Toolbox {
     }
 
     fn schema(&self) -> Json {
-        let tools: Vec<Json> = self.tools.iter().map(|(id, label, icon)| json!({ "id": id, "label": label, "icon": icon })).collect();
+        let tools: Vec<Json> =
+            self.tools.iter().map(|(id, label, icon)| json!({ "id": id, "label": label, "icon": icon })).collect();
         json!({ "type": "toolbox", "label": self.label, "tools": tools, "selected": self.selected })
     }
 }
@@ -303,7 +314,9 @@ impl StatusBar {
 
 impl Component for StatusBar {
     fn render(&self, out: &mut String, r: &Render) {
-        let items = |list: &[Text]| list.iter().map(|t| format!(r#"<span class="z-statusbar-item">{}</span>"#, r.text(t))).collect::<String>();
+        let items = |list: &[Text]| {
+            list.iter().map(|t| format!(r#"<span class="z-statusbar-item">{}</span>"#, r.text(t))).collect::<String>()
+        };
         out.push_str(&format!(
             r#"<div class="z-statusbar" role="group" aria-label="{}" data-zeyn-statusbar data-testid="{}.statusbar"><div class="z-statusbar-start">{}<span class="z-statusbar-item z-statusbar-live" role="status" aria-live="polite" data-zeyn-status-live>{}</span></div><div class="z-statusbar-end">{}</div></div>"#,
             r.text(&self.label),

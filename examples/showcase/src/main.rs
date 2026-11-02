@@ -15,8 +15,8 @@ mod people;
 mod pro;
 mod sales;
 mod stock;
-mod wide;
 mod ui;
+mod wide;
 
 use std::time::Duration;
 use zeyn::prelude::*;
@@ -42,10 +42,14 @@ impl Plugin for CompanyStandard {
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     let defaults = StaticSource(
-        [("time.zone", "Europe/Istanbul"), ("server.addr", "127.0.0.1:3002"), ("mail.from", "Northwind <no-reply@northwind.test>")]
-            .into_iter()
-            .map(|(k, v)| (k.to_string(), v.to_string()))
-            .collect(),
+        [
+            ("time.zone", "Europe/Istanbul"),
+            ("server.addr", "127.0.0.1:3002"),
+            ("mail.from", "Northwind <no-reply@northwind.test>"),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect(),
     );
     let config = Config::load(vec![Box::new(defaults), Box::new(EnvSource("NORTHWIND"))])
         .await
@@ -77,7 +81,14 @@ async fn main() -> std::io::Result<()> {
             Theme::dark(),
             Theme::named(
                 "sand",
-                [("--z-brand", "#8a4b14"), ("--z-bg", "#f3eee4"), ("--z-surface", "#fffdf8"), ("--z-surface-2", "#f8f3ea"), ("--z-hover", "#efe7d8"), ("--z-border", "#e0d6c3")],
+                [
+                    ("--z-brand", "#8a4b14"),
+                    ("--z-bg", "#f3eee4"),
+                    ("--z-surface", "#fffdf8"),
+                    ("--z-surface-2", "#f8f3ea"),
+                    ("--z-hover", "#efe7d8"),
+                    ("--z-border", "#e0d6c3"),
+                ],
             )
             .label(t!("theme.sand")),
         ])
@@ -118,9 +129,7 @@ async fn main() -> std::io::Result<()> {
     } else {
         app.auth(DevAuth::superuser("Demo User"))
     };
-    app
-        .serve(&addr)
-        .await
+    app.serve(&addr).await
 }
 
 /// Turns on user accounts instead of the development sign in (`NORTHWIND_ACCOUNTS__ENABLED=1`):
@@ -151,7 +160,8 @@ async fn accounts(app: App, config: &Config, mailer: zeyn::Mailer) -> std::io::R
     if let Some(url) = config.get("accounts.public_url") {
         accounts = accounts.public_url(url);
     }
-    if let (Some(email), Ok(password)) = (config.get("accounts.admin_email"), config.secret("accounts.admin_password")) {
+    if let (Some(email), Ok(password)) = (config.get("accounts.admin_email"), config.secret("accounts.admin_password"))
+    {
         let mut admin = User::new(email).with_email(email);
         admin.email_confirmed = true;
         let mut admin = accounts.users().create(admin, Some(password.expose())).await.map_err(fail)?;

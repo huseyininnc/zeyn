@@ -90,7 +90,15 @@ impl Keys {
 
     /// Whether a purpose token is valid for this user, purpose and stamp at `now`. The MAC is
     /// compared in constant time.
-    pub(crate) fn check_token(&self, token: &str, now: i64, lifetime: i64, user: &str, purpose: &Purpose, stamp: &str) -> bool {
+    pub(crate) fn check_token(
+        &self,
+        token: &str,
+        now: i64,
+        lifetime: i64,
+        user: &str,
+        purpose: &Purpose,
+        stamp: &str,
+    ) -> bool {
         if token.len() > 128 {
             return false;
         }
@@ -176,7 +184,10 @@ fn totp(key: &[u8], step: u64, modifier: &[u8]) -> u32 {
     let hash = ctx.sign();
     let h = hash.as_ref();
     let offset = (h[h.len() - 1] & 0x0f) as usize;
-    let binary = (u32::from(h[offset]) & 0x7f) << 24 | u32::from(h[offset + 1]) << 16 | u32::from(h[offset + 2]) << 8 | u32::from(h[offset + 3]);
+    let binary = (u32::from(h[offset]) & 0x7f) << 24
+        | u32::from(h[offset + 1]) << 16
+        | u32::from(h[offset + 2]) << 8
+        | u32::from(h[offset + 3]);
     binary % 1_000_000
 }
 

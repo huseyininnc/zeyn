@@ -37,7 +37,10 @@ impl MediaSource for Files {
     }
 
     fn position(&self, ctx: Ctx, id: String) -> BoxFuture<Result<Option<f64>>> {
-        let at = self.positions.as_ref().map(|p| p.lock().unwrap().get(&(ctx.identity().user.clone().unwrap(), id)).copied());
+        let at = self
+            .positions
+            .as_ref()
+            .map(|p| p.lock().unwrap().get(&(ctx.identity().user.clone().unwrap(), id)).copied());
         Box::pin(async move { at.ok_or(Error::NotFound) })
     }
 
@@ -51,7 +54,11 @@ impl MediaSource for Files {
 
 #[screen(route = "/watch", permission = "media.play")]
 pub fn watch() -> Screen {
-    Screen::new("Watch").body(Row::new().col(Video::new("films", "Clip").file("clip.mp4").captions("clip.en.vtt", "en", "English")))
+    Screen::new("Watch").body(Row::new().col(Video::new("films", "Clip").file("clip.mp4").captions(
+        "clip.en.vtt",
+        "en",
+        "English",
+    )))
 }
 
 fn no_closed(ctx: &Ctx) -> GuardResult {
@@ -64,10 +71,17 @@ fn app(films: Files) -> Router {
         .i18n(I18n::new("en"))
         .auth(|h: &HeaderMap| {
             let user = h.get("x-user")?.to_str().ok()?.to_string();
-            let perms: Vec<String> = h.get("x-perms").and_then(|v| v.to_str().ok()).unwrap_or("").split(',').map(String::from).collect();
+            let perms: Vec<String> =
+                h.get("x-perms").and_then(|v| v.to_str().ok()).unwrap_or("").split(',').map(String::from).collect();
             Some(Identity::user(user).with_permissions(perms))
         })
-        .feature(Feature::new("films").guard(no_closed).media("films", "media.play", films).media("music", "music.play", music).screen(watch))
+        .feature(
+            Feature::new("films")
+                .guard(no_closed)
+                .media("films", "media.play", films)
+                .media("music", "music.play", music)
+                .screen(watch),
+        )
         .router()
         .unwrap()
 }
@@ -93,7 +107,8 @@ fn h<'a>(headers: &'a HeaderMap, name: header::HeaderName) -> &'a str {
 #[tokio::test]
 async fn full_request_has_length_type_ranges_and_nosniff() {
     let router = app(Files::default());
-    let (status, headers, body) = send(&router, get("/_zeyn/media/films/clip.mp4", "media.play").body(Body::empty()).unwrap()).await;
+    let (status, headers, body) =
+        send(&router, get("/_zeyn/media/films/clip.mp4", "media.play").body(Body::empty()).unwrap()).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body, bytes(1000));
     assert_eq!(h(&headers, header::CONTENT_TYPE), "video/mp4");
@@ -107,8 +122,11 @@ async fn full_request_has_length_type_ranges_and_nosniff() {
 async fn ranges_answer_partial_content() {
     let router = app(Files::default());
     let all = bytes(1000);
-    for (range, first, last) in [("bytes=0-99", 0, 99), ("bytes=-500", 500, 999), ("bytes=900-", 900, 999), ("bytes=990-5000", 990, 999)] {
-        let req = get("/_zeyn/media/films/clip.mp4", "media.play").header(header::RANGE, range).body(Body::empty()).unwrap();
+    for (range, first, last) in
+        [("bytes=0-99", 0, 99), ("bytes=-500", 500, 999), ("bytes=900-", 900, 999), ("bytes=990-5000", 990, 999)]
+    {
+        let req =
+            get("/_zeyn/media/films/clip.mp4", "media.play").header(header::RANGE, range).body(Body::empty()).unwrap();
         let (status, headers, body) = send(&router, req).await;
         assert_eq!(status, StatusCode::PARTIAL_CONTENT, "{range}");
         assert_eq!(h(&headers, header::CONTENT_RANGE), format!("bytes {first}-{last}/1000"), "{range}");
@@ -121,7 +139,8 @@ async fn ranges_answer_partial_content() {
 async fn bad_ranges_answer_416() {
     let router = app(Files::default());
     for range in ["bytes=1000-", "bytes=abc", "bytes=5-1", "bytes=-0"] {
-        let req = get("/_zeyn/media/films/clip.mp4", "media.play").header(header::RANGE, range).body(Body::empty()).unwrap();
+        let req =
+            get("/_zeyn/media/films/clip.mp4", "media.play").header(header::RANGE, range).body(Body::empty()).unwrap();
         let (status, headers, body) = send(&router, req).await;
         assert_eq!(status, StatusCode::RANGE_NOT_SATISFIABLE, "{range}");
         assert_eq!(h(&headers, header::CONTENT_RANGE), "bytes */1000");
@@ -132,9 +151,13 @@ async fn bad_ranges_answer_416() {
 #[tokio::test]
 async fn if_range_and_if_none_match_follow_the_entity_tag() {
     let router = app(Files::default());
-    let stale = get("/_zeyn/media/films/clip.mp4", "media.play").header(header::RANGE, "bytes=0-9").header(header::IF_RANGE, "\"old\"");
+    let stale = get("/_zeyn/media/films/clip.mp4", "media.play")
+        .header(header::RANGE, "bytes=0-9")
+        .header(header::IF_RANGE, "\"old\"");
     assert_eq!(send(&router, stale.body(Body::empty()).unwrap()).await.0, StatusCode::OK);
-    let fresh = get("/_zeyn/media/films/clip.mp4", "media.play").header(header::RANGE, "bytes=0-9").header(header::IF_RANGE, "\"v1\"");
+    let fresh = get("/_zeyn/media/films/clip.mp4", "media.play")
+        .header(header::RANGE, "bytes=0-9")
+        .header(header::IF_RANGE, "\"v1\"");
     assert_eq!(send(&router, fresh.body(Body::empty()).unwrap()).await.0, StatusCode::PARTIAL_CONTENT);
     let cached = get("/_zeyn/media/films/clip.mp4", "media.play").header(header::IF_NONE_MATCH, "\"v1\"");
     let (status, _, body) = send(&router, cached.body(Body::empty()).unwrap()).await;
@@ -145,10 +168,14 @@ async fn if_range_and_if_none_match_follow_the_entity_tag() {
 #[tokio::test]
 async fn large_files_stream_in_chunks_with_exact_bytes() {
     let router = app(Files::default());
-    let (status, _, body) = send(&router, get("/_zeyn/media/films/big.webm", "media.play").body(Body::empty()).unwrap()).await;
+    let (status, _, body) =
+        send(&router, get("/_zeyn/media/films/big.webm", "media.play").body(Body::empty()).unwrap()).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body, bytes(200_000));
-    let req = get("/_zeyn/media/films/big.webm", "media.play").header(header::RANGE, "bytes=65000-140000").body(Body::empty()).unwrap();
+    let req = get("/_zeyn/media/films/big.webm", "media.play")
+        .header(header::RANGE, "bytes=65000-140000")
+        .body(Body::empty())
+        .unwrap();
     let (status, _, body) = send(&router, req).await;
     assert_eq!(status, StatusCode::PARTIAL_CONTENT);
     assert_eq!(body, bytes(200_000)[65000..=140000].to_vec());
@@ -169,7 +196,13 @@ async fn permission_guards_and_unknown_ids_are_refused() {
 async fn traversal_never_reaches_the_source() {
     let files = Files::default();
     let router = app(files.clone());
-    for path in ["/_zeyn/media/films/..%2F..%2Fetc%2Fpasswd", "/_zeyn/media/films/..", "/_zeyn/media/films/.env", "/_zeyn/media/films/a%5Cb", "/_zeyn/media/films/..%5Cwin.ini"] {
+    for path in [
+        "/_zeyn/media/films/..%2F..%2Fetc%2Fpasswd",
+        "/_zeyn/media/films/..",
+        "/_zeyn/media/films/.env",
+        "/_zeyn/media/films/a%5Cb",
+        "/_zeyn/media/films/..%5Cwin.ini",
+    ] {
         let (status, _, _) = send(&router, get(path, "media.play").body(Body::empty()).unwrap()).await;
         assert_eq!(status, StatusCode::NOT_FOUND, "{path}");
     }
@@ -179,7 +212,8 @@ async fn traversal_never_reaches_the_source() {
 #[tokio::test]
 async fn unsafe_content_types_download_instead_of_rendering() {
     let router = app(Files::default());
-    let (status, headers, _) = send(&router, get("/_zeyn/media/films/page.html", "media.play").body(Body::empty()).unwrap()).await;
+    let (status, headers, _) =
+        send(&router, get("/_zeyn/media/films/page.html", "media.play").body(Body::empty()).unwrap()).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(h(&headers, header::CONTENT_TYPE), "application/octet-stream");
     assert_eq!(h(&headers, header::CONTENT_DISPOSITION), "attachment");
@@ -201,12 +235,18 @@ fn players_render_accessible_controls_and_escape_text() {
     assert!(!html.contains("secret"));
     assert!(html.contains(r#"data-zeyn-hls="/_zeyn/media/films/clip.m3u8""#));
     assert!(html.contains(r#"data-zeyn-poster="/_zeyn/media/films/clip.jpg""#));
-    assert!(html.contains(r#"<track kind="subtitles" data-zeyn-src="/_zeyn/media/films/clip.en.vtt" srclang="en" label="English">"#));
+    assert!(html.contains(
+        r#"<track kind="subtitles" data-zeyn-src="/_zeyn/media/films/clip.en.vtt" srclang="en" label="English">"#
+    ));
     assert!(html.contains("&lt;Clip&gt;") && !html.contains("<Clip>"));
     assert!(html.contains(r#"role="slider" tabindex="0" data-zeyn-player-seek aria-label="Seek""#));
     assert!(html.contains(r#"data-zeyn-player-volume aria-label="Volume""#));
     assert!(html.contains(r#"aria-haspopup="menu""#) && html.contains(r#"role="menuitemradio""#));
-    assert!(html.contains("data-zeyn-player-cc") && html.contains("data-zeyn-player-fullscreen") && html.contains("data-zeyn-player-pip"));
+    assert!(
+        html.contains("data-zeyn-player-cc")
+            && html.contains("data-zeyn-player-fullscreen")
+            && html.contains("data-zeyn-player-pip")
+    );
     assert!(html.contains(r#"data-zeyn-media-id="clip.webm""#));
 
     let mut audio = String::new();
@@ -229,7 +269,10 @@ async fn page_loads_the_player_assets() {
 }
 
 fn save(perms: &str, csrf: bool, at: serde_json::Value) -> Request<Body> {
-    let mut b = Request::post("/_zeyn/media/position").header("x-user", "ada").header("x-perms", perms).header(header::CONTENT_TYPE, "application/json");
+    let mut b = Request::post("/_zeyn/media/position")
+        .header("x-user", "ada")
+        .header("x-perms", perms)
+        .header(header::CONTENT_TYPE, "application/json");
     if csrf {
         b = b.header(header::COOKIE, format!("zeyn_csrf={TOKEN}")).header("x-zeyn-csrf", TOKEN);
     }
@@ -248,7 +291,10 @@ async fn positions_need_csrf_permission_and_a_store() {
     let read = |perms: &str| get("/_zeyn/media/position?source=films&id=clip.mp4", perms).body(Body::empty()).unwrap();
     let (status, _, body) = send(&router, read("media.play")).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(serde_json::from_slice::<serde_json::Value>(&body).unwrap(), serde_json::json!({ "at": 42.5, "kept": true }));
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&body).unwrap(),
+        serde_json::json!({ "at": 42.5, "kept": true })
+    );
     assert_eq!(send(&router, read("")).await.0, StatusCode::FORBIDDEN);
     let traversal = get("/_zeyn/media/position?source=films&id=..%2Fx", "media.play").body(Body::empty()).unwrap();
     assert_eq!(send(&router, traversal).await.0, StatusCode::NOT_FOUND);
@@ -259,7 +305,10 @@ async fn positions_need_csrf_permission_and_a_store() {
     let without = app(Files::default());
     let (status, _, body) = send(&without, read("media.play")).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(serde_json::from_slice::<serde_json::Value>(&body).unwrap(), serde_json::json!({ "at": null, "kept": false }));
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&body).unwrap(),
+        serde_json::json!({ "at": null, "kept": false })
+    );
     assert_eq!(send(&without, save("media.play", true, 3.into())).await.0, StatusCode::NOT_FOUND);
 }
 

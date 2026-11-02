@@ -11,7 +11,9 @@ use zeyn::prelude::*;
 use zeyn::{Config, Identity, Pdf, PdfLink, PdfTemplate, StaticSource};
 
 async fn config(pairs: &[(&str, &str)]) -> Config {
-    Config::load(vec![Box::new(StaticSource(pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()))]).await.unwrap()
+    Config::load(vec![Box::new(StaticSource(pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()))])
+        .await
+        .unwrap()
 }
 
 /// Invoice line used by the PDF tests.
@@ -69,7 +71,9 @@ pub fn bills(p: BillParams) -> Screen {
 
 fn app(permissions: &[&'static str], rows: i64) -> Router {
     let identity = Identity::user("ayse").with_permissions(permissions.iter().copied());
-    let lines = (1..=rows).map(|i| Line { id: LineId(i), item: format!("Item {i} ]#x"), qty: i, price: Money::tl(i * 1_234) }).collect();
+    let lines = (1..=rows)
+        .map(|i| Line { id: LineId(i), item: format!("Item {i} ]#x"), qty: i, price: Money::tl(i * 1_234) })
+        .collect();
     App::new("Test")
         .service(Lines(Arc::new(RwLock::new(lines))))
         .service(Pdf::from_config(&Config::default()).unwrap())
@@ -80,7 +84,8 @@ fn app(permissions: &[&'static str], rows: i64) -> Router {
 }
 
 async fn get(router: &Router, uri: &str) -> (StatusCode, HeaderMap, Vec<u8>) {
-    let req = Request::get(uri).header("x-user", "1").header(header::COOKIE, "zeyn_locale=tr").body(Body::empty()).unwrap();
+    let req =
+        Request::get(uri).header("x-user", "1").header(header::COOKIE, "zeyn_locale=tr").body(Body::empty()).unwrap();
     let res = router.clone().oneshot(req).await.unwrap();
     let (status, headers) = (res.status(), res.headers().clone());
     (status, headers, res.into_body().collect().await.unwrap().to_bytes().to_vec())
@@ -115,12 +120,15 @@ async fn grids_print_a_list_report() {
     let (_, _, page) = get(&router, &format!("/bills?{PARAMS}")).await;
     let html = String::from_utf8(page).unwrap();
     assert!(html.contains(r#"data-zeyn-export="pdf""#) && html.contains("pdf\""), "{html}");
-    let (status, headers, body) = get(&router, &format!("/_zeyn/grid/export?screen=bills&node=0&format=pdf&{PARAMS}")).await;
+    let (status, headers, body) =
+        get(&router, &format!("/_zeyn/grid/export?screen=bills&node=0&format=pdf&{PARAMS}")).await;
     assert_eq!(status, StatusCode::OK, "{}", String::from_utf8_lossy(&body));
     assert_eq!(headers[header::CONTENT_TYPE], "application/pdf");
     assert!(headers[header::CONTENT_DISPOSITION].to_str().unwrap().contains("bills.pdf"));
     assert!(body.starts_with(b"%PDF-"));
-    let anonymous = Request::get(format!("/_zeyn/grid/export?screen=bills&node=0&format=pdf&{PARAMS}")).body(Body::empty()).unwrap();
+    let anonymous = Request::get(format!("/_zeyn/grid/export?screen=bills&node=0&format=pdf&{PARAMS}"))
+        .body(Body::empty())
+        .unwrap();
     assert_ne!(router.clone().oneshot(anonymous).await.unwrap().status(), StatusCode::OK);
 }
 

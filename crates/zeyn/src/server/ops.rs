@@ -2,21 +2,21 @@
 
 use super::{App, AppState, asset};
 use crate::ctx::BoxFuture;
-use crate::security::IpRange;
-use axum::extract::State;
-use axum::http::{StatusCode, header};
-use axum::response::IntoResponse;
-use serde_json::json;
-use std::future::Future;
-use std::time::Duration;
 use crate::ctx::Ctx;
 use crate::i18n::Text;
 use crate::render::{attr, escape};
+use crate::security::IpRange;
 use axum::Router;
+use axum::extract::State;
 use axum::http::HeaderValue;
+use axum::http::{StatusCode, header};
+use axum::response::IntoResponse;
 use axum::response::Response;
 use axum::routing::get;
+use serde_json::json;
+use std::future::Future;
 use std::sync::{Arc, OnceLock};
+use std::time::Duration;
 
 const JS: &str = include_str!("../../assets/enterprise.js");
 const CSS: &str = include_str!("../../assets/enterprise.css");
@@ -164,7 +164,11 @@ impl App {
     /// ```ignore
     /// app.serve_until("0.0.0.0:3000", async { let _ = tokio::signal::ctrl_c().await; }).await
     /// ```
-    pub async fn serve_until(self, addr: &str, shutdown: impl Future<Output = ()> + Send + 'static) -> std::io::Result<()> {
+    pub async fn serve_until(
+        self,
+        addr: &str,
+        shutdown: impl Future<Output = ()> + Send + 'static,
+    ) -> std::io::Result<()> {
         let jobs = self.extras.jobs.clone();
         let flush = self.start_telemetry();
         let router = self.router().map_err(|problems| {
@@ -222,7 +226,8 @@ pub(super) fn start_jobs(st: &Arc<AppState>) {
     let (services, i18n, config) = (st.services.clone(), st.i18n.clone(), st.config.clone());
     jobs.start(move |name| {
         let locale = i18n.default_locale().to_string();
-        Ctx::new(crate::ctx::Identity::user(format!("job:{name}")), locale, services.clone(), i18n.clone()).with_config(config.clone())
+        Ctx::new(crate::ctx::Identity::user(format!("job:{name}")), locale, services.clone(), i18n.clone())
+            .with_config(config.clone())
     });
 }
 
@@ -268,7 +273,8 @@ async fn ready(State(st): State<Arc<AppState>>) -> Response {
     let r = if failed.is_empty() {
         (StatusCode::OK, axum::Json(json!({ "status": "ready" }))).into_response()
     } else {
-        (StatusCode::SERVICE_UNAVAILABLE, axum::Json(json!({ "status": "not_ready", "failed": failed }))).into_response()
+        (StatusCode::SERVICE_UNAVAILABLE, axum::Json(json!({ "status": "not_ready", "failed": failed })))
+            .into_response()
     };
     no_store(r)
 }
@@ -341,7 +347,9 @@ pub fn build_id() -> &'static str {
             let seed = 0xcbf2_9ce4_8422_2325;
             let hash = match std::env::current_exe().and_then(std::fs::read) {
                 Ok(bytes) => fnv(&bytes, seed),
-                Err(_) => [super::JS, super::CSS, JS, CSS, env!("CARGO_PKG_VERSION")].iter().fold(seed, |h, s| fnv(s.as_bytes(), h)),
+                Err(_) => [super::JS, super::CSS, JS, CSS, env!("CARGO_PKG_VERSION")]
+                    .iter()
+                    .fold(seed, |h, s| fnv(s.as_bytes(), h)),
             };
             format!("{hash:016x}")
         })
@@ -395,7 +403,10 @@ pub(super) fn head(st: &AppState, ctx: &Ctx) -> String {
     format!(
         r#"{session}<meta name="zeyn-build" content="{build}"><meta name="zeyn-texts" content="{texts}"><link rel="stylesheet" href="{base}/_zeyn/enterprise.css"><script type="module" src="{base}/_zeyn/enterprise.js"></script>{dev}"#,
         dev = if dev_mode() {
-            format!(r#"<meta name="zeyn-dev" content="1"><script type="module" src="{}/_zeyn/dev.js"></script>"#, escape(&st.prefix))
+            format!(
+                r#"<meta name="zeyn-dev" content="1"><script type="module" src="{}/_zeyn/dev.js"></script>"#,
+                escape(&st.prefix)
+            )
         } else {
             String::new()
         },

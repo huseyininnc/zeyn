@@ -356,7 +356,9 @@ fn list_screen_renders() {
 #[test]
 fn grid_rows_are_escaped_and_highlighted() {
     let rows = product_grid().rows_html(&[sample()]);
-    assert!(rows.starts_with(r#"<tr class="z-row-warning" tabindex="-1" data-zeyn-effect="{&quot;effect&quot;:&quot;open_window&quot;"#));
+    assert!(rows.starts_with(
+        r#"<tr class="z-row-warning" tabindex="-1" data-zeyn-effect="{&quot;effect&quot;:&quot;open_window&quot;"#
+    ));
     assert!(rows.contains("Tea &lt;Rize&gt;"));
     assert!(rows.contains(">Kilogram<"));
     assert!(rows.contains(r#"<td class="z-num">₺1,234.56</td>"#));
@@ -461,7 +463,8 @@ fn page_sizes_are_bounded() {
     assert_eq!(Paging::pages(0), Paging::Pages { size: 1 });
     assert_eq!(Paging::infinite(10_000), Paging::Infinite { batch: zeyn::MAX_PAGE_SIZE });
 
-    let greedy: DataQuery = serde_json::from_str(r#"{"page":{"type":"offset","offset":0,"limit":4000000000}}"#).unwrap();
+    let greedy: DataQuery =
+        serde_json::from_str(r#"{"page":{"type":"offset","offset":0,"limit":4000000000}}"#).unwrap();
     assert_eq!(greedy.limit(), zeyn::MAX_PAGE_SIZE);
     let empty: DataQuery = serde_json::from_str("{}").unwrap();
     assert_eq!(empty.limit(), zeyn::DEFAULT_PAGE_SIZE);
@@ -487,7 +490,8 @@ fn in_memory_paging_by_offset_and_cursor() {
 
     let q = DataQuery { page: PageRequest::Offset { offset: u64::MAX, limit: 3 }, ..Default::default() };
     assert!(Page::from_slice(&all, &q).items.is_empty());
-    let q = DataQuery { page: PageRequest::After { cursor: Some(Cursor("junk".into())), limit: 2 }, ..Default::default() };
+    let q =
+        DataQuery { page: PageRequest::After { cursor: Some(Cursor("junk".into())), limit: 2 }, ..Default::default() };
     assert_eq!(Page::from_slice(&all, &q).items, [1, 2]);
 }
 

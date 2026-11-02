@@ -5,8 +5,8 @@ use axum::Router;
 use axum::body::Body;
 use axum::http::{HeaderMap, Request, StatusCode, header};
 use http_body_util::BodyExt;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use tower::ServiceExt;
 use zeyn::prelude::*;
 use zeyn::ui::{DockArea, DockLayout};
@@ -39,7 +39,9 @@ pub async fn archive_orders(days: u32, counter: Counter) -> Result<()> {
 }
 
 fn new_order() -> Command {
-    Command::open("orders.new", "New order", order_form, OrderParams { id: None }).shortcut("Ctrl+Alt+N").icon(Icon::Plus)
+    Command::open("orders.new", "New order", order_form, OrderParams { id: None })
+        .shortcut("Ctrl+Alt+N")
+        .icon(Icon::Plus)
 }
 
 fn archive() -> Command {
@@ -75,7 +77,12 @@ pub fn designer() -> Screen {
         )
         .body(
             Row::new()
-                .col(Toolbox::new("Tools").tool("select", "Select", Some(Icon::Search)).tool("text", "Text", None).selected("text"))
+                .col(
+                    Toolbox::new("Tools")
+                        .tool("select", "Select", Some(Icon::Search))
+                        .tool("text", "Text", None)
+                        .selected("text"),
+                )
                 .col(PropertyInspector::new(
                     "Properties",
                     Form::of(Shape { name: "A".into(), width: 5 })
@@ -112,32 +119,29 @@ fn app(counter: Counter) -> Router {
 }
 
 fn app_with(counter: Counter, views: bool) -> Router {
-    let app = App::new("Test")
-        .i18n(I18n::new("en"))
-        .service(counter)
-        .auth(|h: &HeaderMap| {
-            let perms: Vec<String> = h.get("x-perms")?.to_str().ok()?.split(',').map(String::from).collect();
-            let user = h.get("x-user").and_then(|v| v.to_str().ok()).unwrap_or("u").to_string();
-            Some(Identity::user(user).with_permissions(perms))
-        });
+    let app = App::new("Test").i18n(I18n::new("en")).service(counter).auth(|h: &HeaderMap| {
+        let perms: Vec<String> = h.get("x-perms")?.to_str().ok()?.split(',').map(String::from).collect();
+        let user = h.get("x-user").and_then(|v| v.to_str().ok()).unwrap_or("u").to_string();
+        Some(Identity::user(user).with_permissions(perms))
+    });
     let app = if views { app.datagrid_views(MemoryViewStore::default()) } else { app };
     app.feature(
-            Feature::new("orders")
-                .screen(orders)
-                .screen(order_form)
-                .screen(designer)
-                .screen(work)
-                .command(new_order())
-                .command(archive())
-                .command(hello()),
-        )
-        .feature(
-            Feature::new("hidden")
-                .guard(denied)
-                .command(Command::effect("hidden.secret", "Secret command", Effect::Toast { message: "x".into() })),
-        )
-        .router()
-        .unwrap()
+        Feature::new("orders")
+            .screen(orders)
+            .screen(order_form)
+            .screen(designer)
+            .screen(work)
+            .command(new_order())
+            .command(archive())
+            .command(hello()),
+    )
+    .feature(Feature::new("hidden").guard(denied).command(Command::effect(
+        "hidden.secret",
+        "Secret command",
+        Effect::Toast { message: "x".into() },
+    )))
+    .router()
+    .unwrap()
 }
 
 const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -175,9 +179,17 @@ async fn commands_the_user_may_not_run_never_reach_the_html() {
     assert!(!html.contains("Secret command"), "the guard of its feature denies the user");
 
     let (_, html) = send(&router, get("/orders", "orders.read,orders.write,orders.admin")).await;
-    assert!(html.contains(r#"data-zeyn-command="orders.new" data-zeyn-effect="{&quot;effect&quot;:&quot;open_window&quot;"#));
+    assert!(
+        html.contains(
+            r#"data-zeyn-command="orders.new" data-zeyn-effect="{&quot;effect&quot;:&quot;open_window&quot;"#
+        )
+    );
     assert!(html.contains(r#"&quot;screen&quot;:&quot;order_form&quot;"#));
-    assert!(html.contains(r#"aria-keyshortcuts="Control+Alt+N" data-hint="Ctrl+Alt+N" data-icon="plus">New order</button>"#));
+    assert!(
+        html.contains(
+            r#"aria-keyshortcuts="Control+Alt+N" data-hint="Ctrl+Alt+N" data-icon="plus">New order</button>"#
+        )
+    );
     assert!(html.contains(r#"data-zeyn-command="orders.archive" data-zeyn-command-run="orders.archive" aria-keyshortcuts="Control+Shift+A""#));
     assert!(!html.contains("Secret command"));
 }
@@ -199,11 +211,14 @@ async fn action_commands_run_on_the_server_after_csrf_guard_and_permission_check
     assert_eq!(status, StatusCode::OK, "{json}");
     assert_eq!(json, r#"{"effects":[]}"#);
     assert_eq!(counter.0.load(Ordering::SeqCst), 30, "the input was fixed on the server");
-    let unknown = send(&router, post("/_zeyn/command", "orders.admin", serde_json::json!({ "command": "orders.nope" }))).await;
+    let unknown =
+        send(&router, post("/_zeyn/command", "orders.admin", serde_json::json!({ "command": "orders.nope" }))).await;
     assert_eq!(unknown.0, StatusCode::NOT_FOUND);
-    let effect = send(&router, post("/_zeyn/command", "orders.admin", serde_json::json!({ "command": "orders.hello" }))).await;
+    let effect =
+        send(&router, post("/_zeyn/command", "orders.admin", serde_json::json!({ "command": "orders.hello" }))).await;
     assert_eq!(effect.0, StatusCode::NOT_FOUND, "effect commands run in the browser");
-    let guarded = send(&router, post("/_zeyn/command", "orders.admin", serde_json::json!({ "command": "hidden.secret" }))).await;
+    let guarded =
+        send(&router, post("/_zeyn/command", "orders.admin", serde_json::json!({ "command": "hidden.secret" }))).await;
     assert_eq!(guarded.0, StatusCode::FORBIDDEN);
 }
 
@@ -247,7 +262,11 @@ fn duplicate_and_unusable_shortcuts_are_reported_by_the_feature_check() {
     assert!(single[0].contains("single character key"), "{single:?}");
     let unreadable = problems(Feature::new("f").command(hello().shortcut("Ctrl+Hyper")));
     assert!(unreadable[0].contains("cannot be read"), "{unreadable:?}");
-    let ids = problems(Feature::new("f").command(hello()).command(hello()).command(Command::effect("Bad Id", "x", Effect::CloseAndRefresh)));
+    let ids = problems(Feature::new("f").command(hello()).command(hello()).command(Command::effect(
+        "Bad Id",
+        "x",
+        Effect::CloseAndRefresh,
+    )));
     assert!(ids.iter().any(|p| p.contains("command id `orders.hello` is registered twice")), "{ids:?}");
     assert!(ids.iter().any(|p| p.contains("command `Bad Id` has an id that is not usable")), "{ids:?}");
     assert!(problems(Feature::new("f").command(hello().shortcut("Alt+F2")).command(new_order())).is_empty());
@@ -255,9 +274,9 @@ fn duplicate_and_unusable_shortcuts_are_reported_by_the_feature_check() {
 
 #[test]
 fn shortcuts_shared_across_features_are_reported_by_the_app_check() {
-    let app = App::new("Test")
-        .feature(Feature::new("a").command(hello().shortcut("Ctrl+J")))
-        .feature(Feature::new("b").command(Command::effect("b.jump", "Jump", Effect::CloseAndRefresh).shortcut("Ctrl+J")));
+    let app = App::new("Test").feature(Feature::new("a").command(hello().shortcut("Ctrl+J"))).feature(
+        Feature::new("b").command(Command::effect("b.jump", "Jump", Effect::CloseAndRefresh).shortcut("Ctrl+J")),
+    );
     let problems = app.check().unwrap_err();
     assert_eq!(problems.len(), 1, "{problems:?}");
     assert!(problems[0].contains("both use the shortcut `Control+J` (in `a` and `b`)"), "{problems:?}");
@@ -269,7 +288,9 @@ async fn menubar_follows_the_apg_pattern_and_leaves_out_commands_the_user_may_no
     let router = app(Counter::default());
     let (status, html) = send(&router, get("/designer", "orders.read")).await;
     assert_eq!(status, StatusCode::OK);
-    assert!(html.contains(r#"<ul class="z-menubar" role="menubar" aria-label="Main" data-zeyn-menubar data-testid="designer.menubar">"#));
+    assert!(html.contains(
+        r#"<ul class="z-menubar" role="menubar" aria-label="Main" data-zeyn-menubar data-testid="designer.menubar">"#
+    ));
     assert!(!html.contains(">File</button>"), "a menu with nothing the user may run is left out");
     assert!(!html.contains(">Admin</button>"));
     assert!(html.contains(
@@ -279,8 +300,14 @@ async fn menubar_follows_the_apg_pattern_and_leaves_out_commands_the_user_may_no
 
     let (_, html) = send(&router, get("/designer", "orders.read,orders.write,orders.admin")).await;
     let file = html.split(">File</button>").nth(1).unwrap().split("</ul>").next().unwrap();
-    assert_eq!(file.matches(r#"role="separator""#).count(), 1, "leading, doubled and trailing separators are dropped: {file}");
-    assert!(file.contains(r#"<span class="z-menu-label">New order</span><span class="z-menu-hint" aria-hidden="true">Ctrl+Alt+N</span>"#));
+    assert_eq!(
+        file.matches(r#"role="separator""#).count(),
+        1,
+        "leading, doubled and trailing separators are dropped: {file}"
+    );
+    assert!(file.contains(
+        r#"<span class="z-menu-label">New order</span><span class="z-menu-hint" aria-hidden="true">Ctrl+Alt+N</span>"#
+    ));
     assert!(file.contains(r#"data-zeyn-command-run="orders.archive""#));
     assert!(html.contains(r#"tabindex="-1">Admin</button>"#), "only the first top item is a tab stop");
 }
@@ -308,13 +335,22 @@ async fn inspector_saves_through_the_form_endpoint_with_validation_and_permissio
     let counter = Counter::default();
     let router = app(counter.clone());
     let call = |values: serde_json::Value| serde_json::json!({ "screen": "designer", "node": "1.1", "values": values });
-    let (status, _) = send(&router, post("/_zeyn/form", "orders.read", call(serde_json::json!({ "name": "B", "width": "7" })))).await;
+    let (status, _) =
+        send(&router, post("/_zeyn/form", "orders.read", call(serde_json::json!({ "name": "B", "width": "7" })))).await;
     assert_eq!(status, StatusCode::FORBIDDEN, "saving needs orders.write");
-    let (status, body) = send(&router, post("/_zeyn/form", "orders.read,orders.write", call(serde_json::json!({ "name": "", "width": "500" })))).await;
+    let (status, body) = send(
+        &router,
+        post("/_zeyn/form", "orders.read,orders.write", call(serde_json::json!({ "name": "", "width": "500" }))),
+    )
+    .await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
     assert!(body.contains(r#""field":"name""#) && body.contains(r#""field":"width""#), "{body}");
     assert_eq!(counter.0.load(Ordering::SeqCst), 0);
-    let (status, body) = send(&router, post("/_zeyn/form", "orders.read,orders.write", call(serde_json::json!({ "name": "B", "width": "7" })))).await;
+    let (status, body) = send(
+        &router,
+        post("/_zeyn/form", "orders.read,orders.write", call(serde_json::json!({ "name": "B", "width": "7" }))),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK, "{body}");
     assert_eq!(counter.0.load(Ordering::SeqCst), 1);
 }
@@ -324,9 +360,14 @@ async fn dock_renders_areas_tabs_and_dividers_with_node_paths() {
     let router = app(Counter::default());
     let (_, html) = send(&router, get("/work", "orders.read")).await;
     assert!(html.contains(r#"<div class="z-dock" role="group" aria-label="Workspace" data-zeyn-dock="work-dock-0-1" data-testid="work.dock" style="--z-dock-left:30%;--z-dock-right:10%;--z-dock-bottom:60%""#));
-    assert!(html.contains(r#"<section class="z-dock-area" data-area="right" aria-label="Right" hidden>"#), "an area without panels starts hidden");
+    assert!(
+        html.contains(r#"<section class="z-dock-area" data-area="right" aria-label="Right" hidden>"#),
+        "an area without panels starts hidden"
+    );
     assert!(html.contains(r#"role="tab" class="z-dock-tab" id="work-dock-0-1-tab-main" aria-controls="work-dock-0-1-panel-main" aria-selected="true" tabindex="0" draggable="true" data-panel="main""#));
-    assert!(html.contains(r#"id="work-dock-0-1-tab-notes" aria-controls="work-dock-0-1-panel-notes" aria-selected="false" tabindex="-1""#));
+    assert!(html.contains(
+        r#"id="work-dock-0-1-tab-notes" aria-controls="work-dock-0-1-panel-notes" aria-selected="false" tabindex="-1""#
+    ));
     assert!(html.contains(r#"role="tabpanel" id="work-dock-0-1-panel-notes" aria-labelledby="work-dock-0-1-tab-notes" tabindex="0" data-panel="notes" hidden><div class="z-node" data-zeyn-node="0.1.2">"#));
     assert!(html.contains(r#"class="z-dock-bar" data-edge="left" role="separator" tabindex="0" aria-orientation="vertical" aria-valuenow="30" aria-valuemin="10" aria-valuemax="60" aria-label="Resize the Left area""#));
     assert!(html.contains(r#"data-edge="bottom" role="separator" tabindex="0" aria-orientation="horizontal""#));
@@ -359,10 +400,15 @@ async fn dock_layout_is_saved_per_user_in_the_view_store_and_cleaned() {
     let (status, _) = send(&router, dock_call("orders.read", "ann", save)).await;
     assert_eq!(status, StatusCode::NO_CONTENT);
     let (_, body) = send(&router, dock_call("orders.read", "ann", load.clone())).await;
-    let layout: DockLayout = serde_json::from_value(serde_json::from_str::<serde_json::Value>(&body).unwrap()["layout"].clone()).unwrap();
+    let layout: DockLayout =
+        serde_json::from_value(serde_json::from_str::<serde_json::Value>(&body).unwrap()["layout"].clone()).unwrap();
     assert_eq!((layout.sizes.left, layout.sizes.right, layout.sizes.bottom), (10, 35, 60));
     let ids: Vec<(&str, DockArea, bool)> = layout.panels.iter().map(|p| (p.id.as_str(), p.area, p.open)).collect();
-    assert_eq!(ids, [("log", DockArea::Right, true), ("files", DockArea::Left, false)], "unknown and repeated panels are dropped");
+    assert_eq!(
+        ids,
+        [("log", DockArea::Right, true), ("files", DockArea::Left, false)],
+        "unknown and repeated panels are dropped"
+    );
 
     let (_, other) = send(&router, dock_call("orders.read", "bob", load.clone())).await;
     assert_eq!(other, r#"{"layout":null}"#, "layouts are per user");
@@ -382,11 +428,19 @@ async fn dock_endpoint_checks_csrf_access_node_and_store() {
         .body(Body::from(load.to_string()))
         .unwrap();
     assert_eq!(send(&router, no_csrf).await.0, StatusCode::FORBIDDEN);
-    assert_eq!(send(&router, dock_call("", "ann", load.clone())).await.0, StatusCode::FORBIDDEN, "the screen needs orders.read");
+    assert_eq!(
+        send(&router, dock_call("", "ann", load.clone())).await.0,
+        StatusCode::FORBIDDEN,
+        "the screen needs orders.read"
+    );
     let not_dock = serde_json::json!({ "screen": "work", "node": "0.0" });
     assert_eq!(send(&router, dock_call("orders.read", "ann", not_dock)).await.0, StatusCode::NOT_FOUND);
     let no_store = app_with(Counter::default(), false);
-    assert_eq!(send(&no_store, dock_call("orders.read", "ann", load)).await.0, StatusCode::NOT_FOUND, "the browser keeps the layout");
+    assert_eq!(
+        send(&no_store, dock_call("orders.read", "ann", load)).await.0,
+        StatusCode::NOT_FOUND,
+        "the browser keeps the layout"
+    );
 }
 
 #[tokio::test]
@@ -420,7 +474,8 @@ async fn commands_and_saved_layouts_count_against_the_write_limit() {
         assert_eq!(status, StatusCode::TOO_MANY_REQUESTS, "{path} writes");
     }
     for _ in 0..2 {
-        let (status, _) = send(&router, as_user(post("/_zeyn/search", "", serde_json::json!({ "query": "x" })), "reader")).await;
+        let (status, _) =
+            send(&router, as_user(post("/_zeyn/search", "", serde_json::json!({ "query": "x" })), "reader")).await;
         assert_eq!(status, StatusCode::OK, "searching is not a write");
     }
 }

@@ -109,7 +109,10 @@ pub(crate) fn render_choice(out: &mut String, r: &Render, s: &Slot) {
             let listbox = s.control == Some(Control::Listbox);
             out.push_str(s.label);
             let (class, attr) = if listbox {
-                ("z-listbox-field", format!(r#" data-zeyn-listbox size="{}""#, options.len().clamp(2, 8) + usize::from(s.m.optional)))
+                (
+                    "z-listbox-field",
+                    format!(r#" data-zeyn-listbox size="{}""#, options.len().clamp(2, 8) + usize::from(s.m.optional)),
+                )
             } else {
                 ("z-select", " data-zeyn-select".to_string())
             };
@@ -125,7 +128,11 @@ pub(crate) fn render_choice(out: &mut String, r: &Render, s: &Slot) {
             }
             for o in options {
                 let selected = if *s.value == Value::Choice(o.value) { " selected" } else { "" };
-                out.push_str(&format!(r#"<option value="{}"{selected}>{}</option>"#, o.value, label_of(o.key, o.label)));
+                out.push_str(&format!(
+                    r#"<option value="{}"{selected}>{}</option>"#,
+                    o.value,
+                    label_of(o.key, o.label)
+                ));
             }
             out.push_str("</select></div>");
         }
@@ -183,9 +190,15 @@ pub(crate) fn render_text(out: &mut String, r: &Render, s: &Slot) {
     let minlength = s.m.min_len().map(|n| format!(r#" minlength="{n}""#)).unwrap_or_default();
     out.push_str(s.label);
     match max {
-        Some(n) if n > 255 && !matches!(s.control, Some(Control::Password | Control::NewPassword | Control::OneTimeCode)) => {
+        Some(n)
+            if n > 255
+                && !matches!(s.control, Some(Control::Password | Control::NewPassword | Control::OneTimeCode)) =>
+        {
             let id = s.id;
-            let common = s.common.replace(&format!(r#"aria-describedby="{id}-error""#), &format!(r#"aria-describedby="{id}-count {id}-error""#));
+            let common = s.common.replace(
+                &format!(r#"aria-describedby="{id}-error""#),
+                &format!(r#"aria-describedby="{id}-count {id}-error""#),
+            );
             let count = match s.value {
                 Value::Text(t) => t.chars().count(),
                 _ => 0,
@@ -198,7 +211,10 @@ pub(crate) fn render_text(out: &mut String, r: &Render, s: &Slot) {
         }
         _ if s.control == Some(Control::Password) || s.control == Some(Control::NewPassword) => {
             let auto = if s.control == Some(Control::Password) { "current-password" } else { "new-password" };
-            out.push_str(&format!(r#"<input type="password" autocomplete="{auto}" {}{minlength}{maxlength} value="">"#, s.common));
+            out.push_str(&format!(
+                r#"<input type="password" autocomplete="{auto}" {}{minlength}{maxlength} value="">"#,
+                s.common
+            ));
         }
         _ if s.control == Some(Control::OneTimeCode) => {
             out.push_str(&format!(r#"<input type="text" inputmode="text" autocomplete="one-time-code" spellcheck="false" {}{maxlength} value="">"#, s.common));

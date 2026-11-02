@@ -32,7 +32,12 @@ fn start() -> Booking {
 }
 
 fn form() -> Form<Booking> {
-    Form::of(start()).field(Booking::day).field(Booking::at).field(Booking::slot).field(Booking::moment).range(Booking::from, Booking::to)
+    Form::of(start())
+        .field(Booking::day)
+        .field(Booking::at)
+        .field(Booking::slot)
+        .field(Booking::moment)
+        .range(Booking::from, Booking::to)
 }
 
 fn tr() -> DateWords {
@@ -76,7 +81,11 @@ fn words_and_relative_input_are_read_in_the_users_language() {
     assert_eq!(date("- 2 weeks", "en"), Some(d(2024, 3, 1)));
     assert_eq!(date("+1m", "en"), Some(d(2024, 4, 15)));
     let jan31 = d(2024, 1, 31);
-    assert_eq!(Date::parse_input("+1m", "en", jan31, &DateWords::english()), Some(d(2024, 2, 29)), "month ends are kept");
+    assert_eq!(
+        Date::parse_input("+1m", "en", jan31, &DateWords::english()),
+        Some(d(2024, 2, 29)),
+        "month ends are kept"
+    );
 }
 
 #[test]
@@ -114,7 +123,10 @@ fn date_times_combine_a_date_and_a_time() {
     assert_eq!(l("bugün"), at(d(2024, 3, 15), 0, 0));
     assert_eq!(l("şimdi"), Some(now));
     assert_eq!(l("05.01.2024 14:30"), at(d(2024, 1, 5), 14, 30));
-    assert_eq!(LocalDateTime::parse_input("1/5/2024 2:30 PM", "en-US", now, &DateWords::english()), at(d(2024, 1, 5), 14, 30));
+    assert_eq!(
+        LocalDateTime::parse_input("1/5/2024 2:30 PM", "en-US", now, &DateWords::english()),
+        at(d(2024, 1, 5), 14, 30)
+    );
     assert_eq!(l("yarın 25:00"), None);
 }
 
@@ -136,7 +148,8 @@ fn values(pairs: &[(&str, &str)]) -> serde_json::Map<String, serde_json::Value> 
     pairs.iter().map(|(k, v)| (k.to_string(), serde_json::json!(v))).collect()
 }
 
-const BASE: [(&str, &str); 4] = [("day", "05.01.2024"), ("at", "09:00"), ("slot", "05.01.2024 09:00"), ("moment", "05.01.2024 14:30")];
+const BASE: [(&str, &str); 4] =
+    [("day", "05.01.2024"), ("at", "09:00"), ("slot", "05.01.2024 09:00"), ("moment", "05.01.2024 14:30")];
 
 #[test]
 fn the_server_reads_typed_values_and_reports_daylight_saving_gaps() {
@@ -150,7 +163,11 @@ fn the_server_reads_typed_values_and_reports_daylight_saving_gaps() {
     let errors = form().read(&values(&gap), "tr", berlin).unwrap_err();
     assert_eq!(errors.errors.len(), 1);
     assert_eq!(errors.errors[0].field, "moment");
-    assert!(errors.errors[0].message.english().contains("does not exist in your time zone"), "{}", errors.errors[0].message.english());
+    assert!(
+        errors.errors[0].message.english().contains("does not exist in your time zone"),
+        "{}",
+        errors.errors[0].message.english()
+    );
 
     let mut late = BASE.to_vec();
     late[0] = ("day", "05.01.2025");
@@ -284,7 +301,12 @@ async fn the_check_endpoint_answers_canonical_text_in_the_users_language_and_zon
     assert_eq!(r["utc"], "2024-03-15T13:30:00.000Z");
     assert_eq!(r["zone"], "Europe/Berlin");
 
-    let (_, r) = parse_call(serde_json::json!({ "kind": "datetime", "text": "31.03.2024 02:30", "label": "Onay <b>" }), true, "tr").await;
+    let (_, r) = parse_call(
+        serde_json::json!({ "kind": "datetime", "text": "31.03.2024 02:30", "label": "Onay <b>" }),
+        true,
+        "tr",
+    )
+    .await;
     assert_eq!(r["ok"], false);
     assert!(r["message"].as_str().unwrap().starts_with("Onay <b>: bu saat"), "{r}");
 

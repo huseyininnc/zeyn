@@ -4,9 +4,9 @@ use axum::http::{HeaderMap, Request, StatusCode, header};
 use http_body_util::BodyExt;
 use std::sync::{Arc, RwLock};
 use tower::ServiceExt;
+use zeyn::prelude::TimePolicy;
 use zeyn::prelude::*;
 use zeyn::{GuardResult, I18n, Identity};
-use zeyn::prelude::TimePolicy;
 
 /// Product used by the server tests.
 #[entity(table = "products")]
@@ -31,7 +31,13 @@ impl Service for Store {}
 impl Store {
     fn seeded() -> Self {
         let rows = (1..=30)
-            .map(|i| Product { id: ProductId(i), code: format!("P-{i:02}"), price: Money::tl(i * 100), stock: i, version: 1 })
+            .map(|i| Product {
+                id: ProductId(i),
+                code: format!("P-{i:02}"),
+                price: Money::tl(i * 100),
+                stock: i,
+                version: 1,
+            })
             .collect();
         Store(Arc::new(RwLock::new(rows)))
     }
@@ -66,7 +72,8 @@ pub struct EditParams {
 
 #[screen(route = "/products", permission = "stock.read")]
 pub fn list() -> Screen {
-    Screen::new("Products").body(DataGrid::of(search).paging(Paging::pages(10)).column(Product::code).filter().column(Product::price))
+    Screen::new("Products")
+        .body(DataGrid::of(search).paging(Paging::pages(10)).column(Product::code).filter().column(Product::price))
 }
 
 #[screen(permission = "stock.write")]
@@ -214,7 +221,14 @@ async fn form_takes_only_editable_fields_and_detects_stale_versions() {
     let audit = MemoryAudit::default();
     let router = app(writer(), audit.clone(), false).router().unwrap();
     let values = serde_json::json!({ "id": "99", "stock": "5000", "code": "NEW", "price": "12.50", "version": "1" });
-    let r = send(&router, post("/_zeyn/form", serde_json::json!({ "screen": "edit", "params": { "id": 3 }, "node": 0, "values": values }))).await;
+    let r = send(
+        &router,
+        post(
+            "/_zeyn/form",
+            serde_json::json!({ "screen": "edit", "params": { "id": 3 }, "node": 0, "values": values }),
+        ),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
     assert_eq!(r.json()["effects"][0]["message"], "Saved");
 
@@ -236,7 +250,11 @@ async fn form_takes_only_editable_fields_and_detects_stale_versions() {
 #[tokio::test]
 async fn permissions_and_guards_are_enforced_on_the_server() {
     let reader = router(Identity::user("ali").with_permissions(["stock.read"]));
-    let r = send(&reader, post("/_zeyn/form", serde_json::json!({ "screen": "edit", "params": { "id": 1 }, "node": 0, "values": {} }))).await;
+    let r = send(
+        &reader,
+        post("/_zeyn/form", serde_json::json!({ "screen": "edit", "params": { "id": 1 }, "node": 0, "values": {} })),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::FORBIDDEN);
     let r = send(&reader, get("/_zeyn/screen/edit?params=%7B%22id%22%3A1%7D")).await;
     assert_eq!(r.status, StatusCode::FORBIDDEN);
@@ -257,7 +275,12 @@ async fn menu_hides_screens_the_user_cannot_open() {
         App::new("T")
             .service(Store::seeded())
             .auth(move |_: &HeaderMap| Some(id.clone()))
-            .feature(Feature::new("stock").screen(list).screen(edit).menu(|m| m.group("Stock", Icon::Box).item("Products", list)))
+            .feature(
+                Feature::new("stock")
+                    .screen(list)
+                    .screen(edit)
+                    .menu(|m| m.group("Stock", Icon::Box).item("Products", list)),
+            )
             .feature(Feature::new("other").screen(closed).menu(|m| m.group("Other", Icon::Home).item("Closed", closed)))
             .router()
             .unwrap()
@@ -304,7 +327,12 @@ async fn agent_tools_are_off_by_default_and_mcp_needs_an_authorization_header() 
     assert_eq!(r.status, StatusCode::UNAUTHORIZED);
 
     let r = send(&router, rpc(true, serde_json::json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" }))).await;
-    let names: Vec<String> = r.json()["result"]["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap().to_string()).collect();
+    let names: Vec<String> = r.json()["result"]["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["name"].as_str().unwrap().to_string())
+        .collect();
     assert_eq!(names, ["list_0_search", "api_stock_search", "api_stock_save"]);
 
     let call = serde_json::json!({ "jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": { "name": "list_0_search", "arguments": { "page": { "type": "offset", "offset": 0, "limit": 1 } } } });
@@ -335,9 +363,8 @@ async fn time_zone_comes_from_profile_then_manual_choice_then_browser_then_defau
             .unwrap()
     };
     let user = TimePolicy::User { default: TimeZone::named("Europe/London").unwrap() };
-    let page = |cookies: &str| {
-        Request::get("/clock").header(header::COOKIE, cookies.to_string()).body(Body::empty()).unwrap()
-    };
+    let page =
+        |cookies: &str| Request::get("/clock").header(header::COOKIE, cookies.to_string()).body(Body::empty()).unwrap();
 
     let r = send(&build(Identity::user("a"), user), page("")).await;
     assert!(r.body.contains("zone=Europe/London today=2024-01-05"), "{}", r.body);
@@ -346,7 +373,9 @@ async fn time_zone_comes_from_profile_then_manual_choice_then_browser_then_defau
     assert!(r.body.contains("zone=Europe/Istanbul today=2024-01-06"));
     assert!(r.body.contains(r#"<meta name="zeyn-tz" content="Europe/Istanbul">"#));
 
-    let r = send(&build(Identity::user("a"), user), page("zeyn_tz=Europe%2FIstanbul; zeyn_tz_manual=America%2FNew_York")).await;
+    let r =
+        send(&build(Identity::user("a"), user), page("zeyn_tz=Europe%2FIstanbul; zeyn_tz_manual=America%2FNew_York"))
+            .await;
     assert!(r.body.contains("zone=America/New_York"));
 
     let profile = Identity::user("a").with_time_zone("Asia/Tokyo");
@@ -477,7 +506,14 @@ async fn a_call_refused_in_before_never_runs_and_after_still_sees_it() {
     let grid = send(&router, post("/_zeyn/grid", serde_json::json!({ "screen": "list", "node": 0 }))).await;
     assert_eq!(grid.status, StatusCode::FORBIDDEN);
     let values = serde_json::json!({ "code": "X-3", "price": "1", "version": "1" });
-    let form = send(&router, post("/_zeyn/form", serde_json::json!({ "screen": "edit", "params": { "id": 3 }, "node": 0, "values": values }))).await;
+    let form = send(
+        &router,
+        post(
+            "/_zeyn/form",
+            serde_json::json!({ "screen": "edit", "params": { "id": 3 }, "node": 0, "values": values }),
+        ),
+    )
+    .await;
     assert_eq!(form.status, StatusCode::FORBIDDEN);
     assert_eq!(store.get(3).code, "P-03", "the save action never ran");
     let seen = refuse.0.read().unwrap().clone();

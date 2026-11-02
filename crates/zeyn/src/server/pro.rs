@@ -26,7 +26,9 @@ pub(super) const ASSETS: [&str; 2] = ["/_zeyn/pro.js", "/_zeyn/pro.css"];
 
 /// Links placed in the page head after the component library's own.
 pub(super) fn head(base: &str) -> String {
-    format!(r#"<link rel="stylesheet" href="{base}/_zeyn/pro.css"><script type="module" src="{base}/_zeyn/pro.js"></script>"#)
+    format!(
+        r#"<link rel="stylesheet" href="{base}/_zeyn/pro.css"><script type="module" src="{base}/_zeyn/pro.js"></script>"#
+    )
 }
 
 pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
@@ -46,7 +48,11 @@ struct SearchCall {
 /// Runs every palette search the user may run (see `Feature::search`) with the query and returns
 /// `{hits: [{label, group, url}]}`, at most `MAX_SEARCH_HITS`, in feature order. A failing search
 /// is logged and skipped so the others still answer. Hits that leave the app are dropped.
-async fn search_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(call): axum::Json<SearchCall>) -> Response {
+async fn search_call(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::Json(call): axum::Json<SearchCall>,
+) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     if let Err(f) = st.check_csrf(&headers) {
         return st.error_response(&ctx, f);
@@ -65,7 +71,8 @@ async fn search_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::
             if !ctx.identity().can(&meta.access) {
                 continue;
             }
-            let info = Call { kind: CallKind::Screen, screen: f.name(), action: Some(meta), via_agent: ctx.via_agent() };
+            let info =
+                Call { kind: CallKind::Screen, screen: f.name(), action: Some(meta), via_agent: ctx.via_agent() };
             let result = st.intercept(&ctx, &info, || st.timed(search.run(ctx.clone(), query.clone()))).await;
             match result {
                 Ok(found) => hits.extend(found.into_iter().filter(crate::command::SearchHit::is_local)),
@@ -93,7 +100,11 @@ struct DockCall {
 /// Loads or saves the signed in user's layout of a dock, in the app's view store under a key
 /// built from the tenant, the screen and the node. `404` without a store (the browser keeps the
 /// layout itself) or when the node is not a dock; `403` without a signed in user.
-async fn dock_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(call): axum::Json<DockCall>) -> Response {
+async fn dock_call(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::Json(call): axum::Json<DockCall>,
+) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     if let Err(f) = st.check_csrf(&headers) {
         return st.error_response(&ctx, f);
@@ -131,7 +142,10 @@ pub(super) fn shell_parts(st: &AppState, ctx: &Ctx, r: &Render) -> (String, Stri
         r#"<button type="button" class="z-palette-open" data-zeyn-palette-open aria-haspopup="dialog" aria-keyshortcuts="Control+Shift+P F1"><span class="z-icon z-icon-search" aria-hidden="true"></span><span>{}</span><kbd aria-hidden="true">Ctrl+Shift+P</kbd></button>"#,
         t("open")
     );
-    let search = st.features.iter().any(|f| f.check_guards(ctx).is_ok() && f.searches().iter().any(|s| ctx.identity().can(&s.meta().access)));
+    let search = st
+        .features
+        .iter()
+        .any(|f| f.check_guards(ctx).is_ok() && f.searches().iter().any(|s| ctx.identity().can(&s.meta().access)));
     let mut commands = format!(
         r#"<div class="z-commands" hidden data-zeyn-commands{} data-text-label="{}" data-text-placeholder="{}" data-text-empty="{}" data-text-count="{}" data-text-recent="{}" data-text-app="{}" data-text-screen="{}" data-text-go="{}" data-text-done="{}" data-text-hint="{}">"#,
         if search { " data-search" } else { "" },
@@ -167,7 +181,11 @@ struct CommandCall {
 
 /// Runs an action command by id. The input was fixed on the server when the command was built;
 /// the client only names it. Effect commands run in the browser and are not found here.
-async fn command_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(call): axum::Json<CommandCall>) -> Response {
+async fn command_call(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::Json(call): axum::Json<CommandCall>,
+) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     if let Err(f) = st.check_csrf(&headers) {
         return st.error_response(&ctx, f);
@@ -183,7 +201,8 @@ async fn command_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum:
             return Err(Failure::App(Error::Forbidden));
         }
         let run = command.call().ok_or(Failure::App(Error::NotFound))?;
-        let info = Call { kind: CallKind::Screen, screen: command.id(), action: Some(run.meta), via_agent: ctx.via_agent() };
+        let info =
+            Call { kind: CallKind::Screen, screen: command.id(), action: Some(run.meta), via_agent: ctx.via_agent() };
         st.intercept(&ctx, &info, || st.timed((run.run)(ctx.clone()))).await
     }
     .await;
@@ -192,4 +211,3 @@ async fn command_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum:
         Err(f) => st.error_response(&ctx, f),
     }
 }
-

@@ -1,7 +1,9 @@
 //! [`UserManager`] and [`RoleManager`]: the rules around the store (`UserManager<TUser>`,
 //! `RoleManager<TRole>` with `UserValidator`, `PasswordValidator` and `RoleValidator`).
 
-use super::model::{AUTHENTICATOR_KEY, AUTHENTICATOR_STEP, Claim, INTERNAL_PROVIDER, RECOVERY_CODES, Role, User, UserLogin};
+use super::model::{
+    AUTHENTICATOR_KEY, AUTHENTICATOR_STEP, Claim, INTERNAL_PROVIDER, RECOVERY_CODES, Role, User, UserLogin,
+};
 use super::password::Verification;
 use super::tokens::{self, Purpose};
 use super::{AccountEventKind, Accounts, denied, invalid, invalid_n, new_id, new_stamp, normalize, now_secs};
@@ -62,7 +64,10 @@ impl UserManager {
     pub async fn validate(&self, user: &User) -> Result<()> {
         let name = user.user_name.trim();
         let allowed = &self.options().user.allowed_user_name_characters;
-        if name.is_empty() || name.chars().count() > MAX_NAME || (!allowed.is_empty() && name.chars().any(|c| !allowed.contains(c))) {
+        if name.is_empty()
+            || name.chars().count() > MAX_NAME
+            || (!allowed.is_empty() && name.chars().any(|c| !allowed.contains(c)))
+        {
             return Err(invalid("user_name", "invalid_user_name"));
         }
         if let Some(owner) = self.store().user_by_name(&normalize(name)).await?
@@ -231,7 +236,9 @@ impl UserManager {
     pub async fn hash_password(&self, password: &str) -> Result<String> {
         let (hasher, password) = (self.options().hasher, password.to_string());
         let _permit = HASHING.acquire().await.map_err(|_| Error::Internal("hashing closed".into()))?;
-        tokio::task::spawn_blocking(move || hasher.hash(&password)).await.map_err(|e| Error::Internal(format!("hashing: {e}")))?
+        tokio::task::spawn_blocking(move || hasher.hash(&password))
+            .await
+            .map_err(|e| Error::Internal(format!("hashing: {e}")))?
     }
 
     /// Checks a password against a stored hash off the async threads (see [`Self::hash_password`]).
@@ -340,7 +347,13 @@ impl UserManager {
     /// Changes the e-mail address when the token for that address is valid; the address counts
     /// as confirmed and the stamp changes (`ChangeEmailAsync`). With `user_name_is_email` the
     /// user name follows, as in the default UI where both are the same.
-    pub async fn change_email(&self, user: &mut User, new_email: &str, token: &str, user_name_is_email: bool) -> Result<()> {
+    pub async fn change_email(
+        &self,
+        user: &mut User,
+        new_email: &str,
+        token: &str,
+        user_name_is_email: bool,
+    ) -> Result<()> {
         if !self.verify_token(user, &Purpose::ChangeEmail(normalize(new_email)), token) {
             return Err(denied("invalid_token"));
         }
@@ -355,7 +368,11 @@ impl UserManager {
 
     /// A six digit code that confirms `phone` (`GenerateChangePhoneNumberTokenAsync`).
     pub fn generate_change_phone_code(&self, user: &User, phone: &str) -> String {
-        self.0.0.keys.short_code(now_secs(), &user.security_stamp, &format!("Totp:{}:{}", Purpose::ChangePhone(phone.to_string()).name(), user.id))
+        self.0.0.keys.short_code(
+            now_secs(),
+            &user.security_stamp,
+            &format!("Totp:{}:{}", Purpose::ChangePhone(phone.to_string()).name(), user.id),
+        )
     }
 
     /// Sets and confirms the phone number when the code matches (`ChangePhoneNumberAsync`).
@@ -481,7 +498,10 @@ impl UserManager {
         user.two_factor_enabled = enabled;
         user.security_stamp = new_stamp();
         self.save(user).await?;
-        self.0.event(if enabled { AccountEventKind::TwoFactorEnabled } else { AccountEventKind::TwoFactorDisabled }, Some(&user.id));
+        self.0.event(
+            if enabled { AccountEventKind::TwoFactorEnabled } else { AccountEventKind::TwoFactorDisabled },
+            Some(&user.id),
+        );
         Ok(())
     }
 
@@ -492,7 +512,9 @@ impl UserManager {
     /// The user's authenticator key in base32, if one was set (`GetAuthenticatorKeyAsync`). The
     /// store holds it sealed with the accounts key and bound to the user.
     pub async fn authenticator_key(&self, user: &User) -> Result<Option<String>> {
-        let Some(sealed) = self.store().token(&user.id, INTERNAL_PROVIDER, AUTHENTICATOR_KEY).await? else { return Ok(None) };
+        let Some(sealed) = self.store().token(&user.id, INTERNAL_PROVIDER, AUTHENTICATOR_KEY).await? else {
+            return Ok(None);
+        };
         let sealer = self.0.0.sealer.as_ref().ok_or_else(|| Error::Internal("accounts key too short".into()))?;
         Ok(sealer.open::<String>(&Self::key_name(user), &sealed))
     }
@@ -502,7 +524,9 @@ impl UserManager {
     pub async fn reset_authenticator_key(&self, user: &mut User) -> Result<String> {
         let key = tokens::authenticator_key();
         let sealer = self.0.0.sealer.as_ref().ok_or_else(|| Error::Internal("accounts key too short".into()))?;
-        self.store().set_token(&user.id, INTERNAL_PROVIDER, AUTHENTICATOR_KEY, &sealer.seal(&Self::key_name(user), &key)).await?;
+        self.store()
+            .set_token(&user.id, INTERNAL_PROVIDER, AUTHENTICATOR_KEY, &sealer.seal(&Self::key_name(user), &key))
+            .await?;
         self.store().remove_token(&user.id, INTERNAL_PROVIDER, AUTHENTICATOR_STEP).await?;
         self.update_security_stamp(user).await?;
         Ok(key)
@@ -521,7 +545,12 @@ impl UserManager {
     pub async fn verify_authenticator_code(&self, user: &User, code: &str) -> Result<bool> {
         let Some(key) = self.authenticator_key(user).await? else { return Ok(false) };
         let Some(bytes) = tokens::base32_decode(&key) else { return Ok(false) };
-        let last = self.store().token(&user.id, INTERNAL_PROVIDER, AUTHENTICATOR_STEP).await?.and_then(|s| s.parse().ok()).unwrap_or(0);
+        let last = self
+            .store()
+            .token(&user.id, INTERNAL_PROVIDER, AUTHENTICATOR_STEP)
+            .await?
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
         match tokens::check_authenticator(&bytes, code, now_secs(), last) {
             Some(step) => {
                 self.store().set_token(&user.id, INTERNAL_PROVIDER, AUTHENTICATOR_STEP, &step.to_string()).await?;
@@ -573,26 +602,51 @@ impl UserManager {
     }
 
     pub async fn count_recovery_codes(&self, user: &User) -> Result<usize> {
-        Ok(self.store().token(&user.id, INTERNAL_PROVIDER, RECOVERY_CODES).await?.unwrap_or_default().split(';').filter(|h| !h.is_empty()).count())
+        Ok(self
+            .store()
+            .token(&user.id, INTERNAL_PROVIDER, RECOVERY_CODES)
+            .await?
+            .unwrap_or_default()
+            .split(';')
+            .filter(|h| !h.is_empty())
+            .count())
     }
 
     /// A six digit sign in code for e-mail (`GenerateTwoFactorTokenAsync` with the e-mail
     /// provider). Valid for about nine minutes and until the stamp changes.
     pub fn generate_email_code(&self, user: &User) -> String {
-        self.0.0.keys.short_code(now_secs(), &user.security_stamp, &format!("Email:TwoFactor:{}", user.email.as_deref().unwrap_or("")))
+        self.0.0.keys.short_code(
+            now_secs(),
+            &user.security_stamp,
+            &format!("Email:TwoFactor:{}", user.email.as_deref().unwrap_or("")),
+        )
     }
 
     pub fn verify_email_code(&self, user: &User, code: &str) -> bool {
-        self.0.0.keys.check_short_code(code, now_secs(), &user.security_stamp, &format!("Email:TwoFactor:{}", user.email.as_deref().unwrap_or("")))
+        self.0.0.keys.check_short_code(
+            code,
+            now_secs(),
+            &user.security_stamp,
+            &format!("Email:TwoFactor:{}", user.email.as_deref().unwrap_or("")),
+        )
     }
 
     /// A six digit sign in code for text messages (the phone number provider).
     pub fn generate_phone_code(&self, user: &User) -> String {
-        self.0.0.keys.short_code(now_secs(), &user.security_stamp, &format!("Phone:TwoFactor:{}", user.phone_number.as_deref().unwrap_or("")))
+        self.0.0.keys.short_code(
+            now_secs(),
+            &user.security_stamp,
+            &format!("Phone:TwoFactor:{}", user.phone_number.as_deref().unwrap_or("")),
+        )
     }
 
     pub fn verify_phone_code(&self, user: &User, code: &str) -> bool {
-        self.0.0.keys.check_short_code(code, now_secs(), &user.security_stamp, &format!("Phone:TwoFactor:{}", user.phone_number.as_deref().unwrap_or("")))
+        self.0.0.keys.check_short_code(
+            code,
+            now_secs(),
+            &user.security_stamp,
+            &format!("Phone:TwoFactor:{}", user.phone_number.as_deref().unwrap_or("")),
+        )
     }
 
     /// The second factors the user can use now (`GetValidTwoFactorProvidersAsync`).
@@ -691,7 +745,12 @@ impl RoleManager {
         if name.is_empty() || name.chars().count() > MAX_NAME {
             return Err(invalid("name", "invalid_role_name"));
         }
-        let role = Role { id: new_id(), name: name.to_string(), normalized_name: normalize(name), concurrency_stamp: new_stamp() };
+        let role = Role {
+            id: new_id(),
+            name: name.to_string(),
+            normalized_name: normalize(name),
+            concurrency_stamp: new_stamp(),
+        };
         self.store().create_role(&role).await.map_err(|e| match e {
             Error::Conflict => invalid("name", "duplicate_role_name"),
             e => e,

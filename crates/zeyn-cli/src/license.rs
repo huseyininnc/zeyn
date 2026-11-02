@@ -40,13 +40,16 @@ pub fn keygen(out: &Path) -> Result<String, String> {
     #[cfg(unix)]
     std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
     let mut file = options.open(out).map_err(|e| match e.kind() {
-        std::io::ErrorKind::AlreadyExists => format!("{} already exists; refusing to overwrite a private key", out.display()),
+        std::io::ErrorKind::AlreadyExists => {
+            format!("{} already exists; refusing to overwrite a private key", out.display())
+        }
         _ => format!("{}: {e}", out.display()),
     })?;
     let mut secret = [0u8; 32];
     getrandom::getrandom(&mut secret).map_err(|e| format!("no system randomness: {e}"))?;
     let key = SigningKey::from_bytes(&secret);
-    std::io::Write::write_all(&mut file, (hex(&secret) + "\n").as_bytes()).map_err(|e| format!("{}: {e}", out.display()))?;
+    std::io::Write::write_all(&mut file, (hex(&secret) + "\n").as_bytes())
+        .map_err(|e| format!("{}: {e}", out.display()))?;
     Ok(format!(
         "Private key written to {}. Keep it offline: never commit it, never ship it with an app.\n\
          Public key for the app:\n\n    const LICENSE_KEY: &str = \"{}\";\n",
@@ -119,10 +122,17 @@ mod tests {
         let license = zeyn::License::from_signed(&file, &public).unwrap();
         assert_eq!(license.holder, "Acme");
         assert!(license.allows("pos") && !license.allows("hr"));
-        assert_eq!(zeyn::License::from_signed(&file.replace("Acme", "Acne"), &public), Err(zeyn::LicenseError::BadSignature));
+        assert_eq!(
+            zeyn::License::from_signed(&file.replace("Acme", "Acne"), &public),
+            Err(zeyn::LicenseError::BadSignature)
+        );
 
         assert!(sign(r#"{"valid_until":"2027-06-30"}"#, Some(&key_file)).unwrap_err().contains("holder"));
-        assert!(sign(r#"{"holder":"Acme","valid_until":"30.06.2027"}"#, Some(&key_file)).unwrap_err().contains("YYYY-MM-DD"));
+        assert!(
+            sign(r#"{"holder":"Acme","valid_until":"30.06.2027"}"#, Some(&key_file))
+                .unwrap_err()
+                .contains("YYYY-MM-DD")
+        );
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

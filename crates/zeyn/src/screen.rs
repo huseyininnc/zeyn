@@ -51,15 +51,29 @@ pub trait ScreenDef: Copy + Send + Sync + 'static {
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(tag = "effect", rename_all = "snake_case")]
 pub enum Effect {
-    OpenWindow { screen: &'static str, params: serde_json::Value },
-    Navigate { screen: &'static str, params: serde_json::Value },
-    Toast { message: Text },
+    OpenWindow {
+        screen: &'static str,
+        params: serde_json::Value,
+    },
+    Navigate {
+        screen: &'static str,
+        params: serde_json::Value,
+    },
+    Toast {
+        message: Text,
+    },
     CloseAndRefresh,
     /// Asks the user to confirm `message`, then runs `then`. Built with [`Effect::confirm`].
-    Confirm { message: Text, then: Box<Effect> },
+    Confirm {
+        message: Text,
+        then: Box<Effect>,
+    },
     /// Goes to a local path of the app. With `frame` the whole app frame (menu, title, session
     /// settings) is loaded again, as after signing in or out; still without a page load.
-    Go { url: String, frame: bool },
+    Go {
+        url: String,
+        frame: bool,
+    },
 }
 
 impl Effect {
@@ -72,7 +86,11 @@ impl Effect {
     /// assert_eq!(Effect::go("//evil.example", true), Effect::Go { url: "/".into(), frame: true });
     /// ```
     pub fn go(url: &str, frame: bool) -> Effect {
-        let local = url.starts_with('/') && !url.starts_with("//") && !url.contains('\\') && !url.chars().any(char::is_control) && url.len() <= 2048;
+        let local = url.starts_with('/')
+            && !url.starts_with("//")
+            && !url.contains('\\')
+            && !url.chars().any(char::is_control)
+            && url.len() <= 2048;
         Effect::Go { url: if local { url.to_string() } else { "/".into() }, frame }
     }
 
@@ -257,7 +275,14 @@ pub trait GridSource: Send + Sync {
     /// Builds the save of an inline edit of the row with this key from the loaded page: only
     /// editable columns and the row version may be in `values`, otherwise `Forbidden`; values are
     /// read and validated as a form would (`Validation` errors name the fields).
-    fn edit_call(&self, page: &LoadedPage, key: &str, values: &serde_json::Map<String, serde_json::Value>, locale: &str, tz: crate::time::TimeZone) -> Result<RowCall> {
+    fn edit_call(
+        &self,
+        page: &LoadedPage,
+        key: &str,
+        values: &serde_json::Map<String, serde_json::Value>,
+        locale: &str,
+        tz: crate::time::TimeZone,
+    ) -> Result<RowCall> {
         let _ = (page, key, values, locale, tz);
         Err(crate::action::Error::NotFound)
     }
@@ -709,7 +734,9 @@ impl Screen {
         let r = Render { scope, loaded: Some(loaded), ..*r };
         let title = r.text(&self.title);
         let params = match self.menu.as_ref().map(|m| m.to_json(&r)) {
-            Some(items) if items.as_array().is_some_and(|a| !a.is_empty()) => format!(r#"{}" data-zeyn-menu="{}"#, attr(params), attr(&items)),
+            Some(items) if items.as_array().is_some_and(|a| !a.is_empty()) => {
+                format!(r#"{}" data-zeyn-menu="{}"#, attr(params), attr(&items))
+            }
             _ => attr(params),
         };
         let mut out = String::new();

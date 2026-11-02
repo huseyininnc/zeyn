@@ -9,7 +9,7 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tower::ServiceExt;
 use zeyn::prelude::*;
-use zeyn::{Config, I18n, Identity, Mail, Mailer, StaticSource, Transitions, TransitionRequest, Workflow};
+use zeyn::{Config, I18n, Identity, Mail, Mailer, StaticSource, TransitionRequest, Transitions, Workflow};
 
 /// Stage of a request.
 #[choice]
@@ -70,7 +70,12 @@ fn dir(name: &str) -> std::path::PathBuf {
 
 fn app(mailer: Mailer) -> Router {
     let identity = Identity::user("ali").with_permissions(["req.read", "req.submit"]);
-    let rows = vec![Req { id: ReqId(1), title: "Laptop <b>& bag</b>".into(), owner: "Ayşe <ayse@example.com>".into(), stage: Stage::Draft }];
+    let rows = vec![Req {
+        id: ReqId(1),
+        title: "Laptop <b>& bag</b>".into(),
+        owner: "Ayşe <ayse@example.com>".into(),
+        stage: Stage::Draft,
+    }];
     App::new("Test")
         .service(Reqs(Arc::new(RwLock::new(rows))))
         .i18n(I18n::new("en").catalog("tr", r#"{ "Stage": { "Submitted": "Gönderildi" } }"#).unwrap())
@@ -100,7 +105,9 @@ async fn submit(router: &Router, comment: &str) -> StatusCode {
 
 async fn wait_for_file(d: &std::path::Path) -> String {
     for _ in 0..200 {
-        if let Some(e) = std::fs::read_dir(d).unwrap().flatten().find(|e| e.path().extension().is_some_and(|x| x == "eml")) {
+        if let Some(e) =
+            std::fs::read_dir(d).unwrap().flatten().find(|e| e.path().extension().is_some_and(|x| x == "eml"))
+        {
             return std::fs::read_to_string(e.path()).unwrap();
         }
         tokio::time::sleep(Duration::from_millis(25)).await;
@@ -115,7 +122,11 @@ fn decoded(eml: &str) -> String {
     let mut i = 0;
     let mut buf = Vec::new();
     while i < bytes.len() {
-        if bytes[i] == b'=' && i + 2 < bytes.len() && bytes[i + 1].is_ascii_hexdigit() && bytes[i + 2].is_ascii_hexdigit() {
+        if bytes[i] == b'='
+            && i + 2 < bytes.len()
+            && bytes[i + 1].is_ascii_hexdigit()
+            && bytes[i + 2].is_ascii_hexdigit()
+        {
             buf.push(u8::from_str_radix(&joined[i + 1..i + 3], 16).unwrap());
             i += 3;
         } else {
@@ -138,7 +149,10 @@ async fn a_workflow_move_sends_a_localized_mail_from_the_job() {
     assert!(eml.contains("From: Zeyn <no-reply@example.com>"));
     assert!(eml.contains("multipart/alternative") && eml.contains("text/plain") && eml.contains("text/html"));
     let body = decoded(&eml);
-    assert!(body.contains("Laptop <b>& bag</b>, ali tarafından Draft durumundan Submitted durumuna taşındı (submit)."), "{body}");
+    assert!(
+        body.contains("Laptop <b>& bag</b>, ali tarafından Draft durumundan Submitted durumuna taşındı (submit)."),
+        "{body}"
+    );
     assert!(body.contains("<strong>Laptop &lt;b&gt;&amp; bag&lt;/b&gt;</strong>"), "{body}");
     assert!(body.contains("please &lt;approve&gt;"), "HTML gets escaped data: {body}");
     assert!(!body.contains("<b>& bag</b></strong>"));
@@ -148,10 +162,16 @@ async fn a_workflow_move_sends_a_localized_mail_from_the_job() {
 #[tokio::test]
 async fn sending_never_waits_for_the_server_and_failures_stay_queued() {
     let config = Config::load(vec![Box::new(StaticSource(
-        [("mail.from", "a@example.com"), ("mail.transport", "smtp"), ("mail.smtp.host", "127.0.0.1"), ("mail.smtp.port", "1"), ("mail.smtp.tls", "none")]
-            .iter()
-            .map(|(k, v)| (k.to_string(), v.to_string()))
-            .collect(),
+        [
+            ("mail.from", "a@example.com"),
+            ("mail.transport", "smtp"),
+            ("mail.smtp.host", "127.0.0.1"),
+            ("mail.smtp.port", "1"),
+            ("mail.smtp.tls", "none"),
+        ]
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect(),
     ))])
     .await
     .unwrap();
@@ -174,15 +194,24 @@ async fn sending_never_waits_for_the_server_and_failures_stay_queued() {
 #[tokio::test]
 async fn configuration_is_checked() {
     let load = |pairs: &[(&str, &str)]| {
-        let pairs: std::collections::HashMap<String, String> = pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect();
+        let pairs: std::collections::HashMap<String, String> =
+            pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect();
         async move { Config::load(vec![Box::new(StaticSource(pairs))]).await.unwrap() }
     };
     assert!(Mailer::from_config(&load(&[]).await).is_err(), "mail.from is required");
     assert!(Mailer::from_config(&load(&[("mail.from", "nope")]).await).is_err());
     assert!(Mailer::from_config(&load(&[("mail.from", "a@b.co")]).await).is_ok(), "log transport by default");
-    assert!(Mailer::from_config(&load(&[("mail.from", "a@b.co"), ("mail.transport", "file")]).await).is_err(), "file needs a directory");
+    assert!(
+        Mailer::from_config(&load(&[("mail.from", "a@b.co"), ("mail.transport", "file")]).await).is_err(),
+        "file needs a directory"
+    );
     assert!(Mailer::from_config(&load(&[("mail.from", "a@b.co"), ("mail.transport", "pigeon")]).await).is_err());
-    let smtp = [("mail.from", "a@b.co"), ("mail.transport", "smtp"), ("mail.smtp.host", "smtp.example.com"), ("mail.smtp.user", "u")];
+    let smtp = [
+        ("mail.from", "a@b.co"),
+        ("mail.transport", "smtp"),
+        ("mail.smtp.host", "smtp.example.com"),
+        ("mail.smtp.user", "u"),
+    ];
     assert!(Mailer::from_config(&load(&smtp).await).is_err(), "a user needs mail.smtp.password");
     let mut full = smtp.to_vec();
     full.extend([("mail.smtp.password", "p"), ("mail.smtp.port", "587"), ("mail.smtp.tls", "starttls")]);

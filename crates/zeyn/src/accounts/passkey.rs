@@ -99,7 +99,14 @@ impl Party {
 }
 
 /// Creation options for `navigator.credentials.create`, in the JSON form of WebAuthn level 3.
-pub(crate) fn creation_options(o: &PasskeyOptions, party: &Party, user_id: &str, user_name: &str, challenge: &str, exclude: &[Passkey]) -> Json {
+pub(crate) fn creation_options(
+    o: &PasskeyOptions,
+    party: &Party,
+    user_id: &str,
+    user_name: &str,
+    challenge: &str,
+    exclude: &[Passkey],
+) -> Json {
     json!({
         "rp": { "id": party.id, "name": party.name },
         "user": { "id": b64url(user_id.as_bytes()), "name": user_name, "displayName": user_name },
@@ -216,7 +223,14 @@ fn auth_data<'a>(data: &'a [u8], party: &Party, uv_required: bool) -> Result<Aut
 }
 
 /// A verified new passkey and the user handle the browser was given.
-pub(crate) fn verify_registration(o: &PasskeyOptions, party: &Party, state: &PasskeyState, credential: &Json, name: Option<String>, now: i64) -> Result<Passkey> {
+pub(crate) fn verify_registration(
+    o: &PasskeyOptions,
+    party: &Party,
+    state: &PasskeyState,
+    credential: &Json,
+    name: Option<String>,
+    now: i64,
+) -> Result<Passkey> {
     client_data(&bytes(credential, &["response", "clientDataJSON"])?, "webauthn.create", &state.challenge, party)?;
     let att = bytes(credential, &["response", "attestationObject"])?;
     let (obj, _) = cbor::item(&att, 0)?;
@@ -258,7 +272,14 @@ pub(crate) fn assertion_id(credential: &Json) -> Result<Vec<u8>> {
 
 /// Verifies a sign in with `passkey` of the user `user_id`, and returns it with the new counter
 /// and backup state.
-pub(crate) fn verify_assertion(o: &PasskeyOptions, party: &Party, state: &PasskeyState, credential: &Json, user_id: &str, passkey: &Passkey) -> Result<Passkey> {
+pub(crate) fn verify_assertion(
+    o: &PasskeyOptions,
+    party: &Party,
+    state: &PasskeyState,
+    credential: &Json,
+    user_id: &str,
+    passkey: &Passkey,
+) -> Result<Passkey> {
     if let Some(handle) = field(credential, &["response", "userHandle"]).filter(|h| !h.is_empty()) {
         let handle = b64url_decode(handle.trim_end_matches('=')).ok_or_else(|| bad("bad user handle"))?;
         if handle != user_id.as_bytes() {
@@ -403,9 +424,24 @@ pub(crate) mod cbor {
         let (arg, used) = match info {
             0..=23 => (u64::from(info), 1),
             24 => (u64::from(*data.get(1).ok_or_else(|| bad("cbor: short"))?), 2),
-            25 => (u64::from(u16::from_be_bytes(data.get(1..3).ok_or_else(|| bad("cbor: short"))?.try_into().map_err(|_| bad("cbor"))?)), 3),
-            26 => (u64::from(u32::from_be_bytes(data.get(1..5).ok_or_else(|| bad("cbor: short"))?.try_into().map_err(|_| bad("cbor"))?)), 5),
-            27 => (u64::from_be_bytes(data.get(1..9).ok_or_else(|| bad("cbor: short"))?.try_into().map_err(|_| bad("cbor"))?), 9),
+            25 => (
+                u64::from(u16::from_be_bytes(
+                    data.get(1..3).ok_or_else(|| bad("cbor: short"))?.try_into().map_err(|_| bad("cbor"))?,
+                )),
+                3,
+            ),
+            26 => (
+                u64::from(u32::from_be_bytes(
+                    data.get(1..5).ok_or_else(|| bad("cbor: short"))?.try_into().map_err(|_| bad("cbor"))?,
+                )),
+                5,
+            ),
+            27 => (
+                u64::from_be_bytes(
+                    data.get(1..9).ok_or_else(|| bad("cbor: short"))?.try_into().map_err(|_| bad("cbor"))?,
+                ),
+                9,
+            ),
             _ => return Err(bad("cbor: indefinite or reserved length")),
         };
         Ok((major, arg, used))

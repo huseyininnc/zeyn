@@ -17,7 +17,8 @@ pub fn home() -> Screen {
 
 #[action(public)]
 pub async fn search_help(query: String) -> Result<Vec<SearchHit>> {
-    let mut hits: Vec<SearchHit> = (0..30).map(|i| SearchHit::new(format!("{query} {i}"), "Help", format!("/help/{i}"))).collect();
+    let mut hits: Vec<SearchHit> =
+        (0..30).map(|i| SearchHit::new(format!("{query} {i}"), "Help", format!("/help/{i}"))).collect();
     hits.insert(0, SearchHit::new("Elsewhere", "Help", "//evil.example/x"));
     hits.insert(0, SearchHit::new("Script", "Help", "javascript:alert(1)"));
     Ok(hits)
@@ -51,11 +52,16 @@ fn app() -> Router {
 }
 
 async fn search(router: &Router, query: &str, perms: &str, csrf: bool) -> (StatusCode, serde_json::Value) {
-    let mut req = Request::post("/_zeyn/search").header(header::CONTENT_TYPE, "application/json").header("x-perms", perms);
+    let mut req =
+        Request::post("/_zeyn/search").header(header::CONTENT_TYPE, "application/json").header("x-perms", perms);
     if csrf {
         req = req.header(header::COOKIE, format!("zeyn_csrf={TOKEN}")).header("x-zeyn-csrf", TOKEN);
     }
-    let res = router.clone().oneshot(req.body(Body::from(serde_json::json!({ "query": query }).to_string())).unwrap()).await.unwrap();
+    let res = router
+        .clone()
+        .oneshot(req.body(Body::from(serde_json::json!({ "query": query }).to_string())).unwrap())
+        .await
+        .unwrap();
     let status = res.status();
     let bytes = res.into_body().collect().await.unwrap().to_bytes();
     (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
@@ -69,7 +75,10 @@ async fn searches_run_with_permissions_and_guards_and_only_return_app_paths() {
     let hits = body["hits"].as_array().unwrap();
     assert_eq!(hits.len(), zeyn::MAX_SEARCH_HITS);
     assert_eq!(hits[0], serde_json::json!({ "label": "tea 0", "group": "Help", "url": "/help/0" }));
-    assert!(hits.iter().all(|h| h["url"].as_str().unwrap().starts_with("/help/")), "no other feature, no unsafe path: {hits:?}");
+    assert!(
+        hits.iter().all(|h| h["url"].as_str().unwrap().starts_with("/help/")),
+        "no other feature, no unsafe path: {hits:?}"
+    );
 
     let (_, body) = search(&r, "7", "orders.read", true).await;
     assert_eq!(body["hits"][0]["url"], "/orders/1");

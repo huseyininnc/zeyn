@@ -52,9 +52,18 @@ async fn oracle_data_layer_matches_memory_and_saves_safely() {
         assert!(a.items == b.items && a.total == b.total, "ROWNUM paging matches the version's own paging");
 
         let all = DataQuery { page: PageRequest::Offset { offset: 0, limit: 500 }, ..DataQuery::default() };
-        let version = auto.find::<Component>(&all).await.unwrap().items.into_iter().find(|c| c.product.starts_with("Oracle")).unwrap().version;
+        let version = auto
+            .find::<Component>(&all)
+            .await
+            .unwrap()
+            .items
+            .into_iter()
+            .find(|c| c.product.starts_with("Oracle"))
+            .unwrap()
+            .version;
         let major: u32 = version.split('.').next().unwrap().parse().unwrap();
-        let sequences: Vec<String> = auto.find::<Sequence>(&all).await.unwrap().items.into_iter().map(|s| s.sequence_name).collect();
+        let sequences: Vec<String> =
+            auto.find::<Sequence>(&all).await.unwrap().items.into_iter().map(|s| s.sequence_name).collect();
         let own = sequences.iter().any(|s| s == "ZEYN_TEST_ITEMS_SEQ");
         eprintln!("oracle {version}: key sequence {own}");
         assert_eq!(own, major < 12, "11g keys come from a sequence, later versions from identity columns");

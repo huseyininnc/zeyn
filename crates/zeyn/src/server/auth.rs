@@ -100,7 +100,11 @@ pub(super) fn routes(router: Router<Arc<AppState>>, st: &Arc<AppState>) -> Route
             .route("/_zeyn/auth/login", get(oidc::login))
             .route("/_zeyn/auth/callback", get(oidc::callback))
             .route("/_zeyn/auth/logout", get(oidc::logout));
-        if st.sign_in.oidc.as_ref().is_some_and(|o| o.refresh) { router.layer(axum::middleware::from_fn_with_state(st.clone(), oidc::refresh)) } else { router }
+        if st.sign_in.oidc.as_ref().is_some_and(|o| o.refresh) {
+            router.layer(axum::middleware::from_fn_with_state(st.clone(), oidc::refresh))
+        } else {
+            router
+        }
     } else {
         router
     };
@@ -123,7 +127,9 @@ pub(super) fn routes(router: Router<Arc<AppState>>, st: &Arc<AppState>) -> Route
 fn set_cookie(st: &AppState, name: &str, value: Option<&str>, max_age: i64, secure: bool) -> String {
     let secure = if secure || st.secure_cookies { "; Secure" } else { "" };
     match value {
-        Some(v) => format!("{name}={v}; Path={}; HttpOnly; SameSite=Lax; Max-Age={}{secure}", st.cookie_path(), max_age.max(0)),
+        Some(v) => {
+            format!("{name}={v}; Path={}; HttpOnly; SameSite=Lax; Max-Age={}{secure}", st.cookie_path(), max_age.max(0))
+        }
         None => format!("{name}=; Path={}; HttpOnly; SameSite=Lax; Max-Age=0{secure}", st.cookie_path()),
     }
 }
@@ -147,8 +153,8 @@ fn refused(st: &AppState, headers: &HeaderMap, status: StatusCode, code: &'stati
 #[cfg(feature = "oidc")]
 mod oidc {
     use super::*;
-    use crate::auth::{Flow, OidcAuth};
     use crate::auth::oidc::{FLOW, FLOW_TTL, SESSION};
+    use crate::auth::{Flow, OidcAuth};
 
     #[derive(Deserialize)]
     pub(super) struct LoginQuery {
@@ -163,7 +169,11 @@ mod oidc {
 
     /// Starts a sign in: a new `state`, `nonce` and PKCE verifier in a sealed cookie, and a
     /// redirect to the provider.
-    pub(super) async fn login(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Query<LoginQuery>) -> Response {
+    pub(super) async fn login(
+        State(st): State<Arc<AppState>>,
+        headers: HeaderMap,
+        Query(q): Query<LoginQuery>,
+    ) -> Response {
         let Some(oidc) = st.sign_in.oidc.clone() else { return StatusCode::NOT_FOUND.into_response() };
         let Some(sealer) = oidc.sealer.as_ref() else { return StatusCode::NOT_FOUND.into_response() };
         let back = q.return_to.as_deref().and_then(safe_return).map(str::to_string).unwrap_or_else(|| st.url("/"));
@@ -178,7 +188,10 @@ mod oidc {
         match oidc.authorize_url(&flow, &redirect_uri(&st, &oidc), q.reauth.is_some()).await {
             Ok(url) => {
                 let value = sealer.seal(FLOW, &flow);
-                add_cookie(Redirect::to(&url).into_response(), set_cookie(&st, FLOW, Some(&value), FLOW_TTL, oidc.secure()))
+                add_cookie(
+                    Redirect::to(&url).into_response(),
+                    set_cookie(&st, FLOW, Some(&value), FLOW_TTL, oidc.secure()),
+                )
             }
             Err(e) => {
                 tracing::error!("sign in is not available: {e}");
@@ -197,12 +210,19 @@ mod oidc {
     /// The provider's redirect back: checks `state` against the flow cookie (which is used once),
     /// exchanges the code with the PKCE verifier, checks the ID token and its `nonce`, and starts
     /// the session.
-    pub(super) async fn callback(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Query<CallbackQuery>) -> Response {
+    pub(super) async fn callback(
+        State(st): State<Arc<AppState>>,
+        headers: HeaderMap,
+        Query(q): Query<CallbackQuery>,
+    ) -> Response {
         let Some(oidc) = st.sign_in.oidc.clone() else { return StatusCode::NOT_FOUND.into_response() };
         let clear_flow = set_cookie(&st, FLOW, None, 0, oidc.secure());
         let flow = cookie(&headers, FLOW).and_then(|v| oidc.sealer.as_ref()?.open::<Flow>(FLOW, v));
         let result: Result<(String, Flow, i64), (&'static str, String)> = async {
-            let flow = flow.ok_or(("zeyn.auth.failed", "no sign in in progress: the flow cookie is missing, used or changed".to_string()))?;
+            let flow = flow.ok_or((
+                "zeyn.auth.failed",
+                "no sign in in progress: the flow cookie is missing, used or changed".to_string(),
+            ))?;
             if flow.expires <= now_secs() {
                 return Err(("zeyn.auth.failed", "the sign in took too long".into()));
             }
@@ -210,10 +230,18 @@ mod oidc {
                 return Err(("zeyn.auth.failed", "state mismatch".into()));
             }
             if let Some(e) = &q.error {
-                return Err(("zeyn.auth.failed", format!("the provider answered `{}`", e.chars().take(64).collect::<String>())));
+                return Err((
+                    "zeyn.auth.failed",
+                    format!("the provider answered `{}`", e.chars().take(64).collect::<String>()),
+                ));
             }
-            let code = q.code.as_deref().filter(|c| !c.is_empty() && c.len() <= 4096).ok_or(("zeyn.auth.failed", "no code".to_string()))?;
-            let session = oidc.exchange(code, &flow, &redirect_uri(&st, &oidc)).await.map_err(|e| ("zeyn.auth.failed", e))?;
+            let code = q
+                .code
+                .as_deref()
+                .filter(|c| !c.is_empty() && c.len() <= 4096)
+                .ok_or(("zeyn.auth.failed", "no code".to_string()))?;
+            let session =
+                oidc.exchange(code, &flow, &redirect_uri(&st, &oidc)).await.map_err(|e| ("zeyn.auth.failed", e))?;
             if flow.mfa && !session.mfa {
                 return Err(("zeyn.auth.mfa_missing", "the provider did not report a second factor".into()));
             }
@@ -249,7 +277,11 @@ mod oidc {
 
     /// Refreshes the tokens of a session whose tokens expired, before the request runs. A refused
     /// refresh (the user was disabled or signed out at the provider) ends the session.
-    pub(super) async fn refresh(State(st): State<Arc<AppState>>, mut req: axum::extract::Request, next: axum::middleware::Next) -> Response {
+    pub(super) async fn refresh(
+        State(st): State<Arc<AppState>>,
+        mut req: axum::extract::Request,
+        next: axum::middleware::Next,
+    ) -> Response {
         let Some(oidc) = st.sign_in.oidc.clone() else { return next.run(req).await };
         let due = cookie(req.headers(), SESSION)
             .and_then(|v| oidc.open_session(v))
@@ -298,10 +330,10 @@ mod oidc {
 #[cfg(feature = "totp")]
 mod totp {
     use super::*;
-    use crate::render::escape;
     use crate::auth::Totp;
     use crate::auth::totp::{ENROLL, ENROLL_TTL, PROOF, Pending, Proof, base32, qr_svg};
     use crate::ctx::Ctx;
+    use crate::render::escape;
     use axum::Form;
 
     #[derive(Deserialize)]
@@ -350,7 +382,8 @@ mod totp {
         let body = match view {
             View::Enroll { secret, error } => {
                 let url = totp.generator(secret.to_vec(), user).and_then(|g| g.to_url().ok()).unwrap_or_default();
-                let key: Vec<String> = base32(secret).as_bytes().chunks(4).map(|c| String::from_utf8_lossy(c).into_owned()).collect();
+                let key: Vec<String> =
+                    base32(secret).as_bytes().chunks(4).map(|c| String::from_utf8_lossy(c).into_owned()).collect();
                 format!(
                     r#"<p>{scan}</p>{qr}<p>{manual} <code class="z-totp-key">{key}</code></p>{form}"#,
                     scan = t("totp_scan"),
@@ -370,7 +403,10 @@ mod totp {
                 next = t("totp_continue"),
             ),
         };
-        format!(r#"<section class="z-screen z-totp" aria-labelledby="z-totp-title"><h1 id="z-totp-title">{}</h1>{body}</section>"#, t("totp_title"))
+        format!(
+            r#"<section class="z-screen z-totp" aria-labelledby="z-totp-title"><h1 id="z-totp-title">{}</h1>{body}</section>"#,
+            t("totp_title")
+        )
     }
 
     fn html(st: &AppState, ctx: &Ctx, csrf: &str, status: StatusCode, main: String) -> Response {
@@ -406,20 +442,35 @@ mod totp {
     }
 
     /// The enrollment page for a user without a second factor, else the verification page.
-    pub(super) async fn page(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Query<PageQuery>) -> Response {
+    pub(super) async fn page(
+        State(st): State<Arc<AppState>>,
+        headers: HeaderMap,
+        Query(q): Query<PageQuery>,
+    ) -> Response {
         let Some(totp) = st.sign_in.totp.clone() else { return StatusCode::NOT_FOUND.into_response() };
         let ctx = st.ctx(&headers);
         let (csrf, set) = st.csrf(&headers);
         let back = back(&st, q.return_to.as_deref());
         let Some(user) = ctx.identity().user.clone() else {
-            return signed_out(&st, &headers, &format!("{}/_zeyn/auth/totp?return_to={}", st.prefix, super::super::encode(&back)));
+            return signed_out(
+                &st,
+                &headers,
+                &format!("{}/_zeyn/auth/totp?return_to={}", st.prefix, super::super::encode(&back)),
+            );
         };
         let response = match totp.store.load(&user).await {
             Err(e) => st.error_page(&ctx, Failure::App(e), &csrf),
-            Ok(Some(_)) => html(&st, &ctx, &csrf, StatusCode::OK, render(&st, &ctx, &totp, &csrf, &user, &back, View::Verify { error: None })),
+            Ok(Some(_)) => html(
+                &st,
+                &ctx,
+                &csrf,
+                StatusCode::OK,
+                render(&st, &ctx, &totp, &csrf, &user, &back, View::Verify { error: None }),
+            ),
             Ok(None) => {
                 let secret = random::<20>();
-                let main = render(&st, &ctx, &totp, &csrf, &user, &back, View::Enroll { secret: &secret, error: false });
+                let main =
+                    render(&st, &ctx, &totp, &csrf, &user, &back, View::Enroll { secret: &secret, error: false });
                 let r = html(&st, &ctx, &csrf, StatusCode::OK, main);
                 match pending_cookie(&st, &totp, &user, &secret) {
                     Some(c) => add_cookie(r, c),
@@ -441,14 +492,26 @@ mod totp {
             return Err(signed_out(st, headers, &format!("{}/_zeyn/auth/totp", st.prefix)));
         };
         if st.rate_store.take(&format!("totp:{user}"), &totp.attempts).await.is_err() {
-            let main = render(st, &ctx, totp, &f.csrf, &user, &back(st, f.return_to.as_deref()), View::Verify { error: Some("totp_rate_limited") });
+            let main = render(
+                st,
+                &ctx,
+                totp,
+                &f.csrf,
+                &user,
+                &back(st, f.return_to.as_deref()),
+                View::Verify { error: Some("totp_rate_limited") },
+            );
             return Err(html(st, &ctx, &f.csrf, StatusCode::TOO_MANY_REQUESTS, main));
         }
         Ok((ctx, user))
     }
 
     /// Checks a code or a recovery code, records its use, and proves the second factor.
-    pub(super) async fn verify(State(st): State<Arc<AppState>>, headers: HeaderMap, Form(f): Form<CodeForm>) -> Response {
+    pub(super) async fn verify(
+        State(st): State<Arc<AppState>>,
+        headers: HeaderMap,
+        Form(f): Form<CodeForm>,
+    ) -> Response {
         let Some(totp) = st.sign_in.totp.clone() else { return StatusCode::NOT_FOUND.into_response() };
         let (ctx, user) = match admit(&st, &headers, &totp, &f).await {
             Ok(v) => v,
@@ -457,11 +520,19 @@ mod totp {
         let back = back(&st, f.return_to.as_deref());
         let mut record = match totp.store.load(&user).await {
             Ok(Some(r)) => r,
-            Ok(None) => return Redirect::to(&format!("{}/_zeyn/auth/totp?return_to={}", st.prefix, super::super::encode(&back))).into_response(),
+            Ok(None) => {
+                return Redirect::to(&format!(
+                    "{}/_zeyn/auth/totp?return_to={}",
+                    st.prefix,
+                    super::super::encode(&back)
+                ))
+                .into_response();
+            }
             Err(e) => return st.error_page(&ctx, Failure::App(e), &f.csrf),
         };
         let Some(sealer) = totp.sealer.as_ref() else { return StatusCode::NOT_FOUND.into_response() };
-        let secret = sealer.open::<String>(&secret_name(&user), &record.secret).and_then(|s| crate::auth::b64url_decode(&s));
+        let secret =
+            sealer.open::<String>(&secret_name(&user), &record.secret).and_then(|s| crate::auth::b64url_decode(&s));
         let step = secret.and_then(|s| totp.check(s, &user, &f.code)).filter(|s| *s > record.last_step);
         let accepted = if let Some(step) = step {
             record.last_step = step;
@@ -490,28 +561,41 @@ mod totp {
 
     /// Finishes an enrollment: the code must match the secret from the enrollment cookie. A user
     /// who already has a second factor cannot replace it here.
-    pub(super) async fn enroll(State(st): State<Arc<AppState>>, headers: HeaderMap, Form(f): Form<CodeForm>) -> Response {
+    pub(super) async fn enroll(
+        State(st): State<Arc<AppState>>,
+        headers: HeaderMap,
+        Form(f): Form<CodeForm>,
+    ) -> Response {
         let Some(totp) = st.sign_in.totp.clone() else { return StatusCode::NOT_FOUND.into_response() };
         let (ctx, user) = match admit(&st, &headers, &totp, &f).await {
             Ok(v) => v,
             Err(r) => return r,
         };
         let back = back(&st, f.return_to.as_deref());
-        let again = || Redirect::to(&format!("{}/_zeyn/auth/totp?return_to={}", st.prefix, super::super::encode(&back))).into_response();
+        let again = || {
+            Redirect::to(&format!("{}/_zeyn/auth/totp?return_to={}", st.prefix, super::super::encode(&back)))
+                .into_response()
+        };
         match totp.store.load(&user).await {
             Ok(None) => {}
             Ok(Some(_)) => return again(),
             Err(e) => return st.error_page(&ctx, Failure::App(e), &f.csrf),
         }
         let Some(sealer) = totp.sealer.as_ref() else { return StatusCode::NOT_FOUND.into_response() };
-        let pending = cookie(&headers, ENROLL).and_then(|v| sealer.open::<Pending>(ENROLL, v)).filter(|p| p.user == user && p.expires > now_secs());
+        let pending = cookie(&headers, ENROLL)
+            .and_then(|v| sealer.open::<Pending>(ENROLL, v))
+            .filter(|p| p.user == user && p.expires > now_secs());
         let Some(secret) = pending.and_then(|p| crate::auth::b64url_decode(&p.secret)) else { return again() };
         let Some(step) = totp.check(secret.clone(), &user, &f.code) else {
             let main = render(&st, &ctx, &totp, &f.csrf, &user, &back, View::Enroll { secret: &secret, error: true });
             return html(&st, &ctx, &f.csrf, StatusCode::BAD_REQUEST, main);
         };
         let Some((codes, hashes)) = totp.recovery_codes() else { return StatusCode::NOT_FOUND.into_response() };
-        let record = crate::auth::TotpRecord { secret: sealer.seal(&secret_name(&user), &b64url(&secret)), recovery: hashes, last_step: step };
+        let record = crate::auth::TotpRecord {
+            secret: sealer.seal(&secret_name(&user), &b64url(&secret)),
+            recovery: hashes,
+            last_step: step,
+        };
         if let Err(e) = totp.store.save(&user, record).await {
             return st.error_page(&ctx, Failure::App(e), &f.csrf);
         }

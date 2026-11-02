@@ -118,7 +118,10 @@ fn filters_become_bound_parameters() {
 #[test]
 fn unknown_fields_and_injection_attempts_never_reach_the_sql() {
     let q = DataQuery {
-        filters: vec![Filter::contains("code\"; DROP TABLE products; --", "x"), Filter::contains("code", "'; DROP TABLE x; --")],
+        filters: vec![
+            Filter::contains("code\"; DROP TABLE products; --", "x"),
+            Filter::contains("code", "'; DROP TABLE x; --"),
+        ],
         sort: vec![Sort { field: "1; DROP TABLE products".into(), desc: true }],
         ..DataQuery::default()
     };
@@ -165,7 +168,15 @@ fn nullable_sort_keys_place_nulls_like_memory() {
 }
 
 fn product(id: i64, code: &str, note: Option<&str>) -> Product {
-    Product { id, code: code.into(), note: note.map(Into::into), price: Money::tl(100), active: true, stock: 1, version: 1 }
+    Product {
+        id,
+        code: code.into(),
+        note: note.map(Into::into),
+        price: Money::tl(100),
+        active: true,
+        stock: 1,
+        version: 1,
+    }
 }
 
 fn keys(q: &DataQuery) -> Vec<build::OrderKey> {
@@ -188,7 +199,14 @@ fn keyset_cursor_continues_after_the_last_row() {
     );
     assert_eq!(
         sql.args,
-        vec![Arg::Text("P-7".into()), Arg::Text("P-7".into()), Arg::Text("P-7".into()), Arg::Int(7), Arg::Int(21), Arg::Int(0)]
+        vec![
+            Arg::Text("P-7".into()),
+            Arg::Text("P-7".into()),
+            Arg::Text("P-7".into()),
+            Arg::Int(7),
+            Arg::Int(21),
+            Arg::Int(0)
+        ]
     );
 }
 
@@ -197,12 +215,20 @@ fn keyset_cursor_handles_null_sort_values() {
     let base = DataQuery { sort: vec![Sort { field: "note".into(), desc: false }], ..DataQuery::default() };
     let cursor = build::row_cursor(&Postgres, &keys(&base), &product(4, "A", None));
     let q = DataQuery { page: PageRequest::After { cursor: Some(cursor), limit: 10 }, ..base.clone() };
-    assert!(rows(&q).text.contains(r#"WHERE (("note" IS NOT NULL) OR ("note" IS NULL AND "id" > $1))"#), "{}", rows(&q).text);
+    assert!(
+        rows(&q).text.contains(r#"WHERE (("note" IS NOT NULL) OR ("note" IS NULL AND "id" > $1))"#),
+        "{}",
+        rows(&q).text
+    );
 
     let desc = DataQuery { sort: vec![Sort { field: "note".into(), desc: true }], ..DataQuery::default() };
     let cursor = build::row_cursor(&Postgres, &keys(&desc), &product(4, "A", Some("b")));
     let q = DataQuery { page: PageRequest::After { cursor: Some(cursor), limit: 10 }, ..desc };
-    assert!(rows(&q).text.contains(r#"WHERE ((("note" < $1 OR "note" IS NULL)) OR ("note" = $2 AND "id" > $3))"#), "{}", rows(&q).text);
+    assert!(
+        rows(&q).text.contains(r#"WHERE ((("note" < $1 OR "note" IS NULL)) OR ("note" = $2 AND "id" > $3))"#),
+        "{}",
+        rows(&q).text
+    );
 }
 
 #[test]
@@ -213,11 +239,17 @@ fn cursors_from_another_order_or_tampered_are_refused() {
     let err = build::plan_find::<Product>(&Postgres, &other, 10).err().unwrap();
     assert_eq!(err.code(), "validation");
     for junk in ["!!!", "e30", &"A".repeat(9000)] {
-        let q = DataQuery { page: PageRequest::After { cursor: Some(Cursor(junk.into())), limit: 10 }, ..DataQuery::default() };
+        let q = DataQuery {
+            page: PageRequest::After { cursor: Some(Cursor(junk.into())), limit: 10 },
+            ..DataQuery::default()
+        };
         assert!(build::plan_find::<Product>(&Postgres, &q, 10).is_err(), "{junk}");
     }
     let wrong_type = build::row_cursor(&Postgres, &keys(&DataQuery::default()), &product(1, "A", None));
-    let text = String::from_utf8(base64::Engine::decode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, &wrong_type.0).unwrap()).unwrap();
+    let text = String::from_utf8(
+        base64::Engine::decode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, &wrong_type.0).unwrap(),
+    )
+    .unwrap();
     let forged = text.replace("[1]", "[\"1 OR 1=1\"]");
     let forged = Cursor(base64::Engine::encode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, forged));
     let q = DataQuery { page: PageRequest::After { cursor: Some(forged), limit: 10 }, ..DataQuery::default() };
@@ -228,7 +260,10 @@ fn cursors_from_another_order_or_tampered_are_refused() {
 fn total_is_a_capped_count() {
     let q = DataQuery { with_total: true, filters: vec![Filter::is("active", true)], ..DataQuery::default() };
     let count = plan(&q).count.unwrap();
-    assert_eq!(count.text, r#"SELECT COUNT(*) AS c0 FROM (SELECT 1 AS c0 FROM "shop"."products" WHERE "active" = $1 LIMIT $2 OFFSET $3) zc"#);
+    assert_eq!(
+        count.text,
+        r#"SELECT COUNT(*) AS c0 FROM (SELECT 1 AS c0 FROM "shop"."products" WHERE "active" = $1 LIMIT $2 OFFSET $3) zc"#
+    );
     assert_eq!(count.args, vec![Arg::Bool(true), Arg::Int(1000), Arg::Int(0)]);
 }
 
@@ -249,7 +284,8 @@ fn totals_are_one_aggregate_query_and_skip_unfit_columns() {
         sql.text,
         r#"SELECT CAST(COALESCE(SUM("price"), 0) AS BIGINT) AS c0, MIN("price_currency") AS c1, MAX("price_currency") AS c2, CAST(AVG("stock") AS DOUBLE PRECISION) AS c3, CAST(COUNT("code") AS BIGINT) AS c4 FROM "shop"."products""#
     );
-    let cells = vec![Cell::Int(250), Cell::Text("TRY".into()), Cell::Text("TRY".into()), Cell::Float(2.5), Cell::Int(4)];
+    let cells =
+        vec![Cell::Int(250), Cell::Text("TRY".into()), Cell::Text("TRY".into()), Cell::Float(2.5), Cell::Int(4)];
     let totals = build::read_aggs(Product::fields_static(), &aggs, &mut cells.into_iter());
     assert_eq!(totals[0].value, Value::Money(Money::tl(250)));
     assert_eq!(totals[1].value, Value::Decimal(2.5));
@@ -292,7 +328,17 @@ fn insert_skips_new_key_and_readonly_and_starts_the_version() {
     assert!(sql.text.starts_with(
         r#"INSERT INTO "shop"."products" ("code", "note", "price", "price_currency", "active", "version") VALUES ($1, $2, $3, $4, $5, $6) RETURNING CAST("id" AS BIGINT) AS c0"#
     ), "{}", sql.text);
-    assert_eq!(sql.args, vec![Arg::Text("A".into()), Arg::Text("n".into()), Arg::Int(100), Arg::Text("TRY".into()), Arg::Bool(true), Arg::Int(1)]);
+    assert_eq!(
+        sql.args,
+        vec![
+            Arg::Text("A".into()),
+            Arg::Text("n".into()),
+            Arg::Int(100),
+            Arg::Text("TRY".into()),
+            Arg::Bool(true),
+            Arg::Int(1)
+        ]
+    );
     let none = build::plan_insert(&Postgres, &product(0, "A", None), None, false).unwrap();
     assert_eq!(none.args[1], Arg::Null(Col::Text));
 }
@@ -312,7 +358,10 @@ fn update_checks_the_row_version() {
 
 #[test]
 fn unique_violations_name_the_field() {
-    let Err(crate::Error::Validation(e)) = Err::<(), _>(build::unique_error::<Product>(Some("products_code_key"))) else { panic!() };
+    let Err(crate::Error::Validation(e)) = Err::<(), _>(build::unique_error::<Product>(Some("products_code_key")))
+    else {
+        panic!()
+    };
     assert_eq!(e.errors[0].field, "code");
     assert_eq!(e.errors[0].rule, Rule::Unique);
 }
@@ -334,7 +383,16 @@ fn rows_decode_into_models_without_a_map() {
     assert_eq!(p.code, "P-3");
     assert_eq!(p.note, None);
     assert_eq!(p.price, Money::new(1250, crate::Currency::Usd));
-    let mut empty = vec![Cell::Int(3), Cell::Null, Cell::Null, Cell::Int(0), Cell::Text("TRY".into()), Cell::Bool(false), Cell::Int(0), Cell::Int(1)];
+    let mut empty = vec![
+        Cell::Int(3),
+        Cell::Null,
+        Cell::Null,
+        Cell::Int(0),
+        Cell::Text("TRY".into()),
+        Cell::Bool(false),
+        Cell::Int(0),
+        Cell::Int(1),
+    ];
     let p: Product = super::decode::decode_row(&mut empty).unwrap();
     assert_eq!(p.code, "", "NULL in a required text field reads as empty (Oracle)");
 }
@@ -377,10 +435,21 @@ fn oracle_12c_pages_with_offset_fetch() {
 fn oracle_11g_pages_with_rownum() {
     let q = DataQuery { page: PageRequest::Offset { offset: 20, limit: 10 }, ..DataQuery::default() };
     let sql = build::plan_find::<Product>(&V11, &q, 100).unwrap().main;
-    assert!(sql.text.starts_with(r#"SELECT * FROM (SELECT zq.*, ROWNUM zeyn_rn FROM (SELECT "ID" AS c0"#), "{}", sql.text);
-    assert!(sql.text.ends_with(r#" ORDER BY "ID" ASC) zq WHERE ROWNUM <= :1) WHERE zeyn_rn > :2 ORDER BY zeyn_rn"#), "{}", sql.text);
+    assert!(
+        sql.text.starts_with(r#"SELECT * FROM (SELECT zq.*, ROWNUM zeyn_rn FROM (SELECT "ID" AS c0"#),
+        "{}",
+        sql.text
+    );
+    assert!(
+        sql.text.ends_with(r#" ORDER BY "ID" ASC) zq WHERE ROWNUM <= :1) WHERE zeyn_rn > :2 ORDER BY zeyn_rn"#),
+        "{}",
+        sql.text
+    );
     assert_eq!(sql.args, vec![Arg::Int(31), Arg::Int(20)]);
-    let count = build::plan_find::<Product>(&V11, &DataQuery { with_total: true, ..DataQuery::default() }, 500).unwrap().count.unwrap();
+    let count = build::plan_find::<Product>(&V11, &DataQuery { with_total: true, ..DataQuery::default() }, 500)
+        .unwrap()
+        .count
+        .unwrap();
     assert_eq!(
         count.text,
         r#"SELECT COUNT(*) AS c0 FROM (SELECT * FROM (SELECT zq.*, ROWNUM zeyn_rn FROM (SELECT 1 AS c0 FROM "SHOP"."PRODUCTS") zq WHERE ROWNUM <= :1) WHERE zeyn_rn > :2 ORDER BY zeyn_rn) zc"#

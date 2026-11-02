@@ -5,13 +5,12 @@
 
 use super::{AppState, Call, CallKind, Failure, asset};
 use crate::action::Error;
-use crate::render::Render;
 use crate::form::{Reading, read_moment};
 use crate::i18n::Text;
+use crate::render::Render;
 use crate::time::{DateWords, range_presets};
 use crate::ui::{NodePath, input_text, picker_config};
 use crate::value::{FieldKind, Value};
-use serde_json::json;
 use axum::Router;
 use axum::extract::State;
 use axum::http::HeaderMap;
@@ -19,6 +18,7 @@ use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, post};
 use serde::Deserialize;
 use serde_json::Value as Json;
+use serde_json::json;
 use std::sync::Arc;
 
 const JS: &str = include_str!("../../assets/components.js");
@@ -57,7 +57,11 @@ struct ParseCall {
 /// Reads what was typed into a date or time editor the way the form will, in the user's language,
 /// zone and clock, and answers with the canonical text. The browser shows this and never computes
 /// values itself. `presets` answers today and the quick ranges in the user's zone.
-async fn parse_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(call): axum::Json<ParseCall>) -> Response {
+async fn parse_call(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::Json(call): axum::Json<ParseCall>,
+) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     if let Err(f) = st.check_csrf(&headers) {
         return st.error_response(&ctx, f);
@@ -94,7 +98,9 @@ async fn parse_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::J
         Ok(value) => {
             let iso = match &value {
                 Value::DateTime(d) => d.local(ctx.time_zone()).to_string(),
-                other => serde_json::to_value(other).ok().and_then(|v| v.as_str().map(String::from)).unwrap_or_default(),
+                other => {
+                    serde_json::to_value(other).ok().and_then(|v| v.as_str().map(String::from)).unwrap_or_default()
+                }
             };
             let utc = match &value {
                 Value::DateTime(d) => Some(d.to_string()),
@@ -131,7 +137,11 @@ struct DataCall {
 }
 
 /// Renders one node of a screen, with the first page of its grids. Used by lazy tabs.
-async fn node_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(call): axum::Json<NodeCall>) -> Response {
+async fn node_call(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::Json(call): axum::Json<NodeCall>,
+) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     if let Err(f) = st.check_csrf(&headers) {
         return st.error_response(&ctx, f);
@@ -154,7 +164,11 @@ async fn node_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Js
 }
 
 /// Runs the action behind a component's data source and returns its JSON.
-async fn data_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(call): axum::Json<DataCall>) -> Response {
+async fn data_call(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::Json(call): axum::Json<DataCall>,
+) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     if let Err(f) = st.check_csrf(&headers) {
         return st.error_response(&ctx, f);
@@ -166,7 +180,12 @@ async fn data_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Js
         if !ctx.identity().can(&action.access) {
             return Err(Failure::App(Error::Forbidden));
         }
-        let info = Call { kind: CallKind::DataGrid, screen: entry.meta.name, action: Some(action), via_agent: ctx.via_agent() };
+        let info = Call {
+            kind: CallKind::DataGrid,
+            screen: entry.meta.name,
+            action: Some(action),
+            via_agent: ctx.via_agent(),
+        };
         st.intercept(&ctx, &info, || st.timed(source.fetch(ctx.clone(), call.input))).await
     }
     .await;

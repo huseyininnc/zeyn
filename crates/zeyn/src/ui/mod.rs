@@ -8,6 +8,8 @@ mod chart;
 mod controls;
 mod date;
 mod dock;
+#[cfg(feature = "islands")]
+mod island;
 mod layout;
 mod lines;
 mod lookup;
@@ -16,33 +18,33 @@ mod shell;
 mod tree;
 mod widgets;
 #[cfg(feature = "islands")]
-mod island;
+pub(crate) use island::MARKER as ISLAND_MARKER;
 #[cfg(feature = "islands")]
 pub use island::{Canvas, Island, IslandLoad, Remote};
-#[cfg(feature = "islands")]
-pub(crate) use island::MARKER as ISLAND_MARKER;
 #[cfg(feature = "realtime")]
 mod live;
 #[cfg(feature = "realtime")]
 pub use live::Live;
 
+pub(crate) use dock::panel_ids as dock_panel_ids;
+pub use dock::{DOCK_SIZE, Dock, DockArea, DockLayout, DockPanelState, DockSizes};
 pub use layout::{Card, Panel, Row, Split, Stack, Tabs};
 pub use shell::{MenuBar, MenuList, PropertyInspector, StatusBar, Toolbox};
-pub use dock::{DOCK_SIZE, Dock, DockArea, DockLayout, DockPanelState, DockSizes};
-pub(crate) use dock::panel_ids as dock_panel_ids;
 
 pub use chart::{Chart, ChartKind};
 pub use controls::Control;
+pub(crate) use controls::{Slot, render_bool, render_choice, render_number, render_text};
 pub use date::DateOptions;
+pub(crate) use date::{input_text, picker_config, range_reversed, render_date_input, render_range};
+pub(crate) use lines::LinesEditor;
 pub use lines::{Lines, MAX_LINES};
+pub use lookup::{LookupItem, LookupQuery, LookupValue, MAX_LOOKUP_IDS, MAX_LOOKUP_PAGE};
+pub(crate) use lookup::{parse_ids, render_lookup};
 pub use media::{Audio, PLAYBACK_SPEEDS, Video};
 pub use tree::{MAX_TREE_CHILDREN, Tree, TreeItem, TreeQuery};
-pub use widgets::{ActionButton, Alert, Badge, Breadcrumb, DescriptionList, DescriptionOf, EmptyState, Progress, Skeleton, Timeline};
-pub(crate) use lines::LinesEditor;
-pub use lookup::{LookupItem, LookupQuery, LookupValue, MAX_LOOKUP_IDS, MAX_LOOKUP_PAGE};
-pub(crate) use controls::{Slot, render_bool, render_choice, render_number, render_text};
-pub(crate) use lookup::{parse_ids, render_lookup};
-pub(crate) use date::{input_text, picker_config, range_reversed, render_date_input, render_range};
+pub use widgets::{
+    ActionButton, Alert, Badge, Breadcrumb, DescriptionList, DescriptionOf, EmptyState, Progress, Skeleton, Timeline,
+};
 
 use crate::action::{Action, ActionMeta, Result};
 use crate::ctx::{BoxFuture, Ctx};
@@ -78,7 +80,9 @@ impl NodePath {
         let parts: Vec<&str> = s.split('.').collect();
         let valid = parts.len() <= MAX_NODE_DEPTH
             && parts.iter().all(|p| !p.is_empty() && p.len() <= 5 && p.bytes().all(|b| b.is_ascii_digit()));
-        valid.then(|| NodePath(parts.iter().map(|p| p.parse::<usize>().unwrap_or(0).to_string()).collect::<Vec<_>>().join(".")))
+        valid.then(|| {
+            NodePath(parts.iter().map(|p| p.parse::<usize>().unwrap_or(0).to_string()).collect::<Vec<_>>().join("."))
+        })
     }
 
     pub fn as_str(&self) -> &str {
@@ -121,7 +125,8 @@ impl<'de> Deserialize<'de> for NodePath {
             Raw::Index(i) => i.to_string(),
             Raw::Path(s) => s,
         };
-        NodePath::parse(&text).ok_or_else(|| serde::de::Error::custom("node must be an index or a dotted path such as 1.0.2"))
+        NodePath::parse(&text)
+            .ok_or_else(|| serde::de::Error::custom("node must be an index or a dotted path such as 1.0.2"))
     }
 }
 

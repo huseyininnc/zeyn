@@ -189,7 +189,9 @@ impl Desktop {
             *flow = ControlFlow::Wait;
             match event {
                 Event::NewEvents(StartCause::Init) => {}
-                Event::UserEvent(UserEvent::Title(t)) => window.set_title(if t.trim().is_empty() { &title } else { &t }),
+                Event::UserEvent(UserEvent::Title(t)) => {
+                    window.set_title(if t.trim().is_empty() { &title } else { &t })
+                }
                 Event::UserEvent(UserEvent::Focus) => {
                     window.set_minimized(false);
                     window.set_visible(true);
@@ -217,12 +219,24 @@ impl Desktop {
     }
 }
 
-#[cfg(not(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd", target_os = "netbsd", target_os = "openbsd")))]
+#[cfg(not(any(
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd"
+)))]
 fn build(builder: WebViewBuilder, window: &Window) -> wry::Result<WebView> {
     builder.build(window)
 }
 
-#[cfg(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd", target_os = "netbsd", target_os = "openbsd"))]
+#[cfg(any(
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd"
+))]
 fn build(builder: WebViewBuilder, window: &Window) -> wry::Result<WebView> {
     use tao::platform::unix::WindowExtUnix;
     use wry::WebViewBuilderExtUnix;
@@ -260,7 +274,8 @@ fn open_external(url: &str) {
 
 /// `dir/name`, or `dir/stem (n).ext` when that file exists already.
 fn free_path(dir: &Path, name: &str) -> PathBuf {
-    let name = Path::new(name).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "download".into());
+    let name =
+        Path::new(name).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "download".into());
     let first = dir.join(&name);
     if !first.exists() {
         return first;
@@ -282,9 +297,16 @@ fn focus_running(dir: &Path) -> bool {
     let Ok(text) = std::fs::read_to_string(dir.join("instance")) else { return false };
     let Some((port, key)) = text.trim().split_once(' ') else { return false };
     let Ok(port) = port.parse::<u16>() else { return false };
-    let Ok(mut s) = TcpStream::connect_timeout(&SocketAddr::from(([127, 0, 0, 1], port)), Duration::from_millis(500)) else { return false };
+    let Ok(mut s) = TcpStream::connect_timeout(&SocketAddr::from(([127, 0, 0, 1], port)), Duration::from_millis(500))
+    else {
+        return false;
+    };
     let _ = s.set_read_timeout(Some(Duration::from_secs(2)));
-    let req = format!("POST {} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n{}: {key}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n", guard::FOCUS, guard::FOCUS_HEADER);
+    let req = format!(
+        "POST {} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n{}: {key}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+        guard::FOCUS,
+        guard::FOCUS_HEADER
+    );
     let mut status = [0u8; 12];
     s.write_all(req.as_bytes()).is_ok() && s.read_exact(&mut status).is_ok() && &status == b"HTTP/1.1 204"
 }
@@ -333,14 +355,18 @@ impl WindowState {
             }
             _ => return,
         };
-        let json = serde_json::json!({ "x": s.x, "y": s.y, "width": s.width, "height": s.height, "maximized": s.maximized });
+        let json =
+            serde_json::json!({ "x": s.x, "y": s.y, "width": s.width, "height": s.height, "maximized": s.maximized });
         let _ = std::fs::write(path, json.to_string());
     }
 
     /// Whether the window's top left corner lies on a monitor, so it never opens off screen.
     fn inside(&self, at: PhysicalPosition<i32>, size: PhysicalSize<u32>) -> bool {
         let (x, y) = (self.x + 40, self.y + 10);
-        x >= at.x && y >= at.y && i64::from(x) < i64::from(at.x) + i64::from(size.width) && i64::from(y) < i64::from(at.y) + i64::from(size.height)
+        x >= at.x
+            && y >= at.y
+            && i64::from(x) < i64::from(at.x) + i64::from(size.width)
+            && i64::from(y) < i64::from(at.y) + i64::from(size.height)
     }
 }
 
@@ -362,10 +388,25 @@ mod tests {
     #[test]
     fn only_the_app_origin_stays_in_the_window() {
         let o = "http://127.0.0.1:4321";
-        for url in ["http://127.0.0.1:4321", "http://127.0.0.1:4321/", "http://127.0.0.1:4321/orders?x=1", "blob:http://127.0.0.1:4321/3f2a", "about:blank"] {
+        for url in [
+            "http://127.0.0.1:4321",
+            "http://127.0.0.1:4321/",
+            "http://127.0.0.1:4321/orders?x=1",
+            "blob:http://127.0.0.1:4321/3f2a",
+            "about:blank",
+        ] {
             assert!(is_internal(url, o), "{url}");
         }
-        for url in ["http://127.0.0.1:43210/", "http://127.0.0.1:4321.evil.example/", "http://127.0.0.1:4321@evil.example/", "https://example.com/", "file:///C:/Windows", "blob:https://example.com/1", "data:text/html,x", "javascript:alert(1)"] {
+        for url in [
+            "http://127.0.0.1:43210/",
+            "http://127.0.0.1:4321.evil.example/",
+            "http://127.0.0.1:4321@evil.example/",
+            "https://example.com/",
+            "file:///C:/Windows",
+            "blob:https://example.com/1",
+            "data:text/html,x",
+            "javascript:alert(1)",
+        ] {
             assert!(!is_internal(url, o), "{url}");
         }
     }

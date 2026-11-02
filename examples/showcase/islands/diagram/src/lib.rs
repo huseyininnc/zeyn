@@ -75,7 +75,9 @@ impl Editor {
 
     fn hit(&self, x: f64, y: f64) -> Option<usize> {
         let (wx, wy) = self.world(x, y);
-        self.diagram.shapes.iter().rposition(|s| wx >= f64::from(s.x) && wx <= f64::from(s.x + s.w) && wy >= f64::from(s.y) && wy <= f64::from(s.y + s.h))
+        self.diagram.shapes.iter().rposition(|s| {
+            wx >= f64::from(s.x) && wx <= f64::from(s.x + s.w) && wy >= f64::from(s.y) && wy <= f64::from(s.y + s.h)
+        })
     }
 
     fn select(&mut self, index: Option<usize>) {
@@ -193,7 +195,12 @@ impl Scene for Editor {
             ctx.set_line_width(if chosen { 3.0 } else { 1.5 } / self.zoom.max(0.5));
             ctx.stroke();
             ctx.set_fill_style_str(&text);
-            let _ = ctx.fill_text_with_max_width(&s.label, f64::from(s.x) + f64::from(s.w) / 2.0, f64::from(s.y) + f64::from(s.h) / 2.0, f64::from(s.w - 12));
+            let _ = ctx.fill_text_with_max_width(
+                &s.label,
+                f64::from(s.x) + f64::from(s.w) / 2.0,
+                f64::from(s.y) + f64::from(s.h) / 2.0,
+                f64::from(s.w - 12),
+            );
         }
         let _ = ctx.restore();
     }
@@ -356,7 +363,16 @@ pub fn mount(root: Element) -> Result<(), JsValue> {
 
     let view = View { summary, status, texts: texts.clone() };
     view.refresh(&props.diagram, None);
-    let editor = Editor { diagram: props.diagram, selected: None, grab: None, zoom: 1.0, pan: (0.0, 0.0), host: root.clone(), view, on_edit: None };
+    let editor = Editor {
+        diagram: props.diagram,
+        selected: None,
+        grab: None,
+        zoom: 1.0,
+        pan: (0.0, 0.0),
+        host: root.clone(),
+        view,
+        on_edit: None,
+    };
     let described = root.get_attribute("aria-describedby").unwrap_or_default();
     let surface = Surface::new(&stage, editor, Prefer::TwoD, &texts.canvas, &described, props.height.clamp(200, 1200))?;
     surface.canvas().set_attribute("aria-roledescription", &texts.canvas)?;
@@ -394,7 +410,12 @@ pub fn mount(root: Element) -> Result<(), JsValue> {
 
 /// Joins the live document `id`: local edits go out as Y updates, edits of others come in and
 /// replace the diagram. Returns the channel, shared with the editor's `on_edit`.
-fn go_live(surface: &Surface<Editor>, id: &str, badge: &Element, texts: &Rc<DiagramTexts>) -> Result<Rc<RefCell<Option<Channel>>>, JsValue> {
+fn go_live(
+    surface: &Surface<Editor>,
+    id: &str,
+    badge: &Element,
+    texts: &Rc<DiagramTexts>,
+) -> Result<Rc<RefCell<Option<Channel>>>, JsValue> {
     let doc = Rc::new(crdt::Doc::new());
     let channel: Rc<RefCell<Option<Channel>>> = Rc::default();
     let (d, c) = (doc.clone(), channel.clone());
@@ -419,7 +440,8 @@ fn go_live(surface: &Surface<Editor>, id: &str, badge: &Element, texts: &Rc<Diag
         }
     };
     let (badge, texts) = (badge.clone(), texts.clone());
-    let on_state = move |online: bool| badge.set_text_content(Some(if online { &texts.live_on } else { &texts.live_off }));
+    let on_state =
+        move |online: bool| badge.set_text_content(Some(if online { &texts.live_on } else { &texts.live_off }));
     *channel.borrow_mut() = Some(Channel::document("diagram", id, on_open, on_update, on_state)?);
     Ok(channel)
 }

@@ -138,8 +138,30 @@ fn t(r: &Render, key: &str) -> String {
 fn texts(r: &Render) -> Json {
     let mut map = Map::new();
     for key in [
-        "dialog", "dialog_time", "dialog_range", "prev_month", "next_month", "prev_year", "next_year", "today", "now", "clear",
-        "done", "month", "year", "months", "years", "utc", "hours", "minutes", "seconds", "period", "week", "week_long", "from", "to",
+        "dialog",
+        "dialog_time",
+        "dialog_range",
+        "prev_month",
+        "next_month",
+        "prev_year",
+        "next_year",
+        "today",
+        "now",
+        "clear",
+        "done",
+        "month",
+        "year",
+        "months",
+        "years",
+        "utc",
+        "hours",
+        "minutes",
+        "seconds",
+        "period",
+        "week",
+        "week_long",
+        "from",
+        "to",
     ] {
         map.insert(key.to_string(), Json::String(t(r, key)));
     }
@@ -203,7 +225,8 @@ fn hint(r: &Render, kind: FieldKind, id: &str) -> String {
         _ => (LocalDateTime::new(day, time).format(locale), "natural_date"),
     };
     let format = r.text(&Text::key("zeyn.ui.date.format").arg("format", sample));
-    let words = r.text(&Text::key("zeyn.ui.date.natural").arg("examples", Text::key(format!("zeyn.ui.date.{natural}"))));
+    let words =
+        r.text(&Text::key("zeyn.ui.date.natural").arg("examples", Text::key(format!("zeyn.ui.date.{natural}"))));
     format!(r#"<p class="z-field-hint" id="{id}-hint">{format} {words}</p>"#)
 }
 
@@ -231,7 +254,8 @@ pub(crate) fn render_date_input(
     let kind = kind_name(m.kind);
     let zone = m.kind == FieldKind::DateTime;
     let described = if zone { format!("{id}-hint {id}-zone {id}-error") } else { format!("{id}-hint {id}-error") };
-    let common = common.replace(&format!(r#"aria-describedby="{id}-error""#), &format!(r#"aria-describedby="{described}""#));
+    let common =
+        common.replace(&format!(r#"aria-describedby="{id}-error""#), &format!(r#"aria-describedby="{described}""#));
     out.push_str(&format!(r#"<div class="z-date" {}>"#, root_attrs(r, kind, m, options)));
     out.push_str(&format!(
         r#"<input type="text" autocomplete="off" spellcheck="false" data-zeyn-date-input {common} value="{}">"#,
@@ -257,7 +281,12 @@ pub(crate) fn render_date_input(
 }
 
 /// Writes a from and to pair of date fields with one range picker and quick ranges.
-pub(crate) fn render_range(out: &mut String, r: &Render, fields: [(&FieldMeta, Value); 2], options: Option<&DateOptions>) {
+pub(crate) fn render_range(
+    out: &mut String,
+    r: &Render,
+    fields: [(&FieldMeta, Value); 2],
+    options: Option<&DateOptions>,
+) {
     let scope = r.scope;
     let today = r.tz.today(DateTime::now());
     let presets: Vec<Json> = range_presets(today)

@@ -56,7 +56,10 @@ fn a_table_orders_sends_to_the_kitchen_and_pays() {
     assert_eq!(r.table(TABLE).unwrap().open_total, Money::tl(2 * 12_000 + 3_000));
     assert_eq!(stock(&r, LENTIL_SOUP), before, "ordering alone does not touch stock");
 
-    assert!(matches!(r.pay(TABLE, PaymentMethod::Card, Money::tl(0), now(), "en"), Err(Error::Validation(_))), "unsent lines block payment");
+    assert!(
+        matches!(r.pay(TABLE, PaymentMethod::Card, Money::tl(0), now(), "en"), Err(Error::Validation(_))),
+        "unsent lines block payment"
+    );
     assert_eq!(r.send(TABLE, now()).unwrap(), 3);
     assert_eq!(stock(&r, LENTIL_SOUP), before - 2, "sending takes portions out of stock");
     assert_eq!(r.table(TABLE).unwrap().status, TableStatus::Kitchen);
@@ -66,7 +69,10 @@ fn a_table_orders_sends_to_the_kitchen_and_pays() {
     r.ready(soup.id).unwrap();
     assert_eq!(r.lines().unwrap().into_iter().find(|l| l.id == soup.id).unwrap().status, LineStatus::Ready);
 
-    assert!(matches!(r.pay(TABLE, PaymentMethod::Cash, Money::tl(100), now(), "en"), Err(Error::Validation(_))), "cash must cover the total");
+    assert!(
+        matches!(r.pay(TABLE, PaymentMethod::Cash, Money::tl(100), now(), "en"), Err(Error::Validation(_))),
+        "cash must cover the total"
+    );
     assert_eq!(r.pay(TABLE, PaymentMethod::Cash, Money::tl(30_000), now(), "en").unwrap(), Money::tl(3_000));
     assert_eq!(r.table(TABLE).unwrap().status, TableStatus::Free);
     assert_eq!(r.sales().unwrap().len(), 1);
@@ -82,7 +88,10 @@ fn stock_limits_what_can_be_ordered_and_sent() {
     assert!(matches!(r.add(TABLE, RICE_PUDDING, now()), Err(Error::Validation(_))), "only two portions are left");
 
     let other = DiningTableId(2);
-    assert!(matches!(r.add(other, RICE_PUDDING, now()), Err(Error::Validation(_))), "portions waiting on another table count too");
+    assert!(
+        matches!(r.add(other, RICE_PUDDING, now()), Err(Error::Validation(_))),
+        "portions waiting on another table count too"
+    );
     r.send(TABLE, now()).unwrap();
     assert_eq!(stock(&r, RICE_PUDDING), 0);
     assert!(r.add(other, RICE_PUDDING, now()).is_err());

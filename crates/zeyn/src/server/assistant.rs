@@ -10,7 +10,9 @@
 
 use super::{AppState, Chunks, Failure, Tool, ToolTarget, asset};
 use crate::action::{Error, Filter, MAX_FILTERS};
-use crate::assistant::{Assistant, Audio, ChatEvent, ChatKey, ChatMessage, ChatRequest, Role, ToolCall, ToolSpec, chat, clip};
+use crate::assistant::{
+    Assistant, Audio, ChatEvent, ChatKey, ChatMessage, ChatRequest, Role, ToolCall, ToolSpec, chat, clip,
+};
 use crate::ctx::Ctx;
 use crate::i18n::Text;
 use crate::render::{Render, escape};
@@ -47,21 +49,27 @@ pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
         .route("/_zeyn/assistant/chat", post(chat_call))
         .route("/_zeyn/assistant/confirm", post(confirm_call))
         .route("/_zeyn/assistant/clear", post(clear_call))
-        .route("/_zeyn/assistant/stt", post(stt_call).layer(DefaultBodyLimit::max(crate::assistant::MAX_AUDIO_BYTES + 1)))
+        .route(
+            "/_zeyn/assistant/stt",
+            post(stt_call).layer(DefaultBodyLimit::max(crate::assistant::MAX_AUDIO_BYTES + 1)),
+        )
         .route("/_zeyn/assistant/tts", post(tts_call))
 }
 
 /// The assistant, when the user may use it.
 fn usable<'a>(st: &'a AppState, ctx: &Ctx) -> Option<&'a Assistant> {
     let a = st.assistant.as_deref()?;
-    let user_ok = ctx.identity().is_signed_in() && a.permission.is_none_or(|p| ctx.identity().can(&crate::Access::Permission(p)));
+    let user_ok =
+        ctx.identity().is_signed_in() && a.permission.is_none_or(|p| ctx.identity().can(&crate::Access::Permission(p)));
     user_ok.then_some(a)
 }
 
 /// Links placed in the page head when the user may use the assistant.
 pub(super) fn head(st: &AppState, ctx: &Ctx, base: &str) -> String {
     match usable(st, ctx) {
-        Some(_) => format!(r#"<link rel="stylesheet" href="{base}/_zeyn/assistant.css"><script type="module" src="{base}/_zeyn/assistant.js"></script>"#),
+        Some(_) => format!(
+            r#"<link rel="stylesheet" href="{base}/_zeyn/assistant.css"><script type="module" src="{base}/_zeyn/assistant.js"></script>"#
+        ),
         None => String::new(),
     }
 }
@@ -138,8 +146,17 @@ async fn start(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Qu
                 pending = card(&agent, &tool, &call);
             }
         }
-        let suggestions: Vec<String> = a.suggestions.iter().filter(|(s, _)| s.is_empty() || *s == q.screen).map(|(_, t)| ctx.t(t)).collect();
-        let speech = |server: bool| if !a.voice { "off" } else if server { "server" } else { "browser" };
+        let suggestions: Vec<String> =
+            a.suggestions.iter().filter(|(s, _)| s.is_empty() || *s == q.screen).map(|(_, t)| ctx.t(t)).collect();
+        let speech = |server: bool| {
+            if !a.voice {
+                "off"
+            } else if server {
+                "server"
+            } else {
+                "browser"
+            }
+        };
         Ok::<_, Failure>(json!({
             "messages": messages,
             "pending": pending,
@@ -176,7 +193,11 @@ enum Start {
     Confirm { id: String, approve: bool },
 }
 
-async fn chat_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(call): axum::Json<ChatCall>) -> Response {
+async fn chat_call(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::Json(call): axum::Json<ChatCall>,
+) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     let (a, key) = match checked(&st, &ctx, &headers).await {
         Ok(v) => v,
@@ -192,7 +213,11 @@ async fn chat_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Js
     stream(st.clone(), ctx, key, Start::Message { text: text.to_string(), screen })
 }
 
-async fn confirm_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(call): axum::Json<ConfirmCall>) -> Response {
+async fn confirm_call(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::Json(call): axum::Json<ConfirmCall>,
+) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     let key = match checked(&st, &ctx, &headers).await {
         Ok((_, key)) => key,
@@ -224,7 +249,11 @@ async fn stt_call(State(st): State<Arc<AppState>>, headers: HeaderMap, body: Byt
         let (a, _) = checked(&st, &ctx, &headers).await?;
         let stt = a.stt.clone().ok_or(Failure::App(Error::NotFound))?;
         if body.is_empty() || body.len() > a.limits.audio_bytes {
-            return Err(Failure::Status(StatusCode::PAYLOAD_TOO_LARGE, "too_large", Text::key("zeyn.assistant.audio_too_large")));
+            return Err(Failure::Status(
+                StatusCode::PAYLOAD_TOO_LARGE,
+                "too_large",
+                Text::key("zeyn.assistant.audio_too_large"),
+            ));
         }
         let mime = headers.get(header::CONTENT_TYPE).and_then(|v| v.to_str().ok()).unwrap_or("").to_string();
         if !mime.starts_with("audio/") || mime.len() > 100 {
@@ -246,7 +275,11 @@ struct SpeakCall {
 }
 
 /// Text to speech on the server: the audio streams through as the provider sends it.
-async fn tts_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(call): axum::Json<SpeakCall>) -> Response {
+async fn tts_call(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::Json(call): axum::Json<SpeakCall>,
+) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     let result = async {
         let (a, _) = checked(&st, &ctx, &headers).await?;
@@ -275,7 +308,10 @@ async fn tts_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Jso
     });
     let mut r = axum::body::Body::from_stream(Chunks(rx)).into_response();
     let h = r.headers_mut();
-    h.insert(header::CONTENT_TYPE, HeaderValue::from_str(&speech.mime).unwrap_or(HeaderValue::from_static("audio/mpeg")));
+    h.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_str(&speech.mime).unwrap_or(HeaderValue::from_static("audio/mpeg")),
+    );
     h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     r
 }
@@ -323,10 +359,7 @@ fn pending_calls(history: &[ChatMessage]) -> Vec<ToolCall> {
 /// before the latest user message, so it stays put while a turn goes on.
 fn window(history: &[ChatMessage], max: usize) -> &[ChatMessage] {
     let Some(last) = history.iter().rposition(|m| m.role == Role::User) else { return &[] };
-    let start = (0..=last)
-        .filter(|&i| history[i].role == Role::User && last - i < max.max(1))
-        .min()
-        .unwrap_or(last);
+    let start = (0..=last).filter(|&i| history[i].role == Role::User && last - i < max.max(1)).min().unwrap_or(last);
     &history[start..]
 }
 
@@ -366,7 +399,12 @@ fn html_text(html: &str) -> String {
         out.push_str(&decode(&rest[..lt]));
         let Some(gt) = rest[lt..].find('>') else { break };
         let tag = &rest[lt + 1..lt + gt];
-        let name: String = tag.trim_start_matches('/').chars().take_while(|c| c.is_ascii_alphanumeric()).collect::<String>().to_ascii_lowercase();
+        let name: String = tag
+            .trim_start_matches('/')
+            .chars()
+            .take_while(|c| c.is_ascii_alphanumeric())
+            .collect::<String>()
+            .to_ascii_lowercase();
         match (tag.starts_with('/'), name.as_str()) {
             (false, "tr") => {
                 if !out.is_empty() && !out.ends_with('\n') {
@@ -385,11 +423,23 @@ fn html_text(html: &str) -> String {
         rest = &rest[lt + gt + 1..];
     }
     out.push_str(&decode(rest));
-    out.lines().map(|l| l.split('\t').map(|c| c.split_whitespace().collect::<Vec<_>>().join(" ")).collect::<Vec<_>>().join("\t")).filter(|l| !l.trim().is_empty()).collect::<Vec<_>>().join("\n")
+    out.lines()
+        .map(|l| {
+            l.split('\t').map(|c| c.split_whitespace().collect::<Vec<_>>().join(" ")).collect::<Vec<_>>().join("\t")
+        })
+        .filter(|l| !l.trim().is_empty())
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn decode(s: &str) -> String {
-    s.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&#39;", "'").replace("&#x27;", "'").replace("&nbsp;", " ").replace("&amp;", "&")
+    s.replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&#x27;", "'")
+        .replace("&nbsp;", " ")
+        .replace("&amp;", "&")
 }
 
 /// A tool's result as the model reads it: plain text inside `<tool_result>` delimiters, with
@@ -399,20 +449,29 @@ fn result_text(ctx: &Ctx, tool: &Tool, result: Result<Json, Failure>, limit: usi
     let body = match result {
         Ok(v) => match &tool.target {
             ToolTarget::Grid { .. } => {
-                let head = v["head"].as_str().map(|h| h.split("</tr>").next().unwrap_or("")).map(html_text).unwrap_or_default();
+                let head = v["head"]
+                    .as_str()
+                    .map(|h| h.split("</tr>").next().unwrap_or(""))
+                    .map(html_text)
+                    .unwrap_or_default();
                 let rows = html_text(v["rows"].as_str().unwrap_or(""));
                 let total = v["total"].as_u64().map(|t| format!(" of {t}")).unwrap_or_default();
                 format!("{} rows{total}.\n{head}\n{rows}", v["count"].as_u64().unwrap_or(0))
             }
             ToolTarget::Form { .. } => {
-                let notes: Vec<&str> = v["effects"].as_array().into_iter().flatten().filter_map(|e| e["message"].as_str()).collect();
+                let notes: Vec<&str> =
+                    v["effects"].as_array().into_iter().flatten().filter_map(|e| e["message"].as_str()).collect();
                 format!("Saved. {}", notes.join(" "))
             }
             ToolTarget::Api { .. } => v.to_string(),
         },
         Err(f) => format!("Error: {}", failure_text(ctx, &f)),
     };
-    format!("<tool_result name=\"{}\">\n{}\n</tool_result>", escape(&tool.name), clip(&body, limit).replace('<', "&lt;").replace('>', "&gt;"))
+    format!(
+        "<tool_result name=\"{}\">\n{}\n</tool_result>",
+        escape(&tool.name),
+        clip(&body, limit).replace('<', "&lt;").replace('>', "&gt;")
+    )
 }
 
 /// Screens the model may open for the user: routed, offered to models, allowed for the user.
@@ -445,7 +504,10 @@ fn screens_for(st: &AppState, ctx: &Ctx) -> Vec<(&'static str, String, String)> 
 fn builtin_specs(screens: &[(&'static str, String, String)]) -> Vec<ToolSpec> {
     let mut out = Vec::new();
     if !screens.is_empty() {
-        let list: Vec<String> = screens.iter().map(|(n, _, l)| if l.is_empty() { (*n).to_string() } else { format!("{n} ({l})") }).collect();
+        let list: Vec<String> = screens
+            .iter()
+            .map(|(n, _, l)| if l.is_empty() { (*n).to_string() } else { format!("{n} ({l})") })
+            .collect();
         out.push(ToolSpec {
             name: "navigate".into(),
             description: format!(
@@ -509,11 +571,17 @@ fn system_prompt(st: &AppState, a: &Assistant, ctx: &Ctx, screen: &str) -> Strin
 /// Checks a `navigate` call and returns the event for the browser and the result for the model.
 fn navigate(st: &AppState, screens: &[(&'static str, String, String)], args: &Json) -> Result<(Json, String), String> {
     let name = args["screen"].as_str().unwrap_or("");
-    let (_, path, _) = screens.iter().find(|(n, _, _)| *n == name).ok_or_else(|| format!("There is no screen `{}` the user may open.", clip(name, 60)))?;
+    let (_, path, _) = screens
+        .iter()
+        .find(|(n, _, _)| *n == name)
+        .ok_or_else(|| format!("There is no screen `{}` the user may open.", clip(name, 60)))?;
     let mut filters: Vec<Filter> = serde_json::from_value(args["filters"].clone()).unwrap_or_default();
     filters.retain(|f| !f.is_empty() && f.field.len() <= 64);
     filters.truncate(MAX_FILTERS);
-    let note = format!("Opened `{name}` for the user{}.", if filters.is_empty() { String::new() } else { format!(" with {} filter(s)", filters.len()) });
+    let note = format!(
+        "Opened `{name}` for the user{}.",
+        if filters.is_empty() { String::new() } else { format!(" with {} filter(s)", filters.len()) }
+    );
     Ok((json!({ "t": "navigate", "url": st.url(path), "screen": name, "filters": filters }), note))
 }
 
@@ -529,8 +597,10 @@ async fn converse(st: &AppState, ctx: &Ctx, key: &ChatKey, start: Start, out: &O
     let screens = screens_for(st, ctx);
     match start {
         Start::Message { text, screen: s } => {
-            let mut added: Vec<ChatMessage> =
-                pending_calls(&history).into_iter().map(|c| ChatMessage::tool(c.id, "Not run: the user wrote a new message instead.")).collect();
+            let mut added: Vec<ChatMessage> = pending_calls(&history)
+                .into_iter()
+                .map(|c| ChatMessage::tool(c.id, "Not run: the user wrote a new message instead."))
+                .collect();
             added.push(ChatMessage::user(text));
             st.timed(a.store.append(key, added.clone())).await?;
             history.extend(added);
@@ -552,17 +622,29 @@ async fn converse(st: &AppState, ctx: &Ctx, key: &ChatKey, start: Start, out: &O
             history.push(m);
         }
     }
-    let mut specs: Vec<ToolSpec> =
-        tools.iter().map(|t| ToolSpec { name: t.name.clone(), description: t.description.clone(), schema: t.schema.clone() }).collect();
+    let mut specs: Vec<ToolSpec> = tools
+        .iter()
+        .map(|t| ToolSpec { name: t.name.clone(), description: t.description.clone(), schema: t.schema.clone() })
+        .collect();
     specs.extend(builtin_specs(&screens));
     let system = system_prompt(st, a, ctx, &screen);
     let budget = rate_key(key) + ":tokens";
     for _ in 0..limits.rounds {
         if let Some(limit) = &a.tokens {
-            st.rate_store.charge(&budget, limit, 0).await.map_err(|_| Failure::Status(StatusCode::TOO_MANY_REQUESTS, "token_limit", Text::key("zeyn.assistant.token_limit")))?;
+            st.rate_store.charge(&budget, limit, 0).await.map_err(|_| {
+                Failure::Status(StatusCode::TOO_MANY_REQUESTS, "token_limit", Text::key("zeyn.assistant.token_limit"))
+            })?;
         }
-        let request = ChatRequest { system: system.clone(), messages: window(&history, limits.history).to_vec(), tools: specs.clone(), max_tokens: limits.output_tokens };
-        let mut events = tokio::time::timeout(limits.idle, a.provider.chat(request)).await.map_err(|_| Failure::Timeout)?.map_err(Failure::App)?;
+        let request = ChatRequest {
+            system: system.clone(),
+            messages: window(&history, limits.history).to_vec(),
+            tools: specs.clone(),
+            max_tokens: limits.output_tokens,
+        };
+        let mut events = tokio::time::timeout(limits.idle, a.provider.chat(request))
+            .await
+            .map_err(|_| Failure::Timeout)?
+            .map_err(Failure::App)?;
         let mut text = String::new();
         let mut calls: Vec<ToolCall> = Vec::new();
         let mut raw = None;
@@ -641,7 +723,10 @@ async fn converse(st: &AppState, ctx: &Ctx, key: &ChatKey, start: Start, out: &O
                 name => {
                     only_suggest = false;
                     match tools.iter().find(|t| t.name == name) {
-                        None => results.push(ChatMessage::tool(c.id, format!("Error: there is no tool `{}` for this user.", clip(name, 80)))),
+                        None => results.push(ChatMessage::tool(
+                            c.id,
+                            format!("Error: there is no tool `{}` for this user.", clip(name, 80)),
+                        )),
                         Some(tool) if tool.writes || tool.confirm => {
                             out.send(card(ctx, tool, &c)).await;
                             waiting = true;

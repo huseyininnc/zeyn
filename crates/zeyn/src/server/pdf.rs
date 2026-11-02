@@ -58,7 +58,12 @@ async fn document(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q):
         if !ctx.identity().can(&action.access) {
             return Err(Failure::App(Error::Forbidden));
         }
-        let info = Call { kind: CallKind::Document, screen: entry.meta.name, action: Some(action), via_agent: ctx.via_agent() };
+        let info = Call {
+            kind: CallKind::Document,
+            screen: entry.meta.name,
+            action: Some(action),
+            via_agent: ctx.via_agent(),
+        };
         let (state, user) = (&*st, &ctx);
         st.intercept(&ctx, &info, move || async move {
             let (template, data) = state.timed(source.load(user.clone())).await?;
@@ -108,7 +113,11 @@ pub(super) async fn grid_report(
             }
             more = rows.len() >= limit;
         }
-        let columns: Vec<Json> = grid.export_columns(&r, view.as_ref()).into_iter().map(|c| json!({ "label": c.label, "numeric": c.numeric })).collect();
+        let columns: Vec<Json> = grid
+            .export_columns(&r, view.as_ref())
+            .into_iter()
+            .map(|c| json!({ "label": c.label, "numeric": c.numeric }))
+            .collect();
         let note = more.then(|| ctx.t(&crate::i18n::Text::key("zeyn.export.pdf_cut").arg("max", limit.to_string())));
         let data = json!({
             "title": ctx.t(screen.title()),

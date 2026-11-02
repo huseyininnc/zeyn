@@ -41,7 +41,11 @@ impl Formats {
         let first = NumberFormat::for_locale(locale).symbol_first;
         let money = |c: Currency| {
             let s = c.symbol();
-            let code = if first { format!("\"{s}\"#,##0.00;-\"{s}\"#,##0.00") } else { format!("#,##0.00 \"{s}\";-#,##0.00 \"{s}\"") };
+            let code = if first {
+                format!("\"{s}\"#,##0.00;-\"{s}\"#,##0.00")
+            } else {
+                format!("#,##0.00 \"{s}\";-#,##0.00 \"{s}\"")
+            };
             Format::new().set_num_format(code)
         };
         let (order, sep, pad) = Date::pattern(locale);

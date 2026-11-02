@@ -40,14 +40,12 @@ fn grid() -> Node {
 
 #[screen(route = "/layout", permission = "items.read")]
 pub fn layout() -> Screen {
-    Screen::new("Layout")
-        .body(Panel::new("Intro").collapsible().add(Card::new().title("Note")))
-        .body(
-            Tabs::new("Sections")
-                .tab("DataGrid", Row::new().col(grid()).weight(2).col(Stack::new().add(Card::new())))
-                .tab("Form", Form::of(Item::default()).field(Item::code).submit("Save", save_item))
-                .tab("Later", Split::new(grid(), Card::new().title("Detail")).ratio(30)),
-        )
+    Screen::new("Layout").body(Panel::new("Intro").collapsible().add(Card::new().title("Note"))).body(
+        Tabs::new("Sections")
+            .tab("DataGrid", Row::new().col(grid()).weight(2).col(Stack::new().add(Card::new())))
+            .tab("Form", Form::of(Item::default()).field(Item::code).submit("Save", save_item))
+            .tab("Later", Split::new(grid(), Card::new().title("Detail")).ratio(30)),
+    )
 }
 
 fn app() -> Router {
@@ -161,7 +159,9 @@ async fn component_assets_are_served_without_sign_in() {
 #[tokio::test]
 async fn grid_and_form_endpoints_accept_nested_paths_and_plain_indexes() {
     let router = app();
-    let call = |node: serde_json::Value| json_body("layout", node, serde_json::json!({ "page": { "type": "offset", "offset": 5, "limit": 5 } }));
+    let call = |node: serde_json::Value| {
+        json_body("layout", node, serde_json::json!({ "page": { "type": "offset", "offset": 5, "limit": 5 } }))
+    };
     let (status, body) = send(&router, post("/_zeyn/grid", "items.read", call(serde_json::json!("1.0.0")))).await;
     assert_eq!(status, StatusCode::OK, "{body}");
     assert!(body.contains("I-06"));
@@ -194,7 +194,8 @@ async fn lazy_tab_panels_load_through_the_node_endpoint_with_access_checks() {
 
     let (status, _) = send(&router, post("/_zeyn/node", "", body.clone())).await;
     assert_eq!(status, StatusCode::FORBIDDEN, "the screen's permission is checked");
-    let (status, _) = send(&router, post("/_zeyn/node", "items.read", serde_json::json!({ "screen": "layout", "node": "7" }))).await;
+    let (status, _) =
+        send(&router, post("/_zeyn/node", "items.read", serde_json::json!({ "screen": "layout", "node": "7" }))).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 
     let no_csrf = Request::post("/_zeyn/node")

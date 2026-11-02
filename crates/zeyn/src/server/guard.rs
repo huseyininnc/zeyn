@@ -28,14 +28,8 @@ const WRITE_PATHS: [&str; 12] = [
 /// Whether a path is a static asset of the runtime, served without IP rules, rate limits or sign
 /// in so that error and sign in pages still load their scripts and styles.
 fn is_public_asset(path: &str) -> bool {
-    matches!(
-        path,
-        "/_zeyn/zeyn.js"
-            | "/_zeyn/zeyn.css"
-            | "/_zeyn/nav.js"
-            | "/_zeyn/theme.css"
-            | "/favicon.ico"
-    ) || ops::is_asset(path)
+    matches!(path, "/_zeyn/zeyn.js" | "/_zeyn/zeyn.css" | "/_zeyn/nav.js" | "/_zeyn/theme.css" | "/favicon.ico")
+        || ops::is_asset(path)
         || ui::ASSETS.contains(&path)
         || media::ASSETS.contains(&path)
         || pro::ASSETS.contains(&path)
@@ -86,10 +80,7 @@ pub(super) async fn guard_request(
     if let Some(ready) = st.auth.as_ref().and_then(|a| a.prepare(headers)) {
         ready.await;
     }
-    let peer = parts
-        .extensions
-        .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
-        .map(|c| c.0.ip());
+    let peer = parts.extensions.get::<axum::extract::ConnectInfo<std::net::SocketAddr>>().map(|c| c.0.ip());
     let forwarded = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok());
     let ip = client_ip(peer, forwarded, &st.trusted);
     let probe = ops::is_probe(path);
@@ -110,40 +101,25 @@ pub(super) async fn guard_request(
         && (WRITE_PATHS.contains(&path)
             || path.starts_with("/_zeyn/assistant/")
             || path.starts_with("/_zeyn/account/")
-            || path
-                .strip_prefix(st.api_prefix.as_str())
-                .is_some_and(|rest| rest.starts_with('/')));
+            || path.strip_prefix(st.api_prefix.as_str()).is_some_and(|rest| rest.starts_with('/')));
     let limits = if probe {
         [(None, "all"), (None, "write")]
     } else {
-        [
-            (st.rate, "all"),
-            (if is_write { st.write_rate } else { None }, "write"),
-        ]
+        [(st.rate, "all"), (if is_write { st.write_rate } else { None }, "write")]
     };
     for (limit, scope) in limits {
         let Some(limit) = limit else { continue };
-        let ip_key = ip
-            .map(|i| i.to_string())
-            .unwrap_or_else(|| "unknown".into());
+        let ip_key = ip.map(|i| i.to_string()).unwrap_or_else(|| "unknown".into());
         let key = match limit.key {
             RateKey::Ip => format!("{scope}:ip:{ip_key}"),
-            RateKey::User => match st
-                .auth
-                .as_ref()
-                .and_then(|a| a.authenticate(headers))
-                .and_then(|i| i.user)
-            {
+            RateKey::User => match st.auth.as_ref().and_then(|a| a.authenticate(headers)).and_then(|i| i.user) {
                 Some(user) => format!("{scope}:user:{user}"),
                 None => format!("{scope}:ip:{ip_key}"),
             },
         };
         if let Err(wait) = st.rate_store.take(&key, &limit).await {
             let ctx = st.ctx(headers);
-            let mut response = problem(
-                &ctx,
-                Failure::App(Error::Denied(Text::key("zeyn.error.rate_limited"))),
-            );
+            let mut response = problem(&ctx, Failure::App(Error::Denied(Text::key("zeyn.error.rate_limited"))));
             *response.status_mut() = StatusCode::TOO_MANY_REQUESTS;
             if let Some(body) = response.headers_mut().get_mut(header::CONTENT_TYPE) {
                 *body = HeaderValue::from_static("application/problem+json");
@@ -155,16 +131,12 @@ pub(super) async fn guard_request(
             return response;
         }
     }
-    next.run(axum::extract::Request::from_parts(parts, body))
-        .await
+    next.run(axum::extract::Request::from_parts(parts, body)).await
 }
 
 /// One `request` span per request: method, path without the query string, status and duration,
 /// plus the call's kind, screen, action, user, tenant and outcome once the handler knows them.
-pub(super) async fn trace_request(
-    req: axum::extract::Request,
-    next: axum::middleware::Next,
-) -> Response {
+pub(super) async fn trace_request(req: axum::extract::Request, next: axum::middleware::Next) -> Response {
     use tracing::Instrument;
     use tracing::field::Empty;
     let span = tracing::info_span!(
@@ -194,16 +166,9 @@ pub(super) async fn trace_request(
 /// Security headers on every response.
 pub(super) async fn security_headers(mut response: Response) -> Response {
     let h = response.headers_mut();
-    h.entry(header::CONTENT_SECURITY_POLICY)
-        .or_insert(HeaderValue::from_static(CSP));
-    h.insert(
-        header::X_CONTENT_TYPE_OPTIONS,
-        HeaderValue::from_static("nosniff"),
-    );
-    h.insert(
-        header::REFERRER_POLICY,
-        HeaderValue::from_static("same-origin"),
-    );
+    h.entry(header::CONTENT_SECURITY_POLICY).or_insert(HeaderValue::from_static(CSP));
+    h.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+    h.insert(header::REFERRER_POLICY, HeaderValue::from_static("same-origin"));
     h.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
     response
 }

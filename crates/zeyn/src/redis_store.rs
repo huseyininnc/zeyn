@@ -137,7 +137,9 @@ impl RateStore for RedisStore {
                 return Ok(());
             }
             let result = match store.connection().await {
-                Ok(mut con) => store.0.script.key(key).arg(capacity).arg(per_ms).arg(window_ms).invoke_async::<u64>(&mut con).await,
+                Ok(mut con) => {
+                    store.0.script.key(key).arg(capacity).arg(per_ms).arg(window_ms).invoke_async::<u64>(&mut con).await
+                }
                 Err(e) => Err(e),
             };
             match store.health(result) {
@@ -156,7 +158,8 @@ impl DataGridViewStore for RedisStore {
                 return Err(unavailable());
             }
             let mut con = store.health(store.connection().await).ok_or_else(unavailable)?;
-            let json: Option<String> = store.health(redis::cmd("GET").arg(&key).query_async(&mut con).await).ok_or_else(unavailable)?;
+            let json: Option<String> =
+                store.health(redis::cmd("GET").arg(&key).query_async(&mut con).await).ok_or_else(unavailable)?;
             Ok(json.and_then(|j| serde_json::from_str(&j).ok()))
         })
     }
@@ -169,7 +172,10 @@ impl DataGridViewStore for RedisStore {
             }
             let mut con = store.health(store.connection().await).ok_or_else(unavailable)?;
             let cmd = match view {
-                Some(v) => redis::cmd("SET").arg(&key).arg(serde_json::to_string(&v).map_err(|e| Error::Internal(e.to_string()))?).to_owned(),
+                Some(v) => redis::cmd("SET")
+                    .arg(&key)
+                    .arg(serde_json::to_string(&v).map_err(|e| Error::Internal(e.to_string()))?)
+                    .to_owned(),
                 None => redis::cmd("DEL").arg(&key).to_owned(),
             };
             store.health(cmd.query_async::<()>(&mut con).await).ok_or_else(unavailable)

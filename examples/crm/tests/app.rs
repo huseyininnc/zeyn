@@ -55,7 +55,8 @@ async fn the_shared_customers_feature_opens_with_library_labels_and_app_wording(
 
 #[test]
 fn the_shared_entity_validates_in_this_app_too() {
-    let bad = r#"{"id":0,"code":"C-1","name":"Ada","email":"not an email","segment":"Retail","active":true,"version":0}"#;
+    let bad =
+        r#"{"id":0,"code":"C-1","name":"Ada","email":"not an email","segment":"Retail","active":true,"version":0}"#;
     assert!(serde_json::from_str::<zeyn::Valid<shared_domain::customers::models::Customer>>(bad).is_err());
     let good = bad.replace("not an email", "ada@example.com");
     assert!(serde_json::from_str::<zeyn::Valid<shared_domain::customers::models::Customer>>(&good).is_ok());

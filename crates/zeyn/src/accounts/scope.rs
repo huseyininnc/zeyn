@@ -62,7 +62,9 @@ pub(crate) fn set_cookie(name: &str, value: Option<&str>, max_age: Option<i64>) 
     with(|s| {
         let secure = if s.secure { "; Secure" } else { "" };
         let cookie = match (value, max_age) {
-            (Some(v), Some(age)) => format!("{name}={v}; Path={}; HttpOnly; SameSite=Lax; Max-Age={}{secure}", s.path, age.max(0)),
+            (Some(v), Some(age)) => {
+                format!("{name}={v}; Path={}; HttpOnly; SameSite=Lax; Max-Age={}{secure}", s.path, age.max(0))
+            }
             (Some(v), None) => format!("{name}={v}; Path={}; HttpOnly; SameSite=Lax{secure}", s.path),
             (None, _) => format!("{name}=; Path={}; HttpOnly; SameSite=Lax; Max-Age=0{secure}", s.path),
         };

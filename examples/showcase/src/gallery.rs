@@ -116,7 +116,14 @@ pub async fn top_products(q: DataQuery, store: crate::stock::ProductStore) -> Re
 #[screen(route = "/compact", permission = "stock.product.read")]
 pub fn compact() -> Screen {
     Screen::new(t!("gallery.compact"))
-        .body(DataGrid::of(top_products).paging(Paging::none()).column(Product::name).flex(1).column(Product::price).width(160))
+        .body(
+            DataGrid::of(top_products)
+                .paging(Paging::none())
+                .column(Product::name)
+                .flex(1)
+                .column(Product::price)
+                .width(160),
+        )
         .body(DataGrid::auto(search_products).mode(DataMode::Server).paging(Paging::pages(10)))
 }
 

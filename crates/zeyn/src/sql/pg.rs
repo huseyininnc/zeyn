@@ -14,8 +14,8 @@ use std::str::FromStr;
 /// Opens a bounded pool. Connections are made lazily, so the app starts even when the database is
 /// down; health checks and the first query report it.
 pub(crate) async fn connect(url: &str, limits: &PoolLimits) -> Result<PgPool> {
-    let mut options =
-        PgConnectOptions::from_str(url).map_err(|_| Error::Internal("database.url is not a valid PostgreSQL URL".into()))?;
+    let mut options = PgConnectOptions::from_str(url)
+        .map_err(|_| Error::Internal("database.url is not a valid PostgreSQL URL".into()))?;
     if let Some(t) = limits.statement_timeout {
         options = options.options([("statement_timeout", t.as_millis().to_string())]);
     }

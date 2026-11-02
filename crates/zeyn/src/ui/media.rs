@@ -37,7 +37,16 @@ struct Player {
 
 impl Player {
     fn new(source: &'static str, title: Text) -> Self {
-        Player { source, title, subtitle: None, files: Vec::new(), hls: None, dash: None, poster: None, captions: Vec::new() }
+        Player {
+            source,
+            title,
+            subtitle: None,
+            files: Vec::new(),
+            hls: None,
+            dash: None,
+            poster: None,
+            captions: Vec::new(),
+        }
     }
 
     fn url(&self, id: &str) -> String {
@@ -68,8 +77,18 @@ impl Player {
         let t = |key: &str| r.text(&Text::key(format!("zeyn.ui.media.{key}")));
         let title = r.text(&self.title);
         let texts: Json = [
-            "play", "pause", "mute", "unmute", "time_of", "speed_value", "fullscreen", "exit_fullscreen", "resumed", "failed",
-            "captions_on", "captions_off",
+            "play",
+            "pause",
+            "mute",
+            "unmute",
+            "time_of",
+            "speed_value",
+            "fullscreen",
+            "exit_fullscreen",
+            "resumed",
+            "failed",
+            "captions_on",
+            "captions_off",
         ]
         .iter()
         .map(|k| (k.to_string(), json!(r.i18n.text(r.locale, &Text::key(format!("zeyn.ui.media.{k}"))))))
@@ -91,10 +110,17 @@ impl Player {
         }
         out.push('>');
         out.push_str(r#"<div class="z-player-stage">"#);
-        let poster = self.poster.as_ref().map(|p| format!(r#" data-zeyn-poster="{}""#, self.url(p))).unwrap_or_default();
-        out.push_str(&format!(r#"<{kind} class="z-player-media" preload="metadata" playsinline aria-label="{title}"{poster}>"#));
+        let poster =
+            self.poster.as_ref().map(|p| format!(r#" data-zeyn-poster="{}""#, self.url(p))).unwrap_or_default();
+        out.push_str(&format!(
+            r#"<{kind} class="z-player-media" preload="metadata" playsinline aria-label="{title}"{poster}>"#
+        ));
         for id in &self.files {
-            out.push_str(&format!(r#"<source data-zeyn-src="{}" type="{}">"#, self.url(id), escape(media_type(id).split(';').next().unwrap_or(""))));
+            out.push_str(&format!(
+                r#"<source data-zeyn-src="{}" type="{}">"#,
+                self.url(id),
+                escape(media_type(id).split(';').next().unwrap_or(""))
+            ));
         }
         for c in &self.captions {
             out.push_str(&format!(
@@ -111,7 +137,10 @@ impl Player {
             out.push_str(&format!(r#"<p class="z-player-subtitle">{}</p>"#, r.text(s)));
         }
         out.push_str("</div>");
-        out.push_str(&format!(r#"<div class="z-player-controls" role="group" aria-label="{}: {title}">"#, t(&format!("{kind}_player"))));
+        out.push_str(&format!(
+            r#"<div class="z-player-controls" role="group" aria-label="{}: {title}">"#,
+            t(&format!("{kind}_player"))
+        ));
         out.push_str(&format!(
             r#"<button type="button" class="z-player-button" data-zeyn-player-play aria-label="{}"><span class="z-player-icon z-player-i-play" aria-hidden="true"></span></button>"#,
             t("play")
@@ -156,9 +185,15 @@ impl Player {
                 t("captions_language"),
                 t("captions_language")
             ));
-            out.push_str(&format!(r#"<li role="menuitemradio" tabindex="-1" data-zeyn-track="-1" aria-checked="true">{}</li>"#, t("captions_off")));
+            out.push_str(&format!(
+                r#"<li role="menuitemradio" tabindex="-1" data-zeyn-track="-1" aria-checked="true">{}</li>"#,
+                t("captions_off")
+            ));
             for (i, c) in self.captions.iter().enumerate() {
-                out.push_str(&format!(r#"<li role="menuitemradio" tabindex="-1" data-zeyn-track="{i}" aria-checked="false">{}</li>"#, r.text(&c.label)));
+                out.push_str(&format!(
+                    r#"<li role="menuitemradio" tabindex="-1" data-zeyn-track="{i}" aria-checked="false">{}</li>"#,
+                    r.text(&c.label)
+                ));
             }
             out.push_str("</ul></div>");
         }

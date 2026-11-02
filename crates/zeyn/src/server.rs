@@ -2,17 +2,17 @@
 //!
 //! The protocol is described in `docs/runtime-protocol.md`.
 
-use crate::action::{ActionMeta, Error, DataQuery};
+use crate::action::{ActionMeta, DataQuery, Error};
 use crate::ctx::{Ctx, Identity, Service, Services};
 use crate::feature::{Feature, ScreenEntry};
-use crate::i18n::{I18n, Text};
-use crate::render::{Render, escape};
 use crate::grid::DataGridView;
-use crate::screen::{GridSource, LoadedPage, Screen, ScreenDef};
-use crate::ui::NodePath;
+use crate::i18n::{I18n, Text};
 use crate::platform::{Config, License, LicenseSource, Tenant};
+use crate::render::{Render, escape};
+use crate::screen::{GridSource, LoadedPage, Screen, ScreenDef};
 use crate::security::{IpRange, MemoryRateStore, RateKey, RateLimit, RateStore, client_ip, parse_ranges};
 use crate::time::{DateTime, TimeZone};
+use crate::ui::NodePath;
 use axum::Router;
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
@@ -25,10 +25,10 @@ use std::future::Future;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-mod auth;
 #[cfg(feature = "accounts")]
 pub(crate) mod accounts;
 mod agent;
+mod auth;
 #[cfg(feature = "assistant")]
 use agent::{Tool, ToolTarget};
 mod data;
@@ -41,12 +41,12 @@ mod telemetry;
 mod theme;
 
 pub use theme::Theme;
-#[cfg(feature = "xlsx")]
-mod xlsx;
-#[cfg(feature = "pdf")]
-mod pdf;
 #[cfg(feature = "email")]
 mod mail;
+#[cfg(feature = "pdf")]
+mod pdf;
+#[cfg(feature = "xlsx")]
+mod xlsx;
 
 pub use ops::{build_id, probe};
 
@@ -76,14 +76,14 @@ const JS: &str = concat!(
 const CSS: &str = include_str!("../assets/zeyn.css");
 const NAV: &str = include_str!("../assets/nav.js");
 
-mod ui;
-mod pro;
 #[cfg(feature = "assistant")]
 mod assistant;
 #[cfg(feature = "islands")]
 mod islands;
+mod pro;
 #[cfg(feature = "realtime")]
 pub mod realtime;
+mod ui;
 
 /// Finds out who is calling, usually from a session cookie or an `Authorization` header.
 pub trait Authenticator: Send + Sync + 'static {
@@ -91,7 +91,10 @@ pub trait Authenticator: Send + Sync + 'static {
 
     /// Async work before `authenticate`, once per request, such as fetching an issuer's signing
     /// keys. `None` (the default) when there is nothing to wait for, which costs nothing.
-    fn prepare<'a>(&'a self, _headers: &'a HeaderMap) -> Option<std::pin::Pin<Box<dyn Future<Output = ()> + Send + 'a>>> {
+    fn prepare<'a>(
+        &'a self,
+        _headers: &'a HeaderMap,
+    ) -> Option<std::pin::Pin<Box<dyn Future<Output = ()> + Send + 'a>>> {
         None
     }
 
@@ -136,7 +139,15 @@ pub struct ForwardAuth {
 
 impl ForwardAuth {
     pub fn new(user_header: &'static str) -> Self {
-        ForwardAuth { user: user_header, groups: None, tenant: None, time_zone: None, auth_time: None, shared: None, roles: HashMap::new() }
+        ForwardAuth {
+            user: user_header,
+            groups: None,
+            tenant: None,
+            time_zone: None,
+            auth_time: None,
+            shared: None,
+            roles: HashMap::new(),
+        }
     }
 
     /// Header with the user's groups, comma separated.
@@ -183,7 +194,8 @@ impl ForwardAuth {
 
 impl Authenticator for ForwardAuth {
     fn authenticate(&self, headers: &HeaderMap) -> Option<Identity> {
-        let text = |name: &str| headers.get(name).and_then(|v| v.to_str().ok()).map(str::trim).filter(|v| !v.is_empty());
+        let text =
+            |name: &str| headers.get(name).and_then(|v| v.to_str().ok()).map(str::trim).filter(|v| !v.is_empty());
         if let Some((name, value)) = &self.shared {
             if !text(name).is_some_and(|v| same(v, value)) {
                 return None;
@@ -987,7 +999,11 @@ impl App {
             for s in f.screens() {
                 if let Some(other) = names.insert(s.meta.name, f.name()) {
                     if other != f.name() {
-                        problems.push(format!("screen `{}` is registered in features `{other}` and `{}`", s.meta.name, f.name()));
+                        problems.push(format!(
+                            "screen `{}` is registered in features `{other}` and `{}`",
+                            s.meta.name,
+                            f.name()
+                        ));
                     }
                 }
                 if let Some(path) = f.path_of(&s.meta) {
@@ -1027,13 +1043,18 @@ impl App {
             for m in f.media_sources() {
                 if let Some(other) = media.insert(m.name, f.name()) {
                     if other != f.name() {
-                        problems.push(format!("media source `{}` is registered in features `{other}` and `{}`", m.name, f.name()));
+                        problems.push(format!(
+                            "media source `{}` is registered in features `{other}` and `{}`",
+                            m.name,
+                            f.name()
+                        ));
                     }
                 }
             }
         }
         if let Some(home) = self.home {
-            if !self.features.iter().any(|f| f.screens().iter().any(|s| s.meta.name == home && s.meta.route.is_some())) {
+            if !self.features.iter().any(|f| f.screens().iter().any(|s| s.meta.name == home && s.meta.route.is_some()))
+            {
                 problems.push(format!("home screen `{home}` is not registered or has no route"));
             }
         }
@@ -1166,7 +1187,9 @@ impl App {
                 let path = format!("{}/{}/{}", state.api_prefix, f.name(), a.meta.name);
                 router = router.route(
                     &path,
-                    post(move |st: State<Arc<AppState>>, h: HeaderMap, body: axum::body::Bytes| agent::api_call(st, h, body, fi, ai)),
+                    post(move |st: State<Arc<AppState>>, h: HeaderMap, body: axum::body::Bytes| {
+                        agent::api_call(st, h, body, fi, ai)
+                    }),
                 );
             }
         }
@@ -1177,7 +1200,10 @@ impl App {
                 .route(&format!("{}/docs", state.api_prefix), get(agent::api_reference));
         }
         let home = self.home.and_then(|name| {
-            state.features.iter().find_map(|f| f.screens().iter().find(|s| s.meta.name == name).and_then(|s| f.path_of(&s.meta)))
+            state
+                .features
+                .iter()
+                .find_map(|f| f.screens().iter().find(|s| s.meta.name == name).and_then(|s| f.path_of(&s.meta)))
         });
         if let Some(path) = home.filter(|p| p != "/") {
             let target = format!("{}{path}", state.prefix);
@@ -1206,10 +1232,16 @@ impl App {
         let router = realtime::routes(router);
         #[cfg(feature = "pdf")]
         let router = pdf::routes(router);
-        let router = theme::routes(pro::routes(media::routes(ui::routes(session::routes(data::routes(ops::routes(agent::routes(grid::routes(router)))))))))
-            .fallback(not_found);
+        let router = theme::routes(pro::routes(media::routes(ui::routes(session::routes(data::routes(ops::routes(
+            agent::routes(grid::routes(router)),
+        )))))))
+        .fallback(not_found);
         #[cfg(feature = "accounts")]
-        let router = if state.sign_in.accounts.is_some() { router.layer(axum::middleware::from_fn_with_state(state.clone(), accounts::layer)) } else { router };
+        let router = if state.sign_in.accounts.is_some() {
+            router.layer(axum::middleware::from_fn_with_state(state.clone(), accounts::layer))
+        } else {
+            router
+        };
         let router = router
             .layer(axum::middleware::from_fn_with_state(state.clone(), guard::guard_request))
             .layer(axum::middleware::map_response(guard::security_headers))
@@ -1606,7 +1638,13 @@ impl AppState {
 
     /// The signed in user's saved view of a grid, cleaned by the grid. `None` without a store,
     /// without a user or when nothing is saved; a failing store is logged and ignored.
-    async fn saved_view(&self, ctx: &Ctx, grid: &dyn GridSource, screen: &str, node: &NodePath) -> Option<DataGridView> {
+    async fn saved_view(
+        &self,
+        ctx: &Ctx,
+        grid: &dyn GridSource,
+        screen: &str,
+        node: &NodePath,
+    ) -> Option<DataGridView> {
         let store = self.views.as_ref()?;
         let user = ctx.identity().user.clone()?;
         match self.timed(store.load(&user, &Self::view_key(ctx, screen, node))).await {
@@ -1619,7 +1657,12 @@ impl AppState {
     }
 
     /// Loads the first page of every grid the user may read, in the user's saved view.
-    async fn preload(&self, ctx: &Ctx, nodes: Vec<(NodePath, &crate::screen::Node)>, name: &str) -> HashMap<String, LoadedPage> {
+    async fn preload(
+        &self,
+        ctx: &Ctx,
+        nodes: Vec<(NodePath, &crate::screen::Node)>,
+        name: &str,
+    ) -> HashMap<String, LoadedPage> {
         let mut loaded = HashMap::new();
         let saved = self.views.is_some() && ctx.identity().is_signed_in();
         for (i, node) in nodes {
@@ -1628,7 +1671,9 @@ impl AppState {
                 continue;
             }
             let view = self.saved_view(ctx, grid, name, &i).await;
-            if let Ok(mut page) = self.timed(grid.fetch_at(ctx.clone(), grid.first_query(view.as_ref()), Vec::new())).await {
+            if let Ok(mut page) =
+                self.timed(grid.fetch_at(ctx.clone(), grid.first_query(view.as_ref()), Vec::new())).await
+            {
                 page.view = view;
                 page.saved_views = saved;
                 loaded.insert(i.to_string(), page);
@@ -1710,7 +1755,11 @@ impl AppState {
                         }
                         let path = f.path_of(&entry.meta)?;
                         let aria = if current == Some(item.screen) { r#" aria-current="page""# } else { "" };
-                        Some(format!(r#"<li><a href="{}"{aria}>{}</a></li>"#, escape(&self.url(&path)), r.text(&item.label)))
+                        Some(format!(
+                            r#"<li><a href="{}"{aria}>{}</a></li>"#,
+                            escape(&self.url(&path)),
+                            r.text(&item.label)
+                        ))
                     })
                     .collect();
                 if !items.is_empty() {
@@ -1758,7 +1807,8 @@ impl AppState {
         let app = r.text(&self.name);
         let (palette, commands) = pro::shell_parts(self, ctx, &r);
         #[cfg(feature = "assistant")]
-        let (ai_head, ai_launcher) = (assistant::head(self, ctx, &escape(&self.prefix)), assistant::launcher(self, ctx, &r));
+        let (ai_head, ai_launcher) =
+            (assistant::head(self, ctx, &escape(&self.prefix)), assistant::launcher(self, ctx, &r));
         #[cfg(not(feature = "assistant"))]
         let (ai_head, ai_launcher) = (String::new(), String::new());
         format!(
@@ -1766,8 +1816,14 @@ impl AppState {
             lang = escape(ctx.locale()),
             tz = escape(ctx.time_zone().name()),
             base = escape(&self.prefix),
-            components = format!("{}{}{}{ai_head}", ui::head(&escape(&self.prefix)), media::head(&escape(&self.prefix)), pro::head(&escape(&self.prefix))),
-            html_attrs = format!("{theme_attrs}{}", if self.native_menu { "" } else { r#" data-zeyn-native-menu="off""# }),
+            components = format!(
+                "{}{}{}{ai_head}",
+                ui::head(&escape(&self.prefix)),
+                media::head(&escape(&self.prefix)),
+                pro::head(&escape(&self.prefix))
+            ),
+            html_attrs =
+                format!("{theme_attrs}{}", if self.native_menu { "" } else { r#" data-zeyn-native-menu="off""# }),
             theme_link = if self.look.css.is_empty() {
                 String::new()
             } else {
@@ -1809,7 +1865,12 @@ fn with_cookie(mut response: Response, cookie: Option<String>) -> Response {
     response
 }
 
-async fn page(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Query<ParamsQuery>, name: &'static str) -> Response {
+async fn page(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(q): Query<ParamsQuery>,
+    name: &'static str,
+) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     let (ctx, theme_cookie) = theme::remember(&st, ctx, &headers).await;
     let (csrf, set) = st.csrf(&headers);
@@ -1864,14 +1925,26 @@ async fn page(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Que
             let page = Html(page).into_response();
             page
         }
-        Err(Failure::App(Error::Forbidden | Error::Denied(_))) if !ctx.identity().is_signed_in() && st.login_url.is_some() => {
-            let here = st.screens.get(name).and_then(|(fi, e)| st.features[*fi].path_of(&e.meta)).map(|p| st.url(&p)).unwrap_or_default();
+        Err(Failure::App(Error::Forbidden | Error::Denied(_)))
+            if !ctx.identity().is_signed_in() && st.login_url.is_some() =>
+        {
+            let here = st
+                .screens
+                .get(name)
+                .and_then(|(fi, e)| st.features[*fi].path_of(&e.meta))
+                .map(|p| st.url(&p))
+                .unwrap_or_default();
             let target = st.login_url.clone().unwrap_or_default();
             let sep = if target.contains('?') { '&' } else { '?' };
             Redirect::to(&format!("{target}{sep}return_to={}", encode(&here))).into_response()
         }
         Err(Failure::Status(_, "mfa_required", _)) if st.sign_in.mfa_url.is_some() => {
-            let here = st.screens.get(name).and_then(|(fi, e)| st.features[*fi].path_of(&e.meta)).map(|p| st.url(&p)).unwrap_or_default();
+            let here = st
+                .screens
+                .get(name)
+                .and_then(|(fi, e)| st.features[*fi].path_of(&e.meta))
+                .map(|p| st.url(&p))
+                .unwrap_or_default();
             let target = st.sign_in.mfa_url.clone().unwrap_or_default();
             let sep = if target.contains('?') { '&' } else { '?' };
             Redirect::to(&format!("{target}{sep}return_to={}", encode(&here))).into_response()
@@ -1948,7 +2021,10 @@ pub(super) struct Chunks(pub(super) tokio::sync::mpsc::Receiver<Result<axum::bod
 impl futures_core::Stream for Chunks {
     type Item = Result<axum::body::Bytes, std::io::Error>;
 
-    fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Option<Self::Item>> {
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
         self.0.poll_recv(cx)
     }
 }
@@ -1989,7 +2065,12 @@ impl AppState {
         if !ctx.identity().can(&item.meta.access) {
             return Err(Failure::App(Error::Forbidden));
         }
-        let info = Call { kind: CallKind::Screen, screen: entry.meta.name, action: Some(item.meta), via_agent: ctx.via_agent() };
+        let info = Call {
+            kind: CallKind::Screen,
+            screen: entry.meta.name,
+            action: Some(item.meta),
+            via_agent: ctx.via_agent(),
+        };
         let result = self.intercept(ctx, &info, || self.timed((item.run)(ctx.clone()))).await;
         result?;
         Ok(json!({ "effects": [] }))
@@ -2005,7 +2086,8 @@ impl AppState {
         if ctx.via_agent() {
             agent::agent_policy(&entry.meta.ai, &action, call.confirmed)?;
         }
-        let info = Call { kind: CallKind::Form, screen: entry.meta.name, action: Some(action), via_agent: ctx.via_agent() };
+        let info =
+            Call { kind: CallKind::Form, screen: entry.meta.name, action: Some(action), via_agent: ctx.via_agent() };
         let result = self.intercept(ctx, &info, || self.timed(form.submit(ctx.clone(), call.values))).await;
         let effects = result?;
         let r = user_render(entry.meta.name, ctx);
@@ -2013,7 +2095,11 @@ impl AppState {
     }
 }
 
-async fn menu_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(call): axum::Json<MenuCall>) -> Response {
+async fn menu_call(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::Json(call): axum::Json<MenuCall>,
+) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     if let Err(f) = st.check_csrf(&headers) {
         return st.error_response(&ctx, f);
@@ -2024,7 +2110,11 @@ async fn menu_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Js
     }
 }
 
-async fn form_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(call): axum::Json<FormCall>) -> Response {
+async fn form_call(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::Json(call): axum::Json<FormCall>,
+) -> Response {
     let mut ctx = st.licensed(st.ctx(&headers)).await;
     if let Err(f) = st.check_csrf(&headers) {
         return st.error_response(&ctx, f);
@@ -2046,7 +2136,11 @@ struct LocaleCall {
     locale: String,
 }
 
-async fn set_locale(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(call): axum::Json<LocaleCall>) -> Response {
+async fn set_locale(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::Json(call): axum::Json<LocaleCall>,
+) -> Response {
     let ctx = st.ctx(&headers);
     if let Err(f) = st.check_csrf(&headers) {
         return st.error_response(&ctx, f);
@@ -2103,7 +2197,11 @@ struct ZoneCall {
     zone: String,
 }
 
-async fn set_time_zone(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(call): axum::Json<ZoneCall>) -> Response {
+async fn set_time_zone(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::Json(call): axum::Json<ZoneCall>,
+) -> Response {
     let ctx = st.ctx(&headers);
     if let Err(f) = st.check_csrf(&headers) {
         return st.error_response(&ctx, f);
@@ -2116,7 +2214,11 @@ async fn set_time_zone(State(st): State<Arc<AppState>>, headers: HeaderMap, axum
     let Some(zone) = TimeZone::named(&call.zone) else {
         return st.error_response(&ctx, Failure::App(Error::NotFound));
     };
-    let c = format!("zeyn_tz_manual={}; Path={}; Max-Age=31536000; SameSite=Lax{secure}", encode(zone.name()), st.cookie_path());
+    let c = format!(
+        "zeyn_tz_manual={}; Path={}; Max-Age=31536000; SameSite=Lax{secure}",
+        encode(zone.name()),
+        st.cookie_path()
+    );
     with_cookie(StatusCode::NO_CONTENT.into_response(), Some(c))
 }
 

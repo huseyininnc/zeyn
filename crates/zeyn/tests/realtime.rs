@@ -21,12 +21,16 @@ pub fn home() -> Screen {
 
 async fn start(limits: Limits) -> (SocketAddr, Hub, MemoryDocStore) {
     let store = MemoryDocStore::default();
-    let realtime = Realtime::new().documents("notes", "notes.read", "notes.write", store.clone()).topic("orders", "notes.read").limits(limits);
+    let realtime = Realtime::new()
+        .documents("notes", "notes.read", "notes.write", store.clone())
+        .topic("orders", "notes.read")
+        .limits(limits);
     let hub = realtime.hub();
     let app = App::new("Test")
         .auth(|h: &HeaderMap| {
             let user = h.get("x-user")?.to_str().ok()?.to_string();
-            let perms: &[&str] = if h.contains_key("x-write") { &["notes.read", "notes.write"] } else { &["notes.read"] };
+            let perms: &[&str] =
+                if h.contains_key("x-write") { &["notes.read", "notes.write"] } else { &["notes.read"] };
             Some(Identity::user(user).with_permissions(perms.iter().copied()))
         })
         .feature(Feature::new("notes").screen(home))
@@ -34,7 +38,9 @@ async fn start(limits: Limits) -> (SocketAddr, Hub, MemoryDocStore) {
     let router = app.router().unwrap();
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
-    tokio::spawn(async move { axum::serve(listener, router.into_make_service_with_connect_info::<SocketAddr>()).await.unwrap() });
+    tokio::spawn(async move {
+        axum::serve(listener, router.into_make_service_with_connect_info::<SocketAddr>()).await.unwrap()
+    });
     (addr, hub, store)
 }
 
@@ -97,9 +103,17 @@ async fn handshakes_need_origin_token_user_and_a_declared_document() {
     let here = format!("http://{addr}");
     assert_eq!(status(open(addr, &doc_path("a"), "ayse", true, "http://evil.test").await.unwrap_err()), 403);
     assert_eq!(status(open(addr, "/_zeyn/live/doc/notes/a?csrf=wrong", "ayse", true, &here).await.unwrap_err()), 403);
-    assert_eq!(status(open(addr, &format!("/_zeyn/live/doc/other/a?csrf={TOKEN}"), "ayse", true, &here).await.unwrap_err()), 404);
+    assert_eq!(
+        status(open(addr, &format!("/_zeyn/live/doc/other/a?csrf={TOKEN}"), "ayse", true, &here).await.unwrap_err()),
+        404
+    );
     assert_eq!(status(open(addr, &doc_path("a/b"), "ayse", true, &here).await.unwrap_err()), 404);
-    assert_eq!(status(open(addr, &format!("/_zeyn/live/topics?t=secret&csrf={TOKEN}"), "ayse", true, &here).await.unwrap_err()), 403);
+    assert_eq!(
+        status(
+            open(addr, &format!("/_zeyn/live/topics?t=secret&csrf={TOKEN}"), "ayse", true, &here).await.unwrap_err()
+        ),
+        403
+    );
     assert!(open(addr, &doc_path("a"), "ayse", true, &here).await.is_ok());
 }
 
@@ -135,7 +149,8 @@ async fn two_clients_edit_one_document_and_readers_cannot_write() {
 
 #[tokio::test]
 async fn idle_documents_are_persisted_and_evicted_and_come_back() {
-    let limits = Limits { idle: Duration::from_millis(100), persist_every: Duration::from_millis(50), ..Limits::default() };
+    let limits =
+        Limits { idle: Duration::from_millis(100), persist_every: Duration::from_millis(50), ..Limits::default() };
     let (addr, hub, store) = start(limits).await;
     let here = format!("http://{addr}");
     let mut a = open(addr, &doc_path("memo"), "ayse", true, &here).await.unwrap();

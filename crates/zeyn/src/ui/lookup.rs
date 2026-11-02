@@ -60,7 +60,11 @@ impl LookupQuery {
         } else {
             items
                 .into_iter()
-                .filter(|i| needle.is_empty() || fold(&i.label).contains(&needle) || i.hint.as_deref().is_some_and(|h| fold(h).contains(&needle)))
+                .filter(|i| {
+                    needle.is_empty()
+                        || fold(&i.label).contains(&needle)
+                        || i.hint.as_deref().is_some_and(|h| fold(h).contains(&needle))
+                })
                 .collect()
         };
         let total = matching.len();
@@ -132,7 +136,8 @@ impl SupportsRequired for Vec<i64> {}
 
 /// Reads `3,7,9` as ids. At most 1000 ids; anything else is refused.
 pub(crate) fn parse_ids(text: &str) -> Option<Vec<i64>> {
-    let ids: Option<Vec<i64>> = text.split(',').map(str::trim).filter(|p| !p.is_empty()).map(|p| p.parse().ok()).collect();
+    let ids: Option<Vec<i64>> =
+        text.split(',').map(str::trim).filter(|p| !p.is_empty()).map(|p| p.parse().ok()).collect();
     ids.filter(|v| v.len() <= 1000)
 }
 

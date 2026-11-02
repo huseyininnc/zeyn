@@ -184,7 +184,10 @@ impl Renderer<'_> {
             }
             let code = lines[i + 1..end].join("\n");
             let class = if lang.is_empty() { String::new() } else { format!(r#" class="language-{}""#, escape(lang)) };
-            self.html.push_str(&format!(r#"<pre class="z-code" tabindex="0"><code{class}>{}</code></pre>"#, highlight(lang, &code)));
+            self.html.push_str(&format!(
+                r#"<pre class="z-code" tabindex="0"><code{class}>{}</code></pre>"#,
+                highlight(lang, &code)
+            ));
             self.words(&code);
             return (end + 1).min(lines.len());
         }
@@ -241,7 +244,15 @@ impl Renderer<'_> {
         let mut text = Vec::new();
         while end < lines.len() {
             let l = lines[end].trim();
-            if l.is_empty() || l.starts_with("```") || l.starts_with('#') || l.starts_with('|') || l.starts_with('>') || l.starts_with("@live ") || list_item(lines[end]).is_some() || (end > i && is_rule(l)) {
+            if l.is_empty()
+                || l.starts_with("```")
+                || l.starts_with('#')
+                || l.starts_with('|')
+                || l.starts_with('>')
+                || l.starts_with("@live ")
+                || list_item(lines[end]).is_some()
+                || (end > i && is_rule(l))
+            {
                 break;
             }
             text.push(l);
@@ -288,12 +299,18 @@ impl Renderer<'_> {
         let mut at = i;
         while at < lines.len() {
             let line = lines[at];
-            let Some((_, text)) = list_item(line).filter(|(o, _)| indent_of(line) == indent && *o == ordered) else { break };
+            let Some((_, text)) = list_item(line).filter(|(o, _)| indent_of(line) == indent && *o == ordered) else {
+                break;
+            };
             let mut item = text.trim().to_string();
             at += 1;
             while at < lines.len() {
                 let next = lines[at];
-                if next.trim().is_empty() || list_item(next).is_some() || indent_of(next) <= indent || next.trim_start().starts_with("```") {
+                if next.trim().is_empty()
+                    || list_item(next).is_some()
+                    || indent_of(next) <= indent
+                    || next.trim_start().starts_with("```")
+                {
                     break;
                 }
                 item.push(' ');
@@ -306,7 +323,11 @@ impl Renderer<'_> {
                 at = self.list(lines, at, indent_of(lines[at]));
             }
             self.html.push_str("</li>");
-            if at < lines.len() && lines[at].trim().is_empty() && at + 1 < lines.len() && list_item(lines[at + 1]).is_some_and(|(o, _)| o == ordered && indent_of(lines[at + 1]) == indent) {
+            if at < lines.len()
+                && lines[at].trim().is_empty()
+                && at + 1 < lines.len()
+                && list_item(lines[at + 1]).is_some_and(|(o, _)| o == ordered && indent_of(lines[at + 1]) == indent)
+            {
                 at += 1;
             }
         }
@@ -319,7 +340,8 @@ impl Renderer<'_> {
         let mut out = String::with_capacity(text.len() + 16);
         let chars: Vec<char> = text.chars().collect();
         let mut i = 0;
-        let find = |from: usize, pat: &[char]| -> Option<usize> { (from..chars.len()).find(|&k| chars[k..].starts_with(pat)) };
+        let find =
+            |from: usize, pat: &[char]| -> Option<usize> { (from..chars.len()).find(|&k| chars[k..].starts_with(pat)) };
         let collect = |a: usize, b: usize| -> String { chars[a..b].iter().collect() };
         while i < chars.len() {
             let c = chars[i];
@@ -375,7 +397,10 @@ impl Renderer<'_> {
         let target = (self.link)(target);
         let lower = target.to_ascii_lowercase();
         let external = lower.starts_with("https://") || lower.starts_with("http://");
-        let allowed = external || lower.starts_with("mailto:") || target.starts_with('#') || (target.starts_with('/') && !target.starts_with("//"));
+        let allowed = external
+            || lower.starts_with("mailto:")
+            || target.starts_with('#')
+            || (target.starts_with('/') && !target.starts_with("//"));
         if !allowed {
             return label.to_string();
         }
@@ -401,9 +426,13 @@ mod tests {
 
     #[test]
     fn blocks_and_inline_marks() {
-        let out = render("# Title\n\nSome **bold**, *it* and `a<b>`.\n\n## A b C\n\n- one\n  more\n- two\n  - deep\n\n1. first\n2. second\n", &|t| t.to_string());
+        let out = render(
+            "# Title\n\nSome **bold**, *it* and `a<b>`.\n\n## A b C\n\n- one\n  more\n- two\n  - deep\n\n1. first\n2. second\n",
+            &|t| t.to_string(),
+        );
         assert_eq!(out.title, "Title");
-        let h: String = out.parts.iter().map(|p| if let Part::Html(h) = p { h.clone() } else { String::new() }).collect();
+        let h: String =
+            out.parts.iter().map(|p| if let Part::Html(h) = p { h.clone() } else { String::new() }).collect();
         assert!(h.starts_with("<p>Some <strong>bold</strong>, <em>it</em> and <code>a&lt;b&gt;</code>.</p>"));
         assert!(h.contains(r#"<h2 id="a-b-c">A b C</h2>"#));
         assert!(h.contains("<ul><li>one more</li><li>two<ul><li>deep</li></ul></li></ul>"), "{h}");
@@ -414,7 +443,10 @@ mod tests {
     #[test]
     fn tables_split_cells_outside_code() {
         let out = html("| a | b |\n|---|---|\n| `x|y` | 2 |\n");
-        assert_eq!(out, r#"<table><thead><tr><th scope="col">a</th><th scope="col">b</th></tr></thead><tbody><tr><td><code>x|y</code></td><td>2</td></tr></tbody></table>"#);
+        assert_eq!(
+            out,
+            r#"<table><thead><tr><th scope="col">a</th><th scope="col">b</th></tr></thead><tbody><tr><td><code>x|y</code></td><td>2</td></tr></tbody></table>"#
+        );
     }
 
     #[test]

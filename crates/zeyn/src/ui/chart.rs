@@ -133,7 +133,11 @@ impl Chart {
         let step = (W - LEFT - RIGHT) / n;
         for (i, label) in self.labels.iter().enumerate() {
             let x = LEFT + step * (i as f64 + 0.5);
-            out.push_str(&format!(r#"<text class="z-chart-axis" x="{x:.1}" y="{}" text-anchor="middle">{}</text>"#, H - 10.0, r.text(label)));
+            out.push_str(&format!(
+                r#"<text class="z-chart-axis" x="{x:.1}" y="{}" text-anchor="middle">{}</text>"#,
+                H - 10.0,
+                r.text(label)
+            ));
         }
     }
 
@@ -176,7 +180,11 @@ impl Chart {
                 .map(|i| (LEFT + step * (i as f64 + 0.5), TOP + plot_h - plot_h * values[i].max(0.0) / max))
                 .collect();
             let path: Vec<String> = points.iter().map(|(x, y)| format!("{x:.1},{y:.1}")).collect();
-            out.push_str(&format!(r#"<polyline class="z-chart-line z-series-{}" points="{}"/>"#, s % 6, path.join(" ")));
+            out.push_str(&format!(
+                r#"<polyline class="z-chart-line z-series-{}" points="{}"/>"#,
+                s % 6,
+                path.join(" ")
+            ));
             for (i, (x, y)) in points.iter().enumerate() {
                 out.push_str(&format!(
                     r#"<circle class="z-chart-point z-series-{}" cx="{x:.1}" cy="{y:.1}" r="4"><title>{}, {}: {}</title></circle>"#,
@@ -190,7 +198,8 @@ impl Chart {
     }
 
     fn ring(&self, out: &mut String, r: &Render) {
-        let values: Vec<f64> = self.series.first().map(|(_, v)| v.iter().map(|x| x.max(0.0)).collect()).unwrap_or_default();
+        let values: Vec<f64> =
+            self.series.first().map(|(_, v)| v.iter().map(|x| x.max(0.0)).collect()).unwrap_or_default();
         let total: f64 = values.iter().sum();
         let (cx, cy, radius) = (W / 2.0, H / 2.0, 90.0);
         let circumference = 2.0 * std::f64::consts::PI * radius;
@@ -226,7 +235,8 @@ impl Chart {
             for (i, v) in values.iter().enumerate() {
                 if best.as_ref().is_none_or(|(b, _)| v > b) {
                     let label = self.labels.get(i).map(|l| r.i18n.text(r.locale, l)).unwrap_or_default();
-                    let who = if self.series.len() > 1 { format!("{label}, {}", r.i18n.text(r.locale, name)) } else { label };
+                    let who =
+                        if self.series.len() > 1 { format!("{label}, {}", r.i18n.text(r.locale, name)) } else { label };
                     best = Some((*v, who));
                 }
             }
@@ -259,9 +269,17 @@ impl Component for Chart {
             ChartKind::Donut => self.ring(out, r),
         }
         out.push_str(r#"</svg><ul class="z-chart-legend">"#);
-        let names: Vec<&Text> = if self.kind == ChartKind::Donut { self.labels.iter().collect() } else { self.series.iter().map(|(n, _)| n).collect() };
+        let names: Vec<&Text> = if self.kind == ChartKind::Donut {
+            self.labels.iter().collect()
+        } else {
+            self.series.iter().map(|(n, _)| n).collect()
+        };
         for (i, name) in names.iter().enumerate() {
-            out.push_str(&format!(r#"<li><span class="z-chart-swatch z-series-{}" aria-hidden="true"></span>{}</li>"#, i % 6, r.text(name)));
+            out.push_str(&format!(
+                r#"<li><span class="z-chart-swatch z-series-{}" aria-hidden="true"></span>{}</li>"#,
+                i % 6,
+                r.text(name)
+            ));
         }
         out.push_str(&format!(
             r#"</ul><details class="z-chart-data"><summary>{}</summary><table class="z-chart-table"><caption class="z-sr-only">{}</caption><thead><tr><th scope="col"></th>"#,

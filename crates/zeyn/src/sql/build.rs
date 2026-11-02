@@ -472,7 +472,12 @@ fn from_where<E: Entity>(d: &dyn Dialect, sql: &mut Sql, q: &DataQuery) -> Resul
     let mut first = true;
     for c in &conds {
         let i = match c {
-            Cond::Text(i, ..) | Cond::Range(i, ..) | Cond::AnyOf(i, ..) | Cond::Is(i, ..) | Cond::Blank(i, ..) | Cond::AnyKey(i, ..) => *i,
+            Cond::Text(i, ..)
+            | Cond::Range(i, ..)
+            | Cond::AnyOf(i, ..)
+            | Cond::Is(i, ..)
+            | Cond::Blank(i, ..)
+            | Cond::AnyKey(i, ..) => *i,
         };
         let f = &fields[i];
         if matches!(c, Cond::Text(..)) && matches!(f.kind, FieldKind::Money | FieldKind::Bool) {
@@ -632,7 +637,14 @@ fn push_order(d: &dyn Dialect, sql: &mut Sql, fields: &[FieldMeta], keys: &[Orde
 /// Rows after the cursor position in the sort order: `(a > x) OR (a = x AND b > y) OR ...`, with
 /// NULLs placed as [`push_order`] places them. When the first key cannot be NULL, a plain
 /// `a >= x` goes in front so an index on it narrows the scan.
-fn push_seek(d: &dyn Dialect, sql: &mut Sql, fields: &[FieldMeta], keys: &[OrderKey], values: &[Arg], has_where: bool) -> Result<()> {
+fn push_seek(
+    d: &dyn Dialect,
+    sql: &mut Sql,
+    fields: &[FieldMeta],
+    keys: &[OrderKey],
+    values: &[Arg],
+    has_where: bool,
+) -> Result<()> {
     sql.push(if has_where { " AND " } else { " WHERE " });
     let cast = |k: &OrderKey| match fields[k.index].kind {
         FieldKind::Money => Cast::Plain,
@@ -771,7 +783,9 @@ pub(crate) fn read_cursor(fields: &[FieldMeta], keys: &[OrderKey], cursor: &Curs
                 (FieldKind::Bool, _) => v.as_bool().map(Arg::Bool),
                 (FieldKind::Date, _) => text(&v).and_then(|s| Date::parse(&s)).map(|x| Arg::Text(x.to_string())),
                 (FieldKind::Time, _) => text(&v).and_then(|s| Time::parse(&s)).map(|x| Arg::Text(x.to_string())),
-                (FieldKind::DateTime, _) => text(&v).and_then(|s| DateTime::parse(&s)).map(|x| Arg::Text(x.to_string())),
+                (FieldKind::DateTime, _) => {
+                    text(&v).and_then(|s| DateTime::parse(&s)).map(|x| Arg::Text(x.to_string()))
+                }
                 (FieldKind::LocalDateTime, _) => {
                     text(&v).and_then(|s| LocalDateTime::parse(&s)).map(|x| Arg::Text(x.to_string()))
                 }
@@ -803,7 +817,8 @@ fn push_aggs(d: &dyn Dialect, sql: &mut Sql, fields: &[FieldMeta], q: &DataQuery
         let f = &fields[field];
         let col = column(d, f)?;
         let numeric = matches!(f.kind, FieldKind::Integer | FieldKind::Money);
-        let ordered = numeric || matches!(f.kind, FieldKind::Date | FieldKind::Time | FieldKind::DateTime | FieldKind::LocalDateTime);
+        let ordered = numeric
+            || matches!(f.kind, FieldKind::Date | FieldKind::Time | FieldKind::DateTime | FieldKind::LocalDateTime);
         let fits = match a.op {
             Aggregate::Count => true,
             Aggregate::Sum | Aggregate::Avg => numeric,
@@ -866,7 +881,9 @@ pub(crate) fn read_aggs(
             match (first, a.op) {
                 (Cell::Null, Aggregate::Avg) => Some(Value::Null),
                 (Cell::Null, _) => None,
-                (cell @ Cell::Int(_), Aggregate::Count | Aggregate::Sum) => Some(value_of(&FieldKind::Integer, cell, None)),
+                (cell @ Cell::Int(_), Aggregate::Count | Aggregate::Sum) => {
+                    Some(value_of(&FieldKind::Integer, cell, None))
+                }
                 (cell, _) => Some(value_of(&f.kind, cell, None)),
             }
         };
@@ -1046,7 +1063,12 @@ fn custom_json<M: Model>(row: &M) -> Option<serde_json::Map<String, serde_json::
     }
 }
 
-fn field_args<M: Model>(row: &M, i: usize, f: &FieldMeta, json: &Option<serde_json::Map<String, serde_json::Value>>) -> Vec<Arg> {
+fn field_args<M: Model>(
+    row: &M,
+    i: usize,
+    f: &FieldMeta,
+    json: &Option<serde_json::Map<String, serde_json::Value>>,
+) -> Vec<Arg> {
     let mut args = Vec::with_capacity(2);
     if matches!(f.kind, FieldKind::Custom { .. }) {
         let v = json.as_ref().and_then(|m| m.get(f.name)).filter(|v| !v.is_null());

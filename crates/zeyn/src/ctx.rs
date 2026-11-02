@@ -1,7 +1,7 @@
 use crate::action::{Access, Error, Result};
 use crate::i18n::{I18n, Text};
-use crate::screen::Screen;
 use crate::platform::{Config, License, Tenant};
+use crate::screen::Screen;
 use crate::time::{Date, DateTime, TimeZone};
 use std::any::{Any, TypeId};
 use std::collections::{BTreeSet, HashMap};

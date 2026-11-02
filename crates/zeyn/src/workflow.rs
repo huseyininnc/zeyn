@@ -85,7 +85,13 @@ impl<S: WorkflowState> Workflow<S> {
 
     /// Allows a move. Its button label is the catalog text `workflow.<name>`, or the name.
     pub fn transition(mut self, name: &'static str, from: S, to: S, permission: &'static str) -> Self {
-        self.transitions.push(Transition { name, label: Text::key_or(format!("workflow.{name}"), name), from, to, permission });
+        self.transitions.push(Transition {
+            name,
+            label: Text::key_or(format!("workflow.{name}"), name),
+            from,
+            to,
+            permission,
+        });
         self
     }
 
@@ -117,7 +123,9 @@ impl<S: WorkflowState> Workflow<S> {
         for (i, t) in self.transitions.iter().enumerate() {
             let parts: Vec<&str> = t.permission.split('.').collect();
             let valid = parts.len() >= 2
-                && parts.iter().all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'));
+                && parts.iter().all(|p| {
+                    !p.is_empty() && p.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+                });
             if !valid {
                 problems.push(format!("transition `{}` has an invalid permission `{}`", t.name, t.permission));
             }
@@ -154,7 +162,9 @@ impl<S: WorkflowState> Workflow<S> {
             errors.errors.push(FieldError {
                 field: "comment",
                 rule: Rule::MaxLen(MAX_COMMENT),
-                message: Text::key("zeyn.validation.max_len").arg("label", Text::key("zeyn.workflow.comment")).arg("n", MAX_COMMENT.to_string()),
+                message: Text::key("zeyn.validation.max_len")
+                    .arg("label", Text::key("zeyn.workflow.comment"))
+                    .arg("n", MAX_COMMENT.to_string()),
             });
             return Err(Error::Validation(errors));
         }
@@ -268,7 +278,11 @@ where
 
     fn submit(&self, ctx: Ctx, values: Map<String, Json>) -> BoxFuture<Result<Vec<Effect>>> {
         let text = |k: &str| values.get(k).and_then(Json::as_str).map(str::to_string);
-        let request = TransitionRequest { id: self.id.clone(), transition: text("transition").unwrap_or_default(), comment: text("comment") };
+        let request = TransitionRequest {
+            id: self.id.clone(),
+            transition: text("transition").unwrap_or_default(),
+            comment: text("comment"),
+        };
         let on_success = self.on_success.clone();
         Box::pin(async move {
             let output = A::call(ctx, request).await?;
@@ -285,7 +299,8 @@ where
     }
 
     fn tool_schema(&self) -> Json {
-        let names: Vec<&str> = self.flow.transitions.iter().filter(|t| t.from == self.current).map(|t| t.name).collect();
+        let names: Vec<&str> =
+            self.flow.transitions.iter().filter(|t| t.from == self.current).map(|t| t.name).collect();
         json!({
             "type": "object",
             "properties": {

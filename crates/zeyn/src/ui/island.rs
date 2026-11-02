@@ -109,7 +109,15 @@ pub struct Island {
 impl Island {
     /// An island by its library name: lower case letters, digits and `_`.
     pub fn new(name: &'static str) -> Self {
-        Island { name, props: "null".into(), label: Text::from(""), description: None, load: IslandLoad::Visible, fallback: Vec::new(), remotes: Vec::new() }
+        Island {
+            name,
+            props: "null".into(),
+            label: Text::from(""),
+            description: None,
+            load: IslandLoad::Visible,
+            fallback: Vec::new(),
+            remotes: Vec::new(),
+        }
     }
 
     /// A text shown above the island and referenced by `aria-describedby`: what it shows and how

@@ -100,7 +100,10 @@ impl PoolLimits {
         fn num(config: &Config, key: &str, default: u64) -> Result<u64> {
             match config.get(key) {
                 None => Ok(default),
-                Some(v) => v.trim().parse().map_err(|_| Error::Internal(format!("configuration `{key}` is not a whole number"))),
+                Some(v) => v
+                    .trim()
+                    .parse()
+                    .map_err(|_| Error::Internal(format!("configuration `{key}` is not a whole number"))),
             }
         }
         let d = PoolLimits::default();
@@ -189,7 +192,11 @@ impl Db {
                 let (pool, dialect) = ora::connect(url, &limits).await?;
                 (Backend::Oracle(pool, dialect.compat), Box::new(dialect))
             }
-            _ => return Err(Error::Internal(format!("no database driver for `{scheme}://` URLs; enable the matching Zeyn feature"))),
+            _ => {
+                return Err(Error::Internal(format!(
+                    "no database driver for `{scheme}://` URLs; enable the matching Zeyn feature"
+                )));
+            }
         };
         Ok(Db { inner: Arc::new(Inner { backend, dialect, count_cap: limits.count_cap }) })
     }
@@ -207,7 +214,9 @@ impl Db {
     async fn link(&self) -> Result<Link> {
         match &self.inner.backend {
             #[cfg(feature = "postgres")]
-            Backend::Postgres(pool) => pool.acquire().await.map(Link::Pg).map_err(|e| Error::Internal(format!("database connection: {e}"))),
+            Backend::Postgres(pool) => {
+                pool.acquire().await.map(Link::Pg).map_err(|e| Error::Internal(format!("database connection: {e}")))
+            }
             #[cfg(feature = "oracle")]
             Backend::Oracle(pool, compat) => ora::OraLink::acquire(pool, *compat, false).await.map(Link::Ora),
         }
@@ -272,7 +281,9 @@ impl Db {
     pub async fn begin(&self) -> Result<Tx> {
         let link = match &self.inner.backend {
             #[cfg(feature = "postgres")]
-            Backend::Postgres(pool) => Link::PgTx(pool.begin().await.map_err(|e| Error::Internal(format!("begin: {e}")))?),
+            Backend::Postgres(pool) => {
+                Link::PgTx(pool.begin().await.map_err(|e| Error::Internal(format!("begin: {e}")))?)
+            }
             #[cfg(feature = "oracle")]
             Backend::Oracle(pool, compat) => Link::Ora(ora::OraLink::acquire(pool, *compat, true).await?),
         };
@@ -301,7 +312,10 @@ impl Db {
     /// Creates the entity's table (see [`create_table`]). For scaffolding and tests.
     pub async fn create_table<E: Entity>(&self) -> Result<()> {
         for statement in create_table::<E>(self.dialect())? {
-            self.link().await?.execute(Sql { text: statement, args: Vec::new(), cols: Vec::new() }, on_error::<E>).await?;
+            self.link()
+                .await?
+                .execute(Sql { text: statement, args: Vec::new(), cols: Vec::new() }, on_error::<E>)
+                .await?;
         }
         Ok(())
     }
@@ -320,7 +334,8 @@ impl Db {
     /// Runs the migrations in a folder read at run time (`0001_create_products.sql`, ...).
     #[cfg(feature = "postgres")]
     pub async fn migrate_dir(&self, dir: impl AsRef<std::path::Path>) -> Result<()> {
-        let migrator = sqlx::migrate::Migrator::new(dir.as_ref()).await.map_err(|e| Error::Internal(format!("migration: {e}")))?;
+        let migrator =
+            sqlx::migrate::Migrator::new(dir.as_ref()).await.map_err(|e| Error::Internal(format!("migration: {e}")))?;
         self.migrate(&migrator).await
     }
 }
@@ -380,7 +395,10 @@ impl<E> RowStream<E> {
 impl<E> futures_core::Stream for RowStream<E> {
     type Item = Result<E>;
 
-    fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Option<Self::Item>> {
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
         self.rx.poll_recv(cx)
     }
 }
@@ -500,7 +518,8 @@ impl Link {
         if self.execute(sql, on_error::<E>).await? == 0 {
             return Err(missing);
         }
-        let key = E::fields().iter().position(|f| f.key).and_then(|i| row.value_at(i)).unwrap_or(crate::value::Value::Null);
+        let key =
+            E::fields().iter().position(|f| f.key).and_then(|i| row.value_at(i)).unwrap_or(crate::value::Value::Null);
         self.get_by(d, key).await
     }
 
@@ -511,7 +530,12 @@ impl Link {
         }
     }
 
-    async fn fetch(&mut self, sql: Sql, err: OnError, each: &mut (dyn FnMut(&mut Vec<Cell>) -> Result<()> + Send)) -> Result<()> {
+    async fn fetch(
+        &mut self,
+        sql: Sql,
+        err: OnError,
+        each: &mut (dyn FnMut(&mut Vec<Cell>) -> Result<()> + Send),
+    ) -> Result<()> {
         match self {
             #[cfg(feature = "postgres")]
             Link::Pg(c) => pg::fetch(c, sql, err, each).await,

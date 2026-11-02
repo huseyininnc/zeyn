@@ -39,7 +39,11 @@ impl Sealer {
     pub(crate) fn seal<T: Serialize>(&self, name: &str, value: &T) -> String {
         let mut data = serde_json::to_vec(value).unwrap_or_default();
         let nonce: [u8; NONCE_LEN] = super::random();
-        if self.aead.seal_in_place_append_tag(Nonce::assume_unique_for_key(nonce), Aad::from(name.as_bytes()), &mut data).is_err() {
+        if self
+            .aead
+            .seal_in_place_append_tag(Nonce::assume_unique_for_key(nonce), Aad::from(name.as_bytes()), &mut data)
+            .is_err()
+        {
             return String::new();
         }
         let mut out = Vec::with_capacity(1 + NONCE_LEN + data.len());

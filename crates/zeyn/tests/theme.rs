@@ -76,7 +76,11 @@ async fn the_cookie_is_rendered_on_html_so_the_first_paint_is_right() {
 
 #[tokio::test]
 async fn app_themes_are_served_as_one_stylesheet_and_picked_by_name() {
-    let r = build(App::new("T").theme(Theme::new().radius(6)).themes([Theme::light(), Theme::dark().brand("#2a6f97"), ocean()]));
+    let r = build(App::new("T").theme(Theme::new().radius(6)).themes([
+        Theme::light(),
+        Theme::dark().brand("#2a6f97"),
+        ocean(),
+    ]));
     let (_, h, css) = get(&r, "/_zeyn/theme.css", "").await;
     assert_eq!(h.get(header::CONTENT_TYPE).unwrap(), "text/css; charset=utf-8");
     assert!(css.starts_with(":root{--z-radius:6px;}\n"));
@@ -153,7 +157,10 @@ fn bad_tokens_names_defaults_and_low_contrast_are_reported_by_check() {
         .themes([
             Theme::light(),
             Theme::named("Bad Name", [("--z-brand", "#123456")]),
-            Theme::named("evil", [("--z-bg", "red;}body{display:none"), ("--z-bg", "url(//x)"), ("--z-made-up", "#fff")]),
+            Theme::named(
+                "evil",
+                [("--z-bg", "red;}body{display:none"), ("--z-bg", "url(//x)"), ("--z-made-up", "#fff")],
+            ),
             Theme::named("faint", [("--z-text", "#9aa0a6")]),
             Theme::named("night", [("--z-surface", "#000000")]).dark_base(),
         ])

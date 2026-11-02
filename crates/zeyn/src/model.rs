@@ -42,7 +42,10 @@ pub enum Rule {
     /// Raised by a model level `validate = ...` function.
     Custom,
     /// A problem in one cell of a lines field: the line (from 0) and the column.
-    Line { row: u32, field: &'static str },
+    Line {
+        row: u32,
+        field: &'static str,
+    },
 }
 
 /// Field definition produced at compile time.

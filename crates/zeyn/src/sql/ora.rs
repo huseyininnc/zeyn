@@ -55,7 +55,8 @@ fn percent_decode(s: &str) -> String {
 }
 
 fn parse_url(url: &str) -> Result<Target> {
-    let bad = || Error::Internal("database.url is not a valid Oracle URL (oracle://user:password@host:1521/service)".into());
+    let bad =
+        || Error::Internal("database.url is not a valid Oracle URL (oracle://user:password@host:1521/service)".into());
     let rest = url.strip_prefix("oracle://").ok_or_else(bad)?;
     let (creds, rest) = rest.rsplit_once('@').ok_or_else(bad)?;
     let (user, password) = creds.split_once(':').ok_or_else(bad)?;
@@ -65,7 +66,11 @@ fn parse_url(url: &str) -> Result<Target> {
         compat = Some(match pair {
             "compat=11" => OracleCompat::V11,
             "compat=12" => OracleCompat::V12,
-            _ => return Err(Error::Internal(format!("unknown Oracle URL option `{pair}`; expected compat=11 or compat=12"))),
+            _ => {
+                return Err(Error::Internal(format!(
+                    "unknown Oracle URL option `{pair}`; expected compat=11 or compat=12"
+                )));
+            }
         });
     }
     if user.is_empty() || connect.is_empty() {
@@ -89,7 +94,11 @@ fn error(e: oracle::Error, on: OnError) -> Error {
     if let Some(db) = e.db_error()
         && db.code() == 1
     {
-        let name = db.message().split_once('(').and_then(|(_, r)| r.split_once(')')).map(|(n, _)| n.rsplit('.').next().unwrap_or(n));
+        let name = db
+            .message()
+            .split_once('(')
+            .and_then(|(_, r)| r.split_once(')'))
+            .map(|(n, _)| n.rsplit('.').next().unwrap_or(n));
         return on(Some(name.unwrap_or_default()), e.to_string());
     }
     on(None, e.to_string())
@@ -154,7 +163,10 @@ impl OraLink {
     }
 
     /// Moves the connection into a blocking task for `f` and takes it back.
-    async fn with<T: Send + 'static>(&mut self, f: impl FnOnce(&Connection) -> Result<T> + Send + 'static) -> Result<T> {
+    async fn with<T: Send + 'static>(
+        &mut self,
+        f: impl FnOnce(&Connection) -> Result<T> + Send + 'static,
+    ) -> Result<T> {
         let conn = self.conn.take().ok_or_else(|| Error::Internal("the database connection was lost".into()))?;
         let (conn, result) = tokio::task::spawn_blocking(move || {
             let result = f(&conn);
@@ -188,7 +200,11 @@ impl OraLink {
     /// Inserts a row and returns its key: from the table's sequence on 11g, from the identity
     /// column through `RETURNING ... INTO` on 12c and later, or the key the row already has.
     pub(crate) async fn insert<E: Entity>(&mut self, d: &Oracle, row: &E, on: OnError) -> Result<Value> {
-        let (ki, kf) = E::fields().iter().enumerate().find(|(_, f)| f.key).ok_or_else(|| Error::Internal("entity has no key".into()))?;
+        let (ki, kf) = E::fields()
+            .iter()
+            .enumerate()
+            .find(|(_, f)| f.key)
+            .ok_or_else(|| Error::Internal("entity has no key".into()))?;
         let key = row.value_at(ki).unwrap_or(Value::Null);
         if !build::is_new_key(&key) {
             self.execute(build::plan_insert(d, row, None, false)?, on).await?;
@@ -197,7 +213,11 @@ impl OraLink {
         match self.compat {
             OracleCompat::V11 => {
                 let seq = build::ident(d, &Oracle::sequence(E::TABLE))?;
-                let next = Sql { text: format!("SELECT {seq}.NEXTVAL AS c0 FROM DUAL"), args: Vec::new(), cols: vec![Col::Int] };
+                let next = Sql {
+                    text: format!("SELECT {seq}.NEXTVAL AS c0 FROM DUAL"),
+                    args: Vec::new(),
+                    cols: vec![Col::Int],
+                };
                 let mut id = None;
                 self.fetch(next, on, &mut |cells| {
                     if let Some(Cell::Int(n)) = cells.drain(..).next() {
@@ -328,12 +348,16 @@ pub(crate) fn stream<E: Entity>(pool: OraPool, sql: Sql, tx: tokio::sync::mpsc::
             let Sql { text, args, cols } = sql;
             let values = params(args);
             let refs: Vec<&dyn ToSql> = values.iter().map(|v| &**v).collect();
-            let mut stmt = conn.statement(&text).prefetch_rows(PREFETCH).fetch_array_size(PREFETCH).build().map_err(internal)?;
+            let mut stmt =
+                conn.statement(&text).prefetch_rows(PREFETCH).fetch_array_size(PREFETCH).build().map_err(internal)?;
             let rows = stmt.query(&refs).map_err(internal)?;
             let mut cells = Vec::with_capacity(cols.len());
             for row in rows {
                 cells.clear();
-                let item = row.map_err(internal).and_then(|row| read(&row, &cols, &mut cells)).and_then(|_| decode_row::<E>(&mut cells));
+                let item = row
+                    .map_err(internal)
+                    .and_then(|row| read(&row, &cols, &mut cells))
+                    .and_then(|_| decode_row::<E>(&mut cells));
                 let failed = item.is_err();
                 if tx.blocking_send(item).is_err() || failed {
                     return Ok(());
@@ -356,7 +380,12 @@ mod tests {
         let t = parse_url("oracle://app:p%40ss%3Aw@db.local:1521/XEPDB1?compat=11").unwrap();
         assert_eq!(
             t,
-            Target { user: "app".into(), password: "p@ss:w".into(), connect: "db.local:1521/XEPDB1".into(), compat: Some(OracleCompat::V11) }
+            Target {
+                user: "app".into(),
+                password: "p@ss:w".into(),
+                connect: "db.local:1521/XEPDB1".into(),
+                compat: Some(OracleCompat::V11)
+            }
         );
         assert_eq!(parse_url("oracle://a:b@h/XE").unwrap().compat, None);
         assert!(parse_url("oracle://h/XE").is_err());

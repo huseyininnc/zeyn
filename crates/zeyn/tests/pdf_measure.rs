@@ -54,7 +54,16 @@ fn rendering_cost_is_bounded_and_does_not_leak() {
     let mut kept = Vec::new();
     for round in 0..4 {
         let note = serde_json::json!({ "title": format!("Note {round}"), "body": "Short text with Turkish letters: çğıöşü İ." });
-        let rows: Vec<Vec<String>> = (0..1000).map(|i| vec![format!("ORD-{round}{i:05}"), format!("Customer {i}"), "İzmir".into(), format!("{},50 ₺", i * 7 + round)]).collect();
+        let rows: Vec<Vec<String>> = (0..1000)
+            .map(|i| {
+                vec![
+                    format!("ORD-{round}{i:05}"),
+                    format!("Customer {i}"),
+                    "İzmir".into(),
+                    format!("{},50 ₺", i * 7 + round),
+                ]
+            })
+            .collect();
         let list = serde_json::json!({
             "title": "Orders", "lang": "tr", "note": null, "rows": rows,
             "columns": [{ "label": "No", "numeric": false }, { "label": "Customer", "numeric": false }, { "label": "City", "numeric": false }, { "label": "Total", "numeric": true }],

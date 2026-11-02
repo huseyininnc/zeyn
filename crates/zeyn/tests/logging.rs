@@ -72,17 +72,25 @@ pub struct PersonParams {
 
 #[screen(route = "/people", permission = "hr.read")]
 pub fn people() -> Screen {
-    Screen::new("People").body(DataGrid::of(find_people).column(Person::name).column(Person::national_id).column(Person::email))
+    Screen::new("People")
+        .body(DataGrid::of(find_people).column(Person::name).column(Person::national_id).column(Person::email))
 }
 
 #[screen(permission = "hr.read")]
 pub fn person(params: PersonParams, store: People) -> Result<Screen> {
     let p = store.get(params.id).ok_or(Error::NotFound)?;
-    Ok(Screen::window("Person").body(Form::of(p).field(Person::name).field(Person::national_id).field(Person::email).submit("Save", save_person)))
+    Ok(Screen::window("Person").body(
+        Form::of(p).field(Person::name).field(Person::national_id).field(Person::email).submit("Save", save_person),
+    ))
 }
 
 fn app() -> Router {
-    let identity = Identity::user("clerk").with_permissions(["hr.read", "hr.write", "person.national_id.unmask", "person.email.unmask"]);
+    let identity = Identity::user("clerk").with_permissions([
+        "hr.read",
+        "hr.write",
+        "person.national_id.unmask",
+        "person.email.unmask",
+    ]);
     App::new("Test")
         .service(People::seeded())
         .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
@@ -149,14 +157,32 @@ async fn masked_values_and_input_never_reach_the_logs() {
     let reveal = serde_json::json!({ "screen": "person", "params": { "id": 3 }, "node": 0, "field": "national_id" });
     let (status, body) = send(&router, post("/_zeyn/reveal", reveal, false)).await;
     assert!(status == StatusCode::OK && body.contains("12345678903"), "{body}");
-    let (status, _) = send(&router, post("/api/v1/hr/save_person", serde_json::json!({ "id": 9, "name": "Ghost", "national_id": "99999999999", "version": 1 }), true)).await;
+    let (status, _) = send(
+        &router,
+        post(
+            "/api/v1/hr/save_person",
+            serde_json::json!({ "id": 9, "name": "Ghost", "national_id": "99999999999", "version": 1 }),
+            true,
+        ),
+    )
+    .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 
     let log = String::from_utf8(captured.0.lock().unwrap().clone()).unwrap();
-    for expected in ["request", "action=\"save_person\"", "user=\"clerk\"", "status=200", "status=404", "interceptor", "run", "ms="] {
+    for expected in
+        ["request", "action=\"save_person\"", "user=\"clerk\"", "status=200", "status=404", "interceptor", "run", "ms="]
+    {
         assert!(log.contains(expected), "`{expected}` is missing from the log:\n{log}");
     }
-    for secret in ["55555555555", "12345678901", "12345678902", "12345678903", "99999999999", "person1@example.com", "person2@example.com"] {
+    for secret in [
+        "55555555555",
+        "12345678901",
+        "12345678902",
+        "12345678903",
+        "99999999999",
+        "person1@example.com",
+        "person2@example.com",
+    ] {
         assert!(!log.contains(secret), "`{secret}` reached the log:\n{log}");
     }
 }

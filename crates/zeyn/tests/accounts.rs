@@ -10,8 +10,8 @@ use serde_json::{Value as Json, json};
 use std::time::{Duration, Instant};
 use tower::ServiceExt;
 use zeyn::accounts::{
-    self, AccountEventKind, Accounts, Claim, MemoryAccountEvents, MemoryAccountStore, MemorySender, PasswordDenyList, PasswordHasher, Purpose,
-    SignInResult, User, dotnet, normalize,
+    self, AccountEventKind, Accounts, Claim, MemoryAccountEvents, MemoryAccountStore, MemorySender, PasswordDenyList,
+    PasswordHasher, Purpose, SignInResult, User, dotnet, normalize,
 };
 use zeyn::prelude::*;
 
@@ -53,7 +53,12 @@ pub async fn whoami(_unit: (), ctx: Ctx) -> Result<String> {
 }
 
 fn app(accounts: Accounts) -> Router {
-    App::new("T").accounts(accounts).feature(Feature::new("crm").screen(home).api(whoami)).feature(accounts::ui().admin(true).build()).router().unwrap()
+    App::new("T")
+        .accounts(accounts)
+        .feature(Feature::new("crm").screen(home).api(whoami))
+        .feature(accounts::ui().admin(true).build())
+        .router()
+        .unwrap()
 }
 
 fn form(screen: &str, params: Json, node: &str, values: Json, cookies: &str) -> Request<Body> {
@@ -69,13 +74,43 @@ async fn the_sign_in_screen_signs_in_without_a_page_load_and_only_goes_to_local_
     assert_eq!(page.status, StatusCode::OK);
     assert!(page.body.contains(r#"type="password" autocomplete="current-password""#), "password input");
     assert!(page.body.contains("/_zeyn/account/accounts.js"));
-    let ok = send(&router, form("account_login", json!({ "return_to": "/home" }), "0.0", json!({ "user_name": "ui@example.com", "password": PASSWORD }), "")).await;
+    let ok = send(
+        &router,
+        form(
+            "account_login",
+            json!({ "return_to": "/home" }),
+            "0.0",
+            json!({ "user_name": "ui@example.com", "password": PASSWORD }),
+            "",
+        ),
+    )
+    .await;
     assert_eq!(ok.status, StatusCode::OK, "{}", ok.body);
-    assert!(ok.body.contains(r#""effect":"go""#) && ok.body.contains(r#""url":"/home""#) && ok.body.contains(r#""frame":true"#), "{}", ok.body);
+    assert!(
+        ok.body.contains(r#""effect":"go""#)
+            && ok.body.contains(r#""url":"/home""#)
+            && ok.body.contains(r#""frame":true"#),
+        "{}",
+        ok.body
+    );
     assert!(ok.cookie("zeyn_account").is_some_and(|c| !c.is_empty()));
-    let evil = send(&router, form("account_login", json!({ "return_to": "//evil.example/x" }), "0.0", json!({ "user_name": "ui@example.com", "password": PASSWORD }), "")).await;
+    let evil = send(
+        &router,
+        form(
+            "account_login",
+            json!({ "return_to": "//evil.example/x" }),
+            "0.0",
+            json!({ "user_name": "ui@example.com", "password": PASSWORD }),
+            "",
+        ),
+    )
+    .await;
     assert!(evil.body.contains(r#""url":"/""#) && !evil.body.contains("evil.example"), "{}", evil.body);
-    let wrong = send(&router, form("account_login", json!({}), "0.0", json!({ "user_name": "ui@example.com", "password": "nope" }), "")).await;
+    let wrong = send(
+        &router,
+        form("account_login", json!({}), "0.0", json!({ "user_name": "ui@example.com", "password": "nope" }), ""),
+    )
+    .await;
     assert!(wrong.cookie("zeyn_account").is_none());
     assert!(wrong.body.contains("wrong"), "{}", wrong.body);
 }
@@ -87,9 +122,21 @@ async fn manage_screens_need_a_session_and_admin_screens_a_permission() {
     let router = app(a.clone());
     let out = send(&router, get("/account/manage", "")).await;
     assert!(out.status.is_redirection(), "{}", out.status);
-    let login = send(&router, post("/_zeyn/account/login?useCookies=true", json!({ "email": "m@example.com", "password": PASSWORD }), "")).await;
+    let login = send(
+        &router,
+        post("/_zeyn/account/login?useCookies=true", json!({ "email": "m@example.com", "password": PASSWORD }), ""),
+    )
+    .await;
     let session = format!("zeyn_account={}", login.cookie("zeyn_account").unwrap());
-    for path in ["/account/manage", "/account/manage/email", "/account/manage/password", "/account/manage/two-factor", "/account/manage/passkeys", "/account/manage/logins", "/account/manage/personal-data"] {
+    for path in [
+        "/account/manage",
+        "/account/manage/email",
+        "/account/manage/password",
+        "/account/manage/two-factor",
+        "/account/manage/passkeys",
+        "/account/manage/logins",
+        "/account/manage/personal-data",
+    ] {
         let r = send(&router, get(path, &session)).await;
         assert_eq!(r.status, StatusCode::OK, "{path}");
         assert!(!r.body.contains("argon2"), "{path}");
@@ -109,7 +156,19 @@ async fn every_account_screen_renders_in_both_languages() {
     let tr = zeyn::I18n::new("en");
     assert_eq!(tr.text("tr", &Text::key("zeyn.accounts.login.title")), "Oturum aç");
     assert_eq!(tr.text("tr", &Text::key("AccountLogin.password")), "Parola");
-    for path in ["/account/register", "/account/forgot-password", "/account/resend-confirmation", "/account/lockout", "/account/access-denied", "/account/check-email", "/account/logout", "/account/login-recovery", "/account/login-2fa", "/account/reset-password", "/account/confirm-email"] {
+    for path in [
+        "/account/register",
+        "/account/forgot-password",
+        "/account/resend-confirmation",
+        "/account/lockout",
+        "/account/access-denied",
+        "/account/check-email",
+        "/account/logout",
+        "/account/login-recovery",
+        "/account/login-2fa",
+        "/account/reset-password",
+        "/account/confirm-email",
+    ] {
         assert_eq!(send(&router, get(path, "")).await.status, StatusCode::OK, "{path}");
     }
 }
@@ -163,7 +222,8 @@ fn page(cookies: &str) -> Request<Body> {
 /// RFC 6238 code for a base32 key at the current time, as an authenticator app computes it.
 fn totp_now(key: &str) -> String {
     let bytes = base32(key);
-    let step = (std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() / 30).to_be_bytes();
+    let step =
+        (std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() / 30).to_be_bytes();
     let tag = ring::hmac::sign(&ring::hmac::Key::new(ring::hmac::HMAC_SHA1_FOR_LEGACY_USE_ONLY, &bytes), &step);
     let h = tag.as_ref();
     let o = (h[19] & 15) as usize;
@@ -222,7 +282,15 @@ async fn turkish_letters_normalize_without_a_language() {
 async fn password_policy_matches_the_dotnet_defaults() {
     let a = accounts();
     let codes = |pw: &str| a.settings().password.check(pw).into_iter().map(|(c, _)| c).collect::<Vec<_>>();
-    assert_eq!(codes("abc"), ["password_too_short", "password_requires_non_alphanumeric", "password_requires_digit", "password_requires_upper"]);
+    assert_eq!(
+        codes("abc"),
+        [
+            "password_too_short",
+            "password_requires_non_alphanumeric",
+            "password_requires_digit",
+            "password_requires_upper"
+        ]
+    );
     assert!(codes("Secret-123").is_empty());
     let err = a.users().create(User::new("x@example.com"), Some("short")).await.unwrap_err();
     let Error::Validation(v) = err else { panic!() };
@@ -249,7 +317,10 @@ async fn dotnet_v2_and_v3_hashes_verify_and_are_rehashed_to_argon2id() {
         let mut u = a.users().create(User::new(&email), None).await.unwrap();
         u.password_hash = Some(stored.clone());
         a.users().update(&mut u).await.unwrap();
-        assert_eq!(a.sign_in().password_sign_in(&email, "Migrated-1", false, true).await.unwrap(), SignInResult::Succeeded);
+        assert_eq!(
+            a.sign_in().password_sign_in(&email, "Migrated-1", false, true).await.unwrap(),
+            SignInResult::Succeeded
+        );
         let after = a.users().find_by_name(&email).await.unwrap().unwrap();
         assert!(after.password_hash.unwrap().starts_with("$argon2id$"), "rehashed on sign in");
     }
@@ -282,7 +353,10 @@ async fn purpose_tokens_are_bound_to_user_purpose_and_stamp() {
     assert!(u.email_confirmed);
     let reset = a.users().generate_password_reset_token(&u);
     a.users().change_password(&mut u, PASSWORD, "Changed-456").await.unwrap();
-    assert!(a.users().reset_password(&mut u, &reset, "Another-789").await.is_err(), "a password change voids reset links");
+    assert!(
+        a.users().reset_password(&mut u, &reset, "Another-789").await.is_err(),
+        "a password change voids reset links"
+    );
     let reset = a.users().generate_password_reset_token(&u);
     a.users().reset_password(&mut u, &reset, "Another-789").await.unwrap();
     assert!(a.users().reset_password(&mut u, &reset, "Again-0000x").await.is_err(), "a reset link works once");
@@ -307,13 +381,26 @@ async fn five_failures_lock_the_account_and_events_are_recorded() {
     let a = accounts_with(MemorySender::default(), events.clone());
     user(&a, "l@example.com").await;
     for _ in 0..4 {
-        assert_eq!(a.sign_in().password_sign_in("l@example.com", "wrong", false, true).await.unwrap(), SignInResult::Failed);
+        assert_eq!(
+            a.sign_in().password_sign_in("l@example.com", "wrong", false, true).await.unwrap(),
+            SignInResult::Failed
+        );
     }
-    assert_eq!(a.sign_in().password_sign_in("l@example.com", "wrong", false, true).await.unwrap(), SignInResult::LockedOut);
-    assert_eq!(a.sign_in().password_sign_in("l@example.com", PASSWORD, false, true).await.unwrap(), SignInResult::LockedOut, "even the right password");
+    assert_eq!(
+        a.sign_in().password_sign_in("l@example.com", "wrong", false, true).await.unwrap(),
+        SignInResult::LockedOut
+    );
+    assert_eq!(
+        a.sign_in().password_sign_in("l@example.com", PASSWORD, false, true).await.unwrap(),
+        SignInResult::LockedOut,
+        "even the right password"
+    );
     let mut u = a.users().find_by_name("l@example.com").await.unwrap().unwrap();
     a.users().set_lockout_end(&mut u, None).await.unwrap();
-    assert_eq!(a.sign_in().password_sign_in("l@example.com", PASSWORD, false, true).await.unwrap(), SignInResult::Succeeded);
+    assert_eq!(
+        a.sign_in().password_sign_in("l@example.com", PASSWORD, false, true).await.unwrap(),
+        SignInResult::Succeeded
+    );
     let kinds: Vec<_> = events.events().into_iter().map(|e| e.kind).collect();
     assert!(kinds.contains(&AccountEventKind::SignInFailed));
     assert!(kinds.contains(&AccountEventKind::LockedOut));
@@ -327,19 +414,26 @@ async fn confirmed_email_can_be_required() {
         o.sign_in.require_confirmed_email = true;
     });
     user(&a, "c@example.com").await;
-    assert_eq!(a.sign_in().password_sign_in("c@example.com", PASSWORD, false, true).await.unwrap(), SignInResult::NotAllowed);
+    assert_eq!(
+        a.sign_in().password_sign_in("c@example.com", PASSWORD, false, true).await.unwrap(),
+        SignInResult::NotAllowed
+    );
 }
 
 #[tokio::test]
 async fn missing_users_take_as_long_as_wrong_passwords() {
-    let a = Accounts::new(MemoryAccountStore::new(), Secret::new(KEY.into())).options(|o| o.hasher = PasswordHasher { memory_kib: 4096, iterations: 2, parallelism: 1 });
+    let a = Accounts::new(MemoryAccountStore::new(), Secret::new(KEY.into()))
+        .options(|o| o.hasher = PasswordHasher { memory_kib: 4096, iterations: 2, parallelism: 1 });
     user(&a, "timing@example.com").await;
     let time = |name: &'static str| {
         let a = a.clone();
         async move {
             let started = Instant::now();
             for _ in 0..3 {
-                assert_eq!(a.sign_in().password_sign_in(name, "Wrong-123", false, false).await.unwrap(), SignInResult::Failed);
+                assert_eq!(
+                    a.sign_in().password_sign_in(name, "Wrong-123", false, false).await.unwrap(),
+                    SignInResult::Failed
+                );
             }
             started.elapsed().as_secs_f64()
         }
@@ -369,7 +463,8 @@ async fn authenticator_codes_work_once_and_the_key_is_sealed() {
     let mut u = user(&a, "k@example.com").await;
     let key = a.users().reset_authenticator_key(&mut u).await.unwrap();
     assert_eq!(base32(&key).len(), 20);
-    let stored = a.store().token(&u.id, accounts::INTERNAL_PROVIDER, accounts::AUTHENTICATOR_KEY).await.unwrap().unwrap();
+    let stored =
+        a.store().token(&u.id, accounts::INTERNAL_PROVIDER, accounts::AUTHENTICATOR_KEY).await.unwrap().unwrap();
     assert!(!stored.contains(&key));
     let code = totp_now(&key);
     assert!(a.users().verify_authenticator_code(&u, &code).await.unwrap());
@@ -398,10 +493,17 @@ async fn roles_and_role_claims_become_permissions() {
     a.users().add_to_role(&mut u, "AUDITORS").await.unwrap();
     assert_eq!(a.users().roles(&u).await.unwrap(), ["Admins", "auditors"]);
     let router = app(a.clone());
-    let r = send(&router, post("/_zeyn/account/login?useCookies=true", json!({ "email": "admin@example.com", "password": PASSWORD }), "")).await;
+    let r = send(
+        &router,
+        post("/_zeyn/account/login?useCookies=true", json!({ "email": "admin@example.com", "password": PASSWORD }), ""),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
     let session = r.cookie("zeyn_account").unwrap();
-    assert!(r.headers.get_all(header::SET_COOKIE).iter().any(|c| c.to_str().unwrap().contains("Max-Age")), "useCookies is persistent");
+    assert!(
+        r.headers.get_all(header::SET_COOKIE).iter().any(|c| c.to_str().unwrap().contains("Max-Age")),
+        "useCookies is persistent"
+    );
     let me = send(&router, page(&format!("zeyn_account={session}"))).await;
     assert_eq!(me.status, StatusCode::OK, "{}", me.body);
     assert!(me.body.contains("Home"));
@@ -412,15 +514,23 @@ async fn register_answers_the_same_for_new_and_existing_addresses() {
     let sender = MemorySender::default();
     let a = accounts_with(sender.clone(), MemoryAccountEvents::default());
     let router = app(a.clone());
-    let first = send(&router, post("/_zeyn/account/register", json!({ "email": "new@example.com", "password": PASSWORD }), "")).await;
-    let again = send(&router, post("/_zeyn/account/register", json!({ "email": "NEW@example.com", "password": PASSWORD }), "")).await;
+    let first =
+        send(&router, post("/_zeyn/account/register", json!({ "email": "new@example.com", "password": PASSWORD }), ""))
+            .await;
+    let again =
+        send(&router, post("/_zeyn/account/register", json!({ "email": "NEW@example.com", "password": PASSWORD }), ""))
+            .await;
     assert_eq!((first.status, first.body.as_str()), (again.status, again.body.as_str()));
     let kinds: Vec<String> = sender.messages().iter().map(|(_, m)| format!("{m:?}")).collect();
     assert_eq!(kinds, ["ConfirmEmail([redacted])", "AlreadyRegistered([redacted])"]);
-    let forgot_known = send(&router, post("/_zeyn/account/forgotPassword", json!({ "email": "new@example.com" }), "")).await;
-    let forgot_unknown = send(&router, post("/_zeyn/account/forgotPassword", json!({ "email": "ghost@example.com" }), "")).await;
+    let forgot_known =
+        send(&router, post("/_zeyn/account/forgotPassword", json!({ "email": "new@example.com" }), "")).await;
+    let forgot_unknown =
+        send(&router, post("/_zeyn/account/forgotPassword", json!({ "email": "ghost@example.com" }), "")).await;
     assert_eq!((forgot_known.status, forgot_known.body), (forgot_unknown.status, forgot_unknown.body));
-    let weak = send(&router, post("/_zeyn/account/register", json!({ "email": "w@example.com", "password": "weak" }), "")).await;
+    let weak =
+        send(&router, post("/_zeyn/account/register", json!({ "email": "w@example.com", "password": "weak" }), ""))
+            .await;
     assert_eq!(weak.status, StatusCode::BAD_REQUEST);
     assert!(weak.json()["errors"]["PasswordTooShort"].is_array(), "{}", weak.body);
 }
@@ -430,19 +540,53 @@ async fn confirmation_link_and_password_reset_flow() {
     let sender = MemorySender::default();
     let a = accounts_with(sender.clone(), MemoryAccountEvents::default());
     let router = app(a.clone());
-    send(&router, post("/_zeyn/account/register", json!({ "email": "flow@example.com", "password": PASSWORD }), "")).await;
+    send(&router, post("/_zeyn/account/register", json!({ "email": "flow@example.com", "password": PASSWORD }), ""))
+        .await;
     let link = sender.last("flow@example.com").unwrap();
     assert!(link.starts_with("http://localhost:3071/account/confirm-email?params="));
     let params: Json = serde_json::from_str(&urldecode(link.split("params=").nth(1).unwrap())).unwrap();
-    let confirm = send(&router, get(&format!("/_zeyn/account/confirmEmail?userId={}&code={}", params["user"].as_str().unwrap(), params["code"].as_str().unwrap()), "")).await;
+    let confirm = send(
+        &router,
+        get(
+            &format!(
+                "/_zeyn/account/confirmEmail?userId={}&code={}",
+                params["user"].as_str().unwrap(),
+                params["code"].as_str().unwrap()
+            ),
+            "",
+        ),
+    )
+    .await;
     assert_eq!(confirm.status, StatusCode::OK);
     send(&router, post("/_zeyn/account/forgotPassword", json!({ "email": "flow@example.com" }), "")).await;
-    let reset: Json = serde_json::from_str(&urldecode(sender.last("flow@example.com").unwrap().split("params=").nth(1).unwrap())).unwrap();
-    let r = send(&router, post("/_zeyn/account/resetPassword", json!({ "email": "flow@example.com", "resetCode": reset["code"], "newPassword": "Brand-new-1" }), "")).await;
+    let reset: Json =
+        serde_json::from_str(&urldecode(sender.last("flow@example.com").unwrap().split("params=").nth(1).unwrap()))
+            .unwrap();
+    let r = send(
+        &router,
+        post(
+            "/_zeyn/account/resetPassword",
+            json!({ "email": "flow@example.com", "resetCode": reset["code"], "newPassword": "Brand-new-1" }),
+            "",
+        ),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
-    let login = send(&router, post("/_zeyn/account/login", json!({ "email": "flow@example.com", "password": "Brand-new-1" }), "")).await;
+    let login = send(
+        &router,
+        post("/_zeyn/account/login", json!({ "email": "flow@example.com", "password": "Brand-new-1" }), ""),
+    )
+    .await;
     assert_eq!(login.status, StatusCode::OK);
-    let again = send(&router, post("/_zeyn/account/resetPassword", json!({ "email": "flow@example.com", "resetCode": reset["code"], "newPassword": "Brand-new-2" }), "")).await;
+    let again = send(
+        &router,
+        post(
+            "/_zeyn/account/resetPassword",
+            json!({ "email": "flow@example.com", "resetCode": reset["code"], "newPassword": "Brand-new-2" }),
+            "",
+        ),
+    )
+    .await;
     assert_eq!(again.status, StatusCode::BAD_REQUEST);
 }
 
@@ -469,13 +613,22 @@ async fn bearer_tokens_refresh_until_the_stamp_changes() {
     a.roles().create("admins").await.unwrap();
     a.users().add_to_role(&mut u, "admins").await.unwrap();
     let router = app(a.clone());
-    let login = send(&router, post("/_zeyn/account/login", json!({ "email": "b@example.com", "password": PASSWORD }), "")).await;
+    let login =
+        send(&router, post("/_zeyn/account/login", json!({ "email": "b@example.com", "password": PASSWORD }), ""))
+            .await;
     let t = login.json();
     assert_eq!((t["tokenType"].as_str(), t["expiresIn"].as_i64()), (Some("Bearer"), Some(3600)));
     assert!(login.cookie("zeyn_account").is_none(), "bearer logins set no session cookie");
-    let call = |token: &str| Request::post("/api/v1/crm/whoami").header(header::AUTHORIZATION, format!("Bearer {token}")).header(header::CONTENT_TYPE, "application/json").body(Body::from("null")).unwrap();
+    let call = |token: &str| {
+        Request::post("/api/v1/crm/whoami")
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from("null"))
+            .unwrap()
+    };
     assert_eq!(send(&router, call(t["accessToken"].as_str().unwrap())).await.status, StatusCode::OK);
-    let refreshed = send(&router, post("/_zeyn/account/refresh", json!({ "refreshToken": t["refreshToken"] }), "")).await;
+    let refreshed =
+        send(&router, post("/_zeyn/account/refresh", json!({ "refreshToken": t["refreshToken"] }), "")).await;
     assert_eq!(refreshed.status, StatusCode::OK);
     let mut u = a.users().find_by_id(&u.id).await.unwrap().unwrap();
     a.users().change_password(&mut u, PASSWORD, "Changed-456").await.unwrap();
@@ -493,9 +646,24 @@ async fn a_changed_security_stamp_signs_other_sessions_out() {
     a.roles().create("admins").await.unwrap();
     a.users().add_to_role(&mut u, "admins").await.unwrap();
     let router = app(a.clone());
-    let login = send(&router, post("/_zeyn/account/login?useSessionCookies=true", json!({ "email": "stamp@example.com", "password": PASSWORD }), "")).await;
+    let login = send(
+        &router,
+        post(
+            "/_zeyn/account/login?useSessionCookies=true",
+            json!({ "email": "stamp@example.com", "password": PASSWORD }),
+            "",
+        ),
+    )
+    .await;
     let session = login.cookie("zeyn_account").unwrap();
-    assert!(!login.headers.get_all(header::SET_COOKIE).iter().any(|c| c.to_str().unwrap().starts_with("zeyn_account=") && c.to_str().unwrap().contains("Max-Age")), "a browser session cookie");
+    assert!(
+        !login
+            .headers
+            .get_all(header::SET_COOKIE)
+            .iter()
+            .any(|c| c.to_str().unwrap().starts_with("zeyn_account=") && c.to_str().unwrap().contains("Max-Age")),
+        "a browser session cookie"
+    );
     let ok = send(&router, page(&format!("zeyn_account={session}"))).await;
     assert_eq!(ok.status, StatusCode::OK);
     let mut u = a.users().find_by_id(&u.id).await.unwrap().unwrap();
@@ -511,23 +679,54 @@ async fn two_factor_sign_in_with_authenticator_and_recovery_codes() {
     let a = accounts_with(MemorySender::default(), events.clone());
     user(&a, "2fa@example.com").await;
     let router = app(a.clone());
-    let login = send(&router, post("/_zeyn/account/login?useCookies=true", json!({ "email": "2fa@example.com", "password": PASSWORD }), "")).await;
+    let login = send(
+        &router,
+        post("/_zeyn/account/login?useCookies=true", json!({ "email": "2fa@example.com", "password": PASSWORD }), ""),
+    )
+    .await;
     let session = format!("zeyn_account={}", login.cookie("zeyn_account").unwrap());
     let setup = send(&router, post("/_zeyn/account/manage/2fa", json!({}), &session)).await;
     assert_eq!(setup.status, StatusCode::OK, "{}", setup.body);
     let key = setup.json()["sharedKey"].as_str().unwrap().to_string();
-    let wrong = send(&router, post("/_zeyn/account/manage/2fa", json!({ "enable": true, "twoFactorCode": "000000" }), &session)).await;
+    let wrong = send(
+        &router,
+        post("/_zeyn/account/manage/2fa", json!({ "enable": true, "twoFactorCode": "000000" }), &session),
+    )
+    .await;
     assert_eq!(wrong.status, StatusCode::BAD_REQUEST);
-    let on = send(&router, post("/_zeyn/account/manage/2fa", json!({ "enable": true, "twoFactorCode": totp_now(&key) }), &session)).await;
+    let on = send(
+        &router,
+        post("/_zeyn/account/manage/2fa", json!({ "enable": true, "twoFactorCode": totp_now(&key) }), &session),
+    )
+    .await;
     assert_eq!(on.status, StatusCode::OK, "{}", on.body);
-    let codes: Vec<String> = on.json()["recoveryCodes"].as_array().unwrap().iter().map(|c| c.as_str().unwrap().to_string()).collect();
+    let codes: Vec<String> =
+        on.json()["recoveryCodes"].as_array().unwrap().iter().map(|c| c.as_str().unwrap().to_string()).collect();
     assert_eq!(codes.len(), 10);
-    let step = send(&router, post("/_zeyn/account/login", json!({ "email": "2fa@example.com", "password": PASSWORD }), "")).await;
+    let step =
+        send(&router, post("/_zeyn/account/login", json!({ "email": "2fa@example.com", "password": PASSWORD }), ""))
+            .await;
     assert_eq!(step.status, StatusCode::UNAUTHORIZED);
     assert!(step.body.contains("RequiresTwoFactor"));
-    let with_code = send(&router, post("/_zeyn/account/login", json!({ "email": "2fa@example.com", "password": PASSWORD, "twoFactorRecoveryCode": codes[0] }), "")).await;
+    let with_code = send(
+        &router,
+        post(
+            "/_zeyn/account/login",
+            json!({ "email": "2fa@example.com", "password": PASSWORD, "twoFactorRecoveryCode": codes[0] }),
+            "",
+        ),
+    )
+    .await;
     assert_eq!(with_code.status, StatusCode::OK, "{}", with_code.body);
-    let reused = send(&router, post("/_zeyn/account/login", json!({ "email": "2fa@example.com", "password": PASSWORD, "twoFactorRecoveryCode": codes[0] }), "")).await;
+    let reused = send(
+        &router,
+        post(
+            "/_zeyn/account/login",
+            json!({ "email": "2fa@example.com", "password": PASSWORD, "twoFactorRecoveryCode": codes[0] }),
+            "",
+        ),
+    )
+    .await;
     assert_eq!(reused.status, StatusCode::UNAUTHORIZED);
     let kinds: Vec<_> = events.events().into_iter().map(|e| e.kind).collect();
     assert!(kinds.contains(&AccountEventKind::TwoFactorEnabled) && kinds.contains(&AccountEventKind::RecoveryCodeUsed));
@@ -538,9 +737,16 @@ async fn posts_need_json_and_cookie_sessions_need_the_csrf_token() {
     let a = accounts();
     user(&a, "csrf@example.com").await;
     let router = app(a.clone());
-    let form = Request::post("/_zeyn/account/login").header(header::CONTENT_TYPE, "application/x-www-form-urlencoded").body(Body::from("email=a&password=b")).unwrap();
+    let form = Request::post("/_zeyn/account/login")
+        .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+        .body(Body::from("email=a&password=b"))
+        .unwrap();
     assert_eq!(send(&router, form).await.status, StatusCode::UNSUPPORTED_MEDIA_TYPE);
-    let login = send(&router, post("/_zeyn/account/login?useCookies=true", json!({ "email": "csrf@example.com", "password": PASSWORD }), "")).await;
+    let login = send(
+        &router,
+        post("/_zeyn/account/login?useCookies=true", json!({ "email": "csrf@example.com", "password": PASSWORD }), ""),
+    )
+    .await;
     let session = login.cookie("zeyn_account").unwrap();
     let no_token = Request::post("/_zeyn/account/manage/2fa")
         .header(header::CONTENT_TYPE, "application/json")
@@ -560,7 +766,12 @@ async fn sign_in_attempts_are_rate_limited_per_account() {
     let router = app(a.clone());
     let mut last = StatusCode::OK;
     for _ in 0..4 {
-        last = send(&router, post("/_zeyn/account/login", json!({ "email": "rl@example.com", "password": "Wrong-123" }), "")).await.status;
+        last = send(
+            &router,
+            post("/_zeyn/account/login", json!({ "email": "rl@example.com", "password": "Wrong-123" }), ""),
+        )
+        .await
+        .status;
     }
     assert_eq!(last, StatusCode::TOO_MANY_REQUESTS);
 }
@@ -574,7 +785,10 @@ async fn external_logins_link_sign_in_and_never_unlink_the_last_way_in() {
     let mut other = user(&a, "other@example.com").await;
     assert!(a.users().add_login(&mut other, login).await.is_err(), "one provider key belongs to one user");
     assert_eq!(a.sign_in().external_login_sign_in("keycloak", "sub-42", false).await.unwrap(), SignInResult::Succeeded);
-    assert_eq!(a.sign_in().external_login_sign_in("keycloak", "sub-unknown", false).await.unwrap(), SignInResult::Failed);
+    assert_eq!(
+        a.sign_in().external_login_sign_in("keycloak", "sub-unknown", false).await.unwrap(),
+        SignInResult::Failed
+    );
     assert!(a.users().remove_login(&mut linked, "keycloak", "sub-42").await.is_err(), "the last way to sign in stays");
     a.users().add_password(&mut linked, "Another-123").await.unwrap();
     a.users().remove_login(&mut linked, "keycloak", "sub-42").await.unwrap();
@@ -586,7 +800,11 @@ async fn manage_info_never_returns_hashes_or_stamps() {
     let a = accounts();
     let u = user(&a, "info@example.com").await;
     let router = app(a.clone());
-    let login = send(&router, post("/_zeyn/account/login?useCookies=true", json!({ "email": "info@example.com", "password": PASSWORD }), "")).await;
+    let login = send(
+        &router,
+        post("/_zeyn/account/login?useCookies=true", json!({ "email": "info@example.com", "password": PASSWORD }), ""),
+    )
+    .await;
     let session = format!("zeyn_account={}", login.cookie("zeyn_account").unwrap());
     let info = send(&router, get("/_zeyn/account/manage/info", &session)).await;
     assert_eq!(info.json(), json!({ "email": "info@example.com", "isEmailConfirmed": false }));
@@ -598,9 +816,29 @@ async fn manage_info_never_returns_hashes_or_stamps() {
 #[tokio::test]
 async fn the_register_screen_goes_to_a_screen_that_opens() {
     let router = app(accounts());
-    let r = send(&router, form("account_register", json!(null), "0.0", json!({ "email": "s@example.com", "password": PASSWORD, "confirm_password": PASSWORD }), "")).await;
+    let r = send(
+        &router,
+        form(
+            "account_register",
+            json!(null),
+            "0.0",
+            json!({ "email": "s@example.com", "password": PASSWORD, "confirm_password": PASSWORD }),
+            "",
+        ),
+    )
+    .await;
     assert!(r.body.contains(r#""url":"/account/check-email""#), "{}", r.body);
     assert_eq!(send(&router, get("/account/check-email", "")).await.status, StatusCode::OK);
-    let mismatch = send(&router, form("account_register", json!(null), "0.0", json!({ "email": "t@example.com", "password": PASSWORD, "confirm_password": "Other-123" }), "")).await;
+    let mismatch = send(
+        &router,
+        form(
+            "account_register",
+            json!(null),
+            "0.0",
+            json!({ "email": "t@example.com", "password": PASSWORD, "confirm_password": "Other-123" }),
+            "",
+        ),
+    )
+    .await;
     assert!(mismatch.body.contains("do not match"), "{}", mismatch.body);
 }

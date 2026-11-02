@@ -171,15 +171,21 @@ impl SignInManager {
     /// the options ask for one.
     pub fn can_sign_in(&self, user: &User) -> bool {
         let o = self.0.0.options.sign_in;
-        !(o.require_confirmed_email && !user.email_confirmed) && !(o.require_confirmed_phone_number && !user.phone_number_confirmed)
+        !(o.require_confirmed_email && !user.email_confirmed)
+            && !(o.require_confirmed_phone_number && !user.phone_number_confirmed)
     }
 
     /// Takes one attempt from the per address and per account allowances.
     async fn throttle(&self, account: &str) -> Result<()> {
         let o = &self.0.0.options;
         let ip = scope::ip().map(|i| i.to_string()).unwrap_or_else(|| "unknown".into());
-        let by_ip = scope::limit(&format!("accounts:ip:{ip}"), RateLimit::per_ip(o.ip_attempts.0, o.ip_attempts.1)).await;
-        let by_account = scope::limit(&format!("accounts:user:{}", super::normalize(account)), RateLimit::per_user(o.account_attempts.0, o.account_attempts.1)).await;
+        let by_ip =
+            scope::limit(&format!("accounts:ip:{ip}"), RateLimit::per_ip(o.ip_attempts.0, o.ip_attempts.1)).await;
+        let by_account = scope::limit(
+            &format!("accounts:user:{}", super::normalize(account)),
+            RateLimit::per_user(o.account_attempts.0, o.account_attempts.1),
+        )
+        .await;
         if by_ip.is_err() || by_account.is_err() {
             self.0.event(AccountEventKind::RateLimited, None);
             return Err(denied("rate_limited"));
@@ -191,7 +197,10 @@ impl SignInManager {
     pub(crate) async fn throttle_ip(&self) -> Result<()> {
         let o = &self.0.0.options;
         let ip = scope::ip().map(|i| i.to_string()).unwrap_or_else(|| "unknown".into());
-        if scope::limit(&format!("accounts:ip:{ip}"), RateLimit::per_ip(o.ip_attempts.0, o.ip_attempts.1)).await.is_err() {
+        if scope::limit(&format!("accounts:ip:{ip}"), RateLimit::per_ip(o.ip_attempts.0, o.ip_attempts.1))
+            .await
+            .is_err()
+        {
             self.0.event(AccountEventKind::RateLimited, None);
             return Err(denied("rate_limited"));
         }
@@ -201,7 +210,13 @@ impl SignInManager {
     /// Signs in with a user name (or e-mail) and password (`PasswordSignInAsync`). A missing
     /// user costs the same password hashing time as a wrong password and gives the same
     /// `Failed`. Rate limited per client address and per account name.
-    pub async fn password_sign_in(&self, name: &str, password: &str, remember: bool, lockout_on_failure: bool) -> Result<SignInResult> {
+    pub async fn password_sign_in(
+        &self,
+        name: &str,
+        password: &str,
+        remember: bool,
+        lockout_on_failure: bool,
+    ) -> Result<SignInResult> {
         self.throttle(name).await?;
         let Some(mut user) = self.users().find_by_name_or_email(name).await? else {
             self.users().dummy_check(password).await;
@@ -216,7 +231,12 @@ impl SignInManager {
     }
 
     /// Checks the password with lockout but does not sign in (`CheckPasswordSignInAsync`).
-    pub async fn check_password_sign_in(&self, user: &mut User, password: &str, lockout_on_failure: bool) -> Result<SignInResult> {
+    pub async fn check_password_sign_in(
+        &self,
+        user: &mut User,
+        password: &str,
+        lockout_on_failure: bool,
+    ) -> Result<SignInResult> {
         if let Some(early) = self.pre_sign_in(user) {
             self.users().dummy_check(password).await;
             return Ok(early);
@@ -251,7 +271,13 @@ impl SignInManager {
 
     async fn sign_in_or_two_factor(&self, user: &User, remember: bool, provider: Option<&str>) -> Result<SignInResult> {
         if self.is_two_factor_enabled(user).await? && !self.is_two_factor_client_remembered(user) {
-            let pending = Pending { id: user.id.clone(), stamp: self.tag(user), remember, provider: provider.map(str::to_string), expires: now_secs() + TWO_FACTOR_TTL };
+            let pending = Pending {
+                id: user.id.clone(),
+                stamp: self.tag(user),
+                remember,
+                provider: provider.map(str::to_string),
+                expires: now_secs() + TWO_FACTOR_TTL,
+            };
             scope::set_cookie(TWO_FACTOR, Some(&self.sealer()?.seal(TWO_FACTOR, &pending)), Some(TWO_FACTOR_TTL));
             return Ok(SignInResult::RequiresTwoFactor);
         }
@@ -260,12 +286,22 @@ impl SignInManager {
     }
 
     /// Builds the session of a user, with roles and permission claims from the store.
-    pub(crate) async fn session(&self, user: &User, persistent: bool, method: &str, mfa: bool, auth_time: i64) -> Result<Session> {
+    pub(crate) async fn session(
+        &self,
+        user: &User,
+        persistent: bool,
+        method: &str,
+        mfa: bool,
+        auth_time: i64,
+    ) -> Result<Session> {
         let store = &self.0.0.store;
         let roles = store.roles_of(&user.id).await?;
-        let mut permissions: Vec<String> = store.claims_of(&user.id).await?.into_iter().filter(|c| c.kind == "permission").map(|c| c.value).collect();
+        let mut permissions: Vec<String> =
+            store.claims_of(&user.id).await?.into_iter().filter(|c| c.kind == "permission").map(|c| c.value).collect();
         for role in &roles {
-            permissions.extend(store.role_claims(&role.id).await?.into_iter().filter(|c| c.kind == "permission").map(|c| c.value));
+            permissions.extend(
+                store.role_claims(&role.id).await?.into_iter().filter(|c| c.kind == "permission").map(|c| c.value),
+            );
         }
         permissions.sort();
         permissions.dedup();
@@ -288,7 +324,10 @@ impl SignInManager {
     pub(crate) fn seal_session(&self, s: &Session) -> Result<String> {
         let value = self.sealer()?.seal(SESSION, s);
         if value.len() > MAX_COOKIE {
-            return Err(Error::Internal(format!("the account session cookie would be {} bytes; give the user fewer roles or permission claims", value.len())));
+            return Err(Error::Internal(format!(
+                "the account session cookie would be {} bytes; give the user fewer roles or permission claims",
+                value.len()
+            )));
         }
         Ok(value)
     }
@@ -375,8 +414,12 @@ impl SignInManager {
         self.throttle_ip().await?;
         let Some((user, _)) = self.pending().await? else { return Err(denied("two_factor_expired")) };
         let (to, code) = match kind {
-            TwoFactorKind::Email if user.email_confirmed => (user.email.clone(), self.users().generate_email_code(&user)),
-            TwoFactorKind::Phone if user.phone_number_confirmed => (user.phone_number.clone(), self.users().generate_phone_code(&user)),
+            TwoFactorKind::Email if user.email_confirmed => {
+                (user.email.clone(), self.users().generate_email_code(&user))
+            }
+            TwoFactorKind::Phone if user.phone_number_confirmed => {
+                (user.phone_number.clone(), self.users().generate_phone_code(&user))
+            }
             _ => (None, String::new()),
         };
         let Some(to) = to else { return Err(denied("two_factor_unavailable")) };
@@ -386,7 +429,12 @@ impl SignInManager {
     /// Completes a sign in with a second factor code (`TwoFactorAuthenticatorSignInAsync`,
     /// `TwoFactorSignInAsync`). Wrong codes count toward lockout. `remember_client` lets this
     /// browser skip the second factor for `remember_two_factor`.
-    pub async fn two_factor_sign_in(&self, kind: TwoFactorKind, code: &str, remember_client: bool) -> Result<SignInResult> {
+    pub async fn two_factor_sign_in(
+        &self,
+        kind: TwoFactorKind,
+        code: &str,
+        remember_client: bool,
+    ) -> Result<SignInResult> {
         self.throttle_ip().await?;
         let Some((mut user, pending)) = self.pending().await? else { return Ok(SignInResult::Failed) };
         if let Some(early) = self.pre_sign_in(&user) {
@@ -425,7 +473,12 @@ impl SignInManager {
         self.finish_two_factor(&mut user, &pending, false).await
     }
 
-    async fn finish_two_factor(&self, user: &mut User, pending: &Pending, remember_client: bool) -> Result<SignInResult> {
+    async fn finish_two_factor(
+        &self,
+        user: &mut User,
+        pending: &Pending,
+        remember_client: bool,
+    ) -> Result<SignInResult> {
         self.users().reset_access_failed(user).await?;
         if remember_client {
             self.remember_two_factor_client(user)?;
@@ -482,7 +535,14 @@ impl SignInManager {
         let now = now_secs();
         let mut s = self.session(user, false, method, mfa, now).await?;
         s.expires = now + o.bearer_expiration.as_secs() as i64;
-        let refresh = Refresh { id: user.id.clone(), stamp: self.tag(user), method: method.to_string(), mfa, auth_time: now, expires: now + o.refresh_expiration.as_secs() as i64 };
+        let refresh = Refresh {
+            id: user.id.clone(),
+            stamp: self.tag(user),
+            method: method.to_string(),
+            mfa,
+            auth_time: now,
+            expires: now + o.refresh_expiration.as_secs() as i64,
+        };
         Ok(AccessTokens {
             token_type: "Bearer",
             access_token: self.sealer()?.seal(BEARER, &s),

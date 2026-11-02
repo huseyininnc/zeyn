@@ -2,7 +2,7 @@
 //!
 //! Orders are generated from their number, so the archive uses no memory.
 
-use crate::stock::{ProductParams, ProductStore, Product, ProductId, product_editor};
+use crate::stock::{Product, ProductId, ProductParams, ProductStore, product_editor};
 use zeyn::prelude::*;
 use zeyn::{Cursor, PageRequest};
 #[cfg(feature = "pdf")]
@@ -81,8 +81,16 @@ pub enum OrderStatus {
 
 pub const ARCHIVE: u64 = 1_000_000;
 const CUSTOMERS: [&str; 10] = [
-    "Ada Yılmaz", "Can Demir", "Elif Şahin", "Mert Kaya", "Zeynep Arslan", "Ömer Çelik", "İpek Aydın", "Deniz Koç",
-    "Selin Öztürk", "Kaan Yıldız",
+    "Ada Yılmaz",
+    "Can Demir",
+    "Elif Şahin",
+    "Mert Kaya",
+    "Zeynep Arslan",
+    "Ömer Çelik",
+    "İpek Aydın",
+    "Deniz Koç",
+    "Selin Öztürk",
+    "Kaan Yıldız",
 ];
 const CITIES: [&str; 7] = ["İstanbul", "Ankara", "İzmir", "Bursa", "Antalya", "Konya", "Eskişehir"];
 
@@ -106,7 +114,8 @@ pub fn order(n: u64, now: DateTime, minutes_ago: i64) -> Order {
 /// Orders placed since midnight in the user's time zone, one every 9 minutes.
 pub fn todays_orders(ctx: &Ctx) -> Vec<Order> {
     let now = ctx.now();
-    let midnight = DateTime::from_local(LocalDateTime::new(ctx.today(), Time::default()), ctx.time_zone()).unwrap_or(now);
+    let midnight =
+        DateTime::from_local(LocalDateTime::new(ctx.today(), Time::default()), ctx.time_zone()).unwrap_or(now);
     let minutes = (now.unix_ms() - midnight.unix_ms()) / 60_000;
     (0..=minutes / 9).map(|i| order(ARCHIVE + 1 + i as u64, now, minutes - i * 9)).collect()
 }
@@ -269,7 +278,10 @@ pub async fn invoice_data(p: OrderParams, store: ProductStore, ctx: Ctx) -> Resu
         customer_label: t("sales.invoice.customer"),
         customer: o.customer,
         city: o.city,
-        columns: ["code", "product", "quantity", "price", "amount"].iter().map(|c| t(&format!("sales.invoice.{c}"))).collect(),
+        columns: ["code", "product", "quantity", "price", "amount"]
+            .iter()
+            .map(|c| t(&format!("sales.invoice.{c}")))
+            .collect(),
         lines: lines
             .iter()
             .map(|l| InvoiceLine {
@@ -314,29 +326,31 @@ pub fn order_lines(params: OrderParams) -> Screen {
 
 #[screen(route = "/archive", permission = "sales.order.read")]
 pub fn archive() -> Screen {
-    Screen::new(t!("sales.archive")).toolbar(|t| {
-        let t = t.export(Export::Csv).export(Export::Xlsx);
-        if cfg!(feature = "pdf") { t.export(Export::Pdf) } else { t }
-    }).body(
-        DataGrid::of(search_archive)
-            .mode(DataMode::Server)
-            .paging(Paging::virtual_scroll())
-            .exportable()
-            .sort_by(Order::id, true)
-            .column(Order::id)
-            .width(110)
-            .column(Order::placed_at)
-            .width(190)
-            .column(Order::customer)
-            .flex(2)
-            .column(Order::city)
-            .flex(1)
-            .column(Order::amount)
-            .width(150)
-            .column(Order::status)
-            .width(130)
-            .row_style(muted_if_cancelled),
-    )
+    Screen::new(t!("sales.archive"))
+        .toolbar(|t| {
+            let t = t.export(Export::Csv).export(Export::Xlsx);
+            if cfg!(feature = "pdf") { t.export(Export::Pdf) } else { t }
+        })
+        .body(
+            DataGrid::of(search_archive)
+                .mode(DataMode::Server)
+                .paging(Paging::virtual_scroll())
+                .exportable()
+                .sort_by(Order::id, true)
+                .column(Order::id)
+                .width(110)
+                .column(Order::placed_at)
+                .width(190)
+                .column(Order::customer)
+                .flex(2)
+                .column(Order::city)
+                .flex(1)
+                .column(Order::amount)
+                .width(150)
+                .column(Order::status)
+                .width(130)
+                .row_style(muted_if_cancelled),
+        )
 }
 
 pub fn feature() -> Feature {

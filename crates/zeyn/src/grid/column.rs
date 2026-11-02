@@ -12,10 +12,7 @@ pub struct DataGridColumn<E: Model, T> {
 
 impl<E: Model, T> DataGridColumn<E, T> {
     fn last(&mut self) -> &mut Column<E> {
-        self.grid
-            .columns
-            .last_mut()
-            .expect("DataGridColumn always has a column")
+        self.grid.columns.last_mut().expect("DataGridColumn always has a column")
     }
 
     /// Fixed width in pixels.
@@ -123,11 +120,7 @@ impl<E: Model, T> DataGridColumn<E, T> {
     {
         let kind = self.field.meta().kind;
         self.cell(move |v: &T, r: &Render| {
-            format!(
-                r#"<span class="z-badge z-tone-{}">{}</span>"#,
-                tone(v).code(),
-                r.value(&v.to_value(), &kind)
-            )
+            format!(r#"<span class="z-badge z-tone-{}">{}</span>"#, tone(v).code(), r.value(&v.to_value(), &kind))
         })
     }
 
@@ -218,10 +211,7 @@ impl<E: Model, T> DataGridColumn<E, T> {
         self.grid.paging(paging)
     }
 
-    pub fn row_style(
-        self,
-        style: impl Fn(&E) -> Option<RowStyle> + Send + Sync + 'static,
-    ) -> DataGrid<E> {
+    pub fn row_style(self, style: impl Fn(&E) -> Option<RowStyle> + Send + Sync + 'static) -> DataGrid<E> {
         self.grid.row_style(style)
     }
 
@@ -246,10 +236,7 @@ impl<E: Model, T> DataGridColumn<E, T> {
         self.grid.selectable()
     }
 
-    pub fn row_menu(
-        self,
-        menu: impl Fn(&E) -> crate::menu::ContextMenu + Send + Sync + 'static,
-    ) -> DataGrid<E> {
+    pub fn row_menu(self, menu: impl Fn(&E) -> crate::menu::ContextMenu + Send + Sync + 'static) -> DataGrid<E> {
         self.grid.row_menu(menu)
     }
 
@@ -265,12 +252,7 @@ impl<E: Model, T> DataGridColumn<E, T> {
         self.grid.edit_with(save)
     }
 
-    pub fn bulk_action<A, K>(
-        self,
-        label: impl Into<Text>,
-        action: A,
-        key: Field<E, K>,
-    ) -> DataGrid<E>
+    pub fn bulk_action<A, K>(self, label: impl Into<Text>, action: A, key: Field<E, K>) -> DataGrid<E>
     where
         A: BulkAction<K> + Action<Input = Vec<K>>,
         A::Output: Outcome,
@@ -279,10 +261,7 @@ impl<E: Model, T> DataGridColumn<E, T> {
         self.grid.bulk_action(label, action, key)
     }
 
-    pub fn detail<S: ScreenDef>(
-        self,
-        detail: impl Fn(&E) -> (S, S::Params) + Send + Sync + 'static,
-    ) -> DataGrid<E> {
+    pub fn detail<S: ScreenDef>(self, detail: impl Fn(&E) -> (S, S::Params) + Send + Sync + 'static) -> DataGrid<E> {
         self.grid.detail(detail)
     }
 

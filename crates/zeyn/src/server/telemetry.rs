@@ -35,7 +35,8 @@ pub(crate) fn init(config: &Config, service: &str) -> Option<Flush> {
         Err(_) => (Targets::new().with_default(tracing::Level::INFO), true),
     };
     let events_only = filter.clone().and(tracing_subscriber::filter::filter_fn(|m| m.is_event()));
-    let stderr = tracing_subscriber::fmt::layer().with_writer(std::io::stderr).with_ansi(false).with_filter(events_only);
+    let stderr =
+        tracing_subscriber::fmt::layer().with_writer(std::io::stderr).with_ansi(false).with_filter(events_only);
     #[cfg(feature = "otel")]
     let (otel, provider, otel_error) = match otel::exporter(config, service) {
         Ok(Some(provider)) => (Some(otel::layer(&provider).with_filter(filter)), Some(provider), None),
@@ -92,8 +93,13 @@ mod otel {
     /// The OTLP exporter when `otel.endpoint` is set.
     pub(super) fn exporter(config: &Config, service: &str) -> Result<Option<SdkTracerProvider>, String> {
         let Some(endpoint) = config.get("otel.endpoint").map(|e| e.trim_end_matches('/')) else { return Ok(None) };
-        let endpoint = if endpoint.ends_with("/v1/traces") { endpoint.to_string() } else { format!("{endpoint}/v1/traces") };
-        let exporter = opentelemetry_otlp::SpanExporter::builder().with_http().with_endpoint(endpoint).build().map_err(|e| e.to_string())?;
+        let endpoint =
+            if endpoint.ends_with("/v1/traces") { endpoint.to_string() } else { format!("{endpoint}/v1/traces") };
+        let exporter = opentelemetry_otlp::SpanExporter::builder()
+            .with_http()
+            .with_endpoint(endpoint)
+            .build()
+            .map_err(|e| e.to_string())?;
         let name = config.get("otel.service_name").unwrap_or(service).to_string();
         Ok(Some(
             SdkTracerProvider::builder()

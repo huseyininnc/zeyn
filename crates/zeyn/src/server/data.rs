@@ -22,10 +22,7 @@ pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
     router
         .route("/_zeyn/reveal", post(reveal))
         .route("/_zeyn/reason", post(give_reason))
-        .route(
-            "/_zeyn/import",
-            post(import).layer(axum::extract::DefaultBodyLimit::max(IMPORT_BODY_LIMIT)),
-        )
+        .route("/_zeyn/import", post(import).layer(axum::extract::DefaultBodyLimit::max(IMPORT_BODY_LIMIT)))
 }
 
 /// Largest import request: the CSV text, or an XLSX file in base64.
@@ -64,7 +61,11 @@ pub(super) fn check_reason(ctx: &Ctx, meta: &ScreenMeta) -> Result<(), Failure> 
             ctx.update_trail(|t| t.reason = Some(reason));
             Ok(())
         }
-        _ => Err(Failure::Status(StatusCode::PRECONDITION_REQUIRED, "reason_required", Text::key("zeyn.privacy.reason_required"))),
+        _ => Err(Failure::Status(
+            StatusCode::PRECONDITION_REQUIRED,
+            "reason_required",
+            Text::key("zeyn.privacy.reason_required"),
+        )),
     }
 }
 
@@ -87,7 +88,8 @@ pub(super) fn reason_page(st: &AppState, ctx: &Ctx, screen: &str, csrf: &str) ->
         go = text("reason_continue"),
         screen = escape(screen),
     );
-    let mut r = Html(st.shell(ctx, csrf, &ctx.t(&Text::key("zeyn.privacy.reason_title")), &body, Some(screen))).into_response();
+    let mut r =
+        Html(st.shell(ctx, csrf, &ctx.t(&Text::key("zeyn.privacy.reason_title")), &body, Some(screen))).into_response();
     *r.status_mut() = StatusCode::PRECONDITION_REQUIRED;
     r
 }
@@ -122,7 +124,11 @@ impl ImportCall {
 
 /// Previews (`commit: false`) or imports a CSV or XLSX file through an import component. Both
 /// need the import action's permission; the file is read and validated again on commit.
-async fn import(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(mut call): axum::Json<ImportCall>) -> Response {
+async fn import(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::Json(mut call): axum::Json<ImportCall>,
+) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     if let Err(f) = st.check_csrf(&headers) {
         return st.error_response(&ctx, f);
@@ -157,7 +163,11 @@ struct ReasonCall {
 
 /// Stores the user's reason for opening a screen for 15 minutes, in an `HttpOnly` cookie. The
 /// reason is written to the audit record of every call to that screen.
-async fn give_reason(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(call): axum::Json<ReasonCall>) -> Response {
+async fn give_reason(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::Json(call): axum::Json<ReasonCall>,
+) -> Response {
     let ctx = st.ctx(&headers);
     if let Err(f) = st.check_csrf(&headers) {
         return st.error_response(&ctx, f);
@@ -174,7 +184,11 @@ async fn give_reason(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::
     let reason = call.reason.trim();
     if !valid_reason(reason) {
         let mut errors = ValidationErrors::default();
-        errors.errors.push(FieldError { field: "reason", rule: Rule::Custom, message: Text::key("zeyn.privacy.reason_invalid") });
+        errors.errors.push(FieldError {
+            field: "reason",
+            rule: Rule::Custom,
+            message: Text::key("zeyn.privacy.reason_invalid"),
+        });
         return st.error_response(&ctx, Failure::App(Error::Validation(errors)));
     }
     let secure = if st.secure_cookies { "; Secure" } else { "" };
@@ -199,7 +213,11 @@ struct RevealCall {
 
 /// Sends the raw value of one masked field to a user with its unmask permission. Every attempt is
 /// audited, including refused ones.
-async fn reveal(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(call): axum::Json<RevealCall>) -> Response {
+async fn reveal(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::Json(call): axum::Json<RevealCall>,
+) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     if let Err(f) = st.check_csrf(&headers) {
         return st.error_response(&ctx, f);
@@ -210,31 +228,36 @@ async fn reveal(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(
     };
     let info = Call { kind: CallKind::Reveal, screen: screen_name, action: None, via_agent: false };
     let (state, user) = (&*st, &ctx);
-    let result = st.intercept(&ctx, &info, move || async move {
-        let (st, ctx) = (state, user);
-        let (_, _, screen) = st.open(ctx, screen_name, call.params).await?;
-        let node = screen.node(&call.node).ok_or(Failure::App(Error::NotFound))?;
-        let found = match node.grid() {
-            Some(grid) => {
-                if !ctx.identity().can(&grid.action().access) {
-                    return Err(Failure::App(Error::Forbidden));
+    let result = st
+        .intercept(&ctx, &info, move || async move {
+            let (st, ctx) = (state, user);
+            let (_, _, screen) = st.open(ctx, screen_name, call.params).await?;
+            let node = screen.node(&call.node).ok_or(Failure::App(Error::NotFound))?;
+            let found = match node.grid() {
+                Some(grid) => {
+                    if !ctx.identity().can(&grid.action().access) {
+                        return Err(Failure::App(Error::Forbidden));
+                    }
+                    let key = call.key.clone().ok_or(Failure::App(Error::NotFound))?;
+                    st.timed(grid.reveal(ctx.clone(), key, call.field.clone())).await?
                 }
-                let key = call.key.clone().ok_or(Failure::App(Error::NotFound))?;
-                st.timed(grid.reveal(ctx.clone(), key, call.field.clone())).await?
+                None => node.reveal(&call.field),
+            };
+            let found = found.ok_or(Failure::App(Error::NotFound))?;
+            let permission = found.meta.mask.map(|m| m.permission).ok_or(Failure::App(Error::NotFound))?;
+            if !ctx.identity().can(&Access::Permission(permission)) {
+                return Err(Failure::App(Error::Forbidden));
             }
-            None => node.reveal(&call.field),
-        };
-        let found = found.ok_or(Failure::App(Error::NotFound))?;
-        let permission = found.meta.mask.map(|m| m.permission).ok_or(Failure::App(Error::NotFound))?;
-        if !ctx.identity().can(&Access::Permission(permission)) {
-            return Err(Failure::App(Error::Forbidden));
-        }
-        ctx.update_trail(|t| {
-            t.revealed.push(FieldRef { model: found.record.model, id: found.record.id.clone(), field: found.meta.name })
-        });
-        Ok(found.value)
-    })
-    .await;
+            ctx.update_trail(|t| {
+                t.revealed.push(FieldRef {
+                    model: found.record.model,
+                    id: found.record.id.clone(),
+                    field: found.meta.name,
+                })
+            });
+            Ok(found.value)
+        })
+        .await;
     match result {
         Ok(value) => {
             let mut r = axum::Json(json!({ "value": value })).into_response();

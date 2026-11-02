@@ -88,7 +88,13 @@ impl LeaveStore {
     }
 
     fn get(&self, id: LeaveRequestId) -> Result<LeaveRequest> {
-        self.0.read().map_err(|_| Error::Internal("leave store lock".into()))?.iter().find(|r| r.id == id).cloned().ok_or(Error::NotFound)
+        self.0
+            .read()
+            .map_err(|_| Error::Internal("leave store lock".into()))?
+            .iter()
+            .find(|r| r.id == id)
+            .cloned()
+            .ok_or(Error::NotFound)
     }
 }
 
@@ -116,7 +122,12 @@ pub async fn save_leave(request: Valid<LeaveRequest>, store: LeaveStore, ctx: Ct
 /// Moves a request through its workflow and tells the manager by e-mail. The mail is only
 /// queued here; a background job sends it.
 #[action(permission = "people.leave.request", audit)]
-pub async fn move_leave(request: TransitionRequest<LeaveRequestId>, store: LeaveStore, mailer: Mailer, ctx: Ctx) -> Result<LeaveState> {
+pub async fn move_leave(
+    request: TransitionRequest<LeaveRequestId>,
+    store: LeaveStore,
+    mailer: Mailer,
+    ctx: Ctx,
+) -> Result<LeaveState> {
     let (state, manager, employee) = {
         let mut rows = store.0.write().map_err(|_| Error::Internal("leave store lock".into()))?;
         let row = rows.iter_mut().find(|r| r.id == request.id).ok_or(Error::NotFound)?;
@@ -192,7 +203,8 @@ pub struct Employee {
     pub salary: Money,
 }
 
-const FIRST: [&str; 12] = ["Ada", "Can", "Elif", "Mert", "Zeynep", "Ömer", "İpek", "Deniz", "Selin", "Kaan", "Derya", "Emre"];
+const FIRST: [&str; 12] =
+    ["Ada", "Can", "Elif", "Mert", "Zeynep", "Ömer", "İpek", "Deniz", "Selin", "Kaan", "Derya", "Emre"];
 const LAST: [&str; 9] = ["Yılmaz", "Demir", "Şahin", "Kaya", "Arslan", "Çelik", "Aydın", "Koç", "Öztürk"];
 
 /// The organization: one chief, five directors, four managers under each and six people under

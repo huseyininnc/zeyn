@@ -43,8 +43,18 @@ fn poisoned<T>(_: T) -> Error {
 impl ProductStore {
     pub fn seeded() -> Self {
         let names = [
-            "Black tea", "Green tea", "Arabica beans", "Olive oil", "Pine honey", "Hazelnuts", "Dried apricots",
-            "Feta cheese", "Bulgur", "Red lentils", "Pomegranate syrup", "Tahini",
+            "Black tea",
+            "Green tea",
+            "Arabica beans",
+            "Olive oil",
+            "Pine honey",
+            "Hazelnuts",
+            "Dried apricots",
+            "Feta cheese",
+            "Bulgur",
+            "Red lentils",
+            "Pomegranate syrup",
+            "Tahini",
         ];
         let rows = (1..=240)
             .map(|i| Product {

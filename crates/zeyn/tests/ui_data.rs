@@ -60,7 +60,10 @@ async fn data(perms: &str, input: serde_json::Value, key: &str) -> (StatusCode, 
 async fn tree_children_load_through_the_actions_permission() {
     let (status, roots) = data("org.read", serde_json::json!({ "parent": null }), "").await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(roots[0], serde_json::json!({ "id": "sales", "label": "Sales <dept>", "has_children": true, "hint": "2" }));
+    assert_eq!(
+        roots[0],
+        serde_json::json!({ "id": "sales", "label": "Sales <dept>", "has_children": true, "hint": "2" })
+    );
     let (_, children) = data("org.read", serde_json::json!({ "parent": "sales" }), "").await;
     assert_eq!(children.as_array().unwrap().len(), 2);
     let (status, _) = data("org.read", serde_json::json!({ "parent": "nope" }), "").await;
@@ -80,7 +83,11 @@ fn render(chart: Chart, locale: &str) -> String {
 #[test]
 fn bar_charts_are_accessible_svg_with_a_legend_and_a_data_table() {
     let html = render(
-        Chart::bar("Sales <2026>").labels(["Jan", "Feb <b>"]).series("Shop", [1200.5, 204.0]).series("Web", [f64::NAN, 50.0]).decimals(1),
+        Chart::bar("Sales <2026>")
+            .labels(["Jan", "Feb <b>"])
+            .series("Shop", [1200.5, 204.0])
+            .series("Web", [f64::NAN, 50.0])
+            .decimals(1),
         "tr",
     );
     assert!(html.contains(r#"<svg class="z-chart-svg" viewBox="0 0 640 260" role="img" aria-labelledby="s-chart--title s-chart--desc" focusable="false">"#));
@@ -88,9 +95,15 @@ fn bar_charts_are_accessible_svg_with_a_legend_and_a_data_table() {
     assert!(html.contains("2 kategoride 2 seri gösteren sütun grafiği. En yüksek: Jan, Shop, 1.200,5."), "{html}");
     assert!(html.contains("<title>Feb &lt;b&gt;, Web: 50,0</title>"));
     assert!(!html.contains("<b>"), "labels are escaped");
-    assert!(html.contains(r#">1.500,0</text>"#) && html.contains(r#">500,0</text>"#) && html.contains(r#">0,0</text>"#), "axis goes to a round number");
+    assert!(
+        html.contains(r#">1.500,0</text>"#) && html.contains(r#">500,0</text>"#) && html.contains(r#">0,0</text>"#),
+        "axis goes to a round number"
+    );
     assert!(html.contains(r#"<li><span class="z-chart-swatch z-series-1" aria-hidden="true"></span>Web</li>"#));
-    assert!(html.contains(r#"<tr><th scope="row">Jan</th><td class="z-num">1.200,5</td><td class="z-num">0,0</td></tr>"#), "missing numbers count as zero");
+    assert!(
+        html.contains(r#"<tr><th scope="row">Jan</th><td class="z-num">1.200,5</td><td class="z-num">0,0</td></tr>"#),
+        "missing numbers count as zero"
+    );
 }
 
 #[test]

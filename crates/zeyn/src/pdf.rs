@@ -30,11 +30,11 @@ use std::marker::PhantomData;
 use std::sync::{Arc, OnceLock};
 use typst::diag::{FileError, FileResult};
 use typst::foundations::{Bytes, Datetime};
-use typst_layout::PagedDocument;
 use typst::syntax::{FileId, RootedPath, Source, VirtualPath, VirtualRoot};
 use typst::text::{Font, FontBook};
 use typst::utils::LazyHash;
 use typst::{Library, LibraryExt, World};
+use typst_layout::PagedDocument;
 
 /// Largest data a document may get, in bytes of JSON.
 pub const MAX_PDF_DATA: usize = 16 * 1024 * 1024;
@@ -109,14 +109,21 @@ impl Pdf {
             let entries = std::fs::read_dir(dir).map_err(|e| Error::Internal(format!("pdf.fonts: {e}")))?;
             for entry in entries.flatten() {
                 let path = entry.path();
-                let font = path.extension().and_then(|e| e.to_str()).is_some_and(|e| matches!(e.to_ascii_lowercase().as_str(), "ttf" | "otf" | "ttc" | "otc"));
+                let font = path
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .is_some_and(|e| matches!(e.to_ascii_lowercase().as_str(), "ttf" | "otf" | "ttc" | "otc"));
                 if font && let Ok(data) = std::fs::read(&path) {
                     extra.extend(Font::iter(Bytes::new(data)));
                 }
             }
         }
         let max = match config.get("pdf.max_concurrent") {
-            Some(n) => n.parse::<usize>().ok().filter(|n| (1..=64).contains(n)).ok_or_else(|| Error::Internal("pdf.max_concurrent must be 1 to 64".into()))?,
+            Some(n) => n
+                .parse::<usize>()
+                .ok()
+                .filter(|n| (1..=64).contains(n))
+                .ok_or_else(|| Error::Internal("pdf.max_concurrent must be 1 to 64".into()))?,
             None => default_limit(),
         };
         Ok(Pdf::build(extra, max))
@@ -157,11 +164,16 @@ impl Pdf {
     pub async fn render(&self, template: PdfTemplate, data: &impl Serialize) -> Result<Vec<u8>> {
         let data = serde_json::to_vec(data).map_err(|e| Error::Internal(format!("pdf data: {e}")))?;
         if data.len() > MAX_PDF_DATA {
-            return Err(Error::Internal(format!("pdf data for `{}` is larger than {MAX_PDF_DATA} bytes", template.name)));
+            return Err(Error::Internal(format!(
+                "pdf data for `{}` is larger than {MAX_PDF_DATA} bytes",
+                template.name
+            )));
         }
         let _permit = self.0.permits.acquire().await.map_err(|_| Error::Internal("pdf renderer closed".into()))?;
         let pdf = self.clone();
-        tokio::task::spawn_blocking(move || pdf.render_now(template, data)).await.map_err(|e| Error::Internal(format!("pdf: {e}")))?
+        tokio::task::spawn_blocking(move || pdf.render_now(template, data))
+            .await
+            .map_err(|e| Error::Internal(format!("pdf: {e}")))?
     }
 
     /// Renders on the calling thread without the concurrency limit. `data` is JSON.
@@ -169,10 +181,21 @@ impl Pdf {
         let world = DocWorld::new(&self.0, template, data);
         let compiled = typst::compile::<PagedDocument>(&world).output;
         let result = compiled
-            .map_err(|errors| Error::Internal(format!("pdf `{}`: {}", template.name, errors.iter().map(|e| e.message.as_str()).collect::<Vec<_>>().join("; "))))
+            .map_err(|errors| {
+                Error::Internal(format!(
+                    "pdf `{}`: {}",
+                    template.name,
+                    errors.iter().map(|e| e.message.as_str()).collect::<Vec<_>>().join("; ")
+                ))
+            })
             .and_then(|doc| {
-                typst_pdf::pdf(&doc, &typst_pdf::PdfOptions::default())
-                    .map_err(|errors| Error::Internal(format!("pdf `{}`: {}", template.name, errors.iter().map(|e| e.message.as_str()).collect::<Vec<_>>().join("; "))))
+                typst_pdf::pdf(&doc, &typst_pdf::PdfOptions::default()).map_err(|errors| {
+                    Error::Internal(format!(
+                        "pdf `{}`: {}",
+                        template.name,
+                        errors.iter().map(|e| e.message.as_str()).collect::<Vec<_>>().join("; ")
+                    ))
+                })
             });
         typst::comemo::evict(0);
         result
@@ -379,8 +402,14 @@ mod tests {
 
     #[test]
     fn embedded_fonts_cover_turkish_text() {
-        assert!(Pdf::new().families().iter().any(|f| f.eq_ignore_ascii_case("libertinus serif")), "{:?}", Pdf::new().families());
-        let text = printed("#set text(font: \"Libertinus Serif\")\n#data.t", json!({ "t": "Çağrı Şükrü İĞÖÜ ıi 1.234,56 ₺" })).unwrap();
+        assert!(
+            Pdf::new().families().iter().any(|f| f.eq_ignore_ascii_case("libertinus serif")),
+            "{:?}",
+            Pdf::new().families()
+        );
+        let text =
+            printed("#set text(font: \"Libertinus Serif\")\n#data.t", json!({ "t": "Çağrı Şükrü İĞÖÜ ıi 1.234,56 ₺" }))
+                .unwrap();
         assert_eq!(text, "ÇağrıŞükrüİĞÖÜıi1.234,56₺");
         assert_eq!((lang("tr-TR"), lang("en"), lang("*")), ("tr".to_string(), "en".to_string(), "en".to_string()));
     }

@@ -57,7 +57,11 @@ impl Authenticator {
     fn new() -> Self {
         let rng = SystemRandom::new();
         let pkcs8 = EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, &rng).unwrap();
-        Authenticator { key: EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, pkcs8.as_ref(), &rng).unwrap(), id: vec![7; 32], count: 0 }
+        Authenticator {
+            key: EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, pkcs8.as_ref(), &rng).unwrap(),
+            id: vec![7; 32],
+            count: 0,
+        }
     }
 
     fn cose(&self) -> Vec<u8> {
@@ -95,7 +99,8 @@ impl Authenticator {
 
     fn assert(&mut self, options: &Json, origin: &str) -> Json {
         self.count += 1;
-        let mut auth = ring::digest::digest(&ring::digest::SHA256, options["rpId"].as_str().unwrap().as_bytes()).as_ref().to_vec();
+        let mut auth =
+            ring::digest::digest(&ring::digest::SHA256, options["rpId"].as_str().unwrap().as_bytes()).as_ref().to_vec();
         auth.push(0x05);
         auth.extend(self.count.to_be_bytes());
         let cd = Self::client_data("webauthn.get", options["challenge"].as_str().unwrap(), origin);
@@ -143,7 +148,13 @@ async fn passkeys_register_sign_in_and_refuse_replays_and_forgeries() {
         .public_url(ORIGIN);
     a.users().create(User::new("pk@example.com").with_email("pk@example.com"), Some("Secret-123")).await.unwrap();
     let router = App::new("T").accounts(a.clone()).feature(accounts::feature()).router().unwrap();
-    let login = post(&router, "/_zeyn/account/login?useCookies=true", json!({ "email": "pk@example.com", "password": "Secret-123" }), "").await;
+    let login = post(
+        &router,
+        "/_zeyn/account/login?useCookies=true",
+        json!({ "email": "pk@example.com", "password": "Secret-123" }),
+        "",
+    )
+    .await;
     let session = format!("zeyn_account={}", login.cookie("zeyn_account").unwrap());
 
     let mut device = Authenticator::new();
@@ -155,27 +166,62 @@ async fn passkeys_register_sign_in_and_refuse_replays_and_forgeries() {
     assert_eq!(unb64(opts["challenge"].as_str().unwrap()).len(), 32);
     let ceremony = format!("zeyn_account_passkey={}", options.cookie("zeyn_account_passkey").unwrap());
     let cred = device.register(&opts);
-    let added = post(&router, "/_zeyn/account/manage/passkeys", json!({ "credentialJson": cred.to_string(), "name": "Laptop" }), &format!("{session}; {ceremony}")).await;
+    let added = post(
+        &router,
+        "/_zeyn/account/manage/passkeys",
+        json!({ "credentialJson": cred.to_string(), "name": "Laptop" }),
+        &format!("{session}; {ceremony}"),
+    )
+    .await;
     assert_eq!(added.status, StatusCode::OK, "{}", added.body);
-    let again = post(&router, "/_zeyn/account/manage/passkeys", json!({ "credentialJson": cred.to_string(), "name": "Laptop" }), &session).await;
+    let again = post(
+        &router,
+        "/_zeyn/account/manage/passkeys",
+        json!({ "credentialJson": cred.to_string(), "name": "Laptop" }),
+        &session,
+    )
+    .await;
     assert_eq!(again.status, StatusCode::BAD_REQUEST, "a registration needs its own challenge");
 
     let request = post(&router, "/_zeyn/account/passkeys/requestOptions", json!({}), "").await;
     let ropts: Json = serde_json::from_str(&request.body).unwrap();
     let ceremony = format!("zeyn_account_passkey={}", request.cookie("zeyn_account_passkey").unwrap());
     let assertion = device.assert(&ropts, ORIGIN);
-    let signed_in = post(&router, "/_zeyn/account/passkeys/login?useSessionCookies=true", json!({ "credentialJson": assertion.to_string() }), &ceremony).await;
+    let signed_in = post(
+        &router,
+        "/_zeyn/account/passkeys/login?useSessionCookies=true",
+        json!({ "credentialJson": assertion.to_string() }),
+        &ceremony,
+    )
+    .await;
     assert_eq!(signed_in.status, StatusCode::OK, "{}", signed_in.body);
     assert!(signed_in.cookie("zeyn_account").is_some_and(|c| !c.is_empty()));
 
-    let replay = post(&router, "/_zeyn/account/passkeys/login?useSessionCookies=true", json!({ "credentialJson": assertion.to_string() }), "").await;
+    let replay = post(
+        &router,
+        "/_zeyn/account/passkeys/login?useSessionCookies=true",
+        json!({ "credentialJson": assertion.to_string() }),
+        "",
+    )
+    .await;
     assert_eq!(replay.status, StatusCode::BAD_REQUEST, "the challenge is used once");
 
-    let fresh = |r: &Reply| (serde_json::from_str::<Json>(&r.body).unwrap(), format!("zeyn_account_passkey={}", r.cookie("zeyn_account_passkey").unwrap()));
+    let fresh = |r: &Reply| {
+        (
+            serde_json::from_str::<Json>(&r.body).unwrap(),
+            format!("zeyn_account_passkey={}", r.cookie("zeyn_account_passkey").unwrap()),
+        )
+    };
     let (o, c) = fresh(&post(&router, "/_zeyn/account/passkeys/requestOptions", json!({}), "").await);
     device.count -= 1;
     let same_count = device.assert(&o, ORIGIN);
-    assert_eq!(post(&router, "/_zeyn/account/passkeys/login", json!({ "credentialJson": same_count.to_string() }), &c).await.status, StatusCode::BAD_REQUEST, "a counter that does not grow is refused");
+    assert_eq!(
+        post(&router, "/_zeyn/account/passkeys/login", json!({ "credentialJson": same_count.to_string() }), &c)
+            .await
+            .status,
+        StatusCode::BAD_REQUEST,
+        "a counter that does not grow is refused"
+    );
 
     let (o, c) = fresh(&post(&router, "/_zeyn/account/passkeys/requestOptions", json!({}), "").await);
     let mut stale = device.assert(&o, ORIGIN);
@@ -183,11 +229,21 @@ async fn passkeys_register_sign_in_and_refuse_replays_and_forgeries() {
     let last = sig.len() - 1;
     sig[last] ^= 1;
     stale["response"]["signature"] = json!(b64(&sig));
-    assert_eq!(post(&router, "/_zeyn/account/passkeys/login", json!({ "credentialJson": stale.to_string() }), &c).await.status, StatusCode::BAD_REQUEST, "a changed signature is refused");
+    assert_eq!(
+        post(&router, "/_zeyn/account/passkeys/login", json!({ "credentialJson": stale.to_string() }), &c).await.status,
+        StatusCode::BAD_REQUEST,
+        "a changed signature is refused"
+    );
 
     let (o, c) = fresh(&post(&router, "/_zeyn/account/passkeys/requestOptions", json!({}), "").await);
     let phishing = device.assert(&o, "http://localhost.evil.example");
-    assert_eq!(post(&router, "/_zeyn/account/passkeys/login", json!({ "credentialJson": phishing.to_string() }), &c).await.status, StatusCode::BAD_REQUEST, "another origin is refused");
+    assert_eq!(
+        post(&router, "/_zeyn/account/passkeys/login", json!({ "credentialJson": phishing.to_string() }), &c)
+            .await
+            .status,
+        StatusCode::BAD_REQUEST,
+        "another origin is refused"
+    );
 
     let user = a.users().find_by_name("pk@example.com").await.unwrap().unwrap();
     let stored = a.users().passkeys(&user).await.unwrap();

@@ -167,7 +167,10 @@ mod tests {
         let g = guard();
         let cookie = format!("theme=dark; {COOKIE}={}", g.token);
         assert_eq!(g.check(&headers(&[("host", "127.0.0.1:4321"), ("cookie", &cookie)])), Ok(()));
-        assert_eq!(g.check(&headers(&[("host", "127.0.0.1:4321"), ("origin", "http://127.0.0.1:4321"), (HEADER, &g.token)])), Ok(()));
+        assert_eq!(
+            g.check(&headers(&[("host", "127.0.0.1:4321"), ("origin", "http://127.0.0.1:4321"), (HEADER, &g.token)])),
+            Ok(())
+        );
     }
 
     #[test]
@@ -188,7 +191,11 @@ mod tests {
         }
         assert_eq!(g.check(&headers(&[(HEADER, &g.token)])), Err(Refusal::Host));
         for origin in ["http://evil.example", "null", "http://localhost:4321", "https://127.0.0.1:4321"] {
-            assert_eq!(g.check(&headers(&[("host", "127.0.0.1:4321"), ("origin", origin), (HEADER, &g.token)])), Err(Refusal::Origin), "{origin}");
+            assert_eq!(
+                g.check(&headers(&[("host", "127.0.0.1:4321"), ("origin", origin), (HEADER, &g.token)])),
+                Err(Refusal::Origin),
+                "{origin}"
+            );
         }
     }
 

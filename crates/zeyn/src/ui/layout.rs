@@ -19,7 +19,6 @@ macro_rules! into_node {
 }
 pub(crate) use into_node;
 
-
 into_node!(Row, Stack, Panel, Card, Tabs, Split);
 
 fn children_schema(nodes: &[Node]) -> Vec<Json> {
@@ -176,7 +175,9 @@ impl Component for Panel {
     fn render(&self, out: &mut String, r: &Render) {
         let id = dom_id(r, "panel");
         let title = r.text(&self.title);
-        out.push_str(&format!(r#"<section class="z-panel" aria-labelledby="{id}-title"><header class="z-panel-head">"#));
+        out.push_str(&format!(
+            r#"<section class="z-panel" aria-labelledby="{id}-title"><header class="z-panel-head">"#
+        ));
         if self.collapsible {
             out.push_str(&format!(
                 r#"<h2 class="z-panel-title" id="{id}-title"><button type="button" class="z-panel-toggle" data-zeyn-toggle aria-expanded="{}" aria-controls="{id}-body" data-testid="{}.panel.{}"><span class="z-chevron" aria-hidden="true"></span>{title}</button></h2>"#,
@@ -369,7 +370,8 @@ impl Split {
 impl Component for Split {
     fn render(&self, out: &mut String, r: &Render) {
         let id = dom_id(r, "split");
-        let (class, orientation) = if self.vertical { ("z-split z-split-v", "horizontal") } else { ("z-split", "vertical") };
+        let (class, orientation) =
+            if self.vertical { ("z-split z-split-v", "horizontal") } else { ("z-split", "vertical") };
         out.push_str(&format!(r#"<div class="{class}" data-zeyn-split style="--z-split:{}%">"#, self.ratio));
         out.push_str(&format!(r#"<div class="z-split-pane" id="{id}-first">"#));
         render_child(out, r, 0, &self.nodes[0]);

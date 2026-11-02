@@ -62,9 +62,13 @@ impl PasswordHasher {
 
     /// The hash of `password` as a PHC string.
     pub fn hash(&self, password: &str) -> crate::Result<String> {
-        let salt = SaltString::encode_b64(&super::random_bytes::<16>()).map_err(|e| crate::Error::Internal(format!("salt: {e}")))?;
+        let salt = SaltString::encode_b64(&super::random_bytes::<16>())
+            .map_err(|e| crate::Error::Internal(format!("salt: {e}")))?;
         let argon = self.argon().ok_or_else(|| crate::Error::Internal("invalid Argon2 parameters".into()))?;
-        argon.hash_password(password.as_bytes(), &salt).map(|h| h.to_string()).map_err(|e| crate::Error::Internal(format!("password hash: {e}")))
+        argon
+            .hash_password(password.as_bytes(), &salt)
+            .map(|h| h.to_string())
+            .map_err(|e| crate::Error::Internal(format!("password hash: {e}")))
     }
 
     /// Checks `password` against a stored hash in any supported format. Malformed hashes fail.
@@ -136,10 +140,15 @@ pub mod dotnet {
                     return false;
                 }
                 let iterations = NonZeroU32::new(1000).expect("non zero");
-                pbkdf2::verify(pbkdf2::PBKDF2_HMAC_SHA1, iterations, &bytes[1..17], password.as_bytes(), &bytes[17..]).is_ok()
+                pbkdf2::verify(pbkdf2::PBKDF2_HMAC_SHA1, iterations, &bytes[1..17], password.as_bytes(), &bytes[17..])
+                    .is_ok()
             }
             Some(0x01) => {
-                let (Some(prf), Some(iterations), Some(salt_len)) = (read_u32(&bytes, 1), read_u32(&bytes, 5), read_u32(&bytes, 9)) else { return false };
+                let (Some(prf), Some(iterations), Some(salt_len)) =
+                    (read_u32(&bytes, 1), read_u32(&bytes, 5), read_u32(&bytes, 9))
+                else {
+                    return false;
+                };
                 let prf = match prf {
                     0 => Prf::Sha1,
                     1 => Prf::Sha256,
@@ -147,7 +156,11 @@ pub mod dotnet {
                     _ => return false,
                 };
                 let salt_len = salt_len as usize;
-                if salt_len < 16 || iterations > MAX_PBKDF2_ITERATIONS || bytes.len() < 13 + salt_len + 16 || bytes.len() > 13 + 1024 {
+                if salt_len < 16
+                    || iterations > MAX_PBKDF2_ITERATIONS
+                    || bytes.len() < 13 + salt_len + 16
+                    || bytes.len() > 13 + 1024
+                {
                     return false;
                 }
                 let Some(iterations) = NonZeroU32::new(iterations) else { return false };
@@ -162,7 +175,13 @@ pub mod dotnet {
     /// migration tooling.
     pub fn hash_v2(password: &str, salt: [u8; 16]) -> String {
         let mut subkey = [0u8; 32];
-        pbkdf2::derive(pbkdf2::PBKDF2_HMAC_SHA1, NonZeroU32::new(1000).expect("non zero"), &salt, password.as_bytes(), &mut subkey);
+        pbkdf2::derive(
+            pbkdf2::PBKDF2_HMAC_SHA1,
+            NonZeroU32::new(1000).expect("non zero"),
+            &salt,
+            password.as_bytes(),
+            &mut subkey,
+        );
         let mut out = vec![0x00];
         out.extend_from_slice(&salt);
         out.extend_from_slice(&subkey);
@@ -173,7 +192,13 @@ pub mod dotnet {
     /// migration tooling.
     pub fn hash_v3(password: &str, prf: Prf, iterations: u32, salt: &[u8]) -> String {
         let mut subkey = [0u8; 32];
-        pbkdf2::derive(prf.algorithm(), NonZeroU32::new(iterations.max(1)).expect("non zero"), salt, password.as_bytes(), &mut subkey);
+        pbkdf2::derive(
+            prf.algorithm(),
+            NonZeroU32::new(iterations.max(1)).expect("non zero"),
+            salt,
+            password.as_bytes(),
+            &mut subkey,
+        );
         let mut out = vec![0x01];
         out.extend_from_slice(&(prf as u32).to_be_bytes());
         out.extend_from_slice(&iterations.to_be_bytes());

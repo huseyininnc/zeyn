@@ -159,28 +159,55 @@ pub async fn data_layer(url: &str, raw: &Raw) {
     assert_eq!(all.len(), 300);
     assert_eq!(all[0].code, "P-0001");
     assert_eq!(all[0].version, 1);
-    assert!(all[3] == Item { id: ItemId(4), stock: 4, version: 1, ..item(4) }, "every type reads back as written: {:?}", all[3]);
+    assert!(
+        all[3] == Item { id: ItemId(4), stock: 4, version: 1, ..item(4) },
+        "every type reads back as written: {:?}",
+        all[3]
+    );
 
     same(&db, &all, query(vec![], vec![], 0, 25)).await;
     same(&db, &all, query(vec![], vec![("name", false)], 50, 25)).await;
     same(&db, &all, query(vec![], vec![("note", true), ("price", false)], 0, 60)).await;
     same(&db, &all, query(vec![], vec![("at", false)], 280, 30)).await;
     same(&db, &all, query(vec![Filter::contains("name", "TEA")], vec![("qty", true)], 0, 500)).await;
-    same(&db, &all, query(vec![Filter { starts_with: Some("gre".into()), ..Filter::contains("name", "") }], vec![], 0, 50)).await;
-    same(&db, &all, query(vec![Filter { equals: Some("p-0042".into()), ..Filter::contains("code", "") }], vec![], 0, 50)).await;
+    same(
+        &db,
+        &all,
+        query(vec![Filter { starts_with: Some("gre".into()), ..Filter::contains("name", "") }], vec![], 0, 50),
+    )
+    .await;
+    same(
+        &db,
+        &all,
+        query(vec![Filter { equals: Some("p-0042".into()), ..Filter::contains("code", "") }], vec![], 0, 50),
+    )
+    .await;
     same(&db, &all, query(vec![Filter::range("price", Some("10"), Some("45.5"))], vec![], 0, 500)).await;
     same(&db, &all, query(vec![Filter::range("qty", Some("-2.5"), Some("3.5"))], vec![("small", true)], 0, 500)).await;
-    same(&db, &all, query(vec![Filter::range("day", Some("2026-03-01"), Some("2026-05-15"))], vec![("day", false)], 0, 500)).await;
+    same(
+        &db,
+        &all,
+        query(vec![Filter::range("day", Some("2026-03-01"), Some("2026-05-15"))], vec![("day", false)], 0, 500),
+    )
+    .await;
     same(&db, &all, query(vec![Filter::range("at", Some("2026-01-02"), Some("2026-01-05"))], vec![], 0, 500)).await;
-    same(&db, &all, query(vec![Filter::range("clock", Some("10:00"), Some("14:30"))], vec![("clock", true)], 0, 500)).await;
+    same(&db, &all, query(vec![Filter::range("clock", Some("10:00"), Some("14:30"))], vec![("clock", true)], 0, 500))
+        .await;
     same(&db, &all, query(vec![Filter::range("local", Some("2026-02-01"), None)], vec![("local", true)], 0, 500)).await;
     same(&db, &all, query(vec![Filter::any_of("kind", ["Food", "Tool", "Nope"])], vec![("kind", false)], 0, 500)).await;
     same(&db, &all, query(vec![Filter::is("active", false), Filter::blank("note", true)], vec![], 0, 500)).await;
-    same(&db, &all, query(vec![Filter::blank("at", false), Filter::any_of("id", ["3", "30", "300", "x"])], vec![], 0, 50)).await;
+    same(
+        &db,
+        &all,
+        query(vec![Filter::blank("at", false), Filter::any_of("id", ["3", "30", "300", "x"])], vec![], 0, 50),
+    )
+    .await;
     same(&db, &all, query(vec![Filter::contains("day", "2026-03")], vec![], 0, 500)).await;
     same(&db, &all, query(vec![Filter::contains("code", "%"), Filter::contains("code", "_")], vec![], 0, 500)).await;
 
-    let totals = |field: &str, ops: &[Aggregate]| ops.iter().map(|op| AggregateRequest { field: field.into(), op: *op }).collect::<Vec<_>>();
+    let totals = |field: &str, ops: &[Aggregate]| {
+        ops.iter().map(|op| AggregateRequest { field: field.into(), op: *op }).collect::<Vec<_>>()
+    };
     let mut q = query(vec![Filter::is("active", true)], vec![], 0, 10);
     q.aggregates = [
         totals("price", &[Aggregate::Sum, Aggregate::Avg, Aggregate::Min, Aggregate::Max, Aggregate::Count]),
@@ -205,7 +232,12 @@ pub async fn data_layer(url: &str, raw: &Raw) {
         same(&db, &all, g).await;
     }
 
-    for sort in [vec![("note", true), ("name", false)], vec![("note", false)], vec![("at", true)], vec![("price", true), ("day", false)]] {
+    for sort in [
+        vec![("note", true), ("name", false)],
+        vec![("note", false)],
+        vec![("at", true)],
+        vec![("price", true), ("day", false)],
+    ] {
         let mut expected = query(vec![Filter::range("qty", Some("-3"), None)], sort.clone(), 0, 500);
         expected.with_total = false;
         let expected = expected.apply(all.clone());
@@ -290,7 +322,8 @@ pub async fn streams(url: &str, raw: &Raw) {
     let db = Db::connect(url, PoolLimits { max_connections: 2, ..PoolLimits::default() }).await.unwrap();
     db.execute(raw.fill_stream, vec![]).await.unwrap();
 
-    let mut stream = db.stream::<Line>(&DataQuery { sort: vec![Sort { field: "id".into(), desc: true }], ..DataQuery::default() });
+    let mut stream =
+        db.stream::<Line>(&DataQuery { sort: vec![Sort { field: "id".into(), desc: true }], ..DataQuery::default() });
     let (mut n, mut last) = (0u64, i64::MAX);
     while let Some(row) = stream.next().await {
         let row = row.unwrap();

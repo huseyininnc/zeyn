@@ -254,14 +254,27 @@ pub fn normalize_shortcut(keys: &str) -> Option<String> {
         flags[i] = true;
     }
     let key = key_name(key)?;
-    let mut out: Vec<&str> = ["Control", "Alt", "Shift", "Meta"].iter().zip(flags).filter(|(_, on)| *on).map(|(n, _)| *n).collect();
+    let mut out: Vec<&str> =
+        ["Control", "Alt", "Shift", "Meta"].iter().zip(flags).filter(|(_, on)| *on).map(|(n, _)| *n).collect();
     out.push(&key);
     Some(out.join("+"))
 }
 
 const NAMED_KEYS: [&str; 14] = [
-    "Enter", "Escape", "Delete", "Backspace", "Insert", "Home", "End", "PageUp", "PageDown", "ArrowUp", "ArrowDown", "ArrowLeft",
-    "ArrowRight", "Tab",
+    "Enter",
+    "Escape",
+    "Delete",
+    "Backspace",
+    "Insert",
+    "Home",
+    "End",
+    "PageUp",
+    "PageDown",
+    "ArrowUp",
+    "ArrowDown",
+    "ArrowLeft",
+    "ArrowRight",
+    "Tab",
 ];
 
 fn key_name(key: &str) -> Option<String> {
@@ -293,7 +306,9 @@ pub(crate) fn problems(commands: &[(&str, &Command)], check_each: bool) -> Vec<S
     let mut seen: Vec<(String, &str, &str)> = Vec::new();
     for (i, (owner, c)) in commands.iter().enumerate() {
         if check_each {
-            if c.id.is_empty() || !c.id.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"._-".contains(&b)) {
+            if c.id.is_empty()
+                || !c.id.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"._-".contains(&b))
+            {
                 out.push(format!(
                     "command `{}` has an id that is not usable in HTML\n  = help: use lower case letters, digits, dots, dashes and underscores, such as `sales.new_order`",
                     c.id
@@ -363,7 +378,9 @@ impl SearchHit {
     /// Whether the path stays in the app: it starts with one `/` and has no backslash or control
     /// character. Hits that do not are dropped before they reach the browser.
     pub fn is_local(&self) -> bool {
-        self.url.starts_with('/') && !self.url.starts_with("//") && !self.url.chars().any(|c| c == '\\' || c.is_control())
+        self.url.starts_with('/')
+            && !self.url.starts_with("//")
+            && !self.url.chars().any(|c| c == '\\' || c.is_control())
     }
 }
 

@@ -60,12 +60,20 @@ impl Island {
 }
 
 fn network(e: JsValue) -> CallError {
-    CallError { status: 0, code: "network".into(), message: e.as_string().unwrap_or_else(|| "The server could not be reached.".into()) }
+    CallError {
+        status: 0,
+        code: "network".into(),
+        message: e.as_string().unwrap_or_else(|| "The server could not be reached.".into()),
+    }
 }
 
 /// Content of `meta[name=...]` in the page head.
 fn meta(doc: &web_sys::Document, name: &str) -> String {
-    doc.query_selector(&format!("meta[name=\"{name}\"]")).ok().flatten().and_then(|m| m.get_attribute("content")).unwrap_or_default()
+    doc.query_selector(&format!("meta[name=\"{name}\"]"))
+        .ok()
+        .flatten()
+        .and_then(|m| m.get_attribute("content"))
+        .unwrap_or_default()
 }
 
 /// Posts JSON below the app base with the CSRF header. Returns the status and the body text.
@@ -81,7 +89,11 @@ async fn post(path: &str, body: &str) -> Result<(u16, String), CallError> {
     init.set_headers(&headers);
     init.set_body(&JsValue::from_str(body));
     let url = format!("{}{path}", meta(&doc, "zeyn-base").trim_end_matches('/'));
-    let res: Response = JsFuture::from(window.fetch_with_str_and_init(&url, &init)).await.map_err(network)?.dyn_into().map_err(network)?;
+    let res: Response = JsFuture::from(window.fetch_with_str_and_init(&url, &init))
+        .await
+        .map_err(network)?
+        .dyn_into()
+        .map_err(network)?;
     let text = JsFuture::from(res.text().map_err(network)?).await.map_err(network)?;
     Ok((res.status(), text.as_string().unwrap_or_default()))
 }

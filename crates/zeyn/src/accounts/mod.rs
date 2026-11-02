@@ -32,14 +32,15 @@ mod ui;
 pub use manager::{RoleManager, UserManager};
 pub use model::{AUTHENTICATOR_KEY, Claim, INTERNAL_PROVIDER, Passkey, RECOVERY_CODES, Role, User, UserLogin};
 pub use passkey::PasskeyOptions;
-pub use password::{BreachedPasswords, MAX_PASSWORD_BYTES, PasswordDenyList, PasswordHasher, PasswordOptions, Verification, dotnet};
+pub use password::{
+    BreachedPasswords, MAX_PASSWORD_BYTES, PasswordDenyList, PasswordHasher, PasswordOptions, Verification, dotnet,
+};
 pub use signin::{SignInManager, SignInResult, TwoFactorKind};
 #[cfg(any(feature = "postgres", feature = "oracle"))]
 pub use sql::{SqlAccountStore, create_tables};
 pub use store::{AccountStore, MemoryAccountStore};
 pub use tokens::Purpose;
 pub use ui::{AccountsUi, ROLES_WRITE, USERS_READ, USERS_WRITE, feature, ui};
-
 
 use crate::ctx::{BoxFuture, Ctx, Service};
 use crate::i18n::Text;
@@ -60,7 +61,11 @@ pub struct LockoutOptions {
 
 impl Default for LockoutOptions {
     fn default() -> Self {
-        LockoutOptions { allowed_for_new_users: true, max_failed_access_attempts: 5, default_lockout: Duration::from_secs(300) }
+        LockoutOptions {
+            allowed_for_new_users: true,
+            max_failed_access_attempts: 5,
+            default_lockout: Duration::from_secs(300),
+        }
     }
 }
 
@@ -309,7 +314,10 @@ impl MemorySender {
     /// The last link or code sent to `to`.
     pub fn last(&self, to: &str) -> Option<String> {
         self.messages().into_iter().rev().find(|(t, _)| t == to).map(|(_, m)| match m {
-            AccountMessage::ConfirmEmail { link } | AccountMessage::ResetPassword { link } | AccountMessage::ChangeEmail { link } | AccountMessage::AlreadyRegistered { link } => link,
+            AccountMessage::ConfirmEmail { link }
+            | AccountMessage::ResetPassword { link }
+            | AccountMessage::ChangeEmail { link }
+            | AccountMessage::AlreadyRegistered { link } => link,
             AccountMessage::TwoFactorCode { code } | AccountMessage::PhoneCode { code } => code,
         })
     }
@@ -533,7 +541,8 @@ impl Accounts {
     #[cfg(feature = "oidc")]
     pub fn external(self, name: &str, mut provider: crate::auth::OidcAuth) -> Accounts {
         provider.finish();
-        let name = name.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_').take(32).collect::<String>();
+        let name =
+            name.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_').take(32).collect::<String>();
         self.change(|c| c.externals.push((name, Arc::new(provider))))
     }
 
@@ -580,16 +589,24 @@ impl Accounts {
             problems.push(format!("Accounts: the key must be at least {} bytes", crate::auth::seal::MIN_SECRET));
         }
         if self.0.public_url.as_deref().is_some_and(|u| !(u.starts_with("https://") || u.starts_with("http://"))) {
-            problems.push("Accounts: the public URL must start with https:// (or http:// for local development)".into());
+            problems
+                .push("Accounts: the public URL must start with https:// (or http:// for local development)".into());
         }
         problems
     }
 
     pub(crate) fn event(&self, kind: AccountEventKind, user: Option<&str>) {
-        let event = AccountEvent { at: now_secs(), kind, user: user.map(str::to_string), ip: scope::ip().map(|i| i.to_string()) };
+        let event = AccountEvent {
+            at: now_secs(),
+            kind,
+            user: user.map(str::to_string),
+            ip: scope::ip().map(|i| i.to_string()),
+        };
         match &self.0.events {
             Some(sink) => sink.record(event),
-            None => tracing::info!(target: "zeyn::accounts", kind = ?event.kind, user = event.user.as_deref().unwrap_or(""), ip = event.ip.as_deref().unwrap_or(""), "account event"),
+            None => {
+                tracing::info!(target: "zeyn::accounts", kind = ?event.kind, user = event.user.as_deref().unwrap_or(""), ip = event.ip.as_deref().unwrap_or(""), "account event")
+            }
         }
     }
 

@@ -38,7 +38,8 @@ async fn postgres_runs_migrations() {
         db.execute("DROP TABLE IF EXISTS _sqlx_migrations", vec![]).await.unwrap();
         let dir = std::env::temp_dir().join(format!("zeyn-migrations-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("0001_create.sql"), "CREATE TABLE zeyn_test_migrated (id BIGINT PRIMARY KEY);").unwrap();
+        std::fs::write(dir.join("0001_create.sql"), "CREATE TABLE zeyn_test_migrated (id BIGINT PRIMARY KEY);")
+            .unwrap();
         db.migrate_dir(&dir).await.unwrap();
         db.migrate_dir(&dir).await.unwrap();
         assert_eq!(db.execute("INSERT INTO zeyn_test_migrated (id) VALUES ($1)", vec![Arg::Int(1)]).await.unwrap(), 1);

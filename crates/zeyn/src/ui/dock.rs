@@ -104,7 +104,11 @@ impl DockLayout {
     /// Keeps only panels in `known`, each once, and sizes within [`DOCK_SIZE`].
     pub fn clean(mut self, known: &[&str]) -> DockLayout {
         let clamp = |v: u8| v.clamp(DOCK_SIZE.0, DOCK_SIZE.1);
-        self.sizes = DockSizes { left: clamp(self.sizes.left), right: clamp(self.sizes.right), bottom: clamp(self.sizes.bottom) };
+        self.sizes = DockSizes {
+            left: clamp(self.sizes.left),
+            right: clamp(self.sizes.right),
+            bottom: clamp(self.sizes.bottom),
+        };
         let mut seen: Vec<String> = Vec::new();
         self.panels.retain(|p| {
             let keep = known.contains(&p.id.as_str()) && !seen.contains(&p.id);
@@ -120,8 +124,10 @@ impl DockLayout {
     /// `width`, `panel:{area}:{id}` columns carry `width` 1 when open and 0 when closed and pin
     /// `start` on the active panel.
     pub fn to_view(&self) -> DataGridView {
-        let size = |name: &str, v: u8| ColumnView { field: format!("{SIZE_PREFIX}{name}"), width: Some(v.into()), pin: None };
-        let mut columns = vec![size("left", self.sizes.left), size("right", self.sizes.right), size("bottom", self.sizes.bottom)];
+        let size =
+            |name: &str, v: u8| ColumnView { field: format!("{SIZE_PREFIX}{name}"), width: Some(v.into()), pin: None };
+        let mut columns =
+            vec![size("left", self.sizes.left), size("right", self.sizes.right), size("bottom", self.sizes.bottom)];
         columns.extend(self.panels.iter().map(|p| ColumnView {
             field: format!("{PANEL_PREFIX}{}:{}", p.area.code(), p.id),
             width: Some(p.open.into()),
@@ -243,7 +249,10 @@ impl Component for Dock {
             s.right,
             s.bottom
         ));
-        for key in ["left", "right", "bottom", "center", "options", "move", "close", "show", "moved", "closed", "shown", "empty"] {
+        for key in [
+            "left", "right", "bottom", "center", "options", "move", "close", "show", "moved", "closed", "shown",
+            "empty",
+        ] {
             out.push_str(&format!(r#" data-text-{key}="{}""#, t(key)));
         }
         let titles: Vec<Json> = self.panels.iter().map(|p| json!({ "id": p.id, "title": r.text(&p.title) })).collect();
@@ -296,8 +305,12 @@ impl Component for Dock {
     }
 
     fn schema(&self) -> Json {
-        let panels: Vec<Json> =
-            self.panels.iter().zip(&self.nodes).map(|(p, n)| json!({ "id": p.id, "title": p.title, "area": p.area, "node": n.schema() })).collect();
+        let panels: Vec<Json> = self
+            .panels
+            .iter()
+            .zip(&self.nodes)
+            .map(|(p, n)| json!({ "id": p.id, "title": p.title, "area": p.area, "node": n.schema() }))
+            .collect();
         json!({ "type": "dock", "label": self.label, "sizes": self.sizes, "panels": panels })
     }
 
@@ -309,12 +322,11 @@ impl Component for Dock {
 impl Dock {
     fn bar(&self, id: &str, edge: &str, value: u8, r: &Render) -> String {
         let orientation = if edge == "bottom" { "horizontal" } else { "vertical" };
-        let label = r.text(&Text::key("zeyn.ui.dock.resize").arg("area", r.text(&Text::key(format!("zeyn.ui.dock.{edge}")))));
+        let label =
+            r.text(&Text::key("zeyn.ui.dock.resize").arg("area", r.text(&Text::key(format!("zeyn.ui.dock.{edge}")))));
         format!(
             r#"<div class="z-dock-bar" data-edge="{edge}" role="separator" tabindex="0" aria-orientation="{orientation}" aria-valuenow="{value}" aria-valuemin="{}" aria-valuemax="{}" aria-label="{label}" data-testid="{}.dock.resize.{edge}" data-id="{id}"></div>"#,
-            DOCK_SIZE.0,
-            DOCK_SIZE.1,
-            r.scope
+            DOCK_SIZE.0, DOCK_SIZE.1, r.scope
         )
     }
 }

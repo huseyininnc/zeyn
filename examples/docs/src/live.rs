@@ -33,7 +33,18 @@ pub enum Unit {
 }
 
 static SAMPLES: LazyLock<Vec<Sample>> = LazyLock::new(|| {
-    let names = ["Black tea", "Green tea", "Coffee beans", "Olive oil", "Honey", "Hazelnuts", "Dried apricots", "Cheese", "Bulgur", "Lentils"];
+    let names = [
+        "Black tea",
+        "Green tea",
+        "Coffee beans",
+        "Olive oil",
+        "Honey",
+        "Hazelnuts",
+        "Dried apricots",
+        "Cheese",
+        "Bulgur",
+        "Lentils",
+    ];
     (1..=120)
         .map(|i| Sample {
             id: SampleId(i),
@@ -68,10 +79,20 @@ pub async fn find_samples(q: LookupQuery) -> Result<Page<LookupItem>> {
 pub async fn sample_tree(q: TreeQuery) -> Result<Vec<TreeItem>> {
     let units = [("piece", Unit::Piece, "Piece"), ("kg", Unit::Kg, "Kilogram"), ("liter", Unit::Liter, "Liter")];
     Ok(match q.parent.as_deref() {
-        None => units.iter().map(|(id, unit, label)| TreeItem::branch(*id, *label).hint(SAMPLES.iter().filter(|s| s.unit == *unit).count().to_string())).collect(),
+        None => units
+            .iter()
+            .map(|(id, unit, label)| {
+                TreeItem::branch(*id, *label).hint(SAMPLES.iter().filter(|s| s.unit == *unit).count().to_string())
+            })
+            .collect(),
         Some(parent) => {
             let Some((_, unit, _)) = units.iter().find(|(id, _, _)| *id == parent) else { return Err(Error::NotFound) };
-            SAMPLES.iter().filter(|s| s.unit == *unit).take(12).map(|s| TreeItem::leaf(s.id.0.to_string(), s.name.clone()).hint(s.code.clone())).collect()
+            SAMPLES
+                .iter()
+                .filter(|s| s.unit == *unit)
+                .take(12)
+                .map(|s| TreeItem::leaf(s.id.0.to_string(), s.name.clone()).hint(s.code.clone()))
+                .collect()
         }
     })
 }
@@ -220,15 +241,20 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
             .into(),
         "dates" => {
             let today = ctx.today();
-            Form::of(Visit { day: Some(today), arrives: Time::new(9, 30, 0).unwrap_or_default(), slot: LocalDateTime::new(today, Time::new(14, 0, 0).unwrap_or_default()), ..Visit::default() })
-                .row(|r| r.field(Visit::day).field(Visit::arrives))
-                .field(Visit::slot)
-                .range(Visit::stay_from, Visit::stay_to)
-                .date_options(Visit::day, DateOptions::new().no_weekends().week_numbers())
-                .date_options(Visit::arrives, DateOptions::new().step_minutes(15))
-                .submit(t!("docs.live.book"), book_visit)
-                .on_success(|_, ui| ui.toast(t!("docs.live.booked")))
-                .into()
+            Form::of(Visit {
+                day: Some(today),
+                arrives: Time::new(9, 30, 0).unwrap_or_default(),
+                slot: LocalDateTime::new(today, Time::new(14, 0, 0).unwrap_or_default()),
+                ..Visit::default()
+            })
+            .row(|r| r.field(Visit::day).field(Visit::arrives))
+            .field(Visit::slot)
+            .range(Visit::stay_from, Visit::stay_to)
+            .date_options(Visit::day, DateOptions::new().no_weekends().week_numbers())
+            .date_options(Visit::arrives, DateOptions::new().step_minutes(15))
+            .submit(t!("docs.live.book"), book_visit)
+            .on_success(|_, ui| ui.toast(t!("docs.live.booked")))
+            .into()
         }
         "lines" => Form::of(Invoice {
             customer: "Northwind".into(),
@@ -238,12 +264,19 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
             ],
         })
         .field(Invoice::customer)
-        .lines(Invoice::lines, |l| l.column(Line::item).column(Line::quantity).column(Line::unit_price).total(Line::quantity, Line::unit_price))
+        .lines(Invoice::lines, |l| {
+            l.column(Line::item).column(Line::quantity).column(Line::unit_price).total(Line::quantity, Line::unit_price)
+        })
         .submit(t!("docs.live.save"), save_invoice)
         .on_success(|_, ui| ui.toast(t!("docs.live.saved")))
         .into(),
         "layout" => Stack::new()
-            .add(Row::new().col(Card::new().title("Orders")).col(Card::new().title("Stock")).col(Card::new().title("People")))
+            .add(
+                Row::new()
+                    .col(Card::new().title("Orders"))
+                    .col(Card::new().title("Stock"))
+                    .col(Card::new().title("People")),
+            )
             .add(
                 Panel::new("Products").collapsible().add(
                     Tabs::new("Views")
@@ -255,13 +288,20 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
         "display" => Stack::new()
             .add(Alert::info("Imports run in the background.").dismissible())
             .add(Alert::warning("Three products are low on stock.").title("Stock"))
-            .add(Row::new().compact().col(Badge::new("Paid").tone(Tone::Success)).col(Badge::new("Overdue").tone(Tone::Danger)).col(Badge::new("Draft")))
-            .add(Progress::new("Import", 64, 100))
             .add(
-                Timeline::new()
-                    .event(ctx.now().add_ms(-26 * 3_600_000), "Created", None, Tone::Info)
-                    .event(ctx.now().add_ms(-3_600_000), "Approved", Some(Text::from("by the manager")), Tone::Success),
+                Row::new()
+                    .compact()
+                    .col(Badge::new("Paid").tone(Tone::Success))
+                    .col(Badge::new("Overdue").tone(Tone::Danger))
+                    .col(Badge::new("Draft")),
             )
+            .add(Progress::new("Import", 64, 100))
+            .add(Timeline::new().event(ctx.now().add_ms(-26 * 3_600_000), "Created", None, Tone::Info).event(
+                ctx.now().add_ms(-3_600_000),
+                "Approved",
+                Some(Text::from("by the manager")),
+                Tone::Success,
+            ))
             .add(Skeleton::lines(2))
             .into(),
         "action" => ActionButton::new(t!("docs.live.count"), count_samples, ())
@@ -273,12 +313,22 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
             .into(),
         "tree" => Tree::of(sample_tree).label("Products by unit").into(),
         "chart" => Row::new()
-            .col(Chart::bar("Sales").labels(months()).series("2025", [120.0, 98.0, 143.0, 160.0, 151.0, 189.0]).series("2026", [131.0, 122.0, 150.0, 171.0, 166.0, 204.0]))
+            .col(
+                Chart::bar("Sales")
+                    .labels(months())
+                    .series("2025", [120.0, 98.0, 143.0, 160.0, 151.0, 189.0])
+                    .series("2026", [131.0, 122.0, 150.0, 171.0, 166.0, 204.0]),
+            )
             .col(Chart::donut("Units").labels(["Piece", "Kg", "Liter"]).series("Products", [40.0, 40.0, 40.0]))
             .into(),
         "shell" => Stack::new()
             .gap(2)
-            .add(Toolbox::new("Tools").tool("select", "Select", Some(Icon::Search)).tool("draw", "Draw", Some(Icon::Edit)).tool("text", "Text", None))
+            .add(
+                Toolbox::new("Tools")
+                    .tool("select", "Select", Some(Icon::Search))
+                    .tool("draw", "Draw", Some(Icon::Edit))
+                    .tool("text", "Text", None),
+            )
             .add(StatusBar::new("Status").left("Ready").right("UTF-8"))
             .into(),
         _ => return None,
@@ -286,4 +336,5 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
 }
 
 /// Names of every live example, for checks and tests.
-pub const EXAMPLES: &[&str] = &["datagrid", "form", "controls", "dates", "lines", "layout", "display", "action", "tree", "chart", "shell"];
+pub const EXAMPLES: &[&str] =
+    &["datagrid", "form", "controls", "dates", "lines", "layout", "display", "action", "tree", "chart", "shell"];

@@ -12,7 +12,7 @@ mod script;
 
 pub use chat::AssistantChat;
 pub use http::{Anthropic, OpenAiCompatible, OpenAiSpeech, OpenAiTranscription};
-pub use script::{ScriptedProvider, Say};
+pub use script::{Say, ScriptedProvider};
 
 use crate::ctx::BoxFuture;
 use crate::i18n::Text;
@@ -71,7 +71,13 @@ impl ChatMessage {
     }
 
     pub fn tool(call_id: impl Into<String>, text: impl Into<String>) -> Self {
-        ChatMessage { role: Role::Tool, text: text.into(), tool_calls: Vec::new(), tool_call_id: Some(call_id.into()), raw: None }
+        ChatMessage {
+            role: Role::Tool,
+            text: text.into(),
+            tool_calls: Vec::new(),
+            tool_call_id: Some(call_id.into()),
+            raw: None,
+        }
     }
 }
 
@@ -181,7 +187,11 @@ pub struct MemoryChatStore {
 
 impl MemoryChatStore {
     pub fn new(max_users: usize, max_messages: usize) -> Self {
-        MemoryChatStore { chats: Mutex::new(HashMap::new()), max_users: max_users.max(1), max_messages: max_messages.max(2) }
+        MemoryChatStore {
+            chats: Mutex::new(HashMap::new()),
+            max_users: max_users.max(1),
+            max_messages: max_messages.max(2),
+        }
     }
 
     /// Number of conversations held.

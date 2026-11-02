@@ -158,7 +158,10 @@ impl Mailer {
     ///   `starttls`), `mail.smtp.user`, `mail.smtp.password` (a secret)
     /// - `mail.file.dir`: the directory of the `file` transport
     pub fn from_config(config: &Config) -> Result<Mailer> {
-        let from: Mailbox = config.require("mail.from")?.parse().map_err(|_| Error::Internal("mail.from is not an e-mail address".into()))?;
+        let from: Mailbox = config
+            .require("mail.from")?
+            .parse()
+            .map_err(|_| Error::Internal("mail.from is not an e-mail address".into()))?;
         let transport = match config.get("mail.transport").unwrap_or("log") {
             "log" => Transport::Log,
             "file" => Transport::File(config.require("mail.file.dir")?.into()),
@@ -200,7 +203,8 @@ impl Mailer {
         let (subject, plain, html) = mail.render(ctx.i18n(), &locale);
         let mut builder = Message::builder().from(self.0.from.clone()).subject(subject);
         for to in &mail.to {
-            let mailbox: Mailbox = to.parse().map_err(|_| Error::Internal("a recipient is not an e-mail address".into()))?;
+            let mailbox: Mailbox =
+                to.parse().map_err(|_| Error::Internal("a recipient is not an e-mail address".into()))?;
             builder = builder.to(mailbox);
         }
         let message = builder
@@ -286,11 +290,15 @@ fn smtp(config: &Config) -> Result<lettre::AsyncSmtpTransport<lettre::Tokio1Exec
     .map_err(|e| Error::Internal(format!("mail.smtp.host: {e}")))?;
     let mut builder = builder.timeout(Some(Duration::from_secs(30)));
     if let Some(port) = config.get("mail.smtp.port") {
-        builder = builder.port(port.parse().map_err(|_| Error::Internal("mail.smtp.port is not a port number".into()))?);
+        builder =
+            builder.port(port.parse().map_err(|_| Error::Internal("mail.smtp.port is not a port number".into()))?);
     }
     if let Some(user) = config.get("mail.smtp.user") {
         let password: Secret<String> = config.secret("mail.smtp.password")?;
-        builder = builder.credentials(lettre::transport::smtp::authentication::Credentials::new(user.to_string(), password.expose().clone()));
+        builder = builder.credentials(lettre::transport::smtp::authentication::Credentials::new(
+            user.to_string(),
+            password.expose().clone(),
+        ));
     }
     Ok(builder.build())
 }

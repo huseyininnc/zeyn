@@ -100,7 +100,14 @@ impl RateStore for MemoryRateStore {
 impl MemoryRateStore {
     /// Takes one request from the key's allowance, right away.
     pub fn take(&self, key: &str, limit: &RateLimit) -> Result<(), Duration> {
-        self.bucket(key, limit, |tokens| if *tokens >= 1.0 { *tokens -= 1.0; true } else { false })
+        self.bucket(key, limit, |tokens| {
+            if *tokens >= 1.0 {
+                *tokens -= 1.0;
+                true
+            } else {
+                false
+            }
+        })
     }
 
     /// Takes `amount` units right away; see [`RateStore::charge`].

@@ -103,7 +103,8 @@ pub fn new_customer() -> Screen {
 
 #[screen(route = "/archive", permission = "crm.write")]
 pub fn archive() -> Screen {
-    Screen::new("Archive").body(Form::of(ArchiveRequest::default()).field(ArchiveRequest::name).submit("Archive", archive_customer))
+    Screen::new("Archive")
+        .body(Form::of(ArchiveRequest::default()).field(ArchiveRequest::name).submit("Archive", archive_customer))
 }
 
 fn app(mcp: Option<Mcp>, audit: MemoryAudit) -> App {
@@ -189,7 +190,13 @@ fn names(tools: &[Json]) -> Vec<String> {
 }
 
 async fn call(router: &Router, name: &str, args: Json) -> Json {
-    let r = send(router, rpc(json!({ "jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": { "name": name, "arguments": args } }))).await;
+    let r = send(
+        router,
+        rpc(
+            json!({ "jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": { "name": name, "arguments": args } }),
+        ),
+    )
+    .await;
     r.json()["result"].clone()
 }
 
@@ -212,7 +219,14 @@ async fn mcp_is_off_by_default() {
     assert_eq!(send(&router, get("/_zeyn/tools?screen=customers")).await.status, StatusCode::NOT_FOUND);
     let r = send(&router, rpc(json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" }))).await;
     assert_eq!(r.status, StatusCode::NOT_FOUND);
-    let r = send(&router, post("/_zeyn/form", json!({ "screen": "new_customer", "node": 0, "values": { "name": "Deniz" }, "via_agent": true }))).await;
+    let r = send(
+        &router,
+        post(
+            "/_zeyn/form",
+            json!({ "screen": "new_customer", "node": 0, "values": { "name": "Deniz" }, "via_agent": true }),
+        ),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::FORBIDDEN, "an agent form save needs WebMCP writes");
     assert!(app(None, MemoryAudit::default()).describe()["mcp"].is_null());
 }
@@ -252,7 +266,12 @@ async fn ai_false_hides_screens_and_actions_everywhere() {
     assert_eq!(doc["paths"]["/api/v1/crm/reindex"]["post"]["x-zeyn-ai"], json!(false));
     assert_eq!(doc["paths"]["/api/v1/crm/archive_customer"]["post"]["x-zeyn-ai"]["confirm"], true);
     assert_eq!(doc["paths"]["/api/v1/crm/search_customers"]["post"]["x-zeyn-ai"]["writes"], false);
-    assert!(doc["paths"]["/api/v1/crm/save_customer"]["post"]["description"].as_str().unwrap().starts_with("Saves a new customer."));
+    assert!(
+        doc["paths"]["/api/v1/crm/save_customer"]["post"]["description"]
+            .as_str()
+            .unwrap()
+            .starts_with("Saves a new customer.")
+    );
 }
 
 #[tokio::test]
@@ -277,14 +296,21 @@ async fn webmcp_confirm_needs_the_users_confirmation() {
     assert_eq!(r.json()["tools"][0]["confirm"], true);
     assert!(r.json()["texts"]["ok"].is_string());
 
-    let save = |confirmed: bool| post("/_zeyn/form", json!({ "screen": "archive", "node": 0, "values": { "name": "Ada" }, "via_agent": true, "confirmed": confirmed }));
+    let save = |confirmed: bool| {
+        post(
+            "/_zeyn/form",
+            json!({ "screen": "archive", "node": 0, "values": { "name": "Ada" }, "via_agent": true, "confirmed": confirmed }),
+        )
+    };
     let r = send(&router, save(false)).await;
     assert_eq!(r.status, StatusCode::FORBIDDEN);
     assert_eq!(r.json()["error"], "confirmation_required");
     let r = send(&router, save(true)).await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
 
-    let r = send(&router, post("/_zeyn/form", json!({ "screen": "hidden", "node": 0, "values": {}, "via_agent": true }))).await;
+    let r =
+        send(&router, post("/_zeyn/form", json!({ "screen": "hidden", "node": 0, "values": {}, "via_agent": true })))
+            .await;
     assert_eq!(r.status, StatusCode::NOT_FOUND);
 }
 
@@ -295,7 +321,14 @@ async fn read_only_lists_no_writes_and_refuses_them() {
     assert_eq!(listed, ["customers_0_search", "api_crm_search_customers"]);
     let r = call(&router, "api_crm_save_customer", json!({ "id": 0, "name": "Deniz", "iban": "" })).await;
     assert_eq!(r["isError"], true);
-    let r = send(&router, post("/_zeyn/form", json!({ "screen": "new_customer", "node": 0, "values": { "name": "Deniz" }, "via_agent": true }))).await;
+    let r = send(
+        &router,
+        post(
+            "/_zeyn/form",
+            json!({ "screen": "new_customer", "node": 0, "values": { "name": "Deniz" }, "via_agent": true }),
+        ),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::FORBIDDEN);
 }
 
@@ -309,7 +342,14 @@ async fn each_door_can_be_closed_on_its_own() {
     let router = router(Some(Mcp::on().webmcp(false)));
     assert_eq!(send(&router, get("/_zeyn/tools?screen=customers")).await.status, StatusCode::NOT_FOUND);
     assert!(!mcp_tools(&router).await.is_empty());
-    let r = send(&router, post("/_zeyn/form", json!({ "screen": "new_customer", "node": 0, "values": { "name": "Deniz" }, "via_agent": true }))).await;
+    let r = send(
+        &router,
+        post(
+            "/_zeyn/form",
+            json!({ "screen": "new_customer", "node": 0, "values": { "name": "Deniz" }, "via_agent": true }),
+        ),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::FORBIDDEN);
 }
 

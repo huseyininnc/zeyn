@@ -20,7 +20,9 @@ pub enum FieldKind {
     LocalDateTime,
     Choice(&'static [ChoiceOption]),
     /// Field type defined outside Zeyn. `editor` names the client side editor that enhances the input.
-    Custom { editor: &'static str },
+    Custom {
+        editor: &'static str,
+    },
 }
 
 /// One option of a `#[choice]` enum.
@@ -128,11 +130,8 @@ impl Money {
     /// ignored; at most two decimals are accepted.
     pub fn parse(input: &str, locale: &str, currency: Currency) -> Result<Money, ()> {
         let f = NumberFormat::for_locale(locale);
-        let cleaned: String = input
-            .trim()
-            .chars()
-            .filter(|c| !c.is_whitespace() && *c != f.group && !"₺$€".contains(*c))
-            .collect();
+        let cleaned: String =
+            input.trim().chars().filter(|c| !c.is_whitespace() && *c != f.group && !"₺$€".contains(*c)).collect();
         let (negative, digits) = match cleaned.strip_prefix('-') {
             Some(rest) => (true, rest),
             None => (false, cleaned.as_str()),

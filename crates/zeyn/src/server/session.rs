@@ -31,7 +31,13 @@ pub(super) struct Settings {
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { idle: None, warning: Duration::from_secs(60), logout_url: None, reauth_within: Duration::from_secs(300), reauth_url: None }
+        Settings {
+            idle: None,
+            warning: Duration::from_secs(60),
+            logout_url: None,
+            reauth_within: Duration::from_secs(300),
+            reauth_url: None,
+        }
     }
 }
 

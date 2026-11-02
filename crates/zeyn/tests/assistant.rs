@@ -10,8 +10,8 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 use tower::ServiceExt;
 use zeyn::assistant::{
-    Anthropic, Assistant, ChatEvent, ChatKey, ChatMessage, ChatRequest, ChatStore, Limits, LlmProvider, MemoryChatStore, OpenAiCompatible, Say,
-    ScriptedProvider,
+    Anthropic, Assistant, ChatEvent, ChatKey, ChatMessage, ChatRequest, ChatStore, Limits, LlmProvider,
+    MemoryChatStore, OpenAiCompatible, Say, ScriptedProvider,
 };
 use zeyn::prelude::*;
 use zeyn::{BoxFuture, Identity};
@@ -92,9 +92,30 @@ impl LlmProvider for Recorder {
 
 fn script() -> ScriptedProvider {
     ScriptedProvider::new()
-        .when("list", vec![vec![Say::tool("customers_0_search", json!({}))], vec![Say::text("Here **they** are."), Say::tool("suggest", json!({ "items": ["Show Ada"] }))]])
-        .when("open", vec![vec![Say::tool("navigate", json!({ "screen": "customers", "filters": [{ "field": "name", "contains": "Ada" }] }))], vec![Say::text("Opened.")]])
-        .when("hidden", vec![vec![Say::tool("navigate", json!({ "screen": "secret" })), Say::tool("api_crm_export_all", json!({}))], vec![Say::text("No.")]])
+        .when(
+            "list",
+            vec![
+                vec![Say::tool("customers_0_search", json!({}))],
+                vec![Say::text("Here **they** are."), Say::tool("suggest", json!({ "items": ["Show Ada"] }))],
+            ],
+        )
+        .when(
+            "open",
+            vec![
+                vec![Say::tool(
+                    "navigate",
+                    json!({ "screen": "customers", "filters": [{ "field": "name", "contains": "Ada" }] }),
+                )],
+                vec![Say::text("Opened.")],
+            ],
+        )
+        .when(
+            "hidden",
+            vec![
+                vec![Say::tool("navigate", json!({ "screen": "secret" })), Say::tool("api_crm_export_all", json!({}))],
+                vec![Say::text("No.")],
+            ],
+        )
         .when("delete", vec![vec![Say::tool("api_crm_delete_customer", json!("Ada"))], vec![Say::text("Deleted Ada.")]])
         .otherwise(vec![vec![Say::text("Hello from the scripted model.")]])
 }
@@ -116,7 +137,14 @@ fn setup(permissions: &[&str], tune: impl FnOnce(Assistant) -> Assistant) -> Set
         .service(store.clone())
         .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
         .interceptor(AuditLog(audit.clone()))
-        .feature(Feature::new("crm").screen(customers).screen(secret).api(search_customers).api(delete_customer).api(export_all))
+        .feature(
+            Feature::new("crm")
+                .screen(customers)
+                .screen(secret)
+                .api(search_customers)
+                .api(delete_customer)
+                .api(export_all),
+        )
         .assistant(tune(Assistant::new(provider)))
         .router()
         .unwrap();
@@ -183,7 +211,11 @@ async fn answers_stream_as_json_lines_and_history_is_kept() {
     assert_eq!(r.text(), "Hello from the scripted model.");
     assert_eq!(r.events().last().unwrap()["t"], "done");
 
-    let start = send(&s.router, Request::get("/_zeyn/assistant/start?screen=customers").header("x-user", "1").body(Body::empty()).unwrap()).await;
+    let start = send(
+        &s.router,
+        Request::get("/_zeyn/assistant/start?screen=customers").header("x-user", "1").body(Body::empty()).unwrap(),
+    )
+    .await;
     let start: Json = serde_json::from_str(&start.body).unwrap();
     assert_eq!(start["messages"][0], json!({ "role": "user", "text": "hello" }));
     assert_eq!(start["messages"][1]["text"], "Hello from the scripted model.");
@@ -330,7 +362,10 @@ async fn limits_and_security_checks() {
     assert_eq!(say(&gated, "hello").await.status, StatusCode::FORBIDDEN);
 
     let off = App::new("T").router().unwrap();
-    assert_eq!(send(&off, post("/_zeyn/assistant/chat", json!({ "message": "hi" }))).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(
+        send(&off, post("/_zeyn/assistant/chat", json!({ "message": "hi" }))).await.status,
+        StatusCode::NOT_FOUND
+    );
 }
 
 #[tokio::test]
@@ -353,7 +388,10 @@ async fn memory_store_is_capped_per_user_and_in_users() {
     let store = MemoryChatStore::new(2, 3);
     let key = |u: &str| ChatKey { tenant: String::new(), user: u.into() };
     store.append(&key("a"), (0..5).map(|i| ChatMessage::user(i.to_string())).collect()).await.unwrap();
-    assert_eq!(store.load(&key("a"), 10).await.unwrap().iter().map(|m| m.text.clone()).collect::<Vec<_>>(), ["2", "3", "4"]);
+    assert_eq!(
+        store.load(&key("a"), 10).await.unwrap().iter().map(|m| m.text.clone()).collect::<Vec<_>>(),
+        ["2", "3", "4"]
+    );
     store.append(&key("b"), vec![ChatMessage::user("b")]).await.unwrap();
     store.append(&key("c"), vec![ChatMessage::user("c")]).await.unwrap();
     assert_eq!(store.len(), 2);
@@ -370,7 +408,8 @@ async fn fake_server(body: &'static str) -> String {
 }
 
 async fn collect(provider: &dyn LlmProvider) -> Vec<ChatEvent> {
-    let req = ChatRequest { system: "s".into(), messages: vec![ChatMessage::user("hi")], tools: Vec::new(), max_tokens: 10 };
+    let req =
+        ChatRequest { system: "s".into(), messages: vec![ChatMessage::user("hi")], tools: Vec::new(), max_tokens: 10 };
     let mut rx = provider.chat(req).await.unwrap();
     let mut out = Vec::new();
     while let Some(e) = rx.recv().await {

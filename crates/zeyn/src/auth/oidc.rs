@@ -136,7 +136,11 @@ impl OidcAuth {
 
     /// Scopes asked for; `openid profile email` unless set. `openid` is always added.
     pub fn scopes(mut self, scopes: &str) -> Self {
-        self.scopes = if scopes.split_whitespace().any(|s| s == "openid") { scopes.to_string() } else { format!("openid {scopes}") };
+        self.scopes = if scopes.split_whitespace().any(|s| s == "openid") {
+            scopes.to_string()
+        } else {
+            format!("openid {scopes}")
+        };
         self
     }
 
@@ -182,7 +186,13 @@ impl OidcAuth {
     /// Builds the bearer authenticator once the settings are final.
     pub(crate) fn finish(&mut self) {
         if let Some(audience) = &self.bearer {
-            self.bearer_auth = Some(JwtAuth::uses(self.issuer.clone(), audience, self.algorithms.clone(), self.leeway, self.claims.clone()));
+            self.bearer_auth = Some(JwtAuth::uses(
+                self.issuer.clone(),
+                audience,
+                self.algorithms.clone(),
+                self.leeway,
+                self.claims.clone(),
+            ));
         }
     }
 
@@ -193,7 +203,8 @@ impl OidcAuth {
             problems.push(format!("OidcAuth: the session key must be at least {} bytes", super::seal::MIN_SECRET));
         }
         if !(self.public_url.starts_with("https://") || self.public_url.starts_with("http://")) {
-            problems.push("OidcAuth: the public URL must start with https:// (or http:// for local development)".into());
+            problems
+                .push("OidcAuth: the public URL must start with https:// (or http:// for local development)".into());
         }
         problems
     }
@@ -242,7 +253,12 @@ impl OidcAuth {
             }
             body.push_str(&format!("{}={}", pct(k), pct(v)));
         }
-        let mut req = self.issuer.http().post(&d.token_endpoint).header("content-type", "application/x-www-form-urlencoded").header("accept", "application/json");
+        let mut req = self
+            .issuer
+            .http()
+            .post(&d.token_endpoint)
+            .header("content-type", "application/x-www-form-urlencoded")
+            .header("accept", "application/json");
         match &self.client_secret {
             Some(secret) => req = req.basic_auth(pct(&self.client_id), Some(pct(secret.expose()))),
             None => {
@@ -257,7 +273,12 @@ impl OidcAuth {
     /// the flow's nonce.
     pub(crate) async fn exchange(&self, code: &str, flow: &Flow, redirect_uri: &str) -> Result<Session, String> {
         let tokens = self
-            .token_call(&[("grant_type", "authorization_code"), ("code", code), ("redirect_uri", redirect_uri), ("code_verifier", &flow.verifier)])
+            .token_call(&[
+                ("grant_type", "authorization_code"),
+                ("code", code),
+                ("redirect_uri", redirect_uri),
+                ("code_verifier", &flow.verifier),
+            ])
             .await?;
         self.session(&tokens, Some(&flow.nonce), None).await
     }
@@ -265,12 +286,26 @@ impl OidcAuth {
     /// Exchanges the authorization code and returns the checked ID token's claims, for linking
     /// the provider's users to local accounts (`zeyn::accounts`).
     #[cfg(feature = "accounts")]
-    pub(crate) async fn exchange_claims(&self, code: &str, flow: &Flow, redirect_uri: &str) -> Result<serde_json::Map<String, Json>, String> {
+    pub(crate) async fn exchange_claims(
+        &self,
+        code: &str,
+        flow: &Flow,
+        redirect_uri: &str,
+    ) -> Result<serde_json::Map<String, Json>, String> {
         let tokens = self
-            .token_call(&[("grant_type", "authorization_code"), ("code", code), ("redirect_uri", redirect_uri), ("code_verifier", &flow.verifier)])
+            .token_call(&[
+                ("grant_type", "authorization_code"),
+                ("code", code),
+                ("redirect_uri", redirect_uri),
+                ("code_verifier", &flow.verifier),
+            ])
             .await?;
         let id_token = tokens.get("id_token").and_then(Json::as_str).ok_or("the token response has no ID token")?;
-        let claims = self.issuer.validate_id_token(id_token, &self.client_id, &self.algorithms, self.leeway).await.map_err(|why| format!("ID token refused: {why:?}"))?;
+        let claims = self
+            .issuer
+            .validate_id_token(id_token, &self.client_id, &self.algorithms, self.leeway)
+            .await
+            .map_err(|why| format!("ID token refused: {why:?}"))?;
         if !claims.get("nonce").and_then(Json::as_str).is_some_and(|n| crate::server::same(n, &flow.nonce)) {
             return Err(format!("ID token refused: {:?}", super::jwt::Refusal::Nonce));
         }
@@ -286,11 +321,16 @@ impl OidcAuth {
 
     async fn session(&self, tokens: &Json, nonce: Option<&str>, old: Option<&Session>) -> Result<Session, String> {
         let id_token = tokens.get("id_token").and_then(Json::as_str).ok_or("the token response has no ID token")?;
-        let claims = self.issuer.validate_id_token(id_token, &self.client_id, &self.algorithms, self.leeway).await.map_err(|why| format!("ID token refused: {why:?}"))?;
+        let claims = self
+            .issuer
+            .validate_id_token(id_token, &self.client_id, &self.algorithms, self.leeway)
+            .await
+            .map_err(|why| format!("ID token refused: {why:?}"))?;
         if let Some(nonce) = nonce
-            && !claims.get("nonce").and_then(Json::as_str).is_some_and(|n| crate::server::same(n, nonce)) {
-                return Err(format!("ID token refused: {:?}", super::jwt::Refusal::Nonce));
-            }
+            && !claims.get("nonce").and_then(Json::as_str).is_some_and(|n| crate::server::same(n, nonce))
+        {
+            return Err(format!("ID token refused: {:?}", super::jwt::Refusal::Nonce));
+        }
         let mut s = self.claims.extract(&claims).ok_or("the ID token has no user claim")?;
         if let Some(old) = old {
             if s.user != old.user {
@@ -304,7 +344,11 @@ impl OidcAuth {
         s.expires = old.map(|o| o.expires).unwrap_or(now + self.lifetime.as_secs() as i64);
         s.check = exp.min(access);
         if self.refresh {
-            s.refresh = tokens.get("refresh_token").and_then(Json::as_str).map(str::to_string).or_else(|| old.and_then(|o| o.refresh.clone()));
+            s.refresh = tokens
+                .get("refresh_token")
+                .and_then(Json::as_str)
+                .map(str::to_string)
+                .or_else(|| old.and_then(|o| o.refresh.clone()));
         }
         Ok(s)
     }
@@ -340,9 +384,10 @@ impl OidcAuth {
 impl Authenticator for OidcAuth {
     fn authenticate(&self, headers: &HeaderMap) -> Option<Identity> {
         if let Some(bearer) = &self.bearer_auth
-            && JwtAuth::has_bearer(headers) {
-                return bearer.authenticate(headers);
-            }
+            && JwtAuth::has_bearer(headers)
+        {
+            return bearer.authenticate(headers);
+        }
         let session = self.open_session(crate::server::cookie(headers, SESSION)?)?;
         Some(self.claims.identity(&session))
     }

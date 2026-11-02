@@ -60,7 +60,9 @@ impl ConfigSource for Vault {
 
     fn load(&self) -> BoxFuture<Result<HashMap<String, String>, String>> {
         self.0.fetch_add(1, Ordering::SeqCst);
-        Box::pin(async { Ok(map(&[("tenants.acme.db_url", "postgres://acme"), ("tenants.globex.db_url", "postgres://globex")])) })
+        Box::pin(async {
+            Ok(map(&[("tenants.acme.db_url", "postgres://acme"), ("tenants.globex.db_url", "postgres://globex")]))
+        })
     }
 }
 
@@ -81,7 +83,11 @@ async fn per_tenant_services_are_built_once_per_tenant() {
         counter.fetch_add(1, Ordering::SeqCst);
         Box::pin(async move { Ok(config.secret(&format!("tenants.{}.db_url", tenant.id()))?.expose().clone()) })
     });
-    let ctx = |t: &str| Ctx::for_tests(Identity::anonymous(), Services::default()).with_config(config.clone()).with_tenant(Tenant::new(t));
+    let ctx = |t: &str| {
+        Ctx::for_tests(Identity::anonymous(), Services::default())
+            .with_config(config.clone())
+            .with_tenant(Tenant::new(t))
+    };
     assert_eq!(pools.get(&ctx("acme")).await.unwrap(), "postgres://acme");
     assert_eq!(pools.get(&ctx("acme")).await.unwrap(), "postgres://acme");
     assert_eq!(pools.get(&ctx("globex")).await.unwrap(), "postgres://globex");
@@ -220,7 +226,9 @@ async fn a_failing_license_server_keeps_the_last_license_per_tenant() {
 #[tokio::test]
 async fn tenant_required_and_identity_tenant_wins() {
     let build = |auth: Option<Identity>| {
-        let mut app = App::new("T").tenancy(HeaderTenant("x-tenant")).feature(Feature::new("t").guard(TenantRequired).screen(pos));
+        let mut app = App::new("T")
+            .tenancy(HeaderTenant("x-tenant"))
+            .feature(Feature::new("t").guard(TenantRequired).screen(pos));
         if let Some(id) = auth {
             app = app.auth(move |_: &HeaderMap| Some(id.clone()));
         }
@@ -312,7 +320,10 @@ async fn rate_limit_answers_429_with_retry_after_per_client_ip() {
     assert!(blocked.headers().get(header::RETRY_AFTER).unwrap().to_str().unwrap().parse::<u64>().unwrap() >= 1);
     assert_eq!(blocked.headers().get(header::CONTENT_TYPE).unwrap(), "application/problem+json");
     assert_eq!(r.clone().oneshot(with_ip("/pos", "203.0.113.6", "GET")).await.unwrap().status(), StatusCode::OK);
-    assert_eq!(r.clone().oneshot(with_ip("/_zeyn/zeyn.js", "203.0.113.5", "GET")).await.unwrap().status(), StatusCode::OK);
+    assert_eq!(
+        r.clone().oneshot(with_ip("/_zeyn/zeyn.js", "203.0.113.5", "GET")).await.unwrap().status(),
+        StatusCode::OK
+    );
 }
 
 #[tokio::test]
@@ -330,7 +341,10 @@ async fn forwarded_for_is_believed_only_from_trusted_proxies() {
     };
     assert_eq!(r.clone().oneshot(via("10.0.0.2", "198.51.100.1, 10.0.0.9")).await.unwrap().status(), StatusCode::OK);
     assert_eq!(r.clone().oneshot(via("10.0.0.3", "198.51.100.2")).await.unwrap().status(), StatusCode::OK);
-    assert_eq!(r.clone().oneshot(via("10.0.0.2", "198.51.100.1")).await.unwrap().status(), StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(
+        r.clone().oneshot(via("10.0.0.2", "198.51.100.1")).await.unwrap().status(),
+        StatusCode::TOO_MANY_REQUESTS
+    );
     assert_eq!(r.clone().oneshot(via("203.0.113.9", "1.1.1.1")).await.unwrap().status(), StatusCode::OK);
     assert_eq!(r.clone().oneshot(via("203.0.113.9", "2.2.2.2")).await.unwrap().status(), StatusCode::TOO_MANY_REQUESTS);
 }
@@ -377,9 +391,15 @@ async fn api_docs_can_be_closed_open_password_or_permission_protected() {
     let (status, h, _) = get(&basic, "/api/v1/openapi.json", &[]).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
     assert!(h.get(header::WWW_AUTHENTICATE).unwrap().to_str().unwrap().starts_with("Basic"));
-    assert_eq!(get(&basic, "/api/v1/openapi.json", &[("authorization", "Basic ZG9jczp3cm9uZw==")]).await.0, StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        get(&basic, "/api/v1/openapi.json", &[("authorization", "Basic ZG9jczp3cm9uZw==")]).await.0,
+        StatusCode::UNAUTHORIZED
+    );
     assert_eq!(get(&basic, "/api/v1/openapi.json", &[("authorization", "Basic ZG9jczpwQHNz")]).await.0, StatusCode::OK);
-    assert_eq!(get(&basic, "/api/v1/openapi.json", &[("authorization", "Basic !!!")]).await.0, StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        get(&basic, "/api/v1/openapi.json", &[("authorization", "Basic !!!")]).await.0,
+        StatusCode::UNAUTHORIZED
+    );
 
     let perm = App::new("T")
         .auth(|h: &HeaderMap| h.contains_key("x-admin").then(|| Identity::user("a").with_permissions(["api.docs"])))
@@ -393,7 +413,17 @@ async fn api_docs_can_be_closed_open_password_or_permission_protected() {
 
 #[tokio::test]
 async fn apps_can_live_under_a_base_path() {
-    let build = |app: App| app.home(pos).feature(Feature::new("s").route_prefix("/sales").screen(pos).menu(|m| m.group("S", Icon::Cart).item("POS", pos))).router().unwrap();
+    let build = |app: App| {
+        app.home(pos)
+            .feature(
+                Feature::new("s")
+                    .route_prefix("/sales")
+                    .screen(pos)
+                    .menu(|m| m.group("S", Icon::Cart).item("POS", pos)),
+            )
+            .router()
+            .unwrap()
+    };
     let mounted = build(App::new("T").base_path("inventory/"));
     let (status, h, _) = get(&mounted, "/inventory", &[]).await;
     assert_eq!(status, StatusCode::SEE_OTHER);

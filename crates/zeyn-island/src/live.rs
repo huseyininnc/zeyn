@@ -45,7 +45,12 @@ impl Channel {
         let window = web_sys::window().ok_or("no window")?;
         let document = window.document().ok_or("no document")?;
         let meta = |name: &str| {
-            document.query_selector(&format!("meta[name=\"{name}\"]")).ok().flatten().and_then(|m| m.get_attribute("content")).unwrap_or_default()
+            document
+                .query_selector(&format!("meta[name=\"{name}\"]"))
+                .ok()
+                .flatten()
+                .and_then(|m| m.get_attribute("content"))
+                .unwrap_or_default()
         };
         let location = window.location();
         let scheme = if location.protocol()? == "https:" { "wss" } else { "ws" };

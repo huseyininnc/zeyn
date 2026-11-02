@@ -3,7 +3,7 @@
 //! Masking happens on the server. A masked value leaves the server only as its masked text, unless
 //! the user has the field's unmask permission and asks to see it; that reveal is audited.
 
-use crate::action::{Access, Filter, DataQuery, Page, PageRequest, Result};
+use crate::action::{Access, DataQuery, Filter, Page, PageRequest, Result};
 use crate::audit::{RecordRef, plain};
 use crate::ctx::{BoxFuture, Ctx};
 use crate::i18n::Text;

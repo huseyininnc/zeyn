@@ -51,7 +51,10 @@ fn page(start: usize) -> Vec<Vec<Value>> {
                 Value::Money(Money::new(i as i64 * 137, Currency::Try)),
                 Value::Bool(i % 2 == 0),
                 Value::Date(Date::new(2026, 1 + (i % 12) as u8, 1 + (i % 28) as u8).unwrap()),
-                Value::LocalDateTime(LocalDateTime::new(Date::new(2026, 5, 4).unwrap(), Time::new((i % 24) as u8, 30, 0).unwrap())),
+                Value::LocalDateTime(LocalDateTime::new(
+                    Date::new(2026, 5, 4).unwrap(),
+                    Time::new((i % 24) as u8, 30, 0).unwrap(),
+                )),
             ]
         })
         .collect()
@@ -59,7 +62,10 @@ fn page(start: usize) -> Vec<Vec<Value>> {
 
 #[test]
 fn exporting_100k_rows_keeps_memory_flat() {
-    let columns: Vec<ExportColumn> = ["Text", "Int", "Money", "Bool", "Date", "Moment"].iter().map(|l| ExportColumn { label: l.to_string(), width: None, numeric: false }).collect();
+    let columns: Vec<ExportColumn> = ["Text", "Int", "Money", "Bool", "Date", "Moment"]
+        .iter()
+        .map(|l| ExportColumn { label: l.to_string(), width: None, numeric: false })
+        .collect();
     let started = std::time::Instant::now();
     let base = LIVE.load(Ordering::Relaxed);
     let mut sheet = XlsxSheet::new(&columns, "tr").unwrap();

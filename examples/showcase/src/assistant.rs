@@ -78,7 +78,9 @@ pub fn assistant(config: &Config) -> std::io::Result<Option<Assistant>> {
     };
     Ok(Some(
         assistant
-            .instructions("Northwind sells food and drink to shops across Türkiye. Users manage stock, orders and staff leave.")
+            .instructions(
+                "Northwind sells food and drink to shops across Türkiye. Users manage stock, orders and staff leave.",
+            )
             .suggest(assistant_page, t!("assistant.try_orders"))
             .suggest(assistant_page, t!("assistant.try_archive"))
             .suggest(sales::today, t!("assistant.try_orders"))

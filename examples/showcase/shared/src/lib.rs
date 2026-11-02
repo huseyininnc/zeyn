@@ -93,7 +93,14 @@ impl Diagram {
             .iter()
             .map(|s| {
                 let kind = if s.kind == ShapeKind::Box { &kinds.kind_box } else { &kinds.kind_ellipse };
-                kinds.line.replace("{kind}", kind).replace("{label}", &s.label).replace("{x}", &s.x.to_string()).replace("{y}", &s.y.to_string()).replace("{w}", &s.w.to_string()).replace("{h}", &s.h.to_string())
+                kinds
+                    .line
+                    .replace("{kind}", kind)
+                    .replace("{label}", &s.label)
+                    .replace("{x}", &s.x.to_string())
+                    .replace("{y}", &s.y.to_string())
+                    .replace("{w}", &s.w.to_string())
+                    .replace("{h}", &s.h.to_string())
             })
             .collect()
     }

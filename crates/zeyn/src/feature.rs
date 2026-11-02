@@ -83,7 +83,11 @@ pub struct SignedIn;
 
 impl Guard for SignedIn {
     fn check(&self, ctx: &Ctx) -> GuardResult {
-        if ctx.identity().is_signed_in() { GuardResult::Allow } else { GuardResult::Deny(Text::key("zeyn.error.forbidden")) }
+        if ctx.identity().is_signed_in() {
+            GuardResult::Allow
+        } else {
+            GuardResult::Deny(Text::key("zeyn.error.forbidden"))
+        }
     }
 
     fn name(&self) -> &'static str {
@@ -184,7 +188,12 @@ impl Feature {
     /// Serves the files of a media source at `/_zeyn/media/{name}/{id}` to users with
     /// `permission`, after the feature's guards. `name` must be unique in the app and have the
     /// shape of a media id (letters, digits, `-`, `_`, `.`).
-    pub fn media(mut self, name: &'static str, permission: &'static str, source: impl crate::media::MediaSource) -> Self {
+    pub fn media(
+        mut self,
+        name: &'static str,
+        permission: &'static str,
+        source: impl crate::media::MediaSource,
+    ) -> Self {
         self.media.push(crate::media::MediaEntry { name, permission, source: Arc::new(source) });
         self
     }

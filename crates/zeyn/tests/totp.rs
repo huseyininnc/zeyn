@@ -34,7 +34,9 @@ fn app(store: MemoryTotpStore) -> Router {
 
 fn app_with(store: MemoryTotpStore, attempts: u32) -> Router {
     App::new("T")
-        .auth(|h: &HeaderMap| h.get("x-user").and_then(|v| v.to_str().ok()).map(|u| Identity::user(u).with_permissions(["crm.read"])))
+        .auth(|h: &HeaderMap| {
+            h.get("x-user").and_then(|v| v.to_str().ok()).map(|u| Identity::user(u).with_permissions(["crm.read"]))
+        })
         .login_url("https://sso.example.com/login")
         .totp(Totp::new(store, Secret::new(KEY.into())).issuer("Test App").attempts(attempts, Duration::from_secs(300)))
         .feature(Feature::new("crm").screen(home).api(close_books))
@@ -108,7 +110,12 @@ fn base32_decode(s: &str) -> Vec<u8> {
 }
 
 fn code(secret: &[u8], offset: i64) -> String {
-    let totp = totp_rs::Builder::new().with_secret(secret.to_vec()).with_account_name("ayse").with_issuer(Some("Test App")).build().unwrap();
+    let totp = totp_rs::Builder::new()
+        .with_secret(secret.to_vec())
+        .with_account_name("ayse")
+        .with_issuer(Some("Test App"))
+        .build()
+        .unwrap();
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() as i64;
     totp.generate((now + offset) as u64).to_string()
 }
@@ -133,7 +140,10 @@ async fn users_enroll_with_a_qr_code_and_get_recovery_codes_once() {
     let (pending, secret, page) = enrollment(&router, "ayse").await;
     let (second, other, _) = enrollment(&router, "ayse").await;
     assert_eq!(secret.len(), 20);
-    assert!(page.body.contains(r#"<svg class="z-totp-qr""#) && page.body.contains(r#"role="img""#), "QR code drawn as SVG");
+    assert!(
+        page.body.contains(r#"<svg class="z-totp-qr""#) && page.body.contains(r#"role="img""#),
+        "QR code drawn as SVG"
+    );
     assert!(page.body.contains(r#"autocomplete="one-time-code""#));
     assert!(page.cookie("zeyn_totp_enroll").unwrap().contains("HttpOnly"));
     assert!(!pending.contains(&format!("{secret:?}")));
@@ -149,7 +159,8 @@ async fn users_enroll_with_a_qr_code_and_get_recovery_codes_once() {
 
     let r = send(&router, post("/_zeyn/auth/totp/enroll", "ayse", &cookies, CSRF, &code(&secret, 0))).await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
-    let codes: Vec<String> = r.body.split("<li><code>").skip(1).map(|c| c[..c.find('<').unwrap()].to_string()).collect();
+    let codes: Vec<String> =
+        r.body.split("<li><code>").skip(1).map(|c| c[..c.find('<').unwrap()].to_string()).collect();
     assert_eq!(codes.len(), zeyn::auth::RECOVERY_CODES);
     assert!(codes.iter().all(|c| c.len() == 11 && c.as_bytes()[5] == b'-'));
     let proof = r.cookie_value("zeyn_mfa");
@@ -162,9 +173,17 @@ async fn users_enroll_with_a_qr_code_and_get_recovery_codes_once() {
     assert!(!record.secret.is_empty() && base32_decode_lossy(&record.secret).is_none());
 
     assert_eq!(send(&router, get("/vault", "ayse", &format!("zeyn_mfa={proof}"))).await.status, StatusCode::OK);
-    assert_eq!(send(&router, get("/vault", "mehmet", &format!("zeyn_mfa={proof}"))).await.status, StatusCode::SEE_OTHER, "a proof is for one user");
+    assert_eq!(
+        send(&router, get("/vault", "mehmet", &format!("zeyn_mfa={proof}"))).await.status,
+        StatusCode::SEE_OTHER,
+        "a proof is for one user"
+    );
 
-    let r = send(&router, post("/_zeyn/auth/totp/enroll", "ayse", &format!("zeyn_totp_enroll={second}"), CSRF, &code(&other, 0))).await;
+    let r = send(
+        &router,
+        post("/_zeyn/auth/totp/enroll", "ayse", &format!("zeyn_totp_enroll={second}"), CSRF, &code(&other, 0)),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::SEE_OTHER, "an enrolled factor cannot be replaced from a session alone");
     assert_eq!(store.load("ayse").await.unwrap().unwrap(), record);
 }
@@ -175,7 +194,11 @@ fn base32_decode_lossy(s: &str) -> Option<Vec<u8>> {
 
 async fn enrolled(router: &Router, user: &str) -> (Vec<u8>, Vec<String>) {
     let (pending, secret, _) = enrollment(router, user).await;
-    let r = send(router, post("/_zeyn/auth/totp/enroll", user, &format!("zeyn_totp_enroll={pending}"), CSRF, &code(&secret, -30))).await;
+    let r = send(
+        router,
+        post("/_zeyn/auth/totp/enroll", user, &format!("zeyn_totp_enroll={pending}"), CSRF, &code(&secret, -30)),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
     let codes = r.body.split("<li><code>").skip(1).map(|c| c[..c.find('<').unwrap()].to_string()).collect();
     (secret, codes)
@@ -252,11 +275,16 @@ async fn signed_out_visitors_sign_in_first() {
     let router = app(MemoryTotpStore::default());
     let r = send(&router, Request::get("/_zeyn/auth/totp").body(Body::empty()).unwrap()).await;
     assert_eq!(r.status, StatusCode::SEE_OTHER);
-    assert!(r.location().starts_with("https://sso.example.com/login?return_to=%2F_zeyn%2Fauth%2Ftotp"), "{}", r.location());
+    assert!(
+        r.location().starts_with("https://sso.example.com/login?return_to=%2F_zeyn%2Fauth%2Ftotp"),
+        "{}",
+        r.location()
+    );
 }
 
 #[test]
 fn short_keys_stop_the_app() {
-    let problems = App::new("T").totp(Totp::new(MemoryTotpStore::default(), Secret::new("short".into()))).check().unwrap_err();
+    let problems =
+        App::new("T").totp(Totp::new(MemoryTotpStore::default(), Secret::new("short".into()))).check().unwrap_err();
     assert!(problems.iter().any(|p| p.contains("Totp")), "{problems:?}");
 }

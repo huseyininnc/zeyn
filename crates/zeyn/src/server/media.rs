@@ -9,7 +9,9 @@ use super::{AppState, Call, CallKind, Chunks, Failure, asset};
 use crate::action::{Access, Error};
 use crate::ctx::Ctx;
 use crate::i18n::Text;
-use crate::media::{ByteRange, MAX_POSITION_SECONDS, MEDIA_CHUNK, Media, MediaEntry, MediaReader, inline_type, valid_media_id};
+use crate::media::{
+    ByteRange, MAX_POSITION_SECONDS, MEDIA_CHUNK, Media, MediaEntry, MediaReader, inline_type, valid_media_id,
+};
 use axum::Router;
 use axum::body::{Body, Bytes};
 use axum::extract::{Path, Query, State};
@@ -29,7 +31,9 @@ pub(super) const ASSETS: [&str; 2] = ["/_zeyn/media.js", "/_zeyn/media.css"];
 
 /// Links placed in the page head after the component library's own.
 pub(super) fn head(base: &str) -> String {
-    format!(r#"<link rel="stylesheet" href="{base}/_zeyn/media.css"><script type="module" src="{base}/_zeyn/media.js"></script>"#)
+    format!(
+        r#"<link rel="stylesheet" href="{base}/_zeyn/media.css"><script type="module" src="{base}/_zeyn/media.js"></script>"#
+    )
 }
 
 pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
@@ -68,7 +72,11 @@ async fn intercepted<T>(
     st.intercept(ctx, &call, || st.timed(work)).await
 }
 
-async fn media_file(State(st): State<Arc<AppState>>, Path((source, id)): Path<(String, String)>, headers: HeaderMap) -> Response {
+async fn media_file(
+    State(st): State<Arc<AppState>>,
+    Path((source, id)): Path<(String, String)>,
+    headers: HeaderMap,
+) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     let opened = async {
         let entry = entry(&st, &ctx, &source, &id)?;
@@ -216,7 +224,11 @@ async fn position_get(State(st): State<Arc<AppState>>, headers: HeaderMap, Query
 
 /// Saves where the signed in user stopped. `204`; `404` as for reading; `422` for a position
 /// that is negative, not a number or longer than [`MAX_POSITION_SECONDS`].
-async fn position_save(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(call): axum::Json<PositionCall>) -> Response {
+async fn position_save(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::Json(call): axum::Json<PositionCall>,
+) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     if let Err(f) = st.check_csrf(&headers) {
         return st.error_response(&ctx, f);
@@ -227,7 +239,11 @@ async fn position_save(State(st): State<Arc<AppState>>, headers: HeaderMap, axum
             return Err(Failure::App(Error::NotFound));
         }
         if !call.at.is_finite() || !(0.0..=MAX_POSITION_SECONDS).contains(&call.at) {
-            return Err(Failure::Status(StatusCode::UNPROCESSABLE_ENTITY, "validation", Text::key("zeyn.ui.media.bad_position")));
+            return Err(Failure::Status(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "validation",
+                Text::key("zeyn.ui.media.bad_position"),
+            ));
         }
         intercepted(&st, &ctx, &entry, entry.source.save_position(ctx.clone(), call.id, call.at)).await
     }

@@ -3,7 +3,10 @@
 //! bounded channels; nothing is buffered whole. API keys stay on the server and never appear in
 //! errors or logs.
 
-use super::{Audio, ChatEvent, ChatMessage, ChatRequest, ChatStream, LlmProvider, Role, STREAM_BUFFER, SpeechStream, SpeechToText, TextToSpeech, ToolCall};
+use super::{
+    Audio, ChatEvent, ChatMessage, ChatRequest, ChatStream, LlmProvider, Role, STREAM_BUFFER, SpeechStream,
+    SpeechToText, TextToSpeech, ToolCall,
+};
 use crate::action::Error;
 use crate::ctx::BoxFuture;
 use crate::platform::Secret;
@@ -88,7 +91,11 @@ impl Sse {
             if self.buf.len() > MAX_LINE {
                 return Err(Error::Internal("model stream line too long".into()));
             }
-            let chunk = self.res.chunk().await.map_err(|e| Error::Internal(format!("model stream broke: {}", e.without_url())))?;
+            let chunk = self
+                .res
+                .chunk()
+                .await
+                .map_err(|e| Error::Internal(format!("model stream broke: {}", e.without_url())))?;
             match chunk {
                 Some(c) => self.buf.extend_from_slice(&c),
                 None => return Ok(None),
@@ -251,7 +258,11 @@ fn finish_calls(partial: Partial) -> Vec<ChatEvent> {
         .filter(|(_, name, _)| !name.is_empty())
         .enumerate()
         .map(|(i, (id, name, args))| {
-            let arguments = if args.trim().is_empty() { json!({}) } else { serde_json::from_str(&args).unwrap_or_else(|_| json!({})) };
+            let arguments = if args.trim().is_empty() {
+                json!({})
+            } else {
+                serde_json::from_str(&args).unwrap_or_else(|_| json!({}))
+            };
             let id = if id.is_empty() { format!("call_{i}") } else { id };
             ChatEvent::ToolCall(ToolCall { id, name, arguments })
         })
@@ -260,7 +271,8 @@ fn finish_calls(partial: Partial) -> Vec<ChatEvent> {
 
 impl LlmProvider for OpenAiCompatible {
     fn chat(&self, request: ChatRequest) -> BoxFuture<crate::Result<ChatStream>> {
-        let req = authorize(self.http.post(format!("{}/chat/completions", self.base)), self.key.as_ref(), self.header).json(&self.body(&request));
+        let req = authorize(self.http.post(format!("{}/chat/completions", self.base)), self.key.as_ref(), self.header)
+            .json(&self.body(&request));
         Box::pin(async move {
             let res = send(req, "chat model").await?;
             Ok(spawn_stream(|tx| async move {
@@ -340,7 +352,9 @@ impl Anthropic {
                                 blocks.push(json!({ "type": "text", "text": m.text }));
                             }
                             for c in &m.tool_calls {
-                                blocks.push(json!({ "type": "tool_use", "id": c.id, "name": c.name, "input": c.arguments }));
+                                blocks.push(
+                                    json!({ "type": "tool_use", "id": c.id, "name": c.name, "input": c.arguments }),
+                                );
                             }
                             Json::Array(blocks)
                         }
@@ -359,7 +373,11 @@ impl Anthropic {
             "messages": messages,
         });
         if !request.tools.is_empty() {
-            body["tools"] = request.tools.iter().map(|t| json!({ "name": t.name, "description": t.description, "input_schema": t.schema })).collect();
+            body["tools"] = request
+                .tools
+                .iter()
+                .map(|t| json!({ "name": t.name, "description": t.description, "input_schema": t.schema }))
+                .collect();
         }
         body
     }
@@ -381,7 +399,8 @@ impl Blocks {
         let kind = data.get("type").and_then(Json::as_str).unwrap_or(name);
         match kind {
             "message_start" => {
-                self.input_tokens = data.pointer("/message/usage/input_tokens").and_then(Json::as_u64).unwrap_or(0) as u32;
+                self.input_tokens =
+                    data.pointer("/message/usage/input_tokens").and_then(Json::as_u64).unwrap_or(0) as u32;
             }
             "content_block_start" => {
                 let block = data.get("content_block").cloned().unwrap_or(Json::Null);
@@ -393,7 +412,9 @@ impl Blocks {
             }
             "content_block_delta" => {
                 let i = data.get("index").and_then(Json::as_u64).unwrap_or(0) as usize;
-                let (Some(block), Some(input)) = (self.blocks.get_mut(i), self.inputs.get_mut(i)) else { return Ok(true) };
+                let (Some(block), Some(input)) = (self.blocks.get_mut(i), self.inputs.get_mut(i)) else {
+                    return Ok(true);
+                };
                 let delta = &data["delta"];
                 match delta["type"].as_str() {
                     Some("text_delta") => {
@@ -413,7 +434,11 @@ impl Blocks {
                 let i = data.get("index").and_then(Json::as_u64).unwrap_or(0) as usize;
                 if let (Some(block), Some(input)) = (self.blocks.get_mut(i), self.inputs.get(i)) {
                     if block["type"] == "tool_use" {
-                        let arguments = if input.trim().is_empty() { json!({}) } else { serde_json::from_str(input).unwrap_or_else(|_| json!({})) };
+                        let arguments = if input.trim().is_empty() {
+                            json!({})
+                        } else {
+                            serde_json::from_str(input).unwrap_or_else(|_| json!({}))
+                        };
                         block["input"] = arguments.clone();
                         out.push(ChatEvent::ToolCall(ToolCall {
                             id: block["id"].as_str().unwrap_or_default().to_string(),
@@ -492,7 +517,13 @@ pub struct OpenAiTranscription {
 
 impl OpenAiTranscription {
     pub fn new(base_url: impl Into<String>, model: impl Into<String>) -> Self {
-        OpenAiTranscription { base: base_url.into().trim_end_matches('/').to_string(), model: model.into(), key: None, header: KeyHeader::Bearer, http: client() }
+        OpenAiTranscription {
+            base: base_url.into().trim_end_matches('/').to_string(),
+            model: model.into(),
+            key: None,
+            header: KeyHeader::Bearer,
+            http: client(),
+        }
     }
 
     pub fn api_key(mut self, key: Secret<String>) -> Self {
@@ -510,10 +541,13 @@ impl OpenAiTranscription {
 fn multipart(fields: &[(&str, &str)], file: &Audio) -> (String, Vec<u8>) {
     let mut bytes = [0u8; 16];
     let _ = getrandom::getrandom(&mut bytes);
-    let boundary: String = std::iter::once("zeyn".to_string()).chain(bytes.iter().map(|b| format!("{b:02x}"))).collect();
+    let boundary: String =
+        std::iter::once("zeyn".to_string()).chain(bytes.iter().map(|b| format!("{b:02x}"))).collect();
     let mut body = Vec::with_capacity(file.bytes.len() + 512);
     for (name, value) in fields {
-        body.extend_from_slice(format!("--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n{value}\r\n").as_bytes());
+        body.extend_from_slice(
+            format!("--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n{value}\r\n").as_bytes(),
+        );
     }
     let ext = match file.mime.split(';').next().unwrap_or("") {
         "audio/ogg" => "ogg",
@@ -532,13 +566,16 @@ fn multipart(fields: &[(&str, &str)], file: &Audio) -> (String, Vec<u8>) {
 impl SpeechToText for OpenAiTranscription {
     fn transcribe(&self, audio: Audio, locale: String) -> BoxFuture<crate::Result<String>> {
         let language: String = locale.chars().take_while(|c| c.is_ascii_alphabetic()).take(3).collect();
-        let (content_type, body) = multipart(&[("model", &self.model), ("language", &language), ("response_format", "json")], &audio);
-        let req = authorize(self.http.post(format!("{}/audio/transcriptions", self.base)), self.key.as_ref(), self.header)
-            .header(reqwest::header::CONTENT_TYPE, content_type)
-            .body(body);
+        let (content_type, body) =
+            multipart(&[("model", &self.model), ("language", &language), ("response_format", "json")], &audio);
+        let req =
+            authorize(self.http.post(format!("{}/audio/transcriptions", self.base)), self.key.as_ref(), self.header)
+                .header(reqwest::header::CONTENT_TYPE, content_type)
+                .body(body);
         Box::pin(async move {
             let res = send(req, "speech to text").await?;
-            let value: Json = res.json().await.map_err(|_| Error::Internal("speech to text: unreadable answer".into()))?;
+            let value: Json =
+                res.json().await.map_err(|_| Error::Internal("speech to text: unreadable answer".into()))?;
             Ok(value.get("text").and_then(Json::as_str).unwrap_or_default().trim().to_string())
         })
     }
@@ -585,7 +622,8 @@ impl TextToSpeech for OpenAiSpeech {
         body.insert("voice".into(), json!(self.voice));
         body.insert("input".into(), json!(text));
         body.insert("response_format".into(), json!("mp3"));
-        let req = authorize(self.http.post(format!("{}/audio/speech", self.base)), self.key.as_ref(), self.header).json(&body);
+        let req = authorize(self.http.post(format!("{}/audio/speech", self.base)), self.key.as_ref(), self.header)
+            .json(&body);
         Box::pin(async move {
             let mut res = send(req, "text to speech").await?;
             let (tx, rx) = channel::<crate::Result<Bytes>>(STREAM_BUFFER);
@@ -626,7 +664,14 @@ mod tests {
         out.extend(finish_calls(partial));
         assert_eq!(out[0], ChatEvent::Text("Hi".into()));
         assert_eq!(out[1], ChatEvent::Usage { input: 10, output: 3 });
-        assert_eq!(out[2], ChatEvent::ToolCall(ToolCall { id: "call_1".into(), name: "navigate".into(), arguments: json!({ "screen": "today" }) }));
+        assert_eq!(
+            out[2],
+            ChatEvent::ToolCall(ToolCall {
+                id: "call_1".into(),
+                name: "navigate".into(),
+                arguments: json!({ "screen": "today" })
+            })
+        );
     }
 
     #[test]
@@ -649,7 +694,14 @@ mod tests {
         }
         assert!(!state.event("", &json!({ "type": "message_stop" }), &mut out).unwrap());
         assert_eq!(out[0], ChatEvent::Text("Opening".into()));
-        assert_eq!(out[1], ChatEvent::ToolCall(ToolCall { id: "toolu_1".into(), name: "navigate".into(), arguments: json!({ "screen": "today" }) }));
+        assert_eq!(
+            out[1],
+            ChatEvent::ToolCall(ToolCall {
+                id: "toolu_1".into(),
+                name: "navigate".into(),
+                arguments: json!({ "screen": "today" })
+            })
+        );
         assert_eq!(out[2], ChatEvent::Usage { input: 12, output: 7 });
         let ChatEvent::Raw(Json::Array(blocks)) = &out[3] else { panic!("{out:?}") };
         assert_eq!(blocks[0]["signature"], "sig");
@@ -660,14 +712,25 @@ mod tests {
     fn anthropic_groups_tool_results_and_keeps_reasoning_only_in_the_current_turn() {
         let a = Anthropic::new("m");
         let mut old = ChatMessage::assistant("earlier");
-        old.raw = Some(json!([{ "type": "thinking", "thinking": "", "signature": "old" }, { "type": "text", "text": "earlier" }]));
+        old.raw = Some(
+            json!([{ "type": "thinking", "thinking": "", "signature": "old" }, { "type": "text", "text": "earlier" }]),
+        );
         let mut call = ChatMessage::assistant("");
         call.tool_calls = vec![
             ToolCall { id: "a".into(), name: "x".into(), arguments: json!({}) },
             ToolCall { id: "b".into(), name: "y".into(), arguments: json!({}) },
         ];
-        call.raw = Some(json!([{ "type": "thinking", "thinking": "", "signature": "new" }, { "type": "tool_use", "id": "a", "name": "x", "input": {} }, { "type": "tool_use", "id": "b", "name": "y", "input": {} }]));
-        let messages = vec![ChatMessage::user("one"), old, ChatMessage::user("two"), call, ChatMessage::tool("a", "r1"), ChatMessage::tool("b", "r2")];
+        call.raw = Some(
+            json!([{ "type": "thinking", "thinking": "", "signature": "new" }, { "type": "tool_use", "id": "a", "name": "x", "input": {} }, { "type": "tool_use", "id": "b", "name": "y", "input": {} }]),
+        );
+        let messages = vec![
+            ChatMessage::user("one"),
+            old,
+            ChatMessage::user("two"),
+            call,
+            ChatMessage::tool("a", "r1"),
+            ChatMessage::tool("b", "r2"),
+        ];
         let body = a.body(&ChatRequest { system: "s".into(), messages, tools: Vec::new(), max_tokens: 10 });
         let m = body["messages"].as_array().unwrap();
         assert_eq!(m.len(), 5);

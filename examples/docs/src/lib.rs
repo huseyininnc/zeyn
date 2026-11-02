@@ -177,14 +177,19 @@ impl Docs {
     /// The screen of a page, with its live examples built for this request.
     pub fn screen(&self, route: &str, ctx: &Ctx) -> Screen {
         let Some(i) = self.index(route) else { return Screen::new(t!("docs.missing")) };
-        let lives = self.0[i].lives.iter().map(|n| live::example(n, ctx).unwrap_or_else(|| Alert::danger(t!("docs.missing")).into())).collect();
+        let lives = self.0[i]
+            .lives
+            .iter()
+            .map(|n| live::example(n, ctx).unwrap_or_else(|| Alert::danger(t!("docs.missing")).into()))
+            .collect();
         Screen::new(self.0[i].title.clone()).body(Node::new(DocPage { docs: self.clone(), index: i, lives }))
     }
 
     /// Pages and sections whose text has every word of the query, best first: words in a
     /// heading count most, then the page title, then the text.
     pub fn search(&self, query: &str) -> Vec<SearchHit> {
-        let words: Vec<String> = query.split_whitespace().map(str::to_lowercase).filter(|w| !w.is_empty()).take(8).collect();
+        let words: Vec<String> =
+            query.split_whitespace().map(str::to_lowercase).filter(|w| !w.is_empty()).take(8).collect();
         if words.is_empty() {
             return Vec::new();
         }
@@ -197,8 +202,19 @@ impl Docs {
                 if !words.iter().all(|w| heading.contains(w) || title.contains(w) || text.contains(w)) {
                     continue;
                 }
-                let score: usize = words.iter().map(|w| 10 * usize::from(heading.contains(w)) + 5 * usize::from(title.contains(w)) + text.matches(w.as_str()).count().min(5)).sum();
-                let (label, url) = if s.id.is_empty() { (d.title.clone(), d.route.to_string()) } else { (s.heading.clone(), format!("{}#{}", d.route, s.id)) };
+                let score: usize = words
+                    .iter()
+                    .map(|w| {
+                        10 * usize::from(heading.contains(w))
+                            + 5 * usize::from(title.contains(w))
+                            + text.matches(w.as_str()).count().min(5)
+                    })
+                    .sum();
+                let (label, url) = if s.id.is_empty() {
+                    (d.title.clone(), d.route.to_string())
+                } else {
+                    (s.heading.clone(), format!("{}#{}", d.route, s.id))
+                };
                 found.push((score, SearchHit::new(label, d.title.clone(), url)));
             }
         }
@@ -220,7 +236,12 @@ impl DocPage {
     fn link(&self, r: &Render, at: Option<usize>, class: &str, key: &str) -> String {
         at.map(|i| {
             let d = &self.docs.0[i];
-            format!(r#"<a class="{class}" href="{}"><span>{}</span>{}</a>"#, d.route, r.text(&Text::key(key.to_string())), escape(&d.title))
+            format!(
+                r#"<a class="{class}" href="{}"><span>{}</span>{}</a>"#,
+                d.route,
+                r.text(&Text::key(key.to_string())),
+                escape(&d.title)
+            )
         })
         .unwrap_or_default()
     }

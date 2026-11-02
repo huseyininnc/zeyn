@@ -1,24 +1,26 @@
 use crate::action::{
-    Action, ActionMeta, Aggregate, AggregateRequest, Cursor, DEFAULT_PAGE_SIZE, Filter, DataQuery, MAX_FILTER_CHOICES,
+    Action, ActionMeta, Aggregate, AggregateRequest, Cursor, DEFAULT_PAGE_SIZE, DataQuery, Filter, MAX_FILTER_CHOICES,
     MAX_FILTER_TEXT, MAX_FILTERS, MAX_PAGE_SIZE, Page, PageRequest, Result, Sort, Total,
 };
-use serde::Deserialize;
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use crate::time::{Date, DateTime, LocalDateTime, Time, TimeZone};
+use crate::ctx::Outcome;
 use crate::ctx::{BoxFuture, Ctx};
 use crate::i18n::Text;
 use crate::model::{Field, FieldMeta, Model, Valid};
 use crate::render::{Render, attr, escape};
-use crate::screen::{Component, Effect, GridSource, LoadedPage, Node, ScreenDef};
-use crate::ctx::Outcome;
-use crate::screen::RowCall;
 use crate::screen::Icon;
-use crate::value::{ChoiceType, FieldKind, FieldType, IsBool, IsMoment, Money, SupportsMinMaxTotal, SupportsSum, Value};
+use crate::screen::RowCall;
+use crate::screen::{Component, Effect, GridSource, LoadedPage, Node, ScreenDef};
+use crate::time::{Date, DateTime, LocalDateTime, Time, TimeZone};
+use crate::value::{
+    ChoiceType, FieldKind, FieldType, IsBool, IsMoment, Money, SupportsMinMaxTotal, SupportsSum, Value,
+};
+use serde::Deserialize;
 use serde::Serialize;
 use serde_json::json;
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::marker::PhantomData;
+use std::sync::{Arc, Mutex};
 
 mod column;
 mod memory;
@@ -309,7 +311,8 @@ pub trait BulkAction<K>: Action {}
 
 impl<K, A: Action<Input = Vec<K>>> BulkAction<K> for A {}
 
-type BulkFn = Box<dyn Fn(Vec<serde_json::Value>) -> Option<Box<dyn FnOnce(Ctx) -> BoxFuture<Result<()>> + Send>> + Send + Sync>;
+type BulkFn =
+    Box<dyn Fn(Vec<serde_json::Value>) -> Option<Box<dyn FnOnce(Ctx) -> BoxFuture<Result<()>> + Send>> + Send + Sync>;
 
 /// A button in the selection bar that runs an action with the selected keys.
 struct BulkDef {
@@ -774,7 +777,12 @@ impl<E: Model> DataGrid<E> {
     /// users with the action's permission. When pressed, the server loads the row again by its key
     /// through the grid's action, builds the input from it, checks the permission again and runs
     /// the action; the client never sends the input.
-    pub fn row_action<A>(mut self, label: impl Into<Text>, _action: A, input: impl Fn(&E) -> A::Input + Send + Sync + 'static) -> Self
+    pub fn row_action<A>(
+        mut self,
+        label: impl Into<Text>,
+        _action: A,
+        input: impl Fn(&E) -> A::Input + Send + Sync + 'static,
+    ) -> Self
     where
         A: Action,
         A::Output: Outcome,
@@ -813,7 +821,8 @@ impl<E: Model> DataGrid<E> {
             label: label.into(),
             meta: A::META,
             run: Box::new(|keys| {
-                let keys: Vec<K> = keys.into_iter().map(serde_json::from_value).collect::<std::result::Result<_, _>>().ok()?;
+                let keys: Vec<K> =
+                    keys.into_iter().map(serde_json::from_value).collect::<std::result::Result<_, _>>().ok()?;
                 Some(runner::<A>(keys))
             }),
         });
@@ -918,9 +927,11 @@ impl<E: Model> DataGrid<E> {
         query.filters.retain(|f| filterable(&f.field) && !f.is_empty());
         query.filters.truncate(MAX_FILTERS);
         let mut seen = Vec::new();
-        query.sort.retain(|s| shown(&s.field) && !seen.contains(&s.field) && {
-            seen.push(s.field.clone());
-            true
+        query.sort.retain(|s| {
+            shown(&s.field) && !seen.contains(&s.field) && {
+                seen.push(s.field.clone());
+                true
+            }
         });
         query.sort.truncate(MAX_SORT);
     }
@@ -1082,7 +1093,10 @@ impl<E: Model> DataGrid<E> {
                     (None, None) => r.value(&value, &c.meta.kind),
                 };
                 if first {
-                    content = format!(r#"<span class="z-tree" style="--z-level:{}">{toggle}<span>{content}</span></span>"#, b.depth);
+                    content = format!(
+                        r#"<span class="z-tree" style="--z-level:{}">{toggle}<span>{content}</span></span>"#,
+                        b.depth
+                    );
                 }
                 if edit && c.editable && !c.meta.readonly && !c.meta.key && !c.meta.version && c.meta.mask.is_none() {
                     let v = crate::form::edit_value(&value, r.locale, r.tz);
@@ -1091,7 +1105,8 @@ impl<E: Model> DataGrid<E> {
                     out.push_str(&format!("<td{class}>{content}</td>"));
                 }
             }
-            let actions: Vec<(usize, &RowAction<E>)> = self.row_actions.iter().enumerate().filter(|(_, a)| r.can(&a.meta.access)).collect();
+            let actions: Vec<(usize, &RowAction<E>)> =
+                self.row_actions.iter().enumerate().filter(|(_, a)| r.can(&a.meta.access)).collect();
             if !self.row_actions.is_empty() {
                 out.push_str(r#"<td class="z-row-actions">"#);
                 for (i, a) in actions {
@@ -1126,7 +1141,10 @@ impl<E: Model> DataGrid<E> {
                     r.text(&b.label)
                 ));
             }
-            out.push_str(&format!(r#"<button type="button" class="z-button" data-zeyn-select-clear>{}</button></div>"#, t("clear_selection")));
+            out.push_str(&format!(
+                r#"<button type="button" class="z-button" data-zeyn-select-clear>{}</button></div>"#,
+                t("clear_selection")
+            ));
         }
         let grid_text = |key: &str| r.text(&Text::key(format!("zeyn.grid.{key}")));
         out.push_str(&format!(
@@ -1264,7 +1282,14 @@ impl<E: Model> DataGrid<E> {
     /// Header rows of groups at `depth`: the expander, column label, value and row count span
     /// the columns up to the first one with totals; the totals of each group follow under their
     /// columns.
-    fn group_rows(&self, groups: &[crate::action::Group], r: &Render, cols: &[Shown], depth: usize, path: &[Option<String>]) -> String {
+    fn group_rows(
+        &self,
+        groups: &[crate::action::Group],
+        r: &Render,
+        cols: &[Shown],
+        depth: usize,
+        path: &[Option<String>],
+    ) -> String {
         let Some(meta) = self.group_by.get(depth) else { return String::new() };
         let lead = self.lead(r);
         let first = cols.iter().position(|s| !self.columns[s.index].aggregates.is_empty()).unwrap_or(cols.len());
@@ -1363,7 +1388,8 @@ impl<E: Model> DataGrid<E> {
             let page = fetch(ctx.clone(), query.clone()).await?;
             let mut parents = Vec::new();
             if let (Some(parent), Some(ki)) = (parent, Self::key_index()) {
-                let keys: Vec<String> = page.items.iter().filter_map(|row| row.value_at(ki)).filter_map(|v| value_key(&v)).collect();
+                let keys: Vec<String> =
+                    page.items.iter().filter_map(|row| row.value_at(ki)).filter_map(|v| value_key(&v)).collect();
                 if !keys.is_empty() {
                     let mut filters = scope.clone();
                     filters.extend(user.iter().cloned());
@@ -1375,7 +1401,8 @@ impl<E: Model> DataGrid<E> {
                         time_zone: query.time_zone,
                         ..DataQuery::default()
                     };
-                    parents = fetch(ctx.clone(), ask).await?.groups.iter().filter_map(|g| value_key(&g.value)).collect();
+                    parents =
+                        fetch(ctx.clone(), ask).await?.groups.iter().filter_map(|g| value_key(&g.value)).collect();
                 }
             }
             let totals = match totals_query {
@@ -1485,7 +1512,9 @@ impl<E: Model> GridSource for DataGrid<E> {
         let Some(i) = Self::key_index() else { return Vec::new() };
         page.items
             .downcast_ref::<Vec<E>>()
-            .map(|rows| rows.iter().filter_map(|r| r.value_at(i)).filter_map(|v| serde_json::to_value(v).ok()).collect())
+            .map(|rows| {
+                rows.iter().filter_map(|r| r.value_at(i)).filter_map(|v| serde_json::to_value(v).ok()).collect()
+            })
             .unwrap_or_default()
     }
 
@@ -1585,7 +1614,8 @@ impl<E: Model> GridSource for DataGrid<E> {
         let row = rows.iter().find(|r| r.value_at(i).is_some_and(|v| key_text(&v) == key)).ok_or(Error::NotFound)?;
         let editable = self.editable_fields();
         let fields = E::fields();
-        let allowed = |name: &str| fields.iter().enumerate().any(|(j, f)| f.name == name && (f.version || editable.contains(&j)));
+        let allowed =
+            |name: &str| fields.iter().enumerate().any(|(j, f)| f.name == name && (f.version || editable.contains(&j)));
         if values.is_empty() || values.keys().any(|k| !allowed(k)) {
             return Err(Error::Forbidden);
         }
@@ -1798,24 +1828,49 @@ fn filter_kind(kind: &FieldKind) -> &'static str {
 
 /// Localized texts the runtime needs for grid controls, sent once on the grid root.
 fn grid_texts(r: &Render) -> serde_json::Value {
-    let keys = [
-        "filter", "from", "to", "all", "contains", "starts_with", "equals", "match", "selected", "clear", "sorted",
-    ];
+    let keys =
+        ["filter", "from", "to", "all", "contains", "starts_with", "equals", "match", "selected", "clear", "sorted"];
     let mut map = serde_json::Map::new();
     for k in keys {
         map.insert(k.to_string(), json!(r.i18n.text(r.locale, &Text::key(format!("zeyn.grid.filter.{k}")))));
     }
     let menu = [
-        "options", "resize", "sort_asc", "sort_desc", "sort_clear", "pin_start", "pin_end", "unpin", "move_prev", "move_next",
-        "hide", "columns", "reset", "filter",
+        "options",
+        "resize",
+        "sort_asc",
+        "sort_desc",
+        "sort_clear",
+        "pin_start",
+        "pin_end",
+        "unpin",
+        "move_prev",
+        "move_next",
+        "hide",
+        "columns",
+        "reset",
+        "filter",
     ];
     for k in menu {
         map.insert(format!("menu_{k}"), json!(r.i18n.text(r.locale, &Text::key(format!("zeyn.grid.menu.{k}")))));
     }
     map.insert("done".into(), json!(r.i18n.text(r.locale, &Text::key("zeyn.grid.done"))));
     for k in [
-        "saved", "undo", "undone", "empty", "error", "retry", "copied", "details", "loading", "load_more", "copied_cells",
-        "paste_confirm", "pasted", "paste_failed", "paste_readonly", "paste_too_many",
+        "saved",
+        "undo",
+        "undone",
+        "empty",
+        "error",
+        "retry",
+        "copied",
+        "details",
+        "loading",
+        "load_more",
+        "copied_cells",
+        "paste_confirm",
+        "pasted",
+        "paste_failed",
+        "paste_readonly",
+        "paste_too_many",
     ] {
         map.insert(k.into(), json!(r.i18n.text(r.locale, &Text::key(format!("zeyn.grid.{k}")))));
     }

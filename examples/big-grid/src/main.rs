@@ -28,7 +28,8 @@ pub enum Status {
 }
 
 const TOTAL: u64 = 1_000_000;
-const CUSTOMERS: [&str; 8] = ["Ada Yılmaz", "Can Demir", "Elif Şahin", "Mert Kaya", "Zeynep Arslan", "Ömer Çelik", "İpek Aydın", "Deniz Koç"];
+const CUSTOMERS: [&str; 8] =
+    ["Ada Yılmaz", "Can Demir", "Elif Şahin", "Mert Kaya", "Zeynep Arslan", "Ömer Çelik", "İpek Aydın", "Deniz Koç"];
 const CITIES: [&str; 6] = ["İstanbul", "Ankara", "İzmir", "Bursa", "Antalya", "Konya"];
 
 /// Order number `n`, always the same for the same number.

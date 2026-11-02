@@ -148,7 +148,9 @@ impl AccountStore for MemoryAccountStore {
             if s.users.len() >= max {
                 return Err(Error::Internal("the memory account store is full".into()));
             }
-            if s.users.contains_key(&user.id) || s.users.values().any(|u| u.normalized_user_name == user.normalized_user_name) {
+            if s.users.contains_key(&user.id)
+                || s.users.values().any(|u| u.normalized_user_name == user.normalized_user_name)
+            {
                 return Err(Error::Conflict);
             }
             s.users.insert(user.id.clone(), user);
@@ -197,7 +199,13 @@ impl AccountStore for MemoryAccountStore {
 
     fn user_by_email(&self, normalized: &str) -> BoxFuture<Result<Option<User>>> {
         let n = normalized.to_string();
-        self.with(move |s| Ok(s.users.values().filter(|u| u.normalized_email.as_deref() == Some(n.as_str())).min_by(|a, b| a.id.cmp(&b.id)).cloned()))
+        self.with(move |s| {
+            Ok(s.users
+                .values()
+                .filter(|u| u.normalized_email.as_deref() == Some(n.as_str()))
+                .min_by(|a, b| a.id.cmp(&b.id))
+                .cloned())
+        })
     }
 
     fn users(&self, search: Option<&str>, offset: u64, limit: u32) -> BoxFuture<Result<(Vec<User>, u64)>> {
@@ -207,7 +215,10 @@ impl AccountStore for MemoryAccountStore {
                 .users
                 .values()
                 .filter(|u| {
-                    search.as_deref().is_none_or(|q| u.normalized_user_name.contains(q) || u.normalized_email.as_deref().is_some_and(|e| e.contains(q)))
+                    search.as_deref().is_none_or(|q| {
+                        u.normalized_user_name.contains(q)
+                            || u.normalized_email.as_deref().is_some_and(|e| e.contains(q))
+                    })
                 })
                 .collect();
             all.sort_by(|a, b| a.normalized_user_name.cmp(&b.normalized_user_name));
@@ -300,7 +311,8 @@ impl AccountStore for MemoryAccountStore {
     fn roles_of(&self, user_id: &str) -> BoxFuture<Result<Vec<Role>>> {
         let user = user_id.to_string();
         self.with(move |s| {
-            let mut roles: Vec<Role> = s.user_roles.iter().filter(|(u, _)| *u == user).filter_map(|(_, r)| s.roles.get(r).cloned()).collect();
+            let mut roles: Vec<Role> =
+                s.user_roles.iter().filter(|(u, _)| *u == user).filter_map(|(_, r)| s.roles.get(r).cloned()).collect();
             roles.sort_by(|a, b| a.normalized_name.cmp(&b.normalized_name));
             Ok(roles)
         })
@@ -309,7 +321,12 @@ impl AccountStore for MemoryAccountStore {
     fn users_in_role(&self, role_id: &str, limit: u32) -> BoxFuture<Result<Vec<User>>> {
         let role = role_id.to_string();
         self.with(move |s| {
-            Ok(s.user_roles.iter().filter(|(_, r)| *r == role).filter_map(|(u, _)| s.users.get(u).cloned()).take(limit as usize).collect())
+            Ok(s.user_roles
+                .iter()
+                .filter(|(_, r)| *r == role)
+                .filter_map(|(u, _)| s.users.get(u).cloned())
+                .take(limit as usize)
+                .collect())
         })
     }
 
@@ -385,7 +402,10 @@ impl AccountStore for MemoryAccountStore {
     fn user_by_login(&self, provider: &str, key: &str) -> BoxFuture<Result<Option<User>>> {
         let (provider, key) = (provider.to_string(), key.to_string());
         self.with(move |s| {
-            Ok(s.logins.iter().find(|(_, l)| l.provider == provider && l.provider_key == key).and_then(|(u, _)| s.users.get(u).cloned()))
+            Ok(s.logins
+                .iter()
+                .find(|(_, l)| l.provider == provider && l.provider_key == key)
+                .and_then(|(u, _)| s.users.get(u).cloned()))
         })
     }
 
@@ -426,18 +446,16 @@ impl AccountStore for MemoryAccountStore {
 
     fn save_passkey(&self, user_id: &str, passkey: &Passkey) -> BoxFuture<Result<()>> {
         let (user, passkey) = (user_id.to_string(), passkey.clone());
-        self.with(move |s| {
-            match s.passkeys.iter_mut().find(|(_, p)| p.credential_id == passkey.credential_id) {
-                Some((owner, _)) if *owner != user => Err(Error::Conflict),
-                Some((_, p)) => {
-                    *p = passkey;
-                    Ok(())
-                }
-                None => {
-                    per_user(&s.passkeys, &user)?;
-                    s.passkeys.push((user, passkey));
-                    Ok(())
-                }
+        self.with(move |s| match s.passkeys.iter_mut().find(|(_, p)| p.credential_id == passkey.credential_id) {
+            Some((owner, _)) if *owner != user => Err(Error::Conflict),
+            Some((_, p)) => {
+                *p = passkey;
+                Ok(())
+            }
+            None => {
+                per_user(&s.passkeys, &user)?;
+                s.passkeys.push((user, passkey));
+                Ok(())
             }
         })
     }

@@ -28,12 +28,17 @@ pub fn hello() -> Command {
 #[screen(route = "/palette", permission = "stock.product.read")]
 pub fn palette() -> Screen {
     Screen::new(t!("pro.palette"))
-        .toolbar(|t| t.button(t!("pro.tb_new")).icon(Icon::Plus).shortcut("Ctrl+Alt+E").opens(product_editor, ProductParams { id: None }))
-        .context_menu(
-            ContextMenu::new()
-                .item(t!("pro.cmd_hello"), Effect::Toast { message: t!("pro.hello") })
-                .action(t!("pro.cmd_restock"), restock_low, ()),
-        )
+        .toolbar(|t| {
+            t.button(t!("pro.tb_new"))
+                .icon(Icon::Plus)
+                .shortcut("Ctrl+Alt+E")
+                .opens(product_editor, ProductParams { id: None })
+        })
+        .context_menu(ContextMenu::new().item(t!("pro.cmd_hello"), Effect::Toast { message: t!("pro.hello") }).action(
+            t!("pro.cmd_restock"),
+            restock_low,
+            (),
+        ))
         .body(
             Stack::new()
                 .add(Alert::info(t!("pro.palette_intro")).title(t!("pro.palette_title")))
@@ -87,23 +92,27 @@ pub fn designer() -> Screen {
                             .tool("text", t!("pro.tool_text"), None),
                     )
                     .col(Card::new().title(t!("pro.canvas")).add(Alert::new(Tone::Neutral, t!("pro.canvas_hint"))))
-                    .col(
-                        PropertyInspector::new(
-                            t!("pro.properties"),
-                            Form::of(shape)
-                                .section(t!("pro.section_general"))
-                                .field(Shape::name)
-                                .field(Shape::visible)
-                                .section(t!("pro.section_position"))
-                                .row(|r| r.field(Shape::x).field(Shape::y))
-                                .section(t!("pro.section_size"))
-                                .row(|r| r.field(Shape::width).field(Shape::height))
-                                .submit(t!("pro.apply"), save_shape)
-                                .on_success(|_, ui| ui.toast(t!("pro.applied"))),
-                        ),
-                    ),
+                    .col(PropertyInspector::new(
+                        t!("pro.properties"),
+                        Form::of(shape)
+                            .section(t!("pro.section_general"))
+                            .field(Shape::name)
+                            .field(Shape::visible)
+                            .section(t!("pro.section_position"))
+                            .row(|r| r.field(Shape::x).field(Shape::y))
+                            .section(t!("pro.section_size"))
+                            .row(|r| r.field(Shape::width).field(Shape::height))
+                            .submit(t!("pro.apply"), save_shape)
+                            .on_success(|_, ui| ui.toast(t!("pro.applied"))),
+                    )),
             )
-            .add(StatusBar::new(t!("pro.status")).left(t!("pro.status_ready")).live(t!("pro.status_hint")).right("100%").right("UTF-8")),
+            .add(
+                StatusBar::new(t!("pro.status"))
+                    .left(t!("pro.status_ready"))
+                    .live(t!("pro.status_hint"))
+                    .right("100%")
+                    .right("UTF-8"),
+            ),
     )
 }
 
@@ -124,7 +133,15 @@ fn shape_inspector() -> PropertyInspector {
 
 #[screen(route = "/workspace", permission = "stock.product.read")]
 pub fn workspace() -> Screen {
-    let products = DataGrid::of(search_products).paging(Paging::pages(10)).column(Product::code).width(110).filter().column(Product::name).flex(1).column(Product::price).width(130);
+    let products = DataGrid::of(search_products)
+        .paging(Paging::pages(10))
+        .column(Product::code)
+        .width(110)
+        .filter()
+        .column(Product::name)
+        .flex(1)
+        .column(Product::price)
+        .width(130);
     Screen::new(t!("pro.workspace")).body(
         Stack::new()
             .gap(2)
@@ -156,5 +173,10 @@ pub fn feature() -> Feature {
         .command(restock())
         .command(go_products())
         .command(hello())
-        .menu(|m| m.group(t!("menu.pro"), Icon::Search).item(t!("pro.palette"), palette).item(t!("pro.designer"), designer).item(t!("pro.workspace"), workspace))
+        .menu(|m| {
+            m.group(t!("menu.pro"), Icon::Search)
+                .item(t!("pro.palette"), palette)
+                .item(t!("pro.designer"), designer)
+                .item(t!("pro.workspace"), workspace)
+        })
 }

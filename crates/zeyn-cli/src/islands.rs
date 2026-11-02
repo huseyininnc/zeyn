@@ -54,13 +54,31 @@ pub fn build(crates: &[PathBuf], out: &Path) -> Result<String, String> {
         let staging = out.join(format!(".staging-{name}"));
         let _ = std::fs::remove_dir_all(&staging);
         run(Command::new("wasm-bindgen")
-            .args(["--target", "web", "--no-typescript", "--remove-name-section", "--remove-producers-section", "--out-name", &name, "--out-dir"])
+            .args([
+                "--target",
+                "web",
+                "--no-typescript",
+                "--remove-name-section",
+                "--remove-producers-section",
+                "--out-name",
+                &name,
+                "--out-dir",
+            ])
             .arg(&staging)
             .arg(&wasm))?;
         let bg = staging.join(format!("{name}_bg.wasm"));
         if optimizer {
             run(Command::new("wasm-opt")
-                .args(["-Oz", "--enable-bulk-memory", "--enable-nontrapping-float-to-int", "--enable-sign-ext", "--enable-reference-types", "--enable-mutable-globals", "--enable-multivalue", "-o"])
+                .args([
+                    "-Oz",
+                    "--enable-bulk-memory",
+                    "--enable-nontrapping-float-to-int",
+                    "--enable-sign-ext",
+                    "--enable-reference-types",
+                    "--enable-mutable-globals",
+                    "--enable-multivalue",
+                    "-o",
+                ])
                 .arg(&bg)
                 .arg(&bg))?;
         }
@@ -72,11 +90,16 @@ pub fn build(crates: &[PathBuf], out: &Path) -> Result<String, String> {
         std::fs::write(out.join(&js_file), &js_bytes).map_err(|e| e.to_string())?;
         std::fs::write(out.join(&wasm_file), &wasm_bytes).map_err(|e| e.to_string())?;
         let _ = std::fs::remove_dir_all(&staging);
-        report.push_str(&format!("{name}: {wasm_file} {} bytes, {js_file} {} bytes\n", wasm_bytes.len(), js_bytes.len()));
+        report.push_str(&format!(
+            "{name}: {wasm_file} {} bytes, {js_file} {} bytes\n",
+            wasm_bytes.len(),
+            js_bytes.len()
+        ));
         islands.insert(name, json!({ "js": js_file, "wasm": wasm_file }));
     }
     let manifest = json!({ "islands": islands });
-    std::fs::write(&manifest_path, serde_json::to_string_pretty(&manifest).unwrap_or_default() + "\n").map_err(|e| e.to_string())?;
+    std::fs::write(&manifest_path, serde_json::to_string_pretty(&manifest).unwrap_or_default() + "\n")
+        .map_err(|e| e.to_string())?;
     if !optimizer {
         report.push_str("wasm-opt was not found on the PATH; install binaryen for smaller files\n");
     }
@@ -100,7 +123,9 @@ fn compile(dir: &Path) -> Result<(String, PathBuf), String> {
         .as_array()
         .into_iter()
         .flatten()
-        .find(|p| p["manifest_path"].as_str().and_then(|m| std::fs::canonicalize(m).ok()).is_some_and(|m| m == manifest))
+        .find(|p| {
+            p["manifest_path"].as_str().and_then(|m| std::fs::canonicalize(m).ok()).is_some_and(|m| m == manifest)
+        })
         .ok_or_else(|| format!("{}: package not found", manifest.display()))?;
     let lib = package["targets"]
         .as_array()
@@ -110,7 +135,8 @@ fn compile(dir: &Path) -> Result<(String, PathBuf), String> {
         .and_then(|t| t["name"].as_str())
         .ok_or_else(|| format!("{}: an island needs `[lib] crate-type = [\"cdylib\"]`", manifest.display()))?
         .replace('-', "_");
-    let target = meta["target_directory"].as_str().map(PathBuf::from).ok_or("cargo metadata has no target directory")?;
+    let target =
+        meta["target_directory"].as_str().map(PathBuf::from).ok_or("cargo metadata has no target directory")?;
     let mut cargo = Command::new("cargo");
     cargo.args(["build", "--lib", "--release", "--target", "wasm32-unknown-unknown", "--manifest-path"]).arg(&manifest);
     for setting in SIZE_PROFILE {
@@ -131,7 +157,8 @@ fn remove_old(out: &Path, name: &str) {
     let Ok(entries) = std::fs::read_dir(out) else { return };
     for e in entries.flatten() {
         let file = e.file_name().to_string_lossy().into_owned();
-        let ours = (file.starts_with(&format!("{name}.")) && file.ends_with(".js")) || (file.starts_with(&format!("{name}_bg.")) && file.ends_with(".wasm"));
+        let ours = (file.starts_with(&format!("{name}.")) && file.ends_with(".js"))
+            || (file.starts_with(&format!("{name}_bg.")) && file.ends_with(".wasm"));
         if ours {
             let _ = std::fs::remove_file(e.path());
         }
@@ -167,7 +194,8 @@ mod tests {
             std::fs::write(dir.join(f), "x").unwrap();
         }
         remove_old(&dir, "a");
-        let mut left: Vec<String> = std::fs::read_dir(&dir).unwrap().flatten().map(|e| e.file_name().to_string_lossy().into_owned()).collect();
+        let mut left: Vec<String> =
+            std::fs::read_dir(&dir).unwrap().flatten().map(|e| e.file_name().to_string_lossy().into_owned()).collect();
         left.sort();
         assert_eq!(left, ["ab.222.js", "manifest.json"]);
         std::fs::remove_dir_all(&dir).unwrap();

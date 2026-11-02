@@ -73,12 +73,24 @@ fn form(order: Order) -> zeyn::SubmitForm<Order, save_order> {
 
 #[screen(route = "/orders", public)]
 pub fn orders() -> Screen {
-    Screen::new("Orders").body(Panel::new("Order").add(form(Order { customer: Some(CustomerId(2)), tags: vec![1, 3], quantity: 1250, ..Order::default() })))
+    Screen::new("Orders").body(Panel::new("Order").add(form(Order {
+        customer: Some(CustomerId(2)),
+        tags: vec![1, 3],
+        quantity: 1250,
+        ..Order::default()
+    })))
 }
 
 fn html(locale: &str) -> String {
     let mut out = String::new();
-    let order = Order { customer: Some(CustomerId(2)), tags: vec![1, 3], quantity: 1250, price: Money::tl(123456), size: Size::Large, ..Order::default() };
+    let order = Order {
+        customer: Some(CustomerId(2)),
+        tags: vec![1, 3],
+        quantity: 1250,
+        price: Money::tl(123456),
+        size: Size::Large,
+        ..Order::default()
+    };
     form(order).render(&mut out, &Render::new("o", locale, I18n::builtin()));
     out
 }
@@ -86,19 +98,34 @@ fn html(locale: &str) -> String {
 #[test]
 fn every_field_kind_gets_a_control_with_a_native_element_underneath() {
     let tr = html("tr");
-    assert!(tr.contains(r#"<div class="z-select" data-text-none="Seçilmedi""#), "choices render a native select inside the select control");
+    assert!(
+        tr.contains(r#"<div class="z-select" data-text-none="Seçilmedi""#),
+        "choices render a native select inside the select control"
+    );
     assert!(tr.contains(r#"<select id="o-size" name="size""#));
     assert!(tr.contains(r#"<option value="Large" selected>"#));
     assert!(tr.contains(r#"<fieldset class="z-radios z-segmented" aria-describedby="o-other-error">"#));
-    assert!(tr.contains(r#"<input type="radio" id="o-other" name="other" value="Small""#), "the first radio carries the field id for error messages");
+    assert!(
+        tr.contains(r#"<input type="radio" id="o-other" name="other" value="Small""#),
+        "the first radio carries the field id for error messages"
+    );
     assert!(tr.contains(r#"type="checkbox" role="switch" class="z-switch""#));
     assert!(tr.contains(r#"type="checkbox" class="z-checkbox""#));
-    assert!(tr.contains(r#"role="spinbutton" inputmode="numeric""#) && tr.contains(r#"value="1.250""#), "whole numbers are grouped in the user's language");
+    assert!(
+        tr.contains(r#"role="spinbutton" inputmode="numeric""#) && tr.contains(r#"value="1.250""#),
+        "whole numbers are grouped in the user's language"
+    );
     assert!(tr.contains(r#"data-min="1" aria-valuemin="1" data-max="5000" aria-valuemax="5000""#));
     assert!(tr.contains(r#"inputmode="decimal""#) && tr.contains(r#"value="1.234,56""#));
-    assert!(tr.contains(r#"<textarea rows="3" class="z-textarea" data-zeyn-autosize"#) && tr.contains(r#"maxlength="400""#));
+    assert!(
+        tr.contains(r#"<textarea rows="3" class="z-textarea" data-zeyn-autosize"#) && tr.contains(r#"maxlength="400""#)
+    );
     assert!(tr.contains(r#"aria-describedby="o-note-count o-note-error""#) && tr.contains("0 / 400 karakter"));
-    assert!(tr.contains(r#"data-zeyn-lookup="customer" data-multiple="false""#) && tr.contains(r#"name="customer""#) && tr.contains(r#"value="2""#));
+    assert!(
+        tr.contains(r#"data-zeyn-lookup="customer" data-multiple="false""#)
+            && tr.contains(r#"name="customer""#)
+            && tr.contains(r#"value="2""#)
+    );
     assert!(tr.contains(r#"data-zeyn-lookup="tags" data-multiple="true""#) && tr.contains(r#"value="1,3""#));
     assert!(tr.contains(r#"<label for="o-customer" id="o-customer-label">"#));
     for native in [r#"type="number""#, r#"type="date""#] {
@@ -172,7 +199,8 @@ async fn data(perms: &str, body: serde_json::Value) -> (StatusCode, serde_json::
 #[tokio::test]
 async fn lookup_searches_go_through_the_actions_permission() {
     let call = |key: &str, input: serde_json::Value| serde_json::json!({ "screen": "orders", "node": "0.0", "key": key, "input": input });
-    let (status, body) = data("customers.read", call("customer", serde_json::json!({ "text": "kaya", "limit": 5 }))).await;
+    let (status, body) =
+        data("customers.read", call("customer", serde_json::json!({ "text": "kaya", "limit": 5 }))).await;
     assert_eq!(status, StatusCode::OK, "{body}");
     assert_eq!(body["items"][0]["label"], "Mert Kaya");
     assert_eq!(body["total"], 1);
@@ -183,6 +211,8 @@ async fn lookup_searches_go_through_the_actions_permission() {
     assert_eq!(status, StatusCode::NOT_FOUND, "only lookup fields are data sources");
     let (status, _) = data("customers.read", call("customer", serde_json::json!({ "text": 5 }))).await;
     assert_eq!(status, StatusCode::NOT_FOUND, "input that does not fit the action is refused");
-    let (status, _) = data("customers.read", serde_json::json!({ "screen": "orders", "node": "0", "key": "customer", "input": {} })).await;
+    let (status, _) =
+        data("customers.read", serde_json::json!({ "screen": "orders", "node": "0", "key": "customer", "input": {} }))
+            .await;
     assert_eq!(status, StatusCode::NOT_FOUND, "the panel itself has no data source");
 }

@@ -139,16 +139,19 @@ impl Jobs {
         }
         jobs.push(Arc::new(Job { name, schedule, run: Arc::new(move |ctx| Box::pin(run(ctx))), wake: Notify::new() }));
         if let Ok(mut status) = self.0.status.lock() {
-            status.insert(name, JobStatus {
+            status.insert(
                 name,
-                state: JobState::Idle,
-                runs: 0,
-                failures: 0,
-                last_started_ms: None,
-                last_finished_ms: None,
-                last_error: None,
-                every_ms: schedule.every.map(|d| d.as_millis()),
-            });
+                JobStatus {
+                    name,
+                    state: JobState::Idle,
+                    runs: 0,
+                    failures: 0,
+                    last_started_ms: None,
+                    last_finished_ms: None,
+                    last_error: None,
+                    every_ms: schedule.every.map(|d| d.as_millis()),
+                },
+            );
         }
     }
 
@@ -171,7 +174,8 @@ impl Jobs {
 
     /// Status of every job, in registration order.
     pub fn status(&self) -> Vec<JobStatus> {
-        let names: Vec<&'static str> = self.0.jobs.lock().map(|j| j.iter().map(|j| j.name).collect()).unwrap_or_default();
+        let names: Vec<&'static str> =
+            self.0.jobs.lock().map(|j| j.iter().map(|j| j.name).collect()).unwrap_or_default();
         let status = self.0.status.lock();
         names.iter().filter_map(|n| status.as_ref().ok().and_then(|s| s.get(n).cloned())).collect()
     }

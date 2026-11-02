@@ -46,7 +46,12 @@ pub async fn save_order(order: Valid<Order>) -> Result<i64> {
 fn form(o: Order) -> zeyn::SubmitForm<Order, save_order> {
     Form::of(o)
         .field(Order::customer)
-        .lines(Order::lines, |l| l.column(OrderLine::item).column(OrderLine::quantity).column(OrderLine::price).total(OrderLine::quantity, OrderLine::price))
+        .lines(Order::lines, |l| {
+            l.column(OrderLine::item)
+                .column(OrderLine::quantity)
+                .column(OrderLine::price)
+                .total(OrderLine::quantity, OrderLine::price)
+        })
         .submit("Save", save_order)
 }
 
@@ -65,7 +70,11 @@ fn lines_render_as_a_table_with_named_cells_and_server_totals() {
     assert!(out.contains(r#"<table class="z-lines-table" aria-labelledby="o-lines-label">"#));
     assert!(out.contains(r#"name="lines.0.item""#) && out.contains(r#"name="lines.1.price""#));
     assert!(out.contains(r#"name="lines.1._i" value="1""#));
-    assert!(out.contains(r#"aria-label="Quantity, Satır 1""#) || out.contains(r#"aria-label="Miktar, Satır 1""#) || out.contains("Quantity, Satır 1"));
+    assert!(
+        out.contains(r#"aria-label="Quantity, Satır 1""#)
+            || out.contains(r#"aria-label="Miktar, Satır 1""#)
+            || out.contains("Quantity, Satır 1")
+    );
     assert!(out.contains(r#"value="150,00""#));
     assert!(out.contains(r#"data-zeyn-line-total>300,00</td>"#), "line total is quantity times price");
     assert!(out.contains(r#"data-zeyn-lines-sum aria-live="polite">399,95</td>"#), "footer total of every line");
@@ -139,9 +148,22 @@ fn every_line_is_validated_and_errors_name_the_line_and_column() {
     ])
     .unwrap_err();
     let found: Vec<(Rule, String)> = errors.errors.iter().map(|e| (e.rule, e.message.english())).collect();
-    assert!(found.contains(&(Rule::Line { row: 1, field: "quantity" }, "Line 2: Quantity has an invalid value.".to_string())), "{found:?}");
-    assert!(found.contains(&(Rule::Line { row: 0, field: "item" }, "Line 1: Item is required.".to_string())), "{found:?}");
-    assert_eq!(found.iter().filter(|(r, _)| *r == Rule::Line { row: 1, field: "quantity" }).count(), 1, "an unreadable cell is reported once");
+    assert!(
+        found.contains(&(
+            Rule::Line { row: 1, field: "quantity" },
+            "Line 2: Quantity has an invalid value.".to_string()
+        )),
+        "{found:?}"
+    );
+    assert!(
+        found.contains(&(Rule::Line { row: 0, field: "item" }, "Line 1: Item is required.".to_string())),
+        "{found:?}"
+    );
+    assert_eq!(
+        found.iter().filter(|(r, _)| *r == Rule::Line { row: 1, field: "quantity" }).count(),
+        1,
+        "an unreadable cell is reported once"
+    );
     assert!(errors.errors.iter().all(|e| e.field == "lines"));
 }
 
@@ -164,7 +186,8 @@ fn removing_every_line_empties_the_list_and_forms_without_cells_keep_the_loaded_
     for i in 0..600 {
         many.push((format!("lines.{i}.item"), "x".into()));
     }
-    let map: serde_json::Map<String, serde_json::Value> = many.into_iter().map(|(k, v)| (k, serde_json::json!(v))).collect();
+    let map: serde_json::Map<String, serde_json::Value> =
+        many.into_iter().map(|(k, v)| (k, serde_json::json!(v))).collect();
     let errors = form(order()).form().read(&map, "tr", TimeZone::UTC).unwrap_err();
     assert!(errors.errors.iter().any(|e| e.rule == Rule::MaxLen(zeyn::ui::MAX_LINES)));
 }
@@ -197,5 +220,8 @@ async fn the_form_endpoint_reports_line_errors_with_row_and_column() {
     assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
     let json: serde_json::Value = serde_json::from_slice(&res.into_body().collect().await.unwrap().to_bytes()).unwrap();
     assert_eq!(json["errors"][0]["field"], "lines");
-    assert_eq!(json["errors"][0]["rule"], serde_json::json!({ "rule": "line", "value": { "row": 0, "field": "quantity" } }));
+    assert_eq!(
+        json["errors"][0]["rule"],
+        serde_json::json!({ "rule": "line", "value": { "row": 0, "field": "quantity" } })
+    );
 }

@@ -1,3 +1,4 @@
+use crate::action::Page;
 use crate::action::{Action, ActionMeta, Error, Result};
 use crate::ctx::{BoxFuture, Ctx, Outcome};
 use crate::i18n::Text;
@@ -5,8 +6,9 @@ use crate::model::{Field, FieldError, FieldMeta, Model, Rule, Valid, ValidationE
 use crate::render::{Render, escape};
 use crate::screen::{Component, Effect, FormSource, Node, UiCtx};
 use crate::time::{Date, DateTime, DateWords, LocalDateTime, LocalTimeError, Time, TimeZone};
-use crate::action::Page;
-use crate::ui::{ActionSource, Control, DataSource, DateOptions, Lines, LinesEditor, LookupItem, LookupQuery, LookupValue, Slot};
+use crate::ui::{
+    ActionSource, Control, DataSource, DateOptions, Lines, LinesEditor, LookupItem, LookupQuery, LookupValue, Slot,
+};
 use crate::value::{Currency, FieldKind, FieldType, Money, Value};
 use serde_json::{Map, Value as Json, json};
 use std::marker::PhantomData;
@@ -87,7 +89,14 @@ impl<M: Model> Form<M> {
 
     /// Empty form filled with the given value. Add fields with `field` and `row`.
     pub fn of(model: M) -> Self {
-        Self { model, items: Vec::new(), options: Vec::new(), controls: Vec::new(), lookups: Vec::new(), lines: Vec::new() }
+        Self {
+            model,
+            items: Vec::new(),
+            options: Vec::new(),
+            controls: Vec::new(),
+            lookups: Vec::new(),
+            lines: Vec::new(),
+        }
     }
 
     /// Form with every field of the model, in declaration order. Keys and versions become hidden
@@ -154,8 +163,12 @@ impl<M: Model> Form<M> {
                 FormItem::Step(_) => steps.push(Vec::new()),
                 FormItem::Section(_) => {}
                 FormItem::Field(f) => steps.last_mut().into_iter().for_each(|s| s.push(f.meta.name)),
-                FormItem::Row(fs) => steps.last_mut().into_iter().for_each(|s| s.extend(fs.iter().map(|f| f.meta.name))),
-                FormItem::Range(a, b) => steps.last_mut().into_iter().for_each(|s| s.extend([a.meta.name, b.meta.name])),
+                FormItem::Row(fs) => {
+                    steps.last_mut().into_iter().for_each(|s| s.extend(fs.iter().map(|f| f.meta.name)))
+                }
+                FormItem::Range(a, b) => {
+                    steps.last_mut().into_iter().for_each(|s| s.extend([a.meta.name, b.meta.name]))
+                }
             }
         }
         steps
@@ -248,16 +261,18 @@ impl<M: Model> Form<M> {
     }
 
     fn fields(&self) -> impl Iterator<Item = &FormField<M>> {
-        self.items.iter().flat_map(|item| match item {
-            FormItem::Field(f) => std::slice::from_ref(f).iter(),
-            FormItem::Row(fs) => fs.iter(),
-            FormItem::Range(a, _) => std::slice::from_ref(a).iter(),
-            FormItem::Step(_) | FormItem::Section(_) => [].iter(),
-        })
-        .chain(self.items.iter().filter_map(|item| match item {
-            FormItem::Range(_, b) => Some(b),
-            _ => None,
-        }))
+        self.items
+            .iter()
+            .flat_map(|item| match item {
+                FormItem::Field(f) => std::slice::from_ref(f).iter(),
+                FormItem::Row(fs) => fs.iter(),
+                FormItem::Range(a, _) => std::slice::from_ref(a).iter(),
+                FormItem::Step(_) | FormItem::Section(_) => [].iter(),
+            })
+            .chain(self.items.iter().filter_map(|item| match item {
+                FormItem::Range(_, b) => Some(b),
+                _ => None,
+            }))
     }
 
     fn render_fields(&self, out: &mut String, r: &Render) {
@@ -266,7 +281,8 @@ impl<M: Model> Form<M> {
                 ctx.record_read(&self.model);
             }
         }
-        let titles: Vec<&Text> = self.items.iter().filter_map(|i| if let FormItem::Step(t) = i { Some(t) } else { None }).collect();
+        let titles: Vec<&Text> =
+            self.items.iter().filter_map(|i| if let FormItem::Step(t) = i { Some(t) } else { None }).collect();
         if !titles.is_empty() {
             out.push_str(&format!(
                 r#"<ol class="z-steps" data-zeyn-steps aria-label="{}" data-text-progress="{}">"#,
@@ -373,8 +389,17 @@ impl<M: Model> Form<M> {
     ///
     /// Masked fields are only taken from the client while they are empty; [`Form::read_for`]
     /// also takes them from users who may reveal them.
-    pub fn read(&self, values: &Map<String, Json>, locale: &str, tz: TimeZone) -> std::result::Result<Valid<M>, ValidationErrors> {
-        self.read_with(values, &Reading::new(locale, tz, DateTime::now(), &DateWords::from_i18n(crate::i18n::I18n::builtin(), locale)), &|_| false)
+    pub fn read(
+        &self,
+        values: &Map<String, Json>,
+        locale: &str,
+        tz: TimeZone,
+    ) -> std::result::Result<Valid<M>, ValidationErrors> {
+        self.read_with(
+            values,
+            &Reading::new(locale, tz, DateTime::now(), &DateWords::from_i18n(crate::i18n::I18n::builtin(), locale)),
+            &|_| false,
+        )
     }
 
     /// [`Form::read`] for the user of a request: their language, time zone, clock and catalogs
@@ -433,7 +458,9 @@ impl<M: Model> Form<M> {
                 errors.errors.push(FieldError {
                     field: to.meta.name,
                     rule: Rule::Custom,
-                    message: Text::key("zeyn.validation.range_order").arg("label", to.meta.label_text()).arg("other", from.meta.label_text()),
+                    message: Text::key("zeyn.validation.range_order")
+                        .arg("label", to.meta.label_text())
+                        .arg("other", from.meta.label_text()),
                 });
             }
         }
@@ -450,7 +477,10 @@ impl<M: Model> Form<M> {
             _ => return Err(general_error()),
         };
         let mut errors = ValidationErrors::default();
-        let empty = |name: &str| matches!(object.get(name), None | Some(Json::Null)) || object.get(name) == Some(&Json::String(String::new()));
+        let empty = |name: &str| {
+            matches!(object.get(name), None | Some(Json::Null))
+                || object.get(name) == Some(&Json::String(String::new()))
+        };
         let editable: Vec<&FieldMeta> = self
             .fields()
             .map(|f| f.meta)
@@ -530,7 +560,9 @@ pub(crate) fn read_moment(kind: FieldKind, text: &str, reading: &Reading) -> std
     match kind {
         FieldKind::Date => Date::parse_input(t, locale, reading.now.date, reading.words).map(Value::Date).ok_or(false),
         FieldKind::Time => Time::parse_input(t, locale, reading.now.time, reading.words).map(Value::Time).ok_or(false),
-        FieldKind::LocalDateTime => LocalDateTime::parse_input(t, locale, reading.now, reading.words).map(Value::LocalDateTime).ok_or(false),
+        FieldKind::LocalDateTime => {
+            LocalDateTime::parse_input(t, locale, reading.now, reading.words).map(Value::LocalDateTime).ok_or(false)
+        }
         FieldKind::DateTime => {
             if let Some(exact) = DateTime::parse(t) {
                 return Ok(Value::DateTime(exact));
@@ -544,7 +576,12 @@ pub(crate) fn read_moment(kind: FieldKind, text: &str, reading: &Reading) -> std
 
 /// Reads one submitted value as the field's type. Text arrives as typed by the user; wall clock
 /// date times are read in the user's time zone.
-pub(crate) fn parse_value(meta: &FieldMeta, raw: &Json, reading: &Reading, current: &Json) -> std::result::Result<Json, Unreadable> {
+pub(crate) fn parse_value(
+    meta: &FieldMeta,
+    raw: &Json,
+    reading: &Reading,
+    current: &Json,
+) -> std::result::Result<Json, Unreadable> {
     let locale = reading.locale;
     if let FieldKind::Bool = meta.kind {
         return raw.as_bool().map(Json::Bool).ok_or(Unreadable::Format);
@@ -560,29 +597,33 @@ pub(crate) fn parse_value(meta: &FieldMeta, raw: &Json, reading: &Reading, curre
         return Ok(Json::Null);
     }
     match meta.kind {
-        FieldKind::Custom { editor: "ids" } => crate::ui::parse_ids(trimmed).map(|ids| Json::from(ids)).ok_or(Unreadable::Format),
+        FieldKind::Custom { editor: "ids" } => {
+            crate::ui::parse_ids(trimmed).map(|ids| Json::from(ids)).ok_or(Unreadable::Format)
+        }
         FieldKind::Text | FieldKind::Custom { .. } => Ok(Json::String(text)),
         FieldKind::Integer | FieldKind::Id => {
             let group = crate::i18n::NumberFormat::for_locale(locale).group;
             let digits: String = trimmed.chars().filter(|c| *c != group && !c.is_whitespace()).collect();
             digits.parse::<i64>().map(Json::from).map_err(|_| Unreadable::Format)
         }
-        FieldKind::Date | FieldKind::Time | FieldKind::LocalDateTime | FieldKind::DateTime => match read_moment(meta.kind, trimmed, reading) {
-            Ok(v) => serde_json::to_value(v).map_err(|_| Unreadable::Format),
-            Err(true) => Err(Unreadable::SkippedTime),
-            Err(false) => Err(Unreadable::Format),
-        },
+        FieldKind::Date | FieldKind::Time | FieldKind::LocalDateTime | FieldKind::DateTime => {
+            match read_moment(meta.kind, trimmed, reading) {
+                Ok(v) => serde_json::to_value(v).map_err(|_| Unreadable::Format),
+                Err(true) => Err(Unreadable::SkippedTime),
+                Err(false) => Err(Unreadable::Format),
+            }
+        }
         FieldKind::Money => {
-            let currency: Currency = current
-                .get("currency")
-                .and_then(|c| serde_json::from_value(c.clone()).ok())
-                .unwrap_or_default();
+            let currency: Currency =
+                current.get("currency").and_then(|c| serde_json::from_value(c.clone()).ok()).unwrap_or_default();
             let money = Money::parse(trimmed, locale, currency)?;
             serde_json::to_value(money).map_err(|_| Unreadable::Format)
         }
-        FieldKind::Choice(options) => {
-            options.iter().find(|o| o.value == trimmed).map(|o| Json::String(o.value.to_string())).ok_or(Unreadable::Format)
-        }
+        FieldKind::Choice(options) => options
+            .iter()
+            .find(|o| o.value == trimmed)
+            .map(|o| Json::String(o.value.to_string()))
+            .ok_or(Unreadable::Format),
         FieldKind::Bool => Err(Unreadable::Format),
     }
 }
@@ -627,10 +668,8 @@ fn render_field<M: Model>(out: &mut String, r: &Render, f: &FormField<M>, form: 
     }
 
     let required = m.is_required();
-    let mut common = format!(
-        r#"id="{id}" name="{}" data-testid="{scope}.field.{}" aria-describedby="{id}-error""#,
-        m.name, m.name
-    );
+    let mut common =
+        format!(r#"id="{id}" name="{}" data-testid="{scope}.field.{}" aria-describedby="{id}-error""#, m.name, m.name);
     if required {
         common.push_str(r#" required aria-required="true""#);
     }
@@ -742,33 +781,49 @@ where
     fn tool_schema(&self) -> Json {
         let mut properties = Map::new();
         let mut required = Vec::new();
-        for m in self.form.fields().map(|f| f.meta).filter(|m| !m.key && !m.readonly && !m.version && m.mask.is_none()) {
+        for m in self.form.fields().map(|f| f.meta).filter(|m| !m.key && !m.readonly && !m.version && m.mask.is_none())
+        {
             let (kind, hint) = match m.kind {
                 FieldKind::Bool => ("boolean", String::new()),
                 FieldKind::Integer | FieldKind::Id => ("string", "Whole number.".to_string()),
-                FieldKind::Money => ("string", "Amount as typed by a user of the current language, for example 1.234,56 in Turkish.".to_string()),
+                FieldKind::Money => (
+                    "string",
+                    "Amount as typed by a user of the current language, for example 1.234,56 in Turkish.".to_string(),
+                ),
                 FieldKind::Choice(options) => {
                     let values: Vec<&str> = options.iter().map(|o| o.value).collect();
                     ("string", format!("One of: {}.", values.join(", ")))
                 }
                 FieldKind::Custom { editor: "lines" } => (
                     "string",
-                    format!("Send \"rows\" here and one value per cell as {}.<line>.<column>, lines numbered from 0.", m.name),
+                    format!(
+                        "Send \"rows\" here and one value per cell as {}.<line>.<column>, lines numbered from 0.",
+                        m.name
+                    ),
                 ),
                 FieldKind::Custom { editor: "ids" } => ("string", "Ids separated by commas.".to_string()),
                 FieldKind::Text | FieldKind::Custom { .. } => ("string", String::new()),
                 FieldKind::Date => ("string", "Date as YYYY-MM-DD.".to_string()),
                 FieldKind::Time => ("string", "Time as HH:MM.".to_string()),
                 FieldKind::LocalDateTime => ("string", "Date and time as YYYY-MM-DDTHH:MM, no time zone.".to_string()),
-                FieldKind::DateTime => ("string", "Moment in RFC 3339 with offset, or YYYY-MM-DDTHH:MM in the user's time zone.".to_string()),
+                FieldKind::DateTime => (
+                    "string",
+                    "Moment in RFC 3339 with offset, or YYYY-MM-DDTHH:MM in the user's time zone.".to_string(),
+                ),
             };
-            properties.insert(m.name.to_string(), json!({ "type": kind, "description": format!("{}. {hint}", m.label).trim().to_string() }));
+            properties.insert(
+                m.name.to_string(),
+                json!({ "type": kind, "description": format!("{}. {hint}", m.label).trim().to_string() }),
+            );
             if m.is_required() {
                 required.push(m.name);
             }
         }
         for m in M::fields().iter().filter(|m| m.version) {
-            properties.insert(m.name.to_string(), json!({ "type": "string", "description": "Row version as loaded. Send it back unchanged." }));
+            properties.insert(
+                m.name.to_string(),
+                json!({ "type": "string", "description": "Row version as loaded. Send it back unchanged." }),
+            );
         }
         json!({ "type": "object", "properties": properties, "required": required })
     }

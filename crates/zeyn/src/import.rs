@@ -231,9 +231,8 @@ fn columns_of<M: Model>(ctx: &Ctx, header: &[String]) -> Result<Vec<&'static Fie
     let mut columns = Vec::new();
     for name in header {
         let key = fold(name);
-        let meta = importable::<M>().find(|m| {
-            fold(m.name) == key || fold(m.label) == key || fold(&ctx.t(&m.label_text())) == key
-        });
+        let meta = importable::<M>()
+            .find(|m| fold(m.name) == key || fold(m.label) == key || fold(&ctx.t(&m.label_text())) == key);
         match meta {
             Some(m) if !columns.iter().any(|c: &&FieldMeta| c.name == m.name) => columns.push(m),
             _ => return Err(general(ctx, "unknown_column", &[("name", name.trim().to_string())])),
@@ -263,20 +262,28 @@ fn check_rows<M: Model>(ctx: &Ctx, columns: Vec<&'static FieldMeta>, rows: Vec<V
         for (meta, cell) in columns.iter().zip(row.iter().chain(std::iter::repeat(&String::new()))) {
             let value = match meta.kind {
                 FieldKind::Bool => bool_text(cell).map(Json::Bool).unwrap_or_else(|| Json::String(cell.clone())),
-                FieldKind::Choice(options) => {
-                    Json::String(choice_value(ctx, options, cell).map_or_else(|| cell.trim().to_string(), str::to_string))
-                }
+                FieldKind::Choice(options) => Json::String(
+                    choice_value(ctx, options, cell).map_or_else(|| cell.trim().to_string(), str::to_string),
+                ),
                 _ => Json::String(cell.trim().to_string()),
             };
             values.insert(meta.name.to_string(), value);
         }
         if row.len() > columns.len() && row[columns.len()..].iter().any(|c| !c.trim().is_empty()) {
-            errors.push(RowError { row: i + 1, field: String::new(), message: ctx.t(&Text::key("zeyn.import.extra_cells")) });
+            errors.push(RowError {
+                row: i + 1,
+                field: String::new(),
+                message: ctx.t(&Text::key("zeyn.import.extra_cells")),
+            });
             continue;
         }
         match form.read_for(&values, ctx) {
             Ok(v) => valid.push((i + 1, v)),
-            Err(e) => errors.extend(e.errors.iter().map(|e| RowError { row: i + 1, field: e.field.to_string(), message: ctx.t(&e.message) })),
+            Err(e) => errors.extend(e.errors.iter().map(|e| RowError {
+                row: i + 1,
+                field: e.field.to_string(),
+                message: ctx.t(&e.message),
+            })),
         }
     }
     Checked { columns, valid, errors, total: rows.len(), raw: rows }
@@ -354,9 +361,17 @@ where
         table.push_str("</tr></thead><tbody>");
         for (i, row) in checked.raw.iter().take(PREVIEW_ROWS).enumerate() {
             let bad = checked.errors.iter().any(|e| e.row == i + 1);
-            table.push_str(&format!(r#"<tr{}><th scope="row">{}</th>"#, if bad { r#" class="z-row-danger""# } else { "" }, i + 1));
+            table.push_str(&format!(
+                r#"<tr{}><th scope="row">{}</th>"#,
+                if bad { r#" class="z-row-danger""# } else { "" },
+                i + 1
+            ));
             for (m, cell) in checked.columns.iter().zip(row.iter().chain(std::iter::repeat(&String::new()))) {
-                let shown = if m.mask.is_some() && !cell.trim().is_empty() { crate::privacy::masked_text(m, cell) } else { cell.clone() };
+                let shown = if m.mask.is_some() && !cell.trim().is_empty() {
+                    crate::privacy::masked_text(m, cell)
+                } else {
+                    cell.clone()
+                };
                 table.push_str(&format!("<td>{}</td>", escape(&shown)));
             }
             table.push_str("</tr>");
@@ -395,7 +410,8 @@ where
             if let Some(error) = output.failure() {
                 return Err(error);
             }
-            let message = Text::key("zeyn.import.imported").arg("count", count.to_string()).arg("skipped", skipped.to_string());
+            let message =
+                Text::key("zeyn.import.imported").arg("count", count.to_string()).arg("skipped", skipped.to_string());
             Ok(json!({ "imported": count, "skipped": skipped, "message": ctx.t(&message) }))
         })
     }
@@ -410,7 +426,9 @@ where
         let scope = r.scope;
         let text = |k: &str| r.text(&Text::key(format!("zeyn.import.{k}")));
         let columns: Vec<String> = importable::<M>().map(|m| r.label(m)).collect();
-        let hint = r.text(&Text::key("zeyn.import.hint").arg("columns", columns.join(", ")).arg("max", self.max_rows.to_string()));
+        let hint = r.text(
+            &Text::key("zeyn.import.hint").arg("columns", columns.join(", ")).arg("max", self.max_rows.to_string()),
+        );
         out.push_str(&format!(
             r#"<div class="z-import" data-zeyn-import data-testid="{scope}.import"><div class="z-field"><label for="{scope}-import-file">{file}</label><input type="file" id="{scope}-import-file" accept="{ACCEPT}" data-testid="{scope}.import.file" aria-describedby="{scope}-import-hint"><p class="z-hint" id="{scope}-import-hint">{hint}</p></div><p class="z-import-status" role="status" aria-live="polite" data-zeyn-import-status></p><div data-zeyn-import-preview></div><div class="z-form-actions"><button type="button" class="z-button" data-zeyn-import-report hidden>{report}</button><button type="button" class="z-button z-primary" data-zeyn-import-commit data-testid="{scope}.import.commit" disabled>{commit}</button></div></div>"#,
             file = text(if cfg!(feature = "xlsx") { "file_any" } else { "file" }),

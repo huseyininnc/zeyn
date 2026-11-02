@@ -82,7 +82,9 @@ impl NumberFormat {
     /// Format for a locale such as `tr`, `tr-TR` or `en-US`.
     pub fn for_locale(locale: &str) -> Self {
         match primary(locale) {
-            "tr" | "de" | "es" | "it" | "nl" | "pt" | "id" => NumberFormat { decimal: ',', group: '.', symbol_first: false },
+            "tr" | "de" | "es" | "it" | "nl" | "pt" | "id" => {
+                NumberFormat { decimal: ',', group: '.', symbol_first: false }
+            }
             "fr" | "ru" | "pl" | "cs" | "sv" | "fi" | "nb" | "uk" => {
                 NumberFormat { decimal: ',', group: '\u{202f}', symbol_first: false }
             }
@@ -202,9 +204,8 @@ impl I18n {
             .filter_map(|part| {
                 let mut pieces = part.trim().split(';');
                 let tag = pieces.next()?.trim();
-                let q = pieces
-                    .find_map(|p| p.trim().strip_prefix("q=").and_then(|q| q.parse::<f32>().ok()))
-                    .unwrap_or(1.0);
+                let q =
+                    pieces.find_map(|p| p.trim().strip_prefix("q=").and_then(|q| q.parse::<f32>().ok())).unwrap_or(1.0);
                 (!tag.is_empty() && q > 0.0).then_some((q, tag))
             })
             .collect();

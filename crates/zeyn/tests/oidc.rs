@@ -38,10 +38,7 @@ fn now() -> i64 {
 
 fn query(url: &str) -> HashMap<String, String> {
     let q = url.split_once('?').map(|(_, q)| q).unwrap_or("");
-    q.split('&')
-        .filter_map(|p| p.split_once('='))
-        .map(|(k, v)| (k.to_string(), percent_decode(v)))
-        .collect()
+    q.split('&').filter_map(|p| p.split_once('=')).map(|(k, v)| (k.to_string(), percent_decode(v))).collect()
 }
 
 fn percent_decode(s: &str) -> String {
@@ -140,7 +137,11 @@ async fn jwks(State(idp): State<Arc<Idp>>) -> Json<Value> {
     Json(json!({ "keys": [idp.jwk(), { "kty": "oct", "k": "AAAA", "kid": "shared" }] }))
 }
 
-async fn token(State(idp): State<Arc<Idp>>, headers: HeaderMap, Form(f): Form<HashMap<String, String>>) -> (StatusCode, Json<Value>) {
+async fn token(
+    State(idp): State<Arc<Idp>>,
+    headers: HeaderMap,
+    Form(f): Form<HashMap<String, String>>,
+) -> (StatusCode, Json<Value>) {
     let basic = format!("Basic {}", base64_std(b"web:not-a-real-secret"));
     if headers.get(header::AUTHORIZATION).and_then(|v| v.to_str().ok()) != Some(basic.as_str()) {
         return (StatusCode::UNAUTHORIZED, Json(json!({ "error": "invalid_client" })));
@@ -149,7 +150,11 @@ async fn token(State(idp): State<Arc<Idp>>, headers: HeaderMap, Form(f): Form<Ha
     let expires_in = idp.expires_in.load(Ordering::SeqCst);
     match f.get("grant_type").map(String::as_str) {
         Some("authorization_code") => {
-            let Some((nonce, challenge, extra)) = idp.codes.lock().unwrap().remove(f.get("code").map(String::as_str).unwrap_or("")) else { return bad };
+            let Some((nonce, challenge, extra)) =
+                idp.codes.lock().unwrap().remove(f.get("code").map(String::as_str).unwrap_or(""))
+            else {
+                return bad;
+            };
             let verifier = f.get("code_verifier").cloned().unwrap_or_default();
             if b64(ring::digest::digest(&ring::digest::SHA256, verifier.as_bytes()).as_ref()) != challenge {
                 return bad;
@@ -161,10 +166,22 @@ async fn token(State(idp): State<Arc<Idp>>, headers: HeaderMap, Form(f): Form<Ha
             if extra.get("nonce").is_none() {
                 extra["nonce"] = json!(nonce);
             }
-            (StatusCode::OK, Json(json!({ "id_token": idp.token("web", extra), "access_token": "opaque", "expires_in": expires_in, "refresh_token": "r1" })))
+            (
+                StatusCode::OK,
+                Json(
+                    json!({ "id_token": idp.token("web", extra), "access_token": "opaque", "expires_in": expires_in, "refresh_token": "r1" }),
+                ),
+            )
         }
-        Some("refresh_token") if idp.refresh_ok.load(Ordering::SeqCst) && f.get("refresh_token").is_some_and(|r| r.starts_with('r')) => {
-            (StatusCode::OK, Json(json!({ "id_token": idp.token("web", json!({})), "expires_in": expires_in, "refresh_token": "r2" })))
+        Some("refresh_token")
+            if idp.refresh_ok.load(Ordering::SeqCst) && f.get("refresh_token").is_some_and(|r| r.starts_with('r')) =>
+        {
+            (
+                StatusCode::OK,
+                Json(
+                    json!({ "id_token": idp.token("web", json!({})), "expires_in": expires_in, "refresh_token": "r2" }),
+                ),
+            )
         }
         _ => bad,
     }
@@ -258,7 +275,11 @@ async fn start(router: &Router, path: &str) -> (String, HashMap<String, String>,
 async fn sign_in(router: &Router, idp: &Idp, path: &str, code: &str, extra: Value) -> String {
     let (flow, q, _) = start(router, path).await;
     idp.register(code, &q["nonce"], &q["code_challenge"], extra);
-    let r = send(router, get_with(&format!("/_zeyn/auth/callback?code={code}&state={}", q["state"]), &format!("zeyn_oidc={flow}"))).await;
+    let r = send(
+        router,
+        get_with(&format!("/_zeyn/auth/callback?code={code}&state={}", q["state"]), &format!("zeyn_oidc={flow}")),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::SEE_OTHER, "{}", r.body);
     r.cookie_value("zeyn_session")
 }
@@ -281,15 +302,25 @@ async fn a_browser_signs_in_with_pkce_state_and_nonce_and_gets_a_sealed_session_
     assert!(q["state"].len() >= 43 && q["nonce"].len() >= 43 && q["state"] != q["nonce"]);
     assert!(!q.contains_key("prompt"));
     let flow_cookie = r.cookie("zeyn_oidc").unwrap();
-    assert!(flow_cookie.contains("HttpOnly") && flow_cookie.contains("SameSite=Lax") && !flow_cookie.contains("Secure"), "{flow_cookie}");
+    assert!(
+        flow_cookie.contains("HttpOnly") && flow_cookie.contains("SameSite=Lax") && !flow_cookie.contains("Secure"),
+        "{flow_cookie}"
+    );
     assert!(!flow.contains(&q["state"]), "the flow cookie is encrypted");
 
     idp.register("c1", &q["nonce"], &q["code_challenge"], json!({}));
-    let r = send(&router, get_with(&format!("/_zeyn/auth/callback?code=c1&state={}", q["state"]), &format!("zeyn_oidc={flow}"))).await;
+    let r = send(
+        &router,
+        get_with(&format!("/_zeyn/auth/callback?code=c1&state={}", q["state"]), &format!("zeyn_oidc={flow}")),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::SEE_OTHER, "{}", r.body);
     assert_eq!(r.location(), "/home");
     let session = r.cookie("zeyn_session").unwrap();
-    assert!(session.contains("HttpOnly") && session.contains("SameSite=Lax") && session.contains("Path=/"), "{session}");
+    assert!(
+        session.contains("HttpOnly") && session.contains("SameSite=Lax") && session.contains("Path=/"),
+        "{session}"
+    );
     assert!(r.cookie("zeyn_oidc").unwrap().contains("Max-Age=0"), "the flow cookie is used once");
     let value = r.cookie_value("zeyn_session");
     assert!(!value.contains("ayse") && value.len() < 3800);
@@ -298,7 +329,11 @@ async fn a_browser_signs_in_with_pkce_state_and_nonce_and_gets_a_sealed_session_
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
     assert!(r.body.contains("_zeyn/auth/logout"), "idle sign out goes through the provider");
 
-    let r = send(&router, get_with(&format!("/_zeyn/auth/callback?code=c1&state={}", q["state"]), &format!("zeyn_oidc={flow}"))).await;
+    let r = send(
+        &router,
+        get_with(&format!("/_zeyn/auth/callback?code=c1&state={}", q["state"]), &format!("zeyn_oidc={flow}")),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::BAD_REQUEST, "a replayed callback is refused");
     assert!(r.cookie("zeyn_session").is_none());
 }
@@ -326,27 +361,53 @@ async fn callbacks_with_a_wrong_state_nonce_or_cookie_are_refused() {
     let mut tampered = flow.clone().into_bytes();
     let i = tampered.len() / 2;
     tampered[i] = if tampered[i] == b'A' { b'B' } else { b'A' };
-    let r = send(&router, get_with(&format!("/_zeyn/auth/callback?code=c2&state={}", q["state"]), &format!("zeyn_oidc={}", String::from_utf8(tampered).unwrap()))).await;
+    let r = send(
+        &router,
+        get_with(
+            &format!("/_zeyn/auth/callback?code=c2&state={}", q["state"]),
+            &format!("zeyn_oidc={}", String::from_utf8(tampered).unwrap()),
+        ),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::BAD_REQUEST, "tampered flow cookie");
 
     let (flow, q, _) = start(&router, "/_zeyn/auth/login").await;
     idp.register("c3", "another nonce", &q["code_challenge"], json!({ "nonce": "another nonce" }));
-    let r = send(&router, get_with(&format!("/_zeyn/auth/callback?code=c3&state={}", q["state"]), &format!("zeyn_oidc={flow}"))).await;
+    let r = send(
+        &router,
+        get_with(&format!("/_zeyn/auth/callback?code=c3&state={}", q["state"]), &format!("zeyn_oidc={flow}")),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::BAD_REQUEST, "nonce mismatch");
     assert!(r.cookie("zeyn_session").is_none());
 
     let (flow, q, _) = start(&router, "/_zeyn/auth/login").await;
     idp.register("c4", &q["nonce"], "a challenge for another verifier", json!({}));
-    let r = send(&router, get_with(&format!("/_zeyn/auth/callback?code=c4&state={}", q["state"]), &format!("zeyn_oidc={flow}"))).await;
+    let r = send(
+        &router,
+        get_with(&format!("/_zeyn/auth/callback?code=c4&state={}", q["state"]), &format!("zeyn_oidc={flow}")),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::BAD_REQUEST, "PKCE verifier mismatch");
 
     let (flow, q, _) = start(&router, "/_zeyn/auth/login").await;
-    let r = send(&router, get_with(&format!("/_zeyn/auth/callback?error=access_denied&state={}", q["state"]), &format!("zeyn_oidc={flow}"))).await;
+    let r = send(
+        &router,
+        get_with(
+            &format!("/_zeyn/auth/callback?error=access_denied&state={}", q["state"]),
+            &format!("zeyn_oidc={flow}"),
+        ),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::BAD_REQUEST, "provider error");
 
     let (flow, q, _) = start(&router, "/_zeyn/auth/login").await;
     idp.register("c5", &q["nonce"], &q["code_challenge"], json!({ "aud": ["web", "other"], "azp": "other" }));
-    let r = send(&router, get_with(&format!("/_zeyn/auth/callback?code=c5&state={}", q["state"]), &format!("zeyn_oidc={flow}"))).await;
+    let r = send(
+        &router,
+        get_with(&format!("/_zeyn/auth/callback?code=c5&state={}", q["state"]), &format!("zeyn_oidc={flow}")),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::BAD_REQUEST, "ID token for another authorized party");
 }
 
@@ -358,14 +419,23 @@ async fn return_to_only_accepts_local_paths() {
         let (flow, q, _) = start(&router, &format!("/_zeyn/auth/login?return_to={target}")).await;
         let code = format!("r-{target}");
         idp.register(&code, &q["nonce"], &q["code_challenge"], json!({}));
-        let r = send(&router, get_with(&format!("/_zeyn/auth/callback?code={}&state={}", percent_encode(&code), q["state"]), &format!("zeyn_oidc={flow}"))).await;
+        let r = send(
+            &router,
+            get_with(
+                &format!("/_zeyn/auth/callback?code={}&state={}", percent_encode(&code), q["state"]),
+                &format!("zeyn_oidc={flow}"),
+            ),
+        )
+        .await;
         assert_eq!(r.status, StatusCode::SEE_OTHER, "{}", r.body);
         assert_eq!(r.location(), "/", "{target}");
     }
 }
 
 fn percent_encode(s: &str) -> String {
-    s.bytes().map(|b| if b.is_ascii_alphanumeric() || b == b'-' { (b as char).to_string() } else { format!("%{b:02X}") }).collect()
+    s.bytes()
+        .map(|b| if b.is_ascii_alphanumeric() || b == b'-' { (b as char).to_string() } else { format!("%{b:02X}") })
+        .collect()
 }
 
 #[tokio::test]
@@ -380,7 +450,15 @@ async fn a_tampered_or_foreign_session_cookie_is_not_signed_in() {
     assert_eq!(r.status, StatusCode::SEE_OTHER, "tampered session goes to sign in");
 
     let other = App::new("T")
-        .oidc(OidcAuth::new(&idp.base, "web", "http://app.test", Secret::new("another key of at least thirty two bytes".into())).algorithms([Algorithm::ES256]))
+        .oidc(
+            OidcAuth::new(
+                &idp.base,
+                "web",
+                "http://app.test",
+                Secret::new("another key of at least thirty two bytes".into()),
+            )
+            .algorithms([Algorithm::ES256]),
+        )
         .feature(Feature::new("crm").screen(home))
         .router()
         .unwrap();
@@ -410,10 +488,16 @@ async fn step_up_sends_the_user_back_to_the_provider_with_acr_values() {
     assert_eq!(q["prompt"], "login");
     assert_eq!(q["max_age"], "0");
     idp.register("s2", &q["nonce"], &q["code_challenge"], json!({}));
-    let r = send(&router, get_with(&format!("/_zeyn/auth/callback?code=s2&state={}", q["state"]), &format!("zeyn_oidc={flow}"))).await;
+    let r = send(
+        &router,
+        get_with(&format!("/_zeyn/auth/callback?code=s2&state={}", q["state"]), &format!("zeyn_oidc={flow}")),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::BAD_REQUEST, "the provider did not do MFA");
 
-    let strong = sign_in(&router, &idp, "/_zeyn/auth/login?mfa=1&return_to=%2Fvault", "s3", json!({ "amr": ["pwd", "otp"] })).await;
+    let strong =
+        sign_in(&router, &idp, "/_zeyn/auth/login?mfa=1&return_to=%2Fvault", "s3", json!({ "amr": ["pwd", "otp"] }))
+            .await;
     let r = send(&router, get_with("/vault", &format!("zeyn_session={strong}"))).await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
     let by_acr = sign_in(&router, &idp, "/_zeyn/auth/login?mfa=1", "s4", json!({ "acr": "2" })).await;
@@ -432,7 +516,8 @@ async fn csrf_still_guards_posts_for_cookie_sessions() {
     let value = sign_in(&router, &idp, "/_zeyn/auth/login", "x1", json!({})).await;
     let token = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
     let post = |csrf: Option<&str>| {
-        let mut b = Request::post("/_zeyn/keepalive").header(header::COOKIE, format!("zeyn_session={value}; zeyn_csrf={token}"));
+        let mut b = Request::post("/_zeyn/keepalive")
+            .header(header::COOKIE, format!("zeyn_session={value}; zeyn_csrf={token}"));
         if let Some(c) = csrf {
             b = b.header("x-zeyn-csrf", c);
         }
@@ -450,7 +535,10 @@ async fn logout_clears_the_session_and_goes_through_the_end_session_endpoint() {
     let value = sign_in(&router, &idp, "/_zeyn/auth/login", "l1", json!({})).await;
     let r = send(&router, get_with("/_zeyn/auth/logout", &format!("zeyn_session={value}"))).await;
     assert_eq!(r.status, StatusCode::SEE_OTHER);
-    assert_eq!(r.location(), format!("{}/logout?client_id=web&post_logout_redirect_uri=http%3A%2F%2Fapp.test%2F", idp.base));
+    assert_eq!(
+        r.location(),
+        format!("{}/logout?client_id=web&post_logout_redirect_uri=http%3A%2F%2Fapp.test%2F", idp.base)
+    );
     assert!(r.cookie("zeyn_session").unwrap().contains("Max-Age=0"));
 }
 
@@ -479,7 +567,11 @@ async fn an_oversized_session_is_refused_instead_of_cut() {
     let (flow, q, _) = start(&router, "/_zeyn/auth/login").await;
     let scope: Vec<String> = (0..400).map(|i| format!("crm.permission.number.{i}")).collect();
     idp.register("big", &q["nonce"], &q["code_challenge"], json!({ "scope": scope.join(" ") }));
-    let r = send(&router, get_with(&format!("/_zeyn/auth/callback?code=big&state={}", q["state"]), &format!("zeyn_oidc={flow}"))).await;
+    let r = send(
+        &router,
+        get_with(&format!("/_zeyn/auth/callback?code=big&state={}", q["state"]), &format!("zeyn_oidc={flow}")),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::BAD_REQUEST);
     assert!(r.cookie("zeyn_session").is_none());
 }
@@ -515,7 +607,12 @@ fn jwt(idp: &Idp) -> JwtAuth {
 async fn bearer_tokens_map_claims_to_the_identity() {
     let idp = Idp::start().await;
     let auth = jwt(&idp);
-    let id = check(&auth, &idp.token("api", json!({ "tenant": "acme", "zoneinfo": "Europe/Istanbul", "auth_time": 1_700_000_000 }))).await.unwrap();
+    let id = check(
+        &auth,
+        &idp.token("api", json!({ "tenant": "acme", "zoneinfo": "Europe/Istanbul", "auth_time": 1_700_000_000 })),
+    )
+    .await
+    .unwrap();
     assert_eq!(id.user.as_deref(), Some("ayse"));
     assert_eq!(id.tenant.as_deref(), Some("acme"));
     assert_eq!(id.time_zone.as_deref(), Some("Europe/Istanbul"));
@@ -570,7 +667,8 @@ async fn forged_tokens_are_refused() {
     let good = idp.token("api", json!({}));
     let (head, rest) = good.split_once('.').unwrap();
     let sig = rest.split_once('.').unwrap().1;
-    let more = idp.claims("api", json!({ "realm_access": { "roles": ["clerks", "admins"] }, "preferred_username": "root" }));
+    let more =
+        idp.claims("api", json!({ "realm_access": { "roles": ["clerks", "admins"] }, "preferred_username": "root" }));
     let tampered = format!("{head}.{}.{sig}", b64(more.to_string().as_bytes()));
     assert!(check(&auth, &tampered).await.is_none(), "changed claims");
 
@@ -611,7 +709,10 @@ async fn api_and_mcp_calls_accept_bearer_tokens_next_to_the_browser_session() {
     let router = app(oidc(&idp, "http://app.test").accept_bearer("api"));
     let page = |auth: String| Request::get("/home").header(header::AUTHORIZATION, auth).body(Body::empty()).unwrap();
     assert_eq!(send(&router, page(format!("Bearer {}", idp.token("api", json!({}))))).await.status, StatusCode::OK);
-    assert_eq!(send(&router, page(format!("Bearer {}", idp.token("web", json!({}))))).await.status, StatusCode::SEE_OTHER);
+    assert_eq!(
+        send(&router, page(format!("Bearer {}", idp.token("web", json!({}))))).await.status,
+        StatusCode::SEE_OTHER
+    );
 }
 
 mod keycloak {
@@ -627,7 +728,13 @@ mod keycloak {
     async fn admin_token(http: &reqwest::Client, base: &str) -> String {
         let r: Value = http
             .post(format!("{base}/realms/master/protocol/openid-connect/token"))
-            .header(reqwest::header::CONTENT_TYPE, "application/x-www-form-urlencoded").body(form_body(&[("grant_type", "password"), ("client_id", "admin-cli"), ("username", "admin"), ("password", "admin")]))
+            .header(reqwest::header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .body(form_body(&[
+                ("grant_type", "password"),
+                ("client_id", "admin-cli"),
+                ("username", "admin"),
+                ("password", "admin"),
+            ]))
             .send()
             .await
             .unwrap()
@@ -701,7 +808,8 @@ mod keycloak {
         let res = http
             .post(&action)
             .header(reqwest::header::COOKIE, jar_header(&jar))
-            .header(reqwest::header::CONTENT_TYPE, "application/x-www-form-urlencoded").body(form_body(&[("username", "ayse"), ("password", "test-password"), ("credentialId", "")]))
+            .header(reqwest::header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .body(form_body(&[("username", "ayse"), ("password", "test-password"), ("credentialId", "")]))
             .send()
             .await
             .unwrap();
@@ -721,12 +829,10 @@ mod keycloak {
         setup(&http, &base).await;
         let issuer = format!("{base}/realms/{REALM}");
         let claims = ClaimMap::new().roles("realm_access.roles").role("clerks", ["crm.read"]).mfa_acr(["2"]);
-        let router = app(
-            OidcAuth::new(&issuer, "zeyn-web", "http://app.test", Secret::new(KEY.into()))
-                .client_secret(Secret::new(CLIENT_SECRET.into()))
-                .claims(claims.clone())
-                .refresh_tokens(true),
-        );
+        let router = app(OidcAuth::new(&issuer, "zeyn-web", "http://app.test", Secret::new(KEY.into()))
+            .client_secret(Secret::new(CLIENT_SECRET.into()))
+            .claims(claims.clone())
+            .refresh_tokens(true));
 
         let (flow, q, r) = start(&router, "/_zeyn/auth/login?return_to=%2Fhome").await;
         let back = browser_login(&http, &r.location()).await;
@@ -752,11 +858,23 @@ mod keycloak {
         assert_eq!(r.status, StatusCode::BAD_REQUEST, "no second factor was done, so step up is refused");
 
         let r = send(&router, get_with("/_zeyn/auth/logout", &format!("zeyn_session={session}"))).await;
-        assert!(r.location().starts_with(&format!("{issuer}/protocol/openid-connect/logout?client_id=zeyn-web")), "{}", r.location());
+        assert!(
+            r.location().starts_with(&format!("{issuer}/protocol/openid-connect/logout?client_id=zeyn-web")),
+            "{}",
+            r.location()
+        );
 
         let tokens: Value = http
             .post(format!("{issuer}/protocol/openid-connect/token"))
-            .header(reqwest::header::CONTENT_TYPE, "application/x-www-form-urlencoded").body(form_body(&[("grant_type", "password"), ("client_id", "zeyn-web"), ("client_secret", CLIENT_SECRET), ("username", "ayse"), ("password", "test-password"), ("scope", "openid")]))
+            .header(reqwest::header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .body(form_body(&[
+                ("grant_type", "password"),
+                ("client_id", "zeyn-web"),
+                ("client_secret", CLIENT_SECRET),
+                ("username", "ayse"),
+                ("password", "test-password"),
+                ("scope", "openid"),
+            ]))
             .send()
             .await
             .unwrap()
@@ -769,7 +887,10 @@ mod keycloak {
         assert_eq!(id.user.as_deref(), Some("ayse"));
         assert!(id.permissions.contains("crm.read"));
         assert!(check(&JwtAuth::new(&issuer, "another-api"), access).await.is_none(), "wrong audience");
-        assert!(check(&JwtAuth::new(&format!("{base}/realms/master"), "zeyn-api"), access).await.is_none(), "wrong issuer");
+        assert!(
+            check(&JwtAuth::new(&format!("{base}/realms/master"), "zeyn-api"), access).await.is_none(),
+            "wrong issuer"
+        );
         let token = admin_token(&http, &base).await;
         let _ = http.delete(format!("{base}/admin/realms/{REALM}")).bearer_auth(&token).send().await;
     }
