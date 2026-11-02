@@ -14,6 +14,15 @@ The `zeyn` command creates projects, adds features, checks an app and runs an MC
 | `zeyn check --fix` | Rewrites renamed Zeyn APIs in `src`, `tests` and `examples`, then checks |
 | `zeyn mcp` | Runs an MCP server on stdio for AI agents |
 
+Install it from crates.io:
+
+```sh
+cargo install zeyn-cli
+zeyn new my-app
+cd my-app
+cargo run
+```
+
 Inside this repository, run the CLI through Cargo:
 
 ```sh

@@ -35,6 +35,17 @@ The same three macros carry the whole language: `#[entity]` describes data, `#[a
 
 ## Try it
 
+Start your own app:
+
+```sh
+cargo install zeyn-cli
+zeyn new my-app
+cd my-app
+cargo run
+```
+
+Or run the examples from the repository:
+
 ```sh
 cargo run -p zeyn-example-showcase
 cargo run -p zeyn-example-docs

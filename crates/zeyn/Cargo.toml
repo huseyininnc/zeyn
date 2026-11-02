@@ -43,8 +43,8 @@ email = ["server", "dep:lettre"]
 accounts = ["totp", "dep:argon2", "dep:base64", "dep:unicode-normalization"]
 
 [dependencies]
-zeyn-macros = { path = "../zeyn-macros", version = "0.0.2" }
-zeyn-island = { path = "../zeyn-island", version = "0.0.2", optional = true }
+zeyn-macros = { path = "../zeyn-macros", version = "0.0.3" }
+zeyn-island = { path = "../zeyn-island", version = "0.0.3", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 jiff = { version = "0.2", default-features = false, features = ["std", "tzdb-bundle-always"] }
