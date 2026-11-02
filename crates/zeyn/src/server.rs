@@ -25,6 +25,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 mod data;
 mod ops;
+mod session;
 
 pub use ops::build_id;
 
@@ -70,13 +71,14 @@ pub struct ForwardAuth {
     groups: Option<&'static str>,
     tenant: Option<&'static str>,
     time_zone: Option<&'static str>,
+    auth_time: Option<&'static str>,
     shared: Option<(&'static str, String)>,
     roles: HashMap<String, Vec<String>>,
 }
 
 impl ForwardAuth {
     pub fn new(user_header: &'static str) -> Self {
-        ForwardAuth { user: user_header, groups: None, tenant: None, time_zone: None, shared: None, roles: HashMap::new() }
+        ForwardAuth { user: user_header, groups: None, tenant: None, time_zone: None, auth_time: None, shared: None, roles: HashMap::new() }
     }
 
     /// Header with the user's groups, comma separated.
@@ -94,6 +96,13 @@ impl ForwardAuth {
     /// Header with the user's time zone.
     pub fn time_zone(mut self, header: &'static str) -> Self {
         self.time_zone = Some(header);
+        self
+    }
+
+    /// Header with the time the user signed in, as Unix seconds or RFC 3339. Needed by actions
+    /// marked `reauth`.
+    pub fn auth_time(mut self, header: &'static str) -> Self {
+        self.auth_time = Some(header);
         self
     }
 
@@ -132,6 +141,10 @@ impl Authenticator for ForwardAuth {
         }
         identity.tenant = self.tenant.and_then(text).map(str::to_string);
         identity.time_zone = self.time_zone.and_then(text).map(str::to_string);
+        identity.authenticated_at = self.auth_time.and_then(text).and_then(|t| match t.parse::<i64>() {
+            Ok(secs) => secs.checked_mul(1000).map(DateTime::from_unix_ms),
+            Err(_) => DateTime::parse(t),
+        });
         Some(identity)
     }
 }
@@ -187,7 +200,9 @@ impl DevAuth {
 
 impl Authenticator for DevAuth {
     fn authenticate(&self, _headers: &HeaderMap) -> Option<Identity> {
-        Some(self.0.clone())
+        let mut identity = self.0.clone();
+        identity.authenticated_at.get_or_insert_with(DateTime::now);
+        Some(identity)
     }
 
     fn is_development(&self) -> bool {
@@ -1022,7 +1037,7 @@ impl App {
             .route("/_zeyn/timezone", post(set_time_zone))
             .route("/_zeyn/tools", get(tools))
             .route("/_zeyn/mcp", post(mcp));
-        let router = data::routes(ops::routes(router))
+        let router = session::routes(data::routes(ops::routes(router)))
             .fallback(not_found)
             .layer(axum::middleware::from_fn_with_state(state.clone(), guard_request))
             .layer(axum::middleware::map_response(security_headers))
@@ -1280,6 +1295,7 @@ impl AppState {
     }
 
     fn before(&self, ctx: &Ctx, call: &Call) -> Result<(), Failure> {
+        session::check_reauth(self, ctx, call)?;
         for i in &self.interceptors {
             i.before(ctx, call)?;
         }

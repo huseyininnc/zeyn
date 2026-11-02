@@ -158,6 +158,7 @@ pub fn action(attr: TokenStream, item: TokenStream) -> TokenStream {
     let f = syn::parse_macro_input!(item as ItemFn);
     let mut access = AccessArgs::default();
     let mut audit = false;
+    let mut reauth = false;
     let parser = syn::meta::parser(|meta| {
         if meta.path.is_ident("permission") {
             access.permission = Some(meta.value()?.parse()?);
@@ -165,17 +166,19 @@ pub fn action(attr: TokenStream, item: TokenStream) -> TokenStream {
             access.public = true;
         } else if meta.path.is_ident("audit") {
             audit = true;
+        } else if meta.path.is_ident("reauth") {
+            reauth = true;
         } else {
-            return Err(meta.error("unknown action option\n  = help: expected `permission = \"...\"`, `public` or `audit`"));
+            return Err(meta.error("unknown action option\n  = help: expected `permission = \"...\"`, `public`, `audit` or `reauth`"));
         }
         Ok(())
     });
     syn::parse_macro_input!(attr with parser);
     let original = quote!(#f);
-    or_error(expand_action(&f, &access, audit), original)
+    or_error(expand_action(&f, &access, audit, reauth), original)
 }
 
-fn expand_action(f: &ItemFn, access: &AccessArgs, audit: bool) -> syn::Result<Ts> {
+fn expand_action(f: &ItemFn, access: &AccessArgs, audit: bool, reauth: bool) -> syn::Result<Ts> {
     let (input, output) = fn_types(f, "action")?;
     let name = &f.sig.ident;
     let access = access.tokens("action", name)?;
@@ -192,6 +195,7 @@ fn expand_action(f: &ItemFn, access: &AccessArgs, audit: bool) -> syn::Result<Ts
                 name: #name_str,
                 access: #access,
                 audit: #audit,
+                reauth: #reauth,
             };
 
             fn deps() -> ::std::vec::Vec<::zeyn::Dep> {

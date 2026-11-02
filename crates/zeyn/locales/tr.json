@@ -14,6 +14,19 @@
       "restored": "Daha önce kaydetmediğiniz girişler geri yüklendi.",
       "discard": "Girişleri at"
     },
+    "session": {
+      "idle_title": "Hâlâ orada mısınız?",
+      "idle_body": "Bir süredir işlem yapmadığınız için {seconds} saniye sonra oturumunuz kapatılacak.",
+      "stay": "Oturumu açık tut",
+      "signed_out_title": "Oturumunuz kapatıldı",
+      "signed_out_body": "Bir süredir işlem yapmadığınız için oturumunuz kapatıldı. Kaydedilmemiş form girişleriniz bu sekmede saklanıyor.",
+      "sign_in": "Yeniden giriş yap",
+      "reauth_required": "Güvenliğiniz için bu işlemden önce yeniden giriş yapın.",
+      "reauth_title": "Kimliğinizi doğrulayın",
+      "reauth_body": "Bu işlem yakın zamanda giriş yapmış olmanızı gerektiriyor. Yeni sekmede yeniden giriş yapın, sonra buraya dönüp devam edin.",
+      "reauth_open": "Yeniden giriş yap",
+      "reauth_continue": "Giriş yaptım, devam et"
+    },
     "workflow": {
       "state": "Durum",
       "comment": "Açıklama",

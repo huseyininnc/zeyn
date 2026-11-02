@@ -24,6 +24,9 @@ pub struct Identity {
     /// Time zone from the user's profile, set by an administrator or the user. It wins over the
     /// browser's zone under `TimePolicy::User`.
     pub time_zone: Option<String>,
+    /// When the user last proved who they are (signed in), as reported by the identity provider.
+    /// Actions marked `reauth` need this to be recent.
+    pub authenticated_at: Option<crate::time::DateTime>,
 }
 
 impl Identity {
@@ -56,6 +59,11 @@ impl Identity {
 
     pub fn with_time_zone(mut self, zone: impl Into<String>) -> Self {
         self.time_zone = Some(zone.into());
+        self
+    }
+
+    pub fn with_authenticated_at(mut self, at: crate::time::DateTime) -> Self {
+        self.authenticated_at = Some(at);
         self
     }
 

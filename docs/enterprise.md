@@ -164,3 +164,22 @@ API, MCP and runtime calls; not static assets or health probes) so developers se
 and double clicks the way users on a slow network do. It works only in debug builds: in release
 builds the method does nothing and the delay code is compiled out, so leaving it in by mistake
 cannot slow production. A warning is printed at startup while it is on.
+
+## Session safety
+
+Sign in is external (a single sign on proxy today, OIDC later), so these features only need the
+authenticator to say who the user is and, for re authentication, when they signed in
+(`Identity::authenticated_at`; `ForwardAuth::auth_time("x-auth-time")` reads Unix seconds or
+RFC 3339; `DevAuth` reports every request as freshly signed in).
+
+- `App::idle_timeout(Duration)` makes the runtime warn the user `idle_warning` before the end
+  (one minute by default) in an alert dialog with a countdown and a "stay signed in" button, which
+  calls `POST /_zeyn/keepalive` so a proxy in front sees activity. Input in any tab of the app
+  counts. At the end the user goes to `logout_url`, else to `login_url` with `return_to`, else
+  sees a signed out screen. Form drafts are kept. The idle timeout only closes forgotten screens;
+  ending the real session is the identity provider's job.
+- `#[action(permission = "...", reauth)]` needs a sign in within `App::reauth_within` (five
+  minutes by default). Otherwise the server answers `401` with code `reauth_required` (problem
+  type `urn:zeyn:problem:reauth_required` on the API), whatever the client sends. The runtime asks
+  the user to sign in again in a new tab (`reauth_url`, else `login_url`) and repeats the request
+  when they come back, so nothing typed is lost. Identities without a sign in time never pass.

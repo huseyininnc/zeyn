@@ -776,3 +776,82 @@ async fn dev_latency_slows_calls_in_debug_builds_but_not_probes_or_assets() {
     assert!(timed("/_zeyn/health").await < delay);
     assert!(timed("/_zeyn/zeyn.js").await < delay);
 }
+
+#[action(permission = "crm.write", reauth)]
+pub async fn close_account(id: i64) -> Result<i64> {
+    Ok(id)
+}
+
+#[screen(permission = "crm.write")]
+pub fn closing(params: CustomerParams, store: Customers) -> Result<Screen> {
+    let c = store.get(params.id).ok_or(Error::NotFound)?;
+    Ok(Screen::window("Close").body(Form::of(c).field(Customer::name).submit("Close", save_after_reauth)))
+}
+
+#[action(permission = "crm.write", reauth)]
+pub async fn save_after_reauth(c: Valid<Customer>) -> Result<i64> {
+    Ok(c.id.0)
+}
+
+fn reauth_app(identity: Identity) -> Router {
+    App::new("T")
+        .service(Customers::seeded())
+        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .login_url("https://sso.example.com/login")
+        .idle_timeout(std::time::Duration::from_secs(900))
+        .reauth_within(std::time::Duration::from_secs(300))
+        .feature(Feature::new("crm").screen(customers).screen(closing).api(close_account))
+        .router()
+        .unwrap()
+}
+
+#[tokio::test]
+async fn reauth_actions_need_a_recent_sign_in_reported_by_the_identity_provider() {
+    let now = DateTime::now();
+    let form = serde_json::json!({ "screen": "closing", "params": { "id": 1 }, "node": 0, "values": { "name": "X" } });
+    for identity in [crm_writer(), crm_writer().with_authenticated_at(now.add_ms(-600_000)), crm_writer().with_authenticated_at(now.add_ms(600_000))] {
+        let router = reauth_app(identity);
+        let r = send(&router, post("/_zeyn/form", form.clone())).await;
+        assert_eq!(r.status, StatusCode::UNAUTHORIZED);
+        assert_eq!(r.json()["error"], "reauth_required");
+        let r = send(&router, api("/api/v1/crm/close_account", serde_json::json!(5))).await;
+        assert_eq!(r.status, StatusCode::UNAUTHORIZED);
+        assert_eq!(r.json()["type"], "urn:zeyn:problem:reauth_required");
+    }
+    let router = reauth_app(crm_writer().with_authenticated_at(now.add_ms(-60_000)));
+    assert_eq!(send(&router, post("/_zeyn/form", form)).await.status, StatusCode::OK);
+    assert_eq!(send(&router, api("/api/v1/crm/close_account", serde_json::json!(5))).await.json(), 5);
+}
+
+#[tokio::test]
+async fn forward_auth_reads_the_sign_in_time_and_dev_auth_is_always_fresh() {
+    use zeyn::server::{Authenticator, ForwardAuth};
+    let auth = ForwardAuth::new("x-user").auth_time("x-auth-time");
+    let mut h = HeaderMap::new();
+    h.insert("x-user", "ayse".parse().unwrap());
+    h.insert("x-auth-time", "1700000000".parse().unwrap());
+    assert_eq!(auth.authenticate(&h).unwrap().authenticated_at, Some(DateTime::from_unix_ms(1_700_000_000_000)));
+    h.insert("x-auth-time", "2024-01-05T11:30:00Z".parse().unwrap());
+    assert_eq!(auth.authenticate(&h).unwrap().authenticated_at, DateTime::parse("2024-01-05T11:30:00Z"));
+    h.insert("x-auth-time", "yesterday".parse().unwrap());
+    assert_eq!(auth.authenticate(&h).unwrap().authenticated_at, None);
+    let dev = DevAuth::superuser("dev").authenticate(&HeaderMap::new()).unwrap();
+    assert!(dev.authenticated_at.is_some());
+}
+
+#[tokio::test]
+async fn the_page_tells_the_runtime_about_the_idle_timeout_and_keepalive_needs_csrf() {
+    let router = reauth_app(crm_writer());
+    let page = send(&router, get("/customers")).await;
+    let start = page.body.find(r#"<meta name="zeyn-session" content=""#).expect("session meta");
+    let meta = &page.body[start..start + 300];
+    assert!(meta.contains("&quot;idle&quot;:900") && meta.contains("&quot;warn&quot;:60"), "{meta}");
+    assert!(meta.contains("https://sso.example.com/login"));
+    let r = send(&router, Request::post("/_zeyn/keepalive").header("x-user", "1").body(Body::empty()).unwrap()).await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN);
+    let r = send(&router, post("/_zeyn/keepalive", serde_json::json!({}))).await;
+    assert_eq!(r.status, StatusCode::NO_CONTENT);
+    let anonymous = App::new("T").idle_timeout(std::time::Duration::from_secs(60)).feature(Feature::new("x").screen(overview)).router().unwrap();
+    let r = send(&anonymous, Request::get("/overview").body(Body::empty()).unwrap()).await;
+    assert!(!r.body.contains("zeyn-session"));
+}

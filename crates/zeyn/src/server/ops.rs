@@ -35,6 +35,7 @@ pub(super) struct Extras {
     probe_ips: Vec<IpRange>,
     #[cfg(debug_assertions)]
     pub(super) latency: Option<Duration>,
+    pub(super) session: super::session::Settings,
 }
 
 impl Extras {
@@ -199,6 +200,16 @@ const TEXTS: &[&str] = &[
     "deploy.later",
     "draft.restored",
     "draft.discard",
+    "session.idle_title",
+    "session.idle_body",
+    "session.stay",
+    "session.signed_out_title",
+    "session.signed_out_body",
+    "session.sign_in",
+    "session.reauth_title",
+    "session.reauth_body",
+    "session.reauth_open",
+    "session.reauth_continue",
     "privacy.revealed",
     "privacy.reveal_failed",
     "privacy.reason_title",
@@ -214,9 +225,10 @@ pub(super) fn head(st: &AppState, ctx: &Ctx) -> String {
     let texts: serde_json::Map<String, serde_json::Value> =
         TEXTS.iter().map(|k| (k.to_string(), ctx.t(&Text::key(format!("zeyn.{k}"))).into())).collect();
     format!(
-        r#"<meta name="zeyn-build" content="{build}"><meta name="zeyn-texts" content="{texts}"><link rel="stylesheet" href="{base}/_zeyn/enterprise.css"><script type="module" src="{base}/_zeyn/enterprise.js"></script>"#,
+        r#"{session}<meta name="zeyn-build" content="{build}"><meta name="zeyn-texts" content="{texts}"><link rel="stylesheet" href="{base}/_zeyn/enterprise.css"><script type="module" src="{base}/_zeyn/enterprise.js"></script>"#,
         texts = attr(&texts),
         build = escape(build_id()),
+        session = super::session::head(st, ctx),
         base = escape(&st.prefix),
     )
 }

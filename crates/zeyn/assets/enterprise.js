@@ -431,3 +431,179 @@ new MutationObserver((records) => {
     }
   }
 }).observe(document.body, { childList: true, subtree: true });
+
+/** Session settings from `meta[name=zeyn-session]`, present for signed in users. */
+const SESSION = (() => {
+  try {
+    return JSON.parse(document.querySelector('meta[name="zeyn-session"]')?.content ?? 'null');
+  } catch {
+    return null;
+  }
+})();
+
+/** Address of a sign in page with `return_to` set to this page. */
+function withReturn(url) {
+  const sep = url.includes('?') ? '&' : '?';
+  return `${url}${sep}return_to=${encodeURIComponent(location.pathname + location.search)}`;
+}
+
+/**
+ * Builds a modal dialog with a title, a text and buttons. Escape does nothing unless `cancel` is
+ * given, so a warning cannot be dismissed by accident.
+ * @param {{title: string, body: string, buttons: {label: string, primary?: boolean, run: () => void}[], role?: string, cancel?: () => void}} spec
+ */
+function modal(spec) {
+  const dialog = document.createElement('dialog');
+  dialog.className = 'z-dialog z-session-dialog';
+  dialog.setAttribute('role', spec.role ?? 'dialog');
+  const id = `z-session-${Math.random().toString(36).slice(2)}`;
+  dialog.setAttribute('aria-labelledby', `${id}-title`);
+  dialog.setAttribute('aria-describedby', `${id}-body`);
+  const win = document.createElement('div');
+  win.className = 'z-window';
+  const h = document.createElement('h2');
+  h.id = `${id}-title`;
+  h.textContent = spec.title;
+  const p = document.createElement('p');
+  p.id = `${id}-body`;
+  p.textContent = spec.body;
+  const actions = document.createElement('div');
+  actions.className = 'z-form-actions';
+  for (const b of spec.buttons) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = b.primary ? 'z-button z-primary' : 'z-button';
+    button.textContent = b.label;
+    button.addEventListener('click', b.run);
+    actions.append(button);
+  }
+  win.append(h, p, actions);
+  dialog.append(win);
+  dialog.addEventListener('cancel', (e) => {
+    e.preventDefault();
+    spec.cancel?.();
+  });
+  document.body.append(dialog);
+  dialog.showModal();
+  (actions.querySelector('.z-primary') ?? actions.querySelector('button'))?.focus();
+  return { dialog, body: p };
+}
+
+const ACTIVITY_KEY = 'zeyn:activity';
+let lastWrite = 0;
+
+/** Last input in any tab of the app, in milliseconds. */
+function lastActivity() {
+  try {
+    return Number(localStorage.getItem(ACTIVITY_KEY)) || Date.now();
+  } catch {
+    return lastWrite || Date.now();
+  }
+}
+
+function touch(force = false) {
+  const now = Date.now();
+  if (!force && now - lastWrite < 5000) return;
+  lastWrite = now;
+  try {
+    localStorage.setItem(ACTIVITY_KEY, String(now));
+  } catch {
+    return;
+  }
+}
+
+/**
+ * Idle timeout: warns `warn` seconds before the end with a countdown, then sends the user to the
+ * sign out or sign in page, or shows a signed out screen. The server's own session rules still
+ * apply; this only stops a forgotten screen from staying open.
+ */
+function startIdle(idle, warn) {
+  let warning = null;
+  let ended = false;
+  touch(true);
+  for (const type of ['pointerdown', 'keydown', 'wheel', 'touchstart']) {
+    document.addEventListener(type, () => {
+      if (!warning && !ended) touch();
+    }, { passive: true, capture: true });
+  }
+  const stay = async () => {
+    touch(true);
+    warning?.dialog.close();
+    warning?.dialog.remove();
+    warning = null;
+    await post('/_zeyn/keepalive', {});
+  };
+  const end = () => {
+    ended = true;
+    saveAllDrafts();
+    warning?.dialog.close();
+    warning?.dialog.remove();
+    warning = null;
+    const target = SESSION.logout ?? (SESSION.login ? withReturn(SESSION.login) : null);
+    if (target) {
+      location.assign(target);
+      return;
+    }
+    modal({
+      title: t('session.signed_out_title'),
+      body: t('session.signed_out_body'),
+      role: 'alertdialog',
+      buttons: [{ label: t('session.sign_in'), primary: true, run: () => location.reload() }],
+    });
+  };
+  setInterval(() => {
+    if (ended) return;
+    const left = Math.ceil((lastActivity() + idle * 1000 - Date.now()) / 1000);
+    if (left <= 0) return end();
+    if (left > warn) {
+      if (warning) {
+        warning.dialog.close();
+        warning.dialog.remove();
+        warning = null;
+      }
+      return;
+    }
+    if (!warning) {
+      warning = modal({
+        title: t('session.idle_title'),
+        body: t('session.idle_body', { seconds: left }),
+        role: 'alertdialog',
+        buttons: [{ label: t('session.stay'), primary: true, run: stay }],
+        cancel: stay,
+      });
+    }
+    warning.body.textContent = t('session.idle_body', { seconds: left });
+  }, 1000);
+}
+
+if (SESSION?.idle > 0) startIdle(SESSION.idle, Math.min(SESSION.warn ?? 60, SESSION.idle));
+
+/**
+ * Asks the user to sign in again for an action that needs a recent sign in, then sends the
+ * request again. The sign in page opens in a new tab so the work on this page is kept.
+ * @returns {Promise<boolean>} True when the user wants to try again.
+ */
+function askReauth() {
+  return new Promise((resolve) => {
+    const finish = (again) => {
+      m.dialog.close();
+      m.dialog.remove();
+      resolve(again);
+    };
+    const buttons = [];
+    if (SESSION?.reauth) buttons.push({ label: t('session.reauth_open'), run: () => window.open(withReturn(SESSION.reauth), '_blank', 'noopener') });
+    buttons.push({ label: t('session.reauth_continue'), primary: true, run: () => finish(true) });
+    buttons.push({ label: t('privacy.reason_cancel'), run: () => finish(false) });
+    const m = modal({ title: t('session.reauth_title'), body: t('session.reauth_body'), buttons, cancel: () => finish(false) });
+  });
+}
+
+hooks.push(async (res, input, init) => {
+  if (res.status !== 401) return null;
+  const data = await res.clone().json().catch(() => null);
+  const code = data?.error ?? (typeof data?.type === 'string' ? data.type.split(':').pop() : null);
+  if (code !== 'reauth_required') return null;
+  let next = res;
+  while (next.status === 401 && (await askReauth())) next = await nativeFetch(input, init);
+  return next;
+});
