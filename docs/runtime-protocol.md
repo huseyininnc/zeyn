@@ -148,6 +148,23 @@ The runtime shows the `message` as an error toast.
 
 The shell renders a language selector (`select[data-zeyn-locale]`) when the app has more than one locale.
 
+### 4.7 Enterprise endpoints
+
+`enterprise.js` and `enterprise.css` load next to the runtime. Details are in `docs/enterprise.md`.
+
+| Endpoint | Purpose |
+| --- | --- |
+| `POST /_zeyn/reveal {screen, params, node, field, key?}` | Raw value of a masked field, `{value}`; needs the unmask permission, always audited |
+| `POST /_zeyn/reason {screen, reason}` | Reason for a screen marked `reason`; `204` with an `HttpOnly` cookie |
+| `POST /_zeyn/import {screen, params, node, csv, commit}` | CSV preview (`commit: false`) or import |
+| `POST /_zeyn/keepalive` | "Stay signed in" after the idle warning; `204` |
+| `GET /_zeyn/health`, `GET /_zeyn/ready` | Liveness and readiness; not rate limited |
+| `GET /_zeyn/jobs` | Job status for users with the jobs permission |
+
+Every response carries `x-zeyn-build`. Refusals the runtime acts on: `428 reason_required` (asks for a
+reason and repeats the request) and `401 reauth_required` (asks the user to sign in again and repeats
+the request).
+
 ## 5. Security
 
 - Every response sets `Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`, `X-Content-Type-Options: nosniff` and `Referrer-Policy: same-origin`.
