@@ -41,7 +41,7 @@ impl Plugin for CompanyStandard {
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     let defaults = StaticSource(
-        [("time.zone", "Europe/Istanbul"), ("server.addr", "127.0.0.1:3002")]
+        [("time.zone", "Europe/Istanbul"), ("server.addr", "127.0.0.1:3002"), ("mail.from", "Northwind <no-reply@northwind.test>")]
             .into_iter()
             .map(|(k, v)| (k.to_string(), v.to_string()))
             .collect(),
@@ -64,6 +64,7 @@ async fn main() -> std::io::Result<()> {
     };
 
     let assistant = assistant::assistant(&config)?;
+    let mailer = zeyn::Mailer::from_config(&config).map_err(|e| std::io::Error::other(format!("{e:?}")))?;
     #[cfg(feature = "pdf")]
     let pdf = zeyn::Pdf::from_config(&config).map_err(|e| std::io::Error::other(format!("{e:?}")))?;
     let mut app = App::new(t!("app.name"))
@@ -73,6 +74,7 @@ async fn main() -> std::io::Result<()> {
         .idle_warning(Duration::from_secs((idle / 2).min(60)))
         .i18n(i18n)
         .service(stock::ProductStore::seeded())
+        .mailer(mailer)
         .datagrid_views(MemoryViewStore::default())
         .service(people::LeaveStore::seeded(TimeZone::UTC.today(DateTime::now())))
         .auth(DevAuth::superuser("Demo User"))

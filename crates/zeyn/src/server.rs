@@ -34,6 +34,8 @@ mod telemetry;
 mod xlsx;
 #[cfg(feature = "pdf")]
 mod pdf;
+#[cfg(feature = "email")]
+mod mail;
 
 pub use ops::{build_id, probe};
 

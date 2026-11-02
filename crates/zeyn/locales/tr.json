@@ -50,6 +50,13 @@
       "report_message": "Mesaj",
       "reading": "Dosya okunuyor..."
     },
+    "mail": {
+      "transition": {
+        "subject": "{record}: {to}",
+        "text": "{record}, {by} tarafından {from} durumundan {to} durumuna taşındı ({move}).\n\n{comment}",
+        "html": "<p><strong>{record}</strong>, {by} tarafından {from} durumundan <strong>{to}</strong> durumuna taşındı ({move}).</p><p>{comment}</p>"
+      }
+    },
     "workflow": {
       "state": "Durum",
       "comment": "Açıklama",

@@ -1,7 +1,7 @@
 # Operations
 
 Running a Zeyn app in production: time zone data, signed licenses, shared state for several
-servers, logs and traces, and PDF documents.
+servers, logs and traces, PDF documents and e-mail.
 
 ## Time zones
 
@@ -197,3 +197,45 @@ Measured on Windows (release build, x86_64):
 | Fonts | 0.25 MB of heap for the font index |
 
 A debug build is about ten times slower (a 2,000 row report took 71 s in the showcase).
+
+## E-mail
+
+The `email` Cargo feature sends notifications with [lettre](https://lettre.rs).
+
+```rust
+let mailer = Mailer::from_config(&config)?;
+App::new("People").mailer(mailer)
+
+#[action(permission = "people.leave.request", audit)]
+pub async fn move_leave(r: TransitionRequest<LeaveRequestId>, store: Leaves, mailer: Mailer, ctx: Ctx) -> Result<LeaveState> {
+    let state = leave_flow().apply(&ctx, current, &r.transition, r.comment.as_deref())?;
+    mailer.send(&ctx, Mail::transition(&ctx, &manager_email, &employee)?)?;
+    Ok(state)
+}
+```
+
+- `Mailer::send` renders the message and puts it in an in memory queue (at most 10,000
+  messages), then returns. The `zeyn.mail` background job sends the queue at once, tries failed
+  messages again with backoff (five times from ten seconds unless `Mailer::retry` says otherwise)
+  and looks at the queue every minute. A message is dropped, with an error in the log, after eight
+  failed tries. Like every job, a queue that has not been sent when the process stops is lost;
+  durable delivery needs the database backed queue of the data layer.
+- Messages come from the i18n catalogs: `<template>.subject`, `<template>.text` and optionally
+  `<template>.html`, with `{name}` arguments. The recipient's language is the sender's unless
+  `Mail::locale` sets it. Every message has a plain text and an HTML part; in the HTML part every
+  argument is escaped, and without an `.html` entry the HTML is the escaped text. Line breaks are
+  removed from subjects, and addresses are parsed, so data cannot add headers or recipients.
+- `Mail::transition` writes the move the call just made with `Workflow::apply` (record, from, to,
+  who and the comment) with the built in `zeyn.mail.transition` template. The showcase tells the
+  manager when a leave request moves.
+
+| Key | Meaning |
+|---|---|
+| `mail.from` | Sender, such as `Northwind <no-reply@example.com>` (required) |
+| `mail.transport` | `smtp`, `file` (an `.eml` file per message, for development and tests) or `log` (a log line with the number of recipients and the size, never addresses or content; the default) |
+| `mail.smtp.host`, `mail.smtp.port` | The SMTP server |
+| `mail.smtp.tls` | `starttls` (default), `tls` (implicit TLS, usually port 465) or `none` (local relays only) |
+| `mail.smtp.user`, `mail.smtp.password` | Credentials; read the password from a secret source such as the environment |
+| `mail.file.dir` | Directory of the `file` transport |
+
+TLS uses rustls with the Mozilla root certificates (`webpki-roots`).

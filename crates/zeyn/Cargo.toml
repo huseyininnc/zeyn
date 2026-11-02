@@ -18,6 +18,8 @@ assistant = ["server", "dep:reqwest", "dep:rustls"]
 xlsx = ["dep:rust_xlsxwriter", "dep:calamine", "dep:zip"]
 # PDF documents from Typst templates, and grid export to PDF.
 pdf = ["server", "dep:typst", "dep:typst-layout", "dep:typst-pdf"]
+# E-mail notifications over SMTP, sent from a background job.
+email = ["server", "dep:lettre"]
 
 [dependencies]
 zeyn-macros = { path = "../zeyn-macros", version = "0.0.2" }
@@ -45,6 +47,7 @@ zip = { version = "9", default-features = false, features = ["deflate"], optiona
 typst = { version = "0.15", optional = true }
 typst-layout = { version = "0.15", optional = true }
 typst-pdf = { version = "0.15", optional = true }
+lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "pool", "hostname", "tokio1", "tokio1-rustls-tls", "file-transport"], optional = true }
 
 [dev-dependencies]
 ed25519-dalek = { version = "3", default-features = false }
@@ -77,3 +80,7 @@ required-features = ["pdf"]
 [[test]]
 name = "pdf_measure"
 required-features = ["pdf"]
+
+[[test]]
+name = "mail"
+required-features = ["email"]

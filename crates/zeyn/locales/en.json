@@ -50,6 +50,13 @@
       "report_message": "Message",
       "reading": "Reading the file..."
     },
+    "mail": {
+      "transition": {
+        "subject": "{record}: {to}",
+        "text": "{record} moved from {from} to {to} ({move}) by {by}.\n\n{comment}",
+        "html": "<p><strong>{record}</strong> moved from {from} to <strong>{to}</strong> ({move}) by {by}.</p><p>{comment}</p>"
+      }
+    },
     "workflow": {
       "state": "State",
       "comment": "Comment",
