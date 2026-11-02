@@ -26,6 +26,22 @@ const TEMPLATES: &[(&str, &str)] = &[
     ("tests/app.rs", include_str!("../templates/tests/app.rs")),
 ];
 
+const LIB_TEMPLATES: &[(&str, &str)] = &[
+    ("Cargo.toml", include_str!("../templates/lib/Cargo.toml.tmpl")),
+    ("AGENTS.md", include_str!("../templates/lib/AGENTS.md.tmpl")),
+    ("CLAUDE.md", include_str!("../templates/CLAUDE.md.tmpl")),
+    (".gitignore", include_str!("../templates/lib/gitignore.tmpl")),
+    ("locales/en.json", include_str!("../templates/lib/locales/en.json")),
+    ("locales/tr.json", include_str!("../templates/lib/locales/tr.json")),
+    ("src/lib.rs", include_str!("../templates/lib/src/lib.rs")),
+    ("src/customers/mod.rs", include_str!("../templates/lib/src/customers/mod.rs")),
+    ("src/customers/models.rs", include_str!("../templates/lib/src/customers/models.rs")),
+    ("src/customers/store.rs", include_str!("../templates/lib/src/customers/store.rs")),
+    ("src/customers/actions.rs", include_str!("../templates/lib/src/customers/actions.rs")),
+    ("src/customers/screens.rs", include_str!("../templates/lib/src/customers/screens.rs")),
+    ("tests/lib.rs", include_str!("../templates/lib/tests/lib.rs")),
+];
+
 const DOCS: &[(&str, &str)] = &[
     ("rules", include_str!("../templates/AGENTS.md.tmpl")),
     ("language", include_str!("../../../docs/language-example.md")),
@@ -36,7 +52,8 @@ const DOCS: &[(&str, &str)] = &[
 const HELP: &str = "zeyn: command line tool for Zeyn Framework
 
 Usage:
-  zeyn new <name> [--zeyn-path <path>]   create a project with the standard feature structure
+  zeyn new <name> [--zeyn-path <path>]   create an app with the standard feature structure
+  zeyn new <name> --lib [--zeyn-path <path>]   create a shared library (models, features, texts) for several apps
   zeyn g feature <name>                   add src/features/<name> with models, store, actions and screens
   zeyn routes                             list features, screens, routes, APIs and access
   zeyn check                              compile and report structural problems and missing translations
@@ -47,7 +64,7 @@ fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let words: Vec<&str> = args.iter().map(String::as_str).collect();
     let result = match words.as_slice() {
-        ["new", name, rest @ ..] => new_project(name, flag(rest, "--zeyn-path")),
+        ["new", name, rest @ ..] => new_project(name, flag(rest, "--zeyn-path"), rest.contains(&"--lib")),
         ["g" | "generate", "feature", name] => new_feature(Path::new("."), name).map(|m| println!("{m}")),
         ["routes"] => describe(Path::new(".")).map(|d| print!("{}", routes_table(&d))),
         ["check"] => check(Path::new(".")).and_then(|report| {
@@ -91,7 +108,7 @@ fn title_of(name: &str) -> String {
         .join(" ")
 }
 
-fn new_project(name: &str, zeyn_path: Option<&str>) -> Result<(), String> {
+fn new_project(name: &str, zeyn_path: Option<&str>, lib: bool) -> Result<(), String> {
     let ok = name.chars().next().is_some_and(|c| c.is_ascii_lowercase())
         && name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_');
     if !ok {
@@ -110,15 +127,25 @@ fn new_project(name: &str, zeyn_path: Option<&str>) -> Result<(), String> {
         None => format!("zeyn = \"{}\"", env!("CARGO_PKG_VERSION")),
     };
     let title = title_of(name);
-    for (path, body) in TEMPLATES {
+    let crate_name = name.replace('-', "_");
+    let templates = if lib { LIB_TEMPLATES } else { TEMPLATES };
+    for (path, body) in templates {
         let target = root.join(path);
         if let Some(dir) = target.parent() {
             std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
         }
-        let text = body.replace("{{name}}", name).replace("{{title}}", &title).replace("{{zeyn_dep}}", &dep);
+        let text = body
+            .replace("{{name}}", name)
+            .replace("{{crate}}", &crate_name)
+            .replace("{{title}}", &title)
+            .replace("{{zeyn_dep}}", &dep);
         std::fs::write(&target, text).map_err(|e| format!("{}: {e}", target.display()))?;
     }
-    println!("Created {name}/\n\n  cd {name}\n  cargo run\n\nAgents: read {name}/AGENTS.md; the zeyn MCP server is set up in .mcp.json.");
+    if lib {
+        println!("Created library {name}/\n\n  cd {name}\n  cargo test\n\nUse it from an app: {crate_name} = {{ git = \"<repo url>\", tag = \"v0.1.0\" }}");
+    } else {
+        println!("Created {name}/\n\n  cd {name}\n  cargo run\n\nAgents: read {name}/AGENTS.md; the zeyn MCP server is set up in .mcp.json.");
+    }
     Ok(())
 }
 

@@ -1,0 +1,5 @@
+{
+  "customers": { "menu": "Customers", "list": "Customers", "new": "New customer", "editor": "Customer", "save": "Save", "saved": "Customer saved." },
+  "Customer": { "id": "No", "code": "Code", "name": "Name", "email": "Email", "segment": "Segment", "active": "Active" },
+  "Segment": { "Retail": "Retail", "Corporate": "Corporate", "Public": "Public sector" }
+}

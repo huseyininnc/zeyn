@@ -1,0 +1,14 @@
+# {{title}}
+
+A shared Zeyn library: models, services, actions, screens and features that several apps use.
+The rules of a Zeyn app apply (see the framework index in any app's AGENTS.md, or `zeyn_docs` in
+the `zeyn` MCP server). Extra rules for a library:
+
+1. Every user facing text goes into `locales/*.json` and every locale file has the same keys
+   (`cargo test` checks it). Apps load them with `I18n::catalogs({{crate}}::CATALOGS)`.
+2. Changing a public type, field, permission name or route breaks every app that uses this
+   library. Prefer adding over changing; when a change is needed, keep the old name working for
+   one release with `#[deprecated]` and raise the minor version (0.x) or major version (1.x+).
+3. Release by tagging: `git tag v0.2.0 && git push --tags`. Apps depend on the tag.
+4. The library and every app must use the same Zeyn version.
+5. Keep app specific code out: a library knows nothing about the apps that use it.

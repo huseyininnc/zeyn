@@ -132,6 +132,22 @@ impl I18n {
         Ok(self)
     }
 
+    /// Adds several catalogs at once, such as the `CATALOGS` constant of a shared library.
+    /// Later catalogs override earlier ones, so add libraries first and the app last.
+    ///
+    /// ```
+    /// use zeyn::I18n;
+    /// const LIB: &[(&str, &str)] = &[("en", r#"{ "Customer": { "name": "Name" } }"#), ("tr", r#"{ "Customer": { "name": "Ad" } }"#)];
+    /// let i18n = I18n::new("en").catalogs(LIB).unwrap();
+    /// assert_eq!(i18n.lookup("tr", "Customer.name"), Some("Ad"));
+    /// ```
+    pub fn catalogs(mut self, catalogs: &[(&str, &str)]) -> Result<Self, String> {
+        for (locale, json) in catalogs {
+            self.merge(locale, json, true)?;
+        }
+        Ok(self)
+    }
+
     fn merge(&mut self, locale: &str, json: &str, offered: bool) -> Result<(), String> {
         let value: serde_json::Value =
             serde_json::from_str(json).map_err(|e| format!("catalog `{locale}` is not valid JSON: {e}"))?;
