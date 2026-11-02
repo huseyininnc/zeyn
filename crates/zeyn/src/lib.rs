@@ -314,7 +314,7 @@ pub use time::{DateWords, range_presets};
 #[cfg(feature = "server")]
 pub use server::{
     Agents, ApiDocs, App, AuditLog, Authenticator, BasicCredentials, DevAuth, ForwardAuth, HeaderTenant, Interceptor, MemoryAudit, Plugin, StaticCredentials, StderrAudit,
-    SubdomainTenant, TenantResolver, Theme, TimePolicy,
+    SubdomainTenant, TenantResolver, Theme, TimePolicy, probe,
 };
 #[cfg(feature = "server")]
 pub use jobs::{JobState, JobStatus, Jobs, Schedule};

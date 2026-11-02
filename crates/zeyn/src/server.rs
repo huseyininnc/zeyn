@@ -30,7 +30,7 @@ mod media;
 mod ops;
 mod session;
 
-pub use ops::build_id;
+pub use ops::{build_id, probe};
 
 const JS: &str = include_str!("../assets/zeyn.js");
 const CSS: &str = include_str!("../assets/zeyn.css");

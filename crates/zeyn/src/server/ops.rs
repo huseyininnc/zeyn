@@ -246,6 +246,34 @@ pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
         .route("/_zeyn/enterprise.css", get(|| async { asset(CSS, "text/css; charset=utf-8") }))
 }
 
+/// Asks a running app at `addr` whether it is alive (`GET /_zeyn/health`), for container health
+/// checks in images without a shell or curl: `my-app health` exits non zero when it is not.
+/// A wildcard address (`0.0.0.0`, `[::]`) is checked on the loopback address. Std only, no
+/// runtime, one short connection with a two second limit.
+///
+/// ```no_run
+/// zeyn::probe("0.0.0.0:3000").expect("the app answers");
+/// ```
+pub fn probe(addr: &str) -> std::io::Result<()> {
+    use std::io::{Read, Write};
+    use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
+    use std::time::Duration;
+    let mut target: SocketAddr = addr.to_socket_addrs()?.next().ok_or_else(|| std::io::Error::other("no address"))?;
+    if target.ip().is_unspecified() {
+        target.set_ip(if target.is_ipv4() { [127, 0, 0, 1].into() } else { std::net::Ipv6Addr::LOCALHOST.into() });
+    }
+    let limit = Duration::from_secs(2);
+    let mut stream = TcpStream::connect_timeout(&target, limit)?;
+    stream.set_read_timeout(Some(limit))?;
+    stream.write_all(b"GET /_zeyn/health HTTP/1.0\r\nHost: localhost\r\n\r\n")?;
+    let mut head = [0u8; 16];
+    let n = stream.read(&mut head)?;
+    match head.get(..n).and_then(|h| std::str::from_utf8(h).ok()) {
+        Some(line) if line.starts_with("HTTP/1.") && line.get(9..12) == Some("200") => Ok(()),
+        _ => Err(std::io::Error::other("health check failed")),
+    }
+}
+
 /// Header that carries the build id on every response.
 pub(super) const BUILD_HEADER: &str = "x-zeyn-build";
 

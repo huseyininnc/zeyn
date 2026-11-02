@@ -12,7 +12,7 @@ pub fn home() -> Screen {
 struct Intro;
 
 impl zeyn::Component for Intro {
-    fn render(&self, out: &mut String, r: &zeyn::Render) {
+    fn render(&self, out: &mut String, r: &zeyn::Render<'_>) {
         out.push_str(&format!("<p>{}</p>", r.text(&t!("home.intro"))));
     }
 

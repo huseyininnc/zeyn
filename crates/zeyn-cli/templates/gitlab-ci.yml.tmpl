@@ -12,7 +12,7 @@ variables:
 cache:
   key:
     files: [Cargo.lock]
-  paths: [.cargo/registry, .cargo/git, target]
+  paths: [.cargo/registry, .cargo/git, .cargo/bin, target]
 
 before_script:
   - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/".insteadOf "https://${CI_SERVER_HOST}/"
@@ -32,6 +32,12 @@ clippy:
 test:
   stage: test
   script: [cargo test]
+
+licenses-and-advisories:
+  stage: test
+  script:
+    - command -v cargo-deny || cargo install cargo-deny --locked
+    - cargo deny check
 
 tag-matches-version:
   stage: release

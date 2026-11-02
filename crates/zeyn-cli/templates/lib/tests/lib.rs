@@ -1,5 +1,7 @@
 //! The library mounted into a throwaway app, the way real apps use it.
 
+#![allow(clippy::unwrap_used)]
+
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use tower::ServiceExt;

@@ -1,5 +1,7 @@
 //! Drives the app through its router, without opening a port.
 
+#![allow(clippy::unwrap_used)]
+
 #[path = "../src/app.rs"]
 mod app;
 #[path = "../src/features/mod.rs"]

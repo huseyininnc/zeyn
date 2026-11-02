@@ -1,0 +1,21 @@
+# syntax=docker/dockerfile:1.7
+# Build: docker build -t {{name}} .    Run: docker run -p 3000:3000 {{name}}
+# Configuration comes from config/app.json and APP_* environment variables (APP_SERVER__ADDR, ...).
+
+FROM rust:1.98-slim-bookworm AS build
+WORKDIR /src
+COPY . .
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/src/target \
+    cargo build --release && cp target/release/{{name}} /app-bin
+
+FROM gcr.io/distroless/cc-debian12:nonroot
+WORKDIR /app
+COPY --from=build /app-bin /app/{{name}}
+COPY config ./config
+ENV APP_SERVER__ADDR=0.0.0.0:3000
+EXPOSE 3000
+USER nonroot
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 CMD ["/app/{{name}}", "health"]
+ENTRYPOINT ["/app/{{name}}"]
