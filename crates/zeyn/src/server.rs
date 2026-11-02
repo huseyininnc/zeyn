@@ -1611,7 +1611,7 @@ async fn guard_request(State(st): State<Arc<AppState>>, req: axum::extract::Requ
                 None => format!("{scope}:ip:{ip_key}"),
             },
         };
-        if let Err(wait) = st.rate_store.take(&key, &limit) {
+        if let Err(wait) = st.rate_store.take(&key, &limit).await {
             let ctx = st.ctx(&headers);
             let mut response = problem(&ctx, Failure::App(Error::Denied(Text::key("zeyn.error.rate_limited"))));
             *response.status_mut() = StatusCode::TOO_MANY_REQUESTS;

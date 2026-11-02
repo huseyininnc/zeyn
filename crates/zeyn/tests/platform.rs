@@ -356,7 +356,7 @@ fn memory_rate_store_caps_its_size() {
     let store = zeyn::MemoryRateStore::with_max_keys(100);
     let limit = RateLimit::per_ip(5, Duration::from_secs(60));
     for i in 0..1000 {
-        zeyn::RateStore::take(&store, &format!("ip:{i}"), &limit).unwrap();
+        store.take(&format!("ip:{i}"), &limit).unwrap();
     }
     assert!(store.len() <= 100);
 }

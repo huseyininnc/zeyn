@@ -270,6 +270,8 @@ mod model;
 mod platform;
 mod privacy;
 mod media;
+#[cfg(feature = "redis")]
+mod redis_store;
 pub mod render;
 mod screen;
 #[cfg(feature = "server")]
@@ -322,6 +324,8 @@ pub use server::{
 pub use jobs::{JobState, JobStatus, Jobs, Schedule};
 #[cfg(feature = "server")]
 pub use security::{IpRange, MemoryRateStore, RateKey, RateLimit, RateStore, client_ip, parse_ranges};
+#[cfg(feature = "redis")]
+pub use redis_store::RedisStore;
 pub use screen::{
     Component, Effect, Export, FormSource, GridSource, Icon, LoadedPage, Node, Params, RowCall, Screen, ScreenDef, ScreenMeta,
     ToolButton, Toolbar, UiCtx, Window,

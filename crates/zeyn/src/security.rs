@@ -1,5 +1,6 @@
 //! Rate limits and IP rules.
 
+use crate::ctx::BoxFuture;
 use std::collections::HashMap;
 use std::net::IpAddr;
 use std::sync::Mutex;
@@ -40,10 +41,12 @@ impl RateLimit {
 }
 
 /// Counters behind a rate limit. The built in one keeps them in memory, which is right for a single
-/// server; several servers behind a load balancer need a shared store such as Redis.
+/// server; several servers behind a load balancer need a shared store such as `RedisStore`
+/// (Cargo feature `redis`).
 pub trait RateStore: Send + Sync + 'static {
-    /// Takes one request from the key's allowance. `Err` carries how long to wait.
-    fn take(&self, key: &str, limit: &RateLimit) -> Result<(), Duration>;
+    /// Takes one request from the key's allowance. `Err` carries how long to wait. A store that
+    /// cannot reach its backend lets the request through: a cache outage must not stop the app.
+    fn take(&self, key: &str, limit: &RateLimit) -> BoxFuture<Result<(), Duration>>;
 }
 
 /// In memory token buckets with a cap on the number of keys, so a flood of addresses cannot
@@ -74,7 +77,15 @@ impl MemoryRateStore {
 }
 
 impl RateStore for MemoryRateStore {
-    fn take(&self, key: &str, limit: &RateLimit) -> Result<(), Duration> {
+    fn take(&self, key: &str, limit: &RateLimit) -> BoxFuture<Result<(), Duration>> {
+        let taken = MemoryRateStore::take(self, key, limit);
+        Box::pin(async move { taken })
+    }
+}
+
+impl MemoryRateStore {
+    /// Takes one request from the key's allowance, right away.
+    pub fn take(&self, key: &str, limit: &RateLimit) -> Result<(), Duration> {
         let now = Instant::now();
         let capacity = f64::from(limit.requests);
         let per_sec = capacity / limit.window.as_secs_f64().max(0.001);

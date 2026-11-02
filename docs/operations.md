@@ -64,3 +64,49 @@ App::new("Shop")
   does not match, and the message says so.
 - `max_users` is carried and signed but not enforced by the framework; the app decides what it
   counts as a user.
+
+## Several servers: shared state in Redis
+
+With the `redis` Cargo feature, `RedisStore` keeps the state that must be the same on every
+instance behind a load balancer:
+
+```rust
+let redis = RedisStore::new(config.require("redis.url")?, "billing").map_err(Error::Internal)?;
+App::new("Billing")
+    .rate_limit(RateLimit::per_ip(300, Duration::from_secs(60)))
+    .rate_store(redis.clone())
+    .datagrid_views(redis)
+```
+
+What the server keeps per user, and where:
+
+| State | Where | Shared |
+|---|---|---|
+| Rate limit counters | `RateStore` | `RedisStore` |
+| Saved grid views and dock layouts | `DataGridViewStore` | `RedisStore` |
+| Idle timeout | the browser (all tabs of the app) | nothing on the server |
+| Sign in and re authentication | the single sign on proxy | nothing on the server |
+| Reason for a sensitive screen | an `HttpOnly` cookie | nothing on the server |
+| Form drafts | `sessionStorage` | nothing on the server |
+| License cache | per process, reloaded from the source | each server loads its own |
+| Background jobs | per process | not shared; see the jobs section of `enterprise.md` |
+
+- Rate limits are a token bucket in one Lua script, so concurrent requests on different servers
+  never exceed the limit. Time comes from Redis, not from the app servers. Counters expire one
+  window after their last use.
+- Views are JSON under `zeyn:<prefix>:view:<user length>:<user>:<grid>` and never expire.
+- The connection is made on first use and comes back by itself. Calls time out after 500 ms.
+  When Redis is down, rate limits let requests through, views are neither loaded nor saved (the
+  grid falls back to its own layout, the dock to `localStorage`), the outage and the recovery are
+  each logged once, and Redis is left alone for five seconds after each failure so requests do not
+  each wait for a timeout.
+- `RateStore::take` returns a future so stores can talk to a network. `MemoryRateStore::take`
+  stays synchronous for direct use.
+- TLS (`rediss://`) is not built in.
+- Tests run against a real server when `ZEYN_TEST_REDIS` is set:
+
+  ```
+  docker run -d --rm --name zeyn-redis -p 6379:6379 redis:7-alpine
+  ZEYN_TEST_REDIS=redis://127.0.0.1:6379 cargo test -p zeyn --features redis --test redis
+  docker stop zeyn-redis
+  ```
