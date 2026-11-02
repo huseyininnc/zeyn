@@ -119,11 +119,12 @@ pub struct Feature {
     guards: Vec<Arc<dyn Guard>>,
     menu: Vec<MenuGroup>,
     apis: Vec<ApiEntry>,
+    media: Vec<crate::media::MediaEntry>,
 }
 
 impl Feature {
     pub fn new(name: &'static str) -> Self {
-        Self { name, prefix: String::new(), screens: Vec::new(), guards: Vec::new(), menu: Vec::new(), apis: Vec::new() }
+        Self { name, prefix: String::new(), screens: Vec::new(), guards: Vec::new(), menu: Vec::new(), apis: Vec::new(), media: Vec::new() }
     }
 
     /// Publishes an action as `POST /api/v1/{feature}/{action}`. Callers need an `Authorization`
@@ -140,6 +141,18 @@ impl Feature {
 
     pub fn apis(&self) -> &[ApiEntry] {
         &self.apis
+    }
+
+    /// Serves the files of a media source at `/_zeyn/media/{name}/{id}` to users with
+    /// `permission`, after the feature's guards. `name` must be unique in the app and have the
+    /// shape of a media id (letters, digits, `-`, `_`, `.`).
+    pub fn media(mut self, name: &'static str, permission: &'static str, source: impl crate::media::MediaSource) -> Self {
+        self.media.push(crate::media::MediaEntry { name, permission, source: Arc::new(source) });
+        self
+    }
+
+    pub fn media_sources(&self) -> &[crate::media::MediaEntry] {
+        &self.media
     }
 
     pub fn name(&self) -> &'static str {
@@ -216,6 +229,14 @@ impl Feature {
         for (i, s) in self.screens.iter().enumerate() {
             if self.screens[..i].iter().any(|o| o.meta.name == s.meta.name) {
                 problems.push(format!("screen `{}` is registered twice", s.meta.name));
+            }
+        }
+        for (i, m) in self.media.iter().enumerate() {
+            if !crate::media::valid_media_id(m.name) {
+                problems.push(format!("media source `{}` must use only letters, digits, `-`, `_` and `.`", m.name));
+            }
+            if self.media[..i].iter().any(|o| o.name == m.name) {
+                problems.push(format!("media source `{}` is registered twice", m.name));
             }
         }
         for item in self.menu.iter().flat_map(|g| &g.items) {

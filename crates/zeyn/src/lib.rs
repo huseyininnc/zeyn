@@ -268,6 +268,7 @@ mod jobs;
 mod model;
 mod platform;
 mod privacy;
+mod media;
 pub mod render;
 mod screen;
 #[cfg(feature = "server")]
@@ -327,6 +328,7 @@ pub use value::{
     Value,
 };
 pub use import::{CsvError, Checked, DEFAULT_MAX_ROWS, HARD_MAX_ROWS, Import, ImportSource, MAX_CSV_BYTES, RowError, check_csv, error_report, parse_csv};
+pub use media::{ByteRange, MAX_MEDIA_ID, MAX_POSITION_SECONDS, MEDIA_CHUNK, Media, MediaEntry, MediaReader, MediaSource, media_type, valid_media_id};
 pub use workflow::{MAX_COMMENT, Transition, TransitionRecord, TransitionRequest, Transitions, Workflow, WorkflowState};
 pub use zeyn_macros::{action, choice, entity, model, params, screen, t};
 
@@ -338,8 +340,8 @@ pub use serde_json as __serde_json;
 /// Everything application code needs: `use zeyn::prelude::*;`
 pub mod prelude {
     pub use crate::ui::{
-        ActionButton, Alert, Badge, Breadcrumb, Card, Chart, Control, DateOptions, DescriptionList, EmptyState, LookupItem, LookupQuery,
-        Panel, Progress, Row, Skeleton, Split, Stack, Tabs, Timeline, Tree, TreeItem, TreeQuery,
+        ActionButton, Alert, Audio, Badge, Breadcrumb, Card, Chart, Control, DateOptions, DescriptionList, EmptyState, LookupItem, LookupQuery,
+        Panel, Progress, Row, Skeleton, Split, Stack, Tabs, Timeline, Tree, TreeItem, TreeQuery, Video,
     };
     pub use crate::{
         Action, ContextMenu, Ctx, Currency, Date, DateTime, Effect, Tone, LocalDateTime, Time, TimeZone, Entity, Error, Export, Feature, Field, Form, DataGrid, DataMode, DataQuery,

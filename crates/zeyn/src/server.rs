@@ -26,6 +26,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 mod data;
+mod media;
 mod ops;
 mod session;
 
@@ -228,6 +229,8 @@ pub enum CallKind {
     Reveal,
     /// Rows imported from a CSV file.
     Import,
+    /// A media file or a saved play position; `screen` holds the media source name.
+    Media,
 }
 
 /// What is being called.
@@ -931,6 +934,16 @@ impl App {
                 }
             }
         }
+        let mut media: HashMap<&str, &str> = HashMap::new();
+        for f in &self.features {
+            for m in f.media_sources() {
+                if let Some(other) = media.insert(m.name, f.name()) {
+                    if other != f.name() {
+                        problems.push(format!("media source `{}` is registered in features `{other}` and `{}`", m.name, f.name()));
+                    }
+                }
+            }
+        }
         if let Some(home) = self.home {
             if !self.features.iter().any(|f| f.screens().iter().any(|s| s.meta.name == home && s.meta.route.is_some())) {
                 problems.push(format!("home screen `{home}` is not registered or has no route"));
@@ -1076,7 +1089,7 @@ impl App {
             .route("/_zeyn/timezone", post(set_time_zone))
             .route("/_zeyn/tools", get(tools))
             .route("/_zeyn/mcp", post(mcp));
-        let router = ui::routes(session::routes(data::routes(ops::routes(router))))
+        let router = media::routes(ui::routes(session::routes(data::routes(ops::routes(router)))))
             .fallback(not_found)
             .layer(axum::middleware::from_fn_with_state(state.clone(), guard_request))
             .layer(axum::middleware::map_response(security_headers))
@@ -1517,7 +1530,7 @@ impl AppState {
             lang = escape(ctx.locale()),
             tz = escape(ctx.time_zone().name()),
             base = escape(&self.prefix),
-            components = ui::head(&escape(&self.prefix)),
+            components = format!("{}{}", ui::head(&escape(&self.prefix)), media::head(&escape(&self.prefix))),
             scheme = self.theme.as_ref().and_then(|t| t.scheme).unwrap_or("light dark"),
             html_attrs = format!(
                 "{}{}",
@@ -1557,7 +1570,7 @@ fn asset(body: &'static str, content_type: &'static str) -> Response {
 /// IP rules and rate limits, before any handler runs.
 async fn guard_request(State(st): State<Arc<AppState>>, req: axum::extract::Request, next: axum::middleware::Next) -> Response {
     let path = req.uri().path().to_string();
-    if path == "/_zeyn/zeyn.js" || path == "/_zeyn/zeyn.css" || path == "/_zeyn/nav.js" || path == "/_zeyn/theme.css" || path == "/favicon.ico" || ops::is_asset(&path) || ui::ASSETS.contains(&path.as_str()) {
+    if path == "/_zeyn/zeyn.js" || path == "/_zeyn/zeyn.css" || path == "/_zeyn/nav.js" || path == "/_zeyn/theme.css" || path == "/favicon.ico" || ops::is_asset(&path) || ui::ASSETS.contains(&path.as_str()) || media::ASSETS.contains(&path.as_str()) {
         return next.run(req).await;
     }
     ops::delay(&st, &path).await;
@@ -1578,7 +1591,7 @@ async fn guard_request(State(st): State<Arc<AppState>>, req: axum::extract::Requ
         return problem(&ctx, Failure::App(Error::Forbidden));
     }
     let is_write = req.method() == axum::http::Method::POST
-        && (matches!(path.as_str(), "/_zeyn/form" | "/_zeyn/import" | "/_zeyn/mcp" | "/_zeyn/menu" | "/_zeyn/grid/edit" | "/_zeyn/grid/run" | "/_zeyn/grid/bulk")
+        && (matches!(path.as_str(), "/_zeyn/form" | "/_zeyn/import" | "/_zeyn/mcp" | "/_zeyn/menu" | "/_zeyn/grid/edit" | "/_zeyn/grid/run" | "/_zeyn/grid/bulk" | "/_zeyn/media/position")
             || path.starts_with(&format!("{}/", st.api_prefix)));
     let limits = if probe { [(None, "all"), (None, "write")] } else { [(st.rate, "all"), (if is_write { st.write_rate } else { None }, "write")] };
     for (limit, scope) in limits {
