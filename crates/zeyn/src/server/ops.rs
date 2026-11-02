@@ -166,21 +166,25 @@ impl App {
     /// ```
     pub async fn serve_until(self, addr: &str, shutdown: impl Future<Output = ()> + Send + 'static) -> std::io::Result<()> {
         let jobs = self.extras.jobs.clone();
+        let flush = self.start_telemetry();
         let router = self.router().map_err(|problems| {
             for p in &problems {
-                eprintln!("error: {p}");
+                tracing::error!("{p}");
             }
             std::io::Error::other("the app has problems; see the errors above")
         })?;
         let listener = tokio::net::TcpListener::bind(addr).await?;
-        eprintln!("Zeyn is listening on http://{}", listener.local_addr()?);
+        tracing::info!("Zeyn is listening on http://{}", listener.local_addr()?);
         axum::serve(listener, router.into_make_service_with_connect_info::<std::net::SocketAddr>())
             .with_graceful_shutdown(shutdown)
             .await?;
         if let Some(jobs) = jobs {
             if !jobs.shutdown(Duration::from_secs(30)).await {
-                eprintln!("warning: some jobs were still running at shutdown");
+                tracing::warn!("some jobs were still running at shutdown");
             }
+        }
+        if let Some(f) = flush {
+            f.shutdown().await;
         }
         Ok(())
     }

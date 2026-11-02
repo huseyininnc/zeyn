@@ -251,7 +251,7 @@ impl Jobs {
                 }
                 Err(e) => {
                     if let Error::Internal(detail) = &e {
-                        eprintln!("error: job `{}` failed: {detail}", job.name);
+                        tracing::error!(job = job.name, "job `{}` failed: {detail}", job.name);
                     }
                     let last = attempt == job.schedule.retries || self.0.stopping.load(Ordering::SeqCst);
                     self.set(job.name, |s| {

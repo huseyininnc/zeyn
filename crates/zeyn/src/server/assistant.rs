@@ -93,10 +93,10 @@ fn rate_limited() -> Failure {
 }
 
 /// CSRF, the assistant, the user and the assistant's rate limit, for every `POST`.
-fn checked<'a>(st: &'a AppState, ctx: &Ctx, headers: &HeaderMap) -> Result<(&'a Assistant, ChatKey), Failure> {
+async fn checked<'a>(st: &'a AppState, ctx: &Ctx, headers: &HeaderMap) -> Result<(&'a Assistant, ChatKey), Failure> {
     st.check_csrf(headers)?;
     let (a, key) = allowed(st, ctx)?;
-    st.rate_store.take(&rate_key(&key), &a.rate).map_err(|_| rate_limited())?;
+    st.rate_store.take(&rate_key(&key), &a.rate).await.map_err(|_| rate_limited())?;
     Ok((a, key))
 }
 
@@ -178,7 +178,7 @@ enum Start {
 
 async fn chat_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(call): axum::Json<ChatCall>) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
-    let (a, key) = match checked(&st, &ctx, &headers) {
+    let (a, key) = match checked(&st, &ctx, &headers).await {
         Ok(v) => v,
         Err(f) => return st.error_response(&ctx, f),
     };
@@ -194,7 +194,7 @@ async fn chat_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Js
 
 async fn confirm_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(call): axum::Json<ConfirmCall>) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
-    let key = match checked(&st, &ctx, &headers) {
+    let key = match checked(&st, &ctx, &headers).await {
         Ok((_, key)) => key,
         Err(f) => return st.error_response(&ctx, f),
     };
@@ -207,7 +207,7 @@ async fn confirm_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum:
 async fn clear_call(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     let result = async {
-        let (a, key) = checked(&st, &ctx, &headers)?;
+        let (a, key) = checked(&st, &ctx, &headers).await?;
         st.timed(a.store.clear(&key)).await
     }
     .await;
@@ -221,7 +221,7 @@ async fn clear_call(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Resp
 async fn stt_call(State(st): State<Arc<AppState>>, headers: HeaderMap, body: Bytes) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     let result = async {
-        let (a, _) = checked(&st, &ctx, &headers)?;
+        let (a, _) = checked(&st, &ctx, &headers).await?;
         let stt = a.stt.clone().ok_or(Failure::App(Error::NotFound))?;
         if body.is_empty() || body.len() > a.limits.audio_bytes {
             return Err(Failure::Status(StatusCode::PAYLOAD_TOO_LARGE, "too_large", Text::key("zeyn.assistant.audio_too_large")));
@@ -249,7 +249,7 @@ struct SpeakCall {
 async fn tts_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(call): axum::Json<SpeakCall>) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     let result = async {
-        let (a, _) = checked(&st, &ctx, &headers)?;
+        let (a, _) = checked(&st, &ctx, &headers).await?;
         let tts = a.tts.clone().ok_or(Failure::App(Error::NotFound))?;
         let text = clip(call.text.trim(), a.limits.speech_chars).to_string();
         if text.is_empty() {
@@ -559,7 +559,7 @@ async fn converse(st: &AppState, ctx: &Ctx, key: &ChatKey, start: Start, out: &O
     let budget = rate_key(key) + ":tokens";
     for _ in 0..limits.rounds {
         if let Some(limit) = &a.tokens {
-            st.rate_store.charge(&budget, limit, 0).map_err(|_| Failure::Status(StatusCode::TOO_MANY_REQUESTS, "token_limit", Text::key("zeyn.assistant.token_limit")))?;
+            st.rate_store.charge(&budget, limit, 0).await.map_err(|_| Failure::Status(StatusCode::TOO_MANY_REQUESTS, "token_limit", Text::key("zeyn.assistant.token_limit")))?;
         }
         let request = ChatRequest { system: system.clone(), messages: window(&history, limits.history).to_vec(), tools: specs.clone(), max_tokens: limits.output_tokens };
         let mut events = tokio::time::timeout(limits.idle, a.provider.chat(request)).await.map_err(|_| Failure::Timeout)?.map_err(Failure::App)?;
@@ -586,7 +586,7 @@ async fn converse(st: &AppState, ctx: &Ctx, key: &ChatKey, start: Start, out: &O
                 Some(Ok(ChatEvent::ToolCall(_))) => {}
                 Some(Ok(ChatEvent::Usage { input, output })) => {
                     if let Some(limit) = &a.tokens {
-                        let _ = st.rate_store.charge(&budget, limit, input.saturating_add(output));
+                        let _ = st.rate_store.charge(&budget, limit, input.saturating_add(output)).await;
                     }
                 }
                 Some(Ok(ChatEvent::Raw(r))) => raw = Some(r),

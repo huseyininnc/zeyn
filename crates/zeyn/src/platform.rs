@@ -349,13 +349,126 @@ impl Licensed {
 
 impl Guard for Licensed {
     fn check(&self, ctx: &Ctx) -> GuardResult {
-        let ok = ctx
-            .license()
-            .is_some_and(|l| l.is_valid_on(ctx.today()) && self.0.is_none_or(|m| l.allows(m)));
-        if ok { GuardResult::Allow } else { GuardResult::Deny(Text::key("zeyn.error.license")) }
+        match ctx.license() {
+            Some(l) if !l.is_valid_on(ctx.today()) => GuardResult::Deny(Text::key("zeyn.error.license_expired")),
+            Some(l) if self.0.is_none_or(|m| l.allows(m)) => GuardResult::Allow,
+            _ => GuardResult::Deny(Text::key("zeyn.error.license")),
+        }
     }
 
     fn name(&self) -> &'static str {
         "Licensed"
+    }
+}
+
+/// What a signed license signs: this prefix, then the payload text exactly as stored.
+#[cfg(feature = "signed-licenses")]
+const LICENSE_CONTEXT: &[u8] = b"zeyn-license-v1\n";
+
+/// Why a signed license was refused. Every case leaves the app locked.
+#[cfg(feature = "signed-licenses")]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum LicenseError {
+    /// The public key in the app is not 64 hex digits of a valid ed25519 key.
+    InvalidPublicKey,
+    /// The file is not a signed license: not JSON, no `payload` or `signature`, or a payload
+    /// that is not a license.
+    Malformed(String),
+    /// The signature does not match: the file was changed after signing, or it was signed with
+    /// another key than the one the app trusts.
+    BadSignature,
+}
+
+#[cfg(feature = "signed-licenses")]
+impl fmt::Display for LicenseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LicenseError::InvalidPublicKey => f.write_str("the license public key in the app is not a valid ed25519 key (64 hex digits)"),
+            LicenseError::Malformed(why) => write!(f, "the license file is not a signed license: {why}"),
+            LicenseError::BadSignature => {
+                f.write_str("the license signature does not match: the file was changed after signing or was signed with another key")
+            }
+        }
+    }
+}
+
+#[cfg(feature = "signed-licenses")]
+impl std::error::Error for LicenseError {}
+
+#[cfg(feature = "signed-licenses")]
+fn from_hex<const N: usize>(hex: &str) -> Option<[u8; N]> {
+    let hex = hex.trim().as_bytes();
+    if hex.len() != N * 2 {
+        return None;
+    }
+    let mut out = [0u8; N];
+    for (i, pair) in hex.chunks(2).enumerate() {
+        out[i] = u8::from_str_radix(std::str::from_utf8(pair).ok()?, 16).ok()?;
+    }
+    Some(out)
+}
+
+#[cfg(feature = "signed-licenses")]
+impl License {
+    /// Reads a license file made by `zeyn license sign` and checks its ed25519 signature against
+    /// the public key built into the app. Expiry is not checked here: the [`Licensed`] guard
+    /// compares `valid_until` with the user's today on every request.
+    ///
+    /// The file is JSON: `{"payload": "<license JSON as text>", "signature": "<128 hex digits>"}`.
+    /// The payload stays text so the signed bytes are exactly the stored bytes.
+    pub fn from_signed(file: &str, public_key: &str) -> std::result::Result<License, LicenseError> {
+        let key = from_hex::<32>(public_key)
+            .and_then(|k| ed25519_dalek::VerifyingKey::from_bytes(&k).ok())
+            .ok_or(LicenseError::InvalidPublicKey)?;
+        #[derive(Deserialize)]
+        struct Signed {
+            payload: String,
+            signature: String,
+        }
+        let signed: Signed = serde_json::from_str(file).map_err(|e| LicenseError::Malformed(e.to_string()))?;
+        let signature = from_hex::<64>(&signed.signature)
+            .ok_or_else(|| LicenseError::Malformed("`signature` is not 128 hex digits".into()))?;
+        let mut message = Vec::with_capacity(LICENSE_CONTEXT.len() + signed.payload.len());
+        message.extend_from_slice(LICENSE_CONTEXT);
+        message.extend_from_slice(signed.payload.as_bytes());
+        key.verify_strict(&message, &ed25519_dalek::Signature::from_bytes(&signature))
+            .map_err(|_| LicenseError::BadSignature)?;
+        serde_json::from_str(&signed.payload).map_err(|e| LicenseError::Malformed(format!("payload: {e}")))
+    }
+}
+
+/// A signed license file on disk, checked against the public key built into the app. Read on
+/// every refresh, so a renewed file is picked up without a restart.
+///
+/// A file that fails the check (changed, signed with another key, not a license) locks the app
+/// and logs why; a file that cannot be read keeps the last license, like any failing source.
+///
+/// ```ignore
+/// const LICENSE_KEY: &str = "3b6a27bcceb6a42d62a3a8d02a6f0d73653215771de243a63ac048a18b59da29";
+/// App::new("Shop").license(SignedLicenseFile::new("license.json", LICENSE_KEY), Duration::from_secs(3600))
+/// ```
+#[cfg(feature = "signed-licenses")]
+pub struct SignedLicenseFile {
+    path: std::path::PathBuf,
+    public_key: &'static str,
+}
+
+#[cfg(feature = "signed-licenses")]
+impl SignedLicenseFile {
+    /// `public_key` is the 64 hex digits `zeyn license keygen` printed.
+    pub fn new(path: impl Into<std::path::PathBuf>, public_key: &'static str) -> Self {
+        SignedLicenseFile { path: path.into(), public_key }
+    }
+}
+
+#[cfg(feature = "signed-licenses")]
+impl LicenseSource for SignedLicenseFile {
+    fn load(&self, _tenant: Option<&Tenant>) -> BoxFuture<std::result::Result<Option<License>, String>> {
+        let result = std::fs::read_to_string(&self.path).map_err(|e| format!("{}: {e}", self.path.display())).map(|text| {
+            License::from_signed(&text, self.public_key)
+                .inspect_err(|e| tracing::error!("license {} refused, the app is locked: {e}", self.path.display()))
+                .ok()
+        });
+        Box::pin(async move { result })
     }
 }

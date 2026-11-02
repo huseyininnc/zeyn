@@ -20,10 +20,13 @@ cargo run -p zeyn-cli -- new my-domain --lib   # a library of features shared by
 - Server rendered screens with a small browser runtime; no JavaScript to write
 - Data grid: server paging, infinite scroll, virtual scrolling over a million rows, filters, sorting, totals
 - Forms for every field type, validation shared by server, client and API, row version conflict checks
-- Dates and times without time zone bugs: `Date`, `Time`, `DateTime` (UTC), `LocalDateTime`
+- Dates and times without time zone bugs: `Date`, `Time`, `DateTime` (UTC), `LocalDateTime`, every
+  IANA time zone with its history built in (see `docs/operations.md`)
 - English and Turkish built in, compile time checked translation keys, locale aware money and dates
 - Security: permissions, guards, interceptors, audit log, CSRF, CSP, rate limits, IP rules, CORS
 - Single sign on through a proxy, tenants, licenses, layered configuration and secrets
+- Operations: ed25519 signed licenses, Redis for several servers, `tracing` spans and optional
+  OpenTelemetry export (see `docs/operations.md`)
 - JSON API with OpenAPI 3.1 and problem details, optional API docs with basic auth or permissions
 - MCP for agents: a project MCP server (`zeyn mcp`) and in app tools through WebMCP and `/_zeyn/mcp`, opt in with `App::mcp`
 - An embedded AI assistant (feature `assistant`): any LLM, speech, pluggable history, confirmation before writes (see `docs/assistant.md`)

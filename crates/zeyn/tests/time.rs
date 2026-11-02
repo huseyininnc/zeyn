@@ -103,6 +103,40 @@ fn skipped_and_repeated_wall_times_are_handled() {
 }
 
 #[test]
+fn istanbul_history_follows_the_2016_move_to_permanent_plus_three() {
+    let ist = tz("Europe/Istanbul");
+    assert_eq!(ist.offset_minutes_at(at("2015-07-01T12:00:00Z")), 180);
+    assert_eq!(ist.offset_minutes_at(at("2015-12-01T12:00:00Z")), 120);
+    assert_eq!(ist.offset_minutes_at(at("2016-12-01T12:00:00Z")), 180);
+    assert_eq!(at("2015-12-01T12:00:00Z").local(ist), local("2015-12-01T14:00:00"));
+    assert_eq!(DateTime::from_local(local("2015-03-29T03:30:00"), ist), Err(zeyn::LocalTimeError::Skipped));
+    assert_eq!(DateTime::from_local(local("2015-11-08T03:30:00"), ist), Ok(at("2015-11-08T00:30:00Z")));
+}
+
+#[test]
+fn old_us_rules_start_in_april_and_end_in_october() {
+    let ny = tz("America/New_York");
+    assert_eq!(ny.offset_minutes_at(at("2006-04-02T06:59:59Z")), -300);
+    assert_eq!(ny.offset_minutes_at(at("2006-04-02T07:00:00Z")), -240);
+    assert_eq!(ny.offset_minutes_at(at("2006-10-29T05:59:59Z")), -240);
+    assert_eq!(ny.offset_minutes_at(at("2006-10-29T06:00:00Z")), -300);
+    assert_eq!(ny.offset_minutes_at(at("2006-03-12T12:00:00Z")), -300);
+}
+
+#[test]
+fn every_iana_zone_is_known_in_any_case() {
+    assert_eq!(tz("europe/istanbul").name(), "Europe/Istanbul");
+    assert_eq!(tz("europe/istanbul"), tz("Europe/Istanbul"));
+    assert_eq!(tz("Asia/Kathmandu").offset_minutes_at(at("2024-01-01T00:00:00Z")), 345);
+    let sydney = tz("Australia/Sydney");
+    assert_eq!(sydney.offset_minutes_at(at("2024-01-15T00:00:00Z")), 660);
+    assert_eq!(sydney.offset_minutes_at(at("2024-07-15T00:00:00Z")), 600);
+    assert!(TimeZone::names().all(|n| TimeZone::named(n).is_some()));
+    assert!(TimeZone::named("Europe/Atlantis").is_none());
+    assert!(TimeZone::named(&"x".repeat(5000)).is_none());
+}
+
+#[test]
 fn fixed_offsets_and_unknown_zones() {
     assert_eq!(tz("UTC+05:30").offset_minutes_at(DateTime::now()), 330);
     assert_eq!(tz("+03:00").name(), "UTC+03:00");

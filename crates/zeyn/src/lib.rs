@@ -317,6 +317,8 @@ mod model;
 mod platform;
 mod privacy;
 mod media;
+#[cfg(feature = "redis")]
+mod redis_store;
 pub mod render;
 mod screen;
 #[cfg(feature = "server")]
@@ -355,6 +357,8 @@ pub use platform::{
     Config, ConfigSource, EnvSource, FixedLicense, JsonFileSource, License, LicenseSource, Licensed, PerTenant, Secret,
     StaticSource, Tenant, TenantRequired,
 };
+#[cfg(feature = "signed-licenses")]
+pub use platform::{LicenseError, SignedLicenseFile};
 pub use render::Render;
 pub use time::{Date, DateTime, LocalDateTime, LocalTimeError, Time, TimeZone};
 pub use time::{DateWords, range_presets};
@@ -372,6 +376,8 @@ pub use server::Agents;
 pub use assistant::Assistant;
 #[cfg(feature = "server")]
 pub use security::{IpRange, MemoryRateStore, RateKey, RateLimit, RateStore, client_ip, parse_ranges};
+#[cfg(feature = "redis")]
+pub use redis_store::RedisStore;
 pub use screen::{
     Component, Effect, Export, FormSource, GridSource, Icon, LoadedPage, Node, Params, RowCall, Screen, ScreenDef, ScreenMeta,
     ToolButton, Toolbar, UiCtx, Window,

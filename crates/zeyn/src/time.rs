@@ -627,7 +627,7 @@ impl DateTime {
 
     /// Wall clock date and time of this moment in a zone.
     pub fn local(&self, zone: TimeZone) -> LocalDateTime {
-        let local = self.unix_ms + i64::from(zone.offset_minutes_at(*self)) * 60_000;
+        let local = self.unix_ms + i64::from(zone.offset_seconds_at(*self)) * 1000;
         let days = local.div_euclid(MS_PER_DAY);
         let secs = local.rem_euclid(MS_PER_DAY) / 1000;
         LocalDateTime {
@@ -639,15 +639,8 @@ impl DateTime {
     /// The moment when a wall clock in `zone` shows `local`. When clocks move back and a time
     /// happens twice, the earlier moment is used.
     pub fn from_local(local: LocalDateTime, zone: TimeZone) -> Result<DateTime, LocalTimeError> {
-        let wall = local.epoch_ms();
-        let mut candidates: Vec<DateTime> = zone
-            .possible_offsets()
-            .iter()
-            .map(|off| DateTime { unix_ms: wall - i64::from(*off) * 60_000 })
-            .filter(|dt| dt.local(zone) == local)
-            .collect();
-        candidates.sort();
-        candidates.first().copied().ok_or(LocalTimeError::Skipped)
+        let offset = zone.offset_seconds_of(local)?;
+        Ok(DateTime { unix_ms: local.epoch_ms() - i64::from(offset) * 1000 })
     }
 
     /// Reads RFC 3339: `2024-01-05T11:30:00Z`, `2024-01-05T14:30:00+03:00`, with optional fractions.
@@ -691,107 +684,95 @@ impl fmt::Display for DateTime {
     }
 }
 
-/// Daylight saving rules a zone follows.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Rule {
-    None,
-    /// European Union: last Sunday of March to last Sunday of October, 01:00 UTC.
-    Eu,
-    /// United States and Canada: second Sunday of March to first Sunday of November, 02:00 local.
-    Us,
-}
-
-/// A time zone: name, standard offset and daylight saving rule.
+/// A time zone: an IANA zone such as `Europe/Istanbul` with its whole history of offset and
+/// daylight saving changes, or a fixed offset such as `UTC+03:00`.
 ///
-/// Built in zones cover UTC, fixed offsets (`UTC+03:00`) and common zones with today's rules.
-/// Past rule changes are not modeled; for example Turkey used daylight saving before 2016.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Zone data is the IANA time zone database bundled into the binary (through `jiff`), so every
+/// platform gives the same answers, Windows included, without a system zoneinfo. A zone is read
+/// from the bundle the first time its name is used and then kept for the life of the process
+/// (a few kilobytes each, at most one copy per zone). `TimeZone` itself is a small `Copy` handle.
+///
+/// ```
+/// use zeyn::{DateTime, TimeZone};
+/// let istanbul = TimeZone::named("Europe/Istanbul").unwrap();
+/// assert_eq!(istanbul.offset_minutes_at(DateTime::parse("2015-07-01T00:00:00Z").unwrap()), 180);
+/// assert_eq!(istanbul.offset_minutes_at(DateTime::parse("2015-12-01T00:00:00Z").unwrap()), 120);
+/// assert_eq!(istanbul.offset_minutes_at(DateTime::parse("2016-12-01T00:00:00Z").unwrap()), 180);
+/// ```
+#[derive(Clone, Copy)]
 pub struct TimeZone {
     name: &'static str,
-    standard_minutes: i32,
-    rule: Rule,
+    zone: Zone,
 }
 
-const ZONES: &[(&str, i32, Rule)] = &[
-    ("UTC", 0, Rule::None),
-    ("Etc/UTC", 0, Rule::None),
-    ("Europe/Istanbul", 180, Rule::None),
-    ("Asia/Istanbul", 180, Rule::None),
-    ("Europe/Moscow", 180, Rule::None),
-    ("Europe/Minsk", 180, Rule::None),
-    ("Asia/Riyadh", 180, Rule::None),
-    ("Asia/Baghdad", 180, Rule::None),
-    ("Asia/Qatar", 180, Rule::None),
-    ("Asia/Dubai", 240, Rule::None),
-    ("Asia/Baku", 240, Rule::None),
-    ("Asia/Tbilisi", 240, Rule::None),
-    ("Asia/Tashkent", 300, Rule::None),
-    ("Asia/Karachi", 300, Rule::None),
-    ("Asia/Kolkata", 330, Rule::None),
-    ("Asia/Almaty", 300, Rule::None),
-    ("Asia/Bangkok", 420, Rule::None),
-    ("Asia/Shanghai", 480, Rule::None),
-    ("Asia/Singapore", 480, Rule::None),
-    ("Asia/Tokyo", 540, Rule::None),
-    ("Asia/Seoul", 540, Rule::None),
-    ("Australia/Brisbane", 600, Rule::None),
-    ("Africa/Cairo", 120, Rule::None),
-    ("Africa/Johannesburg", 120, Rule::None),
-    ("Africa/Lagos", 60, Rule::None),
-    ("America/Sao_Paulo", -180, Rule::None),
-    ("America/Phoenix", -420, Rule::None),
-    ("Europe/London", 0, Rule::Eu),
-    ("Europe/Dublin", 0, Rule::Eu),
-    ("Europe/Lisbon", 0, Rule::Eu),
-    ("Europe/Berlin", 60, Rule::Eu),
-    ("Europe/Paris", 60, Rule::Eu),
-    ("Europe/Amsterdam", 60, Rule::Eu),
-    ("Europe/Brussels", 60, Rule::Eu),
-    ("Europe/Vienna", 60, Rule::Eu),
-    ("Europe/Zurich", 60, Rule::Eu),
-    ("Europe/Rome", 60, Rule::Eu),
-    ("Europe/Madrid", 60, Rule::Eu),
-    ("Europe/Stockholm", 60, Rule::Eu),
-    ("Europe/Oslo", 60, Rule::Eu),
-    ("Europe/Copenhagen", 60, Rule::Eu),
-    ("Europe/Warsaw", 60, Rule::Eu),
-    ("Europe/Prague", 60, Rule::Eu),
-    ("Europe/Budapest", 60, Rule::Eu),
-    ("Europe/Belgrade", 60, Rule::Eu),
-    ("Europe/Athens", 120, Rule::Eu),
-    ("Europe/Bucharest", 120, Rule::Eu),
-    ("Europe/Sofia", 120, Rule::Eu),
-    ("Europe/Helsinki", 120, Rule::Eu),
-    ("Europe/Kyiv", 120, Rule::Eu),
-    ("Europe/Kiev", 120, Rule::Eu),
-    ("Asia/Nicosia", 120, Rule::Eu),
-    ("America/New_York", -300, Rule::Us),
-    ("America/Toronto", -300, Rule::Us),
-    ("America/Chicago", -360, Rule::Us),
-    ("America/Denver", -420, Rule::Us),
-    ("America/Los_Angeles", -480, Rule::Us),
-    ("America/Vancouver", -480, Rule::Us),
+#[derive(Clone, Copy)]
+enum Zone {
+    /// Offset in minutes.
+    Fixed(i32),
+    Iana(&'static jiff::tz::TimeZone),
+}
+
+impl PartialEq for TimeZone {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+
+impl Eq for TimeZone {}
+
+impl fmt::Debug for TimeZone {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("TimeZone").field(&self.name).finish()
+    }
+}
+
+/// Common zones offered by pickers, in the order shown.
+const PICKER: &[&str] = &[
+    "UTC", "Europe/Istanbul", "Europe/Moscow", "Europe/Minsk", "Asia/Riyadh", "Asia/Baghdad", "Asia/Qatar",
+    "Asia/Dubai", "Asia/Baku", "Asia/Tbilisi", "Asia/Tashkent", "Asia/Karachi", "Asia/Kolkata", "Asia/Almaty",
+    "Asia/Bangkok", "Asia/Shanghai", "Asia/Singapore", "Asia/Tokyo", "Asia/Seoul", "Australia/Brisbane",
+    "Africa/Cairo", "Africa/Johannesburg", "Africa/Lagos", "America/Sao_Paulo", "America/Phoenix", "Europe/London",
+    "Europe/Dublin", "Europe/Lisbon", "Europe/Berlin", "Europe/Paris", "Europe/Amsterdam", "Europe/Brussels",
+    "Europe/Vienna", "Europe/Zurich", "Europe/Rome", "Europe/Madrid", "Europe/Stockholm", "Europe/Oslo",
+    "Europe/Copenhagen", "Europe/Warsaw", "Europe/Prague", "Europe/Budapest", "Europe/Belgrade", "Europe/Athens",
+    "Europe/Bucharest", "Europe/Sofia", "Europe/Helsinki", "Europe/Kyiv", "Asia/Nicosia", "America/New_York",
+    "America/Toronto", "America/Chicago", "America/Denver", "America/Los_Angeles", "America/Vancouver",
 ];
 
-/// Nth (1 based) or last (0) Sunday of a month.
-fn sunday(year: i32, month: u8, nth: u8) -> Date {
-    if nth == 0 {
-        let last = Date::new(year, month, days_in_month(year, month)).unwrap_or_default();
-        return last.add_days(-i64::from(last.weekday() % 7)).unwrap_or(last);
-    }
-    let first = Date::new(year, month, 1).unwrap_or_default();
-    let to_sunday = (7 - i64::from(first.weekday())) % 7;
-    first.add_days(to_sunday + 7 * i64::from(nth - 1)).unwrap_or(first)
-}
+/// Zones read from the bundled database so far. Only names the database knows are added, so
+/// the list is bounded by the number of IANA zones whatever clients send.
+static LOADED: std::sync::Mutex<Vec<TimeZone>> = std::sync::Mutex::new(Vec::new());
 
 impl TimeZone {
-    pub const UTC: TimeZone = TimeZone { name: "UTC", standard_minutes: 0, rule: Rule::None };
+    pub const UTC: TimeZone = TimeZone { name: "UTC", zone: Zone::Fixed(0) };
 
-    /// A built in zone by IANA name (`Europe/Istanbul`) or a fixed offset (`UTC+03:00`, `+05:30`).
+    /// A zone by IANA name (`Europe/Istanbul`, any case) or a fixed offset (`UTC+03:00`, `+05:30`).
     pub fn named(name: &str) -> Option<TimeZone> {
-        if let Some(&(n, std, rule)) = ZONES.iter().find(|(n, ..)| n.eq_ignore_ascii_case(name)) {
-            return Some(TimeZone { name: n, standard_minutes: std, rule });
+        if let Some(fixed) = TimeZone::fixed(name) {
+            return Some(fixed);
         }
+        if name.eq_ignore_ascii_case("UTC") {
+            return Some(TimeZone::UTC);
+        }
+        if name.is_empty() || name.len() > 64 {
+            return None;
+        }
+        let mut loaded = LOADED.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some(z) = loaded.iter().find(|z| z.name.eq_ignore_ascii_case(name)) {
+            return Some(*z);
+        }
+        let tz = jiff::tz::db().get(name).ok()?;
+        let canonical = tz.iana_name()?;
+        if let Some(z) = loaded.iter().find(|z| z.name == canonical) {
+            return Some(*z);
+        }
+        let name: &'static str = Box::leak(canonical.into());
+        let zone = TimeZone { name, zone: Zone::Iana(Box::leak(Box::new(tz.clone()))) };
+        loaded.push(zone);
+        Some(zone)
+    }
+
+    fn fixed(name: &str) -> Option<TimeZone> {
         let offset = name.strip_prefix("UTC").or_else(|| name.strip_prefix("GMT")).unwrap_or(name);
         let sign = match offset.chars().next()? {
             '+' => 1,
@@ -804,45 +785,45 @@ impl TimeZone {
             return None;
         }
         let minutes = sign * (h * 60 + m);
-        let fixed: &'static [(&str, i32)] = &FIXED;
-        let name = fixed.iter().find(|(_, mins)| *mins == minutes).map(|(n, _)| *n)?;
-        Some(TimeZone { name, standard_minutes: minutes, rule: Rule::None })
+        let name = FIXED.iter().find(|(_, mins)| *mins == minutes).map(|(n, _)| *n)?;
+        Some(TimeZone { name, zone: Zone::Fixed(minutes) })
     }
 
     pub fn name(&self) -> &'static str {
         self.name
     }
 
-    /// Names of the built in zones, for pickers.
+    /// Names of common zones, for pickers. [`TimeZone::named`] accepts every IANA name.
     pub fn names() -> impl Iterator<Item = &'static str> {
-        ZONES.iter().map(|(n, ..)| *n).filter(|n| !matches!(*n, "Etc/UTC" | "Asia/Istanbul" | "Europe/Kiev"))
+        PICKER.iter().copied()
     }
 
-    /// Offset from UTC in minutes at a moment.
+    /// Offset from UTC in minutes at a moment. Historical local mean time offsets with seconds
+    /// are rounded toward zero; [`DateTime::local`] keeps the seconds.
     pub fn offset_minutes_at(&self, at: DateTime) -> i32 {
-        let dst = match self.rule {
-            Rule::None => false,
-            Rule::Eu => {
-                let year = DateTime::from_unix_ms(at.unix_ms).local(TimeZone::UTC).date.year;
-                let start = sunday(year, 3, 0).days_since_epoch() * MS_PER_DAY + 3_600_000;
-                let end = sunday(year, 10, 0).days_since_epoch() * MS_PER_DAY + 3_600_000;
-                (start..end).contains(&at.unix_ms)
-            }
-            Rule::Us => {
-                let year = DateTime::from_unix_ms(at.unix_ms + i64::from(self.standard_minutes) * 60_000).local(TimeZone::UTC).date.year;
-                let std_ms = i64::from(self.standard_minutes) * 60_000;
-                let start = sunday(year, 3, 2).days_since_epoch() * MS_PER_DAY + 7_200_000 - std_ms;
-                let end = sunday(year, 11, 1).days_since_epoch() * MS_PER_DAY + 7_200_000 - (std_ms + 3_600_000);
-                (start..end).contains(&at.unix_ms)
-            }
-        };
-        self.standard_minutes + if dst { 60 } else { 0 }
+        self.offset_seconds_at(at) / 60
     }
 
-    fn possible_offsets(&self) -> Vec<i32> {
-        match self.rule {
-            Rule::None => vec![self.standard_minutes],
-            _ => vec![self.standard_minutes + 60, self.standard_minutes],
+    fn offset_seconds_at(&self, at: DateTime) -> i32 {
+        match self.zone {
+            Zone::Fixed(minutes) => minutes * 60,
+            Zone::Iana(tz) => {
+                let ms = at.unix_ms.clamp(jiff::Timestamp::MIN.as_millisecond(), jiff::Timestamp::MAX.as_millisecond());
+                jiff::Timestamp::from_millisecond(ms).map(|t| tz.to_offset(t).seconds()).unwrap_or(0)
+            }
+        }
+    }
+
+    /// Offset in seconds of a wall clock time; the earlier moment's when the time happens twice.
+    fn offset_seconds_of(&self, local: LocalDateTime) -> Result<i32, LocalTimeError> {
+        let Zone::Iana(tz) = self.zone else { return Ok(self.offset_seconds_at(DateTime::default())) };
+        let (d, t) = (local.date, local.time);
+        let civil = jiff::civil::DateTime::new(d.year as i16, d.month as i8, d.day as i8, t.hour as i8, t.minute as i8, t.second as i8, 0)
+            .map_err(|_| LocalTimeError::Skipped)?;
+        match tz.to_ambiguous_timestamp(civil).offset() {
+            jiff::tz::AmbiguousOffset::Unambiguous { offset } => Ok(offset.seconds()),
+            jiff::tz::AmbiguousOffset::Gap { .. } => Err(LocalTimeError::Skipped),
+            jiff::tz::AmbiguousOffset::Fold { before, after } => Ok(before.seconds().max(after.seconds())),
         }
     }
 

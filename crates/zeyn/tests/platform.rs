@@ -177,7 +177,7 @@ async fn licenses_open_modules_until_they_expire() {
     let r = licensed_app(FixedLicense(license((2026, 11, 1), &[])), "pos");
     let (status, _, body) = get(&r, "/pos", &[]).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
-    assert!(body.contains("Your license does not cover this."));
+    assert!(body.contains("Your license has expired."));
 
     let r = licensed_app(FixedLicense(license((2026, 12, 31), &["inventory"])), "pos");
     assert_eq!(get(&r, "/pos", &[]).await.0, StatusCode::FORBIDDEN);
@@ -356,7 +356,7 @@ fn memory_rate_store_caps_its_size() {
     let store = zeyn::MemoryRateStore::with_max_keys(100);
     let limit = RateLimit::per_ip(5, Duration::from_secs(60));
     for i in 0..1000 {
-        zeyn::RateStore::take(&store, &format!("ip:{i}"), &limit).unwrap();
+        store.take(&format!("ip:{i}"), &limit).unwrap();
     }
     assert!(store.len() <= 100);
 }

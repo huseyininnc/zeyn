@@ -1,5 +1,6 @@
 //! Rate limits and IP rules.
 
+use crate::ctx::BoxFuture;
 use std::collections::HashMap;
 use std::net::IpAddr;
 use std::sync::Mutex;
@@ -40,16 +41,18 @@ impl RateLimit {
 }
 
 /// Counters behind a rate limit. The built in one keeps them in memory, which is right for a single
-/// server; several servers behind a load balancer need a shared store such as Redis.
+/// server; several servers behind a load balancer need a shared store such as `RedisStore`
+/// (Cargo feature `redis`).
 pub trait RateStore: Send + Sync + 'static {
-    /// Takes one request from the key's allowance. `Err` carries how long to wait.
-    fn take(&self, key: &str, limit: &RateLimit) -> Result<(), Duration>;
+    /// Takes one request from the key's allowance. `Err` carries how long to wait. A store that
+    /// cannot reach its backend lets the request through: a cache outage must not stop the app.
+    fn take(&self, key: &str, limit: &RateLimit) -> BoxFuture<Result<(), Duration>>;
 
     /// Takes `amount` units at once, such as the tokens of a model answer. The allowance may go
     /// below zero, so a large answer is paid in full and the next call waits. `Err` when less than
     /// one unit is left (also with `amount` 0, which only checks). Stores that only count requests
     /// may keep the default, which takes one unit.
-    fn charge(&self, key: &str, limit: &RateLimit, amount: u32) -> Result<(), Duration> {
+    fn charge(&self, key: &str, limit: &RateLimit, amount: u32) -> BoxFuture<Result<(), Duration>> {
         let _ = amount;
         self.take(key, limit)
     }
@@ -83,19 +86,31 @@ impl MemoryRateStore {
 }
 
 impl RateStore for MemoryRateStore {
-    fn take(&self, key: &str, limit: &RateLimit) -> Result<(), Duration> {
+    fn take(&self, key: &str, limit: &RateLimit) -> BoxFuture<Result<(), Duration>> {
+        let taken = MemoryRateStore::take(self, key, limit);
+        Box::pin(async move { taken })
+    }
+
+    fn charge(&self, key: &str, limit: &RateLimit, amount: u32) -> BoxFuture<Result<(), Duration>> {
+        let charged = MemoryRateStore::charge(self, key, limit, amount);
+        Box::pin(async move { charged })
+    }
+}
+
+impl MemoryRateStore {
+    /// Takes one request from the key's allowance, right away.
+    pub fn take(&self, key: &str, limit: &RateLimit) -> Result<(), Duration> {
         self.bucket(key, limit, |tokens| if *tokens >= 1.0 { *tokens -= 1.0; true } else { false })
     }
 
-    fn charge(&self, key: &str, limit: &RateLimit, amount: u32) -> Result<(), Duration> {
+    /// Takes `amount` units right away; see [`RateStore::charge`].
+    pub fn charge(&self, key: &str, limit: &RateLimit, amount: u32) -> Result<(), Duration> {
         self.bucket(key, limit, |tokens| {
             *tokens -= f64::from(amount);
             *tokens >= 1.0
         })
     }
-}
 
-impl MemoryRateStore {
     /// Refills the key's bucket and lets `use_tokens` take from it; `Err` with the wait until one
     /// unit is back when it says no.
     fn bucket(&self, key: &str, limit: &RateLimit, use_tokens: impl FnOnce(&mut f64) -> bool) -> Result<(), Duration> {
