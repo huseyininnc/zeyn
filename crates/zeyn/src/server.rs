@@ -987,6 +987,7 @@ impl App {
             .route("/_zeyn/route/{screen}", get(route_redirect))
             .route("/_zeyn/grid", post(grid_call))
             .route("/_zeyn/grid/view", post(grid_view_call))
+            .route("/_zeyn/grid/run", post(grid_run_call))
             .route("/_zeyn/form", post(form_call))
             .route("/_zeyn/locale", post(set_locale))
             .route("/_zeyn/timezone", post(set_time_zone))
@@ -1353,7 +1354,7 @@ impl AppState {
 
     /// Full page around a screen: menu, language selector, toasts and assets.
     fn shell(&self, ctx: &Ctx, csrf: &str, title: &str, main: &str, current: Option<&str>) -> String {
-        let r = Render::new("shell", ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone());
+        let r = Render::new("shell", ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity());
         let mut nav = String::new();
         for f in &self.features {
             if f.check_guards(ctx).is_err() {
@@ -1527,7 +1528,7 @@ async fn page(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Que
         st.before(&ctx, &call)?;
         let (_, entry, screen) = st.open(&ctx, name, params.clone()).await?;
         let loaded = st.preload(&ctx, &screen, name).await;
-        let r = Render::new(name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone());
+        let r = Render::new(name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity());
         let html = screen.render(&r, &entry.meta, &params, &loaded);
         Ok::<_, Failure>((ctx.t(screen.title()), html))
     }
@@ -1570,7 +1571,7 @@ async fn screen_fragment(
         let params = q.value()?;
         let (_, entry, screen) = st.open(&ctx, &name, params.clone()).await?;
         let loaded = st.preload(&ctx, &screen, entry.meta.name).await;
-        let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone());
+        let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity());
         Ok::<_, Failure>(screen.render(&r, &entry.meta, &params, &loaded))
     }
     .await;
@@ -1628,6 +1629,18 @@ struct GridCall {
 }
 
 #[derive(Deserialize)]
+struct RowItemCall {
+    screen: String,
+    #[serde(default)]
+    params: Json,
+    node: usize,
+    /// Key of the row, as in `data-zeyn-key`.
+    key: String,
+    /// Which item: `a0` is the first row action.
+    item: String,
+}
+
+#[derive(Deserialize)]
 struct DataGridViewCall {
     screen: String,
     #[serde(default)]
@@ -1667,7 +1680,7 @@ impl AppState {
         self.after(ctx, &info, started, &result);
         let mut page = result?;
         page.view = call.view.map(|v| grid.clean_view(v));
-        let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone());
+        let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity());
         Ok(json!({
             "head": call.head.then(|| grid.head_html(&r, page.view.as_ref())),
             "rows": grid.rows_html(&page, &r),
@@ -1693,6 +1706,35 @@ impl AppState {
         self.timed(store.save(&user, &Self::view_key(ctx, entry.meta.name, call.node), view)).await
     }
 
+    /// Runs a row item. The row is loaded again by key through the grid's action (with the
+    /// grid's read access), the item is built from that row, its action's access is checked and
+    /// interceptors run. The client only names the row and the item; it never sends the input.
+    async fn run_row_item(&self, ctx: &Ctx, call: RowItemCall) -> Result<Json, Failure> {
+        if call.key.len() > 200 || call.item.len() > 32 {
+            return Err(Failure::App(Error::NotFound));
+        }
+        let (_, entry, screen) = self.open(ctx, &call.screen, call.params).await?;
+        let grid = screen.nodes().get(call.node).and_then(|n| n.grid()).ok_or(Failure::App(Error::NotFound))?;
+        if !ctx.identity().can(&grid.action().access) {
+            return Err(Failure::App(Error::Forbidden));
+        }
+        let page = self.timed(grid.find_row(ctx.clone(), call.key.clone())).await?;
+        let row = grid.row_call(&page, &call.key, &call.item).ok_or(Failure::App(Error::NotFound))?;
+        if !ctx.identity().can(&row.meta.access) {
+            return Err(Failure::App(Error::Forbidden));
+        }
+        let info = Call { kind: CallKind::Grid, screen: entry.meta.name, action: Some(row.meta), via_agent: ctx.via_agent() };
+        let started = Instant::now();
+        let result = async {
+            self.before(ctx, &info)?;
+            self.timed((row.run)(ctx.clone())).await
+        }
+        .await;
+        self.after(ctx, &info, started, &result);
+        result?;
+        Ok(json!({ "effects": [] }))
+    }
+
     async fn run_form(&self, ctx: &Ctx, call: FormCall) -> Result<Json, Failure> {
         if call.via_agent && !self.agents.is_some_and(|a| a.writes) {
             return Err(Failure::App(Error::Forbidden));
@@ -1712,7 +1754,7 @@ impl AppState {
         .await;
         self.after(ctx, &info, started, &result);
         let effects = result?;
-        let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone());
+        let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity());
         Ok(json!({ "effects": effects.iter().map(|e| e.to_json(&r)).collect::<Vec<_>>() }))
     }
 
@@ -1758,6 +1800,17 @@ async fn grid_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Js
         return st.error_response(&ctx, f);
     }
     match st.run_grid(&ctx, call).await {
+        Ok(body) => axum::Json(body).into_response(),
+        Err(f) => st.error_response(&ctx, f),
+    }
+}
+
+async fn grid_run_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(call): axum::Json<RowItemCall>) -> Response {
+    let ctx = st.licensed(st.ctx(&headers)).await;
+    if let Err(f) = st.check_csrf(&headers) {
+        return st.error_response(&ctx, f);
+    }
+    match st.run_row_item(&ctx, call).await {
         Ok(body) => axum::Json(body).into_response(),
         Err(f) => st.error_response(&ctx, f),
     }

@@ -17,6 +17,7 @@
     "revenue_today": "Revenue today"
   },
   "stock": {
+    "restock": "Restock +10",
     "products": "Products",
     "new_product": "New product",
     "product": "Product",

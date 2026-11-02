@@ -35,6 +35,8 @@
       "range_total": "{from}-{to} / {total}",
       "loaded": "{count} satır yüklendi",
       "empty": "Kayıt yok.",
+      "actions": "İşlemler",
+      "done": "Tamamlandı.",
       "filter": {"filter": "{label} filtresi", "from": "En az", "to": "En çok", "all": "Tümü", "contains": "İçerir", "starts_with": "İle başlar", "equals": "Eşittir", "match": "Eşleşme", "selected": "{n} seçili", "clear": "Filtreyi temizle", "sorted": "Sıralama {n}"},
       "menu": {"options": "Kolon seçenekleri: {label}", "resize": "{label} genişliği", "sort_asc": "Artan sırala", "sort_desc": "Azalan sırala", "sort_clear": "Sıralamayı kaldır", "pin_start": "Başa sabitle", "pin_end": "Sona sabitle", "unpin": "Sabitlemeyi kaldır", "move_prev": "Sola taşı", "move_next": "Sağa taşı", "hide": "Kolonu gizle", "columns": "Kolonlar", "reset": "Görünümü sıfırla"},
       "agg": { "sum": "Toplam", "avg": "Ortalama", "min": "En az", "max": "En çok", "count": "Adet" }

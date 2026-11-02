@@ -82,6 +82,14 @@ pub async fn search_archive(q: GridQuery, ctx: Ctx) -> Result<Page<Order>> {
     Ok(if end < ARCHIVE { page.next(Cursor(end.to_string())) } else { page })
 }
 
+fn status_tone(s: &OrderStatus) -> Tone {
+    match s {
+        OrderStatus::Open => Tone::Warning,
+        OrderStatus::Shipped => Tone::Success,
+        OrderStatus::Cancelled => Tone::Danger,
+    }
+}
+
 fn muted_if_cancelled(o: &Order) -> Option<RowStyle> {
     matches!(o.status, OrderStatus::Cancelled).then_some(RowStyle::Muted)
 }
@@ -99,6 +107,7 @@ pub fn today() -> Screen {
             .width(240)
             .filter()
             .min()
+            .relative_time()
             .column(Order::customer)
             .flex(2)
             .filter()
@@ -113,6 +122,7 @@ pub fn today() -> Screen {
             .column(Order::status)
             .width(130)
             .filter()
+            .badge(status_tone)
             .row_style(muted_if_cancelled),
     )
 }

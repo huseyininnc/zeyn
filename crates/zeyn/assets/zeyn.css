@@ -912,6 +912,116 @@ th[aria-sort="descending"] .z-sort::after {
   background: var(--z-border);
 }
 
+/**
+ * Cell components: badges, progress bars, yes/no icons, links and row action buttons.
+ */
+
+.z-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: var(--z-font-size-xs);
+  font-weight: 600;
+  line-height: 1.6;
+  white-space: nowrap;
+  --z-tone: var(--z-text-muted);
+  color: color-mix(in oklab, var(--z-tone) 85%, var(--z-text));
+  background: color-mix(in oklab, var(--z-tone) var(--z-tint), var(--z-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--z-tone) 30%, transparent);
+}
+
+.z-tone-info { --z-tone: var(--z-info); }
+.z-tone-success { --z-tone: var(--z-success); }
+.z-tone-warning { --z-tone: var(--z-warning); }
+.z-tone-danger { --z-tone: var(--z-danger); }
+.z-tone-brand { --z-tone: var(--z-accent); }
+
+.z-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--z-space) * 2);
+  width: 100%;
+}
+
+.z-progress-track {
+  flex: 1 1 auto;
+  height: 6px;
+  min-width: 32px;
+  border-radius: 3px;
+  background: var(--z-hover);
+  overflow: hidden;
+}
+
+.z-progress-bar {
+  display: block;
+  width: var(--z-pct, 0%);
+  height: 100%;
+  border-radius: 3px;
+  background: var(--z-accent);
+}
+
+.z-progress-text { flex: none; min-width: 3ch; text-align: end; }
+
+.z-bool {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  background: currentColor;
+  vertical-align: middle;
+  -webkit-mask: var(--z-b) center / contain no-repeat;
+  mask: var(--z-b) center / contain no-repeat;
+}
+
+.z-bool-yes {
+  color: var(--z-success);
+  --z-b: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 7.5l3 3 6-7'/%3E%3C/svg%3E");
+}
+
+.z-bool-no {
+  color: var(--z-text-muted);
+  --z-b: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M3.5 7h7'/%3E%3C/svg%3E");
+}
+
+.z-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--z-accent);
+  font: inherit;
+  text-align: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.z-link:hover { text-decoration-thickness: 2px; }
+
+.z-grid td.z-row-actions,
+.z-grid th.z-actions-col { width: 1%; white-space: nowrap; }
+
+.z-row-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--z-radius-sm);
+  background: transparent;
+  color: var(--z-accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.z-row-action + .z-row-action { margin-inline-start: 2px; }
+
+.z-row-action:hover { background: var(--z-brand-subtle); border-color: color-mix(in oklab, var(--z-accent) 30%, transparent); }
+
+.z-row-action:disabled { opacity: 0.5; cursor: progress; }
+
 .z-sort-order {
   display: inline-grid;
   place-items: center;

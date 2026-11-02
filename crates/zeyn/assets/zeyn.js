@@ -418,19 +418,34 @@ function applyFoot(grid, html) {
   if (foot && typeof html === 'string') foot.innerHTML = html;
 }
 
+/**
+ * Buttons and links inside a row are reachable with Tab only in the active row, so the grid
+ * stays one tab stop while each row's actions can still be used from the keyboard.
+ */
+function rowControls(tr, on) {
+  for (const c of tr.querySelectorAll('button, a[href], input')) c.tabIndex = on ? 0 : -1;
+}
+
 /** Applies the roving tabindex: the active row gets 0, the others -1. */
 function roving(grid, focus) {
   const s = grids.get(grid);
   const list = rows(grid);
   s.active = Math.min(s.active, Math.max(0, list.length - 1));
-  list.forEach((tr, i) => (tr.tabIndex = i === s.active ? 0 : -1));
+  list.forEach((tr, i) => {
+    tr.tabIndex = i === s.active ? 0 : -1;
+    rowControls(tr, i === s.active);
+  });
+  relativeTimes(grid);
   if (focus) list[s.active]?.focus();
 }
 
 /** Makes a row the active one and optionally focuses it. */
 function activate(tr, focus) {
   const list = [...tr.parentElement.rows];
-  list.forEach((r) => (r.tabIndex = r === tr ? 0 : -1));
+  list.forEach((r) => {
+    r.tabIndex = r === tr ? 0 : -1;
+    rowControls(r, r === tr);
+  });
   const s = grids.get(tr.closest('[data-zeyn-grid]'));
   if (s) s.active = tr.dataset.zeynIndex != null ? Number(tr.dataset.zeynIndex) : list.indexOf(tr);
   if (focus) tr.focus();
@@ -602,7 +617,12 @@ function renderVirtual(grid, focusIndex = null) {
     const nodes = [];
     for (let i = start; i < end; i++) nodes.push(virtualRow(s, i, spare));
     const roving = nodes.find((n) => Number(n.dataset.zeynIndex) === s.active) ?? nodes[0];
-    for (const n of nodes) if (n.tabIndex !== (n === roving ? 0 : -1)) n.tabIndex = n === roving ? 0 : -1;
+    for (const n of nodes) {
+      if (n.tabIndex !== (n === roving ? 0 : -1)) {
+        n.tabIndex = n === roving ? 0 : -1;
+        rowControls(n, n === roving);
+      }
+    }
     const want = new Set(nodes);
     const active = document.activeElement;
     const kept = s.body.contains(active) && want.has(active);
@@ -689,6 +709,7 @@ async function fetchBlock(grid, s, b) {
   const t = document.createElement('template');
   t.innerHTML = `<table><tbody>${r.data.rows ?? ''}</tbody></table>`;
   s.cache.set(b, [...t.content.querySelectorAll('tr')].map((tr, k) => prepRow(s, tr, b * s.size + k)));
+  relativeTimes(t.content);
   s.stale.delete(b);
   while (s.cache.size > V_CACHE) s.cache.delete(s.cache.keys().next().value);
   applyFoot(grid, r.data.foot);
@@ -749,6 +770,58 @@ function virtualKey(e, grid) {
   s.key = '';
   renderVirtual(grid, s.active);
   return true;
+}
+
+/** Relative time formatter for the page language, made once. */
+let relativeFormat = null;
+
+/**
+ * Shows `time[data-zeyn-relative]` as relative time ("3 minutes ago") in the page language. The
+ * server rendered exact time stays in the `title`. Called when rows arrive and once a minute.
+ */
+function relativeTimes(root) {
+  const list = root.querySelectorAll('time[data-zeyn-relative]');
+  if (!list.length || typeof Intl.RelativeTimeFormat !== 'function') return;
+  relativeFormat ??= new Intl.RelativeTimeFormat(document.documentElement.lang || undefined, { numeric: 'auto' });
+  const now = Date.now();
+  const units = [
+    ['year', 31536000],
+    ['month', 2592000],
+    ['week', 604800],
+    ['day', 86400],
+    ['hour', 3600],
+    ['minute', 60],
+  ];
+  for (const el of list) {
+    const at = Date.parse(el.getAttribute('datetime'));
+    if (Number.isNaN(at)) continue;
+    const secs = (at - now) / 1000;
+    const [unit, size] = units.find(([, n]) => Math.abs(secs) >= n) ?? ['second', 1];
+    el.textContent = relativeFormat.format(Math.round(secs / size), unit);
+  }
+}
+
+/**
+ * Runs a row item (`data-zeyn-run`) with `POST /_zeyn/grid/run`, sending only the row key and the
+ * item. On success shows a short confirmation and reloads the grid.
+ */
+async function runRowItem(button, item) {
+  const tr = button?.closest('tr[data-zeyn-key]') ?? null;
+  const grid = (tr ?? button)?.closest('[data-zeyn-grid]');
+  const key = tr?.dataset.zeynKey ?? button?.dataset.zeynKey;
+  if (!grid || key == null) return;
+  if (button?.tagName === 'BUTTON') button.disabled = true;
+  const r = await post(BASE + '/_zeyn/grid/run', { ...address(grid), key, item: item ?? button.dataset.zeynRun });
+  if (button?.isConnected && button.tagName === 'BUTTON') button.disabled = false;
+  if (!r.ok) return;
+  await runEffects(r.data?.effects, button);
+  toast(grids.get(grid)?.texts.done || 'Done.');
+  await loadGrid(grid, 'reload');
+  const again = grid.querySelector(`[data-zeyn-rows] tr[data-zeyn-key="${CSS.escape(key)}"]`);
+  if (again && (!document.activeElement || document.activeElement === document.body)) {
+    activate(again, false);
+    (again.querySelector(`[data-zeyn-run="${CSS.escape(item ?? button.dataset.zeynRun)}"]`) ?? again).focus();
+  }
 }
 
 /**
@@ -1747,6 +1820,7 @@ document.addEventListener('click', (e) => {
   if (!t) return;
   let el;
   if ((el = t.closest('.z-menu-item'))) return runMenuItem(el);
+  if ((el = t.closest('button[data-zeyn-run]'))) return runRowItem(el);
   if ((el = t.closest('button.z-sort'))) return toggleSort(el, e.shiftKey);
   if ((el = t.closest('button.z-col-menu'))) return openColumnMenu(el);
   if ((el = t.closest('[data-zeyn-page]'))) return loadGrid(el.closest('[data-zeyn-grid]'), el.dataset.zeynPage === 'prev' ? 'prev' : 'next');
@@ -1824,6 +1898,7 @@ document.addEventListener('change', (e) => {
 });
 
 syncTimeZone();
+setInterval(() => relativeTimes(document), 60_000);
 initGrids(document);
 syncAgentTools();
 

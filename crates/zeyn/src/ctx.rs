@@ -308,7 +308,8 @@ impl IntoScreen for Result<Screen> {
 /// Action outputs that can report failure to a form or grid.
 #[diagnostic::on_unimplemented(
     message = "`{Self}` is not a supported action result",
-    note = "actions used by forms and grids return `zeyn::Result<T>`"
+    label = "this action does not return a `Result`",
+    note = "actions used by forms, grid row actions, menus and bulk actions return `zeyn::Result<T>`"
 )]
 pub trait Outcome {
     fn failure(&self) -> Option<Error>;

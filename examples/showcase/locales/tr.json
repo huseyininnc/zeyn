@@ -17,6 +17,7 @@
     "revenue_today": "Bugünkü ciro"
   },
   "stock": {
+    "restock": "Stok ekle +10",
     "products": "Ürünler",
     "new_product": "Yeni ürün",
     "product": "Ürün",

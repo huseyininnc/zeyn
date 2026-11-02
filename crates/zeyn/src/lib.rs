@@ -121,6 +121,46 @@
 //! fn grid() -> Node { Grid::of(search_products).column(Product::active).min().into() }
 //! ```
 //!
+//! A badge on a column that is not a `#[choice]` enum:
+//!
+//! ```compile_fail
+//! use zeyn::prelude::*;
+//! use zeyn::Tone;
+//!
+//! #[entity(table = "products")]
+//! pub struct Product {
+//!     #[key]
+//!     pub id: ProductId,
+//!     pub code: String,
+//! }
+//!
+//! #[action(permission = "stock.product.read")]
+//! pub async fn search_products(_q: GridQuery) -> Result<Page<Product>> { Ok(Page::default()) }
+//!
+//! fn grid() -> Node { Grid::of(search_products).column(Product::code).badge(|_| Tone::Info).into() }
+//! ```
+//!
+//! A row action whose input is not built from the row the way the action takes it:
+//!
+//! ```compile_fail
+//! use zeyn::prelude::*;
+//!
+//! #[entity(table = "products")]
+//! pub struct Product {
+//!     #[key]
+//!     pub id: ProductId,
+//!     pub code: String,
+//! }
+//!
+//! #[action(permission = "stock.product.read")]
+//! pub async fn search_products(_q: GridQuery) -> Result<Page<Product>> { Ok(Page::default()) }
+//!
+//! #[action(permission = "stock.product.write")]
+//! pub async fn archive_product(_id: ProductId) -> Result<()> { Ok(()) }
+//!
+//! fn grid() -> Node { Grid::of(search_products).column(Product::code).row_action("Archive", archive_product, |p| p.code.clone()).into() }
+//! ```
+//!
 //! A menu item for a screen without a route:
 //!
 //! ```compile_fail
@@ -187,7 +227,7 @@ pub use ctx::{BoxFuture, Ctx, Dep, Identity, Inject, IntoScreen, Outcome, Servic
 pub use feature::{Feature, Guard, GuardResult, Menu, MenuGroup, MenuItem, Route, ScreenEntry, SignedIn};
 pub use form::{Form, FormAction, FormRow, SubmitForm};
 pub use grid::{
-    COLUMN_WIDTH, ColumnView, Grid, GridColumn, GridMode, DataGridView, DataGridViewStore, MAX_PINNED, MAX_SORT, MemoryViewStore, Paging,
+    COLUMN_WIDTH, CellRenderer, ColumnView, Grid, GridColumn, Tone, GridMode, DataGridView, DataGridViewStore, MAX_PINNED, MAX_SORT, MemoryViewStore, Paging,
     Pin, RowStyle, position_cursor, total,
 };
 pub use i18n::{I18n, NumberFormat, Text};
@@ -206,11 +246,11 @@ pub use server::{
 #[cfg(feature = "server")]
 pub use security::{IpRange, MemoryRateStore, RateKey, RateLimit, RateStore, client_ip, parse_ranges};
 pub use screen::{
-    Component, Effect, Export, FormSource, GridSource, Icon, LoadedPage, Node, Params, Screen, ScreenDef, ScreenMeta,
+    Component, Effect, Export, FormSource, GridSource, Icon, LoadedPage, Node, Params, RowCall, Screen, ScreenDef, ScreenMeta,
     ToolButton, Toolbar, UiCtx, Window,
 };
 pub use value::{
-    ChoiceOption, Currency, FieldKind, FieldType, Money, SupportsMinMax, SupportsMinMaxTotal, SupportsRequired, SupportsSum,
+    ChoiceOption, ChoiceType, Currency, FieldKind, FieldType, IsBool, IsMoment, Money, SupportsMinMax, SupportsMinMaxTotal, SupportsRequired, SupportsSum,
     SupportsText,
     Value,
 };
@@ -224,7 +264,7 @@ pub use serde_json as __serde_json;
 /// Everything application code needs: `use zeyn::prelude::*;`
 pub mod prelude {
     pub use crate::{
-        Action, Ctx, Currency, Date, DateTime, Effect, LocalDateTime, Time, TimeZone, Entity, Error, Export, Feature, Field, Form, Grid, GridMode, GridQuery,
+        Action, Ctx, Currency, Date, DateTime, Effect, Tone, LocalDateTime, Time, TimeZone, Entity, Error, Export, Feature, Field, Form, Grid, GridMode, GridQuery,
         GuardResult, Icon, Identity, Licensed, Model, Secret, Tenant, TenantRequired, Money, Node, Page, Paging, Result, RowStyle, Screen, ScreenDef, Service,
         SignedIn, Text, UiCtx, Valid, ValidationErrors, Window, action, choice, entity, model, params, screen, t,
     };

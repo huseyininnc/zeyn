@@ -304,6 +304,34 @@ impl SupportsMinMaxTotal for DateTime {}
 impl SupportsMinMaxTotal for LocalDateTime {}
 impl<T: SupportsMinMaxTotal> SupportsMinMaxTotal for Option<T> {}
 
+/// Enums made with `#[choice]`. Grid badges work only on them.
+#[diagnostic::on_unimplemented(
+    message = "`badge()` cannot be used on a `{Self}` column",
+    label = "not a `#[choice]` enum",
+    note = "badges color the options of a `#[choice]` enum; use `cell(...)` for other columns"
+)]
+pub trait ChoiceType {}
+
+/// Yes/no column types, for `check_icon()`.
+#[diagnostic::on_unimplemented(
+    message = "`check_icon()` cannot be used on a `{Self}` column",
+    label = "not a yes/no column",
+    note = "`check_icon()` works on bool and Option<bool>"
+)]
+pub trait IsBool {}
+impl IsBool for bool {}
+impl IsBool for Option<bool> {}
+
+/// Moment column types, for `relative_time()`.
+#[diagnostic::on_unimplemented(
+    message = "`relative_time()` cannot be used on a `{Self}` column",
+    label = "not a moment",
+    note = "`relative_time()` works on DateTime and Option<DateTime>, which are exact moments"
+)]
+pub trait IsMoment {}
+impl IsMoment for DateTime {}
+impl IsMoment for Option<DateTime> {}
+
 /// Types that accept the `required` rule.
 #[diagnostic::on_unimplemented(
     message = "the `required` rule cannot be used on `{Self}`",

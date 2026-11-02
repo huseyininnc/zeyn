@@ -73,6 +73,15 @@ impl ProductStore {
         self.0.read().map_err(poisoned)?.iter().find(|p| p.id == id).cloned().ok_or(Error::NotFound)
     }
 
+    /// Adds ten units to a product's stock.
+    pub fn restock(&self, id: ProductId) -> Result<()> {
+        let mut rows = self.0.write().map_err(poisoned)?;
+        let product = rows.iter_mut().find(|p| p.id == id).ok_or(Error::NotFound)?;
+        product.stock += 10;
+        product.version += 1;
+        Ok(())
+    }
+
     pub fn save(&self, mut product: Product) -> Result<Product> {
         let mut rows = self.0.write().map_err(poisoned)?;
         if rows.iter().any(|p| p.code.eq_ignore_ascii_case(&product.code) && p.id != product.id) {
@@ -108,6 +117,12 @@ pub async fn save_product(product: Valid<Product>, store: ProductStore) -> Resul
     store.save(product.into_inner())
 }
 
+/// Adds ten units to a product's stock. A row action on the product list.
+#[action(permission = "stock.product.write", audit)]
+pub async fn restock_product(id: ProductId, store: ProductStore) -> Result<()> {
+    store.restock(id)
+}
+
 /// Which product the editor opens; `None` creates one.
 #[params]
 pub struct ProductParams {
@@ -133,6 +148,7 @@ pub fn product_list() -> Screen {
                 .width(120)
                 .pin_start()
                 .filter()
+                .link(|p| Window::open(product_editor, ProductParams { id: Some(p.id) }))
                 .column(Product::id)
                 .width(90)
                 .hidden()
@@ -142,18 +158,26 @@ pub fn product_list() -> Screen {
                 .column(Product::unit)
                 .width(130)
                 .filter()
+                .badge(|u| match u {
+                    Unit::Piece => Tone::Neutral,
+                    Unit::Kg => Tone::Info,
+                    Unit::Liter => Tone::Brand,
+                })
                 .column(Product::price)
                 .width(220)
                 .filter()
                 .avg()
                 .max()
                 .column(Product::stock)
-                .width(150)
+                .width(170)
                 .filter()
                 .sum()
+                .progress(120)
                 .column(Product::active)
                 .width(110)
                 .filter()
+                .check_icon()
+                .row_action(t!("stock.restock"), restock_product, |p| p.id)
                 .row_style(|p| match p.stock {
                     0 => Some(RowStyle::Danger),
                     1..=9 => Some(RowStyle::Warning),
@@ -194,5 +218,6 @@ pub fn feature() -> Feature {
         .screen(product_editor)
         .api(search_products)
         .api(save_product)
+        .api(restock_product)
         .menu(|m| m.group(t!("menu.stock"), Icon::Box).item(t!("stock.products"), product_list))
 }

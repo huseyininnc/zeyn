@@ -364,6 +364,8 @@ fn expand_choice(mut e: ItemEnum) -> syn::Result<Ts> {
         #[serde(crate = "::zeyn::__serde")]
         #e
 
+        impl ::zeyn::ChoiceType for #ident {}
+
         impl ::zeyn::FieldType for #ident {
             const KIND: ::zeyn::FieldKind = ::zeyn::FieldKind::Choice(&[#(#options),*]);
             fn to_value(&self) -> ::zeyn::Value {

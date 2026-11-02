@@ -434,7 +434,7 @@ async fn saved_view_comes_back_on_the_next_page_load_with_its_sort_and_filters()
     assert!(!head.contains(r#"data-field="kind""#));
     assert!(page.body.contains(r#"data-zeyn-total="6""#), "only tools, the note filter is not offered");
     let rows = page.body.split("<tbody data-zeyn-rows>").nth(1).unwrap();
-    assert!(rows.starts_with("<tr><td>C-18</td><td class=\"z-num\">18</td></tr>"), "{}", &rows[..120]);
+    assert!(rows.starts_with("<tr data-zeyn-key=\"18\"><td>C-18</td><td class=\"z-num\">18</td></tr>"), "{}", &rows[..120]);
 
     let other = send(&router, as_user(get("/items"), "mert")).await;
     assert!(!other.body.contains("data-zeyn-view="));
@@ -466,7 +466,7 @@ async fn grid_endpoint_renders_rows_and_header_in_the_requested_layout() {
     });
     let r = send(&router(reader()), post("/_zeyn/grid", body)).await;
     let j = r.json();
-    assert_eq!(j["rows"], "<tr><td class=\"z-num\">1</td><td class=\"z-num\">₺10.00</td></tr>");
+    assert_eq!(j["rows"], "<tr data-zeyn-key=\"1\"><td class=\"z-num\">1</td><td class=\"z-num\">₺10.00</td></tr>");
     let head = j["head"].as_str().unwrap();
     assert!(head.find("qty").unwrap() < head.find("price").unwrap());
     assert!(head.contains(r#"data-pin="end""#));
@@ -484,4 +484,96 @@ fn at_most_three_columns_stay_pinned_per_side() {
     let clean = GridSource::clean_view(&grid, view);
     assert_eq!(clean.columns.iter().filter(|c| c.pin.is_some()).count(), 3);
     assert_eq!(clean.columns.len(), 5);
+}
+
+#[action(permission = "items.write")]
+pub async fn bump(id: ItemId, store: Store) -> Result<()> {
+    let mut rows = store.0.write().unwrap();
+    let row = rows.iter_mut().find(|r| r.id == id).ok_or(Error::NotFound)?;
+    if row.qty > 100 {
+        return Err(Error::Denied("too many".into()));
+    }
+    row.qty += 100;
+    Ok(())
+}
+
+#[screen(route = "/act", permission = "items.read")]
+pub fn act() -> Screen {
+    Screen::new("Act").body(
+        Grid::of(search)
+            .column(Item::code)
+            .column(Item::kind)
+            .badge(|k| match k {
+                Kind::Tool => zeyn::Tone::Info,
+                _ => zeyn::Tone::Neutral,
+            })
+            .column(Item::qty)
+            .progress(40)
+            .column(Item::active)
+            .check_icon()
+            .row_action("Bump", bump, |i| i.id),
+    )
+}
+
+fn act_router(identity: Identity) -> (Router, Store) {
+    let store = Store::seeded();
+    let router = App::new("Test")
+        .service(store.clone())
+        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .feature(Feature::new("items").screen(act))
+        .router()
+        .unwrap();
+    (router, store)
+}
+
+fn run(key: &str, item: &str) -> Request<Body> {
+    post("/_zeyn/grid/run", serde_json::json!({ "screen": "act", "node": 0, "key": key, "item": item }))
+}
+
+#[tokio::test]
+async fn cells_render_badges_progress_and_icons() {
+    let (router, _) = act_router(reader());
+    let r = send(&router, get("/act")).await;
+    assert!(r.body.contains(r#"<span class="z-badge z-tone-neutral">Part</span>"#));
+    assert!(r.body.contains(r#"<span class="z-badge z-tone-info">Tool</span>"#));
+    assert!(r.body.contains(r#"style="--z-pct:2.5%""#), "1 of 40");
+    assert!(r.body.contains(r#"<span class="z-bool z-bool-no" role="img" aria-label="No"></span>"#));
+    assert!(r.body.contains(r#"<tr data-zeyn-key="1">"#));
+}
+
+#[tokio::test]
+async fn row_action_buttons_show_only_with_the_actions_permission() {
+    let (router, _) = act_router(reader());
+    let r = send(&router, get("/act")).await;
+    assert!(r.body.contains(r#"<td class="z-row-actions"></td>"#));
+    assert!(!r.body.contains("data-zeyn-run="));
+    let writer = Identity::user("w").with_permissions(["items.read", "items.write"]);
+    let (router, _) = act_router(writer);
+    let r = send(&router, get("/act")).await;
+    assert!(r.body.contains(r#"data-zeyn-run="a0""#));
+}
+
+#[tokio::test]
+async fn row_action_runs_with_input_built_from_the_row_on_the_server() {
+    let writer = Identity::user("w").with_permissions(["items.read", "items.write"]);
+    let (router, store) = act_router(writer);
+    let r = send(&router, run("7", "a0")).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    assert_eq!(store.0.read().unwrap()[6].qty, 107);
+    let r = send(&router, run("7", "a0")).await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN, "the action's own error comes back");
+}
+
+#[tokio::test]
+async fn row_action_is_refused_without_permission_unknown_items_or_rows() {
+    let (router, store) = act_router(reader());
+    assert_eq!(send(&router, run("7", "a0")).await.status, StatusCode::FORBIDDEN);
+    assert_eq!(store.0.read().unwrap()[6].qty, 7);
+    let writer = Identity::user("w").with_permissions(["items.read", "items.write"]);
+    let (router, _) = act_router(writer.clone());
+    assert_eq!(send(&router, run("7", "a1")).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(send(&router, run("7", "x")).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(send(&router, run("999", "a0")).await.status, StatusCode::NOT_FOUND);
+    let (router, _) = act_router(Identity::user("w").with_permissions(["items.write"]));
+    assert_eq!(send(&router, run("7", "a0")).await.status, StatusCode::FORBIDDEN, "screen access first");
 }

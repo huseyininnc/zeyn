@@ -11,7 +11,10 @@ use crate::i18n::Text;
 use crate::model::{Field, FieldMeta, Model};
 use crate::render::{Render, attr, escape};
 use crate::screen::{Component, Effect, GridSource, LoadedPage, Node};
-use crate::value::{FieldKind, FieldType, Money, SupportsMinMaxTotal, SupportsSum, Value};
+use crate::ctx::Outcome;
+use crate::screen::RowCall;
+use crate::screen::Icon;
+use crate::value::{ChoiceType, FieldKind, FieldType, IsBool, IsMoment, Money, SupportsMinMaxTotal, SupportsSum, Value};
 use serde::Serialize;
 use serde_json::json;
 use std::cmp::Ordering;
@@ -230,6 +233,91 @@ struct Shown {
     pin: Option<Pin>,
 }
 
+/// Color of a badge. Tones follow the theme, so they work in light and dark mode.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Tone {
+    Neutral,
+    Info,
+    Success,
+    Warning,
+    Danger,
+    Brand,
+}
+
+impl Tone {
+    fn code(self) -> &'static str {
+        match self {
+            Tone::Neutral => "neutral",
+            Tone::Info => "info",
+            Tone::Success => "success",
+            Tone::Warning => "warning",
+            Tone::Danger => "danger",
+            Tone::Brand => "brand",
+        }
+    }
+}
+
+/// Draws the content of a grid cell from the column's typed value. The extension point for
+/// app specific cells; closures `Fn(&T, &Render) -> String` are renderers too.
+///
+/// The returned HTML goes into the cell as is: escape user data with [`crate::render::escape`]
+/// or [`Render::value`]. Exports and copy use the plain value, not this HTML.
+///
+/// ```ignore
+/// Grid::of(search_products).column(Product::code).cell(|code: &String, _r: &Render| {
+///     format!("<code>{}</code>", zeyn::render::escape(code))
+/// })
+/// ```
+pub trait CellRenderer<T>: Send + Sync + 'static {
+    fn render(&self, value: &T, r: &Render) -> String;
+}
+
+impl<T, F> CellRenderer<T> for F
+where
+    F: Fn(&T, &Render) -> String + Send + Sync + 'static,
+{
+    fn render(&self, value: &T, r: &Render) -> String {
+        self(value, r)
+    }
+}
+
+type CellFn<E> = Box<dyn Fn(&E, &Render) -> String + Send + Sync>;
+type RunFn<E> = Box<dyn Fn(&E) -> Box<dyn FnOnce(Ctx) -> BoxFuture<Result<()>> + Send> + Send + Sync>;
+
+/// A button on every row that runs an action with input built from the row.
+struct RowAction<E> {
+    label: Text,
+    icon: Option<Icon>,
+    meta: ActionMeta,
+    run: RunFn<E>,
+}
+
+/// Runs action `A` with `input` and turns a failed outcome into an error.
+fn runner<A>(input: A::Input) -> Box<dyn FnOnce(Ctx) -> BoxFuture<Result<()>> + Send>
+where
+    A: Action,
+    A::Output: Outcome,
+{
+    Box::new(move |ctx| {
+        Box::pin(async move {
+            let output = A::call(ctx, input).await?;
+            output.failure().map_or(Ok(()), Err)
+        })
+    })
+}
+
+/// Key of a row as text: the value of the model's `#[key]` field.
+fn key_text(value: &Value) -> String {
+    match value {
+        Value::Int(n) => n.to_string(),
+        Value::Text(s) => s.clone(),
+        Value::Choice(c) => c.to_string(),
+        Value::Null => String::new(),
+        other => serde_json::to_string(other).unwrap_or_default(),
+    }
+}
+
 type ValueFn<E> = Box<dyn Fn(&E) -> Value + Send + Sync>;
 type StyleFn<E> = Box<dyn Fn(&E) -> Option<RowStyle> + Send + Sync>;
 type OpenFn<E> = Box<dyn Fn(&E) -> Effect + Send + Sync>;
@@ -244,6 +332,7 @@ struct Column<E> {
     aggregates: Vec<Aggregate>,
     pin: Option<Pin>,
     hidden: bool,
+    cell: Option<CellFn<E>>,
 }
 
 /// Data grid. Its data source is an action that takes a `GridQuery` and returns `Page<E>`.
@@ -260,6 +349,7 @@ pub struct Grid<E: Model> {
     columns: Vec<Column<E>>,
     row_style: Option<StyleFn<E>>,
     on_open: Option<OpenFn<E>>,
+    row_actions: Vec<RowAction<E>>,
 }
 
 fn fetch_via<A, E>(ctx: Ctx, query: GridQuery) -> BoxFuture<Result<Page<E>>>
@@ -284,6 +374,7 @@ impl<E: Model> Grid<E> {
             columns: Vec::new(),
             row_style: None,
             on_open: None,
+            row_actions: Vec::new(),
         }
     }
 
@@ -305,6 +396,7 @@ impl<E: Model> Grid<E> {
                 aggregates: Vec::new(),
                 pin: None,
                 hidden: false,
+                cell: None,
             });
         }
         grid
@@ -332,8 +424,9 @@ impl<E: Model> Grid<E> {
             aggregates: Vec::new(),
             pin: None,
             hidden: false,
+            cell: None,
         });
-        GridColumn { grid: self, _type: PhantomData }
+        GridColumn { grid: self, field, _type: PhantomData }
     }
 
     /// Picks a highlight per row.
@@ -346,6 +439,38 @@ impl<E: Model> Grid<E> {
     pub fn on_open(mut self, open: impl Fn(&E) -> Effect + Send + Sync + 'static) -> Self {
         self.on_open = Some(Box::new(open));
         self
+    }
+
+    /// Adds a button to every row that runs `action` with input built from the row:
+    /// `.row_action(t!("stock.archive"), archive_product, |p| p.id)`. The button only shows for
+    /// users with the action's permission. When pressed, the server loads the row again by its key
+    /// through the grid's action, builds the input from it, checks the permission again and runs
+    /// the action; the client never sends the input.
+    pub fn row_action<A>(mut self, label: impl Into<Text>, _action: A, input: impl Fn(&E) -> A::Input + Send + Sync + 'static) -> Self
+    where
+        A: Action,
+        A::Output: Outcome,
+    {
+        self.row_actions.push(RowAction {
+            label: label.into(),
+            icon: None,
+            meta: A::META,
+            run: Box::new(move |row| runner::<A>(input(row))),
+        });
+        self
+    }
+
+    /// Icon of the last added row action.
+    pub fn icon(mut self, icon: Icon) -> Self {
+        if let Some(a) = self.row_actions.last_mut() {
+            a.icon = Some(icon);
+        }
+        self
+    }
+
+    /// Index of the `#[key]` field, if the model has one.
+    fn key_index() -> Option<usize> {
+        E::fields().iter().position(|f| f.key)
     }
 
     /// Effect produced when the row is opened.
@@ -477,6 +602,13 @@ impl<E: Model> Grid<E> {
             }
             out.push_str(&format!(">{}</th>", r.label(c.meta)));
         }
+        if !self.row_actions.is_empty() {
+            out.push_str(&format!(
+                r#"<th scope="col" class="z-actions-col" data-pin="end" aria-colindex="{}"><span class="z-sr-only">{}</span></th>"#,
+                cols.len() + 1,
+                r.text(&Text::key("zeyn.grid.actions"))
+            ));
+        }
         out.push_str("</tr>");
         out
     }
@@ -491,12 +623,31 @@ impl<E: Model> Grid<E> {
             if let Some(effect) = self.open_effect(row) {
                 out.push_str(&format!(r#" tabindex="-1" data-zeyn-effect="{}""#, attr(&effect)));
             }
+            if let Some(k) = Self::key_index().and_then(|i| row.value_at(i)) {
+                out.push_str(&format!(r#" data-zeyn-key="{}""#, escape(&key_text(&k))));
+            }
             out.push('>');
             for s in cols {
                 let c = &self.columns[s.index];
                 let value = (c.value)(row);
                 let class = if matches!(value, Value::Int(_) | Value::Money(_)) { r#" class="z-num""# } else { "" };
-                out.push_str(&format!("<td{class}>{}</td>", r.value(&value, &c.meta.kind)));
+                let content = match &c.cell {
+                    Some(cell) => cell(row, r),
+                    None => r.value(&value, &c.meta.kind),
+                };
+                out.push_str(&format!("<td{class}>{content}</td>"));
+            }
+            let actions: Vec<(usize, &RowAction<E>)> = self.row_actions.iter().enumerate().filter(|(_, a)| r.can(&a.meta.access)).collect();
+            if !self.row_actions.is_empty() {
+                out.push_str(r#"<td class="z-row-actions">"#);
+                for (i, a) in actions {
+                    let label = r.text(&a.label);
+                    let icon = a.icon.map(Icon::html).unwrap_or_default();
+                    out.push_str(&format!(
+                        r#"<button type="button" class="z-row-action" data-zeyn-run="a{i}" tabindex="-1">{icon}<span>{label}</span></button>"#
+                    ));
+                }
+                out.push_str("</td>");
             }
             out.push_str("</tr>");
         }
@@ -546,7 +697,7 @@ impl<E: Model> Grid<E> {
         }
         out.push_str(&format!(
             r#"><table role="grid" aria-colcount="{}"><thead>{}</thead><tbody data-zeyn-rows>"#,
-            self.columns.len(),
+            self.columns.len() + usize::from(!self.row_actions.is_empty()),
             self.head_row(r, &cols)
         ));
         if let Some(p) = page {
@@ -608,6 +759,9 @@ impl<E: Model> Grid<E> {
             }
             out.push_str("</td>");
         }
+        if !self.row_actions.is_empty() {
+            out.push_str("<td></td>");
+        }
         out.push_str("</tr>");
         out
     }
@@ -652,6 +806,46 @@ impl<E: Model> GridSource for Grid<E> {
 
     fn head_html(&self, r: &Render, view: Option<&DataGridView>) -> String {
         self.head_row(r, &self.layout(view))
+    }
+
+    fn find_row(&self, ctx: Ctx, key: String) -> BoxFuture<Result<LoadedPage>> {
+        let Some(i) = Self::key_index() else {
+            return Box::pin(async { Err(crate::action::Error::NotFound) });
+        };
+        let meta = &E::fields()[i];
+        let filter = match meta.kind {
+            FieldKind::Id | FieldKind::Integer => Filter::range(meta.name, Some(&key), Some(&key)),
+            _ => Filter { field: meta.name.to_string(), equals: Some(key), ..Filter::default() },
+        };
+        let query = GridQuery {
+            page: PageRequest::Offset { offset: 0, limit: 5 },
+            filters: vec![filter],
+            time_zone: ctx.time_zone(),
+            ..GridQuery::default()
+        };
+        let fetch = self.fetch;
+        Box::pin(async move {
+            let page = fetch(ctx, query).await?;
+            Ok(LoadedPage {
+                count: page.items.len(),
+                total: page.total,
+                next: None,
+                offset: 0,
+                totals: Vec::new(),
+                items: Box::new(page.items),
+                view: None,
+                saved_views: false,
+            })
+        })
+    }
+
+    fn row_call(&self, page: &LoadedPage, key: &str, item: &str) -> Option<RowCall> {
+        let i = Self::key_index()?;
+        let rows = page.items.downcast_ref::<Vec<E>>()?;
+        let row = rows.iter().find(|r| r.value_at(i).is_some_and(|v| key_text(&v) == key))?;
+        let index: usize = item.strip_prefix('a')?.parse().ok()?;
+        let action = self.row_actions.get(index)?;
+        Some(RowCall { meta: action.meta, run: (action.run)(row) })
     }
 
     fn fetch(&self, ctx: Ctx, mut query: GridQuery) -> BoxFuture<Result<LoadedPage>> {
@@ -775,6 +969,7 @@ impl<E: Model> Component for Grid<E> {
                 "pin": c.pin,
                 "hidden": c.hidden,
             })).collect::<Vec<_>>(),
+            "row_actions": self.row_actions.iter().map(|a| json!({ "label": a.label, "action": a.meta })).collect::<Vec<_>>(),
         })
     }
 
@@ -786,6 +981,7 @@ impl<E: Model> Component for Grid<E> {
 /// Configures the last added column. Grid methods can be called from here too.
 pub struct GridColumn<E: Model, T> {
     grid: Grid<E>,
+    field: Field<E, T>,
     _type: PhantomData<fn() -> T>,
 }
 
@@ -872,6 +1068,99 @@ impl<E: Model, T> GridColumn<E, T> {
         self
     }
 
+    /// Draws the cells with a custom renderer. See [`CellRenderer`].
+    pub fn cell(mut self, renderer: impl CellRenderer<T>) -> Self
+    where
+        T: 'static,
+    {
+        let field = self.field;
+        self.last().cell = Some(Box::new(move |row, r| renderer.render(field.get(row), r)));
+        self
+    }
+
+    /// Shows the choice as a colored badge; `tone` picks the color per option:
+    /// `.badge(|u| match u { Unit::Kg => Tone::Info, _ => Tone::Neutral })`. Compiles only on
+    /// `#[choice]` columns.
+    pub fn badge(self, tone: impl Fn(&T) -> Tone + Send + Sync + 'static) -> Self
+    where
+        T: ChoiceType + FieldType + 'static,
+    {
+        let kind = self.field.meta().kind;
+        self.cell(move |v: &T, r: &Render| {
+            format!(r#"<span class="z-badge z-tone-{}">{}</span>"#, tone(v).code(), r.value(&v.to_value(), &kind))
+        })
+    }
+
+    /// Shows a number as a bar filled up to `max`, with the number beside it. Compiles only on
+    /// numeric and money columns.
+    pub fn progress(self, max: i64) -> Self
+    where
+        T: SupportsSum + FieldType + 'static,
+    {
+        let kind = self.field.meta().kind;
+        self.cell(move |v: &T, r: &Render| {
+            let value = v.to_value();
+            let amount = match value {
+                Value::Int(n) => n as f64,
+                Value::Money(m) => m.minor as f64 / 100.0,
+                _ => return String::new(),
+            };
+            let pct = if max > 0 { (amount / max as f64 * 100.0).clamp(0.0, 100.0) } else { 0.0 };
+            format!(
+                r#"<span class="z-progress"><span class="z-progress-track" aria-hidden="true"><span class="z-progress-bar" style="--z-pct:{pct:.1}%"></span></span><span class="z-progress-text">{}</span></span>"#,
+                r.value(&value, &kind)
+            )
+        })
+    }
+
+    /// Makes the cell a link that runs an effect built from the row, such as opening a window.
+    pub fn link(mut self, effect: impl Fn(&E) -> Effect + Send + Sync + 'static) -> Self
+    where
+        T: FieldType + 'static,
+    {
+        let field = self.field;
+        let kind = field.meta().kind;
+        self.last().cell = Some(Box::new(move |row, r| {
+            format!(
+                r#"<button type="button" class="z-link" tabindex="-1" data-zeyn-effect="{}">{}</button>"#,
+                attr(&effect(row)),
+                r.value(&field.get(row).to_value(), &kind)
+            )
+        }));
+        self
+    }
+
+    /// Shows yes as a check mark and no as a dash, with the words for screen readers. Compiles
+    /// only on yes/no columns.
+    pub fn check_icon(self) -> Self
+    where
+        T: IsBool + FieldType + 'static,
+    {
+        self.cell(|v: &T, r: &Render| match v.to_value() {
+            Value::Bool(b) => format!(
+                r#"<span class="z-bool z-bool-{}" role="img" aria-label="{}"></span>"#,
+                if b { "yes" } else { "no" },
+                r.text(&Text::key(if b { "zeyn.yes" } else { "zeyn.no" }))
+            ),
+            _ => String::new(),
+        })
+    }
+
+    /// Shows a moment as relative time ("3 minutes ago") in the user's language, with the exact
+    /// time in the user's time zone as a tooltip. Compiles only on moment columns.
+    pub fn relative_time(self) -> Self
+    where
+        T: IsMoment + FieldType + 'static,
+    {
+        self.cell(|v: &T, r: &Render| match v.to_value() {
+            Value::DateTime(d) => {
+                let exact = d.format(r.tz, r.locale);
+                format!(r#"<time datetime="{d}" title="{exact}" data-zeyn-relative>{exact}</time>"#)
+            }
+            _ => String::new(),
+        })
+    }
+
     /// Shows how many matching rows have a value in this column. Works on every column.
     pub fn count(self) -> Self {
         self.aggregate(Aggregate::Count)
@@ -895,6 +1184,14 @@ impl<E: Model, T> GridColumn<E, T> {
 
     pub fn on_open(self, open: impl Fn(&E) -> Effect + Send + Sync + 'static) -> Grid<E> {
         self.grid.on_open(open)
+    }
+
+    pub fn row_action<A>(self, label: impl Into<Text>, action: A, input: impl Fn(&E) -> A::Input + Send + Sync + 'static) -> Grid<E>
+    where
+        A: Action,
+        A::Output: Outcome,
+    {
+        self.grid.row_action(label, action, input)
     }
 
     /// Returns the grid.
@@ -965,6 +1262,7 @@ fn grid_texts(r: &Render) -> serde_json::Value {
     for k in menu {
         map.insert(format!("menu_{k}"), json!(r.i18n.text(r.locale, &Text::key(format!("zeyn.grid.menu.{k}")))));
     }
+    map.insert("done".into(), json!(r.i18n.text(r.locale, &Text::key("zeyn.grid.done"))));
     map.insert("yes".into(), json!(r.i18n.text(r.locale, &Text::key("zeyn.yes"))));
     map.insert("no".into(), json!(r.i18n.text(r.locale, &Text::key("zeyn.no"))));
     serde_json::Value::Object(map)

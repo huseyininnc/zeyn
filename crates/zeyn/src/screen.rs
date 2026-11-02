@@ -115,6 +115,12 @@ pub struct LoadedPage {
     pub saved_views: bool,
 }
 
+/// An action call built on the server for one row or menu item, ready to run.
+pub struct RowCall {
+    pub meta: ActionMeta,
+    pub run: Box<dyn FnOnce(Ctx) -> BoxFuture<Result<()>> + Send>,
+}
+
 /// A component that loads rows through an action. Implemented by `Grid`.
 pub trait GridSource: Send + Sync {
     fn action(&self) -> ActionMeta;
@@ -143,6 +149,20 @@ pub trait GridSource: Send + Sync {
 
     /// JSON Schema of the query, for agent tools.
     fn tool_schema(&self) -> serde_json::Value;
+
+    /// Loads the row with this key through the grid's own action. The result holds at most the
+    /// rows the action returned for a key filter; [`GridSource::row_call`] picks the matching one.
+    fn find_row(&self, ctx: Ctx, key: String) -> BoxFuture<Result<LoadedPage>> {
+        let _ = (ctx, key);
+        Box::pin(async { Err(crate::action::Error::NotFound) })
+    }
+
+    /// Builds the call of a row item (`a0` for the first row action) from the loaded row with
+    /// this key. `None` when the row is not there or the item does not exist for it.
+    fn row_call(&self, page: &LoadedPage, key: &str, item: &str) -> Option<RowCall> {
+        let _ = (page, key, item);
+        None
+    }
 }
 
 /// A component that saves data through an action. Implemented by forms with `submit`.
