@@ -1145,6 +1145,29 @@ async function undoEdit(grid) {
   if (await sendEdit(grid, tr, values)) toast(s.texts.undone || 'Change undone.');
 }
 
+/**
+ * Copies the selected rows in the DOM (or the focused row) as tab separated text for
+ * spreadsheets, in the shown column order, with a header line when there is more than one row.
+ * Selection and action columns are left out. Returns true when something was copied.
+ */
+function copyRows(grid, focused) {
+  const s = grids.get(grid);
+  if (!s || !navigator.clipboard?.writeText) return false;
+  const picked = rows(grid).filter((tr) => tr.getAttribute('aria-selected') === 'true');
+  const list = picked.length ? picked : focused ? [focused] : [];
+  if (!list.length) return false;
+  const keep = (cell) => !cell.matches('.z-select, .z-select-col, .z-row-actions, .z-actions-col');
+  const text = (cell) =>
+    (cell.textContent.trim() || cell.querySelector('[role="img"][aria-label]')?.getAttribute('aria-label') || '').replace(/[\t\r\n]+/g, ' ');
+  const lines = list.map((tr) => [...tr.cells].filter(keep).map(text).join('\t'));
+  if (list.length > 1) lines.unshift([...grid.querySelector('thead tr').cells].filter(keep).map(text).join('\t'));
+  navigator.clipboard.writeText(lines.join('\r\n') + '\r\n').then(
+    () => toast(fill(s.texts.copied || '{n} rows copied.', { n: fmt(list.length) })),
+    () => {},
+  );
+  return true;
+}
+
 /** Keys in a row in edit mode: Enter saves, Escape cancels. Returns true when handled. */
 function editKey(e, input) {
   const tr = input.closest('tr');
@@ -2256,6 +2279,11 @@ document.addEventListener('keydown', (e) => {
   if (t instanceof Element && t.matches('.z-cell-input') && editKey(e, t)) return;
   if (e.key === 'F2' && t instanceof HTMLTableRowElement && t.parentElement?.matches('[data-zeyn-rows]')) {
     if (startEdit(t, null)) return e.preventDefault();
+  }
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'c' && !typing(t) && t instanceof Element) {
+    const g = t.closest('[data-zeyn-grid]');
+    const sel = window.getSelection();
+    if (g && (!sel || sel.isCollapsed) && copyRows(g, t.closest('[data-zeyn-rows] > tr'))) return e.preventDefault();
   }
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z' && !typing(t) && t instanceof Element) {
     const g = t.closest('[data-zeyn-grid]');

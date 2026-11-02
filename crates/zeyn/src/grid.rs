@@ -1632,7 +1632,7 @@ fn grid_texts(r: &Render) -> serde_json::Value {
         map.insert(format!("menu_{k}"), json!(r.i18n.text(r.locale, &Text::key(format!("zeyn.grid.menu.{k}")))));
     }
     map.insert("done".into(), json!(r.i18n.text(r.locale, &Text::key("zeyn.grid.done"))));
-    for k in ["saved", "undo", "undone", "empty", "error", "retry"] {
+    for k in ["saved", "undo", "undone", "empty", "error", "retry", "copied"] {
         map.insert(k.into(), json!(r.i18n.text(r.locale, &Text::key(format!("zeyn.grid.{k}")))));
     }
     map.insert("yes".into(), json!(r.i18n.text(r.locale, &Text::key("zeyn.yes"))));
