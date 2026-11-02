@@ -1,0 +1,25 @@
+# Zeyn
+
+> Zeyn is an open source Rust web framework for data-heavy business apps, built on axum. AI agents write the application code, people review it, and the framework keeps it safe. Status: alpha; APIs still change.
+
+Apps are written as models, actions and screens in Rust. The server renders the screens, so app authors write no HTML, CSS or JavaScript. An action can serve a screen, a JSON API endpoint and an AI tool at once, with the same permission checks. Compile errors are written so that an agent can act on them.
+
+## Docs
+
+- [crates.io](https://crates.io/crates/zeyn) and [docs.rs](https://docs.rs/zeyn): the published crate and its API reference
+
+- [Documentation](https://docs.zeynsoft.com/): introduction, project structure, CLI, the language (entities, actions, screens, forms, DataGrid), components and guides
+- [Live demo](https://framework.zeynsoft.com/): every component and feature in one running app
+
+## Key facts
+
+- Built on axum
+- Every action and screen declares `permission = "..."` or `public`; missing access is a compile error
+- AI attributes on actions: `ai = "guidance"`, `ai = false` (never offered to a model), `confirm` (runs only after the user confirms)
+- `zeyn mcp`: an MCP server for coding agents with `zeyn_docs`, `zeyn_describe`, `zeyn_check`, `zeyn_test` and `zeyn_new_feature`
+- DataGrid with virtual scrolling over a million rows, filters, totals, grouping, inline editing and export
+- PostgreSQL and Oracle 11g or later
+- OpenID Connect, JWT, MFA, passkeys and an optional accounts system
+- Security defaults: permissions, CSRF, strict CSP, audit, field masking, rate limits
+- A generated app's container image is about 43 MB and an idle app uses a few MB of memory (https://docs.zeynsoft.com/start/cli#docker); a desktop executable is experimental
+- License: MIT or Apache 2.0
