@@ -1,0 +1,52 @@
+# {{title}}
+
+A Zeyn Framework app. Zeyn is a Rust web framework: screens are rendered on the server, a small
+runtime in the browser applies changes, and there is no JavaScript to write.
+
+## Commands
+
+- Run: `cargo run` then open the address printed in the terminal
+- Test: `cargo test`
+- Check the app without starting it: `zeyn check`
+- Show every route, screen, API and missing translation: `zeyn routes`
+- New feature folder: `zeyn g feature <name>`
+
+The `zeyn` MCP server (see `.mcp.json`) gives agents the same commands plus the framework reference.
+
+## Structure
+
+```
+config/app.json          defaults; environment variables APP_* override them (APP_SERVER__ADDR -> server.addr)
+locales/<lang>.json      every user facing text; all files must have the same keys
+src/main.rs              loads configuration and starts the app
+src/app.rs               the App: services, features, security settings
+src/features/<name>/     one folder per feature
+    mod.rs               the Feature: route prefix, guards, screens, APIs, menu
+    models.rs            #[entity] and #[model] types
+    store.rs             services that read and write data
+    actions.rs           #[action] functions
+    screens.rs           #[screen] functions
+tests/                   tests that drive the app through its router
+```
+
+## Rules
+
+1. Every action and screen declares access: `permission = "feature.resource.verb"` or `public`.
+2. The first argument of an action is its input; the first argument of a screen is its params
+   (`#[params]` struct, or `_: ()`). Every other argument is injected: `Ctx` or a registered `Service`.
+3. Saving takes `Valid<Model>`. Never validate by hand what a `#[rule]` can express. Rules across
+   fields go in `#[model(validate = fn)]` / `#[entity(validate = fn)]`.
+4. Every text a user sees comes from `locales/` through `t!("key")`. The compiler checks that every
+   locale file has the key and that the arguments match.
+5. Dates use `Date`, wall clock times `Time`, exact moments `DateTime` (UTC), and wall clock date
+   times at a place `LocalDateTime`. Never store a calendar day as a moment. Use `ctx.now()` and
+   `ctx.today()`; never the system clock.
+6. Money uses `Money` (integer minor units). Never `f64` for money.
+7. Lists take a `GridQuery` and return `Page<Model>`. Never return unbounded lists.
+8. A new screen is registered in its feature's `mod.rs`; a new feature in `src/app.rs`.
+9. Do not write HTML, CSS or JavaScript. If a component is missing, write a `Component`.
+10. Keep secrets in configuration (`config.secret("key")`), never in code or logs.
+
+## Before you finish
+
+Run `cargo test` and `zeyn check`. Both must pass.

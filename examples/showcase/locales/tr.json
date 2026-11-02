@@ -1,0 +1,105 @@
+{
+  "app": {
+    "name": "Northwind Operasyon"
+  },
+  "menu": {
+    "overview": "Genel bakış",
+    "stock": "Stok",
+    "sales": "Satış",
+    "people": "İnsan kaynakları",
+    "gallery": "Bileşenler"
+  },
+  "dashboard": {
+    "title": "Genel bakış",
+    "products": "Ürün",
+    "low_stock": "Azalan stok",
+    "orders_today": "Bugünkü sipariş",
+    "revenue_today": "Bugünkü ciro"
+  },
+  "stock": {
+    "products": "Ürünler",
+    "new_product": "Yeni ürün",
+    "product": "Ürün",
+    "save": "Kaydet",
+    "saved": "{code} kodlu ürün kaydedildi.",
+    "code_taken": "{code} kodu başka bir ürün tarafından kullanılıyor."
+  },
+  "sales": {
+    "today": "Bugünkü siparişler",
+    "archive": "Sipariş arşivi"
+  },
+  "people": {
+    "leave": "İzin talebi",
+    "send": "Talebi gönder",
+    "sent": "{days} günlük izin talebiniz gönderildi.",
+    "ends_before_start": "Son gün ilk günden önce olamaz.",
+    "too_long": "Tek bir talep en fazla 30 günü kapsayabilir."
+  },
+  "Product": {
+    "code": "Kod",
+    "name": "Ürün adı",
+    "unit": "Birim",
+    "price": "Fiyat",
+    "stock": "Eldeki miktar",
+    "active": "Aktif"
+  },
+  "Unit": {
+    "Piece": "Adet",
+    "Kg": "Kilogram",
+    "Liter": "Litre"
+  },
+  "Order": {
+    "id": "No",
+    "customer": "Müşteri",
+    "city": "Şehir",
+    "placed_at": "Sipariş zamanı",
+    "amount": "Tutar",
+    "status": "Durum"
+  },
+  "OrderStatus": {
+    "Open": "Açık",
+    "Shipped": "Gönderildi",
+    "Cancelled": "İptal"
+  },
+  "LeaveRequest": {
+    "employee": "Çalışan",
+    "manager_email": "Yönetici e-postası",
+    "first_day": "İlk gün",
+    "last_day": "Son gün",
+    "kind": "Tür",
+    "note": "Not"
+  },
+  "LeaveKind": {
+    "Annual": "Yıllık izin",
+    "Sick": "Hastalık izni",
+    "Unpaid": "Ücretsiz izin"
+  },
+  "gallery": {
+    "fields": "Tüm alanlar",
+    "check": "Kontrol et",
+    "valid": "{name} için her şey geçerli.",
+    "infinite": "Sonsuz kaydırma",
+    "compact": "Kısa listeler"
+  },
+  "Sample": {
+    "full_name": "Ad soyad",
+    "email": "E-posta",
+    "quantity": "Miktar",
+    "budget": "Bütçe",
+    "approved": "Onaylandı",
+    "priority": "Öncelik",
+    "start_date": "Başlangıç tarihi",
+    "reminder": "Hatırlatma saati",
+    "created_at": "Oluşturulma zamanı",
+    "meeting": "Toplantı (yerel saat)",
+    "phone": "Telefon",
+    "due": "Son tarih",
+    "comment": "Açıklama",
+    "reference": "Referans"
+  },
+  "Priority": {
+    "Low": "Düşük",
+    "Normal": "Normal",
+    "High": "Yüksek"
+  }
+}

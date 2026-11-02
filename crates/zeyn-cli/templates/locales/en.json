@@ -1,0 +1,13 @@
+{
+  "app": { "name": "{{title}}" },
+  "home": { "menu": "Home", "title": "Welcome", "intro": "This app was created with zeyn new. Start in src/features." },
+  "notes": {
+    "menu": "Notes",
+    "list": "Notes",
+    "new": "New note",
+    "editor": "Note",
+    "save": "Save",
+    "saved": "Note saved."
+  },
+  "Note": { "id": "No", "title": "Title", "body": "Text", "due": "Due date", "done": "Done" }
+}

@@ -1,0 +1,27 @@
+[package]
+name = "zeyn"
+description = "Rust web framework for data heavy applications, written by AI agents and reviewed by people"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = ["server"]
+server = ["dep:axum", "dep:tokio", "dep:getrandom", "dep:tower-http"]
+
+[dependencies]
+zeyn-macros = { path = "../zeyn-macros", version = "0.0.1" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+axum = { version = "0.8", optional = true }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time"], optional = true }
+getrandom = { version = "0.2", optional = true }
+tower-http = { version = "0.6", features = ["cors"], optional = true }
+
+[dev-dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"

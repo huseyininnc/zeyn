@@ -1,0 +1,305 @@
+//! `zeyn`: new projects, generators, checks and an MCP server for AI agents.
+
+use serde_json::{Value, json};
+use std::io::{BufRead, Write};
+use std::path::{Path, PathBuf};
+use std::process::{Command, ExitCode};
+
+const TEMPLATES: &[(&str, &str)] = &[
+    ("Cargo.toml", include_str!("../templates/Cargo.toml.tmpl")),
+    ("AGENTS.md", include_str!("../templates/AGENTS.md.tmpl")),
+    ("CLAUDE.md", include_str!("../templates/CLAUDE.md.tmpl")),
+    (".mcp.json", include_str!("../templates/mcp.json.tmpl")),
+    (".gitignore", include_str!("../templates/gitignore.tmpl")),
+    ("config/app.json", include_str!("../templates/config/app.json")),
+    ("locales/en.json", include_str!("../templates/locales/en.json")),
+    ("locales/tr.json", include_str!("../templates/locales/tr.json")),
+    ("src/main.rs", include_str!("../templates/src/main.rs")),
+    ("src/app.rs", include_str!("../templates/src/app.rs")),
+    ("src/features/mod.rs", include_str!("../templates/src/features/mod.rs")),
+    ("src/features/home/mod.rs", include_str!("../templates/src/features/home/mod.rs")),
+    ("src/features/notes/mod.rs", include_str!("../templates/src/features/notes/mod.rs")),
+    ("src/features/notes/models.rs", include_str!("../templates/src/features/notes/models.rs")),
+    ("src/features/notes/store.rs", include_str!("../templates/src/features/notes/store.rs")),
+    ("src/features/notes/actions.rs", include_str!("../templates/src/features/notes/actions.rs")),
+    ("src/features/notes/screens.rs", include_str!("../templates/src/features/notes/screens.rs")),
+    ("tests/app.rs", include_str!("../templates/tests/app.rs")),
+];
+
+const DOCS: &[(&str, &str)] = &[
+    ("rules", include_str!("../templates/AGENTS.md.tmpl")),
+    ("language", include_str!("../../../docs/language-example.md")),
+    ("protocol", include_str!("../../../docs/runtime-protocol.md")),
+    ("architecture", include_str!("../../../docs/vision-and-architecture.md")),
+];
+
+const HELP: &str = "zeyn: command line tool for Zeyn Framework
+
+Usage:
+  zeyn new <name> [--zeyn-path <path>]   create a project with the standard feature structure
+  zeyn g feature <name>                   add src/features/<name> with models, store, actions and screens
+  zeyn routes                             list features, screens, routes, APIs and access
+  zeyn check                              compile and report structural problems and missing translations
+  zeyn mcp                                MCP server on stdio for AI agents
+";
+
+fn main() -> ExitCode {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let words: Vec<&str> = args.iter().map(String::as_str).collect();
+    let result = match words.as_slice() {
+        ["new", name, rest @ ..] => new_project(name, flag(rest, "--zeyn-path")),
+        ["g" | "generate", "feature", name] => new_feature(Path::new("."), name).map(|m| println!("{m}")),
+        ["routes"] => describe(Path::new(".")).map(|d| print!("{}", routes_table(&d))),
+        ["check"] => check(Path::new(".")).and_then(|report| {
+            print!("{report}");
+            if report.contains("error") { Err("the app has problems".into()) } else { Ok(()) }
+        }),
+        ["mcp"] => mcp(),
+        _ => {
+            print!("{HELP}");
+            Ok(())
+        }
+    };
+    match result {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(e) => {
+            eprintln!("error: {e}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn flag<'a>(rest: &[&'a str], name: &str) -> Option<&'a str> {
+    rest.iter().position(|a| *a == name).and_then(|i| rest.get(i + 1).copied())
+}
+
+/// `notes`, `sales_orders`: lower case letters, digits and `_`, starting with a letter.
+fn valid_ident(name: &str) -> bool {
+    name.chars().next().is_some_and(|c| c.is_ascii_lowercase())
+        && name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+}
+
+/// `acme-portal` becomes `Acme Portal`.
+fn title_of(name: &str) -> String {
+    name.split(['-', '_'])
+        .filter(|w| !w.is_empty())
+        .map(|w| {
+            let mut c = w.chars();
+            c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default()
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn new_project(name: &str, zeyn_path: Option<&str>) -> Result<(), String> {
+    let ok = name.chars().next().is_some_and(|c| c.is_ascii_lowercase())
+        && name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_');
+    if !ok {
+        return Err(format!("`{name}` is not a valid project name; use lower case letters, digits, `-` and `_`"));
+    }
+    let root = PathBuf::from(name);
+    if root.exists() {
+        return Err(format!("`{name}` already exists"));
+    }
+    let dep = match zeyn_path {
+        Some(p) => {
+            let abs = std::fs::canonicalize(p).map_err(|e| format!("--zeyn-path {p}: {e}"))?;
+            let shown = abs.to_string_lossy().trim_start_matches(r"\\?\").replace('\\', "/");
+            format!("zeyn = {{ path = \"{shown}\" }}")
+        }
+        None => format!("zeyn = \"{}\"", env!("CARGO_PKG_VERSION")),
+    };
+    let title = title_of(name);
+    for (path, body) in TEMPLATES {
+        let target = root.join(path);
+        if let Some(dir) = target.parent() {
+            std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+        }
+        let text = body.replace("{{name}}", name).replace("{{title}}", &title).replace("{{zeyn_dep}}", &dep);
+        std::fs::write(&target, text).map_err(|e| format!("{}: {e}", target.display()))?;
+    }
+    println!("Created {name}/\n\n  cd {name}\n  cargo run\n\nAgents: read {name}/AGENTS.md; the zeyn MCP server is set up in .mcp.json.");
+    Ok(())
+}
+
+/// Adds `src/features/<name>` and registers the module. Returns what is left to do by hand.
+fn new_feature(root: &Path, name: &str) -> Result<String, String> {
+    if !valid_ident(name) {
+        return Err(format!("`{name}` is not a valid feature name; use lower case letters, digits and `_`"));
+    }
+    let dir = root.join("src/features").join(name);
+    if dir.exists() {
+        return Err(format!("{} already exists", dir.display()));
+    }
+    let model = title_of(name).replace(' ', "");
+    let files = [
+        ("mod.rs", format!("//! {model}.\n\npub mod actions;\npub mod models;\npub mod screens;\n\nuse zeyn::prelude::*;\n\npub fn feature() -> Feature {{\n    Feature::new(\"{name}\")\n        .route_prefix(\"/{name}\")\n        .guard(SignedIn)\n        .screen(screens::{name}_list)\n}}\n")),
+        ("models.rs", format!("use zeyn::prelude::*;\n\n/// A {name} record.\n#[entity(table = \"{name}\")]\npub struct {model} {{\n    #[key]\n    pub id: {model}Id,\n    #[rule(required, max_len = 120)]\n    pub name: String,\n    #[version]\n    pub version: i64,\n}}\n")),
+        ("actions.rs", format!("use super::models::{model};\nuse zeyn::prelude::*;\n\n/// Records for the list. Replace the empty page with your store or database.\n#[action(permission = \"{name}.record.read\")]\npub async fn search_{name}(q: GridQuery) -> Result<Page<{model}>> {{\n    Ok(q.apply(Vec::new()))\n}}\n")),
+        ("screens.rs", format!("use super::actions::search_{name};\nuse zeyn::prelude::*;\n\n/// List screen.\n#[screen(route = \"/\", permission = \"{name}.record.read\")]\npub fn {name}_list() -> Screen {{\n    Screen::new(\"{model}\").body(Grid::auto(search_{name}).mode(GridMode::Server))\n}}\n")),
+    ];
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    for (file, body) in files {
+        std::fs::write(dir.join(file), body).map_err(|e| e.to_string())?;
+    }
+    let mod_rs = root.join("src/features/mod.rs");
+    let mut text = std::fs::read_to_string(&mod_rs).unwrap_or_default();
+    if !text.ends_with('\n') && !text.is_empty() {
+        text.push('\n');
+    }
+    text.push_str(&format!("pub mod {name};\n"));
+    std::fs::write(&mod_rs, text).map_err(|e| e.to_string())?;
+    Ok(format!(
+        "Created src/features/{name}/ and registered it in src/features/mod.rs.\nNext: add `.feature(features::{name}::feature())` in src/app.rs, add texts to locales/, and `cargo test`."
+    ))
+}
+
+/// Runs the app with `ZEYN_DESCRIBE=1`, which prints its description instead of serving.
+fn describe(root: &Path) -> Result<Value, String> {
+    let out = Command::new("cargo")
+        .args(["run", "--quiet"])
+        .current_dir(root)
+        .env("ZEYN_DESCRIBE", "1")
+        .output()
+        .map_err(|e| format!("cargo could not be started: {e}"))?;
+    if !out.status.success() {
+        return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
+    }
+    serde_json::from_slice(&out.stdout).map_err(|e| format!("the app did not print a description: {e}"))
+}
+
+fn routes_table(d: &Value) -> String {
+    let mut out = String::new();
+    for f in d["features"].as_array().into_iter().flatten() {
+        out.push_str(&format!("feature {}  guards: {}\n", f["name"].as_str().unwrap_or(""), f["guards"]));
+        for s in f["screens"].as_array().into_iter().flatten() {
+            let access = s["access"]["permission"].as_str().unwrap_or("public");
+            out.push_str(&format!(
+                "  screen {:<28} {:<32} {access}\n",
+                s["name"].as_str().unwrap_or(""),
+                s["path"].as_str().unwrap_or("(window)")
+            ));
+        }
+        for a in f["apis"].as_array().into_iter().flatten() {
+            let access = a["access"]["permission"].as_str().unwrap_or("public");
+            out.push_str(&format!("  api    {:<28} POST {:<27} {access}\n", a["action"].as_str().unwrap_or(""), a["path"].as_str().unwrap_or("")));
+        }
+    }
+    out
+}
+
+/// Compiles, then reports structural problems and missing translations.
+fn check(root: &Path) -> Result<String, String> {
+    let out = Command::new("cargo")
+        .args(["check", "--quiet", "--message-format=short"])
+        .current_dir(root)
+        .output()
+        .map_err(|e| format!("cargo could not be started: {e}"))?;
+    let mut report = String::new();
+    if !out.status.success() {
+        report.push_str(&String::from_utf8_lossy(&out.stderr));
+        return Ok(report);
+    }
+    let d = describe(root)?;
+    for p in d["problems"].as_array().into_iter().flatten() {
+        report.push_str(&format!("error: {}\n", p.as_str().unwrap_or("")));
+    }
+    for m in d["missing_translations"].as_array().into_iter().flatten() {
+        report.push_str(&format!("warning: translation `{}` is missing in `{}`\n", m[1].as_str().unwrap_or(""), m[0].as_str().unwrap_or("")));
+    }
+    if report.is_empty() {
+        report.push_str("ok: no problems found\n");
+    }
+    Ok(report)
+}
+
+fn tool(name: &str, description: &str, properties: Value, required: &[&str]) -> Value {
+    json!({ "name": name, "description": description, "inputSchema": { "type": "object", "properties": properties, "required": required } })
+}
+
+fn tools() -> Value {
+    json!([
+        tool("zeyn_docs", "Zeyn framework reference. Topics: rules (project rules for agents), language (how to write models, actions, screens, forms, grids), protocol (browser runtime protocol), architecture.", json!({ "topic": { "type": "string", "enum": ["rules", "language", "protocol", "architecture"] } }), &["topic"]),
+        tool("zeyn_describe", "Describe the app in the current directory: features, screens, routes, access, APIs, problems and missing translations.", json!({}), &[]),
+        tool("zeyn_check", "Compile the app and report compiler errors, structural problems and missing translations.", json!({}), &[]),
+        tool("zeyn_test", "Run cargo test and return the end of the output.", json!({}), &[]),
+        tool("zeyn_new_feature", "Create src/features/<name> with models, actions and screens and register the module.", json!({ "name": { "type": "string", "description": "lower case, digits and _" } }), &["name"]),
+    ])
+}
+
+fn call_tool(name: &str, args: &Value) -> Result<String, String> {
+    let root = Path::new(".");
+    match name {
+        "zeyn_docs" => {
+            let topic = args["topic"].as_str().unwrap_or("rules");
+            DOCS.iter().find(|(t, _)| *t == topic).map(|(_, d)| d.to_string()).ok_or_else(|| format!("unknown topic `{topic}`"))
+        }
+        "zeyn_describe" => describe(root).map(|d| serde_json::to_string_pretty(&d).unwrap_or_default()),
+        "zeyn_check" => check(root),
+        "zeyn_test" => {
+            let out = Command::new("cargo").args(["test", "--quiet"]).current_dir(root).output().map_err(|e| e.to_string())?;
+            let text = format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
+            let tail: String = text.lines().rev().take(80).collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join("\n");
+            Ok(format!("{}\n{tail}", if out.status.success() { "tests passed" } else { "tests failed" }))
+        }
+        "zeyn_new_feature" => new_feature(root, args["name"].as_str().unwrap_or("")),
+        _ => Err(format!("unknown tool `{name}`")),
+    }
+}
+
+/// MCP over stdio: one JSON-RPC message per line.
+fn mcp() -> Result<(), String> {
+    let stdin = std::io::stdin();
+    let mut stdout = std::io::stdout();
+    for line in stdin.lock().lines() {
+        let line = line.map_err(|e| e.to_string())?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let Ok(req) = serde_json::from_str::<Value>(&line) else { continue };
+        let Some(id) = req.get("id").cloned() else { continue };
+        let result = match req["method"].as_str().unwrap_or("") {
+            "initialize" => json!({
+                "protocolVersion": "2025-06-18",
+                "capabilities": { "tools": {} },
+                "serverInfo": { "name": "zeyn", "version": env!("CARGO_PKG_VERSION") },
+                "instructions": "Zeyn framework tools. Read zeyn_docs topic rules before changing code. Run zeyn_check and zeyn_test before finishing."
+            }),
+            "tools/list" => json!({ "tools": tools() }),
+            "tools/call" => match call_tool(req["params"]["name"].as_str().unwrap_or(""), &req["params"]["arguments"]) {
+                Ok(text) => json!({ "content": [{ "type": "text", "text": text }], "isError": false }),
+                Err(e) => json!({ "content": [{ "type": "text", "text": e }], "isError": true }),
+            },
+            "ping" => json!({}),
+            other => {
+                let reply = json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32601, "message": format!("method `{other}` not found") } });
+                writeln!(stdout, "{reply}").map_err(|e| e.to_string())?;
+                stdout.flush().map_err(|e| e.to_string())?;
+                continue;
+            }
+        };
+        writeln!(stdout, "{}", json!({ "jsonrpc": "2.0", "id": id, "result": result })).map_err(|e| e.to_string())?;
+        stdout.flush().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn names_and_titles() {
+        assert!(valid_ident("sales_orders"));
+        assert!(!valid_ident("Sales") && !valid_ident("1x") && !valid_ident("a-b") && !valid_ident(""));
+        assert_eq!(title_of("acme-portal"), "Acme Portal");
+    }
+
+    #[test]
+    fn every_doc_topic_is_listed_in_the_tool_schema() {
+        let topics = tools()[0]["inputSchema"]["properties"]["topic"]["enum"].clone();
+        for (t, _) in DOCS {
+            assert!(topics.as_array().unwrap().iter().any(|v| v == t), "{t}");
+        }
+    }
+}

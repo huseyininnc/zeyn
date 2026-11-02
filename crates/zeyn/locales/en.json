@@ -1,0 +1,51 @@
+{
+  "zeyn": {
+    "locale": {
+      "name": "English"
+    },
+    "yes": "Yes",
+    "no": "No",
+    "validation": {
+      "required": "{label} is required.",
+      "min_len": "{label} must be at least {n} characters.",
+      "max_len": "{label} must be at most {n} characters.",
+      "email": "{label} must be a valid email address.",
+      "min": "{label} must be at least {n}.",
+      "max": "{label} must be at most {n}.",
+      "format": "{label} has an invalid value.",
+      "skipped_time": "{label}: this time does not exist in your time zone because the clocks changed."
+    },
+    "error": {
+      "forbidden": "You are not allowed to do this.",
+      "not_found": "Record not found.",
+      "conflict": "Someone else changed this record. Reload it and try again.",
+      "timeout": "The request took too long.",
+      "internal": "An unexpected error occurred.",
+      "csrf": "Your session expired. Reload the page.",
+      "license": "Your license does not cover this. Contact your administrator.",
+      "tenant": "This address does not belong to a known organization.",
+      "rate_limited": "Too many requests. Try again in a moment."
+    },
+    "grid": {
+      "pagination": "Pagination",
+      "previous": "Previous page",
+      "next": "Next page",
+      "load_more": "Load more",
+      "range": "{from}-{to}",
+      "range_total": "{from}-{to} of {total}",
+      "loaded": "{count} rows loaded",
+      "empty": "No records."
+    },
+    "export": {
+      "xlsx": "Export to Excel",
+      "csv": "Export to CSV"
+    },
+    "shell": {
+      "skip": "Skip to content",
+      "menu": "Main",
+      "language": "Language",
+      "time_zone": "Time zone",
+      "time_zone_auto": "Automatic (this device)"
+    }
+  }
+}

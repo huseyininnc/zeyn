@@ -1,0 +1,5 @@
+{
+  "orders": { "title": "Orders", "menu": "Sales", "list": "All orders" },
+  "Order": { "id": "No", "customer": "Customer", "city": "City", "amount": "Amount", "status": "Status" },
+  "Status": { "Open": "Open", "Shipped": "Shipped", "Cancelled": "Cancelled" }
+}

@@ -1,0 +1,51 @@
+{
+  "zeyn": {
+    "locale": {
+      "name": "Türkçe"
+    },
+    "yes": "Evet",
+    "no": "Hayır",
+    "validation": {
+      "required": "{label} alanı zorunludur.",
+      "min_len": "{label} en az {n} karakter olmalıdır.",
+      "max_len": "{label} en fazla {n} karakter olabilir.",
+      "email": "{label} geçerli bir e-posta adresi olmalıdır.",
+      "min": "{label} en az {n} olmalıdır.",
+      "max": "{label} en fazla {n} olabilir.",
+      "format": "{label} geçersiz bir değer içeriyor.",
+      "skipped_time": "{label}: bu saat, saat değişikliği nedeniyle sizin saat diliminizde yok."
+    },
+    "error": {
+      "forbidden": "Bu işlem için yetkiniz yok.",
+      "not_found": "Kayıt bulunamadı.",
+      "conflict": "Bu kayıt başka biri tarafından değiştirildi. Kaydı yenileyip tekrar deneyin.",
+      "timeout": "İstek çok uzun sürdü.",
+      "internal": "Beklenmeyen bir hata oluştu.",
+      "csrf": "Oturumunuzun süresi doldu. Sayfayı yenileyin.",
+      "license": "Lisansınız bu işlemi kapsamıyor. Yöneticinize başvurun.",
+      "tenant": "Bu adres tanınan bir kuruma ait değil.",
+      "rate_limited": "Çok fazla istek gönderildi. Biraz sonra tekrar deneyin."
+    },
+    "grid": {
+      "pagination": "Sayfalama",
+      "previous": "Önceki sayfa",
+      "next": "Sonraki sayfa",
+      "load_more": "Daha fazla yükle",
+      "range": "{from}-{to}",
+      "range_total": "{from}-{to} / {total}",
+      "loaded": "{count} satır yüklendi",
+      "empty": "Kayıt yok."
+    },
+    "export": {
+      "xlsx": "Excel'e aktar",
+      "csv": "CSV'ye aktar"
+    },
+    "shell": {
+      "skip": "İçeriğe geç",
+      "menu": "Ana menü",
+      "language": "Dil",
+      "time_zone": "Saat dilimi",
+      "time_zone_auto": "Otomatik (bu cihaz)"
+    }
+  }
+}

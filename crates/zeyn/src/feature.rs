@@ -1,0 +1,239 @@
+use crate::action::{Action, Error, Result};
+use crate::api::{ApiEntry, ApiInput, ApiResult};
+use crate::ctx::{BoxFuture, Ctx, Dep};
+use crate::i18n::Text;
+use crate::screen::{Icon, Screen, ScreenDef, ScreenMeta};
+use serde::Serialize;
+use std::sync::Arc;
+
+/// Menu item.
+#[derive(Clone, Debug, Serialize)]
+pub struct MenuItem {
+    pub label: Text,
+    pub screen: &'static str,
+}
+
+/// Menu group.
+#[derive(Clone, Debug, Serialize)]
+pub struct MenuGroup {
+    pub label: Text,
+    pub icon: Icon,
+    pub items: Vec<MenuItem>,
+}
+
+/// Menu builder.
+#[derive(Debug, Default)]
+pub struct Menu {
+    groups: Vec<MenuGroup>,
+}
+
+impl Menu {
+    /// Starts a group; following `item` calls add to it.
+    pub fn group(mut self, label: impl Into<Text>, icon: Icon) -> Self {
+        self.groups.push(MenuGroup { label: label.into(), icon, items: Vec::new() });
+        self
+    }
+
+    /// Adds a screen to the last group. A screen without a route cannot be added (compile error).
+    pub fn item<S: ScreenDef>(mut self, label: impl Into<Text>, _screen: S) -> Self {
+        const { assert!(S::META.route.is_some(), "a menu item must point to a screen that has a route") };
+        let group = self.groups.last_mut().expect("call `group` before `item`");
+        group.items.push(MenuItem { label: label.into(), screen: S::META.name });
+        self
+    }
+}
+
+/// A route of a feature.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct Route {
+    pub path: String,
+    pub screen: &'static str,
+}
+
+/// Result of a guard.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum GuardResult {
+    Allow,
+    /// Denied, with a message for the user.
+    Deny(Text),
+}
+
+/// A check that runs on the server before any screen of a feature is opened and before any of its
+/// grids or forms is called. Plain functions `fn(&Ctx) -> GuardResult` are guards.
+pub trait Guard: Send + Sync + 'static {
+    fn check(&self, ctx: &Ctx) -> GuardResult;
+
+    fn name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
+}
+
+impl<F> Guard for F
+where
+    F: Fn(&Ctx) -> GuardResult + Send + Sync + 'static,
+{
+    fn check(&self, ctx: &Ctx) -> GuardResult {
+        self(ctx)
+    }
+}
+
+/// Built in guard: the user must be signed in.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SignedIn;
+
+impl Guard for SignedIn {
+    fn check(&self, ctx: &Ctx) -> GuardResult {
+        if ctx.identity().is_signed_in() { GuardResult::Allow } else { GuardResult::Deny(Text::key("zeyn.error.forbidden")) }
+    }
+
+    fn name(&self) -> &'static str {
+        "SignedIn"
+    }
+}
+
+/// A registered screen with type erased params.
+#[derive(Clone, Copy)]
+pub struct ScreenEntry {
+    pub meta: ScreenMeta,
+    pub deps: fn() -> Vec<Dep>,
+    pub build: fn(Ctx, serde_json::Value) -> BoxFuture<Result<Screen>>,
+}
+
+fn build_erased<S: ScreenDef>(ctx: Ctx, params: serde_json::Value) -> BoxFuture<Result<Screen>> {
+    match serde_json::from_value::<S::Params>(params) {
+        Ok(p) => S::build(ctx, p),
+        Err(_) => Box::pin(async { Err(Error::NotFound) }),
+    }
+}
+
+/// A feature: route prefix, guards, screens and menu.
+///
+/// Example:
+/// ```ignore
+/// Feature::new("stock").route_prefix("/stock").guard(SignedIn).screen(product_list)
+/// ```
+pub struct Feature {
+    name: &'static str,
+    prefix: String,
+    screens: Vec<ScreenEntry>,
+    guards: Vec<Arc<dyn Guard>>,
+    menu: Vec<MenuGroup>,
+    apis: Vec<ApiEntry>,
+}
+
+impl Feature {
+    pub fn new(name: &'static str) -> Self {
+        Self { name, prefix: String::new(), screens: Vec::new(), guards: Vec::new(), menu: Vec::new(), apis: Vec::new() }
+    }
+
+    /// Publishes an action as `POST /api/v1/{feature}/{action}`. Callers need an `Authorization`
+    /// header; access, guards, interceptors and audit apply as for screens.
+    pub fn api<A>(mut self, _action: A) -> Self
+    where
+        A: Action,
+        A::Input: ApiInput,
+        A::Output: ApiResult,
+    {
+        self.apis.push(ApiEntry::of::<A>());
+        self
+    }
+
+    pub fn apis(&self) -> &[ApiEntry] {
+        &self.apis
+    }
+
+    pub fn name(&self) -> &'static str {
+        self.name
+    }
+
+    /// Prefix of all routes of the feature, such as `/stock`.
+    pub fn route_prefix(mut self, prefix: impl Into<String>) -> Self {
+        self.prefix = prefix.into().trim_end_matches('/').to_string();
+        self
+    }
+
+    /// Adds a guard that every screen and call of the feature must pass.
+    pub fn guard(mut self, guard: impl Guard) -> Self {
+        self.guards.push(Arc::new(guard));
+        self
+    }
+
+    /// Registers a screen.
+    pub fn screen<S: ScreenDef>(mut self, _screen: S) -> Self {
+        self.screens.push(ScreenEntry { meta: S::META, deps: S::deps, build: build_erased::<S> });
+        self
+    }
+
+    pub fn menu(mut self, build: impl FnOnce(Menu) -> Menu) -> Self {
+        self.menu = build(Menu::default()).groups;
+        self
+    }
+
+    pub fn menu_groups(&self) -> &[MenuGroup] {
+        &self.menu
+    }
+
+    pub fn screens(&self) -> &[ScreenEntry] {
+        &self.screens
+    }
+
+    pub fn guards(&self) -> &[Arc<dyn Guard>] {
+        &self.guards
+    }
+
+    /// Runs the guards in order; the first denial wins.
+    pub fn check_guards(&self, ctx: &Ctx) -> Result<()> {
+        for g in &self.guards {
+            if let GuardResult::Deny(reason) = g.check(ctx) {
+                return Err(Error::Denied(reason));
+            }
+        }
+        Ok(())
+    }
+
+    /// Full path of a screen of this feature, if it has a route.
+    pub fn path_of(&self, meta: &ScreenMeta) -> Option<String> {
+        meta.route.map(|r| format!("{}{r}", self.prefix))
+    }
+
+    /// Full paths of the screens that have a route.
+    pub fn routes(&self) -> Vec<Route> {
+        self.screens
+            .iter()
+            .filter_map(|s| self.path_of(&s.meta).map(|path| Route { path, screen: s.meta.name }))
+            .collect()
+    }
+
+    /// Checks structure rules: no duplicate routes or screens, every menu item points to a registered screen with a route.
+    pub fn check(&self) -> std::result::Result<(), Vec<String>> {
+        let mut problems = Vec::new();
+        let routes = self.routes();
+        for (i, r) in routes.iter().enumerate() {
+            if routes[..i].iter().any(|o| o.path == r.path) {
+                problems.push(format!("route `{}` is used by more than one screen", r.path));
+            }
+        }
+        for (i, s) in self.screens.iter().enumerate() {
+            if self.screens[..i].iter().any(|o| o.meta.name == s.meta.name) {
+                problems.push(format!("screen `{}` is registered twice", s.meta.name));
+            }
+        }
+        for item in self.menu.iter().flat_map(|g| &g.items) {
+            match self.screens.iter().find(|s| s.meta.name == item.screen) {
+                Some(s) if s.meta.route.is_none() => problems.push(format!(
+                    "menu item `{}` points to screen `{}`, which has no route",
+                    item.label.english(),
+                    item.screen
+                )),
+                Some(_) => {}
+                None => problems.push(format!(
+                    "menu item `{}` points to screen `{}`, which is not registered in feature `{}`",
+                    item.label.english(),
+                    item.screen,
+                    self.name
+                )),
+            }
+        }
+        if problems.is_empty() { Ok(()) } else { Err(problems) }
+    }
+}

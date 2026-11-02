@@ -1,0 +1,5 @@
+{
+  "orders": { "title": "Siparişler", "menu": "Satış", "list": "Tüm siparişler" },
+  "Order": { "id": "No", "customer": "Müşteri", "city": "Şehir", "amount": "Tutar", "status": "Durum" },
+  "Status": { "Open": "Açık", "Shipped": "Gönderildi", "Cancelled": "İptal" }
+}

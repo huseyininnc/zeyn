@@ -1,0 +1,105 @@
+{
+  "app": {
+    "name": "Northwind Operations"
+  },
+  "menu": {
+    "overview": "Overview",
+    "stock": "Stock",
+    "sales": "Sales",
+    "people": "People",
+    "gallery": "Components"
+  },
+  "dashboard": {
+    "title": "Overview",
+    "products": "Products",
+    "low_stock": "Low stock",
+    "orders_today": "Orders today",
+    "revenue_today": "Revenue today"
+  },
+  "stock": {
+    "products": "Products",
+    "new_product": "New product",
+    "product": "Product",
+    "save": "Save",
+    "saved": "Product {code} saved.",
+    "code_taken": "Code {code} is already used by another product."
+  },
+  "sales": {
+    "today": "Today's orders",
+    "archive": "Order archive"
+  },
+  "people": {
+    "leave": "Leave request",
+    "send": "Send request",
+    "sent": "Your request for {days} days was sent.",
+    "ends_before_start": "The last day cannot be before the first day.",
+    "too_long": "A single request can cover at most 30 days."
+  },
+  "Product": {
+    "code": "Code",
+    "name": "Product name",
+    "unit": "Unit",
+    "price": "Price",
+    "stock": "On hand",
+    "active": "Active"
+  },
+  "Unit": {
+    "Piece": "Piece",
+    "Kg": "Kilogram",
+    "Liter": "Liter"
+  },
+  "Order": {
+    "id": "No",
+    "customer": "Customer",
+    "city": "City",
+    "placed_at": "Placed at",
+    "amount": "Amount",
+    "status": "Status"
+  },
+  "OrderStatus": {
+    "Open": "Open",
+    "Shipped": "Shipped",
+    "Cancelled": "Cancelled"
+  },
+  "LeaveRequest": {
+    "employee": "Employee",
+    "manager_email": "Manager's email",
+    "first_day": "First day",
+    "last_day": "Last day",
+    "kind": "Kind",
+    "note": "Note"
+  },
+  "LeaveKind": {
+    "Annual": "Annual leave",
+    "Sick": "Sick leave",
+    "Unpaid": "Unpaid leave"
+  },
+  "gallery": {
+    "fields": "Every field",
+    "check": "Check",
+    "valid": "Everything is valid for {name}.",
+    "infinite": "Infinite scroll",
+    "compact": "Short lists"
+  },
+  "Sample": {
+    "full_name": "Full name",
+    "email": "Email",
+    "quantity": "Quantity",
+    "budget": "Budget",
+    "approved": "Approved",
+    "priority": "Priority",
+    "start_date": "Start date",
+    "reminder": "Reminder time",
+    "created_at": "Created at",
+    "meeting": "Meeting (local time)",
+    "phone": "Phone",
+    "due": "Due date",
+    "comment": "Comment",
+    "reference": "Reference"
+  },
+  "Priority": {
+    "Low": "Low",
+    "Normal": "Normal",
+    "High": "High"
+  }
+}

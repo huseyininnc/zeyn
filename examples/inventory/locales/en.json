@@ -1,0 +1,27 @@
+{
+  "app": {
+    "name": "Inventory"
+  },
+  "stock": {
+    "menu": "Stock",
+    "products": "Products",
+    "new_product": "New product",
+    "product": "Product",
+    "save": "Save",
+    "saved": "Product {code} saved.",
+    "code_taken": "Code {code} is already used by another product."
+  },
+  "Product": {
+    "code": "Code",
+    "name": "Product name",
+    "unit": "Unit",
+    "price": "Price",
+    "stock": "On hand",
+    "active": "Active"
+  },
+  "Unit": {
+    "Piece": "Piece",
+    "Kg": "Kilogram",
+    "Liter": "Liter"
+  }
+}

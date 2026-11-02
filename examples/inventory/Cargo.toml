@@ -1,0 +1,10 @@
+[package]
+name = "zeyn-example-inventory"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+zeyn = { path = "../../crates/zeyn" }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
