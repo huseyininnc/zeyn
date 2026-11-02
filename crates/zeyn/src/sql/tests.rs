@@ -116,6 +116,18 @@ fn filters_become_bound_parameters() {
 }
 
 #[test]
+fn free_text_searches_every_text_field_with_one_bound_pattern_each() {
+    let q = DataQuery { q: " İstanbul_%".into(), filters: vec![Filter::is("active", true)], ..DataQuery::default() };
+    let sql = rows(&q);
+    assert!(sql.text.contains(
+        r#" WHERE "active" = $1 AND (LOWER(TRANSLATE("code", 'İı', 'ii')) LIKE $2 ESCAPE '\' OR LOWER(TRANSLATE("note", 'İı', 'ii')) LIKE $3 ESCAPE '\') ORDER BY"#
+    ), "{}", sql.text);
+    assert_eq!(sql.args[1], Arg::Text(r"%istanbul\_\%%".into()));
+    let long = DataQuery { q: "x".repeat(crate::MAX_SEARCH_QUERY + 1), ..DataQuery::default() };
+    assert!(!rows(&long).text.contains("WHERE"), "text over the cap is ignored");
+}
+
+#[test]
 fn unknown_fields_and_injection_attempts_never_reach_the_sql() {
     let q = DataQuery {
         filters: vec![
@@ -547,6 +559,7 @@ impl crate::Model for Holder {
     }
 }
 
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 struct Measure {
     id: i64,
     rate: crate::Decimal,

@@ -33,6 +33,12 @@
   },
   "shop": {
     "menu": { "home": "Home", "help": "Help" },
+    "new": "New",
+    "new_arrivals": "New arrivals",
+    "products": "Products",
+    "search": { "label": "Search products", "all": "Search", "title": "Results for “{q}”" },
+    "sort": { "newest": "Newest", "name": "Name", "cheapest": "Lowest price", "dearest": "Highest price" },
+    "product": { "text": "Code {code}, {price}." },
     "home": {
       "title": "Northwind Market",
       "lead": "Fresh from the warehouse",

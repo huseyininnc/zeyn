@@ -36,6 +36,7 @@ Which page answers what:
 | Texts and translations | `language/texts` (`texts.md`) |
 | Layouts, controls, pickers, lines editor, display, tree, charts | `components/*` (`layouts.md`, `controls.md`, `lines.md`, `display.md`, `data.md`) |
 | Command palette, menu bar, dock, status bar, site shell for public pages | `components/shell` (`shell.md`) |
+| Card grids, rails, search boxes, free text search (`DataQuery::q`) | `components/catalog` (`catalog.md`) |
 | Video and audio | `components/media` (`docs/media.md`) |
 | Dates, time zones, money, languages | `guides/time-and-languages` (`time-and-languages.md`) |
 | Permissions, guards, CSRF, masking, audit | `guides/security` (`security.md`), `docs/enterprise.md` |

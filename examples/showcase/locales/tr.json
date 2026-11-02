@@ -33,6 +33,12 @@
   },
   "shop": {
     "menu": { "home": "Ana sayfa", "help": "Yardım" },
+    "new": "Yeni",
+    "new_arrivals": "Yeni gelenler",
+    "products": "Ürünler",
+    "search": { "label": "Ürün ara", "all": "Arama", "title": "“{q}” için sonuçlar" },
+    "sort": { "newest": "En yeni", "name": "Ad", "cheapest": "En düşük fiyat", "dearest": "En yüksek fiyat" },
+    "product": { "text": "Kod {code}, {price}." },
     "home": {
       "title": "Northwind Pazarı",
       "lead": "Depodan taze",

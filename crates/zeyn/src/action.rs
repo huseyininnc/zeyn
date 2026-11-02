@@ -253,6 +253,18 @@ pub struct DataQuery {
     pub sort: Vec<Sort>,
     #[serde(default)]
     pub filters: Vec<Filter>,
+    /// Free text: rows whose text fields contain it, ignoring case, where the Turkish dotted and
+    /// dotless `i` (`İ`, `ı`) match `i`. Fields with `#[mask]` are never searched. Text longer than
+    /// [`MAX_SEARCH_QUERY`](crate::MAX_SEARCH_QUERY) characters is ignored; blank text matches
+    /// every row. [`DataQuery::apply`] and the SQL data layers read it the same way.
+    ///
+    /// ```
+    /// use zeyn::DataQuery;
+    /// let q: DataQuery = serde_json::from_value(serde_json::json!({ "q": "tea" })).unwrap();
+    /// assert_eq!(q.q, "tea");
+    /// ```
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub q: String,
     /// Whether the client needs the total count. Infinite scroll usually does not.
     #[serde(default)]
     pub with_total: bool,

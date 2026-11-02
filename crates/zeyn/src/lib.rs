@@ -499,9 +499,10 @@ pub mod prelude {
     #[allow(deprecated)]
     pub use crate::Agents;
     pub use crate::ui::{
-        ActionButton, Alert, Audio, Badge, Breadcrumb, Busy, Card, Chart, Control, DateOptions, DescriptionList, Dock,
-        EmptyState, Kpi, LookupItem, LookupQuery, MenuBar, MenuButton, Panel, Popover, Progress, PropertyInspector,
-        Row, Skeleton, Split, Stack, StatusBar, Tabs, Timeline, Toolbox, Tree, TreeItem, TreeQuery, Video,
+        ActionButton, Alert, Audio, Badge, Breadcrumb, Busy, Card, CardGrid, Chart, Control, DateOptions,
+        DescriptionList, Dock, EmptyState, Kpi, LookupItem, LookupQuery, MenuBar, MenuButton, Panel, Popover, Progress,
+        PropertyInspector, Rail, Row, SearchBox, SearchParams, Skeleton, Split, Stack, StatusBar, Tabs, Timeline,
+        Toolbox, Tree, TreeItem, TreeQuery, Video,
     };
     pub use crate::{
         Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime, Decimal, Effect,

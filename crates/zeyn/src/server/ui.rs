@@ -23,14 +23,18 @@ use std::sync::Arc;
 
 const JS: &str = include_str!("../../assets/components.js");
 const CSS: &str = include_str!("../../assets/components.css");
+const CATALOG_JS: &str = include_str!("../../assets/catalog.js");
+const CATALOG_CSS: &str = include_str!("../../assets/catalog.css");
 
 /// Asset paths served without authentication, like the runtime itself.
-pub(super) const ASSETS: [&str; 2] = ["/_zeyn/components.js", "/_zeyn/components.css"];
+pub(super) const ASSETS: [&str; 4] =
+    ["/_zeyn/components.js", "/_zeyn/components.css", "/_zeyn/catalog.js", "/_zeyn/catalog.css"];
 
-/// Links placed in the page head after the runtime's own.
+/// Links placed in the page head after the runtime's own. The catalog script (card grids, rails,
+/// search boxes) is not among them: components.js loads it when a page first holds one.
 pub(super) fn head(base: &str) -> String {
     format!(
-        r#"<link rel="stylesheet" href="{base}/_zeyn/components.css"><script type="module" src="{base}/_zeyn/components.js"></script>"#
+        r#"<link rel="stylesheet" href="{base}/_zeyn/components.css"><script type="module" src="{base}/_zeyn/components.js"></script><link rel="stylesheet" href="{base}/_zeyn/catalog.css">"#
     )
 }
 
@@ -38,6 +42,8 @@ pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
     router
         .route("/_zeyn/components.js", get(|| async { asset(JS, "text/javascript; charset=utf-8") }))
         .route("/_zeyn/components.css", get(|| async { asset(CSS, "text/css; charset=utf-8") }))
+        .route("/_zeyn/catalog.js", get(|| async { asset(CATALOG_JS, "text/javascript; charset=utf-8") }))
+        .route("/_zeyn/catalog.css", get(|| async { asset(CATALOG_CSS, "text/css; charset=utf-8") }))
         .route("/_zeyn/node", post(node_call))
         .route("/_zeyn/data", post(data_call))
         .route("/_zeyn/parse", post(parse_call))

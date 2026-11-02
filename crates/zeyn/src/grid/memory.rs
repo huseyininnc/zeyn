@@ -99,6 +99,31 @@ pub(crate) enum Cond {
     Is(usize, bool),
     Blank(usize, bool),
     AnyKey(usize, Vec<String>),
+    /// Free text ([`DataQuery::q`]), folded, in any of these text fields.
+    Search(Vec<usize>, String),
+}
+
+/// Text in the form free text search compares: `İ` and `ı` become `i`, then lower case.
+pub(crate) fn fold(s: &str) -> String {
+    s.chars().map(|c| if matches!(c, 'İ' | 'ı') { 'i' } else { c }).flat_map(char::to_lowercase).collect()
+}
+
+impl Cond {
+    /// The free text condition of a query, over the unmasked text fields. `None` when the text is
+    /// blank or longer than [`crate::MAX_SEARCH_QUERY`] characters.
+    pub(crate) fn search(q: &str, fields: &[crate::model::FieldMeta]) -> Option<Cond> {
+        let q = q.trim();
+        if q.is_empty() || q.chars().count() > crate::MAX_SEARCH_QUERY {
+            return None;
+        }
+        let cols = fields
+            .iter()
+            .enumerate()
+            .filter(|(_, f)| matches!(f.kind, FieldKind::Text) && f.mask.is_none())
+            .map(|(i, _)| i)
+            .collect();
+        Some(Cond::Search(cols, fold(q)))
+    }
 }
 
 impl Cond {
@@ -188,6 +213,10 @@ impl Cond {
                 let v = value(i);
                 v != Value::Null && keys.contains(&key_text(&v))
             }
+            Cond::Search(cols, needle) => cols.iter().any(|i| match value(i) {
+                Value::Text(t) => fold(&t).contains(needle.as_str()),
+                _ => false,
+            }),
         }
     }
 }
@@ -295,6 +324,7 @@ impl DataQuery {
         for f in self.filters.iter().take(MAX_FILTERS) {
             Cond::read(f, fields, self.time_zone, &mut conds);
         }
+        conds.extend(Cond::search(&self.q, fields));
         let mut rows: Vec<M> = rows.into_iter().filter(|row| conds.iter().all(|c| c.holds(row))).collect();
         let mut order: Vec<(usize, bool)> =
             self.sort.iter().take(MAX_SORT).filter_map(|s| index(&s.field).map(|i| (i, s.desc))).collect();

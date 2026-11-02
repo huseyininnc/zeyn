@@ -223,6 +223,25 @@
     },
     "ui": {
       "resize": "Bölmeleri yeniden boyutlandır",
+      "cards": {
+        "load_more": "Daha fazla göster",
+        "loaded": "{count} öğe gösteriliyor",
+        "empty": "Gösterilecek bir şey yok.",
+        "error": "Liste yüklenemedi. Yeniden deneyin.",
+        "sort": "Sıralama",
+        "pages": "Sayfalar",
+        "page": "Sayfa {page} / {pages}",
+        "previous_page": "Önceki sayfa",
+        "next_page": "Sonraki sayfa",
+        "previous": "Geri kaydır",
+        "next": "İleri kaydır"
+      },
+      "search": {
+        "label": "Ara",
+        "suggestions": "Öneriler",
+        "count": "{count} öneri, seçmek için ok tuşlarını kullanın",
+        "none": "Öneri yok"
+      },
       "palette": {
         "open": "Komutlar",
         "label": "Komut paleti",
