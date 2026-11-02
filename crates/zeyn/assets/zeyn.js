@@ -1572,6 +1572,7 @@ function showErrors(form, errors) {
     first ??= box;
   }
   first?.focus();
+  form.dispatchEvent(new CustomEvent('zeyn:errors', { bubbles: true, detail: errors }));
 }
 
 /** Validates in the browser, posts to `/_zeyn/form`, then shows errors or runs effects. */

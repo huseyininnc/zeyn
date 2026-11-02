@@ -123,7 +123,11 @@
     "controls": "Controls",
     "panel_request": "Stock request",
     "send": "Send request",
-    "sent": "Request sent."
+    "sent": "Request sent.",
+    "invoice": "Invoice",
+    "panel_invoice": "Invoice and lines",
+    "save_invoice": "Save invoice",
+    "invoice_saved": "Invoice saved, total {total}."
   },
   "Visit": {
     "day": "Visit day",
@@ -160,5 +164,15 @@
     "Eskisehir": "Eskisehir",
     "Istanbul": "Istanbul",
     "Izmir": "Izmir"
+  },
+  "Invoice": {
+    "customer": "Customer",
+    "issued": "Issue date",
+    "lines": "Lines"
+  },
+  "InvoiceLine": {
+    "item": "Item",
+    "quantity": "Quantity",
+    "unit_price": "Unit price"
   }
 }

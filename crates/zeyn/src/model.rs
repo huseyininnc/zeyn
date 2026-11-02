@@ -37,6 +37,8 @@ pub enum Rule {
     Format,
     /// Raised by a model level `validate = ...` function.
     Custom,
+    /// A problem in one cell of a lines field: the line (from 0) and the column.
+    Line { row: u32, field: &'static str },
 }
 
 /// Field definition produced at compile time.
@@ -279,5 +281,6 @@ pub mod __rules {
                 errors.errors.push(FieldError { field: meta.name, rule: *rule, message });
             }
         }
+        value.__validate_items(meta, errors);
     }
 }

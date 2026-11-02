@@ -191,6 +191,10 @@ pub trait FieldType {
     fn __compare(&self, _limit: i64) -> Option<std::cmp::Ordering> {
         None
     }
+
+    /// Validates nested values, such as the lines of an order. Errors name the line and column.
+    #[doc(hidden)]
+    fn __validate_items(&self, _meta: &crate::model::FieldMeta, _errors: &mut crate::model::ValidationErrors) {}
 }
 
 impl FieldType for String {

@@ -176,6 +176,61 @@ pub fn controls() -> Screen {
     )
 }
 
+/// One invoice line.
+#[model]
+pub struct InvoiceLine {
+    #[rule(required, max_len = 80)]
+    pub item: String,
+    #[rule(min = 1, max = 999)]
+    pub quantity: i64,
+    #[rule(min = 0)]
+    pub unit_price: Money,
+}
+
+/// An invoice with its lines.
+#[model]
+pub struct Invoice {
+    #[rule(required, max_len = 80)]
+    pub customer: String,
+    pub issued: Date,
+    #[rule(required)]
+    pub lines: Vec<InvoiceLine>,
+}
+
+#[action(public)]
+pub async fn save_invoice(invoice: Valid<Invoice>) -> Result<Money> {
+    let minor = invoice.lines.iter().map(|l| l.unit_price.minor * l.quantity).sum();
+    Ok(Money::tl(minor))
+}
+
+#[screen(route = "/invoice", public)]
+pub fn invoice_form(_: (), ctx: Ctx) -> Screen {
+    let line = |item: &str, quantity, kurus| InvoiceLine { item: item.into(), quantity, unit_price: Money::tl(kurus) };
+    let invoice = Invoice {
+        customer: "Anadolu Gıda".into(),
+        issued: ctx.today(),
+        lines: vec![line("Green tea 105", 12, 8369), line("Olive oil 115", 4, 24207), line("Pine honey 120", 2, 32126)],
+    };
+    Screen::new(t!("ui.invoice")).body(
+        Panel::new(t!("ui.panel_invoice")).add(
+            Form::of(invoice)
+                .row(|r| r.field(Invoice::customer).field(Invoice::issued))
+                .lines(Invoice::lines, |l| {
+                    l.column(InvoiceLine::item)
+                        .column(InvoiceLine::quantity)
+                        .column(InvoiceLine::unit_price)
+                        .total(InvoiceLine::quantity, InvoiceLine::unit_price)
+                })
+                .submit(t!("ui.save_invoice"), save_invoice)
+                .on_success(|total, ui| {
+                    if let Ok(t) = total {
+                        ui.toast(t!("ui.invoice_saved", total = t.format("tr")));
+                    }
+                }),
+        ),
+    )
+}
+
 pub fn feature() -> Feature {
     Feature::new("ui")
         .route_prefix("/ui")
@@ -183,10 +238,12 @@ pub fn feature() -> Feature {
         .screen(layout)
         .screen(editors)
         .screen(controls)
+        .screen(invoice_form)
         .menu(|m| {
             m.group(t!("menu.ui"), Icon::Table)
                 .item(t!("ui.layout"), layout)
                 .item(t!("ui.editors"), editors)
                 .item(t!("ui.controls"), controls)
+                .item(t!("ui.invoice"), invoice_form)
         })
 }

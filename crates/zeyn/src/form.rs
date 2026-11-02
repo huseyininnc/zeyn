@@ -6,7 +6,7 @@ use crate::render::{Render, escape};
 use crate::screen::{Component, Effect, FormSource, Node, UiCtx};
 use crate::time::{Date, DateTime, DateWords, LocalDateTime, LocalTimeError, Time, TimeZone};
 use crate::action::Page;
-use crate::ui::{ActionSource, Control, DataSource, DateOptions, LookupItem, LookupQuery, LookupValue, Slot};
+use crate::ui::{ActionSource, Control, DataSource, DateOptions, Lines, LinesEditor, LookupItem, LookupQuery, LookupValue, Slot};
 use crate::value::{Currency, FieldKind, FieldType, Money, Value};
 use serde_json::{Map, Value as Json, json};
 use std::marker::PhantomData;
@@ -70,12 +70,13 @@ pub struct Form<M: Model> {
     options: Vec<(&'static str, DateOptions)>,
     controls: Vec<(&'static str, Control)>,
     lookups: Vec<(&'static str, Box<dyn DataSource>, bool)>,
+    lines: Vec<(&'static str, Box<dyn LinesEditor>)>,
 }
 
 impl<M: Model> Form<M> {
     /// Empty form filled with the given value. Add fields with `field` and `row`.
     pub fn of(model: M) -> Self {
-        Self { model, items: Vec::new(), options: Vec::new(), controls: Vec::new(), lookups: Vec::new() }
+        Self { model, items: Vec::new(), options: Vec::new(), controls: Vec::new(), lookups: Vec::new(), lines: Vec::new() }
     }
 
     /// Form with every field of the model, in declaration order. Keys and versions become hidden
@@ -85,7 +86,7 @@ impl<M: Model> Form<M> {
             .filter(|i| !M::fields()[*i].version)
             .map(|i| FormItem::Field(FormField::at(i)))
             .collect();
-        Self { model, items, options: Vec::new(), controls: Vec::new(), lookups: Vec::new() }
+        Self { model, items, options: Vec::new(), controls: Vec::new(), lookups: Vec::new(), lines: Vec::new() }
     }
 
     pub fn field<T: FieldType + 'static>(mut self, field: Field<M, T>) -> Self {
@@ -157,6 +158,25 @@ impl<M: Model> Form<M> {
         self
     }
 
+    /// Adds a lines field (order lines, invoice lines) edited as a table: add, remove and move
+    /// lines, a line total and a footer total. Every line is checked with its model's rules.
+    ///
+    /// ```ignore
+    /// Form::of(order).lines(Order::lines, |l| {
+    ///     l.column(OrderLine::product).column(OrderLine::quantity).column(OrderLine::price)
+    ///         .total(OrderLine::quantity, OrderLine::price)
+    /// })
+    /// ```
+    pub fn lines<L: Model>(mut self, field: Field<M, Vec<L>>, build: impl FnOnce(Lines<L>) -> Lines<L>) -> Self {
+        self.items.push(FormItem::Field(FormField::of(field)));
+        self.lines.push((field.meta().name, Box::new(build(Lines::new()))));
+        self
+    }
+
+    fn lines_of(&self, name: &str) -> Option<&dyn LinesEditor> {
+        self.lines.iter().find(|(n, _)| *n == name).map(|(_, e)| e.as_ref())
+    }
+
     fn control_of(&self, name: &str) -> Option<Control> {
         self.controls.iter().find(|(n, _)| *n == name).map(|(_, c)| *c)
     }
@@ -223,7 +243,11 @@ impl<M: Model> Form<M> {
                 FormItem::Range(a, b) => vec![a, b],
             };
             for f in fields {
-                list.push(json!({ "row": row, "field": f.meta }));
+                let mut entry = json!({ "row": row, "field": f.meta });
+                if let Some(editor) = self.lines_of(f.meta.name) {
+                    entry["lines"] = editor.schema();
+                }
+                list.push(entry);
             }
         }
         list
@@ -250,8 +274,11 @@ impl<M: Model> Form<M> {
         let (model, mut errors) = self.merge(values, reading)?;
         self.check_pickers(&model, reading.tz, &mut errors);
         if let Err(rules) = model.validate() {
-            let unreadable: Vec<&str> = errors.errors.iter().map(|e| e.field).collect();
-            errors.errors.extend(rules.errors.into_iter().filter(|e| !unreadable.contains(&e.field)));
+            let unreadable: Vec<(&str, Rule)> = errors.errors.iter().map(|e| (e.field, e.rule)).collect();
+            let shadowed = |e: &FieldError| {
+                unreadable.iter().any(|(f, r)| *f == e.field && (!matches!(r, Rule::Line { .. }) || *r == e.rule))
+            };
+            errors.errors.extend(rules.errors.into_iter().filter(|e| !shadowed(e)));
         }
         errors.into_result()?;
         Valid::new(model)
@@ -299,6 +326,14 @@ impl<M: Model> Form<M> {
         let editable = self.fields().map(|f| f.meta).filter(|m| !m.key && !m.readonly && !m.version);
         let versions = M::fields().iter().filter(|m| m.version);
         for meta in editable.chain(versions) {
+            if let Some(editor) = self.lines_of(meta.name) {
+                let current = object.get(meta.name).cloned().unwrap_or(Json::Null);
+                if let Some((lines, problems)) = editor.read(values, meta, reading, &current) {
+                    object.insert(meta.name.to_string(), lines);
+                    errors.errors.extend(problems);
+                }
+                continue;
+            }
             let Some(raw) = values.get(meta.name) else { continue };
             let current = object.get(meta.name).cloned().unwrap_or(Json::Null);
             match parse_value(meta, raw, reading, &current) {
@@ -330,7 +365,7 @@ fn general_error() -> ValidationErrors {
 }
 
 /// Why a submitted value could not be read.
-enum Unreadable {
+pub(crate) enum Unreadable {
     Format,
     SkippedTime,
 }
@@ -377,7 +412,7 @@ pub(crate) fn read_moment(kind: FieldKind, text: &str, reading: &Reading) -> std
 
 /// Reads one submitted value as the field's type. Text arrives as typed by the user; wall clock
 /// date times are read in the user's time zone.
-fn parse_value(meta: &FieldMeta, raw: &Json, reading: &Reading, current: &Json) -> std::result::Result<Json, Unreadable> {
+pub(crate) fn parse_value(meta: &FieldMeta, raw: &Json, reading: &Reading, current: &Json) -> std::result::Result<Json, Unreadable> {
     let locale = reading.locale;
     if let FieldKind::Bool = meta.kind {
         return raw.as_bool().map(Json::Bool).ok_or(Unreadable::Format);
@@ -456,6 +491,12 @@ fn render_field<M: Model>(out: &mut String, r: &Render, f: &FormField<M>, form: 
         _ => String::new(),
     };
     let slot = Slot { m, value: &value, common: &common, id: &id, label: &label, control: form.control_of(m.name) };
+    if let Some(editor) = form.lines_of(m.name) {
+        let current = serde_json::to_value(&form.model).ok().and_then(|v| v.get(m.name).cloned()).unwrap_or(Json::Null);
+        editor.render(out, r, m, &current);
+        out.push_str(&format!(r#"<p class="z-field-error" id="{id}-error" aria-live="polite"></p></div>"#));
+        return;
+    }
     if let Some((_, many)) = form.lookup_of(m.name) {
         crate::ui::render_lookup(out, r, &slot, many);
         out.push_str(&format!(r#"<p class="z-field-error" id="{id}-error" aria-live="polite"></p></div>"#));
@@ -552,6 +593,11 @@ where
                     let values: Vec<&str> = options.iter().map(|o| o.value).collect();
                     ("string", format!("One of: {}.", values.join(", ")))
                 }
+                FieldKind::Custom { editor: "lines" } => (
+                    "string",
+                    format!("Send \"rows\" here and one value per cell as {}.<line>.<column>, lines numbered from 0.", m.name),
+                ),
+                FieldKind::Custom { editor: "ids" } => ("string", "Ids separated by commas.".to_string()),
                 FieldKind::Text | FieldKind::Custom { .. } => ("string", String::new()),
                 FieldKind::Date => ("string", "Date as YYYY-MM-DD.".to_string()),
                 FieldKind::Time => ("string", "Time as HH:MM.".to_string()),

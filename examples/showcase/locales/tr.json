@@ -123,7 +123,11 @@
     "controls": "Kontroller",
     "panel_request": "Stok talebi",
     "send": "Talebi gönder",
-    "sent": "Talep gönderildi."
+    "sent": "Talep gönderildi.",
+    "invoice": "Fatura",
+    "panel_invoice": "Fatura ve satırları",
+    "save_invoice": "Faturayı kaydet",
+    "invoice_saved": "Fatura kaydedildi, toplam {total}."
   },
   "Visit": {
     "day": "Ziyaret günü",
@@ -160,5 +164,15 @@
     "Eskisehir": "Eskişehir",
     "Istanbul": "İstanbul",
     "Izmir": "İzmir"
+  },
+  "Invoice": {
+    "customer": "Müşteri",
+    "issued": "Düzenleme tarihi",
+    "lines": "Satırlar"
+  },
+  "InvoiceLine": {
+    "item": "Kalem",
+    "quantity": "Miktar",
+    "unit_price": "Birim fiyat"
   }
 }
