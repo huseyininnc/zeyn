@@ -149,10 +149,21 @@ function toastRegion() {
  * @param {string} message
  * @param {'info' | 'error'} [variant]
  */
-function toast(message, variant = 'info') {
+function toast(message, variant = 'info', action = null) {
   const el = document.createElement('div');
   el.className = `z-toast z-toast-${variant}`;
   el.textContent = message;
+  if (action) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'z-toast-action';
+    button.textContent = action.label;
+    button.addEventListener('click', () => {
+      el.remove();
+      action.run();
+    });
+    el.append(' ', button);
+  }
   let left = TOAST_MS;
   let started = 0;
   let timer = 0;
@@ -927,6 +938,195 @@ async function runBulk(button) {
   toast(s.texts.done || 'Done.');
   clearSelection(grid);
   await loadGrid(grid, 'reload');
+}
+
+/** Editable header cells by column position: `th[data-edit]` or `null`. */
+function editableHeads(grid) {
+  return [...(grid.querySelector('thead tr')?.cells ?? [])].map((th) => (th.dataset.edit ? th : null));
+}
+
+/**
+ * Puts a row in edit mode: every editable cell (`td[data-v]`) gets an input of its column's kind
+ * holding the server's input value. Focus goes to the cell `start`, or the first input.
+ */
+function startEdit(tr, start) {
+  const grid = tr.closest('[data-zeyn-grid]');
+  const s = grids.get(grid);
+  if (!s || tr.classList.contains('z-editing') || tr.dataset.zeynKey == null) return false;
+  const heads = editableHeads(grid);
+  let first = null;
+  let wanted = null;
+  [...tr.cells].forEach((td, i) => {
+    const th = heads[i];
+    if (!th || td.dataset.v == null) return;
+    td._orig = td.innerHTML;
+    const kind = th.dataset.edit;
+    const label = `${th.textContent.trim()}`;
+    let input;
+    if (kind === 'choice') {
+      input = make('select', 'z-cell-input', { 'aria-label': label });
+      let options = [];
+      try {
+        options = JSON.parse(th.dataset.options || '[]');
+      } catch {
+        options = [];
+      }
+      if (th.dataset.optional) input.append(new Option('', ''));
+      for (const o of options) input.append(new Option(o.label, o.value));
+      input.value = td.dataset.v;
+    } else if (kind === 'bool') {
+      input = make('input', 'z-cell-input', { type: 'checkbox', 'aria-label': label });
+      input.checked = td.dataset.v === 'true';
+    } else {
+      const type = { number: 'number', date: 'date', datetime: 'datetime-local', time: 'time' }[kind] ?? 'text';
+      input = make('input', 'z-cell-input', { type, 'aria-label': label, autocomplete: 'off' });
+      if (type === 'number') input.step = '1';
+      if (type === 'datetime-local' || type === 'time') input.step = '1';
+      if (kind === 'money') input.inputMode = 'decimal';
+      input.value = td.dataset.v;
+    }
+    input.dataset.field = th.dataset.field;
+    td.replaceChildren(input);
+    first ??= input;
+    if (td === start) wanted = input;
+  });
+  if (!first) return false;
+  tr.classList.add('z-editing');
+  (wanted ?? first).focus();
+  (wanted ?? first).select?.();
+  return true;
+}
+
+/** Leaves edit mode without saving and puts the cells back. */
+function cancelEdit(tr) {
+  for (const td of tr.cells) {
+    if (td._orig != null) {
+      td.innerHTML = td._orig;
+      td._orig = null;
+    }
+  }
+  tr.classList.remove('z-editing');
+  tr.focus();
+}
+
+/** Values of a row in edit mode, as a form sends them, with the row version. */
+function editValues(tr) {
+  const grid = tr.closest('[data-zeyn-grid]');
+  const values = {};
+  for (const input of tr.querySelectorAll('.z-cell-input')) {
+    values[input.dataset.field] = input.type === 'checkbox' ? input.checked : input.value;
+  }
+  const vf = grid.dataset.zeynVersionField;
+  if (vf && tr.dataset.zeynVersion != null) values[vf] = tr.dataset.zeynVersion;
+  return values;
+}
+
+/**
+ * Sends values of a row to `POST /_zeyn/grid/edit` and swaps in the saved row. On `422` the
+ * messages show in their cells (`aria-invalid`, `role="alert"`) and focus moves to the first one.
+ * Returns the saved row or `null`.
+ */
+async function sendEdit(grid, tr, values) {
+  const s = grids.get(grid);
+  for (const e of tr.querySelectorAll('.z-cell-error')) e.remove();
+  tr.setAttribute('aria-busy', 'true');
+  const r = await post(BASE + '/_zeyn/grid/edit', {
+    ...address(grid),
+    key: tr.dataset.zeynKey,
+    values,
+    view: s?.columns ? { columns: s.columns } : null,
+  });
+  tr.removeAttribute('aria-busy');
+  if (r.status === 422) {
+    let first = null;
+    for (const err of r.data?.errors ?? []) {
+      const input = tr.querySelector(`.z-cell-input[data-field="${CSS.escape(err.field)}"]`);
+      if (!input) {
+        toast(err.message, 'error');
+        continue;
+      }
+      input.setAttribute('aria-invalid', 'true');
+      const box = make('span', 'z-cell-error', { role: 'alert' });
+      box.id = `z-cell-error-${++uid}`;
+      box.textContent = err.message;
+      input.setAttribute('aria-describedby', box.id);
+      input.after(box);
+      first ??= input;
+    }
+    first?.focus();
+    return null;
+  }
+  if (!r.ok || typeof r.data?.row !== 'string') {
+    if (r.status === 409) await loadGrid(grid, 'reload');
+    return null;
+  }
+  const t = document.createElement('template');
+  t.innerHTML = `<table><tbody>${r.data.row}</tbody></table>`;
+  const fresh = t.content.querySelector('tr');
+  if (!fresh) return null;
+  if (tr.dataset.zeynIndex != null) prepRow(s, fresh, Number(tr.dataset.zeynIndex));
+  tr.replaceWith(fresh);
+  if (s?.cache) {
+    for (const block of s.cache.values()) {
+      const i = block.indexOf(tr);
+      if (i >= 0) block[i] = fresh;
+    }
+  }
+  activate(fresh, true);
+  relativeTimes(fresh);
+  syncSelection(grid);
+  return fresh;
+}
+
+/** Saves a row in edit mode and offers to undo the change. */
+async function saveEdit(tr) {
+  const grid = tr.closest('[data-zeyn-grid]');
+  const s = grids.get(grid);
+  if (!s || tr.getAttribute('aria-busy') === 'true') return;
+  const before = {};
+  for (const td of tr.cells) {
+    const input = td.querySelector('.z-cell-input');
+    if (input) before[input.dataset.field] = input.type === 'checkbox' ? td.dataset.v === 'true' : td.dataset.v;
+  }
+  const values = editValues(tr);
+  const changed = Object.keys(before).some((k) => String(before[k]) !== String(values[k]));
+  if (!changed) return cancelEdit(tr);
+  const fresh = await sendEdit(grid, tr, values);
+  if (!fresh) return;
+  const key = fresh.dataset.zeynKey;
+  s.undo = { key, values: before };
+  toast(s.texts.saved || 'Saved.', 'info', { label: s.texts.undo || 'Undo', run: () => undoEdit(grid) });
+}
+
+/** Puts back the values from before the last inline save, with the row's current version. */
+async function undoEdit(grid) {
+  const s = grids.get(grid);
+  const undo = s?.undo;
+  if (!undo) return;
+  const tr = grid.querySelector(`[data-zeyn-rows] tr[data-zeyn-key="${CSS.escape(undo.key)}"]`);
+  if (!tr) return;
+  s.undo = null;
+  const values = { ...undo.values };
+  const vf = grid.dataset.zeynVersionField;
+  if (vf && tr.dataset.zeynVersion != null) values[vf] = tr.dataset.zeynVersion;
+  if (await sendEdit(grid, tr, values)) toast(s.texts.undone || 'Change undone.');
+}
+
+/** Keys in a row in edit mode: Enter saves, Escape cancels. Returns true when handled. */
+function editKey(e, input) {
+  const tr = input.closest('tr');
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    e.stopPropagation();
+    cancelEdit(tr);
+    return true;
+  }
+  if (e.key === 'Enter' && !e.isComposing) {
+    e.preventDefault();
+    saveEdit(tr);
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -1992,6 +2192,9 @@ document.addEventListener('focusin', (e) => {
 });
 
 document.addEventListener('dblclick', (e) => {
+  const td = e.target instanceof Element ? e.target.closest('[data-zeyn-rows] > tr > td[data-v]') : null;
+  if (td && !td.closest('.z-editing') && startEdit(td.parentElement, td)) return;
+  if (e.target instanceof Element && e.target.closest('.z-editing')) return;
   const tr = e.target instanceof Element ? e.target.closest('[data-zeyn-rows] > tr[data-zeyn-effect]') : null;
   const effect = tr && parseEffect(tr);
   if (effect) runEffect(effect, tr);
@@ -2000,6 +2203,17 @@ document.addEventListener('dblclick', (e) => {
 document.addEventListener('keydown', (e) => {
   const t = e.target;
   if (t instanceof Element && t.matches('.z-menu-item') && menuKey(e, t)) return;
+  if (t instanceof Element && t.matches('.z-cell-input') && editKey(e, t)) return;
+  if (e.key === 'F2' && t instanceof HTMLTableRowElement && t.parentElement?.matches('[data-zeyn-rows]')) {
+    if (startEdit(t, null)) return e.preventDefault();
+  }
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z' && !typing(t) && t instanceof Element) {
+    const g = t.closest('[data-zeyn-grid]');
+    if (g && grids.get(g)?.undo) {
+      e.preventDefault();
+      return undoEdit(g);
+    }
+  }
   if (t instanceof Element && t.matches('.z-resize') && resizeKey(e, t)) return;
   if (t instanceof Element && (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) && !typing(t)) {
     if (t.closest('thead th[data-field]')) {

@@ -189,9 +189,11 @@ pub fn product_list() -> Screen {
                 .column(Product::name)
                 .flex(1)
                 .filter()
+                .editable()
                 .column(Product::unit)
                 .width(130)
                 .filter()
+                .editable()
                 .badge(|u| match u {
                     Unit::Piece => Tone::Neutral,
                     Unit::Kg => Tone::Info,
@@ -200,6 +202,7 @@ pub fn product_list() -> Screen {
                 .column(Product::price)
                 .width(220)
                 .filter()
+                .editable()
                 .avg()
                 .max()
                 .column(Product::stock)
@@ -211,6 +214,8 @@ pub fn product_list() -> Screen {
                 .width(110)
                 .filter()
                 .check_icon()
+                .editable()
+                .edit_with(save_product)
                 .row_action(t!("stock.restock"), restock_product, |p| p.id)
                 .bulk_action(t!("stock.deactivate"), deactivate_products, Product::id)
                 .row_menu(|p| {

@@ -1050,6 +1050,53 @@ th[aria-sort="descending"] .z-sort::after {
 
 .z-bulk-count { font-weight: 600; margin-inline-end: auto; }
 
+/**
+ * Inline editing: inputs fill their cell; errors show under the input.
+ */
+
+.z-grid tbody tr.z-editing td { background: var(--z-surface); padding-block: 2px; }
+
+.z-grid tbody tr.z-editing { box-shadow: inset 0 0 0 2px var(--z-accent); }
+
+.z-grid td[data-v] { cursor: text; }
+
+.z-cell-input {
+  width: 100%;
+  min-width: 4rem;
+  min-height: max(24px, calc(var(--z-row) - 6px));
+  padding: 0 6px;
+  border: 1px solid var(--z-border-strong);
+  border-radius: var(--z-radius-sm);
+  background: var(--z-surface);
+  color: var(--z-text);
+  font: inherit;
+  text-align: inherit;
+}
+
+.z-cell-input[type="checkbox"] { width: 16px; min-width: 0; min-height: 0; accent-color: var(--z-accent); }
+
+.z-cell-input[aria-invalid="true"] { border-color: var(--z-danger); }
+
+.z-cell-error {
+  display: block;
+  margin-top: 2px;
+  color: var(--z-danger);
+  font-size: var(--z-font-size-xs);
+  white-space: normal;
+}
+
+.z-toast-action {
+  margin-inline-start: calc(var(--z-space) * 3);
+  padding: 2px 8px;
+  border: 1px solid currentColor;
+  border-radius: var(--z-radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .z-sort-order {
   display: inline-grid;
   place-items: center;

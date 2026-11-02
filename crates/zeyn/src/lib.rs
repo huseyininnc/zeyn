@@ -182,6 +182,27 @@
 //! fn grid() -> Node { Grid::of(search_products).column(Product::code).bulk_action("Archive", archive_products, Product::id).into() }
 //! ```
 //!
+//! An inline edit save action that does not take `Valid<M>`:
+//!
+//! ```compile_fail
+//! use zeyn::prelude::*;
+//!
+//! #[entity(table = "products")]
+//! pub struct Product {
+//!     #[key]
+//!     pub id: ProductId,
+//!     pub code: String,
+//! }
+//!
+//! #[action(permission = "stock.product.read")]
+//! pub async fn search_products(_q: GridQuery) -> Result<Page<Product>> { Ok(Page::default()) }
+//!
+//! #[action(permission = "stock.product.write")]
+//! pub async fn save_code(_p: Product) -> Result<()> { Ok(()) }
+//!
+//! fn grid() -> Node { Grid::of(search_products).column(Product::code).editable().edit_with(save_code).into() }
+//! ```
+//!
 //! A menu item for a screen without a route:
 //!
 //! ```compile_fail

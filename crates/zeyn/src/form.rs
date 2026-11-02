@@ -66,6 +66,11 @@ pub struct Form<M: Model> {
 }
 
 impl<M: Model> Form<M> {
+    /// Form over the fields at these indexes of `M::fields()`. Used for grid row edits.
+    pub(crate) fn with_fields(model: M, indexes: &[usize]) -> Self {
+        Self { model, items: indexes.iter().map(|i| FormItem::Field(FormField::at(*i))).collect() }
+    }
+
     /// Empty form filled with the given value. Add fields with `field` and `row`.
     pub fn of(model: M) -> Self {
         Self { model, items: Vec::new() }
@@ -253,6 +258,25 @@ fn parse_value(meta: &FieldMeta, raw: &Json, locale: &str, tz: TimeZone, current
             options.iter().find(|o| o.value == trimmed).map(|o| Json::String(o.value.to_string())).ok_or(Unreadable::Format)
         }
         FieldKind::Bool => Err(Unreadable::Format),
+    }
+}
+
+/// A value as an input holds it, in the form `Form::read` reads back: money in the locale's
+/// format without the symbol, dates as `YYYY-MM-DD`, moments as local date and time in `tz`,
+/// choices by value, booleans as `true` or `false`.
+pub(crate) fn edit_value(value: &Value, locale: &str, tz: TimeZone) -> String {
+    match value {
+        Value::Null => String::new(),
+        Value::Bool(b) => b.to_string(),
+        Value::Int(n) => n.to_string(),
+        Value::Text(s) => s.clone(),
+        Value::Money(m) => m.format_plain(locale),
+        Value::Date(d) => d.to_string(),
+        Value::Time(t) => t.to_string(),
+        Value::LocalDateTime(l) => l.to_string(),
+        Value::DateTime(d) => d.local(tz).to_string(),
+        Value::Choice(c) => c.to_string(),
+        Value::Decimal(x) => x.to_string(),
     }
 }
 

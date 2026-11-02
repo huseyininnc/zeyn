@@ -772,3 +772,104 @@ async fn browser_menu_stays_unless_the_app_turns_it_off() {
         .unwrap();
     assert!(send(&router, get("/menus")).await.body.contains(r#"data-zeyn-native-menu="off""#));
 }
+
+#[action(permission = "items.write")]
+pub async fn save_item(item: Valid<Item>, store: Store) -> Result<Item> {
+    let mut rows = store.0.write().unwrap();
+    let current = rows.iter_mut().find(|r| r.id == item.id).ok_or(Error::NotFound)?;
+    if current.version != item.version {
+        return Err(Error::Conflict);
+    }
+    let mut saved = item.into_inner();
+    saved.version += 1;
+    *current = saved.clone();
+    Ok(saved)
+}
+
+#[screen(route = "/edit", permission = "items.read")]
+pub fn edit_list() -> Screen {
+    Screen::new("Edit").body(
+        Grid::of(search)
+            .paging(Paging::pages(5))
+            .column(Item::code)
+            .editable()
+            .column(Item::price)
+            .editable()
+            .column(Item::qty)
+            .column(Item::note)
+            .editable()
+            .column(Item::active)
+            .editable()
+            .edit_with(save_item),
+    )
+}
+
+fn edit_router(identity: Identity) -> (Router, Store) {
+    let store = Store::seeded();
+    let router = App::new("Test")
+        .service(store.clone())
+        .i18n(I18n::new("en").catalog("tr", "{}").unwrap())
+        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .feature(Feature::new("items").screen(edit_list))
+        .router()
+        .unwrap();
+    (router, store)
+}
+
+fn edit(key: &str, values: serde_json::Value) -> Request<Body> {
+    post("/_zeyn/grid/edit", serde_json::json!({ "screen": "edit_list", "node": 0, "key": key, "values": values }))
+}
+
+#[tokio::test]
+async fn editable_cells_carry_input_values_only_for_users_who_may_save() {
+    let (router, _) = edit_router(writer_items());
+    let r = send(&router, get("/edit")).await;
+    assert!(r.body.contains(r#"data-field="code" aria-sort="none" aria-colindex="1" data-edit="text""#), "{}", r.body);
+    assert!(r.body.contains(r#"data-zeyn-version-field="version""#));
+    assert!(r.body.contains(r#"<tr data-zeyn-key="1" data-zeyn-version="1"><td data-v="C-01">C-01</td><td class="z-num" data-v="10.00">"#));
+    assert!(!r.body.contains(r#"data-field="note" aria-sort="none" aria-colindex="4" data-edit"#), "read only");
+    let (router, _) = edit_router(reader());
+    let r = send(&router, get("/edit")).await;
+    assert!(!r.body.contains("data-edit=") && !r.body.contains("data-v="));
+}
+
+#[tokio::test]
+async fn inline_edit_saves_through_valid_and_returns_the_row() {
+    let (router, store) = edit_router(writer_items());
+    let r = send(&router, edit("3", serde_json::json!({ "code": "NEW-3", "price": "12.50", "active": true, "version": "1" }))).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    assert!(r.json()["row"].as_str().unwrap().contains(r#"data-zeyn-version="2"><td data-v="NEW-3">NEW-3</td>"#));
+    let saved = store.0.read().unwrap()[2].clone();
+    assert_eq!((saved.code.as_str(), saved.price, saved.active, saved.qty, saved.version), ("NEW-3", Money::tl(1250), true, 3, 2));
+}
+
+#[tokio::test]
+async fn inline_edit_reports_validation_and_conflicts() {
+    let (router, store) = edit_router(writer_items());
+    let r = send(&router, edit("3", serde_json::json!({ "code": "", "price": "abc", "version": "1" }))).await;
+    assert_eq!(r.status, StatusCode::UNPROCESSABLE_ENTITY);
+    let fields: Vec<String> = r.json()["errors"].as_array().unwrap().iter().map(|e| e["field"].as_str().unwrap().to_string()).collect();
+    assert_eq!(fields, ["price", "code"]);
+    let r = send(&router, edit("3", serde_json::json!({ "code": "X", "version": "7" }))).await;
+    assert_eq!(r.status, StatusCode::CONFLICT);
+    assert_eq!(store.0.read().unwrap()[2].code, "C-03");
+}
+
+#[tokio::test]
+async fn inline_edit_refuses_read_only_and_unknown_columns_and_missing_permission() {
+    let (router, store) = edit_router(writer_items());
+    for values in [
+        serde_json::json!({ "note": "hacked", "version": "1" }),
+        serde_json::json!({ "qty": "999", "version": "1" }),
+        serde_json::json!({ "id": "77", "code": "X", "version": "1" }),
+        serde_json::json!({ "secret": "1" }),
+        serde_json::json!({}),
+    ] {
+        assert_eq!(send(&router, edit("3", values)).await.status, StatusCode::FORBIDDEN);
+    }
+    assert_eq!(send(&router, edit("999", serde_json::json!({ "code": "X" }))).await.status, StatusCode::NOT_FOUND);
+    let (router, _) = edit_router(reader());
+    assert_eq!(send(&router, edit("3", serde_json::json!({ "code": "X", "version": "1" }))).await.status, StatusCode::FORBIDDEN);
+    let row = store.0.read().unwrap()[2].clone();
+    assert_eq!((row.note.as_str(), row.qty, row.code.as_str()), ("note 3", 3, "C-03"));
+}

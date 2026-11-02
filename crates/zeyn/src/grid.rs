@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use crate::time::{Date, DateTime, LocalDateTime, Time, TimeZone};
 use crate::ctx::{BoxFuture, Ctx};
 use crate::i18n::Text;
-use crate::model::{Field, FieldMeta, Model};
+use crate::model::{Field, FieldMeta, Model, Valid};
 use crate::render::{Render, attr, escape};
 use crate::screen::{Component, Effect, GridSource, LoadedPage, Node};
 use crate::ctx::Outcome;
@@ -356,6 +356,7 @@ struct Column<E> {
     pin: Option<Pin>,
     hidden: bool,
     cell: Option<CellFn<E>>,
+    editable: bool,
 }
 
 /// Data grid. Its data source is an action that takes a `GridQuery` and returns `Page<E>`.
@@ -376,6 +377,15 @@ pub struct Grid<E: Model> {
     selectable: bool,
     bulk: Vec<BulkDef>,
     row_menu: Option<MenuFn<E>>,
+    save: Option<SaveDef<E>>,
+}
+
+type SaveRun<E> = Box<dyn Fn(Valid<E>) -> Box<dyn FnOnce(Ctx) -> BoxFuture<Result<()>> + Send> + Send + Sync>;
+
+/// The action that saves inline edits.
+struct SaveDef<E: Model> {
+    meta: ActionMeta,
+    run: SaveRun<E>,
 }
 
 type MenuFn<E> = Box<dyn Fn(&E) -> crate::menu::ContextMenu + Send + Sync>;
@@ -406,7 +416,37 @@ impl<E: Model> Grid<E> {
             selectable: false,
             bulk: Vec::new(),
             row_menu: None,
+            save: None,
         }
+    }
+
+    /// Lets users edit cells of the columns marked `editable()` in place, saved with `save`, an
+    /// action that takes `Valid<E>` like a form's. The server loads the row again by key, applies
+    /// only the editable columns and the row version (`#[version]`) the client sends, validates
+    /// and runs the action; a changed row comes back as a conflict. F2 or a double click on an
+    /// editable cell starts editing, Enter saves, Escape cancels, Ctrl+Z undoes the last save.
+    pub fn edit_with<A>(mut self, _save: A) -> Self
+    where
+        A: crate::form::FormAction<E> + Action<Input = Valid<E>>,
+        A::Output: Outcome,
+    {
+        self.save = Some(SaveDef { meta: A::META, run: Box::new(|valid| runner::<A>(valid)) });
+        self
+    }
+
+    /// Indexes in `E::fields()` of the columns users may edit: marked `editable()`, not keys, read
+    /// only fields or row versions.
+    fn editable_fields(&self) -> Vec<usize> {
+        self.columns
+            .iter()
+            .filter(|c| c.editable && !c.meta.key && !c.meta.readonly && !c.meta.version)
+            .filter_map(|c| E::fields().iter().position(|f| f.name == c.meta.name))
+            .collect()
+    }
+
+    /// Whether the page's user may save inline edits.
+    fn can_edit(&self, r: &Render) -> bool {
+        self.save.as_ref().is_some_and(|s| r.can(&s.meta.access))
     }
 
     /// Context menu of each row, built on the server from the row. Right click, Shift+F10 or the
@@ -435,6 +475,7 @@ impl<E: Model> Grid<E> {
                 pin: None,
                 hidden: false,
                 cell: None,
+                editable: false,
             });
         }
         grid
@@ -463,6 +504,7 @@ impl<E: Model> Grid<E> {
             pin: None,
             hidden: false,
             cell: None,
+            editable: false,
         });
         GridColumn { grid: self, field, _type: PhantomData }
     }
@@ -666,6 +708,19 @@ impl<E: Model> Grid<E> {
             if let Some(p) = s.pin {
                 out.push_str(&format!(r#" data-pin="{}""#, p.code()));
             }
+            if self.can_edit(r) && c.editable && !c.meta.readonly && !c.meta.key && !c.meta.version {
+                out.push_str(&format!(r#" data-edit="{}""#, filter_kind(&c.meta.kind)));
+                if c.meta.optional {
+                    out.push_str(r#" data-optional="true""#);
+                }
+                if let (FieldKind::Choice(options), false) = (c.meta.kind, c.filter) {
+                    let list: Vec<serde_json::Value> = options
+                        .iter()
+                        .map(|o| json!({ "value": o.value, "label": r.i18n.text(r.locale, &Text::key_or(o.key, o.label)) }))
+                        .collect();
+                    out.push_str(&format!(r#" data-options="{}""#, attr(&list)));
+                }
+            }
             if c.filter {
                 out.push_str(&format!(r#" data-filter="{}""#, filter_kind(&c.meta.kind)));
                 if let FieldKind::Choice(options) = c.meta.kind {
@@ -702,6 +757,12 @@ impl<E: Model> Grid<E> {
             if let Some(k) = Self::key_index().and_then(|i| row.value_at(i)) {
                 out.push_str(&format!(r#" data-zeyn-key="{}""#, escape(&key_text(&k))));
             }
+            let edit = self.can_edit(r);
+            if edit {
+                if let Some(v) = E::fields().iter().position(|f| f.version).and_then(|i| row.value_at(i)) {
+                    out.push_str(&format!(r#" data-zeyn-version="{}""#, escape(&key_text(&v))));
+                }
+            }
             if let Some(menu) = self.row_menu.as_ref().map(|f| f(row)) {
                 let items = menu.to_json(r);
                 if items.as_array().is_some_and(|a| !a.is_empty()) {
@@ -723,7 +784,12 @@ impl<E: Model> Grid<E> {
                     Some(cell) => cell(row, r),
                     None => r.value(&value, &c.meta.kind),
                 };
-                out.push_str(&format!("<td{class}>{content}</td>"));
+                if edit && c.editable && !c.meta.readonly && !c.meta.key && !c.meta.version {
+                    let v = crate::form::edit_value(&value, r.locale, r.tz);
+                    out.push_str(&format!(r#"<td{class} data-v="{}">{content}</td>"#, escape(&v)));
+                } else {
+                    out.push_str(&format!("<td{class}>{content}</td>"));
+                }
             }
             let actions: Vec<(usize, &RowAction<E>)> = self.row_actions.iter().enumerate().filter(|(_, a)| r.can(&a.meta.access)).collect();
             if !self.row_actions.is_empty() {
@@ -798,6 +864,11 @@ impl<E: Model> Grid<E> {
         }
         if page.is_some_and(|p| p.saved_views) {
             out.push_str(r#" data-zeyn-views="server""#);
+        }
+        if self.can_edit(r) {
+            if let Some(v) = E::fields().iter().find(|f| f.version) {
+                out.push_str(&format!(r#" data-zeyn-version-field="{}""#, v.name));
+            }
         }
         out.push_str(&format!(
             r#"><table role="grid" aria-colcount="{}"><thead>{}</thead><tbody data-zeyn-rows>"#,
@@ -966,6 +1037,36 @@ impl<E: Model> GridSource for Grid<E> {
             .downcast_ref::<Vec<E>>()
             .map(|rows| rows.iter().filter_map(|r| r.value_at(i)).filter_map(|v| serde_json::to_value(v).ok()).collect())
             .unwrap_or_default()
+    }
+
+    fn edit_call(
+        &self,
+        page: &LoadedPage,
+        key: &str,
+        values: &serde_json::Map<String, serde_json::Value>,
+        locale: &str,
+        tz: TimeZone,
+    ) -> Result<RowCall> {
+        use crate::action::Error;
+        let save = self.save.as_ref().ok_or(Error::NotFound)?;
+        let i = Self::key_index().ok_or(Error::NotFound)?;
+        let rows = page.items.downcast_ref::<Vec<E>>().ok_or(Error::NotFound)?;
+        let row = rows.iter().find(|r| r.value_at(i).is_some_and(|v| key_text(&v) == key)).ok_or(Error::NotFound)?;
+        let editable = self.editable_fields();
+        let fields = E::fields();
+        let allowed = |name: &str| fields.iter().enumerate().any(|(j, f)| f.name == name && (f.version || editable.contains(&j)));
+        if values.is_empty() || values.keys().any(|k| !allowed(k)) {
+            return Err(Error::Forbidden);
+        }
+        let valid = crate::form::Form::with_fields(row.clone(), &editable).read(values, locale, tz)?;
+        Ok(RowCall { meta: save.meta, run: (save.run)(valid) })
+    }
+
+    fn row_html(&self, page: &LoadedPage, key: &str, r: &Render) -> Option<String> {
+        let i = Self::key_index()?;
+        let rows = page.items.downcast_ref::<Vec<E>>()?;
+        let row = rows.iter().find(|row| row.value_at(i).is_some_and(|v| key_text(&v) == key))?;
+        Some(self.rows(std::slice::from_ref(row), r, &self.layout(page.view.as_ref())))
     }
 
     fn row_call(&self, page: &LoadedPage, key: &str, item: &str) -> Option<RowCall> {
@@ -1200,6 +1301,14 @@ impl<E: Model, T> GridColumn<E, T> {
         self
     }
 
+    /// Lets users edit this column in place when the grid has a save action (`Grid::edit_with`).
+    /// Keys, read only fields and row versions never become editable; the server refuses
+    /// values for them.
+    pub fn editable(mut self) -> Self {
+        self.last().editable = true;
+        self
+    }
+
     /// Draws the cells with a custom renderer. See [`CellRenderer`].
     pub fn cell(mut self, renderer: impl CellRenderer<T>) -> Self
     where
@@ -1334,6 +1443,14 @@ impl<E: Model, T> GridColumn<E, T> {
         self.grid.row_menu(menu)
     }
 
+    pub fn edit_with<A>(self, save: A) -> Grid<E>
+    where
+        A: crate::form::FormAction<E> + Action<Input = Valid<E>>,
+        A::Output: Outcome,
+    {
+        self.grid.edit_with(save)
+    }
+
     pub fn bulk_action<A, K>(self, label: impl Into<Text>, action: A, key: Field<E, K>) -> Grid<E>
     where
         A: BulkAction<K> + Action<Input = Vec<K>>,
@@ -1412,6 +1529,9 @@ fn grid_texts(r: &Render) -> serde_json::Value {
         map.insert(format!("menu_{k}"), json!(r.i18n.text(r.locale, &Text::key(format!("zeyn.grid.menu.{k}")))));
     }
     map.insert("done".into(), json!(r.i18n.text(r.locale, &Text::key("zeyn.grid.done"))));
+    for k in ["saved", "undo", "undone"] {
+        map.insert(k.into(), json!(r.i18n.text(r.locale, &Text::key(format!("zeyn.grid.{k}")))));
+    }
     map.insert("yes".into(), json!(r.i18n.text(r.locale, &Text::key("zeyn.yes"))));
     map.insert("no".into(), json!(r.i18n.text(r.locale, &Text::key("zeyn.no"))));
     serde_json::Value::Object(map)

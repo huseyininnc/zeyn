@@ -182,6 +182,20 @@ pub trait GridSource: Send + Sync {
         Vec::new()
     }
 
+    /// Builds the save of an inline edit of the row with this key from the loaded page: only
+    /// editable columns and the row version may be in `values`, otherwise `Forbidden`; values are
+    /// read and validated as a form would (`Validation` errors name the fields).
+    fn edit_call(&self, page: &LoadedPage, key: &str, values: &serde_json::Map<String, serde_json::Value>, locale: &str, tz: crate::time::TimeZone) -> Result<RowCall> {
+        let _ = (page, key, values, locale, tz);
+        Err(crate::action::Error::NotFound)
+    }
+
+    /// The row with this key from a loaded page as HTML, in the page's view.
+    fn row_html(&self, page: &LoadedPage, key: &str, r: &Render) -> Option<String> {
+        let _ = (page, key, r);
+        None
+    }
+
     /// Builds the call of a row item (`a0` for the first row action) from the loaded row with
     /// this key. `None` when the row is not there or the item does not exist for it.
     fn row_call(&self, page: &LoadedPage, key: &str, item: &str) -> Option<RowCall> {

@@ -1003,6 +1003,7 @@ impl App {
             .route("/_zeyn/grid/run", post(grid_run_call))
             .route("/_zeyn/grid/bulk", post(grid_bulk_call))
             .route("/_zeyn/menu", post(menu_call))
+            .route("/_zeyn/grid/edit", post(grid_edit_call))
             .route("/_zeyn/form", post(form_call))
             .route("/_zeyn/locale", post(set_locale))
             .route("/_zeyn/timezone", post(set_time_zone))
@@ -1649,6 +1650,20 @@ struct GridCall {
 }
 
 #[derive(Deserialize)]
+struct EditCall {
+    screen: String,
+    #[serde(default)]
+    params: Json,
+    node: usize,
+    key: String,
+    /// Typed values of the edited cells and the row version, as a form sends them.
+    values: Map<String, Json>,
+    /// Layout to render the saved row in.
+    #[serde(default)]
+    view: Option<DataGridView>,
+}
+
+#[derive(Deserialize)]
 struct MenuCall {
     screen: String,
     #[serde(default)]
@@ -1779,6 +1794,38 @@ impl AppState {
         self.after(ctx, &info, started, &result);
         result?;
         Ok(json!({ "effects": [] }))
+    }
+
+    /// Saves an inline edit: the row is loaded again by key, the values are applied to the
+    /// editable columns only and validated like a form, the save action's access is checked,
+    /// interceptors run, and the saved row comes back as HTML.
+    async fn run_edit(&self, ctx: &Ctx, call: EditCall) -> Result<Json, Failure> {
+        if call.key.len() > 200 || call.values.len() > 64 {
+            return Err(Failure::App(Error::NotFound));
+        }
+        let (_, entry, screen) = self.open(ctx, &call.screen, call.params).await?;
+        let grid = screen.nodes().get(call.node).and_then(|n| n.grid()).ok_or(Failure::App(Error::NotFound))?;
+        if !ctx.identity().can(&grid.action().access) {
+            return Err(Failure::App(Error::Forbidden));
+        }
+        let page = self.timed(grid.find_row(ctx.clone(), call.key.clone())).await?;
+        let save = grid.edit_call(&page, &call.key, &call.values, ctx.locale(), ctx.time_zone())?;
+        if !ctx.identity().can(&save.meta.access) {
+            return Err(Failure::App(Error::Forbidden));
+        }
+        let info = Call { kind: CallKind::Form, screen: entry.meta.name, action: Some(save.meta), via_agent: ctx.via_agent() };
+        let started = Instant::now();
+        let result = async {
+            self.before(ctx, &info)?;
+            self.timed((save.run)(ctx.clone())).await
+        }
+        .await;
+        self.after(ctx, &info, started, &result);
+        result?;
+        let mut page = self.timed(grid.find_row(ctx.clone(), call.key.clone())).await?;
+        page.view = call.view.map(|v| grid.clean_view(v));
+        let r = Render::new(entry.meta.name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity());
+        Ok(json!({ "row": grid.row_html(&page, &call.key, &r) }))
     }
 
     /// Runs an action item of a screen's context menu: the screen is built again with its params,
@@ -1927,6 +1974,17 @@ async fn grid_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Js
         return st.error_response(&ctx, f);
     }
     match st.run_grid(&ctx, call).await {
+        Ok(body) => axum::Json(body).into_response(),
+        Err(f) => st.error_response(&ctx, f),
+    }
+}
+
+async fn grid_edit_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(call): axum::Json<EditCall>) -> Response {
+    let ctx = st.licensed(st.ctx(&headers)).await;
+    if let Err(f) = st.check_csrf(&headers) {
+        return st.error_response(&ctx, f);
+    }
+    match st.run_edit(&ctx, call).await {
         Ok(body) => axum::Json(body).into_response(),
         Err(f) => st.error_response(&ctx, f),
     }
