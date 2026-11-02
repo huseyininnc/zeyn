@@ -1430,6 +1430,7 @@ function setupHead(grid, s) {
       'aria-label': fill(t.menu_resize || 'Resize {label}', { label }),
       'aria-valuemin': String(MIN_COLUMN),
       'aria-valuemax': String(MAX_COLUMN),
+      'aria-valuenow': String(Math.min(MAX_COLUMN, Math.max(MIN_COLUMN, Math.round(th.getBoundingClientRect().width) || MIN_COLUMN))),
     });
     const inner = make('div', 'z-th');
     inner.append(sort, menu);
@@ -1909,7 +1910,9 @@ function filterControls(cell, th, t) {
       popovertarget: id,
     });
     button.dataset.zeynChoice = '';
+    button.dataset.name = name;
     button.textContent = t.all || 'All';
+    button.setAttribute('aria-label', `${name}: ${button.textContent}`);
     const panel = make('div', 'z-popover z-choice-panel', { id, role: 'group', 'aria-label': name, popover: 'auto' });
     for (const o of options) {
       const row = make('label', 'z-check');
@@ -1988,6 +1991,7 @@ function choiceLabel(cell, t) {
   button.textContent =
     picked.length === 0 ? t.all || 'All' : picked.length === 1 ? picked[0].parentElement.textContent : fill(t.selected || '{n} selected', { n: picked.length });
   button.classList.toggle('z-active', picked.length > 0);
+  button.setAttribute('aria-label', `${button.dataset.name}: ${button.textContent}`);
 }
 
 /** Active filters as the query sends them. */
