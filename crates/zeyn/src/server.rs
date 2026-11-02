@@ -6,7 +6,7 @@ use crate::action::{ActionMeta, Error, DataQuery};
 use crate::ctx::{Ctx, Identity, Service, Services};
 use crate::feature::{Feature, ScreenEntry};
 use crate::i18n::{I18n, Text};
-use crate::render::{Render, attr, escape};
+use crate::render::{Render, escape};
 use crate::grid::DataGridView;
 use crate::screen::{GridSource, LoadedPage, Screen, ScreenDef};
 use crate::ui::NodePath;
@@ -3079,9 +3079,4 @@ async fn not_found(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Respo
     let ctx = st.ctx(&headers);
     let (csrf, set) = st.csrf(&headers);
     with_cookie(st.error_page(&ctx, Failure::App(Error::NotFound), &csrf), set)
-}
-
-#[allow(dead_code)]
-fn _attr_is_used(v: &Json) -> String {
-    attr(v)
 }
