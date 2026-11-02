@@ -1,4 +1,4 @@
-//! CSV import: preview, validation of every row with the model's own rules, a row error report
+//! CSV and XLSX import: preview, validation of every row with the model's own rules, a row error report
 //! and an import through an action.
 //!
 //! ```ignore
@@ -27,6 +27,10 @@ pub const HARD_MAX_ROWS: usize = 50_000;
 /// Largest CSV text accepted, in bytes.
 pub const MAX_CSV_BYTES: usize = 8 * 1024 * 1024;
 const PREVIEW_ROWS: usize = 10;
+#[cfg(feature = "xlsx")]
+const ACCEPT: &str = ".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+#[cfg(not(feature = "xlsx"))]
+const ACCEPT: &str = ".csv,text/csv";
 const MAX_ERRORS_SHOWN: usize = 200;
 
 /// Why a CSV text could not be read at all.
@@ -160,6 +164,14 @@ fn bool_text(cell: &str) -> Option<bool> {
     }
 }
 
+/// A file to import: CSV text, or XLSX bytes with the `xlsx` feature.
+#[derive(Clone, Debug)]
+pub enum ImportFile {
+    Csv(String),
+    #[cfg(feature = "xlsx")]
+    Xlsx(Vec<u8>),
+}
+
 /// Reads a CSV file and validates every row as a form of `M` would, in the user's language and
 /// time zone. Columns are matched by field name or label, in any case.
 pub fn check_csv<M: Model>(ctx: &Ctx, csv: &str, max_rows: usize) -> Result<Checked<M>> {
@@ -174,8 +186,50 @@ pub fn check_csv<M: Model>(ctx: &Ctx, csv: &str, max_rows: usize) -> Result<Chec
     if rows.len() > max_rows {
         return Err(general(ctx, "too_many", &[("max", max_rows.to_string())]));
     }
+    let columns = columns_of::<M>(ctx, &header)?;
+    Ok(check_rows(ctx, columns, rows))
+}
+
+/// Reads a CSV or XLSX file and validates every row as [`check_csv`] does. XLSX cells keep their
+/// types: numbers, dates and booleans are read as such, whatever the user's locale.
+pub fn check_file<M: Model>(ctx: &Ctx, file: &ImportFile, max_rows: usize) -> Result<Checked<M>> {
+    match file {
+        ImportFile::Csv(csv) => check_csv(ctx, csv, max_rows),
+        #[cfg(feature = "xlsx")]
+        ImportFile::Xlsx(bytes) => {
+            use crate::xlsx::XlsxReadError;
+            let (header, cells) = crate::xlsx::read(bytes, max_rows).map_err(|e| match e {
+                XlsxReadError::TooLarge => general(ctx, "too_large", &[]),
+                XlsxReadError::TooMany => general(ctx, "too_many", &[("max", max_rows.to_string())]),
+                XlsxReadError::Unreadable => general(ctx, "bad_file", &[]),
+            })?;
+            if cells.is_empty() {
+                return Err(general(ctx, "empty", &[]));
+            }
+            let columns = columns_of::<M>(ctx, &header)?;
+            let locale = ctx.locale();
+            let rows = cells
+                .iter()
+                .map(|row| {
+                    row.iter()
+                        .enumerate()
+                        .map(|(i, cell)| match columns.get(i) {
+                            Some(m) => crate::xlsx::cell_text(cell, &m.kind, locale),
+                            None if *cell == crate::xlsx::XlsxCell::Empty => String::new(),
+                            None => "x".to_string(),
+                        })
+                        .collect()
+                })
+                .collect();
+            Ok(check_rows(ctx, columns, rows))
+        }
+    }
+}
+
+/// The importable field each header cell names, by field name or label in any case.
+fn columns_of<M: Model>(ctx: &Ctx, header: &[String]) -> Result<Vec<&'static FieldMeta>> {
     let mut columns = Vec::new();
-    for name in &header {
+    for name in header {
         let key = fold(name);
         let meta = importable::<M>().find(|m| {
             fold(m.name) == key || fold(m.label) == key || fold(&ctx.t(&m.label_text())) == key
@@ -185,6 +239,22 @@ pub fn check_csv<M: Model>(ctx: &Ctx, csv: &str, max_rows: usize) -> Result<Chec
             _ => return Err(general(ctx, "unknown_column", &[("name", name.trim().to_string())])),
         }
     }
+    Ok(columns)
+}
+
+/// A choice cell by value, or by label in the catalog or in the user's language, so exported
+/// files import again.
+fn choice_value(ctx: &Ctx, options: &[crate::value::ChoiceOption], cell: &str) -> Option<&'static str> {
+    let key = fold(cell);
+    options
+        .iter()
+        .find(|o| o.value == cell.trim())
+        .or_else(|| options.iter().find(|o| fold(o.label) == key || fold(&ctx.t(&Text::key_or(o.key, o.label))) == key))
+        .map(|o| o.value)
+}
+
+/// Validates every data row as a form of `M` would.
+fn check_rows<M: Model>(ctx: &Ctx, columns: Vec<&'static FieldMeta>, rows: Vec<Vec<String>>) -> Checked<M> {
     let form = Form::auto(M::default());
     let mut valid = Vec::new();
     let mut errors = Vec::new();
@@ -193,6 +263,9 @@ pub fn check_csv<M: Model>(ctx: &Ctx, csv: &str, max_rows: usize) -> Result<Chec
         for (meta, cell) in columns.iter().zip(row.iter().chain(std::iter::repeat(&String::new()))) {
             let value = match meta.kind {
                 FieldKind::Bool => bool_text(cell).map(Json::Bool).unwrap_or_else(|| Json::String(cell.clone())),
+                FieldKind::Choice(options) => {
+                    Json::String(choice_value(ctx, options, cell).map_or_else(|| cell.trim().to_string(), str::to_string))
+                }
                 _ => Json::String(cell.trim().to_string()),
             };
             values.insert(meta.name.to_string(), value);
@@ -206,7 +279,7 @@ pub fn check_csv<M: Model>(ctx: &Ctx, csv: &str, max_rows: usize) -> Result<Chec
             Err(e) => errors.extend(e.errors.iter().map(|e| RowError { row: i + 1, field: e.field.to_string(), message: ctx.t(&e.message) })),
         }
     }
-    Ok(Checked { columns, valid, errors, total: rows.len(), raw: rows })
+    Checked { columns, valid, errors, total: rows.len(), raw: rows }
 }
 
 /// Error report as CSV (`row;field;message`), safe to open in a spreadsheet.
@@ -231,10 +304,10 @@ pub trait ImportSource: Send + Sync {
     fn action(&self) -> ActionMeta;
 
     /// Reads and validates the file and describes the result. Nothing is saved.
-    fn preview(&self, ctx: &Ctx, csv: &str) -> Result<Json>;
+    fn preview(&self, ctx: &Ctx, file: &ImportFile) -> Result<Json>;
 
     /// Reads and validates the file again and imports through the action.
-    fn commit(&self, ctx: Ctx, csv: String) -> BoxFuture<Result<Json>>;
+    fn commit(&self, ctx: Ctx, file: ImportFile) -> BoxFuture<Result<Json>>;
 }
 
 /// CSV import of `M` rows through an action that takes `Vec<Valid<M>>`.
@@ -272,8 +345,8 @@ where
         A::META
     }
 
-    fn preview(&self, ctx: &Ctx, csv: &str) -> Result<Json> {
-        let checked = check_csv::<M>(ctx, csv, self.max_rows)?;
+    fn preview(&self, ctx: &Ctx, file: &ImportFile) -> Result<Json> {
+        let checked = check_file::<M>(ctx, file, self.max_rows)?;
         let mut table = String::from(r#"<table class="z-import-preview"><thead><tr><th scope="col">#</th>"#);
         for m in &checked.columns {
             table.push_str(&format!(r#"<th scope="col">{}</th>"#, escape(&ctx.t(&m.label_text()))));
@@ -306,8 +379,8 @@ where
         }))
     }
 
-    fn commit(&self, ctx: Ctx, csv: String) -> BoxFuture<Result<Json>> {
-        let checked = check_csv::<M>(&ctx, &csv, self.max_rows);
+    fn commit(&self, ctx: Ctx, file: ImportFile) -> BoxFuture<Result<Json>> {
+        let checked = check_file::<M>(&ctx, &file, self.max_rows);
         let all_or_nothing = self.all_or_nothing;
         Box::pin(async move {
             let checked = checked?;
@@ -339,8 +412,8 @@ where
         let columns: Vec<String> = importable::<M>().map(|m| r.label(m)).collect();
         let hint = r.text(&Text::key("zeyn.import.hint").arg("columns", columns.join(", ")).arg("max", self.max_rows.to_string()));
         out.push_str(&format!(
-            r#"<div class="z-import" data-zeyn-import data-testid="{scope}.import"><div class="z-field"><label for="{scope}-import-file">{file}</label><input type="file" id="{scope}-import-file" accept=".csv,text/csv" data-testid="{scope}.import.file" aria-describedby="{scope}-import-hint"><p class="z-hint" id="{scope}-import-hint">{hint}</p></div><p class="z-import-status" role="status" aria-live="polite" data-zeyn-import-status></p><div data-zeyn-import-preview></div><div class="z-form-actions"><button type="button" class="z-button" data-zeyn-import-report hidden>{report}</button><button type="button" class="z-button z-primary" data-zeyn-import-commit data-testid="{scope}.import.commit" disabled>{commit}</button></div></div>"#,
-            file = text("file"),
+            r#"<div class="z-import" data-zeyn-import data-testid="{scope}.import"><div class="z-field"><label for="{scope}-import-file">{file}</label><input type="file" id="{scope}-import-file" accept="{ACCEPT}" data-testid="{scope}.import.file" aria-describedby="{scope}-import-hint"><p class="z-hint" id="{scope}-import-hint">{hint}</p></div><p class="z-import-status" role="status" aria-live="polite" data-zeyn-import-status></p><div data-zeyn-import-preview></div><div class="z-form-actions"><button type="button" class="z-button" data-zeyn-import-report hidden>{report}</button><button type="button" class="z-button z-primary" data-zeyn-import-commit data-testid="{scope}.import.commit" disabled>{commit}</button></div></div>"#,
+            file = text(if cfg!(feature = "xlsx") { "file_any" } else { "file" }),
             report = text("report"),
             commit = text(if self.all_or_nothing { "commit_all" } else { "commit" }),
         ));

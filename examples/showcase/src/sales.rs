@@ -235,7 +235,7 @@ pub fn order_lines(params: OrderParams) -> Screen {
 
 #[screen(route = "/archive", permission = "sales.order.read")]
 pub fn archive() -> Screen {
-    Screen::new(t!("sales.archive")).toolbar(|t| t.export(Export::Csv)).body(
+    Screen::new(t!("sales.archive")).toolbar(|t| t.export(Export::Csv).export(Export::Xlsx)).body(
         DataGrid::of(search_archive)
             .mode(DataMode::Server)
             .paging(Paging::virtual_scroll())

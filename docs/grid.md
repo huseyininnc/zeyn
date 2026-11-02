@@ -264,6 +264,19 @@ parsing blocks of 200 rows with every column, which column virtualization does n
 streams each page at once, in the user's layout and language. Formulas are defused. Up to 100,000
 rows by default.
 
+With the `xlsx` Cargo feature the toolbar's `Export::Xlsx` button downloads the same rows as an
+Excel workbook (`GET /_zeyn/grid/export?format=xlsx`). Cells keep their types: numbers, money as a
+number with its currency format, dates and date times as real Excel dates in the user's time zone,
+and booleans. Choices are written as their labels, masked fields as their masked text, and text is
+always text, so nothing becomes a formula. The header row holds the labels in the user's language,
+is bold and frozen, and columns keep the user's order and widths.
+
+The workbook is written with `rust_xlsxwriter` in constant memory mode: each page goes to a
+temporary file as it arrives (at most two pages wait in memory), and the zipped workbook is
+streamed to the response at the end. Exporting 100,000 rows of six columns kept the heap at about
+134 KiB while writing rows (the same after 10,000 and after 100,000 rows) and 460 KiB while
+zipping; the file was 3.4 MB.
+
 ## Selection
 
 `selectable()` (implied by `bulk_action`) adds a checkbox column. Shift selects a range, Space

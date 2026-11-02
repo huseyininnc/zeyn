@@ -25,9 +25,15 @@ pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
         .route("/_zeyn/reason", post(give_reason))
         .route(
             "/_zeyn/import",
-            post(import).layer(axum::extract::DefaultBodyLimit::max(crate::import::MAX_CSV_BYTES + 64 * 1024)),
+            post(import).layer(axum::extract::DefaultBodyLimit::max(IMPORT_BODY_LIMIT)),
         )
 }
+
+/// Largest import request: the CSV text, or an XLSX file in base64.
+#[cfg(feature = "xlsx")]
+const IMPORT_BODY_LIMIT: usize = crate::xlsx::MAX_XLSX_BYTES.div_ceil(3) * 4 + 64 * 1024;
+#[cfg(not(feature = "xlsx"))]
+const IMPORT_BODY_LIMIT: usize = crate::import::MAX_CSV_BYTES + 64 * 1024;
 
 const REASON_COOKIE: &str = "zeyn_reason";
 const REASON_SECONDS: u32 = 900;
@@ -93,18 +99,36 @@ struct ImportCall {
     #[serde(default)]
     params: Json,
     node: crate::ui::NodePath,
+    #[serde(default)]
     csv: String,
+    /// An XLSX file in base64, instead of `csv`.
+    #[serde(default)]
+    xlsx: Option<String>,
     #[serde(default)]
     commit: bool,
 }
 
-/// Previews (`commit: false`) or imports a CSV file through an import component. Both need the
-/// import action's permission; the file is read and validated again on commit.
-async fn import(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(call): axum::Json<ImportCall>) -> Response {
+impl ImportCall {
+    /// The uploaded file. An XLSX file needs the `xlsx` feature; bad base64 reads as a broken file.
+    fn file(&mut self) -> Result<crate::import::ImportFile, Failure> {
+        match self.xlsx.take() {
+            None => Ok(crate::import::ImportFile::Csv(std::mem::take(&mut self.csv))),
+            #[cfg(feature = "xlsx")]
+            Some(b64) => Ok(crate::import::ImportFile::Xlsx(super::base64_decode(&b64).unwrap_or_default())),
+            #[cfg(not(feature = "xlsx"))]
+            Some(_) => Err(Failure::App(Error::NotFound)),
+        }
+    }
+}
+
+/// Previews (`commit: false`) or imports a CSV or XLSX file through an import component. Both
+/// need the import action's permission; the file is read and validated again on commit.
+async fn import(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(mut call): axum::Json<ImportCall>) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     if let Err(f) = st.check_csrf(&headers) {
         return st.error_response(&ctx, f);
     }
+    let file = call.file();
     let result = async {
         let (_, entry, screen) = st.open(&ctx, &call.screen, call.params).await?;
         let source = screen.node(&call.node).and_then(|n| n.import()).ok_or(Failure::App(Error::NotFound))?;
@@ -112,14 +136,15 @@ async fn import(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(
         if !ctx.identity().can(&action.access) {
             return Err(Failure::App(Error::Forbidden));
         }
+        let file = file?;
         if !call.commit {
-            return source.preview(&ctx, &call.csv).map_err(Failure::App);
+            return source.preview(&ctx, &file).map_err(Failure::App);
         }
         let info = Call { kind: CallKind::Import, screen: entry.meta.name, action: Some(action), via_agent: false };
         let started = Instant::now();
         let outcome = async {
             st.before(&ctx, &info)?;
-            st.timed(source.commit(ctx.clone(), call.csv)).await
+            st.timed(source.commit(ctx.clone(), file)).await
         }
         .await;
         st.after(&ctx, &info, started, &outcome);

@@ -14,6 +14,8 @@ redis = ["server", "dep:redis"]
 otel = ["server", "dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp", "dep:tracing-opentelemetry"]
 # Embedded AI assistant with LLM and speech providers over HTTP. Off unless an app asks for it.
 assistant = ["server", "dep:reqwest", "dep:rustls"]
+# Grid export to XLSX and XLSX import.
+xlsx = ["dep:rust_xlsxwriter", "dep:calamine", "dep:zip"]
 
 [dependencies]
 zeyn-macros = { path = "../zeyn-macros", version = "0.0.2" }
@@ -35,6 +37,9 @@ opentelemetry = { version = "0.33", default-features = false, features = ["trace
 opentelemetry_sdk = { version = "0.33", default-features = false, features = ["trace"], optional = true }
 opentelemetry-otlp = { version = "0.33", default-features = false, features = ["http-proto", "trace", "reqwest-blocking-client"], optional = true }
 tracing-opentelemetry = { version = "0.34", default-features = false, optional = true }
+rust_xlsxwriter = { version = "0.102", default-features = false, features = ["constant_memory"], optional = true }
+calamine = { version = "0.38", default-features = false, optional = true }
+zip = { version = "9", default-features = false, features = ["deflate"], optional = true }
 
 [dev-dependencies]
 ed25519-dalek = { version = "3", default-features = false }
@@ -44,7 +49,18 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-util"] }
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["std", "fmt", "registry"] }
+calamine = { version = "0.38", default-features = false }
+rust_xlsxwriter = { version = "0.102", default-features = false }
+zip = { version = "9", default-features = false, features = ["deflate"] }
 
 [[test]]
 name = "assistant"
 required-features = ["assistant"]
+
+[[test]]
+name = "xlsx"
+required-features = ["xlsx"]
+
+[[test]]
+name = "xlsx_memory"
+required-features = ["xlsx"]

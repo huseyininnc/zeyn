@@ -446,7 +446,14 @@ fn key_filter(meta: &FieldMeta, key: Option<&str>) -> Filter {
     }
 }
 
-/// Most rows a CSV export holds unless the grid sets another limit.
+/// One column of a typed export: the label in the user's language and the width in pixels.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExportColumn {
+    pub label: String,
+    pub width: Option<u32>,
+}
+
+/// Most rows an export holds unless the grid sets another limit.
 pub const DEFAULT_EXPORT_LIMIT: usize = 100_000;
 
 /// Quotes one CSV cell (RFC 4180) and defuses spreadsheet formulas in text that is not a number.
@@ -457,6 +464,11 @@ fn csv_cell(value: &str) -> String {
         v.insert(0, '\'');
     }
     if v.contains([',', '"', '\r', '\n']) { format!("\"{}\"", v.replace('"', "\"\"")) } else { v }
+}
+
+/// The masked text of a masked field's value, as its grid cell shows it.
+fn masked(meta: &FieldMeta, value: &Value) -> String {
+    crate::audit::plain(value).map(|v| crate::privacy::masked_text(meta, &v)).unwrap_or_default()
 }
 
 /// A value as the user reads it, escaped for HTML.
@@ -1146,7 +1158,7 @@ impl<E: Model> DataGrid<E> {
             out.push_str(r#" data-zeyn-views="server""#);
         }
         if self.export.is_some_and(|e| r.can(&e.0)) {
-            out.push_str(r#" data-zeyn-exportable="csv""#);
+            out.push_str(if cfg!(feature = "xlsx") { r#" data-zeyn-exportable="csv xlsx""# } else { r#" data-zeyn-exportable="csv""# });
         }
         if self.can_edit(r) {
             if let Some(v) = E::fields().iter().find(|f| f.version) {
@@ -1485,13 +1497,41 @@ impl<E: Model> GridSource for DataGrid<E> {
                 .iter()
                 .map(|s| {
                     let c = &self.columns[s.index];
-                    csv_cell(&plain(&(c.value)(row), &c.meta.kind, r))
+                    let v = (c.value)(row);
+                    csv_cell(&if c.meta.mask.is_some() { masked(c.meta, &v) } else { plain(&v, &c.meta.kind, r) })
                 })
                 .collect();
             out.push_str(&line.join(","));
             out.push_str("\r\n");
         }
         out
+    }
+
+    fn export_columns(&self, r: &Render, view: Option<&DataGridView>) -> Vec<ExportColumn> {
+        self.layout(view)
+            .iter()
+            .map(|s| ExportColumn { label: r.i18n.text(r.locale, &self.columns[s.index].meta.label_text()), width: s.width })
+            .collect()
+    }
+
+    fn export_values(&self, page: &LoadedPage, r: &Render) -> Vec<Vec<Value>> {
+        let cols = self.layout(page.view.as_ref());
+        let Some(rows) = page.items.downcast_ref::<Vec<E>>() else { return Vec::new() };
+        rows.iter()
+            .map(|row| {
+                cols.iter()
+                    .map(|s| {
+                        let c = &self.columns[s.index];
+                        match (c.value)(row) {
+                            v if c.meta.mask.is_some() => Value::Text(masked(c.meta, &v)),
+                            v @ Value::Choice(_) => Value::Text(plain(&v, &c.meta.kind, r)),
+                            Value::DateTime(d) => Value::LocalDateTime(d.local(r.tz)),
+                            v => v,
+                        }
+                    })
+                    .collect()
+            })
+            .collect()
     }
 
     fn edit_call(

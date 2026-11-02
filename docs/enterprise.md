@@ -1,7 +1,7 @@
 # Enterprise Features
 
 Cross cutting features for business apps: data audit, personal data protection, safe deploys,
-health checks, session safety, CSV import, background jobs and approval workflows. Everything is
+health checks, session safety, CSV and XLSX import, background jobs and approval workflows. Everything is
 checked on the server; the browser runtime only makes it pleasant to use. KVKK and GDPR are the
 privacy laws kept in mind, but nothing here is specific to a country or an industry.
 
@@ -208,6 +208,22 @@ Screen::new("Import").body(Import::of(import_leaves).max_rows(1000))
   preview is trusted. Both steps need the action's permission, and the import is audited.
 - `.max_rows(n)` limits rows (5000 by default, never more than 50000). The error report defuses
   spreadsheet formulas. Masked fields are shown masked in the preview.
+
+### XLSX import
+
+With the `xlsx` Cargo feature the same component also takes Excel workbooks (`.xlsx`). The
+runtime sends the file in base64 (`"xlsx"` instead of `"csv"` in the same JSON body), and the
+server reads the first worksheet with `calamine` into the same row by row validation, preview and
+error report as CSV.
+
+- Cells keep their types: a number is read as a number and a date cell as a date, whatever the
+  user's language, so `1234.5` in a Turkish session is still 1.234,50. Wall clock times in a date
+  cell are read in the user's time zone, as a form reads them. Choices match by value or by label.
+- Limits: at most 8 MB of file, and the archive may unpack to at most 64 MB in at most 1000 parts,
+  checked from the sizes the archive declares before anything is unpacked. Cells are read one by
+  one and reading stops at the row limit, so a sheet with a million rows costs no more than the
+  limit. A file that is not a workbook, password protected or cut short gets a clear error.
+- Only the first worksheet is read. Formulas count with their cached value.
 
 ## Background jobs
 

@@ -29,6 +29,8 @@
     },
     "import": {
       "file": "CSV file",
+      "file_any": "CSV or Excel file",
+      "bad_file": "The file could not be read as an Excel workbook.",
       "hint": "The first row names the columns: {columns}. Values are separated by commas or semicolons. At most {max} rows.",
       "summary": "{total} rows read: {valid} valid, {invalid} with errors.",
       "commit": "Import valid rows",

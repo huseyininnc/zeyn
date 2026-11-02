@@ -252,7 +252,7 @@ pub trait GridSource: Send + Sync {
         None
     }
 
-    /// Who may export the whole filtered result as CSV; `None` when the grid offers no export.
+    /// Who may export the whole filtered result; `None` when the grid offers no export.
     fn export_access(&self) -> Option<crate::action::Access> {
         None
     }
@@ -273,6 +273,19 @@ pub trait GridSource: Send + Sync {
     fn csv_rows(&self, page: &LoadedPage, r: &Render) -> String {
         let _ = (page, r);
         String::new()
+    }
+
+    /// Columns of a typed export (XLSX) in a view: labels in the user's language and widths.
+    fn export_columns(&self, r: &Render, view: Option<&crate::grid::DataGridView>) -> Vec<crate::grid::ExportColumn> {
+        let _ = (r, view);
+        Vec::new()
+    }
+
+    /// Typed values of a loaded page in its view, one row per item: choices as the user's labels
+    /// and exact moments as wall clock time in the user's time zone. Everything else keeps its type.
+    fn export_values(&self, page: &LoadedPage, r: &Render) -> Vec<Vec<crate::value::Value>> {
+        let _ = (page, r);
+        Vec::new()
     }
 
     /// Builds the call of a row item (`a0` for the first row action) from the loaded row with

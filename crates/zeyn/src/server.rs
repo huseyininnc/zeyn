@@ -30,6 +30,8 @@ mod media;
 mod ops;
 mod session;
 mod telemetry;
+#[cfg(feature = "xlsx")]
+mod xlsx;
 
 pub use ops::{build_id, probe};
 
@@ -1964,6 +1966,8 @@ struct ExportQuery {
     node: crate::ui::NodePath,
     /// JSON of `{ "sort": [...], "filters": [...], "columns": [...] }`, all optional.
     q: Option<String>,
+    /// `csv` (the default) or `xlsx`.
+    format: Option<String>,
 }
 
 /// Body of a streamed export: chunks from a channel.
@@ -2495,11 +2499,17 @@ async fn grid_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Js
     }
 }
 
-/// Streams every row that matches the filters as CSV, page by page through the grid's action,
-/// in the user's column layout and language, up to the grid's export limit. Needs the grid's
-/// read access and its export access; interceptors see the call.
+/// Streams every row that matches the filters as CSV (or XLSX with the `xlsx` feature), page by
+/// page through the grid's action, in the user's column layout and language, up to the grid's
+/// export limit. Needs the grid's read access and its export access; interceptors see the call.
 async fn grid_export(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Query<ExportQuery>) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
+    let xlsx = match q.format.as_deref() {
+        None | Some("csv") => false,
+        #[cfg(feature = "xlsx")]
+        Some("xlsx") => true,
+        Some(_) => return st.error_response(&ctx, Failure::App(Error::NotFound)),
+    };
     let opened = async {
         let params = match &q.params {
             None => Json::Null,
@@ -2541,9 +2551,15 @@ async fn grid_export(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(
         let Some(grid) = screen.node(&node).and_then(|n| n.grid()) else { return };
         let view = view.map(|v| grid.clean_view(v));
         let r = Render::new(name, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity());
-        let head = format!("\u{feff}{}", grid.csv_head(&r, view.as_ref()));
-        if tx.send(Ok(head.into())).await.is_err() {
-            return;
+        #[cfg(feature = "xlsx")]
+        let sheet = xlsx.then(|| xlsx::XlsxSink::open(grid.export_columns(&r, view.as_ref()), ctx.locale().to_string(), tx.clone()));
+        #[cfg(not(feature = "xlsx"))]
+        let sheet: Option<std::convert::Infallible> = None;
+        if sheet.is_none() {
+            let head = format!("\u{feff}{}", grid.csv_head(&r, view.as_ref()));
+            if tx.send(Ok(head.into())).await.is_err() {
+                return;
+            }
         }
         let limit = grid.export_limit();
         let mut sent = 0usize;
@@ -2562,7 +2578,15 @@ async fn grid_export(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(
             };
             page.view = view.clone();
             let n = page.count;
-            if n > 0 && tx.send(Ok(grid.csv_rows(&page, &r).into())).await.is_err() {
+            let open = match &sheet {
+                _ if n == 0 => true,
+                #[cfg(feature = "xlsx")]
+                Some(s) => s.send(grid.export_values(&page, &r)).await,
+                #[cfg(not(feature = "xlsx"))]
+                Some(never) => match *never {},
+                None => tx.send(Ok(grid.csv_rows(&page, &r).into())).await.is_ok(),
+            };
+            if !open {
                 break;
             }
             sent += n;
@@ -2570,13 +2594,24 @@ async fn grid_export(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(
                 break;
             }
         }
+        #[cfg(feature = "xlsx")]
+        if let Some(s) = sheet
+            && let Err(e) = s.finish(outcome.is_ok()).await
+        {
+            tracing::warn!("XLSX export did not finish: {e}");
+        }
         state.after(&ctx, &info, started, &outcome);
     });
     let mut response = axum::body::Body::from_stream(Chunks(rx)).into_response();
     let h = response.headers_mut();
-    h.insert(header::CONTENT_TYPE, HeaderValue::from_static("text/csv; charset=utf-8"));
+    let (kind, ext) = if xlsx {
+        ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "xlsx")
+    } else {
+        ("text/csv; charset=utf-8", "csv")
+    };
+    h.insert(header::CONTENT_TYPE, HeaderValue::from_static(kind));
     h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
-    if let Ok(v) = HeaderValue::from_str(&format!("attachment; filename=\"{name}.csv\"")) {
+    if let Ok(v) = HeaderValue::from_str(&format!("attachment; filename=\"{name}.{ext}\"")) {
         h.insert(header::CONTENT_DISPOSITION, v);
     }
     response
