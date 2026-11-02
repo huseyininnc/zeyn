@@ -430,7 +430,12 @@ pub use import::{
     check_csv, check_file, error_report, parse_csv,
 };
 #[cfg(feature = "server")]
-pub use jobs::{JobState, JobStatus, Jobs, Schedule};
+pub use jobs::{
+    ClaimedJob, JOB_LEASE, JOB_POLL, JobState, JobStatus, JobStore, Jobs, MAX_BACKOFF_MS, MAX_JOB_PAYLOAD,
+    MEMORY_JOB_CAPACITY, MemoryJobStore, NewJob, NextRun, Schedule,
+};
+#[cfg(all(feature = "server", any(feature = "postgres", feature = "oracle")))]
+pub use jobs::{SqlJobStore, create_job_tables};
 #[cfg(feature = "email")]
 pub use mail::{MAIL_JOB, MAX_ATTEMPTS, MAX_QUEUED, Mail, Mailer};
 pub use media::{

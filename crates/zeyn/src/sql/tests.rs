@@ -547,6 +547,7 @@ impl crate::Model for Holder {
     }
 }
 
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 struct Measure {
     id: i64,
     rate: crate::Decimal,

@@ -12,7 +12,7 @@ use super::model::{Claim, Passkey, Role, User, UserLogin};
 use super::store::AccountStore;
 use crate::auth::b64url;
 use crate::ctx::BoxFuture;
-use crate::sql::{Arg, Cast, Cell, Col, Db, Sql};
+use crate::sql::{Arg, Cell, Col, Db, Sql, checked_prefix};
 use crate::{Error, Result};
 use std::sync::Arc;
 
@@ -95,17 +95,6 @@ pub fn create_tables(dialect: &str, prefix: &str) -> Result<Vec<String>> {
         ),
         format!("CREATE INDEX {p}user_passkeys_user ON {p}user_passkeys (user_id)"),
     ])
-}
-
-fn checked_prefix(prefix: &str) -> Result<String> {
-    let ok = prefix.len() <= 16
-        && prefix.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
-        && !prefix.starts_with(|c: char| c.is_ascii_digit());
-    if ok {
-        Ok(prefix.to_string())
-    } else {
-        Err(Error::Internal("the account table prefix may hold lower case letters, digits and `_`, at most 16".into()))
-    }
 }
 
 const USER_COLS: &str = "id, user_name, normalized_user_name, email, normalized_email, email_confirmed, password_hash, security_stamp, concurrency_stamp, phone_number, phone_number_confirmed, two_factor_enabled, lockout_end, lockout_enabled, access_failed_count, extra";
@@ -231,18 +220,7 @@ impl SqlAccountStore {
 
     /// SQL with `{p}` replaced by the prefix and each `?` by the dialect's placeholder.
     fn sql(&self, template: &str, args: Vec<Arg>, cols: &[Col]) -> Sql {
-        let template = template.replace("{p}", &self.prefix);
-        let mut text = String::with_capacity(template.len() + 16);
-        let mut n = 0;
-        for ch in template.chars() {
-            if ch == '?' {
-                n += 1;
-                self.db.dialect().param(&mut text, n, Cast::Plain);
-            } else {
-                text.push(ch);
-            }
-        }
-        Sql { text, args, cols: cols.to_vec() }
+        crate::sql::bind(self.db.dialect(), &self.prefix, template, args, cols)
     }
 
     async fn users_where(&self, condition: &str, args: Vec<Arg>) -> Result<Vec<User>> {
