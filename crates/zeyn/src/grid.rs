@@ -504,6 +504,7 @@ fn plain(value: &Value, kind: &FieldKind, r: &Render) -> String {
         Value::LocalDateTime(l) => l.format(r.locale),
         Value::DateTime(d) => d.format(r.tz, r.locale),
         Value::Decimal(x) => format!("{x:.2}"),
+        Value::Number(d) => d.format(r.locale),
         Value::Choice(c) => match kind {
             FieldKind::Choice(options) => options
                 .iter()
@@ -960,7 +961,7 @@ impl<E: Model> DataGrid<E> {
             if let Some(f) = c.flex.filter(|_| s.width.is_none()) {
                 style.push_str(&format!("--z-flex:{f};"));
             }
-            let num = matches!(c.meta.kind, FieldKind::Integer | FieldKind::Money);
+            let num = matches!(c.meta.kind, FieldKind::Integer | FieldKind::Money | FieldKind::Decimal);
             let class = if num { r#" class="z-num""# } else { "" };
             out.push_str(&format!(
                 r#"<th scope="col"{class} data-field="{}" aria-sort="none" aria-colindex="{}""#,
@@ -1257,7 +1258,7 @@ impl<E: Model> DataGrid<E> {
             return "<td></td>".to_string();
         }
         let ops: Vec<&str> = c.aggregates.iter().map(|a| a.code()).collect();
-        let num = matches!(c.meta.kind, FieldKind::Integer | FieldKind::Money);
+        let num = matches!(c.meta.kind, FieldKind::Integer | FieldKind::Money | FieldKind::Decimal);
         let class = if num { r#" class="z-num""# } else { "" };
         let mut out = format!(r#"<td{class} data-field="{}" data-agg="{}">"#, c.meta.name, ops.join(" "));
         for op in &c.aggregates {
@@ -1557,7 +1558,8 @@ impl<E: Model> GridSource for DataGrid<E> {
             .iter()
             .map(|s| {
                 let meta = &self.columns[s.index].meta;
-                let numeric = matches!(meta.kind, FieldKind::Integer | FieldKind::Money) && meta.mask.is_none();
+                let numeric = matches!(meta.kind, FieldKind::Integer | FieldKind::Money | FieldKind::Decimal)
+                    && meta.mask.is_none();
                 ExportColumn { label: r.i18n.text(r.locale, &meta.label_text()), width: s.width, numeric }
             })
             .collect()
@@ -1816,7 +1818,7 @@ pub const MAX_SORT: usize = 4;
 fn filter_kind(kind: &FieldKind) -> &'static str {
     match kind {
         FieldKind::Integer | FieldKind::Id => "number",
-        FieldKind::Money => "money",
+        FieldKind::Money | FieldKind::Decimal => "money",
         FieldKind::Date => "date",
         FieldKind::DateTime | FieldKind::LocalDateTime => "datetime",
         FieldKind::Time => "time",

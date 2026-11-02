@@ -331,10 +331,52 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
             )
             .add(StatusBar::new("Status").left("Ready").right("UTF-8"))
             .into(),
+        "inputs" => inputs(),
         _ => return None,
     })
 }
 
+/// Terms for the decimal, percent, masked and password example.
+#[model]
+pub struct Terms {
+    #[rule(precision = 12, scale = 4, min = 0)]
+    pub rate: Decimal,
+    #[rule(scale = 1, min = 0, max = 100)]
+    pub discount: Option<Decimal>,
+    #[rule(required, mask = "(999) 999 99 99")]
+    pub phone: String,
+    #[label("IBAN")]
+    #[rule(mask = "AA99 9999 9999 9999 9999 9999 99")]
+    pub iban: Option<String>,
+    #[rule(min_len = 10, max_len = 128)]
+    pub password: String,
+}
+
+/// Accepts valid terms and sends nothing back. Nothing is stored.
+#[action(public)]
+pub async fn save_terms(terms: Valid<Terms>) -> Result<String> {
+    Ok(terms.phone.clone())
+}
+
+/// The decimal, percent, masked and password inputs.
+fn inputs() -> Node {
+    Form::of(Terms {
+        rate: Decimal::parse("1.0825").unwrap_or_default(),
+        discount: Decimal::parse("12.5"),
+        phone: "5321234567".into(),
+        ..Terms::default()
+    })
+    .row(|r| r.field(Terms::rate).field(Terms::discount))
+    .control(Terms::discount, Control::Percent)
+    .row(|r| r.field(Terms::phone).field(Terms::iban))
+    .field(Terms::password)
+    .control(Terms::password, Control::PasswordMeter)
+    .submit(t!("docs.live.save"), save_terms)
+    .on_success(|_, ui| ui.toast(t!("docs.live.saved")))
+    .into()
+}
+
 /// Names of every live example, for checks and tests.
-pub const EXAMPLES: &[&str] =
-    &["datagrid", "form", "controls", "dates", "lines", "layout", "display", "action", "tree", "chart", "shell"];
+pub const EXAMPLES: &[&str] = &[
+    "datagrid", "form", "controls", "dates", "lines", "layout", "display", "action", "tree", "chart", "shell", "inputs",
+];

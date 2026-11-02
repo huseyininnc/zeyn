@@ -37,6 +37,16 @@ pub enum Rule {
     MaxLen(usize),
     Min(i64),
     Max(i64),
+    /// Most decimals of a `Decimal` field (`#[rule(scale = 4)]`); 2 without the rule.
+    Scale(u8),
+    /// Most digits of a `Decimal` field, decimals included (`#[rule(precision = 12)]`); 18
+    /// without the rule. With the scale it gives the column type, `NUMERIC(12, 4)`.
+    Precision(u8),
+    /// The raw value fills a pattern (`#[rule(mask = "(999) 999 99 99")]`): `9` a digit, `a` a
+    /// letter, `A` a letter written upper case, `*` a letter or digit, a backslash makes the
+    /// next character literal. Literals are shown while typing but never stored. See
+    /// [`crate::ui::mask_fits`].
+    Mask(&'static str),
     /// The submitted value could not be read as the field's type.
     Format,
     /// Raised by a model level `validate = ...` function.
@@ -95,6 +105,21 @@ impl FieldMeta {
             Rule::Min(n) => Some(*n),
             _ => None,
         })
+    }
+
+    /// Digits and decimals of a `Decimal` field: its `precision` and `scale` rules, or 18 and 2.
+    pub fn decimal_limits(&self) -> (u8, u8) {
+        let scale = self.rules.iter().find_map(|r| if let Rule::Scale(n) = r { Some(*n) } else { None });
+        let precision = self.rules.iter().find_map(|r| if let Rule::Precision(n) = r { Some(*n) } else { None });
+        let scale = scale.unwrap_or(crate::decimal::DEFAULT_SCALE).min(crate::decimal::MAX_SCALE);
+        let precision =
+            precision.unwrap_or(crate::decimal::DEFAULT_PRECISION).clamp(scale.max(1), crate::decimal::MAX_PRECISION);
+        (precision, scale)
+    }
+
+    /// The pattern of the `mask` rule, if any.
+    pub fn mask_pattern(&self) -> Option<&'static str> {
+        self.rules.iter().find_map(|r| if let Rule::Mask(p) = r { Some(*p) } else { None })
     }
 
     pub fn max(&self) -> Option<i64> {
@@ -237,12 +262,13 @@ fn looks_like_email(s: &str) -> bool {
 #[doc(hidden)]
 pub mod __rules {
     use super::*;
-    use crate::value::{SupportsMinMax, SupportsRequired, SupportsText};
+    use crate::value::{SupportsMinMax, SupportsRequired, SupportsScale, SupportsText};
     use std::cmp::Ordering;
 
     pub fn required<T: SupportsRequired>() {}
     pub fn text<T: SupportsText>() {}
     pub fn min_max<T: SupportsMinMax>() {}
+    pub fn scale<T: SupportsScale>() {}
     pub fn version<T: IsVersion>() {}
 
     /// Types allowed for `#[version]`.
@@ -284,10 +310,27 @@ pub mod __rules {
                 Rule::Max(n) if value.__compare(n) == Some(Ordering::Greater) => {
                     Some(message("zeyn.validation.max").arg("n", limit_text(meta, n)))
                 }
+                Rule::Mask(p) if !empty && value.__text().is_some_and(|s| !crate::ui::mask_fits(p, s)) => {
+                    Some(message("zeyn.validation.mask").arg("pattern", crate::ui::mask_example(p)))
+                }
                 _ => None,
             };
             if let Some(message) = text {
                 errors.errors.push(FieldError { field: meta.name, rule: *rule, message });
+            }
+        }
+        if let Some(d) = value.__decimal() {
+            let (precision, scale) = meta.decimal_limits();
+            let problem = if d.fraction_digits() > scale {
+                Some((Rule::Scale(scale), message("zeyn.validation.scale").arg("n", scale.to_string())))
+            } else if d.integer_digits() > precision - scale {
+                let whole = (precision - scale).to_string();
+                Some((Rule::Precision(precision), message("zeyn.validation.precision").arg("n", whole)))
+            } else {
+                None
+            };
+            if let Some((rule, message)) = problem {
+                errors.errors.push(FieldError { field: meta.name, rule, message });
             }
         }
         value.__validate_items(meta, errors);

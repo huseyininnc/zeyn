@@ -11,6 +11,8 @@ pub enum FieldKind {
     Text,
     Integer,
     Money,
+    /// An exact decimal number ([`crate::Decimal`]) with the `scale` and `precision` rules.
+    Decimal,
     Bool,
     Date,
     Time,
@@ -51,6 +53,8 @@ pub enum Value {
     /// A computed number with a fraction, such as the average of a whole number column.
     /// Shown with two decimals in the user's locale. Never a model field.
     Decimal(f64),
+    /// An exact decimal number, the value of a [`crate::Decimal`] field.
+    Number(crate::Decimal),
 }
 
 /// Currency.
@@ -161,7 +165,7 @@ impl fmt::Display for Money {
 #[diagnostic::on_unimplemented(
     message = "`{Self}` cannot be used as a model field",
     label = "unsupported field type",
-    note = "supported types: String, i32, i64, bool, Money, Date, Time, DateTime, LocalDateTime, Option<T>, entity ids and `#[choice]` enums"
+    note = "supported types: String, i32, i64, bool, Money, Decimal, Date, Time, DateTime, LocalDateTime, Option<T>, entity ids and `#[choice]` enums"
 )]
 pub trait FieldType {
     const KIND: FieldKind;
@@ -188,6 +192,12 @@ pub trait FieldType {
 
     #[doc(hidden)]
     fn __compare(&self, _limit: i64) -> Option<std::cmp::Ordering> {
+        None
+    }
+
+    /// The exact decimal held, for the `scale` and `precision` checks.
+    #[doc(hidden)]
+    fn __decimal(&self) -> Option<crate::Decimal> {
         None
     }
 
@@ -277,6 +287,19 @@ impl FieldType for Money {
     }
 }
 
+impl FieldType for crate::Decimal {
+    const KIND: FieldKind = FieldKind::Decimal;
+    fn to_value(&self) -> Value {
+        Value::Number(*self)
+    }
+    fn __compare(&self, limit: i64) -> Option<std::cmp::Ordering> {
+        Some(self.cmp_int(limit))
+    }
+    fn __decimal(&self) -> Option<crate::Decimal> {
+        Some(*self)
+    }
+}
+
 impl<T: FieldType> FieldType for Option<T> {
     const KIND: FieldKind = T::KIND;
     const OPTIONAL: bool = true;
@@ -292,18 +315,22 @@ impl<T: FieldType> FieldType for Option<T> {
     fn __compare(&self, limit: i64) -> Option<std::cmp::Ordering> {
         self.as_ref().and_then(|v| v.__compare(limit))
     }
+    fn __decimal(&self) -> Option<crate::Decimal> {
+        self.as_ref().and_then(T::__decimal)
+    }
 }
 
 /// Column types that accept `min()` and `max()` totals in a grid.
 #[diagnostic::on_unimplemented(
     message = "`min()` and `max()` cannot be used on a `{Self}` column",
     label = "values of this column have no order that makes a useful total",
-    note = "`min()` and `max()` work on i32, i64, Money, Date, Time, DateTime, LocalDateTime and their Option forms"
+    note = "`min()` and `max()` work on i32, i64, Money, Decimal, Date, Time, DateTime, LocalDateTime and their Option forms"
 )]
 pub trait SupportsMinMaxTotal {}
 impl SupportsMinMaxTotal for i32 {}
 impl SupportsMinMaxTotal for i64 {}
 impl SupportsMinMaxTotal for Money {}
+impl SupportsMinMaxTotal for crate::Decimal {}
 impl SupportsMinMaxTotal for Date {}
 impl SupportsMinMaxTotal for Time {}
 impl SupportsMinMaxTotal for DateTime {}
@@ -362,12 +389,13 @@ impl SupportsText for Option<String> {}
 #[diagnostic::on_unimplemented(
     message = "the `min` and `max` rules cannot be used on `{Self}`",
     label = "not a numeric field",
-    note = "`min` and `max` work on i32, i64, Money, Date and their Option forms; for Money the limit is in major units, for Date it is written as YYYY_MM_DD"
+    note = "`min` and `max` work on i32, i64, Money, Decimal, Date and their Option forms; for Money and Decimal the limit is a whole number, for Date it is written as YYYY_MM_DD"
 )]
 pub trait SupportsMinMax {}
 impl SupportsMinMax for i32 {}
 impl SupportsMinMax for i64 {}
 impl SupportsMinMax for Money {}
+impl SupportsMinMax for crate::Decimal {}
 /// Dates take limits written as `YYYY_MM_DD`: `#[rule(min = 2024_01_01)]`.
 impl SupportsMinMax for Date {}
 impl<T: SupportsMinMax> SupportsMinMax for Option<T> {}
@@ -376,10 +404,21 @@ impl<T: SupportsMinMax> SupportsMinMax for Option<T> {}
 #[diagnostic::on_unimplemented(
     message = "`sum()` and `avg()` cannot be used on a `{Self}` column",
     label = "not a numeric column",
-    note = "`sum()` and `avg()` work on i32, i64, Money and their Option forms; use `count()` for other columns"
+    note = "`sum()` and `avg()` work on i32, i64, Money, Decimal and their Option forms; use `count()` for other columns"
 )]
 pub trait SupportsSum {}
+impl SupportsSum for crate::Decimal {}
 impl SupportsSum for i32 {}
 impl SupportsSum for i64 {}
 impl SupportsSum for Money {}
 impl<T: SupportsSum> SupportsSum for Option<T> {}
+
+/// Types that accept the `scale` and `precision` rules.
+#[diagnostic::on_unimplemented(
+    message = "the `scale` and `precision` rules cannot be used on `{Self}`",
+    label = "not a decimal field",
+    note = "`scale` and `precision` work on Decimal and Option<Decimal>; Money always has two decimals"
+)]
+pub trait SupportsScale {}
+impl SupportsScale for crate::Decimal {}
+impl SupportsScale for Option<crate::Decimal> {}

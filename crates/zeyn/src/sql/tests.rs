@@ -513,3 +513,102 @@ fn oracle_identifiers_stay_within_30_characters() {
     assert!(build::ident(&V11, &"a".repeat(30)).is_ok());
     assert!(build::ident(&V11, &"a".repeat(31)).is_err());
 }
+
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+struct Measure {
+    id: i64,
+    rate: crate::Decimal,
+}
+
+static MEASURE_FIELDS: [crate::FieldMeta; 2] = [
+    crate::FieldMeta { key: true, model: "Measure", ..meta("id", crate::FieldKind::Id) },
+    crate::FieldMeta {
+        model: "Measure",
+        rules: &[Rule::Precision(12), Rule::Scale(4)],
+        ..meta("rate", crate::FieldKind::Decimal)
+    },
+];
+
+impl crate::Model for Measure {
+    const NAME: &'static str = "Measure";
+    fn fields() -> &'static [crate::FieldMeta] {
+        &MEASURE_FIELDS
+    }
+    fn value_at(&self, index: usize) -> Option<Value> {
+        Some(match index {
+            0 => Value::Int(self.id),
+            1 => Value::Number(self.rate),
+            _ => return None,
+        })
+    }
+    fn validate(&self) -> std::result::Result<(), crate::ValidationErrors> {
+        Ok(())
+    }
+}
+
+impl crate::Entity for Measure {
+    const TABLE: &'static str = "measures";
+}
+
+#[test]
+fn decimals_map_to_numeric_columns_with_their_precision_and_scale() {
+    let pg = create_table::<Measure>(&Postgres).unwrap();
+    assert!(pg[0].contains(r#""rate" NUMERIC(12, 4) NOT NULL"#), "{}", pg[0]);
+    let ora = create_table::<Measure>(&V12).unwrap();
+    assert!(ora[0].contains(r#""RATE" NUMBER(12, 4) NOT NULL"#), "{}", ora[0]);
+}
+
+#[test]
+fn decimals_bind_as_exact_text_and_read_back_without_session_settings() {
+    let q = DataQuery { filters: vec![Filter::range("rate", Some("0.125"), Some("2,5"))], ..DataQuery::default() };
+    let sql = build::plan_find::<Measure>(&Postgres, &q, 10).unwrap().main;
+    assert!(sql.text.contains(r#"CAST("rate" AS TEXT) AS c1"#), "{}", sql.text);
+    assert!(sql.text.contains(r#""rate" >= CAST($1 AS numeric) AND "rate" <= CAST($2 AS numeric)"#), "{}", sql.text);
+    assert_eq!(sql.args[..2], [Arg::Text("125E-3".into()), Arg::Text("25E-1".into())]);
+    let ora = build::plan_find::<Measure>(&V12, &q, 10).unwrap().main;
+    assert!(ora.text.contains(r#"TO_CHAR("RATE", 'TM9', 'NLS_NUMERIC_CHARACTERS=''.,''') AS c1"#), "{}", ora.text);
+    assert!(ora.text.contains(r#""RATE" >= TO_NUMBER(:1)"#), "{}", ora.text);
+
+    let mut cells = vec![Cell::Int(1), Cell::Text("-.5".into())];
+    let m: Measure = super::decode::decode_row(&mut cells).unwrap();
+    assert_eq!(m.rate, crate::Decimal::parse("-0.5").unwrap(), "Oracle writes -.5");
+    let mut args = Vec::new();
+    super::decode::args_of(&crate::FieldKind::Decimal, Value::Number(m.rate), &mut args);
+    assert_eq!(args, vec![Arg::Text("-5E-1".into())]);
+}
+
+#[test]
+fn decimal_totals_are_exact_and_averages_round_to_the_scale() {
+    let q = DataQuery {
+        aggregates: vec![
+            AggregateRequest { field: "rate".into(), op: Aggregate::Sum },
+            AggregateRequest { field: "rate".into(), op: Aggregate::Avg },
+            AggregateRequest { field: "rate".into(), op: Aggregate::Max },
+        ],
+        ..DataQuery::default()
+    };
+    let (sql, aggs) = build::plan_find::<Measure>(&Postgres, &q, 10).unwrap().totals.unwrap();
+    assert_eq!(
+        sql.text,
+        r#"SELECT CAST(COALESCE(SUM("rate"), 0) AS TEXT) AS c0, CAST(ROUND(AVG("rate"), 4) AS TEXT) AS c1, CAST(MAX("rate") AS TEXT) AS c2 FROM "measures""#
+    );
+    let cells =
+        vec![Cell::Text("10000000000000000.0003".into()), Cell::Text("0.3333".into()), Cell::Text("9.5000".into())];
+    let totals = build::read_aggs(&MEASURE_FIELDS, &aggs, &mut cells.into_iter());
+    assert_eq!(totals[0].value, Value::Number(crate::Decimal::parse("10000000000000000.0003").unwrap()));
+    assert_eq!(totals[1].value, Value::Number(crate::Decimal::parse("0.3333").unwrap()));
+    assert_eq!(totals[2].value, Value::Number(crate::Decimal::parse("9.5").unwrap()));
+}
+
+#[test]
+fn decimal_cursors_keep_the_exact_value() {
+    let q = DataQuery { sort: vec![Sort { field: "rate".into(), desc: false }], ..DataQuery::default() };
+    let keys = match build::plan_find::<Measure>(&Postgres, &q, 10).unwrap().shape {
+        Shape::Rows(keys) => keys,
+        _ => unreachable!(),
+    };
+    let row = Measure { id: 7, rate: crate::Decimal::parse("0.1000").unwrap() };
+    let cursor = build::row_cursor(&Postgres, &keys, &row);
+    let args = build::read_cursor(&MEASURE_FIELDS, &keys, &cursor).unwrap();
+    assert_eq!(args, vec![Arg::Text("1000E-4".into()), Arg::Int(7)]);
+}

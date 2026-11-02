@@ -111,6 +111,7 @@ Columns are named after the fields. Types:
 | `i32`, `i64` | `BIGINT` (an `INTEGER` column works too) | `NUMBER(19)` |
 | `bool` | `BOOLEAN` | `NUMBER(1)` |
 | `Money` | `BIGINT` amount in the smallest unit, plus `<field>_currency VARCHAR(3)` | `NUMBER(19)`, plus `<field>_currency` |
+| `Decimal` | `NUMERIC(precision, scale)` from the field's rules, `NUMERIC(18, 2)` without them | `NUMBER(precision, scale)` |
 | `Date` | `DATE` | `DATE` |
 | `Time` | `TIME` | `VARCHAR2(8)` holding `HH:MM:SS` |
 | `DateTime` | `TIMESTAMPTZ(3)` | `TIMESTAMP(3)` holding UTC |
@@ -121,7 +122,11 @@ Columns are named after the fields. Types:
 
 Currencies are stored as `TRY`, `USD` and `EUR`. Dates and times travel as ISO text and the SQL
 converts them with fixed formats (`TO_DATE(:1, 'YYYY-MM-DD')`, `to_char(...)`), so session
-settings such as `NLS_DATE_FORMAT` or the PostgreSQL time zone do not change results.
+settings such as `NLS_DATE_FORMAT` or the PostgreSQL time zone do not change results. Decimals
+are bound as exact text without a decimal separator (`12345E-2`, read by `CAST(... AS NUMERIC)`
+and `TO_NUMBER(...)`) and read back with `CAST(... AS TEXT)` or
+`TO_CHAR(..., 'TM9', 'NLS_NUMERIC_CHARACTERS=''.,''')`, so `NLS_NUMERIC_CHARACTERS` does not
+change them either.
 
 `create_table::<E>(dialect)` (or `db.create_table::<E>()`) writes the `CREATE TABLE` for
 scaffolding and tests, with a constraint named `<table>_<field>_key` for every

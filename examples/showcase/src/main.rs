@@ -8,6 +8,7 @@
 
 mod assistant;
 mod gallery;
+mod inputs;
 mod islands;
 mod media;
 mod overview;
@@ -116,6 +117,7 @@ async fn main() -> std::io::Result<()> {
         .feature(pro::feature())
         .feature(islands::feature())
         .feature(assistant::feature())
+        .feature(inputs::feature())
         .islands(concat!(env!("CARGO_MANIFEST_DIR"), "/dist/islands"));
     #[cfg(feature = "pdf")]
     {

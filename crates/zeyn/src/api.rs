@@ -23,6 +23,14 @@ pub fn model_schema<M: Model>() -> Json {
 fn field_schema(f: &FieldMeta) -> Json {
     let mut s = match f.kind {
         FieldKind::Id | FieldKind::Integer => json!({ "type": "integer" }),
+        FieldKind::Decimal => {
+            let (precision, scale) = f.decimal_limits();
+            json!({
+                "type": "string",
+                "pattern": "^-?\\d+(\\.\\d+)?$",
+                "description": format!("Exact decimal number with '.' as the separator, at most {precision} digits and {scale} decimals")
+            })
+        }
         FieldKind::Text | FieldKind::Custom { .. } => json!({ "type": "string" }),
         FieldKind::Bool => json!({ "type": "boolean" }),
         FieldKind::Date => json!({ "type": "string", "format": "date" }),

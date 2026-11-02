@@ -5,8 +5,8 @@
 //! |---|---|---|
 //! | `bool` | checkbox | [`Control::Switch`] |
 //! | `#[choice]` | select (ARIA select only combobox) | [`Control::Radio`], [`Control::Segmented`], [`Control::Listbox`] |
-//! | `i32`, `i64`, `Money` | number input formatted while typing, with step buttons | |
-//! | `String` | text input; a growing text area with a counter above 255 characters | |
+//! | `i32`, `i64`, `Money`, `Decimal` | number input formatted while typing, with step buttons | [`Control::Percent`] |
+//! | `String` | text input; a growing text area with a counter above 255 characters; a masked input with the `mask` rule | [`Control::Password`], [`Control::NewPassword`], [`Control::PasswordMeter`], [`Control::OneTimeCode`] |
 
 use crate::i18n::{NumberFormat, Text};
 use crate::model::FieldMeta;
@@ -41,6 +41,12 @@ pub enum Control {
     /// A one time code input for text fields: numeric keyboard, `autocomplete="one-time-code"`,
     /// never kept in drafts.
     OneTimeCode,
+    /// A number shown as a percentage, for `Decimal` and whole number fields. The value is in
+    /// percent points: `12.5` is shown as `12.5 %` (`%12,5` in Turkish) and stored as `12.5`.
+    Percent,
+    /// A new password input with a strength meter. The meter is a hint computed in the browser;
+    /// the field's rules (`min_len`, a model `validate` function) are what the server enforces.
+    PasswordMeter,
 }
 
 /// What a control needs to render one field.
@@ -139,14 +145,21 @@ pub(crate) fn render_choice(out: &mut String, r: &Render, s: &Slot) {
     }
 }
 
-/// Whole numbers and money: formatted while typing in the user's language, with step buttons.
-/// Key fields are not grouped (`10234`, not `10.234`).
+/// Whole numbers, money and decimals: formatted while typing in the user's language, with step
+/// buttons. Key fields are not grouped (`10234`, not `10.234`). Decimals keep their field's scale.
 pub(crate) fn render_number(out: &mut String, r: &Render, s: &Slot) {
     let f = NumberFormat::for_locale(r.locale);
     let money = s.m.kind == FieldKind::Money;
     let group = s.m.kind != FieldKind::Id;
+    let scale = match s.m.kind {
+        FieldKind::Money => 2,
+        FieldKind::Decimal => s.m.decimal_limits().1,
+        _ => 0,
+    };
+    let percent = s.control == Some(Control::Percent);
     let text = match s.value {
         Value::Money(m) => m.format_plain(r.locale),
+        Value::Number(d) => d.format(r.locale),
         Value::Int(n) if group => crate::value::Money::new(n.saturating_mul(100), Default::default())
             .format_plain(r.locale)
             .rsplit_once(f.decimal)
@@ -159,16 +172,36 @@ pub(crate) fn render_number(out: &mut String, r: &Render, s: &Slot) {
         .iter()
         .filter_map(|(k, v)| v.map(|n| format!(r#" data-{k}="{n}" aria-value{k}="{n}""#)))
         .collect::<String>();
+    let _ = money;
     out.push_str(s.label);
+    let (class, common) = if percent {
+        let unit = format!("{}-unit", s.id);
+        let common = s.common.replacen(r#"aria-describedby=""#, &format!(r#"aria-describedby="{unit} "#), 1);
+        (
+            if NumberFormat::percent_first(r.locale) {
+                "z-number z-percent z-affix-first"
+            } else {
+                "z-number z-percent"
+            },
+            common,
+        )
+    } else {
+        ("z-number", s.common.to_string())
+    };
     out.push_str(&format!(
-        r#"<div class="z-number" data-zeyn-number data-decimal="{}" data-group="{}" data-scale="{}" data-grouped="{group}"><input type="text" role="spinbutton" inputmode="{}" autocomplete="off" class="z-num" {}{limits} value="{}">"#,
+        r#"<div class="{class}" data-zeyn-number data-decimal="{}" data-group="{}" data-scale="{scale}" data-grouped="{group}"><input type="text" role="spinbutton" inputmode="{}" autocomplete="off" class="z-num" {common}{limits} value="{}">"#,
         escape(&f.decimal.to_string()),
         escape(&f.group.to_string()),
-        if money { 2 } else { 0 },
-        if money { "decimal" } else { "numeric" },
-        s.common,
+        if scale > 0 { "decimal" } else { "numeric" },
         escape(&text)
     ));
+    if percent {
+        out.push_str(&format!(
+            r#"<span class="z-affix" aria-hidden="true">%</span><span class="z-sr-only" id="{}-unit">{}</span>"#,
+            s.id,
+            ui(r, "number.percent")
+        ));
+    }
     if !s.m.readonly {
         out.push_str(&format!(
             r#"<span class="z-steppers"><button type="button" tabindex="-1" data-zeyn-step="1" aria-label="{}"><span aria-hidden="true">+</span></button><button type="button" tabindex="-1" data-zeyn-step="-1" aria-label="{}"><span aria-hidden="true">&#8722;</span></button></span>"#,
@@ -181,6 +214,12 @@ pub(crate) fn render_number(out: &mut String, r: &Render, s: &Slot) {
 
 /// Text: an input, an email input, or a growing text area with a counter for long texts.
 pub(crate) fn render_text(out: &mut String, r: &Render, s: &Slot) {
+    if let Some(pattern) = s.m.mask_pattern()
+        && s.control.is_none()
+    {
+        crate::ui::inputs::render_mask(out, s, pattern);
+        return;
+    }
     let text = match s.value {
         Value::Text(t) => escape(t),
         _ => String::new(),
@@ -209,13 +248,30 @@ pub(crate) fn render_text(out: &mut String, r: &Render, s: &Slot) {
                 escape(&r.i18n.text(r.locale, &Text::key("zeyn.ui.text.count").arg("n", count.to_string()).arg("max", n.to_string())))
             ));
         }
-        _ if s.control == Some(Control::Password) || s.control == Some(Control::NewPassword) => {
+        _ if matches!(s.control, Some(Control::Password | Control::NewPassword | Control::PasswordMeter)) => {
             let auto = if s.control == Some(Control::Password) { "current-password" } else { "new-password" };
+            let meter = s.control == Some(Control::PasswordMeter);
+            let id = s.id;
+            let common = if meter {
+                s.common.replacen(r#"aria-describedby=""#, &format!(r#"aria-describedby="{id}-strength "#), 1)
+            } else {
+                s.common.to_string()
+            };
             out.push_str(&format!(
-                r#"<input type="password" autocomplete="{auto}" {}{minlength}{maxlength} value="">"#,
-                s.common
+                r#"<div class="z-password" data-zeyn-password><input type="password" autocomplete="{auto}" spellcheck="false" {common}{minlength}{maxlength} value=""><button type="button" class="z-password-toggle" aria-pressed="false" aria-controls="{id}" aria-label="{}" data-testid="{}.field.{}.toggle" hidden><span class="z-eye" aria-hidden="true"></span></button></div>"#,
+                ui(r, "password.show"),
+                r.scope,
+                s.m.name
             ));
+            if meter {
+                let levels = ["weak", "fair", "good", "strong"].map(|k| ui(r, &format!("password.{k}")));
+                out.push_str(&format!(
+                    r#"<div class="z-strength" data-zeyn-strength="{id}" data-levels="{}" hidden><span class="z-strength-bar" aria-hidden="true"><span></span><span></span><span></span><span></span></span><span class="z-strength-text" id="{id}-strength" aria-live="polite"></span></div>"#,
+                    crate::render::attr(&levels)
+                ));
+            }
         }
+
         _ if s.control == Some(Control::OneTimeCode) => {
             out.push_str(&format!(r#"<input type="text" inputmode="text" autocomplete="one-time-code" spellcheck="false" {}{maxlength} value="">"#, s.common));
         }

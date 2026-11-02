@@ -7,6 +7,8 @@ use super::*;
 #[derive(Clone, Copy, PartialEq, PartialOrd)]
 pub(crate) enum Key {
     Num(i128),
+    /// An exact decimal bound or value.
+    Dec(crate::Decimal),
     Date(Date),
     Time(Time),
     Moment(DateTime),
@@ -18,6 +20,7 @@ impl Key {
         Some(match value {
             Value::Int(x) => Key::Num(i128::from(*x) * 100),
             Value::Money(m) => Key::Num(i128::from(m.minor)),
+            Value::Number(d) => Key::Dec(*d),
             Value::Date(d) => Key::Date(*d),
             Value::Time(t) => Key::Time(*t),
             Value::DateTime(d) => Key::Moment(*d),
@@ -63,6 +66,7 @@ fn bound(kind: &FieldKind, raw: &str, tz: TimeZone, upper: bool) -> Option<Key> 
     }
     match kind {
         FieldKind::Integer | FieldKind::Id | FieldKind::Money => hundredths(s).map(Key::Num),
+        FieldKind::Decimal => crate::Decimal::parse(&s.replace(',', ".")).map(Key::Dec),
         FieldKind::Date => Date::parse(s).map(Key::Date),
         FieldKind::Time => Time::parse(s).map(Key::Time),
         FieldKind::LocalDateTime => match Date::parse(s) {
@@ -202,6 +206,7 @@ fn filter_text(value: &Value) -> String {
         Value::DateTime(d) => d.to_string(),
         Value::LocalDateTime(l) => l.to_string(),
         Value::Decimal(x) => x.to_string(),
+        Value::Number(d) => d.to_string(),
     }
 }
 
@@ -220,6 +225,7 @@ fn compare(a: &Value, b: &Value) -> Ordering {
         (Value::DateTime(x), Value::DateTime(y)) => x.cmp(y),
         (Value::LocalDateTime(x), Value::LocalDateTime(y)) => x.cmp(y),
         (Value::Decimal(x), Value::Decimal(y)) => x.total_cmp(y),
+        (Value::Number(x), Value::Number(y)) => x.cmp(y),
         _ => Ordering::Equal,
     }
 }
@@ -228,11 +234,24 @@ fn compare(a: &Value, b: &Value) -> Ordering {
 /// the values (a sum of text, or money in different currencies). Money averages round half away
 /// from zero to the smallest unit.
 pub fn total(values: impl Iterator<Item = Value>, op: Aggregate) -> Option<Value> {
-    let values = values.filter(|v| *v != Value::Null);
+    let mut values = values.filter(|v| *v != Value::Null).peekable();
     match op {
         Aggregate::Count => Some(Value::Int(values.count() as i64)),
         Aggregate::Min => values.min_by(compare),
         Aggregate::Max => values.max_by(compare),
+        Aggregate::Sum | Aggregate::Avg if values.peek().is_some_and(|v| matches!(v, Value::Number(_))) => {
+            let (mut sum, mut n, mut scale) = (crate::Decimal::ZERO, 0i128, 0u8);
+            for v in values {
+                let Value::Number(d) = v else { return None };
+                sum = sum.checked_add(d)?;
+                scale = scale.max(d.scale());
+                n += 1;
+            }
+            match op {
+                Aggregate::Sum => Some(Value::Number(sum)),
+                _ => sum.div_int(n, scale).map(Value::Number),
+            }
+        }
         Aggregate::Sum | Aggregate::Avg => {
             let (mut sum, mut n, mut currency, mut money) = (0i128, 0i128, None, false);
             for v in values {

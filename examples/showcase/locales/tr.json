@@ -15,7 +15,8 @@
     "media": "Medya",
     "pro": "Masaüstü kabuğu",
     "assistant": "Asistan",
-    "islands": "Adacıklar"
+    "islands": "Adacıklar",
+    "inputs": "Girişler"
   },
   "dashboard": {
     "title": "Genel bakış",
@@ -391,5 +392,20 @@
     "try_orders": "Bugün İzmir'den gelen siparişleri göster",
     "try_archive": "NW-0003 ürününü arşivle",
     "try_low": "Stoğu azalan ürünleri göster"
+  },
+  "inputs": {
+    "fields": "Sayılar, maskeler ve parolalar",
+    "panel_terms": "Tedarikçi koşulları",
+    "save": "Koşulları kaydet",
+    "saved": "Koşullar kaydedildi. Hiçbir şey saklanmadı."
+  },
+  "SupplierTerms": {
+    "supplier": "Tedarikçi",
+    "exchange_rate": "Döviz kuru",
+    "discount": "İskonto",
+    "minimum_order": "En az sipariş (kg)",
+    "phone": "Telefon",
+    "iban": "IBAN",
+    "portal_password": "Portal parolası"
   }
 }

@@ -31,6 +31,8 @@ pub enum Cast {
     Moment,
     /// A wall clock date and time: `2026-03-31T14:30:00`.
     Local,
+    /// An exact decimal, bound as `12345E-2` and read as text with `.`.
+    Decimal,
 }
 
 impl Cast {
@@ -41,6 +43,7 @@ impl Cast {
             FieldKind::Time => Cast::Time,
             FieldKind::DateTime => Cast::Moment,
             FieldKind::LocalDateTime => Cast::Local,
+            FieldKind::Decimal => Cast::Decimal,
             _ => Cast::Plain,
         }
     }
@@ -78,6 +81,11 @@ pub trait Dialect: Send + Sync + 'static {
 
     /// Column type for a field of `kind`. `max_len` comes from the field's `max_len` rule.
     fn column_type(&self, kind: &FieldKind, max_len: Option<usize>) -> String;
+
+    /// Column type of a `Decimal` field with `precision` digits and `scale` decimals.
+    fn decimal_type(&self, precision: u8, scale: u8) -> String {
+        format!("NUMERIC({precision}, {scale})")
+    }
 
     /// Column definition of a generated whole number key, without the name.
     fn generated_key(&self) -> &'static str;
@@ -117,6 +125,7 @@ impl Dialect for Postgres {
             Cast::Time => "time",
             Cast::Moment => "timestamptz",
             Cast::Local => "timestamp",
+            Cast::Decimal => "numeric",
         };
         out.push_str("CAST($");
         out.push_str(&n.to_string());
@@ -143,6 +152,7 @@ impl Dialect for Postgres {
             Cast::Time => ("to_char(", ", 'HH24:MI:SS')"),
             Cast::Moment => ("to_char(", " AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"')"),
             Cast::Local => ("to_char(", ", 'YYYY-MM-DD\"T\"HH24:MI:SS')"),
+            Cast::Decimal => ("CAST(", " AS TEXT)"),
         };
         out.push_str(start);
         out.push_str(expr);
@@ -171,6 +181,7 @@ impl Dialect for Postgres {
     fn column_type(&self, kind: &FieldKind, max_len: Option<usize>) -> String {
         match kind {
             FieldKind::Id | FieldKind::Integer | FieldKind::Money => "BIGINT".into(),
+            FieldKind::Decimal => "NUMERIC".into(),
             FieldKind::Bool => "BOOLEAN".into(),
             FieldKind::Date => "DATE".into(),
             FieldKind::Time => "TIME(0)".into(),
@@ -233,6 +244,7 @@ impl Dialect for Oracle {
             Cast::Date => ("TO_DATE(", ", 'YYYY-MM-DD')"),
             Cast::Moment => ("TO_TIMESTAMP(", ", 'YYYY-MM-DD\"T\"HH24:MI:SS.FF3\"Z\"')"),
             Cast::Local => ("TO_TIMESTAMP(", ", 'YYYY-MM-DD\"T\"HH24:MI:SS')"),
+            Cast::Decimal => ("TO_NUMBER(", ")"),
         };
         out.push_str(start);
         out.push(':');
@@ -256,6 +268,7 @@ impl Dialect for Oracle {
             Cast::Date => ("TO_CHAR(", ", 'YYYY-MM-DD')"),
             Cast::Moment => ("TO_CHAR(CAST(", " AS TIMESTAMP(3)), 'YYYY-MM-DD\"T\"HH24:MI:SS.FF3\"Z\"')"),
             Cast::Local => ("TO_CHAR(", ", 'YYYY-MM-DD\"T\"HH24:MI:SS')"),
+            Cast::Decimal => ("TO_CHAR(", ", 'TM9', 'NLS_NUMERIC_CHARACTERS=''.,''')"),
         };
         out.push_str(start);
         out.push_str(expr);
@@ -300,6 +313,7 @@ impl Dialect for Oracle {
     fn column_type(&self, kind: &FieldKind, max_len: Option<usize>) -> String {
         match kind {
             FieldKind::Id | FieldKind::Integer | FieldKind::Money => "NUMBER(19)".into(),
+            FieldKind::Decimal => "NUMBER".into(),
             FieldKind::Bool => "NUMBER(1)".into(),
             FieldKind::Date => "DATE".into(),
             FieldKind::Time => "VARCHAR2(8)".into(),
@@ -312,6 +326,10 @@ impl Dialect for Oracle {
             },
             FieldKind::Custom { .. } => "CLOB".into(),
         }
+    }
+
+    fn decimal_type(&self, precision: u8, scale: u8) -> String {
+        format!("NUMBER({precision}, {scale})")
     }
 
     fn generated_key(&self) -> &'static str {
@@ -542,6 +560,7 @@ fn condition(d: &dyn Dialect, sql: &mut Sql, f: &FieldMeta, c: &Cond) -> Result<
                     Key::Num(h) if matches!(f.kind, FieldKind::Money) => (Arg::Int(clamp(h)), Cast::Plain),
                     Key::Num(h) if upper => (Arg::Int(clamp(h.div_euclid(100))), Cast::Plain),
                     Key::Num(h) => (Arg::Int(clamp(-((-h).div_euclid(100)))), Cast::Plain),
+                    Key::Dec(v) => (Arg::Text(v.sql_text()), Cast::Decimal),
                     Key::Date(v) => (Arg::Text(v.to_string()), Cast::Date),
                     Key::Time(v) => (Arg::Text(v.to_string()), Cast::Time),
                     Key::Moment(v) => (Arg::Text(v.to_string()), Cast::Moment),
@@ -755,6 +774,7 @@ pub(crate) fn row_cursor<M: Model>(d: &dyn Dialect, keys: &[OrderKey], row: &M) 
             Value::DateTime(x) => x.to_string().into(),
             Value::LocalDateTime(x) => x.to_string().into(),
             Value::Decimal(_) => serde_json::Value::Null,
+            Value::Number(x) => x.to_string().into(),
         })
         .collect();
     let o = keys.iter().map(|k| (fields[k.index].name.to_string(), k.desc)).collect();
@@ -793,6 +813,9 @@ pub(crate) fn read_cursor(fields: &[FieldMeta], keys: &[OrderKey], cursor: &Curs
                     text(&v).filter(|s| options.iter().any(|o| o.value == s)).map(Arg::Text)
                 }
                 (FieldKind::Text, _) => text(&v).map(Arg::Text),
+                (FieldKind::Decimal, _) => {
+                    text(&v).and_then(|s| crate::Decimal::parse(&s)).map(|x| Arg::Text(x.sql_text()))
+                }
                 (FieldKind::Custom { .. }, _) => None,
             };
             arg.ok_or_else(bad_cursor)
@@ -816,7 +839,7 @@ fn push_aggs(d: &dyn Dialect, sql: &mut Sql, fields: &[FieldMeta], q: &DataQuery
         let Some(field) = fields.iter().position(|f| f.name == a.field) else { continue };
         let f = &fields[field];
         let col = column(d, f)?;
-        let numeric = matches!(f.kind, FieldKind::Integer | FieldKind::Money);
+        let numeric = matches!(f.kind, FieldKind::Integer | FieldKind::Money | FieldKind::Decimal);
         let ordered = numeric
             || matches!(f.kind, FieldKind::Date | FieldKind::Time | FieldKind::DateTime | FieldKind::LocalDateTime);
         let fits = match a.op {
@@ -830,6 +853,13 @@ fn push_aggs(d: &dyn Dialect, sql: &mut Sql, fields: &[FieldMeta], q: &DataQuery
         let money = matches!(f.kind, FieldKind::Money);
         match a.op {
             Aggregate::Count => sql.select(d, &format!("COUNT({col})"), Cast::Int, Col::Int),
+            Aggregate::Sum if f.kind == FieldKind::Decimal => {
+                sql.select(d, &format!("COALESCE(SUM({col}), 0)"), Cast::Decimal, Col::Text)
+            }
+            Aggregate::Avg if f.kind == FieldKind::Decimal => {
+                let scale = f.decimal_limits().1;
+                sql.select(d, &format!("ROUND(AVG({col}), {scale})"), Cast::Decimal, Col::Text)
+            }
             Aggregate::Sum => sql.select(d, &format!("COALESCE(SUM({col}), 0)"), Cast::Int, Col::Int),
             Aggregate::Avg if money => sql.select(d, &format!("ROUND(AVG({col}))"), Cast::Int, Col::Int),
             Aggregate::Avg => {
@@ -1285,7 +1315,7 @@ pub fn create_table<E: Entity>(d: &dyn Dialect) -> Result<Vec<String>> {
         }
         let default = match (&f.kind, f.version, f.readonly && !f.optional) {
             (_, true, _) => " DEFAULT 1",
-            (FieldKind::Integer | FieldKind::Money, _, true) => " DEFAULT 0",
+            (FieldKind::Integer | FieldKind::Money | FieldKind::Decimal, _, true) => " DEFAULT 0",
             (FieldKind::Bool, _, true) => match d.false_literal() {
                 "0" => " DEFAULT 0",
                 _ => " DEFAULT FALSE",
@@ -1293,7 +1323,14 @@ pub fn create_table<E: Entity>(d: &dyn Dialect) -> Result<Vec<String>> {
             (FieldKind::Text, _, true) if !text_null => " DEFAULT ''",
             _ => "",
         };
-        cols.push(format!("{name} {}{default}{not_null}", d.column_type(&f.kind, f.max_len())));
+        let ty = match f.kind {
+            FieldKind::Decimal => {
+                let (precision, scale) = f.decimal_limits();
+                d.decimal_type(precision, scale)
+            }
+            _ => d.column_type(&f.kind, f.max_len()),
+        };
+        cols.push(format!("{name} {ty}{default}{not_null}"));
         if matches!(f.kind, FieldKind::Money) {
             let default = if f.readonly && !f.optional { " DEFAULT 'TRY'" } else { "" };
             cols.push(format!("{} {}{default}{not_null}", currency(d, f)?, d.column_type(&FieldKind::Text, Some(3))));

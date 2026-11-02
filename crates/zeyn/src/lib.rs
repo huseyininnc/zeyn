@@ -235,6 +235,30 @@
 //! }
 //! ```
 //!
+//! A `scale` rule on a field that is not a `Decimal`:
+//!
+//! ```compile_fail
+//! use zeyn::prelude::*;
+//!
+//! #[model]
+//! pub struct Price {
+//!     #[rule(scale = 2)]
+//!     pub amount: i64,
+//! }
+//! ```
+//!
+//! A `mask` rule on a field that is not text:
+//!
+//! ```compile_fail
+//! use zeyn::prelude::*;
+//!
+//! #[model]
+//! pub struct Contact {
+//!     #[rule(mask = "(999) 999 99 99")]
+//!     pub phone: i64,
+//! }
+//! ```
+//!
 //! A mask on a field that is not text:
 //!
 //! ```compile_fail
@@ -311,6 +335,7 @@ pub mod audit;
 pub mod auth;
 mod command;
 mod ctx;
+mod decimal;
 mod feature;
 mod form;
 mod grid;
@@ -369,6 +394,7 @@ pub use command::{
 };
 pub use command::{MAX_SEARCH_HITS, MAX_SEARCH_QUERY, Search, SearchHit};
 pub use ctx::{BoxFuture, Ctx, Dep, Identity, Inject, IntoScreen, Outcome, Service, Services};
+pub use decimal::{DEFAULT_PRECISION, DEFAULT_SCALE, Decimal, MAX_PRECISION, MAX_SCALE};
 pub use feature::{Feature, Guard, GuardResult, Menu, MenuGroup, MenuItem, Route, ScreenEntry, SignedIn};
 pub use form::{Form, FormAction, FormRow, SubmitForm};
 pub use grid::{
@@ -427,7 +453,7 @@ pub use time::{Date, DateTime, LocalDateTime, LocalTimeError, Time, TimeZone};
 pub use time::{DateWords, range_presets};
 pub use value::{
     ChoiceOption, ChoiceType, Currency, FieldKind, FieldType, IsBool, IsMoment, Money, SupportsMinMax,
-    SupportsMinMaxTotal, SupportsRequired, SupportsSum, SupportsText, Value,
+    SupportsMinMaxTotal, SupportsRequired, SupportsScale, SupportsSum, SupportsText, Value,
 };
 pub use workflow::{
     MAX_COMMENT, Transition, TransitionRecord, TransitionRequest, Transitions, Workflow, WorkflowState,
@@ -452,9 +478,9 @@ pub mod prelude {
         StatusBar, Tabs, Timeline, Toolbox, Tree, TreeItem, TreeQuery, Video,
     };
     pub use crate::{
-        Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime, Effect, Entity,
-        Error, Export, Feature, Field, Form, GuardResult, Icon, Identity, Import, Licensed, LocalDateTime, Model,
-        Money, Node, Page, Paging, Result, RowStyle, Screen, ScreenDef, Secret, Service, SignedIn, Tenant,
+        Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime, Decimal, Effect,
+        Entity, Error, Export, Feature, Field, Form, GuardResult, Icon, Identity, Import, Licensed, LocalDateTime,
+        Model, Money, Node, Page, Paging, Result, RowStyle, Screen, ScreenDef, Secret, Service, SignedIn, Tenant,
         TenantRequired, Text, Time, TimeZone, Tone, TransitionRequest, Transitions, UiCtx, Valid, ValidationErrors,
         Window, Workflow, action, choice, entity, model, params, screen, t,
     };

@@ -91,6 +91,11 @@ impl NumberFormat {
             _ => NumberFormat { decimal: '.', group: ',', symbol_first: true },
         }
     }
+
+    /// Whether the percent sign comes before the number, as in Turkish `%15`.
+    pub fn percent_first(locale: &str) -> bool {
+        matches!(primary(locale), "tr" | "eu")
+    }
 }
 
 fn primary(locale: &str) -> &str {

@@ -2400,3 +2400,198 @@ new MutationObserver((records) => {
 }).observe(document.body, { childList: true });
 
 init(document);
+
+/* Masked text -------------------------------------------------------------------------------- */
+
+/** Slots and literals of a mask pattern: `9` digit, `a` letter, `A` upper case letter, `*` either. */
+function maskTokens(pattern) {
+  const out = [];
+  for (let i = 0; i < pattern.length; i++) {
+    const c = pattern[i];
+    if (c === '\\' && i + 1 < pattern.length) out.push({ lit: pattern[++i] });
+    else if ('9aA*'.includes(c)) out.push({ slot: c });
+    else out.push({ lit: c });
+  }
+  return out;
+}
+
+/** Whether a slot takes a character. */
+function slotTakes(slot, c) {
+  if (slot === '9') return /^\d$/.test(c);
+  if (slot === '*') return /^[\p{L}\p{N}]$/u.test(c);
+  return /^\p{L}$/u.test(c);
+}
+
+/** The raw characters of typed text, as the server reads them (`ui::mask_raw`). */
+function maskRaw(tokens, text) {
+  let raw = '';
+  let at = 0;
+  outer: for (const c of text) {
+    while (tokens[at]?.lit !== undefined) {
+      if (tokens[at++].lit === c) continue outer;
+    }
+    const t = tokens[at];
+    if (t && slotTakes(t.slot, c)) {
+      raw += t.slot === 'A' ? c.toLocaleUpperCase(lang()) : c;
+      at++;
+    } else if (/[\p{L}\p{N}]/u.test(c)) break;
+  }
+  return raw;
+}
+
+/** Raw characters shown through the pattern, with the literals up to the last one typed. */
+function maskFormat(tokens, raw) {
+  let out = '';
+  let i = 0;
+  for (const t of tokens) {
+    if (i >= raw.length) break;
+    if (t.lit !== undefined) out += t.lit;
+    else out += raw[i++];
+  }
+  return out;
+}
+
+/** Turns `[data-zeyn-mask]` inputs into masked inputs over the raw value the form submits. */
+function initMasks(root) {
+  root.querySelectorAll('.z-mask:not([data-ready])').forEach((wrap) => {
+    const native = wrap.querySelector('.z-mask-value');
+    if (!native) return;
+    wrap.dataset.ready = '';
+    const tokens = maskTokens(wrap.dataset.zeynMask);
+    const shown = make('input', 'z-mask-input', {
+      type: 'text',
+      id: native.id,
+      autocomplete: 'off',
+      spellcheck: 'false',
+      inputmode: native.inputMode || 'text',
+      dir: 'ltr',
+      placeholder: wrap.dataset.example ?? '',
+      'data-testid': `${native.dataset.testid ?? ''}.input`,
+    });
+    for (const a of ['aria-describedby', 'aria-required', 'aria-invalid']) if (native.hasAttribute(a)) shown.setAttribute(a, native.getAttribute(a));
+    shown.readOnly = native.readOnly;
+    shown.value = maskFormat(tokens, maskRaw(tokens, native.value));
+    native.removeAttribute('id');
+    hideNative(native);
+    wrap.prepend(shown);
+    wrap.zeynTokens = tokens;
+  });
+}
+
+/**
+ * Reformats a masked input as the user types, keeps the caret after the same raw character and
+ * writes the raw value. Backspace over a literal removes the character before it.
+ */
+function maskInput(shown, e) {
+  const wrap = shown.closest('.z-mask');
+  const tokens = wrap.zeynTokens;
+  const native = wrap.querySelector('.z-mask-value');
+  const caret = shown.selectionStart ?? shown.value.length;
+  let before = maskRaw(tokens, shown.value.slice(0, caret)).length;
+  let raw = maskRaw(tokens, shown.value);
+  if (e.inputType === 'deleteContentBackward' && raw === native.value && before > 0) {
+    raw = raw.slice(0, before - 1) + raw.slice(before);
+    before--;
+  }
+  const text = maskFormat(tokens, raw);
+  if (text !== shown.value) {
+    shown.value = text;
+    let seen = 0;
+    let pos = 0;
+    for (const t of tokens) {
+      if (seen >= before || pos >= text.length) break;
+      pos++;
+      if (t.lit === undefined) seen++;
+    }
+    shown.setSelectionRange(pos, pos);
+  }
+  if (native.value === raw) return;
+  native.value = raw;
+  native.dispatchEvent(new Event('input', { bubbles: true }));
+  native.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+/* Password ----------------------------------------------------------------------------------- */
+
+/** Shows the show and hide buttons of password inputs, which need this script. */
+function initPasswords(root) {
+  root.querySelectorAll('[data-zeyn-password]:not([data-ready])').forEach((wrap) => {
+    wrap.dataset.ready = '';
+    const button = wrap.querySelector('.z-password-toggle');
+    if (button) button.hidden = false;
+  });
+}
+
+/** Shows or hides the password (APG toggle button: the name stays, `aria-pressed` changes). */
+function togglePassword(button) {
+  const input = button.closest('[data-zeyn-password]').querySelector('input');
+  const show = button.getAttribute('aria-pressed') !== 'true';
+  input.type = show ? 'text' : 'password';
+  button.setAttribute('aria-pressed', String(show));
+}
+
+/**
+ * A rough strength from 1 (weak) to 4 (strong): length, kinds of characters and obvious
+ * patterns. Only a hint; the server's rules decide what is accepted.
+ */
+function strengthOf(pw) {
+  const len = [...pw].length;
+  const kinds = [/\p{Ll}/u, /\p{Lu}/u, /\p{N}/u, /[^\p{L}\p{N}]/u].filter((r) => r.test(pw)).length;
+  if (len < 8 || /^(.)\1*$/u.test(pw) || /^(?:password|parola|qwerty|123456|111111|abc123)/i.test(pw)) return 1;
+  return Math.min(4, 1 + (len >= 12) + (kinds >= 3) + (len >= 16 || (len >= 12 && kinds === 4)));
+}
+
+/** Updates the strength meter under a new password input. */
+function meterInput(input) {
+  const meter = document.querySelector(`[data-zeyn-strength="${CSS.escape(input.id)}"]`);
+  if (!meter) return;
+  const level = input.value ? strengthOf(input.value) : 0;
+  meter.hidden = level === 0;
+  if (meter.dataset.level === String(level)) return;
+  meter.dataset.level = String(level);
+  const levels = parse(meter.dataset.levels ?? '[]') ?? [];
+  meter.querySelector('.z-strength-text').textContent = level ? (levels[level - 1] ?? '') : '';
+}
+
+/* Setup of the inputs above ------------------------------------------------------------------ */
+
+initializers.push(initMasks, initPasswords);
+
+clickHandlers.push((e, t) => {
+  const b = t.closest('.z-password-toggle');
+  return b && (togglePassword(b), true);
+});
+
+document.addEventListener('input', (e) => {
+  const t = e.target;
+  if (!(t instanceof HTMLInputElement)) return;
+  if (t.matches('.z-mask-input')) maskInput(t, e);
+  else if (t.matches('[data-zeyn-password] input')) meterInput(t);
+});
+
+document.addEventListener('focusin', (e) => {
+  const t = e.target;
+  if (t instanceof Element && t.matches('.z-mask > .z-native')) t.parentElement.querySelector('.z-mask-input')?.focus();
+});
+
+document.addEventListener(
+  'submit',
+  (e) => {
+    for (const b of e.target.querySelectorAll?.('.z-password-toggle[aria-pressed="true"]') ?? []) togglePassword(b);
+  },
+  true,
+);
+
+/** Validation marks set on the raw input show on the masked one. */
+new MutationObserver((records) => {
+  for (const r of records) {
+    const el = r.target;
+    if (!(el instanceof Element) || !el.matches('.z-mask > .z-native')) continue;
+    const shown = el.parentElement.querySelector('.z-mask-input');
+    if (el.getAttribute('aria-invalid') === 'true') shown?.setAttribute('aria-invalid', 'true');
+    else shown?.removeAttribute('aria-invalid');
+  }
+}).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['aria-invalid'] });
+
+initMasks(document);
+initPasswords(document);

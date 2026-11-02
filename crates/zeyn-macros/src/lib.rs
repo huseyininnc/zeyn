@@ -532,7 +532,8 @@ fn parse_model_args(attr: TokenStream, allow_table: bool) -> syn::Result<ModelAr
 
 /// Defines validated data that is not tied to a table: form input, filters, wizard steps, report rows.
 ///
-/// Field rules: `required`, `min_len = N`, `max_len = N`, `email`, `min = N`, `max = N`.
+/// Field rules: `required`, `min_len = N`, `max_len = N`, `email`, `min = N`, `max = N`,
+/// `scale = N` and `precision = N` (for `Decimal`), `mask = "..."` (for text).
 /// Rules that involve several fields go in a function given with `validate = ...`.
 ///
 /// Text fields with personal data can be masked: `#[mask(last4)]`, `#[mask(email)]` or
@@ -702,9 +703,42 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
                             rules.push(quote!(::zeyn::Rule::Max(#n)));
                         }
                         checks.push(quote_spanned!(ty.span()=> ::zeyn::__rules::min_max::<#ty>();));
+                    } else if m.path.is_ident("scale") || m.path.is_ident("precision") {
+                        let n: LitInt = m.value()?.parse()?;
+                        let v: u8 = n.base10_parse()?;
+                        if m.path.is_ident("scale") {
+                            if v > 28 {
+                                return Err(syn::Error::new(n.span(), "`scale` is at most 28"));
+                            }
+                            rules.push(quote!(::zeyn::Rule::Scale(#n)));
+                        } else {
+                            if v == 0 || v > 38 {
+                                return Err(syn::Error::new(n.span(), "`precision` is between 1 and 38"));
+                            }
+                            rules.push(quote!(::zeyn::Rule::Precision(#n)));
+                        }
+                        checks.push(quote_spanned!(ty.span()=> ::zeyn::__rules::scale::<#ty>();));
+                    } else if m.path.is_ident("mask") {
+                        let p: LitStr = m.value()?.parse()?;
+                        let mut slots = 0usize;
+                        let mut escaped = false;
+                        for c in p.value().chars() {
+                            if !escaped && matches!(c, '9' | 'a' | 'A' | '*') {
+                                slots += 1;
+                            }
+                            escaped = !escaped && c == '\\';
+                        }
+                        if slots == 0 {
+                            return Err(syn::Error::new(
+                                p.span(),
+                                "a mask needs at least one slot\n  = help: `9` is a digit, `a` a letter, `A` an upper case letter, `*` a letter or digit",
+                            ));
+                        }
+                        rules.push(quote!(::zeyn::Rule::Mask(#p)));
+                        checks.push(text_check);
                     } else {
                         return Err(m.error(
-                            "unknown rule\n  = help: expected `required`, `unique`, `email`, `min_len = N`, `max_len = N`, `min = N` or `max = N`",
+                            "unknown rule\n  = help: expected `required`, `unique`, `email`, `min_len = N`, `max_len = N`, `min = N`, `max = N`, `scale = N`, `precision = N` or `mask = \"...\"`",
                         ));
                     }
                     Ok(())

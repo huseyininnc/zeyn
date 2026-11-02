@@ -108,7 +108,10 @@
       "disabled_day": "{label}: this day cannot be chosen.",
       "time_step": "{label} must be on a {n} minute step.",
       "range_order": "{label} cannot be before {other}.",
-      "unique": "{label} is already used by another record."
+      "unique": "{label} is already used by another record.",
+      "scale": "{label} can have at most {n} decimals.",
+      "precision": "{label} can have at most {n} digits before the decimal separator.",
+      "mask": "{label} must look like {pattern}."
     },
     "error": {
       "forbidden": "You are not allowed to do this.",
@@ -343,7 +346,8 @@
       },
       "number": {
         "up": "Increase",
-        "down": "Decrease"
+        "down": "Decrease",
+        "percent": "percent"
       },
       "text": {
         "count": "{n} of {max} characters"
@@ -378,6 +382,13 @@
         "warning": "Warning",
         "danger": "Error",
         "brand": "Note"
+      },
+      "password": {
+        "show": "Show password",
+        "weak": "Strength: weak",
+        "fair": "Strength: fair",
+        "good": "Strength: good",
+        "strong": "Strength: strong"
       }
     },
     "date": {

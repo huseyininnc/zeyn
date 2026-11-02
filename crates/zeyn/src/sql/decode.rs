@@ -138,6 +138,7 @@ pub(crate) fn args_of(kind: &FieldKind, value: Value, out: &mut Vec<Arg>) {
         Value::DateTime(d) => out.push(Arg::Text(d.to_string())),
         Value::LocalDateTime(l) => out.push(Arg::Text(l.to_string())),
         Value::Decimal(x) => out.push(Arg::Text(x.to_string())),
+        Value::Number(d) => out.push(Arg::Text(d.sql_text())),
     }
 }
 
@@ -166,6 +167,7 @@ fn text_value(kind: &FieldKind, s: String) -> Value {
         FieldKind::DateTime => DateTime::parse(&s).map(Value::DateTime),
         FieldKind::LocalDateTime => LocalDateTime::parse(&s).map(Value::LocalDateTime),
         FieldKind::Choice(options) => options.iter().find(|o| o.value == s).map(|o| Value::Choice(o.value)),
+        FieldKind::Decimal => crate::Decimal::parse(&s).map(Value::Number),
         _ => None,
     };
     parsed.unwrap_or(Value::Text(s))

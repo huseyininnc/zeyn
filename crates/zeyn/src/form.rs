@@ -600,7 +600,17 @@ pub(crate) fn parse_value(
         FieldKind::Custom { editor: "ids" } => {
             crate::ui::parse_ids(trimmed).map(|ids| Json::from(ids)).ok_or(Unreadable::Format)
         }
-        FieldKind::Text | FieldKind::Custom { .. } => Ok(Json::String(text)),
+        FieldKind::Text => match meta.mask_pattern() {
+            Some(pattern) => Ok(Json::String(crate::ui::mask_raw(pattern, &text))),
+            None => Ok(Json::String(text)),
+        },
+        FieldKind::Custom { .. } => Ok(Json::String(text)),
+        FieldKind::Decimal => {
+            let (_, scale) = meta.decimal_limits();
+            let d = crate::Decimal::parse_input(trimmed, locale).ok_or(Unreadable::Format)?;
+            let d = if d.scale() < scale { d.round(scale) } else { d };
+            serde_json::to_value(d).map_err(|_| Unreadable::Format)
+        }
         FieldKind::Integer | FieldKind::Id => {
             let group = crate::i18n::NumberFormat::for_locale(locale).group;
             let digits: String = trimmed.chars().filter(|c| *c != group && !c.is_whitespace()).collect();
@@ -644,6 +654,7 @@ pub(crate) fn edit_value(value: &Value, locale: &str, tz: TimeZone) -> String {
         Value::DateTime(d) => d.local(tz).to_string(),
         Value::Choice(c) => c.to_string(),
         Value::Decimal(x) => x.to_string(),
+        Value::Number(d) => d.format(locale),
     }
 }
 
@@ -700,7 +711,9 @@ fn render_field<M: Model>(out: &mut String, r: &Render, f: &FormField<M>, form: 
     match m.kind {
         FieldKind::Bool => crate::ui::render_bool(out, &slot),
         FieldKind::Choice(_) => crate::ui::render_choice(out, r, &slot),
-        FieldKind::Money | FieldKind::Integer | FieldKind::Id => crate::ui::render_number(out, r, &slot),
+        FieldKind::Money | FieldKind::Integer | FieldKind::Id | FieldKind::Decimal => {
+            crate::ui::render_number(out, r, &slot)
+        }
         FieldKind::Text => crate::ui::render_text(out, r, &slot),
         FieldKind::Date | FieldKind::Time | FieldKind::DateTime | FieldKind::LocalDateTime => {
             out.push_str(&label);
@@ -790,10 +803,26 @@ where
                     "string",
                     "Amount as typed by a user of the current language, for example 1.234,56 in Turkish.".to_string(),
                 ),
+                FieldKind::Decimal => {
+                    let (_, scale) = m.decimal_limits();
+                    (
+                        "string",
+                        format!(
+                            "Number as typed by a user of the current language, at most {scale} decimals, for example 1.234,5 in Turkish."
+                        ),
+                    )
+                }
                 FieldKind::Choice(options) => {
                     let values: Vec<&str> = options.iter().map(|o| o.value).collect();
                     ("string", format!("One of: {}.", values.join(", ")))
                 }
+                FieldKind::Text if m.mask_pattern().is_some() => (
+                    "string",
+                    format!(
+                        "Fills the pattern {}: 9 is a digit, a a letter, A an upper case letter, * either; send only those characters.",
+                        m.mask_pattern().unwrap_or_default()
+                    ),
+                ),
                 FieldKind::Custom { editor: "lines" } => (
                     "string",
                     format!(

@@ -71,7 +71,9 @@ pub enum Unit {
 | `required` | any | Must have a value |
 | `min_len = n`, `max_len = n` | text | Length in characters |
 | `email` | text | An email address |
-| `min = n`, `max = n` | numbers, money, dates | Bounds. Dates are written `2026_01_01` |
+| `min = n`, `max = n` | numbers, money, decimals, dates | Bounds. Dates are written `2026_01_01` |
+| `scale = n`, `precision = n` | `Decimal` | Most decimals (2 without the rule) and most digits in all (18 without the rule). They also set the column type, `NUMERIC(precision, scale)` |
+| `mask = "..."` | text | The raw value fills a pattern: `9` a digit, `a` a letter, `A` an upper case letter, `*` either; other characters are shown while typing but not stored. See [Controls](controls.md#masked-input) |
 | `unique` | any | Checked by the store; the form shows the error from the action |
 
 A rule that does not fit the field type is a compile error with a message that says what to do. Rules across fields go in a function:
@@ -105,6 +107,6 @@ pub async fn save_product(product: Valid<Product>, store: ProductStore) -> Resul
 
 ## Field types
 
-`String`, `i32`, `i64`, `bool`, `Money`, `Date`, `Time`, `DateTime`, `LocalDateTime`, `#[choice]` enums, entity ids and `Option<T>` of any of them. `Vec<M>` of a model becomes a line editor in forms (see [Line editor](lines.md)).
+`String`, `i32`, `i64`, `bool`, `Money`, `Decimal`, `Date`, `Time`, `DateTime`, `LocalDateTime`, `#[choice]` enums, entity ids and `Option<T>` of any of them. `Vec<M>` of a model becomes a line editor in forms (see [Line editor](lines.md)).
 
-Money is stored in integer minor units with its currency. Never use `f64` for money. Dates and times are covered in [Time and languages](time-and-languages.md).
+Money is stored in integer minor units with its currency. Never use `f64` for money. `Decimal` is an exact number for everything else with a fraction: quantities, unit prices with more than two decimals, rates. It holds up to 38 digits, never goes through a float, and travels in JSON as a string (`"12.50"`). Dates and times are covered in [Time and languages](time-and-languages.md).

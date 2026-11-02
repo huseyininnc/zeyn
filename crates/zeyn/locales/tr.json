@@ -108,7 +108,10 @@
       "disabled_day": "{label}: bu gün seçilemez.",
       "time_step": "{label} {n} dakikalık adımlarla girilmelidir.",
       "range_order": "{label}, {other} tarihinden önce olamaz.",
-      "unique": "{label} başka bir kayıtta kullanılıyor."
+      "unique": "{label} başka bir kayıtta kullanılıyor.",
+      "scale": "{label} en fazla {n} ondalık basamak içerebilir.",
+      "precision": "{label} ondalık ayırıcıdan önce en fazla {n} basamak içerebilir.",
+      "mask": "{label} {pattern} biçiminde olmalı."
     },
     "error": {
       "forbidden": "Bu işlem için yetkiniz yok.",
@@ -343,7 +346,8 @@
       },
       "number": {
         "up": "Artır",
-        "down": "Azalt"
+        "down": "Azalt",
+        "percent": "yüzde"
       },
       "text": {
         "count": "{n} / {max} karakter"
@@ -378,6 +382,13 @@
         "warning": "Uyarı",
         "danger": "Hata",
         "brand": "Not"
+      },
+      "password": {
+        "show": "Parolayı göster",
+        "weak": "Güç: zayıf",
+        "fair": "Güç: orta",
+        "good": "Güç: iyi",
+        "strong": "Güç: güçlü"
       }
     },
     "date": {
