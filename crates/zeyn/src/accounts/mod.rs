@@ -439,6 +439,8 @@ pub(crate) struct Core {
     pub events: Option<Arc<dyn AccountEvents>>,
     pub breached: Option<Arc<dyn BreachedPasswords>>,
     pub roles: RolePermissions,
+    /// Permissions of every signed in user.
+    pub everyone: Vec<String>,
     pub public_url: Option<String>,
     /// A hash of a random password, checked when no user matches so a missing account costs as
     /// much time as a wrong password.
@@ -472,6 +474,7 @@ impl Accounts {
             events: None,
             breached: None,
             roles: RolePermissions::default(),
+            everyone: Vec::new(),
             public_url: None,
             dummy_hash,
         }))
@@ -509,6 +512,12 @@ impl Accounts {
     /// Permissions of the holders of a role.
     pub fn role<I: IntoIterator<Item = S>, S: Into<String>>(self, role: &str, permissions: I) -> Accounts {
         self.change(|c| c.roles = std::mem::take(&mut c.roles).role(role, permissions))
+    }
+
+    /// Permissions every signed in user has, whatever their roles, such as reading a catalog.
+    pub fn signed_in_permissions<I: IntoIterator<Item = S>, S: Into<String>>(self, permissions: I) -> Accounts {
+        let list: Vec<String> = permissions.into_iter().map(Into::into).collect();
+        self.change(|c| c.everyone.extend(list))
     }
 
     /// The app's address as users see it (`https://shop.example.com`), for links in messages and

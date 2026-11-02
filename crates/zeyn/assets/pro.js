@@ -371,7 +371,7 @@ function paletteKey(e) {
 /** True for the palette shortcut: Ctrl+Shift+P (Command on macOS) or F1. */
 function paletteShortcut(e) {
   if (e.key === 'F1' && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) return true;
-  return e.key.toLowerCase() === 'p' && e.shiftKey && !e.altKey && (MAC ? e.metaKey : e.ctrlKey);
+  return (e.key ?? '').toLowerCase() === 'p' && e.shiftKey && !e.altKey && (MAC ? e.metaKey : e.ctrlKey);
 }
 
 /* Commands that run on the server ------------------------------------------------------------ */

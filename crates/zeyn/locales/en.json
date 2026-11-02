@@ -716,5 +716,10 @@
   },
   "AccountExternal": {
     "email": "E-mail"
+  },
+  "AccountEmailCode": {
+    "code": "Code from the e-mail",
+    "remember_machine": "Remember this browser",
+    "return_to": "Return to"
   }
 }

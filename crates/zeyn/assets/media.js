@@ -522,7 +522,7 @@ document.addEventListener('keydown', (e) => {
   const slider = t.closest('.z-player-slider');
   if (slider && sliderKey(e, slider, p)) return;
   if (t.closest('button') && (e.key === ' ' || e.key === 'Enter')) return;
-  const key = e.key.toLowerCase();
+  const key = (e.key ?? '').toLowerCase();
   const actions = {
     ' ': () => toggle(p),
     k: () => toggle(p),

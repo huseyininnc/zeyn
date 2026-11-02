@@ -716,5 +716,10 @@
   },
   "AccountExternal": {
     "email": "E-posta"
+  },
+  "AccountEmailCode": {
+    "code": "E-postadaki kod",
+    "remember_machine": "Bu tarayıcıyı hatırla",
+    "return_to": "Dönüş"
   }
 }

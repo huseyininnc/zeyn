@@ -513,6 +513,7 @@ impl SignInManager {
         let mut identity = Identity::user(s.user.clone());
         identity.permissions.extend(s.permissions.iter().cloned());
         identity.permissions.extend(self.0.0.roles.of(&s.roles).cloned());
+        identity.permissions.extend(self.0.0.everyone.iter().cloned());
         identity.authenticated_at = Some(DateTime::from_unix_ms(s.auth_time.saturating_mul(1000)));
         identity.mfa = s.mfa;
         identity

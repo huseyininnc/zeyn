@@ -235,7 +235,7 @@ macro_rules! optional_params {
 /// Sign in form.
 #[model]
 pub struct AccountLogin {
-    #[rule(required, max_len = 256)]
+    #[rule(required, max_len = 254)]
     pub user_name: String,
     #[rule(required, max_len = 1024)]
     pub password: String,
@@ -325,7 +325,7 @@ pub async fn account_login(p: LoginParams, accounts: Accounts) -> Result<Screen>
 /// Registration form.
 #[model]
 pub struct AccountRegister {
-    #[rule(required, email, max_len = 256)]
+    #[rule(required, email, max_len = 254)]
     pub email: String,
     #[rule(required, max_len = 1024)]
     pub password: String,
@@ -341,7 +341,7 @@ pub async fn account_sign_up(input: Valid<AccountRegister>, accounts: Accounts, 
         return Err(invalid("confirm_password", "password_confirm_mismatch"));
     }
     crate::server::accounts::register_user(&ctx, &accounts, &input.email, &input.password).await?;
-    go(with_params("/account/check-email", json!({})), false)
+    go(path("/account/check-email"), false)
 }
 
 #[screen(route = "/account/register", public)]
@@ -370,7 +370,7 @@ pub fn account_check_email(_: ()) -> Screen {
 /// E-mail form for password recovery and confirmation links.
 #[model]
 pub struct AccountEmailOnly {
-    #[rule(required, email, max_len = 256)]
+    #[rule(required, email, max_len = 254)]
     pub email: String,
 }
 
@@ -378,7 +378,7 @@ pub struct AccountEmailOnly {
 #[action(public, ai = false)]
 pub async fn account_forgot(input: Valid<AccountEmailOnly>, accounts: Accounts, ctx: Ctx) -> Result<Next> {
     crate::server::accounts::forgot_password(&ctx, &accounts, &input.email).await?;
-    go(with_params("/account/check-email", json!({})), false)
+    go(path("/account/check-email"), false)
 }
 
 #[screen(route = "/account/forgot-password", public)]
@@ -397,7 +397,7 @@ pub fn account_forgot_password(_: ()) -> Screen {
 #[action(public, ai = false)]
 pub async fn account_resend(input: Valid<AccountEmailOnly>, accounts: Accounts, ctx: Ctx) -> Result<Next> {
     crate::server::accounts::resend_confirmation(&ctx, &accounts, &input.email).await?;
-    go(with_params("/account/check-email", json!({})), false)
+    go(path("/account/check-email"), false)
 }
 
 #[screen(route = "/account/resend-confirmation", public)]
@@ -505,9 +505,18 @@ pub async fn account_verify_code(input: Valid<AccountCode>, sign_in: SignInManag
     }
 }
 
+/// A code sent by e-mail, a form of its own so the screen has unique field ids.
+#[model]
+pub struct AccountEmailCode {
+    #[rule(required, max_len = 16)]
+    pub code: String,
+    pub remember_machine: bool,
+    pub return_to: String,
+}
+
 /// Completes a sign in with a code sent by e-mail.
 #[action(public, ai = false)]
-pub async fn account_verify_email_code(input: Valid<AccountCode>, sign_in: SignInManager) -> Result<Next> {
+pub async fn account_verify_email_code(input: Valid<AccountEmailCode>, sign_in: SignInManager) -> Result<Next> {
     match sign_in.two_factor_sign_in(TwoFactorKind::Email, &input.code, input.remember_machine).await? {
         SignInResult::Succeeded => go(back(&input.return_to), true),
         SignInResult::LockedOut => go(path("/account/lockout"), false),
@@ -545,10 +554,10 @@ pub async fn account_login_2fa(p: TwoFactorParams, sign_in: SignInManager) -> Re
             .add(para("zeyn.accounts.two_factor.email_intro"))
             .add(ActionButton::new(t!("zeyn.accounts.two_factor.send_email"), account_send_email_code, ()).on_success(|_, ui| ui.toast(t!("zeyn.accounts.two_factor.sent"))))
             .add(
-                Form::of(model)
-                    .field(AccountCode::code)
-                    .control(AccountCode::code, Control::OneTimeCode)
-                    .field(AccountCode::remember_machine)
+                Form::of(AccountEmailCode { return_to: model.return_to.clone(), ..AccountEmailCode::default() })
+                    .field(AccountEmailCode::code)
+                    .control(AccountEmailCode::code, Control::OneTimeCode)
+                    .field(AccountEmailCode::remember_machine)
                     .submit(t!("zeyn.accounts.two_factor.submit_email"), account_verify_email_code)
                     .on_success(next_effect),
             );
@@ -654,7 +663,7 @@ pub async fn account_manage(_: (), accounts: Accounts) -> Result<Screen> {
 /// A new e-mail address.
 #[model]
 pub struct AccountNewEmail {
-    #[rule(required, email, max_len = 256)]
+    #[rule(required, email, max_len = 254)]
     pub new_email: String,
 }
 
@@ -1152,7 +1161,7 @@ pub async fn account_admin_user_roles(p: UserParams, accounts: Accounts) -> Resu
 pub struct AccountRoleRow {
     #[readonly]
     pub id: String,
-    #[rule(required, max_len = 256)]
+    #[rule(required, max_len = 254)]
     pub name: String,
     pub permissions: String,
 }
@@ -1216,7 +1225,7 @@ pub fn account_admin_roles(_: ()) -> Screen {
 #[cfg(feature = "oidc")]
 #[model]
 pub struct AccountExternal {
-    #[rule(required, email, max_len = 256)]
+    #[rule(required, email, max_len = 254)]
     pub email: String,
 }
 
@@ -1239,7 +1248,7 @@ pub async fn account_external_create(input: Valid<AccountExternal>, accounts: Ac
     scope::set_cookie(EXTERNAL_PENDING, None, None);
     accounts.event(super::AccountEventKind::Registered, Some(&user.id));
     if !accounts.sign_in().can_sign_in(&user) {
-        return go(with_params("/account/check-email", json!({})), false);
+        return go(path("/account/check-email"), false);
     }
     accounts.sign_in().sign_in(&user, false, &p.provider, false).await?;
     go(back(&p.return_to), true)

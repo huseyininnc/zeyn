@@ -594,3 +594,13 @@ async fn manage_info_never_returns_hashes_or_stamps() {
     assert!(data.headers.get(header::CONTENT_DISPOSITION).is_some());
     assert!(!data.body.contains(&u.security_stamp) && !data.body.contains("argon2"));
 }
+
+#[tokio::test]
+async fn the_register_screen_goes_to_a_screen_that_opens() {
+    let router = app(accounts());
+    let r = send(&router, form("account_register", json!(null), "0.0", json!({ "email": "s@example.com", "password": PASSWORD, "confirm_password": PASSWORD }), "")).await;
+    assert!(r.body.contains(r#""url":"/account/check-email""#), "{}", r.body);
+    assert_eq!(send(&router, get("/account/check-email", "")).await.status, StatusCode::OK);
+    let mismatch = send(&router, form("account_register", json!(null), "0.0", json!({ "email": "t@example.com", "password": PASSWORD, "confirm_password": "Other-123" }), "")).await;
+    assert!(mismatch.body.contains("do not match"), "{}", mismatch.body);
+}
