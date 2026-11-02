@@ -169,6 +169,7 @@ struct CtxInner {
     trail: Arc<Mutex<crate::audit::Trail>>,
     theme: Option<Arc<str>>,
     reauth_within: std::time::Duration,
+    csp: Option<Arc<crate::csp::Csp>>,
 }
 
 /// How recent a sign in counts as recent unless the app sets another age.
@@ -195,6 +196,7 @@ impl Ctx {
             trail: Arc::default(),
             theme: None,
             reauth_within: REAUTH_WITHIN,
+            csp: None,
         }))
     }
 
@@ -210,6 +212,7 @@ impl Ctx {
         config: Config,
         theme: Arc<str>,
         reauth_within: std::time::Duration,
+        csp: Arc<crate::csp::Csp>,
     ) -> Self {
         Ctx(Arc::new(CtxInner {
             identity,
@@ -225,6 +228,7 @@ impl Ctx {
             trail: Arc::default(),
             theme: Some(theme),
             reauth_within,
+            csp: Some(csp),
         }))
     }
 
@@ -258,6 +262,18 @@ impl Ctx {
         self.0.theme.as_deref()
     }
 
+    /// Same context with the app's content security policy, which [`crate::ui::Embed`] and
+    /// [`crate::ui::Image`] read to leave out hosts the browser would block. The server sets it
+    /// on every request; tests set it by hand.
+    pub fn with_csp(&self, csp: Arc<crate::csp::Csp>) -> Self {
+        self.rebuild(|i| i.csp = Some(csp))
+    }
+
+    /// The app's content security policy; the strict default outside a request.
+    pub fn csp(&self) -> &crate::csp::Csp {
+        self.0.csp.as_deref().unwrap_or(&crate::csp::EMPTY)
+    }
+
     fn rebuild(&self, change: impl FnOnce(&mut CtxInner)) -> Self {
         let i = &self.0;
         let mut inner = CtxInner {
@@ -274,6 +290,7 @@ impl Ctx {
             trail: i.trail.clone(),
             theme: i.theme.clone(),
             reauth_within: i.reauth_within,
+            csp: i.csp.clone(),
         };
         change(&mut inner);
         Ctx(Arc::new(inner))

@@ -176,6 +176,50 @@ pub fn media_play(p: PlayParams) -> Result<Screen> {
     library_of(&p.item)
 }
 
+/// Content from other sites: a click to load player on a host of the app's `frame-src`, and an
+/// embed whose host is not listed, which renders a warning instead of a frame.
+#[screen(route = "/external", permission = "showcase.media.play")]
+pub fn media_external() -> Result<Screen> {
+    Ok(Screen::new(t!("media.external")).body(
+        Row::new()
+            .col(
+                Panel::new(t!("media.embed_card")).add(
+                    Embed::url("https://www.youtube-nocookie.com/embed/aqz-KE-bpKQ")
+                        .title(t!("media.embed_title"))
+                        .allow([EmbedPermission::Fullscreen, EmbedPermission::PictureInPicture])
+                        .click_to_load("/_zeyn/media/films/harbor.jpg"),
+                ),
+            )
+            .col(
+                Stack::new()
+                    .add(
+                        Panel::new(t!("media.blocked_card")).add(
+                            Embed::url("https://maps.example.net/embed?q=harbor").title(t!("media.blocked_title")),
+                        ),
+                    )
+                    .add(
+                        Panel::new(t!("media.images_card"))
+                            .add(
+                                Image::new("/_zeyn/media/films/zoom.jpg")
+                                    .alt(t!("media.still_alt"))
+                                    .size(320, 180)
+                                    .lazy(),
+                            )
+                            .add(
+                                Image::new("https://charts.example.net/q3.png")
+                                    .alt(t!("media.blocked_alt"))
+                                    .size(320, 180),
+                            ),
+                    )
+                    .add(
+                        Panel::new(t!("media.links_card"))
+                            .add(ExternalLink::new("https://github.com/", t!("media.link_repo")).new_tab())
+                            .add(ExternalLink::new("https://example.org/", t!("media.link_user")).user_content()),
+                    ),
+            ),
+    ))
+}
+
 pub fn feature() -> Feature {
     Feature::new("media")
         .route_prefix("/media")
@@ -205,5 +249,10 @@ pub fn feature() -> Feature {
         )
         .screen(media_library)
         .screen(media_play)
-        .menu(|m| m.group(t!("menu.media"), Icon::Chart).item(t!("media.title"), media_library))
+        .screen(media_external)
+        .menu(|m| {
+            m.group(t!("menu.media"), Icon::Chart)
+                .item(t!("media.title"), media_library)
+                .item(t!("media.external"), media_external)
+        })
 }

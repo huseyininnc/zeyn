@@ -530,3 +530,95 @@ async fn llms_txt_is_served_as_plain_text_to_everyone_when_set() {
     assert_eq!(r.body, "# Shop\n");
     assert!(r.headers.get(header::CONTENT_TYPE).unwrap().to_str().unwrap().starts_with("text/plain"));
 }
+
+fn csp_of(reply: &Reply) -> String {
+    reply.headers.get(header::CONTENT_SECURITY_POLICY).unwrap().to_str().unwrap().to_string()
+}
+
+#[tokio::test]
+async fn csp_allowlist_adds_named_hosts_to_the_header() {
+    let app = app(writer(), MemoryAudit::default(), false).csp(|c| {
+        c.img_src(["https://images.example.com"])
+            .frame_src(["https://www.youtube-nocookie.com", "https://*.vimeo.com"])
+            .media_src(["https://media.example.com:8443"])
+            .media_blob()
+            .connect_src(["https://api.example.com"])
+            .font_src(["https://fonts.example.com"])
+    });
+    let policy = csp_of(&send(&app.router().unwrap(), get("/products")).await);
+    assert!(policy.contains("img-src 'self' data: blob: https://images.example.com;"), "{policy}");
+    assert!(policy.contains("frame-src 'self' https://www.youtube-nocookie.com https://*.vimeo.com;"), "{policy}");
+    assert!(policy.contains("media-src 'self' blob: https://media.example.com:8443;"), "{policy}");
+    assert!(policy.contains("connect-src 'self' https://api.example.com;"), "{policy}");
+    assert!(policy.contains("font-src 'self' https://fonts.example.com;"), "{policy}");
+    assert!(policy.contains("script-src 'self';"));
+    assert!(policy.ends_with("object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"));
+}
+
+#[tokio::test]
+async fn csp_without_allowlist_stays_the_strict_default() {
+    let policy = csp_of(&send(&router(writer()), get("/products")).await);
+    assert_eq!(
+        policy,
+        "default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    );
+}
+
+#[test]
+fn csp_refuses_every_value_that_would_weaken_the_policy() {
+    let forbidden = [
+        "*",
+        "http://cdn.example.com",
+        "http:",
+        "https:",
+        "data:",
+        "blob:",
+        "'unsafe-inline'",
+        "'unsafe-eval'",
+        "'self'",
+        "https://cdn.example.com/path",
+        "https://cdn.example.com/a b",
+        "https://cdn.example.com; script-src *",
+        "https://cdn.example.com https://other.example.com",
+        "https://cdn.example.com,https://x.test",
+        "https://*",
+        "https://*.com",
+        "https://user@cdn.example.com",
+        "https://cdn.example.com:0",
+        "https://cdn.example.com:99999",
+        "https://cdn.*.example.com",
+        "",
+    ];
+    for value in forbidden {
+        for app in [
+            App::new("T").csp(|c| c.img_src([value])),
+            App::new("T").csp(|c| c.frame_src([value])),
+            App::new("T").csp(|c| c.media_src([value])),
+            App::new("T").csp(|c| c.connect_src([value])),
+            App::new("T").csp(|c| c.font_src([value])),
+        ] {
+            let problems = app.check().expect_err(value);
+            assert!(problems.iter().any(|p| p.starts_with("csp ") && p.contains("= help:")), "{value}: {problems:?}");
+        }
+    }
+    assert!(App::new("T").csp(|c| c.img_src(["https://CDN.example.com:443", "https://*.example.org"])).check().is_ok());
+}
+
+#[test]
+fn csp_fixed_directives_cannot_be_opened() {
+    let c = zeyn::Csp::new()
+        .img_src(["https://a.example.com"])
+        .frame_src(["https://b.example.com"])
+        .connect_src(["https://c.example.com"])
+        .media_blob();
+    for wasm in [false, true] {
+        let h = c.header(wasm);
+        let script = if wasm { "script-src 'self' 'wasm-unsafe-eval';" } else { "script-src 'self';" };
+        assert!(h.contains(script), "{h}");
+        assert!(h.ends_with("object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"), "{h}");
+        assert_eq!(h.matches("script-src").count(), 1);
+        assert_eq!(h.matches("object-src").count(), 1);
+        assert_eq!(h.matches("base-uri").count(), 1);
+        assert_eq!(h.matches("frame-ancestors").count(), 1);
+    }
+}

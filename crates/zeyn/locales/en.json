@@ -111,7 +111,9 @@
       "unique": "{label} is already used by another record.",
       "scale": "{label} can have at most {n} decimals.",
       "precision": "{label} can have at most {n} digits before the decimal separator.",
-      "mask": "{label} must look like {pattern}."
+      "mask": "{label} must look like {pattern}.",
+      "embed": "{label} must be an https address to embed, or embed code that holds one.",
+      "embed_host": "{label}: {host} is not on the list of sites this app may embed."
     },
     "error": {
       "forbidden": "You are not allowed to do this.",
@@ -322,6 +324,15 @@
       "empty": "Nothing here yet.",
       "breadcrumb": "Breadcrumb",
       "dismiss": "Dismiss",
+      "link": {
+        "external": "external site",
+        "external_new_tab": "external site, opens in a new tab"
+      },
+      "embed": {
+        "blocked": "{title} cannot be shown here: its site is not on the list of sites this app may embed.",
+        "load": "Load {title}",
+        "from": "Content from {host}. It loads only when you ask."
+      },
       "steps": {
         "progress": "Step {n} of {total}",
         "next": "Next",

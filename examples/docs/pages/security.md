@@ -49,6 +49,20 @@ An interceptor runs around every screen, grid, form, API and command call after 
 
 - Every page sets a random `zeyn_csrf` cookie (`HttpOnly`, `SameSite=Strict`) and puts the same token in a meta tag. Every call from the runtime sends it in the `x-zeyn-csrf` header and the server compares the two in constant time.
 - The Content Security Policy allows scripts, styles and images only from the app's own origin. There are no inline scripts; themes are stylesheets, never inline styles.
+- `App::csp` opens the policy for named hosts, one directive at a time. The header is built once at startup.
+
+```rust
+App::new("Shop").csp(|c| {
+    c.img_src(["https://images.example.com"])
+        .frame_src(["https://www.youtube-nocookie.com", "https://*.vimeo.com"])
+        .media_src(["https://media.example.com:8443"])
+        .media_blob()
+        .connect_src(["https://api.example.com"])
+        .font_src(["https://fonts.example.com"])
+})
+```
+
+  Only `https://host`, `https://host:port` and `https://*.host` are accepted (a wildcard matches subdomains, not the host itself). `.media_blob()` adds `blob:` to `media-src` for streaming libraries. `App::check` refuses `*`, `http:`, bare schemes such as `data:` or `https:`, quoted keywords such as `'unsafe-inline'` or `'unsafe-eval'`, paths, user names, and values with spaces, commas or semicolons; each problem says what to write instead. `script-src`, `object-src`, `base-uri` and `frame-ancestors` cannot be changed. `Embed` and `Image` read the same lists, so a host the browser would block is never rendered (see [Display](display.md)).
 - Responses carry `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin` and `X-Frame-Options: DENY`.
 - `App::secure_cookies(true)` marks cookies `Secure`; turn it on behind HTTPS.
 

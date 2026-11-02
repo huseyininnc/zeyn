@@ -385,6 +385,7 @@ pub mod audit;
 #[cfg(feature = "server")]
 pub mod auth;
 mod command;
+mod csp;
 mod ctx;
 mod decimal;
 mod feature;
@@ -446,6 +447,7 @@ pub use command::{
     normalize_shortcut,
 };
 pub use command::{MAX_SEARCH_HITS, MAX_SEARCH_QUERY, Search, SearchHit};
+pub use csp::{Csp, MAX_EMBED_URL, TRACKING_PARAMS, embed_url};
 pub use ctx::{BoxFuture, Ctx, Dep, Identity, Inject, IntoScreen, Outcome, Service, Services};
 pub use decimal::{DEFAULT_PRECISION, DEFAULT_SCALE, Decimal, MAX_PRECISION, MAX_SCALE};
 pub use feature::{Feature, Guard, GuardResult, Menu, MenuGroup, MenuItem, Route, ScreenEntry, SignedIn};
@@ -548,8 +550,9 @@ pub mod prelude {
     pub use crate::ui::Markdown;
     pub use crate::ui::{
         ActionButton, Alert, Audio, Badge, Breadcrumb, Busy, Card, Chart, Control, DateOptions, DescriptionList, Dock,
-        EmptyState, Kpi, LookupItem, LookupQuery, MenuBar, MenuButton, Panel, Popover, Progress, PropertyInspector,
-        Row, Skeleton, Split, Stack, StatusBar, Tabs, Timeline, Toolbox, Tree, TreeItem, TreeQuery, Video,
+        Embed, EmbedPermission, EmptyState, ExternalLink, Image, Kpi, LookupItem, LookupQuery, MenuBar, MenuButton,
+        Panel, Popover, Progress, PropertyInspector, Row, Skeleton, Split, Stack, StatusBar, Tabs, Timeline, Toolbox,
+        Tree, TreeItem, TreeQuery, Video,
     };
     pub use crate::{
         Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime, Decimal, Effect,

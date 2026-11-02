@@ -71,6 +71,7 @@ pub enum Unit {
 | `required` | any | Must have a value |
 | `min_len = n`, `max_len = n` | text | Length in characters |
 | `email` | text | An email address |
+| `embed` | text | An address to embed with `Embed`: `https` on a host of the app's `frame-src` (`App::csp`). Forms also take pasted `<iframe>` code and store only its canonical address, without tracking parameters. See [Display](display.md#embed) |
 | `min = n`, `max = n` | numbers, money, decimals, dates | Bounds. Dates are written `2026_01_01` |
 | `scale = n`, `precision = n` | `Decimal` | Most decimals (2 without the rule) and most digits in all (18 without the rule). They also set the column type, `NUMERIC(precision, scale)` |
 | `mask = "..."` | text | The raw value fills a pattern: `9` a digit, `a` a letter, `A` an upper case letter, `*` either; other characters are shown while typing but not stored. See [Controls](controls.md#masked-input) |

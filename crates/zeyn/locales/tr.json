@@ -111,7 +111,9 @@
       "unique": "{label} başka bir kayıtta kullanılıyor.",
       "scale": "{label} en fazla {n} ondalık basamak içerebilir.",
       "precision": "{label} ondalık ayırıcıdan önce en fazla {n} basamak içerebilir.",
-      "mask": "{label} {pattern} biçiminde olmalı."
+      "mask": "{label} {pattern} biçiminde olmalı.",
+      "embed": "{label} gömülecek bir https adresi ya da bu adresi içeren gömme kodu olmalı.",
+      "embed_host": "{label}: {host} bu uygulamanın gömebileceği siteler listesinde yok."
     },
     "error": {
       "forbidden": "Bu işlem için yetkiniz yok.",
@@ -322,6 +324,15 @@
       "empty": "Henüz kayıt yok.",
       "breadcrumb": "Konum",
       "dismiss": "Kapat",
+      "link": {
+        "external": "dış site",
+        "external_new_tab": "dış site, yeni sekmede açılır"
+      },
+      "embed": {
+        "blocked": "{title} burada gösterilemiyor: sitesi bu uygulamanın gömebileceği siteler listesinde yok.",
+        "load": "{title} içeriğini yükle",
+        "from": "{host} kaynaklı içerik. Yalnızca siz isteyince yüklenir."
+      },
       "steps": {
         "progress": "Adım {n} / {total}",
         "next": "İleri",
