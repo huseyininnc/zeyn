@@ -1,0 +1,37 @@
+name: zeyn
+
+services:
+  landing:
+    image: docker.zeynsoft.com/zeyn/landing:latest
+    container_name: zeyn-landing
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3009:80"
+    mem_limit: 64m
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+      - /tmp
+
+  docs:
+    image: docker.zeynsoft.com/zeyn/docs:latest
+    container_name: zeyn-docs
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3008:3008"
+    mem_limit: 128m
+    cpus: 1.0
+    read_only: true
+
+  showcase:
+    image: docker.zeynsoft.com/zeyn/showcase:latest
+    container_name: zeyn-showcase
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3002:3002"
+    mem_limit: 384m
+    cpus: 1.0
+    read_only: true
+    tmpfs:
+      - /tmp

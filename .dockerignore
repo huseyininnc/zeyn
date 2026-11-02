@@ -1,0 +1,7 @@
+target
+.git
+.claude
+.playwright-mcp
+**/target
+**/dist
+*.log

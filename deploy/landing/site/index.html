@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Zeyn: the AI-native Rust framework for data-heavy business apps</title>
+<meta name="description" content="Zeyn is an open source Rust web framework for data-heavy business apps. AI agents write the code, people review it, and the framework keeps it safe.">
+<link rel="stylesheet" href="/style.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <a class="brand" href="/" aria-label="Zeyn home"><img src="/favicon.svg" alt="" width="28" height="28"><span>Zeyn</span></a>
+  <nav aria-label="Main">
+    <a href="https://docs.zeynsoft.com">Docs</a>
+    <a href="https://framework.zeynsoft.com">Live demo</a>
+  </nav>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <p class="status">Alpha. Not on crates.io yet.</p>
+    <h1>The AI-native Rust framework for data-heavy business apps</h1>
+    <p class="lead">AI agents write the code. People review it. The framework keeps it safe.</p>
+    <p class="actions">
+      <a class="button primary" href="https://docs.zeynsoft.com">Read the docs</a>
+      <a class="button" href="https://framework.zeynsoft.com">See every component</a>
+    </p>
+  </section>
+
+  <section aria-labelledby="mech">
+    <h2 id="mech">What AI-native means here</h2>
+    <div class="cards">
+      <article>
+        <h3>Every action is a typed tool</h3>
+        <p>Each <code>#[action]</code> is an API endpoint and a tool for AI agents. Its JSON schema comes from the input type, its description from the doc comment.</p>
+      </article>
+      <article>
+        <h3>Models stay inside your permissions</h3>
+        <p>Agents act as the signed in user. <code>ai = false</code> hides an action from models, <code>confirm</code> makes the user approve it first, and every agent call is audited.</p>
+      </article>
+      <article>
+        <h3>Compiler errors written for agents</h3>
+        <p>A missing permission, a missing translation or a wrong field type fails at compile time, with a message that says what to change.</p>
+      </article>
+      <article>
+        <h3>An MCP server for your project</h3>
+        <p><code>zeyn mcp</code> gives coding agents the docs, a structural check of the app and its tests as tools.</p>
+      </article>
+    </div>
+  </section>
+
+  <section aria-labelledby="axum">
+    <h2 id="axum">Built on axum, not instead of it</h2>
+    <p>axum handles HTTP. Zeyn adds what a business app needs on top of it, the way Django sits on WSGI.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th scope="col">You get</th><th scope="col">axum</th><th scope="col">Zeyn</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Routing, middleware, async HTTP</th><td>Yes</td><td>Yes (it is axum)</td></tr>
+          <tr><th scope="row">Models, validation on deserialize, row versions</th><td>No</td><td>Yes</td></tr>
+          <tr><th scope="row">Server rendered screens, DataGrid, forms, pickers</th><td>No</td><td>Yes</td></tr>
+          <tr><th scope="row">Permissions on every action, CSRF, strict CSP, audit, masking</th><td>No</td><td>Yes</td></tr>
+          <tr><th scope="row">Translations checked at compile time, time zones, money</th><td>No</td><td>Yes</td></tr>
+          <tr><th scope="row">API with OpenAPI, MCP tools, embedded assistant</th><td>No</td><td>Yes</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="code">
+    <h2 id="code">A list, an editor and an API</h2>
+<pre><code>#[action(permission = "sales.order.read")]
+pub async fn search_orders(q: DataQuery, store: OrderStore) -&gt; Result&lt;Page&lt;Order&gt;&gt; {
+    Ok(q.apply(store.all()?))
+}
+
+#[screen(route = "/", permission = "sales.order.read")]
+pub fn order_list() -&gt; Screen {
+    Screen::new(t!("orders.title")).body(
+        DataGrid::of(search_orders).column(Order::code).filter().column(Order::total).sum(),
+    )
+}</code></pre>
+    <p>No HTML, CSS or JavaScript to write. The grid pages, filters and sums on the server, and the same action answers the API and AI agents.</p>
+  </section>
+
+  <section aria-labelledby="what">
+    <h2 id="what">In the box</h2>
+    <ul class="grid">
+      <li><strong>DataGrid</strong> Virtual scrolling over a million rows, typed filters, totals, grouping, inline editing, CSV and Excel export.</li>
+      <li><strong>Components</strong> Layouts, date and time pickers, controls, lines editor, tree, charts, command palette, menus, docking panels.</li>
+      <li><strong>Security</strong> Permissions, guards, interceptors, field audit, read audit, masking, rate limits, IP rules.</li>
+      <li><strong>Data</strong> PostgreSQL and Oracle 11g or later, keyset cursors, transactions, streams, migrations.</li>
+      <li><strong>Sign in</strong> OIDC, JWT, MFA, passkeys and an optional accounts system with ready screens.</li>
+      <li><strong>Runs light</strong> A 43 MB container that idles at about 3 MiB of memory, or one desktop exe.</li>
+    </ul>
+  </section>
+</main>
+
+<footer>
+  <p>Zeyn is open source under MIT or Apache 2.0.</p>
+</footer>
+</body>
+</html>
