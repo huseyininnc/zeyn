@@ -9,3 +9,6 @@ Thumbs.db
 .playwright-mcp/
 .claude/
 *.key
+
+# Built WASM islands (zeyn build-islands)
+dist/

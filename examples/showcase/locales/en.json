@@ -14,7 +14,8 @@
     "ui": "Component library",
     "media": "Media",
     "pro": "Desktop shell",
-    "assistant": "Assistant"
+    "assistant": "Assistant",
+    "islands": "Islands"
   },
   "dashboard": {
     "title": "Overview",
@@ -331,6 +332,12 @@
     "dock_hint": "Drag a tab to another area, or use the panel options button. Resize areas with the dividers or their arrow keys. Delete closes the focused tab; View in the menu brings panels back. The layout is saved for you.",
     "output_text": "Build finished without warnings."
   },
+  "DiagramRow": {
+    "label": "Label",
+    "kind": "Kind",
+    "x": "X",
+    "y": "Y"
+  },
   "Shape": {
     "name": "Name",
     "x": "X",
@@ -338,6 +345,32 @@
     "width": "Width",
     "height": "Height",
     "visible": "Visible"
+  },
+  "islands": {
+    "counter": "Counter",
+    "counter_intro": "A Rust component compiled to WebAssembly. The server renders this screen; the counter loads when it comes into view and saves through a typed action with the usual checks.",
+    "fallback": "The interactive counter could not load here. Everything else on the page works without it.",
+    "less": "Less",
+    "more": "More",
+    "save": "Save",
+    "saved": "Saved: {value}",
+    "diagram": "Diagram editor",
+    "diagram_help": "A process diagram you can edit with a pointer or the keyboard. Drag a shape to move it, drag the background to pan and use the wheel to zoom. With the canvas focused: ] and [ select the next or previous shape, arrow keys move it (Shift moves 10 pixels), Delete removes it, plus, minus and 0 zoom, Escape clears the selection. The toolbar buttons do the same, and the list under the canvas describes every shape.",
+    "add_box": "Add box",
+    "add_ellipse": "Add ellipse",
+    "remove": "Remove selected",
+    "next": "Select next",
+    "tools": "Diagram tools",
+    "summary": "Shapes",
+    "empty": "The diagram is empty.",
+    "selected": "Selected: {shape}",
+    "kind_box": "Box",
+    "kind_ellipse": "Ellipse",
+    "line": "{kind} \"{label}\" at {x}, {y}, {w} by {h}",
+    "diagram_saved": "Saved {count} shapes.",
+    "live_on": "Live: changes are shared as you make them",
+    "live_off": "Offline: changes are kept and shared when the connection is back",
+    "stored": "Shapes stored on the server (refresh in place)"
   },
   "assistant": {
     "title": "Assistant",

@@ -14,7 +14,8 @@
     "ui": "Bileşen kütüphanesi",
     "media": "Medya",
     "pro": "Masaüstü kabuğu",
-    "assistant": "Asistan"
+    "assistant": "Asistan",
+    "islands": "Adacıklar"
   },
   "dashboard": {
     "title": "Genel bakış",
@@ -331,6 +332,12 @@
     "dock_hint": "Bir sekmeyi başka bir alana sürükleyin ya da panel seçenekleri düğmesini kullanın. Alanları ayırıcılarla ya da ok tuşlarıyla boyutlandırın. Delete odaktaki sekmeyi kapatır; menüdeki Görünüm panelleri geri getirir. Yerleşim sizin için kaydedilir.",
     "output_text": "Derleme uyarısız tamamlandı."
   },
+  "DiagramRow": {
+    "label": "Etiket",
+    "kind": "Tür",
+    "x": "X",
+    "y": "Y"
+  },
   "Shape": {
     "name": "Ad",
     "x": "X",
@@ -338,6 +345,32 @@
     "width": "Genişlik",
     "height": "Yükseklik",
     "visible": "Görünür"
+  },
+  "islands": {
+    "counter": "Sayaç",
+    "counter_intro": "WebAssembly olarak derlenmiş bir Rust bileşeni. Ekranı sunucu çizer; sayaç görünür olunca yüklenir ve olağan denetimlerle tipli bir eylem üzerinden kaydedilir.",
+    "fallback": "Etkileşimli sayaç burada yüklenemedi. Sayfanın geri kalanı onsuz da çalışır.",
+    "less": "Azalt",
+    "more": "Artır",
+    "save": "Kaydet",
+    "saved": "Kaydedildi: {value}",
+    "diagram": "Diyagram düzenleyici",
+    "diagram_help": "İşaretçiyle ya da klavyeyle düzenlenebilen bir süreç diyagramı. Bir şekli taşımak için sürükleyin, kaydırmak için arka planı sürükleyin, yakınlaştırmak için tekerleği kullanın. Tuval odaktayken: ] ve [ sonraki ya da önceki şekli seçer, ok tuşları onu taşır (Shift ile 10 piksel), Delete siler, artı, eksi ve 0 yakınlaştırır, Escape seçimi kaldırır. Araç çubuğundaki düğmeler de aynısını yapar; tuvalin altındaki liste her şekli anlatır.",
+    "add_box": "Kutu ekle",
+    "add_ellipse": "Elips ekle",
+    "remove": "Seçileni sil",
+    "next": "Sonrakini seç",
+    "tools": "Diyagram araçları",
+    "summary": "Şekiller",
+    "empty": "Diyagram boş.",
+    "selected": "Seçildi: {shape}",
+    "kind_box": "Kutu",
+    "kind_ellipse": "Elips",
+    "line": "{kind} \"{label}\", konum {x}, {y}, boyut {w} x {h}",
+    "diagram_saved": "{count} şekil kaydedildi.",
+    "live_on": "Canlı: değişiklikler yapıldıkça paylaşılır",
+    "live_off": "Çevrim dışı: değişiklikler saklanır, bağlantı gelince paylaşılır",
+    "stored": "Sunucuda kayıtlı şekiller (yerinde yenilenir)"
   },
   "assistant": {
     "title": "Asistan",

@@ -1,0 +1,24 @@
+[package]
+name = "zeyn-island"
+description = "Client side of Zeyn islands: typed action calls and props for Rust components compiled to WebAssembly"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = []
+# Browser side: `Island` and typed `call` over `fetch`. Off in crates the server shares with islands.
+client = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:web-sys"]
+# Drawing surface (`canvas::Surface`): high DPI canvas, input events, frames only on change.
+# Live documents over `/_zeyn/live` (`live::Channel`), for islands of apps with the `realtime` feature.
+realtime = ["client", "dep:js-sys", "web-sys/WebSocket", "web-sys/BinaryType", "web-sys/MessageEvent", "web-sys/CloseEvent", "web-sys/Location", "web-sys/Event"]
+canvas = ["client", "dep:js-sys", "web-sys/HtmlCanvasElement", "web-sys/HtmlElement", "web-sys/CssStyleDeclaration", "web-sys/CanvasRenderingContext2d", "web-sys/WebGl2RenderingContext", "web-sys/Event", "web-sys/EventTarget", "web-sys/MouseEvent", "web-sys/PointerEvent", "web-sys/WheelEvent", "web-sys/KeyboardEvent", "web-sys/AddEventListenerOptions", "web-sys/ResizeObserver", "web-sys/Navigator"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+wasm-bindgen = { version = "=0.2.130", optional = true }
+wasm-bindgen-futures = { version = "0.4", optional = true }
+js-sys = { version = "0.3", optional = true }
+web-sys = { version = "0.3", optional = true, features = ["Window", "Document", "Element", "Headers", "Request", "RequestInit", "RequestCredentials", "Response"] }

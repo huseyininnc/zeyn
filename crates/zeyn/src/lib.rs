@@ -390,6 +390,9 @@ pub use auth::RequireMfa;
 pub use auth::{Algorithm, ClaimMap, JwtAuth, OidcAuth};
 #[cfg(feature = "totp")]
 pub use auth::{MemoryTotpStore, Totp, TotpRecord, TotpStore};
+/// Realtime channel: WebSocket rooms with Y-CRDT documents and change topics.
+#[cfg(feature = "realtime")]
+pub use server::realtime;
 pub use screen::{
     Component, Effect, Export, FormSource, GridSource, Icon, LoadedPage, Node, Params, RowCall, Screen, ScreenDef, ScreenMeta,
     ToolButton, Toolbar, UiCtx, Window,

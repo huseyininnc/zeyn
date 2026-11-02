@@ -1,0 +1,18 @@
+[package]
+name = "showcase-shared"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "MIT OR Apache-2.0"
+
+# Types the showcase server and its islands both compile: props, messages and remotes.
+# Only serde and the contract half of zeyn-island, so the server pulls in no browser code.
+[features]
+# The diagram as a Y-CRDT document, for live editing (server store and island).
+crdt = ["dep:yrs", "dep:serde_json"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+zeyn-island = { path = "../../../crates/zeyn-island" }
+yrs = { version = "0.28", optional = true }
+serde_json = { version = "1", optional = true }

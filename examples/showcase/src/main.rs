@@ -8,6 +8,7 @@
 
 mod assistant;
 mod gallery;
+mod islands;
 mod media;
 mod overview;
 mod people;
@@ -64,6 +65,7 @@ async fn main() -> std::io::Result<()> {
     };
 
     let assistant = assistant::assistant(&config)?;
+    let diagrams = islands::DiagramStore::default();
     let mut app = App::new(t!("app.name"))
         .plugin(CompanyStandard { config })
         .theme(Theme::new().radius(6))
@@ -80,6 +82,9 @@ async fn main() -> std::io::Result<()> {
         .idle_warning(Duration::from_secs((idle / 2).min(60)))
         .i18n(i18n)
         .service(stock::ProductStore::seeded())
+        .service(islands::CounterStore::default())
+        .service(diagrams.clone())
+        .realtime(islands::realtime(diagrams))
         .datagrid_views(MemoryViewStore::default())
         .service(people::LeaveStore::seeded(TimeZone::UTC.today(DateTime::now())))
         .auth(DevAuth::superuser("Demo User"))
@@ -95,7 +100,9 @@ async fn main() -> std::io::Result<()> {
         .feature(ui::feature())
         .feature(media::feature())
         .feature(pro::feature())
-        .feature(assistant::feature());
+        .feature(islands::feature())
+        .feature(assistant::feature())
+        .islands(concat!(env!("CARGO_MANIFEST_DIR"), "/dist/islands"));
     if let Some(a) = assistant {
         app = app.assistant(a);
     }

@@ -15,6 +15,16 @@ mod media;
 mod shell;
 mod tree;
 mod widgets;
+#[cfg(feature = "islands")]
+mod island;
+#[cfg(feature = "islands")]
+pub use island::{Canvas, Island, IslandLoad, Remote};
+#[cfg(feature = "islands")]
+pub(crate) use island::MARKER as ISLAND_MARKER;
+#[cfg(feature = "realtime")]
+mod live;
+#[cfg(feature = "realtime")]
+pub use live::Live;
 
 pub use layout::{Card, Panel, Row, Split, Stack, Tabs};
 pub use shell::{MenuBar, MenuList, PropertyInspector, StatusBar, Toolbox};

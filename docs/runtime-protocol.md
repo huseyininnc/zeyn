@@ -279,6 +279,38 @@ Effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":".
 | `GET /_zeyn/media/position?source=&id=` | `{ at, kept }`, where the signed in user stopped; `kept` is `false` when the source keeps no positions (the player then uses local storage). |
 | `POST /_zeyn/media/position` | `{ source, id, at }` with the CSRF header saves it: `204`, `422` for a bad position. |
 
+### 7.5 Islands
+
+With the `islands` feature, a screen that holds `div[data-zeyn-island]` is served with
+`<meta name="zeyn-islands">` (island name to `{ js, wasm }` URLs), `/_zeyn/islands.js` and a policy
+with `'wasm-unsafe-eval'`; other pages are unchanged. A partial answer that holds an island carries
+`x-zeyn-islands: 1`, and `nav.js` loads it in full when the document lacks the island policy.
+
+| Attribute or endpoint | Meaning |
+|---|---|
+| `data-zeyn-island`, `data-zeyn-load`, `data-zeyn-props` | Island name, `visible`, `interaction` or `idle`, props JSON |
+| `data-zeyn-island-fallback` | Fallback content, hidden once the island mounts |
+| `data-zeyn-island-state` | Set by the loader: `loading`, `ready`, `failed` |
+| `GET /_zeyn/islands/{file}` | A built file listed in the manifest, cached for a year |
+| `POST /_zeyn/data` with `key` = remote name | A typed call from the island, with all the checks of 7.1 |
+
+See `docs/islands.md`.
+
+### 7.6 Realtime
+
+With the `realtime` feature, `div[data-zeyn-live="topic"]` marks nodes that refresh when the server
+notifies the topic. Pages holding one link `/_zeyn/live.js`; a partial answer holding one carries
+`x-zeyn-live: 1` and `nav.js` imports the script. `zeyn:reload` on an element reloads the grids
+inside it in place.
+
+| Endpoint | Does |
+|---|---|
+| `GET /_zeyn/live/topics?t=a,b&csrf=` | WebSocket; text frames `{ "topic": "a" }` |
+| `GET /_zeyn/live/doc/{kind}/{doc}?csrf=` | WebSocket; binary frames `0x01` + Y update (v1) both ways |
+
+Handshakes check the origin, the CSRF token against the cookie, the signed in user and the
+permissions before upgrading. See `docs/realtime.md`.
+
 The player dispatches the cancelable `zeyn:media-adaptive` event (`{ media, kind, url, hls, dash }`) on its root before falling back to progressive files; a streaming library calls `preventDefault()` to take over.
 
 ## 8. Desktop class shell

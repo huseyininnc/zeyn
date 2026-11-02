@@ -88,7 +88,7 @@ fn walk(dir: &Path, out: &mut HashMap<PathBuf, SystemTime>) {
         let path = entry.path();
         let name = entry.file_name();
         let name = name.to_string_lossy();
-        if name.starts_with('.') || name == "target" || name == "node_modules" {
+        if name.starts_with('.') || name == "target" || name == "node_modules" || name == "dist" {
             continue;
         }
         let Ok(meta) = entry.metadata() else { continue };
@@ -100,8 +100,19 @@ fn walk(dir: &Path, out: &mut HashMap<PathBuf, SystemTime>) {
     }
 }
 
-/// Builds the app; returns its binary, or `None` when the build failed (errors are already shown).
+/// Builds the islands (crates in `islands/`, see `zeyn build-islands`), then the app; returns its
+/// binary, or `None` when a build failed (errors are already shown).
 fn build(root: &Path) -> Result<Option<PathBuf>, String> {
+    let islands = crate::islands::default_crates(root);
+    if !islands.is_empty() {
+        match crate::islands::build(&islands, &root.join(crate::islands::OUT_DIR)) {
+            Ok(report) => println!("{report}"),
+            Err(e) => {
+                println!("zeyn dev: islands failed to build: {e}");
+                return Ok(None);
+            }
+        }
+    }
     let manifest = std::fs::canonicalize(root.join("Cargo.toml")).map_err(|e| format!("Cargo.toml: {e}"))?;
     let mut child = Command::new("cargo")
         .args(["build", "--message-format=json-render-diagnostics"])

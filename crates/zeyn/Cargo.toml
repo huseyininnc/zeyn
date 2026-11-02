@@ -22,9 +22,15 @@ oracle = ["dep:oracle", "dep:base64", "dep:tokio", "dep:futures-core"]
 oidc = ["server", "dep:reqwest", "dep:rustls", "dep:ring"]
 # Built in TOTP second factor for apps without an identity provider. See docs/auth.md.
 totp = ["server", "dep:ring", "dep:totp-rs", "dep:qrcodegen"]
+# WASM islands (`ui::Island`, `App::islands`). Pages without an island pay nothing either way.
+islands = ["server", "dep:zeyn-island", "tokio/fs"]
+# WebSocket rooms with Y-CRDT documents and change topics (`realtime::Realtime`, `ui::Live`).
+# Off by default: requests stay stateless unless an app turns this on.
+realtime = ["server", "axum/ws", "dep:yrs", "dep:futures-util", "futures-util/sink"]
 
 [dependencies]
 zeyn-macros = { path = "../zeyn-macros", version = "0.0.2" }
+zeyn-island = { path = "../zeyn-island", version = "0.0.2", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 jiff = { version = "0.2", default-features = false, features = ["std", "tzdb-bundle-always"] }
@@ -50,6 +56,7 @@ sqlx = { version = "0.9", default-features = false, features = ["postgres", "run
 base64 = { version = "0.22", optional = true }
 futures-util = { version = "0.3", default-features = false, optional = true }
 oracle = { version = "0.6", optional = true }
+yrs = { version = "0.28", optional = true }
 
 [dev-dependencies]
 ed25519-dalek = { version = "3", default-features = false }
@@ -59,6 +66,9 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-util"] }
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["std", "fmt", "registry"] }
+tokio-tungstenite = "0.29"
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
+yrs = "0.28"
 
 [[test]]
 name = "assistant"
@@ -71,3 +81,11 @@ required-features = ["oidc"]
 [[test]]
 name = "totp"
 required-features = ["totp"]
+
+[[test]]
+name = "islands"
+required-features = ["islands"]
+
+[[test]]
+name = "realtime"
+required-features = ["realtime"]
