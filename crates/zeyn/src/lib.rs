@@ -127,6 +127,7 @@
 
 mod action;
 mod api;
+pub mod audit;
 mod ctx;
 mod feature;
 mod form;
@@ -147,6 +148,7 @@ pub use action::{
     Access, Action, ActionMeta, Cursor, DEFAULT_PAGE_SIZE, Error, Filter, GridQuery, MAX_PAGE_SIZE, Page, PageRequest,
     Result, Sort,
 };
+pub use audit::{FieldChange, RecordRef, Trail};
 pub use api::{ApiEntry, ApiInput, ApiOutput, ApiResult, model_schema};
 pub use ctx::{BoxFuture, Ctx, Dep, Identity, Inject, IntoScreen, Outcome, Service, Services};
 pub use feature::{Feature, Guard, GuardResult, Menu, MenuGroup, MenuItem, Route, ScreenEntry, SignedIn};

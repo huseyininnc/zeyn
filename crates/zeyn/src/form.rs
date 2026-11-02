@@ -408,6 +408,9 @@ where
 
     fn submit(&self, ctx: Ctx, values: Map<String, Json>) -> BoxFuture<Result<Vec<Effect>>> {
         let valid = self.form.read(&values, ctx.locale(), ctx.time_zone());
+        if let Ok(saved) = &valid {
+            ctx.record_changes(&self.form.model, saved);
+        }
         let on_success = self.on_success.clone();
         Box::pin(async move {
             let valid = valid.map_err(Error::Validation)?;

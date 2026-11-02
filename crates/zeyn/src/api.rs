@@ -77,6 +77,11 @@ pub trait ApiInput: Sized + Send + 'static {
 
     /// Reads the request body. Validation failures become `Error::Validation`.
     fn from_json(value: Json) -> Result<Self>;
+
+    /// The record this input saves, for the audit log.
+    fn record(&self) -> Option<crate::audit::RecordRef> {
+        None
+    }
 }
 
 fn unreadable(e: serde_json::Error) -> Error {
@@ -93,6 +98,10 @@ impl<M: Model> ApiInput for Valid<M> {
     fn from_json(value: Json) -> Result<Self> {
         let model: M = serde_json::from_value(value).map_err(unreadable)?;
         Valid::new(model).map_err(Error::Validation)
+    }
+
+    fn record(&self) -> Option<crate::audit::RecordRef> {
+        Some(crate::audit::RecordRef::of(&**self))
     }
 }
 
@@ -206,6 +215,11 @@ where
 {
     Box::pin(async move {
         let input = A::Input::from_json(body)?;
+        if let Some(record) = input.record() {
+            ctx.update_trail(|t| {
+                t.record.get_or_insert(record);
+            });
+        }
         A::call(ctx, input).await?.into_json()
     })
 }

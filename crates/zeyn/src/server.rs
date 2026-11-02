@@ -241,6 +241,15 @@ pub struct AuditEntry {
     pub error: Option<&'static str>,
     pub via_agent: bool,
     pub millis: u128,
+    /// Model of the saved record, such as `Product`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<&'static str>,
+    /// Key of the saved record as text.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub record: Option<String>,
+    /// Changed fields with old and new values. Old values come from the record the server loaded.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub changes: Vec<crate::audit::FieldChange>,
 }
 
 /// Where audit records go.
@@ -286,7 +295,11 @@ impl<S: AuditSink> Interceptor for AuditLog<S> {
         if !audited {
             return;
         }
+        let trail = ctx.trail();
         self.0.record(AuditEntry {
+            model: trail.record.as_ref().map(|r| r.model),
+            record: trail.record.and_then(|r| r.id),
+            changes: trail.changes,
             at_unix_ms: SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0),
             user: ctx.identity().user.clone(),
             kind: call.kind,
