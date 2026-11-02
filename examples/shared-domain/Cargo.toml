@@ -1,0 +1,18 @@
+[package]
+name = "zeyn-example-shared-domain"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[lib]
+name = "shared_domain"
+path = "src/lib.rs"
+
+[dependencies]
+zeyn = { path = "../../crates/zeyn" }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+axum = "0.8"
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"

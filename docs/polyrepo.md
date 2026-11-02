@@ -29,6 +29,19 @@ App::new(t!("app.name"))
 Library catalogs are loaded first, so an app can override a library string by defining the same key.
 Prefix library keys with the feature name (`customers.list`) so two libraries never collide.
 
+`examples/shared-domain` is such a library. `examples/billing` and `examples/crm` both mount its
+customers feature; crm renames "Customers" to "Accounts" in its own catalog.
+
+## What the library has to own
+
+Rust's orphan rule says a trait can only be implemented in the crate that defines the trait or
+the type. An app cannot implement `zeyn::Model` or `zeyn::Entity` for a type from a library, so:
+
+- Put `#[entity]`, `#[model]` and `#[choice]` on the type in the library, next to its rules.
+- Keep validation rules (`#[rule(...)]`) on the shared type. Every app then validates the same way.
+- An app that needs extra behavior wraps the type (`struct Invoice { customer: Customer, ... }`)
+  or adds its own trait. It does not edit the library type.
+
 ## How apps get the library
 
 | Option | Good | Watch out for |

@@ -1,0 +1,5 @@
+{
+  "customers": { "menu": "Müşteriler", "list": "Müşteriler", "new": "Yeni müşteri", "editor": "Müşteri", "save": "Kaydet", "saved": "Müşteri kaydedildi." },
+  "Customer": { "id": "No", "code": "Kod", "name": "Ad", "email": "E-posta", "segment": "Segment", "active": "Aktif" },
+  "Segment": { "Retail": "Bireysel", "Corporate": "Kurumsal", "Public": "Kamu" }
+}

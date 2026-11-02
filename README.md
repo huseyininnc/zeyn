@@ -9,7 +9,9 @@ Status: early development, not published. Everything below compiles and is teste
 ```
 cargo run -p zeyn-example-showcase     # http://127.0.0.1:3002, every component and feature
 cargo run -p zeyn-example-big-grid     # http://127.0.0.1:3000, one million rows
+cargo run -p zeyn-example-billing      # http://127.0.0.1:3004, an app using the shared-domain library
 cargo run -p zeyn-cli -- new my-app    # a new project with the standard feature structure
+cargo run -p zeyn-cli -- new my-domain --lib   # a library of features shared by several apps
 ```
 
 ## What works today
@@ -27,6 +29,7 @@ cargo run -p zeyn-cli -- new my-app    # a new project with the standard feature
 - Themeable design system with light and dark themes (see `docs/theming.md`)
 - Field level audit, read audit with reasons, field masking, safe deploys, health checks, idle
   timeout and re authentication, CSV import, background jobs and approval workflows (see `docs/enterprise.md`)
+- Apps and shared libraries in separate repositories, GitLab CI templates (see `docs/polyrepo.md`)
 
 ## Goals
 

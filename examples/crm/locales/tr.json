@@ -1,0 +1,28 @@
+{
+  "app": {
+    "name": "Crm"
+  },
+  "home": {
+    "menu": "Ana sayfa",
+    "title": "Hoş geldiniz",
+    "intro": "Bu uygulama zeyn new ile oluşturuldu. İşe src/features klasöründen başlayın."
+  },
+  "notes": {
+    "menu": "Notlar",
+    "list": "Notlar",
+    "new": "Yeni not",
+    "editor": "Not",
+    "save": "Kaydet",
+    "saved": "Not kaydedildi."
+  },
+  "Note": {
+    "id": "No",
+    "title": "Başlık",
+    "body": "Metin",
+    "due": "Son tarih",
+    "done": "Tamamlandı"
+  },
+  "customers": {
+    "list": "Hesaplar"
+  }
+}

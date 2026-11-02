@@ -552,10 +552,47 @@ dependencies = [
 ]
 
 [[package]]
+name = "zeyn-example-billing"
+version = "0.0.0"
+dependencies = [
+ "axum",
+ "http-body-util",
+ "serde_json",
+ "tokio",
+ "tower",
+ "zeyn",
+ "zeyn-example-shared-domain",
+]
+
+[[package]]
+name = "zeyn-example-crm"
+version = "0.0.0"
+dependencies = [
+ "axum",
+ "http-body-util",
+ "serde_json",
+ "tokio",
+ "tower",
+ "zeyn",
+ "zeyn-example-shared-domain",
+]
+
+[[package]]
 name = "zeyn-example-inventory"
 version = "0.0.0"
 dependencies = [
  "tokio",
+ "zeyn",
+]
+
+[[package]]
+name = "zeyn-example-shared-domain"
+version = "0.0.0"
+dependencies = [
+ "axum",
+ "http-body-util",
+ "tokio",
+ "tower",
  "zeyn",
 ]
 
