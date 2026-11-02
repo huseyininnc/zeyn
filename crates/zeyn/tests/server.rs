@@ -446,3 +446,40 @@ async fn check_reports_missing_services_of_published_actions() {
     let problems = App::new("T").feature(Feature::new("stock").api(search)).check().unwrap_err();
     assert!(problems.iter().any(|p| p.contains("api `search` needs service")));
 }
+
+/// Refuses every call in `before` and records what `after` sees.
+#[derive(Clone, Default)]
+struct Refuse(Arc<RwLock<Vec<(zeyn::server::CallKind, bool, Option<&'static str>)>>>);
+
+impl zeyn::Interceptor for Refuse {
+    fn before(&self, _ctx: &Ctx, _call: &zeyn::server::Call) -> Result<()> {
+        Err(Error::Forbidden)
+    }
+
+    fn after(&self, _ctx: &Ctx, call: &zeyn::server::Call, outcome: &zeyn::server::CallOutcome) {
+        self.0.write().unwrap().push((call.kind, outcome.ok, outcome.error));
+    }
+}
+
+#[tokio::test]
+async fn a_call_refused_in_before_never_runs_and_after_still_sees_it() {
+    use zeyn::server::CallKind;
+    let store = Store::seeded();
+    let refuse = Refuse::default();
+    let identity = writer();
+    let router = App::new("Test")
+        .service(store.clone())
+        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .interceptor(refuse.clone())
+        .feature(Feature::new("stock").screen(list).screen(edit))
+        .router()
+        .unwrap();
+    let grid = send(&router, post("/_zeyn/grid", serde_json::json!({ "screen": "list", "node": 0 }))).await;
+    assert_eq!(grid.status, StatusCode::FORBIDDEN);
+    let values = serde_json::json!({ "code": "X-3", "price": "1", "version": "1" });
+    let form = send(&router, post("/_zeyn/form", serde_json::json!({ "screen": "edit", "params": { "id": 3 }, "node": 0, "values": values }))).await;
+    assert_eq!(form.status, StatusCode::FORBIDDEN);
+    assert_eq!(store.get(3).code, "P-03", "the save action never ran");
+    let seen = refuse.0.read().unwrap().clone();
+    assert_eq!(seen, [(CallKind::DataGrid, false, Some("forbidden")), (CallKind::Form, false, Some("forbidden"))]);
+}
