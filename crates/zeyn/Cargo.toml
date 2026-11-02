@@ -14,6 +14,7 @@ server = ["dep:axum", "dep:tokio", "dep:getrandom", "dep:tower-http", "dep:futur
 zeyn-macros = { path = "../zeyn-macros", version = "0.0.2" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+jiff = { version = "0.2", default-features = false, features = ["std", "tzdb-bundle-always"] }
 axum = { version = "0.8", optional = true }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "sync"], optional = true }
 futures-core = { version = "0.3", optional = true }

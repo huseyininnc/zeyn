@@ -1520,7 +1520,8 @@ impl AppState {
             let current = ctx.time_zone().name();
             let auto = r.text(&Text::key("zeyn.shell.time_zone_auto"));
             let mut options = format!(r#"<option value="">{auto}</option>"#);
-            for name in TimeZone::names() {
+            let listed = TimeZone::names().any(|n| n == current);
+            for name in TimeZone::names().chain((!listed).then_some(current)) {
                 let selected = if name == current { " selected" } else { "" };
                 options.push_str(&format!(r#"<option value="{name}"{selected}>{}</option>"#, name.replace('_', " ")));
             }
