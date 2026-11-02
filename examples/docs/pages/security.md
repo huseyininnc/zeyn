@@ -48,6 +48,7 @@ An interceptor runs around every screen, grid, form, API and command call after 
 ## CSRF, CSP and headers
 
 - Every page sets a random `zeyn_csrf` cookie (`HttpOnly`, `SameSite=Strict`) and puts the same token in a meta tag. Every call from the runtime sends it in the `x-zeyn-csrf` header and the server compares the two in constant time.
+- Public screens opened without a session are the exception: they set no cookie and carry no token, so they can be cached. The runtime fetches the token from `GET /_zeyn/csrf` before its first call, and every `POST` is still checked the same way (see [Public pages](public-pages.md)).
 - The Content Security Policy allows scripts, styles and images only from the app's own origin. There are no inline scripts; themes are stylesheets, never inline styles.
 - `App::csp` opens the policy for named hosts, one directive at a time. The header is built once at startup.
 

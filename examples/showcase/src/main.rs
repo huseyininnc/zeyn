@@ -112,6 +112,8 @@ async fn main() -> std::io::Result<()> {
         .home(overview::overview)
         .not_found(overview::not_found_page)
         .server_error(overview::server_error_page)
+        .site_url(config.get("site.url").unwrap_or("https://northwind.example"))
+        .robots_txt("User-agent: *\nAllow: /about\nAllow: /dashboard\nDisallow: /\nSitemap: https://northwind.example/sitemap.xml\n")
         .feature(overview::feature())
         .feature(stock::feature())
         .feature(sales::feature())

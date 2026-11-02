@@ -39,6 +39,7 @@ Which page answers what:
 | Video and audio | `components/media` (`docs/media.md`) |
 | Dates, time zones, money, languages | `guides/time-and-languages` (`time-and-languages.md`) |
 | Permissions, guards, CSRF, masking, audit | `guides/security` (`security.md`), `docs/enterprise.md` |
+| Public pages: no cookies, HTTP caching, SEO head tags, sitemap, robots.txt | `guides/public-pages` (`public-pages.md`) |
 | Sign in with an identity provider, JWT, MFA | `docs/auth.md` |
 | Own user accounts: registration, passwords, two factor, passkeys | `guides/accounts` (`accounts.md`, `docs/accounts.md`) |
 | Database | `guides/database` (`docs/database.md`) |

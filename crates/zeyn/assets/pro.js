@@ -13,9 +13,10 @@
 const BASE = (document.querySelector('meta[name="zeyn-base"]')?.content ?? '').replace(/\/$/, '');
 const MAC = /mac|iphone|ipad/i.test(navigator.userAgentData?.platform ?? navigator.platform ?? '');
 
-/** Returns the CSRF token from `meta[name=zeyn-csrf]`. */
-function csrf() {
-  return document.querySelector('meta[name="zeyn-csrf"]')?.content ?? '';
+/** Returns the CSRF token of the page, or asks `zeyn.js` for one when the page came without it. */
+async function csrf() {
+  const token = document.querySelector('meta[name="zeyn-csrf"]')?.content;
+  return token || (window.zeynCsrf ? window.zeynCsrf() : '');
 }
 
 /**
@@ -27,7 +28,7 @@ async function post(path, body) {
     const res = await fetch(BASE + path, {
       method: 'POST',
       credentials: 'same-origin',
-      headers: { 'content-type': 'application/json', 'x-zeyn-csrf': csrf() },
+      headers: { 'content-type': 'application/json', 'x-zeyn-csrf': await csrf() },
       body: JSON.stringify(body),
     });
     let data = null;

@@ -26,6 +26,12 @@
     "not_found_text": "Bu adres bir yere çıkmıyor. Taşınmış ya da kayıt silinmiş olabilir.",
     "server": "Bir şeyler ters gitti",
     "server_text": "Sunucu bu isteği tamamlayamadı. Lütfen biraz sonra yeniden deneyin."
+},
+  "about": {
+    "title": "Northwind hakkında",
+    "description": "Northwind Operasyon: küçük bir ticaret şirketinin stoğu, siparişleri ve çalışanları tek bir Zeyn uygulamasında.",
+    "lead": "Northwind Operasyon, küçük bir ticaret şirketinin stoğunu, siparişlerini ve çalışanlarını yönetir.",
+    "cache": "Bu sayfa herkese açık: ziyaretçiler onu çerezsiz alır, tarayıcılar ve önbellekler beş dakika saklar."
   },
   "dashboard": {
     "title": "Genel bakış",

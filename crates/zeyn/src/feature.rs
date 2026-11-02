@@ -141,6 +141,7 @@ pub struct Feature {
     media: Vec<crate::media::MediaEntry>,
     commands: Vec<crate::command::Command>,
     searches: Vec<crate::command::Search>,
+    sitemap: Option<crate::seo::Sitemap>,
     #[cfg(feature = "server")]
     files: Vec<crate::files::FileEntry>,
     #[cfg(feature = "server")]
@@ -158,6 +159,7 @@ impl Feature {
             apis: Vec::new(),
             commands: Vec::new(),
             searches: Vec::new(),
+            sitemap: None,
             media: Vec::new(),
             #[cfg(feature = "server")]
             files: Vec::new(),
@@ -190,6 +192,24 @@ impl Feature {
 
     pub fn searches(&self) -> &[crate::command::Search] {
         &self.searches
+    }
+
+    /// Serves `/sitemap.xml` from a public action that lists the site's URLs part by part (see
+    /// [`crate::seo::Sitemap`]). Above 50,000 URLs it becomes a sitemap index of numbered parts.
+    /// One sitemap per app; a second one is ignored.
+    pub fn sitemap<A>(mut self, action: A) -> Self
+    where
+        A: crate::action::Action<
+                Input = crate::seo::SitemapPart,
+                Output = crate::action::Result<Vec<crate::seo::SitemapUrl>>,
+            >,
+    {
+        self.sitemap = Some(crate::seo::Sitemap::of(action));
+        self
+    }
+
+    pub fn sitemap_source(&self) -> Option<&crate::seo::Sitemap> {
+        self.sitemap.as_ref()
     }
 
     /// Publishes an action as `POST /api/v1/{feature}/{action}`. Callers need an `Authorization`

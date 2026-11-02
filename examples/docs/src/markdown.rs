@@ -355,11 +355,9 @@ impl Renderer<'_> {
                     let code = collect(i + 1, end);
                     let page = code.split('#').next().is_some_and(|p| p.ends_with(".md")).then(|| (self.link)(&code));
                     match page.filter(|p| p.starts_with('/')) {
-                        Some(route) => out.push_str(&format!(
-                            r#"<a href="{}"><code>{}</code></a>"#,
-                            escape(&route),
-                            escape(&code)
-                        )),
+                        Some(route) => {
+                            out.push_str(&format!(r#"<a href="{}"><code>{}</code></a>"#, escape(&route), escape(&code)))
+                        }
                         None => out.push_str(&format!("<code>{}</code>", escape(&code))),
                     }
                     i = end + 1;

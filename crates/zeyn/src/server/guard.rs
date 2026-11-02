@@ -28,9 +28,9 @@ const WRITE_PATHS: [&str; 14] = [
     "/_zeyn/media/position",
 ];
 
-/// Framework endpoints whose `GET` costs as much as a write: exports and printed documents. They
-/// count against the write limit too.
-const COSTLY_GETS: [&str; 2] = ["/_zeyn/grid/export", "/_zeyn/pdf"];
+/// Framework endpoints whose `GET` costs as much as a write: exports, printed documents and the
+/// sitemap (with its parts under `/sitemaps/`). They count against the write limit too.
+const COSTLY_GETS: [&str; 3] = ["/_zeyn/grid/export", "/_zeyn/pdf", "/sitemap.xml"];
 
 /// Whether a path is a static asset of the runtime, served without IP rules, rate limits or sign
 /// in so that error and sign in pages still load their scripts and styles.
@@ -127,7 +127,8 @@ pub(super) async fn guard_request(
         let ctx = st.ctx(headers);
         return problem(&ctx, Failure::App(Error::Forbidden));
     }
-    let is_write = (parts.method == axum::http::Method::GET && COSTLY_GETS.contains(&path))
+    let is_write = (parts.method == axum::http::Method::GET
+        && (COSTLY_GETS.contains(&path) || path.starts_with("/sitemaps/")))
         || parts.method == axum::http::Method::POST
             && (WRITE_PATHS.contains(&path)
                 || files::is_upload(path)

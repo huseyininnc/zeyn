@@ -32,10 +32,34 @@ const grids = new WeakMap();
 const dialogs = [];
 let uid = 0;
 
-/** Returns the CSRF token from `meta[name=zeyn-csrf]`. */
-function csrf() {
-  return document.querySelector('meta[name="zeyn-csrf"]')?.content ?? '';
+/** @type {Promise<string> | null} The `GET /_zeyn/csrf` request in flight, shared by all callers. */
+let csrfPending = null;
+
+/**
+ * Returns the CSRF token for a `POST`, from `meta[name=zeyn-csrf]`. A page sent without a session
+ * (a public screen) carries none, so that it can be cached; the first call then asks
+ * `GET /_zeyn/csrf`, which sets the cookie, and keeps the token in the meta tag. When that fails
+ * the token is empty and the server refuses the post with an error the user sees; nothing is
+ * retried silently. The other scripts of the page reach it as `window.zeynCsrf`.
+ * @returns {Promise<string>}
+ */
+async function csrf() {
+  const meta = document.querySelector('meta[name="zeyn-csrf"]');
+  if (meta?.content) return meta.content;
+  csrfPending ??= fetch(`${BASE}/_zeyn/csrf`, { credentials: 'same-origin', cache: 'no-store' })
+    .then((res) => (res.ok ? res.json() : null))
+    .then((data) => {
+      const token = typeof data?.token === 'string' ? data.token : '';
+      if (meta && token) meta.content = token;
+      return token;
+    })
+    .catch(() => '')
+    .finally(() => {
+      csrfPending = null;
+    });
+  return csrfPending;
 }
+window.zeynCsrf = csrf;
 
 /**
  * Parses a JSON response body; returns `null` for empty or invalid bodies.
@@ -65,7 +89,7 @@ async function post(url, body, { quiet = false, signal } = {}) {
     res = await fetch(url, {
       method: 'POST',
       credentials: 'same-origin',
-      headers: { 'content-type': 'application/json', 'x-zeyn-csrf': csrf() },
+      headers: { 'content-type': 'application/json', 'x-zeyn-csrf': await csrf() },
       body: JSON.stringify(body),
       signal,
     });

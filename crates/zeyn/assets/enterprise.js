@@ -24,9 +24,10 @@ function t(key, values = {}) {
   return (TEXTS[key] ?? key).replace(/\{(\w+)\}/g, (m, k) => (k in values ? String(values[k]) : m));
 }
 
-/** Returns the CSRF token from `meta[name=zeyn-csrf]`. */
-function csrf() {
-  return document.querySelector('meta[name="zeyn-csrf"]')?.content ?? '';
+/** Returns the CSRF token of the page, or asks `zeyn.js` for one when the page came without it. */
+async function csrf() {
+  const token = document.querySelector('meta[name="zeyn-csrf"]')?.content;
+  return token || (window.zeynCsrf ? window.zeynCsrf() : '');
 }
 
 /** Screen name, params and node of an element, as the server expects them. */
@@ -51,7 +52,7 @@ async function post(path, body) {
     const res = await fetch(BASE + path, {
       method: 'POST',
       credentials: 'same-origin',
-      headers: { 'content-type': 'application/json', 'x-zeyn-csrf': csrf() },
+      headers: { 'content-type': 'application/json', 'x-zeyn-csrf': await csrf() },
       body: JSON.stringify(body),
     });
     let data = null;

@@ -20,9 +20,10 @@ const ANNOUNCE_STEP = 25;
 /** Upload state by item element: the chosen file, the running request and the object URL. */
 const items = new WeakMap();
 
-/** Returns the CSRF token from `meta[name=zeyn-csrf]`. */
-function csrf() {
-  return document.querySelector('meta[name="zeyn-csrf"]')?.content ?? '';
+/** Returns the CSRF token of the page, or asks `zeyn.js` for one when the page came without it. */
+async function csrf() {
+  const token = document.querySelector('meta[name="zeyn-csrf"]')?.content;
+  return token || (window.zeynCsrf ? window.zeynCsrf() : '');
 }
 
 /** Parses JSON, or returns `null`. */
@@ -135,7 +136,7 @@ function failed(f, li, reason, canRetry) {
 }
 
 /** Sends the item's file, with progress, and handles the answer. */
-function send(f, li) {
+async function send(f, li) {
   const s = items.get(li);
   li.dataset.state = 'uploading';
   li.querySelector('.z-upload-error').textContent = '';
@@ -151,11 +152,12 @@ function send(f, li) {
   const hadFocus = li.contains(document.activeElement);
   actions(li, button('z-upload-cancel', f.texts.cancel, `${f.texts.cancel}: ${s.file.name}`));
   if (hadFocus) li.querySelector('.z-upload-cancel').focus();
+  const token = await csrf();
   const xhr = new XMLHttpRequest();
   s.xhr = xhr;
   let said = -1;
   xhr.open('POST', `${BASE}/_zeyn/files/${encodeURIComponent(f.store)}`);
-  xhr.setRequestHeader('x-zeyn-csrf', csrf());
+  xhr.setRequestHeader('x-zeyn-csrf', token);
   xhr.setRequestHeader('x-zeyn-file-name', encodeURIComponent(s.file.name));
   xhr.setRequestHeader('content-type', s.file.type || 'application/octet-stream');
   xhr.upload.addEventListener('progress', (e) => {

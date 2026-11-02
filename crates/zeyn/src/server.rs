@@ -38,6 +38,7 @@ mod grid;
 mod guard;
 mod media;
 mod ops;
+mod seo;
 mod session;
 mod telemetry;
 mod theme;
@@ -653,6 +654,8 @@ pub struct App {
     errors: ErrorScreens,
     llms_txt: Option<&'static str>,
     csp: crate::csp::Csp,
+    robots_txt: Option<&'static str>,
+    site_url: String,
     time: TimePolicy,
     fixed_now: Option<DateTime>,
     zone_picker: bool,
@@ -703,6 +706,8 @@ impl App {
             errors: ErrorScreens::default(),
             llms_txt: None,
             csp: crate::csp::Csp::new(),
+            robots_txt: None,
+            site_url: String::new(),
             time: TimePolicy::User { default: TimeZone::UTC },
             fixed_now: None,
             zone_picker: false,
@@ -1001,6 +1006,34 @@ impl App {
         self
     }
 
+    /// Serves `text` at `/robots.txt` as plain text, to everyone.
+    ///
+    /// ```
+    /// # use zeyn::App;
+    /// let app = App::new("Shop").robots_txt("User-agent: *\nAllow: /\nSitemap: https://shop.example/sitemap.xml\n");
+    /// ```
+    pub fn robots_txt(mut self, text: &'static str) -> Self {
+        self.robots_txt = Some(text);
+        self
+    }
+
+    /// The `https` origin the site is reached at, such as `https://shop.example`. App paths in
+    /// canonical URLs, preview images and the sitemap are written behind it (and the base path),
+    /// because search engines need absolute URLs. Without it, head tags keep app paths and the
+    /// sitemap leaves them out.
+    pub fn site_url(mut self, url: &str) -> Self {
+        let url = url.trim_end_matches('/');
+        if crate::seo::valid_url(url) && url.starts_with("https://") && !url["https://".len()..].contains('/') {
+            self.site_url = url.to_string();
+        } else {
+            self.setup_problems.push(format!(
+                "site_url `{}` is not an https origin\n  = help: pass only the scheme and host, such as `https://shop.example`",
+                url.chars().take(80).collect::<String>()
+            ));
+        }
+        self
+    }
+
     /// Applies a plugin. Settings made after this line override the plugin's.
     pub fn plugin(self, plugin: impl Plugin) -> Self {
         plugin.install(self)
@@ -1074,6 +1107,21 @@ impl App {
         problems.extend(self.csp.problems().iter().cloned());
         let mut paths: HashMap<String, &str> = HashMap::new();
         let mut names: HashMap<&str, &str> = HashMap::new();
+        let sitemaps: Vec<_> = self.features.iter().filter_map(|f| f.sitemap_source().map(|s| (f.name(), s))).collect();
+        if sitemaps.len() > 1 {
+            problems.push(
+                "more than one feature has a sitemap\n  = help: keep one `Feature::sitemap` that lists every URL"
+                    .into(),
+            );
+        }
+        for (feature, s) in &sitemaps {
+            if !matches!(s.meta().access, crate::action::Access::Public) {
+                problems.push(format!(
+                    "the sitemap action `{}` of feature `{feature}` is not public\n  = help: `/sitemap.xml` is read by search engines without a session; mark the action `#[action(public)]`",
+                    s.meta().name
+                ));
+            }
+        }
         for f in &self.features {
             if let Err(p) = f.check() {
                 problems.extend(p.into_iter().map(|p| format!("feature `{}`: {p}", f.name())));
@@ -1089,8 +1137,11 @@ impl App {
                     }
                 }
                 if let Some(path) = f.path_of(&s.meta) {
-                    let shape: String =
-                        path.split('/').map(|p| if p.starts_with('{') { "{}" } else { p }).collect::<Vec<_>>().join("/");
+                    let shape: String = path
+                        .split('/')
+                        .map(|p| if p.starts_with('{') { "{}" } else { p })
+                        .collect::<Vec<_>>()
+                        .join("/");
                     if let Some(other) = paths.insert(shape, s.meta.name) {
                         if other != s.meta.name {
                             problems.push(format!("route `{path}` is used by screens `{other}` and `{}`", s.meta.name));
@@ -1152,9 +1203,12 @@ impl App {
             {
                 problems.push(format!("home screen `{home}` is not registered or has no route"));
             }
-            if self.features.iter().flat_map(|f| f.screens()).any(|s| {
-                s.meta.name == home && crate::screen::route_has_segments(s.meta.route)
-            }) {
+            if self
+                .features
+                .iter()
+                .flat_map(|f| f.screens())
+                .any(|s| s.meta.name == home && crate::screen::route_has_segments(s.meta.route))
+            {
                 problems.push(format!(
                     "home screen `{home}` has path segments in its route
   = help: `/` cannot fill them; make a screen without segments the home screen"
@@ -1285,6 +1339,7 @@ impl App {
             allow: self.allow,
             api_docs: self.api_docs,
             prefix: url_prefix,
+            site_url: self.site_url,
             look,
             views: self.views,
             native_menu: self.native_menu,
@@ -1313,15 +1368,22 @@ impl App {
                                       h: HeaderMap,
                                       uri: axum::http::Uri,
                                       Path(segments): Path<Vec<(String, String)>>,
-                                      q: Query<ParamsQuery>| page(st, h, uri, segments, q, name),
+                                      q: Query<ParamsQuery>| {
+                                    page(st, h, uri, segments, q, name)
+                                },
                             ),
                         )
                     } else {
                         router.route(
                             &path,
-                            get(move |st: State<Arc<AppState>>, h: HeaderMap, uri: axum::http::Uri, q: Query<ParamsQuery>| {
-                                page(st, h, uri, Vec::new(), q, name)
-                            }),
+                            get(
+                                move |st: State<Arc<AppState>>,
+                                      h: HeaderMap,
+                                      uri: axum::http::Uri,
+                                      q: Query<ParamsQuery>| {
+                                    page(st, h, uri, Vec::new(), q, name)
+                                },
+                            ),
                         )
                     };
                 }
@@ -1357,12 +1419,17 @@ impl App {
         if let Some(text) = self.llms_txt {
             router = router.route("/llms.txt", get(move || async move { asset(text, "text/plain; charset=utf-8") }));
         }
+        if let Some(text) = self.robots_txt {
+            router = router.route("/robots.txt", get(move || async move { asset(text, "text/plain; charset=utf-8") }));
+        }
+        let router = seo::routes(router, &state);
         let router = router
             .route("/_zeyn/zeyn.js", get(|| async { asset(JS, "text/javascript; charset=utf-8") }))
             .route("/_zeyn/zeyn.css", get(|| async { asset(CSS, "text/css; charset=utf-8") }))
             .route("/_zeyn/nav.js", get(|| async { asset(NAV, "text/javascript; charset=utf-8") }))
             .route("/_zeyn/theme.css", get(theme_css))
             .route("/favicon.ico", get(|| async { StatusCode::NO_CONTENT }))
+            .route("/_zeyn/csrf", get(csrf_token))
             .route("/_zeyn/screen/{screen}", get(screen_fragment))
             .route("/_zeyn/route/{screen}", get(route_redirect))
             .route("/_zeyn/menu", post(menu_call))
@@ -1497,6 +1564,7 @@ struct AppState {
     allow: Vec<IpRange>,
     api_docs: Option<ApiDocs>,
     prefix: String,
+    site_url: String,
     look: theme::Look,
     views: Option<Arc<dyn crate::grid::DataGridViewStore>>,
     native_menu: bool,
@@ -2164,7 +2232,11 @@ async fn page(
 ) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     let (ctx, theme_cookie) = theme::remember(&st, ctx, &headers).await;
-    let (csrf, set) = st.csrf(&headers);
+    let meta = st.screens.get(name).map(|(_, e)| e.meta);
+    let open =
+        !ctx.identity().is_signed_in() && meta.is_some_and(|m| matches!(m.access, crate::action::Access::Public));
+    let (csrf, set) = if open { (String::new(), None) } else { st.csrf(&headers) };
+    let cache = meta.map_or(0, |m| m.cache.min(crate::screen::MAX_SCREEN_CACHE));
     let started = Instant::now();
     let call = Call { kind: CallKind::Page, screen: name, action: None, via_agent: false };
     let result = async {
@@ -2175,21 +2247,23 @@ async fn page(
         let loaded = st.preload(&ctx, screen.walk(), name).await;
         let r = user_render(name, &ctx);
         let html = screen.render(&r, &entry.meta, &params, &loaded);
-        Ok::<_, Failure>((ctx.t(screen.title()), html))
+        let head = screen.head_html(&r, &st.site_url, &st.prefix);
+        Ok::<_, Failure>((ctx.t(screen.title()), html, head))
     }
     .await;
     st.after(&ctx, &call, started, &result);
     let partial = headers.get("x-zeyn-partial").is_some_and(|v| v == "1");
     let response = match result {
-        Ok((title, html)) if partial => {
+        Ok((title, html, head)) if partial => {
             let full = format!("{title} · {}", ctx.t(&st.name));
             #[cfg(feature = "islands")]
             let holds_island = islands::holds(&st, &html);
             #[cfg(feature = "realtime")]
             let holds_live = realtime::holds(&st, &html);
+            let html = if head.is_empty() { html } else { format!("<template data-zeyn-head>{head}</template>{html}") };
+            let tag = (open && cache > 0).then(|| etag("p", &[&full, &html]));
             #[allow(unused_mut)]
             let mut r = partial_response(&full, html);
-            #[cfg(any(feature = "islands", feature = "realtime"))]
             let h = r.headers_mut();
             #[cfg(feature = "islands")]
             if holds_island {
@@ -2199,18 +2273,28 @@ async fn page(
             if holds_live {
                 h.insert("x-zeyn-live", HeaderValue::from_static("1"));
             }
-            r
+            match tag {
+                Some(tag) => public_cache(r, &headers, &tag, cache),
+                None => r,
+            }
         }
-        Ok((title, html)) => {
-            #[allow(unused_mut)]
+        Ok((title, html, head)) => {
             let mut page = st.shell(&ctx, &csrf, &title, &html, Some(name));
+            if !head.is_empty() {
+                page = page.replacen("</head>", &format!("{head}</head>"), 1);
+            }
             #[cfg(feature = "realtime")]
             realtime::head(&st, &html, &mut page);
+            let tag = (open && cache > 0).then(|| etag("f", &[&page]));
             #[cfg(feature = "islands")]
             let page = islands::page(&st, page, &html);
             #[cfg(not(feature = "islands"))]
             let page = Html(page).into_response();
-            page
+            match tag {
+                Some(tag) => public_cache(page, &headers, &tag, cache),
+                None if cache > 0 => private_page(page),
+                None => page,
+            }
         }
         Err(Failure::App(Error::Forbidden | Error::Denied(_)))
             if !ctx.identity().is_signed_in() && st.login_url.is_some() =>
@@ -2234,6 +2318,66 @@ async fn page(
         Err(f) => st.error_screen(&ctx, f, &csrf, partial).await,
     };
     with_cookie(with_cookie(response, set), theme_cookie)
+}
+
+/// Strong ETag over the parts of a rendered body; `kind` keeps full pages and partial screens
+/// apart. The hash is SipHash with fixed keys, the same in every process of one build.
+fn etag(kind: &str, parts: &[&str]) -> String {
+    use std::hash::Hasher;
+    let mut h = std::hash::DefaultHasher::new();
+    let mut len = 0;
+    for p in parts {
+        h.write(p.as_bytes());
+        h.write_u8(0xff);
+        len += p.len();
+    }
+    format!("\"{kind}{len:x}-{:016x}\"", h.finish())
+}
+
+/// Whether `If-None-Match` names the ETag (or `*`). Weak tags compare by their value.
+fn etag_matches(headers: &HeaderMap, tag: &str) -> bool {
+    headers.get_all(header::IF_NONE_MATCH).iter().filter_map(|v| v.to_str().ok()).flat_map(|v| v.split(',')).any(|t| {
+        let t = t.trim();
+        t == "*" || t.strip_prefix("W/").unwrap_or(t) == tag
+    })
+}
+
+/// Marks the page of a public screen opened without a session as cacheable: `Cache-Control:
+/// public, max-age`, the ETag, and `Vary` on what the page is rendered from. A matching
+/// `If-None-Match` gets `304 Not Modified` without the body.
+fn public_cache(mut response: Response, headers: &HeaderMap, tag: &str, seconds: u32) -> Response {
+    let Ok(tag_value) = HeaderValue::from_str(tag) else { return private_page(response) };
+    if etag_matches(headers, tag) {
+        response = StatusCode::NOT_MODIFIED.into_response();
+    }
+    let h = response.headers_mut();
+    h.insert(header::ETAG, tag_value);
+    if let Ok(v) = HeaderValue::from_str(&format!("public, max-age={seconds}")) {
+        h.insert(header::CACHE_CONTROL, v);
+    }
+    h.insert(header::VARY, HeaderValue::from_static("x-zeyn-partial, Accept-Language, Cookie"));
+    response
+}
+
+/// A cacheable screen opened with a session: never stored.
+fn private_page(mut response: Response) -> Response {
+    response.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("private, no-store"));
+    response
+}
+
+/// `GET /_zeyn/csrf`: the CSRF token for pages that were sent without one (public screens opened
+/// without a session), setting the `zeyn_csrf` cookie when the browser has none. Only same
+/// origin requests get it.
+async fn csrf_token(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    let site = headers.get("sec-fetch-site").and_then(|v| v.to_str().ok());
+    if site.is_some_and(|s| s != "same-origin" && s != "none") {
+        let ctx = st.ctx(&headers);
+        return st.error_response(&ctx, Failure::App(Error::Forbidden));
+    }
+    let (token, set) = st.csrf(&headers);
+    let mut r = axum::Json(json!({ "token": token })).into_response();
+    r.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    with_cookie(r, set)
 }
 
 async fn screen_fragment(
@@ -2307,12 +2451,10 @@ fn partial_response(full_title: &str, html: String) -> Response {
 /// Runs a future and turns a panic while it is polled into `Err`, without boxing it.
 async fn catch_panic<F: Future>(fut: F) -> std::thread::Result<F::Output> {
     let mut fut = std::pin::pin!(fut);
-    std::future::poll_fn(|cx| {
-        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| fut.as_mut().poll(cx))) {
-            Ok(std::task::Poll::Ready(v)) => std::task::Poll::Ready(Ok(v)),
-            Ok(std::task::Poll::Pending) => std::task::Poll::Pending,
-            Err(e) => std::task::Poll::Ready(Err(e)),
-        }
+    std::future::poll_fn(|cx| match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| fut.as_mut().poll(cx))) {
+        Ok(std::task::Poll::Ready(v)) => std::task::Poll::Ready(Ok(v)),
+        Ok(std::task::Poll::Pending) => std::task::Poll::Pending,
+        Err(e) => std::task::Poll::Ready(Err(e)),
     })
     .await
 }

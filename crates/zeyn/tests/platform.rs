@@ -463,6 +463,8 @@ async fn apps_can_live_under_a_base_path() {
     assert!(body.contains(r#"<meta name="zeyn-base" content="/inventory">"#));
     assert!(body.contains(r#"href="/inventory/_zeyn/zeyn.css""#));
     assert!(body.contains(r#"<a href="/inventory/sales/pos" aria-current="page">"#));
+    assert!(h.get(header::SET_COOKIE).is_none(), "a public screen sets no cookie for a visitor");
+    let (_, h, _) = get(&mounted, "/inventory/_zeyn/csrf", &[]).await;
     assert!(h.get(header::SET_COOKIE).unwrap().to_str().unwrap().contains("Path=/inventory;"));
     assert_eq!(get(&mounted, "/inventory/_zeyn/zeyn.js", &[]).await.0, StatusCode::OK);
     assert_eq!(get(&mounted, "/sales/pos", &[]).await.0, StatusCode::NOT_FOUND);

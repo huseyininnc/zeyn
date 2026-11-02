@@ -37,6 +37,22 @@
 //! pub async fn delete_product(_id: i64) -> Result<()> { Ok(()) }
 //! ```
 //!
+//! A shared cache on a screen that is not public, and one longer than a day:
+//!
+//! ```compile_fail
+//! use zeyn::prelude::*;
+//!
+//! #[screen(permission = "stock.product.read", cache = 300)]
+//! pub fn products() -> Screen { Screen::new("Products") }
+//! ```
+//!
+//! ```compile_fail
+//! use zeyn::prelude::*;
+//!
+//! #[screen(public, cache = 100000)]
+//! pub fn about() -> Screen { Screen::new("About") }
+//! ```
+//!
 //! A text rule on a field that is not text:
 //!
 //! ```compile_fail
@@ -411,6 +427,8 @@ pub mod render;
 mod screen;
 #[cfg(feature = "server")]
 mod security;
+/// Head tags for search engines and the sitemap.
+pub mod seo;
 #[cfg(feature = "server")]
 pub mod server;
 mod slug;
@@ -502,11 +520,10 @@ pub use privacy::{MaskStyle, Masking, Revealed, can_unmask, masked_text, reveal_
 pub use redis_store::RedisStore;
 pub use render::Render;
 pub use screen::{
-    Component, Effect, Export, FormSource, GridSource, Icon, LoadedPage, MAX_SEGMENT, MAX_TOASTS, Node, Params,
-    PathValue, RowCall, Screen, ScreenDef, ScreenMeta, Toast, ToolButton, Toolbar, UiCtx, Window, __path_value,
-    route_has_segments, screen_url,
+    __path_value, Component, Effect, Export, FormSource, GridSource, Icon, LoadedPage, MAX_SCREEN_CACHE, MAX_SEGMENT,
+    MAX_TOASTS, Node, Params, PathValue, RowCall, Screen, ScreenDef, ScreenMeta, Toast, ToolButton, Toolbar, UiCtx,
+    Window, route_has_segments, screen_url,
 };
-pub use slug::Slug;
 #[cfg(feature = "server")]
 pub use security::{IpRange, MemoryRateStore, RateKey, RateLimit, RateStore, client_ip, parse_ranges};
 #[cfg(feature = "server")]
@@ -521,6 +538,7 @@ pub use server::{
     DevAuth, ForwardAuth, HeaderTenant, Interceptor, Mcp, MemoryAudit, Plugin, READY_CACHE, StaticCredentials,
     StderrAudit, SubdomainTenant, TenantResolver, Theme, TimePolicy, probe,
 };
+pub use slug::Slug;
 pub use time::{Date, DateTime, LocalDateTime, LocalTimeError, Time, TimeZone};
 pub use time::{DateWords, range_presets};
 #[doc(hidden)]
@@ -546,6 +564,7 @@ pub mod prelude {
     #[cfg(feature = "server")]
     #[allow(deprecated)]
     pub use crate::Agents;
+    pub use crate::seo::{Robots, SitemapPart, SitemapUrl};
     #[cfg(feature = "markdown")]
     pub use crate::ui::Markdown;
     pub use crate::ui::{
@@ -558,8 +577,9 @@ pub mod prelude {
         Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime, Decimal, Effect,
         Entity, Error, Export, Feature, Field, File, FileRules, FileType, Form, GuardResult, Icon, Identity, Import,
         Licensed, LocalDateTime, Model, Money, Node, Page, Paging, Result, RowStyle, Screen, ScreenDef, Secret,
-        Service, SignedIn, Slug, Tenant, TenantRequired, Text, Time, TimeZone, Toast, Tone, TransitionRequest, Transitions,
-        UiCtx, Valid, ValidationErrors, Window, Workflow, action, choice, entity, model, params, screen, t,
+        Service, SignedIn, Slug, Tenant, TenantRequired, Text, Time, TimeZone, Toast, Tone, TransitionRequest,
+        Transitions, UiCtx, Valid, ValidationErrors, Window, Workflow, action, choice, entity, model, params, screen,
+        t,
     };
     #[cfg(feature = "server")]
     pub use crate::{

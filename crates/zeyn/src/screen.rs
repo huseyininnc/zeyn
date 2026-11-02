@@ -33,7 +33,13 @@ pub struct ScreenMeta {
     /// AI policy from `ai = "..."` or `ai = false`. A hidden screen offers no tools and models
     /// cannot navigate to it.
     pub ai: crate::action::Ai,
+    /// Seconds a shared cache may keep the page of a public screen opened without a session
+    /// (`cache = N`, at most [`MAX_SCREEN_CACHE`]); 0 sends no public cache headers.
+    pub cache: u32,
 }
+
+/// Longest `cache = N` a screen may ask for: one day.
+pub const MAX_SCREEN_CACHE: u32 = 86_400;
 
 /// A screen. Implemented by `#[screen]`, never written by hand.
 pub trait ScreenDef: Copy + Send + Sync + 'static {
@@ -146,7 +152,11 @@ pub const fn route_has_segments(route: Option<&str>) -> bool {
 /// ```
 pub fn screen_url(path: &str, params: &serde_json::Value) -> Option<String> {
     if !route_has_segments(Some(path)) {
-        return Some(if params.is_null() { path.to_string() } else { format!("{path}?params={}", encode(&params.to_string())) });
+        return Some(if params.is_null() {
+            path.to_string()
+        } else {
+            format!("{path}?params={}", encode(&params.to_string()))
+        });
     }
     let fields = params.as_object()?;
     let mut out = String::with_capacity(path.len() + 16);
@@ -935,12 +945,21 @@ pub struct Screen {
     body: Vec<Node>,
     menu: Option<crate::menu::ContextMenu>,
     moved: Option<(&'static str, serde_json::Value)>,
+    head: Option<Box<crate::seo::Head>>,
 }
 
 impl Screen {
     /// Full page screen.
     pub fn new(title: impl Into<Text>) -> Self {
-        Self { title: title.into(), kind: ScreenKind::Page, toolbar: None, body: Vec::new(), menu: None, moved: None }
+        Self {
+            title: title.into(),
+            kind: ScreenKind::Page,
+            toolbar: None,
+            body: Vec::new(),
+            menu: None,
+            moved: None,
+            head: None,
+        }
     }
 
     /// Answers that this page lives at another screen's address now: the browser gets a permanent
@@ -959,6 +978,49 @@ impl Screen {
     /// Screen and params of [`Screen::moved_to`], if this screen moved.
     pub(crate) fn take_moved(&mut self) -> Option<(&'static str, serde_json::Value)> {
         self.moved.take()
+    }
+
+    fn head_mut(&mut self) -> &mut crate::seo::Head {
+        self.head.get_or_insert_with(Default::default)
+    }
+
+    /// Summary for search results and link previews: `<meta name="description">` and
+    /// `og:description`.
+    pub fn description(mut self, text: impl Into<Text>) -> Self {
+        self.head_mut().description = Some(text.into());
+        self
+    }
+
+    /// The URL search engines should index for this page: an `https` URL, or an app path written
+    /// behind `App::site_url` and the base path. Other URLs are ignored with a warning.
+    pub fn canonical(mut self, url: impl Into<String>) -> Self {
+        self.head_mut().canonical = crate::seo::checked(url.into(), "a canonical URL");
+        self
+    }
+
+    /// Image of link previews (`og:image`): an `https` URL or an app path.
+    pub fn og_image(mut self, url: impl Into<String>) -> Self {
+        self.head_mut().og_image = crate::seo::checked(url.into(), "an og:image URL");
+        self
+    }
+
+    /// Structured data for search engines, sent as `<script type="application/ld+json">`. The
+    /// browser never runs it, and the JSON is escaped so it cannot end the script element.
+    pub fn json_ld(mut self, data: serde_json::Value) -> Self {
+        self.head_mut().json_ld = Some(data);
+        self
+    }
+
+    /// Whether search engines may index the page.
+    pub fn robots(mut self, robots: crate::seo::Robots) -> Self {
+        self.head_mut().robots = Some(robots);
+        self
+    }
+
+    /// Head tags of the page (description, canonical, preview image, robots, JSON-LD), empty
+    /// when the screen sets none.
+    pub fn head_html(&self, r: &Render, site: &str, prefix: &str) -> String {
+        self.head.as_ref().map(|h| h.render(r, site, prefix)).unwrap_or_default()
     }
 
     /// Screen opened as a window.
