@@ -82,7 +82,7 @@ function make(tag, className, attrs = {}) {
 
 /** Announces a message in the closest live region, or the page toast region. */
 function announce(el, message) {
-  const region = el.closest('[data-zeyn-live]')?.querySelector('[aria-live]') ?? document.querySelector('.z-toasts');
+  const region = el.closest('[data-zeyn-live]')?.querySelector(':scope > .z-sr-only[aria-live]') ?? document.querySelector('.z-toasts');
   if (region) region.textContent = message;
 }
 
@@ -1796,6 +1796,167 @@ function showLineErrors(form, errors) {
   first?.focus();
 }
 
+/* Confirm, alerts, breadcrumbs --------------------------------------------------------------- */
+
+/**
+ * Asks the user to confirm in a modal alert dialog. Cancel has the focus first, so Enter alone
+ * never runs a destructive action. Resolves `true` only for the confirm button.
+ * @param {{title: string, message: string, ok: string, cancel: string, danger?: boolean}} t
+ */
+function confirmDialog(t) {
+  return new Promise((resolve) => {
+    const opener = document.activeElement;
+    const id = `z-confirm-${++listUid}`;
+    const dialog = make('dialog', 'z-confirm', { role: 'alertdialog', 'aria-labelledby': `${id}-title`, 'aria-describedby': `${id}-text` });
+    const cancel = make('button', 'z-button', { type: 'button', text: t.cancel });
+    const ok = make('button', `z-button ${t.danger ? 'z-danger-button' : 'z-primary'}`, { type: 'button', text: t.ok });
+    const actions = make('div', 'z-confirm-actions');
+    actions.append(cancel, ok);
+    dialog.append(make('h2', '', { id: `${id}-title`, text: t.title }), make('p', '', { id: `${id}-text`, text: t.message }), actions);
+    let answered = false;
+    const finish = (yes) => {
+      if (answered) return;
+      answered = true;
+      if (dialog.open) dialog.close();
+      dialog.remove();
+      if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
+      resolve(yes);
+    };
+    cancel.addEventListener('click', () => finish(false));
+    ok.addEventListener('click', () => finish(true));
+    dialog.addEventListener('cancel', (e) => {
+      e.preventDefault();
+      finish(false);
+    });
+    document.body.append(dialog);
+    dialog.showModal();
+    cancel.focus();
+  });
+}
+
+/** Asks before submitting forms that carry `data-zeyn-confirm` (action buttons). */
+async function confirmSubmit(e) {
+  const form = e.target;
+  if (!(form instanceof HTMLFormElement) || !form.dataset.zeynConfirm) return;
+  if (form.zeynConfirmed) {
+    form.zeynConfirmed = false;
+    return;
+  }
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  const d = form.dataset;
+  const danger = !!form.querySelector('.z-danger-button');
+  if (await confirmDialog({ title: d.textTitle, message: d.zeynConfirm, ok: d.textOk, cancel: d.textCancel, danger })) {
+    form.zeynConfirmed = true;
+    form.requestSubmit();
+  }
+}
+
+/** Prefixes app relative links (breadcrumbs) with the path the app is served under. */
+function baseLinks(root) {
+  root.querySelectorAll('a[data-zeyn-base-href]').forEach((a) => {
+    a.setAttribute('href', BASE + a.getAttribute('href'));
+    a.removeAttribute('data-zeyn-base-href');
+  });
+}
+
+/* Steps -------------------------------------------------------------------------------------- */
+
+/** Form values as the runtime sends them: booleans for checkboxes, strings otherwise. */
+function valuesOf(form) {
+  const values = {};
+  for (const el of form.elements) {
+    if (!el.name || el.disabled || el.readOnly) continue;
+    if (el.type === 'hidden' && !el.hasAttribute('data-zeyn-version')) continue;
+    if (el.matches('button, fieldset, output, [type="submit"], [type="button"], [type="reset"]')) continue;
+    if (el.type === 'checkbox') values[el.name] = el.checked;
+    else if (el.type === 'radio') {
+      if (el.checked) values[el.name] = el.value;
+    } else values[el.name] = el.value;
+  }
+  return values;
+}
+
+/** Shows one step of a stepped form, updates the step list and the buttons, and announces it. */
+function showStep(form, n, focus = true) {
+  const steps = [...form.querySelectorAll('fieldset[data-zeyn-step]')];
+  const list = form.querySelector('[data-zeyn-steps]');
+  const total = steps.length;
+  n = Math.max(0, Math.min(total - 1, n));
+  form.dataset.step = String(n);
+  steps.forEach((s, i) => (s.hidden = i !== n));
+  list?.querySelectorAll('li').forEach((li, i) => {
+    if (i === n) li.setAttribute('aria-current', 'step');
+    else li.removeAttribute('aria-current');
+    li.classList.toggle('z-step-done', i < n);
+  });
+  const back = form.querySelector('[data-zeyn-step-back]');
+  const next = form.querySelector('[data-zeyn-step-next]');
+  const submit = form.querySelector('.z-form-actions [type="submit"]');
+  if (back) back.hidden = n === 0;
+  if (next) next.hidden = n === total - 1;
+  if (submit) submit.hidden = n !== total - 1;
+  if (list) announce(form, fill(list.dataset.textProgress, { n: n + 1, total }));
+  if (focus) (steps[n].querySelector('input:not([type="hidden"]):not(.z-native), select:not(.z-native), textarea, [role="combobox"], [role="listbox"]') ?? steps[n]).focus();
+}
+
+/** Sets up stepped forms: one step at a time, with the step buttons shown. */
+function initSteps(root) {
+  root.querySelectorAll('form:has([data-zeyn-steps]):not([data-step])').forEach((form) => {
+    form.dataset.zeynLive = '';
+    if (!form.querySelector(':scope > .z-sr-only[aria-live]')) form.append(make('span', 'z-sr-only', { 'aria-live': 'polite' }));
+    showStep(form, 0, false);
+  });
+}
+
+/** Writes errors under their fields, as the runtime does, and focuses the first one. */
+function showFieldErrors(form, errors) {
+  const scope = form.closest('[data-zeyn-screen]')?.dataset.zeynScreen;
+  form.querySelectorAll('.z-field-error').forEach((p) => (p.textContent = ''));
+  form.querySelectorAll('[aria-invalid="true"]').forEach((el) => el.removeAttribute('aria-invalid'));
+  let first = null;
+  for (const err of errors) {
+    const named = form.elements.namedItem(err.field);
+    const input = named instanceof RadioNodeList ? named[0] : named;
+    const box = document.getElementById(input?.id ? `${input.id}-error` : `${scope}-${err.field}-error`) ?? document.getElementById(`${scope}-${err.field}-error`);
+    if (box) box.textContent = box.textContent ? `${box.textContent} ${err.message}` : err.message;
+    input?.setAttribute?.('aria-invalid', 'true');
+    first ??= input;
+  }
+  first?.focus?.();
+}
+
+/** Next: checks the step's fields on the server, then moves on when they are fine. */
+async function nextStep(button) {
+  const form = button.closest('form');
+  const n = Number(form.dataset.step);
+  button.disabled = true;
+  const data = await fetchData(form, '_step', { step: n, values: valuesOf(form) });
+  button.disabled = false;
+  const errors = data?.errors ?? [];
+  if (errors.length) {
+    showFieldErrors(form, errors);
+    return;
+  }
+  form.querySelectorAll('.z-field-error').forEach((p) => (p.textContent = ''));
+  showStep(form, n + 1);
+}
+
+/** After a failed save, shows the step that holds the first error. */
+function stepOfErrors(form, errors) {
+  if (!form.matches('[data-step]')) return;
+  for (const err of errors) {
+    const named = form.elements.namedItem(err.field);
+    const input = named instanceof RadioNodeList ? named[0] : named;
+    const step = input?.closest('fieldset[data-zeyn-step]');
+    if (step) {
+      showStep(form, Number(step.dataset.zeynStep), false);
+      (form.querySelector('[aria-invalid="true"]:not(.z-native)') ?? input).focus();
+      return;
+    }
+  }
+}
+
 /* Native elements under controls ------------------------------------------------------------- */
 
 /** The visible control of a hidden native element. */
@@ -1819,7 +1980,7 @@ new MutationObserver((records) => {
 /* Setup -------------------------------------------------------------------------------------- */
 
 /** Initializers run for every root that gets new content. */
-const initializers = [restoreTabs, initSelects, initListboxes, initLookups, initTextareas];
+const initializers = [restoreTabs, initSelects, initListboxes, initLookups, initTextareas, initSteps, baseLinks];
 
 /** Initializes every component inside `root`. Safe to call more than once. */
 function init(root) {
@@ -1893,6 +2054,24 @@ const clickHandlers = [
     const input = b.closest('[data-zeyn-number]').querySelector('input');
     stepNumber(input, Number(b.dataset.zeynStep));
     input.focus();
+    return true;
+  },
+  (e, t) => {
+    const b = t.closest('[data-zeyn-dismiss]');
+    if (!b) return false;
+    const heading = b.closest('dialog')?.querySelector('h2') ?? document.querySelector('#z-main h1');
+    b.closest('.z-callout')?.remove();
+    if (heading) {
+      heading.tabIndex = -1;
+      heading.focus();
+    }
+    return true;
+  },
+  (e, t) => {
+    const b = t.closest('[data-zeyn-step-next], [data-zeyn-step-back]');
+    if (!b) return false;
+    if (b.hasAttribute('data-zeyn-step-next')) nextStep(b);
+    else showStep(b.closest('form'), Number(b.closest('form').dataset.step) - 1);
     return true;
   },
   (e, t) => {
@@ -1981,7 +2160,17 @@ document.addEventListener('focusin', (e) => {
 });
 
 document.addEventListener('zeyn:errors', (e) => {
-  if (e.target instanceof HTMLFormElement) showLineErrors(e.target, e.detail ?? []);
+  if (!(e.target instanceof HTMLFormElement)) return;
+  showLineErrors(e.target, e.detail ?? []);
+  stepOfErrors(e.target, e.detail ?? []);
+});
+
+document.addEventListener('submit', confirmSubmit, true);
+
+document.addEventListener('zeyn:effect', async (e) => {
+  const { effect, run } = e.detail ?? {};
+  if (effect?.effect !== 'confirm') return;
+  if (await confirmDialog(effect)) run?.(effect.then);
 });
 
 document.addEventListener('focusout', (e) => {

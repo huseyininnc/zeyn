@@ -165,7 +165,8 @@
         "next": "İleri",
         "back": "Geri",
         "done": "Tamamlandı",
-        "current": "Geçerli adım"
+        "current": "Geçerli adım",
+        "label": "Adımlar"
       },
       "chart": {
         "data": "Verileri göster",
@@ -184,6 +185,13 @@
       },
       "text": {
         "count": "{n} / {max} karakter"
+      },
+      "tone": {
+        "neutral": "Not",
+        "info": "Bilgi",
+        "success": "Başarılı",
+        "warning": "Uyarı",
+        "danger": "Hata"
       }
     },
     "date": {

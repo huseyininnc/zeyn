@@ -200,6 +200,8 @@ async function runEffect(effect, source) {
       return toast(effect.message ?? '');
     case 'close_and_refresh':
       return closeAndRefresh();
+    default:
+      document.dispatchEvent(new CustomEvent('zeyn:effect', { detail: { effect, source, run: (next) => runEffect(next, source) } }));
   }
 }
 

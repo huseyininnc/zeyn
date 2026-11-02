@@ -231,6 +231,121 @@ pub fn invoice_form(_: (), ctx: Ctx) -> Screen {
     )
 }
 
+#[action(permission = "stock.product.write")]
+pub async fn archive_samples(count: i64) -> Result<i64> {
+    Ok(count)
+}
+
+#[action(permission = "stock.product.read")]
+pub async fn check_stock(_: ()) -> Result<i64> {
+    Ok(3)
+}
+
+#[screen(route = "/widgets", permission = "stock.product.read")]
+pub fn widgets(_: (), ctx: Ctx) -> Screen {
+    let now = ctx.now();
+    let hour = 3_600_000;
+    let invoice = Invoice { customer: "Anadolu Gıda".into(), issued: ctx.today(), lines: Vec::new() };
+    Screen::new(t!("ui.widgets")).body(
+        Stack::new()
+            .add(Breadcrumb::new().link(t!("ui.layout"), layout, ()).current(t!("ui.widgets")))
+            .add(
+                Row::new()
+                    .col(
+                        Stack::new()
+                            .gap(2)
+                            .add(Alert::info(t!("ui.alert_info")).dismissible())
+                            .add(Alert::success(t!("ui.alert_success")))
+                            .add(Alert::warning(t!("ui.alert_warning")).title(t!("ui.alert_warning_title")))
+                            .add(Alert::danger(t!("ui.alert_danger"))),
+                    )
+                    .col(
+                        Card::new()
+                            .title(t!("ui.card_invoice"))
+                            .add(
+                                DescriptionList::of(&invoice)
+                                    .field(Invoice::customer)
+                                    .field(Invoice::issued)
+                                    .item(t!("ui.status"), "INV-2026-0042"),
+                            )
+                            .add(Row::new().compact().col(Badge::new(t!("ui.badge_paid")).tone(Tone::Success)).col(Badge::new(t!("ui.badge_overdue")).tone(Tone::Danger)).col(Badge::new(t!("ui.badge_draft"))))
+                            .add(Progress::new(t!("ui.progress_import"), 64, 100))
+                            .add(Progress::new(t!("ui.progress_quota"), 92, 100).tone(Tone::Warning)),
+                    ),
+            )
+            .add(
+                Row::new()
+                    .col(
+                        Card::new().title(t!("ui.card_history")).add(
+                            Timeline::new()
+                                .event(now.add_ms(-26 * hour), t!("ui.event_created"), None, Tone::Info)
+                                .event(now.add_ms(-5 * hour), t!("ui.event_approved"), Some(t!("ui.event_approved_by")), Tone::Success)
+                                .event(now.add_ms(-hour), t!("ui.event_shipped"), None, Tone::Neutral),
+                        ),
+                    )
+                    .col(
+                        Card::new()
+                            .title(t!("ui.card_actions"))
+                            .add(
+                                ActionButton::new(t!("ui.archive"), archive_samples, 12)
+                                    .confirm(t!("ui.archive_confirm"))
+                                    .tone(Tone::Danger)
+                                    .on_success(|n, ui| {
+                                        if let Ok(n) = n {
+                                            ui.toast(t!("ui.archived", n = n));
+                                        }
+                                    }),
+                            )
+                            .add(ActionButton::new(t!("ui.check_stock"), check_stock, ()).on_success(|_, ui| {
+                                ui.effect(Effect::confirm(t!("ui.low_stock_confirm"), Effect::Navigate { screen: "product_list", params: serde_json::Value::Null }));
+                            }))
+                            .add(Skeleton::lines(3)),
+                    )
+                    .col(Card::new().add(EmptyState::new(t!("ui.empty_title")).text(t!("ui.empty_text")).opens(t!("ui.empty_button"), crate::stock::product_editor, crate::stock::ProductParams { id: None }))),
+            ),
+    )
+}
+
+/// A job application filled in three steps.
+#[model]
+pub struct Application {
+    #[rule(required, max_len = 60)]
+    pub full_name: String,
+    #[rule(required, email)]
+    pub email: String,
+    #[rule(required, max_len = 40)]
+    pub city: String,
+    pub start: Option<Date>,
+    pub remote: bool,
+    #[rule(max_len = 400)]
+    pub motivation: String,
+}
+
+#[action(public)]
+pub async fn apply(application: Valid<Application>) -> Result<String> {
+    Ok(application.full_name.clone())
+}
+
+#[screen(route = "/wizard", public)]
+pub fn wizard() -> Screen {
+    Screen::new(t!("ui.wizard")).body(
+        Panel::new(t!("ui.panel_application")).add(
+            Form::of(Application::default())
+                .step(t!("ui.step_person"))
+                .field(Application::full_name)
+                .field(Application::email)
+                .step(t!("ui.step_work"))
+                .row(|r| r.field(Application::city).field(Application::start))
+                .field(Application::remote)
+                .control(Application::remote, Control::Switch)
+                .step(t!("ui.step_motivation"))
+                .field(Application::motivation)
+                .submit(t!("ui.apply"), apply)
+                .on_success(|_, ui| ui.toast(t!("ui.applied"))),
+        ),
+    )
+}
+
 pub fn feature() -> Feature {
     Feature::new("ui")
         .route_prefix("/ui")
@@ -239,11 +354,15 @@ pub fn feature() -> Feature {
         .screen(editors)
         .screen(controls)
         .screen(invoice_form)
+        .screen(widgets)
+        .screen(wizard)
         .menu(|m| {
             m.group(t!("menu.ui"), Icon::Table)
                 .item(t!("ui.layout"), layout)
                 .item(t!("ui.editors"), editors)
                 .item(t!("ui.controls"), controls)
                 .item(t!("ui.invoice"), invoice_form)
+                .item(t!("ui.widgets"), widgets)
+                .item(t!("ui.wizard"), wizard)
         })
 }

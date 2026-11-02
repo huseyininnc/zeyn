@@ -46,15 +46,36 @@ pub enum Effect {
     Navigate { screen: &'static str, params: serde_json::Value },
     Toast { message: Text },
     CloseAndRefresh,
+    /// Asks the user to confirm `message`, then runs `then`. Built with [`Effect::confirm`].
+    Confirm { message: Text, then: Box<Effect> },
 }
 
 impl Effect {
+    /// Runs `then` only after the user confirms `message` in a dialog.
+    ///
+    /// ```
+    /// use zeyn::Effect;
+    /// let e = Effect::confirm("Close without saving?", Effect::CloseAndRefresh);
+    /// assert!(matches!(e, Effect::Confirm { .. }));
+    /// ```
+    pub fn confirm(message: impl Into<Text>, then: Effect) -> Effect {
+        Effect::Confirm { message: message.into(), then: Box::new(then) }
+    }
+
     /// JSON sent to the client, with texts resolved in the user's language.
     pub fn to_json(&self, r: &Render) -> serde_json::Value {
         match self {
             Effect::Toast { message } => {
                 json!({ "effect": "toast", "message": r.i18n.text(r.locale, message) })
             }
+            Effect::Confirm { message, then } => json!({
+                "effect": "confirm",
+                "message": r.i18n.text(r.locale, message),
+                "title": r.i18n.text(r.locale, &Text::key("zeyn.ui.confirm.title")),
+                "ok": r.i18n.text(r.locale, &Text::key("zeyn.ui.confirm.ok")),
+                "cancel": r.i18n.text(r.locale, &Text::key("zeyn.ui.confirm.cancel")),
+                "then": then.to_json(r),
+            }),
             other => serde_json::to_value(other).unwrap_or(serde_json::Value::Null),
         }
     }
@@ -93,6 +114,11 @@ impl UiCtx {
 
     pub fn navigate<S: ScreenDef>(&mut self, _screen: S, params: S::Params) {
         self.effects.push(Effect::Navigate { screen: S::META.name, params: params_json(&params) });
+    }
+
+    /// Any effect, such as `Effect::confirm(...)`.
+    pub fn effect(&mut self, effect: Effect) {
+        self.effects.push(effect);
     }
 
     pub fn into_effects(self) -> Vec<Effect> {

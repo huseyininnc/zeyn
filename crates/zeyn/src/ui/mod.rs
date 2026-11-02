@@ -9,12 +9,14 @@ mod date;
 mod layout;
 mod lines;
 mod lookup;
+mod widgets;
 
 pub use layout::{Card, Panel, Row, Split, Stack, Tabs};
 
 pub use controls::Control;
 pub use date::DateOptions;
 pub use lines::{Lines, MAX_LINES};
+pub use widgets::{ActionButton, Alert, Badge, Breadcrumb, DescriptionList, DescriptionOf, EmptyState, Progress, Skeleton, Timeline, Tone};
 pub(crate) use lines::LinesEditor;
 pub use lookup::{LookupItem, LookupQuery, LookupValue, MAX_LOOKUP_IDS, MAX_LOOKUP_PAGE};
 pub(crate) use controls::{Slot, render_bool, render_choice, render_number, render_text};

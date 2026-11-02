@@ -44,6 +44,8 @@ enum FormItem<M> {
     Row(Vec<FormField<M>>),
     /// A from and to date pair edited with one range picker.
     Range(FormField<M>, FormField<M>),
+    /// Starts a step of a stepped form.
+    Step(Text),
 }
 
 /// Fields placed side by side.
@@ -106,6 +108,35 @@ impl<M: Model> Form<M> {
     pub fn range<T: FieldType + 'static>(mut self, from: Field<M, T>, to: Field<M, T>) -> Self {
         self.items.push(FormItem::Range(FormField::of(from), FormField::of(to)));
         self
+    }
+
+    /// Starts a step: the fields added after it, up to the next step, are shown together. A form
+    /// with steps shows one step at a time with Back and Next buttons; Next checks the step's
+    /// fields on the server before moving on, and the last step submits the whole form.
+    ///
+    /// ```ignore
+    /// Form::of(application)
+    ///     .step("Applicant").field(Application::name).field(Application::email)
+    ///     .step("Address").field(Application::city)
+    ///     .submit("Apply", apply)
+    /// ```
+    pub fn step(mut self, title: impl Into<Text>) -> Self {
+        self.items.push(FormItem::Step(title.into()));
+        self
+    }
+
+    /// Field names of each step, in order. Empty when the form has no steps.
+    pub fn steps(&self) -> Vec<Vec<&'static str>> {
+        let mut steps: Vec<Vec<&'static str>> = Vec::new();
+        for item in &self.items {
+            match item {
+                FormItem::Step(_) => steps.push(Vec::new()),
+                FormItem::Field(f) => steps.last_mut().into_iter().for_each(|s| s.push(f.meta.name)),
+                FormItem::Row(fs) => steps.last_mut().into_iter().for_each(|s| s.extend(fs.iter().map(|f| f.meta.name))),
+                FormItem::Range(a, b) => steps.last_mut().into_iter().for_each(|s| s.extend([a.meta.name, b.meta.name])),
+            }
+        }
+        steps
     }
 
     /// Calendar and clock options of a date or time field: days that cannot be chosen, minute
@@ -199,6 +230,7 @@ impl<M: Model> Form<M> {
             FormItem::Field(f) => std::slice::from_ref(f).iter(),
             FormItem::Row(fs) => fs.iter(),
             FormItem::Range(a, _) => std::slice::from_ref(a).iter(),
+            FormItem::Step(_) => [].iter(),
         })
         .chain(self.items.iter().filter_map(|item| match item {
             FormItem::Range(_, b) => Some(b),
@@ -207,8 +239,34 @@ impl<M: Model> Form<M> {
     }
 
     fn render_fields(&self, out: &mut String, r: &Render) {
+        let titles: Vec<&Text> = self.items.iter().filter_map(|i| if let FormItem::Step(t) = i { Some(t) } else { None }).collect();
+        if !titles.is_empty() {
+            out.push_str(&format!(
+                r#"<ol class="z-steps" data-zeyn-steps aria-label="{}" data-text-progress="{}">"#,
+                r.text(&Text::key("zeyn.ui.steps.label")),
+                r.text(&Text::key("zeyn.ui.steps.progress"))
+            ));
+            for (i, t) in titles.iter().enumerate() {
+                let current = if i == 0 { r#" aria-current="step""# } else { "" };
+                out.push_str(&format!(r#"<li data-step="{i}"{current}><span class="z-step-n" aria-hidden="true">{}</span><span class="z-step-title">{}</span></li>"#, i + 1, r.text(t)));
+            }
+            out.push_str("</ol>");
+        }
+        let mut step = 0usize;
+        let mut open = false;
         for item in &self.items {
             match item {
+                FormItem::Step(title) => {
+                    if open {
+                        out.push_str("</fieldset>");
+                    }
+                    out.push_str(&format!(
+                        r#"<fieldset class="z-step" data-zeyn-step="{step}"><legend class="z-step-legend">{}</legend>"#,
+                        r.text(title)
+                    ));
+                    step += 1;
+                    open = true;
+                }
                 FormItem::Field(f) => render_field(out, r, f, self),
                 FormItem::Range(from, to) => crate::ui::render_range(
                     out,
@@ -224,6 +282,9 @@ impl<M: Model> Form<M> {
                     out.push_str("</div>");
                 }
             }
+        }
+        if open {
+            out.push_str("</fieldset>");
         }
         for (i, meta) in M::fields().iter().enumerate().filter(|(_, m)| m.version) {
             let v = match self.model.value_at(i) {
@@ -241,6 +302,10 @@ impl<M: Model> Form<M> {
                 FormItem::Field(f) => vec![f],
                 FormItem::Row(fs) => fs.iter().collect(),
                 FormItem::Range(a, b) => vec![a, b],
+                FormItem::Step(title) => {
+                    list.push(json!({ "row": row, "step": title }));
+                    Vec::new()
+                }
             };
             for f in fields {
                 let mut entry = json!({ "row": row, "field": f.meta });
@@ -616,6 +681,38 @@ where
     }
 }
 
+/// Checks one step of a stepped form: reads every submitted value the way a save would and
+/// returns the errors of the step's fields only. Nothing is saved; the submit action's
+/// permission is required, as for saving.
+impl<M: Model, A> DataSource for SubmitForm<M, A>
+where
+    A: Action<Input = Valid<M>>,
+    A::Output: Outcome,
+{
+    fn action(&self) -> ActionMeta {
+        A::META
+    }
+
+    fn fetch(&self, ctx: Ctx, input: Json) -> BoxFuture<Result<Json>> {
+        let step = input.get("step").and_then(Json::as_u64).unwrap_or(u64::MAX) as usize;
+        let values = input.get("values").and_then(Json::as_object).cloned().unwrap_or_default();
+        let fields = self.form.steps().get(step).cloned();
+        let result = fields.map(|fields| match self.form.read_in(&values, &ctx) {
+            Ok(_) => Vec::new(),
+            Err(errors) => errors
+                .errors
+                .into_iter()
+                .filter(|e| fields.contains(&e.field))
+                .map(|e| json!({ "field": e.field, "rule": e.rule, "message": ctx.t(&e.message) }))
+                .collect(),
+        });
+        Box::pin(async move {
+            let errors = result.ok_or(Error::NotFound)?;
+            Ok(json!({ "errors": errors }))
+        })
+    }
+}
+
 impl<M: Model> Component for Form<M> {
     fn source(&self, key: &str) -> Option<&dyn DataSource> {
         self.lookup_of(key).map(|(s, _)| s)
@@ -644,8 +741,18 @@ where
             A::META.name
         ));
         self.form.render_fields(out, r);
+        let steps = if self.form.steps().is_empty() {
+            String::new()
+        } else {
+            format!(
+                r#"<button type="button" class="z-button" data-zeyn-step-back hidden data-testid="{0}.form.back">{1}</button><button type="button" class="z-button z-primary" data-zeyn-step-next hidden data-testid="{0}.form.next">{2}</button>"#,
+                r.scope,
+                r.text(&Text::key("zeyn.ui.steps.back")),
+                r.text(&Text::key("zeyn.ui.steps.next"))
+            )
+        };
         out.push_str(&format!(
-            r#"<div class="z-form-actions"><button type="submit" class="z-button z-primary" data-testid="{}.form.submit">{}</button></div></form>"#,
+            r#"<div class="z-form-actions">{steps}<button type="submit" class="z-button z-primary" data-testid="{}.form.submit">{}</button></div></form>"#,
             r.scope,
             r.text(&self.label)
         ));
@@ -665,6 +772,9 @@ where
     }
 
     fn source(&self, key: &str) -> Option<&dyn DataSource> {
+        if key == "_step" && !self.form.steps().is_empty() {
+            return Some(self);
+        }
         self.form.lookup_of(key).map(|(s, _)| s)
     }
 }

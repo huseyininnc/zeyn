@@ -165,7 +165,8 @@
         "next": "Next",
         "back": "Back",
         "done": "Completed",
-        "current": "Current step"
+        "current": "Current step",
+        "label": "Steps"
       },
       "chart": {
         "data": "Show data",
@@ -184,6 +185,13 @@
       },
       "text": {
         "count": "{n} of {max} characters"
+      },
+      "tone": {
+        "neutral": "Note",
+        "info": "Information",
+        "success": "Success",
+        "warning": "Warning",
+        "danger": "Error"
       }
     },
     "date": {

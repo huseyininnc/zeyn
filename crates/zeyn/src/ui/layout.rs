@@ -17,6 +17,7 @@ macro_rules! into_node {
         })*
     };
 }
+pub(crate) use into_node;
 
 
 into_node!(Row, Stack, Panel, Card, Tabs, Split);
@@ -35,6 +36,7 @@ fn children_schema(nodes: &[Node]) -> Vec<Json> {
 pub struct Row {
     nodes: Vec<Node>,
     weights: Vec<u8>,
+    compact: bool,
 }
 
 impl Row {
@@ -49,6 +51,12 @@ impl Row {
         self
     }
 
+    /// Columns as wide as their content, wrapping when there is no room: for badges and buttons.
+    pub fn compact(mut self) -> Self {
+        self.compact = true;
+        self
+    }
+
     /// Weight of the last column, 1 to 12. A column of weight 2 is twice as wide as one of weight 1.
     pub fn weight(mut self, weight: u8) -> Self {
         if let Some(w) = self.weights.last_mut() {
@@ -60,7 +68,7 @@ impl Row {
 
 impl Component for Row {
     fn render(&self, out: &mut String, r: &Render) {
-        out.push_str(r#"<div class="z-row">"#);
+        out.push_str(if self.compact { r#"<div class="z-row z-row-compact">"# } else { r#"<div class="z-row">"# });
         for (i, node) in self.nodes.iter().enumerate() {
             out.push_str(&format!(r#"<div class="z-col" style="--z-flex:{}">"#, self.weights[i]));
             render_child(out, r, i, node);
