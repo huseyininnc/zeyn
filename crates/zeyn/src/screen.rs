@@ -783,12 +783,56 @@ pub struct Screen {
     toolbar: Option<Toolbar>,
     body: Vec<Node>,
     menu: Option<crate::menu::ContextMenu>,
+    head: Option<Box<crate::seo::Head>>,
 }
 
 impl Screen {
     /// Full page screen.
     pub fn new(title: impl Into<Text>) -> Self {
-        Self { title: title.into(), kind: ScreenKind::Page, toolbar: None, body: Vec::new(), menu: None }
+        Self { title: title.into(), kind: ScreenKind::Page, toolbar: None, body: Vec::new(), menu: None, head: None }
+    }
+
+    fn head_mut(&mut self) -> &mut crate::seo::Head {
+        self.head.get_or_insert_with(Default::default)
+    }
+
+    /// Summary for search results and link previews: `<meta name="description">` and
+    /// `og:description`.
+    pub fn description(mut self, text: impl Into<Text>) -> Self {
+        self.head_mut().description = Some(text.into());
+        self
+    }
+
+    /// The URL search engines should index for this page: an `https` URL, or an app path written
+    /// behind `App::site_url` and the base path. Other URLs are ignored with a warning.
+    pub fn canonical(mut self, url: impl Into<String>) -> Self {
+        self.head_mut().canonical = crate::seo::checked(url.into(), "a canonical URL");
+        self
+    }
+
+    /// Image of link previews (`og:image`): an `https` URL or an app path.
+    pub fn og_image(mut self, url: impl Into<String>) -> Self {
+        self.head_mut().og_image = crate::seo::checked(url.into(), "an og:image URL");
+        self
+    }
+
+    /// Structured data for search engines, sent as `<script type="application/ld+json">`. The
+    /// browser never runs it, and the JSON is escaped so it cannot end the script element.
+    pub fn json_ld(mut self, data: serde_json::Value) -> Self {
+        self.head_mut().json_ld = Some(data);
+        self
+    }
+
+    /// Whether search engines may index the page.
+    pub fn robots(mut self, robots: crate::seo::Robots) -> Self {
+        self.head_mut().robots = Some(robots);
+        self
+    }
+
+    /// Head tags of the page (description, canonical, preview image, robots, JSON-LD), empty
+    /// when the screen sets none.
+    pub fn head_html(&self, r: &Render, site: &str, prefix: &str) -> String {
+        self.head.as_ref().map(|h| h.render(r, site, prefix)).unwrap_or_default()
     }
 
     /// Screen opened as a window.

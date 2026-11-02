@@ -23,6 +23,7 @@
   },
   "about": {
     "title": "Northwind hakkında",
+    "description": "Northwind Operasyon: küçük bir ticaret şirketinin stoğu, siparişleri ve çalışanları tek bir Zeyn uygulamasında.",
     "lead": "Northwind Operasyon, küçük bir ticaret şirketinin stoğunu, siparişlerini ve çalışanlarını yönetir.",
     "cache": "Bu sayfa herkese açık: ziyaretçiler onu çerezsiz alır, tarayıcılar ve önbellekler beş dakika saklar."
   },

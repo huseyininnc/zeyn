@@ -362,16 +362,14 @@ fn screen_cache(cache: Option<&syn::LitInt>, public: bool) -> syn::Result<u32> {
     if !public {
         return Err(syn::Error::new(
             lit.span(),
-            "`cache` is only for public screens
-  = help: add `public`, or remove `cache`; pages of signed in users are never kept in a shared cache",
+            "`cache` is only for public screens\n  = help: add `public`, or remove `cache`; pages of signed in users are never kept in a shared cache",
         ));
     }
     match lit.base10_parse::<u32>() {
         Ok(n @ 1..=86_400) => Ok(n),
         _ => Err(syn::Error::new(
             lit.span(),
-            "`cache` takes seconds from 1 to 86400
-  = help: for example `cache = 300` keeps the page for five minutes",
+            "`cache` takes seconds from 1 to 86400\n  = help: for example `cache = 300` keeps the page for five minutes",
         )),
     }
 }

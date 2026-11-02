@@ -40,6 +40,16 @@ function announce(main) {
   }
 }
 
+/**
+ * Replaces the head tags of the last screen (description, canonical URL, preview image, robots,
+ * JSON-LD: every `[data-zeyn-head]`) with `tags`. JSON-LD is data and never runs.
+ * @param {Iterable<Node>} tags
+ */
+function replaceHead(tags) {
+  document.head.querySelectorAll('[data-zeyn-head]').forEach((el) => el.remove());
+  document.head.append(...tags);
+}
+
 /** Loads a screen into `#z-main`. Falls back to a full page load whenever that is safer. */
 async function visit(url, push) {
   const main = document.getElementById('z-main');
@@ -76,6 +86,9 @@ async function visit(url, push) {
   const title = res.headers.get('x-zeyn-title');
   if (title) document.title = decodeURIComponent(title);
   main.innerHTML = html;
+  const head = main.querySelector(':scope > template[data-zeyn-head]');
+  replaceHead(head ? head.content.childNodes : []);
+  head?.remove();
   main.removeAttribute('aria-busy');
   markCurrent(finalUrl);
   announce(main);
@@ -120,7 +133,8 @@ async function refreshPage() {
   if (doc.documentElement.dir) document.documentElement.dir = doc.documentElement.dir;
   else document.documentElement.removeAttribute('dir');
   document.title = doc.title;
-  for (const meta of doc.querySelectorAll('head meta[name]')) {
+  replaceHead([...doc.head.querySelectorAll('[data-zeyn-head]')].map((el) => document.importNode(el, true)));
+  for (const meta of doc.querySelectorAll('head meta[name]:not([data-zeyn-head])')) {
     if (meta.name === 'zeyn-csrf' && !meta.content) continue;
     const old = document.head.querySelector(`meta[name="${CSS.escape(meta.name)}"]`);
     if (old) old.content = meta.content;

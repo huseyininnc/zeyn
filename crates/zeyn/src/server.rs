@@ -38,6 +38,7 @@ mod grid;
 mod guard;
 mod media;
 mod ops;
+mod seo;
 mod session;
 mod telemetry;
 mod theme;
@@ -651,6 +652,8 @@ pub struct App {
     mcp: Mcp,
     home: Option<&'static str>,
     llms_txt: Option<&'static str>,
+    robots_txt: Option<&'static str>,
+    site_url: String,
     time: TimePolicy,
     fixed_now: Option<DateTime>,
     zone_picker: bool,
@@ -699,6 +702,8 @@ impl App {
             mcp: Mcp::off(),
             home: None,
             llms_txt: None,
+            robots_txt: None,
+            site_url: String::new(),
             time: TimePolicy::User { default: TimeZone::UTC },
             fixed_now: None,
             zone_picker: false,
@@ -960,6 +965,34 @@ impl App {
         self
     }
 
+    /// Serves `text` at `/robots.txt` as plain text, to everyone.
+    ///
+    /// ```
+    /// # use zeyn::App;
+    /// let app = App::new("Shop").robots_txt("User-agent: *\nAllow: /\nSitemap: https://shop.example/sitemap.xml\n");
+    /// ```
+    pub fn robots_txt(mut self, text: &'static str) -> Self {
+        self.robots_txt = Some(text);
+        self
+    }
+
+    /// The `https` origin the site is reached at, such as `https://shop.example`. App paths in
+    /// canonical URLs, preview images and the sitemap are written behind it (and the base path),
+    /// because search engines need absolute URLs. Without it, head tags keep app paths and the
+    /// sitemap leaves them out.
+    pub fn site_url(mut self, url: &str) -> Self {
+        let url = url.trim_end_matches('/');
+        if crate::seo::valid_url(url) && url.starts_with("https://") && !url["https://".len()..].contains('/') {
+            self.site_url = url.to_string();
+        } else {
+            self.setup_problems.push(format!(
+                "site_url `{}` is not an https origin\n  = help: pass only the scheme and host, such as `https://shop.example`",
+                url.chars().take(80).collect::<String>()
+            ));
+        }
+        self
+    }
+
     /// Applies a plugin. Settings made after this line override the plugin's.
     pub fn plugin(self, plugin: impl Plugin) -> Self {
         plugin.install(self)
@@ -1032,6 +1065,21 @@ impl App {
         problems.extend(self.dev_auth_check());
         let mut paths: HashMap<String, &str> = HashMap::new();
         let mut names: HashMap<&str, &str> = HashMap::new();
+        let sitemaps: Vec<_> = self.features.iter().filter_map(|f| f.sitemap_source().map(|s| (f.name(), s))).collect();
+        if sitemaps.len() > 1 {
+            problems.push(
+                "more than one feature has a sitemap\n  = help: keep one `Feature::sitemap` that lists every URL"
+                    .into(),
+            );
+        }
+        for (feature, s) in &sitemaps {
+            if !matches!(s.meta().access, crate::action::Access::Public) {
+                problems.push(format!(
+                    "the sitemap action `{}` of feature `{feature}` is not public\n  = help: `/sitemap.xml` is read by search engines without a session; mark the action `#[action(public)]`",
+                    s.meta().name
+                ));
+            }
+        }
         for f in &self.features {
             if let Err(p) = f.check() {
                 problems.extend(p.into_iter().map(|p| format!("feature `{}`: {p}", f.name())));
@@ -1211,6 +1259,7 @@ impl App {
             allow: self.allow,
             api_docs: self.api_docs,
             prefix: url_prefix,
+            site_url: self.site_url,
             look,
             views: self.views,
             native_menu: self.native_menu,
@@ -1268,6 +1317,10 @@ impl App {
         if let Some(text) = self.llms_txt {
             router = router.route("/llms.txt", get(move || async move { asset(text, "text/plain; charset=utf-8") }));
         }
+        if let Some(text) = self.robots_txt {
+            router = router.route("/robots.txt", get(move || async move { asset(text, "text/plain; charset=utf-8") }));
+        }
+        let router = seo::routes(router, &state);
         let router = router
             .route("/_zeyn/zeyn.js", get(|| async { asset(JS, "text/javascript; charset=utf-8") }))
             .route("/_zeyn/zeyn.css", get(|| async { asset(CSS, "text/css; charset=utf-8") }))
@@ -1401,6 +1454,7 @@ struct AppState {
     allow: Vec<IpRange>,
     api_docs: Option<ApiDocs>,
     prefix: String,
+    site_url: String,
     look: theme::Look,
     views: Option<Arc<dyn crate::grid::DataGridViewStore>>,
     native_menu: bool,
@@ -1986,18 +2040,20 @@ async fn page(
         let loaded = st.preload(&ctx, screen.walk(), name).await;
         let r = user_render(name, &ctx);
         let html = screen.render(&r, &entry.meta, &params, &loaded);
-        Ok::<_, Failure>((ctx.t(screen.title()), html))
+        let head = screen.head_html(&r, &st.site_url, &st.prefix);
+        Ok::<_, Failure>((ctx.t(screen.title()), html, head))
     }
     .await;
     st.after(&ctx, &call, started, &result);
     let partial = headers.get("x-zeyn-partial").is_some_and(|v| v == "1");
     let response = match result {
-        Ok((title, html)) if partial => {
+        Ok((title, html, head)) if partial => {
             let full = format!("{title} · {}", ctx.t(&st.name));
             #[cfg(feature = "islands")]
             let holds_island = islands::holds(&st, &html);
             #[cfg(feature = "realtime")]
             let holds_live = realtime::holds(&st, &html);
+            let html = if head.is_empty() { html } else { format!("<template data-zeyn-head>{head}</template>{html}") };
             let tag = (open && cache > 0).then(|| etag("p", &[&full, &html]));
             let mut r = Html(html).into_response();
             let h = r.headers_mut();
@@ -2007,7 +2063,6 @@ async fn page(
             }
             h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
             h.insert(header::VARY, HeaderValue::from_static("x-zeyn-partial"));
-
             #[cfg(feature = "islands")]
             if holds_island {
                 h.insert("x-zeyn-islands", HeaderValue::from_static("1"));
@@ -2021,9 +2076,11 @@ async fn page(
                 None => r,
             }
         }
-        Ok((title, html)) => {
-            #[allow(unused_mut)]
+        Ok((title, html, head)) => {
             let mut page = st.shell(&ctx, &csrf, &title, &html, Some(name));
+            if !head.is_empty() {
+                page = page.replacen("</head>", &format!("{head}</head>"), 1);
+            }
             #[cfg(feature = "realtime")]
             realtime::head(&st, &html, &mut page);
             let tag = (open && cache > 0).then(|| etag("f", &[&page]));

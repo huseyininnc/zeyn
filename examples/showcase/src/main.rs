@@ -109,6 +109,8 @@ async fn main() -> std::io::Result<()> {
         .mcp(Mcp::on())
         .api_docs(ApiDocs::open())
         .home(overview::overview)
+        .site_url(config.get("site.url").unwrap_or("https://northwind.example"))
+        .robots_txt("User-agent: *\nAllow: /about\nAllow: /dashboard\nDisallow: /\nSitemap: https://northwind.example/sitemap.xml\n")
         .feature(overview::feature())
         .feature(stock::feature())
         .feature(sales::feature())

@@ -23,6 +23,7 @@
   },
   "about": {
     "title": "About Northwind",
+    "description": "Northwind Operations: stock, orders and people of a small trading company in one Zeyn app.",
     "lead": "Northwind Operations runs stock, orders and people for a small trading company.",
     "cache": "This page is public: visitors get it without cookies, and browsers and caches keep it for five minutes."
   },

@@ -386,6 +386,8 @@ pub mod render;
 mod screen;
 #[cfg(feature = "server")]
 mod security;
+/// Head tags for search engines and the sitemap.
+pub mod seo;
 #[cfg(feature = "server")]
 pub mod server;
 /// Data layer for SQL databases (`postgres` and `oracle` features).
@@ -512,6 +514,7 @@ pub mod prelude {
     #[cfg(feature = "server")]
     #[allow(deprecated)]
     pub use crate::Agents;
+    pub use crate::seo::{Robots, SitemapPart, SitemapUrl};
     pub use crate::ui::{
         ActionButton, Alert, Audio, Badge, Breadcrumb, Busy, Card, Chart, Control, DateOptions, DescriptionList, Dock,
         EmptyState, Kpi, LookupItem, LookupQuery, MenuBar, MenuButton, Panel, Popover, Progress, PropertyInspector,

@@ -101,6 +101,8 @@ All `POST` requests send JSON, must carry the header `x-zeyn-csrf` with the toke
 
 A public screen opened without a session comes with an empty `zeyn-csrf` meta tag and no `Set-Cookie`, so that it can be cached. Before its first `POST` the runtime calls `GET /_zeyn/csrf`, which answers `{ "token": "..." }` with `Cache-Control: no-store`, sets the `zeyn_csrf` cookie when the browser has none, and refuses requests whose `Sec-Fetch-Site` is not `same-origin`. The token goes into the meta tag; when the call fails the `POST` goes out without a token and is refused like any other. Nothing is retried silently.
 
+In-app navigation (`nav.js`) asks for a screen with `x-zeyn-partial: 1` and gets only its HTML, with the page title in `x-zeyn-title`. When the screen sets head tags (description, canonical URL, preview image, robots, JSON-LD), the body starts with `<template data-zeyn-head>` holding them; `nav.js` removes every `[data-zeyn-head]` element of the document head, moves the template's tags there and drops the template. A screen without head tags sends no template, so the old tags are only removed.
+
 ### 4.1 Screen fragment
 
 `GET /_zeyn/screen/{screen}?params={json}` returns the screen HTML only, without the page shell. Used for windows and for row details: opening a row with `data-zeyn-detail` loads its screen into a new `tr.z-detail` right under it (one cell spanning the row, holding a `role="region"`), and closing removes that row. The screen's permission is checked like any screen; grids inside the detail talk to the server with the detail screen's own name and params.

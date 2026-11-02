@@ -46,14 +46,30 @@ pub fn overview(_: (), store: ProductStore, ctx: Ctx) -> Result<Screen> {
     ])))
 }
 
-/// A public page for visitors: sent without cookies and kept by caches for five minutes.
+/// A public page for visitors: sent without cookies, kept by caches for five minutes, and
+/// described for search engines and link previews.
 #[screen(route = "/about", public, cache = 300)]
 pub fn about() -> Screen {
-    Screen::new(t!("about.title")).body(Card::new().title(t!("about.lead")).add(Alert::info(t!("about.cache"))))
+    Screen::new(t!("about.title"))
+        .description(t!("about.description"))
+        .canonical("/about")
+        .robots(Robots::Index)
+        .json_ld(serde_json::json!({
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            "name": "Northwind Operations",
+        }))
+        .body(Card::new().title(t!("about.lead")).add(Alert::info(t!("about.cache"))))
+}
+
+/// The public pages of the showcase for `/sitemap.xml`.
+#[action(public)]
+pub async fn public_pages(part: SitemapPart) -> Result<Vec<SitemapUrl>> {
+    Ok(part.of(&[SitemapUrl::new("/about"), SitemapUrl::new("/dashboard")]))
 }
 
 pub fn feature() -> Feature {
-    Feature::new("overview").screen(overview).screen(about).menu(|m| {
+    Feature::new("overview").screen(overview).screen(about).sitemap(public_pages).menu(|m| {
         m.group(t!("menu.overview"), Icon::Chart).item(t!("dashboard.title"), overview).item(t!("about.title"), about)
     })
 }
