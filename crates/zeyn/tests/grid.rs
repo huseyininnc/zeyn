@@ -671,3 +671,104 @@ async fn bulk_action_is_refused_without_permission_bad_keys_unknown_actions_or_t
     assert_eq!(send(&router, bulk(serde_json::json!({ "keys": many }))).await.status, StatusCode::FORBIDDEN);
     assert_eq!(active_ids(&store).len(), 10);
 }
+
+#[action(permission = "items.admin")]
+pub async fn wipe(id: ItemId, store: Store) -> Result<()> {
+    store.0.write().unwrap().retain(|r| r.id != id);
+    Ok(())
+}
+
+#[action(permission = "items.write")]
+pub async fn bump_all(_: (), store: Store) -> Result<()> {
+    for r in store.0.write().unwrap().iter_mut() {
+        r.qty += 1;
+    }
+    Ok(())
+}
+
+#[screen(route = "/menus", permission = "items.read")]
+pub fn menus() -> Screen {
+    Screen::new("Menus")
+        .context_menu(ContextMenu::new().item("Open", Effect::Toast { message: "hi".into() }).action("Bump all", bump_all, ()))
+        .body(Grid::of(search).paging(Paging::pages(5)).column(Item::code).column(Item::qty).row_menu(|i| {
+            ContextMenu::new()
+                .item("Toast", Effect::Toast { message: "x".into() })
+                .separator()
+                .action("Bump", bump, i.id)
+                .disabled(i.qty > 3)
+                .submenu("Danger", ContextMenu::new().action("Wipe", wipe, i.id))
+                .separator()
+        }))
+}
+
+fn menu_router(identity: Identity) -> (Router, Store) {
+    let store = Store::seeded();
+    let router = App::new("Test")
+        .service(store.clone())
+        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .feature(Feature::new("items").screen(menus))
+        .router()
+        .unwrap();
+    (router, store)
+}
+
+fn menu_run(key: &str, item: &str) -> Request<Body> {
+    post("/_zeyn/grid/run", serde_json::json!({ "screen": "menus", "node": 0, "key": key, "item": item }))
+}
+
+#[tokio::test]
+async fn row_menus_leave_out_items_the_user_may_not_run() {
+    let (router, _) = menu_router(writer_items());
+    let r = send(&router, get("/menus")).await;
+    let first = r.body.split(r#"<tr data-zeyn-key="1" data-zeyn-menu=""#).nth(1).unwrap().split('"').next().unwrap().replace("&quot;", "\"");
+    let items: serde_json::Value = serde_json::from_str(&first).unwrap();
+    assert_eq!(items.as_array().unwrap().len(), 3, "toast, separator, bump; no empty submenu, no dangling separator: {items}");
+    assert_eq!(items[2]["run"], "2");
+    let r = send(&router, get("/menus")).await;
+    assert!(r.body.contains(r#"data-zeyn-screen="menus" data-zeyn-params="null" data-zeyn-menu=""#));
+    let admin = Identity::user("a").with_permissions(["items.read", "items.write", "items.admin"]);
+    let (router, _) = menu_router(admin);
+    let r = send(&router, get("/menus")).await;
+    assert!(r.body.contains("Wipe"));
+}
+
+#[tokio::test]
+async fn row_menu_actions_run_from_the_row_on_the_server_and_check_permission_again() {
+    let (router, store) = menu_router(writer_items());
+    let r = send(&router, menu_run("2", "m2")).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    assert_eq!(store.0.read().unwrap()[1].qty, 102);
+    assert_eq!(send(&router, menu_run("2", "m2")).await.status, StatusCode::NOT_FOUND, "disabled now that qty > 3");
+    assert_eq!(send(&router, menu_run("1", "m3.0")).await.status, StatusCode::FORBIDDEN, "admin only");
+    assert_eq!(store.0.read().unwrap().len(), 20);
+    assert_eq!(send(&router, menu_run("1", "m0")).await.status, StatusCode::NOT_FOUND, "effects run in the browser");
+    assert_eq!(send(&router, menu_run("1", "m9")).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(send(&router, menu_run("1", "m3")).await.status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn screen_menu_actions_run_with_permission_checked() {
+    let (router, store) = menu_router(writer_items());
+    let call = |item: &str| post("/_zeyn/menu", serde_json::json!({ "screen": "menus", "item": item }));
+    assert_eq!(send(&router, call("1")).await.status, StatusCode::OK);
+    assert_eq!(store.0.read().unwrap()[0].qty, 2);
+    assert_eq!(send(&router, call("0")).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(send(&router, call("7")).await.status, StatusCode::NOT_FOUND);
+    let (router, store) = menu_router(reader());
+    assert_eq!(send(&router, call("1")).await.status, StatusCode::FORBIDDEN);
+    assert_eq!(store.0.read().unwrap()[0].qty, 1);
+}
+
+#[tokio::test]
+async fn browser_menu_stays_unless_the_app_turns_it_off() {
+    let (router, _) = menu_router(reader());
+    assert!(!send(&router, get("/menus")).await.body.contains("data-zeyn-native-menu"));
+    let router = App::new("Test")
+        .service(Store::seeded())
+        .browser_context_menu(false)
+        .auth(|h: &HeaderMap| h.contains_key("x-user").then(reader))
+        .feature(Feature::new("items").screen(menus))
+        .router()
+        .unwrap();
+    assert!(send(&router, get("/menus")).await.body.contains(r#"data-zeyn-native-menu="off""#));
+}

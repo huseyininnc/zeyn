@@ -439,12 +439,13 @@ pub struct Screen {
     kind: ScreenKind,
     toolbar: Option<Toolbar>,
     body: Vec<Node>,
+    menu: Option<crate::menu::ContextMenu>,
 }
 
 impl Screen {
     /// Full page screen.
     pub fn new(title: impl Into<Text>) -> Self {
-        Self { title: title.into(), kind: ScreenKind::Page, toolbar: None, body: Vec::new() }
+        Self { title: title.into(), kind: ScreenKind::Page, toolbar: None, body: Vec::new(), menu: None }
     }
 
     /// Screen opened as a window.
@@ -474,6 +475,17 @@ impl Screen {
         self
     }
 
+    /// Context menu for the empty space of the screen (not over rows, headers or inputs).
+    pub fn context_menu(mut self, menu: crate::menu::ContextMenu) -> Self {
+        self.menu = Some(menu);
+        self
+    }
+
+    /// Takes the action item at `path` of the screen's context menu, to run it.
+    pub fn menu_call(&self, path: &str) -> Option<RowCall> {
+        self.menu.as_ref()?.take(path)
+    }
+
     pub fn title(&self) -> &Text {
         &self.title
     }
@@ -498,7 +510,10 @@ impl Screen {
         let scope = meta.name;
         let r = Render { scope, ..*r };
         let title = r.text(&self.title);
-        let params = attr(params);
+        let params = match self.menu.as_ref().map(|m| m.to_json(&r)) {
+            Some(items) if items.as_array().is_some_and(|a| !a.is_empty()) => format!(r#"{}" data-zeyn-menu="{}"#, attr(params), attr(&items)),
+            _ => attr(params),
+        };
         let mut out = String::new();
         let close = match self.kind {
             ScreenKind::Page => {

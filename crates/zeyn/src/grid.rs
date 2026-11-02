@@ -375,7 +375,10 @@ pub struct Grid<E: Model> {
     row_actions: Vec<RowAction<E>>,
     selectable: bool,
     bulk: Vec<BulkDef>,
+    row_menu: Option<MenuFn<E>>,
 }
+
+type MenuFn<E> = Box<dyn Fn(&E) -> crate::menu::ContextMenu + Send + Sync>;
 
 fn fetch_via<A, E>(ctx: Ctx, query: GridQuery) -> BoxFuture<Result<Page<E>>>
 where
@@ -402,7 +405,15 @@ impl<E: Model> Grid<E> {
             row_actions: Vec::new(),
             selectable: false,
             bulk: Vec::new(),
+            row_menu: None,
         }
+    }
+
+    /// Context menu of each row, built on the server from the row. Right click, Shift+F10 or the
+    /// context menu key opens it. See [`crate::ContextMenu`].
+    pub fn row_menu(mut self, menu: impl Fn(&E) -> crate::menu::ContextMenu + Send + Sync + 'static) -> Self {
+        self.row_menu = Some(Box::new(menu));
+        self
     }
 
     /// Grid with a column for every field of the model except the row version, in declaration
@@ -691,6 +702,12 @@ impl<E: Model> Grid<E> {
             if let Some(k) = Self::key_index().and_then(|i| row.value_at(i)) {
                 out.push_str(&format!(r#" data-zeyn-key="{}""#, escape(&key_text(&k))));
             }
+            if let Some(menu) = self.row_menu.as_ref().map(|f| f(row)) {
+                let items = menu.to_json(r);
+                if items.as_array().is_some_and(|a| !a.is_empty()) {
+                    out.push_str(&format!(r#" data-zeyn-menu="{}""#, attr(&items)));
+                }
+            }
             out.push('>');
             if self.selectable {
                 out.push_str(&format!(
@@ -955,6 +972,9 @@ impl<E: Model> GridSource for Grid<E> {
         let i = Self::key_index()?;
         let rows = page.items.downcast_ref::<Vec<E>>()?;
         let row = rows.iter().find(|r| r.value_at(i).is_some_and(|v| key_text(&v) == key))?;
+        if let Some(path) = item.strip_prefix('m') {
+            return self.row_menu.as_ref()?(row).take(path);
+        }
         let index: usize = item.strip_prefix('a')?.parse().ok()?;
         let action = self.row_actions.get(index)?;
         Some(RowCall { meta: action.meta, run: (action.run)(row) })
@@ -1310,6 +1330,10 @@ impl<E: Model, T> GridColumn<E, T> {
         self.grid.selectable()
     }
 
+    pub fn row_menu(self, menu: impl Fn(&E) -> crate::menu::ContextMenu + Send + Sync + 'static) -> Grid<E> {
+        self.grid.row_menu(menu)
+    }
+
     pub fn bulk_action<A, K>(self, label: impl Into<Text>, action: A, key: Field<E, K>) -> Grid<E>
     where
         A: BulkAction<K> + Action<Input = Vec<K>>,
@@ -1382,7 +1406,7 @@ fn grid_texts(r: &Render) -> serde_json::Value {
     }
     let menu = [
         "options", "resize", "sort_asc", "sort_desc", "sort_clear", "pin_start", "pin_end", "unpin", "move_prev", "move_next",
-        "hide", "columns", "reset",
+        "hide", "columns", "reset", "filter",
     ];
     for k in menu {
         map.insert(format!("menu_{k}"), json!(r.i18n.text(r.locale, &Text::key(format!("zeyn.grid.menu.{k}")))));

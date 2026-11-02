@@ -227,6 +227,7 @@ mod feature;
 mod form;
 mod grid;
 mod i18n;
+mod menu;
 mod model;
 mod platform;
 pub mod render;
@@ -252,6 +253,7 @@ pub use grid::{
     Pin, RowStyle, position_cursor, total,
 };
 pub use i18n::{I18n, NumberFormat, Text};
+pub use menu::ContextMenu;
 pub use model::{__rules, Entity, Field, FieldError, FieldMeta, Model, Rule, Valid, ValidationErrors};
 pub use platform::{
     Config, ConfigSource, EnvSource, FixedLicense, JsonFileSource, License, LicenseSource, Licensed, PerTenant, Secret,
@@ -285,7 +287,7 @@ pub use serde_json as __serde_json;
 /// Everything application code needs: `use zeyn::prelude::*;`
 pub mod prelude {
     pub use crate::{
-        Action, Ctx, Currency, Date, DateTime, Effect, Tone, LocalDateTime, Time, TimeZone, Entity, Error, Export, Feature, Field, Form, Grid, GridMode, GridQuery,
+        Action, ContextMenu, Ctx, Currency, Date, DateTime, Effect, Tone, LocalDateTime, Time, TimeZone, Entity, Error, Export, Feature, Field, Form, Grid, GridMode, GridQuery,
         GuardResult, Icon, Identity, Licensed, Model, Secret, Tenant, TenantRequired, Money, Node, Page, Paging, Result, RowStyle, Screen, ScreenDef, Service,
         SignedIn, Text, UiCtx, Valid, ValidationErrors, Window, action, choice, entity, model, params, screen, t,
     };

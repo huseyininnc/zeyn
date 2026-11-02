@@ -547,6 +547,7 @@ pub struct App {
     allow: Vec<IpRange>,
     setup_problems: Vec<String>,
     views: Option<Arc<dyn crate::grid::DataGridViewStore>>,
+    native_menu: bool,
 }
 
 impl App {
@@ -583,7 +584,18 @@ impl App {
             allow: Vec::new(),
             setup_problems: Vec::new(),
             views: None,
+            native_menu: true,
         }
+    }
+
+    /// `false` stops the browser's own context menu everywhere except in text inputs, text areas
+    /// and editable text. This protects nothing (any user can still view the source, use the
+    /// developer tools or turn scripts off) and it takes away spell check, copy link, translate
+    /// and accessibility tools. Keep the default (`true`) unless a kiosk or a strict brief asks
+    /// for it; Zeyn's own menus work either way.
+    pub fn browser_context_menu(mut self, allow: bool) -> Self {
+        self.native_menu = allow;
+        self
     }
 
     /// Saves each signed in user's grid layout, sort and filters on the server, so they come
@@ -942,6 +954,7 @@ impl App {
             prefix: url_prefix,
             theme: self.theme,
             views: self.views,
+            native_menu: self.native_menu,
         });
         let mut router = Router::new();
         for f in &state.features {
@@ -989,6 +1002,7 @@ impl App {
             .route("/_zeyn/grid/view", post(grid_view_call))
             .route("/_zeyn/grid/run", post(grid_run_call))
             .route("/_zeyn/grid/bulk", post(grid_bulk_call))
+            .route("/_zeyn/menu", post(menu_call))
             .route("/_zeyn/form", post(form_call))
             .route("/_zeyn/locale", post(set_locale))
             .route("/_zeyn/timezone", post(set_time_zone))
@@ -1065,6 +1079,7 @@ struct AppState {
     prefix: String,
     theme: Option<Theme>,
     views: Option<Arc<dyn crate::grid::DataGridViewStore>>,
+    native_menu: bool,
 }
 
 /// Decodes `%XX` sequences in a cookie value.
@@ -1420,14 +1435,18 @@ impl AppState {
             tz = escape(ctx.time_zone().name()),
             base = escape(&self.prefix),
             scheme = self.theme.as_ref().and_then(|t| t.scheme).unwrap_or("light dark"),
-            html_attrs = match &self.theme {
-                Some(t) => format!(
-                    "{}{}",
-                    t.scheme.map(|s| format!(r#" data-theme="{s}""#)).unwrap_or_default(),
-                    if t.compact { r#" data-density="compact""# } else { "" }
-                ),
-                None => String::new(),
-            },
+            html_attrs = format!(
+                "{}{}",
+                match &self.theme {
+                    Some(t) => format!(
+                        "{}{}",
+                        t.scheme.map(|s| format!(r#" data-theme="{s}""#)).unwrap_or_default(),
+                        if t.compact { r#" data-density="compact""# } else { "" }
+                    ),
+                    None => String::new(),
+                },
+                if self.native_menu { "" } else { r#" data-zeyn-native-menu="off""# }
+            ),
             theme_link = if self.theme.is_some() {
                 format!(r#"<link rel="stylesheet" href="{}/_zeyn/theme.css">"#, escape(&self.prefix))
             } else {
@@ -1630,6 +1649,15 @@ struct GridCall {
 }
 
 #[derive(Deserialize)]
+struct MenuCall {
+    screen: String,
+    #[serde(default)]
+    params: Json,
+    /// Path of the item in the screen's context menu, such as `"2.1"`.
+    item: String,
+}
+
+#[derive(Deserialize)]
 struct BulkCall {
     screen: String,
     #[serde(default)]
@@ -1746,6 +1774,29 @@ impl AppState {
         let result = async {
             self.before(ctx, &info)?;
             self.timed((row.run)(ctx.clone())).await
+        }
+        .await;
+        self.after(ctx, &info, started, &result);
+        result?;
+        Ok(json!({ "effects": [] }))
+    }
+
+    /// Runs an action item of a screen's context menu: the screen is built again with its params,
+    /// the item is taken from that menu, its access is checked and interceptors run.
+    async fn run_menu(&self, ctx: &Ctx, call: MenuCall) -> Result<Json, Failure> {
+        if call.item.len() > 32 {
+            return Err(Failure::App(Error::NotFound));
+        }
+        let (_, entry, screen) = self.open(ctx, &call.screen, call.params).await?;
+        let item = screen.menu_call(&call.item).ok_or(Failure::App(Error::NotFound))?;
+        if !ctx.identity().can(&item.meta.access) {
+            return Err(Failure::App(Error::Forbidden));
+        }
+        let info = Call { kind: CallKind::Screen, screen: entry.meta.name, action: Some(item.meta), via_agent: ctx.via_agent() };
+        let started = Instant::now();
+        let result = async {
+            self.before(ctx, &info)?;
+            self.timed((item.run)(ctx.clone())).await
         }
         .await;
         self.after(ctx, &info, started, &result);
@@ -1876,6 +1927,17 @@ async fn grid_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Js
         return st.error_response(&ctx, f);
     }
     match st.run_grid(&ctx, call).await {
+        Ok(body) => axum::Json(body).into_response(),
+        Err(f) => st.error_response(&ctx, f),
+    }
+}
+
+async fn menu_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(call): axum::Json<MenuCall>) -> Response {
+    let ctx = st.licensed(st.ctx(&headers)).await;
+    if let Err(f) = st.check_csrf(&headers) {
+        return st.error_response(&ctx, f);
+    }
+    match st.run_menu(&ctx, call).await {
         Ok(body) => axum::Json(body).into_response(),
         Err(f) => st.error_response(&ctx, f),
     }

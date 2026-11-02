@@ -141,6 +141,15 @@ pub async fn deactivate_products(ids: Vec<ProductId>, store: ProductStore) -> Re
     store.deactivate(&ids)
 }
 
+/// Adds ten units to every product with fewer than ten. From the product list's context menu.
+#[action(permission = "stock.product.write", audit)]
+pub async fn restock_low(_: (), store: ProductStore) -> Result<()> {
+    for p in store.all()?.into_iter().filter(|p| p.stock < 10) {
+        store.restock(p.id)?;
+    }
+    Ok(())
+}
+
 /// Which product the editor opens; `None` creates one.
 #[params]
 pub struct ProductParams {
@@ -151,6 +160,13 @@ pub struct ProductParams {
 #[screen(route = "/products", permission = "stock.product.read")]
 pub fn product_list() -> Screen {
     Screen::new(t!("stock.products"))
+        .context_menu(
+            ContextMenu::new()
+                .item(t!("stock.new_product"), Window::open(product_editor, ProductParams { id: None }))
+                .icon(Icon::Plus)
+                .shortcut("Ctrl+N")
+                .action(t!("stock.restock_low"), restock_low, ()),
+        )
         .toolbar(|t| {
             t.button(t!("stock.new_product"))
                 .icon(Icon::Plus)
@@ -197,6 +213,16 @@ pub fn product_list() -> Screen {
                 .check_icon()
                 .row_action(t!("stock.restock"), restock_product, |p| p.id)
                 .bulk_action(t!("stock.deactivate"), deactivate_products, Product::id)
+                .row_menu(|p| {
+                    ContextMenu::new()
+                        .item(t!("stock.edit"), Window::open(product_editor, ProductParams { id: Some(p.id) }))
+                        .icon(Icon::Edit)
+                        .shortcut("Enter")
+                        .action(t!("stock.restock"), restock_product, p.id)
+                        .separator()
+                        .action(t!("stock.deactivate"), deactivate_products, vec![p.id])
+                        .disabled(!p.active)
+                })
                 .row_style(|p| match p.stock {
                     0 => Some(RowStyle::Danger),
                     1..=9 => Some(RowStyle::Warning),

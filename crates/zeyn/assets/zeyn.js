@@ -1292,6 +1292,11 @@ function columnMenu(grid, th) {
     { label: t.menu_move_next || 'Move right', disabled: i < 0 || i >= shown.length - 1, run: move(1) },
     { label: t.menu_hide || 'Hide column', disabled: shown.length <= 1, run: () => setColumns(grid, shown.filter((c) => c.field !== field)) },
     {
+      label: t.menu_filter || 'Filter',
+      disabled: !th.dataset.filter,
+      run: () => grid.querySelector(`.z-filter-cell[data-field="${CSS.escape(field)}"] .z-filter`)?.focus(),
+    },
+    {
       label: t.menu_columns || 'Columns',
       items: all.map((c) => {
         const on = shown.some((x) => x.field === c.field);
@@ -1996,9 +2001,16 @@ document.addEventListener('keydown', (e) => {
   const t = e.target;
   if (t instanceof Element && t.matches('.z-menu-item') && menuKey(e, t)) return;
   if (t instanceof Element && t.matches('.z-resize') && resizeKey(e, t)) return;
-  if (t instanceof Element && (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) && t.closest('thead th[data-field]')) {
-    e.preventDefault();
-    return openColumnMenu(t.closest('th').querySelector('.z-col-menu'));
+  if (t instanceof Element && (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) && !typing(t)) {
+    if (t.closest('thead th[data-field]')) {
+      e.preventDefault();
+      return openColumnMenu(t.closest('th').querySelector('.z-col-menu'));
+    }
+    const owner = t.closest('[data-zeyn-rows] > tr[data-zeyn-menu], [data-zeyn-screen][data-zeyn-menu]');
+    if (owner) {
+      const box = (owner.matches('tr') ? owner : t).getBoundingClientRect();
+      if (openContextMenu(owner, { x: box.left + 16, y: box.bottom }, t)) return e.preventDefault();
+    }
   }
   const vg = t instanceof Element ? t.closest('[data-zeyn-grid][data-zeyn-paging="virtual"]') : null;
   if (vg && (t === vg || t.parentElement?.matches('[data-zeyn-rows]')) && virtualKey(e, vg)) return;
@@ -2011,14 +2023,73 @@ document.addEventListener('pointerdown', (e) => {
   if (handle && e.button === 0) startResize(e, handle);
 });
 
+/**
+ * Right click: our menu where one is defined (a column header, a row with `data-zeyn-menu`, a
+ * screen with `data-zeyn-menu`), the browser's own menu elsewhere. Text inputs, text areas and
+ * editable text always keep the browser menu. With `<html data-zeyn-native-menu="off">` the
+ * browser menu is stopped everywhere else too.
+ */
 document.addEventListener('contextmenu', (e) => {
-  const th = e.target instanceof Element ? e.target.closest('[data-zeyn-grid] thead th[data-field]') : null;
-  if (!th) return;
-  e.preventDefault();
-  const grid = th.closest('[data-zeyn-grid]');
-  if (!grids.get(grid)) return;
-  openMenu(columnMenu(grid, th), { x: e.clientX, y: e.clientY, opener: th.querySelector('.z-col-menu'), label: th.querySelector('.z-col-menu')?.getAttribute('aria-label') });
+  const t = e.target instanceof Element ? e.target : null;
+  if (!t || typing(t) || t.closest('.z-menu')) return;
+  const th = t.closest('[data-zeyn-grid] thead th[data-field]');
+  if (th) {
+    e.preventDefault();
+    const grid = th.closest('[data-zeyn-grid]');
+    if (!grids.get(grid)) return;
+    const button = th.querySelector('.z-col-menu');
+    return openMenu(columnMenu(grid, th), { x: e.clientX, y: e.clientY, opener: button, label: button?.getAttribute('aria-label') });
+  }
+  const owner = t.closest('[data-zeyn-rows] > tr[data-zeyn-menu], [data-zeyn-screen][data-zeyn-menu]');
+  if (owner && openContextMenu(owner, { x: e.clientX, y: e.clientY }, t)) return e.preventDefault();
+  if (document.documentElement.dataset.zeynNativeMenu === 'off') e.preventDefault();
 });
+
+/**
+ * Opens the context menu of a row or a screen. Effect items run in the browser; action items
+ * ask the server to run them (`/_zeyn/grid/run` with the row key, `/_zeyn/menu` for screens).
+ * Returns false when the owner has no items.
+ */
+function openContextMenu(owner, at, opener) {
+  let items;
+  try {
+    items = JSON.parse(owner.dataset.zeynMenu || '[]');
+  } catch {
+    return false;
+  }
+  if (!items.length) return false;
+  const row = owner.matches('tr');
+  if (row) activate(owner, false);
+  const focusBack = row ? owner : opener?.closest(FOCUSABLE) ?? owner;
+  const convert = (list) =>
+    list.map((i) =>
+      i.separator
+        ? { separator: true }
+        : {
+            label: i.label,
+            icon: i.icon,
+            hint: i.hint,
+            disabled: i.disabled,
+            items: i.items ? convert(i.items) : undefined,
+            run: i.effect
+              ? () => runEffect(i.effect, focusBack)
+              : i.run != null
+                ? () => (row ? runRowItem(owner, `m${i.run}`) : runScreenItem(owner, i.run))
+                : undefined,
+          },
+    );
+  openMenu(convert(items), { ...at, opener: focusBack, label: row ? owner.querySelector('td:not(.z-select)')?.textContent.trim() : owner.querySelector('h1, h2')?.textContent });
+  return true;
+}
+
+/** Runs an action item of a screen's context menu with `POST /_zeyn/menu`. */
+async function runScreenItem(screen, item) {
+  const r = await post(BASE + '/_zeyn/menu', { screen: screen.dataset.zeynScreen, params: paramsOf(screen), item });
+  if (!r.ok) return;
+  await runEffects(r.data?.effects, screen);
+  toast(screen.querySelector('[data-zeyn-grid]') ? grids.get(screen.querySelector('[data-zeyn-grid]'))?.texts.done || 'Done.' : 'Done.');
+  await Promise.all([...screen.querySelectorAll('[data-zeyn-grid]')].map((g) => loadGrid(g, 'reload')));
+}
 
 document.addEventListener('submit', (e) => {
   const form = e.target;
