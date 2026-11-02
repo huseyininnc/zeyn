@@ -135,12 +135,95 @@ pub fn input_choices() -> Screen {
     )
 }
 
+/// Recounts stock slowly, so the busy overlay shows.
+#[action(permission = "stock.product.read")]
+pub async fn recount_stock(_: (), store: crate::stock::ProductStore) -> Result<usize> {
+    tokio::time::sleep(std::time::Duration::from_millis(1800)).await;
+    Ok(store.all()?.len())
+}
+
+/// Counts products at once; the busy overlay never shows for it.
+#[action(permission = "stock.product.read")]
+pub async fn count_stock(_: (), store: crate::stock::ProductStore) -> Result<usize> {
+    Ok(store.all()?.len())
+}
+
+/// A shipment note, with help on its fields.
+#[model]
+pub struct ShipmentNote {
+    #[rule(required, max_len = 20)]
+    pub reference: String,
+    #[rule(max_len = 200)]
+    pub instructions: Option<String>,
+}
+
+#[action(public)]
+pub async fn save_shipment_note(note: Valid<ShipmentNote>) -> Result<ShipmentNote> {
+    tokio::time::sleep(std::time::Duration::from_millis(900)).await;
+    Ok(note.into_inner())
+}
+
+#[screen(route = "/overlays", permission = "stock.product.read")]
+pub fn input_overlays() -> Screen {
+    let counted = |n: &Result<usize>, ui: &mut UiCtx| {
+        if let Ok(n) = n {
+            let n = *n;
+            ui.toast(t!("inputs.counted", n = n));
+        }
+    };
+    Screen::new(t!("inputs.overlays"))
+        .toolbar(|t| t.button(t!("inputs.new_note")).icon(Icon::Plus).tip(t!("inputs.new_note_tip")))
+        .body(
+            Stack::new()
+                .add(
+                    Panel::new(t!("inputs.panel_actions")).add(
+                        Row::new()
+                            .compact()
+                            .col(
+                                ActionButton::new(t!("inputs.count"), count_stock, ())
+                                    .tip(t!("inputs.count_tip"))
+                                    .on_success(counted),
+                            )
+                            .col(
+                                Busy::new().add(
+                                    ActionButton::new(t!("inputs.recount"), recount_stock, ())
+                                        .tip(t!("inputs.recount_tip"))
+                                        .on_success(counted),
+                                ),
+                            )
+                            .col(
+                                Popover::new(t!("inputs.carrier"))
+                                    .title(t!("inputs.carrier_title"))
+                                    .add(Alert::info(t!("inputs.carrier_text"))),
+                            ),
+                    ),
+                )
+                .add(
+                    Panel::new(t!("inputs.panel_note")).add(
+                        Busy::new().add(
+                            Form::of(ShipmentNote::default())
+                                .field(ShipmentNote::reference)
+                                .tip(ShipmentNote::reference, t!("inputs.reference_tip"))
+                                .field(ShipmentNote::instructions)
+                                .submit(t!("inputs.save_note"), save_shipment_note)
+                                .on_success(|_, ui| ui.toast(t!("inputs.note_saved"))),
+                        ),
+                    ),
+                ),
+        )
+}
+
 pub fn feature() -> Feature {
-    Feature::new("inputs").route_prefix("/inputs").guard(SignedIn).screen(input_fields).screen(input_choices).menu(
-        |m| {
+    Feature::new("inputs")
+        .route_prefix("/inputs")
+        .guard(SignedIn)
+        .screen(input_fields)
+        .screen(input_choices)
+        .screen(input_overlays)
+        .menu(|m| {
             m.group(t!("menu.inputs"), Icon::Edit)
                 .item(t!("inputs.fields"), input_fields)
                 .item(t!("inputs.choices"), input_choices)
-        },
-    )
+                .item(t!("inputs.overlays"), input_overlays)
+        })
 }

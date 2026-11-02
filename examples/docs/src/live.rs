@@ -332,6 +332,7 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
             .add(StatusBar::new("Status").left("Ready").right("UTF-8"))
             .into(),
         "inputs" => inputs(),
+        "overlay" => overlay(),
         "multi" => Form::of(Reach { channels: vec![Channel::Email], ..Reach::default() })
             .field(Reach::channels)
             .lookup_columns(Reach::product, find_sample_rows, ["Code", "Name", "Unit"])
@@ -423,8 +424,43 @@ pub async fn find_sample_rows(q: LookupQuery) -> Result<Page<LookupItem>> {
     ))
 }
 
+/// Counts the sample products slowly, to show the busy overlay.
+#[action(public)]
+pub async fn slow_count(_: ()) -> Result<i64> {
+    tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+    Ok(SAMPLES.len() as i64)
+}
+
+fn overlay() -> Node {
+    let sample = &SAMPLES[0];
+    Row::new()
+        .compact()
+        .col(ActionButton::new(t!("docs.live.count"), count_samples, ()).tip(t!("docs.live.count_tip")).on_success(
+            |n, ui| {
+                if let Ok(n) = n {
+                    ui.toast(t!("docs.live.counted", n = n));
+                }
+            },
+        ))
+        .col(
+            Popover::new(t!("docs.live.rules")).title(t!("docs.live.rules_title")).add(
+                DescriptionList::of(sample)
+                    .field(Sample::code)
+                    .field(Sample::unit)
+                    .field(Sample::price)
+                    .field(Sample::stock),
+            ),
+        )
+        .col(Busy::new().add(ActionButton::new(t!("docs.live.slow"), slow_count, ()).on_success(|n, ui| {
+            if let Ok(n) = n {
+                ui.toast(t!("docs.live.counted", n = n));
+            }
+        })))
+        .into()
+}
+
 /// Names of every live example, for checks and tests.
 pub const EXAMPLES: &[&str] = &[
     "datagrid", "form", "controls", "dates", "lines", "layout", "display", "action", "tree", "chart", "shell",
-    "inputs", "multi",
+    "inputs", "multi", "overlay",
 ];

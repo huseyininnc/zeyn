@@ -22,7 +22,11 @@
       "save": "Save",
       "saved": "Saved. Nothing was stored.",
       "count": "Count products",
-      "counted": "{n} products."
+      "counted": "{n} products.",
+      "count_tip": "Counts every sample product on the server",
+      "rules": "Product details",
+      "rules_title": "First sample product",
+      "slow": "Count slowly"
     }
   }
 }

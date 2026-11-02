@@ -404,7 +404,23 @@
     "campaign_saved": "Kampanya kaydedildi. Hiçbir şey saklanmadı.",
     "col_code": "Kod",
     "col_name": "Ad",
-    "col_price": "Fiyat"
+    "col_price": "Fiyat",
+    "overlays": "İpuçları, açılır kutular ve meşgul",
+    "new_note": "Yeni not",
+    "new_note_tip": "Boş bir sevkiyat notu başlatır",
+    "panel_actions": "Stok işlemleri",
+    "count": "Ürünleri say",
+    "count_tip": "Hemen yanıt verir, döner simge görünmez",
+    "recount": "Stoku yeniden say",
+    "recount_tip": "Yaklaşık iki saniye sürer; bu sırada alan döner simge gösterir",
+    "counted": "{n} ürün sayıldı.",
+    "carrier": "Taşıyıcı kuralları",
+    "carrier_title": "Taşıyıcı kuralları",
+    "carrier_text": "15:00'ten önce verilen siparişler aynı gün çıkar. 30 kg üstü koliler yük taşımacılığıyla gider.",
+    "panel_note": "Sevkiyat notu",
+    "reference_tip": "İrsaliyeye basılır; en fazla 20 karakter",
+    "save_note": "Notu kaydet",
+    "note_saved": "Not kaydedildi. Hiçbir şey saklanmadı."
   },
   "SupplierTerms": {
     "supplier": "Tedarikçi",
@@ -436,5 +452,9 @@
     "BlackSea": "Karadeniz",
     "East": "Doğu Anadolu",
     "Southeast": "Güneydoğu Anadolu"
+  },
+  "ShipmentNote": {
+    "reference": "Referans",
+    "instructions": "Talimatlar"
   }
 }

@@ -392,6 +392,13 @@
       },
       "multi": {
         "count": "{n} seçili"
+      },
+      "popover": {
+        "close": "Kapat"
+      },
+      "busy": "Çalışıyor",
+      "tip": {
+        "about": "{label} hakkında"
       }
     },
     "date": {

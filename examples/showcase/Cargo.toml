@@ -15,4 +15,4 @@ zeyn = { path = "../../crates/zeyn", features = ["assistant", "islands", "realti
 showcase-shared = { path = "shared", features = ["crdt"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }

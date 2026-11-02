@@ -1831,3 +1831,134 @@ dialog.z-confirm::backdrop { background: var(--z-backdrop); }
   .z-list-columns .z-option-cells { grid-template-columns: 1fr; gap: 0; }
   .z-option-cells > span:not(:first-child) { color: var(--z-text-muted); font-size: var(--z-font-size-xs); }
 }
+
+/* Tooltip, popover and busy overlay ----------------------------------------------------------- */
+
+.z-tip {
+  position: fixed;
+  z-index: 1000;
+  max-width: min(18rem, calc(100vw - 8px));
+  padding: 6px calc(var(--z-space) * 2.5);
+  border-radius: var(--z-radius);
+  background: var(--z-text);
+  color: var(--z-surface);
+  font-size: var(--z-font-size-sm);
+  font-weight: 400;
+  line-height: 1.4;
+  text-align: start;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  box-shadow: 0 2px 8px hsl(var(--z-shadow-color) / var(--z-shadow-strength));
+}
+
+.z-tip[hidden],
+.z-popover[hidden],
+.z-busy-overlay[hidden] { display: none; }
+
+.z-tip-host { display: inline-flex; }
+
+.z-label-row { display: inline-flex; align-items: center; gap: calc(var(--z-space) * 1.5); }
+
+.z-tip-button {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--z-border-strong);
+  border-radius: 50%;
+  background: var(--z-surface);
+  color: var(--z-text-muted);
+  font: 600 0.75rem/1 var(--z-font);
+  font-style: italic;
+  cursor: help;
+}
+
+.z-tip-button:hover { color: var(--z-text); border-color: var(--z-text-muted); }
+
+.z-tip-button:focus-visible { outline: 2px solid var(--z-focus); outline-offset: 1px; }
+
+.z-popover-wrap { display: inline-block; }
+
+.z-popover {
+  position: fixed;
+  z-index: 900;
+  width: min(24rem, calc(100vw - 16px));
+  max-height: min(28rem, 70vh);
+  overflow: auto;
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius);
+  background: var(--z-surface);
+  color: var(--z-text);
+  box-shadow: 0 6px 24px hsl(var(--z-shadow-color) / var(--z-shadow-strength));
+}
+
+.z-popover:focus-visible { outline: 2px solid var(--z-focus); outline-offset: 1px; }
+
+.z-popover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--z-space) * 2);
+  padding: calc(var(--z-space) * 2) calc(var(--z-space) * 3);
+  border-bottom: 1px solid var(--z-border);
+}
+
+.z-popover-title { margin: 0; font-size: var(--z-font-size); font-weight: 600; }
+
+.z-popover-body { display: grid; gap: calc(var(--z-space) * 3); padding: calc(var(--z-space) * 3); }
+
+.z-busy { position: relative; }
+
+.z-busy-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  grid-auto-flow: column;
+  place-content: center;
+  align-items: center;
+  gap: calc(var(--z-space) * 2);
+  border-radius: var(--z-radius);
+  background: color-mix(in srgb, var(--z-surface) 85%, transparent);
+  color: var(--z-text);
+  cursor: progress;
+}
+
+.z-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--z-border);
+  border-top-color: var(--z-accent);
+  border-radius: 50%;
+  animation: z-spin 0.8s linear infinite;
+}
+
+.z-busy-text { font-size: var(--z-font-size-sm); font-weight: 600; }
+
+@keyframes z-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 640px) {
+  .z-popover {
+    inset: auto 0 0 0;
+    width: auto;
+    max-height: 70vh;
+    border-radius: var(--z-radius) var(--z-radius) 0 0;
+  }
+}
+
+@media (pointer: coarse) {
+  .z-tip-button { width: 44px; height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .z-spinner { animation-duration: 2.4s; }
+}
+
+@media (forced-colors: active) {
+  .z-tip { border: 1px solid CanvasText; }
+  .z-busy-overlay { background: Canvas; }
+  .z-spinner { border-color: CanvasText; border-top-color: Highlight; }
+}

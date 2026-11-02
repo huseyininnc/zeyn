@@ -15,6 +15,7 @@ mod layout;
 mod lines;
 mod lookup;
 mod media;
+mod overlay;
 mod shell;
 mod tree;
 mod widgets;
@@ -45,6 +46,8 @@ pub use lines::{Lines, MAX_LINES};
 pub use lookup::{LookupItem, LookupQuery, LookupValue, MAX_LOOKUP_COLUMNS, MAX_LOOKUP_IDS, MAX_LOOKUP_PAGE};
 pub(crate) use lookup::{parse_ids, render_lookup};
 pub use media::{Audio, PLAYBACK_SPEEDS, Video};
+pub(crate) use overlay::tip;
+pub use overlay::{BUSY_DELAY_MS, Busy, MAX_TIP, Popover};
 pub use tree::{MAX_TREE_CHILDREN, Tree, TreeItem, TreeQuery};
 pub use widgets::{
     ActionButton, Alert, Badge, Breadcrumb, DescriptionList, DescriptionOf, EmptyState, Progress, Skeleton, Timeline,

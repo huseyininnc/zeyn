@@ -531,6 +531,7 @@ struct ButtonSpec {
     shortcut: Option<String>,
     override_browser: bool,
     effect: Option<Effect>,
+    tip: Option<Text>,
 }
 
 #[derive(Debug)]
@@ -549,7 +550,14 @@ impl Toolbar {
     pub fn button(self, label: impl Into<Text>) -> ToolButton {
         ToolButton {
             bar: self,
-            spec: ButtonSpec { label: label.into(), icon: None, shortcut: None, override_browser: false, effect: None },
+            spec: ButtonSpec {
+                label: label.into(),
+                icon: None,
+                shortcut: None,
+                override_browser: false,
+                effect: None,
+                tip: None,
+            },
         }
     }
 
@@ -562,9 +570,13 @@ impl Toolbar {
     pub(crate) fn render(&self, out: &mut String, r: &Render, title: &str) {
         let scope = r.scope;
         out.push_str(&format!(r#"<div class="z-toolbar" role="toolbar" aria-label="{title}">"#));
-        for item in &self.items {
+        for (n, item) in self.items.iter().enumerate() {
             match item {
                 ToolItem::Button(b) => {
+                    let tip = b.tip.as_ref().map(|t| crate::ui::tip(r, &format!("{scope}-tooltip-{n}"), t));
+                    if tip.is_some() {
+                        out.push_str(r#"<span class="z-tip-host">"#);
+                    }
                     let english = b.label.english();
                     out.push_str(&format!(
                         r#"<button type="button" class="z-button" data-testid="{scope}.toolbar.{}""#,
@@ -576,12 +588,19 @@ impl Toolbar {
                     if let Some(e) = &b.effect {
                         out.push_str(&format!(r#" data-zeyn-effect="{}""#, attr(e)));
                     }
+                    if let Some((attrs, _)) = &tip {
+                        out.push_str(attrs);
+                    }
                     out.push('>');
                     if let Some(i) = b.icon {
                         out.push_str(&i.html());
                     }
                     out.push_str(&r.text(&b.label));
                     out.push_str("</button>");
+                    if let Some((_, html)) = &tip {
+                        out.push_str(html);
+                        out.push_str("</span>");
+                    }
                 }
                 ToolItem::Export(e) => out.push_str(&format!(
                     r#"<button type="button" class="z-button" data-testid="{scope}.toolbar.export-{code}" data-zeyn-export="{code}">{}</button>"#,
@@ -633,6 +652,12 @@ impl ToolButton {
     /// Takes over a shortcut the browser uses, on purpose.
     pub fn override_browser(mut self) -> Self {
         self.spec.override_browser = true;
+        self
+    }
+
+    /// A tooltip for the button: shown on hover, focus and long press, read as its description.
+    pub fn tip(mut self, text: impl Into<Text>) -> Self {
+        self.spec.tip = Some(text.into());
         self
     }
 

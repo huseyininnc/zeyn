@@ -392,6 +392,13 @@
       },
       "multi": {
         "count": "{n} selected"
+      },
+      "popover": {
+        "close": "Close"
+      },
+      "busy": "Working",
+      "tip": {
+        "about": "About {label}"
       }
     },
     "date": {

@@ -67,3 +67,30 @@ ActionButton::new(t!("docs.live.count"), count_samples, ())
 ```
 
 @live action
+
+## Tooltip, popover and busy overlay
+
+A tooltip is a short description of one control: `ActionButton::tip(text)`, `ToolButton::tip(text)` in a screen toolbar and `Form::tip(field, text)`, which adds an info button after the field's label. The text is the control's `aria-describedby`, so screen readers hear it with the control. It shows after a short hover and at once on focus, stays while the pointer is over it (WCAG 1.4.13), hides with Escape without moving focus, and shows on touch after a long press (a tap on the info button). A tooltip never carries information the user must have: put that in the label, the field's rules or the page.
+
+`Popover::new(label).title(title).add(node)` is a button that opens a non-modal dialog next to it, for small details. Focus moves into it; Escape, the close button or a click outside close it and focus returns to the button. On narrow screens it opens as a bottom sheet. Its children are ordinary nodes, so a form inside it posts to its own node path with every server check.
+
+`Busy::new().add(node)` covers its content while a request inside it runs: a form saving, an action button, a grid or tree loading. The container gets `aria-busy` at once; the spinner and the text "Working" (a status message) show only after 400 ms, or `.delay_ms(n)`, so fast answers do not flash, and stay at least 300 ms once shown. The overlay blocks the pointer, not the keyboard, and focus stays where it was.
+
+```rust
+Stack::new()
+    .add(ActionButton::new(t!("docs.live.count"), count_samples, ()).tip(t!("docs.live.count_tip")))
+    .add(Popover::new(t!("docs.live.rules")).title(t!("docs.live.rules_title")).add(rules_list))
+    .add(Busy::new().add(ActionButton::new(t!("docs.live.slow"), slow_count, ())))
+```
+
+@live overlay
+
+| Key | Where | Does |
+|---|---|---|
+| Tab | a control with a tooltip | Focus shows the tooltip; leaving hides it |
+| Escape | anywhere while a tooltip shows | Hides the tooltip; focus stays |
+| Enter, Space | popover button | Opens the popover; focus moves to its first control |
+| Escape | inside the popover | Closes it; focus returns to the button |
+| Tab | inside the popover | Moves through its controls; leaving it closes it |
+
+The three need about 2.2 KB gzip of script and no request of their own; a tooltip is 1 node, a popover 6 plus its content, the busy overlay 3.

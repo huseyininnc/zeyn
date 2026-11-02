@@ -79,6 +79,8 @@ pub struct Form<M: Model> {
     /// Column headers of lookups that show several columns, by field.
     lookup_columns: Vec<(&'static str, Vec<Text>)>,
     lines: Vec<(&'static str, Box<dyn LinesEditor>)>,
+    /// Tooltips of fields, by field.
+    tips: Vec<(&'static str, Text)>,
 }
 
 impl<M: Model> Form<M> {
@@ -99,6 +101,7 @@ impl<M: Model> Form<M> {
             lookups: Vec::new(),
             lookup_columns: Vec::new(),
             lines: Vec::new(),
+            tips: Vec::new(),
         }
     }
 
@@ -117,6 +120,7 @@ impl<M: Model> Form<M> {
             lookups: Vec::new(),
             lookup_columns: Vec::new(),
             lines: Vec::new(),
+            tips: Vec::new(),
         }
     }
 
@@ -221,6 +225,21 @@ impl<M: Model> Form<M> {
     {
         self.items.push(FormItem::Field(FormField::of(field)));
         self.lookups.push((field.meta().name, Box::new(ActionSource::<A>::new()), false));
+        self
+    }
+
+    /// A tooltip for a field: an info button after its label shows `text` on hover, focus, tap
+    /// and long press, and the field's input is described by it for screen readers. Use it for
+    /// help such as a format or where a value comes from; the label and the rules must still say
+    /// what is required.
+    ///
+    /// ```ignore
+    /// Form::of(order).field(Order::reference).tip(Order::reference, t!("orders.reference_help"))
+    /// ```
+    pub fn tip<T: FieldType + 'static>(mut self, field: Field<M, T>, text: impl Into<Text>) -> Self {
+        let name = field.meta().name;
+        self.tips.retain(|(n, _)| *n != name);
+        self.tips.push((name, text.into()));
         self
     }
 
@@ -723,9 +742,23 @@ fn render_field<M: Model>(out: &mut String, r: &Render, f: &FormField<M>, form: 
         common.push_str(" readonly");
     }
 
+    let tip = form.tips.iter().find(|(n, _)| *n == m.name).map(|(_, t)| {
+        let (attrs, html) = crate::ui::tip(r, &format!("{id}-tip"), t);
+        let about = r.text(&Text::key("zeyn.ui.tip.about").arg("label", m.label_text()));
+        (format!(r#"<button type="button" class="z-tip-button" aria-label="{about}"{attrs}><span aria-hidden="true">i</span></button>"#), html)
+    });
+    if tip.is_some() {
+        common = common.replacen(r#"aria-describedby=""#, &format!(r#"aria-describedby="{id}-tip "#), 1);
+    }
     out.push_str(r#"<div class="z-field">"#);
     let star = if required { r#"<span class="z-required" aria-hidden="true">*</span>"# } else { "" };
-    let label = format!(r#"<label for="{id}" id="{id}-label">{}{star}</label>"#, r.label(m));
+    let label = match &tip {
+        Some((button, html)) => format!(
+            r#"<span class="z-label-row"><label for="{id}" id="{id}-label">{}{star}</label>{button}</span>{html}"#,
+            r.label(m)
+        ),
+        None => format!(r#"<label for="{id}" id="{id}-label">{}{star}</label>"#, r.label(m)),
+    };
     let text = |v: &Value| match v {
         Value::Text(s) => escape(s),
         _ => String::new(),

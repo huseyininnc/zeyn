@@ -462,6 +462,7 @@ pub struct ActionButton<A: Action> {
     input: A::Input,
     confirm: Option<Text>,
     tone: Tone,
+    tip: Option<Text>,
     on_success: Option<SuccessFn<A::Output>>,
 }
 
@@ -470,12 +471,19 @@ where
     A::Input: Clone + Sync,
 {
     pub fn new(label: impl Into<Text>, _action: A, input: A::Input) -> Self {
-        Self { label: label.into(), input, confirm: None, tone: Tone::Neutral, on_success: None }
+        Self { label: label.into(), input, confirm: None, tone: Tone::Neutral, tip: None, on_success: None }
     }
 
     /// Asks the user to confirm with this message before running.
     pub fn confirm(mut self, message: impl Into<Text>) -> Self {
         self.confirm = Some(message.into());
+        self
+    }
+
+    /// A tooltip: a short description shown on hover, focus and long press, and read by screen
+    /// readers as the button's description. Never put essential information only here.
+    pub fn tip(mut self, text: impl Into<Text>) -> Self {
+        self.tip = Some(text.into());
         self
     }
 
@@ -540,8 +548,12 @@ where
             None => String::new(),
         };
         let class = if self.tone == Tone::Danger { "z-button z-danger-button" } else { "z-button" };
+        let (tip_attrs, tip) = match &self.tip {
+            Some(t) => crate::ui::tip(r, &crate::ui::dom_id(r, "tip"), t),
+            None => (String::new(), String::new()),
+        };
         out.push_str(&format!(
-            r#"<form class="z-action" data-zeyn-submit="{}"{confirm} novalidate><button type="submit" class="{class}" data-testid="{}.action.{}">{}</button></form>"#,
+            r#"<form class="z-action" data-zeyn-submit="{}"{confirm} novalidate><button type="submit" class="{class}" data-testid="{}.action.{}"{tip_attrs}>{}</button>{tip}</form>"#,
             A::META.name,
             r.scope,
             slug(&self.label.english()),

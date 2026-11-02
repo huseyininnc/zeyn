@@ -22,7 +22,11 @@
       "save": "Kaydet",
       "saved": "Kaydedildi. Hiçbir şey saklanmadı.",
       "count": "Ürünleri say",
-      "counted": "{n} ürün."
+      "counted": "{n} ürün.",
+      "count_tip": "Sunucudaki tüm örnek ürünleri sayar",
+      "rules": "Ürün ayrıntıları",
+      "rules_title": "İlk örnek ürün",
+      "slow": "Yavaş say"
     }
   }
 }

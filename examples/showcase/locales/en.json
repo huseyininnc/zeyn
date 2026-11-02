@@ -404,7 +404,23 @@
     "campaign_saved": "Campaign saved. Nothing was stored.",
     "col_code": "Code",
     "col_name": "Name",
-    "col_price": "Price"
+    "col_price": "Price",
+    "overlays": "Tooltips, popovers and busy",
+    "new_note": "New note",
+    "new_note_tip": "Starts an empty shipment note",
+    "panel_actions": "Stock actions",
+    "count": "Count products",
+    "count_tip": "Answers at once, so no spinner shows",
+    "recount": "Recount stock",
+    "recount_tip": "Takes about two seconds; the area shows a spinner meanwhile",
+    "counted": "{n} products counted.",
+    "carrier": "Carrier rules",
+    "carrier_title": "Carrier rules",
+    "carrier_text": "Orders placed before 15:00 leave the same day. Parcels over 30 kg go by freight.",
+    "panel_note": "Shipment note",
+    "reference_tip": "Printed on the waybill; up to 20 characters",
+    "save_note": "Save note",
+    "note_saved": "Note saved. Nothing was stored."
   },
   "SupplierTerms": {
     "supplier": "Supplier",
@@ -436,5 +452,9 @@
     "BlackSea": "Black Sea",
     "East": "Eastern Anatolia",
     "Southeast": "Southeastern Anatolia"
+  },
+  "ShipmentNote": {
+    "reference": "Reference",
+    "instructions": "Instructions"
   }
 }
