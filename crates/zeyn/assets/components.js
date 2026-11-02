@@ -800,8 +800,23 @@ function clockColumns(root) {
 
 let uidCounter = 0;
 
-/** Marks the chosen hour, minute and second, keeps them in view and sets the roving focus. */
-function drawClock(moveFocus) {
+/**
+ * Scrolls only `list` so `option` shows: centered when `center`, otherwise just enough. Unlike
+ * `scrollIntoView` it never moves the page or the popup.
+ */
+function reveal(list, option, center = false) {
+  const l = list.getBoundingClientRect();
+  const o = option.getBoundingClientRect();
+  if (center) list.scrollTop += o.top - l.top - (list.clientHeight - o.height) / 2;
+  else if (o.top < l.top) list.scrollTop -= l.top - o.top;
+  else if (o.bottom > l.bottom) list.scrollTop += o.bottom - l.bottom;
+}
+
+/**
+ * Marks the chosen hour, minute and second, keeps them in view and sets the roving focus.
+ * `center` puts each choice in the middle of its column, as when the picker opens.
+ */
+function drawClock(moveFocus, center = true) {
   const { root, panel } = picker;
   const time = picker.time;
   const h12 = root.dataset.h12 === 'true';
@@ -822,7 +837,7 @@ function drawClock(moveFocus) {
     active ??= list.children[0];
     list.setAttribute('aria-activedescendant', active.id);
     list.tabIndex = i === 0 ? 0 : -1;
-    active.scrollIntoView({ block: 'center', behavior: 'instant' });
+    reveal(list, active, center);
   });
   if (moveFocus) lists[0]?.focus();
 }
@@ -840,8 +855,8 @@ function chooseTime(list, option) {
   if (list.dataset.unit === 'p') t.h = (t.h % 12) + (v === 'PM' ? 12 : 0);
   picker.time = t;
   writePicked();
-  drawClock(false);
-  list.focus();
+  drawClock(false, false);
+  list.focus({ preventScroll: true });
 }
 
 /** Writes what the picker holds into its inputs, in the locale's form. */
@@ -1170,7 +1185,7 @@ function setActive(i) {
   const item = lb.items[i];
   if (item) {
     lb.combo.setAttribute('aria-activedescendant', item.el.id);
-    item.el.scrollIntoView({ block: 'nearest' });
+    reveal(lb.panel, item.el);
   } else lb.combo.removeAttribute('aria-activedescendant');
 }
 
@@ -1365,7 +1380,7 @@ function chooseInline(list, option) {
   const native = list.closest('.z-listbox-field').querySelector('select');
   list.querySelectorAll('[role="option"]').forEach((o) => o.setAttribute('aria-selected', String(o === option)));
   list.setAttribute('aria-activedescendant', option.id);
-  option.scrollIntoView({ block: 'nearest' });
+  reveal(list, option);
   native.value = option.dataset.value;
   native.dispatchEvent(new Event('input', { bubbles: true }));
   native.dispatchEvent(new Event('change', { bubbles: true }));
