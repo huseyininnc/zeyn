@@ -414,8 +414,9 @@ pub use server::Agents;
 pub use server::realtime;
 #[cfg(feature = "server")]
 pub use server::{
-    ApiDocs, App, AuditLog, Authenticator, BasicCredentials, DevAuth, ForwardAuth, HeaderTenant, Interceptor, Mcp,
-    MemoryAudit, Plugin, StaticCredentials, StderrAudit, SubdomainTenant, TenantResolver, Theme, TimePolicy, probe,
+    ApiDocs, App, AuditEntry, AuditLog, AuditSink, Authenticator, BasicCredentials, Call, CallKind, CallOutcome,
+    DevAuth, ForwardAuth, HeaderTenant, Interceptor, Mcp, MemoryAudit, Plugin, StaticCredentials, StderrAudit,
+    SubdomainTenant, TenantResolver, Theme, TimePolicy, probe,
 };
 pub use time::{Date, DateTime, LocalDateTime, LocalTimeError, Time, TimeZone};
 pub use time::{DateWords, range_presets};
