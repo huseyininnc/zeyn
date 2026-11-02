@@ -604,6 +604,12 @@ async fn two_factor(State(st): State<Arc<AppState>>, headers: HeaderMap, raw: ax
     let Ok(Some(mut user)) = current(&accounts, &headers).await else { return StatusCode::NOT_FOUND.into_response() };
     let users = accounts.users();
     let manager = accounts.sign_in();
+    let fresh = ctx.signed_in_recently();
+    if r.enable.is_some() || r.reset_shared_key || r.reset_recovery_codes {
+        if let Err(f) = super::session::recent(&ctx) {
+            return st.error_response(&ctx, f);
+        }
+    }
     let result: Result<Json> = async {
         if r.enable == Some(true) {
             if r.reset_shared_key {
@@ -631,9 +637,10 @@ async fn two_factor(State(st): State<Arc<AppState>>, headers: HeaderMap, raw: ax
         if r.forget_machine {
             manager.forget_two_factor_client();
         }
-        let key = match users.authenticator_key(&user).await? {
-            Some(k) => k,
-            None => users.reset_authenticator_key(&mut user).await?,
+        let key = match (fresh && !user.two_factor_enabled, users.authenticator_key(&user).await?) {
+            (false, _) => None,
+            (true, Some(k)) => Some(k),
+            (true, None) => Some(users.reset_authenticator_key(&mut user).await?),
         };
         manager.refresh_sign_in(&user).await?;
         Ok(json!({
@@ -850,6 +857,10 @@ async fn passkey_creation(State(st): State<Arc<AppState>>, headers: HeaderMap) -
     }
     let accounts = accounts(&st);
     let Ok(Some(user)) = current(&accounts, &headers).await else { return StatusCode::NOT_FOUND.into_response() };
+    let ctx = st.ctx(&headers);
+    if let Err(f) = super::session::recent(&ctx) {
+        return st.error_response(&ctx, f);
+    }
     match passkey_creation_options(&accounts, &st, &user).await {
         Ok(j) => axum::Json(j).into_response(),
         Err(e) => failed(&st.ctx(&headers), e),
@@ -893,6 +904,9 @@ async fn passkey_add(State(st): State<Arc<AppState>>, headers: HeaderMap, raw: a
     let ctx = st.ctx(&headers);
     let accounts = accounts(&st);
     let Ok(Some(mut user)) = current(&accounts, &headers).await else { return StatusCode::NOT_FOUND.into_response() };
+    if let Err(f) = super::session::recent(&ctx) {
+        return st.error_response(&ctx, f);
+    }
     match passkey_register(&accounts, &st, &mut user, &r.credential_json, r.name).await {
         Ok(p) => axum::Json(passkey_json(&p)).into_response(),
         Err(e) => failed(&ctx, e),
@@ -922,6 +936,9 @@ async fn passkey_remove(State(st): State<Arc<AppState>>, headers: HeaderMap, raw
     let ctx = st.ctx(&headers);
     let accounts = accounts(&st);
     let Ok(Some(mut user)) = current(&accounts, &headers).await else { return StatusCode::NOT_FOUND.into_response() };
+    if let Err(f) = super::session::recent(&ctx) {
+        return st.error_response(&ctx, f);
+    }
     let Some(id) = b64url_decode(r.credential_id.trim_end_matches('=')) else {
         return failed(&ctx, crate::accounts::invalid("credential_id", "passkey_invalid"));
     };

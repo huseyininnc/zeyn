@@ -483,6 +483,8 @@
         "disable_confirm": "Turn off two step sign in? Your account will be easier to break into.",
         "reset_key": "Reset the authenticator key",
         "reset_key_confirm": "Your authenticator app will stop working for this account until you set it up again. Continue?",
+        "reauth": "For your security, sign in again to set up two step sign in.",
+        "reauth_link": "Sign in again",
         "setup": "Scan the QR code with an authenticator app, or type the key, then enter the six digit code it shows.",
         "qr": "QR code for your authenticator app",
         "manual": "Key:",

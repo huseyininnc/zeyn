@@ -19,8 +19,12 @@ pub struct Identity {
     pub permissions: BTreeSet<String>,
     /// Grants every permission. Only for development and tests.
     pub superuser: bool,
-    /// Tenant named by the identity provider. Wins over the tenant resolved from the request.
+    /// The user's own tenant, named by the identity provider. Used when the app resolves no tenant
+    /// from the request. When it does (`App::tenancy`), the resolved tenant must be this one or
+    /// one of `tenants`, or the request runs signed out.
     pub tenant: Option<String>,
+    /// Every other tenant the user may work in, for users who belong to more than one.
+    pub tenants: BTreeSet<String>,
     /// Time zone from the user's profile, set by an administrator or the user. It wins over the
     /// browser's zone under `TimePolicy::User`.
     pub time_zone: Option<String>,
@@ -59,6 +63,29 @@ impl Identity {
     pub fn with_tenant(mut self, tenant: impl Into<String>) -> Self {
         self.tenant = Some(tenant.into());
         self
+    }
+
+    /// Adds tenants the user may also work in.
+    pub fn with_tenants<I, S>(mut self, tenants: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        self.tenants.extend(tenants.into_iter().map(Into::into));
+        self
+    }
+
+    /// Whether the user belongs to the tenant with this id: it is their own tenant or one of
+    /// `tenants`. A superuser belongs to every tenant.
+    ///
+    /// ```
+    /// use zeyn::Identity;
+    /// let ayse = Identity::user("ayse").with_tenant("acme").with_tenants(["globex"]);
+    /// assert!(ayse.member_of("acme") && ayse.member_of("globex"));
+    /// assert!(!ayse.member_of("initech"));
+    /// ```
+    pub fn member_of(&self, tenant: &str) -> bool {
+        self.superuser || self.tenant.as_deref() == Some(tenant) || self.tenants.contains(tenant)
     }
 
     pub fn with_time_zone(mut self, zone: impl Into<String>) -> Self {
@@ -141,7 +168,11 @@ struct CtxInner {
     via_agent: bool,
     trail: Arc<Mutex<crate::audit::Trail>>,
     theme: Option<Arc<str>>,
+    reauth_within: std::time::Duration,
 }
+
+/// How recent a sign in counts as recent unless the app sets another age.
+const REAUTH_WITHIN: std::time::Duration = std::time::Duration::from_secs(300);
 
 /// Request context: identity, language and services. Cheap to clone. Actions and screens may take
 /// it as an injected argument.
@@ -163,7 +194,47 @@ impl Ctx {
             via_agent: false,
             trail: Arc::default(),
             theme: None,
+            reauth_within: REAUTH_WITHIN,
         }))
+    }
+
+    /// The context of one request, built in one step.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn for_request(
+        identity: Identity,
+        locale: String,
+        services: Arc<Services>,
+        i18n: Arc<I18n>,
+        tz: TimeZone,
+        tenant: Option<Tenant>,
+        config: Config,
+        theme: Arc<str>,
+        reauth_within: std::time::Duration,
+    ) -> Self {
+        Ctx(Arc::new(CtxInner {
+            identity,
+            locale,
+            tz,
+            now: None,
+            tenant,
+            license: None,
+            config,
+            services,
+            i18n,
+            via_agent: false,
+            trail: Arc::default(),
+            theme: Some(theme),
+            reauth_within,
+        }))
+    }
+
+    /// Whether the user proved who they are recently: signed in within `App::reauth_within`
+    /// (five minutes unless set), as the identity provider reports it. Actions marked `reauth` and
+    /// account security steps (second factor, recovery codes, passkeys) need it.
+    pub fn signed_in_recently(&self) -> bool {
+        let limit = i64::try_from(self.0.reauth_within.as_millis()).unwrap_or(i64::MAX);
+        let now = DateTime::now().unix_ms();
+        self.0.identity.authenticated_at.is_some_and(|at| at.unix_ms() <= now && now - at.unix_ms() < limit)
     }
 
     /// Same context in another time zone.
@@ -202,6 +273,7 @@ impl Ctx {
             via_agent: i.via_agent,
             trail: i.trail.clone(),
             theme: i.theme.clone(),
+            reauth_within: i.reauth_within,
         };
         change(&mut inner);
         Ctx(Arc::new(inner))

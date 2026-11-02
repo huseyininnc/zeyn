@@ -888,7 +888,9 @@ impl App {
         self
     }
 
-    /// Finds the tenant of each request. An identity's own tenant wins over the resolved one.
+    /// Finds the tenant of each request. A signed in user must belong to the resolved tenant
+    /// ([`Identity::member_of`]); otherwise the request runs signed out, so public screens still
+    /// work and nothing else does. Without a resolved tenant the user's own tenant applies.
     pub fn tenancy(mut self, resolver: impl TenantResolver) -> Self {
         self.tenancy = Some(Arc::new(resolver));
         self
@@ -1498,16 +1500,27 @@ impl AppState {
                 .or_else(|| cookie(headers, "zeyn_tz").and_then(|z| TimeZone::named(&percent_decode(z))))
                 .unwrap_or(default),
         };
-        let tenant = identity
-            .tenant
-            .as_deref()
-            .and_then(Tenant::new)
-            .or_else(|| self.tenancy.as_ref().and_then(|r| r.resolve(headers)).and_then(|t| Tenant::new(&t)));
-        let ctx = Ctx::new(identity, locale, self.services.clone(), self.i18n.clone())
-            .with_time_zone(tz)
-            .with_tenant(tenant)
-            .with_config(self.config.clone())
-            .with_theme(self.look.pick(cookie(headers, "zeyn_theme")));
+        let resolved = self.tenancy.as_ref().and_then(|r| r.resolve(headers)).and_then(|t| Tenant::new(&t));
+        let tenant = match resolved {
+            Some(t) if identity.is_signed_in() && !identity.member_of(t.id()) => {
+                tracing::debug!(tenant = t.id(), "the user is not a member of the request's tenant; signed out");
+                identity = Identity::anonymous();
+                Some(t)
+            }
+            Some(t) => Some(t),
+            None => identity.tenant.as_deref().and_then(Tenant::new),
+        };
+        let ctx = Ctx::for_request(
+            identity,
+            locale.into(),
+            self.services.clone(),
+            self.i18n.clone(),
+            tz,
+            tenant,
+            self.config.clone(),
+            self.look.pick(cookie(headers, "zeyn_theme")),
+            self.extras.session.reauth_within,
+        );
         data::read_reason(&ctx, headers);
         match self.fixed_now {
             Some(now) => ctx.with_now(now),

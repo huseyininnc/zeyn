@@ -224,11 +224,11 @@ async fn a_failing_license_server_keeps_the_last_license_per_tenant() {
 }
 
 #[tokio::test]
-async fn tenant_required_and_identity_tenant_wins() {
+async fn signed_in_users_work_only_in_tenants_they_belong_to() {
     let build = |auth: Option<Identity>| {
         let mut app = App::new("T")
             .tenancy(HeaderTenant("x-tenant"))
-            .feature(Feature::new("t").guard(TenantRequired).screen(pos));
+            .feature(Feature::new("t").guard(TenantRequired).screen(pos).screen(secret_page));
         if let Some(id) = auth {
             app = app.auth(move |_: &HeaderMap| Some(id.clone()));
         }
@@ -236,8 +236,25 @@ async fn tenant_required_and_identity_tenant_wins() {
     };
     assert_eq!(get(&build(None), "/pos", &[]).await.0, StatusCode::FORBIDDEN);
     assert_eq!(get(&build(None), "/pos", &[("x-tenant", "../x")]).await.0, StatusCode::FORBIDDEN);
-    let body = get(&build(Some(Identity::user("a").with_tenant("globex"))), "/pos", &[("x-tenant", "acme")]).await.2;
-    assert!(body.contains("tenant globex"));
+    let reader = Identity::user("a").with_permissions(["secret.read"]);
+
+    let globex = build(Some(reader.clone().with_tenant("globex")));
+    assert_eq!(get(&globex, "/secret", &[("x-tenant", "globex")]).await.0, StatusCode::OK);
+    assert!(
+        get(&globex, "/pos", &[]).await.2.contains("tenant globex"),
+        "without a resolved tenant the own one applies"
+    );
+    assert_ne!(get(&globex, "/secret", &[("x-tenant", "acme")]).await.0, StatusCode::OK, "another tenant is refused");
+    assert!(
+        get(&globex, "/pos", &[("x-tenant", "acme")]).await.2.contains("tenant acme"),
+        "public screens stay public"
+    );
+
+    let both = build(Some(reader.clone().with_tenant("globex").with_tenants(["acme"])));
+    assert_eq!(get(&both, "/secret", &[("x-tenant", "acme")]).await.0, StatusCode::OK);
+
+    let none = build(Some(reader));
+    assert_ne!(get(&none, "/secret", &[("x-tenant", "acme")]).await.0, StatusCode::OK, "no tenant, no tenant access");
 }
 
 #[tokio::test]

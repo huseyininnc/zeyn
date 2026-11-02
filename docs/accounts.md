@@ -233,6 +233,14 @@ while the stamp is unchanged.
   for `remember_two_factor`, also bound to the stamp.
 - Wrong codes count toward lockout, as in .NET.
 - `Identity::mfa` is true after a second factor or a verified passkey, so `RequireMfa` works.
+- Changing the second factor needs a recent sign in (`App::reauth_within`, five minutes unless
+  set): turning it on or off, a new authenticator key, new recovery codes, adding or removing a
+  passkey and removing an external login. Otherwise the call answers `401` with code
+  `reauth_required`. The authenticator key is shown only after a recent sign in and only while two
+  factor is off; `POST /manage/2fa` returns `sharedKey: null` otherwise.
+- Refreshed bearer tokens keep the time of the original sign in, so a refresh never counts as a
+  recent sign in.
+- Claims of type `tenant` give a user their tenants for `App::tenancy` (see `docs/auth.md`).
 
 ## Passkeys
 

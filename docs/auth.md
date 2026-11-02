@@ -52,6 +52,24 @@ App::new("Stock").auth(
   fetch keeps the old keys.
 - A refused token is simply not signed in; the reason is logged at debug level only.
 
+### Tenants
+
+Every authenticator fills the same two fields of `Identity`: `tenant` (the user's own tenant) and
+`tenants` (every other tenant the user may work in). `Identity::member_of(id)` is true for either;
+a superuser (`DevAuth`) belongs to every tenant.
+
+| Authenticator | Where the tenants come from |
+| --- | --- |
+| `JwtAuth`, `OidcAuth` | the claim named with `ClaimMap::tenant`, a string or a list |
+| `accounts` | the user's claims of type `tenant` (`Claim::new("tenant", "acme")`), in the order they were added |
+| `ForwardAuth` | the header named with `ForwardAuth::tenant`, one tenant |
+| your own `Authenticator` | set `identity.tenant` and `identity.tenants` |
+
+With `App::tenancy(resolver)` the tenant of a request comes from the request (host or header).
+A signed in user must belong to it; otherwise the request runs signed out, so public screens
+still work and everything else answers as for an anonymous user. A signed in user without any
+tenant belongs to none. When the resolver finds no tenant, the user's own tenant applies.
+
 ### Claims
 
 `ClaimMap` turns claims into the `Identity`:
@@ -59,7 +77,7 @@ App::new("Stock").auth(
 | Method | Default | Notes |
 | --- | --- | --- |
 | `user("email")` | `preferred_username`, else `sub` | a token without it is refused |
-| `tenant("tenant")` | none | wins over the tenant resolved from the request |
+| `tenant("tenant")` | none | the user's tenant; a list (array or space separated) names every tenant the user belongs to, the first is the user's own. See "Tenants" below |
 | `roles("realm_access.roles")` | none | dotted path; Keycloak realm roles, or `groups` in Authentik |
 | `role("clerks", [...])` | none | permissions for holders of a role or members of a group |
 | `permissions("scope")` | none | claim whose values are permissions; a list or a space separated string |

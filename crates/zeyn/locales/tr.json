@@ -483,6 +483,8 @@
         "disable_confirm": "İki adımlı oturum açma kapatılsın mı? Hesabınız daha kolay ele geçirilebilir.",
         "reset_key": "Doğrulama anahtarını sıfırla",
         "reset_key_confirm": "Yeniden kurana kadar doğrulama uygulamanız bu hesap için çalışmaz. Devam edilsin mi?",
+        "reauth": "Güvenliğiniz için iki adımlı girişi kurmadan önce yeniden giriş yapın.",
+        "reauth_link": "Yeniden giriş yap",
         "setup": "QR kodu bir doğrulama uygulamasıyla okutun ya da anahtarı yazın, sonra gösterdiği altı haneli kodu girin.",
         "qr": "Doğrulama uygulamanız için QR kod",
         "manual": "Anahtar:",

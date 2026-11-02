@@ -31,6 +31,9 @@ pub(crate) struct Session {
     pub user: String,
     #[serde(rename = "t", default, skip_serializing_if = "Option::is_none")]
     pub tenant: Option<String>,
+    /// Further tenants when the tenant claim names several.
+    #[serde(rename = "ts", default, skip_serializing_if = "Vec::is_empty")]
+    pub tenants: Vec<String>,
     #[serde(rename = "z", default, skip_serializing_if = "Option::is_none")]
     pub time_zone: Option<String>,
     #[serde(rename = "r", default, skip_serializing_if = "Vec::is_empty")]

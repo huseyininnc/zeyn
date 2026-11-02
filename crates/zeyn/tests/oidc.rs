@@ -645,6 +645,9 @@ async fn bearer_tokens_map_claims_to_the_identity() {
     let by_list = check(&auth, &idp.token("api", json!({ "aud": ["other", "api"], "azp": "api" }))).await;
     assert!(by_list.is_some());
     assert!(check(&auth, &idp.token("api", json!({ "exp": now() - 30 }))).await.is_some(), "inside the leeway");
+    let many = check(&auth, &idp.token("api", json!({ "tenant": ["acme", "globex"] }))).await.unwrap();
+    assert_eq!(many.tenant.as_deref(), Some("acme"));
+    assert!(many.member_of("globex") && !many.member_of("initech"));
 }
 
 #[tokio::test]
