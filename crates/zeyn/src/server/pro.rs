@@ -17,7 +17,6 @@ use axum::routing::{get, post};
 use serde::Deserialize;
 use serde_json::json;
 use std::sync::Arc;
-use std::time::Instant;
 
 const JS: &str = include_str!("../../assets/pro.js");
 const CSS: &str = include_str!("../../assets/pro.css");
@@ -67,13 +66,7 @@ async fn search_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::
                 continue;
             }
             let info = Call { kind: CallKind::Screen, screen: f.name(), action: Some(meta), via_agent: ctx.via_agent() };
-            let started = Instant::now();
-            let result = async {
-                st.before(&ctx, &info)?;
-                st.timed(search.run(ctx.clone(), query.clone())).await
-            }
-            .await;
-            st.after(&ctx, &info, started, &result);
+            let result = st.intercept(&ctx, &info, || st.timed(search.run(ctx.clone(), query.clone()))).await;
             match result {
                 Ok(found) => hits.extend(found.into_iter().filter(crate::command::SearchHit::is_local)),
                 Err(_) => eprintln!("warning: palette search `{}` failed", meta.name),
@@ -191,14 +184,7 @@ async fn command_call(State(st): State<Arc<AppState>>, headers: HeaderMap, axum:
         }
         let run = command.call().ok_or(Failure::App(Error::NotFound))?;
         let info = Call { kind: CallKind::Screen, screen: command.id(), action: Some(run.meta), via_agent: ctx.via_agent() };
-        let started = Instant::now();
-        let result = async {
-            st.before(&ctx, &info)?;
-            st.timed((run.run)(ctx.clone())).await
-        }
-        .await;
-        st.after(&ctx, &info, started, &result);
-        result
+        st.intercept(&ctx, &info, || st.timed((run.run)(ctx.clone()))).await
     }
     .await;
     match result {

@@ -67,7 +67,7 @@ App::new(t!("app.name"))
     .deny_ips(["203.0.113.7"])
 ```
 
-- `rate_limit` applies to every request except static assets; `write_limit` adds a stricter one for form submits, API calls and MCP calls. Refused requests get `429` with `Retry-After`.
+- `rate_limit` applies to every request except static assets; `write_limit` adds a stricter one for calls that change data: form submits, grid edits, row, bulk and menu actions, commands, imports, saved grid views, dock layouts and themes, API calls, MCP calls and the assistant. Refused requests get `429` with `Retry-After`.
 - `X-Forwarded-For` is only believed from `trusted_proxies`.
 - Page sizes, line counts, query lengths and upload sizes are capped on the server whatever the client sends.
 

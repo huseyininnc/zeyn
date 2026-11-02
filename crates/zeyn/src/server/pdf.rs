@@ -59,16 +59,13 @@ async fn document(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q):
             return Err(Failure::App(Error::Forbidden));
         }
         let info = Call { kind: CallKind::Document, screen: entry.meta.name, action: Some(action), via_agent: ctx.via_agent() };
-        let started = Instant::now();
-        let outcome = async {
-            st.before(&ctx, &info)?;
-            let (template, data) = st.timed(source.load(ctx.clone())).await?;
-            let bytes = st.timed(Pdf::of(&ctx).render(template, &data)).await?;
+        let (state, user) = (&*st, &ctx);
+        st.intercept(&ctx, &info, move || async move {
+            let (template, data) = state.timed(source.load(user.clone())).await?;
+            let bytes = state.timed(Pdf::of(user).render(template, &data)).await?;
             Ok((template, bytes))
-        }
-        .await;
-        st.after(&ctx, &info, started, &outcome);
-        outcome
+        })
+        .await
     }
     .await;
     match result {

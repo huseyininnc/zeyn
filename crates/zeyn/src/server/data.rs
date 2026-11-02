@@ -17,7 +17,6 @@ use axum::routing::post;
 use serde::Deserialize;
 use serde_json::{Value as Json, json};
 use std::sync::Arc;
-use std::time::Instant;
 
 pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
     router
@@ -141,14 +140,7 @@ async fn import(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(
             return source.preview(&ctx, &file).map_err(Failure::App);
         }
         let info = Call { kind: CallKind::Import, screen: entry.meta.name, action: Some(action), via_agent: false };
-        let started = Instant::now();
-        let outcome = async {
-            st.before(&ctx, &info)?;
-            st.timed(source.commit(ctx.clone(), file)).await
-        }
-        .await;
-        st.after(&ctx, &info, started, &outcome);
-        outcome
+        st.intercept(&ctx, &info, || st.timed(source.commit(ctx.clone(), file))).await
     }
     .await;
     match result {
@@ -217,10 +209,10 @@ async fn reveal(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(
         None => return st.error_response(&ctx, Failure::App(Error::NotFound)),
     };
     let info = Call { kind: CallKind::Reveal, screen: screen_name, action: None, via_agent: false };
-    let started = Instant::now();
-    let result = async {
-        st.before(&ctx, &info)?;
-        let (_, _, screen) = st.open(&ctx, screen_name, call.params).await?;
+    let (state, user) = (&*st, &ctx);
+    let result = st.intercept(&ctx, &info, move || async move {
+        let (st, ctx) = (state, user);
+        let (_, _, screen) = st.open(ctx, screen_name, call.params).await?;
         let node = screen.node(&call.node).ok_or(Failure::App(Error::NotFound))?;
         let found = match node.grid() {
             Some(grid) => {
@@ -241,9 +233,8 @@ async fn reveal(State(st): State<Arc<AppState>>, headers: HeaderMap, axum::Json(
             t.revealed.push(FieldRef { model: found.record.model, id: found.record.id.clone(), field: found.meta.name })
         });
         Ok(found.value)
-    }
+    })
     .await;
-    st.after(&ctx, &info, started, &result);
     match result {
         Ok(value) => {
             let mut r = axum::Json(json!({ "value": value })).into_response();
