@@ -68,6 +68,33 @@ ActionButton::new(t!("docs.live.count"), count_samples, ())
 
 @live action
 
+## Embed
+
+`Embed` shows a page from another site, such as a video player or a map, in a locked frame. A title is required (screen readers announce frames by it); without `.title(...)` the embed cannot be placed and the compiler says so.
+
+```rust
+Embed::url("https://www.youtube-nocookie.com/embed/abc")
+    .title(t!("tour.title"))
+    .allow([EmbedPermission::Fullscreen, EmbedPermission::PictureInPicture])
+    .aspect(16, 9)
+    .click_to_load("/static/tour.jpg")
+```
+
+- The host must be in the app's `frame-src`: `App::csp(|c| c.frame_src(["https://www.youtube-nocookie.com"]))` (see [Security](security.md#csrf-csp-and-headers)). When the address is not `https` or its host is not listed, no frame is rendered at all; a warning says the content cannot be shown.
+- Every frame gets `sandbox="allow-scripts allow-same-origin allow-presentation"`, `referrerpolicy="no-referrer"` and `loading="lazy"`. Popups, top navigation, forms and downloads can never be allowed. `.allow(...)` adds browser features: `Fullscreen`, `PictureInPicture`, `Autoplay` and `EncryptedMedia`.
+- `.click_to_load(poster)` shows a button first, with the poster image (a path on the app or a host of `img-src`; `""` for none) and the other site's name. The other site is not contacted until the button is pressed; then the frame takes its place and receives focus. The script is part of `media.js`, so it costs no extra request.
+- A field that holds an address to embed takes `#[rule(embed)]`. Forms accept a URL or pasted embed code, keep only the `src`, require `https` and a listed host, drop tracking parameters (`utm_*`, `fbclid`, `gclid` and others) and store the canonical address, never the HTML. API inputs must send the canonical address.
+
+```rust
+#[entity(table = "videos")]
+pub struct Video {
+    #[key]
+    pub id: VideoId,
+    #[rule(required, embed)]
+    pub url: String,
+}
+```
+
 ## Tooltip, popover and busy overlay
 
 A tooltip is a short description of one control: `ActionButton::tip(text)`, `ToolButton::tip(text)` in a screen toolbar and `Form::tip(field, text)`, which adds an info button after the field's label. The text is the control's `aria-describedby`, so screen readers hear it with the control. It shows after a short hover and at once on focus, stays while the pointer is over it (WCAG 1.4.13), hides with Escape without moving focus, and shows on touch after a long press (a tap on the info button). A tooltip never carries information the user must have: put that in the label, the field's rules or the page.

@@ -72,6 +72,10 @@ fn field_schema(f: &FieldMeta) -> Json {
             crate::model::Rule::Email => {
                 o.insert("format".into(), json!("email"));
             }
+            crate::model::Rule::Embed => {
+                o.insert("format".into(), json!("uri"));
+                o.insert("pattern".into(), json!("^https://"));
+            }
             _ => {}
         }
     }
@@ -108,6 +112,13 @@ pub trait ApiInput: Sized + Send + 'static {
     /// [`DataQuery`] loses filters and sorts on masked fields the user may not reveal.
     #[doc(hidden)]
     fn clean(&mut self, _fields: &'static [FieldMeta], _ctx: &Ctx) {}
+
+    /// Checks what `from_json` cannot see without the request: the hosts `#[rule(embed)]`
+    /// fields may point to.
+    #[doc(hidden)]
+    fn check_with(&self, _ctx: &Ctx) -> Result<()> {
+        Ok(())
+    }
 }
 
 fn unreadable(e: serde_json::Error) -> Error {
@@ -124,6 +135,12 @@ impl<M: Model> ApiInput for Valid<M> {
     fn from_json(value: Json) -> Result<Self> {
         let model: M = serde_json::from_value(value).map_err(unreadable)?;
         Valid::new(model).map_err(Error::Validation)
+    }
+
+    fn check_with(&self, ctx: &Ctx) -> Result<()> {
+        let mut errors = ValidationErrors::default();
+        crate::model::check_embeds(&**self, ctx.csp(), &mut errors);
+        errors.into_result().map_err(Error::Validation)
     }
 
     fn record(&self) -> Option<crate::audit::RecordRef> {
@@ -314,6 +331,7 @@ where
     Box::pin(async move {
         let mut input = A::Input::from_json(body)?;
         input.clean(<A::Output as ApiResult>::fields(), &ctx);
+        input.check_with(&ctx)?;
         if let Some(record) = input.record() {
             ctx.update_trail(|t| {
                 t.record.get_or_insert(record);

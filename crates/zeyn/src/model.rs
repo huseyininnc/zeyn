@@ -26,6 +26,26 @@ pub trait Entity: Model {
     const TABLE: &'static str;
 }
 
+/// Adds an error for every `#[rule(embed)]` field whose address is not on a host of the app's
+/// `frame-src`. Runs where the request context is known: forms and API inputs.
+pub(crate) fn check_embeds<M: Model>(model: &M, csp: &crate::csp::Csp, errors: &mut ValidationErrors) {
+    for (i, meta) in M::fields().iter().enumerate() {
+        if !meta.rules.contains(&Rule::Embed) || errors.errors.iter().any(|e| e.field == meta.name) {
+            continue;
+        }
+        if let Some(Value::Text(url)) = model.value_at(i) {
+            if !url.trim().is_empty() && !csp.allows_frame(&url) {
+                let host = url.trim_start_matches("https://").split(['/', '?', '#']).next().unwrap_or("").to_string();
+                errors.errors.push(FieldError {
+                    field: meta.name,
+                    rule: Rule::Embed,
+                    message: Text::key("zeyn.validation.embed_host").arg("label", meta.label_text()).arg("host", host),
+                });
+            }
+        }
+    }
+}
+
 /// Field validation rule.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(tag = "rule", content = "value", rename_all = "snake_case")]
@@ -47,6 +67,10 @@ pub enum Rule {
     /// next character literal. Literals are shown while typing but never stored. See
     /// [`crate::ui::mask_fits`].
     Mask(&'static str),
+    /// An address to embed with [`crate::ui::Embed`] (`#[rule(embed)]` on a `String`): an
+    /// `https` URL in the form [`crate::embed_url`] gives, on a host of the app's `frame-src`
+    /// (`App::csp`). Forms take pasted embed code too and keep only its canonical address.
+    Embed,
     /// The submitted value could not be read as the field's type.
     Format,
     /// Raised by a model level `validate = ...` function.
@@ -312,6 +336,11 @@ pub mod __rules {
                 }
                 Rule::Mask(p) if !empty && value.__text().is_some_and(|s| !crate::ui::mask_fits(p, s)) => {
                     Some(message("zeyn.validation.mask").arg("pattern", crate::ui::mask_example(p)))
+                }
+                Rule::Embed
+                    if !empty && value.__text().is_some_and(|s| crate::csp::embed_url(s).as_deref() != Some(s)) =>
+                {
+                    Some(message("zeyn.validation.embed"))
                 }
                 _ => None,
             };

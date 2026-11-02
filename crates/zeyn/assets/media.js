@@ -14,6 +14,9 @@
  *
  * Resume: the position is read from and saved to `/_zeyn/media/position` when the media source
  * keeps positions for the signed in user; otherwise it is kept in this browser's local storage.
+ *
+ * Embeds: `zeyn::ui::Embed` with `click_to_load` renders a poster button and the frame inside an
+ * inert `<template>`. Pressing the button puts the frame in its place and moves focus to it.
  * @module media
  */
 
@@ -558,3 +561,17 @@ new MutationObserver((records) => {
 }).observe(document.body, { childList: true });
 
 init(document);
+
+/**
+ * Loads a click to load embed: the frame in the button's template replaces the poster.
+ * @example
+ * // <div class="z-embed"><button data-zeyn-embed-load>..</button><template data-zeyn-embed><iframe ..></template></div>
+ */
+document.addEventListener('click', (e) => {
+  const button = e.target instanceof Element ? e.target.closest('[data-zeyn-embed-load]') : null;
+  const root = button?.closest('.z-embed');
+  const template = root?.querySelector('template[data-zeyn-embed]');
+  if (!template) return;
+  root.replaceChildren(template.content.cloneNode(true));
+  root.querySelector('iframe')?.focus();
+});

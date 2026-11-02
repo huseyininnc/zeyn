@@ -95,6 +95,7 @@ async fn main() -> std::io::Result<()> {
             )
             .label(t!("theme.sand")),
         ])
+        .csp(|c| c.frame_src(["https://www.youtube-nocookie.com"]))
         .idle_timeout(Duration::from_secs(idle))
         .idle_warning(Duration::from_secs((idle / 2).min(60)))
         .i18n(i18n)

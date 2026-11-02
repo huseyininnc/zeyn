@@ -297,6 +297,11 @@
   },
   "media": {
     "title": "Medya kitaplığı",
+    "external": "Dış içerik",
+    "embed_card": "Gömülü oynatıcı",
+    "embed_title": "Zeyn tanıtım videosu",
+    "blocked_card": "Listede olmayan site",
+    "blocked_title": "Listede olmayan bir siteden harita",
     "films": "Filmler",
     "songs": "Şarkılar",
     "harbor": "Şafakta liman",

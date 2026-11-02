@@ -701,6 +701,9 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
                     } else if m.path.is_ident("email") {
                         rules.push(quote!(::zeyn::Rule::Email));
                         checks.push(text_check);
+                    } else if m.path.is_ident("embed") {
+                        rules.push(quote!(::zeyn::Rule::Embed));
+                        checks.push(text_check);
                     } else if m.path.is_ident("max_len") || m.path.is_ident("min_len") {
                         let n: LitInt = m.value()?.parse()?;
                         if m.path.is_ident("max_len") {
@@ -752,7 +755,7 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
                         checks.push(text_check);
                     } else {
                         return Err(m.error(
-                            "unknown rule\n  = help: expected `required`, `unique`, `email`, `min_len = N`, `max_len = N`, `min = N`, `max = N`, `scale = N`, `precision = N` or `mask = \"...\"`",
+                            "unknown rule\n  = help: expected `required`, `unique`, `email`, `embed`, `min_len = N`, `max_len = N`, `min = N`, `max = N`, `scale = N`, `precision = N` or `mask = \"...\"`",
                         ));
                     }
                     Ok(())

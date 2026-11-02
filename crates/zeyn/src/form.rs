@@ -474,6 +474,7 @@ impl<M: Model> Form<M> {
             values,
             &Reading::new(locale, tz, DateTime::now(), &DateWords::from_i18n(crate::i18n::I18n::builtin(), locale)),
             &|_| false,
+            None,
         )
     }
 
@@ -482,9 +483,12 @@ impl<M: Model> Form<M> {
     /// have the field's unmask permission.
     pub fn read_for(&self, values: &Map<String, Json>, ctx: &Ctx) -> std::result::Result<Valid<M>, ValidationErrors> {
         let words = DateWords::from_i18n(ctx.i18n(), ctx.locale());
-        self.read_with(values, &Reading::new(ctx.locale(), ctx.time_zone(), ctx.now(), &words), &|m| {
-            crate::privacy::can_unmask(Some(ctx), m)
-        })
+        self.read_with(
+            values,
+            &Reading::new(ctx.locale(), ctx.time_zone(), ctx.now(), &words),
+            &|m| crate::privacy::can_unmask(Some(ctx), m),
+            Some(ctx.csp()),
+        )
     }
 
     fn read_with(
@@ -492,6 +496,7 @@ impl<M: Model> Form<M> {
         values: &Map<String, Json>,
         reading: &Reading,
         unmask: &dyn Fn(&FieldMeta) -> bool,
+        csp: Option<&crate::csp::Csp>,
     ) -> std::result::Result<Valid<M>, ValidationErrors> {
         let (model, mut errors) = self.merge(values, reading, unmask)?;
         self.check_pickers(&model, reading.tz, &mut errors);
@@ -501,6 +506,9 @@ impl<M: Model> Form<M> {
                 unreadable.iter().any(|(f, r)| *f == e.field && (!matches!(r, Rule::Line { .. }) || *r == e.rule))
             };
             errors.errors.extend(rules.errors.into_iter().filter(|e| !shadowed(e)));
+        }
+        if let Some(csp) = csp {
+            crate::model::check_embeds(&model, csp, &mut errors);
         }
         errors.into_result()?;
         Valid::new(model)
@@ -590,6 +598,10 @@ impl<M: Model> Form<M> {
             let Some(raw) = values.get(meta.name) else { continue };
             let current = object.get(meta.name).cloned().unwrap_or(Json::Null);
             match parse_value(meta, raw, reading, &current) {
+                Ok(Json::String(s)) if meta.rules.contains(&Rule::Embed) => {
+                    let url = crate::csp::embed_url(&s).unwrap_or(s);
+                    object.insert(meta.name.to_string(), Json::String(url));
+                }
                 Ok(v) => {
                     object.insert(meta.name.to_string(), v);
                 }
