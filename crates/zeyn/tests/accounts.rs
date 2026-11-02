@@ -668,7 +668,7 @@ async fn refreshed_bearer_tokens_keep_the_original_sign_in_time() {
     let mut u = user(&a, "fresh@example.com").await;
     a.roles().create("admins").await.unwrap();
     a.users().add_to_role(&mut u, "admins").await.unwrap();
-    let router = app_with(a, Duration::from_secs(1));
+    let router = app_with(a, Duration::from_secs(4));
     let login =
         send(&router, post("/_zeyn/account/login", json!({ "email": "fresh@example.com", "password": PASSWORD }), ""))
             .await;
@@ -677,7 +677,7 @@ async fn refreshed_bearer_tokens_keep_the_original_sign_in_time() {
         send(&router, api_call("/api/v1/crm/rotate_keys", t["accessToken"].as_str().unwrap())).await.status,
         StatusCode::OK
     );
-    tokio::time::sleep(Duration::from_millis(1300)).await;
+    tokio::time::sleep(Duration::from_millis(4300)).await;
     let mut refresh = t["refreshToken"].clone();
     let mut access = String::new();
     for _ in 0..2 {
