@@ -26,6 +26,8 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 mod auth;
+#[cfg(feature = "accounts")]
+mod accounts;
 mod data;
 mod media;
 mod ops;
@@ -1178,6 +1180,8 @@ impl App {
         #[cfg(feature = "assistant")]
         let router = assistant::routes(router);
         let router = auth::routes(router, &state);
+        #[cfg(feature = "accounts")]
+        let router = accounts::routes(router, &state);
         #[cfg(feature = "islands")]
         let router = islands::routes(router);
         #[cfg(feature = "realtime")]
@@ -1185,7 +1189,10 @@ impl App {
         #[cfg(feature = "pdf")]
         let router = pdf::routes(router);
         let router = theme::routes(pro::routes(media::routes(ui::routes(session::routes(data::routes(ops::routes(router)))))))
-            .fallback(not_found)
+            .fallback(not_found);
+        #[cfg(feature = "accounts")]
+        let router = if state.sign_in.accounts.is_some() { router.layer(axum::middleware::from_fn_with_state(state.clone(), accounts::layer)) } else { router };
+        let router = router
             .layer(axum::middleware::from_fn_with_state(state.clone(), guard_request))
             .layer(axum::middleware::map_response(security_headers))
             .layer(axum::middleware::map_response(ops::stamp))
@@ -1352,6 +1359,12 @@ pub(crate) fn cookie<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> 
 /// Compares two strings in time that does not depend on where they differ.
 pub(crate) fn same(a: &str, b: &str) -> bool {
     a.len() == b.len() && a.bytes().zip(b.bytes()).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
+}
+
+/// Compares two byte strings in time that does not depend on where they differ.
+#[cfg(feature = "accounts")]
+pub(crate) fn same_bytes(a: &[u8], b: &[u8]) -> bool {
+    a.len() == b.len() && a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
 
 fn new_token() -> String {
@@ -1778,6 +1791,7 @@ async fn guard_request(State(st): State<Arc<AppState>>, req: axum::extract::Requ
     let is_write = req.method() == axum::http::Method::POST
         && (matches!(path.as_str(), "/_zeyn/form" | "/_zeyn/import" | "/_zeyn/mcp" | "/_zeyn/menu" | "/_zeyn/grid/edit" | "/_zeyn/grid/run" | "/_zeyn/grid/bulk" | "/_zeyn/media/position")
             || path.starts_with("/_zeyn/assistant/")
+            || path.starts_with("/_zeyn/account/")
             || path.starts_with(&format!("{}/", st.api_prefix)));
     let limits = if probe { [(None, "all"), (None, "write")] } else { [(st.rate, "all"), (if is_write { st.write_rate } else { None }, "write")] };
     for (limit, scope) in limits {

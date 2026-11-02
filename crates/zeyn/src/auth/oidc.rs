@@ -262,6 +262,21 @@ impl OidcAuth {
         self.session(&tokens, Some(&flow.nonce), None).await
     }
 
+    /// Exchanges the authorization code and returns the checked ID token's claims, for linking
+    /// the provider's users to local accounts (`zeyn::accounts`).
+    #[cfg(feature = "accounts")]
+    pub(crate) async fn exchange_claims(&self, code: &str, flow: &Flow, redirect_uri: &str) -> Result<serde_json::Map<String, Json>, String> {
+        let tokens = self
+            .token_call(&[("grant_type", "authorization_code"), ("code", code), ("redirect_uri", redirect_uri), ("code_verifier", &flow.verifier)])
+            .await?;
+        let id_token = tokens.get("id_token").and_then(Json::as_str).ok_or("the token response has no ID token")?;
+        let claims = self.issuer.validate_id_token(id_token, &self.client_id, &self.algorithms, self.leeway).await.map_err(|why| format!("ID token refused: {why:?}"))?;
+        if !claims.get("nonce").and_then(Json::as_str).is_some_and(|n| crate::server::same(n, &flow.nonce)) {
+            return Err(format!("ID token refused: {:?}", super::jwt::Refusal::Nonce));
+        }
+        Ok(claims)
+    }
+
     /// Uses the session's refresh token for new tokens and a renewed session.
     pub(crate) async fn renew(&self, old: &Session) -> Result<Session, String> {
         let rt = old.refresh.as_deref().ok_or("no refresh token")?;

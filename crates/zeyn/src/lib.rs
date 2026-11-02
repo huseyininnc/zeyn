@@ -298,7 +298,11 @@
 //! - [`FieldType`]: new field types; use [`FieldKind::Custom`] to name a client side editor.
 //! - Models, actions and screens from other crates are used like local ones.
 
+extern crate self as zeyn;
+
 mod action;
+#[cfg(feature = "accounts")]
+pub mod accounts;
 #[cfg(feature = "server")]
 pub mod auth;
 #[cfg(feature = "assistant")]

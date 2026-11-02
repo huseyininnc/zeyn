@@ -33,6 +33,8 @@ pub(super) struct Extras {
     oidc: Option<Arc<crate::auth::OidcAuth>>,
     #[cfg(feature = "totp")]
     totp: Option<Arc<crate::auth::Totp>>,
+    #[cfg(feature = "accounts")]
+    pub accounts: Option<crate::accounts::Accounts>,
 }
 
 impl App {
@@ -71,6 +73,13 @@ pub(super) fn resolve(extras: &mut Extras, prefix: &str, login_url: &mut Option<
         extras.mfa_url = Some(format!("{prefix}/_zeyn/auth/login?mfa=1"));
         extras.reauth_url = Some(format!("{prefix}/_zeyn/auth/login?reauth=1"));
         extras.logout_url = Some(format!("{prefix}/_zeyn/auth/logout"));
+    }
+    #[cfg(feature = "accounts")]
+    if extras.accounts.is_some() {
+        let login = login_url.get_or_insert_with(|| format!("{prefix}/account/login")).clone();
+        extras.mfa_url = Some(login.clone());
+        extras.reauth_url = Some(login);
+        extras.logout_url = Some(format!("{prefix}/_zeyn/account/signout"));
     }
     let _ = (extras, prefix, login_url);
 }
