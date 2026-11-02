@@ -3140,9 +3140,75 @@ document.addEventListener('keydown', (e) => {
 });
 
 document.addEventListener('pointerdown', (e) => {
-  const handle = e.target instanceof Element ? e.target.closest('.z-resize') : null;
-  if (handle && e.button === 0) startResize(e, handle);
+  const t = e.target instanceof Element ? e.target : null;
+  if (!t || e.button !== 0) return;
+  const handle = t.closest('.z-resize');
+  if (handle) return startResize(e, handle);
+  const sort = t.closest('[data-zeyn-grid] thead th[data-field] .z-sort');
+  if (sort) startColumnDrag(e, sort.closest('th'));
 });
+
+/**
+ * Moves a column by dragging its header onto another header of the same pinned group. A press
+ * that moves less than a few pixels is still a click and sorts. The column menu (Move left,
+ * Move right) does the same from the keyboard.
+ */
+function startColumnDrag(e, th) {
+  const grid = th.closest('[data-zeyn-grid]');
+  if (!grids.get(grid)) return;
+  const x0 = e.clientX;
+  const y0 = e.clientY;
+  const rtl = getComputedStyle(grid).direction === 'rtl';
+  const group = () =>
+    [...th.parentElement.cells].filter((h) => h.dataset.field && (h.dataset.pin || '') === (th.dataset.pin || ''));
+  let dragging = false;
+  let target = null;
+  let after = false;
+  const mark = (on) => target?.classList.toggle(after ? 'z-col-drop-end' : 'z-col-drop-start', on);
+  const move = (ev) => {
+    if (!dragging) {
+      if (Math.abs(ev.clientX - x0) < 6 && Math.abs(ev.clientY - y0) < 6) return;
+      dragging = true;
+      th.classList.add('z-col-dragging');
+      document.documentElement.classList.add('z-col-moving');
+    }
+    mark(false);
+    target = group().find((h) => {
+      const r = h.getBoundingClientRect();
+      return ev.clientX >= r.left && ev.clientX <= r.right;
+    }) ?? null;
+    if (target === th) target = null;
+    if (target) {
+      const r = target.getBoundingClientRect();
+      after = ev.clientX > r.left + r.width / 2 !== rtl;
+      mark(true);
+    }
+  };
+  const end = (ev) => {
+    document.removeEventListener('pointermove', move);
+    document.removeEventListener('pointerup', end);
+    document.removeEventListener('pointercancel', end);
+    mark(false);
+    th.classList.remove('z-col-dragging');
+    document.documentElement.classList.remove('z-col-moving');
+    if (!dragging) return;
+    const swallow = (c) => {
+      c.preventDefault();
+      c.stopPropagation();
+    };
+    document.addEventListener('click', swallow, { capture: true, once: true });
+    setTimeout(() => document.removeEventListener('click', swallow, true), 0);
+    if (!target || ev.type === 'pointercancel') return;
+    const shown = shownColumns(grid);
+    const [col] = shown.splice(shown.findIndex((c) => c.field === th.dataset.field), 1);
+    const at = shown.findIndex((c) => c.field === target.dataset.field) + (after ? 1 : 0);
+    shown.splice(at, 0, col);
+    setColumns(grid, shown);
+  };
+  document.addEventListener('pointermove', move);
+  document.addEventListener('pointerup', end);
+  document.addEventListener('pointercancel', end);
+}
 
 /**
  * Right click: our menu where one is defined (a column header, a row with `data-zeyn-menu`, a

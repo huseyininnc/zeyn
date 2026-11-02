@@ -70,7 +70,8 @@ Shift+click on a header adds that column to the sort keys. A number in the heade
 three per side). `hidden()` leaves a column out until the user shows it. Every header has a
 column menu (the button, a right click, Shift+F10 or the context menu key) with sort, pin, move
 left and right, hide, filter, a column chooser and reset. The edge of a header resizes the column,
-by dragging or with the arrow keys (Shift for bigger steps). All of it works right to left.
+by dragging or with the arrow keys (Shift for bigger steps). Dragging a header onto another header
+of the same pinned group moves the column; a short press still sorts. All of it works right to left.
 
 ## Saved views
 

@@ -1672,3 +1672,10 @@ select[data-zeyn-timezone] {
   .z-placeholder td::before { background: GrayText; }
   .z-toast, .z-form-errors, .z-screen.z-error { border-left-color: CanvasText; }
 }
+
+.z-col-moving, .z-col-moving * { cursor: grabbing !important; user-select: none; }
+.z-grid th.z-col-dragging { opacity: 0.55; }
+.z-grid th.z-col-drop-start { box-shadow: inset 3px 0 0 var(--z-accent); }
+.z-grid th.z-col-drop-end { box-shadow: inset -3px 0 0 var(--z-accent); }
+[dir="rtl"] .z-grid th.z-col-drop-start { box-shadow: inset -3px 0 0 var(--z-accent); }
+[dir="rtl"] .z-grid th.z-col-drop-end { box-shadow: inset 3px 0 0 var(--z-accent); }
