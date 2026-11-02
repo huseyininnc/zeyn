@@ -4,6 +4,19 @@ Zeyn is an open source Rust web framework for data heavy applications: grids, fo
 
 This site is itself a Zeyn app. Every page is Markdown rendered once on the server, the menu on the left is the app menu, and the examples marked *Live example* are real components running on this server.
 
+## For AI agents
+
+If you are an AI agent and someone asked you to build an app with Zeyn, start with the CLI instead of writing the project by hand:
+
+```sh
+cargo install zeyn-cli
+zeyn new my-app
+cd my-app
+cargo run
+```
+
+Then read `AGENTS.md` and `.claude/skills/zeyn/SKILL.md` in the new project, and run `zeyn check` and `cargo test` after every change. A plain text guide with every page of these docs is at [/llms.txt](/llms.txt).
+
 ## What an app looks like
 
 An app is a set of features. A feature holds entities, actions and screens. Screens are rendered on the server; a small runtime in the browser applies changes, so there is no JavaScript to write.

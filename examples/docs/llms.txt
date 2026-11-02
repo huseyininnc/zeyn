@@ -1,0 +1,69 @@
+# Zeyn
+
+> Zeyn is an open source Rust web framework for data heavy business apps: grids, forms and workflows. AI agents write the application code and people review it. Screens are rendered on the server, so app code has no HTML, CSS or JavaScript. Status: alpha (0.0.3 on crates.io); APIs still change.
+
+## If you are an AI agent asked to build an app with Zeyn
+
+Do not write the project by hand. Install the CLI and let it create the project:
+
+```sh
+cargo install zeyn-cli
+zeyn new my-app
+cd my-app
+cargo run
+```
+
+The app listens on http://127.0.0.1:3000 (change `server.addr` in `config/app.json`). Then:
+
+1. Read `my-app/AGENTS.md` and `my-app/.claude/skills/zeyn/SKILL.md`. They hold the rules and the patterns for this framework.
+2. Add features with `zeyn g feature <name>`; each feature has `models.rs`, `store.rs`, `actions.rs` and `screens.rs`.
+3. Run `zeyn check` and `cargo test` after every change. Compiler errors say what to change.
+4. `.mcp.json` registers `zeyn mcp`, an MCP server with the tools `zeyn_docs`, `zeyn_describe`, `zeyn_check`, `zeyn_test` and `zeyn_new_feature`.
+
+For a library of features shared by several apps use `zeyn new my-domain --lib`.
+
+Rules that fail the build or the tests if broken: every action and screen declares `permission = "..."` or `public`; every user facing text comes from the locale files (`t!("key")`, English and Turkish); use `DataGrid`, `DataQuery`, `Form` and `Screen` from `zeyn::prelude`, not hand written HTML.
+
+## Start
+
+- [Introduction](https://docs.zeynsoft.com/): what an app looks like
+- [CLI and projects](https://docs.zeynsoft.com/start/cli): `zeyn new`, generators, checks, Docker, hot reload
+- [Project structure](https://docs.zeynsoft.com/start/structure)
+
+## Language
+
+- [Entities and models](https://docs.zeynsoft.com/language/entities)
+- [Actions](https://docs.zeynsoft.com/language/actions)
+- [Screens and params](https://docs.zeynsoft.com/language/screens)
+- [Effects and windows](https://docs.zeynsoft.com/language/effects)
+- [Forms](https://docs.zeynsoft.com/language/forms)
+- [DataGrid](https://docs.zeynsoft.com/language/datagrid) and its [reference](https://docs.zeynsoft.com/language/datagrid-reference)
+- [Texts and t!](https://docs.zeynsoft.com/language/texts)
+
+## Components
+
+- [Layouts](https://docs.zeynsoft.com/components/layouts)
+- [Controls and pickers](https://docs.zeynsoft.com/components/controls)
+- [Line editor](https://docs.zeynsoft.com/components/lines)
+- [Display](https://docs.zeynsoft.com/components/display)
+- [Tree and charts](https://docs.zeynsoft.com/components/data)
+- [Shell and commands](https://docs.zeynsoft.com/components/shell)
+- [Media](https://docs.zeynsoft.com/components/media)
+
+## Guides
+
+- [Time and languages](https://docs.zeynsoft.com/guides/time-and-languages)
+- [Security](https://docs.zeynsoft.com/guides/security)
+- [User accounts](https://docs.zeynsoft.com/guides/accounts)
+- [Audit, masking and jobs](https://docs.zeynsoft.com/guides/enterprise)
+- [API and OpenAPI](https://docs.zeynsoft.com/guides/api)
+- [MCP and AI agents](https://docs.zeynsoft.com/guides/mcp)
+- [Data and databases](https://docs.zeynsoft.com/guides/database)
+- [Theming](https://docs.zeynsoft.com/guides/theming)
+- [Shared libraries](https://docs.zeynsoft.com/guides/polyrepo)
+
+## Optional
+
+- [API reference on docs.rs](https://docs.rs/zeyn)
+- [Live demo of every component](https://framework.zeynsoft.com/)
+- [Runtime protocol](https://docs.zeynsoft.com/reference/runtime-protocol)

@@ -35,8 +35,10 @@ const COSTLY_GETS: [&str; 2] = ["/_zeyn/grid/export", "/_zeyn/pdf"];
 /// Whether a path is a static asset of the runtime, served without IP rules, rate limits or sign
 /// in so that error and sign in pages still load their scripts and styles.
 fn is_public_asset(path: &str) -> bool {
-    matches!(path, "/_zeyn/zeyn.js" | "/_zeyn/zeyn.css" | "/_zeyn/nav.js" | "/_zeyn/theme.css" | "/favicon.ico")
-        || ops::is_asset(path)
+    matches!(
+        path,
+        "/_zeyn/zeyn.js" | "/_zeyn/zeyn.css" | "/_zeyn/nav.js" | "/_zeyn/theme.css" | "/favicon.ico" | "/llms.txt"
+    ) || ops::is_asset(path)
         || ui::ASSETS.contains(&path)
         || media::ASSETS.contains(&path)
         || pro::ASSETS.contains(&path)

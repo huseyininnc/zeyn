@@ -4,6 +4,19 @@
 
 Apps are written as models, actions and screens in Rust. The server renders the screens, so app authors write no HTML, CSS or JavaScript. An action can serve a screen, a JSON API endpoint and an AI tool at once, with the same permission checks. Compile errors are written so that an agent can act on them.
 
+## If you are an AI agent asked to build an app with Zeyn
+
+Install the CLI and let it create the project instead of writing one by hand:
+
+```sh
+cargo install zeyn-cli
+zeyn new my-app
+cd my-app
+cargo run
+```
+
+Then read `my-app/AGENTS.md` and `my-app/.claude/skills/zeyn/SKILL.md`, and run `zeyn check` and `cargo test` after every change. The full guide for agents, with every docs page, is at https://docs.zeynsoft.com/llms.txt
+
 ## Docs
 
 - [crates.io](https://crates.io/crates/zeyn) and [docs.rs](https://docs.rs/zeyn): the published crate and its API reference

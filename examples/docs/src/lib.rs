@@ -295,5 +295,10 @@ pub fn app(docs: Docs) -> Result<App, String> {
     let i18n = zeyn::I18n::new("en")
         .catalog("en", include_str!("../locales/en.json"))
         .and_then(|i| i.catalog("tr", include_str!("../locales/tr.json")))?;
-    Ok(App::new(t!("docs.app")).i18n(i18n).service(docs).home(introduction).feature(feature()))
+    Ok(App::new(t!("docs.app"))
+        .i18n(i18n)
+        .llms_txt(include_str!("../llms.txt"))
+        .service(docs)
+        .home(introduction)
+        .feature(feature()))
 }

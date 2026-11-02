@@ -519,3 +519,14 @@ async fn a_call_refused_in_before_never_runs_and_after_still_sees_it() {
     let seen = refuse.0.read().unwrap().clone();
     assert_eq!(seen, [(CallKind::DataGrid, false, Some("forbidden")), (CallKind::Form, false, Some("forbidden"))]);
 }
+
+#[tokio::test]
+async fn llms_txt_is_served_as_plain_text_to_everyone_when_set() {
+    let plain = router(writer());
+    assert_eq!(send(&plain, get("/llms.txt")).await.status, StatusCode::NOT_FOUND);
+    let with = app(writer(), MemoryAudit::default(), false).llms_txt("# Shop\n").router().unwrap();
+    let r = send(&with, Request::get("/llms.txt").body(Body::empty()).unwrap()).await;
+    assert_eq!(r.status, StatusCode::OK);
+    assert_eq!(r.body, "# Shop\n");
+    assert!(r.headers.get(header::CONTENT_TYPE).unwrap().to_str().unwrap().starts_with("text/plain"));
+}

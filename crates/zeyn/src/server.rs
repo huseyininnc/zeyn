@@ -650,6 +650,7 @@ pub struct App {
     secure_cookies: bool,
     mcp: Mcp,
     home: Option<&'static str>,
+    llms_txt: Option<&'static str>,
     time: TimePolicy,
     fixed_now: Option<DateTime>,
     zone_picker: bool,
@@ -697,6 +698,7 @@ impl App {
             secure_cookies: false,
             mcp: Mcp::off(),
             home: None,
+            llms_txt: None,
             time: TimePolicy::User { default: TimeZone::UTC },
             fixed_now: None,
             zone_picker: false,
@@ -943,6 +945,18 @@ impl App {
     /// Screen that `/` redirects to. It must have a route.
     pub fn home<S: ScreenDef>(mut self, _screen: S) -> Self {
         self.home = Some(S::META.name);
+        self
+    }
+
+    /// Serves `text` at `/llms.txt` (see llmstxt.org): a short Markdown guide for language models
+    /// that read the site. Only public facts belong here; it is served to everyone.
+    ///
+    /// ```
+    /// # use zeyn::App;
+    /// let app = App::new("Shop").llms_txt("# Shop\n\n> Orders and stock.\n");
+    /// ```
+    pub fn llms_txt(mut self, text: &'static str) -> Self {
+        self.llms_txt = Some(text);
         self
     }
 
@@ -1251,6 +1265,9 @@ impl App {
             let target = format!("{}{path}", state.prefix);
             router = router.route("/", get(move || async move { Redirect::to(&target) }));
         }
+        if let Some(text) = self.llms_txt {
+            router = router.route("/llms.txt", get(move || async move { asset(text, "text/plain; charset=utf-8") }));
+        }
         let router = router
             .route("/_zeyn/zeyn.js", get(|| async { asset(JS, "text/javascript; charset=utf-8") }))
             .route("/_zeyn/zeyn.css", get(|| async { asset(CSS, "text/css; charset=utf-8") }))
@@ -1318,7 +1335,17 @@ impl App {
             }
             std::io::Error::other("the app has problems; see the errors above")
         })?;
-        let listener = tokio::net::TcpListener::bind(addr).await?;
+        let listener = tokio::net::TcpListener::bind(addr).await.map_err(|e| match e.kind() {
+            std::io::ErrorKind::AddrInUse | std::io::ErrorKind::PermissionDenied => std::io::Error::new(
+                e.kind(),
+                format!(
+                    "cannot listen on {addr}: {e}. Another program uses the port, or the system reserves it \
+                     (on Windows see `netsh interface ipv4 show excludedportrange protocol=tcp`). \
+                     Choose another address with `server.addr` in the configuration."
+                ),
+            ),
+            _ => e,
+        })?;
         tracing::info!("Zeyn is listening on http://{}", listener.local_addr()?);
         let served = axum::serve(listener, router.into_make_service_with_connect_info::<std::net::SocketAddr>()).await;
         if let Some(f) = flush {
