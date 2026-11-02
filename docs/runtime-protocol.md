@@ -264,3 +264,30 @@ All are `POST` with JSON and the CSRF header, and check the screen's access and 
 | `zeyn:effect` | `document` | An effect the runtime does not know: `{ effect, source, run }`. `run(next)` runs another effect. Used by `confirm`. |
 
 Effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":"...","then":{...}}` asks in a modal alert dialog and runs `then` only after the user confirms.
+
+## 8. Desktop class shell
+
+`/_zeyn/pro.js` and `/_zeyn/pro.css` load after the component library. Like the runtime they need no sign in.
+
+### 8.1 Commands and the palette
+
+Commands are declared in Rust (`Command::open`, `Command::navigate`, `Command::effect`, `Command::action`) and registered with `Feature::command`. The shell renders one hidden button per command the user may run (feature guards pass and the command's access allows it) inside `div[data-zeyn-commands]`:
+
+| Attribute | Meaning |
+|---|---|
+| `data-zeyn-command` | Command id |
+| `data-zeyn-effect` | Effect of an effect command, run by the runtime on click |
+| `data-zeyn-command-run` | Id of an action command, run with `POST /_zeyn/command` |
+| `aria-keyshortcuts` | Normalized shortcut (`Control+Alt+N`); the runtime's shortcut handling clicks the button |
+| `data-hint`, `data-icon` | Shortcut as shown to users, icon name |
+| `data-text-*` on the container | Localized palette texts |
+
+`App::check` refuses shortcuts that cannot be read, single character shortcuts (WCAG 2.1.4), the palette's own keys (`Control+Shift+P`, `F1`) and shortcuts or ids used by two commands.
+
+Ctrl+Shift+P (Command+Shift+P on macOS) and F1 open the palette, also from `button[data-zeyn-palette-open]` in the menu. It is a modal `<dialog>` with an ARIA combobox and listbox. It lists the app's commands, the toolbar buttons, menu bar commands and context menu items of the current screen (the top window when one is open) and the screens in the menu. Matching is fuzzy and ignores case and accents; the eight most recently run commands come first (`localStorage` key `zeyn.palette.recent`). Escape closes it and focus returns to where it was.
+
+| Endpoint | Body | Answer |
+|---|---|---|
+| `POST /_zeyn/command` | `{ command }` | Runs an action command with the input fixed on the server: CSRF, feature guards, the action's permission and the interceptors. `{ effects }`; `404` for unknown ids and effect commands |
+
+The runtime listens to `zeyn:run` on `document` so other scripts run work through it: `{ effects, source }` runs effects, `{ screen, item }` runs a screen context menu item, `{ error }` shows an error toast.

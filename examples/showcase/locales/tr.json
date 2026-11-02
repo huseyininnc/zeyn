@@ -8,7 +8,20 @@
     "sales": "Satış",
     "people": "İnsan kaynakları",
     "gallery": "Bileşenler",
-    "ui": "Bileşen kütüphanesi"
+    "ui": "Bileşen kütüphanesi",
+    "pro": "Masaüstü kabuğu"
+  },
+  "pro": {
+    "palette": "Komut paleti",
+    "palette_title": "Ctrl+Shift+P ya da F1 tuşuna basın",
+    "palette_intro": "Palet çalıştırabileceğiniz her komutu arar: uygulamanın komutları, bu ekranın araç çubuğu ve sağ tık menüsü, menüdeki her ekran. Son kullanılan komutlar önce gelir.",
+    "palette_sources": "Yeni ürün için Ctrl+Alt+N, selam için Alt+H deneyin ya da sağ tık menüsü için sayfaya sağ tıklayın. Çalıştıramayacağınız komutlar tarayıcınıza hiç gönderilmez.",
+    "cmd_new_product": "Yeni ürün",
+    "cmd_restock": "10'un altındaki her şeye stok ekle",
+    "cmd_products": "Ürünlere git",
+    "cmd_hello": "Selam ver",
+    "hello": "Bir komuttan selam.",
+    "tb_new": "Yeni ürün penceresi"
   },
   "dashboard": {
     "title": "Genel bakış",

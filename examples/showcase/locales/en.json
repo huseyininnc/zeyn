@@ -8,7 +8,20 @@
     "sales": "Sales",
     "people": "People",
     "gallery": "Components",
-    "ui": "Component library"
+    "ui": "Component library",
+    "pro": "Desktop shell"
+  },
+  "pro": {
+    "palette": "Command palette",
+    "palette_title": "Press Ctrl+Shift+P or F1",
+    "palette_intro": "The palette searches every command you may run: the app's commands, the toolbar and the context menu of this screen, and every screen in the menu. Recently used commands come first.",
+    "palette_sources": "Try Ctrl+Alt+N for a new product, Alt+H for a greeting, or right click this page for its context menu. Commands you may not run are never sent to your browser.",
+    "cmd_new_product": "New product",
+    "cmd_restock": "Restock everything below 10",
+    "cmd_products": "Go to products",
+    "cmd_hello": "Say hello",
+    "hello": "Hello from a command.",
+    "tb_new": "New product window"
   },
   "dashboard": {
     "title": "Overview",

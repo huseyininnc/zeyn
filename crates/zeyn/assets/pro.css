@@ -1,0 +1,128 @@
+/**
+ * Zeyn desktop class shell styles: command palette.
+ *
+ * Loaded after components.css and read only the theme tokens (docs/theming.md), so themes,
+ * dark mode and density apply here too.
+ */
+
+/* Command palette ---------------------------------------------------------------------------- */
+
+.z-palette-open {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: var(--z-control);
+  margin: 0 0 calc(var(--z-space) * 1);
+  padding: 0 8px 0 10px;
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius);
+  background: var(--z-surface-2);
+  color: var(--z-text-muted);
+  font: inherit;
+  font-size: var(--z-font-size-sm);
+  text-align: start;
+  cursor: pointer;
+}
+
+.z-palette-open:hover { background: var(--z-hover); color: var(--z-text); }
+
+.z-palette-open:focus-visible { outline: 2px solid var(--z-focus); outline-offset: 1px; }
+
+.z-palette-open > span:not(.z-icon) { flex: 1 1 auto; }
+
+.z-palette-open .z-icon { width: 14px; height: 14px; }
+
+.z-palette-open kbd,
+.z-palette-kbd {
+  padding: 0 5px;
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius-sm);
+  background: var(--z-surface);
+  color: var(--z-text-muted);
+  font: 500 var(--z-font-size-xs) / 1.6 var(--z-font-mono);
+  white-space: nowrap;
+}
+
+dialog.z-palette {
+  width: min(40rem, calc(100vw - 32px));
+  max-height: min(32rem, calc(100dvh - 64px));
+  margin: 12dvh auto auto;
+  padding: 0;
+  border: 1px solid var(--z-border-strong);
+  border-radius: var(--z-radius-lg);
+  background: var(--z-surface);
+  color: var(--z-text);
+  box-shadow: var(--z-shadow-2);
+  overflow: hidden;
+}
+
+dialog.z-palette[open] { display: flex; flex-direction: column; }
+
+dialog.z-palette::backdrop { background: var(--z-backdrop); }
+
+.z-palette-input {
+  flex: 0 0 auto;
+  width: 100%;
+  min-height: calc(var(--z-control) * 1.375);
+  padding: 0 calc(var(--z-space) * 4);
+  border: 0;
+  border-bottom: 1px solid var(--z-border);
+  background: var(--z-surface);
+  color: var(--z-text);
+  font: inherit;
+  font-size: 1rem;
+}
+
+.z-palette-input:focus-visible { outline: 2px solid var(--z-focus); outline-offset: -2px; }
+
+.z-palette-list {
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.z-palette-option {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--z-space) * 3);
+  min-height: 32px;
+  padding: 2px calc(var(--z-space) * 3);
+  border-radius: var(--z-radius-sm);
+  cursor: pointer;
+}
+
+.z-palette-option[aria-selected="true"] {
+  background: var(--z-brand-subtle);
+  box-shadow: inset 2px 0 0 var(--z-accent);
+}
+
+.z-palette-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.z-palette-group {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--z-text-muted);
+  font-size: var(--z-font-size-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.z-palette-empty { padding: calc(var(--z-space) * 4); color: var(--z-text-muted); text-align: center; }
+
+.z-palette-hint {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: calc(var(--z-space) * 1.5) calc(var(--z-space) * 4);
+  border-top: 1px solid var(--z-border);
+  background: var(--z-surface-2);
+  color: var(--z-text-muted);
+  font-size: var(--z-font-size-xs);
+}
+
+@media (forced-colors: active) {
+  .z-palette-option[aria-selected="true"] { outline: 2px solid Highlight; }
+}

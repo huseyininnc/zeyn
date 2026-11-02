@@ -175,6 +175,19 @@
     },
     "ui": {
       "resize": "Bölmeleri yeniden boyutlandır",
+      "palette": {
+        "open": "Komutlar",
+        "label": "Komut paleti",
+        "placeholder": "Bir komut ya da ekran adı yazın",
+        "empty": "Eşleşen komut yok.",
+        "count": "{n} komut",
+        "recent": "Son kullanılanlar",
+        "app": "Komutlar",
+        "screen": "Bu ekran",
+        "go": "Git",
+        "done": "Tamamlandı.",
+        "hint": "Yukarı ve aşağı oklarla gezinin, Enter ile çalıştırın, Escape ile kapatın."
+      },
       "loading": "Yükleniyor…",
       "load_failed": "Bu bölüm yüklenemedi. Tekrar deneyin.",
       "date": {

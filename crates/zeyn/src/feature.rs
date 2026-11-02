@@ -119,11 +119,31 @@ pub struct Feature {
     guards: Vec<Arc<dyn Guard>>,
     menu: Vec<MenuGroup>,
     apis: Vec<ApiEntry>,
+    commands: Vec<crate::command::Command>,
 }
 
 impl Feature {
     pub fn new(name: &'static str) -> Self {
-        Self { name, prefix: String::new(), screens: Vec::new(), guards: Vec::new(), menu: Vec::new(), apis: Vec::new() }
+        Self {
+            name,
+            prefix: String::new(),
+            screens: Vec::new(),
+            guards: Vec::new(),
+            menu: Vec::new(),
+            apis: Vec::new(),
+            commands: Vec::new(),
+        }
+    }
+
+    /// Registers a command: the command palette lists it and its shortcut works on every page of
+    /// the app, for users who pass the feature's guards and may run it. See [`crate::Command`].
+    pub fn command(mut self, command: crate::command::Command) -> Self {
+        self.commands.push(command);
+        self
+    }
+
+    pub fn commands(&self) -> &[crate::command::Command] {
+        &self.commands
     }
 
     /// Publishes an action as `POST /api/v1/{feature}/{action}`. Callers need an `Authorization`
@@ -204,7 +224,8 @@ impl Feature {
             .collect()
     }
 
-    /// Checks structure rules: no duplicate routes or screens, every menu item points to a registered screen with a route.
+    /// Checks structure rules: no duplicate routes or screens, every menu item points to a
+    /// registered screen with a route, command ids and shortcuts are usable and not used twice.
     pub fn check(&self) -> std::result::Result<(), Vec<String>> {
         let mut problems = Vec::new();
         let routes = self.routes();
@@ -234,6 +255,8 @@ impl Feature {
                 )),
             }
         }
+        let commands: Vec<(&str, &crate::command::Command)> = self.commands.iter().map(|c| (self.name, c)).collect();
+        problems.extend(crate::command::problems(&commands, true));
         if problems.is_empty() { Ok(()) } else { Err(problems) }
     }
 }
