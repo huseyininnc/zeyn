@@ -95,14 +95,14 @@ impl RedisStore {
         match result {
             Ok(v) => {
                 if self.0.down.swap(false, Ordering::Relaxed) {
-                    eprintln!("info: redis is reachable again");
+                    tracing::info!("redis is reachable again");
                 }
                 Some(v)
             }
             Err(e) => {
                 self.0.retry_at.store(self.elapsed_ms() + RETRY_AFTER_MS, Ordering::Relaxed);
                 if !self.0.down.swap(true, Ordering::Relaxed) {
-                    eprintln!("warning: redis is unreachable, rate limits are off and views are not saved: {e}");
+                    tracing::warn!("redis is unreachable, rate limits are off and views are not saved: {e}");
                 }
                 None
             }

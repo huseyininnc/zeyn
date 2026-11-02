@@ -29,6 +29,7 @@ mod data;
 mod media;
 mod ops;
 mod session;
+mod telemetry;
 
 pub use ops::build_id;
 
@@ -254,6 +255,11 @@ pub struct CallOutcome {
 
 /// Runs around every screen, grid and form call, after access checks.
 pub trait Interceptor: Send + Sync + 'static {
+    /// Name in traces; the type name unless overridden.
+    fn name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
+
     /// Returning an error stops the call.
     fn before(&self, _ctx: &Ctx, _call: &Call) -> crate::Result<()> {
         Ok(())
@@ -1099,6 +1105,7 @@ impl App {
             .layer(axum::middleware::from_fn_with_state(state.clone(), guard_request))
             .layer(axum::middleware::map_response(security_headers))
             .layer(axum::middleware::map_response(ops::stamp))
+            .layer(axum::middleware::from_fn(trace_request))
             .with_state(state);
         let router = if mount.is_empty() { router } else { Router::new().nest(&mount, router) };
         if cors.is_empty() {
@@ -1119,25 +1126,37 @@ impl App {
             println!("{}", serde_json::to_string_pretty(&self.describe()).unwrap_or_default());
             return Ok(());
         }
-        for (locale, key) in self.i18n.missing_keys() {
-            eprintln!("warning: translation `{key}` is missing in `{locale}`");
-        }
-        #[cfg(debug_assertions)]
-        if let Some(d) = self.extras.latency {
-            eprintln!("warning: every call is delayed by {} ms (dev_latency)", d.as_millis());
-        }
-        if self.auth.as_ref().is_some_and(|a| a.is_development()) {
-            eprintln!("warning: DevAuth is on; every request has full access. Do not use it in production.");
-        }
+        let flush = self.start_telemetry();
         let router = self.router().map_err(|problems| {
             for p in &problems {
-                eprintln!("error: {p}");
+                tracing::error!("{p}");
             }
             std::io::Error::other("the app has problems; see the errors above")
         })?;
         let listener = tokio::net::TcpListener::bind(addr).await?;
-        eprintln!("Zeyn is listening on http://{}", listener.local_addr()?);
-        axum::serve(listener, router.into_make_service_with_connect_info::<std::net::SocketAddr>()).await
+        tracing::info!("Zeyn is listening on http://{}", listener.local_addr()?);
+        let served = axum::serve(listener, router.into_make_service_with_connect_info::<std::net::SocketAddr>()).await;
+        if let Some(f) = flush {
+            f.shutdown().await;
+        }
+        served
+    }
+
+    /// Installs the default log and trace subscriber (see `server::telemetry`) and logs the
+    /// startup warnings.
+    fn start_telemetry(&self) -> Option<telemetry::Flush> {
+        let flush = telemetry::init(&self.config, &self.i18n.text(self.i18n.default_locale(), &self.name));
+        for (locale, key) in self.i18n.missing_keys() {
+            tracing::warn!("translation `{key}` is missing in `{locale}`");
+        }
+        #[cfg(debug_assertions)]
+        if let Some(d) = self.extras.latency {
+            tracing::warn!("every call is delayed by {} ms (dev_latency)", d.as_millis());
+        }
+        if self.auth.as_ref().is_some_and(|a| a.is_development()) {
+            tracing::warn!("DevAuth is on; every request has full access. Do not use it in production.");
+        }
+        flush
     }
 }
 
@@ -1302,7 +1321,7 @@ impl AppState {
         let license = match source.load(ctx.tenant()).await {
             Ok(l) => l.map(Arc::new),
             Err(e) => {
-                eprintln!("warning: license source failed, keeping the last license: {e}");
+                tracing::warn!("license source failed, keeping the last license: {e}");
                 cached.and_then(|(_, l)| l)
             }
         };
@@ -1333,8 +1352,11 @@ impl AppState {
         }
     }
 
+    /// Runs application code (an action, a data source, a screen builder) with the app's time
+    /// limit, inside a `run` span.
     async fn timed<T>(&self, fut: impl Future<Output = crate::Result<T>>) -> Result<T, Failure> {
-        match tokio::time::timeout(self.timeout, fut).await {
+        use tracing::Instrument;
+        match tokio::time::timeout(self.timeout, fut).instrument(tracing::info_span!("run")).await {
             Ok(r) => r.map_err(Failure::App),
             Err(_) => Err(Failure::Timeout),
         }
@@ -1354,8 +1376,23 @@ impl AppState {
     }
 
     fn before(&self, ctx: &Ctx, call: &Call) -> Result<(), Failure> {
+        let span = tracing::Span::current();
+        if !span.is_disabled() {
+            span.record("kind", tracing::field::debug(call.kind));
+            span.record("screen", call.screen);
+            if let Some(a) = &call.action {
+                span.record("action", a.name);
+            }
+            if let Some(user) = ctx.identity().user.as_deref() {
+                span.record("user", user);
+            }
+            if let Some(tenant) = ctx.tenant() {
+                span.record("tenant", tenant.id());
+            }
+        }
         session::check_reauth(self, ctx, call)?;
         for i in &self.interceptors {
+            let _span = tracing::debug_span!("interceptor", name = i.name(), stage = "before").entered();
             i.before(ctx, call)?;
         }
         Ok(())
@@ -1372,7 +1409,24 @@ impl AppState {
             },
             duration: started.elapsed(),
         };
+        let span = tracing::Span::current();
+        if !span.is_disabled() {
+            span.record("ok", outcome.ok);
+            span.record("error", outcome.error);
+        }
+        tracing::debug!(
+            kind = ?call.kind,
+            screen = call.screen,
+            action = call.action.as_ref().map(|a| a.name),
+            user = ctx.identity().user.as_deref(),
+            tenant = ctx.tenant().map(|t| t.id()),
+            ok = outcome.ok,
+            error = outcome.error,
+            ms = outcome.duration.as_millis() as u64,
+            "call finished"
+        );
         for i in &self.interceptors {
+            let _span = tracing::debug_span!("interceptor", name = i.name(), stage = "after").entered();
             i.after(ctx, call, &outcome);
         }
     }
@@ -1390,7 +1444,7 @@ impl AppState {
         match self.timed(store.load(&user, &Self::view_key(ctx, screen, node))).await {
             Ok(view) => view.map(|v| grid.clean_view(v)),
             Err(_) => {
-                eprintln!("warning: grid view store failed to load a view");
+                tracing::warn!("grid view store failed to load a view");
                 None
             }
         }
@@ -1426,7 +1480,7 @@ impl AppState {
                     Error::Conflict => StatusCode::CONFLICT,
                     Error::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY,
                     Error::Internal(detail) => {
-                        eprintln!("error: {detail}");
+                        tracing::error!("{detail}");
                         StatusCode::INTERNAL_SERVER_ERROR
                     }
                 };
@@ -1455,7 +1509,7 @@ impl AppState {
                     Error::Conflict => StatusCode::CONFLICT,
                     Error::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY,
                     Error::Internal(detail) => {
-                        eprintln!("error: {detail}");
+                        tracing::error!("{detail}");
                         StatusCode::INTERNAL_SERVER_ERROR
                     }
                 };
@@ -1626,6 +1680,35 @@ async fn guard_request(State(st): State<Arc<AppState>>, req: axum::extract::Requ
         }
     }
     next.run(req).await
+}
+
+/// One `request` span per request: method, path without the query string, status and duration,
+/// plus the call's kind, screen, action, user, tenant and outcome once the handler knows them.
+async fn trace_request(req: axum::extract::Request, next: axum::middleware::Next) -> Response {
+    use tracing::Instrument;
+    use tracing::field::Empty;
+    let span = tracing::info_span!(
+        "request",
+        method = %req.method(),
+        path = req.uri().path(),
+        status = Empty,
+        ms = Empty,
+        kind = Empty,
+        screen = Empty,
+        action = Empty,
+        user = Empty,
+        tenant = Empty,
+        ok = Empty,
+        error = Empty,
+    );
+    if span.is_disabled() {
+        return next.run(req).await;
+    }
+    let started = Instant::now();
+    let response = next.run(req).instrument(span.clone()).await;
+    span.record("status", response.status().as_u16());
+    span.record("ms", started.elapsed().as_millis() as u64);
+    response
 }
 
 async fn theme_css(State(st): State<Arc<AppState>>) -> Response {
@@ -2314,7 +2397,7 @@ fn problem(ctx: &Ctx, failure: Failure) -> Response {
                 Error::Conflict => StatusCode::CONFLICT,
                 Error::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY,
                 Error::Internal(detail) => {
-                    eprintln!("error: {detail}");
+                    tracing::error!("{detail}");
                     StatusCode::INTERNAL_SERVER_ERROR
                 }
             },

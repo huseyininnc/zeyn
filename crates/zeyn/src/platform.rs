@@ -466,7 +466,7 @@ impl LicenseSource for SignedLicenseFile {
     fn load(&self, _tenant: Option<&Tenant>) -> BoxFuture<std::result::Result<Option<License>, String>> {
         let result = std::fs::read_to_string(&self.path).map_err(|e| format!("{}: {e}", self.path.display())).map(|text| {
             License::from_signed(&text, self.public_key)
-                .inspect_err(|e| eprintln!("error: license {} refused, the app is locked: {e}", self.path.display()))
+                .inspect_err(|e| tracing::error!("license {} refused, the app is locked: {e}", self.path.display()))
                 .ok()
         });
         Box::pin(async move { result })

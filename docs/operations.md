@@ -110,3 +110,36 @@ What the server keeps per user, and where:
   ZEYN_TEST_REDIS=redis://127.0.0.1:6379 cargo test -p zeyn --features redis --test redis
   docker stop zeyn-redis
   ```
+
+## Logs and traces
+
+The framework reports through `tracing`. It never prints by itself.
+
+- `App::serve` and `App::serve_until` install a subscriber unless the app installed one first:
+  events go to standard error as text lines, filtered by `log.level` (`info` by default; any
+  `tracing` target filter such as `warn,zeyn=debug`). An app that wants JSON lines or another
+  sink installs its own subscriber before serving, and Zeyn leaves it alone.
+- At `info` the output is what it always was: the listening address, startup warnings
+  (missing translations, `DevAuth`, `dev_latency`), failing license sources and internal errors.
+  At `debug` every call adds a `call finished` line with kind, screen, action, user id, tenant
+  id, outcome, error code and milliseconds.
+- Spans, for tracing backends:
+
+  | Span | Level | Fields |
+  |---|---|---|
+  | `request` | info | method, path (no query string), status, ms, and once known: kind, screen, action, user, tenant, ok, error |
+  | `run` | info | application code: an action, a data source (grid fetch, row lookup, view store), a screen builder |
+  | `interceptor` | debug | name (the type name, or `Interceptor::name`), stage (`before` or `after`) |
+
+- With the `otel` Cargo feature, spans are exported over OTLP/HTTP when `otel.endpoint` is set
+  in `Config` (`http://collector:4318`; spans go to `/v1/traces`). `otel.service_name` names the
+  service, the app's name by default. Spans are batched on a background thread and flushed when
+  `serve_until` stops.
+- Without export, standard error receives events only, so no span is built and the spans cost
+  one cached check each. Apps mounted with `App::router` in another server, and tests, pay the
+  same.
+- What is never recorded: field values (masked or not), form and API input, query strings,
+  cookies, headers and secrets. A test runs grids, form saves, API calls and reveals under a
+  trace level subscriber and checks that no masked value appears. Two things stay with the app:
+  paths are recorded, so do not put personal data in routes, and `Error::Internal` messages are
+  logged as written.

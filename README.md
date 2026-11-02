@@ -25,6 +25,8 @@ cargo run -p zeyn-cli -- new my-domain --lib   # a library of features shared by
 - English and Turkish built in, compile time checked translation keys, locale aware money and dates
 - Security: permissions, guards, interceptors, audit log, CSRF, CSP, rate limits, IP rules, CORS
 - Single sign on through a proxy, tenants, licenses, layered configuration and secrets
+- Operations: ed25519 signed licenses, Redis for several servers, `tracing` spans and optional
+  OpenTelemetry export (see `docs/operations.md`)
 - JSON API with OpenAPI 3.1 and problem details, optional API docs with basic auth or permissions
 - MCP for agents: a project MCP server (`zeyn mcp`) and in app tools through WebMCP and `/_zeyn/mcp`
 - Themeable design system with light and dark themes (see `docs/theming.md`)
