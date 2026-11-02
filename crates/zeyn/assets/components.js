@@ -2145,8 +2145,13 @@ new MutationObserver((records) => {
 
 /* Setup -------------------------------------------------------------------------------------- */
 
+/** Loads the catalog runtime (card grids, rails, search boxes) the first time a page holds one. */
+function initCatalog(root) {
+  if (root.querySelector('[data-zeyn-cards], [data-zeyn-searchbox]')) import(`${BASE}/_zeyn/catalog.js`);
+}
+
 /** Initializers run for every root that gets new content. */
-const initializers = [restoreTabs, initSelects, initListboxes, initLookups, initTextareas, initSteps, baseLinks, initTrees];
+const initializers = [restoreTabs, initSelects, initListboxes, initLookups, initTextareas, initSteps, baseLinks, initTrees, initCatalog];
 
 /** Initializes every component inside `root`. Safe to call more than once. */
 function init(root) {

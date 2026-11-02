@@ -1,0 +1,276 @@
+/**
+ * Site shell: a top bar with the brand, a horizontal menu (disclosure navigation) and actions,
+ * the screen in a centered column, and a footer. Below 800px the menu folds behind a button.
+ * Colors come from the theme tokens of zeyn.css, so both themes work.
+ */
+
+.z-app.z-site {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  --z-site-gutter: max(16px, calc((100% - 1200px) / 2));
+}
+
+.z-site-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px 24px;
+  min-height: 56px;
+  padding: 0 var(--z-site-gutter);
+  background: var(--z-surface);
+  border-bottom: 1px solid var(--z-border);
+}
+
+.z-site-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.z-site-brand {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: var(--z-text);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.z-site-brand:hover { color: var(--z-accent); }
+
+.z-site-nav {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  min-width: 0;
+}
+
+.z-site-menu,
+.z-site-sub,
+.z-site-column ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.z-site-menu {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+}
+
+.z-site-menu > li { position: relative; }
+
+.z-site-menu a,
+.z-site-group-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--z-radius);
+  background: none;
+  color: var(--z-text);
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.z-site-menu a:hover,
+.z-site-group-button:hover { background: var(--z-hover); }
+
+.z-site-menu a[aria-current="page"],
+.z-site-group-button[data-current] {
+  color: var(--z-accent);
+  font-weight: 600;
+}
+
+.z-site-menu > li > a[aria-current="page"] { box-shadow: inset 0 -2px 0 var(--z-accent); }
+
+.z-site-caret {
+  width: 0.45em;
+  height: 0.45em;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+}
+
+.z-site-group-button[aria-expanded="true"] .z-site-caret { transform: translateY(1px) rotate(-135deg); }
+
+.z-site-sub {
+  position: absolute;
+  top: calc(100% + 4px);
+  inset-inline-start: 0;
+  min-width: 200px;
+  padding: 4px;
+  background: var(--z-surface);
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius-lg);
+  box-shadow: var(--z-shadow-2);
+}
+
+.z-site-sub[hidden] { display: none; }
+
+.z-site-sub a { white-space: nowrap; }
+
+.z-site-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.z-site-actions .z-locale {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+}
+
+.z-site-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius);
+  background: var(--z-surface);
+  color: var(--z-text);
+  cursor: pointer;
+}
+
+.z-site-toggle[hidden] { display: none; }
+
+.z-site-toggle:hover { background: var(--z-hover); }
+
+.z-site-burger,
+.z-site-burger::before,
+.z-site-burger::after {
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: currentColor;
+  border-radius: 1px;
+}
+
+.z-site-burger { position: relative; }
+
+.z-site-burger::before,
+.z-site-burger::after {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+}
+
+.z-site-burger::before { top: -6px; }
+.z-site-burger::after { top: 6px; }
+
+.z-site-toggle[aria-expanded="true"] .z-site-burger { background: transparent; }
+.z-site-toggle[aria-expanded="true"] .z-site-burger::before { top: 0; transform: rotate(45deg); }
+.z-site-toggle[aria-expanded="true"] .z-site-burger::after { top: 0; transform: rotate(-45deg); }
+
+.z-main.z-site-main {
+  flex: 1;
+  width: 100%;
+  padding: 24px var(--z-site-gutter) 48px;
+}
+
+.z-site-footer {
+  padding: 32px var(--z-site-gutter);
+  background: var(--z-surface-2);
+  border-top: 1px solid var(--z-border);
+  color: var(--z-text-muted);
+}
+
+.z-site-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 24px;
+}
+
+.z-site-column h2 {
+  margin: 0 0 8px;
+  font-size: var(--z-font-size);
+  font-weight: 600;
+  color: var(--z-text);
+}
+
+.z-site-column a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  color: var(--z-text-muted);
+  text-decoration: none;
+}
+
+.z-site-column a:hover { color: var(--z-accent); text-decoration: underline; }
+
+.z-site-note {
+  margin: 24px 0 0;
+  font-size: var(--z-font-size-sm);
+}
+
+.z-site-columns + .z-site-note {
+  padding-top: 16px;
+  border-top: 1px solid var(--z-border);
+}
+
+@media (min-width: 801px) {
+  .z-site-toggle { display: none; }
+}
+
+@media (max-width: 800px) {
+  .z-site-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+  .z-site-bar { min-height: 56px; }
+  .z-site-nav {
+    flex-direction: column;
+    align-items: stretch;
+    padding-bottom: 12px;
+  }
+  .z-site-header[data-zeyn-collapsible] .z-site-nav:not([data-open]) { display: none; }
+  .z-site-menu {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .z-site-menu > li > a[aria-current="page"] { box-shadow: inset 2px 0 0 var(--z-accent); }
+  .z-site-group-button { width: 100%; justify-content: space-between; }
+  .z-site-sub {
+    position: static;
+    min-width: 0;
+    padding: 0 0 0 12px;
+    border: 0;
+    box-shadow: none;
+    background: none;
+  }
+  .z-site-sub a { white-space: normal; }
+  .z-site-actions { padding-top: 8px; border-top: 1px solid var(--z-border); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .z-site-caret,
+  .z-site-burger::before,
+  .z-site-burger::after { transition: transform 0.15s ease; }
+}
+
+@media (forced-colors: active) {
+  .z-site-menu > li > a[aria-current="page"] { outline: 2px solid Highlight; outline-offset: -2px; }
+  .z-site-sub { border-color: CanvasText; }
+}

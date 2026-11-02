@@ -431,6 +431,7 @@ mod security;
 pub mod seo;
 #[cfg(feature = "server")]
 pub mod server;
+mod site;
 mod slug;
 /// Data layer for SQL databases (`postgres` and `oracle` features).
 #[cfg(any(feature = "postgres", feature = "oracle"))]
@@ -538,6 +539,7 @@ pub use server::{
     DevAuth, ForwardAuth, HeaderTenant, Interceptor, Mcp, MemoryAudit, Plugin, READY_CACHE, StaticCredentials,
     StderrAudit, SubdomainTenant, TenantResolver, Theme, TimePolicy, probe,
 };
+pub use site::{FooterColumn, Shell, SiteFooter, SiteHeader, SiteShell};
 pub use slug::Slug;
 pub use time::{Date, DateTime, LocalDateTime, LocalTimeError, Time, TimeZone};
 pub use time::{DateWords, range_presets};
@@ -568,16 +570,16 @@ pub mod prelude {
     #[cfg(feature = "markdown")]
     pub use crate::ui::Markdown;
     pub use crate::ui::{
-        ActionButton, Alert, Audio, Badge, Breadcrumb, Busy, Card, Chart, Control, DateOptions, DescriptionList, Dock,
-        Embed, EmbedPermission, EmptyState, ExternalLink, Image, Kpi, LookupItem, LookupQuery, MenuBar, MenuButton,
-        Panel, Popover, Progress, PropertyInspector, Row, Skeleton, Split, Stack, StatusBar, Tabs, Timeline, Toolbox,
-        Tree, TreeItem, TreeQuery, Video,
+        ActionButton, Alert, Audio, Badge, Breadcrumb, Busy, Card, CardGrid, Chart, Control, DateOptions,
+        DescriptionList, Dock, Embed, EmbedPermission, EmptyState, ExternalLink, Image, Kpi, LookupItem, LookupQuery,
+        MenuBar, MenuButton, Panel, Popover, Progress, PropertyInspector, Rail, Row, SearchBox, SearchParams, Skeleton,
+        Split, Stack, StatusBar, Tabs, Timeline, Toolbox, Tree, TreeItem, TreeQuery, Video,
     };
     pub use crate::{
         Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime, Decimal, Effect,
         Entity, Error, Export, Feature, Field, File, FileRules, FileType, Form, GuardResult, Icon, Identity, Import,
         Licensed, LocalDateTime, Model, Money, Node, Page, Paging, Result, RowStyle, Screen, ScreenDef, Secret,
-        Service, SignedIn, Slug, Tenant, TenantRequired, Text, Time, TimeZone, Toast, Tone, TransitionRequest,
+        Service, Shell, SignedIn, Slug, Tenant, TenantRequired, Text, Time, TimeZone, Toast, Tone, TransitionRequest,
         Transitions, UiCtx, Valid, ValidationErrors, Window, Workflow, action, choice, entity, model, params, screen,
         t,
     };

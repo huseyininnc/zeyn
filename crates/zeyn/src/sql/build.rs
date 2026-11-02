@@ -487,8 +487,32 @@ fn from_where<E: Entity>(d: &dyn Dialect, sql: &mut Sql, q: &DataQuery) -> Resul
     for f in q.filters.iter().take(MAX_FILTERS) {
         Cond::read(f, fields, q.time_zone, &mut conds);
     }
+    conds.extend(Cond::search(&q.q, fields));
     let mut first = true;
     for c in &conds {
+        if let Cond::Search(cols, needle) = c {
+            sql.push(if first { " WHERE (" } else { " AND (" });
+            first = false;
+            if cols.is_empty() {
+                sql.push("1 = 0");
+            }
+            let mut pattern = String::with_capacity(needle.len() + 2);
+            pattern.push('%');
+            like_escape(needle, &mut pattern);
+            pattern.push('%');
+            for (n, i) in cols.iter().enumerate() {
+                if n > 0 {
+                    sql.push(" OR ");
+                }
+                sql.push("LOWER(TRANSLATE(");
+                sql.push(&column(d, &fields[*i])?);
+                sql.push(", 'İı', 'ii')) LIKE ");
+                sql.bind(d, Arg::Text(pattern.clone()), Cast::Plain);
+                sql.push(" ESCAPE '\\'");
+            }
+            sql.push(")");
+            continue;
+        }
         let i = match c {
             Cond::Text(i, ..)
             | Cond::Range(i, ..)
@@ -496,6 +520,7 @@ fn from_where<E: Entity>(d: &dyn Dialect, sql: &mut Sql, q: &DataQuery) -> Resul
             | Cond::Is(i, ..)
             | Cond::Blank(i, ..)
             | Cond::AnyKey(i, ..) => *i,
+            Cond::Search(..) => continue,
         };
         let f = &fields[i];
         if matches!(c, Cond::Text(..)) && matches!(f.kind, FieldKind::Money | FieldKind::Bool) {
@@ -587,6 +612,7 @@ fn condition(d: &dyn Dialect, sql: &mut Sql, f: &FieldMeta, c: &Cond) -> Result<
             sql.push(&col);
             sql.push(if *b { " IS NULL" } else { " IS NOT NULL" });
         }
+        Cond::Search(..) => {}
     }
     Ok(())
 }

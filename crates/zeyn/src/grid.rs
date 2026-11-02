@@ -357,7 +357,7 @@ fn key_text(value: &Value) -> String {
 type ValueFn<E> = Box<dyn Fn(&E) -> Value + Send + Sync>;
 type StyleFn<E> = Box<dyn Fn(&E) -> Option<RowStyle> + Send + Sync>;
 type OpenFn<E> = Box<dyn Fn(&E) -> Effect + Send + Sync>;
-type FetchFn<E> = fn(Ctx, DataQuery) -> BoxFuture<Result<Page<E>>>;
+pub(crate) type FetchFn<E> = fn(Ctx, DataQuery) -> BoxFuture<Result<Page<E>>>;
 
 struct Column<E> {
     meta: &'static FieldMeta,
@@ -543,7 +543,7 @@ struct SaveDef<E: Model> {
 
 type MenuFn<E> = Box<dyn Fn(&E) -> crate::menu::ContextMenu + Send + Sync>;
 
-fn fetch_via<A, E>(ctx: Ctx, query: DataQuery) -> BoxFuture<Result<Page<E>>>
+pub(crate) fn fetch_via<A, E>(ctx: Ctx, query: DataQuery) -> BoxFuture<Result<Page<E>>>
 where
     A: Action<Input = DataQuery, Output = Result<Page<E>>>,
     E: Model,

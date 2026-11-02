@@ -1,0 +1,684 @@
+//! Catalog components for public pages: [`CardGrid`] (the card view of a DataGrid), [`Rail`] (a
+//! horizontal list of cards) and [`SearchBox`] (a search field with suggestions).
+//!
+//! All three load rows through an action that takes a [`DataQuery`] and returns a [`Page`], the
+//! same action a DataGrid uses. Paging, sorting, free text search and permissions run on the
+//! server; the browser never chooses a page size, a field or a filter on its own.
+
+use super::layout::Card;
+use super::widgets::{Badge, encode};
+use super::{DataSource, dom_id};
+use crate::action::{ActionMeta, Cursor, DataQuery, Error, Page, PageRequest, Result, Sort};
+use crate::ctx::{BoxFuture, Ctx};
+use crate::grid::{FetchFn, Paging, fetch_via};
+use crate::i18n::Text;
+use crate::model::Model;
+use crate::render::{Render, attr, escape};
+use crate::screen::{Component, GridSource, LoadedPage, Node, Params, ScreenDef};
+use crate::value::Value;
+use serde::{Deserialize, Serialize};
+use serde_json::{Value as Json, json};
+
+/// Params of a search results screen: the text the user searched for. A screen opened without
+/// params (from a menu) gets empty text.
+///
+/// ```
+/// use zeyn::prelude::*;
+/// use zeyn::ui::SearchParams;
+///
+/// #[screen(route = "/search", public)]
+/// pub fn results(p: SearchParams) -> Screen {
+///     Screen::new("Results").body(zeyn::ui::Alert::info(p.q))
+/// }
+/// ```
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct SearchParams {
+    pub q: String,
+}
+
+impl<'de> Deserialize<'de> for SearchParams {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> std::result::Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        struct Raw {
+            #[serde(default)]
+            q: String,
+        }
+        Ok(Option::<Raw>::deserialize(d)?.map(|r| SearchParams { q: r.q }).unwrap_or_default())
+    }
+}
+
+impl Params for SearchParams {}
+
+/// One card of a [`CardGrid`] or [`Rail`]: an image, a title, optional text and badge, and the
+/// screen the card opens. Built from a row with [`Card::poster`].
+pub struct PosterCard {
+    image: String,
+    title: Text,
+    text: Option<Text>,
+    alt: Text,
+    badge: Option<Badge>,
+    link: Option<(&'static str, Json)>,
+}
+
+impl Card {
+    /// A card with an image and a title, for a [`CardGrid`] or [`Rail`]. The image is a path of
+    /// the app (`/...`), an `https:` address or a `data:image/` URI; anything else is left out.
+    /// Its alternative text is empty, because the title next to it names the card; give
+    /// [`PosterCard::alt`] when the image says more than the title.
+    pub fn poster(image: impl Into<String>, title: impl Into<Text>) -> PosterCard {
+        PosterCard {
+            image: image.into(),
+            title: title.into(),
+            text: None,
+            alt: Text::from(""),
+            badge: None,
+            link: None,
+        }
+    }
+}
+
+impl PosterCard {
+    /// A line under the title, such as a price.
+    pub fn text(mut self, text: impl Into<Text>) -> Self {
+        self.text = Some(text.into());
+        self
+    }
+
+    /// Alternative text of the image, when it shows something the title does not say.
+    pub fn alt(mut self, alt: impl Into<Text>) -> Self {
+        self.alt = alt.into();
+        self
+    }
+
+    /// A badge on the image, such as "New".
+    pub fn badge(mut self, badge: Badge) -> Self {
+        self.badge = Some(badge);
+        self
+    }
+
+    /// The screen the card opens. The whole card is one link, loaded without a page reload.
+    /// Params of the wrong type do not compile.
+    pub fn link<S: ScreenDef>(mut self, _screen: S, params: S::Params) -> Self {
+        self.link = Some((S::META.name, serde_json::to_value(params).unwrap_or(Json::Null)));
+        self
+    }
+
+    fn html(&self, out: &mut String, r: &Render, size: (u32, u32)) {
+        let safe = self.image.starts_with('/') && !self.image.starts_with("//")
+            || self.image.starts_with("https://")
+            || self.image.starts_with("data:image/");
+        let img = if safe {
+            format!(
+                r#"<img class="z-poster-img" src="{}" alt="{}" width="{}" height="{}" loading="lazy" decoding="async">"#,
+                escape(&self.image),
+                r.text(&self.alt),
+                size.0,
+                size.1
+            )
+        } else {
+            format!(r#"<span class="z-poster-img" style="aspect-ratio:{} / {}"></span>"#, size.0, size.1)
+        };
+        let badge = self.badge.as_ref().map(|b| b.html(r)).unwrap_or_default();
+        let text = self
+            .text
+            .as_ref()
+            .map(|t| format!(r#"<span class="z-poster-text">{}</span>"#, r.text(t)))
+            .unwrap_or_default();
+        let body = format!(
+            r#"<span class="z-poster-media">{img}{badge}</span><span class="z-poster-body"><span class="z-poster-title">{}</span>{text}</span>"#,
+            r.text(&self.title)
+        );
+        match &self.link {
+            Some((screen, params)) => {
+                let query =
+                    if params.is_null() { String::new() } else { format!("?params={}", encode(&params.to_string())) };
+                out.push_str(&format!(
+                    r#"<li class="z-poster"><a class="z-poster-link" href="/_zeyn/route/{screen}{query}" data-zeyn-base-href>{body}</a></li>"#
+                ));
+            }
+            None => out.push_str(&format!(r#"<li class="z-poster"><div class="z-poster-link">{body}</div></li>"#)),
+        }
+    }
+}
+
+type CardFn<E> = Box<dyn Fn(&E) -> PosterCard + Send + Sync>;
+
+/// Turns away rows of a model with `#[mask]` fields the user may not reveal. Cards and
+/// suggestions are built by app closures that see the raw row, so they could not keep a masked
+/// value masked.
+fn check_masks<E: Model>(ctx: &Ctx) -> Result<()> {
+    if E::fields().iter().any(|f| !crate::privacy::can_unmask(Some(ctx), f)) { Err(Error::Forbidden) } else { Ok(()) }
+}
+
+/// The card view of a DataGrid: rows of an action shown as cards in a responsive grid, with
+/// numbered pages or "load more" paging and an optional sort picker. Paging, sorting and the
+/// search text run on the server through the action and its [`DataQuery`]; the server keeps the
+/// page size and accepts only the sort orders offered here. Reading needs the action's access,
+/// as for a DataGrid.
+///
+/// Cards are built by a closure that sees the raw row, so a model with `#[mask]` fields is only
+/// shown to users who may reveal them; everyone else gets `Forbidden`.
+///
+/// ```ignore
+/// CardGrid::of(search_products)
+///     .title(t!("shop.products"))
+///     .card(|p: &Product| Card::poster(p.image.clone(), p.name.clone()).text(p.price.to_string())
+///         .badge(Badge::new(t!("shop.new")).tone(Tone::Success))
+///         .link(product_page, ProductParams { id: p.id }))
+///     .sort_option(t!("shop.by_name"), Product::name, false)
+///     .paging(Paging::infinite(24))
+/// ```
+pub struct CardGrid<E: Model> {
+    action: ActionMeta,
+    fetch: FetchFn<E>,
+    card: Option<CardFn<E>>,
+    title: Option<Text>,
+    paging: Paging,
+    sorts: Vec<(Text, Sort)>,
+    search: String,
+    image: (u32, u32),
+    rail: bool,
+}
+
+/// A horizontal list of cards that scrolls sideways, with previous and next buttons and scroll
+/// snapping. It loads the next batch when the user scrolls near its end. Built like a
+/// [`CardGrid`], which it is, laid out in one row.
+///
+/// Keyboard: the cards are links in the tab order and scroll into view as they get focus; the
+/// previous and next buttons scroll by a view's width.
+///
+/// ```ignore
+/// Rail::of(search_products).title(t!("shop.new_arrivals")).card(|p: &Product| Card::poster(p.image.clone(), p.name.clone()))
+/// ```
+pub struct Rail;
+
+impl Rail {
+    /// A rail that loads its cards from the given action, 12 at a time.
+    #[allow(clippy::new_ret_no_self)]
+    pub fn of<A, E>(source: A) -> CardGrid<E>
+    where
+        A: crate::action::Action<Input = DataQuery, Output = Result<Page<E>>>,
+        E: Model,
+    {
+        let mut grid = CardGrid::of(source);
+        grid.rail = true;
+        grid.paging = Paging::infinite(12);
+        grid
+    }
+}
+
+impl<E: Model> CardGrid<E> {
+    /// Cards of the rows of the given action, 24 per page with a "load more" button.
+    pub fn of<A>(_source: A) -> Self
+    where
+        A: crate::action::Action<Input = DataQuery, Output = Result<Page<E>>>,
+    {
+        Self {
+            action: A::META,
+            fetch: fetch_via::<A, E>,
+            card: None,
+            title: None,
+            paging: Paging::infinite(24),
+            sorts: Vec::new(),
+            search: String::new(),
+            image: (300, 400),
+            rail: false,
+        }
+    }
+
+    /// How a row becomes a card.
+    pub fn card(mut self, build: impl Fn(&E) -> PosterCard + Send + Sync + 'static) -> Self {
+        self.card = Some(Box::new(build));
+        self
+    }
+
+    /// A heading over the cards, which also names the list for screen readers.
+    pub fn title(mut self, title: impl Into<Text>) -> Self {
+        self.title = Some(title.into());
+        self
+    }
+
+    /// `Paging::infinite(n)` (the default, 24) loads `n` more with a button that also fires when
+    /// it scrolls into view; `Paging::pages(n)` shows numbered pages with previous and next.
+    /// Other kinds of paging work as `infinite`.
+    pub fn paging(mut self, paging: Paging) -> Self {
+        self.paging = paging;
+        self
+    }
+
+    /// A sort order users can pick. The first one is the order the cards start in.
+    pub fn sort_option<T>(mut self, label: impl Into<Text>, field: crate::model::Field<E, T>, desc: bool) -> Self {
+        self.sorts.push((label.into(), Sort { field: field.meta().name.to_string(), desc }));
+        self
+    }
+
+    /// Shows only rows that match this free text ([`DataQuery::q`]), such as the text of a
+    /// search results screen.
+    pub fn search(mut self, text: impl Into<String>) -> Self {
+        self.search = text.into();
+        self
+    }
+
+    /// Width and height of the card images in pixels, so the page does not jump while they load.
+    /// 300 by 400 unless set.
+    pub fn image_size(mut self, width: u32, height: u32) -> Self {
+        self.image = (width.clamp(1, 4000), height.clamp(1, 4000));
+        self
+    }
+
+    fn size(&self) -> u32 {
+        match self.paging {
+            Paging::Pages { size } => size,
+            Paging::Infinite { batch } => batch,
+            _ => 24,
+        }
+    }
+
+    fn pages(&self) -> bool {
+        matches!(self.paging, Paging::Pages { .. }) && !self.rail
+    }
+
+    /// The query the server runs: the client's position and one of the offered sort orders; the
+    /// page size and search text come from the server; client filters are dropped.
+    fn allow(&self, query: &mut DataQuery) {
+        let size = self.size();
+        query.page = match &query.page {
+            PageRequest::Offset { offset, .. } if self.pages() => PageRequest::Offset { offset: *offset, limit: size },
+            PageRequest::After { cursor, .. } if !self.pages() => {
+                PageRequest::After { cursor: cursor.clone(), limit: size }
+            }
+            _ if self.pages() => PageRequest::Offset { offset: 0, limit: size },
+            _ => PageRequest::After { cursor: None, limit: size },
+        };
+        query.sort.retain(|s| self.sorts.iter().any(|(_, o)| o == s));
+        query.sort.truncate(1);
+        if query.sort.is_empty() {
+            query.sort.extend(self.sorts.first().map(|(_, s)| s.clone()));
+        }
+        query.filters.clear();
+        query.q = self.search.clone();
+        query.with_total = self.pages();
+        query.aggregates.clear();
+        query.group = None;
+    }
+
+    fn cards(&self, page: &LoadedPage, r: &Render) -> String {
+        let mut out = String::new();
+        if let (Some(rows), Some(card)) = (page.items.downcast_ref::<Vec<E>>(), &self.card) {
+            for row in rows {
+                card(row).html(&mut out, r, self.image);
+            }
+        }
+        out
+    }
+
+    fn render_with(&self, out: &mut String, r: &Render, page: Option<&LoadedPage>) {
+        let id = dom_id(r, "cards");
+        let t = |key: &str| r.text(&Text::key(format!("zeyn.ui.cards.{key}")));
+        let class = if self.rail { "z-rail" } else { "z-cards" };
+        let labelled = if self.title.is_some() { format!(r#" aria-labelledby="{id}-title""#) } else { String::new() };
+        out.push_str(&format!(
+            r#"<section class="{class}" data-zeyn-cards data-zeyn-paging="{}" data-testid="{}.cards"{labelled} data-text-loaded="{}" data-text-page="{}" data-text-error="{}""#,
+            if self.pages() { "pages" } else { "infinite" },
+            r.scope,
+            t("loaded"),
+            t("page"),
+            t("error"),
+        ));
+        if let Some(p) = page {
+            out.push_str(&format!(
+                r#" data-zeyn-offset="{}" data-zeyn-count="{}" data-zeyn-size="{}""#,
+                p.offset,
+                p.count,
+                self.size()
+            ));
+            if let Some(total) = p.total {
+                out.push_str(&format!(r#" data-zeyn-total="{total}""#));
+            }
+            if let Some(Cursor(next)) = &p.next {
+                out.push_str(&format!(r#" data-zeyn-next="{}""#, escape(next)));
+            }
+        }
+        out.push('>');
+        let title = self
+            .title
+            .as_ref()
+            .map(|t| format!(r#"<h2 class="z-cards-title" id="{id}-title">{}</h2>"#, r.text(t)))
+            .unwrap_or_default();
+        let sorts = if self.sorts.len() > 1 && !self.rail {
+            let options: String = self
+                .sorts
+                .iter()
+                .enumerate()
+                .map(|(i, (label, s))| {
+                    format!(r#"<option value="{i}" data-sort="{}">{}</option>"#, attr(s), r.text(label))
+                })
+                .collect();
+            format!(
+                r#"<div class="z-cards-sort"><label for="{id}-sort">{}</label><div class="z-select" data-text-none=""><select id="{id}-sort" data-zeyn-cards-sort>{options}</select></div></div>"#,
+                t("sort")
+            )
+        } else {
+            String::new()
+        };
+        if self.rail {
+            out.push_str(&format!(
+                r#"<div class="z-rail-head">{title}<div class="z-rail-nav"><button type="button" class="z-rail-button" data-zeyn-rail-prev aria-controls="{id}-list" aria-label="{}" aria-disabled="true"><span aria-hidden="true">&#8249;</span></button><button type="button" class="z-rail-button" data-zeyn-rail-next aria-controls="{id}-list" aria-label="{}"><span aria-hidden="true">&#8250;</span></button></div></div>"#,
+                t("previous"),
+                t("next")
+            ));
+        } else if !title.is_empty() || !sorts.is_empty() {
+            out.push_str(&format!(r#"<div class="z-cards-head">{title}{sorts}</div>"#));
+        }
+        let list = if self.rail { "z-rail-list" } else { "z-cards-list" };
+        out.push_str(&format!(r#"<ul class="{list}" id="{id}-list" data-zeyn-rows>"#));
+        if let Some(p) = page {
+            out.push_str(&self.cards(p, r));
+        }
+        out.push_str("</ul>");
+        let empty = page.is_none_or(|p| p.count == 0);
+        out.push_str(&format!(
+            r#"<p class="z-cards-empty" data-zeyn-cards-empty{}>{}</p>"#,
+            if empty { "" } else { " hidden" },
+            t("empty")
+        ));
+        let more = page.is_some_and(|p| p.next.is_some());
+        if self.pages() {
+            out.push_str(&format!(
+                r#"<nav class="z-cards-pager" aria-label="{}"><button type="button" class="z-button" data-zeyn-cards-prev aria-disabled="true">{}</button><span class="z-cards-page" data-zeyn-cards-page></span><button type="button" class="z-button" data-zeyn-cards-next aria-disabled="{}">{}</button></nav>"#,
+                t("pages"),
+                t("previous_page"),
+                !more,
+                t("next_page")
+            ));
+        } else if !self.rail {
+            out.push_str(&format!(
+                r#"<div class="z-cards-more"><button type="button" class="z-button" data-zeyn-cards-more{}>{}</button></div>"#,
+                if more { "" } else { " hidden" },
+                t("load_more")
+            ));
+        }
+        out.push_str(r#"<p class="z-sr-only" role="status" aria-live="polite" data-zeyn-cards-status></p></section>"#);
+    }
+}
+
+impl<E: Model> GridSource for CardGrid<E> {
+    fn action(&self) -> ActionMeta {
+        self.action
+    }
+
+    fn first_query(&self, _view: Option<&crate::grid::DataGridView>) -> DataQuery {
+        let mut query = DataQuery::default();
+        self.allow(&mut query);
+        query
+    }
+
+    fn clean_view(&self, _view: crate::grid::DataGridView) -> crate::grid::DataGridView {
+        crate::grid::DataGridView::default()
+    }
+
+    fn head_html(&self, _r: &Render, _view: Option<&crate::grid::DataGridView>) -> String {
+        String::new()
+    }
+
+    fn fetch(&self, ctx: Ctx, mut query: DataQuery) -> BoxFuture<Result<LoadedPage>> {
+        self.allow(&mut query);
+        query.time_zone = ctx.time_zone();
+        let fetch = self.fetch;
+        let offset = match &query.page {
+            PageRequest::Offset { offset, .. } => *offset,
+            PageRequest::After { .. } => 0,
+        };
+        Box::pin(async move {
+            check_masks::<E>(&ctx)?;
+            let page = fetch(ctx, query).await?;
+            Ok(LoadedPage {
+                count: page.items.len(),
+                total: page.total,
+                next: page.next,
+                offset,
+                totals: Vec::new(),
+                items: Box::new(page.items),
+                view: None,
+                saved_views: false,
+                depth: 0,
+                path: Vec::new(),
+                groups: None,
+                parents: Vec::new(),
+            })
+        })
+    }
+
+    fn rows_html(&self, page: &LoadedPage, r: &Render) -> String {
+        self.cards(page, r)
+    }
+
+    fn foot_html(&self, _page: &LoadedPage, _r: &Render) -> Option<String> {
+        None
+    }
+
+    fn render_loaded(&self, out: &mut String, r: &Render, page: &LoadedPage) {
+        self.render_with(out, r, Some(page));
+    }
+
+    fn tool_schema(&self) -> Json {
+        let sorts: Vec<&Sort> = self.sorts.iter().map(|(_, s)| s).collect();
+        json!({
+            "type": "object",
+            "description": "Cards of rows. The server sets the page size; sort must be one of the offered orders.",
+            "properties": {
+                "page": {
+                    "type": "object",
+                    "properties": {
+                        "type": { "type": "string", "enum": ["offset", "after"] },
+                        "offset": { "type": "integer", "minimum": 0 },
+                        "cursor": { "type": ["string", "null"] }
+                    }
+                },
+                "sort": { "type": "array", "items": { "enum": sorts } }
+            }
+        })
+    }
+
+    fn fields(&self) -> &'static [crate::model::FieldMeta] {
+        E::fields()
+    }
+}
+
+impl<E: Model> Component for CardGrid<E> {
+    fn render(&self, out: &mut String, r: &Render) {
+        self.render_with(out, r, None);
+    }
+
+    fn schema(&self) -> Json {
+        json!({
+            "type": if self.rail { "rail" } else { "card_grid" },
+            "model": E::NAME,
+            "action": self.action,
+            "title": self.title,
+            "paging": self.paging,
+            "sorts": self.sorts.iter().map(|(l, s)| json!({ "label": l, "field": s.field, "desc": s.desc })).collect::<Vec<_>>(),
+            "search": self.search,
+        })
+    }
+
+    fn grid(&self) -> Option<&dyn GridSource> {
+        Some(self)
+    }
+}
+
+impl<E: Model> From<CardGrid<E>> for Node {
+    fn from(g: CardGrid<E>) -> Self {
+        Node::new(g)
+    }
+}
+
+/// Most suggestions one search box shows.
+pub const MAX_SUGGESTIONS: u32 = 20;
+
+type SuggestFn<E> = std::sync::Arc<dyn Fn(&E) -> Option<String> + Send + Sync>;
+
+/// A search field with suggestions (W3C APG combobox with a list box popup). As the user types,
+/// it waits `instant` milliseconds, then asks the server for suggestions: the action runs with the
+/// text as [`DataQuery::q`] and the suggestion text of each row comes back. Enter, or picking a
+/// suggestion, opens the results screen with the text in [`SearchParams`].
+///
+/// The server cuts the text to [`crate::MAX_SEARCH_QUERY`] characters, sets the number of
+/// suggestions itself (8 unless set, at most [`MAX_SUGGESTIONS`]), checks the screen's access,
+/// the feature's guards and the action's permission, and counts each call against the write rate
+/// limit (`App::write_limit`), like every data source call.
+///
+/// Keyboard: Down and Up move through the suggestions (Down opens them), Enter searches with the
+/// highlighted suggestion or the typed text, Escape closes the suggestions and then clears the
+/// field.
+///
+/// ```ignore
+/// SearchBox::of(search_products).instant(150).results(search_results).suggestion(|p: &Product| p.name.clone())
+/// ```
+pub struct SearchBox<E: Model> {
+    action: ActionMeta,
+    fetch: FetchFn<E>,
+    label: Text,
+    delay: u32,
+    results: Option<&'static str>,
+    limit: u32,
+    value: String,
+    suggestion: SuggestFn<E>,
+}
+
+impl<E: Model> SearchBox<E> {
+    pub fn of<A>(_source: A) -> Self
+    where
+        A: crate::action::Action<Input = DataQuery, Output = Result<Page<E>>>,
+    {
+        Self {
+            action: A::META,
+            fetch: fetch_via::<A, E>,
+            label: Text::key("zeyn.ui.search.label"),
+            delay: 150,
+            results: None,
+            limit: 8,
+            value: String::new(),
+            suggestion: std::sync::Arc::new(first_text::<E>),
+        }
+    }
+
+    /// How long to wait after the last key before asking for suggestions, in milliseconds
+    /// (150 unless set, between 50 and 2000).
+    pub fn instant(mut self, ms: u32) -> Self {
+        self.delay = ms.clamp(50, 2000);
+        self
+    }
+
+    /// The screen Enter opens with the text. Its params are [`SearchParams`].
+    pub fn results<S: ScreenDef<Params = SearchParams>>(mut self, _screen: S) -> Self {
+        const { assert!(S::META.route.is_some(), "the results screen of a search box must have a route") };
+        self.results = Some(S::META.name);
+        self
+    }
+
+    /// The label of the field, read by screen readers. "Search" unless set.
+    pub fn label(mut self, label: impl Into<Text>) -> Self {
+        self.label = label.into();
+        self
+    }
+
+    /// The text the field starts with, such as the search of a results screen.
+    pub fn value(mut self, text: impl Into<String>) -> Self {
+        self.value = text.into();
+        self
+    }
+
+    /// How many suggestions to show, at most [`MAX_SUGGESTIONS`].
+    pub fn limit(mut self, n: u32) -> Self {
+        self.limit = n.clamp(1, MAX_SUGGESTIONS);
+        self
+    }
+
+    /// The text a row suggests. The row's first unmasked text field unless set.
+    pub fn suggestion(mut self, text: impl Fn(&E) -> String + Send + Sync + 'static) -> Self {
+        self.suggestion = std::sync::Arc::new(move |row| Some(text(row)));
+        self
+    }
+}
+
+/// The first text field of a row that is neither the key nor masked.
+fn first_text<E: Model>(row: &E) -> Option<String> {
+    let i = E::fields()
+        .iter()
+        .position(|f| matches!(f.kind, crate::value::FieldKind::Text) && f.mask.is_none() && !f.key)?;
+    match row.value_at(i) {
+        Some(Value::Text(t)) => Some(t),
+        _ => None,
+    }
+}
+
+impl<E: Model> DataSource for SearchBox<E> {
+    fn action(&self) -> ActionMeta {
+        self.action
+    }
+
+    fn fetch(&self, ctx: Ctx, input: Json) -> BoxFuture<Result<Json>> {
+        let text: String = input.as_str().unwrap_or_default().trim().chars().take(crate::MAX_SEARCH_QUERY).collect();
+        let query = DataQuery {
+            page: PageRequest::After { cursor: None, limit: self.limit },
+            q: text.clone(),
+            time_zone: ctx.time_zone(),
+            ..DataQuery::default()
+        };
+        let fetch = self.fetch;
+        let suggest = self.suggestion.clone();
+        let rows = async move {
+            if text.is_empty() {
+                return Ok(Page::default());
+            }
+            check_masks::<E>(&ctx)?;
+            fetch(ctx, query).await
+        };
+        Box::pin(async move {
+            let page = rows.await?;
+            let mut out: Vec<String> = Vec::new();
+            for s in page.items.iter().filter_map(|r| suggest(r)) {
+                if !s.is_empty() && !out.contains(&s) {
+                    out.push(s);
+                }
+            }
+            Ok(json!(out))
+        })
+    }
+}
+
+impl<E: Model> Component for SearchBox<E> {
+    fn render(&self, out: &mut String, r: &Render) {
+        let id = dom_id(r, "search");
+        let t = |key: &str| r.text(&Text::key(format!("zeyn.ui.search.{key}")));
+        out.push_str(&format!(
+            r#"<form class="z-search" role="search" data-zeyn-searchbox data-zeyn-delay="{}" data-zeyn-max="{}"{} data-text-count="{}" data-text-none="{}" data-testid="{}.search"><label class="z-sr-only" for="{id}">{}</label><span class="z-search-field"><span class="z-icon z-icon-search" aria-hidden="true"></span><input id="{id}" type="search" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="{id}-list" autocomplete="off" spellcheck="false" enterkeyhint="search" maxlength="{}" placeholder="{}" value="{}"><ul class="z-search-list" role="listbox" id="{id}-list" aria-label="{}" hidden></ul></span><p class="z-sr-only" role="status" aria-live="polite" data-zeyn-search-status></p></form>"#,
+            self.delay,
+            crate::MAX_SEARCH_QUERY,
+            self.results.map(|s| format!(r#" data-zeyn-results="{s}""#)).unwrap_or_default(),
+            t("count"),
+            t("none"),
+            r.scope,
+            r.text(&self.label),
+            crate::MAX_SEARCH_QUERY,
+            r.text(&self.label),
+            escape(&self.value),
+            t("suggestions"),
+        ));
+    }
+
+    fn schema(&self) -> Json {
+        json!({ "type": "search_box", "model": E::NAME, "action": self.action, "results": self.results, "label": self.label })
+    }
+
+    fn source(&self, key: &str) -> Option<&dyn DataSource> {
+        (key == "suggest").then_some(self as &dyn DataSource)
+    }
+}
+
+impl<E: Model> From<SearchBox<E>> for Node {
+    fn from(s: SearchBox<E>) -> Self {
+        Node::new(s)
+    }
+}

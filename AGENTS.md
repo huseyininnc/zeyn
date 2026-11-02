@@ -21,7 +21,7 @@ them. When code and docs disagree, fix the one that is wrong in the same change.
 | Anything, the first time | `README.md`, then `docs/vision-and-architecture.md` |
 | The language: entities, actions, screens, forms, texts | `examples/docs/pages/` (`entities.md`, `actions.md`, `screens.md`, `forms.md`, `effects.md`, `texts.md`) |
 | DataGrid | `docs/grid.md`, `examples/docs/pages/datagrid.md` |
-| Components and layouts | `examples/docs/pages/` (`layouts.md`, `controls.md`, `lines.md`, `display.md`, `data.md`, `shell.md`) |
+| Components and layouts | `examples/docs/pages/` (`layouts.md`, `controls.md`, `lines.md`, `display.md`, `data.md`, `catalog.md`, `shell.md`) |
 | Browser runtime, endpoints, events | `docs/runtime-protocol.md` |
 | Security, audit, masking, sessions, jobs, workflows | `examples/docs/pages/security.md`, `docs/enterprise.md` |
 | Sign in, JWT, OIDC, MFA | `docs/auth.md` |

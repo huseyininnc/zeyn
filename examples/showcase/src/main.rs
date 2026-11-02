@@ -16,6 +16,7 @@ mod overview;
 mod people;
 mod pro;
 mod sales;
+mod shop;
 mod stock;
 mod ui;
 mod uploads;
@@ -127,6 +128,7 @@ async fn main() -> std::io::Result<()> {
         .feature(uploads::feature())
         .feature(charts::feature())
         .feature(inputs::feature())
+        .feature(shop::feature())
         .islands(concat!(env!("CARGO_MANIFEST_DIR"), "/dist/islands"));
     #[cfg(feature = "pdf")]
     {

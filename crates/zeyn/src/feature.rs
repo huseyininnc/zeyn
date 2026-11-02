@@ -142,6 +142,7 @@ pub struct Feature {
     commands: Vec<crate::command::Command>,
     searches: Vec<crate::command::Search>,
     sitemap: Option<crate::seo::Sitemap>,
+    site: Option<crate::site::SiteShell>,
     #[cfg(feature = "server")]
     files: Vec<crate::files::FileEntry>,
     #[cfg(feature = "server")]
@@ -161,6 +162,7 @@ impl Feature {
             searches: Vec::new(),
             sitemap: None,
             media: Vec::new(),
+            site: None,
             #[cfg(feature = "server")]
             files: Vec::new(),
             #[cfg(feature = "server")]
@@ -306,6 +308,19 @@ impl Feature {
     pub fn menu(mut self, build: impl FnOnce(Menu) -> Menu) -> Self {
         self.menu = build(Menu::default()).groups;
         self
+    }
+
+    /// Opens the feature's screens in the site shell (a top bar with a horizontal menu built from
+    /// this feature's menu, and a footer) instead of the app shell's side menu. See
+    /// [`crate::Shell`]. Screens of other features keep their own shell.
+    pub fn shell(mut self, shell: crate::site::SiteShell) -> Self {
+        self.site = Some(shell);
+        self
+    }
+
+    /// The site shell, when the feature chose it.
+    pub fn site_shell(&self) -> Option<&crate::site::SiteShell> {
+        self.site.as_ref()
     }
 
     pub fn menu_groups(&self) -> &[MenuGroup] {

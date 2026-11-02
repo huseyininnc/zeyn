@@ -67,6 +67,7 @@ pages! {
         lines "/components/lines" "lines.md" "Line editor" "../pages/lines.md";
         display "/components/display" "display.md" "Display" "../pages/display.md";
         data_views "/components/data" "data.md" "Tree and charts" "../pages/data.md";
+        catalog "/components/catalog" "catalog.md" "Cards, rails and search" "../pages/catalog.md";
         shell "/components/shell" "shell.md" "Shell and commands" "../pages/shell.md";
         media "/components/media" "media.md" "Media" "../../../docs/media.md";
     }

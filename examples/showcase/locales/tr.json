@@ -38,7 +38,31 @@
     "products": "Ürün",
     "low_stock": "Azalan stok",
     "orders_today": "Bugünkü sipariş",
-    "revenue_today": "Bugünkü ciro"
+    "revenue_today": "Bugünkü ciro",
+    "shop": "Herkese açık mağaza",
+    "shop_text": "Aynı uygulama site kabuğunda herkese açık bir katalog da sunar: yan menü yerine üst menü ve alt bilgi.",
+    "open_shop": "Mağazayı aç"
+  },
+  "shop": {
+    "menu": { "home": "Ana sayfa", "help": "Yardım" },
+    "new": "Yeni",
+    "new_arrivals": "Yeni gelenler",
+    "products": "Ürünler",
+    "search": { "label": "Ürün ara", "all": "Arama", "title": "“{q}” için sonuçlar" },
+    "sort": { "newest": "En yeni", "name": "Ad", "cheapest": "En düşük fiyat", "dearest": "En yüksek fiyat" },
+    "product": { "text": "Kod {code}, {price}." },
+    "home": {
+      "title": "Northwind Pazarı",
+      "lead": "Depodan taze",
+      "text": "Northwind stoğundan çay, kahve, yağ ve kuru gıda; herkes göz atabilir.",
+      "panel": "Çalışma ekranları",
+      "panel_text": "Personel ekranları yan menülü uygulama kabuğunda açılır. Kabuk değiştirmek sayfayı yenilemez.",
+      "open_panel": "Genel bakışı aç"
+    },
+    "delivery": { "title": "Teslimat", "text": "Saat 14.00 öncesi verilen siparişler aynı gün depodan çıkar." },
+    "returns": { "title": "İade", "text": "Açılmamış ürünler 14 gün içinde iade edilebilir." },
+    "about": { "title": "Hakkımızda", "text": "Northwind örnek bir şirkettir. Mağazası Zeyn site kabuğunu gösterir." },
+    "footer": { "company": "Şirket", "panel": "Personel genel bakışı", "note": "Northwind Pazarı, Zeyn ile yapılmış bir örnektir." }
   },
   "stock": {
     "product_title": "{code} ürünü",

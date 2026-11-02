@@ -217,10 +217,33 @@
       "theme": "Theme",
       "theme_system": "System",
       "theme_light": "Light",
-      "theme_dark": "Dark"
+      "theme_dark": "Dark",
+      "site": {
+        "sign_in": "Sign in",
+        "sign_out": "Sign out"
+      }
     },
     "ui": {
       "resize": "Resize panes",
+      "cards": {
+        "load_more": "Show more",
+        "loaded": "{count} items shown",
+        "empty": "Nothing to show.",
+        "error": "The list could not be loaded. Try again.",
+        "sort": "Sort by",
+        "pages": "Pages",
+        "page": "Page {page} of {pages}",
+        "previous_page": "Previous page",
+        "next_page": "Next page",
+        "previous": "Scroll back",
+        "next": "Scroll forward"
+      },
+      "search": {
+        "label": "Search",
+        "suggestions": "Suggestions",
+        "count": "{count} suggestions, use the arrow keys to choose",
+        "none": "No suggestions"
+      },
       "palette": {
         "open": "Commands",
         "label": "Command palette",

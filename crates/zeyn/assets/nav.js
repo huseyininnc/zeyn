@@ -4,7 +4,9 @@
  * Links inside the app load only the screen (`x-zeyn-partial: 1`) and swap the contents of
  * `#z-main`, the page title and the current menu item, without a full page load. History, the
  * back and forward buttons, new tabs and modified clicks keep working as normal links. Before a
- * screen is swapped, `zeyn:leave` lets other scripts close windows and popups. Anything
+ * screen is swapped, `zeyn:leave` lets other scripts close windows and popups. When the screen
+ * opens in the other shell (`x-zeyn-shell`: the side menu app shell or the site shell), the
+ * whole frame is swapped instead, still without a page load. Anything
  * the server does not answer with a partial screen (errors, redirects to a login page, other apps)
  * falls back to a normal page load.
  */
@@ -29,7 +31,7 @@ function isScreenUrl(url) {
 
 /** Marks the menu link of the current page. */
 function markCurrent(url) {
-  document.querySelectorAll('.z-nav a[href]').forEach((a) => {
+  document.querySelectorAll('.z-nav a[href], .z-site-nav a[href]').forEach((a) => {
     const here = new URL(a.href, location.href).pathname === url.pathname;
     if (here) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
@@ -83,6 +85,12 @@ async function visit(url, push) {
     location.assign(res.redirected ? res.url : url.href);
     return;
   }
+  const shell = res.headers.get('x-zeyn-shell') ?? 'app';
+  if (shell !== (document.querySelector('.z-app')?.dataset.zeynShell ?? 'app')) {
+    main.removeAttribute('aria-busy');
+    await swapFrame(new URL(res.url || url.href), push, url.hash);
+    return;
+  }
   if (res.headers.get('x-zeyn-live') === '1') import(`${BASE}/_zeyn/live.js`);
   const html = await res.text();
   const finalUrl = new URL(res.url || url.href);
@@ -114,16 +122,45 @@ document.addEventListener('click', (e) => {
   visit(url, true);
 });
 
+/** Loads the stylesheets and module scripts of `doc`'s head that this page does not have yet. */
+async function addAssets(doc) {
+  const waits = [];
+  const have = (sel, attr, url) => [...document.querySelectorAll(sel)].some((el) => el[attr] === url);
+  for (const link of doc.querySelectorAll('head link[rel="stylesheet"][href]')) {
+    const href = new URL(link.getAttribute('href'), location.href).href;
+    if (have('link[rel="stylesheet"]', 'href', href)) continue;
+    const el = document.createElement('link');
+    el.rel = 'stylesheet';
+    el.href = href;
+    waits.push(new Promise((done) => {
+      el.onload = done;
+      el.onerror = done;
+    }));
+    document.head.append(el);
+  }
+  for (const script of doc.querySelectorAll('head script[type="module"][src]')) {
+    const src = new URL(script.getAttribute('src'), location.href).href;
+    if (have('script[src]', 'src', src)) continue;
+    const el = document.createElement('script');
+    el.type = 'module';
+    el.src = src;
+    document.head.append(el);
+  }
+  await Promise.all(waits);
+}
+
 /**
- * Reloads the whole app frame (menu, screen, title, language, page metadata) without a page load,
- * after something that changes more than the screen, such as the language or the time zone.
+ * Replaces the whole app frame (menu or top bar, screen, footer, title, language, page metadata)
+ * with the one of `url` without a page load. Used after something that changes more than the
+ * screen, such as the language, and when a link leads to a screen in the other shell (app or
+ * site). Only when the page cannot be fetched or read does it fall back to a page load.
  */
-async function refreshPage() {
+async function swapFrame(url, push, hash) {
   let res;
   try {
-    res = await fetch(location.href, { credentials: 'same-origin' });
+    res = await fetch(url.href, { credentials: 'same-origin' });
   } catch {
-    location.reload();
+    location.assign(url.href);
     return;
   }
   const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
@@ -131,8 +168,13 @@ async function refreshPage() {
   const current = document.querySelector('.z-app');
   const needsIslands = doc.querySelector('meta[name="zeyn-islands"]') && !document.querySelector('meta[name="zeyn-islands"]');
   if (!res.ok || !next || !current || needsIslands) {
-    location.reload();
+    location.assign(url.href);
     return;
+  }
+  if (push) {
+    const finalUrl = new URL(res.url || url.href);
+    if (hash && !finalUrl.hash) finalUrl.hash = hash;
+    history.pushState({ zeyn: true }, '', finalUrl.href);
   }
   document.documentElement.lang = doc.documentElement.lang;
   if (doc.documentElement.dir) document.documentElement.dir = doc.documentElement.dir;
@@ -145,10 +187,21 @@ async function refreshPage() {
     if (old) old.content = meta.content;
     else document.head.append(document.importNode(meta, true));
   }
+  await addAssets(doc);
   const app = document.importNode(next, true);
   current.replaceWith(app);
   markCurrent(new URL(location.href));
+  if (push) {
+    const main = document.getElementById('z-main');
+    if (main) announce(main);
+    window.scrollTo(0, 0);
+  }
   document.dispatchEvent(new CustomEvent('zeyn:content', { detail: app }));
+}
+
+/** Reloads the whole app frame in place, such as after the language or the time zone changed. */
+function refreshPage() {
+  return swapFrame(new URL(location.href), false);
 }
 
 /**
