@@ -29,6 +29,8 @@ cargo run -p zeyn-cli -- new my-domain --lib   # a library of features shared by
   OpenTelemetry export (see `docs/operations.md`)
 - JSON API with OpenAPI 3.1 and problem details, optional API docs with basic auth or permissions
 - MCP for agents: a project MCP server (`zeyn mcp`) and in app tools through WebMCP and `/_zeyn/mcp`, opt in with `App::mcp`
+- Sign in with OpenID Connect, bearer JWTs for APIs and MCP, a second factor guard and built in
+  TOTP (features `oidc` and `totp`, see `docs/auth.md`)
 - An embedded AI assistant (feature `assistant`): any LLM, speech, pluggable history, confirmation before writes (see `docs/assistant.md`)
 - Themeable design system with light and dark themes (see `docs/theming.md`)
 - Field level audit, read audit with reasons, field masking, safe deploys, health checks, idle

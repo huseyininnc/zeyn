@@ -1,8 +1,10 @@
 //! Session safety: idle timeout warnings and recent sign in for sensitive actions.
 //!
-//! Sign in itself is external (a single sign on proxy today, OIDC later), so the server cannot
-//! end a session. It tells the runtime when to warn and where to send the user, and it refuses
-//! actions marked `reauth` when the identity provider reports an old sign in.
+//! Sign in is done by a single sign on proxy, by the built in OpenID Connect sign in or by the app's
+//! own authenticator. This module tells the runtime when to warn and where to send the user, and it
+//! refuses actions marked `reauth` when the identity provider reports an old sign in. With
+//! `OidcAuth` a fresh sign in goes back to the provider with `prompt=login`; with `Totp` a
+//! verified code counts as a fresh sign in.
 
 use super::{App, AppState, Call, Failure};
 use crate::ctx::Ctx;
@@ -92,12 +94,14 @@ pub(super) fn head(st: &AppState, ctx: &Ctx) -> String {
     if !ctx.identity().is_signed_in() {
         return String::new();
     }
+    let auth = &st.sign_in;
     let config = json!({
         "idle": s.idle.map(|d| d.as_secs()),
         "warn": s.warning.as_secs(),
-        "logout": s.logout_url,
+        "logout": s.logout_url.as_ref().or(auth.logout_url.as_ref()),
         "login": st.login_url,
-        "reauth": s.reauth_url.as_ref().or(st.login_url.as_ref()),
+        "reauth": s.reauth_url.as_ref().or(auth.reauth_url.as_ref()).or(st.login_url.as_ref()).or(auth.mfa_url.as_ref()),
+        "mfa": auth.mfa_url,
     });
     format!(r#"<meta name="zeyn-session" content="{}">"#, attr(&config))
 }

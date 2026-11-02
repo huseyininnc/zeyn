@@ -167,8 +167,8 @@ cannot slow production. A warning is printed at startup while it is on.
 
 ## Session safety
 
-Sign in is external (a single sign on proxy today, OIDC later), so these features only need the
-authenticator to say who the user is and, for re authentication, when they signed in
+Sign in comes from a single sign on proxy, the built in OpenID Connect sign in or bearer tokens
+(see `docs/auth.md`), so these features only need the authenticator to say who the user is and, for re authentication, when they signed in
 (`Identity::authenticated_at`; `ForwardAuth::auth_time("x-auth-time")` reads Unix seconds or
 RFC 3339; `DevAuth` reports every request as freshly signed in).
 

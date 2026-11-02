@@ -299,6 +299,8 @@
 //! - Models, actions and screens from other crates are used like local ones.
 
 mod action;
+#[cfg(feature = "server")]
+pub mod auth;
 #[cfg(feature = "assistant")]
 pub mod assistant;
 mod api;
@@ -378,6 +380,12 @@ pub use assistant::Assistant;
 pub use security::{IpRange, MemoryRateStore, RateKey, RateLimit, RateStore, client_ip, parse_ranges};
 #[cfg(feature = "redis")]
 pub use redis_store::RedisStore;
+#[cfg(feature = "server")]
+pub use auth::RequireMfa;
+#[cfg(feature = "oidc")]
+pub use auth::{Algorithm, ClaimMap, JwtAuth, OidcAuth};
+#[cfg(feature = "totp")]
+pub use auth::{MemoryTotpStore, Totp, TotpRecord, TotpStore};
 pub use screen::{
     Component, Effect, Export, FormSource, GridSource, Icon, LoadedPage, Node, Params, RowCall, Screen, ScreenDef, ScreenMeta,
     ToolButton, Toolbar, UiCtx, Window,

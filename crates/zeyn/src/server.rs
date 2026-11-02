@@ -25,6 +25,7 @@ use std::future::Future;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+mod auth;
 mod data;
 mod media;
 mod ops;
@@ -46,6 +47,12 @@ const CSP: &str = "default-src 'self'; script-src 'self'; style-src 'self'; styl
 /// Finds out who is calling, usually from a session cookie or an `Authorization` header.
 pub trait Authenticator: Send + Sync + 'static {
     fn authenticate(&self, headers: &HeaderMap) -> Option<Identity>;
+
+    /// Async work before `authenticate`, once per request, such as fetching an issuer's signing
+    /// keys. `None` (the default) when there is nothing to wait for, which costs nothing.
+    fn prepare<'a>(&'a self, _headers: &'a HeaderMap) -> Option<std::pin::Pin<Box<dyn Future<Output = ()> + Send + 'a>>> {
+        None
+    }
 
     /// True for development only authenticators; the server prints a warning at startup.
     fn is_development(&self) -> bool {
@@ -675,6 +682,7 @@ pub struct App {
     views: Option<Arc<dyn crate::grid::DataGridViewStore>>,
     native_menu: bool,
     extras: ops::Extras,
+    sign_in: auth::Extras,
     #[cfg(feature = "assistant")]
     assistant: Option<Arc<crate::assistant::Assistant>>,
 }
@@ -715,6 +723,7 @@ impl App {
             views: None,
             native_menu: true,
             extras: ops::Extras::default(),
+            sign_in: auth::Extras::default(),
             #[cfg(feature = "assistant")]
             assistant: None,
         }
@@ -1081,11 +1090,12 @@ impl App {
     }
 
     /// Builds the HTTP router. Fails when `check` finds problems.
-    pub fn router(self) -> Result<Router, Vec<String>> {
+    pub fn router(mut self) -> Result<Router, Vec<String>> {
         self.check()?;
         let docs_enabled = self.api_docs.is_some();
         let mount = self.base_path.clone();
         let url_prefix = self.public_path.clone().unwrap_or_else(|| self.base_path.clone());
+        auth::resolve(&mut self.sign_in, &url_prefix, &mut self.login_url);
         let mut screens = HashMap::new();
         for (fi, f) in self.features.iter().enumerate() {
             for s in f.screens() {
@@ -1124,6 +1134,7 @@ impl App {
             views: self.views,
             native_menu: self.native_menu,
             extras: self.extras,
+            sign_in: self.sign_in,
             #[cfg(feature = "assistant")]
             assistant: self.assistant,
         });
@@ -1184,6 +1195,7 @@ impl App {
             .route("/_zeyn/mcp", post(mcp));
         #[cfg(feature = "assistant")]
         let router = assistant::routes(router);
+        let router = auth::routes(router, &state);
         let router = pro::routes(media::routes(ui::routes(session::routes(data::routes(ops::routes(router))))))
             .fallback(not_found)
             .layer(axum::middleware::from_fn_with_state(state.clone(), guard_request))
@@ -1276,6 +1288,7 @@ struct AppState {
     views: Option<Arc<dyn crate::grid::DataGridViewStore>>,
     native_menu: bool,
     extras: ops::Extras,
+    sign_in: auth::Extras,
     #[cfg(feature = "assistant")]
     assistant: Option<Arc<crate::assistant::Assistant>>,
 }
@@ -1308,8 +1321,14 @@ enum Failure {
 }
 
 impl From<Error> for Failure {
+    /// A refusal for a missing second factor becomes `mfa_required`, which starts a step up sign in.
     fn from(e: Error) -> Self {
-        Failure::App(e)
+        match e {
+            Error::Denied(Text::Key { ref key, .. }) if key == crate::auth::MFA_REQUIRED => {
+                Failure::Status(StatusCode::UNAUTHORIZED, "mfa_required", Text::key(crate::auth::MFA_REQUIRED))
+            }
+            e => Failure::App(e),
+        }
     }
 }
 
@@ -1327,7 +1346,7 @@ impl ParamsQuery {
     }
 }
 
-fn cookie<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
+pub(crate) fn cookie<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
     headers
         .get_all(header::COOKIE)
         .iter()
@@ -1339,7 +1358,7 @@ fn cookie<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
 }
 
 /// Compares two strings in time that does not depend on where they differ.
-fn same(a: &str, b: &str) -> bool {
+pub(crate) fn same(a: &str, b: &str) -> bool {
     a.len() == b.len() && a.bytes().zip(b.bytes()).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
 
@@ -1365,7 +1384,8 @@ impl AppState {
     }
 
     fn ctx(&self, headers: &HeaderMap) -> Ctx {
-        let identity = self.auth.as_ref().and_then(|a| a.authenticate(headers)).unwrap_or_default();
+        let mut identity = self.auth.as_ref().and_then(|a| a.authenticate(headers)).unwrap_or_default();
+        auth::adjust(self, headers, &mut identity);
         let accept = headers.get(header::ACCEPT_LANGUAGE).and_then(|v| v.to_str().ok());
         let locale = self.i18n.negotiate(cookie(headers, "zeyn_locale"), accept);
         let tz = match self.time {
@@ -1736,6 +1756,9 @@ async fn guard_request(State(st): State<Arc<AppState>>, req: axum::extract::Requ
         return next.run(req).await;
     }
     ops::delay(&st, &path).await;
+    if let Some(ready) = st.auth.as_ref().and_then(|a| a.prepare(req.headers())) {
+        ready.await;
+    }
     let headers = req.headers().clone();
     let peer = req.extensions().get::<axum::extract::ConnectInfo<std::net::SocketAddr>>().map(|c| c.0.ip());
     let forwarded = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok());
@@ -1869,6 +1892,12 @@ async fn page(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Que
         Err(Failure::App(Error::Forbidden | Error::Denied(_))) if !ctx.identity().is_signed_in() && st.login_url.is_some() => {
             let here = st.screens.get(name).and_then(|(fi, e)| st.features[*fi].path_of(&e.meta)).map(|p| st.url(&p)).unwrap_or_default();
             let target = st.login_url.clone().unwrap_or_default();
+            let sep = if target.contains('?') { '&' } else { '?' };
+            Redirect::to(&format!("{target}{sep}return_to={}", encode(&here))).into_response()
+        }
+        Err(Failure::Status(_, "mfa_required", _)) if st.sign_in.mfa_url.is_some() => {
+            let here = st.screens.get(name).and_then(|(fi, e)| st.features[*fi].path_of(&e.meta)).map(|p| st.url(&p)).unwrap_or_default();
+            let target = st.sign_in.mfa_url.clone().unwrap_or_default();
             let sep = if target.contains('?') { '&' } else { '?' };
             Redirect::to(&format!("{target}{sep}return_to={}", encode(&here))).into_response()
         }
