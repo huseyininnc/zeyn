@@ -20,8 +20,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="zeyn-csrf" content="TOKEN">
   <title>Products · Inventory</title>
-  <link rel="stylesheet" href="/_zeyn/zeyn.css">
-  <script type="module" src="/_zeyn/zeyn.js"></script>
+  <link rel="stylesheet" href="/_zeyn/zeyn.css?v=BUILD">
+  <script type="module" src="/_zeyn/zeyn.js?v=BUILD"></script>
 </head>
 <body>
   <a class="z-skip" href="#z-main">Skip to content</a>
@@ -35,6 +35,10 @@
 ```
 
 メニューには、現在のユーザーが開ける Screen だけが並びます。現在の項目には `aria-current="page"` が付きます。
+
+head にあるフレームワークのスクリプトとスタイルシートにはすべて、`?v=` とビルド ID（`meta[name=zeyn-build]`。`ZEYN_BUILD_ID` か実行ファイルのハッシュ）が付き、`theme.css` にはテーマ文字列のハッシュが付きます。現在の値を持つリクエストは `Cache-Control: public, max-age=31536000, immutable` を受け取るため、ウォームなページ読み込みではそれらを 1 つも要求しません。それ以外のリクエスト（デプロイ後の古いタブ、`v` なし）は `no-cache` と ETag を受け取ります。ランタイムがあとからインポートするモジュールは、それをインポートするスクリプトの URL から同じ `v` を引き継ぎます。
+
+すべてのページが `zeyn.js`（リクエスト、effect、ウィンドウ、フォーム、メニュー、ショートカット、イベント委譲）、`nav.js`、`components.js` を読み込み、アプリシェルでは `pro.js` と `enterprise.js` も読み込みます。残りは、それを使うページでだけ読み込まれ、`nav.js` が画面を差し替えるときも同じです。`zeyn.js` は、コンテンツに `[data-zeyn-grid]` が初めて入ったときに grid ランタイム `grid.js` をインポートし（grid を持つ完全なページは `<link rel="modulepreload">` でこれを指定します）、`components.js` は `catalog.js`（カード grid、検索ボックス）、`media.js`（プレーヤー、埋め込み）、`files.js`（アップロード）、`charts.js`、`assistant.js`（チャットパネル、またはランチャーを初めて押したとき）をインポートします。これらのスタイルシートは head に残るので、スクリプトが届いても見た目は変わりません。showcase のダッシュボードでは、9 スクリプト 403 KB（116 KB）ではなく、5 スクリプト 258 KB（転送 74 KB）になります。
 
 ## 2. Screen markup
 
@@ -161,13 +165,13 @@ Effects:
 
 ### 4.2.2 Virtual scrolling
 
-`data-zeyn-paging="virtual"` を持つ grid は、行がいくつあっても、すべての行にわたる 1 つのスクロール可能なリストを表示します。サーバーは最初のブロック（`data-zeyn-page-size` 行、オフセット 0）を `data-zeyn-total` 付きでレンダリングします。grid ルートには `data-zeyn-row-height`（ピクセル）と CSS 変数 `--z-row-height` もあります。
+`data-zeyn-paging="virtual"` を持つ grid は、行がいくつあっても、すべての行にわたる 1 つのスクロール可能なリストを表示します。サーバーは最初のブロック（`data-zeyn-page-size` 行、オフセット 0）を `data-zeyn-total` 付きでレンダリングします。最初の 64 行はテーブルに、残りはその後ろの `<template data-zeyn-rows-later>` に入り、grid が 40 列以上を表示する場合は、すべての行がテンプレートに入ります。grid ルートには `data-zeyn-row-height`（ピクセル）と CSS 変数 `--z-row-height` もあります。
 
 ランタイムの動作:
 
 - テーブル本体を、内側のスペーサーの高さが `total * rowHeight` ピクセル（上限 8,000,000 px）のスクロールコンテナに入れます。上限を超える場合、スクロール位置は比率で行インデックスに対応付けられる（`row = scrollTop / (spacerHeight - viewport) * (total - visibleRows)`）ため、1,000,000 行でも末尾に到達できます。
 - DOM には、表示中の行とその上下 20 行だけを保持し、`transform: translateY(...)` で配置します。行の高さは固定で、長いテキストは省略記号で切り詰められます。
-- `POST /_zeyn/grid` で、`data-zeyn-page-size` 行のブロックを `page: { "type": "offset", "offset": blockStart, "limit": blockSize }` として読み込み、最初の呼び出しの後は `with_total: false` にします。最大 20 ブロックをキャッシュに保持し（最も長く使われていないものから破棄）、スクロール方向の次のブロックを先読みし、表示範囲から外れたブロックのリクエストは取り消します（`AbortController`）。
+- `POST /_zeyn/grid` で、`data-zeyn-page-size` 行のブロックを `page: { "type": "offset", "offset": blockStart, "limit": blockSize }` として読み込み、最初の呼び出しの後は `with_total: false` にします。最大 20 ブロックかつ最大 100,000 セルをキャッシュに保持し（最も長く使われていないものから破棄。63 列の grid では 7 ブロックで、3 を下回ることはありません）、`reload` のために保持するブロックも同じ上限に数えられ、最初に破棄され、スクロール方向の次のブロックを先読みし、表示範囲から外れたブロックのリクエストは取り消します（`AbortController`）。
 - ブロックの読み込み中、表示中の行を消すことはありません。足りない行は、そのブロックが届くまで `aria-busy="true"` のプレースホルダー行を表示するため、画面がちらつきません。
 - ソートやフィルターが変わると、キャッシュを破棄して先頭へスクロールします。
 - キーボード: 矢印キー、Page Up、Page Down、Home、End でアクティブな行が移動し、表示範囲にスクロールされます。テーブルには `aria-rowcount` = total が、各行には `aria-rowindex` が付きます。
@@ -235,6 +239,8 @@ Effects:
 - すべてのレスポンスは `Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`、`X-Content-Type-Options: nosniff`、`Referrer-Policy: same-origin` を設定します。`App::csp` は、指定した `https` ホストを `img-src`、`media-src`（および `blob:`）、`frame-src`、`connect-src`、`font-src` に追加します。ほかのディレクティブは変わりません。ヘッダーの文字列は起動時に一度だけ作られます。
 - インラインスクリプトやインラインイベントハンドラーはありません。インラインの `style` 属性は CSS カスタムプロパティ（`--z-width`、`--z-flex`）と固定の列幅にのみ使われるため、ポリシーに `style-src-attr 'unsafe-inline'` が加わっています。スクリプトは厳格なままです。
 - CSRF トークンは `HttpOnly`、`SameSite=Strict` の Cookie に保存され、`x-zeyn-csrf` ヘッダーと定数時間で比較されます。
+- ページ、`totp` フォーム、`GET /_zeyn/csrf` は、トークンを Cookie にあるそのままの形では載せません。レスポンスごとに新しいランダムなパッドの後ろに、トークンとパッドの XOR（16 進数 128 桁）を付けるため、gzip でトークンが漏れることはありません（BREACH）。サーバーは比較の前にマスクを外し、通常の 64 桁のトークンも引き続き受け付けます。
+- 1 KB 以上の動的レスポンス（ページ、部分的な Screen、grid ブロック、エクスポート）は、ブラウザが受け付ける場合にレベル 2 で gzip 圧縮され、`Vary: Accept-Encoding` が付きます。圧縮しないもの: すでに `Content-Encoding` があるレスポンス（一度だけ圧縮してキャッシュするフレームワークのアセット）、範囲（`Content-Range`、および `Range` を持つすべてのリクエスト）、動画、音声、SVG 以外の画像、`application/octet-stream`、アーカイブと PDF、`text/event-stream`、`application/x-ndjson`（アシスタントのストリーム）、WebSocket のアップグレード。
 - 各呼び出しは次の順に確認します。認証、Screen のアクセス、feature のガード、ノードの action のアクセス。その後、インターセプターと action を実行します。
 
 ## 6. Runtime behavior

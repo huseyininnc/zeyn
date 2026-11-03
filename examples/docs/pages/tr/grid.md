@@ -249,7 +249,7 @@ sayılır; bu yüzden büyük bir yapıştırma uygulamanın yazma sınırına t
 bırakılan sütunlar için her yanda tek bir boşluk hücresi durur; böylece genişlikler, sabitlemeler ve
 kaydırma eskisi gibi kalır. Satırlar tam hücre listesini korur, bu yüzden kopyalama, yapıştırma ve
 düzenleme her sütunu görür ve hücreler `aria-colindex` taşır. Pencere yalnızca dışındaki bir sütun
-görünüme girdiğinde hareket eder. Sunucu yine de bir satırın her hücresini gönderir.
+görünüme girdiğinde hareket eder. Sunucu yine de bir satırın her hücresini gönderir. Bu kadar geniş bir sanal grid (`VIRTUAL_WIDE_COLUMNS`; seçim, detay ve satır action sütunları dahil sayılır) ilk bloğunun tamamını 64 canlı satır yerine `<template data-zeyn-rows-later>` içinde gönderir; böylece tarayıcı hiçbir zaman her sütunu içeren bir satırı yerleşime sokmaz. Galerinin geniş gridinde en uzun başlangıç görevi 259 ms'den 112 ms'ye, DOMContentLoaded 402 ms'den 228 ms'ye düştü (8 ardışık yüklemenin medyanı, release sunucu, yoğun makine).
 
 Galerinin geniş gridinde (62 sütun, 100.000 satır, sanal kaydırma, debug sunucu, Chromium, 1400'e 900
 pencere, 144 Hz ekran) sütun sanallaştırmasız ve sanallaştırmalı olarak ölçülmüştür:
@@ -314,3 +314,14 @@ Performance API ile, showcase arşivinde (1.000.000 satır, sanal kaydırma, deb
 
 DOM 62 satır (yaklaşık 660 öğe) tutar ve JS heap'i 4 MB civarında kalır. Aynı arşivden 100.000 satırı
 dışa aktarmak 3,4 saniyede 7 MB akıttı.
+
+### Ekran oluşturucuyu ucuz tutun
+
+İstekler durumsuzdur, bu yüzden her grid isteği gridi tutan ekranı yeniden kurar: sanal bir gridin getirdiği her blok (her 200 satır kaydırmada), her sayfa, sıralama, filtre ve dışa aktarma, her satır içi düzenleme ve her satır action'ı, gridin action'ını çalıştırmadan önce `#[screen]` fonksiyonunu yeniden çalıştırır. Sunucu, gridi düğüm yoluyla bulmak ve erişimi denetlemek için ekrana ihtiyaç duyar; kullanıcı başına durum tutmamanın bedeli budur.
+
+Yalnızca bileşenleri dizen bir oluşturucu mikrosaniyelere mal olur. Veritabanını sorgulayan bir oluşturucu ise bu sorgunun bedelini o isteklerin her birinde öder. Bu yüzden:
+
+- Satırları gridin action'ında yükleyin (`DataGrid::of(search)`). Zaten istek başına bir kez çalışır ve sayfayı, sıralamayı ve filtreleri içeren `DataQuery`'yi alır.
+- Seçenekler ve aramalar alan tipine (`#[choice]`), bir form aramasına (`Form::lookup`, kullanıcı yazdığında action'ını çağırır) ya da sınırlı bir önbellekte tutan bir servise aittir; oluşturucunun çalıştırdığı bir sorguya değil.
+- Bir ekran kayıt yüklemek zorundaysa (`Form::of(record)`), büyük veya sanal gridleri ondan uzak tutun: kendi ekranlarına, bir detay ekranına (`DataGrid::detail`) ya da bir pencereye koyun; böylece blok istekleri hiçbir şey yüklemeyen bir ekranı yeniden kurar.
+- Ekran parametreleri oluşturucunun ihtiyaç duyduğu girdidir; onları anahtarlarla sınırlı tutun ve gridin action'ının bunlara göre filtrelemesine izin verin (`DataGrid::scope`).

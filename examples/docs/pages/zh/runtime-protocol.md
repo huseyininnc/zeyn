@@ -20,8 +20,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="zeyn-csrf" content="TOKEN">
   <title>Products · Inventory</title>
-  <link rel="stylesheet" href="/_zeyn/zeyn.css">
-  <script type="module" src="/_zeyn/zeyn.js"></script>
+  <link rel="stylesheet" href="/_zeyn/zeyn.css?v=BUILD">
+  <script type="module" src="/_zeyn/zeyn.js?v=BUILD"></script>
 </head>
 <body>
   <a class="z-skip" href="#z-main">Skip to content</a>
@@ -35,6 +35,10 @@
 ```
 
 菜单只列出当前用户可以打开的 Screen。当前菜单项带有 `aria-current="page"`。
+
+head 中每个框架脚本和样式表都带有 `?v=` 和构建 id（`meta[name=zeyn-build]`，来自 `ZEYN_BUILD_ID` 或可执行文件的哈希）；`theme.css` 带有主题文本的哈希。带当前值的请求会得到 `Cache-Control: public, max-age=31536000, immutable`，因此热页面加载不会再请求它们；其他任何请求（部署后的旧标签页、没有 `v`）得到 `no-cache` 和 ETag。运行时稍后导入的模块，会从导入它们的脚本的 URL 中沿用同一个 `v`。
+
+每个页面都会加载 `zeyn.js`（请求、效果、窗口、表单、菜单、快捷键和事件委托）、`nav.js`、`components.js`，以及在应用外壳中加载 `pro.js` 和 `enterprise.js`。其余的只在用到它们的页面上加载，`nav.js` 换入某个 Screen 时也是如此：内容第一次包含 `[data-zeyn-grid]` 时，`zeyn.js` 会导入 grid 运行时 `grid.js`（带有 grid 的完整页面在 `<link rel="modulepreload">` 中指明它），而 `components.js` 会导入 `catalog.js`（卡片 grid、搜索框）、`media.js`（播放器、嵌入内容）、`files.js`（上传）、`charts.js` 和 `assistant.js`（聊天面板，或第一次点击启动器时）。它们的样式表仍留在 head 中，所以脚本到达时外观不会变化。在展示库仪表板上，这意味着 5 个脚本、258 KB（传输 74 KB），而不是 9 个脚本、403 KB（116 KB）。
 
 ## 2. Screen markup（Screen 标记）
 
@@ -161,13 +165,13 @@ Effects：
 
 ### 4.2.2 Virtual scrolling（虚拟滚动）
 
-带有 `data-zeyn-paging="virtual"` 的 grid 在所有行之上显示一个可滚动的列表，无论共有多少行。服务端渲染第一个块（`data-zeyn-page-size` 行，偏移 0），并带有 `data-zeyn-total`。grid 根元素还带有 `data-zeyn-row-height`（像素）和 CSS 变量 `--z-row-height`。
+带有 `data-zeyn-paging="virtual"` 的 grid 在所有行之上显示一个可滚动的列表，无论共有多少行。服务端渲染第一个块（`data-zeyn-page-size` 行，偏移 0），并带有 `data-zeyn-total`：前 64 行在表格中，其余的在它之后的 `<template data-zeyn-rows-later>` 中；如果 grid 显示 40 列或更多列，则所有行都在 template 中。grid 根元素还带有 `data-zeyn-row-height`（像素）和 CSS 变量 `--z-row-height`。
 
 运行时的行为：
 
 - 把表格主体放进一个滚动容器，其内部占位元素高度为 `total * rowHeight` 像素，上限为 8,000,000 px。超过上限时，滚动位置按比例映射到行索引（`row = scrollTop / (spacerHeight - viewport) * (total - visibleRows)`），因此 1,000,000 行仍然可以滚到末尾。
 - DOM 中只保留可见行以及上下各 20 行，并用 `transform: translateY(...)` 定位。行高固定；过长的文本以省略号截断。
-- 以 `POST /_zeyn/grid` 加载每块 `data-zeyn-page-size` 行的数据块，使用 `page: { "type": "offset", "offset": blockStart, "limit": blockSize }`，首次调用之后 `with_total: false`。缓存最多保留 20 个块（最近最少使用者先淘汰），沿滚动方向预取下一个块，并取消已离开视野的块的请求（`AbortController`）。
+- 以 `POST /_zeyn/grid` 加载每块 `data-zeyn-page-size` 行的数据块，使用 `page: { "type": "offset", "offset": blockStart, "limit": blockSize }`，首次调用之后 `with_total: false`。缓存最多保留 20 个块且最多 100,000 个单元格（最近最少使用者先淘汰；63 列的 grid 为 7 个块，但不少于 3 个），为 `reload` 保留的块计入同一上限并最先被丢弃，沿滚动方向预取下一个块，并取消已离开视野的块的请求（`AbortController`）。
 - 块加载期间从不清空可见行。缺失的行显示带有 `aria-busy="true"` 的占位行，直到其块到达，因此界面不会闪烁。
 - 排序和筛选变化会丢弃缓存并滚动到顶部。
 - 键盘：方向键、Page Up、Page Down、Home 和 End 移动活动行并将其滚动到可见位置。表格带有 `aria-rowcount` = total，每一行带有 `aria-rowindex`。
@@ -235,6 +239,8 @@ Effects：
 - 每个响应都设置 `Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`、`X-Content-Type-Options: nosniff` 和 `Referrer-Policy: same-origin`。`App::csp` 会把指定名称的 `https` 主机加入 `img-src`、`media-src`（以及 `blob:`）、`frame-src`、`connect-src` 和 `font-src`；其他指令绝不改变。该响应头文本在启动时一次性构建。
 - 没有内联脚本，也没有内联事件处理器。内联 `style` 属性只用于 CSS 自定义属性（`--z-width`、`--z-flex`）和固定的列宽，因此策略中加入了 `style-src-attr 'unsafe-inline'`。脚本仍保持严格限制。
 - CSRF 令牌存放在 `HttpOnly`、`SameSite=Strict` 的 cookie 中，并以常量时间与 `x-zeyn-csrf` 请求头比较。
+- 页面、`totp` 表单和 `GET /_zeyn/csrf` 从不原样携带 cookie 中的令牌：每个响应都带有一个新的随机填充（pad），后面跟着令牌与该填充的异或结果（128 个十六进制数字），因此 gzip 无法泄露它（BREACH）。服务器在比较前先还原，并仍接受原来的 64 位明文令牌。
+- 1 KB 或更大的动态响应（页面、局部 Screen、grid 块、导出）在浏览器接受时以级别 2 进行 gzip 压缩，并带有 `Vary: Accept-Encoding`。从不压缩的有：已经带有 `Content-Encoding` 的响应（框架资源，压缩一次后缓存）、范围请求（`Content-Range` 以及任何带 `Range` 的请求）、视频、音频、SVG 以外的图片、`application/octet-stream`、压缩包和 PDF、`text/event-stream`、`application/x-ndjson`（助手的流）以及 WebSocket 升级。
 - 每次调用依次检查：身份认证、Screen 的访问权限、Feature 的 guard、节点 action 的访问权限，然后运行拦截器（interceptor）和 action。
 
 ## 6. Runtime behavior（运行时行为）

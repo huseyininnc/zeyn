@@ -20,8 +20,8 @@ Başarısız bir sayfa kendi durum koduyla (404, 403, 500, ...) ve uygulamanın 
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="zeyn-csrf" content="TOKEN">
   <title>Products · Inventory</title>
-  <link rel="stylesheet" href="/_zeyn/zeyn.css">
-  <script type="module" src="/_zeyn/zeyn.js"></script>
+  <link rel="stylesheet" href="/_zeyn/zeyn.css?v=BUILD">
+  <script type="module" src="/_zeyn/zeyn.js?v=BUILD"></script>
 </head>
 <body>
   <a class="z-skip" href="#z-main">Skip to content</a>
@@ -35,6 +35,10 @@ Başarısız bir sayfa kendi durum koduyla (404, 403, 500, ...) ve uygulamanın 
 ```
 
 Menü yalnızca geçerli kullanıcının açabileceği ekranları listeler. Geçerli öğede `aria-current="page"` bulunur.
+
+Head içindeki her framework script'i ve stil dosyası `?v=` ile build kimliğini taşır (`meta[name=zeyn-build]`; `ZEYN_BUILD_ID`'den ya da çalıştırılabilir dosyanın hash'inden gelir); `theme.css` tema metninin hash'ini taşır. Güncel değerli bir istek `Cache-Control: public, max-age=31536000, immutable` alır, bu yüzden sıcak bir sayfa yüklemesi bunların hiçbirini istemez; başka her istek (bir dağıtımdan sonra eski bir sekme, `v` yok) `no-cache` ve ETag alır. Çalışma zamanının sonradan import ettiği modüller, onları import eden script'in URL'sinden aynı `v` değerini alır.
+
+Her sayfa `zeyn.js` (istekler, efektler, pencereler, formlar, menüler, kısayollar ve olay delegasyonu), `nav.js`, `components.js` ve uygulama kabuğunda `pro.js` ile `enterprise.js` dosyalarını yükler. Geri kalanı yalnızca onu kullanan sayfalarda yüklenir; `nav.js` bir ekranı yerine koyduğunda da böyledir: `zeyn.js`, içerik ilk kez bir `[data-zeyn-grid]` taşıdığında grid çalışma zamanı `grid.js` dosyasını import eder (grid içeren tam sayfalar onu `<link rel="modulepreload">` içinde belirtir), `components.js` ise `catalog.js` (kart gridleri, arama kutuları), `media.js` (oynatıcılar, gömülü içerik), `files.js` (yüklemeler), `charts.js` ve `assistant.js` (sohbet panelleri ya da başlatıcının ilk basışı) dosyalarını import eder. Stil dosyaları head içinde kalır, bu yüzden script geldiğinde görünüm değişmez. Showcase panosunda bu, 9 script ve 403 KB (116 KB) yerine 5 script ve 258 KB (ağda 74 KB) demektir.
 
 ## 2. Screen markup
 
@@ -161,13 +165,13 @@ Gruplanmış ve ağaç grid'leri (`<table role="treegrid">`) bir dalı yüklemek
 
 ### 4.2.2 Virtual scrolling
 
-`data-zeyn-paging="virtual"` olan grid'ler, kaç satır olursa olsun tüm satırlar üzerinde tek bir kaydırılabilir liste gösterir. Sunucu, `data-zeyn-total` ile ilk bloğu (`data-zeyn-page-size` satır, ofset 0) oluşturur. Grid kökünde ayrıca `data-zeyn-row-height` (piksel) ve `--z-row-height` CSS değişkeni bulunur.
+`data-zeyn-paging="virtual"` olan grid'ler, kaç satır olursa olsun tüm satırlar üzerinde tek bir kaydırılabilir liste gösterir. Sunucu, `data-zeyn-total` ile ilk bloğu (`data-zeyn-page-size` satır, ofset 0) oluşturur: ilk 64 satır tabloda, kalanı ondan sonra gelen `<template data-zeyn-rows-later>` içinde durur; grid 40 veya daha fazla sütun gösteriyorsa tüm satırlar template içindedir. Grid kökünde ayrıca `data-zeyn-row-height (piksel) ve `--z-row-height` CSS değişkeni bulunur.
 
 Runtime:
 
 - Tablo gövdesini, iç ara parçası `total * rowHeight` piksel yüksekliğinde olan bir kaydırma kapsayıcısına koyar; yükseklik 8.000.000 pikselle sınırlıdır. Sınırın üstünde kaydırma konumu satır indeksine oranla eşlenir (`row = scrollTop / (spacerHeight - viewport) * (total - visibleRows)`), böylece 1.000.000 satırda da sona ulaşılır.
 - DOM'da yalnızca görünen satırları ve alt ile üstteki 20'şer satırı tutar; bunları `transform: translateY(...)` ile konumlandırır. Satırların yüksekliği sabittir; uzun metin üç noktayla kesilir.
-- `data-zeyn-page-size` satırlık blokları `POST /_zeyn/grid` ile ve `page: { "type": "offset", "offset": blockStart, "limit": blockSize }` kullanarak yükler; ilk çağrıdan sonra `with_total: false` olur. Önbellekte en fazla 20 blok tutar (en az son kullanılan çıkar), kaydırma yönündeki sonraki bloğu önceden getirir ve görünümden çıkan bloklar için istekleri iptal eder (`AbortController`).
+- `data-zeyn-page-size` satırlık blokları `POST /_zeyn/grid` ile ve `page: { "type": "offset", "offset": blockStart, "limit": blockSize }` kullanarak yükler; ilk çağrıdan sonra `with_total: false` olur. Önbellekte en fazla 20 blok ve en çok 100.000 hücre tutar (en az son kullanılan çıkar; 63 sütunlu bir grid için 7 blok, hiçbir zaman 3'ten az değil), `reload` için saklanan blokları aynı sınıra sayar ve onları ilk önce atar, kaydırma yönündeki sonraki bloğu önceden getirir ve görünümden çıkan bloklar için istekleri iptal eder (`AbortController`).
 - Bir blok yüklenirken görünen satırları asla temizlemez. Eksik satırlar, blokları gelene kadar `aria-busy="true"` olan bir yer tutucu satır gösterir; böylece ekran yanıp sönmez.
 - Sıralama ve filtre değişiklikleri önbelleği düşürür ve en üste kaydırır.
 - Klavye: Ok tuşları, Page Up, Page Down, Home ve End etkin satırı taşır ve görünüme kaydırır. Tabloda `aria-rowcount` = total, her satırda `aria-rowindex` bulunur.
@@ -235,6 +239,8 @@ Her yanıt `x-zeyn-build` taşır. Runtime'ın üzerinde işlem yaptığı retle
 - Her yanıt şunları ayarlar: `Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`, `X-Content-Type-Options: nosniff` ve `Referrer-Policy: same-origin`. `App::csp`, adı verilen `https` sunucularını `img-src`, `media-src` (ve `blob:`), `frame-src`, `connect-src` ve `font-src` yönergelerine ekler; diğer yönergeler hiçbir zaman değişmez. Başlık metni açılışta bir kez oluşturulur.
 - Satır içi betik veya satır içi olay işleyicisi yoktur. Satır içi `style` öznitelikleri yalnızca CSS özel özellikleri (`--z-width`, `--z-flex`) ve sabit sütun genişlikleri için kullanılır; bu yüzden politika `style-src-attr 'unsafe-inline'` ekler. Betikler sıkı kalır.
 - CSRF belirteci `HttpOnly`, `SameSite=Strict` bir çerezde saklanır ve `x-zeyn-csrf` başlığıyla sabit zamanlı karşılaştırılır.
+- Sayfalar, `totp` formu ve `GET /_zeyn/csrf` belirteci çerezdeki haliyle asla taşımaz: her yanıt yeni bir rastgele pad ve ardından belirtecin bu pad ile XOR'lanmış halini (128 onaltılık hane) alır, böylece gzip onu sızdıramaz (BREACH). Sunucu karşılaştırmadan önce maskeyi açar ve düz 64 haneli belirteci hâlâ kabul eder.
+- 1 KB veya daha büyük dinamik yanıtlar (sayfalar, kısmi ekranlar, grid blokları, dışa aktarmalar) tarayıcı kabul ediyorsa 2. seviyede gzip ile sıkıştırılır ve `Vary: Accept-Encoding` taşır. Asla sıkıştırılmayanlar: zaten bir `Content-Encoding` taşıyan yanıtlar (bir kez sıkıştırılıp önbelleğe alınan framework varlıkları), aralıklar (`Content-Range` ve `Range` içeren her istek), video, ses, SVG dışındaki görseller, `application/octet-stream`, arşivler ve PDF'ler, `text/event-stream`, `application/x-ndjson` (asistanın akışı) ve WebSocket yükseltmeleri.
 - Her çağrı sırasıyla şunları denetler: kimlik doğrulama, ekranın erişimi, Feature'ın guard'ları, düğüm eyleminin erişimi; ardından interceptor'ları ve eylemi çalıştırır.
 
 ## 6. Runtime behavior

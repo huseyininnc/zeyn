@@ -20,8 +20,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="zeyn-csrf" content="TOKEN">
   <title>Products · Inventory</title>
-  <link rel="stylesheet" href="/_zeyn/zeyn.css">
-  <script type="module" src="/_zeyn/zeyn.js"></script>
+  <link rel="stylesheet" href="/_zeyn/zeyn.css?v=BUILD">
+  <script type="module" src="/_zeyn/zeyn.js?v=BUILD"></script>
 </head>
 <body>
   <a class="z-skip" href="#z-main">Skip to content</a>
@@ -35,6 +35,10 @@
 ```
 
 메뉴에는 현재 사용자가 열 수 있는 Screen만 나열됩니다. 현재 항목에는 `aria-current="page"`가 있습니다.
+
+head의 모든 프레임워크 스크립트와 스타일시트에는 `?v=`와 빌드 id(`meta[name=zeyn-build]`, `ZEYN_BUILD_ID` 또는 실행 파일의 해시)가 붙고, `theme.css`에는 테마 텍스트의 해시가 붙습니다. 현재 값을 가진 요청은 `Cache-Control: public, max-age=31536000, immutable`을 받으므로 웜 페이지 로드는 그중 어느 것도 요청하지 않습니다. 그 밖의 요청(배포 후의 오래된 탭, `v` 없음)은 `no-cache`와 ETag를 받습니다. 런타임이 나중에 가져오는 모듈은 자신을 가져오는 스크립트의 URL에서 같은 `v`를 이어받습니다.
+
+모든 페이지는 `zeyn.js`(요청, effect, 창, 폼, 메뉴, 단축키, 이벤트 위임), `nav.js`, `components.js`를 불러오고, 앱 셸에서는 `pro.js`와 `enterprise.js`도 불러옵니다. 나머지는 그것을 사용하는 페이지에서만 불러오며, `nav.js`가 Screen을 끼워 넣을 때도 마찬가지입니다. `zeyn.js`는 콘텐츠에 `[data-zeyn-grid]`가 처음 들어올 때 그리드 런타임 `grid.js`를 가져오고(그리드가 있는 전체 페이지는 `<link rel="modulepreload">`에 이를 명시합니다), `components.js`는 `catalog.js`(카드 그리드, 검색 상자), `media.js`(플레이어, 임베드), `files.js`(업로드), `charts.js`, `assistant.js`(채팅 패널 또는 런처를 처음 누를 때)를 가져옵니다. 이들의 스타일시트는 head에 남아 있으므로 스크립트가 도착해도 모양은 바뀌지 않습니다. 쇼케이스 대시보드에서는 스크립트 9개 403 KB(116 KB) 대신 5개 258 KB(전송 74 KB)입니다.
 
 ## 2. Screen 마크업
 
@@ -161,13 +165,13 @@ Effect:
 
 ### 4.2.2 가상 스크롤
 
-`data-zeyn-paging="virtual"`이 있는 그리드는 행이 아무리 많아도 모든 행에 걸친 하나의 스크롤 가능한 목록을 보여 줍니다. 서버는 `data-zeyn-total`과 함께 첫 번째 블록(`data-zeyn-page-size`행, 오프셋 0)을 렌더링합니다. 그리드 루트에는 `data-zeyn-row-height`(픽셀)와 CSS 변수 `--z-row-height`도 있습니다.
+`data-zeyn-paging="virtual"`이 있는 그리드는 행이 아무리 많아도 모든 행에 걸친 하나의 스크롤 가능한 목록을 보여 줍니다. 서버는 `data-zeyn-total`과 함께 첫 번째 블록(`data-zeyn-page-size`행, 오프셋 0)을 렌더링합니다. 처음 64행은 테이블에, 나머지는 그 뒤의 `<template data-zeyn-rows-later>`에 들어가며, 그리드가 40개 이상의 열을 보여 줄 때는 모든 행이 템플릿에 들어갑니다. 그리드 루트에는 `data-zeyn-row-height`(픽셀)와 CSS 변수 `--z-row-height`도 있습니다.
 
 런타임은 다음을 합니다.
 
 - 테이블 본문을 스크롤 컨테이너에 넣으며, 그 내부 스페이서의 높이는 `total * rowHeight` 픽셀이고 8,000,000 px로 제한됩니다. 상한을 넘으면 스크롤 위치가 비율로 행 인덱스에 매핑되므로(`row = scrollTop / (spacerHeight - viewport) * (total - visibleRows)`) 1,000,000행도 끝까지 도달합니다.
 - 보이는 행과 위아래 20행만 DOM에 유지하며 `transform: translateY(...)`로 배치합니다. 행의 높이는 고정이며 긴 텍스트는 줄임표로 잘립니다.
-- `POST /_zeyn/grid`와 `page: { "type": "offset", "offset": blockStart, "limit": blockSize }`로 `data-zeyn-page-size`행의 블록을 불러오며, 첫 호출 이후에는 `with_total: false`입니다. 최대 20개 블록을 캐시에 유지하고(가장 오래 사용하지 않은 것부터 제거), 스크롤 방향의 다음 블록을 미리 가져오며, 뷰를 벗어난 블록의 요청은 취소합니다(`AbortController`).
+- `POST /_zeyn/grid`와 `page: { "type": "offset", "offset": blockStart, "limit": blockSize }`로 `data-zeyn-page-size`행의 블록을 불러오며, 첫 호출 이후에는 `with_total: false`입니다. 최대 20개 블록과 최대 100,000개 셀을 캐시에 유지하고(가장 오래 사용하지 않은 것부터 제거. 63개 열 그리드는 7개 블록이며 3개보다 적지 않음), `reload`를 위해 보관하는 블록도 같은 상한에 포함되며 가장 먼저 버려지고, 스크롤 방향의 다음 블록을 미리 가져오며, 뷰를 벗어난 블록의 요청은 취소합니다(`AbortController`).
 - 블록을 불러오는 동안 보이는 행을 절대 지우지 않습니다. 없는 행은 해당 블록이 도착할 때까지 `aria-busy="true"`가 있는 자리 표시자 행을 표시하므로 화면이 깜박이지 않습니다.
 - 정렬과 필터가 바뀌면 캐시를 버리고 맨 위로 스크롤합니다.
 - 키보드: 화살표 키, Page Up, Page Down, Home, End는 활성 행을 이동하고 보이는 곳으로 스크롤합니다. 테이블에는 `aria-rowcount` = total이, 각 행에는 `aria-rowindex`가 있습니다.
@@ -235,6 +239,8 @@ Effect:
 - 모든 응답은 `Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`을 설정합니다. `App::csp`는 지정한 `https` 호스트를 `img-src`, `media-src`(와 `blob:`), `frame-src`, `connect-src`, `font-src`에 추가하며, 다른 지시문은 절대 바뀌지 않습니다. 헤더 텍스트는 시작할 때 한 번 만들어집니다.
 - 인라인 스크립트나 인라인 이벤트 핸들러는 없습니다. 인라인 `style` 속성은 CSS 사용자 지정 속성(`--z-width`, `--z-flex`)과 고정된 열 너비에만 사용되므로 정책은 `style-src-attr 'unsafe-inline'`을 추가합니다. 스크립트는 엄격하게 유지됩니다.
 - CSRF 토큰은 `HttpOnly`, `SameSite=Strict` 쿠키에 저장되며 `x-zeyn-csrf` 헤더와 일정한 시간으로 비교됩니다.
+- 페이지, `totp` 폼, `GET /_zeyn/csrf`는 토큰을 쿠키에 있는 그대로 싣지 않습니다. 응답마다 새로운 무작위 패드 뒤에 토큰과 패드의 XOR(16진수 128자리)을 붙이므로 gzip이 토큰을 유출할 수 없습니다(BREACH). 서버는 비교하기 전에 마스킹을 풀며 일반 64자리 토큰도 여전히 받아들입니다.
+- 1 KB 이상의 동적 응답(페이지, 부분 Screen, 그리드 블록, 내보내기)은 브라우저가 받아들이면 레벨 2로 gzip 압축되고 `Vary: Accept-Encoding`이 붙습니다. 압축하지 않는 것: 이미 `Content-Encoding`이 있는 응답(한 번 압축해 캐시하는 프레임워크 에셋), 범위 응답(`Content-Range`와 `Range`가 있는 모든 요청), 비디오, 오디오, SVG 외의 이미지, `application/octet-stream`, 아카이브와 PDF, `text/event-stream`, `application/x-ndjson`(어시스턴트의 스트림), WebSocket 업그레이드.
 - 각 호출은 순서대로 인증, Screen의 접근 권한, Feature의 가드, 노드 action의 접근 권한을 검사한 다음 인터셉터와 action을 실행합니다.
 
 ## 6. 런타임 동작

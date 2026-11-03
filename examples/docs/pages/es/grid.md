@@ -243,7 +243,11 @@ a cada lado). Cada columna recibe un ancho fijo, y una celda espaciadora represe
 columnas omitidas a cada lado, de modo que los anchos, las columnas fijadas y el desplazamiento se mantienen como estaban. Las filas conservan su lista
 completa de celdas, por lo que copiar, pegar y editar ven todas las columnas, y las celdas llevan `aria-colindex`.
 La ventana se mueve solo cuando una columna fuera de ella entra en la vista. El servidor sigue enviando cada
-celda de una fila.
+celda de una fila. Un grid virtual así de ancho (`VIRTUAL_WIDE_COLUMNS`, contando las columnas de selección, detalle
+y acciones de fila) envía todo su primer bloque dentro de `<template data-zeyn-rows-later>` en lugar de 64 filas
+vivas, de modo que el navegador nunca maqueta una fila con todas las columnas: en el grid ancho de la galería la tarea
+más larga del arranque pasó de 259 a 112 ms y DOMContentLoaded de 402 a 228 ms (medianas de 8 cargas
+intercaladas, servidor release, máquina ocupada).
 
 Medido en el grid ancho de la galería (62 columnas, 100.000 filas, desplazamiento virtual, servidor de depuración,
 Chromium, ventana de 1400 por 900, pantalla de 144 Hz), con y sin virtualización de columnas:
@@ -307,3 +311,14 @@ pantalla de 144 Hz) con la Performance API:
 
 El DOM contiene 62 filas (unos 660 elementos), y el heap de JS se mantiene cerca de 4 MB. Exportar 100.000 filas
 del mismo archivo transmitió 7 MB en 3,4 segundos.
+
+### Mantén barato el constructor de la pantalla
+
+Las peticiones no guardan estado, así que cada petición de un grid reconstruye la pantalla que lo contiene: cada bloque que pide un grid virtual (cada 200 filas desplazadas), cada página, ordenación, filtro y exportación, cada edición en línea y cada acción de fila ejecutan de nuevo la función `#[screen]` antes de ejecutar la action del grid. El servidor necesita la pantalla para encontrar el grid por su ruta de nodo y comprobar el acceso, así que este es el precio de no guardar estado por usuario.
+
+Un constructor que solo coloca componentes cuesta microsegundos. Un constructor que consulta la base de datos paga esa consulta en cada una de esas peticiones. Por eso:
+
+- Carga las filas en la action del grid (`DataGrid::of(search)`). De todos modos se ejecuta una vez por petición y recibe el `DataQuery` con la página, la ordenación y los filtros.
+- Las opciones y las búsquedas pertenecen al tipo del campo (`#[choice]`), a una búsqueda de formulario (`Form::lookup`, que consulta su action cuando el usuario escribe) o a un servicio que las guarda en una caché con límite, no a una consulta que ejecute el constructor.
+- Cuando una pantalla debe cargar un registro (`Form::of(record)`), mantén fuera de ella los grids grandes o virtuales: ponlos en su propia pantalla, en una pantalla de detalle (`DataGrid::detail`) o en una ventana, para que sus peticiones de bloque reconstruyan una pantalla que no carga nada.
+- Los parámetros de la pantalla son la entrada que necesita el constructor; limítalos a claves y deja que la action del grid filtre por ellos (`DataGrid::scope`).

@@ -20,8 +20,8 @@ Una página fallida responde con su estado (404, 403, 500, ...) y la pantalla de
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="zeyn-csrf" content="TOKEN">
   <title>Products · Inventory</title>
-  <link rel="stylesheet" href="/_zeyn/zeyn.css">
-  <script type="module" src="/_zeyn/zeyn.js"></script>
+  <link rel="stylesheet" href="/_zeyn/zeyn.css?v=BUILD">
+  <script type="module" src="/_zeyn/zeyn.js?v=BUILD"></script>
 </head>
 <body>
   <a class="z-skip" href="#z-main">Skip to content</a>
@@ -35,6 +35,10 @@ Una página fallida responde con su estado (404, 403, 500, ...) y la pantalla de
 ```
 
 El menú enumera solo las pantallas que el usuario actual puede abrir. El elemento actual tiene `aria-current="page"`.
+
+Cada script y hoja de estilos del framework en el head lleva `?v=` y el id de compilación (`meta[name=zeyn-build]`, de `ZEYN_BUILD_ID` o un hash del ejecutable); `theme.css` lleva un hash del texto del tema. Una petición con el valor actual recibe `Cache-Control: public, max-age=31536000, immutable`, así que una carga de página en caliente no pide ninguno de ellos; cualquier otra petición (una pestaña antigua tras un despliegue, sin `v`) recibe `no-cache` y el ETag. Los módulos que el runtime importa más tarde toman el mismo `v` de la URL del script que los importa.
+
+Cada página carga `zeyn.js` (peticiones, efectos, ventanas, formularios, menús, atajos y la delegación de eventos), `nav.js`, `components.js` y, en el shell de la aplicación, `pro.js` y `enterprise.js`. El resto se carga solo en las páginas que lo usan, también cuando `nav.js` intercambia una pantalla: `zeyn.js` importa el runtime del grid `grid.js` la primera vez que el contenido tiene un `[data-zeyn-grid]` (las páginas completas con un grid lo nombran en `<link rel="modulepreload">`), y `components.js` importa `catalog.js` (rejillas de tarjetas, cajas de búsqueda), `media.js` (reproductores, incrustaciones), `files.js` (subidas), `charts.js` y `assistant.js` (paneles de chat, o la primera pulsación del lanzador). Sus hojas de estilos se quedan en el head, así que nada cambia de aspecto cuando llega el script. En el panel del showcase son 5 scripts y 258 KB (74 KB por la red) en lugar de 9 scripts y 403 KB (116 KB).
 
 ## 2. Marcado de la pantalla
 
@@ -161,13 +165,13 @@ Los grids agrupados y de árbol (`<table role="treegrid">`) envían `path` con `
 
 ### 4.2.2 Scroll virtual
 
-Los grids con `data-zeyn-paging="virtual"` muestran una única lista desplazable sobre todas las filas, sean cuantas sean. El servidor renderiza el primer bloque (`data-zeyn-page-size` filas, offset 0) con `data-zeyn-total`. La raíz del grid también tiene `data-zeyn-row-height` (píxeles) y la variable CSS `--z-row-height`.
+Los grids con `data-zeyn-paging="virtual"` muestran una única lista desplazable sobre todas las filas, sean cuantas sean. El servidor renderiza el primer bloque (`data-zeyn-page-size` filas, offset 0) con `data-zeyn-total`: las primeras 64 filas viven en la tabla y el resto en `<template data-zeyn-rows-later>` después de ella, o todas las filas en la plantilla cuando el grid muestra 40 columnas o más. La raíz del grid también tiene `data-zeyn-row-height` (píxeles) y la variable CSS `--z-row-height`.
 
 El runtime:
 
 - Coloca el cuerpo de la tabla en un contenedor con scroll cuyo espaciador interno mide `total * rowHeight` píxeles de alto, con un tope de 8 000 000 px. Por encima del tope, la posición del scroll se asigna al índice de fila por proporción (`row = scrollTop / (spacerHeight - viewport) * (total - visibleRows)`), de modo que 1 000 000 de filas aún llegan hasta el final.
 - Mantiene en el DOM solo las filas visibles más 20 filas por encima y por debajo, posicionadas con `transform: translateY(...)`. Las filas tienen una altura fija; el texto largo se corta con puntos suspensivos.
-- Carga bloques de `data-zeyn-page-size` filas con `POST /_zeyn/grid` y `page: { "type": "offset", "offset": blockStart, "limit": blockSize }`, con `with_total: false` después de la primera llamada. Mantiene hasta 20 bloques en una caché (sale el menos usado recientemente), precarga el siguiente bloque en la dirección del scroll y cancela las peticiones de los bloques que salieron de la vista (`AbortController`).
+- Carga bloques de `data-zeyn-page-size` filas con `POST /_zeyn/grid` y `page: { "type": "offset", "offset": blockStart, "limit": blockSize }`, con `with_total: false` después de la primera llamada. Mantiene hasta 20 bloques y como máximo 100.000 celdas en una caché (sale el menos usado recientemente; 7 bloques para un grid de 63 columnas, nunca menos de 3), y los bloques guardados para un `reload` cuentan en el mismo tope y salen primero, precarga el siguiente bloque en la dirección del scroll y cancela las peticiones de los bloques que salieron de la vista (`AbortController`).
 - Nunca borra las filas visibles mientras se carga un bloque. Las filas ausentes muestran una fila marcadora con `aria-busy="true"` hasta que llega su bloque, de modo que la pantalla no parpadea.
 - Los cambios de ordenación y de filtro descartan la caché y vuelven al inicio.
 - Teclado: las teclas de flecha, Page Up, Page Down, Home y End mueven la fila activa y la desplazan hasta dejarla a la vista. La tabla tiene `aria-rowcount` = total y cada fila `aria-rowindex`.
@@ -237,6 +241,8 @@ la petición).
 - Cada respuesta establece `Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`, `X-Content-Type-Options: nosniff` y `Referrer-Policy: same-origin`. `App::csp` añade hosts `https` con nombre a `img-src`, `media-src` (y `blob:`), `frame-src`, `connect-src` y `font-src`; las demás directivas nunca cambian. El texto de la cabecera se construye una sola vez al iniciar.
 - Sin scripts en línea ni manejadores de eventos en línea. Los atributos `style` en línea se usan solo para propiedades personalizadas de CSS (`--z-width`, `--z-flex`) y anchos de columna fijos, por lo que la política añade `style-src-attr 'unsafe-inline'`. Los scripts siguen siendo estrictos.
 - El token CSRF se guarda en una cookie `HttpOnly`, `SameSite=Strict` y se compara en tiempo constante con la cabecera `x-zeyn-csrf`.
+- Las páginas, el formulario `totp` y `GET /_zeyn/csrf` nunca llevan el token tal como está en la cookie: cada respuesta recibe un relleno aleatorio nuevo seguido del token XOR el relleno (128 dígitos hexadecimales), para que gzip no pueda filtrarlo (BREACH). El servidor lo desenmascara antes de comparar y sigue aceptando el token simple de 64 dígitos.
+- Las respuestas dinámicas de 1 KB o más (páginas, pantallas parciales, bloques de grid, exportaciones) se comprimen con gzip en el nivel 2 cuando el navegador lo acepta, con `Vary: Accept-Encoding`. Nunca se comprimen: las respuestas que ya tienen un `Content-Encoding` (los recursos del framework, comprimidos una vez y guardados en caché), los rangos (`Content-Range` y cualquier petición con `Range`), vídeo, audio, imágenes distintas de SVG, `application/octet-stream`, archivos comprimidos y PDF, `text/event-stream`, `application/x-ndjson` (el flujo del asistente) y las actualizaciones a WebSocket.
 - Cada llamada comprueba, por orden: la autenticación, el acceso de la pantalla, los guards de la feature, el acceso de la action del nodo, y luego ejecuta los interceptores y la action.
 
 ## 6. Comportamiento del runtime
