@@ -7072,6 +7072,7 @@ dependencies = [
  "base64 0.22.1",
  "calamine",
  "ed25519-dalek",
+ "flate2",
  "futures-core",
  "futures-util",
  "getrandom 0.2.17",

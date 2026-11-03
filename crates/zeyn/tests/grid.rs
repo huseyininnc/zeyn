@@ -1365,3 +1365,26 @@ async fn an_export_refused_by_an_interceptor_still_reaches_its_after() {
     assert_eq!(r.status, StatusCode::FORBIDDEN);
     assert_eq!(*refuse.0.read().unwrap(), [false], "audit interceptors record the refused export");
 }
+
+#[screen(route = "/long", permission = "items.read")]
+pub fn long_list() -> Screen {
+    Screen::new("Long").body(DataGrid::of(search).paging(Paging::virtual_scroll()).column(Item::code))
+}
+
+#[tokio::test]
+async fn virtual_grids_render_one_screen_of_rows_live_and_keep_the_rest_of_the_block_inert() {
+    let rows = (1..=150).map(|i| Item { id: ItemId(i), code: format!("R-{i:03}"), ..item(i % 28 + 1) }).collect();
+    let router = App::new("Test")
+        .service(Store(Arc::new(RwLock::new(rows))))
+        .auth(|h: &HeaderMap| h.contains_key("x-user").then(reader))
+        .feature(Feature::new("items").screen(long_list))
+        .router()
+        .unwrap();
+    let r = send(&router, get("/long")).await;
+    let (live, later) = r.body.split_once("<template data-zeyn-rows-later>").expect("rows after the first screen wait in a template");
+    let later = &later[..later.find("</template>").unwrap()];
+    assert_eq!(live.matches("R-").count(), zeyn::VIRTUAL_LIVE_ROWS, "{live}");
+    assert!(live.contains("R-064") && !live.contains("R-065"));
+    assert_eq!(later.matches("R-").count(), 150 - zeyn::VIRTUAL_LIVE_ROWS);
+    assert!(later.starts_with("<tr") && later.contains("R-150"));
+}

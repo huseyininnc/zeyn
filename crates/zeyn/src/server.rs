@@ -1480,6 +1480,7 @@ impl App {
         let router = router
             .layer(axum::middleware::from_fn_with_state(state.clone(), catch_panics))
             .layer(axum::middleware::from_fn_with_state(state.clone(), guard::guard_request))
+            .layer(axum::middleware::from_fn(static_files))
             .layer(axum::middleware::map_response_with_state(state.clone(), guard::security_headers))
             .layer(axum::middleware::map_response(ops::stamp))
             .layer(axum::middleware::from_fn(guard::trace_request))
@@ -2271,6 +2272,93 @@ fn user_render<'a>(scope: &'a str, ctx: &'a Ctx) -> Render<'a> {
 fn normalize_base(path: &str) -> String {
     let trimmed = path.trim().trim_matches('/');
     if trimmed.is_empty() { String::new() } else { format!("/{trimmed}") }
+}
+
+/// Framework files that are kept compressed, at most this many.
+const STATIC_CACHE: usize = 64;
+
+/// The ETag and the gzip bytes of a framework file, by the address and length of its bytes.
+type StaticEntry = (HeaderValue, Option<axum::body::Bytes>);
+
+static STATIC_FILES: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<(usize, usize), Arc<StaticEntry>>>> =
+    std::sync::OnceLock::new();
+
+/// Revalidation and compression for the framework's own scripts and styles (`/_zeyn/*.js` and
+/// `*.css`, not media or uploads): a strong ETag over the bytes, `304 Not Modified` for a
+/// matching `If-None-Match`, and gzip when the browser accepts it. Each file is hashed and
+/// compressed once and kept ([`STATIC_CACHE`] files at most); files under 1 KB, such as the
+/// theme, get an ETag but no compression.
+async fn static_files(req: axum::extract::Request, next: axum::middleware::Next) -> Response {
+    let path = req.uri().path();
+    let framework = path.contains("/_zeyn/")
+        && (path.ends_with(".js") || path.ends_with(".css"))
+        && !path.contains("/_zeyn/media/")
+        && !path.contains("/_zeyn/files/");
+    if req.method() != axum::http::Method::GET || !framework {
+        return next.run(req).await;
+    }
+    let gzip = req
+        .headers()
+        .get_all(header::ACCEPT_ENCODING)
+        .iter()
+        .filter_map(|v| v.to_str().ok())
+        .flat_map(|v| v.split(','))
+        .any(|e| {
+            let mut p = e.split(';');
+            p.next().is_some_and(|n| n.trim().eq_ignore_ascii_case("gzip"))
+                && !p.any(|q| q.trim().strip_prefix("q=").is_some_and(|v| v.trim().parse::<f32>().is_ok_and(|v| v == 0.0)))
+        });
+    let headers = req.headers().clone();
+    let response = next.run(req).await;
+    if response.status() != StatusCode::OK
+        || response.headers().contains_key(header::ETAG)
+        || response.headers().contains_key(header::CONTENT_ENCODING)
+    {
+        return response;
+    }
+    let (mut parts, body) = response.into_parts();
+    let Ok(bytes) = axum::body::to_bytes(body, 4 << 20).await else {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    };
+    let key = (bytes.as_ptr() as usize, bytes.len());
+    let cache = STATIC_FILES.get_or_init(Default::default);
+    let known = cache.lock().ok().and_then(|c| c.get(&key).cloned());
+    let entry = known.unwrap_or_else(|| {
+        let text = std::str::from_utf8(&bytes).unwrap_or("");
+        let tag = HeaderValue::from_str(&etag("s", &[text])).unwrap_or(HeaderValue::from_static("\"s\""));
+        let packed = (bytes.len() >= 1024).then(|| {
+            use std::io::Write;
+            let mut z = flate2::write::GzEncoder::new(Vec::with_capacity(bytes.len() / 3), flate2::Compression::new(6));
+            z.write_all(&bytes).ok();
+            z.finish().ok().map(axum::body::Bytes::from)
+        });
+        let entry = Arc::new((tag, packed.flatten()));
+        if let Ok(mut c) = cache.lock() {
+            if c.len() < STATIC_CACHE {
+                c.insert(key, entry.clone());
+            }
+        }
+        entry
+    });
+    let (tag, packed) = &*entry;
+    parts.headers.insert(header::ETAG, tag.clone());
+    parts.headers.insert(header::VARY, HeaderValue::from_static("accept-encoding"));
+    if etag_matches(&headers, tag.to_str().unwrap_or("")) {
+        parts.status = StatusCode::NOT_MODIFIED;
+        parts.headers.remove(header::CONTENT_LENGTH);
+        return Response::from_parts(parts, axum::body::Body::empty());
+    }
+    match packed {
+        Some(z) if gzip => {
+            parts.headers.insert(header::CONTENT_ENCODING, HeaderValue::from_static("gzip"));
+            parts.headers.insert(header::CONTENT_LENGTH, HeaderValue::from(z.len()));
+            Response::from_parts(parts, axum::body::Body::from(z.clone()))
+        }
+        _ => {
+            parts.headers.insert(header::CONTENT_LENGTH, HeaderValue::from(bytes.len()));
+            Response::from_parts(parts, axum::body::Body::from(bytes))
+        }
+    }
 }
 
 fn asset(body: &'static str, content_type: &'static str) -> Response {

@@ -622,3 +622,38 @@ fn csp_fixed_directives_cannot_be_opened() {
         assert_eq!(h.matches("frame-ancestors").count(), 1);
     }
 }
+
+#[tokio::test]
+async fn framework_scripts_and_styles_are_gzipped_once_and_revalidate_with_304() {
+    use std::io::Read;
+    let router = router(writer());
+    let plain = send(&router, Request::get("/_zeyn/zeyn.js").body(Body::empty()).unwrap()).await;
+    assert_eq!(plain.status, StatusCode::OK);
+    assert!(plain.headers.get(header::CONTENT_ENCODING).is_none());
+    let tag = plain.headers.get(header::ETAG).expect("an ETag").to_str().unwrap().to_string();
+    assert_eq!(plain.headers.get(header::VARY).unwrap(), "accept-encoding");
+
+    let res = router
+        .clone()
+        .oneshot(Request::get("/_zeyn/zeyn.js").header(header::ACCEPT_ENCODING, "br, gzip;q=0.8").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(res.headers().get(header::CONTENT_ENCODING).unwrap(), "gzip");
+    assert_eq!(res.headers().get(header::ETAG).unwrap(), tag.as_str());
+    let packed = res.into_body().collect().await.unwrap().to_bytes();
+    assert!(packed.len() * 3 < plain.body.len(), "{} of {}", packed.len(), plain.body.len());
+    let mut text = String::new();
+    flate2::read::GzDecoder::new(&packed[..]).read_to_string(&mut text).unwrap();
+    assert_eq!(text, plain.body);
+
+    let refused = send(
+        &router,
+        Request::get("/_zeyn/zeyn.js").header(header::ACCEPT_ENCODING, "gzip;q=0").body(Body::empty()).unwrap(),
+    )
+    .await;
+    assert!(refused.headers.get(header::CONTENT_ENCODING).is_none());
+
+    let again = send(&router, Request::get("/_zeyn/zeyn.js").header(header::IF_NONE_MATCH, &tag).body(Body::empty()).unwrap()).await;
+    assert_eq!(again.status, StatusCode::NOT_MODIFIED);
+    assert!(again.body.is_empty());
+}

@@ -12,7 +12,7 @@ categories = ["web-programming::http-server", "gui"]
 
 [features]
 default = ["server"]
-server = ["dep:axum", "dep:tokio", "dep:getrandom", "dep:tower-http", "dep:futures-core", "dep:tracing-subscriber"]
+server = ["dep:axum", "dep:tokio", "dep:getrandom", "dep:tower-http", "dep:futures-core", "dep:tracing-subscriber", "dep:flate2"]
 signed-licenses = ["dep:ed25519-dalek"]
 redis = ["server", "dep:redis"]
 otel = ["server", "dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp", "dep:tracing-opentelemetry"]
@@ -55,6 +55,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time",
 futures-core = { version = "0.3", optional = true }
 getrandom = { version = "0.2", optional = true }
 tower-http = { version = "0.6", features = ["cors"], optional = true }
+flate2 = { version = "1.1", optional = true }
 reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "http2", "json"], optional = true }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"], optional = true }
 ed25519-dalek = { version = "3", default-features = false, optional = true }
@@ -99,6 +100,7 @@ yrs = "0.28"
 calamine = { version = "0.38", default-features = false }
 rust_xlsxwriter = { version = "0.102", default-features = false }
 zip = { version = "9", default-features = false, features = ["deflate"] }
+flate2 = "1.1"
 
 [[test]]
 name = "assistant"

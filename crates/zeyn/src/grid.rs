@@ -51,6 +51,10 @@ impl DataMode {
     }
 }
 
+/// Rows of a virtual grid's first block rendered live in the page (enough for a tall screen
+/// plus the overscan); the rest of the block waits in a `<template>` until it scrolls into view.
+pub const VIRTUAL_LIVE_ROWS: usize = 64;
+
 /// How a grid loads rows beyond the first batch.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -102,7 +106,9 @@ impl Paging {
         Paging::None
     }
 
-    /// Virtual scrolling with 32 px rows, fetched in blocks of 200. For very large lists.
+    /// Virtual scrolling with 32 px rows, fetched in blocks of 200. For very large lists. The
+    /// server sends the first block; rows after [`VIRTUAL_LIVE_ROWS`] go in an inert `<template>`
+    /// so the browser styles and lays out only what fits on a screen.
     pub const fn virtual_scroll() -> Self {
         Paging::Virtual { row_height: 32, block: 200 }
     }
@@ -1234,8 +1240,17 @@ impl<E: Model> DataGrid<E> {
             self.columns.len() + usize::from(!self.row_actions.is_empty()) + self.lead(r),
             self.head_row(r, &cols)
         ));
+        let mut later = String::new();
         if let Some(p) = page {
-            out.push_str(&self.rows_html_erased(p, r));
+            match (self.paging, p.items.downcast_ref::<Vec<E>>()) {
+                (Paging::Virtual { .. }, Some(rows)) if p.groups.is_none() && rows.len() > VIRTUAL_LIVE_ROWS => {
+                    let cols = self.layout(p.view.as_ref());
+                    let branch = Branch { depth: p.depth, path: &p.path, parents: &p.parents };
+                    out.push_str(&self.rows(&rows[..VIRTUAL_LIVE_ROWS], r, &cols, &branch));
+                    later = self.rows(&rows[VIRTUAL_LIVE_ROWS..], r, &cols, &branch);
+                }
+                _ => out.push_str(&self.rows_html_erased(p, r)),
+            }
         }
         out.push_str("</tbody>");
         if self.columns.iter().any(|c| !c.aggregates.is_empty()) {
@@ -1244,6 +1259,11 @@ impl<E: Model> DataGrid<E> {
             out.push_str("</tfoot>");
         }
         out.push_str("</table>");
+        if !later.is_empty() {
+            out.push_str("<template data-zeyn-rows-later>");
+            out.push_str(&later);
+            out.push_str("</template>");
+        }
         match self.paging {
             Paging::Pages { .. } => out.push_str(&format!(
                 r#"<nav class="z-pager" aria-label="{}" data-testid="{scope}.pager"><button type="button" class="z-button" data-zeyn-page="prev" data-testid="{scope}.pager.prev" aria-label="{}" disabled>&lsaquo;</button><span class="z-page-info" aria-live="polite" data-zeyn-page-info></span><button type="button" class="z-button" data-zeyn-page="next" data-testid="{scope}.pager.next" aria-label="{}">&rsaquo;</button></nav>"#,

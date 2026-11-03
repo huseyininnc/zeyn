@@ -155,6 +155,7 @@ function setupHead(grid, s) {
   const head = grid.querySelector('thead tr');
   if (!head) return;
   const t = s.texts;
+  const widths = new Map([...head.cells].map((th) => [th, Math.round(th.getBoundingClientRect().width)]));
   for (const th of head.cells) {
     if (!th.dataset.field) continue;
     const label = th.textContent.trim();
@@ -173,7 +174,7 @@ function setupHead(grid, s) {
       'aria-label': fill(t.menu_resize || 'Resize {label}', { label }),
       'aria-valuemin': String(MIN_COLUMN),
       'aria-valuemax': String(MAX_COLUMN),
-      'aria-valuenow': String(Math.min(MAX_COLUMN, Math.max(MIN_COLUMN, Math.round(th.getBoundingClientRect().width) || MIN_COLUMN))),
+      'aria-valuenow': String(Math.min(MAX_COLUMN, Math.max(MIN_COLUMN, widths.get(th) || MIN_COLUMN))),
     });
     const inner = make('div', 'z-th');
     inner.append(sort, menu);

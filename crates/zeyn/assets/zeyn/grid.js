@@ -255,7 +255,8 @@ function updateChrome(grid, announce = false) {
  * Sets up a virtual grid (protocol 4.6). The grid root is the scroll container; a spacer
  * `tbody` after the rows gives the table its full height (capped at 8,000,000 px), and the rows
  * `tbody` holds only the visible rows plus 20 above and below, moved with `translateY`.
- * The server rendered first block becomes the first cache entry.
+ * The server rendered first block becomes the first cache entry, with the rows the server put
+ * in a `<template data-zeyn-rows-later>` (inert until they scroll into view).
  */
 function initVirtual(grid, s) {
   const body = grid.querySelector('[data-zeyn-rows]');
@@ -298,8 +299,11 @@ function initVirtual(grid, s) {
     infoTimer: 0,
   });
   const first = Math.floor(s.offset / s.size);
-  s.cache.set(first, [...body.rows].map((tr, k) => prepRow(s, tr, first * s.size + k)));
-  s.total ??= body.rows.length;
+  const later = grid.querySelector(':scope > template[data-zeyn-rows-later]');
+  const rows = [...body.rows, ...(later ? later.content.children : [])];
+  later?.remove();
+  s.cache.set(first, rows.map((tr, k) => prepRow(s, tr, first * s.size + k)));
+  s.total ??= rows.length;
   grid.tabIndex = -1;
   measureVirtual(s);
   grid.addEventListener('scroll', () => scheduleVirtual(grid), { passive: true });
@@ -423,7 +427,8 @@ function renderVirtual(grid, focusIndex = null) {
   for (let b = Math.floor(start / s.size); b * s.size < Math.max(end, start + 1); b++) blocks.add(b);
   const shown = [...blocks].every((b) => s.cache.has(b));
   const ahead = s.dir > 0 ? Math.max(...blocks) + 1 : Math.min(...blocks) - 1;
-  if (shown && ahead >= 0 && ahead * s.size < total) blocks.add(ahead);
+  const near = s.dir > 0 ? ahead * s.size - end : start - (ahead + 1) * s.size;
+  if (shown && ahead >= 0 && ahead * s.size < total && near < s.size / 2) blocks.add(ahead);
   for (const [b, controller] of s.inflight) {
     if (!blocks.has(b)) {
       controller.abort();
