@@ -311,3 +311,25 @@ Measured on the showcase archive (1,000,000 rows, virtual scrolling, debug serve
 
 The DOM holds 62 rows (about 660 elements), and the JS heap stays near 4 MB. Exporting 100,000 rows
 from the same archive streamed 7 MB in 3.4 seconds.
+
+### Keep the screen builder cheap
+
+Requests are stateless, so every grid request rebuilds the screen that holds the grid: each block
+a virtual grid fetches (every 200 rows scrolled), each page, sort, filter and export, each inline
+edit and each row action runs the `#[screen]` function again before it runs the grid's action.
+The server needs the screen to find the grid by its node path and to check access, so this is
+the price of not keeping state per user.
+
+A builder that only lays out components costs microseconds. A builder that queries the
+database pays that query on every one of those requests. So:
+
+- Load the rows in the grid's action (`DataGrid::of(search)`). It runs once per request anyway
+  and gets the `DataQuery` with the page, the sort and the filters.
+- Choices and lookups belong in the field type (`#[choice]`), in a form lookup
+  (`Form::lookup`, which asks its action when the user types) or in a service that keeps them in
+  a capped cache, not in a query the builder runs.
+- When a screen must load a record (`Form::of(record)`), keep large or virtual grids off it: put
+  them on their own screen, in a detail screen (`DataGrid::detail`) or in a window, so their
+  block requests rebuild a screen that loads nothing.
+- Screen params are the input the builder needs; keep them to keys, and let the grid's action
+  filter by them (`DataGrid::scope`).
