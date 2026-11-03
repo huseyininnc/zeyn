@@ -96,7 +96,8 @@ document.addEventListener('keydown', (e) => {
     const owner = t.closest('[data-zeyn-rows] > tr[data-zeyn-menu], [data-zeyn-screen][data-zeyn-menu]');
     if (owner) {
       const box = (owner.matches('tr') ? owner : t).getBoundingClientRect();
-      if (openContextMenu(owner, { x: box.left + 16, y: box.bottom }, t)) return e.preventDefault();
+      const x = getComputedStyle(owner).direction === 'rtl' ? box.right - 16 : box.left + 16;
+      if (openContextMenu(owner, { x, y: box.bottom }, t)) return e.preventDefault();
     }
   }
   const vg = t instanceof Element ? t.closest('[data-zeyn-grid][data-zeyn-paging="virtual"]') : null;

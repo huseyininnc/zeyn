@@ -30,7 +30,7 @@
 
 .z-notice {
   position: fixed;
-  left: 16px;
+  inset-inline-start: 16px;
   bottom: 16px;
   z-index: 60;
   display: flex;
@@ -40,7 +40,7 @@
   max-width: min(560px, calc(100vw - 32px));
   padding: calc(var(--z-space) * 3) calc(var(--z-space) * 4);
   border: 1px solid var(--z-border);
-  border-left: 3px solid var(--z-info);
+  border-inline-start: 3px solid var(--z-info);
   border-radius: var(--z-radius);
   background: var(--z-surface);
   color: var(--z-text);
@@ -56,7 +56,7 @@
   margin-bottom: var(--z-gap);
   padding: calc(var(--z-space) * 2) calc(var(--z-space) * 3);
   border: 1px solid var(--z-border);
-  border-left: 3px solid var(--z-info);
+  border-inline-start: 3px solid var(--z-info);
   border-radius: var(--z-radius);
   background: var(--z-info-subtle);
 }
@@ -66,7 +66,7 @@
 .z-transitions .z-state { margin: 0; }
 
 @media (forced-colors: active) {
-  .z-notice, .z-draft-note { border-left-color: CanvasText; }
+  .z-notice, .z-draft-note { border-inline-start-color: CanvasText; }
 }
 
 .z-import { display: grid; gap: var(--z-gap); max-width: 960px; }

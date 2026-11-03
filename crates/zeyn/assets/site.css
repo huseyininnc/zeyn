@@ -250,12 +250,13 @@
     flex-direction: column;
     align-items: stretch;
   }
-  .z-site-menu > li > a[aria-current="page"] { box-shadow: inset 2px 0 0 var(--z-accent); }
+  .z-site-menu > li > a[aria-current="page"] { box-shadow: inset calc(2px * var(--z-dir)) 0 0 var(--z-accent); }
   .z-site-group-button { width: 100%; justify-content: space-between; }
   .z-site-sub {
     position: static;
     min-width: 0;
-    padding: 0 0 0 12px;
+    padding: 0;
+    padding-inline-start: 12px;
     border: 0;
     box-shadow: none;
     background: none;

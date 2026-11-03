@@ -114,7 +114,8 @@
 .z-msg-user {
   align-self: flex-end;
   padding: 0.5rem 0.75rem;
-  border-radius: calc(var(--z-radius) * 3) calc(var(--z-radius) * 3) var(--z-radius) calc(var(--z-radius) * 3);
+  border-radius: calc(var(--z-radius) * 3);
+  border-end-end-radius: var(--z-radius);
   background: var(--z-primary);
   color: var(--z-on-primary);
   white-space: pre-wrap;
@@ -123,7 +124,8 @@
 .z-msg-assistant {
   align-self: flex-start;
   padding: 0.5rem 0.75rem;
-  border-radius: calc(var(--z-radius) * 3) calc(var(--z-radius) * 3) calc(var(--z-radius) * 3) var(--z-radius);
+  border-radius: calc(var(--z-radius) * 3);
+  border-end-start-radius: var(--z-radius);
   background: var(--z-surface-2);
   border: 1px solid var(--z-border);
 }

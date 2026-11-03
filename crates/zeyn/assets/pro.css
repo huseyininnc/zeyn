@@ -15,7 +15,8 @@
   width: 100%;
   min-height: var(--z-control);
   margin: 0 0 calc(var(--z-space) * 1);
-  padding: 0 8px 0 10px;
+  padding-block: 0;
+  padding-inline: 10px 8px;
   border: 1px solid var(--z-border);
   border-radius: var(--z-radius);
   background: var(--z-surface-2);
@@ -97,7 +98,7 @@ dialog.z-palette::backdrop { background: var(--z-backdrop); }
 
 .z-palette-option[aria-selected="true"] {
   background: var(--z-brand-subtle);
-  box-shadow: inset 2px 0 0 var(--z-accent);
+  box-shadow: inset calc(2px * var(--z-dir)) 0 0 var(--z-accent);
 }
 
 .z-palette-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -291,6 +292,8 @@ dialog.z-palette::backdrop { background: var(--z-backdrop); }
 }
 
 .z-form-section[open] > .z-form-section-title::before { transform: rotate(45deg); }
+
+[dir="rtl"] .z-form-section-title::before { scale: -1 1; }
 
 .z-form-section-title:focus-visible { outline: 2px solid var(--z-focus); outline-offset: -2px; }
 

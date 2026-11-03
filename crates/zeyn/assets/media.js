@@ -415,10 +415,12 @@ function sliderKey(e, slider, p) {
   const step = seek ? SEEK_STEP_S : VOLUME_STEP;
   const big = seek ? Math.max(duration / 10, JUMP_STEP_S) : VOLUME_STEP * 4;
   const max = seek ? duration : 100;
+  const forward = getComputedStyle(slider).direction === 'rtl' ? 'ArrowLeft' : 'ArrowRight';
+  const back = forward === 'ArrowLeft' ? 'ArrowRight' : 'ArrowLeft';
   const to = {
-    ArrowRight: now + step,
+    [forward]: now + step,
     ArrowUp: now + step,
-    ArrowLeft: now - step,
+    [back]: now - step,
     ArrowDown: now - step,
     PageUp: now + big,
     PageDown: now - big,

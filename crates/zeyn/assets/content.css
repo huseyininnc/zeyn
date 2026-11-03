@@ -243,12 +243,12 @@ span.z-avatar-tone-4 { background: var(--z-danger-subtle); }
   content: "";
   width: 0.5em;
   height: 0.5em;
-  border-inline-end: 2px solid currentColor;
-  border-block-end: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
   transform: rotate(-45deg);
 }
 
-.z-spoiler-label:dir(rtl)::before { transform: rotate(135deg); }
+[dir="rtl"] .z-spoiler-label::before { scale: -1 1; }
 .z-spoiler[open] > .z-spoiler-label::before { transform: rotate(45deg); }
 
 .z-spoiler-label:focus-visible {

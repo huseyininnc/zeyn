@@ -154,11 +154,22 @@ async function loadPanel(panel, root) {
   document.dispatchEvent(new CustomEvent('zeyn:content', { detail: panel }));
 }
 
+/**
+ * The key as it reads at `el`: under `dir="rtl"` Left and Right swap, so ArrowRight still means
+ * previous and ArrowLeft next on a page laid out right to left (W3C APG).
+ * @example readingKey('ArrowLeft', tabOnAnArabicPage) === 'ArrowRight'
+ */
+function readingKey(key, el) {
+  if (key !== 'ArrowLeft' && key !== 'ArrowRight') return key;
+  if (getComputedStyle(el).direction !== 'rtl') return key;
+  return key === 'ArrowLeft' ? 'ArrowRight' : 'ArrowLeft';
+}
+
 /** Arrow keys, Home and End on a tab (ARIA tabs pattern with automatic activation). */
 function tabKey(e, tab) {
   const tabs = tabsOf(tab);
   const i = tabs.indexOf(tab);
-  const next = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[e.key];
+  const next = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[readingKey(e.key, tab)];
   if (next === undefined) return false;
   e.preventDefault();
   selectTab(tabs[(next + tabs.length) % tabs.length], { focus: true });
@@ -193,7 +204,8 @@ function dragSplit(e, bar) {
   e.preventDefault();
   const move = (ev) => {
     const box = split.getBoundingClientRect();
-    const percent = vertical ? ((ev.clientY - box.top) / box.height) * 100 : ((ev.clientX - box.left) / box.width) * 100;
+    const across = getComputedStyle(split).direction === 'rtl' ? box.right - ev.clientX : ev.clientX - box.left;
+    const percent = vertical ? ((ev.clientY - box.top) / box.height) * 100 : (across / box.width) * 100;
     setSplit(bar, percent);
   };
   const up = () => {
@@ -210,7 +222,7 @@ function dragSplit(e, bar) {
 /** Arrow keys move a focused divider by 5 percent, Home and End to the limits. */
 function splitKey(e, bar) {
   const now = Number(bar.getAttribute('aria-valuenow')) || 40;
-  const step = { ArrowLeft: -5, ArrowUp: -5, ArrowRight: 5, ArrowDown: 5 }[e.key];
+  const step = { ArrowLeft: -5, ArrowUp: -5, ArrowRight: 5, ArrowDown: 5 }[readingKey(e.key, bar)];
   if (step !== undefined) setSplit(bar, now + step);
   else if (e.key === 'Home') setSplit(bar, 10);
   else if (e.key === 'End') setSplit(bar, 90);
@@ -917,7 +929,7 @@ function pickerKey(e) {
   if (list) return clockKey(e, list);
   const move = (key, by) => {
     const map = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -by, ArrowDown: by };
-    return map[key];
+    return map[readingKey(key, t)];
   };
   if (t.dataset.month || t.dataset.year) {
     const isMonth = !!t.dataset.month;
@@ -954,9 +966,10 @@ function pickerKey(e) {
     PageUp: () => addMonths(day, e.shiftKey ? -12 : -1),
     PageDown: () => addMonths(day, e.shiftKey ? 12 : 1),
   };
-  if (!(e.key in moves)) return false;
+  const key = readingKey(e.key, t);
+  if (!(key in moves)) return false;
   e.preventDefault();
-  picker.focus = moves[e.key]();
+  picker.focus = moves[key]();
   drawCalendar(true);
   return true;
 }
@@ -983,7 +996,7 @@ function clockKey(e, list) {
       break;
     case 'ArrowLeft':
     case 'ArrowRight': {
-      const next = lists[li + (e.key === 'ArrowLeft' ? -1 : 1)];
+      const next = lists[li + (readingKey(e.key, list) === 'ArrowLeft' ? -1 : 1)];
       if (!next) return false;
       e.preventDefault();
       lists.forEach((l) => (l.tabIndex = l === next ? 0 : -1));
@@ -2084,7 +2097,7 @@ function treeKey(e, li) {
   const items = visibleItems(tree);
   const i = items.indexOf(li);
   const expanded = li.getAttribute('aria-expanded');
-  switch (e.key) {
+  switch (readingKey(e.key, li)) {
     case 'ArrowDown':
       if (items[i + 1]) focusItem(items[i + 1]);
       break;

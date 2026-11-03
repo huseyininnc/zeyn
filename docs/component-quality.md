@@ -177,10 +177,12 @@ Evidence behind the scores:
 - **Contrast.** The token pairs in [theming.md](theming.md#5-verified-contrast) cover the grid,
   forms, menus, alerts and focus; `pro.css`, `media.css`, `assistant.css` and the dock were not
   in that measurement, so they score `part`.
-- **RTL.** The server never renders a `dir` attribute and there is no RTL locale. The grid
-  documents right to left support and `zeyn.css` has RTL rules for pins; the switch has one rule
-  in `components.css`. Other components use some logical properties but are untested. `Chart`
-  scores `fail` because its SVG lays axes out with fixed left margins (`chart.rs`).
+- **RTL.** Arabic pages render `<html dir="rtl">`. The framework stylesheets use logical
+  properties, and `tests/rtl.rs` fails on a new physical side unless it is listed with a reason.
+  Arrows that point in reading direction mirror; Left and Right swap in grid cells, tabs, menus,
+  trees, calendars, sliders, split panes and docks; popups and menus anchor to the start side.
+  Numbers align to the end of the cell (`text-align: end`), so left in a right to left grid.
+  `Chart` scores `fail` because its SVG lays axes out with fixed left margins (`chart.rs`).
 - **Performance.** Only the grid (virtual scrolling, column virtualization, export), media serving
   and the XLSX and PDF exports have published measurements. No component has a stated budget.
 - **Touch.** The grid shows its column menu button on `hover: none` devices and controls keep

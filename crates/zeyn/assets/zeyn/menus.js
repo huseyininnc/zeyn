@@ -109,7 +109,8 @@ function firstItem(menu) {
 function placeAt(panel, x, y) {
   const w = panel.offsetWidth;
   const h = panel.offsetHeight;
-  panel.style.left = `${Math.max(4, Math.min(x, innerWidth - w - 4))}px`;
+  const left = getComputedStyle(panel).direction === 'rtl' ? x - w : x;
+  panel.style.left = `${Math.max(4, Math.min(left, innerWidth - w - 4))}px`;
   panel.style.top = `${Math.max(4, Math.min(y, innerHeight - h - 4))}px`;
 }
 

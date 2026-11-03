@@ -174,7 +174,8 @@
 .z-player-buffered,
 .z-player-fill {
   position: absolute;
-  inset: 0 auto 0 0;
+  inset-block: 0;
+  inset-inline-start: 0;
   border-radius: inherit;
 }
 
@@ -191,10 +192,11 @@
 .z-player-thumb {
   position: absolute;
   top: 50%;
-  left: calc(8px + var(--z-at, 0) * (100% - 16px));
+  inset-inline-start: calc(8px + var(--z-at, 0) * (100% - 16px));
   width: 14px;
   height: 14px;
-  margin: -7px 0 0 -7px;
+  margin-block-start: -7px;
+  margin-inline-start: -7px;
   border-radius: 50%;
   background: var(--z-accent);
   border: 2px solid var(--z-surface);
@@ -209,6 +211,8 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   padding: 0 calc(var(--z-space) * 1);
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 
 .z-player-menu { position: relative; }
@@ -216,7 +220,7 @@
 .z-player-list {
   position: absolute;
   bottom: calc(100% + 4px);
-  right: 0;
+  inset-inline-end: 0;
   z-index: 20;
   min-width: 9rem;
   margin: 0;
@@ -320,7 +324,8 @@
   --z-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M8 5v14l11-7z'/%3E%3C/svg%3E");
   content: "";
   position: absolute;
-  inset: 50% auto auto calc(var(--z-space) * 3);
+  top: 50%;
+  inset-inline-start: calc(var(--z-space) * 3);
   width: 18px;
   height: 18px;
   margin-top: -9px;
@@ -337,7 +342,7 @@
 
 .z-shelf-tile[aria-current="true"] {
   border-color: var(--z-accent);
-  box-shadow: inset 3px 0 0 var(--z-accent);
+  box-shadow: inset calc(3px * var(--z-dir)) 0 0 var(--z-accent);
 }
 
 .z-shelf-name { font-weight: 600; }

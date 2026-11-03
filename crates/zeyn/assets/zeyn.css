@@ -112,6 +112,13 @@
 
 :root[data-density="compact"] { --z-density: 0.75; }
 
+/**
+ * Reading direction as a sign: 1 left to right, -1 right to left. Offsets that have no logical
+ * form (inset box shadows used as start or end accents, slide transforms) multiply by it.
+ */
+:root, [dir="ltr"] { --z-dir: 1; }
+[dir="rtl"] { --z-dir: -1; }
+
 :root {
   --z-brand-subtle: color-mix(in oklab, var(--z-accent) var(--z-tint), var(--z-surface));
   --z-focus: var(--z-accent);
@@ -160,7 +167,8 @@ a {
 
 a:hover { text-decoration-thickness: 2px; }
 
-code, pre { font-family: var(--z-font-mono); font-size: 0.9em; }
+/** Source code reads left to right in every language, also inside a right to left page. */
+code, pre { font-family: var(--z-font-mono); font-size: 0.9em; direction: ltr; unicode-bidi: isolate; text-align: start; }
 
 .z-sr-only {
   position: absolute !important;
@@ -176,7 +184,7 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; }
 
 .z-skip {
   position: absolute;
-  left: 8px;
+  inset-inline-start: 8px;
   top: -100px;
   z-index: 100;
   padding: 8px 12px;
@@ -211,7 +219,7 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; }
   overflow-y: auto;
   padding: 0 calc(var(--z-space) * 2) calc(var(--z-space) * 3);
   background: var(--z-surface);
-  border-right: 1px solid var(--z-border);
+  border-inline-end: 1px solid var(--z-border);
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 }
@@ -267,7 +275,8 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; }
   align-items: center;
   gap: 8px;
   min-height: var(--z-control);
-  padding: 0 10px 0 32px;
+  padding-block: 0;
+  padding-inline: 32px 10px;
   border-radius: var(--z-radius);
   color: var(--z-text);
   text-decoration: none;
@@ -279,7 +288,7 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; }
   background: var(--z-brand-subtle);
   color: var(--z-accent);
   font-weight: 600;
-  box-shadow: inset 2px 0 0 var(--z-accent);
+  box-shadow: inset calc(2px * var(--z-dir)) 0 0 var(--z-accent);
 }
 
 .z-main {
@@ -354,7 +363,7 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; }
     height: auto;
     max-height: 100dvh;
     padding: 0;
-    border-right: 0;
+    border-inline-end: 0;
     border-bottom: 1px solid var(--z-border);
   }
   .z-nav-bar {
@@ -413,7 +422,7 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; }
   padding: calc(var(--z-space) * 5) calc(var(--z-space) * 6);
   background: var(--z-surface);
   border: 1px solid var(--z-border);
-  border-left: 3px solid var(--z-danger);
+  border-inline-start: 3px solid var(--z-danger);
   border-radius: var(--z-radius);
 }
 
@@ -445,7 +454,8 @@ dialog.z-dialog::backdrop { background: var(--z-backdrop); }
 
 .z-window > h2 {
   margin: 0 calc(var(--z-pad) * -1);
-  padding: calc(var(--z-space) * 3 + 2px) 56px calc(var(--z-space) * 3 + 2px) var(--z-pad);
+  padding-block: calc(var(--z-space) * 3 + 2px);
+  padding-inline: var(--z-pad) 56px;
   border-bottom: 1px solid var(--z-border);
   font-size: 1rem;
   font-weight: 600;
@@ -467,7 +477,7 @@ dialog.z-dialog::backdrop { background: var(--z-backdrop); }
 .z-close {
   position: absolute;
   top: 10px;
-  right: 10px;
+  inset-inline-end: 10px;
   z-index: 3;
   width: 32px;
   height: 32px;
@@ -557,7 +567,7 @@ dialog.z-dialog::backdrop { background: var(--z-backdrop); }
 
 .z-button[aria-keyshortcuts]::after {
   content: attr(aria-keyshortcuts) / "";
-  margin-left: 2px;
+  margin-inline-start: 2px;
   padding: 1px 4px;
   border: 1px solid var(--z-border);
   border-radius: var(--z-radius-sm);
@@ -630,7 +640,7 @@ dialog.z-dialog::backdrop { background: var(--z-backdrop); }
 .z-grid td {
   height: var(--z-row);
   padding: calc(var(--z-space) * 1) calc(var(--z-space) * 3);
-  text-align: left;
+  text-align: start;
   vertical-align: middle;
   border-bottom: 1px solid var(--z-border);
 }
@@ -644,7 +654,7 @@ dialog.z-dialog::backdrop { background: var(--z-backdrop); }
   border-bottom-color: var(--z-border-strong);
 }
 
-.z-grid th + th { box-shadow: inset 1px 0 0 var(--z-border); }
+.z-grid th + th { box-shadow: inset calc(1px * var(--z-dir)) 0 0 var(--z-border); }
 
 .z-grid th[style*="--z-flex"] { width: calc(var(--z-flex) * 20%); }
 
@@ -674,7 +684,7 @@ dialog.z-dialog::backdrop { background: var(--z-backdrop); }
   flex: none;
   width: 10px;
   height: 10px;
-  margin-left: auto;
+  margin-inline-start: auto;
   background: currentColor;
   opacity: 0;
   -webkit-mask: var(--z-sort-i) center / contain no-repeat;
@@ -699,9 +709,9 @@ th[aria-sort="descending"] .z-sort::after {
 }
 
 .z-grid th.z-num,
-.z-grid th.z-num .z-sort { text-align: right; justify-content: flex-end; }
+.z-grid th.z-num .z-sort { text-align: end; justify-content: flex-end; }
 
-.z-grid th.z-num .z-sort::after { margin-left: 0; order: -1; }
+.z-grid th.z-num .z-sort::after { margin-inline-start: 0; order: -1; }
 
 .z-filter-row td {
   height: auto;
@@ -710,7 +720,7 @@ th[aria-sort="descending"] .z-sort::after {
   border-bottom-color: var(--z-border-strong);
 }
 
-.z-filter-row td + td { box-shadow: inset 1px 0 0 var(--z-border); }
+.z-filter-row td + td { box-shadow: inset calc(1px * var(--z-dir)) 0 0 var(--z-border); }
 
 .z-filter {
   width: 100%;
@@ -915,17 +925,11 @@ th[aria-sort="descending"] .z-sort::after {
 :where(.z-grid[data-pin-start="2"] > table > * > tr > :nth-child(2)),
 :where(.z-grid[data-pin-start="3"] > table > * > tr > :nth-child(3)),
 :where(.z-grid[data-pin-start="4"] > table > * > tr > :nth-child(4)),
-:where(.z-grid[data-pin-start="5"] > table > * > tr > :nth-child(5)) { box-shadow: inset -1px 0 0 var(--z-border-strong); }
+:where(.z-grid[data-pin-start="5"] > table > * > tr > :nth-child(5)) { box-shadow: inset calc(-1px * var(--z-dir)) 0 0 var(--z-border-strong); }
 
 :where(.z-grid[data-pin-end="1"] > table > * > tr > :nth-last-child(1)),
 :where(.z-grid[data-pin-end="2"] > table > * > tr > :nth-last-child(2)),
-:where(.z-grid[data-pin-end="3"] > table > * > tr > :nth-last-child(3)) { box-shadow: inset 1px 0 0 var(--z-border-strong); }
-
-:where([dir="rtl"]) :where(.z-grid[data-pin-start="1"] > table > * > tr > :nth-child(1)),
-:where([dir="rtl"]) :where(.z-grid[data-pin-start="2"] > table > * > tr > :nth-child(2)),
-:where([dir="rtl"]) :where(.z-grid[data-pin-start="3"] > table > * > tr > :nth-child(3)),
-:where([dir="rtl"]) :where(.z-grid[data-pin-start="4"] > table > * > tr > :nth-child(4)),
-:where([dir="rtl"]) :where(.z-grid[data-pin-start="5"] > table > * > tr > :nth-child(5)) { box-shadow: inset 1px 0 0 var(--z-border-strong); }
+:where(.z-grid[data-pin-end="3"] > table > * > tr > :nth-last-child(3)) { box-shadow: inset calc(1px * var(--z-dir)) 0 0 var(--z-border-strong); }
 
 :where(.z-grid thead th[data-pin]),
 :where(.z-grid .z-filter-row td[data-pin]),
@@ -948,7 +952,8 @@ th[aria-sort="descending"] .z-sort::after {
   gap: calc(var(--z-space) * 2);
   width: 100%;
   min-height: 30px;
-  padding: 0 calc(var(--z-space) * 2) 0 calc(var(--z-space) * 7);
+  padding-block: 0;
+  padding-inline: calc(var(--z-space) * 7) calc(var(--z-space) * 2);
   border: 0;
   border-radius: var(--z-radius-sm);
   background: transparent;
@@ -984,11 +989,11 @@ th[aria-sort="descending"] .z-sort::after {
   width: 6px;
   height: 6px;
   border-block-start: 1.5px solid currentColor;
-  border-inline-end: 1.5px solid currentColor;
+  border-right: 1.5px solid currentColor;
   transform: rotate(45deg);
 }
 
-[dir="rtl"] .z-menu-item[aria-haspopup="menu"]::after { transform: rotate(-135deg); }
+[dir="rtl"] .z-menu-item[aria-haspopup="menu"]::after { scale: -1 1; }
 
 .z-menu-label { flex: 1 1 auto; }
 
@@ -1272,32 +1277,32 @@ th[aria-sort="descending"] .z-sort::after {
 
 .z-grid tbody tr:focus > td { background: var(--z-brand-subtle); }
 
-.z-grid tbody tr:focus > td:first-child { box-shadow: inset 2px 0 0 var(--z-accent); }
+.z-grid tbody tr:focus > td:first-child { box-shadow: inset calc(2px * var(--z-dir)) 0 0 var(--z-accent); }
 
 .z-grid tbody tr:focus-visible > td {
   box-shadow: inset 0 2px 0 var(--z-focus), inset 0 -2px 0 var(--z-focus);
 }
 
 .z-grid tbody tr:focus-visible > td:first-child {
-  box-shadow: inset 2px 2px 0 var(--z-focus), inset 0 -2px 0 var(--z-focus);
+  box-shadow: inset calc(2px * var(--z-dir)) 2px 0 var(--z-focus), inset 0 -2px 0 var(--z-focus);
 }
 
 .z-grid tbody tr:focus-visible > td:last-child {
-  box-shadow: inset -2px 2px 0 var(--z-focus), inset 0 -2px 0 var(--z-focus);
+  box-shadow: inset calc(-2px * var(--z-dir)) 2px 0 var(--z-focus), inset 0 -2px 0 var(--z-focus);
 }
 
 .z-num,
 .z-grid .z-num {
-  text-align: right;
+  text-align: end;
   font-variant-numeric: tabular-nums;
 }
 
 .z-grid tbody tr.z-row-warning > td { background: var(--z-warning-subtle); }
 .z-grid tbody tr.z-row-danger > td { background: var(--z-danger-subtle); }
 .z-grid tbody tr.z-row-success > td { background: var(--z-success-subtle); }
-.z-grid tbody tr.z-row-warning > td:first-child { box-shadow: inset 3px 0 0 var(--z-warning); }
-.z-grid tbody tr.z-row-danger > td:first-child { box-shadow: inset 3px 0 0 var(--z-danger); }
-.z-grid tbody tr.z-row-success > td:first-child { box-shadow: inset 3px 0 0 var(--z-success); }
+.z-grid tbody tr.z-row-warning > td:first-child { box-shadow: inset calc(3px * var(--z-dir)) 0 0 var(--z-warning); }
+.z-grid tbody tr.z-row-danger > td:first-child { box-shadow: inset calc(3px * var(--z-dir)) 0 0 var(--z-danger); }
+.z-grid tbody tr.z-row-success > td:first-child { box-shadow: inset calc(3px * var(--z-dir)) 0 0 var(--z-success); }
 .z-grid tbody tr.z-row-muted > td { color: var(--z-text-muted); }
 
 .z-grid tbody tr.z-row-warning:hover > td,
@@ -1367,7 +1372,7 @@ th[aria-sort="descending"] .z-sort::after {
   transition: transform 0.12s ease;
 }
 
-:where([dir="rtl"]) .z-expander::before { transform: rotate(135deg); }
+:where([dir="rtl"]) .z-expander::before { scale: -1 1; }
 
 .z-expander[aria-expanded="true"]::before { transform: rotate(45deg); }
 
@@ -1380,7 +1385,7 @@ th[aria-sort="descending"] .z-sort::after {
   height: auto;
   padding: calc(var(--z-space) * 3) calc(var(--z-space) * 3) calc(var(--z-space) * 4);
   background: var(--z-surface-2);
-  box-shadow: inset 3px 0 0 var(--z-accent);
+  box-shadow: inset calc(3px * var(--z-dir)) 0 0 var(--z-accent);
   white-space: normal;
 }
 
@@ -1499,7 +1504,7 @@ th[aria-sort="descending"] .z-sort::after {
 }
 
 .z-required {
-  margin-left: 2px;
+  margin-inline-start: 2px;
   color: var(--z-danger);
 }
 
@@ -1549,7 +1554,7 @@ select[data-zeyn-theme-picker] {
   cursor: not-allowed;
 }
 
-.z-field input.z-num { text-align: right; }
+.z-field input.z-num { text-align: end; }
 
 .z-field:has(> input[type="checkbox"]) {
   flex-direction: row;
@@ -1595,7 +1600,7 @@ select[data-zeyn-theme-picker] {
 .z-form-errors {
   padding: calc(var(--z-space) * 2.5) calc(var(--z-space) * 3);
   border: 1px solid color-mix(in oklab, var(--z-danger) 40%, var(--z-surface));
-  border-left: 3px solid var(--z-danger);
+  border-inline-start: 3px solid var(--z-danger);
   border-radius: var(--z-radius);
   background: var(--z-danger-subtle);
   color: var(--z-text);
@@ -1703,7 +1708,7 @@ select[data-zeyn-theme-picker] {
 
 .z-toasts {
   position: fixed;
-  right: 16px;
+  inset-inline-end: 16px;
   bottom: 16px;
   z-index: 50;
   display: flex;
@@ -1715,9 +1720,10 @@ select[data-zeyn-theme-picker] {
 }
 
 .z-toast {
-  padding: calc(var(--z-space) * 2.5) calc(var(--z-space) * 4) calc(var(--z-space) * 2.5) calc(var(--z-space) * 3.5);
+  padding-block: calc(var(--z-space) * 2.5);
+  padding-inline: calc(var(--z-space) * 3.5) calc(var(--z-space) * 4);
   border: 1px solid var(--z-border);
-  border-left: 3px solid var(--z-info);
+  border-inline-start: 3px solid var(--z-info);
   border-radius: var(--z-radius);
   background: var(--z-surface);
   color: var(--z-text);
@@ -1727,7 +1733,7 @@ select[data-zeyn-theme-picker] {
 }
 
 .z-toast-error {
-  border-left-color: var(--z-danger);
+  border-inline-start-color: var(--z-danger);
   background: var(--z-danger-subtle);
 }
 
@@ -1735,9 +1741,9 @@ select[data-zeyn-theme-picker] {
 
 .z-toast-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 
-.z-toast-success { border-left-color: var(--z-success); background: var(--z-success-subtle); }
+.z-toast-success { border-inline-start-color: var(--z-success); background: var(--z-success-subtle); }
 
-.z-toast-warning { border-left-color: var(--z-warning); background: var(--z-warning-subtle); }
+.z-toast-warning { border-inline-start-color: var(--z-warning); background: var(--z-warning-subtle); }
 
 .z-toast-close {
   display: grid;
@@ -1761,16 +1767,6 @@ select[data-zeyn-theme-picker] {
 
 .z-toast-close:focus-visible,
 .z-toast-action:focus-visible { outline: 2px solid var(--z-focus); outline-offset: 1px; }
-
-[dir="rtl"] .z-toasts { right: auto; left: 16px; }
-
-[dir="rtl"] .z-toast { border-left-width: 1px; border-right: 3px solid var(--z-info); }
-
-[dir="rtl"] .z-toast-error { border-right-color: var(--z-danger); }
-
-[dir="rtl"] .z-toast-success { border-right-color: var(--z-success); }
-
-[dir="rtl"] .z-toast-warning { border-right-color: var(--z-warning); }
 
 @media (pointer: coarse) {
   .z-toast-close { width: 44px; height: 44px; }
@@ -1801,17 +1797,15 @@ select[data-zeyn-theme-picker] {
   .z-grid tbody tr:focus-visible { outline: 2px solid CanvasText; }
   .z-grid tbody tr.z-row-warning > td:first-child,
   .z-grid tbody tr.z-row-danger > td:first-child,
-  .z-grid tbody tr.z-row-success > td:first-child { border-left: 3px solid CanvasText; }
+  .z-grid tbody tr.z-row-success > td:first-child { border-inline-start: 3px solid CanvasText; }
   .z-placeholder td::before { background: GrayText; }
-  .z-toast, .z-form-errors, .z-screen.z-error { border-left-color: CanvasText; }
+  .z-toast, .z-form-errors, .z-screen.z-error { border-inline-start-color: CanvasText; }
 }
 
 .z-col-moving, .z-col-moving * { cursor: grabbing !important; user-select: none; }
 .z-grid th.z-col-dragging { opacity: 0.55; }
-.z-grid th.z-col-drop-start { box-shadow: inset 3px 0 0 var(--z-accent); }
-.z-grid th.z-col-drop-end { box-shadow: inset -3px 0 0 var(--z-accent); }
-[dir="rtl"] .z-grid th.z-col-drop-start { box-shadow: inset -3px 0 0 var(--z-accent); }
-[dir="rtl"] .z-grid th.z-col-drop-end { box-shadow: inset 3px 0 0 var(--z-accent); }
+.z-grid th.z-col-drop-start { box-shadow: inset calc(3px * var(--z-dir)) 0 0 var(--z-accent); }
+.z-grid th.z-col-drop-end { box-shadow: inset calc(-3px * var(--z-dir)) 0 0 var(--z-accent); }
 
 /*
  * Prose and code: long text rendered on the server, such as documentation pages. Syntax colors
