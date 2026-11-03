@@ -37,7 +37,7 @@ const COSTLY_GETS: [&str; 3] = ["/_zeyn/grid/export", "/_zeyn/pdf", "/sitemap.xm
 fn is_public_asset(path: &str) -> bool {
     matches!(
         path,
-        "/_zeyn/zeyn.js" | "/_zeyn/zeyn.css" | "/_zeyn/nav.js" | "/_zeyn/theme.css" | "/favicon.ico" | "/llms.txt"
+        "/_zeyn/zeyn.js" | "/_zeyn/grid.js" | "/_zeyn/zeyn.css" | "/_zeyn/nav.js" | "/_zeyn/theme.css" | "/favicon.ico" | "/llms.txt"
     ) || ops::is_asset(path)
         || ui::ASSETS.contains(&path)
         || media::ASSETS.contains(&path)

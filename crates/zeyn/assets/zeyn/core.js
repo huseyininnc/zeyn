@@ -32,7 +32,37 @@ const MAC = /mac|iphone|ipad/i.test(navigator.userAgentData?.platform ?? navigat
 const grids = new WeakMap();
 /** @type {{dialog: HTMLDialogElement, opener: Element | null}[]} Open windows, top last. */
 const dialogs = [];
-let uid = 0;
+
+/** The `?v=` build query this script was loaded with, for the modules it imports later. */
+const VERSION = new URL(import.meta.url).search;
+
+/**
+ * The grid runtime (`/_zeyn/grid.js`) once it has loaded. Pages without a grid never load it, so
+ * every call into it goes through `G?.`: before it loads there is no grid to act on.
+ * @type {object | null}
+ */
+let G = null;
+/** @type {Promise<object> | null} The grid runtime loading, shared by all callers. */
+let gridLoad = null;
+
+/**
+ * Sets up every grid inside `root`, loading the grid runtime the first time a page holds a grid
+ * (on start, after `nav.js` swaps content in, in a window). Safe to call more than once.
+ * @returns {Promise<void>}
+ */
+function initGrids(root) {
+  if (!G && !root.querySelector?.('[data-zeyn-grid]')) return Promise.resolve();
+  gridLoad ??= import(`${BASE}/_zeyn/grid.js${VERSION}`)
+    .then((m) => {
+      m.install({ BASE, FILTER_DELAY_MS, MAX_COLUMN, MIN_COLUMN, UNREACHABLE, VIEW_SAVE_DELAY_MS, V_CACHE, V_CACHE_CELLS, V_CAP, V_FETCH_DELAY_MS, V_OVERSCAN, address, fill, fmt, grids, make, num, openMenu, paramsQuery, parseEffect, place, post, readJson, relativeTimes, runEffect, runEffects, str, toast });
+      return (G = m);
+    })
+    .catch((e) => {
+      gridLoad = null;
+      throw e;
+    });
+  return gridLoad.then((m) => m.initGrids(root));
+}
 
 /** @type {Promise<string> | null} The `GET /_zeyn/csrf` request in flight, shared by all callers. */
 let csrfPending = null;
@@ -355,6 +385,6 @@ async function closeAndRefresh() {
   const under = dialogs.at(-2)?.dialog ?? document.querySelector('.z-main') ?? document.body;
   const top = dialogs.at(-1);
   if (top) finishDialog(top.dialog);
-  await Promise.all([...under.querySelectorAll('[data-zeyn-grid]')].map((g) => loadGrid(g, 'reload')));
+  await Promise.all([...under.querySelectorAll('[data-zeyn-grid]')].map((g) => G?.loadGrid(g, 'reload')));
 }
 

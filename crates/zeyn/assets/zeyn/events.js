@@ -2,28 +2,28 @@ document.addEventListener('click', (e) => {
   const t = e.target instanceof Element ? e.target : null;
   if (!t) return;
   let el;
-  if ((el = t.closest('input[data-zeyn-select]'))) return pickRow(el, e.shiftKey);
-  if ((el = t.closest('input[data-zeyn-select-all]'))) return pickPage(el);
+  if ((el = t.closest('input[data-zeyn-select]'))) return G?.pickRow(el, e.shiftKey);
+  if ((el = t.closest('input[data-zeyn-select-all]'))) return G?.pickPage(el);
   if ((el = t.closest('[data-zeyn-select-matching]'))) {
-    const grid = gridOfBar(el);
+    const grid = G?.gridOfBar(el);
     const s = grids.get(grid);
     if (s) s.allMatching = true;
-    syncSelection(grid);
-    return bulkBar(grid)?.querySelector('[data-zeyn-select-clear]')?.focus();
+    G?.syncSelection(grid);
+    return G?.bulkBar(grid)?.querySelector('[data-zeyn-select-clear]')?.focus();
   }
-  if ((el = t.closest('[data-zeyn-select-clear]'))) return clearSelection(gridOfBar(el));
+  if ((el = t.closest('[data-zeyn-select-clear]'))) return G?.clearSelection(G?.gridOfBar(el));
   if ((el = t.closest('[data-zeyn-expand]'))) {
     const tr = el.closest('tr');
-    return tr.dataset.zeynPath != null ? toggleBranch(tr) : toggleDetail(tr);
+    return tr.dataset.zeynPath != null ? G?.toggleBranch(tr) : G?.toggleDetail(tr);
   }
-  if ((el = t.closest('[data-zeyn-branch-more]'))) return moreBranch(el);
-  if ((el = t.closest('[data-zeyn-bulk-run]'))) return runBulk(el);
+  if ((el = t.closest('[data-zeyn-branch-more]'))) return G?.moreBranch(el);
+  if ((el = t.closest('[data-zeyn-bulk-run]'))) return G?.runBulk(el);
   if ((el = t.closest('.z-menu-item'))) return runMenuItem(el);
-  if ((el = t.closest('button[data-zeyn-run]'))) return runRowItem(el);
-  if ((el = t.closest('button.z-sort'))) return toggleSort(el, e.shiftKey);
-  if ((el = t.closest('button.z-col-menu'))) return openColumnMenu(el);
-  if ((el = t.closest('[data-zeyn-page]'))) return loadGrid(el.closest('[data-zeyn-grid]'), el.dataset.zeynPage === 'prev' ? 'prev' : 'next');
-  if ((el = t.closest('[data-zeyn-more] button'))) return loadGrid(el.closest('[data-zeyn-grid]'), 'more');
+  if ((el = t.closest('button[data-zeyn-run]'))) return G?.runRowItem(el);
+  if ((el = t.closest('button.z-sort'))) return G?.toggleSort(el, e.shiftKey);
+  if ((el = t.closest('button.z-col-menu'))) return G?.openColumnMenu(el);
+  if ((el = t.closest('[data-zeyn-page]'))) return G?.loadGrid(el.closest('[data-zeyn-grid]'), el.dataset.zeynPage === 'prev' ? 'prev' : 'next');
+  if ((el = t.closest('[data-zeyn-more] button'))) return G?.loadGrid(el.closest('[data-zeyn-grid]'), 'more');
   if ((el = t.closest('[data-zeyn-export]'))) return exportGrid(el);
   if ((el = t.closest('[data-zeyn-pdf]'))) return downloadPdf(el);
   if ((el = t.closest('[data-zeyn-close]'))) return el.closest('dialog')?.close();
@@ -35,14 +35,14 @@ document.addEventListener('click', (e) => {
   }
   if ((el = t.closest('[data-zeyn-rows] > tr > td')) && !t.closest('button, a, input, select, label, .z-editing')) {
     const tr = el.parentElement;
-    if (dataRow(tr) && !el.classList.contains('z-col-gap')) focusCell(tr.closest('[data-zeyn-grid]'), tr, cellsOf(tr).indexOf(el), e.shiftKey);
+    if (G?.dataRow(tr) && !el.classList.contains('z-col-gap')) G?.focusCell(tr.closest('[data-zeyn-grid]'), tr, G?.cellsOf(tr).indexOf(el), e.shiftKey);
   }
 });
 
 document.addEventListener('focusin', (e) => {
   const t = e.target;
   const tr = t instanceof HTMLTableCellElement ? t.parentElement : t;
-  if (tr instanceof HTMLTableRowElement && tr.parentElement?.matches('[data-zeyn-rows]')) activate(tr, false);
+  if (tr instanceof HTMLTableRowElement && tr.parentElement?.matches('[data-zeyn-rows]')) G?.activate(tr, false);
 });
 
 document.addEventListener('paste', (e) => {
@@ -51,12 +51,12 @@ document.addEventListener('paste', (e) => {
   const text = e.clipboardData?.getData('text/plain');
   if (!grid || !text || !grids.get(grid)?.anchor) return;
   e.preventDefault();
-  pasteCells(grid, text);
+  G?.pasteCells(grid, text);
 });
 
 document.addEventListener('dblclick', (e) => {
   const td = e.target instanceof Element ? e.target.closest('[data-zeyn-rows] > tr > td[data-v]') : null;
-  if (td && !td.closest('.z-editing') && startEdit(td.parentElement, td)) return;
+  if (td && !td.closest('.z-editing') && G?.startEdit(td.parentElement, td)) return;
   if (e.target instanceof Element && e.target.closest('.z-editing')) return;
   const tr = e.target instanceof Element ? e.target.closest('[data-zeyn-rows] > tr[data-zeyn-effect]') : null;
   const effect = tr && parseEffect(tr);
@@ -66,32 +66,32 @@ document.addEventListener('dblclick', (e) => {
 document.addEventListener('keydown', (e) => {
   const t = e.target;
   if (t instanceof Element && t.matches('.z-menu-item') && menuKey(e, t)) return;
-  if (t instanceof Element && t.matches('.z-cell-input') && editKey(e, t)) return;
+  if (t instanceof Element && t.matches('.z-cell-input') && G?.editKey(e, t)) return;
   if (e.key === 'F2' && t instanceof HTMLTableRowElement && t.parentElement?.matches('[data-zeyn-rows]')) {
-    if (startEdit(t, null)) return e.preventDefault();
+    if (G?.startEdit(t, null)) return e.preventDefault();
   }
   if (t instanceof HTMLTableCellElement && t.parentElement?.parentElement?.matches('[data-zeyn-rows]')) {
     const g = t.closest('[data-zeyn-grid]');
-    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key ?? '').toLowerCase() === 'c' && copyCells(g)) return e.preventDefault();
-    if (cellKey(e, t)) return;
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key ?? '').toLowerCase() === 'c' && G?.copyCells(g)) return e.preventDefault();
+    if (G?.cellKey(e, t)) return;
   }
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key ?? '').toLowerCase() === 'c' && !typing(t) && t instanceof Element) {
     const g = t.closest('[data-zeyn-grid]');
     const sel = window.getSelection();
-    if (g && (!sel || sel.isCollapsed) && copyRows(g, t.closest('[data-zeyn-rows] > tr'))) return e.preventDefault();
+    if (g && (!sel || sel.isCollapsed) && G?.copyRows(g, t.closest('[data-zeyn-rows] > tr'))) return e.preventDefault();
   }
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key ?? '').toLowerCase() === 'z' && !typing(t) && t instanceof Element) {
     const g = t.closest('[data-zeyn-grid]');
     if (g && grids.get(g)?.undo) {
       e.preventDefault();
-      return undoEdit(g);
+      return G?.undoEdit(g);
     }
   }
-  if (t instanceof Element && t.matches('.z-resize') && resizeKey(e, t)) return;
+  if (t instanceof Element && t.matches('.z-resize') && G?.resizeKey(e, t)) return;
   if (t instanceof Element && (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) && !typing(t)) {
     if (t.closest('thead th[data-field]')) {
       e.preventDefault();
-      return openColumnMenu(t.closest('th').querySelector('.z-col-menu'));
+      return G?.openColumnMenu(t.closest('th').querySelector('.z-col-menu'));
     }
     const owner = t.closest('[data-zeyn-rows] > tr[data-zeyn-menu], [data-zeyn-screen][data-zeyn-menu]');
     if (owner) {
@@ -100,8 +100,8 @@ document.addEventListener('keydown', (e) => {
     }
   }
   const vg = t instanceof Element ? t.closest('[data-zeyn-grid][data-zeyn-paging="virtual"]') : null;
-  if (vg && (t === vg || t.parentElement?.matches('[data-zeyn-rows]')) && virtualKey(e, vg)) return;
-  if (t instanceof HTMLTableRowElement && t.parentElement?.matches('[data-zeyn-rows]') && rowKey(e, t)) return;
+  if (vg && (t === vg || t.parentElement?.matches('[data-zeyn-rows]')) && G?.virtualKey(e, vg)) return;
+  if (t instanceof HTMLTableRowElement && t.parentElement?.matches('[data-zeyn-rows]') && G?.rowKey(e, t)) return;
   shortcut(e);
 });
 
@@ -109,7 +109,7 @@ document.addEventListener('pointerdown', (e) => {
   const t = e.target instanceof Element ? e.target : null;
   if (!t || e.button !== 0) return;
   const handle = t.closest('.z-resize');
-  if (handle) return startResize(e, handle);
+  if (handle) return G?.startResize(e, handle);
   const sort = t.closest('[data-zeyn-grid] thead th[data-field] .z-sort');
   if (sort) startColumnDrag(e, sort.closest('th'));
 });
@@ -165,11 +165,11 @@ function startColumnDrag(e, th) {
     document.addEventListener('click', swallow, { capture: true, once: true });
     setTimeout(() => document.removeEventListener('click', swallow, true), 0);
     if (!target || ev.type === 'pointercancel') return;
-    const shown = shownColumns(grid);
+    const shown = G?.shownColumns(grid);
     const [col] = shown.splice(shown.findIndex((c) => c.field === th.dataset.field), 1);
     const at = shown.findIndex((c) => c.field === target.dataset.field) + (after ? 1 : 0);
     shown.splice(at, 0, col);
-    setColumns(grid, shown);
+    G?.setColumns(grid, shown);
   };
   document.addEventListener('pointermove', move);
   document.addEventListener('pointerup', end);
@@ -191,7 +191,7 @@ document.addEventListener('contextmenu', (e) => {
     const grid = th.closest('[data-zeyn-grid]');
     if (!grids.get(grid)) return;
     const button = th.querySelector('.z-col-menu');
-    return openMenu(columnMenu(grid, th), { x: e.clientX, y: e.clientY, opener: button, label: button?.getAttribute('aria-label') });
+    return openMenu(G?.columnMenu(grid, th), { x: e.clientX, y: e.clientY, opener: button, label: button?.getAttribute('aria-label') });
   }
   const owner = t.closest('[data-zeyn-rows] > tr[data-zeyn-menu], [data-zeyn-screen][data-zeyn-menu]');
   if (owner && openContextMenu(owner, { x: e.clientX, y: e.clientY }, t)) return e.preventDefault();
@@ -212,7 +212,7 @@ function openContextMenu(owner, at, opener) {
   }
   if (!items.length) return false;
   const row = owner.matches('tr');
-  if (row) activate(owner, false);
+  if (row) G?.activate(owner, false);
   const focusBack = row ? owner : opener?.closest(FOCUSABLE) ?? owner;
   const convert = (list) =>
     list.map((i) =>
@@ -227,7 +227,7 @@ function openContextMenu(owner, at, opener) {
             run: i.effect
               ? () => runEffect(i.effect, focusBack)
               : i.run != null
-                ? () => (row ? runRowItem(owner, `m${i.run}`) : runScreenItem(owner, i.run))
+                ? () => (row ? G?.runRowItem(owner, `m${i.run}`) : runScreenItem(owner, i.run))
                 : undefined,
           },
     );
@@ -241,7 +241,7 @@ async function runScreenItem(screen, item) {
   if (!r.ok) return;
   await runEffects(r.data?.effects, screen);
   toast(screen.querySelector('[data-zeyn-grid]') ? grids.get(screen.querySelector('[data-zeyn-grid]'))?.texts.done || 'Done.' : 'Done.');
-  await Promise.all([...screen.querySelectorAll('[data-zeyn-grid]')].map((g) => loadGrid(g, 'reload')));
+  await Promise.all([...screen.querySelectorAll('[data-zeyn-grid]')].map((g) => G?.loadGrid(g, 'reload')));
 }
 
 document.addEventListener('submit', (e) => {
@@ -254,7 +254,7 @@ document.addEventListener('submit', (e) => {
 document.addEventListener('input', (e) => {
   const t = e.target;
   if (!(t instanceof Element)) return;
-  if (t.closest('.z-filter-cell')) return onFilter(t);
+  if (t.closest('.z-filter-cell')) return G?.onFilter(t);
   if (t.getAttribute('aria-invalid') === 'true') {
     t.removeAttribute('aria-invalid');
     const box = t.id && document.getElementById(`${t.id}-error`);
@@ -294,7 +294,7 @@ document.addEventListener('zeyn:filter', (e) => {
   const all = [...document.querySelectorAll('.z-main [data-zeyn-grid]')];
   const grid = node == null ? all[0] : all.find((g) => nodeOf(g) === String(node));
   if (!grid || !Array.isArray(filters)) return;
-  initGrid(grid);
+  G?.initGrid(grid);
   const s = grids.get(grid);
   if (!s) return;
   e.preventDefault();
@@ -303,15 +303,15 @@ document.addEventListener('zeyn:filter', (e) => {
     const { field, ...rest } = f ?? {};
     if (typeof field === 'string') s.filters[field] = rest;
   }
-  for (const cell of grid.querySelectorAll('.z-filter-cell[data-field]')) fillFilter(cell, s.filters[cell.dataset.field], s.texts);
+  for (const cell of grid.querySelectorAll('.z-filter-cell[data-field]')) G?.fillFilter(cell, s.filters[cell.dataset.field], s.texts);
   s.allMatching = false;
-  loadGrid(grid, 'reset');
+  G?.loadGrid(grid, 'reset');
 });
 
 /** `zeyn:reload` on an element reloads the grids inside it in place (`live.js` sends it). */
 document.addEventListener('zeyn:reload', (e) => {
   const root = e.target instanceof Element ? e.target : document;
-  root.querySelectorAll('[data-zeyn-grid]').forEach((g) => loadGrid(g, 'reload'));
+  root.querySelectorAll('[data-zeyn-grid]').forEach((g) => G?.loadGrid(g, 'reload'));
 });
 
 /**

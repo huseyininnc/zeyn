@@ -262,7 +262,8 @@ async fn page_loads_the_player_assets() {
     let (status, _, body) = send(&router, get("/watch", "media.play").body(Body::empty()).unwrap()).await;
     assert_eq!(status, StatusCode::OK);
     let html = String::from_utf8(body).unwrap();
-    assert!(html.contains("/_zeyn/media.js") && html.contains("/_zeyn/media.css"));
+    assert!(html.contains("/_zeyn/media.css"));
+    assert!(!html.contains("/_zeyn/media.js"), "components.js imports the player script when a page holds a player");
     assert!(html.contains(r#"data-zeyn-player="video""#));
     let (status, headers, _) = send(&router, Request::get("/_zeyn/media.js").body(Body::empty()).unwrap()).await;
     assert_eq!(status, StatusCode::OK);

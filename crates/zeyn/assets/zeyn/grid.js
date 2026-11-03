@@ -1,3 +1,6 @@
+/** Counter for the ids of elements the grid runtime creates. */
+let uid = 0;
+
 /** Rows currently in a grid, without the rows that hold an opened detail. */
 function rows(grid) {
   return [...(grid.querySelector('[data-zeyn-rows]')?.rows ?? [])].filter((tr) => !tr.classList.contains('z-detail'));

@@ -432,7 +432,7 @@ pub fn build_id() -> &'static str {
             let seed = 0xcbf2_9ce4_8422_2325;
             let hash = match std::env::current_exe().and_then(std::fs::read) {
                 Ok(bytes) => fnv(&bytes, seed),
-                Err(_) => [super::JS, super::CSS, JS, CSS, env!("CARGO_PKG_VERSION")]
+                Err(_) => [super::JS, super::GRID_JS, super::CSS, JS, CSS, env!("CARGO_PKG_VERSION")]
                     .iter()
                     .fold(seed, |h, s| fnv(s.as_bytes(), h)),
             };

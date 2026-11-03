@@ -135,7 +135,7 @@ async function submitForm(form, submitter) {
 function exportServer(grid, format) {
   const s = grids.get(grid);
   const a = address(grid);
-  const q = JSON.stringify({ sort: s?.sort ?? [], filters: s ? filterList(s) : [], columns: s?.columns ?? [] });
+  const q = JSON.stringify({ sort: s?.sort ?? [], filters: s ? G?.filterList(s) : [], columns: s?.columns ?? [] });
   const params = a.params == null ? '' : `&params=${encodeURIComponent(JSON.stringify(a.params))}`;
   const link = document.createElement('a');
   link.href = `${BASE}/_zeyn/grid/export?screen=${encodeURIComponent(a.screen)}&node=${a.node}${params}&format=${format}&q=${encodeURIComponent(q)}`;
@@ -175,7 +175,7 @@ function exportGrid(button) {
   const head = [...grid.querySelectorAll('thead tr:first-child th')].map((th) => th.textContent.trim());
   const s = grids.get(grid);
   const loaded =
-    s?.paging === 'virtual' ? [...s.cache.keys()].sort((a, b) => a - b).flatMap((b) => s.cache.get(b)) : rows(grid);
+    s?.paging === 'virtual' ? [...s.cache.keys()].sort((a, b) => a - b).flatMap((b) => s.cache.get(b)) : G?.rows(grid);
   const body = loaded.map((tr) => [...tr.cells].map((td) => td.textContent.trim()));
   const csv = [head, ...body].map((r) => r.map(csvCell).join(',')).join('\r\n') + '\r\n';
   const url = URL.createObjectURL(new Blob(['﻿', csv], { type: 'text/csv;charset=utf-8' }));

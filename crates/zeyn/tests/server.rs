@@ -735,7 +735,7 @@ async fn asset_links_carry_the_build_and_are_kept_for_a_year() {
     let start = page.find(r#"src="/_zeyn/zeyn.js?v="#).expect("a versioned runtime link") + 5;
     let url = page[start..].split('"').next().unwrap().to_string();
     let version = &url[url.find('?').unwrap()..];
-    for asset in ["zeyn.css", "nav.js", "components.js", "components.css", "enterprise.js", "media.js"] {
+    for asset in ["zeyn.css", "nav.js", "components.js", "components.css", "enterprise.js", "media.css", "grid.js"] {
         assert!(page.contains(&format!("/_zeyn/{asset}{version}")), "{asset}");
     }
     let cache = |r: &Reply| r.headers.get(header::CACHE_CONTROL).unwrap().to_str().unwrap().to_string();
@@ -746,5 +746,53 @@ async fn asset_links_carry_the_build_and_are_kept_for_a_year() {
     for other in ["/_zeyn/zeyn.js", "/_zeyn/zeyn.js?v=old", "/_zeyn/zeyn.js?x=1"] {
         let r = send(&router, Request::get(other).body(Body::empty()).unwrap()).await;
         assert_eq!(cache(&r), "no-cache", "{other} revalidates");
+    }
+}
+
+#[tokio::test]
+async fn only_pages_with_a_grid_preload_the_grid_runtime() {
+    let router = router(writer());
+    let with_grid = send(&router, get("/products")).await.body;
+    assert!(with_grid.contains(r#"<link rel="modulepreload" href="/_zeyn/grid.js?v="#));
+    let without = send(&router, get("/clock")).await.body;
+    assert!(!without.contains("grid.js"), "a page without a grid never names the grid runtime");
+    let js = send(&router, Request::get("/_zeyn/grid.js").body(Body::empty()).unwrap()).await;
+    assert_eq!(js.status, StatusCode::OK);
+    assert!(js.body.contains("export function install(z)") && js.body.contains("export {"));
+    let core = send(&router, Request::get("/_zeyn/zeyn.js").body(Body::empty()).unwrap()).await.body;
+    assert!(!core.contains("function renderVirtual"), "the grid runtime is not in zeyn.js");
+}
+
+/// Names in a comma separated list, as in `let a, b;` or `{ a, b }`.
+fn names(text: &str) -> Vec<&str> {
+    let mut v: Vec<&str> = text.split(',').map(str::trim).filter(|n| !n.is_empty()).collect();
+    v.sort_unstable();
+    v
+}
+
+#[test]
+fn the_two_halves_of_the_browser_runtime_agree_on_what_they_share() {
+    let api = include_str!("../assets/zeyn/grid-api.js");
+    let core = include_str!("../assets/zeyn/core.js");
+    let exports = include_str!("../assets/zeyn/grid-exports.js");
+    let declared = api.lines().find_map(|l| l.strip_prefix("let ")?.strip_suffix(';')).expect("the let line");
+    let handed = core.split("m.install({ ").nth(1).and_then(|s| s.split(" })").next()).expect("the install call");
+    assert_eq!(names(declared), names(handed), "grid-api.js and the install call in core.js list the same names");
+    let exported = exports.split("export { ").nth(1).and_then(|s| s.split(" }").next()).expect("the export list");
+    let exported = names(exported);
+    for part in ["core.js", "menus.js", "page.js", "events.js"] {
+        let src = match part {
+            "core.js" => core,
+            "menus.js" => include_str!("../assets/zeyn/menus.js"),
+            "page.js" => include_str!("../assets/zeyn/page.js"),
+            _ => include_str!("../assets/zeyn/events.js"),
+        };
+        for used in src.split("G?.").skip(1) {
+            let name: String = used.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
+            if name.is_empty() {
+                continue;
+            }
+            assert!(exported.contains(&name.as_str()), "{part} calls G?.{name}, which grid-exports.js does not export");
+        }
     }
 }

@@ -2147,13 +2147,47 @@ new MutationObserver((records) => {
 
 /* Setup -------------------------------------------------------------------------------------- */
 
-/** Loads the catalog runtime (card grids, rails, search boxes) the first time a page holds one. */
-function initCatalog(root) {
-  if (root.querySelector('[data-zeyn-cards], [data-zeyn-searchbox]')) import(`${BASE}/_zeyn/catalog.js${VERSION}`);
+/**
+ * Browser modules a page loads only when it holds one of their components, by selector: the
+ * catalog (card grids, rails, search boxes), media players and embeds, uploads, charts and chat
+ * panels of the assistant. Each module sets up the whole document when it loads and listens to
+ * `zeyn:content` after that, so content that `nav.js` swaps in later is covered too.
+ */
+const LAZY = [
+  ['[data-zeyn-cards], [data-zeyn-searchbox]', 'catalog'],
+  ['[data-zeyn-player], .z-embed', 'media'],
+  ['.z-upload', 'files'],
+  ['[data-zeyn-chart]', 'charts'],
+  ['section[data-zeyn-assistant]:not([data-zeyn-assistant="dock"])', 'assistant'],
+];
+
+/** @type {Set<string>} Modules of `LAZY` already asked for. */
+const lazyLoaded = new Set();
+
+/** Imports one module of `LAZY` once. */
+function loadLazy(name) {
+  if (lazyLoaded.has(name)) return Promise.resolve();
+  lazyLoaded.add(name);
+  return import(`${BASE}/_zeyn/${name}.js${VERSION}`);
 }
 
+/** Loads the modules whose components are inside `root`. */
+function initLazy(root) {
+  for (const [selector, name] of LAZY) if (!lazyLoaded.has(name) && root.querySelector(selector)) loadLazy(name);
+}
+
+/**
+ * The assistant's launcher is on every page; its module loads on the first press, which it then
+ * handles itself.
+ */
+document.addEventListener('click', (e) => {
+  const button = e.target instanceof Element ? e.target.closest('[data-zeyn-assistant-launch]') : null;
+  if (!button || lazyLoaded.has('assistant')) return;
+  loadLazy('assistant').then(() => button.click());
+});
+
 /** Initializers run for every root that gets new content. */
-const initializers = [restoreTabs, initSelects, initListboxes, initLookups, initTextareas, initSteps, baseLinks, initTrees, initCatalog];
+const initializers = [restoreTabs, initSelects, initListboxes, initLookups, initTextareas, initSteps, baseLinks, initTrees, initLazy];
 
 /** Initializes every component inside `root`. Safe to call more than once. */
 function init(root) {

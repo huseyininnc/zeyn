@@ -33,7 +33,7 @@ pub(super) const ASSETS: [&str; 2] = ["/_zeyn/media.js", "/_zeyn/media.css"];
 pub(super) fn head(base: &str) -> String {
     let v = super::ops::asset_version();
     format!(
-        r#"<link rel="stylesheet" href="{base}/_zeyn/media.css{v}"><script type="module" src="{base}/_zeyn/media.js{v}"></script>"#
+        r#"<link rel="stylesheet" href="{base}/_zeyn/media.css{v}">"#
     )
 }
 

@@ -36,7 +36,9 @@ A failed page answers with its status (404, 403, 500, ...) and the app's error s
 
 The menu lists only the screens the current user may open. The current item has `aria-current="page"`.
 
-Every framework script and stylesheet in the head carries `?v=` and the build id (`meta[name=zeyn-build]`, from `ZEYN_BUILD_ID` or a hash of the executable); `theme.css` carries a hash of the theme text. A request with the current value gets `Cache-Control: public, max-age=31536000, immutable`, so a warm page load asks for none of them; any other request (an old tab after a deploy, no `v`) gets `no-cache` and the ETag. Modules the runtime imports later (`catalog.js`, `live.js`) take the same `v` from the URL of the script that imports them.
+Every framework script and stylesheet in the head carries `?v=` and the build id (`meta[name=zeyn-build]`, from `ZEYN_BUILD_ID` or a hash of the executable); `theme.css` carries a hash of the theme text. A request with the current value gets `Cache-Control: public, max-age=31536000, immutable`, so a warm page load asks for none of them; any other request (an old tab after a deploy, no `v`) gets `no-cache` and the ETag. Modules the runtime imports later take the same `v` from the URL of the script that imports them.
+
+Every page loads `zeyn.js` (requests, effects, windows, forms, menus, shortcuts and the event delegation), `nav.js`, `components.js` and, in the app shell, `pro.js` and `enterprise.js`. The rest loads only on pages that use it, also when `nav.js` swaps a screen in: `zeyn.js` imports the grid runtime `grid.js` the first time content holds a `[data-zeyn-grid]` (full pages with a grid name it in `<link rel="modulepreload">`), and `components.js` imports `catalog.js` (card grids, search boxes), `media.js` (players, embeds), `files.js` (uploads), `charts.js` and `assistant.js` (chat panels, or the first press of the launcher). Their stylesheets stay in the head, so nothing changes look when the script arrives. On the showcase dashboard this is 5 scripts and 258 KB (74 KB on the wire) instead of 9 scripts and 403 KB (116 KB).
 
 ## 2. Screen markup
 

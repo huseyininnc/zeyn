@@ -53,28 +53,39 @@ mod xlsx;
 
 pub use ops::{READY_CACHE, build_id, probe};
 
-/// The browser runtime, served as one script at `/_zeyn/zeyn.js` so a page makes one request. The
-/// source is one file per concern under `assets/zeyn/`, joined here in this order (later parts
-/// use functions and constants of earlier ones):
+/// The browser runtime every page loads, served as one module at `/_zeyn/zeyn.js`. The source is
+/// one file per concern under `assets/zeyn/`, joined here in this order (later parts use
+/// functions and constants of earlier ones):
 ///
-/// - `core.js`: constants, requests, toasts, effects, windows
-/// - `grid.js`: grid setup, loading, paging and virtual scrolling
-/// - `grid-rows.js`: selection, bulk actions, inline edits, row items
-/// - `grid-columns.js`: sort, saved views, header, pinning, resizing, column and context menus
-/// - `grid-filters.js`: filter controls
-/// - `grid-cells.js`: row details, cell ranges, copy and paste, column windowing, branches,
-///   row keyboard
+/// - `core.js`: constants, requests, toasts, effects, windows, the loader of the grid runtime
+/// - `menus.js`: menus, popover placement, relative times
 /// - `page.js`: shortcuts, forms, export, language, time zone and theme, WebMCP tools
 /// - `events.js`: event delegation on `document` and start up
 const JS: &str = concat!(
     include_str!("../assets/zeyn/core.js"),
+    include_str!("../assets/zeyn/menus.js"),
+    include_str!("../assets/zeyn/page.js"),
+    include_str!("../assets/zeyn/events.js"),
+);
+
+/// The grid runtime, a module at `/_zeyn/grid.js` that `zeyn.js` imports the first time a page
+/// holds a grid, so pages without one never download it. `grid-api.js` takes what it uses from
+/// `zeyn.js` (`install`), `grid-exports.js` lists what `zeyn.js` calls through `G`; between them:
+///
+/// - `grid.js`: grid setup, loading, paging and virtual scrolling
+/// - `grid-rows.js`: selection, bulk actions, inline edits, row items
+/// - `grid-columns.js`: sort, saved views, header, pinning, resizing, column menus
+/// - `grid-filters.js`: filter controls
+/// - `grid-cells.js`: row details, cell ranges, copy and paste, column windowing, branches,
+///   row keyboard
+const GRID_JS: &str = concat!(
+    include_str!("../assets/zeyn/grid-api.js"),
     include_str!("../assets/zeyn/grid.js"),
     include_str!("../assets/zeyn/grid-rows.js"),
     include_str!("../assets/zeyn/grid-columns.js"),
     include_str!("../assets/zeyn/grid-filters.js"),
     include_str!("../assets/zeyn/grid-cells.js"),
-    include_str!("../assets/zeyn/page.js"),
-    include_str!("../assets/zeyn/events.js"),
+    include_str!("../assets/zeyn/grid-exports.js"),
 );
 const CSS: &str = include_str!("../assets/zeyn.css");
 const NAV: &str = include_str!("../assets/nav.js");
@@ -1443,6 +1454,7 @@ impl App {
         let router = seo::routes(router, &state);
         let router = router
             .route("/_zeyn/zeyn.js", get(|| async { asset(JS, "text/javascript; charset=utf-8") }))
+            .route("/_zeyn/grid.js", get(|| async { asset(GRID_JS, "text/javascript; charset=utf-8") }))
             .route("/_zeyn/zeyn.css", get(|| async { asset(CSS, "text/css; charset=utf-8") }))
             .route("/_zeyn/nav.js", get(|| async { asset(NAV, "text/javascript; charset=utf-8") }))
             .route("/_zeyn/theme.css", get(theme_css))
@@ -2557,6 +2569,14 @@ async fn page(
             let mut page = st.shell(&ctx, &csrf, &title, &html, Some(name));
             if !head.is_empty() {
                 page = page.replacen("</head>", &format!("{head}</head>"), 1);
+            }
+            if html.contains("data-zeyn-grid") {
+                let preload = format!(
+                    r#"<link rel="modulepreload" href="{}/_zeyn/grid.js{}"></head>"#,
+                    escape(&st.prefix),
+                    ops::asset_version()
+                );
+                page = page.replacen("</head>", &preload, 1);
             }
             #[cfg(feature = "realtime")]
             realtime::head(&st, &html, &mut page);

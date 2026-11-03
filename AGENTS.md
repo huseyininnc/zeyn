@@ -57,8 +57,9 @@ crates/zeyn/           the framework (feature gated modules, see Cargo.toml [fea
   src/server.rs        App, the router, the page shell; server/*.rs holds the endpoints
   src/sql/             data layer (features postgres, oracle)
   src/assistant/       embedded AI assistant (feature assistant)
-  assets/              the browser runtime: zeyn/*.js (joined into /_zeyn/zeyn.js), nav.js,
-                       components.js and their CSS
+  assets/              the browser runtime: zeyn/*.js (joined into /_zeyn/zeyn.js and the
+                       grid runtime /_zeyn/grid.js, see server.rs), nav.js, components.js
+                       and their CSS
   locales/             the framework's own texts (en.json, tr.json)
   tests/               integration tests, one file per area
 crates/zeyn-macros/    entity, model, choice, params, action, screen, t!
