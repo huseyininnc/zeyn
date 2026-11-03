@@ -27,12 +27,17 @@ Feature::new("shop")
             c.link(t!("shop.delivery.title"), shop_delivery).url(t!("shop.footer.source"), "https://example.com")
         })
         .text(t!("shop.footer.note"))
-    }))
+    })
+    .bottom_nav([
+        BottomNavItem::new(t!("shop.menu.home"), shop_home).icon(Icon::Home),
+        BottomNavItem::new(t!("shop.menu.help"), shop_delivery).icon(Icon::Box),
+    ]))
 ```
 
 - **Menü.** Üst menü, site shell'indeki her feature'ın menüsünü listeler. Tek öğeli bir grup düz bir bağlantıdır; daha büyük bir grup bağlantılarını açan bir düğmedir (W3C APG disclosure navigation deseni). Enter, Boşluk ya da bir tıklama grubu açıp kapatır, Aşağı ok açar ve ilk bağlantıya geçer, Yukarı ok, Aşağı ok, Home ve End bağlantıları arasında gezdirir, Escape kapatır ve düğmeye döner, gruptan Tab ile çıkmak ya da dışına tıklamak kapatır. Sol ve Sağ ok üst öğeler arasında gezdirir.
 - **Dar ekranlar.** 800 px altında menü, `aria-expanded` taşıyan bir menü düğmesinin arkasına katlanır; Escape kapatır. Betik olmadan menü açık kalır, böylece hiçbir şey erişilemez olmaz.
 - **Eylemler.** `sign_in()`, uygulamanın bir oturum açma sayfası olduğunda ziyaretçilere bir oturum açma bağlantısı, oturum açmış kullanıcılara bir oturum kapatma bağlantısı gösterir; `language()` ve `theme()` uygulama shell'indekiyle aynı seçicileri gösterir.
+- **Alt çubuk.** `bottom_nav([...])`, telefonlarda (800 px ve altı) ekranın altına sabitlenmiş en fazla beş bağlantı ekler; insanların en çok gittiği yerler içindir, beşten fazlası derlenmez. Her öğe, bir etiket, rotası olan bir ekran ve isteğe bağlı bir simge içeren bir `BottomNavItem`'dır. Gösterilen sayfanın bağlantısında `aria-current="page"` bulunur (`nav.js` güncel tutar), kullanıcının açamayacağı ekranlara giden bağlantılar çıkarılır, çubuk `env(safe-area-inset-bottom)` ile ana ekran göstergesinden uzak durur ve sayfanın altında çubuğun hiçbir şeyi gizlememesi için boşluk bırakılır. Üst menü geri kalan yerler için kalır. Çubuk betik gerektirmez.
 - **Alt bilgi.** Screen'lere bağlantılardan (`link`, açma izni olmayan kullanıcılar için çıkarılır) ya da adreslerden (`url`: bir yol, `https:`, `http:` ya da `mailto:`; `App::check` diğer şemaları ve kayıtlı olmayan screen'lere bağlantıları reddeder) oluşan sütunlar ve bir metin satırı.
 
 Bir site shell screen'i ile bir uygulama shell screen'i arasında geçiş, sayfa yüklemeden `nav.js` üzerinden olur: kısmi yanıt hangi shell'e ait olduğunu söyler (`x-zeyn-shell`) ve bu geçerli çerçeveden farklı olduğunda runtime, bir dil değişikliğinin yaptığı gibi tüm çerçeveyi değiştirir ve diğer shell'in stil sayfasını ve betiğini yükler. `/_zeyn/route/{screen}` bağlantıları (breadcrumb'ınki) aynı şekilde izlenir.

@@ -41,6 +41,27 @@ Form::of(Contact { quantity: 2, size: Size::Medium, ..Contact::default() })
 | `Control::Percent` | パーセント記号付きで表示される `Decimal` または整数 |
 | `Control::Password`, `Control::NewPassword` | パスワードとして入力されるテキストフィールド。表示と非表示のボタン付き |
 | `Control::PasswordMeter` | 強度メーター付きの新しいパスワード |
+| `Control::Rating` | 1 から N までの整数を星で表示します（[Rating](#rating) を参照） |
+
+## Rating
+
+`Control::Rating` は整数フィールドを 1 から N までの星として表示します。N はフィールドの `max` ルールです（ルールがなければ 5、最大 10）。凡例がフィールドのラベルである `fieldset` の中にあるネイティブのラジオボタンのグループなので、スクリプトなしで W3C APG のラジオグループパターンに従います。Tab はグループに一度だけ到達し、矢印キーで移動と選択を行い、各星はユーザーの言語で「3 / 5」のように名前が付きます。ホバーするとポインターの位置までの星が点灯します。サーバーは他の数値と同様にフィールドのルールで値を検証するので、フィールドに `min` と `max` を指定してください。`Option<i64>` に `required` がある場合、すべての星を空にすることは拒否されます。
+
+```rust
+#[model]
+pub struct Feedback {
+    #[rule(required, min = 1, max = 5)]
+    pub stars: Option<i64>,
+}
+
+Form::of(Feedback::default())
+    .field(Feedback::stars)
+    .control(Feedback::stars, Control::Rating)
+    .submit(t!("feedback.send"), send_feedback)
+```
+
+@live rating
+
 
 ## ルックアップ
 

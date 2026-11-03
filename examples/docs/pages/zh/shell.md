@@ -27,12 +27,17 @@ Feature::new("shop")
             c.link(t!("shop.delivery.title"), shop_delivery).url(t!("shop.footer.source"), "https://example.com")
         })
         .text(t!("shop.footer.note"))
-    }))
+    })
+    .bottom_nav([
+        BottomNavItem::new(t!("shop.menu.home"), shop_home).icon(Icon::Home),
+        BottomNavItem::new(t!("shop.menu.help"), shop_delivery).icon(Icon::Box),
+    ]))
 ```
 
 - **菜单。** 顶部菜单在站点 shell 中列出每个 feature 的菜单。只有一项的组是普通链接；较大的组是打开其链接的按钮（W3C APG 披露式导航模式）。Enter、Space 或点击切换一个组，Down 打开它并移到其第一个链接，Up、Down、Home 和 End 在其链接之间移动，Escape 关闭它并回到按钮，用 Tab 离开该组或点击外部会将其关闭。Left 和 Right 在顶层项之间移动。
 - **窄屏幕。** 在 800 px 以下，菜单折叠到带 `aria-expanded` 的菜单按钮后面；Escape 将其关闭。没有脚本时菜单保持展开，因此没有任何内容变得无法访问。
 - **操作。** 当应用有登录页面时，`sign_in()` 对访客显示登录链接，对已登录用户显示退出链接；`language()` 和 `theme()` 显示与应用 shell 相同的选择器。
+- **底部栏。** `bottom_nav([...])` 添加最多五个固定在手机屏幕底部（宽度 800 px 及以下）的链接，用于人们最常去的地方；超过五个则无法编译。每个条目是 `BottomNavItem`，包含标签、带路由的屏幕和可选图标。当前显示页面的链接带有 `aria-current="page"`（由 `nav.js` 保持更新），用户无权打开的屏幕的链接会被省略，底部栏通过 `env(safe-area-inset-bottom)` 避开主屏指示条，页面底部会留出空间，因此底部栏不会遮挡任何内容。顶部菜单仍用于其余内容。底部栏不需要脚本。
 - **页脚。** 若干列链接，指向 screen（`link`，对无权打开的用户省略）或地址（`url`：路径、`https:`、`http:` 或 `mailto:`；`App::check` 会拒绝其他协议以及指向未注册 screen 的链接），外加一行文字。
 
 在站点 shell screen 与应用 shell screen 之间切换，通过 `nav.js` 进行，无需整页加载：局部响应会说明它属于哪个 shell（`x-zeyn-shell`），当它与当前框架不同时，运行时会像切换语言那样替换整个框架，并加载另一个 shell 的样式表和脚本。指向 `/_zeyn/route/{screen}` 的链接（面包屑的链接）也以同样方式被跟随。

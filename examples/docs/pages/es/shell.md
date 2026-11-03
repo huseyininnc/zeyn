@@ -27,12 +27,17 @@ Feature::new("shop")
             c.link(t!("shop.delivery.title"), shop_delivery).url(t!("shop.footer.source"), "https://example.com")
         })
         .text(t!("shop.footer.note"))
-    }))
+    })
+    .bottom_nav([
+        BottomNavItem::new(t!("shop.menu.home"), shop_home).icon(Icon::Home),
+        BottomNavItem::new(t!("shop.menu.help"), shop_delivery).icon(Icon::Box),
+    ]))
 ```
 
 - **Menú.** El menú superior lista los menús de todas las features en el shell del sitio. Un grupo de un solo elemento es un enlace simple; un grupo mayor es un botón que abre sus enlaces (el patrón APG de W3C de navegación con disclosure). Enter, Espacio o un clic alternan un grupo, Abajo lo abre y pasa a su primer enlace, Arriba, Abajo, Inicio y Fin se mueven entre sus enlaces, Escape lo cierra y vuelve al botón, y salir del grupo con Tab o hacer clic fuera lo cierra. Izquierda y Derecha se mueven entre los elementos superiores.
 - **Pantallas estrechas.** Por debajo de 800 px el menú se pliega tras un botón de menú con `aria-expanded`; Escape lo cierra. Sin el script el menú permanece abierto, de modo que nada queda inalcanzable.
 - **Acciones.** `sign_in()` muestra un enlace de inicio de sesión a los visitantes y un enlace de cierre de sesión a los usuarios con sesión iniciada cuando la aplicación tiene una página de inicio de sesión; `language()` y `theme()` muestran los mismos selectores que el shell de la aplicación.
+- **Barra inferior.** `bottom_nav([...])` añade hasta cinco enlaces fijos en la parte inferior de la pantalla en teléfonos (800 px de ancho o menos), para los lugares a los que más se va; más de cinco no compila. Cada elemento es un `BottomNavItem` con una etiqueta, una pantalla con ruta y un icono opcional. El enlace de la página mostrada lleva `aria-current="page"` (lo mantiene al día `nav.js`), los enlaces a pantallas que el usuario no puede abrir se omiten, la barra se mantiene alejada del indicador de inicio con `env(safe-area-inset-bottom)` y la página deja espacio abajo para que la barra no oculte nada. El menú superior sigue para el resto. La barra no necesita script.
 - **Pie de página.** Columnas de enlaces a pantallas (`link`, omitido para los usuarios que no pueden abrirlas) o a direcciones (`url`: una ruta, `https:`, `http:` o `mailto:`; `App::check` rechaza otros esquemas y los enlaces a pantallas que no están registradas), y una línea de texto.
 
 El paso entre una pantalla del shell del sitio y una del shell de la aplicación se hace a través de `nav.js` sin cargar la página: la respuesta parcial dice a qué shell pertenece (`x-zeyn-shell`), y cuando eso difiere del marco actual, el runtime sustituye todo el marco como lo hace un cambio de idioma y carga la hoja de estilo y el script del otro shell. Los enlaces a `/_zeyn/route/{screen}` (los de las migas de pan) se siguen de la misma manera.

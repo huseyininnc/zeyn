@@ -102,6 +102,86 @@ Spoiler::new(t!("quiz.show_answer")).add(Paragraph::new(answer.clone()))
 
 @live people
 
+## Chips
+
+一排可换行的圆角小链接。`Chips::links(label)` 在以 label 命名的 `nav` 中放置指向屏幕的普通链接，例如文章的标签。`Chips::filter(label, screen, params)` 基于屏幕参数生成切换按钮：每个 chip 都是指向同一屏幕的链接，其值会被加入或移出参数，因此服务器根据收到的参数渲染 `aria-pressed`，浏览器中不保存任何状态。按下 chip 会通过 `nav.js` 在不刷新页面的情况下打开新地址，焦点和滚动位置保持在该 chip 上。除非调用 `.multiple()`，否则同一时间只能按下一个值；参数中不属于选项的值会被忽略。键盘：Tab 在 chip 之间移动，Enter 或 Space 按下其中一个。被按下的 chip 还会显示对勾，因此状态不只依赖颜色。脚本（`chips.js`，小于 1 KB）只在带有筛选 chip 的页面上加载。
+
+```rust
+#[screen(route = "/articles", public)]
+pub fn articles(p: ArticleParams) -> Screen {
+    Screen::new(t!("blog.articles")).body(
+        Chips::filter(t!("blog.tags"), articles, |tags| ArticleParams { tags: tags.join(",") })
+            .current(p.tags.split(','))
+            .option("guide", t!("blog.guides"))
+            .option("news", t!("blog.news"))
+            .multiple(),
+    )
+}
+```
+
+@live chips
+
+
+## Hero
+
+页面顶部的大型区块：背景图，加上标题、一行文字和按钮等操作。默认是静态的。`.slide(title)` 会添加另一张幻灯片，而 `.text`、`.image` 和 `.action` 始终作用于最后一张。有多张幻灯片时，它遵循 W3C APG 轮播模式：幻灯片选择按钮，每张幻灯片是名为“2 / 3”的分组，被选中的幻灯片会以礼貌方式播报。除非应用调用 `.rotate(seconds)`（4 到 30），幻灯片只在用户选择时切换。调用后，暂停与播放按钮排在最前（WCAG 2.2.2），指针位于 hero 上、焦点位于其中以及标签页隐藏时轮播会停止，用户偏好减少动态效果时则完全不会启动；幻灯片在切换过程中不会被播报。没有脚本时显示第一张幻灯片。
+
+图片遵循 `Image` 的规则（应用的路径，或位于应用 `img-src` 允许的主机上的 `https` 地址）。它是文字后面的装饰，因此替代文本为空：重要内容请写入标题和文字，它们位于深色渐变之上以保证对比度。第一张幻灯片的图片以高优先级加载以加快首次绘制，其他的则延迟加载。脚本（`hero.js`，1.6 KB gzip）只在带有幻灯片的页面上加载。
+
+```rust
+Hero::new(t!("home.fresh"))
+    .text(t!("home.fresh_text"))
+    .image("/img/hero/kitchen.jpg")
+    .action(ActionButton::new(t!("home.order"), start_order, ()))
+    .slide(t!("home.new_teas"))
+    .image("/img/hero/teas.jpg")
+    .rotate(8)
+```
+
+@live hero
+
+
+## Reactions
+
+由应用选定的一排反应按钮，每个按钮有一个 key、一个名称和一个符号（如 emoji），以及计数。`Reactions::of(action, target)` 指明这些反应针对哪个条目；target 由屏幕设定，绝不从浏览器读取。按下按钮会把反应提交到 `POST /_zeyn/data`，该端点会检查 CSRF，计入写入速率限制，打开屏幕，检查操作的权限，并在操作运行之前拒绝集合之外的反应。操作会收到 `ReactionPress`（target、reaction、pressed），将其保存并返回新的 `ReactionState`（各计数和用户自己的反应），计数和 `aria-pressed` 状态就地更新。每个按钮都是以反应名称和计数命名的 toggle button；符号对屏幕阅读器隐藏。`.state(...)` 提供首次渲染时的计数，因此无需脚本也能显示。脚本（`reactions.js`，1.3 KB gzip）只在带有反应的页面上加载。
+
+```rust
+#[action(permission = "answers.react")]
+pub async fn react_to_answer(press: ReactionPress, db: Db, ctx: Ctx) -> Result<ReactionState> {
+    db.toggle_reaction(&ctx, &press.target, &press.reaction, press.pressed).await?;
+    db.reaction_state(&ctx, &press.target).await
+}
+
+Reactions::of(react_to_answer, format!("answer-{}", answer.id))
+    .reaction("helpful", t!("answers.helpful"), "\u{1f44d}")
+    .reaction("thanks", t!("answers.thanks"), "\u{1f64f}")
+    .state(answer.reactions.clone())
+```
+
+@live reactions
+
+
+## RelativeTime
+
+以页面语言显示的相对时间，例如“3 分钟前”或“2 天后”。服务器把用户时区下的准确日期和时间写入 `<time datetime="...">`，因此 HTML 每分钟都保持不变，缓存的页面依然正确。运行时会在页面加载时、`nav.js` 换入屏幕时以及每分钟用 `Intl.RelativeTimeFormat` 重写文本；准确时间保留在提示中。没有脚本时，文本就是准确时间。
+
+```rust
+RelativeTime::new(post.published)
+```
+
+
+## Share
+
+分享链接的按钮：浏览器支持 Web Share API 时（大多数手机）使用系统分享面板，否则复制到剪贴板并用 toast 提示。它分享当前显示的页面，或通过 `Share::screen(screen, params)` 分享某个屏幕，其参数由编译器检查。`.title` 设置分享面板显示的标题；除非用 `.label` 指定，标签为用户语言的“分享”。服务器把按钮渲染为隐藏状态，由其脚本显示，因此没有脚本的页面不会出现什么都不做的按钮。脚本（`share.js`，小于 1 KB）只在包含分享按钮的页面上加载。
+
+```rust
+Share::page().title(post.title.clone())
+Share::screen(article, ArticleParams { id: post.id }).label(t!("blog.share_article"))
+```
+
+@live engage
+
+
 ## AlphaIndex
 
 一排字母，每个字母都是指向某个 screen 的链接，字母位于该 screen 的参数中，例如名字以该字母开头的人。字母来自用户的语言，并按该语言自己的顺序排列（`zeyn::ui::alphabet`）：土耳其语中 `Ç Ğ I İ Ö Ş Ü` 各在其位，西班牙语有 `Ñ`，俄语和阿拉伯语有各自的字母表，其他语言一律为 `A` 到 `Z`。当前显示的 screen 的字母用 `aria-current="page"` 标记（土耳其语的 `i` 标记 `İ`），`.other()` 会在末尾添加一个 `#` 链接，用于以其他字符开头的名称。这些链接无需重新加载页面即可打开，在手机上会折成多行。

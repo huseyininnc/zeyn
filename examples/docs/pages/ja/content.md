@@ -102,6 +102,86 @@ Spoiler::new(t!("quiz.show_answer")).add(Paragraph::new(answer.clone()))
 
 @live people
 
+## Chips
+
+複数行に折り返す、小さな丸いリンクの列です。`Chips::links(label)` は、記事のタグなど画面への通常のリンクを、label で名前が付いた `nav` の中に持ちます。`Chips::filter(label, screen, params)` は画面パラメーターに対するトグルボタンを作ります。各 chip は同じ画面へのリンクで、その値がパラメーターに追加または削除されるため、サーバーは受け取ったパラメーターから `aria-pressed` を描画し、ブラウザーには何も保持されません。chip を押すと `nav.js` を通じてページを再読み込みせずに新しいアドレスが開き、フォーカスとスクロール位置は chip に残ります。`.multiple()` を呼ばない限り、一度に押せる値は一つです。パラメーター内の選択肢でない値は無視されます。キーボード: Tab で chip 間を移動し、Enter または Space で押します。押された chip にはチェックマークも表示されるので、状態が色だけに頼りません。スクリプト（`chips.js`、1 KB 未満）はフィルター chip があるページでのみ読み込まれます。
+
+```rust
+#[screen(route = "/articles", public)]
+pub fn articles(p: ArticleParams) -> Screen {
+    Screen::new(t!("blog.articles")).body(
+        Chips::filter(t!("blog.tags"), articles, |tags| ArticleParams { tags: tags.join(",") })
+            .current(p.tags.split(','))
+            .option("guide", t!("blog.guides"))
+            .option("news", t!("blog.news"))
+            .multiple(),
+    )
+}
+```
+
+@live chips
+
+
+## Hero
+
+ページ上部の大きなセクションで、背景画像にタイトル、一行のテキスト、ボタンなどのアクションが付きます。デフォルトでは静的です。`.slide(title)` はスライドをもう一つ追加し、`.text`、`.image`、`.action` は常に最後のスライドに設定します。複数のスライドがある場合は W3C APG のカルーセルパターンに従います。スライド選択ボタンがあり、各スライドは「2 / 3」という名前のグループで、選ばれたスライドは控えめに読み上げられます。アプリが `.rotate(seconds)`（4 から 30）を呼ばない限り、スライドはユーザーが選んだときだけ切り替わります。呼んだ場合は一時停止と再生のボタンが先頭に来て（WCAG 2.2.2）、ポインターが hero の上にあるとき、フォーカスがその中にあるとき、タブが非表示のときは回転が止まり、ユーザーがモーション低減を望む場合は開始しません。スライドが動いている間は読み上げられません。スクリプトがなければ最初のスライドが表示されます。
+
+画像は `Image` のルールに従います（アプリのパス、またはアプリの `img-src` にあるホストの `https` アドレス）。テキストの背後の装飾なので代替テキストは空です。重要な内容はタイトルとテキストに書いてください。これらはコントラストのために暗いグラデーションの上に置かれます。最初のスライドの画像は素早い初回描画のために高い優先度で読み込まれ、他は遅延読み込みされます。スクリプト（`hero.js`、1.6 KB gzip）はスライドがあるページでのみ読み込まれます。
+
+```rust
+Hero::new(t!("home.fresh"))
+    .text(t!("home.fresh_text"))
+    .image("/img/hero/kitchen.jpg")
+    .action(ActionButton::new(t!("home.order"), start_order, ()))
+    .slide(t!("home.new_teas"))
+    .image("/img/hero/teas.jpg")
+    .rotate(8)
+```
+
+@live hero
+
+
+## Reactions
+
+アプリが選んだリアクションボタンの列で、それぞれにキー、名前、絵文字などの記号、そして件数があります。`Reactions::of(action, target)` はリアクションの対象となる項目を指定します。target は画面が設定し、ブラウザーから読み取ることはありません。ボタンを押すとリアクションが `POST /_zeyn/data` に送られ、このエンドポイントは CSRF を確認し、書き込みレート制限に数えられ、画面を開き、アクションの権限を確認し、アクションが実行される前に集合外のリアクションを拒否します。アクションは `ReactionPress`（target、reaction、pressed）を受け取って保存し、新しい `ReactionState`（件数とユーザー自身のリアクション）を返し、件数と `aria-pressed` の状態はその場で更新されます。各ボタンはリアクションの名前と件数で名前が付いたトグルボタンで、記号はスクリーンリーダーから隠されます。`.state(...)` は最初の描画の件数を与えるので、スクリプトなしでも表示されます。スクリプト（`reactions.js`、1.3 KB gzip）はリアクションがあるページでのみ読み込まれます。
+
+```rust
+#[action(permission = "answers.react")]
+pub async fn react_to_answer(press: ReactionPress, db: Db, ctx: Ctx) -> Result<ReactionState> {
+    db.toggle_reaction(&ctx, &press.target, &press.reaction, press.pressed).await?;
+    db.reaction_state(&ctx, &press.target).await
+}
+
+Reactions::of(react_to_answer, format!("answer-{}", answer.id))
+    .reaction("helpful", t!("answers.helpful"), "\u{1f44d}")
+    .reaction("thanks", t!("answers.thanks"), "\u{1f64f}")
+    .state(answer.reactions.clone())
+```
+
+@live reactions
+
+
+## RelativeTime
+
+ページの言語で「3 分前」や「2 日後」のような相対時間として表示される時刻です。サーバーはユーザーのタイムゾーンでの正確な日付と時刻を `<time datetime="...">` の中に書くので、HTML は分ごとに変わらず、キャッシュされたページも正しいままです。ランタイムは、ページの読み込み時、`nav.js` が画面を差し替えたとき、および 1 分ごとに `Intl.RelativeTimeFormat` でテキストを書き換えます。正確な時刻はツールチップに残ります。スクリプトがなければ、正確な時刻がテキストになります。
+
+```rust
+RelativeTime::new(post.published)
+```
+
+
+## Share
+
+リンクを共有するボタンです。ブラウザーに Web Share API がある場合（ほとんどのスマートフォン）はシステムの共有シートを、ない場合はその旨を伝えるトーストとともにクリップボードへコピーします。表示中のページを共有するか、コンパイラーがパラメーターを検査する `Share::screen(screen, params)` で画面を共有します。`.title` は共有シートに表示されるタイトルを設定し、ラベルは `.label` で指定しない限りユーザーの言語で「共有」になります。サーバーはボタンを非表示で描画し、スクリプトがそれを表示するので、スクリプトのないページには何もしないボタンがありません。スクリプト（`share.js`、1 KB 未満）は共有ボタンのあるページでのみ読み込まれます。
+
+```rust
+Share::page().title(post.title.clone())
+Share::screen(article, ArticleParams { id: post.id }).label(t!("blog.share_article"))
+```
+
+@live engage
+
+
 ## AlphaIndex
 
 文字を並べたバーで、各文字はその文字をパラメーターに持つ screen へのリンクです。たとえば、名前がその文字で始まる人を表示します。文字はユーザーの言語から、その言語自身の順序で取得されます（`zeyn::ui::alphabet`）。トルコ語では `Ç Ğ I İ Ö Ş Ü` が正しい位置に入り、スペイン語には `Ñ` があり、ロシア語とアラビア語にはそれぞれの文字体系があり、それ以外の言語は `A` から `Z` です。表示中の screen の文字には `aria-current="page"` が付き（トルコ語の `i` は `İ` に付く）、`.other()` は、それ以外の文字で始まる名前のために最後に `#` リンクを加えます。リンクはページを再読み込みせずに開き、スマートフォンでは複数行に折り返されます。

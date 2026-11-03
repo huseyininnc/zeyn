@@ -41,6 +41,27 @@ Form::of(Contact { quantity: 2, size: Size::Medium, ..Contact::default() })
 | `Control::Percent` | Yüzde işaretiyle gösterilen `Decimal` ya da tam sayı |
 | `Control::Password`, `Control::NewPassword` | Göster ve gizle düğmeli, parola olarak yazılan metin alanı |
 | `Control::PasswordMeter` | Güç göstergeli yeni parola |
+| `Control::Rating` | 1 ile N arasında bir tam sayı, yıldızlar olarak gösterilir ([Rating](#rating) bölümüne bakın) |
+
+## Rating
+
+`Control::Rating`, tam sayı bir alanı 1'den N'ye kadar yıldızlar olarak gösterir; N, alanın `max` kuralıdır (kural yoksa 5, en fazla 10). Etiketi alanın etiketi olan bir `fieldset` içindeki yerel radio düğmelerinden oluşan bir gruptur, bu yüzden betik olmadan W3C APG radio group desenini izler: Tab gruba bir kez ulaşır, ok tuşları hareket ettirir ve işaretler, her yıldız kullanıcının dilinde "3 / 5" gibi adlandırılır. Üzerine gelmek, imlecin olduğu yıldıza kadar olanları aydınlatır. Sunucu değeri alanın kurallarıyla her sayı gibi doğrular, bu yüzden alana `min` ve `max` verin; `Option<i64>` üzerinde `required` varsa tüm yıldızları boş bırakmak reddedilir.
+
+```rust
+#[model]
+pub struct Feedback {
+    #[rule(required, min = 1, max = 5)]
+    pub stars: Option<i64>,
+}
+
+Form::of(Feedback::default())
+    .field(Feedback::stars)
+    .control(Feedback::stars, Control::Rating)
+    .submit(t!("feedback.send"), send_feedback)
+```
+
+@live rating
+
 
 ## Lookup
 

@@ -42,6 +42,21 @@ Card::image(c.cover.clone(), c.title.clone())
 - **Búsqueda.** `.search(text)` muestra solo las filas que coinciden con el texto libre ([`DataQuery::q`](#free-text)), como el texto de una pantalla de resultados.
 - **Campos enmascarados.** Las tarjetas las construye un closure que ve la fila sin procesar. Para un modelo con campos `#[mask]`, solo los usuarios que pueden revelarlos reciben las tarjetas; todos los demás reciben `Forbidden`. Usa un modelo sin campos enmascarados para las tarjetas públicas.
 
+### Vistas previas al pasar el cursor
+
+`.preview(screen, params)` en una `ImageCard` o un `ListItem` que tenga enlace muestra esa pantalla en un panel junto a la tarjeta: tras aproximadamente medio segundo con el ratón encima, o de inmediato cuando la tarjeta recibe el foco del teclado. La pantalla se carga solo entonces, desde `GET /_zeyn/screen/...` con las mismas comprobaciones de acceso que una ventana, y cada vista previa se conserva mientras dure la página (24 como máximo, se vacían cuando `nav.js` abre otra pantalla). Los marcos, objetos, reproductores multimedia y scripts se eliminan antes de mostrar el panel, así que una vista previa nunca carga un iframe. El panel vive en la capa superior, de modo que los rails y las cuadrículas que recortan su contenido no lo cortan; se abre por el lado con más espacio, se voltea en los bordes de la pantalla, se desplaza dentro de sí mismo y nunca desplaza la página. Sigue WCAG 1.4.13: el puntero puede pasar sobre el panel, Escape lo cierra y permanece hasta que el puntero o el foco se van. En pantallas táctiles y con punteros imprecisos no hay vista previa y un toque abre el enlace; el script (`preview.js`, 2,5 KB gzip) nunca se carga allí, y en el resto se carga con el primer hover o foco de una tarjeta así. Con movimiento reducido, el panel aparece sin su breve animación de crecimiento.
+
+```rust
+Rail::of(search_products).card(|p: &Product| {
+    Card::image(p.image.clone(), p.name.clone())
+        .link(product, ProductParams { id: p.id })
+        .preview(product_summary, ProductParams { id: p.id })
+})
+```
+
+@live preview
+
+
 ## Rail
 
 Un rail es un card grid dispuesto en una sola fila que se desplaza lateralmente, con ajuste al desplazarse y botones anterior y siguiente que se desplazan el ancho de una vista (con suavidad, salvo que el usuario haya pedido movimiento reducido). Carga el siguiente lote, de 12 en 12, cuando el usuario se desplaza cerca del final. Las tarjetas son enlaces en el orden de tabulación y se desplazan hasta quedar a la vista cuando reciben el foco.

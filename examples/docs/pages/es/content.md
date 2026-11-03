@@ -102,6 +102,86 @@ Spoiler::new(t!("quiz.show_answer")).add(Paragraph::new(answer.clone()))
 
 @live people
 
+## Chips
+
+Una fila de pequeños enlaces redondeados que pasan a más líneas. `Chips::links(label)` contiene enlaces simples a pantallas, como las etiquetas de un artículo, dentro de un `nav` nombrado por la etiqueta. `Chips::filter(label, screen, params)` crea botones de alternancia sobre un parámetro de pantalla: cada chip es un enlace a la misma pantalla con su valor añadido al parámetro o quitado de él, de modo que el servidor genera `aria-pressed` a partir de los parámetros recibidos y no se guarda nada en el navegador. Pulsar un chip abre la nueva dirección mediante `nav.js` sin recargar la página, y el foco y la posición de desplazamiento se quedan en el chip. Solo hay un valor pulsado a la vez salvo que se llame a `.multiple()`; los valores de los parámetros que no son opciones se ignoran. Teclado: Tab se mueve entre chips, Enter o Space pulsa uno. Un chip pulsado también muestra una marca de verificación, así que el estado no depende solo del color. El script (`chips.js`, menos de 1 KB) se carga solo en páginas con chips de filtro.
+
+```rust
+#[screen(route = "/articles", public)]
+pub fn articles(p: ArticleParams) -> Screen {
+    Screen::new(t!("blog.articles")).body(
+        Chips::filter(t!("blog.tags"), articles, |tags| ArticleParams { tags: tags.join(",") })
+            .current(p.tags.split(','))
+            .option("guide", t!("blog.guides"))
+            .option("news", t!("blog.news"))
+            .multiple(),
+    )
+}
+```
+
+@live chips
+
+
+## Hero
+
+Una sección grande en la parte superior de una página: una imagen de fondo con un título, una línea de texto y acciones como botones. Es estática por defecto. `.slide(title)` añade otra diapositiva, y `.text`, `.image` y `.action` siempre afectan a la última. Con varias diapositivas sigue el patrón de carrusel de W3C APG: botones para elegir diapositiva, cada diapositiva es un grupo llamado «2 de 3» y la diapositiva elegida se anuncia con cortesía. Las diapositivas cambian solo cuando el usuario elige una, salvo que la app llame a `.rotate(seconds)` (de 4 a 30). Entonces va primero un botón de pausa y reproducción (WCAG 2.2.2), la rotación se detiene mientras el puntero está sobre el hero o el foco está dentro y mientras la pestaña está oculta, y nunca empieza si el usuario prefiere movimiento reducido; las diapositivas no se anuncian mientras se mueven. Sin script se muestra la primera diapositiva.
+
+La imagen sigue las reglas de `Image` (una ruta de la app o una dirección `https` en un host del `img-src` de la app). Es decoración tras el texto, así que su texto alternativo está vacío: pon lo importante en el título y el texto, que se sitúan sobre un degradado oscuro para dar contraste. La imagen de la primera diapositiva se carga con prioridad alta para un primer pintado rápido, las demás de forma diferida. El script (`hero.js`, 1,6 KB gzip) se carga solo en páginas con diapositivas.
+
+```rust
+Hero::new(t!("home.fresh"))
+    .text(t!("home.fresh_text"))
+    .image("/img/hero/kitchen.jpg")
+    .action(ActionButton::new(t!("home.order"), start_order, ()))
+    .slide(t!("home.new_teas"))
+    .image("/img/hero/teas.jpg")
+    .rotate(8)
+```
+
+@live hero
+
+
+## Reactions
+
+Una fila de botones de reacción elegidos por la app, cada uno con una clave, un nombre y un símbolo como un emoji, y su recuento. `Reactions::of(action, target)` indica el elemento sobre el que son las reacciones; el destino lo fija la pantalla y nunca se lee del navegador. Al pulsar un botón se envía la reacción a `POST /_zeyn/data`, que comprueba CSRF, cuenta para el límite de escritura, abre la pantalla, comprueba el permiso de la acción y rechaza una reacción fuera del conjunto antes de que se ejecute la acción. La acción recibe un `ReactionPress` (target, reaction, pressed), lo guarda y devuelve el nuevo `ReactionState` (los recuentos y las reacciones del propio usuario), y los recuentos y los estados `aria-pressed` se actualizan en el sitio. Cada botón es un toggle button nombrado por el nombre de la reacción y su recuento; el símbolo se oculta a los lectores de pantalla. `.state(...)` da los recuentos del primer renderizado, así que se ven sin script. El script (`reactions.js`, 1,3 KB gzip) se carga solo en páginas con reacciones.
+
+```rust
+#[action(permission = "answers.react")]
+pub async fn react_to_answer(press: ReactionPress, db: Db, ctx: Ctx) -> Result<ReactionState> {
+    db.toggle_reaction(&ctx, &press.target, &press.reaction, press.pressed).await?;
+    db.reaction_state(&ctx, &press.target).await
+}
+
+Reactions::of(react_to_answer, format!("answer-{}", answer.id))
+    .reaction("helpful", t!("answers.helpful"), "\u{1f44d}")
+    .reaction("thanks", t!("answers.thanks"), "\u{1f64f}")
+    .state(answer.reactions.clone())
+```
+
+@live reactions
+
+
+## RelativeTime
+
+Un momento mostrado como tiempo relativo, como «hace 3 minutos» o «dentro de 2 días», en el idioma de la página. El servidor escribe la fecha y hora exactas en la zona horaria del usuario dentro de `<time datetime="...">`, así que el HTML es igual de un minuto a otro y una página en caché sigue siendo correcta. El runtime reescribe el texto con `Intl.RelativeTimeFormat` cuando se carga la página, cuando `nav.js` incorpora una pantalla y una vez por minuto; la hora exacta queda en el tooltip. Sin script, el texto es la hora exacta.
+
+```rust
+RelativeTime::new(post.published)
+```
+
+
+## Share
+
+Un botón que comparte un enlace: la hoja de compartir del sistema donde el navegador tiene la Web Share API (la mayoría de los teléfonos) y, si no, una copia al portapapeles con un toast que lo indica. Comparte la página mostrada, o una pantalla con `Share::screen(screen, params)`, cuyos parámetros comprueba el compilador. `.title` fija el título que muestra la hoja de compartir, y la etiqueta es «Compartir» en el idioma del usuario salvo que `.label` dé otra. El servidor renderiza el botón oculto y su script lo muestra, así que una página sin script no tiene un botón que no hace nada. El script (`share.js`, menos de 1 KB) se carga solo en páginas con un botón de compartir.
+
+```rust
+Share::page().title(post.title.clone())
+Share::screen(article, ArticleParams { id: post.id }).label(t!("blog.share_article"))
+```
+
+@live engage
+
+
 ## AlphaIndex
 
 Una barra de letras, cada una un enlace a un screen con la letra en sus parámetros, por ejemplo las personas cuyo nombre empieza por ella. Las letras proceden del idioma del usuario, en su propio orden (`zeyn::ui::alphabet`): el turco tiene `Ç Ğ I İ Ö Ş Ü` en su sitio, el español tiene `Ñ`, el ruso y el árabe tienen sus propios alfabetos, y cualquier otro idioma recibe de la `A` a la `Z`. La letra del screen que se muestra se marca con `aria-current="page"` (una `i` turca marca `İ`), y `.other()` añade al final un enlace `#` para los nombres que empiezan por cualquier otro carácter. Los enlaces se abren sin recargar la página y en los teléfonos se reparten en más líneas.

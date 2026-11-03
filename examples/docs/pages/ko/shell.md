@@ -27,12 +27,17 @@ Feature::new("shop")
             c.link(t!("shop.delivery.title"), shop_delivery).url(t!("shop.footer.source"), "https://example.com")
         })
         .text(t!("shop.footer.note"))
-    }))
+    })
+    .bottom_nav([
+        BottomNavItem::new(t!("shop.menu.home"), shop_home).icon(Icon::Home),
+        BottomNavItem::new(t!("shop.menu.help"), shop_delivery).icon(Icon::Box),
+    ]))
 ```
 
 - **메뉴.** 상단 메뉴는 사이트 셸에 있는 모든 Feature의 메뉴를 나열합니다. 항목이 하나뿐인 그룹은 일반 링크이고, 더 큰 그룹은 링크를 여는 버튼입니다(W3C APG 디스클로저 내비게이션 패턴). Enter, Space, 클릭은 그룹을 토글하고, 아래쪽 화살표는 그룹을 열어 첫 번째 링크로 이동하며, 위쪽 화살표, 아래쪽 화살표, Home, End는 그룹의 링크 사이를 이동하고, Escape는 그룹을 닫고 버튼으로 돌아가며, 그룹 밖으로 Tab하거나 바깥을 클릭하면 닫힙니다. 왼쪽과 오른쪽 화살표는 상단 항목 사이를 이동합니다.
 - **좁은 화면.** 800 px 미만에서는 메뉴가 `aria-expanded`가 있는 메뉴 버튼 뒤로 접히며, Escape로 닫습니다. 스크립트가 없으면 메뉴가 열린 채로 유지되므로 접근할 수 없게 되는 것이 없습니다.
 - **Action.** `sign_in()`은 앱에 로그인 페이지가 있으면 방문자에게 로그인 링크를, 로그인한 사용자에게 로그아웃 링크를 표시합니다. `language()`와 `theme()`는 앱 셸과 같은 선택기를 표시합니다.
+- **하단 바.** `bottom_nav([...])`는 휴대폰(너비 800 px 이하)에서 화면 아래에 고정되는 링크를 최대 다섯 개 추가하며, 사람들이 가장 자주 가는 곳을 위한 것입니다. 다섯 개를 넘으면 컴파일되지 않습니다. 각 항목은 레이블, 라우트가 있는 화면, 선택적 아이콘을 가진 `BottomNavItem`입니다. 표시 중인 페이지의 링크에는 `aria-current="page"`가 있고(`nav.js`가 최신으로 유지), 사용자가 열 수 없는 화면으로의 링크는 제외되며, 바는 `env(safe-area-inset-bottom)`으로 홈 인디케이터를 피하고, 바가 아무것도 가리지 않도록 페이지 아래에 여백이 생깁니다. 나머지를 위해 상단 메뉴는 그대로 있습니다. 바는 스크립트가 필요 없습니다.
 - **바닥글.** Screen으로 가는 링크(`link`, 열 수 없는 사용자에게는 제외됨) 또는 주소(`url`: 경로, `https:`, `http:`, `mailto:`. `App::check`는 다른 스킴과 등록되지 않은 Screen으로의 링크를 거부합니다)의 열, 그리고 한 줄의 텍스트입니다.
 
 사이트 셸 Screen과 앱 셸 Screen 사이의 이동은 페이지 로드 없이 `nav.js`를 거칩니다. 부분 응답이 어느 셸에 속하는지 알려 주고(`x-zeyn-shell`), 이것이 현재 프레임과 다르면 런타임은 언어 변경과 같은 방식으로 전체 프레임을 교체하고 다른 셸의 스타일시트와 스크립트를 불러옵니다. `/_zeyn/route/{screen}`으로 가는 링크(이동 경로의 링크)도 같은 방식으로 따라갑니다.

@@ -42,6 +42,21 @@ Card::image(c.cover.clone(), c.title.clone())
 - **Arama.** `.search(text)` yalnızca serbest metinle eşleşen satırları gösterir ([`DataQuery::q`](#free-text)); örneğin bir sonuç screen'inin metni.
 - **Maskeli alanlar.** Kartlar, ham satırı gören bir closure ile oluşturulur. `#[mask]` alanları olan bir model için kartları yalnızca bu alanları açma yetkisi olan kullanıcılar alır; herkes `Forbidden` alır. Public kartlar için maskeli alanı olmayan bir model kullanın.
 
+### Üzerine gelince önizleme
+
+Bağlantısı olan bir `ImageCard` ya da `ListItem` üzerindeki `.preview(screen, params)`, o ekranı kartın yanındaki bir panelde gösterir: fareyle yaklaşık yarım saniye üzerinde durunca ya da kart klavye odağı alınca hemen. Ekran yalnızca o zaman, bir pencereyle aynı erişim denetimleriyle `GET /_zeyn/screen/...` adresinden yüklenir ve her önizleme sayfanın ömrü boyunca saklanır (en fazla 24, `nav.js` başka bir ekran açınca temizlenir). Çerçeveler, nesneler, medya oynatıcıları ve betikler panel gösterilmeden önce kaldırılır, bu yüzden bir önizleme asla iframe yüklemez. Panel üst katmanda yaşar, bu yüzden içeriğini kırpan rail'ler ve ızgaralar onu kesmez; daha çok yer olan tarafta açılır, ekran kenarlarında yön değiştirir, kendi içinde kayar ve sayfayı asla kaydırmaz. WCAG 1.4.13'ü izler: işaretçi panelin üzerine geçebilir, Escape kapatır ve işaretçi ya da odak ayrılana kadar kalır. Dokunmatik ekranlarda ve kaba işaretçilerde önizleme yoktur ve dokunmak bağlantıyı açar; betik (`preview.js`, 2,5 KB gzip) orada hiç yüklenmez, başka yerde böyle bir kartın ilk üzerine gelişinde ya da odağında yüklenir. Azaltılmış harekette panel kısa büyüme animasyonu olmadan görünür.
+
+```rust
+Rail::of(search_products).card(|p: &Product| {
+    Card::image(p.image.clone(), p.name.clone())
+        .link(product, ProductParams { id: p.id })
+        .preview(product_summary, ProductParams { id: p.id })
+})
+```
+
+@live preview
+
+
 ## Rail
 
 Rail, yana kayan tek satıra dizilmiş bir kart ızgarasıdır; kaydırma yakalama (snap) ve bir görünüm genişliği kadar kaydıran önceki ve sonraki düğmeleri vardır (kullanıcı azaltılmış hareket istemediyse yumuşakça). Kullanıcı sonuna yaklaştıkça sonraki grubu, 12'şer 12'şer yükler. Kartlar sekme sırasında yer alan bağlantılardır ve odak aldıklarında görünüme kayarlar.

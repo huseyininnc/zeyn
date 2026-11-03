@@ -102,6 +102,86 @@ Spoiler::new(t!("quiz.show_answer")).add(Paragraph::new(answer.clone()))
 
 @live people
 
+## Chips
+
+여러 줄로 이어지는 작은 둥근 링크의 한 줄입니다. `Chips::links(label)`은 문서의 태그처럼 화면으로 연결되는 일반 링크를 label로 이름 붙인 `nav` 안에 담습니다. `Chips::filter(label, screen, params)`는 화면 파라미터에 대한 토글 버튼을 만듭니다. 각 chip은 같은 화면으로 연결되는 링크이며 해당 값이 파라미터에 추가되거나 제거되므로, 서버가 받은 파라미터로 `aria-pressed`를 렌더링하고 브라우저에는 아무것도 저장되지 않습니다. chip을 누르면 `nav.js`를 통해 페이지 새로고침 없이 새 주소가 열리고, 포커스와 스크롤 위치는 chip에 남습니다. `.multiple()`을 호출하지 않으면 한 번에 하나의 값만 눌립니다. 파라미터에서 옵션이 아닌 값은 무시됩니다. 키보드: Tab은 chip 사이를 이동하고, Enter 또는 Space로 누릅니다. 눌린 chip은 체크 표시도 보여 주므로 상태가 색에만 의존하지 않습니다. 스크립트(`chips.js`, 1 KB 미만)는 필터 chip이 있는 페이지에서만 로드됩니다.
+
+```rust
+#[screen(route = "/articles", public)]
+pub fn articles(p: ArticleParams) -> Screen {
+    Screen::new(t!("blog.articles")).body(
+        Chips::filter(t!("blog.tags"), articles, |tags| ArticleParams { tags: tags.join(",") })
+            .current(p.tags.split(','))
+            .option("guide", t!("blog.guides"))
+            .option("news", t!("blog.news"))
+            .multiple(),
+    )
+}
+```
+
+@live chips
+
+
+## Hero
+
+페이지 맨 위의 큰 영역으로, 배경 이미지에 제목, 한 줄의 텍스트, 버튼 같은 동작이 들어갑니다. 기본적으로 정적입니다. `.slide(title)`은 슬라이드를 하나 더 추가하며, `.text`, `.image`, `.action`은 항상 마지막 슬라이드에 적용됩니다. 슬라이드가 여러 개이면 W3C APG 캐러셀 패턴을 따릅니다. 슬라이드 선택 버튼이 있고, 각 슬라이드는 "2 / 3"이라는 이름의 그룹이며, 선택된 슬라이드는 정중하게 안내됩니다. 앱이 `.rotate(seconds)`(4에서 30)를 호출하지 않는 한 슬라이드는 사용자가 선택할 때만 바뀝니다. 호출하면 일시정지 및 재생 버튼이 맨 앞에 오고(WCAG 2.2.2), 포인터가 hero 위에 있거나 포커스가 그 안에 있을 때와 탭이 숨겨져 있을 때 회전이 멈추며, 사용자가 동작 줄이기를 선호하면 시작되지 않습니다. 슬라이드가 움직이는 동안에는 안내되지 않습니다. 스크립트가 없으면 첫 슬라이드가 표시됩니다.
+
+이미지는 `Image` 규칙(앱의 경로 또는 앱의 `img-src`에 있는 호스트의 `https` 주소)을 따릅니다. 텍스트 뒤의 장식이므로 대체 텍스트는 비어 있습니다. 중요한 내용은 제목과 텍스트에 넣으십시오. 이 둘은 대비를 위해 어두운 그라데이션 위에 놓입니다. 첫 슬라이드의 이미지는 빠른 첫 페인트를 위해 높은 우선순위로 로드되고, 나머지는 지연 로드됩니다. 스크립트(`hero.js`, 1.6 KB gzip)는 슬라이드가 있는 페이지에서만 로드됩니다.
+
+```rust
+Hero::new(t!("home.fresh"))
+    .text(t!("home.fresh_text"))
+    .image("/img/hero/kitchen.jpg")
+    .action(ActionButton::new(t!("home.order"), start_order, ()))
+    .slide(t!("home.new_teas"))
+    .image("/img/hero/teas.jpg")
+    .rotate(8)
+```
+
+@live hero
+
+
+## Reactions
+
+앱이 고른 반응 버튼의 한 줄로, 각 버튼은 키, 이름, 이모지 같은 기호, 그리고 횟수를 가집니다. `Reactions::of(action, target)`은 반응이 어떤 항목에 대한 것인지 지정합니다. target은 화면이 정하며 브라우저에서 읽지 않습니다. 버튼을 누르면 반응이 `POST /_zeyn/data`로 전송되며, 이 엔드포인트는 CSRF를 확인하고, 쓰기 속도 제한에 포함되며, 화면을 열고, 액션의 권한을 확인하고, 액션이 실행되기 전에 집합 밖의 반응을 거부합니다. 액션은 `ReactionPress`(target, reaction, pressed)를 받아 저장하고 새 `ReactionState`(횟수와 사용자 본인의 반응)를 반환하며, 횟수와 `aria-pressed` 상태는 그 자리에서 갱신됩니다. 각 버튼은 반응의 이름과 횟수로 이름 붙은 toggle button이며, 기호는 스크린 리더에서 숨겨집니다. `.state(...)`는 첫 렌더링의 횟수를 지정하므로 스크립트 없이도 표시됩니다. 스크립트(`reactions.js`, 1.3 KB gzip)는 반응이 있는 페이지에서만 로드됩니다.
+
+```rust
+#[action(permission = "answers.react")]
+pub async fn react_to_answer(press: ReactionPress, db: Db, ctx: Ctx) -> Result<ReactionState> {
+    db.toggle_reaction(&ctx, &press.target, &press.reaction, press.pressed).await?;
+    db.reaction_state(&ctx, &press.target).await
+}
+
+Reactions::of(react_to_answer, format!("answer-{}", answer.id))
+    .reaction("helpful", t!("answers.helpful"), "\u{1f44d}")
+    .reaction("thanks", t!("answers.thanks"), "\u{1f64f}")
+    .state(answer.reactions.clone())
+```
+
+@live reactions
+
+
+## RelativeTime
+
+"3분 전"이나 "2일 후"처럼 페이지의 언어로 상대 시간으로 표시되는 시각입니다. 서버는 사용자의 시간대 기준 정확한 날짜와 시간을 `<time datetime="...">` 안에 쓰므로 HTML은 분마다 같게 유지되고 캐시된 페이지도 여전히 올바릅니다. 런타임은 페이지가 로드될 때, `nav.js`가 화면을 교체할 때, 그리고 1분마다 `Intl.RelativeTimeFormat`으로 텍스트를 다시 씁니다. 정확한 시간은 툴팁에 남습니다. 스크립트가 없으면 정확한 시간이 텍스트입니다.
+
+```rust
+RelativeTime::new(post.published)
+```
+
+
+## Share
+
+링크를 공유하는 버튼입니다. 브라우저에 Web Share API가 있으면(대부분의 휴대폰) 시스템 공유 시트를, 없으면 그 사실을 알리는 토스트와 함께 클립보드에 복사합니다. 표시 중인 페이지를 공유하거나, 컴파일러가 파라미터를 검사하는 `Share::screen(screen, params)`로 화면을 공유합니다. `.title`은 공유 시트가 보여 주는 제목을 정하며, 레이블은 `.label`로 지정하지 않으면 사용자의 언어로 "공유"입니다. 서버는 버튼을 숨긴 상태로 렌더링하고 스크립트가 이를 표시하므로, 스크립트가 없는 페이지에는 아무 일도 하지 않는 버튼이 없습니다. 스크립트(`share.js`, 1 KB 미만)는 공유 버튼이 있는 페이지에서만 로드됩니다.
+
+```rust
+Share::page().title(post.title.clone())
+Share::screen(article, ArticleParams { id: post.id }).label(t!("blog.share_article"))
+```
+
+@live engage
+
+
 ## AlphaIndex
 
 글자로 이루어진 막대이며, 각 글자는 그 글자를 파라미터로 가진 screen으로 가는 링크입니다. 예를 들어 이름이 그 글자로 시작하는 사람들을 보여 줄 때 씁니다. 글자는 사용자 언어의 고유한 순서를 따릅니다(`zeyn::ui::alphabet`). 튀르키예어는 `Ç Ğ I İ Ö Ş Ü`가 제자리에 있고, 스페인어에는 `Ñ`가 있으며, 러시아어와 아랍어는 각자의 알파벳을 쓰고, 그 밖의 모든 언어는 `A`부터 `Z`까지입니다. 현재 보이는 screen의 글자는 `aria-current="page"`로 표시되며(튀르키예어 `i`는 `İ`를 표시), `.other()`는 그 밖의 문자로 시작하는 이름을 위해 마지막에 `#` 링크를 추가합니다. 링크는 페이지를 다시 불러오지 않고 열리며, 휴대폰에서는 여러 줄로 나뉩니다.

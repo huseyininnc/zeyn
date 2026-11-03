@@ -41,6 +41,27 @@ Form::of(Contact { quantity: 2, size: Size::Medium, ..Contact::default() })
 | `Control::Percent` | `Decimal` или целое число со знаком процента |
 | `Control::Password`, `Control::NewPassword` | Текстовое поле типа пароль, с кнопкой показать и скрыть |
 | `Control::PasswordMeter` | Новый пароль с индикатором надёжности |
+| `Control::Rating` | Целое число от 1 до N, показанное звёздами (см. [Rating](#rating)) |
+
+## Rating
+
+`Control::Rating` показывает целочисленное поле в виде звёзд от 1 до N, где N задаётся правилом `max` поля (5 без правила, не более 10). Это группа нативных радиокнопок внутри `fieldset`, чья legend является подписью поля, поэтому без скрипта она следует паттерну W3C APG radio group: Tab попадает в группу один раз, стрелки перемещают и отмечают, а каждая звезда называется «3 из 5» на языке пользователя. При наведении подсвечиваются звёзды до указателя. Сервер проверяет значение правилами поля, как любое число, поэтому задайте полю `min` и `max`; при `required` для `Option<i64>` пустой выбор отклоняется.
+
+```rust
+#[model]
+pub struct Feedback {
+    #[rule(required, min = 1, max = 5)]
+    pub stars: Option<i64>,
+}
+
+Form::of(Feedback::default())
+    .field(Feedback::stars)
+    .control(Feedback::stars, Control::Rating)
+    .submit(t!("feedback.send"), send_feedback)
+```
+
+@live rating
+
 
 ## Lookup
 

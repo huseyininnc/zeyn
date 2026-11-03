@@ -41,6 +41,27 @@ Form::of(Contact { quantity: 2, size: Size::Medium, ..Contact::default() })
 | `Control::Percent` | प्रतिशत चिह्न के साथ दिखाया गया `Decimal` या पूर्ण संख्या |
 | `Control::Password`, `Control::NewPassword` | पासवर्ड के रूप में टाइप किया टेक्स्ट फ़ील्ड, दिखाने और छिपाने के बटन के साथ |
 | `Control::PasswordMeter` | मज़बूती मीटर वाला नया पासवर्ड |
+| `Control::Rating` | 1 से N तक की पूर्ण संख्या, तारों के रूप में दिखाई जाती है ([Rating](#rating) देखें) |
+
+## Rating
+
+`Control::Rating` एक पूर्ण संख्या वाले फ़ील्ड को 1 से N तक तारों के रूप में दिखाता है, जहाँ N फ़ील्ड का `max` नियम है (नियम न हो तो 5, अधिकतम 10)। यह एक `fieldset` के भीतर नेटिव radio बटनों का समूह है जिसकी legend फ़ील्ड का लेबल है, इसलिए यह बिना स्क्रिप्ट के W3C APG radio group पैटर्न का पालन करता है: Tab समूह तक एक बार पहुँचता है, तीर कुंजियाँ ले जाती और चुनती हैं, और हर तारे का नाम उपयोगकर्ता की भाषा में "3 / 5" जैसा होता है। होवर करने पर पॉइंटर तक के तारे जल उठते हैं। सर्वर मान को किसी भी संख्या की तरह फ़ील्ड के नियमों से जाँचता है, इसलिए फ़ील्ड को `min` और `max` दें; `Option<i64>` पर `required` हो तो सभी तारे खाली छोड़ना अस्वीकार किया जाता है।
+
+```rust
+#[model]
+pub struct Feedback {
+    #[rule(required, min = 1, max = 5)]
+    pub stars: Option<i64>,
+}
+
+Form::of(Feedback::default())
+    .field(Feedback::stars)
+    .control(Feedback::stars, Control::Rating)
+    .submit(t!("feedback.send"), send_feedback)
+```
+
+@live rating
+
 
 ## Lookup
 

@@ -41,6 +41,27 @@ Form::of(Contact { quantity: 2, size: Size::Medium, ..Contact::default() })
 | `Control::Percent` | قيمة `Decimal` أو عدد صحيح تُعرض مع علامة النسبة المئوية |
 | `Control::Password`, `Control::NewPassword` | حقل نص من نوع كلمة مرور، مع زر إظهار وإخفاء |
 | `Control::PasswordMeter` | كلمة مرور جديدة مع مقياس قوة |
+| `Control::Rating` | عدد صحيح من 1 إلى N يظهر على شكل نجوم (انظر [Rating](#rating)) |
+
+## Rating
+
+يعرض `Control::Rating` حقلًا لعدد صحيح على شكل نجوم من 1 إلى N، حيث N هو قاعدة `max` للحقل (5 إن لم توجد قاعدة، وبحد أقصى 10). وهو مجموعة من أزرار الراديو الأصلية داخل `fieldset` تكون legend فيه هي تسمية الحقل، لذلك يتبع نمط مجموعة الراديو في W3C APG دون أي سكربت: يصل Tab إلى المجموعة مرة واحدة، وتحرك مفاتيح الأسهم وتحدد، وتُسمّى كل نجمة بلغة المستخدم مثل "3 من 5". عند التمرير تضيء النجوم حتى المؤشر. يتحقق الخادم من القيمة بقواعد الحقل كأي رقم، لذا حدد للحقل `min` و`max`؛ وعند وجود `required` على `Option<i64>` يُرفض ترك كل النجوم فارغة.
+
+```rust
+#[model]
+pub struct Feedback {
+    #[rule(required, min = 1, max = 5)]
+    pub stars: Option<i64>,
+}
+
+Form::of(Feedback::default())
+    .field(Feedback::stars)
+    .control(Feedback::stars, Control::Rating)
+    .submit(t!("feedback.send"), send_feedback)
+```
+
+@live rating
+
 
 ## Lookup
 

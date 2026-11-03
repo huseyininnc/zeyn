@@ -42,6 +42,21 @@ Card::image(c.cover.clone(), c.title.clone())
 - **搜索。** `.search(text)` 只显示与自由文本相匹配的行（[`DataQuery::q`](#free-text)），例如结果 screen 的文本。
 - **掩码字段。** 卡片由一个能看到原始行的闭包构建。对于带有 `#[mask]` 字段的 model，只有有权揭示这些字段的用户才能得到卡片；其他人会得到 `Forbidden`。公开卡片请使用不含掩码字段的 model。
 
+### 悬停预览
+
+在带有链接的 `ImageCard` 或 `ListItem` 上使用 `.preview(screen, params)`，会在卡片旁的面板中显示该屏幕：鼠标悬停约半秒后，或卡片获得键盘焦点时立即显示。屏幕只在那时才通过 `GET /_zeyn/screen/...` 加载，访问检查与窗口相同，每个预览在页面存续期间保留（最多 24 个，`nav.js` 打开其他屏幕时清除）。框架、对象、媒体播放器和脚本在面板显示之前会被移除，因此预览绝不会加载 iframe。面板位于顶层，所以裁剪内容的 rail 和网格不会截断它；它在空间更大的一侧打开，在屏幕边缘翻转，在自身内部滚动，绝不滚动页面。它遵循 WCAG 1.4.13：指针可以移到面板上，Escape 关闭，直到指针或焦点离开才会消失。在触摸屏和粗略指针上没有预览，点按会打开链接；脚本（`preview.js`，2.5 KB gzip）在那里从不加载，在其他环境中于这类卡片首次悬停或获得焦点时加载。启用减少动态效果时，面板不带短暂的放大动画直接出现。
+
+```rust
+Rail::of(search_products).card(|p: &Product| {
+    Card::image(p.image.clone(), p.name.clone())
+        .link(product, ProductParams { id: p.id })
+        .preview(product_summary, ProductParams { id: p.id })
+})
+```
+
+@live preview
+
+
 ## Rail
 
 rail 是排成一行并可横向滚动的卡片网格，带有滚动吸附，以及按一个视图宽度滚动的上一个和下一个按钮（除非用户要求减少动画，否则为平滑滚动）。当用户滚动到接近末尾时，它每次加载下一批，每批 12 张。卡片是处于 Tab 顺序中的链接，获得焦点时会滚动到视野中。

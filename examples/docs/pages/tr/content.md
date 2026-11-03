@@ -102,6 +102,86 @@ Spoiler::new(t!("quiz.show_answer")).add(Paragraph::new(answer.clone()))
 
 @live people
 
+## Chips
+
+Birden çok satıra sarılan küçük yuvarlak bağlantılardan oluşan bir sıra. `Chips::links(label)`, bir makalenin etiketleri gibi ekranlara giden düz bağlantıları, etiketiyle adlandırılmış bir `nav` içinde tutar. `Chips::filter(label, screen, params)`, bir ekran parametresi üzerinde aç/kapa düğmeleri yapar: her chip aynı ekrana giden bir bağlantıdır, değeri parametreye eklenir ya da çıkarılır; böylece sunucu `aria-pressed` değerini aldığı parametrelerden üretir ve tarayıcıda hiçbir şey tutulmaz. Bir chip'e basmak yeni adresi `nav.js` ile sayfa yenilemeden açar, odak ve kaydırma konumu chip üzerinde kalır. `.multiple()` çağrılmadıkça aynı anda tek değer basılı olur; parametrelerde seçenek olmayan değerler yok sayılır. Klavye: Tab chip'ler arasında gezer, Enter veya Space birine basar. Basılı bir chip ayrıca onay işareti gösterir, böylece durum yalnızca renge dayanmaz. Betik (`chips.js`, 1 KB altında) yalnızca filtre chip'i olan sayfalarda yüklenir.
+
+```rust
+#[screen(route = "/articles", public)]
+pub fn articles(p: ArticleParams) -> Screen {
+    Screen::new(t!("blog.articles")).body(
+        Chips::filter(t!("blog.tags"), articles, |tags| ArticleParams { tags: tags.join(",") })
+            .current(p.tags.split(','))
+            .option("guide", t!("blog.guides"))
+            .option("news", t!("blog.news"))
+            .multiple(),
+    )
+}
+```
+
+@live chips
+
+
+## Hero
+
+Bir sayfanın üstünde büyük bir bölüm: bir başlık, bir metin satırı ve düğme gibi eylemlerle arka plan görseli. Varsayılan olarak durağandır. `.slide(title)` bir slayt daha ekler; `.text`, `.image` ve `.action` her zaman sonuncuyu ayarlar. Birden çok slaytla W3C APG carousel desenini izler: slayt seçici düğmeler, "2 / 3" adlı bir grup olan her slayt ve nazikçe duyurulan seçili slayt. Uygulama `.rotate(seconds)` (4 ile 30) çağırmadıkça slaytlar yalnızca kullanıcı seçince değişir. Çağrılırsa önce bir duraklat ve oynat düğmesi gelir (WCAG 2.2.2), işaretçi hero üzerindeyken, odak içindeyken ve sekme gizliyken döndürme durur, kullanıcı azaltılmış hareketi tercih ediyorsa hiç başlamaz; slaytlar hareket ederken duyurulmaz. Betik olmadan ilk slayt görünür.
+
+Görsel `Image` kurallarını izler (uygulamanın bir yolu ya da uygulamanın `img-src` listesindeki bir ana bilgisayarda `https` adresi). Metnin arkasında bir süstür, bu yüzden alternatif metni boştur: önemli olanı, kontrast için koyu bir geçişin üzerinde duran başlığa ve metne yazın. İlk slaytın görseli hızlı ilk çizim için yüksek öncelikle, diğerleri tembel yüklenir. Betik (`hero.js`, 1,6 KB gzip) yalnızca slaytı olan sayfalarda yüklenir.
+
+```rust
+Hero::new(t!("home.fresh"))
+    .text(t!("home.fresh_text"))
+    .image("/img/hero/kitchen.jpg")
+    .action(ActionButton::new(t!("home.order"), start_order, ()))
+    .slide(t!("home.new_teas"))
+    .image("/img/hero/teas.jpg")
+    .rotate(8)
+```
+
+@live hero
+
+
+## Reactions
+
+Uygulamanın seçtiği, her biri bir anahtar, bir ad ve emoji gibi bir sembol ile sayısı olan tepki düğmelerinden oluşan bir sıra. `Reactions::of(action, target)`, tepkilerin hangi öğe hakkında olduğunu belirtir; hedefi ekran belirler ve tarayıcıdan asla okunmaz. Bir düğmeye basmak tepkiyi `POST /_zeyn/data` adresine gönderir; bu uç nokta CSRF'yi kontrol eder, yazma hız sınırına sayılır, ekranı açar, eylemin iznini kontrol eder ve eylem çalışmadan önce kümenin dışındaki bir tepkiyi reddeder. Eylem bir `ReactionPress` (hedef, tepki, basılı mı) alır, kaydeder ve yeni `ReactionState` değerini (sayılar ve kullanıcının kendi tepkileri) döndürür; sayılar ve `aria-pressed` durumları yerinde güncellenir. Her düğme, tepkinin adı ve sayısıyla adlandırılmış bir toggle button'dır; sembol ekran okuyuculardan gizlenir. `.state(...)` ilk çizim için sayıları verir, böylece betik olmadan da görünürler. Betik (`reactions.js`, 1,3 KB gzip) yalnızca tepkisi olan sayfalarda yüklenir.
+
+```rust
+#[action(permission = "answers.react")]
+pub async fn react_to_answer(press: ReactionPress, db: Db, ctx: Ctx) -> Result<ReactionState> {
+    db.toggle_reaction(&ctx, &press.target, &press.reaction, press.pressed).await?;
+    db.reaction_state(&ctx, &press.target).await
+}
+
+Reactions::of(react_to_answer, format!("answer-{}", answer.id))
+    .reaction("helpful", t!("answers.helpful"), "\u{1f44d}")
+    .reaction("thanks", t!("answers.thanks"), "\u{1f64f}")
+    .state(answer.reactions.clone())
+```
+
+@live reactions
+
+
+## RelativeTime
+
+Bir anın, sayfanın dilinde "3 dakika önce" ya da "2 gün içinde" gibi göreli zaman olarak gösterilmesi. Sunucu, kullanıcının saat diliminde tam tarihi ve saati `<time datetime="...">` içine yazar; böylece HTML dakikadan dakikaya aynı kalır ve önbelleğe alınmış sayfa yine doğrudur. Çalışma zamanı metni sayfa yüklendiğinde, `nav.js` bir ekranı değiştirdiğinde ve dakikada bir `Intl.RelativeTimeFormat` ile yeniden yazar; tam zaman ipucunda kalır. Betik olmadan metin tam zamandır.
+
+```rust
+RelativeTime::new(post.published)
+```
+
+
+## Share
+
+Bir bağlantıyı paylaşan düğme: tarayıcıda Web Share API varsa (çoğu telefon) sistem paylaşım sayfası, yoksa bunu söyleyen bir toast ile panoya kopyalama. Gösterilen sayfayı ya da parametreleri derleyici tarafından denetlenen `Share::screen(screen, params)` ile bir ekranı paylaşır. `.title`, paylaşım sayfasının gösterdiği başlığı ayarlar; etiket, `.label` vermedikçe kullanıcının dilinde "Paylaş" olur. Sunucu düğmeyi gizli çizer ve betiği onu gösterir, böylece betiksiz bir sayfada hiçbir şey yapmayan bir düğme olmaz. Betik (`share.js`, 1 KB altında) yalnızca paylaşım düğmesi olan sayfalarda yüklenir.
+
+```rust
+Share::page().title(post.title.clone())
+Share::screen(article, ArticleParams { id: post.id }).label(t!("blog.share_article"))
+```
+
+@live engage
+
+
 ## AlphaIndex
 
 Her biri, içinde harfin parametre olarak bulunduğu bir screen'e bağlantı olan harflerden oluşan bir çubuk; örneğin adı o harfle başlayan kişiler. Harfler kullanıcının dilinden ve o dilin kendi sırasıyla gelir (`zeyn::ui::alphabet`): Türkçede `Ç Ğ I İ Ö Ş Ü` yerindedir, İspanyolcada `Ñ` vardır, Rusça ve Arapçanın kendi alfabeleri vardır, diğer her dil `A`'dan `Z`'ye alır. Gösterilen screen'in harfi `aria-current="page"` ile işaretlenir (Türkçe `i`, `İ`'yi işaretler) ve `.other()`, başka bir şeyle başlayan adlar için sona bir `#` bağlantısı ekler. Bağlantılar sayfa yenilenmeden açılır ve telefonlarda birkaç satıra sarılır.
