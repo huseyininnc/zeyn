@@ -127,3 +127,19 @@ pub fn reactions() -> Node {
         .state(reaction_state(None))
         .into()
 }
+
+/// Rows that open the chips example, each with a hover preview of it.
+pub fn preview() -> Node {
+    [("guide", "Guides"), ("news", "News"), ("release", "Releases")]
+        .iter()
+        .fold(List::new().title("Hover or focus a row"), |list, (tag, name)| {
+            let params = || TagParams { tags: tag.to_string() };
+            list.item(
+                zeyn::ui::ListItem::new(*name)
+                    .subtitle(format!("Articles tagged {tag}"))
+                    .link(tagged, params())
+                    .preview(tagged, params()),
+            )
+        })
+        .into()
+}

@@ -31,11 +31,48 @@ pub fn horizontal(_ctx: &Ctx) -> Node {
         .into()
 }
 
+/// The product of a preview.
+#[params]
+pub struct ProductParams {
+    pub id: i64,
+}
+
+/// A small page of one product, opened by the cards of `with_preview` and shown in their
+/// previews.
+#[screen(route = "/ui/image-card/product/{id}", public)]
+pub fn product(p: ProductParams) -> Screen {
+    let Some(found) = crate::data::products()
+        .iter()
+        .find(|x| x.id.0 == p.id)
+    else {
+        return Screen::new("Product").body(EmptyState::new("No such product"));
+    };
+    Screen::new(found.name.clone()).body(
+        DescriptionList::new()
+            .item("Code", found.code.clone())
+            .item("Price", found.price.to_string())
+            .item("In stock", found.stock.to_string()),
+    )
+}
+
+pub fn with_preview(_ctx: &Ctx) -> Node {
+    Rail::of(search_products)
+        .title("Hover a card")
+        .card(|p: &Product| {
+            Card::image(p.image.clone(), p.name.clone())
+                .text(p.price.to_string())
+                .link(product, ProductParams { id: p.id.0 })
+                .preview(product, ProductParams { id: p.id.0 })
+        })
+        .image_size(300, 300)
+        .into()
+}
+
 /// What the catalog shows of `ImageCard`.
 pub const ENTRY: Entry = Entry {
     name: "ImageCard",
     docs: "components/catalog#card-grid",
     api: &["ImageCard", "Card"],
     overview: &[ex!(overview)],
-    examples: &[ex!(horizontal)],
+    examples: &[ex!(horizontal), ex!(with_preview)],
 };

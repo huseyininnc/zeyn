@@ -172,7 +172,8 @@
       },
       "image_card": {
         "overview": "Example",
-        "horizontal": "Horizontal"
+        "horizontal": "Horizontal",
+        "with_preview": "With a hover preview"
       },
       "kpi": {
         "overview": "Example"

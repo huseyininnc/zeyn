@@ -31,11 +31,20 @@ pub struct ListItem {
     image: Option<String>,
     alt: Text,
     link: Option<(&'static str, Json)>,
+    preview: super::preview::PreviewTarget,
 }
 
 impl ListItem {
     pub fn new(title: impl Into<Text>) -> Self {
-        ListItem { title: title.into(), subtitle: None, meta: None, image: None, alt: Text::from(""), link: None }
+        ListItem {
+            title: title.into(),
+            subtitle: None,
+            meta: None,
+            image: None,
+            alt: Text::from(""),
+            link: None,
+            preview: None,
+        }
     }
 
     /// A line under the title, in a quieter color.
@@ -70,6 +79,17 @@ impl ListItem {
         self
     }
 
+    /// A preview of `screen` in a panel next to the row: after about half a second of hover
+    /// with a mouse, or at once on keyboard focus. The screen loads only then, through the same
+    /// access checks as a window, and is kept for the page's life. Escape closes the panel, the
+    /// pointer can move onto it, frames and media inside are left out, and touch screens show no
+    /// preview (a tap opens the link). Needs [`ListItem::link`]. Params of the wrong type do not
+    /// compile.
+    pub fn preview<S: ScreenDef>(mut self, _screen: S, params: S::Params) -> Self {
+        self.preview = Some((S::META.name, serde_json::to_value(params).unwrap_or(Json::Null)));
+        self
+    }
+
     /// Writes the row as an `<li>`.
     pub(crate) fn html(&self, out: &mut String, r: &Render) {
         let image = match &self.image {
@@ -94,8 +114,9 @@ impl ListItem {
         );
         match &self.link {
             Some((screen, params)) => out.push_str(&format!(
-                r#"<li class="z-list-item"><a class="z-list-row" href="{}" data-zeyn-base-href>{body}</a></li>"#,
-                screen_href(r, screen, params)
+                r#"<li class="z-list-item"><a class="z-list-row" href="{}" data-zeyn-base-href{}>{body}</a></li>"#,
+                screen_href(r, screen, params),
+                super::preview::preview_attr(&self.preview)
             )),
             None => out.push_str(&format!(r#"<li class="z-list-item"><div class="z-list-row">{body}</div></li>"#)),
         }

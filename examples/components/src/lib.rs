@@ -233,7 +233,11 @@ pub fn catalog_home(p: SearchParams, ctx: Ctx) -> Screen {
 
 /// The catalog feature: the index, a page per component and the search.
 pub fn feature() -> Feature {
-    with_screens(Feature::new("components").screen(catalog_home))
+    with_screens(
+        Feature::new("components")
+            .screen(catalog_home)
+            .screen(examples::image_card::product),
+    )
 }
 
 /// The catalog app.

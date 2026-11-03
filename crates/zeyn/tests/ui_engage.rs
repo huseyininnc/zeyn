@@ -166,7 +166,7 @@ async fn get(path: &str) -> (StatusCode, String) {
 #[tokio::test]
 async fn the_lazy_modules_are_served_and_stay_out_of_the_page_head() {
     let (_, page) = get("/items/1").await;
-    for name in ["share", "chips", "hero", "reactions"] {
+    for name in ["share", "chips", "hero", "reactions", "preview"] {
         let (status, body) = get(&format!("/_zeyn/{name}.js")).await;
         assert_eq!(status, StatusCode::OK, "{name}");
         assert!(body.contains("@module"), "{name}");
@@ -177,6 +177,7 @@ async fn the_lazy_modules_are_served_and_stay_out_of_the_page_head() {
     assert!(components.contains("['a[data-zeyn-chip]', 'chips']"));
     assert!(components.contains("['[data-zeyn-hero]', 'hero']"));
     assert!(components.contains("['[data-zeyn-reactions]', 'reactions']"));
+    assert!(components.contains("loadLazy('preview')") && components.contains("(hover: hover) and (pointer: fine)"));
 }
 
 #[params]
@@ -535,4 +536,85 @@ async fn the_site_shell_bottom_bar_marks_the_current_page_and_hides_what_the_use
             .await
             .contains(r#"<li><a href="/shop/orders"><span class="z-site-bottom-label">Orders</span>"#)
     );
+}
+
+#[model]
+pub struct Book {
+    pub id: i64,
+    pub title: String,
+}
+
+#[action(public)]
+pub async fn books(q: DataQuery) -> Result<Page<Book>> {
+    Ok(q.apply(vec![Book { id: 1, title: "First".into() }, Book { id: 2, title: "Second".into() }]))
+}
+
+#[screen(route = "/books", public)]
+pub fn book_cards() -> Screen {
+    Screen::new("Books")
+        .body(CardGrid::of(books).card(|b: &Book| {
+            Card::image("/b.png", b.title.clone())
+                .link(item, ItemParams { id: b.id })
+                .preview(item, ItemParams { id: b.id })
+        }))
+        .body(
+            List::new()
+                .item(
+                    zeyn::ui::ListItem::new("Row")
+                        .link(item, ItemParams { id: 9 })
+                        .preview(item, ItemParams { id: 9 }),
+                )
+                .item(zeyn::ui::ListItem::new("Plain").link(item, ItemParams { id: 8 })),
+        )
+}
+
+#[tokio::test]
+async fn cards_and_rows_with_a_preview_name_the_screen_fragment_to_load_and_nothing_more() {
+    let router = App::new("Test")
+        .i18n(I18n::new("en"))
+        .feature(
+            Feature::new("books")
+                .screen(book_cards)
+                .screen(item),
+        )
+        .router()
+        .unwrap();
+    let res = router
+        .clone()
+        .oneshot(
+            Request::get("/books")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let bytes = res
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes();
+    let page = String::from_utf8_lossy(&bytes).into_owned();
+    assert!(
+        page.contains(r#"data-zeyn-base-href data-zeyn-preview="/_zeyn/screen/item?params=%7B%22id%22%3A1%7D">"#),
+        "{page}"
+    );
+    assert!(page.contains(r#"data-zeyn-preview="/_zeyn/screen/item?params=%7B%22id%22%3A9%7D">"#));
+    assert_eq!(
+        page.matches("data-zeyn-preview=")
+            .count(),
+        3,
+        "the plain row has none"
+    );
+    assert!(!page.contains("/_zeyn/preview.js"), "the module loads on the first hover only");
+
+    let fragment = router
+        .oneshot(
+            Request::get("/_zeyn/screen/item?params=%7B%22id%22%3A1%7D")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(fragment.status(), StatusCode::OK, "the preview's address is a screen fragment");
 }

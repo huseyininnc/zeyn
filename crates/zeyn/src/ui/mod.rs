@@ -26,6 +26,7 @@ mod markdown;
 mod media;
 mod menus;
 mod overlay;
+mod preview;
 mod rating;
 mod reactions;
 mod relative;

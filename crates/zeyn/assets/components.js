@@ -2190,6 +2190,23 @@ document.addEventListener('click', (e) => {
   loadLazy('assistant').then(() => button.click());
 });
 
+/**
+ * Card previews load their module on the first hover with a fine pointer or the first keyboard
+ * focus of a card that has one, and hand it that card. Touch screens never load it.
+ */
+const finePointer = matchMedia('(hover: hover) and (pointer: fine)');
+
+/** Loads `preview.js` for the card under an event, once. */
+function wakePreview(e) {
+  const card = e.target instanceof Element ? e.target.closest('[data-zeyn-preview]') : null;
+  if (!card || lazyLoaded.has('preview') || !finePointer.matches) return;
+  if (e.type === 'pointerover' && e.pointerType === 'touch') return;
+  loadLazy('preview').then((m) => m.wake?.(card, e.type));
+}
+
+document.addEventListener('pointerover', wakePreview);
+document.addEventListener('focusin', wakePreview);
+
 /** Initializers run for every root that gets new content. */
 const initializers = [restoreTabs, initSelects, initListboxes, initLookups, initTextareas, initSteps, baseLinks, initTrees, initLazy];
 

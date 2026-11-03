@@ -172,7 +172,8 @@
       },
       "image_card": {
         "overview": "Örnek",
-        "horizontal": "Yatay"
+        "horizontal": "Yatay",
+        "with_preview": "Üzerine gelince önizleme"
       },
       "kpi": {
         "overview": "Örnek"

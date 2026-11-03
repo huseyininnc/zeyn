@@ -667,3 +667,35 @@ span.z-avatar-tone-4 { background: var(--z-danger-subtle); }
 @media (forced-colors: active) {
   .z-reaction[aria-pressed="true"] { outline: 2px solid Highlight; }
 }
+
+/* Card preview ------------------------------------------------------------------------------- */
+
+.z-preview {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  width: min(380px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 16px;
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius-lg);
+  background: var(--z-surface);
+  color: var(--z-text);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.22);
+}
+
+.z-preview .z-close,
+.z-preview .z-toolbar { display: none; }
+
+.z-preview .z-poster-img,
+.z-preview img { max-width: 100%; height: auto; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .z-preview:popover-open { animation: z-preview-in 140ms ease-out; }
+}
+
+@keyframes z-preview-in {
+  from { opacity: 0; transform: scale(0.96); }
+}
