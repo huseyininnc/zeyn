@@ -7169,6 +7169,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "zeyn-example-components"
+version = "0.0.0"
+dependencies = [
+ "axum",
+ "http-body-util",
+ "serde_json",
+ "tokio",
+ "tower",
+ "zeyn",
+ "zeyn-example-docs",
+]
+
+[[package]]
 name = "zeyn-example-crm"
 version = "0.0.0"
 dependencies = [

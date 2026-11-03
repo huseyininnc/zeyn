@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
-# Images of the public sites: `--target docs` (docs.zeynsoft.com) and `--target showcase`
-# (framework.zeynsoft.com). Build from the repository root: docker build -f deploy/Dockerfile .
+# Images of the public sites: `--target docs` (docs.zeynsoft.com), `--target showcase`
+# (framework.zeynsoft.com) and `--target components` (components.zeynsoft.com). Build from the repository root: docker build -f deploy/Dockerfile .
 
 FROM rust:1.98-slim-bookworm AS build
 WORKDIR /src
@@ -26,3 +26,10 @@ ENV NORTHWIND_SERVER__ADDR=0.0.0.0:3002
 EXPOSE 3002
 USER nonroot
 ENTRYPOINT ["/app/showcase"]
+
+FROM gcr.io/distroless/cc-debian12:nonroot AS components
+COPY --from=build /out/zeyn-example-components /app/components
+ENV ZEYN_COMPONENTS_SERVER__ADDR=0.0.0.0:3010
+EXPOSE 3010
+USER nonroot
+ENTRYPOINT ["/app/components"]
