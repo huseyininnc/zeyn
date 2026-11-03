@@ -2161,6 +2161,7 @@ const LAZY = [
   ['section[data-zeyn-assistant]:not([data-zeyn-assistant="dock"])', 'assistant'],
   ['button[data-zeyn-share]', 'share'],
   ['a[data-zeyn-chip]', 'chips'],
+  ['[data-zeyn-hero]', 'hero'],
 ];
 
 /** @type {Set<string>} Modules of `LAZY` already asked for. */

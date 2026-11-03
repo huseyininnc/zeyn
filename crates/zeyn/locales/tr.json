@@ -505,6 +505,14 @@
         "label": "Paylaş",
         "copied": "Bağlantı kopyalandı.",
         "failed": "Bağlantı kopyalanamadı."
+      },
+      "hero": {
+        "carousel": "döngü",
+        "slide": "slayt",
+        "slide_of": "{n} / {count}",
+        "show": "Slayt {n} / {count} göster",
+        "pause": "Slaytları durdur",
+        "play": "Slaytları başlat"
       }
     },
     "date": {

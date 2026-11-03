@@ -146,6 +146,7 @@ catalog! {
     "media" Box {
         image "/ui/image";
         embed "/ui/embed";
+        hero "/ui/hero";
     }
     "feedback" Plus {
         alert "/ui/alert";

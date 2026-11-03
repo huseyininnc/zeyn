@@ -85,7 +85,8 @@
       "relative_time": "Sayfanın dilinde \"5 dakika önce\" gibi gösterilen an.",
       "share": "Bağlantıyı paylaşır, paylaşım yoksa kopyalar.",
       "rating": "Yıldızlarla gösterilen 1 ile N arası tam sayı.",
-      "chips": "Bağlantı çipleri ve ekran parametresini süzen çipler."
+      "chips": "Bağlantı çipleri ve ekran parametresini süzen çipler.",
+      "hero": "Büyük görselli bölüm; slaytlar yalnızca istenince döner."
     },
     "ex": {
       "action_button": {
@@ -159,6 +160,11 @@
       "heading": {
         "overview": "Örnek",
         "anchor": "Çapayla"
+      },
+      "hero": {
+        "overview": "Örnek",
+        "slides": "Slaytlar",
+        "rotating": "Dönen slaytlar"
       },
       "image": {
         "overview": "Örnek"

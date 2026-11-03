@@ -85,7 +85,8 @@
       "relative_time": "A moment shown as \"5 minutes ago\" in the page language.",
       "share": "Share a link, or copy it where sharing is missing.",
       "rating": "A whole number from 1 to N shown as stars.",
-      "chips": "Link chips and filter chips over a screen param."
+      "chips": "Link chips and filter chips over a screen param.",
+      "hero": "A large image section, with slides that move only when asked."
     },
     "ex": {
       "action_button": {
@@ -159,6 +160,11 @@
       "heading": {
         "overview": "Example",
         "anchor": "With an anchor"
+      },
+      "hero": {
+        "overview": "Example",
+        "slides": "Slides",
+        "rotating": "Rotating slides"
       },
       "image": {
         "overview": "Example"

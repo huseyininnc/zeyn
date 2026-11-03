@@ -13,6 +13,7 @@ mod controls;
 mod date;
 mod dock;
 mod embed;
+mod hero;
 pub(crate) mod inputs;
 #[cfg(feature = "islands")]
 mod island;
@@ -53,6 +54,7 @@ pub use shell::{MenuBar, MenuList, PropertyInspector, StatusBar, Toolbox};
 pub use catalog::PosterCard;
 pub use catalog::{CardGrid, ImageCard, MAX_SUGGESTIONS, Rail, SearchBox, SearchParams};
 pub use chips::{Chips, MAX_CHIPS};
+pub use hero::{HERO_SECONDS, Hero, MAX_HERO_SLIDES};
 pub use chart::{Better, BulletCell, Chart, ChartKind, Kpi, SparklineCell};
 pub use alpha::{AlphaIndex, OTHER_LETTER, alphabet};
 pub use content::{AutoGrid, Avatar, AvatarSize, Heading, MetaLine, Paragraph, PrevNext, Spoiler};

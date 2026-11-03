@@ -482,6 +482,14 @@
         "label": "Compartir",
         "copied": "Enlace copiado.",
         "failed": "No se pudo copiar el enlace."
+      },
+      "hero": {
+        "carousel": "carrusel",
+        "slide": "diapositiva",
+        "slide_of": "{n} de {count}",
+        "show": "Mostrar la diapositiva {n} de {count}",
+        "pause": "Detener las diapositivas",
+        "play": "Iniciar las diapositivas"
       }
     },
     "date": {

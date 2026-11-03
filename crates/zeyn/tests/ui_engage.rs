@@ -165,7 +165,7 @@ async fn get(path: &str) -> (StatusCode, String) {
 #[tokio::test]
 async fn the_lazy_modules_are_served_and_stay_out_of_the_page_head() {
     let (_, page) = get("/items/1").await;
-    for name in ["share", "chips"] {
+    for name in ["share", "chips", "hero"] {
         let (status, body) = get(&format!("/_zeyn/{name}.js")).await;
         assert_eq!(status, StatusCode::OK, "{name}");
         assert!(body.contains("@module"), "{name}");
@@ -174,6 +174,7 @@ async fn the_lazy_modules_are_served_and_stay_out_of_the_page_head() {
     let (_, components) = get("/_zeyn/components.js").await;
     assert!(components.contains("['button[data-zeyn-share]', 'share']"));
     assert!(components.contains("['a[data-zeyn-chip]', 'chips']"));
+    assert!(components.contains("['[data-zeyn-hero]', 'hero']"));
 }
 
 #[params]
@@ -262,4 +263,51 @@ fn link_chips_are_plain_links_in_a_named_nav() {
         "{links}"
     );
     assert!(!links.contains("aria-pressed") && !links.contains("data-zeyn-chip"));
+}
+
+#[test]
+fn a_hero_is_static_unless_it_has_slides() {
+    let one = html(
+        &Hero::new("Fresh <every> morning")
+            .text("By noon")
+            .image("/img/a.jpg")
+            .action(Paragraph::new("Open daily")),
+        "en",
+    );
+    assert!(one.starts_with(r#"<section class="z-hero"><div class="z-hero-slide" id="s-hero-"#), "{one}");
+    assert!(one.contains(r#"<img class="z-hero-img" src="/img/a.jpg" alt="" fetchpriority="high" decoding="async">"#));
+    assert!(one.contains(r#"<h2 class="z-hero-title">Fresh &lt;every&gt; morning</h2>"#));
+    assert!(one.contains(r#"<div class="z-node" data-zeyn-node="0">"#), "actions are children with a path");
+    assert!(!one.contains("data-zeyn-hero") && !one.contains("button") && !one.contains("aria-roledescription"));
+
+    let outside = html(&Hero::new("A").image("https://elsewhere.example/a.jpg"), "en");
+    assert!(!outside.contains("<img"), "pictures off the app's img-src are left out");
+}
+
+#[test]
+fn hero_slides_follow_the_carousel_pattern_and_rotate_only_when_asked() {
+    let still = html(
+        &Hero::new("One")
+            .slide("Two")
+            .image("/img/b.jpg")
+            .action(Paragraph::new("x"))
+            .slide("Three"),
+        "en",
+    );
+    assert!(still.contains(r#"aria-roledescription="carousel" aria-label="One" data-zeyn-hero>"#), "{still}");
+    assert!(!still.contains("data-rotate") && !still.contains("data-zeyn-hero-pause"), "no rotation, no pause button");
+    assert!(still.contains(r#"<div class="z-hero-controls" hidden>"#), "controls wait for the script");
+    assert!(still.contains(r#"role="group" aria-roledescription="slide" aria-label="2 of 3" hidden>"#));
+    assert!(still.contains(r#"aria-label="Show slide 1 of 3" data-zeyn-hero-show="0" aria-current="true">"#));
+    assert!(still.contains(r#"<div class="z-hero-track" aria-live="polite">"#));
+    assert!(still.contains(r#"alt="" loading="lazy""#), "later slides load their picture lazily");
+
+    let moving = Hero::new("One").slide("Two").rotate(1);
+    let en = html(&moving, "en");
+    assert!(en.contains(r#"data-zeyn-hero data-rotate="4">"#), "rotation is at least four seconds");
+    let pause = en.find("data-zeyn-hero-pause").unwrap();
+    assert!(pause < en.find("data-zeyn-hero-show").unwrap(), "the pause button comes first");
+    assert!(en.contains(r#"aria-label="Start the slides""#) && en.contains(r#"aria-live="off""#));
+    assert_eq!(Hero::new("A").rotate(200).schema()["rotate"], 30);
+    assert!(html(&moving, "tr").contains("Slayt 2 / 2 göster"));
 }

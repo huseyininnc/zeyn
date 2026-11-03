@@ -505,6 +505,14 @@
         "label": "Share",
         "copied": "Link copied.",
         "failed": "The link could not be copied."
+      },
+      "hero": {
+        "carousel": "carousel",
+        "slide": "slide",
+        "slide_of": "{n} of {count}",
+        "show": "Show slide {n} of {count}",
+        "pause": "Stop the slides",
+        "play": "Start the slides"
       }
     },
     "date": {

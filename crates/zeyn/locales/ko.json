@@ -482,6 +482,14 @@
         "label": "공유",
         "copied": "링크를 복사했습니다.",
         "failed": "링크를 복사하지 못했습니다."
+      },
+      "hero": {
+        "carousel": "캐러셀",
+        "slide": "슬라이드",
+        "slide_of": "{count}개 중 {n}번째",
+        "show": "{count}개 중 {n}번째 슬라이드 보기",
+        "pause": "슬라이드 멈추기",
+        "play": "슬라이드 시작"
       }
     },
     "date": {

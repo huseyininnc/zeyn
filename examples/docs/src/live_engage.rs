@@ -69,3 +69,16 @@ pub fn tagged(p: TagParams) -> Screen {
         .body(chips(&p.tags))
         .body(Paragraph::new(chosen))
 }
+
+/// A hero with three slides that rotate every eight seconds, with a pause button.
+pub fn hero() -> Node {
+    Hero::new("Fresh every morning")
+        .text("Order before nine and it is at your door by noon.")
+        .action(ActionButton::new(t!("docs.live.count"), crate::live::count_samples, ()))
+        .slide("Twelve new teas")
+        .text("From four countries, in small tins.")
+        .slide("Free delivery")
+        .text("On every order over 500.")
+        .rotate(8)
+        .into()
+}
