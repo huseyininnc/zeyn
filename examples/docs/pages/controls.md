@@ -41,6 +41,26 @@ Form::of(Contact { quantity: 2, size: Size::Medium, ..Contact::default() })
 | `Control::Percent` | A `Decimal` or whole number shown with a percent sign |
 | `Control::Password`, `Control::NewPassword` | A text field typed as a password, with a show and hide button |
 | `Control::PasswordMeter` | A new password with a strength meter |
+| `Control::Rating` | A whole number from 1 to N shown as stars (see [Rating](#rating)) |
+
+## Rating
+
+`Control::Rating` shows a whole number field as stars from 1 to N, where N is the field's `max` rule (5 without one, at most 10). It is a group of native radio buttons inside a `fieldset` whose legend is the field label, so it follows the W3C APG radio group pattern with no script: Tab reaches the group once, the arrow keys move and check, and each star is named "3 of 5" in the user's language. Hovering lights up the stars up to the pointer. The server checks the value with the field's rules like any number, so give the field `min` and `max`; with `required` on an `Option<i64>`, leaving every star empty is refused.
+
+```rust
+#[model]
+pub struct Feedback {
+    #[rule(required, min = 1, max = 5)]
+    pub stars: Option<i64>,
+}
+
+Form::of(Feedback::default())
+    .field(Feedback::stars)
+    .control(Feedback::stars, Control::Rating)
+    .submit(t!("feedback.send"), send_feedback)
+```
+
+@live rating
 
 ## Lookup
 

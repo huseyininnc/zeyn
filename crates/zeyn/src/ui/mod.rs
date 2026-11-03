@@ -7,11 +7,13 @@
 mod alpha;
 mod catalog;
 mod chart;
+mod chips;
 mod content;
 mod controls;
 mod date;
 mod dock;
 mod embed;
+mod hero;
 pub(crate) mod inputs;
 #[cfg(feature = "islands")]
 mod island;
@@ -24,6 +26,11 @@ mod markdown;
 mod media;
 mod menus;
 mod overlay;
+mod preview;
+mod rating;
+mod reactions;
+mod relative;
+mod share;
 mod shell;
 mod tree;
 mod week;
@@ -53,6 +60,7 @@ pub use alpha::{AlphaIndex, OTHER_LETTER, alphabet};
 pub use catalog::PosterCard;
 pub use catalog::{CardGrid, ImageCard, MAX_SUGGESTIONS, Rail, SearchBox, SearchParams};
 pub use chart::{Better, BulletCell, Chart, ChartKind, Kpi, SparklineCell};
+pub use chips::{Chips, MAX_CHIPS};
 pub use content::{AutoGrid, Avatar, AvatarSize, Heading, MetaLine, Paragraph, PrevNext, Spoiler};
 pub use controls::Control;
 pub(crate) use controls::{
@@ -61,6 +69,7 @@ pub(crate) use controls::{
 };
 pub use date::DateOptions;
 pub(crate) use date::{input_text, picker_config, range_reversed, render_date_input, render_range};
+pub use hero::{HERO_SECONDS, Hero, MAX_HERO_SLIDES};
 pub use inputs::{mask_example, mask_fits, mask_raw};
 pub(crate) use lines::LinesEditor;
 pub use lines::{Lines, MAX_LINES};
@@ -73,6 +82,10 @@ pub use media::{Audio, PLAYBACK_SPEEDS, Video};
 pub use menus::MenuButton;
 pub(crate) use overlay::tip;
 pub use overlay::{BUSY_DELAY_MS, Busy, MAX_TIP, Popover};
+pub use rating::{DEFAULT_RATING, MAX_RATING};
+pub use reactions::{MAX_REACTIONS, ReactionPress, ReactionState, Reactions};
+pub use relative::RelativeTime;
+pub use share::Share;
 pub use tree::{MAX_TREE_CHILDREN, Tree, TreeItem, TreeQuery};
 pub use week::{MAX_WEEK_ROWS, WeekDay, WeekSchedule};
 pub use widgets::{

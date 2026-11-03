@@ -102,6 +102,81 @@ Spoiler::new(t!("quiz.show_answer")).add(Paragraph::new(answer.clone()))
 
 @live people
 
+## Chips
+
+A row of small rounded links that wrap onto more lines. `Chips::links(label)` holds plain links to screens, such as the tags of an article, in a `nav` named by the label. `Chips::filter(label, screen, params)` makes toggle buttons over a screen param: each chip is a link to the same screen with its value added to or taken out of the param, so the server renders `aria-pressed` from the params it got and nothing is kept in the browser. Pressing a chip opens the new address through `nav.js` without a page reload, and focus and the scroll position stay on the chip. One value is pressed at a time unless `.multiple()` is called; values in the params that are not options are ignored. Keyboard: Tab moves between chips, Enter or Space presses one. A pressed chip also shows a check mark, so the state does not rest on color. The script (`chips.js`, under 1 KB) loads only on pages with filter chips.
+
+```rust
+#[screen(route = "/articles", public)]
+pub fn articles(p: ArticleParams) -> Screen {
+    Screen::new(t!("blog.articles")).body(
+        Chips::filter(t!("blog.tags"), articles, |tags| ArticleParams { tags: tags.join(",") })
+            .current(p.tags.split(','))
+            .option("guide", t!("blog.guides"))
+            .option("news", t!("blog.news"))
+            .multiple(),
+    )
+}
+```
+
+@live chips
+
+## Hero
+
+A large section at the top of a page: a background image with a title, a line of text and actions such as buttons. It is static by default. `.slide(title)` adds another slide, and `.text`, `.image` and `.action` always set the last one. With several slides it follows the W3C APG carousel pattern: slide picker buttons, each slide a group named "2 of 3", and the picked slide announced politely. Slides change only when the user picks one unless the app calls `.rotate(seconds)` (4 to 30). Then a pause and play button comes first (WCAG 2.2.2), rotation stops while the pointer is over the hero or focus is inside it and while the tab is hidden, and it never starts when the user prefers reduced motion; the slides are not announced while they move. Without script the first slide shows.
+
+The image follows the `Image` rules (a path of the app or an `https` address on a host of the app's `img-src`). It is decoration behind the text, so its alternative text is empty: put what matters into the title and the text, which sit on a dark gradient for contrast. The first slide's image loads with high priority for a fast first paint, the others lazily. The script (`hero.js`, 1.6 KB gzip) loads only on pages with slides.
+
+```rust
+Hero::new(t!("home.fresh"))
+    .text(t!("home.fresh_text"))
+    .image("/img/hero/kitchen.jpg")
+    .action(ActionButton::new(t!("home.order"), start_order, ()))
+    .slide(t!("home.new_teas"))
+    .image("/img/hero/teas.jpg")
+    .rotate(8)
+```
+
+@live hero
+
+## Reactions
+
+A row of reaction buttons chosen by the app, each with a key, a name and a symbol such as an emoji, and its count. `Reactions::of(action, target)` names the item the reactions are about; the target is set by the screen and never read from the browser. Pressing a button posts the reaction to `POST /_zeyn/data`, which checks CSRF, counts against the write rate limit, opens the screen, checks the action's permission and refuses a reaction outside the set before the action runs. The action gets a `ReactionPress` (target, reaction, pressed), stores it and returns the new `ReactionState` (counts and the user's own reactions), and the counts and `aria-pressed` states update in place. Each button is a toggle button named by the reaction's name and its count; the symbol is hidden from screen readers. `.state(...)` gives the counts for the first render, so they show without script. The script (`reactions.js`, 1.3 KB gzip) loads only on pages with reactions.
+
+```rust
+#[action(permission = "answers.react")]
+pub async fn react_to_answer(press: ReactionPress, db: Db, ctx: Ctx) -> Result<ReactionState> {
+    db.toggle_reaction(&ctx, &press.target, &press.reaction, press.pressed).await?;
+    db.reaction_state(&ctx, &press.target).await
+}
+
+Reactions::of(react_to_answer, format!("answer-{}", answer.id))
+    .reaction("helpful", t!("answers.helpful"), "\u{1f44d}")
+    .reaction("thanks", t!("answers.thanks"), "\u{1f64f}")
+    .state(answer.reactions.clone())
+```
+
+@live reactions
+
+## RelativeTime
+
+A moment shown as relative time, such as "3 minutes ago" or "in 2 days", in the page's language. The server writes the exact date and time in the user's time zone inside `<time datetime="...">`, so the HTML stays the same from minute to minute and a cached page is still right. The runtime rewrites the text with `Intl.RelativeTimeFormat` when the page loads, when `nav.js` swaps in a screen and once a minute; the exact time stays in the tooltip. Without script the exact time is the text.
+
+```rust
+RelativeTime::new(post.published)
+```
+
+## Share
+
+A button that shares a link: the system share sheet where the browser has the Web Share API (most phones), and otherwise a copy to the clipboard with a toast that says so. It shares the page being shown, or a screen with `Share::screen(screen, params)`, whose params are checked by the compiler. `.title` sets the title the share sheet shows, and the label is "Share" in the user's language unless `.label` gives one. The server renders the button hidden and its script shows it, so a page without script has no button that does nothing. The script (`share.js`, under 1 KB) loads only on pages that hold a share button.
+
+```rust
+Share::page().title(post.title.clone())
+Share::screen(article, ArticleParams { id: post.id }).label(t!("blog.share_article"))
+```
+
+@live engage
+
 ## AlphaIndex
 
 A bar of letters, each a link to a screen with the letter in its params, such as people whose names start with it. The letters come from the user's language in its own order (`zeyn::ui::alphabet`): Turkish has `Ç Ğ I İ Ö Ş Ü` in place, Spanish has `Ñ`, Russian and Arabic have their own alphabets, and every other language gets `A` to `Z`. The letter of the screen being shown is marked with `aria-current="page"` (a Turkish `i` marks `İ`), and `.other()` adds a last `#` link for names that start with anything else. The links open without a page reload and wrap onto more lines on phones.

@@ -101,6 +101,7 @@ async fn internal_links_and_anchors_resolve() {
                 || href.starts_with("mailto:")
                 || href.ends_with(".txt")
                 || href.ends_with(".xml")
+                || href.contains("?params=")
             {
                 continue;
             }

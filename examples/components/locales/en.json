@@ -81,7 +81,13 @@
       "chart": "Bar, donut, combo and gauge charts.",
       "kpi": "A number with its change and trend.",
       "toolbox": "A group of tool buttons, one selected.",
-      "status_bar": "A bar of short status texts."
+      "status_bar": "A bar of short status texts.",
+      "relative_time": "A moment shown as \"5 minutes ago\" in the page language.",
+      "share": "Share a link, or copy it where sharing is missing.",
+      "rating": "A whole number from 1 to N shown as stars.",
+      "chips": "Link chips and filter chips over a screen param.",
+      "hero": "A large image section, with slides that move only when asked.",
+      "reactions": "Reaction buttons with counts stored by an action."
     },
     "ex": {
       "action_button": {
@@ -124,6 +130,10 @@
         "donut": "Donut",
         "gauge": "Gauge"
       },
+      "chips": {
+        "overview": "Filter chips",
+        "links": "Link chips"
+      },
       "controls": {
         "overview": "Example"
       },
@@ -152,12 +162,18 @@
         "overview": "Example",
         "anchor": "With an anchor"
       },
+      "hero": {
+        "overview": "Example",
+        "slides": "Slides",
+        "rotating": "Rotating slides"
+      },
       "image": {
         "overview": "Example"
       },
       "image_card": {
         "overview": "Example",
-        "horizontal": "Horizontal"
+        "horizontal": "Horizontal",
+        "with_preview": "With a hover preview"
       },
       "kpi": {
         "overview": "Example"
@@ -209,6 +225,17 @@
       "rail": {
         "overview": "Example"
       },
+      "rating": {
+        "overview": "Example",
+        "three_stars": "Three stars"
+      },
+      "reactions": {
+        "overview": "Example"
+      },
+      "relative_time": {
+        "overview": "Example",
+        "past_and_future": "Past and future"
+      },
       "row": {
         "overview": "Example",
         "weights": "Column weights",
@@ -216,6 +243,10 @@
       },
       "search_box": {
         "overview": "Example"
+      },
+      "share": {
+        "overview": "Example",
+        "another_screen": "Another screen"
       },
       "skeleton": {
         "overview": "Example"

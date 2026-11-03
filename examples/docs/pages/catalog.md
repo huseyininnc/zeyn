@@ -42,6 +42,20 @@ Card::image(c.cover.clone(), c.title.clone())
 - **Search.** `.search(text)` shows only rows that match the free text ([`DataQuery::q`](#free-text)), such as the text of a results screen.
 - **Masked fields.** Cards are built by a closure that sees the raw row. For a model with `#[mask]` fields, only users who may reveal them get the cards; everyone else gets `Forbidden`. Use a model without masked fields for public cards.
 
+### Hover previews
+
+`.preview(screen, params)` on an `ImageCard` or a `ListItem` that has a link shows that screen in a panel next to the card: after about half a second of hover with a mouse, or at once when the card gets keyboard focus. The screen loads only then, from `GET /_zeyn/screen/...` with the same access checks as a window, and each preview is kept for the page's life (24 at most, cleared when `nav.js` opens another screen). Frames, objects, media players and scripts are removed before the panel shows, so a preview never loads an iframe. The panel lives in the top layer, so rails and grids that clip their content do not cut it; it opens on the side with more room, flips at the screen edges, scrolls inside itself and never scrolls the page. It follows WCAG 1.4.13: the pointer can move onto the panel, Escape closes it, and it stays until the pointer or focus leaves. On touch screens and coarse pointers there is no preview and a tap opens the link; the script (`preview.js`, 2.5 KB gzip) never loads there, and elsewhere it loads on the first hover or focus of such a card. With reduced motion the panel appears without its short grow animation.
+
+```rust
+Rail::of(search_products).card(|p: &Product| {
+    Card::image(p.image.clone(), p.name.clone())
+        .link(product, ProductParams { id: p.id })
+        .preview(product_summary, ProductParams { id: p.id })
+})
+```
+
+@live preview
+
 ## Rail
 
 A rail is a card grid laid out in one row that scrolls sideways, with scroll snapping and previous and next buttons that scroll by a view's width (smoothly unless the user asked for reduced motion). It loads the next batch, 12 at a time, as the user scrolls near its end. The cards are links in the tab order and scroll into view as they get focus.

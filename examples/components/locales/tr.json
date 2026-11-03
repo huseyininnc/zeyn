@@ -81,7 +81,13 @@
       "chart": "Çubuk, halka, karma ve gösterge grafikleri.",
       "kpi": "Değişimi ve eğilimiyle bir sayı.",
       "toolbox": "Biri seçili araç düğmeleri grubu.",
-      "status_bar": "Kısa durum metinleri çubuğu."
+      "status_bar": "Kısa durum metinleri çubuğu.",
+      "relative_time": "Sayfanın dilinde \"5 dakika önce\" gibi gösterilen an.",
+      "share": "Bağlantıyı paylaşır, paylaşım yoksa kopyalar.",
+      "rating": "Yıldızlarla gösterilen 1 ile N arası tam sayı.",
+      "chips": "Bağlantı çipleri ve ekran parametresini süzen çipler.",
+      "hero": "Büyük görselli bölüm; slaytlar yalnızca istenince döner.",
+      "reactions": "Sayıları bir eylemle saklanan tepki düğmeleri."
     },
     "ex": {
       "action_button": {
@@ -124,6 +130,10 @@
         "donut": "Halka",
         "gauge": "Gösterge"
       },
+      "chips": {
+        "overview": "Süzme çipleri",
+        "links": "Bağlantı çipleri"
+      },
       "controls": {
         "overview": "Örnek"
       },
@@ -152,12 +162,18 @@
         "overview": "Örnek",
         "anchor": "Çapayla"
       },
+      "hero": {
+        "overview": "Örnek",
+        "slides": "Slaytlar",
+        "rotating": "Dönen slaytlar"
+      },
       "image": {
         "overview": "Örnek"
       },
       "image_card": {
         "overview": "Örnek",
-        "horizontal": "Yatay"
+        "horizontal": "Yatay",
+        "with_preview": "Üzerine gelince önizleme"
       },
       "kpi": {
         "overview": "Örnek"
@@ -209,6 +225,17 @@
       "rail": {
         "overview": "Örnek"
       },
+      "rating": {
+        "overview": "Örnek",
+        "three_stars": "Üç yıldız"
+      },
+      "reactions": {
+        "overview": "Örnek"
+      },
+      "relative_time": {
+        "overview": "Örnek",
+        "past_and_future": "Geçmiş ve gelecek"
+      },
       "row": {
         "overview": "Örnek",
         "weights": "Sütun ağırlıkları",
@@ -216,6 +243,10 @@
       },
       "search_box": {
         "overview": "Örnek"
+      },
+      "share": {
+        "overview": "Örnek",
+        "another_screen": "Başka bir ekran"
       },
       "skeleton": {
         "overview": "Örnek"

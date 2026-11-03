@@ -220,7 +220,8 @@
       "theme_dark": "Oscuro",
       "site": {
         "sign_in": "Iniciar sesión",
-        "sign_out": "Cerrar sesión"
+        "sign_out": "Cerrar sesión",
+        "bottom": "Accesos rápidos"
       }
     },
     "ui": {
@@ -474,6 +475,26 @@
       },
       "toast": {
         "dismiss": "Cerrar"
+      },
+      "rating": {
+        "value": "{n} de {max}"
+      },
+      "share": {
+        "label": "Compartir",
+        "copied": "Enlace copiado.",
+        "failed": "No se pudo copiar el enlace."
+      },
+      "hero": {
+        "carousel": "carrusel",
+        "slide": "diapositiva",
+        "slide_of": "{n} de {count}",
+        "show": "Mostrar la diapositiva {n} de {count}",
+        "pause": "Detener las diapositivas",
+        "play": "Iniciar las diapositivas"
+      },
+      "reactions": {
+        "label": "Reacciones",
+        "failed": "No se pudo guardar la reacción."
       }
     },
     "date": {

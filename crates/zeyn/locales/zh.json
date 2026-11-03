@@ -220,7 +220,8 @@
       "theme_dark": "深色",
       "site": {
         "sign_in": "登录",
-        "sign_out": "退出登录"
+        "sign_out": "退出登录",
+        "bottom": "快捷链接"
       }
     },
     "ui": {
@@ -474,6 +475,26 @@
       },
       "toast": {
         "dismiss": "关闭"
+      },
+      "rating": {
+        "value": "{n} / {max}"
+      },
+      "share": {
+        "label": "分享",
+        "copied": "链接已复制。",
+        "failed": "无法复制链接。"
+      },
+      "hero": {
+        "carousel": "轮播",
+        "slide": "幻灯片",
+        "slide_of": "第 {n} 张，共 {count} 张",
+        "show": "显示第 {n} 张，共 {count} 张",
+        "pause": "停止轮播",
+        "play": "开始轮播"
+      },
+      "reactions": {
+        "label": "回应",
+        "failed": "无法保存回应。"
       }
     },
     "date": {

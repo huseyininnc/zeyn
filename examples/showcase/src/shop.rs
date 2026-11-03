@@ -198,6 +198,11 @@ pub fn feature() -> Feature {
                             .link(t!("shop.footer.panel"), crate::overview::overview)
                     })
                     .text(t!("shop.footer.note"))
-                }),
+                })
+                .bottom_nav([
+                    zeyn::BottomNavItem::new(t!("shop.menu.home"), shop_home).icon(Icon::Home),
+                    zeyn::BottomNavItem::new(t!("shop.products"), shop_catalog).icon(Icon::Cart),
+                    zeyn::BottomNavItem::new(t!("shop.search.all"), shop_search).icon(Icon::Search),
+                ]),
         )
 }

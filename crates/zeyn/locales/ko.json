@@ -220,7 +220,8 @@
       "theme_dark": "다크",
       "site": {
         "sign_in": "로그인",
-        "sign_out": "로그아웃"
+        "sign_out": "로그아웃",
+        "bottom": "바로 가기"
       }
     },
     "ui": {
@@ -451,7 +452,7 @@
         "down": "이전 기간 대비 {pct}% 감소",
         "flat": "이전 기간과 변화 없음",
         "target": "목표 {target}, {pct}% 달성"
-},
+      },
       "password": {
         "show": "비밀번호 표시",
         "weak": "강도: 약함",
@@ -474,6 +475,26 @@
       },
       "toast": {
         "dismiss": "닫기"
+      },
+      "rating": {
+        "value": "{max}점 중 {n}점"
+      },
+      "share": {
+        "label": "공유",
+        "copied": "링크를 복사했습니다.",
+        "failed": "링크를 복사하지 못했습니다."
+      },
+      "hero": {
+        "carousel": "캐러셀",
+        "slide": "슬라이드",
+        "slide_of": "{count}개 중 {n}번째",
+        "show": "{count}개 중 {n}번째 슬라이드 보기",
+        "pause": "슬라이드 멈추기",
+        "play": "슬라이드 시작"
+      },
+      "reactions": {
+        "label": "반응",
+        "failed": "반응을 저장하지 못했습니다."
       }
     },
     "date": {

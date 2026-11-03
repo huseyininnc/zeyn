@@ -27,12 +27,17 @@ Feature::new("shop")
             c.link(t!("shop.delivery.title"), shop_delivery).url(t!("shop.footer.source"), "https://example.com")
         })
         .text(t!("shop.footer.note"))
-    }))
+    })
+    .bottom_nav([
+        BottomNavItem::new(t!("shop.menu.home"), shop_home).icon(Icon::Home),
+        BottomNavItem::new(t!("shop.menu.help"), shop_delivery).icon(Icon::Box),
+    ]))
 ```
 
 - **Menu.** The top menu lists the menus of every feature in the site shell. A group of one item is a plain link; a larger group is a button that opens its links (the W3C APG disclosure navigation pattern). Enter, Space or a click toggle a group, Down opens it and moves to its first link, Up, Down, Home and End move between its links, Escape closes it and returns to the button, and Tab out of the group or a click outside closes it. Left and Right move between the top items.
 - **Narrow screens.** Below 800 px the menu folds behind a menu button with `aria-expanded`; Escape closes it. Without the script the menu stays open, so nothing becomes unreachable.
 - **Actions.** `sign_in()` shows a sign in link for visitors and a sign out link for signed in users when the app has a sign in page; `language()` and `theme()` show the same pickers as the app shell.
+- **Bottom bar.** `bottom_nav([...])` adds up to five links fixed to the bottom of the screen on phones (800 px wide and less), for the places people go most; more than five do not compile. Each item is a `BottomNavItem` with a label, a screen with a route and an optional icon. The link of the page being shown has `aria-current="page"` (kept up to date by `nav.js`), links to screens the user may not open are left out, the bar keeps clear of the home indicator with `env(safe-area-inset-bottom)`, and the page gets room at its bottom so the bar hides nothing. The top menu stays for the rest. The bar needs no script.
 - **Footer.** Columns of links to screens (`link`, left out for users who may not open them) or addresses (`url`: a path, `https:`, `http:` or `mailto:`; `App::check` refuses other schemes and links to screens that are not registered), and a line of text.
 
 Moving between a site shell screen and an app shell screen goes through `nav.js` without a page load: the partial response says which shell it belongs to (`x-zeyn-shell`), and when that differs from the current frame, the runtime swaps the whole frame the way a language change does and loads the other shell's stylesheet and script. Links to `/_zeyn/route/{screen}` (the breadcrumb's) are followed the same way.

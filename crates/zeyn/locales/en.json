@@ -220,7 +220,8 @@
       "theme_dark": "Dark",
       "site": {
         "sign_in": "Sign in",
-        "sign_out": "Sign out"
+        "sign_out": "Sign out",
+        "bottom": "Quick links"
       }
     },
     "ui": {
@@ -497,6 +498,26 @@
           "6": "Saturday",
           "7": "Sunday"
         }
+      },
+      "rating": {
+        "value": "{n} of {max}"
+      },
+      "share": {
+        "label": "Share",
+        "copied": "Link copied.",
+        "failed": "The link could not be copied."
+      },
+      "hero": {
+        "carousel": "carousel",
+        "slide": "slide",
+        "slide_of": "{n} of {count}",
+        "show": "Show slide {n} of {count}",
+        "pause": "Stop the slides",
+        "play": "Start the slides"
+      },
+      "reactions": {
+        "label": "Reactions",
+        "failed": "The reaction could not be saved."
       }
     },
     "date": {

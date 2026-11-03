@@ -78,6 +78,7 @@ pub struct ImageCard {
     progress: Option<(f32, Text)>,
     horizontal: bool,
     link: Option<(&'static str, Json)>,
+    preview: super::preview::PreviewTarget,
 }
 
 impl Card {
@@ -98,6 +99,7 @@ impl Card {
             progress: None,
             horizontal: false,
             link: None,
+            preview: None,
         }
     }
 
@@ -180,6 +182,20 @@ impl ImageCard {
         self
     }
 
+    /// A preview of `screen` in a panel next to the card: after about half a second of hover
+    /// with a mouse, or at once on keyboard focus. The screen loads only then, through the same
+    /// access checks as a window, and is kept for the page's life. Escape closes the panel, the
+    /// pointer can move onto it, frames and media inside are left out, and touch screens show no
+    /// preview (a tap opens the link). Needs [`ImageCard::link`]. Params of the wrong type do not
+    /// compile.
+    pub fn preview<S: ScreenDef>(mut self, _screen: S, params: S::Params) -> Self {
+        self.preview = Some((
+            S::META.name,
+            serde_json::to_value(params).unwrap_or(Json::Null),
+        ));
+        self
+    }
+
     fn html(&self, out: &mut String, r: &Render, size: (u32, u32)) {
         let img = if safe_image(&self.image) {
             format!(
@@ -250,7 +266,8 @@ impl ImageCard {
                     format!("?params={}", encode(&params.to_string()))
                 };
                 out.push_str(&format!(
-                    r#"<li class="{class}"><a class="z-poster-link" href="/_zeyn/route/{screen}{query}" data-zeyn-base-href>{body}</a></li>"#
+                    r#"<li class="{class}"><a class="z-poster-link" href="/_zeyn/route/{screen}{query}" data-zeyn-base-href{}>{body}</a></li>"#,
+                    super::preview::preview_attr(&self.preview)
                 ));
             }
             None => out.push_str(&format!(

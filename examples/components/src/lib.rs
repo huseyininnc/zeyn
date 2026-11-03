@@ -114,14 +114,17 @@ catalog! {
         timeline "/ui/timeline";
         markdown "/ui/markdown";
         spoiler "/ui/spoiler";
+        relative_time "/ui/relative-time";
     }
     "navigation" Home {
         breadcrumb "/ui/breadcrumb";
         prev_next "/ui/prev-next";
         alpha_index "/ui/alpha-index";
+        chips "/ui/chips";
         menu_button "/ui/menu-button";
         menu_bar "/ui/menu-bar";
         external_link "/ui/external-link";
+        share "/ui/share";
     }
     "forms" Edit {
         form "/ui/form";
@@ -130,6 +133,7 @@ catalog! {
         lookup "/ui/lookup";
         line_editor "/ui/line-editor";
         masked_inputs "/ui/masked-inputs";
+        rating "/ui/rating";
         action_button "/ui/action-button";
     }
     "data" Table {
@@ -145,6 +149,7 @@ catalog! {
     "media" Box {
         image "/ui/image";
         embed "/ui/embed";
+        hero "/ui/hero";
     }
     "feedback" Plus {
         alert "/ui/alert";
@@ -154,6 +159,7 @@ catalog! {
         popover "/ui/popover";
         busy "/ui/busy";
         toast "/ui/toast";
+        reactions "/ui/reactions";
     }
     "charts" Chart {
         chart "/ui/chart";
@@ -233,7 +239,11 @@ pub fn catalog_home(p: SearchParams, ctx: Ctx) -> Screen {
 
 /// The catalog feature: the index, a page per component and the search.
 pub fn feature() -> Feature {
-    with_screens(Feature::new("components").screen(catalog_home))
+    with_screens(
+        Feature::new("components")
+            .screen(catalog_home)
+            .screen(examples::image_card::product),
+    )
 }
 
 /// The catalog app.
