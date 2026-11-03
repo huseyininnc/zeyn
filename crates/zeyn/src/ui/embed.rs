@@ -101,6 +101,7 @@ pub struct Embed<T = Given> {
     allow: Vec<EmbedPermission>,
     aspect: (u32, u32),
     poster: Option<String>,
+    notice: Option<Text>,
     _title: PhantomData<T>,
 }
 
@@ -113,6 +114,7 @@ impl Embed<NoTitle> {
             allow: Vec::new(),
             aspect: (16, 9),
             poster: None,
+            notice: None,
             _title: PhantomData,
         }
     }
@@ -125,6 +127,7 @@ impl Embed<NoTitle> {
             allow: self.allow,
             aspect: self.aspect,
             poster: self.poster,
+            notice: self.notice,
             _title: PhantomData,
         }
     }
@@ -154,6 +157,24 @@ impl<T> Embed<T> {
     /// a path on the app or an `https` address on a host of `img-src`; pass `""` for none.
     pub fn click_to_load(mut self, poster: impl Into<String>) -> Self {
         self.poster = Some(poster.into());
+        self
+    }
+
+    /// A text of the app shown on the click to load button, such as a content warning. It is part
+    /// of the button's accessible name, so screen readers read it before the button is pressed.
+    /// Without [`Embed::click_to_load`] it turns the button on with no poster.
+    ///
+    /// ```
+    /// # use zeyn::ui::Embed;
+    /// # use zeyn::Text;
+    /// let episode = Embed::url("https://player.example.com/e/12")
+    ///     .title(Text::from("Episode 12"))
+    ///     .click_to_load("")
+    ///     .notice(Text::from("Contains flashing lights."));
+    /// ```
+    pub fn notice(mut self, notice: impl Into<Text>) -> Self {
+        self.notice = Some(notice.into());
+        self.poster.get_or_insert_with(String::new);
         self
     }
 }
@@ -197,8 +218,12 @@ impl Component for Embed<Given> {
                 } else {
                     String::new()
                 };
+                let notice = match &self.notice {
+                    Some(n) => format!(r#"<span class="z-embed-notice">{}</span>"#, r.text(n)),
+                    None => String::new(),
+                };
                 out.push_str(&format!(
-                    r#"<button type="button" class="z-embed-load" data-zeyn-embed-load>{image}<span class="z-embed-play" aria-hidden="true"></span><span class="z-embed-label"><strong>{}</strong><small>{}</small></span></button><template data-zeyn-embed>{frame}</template>"#,
+                    r#"<button type="button" class="z-embed-load" data-zeyn-embed-load>{image}<span class="z-embed-play" aria-hidden="true"></span><span class="z-embed-label">{notice}<strong>{}</strong><small>{}</small></span></button><template data-zeyn-embed>{frame}</template>"#,
                     r.text(&Text::key("zeyn.ui.embed.load").arg("title", self.title.clone())),
                     r.text(&Text::key("zeyn.ui.embed.from").arg("host", host_of(&url).to_string())),
                 ));
@@ -215,6 +240,7 @@ impl Component for Embed<Given> {
             "allow": self.allow,
             "aspect": [self.aspect.0, self.aspect.1],
             "click_to_load": self.poster.is_some(),
+            "notice": self.notice,
         })
     }
 }

@@ -88,6 +88,35 @@ fn click_to_load_shows_a_poster_button_and_keeps_the_frame_inert() {
 }
 
 #[test]
+fn a_notice_on_the_gate_is_escaped_translated_and_part_of_the_button_name() {
+    let e = Embed::url("https://www.youtube-nocookie.com/embed/abc")
+        .title("Episode 12")
+        .click_to_load("")
+        .notice("Flashing <b>lights</b> & violence");
+    let out = html(&e, &ctx(frames()));
+    let button = &out[out.find("<button").expect(&out)..out.find("</button>").expect(&out)];
+    assert!(
+        button.contains(r#"<span class="z-embed-notice">Flashing &lt;b&gt;lights&lt;/b&gt; &amp; violence</span><strong>Load Episode 12</strong>"#),
+        "{out}"
+    );
+    assert!(!out.contains("<b>"), "{out}");
+    assert_eq!(e.schema()["notice"], "Flashing <b>lights</b> & violence");
+
+    let without_poster = Embed::url("https://www.youtube-nocookie.com/embed/abc").title("T").notice("Warning");
+    let out = html(&without_poster, &ctx(frames()));
+    assert!(out.contains("data-zeyn-embed-load") && out.contains("<template data-zeyn-embed><iframe"), "{out}");
+    assert!(!out.contains("<img"), "{out}");
+
+    let tr = zeyn::I18n::builtin();
+    let translated = Embed::url("https://www.youtube-nocookie.com/embed/abc")
+        .title("Bölüm")
+        .notice(Text::key("zeyn.ui.link.external"));
+    let mut out = String::new();
+    translated.render(&mut out, &Render::new("s", "tr", tr).with_ctx(&ctx(frames())));
+    assert!(out.contains(r#"<span class="z-embed-notice">dış site</span>"#), "{out}");
+}
+
+#[test]
 fn embed_urls_are_canonical_and_never_html() {
     let pasted = r#"<iframe width="560" height="315" src="https://WWW.YouTube-nocookie.com/embed/abc?si=x&amp;utm_source=share&amp;fbclid=1" title="YouTube video player" frameborder="0" allow="autoplay" allowfullscreen></iframe>"#;
     assert_eq!(embed_url(pasted).as_deref(), Some("https://www.youtube-nocookie.com/embed/abc?si=x"));
