@@ -75,8 +75,7 @@
       "realtime": "Tiempo real y CRDT",
       "desktop": "Apps de escritorio",
       "protocol": "Protocolo del runtime",
-      "database_reference": "Referencia de base de datos",
-      "architecture": "Arquitectura (histórica)"
+      "database_reference": "Referencia de base de datos"
     },
     "translation": {
       "note": "Esta página está traducida del inglés.",

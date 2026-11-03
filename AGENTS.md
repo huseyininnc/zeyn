@@ -18,7 +18,7 @@ them. When code and docs disagree, fix the one that is wrong in the same change.
 
 | You are working on | Read |
 |---|---|
-| Anything, the first time | `README.md`, then `docs/vision-and-architecture.md` |
+| Anything, the first time | `README.md`, then `examples/docs/pages/introduction.md` |
 | The language: entities, actions, screens, forms, texts | `examples/docs/pages/` (`entities.md`, `actions.md`, `screens.md`, `forms.md`, `effects.md`, `texts.md`) |
 | DataGrid | `docs/grid.md`, `examples/docs/pages/datagrid.md` |
 | Components and layouts | `examples/docs/pages/` (`layouts.md`, `controls.md`, `lines.md`, `display.md`, `content.md`, `data.md`, `catalog.md`, `shell.md`) |
@@ -36,9 +36,6 @@ them. When code and docs disagree, fix the one that is wrong in the same change.
 | Desktop packaging | `docs/desktop.md` |
 | CLI, `zeyn new`, templates | `examples/docs/pages/cli.md`, `crates/zeyn-cli/templates/` |
 | Apps and shared libraries in separate repos | `docs/polyrepo.md` |
-
-`docs/language-example.md` and `docs/framework-analysis.md` are early design notes; some APIs in
-them were never built. Trust `examples/docs/pages/` and the code.
 
 The same docs run as a Zeyn app: `cargo run -p zeyn-example-docs`, then open
 http://127.0.0.1:3008. Alt+Shift+P searches every page.

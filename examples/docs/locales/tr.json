@@ -75,8 +75,7 @@
       "realtime": "Realtime ve CRDT",
       "desktop": "Masaüstü uygulamaları",
       "protocol": "Runtime protokolü",
-      "database_reference": "Veritabanı başvurusu",
-      "architecture": "Mimari (tarihsel)"
+      "database_reference": "Veritabanı başvurusu"
     },
     "translation": {
       "note": "Bu sayfa İngilizceden çevrilmiştir.",

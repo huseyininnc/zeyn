@@ -84,7 +84,6 @@ const DOCS: &[(&str, &str)] = &[
     ("rules", include_str!("../templates/AGENTS.md.tmpl")),
     ("language", include_str!("../embedded/SKILL.md")),
     ("protocol", include_str!("../embedded/runtime-protocol.md")),
-    ("architecture", include_str!("../embedded/vision-and-architecture.md")),
 ];
 
 const HELP: &str = "zeyn: command line tool for Zeyn Framework
@@ -522,7 +521,7 @@ fn tools() -> Value {
         tool(
             "zeyn_docs",
             "Zeyn framework reference. Topics: rules (project rules for agents), language (how to write models, actions, screens, forms, grids), protocol (browser runtime protocol), architecture.",
-            json!({ "topic": { "type": "string", "enum": ["rules", "language", "protocol", "architecture"] } }),
+            json!({ "topic": { "type": "string", "enum": ["rules", "language", "protocol"] } }),
             &["topic"]
         ),
         tool(
@@ -625,7 +624,6 @@ mod tests {
         for (name, original) in [
             ("SKILL.md", "../../skills/zeyn/SKILL.md"),
             ("runtime-protocol.md", "../../docs/runtime-protocol.md"),
-            ("vision-and-architecture.md", "../../docs/vision-and-architecture.md"),
         ] {
             let Ok(original) = std::fs::read_to_string(root.join(original)) else { continue };
             let copy = std::fs::read_to_string(root.join("embedded").join(name)).unwrap();

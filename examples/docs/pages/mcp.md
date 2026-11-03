@@ -11,7 +11,7 @@ The project an agent works in carries its own rules and tools:
 
 | Tool | Does |
 |---|---|
-| `zeyn_docs` | Framework reference by topic: `rules`, `language`, `protocol`, `architecture` |
+| `zeyn_docs` | Framework reference by topic: `rules`, `language`, `protocol` |
 | `zeyn_describe` | Features, screens, routes, access, APIs, problems and missing translations of the app |
 | `zeyn_check` | Compiles and reports problems; `fix: true` first rewrites renamed APIs |
 | `zeyn_test` | Runs `cargo test` and returns the end of the output |

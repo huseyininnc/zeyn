@@ -1,8 +1,7 @@
 # Component quality bar
 
-Status: analysis, 2026-11-02. The definition of done for every Zeyn component, and how the
-components that exist today score against it. The inventory and the plan are in
-[component-matrix.md](component-matrix.md).
+The definition of done for every Zeyn component, and how the components that exist today score
+against it.
 
 A component is done only when it meets every criterion below that applies to it. "Applies" is
 decided per criterion: a `Stack` has no keyboard map, a `Badge` has no server action. A criterion
@@ -197,6 +196,5 @@ Evidence behind the scores:
 
 ## 3. What to harden first
 
-The ordered list is in [component-matrix.md](component-matrix.md#hardening-existing-components).
 In short: add the browser test suite and recorded screen reader runs, set and enforce performance
 budgets, make RTL real, check touch, and give every component a live docs example.

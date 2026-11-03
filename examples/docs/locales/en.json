@@ -75,8 +75,7 @@
       "realtime": "Realtime and CRDT",
       "desktop": "Desktop apps",
       "protocol": "Runtime protocol",
-      "database_reference": "Database reference",
-      "architecture": "Architecture (historical)"
+      "database_reference": "Database reference"
     },
     "translation": {
       "note": "This page is translated from English.",

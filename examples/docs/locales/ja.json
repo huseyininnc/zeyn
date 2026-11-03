@@ -75,8 +75,7 @@
       "realtime": "リアルタイムと CRDT",
       "desktop": "デスクトップアプリ",
       "protocol": "ランタイムプロトコル",
-      "database_reference": "データベースリファレンス",
-      "architecture": "アーキテクチャ（過去の資料）"
+      "database_reference": "データベースリファレンス"
     },
     "translation": {
       "note": "このページは英語から翻訳されています。",
