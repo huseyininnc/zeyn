@@ -12,11 +12,20 @@ pub fn overview(_ctx: &Ctx) -> Node {
         .into()
 }
 
+pub fn with_scrollbar(_ctx: &Ctx) -> Node {
+    Rail::of(search_products)
+        .title("Best sellers")
+        .card(|p: &Product| Card::image(p.image.clone(), p.name.clone()))
+        .image_size(300, 300)
+        .scrollbar(true)
+        .into()
+}
+
 /// What the catalog shows of `Rail`.
 pub const ENTRY: Entry = Entry {
     name: "Rail",
     docs: "components/catalog#rail",
     api: &["Rail", "CardGrid"],
     overview: &[ex!(overview)],
-    examples: &[],
+    examples: &[ex!(with_scrollbar)],
 };

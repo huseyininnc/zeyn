@@ -189,7 +189,7 @@ impl ImageCard {
     fn html(&self, out: &mut String, r: &Render, size: (u32, u32)) {
         let img = if safe_image(&self.image) {
             format!(
-                r#"<img class="z-poster-img" src="{}" alt="{}" width="{}" height="{}" loading="lazy" decoding="async">"#,
+                r#"<img class="z-poster-img" src="{}" alt="{}" width="{}" height="{}" loading="lazy" decoding="async" draggable="false">"#,
                 escape(&self.image),
                 r.text(&self.alt),
                 size.0,
@@ -322,14 +322,22 @@ pub struct CardGrid<E: Model> {
     image: (u32, u32),
     rail: bool,
     list: bool,
+    scrollbar: bool,
 }
 
 /// A horizontal list of cards that scrolls sideways, with previous and next buttons and scroll
 /// snapping. It loads the next batch when the user scrolls near its end. Built like a
 /// [`CardGrid`], which it is, laid out in one row.
 ///
+/// The scrollbar is hidden unless [`CardGrid::scrollbar`] keeps it; touch, trackpad and
+/// Shift+wheel still scroll. A mouse can press and drag the rail sideways: after a move of more
+/// than 5 pixels the click on release is cancelled, so no card opens, and the rail snaps to the
+/// nearest card. Touch keeps the browser's own scrolling. Without JavaScript the buttons are
+/// hidden and the rail scrolls natively.
+///
 /// Keyboard: the cards are links in the tab order and scroll into view as they get focus; the
-/// previous and next buttons scroll by a view's width.
+/// previous and next buttons scroll by a view's width and are disabled at the ends. They are
+/// always there, because the hidden scrollbar is no way to scroll for a keyboard.
 ///
 /// ```ignore
 /// Rail::of(search_products).title(t!("shop.new_arrivals")).card(|p: &Product| Card::image(p.image.clone(), p.name.clone()))
@@ -369,7 +377,15 @@ impl<E: Model> CardGrid<E> {
             image: (300, 400),
             rail: false,
             list: false,
+            scrollbar: false,
         }
+    }
+
+    /// Keeps the scrollbar of a [`Rail`] visible (thin). Rails hide it by default; card grids and
+    /// lists do not scroll sideways, so it changes nothing for them.
+    pub fn scrollbar(mut self, show: bool) -> Self {
+        self.scrollbar = show;
+        self
     }
 
     /// Lays the rows out as a [`super::List`]: see [`super::List::of`].
@@ -510,6 +526,7 @@ impl<E: Model> CardGrid<E> {
         let id = dom_id(r, "cards");
         let t = |key: &str| r.text(&Text::key(format!("zeyn.ui.cards.{key}")));
         let class = match (self.rail, self.list) {
+            (true, _) if self.scrollbar => "z-rail z-rail-bar",
             (true, _) => "z-rail",
             (_, true) => "z-cards z-cards-rows",
             _ => "z-cards",

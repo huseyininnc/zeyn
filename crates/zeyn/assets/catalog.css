@@ -54,13 +54,35 @@
   gap: 16px;
   overflow-x: auto;
   overscroll-behavior-x: contain;
-  scroll-snap-type: x mandatory;
+  scroll-snap-type: x proximity;
   scroll-padding-inline: 4px;
   padding: 4px 4px 12px;
-  scrollbar-width: thin;
+  scrollbar-width: none;
 }
 
+.z-rail:not(.z-rail-bar) .z-rail-list::-webkit-scrollbar { display: none; }
+.z-rail-bar .z-rail-list { scrollbar-width: thin; }
+
 .z-rail-list > .z-poster { scroll-snap-align: start; }
+
+.z-rail:not([data-zeyn-ready]) .z-rail-nav { visibility: hidden; }
+
+@media (pointer: fine) {
+  .z-rail[data-zeyn-ready] .z-rail-list,
+  .z-rail[data-zeyn-ready] .z-rail-list a { cursor: grab; }
+}
+
+.z-rail[data-zeyn-ready] .z-rail-list.z-rail-dragging {
+  cursor: grabbing;
+  user-select: none;
+  scroll-snap-type: none;
+}
+
+.z-rail[data-zeyn-ready] .z-rail-dragging a { cursor: grabbing; }
+
+@media (prefers-reduced-motion: reduce) {
+  .z-rail-list { scroll-behavior: auto; }
+}
 
 .z-rail-nav {
   display: flex;

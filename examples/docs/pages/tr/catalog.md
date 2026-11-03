@@ -61,6 +61,8 @@ Rail::of(search_products).card(|p: &Product| {
 
 Rail, yana kayan tek satıra dizilmiş bir kart ızgarasıdır; kaydırma yakalama (snap) ve bir görünüm genişliği kadar kaydıran önceki ve sonraki düğmeleri vardır (kullanıcı azaltılmış hareket istemediyse yumuşakça). Kullanıcı sonuna yaklaştıkça sonraki grubu, 12'şer 12'şer yükler. Kartlar sekme sırasında yer alan bağlantılardır ve odak aldıklarında görünüme kayarlar.
 
+Kaydırma çubuğu gizlidir; dokunmatik ekran, dokunmatik yüzey ve Shift+tekerlek yine kaydırır, `.scrollbar(true)` ince bir çubuk bırakır. Fareyle basılı tutup şeridi yana sürükleyebilirsiniz. 5 pikselden fazla hareketten sonra bırakıştaki tıklama iptal edilir, böylece işaretçinin altındaki kart açılmaz ve şerit en yakın karta oturur; daha küçük bir hareket normal bir tıklamadır. Sürüklerken metin seçilmez, görseller dışarı sürüklenmez ve kart önizlemesi açılmaz. Dokunmatikte tarayıcının kendi kaydırması kalır. Önceki ve sonraki düğmeleri her zaman vardır ve uçlarda devre dışı kalır, çünkü gizli bir kaydırma çubuğu klavye için bir kaydırma yolu değildir. JavaScript olmadan düğmeler gizlenir ve şerit tarayıcının kendi kaydırmasıyla kayar.
+
 ```rust
 Rail::of(catalog_products)
     .title(t!("shop.new_arrivals"))

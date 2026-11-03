@@ -223,7 +223,8 @@
         "overview": "Example"
       },
       "rail": {
-        "overview": "Example"
+        "overview": "Example",
+        "with_scrollbar": "Visible scrollbar"
       },
       "rating": {
         "overview": "Example",

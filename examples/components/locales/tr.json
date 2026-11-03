@@ -223,7 +223,8 @@
         "overview": "Örnek"
       },
       "rail": {
-        "overview": "Örnek"
+        "overview": "Örnek",
+        "with_scrollbar": "Görünür kaydırma çubuğu"
       },
       "rating": {
         "overview": "Örnek",

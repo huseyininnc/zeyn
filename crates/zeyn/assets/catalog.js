@@ -4,7 +4,8 @@
  *
  * Card grids and rails ask `POST /_zeyn/grid` for more cards with a position and a sort order
  * only; the server sets the page size and the search text. Search boxes ask `POST /_zeyn/data`
- * for suggestions and follow the W3C APG combobox pattern with a list box popup.
+ * for suggestions and follow the W3C APG combobox pattern with a list box popup. A mouse can drag
+ * a rail sideways; touch keeps native scrolling.
  * @module catalog
  */
 
@@ -146,6 +147,77 @@ function railScroll(section, step) {
   list.scrollBy({ left: step * rtl * list.clientWidth * 0.9, behavior: reduced.matches ? 'auto' : 'smooth' });
 }
 
+/** Pixels a mouse moves before a press on a rail becomes a drag instead of a click. */
+const DRAG_PX = 5;
+
+/** Scrolls a rail so the card whose start is nearest to the rail's start lines up with it. */
+function railSnap(list) {
+  const rtl = getComputedStyle(list).direction === 'rtl';
+  const box = list.getBoundingClientRect();
+  const pad = parseFloat(getComputedStyle(list).scrollPaddingInlineStart) || 0;
+  let best = null;
+  for (const card of list.children) {
+    const r = card.getBoundingClientRect();
+    const delta = rtl ? r.right - (box.right - pad) : r.left - (box.left + pad);
+    if (best === null || Math.abs(delta) < Math.abs(best)) best = delta;
+  }
+  if (best) list.scrollBy({ left: best, behavior: reduced.matches ? 'auto' : 'smooth' });
+}
+
+/**
+ * Lets a mouse drag a rail sideways. Touch and pen keep the browser's own scrolling. A press that
+ * moves more than `DRAG_PX` is a drag: the click on release is cancelled, so the card link does
+ * not open, and the rail snaps to the nearest card. A smaller move is a normal click. The
+ * dragging class stays until the mouse moves again, so the pointer events that follow the release
+ * do not start a card preview.
+ */
+function railDrag(list) {
+  let press = null;
+  let dragged = false;
+  list.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'mouse' || e.button !== 0) return;
+    press = { id: e.pointerId, x: e.clientX, left: list.scrollLeft, moving: false };
+    dragged = false;
+  });
+  list.addEventListener('pointermove', (e) => {
+    if (!press || e.pointerId !== press.id) return;
+    const dx = e.clientX - press.x;
+    if (!press.moving) {
+      if (Math.abs(dx) <= DRAG_PX) return;
+      press.moving = true;
+      list.setPointerCapture(e.pointerId);
+      list.classList.add('z-rail-dragging');
+      getSelection()?.removeAllRanges();
+    }
+    list.scrollLeft = press.left - dx;
+  });
+  const release = (e) => {
+    if (!press || e.pointerId !== press.id) return;
+    const moving = press.moving;
+    press = null;
+    if (!moving) return;
+    dragged = true;
+    railSnap(list);
+    list.addEventListener('pointermove', () => list.classList.remove('z-rail-dragging'), { once: true });
+  };
+  list.addEventListener('pointerup', release);
+  list.addEventListener('pointercancel', release);
+  list.addEventListener(
+    'click',
+    (e) => {
+      if (!dragged) return;
+      dragged = false;
+      e.preventDefault();
+      e.stopPropagation();
+    },
+    true,
+  );
+  list.addEventListener('dragstart', (e) => e.preventDefault());
+  list.addEventListener('focusin', (e) => {
+    e.target.closest?.('.z-poster')?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: reduced.matches ? 'auto' : 'smooth' });
+  });
+}
+
 const watcher = 'IntersectionObserver' in window
   ? new IntersectionObserver(
       (entries) => {
@@ -178,6 +250,7 @@ function initCards(root) {
         },
         { passive: true },
       );
+      if (list) railDrag(list);
       railButtons(section);
     }
   }

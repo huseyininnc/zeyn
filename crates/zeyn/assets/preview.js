@@ -94,7 +94,7 @@ async function open(card) {
   clearTimeout(closeTimer);
   owner = card;
   const content = await load(card.dataset.zeynPreview);
-  if (owner !== card || !content || !card.isConnected) return;
+  if (owner !== card || !content || !card.isConnected || card.closest('.z-rail-dragging')) return;
   const p = panelEl();
   p.replaceChildren(content.cloneNode(true));
   if (!p.matches(':popover-open')) p.showPopover();
@@ -123,7 +123,7 @@ function cardOf(target) {
 
 /** Starts the hover timer of a card. */
 function hover(card) {
-  if (!fine.matches) return;
+  if (!fine.matches || card.closest('.z-rail-dragging')) return;
   clearTimeout(closeTimer);
   if (owner === card && panel?.matches(':popover-open')) return;
   clearTimeout(openTimer);
@@ -160,6 +160,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 document.addEventListener('pointerdown', (e) => {
+  clearTimeout(openTimer);
   if (panel?.matches(':popover-open') && !panel.contains(e.target)) close();
 });
 

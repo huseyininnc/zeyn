@@ -129,6 +129,7 @@ pub fn picks() -> Screen {
                     .progress(g.price as f32 / 100.0, "Sold")
                     .horizontal()
             })
+            .scrollbar(true)
             .paging(Paging::infinite(2)),
     )
 }
@@ -237,7 +238,7 @@ async fn card_grids_render_their_first_page_as_linked_lazy_images() {
     assert!(page.contains(r#"data-zeyn-size="4""#) && page.contains(r#"data-zeyn-next="4""#));
     assert!(page.contains(r#"<h2 class="z-cards-title" id="shop-cards-0-title">All goods</h2>"#));
     assert!(page.contains(
-        r#"<img class="z-poster-img" src="/img/1.png" alt="" width="300" height="400" loading="lazy" decoding="async">"#
+        r#"<img class="z-poster-img" src="/img/1.png" alt="" width="300" height="400" loading="lazy" decoding="async" draggable="false">"#
     ));
     assert!(page.contains(r#"<a class="z-poster-link" href="/_zeyn/route/results?params="#));
     assert!(page.contains(r#"<span class="z-badge z-tone-neutral">New</span>"#));
@@ -471,6 +472,54 @@ async fn the_catalog_script_is_served_without_sign_in() {
         js.contains("window.zeynCsrf()"),
         "public pages come without a CSRF token, so paging and suggestions must ask the runtime for one"
     );
+}
+
+#[tokio::test]
+async fn rails_hide_their_scrollbar_unless_kept_and_drag_only_with_a_mouse() {
+    let router = app(None);
+    let (_, shop_page) = send(&router, get("/shop")).await;
+    assert!(
+        shop_page.contains(r#"<section class="z-rail" "#),
+        "{shop_page}"
+    );
+    let (_, picks_page) = send(&router, get("/picks")).await;
+    assert!(
+        picks_page.contains(r#"<section class="z-rail z-rail-bar" "#),
+        "{picks_page}"
+    );
+    assert!(
+        picks_page.contains("data-zeyn-rail-prev") && picks_page.contains("data-zeyn-rail-next"),
+        "the buttons cannot be turned off"
+    );
+    let asset = |path: &'static str| {
+        let router = router.clone();
+        async move {
+            send(
+                &router,
+                Request::get(path)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .1
+        }
+    };
+    let css = asset("/_zeyn/catalog.css").await;
+    assert!(
+        css.contains("scrollbar-width: none")
+            && css.contains("::-webkit-scrollbar { display: none; }")
+    );
+    assert!(css.contains("scroll-snap-type: x proximity"));
+    assert!(
+        css.contains(".z-rail:not([data-zeyn-ready]) .z-rail-nav { visibility: hidden; }"),
+        "without the script the buttons are hidden but keep their space"
+    );
+    let js = asset("/_zeyn/catalog.js").await;
+    assert!(
+        js.contains("e.pointerType !== 'mouse'"),
+        "touch and pen keep native scrolling"
+    );
+    assert!(js.contains("const DRAG_PX = 5;"));
 }
 
 #[tokio::test]
