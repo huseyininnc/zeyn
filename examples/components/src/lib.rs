@@ -156,6 +156,7 @@ catalog! {
         popover "/ui/popover";
         busy "/ui/busy";
         toast "/ui/toast";
+        reactions "/ui/reactions";
     }
     "charts" Chart {
         chart "/ui/chart";

@@ -40,6 +40,7 @@ pub mod prev_next;
 pub mod progress;
 pub mod rail;
 pub mod rating;
+pub mod reactions;
 pub mod relative_time;
 pub mod row;
 pub mod search_box;

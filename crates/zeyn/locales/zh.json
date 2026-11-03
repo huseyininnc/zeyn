@@ -490,6 +490,10 @@
         "show": "显示第 {n} 张，共 {count} 张",
         "pause": "停止轮播",
         "play": "开始轮播"
+      },
+      "reactions": {
+        "label": "回应",
+        "failed": "无法保存回应。"
       }
     },
     "date": {

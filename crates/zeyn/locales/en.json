@@ -513,6 +513,10 @@
         "show": "Show slide {n} of {count}",
         "pause": "Stop the slides",
         "play": "Start the slides"
+      },
+      "reactions": {
+        "label": "Reactions",
+        "failed": "The reaction could not be saved."
       }
     },
     "date": {

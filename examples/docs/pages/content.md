@@ -139,6 +139,25 @@ Hero::new(t!("home.fresh"))
 
 @live hero
 
+## Reactions
+
+A row of reaction buttons chosen by the app, each with a key, a name and a symbol such as an emoji, and its count. `Reactions::of(action, target)` names the item the reactions are about; the target is set by the screen and never read from the browser. Pressing a button posts the reaction to `POST /_zeyn/data`, which checks CSRF, counts against the write rate limit, opens the screen, checks the action's permission and refuses a reaction outside the set before the action runs. The action gets a `ReactionPress` (target, reaction, pressed), stores it and returns the new `ReactionState` (counts and the user's own reactions), and the counts and `aria-pressed` states update in place. Each button is a toggle button named by the reaction's name and its count; the symbol is hidden from screen readers. `.state(...)` gives the counts for the first render, so they show without script. The script (`reactions.js`, 1.3 KB gzip) loads only on pages with reactions.
+
+```rust
+#[action(permission = "answers.react")]
+pub async fn react_to_answer(press: ReactionPress, db: Db, ctx: Ctx) -> Result<ReactionState> {
+    db.toggle_reaction(&ctx, &press.target, &press.reaction, press.pressed).await?;
+    db.reaction_state(&ctx, &press.target).await
+}
+
+Reactions::of(react_to_answer, format!("answer-{}", answer.id))
+    .reaction("helpful", t!("answers.helpful"), "\u{1f44d}")
+    .reaction("thanks", t!("answers.thanks"), "\u{1f64f}")
+    .state(answer.reactions.clone())
+```
+
+@live reactions
+
 ## RelativeTime
 
 A moment shown as relative time, such as "3 minutes ago" or "in 2 days", in the page's language. The server writes the exact date and time in the user's time zone inside `<time datetime="...">`, so the HTML stays the same from minute to minute and a cached page is still right. The runtime rewrites the text with `Intl.RelativeTimeFormat` when the page loads, when `nav.js` swaps in a screen and once a minute; the exact time stays in the tooltip. Without script the exact time is the text.

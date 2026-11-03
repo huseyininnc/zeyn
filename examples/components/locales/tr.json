@@ -86,7 +86,8 @@
       "share": "Bağlantıyı paylaşır, paylaşım yoksa kopyalar.",
       "rating": "Yıldızlarla gösterilen 1 ile N arası tam sayı.",
       "chips": "Bağlantı çipleri ve ekran parametresini süzen çipler.",
-      "hero": "Büyük görselli bölüm; slaytlar yalnızca istenince döner."
+      "hero": "Büyük görselli bölüm; slaytlar yalnızca istenince döner.",
+      "reactions": "Sayıları bir eylemle saklanan tepki düğmeleri."
     },
     "ex": {
       "action_button": {
@@ -226,6 +227,9 @@
       "rating": {
         "overview": "Örnek",
         "three_stars": "Üç yıldız"
+      },
+      "reactions": {
+        "overview": "Örnek"
       },
       "relative_time": {
         "overview": "Örnek",

@@ -2,10 +2,11 @@
 //! chips, heroes, reactions, the site shell's bottom bar and card previews.
 
 use axum::body::Body;
-use axum::http::{HeaderMap, Request, StatusCode};
+use axum::http::{HeaderMap, Request, StatusCode, header};
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 use zeyn::prelude::*;
+use zeyn::ui::{ReactionPress, ReactionState};
 use zeyn::{Component, I18n, Identity, Render};
 
 fn html(c: &impl Component, locale: &str) -> String {
@@ -165,7 +166,7 @@ async fn get(path: &str) -> (StatusCode, String) {
 #[tokio::test]
 async fn the_lazy_modules_are_served_and_stay_out_of_the_page_head() {
     let (_, page) = get("/items/1").await;
-    for name in ["share", "chips", "hero"] {
+    for name in ["share", "chips", "hero", "reactions"] {
         let (status, body) = get(&format!("/_zeyn/{name}.js")).await;
         assert_eq!(status, StatusCode::OK, "{name}");
         assert!(body.contains("@module"), "{name}");
@@ -175,6 +176,7 @@ async fn the_lazy_modules_are_served_and_stay_out_of_the_page_head() {
     assert!(components.contains("['button[data-zeyn-share]', 'share']"));
     assert!(components.contains("['a[data-zeyn-chip]', 'chips']"));
     assert!(components.contains("['[data-zeyn-hero]', 'hero']"));
+    assert!(components.contains("['[data-zeyn-reactions]', 'reactions']"));
 }
 
 #[params]
@@ -310,4 +312,142 @@ fn hero_slides_follow_the_carousel_pattern_and_rotate_only_when_asked() {
     assert!(en.contains(r#"aria-label="Start the slides""#) && en.contains(r#"aria-live="off""#));
     assert_eq!(Hero::new("A").rotate(200).schema()["rotate"], 30);
     assert!(html(&moving, "tr").contains("Slayt 2 / 2 göster"));
+}
+
+const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+/// Echoes a press as a state: the target as the count key, so tests see what the action got.
+#[action(permission = "items.react")]
+pub async fn react(press: ReactionPress) -> Result<ReactionState> {
+    let state = ReactionState::default().count(format!("{}:{}", press.target, press.reaction), 1);
+    Ok(if press.pressed { state.mine(press.reaction) } else { state })
+}
+
+#[screen(route = "/answers/{id}", public)]
+pub fn answer(p: ItemParams) -> Screen {
+    Screen::new("Answer").body(
+        Stack::new().add(
+            Reactions::of(react, format!("answer-{}", p.id))
+                .reaction("helpful", "Helpful", "+")
+                .reaction("thanks", "<Thanks>", "!")
+                .state(
+                    ReactionState::default()
+                        .count("helpful", 12)
+                        .mine("helpful"),
+                ),
+        ),
+    )
+}
+
+fn reactions_app() -> axum::Router {
+    App::new("Test")
+        .i18n(I18n::new("en"))
+        .auth(|h: &HeaderMap| {
+            let perms: Vec<String> = h
+                .get("x-perms")?
+                .to_str()
+                .ok()?
+                .split(',')
+                .map(String::from)
+                .collect();
+            Some(Identity::user("u").with_permissions(perms))
+        })
+        .write_limit(zeyn::RateLimit::per_user(6, std::time::Duration::from_secs(60)))
+        .feature(Feature::new("answers").screen(answer))
+        .router()
+        .unwrap()
+}
+
+async fn press(
+    router: &axum::Router,
+    perms: &str,
+    csrf: bool,
+    input: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    let body =
+        serde_json::json!({ "screen": "answer", "params": { "id": 7 }, "node": "0.0", "key": "react", "input": input });
+    let mut req = Request::post("/_zeyn/data")
+        .header("x-perms", perms)
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::COOKIE, format!("zeyn_csrf={TOKEN}"));
+    if csrf {
+        req = req.header("x-zeyn-csrf", TOKEN);
+    }
+    let res = router
+        .clone()
+        .oneshot(
+            req.body(Body::from(body.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = res.status();
+    let bytes = res
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes();
+    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+}
+
+#[test]
+fn reactions_are_toggle_buttons_with_their_counts() {
+    let row = Reactions::of(react, "a")
+        .label("Say thanks")
+        .reaction("helpful", "Helpful", "+")
+        .reaction("thanks", "<Thanks>", "!")
+        .reaction("helpful", "Twice", "?")
+        .state(
+            ReactionState::default()
+                .count("helpful", 12)
+                .mine("helpful"),
+        );
+    let en = html(&row, "en");
+    assert!(
+        en.starts_with(r#"<div class="z-reactions" role="group" aria-label="Say thanks" data-zeyn-reactions"#),
+        "{en}"
+    );
+    assert!(
+        en.contains(r#"aria-pressed="true" data-reaction="helpful""#)
+            && en.contains(r#"aria-pressed="false" data-reaction="thanks""#)
+    );
+    assert!(
+        en.contains(r#"<span class="z-reaction-count">12</span>"#)
+            && en.contains(r#"<span class="z-reaction-count">0</span>"#)
+    );
+    assert!(en.contains(
+        r#"<span class="z-reaction-symbol" aria-hidden="true">+</span><span class="z-sr-only">Helpful</span>"#
+    ));
+    assert!(en.contains("&lt;Thanks&gt;") && !en.contains("Twice"), "names are escaped, keys are unique");
+    assert!(html(&Reactions::of(react, "a"), "tr").contains(r#"aria-label="Tepkiler""#));
+}
+
+#[tokio::test]
+async fn a_press_runs_the_action_with_the_screens_target_through_the_write_checks() {
+    let router = reactions_app();
+    let (status, state) =
+        press(&router, "items.react", true, serde_json::json!({ "reaction": "thanks", "pressed": true })).await;
+    assert_eq!(status, StatusCode::OK, "{state}");
+    assert_eq!(state["counts"]["answer-7:thanks"], 1, "the target comes from the screen: {state}");
+    assert_eq!(state["mine"], serde_json::json!(["thanks"]));
+
+    let forged = serde_json::json!({ "reaction": "thanks", "pressed": true, "target": "answer-1" });
+    let (_, state) = press(&router, "items.react", true, forged).await;
+    assert!(state["counts"]["answer-7:thanks"] == 1, "a target from the browser is ignored: {state}");
+
+    let (status, _) = press(&router, "items.react", true, serde_json::json!({ "reaction": "angry" })).await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "reactions outside the set never reach the action");
+    let (status, _) = press(&router, "", true, serde_json::json!({ "reaction": "thanks" })).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "the action's permission");
+    let (status, _) = press(&router, "items.react", false, serde_json::json!({ "reaction": "thanks" })).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "the CSRF check");
+
+    let mut last = StatusCode::OK;
+    for _ in 0..4 {
+        last = press(&router, "items.react", true, serde_json::json!({ "reaction": "helpful" }))
+            .await
+            .0;
+    }
+    assert_eq!(last, StatusCode::TOO_MANY_REQUESTS, "presses count against the write limit");
 }

@@ -624,3 +624,46 @@ span.z-avatar-tone-4 { background: var(--z-danger-subtle); }
   .z-hero-dot::before { border-color: ButtonText; background: Canvas; }
   .z-hero-dot[aria-current="true"]::before { background: Highlight; }
 }
+
+/* Reactions ---------------------------------------------------------------------------------- */
+
+.z-reactions { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+
+.z-reactions[aria-busy="true"] { cursor: progress; }
+
+.z-reaction {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--z-border);
+  border-radius: 999px;
+  background: var(--z-surface);
+  color: var(--z-text);
+  font-size: var(--z-font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.z-reaction:hover { border-color: var(--z-border-strong); }
+
+.z-reaction:focus-visible {
+  outline: 2px solid var(--z-focus);
+  outline-offset: 2px;
+}
+
+.z-reaction[aria-pressed="true"] {
+  border-color: var(--z-primary);
+  background: var(--z-brand-subtle);
+  color: var(--z-text);
+  box-shadow: inset 0 0 0 1px var(--z-primary);
+}
+
+.z-reaction-symbol { font-size: 1.1rem; line-height: 1; }
+
+.z-reaction-count { font-variant-numeric: tabular-nums; }
+
+@media (forced-colors: active) {
+  .z-reaction[aria-pressed="true"] { outline: 2px solid Highlight; }
+}

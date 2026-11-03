@@ -9,9 +9,10 @@ use axum::routing::get;
 use std::sync::Arc;
 
 /// The modules by path.
-const MODULES: [(&str, &str); 3] = [
+const MODULES: [(&str, &str); 4] = [
     ("/_zeyn/share.js", include_str!("../../assets/share.js")),
     ("/_zeyn/chips.js", include_str!("../../assets/chips.js")),
+    ("/_zeyn/reactions.js", include_str!("../../assets/reactions.js")),
     ("/_zeyn/hero.js", include_str!("../../assets/hero.js")),
 ];
 

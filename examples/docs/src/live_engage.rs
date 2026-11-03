@@ -82,3 +82,48 @@ pub fn hero() -> Node {
         .rotate(8)
         .into()
 }
+
+/// The reactions of the example and their counts, shared by every visitor and kept in memory.
+const REACTIONS: [(&str, &str, &str); 3] =
+    [("helpful", "Helpful", "\u{1f44d}"), ("thanks", "Thanks", "\u{1f64f}"), ("idea", "Good idea", "\u{1f4a1}")];
+
+static COUNTS: [std::sync::atomic::AtomicU64; 3] = [const { std::sync::atomic::AtomicU64::new(0) }; 3];
+
+/// The counts of the example now, with `mine` as the user's reactions.
+fn reaction_state(mine: Option<&str>) -> zeyn::ui::ReactionState {
+    let mut state = zeyn::ui::ReactionState::default();
+    for (i, (key, _, _)) in REACTIONS.iter().enumerate() {
+        state = state.count(*key, COUNTS[i].load(std::sync::atomic::Ordering::Relaxed));
+    }
+    match mine {
+        Some(m) => state.mine(m),
+        None => state,
+    }
+}
+
+/// Counts a press of the example. The docs keep no users, so "mine" is the reaction just pressed.
+#[action(public)]
+pub async fn react_to_docs(press: zeyn::ui::ReactionPress) -> Result<zeyn::ui::ReactionState> {
+    let i = REACTIONS
+        .iter()
+        .position(|(k, _, _)| *k == press.reaction)
+        .ok_or(Error::NotFound)?;
+    let count = &COUNTS[i];
+    let _ = count.fetch_update(std::sync::atomic::Ordering::Relaxed, std::sync::atomic::Ordering::Relaxed, |n| {
+        Some(if press.pressed { n.saturating_add(1) } else { n.saturating_sub(1) })
+    });
+    Ok(reaction_state(
+        press
+            .pressed
+            .then_some(press.reaction.as_str()),
+    ))
+}
+
+/// A row of three reactions.
+pub fn reactions() -> Node {
+    REACTIONS
+        .iter()
+        .fold(Reactions::of(react_to_docs, "docs-content"), |row, (key, name, symbol)| row.reaction(key, *name, symbol))
+        .state(reaction_state(None))
+        .into()
+}

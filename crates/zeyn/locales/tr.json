@@ -513,6 +513,10 @@
         "show": "Slayt {n} / {count} göster",
         "pause": "Slaytları durdur",
         "play": "Slaytları başlat"
+      },
+      "reactions": {
+        "label": "Tepkiler",
+        "failed": "Tepki kaydedilemedi."
       }
     },
     "date": {

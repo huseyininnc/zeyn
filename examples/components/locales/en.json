@@ -86,7 +86,8 @@
       "share": "Share a link, or copy it where sharing is missing.",
       "rating": "A whole number from 1 to N shown as stars.",
       "chips": "Link chips and filter chips over a screen param.",
-      "hero": "A large image section, with slides that move only when asked."
+      "hero": "A large image section, with slides that move only when asked.",
+      "reactions": "Reaction buttons with counts stored by an action."
     },
     "ex": {
       "action_button": {
@@ -226,6 +227,9 @@
       "rating": {
         "overview": "Example",
         "three_stars": "Three stars"
+      },
+      "reactions": {
+        "overview": "Example"
       },
       "relative_time": {
         "overview": "Example",
