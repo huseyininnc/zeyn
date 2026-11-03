@@ -7,7 +7,7 @@ proxy de inicio de sesión único o de un proveedor de identidad no la necesitan
 quienes conocen ASP.NET Core Identity, está en `docs/accounts.md`.
 
 ```toml
-zeyn = { version = "0.0.5", features = ["accounts"] }
+zeyn = { version = "0.0.6", features = ["accounts"] }
 ```
 
 ## Actívala

@@ -38,7 +38,7 @@ Bir liste action'ı `DataQuery` alır ve `Page<M>` döndürür:
 `DataQuery::apply(vec)` bunların hepsini bellekte yapar. Bir SQL veritabanı için `zeyn::sql` kullanın: `Db::find`, aynı sorguyu PostgreSQL ya da Oracle için `WHERE`, `ORDER BY`, `LIMIT` ve `GROUP BY` ifadelerine çevirir. Yalnızca entity'nin kendi alanları süzülebilir ya da sıralanabilir, her değer parametre olarak bağlanır ve sayfa boyutu sunucuda sınırlanır; böylece istemci girdisi SQL metnine hiç ulaşmaz. SQL'i yalnızca `Db::find`'ın ifade edemediği sorgular için elle yazın ve o zaman istemciden gelen hiçbir alan adını ya da değeri içine yapıştırmayın.
 
 ```toml
-zeyn = { version = "0.0.5", features = ["postgres"] }   # or ["oracle"]
+zeyn = { version = "0.0.6", features = ["postgres"] }   # or ["oracle"]
 ```
 
 ```rust

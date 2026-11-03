@@ -7,7 +7,7 @@
 Core Identity を知っている人向けの対応表を含む完全なリファレンスは `docs/accounts.md` にあります。
 
 ```toml
-zeyn = { version = "0.0.5", features = ["accounts"] }
+zeyn = { version = "0.0.6", features = ["accounts"] }
 ```
 
 ## 有効にする

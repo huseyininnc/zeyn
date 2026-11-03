@@ -6,7 +6,7 @@ detrás de la feature de Cargo `postgres` y Oracle detrás de `oracle`, de modo 
 no compila nada de esto.
 
 ```toml
-zeyn = { version = "0.0.5", features = ["postgres"] }   # or ["oracle"], or both
+zeyn = { version = "0.0.6", features = ["postgres"] }   # or ["oracle"], or both
 ```
 
 ## Configuración

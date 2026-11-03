@@ -3,7 +3,7 @@
 `zeyn::sql`은 entity를 SQL 데이터베이스에 보관합니다. 그리드가 보내는 `DataQuery`(필터, 정렬, 페이지, 합계, 그룹)로 목록을 만들고 행 버전 검사와 함께 저장합니다. PostgreSQL은 `postgres` Cargo 기능, Oracle은 `oracle` 기능 뒤에 있으므로 데이터베이스가 없는 앱은 이 중 아무것도 컴파일하지 않습니다.
 
 ```toml
-zeyn = { version = "0.0.5", features = ["postgres"] }   # or ["oracle"], or both
+zeyn = { version = "0.0.6", features = ["postgres"] }   # or ["oracle"], or both
 ```
 
 ## 설정

@@ -38,7 +38,7 @@ impl ProductStore {
 `DataQuery::apply(vec)` 在内存中完成全部处理。对于 SQL 数据库，请使用 `zeyn::sql`：`Db::find` 会把同样的查询转换成适用于 PostgreSQL 或 Oracle 的 `WHERE`、`ORDER BY`、`LIMIT` 和 `GROUP BY`。只有实体自己的字段可以被过滤或排序，每个值都作为参数绑定，页面大小由服务器限定上限，因此客户端输入永远不会进入 SQL 文本。只有在 `Db::find` 无法表达的查询中才手写 SQL，而且绝不要把来自客户端的字段名或值粘贴进去。
 
 ```toml
-zeyn = { version = "0.0.5", features = ["postgres"] }   # or ["oracle"]
+zeyn = { version = "0.0.6", features = ["postgres"] }   # or ["oracle"]
 ```
 
 ```rust

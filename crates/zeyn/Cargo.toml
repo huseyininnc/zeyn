@@ -56,8 +56,8 @@ lang-ar = []
 lang-all = ["lang-zh", "lang-ru", "lang-es", "lang-ko", "lang-ja", "lang-hi", "lang-ar"]
 
 [dependencies]
-zeyn-macros = { path = "../zeyn-macros", version = "0.0.5" }
-zeyn-island = { path = "../zeyn-island", version = "0.0.5", optional = true }
+zeyn-macros = { path = "../zeyn-macros", version = "0.0.6" }
+zeyn-island = { path = "../zeyn-island", version = "0.0.6", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 jiff = { version = "0.2", default-features = false, features = ["std", "tzdb-bundle-always"] }

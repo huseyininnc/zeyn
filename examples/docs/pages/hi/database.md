@@ -38,7 +38,7 @@ impl ProductStore {
 `DataQuery::apply(vec)` यह सब मेमोरी में करता है। SQL डेटाबेस के लिए `zeyn::sql` इस्तेमाल करें: `Db::find` उसी क्वेरी को PostgreSQL या Oracle के लिए `WHERE`, `ORDER BY`, `LIMIT` और `GROUP BY` में बदल देता है। केवल entity के अपने फ़ील्ड फ़िल्टर या क्रमबद्ध किए जा सकते हैं, हर मान पैरामीटर के रूप में बाँधा जाता है, और पृष्ठ का आकार सर्वर सीमित रखता है, इसलिए क्लाइंट इनपुट कभी SQL टेक्स्ट तक नहीं पहुँचता। SQL हाथ से केवल उन क्वेरी के लिए लिखें जिन्हें `Db::find` व्यक्त नहीं कर सकता, और तब भी क्लाइंट से आया कोई फ़ील्ड नाम या मान उसमें कभी न चिपकाएँ।
 
 ```toml
-zeyn = { version = "0.0.5", features = ["postgres"] }   # or ["oracle"]
+zeyn = { version = "0.0.6", features = ["postgres"] }   # or ["oracle"]
 ```
 
 ```rust

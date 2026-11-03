@@ -6,7 +6,7 @@ PostgreSQL `postgres` Cargo feature'ının, Oracle ise `oracle` feature'ının a
 veritabanı olmayan bir uygulama bunların hiçbirini derlemez.
 
 ```toml
-zeyn = { version = "0.0.5", features = ["postgres"] }   # or ["oracle"], or both
+zeyn = { version = "0.0.6", features = ["postgres"] }   # or ["oracle"], or both
 ```
 
 ## Kurulum

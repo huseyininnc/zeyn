@@ -38,7 +38,7 @@ impl ProductStore {
 `DataQuery::apply(vec)` は、そのすべてをメモリ上で行います。SQL データベースには `zeyn::sql` を使います。`Db::find` は、同じクエリを PostgreSQL または Oracle 向けの `WHERE`、`ORDER BY`、`LIMIT`、`GROUP BY` に変換します。フィルターや並べ替えができるのはエンティティ自身のフィールドだけで、すべての値はパラメータとしてバインドされ、ページサイズにはサーバーが上限を設けるため、クライアントの入力が SQL の文字列に届くことはありません。`Db::find` では表現できないクエリに限って SQL を手で書き、その場合もクライアントからのフィールド名や値を貼り付けてはいけません。
 
 ```toml
-zeyn = { version = "0.0.5", features = ["postgres"] }   # or ["oracle"]
+zeyn = { version = "0.0.6", features = ["postgres"] }   # or ["oracle"]
 ```
 
 ```rust
