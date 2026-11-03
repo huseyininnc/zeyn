@@ -70,4 +70,5 @@ These docs are written in English, and the English pages below are the source. E
 
 - [API reference on docs.rs](https://docs.rs/zeyn)
 - [Live demo of every component](https://framework.zeynsoft.com/)
+- [Component catalog with code to copy](https://components.zeynsoft.com/)
 - [Runtime protocol](https://docs.zeynsoft.com/reference/runtime-protocol)

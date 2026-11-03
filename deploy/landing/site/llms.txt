@@ -23,6 +23,7 @@ Then read `my-app/AGENTS.md` and `my-app/.claude/skills/zeyn/SKILL.md`, and run 
 
 - [Documentation](https://docs.zeynsoft.com/): introduction, project structure, CLI, the language (entities, actions, screens, forms, DataGrid), components and guides
 - [Live demo](https://framework.zeynsoft.com/): every component and feature in one running app
+- [Component catalog](https://components.zeynsoft.com/): every component running live, with its code to copy and its API
 
 ## Languages
 

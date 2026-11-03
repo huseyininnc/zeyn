@@ -507,5 +507,16 @@ h1 {
 .top-in .brand { margin-inline-end: auto; }
 .top nav:has(+ .langs) { margin-right: 0; }
 @media (max-width: 640px) {
-  .langs ul { position: static; margin-top: 4px; box-shadow: none; }
+  .top { padding: 12px 0; }
+  .top-in { gap: 4px 8px; }
+  .top .langs { order: 2; }
+  .top nav:not(.langs) {
+    order: 3;
+    flex-basis: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin-inline: -12px;
+    scrollbar-width: none;
+  }
+  .top nav:not(.langs) a { white-space: nowrap; }
 }
