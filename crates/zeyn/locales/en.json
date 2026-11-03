@@ -451,7 +451,7 @@
         "down": "Down {pct}% from the previous period",
         "flat": "No change from the previous period",
         "target": "Target {target}, {pct}% reached"
-},
+      },
       "password": {
         "show": "Show password",
         "weak": "Strength: weak",
@@ -474,6 +474,29 @@
       },
       "toast": {
         "dismiss": "Dismiss"
+      },
+      "prevnext": {
+        "label": "Previous and next",
+        "previous": "Previous",
+        "next": "Next"
+      },
+      "alpha": {
+        "label": "Browse by letter",
+        "other": "Other characters"
+      },
+      "week": {
+        "label": "Week",
+        "today": "Today",
+        "empty": "Nothing planned",
+        "days": {
+          "1": "Monday",
+          "2": "Tuesday",
+          "3": "Wednesday",
+          "4": "Thursday",
+          "5": "Friday",
+          "6": "Saturday",
+          "7": "Sunday"
+        }
       }
     },
     "date": {

@@ -212,7 +212,12 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; }
   padding: 0 calc(var(--z-space) * 2) calc(var(--z-space) * 3);
   background: var(--z-surface);
   border-right: 1px solid var(--z-border);
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
 }
+
+.z-nav:hover,
+.z-nav:focus-within { scrollbar-color: var(--z-border) transparent; }
 
 .z-nav ul {
   list-style: none;
@@ -284,37 +289,103 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; }
 
 .z-main:focus { outline: none; }
 
+/**
+ * The menu button of the app shell. On wide screens the bar and the body of the menu are
+ * transparent to layout, so the side menu looks the same with or without them.
+ */
+.z-nav-bar,
+.z-nav-body { display: contents; }
+
+.z-nav-toggle {
+  display: none;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--z-radius);
+  background: transparent;
+  color: var(--z-on-brand);
+  cursor: pointer;
+}
+
+.z-nav-toggle:hover { background: color-mix(in srgb, var(--z-on-brand) 16%, transparent); }
+
+.z-nav-toggle:focus-visible {
+  outline: 2px solid var(--z-on-brand);
+  outline-offset: -4px;
+}
+
+.z-nav-burger,
+.z-nav-burger::before,
+.z-nav-burger::after {
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: currentColor;
+  border-radius: 1px;
+}
+
+.z-nav-burger { position: relative; }
+
+.z-nav-burger::before,
+.z-nav-burger::after {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+}
+
+.z-nav-burger::before { top: -6px; }
+.z-nav-burger::after { top: 6px; }
+
+.z-nav-toggle[aria-expanded="true"] .z-nav-burger { background: transparent; }
+.z-nav-toggle[aria-expanded="true"] .z-nav-burger::before { top: 0; transform: rotate(45deg); }
+.z-nav-toggle[aria-expanded="true"] .z-nav-burger::after { top: 0; transform: rotate(-45deg); }
+
 @media (max-width: 800px) {
-  .z-app { grid-template-columns: minmax(0, 1fr); }
+  .z-app {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+  }
   .z-nav {
-    position: static;
+    z-index: 30;
     height: auto;
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 4px 12px;
-    padding: 0 12px 8px;
+    max-height: 100dvh;
+    padding: 0;
     border-right: 0;
     border-bottom: 1px solid var(--z-border);
   }
-  .z-app-name {
-    flex-basis: calc(100% + 24px);
-    min-height: 44px;
-    margin: 0 -12px 4px;
-    padding: 0 16px;
-  }
-  .z-nav-group {
+  .z-nav-bar {
     display: flex;
     align-items: center;
-    gap: 4px;
-    padding-top: 0;
+    gap: 8px;
+    padding-inline-end: 6px;
+    background: var(--z-brand);
   }
-  .z-nav-group ul { display: flex; gap: 2px; }
-  .z-nav h2 { padding: 0 4px; margin: 0; }
-  .z-nav a { padding: 0 10px; }
-  .z-nav li + li { margin-top: 0; }
-  .z-locale { margin: 0; padding: 0; flex-direction: row; align-items: center; }
+  .z-app-name {
+    flex: 1;
+    min-width: 0;
+    min-height: 52px;
+    margin: 0;
+    padding: 0 16px;
+  }
+  .z-nav-toggle:not([hidden]) { display: inline-flex; }
+  .z-nav-body {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 8px 12px 16px;
+  }
+  .z-nav[data-zeyn-collapsible] .z-nav-body:not([data-open]) { display: none; }
   .z-main { padding: 16px; }
+}
+
+@media (max-width: 800px) and (prefers-reduced-motion: no-preference) {
+  .z-nav-burger,
+  .z-nav-burger::before,
+  .z-nav-burger::after { transition: transform 0.15s ease, top 0.15s ease, background 0.15s ease; }
 }
 
 
@@ -577,7 +648,8 @@ dialog.z-dialog::backdrop { background: var(--z-backdrop); }
 
 .z-grid th[style*="--z-flex"] { width: calc(var(--z-flex) * 20%); }
 
-.z-grid th:has(.z-sort) { padding: 0 2px; }
+.z-grid th:has(.z-sort),
+.z-grid th:has(.z-th-label) { padding: 0 2px; }
 
 .z-sort {
   display: flex;
@@ -735,6 +807,18 @@ th[aria-sort="descending"] .z-sort::after {
 }
 
 .z-th .z-sort { flex: 1 1 auto; min-width: 0; }
+
+.z-th-label {
+  display: flex;
+  flex: 1 1 auto;
+  width: 100%;
+  align-items: center;
+  min-width: 0;
+  min-height: max(24px, calc(var(--z-row) - 4px));
+  padding: 0 calc(var(--z-space) * 3 - 2px);
+}
+
+.z-grid th.z-num .z-th-label { justify-content: flex-end; }
 
 :where(.z-grid th) { position: relative; }
 
@@ -1423,6 +1507,7 @@ th[aria-sort="descending"] .z-sort::after {
 .z-field select,
 .z-field textarea,
 select[data-zeyn-locale],
+select[data-zeyn-locale-path],
 select[data-zeyn-timezone],
 select[data-zeyn-theme-picker] {
   width: 100%;
@@ -1542,6 +1627,7 @@ select[data-zeyn-theme-picker] {
 .z-locale + .z-locale { margin-top: 0; }
 
 select[data-zeyn-locale],
+select[data-zeyn-locale-path],
 select[data-zeyn-timezone],
 select[data-zeyn-theme-picker] {
   min-height: max(24px, calc(var(--z-control) - 4px));
@@ -1822,6 +1908,16 @@ select[data-zeyn-theme-picker] {
   font-size: var(--z-font-size-xs);
   font-weight: 600;
   color: var(--z-text-muted);
+}
+
+.z-doc-note {
+  margin: 0 0 calc(var(--z-space) * 4);
+  padding: calc(var(--z-space) * 2) calc(var(--z-space) * 3);
+  font-size: var(--z-font-size-sm);
+  color: var(--z-text-muted);
+  background: var(--z-surface-2);
+  border-inline-start: 3px solid var(--z-info);
+  border-radius: var(--z-radius);
 }
 
 .z-doc-toc {

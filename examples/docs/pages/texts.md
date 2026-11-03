@@ -51,6 +51,16 @@ App::new(t!("app.name")).i18n(i18n)
 
 The first argument of `I18n::new` is the default language. With more than one catalog the shell shows a language picker. The framework's own texts (grid, forms, shell) ship in English and Turkish.
 
+## Framework texts in more languages
+
+The framework's own texts also exist in Chinese, Russian, Spanish, Korean, Japanese, Hindi and Arabic. Each language is a Cargo feature, so an app pays only for the ones it turns on (each adds 35 to 60 KB of text to the binary):
+
+```toml
+zeyn = { version = "0.0", features = ["lang-ru", "lang-ar"] }
+```
+
+`lang-all` turns on every language. The app still offers a language only when it registers its own catalog for it, as above. Without the feature the framework texts fall back to the default language.
+
 ## Texts outside screens
 
 - `ctx.t(&text)` turns a `Text` into a `String` in the user's language, such as for an email.

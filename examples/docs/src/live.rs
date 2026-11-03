@@ -355,6 +355,55 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
             )
             .add(StatusBar::new("Status").left("Ready").right("UTF-8"))
             .into(),
+        "content" => Stack::new()
+            .gap(2)
+            .add(Heading::h3("Brewing green tea"))
+            .add(MetaLine::new().part("12 May 2026").part("5 min read").part("Guides"))
+            .add(Paragraph::new("Water just off the boil and two minutes of steeping keep the taste soft."))
+            .add(Paragraph::new("Times are a starting point.").muted().small())
+            .add(
+                PrevNext::new()
+                    .prev(crate::introduction, ())
+                    .prev_title("Introduction")
+                    .next(crate::cli, ())
+                    .next_title("CLI and projects"),
+            )
+            .into(),
+        "autogrid" => ["Orders", "Stock", "People", "Invoices", "Reports"]
+            .into_iter()
+            .fold(AutoGrid::new().min(160), |tiles, title| tiles.add(Card::new().title(title)))
+            .into(),
+        "list" => List::of(search_samples)
+            .title("Products")
+            .item(|p: &Sample| {
+                zeyn::ui::ListItem::new(p.name.clone())
+                    .subtitle(p.code.clone())
+                    .meta(format!("{} in stock", p.stock))
+                    .link(crate::introduction, ())
+            })
+            .sort_option("Name", Sample::name, false)
+            .paging(Paging::infinite(5))
+            .into(),
+        "people" => Stack::new()
+            .gap(3)
+            .add(
+                Row::new()
+                    .compact()
+                    .col(zeyn::ui::Avatar::new("Ada Lovelace").size(zeyn::ui::AvatarSize::Large))
+                    .col(zeyn::ui::Avatar::new("Alan Turing"))
+                    .col(zeyn::ui::Avatar::new("Grace Hopper").size(zeyn::ui::AvatarSize::Small)),
+            )
+            .add(
+                zeyn::ui::Spoiler::new("Show the answer")
+                    .add(Paragraph::new("Water at about 80 degrees and two minutes of steeping.")),
+            )
+            .into(),
+        "week" => WeekSchedule::of(search_samples)
+            .title("Deliveries")
+            .day(|p: &Sample| (p.id.0 % 7 + 1) as u8)
+            .item(|p: &Sample| zeyn::ui::ListItem::new(p.name.clone()).meta(p.code.clone()))
+            .limit(12)
+            .into(),
         "inputs" => inputs(),
         "overlay" => overlay(),
         "menus" => menus(),
@@ -539,5 +588,5 @@ fn toasts() -> Node {
 /// Names of every live example, for checks and tests.
 pub const EXAMPLES: &[&str] = &[
     "datagrid", "form", "controls", "dates", "lines", "layout", "display", "action", "tree", "chart", "shell",
-    "inputs", "multi", "overlay", "menus", "toasts",
+    "inputs", "multi", "overlay", "menus", "toasts", "content", "autogrid", "list", "people", "week",
 ];

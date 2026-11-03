@@ -4,8 +4,10 @@
 //! index of each child below it (`"1.0.2"`). The renderer writes the path in `data-zeyn-node` and
 //! the endpoints accept it, so grids and forms inside containers keep working.
 
+mod alpha;
 mod catalog;
 mod chart;
+mod content;
 mod controls;
 mod date;
 mod dock;
@@ -15,6 +17,7 @@ pub(crate) mod inputs;
 mod island;
 mod layout;
 mod lines;
+mod list;
 mod lookup;
 #[cfg(feature = "markdown")]
 mod markdown;
@@ -23,6 +26,7 @@ mod menus;
 mod overlay;
 mod shell;
 mod tree;
+mod week;
 mod widgets;
 #[cfg(feature = "islands")]
 pub(crate) use island::MARKER as ISLAND_MARKER;
@@ -45,6 +49,8 @@ pub use shell::{MenuBar, MenuList, PropertyInspector, StatusBar, Toolbox};
 pub use catalog::PosterCard;
 pub use catalog::{CardGrid, ImageCard, MAX_SUGGESTIONS, Rail, SearchBox, SearchParams};
 pub use chart::{Better, BulletCell, Chart, ChartKind, Kpi, SparklineCell};
+pub use alpha::{AlphaIndex, OTHER_LETTER, alphabet};
+pub use content::{AutoGrid, Avatar, AvatarSize, Heading, MetaLine, Paragraph, PrevNext, Spoiler};
 pub use controls::Control;
 pub(crate) use controls::{
     Slot, choices_text, read_choices, render_bool, render_choice, render_choices, render_number, render_text,
@@ -54,6 +60,7 @@ pub(crate) use date::{input_text, picker_config, range_reversed, render_date_inp
 pub use inputs::{mask_example, mask_fits, mask_raw};
 pub(crate) use lines::LinesEditor;
 pub use lines::{Lines, MAX_LINES};
+pub use list::{List, ListItem};
 pub use lookup::{LookupItem, LookupQuery, LookupValue, MAX_LOOKUP_COLUMNS, MAX_LOOKUP_IDS, MAX_LOOKUP_PAGE};
 pub(crate) use lookup::{parse_ids, render_lookup};
 pub use media::{Audio, PLAYBACK_SPEEDS, Video};
@@ -61,6 +68,7 @@ pub use menus::MenuButton;
 pub(crate) use overlay::tip;
 pub use overlay::{BUSY_DELAY_MS, Busy, MAX_TIP, Popover};
 pub use tree::{MAX_TREE_CHILDREN, Tree, TreeItem, TreeQuery};
+pub use week::{MAX_WEEK_ROWS, WeekDay, WeekSchedule};
 pub use widgets::{
     ActionButton, Alert, Badge, Breadcrumb, DescriptionList, DescriptionOf, EmptyState, Progress, Skeleton, Timeline,
 };

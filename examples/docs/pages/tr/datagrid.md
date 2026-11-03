@@ -1,0 +1,76 @@
+# DataGrid
+
+`DataGrid`, `DataQuery` alan ve `Page<E>` döndüren bir action'dan satırları gösterir. Sayfalama, sıralama, filtreler ve toplamlar sunucuda çalışır; dolayısıyla milyon satırlık bir grid, tarayıcıya yüz satırlık bir grid ile aynı maliyeti yükler.
+
+## Bir grid
+
+```rust
+DataGrid::of(search_samples)
+    .paging(Paging::pages(8))
+    .column(Sample::code).width(110).filter()
+    .column(Sample::name).flex(1).filter()
+    .column(Sample::unit).width(120).filter().badge(|u| match u {
+        Unit::Piece => Tone::Neutral,
+        Unit::Kg => Tone::Info,
+        Unit::Liter => Tone::Brand,
+    })
+    .column(Sample::price).width(150).avg()
+    .column(Sample::stock).width(150).sum().progress(120)
+    .column(Sample::active).width(100).check_icon()
+    .row_style(|s| match s.stock {
+        0 => Some(RowStyle::Danger),
+        1..=9 => Some(RowStyle::Warning),
+        _ => None,
+    })
+```
+
+@live datagrid
+
+Bir başlığa tıklayarak sıralayın, filtre kutusuna yazın, bir sütunu taşımak için başlığını, yeniden boyutlandırmak için kenarını sürükleyin. Toplamlar yalnızca sayfayı değil, filtrelenmiş her satırı kapsar.
+
+## Action
+
+```rust
+#[action(permission = "stock.product.read")]
+pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sample>> {
+    Ok(q.apply(store.all()?))
+}
+```
+
+`DataQuery::apply`, bellekteki bir `Vec` üzerinde filtreler, sıralar, toplar ve sayfalar; bu küçük listeler ve testler için uygundur. Veritabanı destekli bir store aynı `DataQuery` değerini (sayfa, sıralama, filtreler, toplamlar) okur ve SQL ile yanıt verir; bkz. [Veri ve veritabanları](database.md).
+
+## Sayfalama
+
+| Sayfalama | Kullanım |
+|---|---|
+| `Paging::pages(n)` | Numaralı sayfalar, ayarlanmazsa 50 satır |
+| `Paging::infinite(n)` | Kaydırırken daha fazla satır yükler |
+| `Paging::virtual_scroll()` | Çok büyük listeler; sayfada yalnızca görünen satırlar bulunur |
+| `Paging::none()` | Tek sayfaya sığan kısa listeler |
+
+İstemci ne isterse istesin, sunucu sayfa boyutunu sınırlar.
+
+## Sütunlar
+
+| Çağrı | Sonuç |
+|---|---|
+| `.width(px)`, `.flex(n)` | Sabit genişlik veya boş genişlikten bir pay |
+| `.filter()` | Türe uyan bir filtre kutusu: metin, sayı aralığı, tarih aralığı, seçim listesi |
+| `.sum()`, `.avg()`, `.min()`, `.max()` | Alt bilgide toplamlar. Metin sütununda `sum` derlenmez |
+| `.badge(\|v\| tone)` | Değeri renkli bir rozet olarak gösterir |
+| `.progress(max)` | 0'dan `max`'a bir çubuk |
+| `.check_icon()` | `true` için bir onay işareti |
+| `.link(\|row\| effect)` | Hücreyi, bir effect çalıştıran bağlantı yapar |
+| `.pin_start()`, `.hidden()` | Başa sabitlenir ya da kullanıcı gösterene kadar gizlenir |
+| `.editable()` | Yerinde düzenlenebilir, `.edit_with(action)` ile kaydedilir |
+
+## Satırlar
+
+- `.on_open(|row| effect)`: bir satırda çift tıklama veya Enter.
+- `.row_action(label, action, |row| input)`: her satırda bir düğme.
+- `.bulk_action(label, action, M::id)`: seçili satırlarda çalışır.
+- `.row_menu(|row| ContextMenu)`: bir satırın sağ tık menüsü.
+- `.row_style(|row| Option<RowStyle>)`: danger, warning veya success satırlar.
+- `.exportable()`: filtrelenmiş satırların CSV dışa aktarımı, sunucu tarafından akıtılır.
+
+[DataGrid başvurusu](grid.md) kayıtlı görünümleri, master detail, gruplamayı, ağaç verisini, satır içi düzenlemeyi, hücre gezinmesini, kopyala yapıştırı, sütun sanallaştırmayı ve erişilebilirliği kapsar.

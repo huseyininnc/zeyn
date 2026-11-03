@@ -1,0 +1,90 @@
+# CLI 与项目
+
+`zeyn` 命令用于创建项目、添加 feature、检查应用，并为智能体运行 MCP 服务器。
+
+## 命令
+
+| 命令 | 作用 |
+|---|---|
+| `zeyn new <name>` | 创建带有标准 feature 结构的应用 |
+| `zeyn new <name> --lib` | 创建由多个应用共享的 model、feature 和文本库 |
+| `zeyn g feature <name>` | 添加 `src/features/<name>`，包含 model、store、action 和 screen |
+| `zeyn routes` | 列出 feature、screen、路由、API 和访问权限 |
+| `zeyn check` | 编译并报告结构问题和缺失的翻译 |
+| `zeyn check --fix` | 改写 `src`、`tests` 和 `examples` 中已重命名的 Zeyn API，然后检查 |
+| `zeyn mcp` | 在 stdio 上为 AI 智能体运行 MCP 服务器 |
+
+从 crates.io 安装：
+
+```sh
+cargo install zeyn-cli
+zeyn new my-app
+cd my-app
+cargo run
+```
+
+在本仓库内，通过 Cargo 运行 CLI：
+
+```sh
+cargo run -p zeyn-cli -- new my-app
+cd my-app
+cargo run
+```
+
+## 新应用
+
+`zeyn new` 会写出一个能够构建、通过测试并遵循智能体所获规则的项目：
+
+- `AGENTS.md` 和 `CLAUDE.md`：项目规则和给智能体的框架索引。
+- `.mcp.json`：注册 `zeyn` MCP 服务器，使智能体可以调用 `zeyn_check` 和 `zeyn_docs`。
+- `config/app.json`：默认值。环境变量 `APP_*` 会覆盖它们，例如用 `APP_SERVER__ADDR` 覆盖 `server.addr`。
+- `locales/en.json` 和 `locales/tr.json`：用户看到的每一段文本。
+- `src/features/`：每个 feature 一个文件夹，带有一个示例 `notes` feature。
+- `rustfmt.toml`、`clippy.toml`、`deny.toml`、`rust-toolchain.toml` 以及 `Cargo.toml` 中的 `[lints]`：由 CI 强制执行的标准。
+  `rustfmt.toml` 设置了 `chain_width = 40`，因此代码自上而下阅读：超过该宽度的调用链
+  每行放一个调用，平均每行一到两个点。智能体和人审阅列表比审阅一长行更快，
+  而且 diff 会显示改动的那一个调用。请保留这项设置。
+
+  ```rust
+  DataGrid::of(search_items)
+      .paging(Paging::pages(25))
+      .column(Item::code)
+      .column(Item::qty)
+  ```
+
+  而不是 `DataGrid::of(search_items).paging(Paging::pages(25)).column(Item::code).column(Item::qty)`。
+- `Dockerfile` 和 `.dockerignore`：体积小的容器镜像。
+- 适用于常见 CI 服务器的流水线，全部运行相同的检查（`cargo fmt --check`、`cargo clippy -D warnings`、`cargo test`、`cargo deny check`），并拒绝与 `Cargo.toml` 不匹配的标签 `vX.Y.Z`：
+  - 用于 GitHub Actions 的 `.github/workflows/ci.yml`，以及 `.github/dependabot.yml`（每周的 Cargo 和 action 更新）和拉取请求检查清单；
+  - 用于 GitLab 的 `.gitlab-ci.yml`；
+  - 用于 Jenkins 的 `Jenkinsfile`（Docker agent，用 `cargo llvm-cov` 统计覆盖率）。
+- `sonar-project.properties`：SonarQube 分析（Clippy 问题以及来自 `target/lcov.info` 的 LCOV 覆盖率）。当设置了仓库变量 `SONAR_HOST_URL` 和密钥 `SONAR_TOKEN` 时，GitHub 工作流会运行它；当作业设置 `SONAR_ENABLED=true` 时，Jenkins 会运行它。
+- `SECURITY.md` 和 `CHANGELOG.md`（Keep a Changelog 格式）。
+- 当安装了 git（Windows、macOS 或 Linux）且该文件夹尚不在某个仓库内时，会创建一个位于 `main` 分支的本地 git 仓库。不会提交任何内容，因此第一次提交会带上你自己的姓名和邮箱。`--no-git` 会跳过这一步。
+
+各个文件夹的说明参见[项目结构](structure.md)。
+
+## 检查应用
+
+`zeyn check` 先运行编译器，再运行应用自己的检查（`App::check`）：重复的路由、被注册两次的 screen、screen 需要但没人注册的服务、无法使用的快捷键、低于 WCAG AA 对比度的主题令牌，以及某种语言中缺失的翻译键。出现任何问题时它都会以错误退出，因此 CI 可以运行它。
+
+当 Zeyn 版本重命名某个 API 时，旧名称会作为已弃用的别名保留一个版本。`zeyn check --fix` 会改写旧名称，例如把 `Grid` 改为 `DataGrid`，把 `GridQuery` 改为 `DataQuery`，然后再次检查。
+
+```sh
+zeyn check --fix
+```
+
+## Docker
+
+生成的 `Dockerfile` 分两个阶段构建，并在 distroless 镜像上以没有 root 权限的用户运行。二进制文件用 `<app> health` 检查自身的健康状况，`HEALTHCHECK` 使用它。
+
+```sh
+docker build -t my-app .
+docker run -p 3000:3000 -e APP_SERVER__ADDR=0.0.0.0:3000 my-app
+```
+
+生成的应用的镜像约为 43 MB，空闲的应用只占用几 MB 内存。
+
+## MCP 服务器
+
+`zeyn mcp` 通过 stdio 使用 MCP 协议。它的工具有 `zeyn_docs`（按主题提供框架参考）、`zeyn_describe`（当前目录中应用的 feature、screen、路由和问题）、`zeyn_check`（带 `fix: true` 时运行 `check --fix`）、`zeyn_test` 和 `zeyn_new_feature`。参见 [MCP 与 AI 智能体](mcp.md)。

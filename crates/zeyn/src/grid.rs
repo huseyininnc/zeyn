@@ -391,6 +391,7 @@ struct Column<E> {
     width: Option<u32>,
     flex: Option<u32>,
     filter: bool,
+    sort: bool,
     aggregates: Vec<Aggregate>,
     pin: Option<Pin>,
     hidden: bool,
@@ -772,6 +773,7 @@ impl<E: Model> DataGrid<E> {
                 width: None,
                 flex: None,
                 filter,
+                sort: true,
                 aggregates: Vec::new(),
                 pin: None,
                 hidden: false,
@@ -801,6 +803,7 @@ impl<E: Model> DataGrid<E> {
             width: None,
             flex: None,
             filter: false,
+            sort: true,
             aggregates: Vec::new(),
             pin: None,
             hidden: false,
@@ -977,13 +980,13 @@ impl<E: Model> DataGrid<E> {
         let allowed = self.aggregate_requests();
         query.aggregates.retain(|a| allowed.contains(a));
         query.aggregates.dedup();
-        let shown = |name: &str| self.columns.iter().any(|c| c.meta.name == name);
+        let sortable = |name: &str| self.columns.iter().any(|c| c.sort && c.meta.name == name);
         let filterable = |name: &str| self.columns.iter().any(|c| c.filter && c.meta.name == name);
         query.filters.retain(|f| filterable(&f.field) && !f.is_empty());
         query.filters.truncate(MAX_FILTERS);
         let mut seen = Vec::new();
         query.sort.retain(|s| {
-            shown(&s.field) && !seen.contains(&s.field) && {
+            sortable(&s.field) && !seen.contains(&s.field) && {
                 seen.push(s.field.clone());
                 true
             }
@@ -1017,8 +1020,9 @@ impl<E: Model> DataGrid<E> {
             }
             let num = matches!(c.meta.kind, FieldKind::Integer | FieldKind::Money | FieldKind::Decimal);
             let class = if num { r#" class="z-num""# } else { "" };
+            let sort = if c.sort { r#" aria-sort="none""# } else { r#" data-sort="off""# };
             out.push_str(&format!(
-                r#"<th scope="col"{class} data-field="{}" aria-sort="none" aria-colindex="{}""#,
+                r#"<th scope="col"{class} data-field="{}"{sort} aria-colindex="{}""#,
                 c.meta.name,
                 pos + 1 + self.lead(r)
             ));

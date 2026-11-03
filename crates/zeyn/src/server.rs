@@ -36,6 +36,7 @@ mod data;
 mod files;
 mod grid;
 mod guard;
+mod locale;
 mod media;
 mod ops;
 mod seo;
@@ -690,6 +691,7 @@ pub struct App {
     setup_problems: Vec<String>,
     views: Option<Arc<dyn crate::grid::DataGridViewStore>>,
     native_menu: bool,
+    locale_paths: bool,
     palette_keys: String,
     extras: ops::Extras,
     sign_in: auth::Extras,
@@ -742,6 +744,7 @@ impl App {
             setup_problems: Vec::new(),
             views: None,
             native_menu: true,
+            locale_paths: false,
             palette_keys: crate::command::PALETTE_SHORTCUT.into(),
             extras: ops::Extras::default(),
             sign_in: auth::Extras::default(),
@@ -782,6 +785,21 @@ impl App {
     /// for it; Zeyn's own menus work either way.
     pub fn browser_context_menu(mut self, allow: bool) -> Self {
         self.native_menu = allow;
+        self
+    }
+
+    /// Puts the language in the URL: the default language stays at `/orders`, every other
+    /// offered language is served at `/tr/orders`, `/ar/orders`. The path alone decides the
+    /// language (not the cookie or `Accept-Language`), so search engines and shared links get the
+    /// same page; menu links keep the language and the picker opens the same page in another
+    /// language without a page load. Screens keep one route each and read the language from
+    /// `ctx.locale()`. See `examples/docs/pages/time-and-languages.md`.
+    ///
+    /// ```
+    /// let app = zeyn::App::new("Shop").locale_paths();
+    /// ```
+    pub fn locale_paths(mut self) -> Self {
+        self.locale_paths = true;
         self
     }
 
@@ -1372,6 +1390,7 @@ impl App {
             look,
             views: self.views,
             native_menu: self.native_menu,
+            locale_paths: self.locale_paths,
             palette_keys: crate::command::normalize_shortcut(&self.palette_keys)
                 .unwrap_or_else(|| crate::command::PALETTE_SHORTCUT.into()),
             extras: self.extras,
@@ -1498,7 +1517,14 @@ impl App {
             .layer(axum::middleware::map_response_with_state(state.clone(), guard::security_headers))
             .layer(axum::middleware::map_response(ops::stamp))
             .layer(axum::middleware::from_fn(guard::trace_request))
-            .with_state(state);
+            .with_state(state.clone());
+        let router = if state.locale_paths {
+            Router::new()
+                .fallback_service(router)
+                .layer(axum::middleware::from_fn_with_state(state, locale::layer))
+        } else {
+            router
+        };
         let router = if mount.is_empty() { router } else { Router::new().nest(&mount, router) };
         if cors.is_empty() {
             return Ok(router);
@@ -1601,6 +1627,7 @@ struct AppState {
     look: theme::Look,
     views: Option<Arc<dyn crate::grid::DataGridViewStore>>,
     native_menu: bool,
+    locale_paths: bool,
     palette_keys: String,
     extras: ops::Extras,
     sign_in: auth::Extras,
@@ -1816,7 +1843,16 @@ impl AppState {
         let mut identity = self.auth.as_ref().and_then(|a| a.authenticate(headers)).unwrap_or_default();
         auth::adjust(self, headers, &mut identity);
         let accept = headers.get(header::ACCEPT_LANGUAGE).and_then(|v| v.to_str().ok());
-        let locale = self.i18n.negotiate(cookie(headers, "zeyn_locale"), accept);
+        let locale = if self.locale_paths {
+            headers
+                .get(locale::HEADER)
+                .and_then(|v| v.to_str().ok())
+                .filter(|l| self.i18n.locales().iter().any(|o| o.as_str() == *l))
+                .unwrap_or(self.i18n.default_locale())
+                .to_string()
+        } else {
+            self.i18n.negotiate(cookie(headers, "zeyn_locale"), accept)
+        };
         let tz = match self.time {
             TimePolicy::Organization(zone) => zone,
             TimePolicy::User { default } => identity
@@ -2210,7 +2246,7 @@ impl AppState {
                         let aria = if current == Some(item.screen) { r#" aria-current="page""# } else { "" };
                         Some(format!(
                             r#"<li><a href="{}"{aria}>{}</a></li>"#,
-                            escape(&self.url(&path)),
+                            escape(&self.url(&locale::path(self, ctx, &path))),
                             r.text(&item.label)
                         ))
                     })
@@ -2228,6 +2264,9 @@ impl AppState {
         let locales = self.i18n.locales();
         if locales.len() < 2 {
             return String::new();
+        }
+        if self.locale_paths {
+            return locale::picker(self, ctx, r);
         }
         let options: String = locales
             .iter()
@@ -2266,8 +2305,9 @@ impl AppState {
         #[cfg(not(feature = "assistant"))]
         let (ai_head, ai_launcher) = (String::new(), String::new());
         format!(
-            r##"<!doctype html><html lang="{lang}"{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css{v}"><script type="module" src="{base}/_zeyn/zeyn.js{v}"></script><script type="module" src="{base}/_zeyn/nav.js{v}"></script>{components}{theme_link}{extra}</head><body><a class="z-skip" href="#z-main">{skip}</a>{frame}<div class="z-toasts" role="status" aria-live="polite" data-text-dismiss="{dismiss}"></div>{commands}{ai_launcher}</body></html>"##,
+            r##"<!doctype html><html lang="{lang}"{dir}{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css{v}"><script type="module" src="{base}/_zeyn/zeyn.js{v}"></script><script type="module" src="{base}/_zeyn/nav.js{v}"></script>{components}{theme_link}{extra}</head><body><a class="z-skip" href="#z-main">{skip}</a>{frame}<div class="z-toasts" role="status" aria-live="polite" data-text-dismiss="{dismiss}"></div>{commands}{ai_launcher}</body></html>"##,
             lang = escape(ctx.locale()),
+            dir = if locale::rtl(ctx.locale()) { r#" dir="rtl""# } else { "" },
             csrf = mask_token(csrf),
             tz = escape(ctx.time_zone().name()),
             base = escape(&self.prefix),
@@ -2295,7 +2335,9 @@ impl AppState {
     }
 
     /// The app shell: a side menu with the app's name, the palette button, the menus of the
-    /// features without a site shell and the pickers, beside the screen.
+    /// features without a site shell and the pickers, beside the screen. Below 800 px the menu
+    /// folds behind a menu button under the app's name (W3C APG disclosure); `nav.js` shows the
+    /// button, so without the script the menu stays open and nothing becomes unreachable.
     #[allow(clippy::too_many_arguments)]
     fn app_frame(
         &self,
@@ -2332,7 +2374,7 @@ impl AppState {
             ));
         }
         format!(
-            r#"<div class="z-app" data-zeyn-shell="app"><nav class="z-nav" aria-label="{menu}"><p class="z-app-name">{app}</p>{palette}{nav}</nav><main class="z-main" id="z-main">{main}</main></div>"#,
+            r#"<div class="z-app" data-zeyn-shell="app"><nav class="z-nav" aria-label="{menu}"><div class="z-nav-bar"><p class="z-app-name">{app}</p><button type="button" class="z-nav-toggle" aria-expanded="false" aria-controls="z-nav-body" data-zeyn-nav-toggle hidden><span class="z-nav-burger" aria-hidden="true"></span><span class="z-sr-only">{menu}</span></button></div><div class="z-nav-body" id="z-nav-body">{palette}{nav}</div></nav><main class="z-main" id="z-main">{main}</main></div>"#,
             menu = r.text(&Text::key("zeyn.shell.menu")),
         )
     }
@@ -2612,6 +2654,10 @@ async fn page(
         },
         Err(f) => st.error_screen(&ctx, f, &csrf, partial).await,
     };
+    let mut response = response;
+    if let Ok(lang) = HeaderValue::from_str(ctx.locale()) {
+        response.headers_mut().insert(header::CONTENT_LANGUAGE, lang);
+    }
     with_cookie(with_cookie(response, set), theme_cookie)
 }
 

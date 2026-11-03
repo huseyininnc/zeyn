@@ -94,10 +94,10 @@ pub fn catalog_page(p: CatalogParams, store: Catalog) -> Result<Screen> {
 | `permission = "..."` | The identity needs this permission |
 | `public` | Anyone. Visitors without a session get the page without cookies (see [Public pages](public-pages.md)) |
 | `cache = 300` | Public screens only: browsers and shared caches may keep the page of a visitor without a session for this many seconds (at most 86400) |
-
-A page also tells search engines and link previews about itself with `.description(..)`, `.canonical(..)`, `.og_image(..)`, `.json_ld(..)` and `.robots(..)` on the `Screen`; see [Public pages](public-pages.md#search-engines-and-link-previews).
 | `sensitive` | Opening it is recorded as a read of personal data |
 | `reason` | The user must give a reason before it opens (see [Audit, masking and jobs](enterprise.md)) |
+
+A page also tells search engines and link previews about itself with `.description(..)`, `.canonical(..)`, `.og_image(..)`, `.json_ld(..)` and `.robots(..)` on the `Screen`; see [Public pages](public-pages.md#search-engines-and-link-previews).
 
 Menu items, toolbar buttons and commands that open a screen the user may not open are left out of the HTML.
 

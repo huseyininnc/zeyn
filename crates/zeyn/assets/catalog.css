@@ -131,6 +131,56 @@ a.z-poster-link:focus-visible {
   inset-inline-start: 8px;
 }
 
+.z-poster-corner {
+  position: absolute;
+  top: 8px;
+  inset-inline-end: 8px;
+}
+
+.z-poster-media .z-poster-corner .z-badge { position: static; }
+
+.z-poster-progress {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 4px;
+  background: color-mix(in srgb, var(--z-surface) 70%, transparent);
+}
+
+.z-poster-progress-bar {
+  display: block;
+  width: var(--z-progress, 0%);
+  height: 100%;
+  background: var(--z-brand);
+}
+
+.z-poster-subtitle {
+  font-size: var(--z-font-size-sm);
+  color: var(--z-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.z-poster-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.z-poster-h .z-poster-link { flex-direction: row; }
+
+.z-poster-h .z-poster-media {
+  flex: 0 0 34%;
+  max-width: 128px;
+  align-self: flex-start;
+}
+
+.z-poster-h .z-poster-body { min-width: 0; flex: 1; }
+
+.z-cards-list:has(> .z-poster-h) { grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+
+.z-rail-list:has(> .z-poster-h) { grid-auto-columns: clamp(260px, 80%, 360px); }
+
 .z-poster-body {
   display: flex;
   flex-direction: column;
@@ -245,4 +295,6 @@ a.z-poster-link:focus-visible {
 @media (forced-colors: active) {
   .z-search-option[aria-selected="true"] { outline: 2px solid Highlight; outline-offset: -2px; }
   .z-rail-button[aria-disabled="true"] { color: GrayText; }
+  .z-poster-progress { border-top: 1px solid CanvasText; }
+  .z-poster-progress-bar { background: Highlight; }
 }

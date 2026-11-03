@@ -1,0 +1,832 @@
+{
+  "zeyn": {
+    "locale": {
+      "name": "한국어"
+    },
+    "yes": "예",
+    "no": "아니요",
+    "deploy": {
+      "new_version": "앱의 새 버전이 있습니다. 준비되면 새로 고치십시오. 저장하지 않은 폼 입력 내용은 유지됩니다.",
+      "reload": "지금 새로 고침",
+      "later": "나중에"
+    },
+    "draft": {
+      "restored": "이전에 저장하지 않은 입력 내용을 복원했습니다.",
+      "discard": "버리기"
+    },
+    "session": {
+      "idle_title": "아직 계신가요?",
+      "idle_body": "활동이 없어 {seconds}초 후에 로그아웃됩니다.",
+      "stay": "로그인 유지",
+      "signed_out_title": "로그아웃되었습니다",
+      "signed_out_body": "활동이 없어 로그아웃되었습니다. 저장하지 않은 폼 입력 내용은 이 탭에 유지됩니다.",
+      "sign_in": "다시 로그인",
+      "reauth_required": "보안을 위해 이 작업을 하려면 다시 로그인하십시오.",
+      "reauth_title": "본인 확인",
+      "reauth_body": "이 작업에는 최근 로그인이 필요합니다. 새 탭에서 다시 로그인한 다음 돌아와서 계속하십시오.",
+      "reauth_open": "다시 로그인",
+      "reauth_continue": "로그인했습니다. 계속",
+      "mfa_title": "두 번째 단계가 필요합니다",
+      "mfa_body": "이 작업에는 두 번째 로그인 단계가 필요합니다. 새 탭에서 완료한 다음 돌아와서 계속하십시오.",
+      "mfa_open": "지금 확인"
+    },
+    "auth": {
+      "mfa_required": "인증 앱의 코드 같은 두 번째 로그인 단계가 필요합니다.",
+      "mfa_missing": "로그인에 두 번째 단계가 포함되지 않았습니다. 다시 로그인하여 완료하십시오.",
+      "failed": "로그인에 실패했습니다. 다시 시도하십시오.",
+      "unavailable": "지금은 로그인할 수 없습니다. 나중에 다시 시도하십시오.",
+      "totp_title": "2단계 인증",
+      "totp_scan": "인증 앱으로 이 코드를 스캔한 다음 표시되는 6자리 코드를 입력하십시오.",
+      "totp_manual": "또는 이 키를 앱에 직접 입력하십시오.",
+      "totp_qr": "인증 앱용 QR 코드",
+      "totp_intro": "인증 앱의 6자리 코드 또는 복구 코드 중 하나를 입력하십시오.",
+      "totp_code": "코드",
+      "totp_verify": "확인",
+      "totp_invalid": "올바르지 않은 코드입니다. 다시 시도하십시오.",
+      "totp_rate_limited": "시도 횟수가 너무 많습니다. 몇 분 기다린 후 다시 시도하십시오.",
+      "totp_recovery_title": "복구 코드",
+      "totp_recovery_body": "이 코드를 안전한 곳에 보관하십시오. 인증 앱을 잃어버리면 각 코드를 한 번씩 사용할 수 있습니다. 다시 표시되지 않습니다.",
+      "totp_continue": "계속"
+    },
+    "import": {
+      "file": "CSV 파일",
+      "file_any": "CSV 또는 Excel 파일",
+      "bad_file": "파일을 Excel 통합 문서로 읽을 수 없습니다.",
+      "hint": "첫 번째 행은 열 이름입니다: {columns}. 값은 쉼표 또는 세미콜론으로 구분합니다. 최대 {max}행.",
+      "summary": "{total}행을 읽었습니다. 유효 {valid}행, 오류 {invalid}행.",
+      "commit": "유효한 행 가져오기",
+      "commit_all": "모든 행 가져오기",
+      "report": "오류 보고서 다운로드",
+      "imported": "{count}행을 가져왔고 {skipped}행을 건너뛰었습니다.",
+      "unknown_column": "알 수 없는 열: {name}.",
+      "too_many": "파일에 {max}행을 넘는 행이 있습니다.",
+      "too_large": "파일이 너무 큽니다.",
+      "empty": "파일에 데이터 행이 없습니다.",
+      "bad_quotes": "파일의 따옴표로 묶은 값이 닫히지 않았습니다.",
+      "extra_cells": "이 행에는 열보다 많은 값이 있습니다.",
+      "nothing_valid": "유효한 행이 없어 아무것도 가져오지 않았습니다.",
+      "fix_first": "먼저 모든 오류를 수정하십시오. 이 가져오기는 전체 또는 전무입니다.",
+      "report_row": "행",
+      "report_field": "필드",
+      "report_message": "메시지",
+      "reading": "파일을 읽는 중..."
+    },
+    "mail": {
+      "transition": {
+        "subject": "{record}: {to}",
+        "text": "{record}이(가) {by}에 의해 {from}에서 {to}(으)로 이동되었습니다 ({move}).\n\n{comment}",
+        "html": "<p><strong>{record}</strong>이(가) {by}에 의해 {from}에서 <strong>{to}</strong>(으)로 이동되었습니다 ({move}).</p><p>{comment}</p>"
+      }
+    },
+    "workflow": {
+      "state": "상태",
+      "comment": "댓글",
+      "done": "완료되었습니다."
+    },
+    "privacy": {
+      "reveal": "{label} 표시",
+      "revealed": "값이 표시되었습니다. 이 내용은 기록되었습니다.",
+      "reveal_failed": "값을 표시할 수 없습니다.",
+      "reason_required": "이 화면을 열려면 사유를 입력하십시오.",
+      "reason_title": "이 레코드가 왜 필요한가요?",
+      "reason_explain": "이 화면에는 개인 데이터가 표시됩니다. 사유는 이름 및 시각과 함께 기록됩니다.",
+      "reason_label": "사유",
+      "reason_continue": "계속",
+      "reason_cancel": "취소",
+      "reason_invalid": "3자에서 300자 사이로 사유를 작성하십시오."
+    },
+    "validation": {
+      "required": "{label}을(를) 입력하십시오.",
+      "min_len": "{label}은(는) 최소 {n}자여야 합니다.",
+      "max_len": "{label}은(는) 최대 {n}자여야 합니다.",
+      "email": "{label}은(는) 올바른 이메일 주소여야 합니다.",
+      "min": "{label}은(는) 최소 {n} 이상이어야 합니다.",
+      "max": "{label}은(는) 최대 {n} 이하여야 합니다.",
+      "format": "{label}의 값이 올바르지 않습니다.",
+      "skipped_time": "{label}: 시계가 변경되어 이 시각은 사용자의 시간대에 존재하지 않습니다.",
+      "line": "{n}번째 줄: {message}",
+      "disabled_day": "{label}: 이 날은 선택할 수 없습니다.",
+      "time_step": "{label}은(는) {n}분 단위여야 합니다.",
+      "range_order": "{label}은(는) {other}보다 앞설 수 없습니다.",
+      "unique": "{label}은(는) 이미 다른 레코드에서 사용 중입니다.",
+      "scale": "{label}은(는) 소수 {n}자리까지만 가능합니다.",
+      "precision": "{label}은(는) 소수점 앞에 최대 {n}자리까지만 가능합니다.",
+      "mask": "{label}은(는) {pattern} 형태여야 합니다.",
+      "embed": "{label}은(는) 삽입할 https 주소 또는 이를 담은 삽입 코드여야 합니다.",
+      "embed_host": "{label}: {host}은(는) 이 앱이 삽입할 수 있는 사이트 목록에 없습니다."
+    },
+    "error": {
+      "forbidden": "이 작업을 할 수 있는 권한이 없습니다.",
+      "not_found": "레코드를 찾을 수 없습니다.",
+      "conflict": "다른 사람이 이 레코드를 변경했습니다. 다시 불러온 후 시도하십시오.",
+      "timeout": "요청이 너무 오래 걸렸습니다.",
+      "internal": "예기치 않은 오류가 발생했습니다.",
+      "csrf": "세션이 만료되었습니다. 페이지를 새로 고치십시오.",
+      "license": "라이선스가 이 기능을 포함하지 않습니다. 관리자에게 문의하십시오.",
+      "license_expired": "라이선스가 만료되었습니다. 갱신하려면 관리자에게 문의하십시오.",
+      "tenant": "이 주소는 알려진 조직에 속하지 않습니다.",
+      "rate_limited": "요청이 너무 많습니다. 잠시 후 다시 시도하십시오.",
+      "confirmation_required": "실행하기 전에 앱에서 확인이 필요합니다.",
+      "cursor": "불러온 이후 목록이 변경되었습니다. 다시 불러온 후 시도하십시오.",
+      "duplicate": "이 레코드는 이미 존재합니다."
+    },
+    "grid": {
+      "pagination": "페이지 이동",
+      "previous": "이전 페이지",
+      "next": "다음 페이지",
+      "load_more": "더 불러오기",
+      "range": "{from}-{to}",
+      "range_total": "{from}-{to} / {total}",
+      "loaded": "{count}행 불러옴",
+      "empty": "레코드가 없습니다.",
+      "actions": "작업",
+      "select_row": "행 선택",
+      "select_page": "이 페이지의 모든 행 선택",
+      "selected_count": "{n}개 선택됨",
+      "select_matching": "일치하는 {total}행 모두 선택",
+      "all_selected": "일치하는 {total}행이 모두 선택됨",
+      "clear_selection": "선택 해제",
+      "too_many": "이 작업에는 최대 {n}행까지 선택하십시오.",
+      "done": "완료되었습니다.",
+      "saved": "저장되었습니다.",
+      "undo": "실행 취소",
+      "undone": "변경을 취소했습니다.",
+      "error": "행을 불러올 수 없습니다.",
+      "retry": "다시 시도",
+      "copied": "{n}행을 복사했습니다.",
+      "copied_cells": "{n}개 셀을 복사했습니다.",
+      "paste_confirm": "{n}행에 붙여넣으시겠습니까? 각 행이 저장됩니다.",
+      "pasted": "{n}행을 저장했습니다.",
+      "paste_failed": "{n}행을 저장할 수 없습니다. 셀에 이유가 표시됩니다.",
+      "paste_readonly": "이 셀은 편집할 수 없습니다.",
+      "paste_too_many": "한 번에 최대 {n}행까지 붙여넣을 수 있습니다.",
+      "details": "상세",
+      "loading": "불러오는 중...",
+      "children": "하위 행",
+      "blank": "(비어 있음)",
+      "group_count": "{n}행",
+      "filter": {
+        "filter": "{label} 필터",
+        "from": "시작",
+        "to": "끝",
+        "all": "전체",
+        "contains": "포함",
+        "starts_with": "시작",
+        "equals": "일치",
+        "match": "조건",
+        "selected": "{n}개 선택됨",
+        "clear": "필터 해제",
+        "sorted": "정렬 순서 {n}"
+      },
+      "menu": {
+        "options": "열 옵션: {label}",
+        "resize": "{label} 크기 조절",
+        "sort_asc": "오름차순 정렬",
+        "sort_desc": "내림차순 정렬",
+        "sort_clear": "정렬 해제",
+        "pin_start": "시작에 고정",
+        "pin_end": "끝에 고정",
+        "unpin": "고정 해제",
+        "move_prev": "왼쪽으로 이동",
+        "move_next": "오른쪽으로 이동",
+        "hide": "열 숨기기",
+        "columns": "열",
+        "filter": "필터",
+        "reset": "뷰 초기화"
+      },
+      "agg": {
+        "sum": "합계",
+        "avg": "평균",
+        "min": "최소",
+        "max": "최대",
+        "count": "개수"
+      }
+    },
+    "export": {
+      "xlsx": "Excel로 내보내기",
+      "csv": "CSV로 내보내기",
+      "pdf": "PDF로 내보내기",
+      "pdf_cut": "처음 {max}행만 인쇄됩니다."
+    },
+    "shell": {
+      "skip": "본문으로 건너뛰기",
+      "menu": "메인",
+      "language": "언어",
+      "time_zone": "시간대",
+      "time_zone_auto": "자동 (이 기기)",
+      "theme": "테마",
+      "theme_system": "시스템",
+      "theme_light": "라이트",
+      "theme_dark": "다크",
+      "site": {
+        "sign_in": "로그인",
+        "sign_out": "로그아웃"
+      }
+    },
+    "ui": {
+      "resize": "창 크기 조절",
+      "cards": {
+        "load_more": "더 보기",
+        "loaded": "{count}개 항목 표시됨",
+        "empty": "표시할 항목이 없습니다.",
+        "error": "목록을 불러올 수 없습니다. 다시 시도하십시오.",
+        "sort": "정렬 기준",
+        "pages": "페이지",
+        "page": "{pages}페이지 중 {page}페이지",
+        "previous_page": "이전 페이지",
+        "next_page": "다음 페이지",
+        "previous": "뒤로 스크롤",
+        "next": "앞으로 스크롤"
+      },
+      "search": {
+        "label": "검색",
+        "suggestions": "제안",
+        "count": "제안 {count}개, 화살표 키로 선택하십시오",
+        "none": "제안 없음"
+      },
+      "palette": {
+        "open": "명령",
+        "label": "명령 팔레트",
+        "placeholder": "명령 또는 화면 이름을 입력하십시오",
+        "empty": "일치하는 명령이 없습니다.",
+        "count": "명령 {n}개",
+        "recent": "최근 사용",
+        "app": "명령",
+        "screen": "이 화면",
+        "go": "이동",
+        "done": "완료되었습니다.",
+        "hint": "위쪽과 아래쪽 화살표로 이동, Enter로 실행, Escape로 닫기."
+      },
+      "toolbox": {
+        "selected": "{tool} 선택됨"
+      },
+      "dock": {
+        "left": "왼쪽",
+        "right": "오른쪽",
+        "bottom": "아래쪽",
+        "center": "가운데",
+        "options": "패널 옵션",
+        "move": "{area}(으)로 이동",
+        "close": "{panel} 닫기",
+        "show": "{panel} 표시",
+        "moved": "{panel}을(를) {area}(으)로 이동했습니다.",
+        "closed": "{panel}을(를) 닫았습니다.",
+        "shown": "{panel}을(를) 표시했습니다.",
+        "empty": "열린 패널이 없습니다. 패널 옵션에서 하나를 여십시오.",
+        "resize": "{area} 영역 크기 조절"
+      },
+      "loading": "불러오는 중…",
+      "load_failed": "이 부분을 불러올 수 없습니다. 다시 시도하십시오.",
+      "date": {
+        "open": "날짜 선택",
+        "dialog": "날짜를 선택하십시오",
+        "prev_month": "이전 달",
+        "next_month": "다음 달",
+        "prev_year": "이전 연도",
+        "next_year": "다음 연도",
+        "today": "오늘",
+        "format": "형식: {format}.",
+        "natural": "다음과 같이 입력할 수도 있습니다: {examples}.",
+        "natural_date": "today, +3d",
+        "natural_time": "now, 930",
+        "open_time": "시간 선택",
+        "dialog_time": "시간을 선택하십시오",
+        "dialog_range": "날짜 범위를 선택하십시오",
+        "month": "월 선택",
+        "year": "연도 선택",
+        "months": "월",
+        "years": "연도",
+        "now": "지금",
+        "clear": "지우기",
+        "done": "완료",
+        "hours": "시",
+        "minutes": "분",
+        "seconds": "초",
+        "period": "오전 또는 오후",
+        "week": "주",
+        "week_long": "주 번호",
+        "zone": "시간대 {zone}",
+        "utc": "UTC: {moment}",
+        "from": "시작",
+        "to": "끝",
+        "presets": {
+          "label": "빠른 범위",
+          "today": "오늘",
+          "yesterday": "어제",
+          "last_7_days": "최근 7일",
+          "this_month": "이번 달",
+          "last_month": "지난달",
+          "this_year": "올해"
+        },
+        "invalid": "{label}을(를) 읽을 수 없습니다."
+      },
+      "lookup": {
+        "open": "옵션 표시",
+        "no_results": "일치하는 항목이 없습니다.",
+        "results": "결과 {count}개",
+        "remove": "{label} 제거",
+        "more": "더 보기",
+        "selected": "선택됨",
+        "type_more": "검색하려면 입력하십시오."
+      },
+      "lines": {
+        "add": "줄 추가",
+        "remove": "{n}번째 줄 제거",
+        "up": "{n}번째 줄을 위로 이동",
+        "down": "{n}번째 줄을 아래로 이동",
+        "row": "{n}번째 줄",
+        "total": "합계",
+        "actions": "작업",
+        "empty": "아직 줄이 없습니다."
+      },
+      "confirm": {
+        "title": "확인해 주십시오",
+        "ok": "확인",
+        "cancel": "취소"
+      },
+      "empty": "아직 아무것도 없습니다.",
+      "breadcrumb": "이동 경로",
+      "dismiss": "닫기",
+      "link": {
+        "external": "외부 사이트",
+        "external_new_tab": "외부 사이트, 새 탭에서 열림"
+      },
+      "embed": {
+        "blocked": "{title}은(는) 여기에 표시할 수 없습니다. 해당 사이트가 이 앱이 삽입할 수 있는 사이트 목록에 없습니다.",
+        "load": "{title} 불러오기",
+        "from": "{host}의 콘텐츠입니다. 요청할 때만 불러옵니다."
+      },
+      "steps": {
+        "progress": "{total}단계 중 {n}단계",
+        "next": "다음",
+        "back": "이전",
+        "done": "완료됨",
+        "current": "현재 단계",
+        "label": "단계"
+      },
+      "chart": {
+        "data": "데이터 표시",
+        "table": "{title}의 데이터",
+        "summary_bar": "{items}개 범주에 걸친 {series}개 계열의 막대 차트. 최고: {max}, {value}.",
+        "summary_line": "{items}개 지점에 걸친 {series}개 계열의 선 차트. 최고: {max}, {value}.",
+        "summary_donut": "{items}개 부분의 도넛 차트. 최대: {max}, {value}.",
+        "role": "차트",
+        "summary_stacked_bar": "{items}개 범주에 걸친 {series}개 계열의 누적 막대 차트. 최고 합계: {max}, {value}.",
+        "summary_area": "{items}개 지점에 걸친 {series}개 계열의 영역 차트. 최고: {max}, {value}.",
+        "summary_combo": "{items}개 범주에 걸친 {series}개 계열의 막대 및 선 차트. 최고: {max}, {value}.",
+        "summary_scatter": "{series}개 그룹에 걸친 {items}개 점의 산점도.",
+        "summary_gauge": "게이지 {value}, 범위 {min}에서 {max}. 목표: {target}.",
+        "summary_funnel": "{items}개 단계의 깔때기 차트. 최대: {max}, {value}.",
+        "gauge_point": "{max} 중 {value}",
+        "sparkline": "{first}에서 {last}까지 {n}개 값의 추이, 최저 {low}, 최고 {high}",
+        "bullet": "{value}, 목표 {target}",
+        "value": "값",
+        "min": "최소",
+        "max": "최대",
+        "target": "목표"
+      },
+      "tree": {
+        "empty": "항목이 없습니다."
+      },
+      "select": {
+        "none": "없음",
+        "search": "목록 검색"
+      },
+      "number": {
+        "up": "증가",
+        "down": "감소",
+        "percent": "퍼센트"
+      },
+      "text": {
+        "count": "{max}자 중 {n}자"
+      },
+      "media": {
+        "video_player": "비디오 플레이어",
+        "audio_player": "오디오 플레이어",
+        "play": "재생",
+        "pause": "일시 정지",
+        "seek": "탐색",
+        "volume": "볼륨",
+        "mute": "음소거",
+        "unmute": "음소거 해제",
+        "time_of": "{total} 중 {current}",
+        "speed": "재생 속도",
+        "speed_value": "재생 속도: {value}",
+        "captions": "자막",
+        "captions_language": "자막 언어",
+        "captions_on": "자막 켜짐: {label}",
+        "captions_off": "끄기",
+        "pip": "화면 속 화면",
+        "fullscreen": "전체 화면",
+        "exit_fullscreen": "전체 화면 종료",
+        "resumed": "{time}부터 이어서 재생합니다",
+        "failed": "이 미디어를 재생할 수 없습니다.",
+        "bad_position": "재생 위치가 올바르지 않습니다."
+      },
+      "tone": {
+        "neutral": "참고",
+        "info": "정보",
+        "success": "성공",
+        "warning": "경고",
+        "danger": "오류",
+        "brand": "참고"
+      },
+      "upload": {
+        "drop": "파일을 여기에 놓거나 선택하십시오.",
+        "hint": "{types}, 최대 {max}.",
+        "hint_many": "{types}, 각각 최대 {max}, 최대 {n}개 파일.",
+        "list": "파일",
+        "uploading": "{name} 업로드 중: {pct}퍼센트",
+        "uploaded": "{name}을(를) 업로드했습니다.",
+        "failed": "{name}을(를) 업로드할 수 없습니다: {reason}",
+        "canceled": "{name} 업로드를 취소했습니다.",
+        "removed": "{name}을(를) 제거했습니다.",
+        "cancel": "취소",
+        "retry": "다시 시도",
+        "remove": "제거",
+        "remove_name": "{name} 제거"
+      },
+      "kpi": {
+        "up": "이전 기간 대비 {pct}% 증가",
+        "down": "이전 기간 대비 {pct}% 감소",
+        "flat": "이전 기간과 변화 없음",
+        "target": "목표 {target}, {pct}% 달성"
+},
+      "password": {
+        "show": "비밀번호 표시",
+        "weak": "강도: 약함",
+        "fair": "강도: 보통",
+        "good": "강도: 좋음",
+        "strong": "강도: 강함"
+      },
+      "multi": {
+        "count": "{n}개 선택됨"
+      },
+      "popover": {
+        "close": "닫기"
+      },
+      "busy": "처리 중",
+      "tip": {
+        "about": "{label} 정보"
+      },
+      "menu": {
+        "more": "{label}의 추가 옵션"
+      },
+      "toast": {
+        "dismiss": "닫기"
+      }
+    },
+    "date": {
+      "words": {
+        "today": "today",
+        "tomorrow": "tomorrow",
+        "yesterday": "yesterday",
+        "now": "now",
+        "day": "d, day, days",
+        "week": "w, week, weeks",
+        "month": "m, month, months",
+        "year": "y, year, years"
+      }
+    },
+    "assistant": {
+      "title": "어시스턴트",
+      "open": "어시스턴트 열기",
+      "close": "어시스턴트 닫기",
+      "new_chat": "새 채팅",
+      "empty": "데이터에 대해 물어보거나 할 일을 알려 주십시오. 저는 사용자의 권한으로 작업하며, 무엇이든 변경하기 전에 먼저 묻습니다.",
+      "suggestions": "제안",
+      "message": "메시지",
+      "placeholder": "이 앱에 대해 무엇이든 물어보십시오",
+      "mic": "말하기",
+      "mic_stop": "듣기 중지",
+      "stop": "중지",
+      "send": "보내기",
+      "note": "AI는 실수할 수 있습니다. 중요한 결과는 확인하십시오.",
+      "you": "나",
+      "thinking": "생각하는 중",
+      "stopped": "중지되었습니다.",
+      "retry": "다시 시도",
+      "read_aloud": "소리 내어 읽기",
+      "copy": "복사",
+      "copied": "복사됨",
+      "confirm": "확인",
+      "decline": "취소",
+      "confirm_title": "이 작업을 확인하십시오",
+      "confirm_question": "어시스턴트가 사용자 대신 이 작업을 하려고 합니다. 확인하면 실행됩니다.",
+      "declined": "취소되었습니다. 아무것도 변경되지 않았습니다.",
+      "listening": "듣는 중",
+      "error": "문제가 발생했습니다.",
+      "unavailable": "어시스턴트를 사용할 수 없습니다.",
+      "working": "작업 중",
+      "too_long": "최대 {max}자까지 작성하십시오.",
+      "audio_too_large": "녹음이 너무 깁니다.",
+      "token_limit": "지금은 어시스턴트의 사용 한도에 도달했습니다. 나중에 다시 시도하십시오.",
+      "too_many_steps": "단계가 너무 많아 중단했습니다. 더 간단한 요청을 시도하십시오."
+    },
+    "accounts": {
+      "login": {
+        "title": "로그인",
+        "submit": "로그인",
+        "passkey": "패스키로 로그인",
+        "external": "또는 다음으로 로그인",
+        "with": "다음으로 로그인",
+        "forgot": "비밀번호를 잊으셨나요?",
+        "resend": "확인 이메일 다시 보내기",
+        "register": "계정 만들기"
+      },
+      "register": {
+        "title": "계정 만들기",
+        "submit": "계정 만들기",
+        "login": "로그인으로 돌아가기"
+      },
+      "check_email": {
+        "title": "이메일을 확인하십시오",
+        "body": "해당 주소가 저희 메일을 받을 수 있다면 다음 단계가 담긴 메시지가 발송됩니다. 메시지의 링크는 하루 동안 유효합니다."
+      },
+      "forgot": {
+        "title": "비밀번호를 잊으셨나요?",
+        "intro": "이메일 주소를 입력하십시오. 확인된 계정에 속한 주소라면 새 비밀번호를 설정하는 링크를 보내 드립니다.",
+        "submit": "링크 보내기"
+      },
+      "resend": {
+        "title": "확인 이메일 다시 보내기",
+        "submit": "다시 보내기"
+      },
+      "reset": {
+        "title": "새 비밀번호 설정",
+        "submit": "새 비밀번호 저장"
+      },
+      "confirm": {
+        "title": "이메일 확인",
+        "done": "감사합니다. 이메일 주소가 확인되었습니다.",
+        "failed": "이 링크는 동작하지 않습니다. 만료되었거나, 이미 사용되었거나, 더 새로운 링크로 대체되었을 수 있습니다."
+      },
+      "two_factor": {
+        "title": "2단계 로그인",
+        "intro": "인증 앱의 코드를 입력하십시오.",
+        "submit": "확인",
+        "email_intro": "또는 이메일로 코드를 받으십시오.",
+        "send_email": "코드 보내기",
+        "sent": "코드를 보냈습니다.",
+        "submit_email": "이메일 코드 확인",
+        "use_recovery": "대신 복구 코드 사용",
+        "on": "2단계 로그인이 켜져 있습니다.",
+        "codes_left": "남은 복구 코드: {n}",
+        "new_codes": "새 복구 코드",
+        "new_codes_confirm": "현재 복구 코드는 더 이상 동작하지 않습니다. 계속하시겠습니까?",
+        "forget": "이 브라우저 잊기",
+        "disable": "끄기",
+        "disable_confirm": "2단계 로그인을 끄시겠습니까? 계정이 더 쉽게 침해될 수 있습니다.",
+        "reset_key": "인증 키 재설정",
+        "reset_key_confirm": "다시 설정하기 전까지 이 계정에서 인증 앱이 동작하지 않습니다. 계속하시겠습니까?",
+        "reauth": "보안을 위해 2단계 로그인을 설정하려면 다시 로그인하십시오.",
+        "reauth_link": "다시 로그인",
+        "setup": "인증 앱으로 QR 코드를 스캔하거나 키를 입력한 다음 표시되는 6자리 코드를 입력하십시오.",
+        "qr": "인증 앱용 QR 코드",
+        "manual": "키:",
+        "enable": "켜기"
+      },
+      "recovery": {
+        "title": "복구 코드로 로그인",
+        "intro": "각 복구 코드는 한 번만 사용할 수 있습니다.",
+        "submit": "로그인"
+      },
+      "lockout": {
+        "title": "계정이 잠겼습니다",
+        "body": "실패한 시도가 너무 많아 이 계정이 잠시 잠겼습니다. 나중에 다시 시도하거나 비밀번호를 재설정하십시오."
+      },
+      "denied": {
+        "title": "접근이 거부되었습니다",
+        "body": "이 페이지에 접근할 권한이 없습니다."
+      },
+      "logout": {
+        "title": "로그아웃",
+        "body": "이 브라우저에서 로그아웃하시겠습니까?",
+        "submit": "로그아웃"
+      },
+      "manage": {
+        "title": "계정 설정",
+        "profile": "프로필",
+        "email": "이메일",
+        "password": "비밀번호",
+        "two_factor": "2단계 로그인",
+        "passkeys": "패스키",
+        "logins": "외부 로그인",
+        "personal_data": "개인 데이터"
+      },
+      "save": "저장",
+      "saved": "저장되었습니다.",
+      "email": {
+        "current": "이메일 주소:",
+        "confirmed": "확인됨",
+        "unconfirmed": "확인되지 않음",
+        "send_verification": "확인 이메일 보내기",
+        "sent": "받은 편지함에서 확인 링크를 확인하십시오.",
+        "change": "이메일 변경"
+      },
+      "password": {
+        "submit": "비밀번호 저장",
+        "changed": "비밀번호가 변경되었습니다. 다른 세션은 로그아웃됩니다."
+      },
+      "codes": {
+        "title": "복구 코드",
+        "keep": "이 코드를 안전한 곳에 보관하십시오. 각 코드는 한 번만 사용할 수 있으며 지금만 표시됩니다.",
+        "gone": "복구 코드는 만든 직후 한 번만 표시됩니다.",
+        "back": "2단계 로그인으로 돌아가기"
+      },
+      "passkeys": {
+        "intro": "패스키는 비밀번호 없이 기기의 화면 잠금으로 로그인합니다.",
+        "none": "아직 패스키가 없습니다.",
+        "remove": "제거",
+        "remove_confirm": "이 패스키를 제거하시겠습니까?",
+        "name": "새 패스키 이름",
+        "add": "패스키 추가",
+        "added": "패스키를 추가했습니다.",
+        "failed": "패스키가 동작하지 않았습니다. 다시 시도하십시오.",
+        "unsupported": "이 브라우저는 패스키를 지원하지 않습니다."
+      },
+      "logins": {
+        "none": "연결된 외부 로그인이 없습니다.",
+        "remove": "연결 해제",
+        "remove_confirm": "이 로그인의 연결을 해제하시겠습니까?",
+        "add": "연결"
+      },
+      "data": {
+        "intro": "이 계정이 사용자에 대해 저장하는 모든 것을 다운로드하거나 계정을 삭제하십시오.",
+        "download": "내 데이터 다운로드",
+        "delete_warning": "계정을 삭제하면 데이터가 영구적으로 제거됩니다. 이 작업은 되돌릴 수 없습니다.",
+        "delete": "내 계정 삭제"
+      },
+      "admin": {
+        "menu": "계정",
+        "users": "사용자",
+        "roles": "역할",
+        "lock": "잠금",
+        "unlock": "잠금 해제",
+        "reset": "재설정 링크 보내기",
+        "delete_role": "삭제",
+        "create_role": "역할 추가"
+      },
+      "external": {
+        "title": "로그인 완료",
+        "intro": "다음으로 로그인했습니다:",
+        "submit": "내 계정 만들기"
+      },
+      "notice": {
+        "confirmed": "이메일 주소가 확인되었습니다. 로그인할 수 있습니다.",
+        "reset": "비밀번호가 재설정되었습니다. 새 비밀번호로 로그인하십시오.",
+        "signed_out": "로그아웃되었습니다.",
+        "deleted": "계정이 삭제되었습니다.",
+        "check_email": "다음 단계는 이메일을 확인하십시오."
+      },
+      "error": {
+        "invalid_user_name": "이 사용자 이름은 올바르지 않습니다.",
+        "duplicate_user_name": "이 이름은 이미 사용 중입니다.",
+        "invalid_email": "올바른 이메일 주소를 입력하십시오.",
+        "duplicate_email": "이 이메일 주소는 이미 사용 중입니다.",
+        "invalid_phone": "올바른 전화번호를 입력하십시오.",
+        "password_too_short": "최소 {n}자를 사용하십시오.",
+        "password_too_long": "최대 {n}바이트를 사용하십시오.",
+        "password_requires_non_alphanumeric": "문자나 숫자가 아닌 문자를 하나 이상 사용하십시오.",
+        "password_requires_digit": "숫자(0에서 9)를 하나 이상 사용하십시오.",
+        "password_requires_lower": "소문자(a에서 z)를 하나 이상 사용하십시오.",
+        "password_requires_upper": "대문자(A에서 Z)를 하나 이상 사용하십시오.",
+        "password_requires_unique_chars": "서로 다른 문자를 {n}개 이상 사용하십시오.",
+        "password_breached": "이 비밀번호는 알려진 데이터 유출에 나타납니다. 다른 비밀번호를 선택하십시오.",
+        "user_already_has_password": "이 계정에는 이미 비밀번호가 있습니다.",
+        "password_mismatch": "비밀번호가 올바르지 않습니다.",
+        "invalid_token": "이 링크는 동작하지 않습니다. 만료되었거나 이미 사용되었을 수 있습니다.",
+        "invalid_code": "코드가 올바르지 않거나 만료되었습니다.",
+        "lockout_not_enabled": "이 사용자는 잠금이 꺼져 있습니다.",
+        "login_already_associated": "이 로그인은 다른 계정에 속해 있습니다.",
+        "last_login": "이것이 마지막 로그인 방법입니다. 먼저 비밀번호나 다른 로그인을 추가하십시오.",
+        "invalid_role_name": "이 역할 이름은 올바르지 않습니다.",
+        "duplicate_role_name": "이 역할은 이미 존재합니다.",
+        "rate_limited": "시도 횟수가 너무 많습니다. 몇 분 기다린 후 다시 시도하십시오.",
+        "two_factor_expired": "로그인에 너무 오래 걸렸습니다. 처음부터 다시 시작하십시오.",
+        "two_factor_unavailable": "이 방법으로는 코드를 받을 수 없습니다.",
+        "passkey_invalid": "패스키를 확인할 수 없습니다.",
+        "passkey_expired": "패스키 요청이 만료되었습니다. 다시 시도하십시오.",
+        "passkey_registered": "이 패스키는 이미 등록되어 있습니다.",
+        "not_allowed": "로그인하기 전에 이메일 주소를 확인하십시오.",
+        "invalid_login": "사용자 이름 또는 비밀번호가 올바르지 않습니다.",
+        "password_confirm_mismatch": "비밀번호가 일치하지 않습니다.",
+        "invalid_recovery_code": "복구 코드가 올바르지 않거나 이미 사용되었습니다.",
+        "email_unchanged": "현재 사용 중인 주소입니다.",
+        "unknown_role": "이 역할 중 하나가 존재하지 않습니다.",
+        "external_expired": "외부 로그인에 너무 오래 걸렸습니다. 처음부터 다시 시작하십시오.",
+        "external_email_taken": "이 이메일로 만든 계정이 이미 있습니다. 해당 계정에 로그인한 다음 계정 설정에서 제공자를 연결하십시오.",
+        "external": "외부 로그인에 실패했습니다.",
+        "old_password_required": "현재 비밀번호를 입력하십시오.",
+        "cannot_reset_shared_key_and_enable": "먼저 키를 재설정한 다음 새 키의 코드로 2단계 로그인을 켜십시오.",
+        "requires_two_factor": "인증 앱의 코드를 입력하십시오.",
+        "invalid_two_factor_code": "코드가 올바르지 않습니다."
+      },
+      "mail": {
+        "confirm": {
+          "subject": "이메일 주소를 확인하십시오",
+          "text": "이메일 주소를 확인하려면 이 링크를 여십시오.\n\n{link}\n\n링크는 하루 동안 유효합니다. 계정을 만들지 않으셨다면 이 메시지를 무시하십시오.",
+          "html": "<p>이메일 주소를 확인하려면 이 링크를 여십시오.</p><p><a href=\"{link}\">내 이메일 주소 확인</a></p><p>링크는 하루 동안 유효합니다. 계정을 만들지 않으셨다면 이 메시지를 무시하십시오.</p>"
+        },
+        "reset": {
+          "subject": "비밀번호를 재설정하십시오",
+          "text": "새 비밀번호를 설정하려면 이 링크를 여십시오.\n\n{link}\n\n링크는 하루 동안 유효합니다. 요청하지 않으셨다면 이 메시지를 무시하십시오.",
+          "html": "<p>새 비밀번호를 설정하려면 이 링크를 여십시오.</p><p><a href=\"{link}\">새 비밀번호 설정</a></p><p>링크는 하루 동안 유효합니다. 요청하지 않으셨다면 이 메시지를 무시하십시오.</p>"
+        },
+        "change": {
+          "subject": "새 이메일 주소를 확인하십시오",
+          "text": "이 주소를 계정에 사용하려면 이 링크를 여십시오.\n\n{link}\n\n이 변경을 요청하지 않으셨다면 이 메시지를 무시하십시오.",
+          "html": "<p>이 주소를 계정에 사용하려면 이 링크를 여십시오.</p><p><a href=\"{link}\">새 주소 확인</a></p><p>이 변경을 요청하지 않으셨다면 이 메시지를 무시하십시오.</p>"
+        },
+        "exists": {
+          "subject": "이미 계정이 있습니다",
+          "text": "누군가 이미 계정이 있는 이 주소로 계정을 만들려고 했습니다. 여기에서 로그인하십시오.\n\n{link}\n\n비밀번호를 잊으셨다면 해당 페이지의 비밀번호 재설정을 사용하십시오.",
+          "html": "<p>누군가 이미 계정이 있는 이 주소로 계정을 만들려고 했습니다.</p><p><a href=\"{link}\">로그인</a></p><p>비밀번호를 잊으셨다면 해당 페이지의 비밀번호 재설정을 사용하십시오.</p>"
+        },
+        "code": {
+          "subject": "로그인 코드",
+          "text": "로그인 코드는 {code}입니다. 몇 분 동안 유효합니다.",
+          "html": "<p>로그인 코드는 <strong>{code}</strong>입니다. 몇 분 동안 유효합니다.</p>"
+        }
+      }
+    },
+    "files": {
+      "too_large": "파일이 너무 큽니다. 허용되는 최대 파일 크기는 {max}입니다.",
+      "too_many": "{label}에는 최대 {n}개 파일을 넣을 수 있습니다.",
+      "type": "이 파일 형식은 허용되지 않거나, 내용이 이름과 일치하지 않습니다.",
+      "refused": "보안 검사에서 파일이 거부되었습니다.",
+      "aborted": "전체 파일이 도착하기 전에 업로드가 중단되었습니다. 다시 시도하십시오.",
+      "empty": "파일이 비어 있습니다.",
+      "store_full": "이 파일을 위한 공간이 남아 있지 않습니다."
+    }
+  },
+  "AccountLogin": {
+    "user_name": "이메일 또는 사용자 이름",
+    "password": "비밀번호",
+    "remember_me": "로그인 상태 유지"
+  },
+  "AccountRegister": {
+    "email": "이메일",
+    "password": "비밀번호",
+    "confirm_password": "비밀번호 확인"
+  },
+  "AccountEmailOnly": {
+    "email": "이메일"
+  },
+  "AccountReset": {
+    "password": "새 비밀번호",
+    "confirm_password": "새 비밀번호 확인",
+    "user": "사용자",
+    "code": "코드"
+  },
+  "AccountCode": {
+    "code": "코드",
+    "remember_machine": "이 브라우저 기억",
+    "return_to": "돌아갈 곳"
+  },
+  "AccountRecovery": {
+    "code": "복구 코드",
+    "return_to": "돌아갈 곳"
+  },
+  "AccountProfile": {
+    "user_name": "사용자 이름",
+    "phone_number": "전화번호"
+  },
+  "AccountNewEmail": {
+    "new_email": "새 이메일"
+  },
+  "AccountPassword": {
+    "old_password": "현재 비밀번호",
+    "new_password": "새 비밀번호",
+    "confirm_password": "새 비밀번호 확인"
+  },
+  "AccountDelete": {
+    "password": "비밀번호"
+  },
+  "AccountUserRow": {
+    "id": "Id",
+    "user_name": "사용자 이름",
+    "email": "이메일",
+    "email_confirmed": "확인됨",
+    "two_factor": "2단계",
+    "locked": "잠김",
+    "roles": "역할"
+  },
+  "AccountUserRoles": {
+    "id": "Id",
+    "roles": "역할 (쉼표로 구분)"
+  },
+  "AccountRoleRow": {
+    "id": "Id",
+    "name": "이름",
+    "permissions": "권한 (쉼표로 구분)"
+  },
+  "AccountExternal": {
+    "email": "이메일"
+  },
+  "AccountEmailCode": {
+    "code": "이메일로 받은 코드",
+    "remember_machine": "이 브라우저 기억",
+    "return_to": "돌아갈 곳"
+  }
+}

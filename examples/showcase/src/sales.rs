@@ -127,7 +127,7 @@ pub async fn search_today(q: DataQuery, ctx: Ctx) -> Result<Page<Order>> {
 
 #[action(permission = "sales.order.read")]
 pub async fn search_archive(q: DataQuery, ctx: Ctx) -> Result<Page<Order>> {
-    let desc = q.sort.first().is_none_or(|s| !(s.field == "id" && !s.desc));
+    let desc = q.sort.first().is_none_or(|s| s.desc);
     let offset = match &q.page {
         PageRequest::Offset { offset, .. } => *offset,
         PageRequest::After { cursor, .. } => cursor.as_ref().and_then(|c| c.0.parse().ok()).unwrap_or(0),
@@ -343,11 +343,15 @@ pub fn archive() -> Screen {
                 .width(190)
                 .column(Order::customer)
                 .flex(2)
+                .no_sort()
                 .column(Order::city)
                 .flex(1)
+                .no_sort()
                 .column(Order::amount)
                 .width(150)
+                .no_sort()
                 .column(Order::status)
+                .no_sort()
                 .width(130)
                 .row_style(muted_if_cancelled),
         )

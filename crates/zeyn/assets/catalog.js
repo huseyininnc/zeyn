@@ -11,6 +11,12 @@
 const BASE = (document.querySelector('meta[name="zeyn-base"]')?.content ?? '').replace(/\/$/, '');
 const reduced = matchMedia('(prefers-reduced-motion: reduce)');
 
+/** Returns the CSRF token of the page, or asks `zeyn.js` for one when the page came without it. */
+async function csrf() {
+  const token = document.querySelector('meta[name="zeyn-csrf"]')?.content;
+  return token || (window.zeynCsrf ? window.zeynCsrf() : '');
+}
+
 /** Posts JSON with the CSRF header. Resolves to the parsed body, or `null` on any failure. */
 async function post(path, body, signal) {
   try {
@@ -19,7 +25,7 @@ async function post(path, body, signal) {
       credentials: 'same-origin',
       headers: {
         'content-type': 'application/json',
-        'x-zeyn-csrf': document.querySelector('meta[name="zeyn-csrf"]')?.content ?? '',
+        'x-zeyn-csrf': await csrf(),
       },
       body: JSON.stringify(body),
       signal,

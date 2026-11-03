@@ -24,6 +24,10 @@ For a library of features shared by several apps use `zeyn new my-domain --lib`.
 
 Rules that fail the build or the tests if broken: every action and screen declares `permission = "..."` or `public`; every user facing text comes from the locale files (`t!("key")`, English and Turkish); use `DataGrid`, `DataQuery`, `Form` and `Screen` from `zeyn::prelude`, not hand written HTML.
 
+## Languages
+
+These docs are written in English, and the English pages below are the source. Every page is also translated into Turkish, Simplified Chinese, Russian, Spanish, Korean, Japanese, Hindi and Arabic, at the same path behind the language code: https://docs.zeynsoft.com/tr/, /zh/, /ru/, /es/, /ko/, /ja/, /hi/ and /ar/ (for example https://docs.zeynsoft.com/tr/language/datagrid). A page whose translation is behind the English source is shown in English there. Prefer the English pages.
+
 ## Start
 
 - [Introduction](https://docs.zeynsoft.com/): what an app looks like

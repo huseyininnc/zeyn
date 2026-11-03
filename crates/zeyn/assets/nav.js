@@ -88,7 +88,8 @@ async function visit(url, push) {
     return;
   }
   const shell = res.headers.get('x-zeyn-shell') ?? 'app';
-  if (shell !== (document.querySelector('.z-app')?.dataset.zeynShell ?? 'app')) {
+  const lang = res.headers.get('content-language') ?? document.documentElement.lang;
+  if (shell !== (document.querySelector('.z-app')?.dataset.zeynShell ?? 'app') || lang !== document.documentElement.lang) {
     main.removeAttribute('aria-busy');
     await swapFrame(new URL(res.url || url.href), push, url.hash);
     return;
@@ -196,7 +197,9 @@ async function swapFrame(url, push, hash) {
   if (push) {
     const main = document.getElementById('z-main');
     if (main) announce(main);
-    window.scrollTo(0, 0);
+    const target = hash && document.getElementById(decodeURIComponent(hash.slice(1)));
+    if (target) target.scrollIntoView();
+    else window.scrollTo(0, 0);
   }
   document.dispatchEvent(new CustomEvent('zeyn:content', { detail: app }));
 }
@@ -229,9 +232,67 @@ document.addEventListener('zeyn:refresh-page', (e) => {
   refreshPage();
 });
 
+/**
+ * The language picker of apps with the language in the URL (`App::locale_paths`): opens the
+ * same page, query and anchor at the chosen language's path. The default language has no path
+ * segment (`/orders`), the others do (`/tr/orders`).
+ */
+document.addEventListener('change', (e) => {
+  const select = e.target instanceof Element ? e.target.closest('select[data-zeyn-locale-path]') : null;
+  if (!select) return;
+  const fallback = select.dataset.zeynLocaleDefault ?? '';
+  const from = document.documentElement.lang;
+  let local = location.pathname.slice(BASE.length) || '/';
+  if (from !== fallback && (local === `/${from}` || local.startsWith(`/${from}/`))) local = local.slice(from.length + 1) || '/';
+  const to = select.value;
+  const path = to === fallback ? local : `/${to}${local}`;
+  visit(new URL(BASE + path + location.search + location.hash, location.href), true);
+});
+
 window.addEventListener('popstate', () => {
   const url = new URL(location.href);
   if (isScreenUrl(url)) visit(url, false);
 });
 
 history.replaceState({ zeyn: true }, '', location.href);
+
+/**
+ * Below 800 px the side menu of the app shell folds behind the menu button under the app's name
+ * (W3C APG disclosure). This shows the button; without the script the menu stays open. Pressing
+ * the button opens or closes the menu, following a link or pressing Escape closes it, and Escape
+ * moves focus back to the button.
+ */
+function initAppMenu() {
+  const toggle = document.querySelector('[data-zeyn-nav-toggle]');
+  if (!toggle || !toggle.hidden) return;
+  toggle.hidden = false;
+  toggle.closest('.z-nav')?.setAttribute('data-zeyn-collapsible', '');
+}
+
+/** Opens or closes the folded app menu. */
+function setAppMenu(open) {
+  const toggle = document.querySelector('[data-zeyn-nav-toggle]');
+  const body = toggle && document.getElementById(toggle.getAttribute('aria-controls'));
+  if (!toggle || !body) return;
+  toggle.setAttribute('aria-expanded', String(open));
+  body.toggleAttribute('data-open', open);
+}
+
+document.addEventListener('click', (e) => {
+  const t = e.target instanceof Element ? e.target : null;
+  if (t?.closest('[data-zeyn-nav-toggle]')) {
+    setAppMenu(t.closest('[data-zeyn-nav-toggle]').getAttribute('aria-expanded') !== 'true');
+  } else if (t?.closest('#z-nav-body[data-open] a[href]')) {
+    setAppMenu(false);
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  const toggle = document.querySelector('[data-zeyn-nav-toggle][aria-expanded="true"]');
+  if (e.key !== 'Escape' || !toggle) return;
+  setAppMenu(false);
+  toggle.focus();
+});
+
+document.addEventListener('zeyn:content', initAppMenu);
+initAppMenu();

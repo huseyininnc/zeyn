@@ -1,0 +1,88 @@
+# CLI ve projeler
+
+`zeyn` komutu proje oluşturur, Feature ekler, bir uygulamayı denetler ve ajanlar için bir MCP sunucusu çalıştırır.
+
+## Komutlar
+
+| Komut | Ne yapar |
+|---|---|
+| `zeyn new <name>` | Standart Feature yapısıyla bir uygulama oluşturur |
+| `zeyn new <name> --lib` | Birkaç uygulamanın paylaştığı model, Feature ve metin kütüphanesi oluşturur |
+| `zeyn g feature <name>` | Modeller, store, action'lar ve screen'lerle `src/features/<name>` ekler |
+| `zeyn routes` | Feature'ları, screen'leri, rotaları, API'leri ve erişimi listeler |
+| `zeyn check` | Derler ve yapısal sorunları ile eksik çevirileri bildirir |
+| `zeyn check --fix` | `src`, `tests` ve `examples` içinde adı değişen Zeyn API'lerini yeniden yazar, sonra denetler |
+| `zeyn mcp` | AI ajanları için stdio üzerinde bir MCP sunucusu çalıştırır |
+
+crates.io üzerinden kurun:
+
+```sh
+cargo install zeyn-cli
+zeyn new my-app
+cd my-app
+cargo run
+```
+
+Bu depo içinde CLI'yi Cargo üzerinden çalıştırın:
+
+```sh
+cargo run -p zeyn-cli -- new my-app
+cd my-app
+cargo run
+```
+
+## Yeni bir uygulama
+
+`zeyn new`, derlenen, testlerini geçen ve ajanlara verilen kuralları izleyen bir proje yazar:
+
+- `AGENTS.md` ve `CLAUDE.md`: proje kuralları ve ajanlar için bir framework dizini.
+- `.mcp.json`: `zeyn` MCP sunucusunu kaydeder; böylece bir ajan `zeyn_check` ve `zeyn_docs` çağırabilir.
+- `config/app.json`: varsayılanlar. `APP_*` ortam değişkenleri bunları geçersiz kılar; örneğin `server.addr` için `APP_SERVER__ADDR`.
+- `locales/en.json` ve `locales/tr.json`: kullanıcının gördüğü her metin.
+- `src/features/`: her Feature için bir klasör, örnek bir `notes` Feature'ı ile.
+- `rustfmt.toml`, `clippy.toml`, `deny.toml`, `rust-toolchain.toml` ve `Cargo.toml` içindeki `[lints]`: CI'ın zorunlu kıldığı standartlar.
+  `rustfmt.toml` `chain_width = 40` ayarlar; böylece kod yukarıdan aşağı okunur: bundan uzun bir çağrı zinciri, satır başına ortalama bir ya da iki nokta olacak şekilde, her çağrı ayrı satıra konur. Ajanlar ve insanlar bir listeyi uzun tek bir satırdan daha hızlı inceler ve diff'ler değişen tek çağrıyı gösterir. Bu ayarı koruyun.
+
+  ```rust
+  DataGrid::of(search_items)
+      .paging(Paging::pages(25))
+      .column(Item::code)
+      .column(Item::qty)
+  ```
+
+  şöyle değil: `DataGrid::of(search_items).paging(Paging::pages(25)).column(Item::code).column(Item::qty)`.
+- `Dockerfile` ve `.dockerignore`: küçük bir konteyner imajı.
+- Yaygın CI sunucuları için, hepsi aynı denetimleri çalıştıran (`cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, `cargo deny check`) ve `Cargo.toml` ile eşleşmeyen bir `vX.Y.Z` etiketini reddeden pipeline'lar:
+  - GitHub Actions için `.github/workflows/ci.yml`; yanında `.github/dependabot.yml` (haftalık Cargo ve action güncellemeleri) ve bir pull request kontrol listesi;
+  - GitLab için `.gitlab-ci.yml`;
+  - Jenkins için `Jenkinsfile` (Docker ajanı, `cargo llvm-cov` ile kapsama).
+- `sonar-project.properties`: SonarQube analizi (Clippy sorunları ve `target/lcov.info` içinden LCOV kapsaması). GitHub workflow'u, `SONAR_HOST_URL` depo değişkeni ve `SONAR_TOKEN` sırrı tanımlıysa bunu çalıştırır; Jenkins, iş `SONAR_ENABLED=true` ayarlıyorsa çalıştırır.
+- `SECURITY.md` ve `CHANGELOG.md` (Keep a Changelog).
+- Git kuruluysa (Windows, macOS ya da Linux) ve klasör zaten bir deponun içinde değilse `main` dalında yerel bir git deposu. Hiçbir şey commit edilmez, bu yüzden ilk commit kendi adınızı ve e-postanızı taşır. `--no-git` bunu atlar.
+
+Her klasör için [Project structure](structure.md) sayfasına bakın.
+
+## Bir uygulamayı denetleme
+
+`zeyn check` önce derleyiciyi, sonra uygulamanın kendi denetimlerini çalıştırır (`App::check`): yinelenen rotalar, iki kez kaydedilmiş screen'ler, bir screen'in ihtiyaç duyduğu ama kimsenin kaydetmediği servisler, kullanılamaz kısayollar, WCAG AA kontrastının altındaki tema belirteçleri ve bir dilde eksik çeviri anahtarları. Bir şey yanlışsa hata ile çıkar; böylece CI bunu çalıştırabilir.
+
+Bir Zeyn sürümü bir API'nin adını değiştirdiğinde, eski ad bir sürüm boyunca kullanımdan kaldırılmış bir takma ad olarak kalır. `zeyn check --fix` eski adları yeniden yazar, örneğin `Grid` yerine `DataGrid` ve `GridQuery` yerine `DataQuery`, sonra yeniden denetler.
+
+```sh
+zeyn check --fix
+```
+
+## Docker
+
+Oluşturulan `Dockerfile` iki aşamada derler ve root yetkisi olmayan bir kullanıcıyla distroless bir imajda çalışır. İkili dosya kendi sağlığını `<app> health` ile denetler; `HEALTHCHECK` bunu kullanır.
+
+```sh
+docker build -t my-app .
+docker run -p 3000:3000 -e APP_SERVER__ADDR=0.0.0.0:3000 my-app
+```
+
+Oluşturulan bir uygulamanın imajı yaklaşık 43 MB'tır ve boşta çalışan bir uygulama birkaç MB RAM kullanır.
+
+## MCP sunucusu
+
+`zeyn mcp`, stdio üzerinden MCP konuşur. Araçları `zeyn_docs` (konuya göre framework başvurusu), `zeyn_describe` (geçerli dizindeki uygulamanın Feature'ları, screen'leri, rotaları ve sorunları), `zeyn_check` (`fix: true` ile `check --fix` çalıştırır), `zeyn_test` ve `zeyn_new_feature`'dır. [MCP and AI agents](mcp.md) sayfasına bakın.

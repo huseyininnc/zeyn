@@ -43,6 +43,17 @@ email = ["server", "dep:lettre"]
 accounts = ["totp", "dep:argon2", "dep:base64", "dep:unicode-normalization"]
 # The `ui::Markdown` component: safe Markdown to HTML, with no dependencies.
 markdown = []
+# Framework texts (`zeyn.*`) in more languages. English and Turkish are always built in; each
+# language adds its catalog (35 to 60 KB of JSON) to the binary. An app offers a language by adding its
+# own catalog for it (`I18n::catalog`). See examples/docs/pages/texts.md.
+lang-zh = []
+lang-ru = []
+lang-es = []
+lang-ko = []
+lang-ja = []
+lang-hi = []
+lang-ar = []
+lang-all = ["lang-zh", "lang-ru", "lang-es", "lang-ko", "lang-ja", "lang-hi", "lang-ar"]
 
 [dependencies]
 zeyn-macros = { path = "../zeyn-macros", version = "0.0.5" }

@@ -1,0 +1,207 @@
+# قاعدة البيانات
+
+تحفظ `zeyn::sql` الكيانات (entities) في قاعدة بيانات SQL. تسردها من `DataQuery` الذي ترسله الشبكة (المرشحات والفرز والصفحات والمجاميع والتجميعات) وتحفظها مع فحوص نسخة الصف. PostgreSQL خلف ميزة Cargo المسماة `postgres`، وOracle خلف `oracle`، فلا يصرّف تطبيق بلا قاعدة بيانات شيئاً منها.
+
+```toml
+zeyn = { version = "0.0.5", features = ["postgres"] }   # or ["oracle"], or both
+```
+
+## الإعداد
+
+سجّل `Db` واحداً خدمةً (service) وخذه في الإجراءات:
+
+```rust
+let db = Db::from_config(&config).await?;
+App::new("Stock").config(config).service(db)
+
+#[action(permission = "stock.product.read")]
+pub async fn search_products(q: DataQuery, db: Db) -> Result<Page<Product>> {
+    db.find(&q).await
+}
+
+#[action(permission = "stock.product.write")]
+pub async fn save_product(p: Valid<Product>, db: Db) -> Result<Product> {
+    if p.id.0 == 0 { db.insert(&*p).await } else { db.update(&*p).await }
+}
+```
+
+تقرأ `Db::from_config` المفتاح `database.url` سراً وحدود المجمّع (pool) من `database.*`:
+
+| المفتاح | الافتراضي | المعنى |
+|---|---|---|
+| `database.url` | مطلوب | `postgres://user:password@host:5432/db` أو `oracle://user:password@host:1521/service` |
+| `database.max_connections` | 10 | حجم المجمّع؛ تنتظر الطلبات اتصالاً حراً |
+| `database.min_connections` | 0 | اتصالات تبقى مفتوحة عند الخمول |
+| `database.acquire_timeout_ms` | 5000 | أطول انتظار لاتصال |
+| `database.idle_timeout_s` | 600 | تُغلق الاتصالات الخاملة فوق الحد الأدنى بعد هذه المدة |
+| `database.statement_timeout_ms` | 30000 | أطول مدة يجوز أن يعمل فيها أمر؛ و0 يُبقي افتراضي الخادم |
+| `database.count_cap` | 1000000 | أكبر مجموع يُعدّ لصفحة |
+
+تفعل `Db::connect(url, PoolLimits { .. })` الشيء نفسه دون `Config`. وتختار بنية عنوان URL (scheme) المشغّل. تُكتب المحارف مثل `@` أو `:` في كلمة مرور Oracle مرمّزة بالنسبة المئوية (`%40`).
+
+تُفتح اتصالات PostgreSQL كسولاً، فيبدأ التطبيق وقاعدة البيانات متوقفة وأول استعلام يبلّغ عن المشكلة. أما Oracle فتسأل الخادم عن إصداره عند الاتصال، ما لم يحدد العنوان أي SQL يُكتب (`?compat=11` أو `?compat=12`)؛ ومع ضبط `compat` يبدأ دون قاعدة البيانات أيضاً.
+
+يحتفظ مثال `inventory` بمنتجاته في الذاكرة، أو في قاعدة البيانات التي يسميها `ZEYN_DATABASE_URL` (ابنِه بـ `--features postgres` أو `--features oracle`):
+
+```
+docker run -d --name zeyn-pg -e POSTGRES_PASSWORD=zeyn -p 55432:5432 postgres:17-alpine
+ZEYN_DATABASE_URL=postgres://postgres:zeyn@127.0.0.1:55432/postgres cargo run -p zeyn-example-inventory --features postgres
+```
+
+## Oracle Instant Client
+
+مشغّل Oracle هو حزمة `oracle` المبنية على ODPI-C. يُصرَّف دون برمجيات Oracle، لكنه يحمّل وقت التشغيل مكتبة Oracle Client (`oci.dll` و`libclntsh.so`). Oracle Instant Client مجاني الاستخدام:
+
+1. نزّل Instant Client Basic Light لمنصتك من صفحة Instant Client لدى Oracle. على Windows x64 خذ الملف المضغوط `instantclient-basiclite-windows.x64-19.*.zip`. الإصدار 19 يتصل بـ Oracle Database من 11.2 إلى 23ai؛ والعملاء الأحدث لا تتصل بـ 11g.
+2. فكّ ضغطه في مجلد خاص به، مثل `C:\oracle\instantclient_19`.
+3. ضع ذلك المجلد أولاً في `PATH`، أو اضبط `ZEYN_ORACLE_CLIENT_DIR` عليه. المتغير يغلب `PATH`، وهذا يفيد عند تثبيت Oracle home آخر. على Linux، ثبّت حزمة RPM أو اضبط `LD_LIBRARY_PATH`؛ كما تحتاج Basic Light إلى `libaio`.
+
+بدون المكتبة يفشل أول اتصال بالرسالة `DPI-1047: Cannot locate a 64-bit Oracle
+Client library`.
+
+## اللهجات (Dialects)
+
+بانٍ SQL مشترك. وتوفّر `Dialect` ما يختلف فقط، وتنفّذها `Postgres` و`Oracle { compat }`:
+
+| | PostgreSQL | Oracle 12c وما بعده (`V12`) | Oracle 11g (`V11`) |
+|---|---|---|---|
+| المعاملات | `$1` | `:1` | `:1` |
+| المعرّفات | `"code"`، حتى 63 حرفاً | `"CODE"`، حتى 30 حرفاً | `"CODE"`، حتى 30 حرفاً |
+| الصفحات | `LIMIT $n OFFSET $m` | `OFFSET :m ROWS FETCH NEXT :n ROWS ONLY` | نافذة `ROWNUM` فوق الاستعلام المرتب |
+| المفاتيح الجديدة | identity، و`RETURNING` | identity، و`RETURNING id INTO :n` | `<table>_seq.NEXTVAL` |
+| القراءة الراجعة بعد الكتابة | `RETURNING` للصف | قراءة بالمفتاح | قراءة بالمفتاح |
+| نعم/لا | `BOOLEAN` | `NUMBER(1)` | `NUMBER(1)` |
+| النص الفارغ | قيمة | NULL | NULL |
+
+يتبع `compat` فكرة `UseOracleSQLCompatibility("11")` في EF Core: إصدار الخادم يختاره عندما لا يفعل العنوان. تبقى المعرّفات ضمن 30 حرفاً في كل إصدارات Oracle لأن 12.1 له الحد نفسه كما في 11g؛ واسم كيان أو حقل أطول خطأ يسمّيه.
+
+تخزّن Oracle السلسلة الفارغة NULL. يقرأ Zeyn قيمة NULL في حقل `String` مطلوب على أنها `""`، ويكتب أعمدة النص قابلة لـ NULL، ويفرز النص ويقسمه إلى صفحات على أنه عمود قابل لـ NULL، فتبقى المؤشرات (cursors) دقيقة. أما `Option<String>` الذي يحمل `Some("")` فيُقرأ راجعاً `None`.
+
+مشغّل Oracle حاجز (blocking). كل استدعاء يعمل على خيوط Tokio الحاجزة مع اتصال مأخوذ من المجمّع المحدود، فلا يوقف بيئة التشغيل غير المتزامنة أبداً؛ ويعمل على الأكثر `max_connections` استدعاء في الوقت نفسه وينتظر الباقي حتى `acquire_timeout_ms`.
+
+## الجداول
+
+تُسمّى الأعمدة بأسماء الحقول. الأنواع:
+
+| الحقل | PostgreSQL | Oracle |
+|---|---|---|
+| معرّف الكيان `#[key]` | `BIGINT GENERATED BY DEFAULT AS IDENTITY` | `NUMBER(19)` identity (12c وما بعده) أو مع sequence (11g) |
+| `String` | `VARCHAR(max_len)` أو `TEXT` | `VARCHAR2(max_len CHAR)` أو `VARCHAR2(4000)`، قابل لـ NULL |
+| `i32`, `i64` | `BIGINT` (ويعمل عمود `INTEGER` أيضاً) | `NUMBER(19)` |
+| `bool` | `BOOLEAN` | `NUMBER(1)` |
+| `Money` | `BIGINT` للمبلغ بأصغر وحدة، إضافة إلى `<field>_currency VARCHAR(3)` | `NUMBER(19)`، إضافة إلى `<field>_currency` |
+| `Decimal` | `NUMERIC(precision, scale)` من قواعد الحقل، و`NUMERIC(18, 2)` بدونها | `NUMBER(precision, scale)` |
+| `Date` | `DATE` | `DATE` |
+| `Time` | `TIME` | `VARCHAR2(8)` يحمل `HH:MM:SS` |
+| `DateTime` | `TIMESTAMPTZ(3)` | `TIMESTAMP(3)` يحمل UTC |
+| `LocalDateTime` | `TIMESTAMP` | `TIMESTAMP(0)` |
+| تعداد `#[choice]` | `VARCHAR` يحمل اسم المتغير (variant) | `VARCHAR2` |
+| أنواع الحقول المخصصة | `TEXT` يحمل JSON | `CLOB` يحمل JSON |
+| `Option<T>` | العمود نفسه، قابل لـ NULL | العمود نفسه، قابل لـ NULL |
+
+تُخزَّن العملات بصيغة `TRY` و`USD` و`EUR`. تنتقل التواريخ والأوقات نصاً بصيغة ISO ويحوّلها SQL بتنسيقات ثابتة (`TO_DATE(:1, 'YYYY-MM-DD')` و`to_char(...)`)، فلا تغيّر إعدادات الجلسة مثل `NLS_DATE_FORMAT` أو المنطقة الزمنية في PostgreSQL النتائج. وتُربط الأعداد العشرية نصاً دقيقاً دون فاصلة عشرية (`12345E-2`، تقرؤها `CAST(... AS NUMERIC)` و`TO_NUMBER(...)`) وتُقرأ راجعة بـ `CAST(... AS TEXT)` أو `TO_CHAR(..., 'TM9', 'NLS_NUMERIC_CHARACTERS=''.,''')`، فلا يغيّرها `NLS_NUMERIC_CHARACTERS` أيضاً.
+
+تكتب `create_table::<E>(dialect)` (أو `db.create_table::<E>()`) أمر `CREATE TABLE` للهياكل الأولية والاختبارات، مع قيد اسمه `<table>_<field>_key` لكل حقل `#[rule(unique)]` وفي 11g مع sequence المفتاح. مخططات الإنتاج مكانها عمليات الترحيل (migrations). على PostgreSQL:
+
+```rust
+db.migrate(&sqlx::migrate!("./migrations")).await?;
+db.migrate_dir("./migrations").await?;
+```
+
+الأولى تضمّن عمليات الترحيل وقت التصريف، والثانية تقرأ المجلد وقت التشغيل. تحتاج `sqlx::migrate!` إلى `sqlx` بميزتيه `macros` و`migrate` في `Cargo.toml` الخاص بالتطبيق؛ أما `migrate_dir` فلا تحتاج شيئاً إضافياً. تُرحَّل مخططات Oracle بأداة الفريق نفسه؛ وتعطي `create_table` السكربت المبدئي.
+
+## القراءة
+
+تشغّل `db.find::<E>(&query)` ثلاثة أوامر على الأكثر على اتصال واحد: الصفحة والعدّ والمجاميع. تُقرأ المرشحات بالشيفرة نفسها التي تقرأ بها `DataQuery::apply`، فتتصرف القائمة بالطريقة نفسها على بيانات الذاكرة وفي SQL:
+
+| المرشح | SQL |
+|---|---|
+| `contains`, `starts_with` | `LOWER(col) LIKE $1 ESCAPE '\'` مع تهريب `%` و`_` في النص |
+| `equals` | `LOWER(col) = $1` |
+| `from`, `to` على الأرقام والمال | `col >= $1`, `col <= $2` |
+| `from`, `to` على التواريخ والأوقات | `col >= CAST($1 AS date)`؛ وحد تاريخ على لحظة يغطي اليوم كله في المنطقة الزمنية للمستخدم |
+| `any_of` | `col IN ($1, $2, ...)` |
+| `is` | `col = $1` |
+| `blank` | `col IS NULL`, `col IS NOT NULL` |
+
+يُتجاهل `contains` على أعمدة المال ونعم/لا في SQL. يُفرز النص بترتيب قاعدة البيانات (Oracle: `NLS_SORT`).
+
+ينتهي كل فرز بالمفتاح، فيكون الترتيب كلياً. تأتي قيم NULL أولاً في التصاعدي وأخيراً في التنازلي، كما في الذاكرة؛ وتُكتب عبارة `NULLS` للأعمدة القابلة لـ NULL فقط، فتخدم الفهارس العادية عمليات الفرز الأخرى.
+
+تقرأ `get(key)` صفاً واحداً وتفشل بـ `Error::NotFound` عند عدم وجوده. ويمكن قراءة أي جدول أو عرض (view) عبر كيان، مثل `user_sequences` في Oracle.
+
+## المؤشرات (Cursors)
+
+تستخدم الصفحات المرقمة الإزاحات (offsets). ويستخدم التمرير اللانهائي والافتراضي مؤشرات المجموعة المفتاحية (keyset)، التي لا تبطؤ في عمق القائمة ولا تتخطى صفوفاً ولا تكررها عند إدراج صفوف أخرى:
+
+```sql
+WHERE "code" <= $1 AND (("code" < $2) OR ("code" = $3 AND "id" > $4))
+ORDER BY "code" DESC, "id" ASC LIMIT $5
+```
+
+تجلب الصفحة صفاً أكثر مما طُلب لتعرف هل يتبعها المزيد. ثم تحمل `Page::next` مؤشراً: JSON بترميز base64url فيه حقول الفرز واتجاهاتها وقيمة آخر صف لكل مفتاح فرز (المفتاح أخيراً). المؤشر معتم للعملاء لكنه ليس سراً، ولا يثق به الخادم أبداً. يُفك ترميزه بحد للحجم، ويُرفض عندما يختلف ترتيبه عن ترتيب الاستعلام، وتُفحص كل قيمة مقابل نوع عمودها قبل ربطها. المؤشر السيئ خطأ تحقق (validation) لا استعلام. هو يقول أين يُتابع فقط؛ وتُطبَّق المرشحات والصلاحيات من جديد.
+
+الصفحات المجمّعة تستخدم الإزاحات لمؤشراتها.
+
+## المجاميع والعدّ
+
+يعدّ `with_total` ما لا يزيد عن `database.count_cap` صف (`COUNT(*)` فوق الاستعلام المقيّد)، فيبقى المجموع على جدول ضخم رخيصاً؛ وعندما يبلغ العدّ الحد تكون `Page::total` هي الحد.
+
+مجاميع الأعمدة أمر تجميع واحد على كل صف يطابق المرشحات. وهي تتبع قواعد الذاكرة: المجموع الفارغ 0، والمتوسط الفارغ فارغ، ومتوسطات المال تُقرَّب بعيداً عن الصفر عند منتصف القيمة، والمال بأكثر من عملة واحدة لا مجموع له.
+
+يتحول `DataQuery::group` إلى `GROUP BY` مع العدّ والمجاميع المطلوبة لكل مجموعة.
+
+## الكتابة
+
+- تترك `insert(&row)` المفتاح الجديد (0) لقاعدة البيانات، وتضبط نسخة الصف على 1، وتعيد الصف المخزن.
+- تشغّل `update(&row)` الأمر `UPDATE ... SET version = version + 1 WHERE id = $1 AND version = $2`. صفر صفوف يعني أن غيرك حفظ أولاً (أو حذف الصف): `Error::Conflict`.
+- تفشل `delete::<E>(key)` بـ `Error::NotFound` عندما لا يُحذف شيء.
+- حقول `#[readonly]` لا تُكتب أبداً من نموذج (model)، فلا يستطيع نموذج مزوَّر تغييرها. شيفرة الخادم تغيّرها بـ SQL خاص بها: `db.execute("UPDATE products SET stock = stock - $1 WHERE id = $2", args)`. تأخذ `execute` سلسلة حرفية (literal)، فلا يمكن أن تصل القيم إلا معاملات.
+
+يتحول انتهاك التفرد (PostgreSQL `23505`، Oracle `ORA-00001`) إلى خطأ تحقق على الحقل: حقل `#[rule(unique)]` الذي يرد اسمه في اسم القيد، أو الحقل الفريد الوحيد. يعرضه النموذج تحت حقل الإدخال كأي قاعدة أخرى. سمِّ القيود `<table>_<column>_key`.
+
+## المعاملات (Transactions)
+
+```rust
+let mut tx = db.begin().await?;
+let order = tx.insert(&order).await?;
+tx.execute("UPDATE products SET stock = stock - $1 WHERE id = $2", vec![qty.into(), id.0.into()]).await?;
+tx.commit().await?;
+```
+
+لـ `Tx` الاستدعاءات نفسها التي لـ `Db` على اتصال واحد. إسقاطه دون `commit` يتراجع. أما الاستدعاءات على `Db` نفسه فتُثبَّت واحداً واحداً.
+
+## التدفقات (Streams)
+
+تعيد `db.stream::<E>(&query)` كل صف مطابق بالترتيب دون تقسيم إلى صفحات، للتصدير. تقرأ مهمة (task) الصفوف في قناة من `STREAM_BUFFER` (64) صفاً وتنتظر ما دام القارئ متأخراً، فتبقى الذاكرة ثابتة مهما كان حجم النتيجة. إسقاط التدفق يوقف الاستعلام ويحرر الاتصال. وينفّذ `RowStream` السمة `futures_core::Stream`.
+
+## الأمان: حقن SQL
+
+- المعرّفات (أسماء الجداول والأعمدة) تأتي من الكيان فقط: `E::TABLE` وقائمة `FieldMeta` الخاصة به. الأسماء التي يرسلها عميل في المرشحات والفرز يُبحث عنها في تلك القائمة وتُسقَط عند غيابها. يُفحص كل معرّف (حروف وأرقام و`_`، وبطول لا يتجاوز طول اللهجة) ويُوضع بين علامات اقتباس.
+- القيم دائماً معاملات مربوطة، بما فيها أنماط `LIKE` وقيم المؤشرات والحدود والإزاحات. لا تُكتب أي قيمة في نص SQL أبداً.
+- SQL المكتوب يدوياً يمر عبر `execute(&'static str, args)`: يجب أن يكون الأمر سلسلة حرفية.
+- تُقصّ الحدود على الخادم (`MAX_PAGE_SIZE` و`MAX_FILTERS` و`MAX_SORT` وطول نص المرشح وحجم `any_of`)، مهما طلب العميل.
+- تُسجَّل أخطاء المشغّل بصيغة `Error::Internal` ولا تُعرض للمستخدمين أبداً. يُقرأ عنوان الاتصال بصيغة `Secret` ولا يُسجَّل أبداً.
+
+## الأداء
+
+- الأوامر مُجهَّزة ومخزنة مؤقتاً لكل اتصال (ذاكرة أوامر sqlx المؤقتة، وذاكرة أوامر Oracle المؤقتة بحجم 64).
+- تُقرأ الصفوف في أنواع خلايا بسيطة قليلة وتُنقل إلى النموذج بمفكّك تسلسل serde: بلا خريطة وسيطة ولا نسخ للنص.
+- المجمّعات محدودة وكل `find` يستخدم اتصالاً واحداً لأمريه أو أوامره الثلاثة.
+- تجلب Oracle 128 صفاً في كل رحلة. وتُقرأ الصفحة (501 صف على الأكثر) على خيط حاجز وتُسلَّم دفعة واحدة؛ أما التدفقات فتسير صفاً صفاً.
+- تحمل التدفقات `STREAM_BUFFER` صفاً على الأكثر.
+
+## الاختبارات
+
+لباني SQL اختبارات وحدة للهجتين لا تحتاج قاعدة بيانات. وتقارن اختبارات التكامل `Db::find` بـ `DataQuery::apply` على الصفوف نفسها، وتمشي على كل مؤشر keyset، وتفحص الحفظ والتعارضات وأخطاء التفرد والمعاملات والتدفقات. وتعمل عندما يحمل متغيرها عنواناً واحداً أو أكثر (مفصولة بمسافات) وتذكر أنها تُخطّيت في غير ذلك:
+
+```
+docker run -d --name zeyn-pg -e POSTGRES_PASSWORD=zeyn -p 55432:5432 postgres:17-alpine
+ZEYN_TEST_PG=postgres://postgres:zeyn@127.0.0.1:55432/postgres cargo test -p zeyn --features postgres --test postgres
+
+docker run -d --name zeyn-ora11 -p 15211:1521 -e ORACLE_PASSWORD=zeyn -e APP_USER=zeyn -e APP_USER_PASSWORD=zeyn gvenzl/oracle-xe:11-slim
+docker run -d --name zeyn-ora21 -p 15221:1521 -e ORACLE_PASSWORD=zeyn -e APP_USER=zeyn -e APP_USER_PASSWORD=zeyn gvenzl/oracle-xe:21-slim
+ZEYN_TEST_ORACLE="oracle://zeyn:zeyn@127.0.0.1:15211/XE oracle://zeyn:zeyn@127.0.0.1:15221/XEPDB1" cargo test -p zeyn --features oracle --test oracle
+```
+
+تستغرق حاويات Oracle بضع دقائق لتبدأ؛ انتظر ظهور `DATABASE IS READY TO USE!` في `docker logs`.

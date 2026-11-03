@@ -159,7 +159,7 @@ function setupHead(grid, s) {
   for (const th of head.cells) {
     if (!th.dataset.field) continue;
     const label = th.textContent.trim();
-    const sort = make('button', 'z-sort', { type: 'button' });
+    const sort = th.dataset.sort === 'off' ? make('span', 'z-th-label') : make('button', 'z-sort', { type: 'button' });
     sort.append(...th.childNodes);
     const menu = make('button', 'z-col-menu', {
       type: 'button',
@@ -361,11 +361,14 @@ function columnMenu(grid, th) {
     setColumns(grid, next);
   };
   const all = columnsOf(grid);
-  return [
+  const sorting = th.dataset.sort === 'off' ? [] : [
     { label: t.menu_sort_asc || 'Sort ascending', checked: key ? !key.desc : false, radio: true, run: sortBy(false) },
     { label: t.menu_sort_desc || 'Sort descending', checked: key ? key.desc : false, radio: true, run: sortBy(true) },
     { label: t.menu_sort_clear || 'Clear sort', disabled: !key, run: sortBy(null) },
     { separator: true },
+  ];
+  return [
+    ...sorting,
     { label: t.menu_pin_start || 'Pin to start', checked: th.dataset.pin === 'start', radio: true, run: pin('start') },
     { label: t.menu_pin_end || 'Pin to end', checked: th.dataset.pin === 'end', radio: true, run: pin('end') },
     { label: t.menu_unpin || 'Unpin', disabled: !th.dataset.pin, run: pin(null) },
@@ -405,7 +408,7 @@ function openColumnMenu(button) {
 
 /** Sets `aria-sort` on every header and the sort order badge when several keys are active. */
 function showSort(grid, s) {
-  for (const th of grid.querySelectorAll(':scope > table > thead th[data-field]')) {
+  for (const th of grid.querySelectorAll(':scope > table > thead th[data-field]:not([data-sort="off"])')) {
     const i = s.sort.findIndex((k) => k.field === th.dataset.field);
     th.setAttribute('aria-sort', i < 0 ? 'none' : s.sort[i].desc ? 'descending' : 'ascending');
     th.querySelector('.z-sort-order')?.remove();
