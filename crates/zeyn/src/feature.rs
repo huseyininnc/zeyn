@@ -250,6 +250,14 @@ impl Feature {
     /// revalidate. The feature's guards and the interceptors still run. Keep private files in a
     /// source registered with [`Feature::media`].
     ///
+    /// `open` must return the same bytes for every visitor: no per user or per language content,
+    /// since shared caches keep one response for everyone. With a long `max_age`, give ids that
+    /// change with the content (a content hash such as `poster-3f9a2c.jpg`), so a new file gets a
+    /// new address instead of waiting for caches to expire. Reads of public sources do not count
+    /// against `App::rate_limit`, because one page loads many images and many visitors can share
+    /// one address; IP allow and deny rules still apply. Limit bandwidth abuse in a CDN or reverse
+    /// proxy in front of the app.
+    ///
     /// ```ignore
     /// Feature::new("catalog").public_media("posters", 86_400, PosterFolder::new("data/posters"))
     /// ```

@@ -101,6 +101,8 @@ pub struct Embed<T = Given> {
     allow: Vec<EmbedPermission>,
     aspect: (u32, u32),
     poster: Option<String>,
+    notice: Option<Text>,
+    remember: Option<&'static str>,
     _title: PhantomData<T>,
 }
 
@@ -113,6 +115,8 @@ impl Embed<NoTitle> {
             allow: Vec::new(),
             aspect: (16, 9),
             poster: None,
+            notice: None,
+            remember: None,
             _title: PhantomData,
         }
     }
@@ -125,6 +129,8 @@ impl Embed<NoTitle> {
             allow: self.allow,
             aspect: self.aspect,
             poster: self.poster,
+            notice: self.notice,
+            remember: self.remember,
             _title: PhantomData,
         }
     }
@@ -156,6 +162,75 @@ impl<T> Embed<T> {
         self.poster = Some(poster.into());
         self
     }
+
+    /// A text of the app shown on the click to load button, such as a content warning. It is part
+    /// of the button's accessible name, so screen readers read it before the button is pressed.
+    /// Without [`Embed::click_to_load`] it turns the button on with no poster.
+    ///
+    /// ```
+    /// # use zeyn::ui::Embed;
+    /// # use zeyn::Text;
+    /// let episode = Embed::url("https://player.example.com/e/12")
+    ///     .title(Text::from("Episode 12"))
+    ///     .click_to_load("")
+    ///     .notice(Text::from("Contains flashing lights."));
+    /// ```
+    pub fn notice(mut self, notice: impl Into<Text>) -> Self {
+        self.notice = Some(notice.into());
+        self.poster.get_or_insert_with(String::new);
+        self
+    }
+
+    /// Remembers for the rest of the browser session that the user pressed the click to load
+    /// button, so other embeds with the same `scope` load at once on later pages. Use it for a
+    /// content warning that should be asked once per visit, not on every episode page.
+    ///
+    /// ```
+    /// # use zeyn::ui::Embed;
+    /// # use zeyn::Text;
+    /// let episode = Embed::url("https://player.example.com/e/12")
+    ///     .title(Text::from("Episode 12"))
+    ///     .notice(Text::from("Contains flashing lights."))
+    ///     .remember_for_session("flashing-lights");
+    /// ```
+    ///
+    /// The consent is kept in the browser's `sessionStorage` under `zeyn.consent.{scope}`; no
+    /// cookie is set and the server never sees it, so cached public pages stay the same for
+    /// everyone. Session storage belongs to one tab: a new tab asks again, and closing the tab
+    /// forgets it. A remembered frame loads without moving focus (WCAG 2.2 3.2.1 On Focus and
+    /// 2.4.3 Focus Order); focus moves to the frame only after a real press. When storage is
+    /// blocked, unavailable or holds anything else, and without JavaScript, the button stays.
+    /// Without [`Embed::click_to_load`] it turns the button on with no poster.
+    ///
+    /// # Panics
+    ///
+    /// When `scope` is empty, longer than 40 characters or holds anything but ASCII letters,
+    /// digits, `-` and `_`.
+    pub fn remember_for_session(mut self, scope: &'static str) -> Self {
+        assert!(
+            valid_scope(scope),
+            "Embed::remember_for_session: scope `{scope}` is not valid. Use 1 to 40 ASCII letters, digits, `-` or `_`, such as \"flashing-lights\"; embeds that share a warning share a scope."
+        );
+        self.remember = Some(scope);
+        self.poster.get_or_insert_with(String::new);
+        self
+    }
+}
+
+/// Whether `scope` names a remembered consent: 1 to 40 ASCII letters, digits, `-` and `_`.
+const fn valid_scope(scope: &str) -> bool {
+    let b = scope.as_bytes();
+    if b.is_empty() || b.len() > 40 {
+        return false;
+    }
+    let mut i = 0;
+    while i < b.len() {
+        if !(b[i].is_ascii_alphanumeric() || b[i] == b'-' || b[i] == b'_') {
+            return false;
+        }
+        i += 1;
+    }
+    true
 }
 
 impl Complete for Embed<Given> {}
@@ -185,8 +260,9 @@ impl Component for Embed<Given> {
             escape(&url)
         );
         let (w, h) = self.aspect;
+        let remember = self.remember.map(|s| format!(r#" data-zeyn-embed-remember="{}""#, escape(s))).unwrap_or_default();
         out.push_str(&format!(
-            r#"<div class="z-embed" style="--z-aspect: {w} / {h}" data-testid="{}.embed">"#,
+            r#"<div class="z-embed" style="--z-aspect: {w} / {h}"{remember} data-testid="{}.embed">"#,
             r.scope
         ));
         match &self.poster {
@@ -197,8 +273,12 @@ impl Component for Embed<Given> {
                 } else {
                     String::new()
                 };
+                let notice = match &self.notice {
+                    Some(n) => format!(r#"<span class="z-embed-notice">{}</span>"#, r.text(n)),
+                    None => String::new(),
+                };
                 out.push_str(&format!(
-                    r#"<button type="button" class="z-embed-load" data-zeyn-embed-load>{image}<span class="z-embed-play" aria-hidden="true"></span><span class="z-embed-label"><strong>{}</strong><small>{}</small></span></button><template data-zeyn-embed>{frame}</template>"#,
+                    r#"<button type="button" class="z-embed-load" data-zeyn-embed-load>{image}<span class="z-embed-play" aria-hidden="true"></span><span class="z-embed-label">{notice}<strong>{}</strong><small>{}</small></span></button><template data-zeyn-embed>{frame}</template>"#,
                     r.text(&Text::key("zeyn.ui.embed.load").arg("title", self.title.clone())),
                     r.text(&Text::key("zeyn.ui.embed.from").arg("host", host_of(&url).to_string())),
                 ));
@@ -215,6 +295,8 @@ impl Component for Embed<Given> {
             "allow": self.allow,
             "aspect": [self.aspect.0, self.aspect.1],
             "click_to_load": self.poster.is_some(),
+            "notice": self.notice,
+            "remember_for_session": self.remember,
         })
     }
 }

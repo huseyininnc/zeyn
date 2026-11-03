@@ -357,6 +357,39 @@ async fn private_media_next_to_public_media_still_needs_its_permission() {
     assert_ne!(h(&headers, header::CACHE_CONTROL), "public, max-age=86400");
 }
 
+#[tokio::test]
+async fn public_media_reads_skip_the_rate_limit_but_private_media_and_ip_rules_still_apply() {
+    let router = App::new("Test")
+        .i18n(I18n::new("en"))
+        .rate_limit(zeyn::RateLimit::per_ip(2, std::time::Duration::from_secs(60)))
+        .deny_ips(["198.51.100.0/24"])
+        .feature(Feature::new("catalog").public_media("posters", 86_400, Files::default()).media("films", "media.play", Files::default()))
+        .router()
+        .unwrap();
+    let from = |path: &str, ip: &str| {
+        let mut req = Request::get(path).body(Body::empty()).unwrap();
+        req.extensions_mut().insert(axum::extract::ConnectInfo(std::net::SocketAddr::new(ip.parse().unwrap(), 5000)));
+        req
+    };
+    for _ in 0..30 {
+        assert_eq!(send(&router, from("/_zeyn/media/posters/clip.mp4", "203.0.113.5")).await.0, StatusCode::OK);
+    }
+    assert_eq!(send(&router, from("/_zeyn/media/films/clip.mp4", "203.0.113.5")).await.0, StatusCode::FORBIDDEN);
+    assert_eq!(send(&router, from("/_zeyn/media/films/clip.mp4", "203.0.113.5")).await.0, StatusCode::FORBIDDEN);
+    assert_eq!(
+        send(&router, from("/_zeyn/media/films/clip.mp4", "203.0.113.5")).await.0,
+        StatusCode::TOO_MANY_REQUESTS,
+        "private media still counts"
+    );
+    assert_eq!(
+        send(&router, from("/_zeyn/media/posters/a/clip.mp4", "203.0.113.5")).await.0,
+        StatusCode::TOO_MANY_REQUESTS,
+        "only a file of a public source skips the limit"
+    );
+    assert_eq!(send(&router, from("/_zeyn/media/posters/clip.mp4", "203.0.113.5")).await.0, StatusCode::OK);
+    assert_eq!(send(&router, from("/_zeyn/media/posters/clip.mp4", "198.51.100.7")).await.0, StatusCode::FORBIDDEN);
+}
+
 #[test]
 fn public_media_cache_is_capped_at_a_year() {
     let f = Feature::new("c").public_media("p", u32::MAX, Files::default());

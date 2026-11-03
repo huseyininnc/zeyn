@@ -16,7 +16,9 @@
  * keeps positions for the signed in user; otherwise it is kept in this browser's local storage.
  *
  * Embeds: `zeyn::ui::Embed` with `click_to_load` renders a poster button and the frame inside an
- * inert `<template>`. Pressing the button puts the frame in its place and moves focus to it.
+ * inert `<template>`. Pressing the button puts the frame in its place and moves focus to it. With
+ * `remember_for_session` the press is kept in `sessionStorage` (one tab), and later pages load
+ * the frames of that scope by themselves without moving focus.
  * @module media
  */
 
@@ -26,6 +28,8 @@ const RESUME_MARGIN_S = 5;
 const SEEK_STEP_S = 5;
 const JUMP_STEP_S = 10;
 const VOLUME_STEP = 5;
+/** Prefix of the `sessionStorage` keys that hold a remembered embed consent. */
+const CONSENT = 'zeyn.consent.';
 
 /** Player state by root element. */
 const players = new WeakMap();
@@ -80,9 +84,10 @@ const local = {
   },
 };
 
-/** Sets up every player inside `root`. Safe to call more than once. */
+/** Sets up every player and remembered embed inside `root`. Safe to call more than once. */
 function init(root) {
   root.querySelectorAll('[data-zeyn-player]').forEach(setup);
+  restoreEmbeds(root);
 }
 
 /** Wires one player: sources, tracks, events and the saved position. */
@@ -568,15 +573,52 @@ new MutationObserver((records) => {
 init(document);
 
 /**
- * Loads a click to load embed: the frame in the button's template replaces the poster.
+ * Whether this tab consented to the embeds of `scope`. False when storage is missing, blocked or
+ * holds anything but the exact value, so the button stays.
+ */
+function consented(scope) {
+  try {
+    return sessionStorage.getItem(CONSENT + scope) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** Puts the frame of a click to load embed in place of its button; `focus` moves focus to it. */
+function loadEmbed(root, focus) {
+  const template = root.querySelector(':scope > template[data-zeyn-embed]');
+  if (!template) return;
+  root.replaceChildren(template.content.cloneNode(true));
+  if (focus) root.querySelector('iframe')?.focus();
+}
+
+/**
+ * Loads the remembered embeds inside `root` whose scope this tab consented to, without moving
+ * focus. An embed that holds focus keeps its button, so focus is never lost.
+ */
+function restoreEmbeds(root) {
+  root.querySelectorAll('.z-embed[data-zeyn-embed-remember]').forEach((e) => {
+    if (!e.contains(document.activeElement) && consented(e.dataset.zeynEmbedRemember)) loadEmbed(e, false);
+  });
+}
+
+/**
+ * Loads a click to load embed when its button is pressed and moves focus to the frame. With a
+ * remembered scope the consent is stored for this tab and the other embeds of that scope load too.
  * @example
- * // <div class="z-embed"><button data-zeyn-embed-load>..</button><template data-zeyn-embed><iframe ..></template></div>
+ * // <div class="z-embed" data-zeyn-embed-remember="flashing"><button data-zeyn-embed-load>..</button><template data-zeyn-embed><iframe ..></template></div>
  */
 document.addEventListener('click', (e) => {
   const button = e.target instanceof Element ? e.target.closest('[data-zeyn-embed-load]') : null;
   const root = button?.closest('.z-embed');
-  const template = root?.querySelector('template[data-zeyn-embed]');
-  if (!template) return;
-  root.replaceChildren(template.content.cloneNode(true));
-  root.querySelector('iframe')?.focus();
+  if (!root) return;
+  loadEmbed(root, true);
+  const scope = root.dataset.zeynEmbedRemember;
+  if (!scope) return;
+  try {
+    sessionStorage.setItem(CONSENT + scope, '1');
+  } catch {
+    return;
+  }
+  restoreEmbeds(document);
 });

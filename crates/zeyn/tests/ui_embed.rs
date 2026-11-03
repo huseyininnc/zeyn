@@ -88,6 +88,62 @@ fn click_to_load_shows_a_poster_button_and_keeps_the_frame_inert() {
 }
 
 #[test]
+fn a_notice_on_the_gate_is_escaped_translated_and_part_of_the_button_name() {
+    let e = Embed::url("https://www.youtube-nocookie.com/embed/abc")
+        .title("Episode 12")
+        .click_to_load("")
+        .notice("Flashing <b>lights</b> & violence");
+    let out = html(&e, &ctx(frames()));
+    let button = &out[out.find("<button").expect(&out)..out.find("</button>").expect(&out)];
+    assert!(
+        button.contains(r#"<span class="z-embed-notice">Flashing &lt;b&gt;lights&lt;/b&gt; &amp; violence</span><strong>Load Episode 12</strong>"#),
+        "{out}"
+    );
+    assert!(!out.contains("<b>"), "{out}");
+    assert_eq!(e.schema()["notice"], "Flashing <b>lights</b> & violence");
+
+    let without_poster = Embed::url("https://www.youtube-nocookie.com/embed/abc").title("T").notice("Warning");
+    let out = html(&without_poster, &ctx(frames()));
+    assert!(out.contains("data-zeyn-embed-load") && out.contains("<template data-zeyn-embed><iframe"), "{out}");
+    assert!(!out.contains("<img"), "{out}");
+
+    let tr = zeyn::I18n::builtin();
+    let translated = Embed::url("https://www.youtube-nocookie.com/embed/abc")
+        .title("Bölüm")
+        .notice(Text::key("zeyn.ui.link.external"));
+    let mut out = String::new();
+    translated.render(&mut out, &Render::new("s", "tr", tr).with_ctx(&ctx(frames())));
+    assert!(out.contains(r#"<span class="z-embed-notice">dış site</span>"#), "{out}");
+}
+
+#[test]
+fn a_remembered_gate_names_its_scope_and_keeps_the_frame_inert() {
+    let e = Embed::url("https://www.youtube-nocookie.com/embed/abc")
+        .title("Episode 12")
+        .notice("Flashing lights")
+        .remember_for_session("flashing_lights-2");
+    let out = html(&e, &ctx(frames()));
+    assert!(out.starts_with(r#"<div class="z-embed" style="--z-aspect: 16 / 9" data-zeyn-embed-remember="flashing_lights-2""#), "{out}");
+    assert!(out.contains("data-zeyn-embed-load") && out.contains("<template data-zeyn-embed><iframe"), "{out}");
+    assert!(!out.replace("<template data-zeyn-embed><iframe", "").contains("<iframe"), "without JavaScript the frame stays inert: {out}");
+    assert_eq!(e.schema()["remember_for_session"], "flashing_lights-2");
+    let plain = html(&Embed::url("https://www.youtube-nocookie.com/embed/abc").title("T").click_to_load(""), &ctx(frames()));
+    assert!(!plain.contains("data-zeyn-embed-remember"), "{plain}");
+    let max: &'static str = "a".repeat(40).leak();
+    let _ = Embed::url("https://a.test/").title("T").remember_for_session(max);
+}
+
+#[test]
+fn remember_scopes_outside_letters_digits_dash_and_underscore_panic() {
+    let long: &'static str = "a".repeat(41).leak();
+    for bad in ["", long, "a b", "a.b", "a\"b", "ç", "a/b", "<x>"] {
+        let panic = std::panic::catch_unwind(|| Embed::url("https://a.test/").title("T").remember_for_session(bad));
+        let message = *panic.err().expect(bad).downcast::<String>().unwrap();
+        assert!(message.contains("scope") && message.contains("1 to 40 ASCII letters, digits"), "{bad}: {message}");
+    }
+}
+
+#[test]
 fn embed_urls_are_canonical_and_never_html() {
     let pasted = r#"<iframe width="560" height="315" src="https://WWW.YouTube-nocookie.com/embed/abc?si=x&amp;utm_source=share&amp;fbclid=1" title="YouTube video player" frameborder="0" allow="autoplay" allowfullscreen></iframe>"#;
     assert_eq!(embed_url(pasted).as_deref(), Some("https://www.youtube-nocookie.com/embed/abc?si=x"));

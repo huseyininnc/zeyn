@@ -408,6 +408,10 @@
   border-top: 1px solid var(--z-border);
 }
 
+.z-embed-notice {
+  font-weight: 600;
+}
+
 .z-embed-label small {
   color: var(--z-text-muted);
 }

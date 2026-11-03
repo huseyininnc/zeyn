@@ -44,6 +44,10 @@ Feature::new("catalog").public_media("posters", 86_400, PosterFolder::new("data/
 
 `GET /_zeyn/media/posters/{id}` skips the permission check (ids, guards and interceptors still run), sets no cookie and answers with `Cache-Control: public, max-age=86400` (at most `MAX_PUBLIC_MEDIA_CACHE`, one year), so browsers and a CDN in front of the app keep it. The entity tag still lets them revalidate with `304`. Use the path as the `src` of an `Image`. For many large images a separate image host behind a CDN is still the cheaper choice; allow it with `App::csp(|c| c.img_src([...]))`.
 
+- `open` must return the same bytes for every visitor. Never vary a public file by user, role, tenant or language: a CDN or proxy keeps the first response and hands it to everyone. Files that differ per user belong in a source registered with `Feature::media`.
+- With a long `max_age`, give ids that change with the content, such as a content hash (`poster-3f9a2c.jpg`). A changed file then gets a new address, instead of old copies living on in caches until they expire.
+- Reads of public sources (`GET` and `HEAD`) do not count against `App::rate_limit`: one page can load dozens of posters, and many mobile visitors share one address behind carrier NAT. Private sources still count, and IP allow and deny rules still apply to both. Limiting bandwidth abuse is the job of a CDN or reverse proxy in front of the app.
+
 ## Players
 
 ```rust
