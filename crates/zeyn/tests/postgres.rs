@@ -33,6 +33,59 @@ async fn postgres_data_layer_matches_memory_and_saves_safely() {
     }
 }
 
+const QUERIES: sql_common::Queries = sql_common::Queries {
+    drop: &[
+        "DROP TABLE IF EXISTS zeyn_test_q_thing",
+        "DROP TABLE IF EXISTS zeyn_test_q_owner",
+    ],
+    like: "SELECT id, name, note FROM zeyn_test_q_thing WHERE name LIKE $1 ORDER BY id",
+    join: "SELECT t.id, t.name, o.name AS owner FROM zeyn_test_q_thing t LEFT JOIN zeyn_test_q_owner o ON o.id = t.owner_id WHERE t.id >= $1 ORDER BY t.id",
+    by_id: "SELECT id, name, note FROM zeyn_test_q_thing WHERE id = $1",
+    bad_type: "SELECT name AS id, name, note FROM zeyn_test_q_thing",
+};
+
+#[tokio::test(flavor = "multi_thread")]
+async fn postgres_hand_written_queries_read_models() {
+    for url in urls("ZEYN_TEST_PG") {
+        sql_common::queries(&url, &QUERIES).await;
+        let db = Db::connect(&url, PoolLimits::default())
+            .await
+            .unwrap();
+        db.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm", vec![])
+            .await
+            .unwrap();
+        db.execute("DROP TABLE IF EXISTS zeyn_test_q_title", vec![])
+            .await
+            .unwrap();
+        db.execute(
+            "CREATE TABLE zeyn_test_q_title AS SELECT g AS id, 'title ' || g AS name, NULL::text AS note FROM generate_series(1, 1500) g",
+            vec![],
+        )
+        .await
+        .unwrap();
+        let near: Vec<sql_common::Thing> = db
+            .query(
+                "SELECT id, name, note, similarity(name, $1) AS score FROM zeyn_test_q_title WHERE name % $1 ORDER BY score DESC, id LIMIT $2",
+                vec!["title 1499".into(), 5.into()],
+            )
+            .await
+            .unwrap();
+        assert_eq!(near.len(), 5);
+        assert_eq!(near[0].name, "title 1499");
+        let unbounded = db
+            .query::<sql_common::Thing>("SELECT id, name, note FROM zeyn_test_q_title", vec![])
+            .await
+            .unwrap_err();
+        assert!(
+            format!("{unbounded:?}").contains("cap of 1000"),
+            "{unbounded:?}"
+        );
+        db.execute("DROP TABLE zeyn_test_q_title", vec![])
+            .await
+            .unwrap();
+    }
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn postgres_runs_migrations() {
     for url in urls("ZEYN_TEST_PG") {

@@ -652,3 +652,139 @@ pub async fn streams(url: &str, raw: &Raw) {
         "the pool is usable after a stream is dropped early"
     );
 }
+
+/// Hand written statements of the `Db::query` test, in each database's placeholder style.
+pub struct Queries {
+    /// Drops `zeyn_test_q_owner` and `zeyn_test_q_thing`; must not fail when they are missing.
+    pub drop: &'static [&'static str],
+    /// `SELECT id, name, note FROM zeyn_test_q_thing WHERE name LIKE <p1> ORDER BY id`.
+    pub like: &'static str,
+    /// The things joined with their owner's name as `owner`, `WHERE t.id >= <p1>`, by id.
+    pub join: &'static str,
+    /// `SELECT id, name, note FROM zeyn_test_q_thing WHERE id = <p1>`.
+    pub by_id: &'static str,
+    /// `SELECT name AS id, name, note FROM zeyn_test_q_thing`: text where a number belongs.
+    pub bad_type: &'static str,
+}
+
+#[model]
+pub struct Thing {
+    pub id: i64,
+    pub name: String,
+    pub note: Option<String>,
+}
+
+#[model]
+pub struct OwnedThing {
+    pub id: i64,
+    pub name: String,
+    pub owner: Option<String>,
+}
+
+/// `Db::query` and `Db::query_one`: bound parameters, joins, NULL columns, type errors, the cap,
+/// and the same calls on a transaction.
+pub async fn queries(url: &str, q: &Queries) {
+    let db = Db::connect(url, PoolLimits::default())
+        .await
+        .unwrap();
+    for sql in q.drop {
+        db.execute(sql, vec![]).await.unwrap();
+    }
+    for sql in [
+        "CREATE TABLE zeyn_test_q_owner (id INTEGER PRIMARY KEY, name VARCHAR(40) NOT NULL)",
+        "CREATE TABLE zeyn_test_q_thing (id INTEGER PRIMARY KEY, name VARCHAR(40) NOT NULL, note VARCHAR(40), owner_id INTEGER)",
+        "INSERT INTO zeyn_test_q_owner (id, name) VALUES (1, 'North')",
+        "INSERT INTO zeyn_test_q_thing (id, name, note, owner_id) VALUES (1, 'Black tea', 'strong', 1)",
+        "INSERT INTO zeyn_test_q_thing (id, name, note, owner_id) VALUES (2, 'Green tea', NULL, NULL)",
+        "INSERT INTO zeyn_test_q_thing (id, name, note, owner_id) VALUES (3, 'Coffee', NULL, 1)",
+    ] {
+        db.execute(sql, vec![]).await.unwrap();
+    }
+
+    let teas: Vec<Thing> = db
+        .query(q.like, vec!["%tea".into()])
+        .await
+        .unwrap();
+    assert_eq!(
+        teas.iter()
+            .map(|t| t.name.as_str())
+            .collect::<Vec<_>>(),
+        ["Black tea", "Green tea"]
+    );
+    assert_eq!(teas[0].note.as_deref(), Some("strong"));
+    assert_eq!(teas[1].note, None, "a NULL column reads as None");
+
+    let injected: Vec<Thing> = db
+        .query(q.like, vec!["x' OR '1'='1".into()])
+        .await
+        .unwrap();
+    assert!(injected.is_empty(), "a parameter is a value, never SQL");
+
+    let owned: Vec<OwnedThing> = db
+        .query(q.join, vec![1.into()])
+        .await
+        .unwrap();
+    assert_eq!(owned.len(), 3);
+    assert_eq!(owned[0].owner.as_deref(), Some("North"));
+    assert_eq!(owned[1].owner, None);
+
+    let one: Option<Thing> = db
+        .query_one(q.by_id, vec![3.into()])
+        .await
+        .unwrap();
+    assert_eq!(one.map(|t| t.name), Some("Coffee".to_string()));
+    let none: Option<Thing> = db
+        .query_one(q.by_id, vec![99.into()])
+        .await
+        .unwrap();
+    assert!(none.is_none());
+    let many = db
+        .query_one::<Thing>(q.like, vec!["%".into()])
+        .await;
+    assert!(many.is_err(), "query_one with several rows is an error");
+
+    let capped = db
+        .query_max::<Thing>(q.like, vec!["%".into()], 2)
+        .await
+        .unwrap_err();
+    assert!(format!("{capped:?}").contains("cap of 2"), "{capped:?}");
+    let fits: Vec<Thing> = db
+        .query_max(q.like, vec!["%".into()], 3)
+        .await
+        .unwrap();
+    assert_eq!(fits.len(), 3, "exactly the cap is fine");
+
+    assert!(
+        db.query::<Thing>(q.bad_type, vec![])
+            .await
+            .is_err(),
+        "text in a number field is an error, not a zero"
+    );
+
+    let mut tx = db.begin().await.unwrap();
+    tx.execute(
+        "UPDATE zeyn_test_q_thing SET note = 'mild' WHERE id = 2",
+        vec![],
+    )
+    .await
+    .unwrap();
+    let seen: Option<Thing> = tx
+        .query_one(q.by_id, vec![2.into()])
+        .await
+        .unwrap();
+    assert_eq!(
+        seen.and_then(|t| t.note).as_deref(),
+        Some("mild"),
+        "a transaction reads its own write"
+    );
+    let all: Vec<Thing> = tx
+        .query(q.like, vec!["%".into()])
+        .await
+        .unwrap();
+    assert_eq!(all.len(), 3);
+    tx.rollback().await.unwrap();
+
+    for sql in q.drop {
+        db.execute(sql, vec![]).await.unwrap();
+    }
+}

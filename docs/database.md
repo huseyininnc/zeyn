@@ -169,6 +169,45 @@ serve the other sorts.
 `get(key)` reads one row and fails with `Error::NotFound` when there is none. Any table or view
 can be read through an entity, for example Oracle's `user_sequences`.
 
+## Hand written queries
+
+Searches by similarity, joins and other queries `find` cannot express go through
+`db.query::<M>(sql, args)`. `M` is any `#[model]` or entity; its fields are read from the columns
+of the same name, with the same conversions as `find`. The SQL must be a string literal, so
+values can only arrive as parameters (`$1`, `$2` in PostgreSQL, `:1`, `:2` in Oracle); a
+`String` or a `format!` does not compile.
+
+```rust
+#[model]
+pub struct Hit {
+    pub id: ItemId,
+    pub slug: String,
+    pub title: String,
+}
+
+#[action(public)]
+pub async fn search_items(q: String, db: Db) -> Result<Vec<Hit>> {
+    db.query(
+        "SELECT i.id, i.slug, i.title, similarity(i.search_key, $1) AS score \
+         FROM items i WHERE i.search_key % $1 \
+         ORDER BY score DESC, i.id LIMIT 20",
+        vec![q.into()],
+    )
+    .await
+}
+```
+
+The example needs `CREATE EXTENSION pg_trgm` and a trigram index:
+`CREATE INDEX items_search_key ON items USING gin (search_key gin_trgm_ops)`. Columns the model
+has no field for, such as `score`, are read by the database and dropped.
+
+- `query_one` returns the one row or `None`; more than one row is an error.
+- At most `QUERY_ROW_CAP` (1000) rows are read. The statement is wrapped as
+  `SELECT <fields> FROM (<sql>) zeyn_q LIMIT 1001`, so one row over the cap is an error that says
+  so instead of a list that silently grows; `query_max(sql, args, n)` sets another cap.
+- A field without a column, or a column of the wrong type, is an error.
+- The statement timeout of the pool applies. `Tx` has the same three calls.
+
 ## Cursors
 
 Numbered pages use offsets. Infinite and virtual scroll use keyset cursors, which do not slow
@@ -241,7 +280,8 @@ connection. `RowStream` implements `futures_core::Stream`.
   dialect's length) and quoted.
 - Values are always bound parameters, including `LIKE` patterns, cursor values, limits and
   offsets. No value is ever written into the SQL text.
-- Hand written SQL goes through `execute(&'static str, args)`: the statement must be a literal.
+- Hand written SQL goes through `execute(&'static str, args)` and `query(&'static str, args)`:
+  the statement must be a literal.
 - Limits are clamped on the server (`MAX_PAGE_SIZE`, `MAX_FILTERS`, `MAX_SORT`, filter text length,
   `any_of` size), whatever the client asks for.
 - Driver errors are logged as `Error::Internal` and never shown to users. The connection URL is

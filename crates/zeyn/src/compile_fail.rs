@@ -357,3 +357,53 @@
 //! #[screen(route = "/products", permission = "stock.product.read", confirm)]
 //! pub fn product_list() -> Screen { Screen::new("Products") }
 //! ```
+
+/// Rules of the data layer, tested when a database feature is on.
+#[cfg(any(feature = "postgres", feature = "oracle"))]
+mod sql {
+    //! SQL built at run time for `Db::query`: the statement must be a literal, values go in `args`.
+    //!
+    //! ```compile_fail
+    //! use zeyn::prelude::*;
+    //!
+    //! #[model]
+    //! pub struct Hit {
+    //!     pub id: i64,
+    //! }
+    //!
+    //! async fn search(db: zeyn::sql::Db, q: String) -> Result<Vec<Hit>> {
+    //!     let sql = format!("SELECT id FROM items WHERE title = '{q}'");
+    //!     db.query(&sql, vec![]).await
+    //! }
+    //! ```
+    //!
+    //! The same with an owned `String` on a transaction:
+    //!
+    //! ```compile_fail
+    //! use zeyn::prelude::*;
+    //!
+    //! #[model]
+    //! pub struct Hit {
+    //!     pub id: i64,
+    //! }
+    //!
+    //! async fn search(mut tx: zeyn::sql::Tx, sql: String) -> Result<Option<Hit>> {
+    //!     tx.query_one(sql, vec![]).await
+    //! }
+    //! ```
+    //!
+    //! The literal form compiles:
+    //!
+    //! ```
+    //! use zeyn::prelude::*;
+    //!
+    //! #[model]
+    //! pub struct Hit {
+    //!     pub id: i64,
+    //! }
+    //!
+    //! async fn search(db: zeyn::sql::Db, q: String) -> Result<Vec<Hit>> {
+    //!     db.query("SELECT id FROM items WHERE title = $1", vec![q.into()]).await
+    //! }
+    //! ```
+}

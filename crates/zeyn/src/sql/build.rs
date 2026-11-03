@@ -1319,6 +1319,33 @@ pub(crate) fn plan_get<E: Entity>(d: &dyn Dialect, key: Value) -> Result<Sql> {
     Ok(sql)
 }
 
+/// A hand written `SELECT` read as rows of `M`: the statement becomes a subquery, the outer select
+/// reads every field of `M` by name with the dialect's conversions, and at most `limit` rows come
+/// back. `args` are the statement's own parameters; the limit is bound after them.
+pub(crate) fn plan_query<M: Model>(
+    d: &dyn Dialect,
+    text: &str,
+    args: Vec<Arg>,
+    limit: usize,
+) -> Result<Sql> {
+    let mut sql = Sql::new();
+    sql.args = args;
+    sql.push("SELECT ");
+    select_fields(d, &mut sql, M::fields())?;
+    sql.push(" FROM (");
+    sql.push(text.trim().trim_end_matches(';'));
+    sql.push(") zeyn_q");
+    d.page(&mut sql, i64::try_from(limit).unwrap_or(i64::MAX), 0);
+    Ok(sql)
+}
+
+/// The error of a hand written query that returned more rows than its cap.
+pub(crate) fn over_cap(model: &str, max: usize) -> Error {
+    Error::Internal(format!(
+        "a query read into `{model}` returned more than its cap of {max} rows: add a LIMIT, or pass a larger cap to `query_max`"
+    ))
+}
+
 /// Whether a key value means "not saved yet": 0 or empty.
 pub(crate) fn is_new_key(v: &Value) -> bool {
     matches!(v, Value::Int(0) | Value::Null) || matches!(v, Value::Text(s) if s.is_empty())

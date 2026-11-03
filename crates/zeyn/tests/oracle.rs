@@ -30,6 +30,25 @@ const RAW: Raw = Raw {
     fill_stream: "INSERT INTO zeyn_test_stream (id, text) SELECT LEVEL, 'line ' || LEVEL FROM DUAL CONNECT BY LEVEL <= 100000",
 };
 
+const QUERIES: sql_common::Queries = sql_common::Queries {
+    drop: &[
+        "BEGIN EXECUTE IMMEDIATE 'DROP TABLE zeyn_test_q_thing PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;",
+        "BEGIN EXECUTE IMMEDIATE 'DROP TABLE zeyn_test_q_owner PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;",
+    ],
+    like: "SELECT id, name, note FROM zeyn_test_q_thing WHERE name LIKE :1 ORDER BY id",
+    join: "SELECT t.id, t.name, o.name AS owner FROM zeyn_test_q_thing t LEFT JOIN zeyn_test_q_owner o ON o.id = t.owner_id WHERE t.id >= :1 ORDER BY t.id",
+    by_id: "SELECT id, name, note FROM zeyn_test_q_thing WHERE id = :1",
+    bad_type: "SELECT name AS id, name, note FROM zeyn_test_q_thing",
+};
+
+#[tokio::test(flavor = "multi_thread")]
+async fn oracle_hand_written_queries_read_models() {
+    for url in urls("ZEYN_TEST_ORACLE") {
+        sql_common::queries(&url, &QUERIES).await;
+        sql_common::queries(&format!("{url}?compat=11"), &QUERIES).await;
+    }
+}
+
 /// One test so the databases are not shared by tests running at the same time.
 #[tokio::test(flavor = "multi_thread")]
 async fn oracle_data_layer_matches_memory_and_saves_safely() {

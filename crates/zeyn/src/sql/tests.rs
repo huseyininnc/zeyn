@@ -1104,3 +1104,62 @@ fn decimal_cursors_keep_the_exact_value() {
     let args = build::read_cursor(&MEASURE_FIELDS, &keys, &cursor).unwrap();
     assert_eq!(args, vec![Arg::Text("1000E-4".into()), Arg::Int(7)]);
 }
+
+#[test]
+fn hand_written_query_reads_fields_by_name_and_binds_the_cap_after_its_parameters() {
+    let sql = build::plan_query::<Product>(
+        &Postgres,
+        "SELECT * FROM shop.products WHERE code % $1 ORDER BY similarity(code, $1) DESC;",
+        vec![Arg::from("tea")],
+        1001,
+    )
+    .unwrap();
+    assert_eq!(
+        sql.text,
+        r#"SELECT CAST("id" AS BIGINT) AS c0, "code" AS c1, "note" AS c2, CAST("price" AS BIGINT) AS c3, "price_currency" AS c4, "active" AS c5, CAST("stock" AS BIGINT) AS c6, CAST("version" AS BIGINT) AS c7 FROM (SELECT * FROM shop.products WHERE code % $1 ORDER BY similarity(code, $1) DESC) zeyn_q LIMIT $2 OFFSET $3"#
+    );
+    assert_eq!(
+        sql.args,
+        vec![Arg::from("tea"), Arg::Int(1001), Arg::Int(0)]
+    );
+    assert_eq!(sql.cols.len(), 8);
+}
+
+#[test]
+fn hand_written_query_uses_oracle_placeholders_and_rownum_on_11g() {
+    let sql = build::plan_query::<Product>(
+        &V11,
+        "SELECT * FROM products WHERE code = :1",
+        vec![Arg::from("tea")],
+        2,
+    )
+    .unwrap();
+    assert!(
+        sql.text
+            .starts_with("SELECT * FROM (SELECT zq.*, ROWNUM zeyn_rn FROM (SELECT \"ID\" AS c0"),
+        "{}",
+        sql.text
+    );
+    assert!(
+        sql.text.contains(
+            " FROM (SELECT * FROM products WHERE code = :1) zeyn_q) zq WHERE ROWNUM <= :2) WHERE zeyn_rn > :3"
+        ),
+        "{}",
+        sql.text
+    );
+    let v12 = build::plan_query::<Product>(&V12, "SELECT * FROM products", Vec::new(), 2).unwrap();
+    assert!(
+        v12.text
+            .ends_with(" zeyn_q OFFSET :1 ROWS FETCH NEXT :2 ROWS ONLY"),
+        "{}",
+        v12.text
+    );
+}
+
+#[test]
+fn over_cap_error_tells_how_to_fix_it() {
+    let Error::Internal(text) = build::over_cap("Hit", 1000) else {
+        panic!("not internal");
+    };
+    assert!(text.contains("1000") && text.contains("LIMIT") && text.contains("query_max"));
+}
