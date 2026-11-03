@@ -5,7 +5,9 @@ use zeyn::prelude::*;
 
 pub fn overview(_ctx: &Ctx) -> Node {
     Split::new(
-        Card::new().title("List").add(Paragraph::new("Drag the handle or use the arrow keys.")),
+        Card::new()
+            .title("List")
+            .add(Paragraph::new("Drag the handle or use the arrow keys.")),
         Card::new().title("Details"),
     )
     .into()

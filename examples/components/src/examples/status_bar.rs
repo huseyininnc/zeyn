@@ -4,7 +4,10 @@ use crate::{Entry, ex};
 use zeyn::prelude::*;
 
 pub fn overview(_ctx: &Ctx) -> Node {
-    StatusBar::new("Status").left("Ready").right("UTF-8").into()
+    StatusBar::new("Status")
+        .left("Ready")
+        .right("UTF-8")
+        .into()
 }
 
 /// What the catalog shows of `StatusBar`.

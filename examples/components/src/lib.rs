@@ -164,7 +164,9 @@ catalog! {
 
 /// The component with this slug.
 pub fn component(slug: &str) -> Option<&'static Component> {
-    COMPONENTS.iter().find(|c| c.slug == slug)
+    COMPONENTS
+        .iter()
+        .find(|c| c.slug == slug)
 }
 
 /// A component as the search finds it: its name and its description in the user's language.
@@ -178,15 +180,28 @@ pub struct Found {
 pub fn matching(q: &str, ctx: &Ctx) -> Vec<&'static Component> {
     let rows: Vec<Found> = COMPONENTS
         .iter()
-        .map(|c| Found { name: c.entry.name.to_string(), summary: ctx.i18n().text(ctx.locale(), &c.summary()) })
+        .map(|c| Found {
+            name: c.entry.name.to_string(),
+            summary: ctx
+                .i18n()
+                .text(ctx.locale(), &c.summary()),
+        })
         .collect();
     let query = DataQuery {
         q: q.to_string(),
         page: zeyn::PageRequest::Offset { offset: 0, limit: zeyn::MAX_PAGE_SIZE },
         ..DataQuery::default()
     };
-    let names: Vec<String> = query.apply(rows).items.into_iter().map(|f| f.name).collect();
-    COMPONENTS.iter().filter(|c| names.iter().any(|n| n == c.entry.name)).collect()
+    let names: Vec<String> = query
+        .apply(rows)
+        .items
+        .into_iter()
+        .map(|f| f.name)
+        .collect();
+    COMPONENTS
+        .iter()
+        .filter(|c| names.iter().any(|n| n == c.entry.name))
+        .collect()
 }
 
 /// Search suggestions: the components whose name or description has the text.
@@ -194,7 +209,12 @@ pub fn matching(q: &str, ctx: &Ctx) -> Vec<&'static Component> {
 pub async fn find_components(q: DataQuery, ctx: Ctx) -> Result<Page<Found>> {
     let rows: Vec<Found> = COMPONENTS
         .iter()
-        .map(|c| Found { name: c.entry.name.to_string(), summary: ctx.i18n().text(ctx.locale(), &c.summary()) })
+        .map(|c| Found {
+            name: c.entry.name.to_string(),
+            summary: ctx
+                .i18n()
+                .text(ctx.locale(), &c.summary()),
+        })
         .collect();
     Ok(q.apply(rows))
 }

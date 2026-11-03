@@ -13,7 +13,9 @@ pub fn overview(_ctx: &Ctx) -> Node {
 }
 
 pub fn one_side(_ctx: &Ctx) -> Node {
-    PrevNext::new().next(crate::alpha_index, ()).into()
+    PrevNext::new()
+        .next(crate::alpha_index, ())
+        .into()
 }
 
 /// What the catalog shows of `PrevNext`.

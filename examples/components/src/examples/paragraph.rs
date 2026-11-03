@@ -7,7 +7,11 @@ pub fn overview(_ctx: &Ctx) -> Node {
     Stack::new()
         .gap(1)
         .add(Paragraph::new("Every order ships within two working days."))
-        .add(Paragraph::new("Prices include tax.").muted().small())
+        .add(
+            Paragraph::new("Prices include tax.")
+                .muted()
+                .small(),
+        )
         .into()
 }
 

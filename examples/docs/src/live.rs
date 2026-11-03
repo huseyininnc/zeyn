@@ -361,13 +361,6 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
             .add(MetaLine::new().part("12 May 2026").part("5 min read").part("Guides"))
             .add(Paragraph::new("Water just off the boil and two minutes of steeping keep the taste soft."))
             .add(Paragraph::new("Times are a starting point.").muted().small())
-            .add(
-                PrevNext::new()
-                    .prev(crate::introduction, ())
-                    .prev_title("Introduction")
-                    .next(crate::cli, ())
-                    .next_title("CLI and projects"),
-            )
             .into(),
         "autogrid" => ["Orders", "Stock", "People", "Invoices", "Reports"]
             .into_iter()
@@ -379,7 +372,6 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
                 zeyn::ui::ListItem::new(p.name.clone())
                     .subtitle(p.code.clone())
                     .meta(format!("{} in stock", p.stock))
-                    .link(crate::introduction, ())
             })
             .sort_option("Name", Sample::name, false)
             .paging(Paging::infinite(5))

@@ -14,7 +14,10 @@ pub const DOCS: &str = "https://docs.zeynsoft.com";
 /// The code of example `func` in a component's file: the file's `use` lines (but the catalog's
 /// own), then the function from its `pub fn` line to the closing brace at the start of a line.
 pub fn snippet(source: &str, func: &str) -> String {
-    let uses: Vec<&str> = source.lines().filter(|l| l.starts_with("use ") && *l != "use crate::{Entry, ex};").collect();
+    let uses: Vec<&str> = source
+        .lines()
+        .filter(|l| l.starts_with("use ") && *l != "use crate::{Entry, ex};")
+        .collect();
     let start = format!("pub fn {func}(");
     let mut body = Vec::new();
     let mut inside = false;
@@ -49,12 +52,22 @@ pub fn index_screen(q: &str, ctx: &Ctx) -> Screen {
     let mut sections = Vec::new();
     let mut previews = Vec::new();
     for cat in CATEGORIES {
-        let cards: Vec<&'static Entry> = found.iter().copied().filter(|c| c.category == *cat).collect();
+        let cards: Vec<&'static Entry> = found
+            .iter()
+            .copied()
+            .filter(|c| c.category == *cat)
+            .collect();
         if cards.is_empty() {
             continue;
         }
         for c in &cards {
-            previews.push(c.entry.overview.first().map(|e| (e.build)(ctx)).unwrap_or_else(|| Stack::new().into()));
+            previews.push(
+                c.entry
+                    .overview
+                    .first()
+                    .map(|e| (e.build)(ctx))
+                    .unwrap_or_else(|| Stack::new().into()),
+            );
         }
         sections.push((*cat, cards));
     }
@@ -63,11 +76,10 @@ pub fn index_screen(q: &str, ctx: &Ctx) -> Screen {
         .suggestion(|f: &crate::Found| f.name.clone())
         .value(q)
         .results(crate::catalog_home);
-    Screen::new(t!("cx.title")).body(Paragraph::new(t!("cx.intro"))).body(search).body(Node::new(Gallery {
-        sections,
-        previews,
-        q: q.to_string(),
-    }))
+    Screen::new(t!("cx.title"))
+        .body(Paragraph::new(t!("cx.intro")))
+        .body(search)
+        .body(Node::new(Gallery { sections, previews, q: q.to_string() }))
 }
 
 /// The cards of the index, grouped by category. The previews are real components rendered with
@@ -176,7 +188,11 @@ impl Component for ApiTable {
     fn render(&self, out: &mut String, r: &Render) {
         out.push_str(&format!(r#"<div class="cx-api"><p class="cx-api-note">{}</p>"#, r.text(&t!("cx.api_note"))));
         for ty in self.types {
-            let methods = API.iter().find(|(name, _)| name == ty).map(|(_, m)| *m).unwrap_or(&[]);
+            let methods = API
+                .iter()
+                .find(|(name, _)| name == ty)
+                .map(|(_, m)| *m)
+                .unwrap_or(&[]);
             out.push_str(&format!(
                 r#"<section class="cx-api-type"><h3 class="cx-api-name"><code>{0}</code></h3><p>{1}</p>"#,
                 escape(ty),
@@ -213,27 +229,39 @@ impl Component for ApiTable {
 pub fn component_screen(slug: &str, ctx: &Ctx) -> Screen {
     let Some(c) = component(slug) else { return Screen::new(t!("cx.missing")) };
     let e = c.entry;
-    let links = Row::new().compact().col(ExternalLink::new(format!("{DOCS}/{}", e.docs), t!("cx.docs"))).col(
-        ExternalLink::new(
+    let links = Row::new()
+        .compact()
+        .col(ExternalLink::new(format!("{DOCS}/{}", e.docs), t!("cx.docs")))
+        .col(ExternalLink::new(
             format!("https://docs.rs/zeyn/latest/zeyn/?search={}", e.api.first().unwrap_or(&e.name)),
             t!("cx.docs_rs"),
-        ),
-    );
+        ));
     let mut tabs = Tabs::new(t!("cx.tabs", name = e.name))
         .tab(t!("cx.overview"), blocks(c, e.overview, ctx))
         .tab(t!("cx.api"), Node::new(ApiTable { types: e.api }));
     if !e.examples.is_empty() {
         tabs = tabs.tab(t!("cx.examples"), blocks(c, e.examples, ctx));
     }
-    Screen::new(e.name).body(Paragraph::new(c.summary())).body(links).body(tabs)
+    Screen::new(e.name)
+        .body(Paragraph::new(c.summary()))
+        .body(links)
+        .body(tabs)
 }
 
 /// Every key the catalog looks up at run time, for the locale test.
 pub fn keys() -> Vec<String> {
-    let mut keys: Vec<String> = CATEGORIES.iter().map(|c| format!("cx.cat.{c}")).collect();
+    let mut keys: Vec<String> = CATEGORIES
+        .iter()
+        .map(|c| format!("cx.cat.{c}"))
+        .collect();
     for c in COMPONENTS {
         keys.push(format!("cx.summary.{}", c.slug));
-        for e in c.entry.overview.iter().chain(c.entry.examples) {
+        for e in c
+            .entry
+            .overview
+            .iter()
+            .chain(c.entry.examples)
+        {
             keys.push(format!("cx.ex.{}.{}", c.slug, e.func));
         }
     }

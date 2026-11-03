@@ -4,11 +4,20 @@ use crate::{Entry, ex};
 use zeyn::prelude::*;
 
 pub fn overview(_ctx: &Ctx) -> Node {
-    MetaLine::new().part("12 May 2026").part("5 min read").part("Guides").into()
+    MetaLine::new()
+        .part("12 May 2026")
+        .part("5 min read")
+        .part("Guides")
+        .into()
 }
 
 pub fn separator(_ctx: &Ctx) -> Node {
-    MetaLine::new().part("Shop").part("Books").part("Atlases").separator("/").into()
+    MetaLine::new()
+        .part("Shop")
+        .part("Books")
+        .part("Atlases")
+        .separator("/")
+        .into()
 }
 
 /// What the catalog shows of `MetaLine`.

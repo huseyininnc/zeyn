@@ -12,11 +12,18 @@ pub fn overview(_ctx: &Ctx) -> Node {
 }
 
 pub fn donut(_ctx: &Ctx) -> Node {
-    Chart::donut("Products by kind").labels(["Books", "Tools", "Plants"]).series("Products", [20.0, 20.0, 20.0]).into()
+    Chart::donut("Products by kind")
+        .labels(["Books", "Tools", "Plants"])
+        .series("Products", [20.0, 20.0, 20.0])
+        .into()
 }
 
 pub fn gauge(_ctx: &Ctx) -> Node {
-    Chart::gauge("Capacity").value(72.0).range(0.0, 100.0).target(85.0).into()
+    Chart::gauge("Capacity")
+        .value(72.0)
+        .range(0.0, 100.0)
+        .target(85.0)
+        .into()
 }
 
 /// What the catalog shows of `Chart`.

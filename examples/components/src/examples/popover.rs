@@ -8,7 +8,12 @@ pub fn overview(_ctx: &Ctx) -> Node {
     let p = &products()[1];
     Popover::new("Details")
         .title("Product")
-        .add(DescriptionList::of(p).field(Product::code).field(Product::price).field(Product::stock))
+        .add(
+            DescriptionList::of(p)
+                .field(Product::code)
+                .field(Product::price)
+                .field(Product::stock),
+        )
         .into()
 }
 

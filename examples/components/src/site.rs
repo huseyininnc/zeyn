@@ -20,21 +20,28 @@ const MAX_PAGE: usize = 4 * 1024 * 1024;
 
 fn asset(body: &'static str, kind: &'static str) -> Response<Body> {
     let mut res = Response::new(Body::from(body));
-    res.headers_mut().insert(header::CONTENT_TYPE, HeaderValue::from_static(kind));
-    res.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("public, max-age=3600"));
+    res.headers_mut()
+        .insert(header::CONTENT_TYPE, HeaderValue::from_static(kind));
+    res.headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("public, max-age=3600"));
     res
 }
 
 async fn picture(Path(file): Path<String>) -> Response<Body> {
-    let n = file.strip_suffix(".svg").and_then(|n| n.parse::<u32>().ok()).filter(|n| (1..=12).contains(n));
+    let n = file
+        .strip_suffix(".svg")
+        .and_then(|n| n.parse::<u32>().ok())
+        .filter(|n| (1..=12).contains(n));
     let Some(n) = n else {
         let mut res = Response::new(Body::empty());
         *res.status_mut() = StatusCode::NOT_FOUND;
         return res;
     };
     let mut res = Response::new(Body::from(crate::data::svg(n)));
-    res.headers_mut().insert(header::CONTENT_TYPE, HeaderValue::from_static("image/svg+xml"));
-    res.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("public, max-age=86400"));
+    res.headers_mut()
+        .insert(header::CONTENT_TYPE, HeaderValue::from_static("image/svg+xml"));
+    res.headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("public, max-age=86400"));
     res
 }
 
@@ -45,7 +52,11 @@ async fn with_head(res: Response<Body>) -> Response<Body> {
         .get(header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
         .is_some_and(|v| v.starts_with("text/html"));
-    if !html || res.headers().contains_key(header::CONTENT_ENCODING) {
+    if !html
+        || res
+            .headers()
+            .contains_key(header::CONTENT_ENCODING)
+    {
         return res;
     }
     let (mut parts, body) = res.into_parts();
@@ -58,7 +69,9 @@ async fn with_head(res: Response<Body>) -> Response<Body> {
         Some(at) => format!("{}{HEAD}{}", &page[..at], &page[at..]),
         None => page.into_owned(),
     };
-    parts.headers.remove(header::CONTENT_LENGTH);
+    parts
+        .headers
+        .remove(header::CONTENT_LENGTH);
     parts.headers.remove(header::ETAG);
     Response::from_parts(parts, Body::from(page))
 }

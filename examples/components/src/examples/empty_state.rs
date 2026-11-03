@@ -4,7 +4,9 @@ use crate::{Entry, ex};
 use zeyn::prelude::*;
 
 pub fn overview(_ctx: &Ctx) -> Node {
-    EmptyState::new("No orders yet").text("Orders you place show up here.").into()
+    EmptyState::new("No orders yet")
+        .text("Orders you place show up here.")
+        .into()
 }
 
 /// What the catalog shows of `EmptyState`.

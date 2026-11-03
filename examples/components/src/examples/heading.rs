@@ -4,11 +4,18 @@ use crate::{Entry, ex};
 use zeyn::prelude::*;
 
 pub fn overview(_ctx: &Ctx) -> Node {
-    Stack::new().gap(1).add(Heading::h2("Section")).add(Heading::h3("Subsection")).add(Heading::h4("Group")).into()
+    Stack::new()
+        .gap(1)
+        .add(Heading::h2("Section"))
+        .add(Heading::h3("Subsection"))
+        .add(Heading::h4("Group"))
+        .into()
 }
 
 pub fn anchor(_ctx: &Ctx) -> Node {
-    Heading::h3("Shipping times").id("shipping").into()
+    Heading::h3("Shipping times")
+        .id("shipping")
+        .into()
 }
 
 /// What the catalog shows of `Heading`.

@@ -26,7 +26,13 @@ pub struct Invoice {
 /// Adds up a valid invoice. Nothing is stored.
 #[action(public)]
 pub async fn total_invoice(invoice: Valid<Invoice>) -> Result<Money> {
-    Ok(Money::tl(invoice.lines.iter().map(|l| l.unit_price.minor * l.quantity).sum()))
+    Ok(Money::tl(
+        invoice
+            .lines
+            .iter()
+            .map(|l| l.unit_price.minor * l.quantity)
+            .sum(),
+    ))
 }
 
 pub fn overview(_ctx: &Ctx) -> Node {
@@ -39,7 +45,10 @@ pub fn overview(_ctx: &Ctx) -> Node {
     })
     .field(Invoice::customer)
     .lines(Invoice::lines, |l| {
-        l.column(Line::item).column(Line::quantity).column(Line::unit_price).total(Line::quantity, Line::unit_price)
+        l.column(Line::item)
+            .column(Line::quantity)
+            .column(Line::unit_price)
+            .total(Line::quantity, Line::unit_price)
     })
     .submit("Save", total_invoice)
     .on_success(|_, ui| ui.toast("Saved. Nothing was stored."))

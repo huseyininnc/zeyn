@@ -30,7 +30,10 @@ fn impl_type(line: &str) -> Option<String> {
             _ => {}
         }
     }
-    let name: String = rest[start..].chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect();
+    let name: String = rest[start..]
+        .chars()
+        .take_while(|c| c.is_alphanumeric() || *c == '_')
+        .collect();
     (!name.is_empty()).then_some(name)
 }
 
@@ -39,7 +42,9 @@ fn signature(lines: &[&str], at: usize) -> String {
     let mut sig = String::new();
     for line in &lines[at..] {
         let line = line.trim();
-        let end = line.find(" {").or_else(|| (line == "{").then_some(0));
+        let end = line
+            .find(" {")
+            .or_else(|| (line == "{").then_some(0));
         let piece = match end {
             Some(i) => &line[..i],
             None => line,
@@ -52,7 +57,10 @@ fn signature(lines: &[&str], at: usize) -> String {
             break;
         }
     }
-    sig.replace(", )", ")").replace("( ", "(").trim_end_matches(',').to_string()
+    sig.replace(", )", ")")
+        .replace("( ", "(")
+        .trim_end_matches(',')
+        .to_string()
 }
 
 /// The first line of the doc comment right above `lines[at]`, skipping attributes.
@@ -70,7 +78,13 @@ fn first_doc(lines: &[&str], at: usize) -> String {
     }
     doc.reverse();
     let text = doc.join(" ");
-    let first = text.split(". ").next().unwrap_or("").trim_end_matches('.').trim().to_string();
+    let first = text
+        .split(". ")
+        .next()
+        .unwrap_or("")
+        .trim_end_matches('.')
+        .trim()
+        .to_string();
     if first.is_empty() { first } else { format!("{first}.") }
 }
 
@@ -83,9 +97,12 @@ fn scan(path: &Path, api: &mut BTreeMap<String, Vec<(String, String)>>) {
             current = Some(name);
         } else if *line == "}" {
             current = None;
-        } else if let (Some(ty), true) =
-            (&current, ["    pub fn ", "    pub const fn ", "    pub async fn "].iter().any(|p| line.starts_with(p)))
-        {
+        } else if let (Some(ty), true) = (
+            &current,
+            ["    pub fn ", "    pub const fn ", "    pub async fn "]
+                .iter()
+                .any(|p| line.starts_with(p)),
+        ) {
             let entry = api.entry(ty.clone()).or_default();
             entry.push((signature(&lines, i), first_doc(&lines, i)));
         }
@@ -96,12 +113,18 @@ fn scan(path: &Path, api: &mut BTreeMap<String, Vec<(String, String)>>) {
 fn walk(dir: &Path, api: &mut BTreeMap<String, Vec<(String, String)>>) {
     println!("cargo:rerun-if-changed={}", dir.display());
     let Ok(entries) = std::fs::read_dir(dir) else { return };
-    let mut paths: Vec<_> = entries.filter_map(|e| e.ok()).map(|e| e.path()).collect();
+    let mut paths: Vec<_> = entries
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .collect();
     paths.sort();
     for path in paths {
         if path.is_dir() {
             walk(&path, api);
-        } else if path.extension().is_some_and(|e| e == "rs") {
+        } else if path
+            .extension()
+            .is_some_and(|e| e == "rs")
+        {
             println!("cargo:rerun-if-changed={}", path.display());
             scan(&path, api);
         }

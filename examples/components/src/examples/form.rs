@@ -24,7 +24,10 @@ pub async fn send_message(message: Valid<Message>) -> Result<String> {
 
 pub fn overview(_ctx: &Ctx) -> Node {
     Form::of(Message { copies: 1, ..Message::default() })
-        .row(|r| r.field(Message::name).field(Message::email))
+        .row(|r| {
+            r.field(Message::name)
+                .field(Message::email)
+        })
         .field(Message::copies)
         .field(Message::note)
         .submit("Send", send_message)

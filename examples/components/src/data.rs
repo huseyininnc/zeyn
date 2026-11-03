@@ -147,7 +147,9 @@ pub async fn search_people(q: DataQuery) -> Result<Page<Person>> {
 #[action(public)]
 pub async fn week_events(q: DataQuery, ctx: Ctx) -> Result<Page<Event>> {
     let today = ctx.today();
-    let monday = today.add_days(1 - i64::from(today.weekday())).unwrap_or(today);
+    let monday = today
+        .add_days(1 - i64::from(today.weekday()))
+        .unwrap_or(today);
     let plan = [
         (0, "Team stand up", "09:00"),
         (0, "Design review", "14:00"),
@@ -174,7 +176,12 @@ pub async fn week_events(q: DataQuery, ctx: Ctx) -> Result<Page<Event>> {
 /// Sample products for lookups.
 #[action(public)]
 pub async fn find_products(q: LookupQuery) -> Result<Page<LookupItem>> {
-    Ok(q.apply(PRODUCTS.iter().map(|p| LookupItem::new(p.id.0, p.name.clone()).hint(p.code.clone())).collect()))
+    Ok(q.apply(
+        PRODUCTS
+            .iter()
+            .map(|p| LookupItem::new(p.id.0, p.name.clone()).hint(p.code.clone()))
+            .collect(),
+    ))
 }
 
 /// Sample products grouped by kind.
@@ -185,11 +192,22 @@ pub async fn product_tree(q: TreeQuery) -> Result<Vec<TreeItem>> {
         None => kinds
             .iter()
             .map(|(id, kind, label)| {
-                TreeItem::branch(*id, *label).hint(PRODUCTS.iter().filter(|p| p.kind == *kind).count().to_string())
+                TreeItem::branch(*id, *label).hint(
+                    PRODUCTS
+                        .iter()
+                        .filter(|p| p.kind == *kind)
+                        .count()
+                        .to_string(),
+                )
             })
             .collect(),
         Some(parent) => {
-            let Some((_, kind, _)) = kinds.iter().find(|(id, _, _)| *id == parent) else { return Err(Error::NotFound) };
+            let Some((_, kind, _)) = kinds
+                .iter()
+                .find(|(id, _, _)| *id == parent)
+            else {
+                return Err(Error::NotFound);
+            };
             PRODUCTS
                 .iter()
                 .filter(|p| p.kind == *kind)
