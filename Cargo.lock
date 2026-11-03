@@ -7065,7 +7065,7 @@ dependencies = [
 
 [[package]]
 name = "zeyn"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "argon2",
  "axum",
@@ -7112,7 +7112,7 @@ dependencies = [
 
 [[package]]
 name = "zeyn-cli"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "ed25519-dalek",
  "getrandom 0.2.17",
@@ -7122,7 +7122,7 @@ dependencies = [
 
 [[package]]
 name = "zeyn-desktop"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "axum",
  "dirs",
@@ -7225,7 +7225,7 @@ dependencies = [
 
 [[package]]
 name = "zeyn-island"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "js-sys",
  "serde",
@@ -7237,7 +7237,7 @@ dependencies = [
 
 [[package]]
 name = "zeyn-macros"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "proc-macro2",
  "quote",

@@ -38,7 +38,7 @@ A list action takes a `DataQuery` and returns `Page<M>`:
 `DataQuery::apply(vec)` does all of it in memory. For a SQL database use `zeyn::sql`: `Db::find` turns the same query into `WHERE`, `ORDER BY`, `LIMIT` and `GROUP BY` for PostgreSQL or Oracle. Only the entity's own fields can be filtered or sorted, every value is bound as a parameter, and the page size is capped by the server, so client input never reaches the SQL text. Write SQL by hand only for queries `Db::find` cannot express, and then never paste a field name or value from the client into it.
 
 ```toml
-zeyn = { version = "0.0.4", features = ["postgres"] }   # or ["oracle"]
+zeyn = { version = "0.0.5", features = ["postgres"] }   # or ["oracle"]
 ```
 
 ```rust
