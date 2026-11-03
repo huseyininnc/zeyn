@@ -443,22 +443,31 @@ async fn missing_users_take_as_long_as_wrong_passwords() {
     let a = Accounts::new(MemoryAccountStore::new(), Secret::new(KEY.into()))
         .options(|o| o.hasher = PasswordHasher { memory_kib: 4096, iterations: 2, parallelism: 1 });
     user(&a, "timing@example.com").await;
-    let time = |name: &'static str| {
+    let once = |name: &'static str| {
         let a = a.clone();
         async move {
             let started = Instant::now();
-            for _ in 0..3 {
-                assert_eq!(
-                    a.sign_in().password_sign_in(name, "Wrong-123", false, false).await.unwrap(),
-                    SignInResult::Failed
-                );
-            }
+            assert_eq!(a.sign_in().password_sign_in(name, "Wrong-123", false, false).await.unwrap(), SignInResult::Failed);
             started.elapsed().as_secs_f64()
         }
     };
-    let (known, unknown) = (time("timing@example.com").await, time("nobody@example.com").await);
+    let median = |mut v: Vec<f64>| {
+        v.sort_by(f64::total_cmp);
+        v[v.len() / 2]
+    };
+    let (mut known, mut unknown) = (Vec::new(), Vec::new());
+    for round in 0..9 {
+        if round % 2 == 0 {
+            known.push(once("timing@example.com").await);
+            unknown.push(once("nobody@example.com").await);
+        } else {
+            unknown.push(once("nobody@example.com").await);
+            known.push(once("timing@example.com").await);
+        }
+    }
+    let (known, unknown) = (median(known), median(unknown));
     let ratio = known / unknown;
-    assert!((0.5..2.0).contains(&ratio), "known {known:.3}s, unknown {unknown:.3}s");
+    assert!((0.5..2.0).contains(&ratio), "median known {known:.4}s, median unknown {unknown:.4}s");
 }
 
 #[tokio::test]
