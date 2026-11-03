@@ -24,6 +24,16 @@ services:
     cpus: 1.0
     read_only: true
 
+  components:
+    image: docker.zeynsoft.com/zeyn/components:latest
+    container_name: zeyn-components
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3010:3010"
+    mem_limit: 128m
+    cpus: 1.0
+    read_only: true
+
   showcase:
     image: docker.zeynsoft.com/zeyn/showcase:latest
     container_name: zeyn-showcase

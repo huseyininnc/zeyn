@@ -1,0 +1,18 @@
+[package]
+name = "zeyn-example-components"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "MIT OR Apache-2.0"
+build = "build.rs"
+
+[dependencies]
+zeyn = { path = "../../crates/zeyn", features = ["markdown"] }
+zeyn-example-docs = { path = "../docs" }
+axum = "0.8"
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"

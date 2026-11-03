@@ -1,0 +1,256 @@
+{
+  "cx": {
+    "app": "Zeyn components",
+    "title": "Components",
+    "intro": "Every component of the Zeyn framework, running live. Open one to see its examples, the code that builds them and its API.",
+    "search": "Search components",
+    "start": "Start",
+    "all": "All components",
+    "none": "No component matches \"{q}\".",
+    "show_code": "Show code",
+    "copy": "Copy",
+    "copied": "Copied",
+    "api_note": "Public methods, read from the framework source when this site was built. The first line of each doc comment is shown; docs.rs has the rest.",
+    "api_method": "Method",
+    "api_doc": "Description",
+    "docs": "Documentation",
+    "docs_rs": "API reference on docs.rs",
+    "missing": "This component does not exist.",
+    "tabs": "{name} sections",
+    "overview": "Overview",
+    "api": "API",
+    "examples": "Examples",
+    "cat": {
+      "layout": "Layout",
+      "text": "Text and display",
+      "navigation": "Navigation",
+      "forms": "Forms and inputs",
+      "data": "Data",
+      "media": "Media",
+      "feedback": "Feedback and overlays",
+      "charts": "Charts",
+      "shell": "Shell"
+    },
+    "summary": {
+      "stack": "Nodes one under the other with a gap.",
+      "row": "Columns side by side that stack on narrow screens.",
+      "card": "A bordered box with an optional title.",
+      "panel": "A titled section that can collapse.",
+      "tabs": "Panels behind a tab list, loaded the first time they open.",
+      "split": "Two panes with a handle that resizes them.",
+      "auto_grid": "As many columns as fit the width.",
+      "heading": "Section headings from h2 to h6.",
+      "paragraph": "A paragraph of escaped text, normal or quiet.",
+      "meta_line": "Short facts on one line with a separator.",
+      "badge": "A short status label in a tone.",
+      "avatar": "A picture of a person or their initials.",
+      "description_list": "Label and value pairs of a record.",
+      "timeline": "Events in order, each with a tone.",
+      "markdown": "Safe Markdown rendered on the server.",
+      "spoiler": "Content hidden until the reader opens it.",
+      "breadcrumb": "The trail of links to the current page.",
+      "prev_next": "Links to the previous and the next item.",
+      "alpha_index": "A letter bar from the user's alphabet.",
+      "menu_button": "Drop down and split buttons with actions.",
+      "menu_bar": "A menu bar of commands.",
+      "external_link": "A link that leaves the app safely.",
+      "form": "A form of a model, checked on the server.",
+      "controls": "Radio buttons, segmented buttons and switches.",
+      "date_pickers": "Date, time and range pickers.",
+      "lookup": "Pick a record from a search on the server.",
+      "line_editor": "Rows of a model inside a form, with totals.",
+      "masked_inputs": "Masked, decimal, percent and password inputs.",
+      "action_button": "A button that runs an action.",
+      "data_grid": "Rows of an action with paging, sorting and filters.",
+      "card_grid": "Rows of an action shown as cards.",
+      "image_card": "A card with an image, badges and progress.",
+      "rail": "A row of cards that scrolls sideways.",
+      "list": "Rows with an image, a title and meta text.",
+      "search_box": "A search field with suggestions.",
+      "tree": "Branches loaded from the server as they open.",
+      "week_schedule": "Seven day columns of rows from an action.",
+      "image": "A picture with required alt text and size.",
+      "embed": "A page of another site in a locked frame.",
+      "alert": "A message in a tinted box.",
+      "progress": "A labelled progress bar.",
+      "skeleton": "Placeholder lines while content loads.",
+      "empty_state": "What a list shows when it has nothing.",
+      "popover": "A button that opens a small panel.",
+      "busy": "An overlay while a slow action runs.",
+      "toast": "A short notice after an action.",
+      "chart": "Bar, donut, combo and gauge charts.",
+      "kpi": "A number with its change and trend.",
+      "toolbox": "A group of tool buttons, one selected.",
+      "status_bar": "A bar of short status texts."
+    },
+    "ex": {
+      "action_button": {
+        "overview": "Example"
+      },
+      "alert": {
+        "overview": "Example",
+        "tones": "Tones"
+      },
+      "alpha_index": {
+        "overview": "Example"
+      },
+      "auto_grid": {
+        "overview": "Example",
+        "wide_columns": "Wide columns"
+      },
+      "avatar": {
+        "overview": "Example",
+        "sizes": "Sizes"
+      },
+      "badge": {
+        "overview": "Example"
+      },
+      "breadcrumb": {
+        "overview": "Example"
+      },
+      "busy": {
+        "overview": "Example"
+      },
+      "card": {
+        "overview": "Example",
+        "nested": "With content"
+      },
+      "card_grid": {
+        "overview": "Example",
+        "pages": "Numbered pages"
+      },
+      "chart": {
+        "overview": "Example",
+        "donut": "Donut",
+        "gauge": "Gauge"
+      },
+      "controls": {
+        "overview": "Example"
+      },
+      "data_grid": {
+        "overview": "Example"
+      },
+      "date_pickers": {
+        "overview": "Example"
+      },
+      "description_list": {
+        "overview": "Example"
+      },
+      "embed": {
+        "overview": "Example"
+      },
+      "empty_state": {
+        "overview": "Example"
+      },
+      "external_link": {
+        "overview": "Example"
+      },
+      "form": {
+        "overview": "Example"
+      },
+      "heading": {
+        "overview": "Example",
+        "anchor": "With an anchor"
+      },
+      "image": {
+        "overview": "Example"
+      },
+      "image_card": {
+        "overview": "Example",
+        "horizontal": "Horizontal"
+      },
+      "kpi": {
+        "overview": "Example"
+      },
+      "line_editor": {
+        "overview": "Example"
+      },
+      "list": {
+        "overview": "Example",
+        "fixed": "Fixed items"
+      },
+      "lookup": {
+        "overview": "Example"
+      },
+      "markdown": {
+        "overview": "Example"
+      },
+      "masked_inputs": {
+        "overview": "Example"
+      },
+      "menu_bar": {
+        "overview": "Example"
+      },
+      "menu_button": {
+        "overview": "Example",
+        "split": "Split button"
+      },
+      "meta_line": {
+        "overview": "Example",
+        "separator": "Another separator"
+      },
+      "panel": {
+        "overview": "Example",
+        "collapsible": "Collapsible"
+      },
+      "paragraph": {
+        "overview": "Example"
+      },
+      "popover": {
+        "overview": "Example"
+      },
+      "prev_next": {
+        "overview": "Example",
+        "one_side": "Only one side"
+      },
+      "progress": {
+        "overview": "Example"
+      },
+      "rail": {
+        "overview": "Example"
+      },
+      "row": {
+        "overview": "Example",
+        "weights": "Column weights",
+        "compact": "Compact"
+      },
+      "search_box": {
+        "overview": "Example"
+      },
+      "skeleton": {
+        "overview": "Example"
+      },
+      "split": {
+        "overview": "Example"
+      },
+      "spoiler": {
+        "overview": "Example"
+      },
+      "stack": {
+        "overview": "Example",
+        "gap": "Gap"
+      },
+      "status_bar": {
+        "overview": "Example"
+      },
+      "tabs": {
+        "overview": "Example"
+      },
+      "timeline": {
+        "overview": "Example"
+      },
+      "toast": {
+        "overview": "Example"
+      },
+      "toolbox": {
+        "overview": "Example"
+      },
+      "tree": {
+        "overview": "Example"
+      },
+      "week_schedule": {
+        "overview": "Example"
+      }
+    }
+  }
+}
