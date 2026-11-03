@@ -20,6 +20,8 @@ const UNREACHABLE = 'The server could not be reached.';
 const V_CAP = 8_000_000;
 const V_OVERSCAN = 20;
 const V_CACHE = 20;
+/** Most cells the parsed blocks of one virtual grid keep, fresh and stale together (8 blocks of 200 rows at 62 columns). */
+const V_CACHE_CELLS = 100_000;
 const V_FETCH_DELAY_MS = 40;
 const VIEW_SAVE_DELAY_MS = 500;
 const MIN_COLUMN = 48;

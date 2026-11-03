@@ -471,6 +471,18 @@ function renderVirtual(grid, focusIndex = null, geometry = null) {
   }, 400);
 }
 
+/**
+ * Keeps the parsed blocks of a virtual grid within [`V_CACHE`] blocks and [`V_CACHE_CELLS`]
+ * cells (at least three blocks, enough for the view and the prefetch): stale blocks kept for a
+ * reload go first, then the least recently used fresh ones.
+ */
+function trimCache(s) {
+  const columns = s.colv?.n ?? s.head.rows[0]?.cells.length ?? 1;
+  const cap = Math.max(3, Math.min(V_CACHE, Math.floor(V_CACHE_CELLS / (s.size * columns))));
+  while (s.stale.size && s.stale.size + s.cache.size > cap) s.stale.delete(s.stale.keys().next().value);
+  while (s.cache.size > cap) s.cache.delete(s.cache.keys().next().value);
+}
+
 /** Fetches one block by offset; stale or aborted answers are dropped. */
 async function fetchBlock(grid, s, b) {
   const controller = new AbortController();
@@ -512,7 +524,7 @@ async function fetchBlock(grid, s, b) {
   if (s.colv) for (const tr of s.cache.get(b)) windowRow(tr, s.colv);
   relativeTimes(t.content);
   s.stale.delete(b);
-  while (s.cache.size > V_CACHE) s.cache.delete(s.cache.keys().next().value);
+  trimCache(s);
   applyFoot(grid, r.data.foot);
   if (withTotal && r.data.total == null) s.needTotal = true;
   if (withTotal && r.data.total != null) {
@@ -534,6 +546,7 @@ function resetVirtual(grid, s, kind) {
   s.holders.clear();
   s.stale = kind === 'reload' ? new Map([...s.stale, ...s.cache]) : new Map();
   s.cache = new Map();
+  trimCache(s);
   s.gen++;
   s.needTotal = true;
   if (kind === 'layout') s.needHead = true;
