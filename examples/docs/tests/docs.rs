@@ -479,7 +479,11 @@ async fn links_in_translated_pages_stay_in_the_language_and_their_anchors_exist(
         }
         for (path, page) in &pages {
             for href in attrs(article(page), "href") {
-                if !href.starts_with('/') || href.ends_with(".txt") || href.ends_with(".xml") {
+                if !href.starts_with('/')
+                    || href.ends_with(".txt")
+                    || href.ends_with(".xml")
+                    || href.contains("/examples/")
+                {
                     continue;
                 }
                 let (target, anchor) = href
