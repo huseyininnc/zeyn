@@ -207,7 +207,7 @@ impl Component for MetaLine {
                 ));
             }
             first = false;
-            out.push_str(&format!(r#"<span class="z-meta-part">{text}</span>"#));
+            out.push_str(&format!(r#"<bdi class="z-meta-part">{text}</bdi>"#));
         }
         out.push_str("</p>");
     }

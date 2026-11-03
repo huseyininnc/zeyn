@@ -102,7 +102,7 @@ fn meta_line_hides_separators_from_screen_readers_and_skips_empty_parts() {
         1
     );
     assert!(m.contains("5 min &lt;read&gt;"));
-    assert!(!m.contains(r#"<span class="z-meta-part"></span>"#));
+    assert!(!m.contains(r#"<bdi class="z-meta-part"></bdi>"#));
 }
 
 #[test]

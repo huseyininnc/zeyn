@@ -54,6 +54,7 @@
       "controls": "Controls and pickers",
       "lines": "Line editor",
       "display": "Display",
+      "content": "Text and content",
       "data_views": "Tree and charts",
       "catalog": "Cards, rails and search",
       "shell": "Shell and commands",

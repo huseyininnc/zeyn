@@ -79,6 +79,37 @@ async fn every_page_opens_with_its_title_in_the_menu() {
             p.route
         );
         assert!(page.contains(r#"<nav class="z-doc-toc""#), "{}", p.route);
+        assert!(
+            !page.contains("docs.page."),
+            "{} has a menu label without a text in en.json",
+            p.route
+        );
+    }
+}
+
+#[test]
+fn every_menu_label_has_a_text_in_every_language() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("locales");
+    for entry in std::fs::read_dir(dir).unwrap() {
+        let path = entry.unwrap().path();
+        let json: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        let labels = &json["docs"]["page"];
+        let en: serde_json::Value =
+            serde_json::from_str(include_str!("../locales/en.json")).unwrap();
+        for key in en["docs"]["page"]
+            .as_object()
+            .unwrap()
+            .keys()
+        {
+            assert!(
+                labels
+                    .get(key)
+                    .is_some_and(|v| v.is_string()),
+                "{} has no docs.page.{key}",
+                path.display()
+            );
+        }
     }
 }
 

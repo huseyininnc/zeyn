@@ -54,6 +54,7 @@
       "controls": "控件和选择器",
       "lines": "明细行编辑器",
       "display": "展示组件",
+      "content": "文本与内容",
       "data_views": "树与图表",
       "catalog": "卡片、横向滚动栏与搜索",
       "shell": "Shell 和命令",
