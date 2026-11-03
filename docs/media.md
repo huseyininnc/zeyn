@@ -34,15 +34,15 @@ Every answer has `Accept-Ranges: bytes`, `Cache-Control: private, no-cache` and 
 
 The content security policy needs no change: `default-src 'self'` already allows media from the app. An adaptive streaming library that uses Media Source Extensions needs `blob:` in `media-src`, which Zeyn does not add.
 
-## Public files: posters, covers, logos
+## Public files: images, logos, downloads
 
 Files that anyone may see, signed in or not, go in a public source:
 
 ```rust
-Feature::new("catalog").public_media("posters", 86_400, PosterFolder::new("data/posters"))
+Feature::new("catalog").public_media("images", 86_400, ImageFolder::new("data/images"))
 ```
 
-`GET /_zeyn/media/posters/{id}` skips the permission check (ids, guards and interceptors still run), sets no cookie and answers with `Cache-Control: public, max-age=86400` (at most `MAX_PUBLIC_MEDIA_CACHE`, one year), so browsers and a CDN in front of the app keep it. The entity tag still lets them revalidate with `304`. Use the path as the `src` of an `Image`. For many large images a separate image host behind a CDN is still the cheaper choice; allow it with `App::csp(|c| c.img_src([...]))`.
+`GET /_zeyn/media/images/{id}` skips the permission check (ids, guards and interceptors still run), sets no cookie and answers with `Cache-Control: public, max-age=86400` (at most `MAX_PUBLIC_MEDIA_CACHE`, one year), so browsers and a CDN in front of the app keep it. The entity tag still lets them revalidate with `304`. Use the path as the `src` of an `Image`. For many large images a separate image host behind a CDN is still the cheaper choice; allow it with `App::csp(|c| c.img_src([...]))`.
 
 - `open` must return the same bytes for every visitor. Never vary a public file by user, role, tenant or language: a CDN or proxy keeps the first response and hands it to everyone. Files that differ per user belong in a source registered with `Feature::media`.
 - With a long `max_age`, give ids that change with the content, such as a content hash (`poster-3f9a2c.jpg`). A changed file then gets a new address, instead of old copies living on in caches until they expire.

@@ -15,7 +15,7 @@ pub async fn catalog_products(q: DataQuery, store: ProductStore) -> Result<Page<
 CardGrid::of(catalog_products)
     .title(t!("shop.products"))
     .card(|p: &Product| {
-        Card::poster(p.image.clone(), p.name.clone())
+        Card::image(p.image.clone(), p.name.clone())
             .text(p.price.to_string())
             .badge(Badge::new(t!("shop.new")).tone(Tone::Success))
             .link(shop_product, ProductPage { id: p.id })
@@ -26,7 +26,7 @@ CardGrid::of(catalog_products)
     .paging(Paging::infinite(24))
 ```
 
-- **Cards.** `Card::poster(image, title)` makes one card from a row, with `text`, `badge`, `alt` and `link` (a screen and its params; the whole card is one link and opens without a page reload). Images are lazy, with the width and height from `image_size` so the page does not jump. The image's alternative text is empty, because the title next to it names the card; set `alt` when the picture says more. Image addresses other than a path, `https:` or `data:image/` are left out.
+- **Cards.** `Card::image(image, title)` makes one card from a row, with `text`, `badge`, `alt` and `link` (a screen and its params; the whole card is one link and opens without a page reload). Images are lazy, with the width and height from `image_size` so the page does not jump. The image's alternative text is empty, because the title next to it names the card; set `alt` when the picture says more. Image addresses other than a path, `https:` or `data:image/` are left out.
 - **Paging.** `Paging::infinite(n)` (the default, 24) shows a "Show more" button that also fires when it scrolls into view; focus moves to the first new card when the button is pressed. `Paging::pages(n)` shows previous and next buttons and the page number. The server sets the page size; the client only says where to continue.
 - **Sorting.** Each `sort_option` is an order users can pick from a select; the first is the order the cards start in. The server accepts only these orders, and drops filters and search text sent by the client.
 - **Search.** `.search(text)` shows only rows that match the free text ([`DataQuery::q`](#free-text)), such as the text of a results screen.
@@ -39,7 +39,7 @@ A rail is a card grid laid out in one row that scrolls sideways, with scroll sna
 ```rust
 Rail::of(catalog_products)
     .title(t!("shop.new_arrivals"))
-    .card(|p: &Product| Card::poster(p.image.clone(), p.name.clone()))
+    .card(|p: &Product| Card::image(p.image.clone(), p.name.clone()))
     .sort_option(t!("shop.sort.newest"), Product::id, true)
 ```
 

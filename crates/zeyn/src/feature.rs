@@ -243,7 +243,7 @@ impl Feature {
         self
     }
 
-    /// A media source anyone may read, signed in or not, such as posters, cover images and logos.
+    /// A media source anyone may read, signed in or not, such as product images, logos and public downloads.
     /// Responses carry no cookie and `Cache-Control: public, max-age={max_age}` (at most
     /// [`MAX_PUBLIC_MEDIA_CACHE`](crate::media::MAX_PUBLIC_MEDIA_CACHE) seconds), so browsers and a
     /// CDN keep them; the entity tag of [`Media::file`](crate::Media::file) still lets them
@@ -259,9 +259,9 @@ impl Feature {
     /// proxy in front of the app.
     ///
     /// ```ignore
-    /// Feature::new("catalog").public_media("posters", 86_400, PosterFolder::new("data/posters"))
+    /// Feature::new("catalog").public_media("images", 86_400, ImageFolder::new("data/images"))
     /// ```
-    /// The browser then loads `/_zeyn/media/posters/{id}`.
+    /// The browser then loads `/_zeyn/media/images/{id}`.
     pub fn public_media(mut self, name: &'static str, max_age: u32, source: impl crate::media::MediaSource) -> Self {
         self.media.push(crate::media::MediaEntry {
             name,

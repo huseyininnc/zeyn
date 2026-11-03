@@ -45,7 +45,7 @@ pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
 }
 
 /// Whether `path` reads a file of a public media source. These requests skip the rate limit:
-/// one page loads many posters, and many visitors can share one address behind carrier NAT.
+/// one page loads many images, and many visitors can share one address behind carrier NAT.
 pub(super) fn is_public(st: &AppState, path: &str) -> bool {
     path.strip_prefix("/_zeyn/media/").and_then(|rest| rest.split_once('/')).is_some_and(|(source, id)| {
         !id.contains('/')

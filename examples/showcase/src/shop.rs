@@ -3,7 +3,7 @@
 
 use crate::stock::{Product, ProductId, ProductStore};
 use zeyn::prelude::*;
-use zeyn::ui::{Alert, PosterCard};
+use zeyn::ui::{Alert, ImageCard};
 use zeyn::{Component, Render};
 
 /// Active products for the public catalog: the same rows as the stock list, without the
@@ -23,9 +23,9 @@ fn picture(p: &Product) -> String {
 }
 
 /// The card of a product, with its price in the visitor's language.
-fn card(locale: String) -> impl Fn(&Product) -> PosterCard + Send + Sync + 'static {
+fn card(locale: String) -> impl Fn(&Product) -> ImageCard + Send + Sync + 'static {
     move |p: &Product| {
-        let card = Card::poster(picture(p), p.name.clone())
+        let card = Card::image(picture(p), p.name.clone())
             .text(p.price.format(&locale))
             .link(shop_product, ProductPage { id: p.id });
         if p.id.0 > 228 { card.badge(Badge::new(t!("shop.new")).tone(Tone::Success)) } else { card }

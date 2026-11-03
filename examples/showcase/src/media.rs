@@ -190,7 +190,7 @@ pub fn media_external() -> Result<Screen> {
                         .allow([EmbedPermission::Fullscreen, EmbedPermission::PictureInPicture])
                         .click_to_load("/_zeyn/media/films/harbor.jpg")
                         .notice(t!("media.embed_notice"))
-                        .remember_for_session("showcase-video"),
+                        .remember("external-video", std::time::Duration::from_secs(24 * 60 * 60)),
                 ),
             )
             .col(

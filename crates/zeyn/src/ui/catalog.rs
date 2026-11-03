@@ -50,8 +50,8 @@ impl<'de> Deserialize<'de> for SearchParams {
 impl Params for SearchParams {}
 
 /// One card of a [`CardGrid`] or [`Rail`]: an image, a title, optional text and badge, and the
-/// screen the card opens. Built from a row with [`Card::poster`].
-pub struct PosterCard {
+/// screen the card opens. Built from a row with [`Card::image`].
+pub struct ImageCard {
     image: String,
     title: Text,
     text: Option<Text>,
@@ -64,9 +64,9 @@ impl Card {
     /// A card with an image and a title, for a [`CardGrid`] or [`Rail`]. The image is a path of
     /// the app (`/...`), an `https:` address or a `data:image/` URI; anything else is left out.
     /// Its alternative text is empty, because the title next to it names the card; give
-    /// [`PosterCard::alt`] when the image says more than the title.
-    pub fn poster(image: impl Into<String>, title: impl Into<Text>) -> PosterCard {
-        PosterCard {
+    /// [`ImageCard::alt`] when the image says more than the title.
+    pub fn image(image: impl Into<String>, title: impl Into<Text>) -> ImageCard {
+        ImageCard {
             image: image.into(),
             title: title.into(),
             text: None,
@@ -75,9 +75,19 @@ impl Card {
             link: None,
         }
     }
+
+    /// The old name of [`Card::image`].
+    #[deprecated(since = "0.0.5", note = "use Card::image(image, title)")]
+    pub fn poster(image: impl Into<String>, title: impl Into<Text>) -> ImageCard {
+        Card::image(image, title)
+    }
 }
 
-impl PosterCard {
+/// The old name of [`ImageCard`].
+#[deprecated(since = "0.0.5", note = "use ImageCard")]
+pub type PosterCard = ImageCard;
+
+impl ImageCard {
     /// A line under the title, such as a price.
     pub fn text(mut self, text: impl Into<Text>) -> Self {
         self.text = Some(text.into());
@@ -141,7 +151,7 @@ impl PosterCard {
     }
 }
 
-type CardFn<E> = Box<dyn Fn(&E) -> PosterCard + Send + Sync>;
+type CardFn<E> = Box<dyn Fn(&E) -> ImageCard + Send + Sync>;
 
 /// Turns away rows of a model with `#[mask]` fields the user may not reveal. Cards and
 /// suggestions are built by app closures that see the raw row, so they could not keep a masked
@@ -227,7 +237,7 @@ impl<E: Model> CardGrid<E> {
     }
 
     /// How a row becomes a card.
-    pub fn card(mut self, build: impl Fn(&E) -> PosterCard + Send + Sync + 'static) -> Self {
+    pub fn card(mut self, build: impl Fn(&E) -> ImageCard + Send + Sync + 'static) -> Self {
         self.card = Some(Box::new(build));
         self
     }

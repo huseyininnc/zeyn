@@ -59,7 +59,7 @@ pub fn shop() -> Screen {
             CardGrid::of(search_goods)
                 .title("All goods")
                 .card(|g: &Good| {
-                    Card::poster(format!("/img/{}.png", g.id.0), g.name.clone())
+                    Card::image(format!("/img/{}.png", g.id.0), g.name.clone())
                         .text(format!("{} TL", g.price))
                         .badge(Badge::new("New"))
                         .link(results, SearchParams { q: g.name.clone() })
@@ -69,7 +69,7 @@ pub fn shop() -> Screen {
                 .paging(Paging::infinite(4)),
         )
         .body(
-            Rail::of(search_goods).title("Picks").card(|g: &Good| Card::poster("javascript:alert(1)", g.name.clone())),
+            Rail::of(search_goods).title("Picks").card(|g: &Good| Card::image("javascript:alert(1)", g.name.clone())),
         )
         .body(SearchBox::of(search_goods).instant(10).limit(3).results(results))
 }
@@ -78,7 +78,7 @@ pub fn shop() -> Screen {
 pub fn results(p: SearchParams) -> Screen {
     Screen::new("Results").body(SearchBox::of(search_goods).value(p.q.clone())).body(
         CardGrid::of(search_goods)
-            .card(|g: &Good| Card::poster("/x.png", g.name.clone()))
+            .card(|g: &Good| Card::image("/x.png", g.name.clone()))
             .search(p.q)
             .paging(Paging::pages(5)),
     )
@@ -245,7 +245,7 @@ pub async fn members(q: DataQuery) -> Result<Page<Member>> {
 
 #[screen(route = "/members", public)]
 pub fn member_cards() -> Screen {
-    Screen::new("Members").body(CardGrid::of(members).card(|m: &Member| Card::poster("/m.png", m.phone.clone())))
+    Screen::new("Members").body(CardGrid::of(members).card(|m: &Member| Card::image("/m.png", m.phone.clone())))
 }
 
 #[tokio::test]

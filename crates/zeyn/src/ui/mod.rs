@@ -37,11 +37,13 @@ pub use live::Live;
 
 pub(crate) use dock::panel_ids as dock_panel_ids;
 pub use dock::{DOCK_SIZE, Dock, DockArea, DockLayout, DockPanelState, DockSizes};
-pub use embed::{Complete, EMBED_SANDBOX, Embed, EmbedPermission, ExternalLink, Given, Image, NoAlt, NoSize, NoTitle};
+pub use embed::{Complete, EMBED_SANDBOX, Embed, MAX_EMBED_CONSENT, EmbedPermission, ExternalLink, Given, Image, NoAlt, NoSize, NoTitle};
 pub use layout::{Card, Panel, Row, Split, Stack, Tabs};
 pub use shell::{MenuBar, MenuList, PropertyInspector, StatusBar, Toolbox};
 
-pub use catalog::{CardGrid, MAX_SUGGESTIONS, PosterCard, Rail, SearchBox, SearchParams};
+#[allow(deprecated)]
+pub use catalog::PosterCard;
+pub use catalog::{CardGrid, ImageCard, MAX_SUGGESTIONS, Rail, SearchBox, SearchParams};
 pub use chart::{Better, BulletCell, Chart, ChartKind, Kpi, SparklineCell};
 pub use controls::Control;
 pub(crate) use controls::{

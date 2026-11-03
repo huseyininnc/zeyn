@@ -17,7 +17,7 @@
  *
  * Embeds: `zeyn::ui::Embed` with `click_to_load` renders a poster button and the frame inside an
  * inert `<template>`. Pressing the button puts the frame in its place and moves focus to it. With
- * `remember_for_session` the press is kept in `sessionStorage` (one tab), and later pages load
+ * `remember` the end time of the consent is kept in `localStorage`, and later pages and tabs load
  * the frames of that scope by themselves without moving focus.
  * @module media
  */
@@ -28,7 +28,7 @@ const RESUME_MARGIN_S = 5;
 const SEEK_STEP_S = 5;
 const JUMP_STEP_S = 10;
 const VOLUME_STEP = 5;
-/** Prefix of the `sessionStorage` keys that hold a remembered embed consent. */
+/** Prefix of the `localStorage` keys that hold the end time of a remembered embed consent. */
 const CONSENT = 'zeyn.consent.';
 
 /** Player state by root element. */
@@ -573,12 +573,17 @@ new MutationObserver((records) => {
 init(document);
 
 /**
- * Whether this tab consented to the embeds of `scope`. False when storage is missing, blocked or
- * holds anything but the exact value, so the button stays.
+ * Whether the embeds of `e`'s scope hold a consent that has not ended. False when the stored
+ * value is not a whole number, has passed, lies further ahead than the embed's own time (changed
+ * by hand), or storage is missing or blocked, so the button stays.
  */
-function consented(scope) {
+function consented(e) {
+  const ms = Number(e.dataset.zeynEmbedFor);
   try {
-    return sessionStorage.getItem(CONSENT + scope) === '1';
+    const v = localStorage.getItem(CONSENT + e.dataset.zeynEmbedRemember);
+    if (!v || !/^[0-9]{1,15}$/.test(v) || !(ms > 0)) return false;
+    const left = Number(v) - Date.now();
+    return left > 0 && left <= ms;
   } catch {
     return false;
   }
@@ -593,20 +598,20 @@ function loadEmbed(root, focus) {
 }
 
 /**
- * Loads the remembered embeds inside `root` whose scope this tab consented to, without moving
+ * Loads the remembered embeds inside `root` whose scope holds a consent, without moving
  * focus. An embed that holds focus keeps its button, so focus is never lost.
  */
 function restoreEmbeds(root) {
   root.querySelectorAll('.z-embed[data-zeyn-embed-remember]').forEach((e) => {
-    if (!e.contains(document.activeElement) && consented(e.dataset.zeynEmbedRemember)) loadEmbed(e, false);
+    if (!e.contains(document.activeElement) && consented(e)) loadEmbed(e, false);
   });
 }
 
 /**
  * Loads a click to load embed when its button is pressed and moves focus to the frame. With a
- * remembered scope the consent is stored for this tab and the other embeds of that scope load too.
+ * remembered scope the end time of the consent is stored and the other embeds of that scope load too.
  * @example
- * // <div class="z-embed" data-zeyn-embed-remember="flashing"><button data-zeyn-embed-load>..</button><template data-zeyn-embed><iframe ..></template></div>
+ * // <div class="z-embed" data-zeyn-embed-remember="external-video" data-zeyn-embed-for="86400000"><button data-zeyn-embed-load>..</button><template data-zeyn-embed><iframe ..></template></div>
  */
 document.addEventListener('click', (e) => {
   const button = e.target instanceof Element ? e.target.closest('[data-zeyn-embed-load]') : null;
@@ -615,8 +620,10 @@ document.addEventListener('click', (e) => {
   loadEmbed(root, true);
   const scope = root.dataset.zeynEmbedRemember;
   if (!scope) return;
+  const ms = Number(root.dataset.zeynEmbedFor);
+  if (!(ms > 0)) return;
   try {
-    sessionStorage.setItem(CONSENT + scope, '1');
+    localStorage.setItem(CONSENT + scope, String(Date.now() + ms));
   } catch {
     return;
   }

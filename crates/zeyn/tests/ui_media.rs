@@ -324,10 +324,10 @@ fn media_source_names_are_checked() {
     assert!(bad.iter().any(|p| p.contains("media source `../x`")), "{bad:?}");
 }
 
-fn public_app(posters: Files) -> Router {
+fn public_app(images: Files) -> Router {
     App::new("Test")
         .i18n(I18n::new("en"))
-        .feature(Feature::new("catalog").public_media("posters", 86_400, posters).media("films", "media.play", Files::default()))
+        .feature(Feature::new("catalog").public_media("images", 86_400, images).media("films", "media.play", Files::default()))
         .router()
         .unwrap()
 }
@@ -335,16 +335,16 @@ fn public_app(posters: Files) -> Router {
 #[tokio::test]
 async fn public_media_is_served_to_anyone_with_a_shared_cache_and_no_cookie() {
     let router = public_app(Files::default());
-    let req = Request::get("/_zeyn/media/posters/clip.mp4").body(Body::empty()).unwrap();
+    let req = Request::get("/_zeyn/media/images/clip.mp4").body(Body::empty()).unwrap();
     let (status, headers, body) = send(&router, req).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body, bytes(1000));
     assert_eq!(h(&headers, header::CACHE_CONTROL), "public, max-age=86400");
     assert_eq!(h(&headers, header::ETAG), "\"v1\"");
     assert!(headers.get(header::SET_COOKIE).is_none());
-    let cached = Request::get("/_zeyn/media/posters/clip.mp4").header(header::IF_NONE_MATCH, "\"v1\"");
+    let cached = Request::get("/_zeyn/media/images/clip.mp4").header(header::IF_NONE_MATCH, "\"v1\"");
     assert_eq!(send(&router, cached.body(Body::empty()).unwrap()).await.0, StatusCode::NOT_MODIFIED);
-    let unknown = Request::get("/_zeyn/media/posters/../x").body(Body::empty()).unwrap();
+    let unknown = Request::get("/_zeyn/media/images/../x").body(Body::empty()).unwrap();
     assert_eq!(send(&router, unknown).await.0, StatusCode::NOT_FOUND);
 }
 
@@ -363,7 +363,7 @@ async fn public_media_reads_skip_the_rate_limit_but_private_media_and_ip_rules_s
         .i18n(I18n::new("en"))
         .rate_limit(zeyn::RateLimit::per_ip(2, std::time::Duration::from_secs(60)))
         .deny_ips(["198.51.100.0/24"])
-        .feature(Feature::new("catalog").public_media("posters", 86_400, Files::default()).media("films", "media.play", Files::default()))
+        .feature(Feature::new("catalog").public_media("images", 86_400, Files::default()).media("films", "media.play", Files::default()))
         .router()
         .unwrap();
     let from = |path: &str, ip: &str| {
@@ -372,7 +372,7 @@ async fn public_media_reads_skip_the_rate_limit_but_private_media_and_ip_rules_s
         req
     };
     for _ in 0..30 {
-        assert_eq!(send(&router, from("/_zeyn/media/posters/clip.mp4", "203.0.113.5")).await.0, StatusCode::OK);
+        assert_eq!(send(&router, from("/_zeyn/media/images/clip.mp4", "203.0.113.5")).await.0, StatusCode::OK);
     }
     assert_eq!(send(&router, from("/_zeyn/media/films/clip.mp4", "203.0.113.5")).await.0, StatusCode::FORBIDDEN);
     assert_eq!(send(&router, from("/_zeyn/media/films/clip.mp4", "203.0.113.5")).await.0, StatusCode::FORBIDDEN);
@@ -382,12 +382,12 @@ async fn public_media_reads_skip_the_rate_limit_but_private_media_and_ip_rules_s
         "private media still counts"
     );
     assert_eq!(
-        send(&router, from("/_zeyn/media/posters/a/clip.mp4", "203.0.113.5")).await.0,
+        send(&router, from("/_zeyn/media/images/a/clip.mp4", "203.0.113.5")).await.0,
         StatusCode::TOO_MANY_REQUESTS,
         "only a file of a public source skips the limit"
     );
-    assert_eq!(send(&router, from("/_zeyn/media/posters/clip.mp4", "203.0.113.5")).await.0, StatusCode::OK);
-    assert_eq!(send(&router, from("/_zeyn/media/posters/clip.mp4", "198.51.100.7")).await.0, StatusCode::FORBIDDEN);
+    assert_eq!(send(&router, from("/_zeyn/media/images/clip.mp4", "203.0.113.5")).await.0, StatusCode::OK);
+    assert_eq!(send(&router, from("/_zeyn/media/images/clip.mp4", "198.51.100.7")).await.0, StatusCode::FORBIDDEN);
 }
 
 #[test]

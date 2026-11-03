@@ -90,17 +90,17 @@ fn click_to_load_shows_a_poster_button_and_keeps_the_frame_inert() {
 #[test]
 fn a_notice_on_the_gate_is_escaped_translated_and_part_of_the_button_name() {
     let e = Embed::url("https://www.youtube-nocookie.com/embed/abc")
-        .title("Episode 12")
+        .title("Product tour")
         .click_to_load("")
-        .notice("Flashing <b>lights</b> & violence");
+        .notice("Sound <b>on</b> & autoplay");
     let out = html(&e, &ctx(frames()));
     let button = &out[out.find("<button").expect(&out)..out.find("</button>").expect(&out)];
     assert!(
-        button.contains(r#"<span class="z-embed-notice">Flashing &lt;b&gt;lights&lt;/b&gt; &amp; violence</span><strong>Load Episode 12</strong>"#),
+        button.contains(r#"<span class="z-embed-notice">Sound &lt;b&gt;on&lt;/b&gt; &amp; autoplay</span><strong>Load Product tour</strong>"#),
         "{out}"
     );
     assert!(!out.contains("<b>"), "{out}");
-    assert_eq!(e.schema()["notice"], "Flashing <b>lights</b> & violence");
+    assert_eq!(e.schema()["notice"], "Sound <b>on</b> & autoplay");
 
     let without_poster = Embed::url("https://www.youtube-nocookie.com/embed/abc").title("T").notice("Warning");
     let out = html(&without_poster, &ctx(frames()));
@@ -109,7 +109,7 @@ fn a_notice_on_the_gate_is_escaped_translated_and_part_of_the_button_name() {
 
     let tr = zeyn::I18n::builtin();
     let translated = Embed::url("https://www.youtube-nocookie.com/embed/abc")
-        .title("Bölüm")
+        .title("Ürün turu")
         .notice(Text::key("zeyn.ui.link.external"));
     let mut out = String::new();
     translated.render(&mut out, &Render::new("s", "tr", tr).with_ctx(&ctx(frames())));
@@ -119,25 +119,25 @@ fn a_notice_on_the_gate_is_escaped_translated_and_part_of_the_button_name() {
 #[test]
 fn a_remembered_gate_names_its_scope_and_keeps_the_frame_inert() {
     let e = Embed::url("https://www.youtube-nocookie.com/embed/abc")
-        .title("Episode 12")
-        .notice("Flashing lights")
-        .remember_for_session("flashing_lights-2");
+        .title("Product tour")
+        .notice("Served by another site")
+        .remember("external_video-2", DAY);
     let out = html(&e, &ctx(frames()));
-    assert!(out.starts_with(r#"<div class="z-embed" style="--z-aspect: 16 / 9" data-zeyn-embed-remember="flashing_lights-2""#), "{out}");
+    assert!(out.starts_with(r#"<div class="z-embed" style="--z-aspect: 16 / 9" data-zeyn-embed-remember="external_video-2" data-zeyn-embed-for="86400000""#), "{out}");
     assert!(out.contains("data-zeyn-embed-load") && out.contains("<template data-zeyn-embed><iframe"), "{out}");
     assert!(!out.replace("<template data-zeyn-embed><iframe", "").contains("<iframe"), "without JavaScript the frame stays inert: {out}");
-    assert_eq!(e.schema()["remember_for_session"], "flashing_lights-2");
+    assert_eq!(e.schema()["remember"], serde_json::json!({ "scope": "external_video-2", "ms": 86_400_000 }));
     let plain = html(&Embed::url("https://www.youtube-nocookie.com/embed/abc").title("T").click_to_load(""), &ctx(frames()));
     assert!(!plain.contains("data-zeyn-embed-remember"), "{plain}");
     let max: &'static str = "a".repeat(40).leak();
-    let _ = Embed::url("https://a.test/").title("T").remember_for_session(max);
+    let _ = Embed::url("https://a.test/").title("T").remember(max, zeyn::ui::MAX_EMBED_CONSENT);
 }
 
 #[test]
 fn remember_scopes_outside_letters_digits_dash_and_underscore_panic() {
     let long: &'static str = "a".repeat(41).leak();
     for bad in ["", long, "a b", "a.b", "a\"b", "ç", "a/b", "<x>"] {
-        let panic = std::panic::catch_unwind(|| Embed::url("https://a.test/").title("T").remember_for_session(bad));
+        let panic = std::panic::catch_unwind(|| Embed::url("https://a.test/").title("T").remember(bad, DAY));
         let message = *panic.err().expect(bad).downcast::<String>().unwrap();
         assert!(message.contains("scope") && message.contains("1 to 40 ASCII letters, digits"), "{bad}: {message}");
     }
@@ -285,4 +285,17 @@ fn external_links_never_hand_over_the_window() {
     let tr = zeyn::I18n::builtin();
     let out = ExternalLink::new("https://example.com", "Yardım").new_tab().html(&Render::new("s", "tr", tr));
     assert!(out.contains("(dış site, yeni sekmede açılır)"), "{out}");
+}
+
+const DAY: std::time::Duration = std::time::Duration::from_secs(24 * 60 * 60);
+
+#[test]
+fn remember_times_outside_one_second_to_thirty_days_panic() {
+    let too_long = zeyn::ui::MAX_EMBED_CONSENT + std::time::Duration::from_secs(1);
+    for bad in [std::time::Duration::ZERO, std::time::Duration::from_millis(999), too_long] {
+        let panic = std::panic::catch_unwind(|| Embed::url("https://a.test/").title("T").remember("notice", bad));
+        let message = *panic.err().expect("panics").downcast::<String>().unwrap();
+        assert!(message.contains("1 second to 30 days"), "{bad:?}: {message}");
+    }
+    let _ = Embed::url("https://a.test/").title("T").remember("notice", std::time::Duration::from_secs(1));
 }
