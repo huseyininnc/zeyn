@@ -54,7 +54,7 @@ fn entry(st: &AppState, ctx: &Ctx, source: &str, id: &str) -> Result<MediaEntry,
         .iter()
         .find_map(|f| f.media_sources().iter().find(|m| m.name == source).map(|m| (f, m)))
         .ok_or(Failure::App(Error::NotFound))?;
-    if !ctx.identity().can(&Access::Permission(entry.permission)) {
+    if entry.public_cache.is_none() && !ctx.identity().can(&Access::Permission(entry.permission)) {
         return Err(Failure::App(Error::Forbidden));
     }
     feature.check_guards(ctx)?;
@@ -80,11 +80,18 @@ async fn media_file(
     let ctx = st.licensed(st.ctx(&headers)).await;
     let opened = async {
         let entry = entry(&st, &ctx, &source, &id)?;
-        intercepted(&st, &ctx, &entry, entry.source.open(ctx.clone(), id)).await
+        let media = intercepted(&st, &ctx, &entry, entry.source.open(ctx.clone(), id)).await?;
+        Ok::<_, Failure>((media, entry.public_cache))
     }
     .await;
     match opened {
-        Ok(media) => respond(media, &headers),
+        Ok((media, public)) => {
+            let mut r = respond(media, &headers);
+            if let Some(v) = public.and_then(|s| HeaderValue::from_str(&format!("public, max-age={s}")).ok()) {
+                r.headers_mut().insert(header::CACHE_CONTROL, v);
+            }
+            r
+        }
         Err(f) => st.error_response(&ctx, f),
     }
 }

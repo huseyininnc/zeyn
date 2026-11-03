@@ -125,7 +125,13 @@ pub struct MediaEntry {
     pub name: &'static str,
     pub permission: &'static str,
     pub source: std::sync::Arc<dyn MediaSource>,
+    /// `Some(seconds)` for a source anyone may read ([`Feature::public_media`](crate::Feature::public_media)):
+    /// no permission check, and browsers and shared caches keep responses that long.
+    pub public_cache: Option<u32>,
 }
+
+/// Longest cache time of a public media source, in seconds (one year).
+pub const MAX_PUBLIC_MEDIA_CACHE: u32 = 31_536_000;
 
 /// Whether a media id or source name has a safe shape: 1 to 128 ASCII letters, digits, `-`, `_`
 /// and `.`, not starting with a dot and without `..`. Ids that fail are answered with `404`

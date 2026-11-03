@@ -232,7 +232,8 @@ impl Component for Embed<Given> {
 ///     .srcset([("https://images.example.com/logo@2x.png", "2x")]);
 /// ```
 ///
-/// `src` is a path on the app (`/static/logo.png`) or an `https` address on a host of the
+/// `src` is a path on the app (such as a public media source: `/_zeyn/media/brand/logo.png`, see
+/// `Feature::public_media`) or an `https` address on a host of the
 /// app's `img-src` (`App::csp(|c| c.img_src([...]))`). Any other image is not rendered; its alt
 /// text is shown instead. `srcset` entries on other hosts, or with a descriptor that is not a
 /// density (`2x`) or a width (`800w`), are left out. Every image gets `decoding="async"`;

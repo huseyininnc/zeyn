@@ -239,7 +239,28 @@ impl Feature {
         permission: &'static str,
         source: impl crate::media::MediaSource,
     ) -> Self {
-        self.media.push(crate::media::MediaEntry { name, permission, source: Arc::new(source) });
+        self.media.push(crate::media::MediaEntry { name, permission, source: Arc::new(source), public_cache: None });
+        self
+    }
+
+    /// A media source anyone may read, signed in or not, such as posters, cover images and logos.
+    /// Responses carry no cookie and `Cache-Control: public, max-age={max_age}` (at most
+    /// [`MAX_PUBLIC_MEDIA_CACHE`](crate::media::MAX_PUBLIC_MEDIA_CACHE) seconds), so browsers and a
+    /// CDN keep them; the entity tag of [`Media::file`](crate::Media::file) still lets them
+    /// revalidate. The feature's guards and the interceptors still run. Keep private files in a
+    /// source registered with [`Feature::media`].
+    ///
+    /// ```ignore
+    /// Feature::new("catalog").public_media("posters", 86_400, PosterFolder::new("data/posters"))
+    /// ```
+    /// The browser then loads `/_zeyn/media/posters/{id}`.
+    pub fn public_media(mut self, name: &'static str, max_age: u32, source: impl crate::media::MediaSource) -> Self {
+        self.media.push(crate::media::MediaEntry {
+            name,
+            permission: "",
+            source: Arc::new(source),
+            public_cache: Some(max_age.min(crate::media::MAX_PUBLIC_MEDIA_CACHE)),
+        });
         self
     }
 

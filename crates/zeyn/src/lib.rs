@@ -501,7 +501,7 @@ pub use jobs::{SqlJobStore, create_job_tables};
 #[cfg(feature = "email")]
 pub use mail::{MAIL_JOB, MAX_ATTEMPTS, MAX_QUEUED, Mail, Mailer};
 pub use media::{
-    ByteRange, MAX_MEDIA_ID, MAX_POSITION_SECONDS, MEDIA_CHUNK, Media, MediaEntry, MediaReader, MediaSource,
+    ByteRange, MAX_MEDIA_ID, MAX_POSITION_SECONDS, MAX_PUBLIC_MEDIA_CACHE, MEDIA_CHUNK, Media, MediaEntry, MediaReader, MediaSource,
     media_type, valid_media_id,
 };
 pub use menu::ContextMenu;

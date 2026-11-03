@@ -323,3 +323,42 @@ fn media_source_names_are_checked() {
     let bad = App::new("T").feature(Feature::new("a").media("../x", "p", Files::default())).check().unwrap_err();
     assert!(bad.iter().any(|p| p.contains("media source `../x`")), "{bad:?}");
 }
+
+fn public_app(posters: Files) -> Router {
+    App::new("Test")
+        .i18n(I18n::new("en"))
+        .feature(Feature::new("catalog").public_media("posters", 86_400, posters).media("films", "media.play", Files::default()))
+        .router()
+        .unwrap()
+}
+
+#[tokio::test]
+async fn public_media_is_served_to_anyone_with_a_shared_cache_and_no_cookie() {
+    let router = public_app(Files::default());
+    let req = Request::get("/_zeyn/media/posters/clip.mp4").body(Body::empty()).unwrap();
+    let (status, headers, body) = send(&router, req).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body, bytes(1000));
+    assert_eq!(h(&headers, header::CACHE_CONTROL), "public, max-age=86400");
+    assert_eq!(h(&headers, header::ETAG), "\"v1\"");
+    assert!(headers.get(header::SET_COOKIE).is_none());
+    let cached = Request::get("/_zeyn/media/posters/clip.mp4").header(header::IF_NONE_MATCH, "\"v1\"");
+    assert_eq!(send(&router, cached.body(Body::empty()).unwrap()).await.0, StatusCode::NOT_MODIFIED);
+    let unknown = Request::get("/_zeyn/media/posters/../x").body(Body::empty()).unwrap();
+    assert_eq!(send(&router, unknown).await.0, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn private_media_next_to_public_media_still_needs_its_permission() {
+    let router = public_app(Files::default());
+    let req = Request::get("/_zeyn/media/films/clip.mp4").body(Body::empty()).unwrap();
+    let (status, headers, _) = send(&router, req).await;
+    assert_ne!(status, StatusCode::OK);
+    assert_ne!(h(&headers, header::CACHE_CONTROL), "public, max-age=86400");
+}
+
+#[test]
+fn public_media_cache_is_capped_at_a_year() {
+    let f = Feature::new("c").public_media("p", u32::MAX, Files::default());
+    assert_eq!(f.media_sources()[0].public_cache, Some(zeyn::MAX_PUBLIC_MEDIA_CACHE));
+}
