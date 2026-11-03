@@ -3,17 +3,28 @@ use serde::Serialize;
 /// Escapes text and attribute values for HTML. User data always goes through here.
 pub fn escape(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
-    for c in s.chars() {
-        match c {
-            '&' => out.push_str("&amp;"),
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            '"' => out.push_str("&quot;"),
-            '\'' => out.push_str("&#39;"),
-            _ => out.push(c),
-        }
-    }
+    escape_into(&mut out, s);
     out
+}
+
+/// Appends `s` to `out` escaped for HTML, as [`escape`] does, without a new string: runs without
+/// a character to escape are copied in one piece.
+pub fn escape_into(out: &mut String, s: &str) {
+    let mut clean = 0;
+    for (i, b) in s.bytes().enumerate() {
+        let entity = match b {
+            b'&' => "&amp;",
+            b'<' => "&lt;",
+            b'>' => "&gt;",
+            b'"' => "&quot;",
+            b'\'' => "&#39;",
+            _ => continue,
+        };
+        out.push_str(&s[clean..i]);
+        out.push_str(entity);
+        clean = i + 1;
+    }
+    out.push_str(&s[clean..]);
 }
 
 /// Serializes a value to JSON and escapes it for use inside an attribute.
@@ -113,36 +124,52 @@ impl<'a> Render<'a> {
 
     /// Value as shown to the user, escaped: money and yes/no in the user's language, choices by label.
     pub fn value(&self, value: &crate::value::Value, kind: &crate::value::FieldKind) -> String {
+        let mut out = String::new();
+        self.value_into(&mut out, value, kind);
+        out
+    }
+
+    /// Appends [`Render::value`] to `out` without building a string for the value first, for
+    /// renderers that write many values, such as grid rows.
+    pub fn value_into(&self, out: &mut String, value: &crate::value::Value, kind: &crate::value::FieldKind) {
         use crate::i18n::Text;
         use crate::value::{FieldKind, Value};
+        use std::fmt::Write;
         match (value, kind) {
-            (Value::Null, _) => String::new(),
-            (Value::Bool(true), _) => self.text(&Text::key("zeyn.yes")),
-            (Value::Bool(false), _) => self.text(&Text::key("zeyn.no")),
-            (Value::Int(n), _) => n.to_string(),
+            (Value::Null, _) => {}
+            (Value::Bool(true), _) => escape_into(out, &self.i18n.text(self.locale, &Text::key("zeyn.yes"))),
+            (Value::Bool(false), _) => escape_into(out, &self.i18n.text(self.locale, &Text::key("zeyn.no"))),
+            (Value::Int(n), _) => {
+                let _ = write!(out, "{n}");
+            }
             (Value::Decimal(x), _) => {
                 let hundredths = (x * 100.0).round();
                 if hundredths.is_finite() {
-                    escape(&crate::value::Money::new(hundredths as i64, Default::default()).format_plain(self.locale))
-                } else {
-                    String::new()
+                    let plain = crate::value::Money::new(hundredths as i64, Default::default()).format_plain(self.locale);
+                    escape_into(out, &plain);
                 }
             }
-            (Value::Text(s), FieldKind::Choices(_)) => escape(&crate::ui::choices_text(s, kind, self)),
-            (Value::Text(s), _) => escape(s),
-            (Value::Money(m), _) => escape(&m.format(self.locale)),
-            (Value::Number(d), _) => escape(&d.format(self.locale)),
-            (Value::Date(d), _) => format!(r#"<time datetime="{d}">{}</time>"#, d.format(self.locale)),
-            (Value::Time(t), _) => format!(r#"<time datetime="{t}">{}</time>"#, t.format(self.locale)),
-            (Value::LocalDateTime(l), _) => format!(r#"<time datetime="{l}">{}</time>"#, l.format(self.locale)),
+            (Value::Text(s), FieldKind::Choices(_)) => escape_into(out, &crate::ui::choices_text(s, kind, self)),
+            (Value::Text(s), _) => escape_into(out, s),
+            (Value::Money(m), _) => escape_into(out, &m.format(self.locale)),
+            (Value::Number(d), _) => escape_into(out, &d.format(self.locale)),
+            (Value::Date(d), _) => {
+                let _ = write!(out, r#"<time datetime="{d}">{}</time>"#, d.format(self.locale));
+            }
+            (Value::Time(t), _) => {
+                let _ = write!(out, r#"<time datetime="{t}">{}</time>"#, t.format(self.locale));
+            }
+            (Value::LocalDateTime(l), _) => {
+                let _ = write!(out, r#"<time datetime="{l}">{}</time>"#, l.format(self.locale));
+            }
             (Value::DateTime(d), _) => {
-                format!(r#"<time datetime="{d}" title="{d}">{}</time>"#, d.format(self.tz, self.locale))
+                let _ = write!(out, r#"<time datetime="{d}" title="{d}">{}</time>"#, d.format(self.tz, self.locale));
             }
             (Value::Choice(v), FieldKind::Choice(options)) => match options.iter().find(|o| o.value == *v) {
-                Some(o) => self.text(&Text::key_or(o.key, o.label)),
-                None => escape(v),
+                Some(o) => escape_into(out, &self.i18n.text(self.locale, &Text::key_or(o.key, o.label))),
+                None => escape_into(out, v),
             },
-            (Value::Choice(v), _) => escape(v),
+            (Value::Choice(v), _) => escape_into(out, v),
         }
     }
 }

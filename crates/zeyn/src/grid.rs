@@ -6,7 +6,7 @@ use crate::ctx::Outcome;
 use crate::ctx::{BoxFuture, Ctx};
 use crate::i18n::Text;
 use crate::model::{Field, FieldMeta, Model, Valid};
-use crate::render::{Render, attr, escape};
+use crate::render::{Render, attr, escape, escape_into};
 use crate::screen::Icon;
 use crate::screen::RowCall;
 use crate::screen::{Component, Effect, GridSource, LoadedPage, Node, ScreenDef};
@@ -350,6 +350,18 @@ where
 }
 
 /// Key of a row as text: the value of the model's `#[key]` field.
+/// Appends [`key_text`] escaped for an attribute, without a new string for numbers and text.
+fn key_into(out: &mut String, value: &Value) {
+    match value {
+        Value::Int(n) => {
+            use std::fmt::Write;
+            let _ = write!(out, "{n}");
+        }
+        Value::Text(s) => escape_into(out, s),
+        other => escape_into(out, &key_text(other)),
+    }
+}
+
 fn key_text(value: &Value) -> String {
     match value {
         Value::Int(n) => n.to_string(),
@@ -1044,115 +1056,137 @@ impl<E: Model> DataGrid<E> {
         out
     }
 
+    /// The `<tr>` of each row. Work that is the same for every row (access checks, labels, the
+    /// row action cell, which columns are editable) is done once, and cells are written straight
+    /// into the output without a string per cell.
     fn rows(&self, rows: &[E], r: &Render, cols: &[Shown], b: &Branch) -> String {
-        let mut out = String::new();
+        use std::fmt::Write;
+        let mut out = String::with_capacity(rows.len() * (cols.len() + 1) * 32);
         let nested = self.nested();
         let tree = nested && self.tree.is_some();
+        let edit = self.can_edit(r);
+        let key_at = Self::key_index();
+        let version_at = edit.then(|| E::fields().iter().position(|f| f.version)).flatten();
+        let detail = self.detail.as_ref().filter(|_| self.expandable(r));
+        let expand_cell = detail.map(|_| {
+            format!(
+                r#"<td class="z-expand"><button type="button" class="z-expander" data-zeyn-expand aria-expanded="false" aria-label="{}" tabindex="-1"></button></td>"#,
+                r.text(&Text::key("zeyn.grid.details"))
+            )
+        });
+        let select_cell = self.selectable.then(|| {
+            format!(
+                r#"<td class="z-row-select"><input type="checkbox" data-zeyn-select tabindex="-1" aria-label="{}"></td>"#,
+                r.text(&Text::key("zeyn.grid.select_row"))
+            )
+        });
+        let tree_toggle = tree.then(|| {
+            format!(
+                r#"<button type="button" class="z-expander" data-zeyn-expand aria-expanded="false" aria-label="{}" tabindex="-1"></button>"#,
+                r.text(&Text::key("zeyn.grid.children"))
+            )
+        });
+        let actions_cell = (!self.row_actions.is_empty()).then(|| {
+            let mut cell = String::from(r#"<td class="z-row-actions">"#);
+            for (i, a) in self.row_actions.iter().enumerate().filter(|(_, a)| r.can(&a.meta.access)) {
+                let label = r.text(&a.label);
+                let icon = a.icon.map(Icon::html).unwrap_or_default();
+                let _ = write!(
+                    cell,
+                    r#"<button type="button" class="z-row-action" data-zeyn-run="a{i}" tabindex="-1">{icon}<span>{label}</span></button>"#
+                );
+            }
+            cell.push_str("</td>");
+            cell
+        });
+        let editable: Vec<bool> = cols
+            .iter()
+            .map(|s| {
+                let c = &self.columns[s.index];
+                edit && c.editable && !c.meta.readonly && !c.meta.key && !c.meta.version && c.meta.mask.is_none()
+            })
+            .collect();
         for row in rows {
             if let (true, Some(ctx)) = (E::SENSITIVE, r.ctx) {
                 ctx.record_read(row);
             }
             out.push_str("<tr");
-            let mut toggle = String::new();
+            let mut toggle = "";
             if nested {
-                out.push_str(&format!(r#" aria-level="{}" data-zeyn-level="{}""#, b.depth + 1, b.depth));
+                let _ = write!(out, r#" aria-level="{}" data-zeyn-level="{}""#, b.depth + 1, b.depth);
             }
             if tree {
-                let key = Self::key_index().and_then(|i| row.value_at(i)).and_then(|v| value_key(&v));
+                let key = key_at.and_then(|i| row.value_at(i)).and_then(|v| value_key(&v));
                 toggle = match key.filter(|k| b.parents.contains(k) && b.depth + 1 < MAX_TREE_DEPTH) {
                     Some(k) => {
                         let mut path = b.path.to_vec();
                         path.push(Some(k));
-                        out.push_str(&format!(r#" aria-expanded="false" data-zeyn-path="{}""#, attr(&path)));
-                        format!(
-                            r#"<button type="button" class="z-expander" data-zeyn-expand aria-expanded="false" aria-label="{}" tabindex="-1"></button>"#,
-                            r.text(&Text::key("zeyn.grid.children"))
-                        )
+                        let _ = write!(out, r#" aria-expanded="false" data-zeyn-path="{}""#, attr(&path));
+                        tree_toggle.as_deref().unwrap_or_default()
                     }
-                    None => r#"<span class="z-tree-spacer" aria-hidden="true"></span>"#.to_string(),
+                    None => r#"<span class="z-tree-spacer" aria-hidden="true"></span>"#,
                 };
             }
             if let Some(style) = self.row_style.as_ref().and_then(|f| f(row)) {
-                out.push_str(&format!(r#" class="{}""#, style.css()));
+                let _ = write!(out, r#" class="{}""#, style.css());
             }
             if let Some(effect) = self.open_effect(row) {
-                out.push_str(&format!(r#" tabindex="-1" data-zeyn-effect="{}""#, attr(&effect)));
+                let _ = write!(out, r#" tabindex="-1" data-zeyn-effect="{}""#, attr(&effect));
             }
-            if let Some(k) = Self::key_index().and_then(|i| row.value_at(i)) {
-                out.push_str(&format!(r#" data-zeyn-key="{}""#, escape(&key_text(&k))));
+            if let Some(k) = key_at.and_then(|i| row.value_at(i)) {
+                out.push_str(r#" data-zeyn-key=""#);
+                key_into(&mut out, &k);
+                out.push('"');
             }
-            let edit = self.can_edit(r);
-            if edit {
-                if let Some(v) = E::fields().iter().position(|f| f.version).and_then(|i| row.value_at(i)) {
-                    out.push_str(&format!(r#" data-zeyn-version="{}""#, escape(&key_text(&v))));
-                }
+            if let Some(v) = version_at.and_then(|i| row.value_at(i)) {
+                out.push_str(r#" data-zeyn-version=""#);
+                key_into(&mut out, &v);
+                out.push('"');
             }
             if let Some(menu) = self.row_menu.as_ref().map(|f| f(row)) {
                 let items = menu.to_json(r);
                 if items.as_array().is_some_and(|a| !a.is_empty()) {
-                    out.push_str(&format!(r#" data-zeyn-menu="{}""#, attr(&items)));
+                    let _ = write!(out, r#" data-zeyn-menu="{}""#, attr(&items));
                 }
             }
-            let detail = self.detail.as_ref().filter(|_| self.expandable(r));
             if let Some(d) = detail {
                 let target = json!({ "screen": d.screen, "params": (d.params)(row) });
-                out.push_str(&format!(r#" aria-expanded="false" data-zeyn-detail="{}""#, attr(&target)));
+                let _ = write!(out, r#" aria-expanded="false" data-zeyn-detail="{}""#, attr(&target));
             }
             out.push('>');
-            if detail.is_some() {
-                out.push_str(&format!(
-                    r#"<td class="z-expand"><button type="button" class="z-expander" data-zeyn-expand aria-expanded="false" aria-label="{}" tabindex="-1"></button></td>"#,
-                    r.text(&Text::key("zeyn.grid.details"))
-                ));
-            }
-            if self.selectable {
-                out.push_str(&format!(
-                    r#"<td class="z-row-select"><input type="checkbox" data-zeyn-select tabindex="-1" aria-label="{}"></td>"#,
-                    r.text(&Text::key("zeyn.grid.select_row"))
-                ));
-            }
+            out.push_str(expand_cell.as_deref().unwrap_or_default());
+            out.push_str(select_cell.as_deref().unwrap_or_default());
             for (n, s) in cols.iter().enumerate() {
                 let c = &self.columns[s.index];
                 let value = (c.value)(row);
                 let num = matches!(value, Value::Int(_) | Value::Money(_));
                 let first = tree && n == 0;
-                let class = match (num, first) {
-                    (true, true) => r#" class="z-num z-tree-cell""#,
-                    (true, false) => r#" class="z-num""#,
-                    (false, true) => r#" class="z-tree-cell""#,
-                    (false, false) => "",
-                };
-                let mut content = match (c.meta.mask, &c.cell) {
-                    (Some(_), _) => crate::privacy::cell(r, c.meta, &value, row),
-                    (None, Some(cell)) => cell(row, r),
-                    (None, None) => r.value(&value, &c.meta.kind),
-                };
+                out.push_str(match (num, first) {
+                    (true, true) => r#"<td class="z-num z-tree-cell""#,
+                    (true, false) => r#"<td class="z-num""#,
+                    (false, true) => r#"<td class="z-tree-cell""#,
+                    (false, false) => "<td",
+                });
+                if editable[n] {
+                    out.push_str(r#" data-v=""#);
+                    escape_into(&mut out, &crate::form::edit_value(&value, r.locale, r.tz));
+                    out.push('"');
+                }
+                out.push('>');
                 if first {
-                    content = format!(
-                        r#"<span class="z-tree" style="--z-level:{}">{toggle}<span>{content}</span></span>"#,
-                        b.depth
-                    );
+                    let _ = write!(out, r#"<span class="z-tree" style="--z-level:{}">{toggle}<span>"#, b.depth);
                 }
-                if edit && c.editable && !c.meta.readonly && !c.meta.key && !c.meta.version && c.meta.mask.is_none() {
-                    let v = crate::form::edit_value(&value, r.locale, r.tz);
-                    out.push_str(&format!(r#"<td{class} data-v="{}">{content}</td>"#, escape(&v)));
-                } else {
-                    out.push_str(&format!("<td{class}>{content}</td>"));
+                match (c.meta.mask, &c.cell) {
+                    (Some(_), _) => out.push_str(&crate::privacy::cell(r, c.meta, &value, row)),
+                    (None, Some(cell)) => out.push_str(&cell(row, r)),
+                    (None, None) => r.value_into(&mut out, &value, &c.meta.kind),
                 }
-            }
-            let actions: Vec<(usize, &RowAction<E>)> =
-                self.row_actions.iter().enumerate().filter(|(_, a)| r.can(&a.meta.access)).collect();
-            if !self.row_actions.is_empty() {
-                out.push_str(r#"<td class="z-row-actions">"#);
-                for (i, a) in actions {
-                    let label = r.text(&a.label);
-                    let icon = a.icon.map(Icon::html).unwrap_or_default();
-                    out.push_str(&format!(
-                        r#"<button type="button" class="z-row-action" data-zeyn-run="a{i}" tabindex="-1">{icon}<span>{label}</span></button>"#
-                    ));
+                if first {
+                    out.push_str("</span></span>");
                 }
                 out.push_str("</td>");
             }
+            out.push_str(actions_cell.as_deref().unwrap_or_default());
             out.push_str("</tr>");
         }
         out
