@@ -61,6 +61,8 @@ Form::of(visit)
 
 El servidor elige el idioma a partir de la cookie `zeyn_locale`, después del `Accept-Language` del navegador y por último del valor por defecto de la aplicación. `<html lang>` siempre coincide. El selector de idioma del menú define la cookie y sustituye la página en el sitio, sin recarga.
 
+Con `App::locale_paths()` el idioma pasa a formar parte de la URL: el idioma predeterminado se queda en `/orders` y los demás usan `/tr/orders` o `/ar/orders`. Solo decide la ruta, así que un enlace compartido se abre en el mismo idioma, y cada pantalla sigue teniendo una sola ruta y lee `ctx.locale()`. Los enlaces del menú conservan el idioma y el selector abre la misma página en el otro idioma sin recargar. El árabe y los demás idiomas que se escriben de derecha a izquierda reciben `<html dir="rtl">`. Indica a los buscadores los idiomas de una página pública con `Screen::alternate("tr", "/tr/orders")`.
+
 ## Números, dinero y fechas
 
 Los valores se formatean en el servidor para el idioma del usuario: `1.234,56` en turco y `1,234.56` en inglés, las fechas como `29.03.2026` o `3/29/2026`, y el dinero con el símbolo de su moneda. Las entradas leen de vuelta los mismos formatos.

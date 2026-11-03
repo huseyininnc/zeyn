@@ -657,3 +657,126 @@ async fn framework_scripts_and_styles_are_gzipped_once_and_revalidate_with_304()
     assert_eq!(again.status, StatusCode::NOT_MODIFIED);
     assert!(again.body.is_empty());
 }
+
+#[screen(route = "/hello", public)]
+pub fn hello(_: (), ctx: Ctx) -> Screen {
+    Screen::new(Text::from(format!("locale={}", ctx.locale())))
+        .alternate("en", "/hello")
+        .alternate("tr", "/tr/hello")
+        .alternate("x-default", "/hello")
+        .alternate("bad\"tag", "/hello")
+}
+
+fn localized() -> Router {
+    let i18n = I18n::new("en")
+        .catalog("tr", r#"{ "x": "x" }"#)
+        .and_then(|i| i.catalog("ar", r#"{ "x": "x" }"#))
+        .unwrap();
+    App::new("Test")
+        .i18n(i18n)
+        .locale_paths()
+        .feature(Feature::new("site").screen(hello).menu(|m| m.group("Site", Icon::Home).item("Hello", hello)))
+        .router()
+        .unwrap()
+}
+
+fn visitor(path: &str) -> axum::http::request::Builder {
+    Request::get(path)
+}
+
+#[tokio::test]
+async fn the_language_in_the_path_decides_the_language_of_the_page() {
+    let router = localized();
+    let r = send(&router, visitor("/tr/hello").body(Body::empty()).unwrap()).await;
+    assert_eq!(r.status, StatusCode::OK);
+    assert!(r.body.contains(r#"<html lang="tr""#), "{}", &r.body[..200]);
+    assert!(r.body.contains("locale=tr"));
+    assert!(r.body.contains(r#"href="/tr/hello""#), "menu links keep the language");
+    assert!(r.body.contains("data-zeyn-locale-path"), "the picker opens the same page in another language");
+    assert_eq!(r.headers.get(header::CONTENT_LANGUAGE).unwrap(), "tr");
+    let partial = visitor("/tr/hello").header("x-zeyn-partial", "1").body(Body::empty()).unwrap();
+    let r = send(&router, partial).await;
+    assert_eq!(r.headers.get(header::CONTENT_LANGUAGE).unwrap(), "tr", "nav.js swaps the frame when the language changes");
+
+    let english = visitor("/hello")
+        .header(header::COOKIE, "zeyn_locale=tr")
+        .header(header::ACCEPT_LANGUAGE, "tr")
+        .header("x-zeyn-path-locale", "tr")
+        .body(Body::empty())
+        .unwrap();
+    let r = send(&router, english).await;
+    assert!(r.body.contains(r#"<html lang="en""#), "no cookie, header or Accept-Language beats the path");
+    assert!(r.body.contains("locale=en"));
+    assert!(r.body.contains(r#"href="/hello""#));
+
+    let r = send(&router, visitor("/ar/hello").body(Body::empty()).unwrap()).await;
+    assert!(r.body.contains(r#"<html lang="ar" dir="rtl""#));
+    let r = send(&router, visitor("/tr").body(Body::empty()).unwrap()).await;
+    assert_ne!(r.status, StatusCode::INTERNAL_SERVER_ERROR);
+
+    for missing in ["/en/hello", "/xx/hello", "/TR/hello", "/tr/tr/hello"] {
+        let r = send(&router, visitor(missing).body(Body::empty()).unwrap()).await;
+        assert_eq!(r.status, StatusCode::NOT_FOUND, "{missing}");
+    }
+}
+
+#[tokio::test]
+async fn runtime_requests_take_the_language_of_the_page_that_sent_them() {
+    let router = localized();
+    let from_tr = visitor("/_zeyn/screen/hello")
+        .header(header::REFERER, "http://localhost/tr/hello")
+        .body(Body::empty())
+        .unwrap();
+    let r = send(&router, from_tr).await;
+    assert_eq!(r.status, StatusCode::OK);
+    assert!(r.body.contains("locale=tr"), "{}", r.body);
+    let from_en = visitor("/_zeyn/screen/hello")
+        .header(header::REFERER, "http://localhost/hello")
+        .body(Body::empty())
+        .unwrap();
+    let r = send(&router, from_en).await;
+    assert!(r.body.contains("locale=en"));
+}
+
+#[tokio::test]
+async fn pages_list_their_languages_for_search_engines() {
+    let r = send(&localized(), visitor("/tr/hello").body(Body::empty()).unwrap()).await;
+    assert!(r.body.contains(r#"<link rel="alternate" hreflang="en" href="/hello" data-zeyn-head>"#));
+    assert!(r.body.contains(r#"<link rel="alternate" hreflang="tr" href="/tr/hello" data-zeyn-head>"#));
+    assert!(r.body.contains(r#"<link rel="alternate" hreflang="x-default" href="/hello" data-zeyn-head>"#));
+    assert!(!r.body.contains("bad"), "a bad language tag is dropped");
+}
+
+#[tokio::test]
+async fn without_locale_paths_the_cookie_still_picks_the_language() {
+    let i18n = I18n::new("en").catalog("tr", r#"{ "x": "x" }"#).unwrap();
+    let router = App::new("Test")
+        .i18n(i18n)
+        .feature(Feature::new("site").screen(hello))
+        .router()
+        .unwrap();
+    let r = send(&router, visitor("/hello").header(header::COOKIE, "zeyn_locale=tr").body(Body::empty()).unwrap()).await;
+    assert!(r.body.contains("locale=tr"));
+    let r = send(&router, visitor("/tr/hello").body(Body::empty()).unwrap()).await;
+    assert_eq!(r.status, StatusCode::NOT_FOUND);
+    let r = send(&router, visitor("/hello").header("x-zeyn-path-locale", "tr").body(Body::empty()).unwrap()).await;
+    assert!(r.body.contains("locale=en"), "the internal header means nothing without locale_paths");
+}
+
+#[cfg(feature = "lang-all")]
+#[test]
+fn every_framework_language_is_built_in_with_lang_all() {
+    let locales: Vec<&str> = I18n::builtin_locales().collect();
+    assert_eq!(locales, ["en", "tr", "zh", "ru", "es", "ko", "ja", "hi", "ar"]);
+    let i18n = I18n::new("en").catalog("ru", "{}").unwrap();
+    assert_eq!(i18n.lookup("ru", "zeyn.date.words.tomorrow"), Some("завтра"));
+    let i18n = I18n::new("ar");
+    assert_eq!(i18n.lookup("ar", "zeyn.locale.name"), Some("العربية"));
+}
+
+#[cfg(not(feature = "lang-zh"))]
+#[test]
+fn languages_without_their_feature_fall_back_to_the_default() {
+    let i18n = I18n::new("en").catalog("zh", "{}").unwrap();
+    assert_eq!(i18n.lookup("zh", "zeyn.shell.language"), i18n.lookup("en", "zeyn.shell.language"));
+}

@@ -1507,6 +1507,7 @@ th[aria-sort="descending"] .z-sort::after {
 .z-field select,
 .z-field textarea,
 select[data-zeyn-locale],
+select[data-zeyn-locale-path],
 select[data-zeyn-timezone],
 select[data-zeyn-theme-picker] {
   width: 100%;
@@ -1626,6 +1627,7 @@ select[data-zeyn-theme-picker] {
 .z-locale + .z-locale { margin-top: 0; }
 
 select[data-zeyn-locale],
+select[data-zeyn-locale-path],
 select[data-zeyn-timezone],
 select[data-zeyn-theme-picker] {
   min-height: max(24px, calc(var(--z-control) - 4px));
@@ -1906,6 +1908,16 @@ select[data-zeyn-theme-picker] {
   font-size: var(--z-font-size-xs);
   font-weight: 600;
   color: var(--z-text-muted);
+}
+
+.z-doc-note {
+  margin: 0 0 calc(var(--z-space) * 4);
+  padding: calc(var(--z-space) * 2) calc(var(--z-space) * 3);
+  font-size: var(--z-font-size-sm);
+  color: var(--z-text-muted);
+  background: var(--z-surface-2);
+  border-inline-start: 3px solid var(--z-info);
+  border-radius: var(--z-radius);
 }
 
 .z-doc-toc {

@@ -61,6 +61,8 @@ Form::of(visit)
 
 Sunucu dili önce `zeyn_locale` çerezinden, sonra tarayıcının `Accept-Language` başlığından, sonra uygulama varsayılanından seçer. `<html lang>` her zaman eşleşir. Menüdeki dil seçici çerezi ayarlar ve sayfayı yeniden yüklemeden yerinde değiştirir.
 
+`App::locale_paths()` ile dil bunun yerine URL'nin parçası olur: varsayılan dil `/orders` adresinde kalır, diğerleri `/tr/orders` veya `/ar/orders` alır. Kararı yalnızca yol verir; böylece paylaşılan bir bağlantı aynı dilde açılır, her screen'in yine tek bir route'u vardır ve dili `ctx.locale()` ile okur. Menü bağlantıları dili korur, seçici de aynı sayfayı yeniden yüklemeden diğer dilde açar. Arapça ve sağdan sola yazılan diğer diller `<html dir="rtl">` alır. Public bir sayfanın dillerini arama motorlarına `Screen::alternate("tr", "/tr/orders")` ile bildirin.
+
 ## Sayılar, para ve tarihler
 
 Değerler sunucuda kullanıcının diline göre biçimlendirilir: Türkçede `1.234,56`, İngilizcede `1,234.56`, tarihler `29.03.2026` veya `3/29/2026` olarak ve para para birimi simgesiyle. Girdiler aynı biçimleri geri okur.

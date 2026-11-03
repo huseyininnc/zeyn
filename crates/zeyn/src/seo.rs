@@ -24,6 +24,23 @@ pub const SITEMAP_BATCH: u32 = 1_000;
 /// Longest URL Zeyn writes into a head tag or a sitemap.
 pub const MAX_URL_LEN: usize = 2_048;
 
+/// Most language alternates of one page ([`crate::Screen::alternate`]).
+pub const MAX_ALTERNATES: usize = 64;
+
+/// Whether a text may be the `hreflang` of an alternate: `x-default`, or a language tag of
+/// letters, digits and `-` that starts with a letter, at most 35 bytes.
+///
+/// ```
+/// assert!(zeyn::seo::valid_hreflang("zh-Hans"));
+/// assert!(zeyn::seo::valid_hreflang("x-default"));
+/// assert!(!zeyn::seo::valid_hreflang("tr\"><script>"));
+/// ```
+pub fn valid_hreflang(tag: &str) -> bool {
+    tag.len() <= 35
+        && tag.starts_with(|c: char| c.is_ascii_alphabetic())
+        && tag.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+}
+
 /// Whether search engines may index a screen, sent as `<meta name="robots">`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Robots {
@@ -61,6 +78,7 @@ pub fn valid_url(url: &str) -> bool {
 pub(crate) struct Head {
     pub(crate) description: Option<Text>,
     pub(crate) canonical: Option<String>,
+    pub(crate) alternates: Vec<(String, String)>,
     pub(crate) og_image: Option<String>,
     pub(crate) json_ld: Option<serde_json::Value>,
     pub(crate) robots: Option<Robots>,
@@ -97,6 +115,10 @@ impl Head {
             let url = escape(&absolute(url, site, prefix));
             out.push_str(&format!(r#"<link rel="canonical" href="{url}" data-zeyn-head>"#));
             out.push_str(&format!(r#"<meta property="og:url" content="{url}" data-zeyn-head>"#));
+        }
+        for (lang, url) in &self.alternates {
+            let url = escape(&absolute(url, site, prefix));
+            out.push_str(&format!(r#"<link rel="alternate" hreflang="{}" href="{url}" data-zeyn-head>"#, escape(lang)));
         }
         if let Some(url) = &self.og_image {
             let url = escape(&absolute(url, site, prefix));
