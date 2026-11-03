@@ -369,6 +369,10 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
                     .next_title("CLI and projects"),
             )
             .into(),
+        "autogrid" => ["Orders", "Stock", "People", "Invoices", "Reports"]
+            .into_iter()
+            .fold(AutoGrid::new().min(160), |tiles, title| tiles.add(Card::new().title(title)))
+            .into(),
         "inputs" => inputs(),
         "overlay" => overlay(),
         "menus" => menus(),
@@ -553,5 +557,5 @@ fn toasts() -> Node {
 /// Names of every live example, for checks and tests.
 pub const EXAMPLES: &[&str] = &[
     "datagrid", "form", "controls", "dates", "lines", "layout", "display", "action", "tree", "chart", "shell",
-    "inputs", "multi", "overlay", "menus", "toasts", "content",
+    "inputs", "multi", "overlay", "menus", "toasts", "content", "autogrid",
 ];

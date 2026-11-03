@@ -99,3 +99,12 @@
   .z-prevnext-next { grid-column: 1; }
   .z-prevnext-gap { display: none; }
 }
+
+.z-autogrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(var(--z-autogrid-min, 240px), 100%), 1fr));
+  gap: calc(var(--z-autogrid-gap, 4) * var(--z-space, 4px));
+  min-width: 0;
+}
+
+.z-autogrid > .z-node { min-width: 0; }

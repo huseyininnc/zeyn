@@ -1,15 +1,16 @@
-//! Content components for reading pages: [`Heading`], [`Paragraph`], [`MetaLine`] and
-//! [`PrevNext`]. They are plain server rendered HTML with no browser script; their styles live in
+//! Content components for reading pages: [`Heading`], [`Paragraph`], [`MetaLine`],
+//! [`PrevNext`] and the [`AutoGrid`] layout. They are plain server rendered HTML with no browser script; their styles live in
 //! `content.css`.
 
 use super::layout::into_node;
+use super::render_child;
 use super::widgets::screen_href;
 use crate::i18n::Text;
 use crate::render::Render;
 use crate::screen::{Component, Node, ScreenDef};
 use serde_json::{Value as Json, json};
 
-into_node!(Heading, Paragraph, MetaLine, PrevNext);
+into_node!(Heading, Paragraph, MetaLine, PrevNext, AutoGrid);
 
 /// A section heading with an explicit level, `h2` to `h6`. The screen title is the page's only
 /// `h1`, so there is no `h1` here; pick the level that follows the outline instead of the size
@@ -307,5 +308,81 @@ impl Component for PrevNext {
                 .map(|s| json!({ "screen": s.screen, "params": s.params, "title": s.title }))
         };
         json!({ "type": "prev_next", "prev": side(&self.prev), "next": side(&self.next) })
+    }
+}
+
+/// Children in a grid whose number of columns follows the available width: as many columns of
+/// at least `min` pixels as fit, sharing the rest of the width, and one column when even one
+/// does not fit. The browser does the layout (`repeat(auto-fill, minmax(min(Npx, 100%), 1fr))`),
+/// so it needs no script and no breakpoints. Not to be mixed up with a DataGrid, which shows
+/// rows of data.
+///
+/// ```
+/// use zeyn::prelude::*;
+/// use zeyn::ui::AutoGrid;
+/// let tiles = AutoGrid::new()
+///     .min(220)
+///     .add(Card::new().title("Orders"))
+///     .add(Card::new().title("Stock"))
+///     .add(Card::new().title("People"));
+/// ```
+pub struct AutoGrid {
+    nodes: Vec<Node>,
+    min: u16,
+    gap: u8,
+}
+
+impl Default for AutoGrid {
+    fn default() -> Self {
+        AutoGrid { nodes: Vec::new(), min: 240, gap: 4 }
+    }
+}
+
+impl AutoGrid {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn add(mut self, node: impl Into<Node>) -> Self {
+        self.nodes.push(node.into());
+        self
+    }
+
+    /// The narrowest a column may get, in CSS pixels, 80 to 1200. 240 unless set.
+    pub fn min(mut self, px: u16) -> Self {
+        self.min = px.clamp(80, 1200);
+        self
+    }
+
+    /// Gap in spacing units (4 px at regular density), 0 to 12. 4 unless set.
+    pub fn gap(mut self, units: u8) -> Self {
+        self.gap = units.min(12);
+        self
+    }
+}
+
+impl Component for AutoGrid {
+    fn render(&self, out: &mut String, r: &Render) {
+        out.push_str(&format!(
+            r#"<div class="z-autogrid" style="--z-autogrid-min:{}px;--z-autogrid-gap:{}">"#,
+            self.min, self.gap
+        ));
+        for (i, node) in self.nodes.iter().enumerate() {
+            render_child(out, r, i, node);
+        }
+        out.push_str("</div>");
+    }
+
+    fn schema(&self) -> Json {
+        json!({
+            "type": "auto_grid",
+            "min": self.min,
+            "gap": self.gap,
+            "children": self.nodes.iter().map(Node::schema).collect::<Vec<_>>(),
+        })
+    }
+
+    fn children(&self) -> &[Node] {
+        &self.nodes
     }
 }

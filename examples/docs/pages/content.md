@@ -40,3 +40,18 @@ PrevNext::new()
     .next(article, ArticleParams { id: next.id })
     .next_title(next.title.clone())
 ```
+
+## AutoGrid
+
+Children in a grid whose column count follows the available width: as many columns of at least `min` pixels (240 unless set) as fit, and one column on a phone. The browser lays it out with `repeat(auto-fill, minmax(min(240px, 100%), 1fr))`, so there are no breakpoints and no script. It holds any nodes: cards, panels, grids. The name keeps it apart from `DataGrid`, which shows rows of data.
+
+```rust
+AutoGrid::new()
+    .min(220)
+    .gap(4)
+    .add(Card::new().title(t!("home.orders")))
+    .add(Card::new().title(t!("home.stock")))
+    .add(Card::new().title(t!("home.people")))
+```
+
+@live autogrid

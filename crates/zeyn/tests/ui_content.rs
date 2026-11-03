@@ -67,3 +67,17 @@ fn prev_next_links_carry_rel_and_localized_words() {
     let only = html(&PrevNext::new().next(article, ArticleParams { id: 2 }), "en");
     assert!(!only.contains(r#"rel="prev""#) && only.contains("z-prevnext-gap"));
 }
+
+#[test]
+fn auto_grid_lets_width_set_the_columns_and_keeps_child_paths() {
+    let grid = AutoGrid::new()
+        .min(5000)
+        .gap(40)
+        .add(Paragraph::new("a"))
+        .add(Paragraph::new("b"));
+    let out = html(&grid, "en");
+    assert!(out.contains("--z-autogrid-min:1200px;--z-autogrid-gap:12"), "{out}");
+    assert!(out.contains(r#"data-zeyn-node="1""#));
+    assert_eq!(grid.children().len(), 2);
+    assert_eq!(grid.schema()["type"], "auto_grid");
+}
