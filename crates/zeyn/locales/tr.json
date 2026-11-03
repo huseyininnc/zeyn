@@ -451,7 +451,7 @@
         "down": "Önceki döneme göre yüzde {pct} düşüş",
         "flat": "Önceki döneme göre değişiklik yok",
         "target": "Hedef {target}, yüzde {pct} ulaşıldı"
-},
+      },
       "password": {
         "show": "Parolayı göster",
         "weak": "Güç: zayıf",
@@ -474,6 +474,11 @@
       },
       "toast": {
         "dismiss": "Kapat"
+      },
+      "prevnext": {
+        "label": "Önceki ve sonraki",
+        "previous": "Önceki",
+        "next": "Sonraki"
       }
     },
     "date": {

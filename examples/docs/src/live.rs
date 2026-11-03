@@ -355,6 +355,20 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
             )
             .add(StatusBar::new("Status").left("Ready").right("UTF-8"))
             .into(),
+        "content" => Stack::new()
+            .gap(2)
+            .add(Heading::h3("Brewing green tea"))
+            .add(MetaLine::new().part("12 May 2026").part("5 min read").part("Guides"))
+            .add(Paragraph::new("Water just off the boil and two minutes of steeping keep the taste soft."))
+            .add(Paragraph::new("Times are a starting point.").muted().small())
+            .add(
+                PrevNext::new()
+                    .prev(crate::introduction, ())
+                    .prev_title("Introduction")
+                    .next(crate::cli, ())
+                    .next_title("CLI and projects"),
+            )
+            .into(),
         "inputs" => inputs(),
         "overlay" => overlay(),
         "menus" => menus(),
@@ -539,5 +553,5 @@ fn toasts() -> Node {
 /// Names of every live example, for checks and tests.
 pub const EXAMPLES: &[&str] = &[
     "datagrid", "form", "controls", "dates", "lines", "layout", "display", "action", "tree", "chart", "shell",
-    "inputs", "multi", "overlay", "menus", "toasts",
+    "inputs", "multi", "overlay", "menus", "toasts", "content",
 ];

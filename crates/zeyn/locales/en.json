@@ -451,7 +451,7 @@
         "down": "Down {pct}% from the previous period",
         "flat": "No change from the previous period",
         "target": "Target {target}, {pct}% reached"
-},
+      },
       "password": {
         "show": "Show password",
         "weak": "Strength: weak",
@@ -474,6 +474,11 @@
       },
       "toast": {
         "dismiss": "Dismiss"
+      },
+      "prevnext": {
+        "label": "Previous and next",
+        "previous": "Previous",
+        "next": "Next"
       }
     },
     "date": {

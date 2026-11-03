@@ -365,14 +365,9 @@ impl Component for Breadcrumb {
             r.text(&Text::key("zeyn.ui.breadcrumb"))
         ));
         for (label, screen, params) in &self.links {
-            let href = crate::screen::Routes::href(r, screen, params).unwrap_or_else(|| {
-                let query =
-                    if params.is_null() { String::new() } else { format!("?params={}", encode(&params.to_string())) };
-                format!("/_zeyn/route/{screen}{query}")
-            });
             out.push_str(&format!(
                 r#"<li><a href="{}" data-zeyn-base-href>{}</a></li>"#,
-                crate::render::escape(&href),
+                screen_href(r, screen, params),
                 r.text(label)
             ));
         }
@@ -387,6 +382,16 @@ impl Component for Breadcrumb {
             self.links.iter().map(|(l, s, p)| json!({ "label": l, "screen": s, "params": p })).collect();
         json!({ "type": "breadcrumb", "links": links, "current": self.current })
     }
+}
+
+/// The escaped address of a screen with its params: its route when it has one, the route
+/// redirect otherwise. Links carry `data-zeyn-base-href` so they open without a page reload.
+pub(crate) fn screen_href(r: &Render, screen: &str, params: &Json) -> String {
+    let href = crate::screen::Routes::href(r, screen, params).unwrap_or_else(|| {
+        let query = if params.is_null() { String::new() } else { format!("?params={}", encode(&params.to_string())) };
+        format!("/_zeyn/route/{screen}{query}")
+    });
+    escape(&href)
 }
 
 /// Percent encodes a query value.
