@@ -123,6 +123,7 @@ App::new("Billing")
 | `--z-radius-sm`、`--z-radius-lg` | 小型部件（筛选器、代码）、窗口 | `--z-radius` 的 `0.75x` 和 `1.5x` | 相同 |
 | `--z-shadow-2` | 仅用于窗口和 toast。表格行永远没有阴影 | 柔和的双层阴影 | 更深 |
 | `--z-backdrop` | 模态窗口后方 | `rgb(20 24 28 / 40%)` | `rgb(0 0 0 / 60%)` |
+| `--z-dir` | 阅读方向的符号，用于没有逻辑属性形式的偏移（标记起始或结束侧的内阴影、滑动变换）：`calc(2px * var(--z-dir))` | `1`，在 `dir="rtl"` 下为 `-1` | 相同 |
 
 由服务器标记设置的元素级令牌：`--z-width`（窗口宽度）、`--z-flex`（列占比）、`--z-row-height`（虚拟表格行高），以及组件库使用的 `--z-stack-gap`、`--z-split`、`--z-progress`、`--z-columns`、`--z-level` 和 `--z-pop-x` / `--z-pop-y`（弹出层位置）。
 

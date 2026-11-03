@@ -123,6 +123,7 @@ Se calculan a partir de los tokens base con `color-mix()` y la sintaxis de color
 | `--z-radius-sm`, `--z-radius-lg` | Partes pequeñas (filtros, código), ventanas | `0.75x` y `1.5x` de `--z-radius` | igual |
 | `--z-shadow-2` | Solo ventanas y toasts. Las filas del grid nunca llevan sombra | sombra suave de dos capas | más oscura |
 | `--z-backdrop` | Detrás de una ventana modal | `rgb(20 24 28 / 40%)` | `rgb(0 0 0 / 60%)` |
+| `--z-dir` | Sentido de lectura como signo, para desplazamientos sin forma lógica (sombras interiores que marcan el lado de inicio o de fin, transformaciones de desplazamiento): `calc(2px * var(--z-dir))` | `1`, y `-1` con `dir="rtl"` | igual |
 
 Tokens por elemento establecidos por el marcado del servidor: `--z-width` (ancho de ventana), `--z-flex` (proporción de columna), `--z-row-height` (altura de fila del grid virtual) y, para la biblioteca de componentes, `--z-stack-gap`, `--z-split`, `--z-progress`, `--z-columns`, `--z-level` y `--z-pop-x` / `--z-pop-y` (posición de popup).
 

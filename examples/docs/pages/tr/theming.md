@@ -123,6 +123,7 @@ Temel token'lardan `color-mix()` ve göreli renk sözdizimi (relative color synt
 | `--z-radius-sm`, `--z-radius-lg` | Küçük parçalar (filtreler, kod), pencereler | `--z-radius` değerinin `0.75x` ve `1.5x` katı | aynı |
 | `--z-shadow-2` | Yalnızca pencereler ve bildirimler. Grid satırları asla gölge almaz | yumuşak iki katmanlı gölge | daha koyu |
 | `--z-backdrop` | Kipli (modal) pencerenin arkası | `rgb(20 24 28 / 40%)` | `rgb(0 0 0 / 60%)` |
+| `--z-dir` | Okuma yönünün işareti; mantıksal karşılığı olmayan kaymalar için (başlangıç ya da bitiş tarafını işaretleyen iç gölgeler, kaydırma dönüşümleri): `calc(2px * var(--z-dir))` | `1`, `dir="rtl"` altında `-1` | aynı |
 
 Sunucu işaretlemesinin ayarladığı öğe başına token'lar: `--z-width` (pencere genişliği), `--z-flex` (sütun payı), `--z-row-height` (sanal grid satır yüksekliği) ve bileşen kütüphanesi için `--z-stack-gap`, `--z-split`, `--z-progress`, `--z-columns`, `--z-level` ile `--z-pop-x` / `--z-pop-y` (açılır pencere konumu).
 

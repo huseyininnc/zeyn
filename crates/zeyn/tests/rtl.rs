@@ -15,14 +15,18 @@ struct Allowed {
     reason: &'static str,
 }
 
-const GLYPH: &str =
-    "chevron drawn with two borders and rotated; [dir=\"rtl\"] mirrors the whole glyph with `scale: -1 1`";
+const GLYPH: &str = "chevron drawn with two borders and rotated; [dir=\"rtl\"] mirrors the whole glyph with `scale: -1 1`";
 const VERTICAL_GLYPH: &str =
     "arrow or check mark that points down, up or is a check; it does not follow reading direction";
 
 /// Declarations that keep a physical side, each with its reason.
 const ALLOWED: &[Allowed] = &[
-    Allowed { file: "components.css", selector: ".z-chevron", property: "border-right", reason: GLYPH },
+    Allowed {
+        file: "components.css",
+        selector: ".z-chevron",
+        property: "border-right",
+        reason: GLYPH,
+    },
     Allowed {
         file: "components.css",
         selector: "[aria-expanded] > .z-tree-row > .z-tree-toggle::before",
@@ -35,16 +39,36 @@ const ALLOWED: &[Allowed] = &[
         property: "border-right",
         reason: GLYPH,
     },
-    Allowed { file: "pro.css", selector: ".z-form-section-title::before", property: "border-right", reason: GLYPH },
-    Allowed { file: "content.css", selector: ".z-spoiler-label::before", property: "border-right", reason: GLYPH },
-    Allowed { file: "zeyn.css", selector: ".z-expander::before", property: "border-right", reason: GLYPH },
+    Allowed {
+        file: "pro.css",
+        selector: ".z-form-section-title::before",
+        property: "border-right",
+        reason: GLYPH,
+    },
+    Allowed {
+        file: "content.css",
+        selector: ".z-spoiler-label::before",
+        property: "border-right",
+        reason: GLYPH,
+    },
+    Allowed {
+        file: "zeyn.css",
+        selector: ".z-expander::before",
+        property: "border-right",
+        reason: GLYPH,
+    },
     Allowed {
         file: "zeyn.css",
         selector: ".z-menu-item[aria-haspopup=\"menu\"]::after",
         property: "border-right",
         reason: GLYPH,
     },
-    Allowed { file: "components.css", selector: ".z-select-arrow", property: "border-right", reason: VERTICAL_GLYPH },
+    Allowed {
+        file: "components.css",
+        selector: ".z-select-arrow",
+        property: "border-right",
+        reason: VERTICAL_GLYPH,
+    },
     Allowed {
         file: "components.css",
         selector: ".z-option[aria-selected=\"true\"]:not(:has(.z-option-check))::after",
@@ -57,14 +81,24 @@ const ALLOWED: &[Allowed] = &[
         property: "border-right",
         reason: VERTICAL_GLYPH,
     },
-    Allowed { file: "site.css", selector: ".z-site-caret", property: "border-right", reason: VERTICAL_GLYPH },
+    Allowed {
+        file: "site.css",
+        selector: ".z-site-caret",
+        property: "border-right",
+        reason: VERTICAL_GLYPH,
+    },
     Allowed {
         file: "components.css",
         selector: ".z-pop",
         property: "left",
         reason: "fixed popup placed by the runtime in viewport pixels, which are physical; the runtime anchors it to the start side",
     },
-    Allowed { file: "components.css", selector: ".z-split-v .z-split-bar::after", property: "inset", reason: CENTERED },
+    Allowed {
+        file: "components.css",
+        selector: ".z-split-v .z-split-bar::after",
+        property: "inset",
+        reason: CENTERED,
+    },
     Allowed {
         file: "components.css",
         selector: ".z-split-v .z-split-bar::after",
@@ -77,7 +111,12 @@ const ALLOWED: &[Allowed] = &[
         property: "inset",
         reason: CENTERED,
     },
-    Allowed { file: "media.css", selector: ".z-embed-play", property: "inset", reason: CENTERED },
+    Allowed {
+        file: "media.css",
+        selector: ".z-embed-play",
+        property: "inset",
+        reason: CENTERED,
+    },
 ];
 
 const CENTERED: &str = "centered with left 50% and a -50% translate, the same in both directions";
@@ -88,9 +127,16 @@ fn stylesheets() -> Vec<(String, String)> {
     let mut out: Vec<(String, String)> = std::fs::read_dir(&dir)
         .unwrap()
         .map(|e| e.unwrap().path())
-        .filter(|p| p.extension().is_some_and(|x| x == "css"))
+        .filter(|p| {
+            p.extension()
+                .is_some_and(|x| x == "css")
+        })
         .map(|p| {
-            let name = p.file_name().unwrap().to_string_lossy().into_owned();
+            let name = p
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .into_owned();
             (name, std::fs::read_to_string(&p).unwrap())
         })
         .collect();
@@ -104,7 +150,9 @@ fn strip_comments(css: &str) -> String {
     let mut rest = css;
     while let Some(at) = rest.find("/*") {
         out.push_str(&rest[..at]);
-        rest = rest[at + 2..].find("*/").map_or("", |end| &rest[at + 2 + end + 2..]);
+        rest = rest[at + 2..]
+            .find("*/")
+            .map_or("", |end| &rest[at + 2 + end + 2..]);
     }
     out.push_str(rest);
     out
@@ -131,7 +179,11 @@ fn declarations(css: &str) -> Vec<(String, String, String)> {
                 buf.push(c);
             }
             '{' => {
-                stack.push(buf.split_whitespace().collect::<Vec<_>>().join(" "));
+                stack.push(
+                    buf.split_whitespace()
+                        .collect::<Vec<_>>()
+                        .join(" "),
+                );
                 buf.clear();
             }
             ';' | '}' => {
@@ -165,7 +217,11 @@ fn split_top(value: &str, sep: char) -> Vec<String> {
             parts.last_mut().unwrap().push(c);
         }
     }
-    parts.into_iter().map(|p| p.trim().to_string()).filter(|p| !p.is_empty()).collect()
+    parts
+        .into_iter()
+        .map(|p| p.trim().to_string())
+        .filter(|p| !p.is_empty())
+        .collect()
 }
 
 /// Why a declaration names a physical side, or `None` when it does not.
@@ -185,15 +241,22 @@ fn physical(property: &str, value: &str) -> Option<&'static str> {
     {
         return Some("use the -inline-start or -inline-end form");
     }
-    if matches!(property, "text-align" | "float" | "clear" | "justify-self" | "justify-items")
-        && matches!(value, "left" | "right")
+    if matches!(
+        property,
+        "text-align" | "float" | "clear" | "justify-self" | "justify-items"
+    ) && matches!(value, "left" | "right")
     {
         return Some("use start or end");
     }
-    if matches!(property, "margin" | "padding" | "inset" | "border-width" | "border-color" | "border-style") {
+    if matches!(
+        property,
+        "margin" | "padding" | "inset" | "border-width" | "border-color" | "border-style"
+    ) {
         let v = split_top(value, ' ');
         if v.len() == 4 && v[1] != v[3] {
-            return Some("the two inline sides differ; use the -block and -inline forms (padding-inline: start end)");
+            return Some(
+                "the two inline sides differ; use the -block and -inline forms (padding-inline: start end)",
+            );
         }
     }
     if property == "border-radius" && !value.contains('/') {
@@ -209,10 +272,14 @@ fn physical(property: &str, value: &str) -> Option<&'static str> {
         }
     }
     if property == "box-shadow" {
-        let fixed = split_top(value, ',').iter().any(|shadow| {
-            let v = split_top(shadow, ' ');
-            v.first().is_some_and(|f| f == "inset") && v.get(1).is_some_and(|x| x != "0" && !x.contains("var(--z-dir)"))
-        });
+        let fixed = split_top(value, ',')
+            .iter()
+            .any(|shadow| {
+                let v = split_top(shadow, ' ');
+                v.first().is_some_and(|f| f == "inset")
+                    && v.get(1)
+                        .is_some_and(|x| x != "0" && !x.contains("var(--z-dir)"))
+            });
         if fixed {
             return Some(
                 "an inset shadow with a horizontal offset marks one side; multiply the offset by var(--z-dir)",
@@ -231,12 +298,17 @@ fn framework_css_uses_logical_properties_for_reading_direction() {
     let mut used = vec![false; ALLOWED.len()];
     for (file, css) in stylesheets() {
         for (selector, property, value) in declarations(&css) {
-            let Some(why) = physical(&property, &value) else { continue };
-            let allowed =
-                ALLOWED.iter().position(|a| a.file == file && a.selector == selector && a.property == property);
+            let Some(why) = physical(&property, &value) else {
+                continue;
+            };
+            let allowed = ALLOWED
+                .iter()
+                .position(|a| a.file == file && a.selector == selector && a.property == property);
             match allowed {
                 Some(i) => used[i] = true,
-                None => found.push(format!("{file}: `{selector} {{ {property}: {value} }}`: {why}")),
+                None => found.push(format!(
+                    "{file}: `{selector} {{ {property}: {value} }}`: {why}"
+                )),
             }
         }
     }
@@ -252,7 +324,11 @@ fn framework_css_uses_logical_properties_for_reading_direction() {
         .filter(|(_, used)| !**used)
         .map(|(a, _)| format!("{}: {} {} ({})", a.file, a.selector, a.property, a.reason))
         .collect();
-    assert!(stale.is_empty(), "ALLOWED lists declarations that are gone; remove them:\n{}", stale.join("\n"));
+    assert!(
+        stale.is_empty(),
+        "ALLOWED lists declarations that are gone; remove them:\n{}",
+        stale.join("\n")
+    );
 }
 
 #[test]
@@ -265,5 +341,13 @@ fn the_checker_catches_physical_sides_and_lets_logical_ones_pass() {
         .filter(|(_, p, v)| physical(p, v).is_some())
         .map(|(s, p, _)| format!("{s} {p}"))
         .collect();
-    assert_eq!(flagged, [".a margin-left", ".a padding", ".a box-shadow", ".c text-align"]);
+    assert_eq!(
+        flagged,
+        [
+            ".a margin-left",
+            ".a padding",
+            ".a box-shadow",
+            ".c text-align"
+        ]
+    );
 }
