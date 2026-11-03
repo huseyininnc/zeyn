@@ -101,3 +101,15 @@ Spoiler::new(t!("quiz.show_answer")).add(Paragraph::new(answer.clone()))
 ```
 
 @live people
+
+## AlphaIndex
+
+A bar of letters, each a link to a screen with the letter in its params, such as people whose names start with it. The letters come from the user's language in its own order (`zeyn::ui::alphabet`): Turkish has `Ç Ğ I İ Ö Ş Ü` in place, Spanish has `Ñ`, Russian and Arabic have their own alphabets, and every other language gets `A` to `Z`. The letter of the screen being shown is marked with `aria-current="page"` (a Turkish `i` marks `İ`), and `.other()` adds a last `#` link for names that start with anything else. The links open without a page reload and wrap onto more lines on phones.
+
+```rust
+#[screen(route = "/people/{letter}", public)]
+pub fn people_by_letter(p: LetterParams) -> Screen {
+    Screen::new(t!("people.title"))
+        .body(AlphaIndex::new(people_by_letter, |l| LetterParams { letter: l.to_string() }).current(&p.letter).other())
+}
+```

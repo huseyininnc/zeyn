@@ -479,6 +479,10 @@
         "label": "Previous and next",
         "previous": "Previous",
         "next": "Next"
+      },
+      "alpha": {
+        "label": "Browse by letter",
+        "other": "Other characters"
       }
     },
     "date": {

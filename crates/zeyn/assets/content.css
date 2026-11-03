@@ -266,3 +266,48 @@ span.z-avatar-tone-4 { background: var(--z-danger-subtle); }
 @media (forced-colors: active) {
   .z-avatar { border: 1px solid CanvasText; }
 }
+
+.z-alpha { margin: 0 0 16px; }
+
+.z-alpha-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.z-alpha-list > li { margin: 0; }
+
+.z-alpha .z-alpha-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0 6px;
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius);
+  background: var(--z-surface);
+  color: var(--z-text);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.z-alpha .z-alpha-link:hover { border-color: var(--z-border-strong); color: var(--z-accent); }
+
+.z-alpha .z-alpha-link:focus-visible {
+  outline: 2px solid var(--z-focus);
+  outline-offset: 2px;
+}
+
+.z-alpha .z-alpha-link[aria-current="page"] {
+  border-color: var(--z-primary);
+  background: var(--z-primary);
+  color: var(--z-on-primary);
+}
+
+@media (forced-colors: active) {
+  .z-alpha .z-alpha-link[aria-current="page"] { outline: 2px solid Highlight; }
+}

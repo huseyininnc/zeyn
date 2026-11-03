@@ -20,6 +20,43 @@ pub fn article(p: ArticleParams) -> Screen {
     Screen::new("Article").body(Paragraph::new(p.id.to_string()))
 }
 
+#[params]
+pub struct LetterParams {
+    pub letter: String,
+}
+
+#[screen(route = "/people", public)]
+pub fn people(p: LetterParams) -> Screen {
+    Screen::new("People").body(Paragraph::new(p.letter))
+}
+
+#[test]
+fn alpha_index_follows_the_locale_alphabet_and_marks_the_current_letter() {
+    let bar = zeyn::ui::AlphaIndex::new(people, |l| LetterParams { letter: l.to_string() })
+        .current("i")
+        .other();
+    let tr = html(&bar, "tr");
+    let letters: Vec<&str> = tr
+        .split(r#"data-zeyn-base-href"#)
+        .skip(1)
+        .filter_map(|s| s.split('>').nth(1)?.split('<').next())
+        .collect();
+    assert_eq!(letters.len(), 30, "29 Turkish letters and #: {tr}");
+    assert_eq!(&letters[9..13], ["H", "I", "İ", "J"]);
+    assert_eq!(letters[29], "#");
+    assert_eq!(
+        tr.matches(r#"aria-current="page""#)
+            .count(),
+        1
+    );
+    assert!(tr.contains(r#"aria-current="page">İ<"#), "Turkish i is the dotted capital: {tr}");
+    assert!(tr.contains(r#"aria-label="Harfe göre gözat""#) && tr.contains(r#"aria-label="Diğer karakterler""#));
+    let en = html(&bar, "en");
+    assert!(en.contains(r#"aria-current="page">I<"#), "{en}");
+    assert!(en.contains("/_zeyn/route/people?params="), "{en}");
+    assert!(!html(&zeyn::ui::AlphaIndex::new(people, |l| LetterParams { letter: l.into() }), "zh").contains("#<"));
+}
+
 #[test]
 fn heading_writes_its_level_and_escapes_text() {
     let h = html(&Heading::h3("Tea <b>").id("tea time!"), "en");

@@ -4,6 +4,7 @@
 //! index of each child below it (`"1.0.2"`). The renderer writes the path in `data-zeyn-node` and
 //! the endpoints accept it, so grids and forms inside containers keep working.
 
+mod alpha;
 mod catalog;
 mod chart;
 mod content;
@@ -47,6 +48,7 @@ pub use shell::{MenuBar, MenuList, PropertyInspector, StatusBar, Toolbox};
 pub use catalog::PosterCard;
 pub use catalog::{CardGrid, ImageCard, MAX_SUGGESTIONS, Rail, SearchBox, SearchParams};
 pub use chart::{Better, BulletCell, Chart, ChartKind, Kpi, SparklineCell};
+pub use alpha::{AlphaIndex, OTHER_LETTER, alphabet};
 pub use content::{AutoGrid, Avatar, AvatarSize, Heading, MetaLine, Paragraph, PrevNext, Spoiler};
 pub use controls::Control;
 pub(crate) use controls::{

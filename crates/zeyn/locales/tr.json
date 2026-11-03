@@ -479,6 +479,10 @@
         "label": "Önceki ve sonraki",
         "previous": "Önceki",
         "next": "Sonraki"
+      },
+      "alpha": {
+        "label": "Harfe göre gözat",
+        "other": "Diğer karakterler"
       }
     },
     "date": {
