@@ -66,7 +66,8 @@ crates/zeyn-macros/    entity, model, choice, params, action, screen, t!
 crates/zeyn-cli/       the zeyn command and the project templates
 crates/zeyn-island/    browser side of WASM islands
 crates/zeyn-desktop/   desktop window around an app
-examples/              showcase (every component), docs, adisyon (POS), inventory, big-grid,
+examples/              showcase (every component), docs, components (catalog: one file per
+                       component, shown live and as its code), adisyon (POS), inventory, big-grid,
                        billing + crm + shared-domain (shared libraries)
 docs/                  design documents and guides
 ```
@@ -80,6 +81,7 @@ cargo test -p zeyn --features assistant,oidc,totp,islands,realtime,xlsx,email,ac
 cargo check -p zeyn --all-features --tests                                      everything compiles
 cargo run -p zeyn-example-showcase      http://127.0.0.1:3002, every component
 cargo run -p zeyn-example-docs          http://127.0.0.1:3008, the documentation
+cargo run -p zeyn-example-components    http://127.0.0.1:3010, the component catalog
 ```
 
 - Database, Redis and identity provider tests skip unless their variable is set

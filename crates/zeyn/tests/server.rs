@@ -667,6 +667,11 @@ pub fn hello(_: (), ctx: Ctx) -> Screen {
         .alternate("bad\"tag", "/hello")
 }
 
+#[screen(route = "/linked", public)]
+pub fn linked() -> Screen {
+    Screen::new("Linked").body(zeyn::ui::PrevNext::new().next(hello, ()))
+}
+
 fn localized() -> Router {
     let i18n = I18n::new("en")
         .catalog("tr", r#"{ "x": "x" }"#)
@@ -675,7 +680,12 @@ fn localized() -> Router {
     App::new("Test")
         .i18n(i18n)
         .locale_paths()
-        .feature(Feature::new("site").screen(hello).menu(|m| m.group("Site", Icon::Home).item("Hello", hello)))
+        .feature(
+            Feature::new("site")
+                .screen(hello)
+                .screen(linked)
+                .menu(|m| m.group("Site", Icon::Home).item("Hello", hello)),
+        )
         .router()
         .unwrap()
 }
@@ -918,4 +928,13 @@ fn the_two_halves_of_the_browser_runtime_agree_on_what_they_share() {
             assert!(exported.contains(&name.as_str()), "{part} calls G?.{name}, which grid-exports.js does not export");
         }
     }
+}
+
+#[tokio::test]
+async fn links_to_screens_inside_components_keep_the_language_of_the_path() {
+    let router = localized();
+    let tr = send(&router, visitor("/tr/linked").body(Body::empty()).unwrap()).await.body;
+    assert!(tr.contains(r#"href="/tr/hello""#), "{tr}");
+    let en = send(&router, visitor("/linked").body(Body::empty()).unwrap()).await.body;
+    assert!(en.contains(r#"href="/hello""#) && !en.contains(r#"href="/en/hello""#), "{en}");
 }

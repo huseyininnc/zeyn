@@ -27,6 +27,16 @@ CardGrid::of(catalog_products)
 ```
 
 - **Kartlar.** `Card::image(image, title)` bir satırdan tek bir kart üretir; `text`, `badge`, `alt` ve `link` ile birlikte kullanılır (`link` bir screen ve onun parametrelerini alır; kartın tamamı tek bir bağlantıdır ve sayfa yenilenmeden açılır). Görseller tembel yüklenir; genişlik ve yükseklik `image_size`'dan gelir, böylece sayfa zıplamaz. Görselin alternatif metni boştur, çünkü yanındaki başlık kartı adlandırır; resim daha fazlasını anlatıyorsa `alt` verin. Bir yol, `https:` ya da `data:image/` dışındaki görsel adresleri çıkarılır.
+- **Karta ek öğeler.** `subtitle`, başlığın altına daha sönük ikinci bir satır ekler (yazar, kategori). `corner(badge)` bir rozeti görselin bitiş köşesine koyar; başlangıç köşesinde ise `badge` durur. `badges([...])` metnin altına etiket gibi bir rozet sırası ekler. `progress(fraction, label)` görselin alt kenarı boyunca, ne kadarının tamamlandığını gösteren ince bir çubuk çizer: oran 0 ile 1 arasındadır ve ekran okuyucular etiketi ve yüzdeyi okur (`aria-valuenow` ile `role="progressbar"`). `horizontal()` kartı bir satır olarak yerleştirir: başta küçük bir görsel, yanında metin; böyle kartlar içeren bir kart ızgarası ya da rail onlara daha geniş sütunlar verir. Hepsi `CardGrid` ve `Rail` içinde çalışır.
+
+```rust
+Card::image(c.cover.clone(), c.title.clone())
+    .subtitle(c.teacher.clone())
+    .corner(Badge::new(t!("courses.new")).tone(Tone::Success))
+    .badges(c.tags.iter().map(|t| Badge::new(t.clone())))
+    .progress(c.done, t!("courses.done"))
+    .horizontal()
+```
 - **Sayfalama.** `Paging::infinite(n)` (varsayılan, 24) ekranda göründüğünde de tetiklenen bir "Show more" düğmesi gösterir; düğmeye basıldığında odak ilk yeni karta geçer. `Paging::pages(n)` önceki ve sonraki düğmelerini ve sayfa numarasını gösterir. Sayfa boyutunu sunucu belirler; istemci yalnızca nereden devam edileceğini söyler.
 - **Sıralama.** Her `sort_option`, kullanıcıların bir seçim listesinden seçebileceği bir sıradır; ilki kartların başladığı sıradır. Sunucu yalnızca bu sıraları kabul eder ve istemcinin gönderdiği süzgeçleri ve arama metnini atar.
 - **Arama.** `.search(text)` yalnızca serbest metinle eşleşen satırları gösterir ([`DataQuery::q`](#free-text)); örneğin bir sonuç screen'inin metni.

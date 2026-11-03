@@ -189,15 +189,26 @@ pub fn screen_url(path: &str, params: &serde_json::Value) -> Option<String> {
 /// Full paths (feature prefix, no base path) of the routed screens of a running app, so links
 /// rendered for a request use the path form. Kept by the server as a service on every request.
 #[derive(Clone, Default)]
-pub(crate) struct Routes(pub(crate) std::sync::Arc<HashMap<&'static str, String>>);
+pub(crate) struct Routes(
+    pub(crate) std::sync::Arc<HashMap<&'static str, String>>,
+    /// The default language when the app keeps the language in the URL (`App::locale_paths`):
+    /// links in another language get its segment in front, so they stay in that language.
+    pub(crate) Option<std::sync::Arc<str>>,
+);
 
 impl crate::ctx::Service for Routes {}
 
 impl Routes {
     /// App path of `screen` with `params`, without the base path; see [`screen_url`].
     pub(crate) fn href(r: &Render, screen: &str, params: &serde_json::Value) -> Option<String> {
-        let routes = r.ctx?.service::<Routes>()?;
-        screen_url(routes.0.get(screen)?, params)
+        let ctx = r.ctx?;
+        let routes = ctx.service::<Routes>()?;
+        let url = screen_url(routes.0.get(screen)?, params)?;
+        Some(match routes.1.as_deref() {
+            Some(default) if ctx.locale() != default && url == "/" => format!("/{}/", ctx.locale()),
+            Some(default) if ctx.locale() != default => format!("/{}{url}", ctx.locale()),
+            _ => url,
+        })
     }
 }
 

@@ -27,6 +27,16 @@ CardGrid::of(catalog_products)
 ```
 
 - **카드.** `Card::image(image, title)`은 행 하나로 카드 하나를 만들며, `text`, `badge`, `alt`, `link`를 사용할 수 있습니다. `link`는 Screen과 그 매개변수이며, 카드 전체가 하나의 링크이고 페이지 새로 고침 없이 열립니다. 이미지는 지연 로드되며, 페이지가 흔들리지 않도록 `image_size`의 너비와 높이를 사용합니다. 이미지의 대체 텍스트는 비어 있습니다. 옆의 제목이 카드를 설명하기 때문입니다. 그림이 더 많은 내용을 전달한다면 `alt`를 설정하십시오. 경로, `https:`, `data:image/`가 아닌 이미지 주소는 제외됩니다.
+- **카드의 추가 요소.** `subtitle`은 제목 아래에 더 흐린 두 번째 줄을 추가합니다(저자, 카테고리 등). `corner(badge)`는 이미지의 끝 모서리 위에 배지를 놓으며, 시작 모서리에는 `badge`가 놓입니다. `badges([...])`는 텍스트 아래에 태그 같은 배지 한 줄을 추가합니다. `progress(fraction, label)`은 이미지 아래쪽 가장자리를 따라 진행 정도를 나타내는 얇은 막대를 그립니다. 비율은 0에서 1까지이며, 스크린 리더는 레이블과 백분율을 읽어 줍니다(`role="progressbar"`와 `aria-valuenow`). `horizontal()`은 카드를 한 행으로 배치하여 시작 쪽에 작은 이미지를, 그 옆에 텍스트를 둡니다. 이런 카드가 있는 카드 그리드나 rail은 더 넓은 열을 줍니다. 모두 `CardGrid`와 `Rail`에서 동작합니다.
+
+```rust
+Card::image(c.cover.clone(), c.title.clone())
+    .subtitle(c.teacher.clone())
+    .corner(Badge::new(t!("courses.new")).tone(Tone::Success))
+    .badges(c.tags.iter().map(|t| Badge::new(t.clone())))
+    .progress(c.done, t!("courses.done"))
+    .horizontal()
+```
 - **페이징.** `Paging::infinite(n)`(기본값이며 24)은 "더 보기" 버튼을 표시하고, 이 버튼이 화면에 스크롤되어 들어오면 자동으로도 동작합니다. 버튼을 누르면 포커스가 첫 번째 새 카드로 이동합니다. `Paging::pages(n)`은 이전과 다음 버튼 및 페이지 번호를 표시합니다. 페이지 크기는 서버가 정하며, 클라이언트는 어디서부터 이어갈지만 알립니다.
 - **정렬.** 각 `sort_option`은 사용자가 선택 목록에서 고를 수 있는 순서입니다. 첫 번째가 카드가 처음 나열되는 순서입니다. 서버는 이 순서만 받아들이고, 클라이언트가 보낸 필터와 검색 텍스트는 버립니다.
 - **검색.** `.search(text)`는 자유 텍스트([`DataQuery::q`](#free-text))와 일치하는 행만 표시합니다. 예를 들어 검색 결과 화면의 텍스트가 있습니다.
