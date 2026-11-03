@@ -159,6 +159,20 @@ Grouped and tree grids (`<table role="treegrid">`) send `path` with `POST /_zeyn
 | `GET /_zeyn/grid/export` | `?screen&params&node&q={sort,filters,columns}` | Streams every matching row as CSV |
 | `POST /_zeyn/menu` | `{screen, params, item}` | Runs an action item of the screen's context menu |
 
+### 4.2.2 Virtual scrolling
+
+Grids with `data-zeyn-paging="virtual"` show one scrollable list over every row, however many there are. The server renders the first block (`data-zeyn-page-size` rows, offset 0) with `data-zeyn-total`. The grid root also has `data-zeyn-row-height` (pixels) and the CSS variable `--z-row-height`.
+
+The runtime:
+
+- Puts the table body in a scroll container whose inner spacer is `total * rowHeight` pixels high, capped at 8,000,000 px. Above the cap, scroll position maps to row index by ratio (`row = scrollTop / (spacerHeight - viewport) * (total - visibleRows)`), so 1,000,000 rows still reach the end.
+- Keeps only the visible rows plus 20 rows above and below in the DOM, positioned with `transform: translateY(...)`. Rows have a fixed height; long text is cut with an ellipsis.
+- Loads blocks of `data-zeyn-page-size` rows with `POST /_zeyn/grid` and `page: { "type": "offset", "offset": blockStart, "limit": blockSize }`, `with_total: false` after the first call. Keeps up to 20 blocks in a cache (least recently used out), prefetches the next block in the scroll direction, and cancels requests for blocks that left the view (`AbortController`).
+- Never clears the visible rows while a block loads. Missing rows show a placeholder row with `aria-busy="true"` until their block arrives, so the screen does not flash.
+- Sort and filter changes drop the cache and scroll to the top.
+- Keyboard: Arrow keys, Page Up, Page Down, Home and End move the active row and scroll it into view. The table has `aria-rowcount` = total and each row `aria-rowindex`.
+- The position text (`data-zeyn-page-info`) uses `data-zeyn-text-range-total`.
+
 ### 4.3 Form submit
 
 `POST /_zeyn/form`
@@ -224,20 +238,6 @@ the request).
 - No inline scripts or inline event handlers. Inline `style` attributes are used only for CSS custom properties (`--z-width`, `--z-flex`) and fixed column widths, so the policy adds `style-src-attr 'unsafe-inline'`. Scripts stay strict.
 - The CSRF token is stored in an `HttpOnly`, `SameSite=Strict` cookie and compared in constant time with the `x-zeyn-csrf` header.
 - Each call checks, in order: authentication, the screen's access, the feature's guards, the node action's access, then runs the interceptors and the action.
-
-### 4.6 Virtual scrolling
-
-Grids with `data-zeyn-paging="virtual"` show one scrollable list over every row, however many there are. The server renders the first block (`data-zeyn-page-size` rows, offset 0) with `data-zeyn-total`. The grid root also has `data-zeyn-row-height` (pixels) and the CSS variable `--z-row-height`.
-
-The runtime:
-
-- Puts the table body in a scroll container whose inner spacer is `total * rowHeight` pixels high, capped at 8,000,000 px. Above the cap, scroll position maps to row index by ratio (`row = scrollTop / (spacerHeight - viewport) * (total - visibleRows)`), so 1,000,000 rows still reach the end.
-- Keeps only the visible rows plus 20 rows above and below in the DOM, positioned with `transform: translateY(...)`. Rows have a fixed height; long text is cut with an ellipsis.
-- Loads blocks of `data-zeyn-page-size` rows with `POST /_zeyn/grid` and `page: { "type": "offset", "offset": blockStart, "limit": blockSize }`, `with_total: false` after the first call. Keeps up to 20 blocks in a cache (least recently used out), prefetches the next block in the scroll direction, and cancels requests for blocks that left the view (`AbortController`).
-- Never clears the visible rows while a block loads. Missing rows show a placeholder row with `aria-busy="true"` until their block arrives, so the screen does not flash.
-- Sort and filter changes drop the cache and scroll to the top.
-- Keyboard: Arrow keys, Page Up, Page Down, Home and End move the active row and scroll it into view. The table has `aria-rowcount` = total and each row `aria-rowindex`.
-- The position text (`data-zeyn-page-info`) uses `data-zeyn-text-range-total`.
 
 ## 6. Runtime behavior
 

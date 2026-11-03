@@ -45,7 +45,15 @@ pub struct Rendered {
 /// Renders Markdown. `link` turns a link target into an app path (such as `theming.md` into
 /// `/guides/theming`) or returns it unchanged.
 pub fn render(source: &str, link: &dyn Fn(&str) -> String) -> Rendered {
-    let mut r = Renderer { link, out: Rendered::default(), html: String::new(), ids: Vec::new() };
+    render_with_ids(source, link, &[])
+}
+
+/// [`render`] with fixed heading anchors: the heading at position `n` gets `ids[n]`, so a
+/// translated page keeps the anchors of the English page and links such as
+/// `security.md#csrf-csp-and-headers` work in every language. Headings past the end of `ids`
+/// get an anchor from their text.
+pub fn render_with_ids(source: &str, link: &dyn Fn(&str) -> String, ids: &[String]) -> Rendered {
+    let mut r = Renderer { link, out: Rendered::default(), html: String::new(), ids: Vec::new(), fixed: ids };
     r.out.sections.push(Section { id: String::new(), heading: String::new(), text: String::new() });
     let lines: Vec<&str> = source.lines().collect();
     let mut i = 0;
@@ -61,6 +69,7 @@ struct Renderer<'a> {
     out: Rendered,
     html: String,
     ids: Vec<String>,
+    fixed: &'a [String],
 }
 
 fn indent_of(line: &str) -> usize {
@@ -204,7 +213,7 @@ impl Renderer<'_> {
                 return i + 1;
             }
             let level = hashes.max(2) as u8;
-            let mut id = slug(&plain(text));
+            let mut id = self.fixed.get(self.out.headings.len()).cloned().unwrap_or_else(|| slug(&plain(text)));
             if self.ids.contains(&id) {
                 let mut n = 2;
                 while self.ids.contains(&format!("{id}-{n}")) {

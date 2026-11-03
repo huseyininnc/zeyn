@@ -1,7 +1,129 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://zeynsoft.com/</loc>
-    <lastmod>2026-11-02</lastmod>
+    <lastmod>2026-11-03</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://zeynsoft.com/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://zeynsoft.com/tr/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://zeynsoft.com/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://zeynsoft.com/ru/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://zeynsoft.com/es/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://zeynsoft.com/ko/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://zeynsoft.com/ja/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://zeynsoft.com/hi/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://zeynsoft.com/ar/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://zeynsoft.com/"/>
+  </url>
+  <url>
+    <loc>https://zeynsoft.com/tr/</loc>
+    <lastmod>2026-11-03</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://zeynsoft.com/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://zeynsoft.com/tr/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://zeynsoft.com/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://zeynsoft.com/ru/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://zeynsoft.com/es/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://zeynsoft.com/ko/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://zeynsoft.com/ja/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://zeynsoft.com/hi/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://zeynsoft.com/ar/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://zeynsoft.com/"/>
+  </url>
+  <url>
+    <loc>https://zeynsoft.com/zh/</loc>
+    <lastmod>2026-11-03</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://zeynsoft.com/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://zeynsoft.com/tr/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://zeynsoft.com/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://zeynsoft.com/ru/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://zeynsoft.com/es/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://zeynsoft.com/ko/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://zeynsoft.com/ja/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://zeynsoft.com/hi/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://zeynsoft.com/ar/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://zeynsoft.com/"/>
+  </url>
+  <url>
+    <loc>https://zeynsoft.com/ru/</loc>
+    <lastmod>2026-11-03</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://zeynsoft.com/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://zeynsoft.com/tr/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://zeynsoft.com/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://zeynsoft.com/ru/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://zeynsoft.com/es/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://zeynsoft.com/ko/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://zeynsoft.com/ja/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://zeynsoft.com/hi/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://zeynsoft.com/ar/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://zeynsoft.com/"/>
+  </url>
+  <url>
+    <loc>https://zeynsoft.com/es/</loc>
+    <lastmod>2026-11-03</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://zeynsoft.com/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://zeynsoft.com/tr/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://zeynsoft.com/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://zeynsoft.com/ru/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://zeynsoft.com/es/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://zeynsoft.com/ko/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://zeynsoft.com/ja/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://zeynsoft.com/hi/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://zeynsoft.com/ar/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://zeynsoft.com/"/>
+  </url>
+  <url>
+    <loc>https://zeynsoft.com/ko/</loc>
+    <lastmod>2026-11-03</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://zeynsoft.com/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://zeynsoft.com/tr/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://zeynsoft.com/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://zeynsoft.com/ru/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://zeynsoft.com/es/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://zeynsoft.com/ko/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://zeynsoft.com/ja/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://zeynsoft.com/hi/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://zeynsoft.com/ar/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://zeynsoft.com/"/>
+  </url>
+  <url>
+    <loc>https://zeynsoft.com/ja/</loc>
+    <lastmod>2026-11-03</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://zeynsoft.com/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://zeynsoft.com/tr/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://zeynsoft.com/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://zeynsoft.com/ru/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://zeynsoft.com/es/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://zeynsoft.com/ko/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://zeynsoft.com/ja/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://zeynsoft.com/hi/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://zeynsoft.com/ar/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://zeynsoft.com/"/>
+  </url>
+  <url>
+    <loc>https://zeynsoft.com/hi/</loc>
+    <lastmod>2026-11-03</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://zeynsoft.com/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://zeynsoft.com/tr/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://zeynsoft.com/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://zeynsoft.com/ru/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://zeynsoft.com/es/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://zeynsoft.com/ko/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://zeynsoft.com/ja/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://zeynsoft.com/hi/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://zeynsoft.com/ar/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://zeynsoft.com/"/>
+  </url>
+  <url>
+    <loc>https://zeynsoft.com/ar/</loc>
+    <lastmod>2026-11-03</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://zeynsoft.com/"/>
+    <xhtml:link rel="alternate" hreflang="tr" href="https://zeynsoft.com/tr/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://zeynsoft.com/zh/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://zeynsoft.com/ru/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://zeynsoft.com/es/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://zeynsoft.com/ko/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://zeynsoft.com/ja/"/>
+    <xhtml:link rel="alternate" hreflang="hi" href="https://zeynsoft.com/hi/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://zeynsoft.com/ar/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://zeynsoft.com/"/>
   </url>
 </urlset>

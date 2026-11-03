@@ -187,28 +187,25 @@ pub struct DateWords {
 }
 
 impl DateWords {
-    /// Words of a locale from the catalogs, followed by the English ones.
+    /// Words of a locale from the catalogs, followed by the English ones. A locale word wins over
+    /// an English word with the same spelling, so in Spanish `s` is a week (semana) and `a` a
+    /// year (año), and an English word is dropped when the locale already uses it for something
+    /// else. Words in any script work (`завтра`, `明天`, `غدا`); input is compared in lower case.
     pub fn from_i18n(i18n: &crate::i18n::I18n, locale: &str) -> DateWords {
-        let list = |key: &str| -> Vec<String> {
-            let mut words: Vec<String> = Vec::new();
-            for l in [locale, "en"] {
-                if let Some(text) = i18n.lookup(l, &format!("zeyn.date.words.{key}")) {
-                    for w in text.split(',').map(|w| lower(w.trim())).filter(|w| !w.is_empty()) {
-                        if !words.contains(&w) {
-                            words.push(w);
-                        }
+        const KEYS: [&str; 8] = ["today", "tomorrow", "yesterday", "now", "day", "week", "month", "year"];
+        let mut lists: [Vec<String>; 8] = Default::default();
+        for l in [locale, "en"] {
+            for (i, key) in KEYS.iter().enumerate() {
+                let Some(text) = i18n.lookup(l, &format!("zeyn.date.words.{key}")) else { continue };
+                for w in text.split(',').map(|w| lower(w.trim())).filter(|w| !w.is_empty()) {
+                    if !lists.iter().any(|list| list.contains(&w)) {
+                        lists[i].push(w);
                     }
                 }
             }
-            words
-        };
-        DateWords {
-            today: list("today"),
-            tomorrow: list("tomorrow"),
-            yesterday: list("yesterday"),
-            now: list("now"),
-            units: [list("day"), list("week"), list("month"), list("year")],
         }
+        let [today, tomorrow, yesterday, now, day, week, month, year] = lists;
+        DateWords { today, tomorrow, yesterday, now, units: [day, week, month, year] }
     }
 
     /// English words only, from the built in catalog.
@@ -220,8 +217,8 @@ impl DateWords {
         list.iter().any(|w| w == word)
     }
 
-    /// Unit index of a word: 0 day, 1 week, 2 month, 3 year. The locale's words come first, so
-    /// `h` is a week in Turkish (hafta).
+    /// Unit index of a word: 0 day, 1 week, 2 month, 3 year, such as `h` for a week in Turkish
+    /// (hafta). Each word belongs to one unit (see [`DateWords::from_i18n`]).
     fn unit(&self, word: &str) -> Option<usize> {
         if word.is_empty() {
             return Some(0);

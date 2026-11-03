@@ -61,6 +61,8 @@ Form::of(visit)
 
 The server picks the language from the `zeyn_locale` cookie, then the browser's `Accept-Language`, then the app default. `<html lang>` always matches. The language picker in the menu sets the cookie and swaps the page in place, without a reload.
 
+With `App::locale_paths()` the language is part of the URL instead: the default language keeps `/orders`, the others get `/tr/orders` or `/ar/orders`. The path alone decides, so a shared link opens in the same language, and each screen still has one route and reads `ctx.locale()`. Menu links keep the language, and the picker opens the same page in the other language without a reload. Arabic and other right to left languages get `<html dir="rtl">`. List the languages of a public page for search engines with `Screen::alternate("tr", "/tr/orders")`.
+
 ## Numbers, money and dates
 
 Values are formatted for the user's language on the server: `1.234,56` in Turkish and `1,234.56` in English, dates as `29.03.2026` or `3/29/2026`, and money with its currency symbol. Inputs read the same formats back.

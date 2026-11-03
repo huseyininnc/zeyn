@@ -102,7 +102,30 @@ fn primary(locale: &str) -> &str {
     locale.split(['-', '_']).next().unwrap_or(locale)
 }
 
-/// Message catalogs. Built in `zeyn.*` messages exist in English and Turkish; apps add their own.
+/// The framework's own catalogs compiled into this build: English and Turkish always, the other
+/// languages behind their Cargo feature (`lang-zh`, `lang-ru`, `lang-es`, `lang-ko`, `lang-ja`,
+/// `lang-hi`, `lang-ar`, or `lang-all` for every one).
+const BUILTIN_CATALOGS: &[(&str, &str)] = &[
+    ("en", include_str!("../locales/en.json")),
+    ("tr", include_str!("../locales/tr.json")),
+    #[cfg(feature = "lang-zh")]
+    ("zh", include_str!("../locales/zh.json")),
+    #[cfg(feature = "lang-ru")]
+    ("ru", include_str!("../locales/ru.json")),
+    #[cfg(feature = "lang-es")]
+    ("es", include_str!("../locales/es.json")),
+    #[cfg(feature = "lang-ko")]
+    ("ko", include_str!("../locales/ko.json")),
+    #[cfg(feature = "lang-ja")]
+    ("ja", include_str!("../locales/ja.json")),
+    #[cfg(feature = "lang-hi")]
+    ("hi", include_str!("../locales/hi.json")),
+    #[cfg(feature = "lang-ar")]
+    ("ar", include_str!("../locales/ar.json")),
+];
+
+/// Message catalogs. Built in `zeyn.*` messages exist in English and Turkish, and in the
+/// languages turned on with the `lang-*` Cargo features; apps add their own.
 ///
 /// ```
 /// use zeyn::I18n;
@@ -118,13 +141,37 @@ pub struct I18n {
 
 impl I18n {
     /// Catalogs with the built in messages. `default` is used when a key is missing in the user's language.
+    ///
+    /// English, Turkish and the default language are read at once. The other built in languages
+    /// are read when the app adds a catalog for them, so a build with `lang-all` keeps in memory
+    /// only the languages the app offers.
     pub fn new(default: &str) -> Self {
         let mut i18n = I18n { default: default.to_string(), locales: Vec::new(), catalogs: HashMap::new() };
-        i18n.merge("en", include_str!("../locales/en.json"), false).expect("built in catalog");
-        i18n.merge("tr", include_str!("../locales/tr.json"), false).expect("built in catalog");
-        i18n.locales.clear();
+        for locale in ["en", "tr", primary(default)] {
+            i18n.load_builtin(locale);
+        }
         i18n.locales.push(default.to_string());
         i18n
+    }
+
+    /// Reads the framework's own catalog of a language once, if this build has it.
+    fn load_builtin(&mut self, locale: &str) {
+        let locale = primary(locale);
+        if self.catalogs.contains_key(locale) {
+            return;
+        }
+        if let Some((_, json)) = BUILTIN_CATALOGS.iter().find(|(l, _)| *l == locale) {
+            self.merge(locale, json, false).expect("built in catalog");
+        }
+    }
+
+    /// Locales whose framework texts are compiled into this build, English first.
+    ///
+    /// ```
+    /// assert!(zeyn::I18n::builtin_locales().any(|l| l == "tr"));
+    /// ```
+    pub fn builtin_locales() -> impl Iterator<Item = &'static str> {
+        BUILTIN_CATALOGS.iter().map(|(locale, _)| *locale)
     }
 
     /// Shared catalogs with only the built in messages, default English.
@@ -156,6 +203,9 @@ impl I18n {
     }
 
     fn merge(&mut self, locale: &str, json: &str, offered: bool) -> Result<(), String> {
+        if offered {
+            self.load_builtin(locale);
+        }
         let value: serde_json::Value =
             serde_json::from_str(json).map_err(|e| format!("catalog `{locale}` is not valid JSON: {e}"))?;
         let catalog = self.catalogs.entry(locale.to_string()).or_default();

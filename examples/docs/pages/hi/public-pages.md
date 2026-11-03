@@ -1,0 +1,96 @@
+# सार्वजनिक पृष्ठ
+
+`public` चिह्नित Screen कोई भी खोल सकता है, उन आगंतुकों समेत जिन्होंने कभी साइन इन नहीं किया: लैंडिंग पृष्ठ, मूल्य सूची, सहायता केंद्र। Zeyn उन्हें इस तरह परोसता है कि उन्हें पहुँचाना सस्ता हो और कैश तथा सर्च इंजन के लिए संभालना आसान।
+
+## आगंतुकों के लिए कोई कुकी नहीं
+
+बिना सत्र वाले अनुरोध से खुली सार्वजनिक Screen कोई कुकी सेट नहीं करती। पृष्ठ में खाली CSRF टोकन होता है, इसलिए एक ही भाषा और थीम वाले हर आगंतुक को वही बाइट मिलते हैं।
+
+ब्राउज़र रनटाइम टोकन चाहिए वाली पहली कॉल (फ़ॉर्म, action, भाषा चयनकर्ता) से ठीक पहले `GET /_zeyn/csrf` से टोकन माँगता है। वह कॉल `zeyn_csrf` कुकी सेट करती है और कभी कैश नहीं होती। हर `POST` ठीक वैसे जाँचा जाता है जैसे किसी भी अन्य पृष्ठ पर: मेल खाते टोकन के बिना उसे `403` से अस्वीकार किया जाता है, और कुछ भी चुपचाप दोबारा नहीं आज़माया जाता।
+
+साइन इन उपयोगकर्ताओं को पहले की तरह हमेशा पृष्ठ में कुकी और टोकन मिलते हैं।
+
+## HTTP कैशिंग
+
+```rust
+#[screen(route = "/pricing", public, cache = 300)]
+pub fn pricing() -> Screen {
+    Screen::new("Pricing")
+}
+```
+
+`cache = N` ब्राउज़र और साझा कैश को पृष्ठ `N` सेकंड (1 से 86400) तक रखने देता है। बिना सत्र वाले अनुरोध के लिए पृष्ठ को तब यह मिलता है:
+
+| हेडर | मान |
+|---|---|
+| `Cache-Control` | `public, max-age=300` |
+| `ETag` | रेंडर की गई बॉडी पर एक मज़बूत टैग |
+| `Vary` | `x-zeyn-partial, Accept-Language, Cookie` |
+
+मेल खाते `If-None-Match` वाले अनुरोध को बिना बॉडी के `304 Not Modified` मिलता है। ऐप के भीतर नेविगेशन से लोड होने वाली Screen उसी तरह कैश होती हैं, अपने टैग के साथ।
+
+सत्र वाले अनुरोध को कभी सार्वजनिक कैश हेडर नहीं मिलते: पृष्ठ `Cache-Control: private, no-store` के साथ भेजा जाता है। जो Screen `public` नहीं है उस पर `cache` कंपाइल नहीं होता।
+
+सर्वर तक पहुँचने वाले हर अनुरोध के लिए Screen फिर भी बनाई और रेंडर की जाती है; टैग ट्रांसफ़र बचाता है, और ऐप के सामने का कैश अनुरोध बचाता है। कैश की जाने वाली Screen को आगंतुक पर निर्भर हर चीज़ से मुक्त रखें: दिन का समय, काउंटर, यादृच्छिक चयन।
+
+## सर्च इंजन और लिंक पूर्वावलोकन
+
+```rust
+#[screen(route = "/pricing", public, cache = 300)]
+pub fn pricing() -> Screen {
+    Screen::new(t!("pricing.title"))
+        .description(t!("pricing.description"))
+        .canonical("/pricing")
+        .og_image("https://cdn.example.com/pricing.png")
+        .robots(Robots::Index)
+        .json_ld(serde_json::json!({
+            "@context": "https://schema.org",
+            "@type": "Product",
+            "name": "Team plan",
+        }))
+}
+```
+
+| मेथड | हेड टैग |
+|---|---|
+| `.description(text)` | उपयोगकर्ता की भाषा में `<meta name="description">` और `og:description` |
+| `.canonical(url)` | `<link rel="canonical">` और `og:url` |
+| `.og_image(url)` | `og:image` |
+| `.robots(Robots::Index)` या `Robots::NoIndex` | `<meta name="robots">` |
+| `.json_ld(value)` | `<script type="application/ld+json">` |
+
+हर मान escape होता है। JSON-LD में `<`, `>` और `&` को `<`, `>` और `&` के रूप में लिखा जाता है, इसलिए `</script>` वाला मान एलिमेंट को खत्म नहीं कर सकता; ब्राउज़र उसे कभी नहीं चलाता, और content security policy उतनी ही सख़्त रहती है जितनी हर अन्य पृष्ठ पर।
+
+URL `https` URL या `/` से शुरू होने वाले ऐप पथ होने चाहिए। कुछ भी और (`http:`, `//host`, `javascript:`, खाली जगह, उद्धरण) लॉग में चेतावनी के साथ छोड़ दिया जाता है। ऐप पथ साइट URL और बेस पथ के पीछे लिखे जाते हैं:
+
+```rust
+App::new(t!("app.name")).site_url("https://shop.example.com")
+```
+
+`site_url` के बिना हेड टैग ऐप पथ रखते हैं, जिसे ब्राउज़र हल कर लेते हैं पर कुछ क्रॉलर नहीं।
+
+ऐप के भीतर नेविगेशन शीर्षक और इन सभी टैग को बिना पृष्ठ लोड के अपडेट करता है।
+
+## साइटमैप
+
+```rust
+#[action(public)]
+pub async fn site_pages(part: SitemapPart, db: Db) -> Result<Vec<SitemapUrl>> {
+    let rows = db.products_after(part.offset, part.limit).await?;
+    Ok(rows.into_iter().map(|p| SitemapUrl::new(format!("/products/{}", p.slug)).lastmod(p.changed)).collect())
+}
+
+Feature::new("site").sitemap(site_pages)
+```
+
+`/sitemap.xml` action से एक बार में 1,000 URL माँगता है (`part.offset`, `part.limit`) और XML स्ट्रीम करता है, इसलिए बड़ी साइट कभी मेमोरी में नहीं बैठती। 50,000 URL तक यह एक `urlset` है। उससे ऊपर यह `/sitemaps/1.xml`, `/sitemaps/2.xml` आदि का साइटमैप इंडेक्स है, हर एक में 50,000 URL। action `public` होनी चाहिए और URL को स्थिर क्रम में लौटाना चाहिए। ऐप पथ को `App::site_url` चाहिए, क्योंकि साइटमैप में निरपेक्ष URL होते हैं; जो प्रविष्टियाँ `https` URL या ऐप पथ नहीं हैं वे छोड़ दी जाती हैं। केवल सार्वजनिक पृष्ठ सूचीबद्ध करें: सर्च इंजन दूसरे नहीं खोल सकते। प्रति ऐप एक feature में साइटमैप होता है।
+
+## robots.txt और llms.txt
+
+```rust
+App::new(t!("app.name"))
+    .robots_txt("User-agent: *\nAllow: /\nSitemap: https://shop.example.com/sitemap.xml\n")
+    .llms_txt(include_str!("../llms.txt"))
+```
+
+दोनों सबको सादे टेक्स्ट के रूप में परोसे जाते हैं।

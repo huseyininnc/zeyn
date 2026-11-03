@@ -1,0 +1,832 @@
+{
+  "zeyn": {
+    "locale": {
+      "name": "日本語"
+    },
+    "yes": "はい",
+    "no": "いいえ",
+    "deploy": {
+      "new_version": "アプリの新しいバージョンがあります。準備ができたら再読み込みしてください。未保存のフォーム入力は保持されます。",
+      "reload": "今すぐ再読み込み",
+      "later": "後で"
+    },
+    "draft": {
+      "restored": "以前の未保存の入力を復元しました。",
+      "discard": "破棄する"
+    },
+    "session": {
+      "idle_title": "まだ操作されていますか？",
+      "idle_body": "操作がないため、{seconds}秒後にサインアウトされます。",
+      "stay": "サインインを続ける",
+      "signed_out_title": "サインアウトしました",
+      "signed_out_body": "操作がなかったためサインアウトしました。未保存のフォーム入力はこのタブに保持されています。",
+      "sign_in": "再度サインイン",
+      "reauth_required": "安全のため、この操作には再度サインインが必要です。",
+      "reauth_title": "本人確認",
+      "reauth_body": "この操作には最近のサインインが必要です。新しいタブで再度サインインし、戻って続けてください。",
+      "reauth_open": "再度サインイン",
+      "reauth_continue": "サインインしました。続ける",
+      "mfa_title": "2つ目の手順が必要です",
+      "mfa_body": "この操作にはサインインの2つ目の手順が必要です。新しいタブで完了し、戻って続けてください。",
+      "mfa_open": "今すぐ確認"
+    },
+    "auth": {
+      "mfa_required": "サインインの2つ目の手順が必要です。認証アプリのコードなどを使用してください。",
+      "mfa_missing": "サインインに2つ目の手順が含まれていませんでした。再度サインインして完了してください。",
+      "failed": "サインインできませんでした。もう一度お試しください。",
+      "unavailable": "現在サインインを利用できません。しばらくしてからお試しください。",
+      "totp_title": "2段階認証",
+      "totp_scan": "認証アプリでこのコードを読み取り、表示された6桁のコードを入力してください。",
+      "totp_manual": "または、このキーをアプリに入力してください。",
+      "totp_qr": "認証アプリ用のQRコード",
+      "totp_intro": "認証アプリの6桁のコード、またはリカバリーコードのいずれかを入力してください。",
+      "totp_code": "コード",
+      "totp_verify": "確認",
+      "totp_invalid": "コードが正しくありません。もう一度お試しください。",
+      "totp_rate_limited": "試行回数が多すぎます。数分待ってからもう一度お試しください。",
+      "totp_recovery_title": "リカバリーコード",
+      "totp_recovery_body": "これらのコードは安全な場所に保管してください。認証アプリを紛失した場合、各コードを一度だけ使用できます。再表示はされません。",
+      "totp_continue": "続ける"
+    },
+    "import": {
+      "file": "CSVファイル",
+      "file_any": "CSVまたはExcelファイル",
+      "bad_file": "ファイルをExcelブックとして読み込めませんでした。",
+      "hint": "1行目に列名を指定します: {columns}。値はカンマまたはセミコロンで区切ります。最大{max}行です。",
+      "summary": "{total}行を読み込みました。有効: {valid}、エラー: {invalid}。",
+      "commit": "有効な行をインポート",
+      "commit_all": "すべての行をインポート",
+      "report": "エラーレポートをダウンロード",
+      "imported": "{count}行をインポートし、{skipped}行をスキップしました。",
+      "unknown_column": "不明な列: {name}。",
+      "too_many": "ファイルの行数が{max}行を超えています。",
+      "too_large": "ファイルが大きすぎます。",
+      "empty": "ファイルにデータ行がありません。",
+      "bad_quotes": "ファイル内の引用符で囲まれた値が閉じられていません。",
+      "extra_cells": "この行の値が列数より多くなっています。",
+      "nothing_valid": "有効な行がないため、何もインポートされませんでした。",
+      "fix_first": "先にすべてのエラーを修正してください。このインポートは全件成功か全件失敗のどちらかです。",
+      "report_row": "行",
+      "report_field": "項目",
+      "report_message": "メッセージ",
+      "reading": "ファイルを読み込み中..."
+    },
+    "mail": {
+      "transition": {
+        "subject": "{record}: {to}",
+        "text": "{record}は{by}により{from}から{to}に移動しました（{move}）。\n\n{comment}",
+        "html": "<p><strong>{record}</strong>は{by}により{from}から<strong>{to}</strong>に移動しました（{move}）。</p><p>{comment}</p>"
+      }
+    },
+    "workflow": {
+      "state": "状態",
+      "comment": "コメント",
+      "done": "完了しました。"
+    },
+    "privacy": {
+      "reveal": "{label}を表示",
+      "revealed": "値を表示しました。この操作は記録されました。",
+      "reveal_failed": "値を表示できませんでした。",
+      "reason_required": "この画面を開くには理由を入力してください。",
+      "reason_title": "このレコードが必要な理由",
+      "reason_explain": "この画面には個人データが表示されます。理由は、お名前と時刻とともに記録されます。",
+      "reason_label": "理由",
+      "reason_continue": "続ける",
+      "reason_cancel": "キャンセル",
+      "reason_invalid": "理由を3〜300文字で入力してください。"
+    },
+    "validation": {
+      "required": "{label}は必須です。",
+      "min_len": "{label}は{n}文字以上で入力してください。",
+      "max_len": "{label}は{n}文字以内で入力してください。",
+      "email": "{label}は有効なメールアドレスにしてください。",
+      "min": "{label}は{n}以上にしてください。",
+      "max": "{label}は{n}以下にしてください。",
+      "format": "{label}の値が正しくありません。",
+      "skipped_time": "{label}: 時計が変更されたため、この時刻はお使いのタイムゾーンに存在しません。",
+      "line": "{n}行目: {message}",
+      "disabled_day": "{label}: この日は選択できません。",
+      "time_step": "{label}は{n}分単位にしてください。",
+      "range_order": "{label}は{other}より前にできません。",
+      "unique": "{label}は別のレコードで既に使われています。",
+      "scale": "{label}の小数は{n}桁までです。",
+      "precision": "{label}の整数部は{n}桁までです。",
+      "mask": "{label}は{pattern}の形式にしてください。",
+      "embed": "{label}には、埋め込み用のhttpsアドレス、またはそれを含む埋め込みコードを指定してください。",
+      "embed_host": "{label}: {host}は、このアプリが埋め込めるサイトの一覧にありません。"
+    },
+    "error": {
+      "forbidden": "この操作は許可されていません。",
+      "not_found": "レコードが見つかりません。",
+      "conflict": "他のユーザーがこのレコードを変更しました。再読み込みして、もう一度お試しください。",
+      "timeout": "リクエストに時間がかかりすぎました。",
+      "internal": "予期しないエラーが発生しました。",
+      "csrf": "セッションの有効期限が切れました。ページを再読み込みしてください。",
+      "license": "お使いのライセンスではこの機能を利用できません。管理者に連絡してください。",
+      "license_expired": "ライセンスの有効期限が切れています。更新については管理者に連絡してください。",
+      "tenant": "このアドレスは既知の組織に属していません。",
+      "rate_limited": "リクエストが多すぎます。しばらくしてからもう一度お試しください。",
+      "confirmation_required": "実行前にアプリで確認が必要です。",
+      "cursor": "読み込み後にリストが変更されました。再読み込みして、もう一度お試しください。",
+      "duplicate": "このレコードは既に存在します。"
+    },
+    "grid": {
+      "pagination": "ページ送り",
+      "previous": "前のページ",
+      "next": "次のページ",
+      "load_more": "さらに読み込む",
+      "range": "{from}-{to}",
+      "range_total": "{from}-{to} / {total}",
+      "loaded": "{count}行を読み込みました",
+      "empty": "レコードがありません。",
+      "actions": "操作",
+      "select_row": "行を選択",
+      "select_page": "このページのすべての行を選択",
+      "selected_count": "{n}件を選択中",
+      "select_matching": "一致する{total}行をすべて選択",
+      "all_selected": "一致する{total}行をすべて選択しました",
+      "clear_selection": "選択を解除",
+      "too_many": "この操作で選択できるのは最大{n}行です。",
+      "done": "完了しました。",
+      "saved": "保存しました。",
+      "undo": "元に戻す",
+      "undone": "変更を元に戻しました。",
+      "error": "行を読み込めませんでした。",
+      "retry": "もう一度試す",
+      "copied": "{n}行をコピーしました。",
+      "copied_cells": "{n}セルをコピーしました。",
+      "paste_confirm": "{n}行に貼り付けますか？各行が保存されます。",
+      "pasted": "{n}行を保存しました。",
+      "paste_failed": "{n}行を保存できませんでした。理由は各セルに表示されます。",
+      "paste_readonly": "これらのセルは編集できません。",
+      "paste_too_many": "一度に貼り付けられるのは最大{n}行です。",
+      "details": "詳細",
+      "loading": "読み込み中...",
+      "children": "子行",
+      "blank": "(空)",
+      "group_count": "{n}行",
+      "filter": {
+        "filter": "{label}で絞り込み",
+        "from": "開始",
+        "to": "終了",
+        "all": "すべて",
+        "contains": "含む",
+        "starts_with": "で始まる",
+        "equals": "等しい",
+        "match": "一致",
+        "selected": "{n}件を選択中",
+        "clear": "絞り込みを解除",
+        "sorted": "並べ替え順 {n}"
+      },
+      "menu": {
+        "options": "列のオプション: {label}",
+        "resize": "{label}のサイズを変更",
+        "sort_asc": "昇順で並べ替え",
+        "sort_desc": "降順で並べ替え",
+        "sort_clear": "並べ替えを解除",
+        "pin_start": "先頭に固定",
+        "pin_end": "末尾に固定",
+        "unpin": "固定を解除",
+        "move_prev": "左へ移動",
+        "move_next": "右へ移動",
+        "hide": "列を非表示",
+        "columns": "列",
+        "filter": "絞り込み",
+        "reset": "表示をリセット"
+      },
+      "agg": {
+        "sum": "合計",
+        "avg": "平均",
+        "min": "最小",
+        "max": "最大",
+        "count": "件数"
+      }
+    },
+    "export": {
+      "xlsx": "Excelにエクスポート",
+      "csv": "CSVにエクスポート",
+      "pdf": "PDFにエクスポート",
+      "pdf_cut": "最初の{max}行のみ印刷されます。"
+    },
+    "shell": {
+      "skip": "本文へスキップ",
+      "menu": "メイン",
+      "language": "言語",
+      "time_zone": "タイムゾーン",
+      "time_zone_auto": "自動（この端末）",
+      "theme": "テーマ",
+      "theme_system": "システム",
+      "theme_light": "ライト",
+      "theme_dark": "ダーク",
+      "site": {
+        "sign_in": "サインイン",
+        "sign_out": "サインアウト"
+      }
+    },
+    "ui": {
+      "resize": "ペインのサイズを変更",
+      "cards": {
+        "load_more": "さらに表示",
+        "loaded": "{count}件を表示中",
+        "empty": "表示する項目がありません。",
+        "error": "リストを読み込めませんでした。もう一度お試しください。",
+        "sort": "並べ替え",
+        "pages": "ページ",
+        "page": "{page} / {pages}ページ",
+        "previous_page": "前のページ",
+        "next_page": "次のページ",
+        "previous": "前へスクロール",
+        "next": "次へスクロール"
+      },
+      "search": {
+        "label": "検索",
+        "suggestions": "候補",
+        "count": "候補が{count}件あります。矢印キーで選択してください",
+        "none": "候補はありません"
+      },
+      "palette": {
+        "open": "コマンド",
+        "label": "コマンドパレット",
+        "placeholder": "コマンドまたは画面名を入力",
+        "empty": "一致するコマンドがありません。",
+        "count": "{n}件のコマンド",
+        "recent": "最近使用",
+        "app": "コマンド",
+        "screen": "この画面",
+        "go": "移動",
+        "done": "完了しました。",
+        "hint": "上下キーで移動、Enterで実行、Escapeで閉じます。"
+      },
+      "toolbox": {
+        "selected": "{tool}を選択中"
+      },
+      "dock": {
+        "left": "左",
+        "right": "右",
+        "bottom": "下",
+        "center": "中央",
+        "options": "パネルのオプション",
+        "move": "{area}へ移動",
+        "close": "{panel}を閉じる",
+        "show": "{panel}を表示",
+        "moved": "{panel}を{area}へ移動しました。",
+        "closed": "{panel}を閉じました。",
+        "shown": "{panel}を表示しました。",
+        "empty": "開いているパネルがありません。パネルのオプションから開いてください。",
+        "resize": "{area}エリアのサイズを変更"
+      },
+      "loading": "読み込み中…",
+      "load_failed": "この部分を読み込めませんでした。もう一度お試しください。",
+      "date": {
+        "open": "日付を選択",
+        "dialog": "日付を選択してください",
+        "prev_month": "前の月",
+        "next_month": "次の月",
+        "prev_year": "前の年",
+        "next_year": "次の年",
+        "today": "今日",
+        "format": "形式: {format}。",
+        "natural": "次のような入力もできます: {examples}。",
+        "natural_date": "今日, +3d",
+        "natural_time": "今, 930",
+        "open_time": "時刻を選択",
+        "dialog_time": "時刻を選択してください",
+        "dialog_range": "日付の範囲を選択してください",
+        "month": "月を選択",
+        "year": "年を選択",
+        "months": "月",
+        "years": "年",
+        "now": "現在",
+        "clear": "クリア",
+        "done": "完了",
+        "hours": "時",
+        "minutes": "分",
+        "seconds": "秒",
+        "period": "午前または午後",
+        "week": "週",
+        "week_long": "週番号",
+        "zone": "タイムゾーン {zone}",
+        "utc": "UTC: {moment}",
+        "from": "開始",
+        "to": "終了",
+        "presets": {
+          "label": "クイック範囲",
+          "today": "今日",
+          "yesterday": "昨日",
+          "last_7_days": "過去7日間",
+          "this_month": "今月",
+          "last_month": "先月",
+          "this_year": "今年"
+        },
+        "invalid": "{label}を読み取れませんでした。"
+      },
+      "lookup": {
+        "open": "選択肢を表示",
+        "no_results": "一致する項目がありません。",
+        "results": "{count}件の結果",
+        "remove": "{label}を削除",
+        "more": "さらに表示",
+        "selected": "選択済み",
+        "type_more": "入力して検索してください。"
+      },
+      "lines": {
+        "add": "行を追加",
+        "remove": "{n}行目を削除",
+        "up": "{n}行目を上へ移動",
+        "down": "{n}行目を下へ移動",
+        "row": "{n}行目",
+        "total": "合計",
+        "actions": "操作",
+        "empty": "行がまだありません。"
+      },
+      "confirm": {
+        "title": "確認してください",
+        "ok": "確認",
+        "cancel": "キャンセル"
+      },
+      "empty": "まだ何もありません。",
+      "breadcrumb": "パンくずリスト",
+      "dismiss": "閉じる",
+      "link": {
+        "external": "外部サイト",
+        "external_new_tab": "外部サイト、新しいタブで開きます"
+      },
+      "embed": {
+        "blocked": "{title}はここに表示できません。このサイトは、アプリが埋め込めるサイトの一覧にありません。",
+        "load": "{title}を読み込む",
+        "from": "{host}のコンテンツです。操作したときにのみ読み込まれます。"
+      },
+      "steps": {
+        "progress": "ステップ {n} / {total}",
+        "next": "次へ",
+        "back": "戻る",
+        "done": "完了",
+        "current": "現在のステップ",
+        "label": "ステップ"
+      },
+      "chart": {
+        "data": "データを表示",
+        "table": "{title}のデータ",
+        "summary_bar": "{items}カテゴリにわたる{series}系列の棒グラフ。最大: {max}、{value}。",
+        "summary_line": "{items}点にわたる{series}系列の折れ線グラフ。最大: {max}、{value}。",
+        "summary_donut": "{items}要素のドーナツグラフ。最大: {max}、{value}。",
+        "role": "グラフ",
+        "summary_stacked_bar": "{items}カテゴリにわたる{series}系列の積み上げ棒グラフ。合計の最大: {max}、{value}。",
+        "summary_area": "{items}点にわたる{series}系列の面グラフ。最大: {max}、{value}。",
+        "summary_combo": "{items}カテゴリにわたる{series}系列の棒と折れ線の複合グラフ。最大: {max}、{value}。",
+        "summary_scatter": "{series}グループ、{items}点の散布図。",
+        "summary_gauge": "ゲージの値は{value}、範囲は{min}から{max}。目標: {target}。",
+        "summary_funnel": "{items}段階のファネル。最大: {max}、{value}。",
+        "gauge_point": "{value} / {max}",
+        "sparkline": "{n}個の値の推移。{first}から{last}、最小{low}、最大{high}",
+        "bullet": "{value}、目標 {target}",
+        "value": "値",
+        "min": "最小",
+        "max": "最大",
+        "target": "目標"
+      },
+      "tree": {
+        "empty": "項目がありません。"
+      },
+      "select": {
+        "none": "なし",
+        "search": "リストを検索"
+      },
+      "number": {
+        "up": "増やす",
+        "down": "減らす",
+        "percent": "パーセント"
+      },
+      "text": {
+        "count": "{n} / {max}文字"
+      },
+      "media": {
+        "video_player": "動画プレーヤー",
+        "audio_player": "音声プレーヤー",
+        "play": "再生",
+        "pause": "一時停止",
+        "seek": "シーク",
+        "volume": "音量",
+        "mute": "ミュート",
+        "unmute": "ミュート解除",
+        "time_of": "{current} / {total}",
+        "speed": "再生速度",
+        "speed_value": "再生速度: {value}",
+        "captions": "字幕",
+        "captions_language": "字幕の言語",
+        "captions_on": "字幕オン: {label}",
+        "captions_off": "オフ",
+        "pip": "ピクチャインピクチャ",
+        "fullscreen": "全画面表示",
+        "exit_fullscreen": "全画面表示を終了",
+        "resumed": "{time}から再開します",
+        "failed": "このメディアを再生できませんでした。",
+        "bad_position": "再生位置が正しくありません。"
+      },
+      "tone": {
+        "neutral": "メモ",
+        "info": "情報",
+        "success": "成功",
+        "warning": "警告",
+        "danger": "エラー",
+        "brand": "メモ"
+      },
+      "upload": {
+        "drop": "ここにファイルをドロップするか、ファイルを選択してください。",
+        "hint": "{types}、最大{max}。",
+        "hint_many": "{types}、1ファイルあたり最大{max}、最大{n}ファイル。",
+        "list": "ファイル",
+        "uploading": "{name}をアップロード中: {pct}パーセント",
+        "uploaded": "{name}をアップロードしました。",
+        "failed": "{name}をアップロードできませんでした: {reason}",
+        "canceled": "{name}のアップロードをキャンセルしました。",
+        "removed": "{name}を削除しました。",
+        "cancel": "キャンセル",
+        "retry": "再試行",
+        "remove": "削除",
+        "remove_name": "{name}を削除"
+      },
+      "kpi": {
+        "up": "前期間より{pct}%増加",
+        "down": "前期間より{pct}%減少",
+        "flat": "前期間から変化なし",
+        "target": "目標 {target}、{pct}%達成"
+},
+      "password": {
+        "show": "パスワードを表示",
+        "weak": "強度: 弱い",
+        "fair": "強度: 普通",
+        "good": "強度: 良い",
+        "strong": "強度: 強い"
+      },
+      "multi": {
+        "count": "{n}件を選択中"
+      },
+      "popover": {
+        "close": "閉じる"
+      },
+      "busy": "処理中",
+      "tip": {
+        "about": "{label}について"
+      },
+      "menu": {
+        "more": "{label}のその他のオプション"
+      },
+      "toast": {
+        "dismiss": "閉じる"
+      }
+    },
+    "date": {
+      "words": {
+        "today": "今日",
+        "tomorrow": "明日",
+        "yesterday": "昨日",
+        "now": "今",
+        "day": "d, 日",
+        "week": "w, 週",
+        "month": "m, 月",
+        "year": "y, 年"
+      }
+    },
+    "assistant": {
+      "title": "アシスタント",
+      "open": "アシスタントを開く",
+      "close": "アシスタントを閉じる",
+      "new_chat": "新しいチャット",
+      "empty": "データについて質問したり、やりたいことを伝えたりしてください。あなたの権限の範囲で動作し、変更する前に確認します。",
+      "suggestions": "候補",
+      "message": "メッセージ",
+      "placeholder": "このアプリについて何でも質問してください",
+      "mic": "音声入力",
+      "mic_stop": "聞き取りを停止",
+      "stop": "停止",
+      "send": "送信",
+      "note": "AIは間違えることがあります。重要な結果は確認してください。",
+      "you": "あなた",
+      "thinking": "考え中",
+      "stopped": "停止しました。",
+      "retry": "もう一度試す",
+      "read_aloud": "読み上げ",
+      "copy": "コピー",
+      "copied": "コピーしました",
+      "confirm": "確認",
+      "decline": "キャンセル",
+      "confirm_title": "この操作を確認してください",
+      "confirm_question": "アシスタントがあなたの権限でこの操作を実行しようとしています。実行するには確認してください。",
+      "declined": "キャンセルしました。何も変更されていません。",
+      "listening": "聞き取り中",
+      "error": "問題が発生しました。",
+      "unavailable": "アシスタントは利用できません。",
+      "working": "処理中です",
+      "too_long": "{max}文字以内で入力してください。",
+      "audio_too_large": "録音が長すぎます。",
+      "token_limit": "アシスタントの利用上限に達しました。しばらくしてからもう一度お試しください。",
+      "too_many_steps": "手順が多くなりすぎたため中止しました。もっと簡単な依頼でお試しください。"
+    },
+    "accounts": {
+      "login": {
+        "title": "サインイン",
+        "submit": "サインイン",
+        "passkey": "パスキーでサインイン",
+        "external": "または次でサインイン",
+        "with": "次でサインイン",
+        "forgot": "パスワードをお忘れですか？",
+        "resend": "確認メールを再送",
+        "register": "アカウントを作成"
+      },
+      "register": {
+        "title": "アカウントを作成",
+        "submit": "アカウントを作成",
+        "login": "サインインに戻る"
+      },
+      "check_email": {
+        "title": "メールを確認してください",
+        "body": "このアドレスが当方からのメールを受信できる場合、次の手順を記載したメッセージを送信しました。メール内のリンクは1日間有効です。"
+      },
+      "forgot": {
+        "title": "パスワードをお忘れですか？",
+        "intro": "メールアドレスを入力してください。確認済みのアカウントのアドレスであれば、新しいパスワードを設定するためのリンクを送信します。",
+        "submit": "リンクを送信"
+      },
+      "resend": {
+        "title": "確認メールを再送",
+        "submit": "再送信"
+      },
+      "reset": {
+        "title": "新しいパスワードを設定",
+        "submit": "新しいパスワードを保存"
+      },
+      "confirm": {
+        "title": "メールアドレスの確認",
+        "done": "ありがとうございます。メールアドレスを確認しました。",
+        "failed": "このリンクは使用できません。有効期限が切れたか、使用済みか、新しいリンクに置き換えられた可能性があります。"
+      },
+      "two_factor": {
+        "title": "2段階サインイン",
+        "intro": "認証アプリのコードを入力してください。",
+        "submit": "確認",
+        "email_intro": "または、メールでコードを受け取ります。",
+        "send_email": "コードを送信",
+        "sent": "コードを送信しました。",
+        "submit_email": "メールのコードを確認",
+        "use_recovery": "代わりにリカバリーコードを使用",
+        "on": "2段階サインインは有効です。",
+        "codes_left": "残りのリカバリーコード: {n}",
+        "new_codes": "新しいリカバリーコード",
+        "new_codes_confirm": "現在のリカバリーコードは使えなくなります。続けますか？",
+        "forget": "このブラウザーを忘れる",
+        "disable": "無効にする",
+        "disable_confirm": "2段階サインインを無効にしますか？アカウントが不正アクセスを受けやすくなります。",
+        "reset_key": "認証キーをリセット",
+        "reset_key_confirm": "再設定するまで、このアカウントでは認証アプリが使えなくなります。続けますか？",
+        "reauth": "安全のため、2段階サインインを設定するには再度サインインしてください。",
+        "reauth_link": "再度サインイン",
+        "setup": "認証アプリでQRコードを読み取るかキーを入力し、表示された6桁のコードを入力してください。",
+        "qr": "認証アプリ用のQRコード",
+        "manual": "キー:",
+        "enable": "有効にする"
+      },
+      "recovery": {
+        "title": "リカバリーコードでサインイン",
+        "intro": "各リカバリーコードは一度だけ使用できます。",
+        "submit": "サインイン"
+      },
+      "lockout": {
+        "title": "アカウントがロックされました",
+        "body": "失敗した試行が多すぎたため、このアカウントはしばらくロックされます。後でもう一度お試しいただくか、パスワードをリセットしてください。"
+      },
+      "denied": {
+        "title": "アクセスが拒否されました",
+        "body": "このページにアクセスする権限がありません。"
+      },
+      "logout": {
+        "title": "サインアウト",
+        "body": "このブラウザーからサインアウトしますか？",
+        "submit": "サインアウト"
+      },
+      "manage": {
+        "title": "アカウント設定",
+        "profile": "プロフィール",
+        "email": "メール",
+        "password": "パスワード",
+        "two_factor": "2段階サインイン",
+        "passkeys": "パスキー",
+        "logins": "外部ログイン",
+        "personal_data": "個人データ"
+      },
+      "save": "保存",
+      "saved": "保存しました。",
+      "email": {
+        "current": "メールアドレス:",
+        "confirmed": "確認済み",
+        "unconfirmed": "未確認",
+        "send_verification": "確認メールを送信",
+        "sent": "受信トレイで確認リンクをご確認ください。",
+        "change": "メールアドレスを変更"
+      },
+      "password": {
+        "submit": "パスワードを保存",
+        "changed": "パスワードを変更しました。他のセッションはサインアウトされます。"
+      },
+      "codes": {
+        "title": "リカバリーコード",
+        "keep": "これらのコードは安全な場所に保管してください。各コードは一度だけ使用でき、表示されるのは今回のみです。",
+        "gone": "リカバリーコードは、作成直後に一度だけ表示されます。",
+        "back": "2段階サインインに戻る"
+      },
+      "passkeys": {
+        "intro": "パスキーを使うと、パスワードなしで、端末の画面ロックでサインインできます。",
+        "none": "パスキーはまだありません。",
+        "remove": "削除",
+        "remove_confirm": "このパスキーを削除しますか？",
+        "name": "新しいパスキーの名前",
+        "add": "パスキーを追加",
+        "added": "パスキーを追加しました。",
+        "failed": "パスキーを使用できませんでした。もう一度お試しください。",
+        "unsupported": "このブラウザーはパスキーに対応していません。"
+      },
+      "logins": {
+        "none": "連携している外部ログインはありません。",
+        "remove": "連携を解除",
+        "remove_confirm": "このログインの連携を解除しますか？",
+        "add": "連携"
+      },
+      "data": {
+        "intro": "このアカウントが保存しているあなたのデータをすべてダウンロードするか、アカウントを削除できます。",
+        "download": "データをダウンロード",
+        "delete_warning": "アカウントを削除すると、データは完全に削除されます。この操作は取り消せません。",
+        "delete": "アカウントを削除"
+      },
+      "admin": {
+        "menu": "アカウント",
+        "users": "ユーザー",
+        "roles": "ロール",
+        "lock": "ロック",
+        "unlock": "ロック解除",
+        "reset": "リセットリンクを送信",
+        "delete_role": "削除",
+        "create_role": "ロールを追加"
+      },
+      "external": {
+        "title": "サインインを完了",
+        "intro": "サインインに使用:",
+        "submit": "アカウントを作成"
+      },
+      "notice": {
+        "confirmed": "メールアドレスを確認しました。サインインできます。",
+        "reset": "パスワードをリセットしました。新しいパスワードでサインインしてください。",
+        "signed_out": "サインアウトしました。",
+        "deleted": "アカウントを削除しました。",
+        "check_email": "次の手順についてメールをご確認ください。"
+      },
+      "error": {
+        "invalid_user_name": "このユーザー名は使用できません。",
+        "duplicate_user_name": "この名前は既に使われています。",
+        "invalid_email": "有効なメールアドレスを入力してください。",
+        "duplicate_email": "このメールアドレスは既に使われています。",
+        "invalid_phone": "有効な電話番号を入力してください。",
+        "password_too_short": "{n}文字以上で入力してください。",
+        "password_too_long": "{n}バイト以内で入力してください。",
+        "password_requires_non_alphanumeric": "英数字以外の文字を1文字以上使用してください。",
+        "password_requires_digit": "数字（0〜9）を1文字以上使用してください。",
+        "password_requires_lower": "小文字（a〜z）を1文字以上使用してください。",
+        "password_requires_upper": "大文字（A〜Z）を1文字以上使用してください。",
+        "password_requires_unique_chars": "異なる文字を{n}種類以上使用してください。",
+        "password_breached": "このパスワードは既知の情報漏えいに含まれています。別のパスワードを選んでください。",
+        "user_already_has_password": "このアカウントには既にパスワードが設定されています。",
+        "password_mismatch": "パスワードが正しくありません。",
+        "invalid_token": "このリンクは使用できません。有効期限が切れたか、使用済みの可能性があります。",
+        "invalid_code": "コードが正しくないか、有効期限が切れています。",
+        "lockout_not_enabled": "このユーザーではロックアウトが無効です。",
+        "login_already_associated": "このログインは別のアカウントに属しています。",
+        "last_login": "これが最後のサインイン手段です。先にパスワードか別のログインを追加してください。",
+        "invalid_role_name": "このロール名は使用できません。",
+        "duplicate_role_name": "このロールは既に存在します。",
+        "rate_limited": "試行回数が多すぎます。数分待ってからもう一度お試しください。",
+        "two_factor_expired": "サインインに時間がかかりすぎました。最初からやり直してください。",
+        "two_factor_unavailable": "この方法ではコードを受け取れません。",
+        "passkey_invalid": "パスキーを検証できませんでした。",
+        "passkey_expired": "パスキーのリクエストの有効期限が切れました。もう一度お試しください。",
+        "passkey_registered": "このパスキーは既に登録されています。",
+        "not_allowed": "サインインする前にメールアドレスを確認してください。",
+        "invalid_login": "ユーザー名またはパスワードが正しくありません。",
+        "password_confirm_mismatch": "パスワードが一致しません。",
+        "invalid_recovery_code": "リカバリーコードが正しくないか、使用済みです。",
+        "email_unchanged": "これは現在のアドレスです。",
+        "unknown_role": "これらのロールのうち1つが存在しません。",
+        "external_expired": "外部サインインに時間がかかりすぎました。最初からやり直してください。",
+        "external_email_taken": "このメールアドレスのアカウントが既にあります。そちらにサインインし、アカウント設定からプロバイダーを連携してください。",
+        "external": "外部サインインに失敗しました。",
+        "old_password_required": "現在のパスワードを入力してください。",
+        "cannot_reset_shared_key_and_enable": "先にキーをリセットしてから、新しいキーのコードで2段階サインインを有効にしてください。",
+        "requires_two_factor": "認証アプリのコードを入力してください。",
+        "invalid_two_factor_code": "コードが正しくありません。"
+      },
+      "mail": {
+        "confirm": {
+          "subject": "メールアドレスの確認",
+          "text": "メールアドレスを確認するには、次のリンクを開いてください。\n\n{link}\n\nリンクは1日間有効です。アカウントを作成していない場合は、このメッセージを無視してください。",
+          "html": "<p>メールアドレスを確認するには、次のリンクを開いてください。</p><p><a href=\"{link}\">メールアドレスを確認する</a></p><p>リンクは1日間有効です。アカウントを作成していない場合は、このメッセージを無視してください。</p>"
+        },
+        "reset": {
+          "subject": "パスワードのリセット",
+          "text": "新しいパスワードを設定するには、次のリンクを開いてください。\n\n{link}\n\nリンクは1日間有効です。心当たりがない場合は、このメッセージを無視してください。",
+          "html": "<p>新しいパスワードを設定するには、次のリンクを開いてください。</p><p><a href=\"{link}\">新しいパスワードを設定する</a></p><p>リンクは1日間有効です。心当たりがない場合は、このメッセージを無視してください。</p>"
+        },
+        "change": {
+          "subject": "新しいメールアドレスの確認",
+          "text": "このアドレスをアカウントで使用するには、次のリンクを開いてください。\n\n{link}\n\nこの変更に心当たりがない場合は、このメッセージを無視してください。",
+          "html": "<p>このアドレスをアカウントで使用するには、次のリンクを開いてください。</p><p><a href=\"{link}\">新しいアドレスを確認する</a></p><p>この変更に心当たりがない場合は、このメッセージを無視してください。</p>"
+        },
+        "exists": {
+          "subject": "既にアカウントをお持ちです",
+          "text": "このアドレスでアカウントを作成しようとした方がいましたが、既にアカウントが存在します。こちらからサインインしてください。\n\n{link}\n\nパスワードをお忘れの場合は、そのページのパスワードリセットをご利用ください。",
+          "html": "<p>このアドレスでアカウントを作成しようとした方がいましたが、既にアカウントが存在します。</p><p><a href=\"{link}\">サインイン</a></p><p>パスワードをお忘れの場合は、そのページのパスワードリセットをご利用ください。</p>"
+        },
+        "code": {
+          "subject": "サインインコード",
+          "text": "サインインコードは{code}です。数分間有効です。",
+          "html": "<p>サインインコードは<strong>{code}</strong>です。数分間有効です。</p>"
+        }
+      }
+    },
+    "files": {
+      "too_large": "ファイルが大きすぎます。許可される最大サイズは{max}です。",
+      "too_many": "{label}には最大{n}ファイルまで指定できます。",
+      "type": "この種類のファイルは受け付けられないか、内容がファイル名と一致しません。",
+      "refused": "セキュリティチェックによりファイルが拒否されました。",
+      "aborted": "ファイル全体が届く前にアップロードが停止しました。もう一度お試しください。",
+      "empty": "ファイルが空です。",
+      "store_full": "このファイルを保存する空きがありません。"
+    }
+  },
+  "AccountLogin": {
+    "user_name": "メールまたはユーザー名",
+    "password": "パスワード",
+    "remember_me": "サインイン状態を保持"
+  },
+  "AccountRegister": {
+    "email": "メール",
+    "password": "パスワード",
+    "confirm_password": "パスワード（確認）"
+  },
+  "AccountEmailOnly": {
+    "email": "メール"
+  },
+  "AccountReset": {
+    "password": "新しいパスワード",
+    "confirm_password": "新しいパスワード（確認）",
+    "user": "ユーザー",
+    "code": "コード"
+  },
+  "AccountCode": {
+    "code": "コード",
+    "remember_machine": "このブラウザーを記憶",
+    "return_to": "戻り先"
+  },
+  "AccountRecovery": {
+    "code": "リカバリーコード",
+    "return_to": "戻り先"
+  },
+  "AccountProfile": {
+    "user_name": "ユーザー名",
+    "phone_number": "電話番号"
+  },
+  "AccountNewEmail": {
+    "new_email": "新しいメール"
+  },
+  "AccountPassword": {
+    "old_password": "現在のパスワード",
+    "new_password": "新しいパスワード",
+    "confirm_password": "新しいパスワード（確認）"
+  },
+  "AccountDelete": {
+    "password": "パスワード"
+  },
+  "AccountUserRow": {
+    "id": "ID",
+    "user_name": "ユーザー名",
+    "email": "メール",
+    "email_confirmed": "確認済み",
+    "two_factor": "2段階",
+    "locked": "ロック中",
+    "roles": "ロール"
+  },
+  "AccountUserRoles": {
+    "id": "ID",
+    "roles": "ロール（カンマ区切り）"
+  },
+  "AccountRoleRow": {
+    "id": "ID",
+    "name": "名前",
+    "permissions": "権限（カンマ区切り）"
+  },
+  "AccountExternal": {
+    "email": "メール"
+  },
+  "AccountEmailCode": {
+    "code": "メールのコード",
+    "remember_machine": "このブラウザーを記憶",
+    "return_to": "戻り先"
+  }
+}

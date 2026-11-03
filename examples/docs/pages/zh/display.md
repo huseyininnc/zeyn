@@ -1,0 +1,197 @@
+# 展示组件
+
+用于展示状态的组件：消息、徽标、进度、键值对、历史记录和占位内容。它们在服务器端渲染，不需要自己的请求。
+
+```rust
+Stack::new()
+    .add(Alert::info("Imports run in the background.").dismissible())
+    .add(Alert::warning("Three products are low on stock.").title("Stock"))
+    .add(Row::new().compact().col(Badge::new("Paid").tone(Tone::Success)).col(Badge::new("Overdue").tone(Tone::Danger)).col(Badge::new("Draft")))
+    .add(Progress::new("Import", 64, 100))
+    .add(Timeline::new()
+        .event(ctx.now().add_ms(-26 * 3_600_000), "Created", None, Tone::Info)
+        .event(ctx.now().add_ms(-3_600_000), "Approved", Some(Text::from("by the manager")), Tone::Success))
+    .add(Skeleton::lines(2))
+```
+
+@live display
+
+## Alert
+
+`Alert::info`、`success`、`warning` 和 `danger`，或者 `Alert::new(tone, text)`。`.title(text)` 添加标题，`.dismissible()` 添加关闭按钮。语气（tone）也会在消息之前被朗读出来，因此信息绝不只靠颜色传达。
+
+## Badge
+
+`Badge::new(text).tone(Tone::...)`。可用的 tone：`Neutral`、`Info`、`Success`、`Warning`、`Danger` 和 `Brand`。表格通过 `.badge(|v| tone)` 将值显示为徽标。
+
+## Progress
+
+`Progress::new(label, value, max)`，可选 `.tone(...)`。它是一个真正的 `progressbar`，带有标签和数值。
+
+## DescriptionList
+
+键值对，可以来自记录的字段，也可以手动添加：
+
+```rust
+DescriptionList::of(&invoice)
+    .field(Invoice::customer)
+    .field(Invoice::issued)
+    .item(t!("ui.status"), "INV-2026-0042")
+```
+
+值的格式与表格单元格相同：金额、日期和选项都按用户的语言显示。
+
+## Timeline
+
+`Timeline::new().event(moment, title, detail, tone)` 列出事件。时间点按用户的时区和语言显示。
+
+## EmptyState 和 Skeleton
+
+`EmptyState::new(title).text(text).opens(label, screen, params)` 用下一步操作填充空白区域。`Skeleton::lines(n)` 是内容加载期间的占位。
+
+## Breadcrumb
+
+`Breadcrumb::new().link(label, screen, params).current(label)`：链接是带类型的 screen 引用，因此重命名 screen 后不会留下失效链接。
+
+## ActionButton
+
+`ActionButton::new(label, action, input)` 运行一个 action。`.confirm(text)` 先进行确认，`.tone(Tone::Danger)` 标记破坏性操作，`.on_success(|result, ui| ...)` 运行 effect。input 在服务器端固定，绝不来自客户端；action 的权限与任何表单一样在服务器端检查。
+
+```rust
+ActionButton::new(t!("docs.live.count"), count_samples, ())
+    .on_success(|n, ui| {
+        if let Ok(n) = n {
+            ui.toast(t!("docs.live.counted", n = n));
+        }
+    })
+```
+
+@live action
+
+## Markdown
+
+`Markdown::new(text)` 显示格式化文本，例如评论、产品描述或帮助内容。文本可以是字符串或 locale 键。它需要 `markdown` feature（`zeyn = { features = ["markdown"] }`），不会引入任何依赖。
+
+```rust
+Markdown::new(product.description.clone())
+Markdown::new(t!("help.import")).trusted()
+```
+
+- 支持标题、段落、列表、表格、代码块、引用、分隔线、行内代码、链接、图片、粗体和斜体。
+- 原始 HTML 绝不会被直接输出：`<script>` 显示为文本，代码块同样会被转义。
+- 链接只能指向 `http`、`https`、`mailto`、锚点或相对路径。其他链接（例如 `javascript:` 或 `data:`）只保留其标签文字。用户提供的链接会带上 `rel="noopener noreferrer nofollow ugc"`。
+- 图片只从应用自身加载（相对路径）；其他图片显示其替代文本。
+- `.trusted()` 用于应用自己编写的文本：标题会获得 id 以便链接跳转，链接不再带有 `nofollow ugc`。转义和链接规则保持不变。
+- 超过 64 KB（`MAX_MARKDOWN`）的文本会被截断，嵌套深度也有上限，因此恶意输入的渲染成本依然很低。
+
+## Embed
+
+`Embed` 在锁定的框架中显示来自其他站点的页面，例如视频播放器或地图。标题是必需的（屏幕阅读器通过它来播报框架）；没有 `.title(...)` 的 embed 无法放置，编译器会给出提示。
+
+```rust
+Embed::url("https://www.youtube-nocookie.com/embed/abc")
+    .title(t!("tour.title"))
+    .allow([EmbedPermission::Fullscreen, EmbedPermission::PictureInPicture])
+    .aspect(16, 9)
+    .click_to_load("/static/tour.jpg")
+```
+
+- 主机必须在应用的 `frame-src` 中：`App::csp(|c| c.frame_src(["https://www.youtube-nocookie.com"]))`（参见[安全](security.md#csrf-csp-and-headers)）。当地址不是 `https` 或其主机未列出时，根本不会渲染框架；会有一条警告说明内容无法显示。
+- 每个框架都会带上 `sandbox="allow-scripts allow-same-origin allow-presentation"`、`referrerpolicy="no-referrer"` 和 `loading="lazy"`。弹出窗口、顶层导航、表单和下载永远不能被允许。`.allow(...)` 添加浏览器功能：`Fullscreen`、`PictureInPicture`、`Autoplay` 和 `EncryptedMedia`。
+- `.click_to_load(poster)` 先显示一个按钮，带有海报图片（应用上的路径或 `img-src` 中的主机；传 `""` 表示没有）以及对方站点的名称。在按下按钮之前不会联系对方站点；按下后框架取代按钮并获得焦点。该脚本是 `media.js` 的一部分，因此不会产生额外请求。
+- `.notice(t!(...))` 在该按钮上放置应用自己的文本，例如内容警告。它会被转义，与所有文本一样可翻译，并且是按钮可访问名称的一部分，因此屏幕阅读器会在用户做出决定之前读出它。没有 `.click_to_load` 时，它会启用无海报的按钮。
+- `.remember("external-video", Duration::from_secs(24 * 60 * 60))` 在该时间内只询问一次，而不是每个页面都问。浏览器只在 `localStorage` 的 `zeyn.consent.{scope}` 下保存结束时间（Unix 毫秒）；不设置 cookie，服务器也看不到它，因此缓存的公共页面对所有人保持一致。之后的页面、应用内导航和其他标签页会自行加载该 scope 的框架，且不移动焦点（WCAG 2.2 3.2.1 获得焦点时、2.4.3 焦点顺序）；只有在真正按下之后焦点才会移到框架。以下情况按钮会重新出现：时间已过；保存的值不是整数，或超出 embed 所设时间（被手动修改）；存储被阻止；以及没有 JavaScript 时。scope 为 1 到 40 个 ASCII 字母、数字、`-` 或 `_`；时间为 1 秒到 30 天（`MAX_EMBED_CONSENT`）。其他情况会 panic 并给出相应提示。共用同一 notice 的 embed 共用一个 scope。
+- 保存待嵌入地址的字段使用 `#[rule(embed)]`。表单接受 URL 或粘贴的嵌入代码，只保留 `src`，要求 `https` 和已列出的主机，丢弃跟踪参数（`utm_*`、`fbclid`、`gclid` 等），并保存规范地址，绝不保存 HTML。API 输入必须发送规范地址。
+
+```rust
+#[entity(table = "videos")]
+pub struct Video {
+    #[key]
+    pub id: VideoId,
+    #[rule(required, embed)]
+    pub url: String,
+}
+```
+
+## Image
+
+`Image` 需要替代文本和尺寸；没有 `.alt(...)` 和 `.size(width, height)` 就无法放置，编译器会给出提示。尺寸会在文件加载期间保留空间，因此页面不会跳动。
+
+```rust
+Image::new("https://images.example.com/logo.png")
+    .alt(t!("brand.logo"))
+    .size(240, 80)
+    .lazy()
+    .srcset([("https://images.example.com/logo@2x.png", "2x")])
+```
+
+- `src` 是应用上的路径（`/static/logo.png`），或位于应用 `img-src` 主机上的 `https` 地址（`App::csp(|c| c.img_src([...]))`）。其他任何图片都不会被渲染，而是显示其替代文本，因此浏览器绝不会记录被拦截的请求。
+- 每张图片都带有 `decoding="async"`；`.lazy()` 为首屏以下的图片添加 `loading="lazy"`。`srcset` 接受密度（`2x`）或宽度（`800w`）描述符；位于其他主机或使用其他描述符的条目会被省略。宽度描述符会根据图片宽度添加 `sizes`。
+- 纯装饰性图片使用空的替代文本：`.alt(Text::from(""))`。
+
+## ExternalLink
+
+`ExternalLink::new(url, text)` 以 `rel="noopener noreferrer"` 链接到其他站点，因此对方站点既得不到页面地址，也无法获得窗口的句柄。屏幕阅读器会在文字之后读出“外部站点”；视觉上用箭头标记。
+
+```rust
+ExternalLink::new("https://example.com/help", t!("help.center")).new_tab()
+ExternalLink::new(customer.website.clone(), t!("customer.website")).user_content()
+```
+
+`.user_content()` 为用户输入的地址添加 `nofollow ugc`。`.new_tab()` 在新标签页中打开并告知屏幕阅读器；未设置时链接在同一标签页中打开。只有 `https` 和 `http` 地址会成为链接；其他任何内容（例如 `javascript:`）都显示为纯文本。
+
+## 工具提示、弹出层和忙碌遮罩
+
+工具提示是对单个控件的简短说明：`ActionButton::tip(text)`、screen 工具栏中的 `ToolButton::tip(text)`，以及 `Form::tip(field, text)`，后者会在字段标签之后添加一个信息按钮。该文本是控件的 `aria-describedby`，因此屏幕阅读器会随控件一起读出。它在悬停片刻后显示，获得焦点时立即显示，指针停留其上时保持显示（WCAG 1.4.13），按 Escape 隐藏且不移动焦点，在触屏上长按（点按信息按钮）后显示。工具提示绝不承载用户必须获知的信息：这类信息应放在标签、字段规则或页面中。
+
+`Popover::new(label).title(title).add(node)` 是一个按钮，会在其旁边打开一个非模态对话框，用于显示少量细节。焦点会移入其中；按 Escape、关闭按钮或点击外部都会将其关闭，焦点回到按钮。在窄屏幕上它以底部面板的形式打开。它的子元素是普通节点，因此其中的表单会以每项服务器检查提交到自己的节点路径。
+
+`Busy::new().add(node)` 在其内部的请求运行期间覆盖其内容：表单保存、操作按钮、表格或树加载。容器会立即获得 `aria-busy`；加载指示器和文字“Working”（状态消息）仅在 400 毫秒后（或 `.delay_ms(n)`）才显示，因此快速响应不会闪烁，显示后至少保持 300 毫秒。遮罩阻挡指针，不阻挡键盘，焦点保持原位。
+
+```rust
+Stack::new()
+    .add(ActionButton::new(t!("docs.live.count"), count_samples, ()).tip(t!("docs.live.count_tip")))
+    .add(Popover::new(t!("docs.live.rules")).title(t!("docs.live.rules_title")).add(rules_list))
+    .add(Busy::new().add(ActionButton::new(t!("docs.live.slow"), slow_count, ())))
+```
+
+@live overlay
+
+| 按键 | 位置 | 作用 |
+|---|---|---|
+| Tab | 带工具提示的控件 | 获得焦点时显示工具提示；离开时隐藏 |
+| Escape | 工具提示显示期间的任何位置 | 隐藏工具提示；焦点保持不动 |
+| Enter、Space | 弹出层按钮 | 打开弹出层；焦点移到其第一个控件 |
+| Escape | 弹出层内部 | 关闭弹出层；焦点回到按钮 |
+| Tab | 弹出层内部 | 在其控件之间移动；离开时将其关闭 |
+
+这三者共需约 2.2 KB gzip 的脚本，没有自己的请求；工具提示是 1 个节点，弹出层是 6 个加上其内容，忙碌遮罩是 3 个。
+
+## 下拉按钮和拆分按钮
+
+`MenuButton::new(label)` 打开一个命令菜单；`MenuButton::split(label, action, input)` 通过主体部分运行一个 action，并通过箭头打开菜单。命令包括 `.action(label, action, input)`（或成功后带 effect 的 `.action_then(...)`）、用于打开窗口等 effect 的 `.item(label, effect)`，以及 `.separator()`。`.confirm(text)` 会在最后一个 action 命令运行之前进行询问。
+
+```rust
+MenuButton::split(t!("orders.save"), save_draft, id)
+    .action(t!("orders.save_and_send"), save_and_send, id)
+    .separator()
+    .action(t!("orders.delete"), delete_order, id)
+    .confirm(t!("orders.delete_confirm"))
+```
+
+action 命令是拥有自己路径的节点，与 `ActionButton` 一样提交到表单端点：每次调用都会检查 screen 的访问权限、feature 的 guard、action 的权限、拦截器、CSRF 和写入速率限制，input 保留在服务器端。用户无权运行的命令会从菜单中省略（拆分按钮的主 action 则改为禁用），即使被调用，服务器仍会拒绝。
+
+@live menus
+
+| 按键 | 位置 | 作用 |
+|---|---|---|
+| Enter、Space、Arrow Down | 按钮 | 打开菜单并定位到第一个命令 |
+| Arrow Up | 按钮 | 打开菜单并定位到最后一个命令 |
+| Arrow Down、Arrow Up | 菜单 | 下一个和上一个命令，循环 |
+| Home、End | 菜单 | 第一个和最后一个命令 |
+| 字母 | 菜单 | 下一个以这些字母开头的命令 |
+| Enter、Space | 命令 | 运行该命令并关闭菜单 |
+| Escape | 菜单 | 关闭菜单；焦点回到按钮 |
+| Tab | 菜单 | 关闭菜单并继续移动 |
+
+菜单需要约 0.8 KB gzip 的脚本，在命令运行之前没有请求；它是 4 个节点加上每个命令 2 个。

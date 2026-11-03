@@ -998,6 +998,30 @@ impl Screen {
         self
     }
 
+    /// The same page in another language, sent as `<link rel="alternate" hreflang="..">`:
+    /// `hreflang` is a language tag such as `tr` or `zh-Hans`, or `x-default` for the page shown
+    /// when no language matches, and `url` an `https` URL or an app path. List every language
+    /// the page has, including its own. Bad tags or URLs are ignored with a warning, and at most
+    /// [`crate::seo::MAX_ALTERNATES`] are kept.
+    ///
+    /// ```
+    /// use zeyn::Screen;
+    /// let s = Screen::new("Orders").alternate("en", "/orders").alternate("tr", "/tr/orders").alternate("x-default", "/orders");
+    /// ```
+    pub fn alternate(mut self, hreflang: &str, url: impl Into<String>) -> Self {
+        let tag = crate::seo::valid_hreflang(hreflang);
+        let url = crate::seo::checked(url.into(), "an alternate URL");
+        let head = self.head_mut();
+        match (tag, url) {
+            (true, Some(url)) if head.alternates.len() < crate::seo::MAX_ALTERNATES => {
+                head.alternates.push((hreflang.to_string(), url));
+            }
+            (false, _) => tracing::warn!("hreflang `{hreflang}` is not a language tag or x-default; ignored"),
+            _ => {}
+        }
+        self
+    }
+
     /// Image of link previews (`og:image`): an `https` URL or an app path.
     pub fn og_image(mut self, url: impl Into<String>) -> Self {
         self.head_mut().og_image = crate::seo::checked(url.into(), "an og:image URL");
@@ -1017,7 +1041,7 @@ impl Screen {
         self
     }
 
-    /// Head tags of the page (description, canonical, preview image, robots, JSON-LD), empty
+    /// Head tags of the page (description, canonical, alternates, preview image, robots, JSON-LD), empty
     /// when the screen sets none.
     pub fn head_html(&self, r: &Render, site: &str, prefix: &str) -> String {
         self.head.as_ref().map(|h| h.render(r, site, prefix)).unwrap_or_default()

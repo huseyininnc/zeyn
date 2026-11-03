@@ -91,8 +91,8 @@ document.addEventListener('zeyn:media-adaptive', (e) => {
 });
 ```
 
-Load that script from a file of your app (inline scripts are blocked by the content security policy).
+Load that script from a file of your app (inline scripts are blocked by the content security policy). When no listener calls `preventDefault()`, the `file` entries play in order. Playlist and segment files are served by the same source, so their relative URLs work as long as their ids are listed in it.
 
 ## Uploaded files
 
-Files uploaded through `Form::file` are served by `GET /_zeyn/files/{store}/{id}` with the same responses as media files (ranges, entity tags, `nosniff`, inline only for raster images, audio and video), after the store's permission, the feature's guards and a tenant check. See the file uploads section of `examples/docs/pages/forms.md`. When no listener calls `preventDefault()`, the `file` entries play in order. Playlist and segment files are served by the same source, so their relative URLs work as long as their ids are listed in it.
+Files uploaded through `Form::file` are served by `GET /_zeyn/files/{store}/{id}` with the same responses as media files (ranges, entity tags, `nosniff`, inline only for raster images, audio and video), after the store's permission, the feature's guards and a tenant check. See the file uploads section of `examples/docs/pages/forms.md`.
