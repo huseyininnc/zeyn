@@ -141,7 +141,7 @@ function applyHead(grid, s, html) {
     s.placeholder.innerHTML = '<td></td>'.repeat(n);
     s.holders.clear();
     s.key = '';
-    measureVirtual(s);
+    s.remeasure = true;
   }
   initColumns(grid, s);
   if (focusField) thead.querySelector(`th[data-field="${CSS.escape(focusField)}"] .z-col-menu`)?.focus();
@@ -237,15 +237,20 @@ function pinOffsets(grid) {
   while (end < cells.length - start && cells[cells.length - 1 - end].dataset.pin === 'end') end++;
   start = Math.min(start, 5);
   end = Math.min(end, 3);
+  const v = grids.get(grid)?.colv;
+  const startW = [];
+  const endW = [];
+  for (let i = 0; i < start; i++) startW.push(v ? v.widths[i] : cells[i].offsetWidth);
+  for (let i = 0; i < end; i++) endW.push(v ? v.widths[v.n - 1 - i] : cells[cells.length - 1 - i].offsetWidth);
   let at = 0;
   for (let i = 0; i < start; i++) {
     grid.style.setProperty(`--z-ps${i + 1}`, `${at}px`);
-    at += cells[i].offsetWidth;
+    at += startW[i];
   }
   at = 0;
   for (let i = 0; i < end; i++) {
     grid.style.setProperty(`--z-pe${i + 1}`, `${at}px`);
-    at += cells[cells.length - 1 - i].offsetWidth;
+    at += endW[i];
   }
   if (start) grid.dataset.pinStart = start;
   else delete grid.dataset.pinStart;

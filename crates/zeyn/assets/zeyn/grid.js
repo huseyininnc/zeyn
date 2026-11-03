@@ -49,6 +49,7 @@ function initGrid(grid) {
     observer: null,
   };
   grids.set(grid, state);
+  state.view0 = { left: Math.abs(grid.scrollLeft), width: grid.clientWidth, top: grid.scrollTop, height: grid.clientHeight };
   if (saved.view) {
     state.sort = saved.view.sort?.length ? saved.view.sort : defaultSort(grid);
     for (const f of saved.view.filters ?? []) {
@@ -61,13 +62,19 @@ function initGrid(grid) {
   initColumns(grid, state);
   if (saved.local) queueMicrotask(() => loadGrid(grid, 'layout'));
   new ResizeObserver(() => {
-    grid.style.setProperty('--z-view-w', `${grid.clientWidth}px`);
+    const width = grid.clientWidth;
     pinOffsets(grid);
+    grid.style.setProperty('--z-view-w', `${width}px`);
   }).observe(grid);
 
   const waiting = grid.querySelector(':scope > template[data-zeyn-rows-later]');
   if (!rows(grid).length && !waiting && grid.dataset.zeynOffset != null) gridState(grid, 'empty');
-  if (state.paging === 'virtual') return initVirtual(grid, state);
+  if (state.paging === 'virtual') {
+    initVirtual(grid, state);
+    state.view0 = null;
+    return;
+  }
+  state.view0 = null;
   const more = own(grid, '[data-zeyn-more]');
   if (state.paging === 'infinite' && more && 'IntersectionObserver' in window) {
     state.observer = new IntersectionObserver((entries) => {
@@ -306,16 +313,20 @@ function initVirtual(grid, s) {
   s.cache.set(first, rows.map((tr, k) => prepRow(s, tr, first * s.size + k)));
   s.total ??= rows.length;
   grid.tabIndex = -1;
-  measureVirtual(s);
+  s.headH = 0;
+  s.footH = 0;
   grid.addEventListener('scroll', () => scheduleVirtual(grid), { passive: true });
   new ResizeObserver(() => {
-    measureVirtual(s);
+    s.remeasure = true;
     scheduleVirtual(grid);
   }).observe(grid);
-  renderVirtual(grid);
+  renderVirtual(grid, null, s.view0);
 }
 
-/** Reads the sticky header and footer heights; called on setup and on resize only. */
+/**
+ * Reads the sticky header and footer heights. Runs at the start of the frame after the grid was
+ * set up or resized (and after a new header), before that frame writes anything.
+ */
 function measureVirtual(s) {
   s.headH = s.head.offsetHeight;
   s.footH = s.foot?.offsetHeight ?? 0;
@@ -357,11 +368,16 @@ function virtualRow(s, i, spare) {
  * only when the window or the loaded blocks changed. Focus stays on the focused row, or moves to
  * `focusIndex` when given.
  */
-function renderVirtual(grid, focusIndex = null) {
+function renderVirtual(grid, focusIndex = null, geometry = null) {
   const s = grids.get(grid);
   s.raf = 0;
-  const top = grid.scrollTop;
-  const view = Math.max(s.rh, grid.clientHeight - s.headH - s.footH);
+  if (s.remeasure && !geometry) {
+    measureVirtual(s);
+    s.remeasure = false;
+  }
+  const top = geometry ? geometry.top : grid.scrollTop;
+  const across = s.colv && !geometry ? { left: Math.abs(grid.scrollLeft), width: grid.clientWidth } : geometry;
+  const view = Math.max(s.rh, (geometry ? geometry.height : grid.clientHeight) - s.headH - s.footH);
   const total = s.total ?? 0;
   const full = total * s.rh;
   const height = Math.min(full, V_CAP);
@@ -408,7 +424,7 @@ function renderVirtual(grid, focusIndex = null) {
       else s.body.insertBefore(n, ref);
     }
     syncSelection(grid);
-    if (s.colv) applyColumns(grid, true);
+    if (s.colv) applyColumns(grid, true, across);
     const filler = Math.max(0, height - (end - start) * s.rh);
     if (filler !== s.fillerHeight) s.filler.style.height = `${(s.fillerHeight = filler)}px`;
     const target = focused != null && s.body.querySelector(`[data-zeyn-index="${focused}"]`);
