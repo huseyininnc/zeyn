@@ -38,7 +38,7 @@ impl ProductStore {
 `DataQuery::apply(vec)`는 이 모든 것을 메모리에서 처리합니다. SQL 데이터베이스에는 `zeyn::sql`을 사용합니다. `Db::find`는 같은 쿼리를 PostgreSQL 또는 Oracle용 `WHERE`, `ORDER BY`, `LIMIT`, `GROUP BY`로 바꿉니다. 엔티티 자신의 필드만 필터링하거나 정렬할 수 있고, 모든 값은 매개변수로 바인드되며, 페이지 크기는 서버가 제한하므로 클라이언트 입력이 SQL 텍스트에 도달하지 않습니다. `Db::find`로 표현할 수 없는 쿼리에만 SQL을 직접 작성하고, 그 경우에도 클라이언트의 필드 이름이나 값을 그대로 붙여 넣지 마십시오.
 
 ```toml
-zeyn = { version = "0.0.6", features = ["postgres"] }   # or ["oracle"]
+zeyn = { version = "0.0.7", features = ["postgres"] }   # or ["oracle"]
 ```
 
 ```rust

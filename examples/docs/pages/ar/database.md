@@ -38,7 +38,7 @@ impl ProductStore {
 تنفذ `DataQuery::apply(vec)` كل ذلك في الذاكرة. ولقاعدة بيانات SQL استخدم `zeyn::sql`: تحوّل `Db::find` الاستعلام نفسه إلى `WHERE` و`ORDER BY` و`LIMIT` و`GROUP BY` لقاعدة PostgreSQL أو Oracle. لا يمكن ترشيح أو فرز إلا حقول الكيان نفسه، وكل قيمة تُربط معاملًا (parameter)، ويضع الخادم حدًا أعلى لحجم الصفحة، فلا يصل مدخل العميل إلى نص SQL أبدًا. اكتب SQL يدويًا فقط للاستعلامات التي لا تستطيع `Db::find` التعبير عنها، وعندها لا تلصق فيه اسم حقل أو قيمة من العميل أبدًا.
 
 ```toml
-zeyn = { version = "0.0.6", features = ["postgres"] }   # or ["oracle"]
+zeyn = { version = "0.0.7", features = ["postgres"] }   # or ["oracle"]
 ```
 
 ```rust

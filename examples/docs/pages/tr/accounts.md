@@ -7,7 +7,7 @@ single sign on proxy'si veya bir kimlik sağlayıcı üzerinden açan uygulamala
 Core Identity bilenler için bir tabloyla birlikte tam başvuru `docs/accounts.md` dosyasındadır.
 
 ```toml
-zeyn = { version = "0.0.6", features = ["accounts"] }
+zeyn = { version = "0.0.7", features = ["accounts"] }
 ```
 
 ## Açmak
