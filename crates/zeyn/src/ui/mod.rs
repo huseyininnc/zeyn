@@ -16,6 +16,7 @@ pub(crate) mod inputs;
 mod island;
 mod layout;
 mod lines;
+mod list;
 mod lookup;
 #[cfg(feature = "markdown")]
 mod markdown;
@@ -56,6 +57,7 @@ pub(crate) use date::{input_text, picker_config, range_reversed, render_date_inp
 pub use inputs::{mask_example, mask_fits, mask_raw};
 pub(crate) use lines::LinesEditor;
 pub use lines::{Lines, MAX_LINES};
+pub use list::{List, ListItem};
 pub use lookup::{LookupItem, LookupQuery, LookupValue, MAX_LOOKUP_COLUMNS, MAX_LOOKUP_IDS, MAX_LOOKUP_PAGE};
 pub(crate) use lookup::{parse_ids, render_lookup};
 pub use media::{Audio, PLAYBACK_SPEEDS, Video};

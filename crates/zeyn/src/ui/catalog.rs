@@ -6,6 +6,7 @@
 //! server; the browser never chooses a page size, a field or a filter on its own.
 
 use super::layout::Card;
+use super::list::ListItem;
 use super::widgets::{Badge, encode};
 use super::{DataSource, dom_id};
 use crate::action::{ActionMeta, Cursor, DataQuery, Error, Page, PageRequest, Result, Sort};
@@ -171,10 +172,7 @@ impl ImageCard {
     }
 
     fn html(&self, out: &mut String, r: &Render, size: (u32, u32)) {
-        let safe = self.image.starts_with('/') && !self.image.starts_with("//")
-            || self.image.starts_with("https://")
-            || self.image.starts_with("data:image/");
-        let img = if safe {
+        let img = if safe_image(&self.image) {
             format!(
                 r#"<img class="z-poster-img" src="{}" alt="{}" width="{}" height="{}" loading="lazy" decoding="async">"#,
                 escape(&self.image),
@@ -231,7 +229,14 @@ impl ImageCard {
     }
 }
 
+/// Whether an image address may go in a card or list row: a path of the app, an `https:`
+/// address or a `data:image/` URI.
+pub(crate) fn safe_image(src: &str) -> bool {
+    src.starts_with('/') && !src.starts_with("//") || src.starts_with("https://") || src.starts_with("data:image/")
+}
+
 type CardFn<E> = Box<dyn Fn(&E) -> ImageCard + Send + Sync>;
+type ItemFn<E> = Box<dyn Fn(&E) -> ListItem + Send + Sync>;
 
 /// Turns away rows of a model with `#[mask]` fields the user may not reveal. Cards and
 /// suggestions are built by app closures that see the raw row, so they could not keep a masked
@@ -262,12 +267,14 @@ pub struct CardGrid<E: Model> {
     action: ActionMeta,
     fetch: FetchFn<E>,
     card: Option<CardFn<E>>,
+    item: Option<ItemFn<E>>,
     title: Option<Text>,
     paging: Paging,
     sorts: Vec<(Text, Sort)>,
     search: String,
     image: (u32, u32),
     rail: bool,
+    list: bool,
 }
 
 /// A horizontal list of cards that scrolls sideways, with previous and next buttons and scroll
@@ -307,13 +314,29 @@ impl<E: Model> CardGrid<E> {
             action: A::META,
             fetch: fetch_via::<A, E>,
             card: None,
+            item: None,
             title: None,
             paging: Paging::infinite(24),
             sorts: Vec::new(),
             search: String::new(),
             image: (300, 400),
             rail: false,
+            list: false,
         }
+    }
+
+    /// Lays the rows out as a [`super::List`]: see [`super::List::of`].
+    pub(crate) fn as_list(mut self) -> Self {
+        self.list = true;
+        self.paging = Paging::infinite(20);
+        self
+    }
+
+    /// How a row becomes a list row, for a list made with [`super::List::of`]. Card grids and
+    /// rails use [`CardGrid::card`] instead.
+    pub fn item(mut self, build: impl Fn(&E) -> ListItem + Send + Sync + 'static) -> Self {
+        self.item = Some(Box::new(build));
+        self
     }
 
     /// How a row becomes a card.
@@ -394,10 +417,11 @@ impl<E: Model> CardGrid<E> {
 
     fn cards(&self, page: &LoadedPage, r: &Render) -> String {
         let mut out = String::new();
-        if let (Some(rows), Some(card)) = (page.items.downcast_ref::<Vec<E>>(), &self.card) {
-            for row in rows {
-                card(row).html(&mut out, r, self.image);
-            }
+        let Some(rows) = page.items.downcast_ref::<Vec<E>>() else { return out };
+        match (&self.card, &self.item) {
+            (_, Some(item)) if self.list => rows.iter().for_each(|row| item(row).html(&mut out, r)),
+            (Some(card), _) if !self.list => rows.iter().for_each(|row| card(row).html(&mut out, r, self.image)),
+            _ => {}
         }
         out
     }
@@ -405,7 +429,11 @@ impl<E: Model> CardGrid<E> {
     fn render_with(&self, out: &mut String, r: &Render, page: Option<&LoadedPage>) {
         let id = dom_id(r, "cards");
         let t = |key: &str| r.text(&Text::key(format!("zeyn.ui.cards.{key}")));
-        let class = if self.rail { "z-rail" } else { "z-cards" };
+        let class = match (self.rail, self.list) {
+            (true, _) => "z-rail",
+            (_, true) => "z-cards z-cards-rows",
+            _ => "z-cards",
+        };
         let labelled = if self.title.is_some() { format!(r#" aria-labelledby="{id}-title""#) } else { String::new() };
         out.push_str(&format!(
             r#"<section class="{class}" data-zeyn-cards data-zeyn-paging="{}" data-testid="{}.cards"{labelled} data-text-loaded="{}" data-text-page="{}" data-text-error="{}""#,
@@ -460,7 +488,11 @@ impl<E: Model> CardGrid<E> {
         } else if !title.is_empty() || !sorts.is_empty() {
             out.push_str(&format!(r#"<div class="z-cards-head">{title}{sorts}</div>"#));
         }
-        let list = if self.rail { "z-rail-list" } else { "z-cards-list" };
+        let list = match (self.rail, self.list) {
+            (true, _) => "z-rail-list",
+            (_, true) => "z-list",
+            _ => "z-cards-list",
+        };
         out.push_str(&format!(r#"<ul class="{list}" id="{id}-list" data-zeyn-rows>"#));
         if let Some(p) = page {
             out.push_str(&self.cards(p, r));
@@ -582,7 +614,7 @@ impl<E: Model> Component for CardGrid<E> {
 
     fn schema(&self) -> Json {
         json!({
-            "type": if self.rail { "rail" } else { "card_grid" },
+            "type": if self.rail { "rail" } else if self.list { "list" } else { "card_grid" },
             "model": E::NAME,
             "action": self.action,
             "title": self.title,

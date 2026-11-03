@@ -100,6 +100,29 @@ pub fn picks() -> Screen {
     )
 }
 
+#[screen(route = "/rows", public)]
+pub fn goods_list() -> Screen {
+    Screen::new("Rows")
+        .body(
+            List::of(search_goods)
+                .title("Goods")
+                .item(|g: &Good| {
+                    zeyn::ui::ListItem::new(g.name.clone())
+                        .image(if g.id.0 == 1 { "javascript:alert(1)".to_string() } else { format!("/img/{}.png", g.id.0) })
+                        .subtitle(g.city.clone())
+                        .meta(format!("{} TL", g.price))
+                        .link(results, SearchParams { q: g.name.clone() })
+                })
+                .sort_option("Cheapest", Good::price, false)
+                .paging(Paging::infinite(3)),
+        )
+        .body(
+            List::new()
+                .item(zeyn::ui::ListItem::new("Static <one>").meta("now"))
+                .item(zeyn::ui::ListItem::new("Static two")),
+        )
+}
+
 const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
 fn app(limit: Option<RateLimit>) -> axum::Router {
@@ -109,7 +132,7 @@ fn app(limit: Option<RateLimit>) -> axum::Router {
             let perms: Vec<String> = h.get("x-perms")?.to_str().ok()?.split(',').map(String::from).collect();
             Some(Identity::user("u").with_permissions(perms))
         })
-        .feature(Feature::new("shop").screen(shop).screen(results).screen(picks));
+        .feature(Feature::new("shop").screen(shop).screen(results).screen(picks).screen(goods_list));
     if let Some(l) = limit {
         app = app.write_limit(l);
     }
@@ -285,6 +308,10 @@ async fn the_catalog_script_is_served_without_sign_in() {
     let (status, js) = send(&app(None), Request::get("/_zeyn/catalog.js").body(Body::empty()).unwrap()).await;
     assert_eq!(status, StatusCode::OK);
     assert!(js.contains("aria-activedescendant"));
+    assert!(
+        js.contains("window.zeynCsrf()"),
+        "public pages come without a CSRF token, so paging and suggestions must ask the runtime for one"
+    );
 }
 
 #[tokio::test]
@@ -305,4 +332,35 @@ async fn image_cards_lay_out_in_a_row_with_subtitle_corner_badges_and_progress()
     assert!(page.contains(r#"role="progressbar" aria-label="Sold" aria-valuemin="0" aria-valuemax="100" aria-valuenow="10" aria-valuetext="10%""#));
     assert!(page.contains(r#"aria-valuenow="20""#), "each row has its own fraction");
     assert!(page.contains("--z-progress:10%"));
+}
+
+#[tokio::test]
+async fn lists_render_rows_as_single_links_and_page_through_the_grid_endpoint() {
+    let router = app(None);
+    let (status, page) = send(&router, get("/rows")).await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert!(page.contains(r#"<section class="z-cards z-cards-rows" data-zeyn-cards data-zeyn-paging="infinite""#), "{page}");
+    assert!(page.contains(r#"<ul class="z-list" id="goods_list-cards-0-list" data-zeyn-rows>"#));
+    assert_eq!(page.matches(r#"<li class="z-list-item"><a class="z-list-row" href="#).count(), 3);
+    assert!(page.contains(r#"<span class="z-list-img"></span>"#), "unsafe image addresses are left out");
+    assert!(!page.contains("javascript:"));
+    assert!(page.contains(r#"<img class="z-list-img" src="/img/2.png" alt="" width="48" height="48""#));
+    assert!(page.contains(r#"<span class="z-list-meta">10 TL</span>"#));
+    assert!(page.contains(r#"<li class="z-list-item"><div class="z-list-row"><span class="z-list-body"><span class="z-list-title">Static &lt;one&gt;</span></span><span class="z-list-meta">now</span></div></li>"#));
+    let (status, body) = send(
+        &router,
+        post(
+            "/_zeyn/grid",
+            "shop.read",
+            serde_json::json!({ "screen": "goods_list", "node": "0", "query": { "page": { "type": "after", "cursor": "3", "limit": 99 } } }),
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+    let rows = json["rows"].as_str().unwrap();
+    assert_eq!(rows.matches(r#"<li class="z-list-item">"#).count(), 3, "the server keeps the page size: {rows}");
+    let (status, _) =
+        send(&router, post("/_zeyn/grid", "", serde_json::json!({ "screen": "goods_list", "node": "0" }))).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "reading needs the action's permission");
 }

@@ -373,6 +373,17 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
             .into_iter()
             .fold(AutoGrid::new().min(160), |tiles, title| tiles.add(Card::new().title(title)))
             .into(),
+        "list" => List::of(search_samples)
+            .title("Products")
+            .item(|p: &Sample| {
+                zeyn::ui::ListItem::new(p.name.clone())
+                    .subtitle(p.code.clone())
+                    .meta(format!("{} in stock", p.stock))
+                    .link(crate::introduction, ())
+            })
+            .sort_option("Name", Sample::name, false)
+            .paging(Paging::infinite(5))
+            .into(),
         "inputs" => inputs(),
         "overlay" => overlay(),
         "menus" => menus(),
@@ -557,5 +568,5 @@ fn toasts() -> Node {
 /// Names of every live example, for checks and tests.
 pub const EXAMPLES: &[&str] = &[
     "datagrid", "form", "controls", "dates", "lines", "layout", "display", "action", "tree", "chart", "shell",
-    "inputs", "multi", "overlay", "menus", "toasts", "content", "autogrid",
+    "inputs", "multi", "overlay", "menus", "toasts", "content", "autogrid", "list",
 ];
