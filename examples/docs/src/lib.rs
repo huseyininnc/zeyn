@@ -94,7 +94,6 @@ pages! {
     "docs.group.reference" Search {
         protocol "/reference/runtime-protocol" "runtime-protocol.md" "Runtime protocol" "../../../docs/runtime-protocol.md";
         database_reference "/reference/database" "database.md" "Database reference" "../../../docs/database.md";
-        architecture "/reference/architecture" "vision-and-architecture.md" "Architecture (historical)" "../../../docs/vision-and-architecture.md";
     }
 }
 

@@ -11,7 +11,7 @@ Zeyn 从两个方面为智能体而设计：编写 Zeyn 应用的智能体，以
 
 | 工具 | 作用 |
 |---|---|
-| `zeyn_docs` | 按主题提供框架参考：`rules`、`language`、`protocol`、`architecture` |
+| `zeyn_docs` | 按主题提供框架参考：`rules`、`language`、`protocol` |
 | `zeyn_describe` | 应用的 feature、界面、路由、访问控制、API、问题和缺失的翻译 |
 | `zeyn_check` | 编译并报告问题；`fix: true` 会先重写已更名的 API |
 | `zeyn_test` | 运行 `cargo test` 并返回输出的末尾部分 |

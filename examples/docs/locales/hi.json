@@ -75,8 +75,7 @@
       "realtime": "Realtime और CRDT",
       "desktop": "डेस्कटॉप ऐप",
       "protocol": "रनटाइम प्रोटोकॉल",
-      "database_reference": "डेटाबेस संदर्भ",
-      "architecture": "आर्किटेक्चर (ऐतिहासिक)"
+      "database_reference": "डेटाबेस संदर्भ"
     },
     "translation": {
       "note": "यह पृष्ठ अंग्रेज़ी से अनुवादित है।",

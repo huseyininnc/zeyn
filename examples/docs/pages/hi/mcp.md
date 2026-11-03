@@ -11,7 +11,7 @@ Zeyn दो तरफ़ के एजेंट के लिए बना ह�
 
 | टूल | क्या करता है |
 |---|---|
-| `zeyn_docs` | विषय के अनुसार फ्रेमवर्क संदर्भ: `rules`, `language`, `protocol`, `architecture` |
+| `zeyn_docs` | विषय के अनुसार फ्रेमवर्क संदर्भ: `rules`, `language`, `protocol` |
 | `zeyn_describe` | ऐप के feature, Screen, रूट, एक्सेस, API, समस्याएँ और छूटे अनुवाद |
 | `zeyn_check` | कंपाइल करता है और समस्याएँ बताता है; `fix: true` पहले नाम बदले गए API को फिर से लिखता है |
 | `zeyn_test` | `cargo test` चलाता है और आउटपुट का अंत लौटाता है |

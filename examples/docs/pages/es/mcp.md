@@ -11,7 +11,7 @@ El proyecto en el que trabaja un agente incluye sus propias reglas y herramienta
 
 | Herramienta | Qué hace |
 |---|---|
-| `zeyn_docs` | Referencia del framework por tema: `rules`, `language`, `protocol`, `architecture` |
+| `zeyn_docs` | Referencia del framework por tema: `rules`, `language`, `protocol` |
 | `zeyn_describe` | Features, pantallas, rutas, accesos, APIs, problemas y traducciones que faltan de la aplicación |
 | `zeyn_check` | Compila e informa de problemas; `fix: true` reescribe primero las APIs renombradas |
 | `zeyn_test` | Ejecuta `cargo test` y devuelve el final de la salida |

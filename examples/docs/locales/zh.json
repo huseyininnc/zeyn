@@ -75,8 +75,7 @@
       "realtime": "实时通道和 CRDT",
       "desktop": "桌面应用",
       "protocol": "运行时协议",
-      "database_reference": "数据库参考",
-      "architecture": "架构（历史文档）"
+      "database_reference": "数据库参考"
     },
     "translation": {
       "note": "本页译自英文。",

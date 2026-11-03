@@ -75,8 +75,7 @@
       "realtime": "الوقت الفعلي وCRDT",
       "desktop": "تطبيقات سطح المكتب (Desktop apps)",
       "protocol": "بروتوكول وقت التشغيل",
-      "database_reference": "مرجع قاعدة البيانات",
-      "architecture": "البنية (وثيقة تاريخية)"
+      "database_reference": "مرجع قاعدة البيانات"
     },
     "translation": {
       "note": "هذه الصفحة مترجمة من الإنجليزية.",
