@@ -44,6 +44,15 @@ pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
         .route("/_zeyn/media/{source}/{id}", get(media_file))
 }
 
+/// Whether `path` reads a file of a public media source. These requests skip the rate limit:
+/// one page loads many posters, and many visitors can share one address behind carrier NAT.
+pub(super) fn is_public(st: &AppState, path: &str) -> bool {
+    path.strip_prefix("/_zeyn/media/").and_then(|rest| rest.split_once('/')).is_some_and(|(source, id)| {
+        !id.contains('/')
+            && st.features.iter().any(|f| f.media_sources().iter().any(|m| m.name == source && m.public_cache.is_some()))
+    })
+}
+
 /// The source behind a request, after the id shape, the permission and the guards.
 fn entry(st: &AppState, ctx: &Ctx, source: &str, id: &str) -> Result<MediaEntry, Failure> {
     if !valid_media_id(id) {

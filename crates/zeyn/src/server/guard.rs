@@ -114,7 +114,8 @@ pub(super) async fn guard_request(
     let forwarded = forwarded_for(headers);
     let ip = client_ip(peer, forwarded.as_deref(), &st.trusted);
     let probe = ops::is_probe(path);
-    let unlimited = ops::probe_unlimited(&st.extras, path, ip);
+    let unlimited = ops::probe_unlimited(&st.extras, path, ip)
+        || (matches!(parts.method, axum::http::Method::GET | axum::http::Method::HEAD) && media::is_public(&st, path));
     let blocked = match ip {
         Some(ip) => {
             st.deny.iter().any(|r| r.contains(ip))
