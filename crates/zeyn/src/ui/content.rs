@@ -1,16 +1,16 @@
 //! Content components for reading pages: [`Heading`], [`Paragraph`], [`MetaLine`],
-//! [`PrevNext`] and the [`AutoGrid`] layout. They are plain server rendered HTML with no browser script; their styles live in
-//! `content.css`.
+//! [`PrevNext`], [`Avatar`], [`Spoiler`] and the [`AutoGrid`] layout. They are plain server
+//! rendered HTML with no browser script; their styles live in `content.css`.
 
 use super::layout::into_node;
 use super::render_child;
 use super::widgets::screen_href;
 use crate::i18n::Text;
-use crate::render::Render;
+use crate::render::{Render, escape};
 use crate::screen::{Component, Node, ScreenDef};
 use serde_json::{Value as Json, json};
 
-into_node!(Heading, Paragraph, MetaLine, PrevNext, AutoGrid);
+into_node!(Heading, Paragraph, MetaLine, PrevNext, AutoGrid, Avatar, Spoiler);
 
 /// A section heading with an explicit level, `h2` to `h6`. The screen title is the page's only
 /// `h1`, so there is no `h1` here; pick the level that follows the outline instead of the size
@@ -380,6 +380,173 @@ impl Component for AutoGrid {
             "gap": self.gap,
             "children": self.nodes.iter().map(Node::schema).collect::<Vec<_>>(),
         })
+    }
+
+    fn children(&self) -> &[Node] {
+        &self.nodes
+    }
+}
+
+/// How large an [`Avatar`] is: 32, 40 or 64 CSS pixels.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AvatarSize {
+    Small,
+    #[default]
+    Medium,
+    Large,
+}
+
+impl AvatarSize {
+    fn px(self) -> u32 {
+        match self {
+            AvatarSize::Small => 32,
+            AvatarSize::Medium => 40,
+            AvatarSize::Large => 64,
+        }
+    }
+}
+
+/// A round picture of a person or a team, or their initials when there is no picture. The name
+/// is required: it is the image's alternative text and the source of the initials. When the
+/// name is written right next to the avatar, call `.decorative()` so screen readers do not hear
+/// it twice.
+///
+/// The picture follows the [`super::Image`] rules: a path of the app or an `https` address on a
+/// host of the app's `img-src`; any other picture is left out and the initials are shown.
+///
+/// ```
+/// use zeyn::ui::{Avatar, AvatarSize};
+/// let ada = Avatar::new("Ada Lovelace").image("/img/people/ada.jpg").size(AvatarSize::Large);
+/// let team = Avatar::new("Support team");
+/// let beside_name = Avatar::new("Alan Turing").size(AvatarSize::Small).decorative();
+/// ```
+pub struct Avatar {
+    name: Text,
+    image: Option<String>,
+    size: AvatarSize,
+    decorative: bool,
+}
+
+impl Avatar {
+    pub fn new(name: impl Into<Text>) -> Self {
+        Avatar { name: name.into(), image: None, size: AvatarSize::Medium, decorative: false }
+    }
+
+    /// The picture. Without one, or when it is not allowed, the initials are shown.
+    pub fn image(mut self, src: impl Into<String>) -> Self {
+        self.image = Some(src.into());
+        self
+    }
+
+    pub fn size(mut self, size: AvatarSize) -> Self {
+        self.size = size;
+        self
+    }
+
+    /// Hides the avatar from screen readers, for when the name is written next to it.
+    pub fn decorative(mut self) -> Self {
+        self.decorative = true;
+        self
+    }
+}
+
+/// Up to two initials of a name, in capitals of the locale: the first letter of the first word
+/// and of the last word. Turkish `i` becomes `İ`.
+fn initials(name: &str, locale: &str) -> String {
+    let words: Vec<&str> = name.split_whitespace().collect();
+    let firsts = match words.as_slice() {
+        [] => Vec::new(),
+        [one] => vec![one],
+        [first, .., last] => vec![first, last],
+    };
+    let turkish = locale.starts_with("tr") || locale.starts_with("az");
+    firsts
+        .iter()
+        .filter_map(|w| w.chars().find(|c| c.is_alphanumeric()))
+        .flat_map(|c| match c {
+            'i' if turkish => "İ".chars().collect::<Vec<_>>(),
+            'ı' if turkish => vec!['I'],
+            c => c.to_uppercase().collect(),
+        })
+        .collect()
+}
+
+impl Component for Avatar {
+    fn render(&self, out: &mut String, r: &Render) {
+        let px = self.size.px();
+        let name = r.i18n.text(r.locale, &self.name);
+        let tone = name.bytes().fold(0u32, |h, b| {
+            h.wrapping_mul(31)
+                .wrapping_add(u32::from(b))
+        }) % 5;
+        let class = format!("z-avatar z-avatar-{} z-avatar-tone-{tone}", px);
+        let hidden = if self.decorative { r#" aria-hidden="true""# } else { "" };
+        let image = self
+            .image
+            .as_deref()
+            .filter(|src| super::embed::policy(r).allows_image(src));
+        match image {
+            Some(src) => out.push_str(&format!(
+                r#"<img class="{class}" src="{}" alt="{}" width="{px}" height="{px}" loading="lazy" decoding="async"{hidden}>"#,
+                escape(src),
+                if self.decorative { String::new() } else { escape(&name) }
+            )),
+            None => {
+                let label = if self.decorative { String::new() } else { format!(r#" role="img" aria-label="{}""#, escape(&name)) };
+                out.push_str(&format!(
+                    r#"<span class="{class}"{label}{hidden}><span aria-hidden="true">{}</span></span>"#,
+                    escape(&initials(&name, r.locale))
+                ));
+            }
+        }
+    }
+
+    fn schema(&self) -> Json {
+        json!({ "type": "avatar", "name": self.name, "image": self.image, "size": self.size, "decorative": self.decorative })
+    }
+}
+
+/// Content hidden until the reader opens it, such as the answer to a quiz or the end of a
+/// story. It is a native disclosure (`<details>` and `<summary>`): the label is a button for
+/// keyboards and screen readers, and the content stays out of the reading order until it is
+/// opened. The label comes from the app.
+///
+/// ```
+/// use zeyn::prelude::*;
+/// use zeyn::ui::Spoiler;
+/// let answer = Spoiler::new("Show the answer").add(Paragraph::new("Forty two."));
+/// ```
+pub struct Spoiler {
+    label: Text,
+    nodes: Vec<Node>,
+}
+
+impl Spoiler {
+    pub fn new(label: impl Into<Text>) -> Self {
+        Spoiler { label: label.into(), nodes: Vec::new() }
+    }
+
+    pub fn add(mut self, node: impl Into<Node>) -> Self {
+        self.nodes.push(node.into());
+        self
+    }
+}
+
+impl Component for Spoiler {
+    fn render(&self, out: &mut String, r: &Render) {
+        out.push_str(&format!(
+            r#"<details class="z-spoiler"><summary class="z-spoiler-label">{}</summary><div class="z-spoiler-body">"#,
+            r.text(&self.label)
+        ));
+        for (i, node) in self.nodes.iter().enumerate() {
+            render_child(out, r, i, node);
+        }
+        out.push_str("</div></details>");
+    }
+
+    fn schema(&self) -> Json {
+        json!({ "type": "spoiler", "label": self.label, "children": self.nodes.iter().map(Node::schema).collect::<Vec<_>>() })
     }
 
     fn children(&self) -> &[Node] {

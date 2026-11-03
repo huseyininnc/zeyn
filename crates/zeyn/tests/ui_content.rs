@@ -81,3 +81,36 @@ fn auto_grid_lets_width_set_the_columns_and_keeps_child_paths() {
     assert_eq!(grid.children().len(), 2);
     assert_eq!(grid.schema()["type"], "auto_grid");
 }
+
+#[test]
+fn avatars_show_initials_with_the_name_as_alt_text() {
+    let a = html(&zeyn::ui::Avatar::new("ada <b> lovelace"), "en");
+    assert!(a.contains(r#"role="img" aria-label="ada &lt;b&gt; lovelace""#), "{a}");
+    assert!(a.contains(r#"<span aria-hidden="true">AL</span>"#), "{a}");
+    let tr = html(&zeyn::ui::Avatar::new("ilker ışık"), "tr");
+    assert!(tr.contains(">İI<"), "Turkish capitals: {tr}");
+    let pic = html(
+        &zeyn::ui::Avatar::new("Ada")
+            .image("/img/ada.png")
+            .size(zeyn::ui::AvatarSize::Large),
+        "en",
+    );
+    assert!(pic.contains(r#"src="/img/ada.png" alt="Ada" width="64" height="64""#), "{pic}");
+    let outside = html(&zeyn::ui::Avatar::new("Ada").image("https://elsewhere.example/a.png"), "en");
+    assert!(!outside.contains("<img") && outside.contains(">A<"), "hosts outside img-src fall back to initials");
+    let quiet = html(&zeyn::ui::Avatar::new("Ada").decorative(), "en");
+    assert!(quiet.contains(r#"aria-hidden="true""#) && !quiet.contains("aria-label"));
+}
+
+#[test]
+fn spoilers_hide_their_content_in_a_native_disclosure() {
+    let s = zeyn::ui::Spoiler::new("Show <answer>").add(Paragraph::new("Forty two"));
+    let out = html(&s, "en");
+    assert!(
+        out.starts_with(r#"<details class="z-spoiler"><summary class="z-spoiler-label">Show &lt;answer&gt;</summary>"#),
+        "{out}"
+    );
+    assert!(!out.contains("<details open"));
+    assert!(out.contains("Forty two") && out.contains(r#"data-zeyn-node="0""#));
+    assert_eq!(s.children().len(), 1);
+}

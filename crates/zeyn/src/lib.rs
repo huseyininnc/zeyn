@@ -571,9 +571,9 @@ pub mod prelude {
     #[cfg(feature = "markdown")]
     pub use crate::ui::Markdown;
     pub use crate::ui::{
-        ActionButton, Alert, Audio, AutoGrid, Badge, Breadcrumb, Busy, Card, CardGrid, Chart, Control, DateOptions,
+        ActionButton, Alert, Audio, AutoGrid, Avatar, Badge, Breadcrumb, Busy, Card, CardGrid, Chart, Control, DateOptions,
         DescriptionList, Dock, Embed, EmbedPermission, EmptyState, ExternalLink, Heading, Image, Kpi, List, LookupItem, LookupQuery,
-        MenuBar, MenuButton, MetaLine, Panel, Paragraph, Popover, PrevNext, Progress, PropertyInspector, Rail, Row, SearchBox, SearchParams, Skeleton,
+        MenuBar, MenuButton, MetaLine, Panel, Paragraph, Popover, PrevNext, Progress, PropertyInspector, Rail, Row, SearchBox, SearchParams, Skeleton, Spoiler,
         Split, Stack, StatusBar, Tabs, Timeline, Toolbox, Tree, TreeItem, TreeQuery, Video,
     };
     pub use crate::{

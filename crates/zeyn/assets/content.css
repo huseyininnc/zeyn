@@ -192,3 +192,77 @@ a.z-list-row:focus-visible {
 @media (forced-colors: active) {
   a.z-list-row:focus-visible { outline-color: Highlight; }
 }
+
+.z-avatar {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  object-fit: cover;
+  overflow: hidden;
+  background: var(--z-surface-2);
+  color: var(--z-text);
+  font-weight: 600;
+  line-height: 1;
+  vertical-align: middle;
+  user-select: none;
+}
+
+.z-avatar-32 { width: 32px; height: 32px; font-size: 0.75rem; }
+.z-avatar-40 { width: 40px; height: 40px; font-size: 0.875rem; }
+.z-avatar-64 { width: 64px; height: 64px; font-size: 1.25rem; }
+
+span.z-avatar-tone-0 { background: var(--z-brand-subtle); }
+span.z-avatar-tone-1 { background: var(--z-info-subtle); }
+span.z-avatar-tone-2 { background: var(--z-success-subtle); }
+span.z-avatar-tone-3 { background: var(--z-warning-subtle); }
+span.z-avatar-tone-4 { background: var(--z-danger-subtle); }
+
+.z-spoiler {
+  margin: 0 0 12px;
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius-lg);
+  background: var(--z-surface);
+}
+
+.z-spoiler-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 16px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+
+.z-spoiler-label::-webkit-details-marker { display: none; }
+
+.z-spoiler-label::before {
+  content: "";
+  width: 0.5em;
+  height: 0.5em;
+  border-inline-end: 2px solid currentColor;
+  border-block-end: 2px solid currentColor;
+  transform: rotate(-45deg);
+}
+
+.z-spoiler-label:dir(rtl)::before { transform: rotate(135deg); }
+.z-spoiler[open] > .z-spoiler-label::before { transform: rotate(45deg); }
+
+.z-spoiler-label:focus-visible {
+  outline: 2px solid var(--z-focus);
+  outline-offset: -2px;
+  border-radius: var(--z-radius-lg);
+}
+
+.z-spoiler-body { padding: 0 16px 12px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .z-spoiler-label::before { transition: transform 0.15s ease; }
+}
+
+@media (forced-colors: active) {
+  .z-avatar { border: 1px solid CanvasText; }
+}

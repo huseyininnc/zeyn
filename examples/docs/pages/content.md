@@ -82,3 +82,22 @@ List::of(search_people)
 ```
 
 @live list
+
+## Avatar
+
+A round picture of a person or a team, 32, 40 or 64 pixels (`AvatarSize::Small`, `Medium`, `Large`). The name is required: it is the alternative text and the source of the initials shown when there is no picture, or when the picture is not on a host the app's `img-src` allows (the same rule as `Image`). Initials follow the language's capitals, so Turkish `i` becomes `İ`. When the name is written right next to the avatar, `.decorative()` hides it from screen readers so they do not read the name twice.
+
+```rust
+Avatar::new(p.name.clone()).image(p.photo.clone()).size(AvatarSize::Large)
+Avatar::new(p.name.clone()).size(AvatarSize::Small).decorative()
+```
+
+## Spoiler
+
+Content hidden until the reader opens it, such as the answer to a question. It is a native disclosure (`<details>` and `<summary>`), so it works with the keyboard and screen readers without any script, and the content stays out of the reading order until it is opened. The label comes from the app.
+
+```rust
+Spoiler::new(t!("quiz.show_answer")).add(Paragraph::new(answer.clone()))
+```
+
+@live people

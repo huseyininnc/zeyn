@@ -36,7 +36,7 @@ pub struct Given;
 pub trait Complete: Component {}
 
 /// The policy of the request, or the strict default when rendering outside one.
-fn policy<'a>(r: &Render<'a>) -> &'a Csp {
+pub(super) fn policy<'a>(r: &Render<'a>) -> &'a Csp {
     r.ctx.map(|c| c.csp()).unwrap_or(&EMPTY)
 }
 

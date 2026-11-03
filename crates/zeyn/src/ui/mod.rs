@@ -47,7 +47,7 @@ pub use shell::{MenuBar, MenuList, PropertyInspector, StatusBar, Toolbox};
 pub use catalog::PosterCard;
 pub use catalog::{CardGrid, ImageCard, MAX_SUGGESTIONS, Rail, SearchBox, SearchParams};
 pub use chart::{Better, BulletCell, Chart, ChartKind, Kpi, SparklineCell};
-pub use content::{AutoGrid, Heading, MetaLine, Paragraph, PrevNext};
+pub use content::{AutoGrid, Avatar, AvatarSize, Heading, MetaLine, Paragraph, PrevNext, Spoiler};
 pub use controls::Control;
 pub(crate) use controls::{
     Slot, choices_text, read_choices, render_bool, render_choice, render_choices, render_number, render_text,

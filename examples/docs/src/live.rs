@@ -384,6 +384,20 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
             .sort_option("Name", Sample::name, false)
             .paging(Paging::infinite(5))
             .into(),
+        "people" => Stack::new()
+            .gap(3)
+            .add(
+                Row::new()
+                    .compact()
+                    .col(zeyn::ui::Avatar::new("Ada Lovelace").size(zeyn::ui::AvatarSize::Large))
+                    .col(zeyn::ui::Avatar::new("Alan Turing"))
+                    .col(zeyn::ui::Avatar::new("Grace Hopper").size(zeyn::ui::AvatarSize::Small)),
+            )
+            .add(
+                zeyn::ui::Spoiler::new("Show the answer")
+                    .add(Paragraph::new("Water at about 80 degrees and two minutes of steeping.")),
+            )
+            .into(),
         "inputs" => inputs(),
         "overlay" => overlay(),
         "menus" => menus(),
@@ -568,5 +582,5 @@ fn toasts() -> Node {
 /// Names of every live example, for checks and tests.
 pub const EXAMPLES: &[&str] = &[
     "datagrid", "form", "controls", "dates", "lines", "layout", "display", "action", "tree", "chart", "shell",
-    "inputs", "multi", "overlay", "menus", "toasts", "content", "autogrid", "list",
+    "inputs", "multi", "overlay", "menus", "toasts", "content", "autogrid", "list", "people",
 ];
