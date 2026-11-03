@@ -1,0 +1,832 @@
+{
+  "zeyn": {
+    "locale": {
+      "name": "简体中文"
+    },
+    "yes": "是",
+    "no": "否",
+    "deploy": {
+      "new_version": "应用有新版本。准备好后请重新加载，未保存的表单内容会保留。",
+      "reload": "立即重新加载",
+      "later": "稍后"
+    },
+    "draft": {
+      "restored": "已恢复您之前未保存的内容。",
+      "discard": "丢弃"
+    },
+    "session": {
+      "idle_title": "您还在吗？",
+      "idle_body": "由于您长时间未操作，将在 {seconds} 秒后退出登录。",
+      "stay": "保持登录",
+      "signed_out_title": "您已退出登录",
+      "signed_out_body": "由于长时间未操作，您已退出登录。未保存的表单内容仍保留在此标签页中。",
+      "sign_in": "重新登录",
+      "reauth_required": "为了您的安全，请重新登录后再执行此操作。",
+      "reauth_title": "确认是您本人",
+      "reauth_body": "此操作需要近期登录。请在新标签页中重新登录，然后返回继续。",
+      "reauth_open": "重新登录",
+      "reauth_continue": "我已登录，继续",
+      "mfa_title": "需要第二步验证",
+      "mfa_body": "此操作需要您完成第二步登录验证。请在新标签页中完成，然后返回继续。",
+      "mfa_open": "立即验证"
+    },
+    "auth": {
+      "mfa_required": "此操作需要第二步登录验证，例如身份验证器应用中的验证码。",
+      "mfa_missing": "本次登录未包含第二步验证。请重新登录并完成验证。",
+      "failed": "登录失败，请重试。",
+      "unavailable": "登录暂时不可用，请稍后再试。",
+      "totp_title": "两步验证",
+      "totp_scan": "请使用身份验证器应用扫描此二维码，然后输入其显示的六位验证码。",
+      "totp_manual": "或在应用中手动输入此密钥：",
+      "totp_qr": "身份验证器应用的二维码",
+      "totp_intro": "请输入身份验证器应用中的六位验证码，或使用一个恢复码。",
+      "totp_code": "验证码",
+      "totp_verify": "验证",
+      "totp_invalid": "验证码无效，请重试。",
+      "totp_rate_limited": "尝试次数过多，请等待几分钟后再试。",
+      "totp_recovery_title": "您的恢复码",
+      "totp_recovery_body": "请妥善保管这些恢复码。如果您丢失了身份验证器应用，每个恢复码可使用一次。恢复码不会再次显示。",
+      "totp_continue": "继续"
+    },
+    "import": {
+      "file": "CSV 文件",
+      "file_any": "CSV 或 Excel 文件",
+      "bad_file": "无法将该文件作为 Excel 工作簿读取。",
+      "hint": "第一行为列名：{columns}。值之间用逗号或分号分隔。最多 {max} 行。",
+      "summary": "共读取 {total} 行：{valid} 行有效，{invalid} 行有错误。",
+      "commit": "导入有效行",
+      "commit_all": "导入全部行",
+      "report": "下载错误报告",
+      "imported": "已导入 {count} 行，跳过 {skipped} 行。",
+      "unknown_column": "未知列：{name}。",
+      "too_many": "文件超过 {max} 行。",
+      "too_large": "文件过大。",
+      "empty": "文件中没有数据行。",
+      "bad_quotes": "文件中有带引号的值未闭合。",
+      "extra_cells": "此行的值多于列数。",
+      "nothing_valid": "没有有效的行，因此未导入任何内容。",
+      "fix_first": "请先修正所有错误；此导入要么全部成功，要么全部不导入。",
+      "report_row": "行",
+      "report_field": "字段",
+      "report_message": "信息",
+      "reading": "正在读取文件..."
+    },
+    "mail": {
+      "transition": {
+        "subject": "{record}：{to}",
+        "text": "{by} 将 {record} 从 {from} 变更为 {to}（{move}）。\n\n{comment}",
+        "html": "<p>{by} 将 <strong>{record}</strong> 从 {from} 变更为 <strong>{to}</strong>（{move}）。</p><p>{comment}</p>"
+      }
+    },
+    "workflow": {
+      "state": "状态",
+      "comment": "备注",
+      "done": "完成。"
+    },
+    "privacy": {
+      "reveal": "显示{label}",
+      "revealed": "已显示该值，此操作已被记录。",
+      "reveal_failed": "无法显示该值。",
+      "reason_required": "请填写理由后再打开此界面。",
+      "reason_title": "您为什么需要此记录？",
+      "reason_explain": "此界面显示个人数据。您的理由将连同您的姓名和时间一并记录。",
+      "reason_label": "理由",
+      "reason_continue": "继续",
+      "reason_cancel": "取消",
+      "reason_invalid": "请填写 3 到 300 个字符的理由。"
+    },
+    "validation": {
+      "required": "{label}为必填项。",
+      "min_len": "{label}至少需要 {n} 个字符。",
+      "max_len": "{label}最多 {n} 个字符。",
+      "email": "{label}必须是有效的电子邮件地址。",
+      "min": "{label}不能小于 {n}。",
+      "max": "{label}不能大于 {n}。",
+      "format": "{label}的值无效。",
+      "skipped_time": "{label}：由于时钟调整，该时间在您的时区中不存在。",
+      "line": "第 {n} 行：{message}",
+      "disabled_day": "{label}：不能选择这一天。",
+      "time_step": "{label}必须以 {n} 分钟为步长。",
+      "range_order": "{label}不能早于{other}。",
+      "unique": "{label}已被其他记录使用。",
+      "scale": "{label}最多 {n} 位小数。",
+      "precision": "{label}的整数部分最多 {n} 位。",
+      "mask": "{label}的格式必须类似 {pattern}。",
+      "embed": "{label}必须是可嵌入的 https 地址，或包含该地址的嵌入代码。",
+      "embed_host": "{label}：{host} 不在此应用允许嵌入的站点列表中。"
+    },
+    "error": {
+      "forbidden": "您无权执行此操作。",
+      "not_found": "未找到记录。",
+      "conflict": "其他人已修改此记录。请重新加载后再试。",
+      "timeout": "请求超时。",
+      "internal": "发生意外错误。",
+      "csrf": "您的会话已过期。请重新加载页面。",
+      "license": "您的许可证不包含此功能。请联系管理员。",
+      "license_expired": "您的许可证已过期。请联系管理员续期。",
+      "tenant": "此地址不属于任何已知的组织。",
+      "rate_limited": "请求过多，请稍后再试。",
+      "confirmation_required": "此操作需要先在应用中确认后才会执行。",
+      "cursor": "列表在加载后已发生变化。请重新加载后再试。",
+      "duplicate": "此记录已存在。"
+    },
+    "grid": {
+      "pagination": "分页",
+      "previous": "上一页",
+      "next": "下一页",
+      "load_more": "加载更多",
+      "range": "{from}-{to}",
+      "range_total": "{from}-{to}，共 {total}",
+      "loaded": "已加载 {count} 行",
+      "empty": "暂无记录。",
+      "actions": "操作",
+      "select_row": "选择行",
+      "select_page": "选择本页所有行",
+      "selected_count": "已选 {n}",
+      "select_matching": "选择全部 {total} 条匹配的行",
+      "all_selected": "已选择全部 {total} 条匹配的行",
+      "clear_selection": "清除选择",
+      "too_many": "此操作最多选择 {n} 行。",
+      "done": "完成。",
+      "saved": "已保存。",
+      "undo": "撤销",
+      "undone": "更改已撤销。",
+      "error": "无法加载行。",
+      "retry": "重试",
+      "copied": "已复制 {n} 行。",
+      "copied_cells": "已复制 {n} 个单元格。",
+      "paste_confirm": "粘贴到 {n} 行？每一行都会被保存。",
+      "pasted": "已保存 {n} 行。",
+      "paste_failed": "{n} 行无法保存，原因见单元格提示。",
+      "paste_readonly": "这些单元格不可编辑。",
+      "paste_too_many": "每次最多粘贴到 {n} 行。",
+      "details": "详情",
+      "loading": "加载中...",
+      "children": "子行",
+      "blank": "（空）",
+      "group_count": "{n} 行",
+      "filter": {
+        "filter": "筛选{label}",
+        "from": "从",
+        "to": "到",
+        "all": "全部",
+        "contains": "包含",
+        "starts_with": "开头是",
+        "equals": "等于",
+        "match": "匹配",
+        "selected": "已选 {n}",
+        "clear": "清除筛选",
+        "sorted": "排序顺序 {n}"
+      },
+      "menu": {
+        "options": "列选项：{label}",
+        "resize": "调整{label}的宽度",
+        "sort_asc": "升序排序",
+        "sort_desc": "降序排序",
+        "sort_clear": "清除排序",
+        "pin_start": "固定到左侧",
+        "pin_end": "固定到右侧",
+        "unpin": "取消固定",
+        "move_prev": "左移",
+        "move_next": "右移",
+        "hide": "隐藏列",
+        "columns": "列",
+        "filter": "筛选",
+        "reset": "重置视图"
+      },
+      "agg": {
+        "sum": "求和",
+        "avg": "平均值",
+        "min": "最小值",
+        "max": "最大值",
+        "count": "计数"
+      }
+    },
+    "export": {
+      "xlsx": "导出为 Excel",
+      "csv": "导出为 CSV",
+      "pdf": "导出为 PDF",
+      "pdf_cut": "仅打印前 {max} 行。"
+    },
+    "shell": {
+      "skip": "跳到正文",
+      "menu": "主菜单",
+      "language": "语言",
+      "time_zone": "时区",
+      "time_zone_auto": "自动（此设备）",
+      "theme": "主题",
+      "theme_system": "跟随系统",
+      "theme_light": "浅色",
+      "theme_dark": "深色",
+      "site": {
+        "sign_in": "登录",
+        "sign_out": "退出登录"
+      }
+    },
+    "ui": {
+      "resize": "调整窗格大小",
+      "cards": {
+        "load_more": "显示更多",
+        "loaded": "已显示 {count} 项",
+        "empty": "没有可显示的内容。",
+        "error": "无法加载列表，请重试。",
+        "sort": "排序方式",
+        "pages": "页",
+        "page": "第 {page} 页，共 {pages} 页",
+        "previous_page": "上一页",
+        "next_page": "下一页",
+        "previous": "向前滚动",
+        "next": "向后滚动"
+      },
+      "search": {
+        "label": "搜索",
+        "suggestions": "建议",
+        "count": "{count} 条建议，使用方向键选择",
+        "none": "没有建议"
+      },
+      "palette": {
+        "open": "命令",
+        "label": "命令面板",
+        "placeholder": "输入命令或界面名称",
+        "empty": "没有匹配的命令。",
+        "count": "{n} 条命令",
+        "recent": "最近使用",
+        "app": "命令",
+        "screen": "当前界面",
+        "go": "前往",
+        "done": "完成。",
+        "hint": "上下键移动，回车执行，Esc 关闭。"
+      },
+      "toolbox": {
+        "selected": "已选择{tool}"
+      },
+      "dock": {
+        "left": "左侧",
+        "right": "右侧",
+        "bottom": "底部",
+        "center": "中间",
+        "options": "面板选项",
+        "move": "移至{area}",
+        "close": "关闭{panel}",
+        "show": "显示{panel}",
+        "moved": "{panel}已移至{area}。",
+        "closed": "{panel}已关闭。",
+        "shown": "{panel}已显示。",
+        "empty": "没有打开的面板。请从面板选项中打开。",
+        "resize": "调整{area}区域大小"
+      },
+      "loading": "加载中…",
+      "load_failed": "无法加载此部分，请重试。",
+      "date": {
+        "open": "选择日期",
+        "dialog": "选择日期",
+        "prev_month": "上个月",
+        "next_month": "下个月",
+        "prev_year": "上一年",
+        "next_year": "下一年",
+        "today": "今天",
+        "format": "格式：{format}。",
+        "natural": "也可以输入：{examples}。",
+        "natural_date": "today, +3d",
+        "natural_time": "now, 930",
+        "open_time": "选择时间",
+        "dialog_time": "选择时间",
+        "dialog_range": "选择日期范围",
+        "month": "选择月份",
+        "year": "选择年份",
+        "months": "月份",
+        "years": "年份",
+        "now": "现在",
+        "clear": "清除",
+        "done": "完成",
+        "hours": "小时",
+        "minutes": "分钟",
+        "seconds": "秒",
+        "period": "上午或下午",
+        "week": "周",
+        "week_long": "周数",
+        "zone": "时区 {zone}",
+        "utc": "UTC：{moment}",
+        "from": "从",
+        "to": "到",
+        "presets": {
+          "label": "快捷范围",
+          "today": "今天",
+          "yesterday": "昨天",
+          "last_7_days": "最近 7 天",
+          "this_month": "本月",
+          "last_month": "上月",
+          "this_year": "今年"
+        },
+        "invalid": "无法识别{label}。"
+      },
+      "lookup": {
+        "open": "显示选项",
+        "no_results": "没有匹配项。",
+        "results": "{count} 条结果",
+        "remove": "移除{label}",
+        "more": "显示更多",
+        "selected": "已选",
+        "type_more": "输入以搜索。"
+      },
+      "lines": {
+        "add": "添加行",
+        "remove": "删除第 {n} 行",
+        "up": "上移第 {n} 行",
+        "down": "下移第 {n} 行",
+        "row": "第 {n} 行",
+        "total": "合计",
+        "actions": "操作",
+        "empty": "暂无行。"
+      },
+      "confirm": {
+        "title": "请确认",
+        "ok": "确认",
+        "cancel": "取消"
+      },
+      "empty": "这里还没有内容。",
+      "breadcrumb": "面包屑导航",
+      "dismiss": "关闭",
+      "link": {
+        "external": "外部站点",
+        "external_new_tab": "外部站点，在新标签页中打开"
+      },
+      "embed": {
+        "blocked": "无法在此显示{title}：其站点不在此应用允许嵌入的站点列表中。",
+        "load": "加载{title}",
+        "from": "内容来自 {host}。仅在您请求时加载。"
+      },
+      "steps": {
+        "progress": "第 {n} 步，共 {total} 步",
+        "next": "下一步",
+        "back": "上一步",
+        "done": "已完成",
+        "current": "当前步骤",
+        "label": "步骤"
+      },
+      "chart": {
+        "data": "显示数据",
+        "table": "{title}的数据",
+        "summary_bar": "柱状图，{series} 个系列，{items} 个类别。最高：{max}，{value}。",
+        "summary_line": "折线图，{series} 个系列，{items} 个点。最高：{max}，{value}。",
+        "summary_donut": "环形图，共 {items} 部分。最大：{max}，{value}。",
+        "role": "图表",
+        "summary_stacked_bar": "堆叠柱状图，{series} 个系列，{items} 个类别。最高合计：{max}，{value}。",
+        "summary_area": "面积图，{series} 个系列，{items} 个点。最高：{max}，{value}。",
+        "summary_combo": "柱线组合图，{series} 个系列，{items} 个类别。最高：{max}，{value}。",
+        "summary_scatter": "散点图，共 {items} 个点，分为 {series} 组。",
+        "summary_gauge": "仪表盘当前为 {value}，范围 {min} 至 {max}。目标：{target}。",
+        "summary_funnel": "漏斗图，共 {items} 个阶段。最大：{max}，{value}。",
+        "gauge_point": "{value}，共 {max}",
+        "sparkline": "{n} 个值的趋势，从 {first} 到 {last}，最低 {low}，最高 {high}",
+        "bullet": "{value}，目标 {target}",
+        "value": "值",
+        "min": "最小值",
+        "max": "最大值",
+        "target": "目标"
+      },
+      "tree": {
+        "empty": "没有项目。"
+      },
+      "select": {
+        "none": "无",
+        "search": "搜索列表"
+      },
+      "number": {
+        "up": "增加",
+        "down": "减少",
+        "percent": "百分比"
+      },
+      "text": {
+        "count": "{n} / {max} 个字符"
+      },
+      "media": {
+        "video_player": "视频播放器",
+        "audio_player": "音频播放器",
+        "play": "播放",
+        "pause": "暂停",
+        "seek": "定位",
+        "volume": "音量",
+        "mute": "静音",
+        "unmute": "取消静音",
+        "time_of": "{current} / {total}",
+        "speed": "播放速度",
+        "speed_value": "播放速度：{value}",
+        "captions": "字幕",
+        "captions_language": "字幕语言",
+        "captions_on": "字幕已开启：{label}",
+        "captions_off": "关闭",
+        "pip": "画中画",
+        "fullscreen": "全屏",
+        "exit_fullscreen": "退出全屏",
+        "resumed": "从 {time} 继续播放",
+        "failed": "无法播放此媒体。",
+        "bad_position": "播放位置无效。"
+      },
+      "tone": {
+        "neutral": "注意",
+        "info": "信息",
+        "success": "成功",
+        "warning": "警告",
+        "danger": "错误",
+        "brand": "注意"
+      },
+      "upload": {
+        "drop": "将文件拖放到此处，或选择文件。",
+        "hint": "{types}，最大 {max}。",
+        "hint_many": "{types}，每个最大 {max}，最多 {n} 个文件。",
+        "list": "文件",
+        "uploading": "正在上传 {name}：{pct}%",
+        "uploaded": "{name} 已上传。",
+        "failed": "{name} 上传失败：{reason}",
+        "canceled": "已取消上传 {name}。",
+        "removed": "已移除 {name}。",
+        "cancel": "取消",
+        "retry": "重试",
+        "remove": "移除",
+        "remove_name": "移除 {name}"
+      },
+      "kpi": {
+        "up": "较上期增长 {pct}%",
+        "down": "较上期下降 {pct}%",
+        "flat": "与上期持平",
+        "target": "目标 {target}，已达成 {pct}%"
+      },
+      "password": {
+        "show": "显示密码",
+        "weak": "强度：弱",
+        "fair": "强度：一般",
+        "good": "强度：良好",
+        "strong": "强度：强"
+      },
+      "multi": {
+        "count": "已选 {n}"
+      },
+      "popover": {
+        "close": "关闭"
+      },
+      "busy": "处理中",
+      "tip": {
+        "about": "关于{label}"
+      },
+      "menu": {
+        "more": "{label}的更多选项"
+      },
+      "toast": {
+        "dismiss": "关闭"
+      }
+    },
+    "date": {
+      "words": {
+        "today": "今天",
+        "tomorrow": "明天",
+        "yesterday": "昨天",
+        "now": "现在",
+        "day": "d, day, days, 天, 日",
+        "week": "w, week, weeks, 周",
+        "month": "m, month, months, 月",
+        "year": "y, year, years, 年"
+      }
+    },
+    "assistant": {
+      "title": "助手",
+      "open": "打开助手",
+      "close": "关闭助手",
+      "new_chat": "新对话",
+      "empty": "可以询问您的数据，或告诉我要做什么。我按您的权限工作，并会在更改任何内容前先征求确认。",
+      "suggestions": "建议",
+      "message": "消息",
+      "placeholder": "询问有关此应用的任何问题",
+      "mic": "语音输入",
+      "mic_stop": "停止聆听",
+      "stop": "停止",
+      "send": "发送",
+      "note": "AI 可能出错，请核对重要结果。",
+      "you": "您",
+      "thinking": "思考中",
+      "stopped": "已停止。",
+      "retry": "重试",
+      "read_aloud": "朗读",
+      "copy": "复制",
+      "copied": "已复制",
+      "confirm": "确认",
+      "decline": "取消",
+      "confirm_title": "确认此操作",
+      "confirm_question": "助手想以您的身份执行此操作。确认后才会运行。",
+      "declined": "已取消，未做任何更改。",
+      "listening": "聆听中",
+      "error": "出了点问题。",
+      "unavailable": "助手不可用。",
+      "working": "处理中",
+      "too_long": "最多输入 {max} 个字符。",
+      "audio_too_large": "录音过长。",
+      "token_limit": "您已达到助手当前的使用上限，请稍后再试。",
+      "too_many_steps": "由于步骤过多，我已停止。请尝试更简单的请求。"
+    },
+    "accounts": {
+      "login": {
+        "title": "登录",
+        "submit": "登录",
+        "passkey": "使用通行密钥登录",
+        "external": "或使用以下方式登录",
+        "with": "使用以下方式登录",
+        "forgot": "忘记密码？",
+        "resend": "重新发送确认邮件",
+        "register": "创建账户"
+      },
+      "register": {
+        "title": "创建账户",
+        "submit": "创建账户",
+        "login": "返回登录"
+      },
+      "check_email": {
+        "title": "请查收邮件",
+        "body": "如果该地址可以接收我们的邮件，包含下一步操作的邮件已在发送途中。邮件中的链接一天内有效。"
+      },
+      "forgot": {
+        "title": "忘记密码？",
+        "intro": "请输入您的电子邮件地址。如果它属于已确认的账户，我们会向您发送设置新密码的链接。",
+        "submit": "发送链接"
+      },
+      "resend": {
+        "title": "重新发送确认邮件",
+        "submit": "再次发送"
+      },
+      "reset": {
+        "title": "设置新密码",
+        "submit": "保存新密码"
+      },
+      "confirm": {
+        "title": "确认您的电子邮件",
+        "done": "谢谢，您的电子邮件地址已确认。",
+        "failed": "此链接无效。它可能已过期、已被使用或已被更新的链接取代。"
+      },
+      "two_factor": {
+        "title": "两步登录",
+        "intro": "请输入身份验证器应用中的验证码。",
+        "submit": "验证",
+        "email_intro": "或通过电子邮件获取验证码。",
+        "send_email": "给我发送验证码",
+        "sent": "验证码已在发送途中。",
+        "submit_email": "验证邮件验证码",
+        "use_recovery": "改用恢复码",
+        "on": "两步登录已开启。",
+        "codes_left": "剩余恢复码：{n}",
+        "new_codes": "新的恢复码",
+        "new_codes_confirm": "您当前的恢复码将失效。是否继续？",
+        "forget": "忘记此浏览器",
+        "disable": "关闭",
+        "disable_confirm": "关闭两步登录？这会使您的账户更容易被攻破。",
+        "reset_key": "重置身份验证器密钥",
+        "reset_key_confirm": "在您重新设置之前，身份验证器应用将无法用于此账户。是否继续？",
+        "reauth": "为了您的安全，请重新登录后再设置两步登录。",
+        "reauth_link": "重新登录",
+        "setup": "请使用身份验证器应用扫描二维码，或输入密钥，然后输入其显示的六位验证码。",
+        "qr": "身份验证器应用的二维码",
+        "manual": "密钥：",
+        "enable": "开启"
+      },
+      "recovery": {
+        "title": "使用恢复码登录",
+        "intro": "每个恢复码只能使用一次。",
+        "submit": "登录"
+      },
+      "lockout": {
+        "title": "账户已锁定",
+        "body": "由于多次尝试失败，此账户已被暂时锁定。请稍后再试，或重置密码。"
+      },
+      "denied": {
+        "title": "访问被拒绝",
+        "body": "您无权访问此页面。"
+      },
+      "logout": {
+        "title": "退出登录",
+        "body": "要退出此浏览器的登录吗？",
+        "submit": "退出登录"
+      },
+      "manage": {
+        "title": "账户设置",
+        "profile": "个人资料",
+        "email": "电子邮件",
+        "password": "密码",
+        "two_factor": "两步登录",
+        "passkeys": "通行密钥",
+        "logins": "外部登录",
+        "personal_data": "个人数据"
+      },
+      "save": "保存",
+      "saved": "已保存。",
+      "email": {
+        "current": "您的电子邮件地址：",
+        "confirmed": "已确认",
+        "unconfirmed": "未确认",
+        "send_verification": "发送确认邮件",
+        "sent": "请在收件箱中查看确认链接。",
+        "change": "更改电子邮件"
+      },
+      "password": {
+        "submit": "保存密码",
+        "changed": "您的密码已更改，其他会话已退出登录。"
+      },
+      "codes": {
+        "title": "恢复码",
+        "keep": "请将这些恢复码保存在安全的地方。每个恢复码只能使用一次，且仅在此刻显示。",
+        "gone": "恢复码仅在生成后显示一次。",
+        "back": "返回两步登录"
+      },
+      "passkeys": {
+        "intro": "通行密钥通过设备的屏幕锁让您登录，无需密码。",
+        "none": "您还没有通行密钥。",
+        "remove": "移除",
+        "remove_confirm": "移除此通行密钥？",
+        "name": "新通行密钥的名称",
+        "add": "添加通行密钥",
+        "added": "通行密钥已添加。",
+        "failed": "通行密钥未能生效，请重试。",
+        "unsupported": "此浏览器不支持通行密钥。"
+      },
+      "logins": {
+        "none": "未关联任何外部登录。",
+        "remove": "取消关联",
+        "remove_confirm": "取消关联此登录？",
+        "add": "关联"
+      },
+      "data": {
+        "intro": "下载此账户存储的所有关于您的数据，或删除账户。",
+        "download": "下载我的数据",
+        "delete_warning": "删除账户将永久移除您的数据，且无法撤销。",
+        "delete": "删除我的账户"
+      },
+      "admin": {
+        "menu": "账户",
+        "users": "用户",
+        "roles": "角色",
+        "lock": "锁定",
+        "unlock": "解锁",
+        "reset": "发送重置链接",
+        "delete_role": "删除",
+        "create_role": "添加角色"
+      },
+      "external": {
+        "title": "完成登录",
+        "intro": "您已通过以下方式登录",
+        "submit": "创建我的账户"
+      },
+      "notice": {
+        "confirmed": "您的电子邮件地址已确认，现在可以登录。",
+        "reset": "您的密码已重置，请使用新密码登录。",
+        "signed_out": "您已退出登录。",
+        "deleted": "您的账户已删除。",
+        "check_email": "请查收邮件以进行下一步。"
+      },
+      "error": {
+        "invalid_user_name": "此用户名无效。",
+        "duplicate_user_name": "此名称已被占用。",
+        "invalid_email": "请输入有效的电子邮件地址。",
+        "duplicate_email": "此电子邮件地址已被占用。",
+        "invalid_phone": "请输入有效的电话号码。",
+        "password_too_short": "至少使用 {n} 个字符。",
+        "password_too_long": "最多使用 {n} 个字节。",
+        "password_requires_non_alphanumeric": "至少使用一个非字母、非数字的字符。",
+        "password_requires_digit": "至少使用一个数字（0 到 9）。",
+        "password_requires_lower": "至少使用一个小写字母（a 到 z）。",
+        "password_requires_upper": "至少使用一个大写字母（A 到 Z）。",
+        "password_requires_unique_chars": "至少使用 {n} 个不同的字符。",
+        "password_breached": "此密码出现在已知的数据泄露中，请选择其他密码。",
+        "user_already_has_password": "此账户已设置密码。",
+        "password_mismatch": "密码错误。",
+        "invalid_token": "此链接无效。它可能已过期或已被使用。",
+        "invalid_code": "验证码错误或已过期。",
+        "lockout_not_enabled": "此用户未启用锁定功能。",
+        "login_already_associated": "此登录已属于另一个账户。",
+        "last_login": "这是您最后一种登录方式。请先添加密码或其他登录方式。",
+        "invalid_role_name": "此角色名称无效。",
+        "duplicate_role_name": "此角色已存在。",
+        "rate_limited": "尝试次数过多，请等待几分钟后再试。",
+        "two_factor_expired": "登录耗时过长，请重新开始。",
+        "two_factor_unavailable": "此获取验证码的方式不可用。",
+        "passkey_invalid": "无法验证通行密钥。",
+        "passkey_expired": "通行密钥请求已过期，请重试。",
+        "passkey_registered": "此通行密钥已注册。",
+        "not_allowed": "请先确认您的电子邮件地址再登录。",
+        "invalid_login": "用户名或密码错误。",
+        "password_confirm_mismatch": "两次输入的密码不一致。",
+        "invalid_recovery_code": "恢复码错误或已被使用。",
+        "email_unchanged": "这是您当前的地址。",
+        "unknown_role": "其中某个角色不存在。",
+        "external_expired": "外部登录耗时过长，请重新开始。",
+        "external_email_taken": "已存在使用此电子邮件的账户。请登录该账户，并在账户设置中关联此提供方。",
+        "external": "外部登录失败。",
+        "old_password_required": "请输入当前密码。",
+        "cannot_reset_shared_key_and_enable": "请先重置密钥，再使用新密钥生成的验证码开启两步登录。",
+        "requires_two_factor": "请输入身份验证器应用中的验证码。",
+        "invalid_two_factor_code": "验证码错误。"
+      },
+      "mail": {
+        "confirm": {
+          "subject": "确认您的电子邮件地址",
+          "text": "请打开此链接以确认您的电子邮件地址：\n\n{link}\n\n链接一天内有效。如果您没有创建账户，请忽略此邮件。",
+          "html": "<p>请打开此链接以确认您的电子邮件地址：</p><p><a href=\"{link}\">确认我的电子邮件地址</a></p><p>链接一天内有效。如果您没有创建账户，请忽略此邮件。</p>"
+        },
+        "reset": {
+          "subject": "重置您的密码",
+          "text": "请打开此链接以设置新密码：\n\n{link}\n\n链接一天内有效。如果这不是您的请求，请忽略此邮件。",
+          "html": "<p>请打开此链接以设置新密码：</p><p><a href=\"{link}\">设置新密码</a></p><p>链接一天内有效。如果这不是您的请求，请忽略此邮件。</p>"
+        },
+        "change": {
+          "subject": "确认您的新电子邮件地址",
+          "text": "请打开此链接，将此地址用于您的账户：\n\n{link}\n\n如果您没有请求此更改，请忽略此邮件。",
+          "html": "<p>请打开此链接，将此地址用于您的账户：</p><p><a href=\"{link}\">确认新地址</a></p><p>如果您没有请求此更改，请忽略此邮件。</p>"
+        },
+        "exists": {
+          "subject": "您已拥有账户",
+          "text": "有人尝试用此地址创建账户，但该地址已有账户。请在此登录：\n\n{link}\n\n如果您忘记了密码，请使用该页面上的密码重置功能。",
+          "html": "<p>有人尝试用此地址创建账户，但该地址已有账户。</p><p><a href=\"{link}\">登录</a></p><p>如果您忘记了密码，请使用该页面上的密码重置功能。</p>"
+        },
+        "code": {
+          "subject": "您的登录验证码",
+          "text": "您的登录验证码是 {code}，几分钟内有效。",
+          "html": "<p>您的登录验证码是 <strong>{code}</strong>，几分钟内有效。</p>"
+        }
+      }
+    },
+    "files": {
+      "too_large": "文件过大。允许的最大文件为 {max}。",
+      "too_many": "{label}最多接受 {n} 个文件。",
+      "type": "不接受此类型的文件，或其内容与文件名不符。",
+      "refused": "文件未通过安全检查，已被拒绝。",
+      "aborted": "上传在整个文件到达之前中断，请重试。",
+      "empty": "文件为空。",
+      "store_full": "没有足够的空间存放此文件。"
+    }
+  },
+  "AccountLogin": {
+    "user_name": "电子邮件或用户名",
+    "password": "密码",
+    "remember_me": "记住我"
+  },
+  "AccountRegister": {
+    "email": "电子邮件",
+    "password": "密码",
+    "confirm_password": "确认密码"
+  },
+  "AccountEmailOnly": {
+    "email": "电子邮件"
+  },
+  "AccountReset": {
+    "password": "新密码",
+    "confirm_password": "确认新密码",
+    "user": "用户",
+    "code": "验证码"
+  },
+  "AccountCode": {
+    "code": "验证码",
+    "remember_machine": "记住此浏览器",
+    "return_to": "返回到"
+  },
+  "AccountRecovery": {
+    "code": "恢复码",
+    "return_to": "返回到"
+  },
+  "AccountProfile": {
+    "user_name": "用户名",
+    "phone_number": "电话号码"
+  },
+  "AccountNewEmail": {
+    "new_email": "新电子邮件"
+  },
+  "AccountPassword": {
+    "old_password": "当前密码",
+    "new_password": "新密码",
+    "confirm_password": "确认新密码"
+  },
+  "AccountDelete": {
+    "password": "密码"
+  },
+  "AccountUserRow": {
+    "id": "ID",
+    "user_name": "用户名",
+    "email": "电子邮件",
+    "email_confirmed": "已确认",
+    "two_factor": "两步登录",
+    "locked": "已锁定",
+    "roles": "角色"
+  },
+  "AccountUserRoles": {
+    "id": "ID",
+    "roles": "角色（逗号分隔）"
+  },
+  "AccountRoleRow": {
+    "id": "ID",
+    "name": "名称",
+    "permissions": "权限（逗号分隔）"
+  },
+  "AccountExternal": {
+    "email": "电子邮件"
+  },
+  "AccountEmailCode": {
+    "code": "邮件中的验证码",
+    "remember_machine": "记住此浏览器",
+    "return_to": "返回到"
+  }
+}

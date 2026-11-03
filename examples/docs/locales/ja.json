@@ -1,0 +1,42 @@
+{
+  "docs": {
+    "app": "Zeyn ドキュメント",
+    "missing": "このページは存在しません。",
+    "on_this_page": "このページの内容",
+    "pager": "前のページと次のページ",
+    "previous": "前へ",
+    "next": "次へ",
+    "group": {
+      "start": "はじめに",
+      "language": "言語",
+      "components": "コンポーネント",
+      "guides": "ガイド",
+      "reference": "リファレンス"
+    },
+    "live": {
+      "label": "ライブ例",
+      "send": "送信",
+      "sent": "送信しました。何も保存されていません。",
+      "book": "予約",
+      "booked": "予約しました。何も保存されていません。",
+      "save": "保存",
+      "saved": "保存しました。何も保存されていません。",
+      "count": "商品を数える",
+      "counted": "{n} 件の商品。",
+      "count_tip": "サーバー上のすべてのサンプル商品を数えます",
+      "rules": "商品の詳細",
+      "rules_title": "最初のサンプル商品",
+      "slow": "ゆっくり数える",
+      "more": "その他",
+      "archive": "サンプルをアーカイブ",
+      "archived": "アーカイブしました。何も保存されていません。",
+      "archive_confirm": "サンプル商品をアーカイブしますか?",
+      "save_copy": "コピーとして保存",
+      "denied": "サンプルは保存できません。",
+      "toast_success": "成功のトースト",
+      "toast_warning": "警告のトースト",
+      "toast_danger": "エラーのトースト",
+      "again": "もう一度表示"
+    }
+  }
+}

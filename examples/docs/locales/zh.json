@@ -1,0 +1,42 @@
+{
+  "docs": {
+    "app": "Zeyn 文档",
+    "missing": "此页面不存在。",
+    "on_this_page": "本页内容",
+    "pager": "上一页和下一页",
+    "previous": "上一页",
+    "next": "下一页",
+    "group": {
+      "start": "快速入门",
+      "language": "语言",
+      "components": "组件",
+      "guides": "指南",
+      "reference": "参考"
+    },
+    "live": {
+      "label": "在线示例",
+      "send": "发送",
+      "sent": "已发送。未保存任何内容。",
+      "book": "预订",
+      "booked": "已预订。未保存任何内容。",
+      "save": "保存",
+      "saved": "已保存。未保存任何内容。",
+      "count": "统计商品",
+      "counted": "共 {n} 件商品。",
+      "count_tip": "在服务器上统计所有示例商品",
+      "rules": "商品详情",
+      "rules_title": "第一个示例商品",
+      "slow": "慢速统计",
+      "more": "更多",
+      "archive": "归档示例",
+      "archived": "已归档。未保存任何内容。",
+      "archive_confirm": "要归档示例商品吗？",
+      "save_copy": "另存为副本",
+      "denied": "无法保存该示例。",
+      "toast_success": "成功提示",
+      "toast_warning": "警告提示",
+      "toast_danger": "危险提示",
+      "again": "再次显示"
+    }
+  }
+}

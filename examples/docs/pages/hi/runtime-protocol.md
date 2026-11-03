@@ -1,0 +1,400 @@
+# रनटाइम प्रोटोकॉल
+
+स्थिति: मसौदा, `zeyn::server` और `assets/zeyn/*.js` (`/_zeyn/zeyn.js` के रूप में परोसा गया) द्वारा लागू।
+
+यह Zeyn सर्वर और ब्राउज़र रनटाइम के बीच का अनुबंध है। Screen सर्वर पर रेंडर होती हैं। ब्राउज़र रनटाइम एक छोटी स्क्रिप्ट है जो उपयोगकर्ता की क्रियाएँ सर्वर को भेजती है और जो वापस आता है उसे लागू करती है। ऐप्लिकेशन कोड कभी JavaScript नहीं लिखता।
+
+## 1. पृष्ठ लोड
+
+`GET {route}?params={json}` पूरा HTML दस्तावेज़ लौटाता है। `params` Screen params का URL एन्कोडेड JSON है और जब Screen में कोई न हो तो छोड़ा जाता है।
+
+पथ खंडों वाला रूट, जैसे `/orders/{id}`, params के वे फ़ील्ड पथ (`/orders/42`) से पढ़ता है और बाकी फ़ील्ड `params` से। जो खंड मान पार्स नहीं होता वह 404 का उत्तर देता है। मान percent एन्कोडेड होते हैं, बिंदु समेत (`%2E`), इसलिए Screen URL रनटाइम को कभी फ़ाइल जैसा नहीं दिखता। जो Screen `Screen::moved_to` से उत्तर दे उसे `Location` में नए URL के साथ `301 Moved Permanently` मिलता है।
+
+विफल पृष्ठ अपने स्टेटस (404, 403, 500, ...) और ऐप की त्रुटि Screen (`App::not_found`, `App::server_error`) या छोटे बिल्ट इन संदेश के साथ, शेल के भीतर, उत्तर देता है। `x-zeyn-partial: 1` वाले अनुरोध को केवल वह Screen `x-zeyn-partial: 1` और `x-zeyn-title` के साथ मिलती है, ताकि रनटाइम उसे बिना पृष्ठ लोड के बदल दे। त्रुटि विवरण कभी ब्राउज़र तक नहीं पहुँचते।
+
+```html
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="zeyn-csrf" content="TOKEN">
+  <title>Products · Inventory</title>
+  <link rel="stylesheet" href="/_zeyn/zeyn.css">
+  <script type="module" src="/_zeyn/zeyn.js"></script>
+</head>
+<body>
+  <a class="z-skip" href="#z-main">Skip to content</a>
+  <div class="z-app">
+    <nav class="z-nav" aria-label="Main">...</nav>
+    <main class="z-main" id="z-main">SCREEN</main>
+  </div>
+  <div class="z-toasts" role="status" aria-live="polite"></div>
+</body>
+</html>
+```
+
+मेनू केवल वही Screen सूचीबद्ध करता है जिन्हें मौजूदा उपयोगकर्ता खोल सकता है। मौजूदा आइटम में `aria-current="page"` होता है।
+
+## 2. Screen मार्कअप
+
+हर Screen रूट अपना नाम और params रखता है:
+
+```html
+<section class="z-screen" data-zeyn-screen="product_list" data-zeyn-params="null" aria-labelledby="product_list-title">
+```
+
+Window `class="z-window" role="dialog" aria-modal="true"` और `--z-width` स्टाइल इस्तेमाल करती हैं।
+
+हर बॉडी आइटम नोड एलिमेंट में लिपटा होता है। उसका पथ वह पता है जिसे नीचे के एंडपॉइंट इस्तेमाल करते हैं। कंटेनर (`Row`, `Stack`, `Panel`, `Card`, `Tabs`, `Split`) हर चाइल्ड को उसी तरह लपेटते हैं, और चाइल्ड का पथ उसका इंडेक्स जोड़ता है: बॉडी आइटम 1 के पहले चाइल्ड का तीसरा चाइल्ड `"1.0.2"` है।
+
+```html
+<div class="z-node" data-zeyn-node="1">
+  <div class="z-node" data-zeyn-node="1.0">...</div>
+</div>
+```
+
+एंडपॉइंट `node` को बिंदु वाली स्ट्रिंग के रूप में या, बॉडी आइटम के लिए, सादी संख्या (`0`) के रूप में लेते हैं। पथों में अधिकतम 16 अंक स्तर होते हैं; बाकी सब `422` से अस्वीकार होता है।
+
+## 3. एट्रिब्यूट जो रनटाइम पढ़ता है
+
+| एट्रिब्यूट | किस पर | अर्थ |
+|---|---|---|
+| `data-zeyn-effect` | button, `tr` | क्लिक पर चलने वाला JSON effect (पंक्तियाँ: डबल क्लिक या Enter पर) |
+| `aria-keyshortcuts` | button | कीबोर्ड शॉर्टकट, उदाहरण के लिए `Control+N` |
+| `data-zeyn-export` | button | उसी Screen के ग्रिड का निर्यात प्रारूप (`csv`, `xlsx`) |
+| `data-zeyn-grid` | ग्रिड रूट | ग्रिड को चिह्नित करता है; इसमें `data-zeyn-mode`, `data-zeyn-paging`, `data-zeyn-page-size`, `data-zeyn-total`, `data-zeyn-next`, `data-zeyn-offset` भी हैं |
+| `data-field`, `aria-sort`, `aria-colindex` | `th` | कॉलम फ़ील्ड नाम, मौजूदा क्रम, स्थिति |
+| `data-filter`, `data-options` | `th` | फ़िल्टर इनपुट प्रकार (`text`, `number`, `money`, `date`, `datetime`, `time`, `choice`, `bool`) और choice विकल्प `[{value,label}]` |
+| `data-pin` | `th` | पिन किए कॉलम के लिए `start` या `end` (चयन और पंक्ति action कॉलम भी) |
+| `data-edit`, `data-optional` | `th` | संपादन योग्य कॉलम का इनपुट प्रकार, उन उपयोगकर्ताओं के लिए जो सहेज सकते हैं |
+| `data-zeyn-texts`, `data-zeyn-columns`, `data-zeyn-view` | ग्रिड रूट | स्थानीयकृत कंट्रोल टेक्स्ट, हर कॉलम `[{field,label,hidden,pin,width}]`, सहेजा गया व्यू |
+| `data-zeyn-views` | ग्रिड रूट | जब व्यू सर्वर पर सहेजे जाते हैं तब `server` |
+| `data-zeyn-version-field`, `data-zeyn-exportable` | ग्रिड रूट | इनलाइन संपादन के लिए पंक्ति संस्करण फ़ील्ड का नाम; जब ग्रिड निर्यात हो सके तब `csv` |
+| `data-zeyn-key`, `data-zeyn-version`, `data-zeyn-menu` | `tr` | पंक्ति कुंजी, पंक्ति संस्करण, संदर्भ मेनू आइटम |
+| `data-v` | `td` | संपादन योग्य सेल का इनपुट मान |
+| `data-zeyn-detail`, `aria-expanded` | `tr` | `{screen, params}` के रूप में पंक्ति की detail Screen; क्या वह खुली है |
+| `data-zeyn-expand` | पंक्ति में बटन | पंक्ति का detail, समूह या संतानें खोलता या बंद करता है |
+| `data-zeyn-level`, `aria-level`, `data-zeyn-path` | `treegrid` में `tr` | समूहित या ट्री ग्रिड में गहराई (शीर्ष पर 0); पंक्ति खुलने पर भेजने के लिए समूह मानों या पूर्वज कुंजियों का पथ |
+| `z-group` | `tr` | समूह शीर्षक पंक्ति; `z-branch-more` शाखा की "और लोड करें" पंक्ति है |
+| `data-zeyn-run` | पंक्ति में बटन | चलाने के लिए पंक्ति आइटम (`a0` पहली पंक्ति action है) |
+| `data-agg` | `tfoot td` | वे योग जो कॉलम दिखाता है (`sum avg min max count`) |
+| `data-zeyn-bulk` | ग्रिड से पहले div | `data-zeyn-bulk-run` बटन वाली चयन पट्टी |
+| `data-zeyn-menu` | Screen रूट | Screen का संदर्भ मेनू |
+| `data-zeyn-native-menu="off"` | `html` | ब्राउज़र का संदर्भ मेनू टेक्स्ट इनपुट को छोड़कर बंद है |
+| `data-zeyn-rows` | `tbody` | जहाँ पंक्तियाँ जाती हैं |
+| `data-zeyn-page` | पेजर बटन | `prev` या `next` |
+| `data-zeyn-page-info` | span | `1-50 of 230` जैसा टेक्स्ट, ग्रिड रूट पर स्थानीयकृत टेम्पलेट से बना |
+| `data-zeyn-text-range`, `data-zeyn-text-range-total`, `data-zeyn-text-loaded` | ग्रिड रूट | स्थानीयकृत टेम्पलेट: `{from}-{to}`, `{from}-{to} of {total}`, `{count} rows loaded` |
+| `data-zeyn-more` | div | अनंत स्क्रॉल प्रहरी, "और लोड करें" बटन रखता है |
+| `data-zeyn-submit` | form | सबमिट action का नाम |
+| `data-zeyn-editor` | input | कस्टम फ़ील्ड प्रकार का क्लाइंट साइड एडिटर |
+
+Effect:
+
+| Effect | JSON | रनटाइम क्या करता है |
+|---|---|---|
+| Window खोलना | `{"effect":"open_window","screen":"product_form","params":{...}}` | Screen को (खंड 4.1) मोडल `<dialog>` में लोड करता है |
+| नेविगेट | `{"effect":"navigate","screen":"...","params":{...}}` | `/_zeyn/route/{screen}?params=` लोड करता है जो पृष्ठ पर रीडायरेक्ट करता है, पथ रूप में जब उसके रूट में खंड हों |
+| टोस्ट | `{"effect":"toast","message":"Saved"}` | 4 सेकंड के लिए टोस्ट दिखाता है |
+| बंद करें और रिफ़्रेश | `{"effect":"close_and_refresh"}` | सबसे ऊपरी डायलॉग बंद करता है और उसके नीचे की Screen का हर ग्रिड रीलोड करता है |
+
+## 4. एंडपॉइंट
+
+सभी `POST` अनुरोध JSON भेजते हैं, उनमें `zeyn-csrf` meta टैग के टोकन के साथ हेडर `x-zeyn-csrf` होना चाहिए, और वरना वे `403` से अस्वीकार होते हैं।
+
+बिना सत्र के खुली सार्वजनिक Screen खाली `zeyn-csrf` meta टैग और बिना `Set-Cookie` के आती है, ताकि वह कैश हो सके। अपने पहले `POST` से पहले रनटाइम `GET /_zeyn/csrf` कॉल करता है, जो `Cache-Control: no-store` के साथ `{ "token": "..." }` का उत्तर देता है, जब ब्राउज़र के पास कोई न हो तब `zeyn_csrf` कुकी सेट करता है, और उन अनुरोधों को अस्वीकार करता है जिनका `Sec-Fetch-Site` `same-origin` नहीं है। टोकन meta टैग में जाता है; जब कॉल विफल हो तो `POST` बिना टोकन के जाता है और किसी भी अन्य की तरह अस्वीकार होता है। कुछ भी चुपचाप दोबारा नहीं आज़माया जाता।
+
+ऐप के भीतर नेविगेशन (`nav.js`) `x-zeyn-partial: 1` के साथ Screen माँगता है और केवल उसका HTML पाता है, पृष्ठ शीर्षक `x-zeyn-title` में। जब Screen हेड टैग सेट करती है (विवरण, canonical URL, पूर्वावलोकन छवि, robots, JSON-LD), बॉडी उन्हें रखने वाले `<template data-zeyn-head>` से शुरू होती है; `nav.js` दस्तावेज़ के हेड का हर `[data-zeyn-head]` एलिमेंट हटाता है, टेम्पलेट के टैग वहाँ रखता है और टेम्पलेट हटा देता है। बिना हेड टैग वाली Screen कोई टेम्पलेट नहीं भेजती, इसलिए पुराने टैग केवल हटाए जाते हैं।
+
+### 4.1 Screen अंश
+
+`GET /_zeyn/screen/{screen}?params={json}` केवल Screen का HTML लौटाता है, पृष्ठ शेल के बिना। Window और पंक्ति detail के लिए इस्तेमाल होता है: `data-zeyn-detail` वाली पंक्ति खोलना उसकी Screen को ठीक उसके नीचे नए `tr.z-detail` में लोड करता है (एक सेल जो पंक्ति भर फैला है और `role="region"` रखता है), और बंद करना उस पंक्ति को हटाता है। Screen की अनुमति किसी भी Screen की तरह जाँची जाती है; detail के भीतर के ग्रिड सर्वर से detail Screen के अपने नाम और params के साथ बात करते हैं।
+
+### 4.2 ग्रिड पंक्तियाँ
+
+`POST /_zeyn/grid`
+
+```json
+{
+  "screen": "product_list",
+  "params": null,
+  "node": 0,
+  "query": {
+    "page": { "type": "offset", "offset": 0, "limit": 50 },
+    "sort": [{ "field": "code", "desc": false }],
+    "filters": [{ "field": "name", "contains": "tea" }, { "field": "price", "from": "10", "to": "99.90" }],
+    "with_total": true,
+    "aggregates": [{ "field": "price", "op": "sum" }]
+  },
+  "view": { "columns": [{ "field": "code", "width": 140, "pin": "start" }, { "field": "name" }] },
+  "head": false
+}
+```
+
+फ़िल्टर `contains`, `starts_with`, `equals`, `from`, `to`, `any_of` और `is` सेट कर सकते हैं (देखें `docs/grid.md`)। `view.columns` वह कॉलम लेआउट है जिसमें पंक्तियाँ रेंडर करनी हैं; `head: true` के साथ उत्तर में `head`, शीर्षक पंक्ति, भी होती है।
+
+अनंत स्क्रॉल के लिए `page` `{ "type": "after", "cursor": "...", "limit": 100 }` है और पहले बैच के लिए `cursor` `null` है।
+
+उत्तर `200`:
+
+```json
+{ "rows": "<tr>...</tr>", "foot": "<tr>...</tr>", "head": null, "count": 50, "total": 230, "next": "50" }
+```
+
+`foot` योग पंक्ति है जब योग माँगे गए हों, वरना `null`।
+
+`total` और `next` `null` हो सकते हैं। रनटाइम पृष्ठबद्ध ग्रिड के लिए पंक्तियाँ बदलता है और अनंत स्क्रॉल के लिए जोड़ता है।
+
+समूहित और ट्री ग्रिड (`<table role="treegrid">`) शाखा लोड करने के लिए `POST /_zeyn/grid` के साथ `path` भेजते हैं: खुल रही पंक्ति के समूह मान (या पूर्वज कुंजियाँ), जैसे उसके `data-zeyn-path` में मिलते हैं। उत्तर का रूप वही है; `rows` में समूह पंक्तियाँ या एक स्तर गहरी पंक्तियाँ हैं, और `total` उन्हें गिनता है। रनटाइम उन्हें खुली पंक्ति के बाद रखता है और पंक्ति बंद होने पर उसके बाद की हर गहरी पंक्ति हटाता है। ग्रिड के समूह स्तरों से (या ट्री में 32 से) लंबा पथ `404` है।
+
+### 4.2.1 और ग्रिड एंडपॉइंट
+
+| एंडपॉइंट | बॉडी | क्या करता है |
+|---|---|---|
+| `POST /_zeyn/grid/view` | `{screen, params, node, view}` | उपयोगकर्ता का व्यू सहेजता है (`null` हटाता है)। `204`; व्यू स्टोर के बिना `404` |
+| `POST /_zeyn/grid/run` | `{screen, params, node, key, item}` | पंक्ति आइटम चलाता है (`a0` पंक्ति action, `m2.1` मेनू पथ)। सर्वर पंक्ति को कुंजी से लोड करता है और इनपुट बनाता है। `{effects}` |
+| `POST /_zeyn/grid/bulk` | `{screen, params, node, action, keys, all, query}` | चुनी गई कुंजियों के साथ, या `all` होने पर `query.filters` से मेल खाती हर पंक्ति के साथ, बल्क action चलाता है। `{effects, count}` |
+| `POST /_zeyn/grid/edit` | `{screen, params, node, key, values, view}` | इनलाइन संपादन सहेजता है; `values` में संपादित कॉलम और पंक्ति संस्करण वैसे हैं जैसे फ़ॉर्म भेजता है। `{row}`; जो कॉलम संपादन योग्य नहीं हैं उनके लिए `403`, `409`, `422` |
+| `GET /_zeyn/grid/export` | `?screen&params&node&q={sort,filters,columns}` | हर मेल खाती पंक्ति को CSV के रूप में स्ट्रीम करता है |
+| `POST /_zeyn/menu` | `{screen, params, item}` | Screen के संदर्भ मेनू का action आइटम चलाता है |
+
+### 4.3 फ़ॉर्म सबमिट
+
+`POST /_zeyn/form`
+
+```json
+{ "screen": "product_form", "params": { "id": 7 }, "node": 0, "values": { "code": "P-001", "price": "1.234,56", "active": true } }
+```
+
+मान वैसे भेजे जाते हैं जैसे उपयोगकर्ता ने टाइप किए: इनपुट और select के लिए स्ट्रिंग, चेकबॉक्स के लिए बूलियन। सर्वर उन्हें फ़ील्ड प्रकार से पार्स करता है।
+
+सर्वर उस मॉडल से शुरू करता है जो Screen ने लोड किया और केवल उन फ़ील्ड को ओवरराइट करता है जो फ़ॉर्म पर हैं और केवल पढ़ने योग्य नहीं हैं। क्लाइंट के अन्य मान अनदेखे किए जाते हैं। कुंजियाँ कभी क्लाइंट से नहीं आतीं।
+
+उत्तर:
+
+- `200 { "effects": [ ... ] }`: सहेजा गया; effect क्रम से चलाएँ।
+- `422 { "errors": [ { "field": "code", "rule": { "rule": "required" }, "message": "Code is required." } ] }`: हर संदेश उसके फ़ील्ड के नीचे दिखाएँ (`#{scope}-{field}-error`), इनपुट पर `aria-invalid="true"` सेट करें और पहले अमान्य इनपुट पर फ़ोकस करें। खाली `field` वाली त्रुटियाँ फ़ॉर्म के शीर्ष पर दिखाई जाती हैं।
+
+### 4.4 त्रुटियाँ
+
+कोई भी एंडपॉइंट इनसे उत्तर दे सकता है:
+
+| स्टेटस | बॉडी | अर्थ |
+|---|---|---|
+| `403` | `{ "error": "forbidden", "message": "..." }` | अनुमति नहीं, गार्ड ने अस्वीकार किया या खराब CSRF टोकन |
+| `404` | `{ "error": "not_found", "message": "..." }` | अज्ञात Screen या नोड |
+| `409` | `{ "error": "conflict", "message": "..." }` | किसी और ने रिकॉर्ड बदल दिया |
+| `422` | देखें 4.3 | सत्यापन |
+| `504` | `{ "error": "timeout", "message": "..." }` | कॉल ने सर्वर की सीमा से अधिक समय लिया |
+| `500` | `{ "error": "internal", "message": "An unexpected error occurred." }` | विवरण केवल सर्वर लॉग में हैं |
+
+रनटाइम `message` को त्रुटि टोस्ट के रूप में दिखाता है।
+
+### 4.5 भाषा
+
+`{ "locale": "tr" }` के साथ `POST /_zeyn/locale` चुनाव को `zeyn_locale` कुकी में रखता है और `204` का उत्तर देता है। रनटाइम पृष्ठ रीलोड करता है। कुकी के बिना सर्वर `Accept-Language` से चुनता है, फिर ऐप के डिफ़ॉल्ट से। `<html lang>` हमेशा चुनी गई locale से मेल खाता है।
+
+जब ऐप में एक से अधिक locale हों तो शेल भाषा चयनकर्ता (`select[data-zeyn-locale]`) रेंडर करता है।
+
+### 4.6 थीम
+
+शेल थीम चयनकर्ता (`select[data-zeyn-theme-picker]`) रेंडर करता है जब तक ऐप उसे छिपाए नहीं या एक ही थीम न दे। हर विकल्प `data-scheme` (`light`, `dark`, System के लिए खाली) और ऐप थीम `data-custom` रखता है। बदलाव पर रनटाइम `<html>` पर `data-theme` और `data-zeyn-theme` और `color-scheme` meta तुरंत सेट करता है, फिर `{ "theme": "dark" }` के साथ `POST /_zeyn/theme` भेजता है। सर्वर `zeyn_theme` कुकी के साथ `204` का उत्तर देता है, या ऐसी थीम के लिए `404` जो ऐप नहीं देता। पृष्ठ उस कुकी की थीम से रेंडर होते हैं, इसलिए कोई रीलोड नहीं और कोई झिलमिलाहट नहीं। देखें `docs/theming.md`।
+
+### 4.7 एंटरप्राइज़ एंडपॉइंट
+
+`enterprise.js` और `enterprise.css` रनटाइम के बगल में लोड होते हैं। विवरण `docs/enterprise.md` में हैं।
+
+| एंडपॉइंट | उद्देश्य |
+| --- | --- |
+| `POST /_zeyn/reveal {screen, params, node, field, key?}` | मास्क किए फ़ील्ड का कच्चा मान, `{value}`; unmask अनुमति चाहिए, हमेशा ऑडिट होता है |
+| `POST /_zeyn/reason {screen, reason}` | `reason` चिह्नित Screen का कारण; `HttpOnly` कुकी के साथ `204` |
+| `POST /_zeyn/import {screen, params, node, csv, commit}` | CSV पूर्वावलोकन (`commit: false`) या इम्पोर्ट |
+| `POST /_zeyn/keepalive` | निष्क्रियता चेतावनी के बाद "साइन इन रहें"; `204` |
+| `GET /_zeyn/health`, `GET /_zeyn/ready` | Liveness और readiness; health पर दर सीमा नहीं, readiness केवल `probe_ips` से |
+| `GET /_zeyn/jobs` | जॉब अनुमति वाले उपयोगकर्ताओं के लिए जॉब स्थिति |
+
+हर उत्तर `x-zeyn-build` रखता है। जिन अस्वीकृतियों पर रनटाइम कार्रवाई करता है: `428 reason_required` (कारण माँगता है और अनुरोध दोहराता है) और `401 reauth_required` (उपयोगकर्ता से फिर साइन इन करने को कहता है और अनुरोध दोहराता है)।
+
+## 5. सुरक्षा
+
+- हर उत्तर `Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`, `X-Content-Type-Options: nosniff` और `Referrer-Policy: same-origin` सेट करता है। `App::csp` नामित `https` होस्ट को `img-src`, `media-src` (और `blob:`), `frame-src`, `connect-src` और `font-src` में जोड़ता है; अन्य directive कभी नहीं बदलते। हेडर टेक्स्ट स्टार्टअप पर एक बार बनता है।
+- कोई इनलाइन स्क्रिप्ट या इनलाइन इवेंट हैंडलर नहीं। इनलाइन `style` एट्रिब्यूट केवल CSS custom properties (`--z-width`, `--z-flex`) और निश्चित कॉलम चौड़ाई के लिए इस्तेमाल होते हैं, इसलिए नीति `style-src-attr 'unsafe-inline'` जोड़ती है। स्क्रिप्ट सख़्त रहती हैं।
+- CSRF टोकन `HttpOnly`, `SameSite=Strict` कुकी में रखा जाता है और `x-zeyn-csrf` हेडर से constant time में तुलना होता है।
+- हर कॉल क्रम से जाँचती है: प्रमाणीकरण, Screen का एक्सेस, feature के गार्ड, नोड action का एक्सेस, फिर इंटरसेप्टर और action चलाती है।
+
+### 4.6 वर्चुअल स्क्रॉलिंग
+
+`data-zeyn-paging="virtual"` वाले ग्रिड हर पंक्ति पर एक स्क्रॉल होने योग्य सूची दिखाते हैं, चाहे कितनी भी हों। सर्वर `data-zeyn-total` के साथ पहला ब्लॉक (`data-zeyn-page-size` पंक्तियाँ, ऑफ़सेट 0) रेंडर करता है। ग्रिड रूट में `data-zeyn-row-height` (पिक्सेल) और CSS वेरिएबल `--z-row-height` भी होते हैं।
+
+रनटाइम:
+
+- तालिका बॉडी को स्क्रॉल कंटेनर में रखता है जिसका भीतरी spacer `total * rowHeight` पिक्सेल ऊँचा है, 8,000,000 px पर सीमित। सीमा से ऊपर, स्क्रॉल स्थिति अनुपात से पंक्ति इंडेक्स से मैप होती है (`row = scrollTop / (spacerHeight - viewport) * (total - visibleRows)`), इसलिए 1,000,000 पंक्तियाँ भी अंत तक पहुँचती हैं।
+- DOM में केवल दिखती पंक्तियाँ और ऊपर-नीचे 20 पंक्तियाँ रखता है, `transform: translateY(...)` से स्थित। पंक्तियों की ऊँचाई निश्चित है; लंबा टेक्स्ट ellipsis से काटा जाता है।
+- `data-zeyn-page-size` पंक्तियों के ब्लॉक `POST /_zeyn/grid` से और `page: { "type": "offset", "offset": blockStart, "limit": blockSize }`, पहली कॉल के बाद `with_total: false` के साथ लोड करता है। कैश में 20 ब्लॉक तक रखता है (सबसे कम हाल में इस्तेमाल हुआ बाहर), स्क्रॉल दिशा में अगला ब्लॉक पहले से लाता है, और जो ब्लॉक दृश्य से बाहर गए उनके अनुरोध रद्द करता है (`AbortController`)।
+- ब्लॉक लोड होते समय दिखती पंक्तियाँ कभी साफ़ नहीं करता। छूटी पंक्तियाँ ब्लॉक आने तक `aria-busy="true"` वाली प्लेसहोल्डर पंक्ति दिखाती हैं, इसलिए Screen झिलमिलाती नहीं।
+- क्रम और फ़िल्टर के बदलाव कैश छोड़ते हैं और शीर्ष पर स्क्रॉल करते हैं।
+- कीबोर्ड: तीर कुंजियाँ, Page Up, Page Down, Home और End सक्रिय पंक्ति चलाते हैं और उसे दृश्य में स्क्रॉल करते हैं। तालिका में `aria-rowcount` = total और हर पंक्ति में `aria-rowindex` है।
+- स्थिति टेक्स्ट (`data-zeyn-page-info`) `data-zeyn-text-range-total` इस्तेमाल करता है।
+
+## 6. रनटाइम व्यवहार
+
+- JavaScript के बिना, पृष्ठ फिर भी हर ग्रिड के पहले पृष्ठ के साथ रेंडर होते हैं। फ़ॉर्म और पृष्ठांकन को रनटाइम चाहिए।
+- कीबोर्ड: तीर कुंजियाँ ग्रिड पंक्तियों के बीच चलती हैं, Enter पंक्ति खोलता है, Escape सबसे ऊपरी डायलॉग बंद करता है, `aria-keyshortcuts` के शॉर्टकट टेक्स्ट इनपुट के भीतर को छोड़कर हर जगह काम करते हैं। ग्रिड में: Space पंक्ति चुनता है, F2 उसे संपादित करता है, Ctrl+Z आखिरी संपादन पूर्ववत करता है, Shift+F10 या संदर्भ मेनू कुंजी पंक्ति या शीर्षक का मेनू खोलती है, Shift+क्लिक कई कॉलम से क्रम लगाता है, Right और Left (दाएँ से बाएँ पृष्ठों में उलटे) पंक्ति का detail, समूह या संतानें खोलते और बंद करते हैं, और चाइल्ड पंक्ति पर Left उसके पैरेंट पर जाता है। पंक्ति पर Right उसके सेल में जाता है: तीर, Home, End, Ctrl+Home, Ctrl+End, Tab और Shift+Tab सेल कर्सर चलाते हैं, Shift रेंज बढ़ाता है (सेल पर `aria-selected`), Ctrl+C रेंज को टैब से अलग टेक्स्ट के रूप में कॉपी करता है और Ctrl+V संपादन योग्य सेल में पेस्ट करता है, हर बदली पंक्ति के लिए एक `POST /_zeyn/grid/edit`। 40 या अधिक कॉलम वाले ग्रिड पृष्ठ में केवल दिख रहे कॉलम रखते हैं (निश्चित चौड़ाई वाला `colgroup`, `colspan` वाले `td.z-col-gap` spacer, सेल पर `aria-colindex`)।
+- राइट क्लिक Zeyn का मेनू खोलता है जहाँ कोई परिभाषित है (शीर्षक, `data-zeyn-menu` वाली पंक्तियाँ, `data-zeyn-menu` वाली Screen); बाकी हर जगह ब्राउज़र का अपना मेनू रहता है।
+- डायलॉग खुलने पर फ़ोकस उसमें जाता है और बंद होने पर खोलने वाले पर लौटता है।
+- क्लाइंट साइड जाँचें (`required`, `minlength`, `maxlength`, `min`, `max`, `type="email"`) सबमिट से पहले ब्राउज़र के constraint validation API से चलती हैं। सर्वर हमेशा फिर सत्यापित करता है।
+
+## 7. कंपोनेंट लाइब्रेरी
+
+`zeyn::ui` कंपोनेंट दो और एसेट से परोसे जाते हैं, जो पृष्ठ हेड में रनटाइम के बाद जुड़ते हैं: `/_zeyn/components.js` और `/_zeyn/components.css`। रनटाइम की तरह, उन्हें साइन इन नहीं चाहिए।
+
+### 7.1 एंडपॉइंट
+
+सभी JSON और CSRF हेडर के साथ `POST` हैं, और पहले Screen का एक्सेस और feature के गार्ड जाँचते हैं।
+
+| एंडपॉइंट | बॉडी | उत्तर |
+|---|---|---|
+| `/_zeyn/node` | `{ screen, params, node }` | एक नोड का HTML उसके ग्रिड के पहले पृष्ठ के साथ। lazy टैब द्वारा इस्तेमाल। |
+| `/_zeyn/data` | `{ screen, params, node, key, input }` | नोड के डेटा स्रोत `key` से JSON: lookup विकल्प (`key` फ़ील्ड नाम है), ट्री संतानें (`key` खाली है), चरण जाँच (`key` `_step` है)। स्रोत की action अनुमति जाँची जाती है और इंटरसेप्टर चलते हैं, जैसे ग्रिड के लिए। जो इनपुट action में न बैठे वह `404` से अस्वीकार होता है। |
+| `/_zeyn/parse` | `{ kind, text, label }` | सर्वर टाइप की गई तारीख़ या समय को उपयोगकर्ता की भाषा, क्षेत्र और घड़ी में कैसे पढ़ता है: `{ ok, text, iso, utc, zone }` या `{ ok: false, message }`। `kind` `date`, `time`, `datetime`, `local` या `presets` (आज और त्वरित सीमाएँ) है। |
+
+### 7.2 मान जो फ़ॉर्म सबमिट करते हैं
+
+- Lookup आईडी टेक्स्ट के रूप में सबमिट करते हैं: `"7"`, या कई के लिए `"3,7,9"`।
+- Lines `"{field}": "rows"` और हर सेल के लिए एक मान `"{field}.{line}.{column}"` के रूप में सबमिट करती हैं, साथ में `"{field}.{line}._i"`, उस लोड की गई पंक्ति का इंडेक्स जहाँ से पंक्ति आई (नई पंक्तियों के लिए खाली)। सर्वर हर पंक्ति को उसकी लोड की गई पंक्ति से फिर बनाता है, इसलिए केवल दिखाए, संपादन योग्य कॉलम बदलते हैं।
+- पंक्ति की सत्यापन त्रुटियाँ `{ "field": "lines", "rule": { "rule": "line", "value": { "row": 0, "field": "quantity" } } }` इस्तेमाल करती हैं।
+
+### 7.3 इवेंट
+
+| इवेंट | किस पर | विवरण |
+|---|---|---|
+| `zeyn:content` | `document` | नई सामग्री वाला एलिमेंट (नेविगेशन, lazy पैनल)। दोनों स्क्रिप्ट वह सब सेट करती हैं जो उसमें है। |
+| `zeyn:errors` | फ़ॉर्म | `422` त्रुटियाँ, रनटाइम के उन्हें दिखाने के बाद। लाइन एडिटर और चरणबद्ध फ़ॉर्म इसका उपयोग करते हैं। |
+| `zeyn:effect` | `document` | वह effect जिसे रनटाइम नहीं जानता: `{ effect, source, run }`। `run(next)` दूसरा effect चलाता है। `confirm` द्वारा इस्तेमाल। |
+
+Effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":"...","then":{...}}` मोडल alert डायलॉग में पूछता है और उपयोगकर्ता के पुष्टि करने के बाद ही `then` चलाता है।
+
+### 7.4 मीडिया
+
+`Video` और `Audio` `/_zeyn/media.js` और `/_zeyn/media.css` से परोसे जाते हैं, जो कंपोनेंट लाइब्रेरी के बाद जुड़ते हैं। देखें `docs/media.md`।
+
+| एंडपॉइंट | क्या करता है |
+|---|---|
+| `GET /_zeyn/media/{source}/{id}` | रेंज अनुरोधों के साथ पंजीकृत मीडिया स्रोत की फ़ाइल: `200`, `206`, `304`, `416`। |
+| `GET /_zeyn/media/position?source=&id=` | `{ at, kept }`, जहाँ साइन इन उपयोगकर्ता रुका; जब स्रोत कोई स्थिति नहीं रखता तब `kept` `false` है (तब प्लेयर local storage इस्तेमाल करता है)। |
+| `POST /_zeyn/media/position` | CSRF हेडर के साथ `{ source, id, at }` इसे सहेजता है: `204`, खराब स्थिति के लिए `422`। |
+
+### 7.5 Islands
+
+`islands` feature के साथ, `div[data-zeyn-island]` रखने वाली Screen `<meta name="zeyn-islands">` (island नाम से `{ js, wasm }` URL), `/_zeyn/islands.js` और `'wasm-unsafe-eval'` वाली नीति के साथ परोसी जाती है; अन्य पृष्ठ अपरिवर्तित हैं। जो आंशिक उत्तर island रखता है उसमें `x-zeyn-islands: 1` होता है, और जब दस्तावेज़ में island नीति न हो तो `nav.js` उसे पूरा लोड करता है।
+
+| एट्रिब्यूट या एंडपॉइंट | अर्थ |
+|---|---|
+| `data-zeyn-island`, `data-zeyn-load`, `data-zeyn-props` | island का नाम, `visible`, `interaction` या `idle`, props JSON |
+| `data-zeyn-island-fallback` | फ़ॉलबैक सामग्री, island के माउंट होने पर छिप जाती है |
+| `data-zeyn-island-state` | लोडर द्वारा सेट: `loading`, `ready`, `failed` |
+| `GET /_zeyn/islands/{file}` | मैनिफ़ेस्ट में सूचीबद्ध बनी हुई फ़ाइल, एक वर्ष के लिए कैश |
+| `key` = remote नाम के साथ `POST /_zeyn/data` | island से टाइप्ड कॉल, 7.1 की सभी जाँचों के साथ |
+
+देखें `docs/islands.md`।
+
+### 7.6 Realtime
+
+`realtime` feature के साथ, `div[data-zeyn-live="topic"]` उन नोड को चिह्नित करता है जो तब रिफ़्रेश होते हैं जब सर्वर topic को सूचित करे। जिन पृष्ठों में एक हो वे `/_zeyn/live.js` जोड़ते हैं; जिस आंशिक उत्तर में एक हो वह `x-zeyn-live: 1` रखता है और `nav.js` स्क्रिप्ट इम्पोर्ट करता है। किसी एलिमेंट पर `zeyn:reload` उसके भीतर के ग्रिड उसी जगह रीलोड करता है।
+
+| एंडपॉइंट | क्या करता है |
+|---|---|
+| `GET /_zeyn/live/topics?t=a,b&csrf=` | WebSocket; टेक्स्ट फ़्रेम `{ "topic": "a" }` |
+| `GET /_zeyn/live/doc/{kind}/{doc}?csrf=` | WebSocket; बाइनरी फ़्रेम `0x01` + Y अपडेट (v1) दोनों दिशाओं में |
+
+हैंडशेक अपग्रेड से पहले origin, कुकी के विरुद्ध CSRF टोकन, साइन इन उपयोगकर्ता और अनुमतियाँ जाँचते हैं। देखें `docs/realtime.md`।
+
+प्लेयर प्रोग्रेसिव फ़ाइलों पर लौटने से पहले अपनी रूट पर रद्द करने योग्य `zeyn:media-adaptive` इवेंट (`{ media, kind, url, hls, dash }`) भेजता है; स्ट्रीमिंग लाइब्रेरी नियंत्रण लेने के लिए `preventDefault()` कॉल करती है।
+
+## 8. डेस्कटॉप श्रेणी का शेल
+
+`/_zeyn/pro.js` और `/_zeyn/pro.css` कंपोनेंट लाइब्रेरी के बाद लोड होते हैं। रनटाइम की तरह उन्हें साइन इन नहीं चाहिए।
+
+### 8.1 कमांड और पैलेट
+
+कमांड Rust में घोषित होते हैं (`Command::open`, `Command::navigate`, `Command::effect`, `Command::action`) और `Feature::command` से पंजीकृत होते हैं। शेल हर उस कमांड के लिए एक छिपा बटन रेंडर करता है जिसे उपयोगकर्ता चला सकता है (feature गार्ड पास हों और कमांड का एक्सेस अनुमति दे) `div[data-zeyn-commands]` के भीतर:
+
+| एट्रिब्यूट | अर्थ |
+|---|---|
+| `data-zeyn-command` | कमांड आईडी |
+| `data-zeyn-effect` | effect कमांड का effect, क्लिक पर रनटाइम चलाता है |
+| `data-zeyn-command-run` | action कमांड की आईडी, `POST /_zeyn/command` से चलाई जाती है |
+| `aria-keyshortcuts` | सामान्यीकृत शॉर्टकट (`Control+Alt+N`); रनटाइम की शॉर्टकट हैंडलिंग बटन पर क्लिक करती है |
+| `data-hint`, `data-icon` | उपयोगकर्ताओं को दिखाया जाने वाला शॉर्टकट, आइकन का नाम |
+| कंटेनर पर `data-text-*` | स्थानीयकृत पैलेट टेक्स्ट |
+
+`App::check` उन शॉर्टकट को अस्वीकार करता है जो पढ़े नहीं जा सकते, एकल वर्ण वाले शॉर्टकट (WCAG 2.1.4), पैलेट का अपना शॉर्टकट, दो कमांड द्वारा इस्तेमाल हुए शॉर्टकट या आईडी, जिन शॉर्टकट को ब्राउज़र पृष्ठ को कभी नहीं देता (`BROWSER_RESERVED`: `Ctrl+N`, `Ctrl+T`, `Ctrl+W`, `Ctrl+Tab`, `Alt+F4` और उनके macOS रूप) और, जब तक कमांड `.override_browser()` न बुलाए, जिन शॉर्टकट को ब्राउज़र इस्तेमाल करता है (`BROWSER_DEFAULTS`: प्रिंट, सेव, खोज, पता पट्टी, रीलोड, ज़ूम, डेवलपर टूल, कॉपी और पेस्ट, `F1` से `F12`)। टूलबार बटन रन टाइम पर यही नियम मानते हैं: ऐसा शॉर्टकट बाँधा नहीं जाता और कारण लॉग होता है। खाली संयोजन `Alt+Shift+<letter>` और `Ctrl+Alt+<letter>` हैं।
+
+`Alt+Shift+P` (macOS पर Option+Shift+P) डिफ़ॉल्ट रूप से पैलेट खोलता है; `App::palette_shortcut("Ctrl+Shift+P")` इसे बदलता है, जान-बूझकर ब्राउज़र की इस्तेमाल की कुंजी में भी। शॉर्टकट `data-palette-keys` में है, और अक्षर भौतिक कुंजी से मेल खाते हैं ताकि Option और AltGr इसे न तोड़ें। पैलेट मेनू में `button[data-zeyn-palette-open]` से भी खुलता है। यह ARIA combobox और listbox वाला मोडल `<dialog>` है। यह ऐप के कमांड, मौजूदा Screen (जब Window खुली हो तो सबसे ऊपरी Window) के टूलबार बटन, मेनू बार कमांड और संदर्भ मेनू आइटम, और मेनू की Screen सूचीबद्ध करता है। मिलान fuzzy है और अक्षर के छोटे-बड़े और उच्चारण चिह्नों की अनदेखी करता है; हाल में चलाए आठ कमांड पहले आते हैं (`localStorage` कुंजी `zeyn.palette.recent`)। Escape इसे बंद करता है और फ़ोकस वहीं लौटता है जहाँ था।
+
+| एंडपॉइंट | बॉडी | उत्तर |
+|---|---|---|
+| `POST /_zeyn/command` | `{ command }` | सर्वर पर तय इनपुट के साथ action कमांड चलाता है: CSRF, feature गार्ड, action की अनुमति और इंटरसेप्टर। `{ effects }`; अज्ञात आईडी और effect कमांड के लिए `404` |
+| `POST /_zeyn/search` | `{ query }` | हर वह `Feature::search` चलाता है जो उपयोगकर्ता चला सकता है (CSRF, feature गार्ड, action की अनुमति, इंटरसेप्टर), क्वेरी को 100 अक्षरों पर काटकर। `{ hits: [{ label, group, url }] }`, अधिकतम 20, केवल ऐप पथ |
+
+जब कंटेनर में `data-search` हो, पैलेट आखिरी कुंजी के 150 ms बाद क्वेरी भेजता है (दो या अधिक अक्षर) और परिणाम कमांड के नीचे सूचीबद्ध करता है। केवल सबसे ताज़ा क्वेरी का उत्तर बनाया जाता है। परिणाम चुनना `url` के आगे बेस पथ के साथ `zeyn:navigate` भेजता है; उसमें `#anchor` Screen बदलने के बाद उस एलिमेंट पर स्क्रॉल करता है।
+
+रनटाइम `document` पर `zeyn:run` सुनता है ताकि अन्य स्क्रिप्ट उसके ज़रिए काम चलाएँ: `{ effects, source }` effect चलाता है, `{ screen, item }` Screen के संदर्भ मेनू का आइटम चलाता है, `{ error }` त्रुटि टोस्ट दिखाता है।
+
+### 8.2 मेनू बार, टूलबॉक्स, प्रॉपर्टी इंस्पेक्टर, स्टेटस बार
+
+| मार्कअप | व्यवहार |
+|---|---|
+| `ul[role=menubar][data-zeyn-menubar]` | W3C APG menubar। शीर्ष आइटम roving tab stop वाले `button[role=menuitem][aria-haspopup=menu]` हैं; हर एक `ul[role=menu]` को नियंत्रित करता है जो बंद रहने पर `hidden` है। आइटम 8.1 के कमांड एट्रिब्यूट रखते हैं। Left और Right मेनू के बीच चलते हैं, Down, Enter और Space खोलते हैं, Up आखिरी आइटम पर खोलता है, Home और End कूदते हैं, अक्षर उससे शुरू होने वाले अगले आइटम पर जाता है, Escape बंद करके बार पर लौटाता है, Tab और बाहर क्लिक बंद करते हैं। जिन मेनू और आइटम को उपयोगकर्ता नहीं चला सकता वे रेंडर नहीं होते। |
+| `div[role=toolbar][aria-orientation=vertical][data-zeyn-toolbox]` | `button.z-tool[aria-pressed]` का टॉगल समूह। तीर, Home और End roving tab stop चलाते हैं; क्लिक, Enter या Space एक टूल चालू करता है, `zeyn:tool` (`detail.tool`) भेजता है और `data-text-selected` को स्टेटस बार में लिखता है। |
+| `section.z-inspector` | `Form::section` समूहों वाला फ़ॉर्म (`role=group` बॉडी वाले `details.z-form-section`) जो इंस्पेक्टर के नोड पथ पर `POST /_zeyn/form` से सहेजा जाता है। विफल फ़ील्ड वाले खंड ब्राउज़र की जाँचों से पहले और `422` के बाद खुलते हैं। |
+| `div[data-zeyn-statusbar]` | शुरुआत और अंत में आइटम और `[data-zeyn-status-live]` (`role=status`, `aria-live=polite`)। Screen के किसी भी एलिमेंट से `zeyn:status` (`detail.text`) लाइव टेक्स्ट बदलता है। |
+
+### 8.3 डॉकिंग पैनल
+
+`div.z-dock[data-zeyn-dock]` चार `section.z-dock-area[data-area]` (`left`, `center`, `bottom`, `right`) और तीन `div.z-dock-bar[role=separator][data-edge]` विभाजकों का ग्रिड है। आकार custom properties `--z-dock-left`, `--z-dock-right` (चौड़ाई का प्रतिशत) और `--z-dock-bottom` (ऊँचाई का प्रतिशत) हैं, 10 से 60। हर क्षेत्र में खींचे जाने योग्य `button.z-dock-tab[data-panel]` का `role=tablist`, एक विकल्प बटन और चाइल्ड नोड रखने वाले `role=tabpanel` पैनल हैं (पथ किसी भी कंटेनर की तरह; पैनल हिलने पर वे कभी नहीं बदलते)। खुले पैनल के बिना साइड क्षेत्र छिपे रहते हैं।
+
+कीबोर्ड: Left और Right (दाएँ से बाएँ पृष्ठों में उलटे), Home और End क्षेत्र के खुले टैब के बीच चलते हैं; Delete फ़ोकस किया पैनल बंद करता है; Shift+F10 या संदर्भ मेनू कुंजी क्षेत्र के विकल्प खोलती है (दूसरे क्षेत्र में ले जाना, बंद करना, बंद पैनल दिखाना); विभाजक पर तीर 5 प्रतिशत से आकार बदलते हैं, Home और End सीमाओं तक जाते हैं। `MenuList::panels` से बनी मेनू बार प्रविष्टि हर पैनल को `menuitemcheckbox` के रूप में सूचीबद्ध करती है। बदलाव `[data-zeyn-dock-live]` में घोषित होते हैं।
+
+| एंडपॉइंट | बॉडी | उत्तर |
+|---|---|---|
+| `POST /_zeyn/dock` | `{ screen, params, node, save: false }` | `{ layout }`: साइन इन उपयोगकर्ता का सहेजा लेआउट या `null` |
+| `POST /_zeyn/dock` | `{ screen, params, node, save: true, layout }` | `204`; `layout: null` इसे हटाता है |
+
+`layout` टैब क्रम में `{ sizes: { left, right, bottom }, panels: [{ id, area, open, active }] }` है। सर्वर CSRF, Screen का एक्सेस और feature के गार्ड जाँचता है, केवल डॉक के अपने पैनल रखता है (प्रत्येक एक बार) और आकार सीमित करता है, फिर इसे ऐप के व्यू स्टोर (`App::datagrid_views`) में टेनेंट, Screen और नोड के नीचे सहेजता है। स्टोर के बिना एंडपॉइंट `404` का उत्तर देता है और उपयोगकर्ता के बिना `403`; तब ब्राउज़र लेआउट `localStorage` में रखता है।
+
+## 9. AI एजेंट: MCP और WebMCP
+
+बाहरी AI एजेंट ऐप तक दो दरवाज़ों से पहुँचते हैं, दोनों डिफ़ॉल्ट रूप से बंद और `App::mcp` से चालू होते हैं:
+
+| सेटिंग | MCP एंडपॉइंट | WebMCP टूल | लेखन |
+|---|---|---|---|
+| `Mcp::off()` (डिफ़ॉल्ट) | `404` | `404` | नहीं |
+| `Mcp::read_only()` | चालू | चालू | नहीं |
+| `Mcp::on()` | चालू | चालू | फ़ॉर्म सेव और API action जो लिखती हैं |
+
+`.server(false)` और `.webmcp(false)` एक दरवाज़ा बंद करते हैं। `zeyn new` से बने नए प्रोजेक्ट `Mcp::read_only()` से शुरू होते हैं।
+
+बंद क्यों: एंडपॉइंट वैध `Authorization` हेडर रखने वाले किसी भी व्यक्ति को मॉडल के ज़रिए ऐप चलाने देता है, और मॉडल को उस डेटा से मोड़ा जा सकता है जो वह पढ़ता है। फ्रेमवर्क हर ऐप को एजेंट के लिए तैयार करता है (टूल कोड से जनरेट होते हैं, कुछ लिखना नहीं), लेकिन ऐप वह दरवाज़ा खोले या नहीं, और एजेंट लिख सकें या नहीं, यह उन लोगों का निर्णय है जो उसे चलाते हैं। केवल पढ़ने वाला मोड एक पंक्ति दूर है।
+
+### 9.1 टूल
+
+टूल साइन इन उपयोगकर्ता के लिए ऐप से बनते हैं:
+
+- हर ग्रिड के लिए एक खोज टूल (`{screen}_{node}_search`, इनपुट: `DataQuery`) और, लेखन के साथ, उस हर रूट वाली Screen के हर फ़ॉर्म के लिए एक सेव टूल (`{screen}_{node}_save`, इनपुट: फ़ॉर्म मान जैसे टाइप किए गए) जो बिना params के खुलती है;
+- हर प्रकाशित API action के लिए एक टूल (`api_{feature}_{action}`)। जिस action का इनपुट `DataQuery` है वह पढ़ती है; हर अन्य API action लेखन गिनी जाती है।
+
+विवरण Screen शीर्षक, Screen और action की `///` डॉक टिप्पणी के पहले अनुच्छेद और उनके `ai = "..."` मार्गदर्शन से बनता है। जो ग्रिड और फ़ॉर्म उपयोगकर्ता इस्तेमाल नहीं कर सकता, और `ai = false` चिह्नित Screen और action, कभी सूचीबद्ध नहीं होते और कॉल होने पर अस्वीकार होते हैं।
+
+`#[action(confirm)]` ऐसी action को चिह्नित करता है जिसे मॉडल तभी चला सकता है जब उपयोगकर्ता ऐप में उसकी पुष्टि करे। `/_zeyn/mcp` ऐसे टूल न सूचीबद्ध करता है न चलाता है (उस चैनल पर कोई पुष्टि नहीं कर सकता)। WebMCP टूल मोडल डायलॉग (`zeyn:confirm`) में पूछते हैं और फिर फ़ॉर्म के साथ `confirmed: true` भेजते हैं; बिल्ट इन असिस्टेंट अपनी चैट में पूछता है (देखें `docs/assistant.md`)।
+
+### 9.2 एंडपॉइंट
+
+| एंडपॉइंट | क्या करता है |
+|---|---|
+| `GET /_zeyn/tools?screen&params` | दृश्य में Screen के लिए `{ tools: [{ name, description, inputSchema, kind, screen, node, writes, confirm }], texts }`। `zeyn.js` उन्हें `document.modelContext` के साथ पंजीकृत करता है |
+| `POST /_zeyn/mcp` | JSON-RPC: `initialize`, `tools/list`, `tools/call`। `Authorization` हेडर और साइन इन उपयोगकर्ता चाहिए |
+| `via_agent: true` के साथ `POST /_zeyn/form` | WebMCP फ़ॉर्म सेव; WebMCP के साथ `Mcp::on()` चाहिए। `confirmed: true` केवल उपयोगकर्ता के पुष्टि करने के बाद |
+
+हर एजेंट कॉल उपयोगकर्ता के रूप में चलती है: Screen का एक्सेस, गार्ड, action की अनुमति, इंटरसेप्टर, दर सीमाएँ और समय सीमा। एजेंट कॉल हमेशा ऑडिट होती हैं (`via_agent: true`) और मास्क किए फ़ील्ड उनके लिए हमेशा मास्क रहते हैं, उन उपयोगकर्ताओं के लिए भी जो reveal कर सकते हैं। OpenAPI हर ऑपरेशन को `x-zeyn-ai` से चिह्नित करता है: `ai = false` के लिए `false`, वरना `{ hint, confirm, writes }`।

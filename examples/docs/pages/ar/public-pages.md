@@ -1,0 +1,96 @@
+# الصفحات العامة
+
+الشاشات المعلّمة بـ `public` يمكن لأي شخص فتحها، بما في ذلك الزوار الذين لم يسجلوا الدخول قط: صفحة هبوط، قائمة أسعار، مركز مساعدة. يقدّمها Zeyn بحيث يكون تسليمها رخيصاً وتتعامل معها ذاكرات التخزين المؤقت ومحركات البحث بسهولة.
+
+## لا ملفات تعريف ارتباط للزوار
+
+الشاشة العامة التي يفتحها طلب بلا جلسة لا تضبط أي ملف تعريف ارتباط (cookie). تحمل الصفحة رمز CSRF فارغاً، لذلك يحصل كل زائر باللغة والسمة نفسيهما على البايتات نفسها.
+
+يطلب وقت تشغيل المتصفح رمزاً من `GET /_zeyn/csrf` قبيل أول استدعاء يحتاج إليه (نموذج أو إجراء أو محدد اللغة). يضبط هذا الاستدعاء ملف تعريف الارتباط `zeyn_csrf` ولا يُخزَّن مؤقتاً أبداً. يُفحص كل `POST` تماماً كما في أي صفحة أخرى: وبدون رمز مطابق يُرفض بالرمز `403`، ولا تُعاد أي محاولة بصمت.
+
+يحصل المستخدمون الذين سجلوا الدخول دائماً على ملف تعريف الارتباط والرمز في الصفحة، كما كان من قبل.
+
+## التخزين المؤقت عبر HTTP
+
+```rust
+#[screen(route = "/pricing", public, cache = 300)]
+pub fn pricing() -> Screen {
+    Screen::new("Pricing")
+}
+```
+
+يتيح `cache = N` للمتصفحات وذاكرات التخزين المشتركة الاحتفاظ بالصفحة لمدة `N` ثانية (من 1 إلى 86400). وبالنسبة إلى طلب بلا جلسة تحصل الصفحة حينئذٍ على:
+
+| الترويسة | القيمة |
+|---|---|
+| `Cache-Control` | `public, max-age=300` |
+| `ETag` | وسم قوي محسوب على الجسم المعروض |
+| `Vary` | `x-zeyn-partial, Accept-Language, Cookie` |
+
+الطلب الذي يحمل `If-None-Match` مطابقاً يحصل على `304 Not Modified` بلا جسم. وتُخزَّن الشاشات المحمّلة بالتنقل داخل التطبيق مؤقتاً بالطريقة نفسها، بوسمها الخاص.
+
+الطلب الذي له جلسة لا يحصل أبداً على ترويسات التخزين المؤقت العامة: تُرسل الصفحة مع `Cache-Control: private, no-store`. ولا تُصرَّف الشيفرة إذا وُضع `cache` على شاشة ليست `public`.
+
+ما زالت الشاشة تُبنى وتُعرض لكل طلب يصل إلى الخادم؛ فالوسم يوفر النقل، وذاكرة التخزين المؤقت التي أمام التطبيق توفر الطلب. أبقِ الشاشات المخزنة مؤقتاً خالية من أي شيء يعتمد على الزائر: وقت اليوم أو عدّاد أو اختيار عشوائي.
+
+## محركات البحث ومعاينات الروابط
+
+```rust
+#[screen(route = "/pricing", public, cache = 300)]
+pub fn pricing() -> Screen {
+    Screen::new(t!("pricing.title"))
+        .description(t!("pricing.description"))
+        .canonical("/pricing")
+        .og_image("https://cdn.example.com/pricing.png")
+        .robots(Robots::Index)
+        .json_ld(serde_json::json!({
+            "@context": "https://schema.org",
+            "@type": "Product",
+            "name": "Team plan",
+        }))
+}
+```
+
+| الدالة | وسوم head |
+|---|---|
+| `.description(text)` | `<meta name="description">` و`og:description`، بلغة المستخدم |
+| `.canonical(url)` | `<link rel="canonical">` و`og:url` |
+| `.og_image(url)` | `og:image` |
+| `.robots(Robots::Index)` أو `Robots::NoIndex` | `<meta name="robots">` |
+| `.json_ld(value)` | `<script type="application/ld+json">` |
+
+كل قيمة تُهرَّب (escaped). يُكتب JSON-LD مع `<` و`>` و`&` على الصورة `<` و`>` و`&`، لذلك لا يمكن لقيمة تحوي `</script>` أن تنهي العنصر؛ فالمتصفح لا ينفذها أبداً، وتبقى سياسة أمان المحتوى صارمة كما في كل صفحة أخرى.
+
+يجب أن تكون عناوين URL من نوع `https` أو مسارات تطبيق تبدأ بـ `/`. أي شيء آخر (`http:` أو `//host` أو `javascript:` أو مسافات أو علامات اقتباس) يُستبعد مع تحذير في السجل. تُكتب مسارات التطبيق خلف عنوان الموقع والمسار الأساسي:
+
+```rust
+App::new(t!("app.name")).site_url("https://shop.example.com")
+```
+
+بدون `site_url` تحتفظ وسوم head بمسار التطبيق، وهو مسار تحلّه المتصفحات لكن بعض الزواحف لا تحلّه.
+
+يحدّث التنقل داخل التطبيق العنوان وكل هذه الوسوم دون تحميل صفحة.
+
+## خريطة الموقع
+
+```rust
+#[action(public)]
+pub async fn site_pages(part: SitemapPart, db: Db) -> Result<Vec<SitemapUrl>> {
+    let rows = db.products_after(part.offset, part.limit).await?;
+    Ok(rows.into_iter().map(|p| SitemapUrl::new(format!("/products/{}", p.slug)).lastmod(p.changed)).collect())
+}
+
+Feature::new("site").sitemap(site_pages)
+```
+
+يطلب `/sitemap.xml` من الإجراء 1000 عنوان URL في كل مرة (`part.offset` و`part.limit`) ويبث XML، فلا يستقر موقع كبير في الذاكرة. حتى 50000 عنوان URL يكون عنصراً `urlset` واحداً. وفوق ذلك يصبح فهرس خرائط موقع من `/sitemaps/1.xml` و`/sitemaps/2.xml` وهكذا، يضم كل منها 50000 عنوان URL. يجب أن يكون الإجراء `public` وأن يعيد العناوين بترتيب ثابت. تحتاج مسارات التطبيق إلى `App::site_url`، لأن خريطة الموقع تحوي عناوين URL مطلقة؛ والمدخلات التي ليست عناوين `https` أو مسارات تطبيق تُستبعد. اسرد الصفحات العامة فقط: لا تستطيع محركات البحث فتح غيرها. لكل تطبيق ميزة واحدة لها خريطة موقع.
+
+## robots.txt وllms.txt
+
+```rust
+App::new(t!("app.name"))
+    .robots_txt("User-agent: *\nAllow: /\nSitemap: https://shop.example.com/sitemap.xml\n")
+    .llms_txt(include_str!("../llms.txt"))
+```
+
+كلاهما يُقدَّم كنص عادي للجميع.

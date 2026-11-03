@@ -1,0 +1,42 @@
+{
+  "docs": {
+    "app": "Documentación de Zeyn",
+    "missing": "Esta página no existe.",
+    "on_this_page": "En esta página",
+    "pager": "Página anterior y siguiente",
+    "previous": "Anterior",
+    "next": "Siguiente",
+    "group": {
+      "start": "Primeros pasos",
+      "language": "Lenguaje",
+      "components": "Componentes",
+      "guides": "Guías",
+      "reference": "Referencia"
+    },
+    "live": {
+      "label": "Ejemplo en vivo",
+      "send": "Enviar",
+      "sent": "Enviado. No se guardó nada.",
+      "book": "Reservar",
+      "booked": "Reservado. No se guardó nada.",
+      "save": "Guardar",
+      "saved": "Guardado. No se guardó nada.",
+      "count": "Contar productos",
+      "counted": "{n} productos.",
+      "count_tip": "Cuenta todos los productos de ejemplo en el servidor",
+      "rules": "Detalles del producto",
+      "rules_title": "Primer producto de ejemplo",
+      "slow": "Contar despacio",
+      "more": "Más",
+      "archive": "Archivar ejemplos",
+      "archived": "Archivado. No se guardó nada.",
+      "archive_confirm": "¿Archivar los productos de ejemplo?",
+      "save_copy": "Guardar como copia",
+      "denied": "El ejemplo no se puede guardar.",
+      "toast_success": "Aviso de éxito",
+      "toast_warning": "Aviso de advertencia",
+      "toast_danger": "Aviso de error",
+      "again": "Mostrar de nuevo"
+    }
+  }
+}

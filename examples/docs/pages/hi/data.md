@@ -1,0 +1,75 @@
+# ट्री और चार्ट
+
+## ट्री
+
+`Tree::of(action)` एक पदानुक्रम दिखाता है जो माँग पर लोड होता है। action `TreeQuery` लेती है और `q.parent` की संतानें लौटाती है (शीर्ष स्तर के लिए `None`)। शाखा अपनी संतानें पहली बार खुलने पर लोड करती है, इसलिए बड़े पदानुक्रम पर ट्री हर खुली शाखा के लिए एक छोटा अनुरोध लेता है।
+
+```rust
+#[action(permission = "stock.product.read")]
+pub async fn sample_tree(q: TreeQuery, store: SampleStore) -> Result<Vec<TreeItem>> {
+    Ok(match q.parent.as_deref() {
+        None => vec![TreeItem::branch("piece", "Piece"), TreeItem::branch("kg", "Kilogram")],
+        Some(unit) => store.by_unit(unit)?.into_iter().map(|s| TreeItem::leaf(s.id.0.to_string(), s.name).hint(s.code)).collect(),
+    })
+}
+
+Tree::of(sample_tree).label("Products by unit")
+```
+
+@live tree
+
+ट्री ARIA tree पैटर्न का पालन करता है: तीर कुंजियाँ आइटमों के बीच चलती हैं और शाखाएँ खोलती या बंद करती हैं। सर्वर प्रति शाखा संतानों की संख्या सीमित रखता है (`MAX_TREE_CHILDREN`)।
+
+## चार्ट
+
+`Chart::bar`, `stacked_bar`, `line`, `area`, `combo`, `scatter`, `donut`, `gauge` और `funnel` सर्वर पर SVG बनाते हैं। ब्राउज़र में कोई चार्ट लाइब्रेरी नहीं है; चार्ट पृष्ठ के HTML का हिस्सा है।
+
+```rust
+Row::new()
+    .col(Chart::bar("Sales").labels(["Jan", "Feb", "Mar", "Apr", "May", "Jun"])
+        .series("2025", [120.0, 98.0, 143.0, 160.0, 151.0, 189.0])
+        .series("2026", [131.0, 122.0, 150.0, 171.0, 166.0, 204.0]))
+    .col(Chart::donut("Units").labels(["Piece", "Kg", "Liter"]).series("Products", [40.0, 40.0, 40.0]))
+
+Chart::stacked_bar("Channels").labels(months).series("Shop", shop).series("Web", web)
+Chart::combo("Sales and margin").labels(months).series("Sales", sales).line_series("Margin %", margin).right_axis()
+Chart::area("Visits").labels(months).series("Visits", visits)
+Chart::scatter("Price and units").points("Tea", [(1.5, 40.0), (2.5, 22.0)])
+Chart::gauge("Capacity").value(72.0).range(0.0, 100.0).target(85.0)
+Chart::funnel("Checkout").labels(["Visited", "Cart", "Paid"]).series("People", [1000.0, 420.0, 150.0])
+```
+
+@live chart
+
+हर चार्ट में शीर्षक, स्क्रीन रीडर के लिए टेक्स्ट सारांश, लेजेंड और *डेटा दिखाएँ* के नीचे तालिका के रूप में उसकी संख्याएँ होती हैं। श्रृंखला के रंग `--z-chart-1` से `--z-chart-6` टोकन हैं; एक टेस्ट (`chart_colors_reach_three_to_one_in_both_themes`) लाइट और दोनों डार्क थीम में `--z-surface` और `--z-surface-2` के विरुद्ध 3:1 जाँचता है (देखें [थीम](theming.md))।
+
+हर बार, बिंदु, स्लाइस, चरण और गेज मान एक मार्क है जिसका नाम उसका लेबल और मान है। SVG शीर्षक और सारांश के नाम वाला एक समूह है, और चार्ट एक टैब स्टॉप है:
+
+| कुंजी | क्या करती है |
+|---|---|
+| Tab | चार्ट में, आखिरी फ़ोकस किए मार्क पर जाती है (शुरू में पहले पर) |
+| Left, Right | उसी श्रृंखला का पिछला या अगला मार्क (`dir="rtl"` में उलटे) |
+| Up, Down | पिछली या अगली श्रृंखला का वही बिंदु |
+| Home, End | श्रृंखला का पहला या आखिरी मार्क |
+| Escape | टूलटिप छिपाती है |
+
+होवर, फ़ोकस और टैप टूलटिप में वही टेक्स्ट दिखाते हैं, जो स्क्रीन रीडर से छिपा रहता है ताकि कुछ दो बार न पढ़ा जाए। स्क्रिप्ट के बिना भी मार्क के नाम रहते हैं और तालिका बनी रहती है। छोटे मार्क (8 px के बिंदु) 24 px लक्ष्य आकार से नीचे हैं; *डेटा दिखाएँ* के नीचे की तालिका समतुल्य रास्ता है (WCAG 2.5.8)।
+
+## मुख्य आँकड़े, स्पार्कलाइन और बुलेट
+
+`Kpi` एक मान दिखाता है, पिछली अवधि से उसका बदलाव तीर और दिशा बताने वाले शब्दों के साथ (बदलाव अच्छा हो तो हरा, नहीं तो लाल; लागत और प्रतीक्षा के लिए `.lower_is_better()`), पहुँचे हिस्से के साथ एक लक्ष्य, और हाल के मानों की स्पार्कलाइन।
+
+```rust
+Kpi::new("Revenue this month", 184_250.0).delta(12.4).target(200_000.0).trend([140.0, 152.0, 160.0, 184.0])
+Kpi::new("Average wait", 6.5).decimals(1).unit("min").delta(-9.0).lower_is_better()
+```
+
+`DataGrid` में, `Vec<f64>` कॉलम स्पार्कलाइन के रूप में और संख्या या मुद्रा कॉलम लक्ष्य के विरुद्ध बुलेट के रूप में बनता है:
+
+```rust
+DataGrid::of(search_reps)
+    .column(Rep::sales).cell(BulletCell::new(80_000.0, 120_000.0))
+    .column(Rep::weeks).cell(SparklineCell::new())
+```
+
+दोनों प्रति सेल एक छोटा SVG हैं, जिनका नाम "Trend of 12 values from 40 to 61, lowest 12, highest 99" जैसा होता है। बजट: दोनों सेल के लिए प्रति पंक्ति लगभग 0.65 KB HTML; दोनों की 10,000 पंक्तियाँ डिबग बिल्ड में लगभग 0.4 सेकंड में रेंडर होती हैं (`sparkline_and_bullet_cells_render_ten_thousand_rows_quickly`), और ग्रिड केवल दिख रही पंक्तियाँ रेंडर करते हैं। `charts.js` 3.7 KB कच्चा (1.4 KB gzip) और `charts.css` 3.3 KB (1.1 KB gzip) जोड़ते हैं।

@@ -1,0 +1,832 @@
+{
+  "zeyn": {
+    "locale": {
+      "name": "Español"
+    },
+    "yes": "Sí",
+    "no": "No",
+    "deploy": {
+      "new_version": "Hay una nueva versión de la aplicación. Recarga cuando estés listo; tus datos de formulario sin guardar se conservan.",
+      "reload": "Recargar ahora",
+      "later": "Más tarde"
+    },
+    "draft": {
+      "restored": "Se restauraron tus datos sin guardar de antes.",
+      "discard": "Descartarlos"
+    },
+    "session": {
+      "idle_title": "¿Sigues ahí?",
+      "idle_body": "Se cerrará tu sesión en {seconds} segundos por inactividad.",
+      "stay": "Mantener la sesión",
+      "signed_out_title": "Se cerró tu sesión",
+      "signed_out_body": "Se cerró tu sesión por inactividad. Los datos de formulario sin guardar se conservan en esta pestaña.",
+      "sign_in": "Iniciar sesión de nuevo",
+      "reauth_required": "Por tu seguridad, inicia sesión de nuevo para hacer esto.",
+      "reauth_title": "Confirma que eres tú",
+      "reauth_body": "Esta acción requiere un inicio de sesión reciente. Inicia sesión de nuevo en la pestaña nueva, vuelve aquí y continúa.",
+      "reauth_open": "Iniciar sesión de nuevo",
+      "reauth_continue": "Ya inicié sesión, continuar",
+      "mfa_title": "Se necesita un segundo paso",
+      "mfa_body": "Esto requiere tu segundo paso de inicio de sesión. Complétalo en la pestaña nueva, vuelve aquí y continúa.",
+      "mfa_open": "Verificar ahora"
+    },
+    "auth": {
+      "mfa_required": "Esto requiere un segundo paso de inicio de sesión, como un código de tu aplicación de autenticación.",
+      "mfa_missing": "El inicio de sesión no incluyó un segundo paso. Inicia sesión de nuevo y complétalo.",
+      "failed": "No se pudo iniciar sesión. Inténtalo de nuevo.",
+      "unavailable": "El inicio de sesión no está disponible ahora. Inténtalo más tarde.",
+      "totp_title": "Verificación en dos pasos",
+      "totp_scan": "Escanea este código con una aplicación de autenticación e introduce el código de seis dígitos que muestra.",
+      "totp_manual": "O escribe esta clave en la aplicación:",
+      "totp_qr": "Código QR para tu aplicación de autenticación",
+      "totp_intro": "Introduce el código de seis dígitos de tu aplicación de autenticación o uno de tus códigos de recuperación.",
+      "totp_code": "Código",
+      "totp_verify": "Verificar",
+      "totp_invalid": "Ese código no es válido. Inténtalo de nuevo.",
+      "totp_rate_limited": "Demasiados intentos. Espera unos minutos e inténtalo de nuevo.",
+      "totp_recovery_title": "Tus códigos de recuperación",
+      "totp_recovery_body": "Guarda estos códigos en un lugar seguro. Si pierdes tu aplicación de autenticación, cada código funciona una sola vez. No se volverán a mostrar.",
+      "totp_continue": "Continuar"
+    },
+    "import": {
+      "file": "Archivo CSV",
+      "file_any": "Archivo CSV o Excel",
+      "bad_file": "No se pudo leer el archivo como libro de Excel.",
+      "hint": "La primera fila nombra las columnas: {columns}. Los valores se separan con comas o punto y coma. Máximo {max} filas.",
+      "summary": "{total} filas leídas: {valid} válidas, {invalid} con errores.",
+      "commit": "Importar filas válidas",
+      "commit_all": "Importar todas las filas",
+      "report": "Descargar informe de errores",
+      "imported": "{count} filas importadas, {skipped} omitidas.",
+      "unknown_column": "Columna desconocida: {name}.",
+      "too_many": "El archivo tiene más de {max} filas.",
+      "too_large": "El archivo es demasiado grande.",
+      "empty": "El archivo no tiene filas de datos.",
+      "bad_quotes": "Un valor entre comillas del archivo no está cerrado.",
+      "extra_cells": "Esta fila tiene más valores que columnas.",
+      "nothing_valid": "Ninguna fila es válida, así que no se importó nada.",
+      "fix_first": "Corrige primero todos los errores; esta importación es todo o nada.",
+      "report_row": "Fila",
+      "report_field": "Campo",
+      "report_message": "Mensaje",
+      "reading": "Leyendo el archivo..."
+    },
+    "mail": {
+      "transition": {
+        "subject": "{record}: {to}",
+        "text": "{by} movió {record} de {from} a {to} ({move}).\n\n{comment}",
+        "html": "<p>{by} movió <strong>{record}</strong> de {from} a <strong>{to}</strong> ({move}).</p><p>{comment}</p>"
+      }
+    },
+    "workflow": {
+      "state": "Estado",
+      "comment": "Comentario",
+      "done": "Listo."
+    },
+    "privacy": {
+      "reveal": "Mostrar {label}",
+      "revealed": "Se muestra el valor. Quedó registrado.",
+      "reveal_failed": "No se pudo mostrar el valor.",
+      "reason_required": "Indica un motivo para abrir esta pantalla.",
+      "reason_title": "¿Por qué necesitas este registro?",
+      "reason_explain": "Esta pantalla muestra datos personales. Tu motivo se registra junto con tu nombre y la hora.",
+      "reason_label": "Motivo",
+      "reason_continue": "Continuar",
+      "reason_cancel": "Cancelar",
+      "reason_invalid": "Escribe un motivo de entre 3 y 300 caracteres."
+    },
+    "validation": {
+      "required": "{label} es obligatorio.",
+      "min_len": "{label} debe tener al menos {n} caracteres.",
+      "max_len": "{label} debe tener como máximo {n} caracteres.",
+      "email": "{label} debe ser una dirección de correo válida.",
+      "min": "{label} debe ser al menos {n}.",
+      "max": "{label} debe ser como máximo {n}.",
+      "format": "{label} tiene un valor no válido.",
+      "skipped_time": "{label}: esta hora no existe en tu zona horaria porque cambió el reloj.",
+      "line": "Línea {n}: {message}",
+      "disabled_day": "{label}: este día no se puede elegir.",
+      "time_step": "{label} debe ir en intervalos de {n} minutos.",
+      "range_order": "{label} no puede ser anterior a {other}.",
+      "unique": "{label} ya lo usa otro registro.",
+      "scale": "{label} puede tener como máximo {n} decimales.",
+      "precision": "{label} puede tener como máximo {n} dígitos antes del separador decimal.",
+      "mask": "{label} debe tener el formato {pattern}.",
+      "embed": "{label} debe ser una dirección https para incrustar, o un código de incrustación que contenga una.",
+      "embed_host": "{label}: {host} no está en la lista de sitios que esta aplicación puede incrustar."
+    },
+    "error": {
+      "forbidden": "No tienes permiso para hacer esto.",
+      "not_found": "Registro no encontrado.",
+      "conflict": "Otra persona cambió este registro. Recárgalo e inténtalo de nuevo.",
+      "timeout": "La solicitud tardó demasiado.",
+      "internal": "Ocurrió un error inesperado.",
+      "csrf": "Tu sesión expiró. Recarga la página.",
+      "license": "Tu licencia no cubre esto. Contacta con tu administrador.",
+      "license_expired": "Tu licencia ha caducado. Contacta con tu administrador para renovarla.",
+      "tenant": "Esta dirección no pertenece a ninguna organización conocida.",
+      "rate_limited": "Demasiadas solicitudes. Inténtalo de nuevo en un momento.",
+      "confirmation_required": "Esto requiere tu confirmación en la aplicación antes de ejecutarse.",
+      "cursor": "La lista cambió desde que se cargó. Recárgala e inténtalo de nuevo.",
+      "duplicate": "Este registro ya existe."
+    },
+    "grid": {
+      "pagination": "Paginación",
+      "previous": "Página anterior",
+      "next": "Página siguiente",
+      "load_more": "Cargar más",
+      "range": "{from}-{to}",
+      "range_total": "{from}-{to} de {total}",
+      "loaded": "{count} filas cargadas",
+      "empty": "Sin registros.",
+      "actions": "Acciones",
+      "select_row": "Seleccionar fila",
+      "select_page": "Seleccionar todas las filas de esta página",
+      "selected_count": "{n} seleccionadas",
+      "select_matching": "Seleccionar las {total} filas coincidentes",
+      "all_selected": "Las {total} filas coincidentes están seleccionadas",
+      "clear_selection": "Borrar selección",
+      "too_many": "Selecciona como máximo {n} filas para esta acción.",
+      "done": "Listo.",
+      "saved": "Guardado.",
+      "undo": "Deshacer",
+      "undone": "Cambio deshecho.",
+      "error": "No se pudieron cargar las filas.",
+      "retry": "Reintentar",
+      "copied": "{n} filas copiadas.",
+      "copied_cells": "{n} celdas copiadas.",
+      "paste_confirm": "¿Pegar en {n} filas? Cada fila se guarda.",
+      "pasted": "{n} filas guardadas.",
+      "paste_failed": "No se pudieron guardar {n} filas. Las celdas indican el motivo.",
+      "paste_readonly": "Estas celdas no se pueden editar.",
+      "paste_too_many": "Pega en {n} filas como máximo cada vez.",
+      "details": "Detalles",
+      "loading": "Cargando...",
+      "children": "Filas hijas",
+      "blank": "(vacío)",
+      "group_count": "{n} filas",
+      "filter": {
+        "filter": "Filtrar {label}",
+        "from": "Desde",
+        "to": "Hasta",
+        "all": "Todos",
+        "contains": "Contiene",
+        "starts_with": "Empieza por",
+        "equals": "Es igual a",
+        "match": "Coincide",
+        "selected": "{n} seleccionados",
+        "clear": "Quitar filtro",
+        "sorted": "Orden {n}"
+      },
+      "menu": {
+        "options": "Opciones de columna: {label}",
+        "resize": "Cambiar tamaño de {label}",
+        "sort_asc": "Orden ascendente",
+        "sort_desc": "Orden descendente",
+        "sort_clear": "Quitar orden",
+        "pin_start": "Fijar al inicio",
+        "pin_end": "Fijar al final",
+        "unpin": "Desfijar",
+        "move_prev": "Mover a la izquierda",
+        "move_next": "Mover a la derecha",
+        "hide": "Ocultar columna",
+        "columns": "Columnas",
+        "filter": "Filtro",
+        "reset": "Restablecer vista"
+      },
+      "agg": {
+        "sum": "Suma",
+        "avg": "Promedio",
+        "min": "Mín.",
+        "max": "Máx.",
+        "count": "Recuento"
+      }
+    },
+    "export": {
+      "xlsx": "Exportar a Excel",
+      "csv": "Exportar a CSV",
+      "pdf": "Exportar a PDF",
+      "pdf_cut": "Solo se imprimen las primeras {max} filas."
+    },
+    "shell": {
+      "skip": "Saltar al contenido",
+      "menu": "Principal",
+      "language": "Idioma",
+      "time_zone": "Zona horaria",
+      "time_zone_auto": "Automática (este dispositivo)",
+      "theme": "Tema",
+      "theme_system": "Sistema",
+      "theme_light": "Claro",
+      "theme_dark": "Oscuro",
+      "site": {
+        "sign_in": "Iniciar sesión",
+        "sign_out": "Cerrar sesión"
+      }
+    },
+    "ui": {
+      "resize": "Cambiar tamaño de los paneles",
+      "cards": {
+        "load_more": "Mostrar más",
+        "loaded": "{count} elementos mostrados",
+        "empty": "Nada que mostrar.",
+        "error": "No se pudo cargar la lista. Inténtalo de nuevo.",
+        "sort": "Ordenar por",
+        "pages": "Páginas",
+        "page": "Página {page} de {pages}",
+        "previous_page": "Página anterior",
+        "next_page": "Página siguiente",
+        "previous": "Desplazar atrás",
+        "next": "Desplazar adelante"
+      },
+      "search": {
+        "label": "Buscar",
+        "suggestions": "Sugerencias",
+        "count": "{count} sugerencias, usa las flechas para elegir",
+        "none": "Sin sugerencias"
+      },
+      "palette": {
+        "open": "Comandos",
+        "label": "Paleta de comandos",
+        "placeholder": "Escribe un comando o el nombre de una pantalla",
+        "empty": "No hay comandos coincidentes.",
+        "count": "{n} comandos",
+        "recent": "Usados recientemente",
+        "app": "Comandos",
+        "screen": "Esta pantalla",
+        "go": "Ir a",
+        "done": "Listo.",
+        "hint": "Arriba y Abajo para moverte, Enter para ejecutar, Escape para cerrar."
+      },
+      "toolbox": {
+        "selected": "{tool} seleccionada"
+      },
+      "dock": {
+        "left": "Izquierda",
+        "right": "Derecha",
+        "bottom": "Abajo",
+        "center": "Centro",
+        "options": "Opciones del panel",
+        "move": "Mover a {area}",
+        "close": "Cerrar {panel}",
+        "show": "Mostrar {panel}",
+        "moved": "{panel} se movió a {area}.",
+        "closed": "{panel} cerrado.",
+        "shown": "{panel} mostrado.",
+        "empty": "No hay paneles abiertos. Abre uno desde las opciones del panel.",
+        "resize": "Cambiar tamaño del área {area}"
+      },
+      "loading": "Cargando…",
+      "load_failed": "No se pudo cargar esta parte. Inténtalo de nuevo.",
+      "date": {
+        "open": "Elegir fecha",
+        "dialog": "Elige una fecha",
+        "prev_month": "Mes anterior",
+        "next_month": "Mes siguiente",
+        "prev_year": "Año anterior",
+        "next_year": "Año siguiente",
+        "today": "Hoy",
+        "format": "Formato: {format}.",
+        "natural": "También puedes escribir: {examples}.",
+        "natural_date": "hoy, +3d",
+        "natural_time": "ahora, 930",
+        "open_time": "Elegir hora",
+        "dialog_time": "Elige una hora",
+        "dialog_range": "Elige un rango de fechas",
+        "month": "Elegir mes",
+        "year": "Elegir año",
+        "months": "Meses",
+        "years": "Años",
+        "now": "Ahora",
+        "clear": "Borrar",
+        "done": "Hecho",
+        "hours": "Horas",
+        "minutes": "Minutos",
+        "seconds": "Segundos",
+        "period": "AM o PM",
+        "week": "Sem.",
+        "week_long": "Número de semana",
+        "zone": "Zona horaria {zone}",
+        "utc": "UTC: {moment}",
+        "from": "Desde",
+        "to": "Hasta",
+        "presets": {
+          "label": "Rangos rápidos",
+          "today": "Hoy",
+          "yesterday": "Ayer",
+          "last_7_days": "Últimos 7 días",
+          "this_month": "Este mes",
+          "last_month": "Mes pasado",
+          "this_year": "Este año"
+        },
+        "invalid": "No se pudo leer {label}."
+      },
+      "lookup": {
+        "open": "Mostrar opciones",
+        "no_results": "Sin coincidencias.",
+        "results": "{count} resultados",
+        "remove": "Quitar {label}",
+        "more": "Mostrar más",
+        "selected": "Seleccionado",
+        "type_more": "Escribe para buscar."
+      },
+      "lines": {
+        "add": "Añadir línea",
+        "remove": "Quitar línea {n}",
+        "up": "Subir línea {n}",
+        "down": "Bajar línea {n}",
+        "row": "Línea {n}",
+        "total": "Total",
+        "actions": "Acciones",
+        "empty": "Aún no hay líneas."
+      },
+      "confirm": {
+        "title": "Confirma, por favor",
+        "ok": "Confirmar",
+        "cancel": "Cancelar"
+      },
+      "empty": "Aún no hay nada aquí.",
+      "breadcrumb": "Ruta de navegación",
+      "dismiss": "Cerrar",
+      "link": {
+        "external": "sitio externo",
+        "external_new_tab": "sitio externo, se abre en una pestaña nueva"
+      },
+      "embed": {
+        "blocked": "{title} no se puede mostrar aquí: su sitio no está en la lista de sitios que esta aplicación puede incrustar.",
+        "load": "Cargar {title}",
+        "from": "Contenido de {host}. Solo se carga cuando lo pides."
+      },
+      "steps": {
+        "progress": "Paso {n} de {total}",
+        "next": "Siguiente",
+        "back": "Atrás",
+        "done": "Completado",
+        "current": "Paso actual",
+        "label": "Pasos"
+      },
+      "chart": {
+        "data": "Mostrar datos",
+        "table": "Datos de {title}",
+        "summary_bar": "Gráfico de barras de {series} series en {items} categorías. Máximo: {max}, {value}.",
+        "summary_line": "Gráfico de líneas de {series} series en {items} puntos. Máximo: {max}, {value}.",
+        "summary_donut": "Gráfico de anillo de {items} partes. Mayor: {max}, {value}.",
+        "role": "gráfico",
+        "summary_stacked_bar": "Gráfico de barras apiladas de {series} series en {items} categorías. Total máximo: {max}, {value}.",
+        "summary_area": "Gráfico de áreas de {series} series en {items} puntos. Máximo: {max}, {value}.",
+        "summary_combo": "Gráfico combinado de barras y líneas de {series} series en {items} categorías. Máximo: {max}, {value}.",
+        "summary_scatter": "Gráfico de dispersión de {items} puntos en {series} grupos.",
+        "summary_gauge": "Indicador en {value}, entre {min} y {max}. Objetivo: {target}.",
+        "summary_funnel": "Embudo de {items} etapas. Mayor: {max}, {value}.",
+        "gauge_point": "{value} de {max}",
+        "sparkline": "Tendencia de {n} valores de {first} a {last}, mínimo {low}, máximo {high}",
+        "bullet": "{value}, objetivo {target}",
+        "value": "Valor",
+        "min": "Mínimo",
+        "max": "Máximo",
+        "target": "Objetivo"
+      },
+      "tree": {
+        "empty": "Sin elementos."
+      },
+      "select": {
+        "none": "Ninguno",
+        "search": "Buscar en la lista"
+      },
+      "number": {
+        "up": "Aumentar",
+        "down": "Disminuir",
+        "percent": "por ciento"
+      },
+      "text": {
+        "count": "{n} de {max} caracteres"
+      },
+      "media": {
+        "video_player": "Reproductor de vídeo",
+        "audio_player": "Reproductor de audio",
+        "play": "Reproducir",
+        "pause": "Pausar",
+        "seek": "Posición",
+        "volume": "Volumen",
+        "mute": "Silenciar",
+        "unmute": "Activar sonido",
+        "time_of": "{current} de {total}",
+        "speed": "Velocidad de reproducción",
+        "speed_value": "Velocidad de reproducción: {value}",
+        "captions": "Subtítulos",
+        "captions_language": "Idioma de los subtítulos",
+        "captions_on": "Subtítulos activados: {label}",
+        "captions_off": "Desactivados",
+        "pip": "Imagen en imagen",
+        "fullscreen": "Pantalla completa",
+        "exit_fullscreen": "Salir de pantalla completa",
+        "resumed": "Se reanuda en {time}",
+        "failed": "No se pudo reproducir este contenido.",
+        "bad_position": "La posición de reproducción no es válida."
+      },
+      "tone": {
+        "neutral": "Nota",
+        "info": "Información",
+        "success": "Éxito",
+        "warning": "Advertencia",
+        "danger": "Error",
+        "brand": "Nota"
+      },
+      "upload": {
+        "drop": "Suelta archivos aquí o elígelos.",
+        "hint": "{types}, hasta {max}.",
+        "hint_many": "{types}, hasta {max} cada uno, máximo {n} archivos.",
+        "list": "Archivos",
+        "uploading": "Subiendo {name}: {pct} por ciento",
+        "uploaded": "{name} subido.",
+        "failed": "No se pudo subir {name}: {reason}",
+        "canceled": "Subida de {name} cancelada.",
+        "removed": "{name} quitado.",
+        "cancel": "Cancelar",
+        "retry": "Reintentar",
+        "remove": "Quitar",
+        "remove_name": "Quitar {name}"
+      },
+      "kpi": {
+        "up": "Sube un {pct}% respecto al periodo anterior",
+        "down": "Baja un {pct}% respecto al periodo anterior",
+        "flat": "Sin cambios respecto al periodo anterior",
+        "target": "Objetivo {target}, {pct}% alcanzado"
+      },
+      "password": {
+        "show": "Mostrar contraseña",
+        "weak": "Seguridad: débil",
+        "fair": "Seguridad: aceptable",
+        "good": "Seguridad: buena",
+        "strong": "Seguridad: fuerte"
+      },
+      "multi": {
+        "count": "{n} seleccionados"
+      },
+      "popover": {
+        "close": "Cerrar"
+      },
+      "busy": "Trabajando",
+      "tip": {
+        "about": "Acerca de {label}"
+      },
+      "menu": {
+        "more": "Más opciones para {label}"
+      },
+      "toast": {
+        "dismiss": "Cerrar"
+      }
+    },
+    "date": {
+      "words": {
+        "today": "hoy",
+        "tomorrow": "mañana",
+        "yesterday": "ayer",
+        "now": "ahora",
+        "day": "d, día, días",
+        "week": "s, semana, semanas",
+        "month": "m, mes, meses",
+        "year": "a, año, años"
+      }
+    },
+    "assistant": {
+      "title": "Asistente",
+      "open": "Abrir el asistente",
+      "close": "Cerrar el asistente",
+      "new_chat": "Chat nuevo",
+      "empty": "Pregunta por tus datos o dime qué hacer. Trabajo con tus permisos y pregunto antes de cambiar algo.",
+      "suggestions": "Sugerencias",
+      "message": "Mensaje",
+      "placeholder": "Pregunta lo que quieras sobre esta aplicación",
+      "mic": "Hablar",
+      "mic_stop": "Dejar de escuchar",
+      "stop": "Detener",
+      "send": "Enviar",
+      "note": "La IA puede cometer errores. Comprueba los resultados importantes.",
+      "you": "Tú",
+      "thinking": "Pensando",
+      "stopped": "Detenido.",
+      "retry": "Reintentar",
+      "read_aloud": "Leer en voz alta",
+      "copy": "Copiar",
+      "copied": "Copiado",
+      "confirm": "Confirmar",
+      "decline": "Cancelar",
+      "confirm_title": "Confirma esta acción",
+      "confirm_question": "El asistente quiere hacer esto en tu nombre. Confirma para que se ejecute.",
+      "declined": "Cancelado. No se cambió nada.",
+      "listening": "Escuchando",
+      "error": "Algo salió mal.",
+      "unavailable": "El asistente no está disponible.",
+      "working": "En ello",
+      "too_long": "Escribe como máximo {max} caracteres.",
+      "audio_too_large": "La grabación es demasiado larga.",
+      "token_limit": "Has alcanzado el límite de uso del asistente por ahora. Inténtalo más tarde.",
+      "too_many_steps": "Me detuve porque esto requería demasiados pasos. Prueba con una solicitud más sencilla."
+    },
+    "accounts": {
+      "login": {
+        "title": "Iniciar sesión",
+        "submit": "Iniciar sesión",
+        "passkey": "Iniciar sesión con una clave de acceso",
+        "external": "O inicia sesión con",
+        "with": "Iniciar sesión con",
+        "forgot": "¿Olvidaste tu contraseña?",
+        "resend": "Reenviar el correo de confirmación",
+        "register": "Crear una cuenta"
+      },
+      "register": {
+        "title": "Crear una cuenta",
+        "submit": "Crear cuenta",
+        "login": "Volver a iniciar sesión"
+      },
+      "check_email": {
+        "title": "Revisa tu correo",
+        "body": "Si la dirección puede recibir correo nuestro, un mensaje con el siguiente paso está en camino. El enlace funciona durante un día."
+      },
+      "forgot": {
+        "title": "¿Olvidaste tu contraseña?",
+        "intro": "Introduce tu dirección de correo. Si pertenece a una cuenta confirmada, te enviamos un enlace para elegir una contraseña nueva.",
+        "submit": "Enviar el enlace"
+      },
+      "resend": {
+        "title": "Reenviar el correo de confirmación",
+        "submit": "Enviar de nuevo"
+      },
+      "reset": {
+        "title": "Elige una contraseña nueva",
+        "submit": "Guardar la contraseña nueva"
+      },
+      "confirm": {
+        "title": "Confirma tu correo",
+        "done": "Gracias, tu dirección de correo está confirmada.",
+        "failed": "Este enlace no funciona. Puede haber caducado, haberse usado ya o haber sido reemplazado por uno más reciente."
+      },
+      "two_factor": {
+        "title": "Inicio de sesión en dos pasos",
+        "intro": "Introduce el código de tu aplicación de autenticación.",
+        "submit": "Verificar",
+        "email_intro": "O recibe un código por correo.",
+        "send_email": "Enviarme un código",
+        "sent": "El código está en camino.",
+        "submit_email": "Verificar el código del correo",
+        "use_recovery": "Usar un código de recuperación",
+        "on": "El inicio de sesión en dos pasos está activado.",
+        "codes_left": "Códigos de recuperación restantes: {n}",
+        "new_codes": "Códigos de recuperación nuevos",
+        "new_codes_confirm": "Tus códigos de recuperación actuales dejarán de funcionar. ¿Continuar?",
+        "forget": "Olvidar este navegador",
+        "disable": "Desactivar",
+        "disable_confirm": "¿Desactivar el inicio de sesión en dos pasos? Será más fácil acceder a tu cuenta sin permiso.",
+        "reset_key": "Restablecer la clave del autenticador",
+        "reset_key_confirm": "Tu aplicación de autenticación dejará de funcionar con esta cuenta hasta que la configures de nuevo. ¿Continuar?",
+        "reauth": "Por tu seguridad, inicia sesión de nuevo para configurar el inicio de sesión en dos pasos.",
+        "reauth_link": "Iniciar sesión de nuevo",
+        "setup": "Escanea el código QR con una aplicación de autenticación, o escribe la clave, e introduce el código de seis dígitos que muestra.",
+        "qr": "Código QR para tu aplicación de autenticación",
+        "manual": "Clave:",
+        "enable": "Activar"
+      },
+      "recovery": {
+        "title": "Iniciar sesión con un código de recuperación",
+        "intro": "Cada código de recuperación funciona una sola vez.",
+        "submit": "Iniciar sesión"
+      },
+      "lockout": {
+        "title": "Cuenta bloqueada",
+        "body": "Esta cuenta se bloquea durante un tiempo tras demasiados intentos fallidos. Inténtalo más tarde o restablece tu contraseña."
+      },
+      "denied": {
+        "title": "Acceso denegado",
+        "body": "No tienes acceso a esta página."
+      },
+      "logout": {
+        "title": "Cerrar sesión",
+        "body": "¿Cerrar sesión en este navegador?",
+        "submit": "Cerrar sesión"
+      },
+      "manage": {
+        "title": "Ajustes de la cuenta",
+        "profile": "Perfil",
+        "email": "Correo",
+        "password": "Contraseña",
+        "two_factor": "Inicio de sesión en dos pasos",
+        "passkeys": "Claves de acceso",
+        "logins": "Inicios de sesión externos",
+        "personal_data": "Datos personales"
+      },
+      "save": "Guardar",
+      "saved": "Guardado.",
+      "email": {
+        "current": "Tu dirección de correo:",
+        "confirmed": "confirmada",
+        "unconfirmed": "sin confirmar",
+        "send_verification": "Enviar el correo de confirmación",
+        "sent": "Revisa tu bandeja de entrada: hay un enlace de confirmación.",
+        "change": "Cambiar correo"
+      },
+      "password": {
+        "submit": "Guardar contraseña",
+        "changed": "Se cambió tu contraseña. Se cerró la sesión en los demás dispositivos."
+      },
+      "codes": {
+        "title": "Códigos de recuperación",
+        "keep": "Guarda estos códigos en un lugar seguro. Cada uno funciona una sola vez y solo se muestran ahora.",
+        "gone": "Los códigos de recuperación solo se muestran una vez, justo después de crearlos.",
+        "back": "Volver al inicio de sesión en dos pasos"
+      },
+      "passkeys": {
+        "intro": "Una clave de acceso te permite iniciar sesión con el bloqueo de pantalla de tu dispositivo, sin contraseña.",
+        "none": "Aún no tienes claves de acceso.",
+        "remove": "Quitar",
+        "remove_confirm": "¿Quitar esta clave de acceso?",
+        "name": "Nombre para una clave de acceso nueva",
+        "add": "Añadir una clave de acceso",
+        "added": "Se añadió la clave de acceso.",
+        "failed": "La clave de acceso no funcionó. Inténtalo de nuevo.",
+        "unsupported": "Este navegador no admite claves de acceso."
+      },
+      "logins": {
+        "none": "No hay inicios de sesión externos vinculados.",
+        "remove": "Desvincular",
+        "remove_confirm": "¿Desvincular este inicio de sesión?",
+        "add": "Vincular"
+      },
+      "data": {
+        "intro": "Descarga todo lo que esta cuenta guarda sobre ti, o elimina la cuenta.",
+        "download": "Descargar mis datos",
+        "delete_warning": "Eliminar tu cuenta borra tus datos para siempre. No se puede deshacer.",
+        "delete": "Eliminar mi cuenta"
+      },
+      "admin": {
+        "menu": "Cuentas",
+        "users": "Usuarios",
+        "roles": "Roles",
+        "lock": "Bloquear",
+        "unlock": "Desbloquear",
+        "reset": "Enviar enlace de restablecimiento",
+        "delete_role": "Eliminar",
+        "create_role": "Añadir rol"
+      },
+      "external": {
+        "title": "Termina de iniciar sesión",
+        "intro": "Iniciaste sesión con",
+        "submit": "Crear mi cuenta"
+      },
+      "notice": {
+        "confirmed": "Tu dirección de correo está confirmada. Ya puedes iniciar sesión.",
+        "reset": "Se restableció tu contraseña. Inicia sesión con la nueva.",
+        "signed_out": "Cerraste sesión.",
+        "deleted": "Se eliminó tu cuenta.",
+        "check_email": "Revisa tu correo para ver el siguiente paso."
+      },
+      "error": {
+        "invalid_user_name": "Este nombre de usuario no es válido.",
+        "duplicate_user_name": "Este nombre ya está en uso.",
+        "invalid_email": "Introduce una dirección de correo válida.",
+        "duplicate_email": "Esta dirección de correo ya está en uso.",
+        "invalid_phone": "Introduce un número de teléfono válido.",
+        "password_too_short": "Usa al menos {n} caracteres.",
+        "password_too_long": "Usa como máximo {n} bytes.",
+        "password_requires_non_alphanumeric": "Usa al menos un carácter que no sea una letra ni un dígito.",
+        "password_requires_digit": "Usa al menos un dígito (0 a 9).",
+        "password_requires_lower": "Usa al menos una letra minúscula (a a z).",
+        "password_requires_upper": "Usa al menos una letra mayúscula (A a Z).",
+        "password_requires_unique_chars": "Usa al menos {n} caracteres distintos.",
+        "password_breached": "Esta contraseña aparece en filtraciones de datos conocidas. Elige otra.",
+        "user_already_has_password": "Esta cuenta ya tiene una contraseña.",
+        "password_mismatch": "La contraseña es incorrecta.",
+        "invalid_token": "Este enlace no funciona. Puede haber caducado o haberse usado ya.",
+        "invalid_code": "El código es incorrecto o ha caducado.",
+        "lockout_not_enabled": "El bloqueo está desactivado para este usuario.",
+        "login_already_associated": "Este inicio de sesión pertenece a otra cuenta.",
+        "last_login": "Es tu última forma de iniciar sesión. Añade primero una contraseña u otro inicio de sesión.",
+        "invalid_role_name": "Este nombre de rol no es válido.",
+        "duplicate_role_name": "Este rol ya existe.",
+        "rate_limited": "Demasiados intentos. Espera unos minutos e inténtalo de nuevo.",
+        "two_factor_expired": "El inicio de sesión tardó demasiado. Empieza de nuevo.",
+        "two_factor_unavailable": "Esta forma de recibir un código no está disponible.",
+        "passkey_invalid": "No se pudo verificar la clave de acceso.",
+        "passkey_expired": "La solicitud de la clave de acceso caducó. Inténtalo de nuevo.",
+        "passkey_registered": "Esta clave de acceso ya está registrada.",
+        "not_allowed": "Confirma tu dirección de correo antes de iniciar sesión.",
+        "invalid_login": "El nombre de usuario o la contraseña son incorrectos.",
+        "password_confirm_mismatch": "Las contraseñas no coinciden.",
+        "invalid_recovery_code": "El código de recuperación es incorrecto o ya se usó.",
+        "email_unchanged": "Esta es tu dirección actual.",
+        "unknown_role": "Uno de estos roles no existe.",
+        "external_expired": "El inicio de sesión externo tardó demasiado. Empieza de nuevo.",
+        "external_email_taken": "Ya existe una cuenta con este correo. Inicia sesión en ella y vincula el proveedor desde los ajustes de tu cuenta.",
+        "external": "El inicio de sesión externo no funcionó.",
+        "old_password_required": "Introduce tu contraseña actual.",
+        "cannot_reset_shared_key_and_enable": "Restablece primero la clave y luego activa el inicio de sesión en dos pasos con un código de la clave nueva.",
+        "requires_two_factor": "Introduce un código de tu aplicación de autenticación.",
+        "invalid_two_factor_code": "El código es incorrecto."
+      },
+      "mail": {
+        "confirm": {
+          "subject": "Confirma tu dirección de correo",
+          "text": "Abre este enlace para confirmar tu dirección de correo:\n\n{link}\n\nEl enlace funciona durante un día. Si no creaste una cuenta, ignora este mensaje.",
+          "html": "<p>Abre este enlace para confirmar tu dirección de correo:</p><p><a href=\"{link}\">Confirmar mi dirección de correo</a></p><p>El enlace funciona durante un día. Si no creaste una cuenta, ignora este mensaje.</p>"
+        },
+        "reset": {
+          "subject": "Restablece tu contraseña",
+          "text": "Abre este enlace para elegir una contraseña nueva:\n\n{link}\n\nEl enlace funciona durante un día. Si no lo solicitaste, ignora este mensaje.",
+          "html": "<p>Abre este enlace para elegir una contraseña nueva:</p><p><a href=\"{link}\">Elegir una contraseña nueva</a></p><p>El enlace funciona durante un día. Si no lo solicitaste, ignora este mensaje.</p>"
+        },
+        "change": {
+          "subject": "Confirma tu nueva dirección de correo",
+          "text": "Abre este enlace para usar esta dirección en tu cuenta:\n\n{link}\n\nSi no solicitaste este cambio, ignora este mensaje.",
+          "html": "<p>Abre este enlace para usar esta dirección en tu cuenta:</p><p><a href=\"{link}\">Confirmar la nueva dirección</a></p><p>Si no solicitaste este cambio, ignora este mensaje.</p>"
+        },
+        "exists": {
+          "subject": "Ya tienes una cuenta",
+          "text": "Alguien intentó crear una cuenta con esta dirección, que ya tiene una. Inicia sesión aquí:\n\n{link}\n\nSi olvidaste tu contraseña, usa el restablecimiento de contraseña de esa página.",
+          "html": "<p>Alguien intentó crear una cuenta con esta dirección, que ya tiene una.</p><p><a href=\"{link}\">Iniciar sesión</a></p><p>Si olvidaste tu contraseña, usa el restablecimiento de contraseña de esa página.</p>"
+        },
+        "code": {
+          "subject": "Tu código de inicio de sesión",
+          "text": "Tu código de inicio de sesión es {code}. Funciona durante unos minutos.",
+          "html": "<p>Tu código de inicio de sesión es <strong>{code}</strong>. Funciona durante unos minutos.</p>"
+        }
+      }
+    },
+    "files": {
+      "too_large": "El archivo es demasiado grande. El tamaño máximo permitido es {max}.",
+      "too_many": "{label} admite como máximo {n} archivos.",
+      "type": "Este tipo de archivo no se acepta, o su contenido no coincide con su nombre.",
+      "refused": "La comprobación de seguridad rechazó el archivo.",
+      "aborted": "La subida se detuvo antes de que llegara todo el archivo. Inténtalo de nuevo.",
+      "empty": "El archivo está vacío.",
+      "store_full": "No queda espacio para este archivo."
+    }
+  },
+  "AccountLogin": {
+    "user_name": "Correo o nombre de usuario",
+    "password": "Contraseña",
+    "remember_me": "Recordarme"
+  },
+  "AccountRegister": {
+    "email": "Correo",
+    "password": "Contraseña",
+    "confirm_password": "Confirmar contraseña"
+  },
+  "AccountEmailOnly": {
+    "email": "Correo"
+  },
+  "AccountReset": {
+    "password": "Contraseña nueva",
+    "confirm_password": "Confirma la contraseña nueva",
+    "user": "Usuario",
+    "code": "Código"
+  },
+  "AccountCode": {
+    "code": "Código",
+    "remember_machine": "Recordar este navegador",
+    "return_to": "Volver a"
+  },
+  "AccountRecovery": {
+    "code": "Código de recuperación",
+    "return_to": "Volver a"
+  },
+  "AccountProfile": {
+    "user_name": "Nombre de usuario",
+    "phone_number": "Teléfono"
+  },
+  "AccountNewEmail": {
+    "new_email": "Correo nuevo"
+  },
+  "AccountPassword": {
+    "old_password": "Contraseña actual",
+    "new_password": "Contraseña nueva",
+    "confirm_password": "Confirma la contraseña nueva"
+  },
+  "AccountDelete": {
+    "password": "Contraseña"
+  },
+  "AccountUserRow": {
+    "id": "Id",
+    "user_name": "Nombre de usuario",
+    "email": "Correo",
+    "email_confirmed": "Confirmado",
+    "two_factor": "Dos pasos",
+    "locked": "Bloqueado",
+    "roles": "Roles"
+  },
+  "AccountUserRoles": {
+    "id": "Id",
+    "roles": "Roles (separados por comas)"
+  },
+  "AccountRoleRow": {
+    "id": "Id",
+    "name": "Nombre",
+    "permissions": "Permisos (separados por comas)"
+  },
+  "AccountExternal": {
+    "email": "Correo"
+  },
+  "AccountEmailCode": {
+    "code": "Código del correo",
+    "remember_machine": "Recordar este navegador",
+    "return_to": "Volver a"
+  }
+}

@@ -1,0 +1,71 @@
+# 카드, 레일, 검색
+
+쇼핑몰 같은 공개 페이지는 행을 표가 아니라 카드로 보여 줍니다. `CardGrid`, `Rail`, `SearchBox`는 DataGrid가 사용하는 것과 같은 종류의 action으로 행을 불러옵니다. 이 action은 `DataQuery`를 받아 `Page`를 반환합니다. 페이징, 정렬, 검색 텍스트는 서버에서 실행되며, DataGrid와 마찬가지로 읽기에는 action의 접근 권한이 필요합니다.
+
+```rust
+#[action(public)]
+pub async fn catalog_products(q: DataQuery, store: ProductStore) -> Result<Page<Product>> {
+    Ok(q.apply(store.all()?.into_iter().filter(|p| p.active).collect()))
+}
+```
+
+## 카드 그리드
+
+```rust
+CardGrid::of(catalog_products)
+    .title(t!("shop.products"))
+    .card(|p: &Product| {
+        Card::image(p.image.clone(), p.name.clone())
+            .text(p.price.to_string())
+            .badge(Badge::new(t!("shop.new")).tone(Tone::Success))
+            .link(shop_product, ProductPage { id: p.id })
+    })
+    .sort_option(t!("shop.sort.name"), Product::name, false)
+    .sort_option(t!("shop.sort.cheapest"), Product::price, false)
+    .image_size(300, 300)
+    .paging(Paging::infinite(24))
+```
+
+- **카드.** `Card::image(image, title)`은 행 하나로 카드 하나를 만들며, `text`, `badge`, `alt`, `link`를 사용할 수 있습니다. `link`는 Screen과 그 매개변수이며, 카드 전체가 하나의 링크이고 페이지 새로 고침 없이 열립니다. 이미지는 지연 로드되며, 페이지가 흔들리지 않도록 `image_size`의 너비와 높이를 사용합니다. 이미지의 대체 텍스트는 비어 있습니다. 옆의 제목이 카드를 설명하기 때문입니다. 그림이 더 많은 내용을 전달한다면 `alt`를 설정하십시오. 경로, `https:`, `data:image/`가 아닌 이미지 주소는 제외됩니다.
+- **페이징.** `Paging::infinite(n)`(기본값이며 24)은 "더 보기" 버튼을 표시하고, 이 버튼이 화면에 스크롤되어 들어오면 자동으로도 동작합니다. 버튼을 누르면 포커스가 첫 번째 새 카드로 이동합니다. `Paging::pages(n)`은 이전과 다음 버튼 및 페이지 번호를 표시합니다. 페이지 크기는 서버가 정하며, 클라이언트는 어디서부터 이어갈지만 알립니다.
+- **정렬.** 각 `sort_option`은 사용자가 선택 목록에서 고를 수 있는 순서입니다. 첫 번째가 카드가 처음 나열되는 순서입니다. 서버는 이 순서만 받아들이고, 클라이언트가 보낸 필터와 검색 텍스트는 버립니다.
+- **검색.** `.search(text)`는 자유 텍스트([`DataQuery::q`](#free-text))와 일치하는 행만 표시합니다. 예를 들어 검색 결과 화면의 텍스트가 있습니다.
+- **마스킹된 필드.** 카드는 원본 행을 보는 클로저가 만듭니다. `#[mask]` 필드가 있는 모델에서는 이를 공개할 수 있는 사용자만 카드를 받고, 그 외에는 `Forbidden`을 받습니다. 공개 카드에는 마스킹된 필드가 없는 모델을 사용하십시오.
+
+## 레일
+
+레일은 한 줄로 배치되어 옆으로 스크롤되는 카드 그리드입니다. 스크롤 스냅과 한 화면 너비만큼 스크롤하는 이전, 다음 버튼이 있으며, 사용자가 동작 줄이기를 요청하지 않았다면 부드럽게 스크롤됩니다. 사용자가 끝 근처까지 스크롤하면 다음 묶음을 12개씩 불러옵니다. 카드는 탭 순서에 있는 링크이며, 포커스를 받으면 화면 안으로 스크롤됩니다.
+
+```rust
+Rail::of(catalog_products)
+    .title(t!("shop.new_arrivals"))
+    .card(|p: &Product| Card::image(p.image.clone(), p.name.clone()))
+    .sort_option(t!("shop.sort.newest"), Product::id, true)
+```
+
+## 검색 상자
+
+제안 목록이 있는 검색 필드이며, 리스트 박스 팝업을 사용하는 W3C APG 콤보박스 패턴을 따릅니다. 사용자가 입력하면 `instant` 밀리초 동안 기다린 후 서버에 제안을 요청합니다. action은 그 텍스트를 `DataQuery::q`로 받아 실행되고, 각 행의 제안 텍스트가 돌아옵니다(`suggestion`으로 달리 지정하지 않으면 마스킹되지 않은 첫 번째 텍스트 필드). Enter를 누르거나 제안을 선택하면 페이지 새로 고침 없이 그 텍스트로 결과 화면이 열립니다.
+
+```rust
+#[screen(route = "/shop/search", public)]
+pub fn shop_search(p: SearchParams) -> Screen {
+    Screen::new(t!("shop.search.all"))
+        .body(SearchBox::of(catalog_products).value(p.q.clone()).results(shop_search))
+        .body(CardGrid::of(catalog_products).card(product_card).search(p.q).paging(Paging::pages(12)))
+}
+
+SearchBox::of(catalog_products)
+    .label(t!("shop.search.label"))
+    .instant(150)
+    .suggestion(|p: &Product| p.name.clone())
+    .results(shop_search)
+```
+
+키보드: 아래쪽 화살표와 위쪽 화살표는 제안 사이를 이동하며(아래쪽 화살표는 제안을 엽니다), Enter는 강조된 제안이나 입력한 텍스트로 검색하고, Escape는 제안을 닫은 다음 필드를 비웁니다. 라이브 리전이 스크린 리더에 제안의 개수를 알려 줍니다.
+
+결과 화면은 `SearchParams`를 받습니다(`q`이며, 메뉴에서 화면을 열면 비어 있습니다). 서버는 텍스트를 `MAX_SEARCH_QUERY`(100)자로 자르고, 보낼 제안의 개수를 정하며(`limit`으로 달리 지정하지 않으면 8개, 최대 20개), Screen의 접근 권한, Feature의 가드, action의 권한을 검사하고, 모든 제안 호출을 쓰기 속도 제한(`App::write_limit`)에 포함합니다.
+
+## 자유 텍스트
+
+`DataQuery::q`는 자유 텍스트입니다. 텍스트 필드에 이 텍스트가 포함된 행을 대소문자를 구분하지 않고 찾습니다. 터키어의 점 있는 `i`와 점 없는 `i`(`İ`, `ı`)는 `i`와 일치하므로 "istanbul"로 "İSTANBUL"을 찾을 수 있습니다. `#[mask]`가 있는 필드는 검색하지 않으며, 빈 텍스트는 모든 행과 일치하고, 100자보다 긴 텍스트는 무시됩니다. `DataQuery::apply`와 SQL 데이터 계층(바인드 매개변수를 쓰는 `LOWER(TRANSLATE(column, 'İı', 'ii')) LIKE ...`)은 이를 같은 방식으로 읽습니다.
