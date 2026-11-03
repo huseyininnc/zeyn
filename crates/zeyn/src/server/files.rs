@@ -38,8 +38,9 @@ const IDLE: Duration = Duration::from_secs(30);
 
 /// Links placed in the page head.
 pub(super) fn head(base: &str) -> String {
+    let v = super::ops::asset_version();
     format!(
-        r#"<link rel="stylesheet" href="{base}/_zeyn/files.css"><script type="module" src="{base}/_zeyn/files.js"></script>"#
+        r#"<link rel="stylesheet" href="{base}/_zeyn/files.css{v}">"#
     )
 }
 

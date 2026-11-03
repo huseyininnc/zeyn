@@ -799,3 +799,142 @@ async fn links_to_screens_inside_components_keep_the_language_of_the_path() {
     let en = send(&router, visitor("/linked").body(Body::empty()).unwrap()).await.body;
     assert!(en.contains(r#"href="/hello""#) && !en.contains(r#"href="/en/hello""#), "{en}");
 }
+
+/// The `content` of `<meta name="zeyn-csrf">` in a page.
+fn page_token(body: &str) -> String {
+    let start = body.find(r#"<meta name="zeyn-csrf" content=""#).expect("a CSRF meta tag") + 32;
+    body[start..].split('"').next().unwrap().to_string()
+}
+
+#[tokio::test]
+async fn the_page_token_is_masked_differently_in_every_response() {
+    let router = router(writer());
+    let cookie = format!("zeyn_csrf={TOKEN}");
+    let page = || {
+        let req = Request::get("/products").header("x-user", "1").header(header::COOKIE, &cookie);
+        send(&router, req.body(Body::empty()).unwrap())
+    };
+    let first = page_token(&page().await.body);
+    let second = page_token(&page().await.body);
+    assert_ne!(first, second, "two responses carry different bytes");
+    for t in [&first, &second] {
+        assert_eq!(t.len(), 128, "{t}");
+        assert!(t.bytes().all(|b| b.is_ascii_hexdigit()) && !t.contains(TOKEN), "{t}");
+    }
+
+    let call = |token: &str| {
+        let mut req = post("/_zeyn/grid", serde_json::json!({ "screen": "list", "node": 0 }));
+        req.headers_mut().insert("x-zeyn-csrf", token.parse().unwrap());
+        send(&router, req)
+    };
+    assert_eq!(call(&first).await.status, StatusCode::OK, "the masked token is accepted");
+    assert_eq!(call(&second).await.status, StatusCode::OK);
+    assert_eq!(call(TOKEN).await.status, StatusCode::OK, "the raw token of older pages is accepted");
+    let mut flipped = first.clone().into_bytes();
+    flipped[127] = if flipped[127] == b'0' { b'1' } else { b'0' };
+    let flipped = String::from_utf8(flipped).unwrap();
+    for wrong in [flipped.as_str(), &first[..127], &first[..64], &first[64..], &"g".repeat(128), ""] {
+        assert_eq!(call(wrong).await.status, StatusCode::FORBIDDEN, "{wrong}");
+    }
+}
+
+#[tokio::test]
+async fn grid_blocks_and_pages_are_gzipped_when_the_browser_accepts_it() {
+    use std::io::Read;
+    let router = router(writer());
+    let query = serde_json::json!({ "page": { "type": "offset", "offset": 0, "limit": 30 } });
+    let body = serde_json::json!({ "screen": "list", "node": 0, "query": query });
+    let plain = send(&router, post("/_zeyn/grid", body.clone())).await;
+    assert_eq!(plain.status, StatusCode::OK);
+    assert!(plain.headers.get(header::CONTENT_ENCODING).is_none());
+    assert!(plain.body.len() > 1024, "{}", plain.body.len());
+
+    let mut req = post("/_zeyn/grid", body);
+    req.headers_mut().insert(header::ACCEPT_ENCODING, "gzip, deflate, br".parse().unwrap());
+    let res = router.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.headers().get(header::CONTENT_ENCODING).unwrap(), "gzip");
+    let vary = res.headers().get_all(header::VARY).iter().map(|v| v.to_str().unwrap().to_ascii_lowercase()).collect::<Vec<_>>();
+    assert!(vary.iter().any(|v| v.contains("accept-encoding")), "{vary:?}");
+    let packed = res.into_body().collect().await.unwrap().to_bytes();
+    assert!(packed.len() < plain.body.len(), "{} of {}", packed.len(), plain.body.len());
+    let mut text = String::new();
+    flate2::read::GzDecoder::new(&packed[..]).read_to_string(&mut text).unwrap();
+    assert_eq!(text, plain.body, "the compressed block decodes to the same body");
+
+    let page = Request::get("/products").header("x-user", "1").header(header::ACCEPT_ENCODING, "gzip");
+    let res = router.clone().oneshot(page.body(Body::empty()).unwrap()).await.unwrap();
+    assert_eq!(res.headers().get(header::CONTENT_ENCODING).unwrap(), "gzip");
+
+    let small = Request::get("/_zeyn/csrf").header(header::ACCEPT_ENCODING, "gzip");
+    let res = router.clone().oneshot(small.body(Body::empty()).unwrap()).await.unwrap();
+    assert!(res.headers().get(header::CONTENT_ENCODING).is_none(), "bodies under 1 KB stay as they are");
+}
+
+#[tokio::test]
+async fn asset_links_carry_the_build_and_are_kept_for_a_year() {
+    let router = router(writer());
+    let page = send(&router, get("/products")).await.body;
+    let start = page.find(r#"src="/_zeyn/zeyn.js?v="#).expect("a versioned runtime link") + 5;
+    let url = page[start..].split('"').next().unwrap().to_string();
+    let version = &url[url.find('?').unwrap()..];
+    for asset in ["zeyn.css", "nav.js", "components.js", "components.css", "enterprise.js", "media.css", "grid.js"] {
+        assert!(page.contains(&format!("/_zeyn/{asset}{version}")), "{asset}");
+    }
+    let cache = |r: &Reply| r.headers.get(header::CACHE_CONTROL).unwrap().to_str().unwrap().to_string();
+    let current = send(&router, Request::get(&url).body(Body::empty()).unwrap()).await;
+    assert_eq!(current.status, StatusCode::OK);
+    assert_eq!(cache(&current), "public, max-age=31536000, immutable");
+    assert!(current.headers.get(header::ETAG).is_some());
+    for other in ["/_zeyn/zeyn.js", "/_zeyn/zeyn.js?v=old", "/_zeyn/zeyn.js?x=1"] {
+        let r = send(&router, Request::get(other).body(Body::empty()).unwrap()).await;
+        assert_eq!(cache(&r), "no-cache", "{other} revalidates");
+    }
+}
+
+#[tokio::test]
+async fn only_pages_with_a_grid_preload_the_grid_runtime() {
+    let router = router(writer());
+    let with_grid = send(&router, get("/products")).await.body;
+    assert!(with_grid.contains(r#"<link rel="modulepreload" href="/_zeyn/grid.js?v="#));
+    let without = send(&router, get("/clock")).await.body;
+    assert!(!without.contains("grid.js"), "a page without a grid never names the grid runtime");
+    let js = send(&router, Request::get("/_zeyn/grid.js").body(Body::empty()).unwrap()).await;
+    assert_eq!(js.status, StatusCode::OK);
+    assert!(js.body.contains("export function install(z)") && js.body.contains("export {"));
+    let core = send(&router, Request::get("/_zeyn/zeyn.js").body(Body::empty()).unwrap()).await.body;
+    assert!(!core.contains("function renderVirtual"), "the grid runtime is not in zeyn.js");
+}
+
+/// Names in a comma separated list, as in `let a, b;` or `{ a, b }`.
+fn names(text: &str) -> Vec<&str> {
+    let mut v: Vec<&str> = text.split(',').map(str::trim).filter(|n| !n.is_empty()).collect();
+    v.sort_unstable();
+    v
+}
+
+#[test]
+fn the_two_halves_of_the_browser_runtime_agree_on_what_they_share() {
+    let api = include_str!("../assets/zeyn/grid-api.js");
+    let core = include_str!("../assets/zeyn/core.js");
+    let exports = include_str!("../assets/zeyn/grid-exports.js");
+    let declared = api.lines().find_map(|l| l.strip_prefix("let ")?.strip_suffix(';')).expect("the let line");
+    let handed = core.split("m.install({ ").nth(1).and_then(|s| s.split(" })").next()).expect("the install call");
+    assert_eq!(names(declared), names(handed), "grid-api.js and the install call in core.js list the same names");
+    let exported = exports.split("export { ").nth(1).and_then(|s| s.split(" }").next()).expect("the export list");
+    let exported = names(exported);
+    for part in ["core.js", "menus.js", "page.js", "events.js"] {
+        let src = match part {
+            "core.js" => core,
+            "menus.js" => include_str!("../assets/zeyn/menus.js"),
+            "page.js" => include_str!("../assets/zeyn/page.js"),
+            _ => include_str!("../assets/zeyn/events.js"),
+        };
+        for used in src.split("G?.").skip(1) {
+            let name: String = used.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
+            if name.is_empty() {
+                continue;
+            }
+            assert!(exported.contains(&name.as_str()), "{part} calls G?.{name}, which grid-exports.js does not export");
+        }
+    }
+}

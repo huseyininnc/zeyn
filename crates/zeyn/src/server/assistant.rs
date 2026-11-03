@@ -68,7 +68,8 @@ fn usable<'a>(st: &'a AppState, ctx: &Ctx) -> Option<&'a Assistant> {
 pub(super) fn head(st: &AppState, ctx: &Ctx, base: &str) -> String {
     match usable(st, ctx) {
         Some(_) => format!(
-            r#"<link rel="stylesheet" href="{base}/_zeyn/assistant.css"><script type="module" src="{base}/_zeyn/assistant.js"></script>"#
+            r#"<link rel="stylesheet" href="{base}/_zeyn/assistant.css{v}">"#,
+            v = super::ops::asset_version()
         ),
         None => String::new(),
     }

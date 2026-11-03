@@ -377,7 +377,7 @@ mod totp {
             format!(
                 r#"<form class="z-form" method="post" action="{base}/_zeyn/auth/totp/{action}"><input type="hidden" name="csrf" value="{csrf}"><input type="hidden" name="return_to" value="{back}"><div class="z-field"><label for="z-totp-code">{label}</label><input id="z-totp-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" required maxlength="16" aria-describedby="z-totp-error"{invalid} autofocus></div><p class="z-field-error" id="z-totp-error" aria-live="polite">{error}</p><div class="z-form-actions"><button type="submit" class="z-button z-primary">{verify}</button></div></form>"#,
                 base = escape(&st.prefix),
-                csrf = escape(csrf),
+                csrf = super::super::mask_token(csrf),
                 back = escape(back),
                 label = t("totp_code"),
                 invalid = if error.is_some() { r#" aria-invalid="true""# } else { "" },
@@ -490,7 +490,7 @@ mod totp {
     /// Common checks of a posted code: the CSRF token, a signed in user and the attempt limit.
     async fn admit(st: &AppState, headers: &HeaderMap, totp: &Totp, f: &CodeForm) -> Result<(Ctx, String), Response> {
         let ctx = st.ctx(headers);
-        let token_ok = cookie(headers, "zeyn_csrf").is_some_and(|c| super::super::valid_token(c) && same(c, &f.csrf));
+        let token_ok = cookie(headers, "zeyn_csrf").is_some_and(|c| super::super::csrf_matches(c, &f.csrf));
         if !token_ok {
             let csrf = st.csrf(headers).0;
             return Err(st.error_page(&ctx, Failure::App(crate::Error::Denied(Text::key("zeyn.error.csrf"))), &csrf));

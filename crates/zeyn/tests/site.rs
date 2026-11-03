@@ -72,7 +72,7 @@ async fn site_screens_open_in_the_site_shell_and_panel_screens_keep_the_app_shel
     let (status, _, page) = get(&router, "/shop/tea", false).await;
     assert_eq!(status, StatusCode::OK);
     assert!(page.contains(r#"<div class="z-app z-site" data-zeyn-shell="site">"#));
-    assert!(page.contains(r#"href="/_zeyn/site.css""#) && page.contains(r#"src="/_zeyn/site.js""#));
+    assert!(page.contains(r#"href="/_zeyn/site.css?v="#) && page.contains(r#"src="/_zeyn/site.js?v="#));
     assert!(page.contains(r#"<a class="z-site-brand" href="/">Corner Shop</a>"#));
     assert!(!page.contains(r#"<nav class="z-nav""#), "no side menu in the site shell");
     assert!(!page.contains("/panel"), "menus of app shell features stay out of the site menu");

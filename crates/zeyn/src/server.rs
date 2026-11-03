@@ -54,28 +54,39 @@ mod xlsx;
 
 pub use ops::{READY_CACHE, build_id, probe};
 
-/// The browser runtime, served as one script at `/_zeyn/zeyn.js` so a page makes one request. The
-/// source is one file per concern under `assets/zeyn/`, joined here in this order (later parts
-/// use functions and constants of earlier ones):
+/// The browser runtime every page loads, served as one module at `/_zeyn/zeyn.js`. The source is
+/// one file per concern under `assets/zeyn/`, joined here in this order (later parts use
+/// functions and constants of earlier ones):
 ///
-/// - `core.js`: constants, requests, toasts, effects, windows
-/// - `grid.js`: grid setup, loading, paging and virtual scrolling
-/// - `grid-rows.js`: selection, bulk actions, inline edits, row items
-/// - `grid-columns.js`: sort, saved views, header, pinning, resizing, column and context menus
-/// - `grid-filters.js`: filter controls
-/// - `grid-cells.js`: row details, cell ranges, copy and paste, column windowing, branches,
-///   row keyboard
+/// - `core.js`: constants, requests, toasts, effects, windows, the loader of the grid runtime
+/// - `menus.js`: menus, popover placement, relative times
 /// - `page.js`: shortcuts, forms, export, language, time zone and theme, WebMCP tools
 /// - `events.js`: event delegation on `document` and start up
 const JS: &str = concat!(
     include_str!("../assets/zeyn/core.js"),
+    include_str!("../assets/zeyn/menus.js"),
+    include_str!("../assets/zeyn/page.js"),
+    include_str!("../assets/zeyn/events.js"),
+);
+
+/// The grid runtime, a module at `/_zeyn/grid.js` that `zeyn.js` imports the first time a page
+/// holds a grid, so pages without one never download it. `grid-api.js` takes what it uses from
+/// `zeyn.js` (`install`), `grid-exports.js` lists what `zeyn.js` calls through `G`; between them:
+///
+/// - `grid.js`: grid setup, loading, paging and virtual scrolling
+/// - `grid-rows.js`: selection, bulk actions, inline edits, row items
+/// - `grid-columns.js`: sort, saved views, header, pinning, resizing, column menus
+/// - `grid-filters.js`: filter controls
+/// - `grid-cells.js`: row details, cell ranges, copy and paste, column windowing, branches,
+///   row keyboard
+const GRID_JS: &str = concat!(
+    include_str!("../assets/zeyn/grid-api.js"),
     include_str!("../assets/zeyn/grid.js"),
     include_str!("../assets/zeyn/grid-rows.js"),
     include_str!("../assets/zeyn/grid-columns.js"),
     include_str!("../assets/zeyn/grid-filters.js"),
     include_str!("../assets/zeyn/grid-cells.js"),
-    include_str!("../assets/zeyn/page.js"),
-    include_str!("../assets/zeyn/events.js"),
+    include_str!("../assets/zeyn/grid-exports.js"),
 );
 const CSS: &str = include_str!("../assets/zeyn.css");
 const NAV: &str = include_str!("../assets/nav.js");
@@ -1465,6 +1476,7 @@ impl App {
         let router = seo::routes(router, &state);
         let router = router
             .route("/_zeyn/zeyn.js", get(|| async { asset(JS, "text/javascript; charset=utf-8") }))
+            .route("/_zeyn/grid.js", get(|| async { asset(GRID_JS, "text/javascript; charset=utf-8") }))
             .route("/_zeyn/zeyn.css", get(|| async { asset(CSS, "text/css; charset=utf-8") }))
             .route("/_zeyn/nav.js", get(|| async { asset(NAV, "text/javascript; charset=utf-8") }))
             .route("/_zeyn/theme.css", get(theme_css))
@@ -1503,6 +1515,8 @@ impl App {
             .layer(axum::middleware::from_fn_with_state(state.clone(), catch_panics))
             .layer(axum::middleware::from_fn_with_state(state.clone(), guard::guard_request))
             .layer(axum::middleware::from_fn(static_files))
+            .layer(compression())
+            .layer(axum::middleware::map_request(identity_for_ranges))
             .layer(axum::middleware::map_response_with_state(state.clone(), guard::security_headers))
             .layer(axum::middleware::map_response(ops::stamp))
             .layer(axum::middleware::from_fn(guard::trace_request))
@@ -1711,7 +1725,6 @@ pub(crate) fn same(a: &str, b: &str) -> bool {
 }
 
 /// Compares two byte strings in time that does not depend on where they differ.
-#[cfg(feature = "accounts")]
 pub(crate) fn same_bytes(a: &[u8], b: &[u8]) -> bool {
     a.len() == b.len() && a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
@@ -1724,6 +1737,68 @@ fn new_token() -> String {
 
 fn valid_token(t: &str) -> bool {
     t.len() == 64 && t.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+/// The value of one hex digit, or `None`.
+fn hex_digit(b: u8) -> Option<u8> {
+    match b {
+        b'0'..=b'9' => Some(b - b'0'),
+        b'a'..=b'f' => Some(b - b'a' + 10),
+        b'A'..=b'F' => Some(b - b'A' + 10),
+        _ => None,
+    }
+}
+
+/// The 32 bytes of a 64 digit hex string, or `None`.
+fn hex32(s: &[u8]) -> Option<[u8; 32]> {
+    if s.len() != 64 {
+        return None;
+    }
+    let mut out = [0u8; 32];
+    for (i, pair) in s.chunks_exact(2).enumerate() {
+        out[i] = hex_digit(pair[0])? << 4 | hex_digit(pair[1])?;
+    }
+    Some(out)
+}
+
+/// The CSRF token as it is written into a page or a response: a fresh random pad followed by the
+/// token XOR the pad, 128 hex digits. Every response carries different bytes for the same token,
+/// so compression cannot leak it (BREACH). A token that is already masked is masked again with a
+/// new pad; an empty token stays empty.
+fn mask_token(token: &str) -> String {
+    let Some(raw) = unmask_token(token).or_else(|| hex32(token.as_bytes())) else { return String::new() };
+    let mut pad = [0u8; 32];
+    getrandom::getrandom(&mut pad).expect("the operating system random source must work");
+    let mut out = String::with_capacity(128);
+    for b in pad.into_iter().chain(raw.into_iter().zip(pad).map(|(r, p)| r ^ p)) {
+        use std::fmt::Write;
+        let _ = write!(out, "{b:02x}");
+    }
+    out
+}
+
+/// The token bytes of a masked token (pad followed by token XOR pad), or `None` when it is not one.
+fn unmask_token(masked: &str) -> Option<[u8; 32]> {
+    let b = masked.as_bytes();
+    if b.len() != 128 {
+        return None;
+    }
+    let (pad, x) = (hex32(&b[..64])?, hex32(&b[64..])?);
+    let mut raw = [0u8; 32];
+    for i in 0..32 {
+        raw[i] = pad[i] ^ x[i];
+    }
+    Some(raw)
+}
+
+/// Whether a token sent with a request matches the `zeyn_csrf` cookie, in constant time. The
+/// token may be masked ([`mask_token`]) or raw, as pages from before masking send it.
+pub(crate) fn csrf_matches(cookie: &str, sent: &str) -> bool {
+    let Some(want) = hex32(cookie.as_bytes()) else { return false };
+    match unmask_token(sent).or_else(|| hex32(sent.as_bytes())) {
+        Some(got) => same_bytes(&want, &got),
+        None => false,
+    }
 }
 
 /// Most tenants whose license is kept in memory. The tenant may come from a header or the host
@@ -1865,7 +1940,7 @@ impl AppState {
     fn check_csrf(&self, headers: &HeaderMap) -> Result<(), Failure> {
         let header = headers.get("x-zeyn-csrf").and_then(|v| v.to_str().ok()).unwrap_or("");
         match cookie(headers, "zeyn_csrf") {
-            Some(c) if valid_token(c) && same(c, header) => Ok(()),
+            Some(c) if csrf_matches(c, header) => Ok(()),
             _ => Err(Failure::App(Error::Denied(Text::key("zeyn.error.csrf")))),
         }
     }
@@ -2233,12 +2308,13 @@ impl AppState {
         #[cfg(not(feature = "assistant"))]
         let (ai_head, ai_launcher) = (String::new(), String::new());
         format!(
-            r##"<!doctype html><html lang="{lang}"{dir}{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css"><script type="module" src="{base}/_zeyn/zeyn.js"></script><script type="module" src="{base}/_zeyn/nav.js"></script>{components}{theme_link}{extra}</head><body><a class="z-skip" href="#z-main">{skip}</a>{frame}<div class="z-toasts" role="status" aria-live="polite" data-text-dismiss="{dismiss}"></div>{commands}{ai_launcher}</body></html>"##,
+            r##"<!doctype html><html lang="{lang}"{dir}{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css{v}"><script type="module" src="{base}/_zeyn/zeyn.js{v}"></script><script type="module" src="{base}/_zeyn/nav.js{v}"></script>{components}{theme_link}{extra}</head><body><a class="z-skip" href="#z-main">{skip}</a>{frame}<div class="z-toasts" role="status" aria-live="polite" data-text-dismiss="{dismiss}"></div>{commands}{ai_launcher}</body></html>"##,
             lang = escape(ctx.locale()),
             dir = if locale::rtl(ctx.locale()) { r#" dir="rtl""# } else { "" },
-            csrf = escape(csrf),
+            csrf = mask_token(csrf),
             tz = escape(ctx.time_zone().name()),
             base = escape(&self.prefix),
+            v = ops::asset_version(),
             components = format!(
                 "{}{}{}{}{}{site_head}{ai_head}",
                 ui::head(&escape(&self.prefix)),
@@ -2252,7 +2328,7 @@ impl AppState {
             theme_link = if self.look.css.is_empty() {
                 String::new()
             } else {
-                format!(r#"<link rel="stylesheet" href="{}/_zeyn/theme.css">"#, escape(&self.prefix))
+                format!(r#"<link rel="stylesheet" href="{}/_zeyn/theme.css?v={}">"#, escape(&self.prefix), self.look.version)
             },
             title = escape(title),
             extra = ops::head(self, ctx),
@@ -2329,7 +2405,8 @@ static STATIC_FILES: std::sync::OnceLock<std::sync::Mutex<std::collections::Hash
     std::sync::OnceLock::new();
 
 /// Revalidation and compression for the framework's own scripts and styles (`/_zeyn/*.js` and
-/// `*.css`, not media or uploads): a strong ETag over the bytes, `304 Not Modified` for a
+/// `*.css`, not media or uploads): `Cache-Control: public, max-age=31536000, immutable` when the
+/// URL carries the running build ([`ops::asset_version`]), a strong ETag over the bytes, `304 Not Modified` for a
 /// matching `If-None-Match`, and gzip when the browser accepts it. Each file is hashed and
 /// compressed once and kept ([`STATIC_CACHE`] files at most); files under 1 KB, such as the
 /// theme, get an ETag but no compression.
@@ -2354,7 +2431,11 @@ async fn static_files(req: axum::extract::Request, next: axum::middleware::Next)
                 && !p.any(|q| q.trim().strip_prefix("q=").is_some_and(|v| v.trim().parse::<f32>().is_ok_and(|v| v == 0.0)))
         });
     let headers = req.headers().clone();
-    let response = next.run(req).await;
+    let current = req.uri().query() == Some(&ops::asset_version()[1..]);
+    let mut response = next.run(req).await;
+    if current && response.status() == StatusCode::OK {
+        response.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static(IMMUTABLE));
+    }
     if response.status() != StatusCode::OK
         || response.headers().contains_key(header::ETAG)
         || response.headers().contains_key(header::CONTENT_ENCODING)
@@ -2406,14 +2487,63 @@ async fn static_files(req: axum::extract::Request, next: axum::middleware::Next)
     }
 }
 
+/// Content types sent as they are: media, files that are compressed already, and streams that
+/// must reach the browser event by event.
+const UNCOMPRESSED: &[&str] = &[
+    "video/",
+    "audio/",
+    "application/octet-stream",
+    "text/event-stream",
+    "application/x-ndjson",
+    "application/grpc",
+    "application/zip",
+    "application/gzip",
+    "application/pdf",
+    "application/vnd.openxmlformats",
+    "font/woff",
+];
+
+/// Gzip for pages, partial screens, grid blocks and other dynamic responses of 1 KB or more, at the
+/// level 2 (a 362 KB grid block becomes 37 KB for 0.8 ms of CPU; level 1 gives 54 KB for 0.6 ms
+/// and level 6 35 KB for 1.4 ms). Responses that
+/// already have a `Content-Encoding` (the framework assets from [`static_files`]) or a
+/// `Content-Range` pass as they are, and so do the types in [`UNCOMPRESSED`], images other than
+/// SVG and protocol switches. Streamed bodies (exports) are compressed as they stream.
+fn compression() -> tower_http::compression::CompressionLayer<impl tower_http::compression::Predicate> {
+    use tower_http::compression::{CompressionLayer, CompressionLevel, Predicate, predicate::SizeAbove};
+    fn compressible(status: StatusCode, _: axum::http::Version, headers: &HeaderMap, _: &axum::http::Extensions) -> bool {
+        let kind = headers.get(header::CONTENT_TYPE).and_then(|v| v.to_str().ok()).unwrap_or("");
+        status != StatusCode::SWITCHING_PROTOCOLS
+            && (!kind.starts_with("image/") || kind.starts_with("image/svg+xml"))
+            && !UNCOMPRESSED.iter().any(|p| kind.starts_with(p))
+    }
+    CompressionLayer::new().quality(CompressionLevel::Precise(2)).compress_when(SizeAbove::new(1024).and(compressible))
+}
+
+/// Drops `Accept-Encoding` from requests with a `Range` header, so a byte range always refers to
+/// the bytes of the file and is never compressed.
+async fn identity_for_ranges(mut req: axum::extract::Request) -> axum::extract::Request {
+    if req.headers().contains_key(header::RANGE) {
+        req.headers_mut().remove(header::ACCEPT_ENCODING);
+    }
+    req
+}
+
 fn asset(body: &'static str, content_type: &'static str) -> Response {
     ([(header::CONTENT_TYPE, content_type), (header::CACHE_CONTROL, "no-cache")], body).into_response()
 }
 
-async fn theme_css(State(st): State<Arc<AppState>>) -> Response {
+/// `GET /_zeyn/theme.css`: the app's theme. Its URL carries a hash of the text (`?v=`), so the
+/// browser keeps it for a year when the hash matches; any other request revalidates.
+async fn theme_css(State(st): State<Arc<AppState>>, uri: axum::http::Uri) -> Response {
     let css = st.look.css.clone();
-    ([(header::CONTENT_TYPE, "text/css; charset=utf-8"), (header::CACHE_CONTROL, "no-cache")], css).into_response()
+    let current = uri.query().and_then(|q| q.strip_prefix("v=")).is_some_and(|v| v == st.look.version);
+    let cache = if current { IMMUTABLE } else { "no-cache" };
+    ([(header::CONTENT_TYPE, "text/css; charset=utf-8"), (header::CACHE_CONTROL, cache)], css).into_response()
 }
+
+/// `Cache-Control` of a framework file asked for by the URL of the running build.
+const IMMUTABLE: &str = "public, max-age=31536000, immutable";
 
 fn with_cookie(mut response: Response, cookie: Option<String>) -> Response {
     if let Some(c) = cookie.and_then(|c| HeaderValue::from_str(&c).ok()) {
@@ -2484,6 +2614,14 @@ async fn page(
             let mut page = st.shell(&ctx, &csrf, &title, &html, Some(name));
             if !head.is_empty() {
                 page = page.replacen("</head>", &format!("{head}</head>"), 1);
+            }
+            if html.contains("data-zeyn-grid") {
+                let preload = format!(
+                    r#"<link rel="modulepreload" href="{}/_zeyn/grid.js{}"></head>"#,
+                    escape(&st.prefix),
+                    ops::asset_version()
+                );
+                page = page.replacen("</head>", &preload, 1);
             }
             #[cfg(feature = "realtime")]
             realtime::head(&st, &html, &mut page);
@@ -2581,7 +2719,7 @@ async fn csrf_token(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Resp
         return st.error_response(&ctx, Failure::App(Error::Forbidden));
     }
     let (token, set) = st.csrf(&headers);
-    let mut r = axum::Json(json!({ "token": token })).into_response();
+    let mut r = axum::Json(json!({ "token": mask_token(&token) })).into_response();
     r.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     with_cookie(r, set)
 }

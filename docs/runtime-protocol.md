@@ -20,8 +20,8 @@ A failed page answers with its status (404, 403, 500, ...) and the app's error s
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="zeyn-csrf" content="TOKEN">
   <title>Products · Inventory</title>
-  <link rel="stylesheet" href="/_zeyn/zeyn.css">
-  <script type="module" src="/_zeyn/zeyn.js"></script>
+  <link rel="stylesheet" href="/_zeyn/zeyn.css?v=BUILD">
+  <script type="module" src="/_zeyn/zeyn.js?v=BUILD"></script>
 </head>
 <body>
   <a class="z-skip" href="#z-main">Skip to content</a>
@@ -35,6 +35,10 @@ A failed page answers with its status (404, 403, 500, ...) and the app's error s
 ```
 
 The menu lists only the screens the current user may open. The current item has `aria-current="page"`.
+
+Every framework script and stylesheet in the head carries `?v=` and the build id (`meta[name=zeyn-build]`, from `ZEYN_BUILD_ID` or a hash of the executable); `theme.css` carries a hash of the theme text. A request with the current value gets `Cache-Control: public, max-age=31536000, immutable`, so a warm page load asks for none of them; any other request (an old tab after a deploy, no `v`) gets `no-cache` and the ETag. Modules the runtime imports later take the same `v` from the URL of the script that imports them.
+
+Every page loads `zeyn.js` (requests, effects, windows, forms, menus, shortcuts and the event delegation), `nav.js`, `components.js` and, in the app shell, `pro.js` and `enterprise.js`. The rest loads only on pages that use it, also when `nav.js` swaps a screen in: `zeyn.js` imports the grid runtime `grid.js` the first time content holds a `[data-zeyn-grid]` (full pages with a grid name it in `<link rel="modulepreload">`), and `components.js` imports `catalog.js` (card grids, search boxes), `media.js` (players, embeds), `files.js` (uploads), `charts.js` and `assistant.js` (chat panels, or the first press of the launcher). Their stylesheets stay in the head, so nothing changes look when the script arrives. On the showcase dashboard this is 5 scripts and 258 KB (74 KB on the wire) instead of 9 scripts and 403 KB (116 KB).
 
 ## 2. Screen markup
 
@@ -161,13 +165,13 @@ Grouped and tree grids (`<table role="treegrid">`) send `path` with `POST /_zeyn
 
 ### 4.2.2 Virtual scrolling
 
-Grids with `data-zeyn-paging="virtual"` show one scrollable list over every row, however many there are. The server renders the first block (`data-zeyn-page-size` rows, offset 0) with `data-zeyn-total`. The grid root also has `data-zeyn-row-height` (pixels) and the CSS variable `--z-row-height`.
+Grids with `data-zeyn-paging="virtual"` show one scrollable list over every row, however many there are. The server renders the first block (`data-zeyn-page-size` rows, offset 0) with `data-zeyn-total`: the first 64 rows live in the table and the rest in `<template data-zeyn-rows-later>` after it, or every row in the template when the grid shows 40 columns or more. The grid root also has `data-zeyn-row-height` (pixels) and the CSS variable `--z-row-height`.
 
 The runtime:
 
 - Puts the table body in a scroll container whose inner spacer is `total * rowHeight` pixels high, capped at 8,000,000 px. Above the cap, scroll position maps to row index by ratio (`row = scrollTop / (spacerHeight - viewport) * (total - visibleRows)`), so 1,000,000 rows still reach the end.
 - Keeps only the visible rows plus 20 rows above and below in the DOM, positioned with `transform: translateY(...)`. Rows have a fixed height; long text is cut with an ellipsis.
-- Loads blocks of `data-zeyn-page-size` rows with `POST /_zeyn/grid` and `page: { "type": "offset", "offset": blockStart, "limit": blockSize }`, `with_total: false` after the first call. Keeps up to 20 blocks in a cache (least recently used out), prefetches the next block in the scroll direction, and cancels requests for blocks that left the view (`AbortController`).
+- Loads blocks of `data-zeyn-page-size` rows with `POST /_zeyn/grid` and `page: { "type": "offset", "offset": blockStart, "limit": blockSize }`, `with_total: false` after the first call. Keeps up to 20 blocks and at most 100,000 cells in a cache (least recently used out; 7 blocks for a 63 column grid, never fewer than 3), with the blocks kept for a `reload` counted in the same cap and dropped first, prefetches the next block in the scroll direction, and cancels requests for blocks that left the view (`AbortController`).
 - Never clears the visible rows while a block loads. Missing rows show a placeholder row with `aria-busy="true"` until their block arrives, so the screen does not flash.
 - Sort and filter changes drop the cache and scroll to the top.
 - Keyboard: Arrow keys, Page Up, Page Down, Home and End move the active row and scroll it into view. The table has `aria-rowcount` = total and each row `aria-rowindex`.
@@ -237,6 +241,8 @@ the request).
 - Every response sets `Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`, `X-Content-Type-Options: nosniff` and `Referrer-Policy: same-origin`. `App::csp` adds named `https` hosts to `img-src`, `media-src` (and `blob:`), `frame-src`, `connect-src` and `font-src`; the other directives never change. The header text is built once at startup.
 - No inline scripts or inline event handlers. Inline `style` attributes are used only for CSS custom properties (`--z-width`, `--z-flex`) and fixed column widths, so the policy adds `style-src-attr 'unsafe-inline'`. Scripts stay strict.
 - The CSRF token is stored in an `HttpOnly`, `SameSite=Strict` cookie and compared in constant time with the `x-zeyn-csrf` header.
+- Pages, the `totp` form and `GET /_zeyn/csrf` never carry the token as it is in the cookie: each response gets a fresh random pad followed by the token XOR the pad (128 hex digits), so gzip cannot leak it (BREACH). The server unmasks before it compares and still accepts the plain 64 digit token.
+- Dynamic responses of 1 KB or more (pages, partial screens, grid blocks, exports) are gzipped at level 2 when the browser accepts it, with `Vary: Accept-Encoding`. Never compressed: responses that already have a `Content-Encoding` (the framework assets, compressed once and cached), ranges (`Content-Range`, and any request with `Range`), video, audio, images other than SVG, `application/octet-stream`, archives and PDFs, `text/event-stream`, `application/x-ndjson` (the assistant's stream) and WebSocket upgrades.
 - Each call checks, in order: authentication, the screen's access, the feature's guards, the node action's access, then runs the interceptors and the action.
 
 ## 6. Runtime behavior

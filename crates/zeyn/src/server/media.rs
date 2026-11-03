@@ -31,8 +31,9 @@ pub(super) const ASSETS: [&str; 2] = ["/_zeyn/media.js", "/_zeyn/media.css"];
 
 /// Links placed in the page head after the component library's own.
 pub(super) fn head(base: &str) -> String {
+    let v = super::ops::asset_version();
     format!(
-        r#"<link rel="stylesheet" href="{base}/_zeyn/media.css"><script type="module" src="{base}/_zeyn/media.js"></script>"#
+        r#"<link rel="stylesheet" href="{base}/_zeyn/media.css{v}">"#
     )
 }
 

@@ -91,7 +91,7 @@ async fn app_themes_are_served_as_one_stylesheet_and_picked_by_name() {
     let (_, _, page) = get(&r, "/home", "zeyn_theme=ocean").await;
     assert_eq!(html_tag(&page), r#"<html lang="en" data-theme="light" data-zeyn-theme="ocean">"#);
     assert!(page.contains(r#"<option value="ocean" data-scheme="light" data-custom selected>Ocean</option>"#));
-    let link = page.find(r#"<link rel="stylesheet" href="/_zeyn/theme.css">"#).unwrap();
+    let link = page.find(r#"<link rel="stylesheet" href="/_zeyn/theme.css?v="#).unwrap();
     assert!(link > page.find("/_zeyn/components.css").unwrap(), "theme tokens load after every kit stylesheet");
 }
 

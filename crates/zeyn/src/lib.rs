@@ -154,7 +154,7 @@ pub use form::{Form, FormAction, FormRow, SubmitForm};
 pub use grid::{
     BulkAction, COLUMN_WIDTH, CellRenderer, ColumnView, DEFAULT_EXPORT_LIMIT, DataGrid, DataGridColumn, DataGridView,
     DataGridViewStore, DataMode, ExportColumn, MAX_BULK, MAX_PINNED, MAX_SORT, MemoryViewStore, Paging, Pin, RowStyle,
-    VIRTUAL_LIVE_ROWS,
+    VIRTUAL_LIVE_ROWS, VIRTUAL_WIDE_COLUMNS,
     Tone, position_cursor, total,
 };
 #[allow(deprecated)]

@@ -111,14 +111,18 @@ async fn the_csrf_endpoint_sets_the_cookie_once_and_is_never_stored() {
         r.header(header::SET_COOKIE).contains("HttpOnly") && r.header(header::SET_COOKIE).contains("SameSite=Strict")
     );
     let body: serde_json::Value = serde_json::from_str(&r.body).unwrap();
-    assert_eq!(body["token"], token);
+    let masked = body["token"].as_str().unwrap().to_string();
+    assert!(masked.len() == 128 && !masked.contains(&token), "the token is sent masked: {masked}");
+    assert_eq!(send(&router, locale_post(Some(&token), Some(&masked))).await.status, StatusCode::NO_CONTENT);
 
     let req =
         Request::get("/_zeyn/csrf").header(header::COOKIE, format!("zeyn_csrf={token}")).body(Body::empty()).unwrap();
     let again = send(&router, req).await;
     assert!(again.headers.get(header::SET_COOKIE).is_none());
     let body: serde_json::Value = serde_json::from_str(&again.body).unwrap();
-    assert_eq!(body["token"], token);
+    let remasked = body["token"].as_str().unwrap();
+    assert!(remasked.len() == 128 && remasked != masked, "every response masks the token again");
+    assert_eq!(send(&router, locale_post(Some(&token), Some(remasked))).await.status, StatusCode::NO_CONTENT);
 
     let req = Request::get("/_zeyn/csrf").header("sec-fetch-site", "cross-site").body(Body::empty()).unwrap();
     let foreign = send(&router, req).await;

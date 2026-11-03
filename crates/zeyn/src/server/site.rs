@@ -18,8 +18,9 @@ pub(super) const ASSETS: [&str; 2] = ["/_zeyn/site.js", "/_zeyn/site.css"];
 
 /// Links placed in the head of site shell pages only.
 pub(super) fn head(base: &str) -> String {
+    let v = super::ops::asset_version();
     format!(
-        r#"<link rel="stylesheet" href="{base}/_zeyn/site.css"><script type="module" src="{base}/_zeyn/site.js"></script>"#
+        r#"<link rel="stylesheet" href="{base}/_zeyn/site.css{v}"><script type="module" src="{base}/_zeyn/site.js{v}"></script>"#
     )
 }
 

@@ -1,32 +1,3 @@
-/** Relative time formatter for the page language, made once. */
-let relativeFormat = null;
-
-/**
- * Shows `time[data-zeyn-relative]` as relative time ("3 minutes ago") in the page language. The
- * server rendered exact time stays in the `title`. Called when rows arrive and once a minute.
- */
-function relativeTimes(root) {
-  const list = root.querySelectorAll('time[data-zeyn-relative]');
-  if (!list.length || typeof Intl.RelativeTimeFormat !== 'function') return;
-  relativeFormat ??= new Intl.RelativeTimeFormat(document.documentElement.lang || undefined, { numeric: 'auto' });
-  const now = Date.now();
-  const units = [
-    ['year', 31536000],
-    ['month', 2592000],
-    ['week', 604800],
-    ['day', 86400],
-    ['hour', 3600],
-    ['minute', 60],
-  ];
-  for (const el of list) {
-    const at = Date.parse(el.getAttribute('datetime'));
-    if (Number.isNaN(at)) continue;
-    const secs = (at - now) / 1000;
-    const [unit, size] = units.find(([, n]) => Math.abs(secs) >= n) ?? ['second', 1];
-    el.textContent = relativeFormat.format(Math.round(secs / size), unit);
-  }
-}
-
 /** The selection bar of a grid, rendered right before it. */
 function bulkBar(grid) {
   const bar = grid.previousElementSibling;

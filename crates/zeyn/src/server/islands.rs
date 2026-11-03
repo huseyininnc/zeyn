@@ -109,9 +109,10 @@ pub(super) fn page(st: &AppState, page: String, screen: &str) -> Response {
         return Html(page).into_response();
     };
     let head = format!(
-        r#"<meta name="zeyn-islands" content="{}"><script type="module" src="{}{LOADER}"></script></head>"#,
+        r#"<meta name="zeyn-islands" content="{}"><script type="module" src="{}{LOADER}{}"></script></head>"#,
         islands.meta,
-        escape(&st.prefix)
+        escape(&st.prefix),
+        super::ops::asset_version()
     );
     let mut r = Html(page.replacen("</head>", &head, 1)).into_response();
     r.headers_mut().insert(header::CONTENT_SECURITY_POLICY, st.island_csp.clone());

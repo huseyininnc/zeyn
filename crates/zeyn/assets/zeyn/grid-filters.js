@@ -1,11 +1,3 @@
-/** Creates an element with a class and optional attributes. */
-function make(tag, className, attrs = {}) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
-  return node;
-}
-
 /**
  * Builds the filter controls of one column in its filter row cell, by `th[data-filter]`:
  * `text` (match kind and text), `number`, `money`, `date`, `datetime`, `time` (from and to),
@@ -102,17 +94,6 @@ function filterControls(cell, th, t) {
     if (type === 'text') wrap.querySelectorAll('input').forEach((i) => (i.dataset.zeynFilterDate = kind === 'time' ? 'time' : 'date'));
     cell.append(wrap);
   }
-}
-
-/** Places a popover under its button, inside the viewport, at the inline start edge. */
-function place(panel, button) {
-  const r = button.getBoundingClientRect();
-  const rtl = getComputedStyle(button).direction === 'rtl';
-  const width = panel.offsetWidth;
-  const left = rtl ? r.right - width : r.left;
-  panel.style.left = `${Math.max(4, Math.min(left, innerWidth - width - 4))}px`;
-  const below = r.bottom + 2;
-  panel.style.top = `${below + panel.offsetHeight > innerHeight ? Math.max(4, r.top - panel.offsetHeight - 2) : below}px`;
 }
 
 /** Reads the controls of a filter cell into a filter object without `field`; `null` when empty. */

@@ -404,6 +404,14 @@ pub fn probe(addr: &str) -> std::io::Result<()> {
 pub(super) const BUILD_HEADER: &str = "x-zeyn-build";
 
 /// FNV-1a, 64 bit. Only used to tell builds apart, not for security.
+/// `?v=` and the [`build_id`], appended to the URL of every framework script and stylesheet a
+/// page links, so the browser keeps them for a year without asking again (see `static_files`).
+/// A new build changes the URLs.
+pub(super) fn asset_version() -> &'static str {
+    static V: OnceLock<String> = OnceLock::new();
+    V.get_or_init(|| format!("?v={}", build_id()))
+}
+
 fn fnv(bytes: &[u8], mut hash: u64) -> u64 {
     for b in bytes {
         hash ^= u64::from(*b);
@@ -424,7 +432,7 @@ pub fn build_id() -> &'static str {
             let seed = 0xcbf2_9ce4_8422_2325;
             let hash = match std::env::current_exe().and_then(std::fs::read) {
                 Ok(bytes) => fnv(&bytes, seed),
-                Err(_) => [super::JS, super::CSS, JS, CSS, env!("CARGO_PKG_VERSION")]
+                Err(_) => [super::JS, super::GRID_JS, super::CSS, JS, CSS, env!("CARGO_PKG_VERSION")]
                     .iter()
                     .fold(seed, |h, s| fnv(s.as_bytes(), h)),
             };
@@ -478,11 +486,12 @@ pub(super) fn head(st: &AppState, ctx: &Ctx) -> String {
     let texts: serde_json::Map<String, serde_json::Value> =
         TEXTS.iter().map(|k| (k.to_string(), ctx.t(&Text::key(format!("zeyn.{k}"))).into())).collect();
     format!(
-        r#"{session}<meta name="zeyn-build" content="{build}"><meta name="zeyn-texts" content="{texts}"><link rel="stylesheet" href="{base}/_zeyn/enterprise.css"><script type="module" src="{base}/_zeyn/enterprise.js"></script>{dev}"#,
+        r#"{session}<meta name="zeyn-build" content="{build}"><meta name="zeyn-texts" content="{texts}"><link rel="stylesheet" href="{base}/_zeyn/enterprise.css{v}"><script type="module" src="{base}/_zeyn/enterprise.js{v}"></script>{dev}"#,
         dev = if dev_mode() {
             format!(
-                r#"<meta name="zeyn-dev" content="1"><script type="module" src="{}/_zeyn/dev.js"></script>"#,
-                escape(&st.prefix)
+                r#"<meta name="zeyn-dev" content="1"><script type="module" src="{}/_zeyn/dev.js{}"></script>"#,
+                escape(&st.prefix),
+                asset_version()
             )
         } else {
             String::new()
@@ -491,6 +500,7 @@ pub(super) fn head(st: &AppState, ctx: &Ctx) -> String {
         build = escape(build_id()),
         session = super::session::head(st, ctx),
         base = escape(&st.prefix),
+        v = asset_version(),
     ) + &accounts_head(st)
 }
 
@@ -498,7 +508,11 @@ pub(super) fn head(st: &AppState, ctx: &Ctx) -> String {
 fn accounts_head(st: &AppState) -> String {
     #[cfg(feature = "accounts")]
     if st.sign_in.accounts.is_some() {
-        return format!(r#"<script type="module" src="{}/_zeyn/account/accounts.js"></script>"#, escape(&st.prefix));
+        return format!(
+            r#"<script type="module" src="{}/_zeyn/account/accounts.js{}"></script>"#,
+            escape(&st.prefix),
+            asset_version()
+        );
     }
     let _ = st;
     String::new()

@@ -7,7 +7,7 @@
 //! cannot keep up is closed, never buffered without end. Rooms without clients are persisted
 //! through [`DocStore`] and dropped after [`Limits::idle`].
 
-use super::{AppState, Call, CallKind, Failure, cookie, same, valid_token};
+use super::{AppState, Call, CallKind, Failure, cookie};
 use crate::action::Error;
 use crate::ctx::{BoxFuture, Ctx, Service};
 use axum::Router;
@@ -413,7 +413,11 @@ pub(super) fn is_asset(path: &str) -> bool {
 pub(super) fn head(st: &AppState, screen: &str, page: &mut String) {
     if st.realtime.is_some() && screen.contains(MARKER) {
         let tag =
-            format!(r#"<script type="module" src="{}{LOADER}"></script></head>"#, crate::render::escape(&st.prefix));
+            format!(
+                r#"<script type="module" src="{}{LOADER}{}"></script></head>"#,
+                crate::render::escape(&st.prefix),
+                super::ops::asset_version()
+            );
         *page = page.replacen("</head>", &tag, 1);
     }
 }
@@ -460,7 +464,7 @@ async fn admit(st: &AppState, headers: &HeaderMap, csrf: &str) -> Result<(Ctx, H
     let Some(config) = hub.config() else {
         return Err(st.error_response(&ctx, Failure::App(Error::NotFound)));
     };
-    let token_ok = cookie(headers, "zeyn_csrf").is_some_and(|c| valid_token(c) && same(c, csrf));
+    let token_ok = cookie(headers, "zeyn_csrf").is_some_and(|c| super::csrf_matches(c, csrf));
     if !origin_allowed(headers, &config.origins) || !token_ok {
         return Err(st.error_response(&ctx, Failure::App(Error::Denied(crate::i18n::Text::key("zeyn.error.csrf")))));
     }

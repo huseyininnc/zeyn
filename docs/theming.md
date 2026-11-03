@@ -123,6 +123,7 @@ Computed from the base tokens with `color-mix()` and relative color syntax. They
 | `--z-radius-sm`, `--z-radius-lg` | Small parts (filters, code), windows | `0.75x` and `1.5x` of `--z-radius` | same |
 | `--z-shadow-2` | Windows and toasts only. Grid rows never get a shadow | soft two layer shadow | darker |
 | `--z-backdrop` | Behind a modal window | `rgb(20 24 28 / 40%)` | `rgb(0 0 0 / 60%)` |
+| `--z-dir` | Reading direction as a sign, for offsets with no logical form (inset box shadows that mark the start or end side, slide transforms): `calc(2px * var(--z-dir))` | `1`, and `-1` under `dir="rtl"` | same |
 
 Per element tokens set by the server markup: `--z-width` (window width), `--z-flex` (column share), `--z-row-height` (virtual grid row height), and for the component library `--z-stack-gap`, `--z-split`, `--z-progress`, `--z-columns`, `--z-level` and `--z-pop-x` / `--z-pop-y` (popup position).
 

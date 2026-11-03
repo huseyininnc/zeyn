@@ -174,7 +174,7 @@ async fn card_grids_render_their_first_page_as_linked_lazy_images() {
     assert!(page.contains("Black &lt;tea&gt;"), "row text is escaped");
     assert_eq!(page.matches(r#"<li class="z-poster">"#).count(), 4 + 12, "four cards and the rail's twelve");
     assert!(page.contains(r#"data-zeyn-cards-sort><option value="0" data-sort=""#));
-    assert!(page.contains(r#"href="/_zeyn/catalog.css""#));
+    assert!(page.contains(r#"href="/_zeyn/catalog.css?v="#));
     assert!(!page.contains("javascript:"), "unsafe image addresses are left out");
     assert!(page.contains(r#"<section class="z-rail""#) && page.contains("data-zeyn-rail-next"));
     assert!(page.contains(r#"role="combobox" aria-autocomplete="list" aria-expanded="false""#));

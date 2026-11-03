@@ -477,7 +477,11 @@ function swapRow(grid, tr, html) {
   return fresh;
 }
 
-/** Fewest columns before only the visible ones (and a few around them) stay in the page. */
+/**
+ * Fewest columns before only the visible ones (and a few around them) stay in the page. The
+ * server's `VIRTUAL_WIDE_COLUMNS` is the same number: a virtual grid this wide comes with every
+ * row of its first block in the template, so no row is laid out before the window is set.
+ */
 const COLV_MIN = 40;
 const COLV_BUFFER = 6;
 
@@ -525,7 +529,7 @@ function initColumns(grid, s) {
       { passive: true },
     );
   }
-  applyColumns(grid, true);
+  applyColumns(grid, true, s.view0);
 }
 
 /**
@@ -534,12 +538,13 @@ function initColumns(grid, s) {
  * columns and six more on each side, so most scroll frames change nothing. `rows` walks the rows
  * even when the window stays, for rows that just arrived.
  */
-function applyColumns(grid, rows = false) {
+function applyColumns(grid, rows = false, geometry = null) {
   const s = grids.get(grid);
   const v = s?.colv;
   if (!v) return;
-  const left = Math.abs(grid.scrollLeft) + v.x[v.pinS];
-  const right = Math.abs(grid.scrollLeft) + grid.clientWidth - (v.x[v.n] - v.x[v.n - v.pinE]);
+  const scrolled = geometry ? geometry.left : Math.abs(grid.scrollLeft);
+  const left = scrolled + v.x[v.pinS];
+  const right = scrolled + (geometry ? geometry.width : grid.clientWidth) - (v.x[v.n] - v.x[v.n - v.pinE]);
   const lastFree = v.n - v.pinE - 1;
   let first = v.pinS;
   while (first < lastFree && v.x[first + 1] <= left) first++;

@@ -242,7 +242,8 @@ a.z-poster-link:focus-visible {
 .z-search-field input {
   width: 100%;
   min-height: 44px;
-  padding: 0 12px 0 38px;
+  padding-block: 0;
+  padding-inline: 38px 12px;
   border: 1px solid var(--z-border-strong);
   border-radius: var(--z-radius-lg);
   background: var(--z-surface);
@@ -285,7 +286,7 @@ a.z-poster-link:focus-visible {
 .z-search-option[aria-selected="true"] {
   background: var(--z-brand-subtle);
   color: var(--z-accent);
-  box-shadow: inset 2px 0 0 var(--z-accent);
+  box-shadow: inset calc(2px * var(--z-dir)) 0 0 var(--z-accent);
 }
 
 @media (prefers-reduced-motion: no-preference) {

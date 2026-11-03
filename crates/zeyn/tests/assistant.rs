@@ -372,7 +372,8 @@ async fn limits_and_security_checks() {
 async fn the_page_shell_carries_the_launcher_and_assets_only_for_allowed_users() {
     let s = setup(ALL, |a| a);
     let page = send(&s.router, Request::get("/customers").header("x-user", "1").body(Body::empty()).unwrap()).await;
-    assert!(page.body.contains("/_zeyn/assistant.js"));
+    assert!(page.body.contains("/_zeyn/assistant.css"), "the script loads on the first press of the launcher");
+    assert!(!page.body.contains("/_zeyn/assistant.js"));
     assert!(page.body.contains("data-zeyn-assistant-launch"));
     assert!(page.body.contains(r#"role="log""#));
     let js = send(&s.router, Request::get("/_zeyn/assistant.js").body(Body::empty()).unwrap()).await;

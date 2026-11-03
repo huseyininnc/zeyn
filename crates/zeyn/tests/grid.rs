@@ -1415,3 +1415,64 @@ async fn columns_without_sorting_get_no_sort_button_and_the_server_drops_their_s
     let rows = send(&router, post("/_zeyn/grid", call)).await.json()["rows"].as_str().unwrap().to_string();
     assert!(rows.find("C-01").unwrap() < rows.find("C-20").unwrap(), "the action never saw the sort: {rows}");
 }
+
+/// Rows as `rows_html` rendered them before the row renderer wrote straight into its output:
+/// every value kind, escaping, editable cells with `data-v`, keys, versions, an open effect and
+/// a row action.
+const ROWS_BEFORE: &str = r##"<tr tabindex="-1" data-zeyn-effect="{&quot;effect&quot;:&quot;toast&quot;,&quot;message&quot;:&quot;open &lt;a href=\&quot;x\&quot;&gt;&amp;&#39;&lt;/a&gt;&quot;}" data-zeyn-key="3" data-zeyn-version="1"><td class="z-num">3</td><td data-v="&lt;a href=&quot;x&quot;&gt;&amp;&#39;&lt;/a&gt;">&lt;a href=&quot;x&quot;&gt;&amp;&#39;&lt;/a&gt;</td><td>Tool</td><td class="z-num" data-v="30.00">₺30.00</td><td class="z-num">3</td><td data-v="false">No</td><td><time datetime="2026-01-03">1/3/2026</time></td><td></td><td>note 3</td><td class="z-row-actions"><button type="button" class="z-row-action" data-zeyn-run="a0" tabindex="-1"><span>Bump</span></button></td></tr><tr tabindex="-1" data-zeyn-effect="{&quot;effect&quot;:&quot;toast&quot;,&quot;message&quot;:&quot;open C-04&quot;}" data-zeyn-key="4" data-zeyn-version="1"><td class="z-num">4</td><td data-v="C-04">C-04</td><td>Part</td><td class="z-num" data-v="40.00">₺40.00</td><td class="z-num">4</td><td data-v="true">Yes</td><td><time datetime="2026-01-04">1/4/2026</time></td><td><time datetime="2026-03-04">3/4/2026</time></td><td>ünïcode ✓ &amp; &quot;quoted&quot;</td><td class="z-row-actions"><button type="button" class="z-row-action" data-zeyn-run="a0" tabindex="-1"><span>Bump</span></button></td></tr><tr tabindex="-1" data-zeyn-effect="{&quot;effect&quot;:&quot;toast&quot;,&quot;message&quot;:&quot;open C-05&quot;}" data-zeyn-key="5" data-zeyn-version="1"><td class="z-num">5</td><td data-v="C-05">C-05</td><td>Food</td><td class="z-num" data-v="-12,345.67">-₺12,345.67</td><td class="z-num">5</td><td data-v="false">No</td><td><time datetime="2026-01-05">1/5/2026</time></td><td></td><td>note 5</td><td class="z-row-actions"><button type="button" class="z-row-action" data-zeyn-run="a0" tabindex="-1"><span>Bump</span></button></td></tr>"##;
+
+#[test]
+fn row_html_stays_byte_for_byte_the_same() {
+    let grid = DataGrid::of(search)
+        .column(Item::id)
+        .column(Item::code)
+        .editable()
+        .column(Item::kind)
+        .column(Item::price)
+        .editable()
+        .column(Item::qty)
+        .column(Item::active)
+        .editable()
+        .column(Item::added)
+        .column(Item::due)
+        .column(Item::note)
+        .editable()
+        .on_open(|i| Effect::Toast { message: Text::from(format!("open {}", i.code)) })
+        .row_action("Bump", bump, |i| i.id)
+        .edit_with(save_item);
+    let mut rows: Vec<Item> = (3..=5).map(item).collect();
+    rows[0].code = r#"<a href="x">&'</a>"#.into();
+    rows[1].note = "ünïcode ✓ & \"quoted\"".into();
+    rows[2].price = Money::tl(-1_234_567);
+    assert_eq!(grid.rows_html(&rows), ROWS_BEFORE);
+}
+
+#[screen(route = "/wide", permission = "items.read")]
+pub fn wide_list() -> Screen {
+    let mut grid = DataGrid::of(search).paging(Paging::virtual_scroll()).column(Item::code).done();
+    for _ in 1..zeyn::VIRTUAL_WIDE_COLUMNS {
+        grid = grid.column(Item::qty).done();
+    }
+    Screen::new("Wide").body(grid)
+}
+
+#[tokio::test]
+async fn wide_virtual_grids_keep_every_row_of_the_first_block_in_the_template() {
+    let rows = (1..=150).map(|i| Item { id: ItemId(i), code: format!("R-{i:03}"), ..item(i % 28 + 1) }).collect();
+    let router = App::new("Test")
+        .service(Store(Arc::new(RwLock::new(rows))))
+        .auth(|h: &HeaderMap| h.contains_key("x-user").then(reader))
+        .feature(Feature::new("items").screen(wide_list).screen(long_list))
+        .router()
+        .unwrap();
+    let r = send(&router, get("/wide")).await;
+    let (live, later) = r.body.split_once("<template data-zeyn-rows-later>").expect("the block waits in a template");
+    let later = &later[..later.find("</template>").unwrap()];
+    let body = &live[live.find("<tbody data-zeyn-rows>").unwrap()..];
+    assert!(body.starts_with("<tbody data-zeyn-rows></tbody>"), "no live rows: {}", &body[..80]);
+    assert_eq!(later.matches("R-").count(), 150);
+    assert!(later.starts_with("<tr") && later.contains("R-001") && later.contains("R-150"));
+
+    let narrow = send(&router, get("/long")).await.body;
+    assert!(narrow.contains("R-001</td>") && !narrow.contains("<tbody data-zeyn-rows></tbody>"), "narrow grids keep live rows");
+}

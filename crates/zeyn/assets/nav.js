@@ -12,6 +12,8 @@
  */
 
 const BASE = (document.querySelector('meta[name="zeyn-base"]')?.content ?? '').replace(/\/$/, '');
+/** The `?v=` build query this script was loaded with, for the modules it imports later. */
+const VERSION = new URL(import.meta.url).search;
 
 let controller = null;
 
@@ -92,7 +94,7 @@ async function visit(url, push) {
     await swapFrame(new URL(res.url || url.href), push, url.hash);
     return;
   }
-  if (res.headers.get('x-zeyn-live') === '1') import(`${BASE}/_zeyn/live.js`);
+  if (res.headers.get('x-zeyn-live') === '1') import(`${BASE}/_zeyn/live.js${VERSION}`);
   const html = await res.text();
   const finalUrl = new URL(res.url || url.href);
   if (url.hash && !finalUrl.hash) finalUrl.hash = url.hash;

@@ -582,7 +582,8 @@ function toolKey(e, t) {
   const box = t.closest('[data-zeyn-toolbox]');
   const tools = [...box.querySelectorAll('.z-tool')];
   const i = tools.indexOf(t);
-  const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[e.key];
+  const rtl = getComputedStyle(box).direction === 'rtl';
+  const step = { ArrowDown: 1, ArrowRight: rtl ? -1 : 1, ArrowUp: -1, ArrowLeft: rtl ? 1 : -1 }[e.key];
   let target = null;
   if (step !== undefined) target = tools[(i + step + tools.length) % tools.length];
   else if (e.key === 'Home') target = tools[0];
@@ -883,8 +884,9 @@ function dockKey(e, t) {
   const dock = t.closest('.z-dock');
   if (t.matches('.z-dock-bar')) {
     const edge = t.dataset.edge;
-    const grow = { left: 'ArrowRight', right: 'ArrowLeft', bottom: 'ArrowUp' }[edge];
-    const shrink = { left: 'ArrowLeft', right: 'ArrowRight', bottom: 'ArrowDown' }[edge];
+    const rtl = getComputedStyle(dock).direction === 'rtl';
+    const grow = { left: rtl ? 'ArrowLeft' : 'ArrowRight', right: rtl ? 'ArrowRight' : 'ArrowLeft', bottom: 'ArrowUp' }[edge];
+    const shrink = { left: rtl ? 'ArrowRight' : 'ArrowLeft', right: rtl ? 'ArrowLeft' : 'ArrowRight', bottom: 'ArrowDown' }[edge];
     const now = sizeOf(dock, edge);
     if (e.key === grow) setDockSize(dock, edge, now + 5);
     else if (e.key === shrink) setDockSize(dock, edge, now - 5);
@@ -926,10 +928,11 @@ function dragDockBar(e, bar) {
   bar.dataset.dragging = '';
   e.preventDefault();
   bar.focus();
+  const onLeft = getComputedStyle(dock).direction === 'rtl' ? 'right' : 'left';
   const move = (ev) => {
     const box = dock.getBoundingClientRect();
     const percent =
-      edge === 'left' ? ((ev.clientX - box.left) / box.width) * 100 : edge === 'right' ? ((box.right - ev.clientX) / box.width) * 100 : ((box.bottom - ev.clientY) / box.height) * 100;
+      edge === onLeft ? ((ev.clientX - box.left) / box.width) * 100 : edge !== 'bottom' ? ((box.right - ev.clientX) / box.width) * 100 : ((box.bottom - ev.clientY) / box.height) * 100;
     setDockSize(dock, edge, percent);
   };
   const up = () => {
