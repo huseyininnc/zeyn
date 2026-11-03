@@ -12,3 +12,6 @@ Thumbs.db
 
 # Built WASM islands (zeyn build-islands)
 dist/
+
+# Private notes of the owner for AI agents
+CLAUDE.local.md
