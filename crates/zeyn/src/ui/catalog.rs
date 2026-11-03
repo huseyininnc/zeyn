@@ -241,7 +241,7 @@ type ItemFn<E> = Box<dyn Fn(&E) -> ListItem + Send + Sync>;
 /// Turns away rows of a model with `#[mask]` fields the user may not reveal. Cards and
 /// suggestions are built by app closures that see the raw row, so they could not keep a masked
 /// value masked.
-fn check_masks<E: Model>(ctx: &Ctx) -> Result<()> {
+pub(crate) fn check_masks<E: Model>(ctx: &Ctx) -> Result<()> {
     if E::fields().iter().any(|f| !crate::privacy::can_unmask(Some(ctx), f)) { Err(Error::Forbidden) } else { Ok(()) }
 }
 

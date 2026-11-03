@@ -398,6 +398,12 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
                     .add(Paragraph::new("Water at about 80 degrees and two minutes of steeping.")),
             )
             .into(),
+        "week" => WeekSchedule::of(search_samples)
+            .title("Deliveries")
+            .day(|p: &Sample| (p.id.0 % 7 + 1) as u8)
+            .item(|p: &Sample| zeyn::ui::ListItem::new(p.name.clone()).meta(p.code.clone()))
+            .limit(12)
+            .into(),
         "inputs" => inputs(),
         "overlay" => overlay(),
         "menus" => menus(),
@@ -582,5 +588,5 @@ fn toasts() -> Node {
 /// Names of every live example, for checks and tests.
 pub const EXAMPLES: &[&str] = &[
     "datagrid", "form", "controls", "dates", "lines", "layout", "display", "action", "tree", "chart", "shell",
-    "inputs", "multi", "overlay", "menus", "toasts", "content", "autogrid", "list", "people",
+    "inputs", "multi", "overlay", "menus", "toasts", "content", "autogrid", "list", "people", "week",
 ];

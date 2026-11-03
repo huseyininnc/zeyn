@@ -26,6 +26,7 @@ mod menus;
 mod overlay;
 mod shell;
 mod tree;
+mod week;
 mod widgets;
 #[cfg(feature = "islands")]
 pub(crate) use island::MARKER as ISLAND_MARKER;
@@ -67,6 +68,7 @@ pub use menus::MenuButton;
 pub(crate) use overlay::tip;
 pub use overlay::{BUSY_DELAY_MS, Busy, MAX_TIP, Popover};
 pub use tree::{MAX_TREE_CHILDREN, Tree, TreeItem, TreeQuery};
+pub use week::{MAX_WEEK_ROWS, WeekDay, WeekSchedule};
 pub use widgets::{
     ActionButton, Alert, Badge, Breadcrumb, DescriptionList, DescriptionOf, EmptyState, Progress, Skeleton, Timeline,
 };

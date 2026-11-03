@@ -151,3 +151,91 @@ fn spoilers_hide_their_content_in_a_native_disclosure() {
     assert!(out.contains("Forty two") && out.contains(r#"data-zeyn-node="0""#));
     assert_eq!(s.children().len(), 1);
 }
+
+#[model]
+pub struct Session {
+    pub name: String,
+    pub day: Option<Date>,
+}
+
+#[action(permission = "week.read")]
+pub async fn week_sessions(q: DataQuery) -> Result<Page<Session>> {
+    let at = |d: u8| Date::new(2026, 11, d);
+    let rows = vec![
+        Session { name: "Yoga <am>".into(), day: at(2) },
+        Session { name: "Cycling".into(), day: at(4) },
+        Session { name: "Swim".into(), day: at(9) },
+        Session { name: "Unplanned".into(), day: None },
+    ];
+    Ok(q.apply(rows))
+}
+
+#[screen(route = "/week", public)]
+pub fn week() -> Screen {
+    Screen::new("Week").body(
+        WeekSchedule::of(week_sessions)
+            .title("This week")
+            .day(|s: &Session| s.day)
+            .item(|s: &Session| zeyn::ui::ListItem::new(s.name.clone())),
+    )
+}
+
+async fn week_page(locale: &str, perms: &str) -> (u16, String) {
+    use tower::ServiceExt;
+    let router = App::new("Test")
+        .i18n(
+            I18n::new("en")
+                .catalog("tr", "{}")
+                .unwrap(),
+        )
+        .fixed_now(DateTime::parse("2026-11-04T10:00:00Z").unwrap())
+        .auth(|h: &axum::http::HeaderMap| {
+            let perms = h.get("x-perms")?.to_str().ok()?;
+            let perms: Vec<String> = perms
+                .split(',')
+                .filter(|p| !p.is_empty())
+                .map(String::from)
+                .collect();
+            Some(zeyn::Identity::user("u").with_permissions(perms))
+        })
+        .feature(Feature::new("week").screen(week))
+        .router()
+        .unwrap();
+    let req = axum::http::Request::get("/week")
+        .header("x-perms", perms)
+        .header("cookie", format!("zeyn_locale={locale}"))
+        .body(axum::body::Body::empty())
+        .unwrap();
+    let res = router.oneshot(req).await.unwrap();
+    let status = res.status().as_u16();
+    let body = http_body_util::BodyExt::collect(res.into_body())
+        .await
+        .unwrap()
+        .to_bytes();
+    (status, String::from_utf8(body.to_vec()).unwrap())
+}
+
+#[tokio::test]
+async fn week_schedules_place_rows_by_day_in_the_locales_week_and_mark_today() {
+    let (status, tr) = week_page("tr", "week.read").await;
+    assert_eq!(status, 200, "{tr}");
+    let days: Vec<&str> = tr
+        .match_indices(r#"class="z-week-name""#)
+        .map(|(i, _)| &tr[i..i + 120])
+        .collect();
+    assert_eq!(days.len(), 7, "{tr}");
+    assert!(days[0].contains("Pazartesi") && days[6].contains("Pazar<"), "Monday first in Turkish: {days:?}");
+    assert!(tr.contains(r#"<section class="z-week-day z-week-today""#));
+    assert!(days[2].contains("Bugün"), "4 November 2026 is a Wednesday: {days:?}");
+    let monday = &tr[tr.find("Pazartesi").unwrap()..tr.find("Salı").unwrap()];
+    assert!(monday.contains("Yoga &lt;am&gt;") && monday.contains("Swim"), "rows go by weekday: {monday}");
+    assert!(!tr.contains("Unplanned"), "rows without a day are left out");
+    assert_eq!(tr.matches("Plan yok").count(), 5);
+    let (_, en) = week_page("en", "week.read").await;
+    let first = en
+        .find(r#"class="z-week-name""#)
+        .unwrap();
+    assert!(en[first..first + 120].contains("Sunday"), "Sunday first in English: {en}");
+    let (_, denied) = week_page("en", "").await;
+    assert!(!denied.contains("Cycling"), "reading needs the action's permission");
+}

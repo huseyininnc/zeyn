@@ -113,3 +113,20 @@ pub fn people_by_letter(p: LetterParams) -> Screen {
         .body(AlphaIndex::new(people_by_letter, |l| LetterParams { letter: l.to_string() }).current(&p.letter).other())
 }
 ```
+
+## WeekSchedule
+
+Seven day columns of rows from an action, such as classes, shifts or events of a week. The action is the same kind a DataGrid uses and is checked the same way. `.day` maps a row to its day: a `Date`, an `Option<Date>` (rows without one are left out) or a weekday number from 1 (Monday) to 7 (Sunday); anything else does not compile. Each row is shown as a `ListItem`, so it can link to a screen. The week starts on the user's first weekday (Monday in Turkish, Sunday in American English), today is marked, days without rows say so, and on narrow screens the days stack. The server loads up to `limit` rows (100 unless set, at most 500) in the action's order; give the action the week's rows, for example with a filter on the date.
+
+```rust
+WeekSchedule::of(this_week_classes)
+    .title(t!("classes.this_week"))
+    .day(|c: &Class| c.date)
+    .item(|c: &Class| {
+        ListItem::new(c.name.clone())
+            .meta(c.starts.to_string())
+            .link(class, ClassParams { id: c.id })
+    })
+```
+
+@live week
