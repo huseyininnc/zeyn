@@ -231,7 +231,7 @@ the request).
 
 ### 4.6 Virtual scrolling
 
-Grids with `data-zeyn-paging="virtual"` show one scrollable list over every row, however many there are. The server renders the first block (`data-zeyn-page-size` rows, offset 0) with `data-zeyn-total`. The grid root also has `data-zeyn-row-height` (pixels) and the CSS variable `--z-row-height`.
+Grids with `data-zeyn-paging="virtual"` show one scrollable list over every row, however many there are. The server renders the first block (`data-zeyn-page-size` rows, offset 0) with `data-zeyn-total`: the first 64 rows live in the table and the rest in `<template data-zeyn-rows-later>` after it, or every row in the template when the grid shows 40 columns or more. The grid root also has `data-zeyn-row-height` (pixels) and the CSS variable `--z-row-height`.
 
 The runtime:
 

@@ -65,7 +65,8 @@ function initGrid(grid) {
     pinOffsets(grid);
   }).observe(grid);
 
-  if (!rows(grid).length && grid.dataset.zeynOffset != null) gridState(grid, 'empty');
+  const waiting = grid.querySelector(':scope > template[data-zeyn-rows-later]');
+  if (!rows(grid).length && !waiting && grid.dataset.zeynOffset != null) gridState(grid, 'empty');
   if (state.paging === 'virtual') return initVirtual(grid, state);
   const more = own(grid, '[data-zeyn-more]');
   if (state.paging === 'infinite' && more && 'IntersectionObserver' in window) {

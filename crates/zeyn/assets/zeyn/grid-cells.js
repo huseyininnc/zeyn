@@ -477,7 +477,11 @@ function swapRow(grid, tr, html) {
   return fresh;
 }
 
-/** Fewest columns before only the visible ones (and a few around them) stay in the page. */
+/**
+ * Fewest columns before only the visible ones (and a few around them) stay in the page. The
+ * server's `VIRTUAL_WIDE_COLUMNS` is the same number: a virtual grid this wide comes with every
+ * row of its first block in the template, so no row is laid out before the window is set.
+ */
 const COLV_MIN = 40;
 const COLV_BUFFER = 6;
 

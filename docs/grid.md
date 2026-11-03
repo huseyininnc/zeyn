@@ -243,7 +243,11 @@ on each side) in the page. Every column gets a fixed width, and one spacer cell 
 columns left out on each side, so widths, pins and scrolling stay as they were. Rows keep their full
 list of cells, so copy, paste and editing see every column, and cells carry `aria-colindex`.
 The window moves only when a column outside it comes into view. The server still sends every
-cell of a row.
+cell of a row. A virtual grid this wide (`VIRTUAL_WIDE_COLUMNS`, counting the selection, detail
+and row action columns) sends its whole first block inside `<template data-zeyn-rows-later>`
+instead of 64 live rows, so the browser never lays out a row with every column: on the wide
+gallery grid the longest startup task went from 259 to 112 ms and DOMContentLoaded from 402 to
+228 ms (medians of 8 interleaved loads, release server, busy machine).
 
 Measured on the gallery's wide grid (62 columns, 100,000 rows, virtual scrolling, debug server,
 Chromium, 1400 by 900 window, 144 Hz display), with and without column virtualization:

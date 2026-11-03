@@ -55,6 +55,12 @@ impl DataMode {
 /// plus the overscan); the rest of the block waits in a `<template>` until it scrolls into view.
 pub const VIRTUAL_LIVE_ROWS: usize = 64;
 
+/// Fewest columns (with the selection, detail and row action columns) for which a virtual grid
+/// sends its whole first block in the `<template>`, so the browser styles and lays out only the
+/// columns the runtime keeps in view. Matches `COLV_MIN` of the browser runtime
+/// (`assets/zeyn/grid-cells.js`), where column windowing starts.
+pub const VIRTUAL_WIDE_COLUMNS: usize = 40;
+
 /// How a grid loads rows beyond the first batch.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -108,7 +114,9 @@ impl Paging {
 
     /// Virtual scrolling with 32 px rows, fetched in blocks of 200. For very large lists. The
     /// server sends the first block; rows after [`VIRTUAL_LIVE_ROWS`] go in an inert `<template>`
-    /// so the browser styles and lays out only what fits on a screen.
+    /// so the browser styles and lays out only what fits on a screen. A grid with
+    /// [`VIRTUAL_WIDE_COLUMNS`] columns or more puts every row there and the runtime inserts the
+    /// rows once it has chosen the columns in view.
     pub const fn virtual_scroll() -> Self {
         Paging::Virtual { row_height: 32, block: 200 }
     }
@@ -1275,13 +1283,14 @@ impl<E: Model> DataGrid<E> {
             self.head_row(r, &cols)
         ));
         let mut later = String::new();
+        let shown = self.lead(r) + cols.len() + usize::from(!self.row_actions.is_empty());
+        let live_rows = if shown >= VIRTUAL_WIDE_COLUMNS { 0 } else { VIRTUAL_LIVE_ROWS };
         if let Some(p) = page {
             match (self.paging, p.items.downcast_ref::<Vec<E>>()) {
-                (Paging::Virtual { .. }, Some(rows)) if p.groups.is_none() && rows.len() > VIRTUAL_LIVE_ROWS => {
-                    let cols = self.layout(p.view.as_ref());
+                (Paging::Virtual { .. }, Some(rows)) if p.groups.is_none() && rows.len() > live_rows => {
                     let branch = Branch { depth: p.depth, path: &p.path, parents: &p.parents };
-                    out.push_str(&self.rows(&rows[..VIRTUAL_LIVE_ROWS], r, &cols, &branch));
-                    later = self.rows(&rows[VIRTUAL_LIVE_ROWS..], r, &cols, &branch);
+                    out.push_str(&self.rows(&rows[..live_rows], r, &cols, &branch));
+                    later = self.rows(&rows[live_rows..], r, &cols, &branch);
                 }
                 _ => out.push_str(&self.rows_html_erased(p, r)),
             }

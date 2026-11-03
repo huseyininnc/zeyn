@@ -1419,3 +1419,33 @@ fn row_html_stays_byte_for_byte_the_same() {
     rows[2].price = Money::tl(-1_234_567);
     assert_eq!(grid.rows_html(&rows), ROWS_BEFORE);
 }
+
+#[screen(route = "/wide", permission = "items.read")]
+pub fn wide_list() -> Screen {
+    let mut grid = DataGrid::of(search).paging(Paging::virtual_scroll()).column(Item::code).done();
+    for _ in 1..zeyn::VIRTUAL_WIDE_COLUMNS {
+        grid = grid.column(Item::qty).done();
+    }
+    Screen::new("Wide").body(grid)
+}
+
+#[tokio::test]
+async fn wide_virtual_grids_keep_every_row_of_the_first_block_in_the_template() {
+    let rows = (1..=150).map(|i| Item { id: ItemId(i), code: format!("R-{i:03}"), ..item(i % 28 + 1) }).collect();
+    let router = App::new("Test")
+        .service(Store(Arc::new(RwLock::new(rows))))
+        .auth(|h: &HeaderMap| h.contains_key("x-user").then(reader))
+        .feature(Feature::new("items").screen(wide_list).screen(long_list))
+        .router()
+        .unwrap();
+    let r = send(&router, get("/wide")).await;
+    let (live, later) = r.body.split_once("<template data-zeyn-rows-later>").expect("the block waits in a template");
+    let later = &later[..later.find("</template>").unwrap()];
+    let body = &live[live.find("<tbody data-zeyn-rows>").unwrap()..];
+    assert!(body.starts_with("<tbody data-zeyn-rows></tbody>"), "no live rows: {}", &body[..80]);
+    assert_eq!(later.matches("R-").count(), 150);
+    assert!(later.starts_with("<tr") && later.contains("R-001") && later.contains("R-150"));
+
+    let narrow = send(&router, get("/long")).await.body;
+    assert!(narrow.contains("R-001</td>") && !narrow.contains("<tbody data-zeyn-rows></tbody>"), "narrow grids keep live rows");
+}
