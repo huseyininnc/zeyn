@@ -8,10 +8,11 @@ pub mod highlight;
 pub mod live;
 pub mod markdown;
 
-use markdown::{Part, Rendered, render};
+use markdown::{Part, Rendered};
 use std::sync::Arc;
 use zeyn::prelude::*;
 use zeyn::render::escape;
+use zeyn::seo::{SitemapPart, SitemapUrl};
 use zeyn::ui::render_child;
 use zeyn::{Component, Render, SearchHit};
 
@@ -40,7 +41,7 @@ macro_rules! pages {
 
         fn with_pages(feature: Feature) -> Feature {
             feature $( $( .screen($name) )* )*
-                .menu(|m| m $( .group(Text::key($group), Icon::$icon) $( .item($label, $name) )* )* )
+                .menu(|m| m $( .group(Text::key($group), Icon::$icon) $( .item(Text::key(concat!("docs.page.", stringify!($name))), $name) )* )* )
         }
     };
 }
@@ -96,14 +97,101 @@ pages! {
     }
 }
 
+include!(concat!(env!("OUT_DIR"), "/translations.rs"));
+
+/// Languages of the documentation, English (the source) first: the path segment and locale
+/// code, and the `hreflang` tag search engines get.
+pub const LANGS: &[(&str, &str)] = &[
+    ("en", "en"),
+    ("tr", "tr"),
+    ("zh", "zh-Hans"),
+    ("ru", "ru"),
+    ("es", "es"),
+    ("ko", "ko"),
+    ("ja", "ja"),
+    ("hi", "hi"),
+    ("ar", "ar"),
+];
+
+/// Content hashes of the English sources each translation was made from, per language and file
+/// (`pages/translations.json`). A page whose English source changed since is stale and is served
+/// in English until it is translated again. After translating pages, record them with
+/// `ZEYN_DOCS_TRANSLATED=tr,zh cargo test -p zeyn-example-docs record_translations` (or `all`).
+pub const MANIFEST: &str = include_str!("../pages/translations.json");
+
+/// Hash of a page source for the manifest: 64 bit FNV-1a over the bytes, carriage returns left
+/// out so a checkout with CRLF line ends gives the same hash.
+///
+/// ```
+/// assert_eq!(zeyn_example_docs::source_hash("a\r\nb"), zeyn_example_docs::source_hash("a\nb"));
+/// ```
+pub fn source_hash(source: &str) -> String {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for b in source.bytes().filter(|b| *b != b'\r') {
+        h ^= u64::from(b);
+        h = h.wrapping_mul(0x0100_0000_01b3);
+    }
+    format!("{h:016x}")
+}
+
+impl PageSource {
+    /// File name of the page's translations in `pages/<lang>/`. `docs/database.md` shares its
+    /// name with the guide, so its translations are `database-reference.md`.
+    pub fn translation_file(&self) -> &'static str {
+        if self.route == "/reference/database" { "database-reference.md" } else { self.file }
+    }
+}
+
+/// The app path of a route in a language: `/language/datagrid` in English,
+/// `/tr/language/datagrid` in Turkish, `/tr/` for the home page.
+pub fn lang_path(lang: &str, route: &str) -> String {
+    match (lang, route) {
+        ("en", _) => route.to_string(),
+        (l, "/") => format!("/{l}/"),
+        (l, r) => format!("/{l}{r}"),
+    }
+}
+
 /// The app path of a link target such as `theming.md#density` or `docs/theming.md`; other
 /// targets are returned unchanged.
 pub fn resolve(target: &str) -> String {
+    resolve_in("en", target)
+}
+
+/// [`resolve`] for a page in a language: links to other pages stay in that language.
+pub fn resolve_in(lang: &str, target: &str) -> String {
     let (path, hash) = target.split_once('#').map(|(p, h)| (p, format!("#{h}"))).unwrap_or((target, String::new()));
     let file = path.rsplit('/').next().unwrap_or(path);
-    match PAGES.iter().find(|p| p.file == file).filter(|_| file.ends_with(".md")) {
-        Some(p) => format!("{}{hash}", p.route),
+    let page = PAGES
+        .iter()
+        .find(|p| p.file == file)
+        .filter(|_| file.ends_with(".md"))
+        .or_else(|| PAGES.iter().find(|p| p.route == path));
+    match page {
+        Some(p) => format!("{}{hash}", lang_path(lang, p.route)),
         None => target.to_string(),
+    }
+}
+
+/// Whether a page is shown in its language and, when not, why it is shown in English.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Status {
+    /// The English source.
+    Source,
+    /// A current translation.
+    Translated,
+    /// No translation file in this language.
+    Missing,
+    /// The English source changed after the translation was made.
+    Stale,
+    /// The translation's headings do not match the English page, so its anchors would differ.
+    Headings,
+}
+
+impl Status {
+    /// Whether the page is shown in its own language.
+    pub fn translated(self) -> bool {
+        matches!(self, Status::Source | Status::Translated)
     }
 }
 
@@ -112,9 +200,12 @@ pub fn resolve(target: &str) -> String {
 pub struct Doc {
     pub route: &'static str,
     pub title: String,
+    pub lang: &'static str,
+    pub status: Status,
     chunks: Vec<Arc<str>>,
     lives: Vec<String>,
     toc: Arc<str>,
+    headings: Vec<(u8, String)>,
     prev: Option<usize>,
     next: Option<usize>,
     sections: Vec<markdown::Section>,
@@ -129,81 +220,164 @@ impl Doc {
     pub fn lives(&self) -> &[String] {
         &self.lives
     }
+
+    /// Level and anchor of every heading, in order.
+    pub fn headings(&self) -> &[(u8, String)] {
+        &self.headings
+    }
+
+    /// The page's path in its language.
+    pub fn url(&self) -> String {
+        lang_path(self.lang, self.route)
+    }
+
+    fn new(p: &PageSource, lang: &'static str, status: Status, source: &str, ids: &[String]) -> Doc {
+        let link = |t: &str| resolve_in(lang, t);
+        let Rendered { title, parts, headings, sections } = markdown::render_with_ids(source, &link, ids);
+        let mut chunks = Vec::new();
+        let mut lives = Vec::new();
+        let mut html = String::new();
+        for part in parts {
+            match part {
+                Part::Html(h) => html.push_str(&h),
+                Part::Live(name) => {
+                    chunks.push(Arc::from(std::mem::take(&mut html)));
+                    lives.push(name);
+                }
+            }
+        }
+        chunks.push(Arc::from(html));
+        let mut toc = String::from("<ul>");
+        for h in headings.iter().filter(|h| h.level <= 3) {
+            let class = if h.level == 3 { r#" class="z-doc-toc-sub""# } else { "" };
+            toc.push_str(&format!(r##"<li{class}><a href="#{}">{}</a></li>"##, h.id, escape(&h.text)));
+        }
+        toc.push_str("</ul>");
+        let title = if title.is_empty() { p.label.to_string() } else { title };
+        Doc {
+            route: p.route,
+            title,
+            lang,
+            status,
+            chunks,
+            lives,
+            toc: Arc::from(toc),
+            headings: headings.into_iter().map(|h| (h.level, h.id)).collect(),
+            prev: None,
+            next: None,
+            sections,
+        }
+    }
 }
 
-/// Every page, rendered once. Cheap to clone; register it with `App::service`.
+/// Every page in every language, rendered once. Cheap to clone; register it with `App::service`.
 #[derive(Clone)]
-pub struct Docs(Arc<Vec<Doc>>);
+pub struct Docs(Arc<Vec<Vec<Doc>>>);
 
 impl Service for Docs {}
 
 impl Docs {
-    /// Renders every page. Pages are small, so this takes a few milliseconds at startup.
+    /// Renders every page in every language. Pages are small, so this takes a few milliseconds
+    /// per language at startup.
     pub fn build() -> Docs {
-        let mut docs: Vec<Doc> = PAGES
-            .iter()
-            .map(|p| {
-                let Rendered { title, parts, headings, sections } = render(p.source, &resolve);
-                let mut chunks = Vec::new();
-                let mut lives = Vec::new();
-                let mut html = String::new();
-                for part in parts {
-                    match part {
-                        Part::Html(h) => html.push_str(&h),
-                        Part::Live(name) => {
-                            chunks.push(Arc::from(std::mem::take(&mut html)));
-                            lives.push(name);
-                        }
-                    }
-                }
-                chunks.push(Arc::from(html));
-                let mut toc = String::from("<ul>");
-                for h in headings.iter().filter(|h| h.level <= 3) {
-                    let class = if h.level == 3 { r#" class="z-doc-toc-sub""# } else { "" };
-                    toc.push_str(&format!(r##"<li{class}><a href="#{}">{}</a></li>"##, h.id, escape(&h.text)));
-                }
-                toc.push_str("</ul>");
-                let title = if title.is_empty() { p.label.to_string() } else { title };
-                Doc { route: p.route, title, chunks, lives, toc: Arc::from(toc), prev: None, next: None, sections }
-            })
-            .collect();
-        let n = docs.len();
-        for (i, d) in docs.iter_mut().enumerate() {
-            d.prev = i.checked_sub(1);
-            d.next = (i + 1 < n).then_some(i + 1);
-        }
-        Docs(Arc::new(docs))
+        Docs::build_from(TRANSLATIONS, MANIFEST)
     }
 
+    /// Renders the pages with these translations and this manifest (see [`MANIFEST`]). A page
+    /// without a current translation whose headings match the English page is rendered from
+    /// the English source, with links that stay in the language.
+    pub fn build_from(translations: &[(&str, &str, &str)], manifest: &str) -> Docs {
+        let manifest: serde_json::Value = serde_json::from_str(manifest).unwrap_or_default();
+        let english: Vec<Doc> = PAGES.iter().map(|p| Doc::new(p, "en", Status::Source, p.source, &[])).collect();
+        let mut all = vec![english];
+        for (lang, _) in &LANGS[1..] {
+            let docs = PAGES
+                .iter()
+                .zip(all[0].iter())
+                .map(|(p, en)| {
+                    let file = p.translation_file();
+                    let ids: Vec<String> = en.headings.iter().map(|(_, id)| id.clone()).collect();
+                    let found = translations.iter().find(|(l, f, _)| l == lang && *f == file).map(|(_, _, s)| *s);
+                    let current = manifest[*lang][file].as_str() == Some(source_hash(p.source).as_str());
+                    let status = match found {
+                        None => Status::Missing,
+                        Some(_) if !current => Status::Stale,
+                        Some(source) => {
+                            let doc = Doc::new(p, lang, Status::Translated, source, &ids);
+                            let levels = |d: &Doc| d.headings.iter().map(|(l, _)| *l).collect::<Vec<_>>();
+                            if levels(&doc) == levels(en) {
+                                return doc;
+                            }
+                            Status::Headings
+                        }
+                    };
+                    Doc::new(p, lang, status, p.source, &[])
+                })
+                .collect();
+            all.push(docs);
+        }
+        for docs in &mut all {
+            let n = docs.len();
+            for (i, d) in docs.iter_mut().enumerate() {
+                d.prev = i.checked_sub(1);
+                d.next = (i + 1 < n).then_some(i + 1);
+            }
+        }
+        Docs(Arc::new(all))
+    }
+
+    /// The English pages.
     pub fn pages(&self) -> &[Doc] {
-        &self.0
+        &self.0[0]
+    }
+
+    /// The pages of a language (English for an unknown one).
+    pub fn lang(&self, lang: &str) -> &[Doc] {
+        &self.0[lang_index(lang)]
     }
 
     fn index(&self, route: &str) -> Option<usize> {
-        self.0.iter().position(|d| d.route == route)
+        self.0[0].iter().position(|d| d.route == route)
     }
 
-    /// The screen of a page, with its live examples built for this request.
+    /// The screen of a page in the request's language, with its live examples built for this
+    /// request, its canonical URL and its language alternates.
     pub fn screen(&self, route: &str, ctx: &Ctx) -> Screen {
         let Some(i) = self.index(route) else { return Screen::new(t!("docs.missing")) };
-        let lives = self.0[i]
+        let lang = lang_index(ctx.locale());
+        let doc = &self.0[lang][i];
+        let lives = doc
             .lives
             .iter()
             .map(|n| live::example(n, ctx).unwrap_or_else(|| Alert::danger(t!("docs.missing")).into()))
             .collect();
-        Screen::new(self.0[i].title.clone()).body(Node::new(DocPage { docs: self.clone(), index: i, lives }))
+        let canonical = if doc.status.translated() { doc.url() } else { route.to_string() };
+        let mut screen = Screen::new(doc.title.clone()).canonical(canonical);
+        for (l, (code, tag)) in LANGS.iter().enumerate() {
+            if self.0[l][i].status.translated() {
+                screen = screen.alternate(tag, lang_path(code, route));
+            }
+        }
+        screen
+            .alternate("x-default", route)
+            .body(Node::new(DocPage { docs: self.clone(), lang, index: i, lives }))
     }
 
-    /// Pages and sections whose text has every word of the query, best first: words in a
-    /// heading count most, then the page title, then the text.
-    pub fn search(&self, query: &str) -> Vec<SearchHit> {
+    /// Every URL of the sitemap: each page in each language it is translated into.
+    pub fn urls(&self) -> Vec<SitemapUrl> {
+        self.0.iter().flatten().filter(|d| d.status.translated()).map(|d| SitemapUrl::new(d.url())).collect()
+    }
+
+    /// Pages and sections of a language whose text has every word of the query, best first:
+    /// words in a heading count most, then the page title, then the text.
+    pub fn search(&self, lang: &str, query: &str) -> Vec<SearchHit> {
         let words: Vec<String> =
             query.split_whitespace().map(str::to_lowercase).filter(|w| !w.is_empty()).take(8).collect();
         if words.is_empty() {
             return Vec::new();
         }
         let mut found: Vec<(usize, SearchHit)> = Vec::new();
-        for d in self.0.iter() {
+        for d in self.lang(lang) {
             let title = d.title.to_lowercase();
             for s in &d.sections {
                 let heading = s.heading.to_lowercase();
@@ -220,9 +394,9 @@ impl Docs {
                     })
                     .sum();
                 let (label, url) = if s.id.is_empty() {
-                    (d.title.clone(), d.route.to_string())
+                    (d.title.clone(), d.url())
                 } else {
-                    (s.heading.clone(), format!("{}#{}", d.route, s.id))
+                    (s.heading.clone(), format!("{}#{}", d.url(), s.id))
                 };
                 found.push((score, SearchHit::new(label, d.title.clone(), url)));
             }
@@ -232,34 +406,62 @@ impl Docs {
     }
 }
 
+/// Position of a language in [`LANGS`], English for an unknown one.
+fn lang_index(lang: &str) -> usize {
+    LANGS.iter().position(|(code, _)| *code == lang).unwrap_or(0)
+}
+
 /// A documentation page on a screen: the article with its live examples, previous and next
 /// links, and "On this page". The HTML pieces are shared; only the live examples are built per
-/// request.
+/// request. A translated page starts with a note that links to the English page; a page shown
+/// in English under another language says it is not translated yet.
 struct DocPage {
     docs: Docs,
+    lang: usize,
     index: usize,
     lives: Vec<Node>,
 }
 
 impl DocPage {
+    fn doc(&self, at: usize) -> &Doc {
+        &self.docs.0[self.lang][at]
+    }
+
     fn link(&self, r: &Render, at: Option<usize>, class: &str, key: &str) -> String {
         at.map(|i| {
-            let d = &self.docs.0[i];
+            let d = self.doc(i);
             format!(
                 r#"<a class="{class}" href="{}"><span>{}</span>{}</a>"#,
-                d.route,
+                d.url(),
                 r.text(&Text::key(key.to_string())),
                 escape(&d.title)
             )
         })
         .unwrap_or_default()
     }
+
+    fn note(&self, r: &Render) -> String {
+        let d = self.doc(self.index);
+        match d.status {
+            Status::Source => String::new(),
+            Status::Translated => format!(
+                r#"<p class="z-doc-note" role="note">{} <a href="{}" hreflang="en" lang="en">{}</a></p>"#,
+                r.text(&t!("docs.translation.note")),
+                d.route,
+                r.text(&t!("docs.translation.english"))
+            ),
+            _ => format!(r#"<p class="z-doc-note" role="note">{}</p>"#, r.text(&t!("docs.translation.missing"))),
+        }
+    }
 }
 
 impl Component for DocPage {
     fn render(&self, out: &mut String, r: &Render) {
-        let d = &self.docs.0[self.index];
-        out.push_str(r#"<div class="z-doc"><article class="z-prose">"#);
+        let d = self.doc(self.index);
+        let lang = if d.status.translated() { "" } else { r#" lang="en""# };
+        out.push_str(r#"<div class="z-doc">"#);
+        out.push_str(&format!(r#"<article class="z-prose"{lang}>"#));
+        out.push_str(&self.note(r));
         for (i, chunk) in d.chunks.iter().enumerate() {
             out.push_str(chunk);
             if let Some(node) = self.lives.get(i) {
@@ -269,7 +471,7 @@ impl Component for DocPage {
             }
         }
         out.push_str(&format!(
-            r#"<nav class="z-doc-pager" aria-label="{}">{}{}</nav></article><nav class="z-doc-toc" aria-labelledby="z-doc-toc-title"><h2 id="z-doc-toc-title">{}</h2>{}</nav></div>"#,
+            r#"<nav class="z-doc-pager" aria-label="{}">{}{}</nav></article><nav class="z-doc-toc" aria-labelledby="z-doc-toc-title"{lang}><h2 id="z-doc-toc-title">{}</h2>{}</nav></div>"#,
             r.text(&t!("docs.pager")),
             self.link(r, d.prev, "z-doc-prev", "docs.previous"),
             self.link(r, d.next, "z-doc-next", "docs.next"),
@@ -279,8 +481,8 @@ impl Component for DocPage {
     }
 
     fn schema(&self) -> serde_json::Value {
-        let d = &self.docs.0[self.index];
-        serde_json::json!({ "type": "doc_page", "route": d.route, "title": d.title, "children": self.lives.iter().map(Node::schema).collect::<Vec<_>>() })
+        let d = self.doc(self.index);
+        serde_json::json!({ "type": "doc_page", "route": d.route, "lang": d.lang, "title": d.title, "children": self.lives.iter().map(Node::schema).collect::<Vec<_>>() })
     }
 
     fn children(&self) -> &[Node] {
@@ -288,26 +490,47 @@ impl Component for DocPage {
     }
 }
 
-/// Searches every page for the command palette.
+/// Searches every page of the request's language for the command palette.
 #[action(public)]
-pub async fn search_docs(query: String, docs: Docs) -> Result<Vec<SearchHit>> {
-    Ok(docs.search(&query))
+pub async fn search_docs(query: String, docs: Docs, ctx: Ctx) -> Result<Vec<SearchHit>> {
+    Ok(docs.search(ctx.locale(), &query))
 }
 
-/// The documentation feature: every page, the sidebar and the palette search.
+/// The URLs of `/sitemap.xml`: every page in every language it is translated into.
+#[action(public)]
+pub async fn docs_sitemap(part: SitemapPart, docs: Docs) -> Result<Vec<SitemapUrl>> {
+    Ok(part.of(&docs.urls()))
+}
+
+/// The documentation feature: every page, the sidebar, the palette search and the sitemap.
 pub fn feature() -> Feature {
-    with_pages(Feature::new("docs")).search(search_docs)
+    with_pages(Feature::new("docs")).search(search_docs).sitemap(docs_sitemap)
 }
 
-/// The documentation app. `docs` is built once with [`Docs::build`].
+/// The documentation app. `docs` is built once with [`Docs::build`]. English pages stay at their
+/// paths, the other languages are served at `/<lang>/...` (`App::locale_paths`).
 pub fn app(docs: Docs) -> Result<App, String> {
-    let i18n = zeyn::I18n::new("en")
-        .catalog("en", include_str!("../locales/en.json"))
-        .and_then(|i| i.catalog("tr", include_str!("../locales/tr.json")))?;
+    let i18n = zeyn::I18n::new("en").catalogs(&[
+        ("en", include_str!("../locales/en.json")),
+        ("tr", include_str!("../locales/tr.json")),
+        ("zh", include_str!("../locales/zh.json")),
+        ("ru", include_str!("../locales/ru.json")),
+        ("es", include_str!("../locales/es.json")),
+        ("ko", include_str!("../locales/ko.json")),
+        ("ja", include_str!("../locales/ja.json")),
+        ("hi", include_str!("../locales/hi.json")),
+        ("ar", include_str!("../locales/ar.json")),
+    ])?;
     Ok(App::new(t!("docs.app"))
         .i18n(i18n)
+        .locale_paths()
+        .site_url(SITE)
         .llms_txt(include_str!("../llms.txt"))
+        .robots_txt(include_str!("../robots.txt"))
         .service(docs)
         .home(introduction)
         .feature(feature()))
 }
+
+/// The public address of the documentation, for canonical URLs, alternates and the sitemap.
+pub const SITE: &str = "https://docs.zeynsoft.com";
