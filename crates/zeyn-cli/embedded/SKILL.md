@@ -80,7 +80,23 @@ These hold in every Zeyn app. `zeyn check` and the compiler enforce many of them
 11. **AI access is explicit.** Doc comments become tool descriptions for models. Add
     `ai = "guidance"` to explain an action to models, `confirm` when a model may only run it
     after the user confirms, and `ai = false` to hide it from models entirely.
-12. **Every change is tested and checked** before you finish (section 5).
+12. **Code reads top to bottom.** Once a chain of calls is longer than about 40 characters, put
+    one call on each line, so a line holds one or two dots on average. Builders, screens and
+    iterator chains read as a list, which is easier to review and to diff:
+
+    ```rust
+    Screen::new(t!("items.title"))
+        .toolbar(Toolbar::new().add(new_item))
+        .body(
+            DataGrid::of(search_items)
+                .paging(Paging::pages(25))
+                .column(Item::code)
+                .column(Item::qty),
+        )
+    ```
+
+    `cargo fmt` keeps this shape with `chain_width = 40` in `rustfmt.toml`; do not raise it.
+13. **Every change is tested and checked** before you finish (section 5).
 
 ## 3. The language in short
 

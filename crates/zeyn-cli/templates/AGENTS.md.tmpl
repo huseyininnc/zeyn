@@ -52,6 +52,9 @@ tests/                   tests that drive the app through its router
 8. A new screen is registered in its feature's `mod.rs`; a new feature in `src/app.rs`.
 9. Do not write HTML, CSS or JavaScript. If a component is missing, write a `Component`.
 10. Keep secrets in configuration (`config.secret("key")`), never in code or logs.
+11. Write code top to bottom. Once a chain of calls is longer than about 40 characters, put one call
+   on each line, so a line holds one or two dots on average. `cargo fmt` does this with
+   `chain_width = 40` in `rustfmt.toml`; do not raise it.
 
 ## Before you finish
 

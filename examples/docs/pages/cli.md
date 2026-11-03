@@ -41,6 +41,18 @@ cargo run
 - `locales/en.json` and `locales/tr.json`: every text a user sees.
 - `src/features/`: one folder per feature, with a sample `notes` feature.
 - `rustfmt.toml`, `clippy.toml`, `deny.toml`, `rust-toolchain.toml` and `[lints]` in `Cargo.toml`: standards that CI enforces.
+  `rustfmt.toml` sets `chain_width = 40`, so code reads top to bottom: a chain of calls longer than
+  that gets one call per line, one or two dots per line on average. Agents and people review a
+  list faster than one long line, and diffs show the one call that changed. Keep the setting.
+
+  ```rust
+  DataGrid::of(search_items)
+      .paging(Paging::pages(25))
+      .column(Item::code)
+      .column(Item::qty)
+  ```
+
+  not `DataGrid::of(search_items).paging(Paging::pages(25)).column(Item::code).column(Item::qty)`.
 - `Dockerfile`, `.dockerignore`, `.gitlab-ci.yml`: a container and a pipeline.
 
 See [Project structure](structure.md) for each folder.

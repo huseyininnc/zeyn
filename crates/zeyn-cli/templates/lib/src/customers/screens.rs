@@ -13,7 +13,11 @@ pub struct CustomerParams {
 #[screen(route = "/", permission = "customers.customer.read")]
 pub fn customer_list() -> Screen {
     Screen::new(t!("customers.list"))
-        .toolbar(|t| t.button(t!("customers.new")).icon(Icon::Plus).opens(customer_editor, CustomerParams { id: None }))
+        .toolbar(|t| {
+            t.button(t!("customers.new"))
+                .icon(Icon::Plus)
+                .opens(customer_editor, CustomerParams { id: None })
+        })
         .body(
             DataGrid::auto(search_customers)
                 .mode(DataMode::Server)
@@ -26,12 +30,17 @@ pub fn customer_list() -> Screen {
 pub fn customer_editor(params: CustomerParams, store: CustomerStore) -> Result<Screen> {
     let customer = match params.id {
         Some(id) => store.get(id)?,
-        None => Customer { active: true, ..Customer::default() },
+        None => Customer {
+            active: true,
+            ..Customer::default()
+        },
     };
     Ok(Screen::window(t!("customers.editor")).body(
-        Form::auto(customer).submit(t!("customers.save"), save_customer).on_success(|_, ui| {
-            ui.toast(t!("customers.saved"));
-            ui.close_and_refresh();
-        }),
+        Form::auto(customer)
+            .submit(t!("customers.save"), save_customer)
+            .on_success(|_, ui| {
+                ui.toast(t!("customers.saved"));
+                ui.close_and_refresh();
+            }),
     ))
 }

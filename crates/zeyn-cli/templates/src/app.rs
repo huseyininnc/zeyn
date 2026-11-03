@@ -14,7 +14,10 @@ pub fn app(config: Config) -> std::io::Result<App> {
         .catalog("en", include_str!("../locales/en.json"))
         .and_then(|i| i.catalog("tr", include_str!("../locales/tr.json")))
         .map_err(std::io::Error::other)?;
-    let zone = config.get("time.zone").and_then(TimeZone::named).unwrap_or(TimeZone::UTC);
+    let zone = config
+        .get("time.zone")
+        .and_then(TimeZone::named)
+        .unwrap_or(TimeZone::UTC);
     let mut app = App::new(t!("app.name"))
         .config(config.clone())
         .i18n(i18n)
@@ -31,7 +34,11 @@ pub fn app(config: Config) -> std::io::Result<App> {
         app = app.auth(DevAuth::superuser("developer"));
     }
     if config.get("docs.mode") == Some("open") {
-        app = app.api_docs(if cfg!(debug_assertions) { ApiDocs::open() } else { ApiDocs::permission("api.docs") });
+        app = app.api_docs(if cfg!(debug_assertions) {
+            ApiDocs::open()
+        } else {
+            ApiDocs::permission("api.docs")
+        });
     }
     Ok(app)
 }

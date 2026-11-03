@@ -133,6 +133,10 @@ missing. Never call `location.reload()` or `location.assign()` for in-app naviga
 - Everything in English: code, doc comments, docs, test names, UI strings (Turkish goes only in
   `tr.json`).
 - No inline `//` comments. Use `///` and `//!` doc comments on items.
+- Write code top to bottom, not across. Once a chain of calls is longer than about 40 characters,
+  put one call on each line, so a line holds one or two dots on average. Builders, screens and
+  iterator chains read as a list. `cargo fmt` does this with `chain_width = 40` in
+  `rustfmt.toml`; do not raise it.
 - Generated code from macros always uses `::zeyn::` paths.
 - Every rule the compiler can enforce gets a `compile_fail` doctest and an error message written
   for an AI agent to act on (`#[diagnostic::on_unimplemented]` where it fits).
