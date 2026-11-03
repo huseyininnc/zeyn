@@ -335,3 +335,15 @@ fn slugs_map_turkish_letters_fold_accents_and_drop_the_rest() {
     let s: Slug = serde_json::from_str(r#""Çay Bardağı""#).unwrap();
     assert_eq!(s.as_str(), "cay-bardagi");
 }
+
+#[tokio::test]
+async fn the_side_menu_folds_behind_a_menu_button_that_only_the_script_shows() {
+    let router = error_app();
+    let (_, _, body) = get(&router, "/nowhere", false).await;
+    assert!(
+        body.contains(r#"<button type="button" class="z-nav-toggle" aria-expanded="false" aria-controls="z-nav-body" data-zeyn-nav-toggle hidden>"#),
+        "{body}"
+    );
+    assert!(body.contains(r#"<div class="z-nav-body" id="z-nav-body">"#));
+    assert!(!body.contains(r#"id="z-nav-body" data-open"#), "the menu starts closed only when the script folds it");
+}

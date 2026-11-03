@@ -2219,7 +2219,9 @@ impl AppState {
     }
 
     /// The app shell: a side menu with the app's name, the palette button, the menus of the
-    /// features without a site shell and the pickers, beside the screen.
+    /// features without a site shell and the pickers, beside the screen. Below 800 px the menu
+    /// folds behind a menu button under the app's name (W3C APG disclosure); `nav.js` shows the
+    /// button, so without the script the menu stays open and nothing becomes unreachable.
     #[allow(clippy::too_many_arguments)]
     fn app_frame(
         &self,
@@ -2256,7 +2258,7 @@ impl AppState {
             ));
         }
         format!(
-            r#"<div class="z-app" data-zeyn-shell="app"><nav class="z-nav" aria-label="{menu}"><p class="z-app-name">{app}</p>{palette}{nav}</nav><main class="z-main" id="z-main">{main}</main></div>"#,
+            r#"<div class="z-app" data-zeyn-shell="app"><nav class="z-nav" aria-label="{menu}"><div class="z-nav-bar"><p class="z-app-name">{app}</p><button type="button" class="z-nav-toggle" aria-expanded="false" aria-controls="z-nav-body" data-zeyn-nav-toggle hidden><span class="z-nav-burger" aria-hidden="true"></span><span class="z-sr-only">{menu}</span></button></div><div class="z-nav-body" id="z-nav-body">{palette}{nav}</div></nav><main class="z-main" id="z-main">{main}</main></div>"#,
             menu = r.text(&Text::key("zeyn.shell.menu")),
         )
     }

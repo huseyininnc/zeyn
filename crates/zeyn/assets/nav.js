@@ -233,3 +233,44 @@ window.addEventListener('popstate', () => {
 });
 
 history.replaceState({ zeyn: true }, '', location.href);
+
+/**
+ * Below 800 px the side menu of the app shell folds behind the menu button under the app's name
+ * (W3C APG disclosure). This shows the button; without the script the menu stays open. Pressing
+ * the button opens or closes the menu, following a link or pressing Escape closes it, and Escape
+ * moves focus back to the button.
+ */
+function initAppMenu() {
+  const toggle = document.querySelector('[data-zeyn-nav-toggle]');
+  if (!toggle || !toggle.hidden) return;
+  toggle.hidden = false;
+  toggle.closest('.z-nav')?.setAttribute('data-zeyn-collapsible', '');
+}
+
+/** Opens or closes the folded app menu. */
+function setAppMenu(open) {
+  const toggle = document.querySelector('[data-zeyn-nav-toggle]');
+  const body = toggle && document.getElementById(toggle.getAttribute('aria-controls'));
+  if (!toggle || !body) return;
+  toggle.setAttribute('aria-expanded', String(open));
+  body.toggleAttribute('data-open', open);
+}
+
+document.addEventListener('click', (e) => {
+  const t = e.target instanceof Element ? e.target : null;
+  if (t?.closest('[data-zeyn-nav-toggle]')) {
+    setAppMenu(t.closest('[data-zeyn-nav-toggle]').getAttribute('aria-expanded') !== 'true');
+  } else if (t?.closest('#z-nav-body[data-open] a[href]')) {
+    setAppMenu(false);
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  const toggle = document.querySelector('[data-zeyn-nav-toggle][aria-expanded="true"]');
+  if (e.key !== 'Escape' || !toggle) return;
+  setAppMenu(false);
+  toggle.focus();
+});
+
+document.addEventListener('zeyn:content', initAppMenu);
+initAppMenu();
