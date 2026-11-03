@@ -6,6 +6,7 @@
 
 pub mod highlight;
 pub mod live;
+pub mod live_engage;
 pub mod markdown;
 
 use markdown::{Part, Rendered};

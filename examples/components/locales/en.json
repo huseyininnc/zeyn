@@ -81,7 +81,10 @@
       "chart": "Bar, donut, combo and gauge charts.",
       "kpi": "A number with its change and trend.",
       "toolbox": "A group of tool buttons, one selected.",
-      "status_bar": "A bar of short status texts."
+      "status_bar": "A bar of short status texts.",
+      "relative_time": "A moment shown as \"5 minutes ago\" in the page language.",
+      "share": "Share a link, or copy it where sharing is missing.",
+      "rating": "A whole number from 1 to N shown as stars."
     },
     "ex": {
       "action_button": {
@@ -209,6 +212,14 @@
       "rail": {
         "overview": "Example"
       },
+      "rating": {
+        "overview": "Example",
+        "three_stars": "Three stars"
+      },
+      "relative_time": {
+        "overview": "Example",
+        "past_and_future": "Past and future"
+      },
       "row": {
         "overview": "Example",
         "weights": "Column weights",
@@ -216,6 +227,10 @@
       },
       "search_box": {
         "overview": "Example"
+      },
+      "share": {
+        "overview": "Example",
+        "another_screen": "Another screen"
       },
       "skeleton": {
         "overview": "Example"

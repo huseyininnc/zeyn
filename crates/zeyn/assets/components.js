@@ -2150,7 +2150,7 @@ new MutationObserver((records) => {
 /**
  * Browser modules a page loads only when it holds one of their components, by selector: the
  * catalog (card grids, rails, search boxes), media players and embeds, uploads, charts and chat
- * panels of the assistant. Each module sets up the whole document when it loads and listens to
+ * panels of the assistant, share buttons. Each module sets up the whole document when it loads and listens to
  * `zeyn:content` after that, so content that `nav.js` swaps in later is covered too.
  */
 const LAZY = [
@@ -2159,6 +2159,7 @@ const LAZY = [
   ['.z-upload', 'files'],
   ['[data-zeyn-chart]', 'charts'],
   ['section[data-zeyn-assistant]:not([data-zeyn-assistant="dock"])', 'assistant'],
+  ['button[data-zeyn-share]', 'share'],
 ];
 
 /** @type {Set<string>} Modules of `LAZY` already asked for. */

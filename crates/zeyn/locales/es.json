@@ -474,6 +474,14 @@
       },
       "toast": {
         "dismiss": "Cerrar"
+      },
+      "rating": {
+        "value": "{n} de {max}"
+      },
+      "share": {
+        "label": "Compartir",
+        "copied": "Enlace copiado.",
+        "failed": "No se pudo copiar el enlace."
       }
     },
     "date": {

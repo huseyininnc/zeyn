@@ -5,7 +5,7 @@
 //! |---|---|---|
 //! | `bool` | checkbox | [`Control::Switch`] |
 //! | `#[choice]` | select (ARIA select only combobox) | [`Control::Radio`], [`Control::Segmented`], [`Control::Listbox`] |
-//! | `i32`, `i64`, `Money`, `Decimal` | number input formatted while typing, with step buttons | [`Control::Percent`] |
+//! | `i32`, `i64`, `Money`, `Decimal` | number input formatted while typing, with step buttons | [`Control::Percent`], [`Control::Rating`] (whole numbers) |
 //! | `String` | text input; a growing text area with a counter above 255 characters; a masked input with the `mask` rule | [`Control::Password`], [`Control::NewPassword`], [`Control::PasswordMeter`], [`Control::OneTimeCode`] |
 
 use crate::i18n::{NumberFormat, Text};
@@ -47,6 +47,11 @@ pub enum Control {
     /// A new password input with a strength meter. The meter is a hint computed in the browser;
     /// the field's rules (`min_len`, a model `validate` function) are what the server enforces.
     PasswordMeter,
+    /// Stars from 1 to N for whole number fields, as a radio group: one tab stop, arrow keys
+    /// move. N is the field's `max` rule (5 without one, at most 10); give the field
+    /// `#[rule(min = 1, max = N)]` so the server checks the value too. No star checked sends no
+    /// value, which a `required` rule turns away.
+    Rating,
 }
 
 /// What a control needs to render one field.
@@ -148,6 +153,9 @@ pub(crate) fn render_choice(out: &mut String, r: &Render, s: &Slot) {
 /// Whole numbers, money and decimals: formatted while typing in the user's language, with step
 /// buttons. Key fields are not grouped (`10234`, not `10.234`). Decimals keep their field's scale.
 pub(crate) fn render_number(out: &mut String, r: &Render, s: &Slot) {
+    if s.control == Some(Control::Rating) && matches!(s.m.kind, FieldKind::Integer) {
+        return super::rating::render_rating(out, r, s);
+    }
     let f = NumberFormat::for_locale(r.locale);
     let money = s.m.kind == FieldKind::Money;
     let group = s.m.kind != FieldKind::Id;

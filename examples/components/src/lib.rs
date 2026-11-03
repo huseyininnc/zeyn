@@ -111,6 +111,7 @@ catalog! {
         timeline "/ui/timeline";
         markdown "/ui/markdown";
         spoiler "/ui/spoiler";
+        relative_time "/ui/relative-time";
     }
     "navigation" Home {
         breadcrumb "/ui/breadcrumb";
@@ -119,6 +120,7 @@ catalog! {
         menu_button "/ui/menu-button";
         menu_bar "/ui/menu-bar";
         external_link "/ui/external-link";
+        share "/ui/share";
     }
     "forms" Edit {
         form "/ui/form";
@@ -127,6 +129,7 @@ catalog! {
         lookup "/ui/lookup";
         line_editor "/ui/line-editor";
         masked_inputs "/ui/masked-inputs";
+        rating "/ui/rating";
         action_button "/ui/action-button";
     }
     "data" Table {

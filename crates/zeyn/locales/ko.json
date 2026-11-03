@@ -451,7 +451,7 @@
         "down": "이전 기간 대비 {pct}% 감소",
         "flat": "이전 기간과 변화 없음",
         "target": "목표 {target}, {pct}% 달성"
-},
+      },
       "password": {
         "show": "비밀번호 표시",
         "weak": "강도: 약함",
@@ -474,6 +474,14 @@
       },
       "toast": {
         "dismiss": "닫기"
+      },
+      "rating": {
+        "value": "{max}점 중 {n}점"
+      },
+      "share": {
+        "label": "공유",
+        "copied": "링크를 복사했습니다.",
+        "failed": "링크를 복사하지 못했습니다."
       }
     },
     "date": {

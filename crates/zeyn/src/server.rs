@@ -38,6 +38,7 @@ mod grid;
 mod guard;
 mod locale;
 mod media;
+mod modules;
 mod ops;
 mod seo;
 mod session;
@@ -1499,7 +1500,7 @@ impl App {
         let router = realtime::routes(router);
         #[cfg(feature = "pdf")]
         let router = pdf::routes(router);
-        let router = site::routes(charts::routes(files::routes(router)));
+        let router = modules::routes(site::routes(charts::routes(files::routes(router))));
         let router = theme::routes(pro::routes(media::routes(ui::routes(session::routes(data::routes(ops::routes(
             agent::routes(grid::routes(router)),
         )))))))

@@ -451,7 +451,7 @@
         "down": "前期間より{pct}%減少",
         "flat": "前期間から変化なし",
         "target": "目標 {target}、{pct}%達成"
-},
+      },
       "password": {
         "show": "パスワードを表示",
         "weak": "強度: 弱い",
@@ -474,6 +474,14 @@
       },
       "toast": {
         "dismiss": "閉じる"
+      },
+      "rating": {
+        "value": "{max} 段階中 {n}"
+      },
+      "share": {
+        "label": "共有",
+        "copied": "リンクをコピーしました。",
+        "failed": "リンクをコピーできませんでした。"
       }
     },
     "date": {

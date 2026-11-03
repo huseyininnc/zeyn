@@ -474,6 +474,14 @@
       },
       "toast": {
         "dismiss": "إغلاق"
+      },
+      "rating": {
+        "value": "{n} من {max}"
+      },
+      "share": {
+        "label": "مشاركة",
+        "copied": "تم نسخ الرابط.",
+        "failed": "تعذر نسخ الرابط."
       }
     },
     "date": {

@@ -102,6 +102,25 @@ Spoiler::new(t!("quiz.show_answer")).add(Paragraph::new(answer.clone()))
 
 @live people
 
+## RelativeTime
+
+A moment shown as relative time, such as "3 minutes ago" or "in 2 days", in the page's language. The server writes the exact date and time in the user's time zone inside `<time datetime="...">`, so the HTML stays the same from minute to minute and a cached page is still right. The runtime rewrites the text with `Intl.RelativeTimeFormat` when the page loads, when `nav.js` swaps in a screen and once a minute; the exact time stays in the tooltip. Without script the exact time is the text.
+
+```rust
+RelativeTime::new(post.published)
+```
+
+## Share
+
+A button that shares a link: the system share sheet where the browser has the Web Share API (most phones), and otherwise a copy to the clipboard with a toast that says so. It shares the page being shown, or a screen with `Share::screen(screen, params)`, whose params are checked by the compiler. `.title` sets the title the share sheet shows, and the label is "Share" in the user's language unless `.label` gives one. The server renders the button hidden and its script shows it, so a page without script has no button that does nothing. The script (`share.js`, under 1 KB) loads only on pages that hold a share button.
+
+```rust
+Share::page().title(post.title.clone())
+Share::screen(article, ArticleParams { id: post.id }).label(t!("blog.share_article"))
+```
+
+@live engage
+
 ## AlphaIndex
 
 A bar of letters, each a link to a screen with the letter in its params, such as people whose names start with it. The letters come from the user's language in its own order (`zeyn::ui::alphabet`): Turkish has `Ç Ğ I İ Ö Ş Ü` in place, Spanish has `Ñ`, Russian and Arabic have their own alphabets, and every other language gets `A` to `Z`. The letter of the screen being shown is marked with `aria-current="page"` (a Turkish `i` marks `İ`), and `.other()` adds a last `#` link for names that start with anything else. The links open without a page reload and wrap onto more lines on phones.

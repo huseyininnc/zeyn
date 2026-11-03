@@ -474,6 +474,14 @@
       },
       "toast": {
         "dismiss": "关闭"
+      },
+      "rating": {
+        "value": "{n} / {max}"
+      },
+      "share": {
+        "label": "分享",
+        "copied": "链接已复制。",
+        "failed": "无法复制链接。"
       }
     },
     "date": {

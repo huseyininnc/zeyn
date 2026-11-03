@@ -81,7 +81,10 @@
       "chart": "Çubuk, halka, karma ve gösterge grafikleri.",
       "kpi": "Değişimi ve eğilimiyle bir sayı.",
       "toolbox": "Biri seçili araç düğmeleri grubu.",
-      "status_bar": "Kısa durum metinleri çubuğu."
+      "status_bar": "Kısa durum metinleri çubuğu.",
+      "relative_time": "Sayfanın dilinde \"5 dakika önce\" gibi gösterilen an.",
+      "share": "Bağlantıyı paylaşır, paylaşım yoksa kopyalar.",
+      "rating": "Yıldızlarla gösterilen 1 ile N arası tam sayı."
     },
     "ex": {
       "action_button": {
@@ -209,6 +212,14 @@
       "rail": {
         "overview": "Örnek"
       },
+      "rating": {
+        "overview": "Örnek",
+        "three_stars": "Üç yıldız"
+      },
+      "relative_time": {
+        "overview": "Örnek",
+        "past_and_future": "Geçmiş ve gelecek"
+      },
       "row": {
         "overview": "Örnek",
         "weights": "Sütun ağırlıkları",
@@ -216,6 +227,10 @@
       },
       "search_box": {
         "overview": "Örnek"
+      },
+      "share": {
+        "overview": "Örnek",
+        "another_screen": "Başka bir ekran"
       },
       "skeleton": {
         "overview": "Örnek"

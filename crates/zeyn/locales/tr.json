@@ -497,6 +497,14 @@
           "6": "Cumartesi",
           "7": "Pazar"
         }
+      },
+      "rating": {
+        "value": "{n} / {max}"
+      },
+      "share": {
+        "label": "Paylaş",
+        "copied": "Bağlantı kopyalandı.",
+        "failed": "Bağlantı kopyalanamadı."
       }
     },
     "date": {

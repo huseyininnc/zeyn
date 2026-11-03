@@ -270,6 +270,7 @@ document.addEventListener('change', (e) => {
 });
 
 syncTimeZone();
+relativeTimes(document);
 setInterval(() => relativeTimes(document), 60_000);
 initGrids(document);
 syncAgentTools();
@@ -280,6 +281,7 @@ document.addEventListener('zeyn:leave', () => {
 
 document.addEventListener('zeyn:content', (e) => {
   initGrids(e.detail);
+  if (e.detail instanceof Element) relativeTimes(e.detail);
   syncAgentTools();
 });
 

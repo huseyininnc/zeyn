@@ -247,6 +247,7 @@ pub mod prelude {
         DescriptionList, Dock, Embed, EmbedPermission, EmptyState, ExternalLink, Heading, Image, Kpi, List, LookupItem, LookupQuery,
         MenuBar, MenuButton, MetaLine, Panel, Paragraph, Popover, PrevNext, Progress, PropertyInspector, Rail, Row, SearchBox, SearchParams, Skeleton, Spoiler,
         Split, Stack, StatusBar, Tabs, Timeline, Toolbox, Tree, TreeItem, TreeQuery, Video, WeekSchedule,
+        RelativeTime, Share,
     };
     pub use crate::{
         Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime, Decimal, Effect,
