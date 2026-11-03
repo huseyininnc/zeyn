@@ -212,7 +212,12 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; }
   padding: 0 calc(var(--z-space) * 2) calc(var(--z-space) * 3);
   background: var(--z-surface);
   border-right: 1px solid var(--z-border);
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
 }
+
+.z-nav:hover,
+.z-nav:focus-within { scrollbar-color: var(--z-border) transparent; }
 
 .z-nav ul {
   list-style: none;
@@ -643,7 +648,8 @@ dialog.z-dialog::backdrop { background: var(--z-backdrop); }
 
 .z-grid th[style*="--z-flex"] { width: calc(var(--z-flex) * 20%); }
 
-.z-grid th:has(.z-sort) { padding: 0 2px; }
+.z-grid th:has(.z-sort),
+.z-grid th:has(.z-th-label) { padding: 0 2px; }
 
 .z-sort {
   display: flex;
@@ -801,6 +807,18 @@ th[aria-sort="descending"] .z-sort::after {
 }
 
 .z-th .z-sort { flex: 1 1 auto; min-width: 0; }
+
+.z-th-label {
+  display: flex;
+  flex: 1 1 auto;
+  width: 100%;
+  align-items: center;
+  min-width: 0;
+  min-height: max(24px, calc(var(--z-row) - 4px));
+  padding: 0 calc(var(--z-space) * 3 - 2px);
+}
+
+.z-grid th.z-num .z-th-label { justify-content: flex-end; }
 
 :where(.z-grid th) { position: relative; }
 

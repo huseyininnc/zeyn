@@ -1388,3 +1388,30 @@ async fn virtual_grids_render_one_screen_of_rows_live_and_keep_the_rest_of_the_b
     assert_eq!(later.matches("R-").count(), 150 - zeyn::VIRTUAL_LIVE_ROWS);
     assert!(later.starts_with("<tr") && later.contains("R-150"));
 }
+
+#[screen(route = "/unsorted", permission = "items.read")]
+pub fn unsorted() -> Screen {
+    Screen::new("Unsorted").body(
+        DataGrid::of(search)
+            .column(Item::code)
+            .column(Item::qty)
+            .no_sort(),
+    )
+}
+
+#[tokio::test]
+async fn columns_without_sorting_get_no_sort_button_and_the_server_drops_their_sort_keys() {
+    let router = App::new("Test")
+        .service(Store::seeded())
+        .auth(|h: &HeaderMap| h.contains_key("x-user").then(reader))
+        .feature(Feature::new("items").screen(unsorted))
+        .router()
+        .unwrap();
+    let page = send(&router, get("/unsorted")).await.body;
+    assert!(page.contains(r#"data-field="code" aria-sort="none""#), "{page}");
+    assert!(page.contains(r#"data-field="qty" data-sort="off""#), "{page}");
+    let q = serde_json::json!({ "sort": [{ "field": "qty", "desc": true }] });
+    let call = serde_json::json!({ "screen": "unsorted", "node": 0, "query": q });
+    let rows = send(&router, post("/_zeyn/grid", call)).await.json()["rows"].as_str().unwrap().to_string();
+    assert!(rows.find("C-01").unwrap() < rows.find("C-20").unwrap(), "the action never saw the sort: {rows}");
+}

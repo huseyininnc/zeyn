@@ -33,6 +33,15 @@ impl<E: Model, T> DataGridColumn<E, T> {
         self
     }
 
+    /// The column cannot be sorted: the header has no sort button, the column menu no sort
+    /// entries, and the server drops sort keys on it before the action runs. Use it when the
+    /// action cannot order by the field (generated rows, a column the database has no index for),
+    /// so the page never offers a sort the data does not follow.
+    pub fn no_sort(mut self) -> Self {
+        self.last().sort = false;
+        self
+    }
+
     fn aggregate(mut self, op: Aggregate) -> Self {
         let column = self.last();
         if !column.aggregates.contains(&op) {

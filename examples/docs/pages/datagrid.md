@@ -56,6 +56,7 @@ The server caps the page size whatever the client asks for.
 |---|---|
 | `.width(px)`, `.flex(n)` | Fixed width or a share of the free width |
 | `.filter()` | A filter box that fits the type: text, number range, date range, choice list |
+| `.no_sort()` | No sort button or sort menu entries; the server drops sort keys on the column. For actions that cannot order by it (generated rows, no database index) |
 | `.sum()`, `.avg()`, `.min()`, `.max()` | Totals in the footer. `sum` on a text column does not compile |
 | `.badge(\|v\| tone)` | Shows the value as a colored badge |
 | `.progress(max)` | A bar from 0 to `max` |
