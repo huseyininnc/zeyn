@@ -1,6 +1,7 @@
 use zeyn::prelude::*;
 use zeyn::render::Render;
 use zeyn::{Component, Ctx, Identity, Services, Value};
+use zeyn::DateWords;
 
 fn tz(name: &str) -> TimeZone {
     TimeZone::named(name).unwrap()
@@ -235,4 +236,127 @@ fn grid_sorts_dates_chronologically() {
     let q: DataQuery = serde_json::from_str(r#"{"sort":[{"field":"day","desc":false}]}"#).unwrap();
     let days: Vec<String> = q.apply(rows).items.iter().map(|a| a.day.to_string()).collect();
     assert_eq!(days, ["2023-12-31", "2024-01-15", "2024-03-01"]);
+}
+
+/// Catalogs of the framework's own locale files, loaded from disk so the test covers every
+/// language whether or not its `lang-*` feature is on.
+fn locale_files() -> Vec<(String, serde_json::Value)> {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("locales");
+    let mut files: Vec<(String, serde_json::Value)> = std::fs::read_dir(dir)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| p.extension().is_some_and(|x| x == "json"))
+        .map(|p| {
+            let locale = p.file_stem().unwrap().to_string_lossy().to_string();
+            let json = serde_json::from_str(&std::fs::read_to_string(&p).unwrap()).unwrap();
+            (locale, json)
+        })
+        .collect();
+    files.sort_by(|a, b| a.0.cmp(&b.0));
+    files
+}
+
+fn words_of(json: &serde_json::Value, key: &str) -> Vec<String> {
+    json["zeyn"]["date"]["words"][key]
+        .as_str()
+        .unwrap()
+        .split(',')
+        .map(|w| w.trim().to_lowercase())
+        .filter(|w| !w.is_empty())
+        .collect()
+}
+
+fn words_for(locale: &str) -> DateWords {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("locales/{locale}.json"));
+    let json = std::fs::read_to_string(path).unwrap();
+    let i18n = zeyn::I18n::new("en").catalog(locale, &json).unwrap();
+    DateWords::from_i18n(&i18n, locale)
+}
+
+#[test]
+fn no_date_word_means_two_things_in_one_language() {
+    const KEYS: [&str; 8] = ["today", "tomorrow", "yesterday", "now", "day", "week", "month", "year"];
+    let files = locale_files();
+    assert!(files.len() >= 9, "every language has a locale file");
+    for (locale, json) in &files {
+        let mut seen: Vec<(String, &str)> = Vec::new();
+        for key in KEYS {
+            for w in words_of(json, key) {
+                if let Some((_, other)) = seen.iter().find(|(s, k)| *s == w && *k != key) {
+                    panic!("`{w}` is both `{other}` and `{key}` in locales/{locale}.json");
+                }
+                seen.push((w, key));
+            }
+        }
+    }
+}
+
+#[test]
+fn english_date_words_work_in_every_language_unless_the_language_uses_the_word() {
+    let today = Date::new(2024, 3, 15).unwrap();
+    let english = [("+3d", 3), ("+3day", 3), ("+1w", 7), ("+1week", 7), ("today", 0), ("tomorrow", 1), ("yesterday", -1)];
+    for (locale, json) in locale_files() {
+        let words = words_for(&locale);
+        let own: Vec<String> = ["day", "week", "month", "year", "today", "tomorrow", "yesterday"]
+            .iter()
+            .flat_map(|k| words_of(&json, k))
+            .collect();
+        for (input, days) in english {
+            let word = input.trim_start_matches(['+', '1', '3']);
+            if own.iter().any(|w| w == word) && locale != "en" {
+                continue;
+            }
+            assert_eq!(Date::parse_input(input, &locale, today, &words), today.add_days(days), "{input} in {locale}");
+        }
+        assert_eq!(Date::parse_input("+2m", &locale, today, &words).is_some(), true, "+2m in {locale}");
+        assert_eq!(Date::parse_input("+1y", &locale, today, &words).is_some(), true, "+1y in {locale}");
+    }
+}
+
+#[test]
+fn translated_date_words_are_read() {
+    let today = Date::new(2024, 3, 15).unwrap();
+    let cases = [
+        ("tr", "yarın", Date::new(2024, 3, 16)),
+        ("tr", "+2g", Date::new(2024, 3, 17)),
+        ("tr", "+1h", Date::new(2024, 3, 22)),
+        ("tr", "+1a", Date::new(2024, 4, 15)),
+        ("ru", "Завтра", Date::new(2024, 3, 16)),
+        ("ru", "+3 дня", Date::new(2024, 3, 18)),
+        ("ru", "-1н", Date::new(2024, 3, 8)),
+        ("ru", "+1м", Date::new(2024, 4, 15)),
+        ("ru", "+1 год", Date::new(2025, 3, 15)),
+        ("zh", "明天", Date::new(2024, 3, 16)),
+        ("zh", "+3天", Date::new(2024, 3, 18)),
+        ("zh", "+1周", Date::new(2024, 3, 22)),
+        ("zh", "+1月", Date::new(2024, 4, 15)),
+        ("es", "mañana", Date::new(2024, 3, 16)),
+        ("es", "AYER", Date::new(2024, 3, 14)),
+        ("es", "+1s", Date::new(2024, 3, 22)),
+        ("es", "+2m", Date::new(2024, 5, 15)),
+        ("es", "+1a", Date::new(2025, 3, 15)),
+        ("es", "+1 año", Date::new(2025, 3, 15)),
+        ("ar", "غدا", Date::new(2024, 3, 16)),
+        ("ar", "أمس", Date::new(2024, 3, 14)),
+        ("ar", "+3 أيام", Date::new(2024, 3, 18)),
+        ("ar", "+1ش", Date::new(2024, 4, 15)),
+        ("ja", "明日", Date::new(2024, 3, 16)),
+        ("hi", "कल", Date::new(2024, 3, 16)),
+        ("hi", "बीता कल", Date::new(2024, 3, 14)),
+    ];
+    for (locale, input, expected) in cases {
+        assert_eq!(Date::parse_input(input, locale, today, &words_for(locale)), expected, "{input} in {locale}");
+    }
+    let now = Time::new(9, 30, 0).unwrap();
+    assert_eq!(Time::parse_input("сейчас", "ru", now, &words_for("ru")), Some(now));
+    assert_eq!(Time::parse_input("现在", "zh", now, &words_for("zh")), Some(now));
+    assert_eq!(Time::parse_input("now", "ar", now, &words_for("ar")), Some(now));
+}
+
+#[test]
+fn unknown_words_and_other_digits_are_refused() {
+    let today = Date::new(2024, 3, 15).unwrap();
+    for (locale, input) in [("ar", "+٣ي"), ("ru", "+3x"), ("zh", "后天"), ("es", "+3 lunas"), ("tr", "+3d3")] {
+        assert_eq!(Date::parse_input(input, locale, today, &words_for(locale)), None, "{input} in {locale}");
+    }
 }

@@ -51,6 +51,16 @@ App::new(t!("app.name")).i18n(i18n)
 
 `I18n::new` işlevinin ilk argümanı varsayılan dildir. Birden fazla katalog olduğunda shell bir dil seçici gösterir. Framework'ün kendi metinleri (grid, formlar, shell) İngilizce ve Türkçe olarak gelir.
 
+## Diğer dillerde framework metinleri
+
+Framework'ün kendi metinleri Çince, Rusça, İspanyolca, Korece, Japonca, Hintçe ve Arapça olarak da vardır. Her dil bir Cargo feature'ıdır; uygulama yalnızca açtığı diller için öder (her biri ikili dosyaya 35 ile 60 KB arası metin ekler):
+
+```toml
+zeyn = { version = "0.0", features = ["lang-ru", "lang-ar"] }
+```
+
+`lang-all` bütün dilleri açar. Uygulama bir dili yine de yalnızca o dil için kendi kataloğunu yukarıdaki gibi kaydettiğinde sunar. Feature açık değilse framework metinleri varsayılan dilde gösterilir.
+
 ## Ekranların dışındaki metinler
 
 - `ctx.t(&text)`, bir `Text` değerini kullanıcının dilinde bir `String` yapar, örneğin bir e-posta için.
