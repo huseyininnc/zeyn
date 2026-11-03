@@ -1331,7 +1331,10 @@ impl App {
                 }
             }
         }
-        self.services.insert(crate::screen::Routes(Arc::new(routes)));
+        let default_locale = self
+            .locale_paths
+            .then(|| Arc::from(self.i18n.default_locale()));
+        self.services.insert(crate::screen::Routes(Arc::new(routes), default_locale));
         let look = self.look();
         #[cfg(feature = "islands")]
         let islands = self.islands_dir.as_deref().and_then(|dir| match islands::Islands::load(dir, &url_prefix) {
