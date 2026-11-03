@@ -1,0 +1,256 @@
+{
+  "cx": {
+    "app": "Zeyn bileşenleri",
+    "title": "Bileşenler",
+    "intro": "Zeyn çatısının her bileşeni, canlı olarak. Örneklerini, onları kuran kodu ve API listesini görmek için birini açın.",
+    "search": "Bileşen ara",
+    "start": "Başlangıç",
+    "all": "Tüm bileşenler",
+    "none": "\"{q}\" ile eşleşen bileşen yok.",
+    "show_code": "Kodu göster",
+    "copy": "Kopyala",
+    "copied": "Kopyalandı",
+    "api_note": "Genel metotlar; site derlenirken çatının kaynak kodundan okunur. Her belge yorumunun ilk satırı gösterilir, devamı docs.rs üzerindedir.",
+    "api_method": "Metot",
+    "api_doc": "Açıklama",
+    "docs": "Belgeler",
+    "docs_rs": "docs.rs üzerinde API başvurusu",
+    "missing": "Bu bileşen yok.",
+    "tabs": "{name} bölümleri",
+    "overview": "Genel bakış",
+    "api": "API",
+    "examples": "Örnekler",
+    "cat": {
+      "layout": "Yerleşim",
+      "text": "Metin ve gösterim",
+      "navigation": "Gezinme",
+      "forms": "Formlar ve girişler",
+      "data": "Veri",
+      "media": "Medya",
+      "feedback": "Geri bildirim ve katmanlar",
+      "charts": "Grafikler",
+      "shell": "Kabuk"
+    },
+    "summary": {
+      "stack": "Aralarında boşluk olan, alt alta düğümler.",
+      "row": "Yan yana sütunlar; dar ekranlarda alt alta geçer.",
+      "card": "İsteğe bağlı başlığı olan çerçeveli kutu.",
+      "panel": "Daraltılabilen başlıklı bölüm.",
+      "tabs": "Sekme listesinin arkasındaki paneller; ilk açılışta yüklenir.",
+      "split": "Bir tutamakla boyutlanan iki bölme.",
+      "auto_grid": "Genişliğe sığdığı kadar sütun.",
+      "heading": "h2 ile h6 arası bölüm başlıkları.",
+      "paragraph": "Kaçışlanmış metin paragrafı; normal ya da sönük.",
+      "meta_line": "Ayraçla tek satırda kısa bilgiler.",
+      "badge": "Tonlu kısa durum etiketi.",
+      "avatar": "Bir kişinin resmi ya da baş harfleri.",
+      "description_list": "Bir kaydın etiket ve değer çiftleri.",
+      "timeline": "Sıralı olaylar, her biri bir tonla.",
+      "markdown": "Sunucuda işlenen güvenli Markdown.",
+      "spoiler": "Okuyucu açana kadar gizli içerik.",
+      "breadcrumb": "Geçerli sayfaya giden bağlantı izi.",
+      "prev_next": "Önceki ve sonraki öğeye bağlantılar.",
+      "alpha_index": "Kullanıcının alfabesinden harf çubuğu.",
+      "menu_button": "Eylemli açılır ve bölünmüş düğmeler.",
+      "menu_bar": "Komutlardan oluşan menü çubuğu.",
+      "external_link": "Uygulamadan güvenle çıkan bağlantı.",
+      "form": "Sunucuda denetlenen bir model formu.",
+      "controls": "Radyo düğmeleri, bölümlü düğmeler ve anahtarlar.",
+      "date_pickers": "Tarih, saat ve aralık seçiciler.",
+      "lookup": "Sunucudaki aramadan kayıt seçimi.",
+      "line_editor": "Form içinde toplamlı model satırları.",
+      "masked_inputs": "Maskeli, ondalık, yüzde ve parola girişleri.",
+      "action_button": "Bir eylemi çalıştıran düğme.",
+      "data_grid": "Sayfalama, sıralama ve süzgeçli eylem satırları.",
+      "card_grid": "Kart olarak gösterilen eylem satırları.",
+      "image_card": "Resimli, rozetli ve ilerlemeli kart.",
+      "rail": "Yana kayan kart sırası.",
+      "list": "Resim, başlık ve ek bilgi içeren satırlar.",
+      "search_box": "Önerili arama alanı.",
+      "tree": "Açıldıkça sunucudan yüklenen dallar.",
+      "week_schedule": "Eylem satırlarından yedi günlük sütunlar.",
+      "image": "Alternatif metni ve boyutu zorunlu resim.",
+      "embed": "Kilitli çerçevede başka bir sitenin sayfası.",
+      "alert": "Renkli kutuda bir mesaj.",
+      "progress": "Etiketli ilerleme çubuğu.",
+      "skeleton": "İçerik yüklenirken yer tutucu satırlar.",
+      "empty_state": "Liste boşken gösterilen içerik.",
+      "popover": "Küçük bir panel açan düğme.",
+      "busy": "Yavaş bir eylem sürerken katman.",
+      "toast": "Bir eylemden sonra kısa bildirim.",
+      "chart": "Çubuk, halka, karma ve gösterge grafikleri.",
+      "kpi": "Değişimi ve eğilimiyle bir sayı.",
+      "toolbox": "Biri seçili araç düğmeleri grubu.",
+      "status_bar": "Kısa durum metinleri çubuğu."
+    },
+    "ex": {
+      "action_button": {
+        "overview": "Örnek"
+      },
+      "alert": {
+        "overview": "Örnek",
+        "tones": "Tonlar"
+      },
+      "alpha_index": {
+        "overview": "Örnek"
+      },
+      "auto_grid": {
+        "overview": "Örnek",
+        "wide_columns": "Geniş sütunlar"
+      },
+      "avatar": {
+        "overview": "Örnek",
+        "sizes": "Boyutlar"
+      },
+      "badge": {
+        "overview": "Örnek"
+      },
+      "breadcrumb": {
+        "overview": "Örnek"
+      },
+      "busy": {
+        "overview": "Örnek"
+      },
+      "card": {
+        "overview": "Örnek",
+        "nested": "İçerikle"
+      },
+      "card_grid": {
+        "overview": "Örnek",
+        "pages": "Numaralı sayfalar"
+      },
+      "chart": {
+        "overview": "Örnek",
+        "donut": "Halka",
+        "gauge": "Gösterge"
+      },
+      "controls": {
+        "overview": "Örnek"
+      },
+      "data_grid": {
+        "overview": "Örnek"
+      },
+      "date_pickers": {
+        "overview": "Örnek"
+      },
+      "description_list": {
+        "overview": "Örnek"
+      },
+      "embed": {
+        "overview": "Örnek"
+      },
+      "empty_state": {
+        "overview": "Örnek"
+      },
+      "external_link": {
+        "overview": "Örnek"
+      },
+      "form": {
+        "overview": "Örnek"
+      },
+      "heading": {
+        "overview": "Örnek",
+        "anchor": "Çapayla"
+      },
+      "image": {
+        "overview": "Örnek"
+      },
+      "image_card": {
+        "overview": "Örnek",
+        "horizontal": "Yatay"
+      },
+      "kpi": {
+        "overview": "Örnek"
+      },
+      "line_editor": {
+        "overview": "Örnek"
+      },
+      "list": {
+        "overview": "Örnek",
+        "fixed": "Sabit öğeler"
+      },
+      "lookup": {
+        "overview": "Örnek"
+      },
+      "markdown": {
+        "overview": "Örnek"
+      },
+      "masked_inputs": {
+        "overview": "Örnek"
+      },
+      "menu_bar": {
+        "overview": "Örnek"
+      },
+      "menu_button": {
+        "overview": "Örnek",
+        "split": "Bölünmüş düğme"
+      },
+      "meta_line": {
+        "overview": "Örnek",
+        "separator": "Başka bir ayraç"
+      },
+      "panel": {
+        "overview": "Örnek",
+        "collapsible": "Daraltılabilir"
+      },
+      "paragraph": {
+        "overview": "Örnek"
+      },
+      "popover": {
+        "overview": "Örnek"
+      },
+      "prev_next": {
+        "overview": "Örnek",
+        "one_side": "Yalnızca bir yan"
+      },
+      "progress": {
+        "overview": "Örnek"
+      },
+      "rail": {
+        "overview": "Örnek"
+      },
+      "row": {
+        "overview": "Örnek",
+        "weights": "Sütun ağırlıkları",
+        "compact": "Sıkışık"
+      },
+      "search_box": {
+        "overview": "Örnek"
+      },
+      "skeleton": {
+        "overview": "Örnek"
+      },
+      "split": {
+        "overview": "Örnek"
+      },
+      "spoiler": {
+        "overview": "Örnek"
+      },
+      "stack": {
+        "overview": "Örnek",
+        "gap": "Boşluk"
+      },
+      "status_bar": {
+        "overview": "Örnek"
+      },
+      "tabs": {
+        "overview": "Örnek"
+      },
+      "timeline": {
+        "overview": "Örnek"
+      },
+      "toast": {
+        "overview": "Örnek"
+      },
+      "toolbox": {
+        "overview": "Örnek"
+      },
+      "tree": {
+        "overview": "Örnek"
+      },
+      "week_schedule": {
+        "overview": "Örnek"
+      }
+    }
+  }
+}

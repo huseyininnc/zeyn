@@ -667,6 +667,11 @@ pub fn hello(_: (), ctx: Ctx) -> Screen {
         .alternate("bad\"tag", "/hello")
 }
 
+#[screen(route = "/linked", public)]
+pub fn linked() -> Screen {
+    Screen::new("Linked").body(zeyn::ui::PrevNext::new().next(hello, ()))
+}
+
 fn localized() -> Router {
     let i18n = I18n::new("en")
         .catalog("tr", r#"{ "x": "x" }"#)
@@ -675,7 +680,12 @@ fn localized() -> Router {
     App::new("Test")
         .i18n(i18n)
         .locale_paths()
-        .feature(Feature::new("site").screen(hello).menu(|m| m.group("Site", Icon::Home).item("Hello", hello)))
+        .feature(
+            Feature::new("site")
+                .screen(hello)
+                .screen(linked)
+                .menu(|m| m.group("Site", Icon::Home).item("Hello", hello)),
+        )
         .router()
         .unwrap()
 }
@@ -779,6 +789,15 @@ fn every_framework_language_is_built_in_with_lang_all() {
 fn languages_without_their_feature_fall_back_to_the_default() {
     let i18n = I18n::new("en").catalog("zh", "{}").unwrap();
     assert_eq!(i18n.lookup("zh", "zeyn.shell.language"), i18n.lookup("en", "zeyn.shell.language"));
+}
+
+#[tokio::test]
+async fn links_to_screens_inside_components_keep_the_language_of_the_path() {
+    let router = localized();
+    let tr = send(&router, visitor("/tr/linked").body(Body::empty()).unwrap()).await.body;
+    assert!(tr.contains(r#"href="/tr/hello""#), "{tr}");
+    let en = send(&router, visitor("/linked").body(Body::empty()).unwrap()).await.body;
+    assert!(en.contains(r#"href="/hello""#) && !en.contains(r#"href="/en/hello""#), "{en}");
 }
 
 /// The `content` of `<meta name="zeyn-csrf">` in a page.

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/zeyn", "crates/zeyn-macros", "crates/zeyn-cli", "crates/zeyn-desktop", "examples/big-grid", "examples/inventory", "examples/showcase", "examples/shared-domain", "examples/billing", "examples/crm", "examples/adisyon", "examples/docs", "crates/zeyn-island", "examples/showcase/shared", "examples/showcase/islands/counter", "examples/showcase/islands/diagram"]
+members = ["crates/zeyn", "crates/zeyn-macros", "crates/zeyn-cli", "crates/zeyn-desktop", "examples/big-grid", "examples/inventory", "examples/showcase", "examples/shared-domain", "examples/billing", "examples/crm", "examples/adisyon", "examples/docs", "examples/components", "crates/zeyn-island", "examples/showcase/shared", "examples/showcase/islands/counter", "examples/showcase/islands/diagram"]
 
 [workspace.package]
 version = "0.0.5"

@@ -27,6 +27,16 @@ CardGrid::of(catalog_products)
 ```
 
 - **卡片。** `Card::image(image, title)` 由一行生成一张卡片，可搭配 `text`、`badge`、`alt` 和 `link`（一个 screen 及其参数；整张卡片是一个链接，打开时不会重新加载页面）。图片是懒加载的，宽度和高度来自 `image_size`，因此页面不会跳动。图片的替代文本为空，因为旁边的标题已经说明了这张卡片；当图片传达的信息更多时，请设置 `alt`。路径、`https:` 或 `data:image/` 以外的图片地址会被省略。
+- **卡片上的更多内容。** `subtitle` 在标题下方添加颜色较淡的第二行（作者、分类）。`corner(badge)` 把徽章放在图片的结束角，起始角则是 `badge`；`badges([...])` 在文本下方添加一排徽章，例如标签。`progress(fraction, label)` 沿图片底边绘制一条细进度条，表示完成了多少：比例取值 0 到 1，屏幕阅读器会读出标签和百分比（`role="progressbar"` 与 `aria-valuenow`）。`horizontal()` 让卡片按一行排列，起始处是小图片，文本在其旁边；包含此类卡片的卡片网格或 rail 会给它们更宽的列。以上都可用于 `CardGrid` 和 `Rail`。
+
+```rust
+Card::image(c.cover.clone(), c.title.clone())
+    .subtitle(c.teacher.clone())
+    .corner(Badge::new(t!("courses.new")).tone(Tone::Success))
+    .badges(c.tags.iter().map(|t| Badge::new(t.clone())))
+    .progress(c.done, t!("courses.done"))
+    .horizontal()
+```
 - **分页。** `Paging::infinite(n)`（默认，24）显示一个“显示更多”按钮，该按钮滚动到视野中时也会触发；按下按钮后，焦点会移到第一张新卡片。`Paging::pages(n)` 显示上一页和下一页按钮以及页码。页面大小由服务器设置；客户端只说明从哪里继续。
 - **排序。** 每个 `sort_option` 是用户可以从下拉框中选择的一种顺序；第一个是卡片起始的顺序。服务器只接受这些顺序，并丢弃客户端发送的过滤条件和搜索文本。
 - **搜索。** `.search(text)` 只显示与自由文本相匹配的行（[`DataQuery::q`](#free-text)），例如结果 screen 的文本。

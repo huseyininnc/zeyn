@@ -1,0 +1,172 @@
+/**
+ * The component catalog: the gallery of previews, the examples with their code and the API
+ * tables. Colors come from the framework's theme tokens, so the light and dark themes both work.
+ */
+
+.cx-section { margin: 0 0 32px; }
+
+.cx-section-title {
+  margin: 0 0 12px;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.cx-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cx-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius-lg);
+  background: var(--z-surface);
+}
+
+.cx-card:hover { border-color: var(--z-border-strong); box-shadow: var(--z-shadow-2); }
+.cx-card:has(.cx-card-link:focus-visible) { outline: 2px solid var(--z-focus); outline-offset: 2px; }
+
+.cx-preview {
+  position: relative;
+  height: 168px;
+  overflow: hidden;
+  padding: 12px;
+  background: var(--z-bg);
+  border-bottom: 1px solid var(--z-border);
+  pointer-events: none;
+}
+
+.cx-preview > .z-node {
+  width: 200%;
+  transform: scale(0.5);
+  transform-origin: top left;
+}
+
+.cx-preview:dir(rtl) > .z-node { transform-origin: top right; }
+
+.cx-preview::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 32px;
+  background: linear-gradient(transparent, var(--z-bg));
+}
+
+.cx-card-body { padding: 12px 16px 16px; }
+
+.cx-card-title {
+  margin: 0 0 4px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.cx-card .cx-card-link {
+  color: var(--z-text);
+  text-decoration: none;
+}
+
+.cx-card .cx-card-link:focus-visible { outline: none; }
+
+.cx-card .cx-card-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.cx-card:hover .cx-card-link { color: var(--z-accent); }
+
+.cx-card-text {
+  margin: 0;
+  font-size: var(--z-font-size-sm);
+  color: var(--z-text-muted);
+}
+
+.cx-none { color: var(--z-text-muted); }
+
+.cx-example { min-width: 0; }
+
+.cx-example-title {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.cx-demo {
+  padding: 16px;
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius-lg) var(--z-radius-lg) 0 0;
+  background: var(--z-bg);
+  overflow-x: auto;
+}
+
+.cx-code-wrap {
+  position: relative;
+  padding: 8px 12px;
+  border: 1px solid var(--z-border);
+  border-top: 0;
+  border-radius: 0 0 var(--z-radius-lg) var(--z-radius-lg);
+  background: var(--z-surface);
+}
+
+.cx-code-toggle {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  font-size: var(--z-font-size-sm);
+  font-weight: 600;
+  color: var(--z-accent);
+  cursor: pointer;
+}
+
+.cx-code-toggle:focus-visible { outline: 2px solid var(--z-focus); outline-offset: 2px; border-radius: var(--z-radius-sm); }
+
+.cx-code pre { margin: 8px 0 0; max-height: 480px; }
+
+.cx-copy {
+  position: absolute;
+  top: 8px;
+  inset-inline-end: 12px;
+}
+
+.cx-api-note { color: var(--z-text-muted); font-size: var(--z-font-size-sm); }
+.cx-api-type { margin: 0 0 24px; }
+.cx-api-name { margin: 0 0 4px; font-size: 1rem; }
+.cx-api-scroll { overflow-x: auto; }
+.cx-api-scroll:focus-visible { outline: 2px solid var(--z-focus); outline-offset: 2px; }
+
+.cx-api-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--z-font-size-sm);
+}
+
+.cx-api-table th,
+.cx-api-table td {
+  padding: 6px 10px;
+  border: 1px solid var(--z-border);
+  text-align: start;
+  vertical-align: top;
+}
+
+.cx-api-table th { background: var(--z-surface-2); font-weight: 600; }
+.cx-api-table td:first-child { min-width: 280px; }
+.cx-api-table code { font-family: var(--z-font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+
+[role="tablist"] { overflow-x: auto; scrollbar-width: thin; }
+
+@media (max-width: 600px) {
+  .cx-cards { grid-template-columns: 1fr; }
+  .cx-api-table td:first-child { min-width: 200px; }
+}
+
+@media (forced-colors: active) {
+  .cx-card:has(.cx-card-link:focus-visible) { outline-color: Highlight; }
+}
