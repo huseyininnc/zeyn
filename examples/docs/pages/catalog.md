@@ -27,6 +27,16 @@ CardGrid::of(catalog_products)
 ```
 
 - **Cards.** `Card::image(image, title)` makes one card from a row, with `text`, `badge`, `alt` and `link` (a screen and its params; the whole card is one link and opens without a page reload). Images are lazy, with the width and height from `image_size` so the page does not jump. The image's alternative text is empty, because the title next to it names the card; set `alt` when the picture says more. Image addresses other than a path, `https:` or `data:image/` are left out.
+- **More on a card.** `subtitle` adds a quieter second line under the title (an author, a category). `corner(badge)` puts a badge over the image's ending corner, next to `badge` at the starting one; `badges([...])` adds a row of badges under the text, such as tags. `progress(fraction, label)` draws a thin bar along the bottom of the image for how much is done: the fraction runs from 0 to 1, and screen readers hear the label and the percentage (`role="progressbar"` with `aria-valuenow`). `horizontal()` lays the card out in a row, a small image at the start and the text beside it; a card grid or rail with such cards gives them wider columns. All of them work in a `CardGrid` and a `Rail`.
+
+```rust
+Card::image(c.cover.clone(), c.title.clone())
+    .subtitle(c.teacher.clone())
+    .corner(Badge::new(t!("courses.new")).tone(Tone::Success))
+    .badges(c.tags.iter().map(|t| Badge::new(t.clone())))
+    .progress(c.done, t!("courses.done"))
+    .horizontal()
+```
 - **Paging.** `Paging::infinite(n)` (the default, 24) shows a "Show more" button that also fires when it scrolls into view; focus moves to the first new card when the button is pressed. `Paging::pages(n)` shows previous and next buttons and the page number. The server sets the page size; the client only says where to continue.
 - **Sorting.** Each `sort_option` is an order users can pick from a select; the first is the order the cards start in. The server accepts only these orders, and drops filters and search text sent by the client.
 - **Search.** `.search(text)` shows only rows that match the free text ([`DataQuery::q`](#free-text)), such as the text of a results screen.

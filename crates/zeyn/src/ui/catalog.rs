@@ -6,6 +6,7 @@
 //! server; the browser never chooses a page size, a field or a filter on its own.
 
 use super::layout::Card;
+use super::list::ListItem;
 use super::widgets::{Badge, encode};
 use super::{DataSource, dom_id};
 use crate::action::{ActionMeta, Cursor, DataQuery, Error, Page, PageRequest, Result, Sort};
@@ -49,14 +50,31 @@ impl<'de> Deserialize<'de> for SearchParams {
 
 impl Params for SearchParams {}
 
-/// One card of a [`CardGrid`] or [`Rail`]: an image, a title, optional text and badge, and the
-/// screen the card opens. Built from a row with [`Card::image`].
+/// One card of a [`CardGrid`] or [`Rail`]: an image, a title, an optional subtitle, text,
+/// badges and progress bar, and the screen the card opens. Built from a row with
+/// [`Card::image`].
+///
+/// ```
+/// use zeyn::prelude::*;
+/// let card = Card::image("/img/course-1.jpg", "Intro to baking")
+///     .subtitle("Six lessons")
+///     .text("12 min left")
+///     .corner(Badge::new("New").tone(Tone::Success))
+///     .badges([Badge::new("Beginner"), Badge::new("Video")])
+///     .progress(0.4, "Watched")
+///     .horizontal();
+/// ```
 pub struct ImageCard {
     image: String,
     title: Text,
+    subtitle: Option<Text>,
     text: Option<Text>,
     alt: Text,
     badge: Option<Badge>,
+    corner: Option<Badge>,
+    badges: Vec<Badge>,
+    progress: Option<(f32, Text)>,
+    horizontal: bool,
     link: Option<(&'static str, Json)>,
 }
 
@@ -69,9 +87,14 @@ impl Card {
         ImageCard {
             image: image.into(),
             title: title.into(),
+            subtitle: None,
             text: None,
             alt: Text::from(""),
             badge: None,
+            corner: None,
+            badges: Vec::new(),
+            progress: None,
+            horizontal: false,
             link: None,
         }
     }
@@ -100,9 +123,44 @@ impl ImageCard {
         self
     }
 
-    /// A badge on the image, such as "New".
+    /// A badge on the image, such as "New", at its starting corner.
     pub fn badge(mut self, badge: Badge) -> Self {
         self.badge = Some(badge);
+        self
+    }
+
+    /// A second line next to the title, such as an author or a category, in a quieter color.
+    pub fn subtitle(mut self, subtitle: impl Into<Text>) -> Self {
+        self.subtitle = Some(subtitle.into());
+        self
+    }
+
+    /// A badge over the image at its ending corner (top right, top left in right to left
+    /// pages), such as a count or a status.
+    pub fn corner(mut self, badge: Badge) -> Self {
+        self.corner = Some(badge);
+        self
+    }
+
+    /// Badges in a row under the text, such as tags. Several calls add to the row.
+    pub fn badges(mut self, badges: impl IntoIterator<Item = Badge>) -> Self {
+        self.badges.extend(badges);
+        self
+    }
+
+    /// A thin progress bar along the bottom of the image, such as how much of a course is done.
+    /// `fraction` runs from 0 to 1 (values outside are clamped, `NaN` is 0); `label` names it for
+    /// screen readers, which also hear the percentage.
+    pub fn progress(mut self, fraction: f32, label: impl Into<Text>) -> Self {
+        let f = if fraction.is_nan() { 0.0 } else { fraction.clamp(0.0, 1.0) };
+        self.progress = Some((f, label.into()));
+        self
+    }
+
+    /// Lays the card out in a row: a small image at the start and the text beside it, for lists
+    /// of compact cards. The card grid or rail gives such cards wider columns.
+    pub fn horizontal(mut self) -> Self {
+        self.horizontal = true;
         self
     }
 
@@ -114,10 +172,7 @@ impl ImageCard {
     }
 
     fn html(&self, out: &mut String, r: &Render, size: (u32, u32)) {
-        let safe = self.image.starts_with('/') && !self.image.starts_with("//")
-            || self.image.starts_with("https://")
-            || self.image.starts_with("data:image/");
-        let img = if safe {
+        let img = if safe_image(&self.image) {
             format!(
                 r#"<img class="z-poster-img" src="{}" alt="{}" width="{}" height="{}" loading="lazy" decoding="async">"#,
                 escape(&self.image),
@@ -129,34 +184,64 @@ impl ImageCard {
             format!(r#"<span class="z-poster-img" style="aspect-ratio:{} / {}"></span>"#, size.0, size.1)
         };
         let badge = self.badge.as_ref().map(|b| b.html(r)).unwrap_or_default();
-        let text = self
-            .text
+        let corner = self
+            .corner
             .as_ref()
-            .map(|t| format!(r#"<span class="z-poster-text">{}</span>"#, r.text(t)))
+            .map(|b| format!(r#"<span class="z-poster-corner">{}</span>"#, b.html(r)))
             .unwrap_or_default();
+        let progress = self
+            .progress
+            .as_ref()
+            .map(|(f, label)| {
+                let pct = (f * 100.0).round() as u32;
+                format!(
+                    r#"<span class="z-poster-progress" role="progressbar" aria-label="{}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{pct}" aria-valuetext="{pct}%"><span class="z-poster-progress-bar" style="--z-progress:{pct}%"></span></span>"#,
+                    r.text(label)
+                )
+            })
+            .unwrap_or_default();
+        let line = |t: &Option<Text>, class: &str| {
+            t.as_ref().map(|t| format!(r#"<span class="{class}">{}</span>"#, r.text(t))).unwrap_or_default()
+        };
+        let subtitle = line(&self.subtitle, "z-poster-subtitle");
+        let text = line(&self.text, "z-poster-text");
+        let badges = if self.badges.is_empty() {
+            String::new()
+        } else {
+            let all: String = self.badges.iter().map(|b| b.html(r)).collect();
+            format!(r#"<span class="z-poster-badges">{all}</span>"#)
+        };
         let body = format!(
-            r#"<span class="z-poster-media">{img}{badge}</span><span class="z-poster-body"><span class="z-poster-title">{}</span>{text}</span>"#,
+            r#"<span class="z-poster-media">{img}{badge}{corner}{progress}</span><span class="z-poster-body"><span class="z-poster-title">{}</span>{subtitle}{text}{badges}</span>"#,
             r.text(&self.title)
         );
+        let class = if self.horizontal { "z-poster z-poster-h" } else { "z-poster" };
         match &self.link {
             Some((screen, params)) => {
                 let query =
                     if params.is_null() { String::new() } else { format!("?params={}", encode(&params.to_string())) };
                 out.push_str(&format!(
-                    r#"<li class="z-poster"><a class="z-poster-link" href="/_zeyn/route/{screen}{query}" data-zeyn-base-href>{body}</a></li>"#
+                    r#"<li class="{class}"><a class="z-poster-link" href="/_zeyn/route/{screen}{query}" data-zeyn-base-href>{body}</a></li>"#
                 ));
             }
-            None => out.push_str(&format!(r#"<li class="z-poster"><div class="z-poster-link">{body}</div></li>"#)),
+            None => out.push_str(&format!(r#"<li class="{class}"><div class="z-poster-link">{body}</div></li>"#)),
         }
     }
 }
 
+/// Whether an image address may go in a card or list row: a path of the app, an `https:`
+/// address or a `data:image/` URI.
+pub(crate) fn safe_image(src: &str) -> bool {
+    src.starts_with('/') && !src.starts_with("//") || src.starts_with("https://") || src.starts_with("data:image/")
+}
+
 type CardFn<E> = Box<dyn Fn(&E) -> ImageCard + Send + Sync>;
+type ItemFn<E> = Box<dyn Fn(&E) -> ListItem + Send + Sync>;
 
 /// Turns away rows of a model with `#[mask]` fields the user may not reveal. Cards and
 /// suggestions are built by app closures that see the raw row, so they could not keep a masked
 /// value masked.
-fn check_masks<E: Model>(ctx: &Ctx) -> Result<()> {
+pub(crate) fn check_masks<E: Model>(ctx: &Ctx) -> Result<()> {
     if E::fields().iter().any(|f| !crate::privacy::can_unmask(Some(ctx), f)) { Err(Error::Forbidden) } else { Ok(()) }
 }
 
@@ -182,12 +267,14 @@ pub struct CardGrid<E: Model> {
     action: ActionMeta,
     fetch: FetchFn<E>,
     card: Option<CardFn<E>>,
+    item: Option<ItemFn<E>>,
     title: Option<Text>,
     paging: Paging,
     sorts: Vec<(Text, Sort)>,
     search: String,
     image: (u32, u32),
     rail: bool,
+    list: bool,
 }
 
 /// A horizontal list of cards that scrolls sideways, with previous and next buttons and scroll
@@ -227,13 +314,29 @@ impl<E: Model> CardGrid<E> {
             action: A::META,
             fetch: fetch_via::<A, E>,
             card: None,
+            item: None,
             title: None,
             paging: Paging::infinite(24),
             sorts: Vec::new(),
             search: String::new(),
             image: (300, 400),
             rail: false,
+            list: false,
         }
+    }
+
+    /// Lays the rows out as a [`super::List`]: see [`super::List::of`].
+    pub(crate) fn as_list(mut self) -> Self {
+        self.list = true;
+        self.paging = Paging::infinite(20);
+        self
+    }
+
+    /// How a row becomes a list row, for a list made with [`super::List::of`]. Card grids and
+    /// rails use [`CardGrid::card`] instead.
+    pub fn item(mut self, build: impl Fn(&E) -> ListItem + Send + Sync + 'static) -> Self {
+        self.item = Some(Box::new(build));
+        self
     }
 
     /// How a row becomes a card.
@@ -314,10 +417,11 @@ impl<E: Model> CardGrid<E> {
 
     fn cards(&self, page: &LoadedPage, r: &Render) -> String {
         let mut out = String::new();
-        if let (Some(rows), Some(card)) = (page.items.downcast_ref::<Vec<E>>(), &self.card) {
-            for row in rows {
-                card(row).html(&mut out, r, self.image);
-            }
+        let Some(rows) = page.items.downcast_ref::<Vec<E>>() else { return out };
+        match (&self.card, &self.item) {
+            (_, Some(item)) if self.list => rows.iter().for_each(|row| item(row).html(&mut out, r)),
+            (Some(card), _) if !self.list => rows.iter().for_each(|row| card(row).html(&mut out, r, self.image)),
+            _ => {}
         }
         out
     }
@@ -325,7 +429,11 @@ impl<E: Model> CardGrid<E> {
     fn render_with(&self, out: &mut String, r: &Render, page: Option<&LoadedPage>) {
         let id = dom_id(r, "cards");
         let t = |key: &str| r.text(&Text::key(format!("zeyn.ui.cards.{key}")));
-        let class = if self.rail { "z-rail" } else { "z-cards" };
+        let class = match (self.rail, self.list) {
+            (true, _) => "z-rail",
+            (_, true) => "z-cards z-cards-rows",
+            _ => "z-cards",
+        };
         let labelled = if self.title.is_some() { format!(r#" aria-labelledby="{id}-title""#) } else { String::new() };
         out.push_str(&format!(
             r#"<section class="{class}" data-zeyn-cards data-zeyn-paging="{}" data-testid="{}.cards"{labelled} data-text-loaded="{}" data-text-page="{}" data-text-error="{}""#,
@@ -380,7 +488,11 @@ impl<E: Model> CardGrid<E> {
         } else if !title.is_empty() || !sorts.is_empty() {
             out.push_str(&format!(r#"<div class="z-cards-head">{title}{sorts}</div>"#));
         }
-        let list = if self.rail { "z-rail-list" } else { "z-cards-list" };
+        let list = match (self.rail, self.list) {
+            (true, _) => "z-rail-list",
+            (_, true) => "z-list",
+            _ => "z-cards-list",
+        };
         out.push_str(&format!(r#"<ul class="{list}" id="{id}-list" data-zeyn-rows>"#));
         if let Some(p) = page {
             out.push_str(&self.cards(p, r));
@@ -502,7 +614,7 @@ impl<E: Model> Component for CardGrid<E> {
 
     fn schema(&self) -> Json {
         json!({
-            "type": if self.rail { "rail" } else { "card_grid" },
+            "type": if self.rail { "rail" } else if self.list { "list" } else { "card_grid" },
             "model": E::NAME,
             "action": self.action,
             "title": self.title,

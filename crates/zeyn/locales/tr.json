@@ -451,7 +451,7 @@
         "down": "Önceki döneme göre yüzde {pct} düşüş",
         "flat": "Önceki döneme göre değişiklik yok",
         "target": "Hedef {target}, yüzde {pct} ulaşıldı"
-},
+      },
       "password": {
         "show": "Parolayı göster",
         "weak": "Güç: zayıf",
@@ -474,6 +474,29 @@
       },
       "toast": {
         "dismiss": "Kapat"
+      },
+      "prevnext": {
+        "label": "Önceki ve sonraki",
+        "previous": "Önceki",
+        "next": "Sonraki"
+      },
+      "alpha": {
+        "label": "Harfe göre gözat",
+        "other": "Diğer karakterler"
+      },
+      "week": {
+        "label": "Hafta",
+        "today": "Bugün",
+        "empty": "Plan yok",
+        "days": {
+          "1": "Pazartesi",
+          "2": "Salı",
+          "3": "Çarşamba",
+          "4": "Perşembe",
+          "5": "Cuma",
+          "6": "Cumartesi",
+          "7": "Pazar"
+        }
       }
     },
     "date": {

@@ -243,10 +243,10 @@ pub mod prelude {
     #[cfg(feature = "markdown")]
     pub use crate::ui::Markdown;
     pub use crate::ui::{
-        ActionButton, Alert, Audio, Badge, Breadcrumb, Busy, Card, CardGrid, Chart, Control, DateOptions,
-        DescriptionList, Dock, Embed, EmbedPermission, EmptyState, ExternalLink, Image, Kpi, LookupItem, LookupQuery,
-        MenuBar, MenuButton, Panel, Popover, Progress, PropertyInspector, Rail, Row, SearchBox, SearchParams, Skeleton,
-        Split, Stack, StatusBar, Tabs, Timeline, Toolbox, Tree, TreeItem, TreeQuery, Video,
+        ActionButton, Alert, AlphaIndex, Audio, AutoGrid, Avatar, Badge, Breadcrumb, Busy, Card, CardGrid, Chart, Control, DateOptions,
+        DescriptionList, Dock, Embed, EmbedPermission, EmptyState, ExternalLink, Heading, Image, Kpi, List, LookupItem, LookupQuery,
+        MenuBar, MenuButton, MetaLine, Panel, Paragraph, Popover, PrevNext, Progress, PropertyInspector, Rail, Row, SearchBox, SearchParams, Skeleton, Spoiler,
+        Split, Stack, StatusBar, Tabs, Timeline, Toolbox, Tree, TreeItem, TreeQuery, Video, WeekSchedule,
     };
     pub use crate::{
         Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime, Decimal, Effect,
