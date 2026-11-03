@@ -8,9 +8,10 @@ COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/src/target \
-    cargo build --release -p zeyn-example-docs -p zeyn-example-showcase \
+    cargo build --release -p zeyn-example-docs -p zeyn-example-showcase -p zeyn-example-components \
     && mkdir -p /out \
-    && cp target/release/zeyn-example-docs target/release/zeyn-example-showcase /out/
+    && cp target/release/zeyn-example-docs target/release/zeyn-example-showcase \
+       target/release/zeyn-example-components /out/
 
 FROM gcr.io/distroless/cc-debian12:nonroot AS docs
 COPY --from=build /out/zeyn-example-docs /app/docs
