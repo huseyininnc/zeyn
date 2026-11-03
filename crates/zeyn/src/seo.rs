@@ -156,11 +156,64 @@ impl Head {
             ));
         }
         if let Some(data) = &self.json_ld {
+            let mut data = data.clone();
+            ld_urls(&mut data, site, prefix);
             out.push_str(r#"<script type="application/ld+json" data-zeyn-head>"#);
-            out.push_str(&json_ld(data));
+            out.push_str(&json_ld(&data));
             out.push_str("</script>");
         }
         out
+    }
+}
+
+/// JSON-LD properties whose values are addresses.
+const LD_URL_KEYS: &[&str] = &[
+    "url",
+    "@id",
+    "image",
+    "logo",
+    "item",
+    "sameAs",
+    "contentUrl",
+    "embedUrl",
+    "thumbnailUrl",
+    "mainEntityOfPage",
+    "target",
+];
+
+/// Writes app paths (`/items/x`) in address properties of JSON-LD behind the site URL and the
+/// base path, at any depth, as search engines expect absolute URLs there. Other values and
+/// `https` URLs stay as they are.
+fn ld_urls(v: &mut serde_json::Value, site: &str, prefix: &str) {
+    use serde_json::Value;
+    match v {
+        Value::Object(map) => {
+            for (k, v) in map.iter_mut() {
+                if LD_URL_KEYS.contains(&k.as_str()) {
+                    ld_url(v, site, prefix);
+                } else {
+                    ld_urls(v, site, prefix);
+                }
+            }
+        }
+        Value::Array(items) => items
+            .iter_mut()
+            .for_each(|v| ld_urls(v, site, prefix)),
+        _ => {}
+    }
+}
+
+fn ld_url(v: &mut serde_json::Value, site: &str, prefix: &str) {
+    use serde_json::Value;
+    match v {
+        Value::String(s) if s.starts_with('/') && !s.starts_with("//") => {
+            *s = absolute(s, site, prefix);
+        }
+        Value::Array(items) => items
+            .iter_mut()
+            .for_each(|v| ld_url(v, site, prefix)),
+        Value::Object(_) => ld_urls(v, site, prefix),
+        _ => {}
     }
 }
 

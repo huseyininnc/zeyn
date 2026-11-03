@@ -72,7 +72,9 @@ pub fn pricing() -> Screen {
 
 Every value is escaped. JSON-LD is written with `<`, `>` and `&` as `\u003c`, `\u003e` and `\u0026`,
 so a value holding `</script>` cannot end the element; the browser never runs it, and the content
-security policy stays as strict as on every other page.
+security policy stays as strict as on every other page. App paths in address properties of
+JSON-LD (`url`, `@id`, `image`, `logo`, `item` and the like) are written absolute with
+`App::site_url`, at any depth, as search engines expect.
 
 URLs must be `https` URLs or app paths starting with `/`. Anything else (`http:`, `//host`,
 `javascript:`, spaces, quotes) is left out with a warning in the log. App paths are written behind

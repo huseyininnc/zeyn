@@ -418,7 +418,15 @@ pub fn pricing() -> Screen {
         .canonical("/pricing")
         .og_image("https://cdn.example/pricing.png")
         .robots(Robots::Index)
-        .json_ld(serde_json::json!({ "@type": "Product", "name": "</script><script>alert(1)</script> & co" }))
+        .json_ld(serde_json::json!({
+            "@type": "Product",
+            "name": "</script><script>alert(1)</script> & co",
+            "url": "/pricing",
+            "image": ["/img/a.png", "https://cdn.example/b.png"],
+            "offers": { "seller": { "@id": "/about#org" } },
+            "sameAs": "//evil.example/x",
+            "description": "/not-a-url",
+        }))
 }
 
 #[screen(route = "/bad-head", public)]
@@ -498,6 +506,21 @@ async fn head_tags_are_escaped_and_json_ld_cannot_end_its_script() {
     );
     let data: serde_json::Value = serde_json::from_str(json).unwrap();
     assert_eq!(data["name"], "</script><script>alert(1)</script> & co");
+    assert_eq!(data["url"], "https://shop.example/pricing");
+    assert_eq!(data["image"][0], "https://shop.example/img/a.png");
+    assert_eq!(data["image"][1], "https://cdn.example/b.png");
+    assert_eq!(
+        data["offers"]["seller"]["@id"],
+        "https://shop.example/about#org"
+    );
+    assert_eq!(
+        data["sameAs"], "//evil.example/x",
+        "protocol relative values are left alone"
+    );
+    assert_eq!(
+        data["description"], "/not-a-url",
+        "only address properties change"
+    );
     assert_eq!(
         r.body.matches("<script>").count(),
         0,

@@ -59,7 +59,7 @@ pub fn pricing() -> Screen {
 | `.robots(Robots::Index)` 或 `Robots::NoIndex` | `<meta name="robots">` |
 | `.json_ld(value)` | `<script type="application/ld+json">` |
 
-每个值都会被转义。JSON-LD 中的 `<`、`>` 和 `&` 分别写成 `<`、`>` 和 `&`，因此包含 `</script>` 的值无法结束该元素；浏览器永远不会运行它，内容安全策略与其他页面一样严格。
+每个值都会被转义。JSON-LD 中的 `<`、`>` 和 `&` 分别写成 `<`、`>` 和 `&`，因此包含 `</script>` 的值无法结束该元素；浏览器永远不会运行它，内容安全策略与其他页面一样严格。JSON-LD 地址属性（`url`、`@id`、`image`、`logo`、`item` 等）中的应用路径，无论层级多深，都会按搜索引擎的要求用 `App::site_url` 写成绝对地址。
 
 URL 必须是 `https` URL，或以 `/` 开头的应用路径。其他任何形式（`http:`、`//host`、`javascript:`、空格、引号）都会被省略，并在日志中给出警告。应用路径会写在站点 URL 和基础路径之后：
 

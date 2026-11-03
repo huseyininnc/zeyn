@@ -7,7 +7,7 @@
 
 use super::layout::Card;
 use super::list::ListItem;
-use super::widgets::{Badge, encode};
+use super::widgets::{Badge, screen_href};
 use super::{DataSource, dom_id};
 use crate::action::{ActionMeta, Cursor, DataQuery, Error, Page, PageRequest, Result, Sort};
 use crate::ctx::{BoxFuture, Ctx};
@@ -162,8 +162,10 @@ impl ImageCard {
         self
     }
 
-    /// The screen the card opens. The whole card is one link, loaded without a page reload.
-    /// Params of the wrong type do not compile.
+    /// The screen the card opens. The whole card is one link, loaded without a page reload. The
+    /// link is the screen's canonical address when it has a route (`/items/{slug}`), so search
+    /// engines and visitors without JavaScript follow it directly. Params of the wrong type do
+    /// not compile.
     pub fn link<S: ScreenDef>(mut self, _screen: S, params: S::Params) -> Self {
         self.link = Some((
             S::META.name,
@@ -249,17 +251,11 @@ impl ImageCard {
             "z-poster"
         };
         match &self.link {
-            Some((screen, params)) => {
-                let query = if params.is_null() {
-                    String::new()
-                } else {
-                    format!("?params={}", encode(&params.to_string()))
-                };
-                out.push_str(&format!(
-                    r#"<li class="{class}"><a class="z-poster-link" href="/_zeyn/route/{screen}{query}" data-zeyn-base-href{}>{body}</a></li>"#,
-                    super::preview::preview_attr(&self.preview)
-                ));
-            }
+            Some((screen, params)) => out.push_str(&format!(
+                r#"<li class="{class}"><a class="z-poster-link" href="{}" data-zeyn-base-href{}>{body}</a></li>"#,
+                screen_href(r, screen, params),
+                super::preview::preview_attr(&self.preview)
+            )),
             None => out.push_str(&format!(
                 r#"<li class="{class}"><div class="z-poster-link">{body}</div></li>"#
             )),

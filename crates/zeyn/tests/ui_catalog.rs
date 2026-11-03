@@ -117,6 +117,17 @@ pub fn results(p: SearchParams) -> Screen {
         )
 }
 
+#[params]
+pub struct GoodParams {
+    pub id: i64,
+}
+
+/// A screen with a path route, so card links to it are canonical paths.
+#[screen(route = "/goods/{id}", public)]
+pub fn good_page(p: GoodParams) -> Screen {
+    Screen::new(format!("Good {}", p.id))
+}
+
 #[screen(route = "/picks", public)]
 pub fn picks() -> Screen {
     Screen::new("Picks").body(
@@ -128,6 +139,7 @@ pub fn picks() -> Screen {
                     .badges([Badge::new("Tag a"), Badge::new("Tag b")])
                     .progress(g.price as f32 / 100.0, "Sold")
                     .horizontal()
+                    .link(good_page, GoodParams { id: g.id.0 })
             })
             .scrollbar(true)
             .paging(Paging::infinite(2)),
@@ -181,6 +193,7 @@ fn app(limit: Option<RateLimit>) -> axum::Router {
                 .screen(shop)
                 .screen(results)
                 .screen(picks)
+                .screen(good_page)
                 .screen(goods_list),
         );
     if let Some(l) = limit {
@@ -240,7 +253,7 @@ async fn card_grids_render_their_first_page_as_linked_lazy_images() {
     assert!(page.contains(
         r#"<img class="z-poster-img" src="/img/1.png" alt="" width="300" height="400" loading="lazy" decoding="async" draggable="false">"#
     ));
-    assert!(page.contains(r#"<a class="z-poster-link" href="/_zeyn/route/results?params="#));
+    assert!(page.contains(r#"<a class="z-poster-link" href="/results?params="#));
     assert!(page.contains(r#"<span class="z-badge z-tone-neutral">New</span>"#));
     assert!(page.contains("Black &lt;tea&gt;"), "row text is escaped");
     assert_eq!(
@@ -520,6 +533,15 @@ async fn rails_hide_their_scrollbar_unless_kept_and_drag_only_with_a_mouse() {
         "touch and pen keep native scrolling"
     );
     assert!(js.contains("const DRAG_PX = 5;"));
+    assert!(
+        js.contains("if (scrolled && entry.isIntersecting)"),
+        "more cards load by themselves only after the user scrolled, so the first page does not shift"
+    );
+    let shell = asset("/_zeyn/zeyn.css").await;
+    assert!(
+        shell.contains("@media (max-width: 800px) and (scripting: enabled)"),
+        "on phones the app menu starts folded, so the page does not jump when the script folds it"
+    );
 }
 
 #[tokio::test]
@@ -552,6 +574,43 @@ async fn image_cards_lay_out_in_a_row_with_subtitle_corner_badges_and_progress()
         "each row has its own fraction"
     );
     assert!(page.contains("--z-progress:10%"));
+}
+
+#[tokio::test]
+async fn rails_render_their_first_page_on_the_server_with_canonical_links() {
+    let router = app(None);
+    let (status, page) = send(&router, get("/picks")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        page.contains(r#"<a class="z-poster-link" href="/goods/1" data-zeyn-base-href>"#),
+        "a path route is linked directly, not through /_zeyn/route: {page}"
+    );
+    assert!(!page.contains("/_zeyn/route/good_page"));
+    assert!(page.contains(r#"data-zeyn-count="2" data-zeyn-size="2""#));
+    let again = send(&router, get("/picks")).await.1;
+    let main =
+        |html: &str| html[html.find("<main").unwrap()..html.find("</main>").unwrap()].to_string();
+    assert!(
+        main(&page) == main(&again),
+        "the cards are the same HTML for every visitor, so a public page can be cached"
+    );
+    let (status, more) = send(
+        &router,
+        post(
+            "/_zeyn/grid",
+            "shop.read",
+            serde_json::json!({ "screen": "picks", "params": null, "node": "0", "query": { "page": { "type": "after", "cursor": "2", "limit": 99 } } }),
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{more}");
+    assert!(
+        more.contains(r#"href=\"/goods/3\""#),
+        "later pages from the client use the same links: {more}"
+    );
+    let (status, opened) = send(&router, get("/goods/3")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(opened.contains("Good 3"));
 }
 
 #[tokio::test]

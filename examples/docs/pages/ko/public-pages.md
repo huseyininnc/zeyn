@@ -59,7 +59,7 @@ pub fn pricing() -> Screen {
 | `.robots(Robots::Index)` 또는 `Robots::NoIndex` | `<meta name="robots">` |
 | `.json_ld(value)` | `<script type="application/ld+json">` |
 
-모든 값은 이스케이프됩니다. JSON-LD는 `<`, `>`, `&`를 `<`, `>`, `&`으로 써서 기록하므로, `</script>`를 담은 값이 요소를 끝낼 수 없습니다. 브라우저는 이를 실행하지 않으며 콘텐츠 보안 정책은 다른 모든 페이지만큼 엄격하게 유지됩니다.
+모든 값은 이스케이프됩니다. JSON-LD는 `<`, `>`, `&`를 `<`, `>`, `&`으로 써서 기록하므로, `</script>`를 담은 값이 요소를 끝낼 수 없습니다. 브라우저는 이를 실행하지 않으며 콘텐츠 보안 정책은 다른 모든 페이지만큼 엄격하게 유지됩니다. JSON-LD의 주소 속성(`url`, `@id`, `image`, `logo`, `item` 등)에 있는 앱 경로는 깊이와 관계없이 검색 엔진이 기대하는 대로 `App::site_url`을 붙인 절대 주소로 기록됩니다.
 
 URL은 `https` URL이거나 `/`로 시작하는 앱 경로여야 합니다. 그 밖의 것(`http:`, `//host`, `javascript:`, 공백, 따옴표)은 로그에 경고를 남기고 제외됩니다. 앱 경로는 사이트 URL과 기본 경로 뒤에 기록됩니다.
 

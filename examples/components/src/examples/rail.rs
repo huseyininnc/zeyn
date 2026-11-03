@@ -1,13 +1,18 @@
 //! Rail examples: a row of cards that scrolls sideways.
 
 use crate::data::{Product, search_products};
+use crate::examples::image_card::{ProductParams, product};
 use crate::{Entry, ex};
 use zeyn::prelude::*;
 
 pub fn overview(_ctx: &Ctx) -> Node {
     Rail::of(search_products)
         .title("New arrivals")
-        .card(|p: &Product| Card::image(p.image.clone(), p.name.clone()).text(p.price.to_string()))
+        .card(|p: &Product| {
+            Card::image(p.image.clone(), p.name.clone())
+                .text(p.price.to_string())
+                .link(product, ProductParams { id: p.id.0 })
+        })
         .image_size(300, 300)
         .into()
 }

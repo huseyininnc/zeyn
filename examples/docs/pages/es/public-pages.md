@@ -72,7 +72,7 @@ pub fn pricing() -> Screen {
 
 Todos los valores se escapan. JSON-LD se escribe con `<`, `>` y `&` como `<`, `>` y `&`,
 de modo que un valor que contenga `</script>` no pueda terminar el elemento; el navegador nunca lo ejecuta y la política
-de seguridad de contenido sigue siendo tan estricta como en cualquier otra página.
+de seguridad de contenido sigue siendo tan estricta como en cualquier otra página. Las rutas de la aplicación en propiedades de dirección de JSON-LD (`url`, `@id`, `image`, `logo`, `item` y similares) se escriben absolutas con `App::site_url`, a cualquier profundidad, como esperan los buscadores.
 
 Las URL deben ser URL `https` o rutas de la aplicación que empiecen por `/`. Cualquier otra cosa (`http:`, `//host`,
 `javascript:`, espacios, comillas) se omite con una advertencia en el registro. Las rutas de la aplicación se escriben detrás

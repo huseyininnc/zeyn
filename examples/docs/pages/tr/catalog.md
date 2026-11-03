@@ -37,6 +37,7 @@ Card::image(c.cover.clone(), c.title.clone())
     .progress(c.done, t!("courses.done"))
     .horizontal()
 ```
+- **İlk sayfa sunucuda.** İlk sayfa (kart ızgarasında 24, şeritte 12 kart ya da `paging` ile verilen boyut) sayfanın HTML'inin parçasıdır; arama motorları ve JavaScript'i olmayan ziyaretçiler kartları ve bağlantılarını görür, görseller boyutlarını taşıdığı için yüklenirken hiçbir şey kaymaz. Sonraki sayfalar tarayıcıdan gelir. Public bir sayfa her ziyaretçi için aynı HTML'dir, bu yüzden önbelleğe alınabilir. Route'u olan bir ekrana bağlanan kart, yönlendirmeye değil o ekranın kanonik adresine (`/items/{slug}`) bağlanır.
 - **Sayfalama.** `Paging::infinite(n)` (varsayılan, 24) ekranda göründüğünde de tetiklenen bir "Show more" düğmesi gösterir; düğmeye basıldığında odak ilk yeni karta geçer. `Paging::pages(n)` önceki ve sonraki düğmelerini ve sayfa numarasını gösterir. Sayfa boyutunu sunucu belirler; istemci yalnızca nereden devam edileceğini söyler.
 - **Sıralama.** Her `sort_option`, kullanıcıların bir seçim listesinden seçebileceği bir sıradır; ilki kartların başladığı sıradır. Sunucu yalnızca bu sıraları kabul eder ve istemcinin gönderdiği süzgeçleri ve arama metnini atar.
 - **Arama.** `.search(text)` yalnızca serbest metinle eşleşen satırları gösterir ([`DataQuery::q`](#free-text)); örneğin bir sonuç screen'inin metni.

@@ -59,7 +59,7 @@ pub fn pricing() -> Screen {
 | `.robots(Robots::Index)` veya `Robots::NoIndex` | `<meta name="robots">` |
 | `.json_ld(value)` | `<script type="application/ld+json">` |
 
-Her değer kaçışlanır. JSON-LD, `<`, `>` ve `&` karakterleri `<`, `>` ve `&` olarak yazılarak üretilir; böylece `</script>` içeren bir değer öğeyi bitiremez, tarayıcı onu asla çalıştırmaz ve content security policy diğer her sayfadaki kadar katı kalır.
+Her değer kaçışlanır. JSON-LD, `<`, `>` ve `&` karakterleri `<`, `>` ve `&` olarak yazılarak üretilir; böylece `</script>` içeren bir değer öğeyi bitiremez, tarayıcı onu asla çalıştırmaz ve content security policy diğer her sayfadaki kadar katı kalır. JSON-LD'nin adres özelliklerindeki (`url`, `@id`, `image`, `logo`, `item` ve benzerleri) uygulama yolları, arama motorlarının beklediği gibi her derinlikte `App::site_url` ile mutlak yazılır.
 
 URL'ler `https` URL'leri ya da `/` ile başlayan uygulama yolları olmalıdır. Bunun dışındaki her şey (`http:`, `//host`, `javascript:`, boşluklar, tırnaklar) günlükte bir uyarıyla dışarıda bırakılır. Uygulama yolları, site URL'sinin ve taban yolun arkasına yazılır:
 

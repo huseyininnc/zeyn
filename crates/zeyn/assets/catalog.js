@@ -218,16 +218,35 @@ function railDrag(list) {
   });
 }
 
+/** Whether the user scrolled the page; more cards load by themselves only after that. */
+let scrolled = false;
+
 const watcher = 'IntersectionObserver' in window
   ? new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          if (entry.isIntersecting) load(entry.target.closest('[data-zeyn-cards]'), 'more', false);
+          if (scrolled && entry.isIntersecting) load(entry.target.closest('[data-zeyn-cards]'), 'more', false);
         }
       },
       { rootMargin: '400px 0px' },
     )
   : null;
+
+/**
+ * The first scroll looks at every "Show more" button again. Loading cards while the page is
+ * still being read would move the content under them, a layout shift the user did not cause.
+ */
+document.addEventListener(
+  'scroll',
+  () => {
+    scrolled = true;
+    for (const more of document.querySelectorAll('[data-zeyn-cards-more]')) {
+      watcher?.unobserve(more);
+      watcher?.observe(more);
+    }
+  },
+  { passive: true, once: true, capture: true },
+);
 
 /** Sets up the card grids and rails inside `root`. */
 function initCards(root) {

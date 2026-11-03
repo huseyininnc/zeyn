@@ -37,6 +37,7 @@ Card::image(c.cover.clone(), c.title.clone())
     .progress(c.done, t!("courses.done"))
     .horizontal()
 ```
+- **First page on the server.** The first page (24 cards in a card grid, 12 in a rail, or the size given to `paging`) is part of the page's HTML, so search engines and visitors without JavaScript see the cards and their links, and the images carry their size so nothing moves while they load. Later pages come from the browser. A public page stays the same HTML for every visitor, so it can be cached. A card linked to a screen with a route links to its canonical address (`/items/{slug}`), never to a redirect.
 - **Paging.** `Paging::infinite(n)` (the default, 24) shows a "Show more" button that also fires when it scrolls into view; focus moves to the first new card when the button is pressed. `Paging::pages(n)` shows previous and next buttons and the page number. The server sets the page size; the client only says where to continue.
 - **Sorting.** Each `sort_option` is an order users can pick from a select; the first is the order the cards start in. The server accepts only these orders, and drops filters and search text sent by the client.
 - **Search.** `.search(text)` shows only rows that match the free text ([`DataQuery::q`](#free-text)), such as the text of a results screen.

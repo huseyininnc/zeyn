@@ -37,6 +37,7 @@ Card::image(c.cover.clone(), c.title.clone())
     .progress(c.done, t!("courses.done"))
     .horizontal()
 ```
+- **Primera página en el servidor.** La primera página (24 tarjetas en una cuadrícula, 12 en un rail, o el tamaño indicado en `paging`) forma parte del HTML de la página, así que los buscadores y los visitantes sin JavaScript ven las tarjetas y sus enlaces, y las imágenes llevan su tamaño para que nada se mueva al cargarse. Las páginas siguientes llegan desde el navegador. Una página pública es el mismo HTML para todos los visitantes, así que puede almacenarse en caché. Una tarjeta enlazada a una screen con ruta enlaza a su dirección canónica (`/items/{slug}`), nunca a una redirección.
 - **Paginación.** `Paging::infinite(n)` (el valor por defecto, 24) muestra un botón "Show more" que también se activa cuando entra en la vista al desplazarse; el foco pasa a la primera tarjeta nueva cuando se pulsa el botón. `Paging::pages(n)` muestra los botones anterior y siguiente y el número de página. El servidor fija el tamaño de página; el cliente solo indica dónde continuar.
 - **Ordenación.** Cada `sort_option` es un orden que los usuarios pueden elegir en un select; el primero es el orden con el que empiezan las tarjetas. El servidor acepta solo estos órdenes y descarta los filtros y el texto de búsqueda que envíe el cliente.
 - **Búsqueda.** `.search(text)` muestra solo las filas que coinciden con el texto libre ([`DataQuery::q`](#free-text)), como el texto de una pantalla de resultados.

@@ -28,6 +28,7 @@
 
 .z-cards-sort {
   display: flex;
+  min-height: 32px;
   align-items: center;
   gap: 8px;
   font-size: var(--z-font-size-sm);
@@ -66,6 +67,7 @@
 .z-rail-list > .z-poster { scroll-snap-align: start; }
 
 .z-rail:not([data-zeyn-ready]) .z-rail-nav { visibility: hidden; }
+
 
 @media (pointer: fine) {
   .z-rail[data-zeyn-ready] .z-rail-list,

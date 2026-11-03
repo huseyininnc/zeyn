@@ -391,6 +391,12 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; direction: ltr; u
   .z-main { padding: 16px; }
 }
 
+/* With scripting on, the menu starts folded so the page does not jump when nav.js folds it. */
+@media (max-width: 800px) and (scripting: enabled) {
+  .z-nav-toggle[data-zeyn-nav-toggle] { display: inline-flex; }
+  .z-nav-body:not([data-open]) { display: none; }
+}
+
 @media (max-width: 800px) and (prefers-reduced-motion: no-preference) {
   .z-nav-burger,
   .z-nav-burger::before,
