@@ -413,7 +413,11 @@ pub(super) fn is_asset(path: &str) -> bool {
 pub(super) fn head(st: &AppState, screen: &str, page: &mut String) {
     if st.realtime.is_some() && screen.contains(MARKER) {
         let tag =
-            format!(r#"<script type="module" src="{}{LOADER}"></script></head>"#, crate::render::escape(&st.prefix));
+            format!(
+                r#"<script type="module" src="{}{LOADER}{}"></script></head>"#,
+                crate::render::escape(&st.prefix),
+                super::ops::asset_version()
+            );
         *page = page.replacen("</head>", &tag, 1);
     }
 }

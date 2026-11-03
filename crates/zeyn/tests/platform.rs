@@ -461,7 +461,7 @@ async fn apps_can_live_under_a_base_path() {
     let (status, h, body) = get(&mounted, "/inventory/sales/pos", &[]).await;
     assert_eq!(status, StatusCode::OK);
     assert!(body.contains(r#"<meta name="zeyn-base" content="/inventory">"#));
-    assert!(body.contains(r#"href="/inventory/_zeyn/zeyn.css""#));
+    assert!(body.contains(r#"href="/inventory/_zeyn/zeyn.css?v="#));
     assert!(body.contains(r#"<a href="/inventory/sales/pos" aria-current="page">"#));
     assert!(h.get(header::SET_COOKIE).is_none(), "a public screen sets no cookie for a visitor");
     let (_, h, _) = get(&mounted, "/inventory/_zeyn/csrf", &[]).await;
@@ -484,8 +484,13 @@ async fn themes_are_served_as_a_stylesheet_and_reject_css_injection() {
         .unwrap();
     let (_, _, page) = get(&r, "/pos", &[]).await;
     assert!(page.contains(r#"<html lang="en" data-theme="dark" data-density="compact">"#));
-    assert!(page.contains(r#"<link rel="stylesheet" href="/_zeyn/theme.css">"#));
+    assert!(page.contains(r#"<link rel="stylesheet" href="/_zeyn/theme.css?v="#));
+    let at = page.find(r#"href="/_zeyn/theme.css?v="#).unwrap() + 6;
+    let versioned = page[at..].split('"').next().unwrap().to_string();
+    let immutable = get(&r, &versioned, &[]).await.1;
+    assert_eq!(immutable.get(header::CACHE_CONTROL).unwrap(), "public, max-age=31536000, immutable");
     let (_, h, css) = get(&r, "/_zeyn/theme.css", &[]).await;
+    assert_eq!(h.get(header::CACHE_CONTROL).unwrap(), "no-cache");
     assert_eq!(h.get(header::CONTENT_TYPE).unwrap(), "text/css; charset=utf-8");
     assert_eq!(css.trim(), ":root{--z-brand:#7a2448;--z-font:Inter, system-ui;--z-radius:12px;}");
 

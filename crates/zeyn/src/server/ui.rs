@@ -33,8 +33,9 @@ pub(super) const ASSETS: [&str; 4] =
 /// Links placed in the page head after the runtime's own. The catalog script (card grids, rails,
 /// search boxes) is not among them: components.js loads it when a page first holds one.
 pub(super) fn head(base: &str) -> String {
+    let v = super::ops::asset_version();
     format!(
-        r#"<link rel="stylesheet" href="{base}/_zeyn/components.css"><script type="module" src="{base}/_zeyn/components.js"></script><link rel="stylesheet" href="{base}/_zeyn/catalog.css">"#
+        r#"<link rel="stylesheet" href="{base}/_zeyn/components.css{v}"><script type="module" src="{base}/_zeyn/components.js{v}"></script><link rel="stylesheet" href="{base}/_zeyn/catalog.css{v}">"#
     )
 }
 

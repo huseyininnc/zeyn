@@ -10,6 +10,8 @@
  */
 
 const BASE = (document.querySelector('meta[name="zeyn-base"]')?.content ?? '').replace(/\/$/, '');
+/** The `?v=` build query this script was loaded with, for the modules it imports later. */
+const VERSION = new URL(import.meta.url).search;
 const LOOKUP_DELAY_MS = 250;
 
 /** Returns the CSRF token of the page, or asks `zeyn.js` for one when the page came without it. */
@@ -2147,7 +2149,7 @@ new MutationObserver((records) => {
 
 /** Loads the catalog runtime (card grids, rails, search boxes) the first time a page holds one. */
 function initCatalog(root) {
-  if (root.querySelector('[data-zeyn-cards], [data-zeyn-searchbox]')) import(`${BASE}/_zeyn/catalog.js`);
+  if (root.querySelector('[data-zeyn-cards], [data-zeyn-searchbox]')) import(`${BASE}/_zeyn/catalog.js${VERSION}`);
 }
 
 /** Initializers run for every root that gets new content. */

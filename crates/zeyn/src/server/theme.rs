@@ -404,6 +404,12 @@ impl App {
         };
         let locked = choices.len() == 1;
         Look {
+            version: format!("{:016x}", {
+                use std::hash::Hasher;
+                let mut h = std::hash::DefaultHasher::new();
+                h.write(css.as_bytes());
+                h.finish()
+            }),
             css: css.into(),
             picker: self.looks.picker && !locked && choices.len() > 1,
             system,
@@ -429,6 +435,8 @@ pub(super) struct Choice {
 /// The themes of a running app: the stylesheet, built once, and what the picker offers.
 pub(super) struct Look {
     pub(super) css: axum::body::Bytes,
+    /// Hash of `css`, the `?v=` of the stylesheet URL.
+    pub(super) version: String,
     picker: bool,
     system: bool,
     default: Arc<str>,

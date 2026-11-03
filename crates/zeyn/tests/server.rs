@@ -727,3 +727,24 @@ async fn grid_blocks_and_pages_are_gzipped_when_the_browser_accepts_it() {
     let res = router.clone().oneshot(small.body(Body::empty()).unwrap()).await.unwrap();
     assert!(res.headers().get(header::CONTENT_ENCODING).is_none(), "bodies under 1 KB stay as they are");
 }
+
+#[tokio::test]
+async fn asset_links_carry_the_build_and_are_kept_for_a_year() {
+    let router = router(writer());
+    let page = send(&router, get("/products")).await.body;
+    let start = page.find(r#"src="/_zeyn/zeyn.js?v="#).expect("a versioned runtime link") + 5;
+    let url = page[start..].split('"').next().unwrap().to_string();
+    let version = &url[url.find('?').unwrap()..];
+    for asset in ["zeyn.css", "nav.js", "components.js", "components.css", "enterprise.js", "media.js"] {
+        assert!(page.contains(&format!("/_zeyn/{asset}{version}")), "{asset}");
+    }
+    let cache = |r: &Reply| r.headers.get(header::CACHE_CONTROL).unwrap().to_str().unwrap().to_string();
+    let current = send(&router, Request::get(&url).body(Body::empty()).unwrap()).await;
+    assert_eq!(current.status, StatusCode::OK);
+    assert_eq!(cache(&current), "public, max-age=31536000, immutable");
+    assert!(current.headers.get(header::ETAG).is_some());
+    for other in ["/_zeyn/zeyn.js", "/_zeyn/zeyn.js?v=old", "/_zeyn/zeyn.js?x=1"] {
+        let r = send(&router, Request::get(other).body(Body::empty()).unwrap()).await;
+        assert_eq!(cache(&r), "no-cache", "{other} revalidates");
+    }
+}

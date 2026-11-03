@@ -141,8 +141,8 @@ async fn page_preloads_grids_inside_containers_and_links_the_component_assets() 
     assert_eq!(status, StatusCode::OK);
     assert!(html.contains("I-01"), "the grid in the first tab has its first page");
     assert!(!html.contains("I-06"), "page size is 5");
-    assert!(html.contains(r#"href="/_zeyn/components.css""#));
-    assert!(html.contains(r#"src="/_zeyn/components.js""#));
+    assert!(html.contains(r#"href="/_zeyn/components.css?v="#));
+    assert!(html.contains(r#"src="/_zeyn/components.js?v="#));
 }
 
 #[tokio::test]
