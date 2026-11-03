@@ -7,7 +7,7 @@
 //! cannot keep up is closed, never buffered without end. Rooms without clients are persisted
 //! through [`DocStore`] and dropped after [`Limits::idle`].
 
-use super::{AppState, Call, CallKind, Failure, cookie, same, valid_token};
+use super::{AppState, Call, CallKind, Failure, cookie};
 use crate::action::Error;
 use crate::ctx::{BoxFuture, Ctx, Service};
 use axum::Router;
@@ -460,7 +460,7 @@ async fn admit(st: &AppState, headers: &HeaderMap, csrf: &str) -> Result<(Ctx, H
     let Some(config) = hub.config() else {
         return Err(st.error_response(&ctx, Failure::App(Error::NotFound)));
     };
-    let token_ok = cookie(headers, "zeyn_csrf").is_some_and(|c| valid_token(c) && same(c, csrf));
+    let token_ok = cookie(headers, "zeyn_csrf").is_some_and(|c| super::csrf_matches(c, csrf));
     if !origin_allowed(headers, &config.origins) || !token_ok {
         return Err(st.error_response(&ctx, Failure::App(Error::Denied(crate::i18n::Text::key("zeyn.error.csrf")))));
     }

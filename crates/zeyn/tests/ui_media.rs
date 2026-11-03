@@ -30,6 +30,7 @@ impl MediaSource for Files {
             match id.as_str() {
                 "clip.mp4" => Ok(Media::bytes(bytes(1000), "video/mp4").etag("v1")),
                 "big.webm" => Ok(Media::bytes(bytes(200_000), "video/webm")),
+                "notes.vtt" => Ok(Media::bytes(notes(), "text/vtt")),
                 "page.html" => Ok(Media::bytes(b"<script>alert(1)</script>".to_vec(), "text/html")),
                 _ => Err(Error::NotFound),
             }
@@ -394,4 +395,37 @@ async fn public_media_reads_skip_the_rate_limit_but_private_media_and_ip_rules_s
 fn public_media_cache_is_capped_at_a_year() {
     let f = Feature::new("c").public_media("p", u32::MAX, Files::default());
     assert_eq!(f.media_sources()[0].public_cache, Some(zeyn::MAX_PUBLIC_MEDIA_CACHE));
+}
+
+#[tokio::test]
+async fn ranges_and_media_are_never_compressed() {
+    let router = app(Files::default());
+    let gz = |path: &str, range: Option<&str>| {
+        let mut req = get(path, "media.play").header(header::ACCEPT_ENCODING, "gzip");
+        if let Some(r) = range {
+            req = req.header(header::RANGE, r);
+        }
+        send(&router, req.body(Body::empty()).unwrap())
+    };
+    let (status, headers, body) = gz("/_zeyn/media/films/notes.vtt", None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(h(&headers, header::CONTENT_ENCODING), "gzip", "captions of 5 KB are compressed without a range");
+    assert!(body.len() < 5000);
+
+    let (status, headers, body) = gz("/_zeyn/media/films/notes.vtt", Some("bytes=100-2099")).await;
+    assert_eq!(status, StatusCode::PARTIAL_CONTENT);
+    assert_eq!(h(&headers, header::CONTENT_ENCODING), "", "a ranged request is never compressed");
+    assert_eq!(h(&headers, header::CONTENT_RANGE), "bytes 100-2099/5000");
+    assert_eq!(body, notes()[100..2100]);
+
+    let (status, headers, body) = gz("/_zeyn/media/films/big.webm", None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(h(&headers, header::CONTENT_ENCODING), "", "video is never compressed");
+    assert_eq!(h(&headers, header::CONTENT_LENGTH), "200000");
+    assert_eq!(body, bytes(200_000));
+}
+
+/// Five thousand bytes of caption text.
+fn notes() -> Vec<u8> {
+    "line of notes\n".repeat(400).into_bytes()[..5000].to_vec()
 }

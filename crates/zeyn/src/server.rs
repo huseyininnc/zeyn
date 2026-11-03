@@ -1481,6 +1481,8 @@ impl App {
             .layer(axum::middleware::from_fn_with_state(state.clone(), catch_panics))
             .layer(axum::middleware::from_fn_with_state(state.clone(), guard::guard_request))
             .layer(axum::middleware::from_fn(static_files))
+            .layer(compression())
+            .layer(axum::middleware::map_request(identity_for_ranges))
             .layer(axum::middleware::map_response_with_state(state.clone(), guard::security_headers))
             .layer(axum::middleware::map_response(ops::stamp))
             .layer(axum::middleware::from_fn(guard::trace_request))
@@ -1681,7 +1683,6 @@ pub(crate) fn same(a: &str, b: &str) -> bool {
 }
 
 /// Compares two byte strings in time that does not depend on where they differ.
-#[cfg(feature = "accounts")]
 pub(crate) fn same_bytes(a: &[u8], b: &[u8]) -> bool {
     a.len() == b.len() && a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
@@ -1694,6 +1695,68 @@ fn new_token() -> String {
 
 fn valid_token(t: &str) -> bool {
     t.len() == 64 && t.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+/// The value of one hex digit, or `None`.
+fn hex_digit(b: u8) -> Option<u8> {
+    match b {
+        b'0'..=b'9' => Some(b - b'0'),
+        b'a'..=b'f' => Some(b - b'a' + 10),
+        b'A'..=b'F' => Some(b - b'A' + 10),
+        _ => None,
+    }
+}
+
+/// The 32 bytes of a 64 digit hex string, or `None`.
+fn hex32(s: &[u8]) -> Option<[u8; 32]> {
+    if s.len() != 64 {
+        return None;
+    }
+    let mut out = [0u8; 32];
+    for (i, pair) in s.chunks_exact(2).enumerate() {
+        out[i] = hex_digit(pair[0])? << 4 | hex_digit(pair[1])?;
+    }
+    Some(out)
+}
+
+/// The CSRF token as it is written into a page or a response: a fresh random pad followed by the
+/// token XOR the pad, 128 hex digits. Every response carries different bytes for the same token,
+/// so compression cannot leak it (BREACH). A token that is already masked is masked again with a
+/// new pad; an empty token stays empty.
+fn mask_token(token: &str) -> String {
+    let Some(raw) = unmask_token(token).or_else(|| hex32(token.as_bytes())) else { return String::new() };
+    let mut pad = [0u8; 32];
+    getrandom::getrandom(&mut pad).expect("the operating system random source must work");
+    let mut out = String::with_capacity(128);
+    for b in pad.into_iter().chain(raw.into_iter().zip(pad).map(|(r, p)| r ^ p)) {
+        use std::fmt::Write;
+        let _ = write!(out, "{b:02x}");
+    }
+    out
+}
+
+/// The token bytes of a masked token (pad followed by token XOR pad), or `None` when it is not one.
+fn unmask_token(masked: &str) -> Option<[u8; 32]> {
+    let b = masked.as_bytes();
+    if b.len() != 128 {
+        return None;
+    }
+    let (pad, x) = (hex32(&b[..64])?, hex32(&b[64..])?);
+    let mut raw = [0u8; 32];
+    for i in 0..32 {
+        raw[i] = pad[i] ^ x[i];
+    }
+    Some(raw)
+}
+
+/// Whether a token sent with a request matches the `zeyn_csrf` cookie, in constant time. The
+/// token may be masked ([`mask_token`]) or raw, as pages from before masking send it.
+pub(crate) fn csrf_matches(cookie: &str, sent: &str) -> bool {
+    let Some(want) = hex32(cookie.as_bytes()) else { return false };
+    match unmask_token(sent).or_else(|| hex32(sent.as_bytes())) {
+        Some(got) => same_bytes(&want, &got),
+        None => false,
+    }
 }
 
 /// Most tenants whose license is kept in memory. The tenant may come from a header or the host
@@ -1826,7 +1889,7 @@ impl AppState {
     fn check_csrf(&self, headers: &HeaderMap) -> Result<(), Failure> {
         let header = headers.get("x-zeyn-csrf").and_then(|v| v.to_str().ok()).unwrap_or("");
         match cookie(headers, "zeyn_csrf") {
-            Some(c) if valid_token(c) && same(c, header) => Ok(()),
+            Some(c) if csrf_matches(c, header) => Ok(()),
             _ => Err(Failure::App(Error::Denied(Text::key("zeyn.error.csrf")))),
         }
     }
@@ -2193,7 +2256,7 @@ impl AppState {
         format!(
             r##"<!doctype html><html lang="{lang}"{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css"><script type="module" src="{base}/_zeyn/zeyn.js"></script><script type="module" src="{base}/_zeyn/nav.js"></script>{components}{theme_link}{extra}</head><body><a class="z-skip" href="#z-main">{skip}</a>{frame}<div class="z-toasts" role="status" aria-live="polite" data-text-dismiss="{dismiss}"></div>{commands}{ai_launcher}</body></html>"##,
             lang = escape(ctx.locale()),
-            csrf = escape(csrf),
+            csrf = mask_token(csrf),
             tz = escape(ctx.time_zone().name()),
             base = escape(&self.prefix),
             components = format!(
@@ -2359,6 +2422,48 @@ async fn static_files(req: axum::extract::Request, next: axum::middleware::Next)
             Response::from_parts(parts, axum::body::Body::from(bytes))
         }
     }
+}
+
+/// Content types sent as they are: media, files that are compressed already, and streams that
+/// must reach the browser event by event.
+const UNCOMPRESSED: &[&str] = &[
+    "video/",
+    "audio/",
+    "application/octet-stream",
+    "text/event-stream",
+    "application/x-ndjson",
+    "application/grpc",
+    "application/zip",
+    "application/gzip",
+    "application/pdf",
+    "application/vnd.openxmlformats",
+    "font/woff",
+];
+
+/// Gzip for pages, partial screens, grid blocks and other dynamic responses of 1 KB or more, at the
+/// level 2 (a 362 KB grid block becomes 37 KB for 0.8 ms of CPU; level 1 gives 54 KB for 0.6 ms
+/// and level 6 35 KB for 1.4 ms). Responses that
+/// already have a `Content-Encoding` (the framework assets from [`static_files`]) or a
+/// `Content-Range` pass as they are, and so do the types in [`UNCOMPRESSED`], images other than
+/// SVG and protocol switches. Streamed bodies (exports) are compressed as they stream.
+fn compression() -> tower_http::compression::CompressionLayer<impl tower_http::compression::Predicate> {
+    use tower_http::compression::{CompressionLayer, CompressionLevel, Predicate, predicate::SizeAbove};
+    fn compressible(status: StatusCode, _: axum::http::Version, headers: &HeaderMap, _: &axum::http::Extensions) -> bool {
+        let kind = headers.get(header::CONTENT_TYPE).and_then(|v| v.to_str().ok()).unwrap_or("");
+        status != StatusCode::SWITCHING_PROTOCOLS
+            && (!kind.starts_with("image/") || kind.starts_with("image/svg+xml"))
+            && !UNCOMPRESSED.iter().any(|p| kind.starts_with(p))
+    }
+    CompressionLayer::new().quality(CompressionLevel::Precise(2)).compress_when(SizeAbove::new(1024).and(compressible))
+}
+
+/// Drops `Accept-Encoding` from requests with a `Range` header, so a byte range always refers to
+/// the bytes of the file and is never compressed.
+async fn identity_for_ranges(mut req: axum::extract::Request) -> axum::extract::Request {
+    if req.headers().contains_key(header::RANGE) {
+        req.headers_mut().remove(header::ACCEPT_ENCODING);
+    }
+    req
 }
 
 fn asset(body: &'static str, content_type: &'static str) -> Response {
@@ -2532,7 +2637,7 @@ async fn csrf_token(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Resp
         return st.error_response(&ctx, Failure::App(Error::Forbidden));
     }
     let (token, set) = st.csrf(&headers);
-    let mut r = axum::Json(json!({ "token": token })).into_response();
+    let mut r = axum::Json(json!({ "token": mask_token(&token) })).into_response();
     r.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     with_cookie(r, set)
 }

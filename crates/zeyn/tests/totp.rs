@@ -243,7 +243,8 @@ async fn a_refused_csrf_token_is_never_written_into_the_page() {
     let r = send(&router, post("/_zeyn/auth/totp/verify", "ayse", "", forged, "123456")).await;
     assert_eq!(r.status, StatusCode::FORBIDDEN);
     assert!(!r.body.contains("http-equiv") && !r.body.contains("evil.example"), "{}", r.body);
-    assert!(r.body.contains(&format!(r#"<meta name="zeyn-csrf" content="{CSRF}">"#)), "{}", r.body);
+    let meta = r.body.split(r#"<meta name="zeyn-csrf" content=""#).nth(1).and_then(|t| t.split('"').next()).unwrap();
+    assert!(meta.len() == 128 && meta.bytes().all(|b| b.is_ascii_hexdigit()), "the page gets the masked token: {meta}");
 }
 
 #[tokio::test]
