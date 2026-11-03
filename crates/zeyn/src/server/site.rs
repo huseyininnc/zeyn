@@ -37,7 +37,8 @@ fn screen_url(st: &AppState, ctx: &Ctx, name: &str) -> Option<String> {
     if f.check_guards(ctx).is_err() || !ctx.identity().can(&entry.meta.access) {
         return None;
     }
-    f.path_of(&entry.meta).map(|p| st.url(&p))
+    f.path_of(&entry.meta)
+        .map(|p| st.url(&super::locale::path(st, ctx, &p)))
 }
 
 /// Where the brand links to: the screen at `/` when there is one, else the feature's first screen
@@ -47,6 +48,35 @@ fn home_url(st: &AppState, fi: usize) -> String {
         return st.url("/");
     }
     st.features[fi].routes().first().map(|r| st.url(&r.path)).unwrap_or_else(|| st.url("/"))
+}
+
+/// The bottom bar of phones ([`SiteShell::bottom_nav`]): links to the screens the user may open,
+/// the current one marked. Empty without items.
+fn bottom_nav(st: &AppState, ctx: &Ctx, r: &Render, shell: &SiteShell, current: Option<&str>) -> String {
+    let links: String = shell
+        .bottom
+        .iter()
+        .filter_map(|item| {
+            let href = screen_url(st, ctx, item.screen)?;
+            let here = if current == Some(item.screen) { r#" aria-current="page""# } else { "" };
+            let icon = item
+                .icon
+                .map(|i| i.html())
+                .unwrap_or_default();
+            Some(format!(
+                r#"<li><a href="{}"{here}>{icon}<span class="z-site-bottom-label">{}</span></a></li>"#,
+                escape(&href),
+                r.text(&item.label)
+            ))
+        })
+        .collect();
+    if links.is_empty() {
+        return String::new();
+    }
+    format!(
+        r#"<nav class="z-site-bottom" aria-label="{}"><ul>{links}</ul></nav>"#,
+        r.text(&Text::key("zeyn.shell.site.bottom"))
+    )
 }
 
 /// The whole frame of a site shell page: top bar with the brand, menu button, menu and actions;
@@ -124,6 +154,7 @@ pub(super) fn frame(
     if !footer.is_empty() {
         footer = format!(r#"<footer class="z-site-footer">{footer}</footer>"#);
     }
+    footer.push_str(&bottom_nav(st, ctx, r, shell, current));
     format!(
         r#"<div class="z-app z-site" data-zeyn-shell="site"><header class="z-site-header" data-zeyn-site-header><div class="z-site-bar"><a class="z-site-brand" href="{home}">{app}</a><button type="button" class="z-site-toggle" aria-expanded="false" aria-controls="z-site-nav" data-zeyn-site-toggle hidden><span class="z-site-burger" aria-hidden="true"></span><span class="z-sr-only">{menu_label}</span></button></div><nav class="z-site-nav" id="z-site-nav" aria-label="{menu_label}"><ul class="z-site-menu">{menu}</ul>{actions}</nav></header><main class="z-main z-site-main" id="z-main">{main}</main>{footer}</div>"#,
         home = escape(&home_url(st, fi)),

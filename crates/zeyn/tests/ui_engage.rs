@@ -451,3 +451,88 @@ async fn a_press_runs_the_action_with_the_screens_target_through_the_write_check
     }
     assert_eq!(last, StatusCode::TOO_MANY_REQUESTS, "presses count against the write limit");
 }
+
+#[screen(route = "/shop", public)]
+pub fn shop_home() -> Screen {
+    Screen::new("Shop")
+}
+
+#[screen(route = "/shop/search", public)]
+pub fn shop_search() -> Screen {
+    Screen::new("Search")
+}
+
+#[screen(route = "/shop/orders", permission = "orders.read")]
+pub fn shop_orders() -> Screen {
+    Screen::new("Orders")
+}
+
+fn shop_app() -> App {
+    App::new("Shop")
+        .i18n(I18n::new("en"))
+        .auth(|h: &HeaderMap| {
+            let perms: Vec<String> = h
+                .get("x-perms")?
+                .to_str()
+                .ok()?
+                .split(',')
+                .map(String::from)
+                .collect();
+            Some(Identity::user("u").with_permissions(perms))
+        })
+        .feature(
+            Feature::new("shop")
+                .screen(shop_home)
+                .screen(shop_search)
+                .screen(shop_orders)
+                .menu(|m| {
+                    m.group("Shop", Icon::Home)
+                        .item("Home", shop_home)
+                })
+                .shell(Shell::site().bottom_nav([
+                    zeyn::BottomNavItem::new("Home", shop_home).icon(Icon::Home),
+                    zeyn::BottomNavItem::new("Search <now>", shop_search).icon(Icon::Search),
+                    zeyn::BottomNavItem::new("Orders", shop_orders),
+                ])),
+        )
+}
+
+#[tokio::test]
+async fn the_site_shell_bottom_bar_marks_the_current_page_and_hides_what_the_user_may_not_open() {
+    let app = shop_app();
+    assert_eq!(app.check(), Ok(()));
+    let router = app.router().unwrap();
+    let page = |perms: &'static str| {
+        let router = router.clone();
+        async move {
+            let res = router
+                .oneshot(
+                    Request::get("/shop/search")
+                        .header("x-perms", perms)
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            let bytes = res
+                .into_body()
+                .collect()
+                .await
+                .unwrap()
+                .to_bytes();
+            String::from_utf8_lossy(&bytes).into_owned()
+        }
+    };
+    let guest = page("").await;
+    let bar = &guest[guest
+        .find(r#"<nav class="z-site-bottom" aria-label="Quick links"><ul>"#)
+        .expect("the bar")..];
+    assert!(bar.contains(r#"<li><a href="/shop"><span class="z-icon z-icon-home" aria-hidden="true"></span><span class="z-site-bottom-label">Home</span></a></li>"#), "{bar}");
+    assert!(bar.contains(r#"<a href="/shop/search" aria-current="page">"#) && bar.contains("Search &lt;now&gt;"));
+    assert!(!bar.contains("/shop/orders"), "screens the user may not open are left out");
+    assert!(
+        page("orders.read")
+            .await
+            .contains(r#"<li><a href="/shop/orders"><span class="z-site-bottom-label">Orders</span>"#)
+    );
+}

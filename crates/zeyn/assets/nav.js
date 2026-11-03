@@ -33,7 +33,7 @@ function isScreenUrl(url) {
 
 /** Marks the menu link of the current page. */
 function markCurrent(url) {
-  document.querySelectorAll('.z-nav a[href], .z-site-nav a[href]').forEach((a) => {
+  document.querySelectorAll('.z-nav a[href], .z-site-nav a[href], .z-site-bottom a[href]').forEach((a) => {
     const here = new URL(a.href, location.href).pathname === url.pathname;
     if (here) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');

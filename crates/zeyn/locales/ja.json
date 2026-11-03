@@ -220,7 +220,8 @@
       "theme_dark": "ダーク",
       "site": {
         "sign_in": "サインイン",
-        "sign_out": "サインアウト"
+        "sign_out": "サインアウト",
+        "bottom": "クイックリンク"
       }
     },
     "ui": {

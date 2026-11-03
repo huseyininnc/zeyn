@@ -220,7 +220,8 @@
       "theme_dark": "深色",
       "site": {
         "sign_in": "登录",
-        "sign_out": "退出登录"
+        "sign_out": "退出登录",
+        "bottom": "快捷链接"
       }
     },
     "ui": {

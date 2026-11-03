@@ -220,7 +220,8 @@
       "theme_dark": "Koyu",
       "site": {
         "sign_in": "Giriş yap",
-        "sign_out": "Çıkış yap"
+        "sign_out": "Çıkış yap",
+        "bottom": "Hızlı bağlantılar"
       }
     },
     "ui": {

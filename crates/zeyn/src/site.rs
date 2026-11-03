@@ -5,7 +5,7 @@
 //! them goes through the browser runtime without a page reload.
 
 use crate::i18n::Text;
-use crate::screen::ScreenDef;
+use crate::screen::{Icon, ScreenDef};
 
 /// Chooses the page frame of a feature's screens. The app shell is the default; call
 /// [`Shell::site`] for public pages.
@@ -46,6 +46,7 @@ impl Shell {
 pub struct SiteShell {
     pub(crate) header: SiteHeader,
     pub(crate) footer: SiteFooter,
+    pub(crate) bottom: Vec<BottomNavItem>,
 }
 
 impl SiteShell {
@@ -61,12 +62,60 @@ impl SiteShell {
         self
     }
 
-    /// Screens the footer links to, for the app's structure check.
+    /// A bar of up to five links fixed to the bottom of the screen on phones (800 px wide and
+    /// less), for the few places people go most; the top menu stays for the rest. The link of
+    /// the page being shown is marked with `aria-current="page"`, links to screens the user may
+    /// not open are left out, the bar keeps clear of the system's home indicator
+    /// (`env(safe-area-inset-bottom)`), and the page gets room at its bottom so the bar hides
+    /// nothing. More than five items do not compile.
+    ///
+    /// ```
+    /// use zeyn::prelude::*;
+    /// use zeyn::BottomNavItem;
+    ///
+    /// #[screen(route = "/", public)]
+    /// pub fn home() -> Screen { Screen::new("Home") }
+    ///
+    /// #[screen(route = "/search", public)]
+    /// pub fn search() -> Screen { Screen::new("Search") }
+    ///
+    /// let shell = Shell::site().bottom_nav([
+    ///     BottomNavItem::new("Home", home).icon(Icon::Home),
+    ///     BottomNavItem::new("Search", search).icon(Icon::Search),
+    /// ]);
+    /// ```
+    ///
+    /// Six items are refused:
+    ///
+    /// ```compile_fail
+    /// use zeyn::prelude::*;
+    /// use zeyn::BottomNavItem;
+    /// #[screen(route = "/", public)]
+    /// pub fn home() -> Screen { Screen::new("Home") }
+    /// let i = || BottomNavItem::new("Home", home);
+    /// let shell = Shell::site().bottom_nav([i(), i(), i(), i(), i(), i()]);
+    /// ```
+    pub fn bottom_nav<const N: usize>(mut self, items: [BottomNavItem; N]) -> Self {
+        const { assert!(N <= 5, "bottom_nav holds at most five items; put the others in the feature's menu") };
+        self.bottom = items.into();
+        self
+    }
+
+    /// Screens the footer and the bottom bar link to, for the app's structure check.
     pub(crate) fn linked_screens(&self) -> impl Iterator<Item = &'static str> + '_ {
-        self.footer.columns.iter().flat_map(|c| &c.links).filter_map(|l| match l.target {
-            FooterTarget::Screen(s) => Some(s),
-            FooterTarget::Url(_) => None,
-        })
+        self.footer
+            .columns
+            .iter()
+            .flat_map(|c| &c.links)
+            .filter_map(|l| match l.target {
+                FooterTarget::Screen(s) => Some(s),
+                FooterTarget::Url(_) => None,
+            })
+            .chain(
+                self.bottom
+                    .iter()
+                    .map(|b| b.screen),
+            )
     }
 
     /// Footer addresses that are not a path, `https:`, `http:` or `mailto:`.
@@ -163,6 +212,28 @@ impl FooterColumn {
     /// or `mailto:...`. Other schemes fail the app's structure check.
     pub fn url(mut self, label: impl Into<Text>, href: &'static str) -> Self {
         self.links.push(FooterLink { label: label.into(), target: FooterTarget::Url(href) });
+        self
+    }
+}
+
+/// One link of the site shell's bottom bar ([`SiteShell::bottom_nav`]): a label, a screen with a
+/// route and an optional icon above the label.
+pub struct BottomNavItem {
+    pub(crate) label: Text,
+    pub(crate) screen: &'static str,
+    pub(crate) icon: Option<Icon>,
+}
+
+impl BottomNavItem {
+    /// A link to a screen of the app. A screen without a route cannot be linked (compile error).
+    pub fn new<S: ScreenDef>(label: impl Into<Text>, _screen: S) -> Self {
+        const { assert!(S::META.route.is_some(), "a bottom bar link must point to a screen that has a route") };
+        BottomNavItem { label: label.into(), screen: S::META.name, icon: None }
+    }
+
+    /// An icon above the label.
+    pub fn icon(mut self, icon: Icon) -> Self {
+        self.icon = Some(icon);
         self
     }
 }

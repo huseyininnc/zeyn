@@ -220,7 +220,8 @@
       "theme_dark": "다크",
       "site": {
         "sign_in": "로그인",
-        "sign_out": "로그아웃"
+        "sign_out": "로그아웃",
+        "bottom": "바로 가기"
       }
     },
     "ui": {
