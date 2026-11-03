@@ -84,6 +84,22 @@ pub fn results(p: SearchParams) -> Screen {
     )
 }
 
+#[screen(route = "/picks", public)]
+pub fn picks() -> Screen {
+    Screen::new("Picks").body(
+        Rail::of(search_goods)
+            .card(|g: &Good| {
+                Card::image("/x.png", g.name.clone())
+                    .subtitle(g.city.clone())
+                    .corner(Badge::new("Hot <1>"))
+                    .badges([Badge::new("Tag a"), Badge::new("Tag b")])
+                    .progress(g.price as f32 / 100.0, "Sold")
+                    .horizontal()
+            })
+            .paging(Paging::infinite(2)),
+    )
+}
+
 const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
 fn app(limit: Option<RateLimit>) -> axum::Router {
@@ -93,7 +109,7 @@ fn app(limit: Option<RateLimit>) -> axum::Router {
             let perms: Vec<String> = h.get("x-perms")?.to_str().ok()?.split(',').map(String::from).collect();
             Some(Identity::user("u").with_permissions(perms))
         })
-        .feature(Feature::new("shop").screen(shop).screen(results));
+        .feature(Feature::new("shop").screen(shop).screen(results).screen(picks));
     if let Some(l) = limit {
         app = app.write_limit(l);
     }
@@ -276,4 +292,17 @@ async fn results_screens_open_without_params_with_empty_text() {
     let (status, page) = send(&app(None), get("/results")).await;
     assert_eq!(status, StatusCode::OK, "{page}");
     assert!(page.contains(r#"data-zeyn-total="30""#));
+}
+
+#[tokio::test]
+async fn image_cards_lay_out_in_a_row_with_subtitle_corner_badges_and_progress() {
+    let (status, page) = send(&app(None), get("/picks")).await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert_eq!(page.matches(r#"<li class="z-poster z-poster-h">"#).count(), 2);
+    assert!(page.contains(r#"<span class="z-poster-subtitle">Bursa</span>"#), "{page}");
+    assert!(page.contains(r#"<span class="z-poster-corner"><span class="z-badge z-tone-neutral">Hot &lt;1&gt;</span></span>"#));
+    assert!(page.contains(r#"<span class="z-poster-badges"><span class="z-badge z-tone-neutral">Tag a</span>"#));
+    assert!(page.contains(r#"role="progressbar" aria-label="Sold" aria-valuemin="0" aria-valuemax="100" aria-valuenow="10" aria-valuetext="10%""#));
+    assert!(page.contains(r#"aria-valuenow="20""#), "each row has its own fraction");
+    assert!(page.contains("--z-progress:10%"));
 }
