@@ -39,7 +39,7 @@ fn warehouse_open(ctx: &Ctx) -> GuardResult {
 Feature::new("stock").guard(SignedIn).guard(warehouse_open)
 ```
 
-Встроенные охранники: `SignedIn`, `TenantRequired` и `Licensed`.
+Встроенные guard-ы: `SignedIn`, `TenantRequired` и `Licensed`.
 
 ## Перехватчики (Interceptors)
 

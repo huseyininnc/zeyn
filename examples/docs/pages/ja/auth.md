@@ -149,7 +149,7 @@ Feature::new("payroll").guard(RequireMfa::new())
 App::new("Back office").interceptor(RequireMfa::new().screen("bank_accounts").action("approve_payment"))
 ```
 
-feature の guard として使うと、feature 全体が対象になります。interceptor として使うと、列挙した screen と action が対象になり、両方のリストが空の場合はすべての呼び出しが対象になります。
+feature のガードとして使うと、feature 全体が対象になります。インターセプターとして使うと、列挙した screen と action が対象になり、両方のリストが空の場合はすべての呼び出しが対象になります。
 
 第 2 要素がない場合、ページの読み込みは `return_to` を付けてステップアップのアドレスへリダイレクトされます。
 それ以外の呼び出しは、コード `mfa_required` の `401` を返します (API では problem type `urn:zeyn:problem:mfa_required`)。ランタイムは新しいタブでステップアップのページを開き、ユーザーが戻ってきたらリクエストを再実行します。これは `reauth_required` の場合と同じです。

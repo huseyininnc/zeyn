@@ -148,7 +148,7 @@ Feature::new("payroll").guard(RequireMfa::new())
 App::new("Back office").interceptor(RequireMfa::new().screen("bank_accounts").action("approve_payment"))
 ```
 
-作为 feature 守卫时，它覆盖整个 feature。作为拦截器时，它覆盖所列出的界面和 action；当两个列表都为空时，覆盖每一次调用。
+作为 feature guard 时，它覆盖整个 feature。作为拦截器时，它覆盖所列出的界面和 action；当两个列表都为空时，覆盖每一次调用。
 
 缺少该因素时，页面加载会带着 `return_to` 被重定向到升级验证地址。其他调用返回 `401`，code 为 `mfa_required`（在 API 上问题类型为 `urn:zeyn:problem:mfa_required`）；运行时会在新标签页中打开升级验证页面，并在用户回来时重复该请求，与 `reauth_required` 的处理方式相同。
 

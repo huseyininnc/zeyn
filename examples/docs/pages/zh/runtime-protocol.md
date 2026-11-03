@@ -221,7 +221,7 @@ Effects：
 
 | Endpoint | Purpose |
 | --- | --- |
-| `POST /_zeyn/reveal {screen, params, node, field, key?}` | 被遮蔽字段的原始值，`{value}`；需要取消遮蔽权限，始终记入审计 |
+| `POST /_zeyn/reveal {screen, params, node, field, key?}` | 被掩码字段的原始值，`{value}`；需要取消掩码权限，始终记入审计 |
 | `POST /_zeyn/reason {screen, reason}` | 标记为 `reason` 的 Screen 所需的理由；返回带 `HttpOnly` cookie 的 `204` |
 | `POST /_zeyn/import {screen, params, node, csv, commit}` | CSV 预览（`commit: false`）或导入 |
 | `POST /_zeyn/keepalive` | 空闲警告之后的“保持登录”；`204` |
@@ -397,4 +397,4 @@ Effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":".
 | `POST /_zeyn/mcp` | JSON-RPC：`initialize`、`tools/list`、`tools/call`。需要 `Authorization` 请求头和已登录用户 |
 | `POST /_zeyn/form` with `via_agent: true` | WebMCP 表单保存；需要启用 WebMCP 的 `Mcp::on()`。只有在用户确认之后才可使用 `confirmed: true` |
 
-每次代理调用都以该用户的身份运行：Screen 的访问权限、guard、action 的权限、拦截器、限流和时间限制。代理调用始终会被审计（`via_agent: true`），被遮蔽的字段对它们始终保持遮蔽，即使用户本人可以取消遮蔽。OpenAPI 用 `x-zeyn-ai` 标记每个操作：`ai = false` 时为 `false`，否则为 `{ hint, confirm, writes }`。
+每次代理调用都以该用户的身份运行：Screen 的访问权限、guard、action 的权限、拦截器、限流和时间限制。代理调用始终会被审计（`via_agent: true`），被掩码的字段对它们始终保持遮蔽，即使用户本人可以取消掩码。OpenAPI 用 `x-zeyn-ai` 标记每个操作：`ai = false` 时为 `false`，否则为 `{ hint, confirm, writes }`。

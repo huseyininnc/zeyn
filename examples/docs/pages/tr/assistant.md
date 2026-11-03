@@ -89,7 +89,7 @@ Assistant::new(model)
 
 ## 4. Geçmiş
 
-`ChatStore` konuşmaları kiracı ve kullanıcıya göre (`ChatKey`) anahtarlayarak tutar; böylece kiracılar hiçbir zaman aynı konuşmayı paylaşmaz:
+`ChatStore` konuşmaları tenant ve kullanıcıya göre (`ChatKey`) anahtarlayarak tutar; böylece tenant'lar hiçbir zaman aynı konuşmayı paylaşmaz:
 
 ```rust
 pub trait ChatStore: Send + Sync + 'static {
@@ -99,7 +99,7 @@ pub trait ChatStore: Send + Sync + 'static {
 }
 ```
 
-`MemoryChatStore::new(max_users, max_messages)` varsayılandır (her biri 60 iletilik 1.000 konuşma, en az yakın zamanda kullanılan önce çıkar, yeniden başlatmada kaybolur). Bir veritabanı için, kiracı, kullanıcı, sıra ve JSON olarak ileti içeren bir tablo üzerinde üç metodu uygulayın. İletiler yalnızca eklenir; saklama süresine depo karar verir. Bekleyen onaylar da geçmişte durur, bu yüzden sunucu kullanıcı başına başka hiçbir durum tutmaz.
+`MemoryChatStore::new(max_users, max_messages)` varsayılandır (her biri 60 iletilik 1.000 konuşma, en az yakın zamanda kullanılan önce çıkar, yeniden başlatmada kaybolur). Bir veritabanı için, tenant, kullanıcı, sıra ve JSON olarak ileti içeren bir tablo üzerinde üç metodu uygulayın. İletiler yalnızca eklenir; saklama süresine depo karar verir. Bekleyen onaylar da geçmişte durur, bu yüzden sunucu kullanıcı başına başka hiçbir durum tutmaz.
 
 ## 5. Araçlar ve action'lar
 
@@ -133,8 +133,8 @@ Yapmadığı şey: bir modelin cevabının doğru olup olmadığına karar verme
 
 Asistanı kendi müşterilerine satan bir uygulama genellikle şunları ister:
 
-- `permission("app.assistant.use")` ve bir guard içinde lisans modülü denetimi; böylece yalnızca ödeme yapan kiracılar görür;
-- kiracı başına model: müşterinin sağlayıcısını `ctx` kiracısına göre yapılandırmadan seçen küçük bir yönlendirici olarak `LlmProvider` uygulayın ya da herkes için tek bir model çalıştırın;
+- `permission("app.assistant.use")` ve bir guard içinde lisans modülü denetimi; böylece yalnızca ödeme yapan tenant'lar görür;
+- tenant başına model: müşterinin sağlayıcısını `ctx` tenant'ına göre yapılandırmadan seçen küçük bir yönlendirici olarak `LlmProvider` uygulayın ya da herkes için tek bir model çalıştırın;
 - müşterinin saklama kurallarıyla, uygulamanın veritabanında bir `ChatStore`;
 - alanı anlatan `instructions(...)` (bir asansör şirketi: üniteler, siteler, servis aralıkları) ve ihtiyaç duyan action'larda `ai = "..."` yönlendirmesi;
 - müşterinin ödediği plana göre ayarlanmış `token_limit`.

@@ -95,7 +95,7 @@ Grid görünümleri (sütunlar, sıralama, süzgeçler), dock yerleşimleri ve s
 
 İçe ve dışa aktarmalar ile diğer uzun işler, ilerleme bilgisiyle arka plan işleri olarak çalışır (`Jobs`), böylece bir istek onları hiç beklemez. [Audit, masking and jobs](enterprise.md) sayfasına bakın.
 
-Uygulama onlara bir store vermedikçe işler bellekte yaşar. `SqlJobStore` ile kuyruktaki çalıştırmalar ve her zamanlamanın sonraki çalıştırması veritabanında tutulur: yeniden başlatmadan etkilenmezler, birden çok sunucu tek bir kuyruğu paylaşır ve bir kira (lease) iki işçinin aynı çalıştırmayı asla yürütmemesini sağlar.
+Uygulama onlara bir store vermedikçe işler bellekte yaşar. `SqlJobStore` ile kuyruktaki çalıştırmalar ve her zamanlamanın sonraki çalıştırması veritabanında tutulur: yeniden başlatmadan etkilenmezler, birden çok sunucu tek bir kuyruğu paylaşır ve bir lease iki işçinin aynı çalıştırmayı asla yürütmemesini sağlar.
 
 ```rust
 let jobs = SqlJobStore::new(db.clone());
@@ -116,7 +116,7 @@ pub async fn send(id: InvoiceId, jobs: Jobs) -> Result<()> {
 ```
 
 - `jobs.enqueue(name, payload)` bir çalıştırmayı kuyruğa alır; `enqueue_after` onu geciktirir. Payload, bir kimlik ya da küçük bir JSON gibi, en çok 4000 bayt uzunluğunda bir metindir.
-- Bir işçi zamanı gelmiş bir çalıştırmayı bir dakikalık kira ile üstlenir ve çalıştırma sürdükçe kirayı yeniler. Sunucu durursa, kira bittikten sonra çalıştırma yeniden üstlenilir; bu deneme sayılır.
+- Bir işçi zamanı gelmiş bir çalıştırmayı bir dakikalık lease ile üstlenir ve çalıştırma sürdükçe lease'i yeniler. Sunucu durursa, lease bittikten sonra çalıştırma yeniden üstlenilir; bu deneme sayılır.
 - Başarısız bir deneme, ikiye katlanan ve on dakikaya kadar çıkan geri çekilmeyi (backoff) bekler; yeniden deneme hakları bitene kadar bu sürer. Sonra çalıştırma, hata koduyla birlikte tabloda `failed` olarak kalır. Bir zamanlama asla kalıcı olarak başarısız olmaz: sonraki aralığına geçer.
 - PostgreSQL `FOR UPDATE SKIP LOCKED` ile üstlenir, Oracle (11g ve sonrası) aynısını kimlik seçen bir sorgu üzerinden yapar. Tablo `zeyn_jobs`'tur; `create_job_tables(dialect, prefix)` bir migration için gereken ifadeleri verir.
 - Bellek içi store (`MemoryJobStore`) en çok 10.000 çalıştırma tutar.

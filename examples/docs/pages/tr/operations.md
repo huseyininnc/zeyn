@@ -86,7 +86,7 @@ Sunucunun kullanıcı başına neyi nerede tuttuğu:
 Framework `tracing` üzerinden raporlar. Kendiliğinden hiçbir şey yazdırmaz.
 
 - `App::serve` ve `App::serve_until`, uygulama önceden bir tane kurmadıysa bir subscriber kurar: olaylar standart hataya metin satırları olarak gider ve `log.level` ile filtrelenir (varsayılan `info`; `warn,zeyn=debug` gibi herhangi bir `tracing` hedef filtresi). JSON satırları ya da başka bir çıkış isteyen bir uygulama, servis vermeden önce kendi subscriber'ını kurar ve Zeyn ona dokunmaz.
-- `info` düzeyinde çıktı her zamanki gibidir: dinlenen adres, başlangıç uyarıları (eksik çeviriler, `DevAuth`, `dev_latency`), başarısız lisans kaynakları ve iç hatalar. `debug` düzeyinde her çağrı; tür, ekran, action, kullanıcı kimliği, kiracı kimliği, sonuç, hata kodu ve milisaniye içeren bir `call finished` satırı ekler.
+- `info` düzeyinde çıktı her zamanki gibidir: dinlenen adres, başlangıç uyarıları (eksik çeviriler, `DevAuth`, `dev_latency`), başarısız lisans kaynakları ve iç hatalar. `debug` düzeyinde her çağrı; tür, ekran, action, kullanıcı kimliği, tenant kimliği, sonuç, hata kodu ve milisaniye içeren bir `call finished` satırı ekler.
 - İz arka uçları için span'ler:
 
   | Span | Düzey | Alanlar |

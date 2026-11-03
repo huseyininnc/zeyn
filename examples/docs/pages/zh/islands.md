@@ -81,7 +81,7 @@ pub fn mount(root: web_sys::Element) -> Result<(), JsValue> {
 }
 ```
 
-`Island::call` 向 `POST /_zeyn/data` 发送请求，携带 island 的屏幕、参数和节点路径，把 remote 的名称作为 `key`，并带上输入。它在 `x-zeyn-csrf` 中发送页面的 CSRF 令牌，并带上会话 cookie。服务器与对待每个组件一样进行检查：CSRF、屏幕的访问控制、feature 的守卫、action 的权限，然后在时间限制内运行拦截器和 action。没有别的入口：island 无法访问其节点未绑定的 action，island 的任何机制都不会绕过任何检查。
+`Island::call` 向 `POST /_zeyn/data` 发送请求，携带 island 的屏幕、参数和节点路径，把 remote 的名称作为 `key`，并带上输入。它在 `x-zeyn-csrf` 中发送页面的 CSRF 令牌，并带上会话 cookie。服务器与对待每个组件一样进行检查：CSRF、屏幕的访问控制、feature 的 guard、action 的权限，然后在时间限制内运行拦截器和 action。没有别的入口：island 无法访问其节点未绑定的 action，island 的任何机制都不会绕过任何检查。
 
 错误以 `CallError { status, code, message }` 返回。对于本地失败（`network`、`props`、`input`、`answer`），`status` 为 `0`。
 

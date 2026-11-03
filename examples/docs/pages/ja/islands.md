@@ -81,7 +81,7 @@ pub fn mount(root: web_sys::Element) -> Result<(), JsValue> {
 }
 ```
 
-`Island::call` は `POST /_zeyn/data` に、island の screen、params、node パス、`key` としての remote 名、そして入力を送ります。ページの CSRF トークンを `x-zeyn-csrf` に、セッション cookie とともに付けて送信します。サーバーは、他のすべてのコンポーネントと同様に次を順に検査します。CSRF、screen のアクセス、feature の guard、action の permission。そのあとでインターセプターを実行し、時間制限付きで action を実行します。これ以外の入口はありません。island は、その node がバインドしていない action には到達できず、island に関するどんなものも検査を迂回しません。
+`Island::call` は `POST /_zeyn/data` に、island の screen、params、node パス、`key` としての remote 名、そして入力を送ります。ページの CSRF トークンを `x-zeyn-csrf` に、セッション cookie とともに付けて送信します。サーバーは、他のすべてのコンポーネントと同様に次を順に検査します。CSRF、screen のアクセス、feature のガード、action の permission。そのあとでインターセプターを実行し、時間制限付きで action を実行します。これ以外の入口はありません。island は、その node がバインドしていない action には到達できず、island に関するどんなものも検査を迂回しません。
 
 エラーは `CallError { status, code, message }` として返ります。`status` は、ローカルでの失敗（`network`、`props`、`input`、`answer`）では `0` です。
 

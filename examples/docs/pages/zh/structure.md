@@ -38,7 +38,7 @@ pub fn app(config: Config) -> App {
 
 ## Feature
 
-一个 feature 将路由前缀、守卫、界面、API、命令和菜单组合在一起：
+一个 feature 将路由前缀、guard、界面、API、命令和菜单组合在一起：
 
 ```rust
 pub fn feature() -> Feature {

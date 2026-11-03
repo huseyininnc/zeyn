@@ -108,7 +108,7 @@ pub trait ChatStore: Send + Sync + 'static {
 - `navigate`：打开用户有权打开的带路由的屏幕，无需整页加载（`zeyn:navigate`），并且可以筛选其表格（`zeyn:filter`）。表格随后通过 `POST /_zeyn/grid` 加载，服务器在那里执行其常规检查。
 - `suggest`：以芯片形式显示的后续提示。
 
-每次调用都走正常的 action 路径，上下文标记为代理（agent）：屏幕的访问控制、feature 的守卫、action 的权限、拦截器、速率限制、时间限制、审计（每次助手调用都以 `via_agent: true` 记录）以及掩码。
+每次调用都走正常的 action 路径，上下文标记为代理（agent）：屏幕的访问控制、feature 的 guard、action 的权限、拦截器、速率限制、时间限制、审计（每次助手调用都以 `via_agent: true` 记录）以及掩码。
 
 **确认。** 读取操作立即执行。任何写入操作（表单保存、输入不是 `DataQuery` 的 API action）以及每个标记为 `#[action(confirm)]` 的 action，都会中止该轮交互并显示一张确认卡片，列出将要执行的内容及其参数。只有用户的点击（带 CSRF 的 `POST /_zeyn/assistant/confirm`，针对该用户自己历史中待处理的调用）才会执行它，且只执行一次。像“我确认”这样的消息只是普通文本：新的消息会将待处理的调用作为未执行而关闭。
 
@@ -133,7 +133,7 @@ pub trait ChatStore: Send + Sync + 'static {
 
 向自己的客户出售助手的应用通常需要：
 
-- `permission("app.assistant.use")` 加上守卫中的许可证模块检查，这样只有付费租户才能看到它；
+- `permission("app.assistant.use")` 加上 guard 中的许可证模块检查，这样只有付费租户才能看到它；
 - 按租户选择模型：把 `LlmProvider` 实现成一个小型路由器，根据 `ctx` 中的租户从配置里选择该客户的提供方，或者让所有人共用一个模型；
 - 建立在应用数据库之上的 `ChatStore`，并遵循客户的保留规则；
 - 描述业务领域的 `instructions(...)`（比如电梯公司：设备、站点、维保周期），以及在需要的 action 上添加 `ai = "..."` 指引；

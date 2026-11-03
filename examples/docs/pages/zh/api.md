@@ -25,7 +25,7 @@ curl -X POST http://127.0.0.1:3002/api/v1/stock/search_products \
 ## 调用方须知
 
 - 调用需要 `Authorization` 头。应用的认证器（authenticator）会读取它；仅有浏览器会话 Cookie 会被拒绝，因此 API 不需要 CSRF 令牌。
-- 访问控制、守卫、拦截器、审计和速率限制的应用方式与界面完全相同。
+- 访问控制、guard、拦截器、审计和速率限制的应用方式与界面完全相同。
 - 接受 `Valid<M>` 的输入会运行每一条 `#[rule]`。字段错误以 `422` 返回，并附带每个字段的消息。
 - 列表接受 `DataQuery` 并返回 `Page`；服务器会限制页大小。
 

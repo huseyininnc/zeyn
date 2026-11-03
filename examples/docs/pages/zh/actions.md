@@ -74,4 +74,4 @@ return Err(errors.into());
 - `Feature::api(action)` 将其发布为 JSON（参见 [API 与 OpenAPI](api.md)）。
 - `Feature::search(action)` 为命令面板添加服务器端搜索。
 
-每条路径都会运行相同的检查：浏览器调用的 CSRF 检查、Feature 的守卫（guard）、action 的访问控制，然后是拦截器（interceptor）。
+每条路径都会运行相同的检查：浏览器调用的 CSRF 检查、Feature 的 guard、action 的访问控制，然后是拦截器（interceptor）。

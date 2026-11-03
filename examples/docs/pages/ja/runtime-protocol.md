@@ -196,7 +196,7 @@ Effects:
 
 | ステータス | Body | 意味 |
 |---|---|---|
-| `403` | `{ "error": "forbidden", "message": "..." }` | 権限がない、guard に拒否された、または CSRF トークンが不正 |
+| `403` | `{ "error": "forbidden", "message": "..." }` | 権限がない、ガードに拒否された、または CSRF トークンが不正 |
 | `404` | `{ "error": "not_found", "message": "..." }` | 不明な Screen またはノード |
 | `409` | `{ "error": "conflict", "message": "..." }` | ほかの誰かがレコードを変更した |
 | `422` | 4.3 を参照 | 検証 |
@@ -235,7 +235,7 @@ Effects:
 - すべてのレスポンスは `Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`、`X-Content-Type-Options: nosniff`、`Referrer-Policy: same-origin` を設定します。`App::csp` は、指定した `https` ホストを `img-src`、`media-src`（および `blob:`）、`frame-src`、`connect-src`、`font-src` に追加します。ほかのディレクティブは変わりません。ヘッダーの文字列は起動時に一度だけ作られます。
 - インラインスクリプトやインラインイベントハンドラーはありません。インラインの `style` 属性は CSS カスタムプロパティ（`--z-width`、`--z-flex`）と固定の列幅にのみ使われるため、ポリシーに `style-src-attr 'unsafe-inline'` が加わっています。スクリプトは厳格なままです。
 - CSRF トークンは `HttpOnly`、`SameSite=Strict` の Cookie に保存され、`x-zeyn-csrf` ヘッダーと定数時間で比較されます。
-- 各呼び出しは次の順に確認します。認証、Screen のアクセス、feature の guard、ノードの action のアクセス。その後、interceptor と action を実行します。
+- 各呼び出しは次の順に確認します。認証、Screen のアクセス、feature のガード、ノードの action のアクセス。その後、インターセプターと action を実行します。
 
 ## 6. Runtime behavior
 
@@ -251,12 +251,12 @@ Effects:
 
 ### 7.1 Endpoints
 
-すべて、JSON と CSRF ヘッダーを使う `POST` で、最初に Screen のアクセスと feature の guard を確認します。
+すべて、JSON と CSRF ヘッダーを使う `POST` で、最初に Screen のアクセスと feature のガードを確認します。
 
 | エンドポイント | Body | 応答 |
 |---|---|---|
 | `/_zeyn/node` | `{ screen, params, node }` | 1 つのノードの HTML（その grid の最初のページ付き）。遅延 tabs で使われます。 |
-| `/_zeyn/data` | `{ screen, params, node, key, input }` | ノードのデータソース `key` からの JSON。lookup の選択肢（`key` はフィールド名）、tree の子（`key` は空）、ステップの確認（`key` は `_step`）。ソースの action 権限が確認され、grid と同様に interceptor が実行されます。action に合わない入力は `404` で拒否されます。 |
+| `/_zeyn/data` | `{ screen, params, node, key, input }` | ノードのデータソース `key` からの JSON。lookup の選択肢（`key` はフィールド名）、tree の子（`key` は空）、ステップの確認（`key` は `_step`）。ソースの action 権限が確認され、grid と同様にインターセプターが実行されます。action に合わない入力は `404` で拒否されます。 |
 | `/_zeyn/parse` | `{ kind, text, label }` | 入力された日付または時刻を、サーバーがユーザーの言語、ゾーン、時計でどう解釈するか。`{ ok, text, iso, utc, zone }` または `{ ok: false, message }`。`kind` は `date`、`time`、`datetime`、`local`、`presets`（今日とクイック範囲）です。 |
 
 ### 7.2 Values the forms submit
@@ -318,7 +318,7 @@ Effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":".
 
 ### 8.1 Commands and the palette
 
-コマンドは Rust で宣言され（`Command::open`、`Command::navigate`、`Command::effect`、`Command::action`）、`Feature::command` で登録されます。シェルは、ユーザーが実行できる（feature の guard を通り、コマンドの access が許可している）コマンドごとに、`div[data-zeyn-commands]` の中に非表示のボタンを 1 つ描画します。
+コマンドは Rust で宣言され（`Command::open`、`Command::navigate`、`Command::effect`、`Command::action`）、`Feature::command` で登録されます。シェルは、ユーザーが実行できる（feature のガードを通り、コマンドの access が許可している）コマンドごとに、`div[data-zeyn-commands]` の中に非表示のボタンを 1 つ描画します。
 
 | 属性 | 意味 |
 |---|---|
@@ -335,8 +335,8 @@ Effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":".
 
 | エンドポイント | Body | 応答 |
 |---|---|---|
-| `POST /_zeyn/command` | `{ command }` | サーバー側で入力が固定された action コマンドを実行します。CSRF、feature の guard、action の権限、interceptor。`{ effects }`。不明な ID と effect コマンドは `404` |
-| `POST /_zeyn/search` | `{ query }` | ユーザーが実行できるすべての `Feature::search` を実行します（CSRF、feature の guard、action の権限、interceptor）。クエリは 100 文字で切り詰められます。`{ hits: [{ label, group, url }] }`。最大 20 件で、アプリのパスのみ |
+| `POST /_zeyn/command` | `{ command }` | サーバー側で入力が固定された action コマンドを実行します。CSRF、feature のガード、action の権限、インターセプター。`{ effects }`。不明な ID と effect コマンドは `404` |
+| `POST /_zeyn/search` | `{ query }` | ユーザーが実行できるすべての `Feature::search` を実行します（CSRF、feature のガード、action の権限、インターセプター）。クエリは 100 文字で切り詰められます。`{ hits: [{ label, group, url }] }`。最大 20 件で、アプリのパスのみ |
 
 コンテナに `data-search` がある場合、パレットは最後のキー入力の 150 ms 後（2 文字以上）にクエリを送り、コマンドの下にヒットを一覧表示します。最新のクエリへの応答だけが描画されます。ヒットを選ぶと、`url` の前にベースパスを付けた `zeyn:navigate` が送られます。その中の `#anchor` は、Screen が差し替えられた後にその要素へスクロールします。
 
@@ -362,7 +362,7 @@ Effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":".
 | `POST /_zeyn/dock` | `{ screen, params, node, save: false }` | `{ layout }`: サインインしているユーザーの保存済みレイアウト、または `null` |
 | `POST /_zeyn/dock` | `{ screen, params, node, save: true, layout }` | `204`。`layout: null` で削除します |
 
-`layout` は、タブ順に並んだ `{ sizes: { left, right, bottom }, panels: [{ id, area, open, active }] }` です。サーバーは CSRF、Screen のアクセス、feature の guard を確認し、dock 自身のパネルだけを（それぞれ一度ずつ）残してサイズを範囲内に収め、アプリのビューストア（`App::datagrid_views`）に、テナント、Screen、ノードをキーとして保存します。ストアがない場合、エンドポイントは `404` を、ユーザーがいない場合は `403` を返し、その場合ブラウザはレイアウトを `localStorage` に保持します。
+`layout` は、タブ順に並んだ `{ sizes: { left, right, bottom }, panels: [{ id, area, open, active }] }` です。サーバーは CSRF、Screen のアクセス、feature のガードを確認し、dock 自身のパネルだけを（それぞれ一度ずつ）残してサイズを範囲内に収め、アプリのビューストア（`App::datagrid_views`）に、テナント、Screen、ノードをキーとして保存します。ストアがない場合、エンドポイントは `404` を、ユーザーがいない場合は `403` を返し、その場合ブラウザはレイアウトを `localStorage` に保持します。
 
 ## 9. AI agents: MCP and WebMCP
 
@@ -397,4 +397,4 @@ Effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":".
 | `POST /_zeyn/mcp` | JSON-RPC: `initialize`、`tools/list`、`tools/call`。`Authorization` ヘッダーとサインインしているユーザーが必要です |
 | `via_agent: true` 付きの `POST /_zeyn/form` | WebMCP の form 保存。WebMCP 付きの `Mcp::on()` が必要です。`confirmed: true` はユーザーが承諾した後にのみ |
 
-エージェントの呼び出しはすべてユーザーとして実行されます。Screen のアクセス、guard、action の権限、interceptor、レート制限、時間制限が適用されます。エージェントの呼び出しは常に監査され（`via_agent: true`）、マスクされたフィールドは、ユーザーが表示できる場合でも、エージェントに対しては常にマスクされたままです。OpenAPI は各操作に `x-zeyn-ai` を付けます。`ai = false` の場合は `false`、それ以外は `{ hint, confirm, writes }` です。
+エージェントの呼び出しはすべてユーザーとして実行されます。Screen のアクセス、ガード、action の権限、インターセプター、レート制限、時間制限が適用されます。エージェントの呼び出しは常に監査され（`via_agent: true`）、マスクされたフィールドは、ユーザーが表示できる場合でも、エージェントに対しては常にマスクされたままです。OpenAPI は各操作に `x-zeyn-ai` を付けます。`ai = false` の場合は `false`、それ以外は `{ hint, confirm, writes }` です。

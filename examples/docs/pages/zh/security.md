@@ -29,7 +29,7 @@ App::new(t!("app.name")).auth(
 
 ## Guards
 
-guard（守卫）在 Feature 的任何 screen 打开之前，以及它的任何 grid、form 或命令被调用之前运行：
+guard 在 Feature 的任何 screen 打开之前，以及它的任何 grid、form 或命令被调用之前运行：
 
 ```rust
 fn warehouse_open(ctx: &Ctx) -> GuardResult {

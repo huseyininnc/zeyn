@@ -55,7 +55,7 @@ pub struct Person {
 - 分页游标绝不包含被掩码字段的值。按被掩码字段排序的列表按位置而不是按主键分页。
 - 网格绝不按被掩码字段分组；对其调用 `group_by` 会被忽略并记录日志。
 - Island 以及其他数据源的输出在任意深度都会被掩码，与 API 输出一样：其中每个 model 的被掩码字段都会以掩码文本输出，敏感 model 的主键会被记录为读取。
-- 网格显示原值时，会通过网格的 action 以主键过滤条件来查找该行，因此该 action 必须支持对其主键字段的过滤。
+- 网格揭示原值时，会通过网格的 action 以主键过滤条件来查找该行，因此该 action 必须支持对其主键字段的过滤。
 - `#[mask]` 只能用于 `String` 和 `Option<String>`，否则无法编译。
 
 ## 敏感记录读取
@@ -64,7 +64,7 @@ pub struct Person {
 
 - `#[entity(table = "cases", sensitive)]`（或者在 `#[entity]` 下方写 `#[sensitive]`）用于标记一个 model。每当向用户展示这样的记录时，该调用的审计记录就会在 `reads` 中列出它（`{"model":"Case","id":"2"}`）：包括网格页中的行、表单、agent 工具结果和 API 输出。读取记录在数据被渲染的地方写入，因此布局内部的组件同样会被计入。
 - `#[screen(..., sensitive)]` 会把每次打开该屏幕记录为一次读取，其 `model` 为屏幕名称，`id` 为其 params，适用于展示不与某个 model 绑定的个人数据的屏幕。
-- `#[screen(..., reason)]` 还会在展示任何数据之前询问用户原因。在给出原因之前，服务器会对该页面、其片段、网格、表单和显示原值的调用返回 `428` 以及代码 `reason_required`（整页加载时返回带原因表单的页面）。运行时会弹出对话框询问，发送 `POST /_zeyn/reason {screen, reason}`（3 到 300 个字符），然后重复原请求。原因会保存在一个 `HttpOnly`、`SameSite=Strict` 的 cookie 中 15 分钟，只对给出原因的那个屏幕有效，并写入该屏幕每条审计记录的 `reason` 中。Agent 和 API 客户端无法给出原因，因此无法打开这类屏幕。
+- `#[screen(..., reason)]` 还会在展示任何数据之前询问用户原因。在给出原因之前，服务器会对该页面、其片段、网格、表单和揭示原值的调用返回 `428` 以及代码 `reason_required`（整页加载时返回带原因表单的页面）。运行时会弹出对话框询问，发送 `POST /_zeyn/reason {screen, reason}`（3 到 300 个字符），然后重复原请求。原因会保存在一个 `HttpOnly`、`SameSite=Strict` 的 cookie 中 15 分钟，只对给出原因的那个屏幕有效，并写入该屏幕每条审计记录的 `reason` 中。Agent 和 API 客户端无法给出原因，因此无法打开这类屏幕。
 - 对敏感 model 的网格进行导出（CSV、XLSX、PDF）时，每个文件写入一条审计记录，并设置 `export`：包含 model、格式、行数，以及所请求的排序和过滤条件。它们不会在 `reads` 中列出每一行，所以大型导出仍然开销很小；其他 model 的导出不产生额外开销。从 `sensitive` 或 `reason` 屏幕导出时，还会记录对该屏幕的读取。
 - 屏幕中的惰性部分（`POST /_zeyn/node`，由惰性标签页使用）会运行拦截器并记录读取，与打开屏幕完全一样。
 - `ctx.record_read(&record)` 可在应用代码中记录一次读取。
@@ -98,7 +98,7 @@ pub async fn move_leave(req: TransitionRequest<LeaveRequestId>, store: LeaveStor
 - `Transitions::of(flow, state, id, action)` 显示当前状态、一个可选的评论，以及用户可以从当前状态发起的每个迁移对应的一个按钮（`Workflow::allowed`）。记录主键来自服务器上的屏幕，因此客户端无法移动其他记录。Agent 将其视为一个表单工具。
 - 按钮标签来自目录中的 `workflow.<name>`；`.label(...)` 可手动设置一个。
 - `Workflow::check` 会报告无效的权限，以及从同一状态声明了两次的迁移；请在测试中调用它。
-- 展示应用（showcase）中的请假申请就使用了它：保存为草稿、提交，然后批准或拒绝。
+- showcase 中的请假申请就使用了它：保存为草稿、提交，然后批准或拒绝。
 
 ## 安全部署
 

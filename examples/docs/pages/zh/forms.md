@@ -60,7 +60,7 @@ Feature::new("support")
 Form::of(ticket).field(Ticket::title).file(Ticket::attachments, ATTACHMENTS)
 ```
 
-该控件是放在拖放区域内的原生文件输入。每个文件独立上传并带进度条，上传过程中可以取消，失败后可以重试，完成后可以移除。图片会显示由所选文件的对象 URL 生成的预览。进度和结果通过一个 polite 实时区域播报。展示应用在 `/uploads` 有一个可运行的示例；本文档站点没有已登录的用户，因此不显示实时上传。
+该控件是放在拖放区域内的原生文件输入。每个文件独立上传并带进度条，上传过程中可以取消，失败后可以重试，完成后可以移除。图片会显示由所选文件的对象 URL 生成的预览。进度和结果通过一个 polite 实时区域播报。showcase 在 `/uploads` 有一个可运行的示例；本文档站点没有已登录的用户，因此不显示实时上传。
 
 | 按键 | 作用 |
 |---|---|
@@ -78,6 +78,6 @@ Form::of(ticket).field(Ticket::title).file(Ticket::attachments, ATTACHMENTS)
 
 下载（`GET /_zeyn/files/{store}/{id}`）会检查 id 的形态、权限、guard 和租户，并通过媒体服务（参见 `docs/media.md`）处理：范围请求、实体标签和 `nosniff`。只有位图图片、音频和视频以内联方式提供；其余一律以 `application/octet-stream` 和 `Content-Disposition: attachment` 发送，附带带引号的 ASCII 名称和 UTF-8 名称，并带有 `Content-Security-Policy: sandbox`。
 
-`DiskStore` 在一个文件夹中保存 `{id}.bin` 和 `{id}.json`，并先把上传内容写到 `{id}.part`。`MemoryStore` 把文件保存在内存中并设有字节上限，用于测试和演示。表单值只是引用文件的名称：必须确认文件存在的保存 action 应调用 `store.meta(id)`，展示应用就是这样做的。
+`DiskStore` 在一个文件夹中保存 `{id}.bin` 和 `{id}.json`，并先把上传内容写到 `{id}.part`。`MemoryStore` 把文件保存在内存中并设有字节上限，用于测试和演示。表单值只是引用文件的名称：必须确认文件存在的保存 action 应调用 `store.meta(id)`，showcase 就是这样做的。
 
 预算：上传 256 MiB 的文件会使服务器堆增长约 0.4 MiB（`tests/files_memory.rs`）；该控件渲染 10 个 DOM 节点，每个文件再加 5 个；`files.js` 增加 12 KB 原始大小和 4 KB gzip 大小，`files.css` 增加 3 KB 原始大小和 1 KB gzip 大小。

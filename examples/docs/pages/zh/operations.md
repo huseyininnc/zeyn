@@ -38,8 +38,8 @@ App::new("Shop")
 
 - 文件为 JSON，许可证内容以文本形式放在 `payload` 中，签名放在 `signature` 中。被签名的内容是 `zeyn-license-v1\n` 后接 payload 文本，因此被签名的字节恰好就是存储的字节。
 - 私钥只保留在签名用的机器上。`keygen` 绝不会覆盖已有的密钥文件，新项目的 `.gitignore` 中已包含 `*.key`。`sign` 从 `--key`、`ZEYN_LICENSE_KEY` 变量或 `zeyn-license.key` 读取密钥，并拒绝没有 `holder` 的许可证，或 `valid_until` 不是 `YYYY-MM-DD` 格式的许可证。
-- 被修改的文件、用其他密钥签名的文件，或根本不是许可证的文件都会被拒绝：`License::from_signed` 返回 `LicenseError`（`BadSignature`、`InvalidPublicKey`、`Malformed`），服务器会记录原因，所有 `Licensed` 守卫都会以 "Your license does not cover this." 拒绝访问。无法读取的文件会保留上一份许可证，与任何失败的许可证来源一样。
-- 守卫在每次请求时按用户当地的今天检查有效期，因此过期的许可证会在无需重启的情况下以 "Your license has expired." 锁定应用。续期后的文件会在下次刷新时读取。
+- 被修改的文件、用其他密钥签名的文件，或根本不是许可证的文件都会被拒绝：`License::from_signed` 返回 `LicenseError`（`BadSignature`、`InvalidPublicKey`、`Malformed`），服务器会记录原因，所有 `Licensed` guard 都会以 "Your license does not cover this." 拒绝访问。无法读取的文件会保留上一份许可证，与任何失败的许可证来源一样。
+- guard 在每次请求时按用户当地的今天检查有效期，因此过期的许可证会在无需重启的情况下以 "Your license has expired." 锁定应用。续期后的文件会在下次刷新时读取。
 - ed25519 无法区分被修改的文件和用其他密钥签名的文件；两者都表现为签名不匹配，提示信息也如此说明。
 - `max_users` 会被携带并签名，但框架不强制执行；由应用自行决定什么算作一个用户。
 

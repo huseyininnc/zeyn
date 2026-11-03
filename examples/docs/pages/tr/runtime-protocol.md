@@ -362,7 +362,7 @@ Klavye: Sol ve Sağ (sağdan sola sayfalarda yansıtılmış olarak), Home ve En
 | `POST /_zeyn/dock` | `{ screen, params, node, save: false }` | `{ layout }`: oturum açmış kullanıcının kaydedilmiş düzeni veya `null` |
 | `POST /_zeyn/dock` | `{ screen, params, node, save: true, layout }` | `204`; `layout: null` siler |
 
-`layout`, sekme sırasıyla `{ sizes: { left, right, bottom }, panels: [{ id, area, open, active }] }` biçimindedir. Sunucu CSRF'yi, ekranın erişimini ve Feature'ın guard'larını denetler, yalnızca dock'un kendi panellerini tutar (her biri bir kez) ve boyutları sınırlar, ardından kiracı (tenant), ekran ve düğüm altında uygulamanın görünüm deposunda (`App::datagrid_views`) saklar. Depo yoksa endpoint `404`, kullanıcı yoksa `403` yanıtı verir; bu durumda tarayıcı düzeni `localStorage` içinde tutar.
+`layout`, sekme sırasıyla `{ sizes: { left, right, bottom }, panels: [{ id, area, open, active }] }` biçimindedir. Sunucu CSRF'yi, ekranın erişimini ve Feature'ın guard'larını denetler, yalnızca dock'un kendi panellerini tutar (her biri bir kez) ve boyutları sınırlar, ardından tenant, ekran ve düğüm altında uygulamanın görünüm deposunda (`App::datagrid_views`) saklar. Depo yoksa endpoint `404`, kullanıcı yoksa `403` yanıtı verir; bu durumda tarayıcı düzeni `localStorage` içinde tutar.
 
 ## 9. AI agents: MCP and WebMCP
 

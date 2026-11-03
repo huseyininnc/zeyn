@@ -307,7 +307,7 @@ async fn send_invoice(ctx: Ctx, invoice_id: String) -> Result<()> { ... }
 jobs.enqueue("send_invoice", "42").await?;
 ```
 
-- `JobStore` çalıştırmaları tutar: `enqueue`, `schedule`, kira (worker kimliği ve bitiş zamanı) ile
+- `JobStore` çalıştırmaları tutar: `enqueue`, `schedule`, lease (worker kimliği ve bitiş zamanı) ile
   `claim`, `heartbeat`, `complete` ve `fail`. `MemoryJobStore` (en fazla 10.000 çalıştırma, önce en
   eski başarısız çalıştırma atılır) varsayılandır; `SqlJobStore` (`postgres`, `oracle` feature'ları)
   çalıştırmaları `zeyn_jobs` içinde tutar. `create_job_tables(dialect, prefix)` bir migration için
@@ -320,7 +320,7 @@ jobs.enqueue("send_invoice", "42").await?;
 - Claim, bu sunucunun bildiği işlerin zamanı gelmiş çalıştırmalarını, en eskiden başlayarak alır ve
   onları `JOB_LEASE` (60 saniye) boyunca tutar; çalıştırma sürerken her 20 saniyede yenilenir.
   `complete` ve `fail`, bir çalıştırmayı yalnızca worker onu hâlâ tutarken değiştirir. Worker'ı
-  duran bir çalıştırma, kirası bitince yeniden claim edilir; kaybolan deneme sayılır, bu yüzden
+  duran bir çalıştırma, lease'i bitince yeniden claim edilir; kaybolan deneme sayılır, bu yüzden
   sunucusunu çökerten bir çalıştırma başarısız olarak biter.
 - Başarısız bir deneme, deneme hakkı kaldıkça backoff süresini bekler (ikiye katlanır, en fazla
   `MAX_BACKOFF_MS`, on dakika), sonra hata koduyla `failed` olarak kalır. Bir zamanlama sonraki
