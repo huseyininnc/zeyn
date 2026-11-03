@@ -1,0 +1,132 @@
+# पाठ और सामग्री
+
+लेख, प्रोफ़ाइल और सूचियों जैसे पढ़ने वाले पृष्ठ कुछ छोटे कंपोनेंट से बनते हैं। ये सर्वर पर रेंडर होने वाला सादा HTML हैं, इनमें कोई स्क्रिप्ट नहीं है, और हर पाठ locale फ़ाइलों से आता है या escape किया जाता है।
+
+@live content
+
+## Heading
+
+`Heading::h2(text)` से `Heading::h6(text)` तक। screen का शीर्षक पृष्ठ का एकमात्र `h1` है, इसलिए यहाँ `h1` नहीं है: वह स्तर चुनें जो रूपरेखा में अगला आता है, वह आकार नहीं जो आप चाहते हैं। `.id("anchor")` से लिंक इसकी ओर इशारा कर सकते हैं।
+
+```rust
+Heading::h2(t!("shop.new_arrivals")).id("new")
+```
+
+## Paragraph
+
+escape किए हुए पाठ का एक अनुच्छेद। `.muted()` द्वितीयक पाठ का रंग और `.small()` छोटा फ़ॉन्ट आकार उपयोग करता है। लंबे शब्द अगली पंक्ति में चले जाते हैं।
+
+```rust
+Paragraph::new(t!("shop.intro"))
+Paragraph::new(t!("shop.tax_note")).muted().small()
+```
+
+## MetaLine
+
+एक पंक्ति में छोटी जानकारियाँ, जैसे तारीख़, पढ़ने का समय और श्रेणी। विभाजक (जब तक `.separator("/")` कुछ और न कहे, एक मध्य बिंदु) स्क्रीन रीडर से छिपा रहता है, और खाली हिस्से छोड़ दिए जाते हैं।
+
+```rust
+MetaLine::new().part(article.published.format(ctx.locale())).part(t!("blog.read_time")).part(article.category.clone())
+```
+
+## PrevNext
+
+पिछले और अगले आइटम के लिंक, जिन पर `rel="prev"` और `rel="next"` होता है। ये पृष्ठ को फिर से लोड किए बिना खुलते हैं। "पिछला" और "अगला" शब्द framework के पाठों से आते हैं; `.prev_title` और `.next_title` इनके नीचे आइटम का शीर्षक जोड़ते हैं। दाएँ से बाएँ वाली भाषाओं में तीर पलट जाते हैं, और फ़ोन पर दोनों लिंक ऊपर-नीचे आ जाते हैं।
+
+```rust
+PrevNext::new()
+    .prev(article, ArticleParams { id: prev.id })
+    .prev_title(prev.title.clone())
+    .next(article, ArticleParams { id: next.id })
+    .next_title(next.title.clone())
+```
+
+## AutoGrid
+
+ऐसे ग्रिड में चाइल्ड, जिसके कॉलमों की संख्या उपलब्ध चौड़ाई के अनुसार बदलती है: कम से कम `min` पिक्सल (तय न करने पर 240) चौड़े जितने कॉलम समा सकें, और फ़ोन पर एक कॉलम। ब्राउज़र इसे `repeat(auto-fill, minmax(min(240px, 100%), 1fr))` से बिछाता है, इसलिए कोई ब्रेकपॉइंट और कोई स्क्रिप्ट नहीं है। इसमें कोई भी नोड रखा जा सकता है: कार्ड, पैनल, ग्रिड। यह नाम इसे `DataGrid` से अलग रखता है, जो डेटा की पंक्तियाँ दिखाता है।
+
+```rust
+AutoGrid::new()
+    .min(220)
+    .gap(4)
+    .add(Card::new().title(t!("home.orders")))
+    .add(Card::new().title(t!("home.stock")))
+    .add(Card::new().title(t!("home.people")))
+```
+
+@live autogrid
+
+## List
+
+एक `<ul>` में एक के नीचे एक पंक्तियाँ। हर `ListItem` का एक शीर्षक होता है और उसमें शुरू में एक छोटी छवि (कार्ड की छवियों जैसे ही सुरक्षित पते: एक पथ, `https:` या `data:image/`), एक उपशीर्षक और अंत में छोटा मेटा पाठ हो सकता है। `.link(screen, params)` के साथ पूरी पंक्ति एक लिंक बन जाती है, इसलिए यह टैब क्रम में एक ही पड़ाव है, इसका फ़ोकस रिंग दिखाई देता है, और यह पृष्ठ को फिर से लोड किए बिना खुलती है। लंबा पाठ अगली पंक्ति में चला जाता है; फ़ोन पर मेटा पाठ शीर्षक के नीचे आ जाता है, और दाएँ से बाएँ वाले पृष्ठों में पंक्ति उलट जाती है।
+
+`List::new()` उसे दिए गए आइटम रखती है। `List::of(action)` पंक्तियाँ उसी प्रकार के action से लोड करती है जो DataGrid उपयोग करता है, और [कार्ड ग्रिड](catalog.md#card-grid) की तरह पृष्ठांकन करती है: जब तक `paging` कुछ और न कहे, 20 पंक्तियाँ और एक "Show more" बटन, क्रम के विकल्प, `.search(text)` से सर्वर-पक्ष की खोज, और हर पृष्ठ के लिए action की पहुँच की जाँच।
+
+```rust
+List::new()
+    .title(t!("team.title"))
+    .item(ListItem::new("Ada Lovelace").subtitle(t!("team.math")))
+    .item(ListItem::new("Alan Turing").subtitle(t!("team.computing")).meta(t!("team.lead")))
+
+List::of(search_people)
+    .title(t!("people.title"))
+    .item(|p: &Person| {
+        ListItem::new(p.name.clone())
+            .image(p.photo.clone())
+            .subtitle(p.city.clone())
+            .meta(p.joined.format(&locale))
+            .link(person, PersonParams { id: p.id })
+    })
+    .sort_option(t!("people.by_name"), Person::name, false)
+    .paging(Paging::pages(20))
+```
+
+@live list
+
+## Avatar
+
+किसी व्यक्ति या टीम की गोल तस्वीर, 32, 40 या 64 पिक्सल की (`AvatarSize::Small`, `Medium`, `Large`)। नाम अनिवार्य है: यह वैकल्पिक पाठ है और उन आद्याक्षरों का स्रोत है जो तब दिखते हैं जब कोई तस्वीर न हो, या जब तस्वीर ऐसे होस्ट पर हो जिसे ऐप का `img-src` अनुमति नहीं देता (`Image` जैसा ही नियम)। आद्याक्षर भाषा के बड़े अक्षरों का पालन करते हैं, इसलिए तुर्की का `i` `İ` बन जाता है। जब नाम अवतार के ठीक बगल में लिखा हो, तो `.decorative()` अवतार को स्क्रीन रीडर से छिपा देता है ताकि वे नाम दो बार न पढ़ें।
+
+```rust
+Avatar::new(p.name.clone()).image(p.photo.clone()).size(AvatarSize::Large)
+Avatar::new(p.name.clone()).size(AvatarSize::Small).decorative()
+```
+
+## Spoiler
+
+वह सामग्री जो पाठक के खोलने तक छिपी रहती है, जैसे किसी प्रश्न का उत्तर। यह एक नेटिव डिस्क्लोज़र (`<details>` और `<summary>`) है, इसलिए यह बिना किसी स्क्रिप्ट के कीबोर्ड और स्क्रीन रीडर के साथ काम करता है, और सामग्री खुलने तक पढ़ने के क्रम से बाहर रहती है। लेबल ऐप से आता है।
+
+```rust
+Spoiler::new(t!("quiz.show_answer")).add(Paragraph::new(answer.clone()))
+```
+
+@live people
+
+## AlphaIndex
+
+अक्षरों की एक पट्टी, जिसका हर अक्षर किसी ऐसे screen का लिंक है जिसके params में वह अक्षर होता है, जैसे वे लोग जिनके नाम उससे शुरू होते हैं। अक्षर उपयोगकर्ता की भाषा से, उसी के अपने क्रम में आते हैं (`zeyn::ui::alphabet`): तुर्की में `Ç Ğ I İ Ö Ş Ü` अपनी जगह पर हैं, स्पेनिश में `Ñ` है, रूसी और अरबी की अपनी वर्णमालाएँ हैं, और हर दूसरी भाषा को `A` से `Z` मिलता है। जो screen दिखाया जा रहा है उसका अक्षर `aria-current="page"` से चिह्नित होता है (तुर्की का `i` `İ` को चिह्नित करता है), और `.other()` उन नामों के लिए अंत में एक `#` लिंक जोड़ता है जो किसी और चीज़ से शुरू होते हैं। लिंक पृष्ठ को फिर से लोड किए बिना खुलते हैं और फ़ोन पर कई पंक्तियों में बँट जाते हैं।
+
+```rust
+#[screen(route = "/people/{letter}", public)]
+pub fn people_by_letter(p: LetterParams) -> Screen {
+    Screen::new(t!("people.title"))
+        .body(AlphaIndex::new(people_by_letter, |l| LetterParams { letter: l.to_string() }).current(&p.letter).other())
+}
+```
+
+## WeekSchedule
+
+किसी action की पंक्तियों के सात दिन वाले कॉलम, जैसे किसी सप्ताह की कक्षाएँ, शिफ़्ट या कार्यक्रम। action वही प्रकार है जो DataGrid उपयोग करता है और उसकी जाँच भी उसी तरह होती है। `.day` एक पंक्ति को उसके दिन से जोड़ता है: एक `Date`, एक `Option<Date>` (बिना दिन वाली पंक्तियाँ छोड़ दी जाती हैं) या 1 (सोमवार) से 7 (रविवार) तक का सप्ताह-दिन संख्या; इसके अलावा कुछ भी कंपाइल नहीं होता। हर पंक्ति `ListItem` के रूप में दिखाई जाती है, इसलिए वह किसी screen से जुड़ सकती है। सप्ताह उपयोगकर्ता के पहले दिन से शुरू होता है (तुर्की में सोमवार, अमेरिकी अंग्रेज़ी में रविवार), आज चिह्नित होता है, बिना पंक्तियों वाले दिन यह बताते हैं, और संकरी स्क्रीन पर दिन ऊपर-नीचे आ जाते हैं। सर्वर action के क्रम में अधिकतम `limit` पंक्तियाँ लोड करता है (तय न करने पर 100, अधिकतम 500); action को सप्ताह की पंक्तियाँ दें, उदाहरण के लिए तारीख़ पर एक फ़िल्टर के साथ।
+
+```rust
+WeekSchedule::of(this_week_classes)
+    .title(t!("classes.this_week"))
+    .day(|c: &Class| c.date)
+    .item(|c: &Class| {
+        ListItem::new(c.name.clone())
+            .meta(c.starts.to_string())
+            .link(class, ClassParams { id: c.id })
+    })
+```
+
+@live week

@@ -27,6 +27,16 @@ CardGrid::of(catalog_products)
 ```
 
 - **Tarjetas.** `Card::image(image, title)` crea una tarjeta a partir de una fila, con `text`, `badge`, `alt` y `link` (una pantalla y sus params; toda la tarjeta es un enlace y se abre sin recargar la página). Las imágenes son diferidas, con el ancho y el alto de `image_size` para que la página no salte. El texto alternativo de la imagen está vacío, porque el título que hay junto a ella da nombre a la tarjeta; define `alt` cuando la imagen diga más. Las direcciones de imagen que no sean una ruta, `https:` o `data:image/` se omiten.
+- **Más en una tarjeta.** `subtitle` añade una segunda línea más tenue bajo el título (un autor, una categoría). `corner(badge)` coloca una insignia sobre la esquina final de la imagen, junto a `badge` en la inicial; `badges([...])` añade una fila de insignias bajo el texto, como etiquetas. `progress(fraction, label)` dibuja una barra fina a lo largo del borde inferior de la imagen para indicar cuánto está hecho: la fracción va de 0 a 1, y los lectores de pantalla oyen la etiqueta y el porcentaje (`role="progressbar"` con `aria-valuenow`). `horizontal()` dispone la tarjeta en una fila, con una imagen pequeña al principio y el texto a su lado; una cuadrícula de tarjetas o un rail con tarjetas así les da columnas más anchas. Todo ello funciona en un `CardGrid` y en un `Rail`.
+
+```rust
+Card::image(c.cover.clone(), c.title.clone())
+    .subtitle(c.teacher.clone())
+    .corner(Badge::new(t!("courses.new")).tone(Tone::Success))
+    .badges(c.tags.iter().map(|t| Badge::new(t.clone())))
+    .progress(c.done, t!("courses.done"))
+    .horizontal()
+```
 - **Paginación.** `Paging::infinite(n)` (el valor por defecto, 24) muestra un botón "Show more" que también se activa cuando entra en la vista al desplazarse; el foco pasa a la primera tarjeta nueva cuando se pulsa el botón. `Paging::pages(n)` muestra los botones anterior y siguiente y el número de página. El servidor fija el tamaño de página; el cliente solo indica dónde continuar.
 - **Ordenación.** Cada `sort_option` es un orden que los usuarios pueden elegir en un select; el primero es el orden con el que empiezan las tarjetas. El servidor acepta solo estos órdenes y descarta los filtros y el texto de búsqueda que envíe el cliente.
 - **Búsqueda.** `.search(text)` muestra solo las filas que coinciden con el texto libre ([`DataQuery::q`](#free-text)), como el texto de una pantalla de resultados.
