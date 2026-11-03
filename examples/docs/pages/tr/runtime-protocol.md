@@ -159,6 +159,20 @@ Gruplanmış ve ağaç grid'leri (`<table role="treegrid">`) bir dalı yüklemek
 | `GET /_zeyn/grid/export` | `?screen&params&node&q={sort,filters,columns}` | Eşleşen her satırı CSV olarak akıtır |
 | `POST /_zeyn/menu` | `{screen, params, item}` | Ekranın bağlam menüsündeki bir eylem öğesini çalıştırır |
 
+### 4.2.2 Virtual scrolling
+
+`data-zeyn-paging="virtual"` olan grid'ler, kaç satır olursa olsun tüm satırlar üzerinde tek bir kaydırılabilir liste gösterir. Sunucu, `data-zeyn-total` ile ilk bloğu (`data-zeyn-page-size` satır, ofset 0) oluşturur. Grid kökünde ayrıca `data-zeyn-row-height` (piksel) ve `--z-row-height` CSS değişkeni bulunur.
+
+Runtime:
+
+- Tablo gövdesini, iç ara parçası `total * rowHeight` piksel yüksekliğinde olan bir kaydırma kapsayıcısına koyar; yükseklik 8.000.000 pikselle sınırlıdır. Sınırın üstünde kaydırma konumu satır indeksine oranla eşlenir (`row = scrollTop / (spacerHeight - viewport) * (total - visibleRows)`), böylece 1.000.000 satırda da sona ulaşılır.
+- DOM'da yalnızca görünen satırları ve alt ile üstteki 20'şer satırı tutar; bunları `transform: translateY(...)` ile konumlandırır. Satırların yüksekliği sabittir; uzun metin üç noktayla kesilir.
+- `data-zeyn-page-size` satırlık blokları `POST /_zeyn/grid` ile ve `page: { "type": "offset", "offset": blockStart, "limit": blockSize }` kullanarak yükler; ilk çağrıdan sonra `with_total: false` olur. Önbellekte en fazla 20 blok tutar (en az son kullanılan çıkar), kaydırma yönündeki sonraki bloğu önceden getirir ve görünümden çıkan bloklar için istekleri iptal eder (`AbortController`).
+- Bir blok yüklenirken görünen satırları asla temizlemez. Eksik satırlar, blokları gelene kadar `aria-busy="true"` olan bir yer tutucu satır gösterir; böylece ekran yanıp sönmez.
+- Sıralama ve filtre değişiklikleri önbelleği düşürür ve en üste kaydırır.
+- Klavye: Ok tuşları, Page Up, Page Down, Home ve End etkin satırı taşır ve görünüme kaydırır. Tabloda `aria-rowcount` = total, her satırda `aria-rowindex` bulunur.
+- Konum metni (`data-zeyn-page-info`) `data-zeyn-text-range-total` değerini kullanır.
+
 ### 4.3 Form submit
 
 `POST /_zeyn/form`
@@ -222,20 +236,6 @@ Her yanıt `x-zeyn-build` taşır. Runtime'ın üzerinde işlem yaptığı retle
 - Satır içi betik veya satır içi olay işleyicisi yoktur. Satır içi `style` öznitelikleri yalnızca CSS özel özellikleri (`--z-width`, `--z-flex`) ve sabit sütun genişlikleri için kullanılır; bu yüzden politika `style-src-attr 'unsafe-inline'` ekler. Betikler sıkı kalır.
 - CSRF belirteci `HttpOnly`, `SameSite=Strict` bir çerezde saklanır ve `x-zeyn-csrf` başlığıyla sabit zamanlı karşılaştırılır.
 - Her çağrı sırasıyla şunları denetler: kimlik doğrulama, ekranın erişimi, Feature'ın guard'ları, düğüm eyleminin erişimi; ardından interceptor'ları ve eylemi çalıştırır.
-
-### 4.6 Virtual scrolling
-
-`data-zeyn-paging="virtual"` olan grid'ler, kaç satır olursa olsun tüm satırlar üzerinde tek bir kaydırılabilir liste gösterir. Sunucu, `data-zeyn-total` ile ilk bloğu (`data-zeyn-page-size` satır, ofset 0) oluşturur. Grid kökünde ayrıca `data-zeyn-row-height` (piksel) ve `--z-row-height` CSS değişkeni bulunur.
-
-Runtime:
-
-- Tablo gövdesini, iç ara parçası `total * rowHeight` piksel yüksekliğinde olan bir kaydırma kapsayıcısına koyar; yükseklik 8.000.000 pikselle sınırlıdır. Sınırın üstünde kaydırma konumu satır indeksine oranla eşlenir (`row = scrollTop / (spacerHeight - viewport) * (total - visibleRows)`), böylece 1.000.000 satırda da sona ulaşılır.
-- DOM'da yalnızca görünen satırları ve alt ile üstteki 20'şer satırı tutar; bunları `transform: translateY(...)` ile konumlandırır. Satırların yüksekliği sabittir; uzun metin üç noktayla kesilir.
-- `data-zeyn-page-size` satırlık blokları `POST /_zeyn/grid` ile ve `page: { "type": "offset", "offset": blockStart, "limit": blockSize }` kullanarak yükler; ilk çağrıdan sonra `with_total: false` olur. Önbellekte en fazla 20 blok tutar (en az son kullanılan çıkar), kaydırma yönündeki sonraki bloğu önceden getirir ve görünümden çıkan bloklar için istekleri iptal eder (`AbortController`).
-- Bir blok yüklenirken görünen satırları asla temizlemez. Eksik satırlar, blokları gelene kadar `aria-busy="true"` olan bir yer tutucu satır gösterir; böylece ekran yanıp sönmez.
-- Sıralama ve filtre değişiklikleri önbelleği düşürür ve en üste kaydırır.
-- Klavye: Ok tuşları, Page Up, Page Down, Home ve End etkin satırı taşır ve görünüme kaydırır. Tabloda `aria-rowcount` = total, her satırda `aria-rowindex` bulunur.
-- Konum metni (`data-zeyn-page-info`) `data-zeyn-text-range-total` değerini kullanır.
 
 ## 6. Runtime behavior
 

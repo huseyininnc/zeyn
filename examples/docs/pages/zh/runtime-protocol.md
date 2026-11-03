@@ -159,6 +159,20 @@ Effects：
 | `GET /_zeyn/grid/export` | `?screen&params&node&q={sort,filters,columns}` | 以 CSV 流式输出所有匹配的行 |
 | `POST /_zeyn/menu` | `{screen, params, item}` | 执行 Screen 上下文菜单中的某个 action 项 |
 
+### 4.2.2 Virtual scrolling（虚拟滚动）
+
+带有 `data-zeyn-paging="virtual"` 的 grid 在所有行之上显示一个可滚动的列表，无论共有多少行。服务端渲染第一个块（`data-zeyn-page-size` 行，偏移 0），并带有 `data-zeyn-total`。grid 根元素还带有 `data-zeyn-row-height`（像素）和 CSS 变量 `--z-row-height`。
+
+运行时的行为：
+
+- 把表格主体放进一个滚动容器，其内部占位元素高度为 `total * rowHeight` 像素，上限为 8,000,000 px。超过上限时，滚动位置按比例映射到行索引（`row = scrollTop / (spacerHeight - viewport) * (total - visibleRows)`），因此 1,000,000 行仍然可以滚到末尾。
+- DOM 中只保留可见行以及上下各 20 行，并用 `transform: translateY(...)` 定位。行高固定；过长的文本以省略号截断。
+- 以 `POST /_zeyn/grid` 加载每块 `data-zeyn-page-size` 行的数据块，使用 `page: { "type": "offset", "offset": blockStart, "limit": blockSize }`，首次调用之后 `with_total: false`。缓存最多保留 20 个块（最近最少使用者先淘汰），沿滚动方向预取下一个块，并取消已离开视野的块的请求（`AbortController`）。
+- 块加载期间从不清空可见行。缺失的行显示带有 `aria-busy="true"` 的占位行，直到其块到达，因此界面不会闪烁。
+- 排序和筛选变化会丢弃缓存并滚动到顶部。
+- 键盘：方向键、Page Up、Page Down、Home 和 End 移动活动行并将其滚动到可见位置。表格带有 `aria-rowcount` = total，每一行带有 `aria-rowindex`。
+- 位置文本（`data-zeyn-page-info`）使用 `data-zeyn-text-range-total`。
+
 ### 4.3 Form submit（表单提交）
 
 `POST /_zeyn/form`
@@ -222,20 +236,6 @@ Effects：
 - 没有内联脚本，也没有内联事件处理器。内联 `style` 属性只用于 CSS 自定义属性（`--z-width`、`--z-flex`）和固定的列宽，因此策略中加入了 `style-src-attr 'unsafe-inline'`。脚本仍保持严格限制。
 - CSRF 令牌存放在 `HttpOnly`、`SameSite=Strict` 的 cookie 中，并以常量时间与 `x-zeyn-csrf` 请求头比较。
 - 每次调用依次检查：身份认证、Screen 的访问权限、Feature 的 guard、节点 action 的访问权限，然后运行拦截器（interceptor）和 action。
-
-### 4.6 Virtual scrolling（虚拟滚动）
-
-带有 `data-zeyn-paging="virtual"` 的 grid 在所有行之上显示一个可滚动的列表，无论共有多少行。服务端渲染第一个块（`data-zeyn-page-size` 行，偏移 0），并带有 `data-zeyn-total`。grid 根元素还带有 `data-zeyn-row-height`（像素）和 CSS 变量 `--z-row-height`。
-
-运行时的行为：
-
-- 把表格主体放进一个滚动容器，其内部占位元素高度为 `total * rowHeight` 像素，上限为 8,000,000 px。超过上限时，滚动位置按比例映射到行索引（`row = scrollTop / (spacerHeight - viewport) * (total - visibleRows)`），因此 1,000,000 行仍然可以滚到末尾。
-- DOM 中只保留可见行以及上下各 20 行，并用 `transform: translateY(...)` 定位。行高固定；过长的文本以省略号截断。
-- 以 `POST /_zeyn/grid` 加载每块 `data-zeyn-page-size` 行的数据块，使用 `page: { "type": "offset", "offset": blockStart, "limit": blockSize }`，首次调用之后 `with_total: false`。缓存最多保留 20 个块（最近最少使用者先淘汰），沿滚动方向预取下一个块，并取消已离开视野的块的请求（`AbortController`）。
-- 块加载期间从不清空可见行。缺失的行显示带有 `aria-busy="true"` 的占位行，直到其块到达，因此界面不会闪烁。
-- 排序和筛选变化会丢弃缓存并滚动到顶部。
-- 键盘：方向键、Page Up、Page Down、Home 和 End 移动活动行并将其滚动到可见位置。表格带有 `aria-rowcount` = total，每一行带有 `aria-rowindex`。
-- 位置文本（`data-zeyn-page-info`）使用 `data-zeyn-text-range-total`。
 
 ## 6. Runtime behavior（运行时行为）
 

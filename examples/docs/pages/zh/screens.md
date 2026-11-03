@@ -94,10 +94,10 @@ pub fn catalog_page(p: CatalogParams, store: Catalog) -> Result<Screen> {
 | `permission = "..."` | 身份需要具有此权限 |
 | `public` | 任何人。没有会话的访客获得不带 cookie 的页面（参见[公共页面](public-pages.md)） |
 | `cache = 300` | 仅限公共 screen：浏览器和共享缓存可以在这么多秒内保留没有会话的访客所看到的页面（最多 86400） |
-
-页面还可以通过 `Screen` 上的 `.description(..)`、`.canonical(..)`、`.og_image(..)`、`.json_ld(..)` 和 `.robots(..)` 向搜索引擎和链接预览介绍自己；参见[公共页面](public-pages.md#search-engines-and-link-previews)。
 | `sensitive` | 打开它会被记录为对个人数据的一次读取 |
 | `reason` | 用户必须先给出理由才能打开（参见[审计、脱敏和作业](enterprise.md)） |
+
+页面还可以通过 `Screen` 上的 `.description(..)`、`.canonical(..)`、`.og_image(..)`、`.json_ld(..)` 和 `.robots(..)` 向搜索引擎和链接预览介绍自己；参见[公共页面](public-pages.md#search-engines-and-link-previews)。
 
 用户无权打开的 screen，其菜单项、工具栏按钮和命令会从 HTML 中省略。
 

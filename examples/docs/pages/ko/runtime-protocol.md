@@ -159,6 +159,20 @@ Effect:
 | `GET /_zeyn/grid/export` | `?screen&params&node&q={sort,filters,columns}` | 일치하는 모든 행을 CSV로 스트리밍합니다 |
 | `POST /_zeyn/menu` | `{screen, params, item}` | Screen의 컨텍스트 메뉴의 action 항목을 실행합니다 |
 
+### 4.2.2 가상 스크롤
+
+`data-zeyn-paging="virtual"`이 있는 그리드는 행이 아무리 많아도 모든 행에 걸친 하나의 스크롤 가능한 목록을 보여 줍니다. 서버는 `data-zeyn-total`과 함께 첫 번째 블록(`data-zeyn-page-size`행, 오프셋 0)을 렌더링합니다. 그리드 루트에는 `data-zeyn-row-height`(픽셀)와 CSS 변수 `--z-row-height`도 있습니다.
+
+런타임은 다음을 합니다.
+
+- 테이블 본문을 스크롤 컨테이너에 넣으며, 그 내부 스페이서의 높이는 `total * rowHeight` 픽셀이고 8,000,000 px로 제한됩니다. 상한을 넘으면 스크롤 위치가 비율로 행 인덱스에 매핑되므로(`row = scrollTop / (spacerHeight - viewport) * (total - visibleRows)`) 1,000,000행도 끝까지 도달합니다.
+- 보이는 행과 위아래 20행만 DOM에 유지하며 `transform: translateY(...)`로 배치합니다. 행의 높이는 고정이며 긴 텍스트는 줄임표로 잘립니다.
+- `POST /_zeyn/grid`와 `page: { "type": "offset", "offset": blockStart, "limit": blockSize }`로 `data-zeyn-page-size`행의 블록을 불러오며, 첫 호출 이후에는 `with_total: false`입니다. 최대 20개 블록을 캐시에 유지하고(가장 오래 사용하지 않은 것부터 제거), 스크롤 방향의 다음 블록을 미리 가져오며, 뷰를 벗어난 블록의 요청은 취소합니다(`AbortController`).
+- 블록을 불러오는 동안 보이는 행을 절대 지우지 않습니다. 없는 행은 해당 블록이 도착할 때까지 `aria-busy="true"`가 있는 자리 표시자 행을 표시하므로 화면이 깜박이지 않습니다.
+- 정렬과 필터가 바뀌면 캐시를 버리고 맨 위로 스크롤합니다.
+- 키보드: 화살표 키, Page Up, Page Down, Home, End는 활성 행을 이동하고 보이는 곳으로 스크롤합니다. 테이블에는 `aria-rowcount` = total이, 각 행에는 `aria-rowindex`가 있습니다.
+- 위치 텍스트(`data-zeyn-page-info`)는 `data-zeyn-text-range-total`을 사용합니다.
+
 ### 4.3 폼 제출
 
 `POST /_zeyn/form`
@@ -222,20 +236,6 @@ Effect:
 - 인라인 스크립트나 인라인 이벤트 핸들러는 없습니다. 인라인 `style` 속성은 CSS 사용자 지정 속성(`--z-width`, `--z-flex`)과 고정된 열 너비에만 사용되므로 정책은 `style-src-attr 'unsafe-inline'`을 추가합니다. 스크립트는 엄격하게 유지됩니다.
 - CSRF 토큰은 `HttpOnly`, `SameSite=Strict` 쿠키에 저장되며 `x-zeyn-csrf` 헤더와 일정한 시간으로 비교됩니다.
 - 각 호출은 순서대로 인증, Screen의 접근 권한, Feature의 가드, 노드 action의 접근 권한을 검사한 다음 인터셉터와 action을 실행합니다.
-
-### 4.6 가상 스크롤
-
-`data-zeyn-paging="virtual"`이 있는 그리드는 행이 아무리 많아도 모든 행에 걸친 하나의 스크롤 가능한 목록을 보여 줍니다. 서버는 `data-zeyn-total`과 함께 첫 번째 블록(`data-zeyn-page-size`행, 오프셋 0)을 렌더링합니다. 그리드 루트에는 `data-zeyn-row-height`(픽셀)와 CSS 변수 `--z-row-height`도 있습니다.
-
-런타임은 다음을 합니다.
-
-- 테이블 본문을 스크롤 컨테이너에 넣으며, 그 내부 스페이서의 높이는 `total * rowHeight` 픽셀이고 8,000,000 px로 제한됩니다. 상한을 넘으면 스크롤 위치가 비율로 행 인덱스에 매핑되므로(`row = scrollTop / (spacerHeight - viewport) * (total - visibleRows)`) 1,000,000행도 끝까지 도달합니다.
-- 보이는 행과 위아래 20행만 DOM에 유지하며 `transform: translateY(...)`로 배치합니다. 행의 높이는 고정이며 긴 텍스트는 줄임표로 잘립니다.
-- `POST /_zeyn/grid`와 `page: { "type": "offset", "offset": blockStart, "limit": blockSize }`로 `data-zeyn-page-size`행의 블록을 불러오며, 첫 호출 이후에는 `with_total: false`입니다. 최대 20개 블록을 캐시에 유지하고(가장 오래 사용하지 않은 것부터 제거), 스크롤 방향의 다음 블록을 미리 가져오며, 뷰를 벗어난 블록의 요청은 취소합니다(`AbortController`).
-- 블록을 불러오는 동안 보이는 행을 절대 지우지 않습니다. 없는 행은 해당 블록이 도착할 때까지 `aria-busy="true"`가 있는 자리 표시자 행을 표시하므로 화면이 깜박이지 않습니다.
-- 정렬과 필터가 바뀌면 캐시를 버리고 맨 위로 스크롤합니다.
-- 키보드: 화살표 키, Page Up, Page Down, Home, End는 활성 행을 이동하고 보이는 곳으로 스크롤합니다. 테이블에는 `aria-rowcount` = total이, 각 행에는 `aria-rowindex`가 있습니다.
-- 위치 텍스트(`data-zeyn-page-info`)는 `data-zeyn-text-range-total`을 사용합니다.
 
 ## 6. 런타임 동작
 

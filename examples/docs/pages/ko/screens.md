@@ -94,10 +94,10 @@ pub fn catalog_page(p: CatalogParams, store: Catalog) -> Result<Screen> {
 | `permission = "..."` | ID에 이 권한이 필요합니다 |
 | `public` | 누구나 가능합니다. 세션이 없는 방문자는 쿠키 없이 페이지를 받습니다([공개 페이지](public-pages.md) 참고) |
 | `cache = 300` | 공개 Screen 전용: 브라우저와 공유 캐시가 세션이 없는 방문자의 페이지를 이 시간(최대 86400)초 동안 보관할 수 있습니다 |
-
-페이지는 `Screen`의 `.description(..)`, `.canonical(..)`, `.og_image(..)`, `.json_ld(..)`, `.robots(..)`로 검색 엔진과 링크 미리 보기에 자신을 알리기도 합니다. [공개 페이지](public-pages.md#search-engines-and-link-previews)를 참고하십시오.
 | `sensitive` | 열면 개인 데이터의 읽기로 기록됩니다 |
 | `reason` | 열기 전에 사용자가 사유를 입력해야 합니다([감사, 마스킹, 작업](enterprise.md) 참고) |
+
+페이지는 `Screen`의 `.description(..)`, `.canonical(..)`, `.og_image(..)`, `.json_ld(..)`, `.robots(..)`로 검색 엔진과 링크 미리 보기에 자신을 알리기도 합니다. [공개 페이지](public-pages.md#search-engines-and-link-previews)를 참고하십시오.
 
 사용자가 열 수 없는 Screen을 여는 메뉴 항목, 툴바 버튼, 명령은 HTML에서 제외됩니다.
 

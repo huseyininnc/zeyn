@@ -159,6 +159,20 @@ Los grids agrupados y de árbol (`<table role="treegrid">`) envían `path` con `
 | `GET /_zeyn/grid/export` | `?screen&params&node&q={sort,filters,columns}` | Transmite por streaming todas las filas coincidentes como CSV |
 | `POST /_zeyn/menu` | `{screen, params, item}` | Ejecuta un elemento de acción del menú contextual de la pantalla |
 
+### 4.2.2 Scroll virtual
+
+Los grids con `data-zeyn-paging="virtual"` muestran una única lista desplazable sobre todas las filas, sean cuantas sean. El servidor renderiza el primer bloque (`data-zeyn-page-size` filas, offset 0) con `data-zeyn-total`. La raíz del grid también tiene `data-zeyn-row-height` (píxeles) y la variable CSS `--z-row-height`.
+
+El runtime:
+
+- Coloca el cuerpo de la tabla en un contenedor con scroll cuyo espaciador interno mide `total * rowHeight` píxeles de alto, con un tope de 8 000 000 px. Por encima del tope, la posición del scroll se asigna al índice de fila por proporción (`row = scrollTop / (spacerHeight - viewport) * (total - visibleRows)`), de modo que 1 000 000 de filas aún llegan hasta el final.
+- Mantiene en el DOM solo las filas visibles más 20 filas por encima y por debajo, posicionadas con `transform: translateY(...)`. Las filas tienen una altura fija; el texto largo se corta con puntos suspensivos.
+- Carga bloques de `data-zeyn-page-size` filas con `POST /_zeyn/grid` y `page: { "type": "offset", "offset": blockStart, "limit": blockSize }`, con `with_total: false` después de la primera llamada. Mantiene hasta 20 bloques en una caché (sale el menos usado recientemente), precarga el siguiente bloque en la dirección del scroll y cancela las peticiones de los bloques que salieron de la vista (`AbortController`).
+- Nunca borra las filas visibles mientras se carga un bloque. Las filas ausentes muestran una fila marcadora con `aria-busy="true"` hasta que llega su bloque, de modo que la pantalla no parpadea.
+- Los cambios de ordenación y de filtro descartan la caché y vuelven al inicio.
+- Teclado: las teclas de flecha, Page Up, Page Down, Home y End mueven la fila activa y la desplazan hasta dejarla a la vista. La tabla tiene `aria-rowcount` = total y cada fila `aria-rowindex`.
+- El texto de posición (`data-zeyn-page-info`) usa `data-zeyn-text-range-total`.
+
 ### 4.3 Envío de formulario
 
 `POST /_zeyn/form`
@@ -224,20 +238,6 @@ la petición).
 - Sin scripts en línea ni manejadores de eventos en línea. Los atributos `style` en línea se usan solo para propiedades personalizadas de CSS (`--z-width`, `--z-flex`) y anchos de columna fijos, por lo que la política añade `style-src-attr 'unsafe-inline'`. Los scripts siguen siendo estrictos.
 - El token CSRF se guarda en una cookie `HttpOnly`, `SameSite=Strict` y se compara en tiempo constante con la cabecera `x-zeyn-csrf`.
 - Cada llamada comprueba, por orden: la autenticación, el acceso de la pantalla, los guards de la feature, el acceso de la action del nodo, y luego ejecuta los interceptores y la action.
-
-### 4.6 Scroll virtual
-
-Los grids con `data-zeyn-paging="virtual"` muestran una única lista desplazable sobre todas las filas, sean cuantas sean. El servidor renderiza el primer bloque (`data-zeyn-page-size` filas, offset 0) con `data-zeyn-total`. La raíz del grid también tiene `data-zeyn-row-height` (píxeles) y la variable CSS `--z-row-height`.
-
-El runtime:
-
-- Coloca el cuerpo de la tabla en un contenedor con scroll cuyo espaciador interno mide `total * rowHeight` píxeles de alto, con un tope de 8 000 000 px. Por encima del tope, la posición del scroll se asigna al índice de fila por proporción (`row = scrollTop / (spacerHeight - viewport) * (total - visibleRows)`), de modo que 1 000 000 de filas aún llegan hasta el final.
-- Mantiene en el DOM solo las filas visibles más 20 filas por encima y por debajo, posicionadas con `transform: translateY(...)`. Las filas tienen una altura fija; el texto largo se corta con puntos suspensivos.
-- Carga bloques de `data-zeyn-page-size` filas con `POST /_zeyn/grid` y `page: { "type": "offset", "offset": blockStart, "limit": blockSize }`, con `with_total: false` después de la primera llamada. Mantiene hasta 20 bloques en una caché (sale el menos usado recientemente), precarga el siguiente bloque en la dirección del scroll y cancela las peticiones de los bloques que salieron de la vista (`AbortController`).
-- Nunca borra las filas visibles mientras se carga un bloque. Las filas ausentes muestran una fila marcadora con `aria-busy="true"` hasta que llega su bloque, de modo que la pantalla no parpadea.
-- Los cambios de ordenación y de filtro descartan la caché y vuelven al inicio.
-- Teclado: las teclas de flecha, Page Up, Page Down, Home y End mueven la fila activa y la desplazan hasta dejarla a la vista. La tabla tiene `aria-rowcount` = total y cada fila `aria-rowindex`.
-- El texto de posición (`data-zeyn-page-info`) usa `data-zeyn-text-range-total`.
 
 ## 6. Comportamiento del runtime
 

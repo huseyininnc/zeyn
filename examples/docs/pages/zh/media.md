@@ -91,8 +91,8 @@ document.addEventListener('zeyn:media-adaptive', (e) => {
 });
 ```
 
-请从应用自己的文件中加载该脚本（内联脚本会被内容安全策略阻止）。
+请从应用自己的文件中加载该脚本（内联脚本会被内容安全策略阻止）。当没有监听器调用 `preventDefault()` 时，`file` 条目会按顺序播放。播放列表和分段文件由同一个 source 提供，因此只要它们的 id 列在其中，它们的相对 URL 就能正常工作。
 
 ## 上传的文件
 
-通过 `Form::file` 上传的文件由 `GET /_zeyn/files/{store}/{id}` 提供，响应与媒体文件相同（范围请求、实体标签、`nosniff`，仅位图图像、音频和视频以内联方式提供），并在 store 的权限、feature 的守卫和租户检查之后进行。请参见 `examples/docs/pages/forms.md` 中关于文件上传的部分。当没有监听器调用 `preventDefault()` 时，`file` 条目会按顺序播放。播放列表和分段文件由同一个 source 提供，因此只要它们的 id 列在其中，它们的相对 URL 就能正常工作。
+通过 `Form::file` 上传的文件由 `GET /_zeyn/files/{store}/{id}` 提供，响应与媒体文件相同（范围请求、实体标签、`nosniff`，仅位图图像、音频和视频以内联方式提供），并在 store 的权限、feature 的守卫和租户检查之后进行。请参见 `examples/docs/pages/forms.md` 中关于文件上传的部分。

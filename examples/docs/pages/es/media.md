@@ -91,8 +91,8 @@ document.addEventListener('zeyn:media-adaptive', (e) => {
 });
 ```
 
-Carga ese script desde un archivo de tu app (los scripts en línea los bloquea la content security policy).
+Carga ese script desde un archivo de tu app (los scripts en línea los bloquea la content security policy). Cuando ningún listener llama a `preventDefault()`, las entradas `file` se reproducen en orden. Los archivos de lista de reproducción y de segmentos los sirve el mismo source, por lo que sus URL relativas funcionan siempre que sus ids estén listados en él.
 
 ## Archivos subidos
 
-Los archivos subidos mediante `Form::file` se sirven con `GET /_zeyn/files/{store}/{id}` con las mismas respuestas que los archivos multimedia (rangos, entity tags, `nosniff`, en línea solo para imágenes raster, audio y vídeo), después del permiso del store, los guards de la feature y una comprobación de tenant. Consulta la sección de subida de archivos de `examples/docs/pages/forms.md`. Cuando ningún listener llama a `preventDefault()`, las entradas `file` se reproducen en orden. Los archivos de lista de reproducción y de segmentos los sirve el mismo source, por lo que sus URL relativas funcionan siempre que sus ids estén listados en él.
+Los archivos subidos mediante `Form::file` se sirven con `GET /_zeyn/files/{store}/{id}` con las mismas respuestas que los archivos multimedia (rangos, entity tags, `nosniff`, en línea solo para imágenes raster, audio y vídeo), después del permiso del store, los guards de la feature y una comprobación de tenant. Consulta la sección de subida de archivos de `examples/docs/pages/forms.md`.

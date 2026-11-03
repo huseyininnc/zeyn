@@ -159,6 +159,20 @@ Effects:
 | `GET /_zeyn/grid/export` | `?screen&params&node&q={sort,filters,columns}` | 一致するすべての行を CSV としてストリーミングします |
 | `POST /_zeyn/menu` | `{screen, params, item}` | Screen のコンテキストメニューにある action 項目を実行します |
 
+### 4.2.2 Virtual scrolling
+
+`data-zeyn-paging="virtual"` を持つ grid は、行がいくつあっても、すべての行にわたる 1 つのスクロール可能なリストを表示します。サーバーは最初のブロック（`data-zeyn-page-size` 行、オフセット 0）を `data-zeyn-total` 付きでレンダリングします。grid ルートには `data-zeyn-row-height`（ピクセル）と CSS 変数 `--z-row-height` もあります。
+
+ランタイムの動作:
+
+- テーブル本体を、内側のスペーサーの高さが `total * rowHeight` ピクセル（上限 8,000,000 px）のスクロールコンテナに入れます。上限を超える場合、スクロール位置は比率で行インデックスに対応付けられる（`row = scrollTop / (spacerHeight - viewport) * (total - visibleRows)`）ため、1,000,000 行でも末尾に到達できます。
+- DOM には、表示中の行とその上下 20 行だけを保持し、`transform: translateY(...)` で配置します。行の高さは固定で、長いテキストは省略記号で切り詰められます。
+- `POST /_zeyn/grid` で、`data-zeyn-page-size` 行のブロックを `page: { "type": "offset", "offset": blockStart, "limit": blockSize }` として読み込み、最初の呼び出しの後は `with_total: false` にします。最大 20 ブロックをキャッシュに保持し（最も長く使われていないものから破棄）、スクロール方向の次のブロックを先読みし、表示範囲から外れたブロックのリクエストは取り消します（`AbortController`）。
+- ブロックの読み込み中、表示中の行を消すことはありません。足りない行は、そのブロックが届くまで `aria-busy="true"` のプレースホルダー行を表示するため、画面がちらつきません。
+- ソートやフィルターが変わると、キャッシュを破棄して先頭へスクロールします。
+- キーボード: 矢印キー、Page Up、Page Down、Home、End でアクティブな行が移動し、表示範囲にスクロールされます。テーブルには `aria-rowcount` = total が、各行には `aria-rowindex` が付きます。
+- 位置を示すテキスト（`data-zeyn-page-info`）は `data-zeyn-text-range-total` を使います。
+
 ### 4.3 Form submit
 
 `POST /_zeyn/form`
@@ -222,20 +236,6 @@ Effects:
 - インラインスクリプトやインラインイベントハンドラーはありません。インラインの `style` 属性は CSS カスタムプロパティ（`--z-width`、`--z-flex`）と固定の列幅にのみ使われるため、ポリシーに `style-src-attr 'unsafe-inline'` が加わっています。スクリプトは厳格なままです。
 - CSRF トークンは `HttpOnly`、`SameSite=Strict` の Cookie に保存され、`x-zeyn-csrf` ヘッダーと定数時間で比較されます。
 - 各呼び出しは次の順に確認します。認証、Screen のアクセス、feature の guard、ノードの action のアクセス。その後、interceptor と action を実行します。
-
-### 4.6 Virtual scrolling
-
-`data-zeyn-paging="virtual"` を持つ grid は、行がいくつあっても、すべての行にわたる 1 つのスクロール可能なリストを表示します。サーバーは最初のブロック（`data-zeyn-page-size` 行、オフセット 0）を `data-zeyn-total` 付きでレンダリングします。grid ルートには `data-zeyn-row-height`（ピクセル）と CSS 変数 `--z-row-height` もあります。
-
-ランタイムの動作:
-
-- テーブル本体を、内側のスペーサーの高さが `total * rowHeight` ピクセル（上限 8,000,000 px）のスクロールコンテナに入れます。上限を超える場合、スクロール位置は比率で行インデックスに対応付けられる（`row = scrollTop / (spacerHeight - viewport) * (total - visibleRows)`）ため、1,000,000 行でも末尾に到達できます。
-- DOM には、表示中の行とその上下 20 行だけを保持し、`transform: translateY(...)` で配置します。行の高さは固定で、長いテキストは省略記号で切り詰められます。
-- `POST /_zeyn/grid` で、`data-zeyn-page-size` 行のブロックを `page: { "type": "offset", "offset": blockStart, "limit": blockSize }` として読み込み、最初の呼び出しの後は `with_total: false` にします。最大 20 ブロックをキャッシュに保持し（最も長く使われていないものから破棄）、スクロール方向の次のブロックを先読みし、表示範囲から外れたブロックのリクエストは取り消します（`AbortController`）。
-- ブロックの読み込み中、表示中の行を消すことはありません。足りない行は、そのブロックが届くまで `aria-busy="true"` のプレースホルダー行を表示するため、画面がちらつきません。
-- ソートやフィルターが変わると、キャッシュを破棄して先頭へスクロールします。
-- キーボード: 矢印キー、Page Up、Page Down、Home、End でアクティブな行が移動し、表示範囲にスクロールされます。テーブルには `aria-rowcount` = total が、各行には `aria-rowindex` が付きます。
-- 位置を示すテキスト（`data-zeyn-page-info`）は `data-zeyn-text-range-total` を使います。
 
 ## 6. Runtime behavior
 

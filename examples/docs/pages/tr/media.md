@@ -91,8 +91,8 @@ document.addEventListener('zeyn:media-adaptive', (e) => {
 });
 ```
 
-Bu betiği uygulamanızın bir dosyasından yükleyin (satır içi betikler içerik güvenlik politikasıyla engellenir).
+Bu betiği uygulamanızın bir dosyasından yükleyin (satır içi betikler içerik güvenlik politikasıyla engellenir). Hiçbir dinleyici `preventDefault()` çağırmadığında `file` girdileri sırayla oynatılır. Oynatma listesi ve segment dosyaları aynı kaynaktan sunulur, bu yüzden id'leri onda listelendiği sürece göreli URL'leri çalışır.
 
 ## Yüklenen dosyalar
 
-`Form::file` ile yüklenen dosyalar, store'un izninden, feature'ın guard'larından ve bir tenant denetiminden sonra `GET /_zeyn/files/{store}/{id}` ile medya dosyalarıyla aynı yanıtlarla sunulur (aralıklar, entity tag'ler, `nosniff`, yalnızca raster görüntüler, ses ve video için satır içi). `examples/docs/pages/forms.md` içindeki dosya yükleme bölümüne bakın. Hiçbir dinleyici `preventDefault()` çağırmadığında `file` girdileri sırayla oynatılır. Oynatma listesi ve segment dosyaları aynı kaynaktan sunulur, bu yüzden id'leri onda listelendiği sürece göreli URL'leri çalışır.
+`Form::file` ile yüklenen dosyalar, store'un izninden, feature'ın guard'larından ve bir tenant denetiminden sonra `GET /_zeyn/files/{store}/{id}` ile medya dosyalarıyla aynı yanıtlarla sunulur (aralıklar, entity tag'ler, `nosniff`, yalnızca raster görüntüler, ses ve video için satır içi). `examples/docs/pages/forms.md` içindeki dosya yükleme bölümüne bakın.

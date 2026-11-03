@@ -94,10 +94,10 @@ pub fn catalog_page(p: CatalogParams, store: Catalog) -> Result<Screen> {
 | `permission = "..."` | Kimliğin bu permission'a sahip olması gerekir |
 | `public` | Herkes. Oturumu olmayan ziyaretçiler sayfayı çerezsiz alır ([Herkese açık sayfalar](public-pages.md) bölümüne bakın) |
 | `cache = 300` | Yalnızca herkese açık screen'ler: tarayıcılar ve paylaşımlı önbellekler, oturumu olmayan bir ziyaretçinin sayfasını bu kadar saniye saklayabilir (en fazla 86400) |
-
-Bir sayfa, arama motorlarına ve bağlantı önizlemelerine kendisini `Screen` üzerindeki `.description(..)`, `.canonical(..)`, `.og_image(..)`, `.json_ld(..)` ve `.robots(..)` ile de tanıtır; [Herkese açık sayfalar](public-pages.md#search-engines-and-link-previews) bölümüne bakın.
 | `sensitive` | Açılması, kişisel verinin okunması olarak kaydedilir |
 | `reason` | Kullanıcı açılmadan önce bir gerekçe vermelidir ([Denetim, maskeleme ve işler](enterprise.md) bölümüne bakın) |
+
+Bir sayfa, arama motorlarına ve bağlantı önizlemelerine kendisini `Screen` üzerindeki `.description(..)`, `.canonical(..)`, `.og_image(..)`, `.json_ld(..)` ve `.robots(..)` ile de tanıtır; [Herkese açık sayfalar](public-pages.md#search-engines-and-link-previews) bölümüne bakın.
 
 Kullanıcının açamayacağı bir screen'i açan menü öğeleri, araç çubuğu düğmeleri ve komutlar HTML'den çıkarılır.
 

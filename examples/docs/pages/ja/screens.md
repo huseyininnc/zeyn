@@ -94,10 +94,10 @@ pub fn catalog_page(p: CatalogParams, store: Catalog) -> Result<Screen> {
 | `permission = "..."` | ID にこの権限が必要です |
 | `public` | 誰でも開けます。セッションのない訪問者には、Cookie なしでページが返されます（[公開ページ](public-pages.md) を参照） |
 | `cache = 300` | 公開画面のみ。セッションのない訪問者のページを、ブラウザと共有キャッシュがこの秒数（最大 86400）だけ保持できます |
-
-ページは、`Screen` の `.description(..)`、`.canonical(..)`、`.og_image(..)`、`.json_ld(..)`、`.robots(..)` で、検索エンジンやリンクプレビューにも自身の情報を伝えます。[公開ページ](public-pages.md#search-engines-and-link-previews) を参照してください。
 | `sensitive` | 開くことが、個人データの読み取りとして記録されます |
 | `reason` | 開く前にユーザーが理由を入力する必要があります（[監査、マスキング、ジョブ](enterprise.md) を参照） |
+
+ページは、`Screen` の `.description(..)`、`.canonical(..)`、`.og_image(..)`、`.json_ld(..)`、`.robots(..)` で、検索エンジンやリンクプレビューにも自身の情報を伝えます。[公開ページ](public-pages.md#search-engines-and-link-previews) を参照してください。
 
 ユーザーが開けない画面を開くメニュー項目、ツールバーのボタン、コマンドは、HTML から省かれます。
 

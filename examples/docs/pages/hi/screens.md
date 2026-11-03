@@ -94,10 +94,10 @@ pub fn catalog_page(p: CatalogParams, store: Catalog) -> Result<Screen> {
 | `permission = "..."` | आइडेंटिटी को यह अनुमति चाहिए |
 | `public` | कोई भी। बिना सत्र वाले आगंतुकों को पृष्ठ बिना कुकी के मिलता है (देखें [सार्वजनिक पृष्ठ](public-pages.md)) |
 | `cache = 300` | केवल सार्वजनिक Screen: ब्राउज़र और साझा कैश बिना सत्र वाले आगंतुक का पृष्ठ इतने सेकंड (अधिकतम 86400) रख सकते हैं |
-
-पृष्ठ `Screen` पर `.description(..)`, `.canonical(..)`, `.og_image(..)`, `.json_ld(..)` और `.robots(..)` से सर्च इंजन और लिंक पूर्वावलोकन को अपने बारे में बताता भी है; देखें [सार्वजनिक पृष्ठ](public-pages.md#search-engines-and-link-previews)।
 | `sensitive` | इसे खोलना व्यक्तिगत डेटा के पठन के रूप में दर्ज होता है |
 | `reason` | खुलने से पहले उपयोगकर्ता को कारण देना होगा (देखें [ऑडिट, मास्किंग और जॉब](enterprise.md)) |
+
+पृष्ठ `Screen` पर `.description(..)`, `.canonical(..)`, `.og_image(..)`, `.json_ld(..)` और `.robots(..)` से सर्च इंजन और लिंक पूर्वावलोकन को अपने बारे में बताता भी है; देखें [सार्वजनिक पृष्ठ](public-pages.md#search-engines-and-link-previews)।
 
 जो Screen उपयोगकर्ता नहीं खोल सकता उसे खोलने वाले मेनू आइटम, टूलबार बटन और कमांड HTML से हटा दिए जाते हैं।
 

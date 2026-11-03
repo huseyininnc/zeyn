@@ -94,10 +94,10 @@ pub fn catalog_page(p: CatalogParams, store: Catalog) -> Result<Screen> {
 | `permission = "..."` | Субъекту нужно это разрешение |
 | `public` | Любой. Посетители без сессии получают страницу без cookie (см. [Public pages](public-pages.md)) |
 | `cache = 300` | Только для публичных экранов: браузеры и общие кэши могут хранить страницу посетителя без сессии указанное число секунд (не более 86400) |
-
-Страница также сообщает поисковым системам и предпросмотрам ссылок о себе через `.description(..)`, `.canonical(..)`, `.og_image(..)`, `.json_ld(..)` и `.robots(..)` у `Screen`; см. [Public pages](public-pages.md#search-engines-and-link-previews).
 | `sensitive` | Открытие записывается как чтение персональных данных |
 | `reason` | Пользователь должен указать причину, прежде чем экран откроется (см. [Audit, masking and jobs](enterprise.md)) |
+
+Страница также сообщает поисковым системам и предпросмотрам ссылок о себе через `.description(..)`, `.canonical(..)`, `.og_image(..)`, `.json_ld(..)` и `.robots(..)` у `Screen`; см. [Public pages](public-pages.md#search-engines-and-link-previews).
 
 Пункты меню, кнопки панели инструментов и команды, открывающие экран, который пользователю открывать нельзя, исключаются из HTML.
 

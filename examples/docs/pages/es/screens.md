@@ -94,10 +94,10 @@ pub fn catalog_page(p: CatalogParams, store: Catalog) -> Result<Screen> {
 | `permission = "..."` | La identidad necesita este permiso |
 | `public` | Cualquiera. Los visitantes sin sesión reciben la página sin cookies (consulta [Páginas públicas](public-pages.md)) |
 | `cache = 300` | Solo pantallas públicas: los navegadores y las cachés compartidas pueden guardar la página de un visitante sin sesión durante este número de segundos (como máximo 86400) |
-
-Una página también informa sobre sí misma a los buscadores y a las vistas previas de enlaces con `.description(..)`, `.canonical(..)`, `.og_image(..)`, `.json_ld(..)` y `.robots(..)` en el `Screen`; consulta [Páginas públicas](public-pages.md#search-engines-and-link-previews).
 | `sensitive` | Abrirla se registra como una lectura de datos personales |
 | `reason` | El usuario debe dar un motivo antes de que se abra (consulta [Auditoría, enmascarado y jobs](enterprise.md)) |
+
+Una página también informa sobre sí misma a los buscadores y a las vistas previas de enlaces con `.description(..)`, `.canonical(..)`, `.og_image(..)`, `.json_ld(..)` y `.robots(..)` en el `Screen`; consulta [Páginas públicas](public-pages.md#search-engines-and-link-previews).
 
 Los elementos de menú, los botones de la barra de herramientas y los comandos que abren una pantalla que el usuario no puede abrir se omiten del HTML.
 
