@@ -176,8 +176,9 @@ pub fn media_play(p: PlayParams) -> Result<Screen> {
     library_of(&p.item)
 }
 
-/// Content from other sites: a click to load player on a host of the app's `frame-src`, and an
-/// embed whose host is not listed, which renders a warning instead of a frame.
+/// Content from other sites: a click to load player on a host of the app's `frame-src` with a
+/// notice that is asked once per tab, and an embed whose host is not listed, which renders a
+/// warning instead of a frame.
 #[screen(route = "/external", permission = "showcase.media.play")]
 pub fn media_external() -> Result<Screen> {
     Ok(Screen::new(t!("media.external")).body(
@@ -187,7 +188,9 @@ pub fn media_external() -> Result<Screen> {
                     Embed::url("https://www.youtube-nocookie.com/embed/aqz-KE-bpKQ")
                         .title(t!("media.embed_title"))
                         .allow([EmbedPermission::Fullscreen, EmbedPermission::PictureInPicture])
-                        .click_to_load("/_zeyn/media/films/harbor.jpg"),
+                        .click_to_load("/_zeyn/media/films/harbor.jpg")
+                        .notice(t!("media.embed_notice"))
+                        .remember_for_session("showcase-video"),
                 ),
             )
             .col(
