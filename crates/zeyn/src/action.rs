@@ -55,7 +55,11 @@ pub struct Ai {
 
 impl Ai {
     /// Offered to models, no extra guidance, no confirmation beyond what writes need.
-    pub const DEFAULT: Ai = Ai { offered: true, hint: "", confirm: false };
+    pub const DEFAULT: Ai = Ai {
+        offered: true,
+        hint: "",
+        confirm: false,
+    };
 }
 
 impl Default for Ai {
@@ -181,18 +185,34 @@ pub struct Group {
 
 impl<M> Default for Page<M> {
     fn default() -> Self {
-        Self { items: Vec::new(), total: None, next: None, totals: Vec::new(), groups: Vec::new() }
+        Self {
+            items: Vec::new(),
+            total: None,
+            next: None,
+            totals: Vec::new(),
+            groups: Vec::new(),
+        }
     }
 }
 
 impl<M> Page<M> {
     pub fn new(items: Vec<M>) -> Self {
-        Self { items, total: None, next: None, totals: Vec::new(), groups: Vec::new() }
+        Self {
+            items,
+            total: None,
+            next: None,
+            totals: Vec::new(),
+            groups: Vec::new(),
+        }
     }
 
     /// Adds a column total. Data layers that page in SQL compute totals with one aggregate query.
     pub fn with_total(mut self, field: impl Into<String>, op: Aggregate, value: Value) -> Self {
-        self.totals.push(Total { field: field.into(), op, value });
+        self.totals.push(Total {
+            field: field.into(),
+            op,
+            value,
+        });
         self
     }
 
@@ -215,12 +235,21 @@ impl<M: Clone> Page<M> {
         let limit = query.limit() as usize;
         let start = match &query.page {
             PageRequest::Offset { offset, .. } => usize::try_from(*offset).unwrap_or(usize::MAX),
-            PageRequest::After { cursor, .. } => cursor.as_ref().and_then(|c| c.0.parse().ok()).unwrap_or(0),
+            PageRequest::After { cursor, .. } => cursor
+                .as_ref()
+                .and_then(|c| c.0.parse().ok())
+                .unwrap_or(0),
         }
         .min(all.len());
-        let end = start.saturating_add(limit).min(all.len());
+        let end = start
+            .saturating_add(limit)
+            .min(all.len());
         let page = Page::new(all[start..end].to_vec()).total(all.len() as u64);
-        if end < all.len() { page.next(Cursor(end.to_string())) } else { page }
+        if end < all.len() {
+            page.next(Cursor(end.to_string()))
+        } else {
+            page
+        }
     }
 }
 
@@ -236,12 +265,18 @@ pub enum PageRequest {
 
 impl Default for PageRequest {
     fn default() -> Self {
-        PageRequest::Offset { offset: 0, limit: DEFAULT_PAGE_SIZE }
+        PageRequest::Offset {
+            offset: 0,
+            limit: DEFAULT_PAGE_SIZE,
+        }
     }
 }
 
 /// Old name of [`DataQuery`]; kept for one release.
-#[deprecated(since = "0.0.2", note = "renamed to `DataQuery`; `zeyn check --fix` rewrites it")]
+#[deprecated(
+    since = "0.0.2",
+    note = "renamed to `DataQuery`; `zeyn check --fix` rewrites it"
+)]
 pub type GridQuery = DataQuery;
 
 /// Query a grid sends to the server.
@@ -393,12 +428,21 @@ pub struct Filter {
 impl Filter {
     /// Rows whose shown value contains `text`, ignoring case.
     pub fn contains(field: impl Into<String>, text: impl Into<String>) -> Self {
-        Self { field: field.into(), contains: text.into(), ..Self::default() }
+        Self {
+            field: field.into(),
+            contains: text.into(),
+            ..Self::default()
+        }
     }
 
     /// Rows whose value is between `from` and `to`, both inclusive; either may be open.
     pub fn range(field: impl Into<String>, from: Option<&str>, to: Option<&str>) -> Self {
-        Self { field: field.into(), from: from.map(Into::into), to: to.map(Into::into), ..Self::default() }
+        Self {
+            field: field.into(),
+            from: from.map(Into::into),
+            to: to.map(Into::into),
+            ..Self::default()
+        }
     }
 
     /// Rows whose choice is one of `values`.
@@ -407,22 +451,40 @@ impl Filter {
         I: IntoIterator<Item = S>,
         S: Into<String>,
     {
-        Self { field: field.into(), any_of: values.into_iter().map(Into::into).collect(), ..Self::default() }
+        Self {
+            field: field.into(),
+            any_of: values
+                .into_iter()
+                .map(Into::into)
+                .collect(),
+            ..Self::default()
+        }
     }
 
     /// Rows whose yes/no value is `value`.
     pub fn is(field: impl Into<String>, value: bool) -> Self {
-        Self { field: field.into(), is: Some(value), ..Self::default() }
+        Self {
+            field: field.into(),
+            is: Some(value),
+            ..Self::default()
+        }
     }
 
     /// Rows whose value is empty (`true`) or set (`false`).
     pub fn blank(field: impl Into<String>, empty: bool) -> Self {
-        Self { field: field.into(), blank: Some(empty), ..Self::default() }
+        Self {
+            field: field.into(),
+            blank: Some(empty),
+            ..Self::default()
+        }
     }
 
     /// Whether the filter sets no condition at all.
     pub fn is_empty(&self) -> bool {
-        let blank = |s: &Option<String>| s.as_deref().is_none_or(|v| v.trim().is_empty());
+        let blank = |s: &Option<String>| {
+            s.as_deref()
+                .is_none_or(|v| v.trim().is_empty())
+        };
         self.contains.trim().is_empty()
             && blank(&self.starts_with)
             && blank(&self.equals)

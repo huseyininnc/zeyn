@@ -45,7 +45,13 @@ impl Guard {
     /// A guard for `127.0.0.1:<port>` with fresh random secrets.
     pub fn new(port: u16, on_focus: Box<dyn Fn() + Send + Sync>) -> std::io::Result<Self> {
         let host = format!("127.0.0.1:{port}");
-        Ok(Self { token: secret()?, focus_key: secret()?, origin: format!("http://{host}"), host, on_focus })
+        Ok(Self {
+            token: secret()?,
+            focus_key: secret()?,
+            origin: format!("http://{host}"),
+            host,
+            on_focus,
+        })
     }
 
     /// The origin of the app, `http://127.0.0.1:<port>`.
@@ -65,7 +71,10 @@ impl Guard {
 
     /// Checks the host and origin of a request.
     pub fn check_origin(&self, h: &HeaderMap) -> Result<(), Refusal> {
-        if h.get(header::HOST).and_then(|v| v.to_str().ok()) != Some(self.host.as_str()) {
+        if h.get(header::HOST)
+            .and_then(|v| v.to_str().ok())
+            != Some(self.host.as_str())
+        {
             return Err(Refusal::Host);
         }
         match h.get(header::ORIGIN) {
@@ -83,9 +92,17 @@ impl Guard {
             .iter()
             .filter_map(|v| v.to_str().ok())
             .flat_map(|v| v.split(';'))
-            .find_map(|c| c.trim().strip_prefix(COOKIE).and_then(|r| r.strip_prefix('=')))
+            .find_map(|c| {
+                c.trim()
+                    .strip_prefix(COOKIE)
+                    .and_then(|r| r.strip_prefix('='))
+            })
             .map(str::as_bytes);
-        if header_token.into_iter().chain(cookie_token).any(|t| same(t, self.token.as_bytes())) {
+        if header_token
+            .into_iter()
+            .chain(cookie_token)
+            .any(|t| same(t, self.token.as_bytes()))
+        {
             Ok(())
         } else {
             Err(Refusal::Token)
@@ -93,16 +110,22 @@ impl Guard {
     }
 
     fn start(&self, query: Option<&str>) -> Response {
-        let given = query.unwrap_or("").split('&').find_map(|p| p.strip_prefix("t=")).unwrap_or("");
+        let given = query
+            .unwrap_or("")
+            .split('&')
+            .find_map(|p| p.strip_prefix("t="))
+            .unwrap_or("");
         if !same(given.as_bytes(), self.token.as_bytes()) {
             return refuse();
         }
         let cookie = format!("{COOKIE}={}; Path=/; HttpOnly; SameSite=Strict", self.token);
         let mut r = (StatusCode::SEE_OTHER, [(header::LOCATION, "/")]).into_response();
         if let Ok(v) = HeaderValue::from_str(&cookie) {
-            r.headers_mut().insert(header::SET_COOKIE, v);
+            r.headers_mut()
+                .insert(header::SET_COOKIE, v);
         }
-        r.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+        r.headers_mut()
+            .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
         r
     }
 }
@@ -117,7 +140,11 @@ pub async fn layer(State(g): State<Arc<Guard>>, req: Request, next: Next) -> Res
         };
     }
     if path == FOCUS && req.method() == Method::POST {
-        let key = req.headers().get(FOCUS_HEADER).map(HeaderValue::as_bytes).unwrap_or_default();
+        let key = req
+            .headers()
+            .get(FOCUS_HEADER)
+            .map(HeaderValue::as_bytes)
+            .unwrap_or_default();
         if g.check_origin(req.headers()).is_ok() && same(key, g.focus_key.as_bytes()) {
             (g.on_focus)();
             return StatusCode::NO_CONTENT.into_response();
@@ -131,19 +158,29 @@ pub async fn layer(State(g): State<Arc<Guard>>, req: Request, next: Next) -> Res
 }
 
 fn refuse() -> Response {
-    (StatusCode::FORBIDDEN, "This server only answers its own desktop window.").into_response()
+    (
+        StatusCode::FORBIDDEN,
+        "This server only answers its own desktop window.",
+    )
+        .into_response()
 }
 
 /// 32 random bytes as 64 hex characters.
 fn secret() -> std::io::Result<String> {
     let mut b = [0u8; 32];
     getrandom::getrandom(&mut b).map_err(|e| std::io::Error::other(e.to_string()))?;
-    Ok(b.iter().map(|x| format!("{x:02x}")).collect())
+    Ok(b.iter()
+        .map(|x| format!("{x:02x}"))
+        .collect())
 }
 
 /// Compares in time that depends only on the length.
 fn same(a: &[u8], b: &[u8]) -> bool {
-    a.len() == b.len() && a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
+    a.len() == b.len()
+        && a.iter()
+            .zip(b)
+            .fold(0u8, |acc, (x, y)| acc | (x ^ y))
+            == 0
 }
 
 #[cfg(test)]
@@ -166,9 +203,16 @@ mod tests {
     fn accepts_cookie_and_header_tokens_from_its_own_origin() {
         let g = guard();
         let cookie = format!("theme=dark; {COOKIE}={}", g.token);
-        assert_eq!(g.check(&headers(&[("host", "127.0.0.1:4321"), ("cookie", &cookie)])), Ok(()));
         assert_eq!(
-            g.check(&headers(&[("host", "127.0.0.1:4321"), ("origin", "http://127.0.0.1:4321"), (HEADER, &g.token)])),
+            g.check(&headers(&[("host", "127.0.0.1:4321"), ("cookie", &cookie)])),
+            Ok(())
+        );
+        assert_eq!(
+            g.check(&headers(&[
+                ("host", "127.0.0.1:4321"),
+                ("origin", "http://127.0.0.1:4321"),
+                (HEADER, &g.token)
+            ])),
             Ok(())
         );
     }
@@ -176,23 +220,50 @@ mod tests {
     #[test]
     fn refuses_requests_without_the_token() {
         let g = guard();
-        assert_eq!(g.check(&headers(&[("host", "127.0.0.1:4321")])), Err(Refusal::Token));
+        assert_eq!(
+            g.check(&headers(&[("host", "127.0.0.1:4321")])),
+            Err(Refusal::Token)
+        );
         let wrong = format!("{COOKIE}={}", "0".repeat(64));
-        assert_eq!(g.check(&headers(&[("host", "127.0.0.1:4321"), ("cookie", &wrong)])), Err(Refusal::Token));
+        assert_eq!(
+            g.check(&headers(&[("host", "127.0.0.1:4321"), ("cookie", &wrong)])),
+            Err(Refusal::Token)
+        );
         let prefix = format!("{COOKIE}x={}", g.token);
-        assert_eq!(g.check(&headers(&[("host", "127.0.0.1:4321"), ("cookie", &prefix)])), Err(Refusal::Token));
+        assert_eq!(
+            g.check(&headers(&[("host", "127.0.0.1:4321"), ("cookie", &prefix)])),
+            Err(Refusal::Token)
+        );
     }
 
     #[test]
     fn refuses_rebound_hosts_and_foreign_origins_even_with_the_token() {
         let g = guard();
-        for host in ["evil.example:4321", "localhost:4321", "127.0.0.1:4322", "127.0.0.1"] {
-            assert_eq!(g.check(&headers(&[("host", host), (HEADER, &g.token)])), Err(Refusal::Host), "{host}");
+        for host in [
+            "evil.example:4321",
+            "localhost:4321",
+            "127.0.0.1:4322",
+            "127.0.0.1",
+        ] {
+            assert_eq!(
+                g.check(&headers(&[("host", host), (HEADER, &g.token)])),
+                Err(Refusal::Host),
+                "{host}"
+            );
         }
         assert_eq!(g.check(&headers(&[(HEADER, &g.token)])), Err(Refusal::Host));
-        for origin in ["http://evil.example", "null", "http://localhost:4321", "https://127.0.0.1:4321"] {
+        for origin in [
+            "http://evil.example",
+            "null",
+            "http://localhost:4321",
+            "https://127.0.0.1:4321",
+        ] {
             assert_eq!(
-                g.check(&headers(&[("host", "127.0.0.1:4321"), ("origin", origin), (HEADER, &g.token)])),
+                g.check(&headers(&[
+                    ("host", "127.0.0.1:4321"),
+                    ("origin", origin),
+                    (HEADER, &g.token)
+                ])),
                 Err(Refusal::Origin),
                 "{origin}"
             );
@@ -206,8 +277,14 @@ mod tests {
         assert_eq!(g.start(None).status(), StatusCode::FORBIDDEN);
         let r = g.start(Some(&format!("t={}", g.token)));
         assert_eq!(r.status(), StatusCode::SEE_OTHER);
-        let cookie = r.headers()[header::SET_COOKIE].to_str().unwrap();
-        assert!(cookie.contains("HttpOnly") && cookie.contains("SameSite=Strict") && cookie.contains(&g.token));
+        let cookie = r.headers()[header::SET_COOKIE]
+            .to_str()
+            .unwrap();
+        assert!(
+            cookie.contains("HttpOnly")
+                && cookie.contains("SameSite=Strict")
+                && cookie.contains(&g.token)
+        );
     }
 
     #[test]
@@ -216,6 +293,9 @@ mod tests {
         assert_eq!(a.token.len(), 64);
         assert_ne!(a.token, b.token);
         assert_ne!(a.token, a.focus_key);
-        assert!(a.start_url().starts_with("http://127.0.0.1:4321/_desktop/start?t="));
+        assert!(
+            a.start_url()
+                .starts_with("http://127.0.0.1:4321/_desktop/start?t=")
+        );
     }
 }

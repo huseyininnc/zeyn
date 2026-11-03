@@ -166,20 +166,28 @@ impl Island {
         R: Remote,
         A: Action<Input = R::Input, Output = Result<R::Output>>,
     {
-        self.remotes.retain(|(k, _)| *k != R::NAME);
-        self.remotes.push((R::NAME, Box::new(ActionSource::<A>::new())));
+        self.remotes
+            .retain(|(k, _)| *k != R::NAME);
+        self.remotes
+            .push((R::NAME, Box::new(ActionSource::<A>::new())));
         self
     }
 
     /// Actions the island may call, by remote name.
     pub fn actions(&self) -> Vec<(&'static str, ActionMeta)> {
-        self.remotes.iter().map(|(k, s)| (*k, s.action())).collect()
+        self.remotes
+            .iter()
+            .map(|(k, s)| (*k, s.action()))
+            .collect()
     }
 }
 
 impl Component for Island {
     fn render(&self, out: &mut String, r: &Render) {
-        let described = self.description.as_ref().map(|_| dom_id(r, "island-description"));
+        let described = self
+            .description
+            .as_ref()
+            .map(|_| dom_id(r, "island-description"));
         out.push_str(&format!(
             r#"<div class="z-island" {MARKER}{}" data-zeyn-load="{}" data-zeyn-props="{}" role="region" aria-label="{}"{} data-testid="{}.island.{}">"#,
             escape(self.name),
@@ -195,7 +203,10 @@ impl Component for Island {
             escape(self.name),
         ));
         if let (Some(id), Some(text)) = (&described, &self.description) {
-            out.push_str(&format!(r#"<p class="z-island-description" id="{id}">{}</p>"#, r.text(text)));
+            out.push_str(&format!(
+                r#"<p class="z-island-description" id="{id}">{}</p>"#,
+                r.text(text)
+            ));
         }
         out.push_str(r#"<div class="z-island-fallback" data-zeyn-island-fallback>"#);
         for (i, node) in self.fallback.iter().enumerate() {
@@ -223,6 +234,9 @@ impl Component for Island {
     }
 
     fn source(&self, key: &str) -> Option<&dyn DataSource> {
-        self.remotes.iter().find(|(k, _)| *k == key).map(|(_, s)| s.as_ref())
+        self.remotes
+            .iter()
+            .find(|(k, _)| *k == key)
+            .map(|(_, s)| s.as_ref())
     }
 }

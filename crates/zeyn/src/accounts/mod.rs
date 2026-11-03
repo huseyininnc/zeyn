@@ -30,10 +30,13 @@ mod tokens;
 mod ui;
 
 pub use manager::{RoleManager, UserManager};
-pub use model::{AUTHENTICATOR_KEY, Claim, INTERNAL_PROVIDER, Passkey, RECOVERY_CODES, Role, User, UserLogin};
+pub use model::{
+    AUTHENTICATOR_KEY, Claim, INTERNAL_PROVIDER, Passkey, RECOVERY_CODES, Role, User, UserLogin,
+};
 pub use passkey::PasskeyOptions;
 pub use password::{
-    BreachedPasswords, MAX_PASSWORD_BYTES, PasswordDenyList, PasswordHasher, PasswordOptions, Verification, dotnet,
+    BreachedPasswords, MAX_PASSWORD_BYTES, PasswordDenyList, PasswordHasher, PasswordOptions,
+    Verification, dotnet,
 };
 pub use signin::{SignInManager, SignInResult, TwoFactorKind};
 #[cfg(any(feature = "postgres", feature = "oracle"))]
@@ -82,7 +85,8 @@ pub struct UserOptions {
 impl Default for UserOptions {
     fn default() -> Self {
         UserOptions {
-            allowed_user_name_characters: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._@+".into(),
+            allowed_user_name_characters:
+                "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._@+".into(),
             require_unique_email: false,
         }
     }
@@ -106,7 +110,10 @@ pub struct TokenOptions {
 
 impl Default for TokenOptions {
     fn default() -> Self {
-        TokenOptions { token_lifespan: Duration::from_secs(24 * 3600), authenticator_issuer: "Zeyn".into() }
+        TokenOptions {
+            token_lifespan: Duration::from_secs(24 * 3600),
+            authenticator_issuer: "Zeyn".into(),
+        }
     }
 }
 
@@ -192,7 +199,12 @@ impl Default for AccountOptions {
 /// ```
 pub fn normalize(name: &str) -> String {
     use unicode_normalization::UnicodeNormalization;
-    name.trim().nfc().collect::<String>().to_uppercase().nfc().collect()
+    name.trim()
+        .nfc()
+        .collect::<String>()
+        .to_uppercase()
+        .nfc()
+        .collect()
 }
 
 /// Random bytes from the operating system.
@@ -204,7 +216,14 @@ pub(crate) fn random_bytes<const N: usize>() -> [u8; N] {
 pub(crate) fn new_id() -> String {
     let b = random_bytes::<16>();
     let h = tokens::hex(&b);
-    format!("{}-{}-4{}-{}-{}", &h[0..8], &h[8..12], &h[13..16], &h[16..20], &h[20..32])
+    format!(
+        "{}-{}-4{}-{}-{}",
+        &h[0..8],
+        &h[8..12],
+        &h[13..16],
+        &h[16..20],
+        &h[20..32]
+    )
 }
 
 /// A new security or concurrency stamp: 160 random bits in base32, like ASP.NET Core Identity.
@@ -227,7 +246,13 @@ pub(crate) fn invalid_n(field: &'static str, code: &str, n: Option<usize>) -> cr
     if let Some(n) = n {
         text = text.arg("n", n.to_string());
     }
-    crate::Error::Validation(ValidationErrors { errors: vec![FieldError { field, rule: Rule::Custom, message: text }] })
+    crate::Error::Validation(ValidationErrors {
+        errors: vec![FieldError {
+            field,
+            rule: Rule::Custom,
+            message: text,
+        }],
+    })
 }
 
 /// A refusal shown as a message, from `zeyn.accounts.error.<code>`.
@@ -242,13 +267,23 @@ pub struct RolePermissions(BTreeMap<String, BTreeSet<String>>);
 
 impl RolePermissions {
     /// Permissions of holders of `role` (matched on its normalized name).
-    pub fn role<I: IntoIterator<Item = S>, S: Into<String>>(mut self, role: &str, permissions: I) -> Self {
-        self.0.entry(normalize(role)).or_default().extend(permissions.into_iter().map(Into::into));
+    pub fn role<I: IntoIterator<Item = S>, S: Into<String>>(
+        mut self,
+        role: &str,
+        permissions: I,
+    ) -> Self {
+        self.0
+            .entry(normalize(role))
+            .or_default()
+            .extend(permissions.into_iter().map(Into::into));
         self
     }
 
     pub(crate) fn of(&self, roles: &[String]) -> impl Iterator<Item = &String> {
-        roles.iter().filter_map(|r| self.0.get(&normalize(r))).flatten()
+        roles
+            .iter()
+            .filter_map(|r| self.0.get(&normalize(r)))
+            .flatten()
     }
 }
 
@@ -297,7 +332,10 @@ pub struct NoSender;
 
 impl AccountSender for NoSender {
     fn send(&self, _ctx: &Ctx, _to: &str, message: AccountMessage) -> BoxFuture<crate::Result<()>> {
-        tracing::warn!(?message, "accounts: no sender is set, the message was dropped");
+        tracing::warn!(
+            ?message,
+            "accounts: no sender is set, the message was dropped"
+        );
         Box::pin(async { Ok(()) })
     }
 }
@@ -308,18 +346,25 @@ pub struct MemorySender(Arc<Mutex<Vec<(String, AccountMessage)>>>);
 
 impl MemorySender {
     pub fn messages(&self) -> Vec<(String, AccountMessage)> {
-        self.0.lock().map(|m| m.clone()).unwrap_or_default()
+        self.0
+            .lock()
+            .map(|m| m.clone())
+            .unwrap_or_default()
     }
 
     /// The last link or code sent to `to`.
     pub fn last(&self, to: &str) -> Option<String> {
-        self.messages().into_iter().rev().find(|(t, _)| t == to).map(|(_, m)| match m {
-            AccountMessage::ConfirmEmail { link }
-            | AccountMessage::ResetPassword { link }
-            | AccountMessage::ChangeEmail { link }
-            | AccountMessage::AlreadyRegistered { link } => link,
-            AccountMessage::TwoFactorCode { code } | AccountMessage::PhoneCode { code } => code,
-        })
+        self.messages()
+            .into_iter()
+            .rev()
+            .find(|(t, _)| t == to)
+            .map(|(_, m)| match m {
+                AccountMessage::ConfirmEmail { link }
+                | AccountMessage::ResetPassword { link }
+                | AccountMessage::ChangeEmail { link }
+                | AccountMessage::AlreadyRegistered { link } => link,
+                AccountMessage::TwoFactorCode { code } | AccountMessage::PhoneCode { code } => code,
+            })
     }
 }
 
@@ -355,7 +400,9 @@ impl AccountSender for MailSender {
                 return Box::pin(async { Ok(()) });
             }
         };
-        let mail = crate::Mail::to(to).template(format!("zeyn.accounts.mail.{template}")).arg(name, value);
+        let mail = crate::Mail::to(to)
+            .template(format!("zeyn.accounts.mail.{template}"))
+            .arg(name, value);
         let sent = self.0.send(ctx, mail);
         Box::pin(async move { sent })
     }
@@ -408,7 +455,10 @@ pub struct MemoryAccountEvents(Arc<Mutex<Vec<AccountEvent>>>);
 
 impl MemoryAccountEvents {
     pub fn events(&self) -> Vec<AccountEvent> {
-        self.0.lock().map(|e| e.clone()).unwrap_or_default()
+        self.0
+            .lock()
+            .map(|e| e.clone())
+            .unwrap_or_default()
     }
 }
 
@@ -472,7 +522,10 @@ impl Accounts {
     pub fn new(store: impl AccountStore, key: Secret<String>) -> Accounts {
         let options = AccountOptions::default();
         let dummy = format!("dummy-{}", tokens::hex(&random_bytes::<16>()));
-        let dummy_hash = options.hasher.hash(&dummy).unwrap_or_default();
+        let dummy_hash = options
+            .hasher
+            .hash(&dummy)
+            .unwrap_or_default();
         Accounts(Arc::new(Core {
             #[cfg(feature = "oidc")]
             externals: Vec::new(),
@@ -492,7 +545,8 @@ impl Accounts {
     }
 
     fn change(self, f: impl FnOnce(&mut Core)) -> Accounts {
-        let mut core = Arc::try_unwrap(self.0).unwrap_or_else(|_| panic!("configure Accounts before cloning it"));
+        let mut core = Arc::try_unwrap(self.0)
+            .unwrap_or_else(|_| panic!("configure Accounts before cloning it"));
         f(&mut core);
         Accounts(Arc::new(core))
     }
@@ -501,7 +555,11 @@ impl Accounts {
     pub fn options(self, f: impl FnOnce(&mut AccountOptions)) -> Accounts {
         self.change(|c| {
             f(&mut c.options);
-            c.dummy_hash = c.options.hasher.hash("zeyn-dummy-password").unwrap_or_default();
+            c.dummy_hash = c
+                .options
+                .hasher
+                .hash("zeyn-dummy-password")
+                .unwrap_or_default();
         })
     }
 
@@ -521,13 +579,23 @@ impl Accounts {
     }
 
     /// Permissions of the holders of a role.
-    pub fn role<I: IntoIterator<Item = S>, S: Into<String>>(self, role: &str, permissions: I) -> Accounts {
+    pub fn role<I: IntoIterator<Item = S>, S: Into<String>>(
+        self,
+        role: &str,
+        permissions: I,
+    ) -> Accounts {
         self.change(|c| c.roles = std::mem::take(&mut c.roles).role(role, permissions))
     }
 
     /// Permissions every signed in user has, whatever their roles, such as reading a catalog.
-    pub fn signed_in_permissions<I: IntoIterator<Item = S>, S: Into<String>>(self, permissions: I) -> Accounts {
-        let list: Vec<String> = permissions.into_iter().map(Into::into).collect();
+    pub fn signed_in_permissions<I: IntoIterator<Item = S>, S: Into<String>>(
+        self,
+        permissions: I,
+    ) -> Accounts {
+        let list: Vec<String> = permissions
+            .into_iter()
+            .map(Into::into)
+            .collect();
         self.change(|c| c.everyone.extend(list))
     }
 
@@ -544,21 +612,36 @@ impl Accounts {
     #[cfg(feature = "oidc")]
     pub fn external(self, name: &str, mut provider: crate::auth::OidcAuth) -> Accounts {
         provider.finish();
-        let name =
-            name.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_').take(32).collect::<String>();
-        self.change(|c| c.externals.push((name, Arc::new(provider))))
+        let name = name
+            .chars()
+            .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+            .take(32)
+            .collect::<String>();
+        self.change(|c| {
+            c.externals
+                .push((name, Arc::new(provider)))
+        })
     }
 
     /// The external provider called `name`.
     #[cfg(feature = "oidc")]
     pub(crate) fn external_provider(&self, name: &str) -> Option<Arc<crate::auth::OidcAuth>> {
-        self.0.externals.iter().find(|(n, _)| n == name).map(|(_, p)| p.clone())
+        self.0
+            .externals
+            .iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, p)| p.clone())
     }
 
     /// Names of the external providers.
     pub fn external_names(&self) -> Vec<String> {
         #[cfg(feature = "oidc")]
-        return self.0.externals.iter().map(|(n, _)| n.clone()).collect();
+        return self
+            .0
+            .externals
+            .iter()
+            .map(|(n, _)| n.clone())
+            .collect();
         #[cfg(not(feature = "oidc"))]
         Vec::new()
     }
@@ -589,9 +672,17 @@ impl Accounts {
     pub(crate) fn problems(&self) -> Vec<String> {
         let mut problems = Vec::new();
         if self.0.sealer.is_none() {
-            problems.push(format!("Accounts: the key must be at least {} bytes", crate::auth::seal::MIN_SECRET));
+            problems.push(format!(
+                "Accounts: the key must be at least {} bytes",
+                crate::auth::seal::MIN_SECRET
+            ));
         }
-        if self.0.public_url.as_deref().is_some_and(|u| !(u.starts_with("https://") || u.starts_with("http://"))) {
+        if self
+            .0
+            .public_url
+            .as_deref()
+            .is_some_and(|u| !(u.starts_with("https://") || u.starts_with("http://")))
+        {
             problems
                 .push("Accounts: the public URL must start with https:// (or http:// for local development)".into());
         }
@@ -615,6 +706,13 @@ impl Accounts {
 
     /// An absolute link to an app path for messages: the public URL when set, else the path.
     pub(crate) fn link(&self, path: &str) -> String {
-        format!("{}{}{path}", self.0.public_url.as_deref().unwrap_or(""), scope::prefix())
+        format!(
+            "{}{}{path}",
+            self.0
+                .public_url
+                .as_deref()
+                .unwrap_or(""),
+            scope::prefix()
+        )
     }
 }

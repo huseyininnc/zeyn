@@ -10,13 +10,24 @@ use zeyn::{Component, Render};
 /// permission, filtered, sorted, searched and paged by the query.
 #[action(public)]
 pub async fn catalog_products(q: DataQuery, store: ProductStore) -> Result<Page<Product>> {
-    Ok(q.apply(store.all()?.into_iter().filter(|p| p.active).collect()))
+    Ok(q.apply(
+        store
+            .all()?
+            .into_iter()
+            .filter(|p| p.active)
+            .collect(),
+    ))
 }
 
 /// A placeholder picture for a product: a tinted square with the first letter of its name.
 fn picture(p: &Product) -> String {
     let hue = (p.id.0 * 47) % 360;
-    let letter = p.name.chars().next().map(String::from).unwrap_or_default();
+    let letter = p
+        .name
+        .chars()
+        .next()
+        .map(String::from)
+        .unwrap_or_default();
     format!(
         "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300'%3E%3Crect width='300' height='300' fill='hsl({hue} 45%25 62%25)'/%3E%3Ctext x='150' y='190' font-family='sans-serif' font-size='140' text-anchor='middle' fill='white'%3E{letter}%3C/text%3E%3C/svg%3E"
     )
@@ -28,7 +39,11 @@ fn card(locale: String) -> impl Fn(&Product) -> ImageCard + Send + Sync + 'stati
         let card = Card::image(picture(p), p.name.clone())
             .text(p.price.format(&locale))
             .link(shop_product, ProductPage { id: p.id });
-        if p.id.0 > 228 { card.badge(Badge::new(t!("shop.new")).tone(Tone::Success)) } else { card }
+        if p.id.0 > 228 {
+            card.badge(Badge::new(t!("shop.new")).tone(Tone::Success))
+        } else {
+            card
+        }
     }
 }
 
@@ -90,27 +105,35 @@ pub fn shop_home(_: (), ctx: Ctx) -> Screen {
 
 #[screen(route = "/shop/products", public)]
 pub fn shop_catalog(_: (), ctx: Ctx) -> Screen {
-    Screen::new(t!("shop.products")).body(search_box(String::new())).body(
-        CardGrid::of(catalog_products)
-            .card(card(ctx.locale().to_string()))
-            .sort_option(t!("shop.sort.name"), Product::name, false)
-            .sort_option(t!("shop.sort.cheapest"), Product::price, false)
-            .sort_option(t!("shop.sort.dearest"), Product::price, true)
-            .image_size(300, 300)
-            .paging(Paging::infinite(24)),
-    )
+    Screen::new(t!("shop.products"))
+        .body(search_box(String::new()))
+        .body(
+            CardGrid::of(catalog_products)
+                .card(card(ctx.locale().to_string()))
+                .sort_option(t!("shop.sort.name"), Product::name, false)
+                .sort_option(t!("shop.sort.cheapest"), Product::price, false)
+                .sort_option(t!("shop.sort.dearest"), Product::price, true)
+                .image_size(300, 300)
+                .paging(Paging::infinite(24)),
+        )
 }
 
 #[screen(route = "/shop/search", public)]
 pub fn shop_search(p: SearchParams, ctx: Ctx) -> Screen {
-    let title = if p.q.trim().is_empty() { t!("shop.search.all") } else { t!("shop.search.title", q = p.q.clone()) };
-    Screen::new(title).body(search_box(p.q.clone())).body(
-        CardGrid::of(catalog_products)
-            .card(card(ctx.locale().to_string()))
-            .search(p.q)
-            .image_size(300, 300)
-            .paging(Paging::pages(12)),
-    )
+    let title = if p.q.trim().is_empty() {
+        t!("shop.search.all")
+    } else {
+        t!("shop.search.title", q = p.q.clone())
+    };
+    Screen::new(title)
+        .body(search_box(p.q.clone()))
+        .body(
+            CardGrid::of(catalog_products)
+                .card(card(ctx.locale().to_string()))
+                .search(p.q)
+                .image_size(300, 300)
+                .paging(Paging::pages(12)),
+        )
 }
 
 #[screen(route = "/shop/product", public)]
@@ -162,13 +185,19 @@ pub fn feature() -> Feature {
                 .group(t!("shop.about.title"), Icon::Home)
                 .item(t!("shop.about.title"), shop_about)
         })
-        .shell(Shell::site().header(|h| h.sign_in().language().theme()).footer(|f| {
-            f.column(t!("shop.menu.help"), |c| {
-                c.link(t!("shop.delivery.title"), shop_delivery).link(t!("shop.returns.title"), shop_returns)
-            })
-            .column(t!("shop.footer.company"), |c| {
-                c.link(t!("shop.about.title"), shop_about).link(t!("shop.footer.panel"), crate::overview::overview)
-            })
-            .text(t!("shop.footer.note"))
-        }))
+        .shell(
+            Shell::site()
+                .header(|h| h.sign_in().language().theme())
+                .footer(|f| {
+                    f.column(t!("shop.menu.help"), |c| {
+                        c.link(t!("shop.delivery.title"), shop_delivery)
+                            .link(t!("shop.returns.title"), shop_returns)
+                    })
+                    .column(t!("shop.footer.company"), |c| {
+                        c.link(t!("shop.about.title"), shop_about)
+                            .link(t!("shop.footer.panel"), crate::overview::overview)
+                    })
+                    .text(t!("shop.footer.note"))
+                }),
+        )
 }

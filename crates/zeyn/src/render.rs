@@ -82,7 +82,16 @@ pub struct Render<'a> {
 
 impl<'a> Render<'a> {
     pub fn new(scope: &'a str, locale: &'a str, i18n: &'a crate::i18n::I18n) -> Self {
-        Self { scope, locale, i18n, tz: crate::time::TimeZone::UTC, identity: None, ctx: None, path: "", loaded: None }
+        Self {
+            scope,
+            locale,
+            i18n,
+            tz: crate::time::TimeZone::UTC,
+            identity: None,
+            ctx: None,
+            path: "",
+            loaded: None,
+        }
     }
 
     /// Sets who the page is for, so components can leave out what this user may not do.
@@ -93,7 +102,8 @@ impl<'a> Render<'a> {
 
     /// Whether the page's user passes an access rule. Without an identity, true.
     pub fn can(&self, access: &crate::action::Access) -> bool {
-        self.identity.is_none_or(|i| i.can(access))
+        self.identity
+            .is_none_or(|i| i.can(access))
     }
 
     /// Renders for the user of this request.
@@ -131,44 +141,85 @@ impl<'a> Render<'a> {
 
     /// Appends [`Render::value`] to `out` without building a string for the value first, for
     /// renderers that write many values, such as grid rows.
-    pub fn value_into(&self, out: &mut String, value: &crate::value::Value, kind: &crate::value::FieldKind) {
+    pub fn value_into(
+        &self,
+        out: &mut String,
+        value: &crate::value::Value,
+        kind: &crate::value::FieldKind,
+    ) {
         use crate::i18n::Text;
         use crate::value::{FieldKind, Value};
         use std::fmt::Write;
         match (value, kind) {
             (Value::Null, _) => {}
-            (Value::Bool(true), _) => escape_into(out, &self.i18n.text(self.locale, &Text::key("zeyn.yes"))),
-            (Value::Bool(false), _) => escape_into(out, &self.i18n.text(self.locale, &Text::key("zeyn.no"))),
+            (Value::Bool(true), _) => escape_into(
+                out,
+                &self
+                    .i18n
+                    .text(self.locale, &Text::key("zeyn.yes")),
+            ),
+            (Value::Bool(false), _) => escape_into(
+                out,
+                &self
+                    .i18n
+                    .text(self.locale, &Text::key("zeyn.no")),
+            ),
             (Value::Int(n), _) => {
                 let _ = write!(out, "{n}");
             }
             (Value::Decimal(x), _) => {
                 let hundredths = (x * 100.0).round();
                 if hundredths.is_finite() {
-                    let plain = crate::value::Money::new(hundredths as i64, Default::default()).format_plain(self.locale);
+                    let plain = crate::value::Money::new(hundredths as i64, Default::default())
+                        .format_plain(self.locale);
                     escape_into(out, &plain);
                 }
             }
-            (Value::Text(s), FieldKind::Choices(_)) => escape_into(out, &crate::ui::choices_text(s, kind, self)),
+            (Value::Text(s), FieldKind::Choices(_)) => {
+                escape_into(out, &crate::ui::choices_text(s, kind, self))
+            }
             (Value::Text(s), _) => escape_into(out, s),
             (Value::Money(m), _) => escape_into(out, &m.format(self.locale)),
             (Value::Number(d), _) => escape_into(out, &d.format(self.locale)),
             (Value::Date(d), _) => {
-                let _ = write!(out, r#"<time datetime="{d}">{}</time>"#, d.format(self.locale));
+                let _ = write!(
+                    out,
+                    r#"<time datetime="{d}">{}</time>"#,
+                    d.format(self.locale)
+                );
             }
             (Value::Time(t), _) => {
-                let _ = write!(out, r#"<time datetime="{t}">{}</time>"#, t.format(self.locale));
+                let _ = write!(
+                    out,
+                    r#"<time datetime="{t}">{}</time>"#,
+                    t.format(self.locale)
+                );
             }
             (Value::LocalDateTime(l), _) => {
-                let _ = write!(out, r#"<time datetime="{l}">{}</time>"#, l.format(self.locale));
+                let _ = write!(
+                    out,
+                    r#"<time datetime="{l}">{}</time>"#,
+                    l.format(self.locale)
+                );
             }
             (Value::DateTime(d), _) => {
-                let _ = write!(out, r#"<time datetime="{d}" title="{d}">{}</time>"#, d.format(self.tz, self.locale));
+                let _ = write!(
+                    out,
+                    r#"<time datetime="{d}" title="{d}">{}</time>"#,
+                    d.format(self.tz, self.locale)
+                );
             }
-            (Value::Choice(v), FieldKind::Choice(options)) => match options.iter().find(|o| o.value == *v) {
-                Some(o) => escape_into(out, &self.i18n.text(self.locale, &Text::key_or(o.key, o.label))),
-                None => escape_into(out, v),
-            },
+            (Value::Choice(v), FieldKind::Choice(options)) => {
+                match options.iter().find(|o| o.value == *v) {
+                    Some(o) => escape_into(
+                        out,
+                        &self
+                            .i18n
+                            .text(self.locale, &Text::key_or(o.key, o.label)),
+                    ),
+                    None => escape_into(out, v),
+                }
+            }
             (Value::Choice(v), _) => escape_into(out, v),
         }
     }

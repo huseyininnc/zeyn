@@ -32,9 +32,11 @@ pub fn people(p: LetterParams) -> Screen {
 
 #[test]
 fn alpha_index_follows_the_locale_alphabet_and_marks_the_current_letter() {
-    let bar = zeyn::ui::AlphaIndex::new(people, |l| LetterParams { letter: l.to_string() })
-        .current("i")
-        .other();
+    let bar = zeyn::ui::AlphaIndex::new(people, |l| LetterParams {
+        letter: l.to_string(),
+    })
+    .current("i")
+    .other();
     let tr = html(&bar, "tr");
     let letters: Vec<&str> = tr
         .split(r#"data-zeyn-base-href"#)
@@ -49,18 +51,33 @@ fn alpha_index_follows_the_locale_alphabet_and_marks_the_current_letter() {
             .count(),
         1
     );
-    assert!(tr.contains(r#"aria-current="page">İ<"#), "Turkish i is the dotted capital: {tr}");
-    assert!(tr.contains(r#"aria-label="Harfe göre gözat""#) && tr.contains(r#"aria-label="Diğer karakterler""#));
+    assert!(
+        tr.contains(r#"aria-current="page">İ<"#),
+        "Turkish i is the dotted capital: {tr}"
+    );
+    assert!(
+        tr.contains(r#"aria-label="Harfe göre gözat""#)
+            && tr.contains(r#"aria-label="Diğer karakterler""#)
+    );
     let en = html(&bar, "en");
     assert!(en.contains(r#"aria-current="page">I<"#), "{en}");
     assert!(en.contains("/_zeyn/route/people?params="), "{en}");
-    assert!(!html(&zeyn::ui::AlphaIndex::new(people, |l| LetterParams { letter: l.into() }), "zh").contains("#<"));
+    assert!(
+        !html(
+            &zeyn::ui::AlphaIndex::new(people, |l| LetterParams { letter: l.into() }),
+            "zh"
+        )
+        .contains("#<")
+    );
 }
 
 #[test]
 fn heading_writes_its_level_and_escapes_text() {
     let h = html(&Heading::h3("Tea <b>").id("tea time!"), "en");
-    assert_eq!(h, r#"<h3 class="z-heading z-heading-3" id="teatime">Tea &lt;b&gt;</h3>"#);
+    assert_eq!(
+        h,
+        r#"<h3 class="z-heading z-heading-3" id="teatime">Tea &lt;b&gt;</h3>"#
+    );
     assert!(html(&Heading::h6("x"), "en").starts_with("<h6"));
 }
 
@@ -101,7 +118,10 @@ fn prev_next_links_carry_rel_and_localized_words() {
     assert!(en.contains(r#"aria-label="Previous and next""#));
     let tr = html(&p, "tr");
     assert!(tr.contains("Önceki") && tr.contains("Sonraki"));
-    let only = html(&PrevNext::new().next(article, ArticleParams { id: 2 }), "en");
+    let only = html(
+        &PrevNext::new().next(article, ArticleParams { id: 2 }),
+        "en",
+    );
     assert!(!only.contains(r#"rel="prev""#) && only.contains("z-prevnext-gap"));
 }
 
@@ -113,7 +133,10 @@ fn auto_grid_lets_width_set_the_columns_and_keeps_child_paths() {
         .add(Paragraph::new("a"))
         .add(Paragraph::new("b"));
     let out = html(&grid, "en");
-    assert!(out.contains("--z-autogrid-min:1200px;--z-autogrid-gap:12"), "{out}");
+    assert!(
+        out.contains("--z-autogrid-min:1200px;--z-autogrid-gap:12"),
+        "{out}"
+    );
     assert!(out.contains(r#"data-zeyn-node="1""#));
     assert_eq!(grid.children().len(), 2);
     assert_eq!(grid.schema()["type"], "auto_grid");
@@ -122,7 +145,10 @@ fn auto_grid_lets_width_set_the_columns_and_keeps_child_paths() {
 #[test]
 fn avatars_show_initials_with_the_name_as_alt_text() {
     let a = html(&zeyn::ui::Avatar::new("ada <b> lovelace"), "en");
-    assert!(a.contains(r#"role="img" aria-label="ada &lt;b&gt; lovelace""#), "{a}");
+    assert!(
+        a.contains(r#"role="img" aria-label="ada &lt;b&gt; lovelace""#),
+        "{a}"
+    );
     assert!(a.contains(r#"<span aria-hidden="true">AL</span>"#), "{a}");
     let tr = html(&zeyn::ui::Avatar::new("ilker ışık"), "tr");
     assert!(tr.contains(">İI<"), "Turkish capitals: {tr}");
@@ -132,9 +158,18 @@ fn avatars_show_initials_with_the_name_as_alt_text() {
             .size(zeyn::ui::AvatarSize::Large),
         "en",
     );
-    assert!(pic.contains(r#"src="/img/ada.png" alt="Ada" width="64" height="64""#), "{pic}");
-    let outside = html(&zeyn::ui::Avatar::new("Ada").image("https://elsewhere.example/a.png"), "en");
-    assert!(!outside.contains("<img") && outside.contains(">A<"), "hosts outside img-src fall back to initials");
+    assert!(
+        pic.contains(r#"src="/img/ada.png" alt="Ada" width="64" height="64""#),
+        "{pic}"
+    );
+    let outside = html(
+        &zeyn::ui::Avatar::new("Ada").image("https://elsewhere.example/a.png"),
+        "en",
+    );
+    assert!(
+        !outside.contains("<img") && outside.contains(">A<"),
+        "hosts outside img-src fall back to initials"
+    );
     let quiet = html(&zeyn::ui::Avatar::new("Ada").decorative(), "en");
     assert!(quiet.contains(r#"aria-hidden="true""#) && !quiet.contains("aria-label"));
 }
@@ -162,10 +197,22 @@ pub struct Session {
 pub async fn week_sessions(q: DataQuery) -> Result<Page<Session>> {
     let at = |d: u8| Date::new(2026, 11, d);
     let rows = vec![
-        Session { name: "Yoga <am>".into(), day: at(2) },
-        Session { name: "Cycling".into(), day: at(4) },
-        Session { name: "Swim".into(), day: at(9) },
-        Session { name: "Unplanned".into(), day: None },
+        Session {
+            name: "Yoga <am>".into(),
+            day: at(2),
+        },
+        Session {
+            name: "Cycling".into(),
+            day: at(4),
+        },
+        Session {
+            name: "Swim".into(),
+            day: at(9),
+        },
+        Session {
+            name: "Unplanned".into(),
+            day: None,
+        },
     ];
     Ok(q.apply(rows))
 }
@@ -224,18 +271,33 @@ async fn week_schedules_place_rows_by_day_in_the_locales_week_and_mark_today() {
         .map(|(i, _)| &tr[i..i + 120])
         .collect();
     assert_eq!(days.len(), 7, "{tr}");
-    assert!(days[0].contains("Pazartesi") && days[6].contains("Pazar<"), "Monday first in Turkish: {days:?}");
+    assert!(
+        days[0].contains("Pazartesi") && days[6].contains("Pazar<"),
+        "Monday first in Turkish: {days:?}"
+    );
     assert!(tr.contains(r#"<section class="z-week-day z-week-today""#));
-    assert!(days[2].contains("Bugün"), "4 November 2026 is a Wednesday: {days:?}");
+    assert!(
+        days[2].contains("Bugün"),
+        "4 November 2026 is a Wednesday: {days:?}"
+    );
     let monday = &tr[tr.find("Pazartesi").unwrap()..tr.find("Salı").unwrap()];
-    assert!(monday.contains("Yoga &lt;am&gt;") && monday.contains("Swim"), "rows go by weekday: {monday}");
+    assert!(
+        monday.contains("Yoga &lt;am&gt;") && monday.contains("Swim"),
+        "rows go by weekday: {monday}"
+    );
     assert!(!tr.contains("Unplanned"), "rows without a day are left out");
     assert_eq!(tr.matches("Plan yok").count(), 5);
     let (_, en) = week_page("en", "week.read").await;
     let first = en
         .find(r#"class="z-week-name""#)
         .unwrap();
-    assert!(en[first..first + 120].contains("Sunday"), "Sunday first in English: {en}");
+    assert!(
+        en[first..first + 120].contains("Sunday"),
+        "Sunday first in English: {en}"
+    );
     let (_, denied) = week_page("en", "").await;
-    assert!(!denied.contains("Cycling"), "reading needs the action's permission");
+    assert!(
+        !denied.contains("Cycling"),
+        "reading needs the action's permission"
+    );
 }

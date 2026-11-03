@@ -104,7 +104,8 @@ path_ints!(i8, i16, i32, i64, u8, u16, u32, u64, usize);
 
 impl PathValue for String {
     fn from_segment(raw: &str) -> Option<Self> {
-        (!raw.is_empty() && raw != "." && raw != ".." && raw.len() <= MAX_SEGMENT).then(|| raw.to_string())
+        (!raw.is_empty() && raw != "." && raw != ".." && raw.len() <= MAX_SEGMENT)
+            .then(|| raw.to_string())
     }
 }
 
@@ -114,14 +115,20 @@ pub const MAX_SEGMENT: usize = 256;
 #[doc(hidden)]
 /// Reads a segment as the type of the params field `field` points to. The closure is never
 /// called; it only names the field, so a missing field is a compile error at the route.
-pub fn __path_value<P, T: PathValue>(raw: &str, field: impl Fn(&P) -> &T) -> Option<serde_json::Value> {
+pub fn __path_value<P, T: PathValue>(
+    raw: &str,
+    field: impl Fn(&P) -> &T,
+) -> Option<serde_json::Value> {
     let _ = field;
     T::from_segment(raw).and_then(|v| serde_json::to_value(v).ok())
 }
 
 /// Names of the path segments of a route: `["slug", "n"]` for `/catalog/{slug}/{n}`.
 pub(crate) fn route_segments(route: &str) -> impl Iterator<Item = &str> {
-    route.split('/').filter_map(|s| s.strip_prefix('{').and_then(|s| s.strip_suffix('}')))
+    route.split('/').filter_map(|s| {
+        s.strip_prefix('{')
+            .and_then(|s| s.strip_suffix('}'))
+    })
 }
 
 /// Whether a route has path segments. Usable in constant checks.
@@ -164,7 +171,10 @@ pub fn screen_url(path: &str, params: &serde_json::Value) -> Option<String> {
         if i > 0 {
             out.push('/');
         }
-        match part.strip_prefix('{').and_then(|p| p.strip_suffix('}')) {
+        match part
+            .strip_prefix('{')
+            .and_then(|p| p.strip_suffix('}'))
+        {
             Some(name) => {
                 let value = match fields.get(name)? {
                     serde_json::Value::Number(n) => n.to_string(),
@@ -177,8 +187,11 @@ pub fn screen_url(path: &str, params: &serde_json::Value) -> Option<String> {
         }
     }
     let segments: Vec<&str> = route_segments(path).collect();
-    let rest: serde_json::Map<String, serde_json::Value> =
-        fields.iter().filter(|(k, _)| !segments.contains(&k.as_str())).map(|(k, v)| (k.clone(), v.clone())).collect();
+    let rest: serde_json::Map<String, serde_json::Value> = fields
+        .iter()
+        .filter(|(k, _)| !segments.contains(&k.as_str()))
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
     if !rest.is_empty() {
         out.push_str("?params=");
         out.push_str(&encode(&serde_json::Value::Object(rest).to_string()));
@@ -276,7 +289,10 @@ impl Effect {
             && !url.contains('\\')
             && !url.chars().any(char::is_control)
             && url.len() <= 2048;
-        Effect::Go { url: if local { url.to_string() } else { "/".into() }, frame }
+        Effect::Go {
+            url: if local { url.to_string() } else { "/".into() },
+            frame,
+        }
     }
 
     /// Runs `then` only after the user confirms `message` in a dialog.
@@ -287,12 +303,18 @@ impl Effect {
     /// assert!(matches!(e, Effect::Confirm { .. }));
     /// ```
     pub fn confirm(message: impl Into<Text>, then: Effect) -> Effect {
-        Effect::Confirm { message: message.into(), then: Box::new(then) }
+        Effect::Confirm {
+            message: message.into(),
+            then: Box::new(then),
+        }
     }
 
     /// Goes to a screen in place, like a link. Params of the wrong type do not compile.
     pub fn navigate<S: ScreenDef>(_screen: S, params: S::Params) -> Effect {
-        Effect::Navigate { screen: S::META.name, params: params_json(&params) }
+        Effect::Navigate {
+            screen: S::META.name,
+            params: params_json(&params),
+        }
     }
 
     /// JSON sent to the client, with texts resolved in the user's language.
@@ -301,10 +323,15 @@ impl Effect {
             Effect::Toast { message } => {
                 json!({ "effect": "toast", "message": r.i18n.text(r.locale, message) })
             }
-            Effect::Notice { message, tone, action } => {
+            Effect::Notice {
+                message,
+                tone,
+                action,
+            } => {
                 let mut j = json!({ "effect": "toast", "message": r.i18n.text(r.locale, message), "tone": tone });
                 if let Some((label, then)) = action {
-                    j["action"] = json!({ "label": r.i18n.text(r.locale, label), "effect": then.to_json(r) });
+                    j["action"] =
+                        json!({ "label": r.i18n.text(r.locale, label), "effect": then.to_json(r) });
                 }
                 j
             }
@@ -345,7 +372,11 @@ pub struct Toast {
 
 impl Toast {
     fn of(tone: crate::grid::Tone, message: impl Into<Text>) -> Self {
-        Toast { message: message.into(), tone, action: None }
+        Toast {
+            message: message.into(),
+            tone,
+            action: None,
+        }
     }
 
     pub fn info(message: impl Into<Text>) -> Self {
@@ -375,7 +406,11 @@ impl Toast {
 
 impl From<Toast> for Effect {
     fn from(t: Toast) -> Self {
-        Effect::Notice { message: t.message, tone: t.tone, action: t.action }
+        Effect::Notice {
+            message: t.message,
+            tone: t.tone,
+            action: t.action,
+        }
     }
 }
 
@@ -385,7 +420,10 @@ pub struct Window;
 impl Window {
     /// Effect that opens a screen as a window. Params of the wrong type do not compile.
     pub fn open<S: ScreenDef>(_screen: S, params: S::Params) -> Effect {
-        Effect::OpenWindow { screen: S::META.name, params: params_json(&params) }
+        Effect::OpenWindow {
+            screen: S::META.name,
+            params: params_json(&params),
+        }
     }
 }
 
@@ -397,7 +435,9 @@ pub struct UiCtx {
 
 impl UiCtx {
     pub fn toast(&mut self, message: impl Into<Text>) {
-        self.effects.push(Effect::Toast { message: message.into() });
+        self.effects.push(Effect::Toast {
+            message: message.into(),
+        });
     }
 
     /// A toast with a tone and maybe an action button: `ui.notify(Toast::success(t!("saved")))`.
@@ -407,11 +447,15 @@ impl UiCtx {
 
     /// Closes the window and refreshes the screen that opened it.
     pub fn close_and_refresh(&mut self) {
-        self.effects.push(Effect::CloseAndRefresh);
+        self.effects
+            .push(Effect::CloseAndRefresh);
     }
 
     pub fn navigate<S: ScreenDef>(&mut self, _screen: S, params: S::Params) {
-        self.effects.push(Effect::Navigate { screen: S::META.name, params: params_json(&params) });
+        self.effects.push(Effect::Navigate {
+            screen: S::META.name,
+            params: params_json(&params),
+        });
     }
 
     /// Any effect, such as `Effect::confirm(...)`.
@@ -472,7 +516,12 @@ pub trait GridSource: Send + Sync {
     /// Loads rows as the user sees them: in a grouped or tree grid, the groups or rows under
     /// `path` (group values or ancestor keys from the client, checked here). Flat grids ignore
     /// `path`. Exports and bulk actions use [`GridSource::fetch`], which never groups.
-    fn fetch_at(&self, ctx: Ctx, query: DataQuery, path: Vec<Option<String>>) -> BoxFuture<Result<LoadedPage>> {
+    fn fetch_at(
+        &self,
+        ctx: Ctx,
+        query: DataQuery,
+        path: Vec<Option<String>>,
+    ) -> BoxFuture<Result<LoadedPage>> {
         let _ = path;
         self.fetch(ctx, query)
     }
@@ -567,7 +616,11 @@ pub trait GridSource: Send + Sync {
     }
 
     /// Columns of a typed export (XLSX) in a view: labels in the user's language and widths.
-    fn export_columns(&self, r: &Render, view: Option<&crate::grid::DataGridView>) -> Vec<crate::grid::ExportColumn> {
+    fn export_columns(
+        &self,
+        r: &Render,
+        view: Option<&crate::grid::DataGridView>,
+    ) -> Vec<crate::grid::ExportColumn> {
         let _ = (r, view);
         Vec::new()
     }
@@ -603,7 +656,12 @@ pub trait GridSource: Send + Sync {
     }
 
     /// The raw value of a masked field of the row with this key, for an audited reveal.
-    fn reveal(&self, _ctx: Ctx, _key: String, _field: String) -> BoxFuture<Result<Option<crate::privacy::Revealed>>> {
+    fn reveal(
+        &self,
+        _ctx: Ctx,
+        _key: String,
+        _field: String,
+    ) -> BoxFuture<Result<Option<crate::privacy::Revealed>>> {
         Box::pin(async { Ok(None) })
     }
 }
@@ -613,7 +671,11 @@ pub trait FormSource: Send + Sync {
     fn action(&self) -> ActionMeta;
 
     /// Parses submitted values, validates and runs the action. `values` holds what the user typed.
-    fn submit(&self, ctx: Ctx, values: serde_json::Map<String, serde_json::Value>) -> BoxFuture<Result<Vec<Effect>>>;
+    fn submit(
+        &self,
+        ctx: Ctx,
+        values: serde_json::Map<String, serde_json::Value>,
+    ) -> BoxFuture<Result<Vec<Effect>>>;
 
     /// JSON Schema of the values, for agent tools.
     fn tool_schema(&self) -> serde_json::Value;
@@ -755,7 +817,10 @@ impl Icon {
 
     /// Icon markup, hidden from screen readers.
     pub fn html(self) -> String {
-        format!(r#"<span class="z-icon z-icon-{}" aria-hidden="true"></span>"#, self.css())
+        format!(
+            r#"<span class="z-icon z-icon-{}" aria-hidden="true"></span>"#,
+            self.css()
+        )
     }
 }
 
@@ -790,6 +855,10 @@ struct ButtonSpec {
 }
 
 #[derive(Debug)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "nearly every entry of the list is the large variant, so boxing it would add an allocation per entry and save no memory"
+)]
 enum ToolItem {
     Button(ButtonSpec),
     Export(Export),
@@ -818,13 +887,16 @@ impl Toolbar {
 
     /// Export button for the grid on this screen.
     pub fn export(mut self, format: Export) -> Toolbar {
-        self.items.push(ToolItem::Export(format));
+        self.items
+            .push(ToolItem::Export(format));
         self
     }
 
     pub(crate) fn render(&self, out: &mut String, r: &Render, title: &str) {
         let scope = r.scope;
-        out.push_str(&format!(r#"<div class="z-toolbar" role="toolbar" aria-label="{title}">"#));
+        out.push_str(&format!(
+            r#"<div class="z-toolbar" role="toolbar" aria-label="{title}">"#
+        ));
         for (n, item) in self.items.iter().enumerate() {
             match item {
                 ToolItem::Button(b) => {
@@ -931,7 +1003,9 @@ impl ToolButton {
     }
 
     fn finish(mut self) -> Toolbar {
-        self.bar.items.push(ToolItem::Button(self.spec));
+        self.bar
+            .items
+            .push(ToolItem::Button(self.spec));
         self.bar
     }
 }
@@ -983,7 +1057,10 @@ impl Screen {
     /// }
     /// ```
     pub fn moved_to<S: ScreenDef>(_screen: S, params: S::Params) -> Self {
-        Self { moved: Some((S::META.name, params_json(&params))), ..Self::new("") }
+        Self {
+            moved: Some((S::META.name, params_json(&params))),
+            ..Self::new("")
+        }
     }
 
     /// Screen and params of [`Screen::moved_to`], if this screen moved.
@@ -992,7 +1069,8 @@ impl Screen {
     }
 
     fn head_mut(&mut self) -> &mut crate::seo::Head {
-        self.head.get_or_insert_with(Default::default)
+        self.head
+            .get_or_insert_with(Default::default)
     }
 
     /// Summary for search results and link previews: `<meta name="description">` and
@@ -1025,9 +1103,12 @@ impl Screen {
         let head = self.head_mut();
         match (tag, url) {
             (true, Some(url)) if head.alternates.len() < crate::seo::MAX_ALTERNATES => {
-                head.alternates.push((hreflang.to_string(), url));
+                head.alternates
+                    .push((hreflang.to_string(), url));
             }
-            (false, _) => tracing::warn!("hreflang `{hreflang}` is not a language tag or x-default; ignored"),
+            (false, _) => {
+                tracing::warn!("hreflang `{hreflang}` is not a language tag or x-default; ignored")
+            }
             _ => {}
         }
         self
@@ -1055,12 +1136,18 @@ impl Screen {
     /// Head tags of the page (description, canonical, alternates, preview image, robots, JSON-LD), empty
     /// when the screen sets none.
     pub fn head_html(&self, r: &Render, site: &str, prefix: &str) -> String {
-        self.head.as_ref().map(|h| h.render(r, site, prefix)).unwrap_or_default()
+        self.head
+            .as_ref()
+            .map(|h| h.render(r, site, prefix))
+            .unwrap_or_default()
     }
 
     /// Screen opened as a window.
     pub fn window(title: impl Into<Text>) -> Self {
-        Self { kind: ScreenKind::Window { width: 560 }, ..Self::new(title) }
+        Self {
+            kind: ScreenKind::Window { width: 560 },
+            ..Self::new(title)
+        }
     }
 
     /// Window width in pixels. No effect on full page screens.
@@ -1106,7 +1193,12 @@ impl Screen {
 
     /// Renders the screen in English with no params and no preloaded rows. For tests and tools.
     pub fn html(&self, meta: &ScreenMeta) -> String {
-        self.render(&Render::english(meta.name), meta, &serde_json::Value::Null, &HashMap::new())
+        self.render(
+            &Render::english(meta.name),
+            meta,
+            &serde_json::Value::Null,
+            &HashMap::new(),
+        )
     }
 
     /// Renders the screen. `loaded` holds the first page of grids by node path (`"0"`, `"1.2"`).
@@ -1118,10 +1210,22 @@ impl Screen {
         loaded: &HashMap<String, LoadedPage>,
     ) -> String {
         let scope = meta.name;
-        let r = Render { scope, loaded: Some(loaded), ..*r };
+        let r = Render {
+            scope,
+            loaded: Some(loaded),
+            ..*r
+        };
         let title = r.text(&self.title);
-        let params = match self.menu.as_ref().map(|m| m.to_json(&r)) {
-            Some(items) if items.as_array().is_some_and(|a| !a.is_empty()) => {
+        let params = match self
+            .menu
+            .as_ref()
+            .map(|m| m.to_json(&r))
+        {
+            Some(items)
+                if items
+                    .as_array()
+                    .is_some_and(|a| !a.is_empty()) =>
+            {
                 format!(r#"{}" data-zeyn-menu="{}"#, attr(params), attr(&items))
             }
             _ => attr(params),

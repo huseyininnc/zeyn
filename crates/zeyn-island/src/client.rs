@@ -35,7 +35,12 @@ impl Island {
 
     /// The props from `data-zeyn-props`.
     pub fn props<P: DeserializeOwned>(&self) -> Result<P, CallError> {
-        crate::props(&self.root.get_attribute("data-zeyn-props").unwrap_or_else(|| "null".into()))
+        crate::props(
+            &self
+                .root
+                .get_attribute("data-zeyn-props")
+                .unwrap_or_else(|| "null".into()),
+        )
     }
 
     /// Runs the server action bound to `R` on this island's node and returns its output. Uses
@@ -43,8 +48,19 @@ impl Island {
     /// other call.
     pub async fn call<R: Remote>(&self, input: &R::Input) -> Result<R::Output, CallError> {
         let attr = |el: Option<Element>, name: &str| el.and_then(|e| e.get_attribute(name));
-        let screen = self.root.closest("[data-zeyn-screen]").ok().flatten();
-        let node = attr(self.root.closest("[data-zeyn-node]").ok().flatten(), "data-zeyn-node").unwrap_or_default();
+        let screen = self
+            .root
+            .closest("[data-zeyn-screen]")
+            .ok()
+            .flatten();
+        let node = attr(
+            self.root
+                .closest("[data-zeyn-node]")
+                .ok()
+                .flatten(),
+            "data-zeyn-node",
+        )
+        .unwrap_or_default();
         let body = call_body::<R>(
             &attr(screen.clone(), "data-zeyn-screen").unwrap_or_default(),
             &attr(screen, "data-zeyn-params").unwrap_or_else(|| "null".into()),
@@ -63,7 +79,9 @@ fn network(e: JsValue) -> CallError {
     CallError {
         status: 0,
         code: "network".into(),
-        message: e.as_string().unwrap_or_else(|| "The server could not be reached.".into()),
+        message: e
+            .as_string()
+            .unwrap_or_else(|| "The server could not be reached.".into()),
     }
 }
 
@@ -79,10 +97,16 @@ fn meta(doc: &web_sys::Document, name: &str) -> String {
 /// Posts JSON below the app base with the CSRF header. Returns the status and the body text.
 async fn post(path: &str, body: &str) -> Result<(u16, String), CallError> {
     let window = web_sys::window().ok_or_else(|| network(JsValue::NULL))?;
-    let doc = window.document().ok_or_else(|| network(JsValue::NULL))?;
+    let doc = window
+        .document()
+        .ok_or_else(|| network(JsValue::NULL))?;
     let headers = Headers::new().map_err(network)?;
-    headers.set("content-type", "application/json").map_err(network)?;
-    headers.set("x-zeyn-csrf", &meta(&doc, "zeyn-csrf")).map_err(network)?;
+    headers
+        .set("content-type", "application/json")
+        .map_err(network)?;
+    headers
+        .set("x-zeyn-csrf", &meta(&doc, "zeyn-csrf"))
+        .map_err(network)?;
     let init = RequestInit::new();
     init.set_method("POST");
     init.set_credentials(RequestCredentials::SameOrigin);
@@ -94,6 +118,8 @@ async fn post(path: &str, body: &str) -> Result<(u16, String), CallError> {
         .map_err(network)?
         .dyn_into()
         .map_err(network)?;
-    let text = JsFuture::from(res.text().map_err(network)?).await.map_err(network)?;
+    let text = JsFuture::from(res.text().map_err(network)?)
+        .await
+        .map_err(network)?;
     Ok((res.status(), text.as_string().unwrap_or_default()))
 }

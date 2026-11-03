@@ -92,7 +92,11 @@ pub(super) fn recent(ctx: &Ctx) -> Result<(), Failure> {
     if ctx.signed_in_recently() {
         Ok(())
     } else {
-        Err(Failure::Status(StatusCode::UNAUTHORIZED, "reauth_required", Text::key("zeyn.session.reauth_required")))
+        Err(Failure::Status(
+            StatusCode::UNAUTHORIZED,
+            "reauth_required",
+            Text::key("zeyn.session.reauth_required"),
+        ))
     }
 }
 

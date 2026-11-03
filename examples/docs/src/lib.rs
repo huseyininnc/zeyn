@@ -138,7 +138,11 @@ impl PageSource {
     /// File name of the page's translations in `pages/<lang>/`. `docs/database.md` shares its
     /// name with the guide, so its translations are `database-reference.md`.
     pub fn translation_file(&self) -> &'static str {
-        if self.route == "/reference/database" { "database-reference.md" } else { self.file }
+        if self.route == "/reference/database" {
+            "database-reference.md"
+        } else {
+            self.file
+        }
     }
 }
 
@@ -160,7 +164,10 @@ pub fn resolve(target: &str) -> String {
 
 /// [`resolve`] for a page in a language: links to other pages stay in that language.
 pub fn resolve_in(lang: &str, target: &str) -> String {
-    let (path, hash) = target.split_once('#').map(|(p, h)| (p, format!("#{h}"))).unwrap_or((target, String::new()));
+    let (path, hash) = target
+        .split_once('#')
+        .map(|(p, h)| (p, format!("#{h}")))
+        .unwrap_or((target, String::new()));
     let file = path.rsplit('/').next().unwrap_or(path);
     let page = PAGES
         .iter()
@@ -231,9 +238,20 @@ impl Doc {
         lang_path(self.lang, self.route)
     }
 
-    fn new(p: &PageSource, lang: &'static str, status: Status, source: &str, ids: &[String]) -> Doc {
+    fn new(
+        p: &PageSource,
+        lang: &'static str,
+        status: Status,
+        source: &str,
+        ids: &[String],
+    ) -> Doc {
         let link = |t: &str| resolve_in(lang, t);
-        let Rendered { title, parts, headings, sections } = markdown::render_with_ids(source, &link, ids);
+        let Rendered {
+            title,
+            parts,
+            headings,
+            sections,
+        } = markdown::render_with_ids(source, &link, ids);
         let mut chunks = Vec::new();
         let mut lives = Vec::new();
         let mut html = String::new();
@@ -249,11 +267,23 @@ impl Doc {
         chunks.push(Arc::from(html));
         let mut toc = String::from("<ul>");
         for h in headings.iter().filter(|h| h.level <= 3) {
-            let class = if h.level == 3 { r#" class="z-doc-toc-sub""# } else { "" };
-            toc.push_str(&format!(r##"<li{class}><a href="#{}">{}</a></li>"##, h.id, escape(&h.text)));
+            let class = if h.level == 3 {
+                r#" class="z-doc-toc-sub""#
+            } else {
+                ""
+            };
+            toc.push_str(&format!(
+                r##"<li{class}><a href="#{}">{}</a></li>"##,
+                h.id,
+                escape(&h.text)
+            ));
         }
         toc.push_str("</ul>");
-        let title = if title.is_empty() { p.label.to_string() } else { title };
+        let title = if title.is_empty() {
+            p.label.to_string()
+        } else {
+            title
+        };
         Doc {
             route: p.route,
             title,
@@ -262,7 +292,10 @@ impl Doc {
             chunks,
             lives,
             toc: Arc::from(toc),
-            headings: headings.into_iter().map(|h| (h.level, h.id)).collect(),
+            headings: headings
+                .into_iter()
+                .map(|h| (h.level, h.id))
+                .collect(),
             prev: None,
             next: None,
             sections,
@@ -288,7 +321,10 @@ impl Docs {
     /// the English source, with links that stay in the language.
     pub fn build_from(translations: &[(&str, &str, &str)], manifest: &str) -> Docs {
         let manifest: serde_json::Value = serde_json::from_str(manifest).unwrap_or_default();
-        let english: Vec<Doc> = PAGES.iter().map(|p| Doc::new(p, "en", Status::Source, p.source, &[])).collect();
+        let english: Vec<Doc> = PAGES
+            .iter()
+            .map(|p| Doc::new(p, "en", Status::Source, p.source, &[]))
+            .collect();
         let mut all = vec![english];
         for (lang, _) in &LANGS[1..] {
             let docs = PAGES
@@ -296,15 +332,28 @@ impl Docs {
                 .zip(all[0].iter())
                 .map(|(p, en)| {
                     let file = p.translation_file();
-                    let ids: Vec<String> = en.headings.iter().map(|(_, id)| id.clone()).collect();
-                    let found = translations.iter().find(|(l, f, _)| l == lang && *f == file).map(|(_, _, s)| *s);
-                    let current = manifest[*lang][file].as_str() == Some(source_hash(p.source).as_str());
+                    let ids: Vec<String> = en
+                        .headings
+                        .iter()
+                        .map(|(_, id)| id.clone())
+                        .collect();
+                    let found = translations
+                        .iter()
+                        .find(|(l, f, _)| l == lang && *f == file)
+                        .map(|(_, _, s)| *s);
+                    let current =
+                        manifest[*lang][file].as_str() == Some(source_hash(p.source).as_str());
                     let status = match found {
                         None => Status::Missing,
                         Some(_) if !current => Status::Stale,
                         Some(source) => {
                             let doc = Doc::new(p, lang, Status::Translated, source, &ids);
-                            let levels = |d: &Doc| d.headings.iter().map(|(l, _)| *l).collect::<Vec<_>>();
+                            let levels = |d: &Doc| {
+                                d.headings
+                                    .iter()
+                                    .map(|(l, _)| *l)
+                                    .collect::<Vec<_>>()
+                            };
                             if levels(&doc) == levels(en) {
                                 return doc;
                             }
@@ -337,21 +386,31 @@ impl Docs {
     }
 
     fn index(&self, route: &str) -> Option<usize> {
-        self.0[0].iter().position(|d| d.route == route)
+        self.0[0]
+            .iter()
+            .position(|d| d.route == route)
     }
 
     /// The screen of a page in the request's language, with its live examples built for this
     /// request, its canonical URL and its language alternates.
     pub fn screen(&self, route: &str, ctx: &Ctx) -> Screen {
-        let Some(i) = self.index(route) else { return Screen::new(t!("docs.missing")) };
+        let Some(i) = self.index(route) else {
+            return Screen::new(t!("docs.missing"));
+        };
         let lang = lang_index(ctx.locale());
         let doc = &self.0[lang][i];
         let lives = doc
             .lives
             .iter()
-            .map(|n| live::example(n, ctx).unwrap_or_else(|| Alert::danger(t!("docs.missing")).into()))
+            .map(|n| {
+                live::example(n, ctx).unwrap_or_else(|| Alert::danger(t!("docs.missing")).into())
+            })
             .collect();
-        let canonical = if doc.status.translated() { doc.url() } else { route.to_string() };
+        let canonical = if doc.status.translated() {
+            doc.url()
+        } else {
+            route.to_string()
+        };
         let mut screen = Screen::new(doc.title.clone()).canonical(canonical);
         for (l, (code, tag)) in LANGS.iter().enumerate() {
             if self.0[l][i].status.translated() {
@@ -360,19 +419,33 @@ impl Docs {
         }
         screen
             .alternate("x-default", route)
-            .body(Node::new(DocPage { docs: self.clone(), lang, index: i, lives }))
+            .body(Node::new(DocPage {
+                docs: self.clone(),
+                lang,
+                index: i,
+                lives,
+            }))
     }
 
     /// Every URL of the sitemap: each page in each language it is translated into.
     pub fn urls(&self) -> Vec<SitemapUrl> {
-        self.0.iter().flatten().filter(|d| d.status.translated()).map(|d| SitemapUrl::new(d.url())).collect()
+        self.0
+            .iter()
+            .flatten()
+            .filter(|d| d.status.translated())
+            .map(|d| SitemapUrl::new(d.url()))
+            .collect()
     }
 
     /// Pages and sections of a language whose text has every word of the query, best first:
     /// words in a heading count most, then the page title, then the text.
     pub fn search(&self, lang: &str, query: &str) -> Vec<SearchHit> {
-        let words: Vec<String> =
-            query.split_whitespace().map(str::to_lowercase).filter(|w| !w.is_empty()).take(8).collect();
+        let words: Vec<String> = query
+            .split_whitespace()
+            .map(str::to_lowercase)
+            .filter(|w| !w.is_empty())
+            .take(8)
+            .collect();
         if words.is_empty() {
             return Vec::new();
         }
@@ -382,7 +455,10 @@ impl Docs {
             for s in &d.sections {
                 let heading = s.heading.to_lowercase();
                 let text = s.text.to_lowercase();
-                if !words.iter().all(|w| heading.contains(w) || title.contains(w) || text.contains(w)) {
+                if !words
+                    .iter()
+                    .all(|w| heading.contains(w) || title.contains(w) || text.contains(w))
+                {
                     continue;
                 }
                 let score: usize = words
@@ -401,14 +477,21 @@ impl Docs {
                 found.push((score, SearchHit::new(label, d.title.clone(), url)));
             }
         }
-        found.sort_by(|a, b| b.0.cmp(&a.0));
-        found.into_iter().take(zeyn::MAX_SEARCH_HITS).map(|(_, h)| h).collect()
+        found.sort_by_key(|hit| std::cmp::Reverse(hit.0));
+        found
+            .into_iter()
+            .take(zeyn::MAX_SEARCH_HITS)
+            .map(|(_, h)| h)
+            .collect()
     }
 }
 
 /// Position of a language in [`LANGS`], English for an unknown one.
 fn lang_index(lang: &str) -> usize {
-    LANGS.iter().position(|(code, _)| *code == lang).unwrap_or(0)
+    LANGS
+        .iter()
+        .position(|(code, _)| *code == lang)
+        .unwrap_or(0)
 }
 
 /// A documentation page on a screen: the article with its live examples, previous and next
@@ -450,7 +533,10 @@ impl DocPage {
                 d.route,
                 r.text(&t!("docs.translation.english"))
             ),
-            _ => format!(r#"<p class="z-doc-note" role="note">{}</p>"#, r.text(&t!("docs.translation.missing"))),
+            _ => format!(
+                r#"<p class="z-doc-note" role="note">{}</p>"#,
+                r.text(&t!("docs.translation.missing"))
+            ),
         }
     }
 }
@@ -458,7 +544,11 @@ impl DocPage {
 impl Component for DocPage {
     fn render(&self, out: &mut String, r: &Render) {
         let d = self.doc(self.index);
-        let lang = if d.status.translated() { "" } else { r#" lang="en""# };
+        let lang = if d.status.translated() {
+            ""
+        } else {
+            r#" lang="en""#
+        };
         out.push_str(r#"<div class="z-doc">"#);
         out.push_str(&format!(r#"<article class="z-prose"{lang}>"#));
         out.push_str(&self.note(r));
@@ -504,7 +594,9 @@ pub async fn docs_sitemap(part: SitemapPart, docs: Docs) -> Result<Vec<SitemapUr
 
 /// The documentation feature: every page, the sidebar, the palette search and the sitemap.
 pub fn feature() -> Feature {
-    with_pages(Feature::new("docs")).search(search_docs).sitemap(docs_sitemap)
+    with_pages(Feature::new("docs"))
+        .search(search_docs)
+        .sitemap(docs_sitemap)
 }
 
 /// The documentation app. `docs` is built once with [`Docs::build`]. English pages stay at their

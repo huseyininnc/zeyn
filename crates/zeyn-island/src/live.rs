@@ -14,15 +14,20 @@ use web_sys::{BinaryType, CloseEvent, MessageEvent, WebSocket};
 /// Tag of a frame holding a Y update.
 pub const FRAME_UPDATE: u8 = 1;
 
+/// Called with every update frame from the room.
+type OnUpdate = Box<dyn FnMut(&[u8])>;
+/// A WebSocket event handler, kept alive as long as the socket.
+type Handler = Closure<dyn FnMut(JsValue)>;
+
 struct Shared {
     url: String,
     ws: RefCell<Option<WebSocket>>,
     on_open: RefCell<Box<dyn FnMut()>>,
-    on_update: RefCell<Box<dyn FnMut(&[u8])>>,
+    on_update: RefCell<OnUpdate>,
     on_state: RefCell<Box<dyn FnMut(bool)>>,
     closed: Cell<bool>,
     wait: Cell<i32>,
-    handlers: RefCell<Vec<Closure<dyn FnMut(JsValue)>>>,
+    handlers: RefCell<Vec<Handler>>,
     retry: RefCell<Option<Closure<dyn FnMut()>>>,
 }
 
@@ -53,7 +58,11 @@ impl Channel {
                 .unwrap_or_default()
         };
         let location = window.location();
-        let scheme = if location.protocol()? == "https:" { "wss" } else { "ws" };
+        let scheme = if location.protocol()? == "https:" {
+            "wss"
+        } else {
+            "ws"
+        };
         let url = format!(
             "{scheme}://{}{}/_zeyn/live/doc/{}/{}?csrf={}",
             location.host()?,
@@ -80,7 +89,12 @@ impl Channel {
     /// Sends an update. `false` while disconnected; the island's next `on_open` resends its state.
     pub fn send_update(&self, update: &[u8]) -> bool {
         let ws = self.shared.ws.borrow();
-        let Some(ws) = ws.as_ref().filter(|w| w.ready_state() == WebSocket::OPEN) else { return false };
+        let Some(ws) = ws
+            .as_ref()
+            .filter(|w| w.ready_state() == WebSocket::OPEN)
+        else {
+            return false;
+        };
         let mut frame = Vec::with_capacity(update.len() + 1);
         frame.push(FRAME_UPDATE);
         frame.extend_from_slice(update);
@@ -89,7 +103,11 @@ impl Channel {
 
     /// Whether the socket is open.
     pub fn is_open(&self) -> bool {
-        self.shared.ws.borrow().as_ref().is_some_and(|w| w.ready_state() == WebSocket::OPEN)
+        self.shared
+            .ws
+            .borrow()
+            .as_ref()
+            .is_some_and(|w| w.ready_state() == WebSocket::OPEN)
     }
 
     /// Closes for good. Call it from the island's `unmount`.
@@ -99,7 +117,10 @@ impl Channel {
             detach(&ws);
             let _ = ws.close_with_code(1000);
         }
-        self.shared.handlers.borrow_mut().clear();
+        self.shared
+            .handlers
+            .borrow_mut()
+            .clear();
         self.shared.retry.borrow_mut().take();
     }
 }
@@ -120,8 +141,15 @@ fn connect(shared: &Rc<Shared>) -> Result<(), JsValue> {
     });
     let first = Rc::new(Cell::new(true));
     let message = handler(&weak, move |s, e| {
-        let Some(e) = e.dyn_ref::<MessageEvent>() else { return };
-        let Ok(buf) = e.data().dyn_into::<js_sys::ArrayBuffer>() else { return };
+        let Some(e) = e.dyn_ref::<MessageEvent>() else {
+            return;
+        };
+        let Ok(buf) = e
+            .data()
+            .dyn_into::<js_sys::ArrayBuffer>()
+        else {
+            return;
+        };
         let bytes = js_sys::Uint8Array::new(&buf).to_vec();
         if bytes.first() == Some(&FRAME_UPDATE) {
             (s.on_update.borrow_mut())(&bytes[1..]);
@@ -131,7 +159,10 @@ fn connect(shared: &Rc<Shared>) -> Result<(), JsValue> {
         }
     });
     let closed = handler(&weak, |s, e| {
-        let code = e.dyn_ref::<CloseEvent>().map(|c| c.code()).unwrap_or(0);
+        let code = e
+            .dyn_ref::<CloseEvent>()
+            .map(|c| c.code())
+            .unwrap_or(0);
         (s.on_state.borrow_mut())(false);
         if s.closed.get() || code == 1008 {
             return;
@@ -140,12 +171,18 @@ fn connect(shared: &Rc<Shared>) -> Result<(), JsValue> {
         s.wait.set((wait * 2).min(30_000));
         let weak = Rc::downgrade(s);
         let retry = Closure::<dyn FnMut()>::new(move || {
-            if let Some(s) = weak.upgrade().filter(|s| !s.closed.get()) {
+            if let Some(s) = weak
+                .upgrade()
+                .filter(|s| !s.closed.get())
+            {
                 let _ = connect(&s);
             }
         });
         if let Some(w) = web_sys::window() {
-            let _ = w.set_timeout_with_callback_and_timeout_and_arguments_0(retry.as_ref().unchecked_ref(), wait);
+            let _ = w.set_timeout_with_callback_and_timeout_and_arguments_0(
+                retry.as_ref().unchecked_ref(),
+                wait,
+            );
         }
         *s.retry.borrow_mut() = Some(retry);
     });
@@ -159,7 +196,10 @@ fn connect(shared: &Rc<Shared>) -> Result<(), JsValue> {
     Ok(())
 }
 
-fn handler(weak: &Weak<Shared>, mut f: impl FnMut(&Rc<Shared>, JsValue) + 'static) -> Closure<dyn FnMut(JsValue)> {
+fn handler(
+    weak: &Weak<Shared>,
+    mut f: impl FnMut(&Rc<Shared>, JsValue) + 'static,
+) -> Closure<dyn FnMut(JsValue)> {
     let weak = weak.clone();
     Closure::new(move |e: JsValue| {
         if let Some(s) = weak.upgrade() {

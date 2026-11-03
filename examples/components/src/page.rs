@@ -79,7 +79,11 @@ pub fn index_screen(q: &str, ctx: &Ctx) -> Screen {
     Screen::new(t!("cx.title"))
         .body(Paragraph::new(t!("cx.intro")))
         .body(search)
-        .body(Node::new(Gallery { sections, previews, q: q.to_string() }))
+        .body(Node::new(Gallery {
+            sections,
+            previews,
+            q: q.to_string(),
+        }))
 }
 
 /// The cards of the index, grouped by category. The previews are real components rendered with
@@ -186,7 +190,10 @@ struct ApiTable {
 
 impl Component for ApiTable {
     fn render(&self, out: &mut String, r: &Render) {
-        out.push_str(&format!(r#"<div class="cx-api"><p class="cx-api-note">{}</p>"#, r.text(&t!("cx.api_note"))));
+        out.push_str(&format!(
+            r#"<div class="cx-api"><p class="cx-api-note">{}</p>"#,
+            r.text(&t!("cx.api_note"))
+        ));
         for ty in self.types {
             let methods = API
                 .iter()
@@ -227,13 +234,21 @@ impl Component for ApiTable {
 
 /// The page of a component: its description and links, then the Overview, API and Examples tabs.
 pub fn component_screen(slug: &str, ctx: &Ctx) -> Screen {
-    let Some(c) = component(slug) else { return Screen::new(t!("cx.missing")) };
+    let Some(c) = component(slug) else {
+        return Screen::new(t!("cx.missing"));
+    };
     let e = c.entry;
     let links = Row::new()
         .compact()
-        .col(ExternalLink::new(format!("{DOCS}/{}", e.docs), t!("cx.docs")))
         .col(ExternalLink::new(
-            format!("https://docs.rs/zeyn/latest/zeyn/?search={}", e.api.first().unwrap_or(&e.name)),
+            format!("{DOCS}/{}", e.docs),
+            t!("cx.docs"),
+        ))
+        .col(ExternalLink::new(
+            format!(
+                "https://docs.rs/zeyn/latest/zeyn/?search={}",
+                e.api.first().unwrap_or(&e.name)
+            ),
             t!("cx.docs_rs"),
         ));
     let mut tabs = Tabs::new(t!("cx.tabs", name = e.name))

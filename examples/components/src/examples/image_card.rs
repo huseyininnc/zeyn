@@ -23,7 +23,10 @@ pub fn horizontal(_ctx: &Ctx) -> Node {
         .card(|p: &Product| {
             Card::image(p.image.clone(), p.name.clone())
                 .subtitle(p.code.clone())
-                .badges([Badge::new("Gift"), Badge::new("Bestseller").tone(Tone::Info)])
+                .badges([
+                    Badge::new("Gift"),
+                    Badge::new("Bestseller").tone(Tone::Info),
+                ])
                 .horizontal()
         })
         .image_size(300, 300)

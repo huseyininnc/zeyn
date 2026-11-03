@@ -10,28 +10,28 @@ use serde_json::{Value as Json, json};
 into_node!(AlphaIndex);
 
 const LATIN: &[&str] = &[
-    "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W",
-    "X", "Y", "Z",
+    "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S",
+    "T", "U", "V", "W", "X", "Y", "Z",
 ];
 
 const TURKISH: &[&str] = &[
-    "A", "B", "C", "Ç", "D", "E", "F", "G", "Ğ", "H", "I", "İ", "J", "K", "L", "M", "N", "O", "Ö", "P", "R", "S", "Ş",
-    "T", "U", "Ü", "V", "Y", "Z",
+    "A", "B", "C", "Ç", "D", "E", "F", "G", "Ğ", "H", "I", "İ", "J", "K", "L", "M", "N", "O", "Ö",
+    "P", "R", "S", "Ş", "T", "U", "Ü", "V", "Y", "Z",
 ];
 
 const SPANISH: &[&str] = &[
-    "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "Ñ", "O", "P", "Q", "R", "S", "T", "U", "V",
-    "W", "X", "Y", "Z",
+    "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "Ñ", "O", "P", "Q", "R",
+    "S", "T", "U", "V", "W", "X", "Y", "Z",
 ];
 
 const RUSSIAN: &[&str] = &[
-    "А", "Б", "В", "Г", "Д", "Е", "Ё", "Ж", "З", "И", "Й", "К", "Л", "М", "Н", "О", "П", "Р", "С", "Т", "У", "Ф", "Х",
-    "Ц", "Ч", "Ш", "Щ", "Ъ", "Ы", "Ь", "Э", "Ю", "Я",
+    "А", "Б", "В", "Г", "Д", "Е", "Ё", "Ж", "З", "И", "Й", "К", "Л", "М", "Н", "О", "П", "Р", "С",
+    "Т", "У", "Ф", "Х", "Ц", "Ч", "Ш", "Щ", "Ъ", "Ы", "Ь", "Э", "Ю", "Я",
 ];
 
 const ARABIC: &[&str] = &[
-    "ا", "ب", "ت", "ث", "ج", "ح", "خ", "د", "ذ", "ر", "ز", "س", "ش", "ص", "ض", "ط", "ظ", "ع", "غ", "ف", "ق", "ك", "ل",
-    "م", "ن", "ه", "و", "ي",
+    "ا", "ب", "ت", "ث", "ج", "ح", "خ", "د", "ذ", "ر", "ز", "س", "ش", "ص", "ض", "ط", "ظ", "ع", "غ",
+    "ف", "ق", "ك", "ل", "م", "ن", "ه", "و", "ي",
 ];
 
 /// The letters of a locale's alphabet in its order: Turkish (`tr`, also `az`) with `Ç Ğ I İ Ö Ş
@@ -96,7 +96,10 @@ pub const OTHER_LETTER: &str = "#";
 impl AlphaIndex {
     /// Letters that open `screen` with the params `params(letter)` returns. Params of the wrong
     /// type do not compile.
-    pub fn new<S: ScreenDef>(_screen: S, params: impl Fn(&str) -> S::Params + Send + Sync + 'static) -> Self {
+    pub fn new<S: ScreenDef>(
+        _screen: S,
+        params: impl Fn(&str) -> S::Params + Send + Sync + 'static,
+    ) -> Self {
         AlphaIndex {
             screen: S::META.name,
             params: Box::new(move |l| serde_json::to_value(params(l)).unwrap_or(Json::Null)),
@@ -122,7 +125,10 @@ impl AlphaIndex {
 impl Component for AlphaIndex {
     fn render(&self, out: &mut String, r: &Render) {
         let t = |key: &str| r.text(&Text::key(format!("zeyn.ui.alpha.{key}")));
-        out.push_str(&format!(r#"<nav class="z-alpha" aria-label="{}"><ul class="z-alpha-list">"#, t("label")));
+        out.push_str(&format!(
+            r#"<nav class="z-alpha" aria-label="{}"><ul class="z-alpha-list">"#,
+            t("label")
+        ));
         let alphabet = alphabet(r.locale);
         let current = self
             .current
@@ -138,11 +144,19 @@ impl Component for AlphaIndex {
             .chain(self.other.then_some(OTHER_LETTER))
         {
             let current = current.as_deref() == Some(letter);
-            let named = if letter == OTHER_LETTER { format!(r#" aria-label="{}""#, t("other")) } else { String::new() };
+            let named = if letter == OTHER_LETTER {
+                format!(r#" aria-label="{}""#, t("other"))
+            } else {
+                String::new()
+            };
             out.push_str(&format!(
                 r#"<li><a class="z-alpha-link" href="{}" data-zeyn-base-href{}{named}>{}</a></li>"#,
                 screen_href(r, self.screen, &(self.params)(letter)),
-                if current { r#" aria-current="page""# } else { "" },
+                if current {
+                    r#" aria-current="page""#
+                } else {
+                    ""
+                },
                 escape(letter)
             ));
         }

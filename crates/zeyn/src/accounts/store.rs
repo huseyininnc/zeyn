@@ -29,7 +29,12 @@ pub trait AccountStore: Send + Sync + 'static {
     fn user_by_email(&self, normalized: &str) -> BoxFuture<Result<Option<User>>>;
     /// A page of users whose name or e-mail contains `search` (normalized), ordered by user name,
     /// and the total.
-    fn users(&self, search: Option<&str>, offset: u64, limit: u32) -> BoxFuture<Result<(Vec<User>, u64)>>;
+    fn users(
+        &self,
+        search: Option<&str>,
+        offset: u64,
+        limit: u32,
+    ) -> BoxFuture<Result<(Vec<User>, u64)>>;
 
     fn create_role(&self, role: &Role) -> BoxFuture<Result<()>>;
     fn update_role(&self, role: &Role, expected: &str) -> BoxFuture<Result<()>>;
@@ -56,8 +61,15 @@ pub trait AccountStore: Send + Sync + 'static {
     fn logins_of(&self, user_id: &str) -> BoxFuture<Result<Vec<UserLogin>>>;
     fn user_by_login(&self, provider: &str, key: &str) -> BoxFuture<Result<Option<User>>>;
 
-    fn token(&self, user_id: &str, provider: &str, name: &str) -> BoxFuture<Result<Option<String>>>;
-    fn set_token(&self, user_id: &str, provider: &str, name: &str, value: &str) -> BoxFuture<Result<()>>;
+    fn token(&self, user_id: &str, provider: &str, name: &str)
+    -> BoxFuture<Result<Option<String>>>;
+    fn set_token(
+        &self,
+        user_id: &str,
+        provider: &str,
+        name: &str,
+        value: &str,
+    ) -> BoxFuture<Result<()>>;
     fn remove_token(&self, user_id: &str, provider: &str, name: &str) -> BoxFuture<Result<()>>;
 
     fn passkeys_of(&self, user_id: &str) -> BoxFuture<Result<Vec<Passkey>>>;
@@ -92,7 +104,10 @@ pub struct MemoryAccountStore {
 
 impl Default for MemoryAccountStore {
     fn default() -> Self {
-        MemoryAccountStore { state: Arc::default(), max_users: 10_000 }
+        MemoryAccountStore {
+            state: Arc::default(),
+            max_users: 10_000,
+        }
     }
 }
 
@@ -116,7 +131,10 @@ impl MemoryAccountStore {
         self
     }
 
-    fn with<T: Send + 'static>(&self, f: impl FnOnce(&mut State) -> Result<T>) -> BoxFuture<Result<T>> {
+    fn with<T: Send + 'static>(
+        &self,
+        f: impl FnOnce(&mut State) -> Result<T>,
+    ) -> BoxFuture<Result<T>> {
         let result = match self.state.lock() {
             Ok(mut s) => f(&mut s),
             Err(_) => Err(Error::Internal("account store lock poisoned".into())),
@@ -126,7 +144,10 @@ impl MemoryAccountStore {
 
     /// Number of users, for tests.
     pub fn len(&self) -> usize {
-        self.state.lock().map(|s| s.users.len()).unwrap_or(0)
+        self.state
+            .lock()
+            .map(|s| s.users.len())
+            .unwrap_or(0)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -135,8 +156,15 @@ impl MemoryAccountStore {
 }
 
 fn per_user<T>(list: &[(String, T)], user: &str) -> Result<()> {
-    if list.iter().filter(|(u, _)| u == user).count() >= MAX_PER_USER {
-        return Err(Error::Internal("too many entries for one user in the memory account store".into()));
+    if list
+        .iter()
+        .filter(|(u, _)| u == user)
+        .count()
+        >= MAX_PER_USER
+    {
+        return Err(Error::Internal(
+            "too many entries for one user in the memory account store".into(),
+        ));
     }
     Ok(())
 }
@@ -149,7 +177,9 @@ impl AccountStore for MemoryAccountStore {
                 return Err(Error::Internal("the memory account store is full".into()));
             }
             if s.users.contains_key(&user.id)
-                || s.users.values().any(|u| u.normalized_user_name == user.normalized_user_name)
+                || s.users
+                    .values()
+                    .any(|u| u.normalized_user_name == user.normalized_user_name)
             {
                 return Err(Error::Conflict);
             }
@@ -161,7 +191,10 @@ impl AccountStore for MemoryAccountStore {
     fn update_user(&self, user: &User, expected: &str) -> BoxFuture<Result<()>> {
         let (user, expected) = (user.clone(), expected.to_string());
         self.with(move |s| {
-            if s.users.values().any(|u| u.id != user.id && u.normalized_user_name == user.normalized_user_name) {
+            if s.users
+                .values()
+                .any(|u| u.id != user.id && u.normalized_user_name == user.normalized_user_name)
+            {
                 return Err(Error::Conflict);
             }
             match s.users.get_mut(&user.id) {
@@ -177,7 +210,9 @@ impl AccountStore for MemoryAccountStore {
     fn delete_user(&self, id: &str) -> BoxFuture<Result<()>> {
         let id = id.to_string();
         self.with(move |s| {
-            s.users.remove(&id).ok_or(Error::NotFound)?;
+            s.users
+                .remove(&id)
+                .ok_or(Error::NotFound)?;
             s.user_roles.retain(|(u, _)| *u != id);
             s.claims.retain(|(u, _)| *u != id);
             s.logins.retain(|(u, _)| *u != id);
@@ -194,7 +229,12 @@ impl AccountStore for MemoryAccountStore {
 
     fn user_by_name(&self, normalized: &str) -> BoxFuture<Result<Option<User>>> {
         let n = normalized.to_string();
-        self.with(move |s| Ok(s.users.values().find(|u| u.normalized_user_name == n).cloned()))
+        self.with(move |s| {
+            Ok(s.users
+                .values()
+                .find(|u| u.normalized_user_name == n)
+                .cloned())
+        })
     }
 
     fn user_by_email(&self, normalized: &str) -> BoxFuture<Result<Option<User>>> {
@@ -208,7 +248,12 @@ impl AccountStore for MemoryAccountStore {
         })
     }
 
-    fn users(&self, search: Option<&str>, offset: u64, limit: u32) -> BoxFuture<Result<(Vec<User>, u64)>> {
+    fn users(
+        &self,
+        search: Option<&str>,
+        offset: u64,
+        limit: u32,
+    ) -> BoxFuture<Result<(Vec<User>, u64)>> {
         let search = search.map(str::to_string);
         self.with(move |s| {
             let mut all: Vec<&User> = s
@@ -217,13 +262,25 @@ impl AccountStore for MemoryAccountStore {
                 .filter(|u| {
                     search.as_deref().is_none_or(|q| {
                         u.normalized_user_name.contains(q)
-                            || u.normalized_email.as_deref().is_some_and(|e| e.contains(q))
+                            || u.normalized_email
+                                .as_deref()
+                                .is_some_and(|e| e.contains(q))
                     })
                 })
                 .collect();
-            all.sort_by(|a, b| a.normalized_user_name.cmp(&b.normalized_user_name));
+            all.sort_by(|a, b| {
+                a.normalized_user_name
+                    .cmp(&b.normalized_user_name)
+            });
             let total = all.len() as u64;
-            Ok((all.into_iter().skip(offset as usize).take(limit as usize).cloned().collect(), total))
+            Ok((
+                all.into_iter()
+                    .skip(offset as usize)
+                    .take(limit as usize)
+                    .cloned()
+                    .collect(),
+                total,
+            ))
         })
     }
 
@@ -231,9 +288,15 @@ impl AccountStore for MemoryAccountStore {
         let role = role.clone();
         self.with(move |s| {
             if s.roles.len() >= MAX_ROLES {
-                return Err(Error::Internal("the memory account store has too many roles".into()));
+                return Err(Error::Internal(
+                    "the memory account store has too many roles".into(),
+                ));
             }
-            if s.roles.contains_key(&role.id) || s.roles.values().any(|r| r.normalized_name == role.normalized_name) {
+            if s.roles.contains_key(&role.id)
+                || s.roles
+                    .values()
+                    .any(|r| r.normalized_name == role.normalized_name)
+            {
                 return Err(Error::Conflict);
             }
             s.roles.insert(role.id.clone(), role);
@@ -244,7 +307,10 @@ impl AccountStore for MemoryAccountStore {
     fn update_role(&self, role: &Role, expected: &str) -> BoxFuture<Result<()>> {
         let (role, expected) = (role.clone(), expected.to_string());
         self.with(move |s| {
-            if s.roles.values().any(|r| r.id != role.id && r.normalized_name == role.normalized_name) {
+            if s.roles
+                .values()
+                .any(|r| r.id != role.id && r.normalized_name == role.normalized_name)
+            {
                 return Err(Error::Conflict);
             }
             match s.roles.get_mut(&role.id) {
@@ -260,7 +326,9 @@ impl AccountStore for MemoryAccountStore {
     fn delete_role(&self, id: &str) -> BoxFuture<Result<()>> {
         let id = id.to_string();
         self.with(move |s| {
-            s.roles.remove(&id).ok_or(Error::NotFound)?;
+            s.roles
+                .remove(&id)
+                .ok_or(Error::NotFound)?;
             s.user_roles.retain(|(_, r)| *r != id);
             s.role_claims.retain(|(r, _)| *r != id);
             Ok(())
@@ -274,15 +342,30 @@ impl AccountStore for MemoryAccountStore {
 
     fn role_by_name(&self, normalized: &str) -> BoxFuture<Result<Option<Role>>> {
         let n = normalized.to_string();
-        self.with(move |s| Ok(s.roles.values().find(|r| r.normalized_name == n).cloned()))
+        self.with(move |s| {
+            Ok(s.roles
+                .values()
+                .find(|r| r.normalized_name == n)
+                .cloned())
+        })
     }
 
     fn roles(&self, offset: u64, limit: u32) -> BoxFuture<Result<(Vec<Role>, u64)>> {
         self.with(move |s| {
             let mut all: Vec<&Role> = s.roles.values().collect();
-            all.sort_by(|a, b| a.normalized_name.cmp(&b.normalized_name));
+            all.sort_by(|a, b| {
+                a.normalized_name
+                    .cmp(&b.normalized_name)
+            });
             let total = all.len() as u64;
-            Ok((all.into_iter().skip(offset as usize).take(limit as usize).cloned().collect(), total))
+            Ok((
+                all.into_iter()
+                    .skip(offset as usize)
+                    .take(limit as usize)
+                    .cloned()
+                    .collect(),
+                total,
+            ))
         })
     }
 
@@ -311,9 +394,16 @@ impl AccountStore for MemoryAccountStore {
     fn roles_of(&self, user_id: &str) -> BoxFuture<Result<Vec<Role>>> {
         let user = user_id.to_string();
         self.with(move |s| {
-            let mut roles: Vec<Role> =
-                s.user_roles.iter().filter(|(u, _)| *u == user).filter_map(|(_, r)| s.roles.get(r).cloned()).collect();
-            roles.sort_by(|a, b| a.normalized_name.cmp(&b.normalized_name));
+            let mut roles: Vec<Role> = s
+                .user_roles
+                .iter()
+                .filter(|(u, _)| *u == user)
+                .filter_map(|(_, r)| s.roles.get(r).cloned())
+                .collect();
+            roles.sort_by(|a, b| {
+                a.normalized_name
+                    .cmp(&b.normalized_name)
+            });
             Ok(roles)
         })
     }
@@ -332,7 +422,13 @@ impl AccountStore for MemoryAccountStore {
 
     fn claims_of(&self, user_id: &str) -> BoxFuture<Result<Vec<Claim>>> {
         let user = user_id.to_string();
-        self.with(move |s| Ok(s.claims.iter().filter(|(u, _)| *u == user).map(|(_, c)| c.clone()).collect()))
+        self.with(move |s| {
+            Ok(s.claims
+                .iter()
+                .filter(|(u, _)| *u == user)
+                .map(|(_, c)| c.clone())
+                .collect())
+        })
     }
 
     fn add_claim(&self, user_id: &str, claim: &Claim) -> BoxFuture<Result<()>> {
@@ -347,14 +443,21 @@ impl AccountStore for MemoryAccountStore {
     fn remove_claim(&self, user_id: &str, claim: &Claim) -> BoxFuture<Result<()>> {
         let (user, claim) = (user_id.to_string(), claim.clone());
         self.with(move |s| {
-            s.claims.retain(|(u, c)| !(*u == user && *c == claim));
+            s.claims
+                .retain(|(u, c)| !(*u == user && *c == claim));
             Ok(())
         })
     }
 
     fn role_claims(&self, role_id: &str) -> BoxFuture<Result<Vec<Claim>>> {
         let role = role_id.to_string();
-        self.with(move |s| Ok(s.role_claims.iter().filter(|(r, _)| *r == role).map(|(_, c)| c.clone()).collect()))
+        self.with(move |s| {
+            Ok(s.role_claims
+                .iter()
+                .filter(|(r, _)| *r == role)
+                .map(|(_, c)| c.clone())
+                .collect())
+        })
     }
 
     fn add_role_claim(&self, role_id: &str, claim: &Claim) -> BoxFuture<Result<()>> {
@@ -369,7 +472,8 @@ impl AccountStore for MemoryAccountStore {
     fn remove_role_claim(&self, role_id: &str, claim: &Claim) -> BoxFuture<Result<()>> {
         let (role, claim) = (role_id.to_string(), claim.clone());
         self.with(move |s| {
-            s.role_claims.retain(|(r, c)| !(*r == role && *c == claim));
+            s.role_claims
+                .retain(|(r, c)| !(*r == role && *c == claim));
             Ok(())
         })
     }
@@ -377,7 +481,10 @@ impl AccountStore for MemoryAccountStore {
     fn add_login(&self, user_id: &str, login: &UserLogin) -> BoxFuture<Result<()>> {
         let (user, login) = (user_id.to_string(), login.clone());
         self.with(move |s| {
-            if s.logins.iter().any(|(_, l)| l.provider == login.provider && l.provider_key == login.provider_key) {
+            if s.logins
+                .iter()
+                .any(|(_, l)| l.provider == login.provider && l.provider_key == login.provider_key)
+            {
                 return Err(Error::Conflict);
             }
             per_user(&s.logins, &user)?;
@@ -389,14 +496,21 @@ impl AccountStore for MemoryAccountStore {
     fn remove_login(&self, user_id: &str, provider: &str, key: &str) -> BoxFuture<Result<()>> {
         let (user, provider, key) = (user_id.to_string(), provider.to_string(), key.to_string());
         self.with(move |s| {
-            s.logins.retain(|(u, l)| !(*u == user && l.provider == provider && l.provider_key == key));
+            s.logins
+                .retain(|(u, l)| !(*u == user && l.provider == provider && l.provider_key == key));
             Ok(())
         })
     }
 
     fn logins_of(&self, user_id: &str) -> BoxFuture<Result<Vec<UserLogin>>> {
         let user = user_id.to_string();
-        self.with(move |s| Ok(s.logins.iter().filter(|(u, _)| *u == user).map(|(_, l)| l.clone()).collect()))
+        self.with(move |s| {
+            Ok(s.logins
+                .iter()
+                .filter(|(u, _)| *u == user)
+                .map(|(_, l)| l.clone())
+                .collect())
+        })
     }
 
     fn user_by_login(&self, provider: &str, key: &str) -> BoxFuture<Result<Option<User>>> {
@@ -409,17 +523,36 @@ impl AccountStore for MemoryAccountStore {
         })
     }
 
-    fn token(&self, user_id: &str, provider: &str, name: &str) -> BoxFuture<Result<Option<String>>> {
+    fn token(
+        &self,
+        user_id: &str,
+        provider: &str,
+        name: &str,
+    ) -> BoxFuture<Result<Option<String>>> {
         let k = (user_id.to_string(), provider.to_string(), name.to_string());
         self.with(move |s| Ok(s.tokens.get(&k).cloned()))
     }
 
-    fn set_token(&self, user_id: &str, provider: &str, name: &str, value: &str) -> BoxFuture<Result<()>> {
+    fn set_token(
+        &self,
+        user_id: &str,
+        provider: &str,
+        name: &str,
+        value: &str,
+    ) -> BoxFuture<Result<()>> {
         let k = (user_id.to_string(), provider.to_string(), name.to_string());
         let value = value.to_string();
         self.with(move |s| {
-            if !s.tokens.contains_key(&k) && s.tokens.keys().filter(|(u, _, _)| *u == k.0).count() >= MAX_PER_USER {
-                return Err(Error::Internal("too many tokens for one user in the memory account store".into()));
+            if !s.tokens.contains_key(&k)
+                && s.tokens
+                    .keys()
+                    .filter(|(u, _, _)| *u == k.0)
+                    .count()
+                    >= MAX_PER_USER
+            {
+                return Err(Error::Internal(
+                    "too many tokens for one user in the memory account store".into(),
+                ));
             }
             s.tokens.insert(k, value);
             Ok(())
@@ -436,26 +569,43 @@ impl AccountStore for MemoryAccountStore {
 
     fn passkeys_of(&self, user_id: &str) -> BoxFuture<Result<Vec<Passkey>>> {
         let user = user_id.to_string();
-        self.with(move |s| Ok(s.passkeys.iter().filter(|(u, _)| *u == user).map(|(_, p)| p.clone()).collect()))
+        self.with(move |s| {
+            Ok(s.passkeys
+                .iter()
+                .filter(|(u, _)| *u == user)
+                .map(|(_, p)| p.clone())
+                .collect())
+        })
     }
 
     fn passkey(&self, credential_id: &[u8]) -> BoxFuture<Result<Option<(String, Passkey)>>> {
         let id = credential_id.to_vec();
-        self.with(move |s| Ok(s.passkeys.iter().find(|(_, p)| p.credential_id == id).cloned()))
+        self.with(move |s| {
+            Ok(s.passkeys
+                .iter()
+                .find(|(_, p)| p.credential_id == id)
+                .cloned())
+        })
     }
 
     fn save_passkey(&self, user_id: &str, passkey: &Passkey) -> BoxFuture<Result<()>> {
         let (user, passkey) = (user_id.to_string(), passkey.clone());
-        self.with(move |s| match s.passkeys.iter_mut().find(|(_, p)| p.credential_id == passkey.credential_id) {
-            Some((owner, _)) if *owner != user => Err(Error::Conflict),
-            Some((_, p)) => {
-                *p = passkey;
-                Ok(())
-            }
-            None => {
-                per_user(&s.passkeys, &user)?;
-                s.passkeys.push((user, passkey));
-                Ok(())
+        self.with(move |s| {
+            match s
+                .passkeys
+                .iter_mut()
+                .find(|(_, p)| p.credential_id == passkey.credential_id)
+            {
+                Some((owner, _)) if *owner != user => Err(Error::Conflict),
+                Some((_, p)) => {
+                    *p = passkey;
+                    Ok(())
+                }
+                None => {
+                    per_user(&s.passkeys, &user)?;
+                    s.passkeys.push((user, passkey));
+                    Ok(())
+                }
             }
         })
     }
@@ -463,7 +613,8 @@ impl AccountStore for MemoryAccountStore {
     fn remove_passkey(&self, user_id: &str, credential_id: &[u8]) -> BoxFuture<Result<()>> {
         let (user, id) = (user_id.to_string(), credential_id.to_vec());
         self.with(move |s| {
-            s.passkeys.retain(|(u, p)| !(*u == user && p.credential_id == id));
+            s.passkeys
+                .retain(|(u, p)| !(*u == user && p.credential_id == id));
             Ok(())
         })
     }

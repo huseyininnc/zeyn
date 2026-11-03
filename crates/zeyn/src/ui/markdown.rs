@@ -40,7 +40,10 @@ impl Markdown {
     /// Markdown from users or other untrusted sources: a string, or a [`Text`] key resolved in the
     /// user's language. At most [`MAX_MARKDOWN`] bytes are rendered.
     pub fn new(text: impl Into<Text>) -> Self {
-        Markdown { text: text.into(), trusted: false }
+        Markdown {
+            text: text.into(),
+            trusted: false,
+        }
     }
 
     /// Text the app wrote itself: headings get ids and links lose `nofollow ugc`. Escaping and
@@ -63,7 +66,11 @@ impl Markdown {
             end -= 1;
         }
         let source = &source[..end];
-        let mut r = Renderer { trusted: self.trusted, html: String::with_capacity(source.len() + 64), ids: Vec::new() };
+        let mut r = Renderer {
+            trusted: self.trusted,
+            html: String::with_capacity(source.len() + 64),
+            ids: Vec::new(),
+        };
         let lines: Vec<&str> = source.lines().collect();
         let mut i = 0;
         while i < lines.len() {
@@ -75,7 +82,10 @@ impl Markdown {
 
 impl Component for Markdown {
     fn render(&self, out: &mut String, r: &Render) {
-        out.push_str(&format!(r#"<div class="z-prose z-markdown" data-testid="{}.markdown">"#, r.scope));
+        out.push_str(&format!(
+            r#"<div class="z-prose z-markdown" data-testid="{}.markdown">"#,
+            r.scope
+        ));
         out.push_str(&self.html_in(r));
         out.push_str("</div>");
     }
@@ -98,14 +108,21 @@ fn indent_of(line: &str) -> usize {
 /// The marker of a list item: ordered or not, and the text after it.
 fn list_item(line: &str) -> Option<(bool, &str)> {
     let t = line.trim_start();
-    if let Some(rest) = t.strip_prefix("- ").or_else(|| t.strip_prefix("* ")) {
+    if let Some(rest) = t
+        .strip_prefix("- ")
+        .or_else(|| t.strip_prefix("* "))
+    {
         return Some((false, rest));
     }
-    let digits = t.bytes().take_while(u8::is_ascii_digit).count();
-    if digits > 0 && digits < 4 {
-        if let Some(rest) = t[digits..].strip_prefix(". ") {
-            return Some((true, rest));
-        }
+    let digits = t
+        .bytes()
+        .take_while(u8::is_ascii_digit)
+        .count();
+    if digits > 0
+        && digits < 4
+        && let Some(rest) = t[digits..].strip_prefix(". ")
+    {
+        return Some((true, rest));
     }
     None
 }
@@ -117,7 +134,10 @@ fn is_rule(line: &str) -> bool {
 
 fn is_table_separator(line: &str) -> bool {
     let t = line.trim();
-    t.starts_with('|') && t.contains('-') && t.chars().all(|c| matches!(c, '|' | '-' | ':' | ' '))
+    t.starts_with('|')
+        && t.contains('-')
+        && t.chars()
+            .all(|c| matches!(c, '|' | '-' | ':' | ' '))
 }
 
 /// Cells of a table row. `|` inside inline code and `\|` do not split.
@@ -138,7 +158,11 @@ fn cells(line: &str) -> Vec<String> {
                 code = !code;
                 cell.push(c);
             }
-            '|' if !code => cells.push(std::mem::take(&mut cell).trim().to_string()),
+            '|' if !code => cells.push(
+                std::mem::take(&mut cell)
+                    .trim()
+                    .to_string(),
+            ),
             _ => cell.push(c),
         }
     }
@@ -157,7 +181,11 @@ fn slug(text: &str) -> String {
         }
     }
     let out = out.trim_end_matches('-').to_string();
-    if out.is_empty() { "section".into() } else { out }
+    if out.is_empty() {
+        "section".into()
+    } else {
+        out
+    }
 }
 
 /// Appends one character escaped as [`escape`] does, without an allocation.
@@ -174,7 +202,11 @@ fn push_escaped(out: &mut String, c: char) {
 
 /// Whether a link or image target may be used, and whether it leaves the app.
 fn target_kind(target: &str) -> Option<Target> {
-    if target.is_empty() || target.chars().any(|c| c.is_control() || c.is_whitespace() || c == '\\') {
+    if target.is_empty()
+        || target
+            .chars()
+            .any(|c| c.is_control() || c.is_whitespace() || c == '\\')
+    {
         return None;
     }
     let lower = target.to_ascii_lowercase();
@@ -187,7 +219,9 @@ fn target_kind(target: &str) -> Option<Target> {
     if target.starts_with("//") {
         return None;
     }
-    let path_end = target.find(['/', '?', '#']).unwrap_or(target.len());
+    let path_end = target
+        .find(['/', '?', '#'])
+        .unwrap_or(target.len());
     if target[..path_end].contains([':', '&']) {
         return None;
     }
@@ -210,7 +244,11 @@ struct Marks<'a> {
 
 impl Marks<'_> {
     fn find(&mut self, from: usize, pat: &'static [char]) -> Option<usize> {
-        if let Some((_, start, hit)) = self.seen.iter().find(|(p, ..)| *p == pat) {
+        if let Some((_, start, hit)) = self
+            .seen
+            .iter()
+            .find(|(p, ..)| *p == pat)
+        {
             match hit {
                 None if *start <= from => return None,
                 Some(h) if *h >= from && *start <= from => return Some(*h),
@@ -240,16 +278,29 @@ impl Renderer {
                 .take(32)
                 .collect();
             let mut end = i + 1;
-            while end < lines.len() && !lines[end].trim_start().starts_with("```") {
+            while end < lines.len()
+                && !lines[end]
+                    .trim_start()
+                    .starts_with("```")
+            {
                 end += 1;
             }
             let code = lines[i + 1..end].join("\n");
-            let class = if lang.is_empty() { String::new() } else { format!(r#" class="language-{lang}""#) };
-            self.html
-                .push_str(&format!(r#"<pre class="z-code" tabindex="0"><code{class}>{}</code></pre>"#, escape(&code)));
+            let class = if lang.is_empty() {
+                String::new()
+            } else {
+                format!(r#" class="language-{lang}""#)
+            };
+            self.html.push_str(&format!(
+                r#"<pre class="z-code" tabindex="0"><code{class}>{}</code></pre>"#,
+                escape(&code)
+            ));
             return (end + 1).min(lines.len());
         }
-        let hashes = t.bytes().take_while(|b| *b == b'#').count();
+        let hashes = t
+            .bytes()
+            .take_while(|b| *b == b'#')
+            .count();
         if (1..=4).contains(&hashes) && t[hashes..].starts_with(' ') {
             let text = t[hashes..].trim();
             let level = (hashes + 1).min(4);
@@ -263,10 +314,12 @@ impl Renderer {
                     }
                     id = format!("{id}-{n}");
                 }
-                self.html.push_str(&format!(r#"<h{level} id="{id}">{body}</h{level}>"#));
+                self.html
+                    .push_str(&format!(r#"<h{level} id="{id}">{body}</h{level}>"#));
                 self.ids.push(id);
             } else {
-                self.html.push_str(&format!("<h{level}>{body}</h{level}>"));
+                self.html
+                    .push_str(&format!("<h{level}>{body}</h{level}>"));
             }
             return i + 1;
         }
@@ -284,11 +337,17 @@ impl Renderer {
             let mut end = i;
             let mut text = Vec::new();
             while end < lines.len() && lines[end].trim().starts_with('>') {
-                text.push(lines[end].trim().trim_start_matches('>').trim());
+                text.push(
+                    lines[end]
+                        .trim()
+                        .trim_start_matches('>')
+                        .trim(),
+                );
                 end += 1;
             }
             let body = self.inline(&text.join(" "), 0);
-            self.html.push_str(&format!("<blockquote><p>{body}</p></blockquote>"));
+            self.html
+                .push_str(&format!("<blockquote><p>{body}</p></blockquote>"));
             return end;
         }
         let mut end = i;
@@ -313,7 +372,8 @@ impl Renderer {
             end = i + 1;
         }
         let body = self.inline(&text.join(" "), 0);
-        self.html.push_str(&format!("<p>{body}</p>"));
+        self.html
+            .push_str(&format!("<p>{body}</p>"));
         end
     }
 
@@ -321,15 +381,18 @@ impl Renderer {
         self.html.push_str("<table><thead><tr>");
         for c in cells(lines[i]) {
             let cell = self.inline(&c, 0);
-            self.html.push_str(&format!(r#"<th scope="col">{cell}</th>"#));
+            self.html
+                .push_str(&format!(r#"<th scope="col">{cell}</th>"#));
         }
-        self.html.push_str("</tr></thead><tbody>");
+        self.html
+            .push_str("</tr></thead><tbody>");
         let mut end = i + 2;
         while end < lines.len() && lines[end].trim().starts_with('|') {
             self.html.push_str("<tr>");
             for c in cells(lines[end]) {
                 let cell = self.inline(&c, 0);
-                self.html.push_str(&format!("<td>{cell}</td>"));
+                self.html
+                    .push_str(&format!("<td>{cell}</td>"));
             }
             self.html.push_str("</tr>");
             end += 1;
@@ -342,13 +405,17 @@ impl Renderer {
     /// [`MAX_DEPTH`] (items deeper still start a new list after it); indented lines that are not
     /// items continue the item before them.
     fn list(&mut self, lines: &[&str], i: usize, indent: usize, depth: usize) -> usize {
-        let ordered = list_item(lines[i]).map(|(o, _)| o).unwrap_or(false);
+        let ordered = list_item(lines[i])
+            .map(|(o, _)| o)
+            .unwrap_or(false);
         let tag = if ordered { "ol" } else { "ul" };
         self.html.push_str(&format!("<{tag}>"));
         let mut at = i;
         while at < lines.len() {
             let line = lines[at];
-            let Some((_, text)) = list_item(line).filter(|(o, _)| indent_of(line) == indent && *o == ordered) else {
+            let Some((_, text)) =
+                list_item(line).filter(|(o, _)| indent_of(line) == indent && *o == ordered)
+            else {
                 break;
             };
             let mut item = text.trim().to_string();
@@ -368,7 +435,8 @@ impl Renderer {
                 at += 1;
             }
             let body = self.inline(&item, 0);
-            self.html.push_str(&format!("<li>{body}"));
+            self.html
+                .push_str(&format!("<li>{body}"));
             if at < lines.len() && nests(lines[at]) && indent_of(lines[at]) > indent {
                 at = self.list(lines, at, indent_of(lines[at]), depth + 1);
             }
@@ -376,7 +444,8 @@ impl Renderer {
             if at < lines.len()
                 && lines[at].trim().is_empty()
                 && at + 1 < lines.len()
-                && list_item(lines[at + 1]).is_some_and(|(o, _)| o == ordered && indent_of(lines[at + 1]) == indent)
+                && list_item(lines[at + 1])
+                    .is_some_and(|(o, _)| o == ordered && indent_of(lines[at + 1]) == indent)
             {
                 at += 1;
             }
@@ -392,7 +461,10 @@ impl Renderer {
             return escape(text);
         }
         let mut out = String::with_capacity(text.len() + 16);
-        let mut marks = Marks { chars: &chars, seen: Vec::new() };
+        let mut marks = Marks {
+            chars: &chars,
+            seen: Vec::new(),
+        };
         let collect = |a: usize, b: usize| -> String { chars[a..b].iter().collect() };
         let mut i = 0;
         while i < chars.len() {
@@ -402,43 +474,53 @@ impl Renderer {
                 i += 2;
                 continue;
             }
-            if c == '`' {
-                if let Some(end) = marks.find(i + 1, &['`']) {
-                    out.push_str(&format!("<code>{}</code>", escape(&collect(i + 1, end))));
-                    i = end + 1;
-                    continue;
-                }
+            if c == '`'
+                && let Some(end) = marks.find(i + 1, &['`'])
+            {
+                out.push_str(&format!("<code>{}</code>", escape(&collect(i + 1, end))));
+                i = end + 1;
+                continue;
             }
             let image = c == '!' && chars.get(i + 1) == Some(&'[');
             if c == '[' || image {
                 let open = if image { i + 1 } else { i };
-                if let Some(close) = marks.find(open + 1, &[']', '(']) {
-                    if let Some(end) = marks.find(close + 2, &[')']) {
-                        let label = collect(open + 1, close);
-                        let target = collect(close + 2, end);
-                        if image {
-                            out.push_str(&self.image(&label, target.trim()));
-                        } else {
-                            out.push_str(&self.anchor(&self.inline(&label, depth + 1), target.trim()));
-                        }
-                        i = end + 1;
-                        continue;
+                if let Some(close) = marks.find(open + 1, &[']', '('])
+                    && let Some(end) = marks.find(close + 2, &[')'])
+                {
+                    let label = collect(open + 1, close);
+                    let target = collect(close + 2, end);
+                    if image {
+                        out.push_str(&self.image(&label, target.trim()));
+                    } else {
+                        out.push_str(&self.anchor(&self.inline(&label, depth + 1), target.trim()));
                     }
-                }
-            }
-            if c == '*' && chars.get(i + 1) == Some(&'*') {
-                if let Some(end) = marks.find(i + 3, &['*', '*']) {
-                    out.push_str(&format!("<strong>{}</strong>", self.inline(&collect(i + 2, end), depth + 1)));
-                    i = end + 2;
-                    continue;
-                }
-            }
-            if c == '*' && chars.get(i + 1).is_some_and(|n| !n.is_whitespace() && *n != '*') {
-                if let Some(end) = marks.find(i + 1, &['*']) {
-                    out.push_str(&format!("<em>{}</em>", self.inline(&collect(i + 1, end), depth + 1)));
                     i = end + 1;
                     continue;
                 }
+            }
+            if c == '*'
+                && chars.get(i + 1) == Some(&'*')
+                && let Some(end) = marks.find(i + 3, &['*', '*'])
+            {
+                out.push_str(&format!(
+                    "<strong>{}</strong>",
+                    self.inline(&collect(i + 2, end), depth + 1)
+                ));
+                i = end + 2;
+                continue;
+            }
+            if c == '*'
+                && chars
+                    .get(i + 1)
+                    .is_some_and(|n| !n.is_whitespace() && *n != '*')
+                && let Some(end) = marks.find(i + 1, &['*'])
+            {
+                out.push_str(&format!(
+                    "<em>{}</em>",
+                    self.inline(&collect(i + 1, end), depth + 1)
+                ));
+                i = end + 1;
+                continue;
             }
             push_escaped(&mut out, c);
             i += 1;
@@ -448,7 +530,9 @@ impl Renderer {
 
     /// A link, or only its label when the target is not allowed.
     fn anchor(&self, label: &str, target: &str) -> String {
-        let Some(kind) = target_kind(target) else { return label.to_string() };
+        let Some(kind) = target_kind(target) else {
+            return label.to_string();
+        };
         let rel = match (kind, self.trusted) {
             (_, false) => r#" rel="noopener noreferrer nofollow ugc""#,
             (Target::External, true) => r#" rel="noopener noreferrer""#,
@@ -461,7 +545,11 @@ impl Renderer {
     fn image(&self, alt: &str, src: &str) -> String {
         match target_kind(src) {
             Some(Target::Local) if !src.starts_with('#') => {
-                format!(r#"<img src="{}" alt="{}" loading="lazy">"#, escape(src), escape(alt))
+                format!(
+                    r#"<img src="{}" alt="{}" loading="lazy">"#,
+                    escape(src),
+                    escape(alt)
+                )
             }
             _ => escape(alt),
         }

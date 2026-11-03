@@ -187,7 +187,11 @@ pub async fn find_products(q: LookupQuery) -> Result<Page<LookupItem>> {
 /// Sample products grouped by kind.
 #[action(public)]
 pub async fn product_tree(q: TreeQuery) -> Result<Vec<TreeItem>> {
-    let kinds = [("book", Kind::Book, "Books"), ("tool", Kind::Tool, "Tools"), ("plant", Kind::Plant, "Plants")];
+    let kinds = [
+        ("book", Kind::Book, "Books"),
+        ("tool", Kind::Tool, "Tools"),
+        ("plant", Kind::Plant, "Plants"),
+    ];
     Ok(match q.parent.as_deref() {
         None => kinds
             .iter()

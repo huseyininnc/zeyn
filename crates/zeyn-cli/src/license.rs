@@ -17,7 +17,10 @@ pub const DEFAULT_KEY: &str = "zeyn-license.key";
 const KEY_ENV: &str = "ZEYN_LICENSE_KEY";
 
 fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
+    bytes
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 fn from_hex(text: &str) -> Option<[u8; 32]> {
@@ -39,12 +42,17 @@ pub fn keygen(out: &Path) -> Result<String, String> {
     options.write(true).create_new(true);
     #[cfg(unix)]
     std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
-    let mut file = options.open(out).map_err(|e| match e.kind() {
-        std::io::ErrorKind::AlreadyExists => {
-            format!("{} already exists; refusing to overwrite a private key", out.display())
-        }
-        _ => format!("{}: {e}", out.display()),
-    })?;
+    let mut file = options
+        .open(out)
+        .map_err(|e| match e.kind() {
+            std::io::ErrorKind::AlreadyExists => {
+                format!(
+                    "{} already exists; refusing to overwrite a private key",
+                    out.display()
+                )
+            }
+            _ => format!("{}: {e}", out.display()),
+        })?;
     let mut secret = [0u8; 32];
     getrandom::getrandom(&mut secret).map_err(|e| format!("no system randomness: {e}"))?;
     let key = SigningKey::from_bytes(&secret);
@@ -67,16 +75,19 @@ pub fn sign(license: &str, key_file: Option<&Path>) -> Result<String, String> {
     } else {
         std::fs::read_to_string(license).map_err(|e| format!("{license}: {e}"))?
     };
-    let payload: Value = serde_json::from_str(&text).map_err(|e| format!("license is not JSON: {e}"))?;
+    let payload: Value =
+        serde_json::from_str(&text).map_err(|e| format!("license is not JSON: {e}"))?;
     check(&payload)?;
     let hex_key = match (key_file, std::env::var(KEY_ENV)) {
         (None, Ok(k)) => k,
         (file, _) => {
             let file = file.unwrap_or(Path::new(DEFAULT_KEY));
-            std::fs::read_to_string(file).map_err(|e| format!("private key {}: {e}", file.display()))?
+            std::fs::read_to_string(file)
+                .map_err(|e| format!("private key {}: {e}", file.display()))?
         }
     };
-    let key = SigningKey::from_bytes(&from_hex(&hex_key).ok_or("the private key is not 64 hex digits")?);
+    let key =
+        SigningKey::from_bytes(&from_hex(&hex_key).ok_or("the private key is not 64 hex digits")?);
     let payload = payload.to_string();
     let mut message = CONTEXT.to_vec();
     message.extend_from_slice(payload.as_bytes());
@@ -90,15 +101,31 @@ fn check(payload: &Value) -> Result<(), String> {
     if holder.trim().is_empty() {
         return Err("license needs a `holder`".into());
     }
-    let until = payload["valid_until"].as_str().unwrap_or("");
-    let digits = until.bytes().enumerate().all(|(i, b)| if i == 4 || i == 7 { b == b'-' } else { b.is_ascii_digit() });
+    let until = payload["valid_until"]
+        .as_str()
+        .unwrap_or("");
+    let digits = until.bytes().enumerate().all(|(i, b)| {
+        if i == 4 || i == 7 {
+            b == b'-'
+        } else {
+            b.is_ascii_digit()
+        }
+    });
     if until.len() != 10 || !digits {
         return Err("license needs `valid_until` as YYYY-MM-DD".into());
     }
-    if !payload["modules"].is_null() && !payload["modules"].as_array().is_some_and(|m| m.iter().all(Value::is_string)) {
+    if !payload["modules"].is_null()
+        && !payload["modules"]
+            .as_array()
+            .is_some_and(|m| m.iter().all(Value::is_string))
+    {
         return Err("`modules` must be a list of module names".into());
     }
-    if !payload["max_users"].is_null() && !payload["max_users"].as_u64().is_some_and(|n| n <= u64::from(u32::MAX)) {
+    if !payload["max_users"].is_null()
+        && !payload["max_users"]
+            .as_u64()
+            .is_some_and(|n| n <= u64::from(u32::MAX))
+    {
         return Err("`max_users` must be a whole number".into());
     }
     Ok(())
@@ -115,10 +142,22 @@ mod tests {
         let key_file = dir.join("vendor.key");
         let _ = std::fs::remove_file(&key_file);
         let out = keygen(&key_file).unwrap();
-        assert!(keygen(&key_file).unwrap_err().contains("refusing to overwrite"));
-        let public = out.split('"').nth(1).unwrap().to_string();
+        assert!(
+            keygen(&key_file)
+                .unwrap_err()
+                .contains("refusing to overwrite")
+        );
+        let public = out
+            .split('"')
+            .nth(1)
+            .unwrap()
+            .to_string();
 
-        let file = sign(r#"{"holder":"Acme","valid_until":"2027-06-30","modules":["pos"]}"#, Some(&key_file)).unwrap();
+        let file = sign(
+            r#"{"holder":"Acme","valid_until":"2027-06-30","modules":["pos"]}"#,
+            Some(&key_file),
+        )
+        .unwrap();
         let license = zeyn::License::from_signed(&file, &public).unwrap();
         assert_eq!(license.holder, "Acme");
         assert!(license.allows("pos") && !license.allows("hr"));
@@ -127,11 +166,18 @@ mod tests {
             Err(zeyn::LicenseError::BadSignature)
         );
 
-        assert!(sign(r#"{"valid_until":"2027-06-30"}"#, Some(&key_file)).unwrap_err().contains("holder"));
         assert!(
-            sign(r#"{"holder":"Acme","valid_until":"30.06.2027"}"#, Some(&key_file))
+            sign(r#"{"valid_until":"2027-06-30"}"#, Some(&key_file))
                 .unwrap_err()
-                .contains("YYYY-MM-DD")
+                .contains("holder")
+        );
+        assert!(
+            sign(
+                r#"{"holder":"Acme","valid_until":"30.06.2027"}"#,
+                Some(&key_file)
+            )
+            .unwrap_err()
+            .contains("YYYY-MM-DD")
         );
         std::fs::remove_dir_all(&dir).unwrap();
     }

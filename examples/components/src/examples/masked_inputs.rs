@@ -23,18 +23,21 @@ pub async fn save_terms(terms: Valid<Terms>) -> Result<String> {
 }
 
 pub fn overview(_ctx: &Ctx) -> Node {
-    Form::of(Terms { rate: Decimal::parse("1.0825").unwrap_or_default(), ..Terms::default() })
-        .row(|r| {
-            r.field(Terms::rate)
-                .field(Terms::discount)
-        })
-        .control(Terms::discount, Control::Percent)
-        .field(Terms::phone)
-        .field(Terms::password)
-        .control(Terms::password, Control::PasswordMeter)
-        .submit("Save", save_terms)
-        .on_success(|_, ui| ui.toast("Saved. Nothing was stored."))
-        .into()
+    Form::of(Terms {
+        rate: Decimal::parse("1.0825").unwrap_or_default(),
+        ..Terms::default()
+    })
+    .row(|r| {
+        r.field(Terms::rate)
+            .field(Terms::discount)
+    })
+    .control(Terms::discount, Control::Percent)
+    .field(Terms::phone)
+    .field(Terms::password)
+    .control(Terms::password, Control::PasswordMeter)
+    .submit("Save", save_terms)
+    .on_success(|_, ui| ui.toast("Saved. Nothing was stored."))
+    .into()
 }
 
 /// What the catalog shows of `Control`.

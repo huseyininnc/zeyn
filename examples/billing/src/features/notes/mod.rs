@@ -15,5 +15,8 @@ pub fn feature() -> Feature {
         .screen(screens::note_editor)
         .api(actions::search_notes)
         .api(actions::save_note)
-        .menu(|m| m.group(t!("notes.menu"), Icon::Edit).item(t!("notes.list"), screens::note_list))
+        .menu(|m| {
+            m.group(t!("notes.menu"), Icon::Edit)
+                .item(t!("notes.list"), screens::note_list)
+        })
 }

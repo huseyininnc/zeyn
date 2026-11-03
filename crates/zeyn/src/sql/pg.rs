@@ -47,10 +47,18 @@ fn query(text: String, args: Vec<Arg>) -> Query<'static, sqlx::Postgres, PgArgum
 fn read(row: &PgRow, cols: &[Col], out: &mut Vec<Cell>) -> Result<()> {
     for (i, col) in cols.iter().enumerate() {
         let cell = match col {
-            Col::Int => row.try_get::<Option<i64>, _>(i).map(|v| v.map_or(Cell::Null, Cell::Int)),
-            Col::Float => row.try_get::<Option<f64>, _>(i).map(|v| v.map_or(Cell::Null, Cell::Float)),
-            Col::Text => row.try_get::<Option<String>, _>(i).map(|v| v.map_or(Cell::Null, Cell::Text)),
-            Col::Bool => row.try_get::<Option<bool>, _>(i).map(|v| v.map_or(Cell::Null, Cell::Bool)),
+            Col::Int => row
+                .try_get::<Option<i64>, _>(i)
+                .map(|v| v.map_or(Cell::Null, Cell::Int)),
+            Col::Float => row
+                .try_get::<Option<f64>, _>(i)
+                .map(|v| v.map_or(Cell::Null, Cell::Float)),
+            Col::Text => row
+                .try_get::<Option<String>, _>(i)
+                .map(|v| v.map_or(Cell::Null, Cell::Text)),
+            Col::Bool => row
+                .try_get::<Option<bool>, _>(i)
+                .map(|v| v.map_or(Cell::Null, Cell::Bool)),
         };
         out.push(cell.map_err(|e| Error::Internal(format!("reading column {i}: {e}")))?);
     }
@@ -76,7 +84,11 @@ pub(crate) async fn fetch(
     let Sql { text, args, cols } = sql;
     let mut rows = query(text, args).fetch(&mut *conn);
     let mut cells = Vec::with_capacity(cols.len());
-    while let Some(row) = rows.try_next().await.map_err(|e| error(e, on))? {
+    while let Some(row) = rows
+        .try_next()
+        .await
+        .map_err(|e| error(e, on))?
+    {
         cells.clear();
         read(&row, &cols, &mut cells)?;
         each(&mut cells)?;
@@ -86,7 +98,11 @@ pub(crate) async fn fetch(
 
 pub(crate) async fn execute(conn: &mut PgConnection, sql: Sql, on: OnError) -> Result<u64> {
     let Sql { text, args, .. } = sql;
-    query(text, args).execute(&mut *conn).await.map(|r| r.rows_affected()).map_err(|e| error(e, on))
+    query(text, args)
+        .execute(&mut *conn)
+        .await
+        .map(|r| r.rows_affected())
+        .map_err(|e| error(e, on))
 }
 
 /// Streams rows into a bounded channel from a task of its own. The task stops when the reader
@@ -97,7 +113,9 @@ pub(crate) fn stream<E: Entity>(pool: PgPool, sql: Sql, tx: tokio::sync::mpsc::S
         let mut conn = match pool.acquire().await {
             Ok(c) => c,
             Err(e) => {
-                let _ = tx.send(Err(Error::Internal(format!("database connection: {e}")))).await;
+                let _ = tx
+                    .send(Err(Error::Internal(format!("database connection: {e}"))))
+                    .await;
                 return;
             }
         };

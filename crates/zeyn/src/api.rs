@@ -53,7 +53,9 @@ fn field_schema(f: &FieldMeta) -> Json {
             json!({ "type": "string", "enum": options.iter().map(|o| o.value).collect::<Vec<_>>() })
         }
     };
-    let o = s.as_object_mut().expect("object schema");
+    let o = s
+        .as_object_mut()
+        .expect("object schema");
     o.insert("title".into(), json!(f.label));
     for r in f.rules {
         match r {
@@ -140,7 +142,9 @@ impl<M: Model> ApiInput for Valid<M> {
     fn check_with(&self, ctx: &Ctx) -> Result<()> {
         let mut errors = ValidationErrors::default();
         crate::model::check_embeds(&**self, ctx.csp(), &mut errors);
-        errors.into_result().map_err(Error::Validation)
+        errors
+            .into_result()
+            .map_err(Error::Validation)
     }
 
     fn record(&self) -> Option<crate::audit::RecordRef> {
@@ -233,8 +237,13 @@ impl<M: Model> ApiOutput for Page<M> {
     }
 
     fn protect(value: &mut Json, ctx: &Ctx) {
-        if let Some(items) = value.get_mut("items").and_then(Json::as_array_mut) {
-            items.iter_mut().for_each(|item| crate::privacy::protect_object::<M>(item, ctx));
+        if let Some(items) = value
+            .get_mut("items")
+            .and_then(Json::as_array_mut)
+        {
+            items
+                .iter_mut()
+                .for_each(|item| crate::privacy::protect_object::<M>(item, ctx));
         }
     }
 }
@@ -250,7 +259,9 @@ impl<M: Model> ApiOutput for Vec<M> {
 
     fn protect(value: &mut Json, ctx: &Ctx) {
         if let Some(items) = value.as_array_mut() {
-            items.iter_mut().for_each(|item| crate::privacy::protect_object::<M>(item, ctx));
+            items
+                .iter_mut()
+                .for_each(|item| crate::privacy::protect_object::<M>(item, ctx));
         }
     }
 }
@@ -298,7 +309,8 @@ impl<T: ApiOutput> ApiResult for Result<T> {
 
     fn into_json(self) -> Result<Json> {
         let value = self?;
-        serde_json::to_value(value).map_err(|e| Error::Internal(format!("response could not be serialized: {e}")))
+        serde_json::to_value(value)
+            .map_err(|e| Error::Internal(format!("response could not be serialized: {e}")))
     }
 
     fn protect(value: &mut Json, ctx: &Ctx) {
@@ -337,7 +349,9 @@ where
                 t.record.get_or_insert(record);
             });
         }
-        let mut value = A::call(ctx.clone(), input).await?.into_json()?;
+        let mut value = A::call(ctx.clone(), input)
+            .await?
+            .into_json()?;
         <A::Output as ApiResult>::protect(&mut value, &ctx);
         Ok(value)
     })

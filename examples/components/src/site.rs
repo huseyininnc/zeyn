@@ -12,8 +12,7 @@ const CSS: &str = include_str!("../assets/components.css");
 const JS: &str = include_str!("../assets/copy.js");
 
 /// The tags put before `</head>` of every page.
-pub const HEAD: &str =
-    r#"<link rel="stylesheet" href="/site/components.css"><script type="module" src="/site/copy.js"></script>"#;
+pub const HEAD: &str = r#"<link rel="stylesheet" href="/site/components.css"><script type="module" src="/site/copy.js"></script>"#;
 
 /// Largest page the head tags are added to. Pages are far smaller; anything bigger passes as is.
 const MAX_PAGE: usize = 4 * 1024 * 1024;
@@ -22,8 +21,10 @@ fn asset(body: &'static str, kind: &'static str) -> Response<Body> {
     let mut res = Response::new(Body::from(body));
     res.headers_mut()
         .insert(header::CONTENT_TYPE, HeaderValue::from_static(kind));
-    res.headers_mut()
-        .insert(header::CACHE_CONTROL, HeaderValue::from_static("public, max-age=3600"));
+    res.headers_mut().insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("public, max-age=3600"),
+    );
     res
 }
 
@@ -38,10 +39,14 @@ async fn picture(Path(file): Path<String>) -> Response<Body> {
         return res;
     };
     let mut res = Response::new(Body::from(crate::data::svg(n)));
-    res.headers_mut()
-        .insert(header::CONTENT_TYPE, HeaderValue::from_static("image/svg+xml"));
-    res.headers_mut()
-        .insert(header::CACHE_CONTROL, HeaderValue::from_static("public, max-age=86400"));
+    res.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("image/svg+xml"),
+    );
+    res.headers_mut().insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("public, max-age=86400"),
+    );
     res
 }
 
@@ -78,8 +83,14 @@ async fn with_head(res: Response<Body>) -> Response<Body> {
 
 /// The app's router with the catalog's own files and the head tags.
 pub fn router(app: Router) -> Router {
-    app.route("/site/components.css", get(|| async { asset(CSS, "text/css; charset=utf-8") }))
-        .route("/site/copy.js", get(|| async { asset(JS, "text/javascript; charset=utf-8") }))
-        .route("/site/img/{file}", get(picture))
-        .layer(axum::middleware::map_response(with_head))
+    app.route(
+        "/site/components.css",
+        get(|| async { asset(CSS, "text/css; charset=utf-8") }),
+    )
+    .route(
+        "/site/copy.js",
+        get(|| async { asset(JS, "text/javascript; charset=utf-8") }),
+    )
+    .route("/site/img/{file}", get(picture))
+    .layer(axum::middleware::map_response(with_head))
 }

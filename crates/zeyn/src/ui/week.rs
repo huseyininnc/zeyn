@@ -98,7 +98,14 @@ impl<E: Model> WeekSchedule<E> {
     where
         A: crate::action::Action<Input = DataQuery, Output = Result<crate::action::Page<E>>>,
     {
-        WeekSchedule { action: A::META, fetch: fetch_via::<A, E>, day: None, item: None, title: None, limit: 100 }
+        WeekSchedule {
+            action: A::META,
+            fetch: fetch_via::<A, E>,
+            day: None,
+            item: None,
+            title: None,
+            limit: 100,
+        }
     }
 
     /// The day of a row: a [`Date`], an `Option<Date>` or a weekday number (1 = Monday).
@@ -127,7 +134,10 @@ impl<E: Model> WeekSchedule<E> {
 
     fn allow(&self, query: &mut DataQuery) {
         *query = DataQuery {
-            page: PageRequest::Offset { offset: 0, limit: self.limit },
+            page: PageRequest::Offset {
+                offset: 0,
+                limit: self.limit,
+            },
             time_zone: query.time_zone,
             ..DataQuery::default()
         };
@@ -174,12 +184,23 @@ impl<E: Model> WeekSchedule<E> {
         let id = dom_id(r, "week");
         let (title, labelled) = match &self.title {
             Some(t) => (
-                format!(r#"<h2 class="z-cards-title" id="{id}-title">{}</h2>"#, r.text(t)),
+                format!(
+                    r#"<h2 class="z-cards-title" id="{id}-title">{}</h2>"#,
+                    r.text(t)
+                ),
                 format!(r#" aria-labelledby="{id}-title""#),
             ),
-            None => (String::new(), format!(r#" aria-label="{}""#, r.text(&Text::key("zeyn.ui.week.label")))),
+            None => (
+                String::new(),
+                format!(
+                    r#" aria-label="{}""#,
+                    r.text(&Text::key("zeyn.ui.week.label"))
+                ),
+            ),
         };
-        out.push_str(&format!(r#"<section class="z-week"{labelled}>{title}<div class="z-week-days">"#));
+        out.push_str(&format!(
+            r#"<section class="z-week"{labelled}>{title}<div class="z-week-days">"#
+        ));
         self.days(out, r, page);
         out.push_str("</div></section>");
     }

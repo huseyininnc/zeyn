@@ -36,7 +36,9 @@ unsafe impl GlobalAlloc for Counting {
 static A: Counting = Counting;
 
 const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-const BIG: FileRules = FileRules::new("big").max_bytes(1 << 30).accept(&[FileType::Png]);
+const BIG: FileRules = FileRules::new("big")
+    .max_bytes(1 << 30)
+    .accept(&[FileType::Png]);
 const CHUNK: usize = 64 * 1024;
 
 /// Counts the bytes it is given and keeps none of them.
@@ -48,7 +50,11 @@ impl FileStore for Counter {
         let n = self.0.clone();
         Box::pin(async move {
             while let Some(c) = chunks.next().await {
-                n.fetch_add(c.map_err(|e| Error::Internal(e.to_string()))?.len() as u64, Ordering::Relaxed);
+                n.fetch_add(
+                    c.map_err(|e| Error::Internal(e.to_string()))?
+                        .len() as u64,
+                    Ordering::Relaxed,
+                );
             }
             Ok(())
         })
@@ -89,10 +95,18 @@ async fn upload(router: &axum::Router, total: usize) -> (StatusCode, usize) {
         .header("x-zeyn-file-name", "huge.png")
         .body(body(total))
         .unwrap();
-    let res = router.clone().oneshot(req).await.unwrap();
+    let res = router
+        .clone()
+        .oneshot(req)
+        .await
+        .unwrap();
     let status = res.status();
     let _ = res.into_body().collect().await;
-    (status, PEAK.load(Ordering::Relaxed).saturating_sub(base))
+    (
+        status,
+        PEAK.load(Ordering::Relaxed)
+            .saturating_sub(base),
+    )
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -112,22 +126,44 @@ async fn a_large_upload_keeps_memory_flat() {
         let c = counter.clone();
         router(Box::new(move |f| f.files(BIG, "files.write", c.clone())))
     };
-    assert_eq!(upload(&counted, 1 << 20).await.0, StatusCode::CREATED, "warm up");
+    assert_eq!(
+        upload(&counted, 1 << 20).await.0,
+        StatusCode::CREATED,
+        "warm up"
+    );
     let (status, small) = upload(&counted, 8 << 20).await;
     assert_eq!(status, StatusCode::CREATED);
     let (status, large) = upload(&counted, 256 << 20).await;
     assert_eq!(status, StatusCode::CREATED);
-    assert_eq!(counter.0.load(Ordering::Relaxed), (1 << 20) + (8 << 20) + (256 << 20));
-    println!("peak heap growth: 8 MiB upload {} KiB, 256 MiB upload {} KiB", small / 1024, large / 1024);
-    assert!(large < 4 << 20, "a 256 MiB upload must not hold more than 4 MiB, held {large} bytes");
+    assert_eq!(
+        counter.0.load(Ordering::Relaxed),
+        (1 << 20) + (8 << 20) + (256 << 20)
+    );
+    println!(
+        "peak heap growth: 8 MiB upload {} KiB, 256 MiB upload {} KiB",
+        small / 1024,
+        large / 1024
+    );
+    assert!(
+        large < 4 << 20,
+        "a 256 MiB upload must not hold more than 4 MiB, held {large} bytes"
+    );
 
     let disk = {
         let d = dir.clone();
-        router(Box::new(move |f| f.files(BIG, "files.write", zeyn::DiskStore::new(d.clone()))))
+        router(Box::new(move |f| {
+            f.files(BIG, "files.write", zeyn::DiskStore::new(d.clone()))
+        }))
     };
     let (status, on_disk) = upload(&disk, 64 << 20).await;
     assert_eq!(status, StatusCode::CREATED);
-    println!("peak heap growth: 64 MiB upload to disk {} KiB", on_disk / 1024);
-    assert!(on_disk < 4 << 20, "a 64 MiB upload to disk must not hold more than 4 MiB, held {on_disk} bytes");
+    println!(
+        "peak heap growth: 64 MiB upload to disk {} KiB",
+        on_disk / 1024
+    );
+    assert!(
+        on_disk < 4 << 20,
+        "a 64 MiB upload to disk must not hold more than 4 MiB, held {on_disk} bytes"
+    );
     let _ = std::fs::remove_dir_all(&dir);
 }

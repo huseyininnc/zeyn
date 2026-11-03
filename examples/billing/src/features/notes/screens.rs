@@ -14,7 +14,10 @@ pub struct NoteParams {
 pub fn note_list() -> Screen {
     Screen::new(t!("notes.list"))
         .toolbar(|t| {
-            t.button(t!("notes.new")).icon(Icon::Plus).shortcut("Alt+N").opens(note_editor, NoteParams { id: None })
+            t.button(t!("notes.new"))
+                .icon(Icon::Plus)
+                .shortcut("Alt+N")
+                .opens(note_editor, NoteParams { id: None })
         })
         .body(
             DataGrid::auto(search_notes)
@@ -30,10 +33,12 @@ pub fn note_editor(params: NoteParams, store: NoteStore) -> Result<Screen> {
         Some(id) => store.get(id)?,
         None => Note::default(),
     };
-    Ok(Screen::window(t!("notes.editor")).body(Form::auto(note).submit(t!("notes.save"), save_note).on_success(
-        |_, ui| {
-            ui.toast(t!("notes.saved"));
-            ui.close_and_refresh();
-        },
-    )))
+    Ok(Screen::window(t!("notes.editor")).body(
+        Form::auto(note)
+            .submit(t!("notes.save"), save_note)
+            .on_success(|_, ui| {
+                ui.toast(t!("notes.saved"));
+                ui.close_and_refresh();
+            }),
+    ))
 }

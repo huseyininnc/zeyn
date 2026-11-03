@@ -25,7 +25,9 @@ use tao::dpi::{LogicalSize, PhysicalPosition, PhysicalSize};
 use tao::event::{Event, StartCause, WindowEvent};
 use tao::event_loop::{ControlFlow, EventLoopBuilder};
 use tao::window::{Window, WindowBuilder};
-use wry::{NewWindowResponse, PermissionKind, PermissionResponse, WebContext, WebView, WebViewBuilder};
+use wry::{
+    NewWindowResponse, PermissionKind, PermissionResponse, WebContext, WebView, WebViewBuilder,
+};
 use zeyn::App;
 
 /// A Zeyn app in a native window.
@@ -47,7 +49,12 @@ impl Desktop {
     /// Wraps an app. The window is 1280 x 800 logical pixels and titled after the executable
     /// until the page sets `document.title`.
     pub fn new(app: App) -> Self {
-        Self { app, title: String::new(), size: (1280, 800), id: None }
+        Self {
+            app,
+            title: String::new(),
+            size: (1280, 800),
+            id: None,
+        }
     }
 
     /// The window title shown before the page sets its own `document.title`.
@@ -74,13 +81,32 @@ impl Desktop {
     /// With `ZEYN_DESCRIBE=1` it prints the app description and returns, like `App::serve`.
     pub fn run(self) -> std::io::Result<()> {
         if std::env::var_os("ZEYN_DESCRIBE").is_some() {
-            println!("{}", serde_json::to_string_pretty(&self.app.describe()).unwrap_or_default());
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&self.app.describe()).unwrap_or_default()
+            );
             return Ok(());
         }
-        let exe = std::env::current_exe().ok().and_then(|p| p.file_stem().map(|s| s.to_string_lossy().into_owned()));
-        let id = sanitize(self.id.as_deref().or(exe.as_deref()).unwrap_or("zeyn-app"));
-        let title = if self.title.is_empty() { id.clone() } else { self.title };
-        let dir = dirs::data_local_dir().unwrap_or_else(std::env::temp_dir).join(&id);
+        let exe = std::env::current_exe()
+            .ok()
+            .and_then(|p| {
+                p.file_stem()
+                    .map(|s| s.to_string_lossy().into_owned())
+            });
+        let id = sanitize(
+            self.id
+                .as_deref()
+                .or(exe.as_deref())
+                .unwrap_or("zeyn-app"),
+        );
+        let title = if self.title.is_empty() {
+            id.clone()
+        } else {
+            self.title
+        };
+        let dir = dirs::data_local_dir()
+            .unwrap_or_else(std::env::temp_dir)
+            .join(&id);
         std::fs::create_dir_all(&dir)?;
         if focus_running(&dir) {
             return Ok(());
@@ -99,26 +125,38 @@ impl Desktop {
             }),
         )?);
 
-        let rt = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()?;
         let router = {
             let _inside = rt.enter();
-            self.app.router().map_err(|problems| std::io::Error::other(problems.join("\n")))?
+            self.app
+                .router()
+                .map_err(|problems| std::io::Error::other(problems.join("\n")))?
         };
-        let router = router.layer(axum::middleware::from_fn_with_state(guard.clone(), guard::layer));
+        let router = router.layer(axum::middleware::from_fn_with_state(
+            guard.clone(),
+            guard::layer,
+        ));
         let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
         let (done_tx, done) = std::sync::mpsc::channel::<()>();
-        std::thread::Builder::new().name("zeyn-server".into()).spawn(move || {
-            let _ = rt.block_on(async move {
-                listener.set_nonblocking(true)?;
-                let listener = tokio::net::TcpListener::from_std(listener)?;
-                axum::serve(listener, router.into_make_service_with_connect_info::<SocketAddr>())
+        std::thread::Builder::new()
+            .name("zeyn-server".into())
+            .spawn(move || {
+                let _ = rt.block_on(async move {
+                    listener.set_nonblocking(true)?;
+                    let listener = tokio::net::TcpListener::from_std(listener)?;
+                    axum::serve(
+                        listener,
+                        router.into_make_service_with_connect_info::<SocketAddr>(),
+                    )
                     .with_graceful_shutdown(async move {
                         let _ = stopped.await;
                     })
                     .await
-            });
-            let _ = done_tx.send(());
-        })?;
+                });
+                let _ = done_tx.send(());
+            })?;
         let instance = dir.join("instance");
         write_private(&instance, &format!("{port} {}", guard.focus_key()));
 
@@ -128,8 +166,13 @@ impl Desktop {
             .with_min_inner_size(LogicalSize::new(480, 360))
             .with_inner_size(LogicalSize::new(self.size.0, self.size.1));
         if let Some(s) = &saved {
-            builder = builder.with_inner_size(PhysicalSize::new(s.width, s.height)).with_maximized(s.maximized);
-            if event_loop.available_monitors().any(|m| s.inside(m.position(), m.size())) {
+            builder = builder
+                .with_inner_size(PhysicalSize::new(s.width, s.height))
+                .with_maximized(s.maximized);
+            if event_loop
+                .available_monitors()
+                .any(|m| s.inside(m.position(), m.size()))
+            {
                 builder = builder.with_position(PhysicalPosition::new(s.x, s.y));
             }
         }
@@ -140,7 +183,9 @@ impl Desktop {
                 builder = builder.with_window_icon(Some(icon));
             }
         }
-        let window = builder.build(&event_loop).map_err(std::io::Error::other)?;
+        let window = builder
+            .build(&event_loop)
+            .map_err(std::io::Error::other)?;
 
         let origin = guard.origin().to_string();
         let downloads = dirs::download_dir().unwrap_or_else(|| dir.clone());
@@ -202,7 +247,10 @@ impl Desktop {
                         let _ = w.load_url(&url);
                     }
                 }
-                Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => {
+                Event::WindowEvent {
+                    event: WindowEvent::CloseRequested,
+                    ..
+                } => {
                     WindowState::save(&window, saved.as_ref(), &state_file);
                     let _ = std::fs::remove_file(&instance);
                     if let Some((w, c, stop)) = held.take() {
@@ -240,7 +288,11 @@ fn build(builder: WebViewBuilder, window: &Window) -> wry::Result<WebView> {
 fn build(builder: WebViewBuilder, window: &Window) -> wry::Result<WebView> {
     use tao::platform::unix::WindowExtUnix;
     use wry::WebViewBuilderExtUnix;
-    builder.build_gtk(window.default_vbox().ok_or(wry::Error::UnsupportedWindowHandle)?)
+    builder.build_gtk(
+        window
+            .default_vbox()
+            .ok_or(wry::Error::UnsupportedWindowHandle)?,
+    )
 }
 
 /// Binds a listener to `127.0.0.1` on a free port the system picks. Never any other address.
@@ -250,8 +302,15 @@ pub fn bind_loopback() -> std::io::Result<TcpListener> {
 
 /// Whether the window may show `url`: the app's own origin, its `blob:` URLs and `about:blank`.
 pub fn is_internal(url: &str, origin: &str) -> bool {
-    let own = |u: &str| u.strip_prefix(origin).is_some_and(|rest| rest.is_empty() || rest.starts_with(['/', '?', '#']));
-    url == "about:blank" || own(url) || url.strip_prefix("blob:").is_some_and(own)
+    let own = |u: &str| {
+        u.strip_prefix(origin)
+            .is_some_and(|rest| rest.is_empty() || rest.starts_with(['/', '?', '#']))
+    };
+    url == "about:blank"
+        || own(url)
+        || url
+            .strip_prefix("blob:")
+            .is_some_and(own)
 }
 
 /// Opens `http`, `https` and `mailto` links in the system's default handler; ignores the rest.
@@ -274,8 +333,10 @@ fn open_external(url: &str) {
 
 /// `dir/name`, or `dir/stem (n).ext` when that file exists already.
 fn free_path(dir: &Path, name: &str) -> PathBuf {
-    let name =
-        Path::new(name).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "download".into());
+    let name = Path::new(name)
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "download".into());
     let first = dir.join(&name);
     if !first.exists() {
         return first;
@@ -284,21 +345,39 @@ fn free_path(dir: &Path, name: &str) -> PathBuf {
         Some((s, e)) if !s.is_empty() => (s.to_string(), format!(".{e}")),
         _ => (name.clone(), String::new()),
     };
-    (1..10_000).map(|n| dir.join(format!("{stem} ({n}){ext}"))).find(|p| !p.exists()).unwrap_or(first)
+    (1..10_000)
+        .map(|n| dir.join(format!("{stem} ({n}){ext}")))
+        .find(|p| !p.exists())
+        .unwrap_or(first)
 }
 
 fn sanitize(id: &str) -> String {
-    let s: String = id.chars().filter(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.')).collect();
-    if s.trim_matches('.').is_empty() { "zeyn-app".into() } else { s }
+    let s: String = id
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+        .collect();
+    if s.trim_matches('.').is_empty() {
+        "zeyn-app".into()
+    } else {
+        s
+    }
 }
 
 /// Asks a running instance to focus its window. True when one answered.
 fn focus_running(dir: &Path) -> bool {
-    let Ok(text) = std::fs::read_to_string(dir.join("instance")) else { return false };
-    let Some((port, key)) = text.trim().split_once(' ') else { return false };
-    let Ok(port) = port.parse::<u16>() else { return false };
-    let Ok(mut s) = TcpStream::connect_timeout(&SocketAddr::from(([127, 0, 0, 1], port)), Duration::from_millis(500))
-    else {
+    let Ok(text) = std::fs::read_to_string(dir.join("instance")) else {
+        return false;
+    };
+    let Some((port, key)) = text.trim().split_once(' ') else {
+        return false;
+    };
+    let Ok(port) = port.parse::<u16>() else {
+        return false;
+    };
+    let Ok(mut s) = TcpStream::connect_timeout(
+        &SocketAddr::from(([127, 0, 0, 1], port)),
+        Duration::from_millis(500),
+    ) else {
         return false;
     };
     let _ = s.set_read_timeout(Some(Duration::from_secs(2)));
@@ -308,12 +387,16 @@ fn focus_running(dir: &Path) -> bool {
         guard::FOCUS_HEADER
     );
     let mut status = [0u8; 12];
-    s.write_all(req.as_bytes()).is_ok() && s.read_exact(&mut status).is_ok() && &status == b"HTTP/1.1 204"
+    s.write_all(req.as_bytes()).is_ok()
+        && s.read_exact(&mut status).is_ok()
+        && &status == b"HTTP/1.1 204"
 }
 
 fn write_private(path: &Path, text: &str) {
     let mut opts = std::fs::OpenOptions::new();
-    opts.write(true).create(true).truncate(true);
+    opts.write(true)
+        .create(true)
+        .truncate(true);
     #[cfg(unix)]
     std::os::unix::fs::OpenOptionsExt::mode(&mut opts, 0o600);
     if let Ok(mut f) = opts.open(path) {
@@ -333,14 +416,25 @@ struct WindowState {
 
 impl WindowState {
     fn load(path: &Path) -> Option<Self> {
-        let v: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(path).ok()?).ok()?;
-        let int = |k: &str| v.get(k).and_then(serde_json::Value::as_i64);
+        let v: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(path).ok()?).ok()?;
+        let int = |k: &str| {
+            v.get(k)
+                .and_then(serde_json::Value::as_i64)
+        };
         let s = Self {
             x: i32::try_from(int("x")?).ok()?,
             y: i32::try_from(int("y")?).ok()?,
-            width: u32::try_from(int("width")?).ok()?.clamp(320, 16_384),
-            height: u32::try_from(int("height")?).ok()?.clamp(240, 16_384),
-            maximized: v.get("maximized").and_then(serde_json::Value::as_bool).unwrap_or(false),
+            width: u32::try_from(int("width")?)
+                .ok()?
+                .clamp(320, 16_384),
+            height: u32::try_from(int("height")?)
+                .ok()?
+                .clamp(240, 16_384),
+            maximized: v
+                .get("maximized")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false),
         };
         Some(s)
     }
@@ -351,12 +445,17 @@ impl WindowState {
             (true, Some(b), _) => Self { maximized, ..*b },
             (_, _, Ok(p)) if !window.is_minimized() => {
                 let size = window.inner_size();
-                Self { x: p.x, y: p.y, width: size.width, height: size.height, maximized }
+                Self {
+                    x: p.x,
+                    y: p.y,
+                    width: size.width,
+                    height: size.height,
+                    maximized,
+                }
             }
             _ => return,
         };
-        let json =
-            serde_json::json!({ "x": s.x, "y": s.y, "width": s.width, "height": s.height, "maximized": s.maximized });
+        let json = serde_json::json!({ "x": s.x, "y": s.y, "width": s.width, "height": s.height, "maximized": s.maximized });
         let _ = std::fs::write(path, json.to_string());
     }
 
@@ -432,9 +531,18 @@ mod tests {
 
     #[test]
     fn saved_windows_open_on_a_monitor() {
-        let s = WindowState { x: 100, y: 100, width: 800, height: 600, maximized: false };
+        let s = WindowState {
+            x: 100,
+            y: 100,
+            width: 800,
+            height: 600,
+            maximized: false,
+        };
         assert!(s.inside(PhysicalPosition::new(0, 0), PhysicalSize::new(1920, 1080)));
-        assert!(!s.inside(PhysicalPosition::new(1920, 0), PhysicalSize::new(1920, 1080)));
+        assert!(!s.inside(
+            PhysicalPosition::new(1920, 0),
+            PhysicalSize::new(1920, 1080)
+        ));
         let off = WindowState { x: -5000, ..s };
         assert!(!off.inside(PhysicalPosition::new(0, 0), PhysicalSize::new(1920, 1080)));
     }

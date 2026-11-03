@@ -56,7 +56,13 @@ impl std::fmt::Debug for User {
             .field("id", &self.id)
             .field("user_name", &self.user_name)
             .field("email_confirmed", &self.email_confirmed)
-            .field("password_hash", &self.password_hash.as_ref().map(|_| "[redacted]"))
+            .field(
+                "password_hash",
+                &self
+                    .password_hash
+                    .as_ref()
+                    .map(|_| "[redacted]"),
+            )
             .field("security_stamp", &"[redacted]")
             .field("two_factor_enabled", &self.two_factor_enabled)
             .field("lockout_end", &self.lockout_end)
@@ -69,7 +75,10 @@ impl User {
     /// A new user with this user name. The manager fills the id, stamps and normalized names when
     /// it creates the user.
     pub fn new(user_name: &str) -> User {
-        User { user_name: user_name.to_string(), ..User::default() }
+        User {
+            user_name: user_name.to_string(),
+            ..User::default()
+        }
     }
 
     /// With this e-mail address.
@@ -91,13 +100,18 @@ impl User {
                 self.extra = map;
                 Ok(())
             }
-            _ => Err(crate::Error::Internal("user data must serialize to a JSON object".into())),
+            _ => Err(crate::Error::Internal(
+                "user data must serialize to a JSON object".into(),
+            )),
         }
     }
 
     /// Whether the user is locked out at `now` (Unix seconds).
     pub fn is_locked_out(&self, now: i64) -> bool {
-        self.lockout_enabled && self.lockout_end.is_some_and(|end| end > now)
+        self.lockout_enabled
+            && self
+                .lockout_end
+                .is_some_and(|end| end > now)
     }
 }
 
@@ -119,7 +133,10 @@ pub struct Claim {
 
 impl Claim {
     pub fn new(kind: &str, value: &str) -> Claim {
-        Claim { kind: kind.to_string(), value: value.to_string() }
+        Claim {
+            kind: kind.to_string(),
+            value: value.to_string(),
+        }
     }
 }
 

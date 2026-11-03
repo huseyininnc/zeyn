@@ -118,8 +118,9 @@ mod xlsx;
 #[allow(deprecated)]
 pub use action::GridQuery;
 pub use action::{
-    Access, Action, ActionMeta, Aggregate, AggregateRequest, Ai, Cursor, DEFAULT_PAGE_SIZE, DataQuery, Error, Filter,
-    MAX_FILTER_CHOICES, MAX_FILTER_TEXT, MAX_FILTERS, MAX_PAGE_SIZE, Page, PageRequest, Result, Sort, Total,
+    Access, Action, ActionMeta, Aggregate, AggregateRequest, Ai, Cursor, DEFAULT_PAGE_SIZE,
+    DataQuery, Error, Filter, MAX_FILTER_CHOICES, MAX_FILTER_TEXT, MAX_FILTERS, MAX_PAGE_SIZE,
+    Page, PageRequest, Result, Sort, Total,
 };
 pub use api::{ApiEntry, ApiInput, ApiOutput, ApiResult, model_schema};
 #[cfg(feature = "assistant")]
@@ -134,56 +135,61 @@ pub use auth::{MemoryTotpStore, Totp, TotpRecord, TotpStore};
 #[allow(deprecated)]
 pub use command::RESERVED_SHORTCUTS;
 pub use command::{
-    BROWSER_DEFAULTS, BROWSER_RESERVED, BrowserShortcut, Command, PALETTE_SHORTCUT, browser_shortcut,
-    normalize_shortcut,
+    BROWSER_DEFAULTS, BROWSER_RESERVED, BrowserShortcut, Command, PALETTE_SHORTCUT,
+    browser_shortcut, normalize_shortcut,
 };
 pub use command::{MAX_SEARCH_HITS, MAX_SEARCH_QUERY, Search, SearchHit};
 pub use csp::{Csp, MAX_EMBED_URL, TRACKING_PARAMS, embed_url};
 pub use ctx::{BoxFuture, Ctx, Dep, Identity, Inject, IntoScreen, Outcome, Service, Services};
 pub use decimal::{DEFAULT_PRECISION, DEFAULT_SCALE, Decimal, MAX_PRECISION, MAX_SCALE};
-pub use feature::{Feature, Guard, GuardResult, Menu, MenuGroup, MenuItem, Route, ScreenEntry, SignedIn};
+pub use feature::{
+    Feature, Guard, GuardResult, Menu, MenuGroup, MenuItem, Route, ScreenEntry, SignedIn,
+};
 #[cfg(feature = "server")]
 pub use files::{
-    DiskStore, FileChunks, FileEntry, FileMeta, FileScanner, FileStore, MemoryStore, ScanVerdict, StoredFile,
+    DiskStore, FileChunks, FileEntry, FileMeta, FileScanner, FileStore, MemoryStore, ScanVerdict,
+    StoredFile,
 };
 pub use files::{
-    File, FileRules, FileType, MAX_FIELD_FILES, MAX_FILE_NAME, MAX_UPLOAD_BYTES, SNIFF_BYTES, UPLOAD_CHUNK,
-    UploadValue, clean_file_name, valid_file_id,
+    File, FileRules, FileType, MAX_FIELD_FILES, MAX_FILE_NAME, MAX_UPLOAD_BYTES, SNIFF_BYTES,
+    UPLOAD_CHUNK, UploadValue, clean_file_name, valid_file_id,
 };
 pub use form::{Form, FormAction, FormRow, SubmitForm};
 pub use grid::{
-    BulkAction, COLUMN_WIDTH, CellRenderer, ColumnView, DEFAULT_EXPORT_LIMIT, DataGrid, DataGridColumn, DataGridView,
-    DataGridViewStore, DataMode, ExportColumn, MAX_BULK, MAX_PINNED, MAX_SORT, MemoryViewStore, Paging, Pin, RowStyle,
-    VIRTUAL_LIVE_ROWS, VIRTUAL_WIDE_COLUMNS,
-    Tone, position_cursor, total,
+    BulkAction, COLUMN_WIDTH, CellRenderer, ColumnView, DEFAULT_EXPORT_LIMIT, DataGrid,
+    DataGridColumn, DataGridView, DataGridViewStore, DataMode, ExportColumn, MAX_BULK, MAX_PINNED,
+    MAX_SORT, MemoryViewStore, Paging, Pin, RowStyle, Tone, VIRTUAL_LIVE_ROWS,
+    VIRTUAL_WIDE_COLUMNS, position_cursor, total,
 };
 #[allow(deprecated)]
 pub use grid::{Grid, GridColumn, GridMode};
 pub use i18n::{I18n, NumberFormat, Text};
 pub use import::{
-    Checked, CsvError, DEFAULT_MAX_ROWS, HARD_MAX_ROWS, Import, ImportFile, ImportSource, MAX_CSV_BYTES, RowError,
-    check_csv, check_file, error_report, parse_csv,
+    Checked, CsvError, DEFAULT_MAX_ROWS, HARD_MAX_ROWS, Import, ImportFile, ImportSource,
+    MAX_CSV_BYTES, RowError, check_csv, check_file, error_report, parse_csv,
 };
 #[cfg(feature = "server")]
 pub use jobs::{
-    ClaimedJob, JOB_LEASE, JOB_POLL, JobState, JobStatus, JobStore, Jobs, MAX_BACKOFF_MS, MAX_JOB_PAYLOAD,
-    MEMORY_JOB_CAPACITY, MemoryJobStore, NewJob, NextRun, Schedule,
+    ClaimedJob, JOB_LEASE, JOB_POLL, JobState, JobStatus, JobStore, Jobs, MAX_BACKOFF_MS,
+    MAX_JOB_PAYLOAD, MEMORY_JOB_CAPACITY, MemoryJobStore, NewJob, NextRun, Schedule,
 };
 #[cfg(all(feature = "server", any(feature = "postgres", feature = "oracle")))]
 pub use jobs::{SqlJobStore, create_job_tables};
 #[cfg(feature = "email")]
 pub use mail::{MAIL_JOB, MAX_ATTEMPTS, MAX_QUEUED, Mail, Mailer};
 pub use media::{
-    ByteRange, MAX_MEDIA_ID, MAX_POSITION_SECONDS, MAX_PUBLIC_MEDIA_CACHE, MEDIA_CHUNK, Media, MediaEntry, MediaReader, MediaSource,
-    media_type, valid_media_id,
+    ByteRange, MAX_MEDIA_ID, MAX_POSITION_SECONDS, MAX_PUBLIC_MEDIA_CACHE, MEDIA_CHUNK, Media,
+    MediaEntry, MediaReader, MediaSource, media_type, valid_media_id,
 };
 pub use menu::ContextMenu;
-pub use model::{__rules, Entity, Field, FieldError, FieldMeta, Model, Rule, Valid, ValidationErrors};
+pub use model::{
+    __rules, Entity, Field, FieldError, FieldMeta, Model, Rule, Valid, ValidationErrors,
+};
 #[cfg(feature = "pdf")]
 pub use pdf::{MAX_PDF_DATA, MAX_PDF_ROWS, Pdf, PdfLink, PdfSource, PdfTemplate};
 pub use platform::{
-    Config, ConfigSource, EnvSource, FixedLicense, JsonFileSource, License, LicenseSource, Licensed, PerTenant, Secret,
-    StaticSource, Tenant, TenantRequired,
+    Config, ConfigSource, EnvSource, FixedLicense, JsonFileSource, License, LicenseSource,
+    Licensed, PerTenant, Secret, StaticSource, Tenant, TenantRequired,
 };
 #[cfg(feature = "signed-licenses")]
 pub use platform::{LicenseError, SignedLicenseFile};
@@ -194,12 +200,14 @@ pub use privacy::{MaskStyle, Masking, Revealed, can_unmask, masked_text, reveal_
 pub use redis_store::RedisStore;
 pub use render::Render;
 pub use screen::{
-    __path_value, Component, Effect, Export, FormSource, GridSource, Icon, LoadedPage, MAX_SCREEN_CACHE, MAX_SEGMENT,
-    MAX_TOASTS, Node, Params, PathValue, RowCall, Screen, ScreenDef, ScreenMeta, Toast, ToolButton, Toolbar, UiCtx,
-    Window, route_has_segments, screen_url,
+    __path_value, Component, Effect, Export, FormSource, GridSource, Icon, LoadedPage,
+    MAX_SCREEN_CACHE, MAX_SEGMENT, MAX_TOASTS, Node, Params, PathValue, RowCall, Screen, ScreenDef,
+    ScreenMeta, Toast, ToolButton, Toolbar, UiCtx, Window, route_has_segments, screen_url,
 };
 #[cfg(feature = "server")]
-pub use security::{IpRange, MemoryRateStore, RateKey, RateLimit, RateStore, client_ip, parse_ranges};
+pub use security::{
+    IpRange, MemoryRateStore, RateKey, RateLimit, RateStore, client_ip, parse_ranges,
+};
 #[cfg(feature = "server")]
 #[allow(deprecated)]
 pub use server::Agents;
@@ -208,9 +216,10 @@ pub use server::Agents;
 pub use server::realtime;
 #[cfg(feature = "server")]
 pub use server::{
-    ApiDocs, App, AuditEntry, AuditLog, AuditSink, Authenticator, BasicCredentials, Call, CallKind, CallOutcome,
-    DevAuth, ForwardAuth, HeaderTenant, Interceptor, Mcp, MemoryAudit, Plugin, READY_CACHE, StaticCredentials,
-    StderrAudit, SubdomainTenant, TenantResolver, Theme, TimePolicy, probe,
+    ApiDocs, App, AuditEntry, AuditLog, AuditSink, Authenticator, BasicCredentials, Call, CallKind,
+    CallOutcome, DevAuth, ForwardAuth, HeaderTenant, Interceptor, Mcp, MemoryAudit, Plugin,
+    READY_CACHE, StaticCredentials, StderrAudit, SubdomainTenant, TenantResolver, Theme,
+    TimePolicy, probe,
 };
 pub use site::{FooterColumn, Shell, SiteFooter, SiteHeader, SiteShell};
 pub use slug::Slug;
@@ -219,11 +228,13 @@ pub use time::{DateWords, range_presets};
 #[doc(hidden)]
 pub use value::__choices_value;
 pub use value::{
-    ChoiceOption, ChoiceType, Currency, FieldKind, FieldType, IsBool, IsMoment, Money, SupportsMinMax,
-    SupportsMinMaxTotal, SupportsRequired, SupportsScale, SupportsSum, SupportsText, Value, VecItem,
+    ChoiceOption, ChoiceType, Currency, FieldKind, FieldType, IsBool, IsMoment, Money,
+    SupportsMinMax, SupportsMinMaxTotal, SupportsRequired, SupportsScale, SupportsSum,
+    SupportsText, Value, VecItem,
 };
 pub use workflow::{
-    MAX_COMMENT, Transition, TransitionRecord, TransitionRequest, Transitions, Workflow, WorkflowState,
+    MAX_COMMENT, Transition, TransitionRecord, TransitionRequest, Transitions, Workflow,
+    WorkflowState,
 };
 #[cfg(feature = "xlsx")]
 pub use xlsx::{MAX_XLSX_BYTES, XlsxReadError, XlsxSheet};
@@ -243,23 +254,26 @@ pub mod prelude {
     #[cfg(feature = "markdown")]
     pub use crate::ui::Markdown;
     pub use crate::ui::{
-        ActionButton, Alert, AlphaIndex, Audio, AutoGrid, Avatar, Badge, Breadcrumb, Busy, Card, CardGrid, Chart, Control, DateOptions,
-        DescriptionList, Dock, Embed, EmbedPermission, EmptyState, ExternalLink, Heading, Image, Kpi, List, LookupItem, LookupQuery,
-        MenuBar, MenuButton, MetaLine, Panel, Paragraph, Popover, PrevNext, Progress, PropertyInspector, Rail, Row, SearchBox, SearchParams, Skeleton, Spoiler,
-        Split, Stack, StatusBar, Tabs, Timeline, Toolbox, Tree, TreeItem, TreeQuery, Video, WeekSchedule,
+        ActionButton, Alert, AlphaIndex, Audio, AutoGrid, Avatar, Badge, Breadcrumb, Busy, Card,
+        CardGrid, Chart, Control, DateOptions, DescriptionList, Dock, Embed, EmbedPermission,
+        EmptyState, ExternalLink, Heading, Image, Kpi, List, LookupItem, LookupQuery, MenuBar,
+        MenuButton, MetaLine, Panel, Paragraph, Popover, PrevNext, Progress, PropertyInspector,
+        Rail, Row, SearchBox, SearchParams, Skeleton, Split, Spoiler, Stack, StatusBar, Tabs,
+        Timeline, Toolbox, Tree, TreeItem, TreeQuery, Video, WeekSchedule,
     };
     pub use crate::{
-        Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime, Decimal, Effect,
-        Entity, Error, Export, Feature, Field, File, FileRules, FileType, Form, GuardResult, Icon, Identity, Import,
-        Licensed, LocalDateTime, Model, Money, Node, Page, Paging, Result, RowStyle, Screen, ScreenDef, Secret,
-        Service, Shell, SignedIn, Slug, Tenant, TenantRequired, Text, Time, TimeZone, Toast, Tone, TransitionRequest,
-        Transitions, UiCtx, Valid, ValidationErrors, Window, Workflow, action, choice, entity, model, params, screen,
-        t,
+        Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime,
+        Decimal, Effect, Entity, Error, Export, Feature, Field, File, FileRules, FileType, Form,
+        GuardResult, Icon, Identity, Import, Licensed, LocalDateTime, Model, Money, Node, Page,
+        Paging, Result, RowStyle, Screen, ScreenDef, Secret, Service, Shell, SignedIn, Slug,
+        Tenant, TenantRequired, Text, Time, TimeZone, Toast, Tone, TransitionRequest, Transitions,
+        UiCtx, Valid, ValidationErrors, Window, Workflow, action, choice, entity, model, params,
+        screen, t,
     };
     #[cfg(feature = "server")]
     pub use crate::{
-        ApiDocs, App, AuditLog, DevAuth, DiskStore, Mcp, MemoryAudit, MemoryStore, Plugin, RateLimit,
-        StaticCredentials, StderrAudit, Theme, TimePolicy,
+        ApiDocs, App, AuditLog, DevAuth, DiskStore, Mcp, MemoryAudit, MemoryStore, Plugin,
+        RateLimit, StaticCredentials, StderrAudit, Theme, TimePolicy,
     };
     #[allow(deprecated)]
     pub use crate::{Grid, GridMode, GridQuery};

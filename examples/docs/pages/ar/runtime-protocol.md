@@ -20,8 +20,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="zeyn-csrf" content="TOKEN">
   <title>Products · Inventory</title>
-  <link rel="stylesheet" href="/_zeyn/zeyn.css">
-  <script type="module" src="/_zeyn/zeyn.js"></script>
+  <link rel="stylesheet" href="/_zeyn/zeyn.css?v=BUILD">
+  <script type="module" src="/_zeyn/zeyn.js?v=BUILD"></script>
 </head>
 <body>
   <a class="z-skip" href="#z-main">Skip to content</a>
@@ -35,6 +35,10 @@
 ```
 
 تسرد القائمة الشاشات التي يحق للمستخدم الحالي فتحها فقط. وللعنصر الحالي `aria-current="page"`.
+
+يحمل كل سكربت وورقة أنماط للإطار في الترويسة `?v=` ومعرّف البناء (`meta[name=zeyn-build]`، من `ZEYN_BUILD_ID` أو من تجزئة الملف التنفيذي)؛ ويحمل `theme.css` تجزئة نص السمة. الطلب الذي يحمل القيمة الحالية يحصل على `Cache-Control: public, max-age=31536000, immutable`، فلا يطلب تحميل صفحة دافئ أيًّا منها؛ وأي طلب آخر (تبويب قديم بعد نشر جديد، أو بلا `v`) يحصل على `no-cache` والـ ETag. والوحدات التي يستوردها وقت التشغيل لاحقًا تأخذ `v` نفسه من عنوان السكربت الذي يستوردها.
+
+تحمّل كل صفحة `zeyn.js` (الطلبات والتأثيرات والنوافذ والنماذج والقوائم والاختصارات وتفويض الأحداث) و`nav.js` و`components.js`، ومعها `pro.js` و`enterprise.js` في غلاف التطبيق. ولا يُحمَّل الباقي إلا في الصفحات التي تستخدمه، وكذلك عندما يُدخل `nav.js` شاشة: يستورد `zeyn.js` وقت تشغيل الشبكة `grid.js` أول مرة يحوي فيها المحتوى `[data-zeyn-grid]` (والصفحات الكاملة ذات الشبكة تسميه في `<link rel="modulepreload">`)، ويستورد `components.js` الوحدات `catalog.js` (شبكات البطاقات ومربعات البحث) و`media.js` (المشغّلات والتضمينات) و`files.js` (الرفع) و`charts.js` و`assistant.js` (لوحات الدردشة، أو أول ضغطة على زر الإطلاق). وتبقى أوراق أنماطها في الترويسة، فلا يتغير المظهر عند وصول السكربت. في لوحة المعرض يعني هذا 5 سكربتات و258 KB (74 KB على الشبكة) بدل 9 سكربتات و403 KB (116 KB).
 
 ## 2. شيفرة الشاشة
 
@@ -161,13 +165,13 @@
 
 ### 4.2.2 التمرير الافتراضي
 
-الشبكات ذات `data-zeyn-paging="virtual"` تعرض قائمة واحدة قابلة للتمرير على كل الصفوف مهما بلغ عددها. يرسم الخادم الكتلة الأولى (`data-zeyn-page-size` صفًّا، الإزاحة 0) مع `data-zeyn-total`. وللشبكة على جذرها أيضًا `data-zeyn-row-height` (بالبكسل) ومتغير CSS `--z-row-height`.
+الشبكات ذات `data-zeyn-paging="virtual"` تعرض قائمة واحدة قابلة للتمرير على كل الصفوف مهما بلغ عددها. يرسم الخادم الكتلة الأولى (`data-zeyn-page-size` صفًّا، الإزاحة 0) مع `data-zeyn-total`: أول 64 صفًّا في الجدول والباقي في `<template data-zeyn-rows-later>` بعده، أو كل الصفوف في القالب عندما تعرض الشبكة 40 عمودًا أو أكثر. وللشبكة على جذرها أيضًا `data-zeyn-row-height` (بالبكسل) ومتغير CSS `--z-row-height`.
 
 وقت التشغيل:
 
 - يضع جسم الجدول في حاوية تمرير ارتفاع فاصلها الداخلي `total * rowHeight` بكسل، بحد أقصى 8,000,000 بكسل. وفوق الحد، يُحوَّل موضع التمرير إلى فهرس صف بالنسبة (`row = scrollTop / (spacerHeight - viewport) * (total - visibleRows)`)، فيبلغ 1,000,000 صف نهايته أيضًا.
 - لا يُبقي في DOM إلا الصفوف المرئية مع 20 صفًّا فوقها وتحتها، موضوعة بـ `transform: translateY(...)`. للصفوف ارتفاع ثابت؛ ويُقطع النص الطويل بنقاط الحذف.
-- يحمّل كتلًا من `data-zeyn-page-size` صفًّا بـ `POST /_zeyn/grid` و`page: { "type": "offset", "offset": blockStart, "limit": blockSize }`، و`with_total: false` بعد الاستدعاء الأول. يحتفظ بما يصل إلى 20 كتلة في ذاكرة مؤقتة (تخرج الأقدم استخدامًا أولًا)، ويجلب مسبقًا الكتلة التالية في اتجاه التمرير، ويلغي طلبات الكتل التي غادرت العرض (`AbortController`).
+- يحمّل كتلًا من `data-zeyn-page-size` صفًّا بـ `POST /_zeyn/grid` و`page: { "type": "offset", "offset": blockStart, "limit": blockSize }`، و`with_total: false` بعد الاستدعاء الأول. يحتفظ بما يصل إلى 20 كتلة و100,000 خلية على الأكثر في ذاكرة مؤقتة (تخرج الأقدم استخدامًا أولًا؛ 7 كتل لشبكة من 63 عمودًا، ولا أقل من 3 أبدًا)، وتُحسب الكتل المحفوظة لـ `reload` ضمن الحد نفسه وتُسقَط أولًا، ويجلب مسبقًا الكتلة التالية في اتجاه التمرير، ويلغي طلبات الكتل التي غادرت العرض (`AbortController`).
 - لا يمسح الصفوف المرئية أبدًا أثناء تحميل كتلة. تعرض الصفوف المفقودة صف عنصر نائب مع `aria-busy="true"` حتى تصل كتلتها، فلا تومض الشاشة.
 - تغيير الفرز أو المرشّحات يُسقط الذاكرة المؤقتة ويمرّر إلى الأعلى.
 - لوحة المفاتيح: مفاتيح الأسهم وPage Up وPage Down وHome وEnd تحرّك الصف النشط وتمرّره إلى العرض. وللجدول `aria-rowcount` = total ولكل صف `aria-rowindex`.
@@ -235,6 +239,8 @@
 - تضبط كل استجابة `Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'` و`X-Content-Type-Options: nosniff` و`Referrer-Policy: same-origin`. تضيف `App::csp` مضيفات `https` مسمّاة إلى `img-src` و`media-src` (و`blob:`) و`frame-src` و`connect-src` و`font-src`؛ أما التوجيهات الأخرى فلا تتغير أبدًا. ويُبنى نص الترويسة مرة واحدة عند بدء التشغيل.
 - لا سكربتات مضمّنة ولا معالجات أحداث مضمّنة. تُستخدم سمات `style` المضمّنة لخصائص CSS المخصصة (`--z-width` و`--z-flex`) ولعروض الأعمدة الثابتة فقط، ولذلك تضيف السياسة `style-src-attr 'unsafe-inline'`. أما السكربتات فتبقى صارمة.
 - يُخزَّن رمز CSRF في ملف تعريف ارتباط `HttpOnly` و`SameSite=Strict` ويُقارن في زمن ثابت مع ترويسة `x-zeyn-csrf`.
+- لا تحمل الصفحات ونموذج `totp` و`GET /_zeyn/csrf` الرمز كما هو في ملف تعريف الارتباط: تحصل كل استجابة على وسادة عشوائية جديدة يليها الرمز XOR الوسادة (128 رقمًا سداسيًّا عشريًّا)، فلا يستطيع gzip تسريبه (BREACH). يزيل الخادم القناع قبل المقارنة ولا يزال يقبل الرمز العادي ذا 64 رقمًا.
+- الاستجابات الديناميكية بحجم 1 KB أو أكثر (الصفحات والشاشات الجزئية وكتل الشبكات والتصديرات) تُضغط بـ gzip عند المستوى 2 إذا قبله المتصفح، مع `Vary: Accept-Encoding`. ولا تُضغط أبدًا: الاستجابات التي لها `Content-Encoding` أصلًا (أصول الإطار، تُضغط مرة واحدة وتُخزَّن مؤقتًا)، والنطاقات (`Content-Range`، وأي طلب فيه `Range`)، والفيديو والصوت، والصور عدا SVG، و`application/octet-stream`، والأرشيفات وملفات PDF، و`text/event-stream`، و`application/x-ndjson` (بث المساعد)، وترقيات WebSocket.
 - يفحص كل استدعاء، بالترتيب: المصادقة، ثم صلاحية الشاشة، ثم حراس الميزة (guards)، ثم صلاحية action العقدة، ثم يشغّل المعترضات (interceptors) والـ action.
 
 ## 6. سلوك وقت التشغيل

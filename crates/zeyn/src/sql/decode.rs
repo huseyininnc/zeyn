@@ -9,7 +9,9 @@ use crate::action::{Error, Result};
 use crate::model::{FieldMeta, Model};
 use crate::time::{Date, DateTime, LocalDateTime, Time};
 use crate::value::{Currency, FieldKind, Money, Value};
-use serde::de::value::{BorrowedStrDeserializer, Error as DeError, I64Deserializer, StrDeserializer};
+use serde::de::value::{
+    BorrowedStrDeserializer, Error as DeError, I64Deserializer, StrDeserializer,
+};
 use serde::de::{self, DeserializeSeed, Deserializer, IntoDeserializer, MapAccess, Visitor};
 
 /// Type of one column as a driver reads it.
@@ -166,7 +168,10 @@ fn text_value(kind: &FieldKind, s: String) -> Value {
         FieldKind::Time => Time::parse(&s).map(Value::Time),
         FieldKind::DateTime => DateTime::parse(&s).map(Value::DateTime),
         FieldKind::LocalDateTime => LocalDateTime::parse(&s).map(Value::LocalDateTime),
-        FieldKind::Choice(options) => options.iter().find(|o| o.value == s).map(|o| Value::Choice(o.value)),
+        FieldKind::Choice(options) => options
+            .iter()
+            .find(|o| o.value == s)
+            .map(|o| Value::Choice(o.value)),
         FieldKind::Decimal => crate::Decimal::parse(&s).map(Value::Number),
         _ => None,
     };
@@ -176,7 +181,11 @@ fn text_value(kind: &FieldKind, s: String) -> Value {
 /// Builds a model from the cells of one row, moving the text out of them. The buffer is left empty
 /// so the driver can reuse it for the next row.
 pub(crate) fn decode_row<M: Model>(cells: &mut Vec<Cell>) -> Result<M> {
-    let de = RowDe { fields: M::fields(), cells: cells.drain(..), index: 0 };
+    let de = RowDe {
+        fields: M::fields(),
+        cells: cells.drain(..),
+        index: 0,
+    };
     M::deserialize(de).map_err(|e| Error::Internal(format!("reading a `{}` row: {e}", M::NAME)))
 }
 
@@ -202,9 +211,14 @@ impl<'de> Deserializer<'de> for RowDe<'_> {
 impl<'de> MapAccess<'de> for RowDe<'_> {
     type Error = DeError;
 
-    fn next_key_seed<K: DeserializeSeed<'de>>(&mut self, seed: K) -> Result<Option<K::Value>, DeError> {
+    fn next_key_seed<K: DeserializeSeed<'de>>(
+        &mut self,
+        seed: K,
+    ) -> Result<Option<K::Value>, DeError> {
         match self.fields.get(self.index) {
-            Some(f) => seed.deserialize(BorrowedStrDeserializer::<DeError>::new(f.name)).map(Some),
+            Some(f) => seed
+                .deserialize(BorrowedStrDeserializer::<DeError>::new(f.name))
+                .map(Some),
             None => Ok(None),
         }
     }
@@ -219,8 +233,10 @@ impl<'de> MapAccess<'de> for RowDe<'_> {
                 seed.deserialize(MoneyDe { minor, currency })
             }
             (FieldKind::Custom { .. } | FieldKind::Choices(_), Cell::Text(json)) => {
-                let value: serde_json::Value = serde_json::from_str(&json).map_err(de::Error::custom)?;
-                seed.deserialize(value).map_err(de::Error::custom)
+                let value: serde_json::Value =
+                    serde_json::from_str(&json).map_err(de::Error::custom)?;
+                seed.deserialize(value)
+                    .map_err(de::Error::custom)
             }
             (_, cell) => seed.deserialize(CellDe(cell)),
         }
@@ -261,7 +277,11 @@ impl<'de> Deserializer<'de> for CellDe {
         self.deserialize_string(visitor)
     }
 
-    fn deserialize_newtype_struct<V: Visitor<'de>>(self, _name: &'static str, visitor: V) -> Result<V::Value, DeError> {
+    fn deserialize_newtype_struct<V: Visitor<'de>>(
+        self,
+        _name: &'static str,
+        visitor: V,
+    ) -> Result<V::Value, DeError> {
         visitor.visit_newtype_struct(self)
     }
 
@@ -292,13 +312,20 @@ impl<'de> Deserializer<'de> for MoneyDe {
     type Error = DeError;
 
     fn deserialize_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, DeError> {
-        let Cell::Int(minor) = self.minor else { return Err(de::Error::custom("money amount is not a whole number")) };
+        let Cell::Int(minor) = self.minor else {
+            return Err(de::Error::custom("money amount is not a whole number"));
+        };
         let code = match &self.currency {
             Cell::Text(s) => s.as_str(),
             _ => "",
         };
-        let currency = currency_variant(code).ok_or_else(|| de::Error::custom(format!("unknown currency `{code}`")))?;
-        visitor.visit_map(MoneyMap { minor, currency, step: 0 })
+        let currency = currency_variant(code)
+            .ok_or_else(|| de::Error::custom(format!("unknown currency `{code}`")))?;
+        visitor.visit_map(MoneyMap {
+            minor,
+            currency,
+            step: 0,
+        })
     }
 
     fn deserialize_option<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, DeError> {
@@ -323,13 +350,17 @@ struct MoneyMap {
 impl<'de> MapAccess<'de> for MoneyMap {
     type Error = DeError;
 
-    fn next_key_seed<K: DeserializeSeed<'de>>(&mut self, seed: K) -> Result<Option<K::Value>, DeError> {
+    fn next_key_seed<K: DeserializeSeed<'de>>(
+        &mut self,
+        seed: K,
+    ) -> Result<Option<K::Value>, DeError> {
         let key = match self.step {
             0 => "minor",
             1 => "currency",
             _ => return Ok(None),
         };
-        seed.deserialize(BorrowedStrDeserializer::<DeError>::new(key)).map(Some)
+        seed.deserialize(BorrowedStrDeserializer::<DeError>::new(key))
+            .map(Some)
     }
 
     fn next_value_seed<V: DeserializeSeed<'de>>(&mut self, seed: V) -> Result<V::Value, DeError> {

@@ -84,7 +84,7 @@ pub(crate) fn markup(r: &Render, mode: &str) -> String {
     } else {
         String::new()
     };
-    let heading = if mode == "page" { "h2" } else { "h2" };
+    let heading = "h2";
     format!(
         r#"<section class="z-assistant" data-zeyn-assistant="{mode}" aria-labelledby="{id}-title" data-zeyn-texts="{texts}"><header class="z-assistant-head"><span class="z-assistant-mark">{ICON_SPARK}</span><{heading} id="{id}-title">{title}</{heading}><button type="button" class="z-button z-assistant-new" data-zeyn-assistant-clear>{new}</button>{close}</header><div class="z-assistant-log" role="log" aria-live="polite" aria-labelledby="{id}-title" tabindex="0" data-zeyn-assistant-log><p class="z-assistant-empty">{empty}</p></div><div class="z-assistant-chips" role="group" aria-label="{suggestions}" data-zeyn-assistant-chips></div><form class="z-assistant-form" data-zeyn-assistant-form><label class="z-sr-only" for="{id}-input">{message}</label><textarea id="{id}-input" rows="1" maxlength="2000" placeholder="{placeholder}" data-zeyn-assistant-input></textarea><button type="button" class="z-icon-button" data-zeyn-assistant-mic aria-pressed="false" aria-label="{mic}" title="{mic}" hidden>{ICON_MIC}</button><button type="button" class="z-icon-button z-assistant-stop" data-zeyn-assistant-stop aria-label="{stop}" title="{stop}" hidden>{ICON_STOP}</button><button type="submit" class="z-icon-button z-assistant-send" aria-label="{send}" title="{send}">{ICON_SEND}</button></form><p class="z-assistant-note">{note}</p><p class="z-sr-only" role="status" data-zeyn-assistant-status></p></section>"#,
         texts = attr(&texts(r)),
@@ -106,7 +106,10 @@ pub(crate) fn launcher(r: &Render) -> String {
     let label = r.text(&Text::key("zeyn.assistant.open"));
     format!(
         r#"<button type="button" class="z-assistant-launch" data-zeyn-assistant-launch aria-expanded="false" aria-controls="z-assistant-dock" aria-label="{label}" title="{label}">{ICON_SPARK}</button><aside id="z-assistant-dock" class="z-assistant-dock" aria-label="{title}" hidden>{panel}</aside>"#,
-        title = escape(&r.i18n.text(r.locale, &Text::key("zeyn.assistant.title"))),
+        title = escape(
+            &r.i18n
+                .text(r.locale, &Text::key("zeyn.assistant.title"))
+        ),
         panel = markup(r, "dock"),
     )
 }

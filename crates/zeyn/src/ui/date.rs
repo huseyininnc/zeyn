@@ -82,10 +82,10 @@ impl DateOptions {
             }
             _ => (None, None),
         };
-        if let Some(d) = date {
-            if (self.no_weekends && d.weekday() >= 6) || self.disabled.contains(&d) {
-                return Some("zeyn.validation.disabled_day");
-            }
+        if let Some(d) = date
+            && ((self.no_weekends && d.weekday() >= 6) || self.disabled.contains(&d))
+        {
+            return Some("zeyn.validation.disabled_day");
         }
         if let Some(t) = time {
             let step = self.step();
@@ -131,7 +131,8 @@ pub(crate) fn input_text(value: &Value, r: &Render) -> String {
 }
 
 fn t(r: &Render, key: &str) -> String {
-    r.i18n.text(r.locale, &Text::key(format!("zeyn.ui.date.{key}")))
+    r.i18n
+        .text(r.locale, &Text::key(format!("zeyn.ui.date.{key}")))
 }
 
 /// Texts the popup needs, resolved in the user's language.
@@ -173,10 +174,18 @@ fn texts(r: &Render) -> Json {
 fn root_attrs(r: &Render, kind: &str, m: &FieldMeta, options: Option<&DateOptions>) -> String {
     let locale = r.locale;
     let (order, sep, pad) = Date::pattern(locale);
-    let limit = |n: Option<i64>| n.and_then(Date::from_compact).map(|d| d.to_string()).unwrap_or_default();
+    let limit = |n: Option<i64>| {
+        n.and_then(Date::from_compact)
+            .map(|d| d.to_string())
+            .unwrap_or_default()
+    };
     let today = r.tz.today(DateTime::now());
     let o = options.cloned().unwrap_or_default();
-    let disabled: Vec<String> = o.disabled.iter().map(Date::to_string).collect();
+    let disabled: Vec<String> = o
+        .disabled
+        .iter()
+        .map(Date::to_string)
+        .collect();
     format!(
         r#"data-zeyn-date="{kind}" data-order="{order}" data-sep="{}" data-pad="{pad}" data-h12="{}" data-first-day="{}" data-min="{}" data-max="{}" data-today="{today}" data-disabled="{}" data-weekends="{}" data-weeks="{}" data-step="{}" data-seconds="{}" data-texts="{}""#,
         escape(&sep.to_string()),
@@ -225,14 +234,24 @@ fn hint(r: &Render, kind: FieldKind, id: &str) -> String {
         _ => (LocalDateTime::new(day, time).format(locale), "natural_date"),
     };
     let format = r.text(&Text::key("zeyn.ui.date.format").arg("format", sample));
-    let words =
-        r.text(&Text::key("zeyn.ui.date.natural").arg("examples", Text::key(format!("zeyn.ui.date.{natural}"))));
+    let words = r.text(
+        &Text::key("zeyn.ui.date.natural")
+            .arg("examples", Text::key(format!("zeyn.ui.date.{natural}"))),
+    );
     format!(r#"<p class="z-field-hint" id="{id}-hint">{format} {words}</p>"#)
 }
 
 fn open_button(r: &Render, kind: &str, name: &str) -> String {
-    let label = if kind == "time" { t(r, "open_time") } else { t(r, "open") };
-    let icon = if kind == "time" { "z-date-icon z-time-icon" } else { "z-date-icon" };
+    let label = if kind == "time" {
+        t(r, "open_time")
+    } else {
+        t(r, "open")
+    };
+    let icon = if kind == "time" {
+        "z-date-icon z-time-icon"
+    } else {
+        "z-date-icon"
+    };
     format!(
         r#"<button type="button" class="z-date-open" data-zeyn-date-open aria-haspopup="dialog" aria-expanded="false" aria-label="{}" data-testid="{}.field.{name}.picker"><span class="{icon}" aria-hidden="true"></span></button>"#,
         escape(&label),
@@ -253,10 +272,19 @@ pub(crate) fn render_date_input(
 ) {
     let kind = kind_name(m.kind);
     let zone = m.kind == FieldKind::DateTime;
-    let described = if zone { format!("{id}-hint {id}-zone {id}-error") } else { format!("{id}-hint {id}-error") };
-    let common =
-        common.replace(&format!(r#"aria-describedby="{id}-error""#), &format!(r#"aria-describedby="{described}""#));
-    out.push_str(&format!(r#"<div class="z-date" {}>"#, root_attrs(r, kind, m, options)));
+    let described = if zone {
+        format!("{id}-hint {id}-zone {id}-error")
+    } else {
+        format!("{id}-hint {id}-error")
+    };
+    let common = common.replace(
+        &format!(r#"aria-describedby="{id}-error""#),
+        &format!(r#"aria-describedby="{described}""#),
+    );
+    out.push_str(&format!(
+        r#"<div class="z-date" {}>"#,
+        root_attrs(r, kind, m, options)
+    ));
     out.push_str(&format!(
         r#"<input type="text" autocomplete="off" spellcheck="false" data-zeyn-date-input {common} value="{}">"#,
         escape(&input_text(value, r))
@@ -266,7 +294,11 @@ pub(crate) fn render_date_input(
             Value::DateTime(d) => d.to_string(),
             _ => String::new(),
         };
-        let title = if utc.is_empty() { String::new() } else { t(r, "utc").replace("{moment}", &utc) };
+        let title = if utc.is_empty() {
+            String::new()
+        } else {
+            t(r, "utc").replace("{moment}", &utc)
+        };
         out.push_str(&format!(
             r#"<span class="z-date-zone" id="{id}-zone" data-zeyn-zone title="{}"><span class="z-sr-only">{} </span>{}<span class="z-sr-only" data-zeyn-utc>{}</span></span>"#,
             escape(&title),
@@ -301,8 +333,16 @@ pub(crate) fn render_range(
     ));
     for (i, (m, value)) in fields.iter().enumerate() {
         let id = format!("{scope}-{}", m.name);
-        let required = if m.is_required() { r#" required aria-required="true""# } else { "" };
-        let star = if m.is_required() { r#"<span class="z-required" aria-hidden="true">*</span>"# } else { "" };
+        let required = if m.is_required() {
+            r#" required aria-required="true""#
+        } else {
+            ""
+        };
+        let star = if m.is_required() {
+            r#"<span class="z-required" aria-hidden="true">*</span>"#
+        } else {
+            ""
+        };
         out.push_str(&format!(
             r#"<div class="z-range-part"><label for="{id}">{}{star}</label><input type="text" autocomplete="off" spellcheck="false" data-zeyn-date-input data-bound="{}" id="{id}" name="{}" data-testid="{scope}.field.{}" aria-describedby="{scope}-{}-hint {id}-error"{required} value="{}"></div>"#,
             r.label(m),
@@ -315,9 +355,16 @@ pub(crate) fn render_range(
     }
     out.push_str(&open_button(r, "range", first.name));
     out.push_str("</div>");
-    out.push_str(&hint(r, FieldKind::Date, &format!("{scope}-{}", first.name)));
+    out.push_str(&hint(
+        r,
+        FieldKind::Date,
+        &format!("{scope}-{}", first.name),
+    ));
     for (m, _) in &fields {
-        out.push_str(&format!(r#"<p class="z-field-error" id="{scope}-{}-error" aria-live="polite"></p>"#, m.name));
+        out.push_str(&format!(
+            r#"<p class="z-field-error" id="{scope}-{}-error" aria-live="polite"></p>"#,
+            m.name
+        ));
     }
     out.push_str("</div>");
 }

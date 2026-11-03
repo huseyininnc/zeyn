@@ -38,18 +38,32 @@ impl Islands {
     /// Reads `dir/manifest.json`. URLs in the page start with `prefix` (the app's public path).
     pub(crate) fn load(dir: &FsPath, prefix: &str) -> Result<Islands, String> {
         let path = dir.join("manifest.json");
-        let text =
-            std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}; run `zeyn build-islands`", path.display()))?;
-        let manifest: Json = serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
+        let text = std::fs::read_to_string(&path)
+            .map_err(|e| format!("{}: {e}; run `zeyn build-islands`", path.display()))?;
+        let manifest: Json =
+            serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
         let mut files = HashMap::new();
         let mut urls = Map::new();
-        for (name, entry) in manifest["islands"].as_object().into_iter().flatten() {
+        for (name, entry) in manifest["islands"]
+            .as_object()
+            .into_iter()
+            .flatten()
+        {
             let (Some(js), Some(wasm)) = (entry["js"].as_str(), entry["wasm"].as_str()) else {
-                return Err(format!("{}: island `{name}` needs `js` and `wasm`", path.display()));
+                return Err(format!(
+                    "{}: island `{name}` needs `js` and `wasm`",
+                    path.display()
+                ));
             };
-            for (file, kind) in [(js, "text/javascript; charset=utf-8"), (wasm, "application/wasm")] {
+            for (file, kind) in [
+                (js, "text/javascript; charset=utf-8"),
+                (wasm, "application/wasm"),
+            ] {
                 if !valid_file(file) {
-                    return Err(format!("{}: `{file}` is not a plain file name", path.display()));
+                    return Err(format!(
+                        "{}: `{file}` is not a plain file name",
+                        path.display()
+                    ));
                 }
                 files.insert(file.to_string(), kind);
             }
@@ -58,7 +72,11 @@ impl Islands {
                 serde_json::json!({ "js": format!("{prefix}{FILES}{js}"), "wasm": format!("{prefix}{FILES}{wasm}") }),
             );
         }
-        Ok(Islands { dir: dir.to_path_buf(), files, meta: escape(&Json::Object(urls).to_string()) })
+        Ok(Islands {
+            dir: dir.to_path_buf(),
+            files,
+            meta: escape(&Json::Object(urls).to_string()),
+        })
     }
 }
 
@@ -67,12 +85,17 @@ fn valid_file(name: &str) -> bool {
     !name.is_empty()
         && !name.starts_with('.')
         && name.len() <= 128
-        && name.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
 }
 
 pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
     router
-        .route(LOADER, get(|| async { asset(JS, "text/javascript; charset=utf-8") }))
+        .route(
+            LOADER,
+            get(|| async { asset(JS, "text/javascript; charset=utf-8") }),
+        )
         .route("/_zeyn/islands/{file}", get(file))
 }
 
@@ -83,14 +106,22 @@ pub(super) fn is_asset(path: &str) -> bool {
 
 /// A built file. Names carry a content hash, so they are cached for a year.
 async fn file(State(st): State<Arc<AppState>>, Path(name): Path<String>) -> Response {
-    let Some((islands, kind)) = st.islands.as_ref().and_then(|i| i.files.get(&name).map(|k| (i, *k))) else {
+    let Some((islands, kind)) = st
+        .islands
+        .as_ref()
+        .and_then(|i| i.files.get(&name).map(|k| (i, *k)))
+    else {
         return StatusCode::NOT_FOUND.into_response();
     };
     match tokio::fs::read(islands.dir.join(&name)).await {
-        Ok(bytes) => {
-            ([(header::CONTENT_TYPE, kind), (header::CACHE_CONTROL, "public, max-age=31536000, immutable")], bytes)
-                .into_response()
-        }
+        Ok(bytes) => (
+            [
+                (header::CONTENT_TYPE, kind),
+                (header::CACHE_CONTROL, "public, max-age=31536000, immutable"),
+            ],
+            bytes,
+        )
+            .into_response(),
         Err(_) => StatusCode::NOT_FOUND.into_response(),
     }
 }
@@ -105,7 +136,11 @@ pub(super) fn holds(st: &AppState, html: &str) -> bool {
 /// A full page. When the screen holds an island, the head gets the loader and the island URLs,
 /// and the response the island policy.
 pub(super) fn page(st: &AppState, page: String, screen: &str) -> Response {
-    let Some(islands) = st.islands.as_ref().filter(|_| holds(st, screen)) else {
+    let Some(islands) = st
+        .islands
+        .as_ref()
+        .filter(|_| holds(st, screen))
+    else {
         return Html(page).into_response();
     };
     let head = format!(
@@ -115,7 +150,8 @@ pub(super) fn page(st: &AppState, page: String, screen: &str) -> Response {
         super::ops::asset_version()
     );
     let mut r = Html(page.replacen("</head>", &head, 1)).into_response();
-    r.headers_mut().insert(header::CONTENT_SECURITY_POLICY, st.island_csp.clone());
+    r.headers_mut()
+        .insert(header::CONTENT_SECURITY_POLICY, st.island_csp.clone());
     r
 }
 
@@ -137,11 +173,22 @@ mod tests {
     fn load_reads_the_manifest_and_refuses_paths() {
         let dir = std::env::temp_dir().join(format!("zeyn-islands-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("manifest.json"), r#"{"islands":{"c":{"js":"c.1.js","wasm":"c_bg.1.wasm"}}}"#).unwrap();
+        std::fs::write(
+            dir.join("manifest.json"),
+            r#"{"islands":{"c":{"js":"c.1.js","wasm":"c_bg.1.wasm"}}}"#,
+        )
+        .unwrap();
         let i = Islands::load(&dir, "/app").unwrap();
         assert_eq!(i.files.get("c_bg.1.wasm"), Some(&"application/wasm"));
-        assert!(i.meta.contains("/app/_zeyn/islands/c.1.js"));
-        std::fs::write(dir.join("manifest.json"), r#"{"islands":{"c":{"js":"../x.js","wasm":"c.wasm"}}}"#).unwrap();
+        assert!(
+            i.meta
+                .contains("/app/_zeyn/islands/c.1.js")
+        );
+        std::fs::write(
+            dir.join("manifest.json"),
+            r#"{"islands":{"c":{"js":"../x.js","wasm":"c.wasm"}}}"#,
+        )
+        .unwrap();
         assert!(Islands::load(&dir, "").is_err());
         std::fs::remove_dir_all(&dir).unwrap();
     }

@@ -49,19 +49,30 @@ pub fn product_list() -> Screen {
 pub async fn product_form(params: ProductFormParams, store: ProductStore) -> Result<Screen> {
     let product = match params.id {
         Some(id) => store.get(id).await?,
-        None => Product { active: true, ..Product::default() },
+        None => Product {
+            active: true,
+            ..Product::default()
+        },
     };
-    Ok(Screen::window(t!("stock.product")).width(640).body(
-        Form::of(product)
-            .row(|r| r.field(Product::code).field(Product::unit))
-            .field(Product::name)
-            .row(|r| r.field(Product::price).field(Product::active))
-            .submit(t!("stock.save"), save_product)
-            .on_success(|saved, ui| {
-                if let Ok(p) = saved {
-                    ui.toast(t!("stock.saved", code = p.code));
-                }
-                ui.close_and_refresh();
-            }),
-    ))
+    Ok(Screen::window(t!("stock.product"))
+        .width(640)
+        .body(
+            Form::of(product)
+                .row(|r| {
+                    r.field(Product::code)
+                        .field(Product::unit)
+                })
+                .field(Product::name)
+                .row(|r| {
+                    r.field(Product::price)
+                        .field(Product::active)
+                })
+                .submit(t!("stock.save"), save_product)
+                .on_success(|saved, ui| {
+                    if let Ok(p) = saved {
+                        ui.toast(t!("stock.saved", code = p.code));
+                    }
+                    ui.close_and_refresh();
+                }),
+        ))
 }

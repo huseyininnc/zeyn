@@ -12,13 +12,16 @@ use zeyn::{BoxFuture, FileMeta, FileScanner, FileStore, MediaReader, ScanVerdict
 const FILES: &str = "showcase.tickets.files";
 
 /// What a ticket accepts: images and PDFs up to 2 MiB, at most five.
-pub const TICKET_FILES: FileRules = FileRules::new("tickets").max_bytes(2 * 1024 * 1024).max_files(5).accept(&[
-    FileType::Png,
-    FileType::Jpeg,
-    FileType::Webp,
-    FileType::Pdf,
-    FileType::Csv,
-]);
+pub const TICKET_FILES: FileRules = FileRules::new("tickets")
+    .max_bytes(2 * 1024 * 1024)
+    .max_files(5)
+    .accept(&[
+        FileType::Png,
+        FileType::Jpeg,
+        FileType::Webp,
+        FileType::Pdf,
+        FileType::Csv,
+    ]);
 
 /// Uploaded ticket files, at most 32 MiB in all.
 static STORE: LazyLock<MemoryStore> = LazyLock::new(|| MemoryStore::new(32 * 1024 * 1024));
@@ -37,9 +40,16 @@ struct NameScanner;
 
 impl FileScanner for NameScanner {
     fn scan(&self, meta: FileMeta, _file: Box<dyn MediaReader>) -> BoxFuture<Result<ScanVerdict>> {
-        let refused = meta.name.to_lowercase().contains("eicar");
+        let refused = meta
+            .name
+            .to_lowercase()
+            .contains("eicar");
         Box::pin(async move {
-            Ok(if refused { ScanVerdict::Refused("test signature in the name".into()) } else { ScanVerdict::Clean })
+            Ok(if refused {
+                ScanVerdict::Refused("test signature in the name".into())
+            } else {
+                ScanVerdict::Clean
+            })
         })
     }
 }
@@ -48,9 +58,16 @@ impl FileScanner for NameScanner {
 #[action(permission = "showcase.tickets.files", audit)]
 pub async fn save_ticket(ticket: Valid<Ticket>) -> Result<usize> {
     let ticket = ticket.into_inner();
-    let files: Vec<&File> = ticket.contract.iter().chain(ticket.attachments.iter()).collect();
+    let files: Vec<&File> = ticket
+        .contract
+        .iter()
+        .chain(ticket.attachments.iter())
+        .collect();
     for f in &files {
-        STORE.meta(f.id.clone()).await.map_err(|_| Error::NotFound)?;
+        STORE
+            .meta(f.id.clone())
+            .await
+            .map_err(|_| Error::NotFound)?;
     }
     Ok(files.len())
 }
@@ -58,18 +75,20 @@ pub async fn save_ticket(ticket: Valid<Ticket>) -> Result<usize> {
 #[screen(route = "/uploads", permission = "showcase.tickets.files")]
 pub fn uploads() -> Screen {
     Screen::new(t!("uploads.title")).body(
-        Card::new().title(t!("uploads.card")).add(
-            Form::of(Ticket::default())
-                .field(Ticket::title)
-                .file(Ticket::contract, TICKET_FILES.max_files(1))
-                .file(Ticket::attachments, TICKET_FILES)
-                .submit(t!("uploads.save"), save_ticket)
-                .on_success(|n, ui| {
-                    if let Ok(n) = n {
-                        ui.toast(t!("uploads.saved", n = n));
-                    }
-                }),
-        ),
+        Card::new()
+            .title(t!("uploads.card"))
+            .add(
+                Form::of(Ticket::default())
+                    .field(Ticket::title)
+                    .file(Ticket::contract, TICKET_FILES.max_files(1))
+                    .file(Ticket::attachments, TICKET_FILES)
+                    .submit(t!("uploads.save"), save_ticket)
+                    .on_success(|n, ui| {
+                        if let Ok(n) = n {
+                            ui.toast(t!("uploads.saved", n = n));
+                        }
+                    }),
+            ),
     )
 }
 
@@ -78,5 +97,8 @@ pub fn feature() -> Feature {
         .files(TICKET_FILES, FILES, STORE.clone())
         .scan_files(NameScanner)
         .screen(uploads)
-        .menu(|m| m.group(t!("menu.uploads"), Icon::Box).item(t!("uploads.title"), uploads))
+        .menu(|m| {
+            m.group(t!("menu.uploads"), Icon::Box)
+                .item(t!("uploads.title"), uploads)
+        })
 }

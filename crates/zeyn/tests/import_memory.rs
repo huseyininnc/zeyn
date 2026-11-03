@@ -52,7 +52,11 @@ fn import_files_are_cut_to_their_limits_while_they_are_read() {
 
     let tall = format!("name\n{}", "a\n".repeat(4 * MIB - 8));
     let used = peak(|| assert!(zeyn::check_csv::<Contact>(&ctx, &tall, 5_000).is_err()));
-    assert!(used < 4 * MIB, "a CSV with too many rows used {} MiB", used / MIB);
+    assert!(
+        used < 4 * MIB,
+        "a CSV with too many rows used {} MiB",
+        used / MIB
+    );
 
     let wide = format!("name\n{}\n", "a,".repeat(4 * MIB - 8));
     let used = peak(|| {
@@ -76,6 +80,10 @@ fn import_files_are_cut_to_their_limits_while_they_are_read() {
             let checked = zeyn::check_file::<Contact>(&ctx, &file, 50_000).unwrap();
             assert_eq!(checked.invalid(), 5_000);
         });
-        assert!(used < 24 * MIB, "a workbook with far right cells used {} MiB", used / MIB);
+        assert!(
+            used < 24 * MIB,
+            "a workbook with far right cells used {} MiB",
+            used / MIB
+        );
     }
 }

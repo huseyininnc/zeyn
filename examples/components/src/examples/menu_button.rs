@@ -12,14 +12,18 @@ pub fn overview(_ctx: &Ctx) -> Node {
             }
         })
         .separator()
-        .action_then("Archive", pretend_save, (), |_, ui| ui.toast("Archived. Nothing was stored."))
+        .action_then("Archive", pretend_save, (), |_, ui| {
+            ui.toast("Archived. Nothing was stored.")
+        })
         .confirm("Archive the selection?")
         .into()
 }
 
 pub fn split(_ctx: &Ctx) -> Node {
     MenuButton::split("Save", pretend_save, ())
-        .action_then("Save a copy", pretend_save, (), |_, ui| ui.toast("Saved. Nothing was stored."))
+        .action_then("Save a copy", pretend_save, (), |_, ui| {
+            ui.toast("Saved. Nothing was stored.")
+        })
         .into()
 }
 

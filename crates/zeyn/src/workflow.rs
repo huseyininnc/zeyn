@@ -74,7 +74,9 @@ pub struct Workflow<S> {
 
 impl<S: WorkflowState> Default for Workflow<S> {
     fn default() -> Self {
-        Workflow { transitions: Vec::new() }
+        Workflow {
+            transitions: Vec::new(),
+        }
     }
 }
 
@@ -84,7 +86,13 @@ impl<S: WorkflowState> Workflow<S> {
     }
 
     /// Allows a move. Its button label is the catalog text `workflow.<name>`, or the name.
-    pub fn transition(mut self, name: &'static str, from: S, to: S, permission: &'static str) -> Self {
+    pub fn transition(
+        mut self,
+        name: &'static str,
+        from: S,
+        to: S,
+        permission: &'static str,
+    ) -> Self {
         self.transitions.push(Transition {
             name,
             label: Text::key_or(format!("workflow.{name}"), name),
@@ -124,16 +132,31 @@ impl<S: WorkflowState> Workflow<S> {
             let parts: Vec<&str> = t.permission.split('.').collect();
             let valid = parts.len() >= 2
                 && parts.iter().all(|p| {
-                    !p.is_empty() && p.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+                    !p.is_empty()
+                        && p.chars()
+                            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
                 });
             if !valid {
-                problems.push(format!("transition `{}` has an invalid permission `{}`", t.name, t.permission));
+                problems.push(format!(
+                    "transition `{}` has an invalid permission `{}`",
+                    t.name, t.permission
+                ));
             }
-            if self.transitions[..i].iter().any(|o| o.name == t.name && o.from == t.from) {
-                problems.push(format!("transition `{}` is declared twice from the same state", t.name));
+            if self.transitions[..i]
+                .iter()
+                .any(|o| o.name == t.name && o.from == t.from)
+            {
+                problems.push(format!(
+                    "transition `{}` is declared twice from the same state",
+                    t.name
+                ));
             }
         }
-        if problems.is_empty() { Ok(()) } else { Err(problems) }
+        if problems.is_empty() {
+            Ok(())
+        } else {
+            Err(problems)
+        }
     }
 
     /// Makes a move on the server. Call it in the action that saves the record, with the state
@@ -148,16 +171,31 @@ impl<S: WorkflowState> Workflow<S> {
     /// Unknown moves are `NotFound`, a record in another state is `Conflict` (someone moved it
     /// first), a missing permission is `Forbidden`. The move is recorded for the audit log.
     pub fn apply(&self, ctx: &Ctx, current: S, name: &str, comment: Option<&str>) -> Result<S> {
-        let mut named = self.transitions.iter().filter(|t| t.name == name).peekable();
+        let mut named = self
+            .transitions
+            .iter()
+            .filter(|t| t.name == name)
+            .peekable();
         if named.peek().is_none() {
             return Err(Error::NotFound);
         }
-        let t = named.find(|t| t.from == current).ok_or(Error::Conflict)?;
-        if !ctx.identity().can(&Access::Permission(t.permission)) {
+        let t = named
+            .find(|t| t.from == current)
+            .ok_or(Error::Conflict)?;
+        if !ctx
+            .identity()
+            .can(&Access::Permission(t.permission))
+        {
             return Err(Error::Forbidden);
         }
-        let comment = comment.map(str::trim).filter(|c| !c.is_empty()).map(str::to_string);
-        if comment.as_ref().is_some_and(|c| c.chars().count() > MAX_COMMENT) {
+        let comment = comment
+            .map(str::trim)
+            .filter(|c| !c.is_empty())
+            .map(str::to_string);
+        if comment
+            .as_ref()
+            .is_some_and(|c| c.chars().count() > MAX_COMMENT)
+        {
             let mut errors = ValidationErrors::default();
             errors.errors.push(FieldError {
                 field: "comment",
@@ -168,7 +206,12 @@ impl<S: WorkflowState> Workflow<S> {
             });
             return Err(Error::Validation(errors));
         }
-        let record = TransitionRecord { name: t.name, from: state_text(t.from), to: state_text(t.to), comment };
+        let record = TransitionRecord {
+            name: t.name,
+            from: state_text(t.from),
+            to: state_text(t.to),
+            comment,
+        };
         ctx.update_trail(|trail| trail.transition = Some(record));
         Ok(t.to)
     }
@@ -206,11 +249,20 @@ where
     A: Action<Input = TransitionRequest<K>>,
 {
     pub fn of(flow: Workflow<S>, current: S, id: K, _action: A) -> Self {
-        Transitions { flow, current, id, on_success: None, _action: PhantomData }
+        Transitions {
+            flow,
+            current,
+            id,
+            on_success: None,
+            _action: PhantomData,
+        }
     }
 
     /// What happens after a successful move. Shows a short confirmation unless set.
-    pub fn on_success(mut self, handler: impl Fn(&A::Output, &mut UiCtx) + Send + Sync + 'static) -> Self {
+    pub fn on_success(
+        mut self,
+        handler: impl Fn(&A::Output, &mut UiCtx) + Send + Sync + 'static,
+    ) -> Self {
         self.on_success = Some(Arc::new(handler));
         self
     }
@@ -230,7 +282,13 @@ where
             r#"<div class="z-transitions" data-testid="{scope}.transitions"><p class="z-state">{}: <strong>{state}</strong></p>"#,
             r.text(&Text::key("zeyn.workflow.state"))
         ));
-        let allowed = r.ctx.map(|c| self.flow.allowed(c.identity(), self.current)).unwrap_or_default();
+        let allowed = r
+            .ctx
+            .map(|c| {
+                self.flow
+                    .allowed(c.identity(), self.current)
+            })
+            .unwrap_or_default();
         if !allowed.is_empty() {
             out.push_str(&format!(
                 r#"<form class="z-form" data-zeyn-submit="{action}" data-testid="{scope}.transitions.form" novalidate><input type="text" name="transition" hidden value=""><div class="z-field"><label for="{scope}-comment">{label}</label><textarea id="{scope}-comment" name="comment" maxlength="{MAX_COMMENT}" rows="2" aria-describedby="{scope}-comment-error"></textarea><p class="z-field-error" id="{scope}-comment-error" aria-live="polite"></p></div><div class="z-form-actions">"#,
@@ -277,7 +335,12 @@ where
     }
 
     fn submit(&self, ctx: Ctx, values: Map<String, Json>) -> BoxFuture<Result<Vec<Effect>>> {
-        let text = |k: &str| values.get(k).and_then(Json::as_str).map(str::to_string);
+        let text = |k: &str| {
+            values
+                .get(k)
+                .and_then(Json::as_str)
+                .map(str::to_string)
+        };
         let request = TransitionRequest {
             id: self.id.clone(),
             transition: text("transition").unwrap_or_default(),
@@ -299,8 +362,13 @@ where
     }
 
     fn tool_schema(&self) -> Json {
-        let names: Vec<&str> =
-            self.flow.transitions.iter().filter(|t| t.from == self.current).map(|t| t.name).collect();
+        let names: Vec<&str> = self
+            .flow
+            .transitions
+            .iter()
+            .filter(|t| t.from == self.current)
+            .map(|t| t.name)
+            .collect();
         json!({
             "type": "object",
             "properties": {

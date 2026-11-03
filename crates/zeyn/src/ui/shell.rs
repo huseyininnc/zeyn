@@ -10,6 +10,10 @@ use serde_json::{Value as Json, json};
 
 super::layout::into_node!(MenuBar, Toolbox, PropertyInspector, StatusBar);
 
+#[allow(
+    clippy::large_enum_variant,
+    reason = "nearly every entry of the list is the large variant, so boxing it would add an allocation per entry and save no memory"
+)]
 enum Entry {
     Command(Command),
     Separator,
@@ -26,7 +30,8 @@ impl MenuList {
     /// A command. Users who may not run it do not see it. Register action commands on the
     /// feature too (`Feature::command`): the server runs them by id.
     pub fn command(mut self, command: Command) -> Self {
-        self.entries.push(Entry::Command(command));
+        self.entries
+            .push(Entry::Command(command));
         self
     }
 
@@ -63,11 +68,19 @@ pub struct MenuBar {
 impl MenuBar {
     /// A menu bar with an accessible name, such as "Main".
     pub fn new(label: impl Into<Text>) -> Self {
-        Self { label: label.into(), menus: Vec::new() }
+        Self {
+            label: label.into(),
+            menus: Vec::new(),
+        }
     }
 
-    pub fn menu(mut self, title: impl Into<Text>, build: impl FnOnce(MenuList) -> MenuList) -> Self {
-        self.menus.push((title.into(), build(MenuList::default())));
+    pub fn menu(
+        mut self,
+        title: impl Into<Text>,
+        build: impl FnOnce(MenuList) -> MenuList,
+    ) -> Self {
+        self.menus
+            .push((title.into(), build(MenuList::default())));
         self
     }
 }
@@ -98,7 +111,12 @@ fn menu_items(list: &MenuList, r: &Render) -> Vec<String> {
                 }
                 let hint = c
                     .hint()
-                    .map(|h| format!(r#"<span class="z-menu-hint" aria-hidden="true">{}</span>"#, escape(&h)))
+                    .map(|h| {
+                        format!(
+                            r#"<span class="z-menu-hint" aria-hidden="true">{}</span>"#,
+                            escape(&h)
+                        )
+                    })
                     .unwrap_or_default();
                 out.push(format!(
                     r#"<li role="none"><button type="button" role="menuitem" class="z-menu-item" tabindex="-1" data-testid="{}.menubar.{}"{}>{}<span class="z-menu-label">{}</span>{hint}</button></li>"#,
@@ -176,12 +194,17 @@ pub struct Toolbox {
 
 impl Toolbox {
     pub fn new(label: impl Into<Text>) -> Self {
-        Self { label: label.into(), tools: Vec::new(), selected: None }
+        Self {
+            label: label.into(),
+            tools: Vec::new(),
+            selected: None,
+        }
     }
 
     /// A tool. Without an icon the button shows the first letter of its label.
     pub fn tool(mut self, id: &'static str, label: impl Into<Text>, icon: Option<Icon>) -> Self {
-        self.tools.push((id, label.into(), icon));
+        self.tools
+            .push((id, label.into(), icon));
         self
     }
 
@@ -194,7 +217,9 @@ impl Toolbox {
 
 impl Component for Toolbox {
     fn render(&self, out: &mut String, r: &Render) {
-        let on = self.selected.or(self.tools.first().map(|t| t.0));
+        let on = self
+            .selected
+            .or(self.tools.first().map(|t| t.0));
         out.push_str(&format!(
             r#"<div class="z-toolbox" role="toolbar" aria-orientation="vertical" aria-label="{}" data-zeyn-toolbox data-text-selected="{}" data-testid="{}.toolbox">"#,
             r.text(&self.label),
@@ -208,7 +233,13 @@ impl Component for Toolbox {
                 Some(i) => i.html(),
                 None => format!(
                     r#"<span aria-hidden="true">{}</span>"#,
-                    escape(&label.chars().next().map(String::from).unwrap_or_default())
+                    escape(
+                        &label
+                            .chars()
+                            .next()
+                            .map(String::from)
+                            .unwrap_or_default()
+                    )
                 ),
             };
             out.push_str(&format!(
@@ -223,8 +254,11 @@ impl Component for Toolbox {
     }
 
     fn schema(&self) -> Json {
-        let tools: Vec<Json> =
-            self.tools.iter().map(|(id, label, icon)| json!({ "id": id, "label": label, "icon": icon })).collect();
+        let tools: Vec<Json> = self
+            .tools
+            .iter()
+            .map(|(id, label, icon)| json!({ "id": id, "label": label, "icon": icon }))
+            .collect();
         json!({ "type": "toolbox", "label": self.label, "tools": tools, "selected": self.selected })
     }
 }
@@ -246,7 +280,10 @@ pub struct PropertyInspector {
 
 impl PropertyInspector {
     pub fn new(title: impl Into<Text>, form: impl Into<Node>) -> Self {
-        Self { title: title.into(), form: form.into() }
+        Self {
+            title: title.into(),
+            form: form.into(),
+        }
     }
 }
 
@@ -290,7 +327,12 @@ pub struct StatusBar {
 
 impl StatusBar {
     pub fn new(label: impl Into<Text>) -> Self {
-        Self { label: label.into(), start: Vec::new(), end: Vec::new(), live: None }
+        Self {
+            label: label.into(),
+            start: Vec::new(),
+            end: Vec::new(),
+            live: None,
+        }
     }
 
     /// An item at the start (the left in left to right languages).
@@ -315,7 +357,9 @@ impl StatusBar {
 impl Component for StatusBar {
     fn render(&self, out: &mut String, r: &Render) {
         let items = |list: &[Text]| {
-            list.iter().map(|t| format!(r#"<span class="z-statusbar-item">{}</span>"#, r.text(t))).collect::<String>()
+            list.iter()
+                .map(|t| format!(r#"<span class="z-statusbar-item">{}</span>"#, r.text(t)))
+                .collect::<String>()
         };
         out.push_str(&format!(
             r#"<div class="z-statusbar" role="group" aria-label="{}" data-zeyn-statusbar data-testid="{}.statusbar"><div class="z-statusbar-start">{}<span class="z-statusbar-item z-statusbar-live" role="status" aria-live="polite" data-zeyn-status-live>{}</span></div><div class="z-statusbar-end">{}</div></div>"#,

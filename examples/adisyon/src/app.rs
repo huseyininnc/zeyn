@@ -11,7 +11,10 @@ pub fn app(config: Config) -> std::io::Result<App> {
         .catalog("en", include_str!("../locales/en.json"))
         .and_then(|i| i.catalog("tr", include_str!("../locales/tr.json")))
         .map_err(std::io::Error::other)?;
-    let zone = config.get("time.zone").and_then(TimeZone::named).unwrap_or(TimeZone::UTC);
+    let zone = config
+        .get("time.zone")
+        .and_then(TimeZone::named)
+        .unwrap_or(TimeZone::UTC);
     let mut app = App::new(t!("app.name"))
         .config(config.clone())
         .i18n(i18n)

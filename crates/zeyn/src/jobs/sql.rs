@@ -28,7 +28,11 @@ pub fn create_job_tables(dialect: &str, prefix: &str) -> Result<Vec<String>> {
     let (text, big) = match dialect {
         "postgres" => ("VARCHAR", "BIGINT"),
         "oracle" => ("VARCHAR2", "NUMBER(19)"),
-        other => return Err(Error::Internal(format!("no job tables for the `{other}` dialect"))),
+        other => {
+            return Err(Error::Internal(format!(
+                "no job tables for the `{other}` dialect"
+            )));
+        }
     };
     Ok(vec![
         format!(
@@ -54,7 +58,15 @@ pub struct SqlJobStore {
 }
 
 const CLAIMED: &str = "id, name, payload, attempts, max_attempts, backoff_ms, every_ms";
-const CLAIMED_COLS: [Col; 7] = [Col::Text, Col::Text, Col::Text, Col::Int, Col::Int, Col::Int, Col::Int];
+const CLAIMED_COLS: [Col; 7] = [
+    Col::Text,
+    Col::Text,
+    Col::Text,
+    Col::Int,
+    Col::Int,
+    Col::Int,
+    Col::Int,
+];
 const DUE: &str = "((state = 'queued' AND run_at <= ?) OR (state = 'running' AND lease_until < ?))";
 const HELD: &str = "id = ? AND lease_owner = ? AND state = 'running'";
 
@@ -104,7 +116,9 @@ pub(crate) fn plan_claim(
     limit: usize,
 ) -> Sql {
     let in_names = list(names.len());
-    let name_args = names.iter().map(|n| Arg::Text((*n).to_string()));
+    let name_args = names
+        .iter()
+        .map(|n| Arg::Text((*n).to_string()));
     if d.name() == "oracle" {
         let mut args: Vec<Arg> = name_args.collect();
         args.extend([Arg::Int(now_ms), Arg::Int(now_ms), Arg::Int(limit as i64)]);
@@ -118,7 +132,10 @@ pub(crate) fn plan_claim(
             &[Col::Text],
         );
     }
-    let mut args = vec![Arg::Text(worker.to_string()), Arg::Int(now_ms.saturating_add(lease_ms))];
+    let mut args = vec![
+        Arg::Text(worker.to_string()),
+        Arg::Int(now_ms.saturating_add(lease_ms)),
+    ];
     args.extend(name_args);
     args.extend([Arg::Int(now_ms), Arg::Int(now_ms), Arg::Int(limit as i64)]);
     sql(
@@ -144,8 +161,17 @@ pub(crate) fn plan_finish(
     let held = [Arg::Text(job.id.clone()), Arg::Text(worker.to_string())];
     let error = error.map_or(Arg::Null(Col::Text), |e| Arg::Text(e.to_string()));
     match next {
-        NextRun::Done => sql(d, p, &format!("DELETE FROM {{p}}jobs WHERE {HELD}"), held.to_vec(), &[]),
-        NextRun::Queue { run_at_ms, attempts } => {
+        NextRun::Done => sql(
+            d,
+            p,
+            &format!("DELETE FROM {{p}}jobs WHERE {HELD}"),
+            held.to_vec(),
+            &[],
+        ),
+        NextRun::Queue {
+            run_at_ms,
+            attempts,
+        } => {
             let mut args = vec![Arg::Int(run_at_ms), Arg::Int(i64::from(attempts)), error];
             args.extend(held);
             sql(
@@ -177,7 +203,10 @@ pub(crate) fn plan_finish(
 impl SqlJobStore {
     /// The store over `db`, with the table `zeyn_jobs`.
     pub fn new(db: Db) -> Self {
-        SqlJobStore { db, prefix: Arc::from("zeyn_") }
+        SqlJobStore {
+            db,
+            prefix: Arc::from("zeyn_"),
+        }
     }
 
     /// Another table prefix: lower case letters, digits and `_`, at most 16 characters.
@@ -190,7 +219,13 @@ impl SqlJobStore {
     /// made from [`create_job_tables`].
     pub async fn create_tables(&self) -> Result<()> {
         for statement in create_job_tables(self.db.dialect().name(), &self.prefix)? {
-            self.db.run(Sql { text: statement, args: Vec::new(), cols: Vec::new() }).await?;
+            self.db
+                .run(Sql {
+                    text: statement,
+                    args: Vec::new(),
+                    cols: Vec::new(),
+                })
+                .await?;
         }
         Ok(())
     }
@@ -199,7 +234,13 @@ impl SqlJobStore {
         sql(self.db.dialect(), &self.prefix, template, args, cols)
     }
 
-    async fn claim_oracle(&self, worker: String, first: Sql, now_ms: i64, lease_ms: i64) -> Result<Vec<ClaimedJob>> {
+    async fn claim_oracle(
+        &self,
+        worker: String,
+        first: Sql,
+        now_ms: i64,
+        lease_ms: i64,
+    ) -> Result<Vec<ClaimedJob>> {
         let mut tx = self.db.begin().await?;
         let ids: Vec<Arg> = tx
             .rows(first)
@@ -238,7 +279,10 @@ impl SqlJobStore {
             ))
             .await?;
         tx.commit().await?;
-        Ok(rows.into_iter().filter_map(claimed_of).collect())
+        Ok(rows
+            .into_iter()
+            .filter_map(claimed_of)
+            .collect())
     }
 }
 
@@ -319,14 +363,32 @@ impl JobStore for SqlJobStore {
     ) -> BoxFuture<Result<Vec<ClaimedJob>>> {
         let s = self.clone();
         let worker = worker.to_string();
-        let plan = (!names.is_empty() && limit > 0)
-            .then(|| plan_claim(s.db.dialect(), &s.prefix, &worker, names, now_ms, lease_ms, limit));
+        let plan = (!names.is_empty() && limit > 0).then(|| {
+            plan_claim(
+                s.db.dialect(),
+                &s.prefix,
+                &worker,
+                names,
+                now_ms,
+                lease_ms,
+                limit,
+            )
+        });
         Box::pin(async move {
-            let Some(plan) = plan else { return Ok(Vec::new()) };
+            let Some(plan) = plan else {
+                return Ok(Vec::new());
+            };
             if s.db.dialect().name() == "oracle" {
-                return s.claim_oracle(worker, plan, now_ms, lease_ms).await;
+                return s
+                    .claim_oracle(worker, plan, now_ms, lease_ms)
+                    .await;
             }
-            Ok(s.db.rows(plan).await?.into_iter().filter_map(claimed_of).collect())
+            Ok(s.db
+                .rows(plan)
+                .await?
+                .into_iter()
+                .filter_map(claimed_of)
+                .collect())
         })
     }
 
@@ -334,7 +396,11 @@ impl JobStore for SqlJobStore {
         let s = self.clone();
         let sql = s.sql(
             &format!("UPDATE {{p}}jobs SET lease_until = ? WHERE {HELD}"),
-            vec![Arg::Int(lease_until_ms), Arg::Text(id.to_string()), Arg::Text(worker.to_string())],
+            vec![
+                Arg::Int(lease_until_ms),
+                Arg::Text(id.to_string()),
+                Arg::Text(worker.to_string()),
+            ],
             &[],
         );
         Box::pin(async move { Ok(s.db.run(sql).await? > 0) })
@@ -342,13 +408,33 @@ impl JobStore for SqlJobStore {
 
     fn complete(&self, job: &ClaimedJob, worker: &str, now_ms: i64) -> BoxFuture<Result<bool>> {
         let s = self.clone();
-        let sql = plan_finish(s.db.dialect(), &s.prefix, job, worker, job.after_success(now_ms), None);
+        let sql = plan_finish(
+            s.db.dialect(),
+            &s.prefix,
+            job,
+            worker,
+            job.after_success(now_ms),
+            None,
+        );
         Box::pin(async move { Ok(s.db.run(sql).await? > 0) })
     }
 
-    fn fail(&self, job: &ClaimedJob, worker: &str, error: &'static str, now_ms: i64) -> BoxFuture<Result<bool>> {
+    fn fail(
+        &self,
+        job: &ClaimedJob,
+        worker: &str,
+        error: &'static str,
+        now_ms: i64,
+    ) -> BoxFuture<Result<bool>> {
         let s = self.clone();
-        let sql = plan_finish(s.db.dialect(), &s.prefix, job, worker, job.after_failure(now_ms), Some(error));
+        let sql = plan_finish(
+            s.db.dialect(),
+            &s.prefix,
+            job,
+            worker,
+            job.after_failure(now_ms),
+            Some(error),
+        );
         Box::pin(async move { Ok(s.db.run(sql).await? > 0) })
     }
 }
@@ -372,7 +458,15 @@ mod tests {
 
     #[test]
     fn postgres_claims_in_one_statement_with_skip_locked_and_binds_every_value() {
-        let sql = plan_claim(&Postgres, "zeyn_", "w1", &["mail", "report"], 1_000, 60_000, 4);
+        let sql = plan_claim(
+            &Postgres,
+            "zeyn_",
+            "w1",
+            &["mail", "report"],
+            1_000,
+            60_000,
+            4,
+        );
         assert_eq!(
             sql.text,
             "UPDATE zeyn_jobs SET state = 'running', lease_owner = $1, lease_until = $2, attempts = attempts + 1 WHERE id IN (SELECT id FROM zeyn_jobs WHERE name IN ($3, $4) AND ((state = 'queued' AND run_at <= $5) OR (state = 'running' AND lease_until < $6)) ORDER BY run_at LIMIT $7 FOR UPDATE SKIP LOCKED) RETURNING id, name, payload, attempts, max_attempts, backoff_ms, every_ms"
@@ -394,7 +488,9 @@ mod tests {
 
     #[test]
     fn oracle_11g_selects_ids_with_rownum_and_skip_locked() {
-        let d = Oracle { compat: OracleCompat::V11 };
+        let d = Oracle {
+            compat: OracleCompat::V11,
+        };
         let sql = plan_claim(&d, "zeyn_", "w1", &["mail"], 1_000, 60_000, 2);
         assert_eq!(
             sql.text,
@@ -411,24 +507,53 @@ mod tests {
     fn finishing_only_changes_a_run_the_worker_still_holds() {
         let j = job();
         let done = plan_finish(&Postgres, "p_", &j, "w1", NextRun::Done, None);
-        assert_eq!(done.text, "DELETE FROM p_jobs WHERE id = $1 AND lease_owner = $2 AND state = 'running'");
-        let retry = plan_finish(&Postgres, "p_", &j, "w1", j.after_failure(1_000), Some("internal"));
-        assert!(retry.text.starts_with("UPDATE p_jobs SET state = 'queued', run_at = $1, attempts = $2"));
-        assert!(retry.text.ends_with("WHERE id = $4 AND lease_owner = $5 AND state = 'running'"));
+        assert_eq!(
+            done.text,
+            "DELETE FROM p_jobs WHERE id = $1 AND lease_owner = $2 AND state = 'running'"
+        );
+        let retry = plan_finish(
+            &Postgres,
+            "p_",
+            &j,
+            "w1",
+            j.after_failure(1_000),
+            Some("internal"),
+        );
+        assert!(
+            retry
+                .text
+                .starts_with("UPDATE p_jobs SET state = 'queued', run_at = $1, attempts = $2")
+        );
+        assert!(
+            retry
+                .text
+                .ends_with("WHERE id = $4 AND lease_owner = $5 AND state = 'running'")
+        );
         assert_eq!(retry.args[0], Arg::Int(1_100));
         assert_eq!(retry.args[2], Arg::Text("internal".into()));
-        let dead =
-            plan_finish(&Postgres, "p_", &ClaimedJob { attempts: 3, ..j }, "w1", NextRun::Dead, Some("internal"));
+        let dead = plan_finish(
+            &Postgres,
+            "p_",
+            &ClaimedJob { attempts: 3, ..j },
+            "w1",
+            NextRun::Dead,
+            Some("internal"),
+        );
         assert!(dead.text.contains("state = 'failed'"));
     }
 
     #[test]
     fn the_schema_uses_whole_number_times_and_checks_the_prefix() {
         for dialect in ["postgres", "oracle"] {
-            let all = create_job_tables(dialect, "shop_").unwrap().join("\n");
+            let all = create_job_tables(dialect, "shop_")
+                .unwrap()
+                .join("\n");
             assert!(all.contains("CREATE TABLE shop_jobs ("));
             assert!(all.contains("CREATE INDEX shop_jobs_due ON shop_jobs (state, run_at)"));
-            assert!(!all.contains("TIMESTAMP") && !all.contains("IDENTITY"), "works on Oracle 11g");
+            assert!(
+                !all.contains("TIMESTAMP") && !all.contains("IDENTITY"),
+                "works on Oracle 11g"
+            );
         }
         assert!(create_job_tables("oracle", "z_").unwrap()[0].contains("VARCHAR2(4000)"));
         assert!(create_job_tables("postgres", "Bad").is_err());

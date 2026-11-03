@@ -76,7 +76,12 @@ impl FieldType for Vec<File> {
     const KIND: FieldKind = FieldKind::Custom { editor: "files" };
 
     fn to_value(&self) -> Value {
-        Value::Text(self.iter().map(|f| f.name.as_str()).collect::<Vec<_>>().join(", "))
+        Value::Text(
+            self.iter()
+                .map(|f| f.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", "),
+        )
     }
 
     fn __is_empty(&self) -> bool {
@@ -183,9 +188,13 @@ impl FileType {
             FileType::Webp => "image/webp",
             FileType::Pdf => "application/pdf",
             FileType::Zip => "application/zip",
-            FileType::Docx => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            FileType::Docx => {
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            }
             FileType::Xlsx => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            FileType::Pptx => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            FileType::Pptx => {
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            }
             FileType::Csv => "text/csv; charset=utf-8",
             FileType::Text => "text/plain; charset=utf-8",
             FileType::Mp4 => "video/mp4",
@@ -243,9 +252,14 @@ impl FileType {
     /// assert_eq!(FileType::detect("list.CSV", b"code;name\nA;B\n"), Some(FileType::Csv));
     /// ```
     pub fn detect(name: &str, head: &[u8]) -> Option<FileType> {
-        let ext = name.rsplit_once('.').map(|(_, e)| e.to_ascii_lowercase())?;
+        let ext = name
+            .rsplit_once('.')
+            .map(|(_, e)| e.to_ascii_lowercase())?;
         let content = sniff(head);
-        FileType::ALL.iter().copied().find(|t| t.content() == content && t.extensions().contains(&ext.as_str()))
+        FileType::ALL
+            .iter()
+            .copied()
+            .find(|t| t.content() == content && t.extensions().contains(&ext.as_str()))
     }
 }
 
@@ -282,15 +296,39 @@ fn sniff(head: &[u8]) -> Content {
 fn text(head: &[u8]) -> Content {
     let valid = match std::str::from_utf8(head) {
         Ok(s) => s,
-        Err(e) if e.error_len().is_none() => std::str::from_utf8(&head[..e.valid_up_to()]).unwrap_or(""),
+        Err(e) if e.error_len().is_none() => {
+            std::str::from_utf8(&head[..e.valid_up_to()]).unwrap_or("")
+        }
         Err(_) => return Content::Unknown,
     };
-    if valid.is_empty() || valid.chars().any(|c| c.is_control() && !matches!(c, '\t' | '\n' | '\r')) {
+    if valid.is_empty()
+        || valid
+            .chars()
+            .any(|c| c.is_control() && !matches!(c, '\t' | '\n' | '\r'))
+    {
         return Content::Unknown;
     }
-    let lower = valid.trim_start_matches('\u{feff}').trim_start().to_lowercase();
-    let markup = ["<!doctype", "<html", "<svg", "<?xml", "<script", "<body", "<iframe", "<head", "<object", "<embed"];
-    if lower.starts_with('<') || markup.iter().any(|m| lower.contains(m)) { Content::Markup } else { Content::Text }
+    let lower = valid
+        .trim_start_matches('\u{feff}')
+        .trim_start()
+        .to_lowercase();
+    let markup = [
+        "<!doctype",
+        "<html",
+        "<svg",
+        "<?xml",
+        "<script",
+        "<body",
+        "<iframe",
+        "<head",
+        "<object",
+        "<embed",
+    ];
+    if lower.starts_with('<') || markup.iter().any(|m| lower.contains(m)) {
+        Content::Markup
+    } else {
+        Content::Text
+    }
 }
 
 /// What an upload field accepts: the store it goes to, the largest file, how many files a field
@@ -326,7 +364,11 @@ impl FileRules {
 
     /// Largest file, in bytes. Never more than [`MAX_UPLOAD_BYTES`].
     pub const fn max_bytes(mut self, bytes: u64) -> Self {
-        self.max_bytes = if bytes > MAX_UPLOAD_BYTES { MAX_UPLOAD_BYTES } else { bytes };
+        self.max_bytes = if bytes > MAX_UPLOAD_BYTES {
+            MAX_UPLOAD_BYTES
+        } else {
+            bytes
+        };
         self
     }
 
@@ -373,8 +415,18 @@ impl FileRules {
     pub(crate) fn accept_attr(&self) -> String {
         let mut parts: Vec<String> = Vec::new();
         for t in self.accept {
-            parts.extend(t.extensions().iter().map(|e| format!(".{e}")));
-            parts.push(t.mime().split(';').next().unwrap_or("").to_string());
+            parts.extend(
+                t.extensions()
+                    .iter()
+                    .map(|e| format!(".{e}")),
+            );
+            parts.push(
+                t.mime()
+                    .split(';')
+                    .next()
+                    .unwrap_or("")
+                    .to_string(),
+            );
         }
         parts.join(",")
     }
@@ -387,7 +439,10 @@ impl FileRules {
 /// assert!(!zeyn::valid_file_id("../../etc/passwd"));
 /// ```
 pub fn valid_file_id(id: &str) -> bool {
-    id.len() == 32 && id.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    id.len() == 32
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
 /// A file name safe to keep and show: the part after the last `/` or `\`, without control
@@ -400,15 +455,34 @@ pub fn valid_file_id(id: &str) -> bool {
 /// assert_eq!(zeyn::clean_file_name(""), "file");
 /// ```
 pub fn clean_file_name(name: &str) -> String {
-    let base = name.rsplit(['/', '\\']).next().unwrap_or("");
-    let cleaned: String = base.chars().filter(|c| !c.is_control()).take(MAX_FILE_NAME).collect();
-    let cleaned = cleaned.trim().trim_start_matches('.').trim().to_string();
-    if cleaned.is_empty() { "file".to_string() } else { cleaned }
+    let base = name
+        .rsplit(['/', '\\'])
+        .next()
+        .unwrap_or("");
+    let cleaned: String = base
+        .chars()
+        .filter(|c| !c.is_control())
+        .take(MAX_FILE_NAME)
+        .collect();
+    let cleaned = cleaned
+        .trim()
+        .trim_start_matches('.')
+        .trim()
+        .to_string();
+    if cleaned.is_empty() {
+        "file".to_string()
+    } else {
+        cleaned
+    }
 }
 
 /// Reads a submitted `File` or `Vec<File>` value: a JSON text from the form, or JSON from the
 /// API. Ids must have the server's shape and names are cleaned; anything else is refused.
-pub(crate) fn parse_files(raw: &serde_json::Value, many: bool, optional: bool) -> Option<serde_json::Value> {
+pub(crate) fn parse_files(
+    raw: &serde_json::Value,
+    many: bool,
+    optional: bool,
+) -> Option<serde_json::Value> {
     use serde_json::Value as Json;
     let value = match raw {
         Json::String(s) if s.trim().is_empty() => Json::Null,
@@ -416,8 +490,16 @@ pub(crate) fn parse_files(raw: &serde_json::Value, many: bool, optional: bool) -
         other => other.clone(),
     };
     let check = |f: File| {
-        let content_type = FileType::ALL.iter().map(|t| t.mime()).find(|m| *m == f.content_type).unwrap_or("");
-        valid_file_id(&f.id).then(|| File { name: clean_file_name(&f.name), content_type: content_type.into(), ..f })
+        let content_type = FileType::ALL
+            .iter()
+            .map(|t| t.mime())
+            .find(|m| *m == f.content_type)
+            .unwrap_or("");
+        valid_file_id(&f.id).then(|| File {
+            name: clean_file_name(&f.name),
+            content_type: content_type.into(),
+            ..f
+        })
     };
     if many {
         let list: Vec<File> = match value {
@@ -447,7 +529,11 @@ pub(crate) fn human_size(bytes: u64, locale: &str) -> String {
         v /= 1024.0;
         u += 1;
     }
-    let text = if u == 0 { format!("{bytes}") } else { format!("{v:.1}") };
+    let text = if u == 0 {
+        format!("{bytes}")
+    } else {
+        format!("{v:.1}")
+    };
     let decimal = crate::i18n::NumberFormat::for_locale(locale).decimal;
     format!("{} {}", text.replace('.', &decimal.to_string()), units[u])
 }
@@ -473,22 +559,38 @@ pub(crate) fn render_upload(
     let t = |k: &str| r.text(&Text::key(format!("zeyn.ui.upload.{k}")));
     let files: Vec<File> = match current {
         serde_json::Value::Array(_) => serde_json::from_value(current.clone()).unwrap_or_default(),
-        serde_json::Value::Object(_) => serde_json::from_value::<File>(current.clone()).into_iter().collect(),
+        serde_json::Value::Object(_) => serde_json::from_value::<File>(current.clone())
+            .into_iter()
+            .collect(),
         _ => Vec::new(),
     };
-    let files: Vec<File> = files.into_iter().filter(|f| valid_file_id(&f.id)).collect();
+    let files: Vec<File> = files
+        .into_iter()
+        .filter(|f| valid_file_id(&f.id))
+        .collect();
     let value = if many {
         serde_json::to_string(&files).unwrap_or_default()
     } else {
-        files.first().and_then(|f| serde_json::to_string(f).ok()).unwrap_or_default()
+        files
+            .first()
+            .and_then(|f| serde_json::to_string(f).ok())
+            .unwrap_or_default()
     };
-    let types: Vec<String> =
-        rules.types().iter().flat_map(|t| t.extensions().first()).map(|e| e.to_uppercase()).collect();
+    let types: Vec<String> = rules
+        .types()
+        .iter()
+        .flat_map(|t| t.extensions().first())
+        .map(|e| e.to_uppercase())
+        .collect();
     let hint = r.text(
-        &Text::key(if many { "zeyn.ui.upload.hint_many" } else { "zeyn.ui.upload.hint" })
-            .arg("types", types.join(", "))
-            .arg("max", human_size(rules.limit(), r.locale))
-            .arg("n", rules.files().to_string()),
+        &Text::key(if many {
+            "zeyn.ui.upload.hint_many"
+        } else {
+            "zeyn.ui.upload.hint"
+        })
+        .arg("types", types.join(", "))
+        .arg("max", human_size(rules.limit(), r.locale))
+        .arg("n", rules.files().to_string()),
     );
     let raw = |text: &Text| r.i18n.text(r.locale, text);
     let key = |k: &str| raw(&Text::key(format!("zeyn.ui.upload.{k}")));
@@ -507,8 +609,16 @@ pub(crate) fn render_upload(
         "type": raw(&Text::key("zeyn.files.type")),
         "aborted": raw(&Text::key("zeyn.files.aborted")),
     });
-    let required = if m.is_required() { r#" aria-required="true""# } else { "" };
-    let star = if m.is_required() { r#"<span class="z-required" aria-hidden="true">*</span>"# } else { "" };
+    let required = if m.is_required() {
+        r#" aria-required="true""#
+    } else {
+        ""
+    };
+    let star = if m.is_required() {
+        r#"<span class="z-required" aria-hidden="true">*</span>"#
+    } else {
+        ""
+    };
     let multiple = if many { " multiple" } else { "" };
     out.push_str(&format!(
         r#"<label for="{id}-pick" id="{id}-label">{label}{star}</label><div class="z-upload" data-zeyn-upload="{store}" data-multiple="{many}" data-max-bytes="{max}" data-max-files="{n}" data-texts="{texts}"><input type="text" hidden class="z-upload-value" id="{id}" name="{name}" data-testid="{scope}.field.{name}" value="{value}"><div class="z-upload-drop"><input type="file" class="z-upload-input" id="{id}-pick" accept="{accept}"{multiple}{required} aria-describedby="{id}-hint {id}-error"><p class="z-upload-hint" id="{id}-hint">{drop} {hint}</p></div><ul class="z-upload-list" aria-label="{list}">"#,
@@ -536,7 +646,9 @@ pub(crate) fn render_upload(
             remove_name = r.text(&Text::key("zeyn.ui.upload.remove_name").arg("name", f.name.clone())),
         ));
     }
-    out.push_str(r#"</ul><p class="z-sr-only z-upload-status" role="status" aria-live="polite"></p></div>"#);
+    out.push_str(
+        r#"</ul><p class="z-sr-only z-upload-status" role="status" aria-live="polite"></p></div>"#,
+    );
 }
 
 #[cfg(feature = "server")]
@@ -651,7 +763,11 @@ mod store {
     /// [`Feature::scan_files`](crate::Feature::scan_files). A refused file, or a scanner that
     /// fails, is deleted and the upload answers `422`.
     pub trait FileScanner: Send + Sync + 'static {
-        fn scan(&self, meta: FileMeta, file: Box<dyn MediaReader>) -> BoxFuture<Result<ScanVerdict>>;
+        fn scan(
+            &self,
+            meta: FileMeta,
+            file: Box<dyn MediaReader>,
+        ) -> BoxFuture<Result<ScanVerdict>>;
     }
 
     /// A store registered on a feature.
@@ -681,7 +797,9 @@ mod store {
     impl DiskStore {
         /// A store in `root`, created on the first upload.
         pub fn new(root: impl Into<PathBuf>) -> Self {
-            DiskStore { root: Arc::new(root.into()) }
+            DiskStore {
+                root: Arc::new(root.into()),
+            }
         }
 
         fn path(&self, id: &str, ext: &str) -> Result<PathBuf> {
@@ -694,7 +812,11 @@ mod store {
 
     impl FileStore for DiskStore {
         fn put(&self, mut meta: FileMeta, mut chunks: FileChunks) -> BoxFuture<Result<()>> {
-            let paths = (self.path(&meta.id, "part"), self.path(&meta.id, "bin"), self.path(&meta.id, "json"));
+            let paths = (
+                self.path(&meta.id, "part"),
+                self.path(&meta.id, "bin"),
+                self.path(&meta.id, "json"),
+            );
             let root = self.root.clone();
             Box::pin(async move {
                 let (part, bin, json) = (paths.0?, paths.1?, paths.2?);
@@ -720,11 +842,13 @@ mod store {
                         }
                     };
                     meta.size = size;
-                    let text = serde_json::to_vec(&meta).map_err(|e| Error::Internal(e.to_string()))?;
+                    let text =
+                        serde_json::to_vec(&meta).map_err(|e| Error::Internal(e.to_string()))?;
                     std::fs::write(&json, text).map_err(io)?;
                     std::fs::rename(&part, &bin).map_err(io)
                 });
-                work.await.map_err(|e| Error::Internal(e.to_string()))?
+                work.await
+                    .map_err(|e| Error::Internal(e.to_string()))?
             })
         }
 
@@ -735,7 +859,10 @@ mod store {
                 tokio::task::spawn_blocking(move || {
                     let meta: FileMeta = read_meta(&json)?;
                     let file = std::fs::File::open(&bin).map_err(|_| not_found())?;
-                    Ok(StoredFile { meta, reader: Box::new(file) })
+                    Ok(StoredFile {
+                        meta,
+                        reader: Box::new(file),
+                    })
                 })
                 .await
                 .map_err(|e| Error::Internal(e.to_string()))?
@@ -796,16 +923,25 @@ mod store {
     impl MemoryStore {
         /// A store that holds at most `cap` bytes in all.
         pub fn new(cap: u64) -> Self {
-            MemoryStore { files: Arc::new(Mutex::new(HashMap::new())), cap }
+            MemoryStore {
+                files: Arc::new(Mutex::new(HashMap::new())),
+                cap,
+            }
         }
 
         /// Ids of the stored files, for tests.
         pub fn ids(&self) -> Vec<String> {
-            self.files.lock().map(|f| f.keys().cloned().collect()).unwrap_or_default()
+            self.files
+                .lock()
+                .map(|f| f.keys().cloned().collect())
+                .unwrap_or_default()
         }
 
         fn used(&self) -> u64 {
-            self.files.lock().map(|f| f.values().map(|(m, _)| m.size).sum()).unwrap_or(0)
+            self.files
+                .lock()
+                .map(|f| f.values().map(|(m, _)| m.size).sum())
+                .unwrap_or(0)
         }
     }
 
@@ -823,22 +959,36 @@ mod store {
                     data.extend_from_slice(&chunk);
                 }
                 meta.size = data.len() as u64;
-                let mut files = this.files.lock().map_err(|_| Error::Internal("file store lock".into()))?;
+                let mut files = this
+                    .files
+                    .lock()
+                    .map_err(|_| Error::Internal("file store lock".into()))?;
                 files.insert(meta.id.clone(), (meta, data.into()));
                 Ok(())
             })
         }
 
         fn get(&self, id: String) -> BoxFuture<Result<StoredFile>> {
-            let found = self.files.lock().ok().and_then(|f| f.get(&id).cloned());
+            let found = self
+                .files
+                .lock()
+                .ok()
+                .and_then(|f| f.get(&id).cloned());
             Box::pin(async move {
                 let (meta, data) = found.ok_or_else(not_found)?;
-                Ok(StoredFile { meta, reader: Box::new(Cursor::new(data)) })
+                Ok(StoredFile {
+                    meta,
+                    reader: Box::new(Cursor::new(data)),
+                })
             })
         }
 
         fn meta(&self, id: String) -> BoxFuture<Result<FileMeta>> {
-            let found = self.files.lock().ok().and_then(|f| f.get(&id).map(|(m, _)| m.clone()));
+            let found = self
+                .files
+                .lock()
+                .ok()
+                .and_then(|f| f.get(&id).map(|(m, _)| m.clone()));
             Box::pin(async move { found.ok_or_else(not_found) })
         }
 
@@ -854,6 +1004,9 @@ mod store {
     pub(crate) fn new_file_id() -> String {
         let mut bytes = [0u8; 16];
         getrandom::getrandom(&mut bytes).expect("the operating system random source must work");
-        bytes.iter().map(|b| format!("{b:02x}")).collect()
+        bytes
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect()
     }
 }

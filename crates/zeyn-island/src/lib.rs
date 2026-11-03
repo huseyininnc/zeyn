@@ -77,7 +77,11 @@ pub struct CallError {
 
 impl CallError {
     fn local(code: &str, message: impl fmt::Display) -> Self {
-        CallError { status: 0, code: code.to_string(), message: message.to_string() }
+        CallError {
+            status: 0,
+            code: code.to_string(),
+            message: message.to_string(),
+        }
     }
 
     /// The server could not be reached: offline, aborted, or blocked.
@@ -110,8 +114,17 @@ pub fn props<P: DeserializeOwned>(json: &str) -> Result<P, CallError> {
 /// Body of `POST /_zeyn/data` for a remote: the island's screen, params and node, the remote's
 /// key and the input. `params` is the screen's `data-zeyn-params` JSON; anything that is not JSON
 /// is sent as `null` (the server then refuses the call if the screen needs params).
-pub fn call_body<R: Remote>(screen: &str, params: &str, node: &str, input: &R::Input) -> Result<String, CallError> {
-    let params = if serde_json::from_str::<IgnoredAny>(params).is_ok() { params } else { "null" };
+pub fn call_body<R: Remote>(
+    screen: &str,
+    params: &str,
+    node: &str,
+    input: &R::Input,
+) -> Result<String, CallError> {
+    let params = if serde_json::from_str::<IgnoredAny>(params).is_ok() {
+        params
+    } else {
+        "null"
+    };
     let input = serde_json::to_string(input).map_err(|e| CallError::local("input", e))?;
     let text = |s: &str| serde_json::to_string(s).unwrap_or_else(|_| "\"\"".into());
     Ok(format!(
@@ -138,8 +151,16 @@ pub fn read_error(status: u16, body: &str) -> CallError {
         message: String,
     }
     match serde_json::from_str::<Problem>(body) {
-        Ok(p) => CallError { status, code: p.error, message: p.message },
-        Err(_) => CallError { status, code: "http".into(), message: format!("The server answered {status}.") },
+        Ok(p) => CallError {
+            status,
+            code: p.error,
+            message: p.message,
+        },
+        Err(_) => CallError {
+            status,
+            code: "http".into(),
+            message: format!("The server answered {status}."),
+        },
     }
 }
 
@@ -162,7 +183,10 @@ mod tests {
     #[test]
     fn call_body_escapes_names_and_drops_broken_params() {
         let body = call_body::<Echo>("a\"b", "{broken", "1.2", &vec![1, 2]).unwrap();
-        assert_eq!(body, r#"{"screen":"a\"b","params":null,"node":"1.2","key":"echo \"x\"","input":[1,2]}"#);
+        assert_eq!(
+            body,
+            r#"{"screen":"a\"b","params":null,"node":"1.2","key":"echo \"x\"","input":[1,2]}"#
+        );
         let v: serde_json::Value = serde_json::from_str(&body).unwrap();
         assert_eq!(v["input"][1], 2);
     }
@@ -170,6 +194,11 @@ mod tests {
     #[test]
     fn read_output_reports_answers_it_cannot_read() {
         assert_eq!(read_output::<Echo>("[3]").unwrap(), vec![3]);
-        assert_eq!(read_output::<Echo>("{}").unwrap_err().code, "answer");
+        assert_eq!(
+            read_output::<Echo>("{}")
+                .unwrap_err()
+                .code,
+            "answer"
+        );
     }
 }

@@ -12,8 +12,12 @@ use zeyn_island::Island;
 #[wasm_bindgen]
 pub fn mount(root: Element) -> Result<(), JsValue> {
     let island = Island::new(root.clone());
-    let props: CounterProps = island.props().map_err(|e| JsValue::from_str(&e.message))?;
-    let doc = root.owner_document().ok_or("the island has no document")?;
+    let props: CounterProps = island
+        .props()
+        .map_err(|e| JsValue::from_str(&e.message))?;
+    let doc = root
+        .owner_document()
+        .ok_or("the island has no document")?;
     let texts = Rc::new(props.texts);
     let value = Rc::new(Cell::new(props.start));
 
@@ -50,7 +54,9 @@ pub fn mount(root: Element) -> Result<(), JsValue> {
         let count = Count { value: value.get() };
         zeyn_island::spawn(async move {
             let text = match island.call::<SaveCount>(&count).await {
-                Ok(saved) => texts.saved.replace("{value}", &saved.value.to_string()),
+                Ok(saved) => texts
+                    .saved
+                    .replace("{value}", &saved.value.to_string()),
                 Err(e) => e.message,
             };
             status.set_text_content(Some(&text));

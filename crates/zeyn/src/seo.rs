@@ -38,7 +38,9 @@ pub const MAX_ALTERNATES: usize = 64;
 pub fn valid_hreflang(tag: &str) -> bool {
     tag.len() <= 35
         && tag.starts_with(|c: char| c.is_ascii_alphabetic())
-        && tag.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+        && tag
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-')
 }
 
 /// Whether search engines may index a screen, sent as `<meta name="robots">`.
@@ -63,11 +65,14 @@ pub enum Robots {
 /// ```
 pub fn valid_url(url: &str) -> bool {
     let clean = url.len() <= MAX_URL_LEN
-        && !url
-            .chars()
-            .any(|c| c.is_control() || c.is_whitespace() || matches!(c, '"' | '\'' | '<' | '>' | '\\' | '`'));
+        && !url.chars().any(|c| {
+            c.is_control() || c.is_whitespace() || matches!(c, '"' | '\'' | '<' | '>' | '\\' | '`')
+        });
     let shape = match url.strip_prefix("https://") {
-        Some(rest) => rest.split(['/', '?', '#']).next().is_some_and(|host| !host.is_empty() && !host.contains('@')),
+        Some(rest) => rest
+            .split(['/', '?', '#'])
+            .next()
+            .is_some_and(|host| !host.is_empty() && !host.contains('@')),
         None => url.starts_with('/') && !url.starts_with("//"),
     };
     clean && shape
@@ -97,7 +102,11 @@ pub(crate) fn checked(url: String, what: &str) -> Option<String> {
 /// URL as written into the page: `https` URLs as they are, app paths behind the site URL and the
 /// base path.
 pub(crate) fn absolute(url: &str, site: &str, prefix: &str) -> String {
-    if url.starts_with('/') { format!("{site}{prefix}{url}") } else { url.to_string() }
+    if url.starts_with('/') {
+        format!("{site}{prefix}{url}")
+    } else {
+        url.to_string()
+    }
 }
 
 impl Head {
@@ -108,28 +117,43 @@ impl Head {
         let mut out = String::new();
         if let Some(d) = &self.description {
             let text = r.text(d);
-            out.push_str(&format!(r#"<meta name="description" content="{text}" data-zeyn-head>"#));
-            out.push_str(&format!(r#"<meta property="og:description" content="{text}" data-zeyn-head>"#));
+            out.push_str(&format!(
+                r#"<meta name="description" content="{text}" data-zeyn-head>"#
+            ));
+            out.push_str(&format!(
+                r#"<meta property="og:description" content="{text}" data-zeyn-head>"#
+            ));
         }
         if let Some(url) = &self.canonical {
             let url = escape(&absolute(url, site, prefix));
-            out.push_str(&format!(r#"<link rel="canonical" href="{url}" data-zeyn-head>"#));
-            out.push_str(&format!(r#"<meta property="og:url" content="{url}" data-zeyn-head>"#));
+            out.push_str(&format!(
+                r#"<link rel="canonical" href="{url}" data-zeyn-head>"#
+            ));
+            out.push_str(&format!(
+                r#"<meta property="og:url" content="{url}" data-zeyn-head>"#
+            ));
         }
         for (lang, url) in &self.alternates {
             let url = escape(&absolute(url, site, prefix));
-            out.push_str(&format!(r#"<link rel="alternate" hreflang="{}" href="{url}" data-zeyn-head>"#, escape(lang)));
+            out.push_str(&format!(
+                r#"<link rel="alternate" hreflang="{}" href="{url}" data-zeyn-head>"#,
+                escape(lang)
+            ));
         }
         if let Some(url) = &self.og_image {
             let url = escape(&absolute(url, site, prefix));
-            out.push_str(&format!(r#"<meta property="og:image" content="{url}" data-zeyn-head>"#));
+            out.push_str(&format!(
+                r#"<meta property="og:image" content="{url}" data-zeyn-head>"#
+            ));
         }
         if let Some(robots) = self.robots {
             let v = match robots {
                 Robots::Index => "index, follow",
                 Robots::NoIndex => "noindex",
             };
-            out.push_str(&format!(r#"<meta name="robots" content="{v}" data-zeyn-head>"#));
+            out.push_str(&format!(
+                r#"<meta name="robots" content="{v}" data-zeyn-head>"#
+            ));
         }
         if let Some(data) = &self.json_ld {
             out.push_str(r#"<script type="application/ld+json" data-zeyn-head>"#);
@@ -167,7 +191,11 @@ pub struct SitemapPart {
 impl SitemapPart {
     /// The URLs of this part from a list in memory.
     pub fn of<T: Clone>(&self, all: &[T]) -> Vec<T> {
-        all.iter().skip(self.offset as usize).take(self.limit as usize).cloned().collect()
+        all.iter()
+            .skip(self.offset as usize)
+            .take(self.limit as usize)
+            .cloned()
+            .collect()
     }
 }
 
@@ -181,7 +209,10 @@ pub struct SitemapUrl {
 impl SitemapUrl {
     /// An `https` URL or an app path (written behind `App::site_url`).
     pub fn new(url: impl Into<String>) -> Self {
-        SitemapUrl { url: url.into(), lastmod: None }
+        SitemapUrl {
+            url: url.into(),
+            lastmod: None,
+        }
     }
 
     pub fn lastmod(mut self, day: Date) -> Self {
@@ -190,7 +221,9 @@ impl SitemapUrl {
     }
 }
 
-type List = Arc<dyn Fn(Ctx, SitemapPart) -> BoxFuture<crate::action::Result<Vec<SitemapUrl>>> + Send + Sync>;
+type List = Arc<
+    dyn Fn(Ctx, SitemapPart) -> BoxFuture<crate::action::Result<Vec<SitemapUrl>>> + Send + Sync,
+>;
 
 /// The action behind `/sitemap.xml`, registered with [`crate::Feature::sitemap`].
 ///
@@ -218,7 +251,10 @@ impl Sitemap {
         A: Action<Input = SitemapPart, Output = crate::action::Result<Vec<SitemapUrl>>>,
     {
         let list: List = Arc::new(|ctx, part| Box::pin(async move { A::call(ctx, part).await? }));
-        Sitemap { meta: A::META, list }
+        Sitemap {
+            meta: A::META,
+            list,
+        }
     }
 
     pub fn meta(&self) -> &ActionMeta {
@@ -226,7 +262,11 @@ impl Sitemap {
     }
 
     /// Lists one part. Access is checked by the caller.
-    pub fn run(&self, ctx: Ctx, part: SitemapPart) -> BoxFuture<crate::action::Result<Vec<SitemapUrl>>> {
+    pub fn run(
+        &self,
+        ctx: Ctx,
+        part: SitemapPart,
+    ) -> BoxFuture<crate::action::Result<Vec<SitemapUrl>>> {
         (self.list)(ctx, part)
     }
 }

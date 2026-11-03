@@ -10,5 +10,8 @@ pub fn feature() -> Feature {
     Feature::new("kitchen")
         .screen(screens::kitchen)
         .api(actions::find_kitchen_lines)
-        .menu(|m| m.group(t!("kitchen.menu"), Icon::Cart).item(t!("kitchen.title"), screens::kitchen))
+        .menu(|m| {
+            m.group(t!("kitchen.menu"), Icon::Cart)
+                .item(t!("kitchen.title"), screens::kitchen)
+        })
 }

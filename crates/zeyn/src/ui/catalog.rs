@@ -44,7 +44,9 @@ impl<'de> Deserialize<'de> for SearchParams {
             #[serde(default)]
             q: String,
         }
-        Ok(Option::<Raw>::deserialize(d)?.map(|r| SearchParams { q: r.q }).unwrap_or_default())
+        Ok(Option::<Raw>::deserialize(d)?
+            .map(|r| SearchParams { q: r.q })
+            .unwrap_or_default())
     }
 }
 
@@ -152,7 +154,11 @@ impl ImageCard {
     /// `fraction` runs from 0 to 1 (values outside are clamped, `NaN` is 0); `label` names it for
     /// screen readers, which also hear the percentage.
     pub fn progress(mut self, fraction: f32, label: impl Into<Text>) -> Self {
-        let f = if fraction.is_nan() { 0.0 } else { fraction.clamp(0.0, 1.0) };
+        let f = if fraction.is_nan() {
+            0.0
+        } else {
+            fraction.clamp(0.0, 1.0)
+        };
         self.progress = Some((f, label.into()));
         self
     }
@@ -167,7 +173,10 @@ impl ImageCard {
     /// The screen the card opens. The whole card is one link, loaded without a page reload.
     /// Params of the wrong type do not compile.
     pub fn link<S: ScreenDef>(mut self, _screen: S, params: S::Params) -> Self {
-        self.link = Some((S::META.name, serde_json::to_value(params).unwrap_or(Json::Null)));
+        self.link = Some((
+            S::META.name,
+            serde_json::to_value(params).unwrap_or(Json::Null),
+        ));
         self
     }
 
@@ -181,9 +190,16 @@ impl ImageCard {
                 size.1
             )
         } else {
-            format!(r#"<span class="z-poster-img" style="aspect-ratio:{} / {}"></span>"#, size.0, size.1)
+            format!(
+                r#"<span class="z-poster-img" style="aspect-ratio:{} / {}"></span>"#,
+                size.0, size.1
+            )
         };
-        let badge = self.badge.as_ref().map(|b| b.html(r)).unwrap_or_default();
+        let badge = self
+            .badge
+            .as_ref()
+            .map(|b| b.html(r))
+            .unwrap_or_default();
         let corner = self
             .corner
             .as_ref()
@@ -201,30 +217,45 @@ impl ImageCard {
             })
             .unwrap_or_default();
         let line = |t: &Option<Text>, class: &str| {
-            t.as_ref().map(|t| format!(r#"<span class="{class}">{}</span>"#, r.text(t))).unwrap_or_default()
+            t.as_ref()
+                .map(|t| format!(r#"<span class="{class}">{}</span>"#, r.text(t)))
+                .unwrap_or_default()
         };
         let subtitle = line(&self.subtitle, "z-poster-subtitle");
         let text = line(&self.text, "z-poster-text");
         let badges = if self.badges.is_empty() {
             String::new()
         } else {
-            let all: String = self.badges.iter().map(|b| b.html(r)).collect();
+            let all: String = self
+                .badges
+                .iter()
+                .map(|b| b.html(r))
+                .collect();
             format!(r#"<span class="z-poster-badges">{all}</span>"#)
         };
         let body = format!(
             r#"<span class="z-poster-media">{img}{badge}{corner}{progress}</span><span class="z-poster-body"><span class="z-poster-title">{}</span>{subtitle}{text}{badges}</span>"#,
             r.text(&self.title)
         );
-        let class = if self.horizontal { "z-poster z-poster-h" } else { "z-poster" };
+        let class = if self.horizontal {
+            "z-poster z-poster-h"
+        } else {
+            "z-poster"
+        };
         match &self.link {
             Some((screen, params)) => {
-                let query =
-                    if params.is_null() { String::new() } else { format!("?params={}", encode(&params.to_string())) };
+                let query = if params.is_null() {
+                    String::new()
+                } else {
+                    format!("?params={}", encode(&params.to_string()))
+                };
                 out.push_str(&format!(
                     r#"<li class="{class}"><a class="z-poster-link" href="/_zeyn/route/{screen}{query}" data-zeyn-base-href>{body}</a></li>"#
                 ));
             }
-            None => out.push_str(&format!(r#"<li class="{class}"><div class="z-poster-link">{body}</div></li>"#)),
+            None => out.push_str(&format!(
+                r#"<li class="{class}"><div class="z-poster-link">{body}</div></li>"#
+            )),
         }
     }
 }
@@ -232,7 +263,9 @@ impl ImageCard {
 /// Whether an image address may go in a card or list row: a path of the app, an `https:`
 /// address or a `data:image/` URI.
 pub(crate) fn safe_image(src: &str) -> bool {
-    src.starts_with('/') && !src.starts_with("//") || src.starts_with("https://") || src.starts_with("data:image/")
+    src.starts_with('/') && !src.starts_with("//")
+        || src.starts_with("https://")
+        || src.starts_with("data:image/")
 }
 
 type CardFn<E> = Box<dyn Fn(&E) -> ImageCard + Send + Sync>;
@@ -242,7 +275,14 @@ type ItemFn<E> = Box<dyn Fn(&E) -> ListItem + Send + Sync>;
 /// suggestions are built by app closures that see the raw row, so they could not keep a masked
 /// value masked.
 pub(crate) fn check_masks<E: Model>(ctx: &Ctx) -> Result<()> {
-    if E::fields().iter().any(|f| !crate::privacy::can_unmask(Some(ctx), f)) { Err(Error::Forbidden) } else { Ok(()) }
+    if E::fields()
+        .iter()
+        .any(|f| !crate::privacy::can_unmask(Some(ctx), f))
+    {
+        Err(Error::Forbidden)
+    } else {
+        Ok(())
+    }
 }
 
 /// The card view of a DataGrid: rows of an action shown as cards in a responsive grid, with
@@ -326,7 +366,7 @@ impl<E: Model> CardGrid<E> {
     }
 
     /// Lays the rows out as a [`super::List`]: see [`super::List::of`].
-    pub(crate) fn as_list(mut self) -> Self {
+    pub(crate) fn into_list(mut self) -> Self {
         self.list = true;
         self.paging = Paging::infinite(20);
         self
@@ -360,8 +400,19 @@ impl<E: Model> CardGrid<E> {
     }
 
     /// A sort order users can pick. The first one is the order the cards start in.
-    pub fn sort_option<T>(mut self, label: impl Into<Text>, field: crate::model::Field<E, T>, desc: bool) -> Self {
-        self.sorts.push((label.into(), Sort { field: field.meta().name.to_string(), desc }));
+    pub fn sort_option<T>(
+        mut self,
+        label: impl Into<Text>,
+        field: crate::model::Field<E, T>,
+        desc: bool,
+    ) -> Self {
+        self.sorts.push((
+            label.into(),
+            Sort {
+                field: field.meta().name.to_string(),
+                desc,
+            },
+        ));
         self
     }
 
@@ -396,17 +447,33 @@ impl<E: Model> CardGrid<E> {
     fn allow(&self, query: &mut DataQuery) {
         let size = self.size();
         query.page = match &query.page {
-            PageRequest::Offset { offset, .. } if self.pages() => PageRequest::Offset { offset: *offset, limit: size },
-            PageRequest::After { cursor, .. } if !self.pages() => {
-                PageRequest::After { cursor: cursor.clone(), limit: size }
-            }
-            _ if self.pages() => PageRequest::Offset { offset: 0, limit: size },
-            _ => PageRequest::After { cursor: None, limit: size },
+            PageRequest::Offset { offset, .. } if self.pages() => PageRequest::Offset {
+                offset: *offset,
+                limit: size,
+            },
+            PageRequest::After { cursor, .. } if !self.pages() => PageRequest::After {
+                cursor: cursor.clone(),
+                limit: size,
+            },
+            _ if self.pages() => PageRequest::Offset {
+                offset: 0,
+                limit: size,
+            },
+            _ => PageRequest::After {
+                cursor: None,
+                limit: size,
+            },
         };
-        query.sort.retain(|s| self.sorts.iter().any(|(_, o)| o == s));
+        query
+            .sort
+            .retain(|s| self.sorts.iter().any(|(_, o)| o == s));
         query.sort.truncate(1);
         if query.sort.is_empty() {
-            query.sort.extend(self.sorts.first().map(|(_, s)| s.clone()));
+            query.sort.extend(
+                self.sorts
+                    .first()
+                    .map(|(_, s)| s.clone()),
+            );
         }
         query.filters.clear();
         query.q = self.search.clone();
@@ -417,10 +484,16 @@ impl<E: Model> CardGrid<E> {
 
     fn cards(&self, page: &LoadedPage, r: &Render) -> String {
         let mut out = String::new();
-        let Some(rows) = page.items.downcast_ref::<Vec<E>>() else { return out };
+        let Some(rows) = page.items.downcast_ref::<Vec<E>>() else {
+            return out;
+        };
         match (&self.card, &self.item) {
-            (_, Some(item)) if self.list => rows.iter().for_each(|row| item(row).html(&mut out, r)),
-            (Some(card), _) if !self.list => rows.iter().for_each(|row| card(row).html(&mut out, r, self.image)),
+            (_, Some(item)) if self.list => rows
+                .iter()
+                .for_each(|row| item(row).html(&mut out, r)),
+            (Some(card), _) if !self.list => rows
+                .iter()
+                .for_each(|row| card(row).html(&mut out, r, self.image)),
             _ => {}
         }
         out
@@ -434,7 +507,11 @@ impl<E: Model> CardGrid<E> {
             (_, true) => "z-cards z-cards-rows",
             _ => "z-cards",
         };
-        let labelled = if self.title.is_some() { format!(r#" aria-labelledby="{id}-title""#) } else { String::new() };
+        let labelled = if self.title.is_some() {
+            format!(r#" aria-labelledby="{id}-title""#)
+        } else {
+            String::new()
+        };
         out.push_str(&format!(
             r#"<section class="{class}" data-zeyn-cards data-zeyn-paging="{}" data-testid="{}.cards"{labelled} data-text-loaded="{}" data-text-page="{}" data-text-error="{}""#,
             if self.pages() { "pages" } else { "infinite" },
@@ -461,7 +538,12 @@ impl<E: Model> CardGrid<E> {
         let title = self
             .title
             .as_ref()
-            .map(|t| format!(r#"<h2 class="z-cards-title" id="{id}-title">{}</h2>"#, r.text(t)))
+            .map(|t| {
+                format!(
+                    r#"<h2 class="z-cards-title" id="{id}-title">{}</h2>"#,
+                    r.text(t)
+                )
+            })
             .unwrap_or_default();
         let sorts = if self.sorts.len() > 1 && !self.rail {
             let options: String = self
@@ -469,7 +551,11 @@ impl<E: Model> CardGrid<E> {
                 .iter()
                 .enumerate()
                 .map(|(i, (label, s))| {
-                    format!(r#"<option value="{i}" data-sort="{}">{}</option>"#, attr(s), r.text(label))
+                    format!(
+                        r#"<option value="{i}" data-sort="{}">{}</option>"#,
+                        attr(s),
+                        r.text(label)
+                    )
                 })
                 .collect();
             format!(
@@ -486,14 +572,18 @@ impl<E: Model> CardGrid<E> {
                 t("next")
             ));
         } else if !title.is_empty() || !sorts.is_empty() {
-            out.push_str(&format!(r#"<div class="z-cards-head">{title}{sorts}</div>"#));
+            out.push_str(&format!(
+                r#"<div class="z-cards-head">{title}{sorts}</div>"#
+            ));
         }
         let list = match (self.rail, self.list) {
             (true, _) => "z-rail-list",
             (_, true) => "z-list",
             _ => "z-cards-list",
         };
-        out.push_str(&format!(r#"<ul class="{list}" id="{id}-list" data-zeyn-rows>"#));
+        out.push_str(&format!(
+            r#"<ul class="{list}" id="{id}-list" data-zeyn-rows>"#
+        ));
         if let Some(p) = page {
             out.push_str(&self.cards(p, r));
         }
@@ -584,7 +674,11 @@ impl<E: Model> GridSource for CardGrid<E> {
     }
 
     fn tool_schema(&self) -> Json {
-        let sorts: Vec<&Sort> = self.sorts.iter().map(|(_, s)| s).collect();
+        let sorts: Vec<&Sort> = self
+            .sorts
+            .iter()
+            .map(|(_, s)| s)
+            .collect();
         json!({
             "type": "object",
             "description": "Cards of rows. The server sets the page size; sort must be one of the offered orders.",
@@ -694,7 +788,12 @@ impl<E: Model> SearchBox<E> {
 
     /// The screen Enter opens with the text. Its params are [`SearchParams`].
     pub fn results<S: ScreenDef<Params = SearchParams>>(mut self, _screen: S) -> Self {
-        const { assert!(S::META.route.is_some(), "the results screen of a search box must have a route") };
+        const {
+            assert!(
+                S::META.route.is_some(),
+                "the results screen of a search box must have a route"
+            )
+        };
         self.results = Some(S::META.name);
         self
     }
@@ -726,9 +825,9 @@ impl<E: Model> SearchBox<E> {
 
 /// The first text field of a row that is neither the key nor masked.
 fn first_text<E: Model>(row: &E) -> Option<String> {
-    let i = E::fields()
-        .iter()
-        .position(|f| matches!(f.kind, crate::value::FieldKind::Text) && f.mask.is_none() && !f.key)?;
+    let i = E::fields().iter().position(|f| {
+        matches!(f.kind, crate::value::FieldKind::Text) && f.mask.is_none() && !f.key
+    })?;
     match row.value_at(i) {
         Some(Value::Text(t)) => Some(t),
         _ => None,
@@ -741,9 +840,18 @@ impl<E: Model> DataSource for SearchBox<E> {
     }
 
     fn fetch(&self, ctx: Ctx, input: Json) -> BoxFuture<Result<Json>> {
-        let text: String = input.as_str().unwrap_or_default().trim().chars().take(crate::MAX_SEARCH_QUERY).collect();
+        let text: String = input
+            .as_str()
+            .unwrap_or_default()
+            .trim()
+            .chars()
+            .take(crate::MAX_SEARCH_QUERY)
+            .collect();
         let query = DataQuery {
-            page: PageRequest::After { cursor: None, limit: self.limit },
+            page: PageRequest::After {
+                cursor: None,
+                limit: self.limit,
+            },
             q: text.clone(),
             time_zone: ctx.time_zone(),
             ..DataQuery::default()
@@ -760,7 +868,11 @@ impl<E: Model> DataSource for SearchBox<E> {
         Box::pin(async move {
             let page = rows.await?;
             let mut out: Vec<String> = Vec::new();
-            for s in page.items.iter().filter_map(|r| suggest(r)) {
+            for s in page
+                .items
+                .iter()
+                .filter_map(|r| suggest(r))
+            {
                 if !s.is_empty() && !out.contains(&s) {
                     out.push(s);
                 }

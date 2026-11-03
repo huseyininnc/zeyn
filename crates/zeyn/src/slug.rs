@@ -52,7 +52,9 @@ impl Slug {
             }
         }
         if out.len() > Self::MAX_LEN {
-            let cut = out[..=Self::MAX_LEN].rfind('-').unwrap_or(Self::MAX_LEN);
+            let cut = out[..=Self::MAX_LEN]
+                .rfind('-')
+                .unwrap_or(Self::MAX_LEN);
             out.truncate(cut);
         }
         while out.ends_with('-') {

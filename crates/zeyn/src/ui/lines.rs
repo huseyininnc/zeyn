@@ -29,11 +29,16 @@ impl<L: Model> crate::value::VecItem for L {
 
     fn __vec_validate(items: &[Self], meta: &FieldMeta, errors: &mut ValidationErrors) {
         for (row, line) in items.iter().enumerate() {
-            let Err(problems) = line.validate() else { continue };
+            let Err(problems) = line.validate() else {
+                continue;
+            };
             for e in problems.errors {
                 errors.errors.push(FieldError {
                     field: meta.name,
-                    rule: Rule::Line { row: row as u32, field: e.field },
+                    rule: Rule::Line {
+                        row: row as u32,
+                        field: e.field,
+                    },
                     message: Text::key("zeyn.validation.line")
                         .arg("n", (row + 1).to_string())
                         .arg("message", e.message),
@@ -59,11 +64,18 @@ pub struct Lines<L: Model> {
 
 impl<L: Model> Lines<L> {
     pub(crate) fn new() -> Self {
-        Lines { columns: Vec::new(), total: None, _line: PhantomData }
+        Lines {
+            columns: Vec::new(),
+            total: None,
+            _line: PhantomData,
+        }
     }
 
     fn index<T>(field: Field<L, T>) -> usize {
-        L::fields().iter().position(|m| m.name == field.meta().name).unwrap_or(0)
+        L::fields()
+            .iter()
+            .position(|m| m.name == field.meta().name)
+            .unwrap_or(0)
     }
 
     pub fn column<T: FieldType + 'static>(mut self, field: Field<L, T>) -> Self {
@@ -73,7 +85,10 @@ impl<L: Model> Lines<L> {
 
     /// A line total column worked out as `quantity` times `price`, with a grand total in the
     /// footer. `quantity` is a whole number field and `price` a money field.
-    pub fn total<Q: FieldType + crate::value::SupportsSum, P: FieldType + crate::value::SupportsSum>(
+    pub fn total<
+        Q: FieldType + crate::value::SupportsSum,
+        P: FieldType + crate::value::SupportsSum,
+    >(
         mut self,
         quantity: Field<L, Q>,
         price: Field<L, P>,
@@ -91,7 +106,11 @@ impl<L: Model> Lines<L> {
         };
         match line.value_at(p)? {
             Value::Money(m) => Some(Money::new(m.minor.saturating_mul(qty), m.currency)),
-            Value::Int(n) => Some(Money::new(n.saturating_mul(qty).saturating_mul(100), Default::default())),
+            Value::Int(n) => Some(Money::new(
+                n.saturating_mul(qty)
+                    .saturating_mul(100),
+                Default::default(),
+            )),
             _ => None,
         }
     }
@@ -120,7 +139,11 @@ impl<L: Model> LinesEditor for Lines<L> {
         let id = format!("{}-{name}", r.scope);
         let t = |k: &str| r.text(&Text::key(format!("zeyn.ui.lines.{k}")));
         let f = crate::i18n::NumberFormat::for_locale(r.locale);
-        let star = if meta.is_required() { r#"<span class="z-required" aria-hidden="true">*</span>"# } else { "" };
+        let star = if meta.is_required() {
+            r#"<span class="z-required" aria-hidden="true">*</span>"#
+        } else {
+            ""
+        };
         out.push_str(&format!(
             r#"<div class="z-lines" data-zeyn-lines="{name}" data-decimal="{}" data-group="{}" data-text-row="{}" data-text-remove="{}" data-text-up="{}" data-text-down="{}"><p class="z-lines-label" id="{id}-label">{}{star}</p><input type="text" hidden name="{name}" id="{id}" value="rows"><div class="z-lines-scroll"><table class="z-lines-table" aria-labelledby="{id}-label"><thead><tr><th scope="col" class="z-lines-n"><span class="z-sr-only">{}</span>#</th>"#,
             escape(&f.decimal.to_string()),
@@ -142,7 +165,10 @@ impl<L: Model> LinesEditor for Lines<L> {
             ));
         }
         if self.total.is_some() {
-            out.push_str(&format!(r#"<th scope="col" class="z-num">{}</th>"#, t("total")));
+            out.push_str(&format!(
+                r#"<th scope="col" class="z-num">{}</th>"#,
+                t("total")
+            ));
         }
         out.push_str(&format!(
             r#"<th scope="col" class="z-lines-actions"><span class="z-sr-only">{}</span></th></tr></thead><tbody>"#,
@@ -187,18 +213,29 @@ impl<L: Model> LinesEditor for Lines<L> {
         let prefix = format!("{}.", meta.name);
         let mut rows: BTreeMap<usize, Map<String, Json>> = BTreeMap::new();
         for (key, value) in values {
-            let Some(rest) = key.strip_prefix(&prefix) else { continue };
-            let Some((row, column)) = rest.split_once('.') else { continue };
-            let Ok(row) = row.parse::<usize>() else { continue };
+            let Some(rest) = key.strip_prefix(&prefix) else {
+                continue;
+            };
+            let Some((row, column)) = rest.split_once('.') else {
+                continue;
+            };
+            let Ok(row) = row.parse::<usize>() else {
+                continue;
+            };
             if row >= MAX_LINES * 4 {
                 continue;
             }
-            rows.entry(row).or_default().insert(column.to_string(), value.clone());
+            rows.entry(row)
+                .or_default()
+                .insert(column.to_string(), value.clone());
             if rows.len() > MAX_LINES {
                 return Some((Json::Array(Vec::new()), vec![too_many(meta)]));
             }
         }
-        let loaded = current.as_array().cloned().unwrap_or_default();
+        let loaded = current
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
         let blank = serde_json::to_value(L::default()).unwrap_or(Json::Null);
         let mut used = vec![false; loaded.len()];
         let mut out = Vec::new();
@@ -212,7 +249,10 @@ impl<L: Model> LinesEditor for Lines<L> {
             if let Some(i) = origin {
                 used[i] = true;
             }
-            let mut line = match origin.map(|i| loaded[i].clone()).unwrap_or_else(|| blank.clone()) {
+            let mut line = match origin
+                .map(|i| loaded[i].clone())
+                .unwrap_or_else(|| blank.clone())
+            {
                 Json::Object(o) => o,
                 _ => Map::new(),
             };
@@ -221,8 +261,13 @@ impl<L: Model> LinesEditor for Lines<L> {
                 if m.key || m.readonly || m.version {
                     continue;
                 }
-                let Some(raw) = cells.get(m.name) else { continue };
-                let base = line.get(m.name).cloned().unwrap_or(Json::Null);
+                let Some(raw) = cells.get(m.name) else {
+                    continue;
+                };
+                let base = line
+                    .get(m.name)
+                    .cloned()
+                    .unwrap_or(Json::Null);
                 match parse_value(m, raw, reading, &base) {
                     Ok(v) => {
                         line.insert(m.name.to_string(), v);
@@ -234,7 +279,10 @@ impl<L: Model> LinesEditor for Lines<L> {
                         };
                         errors.push(FieldError {
                             field: meta.name,
-                            rule: Rule::Line { row: n as u32, field: m.name },
+                            rule: Rule::Line {
+                                row: n as u32,
+                                field: m.name,
+                            },
                             message: Text::key("zeyn.validation.line")
                                 .arg("n", (n + 1).to_string())
                                 .arg("message", Text::key(key).arg("label", m.label_text())),
@@ -248,7 +296,11 @@ impl<L: Model> LinesEditor for Lines<L> {
     }
 
     fn schema(&self) -> Json {
-        let columns: Vec<&FieldMeta> = self.columns.iter().map(|c| &L::fields()[*c]).collect();
+        let columns: Vec<&FieldMeta> = self
+            .columns
+            .iter()
+            .map(|c| &L::fields()[*c])
+            .collect();
         serde_json::json!({ "type": "lines", "model": L::NAME, "columns": columns, "total": self.total.map(|(q, p)| [L::fields()[q].name, L::fields()[p].name]) })
     }
 }
@@ -257,7 +309,9 @@ fn too_many(meta: &FieldMeta) -> FieldError {
     FieldError {
         field: meta.name,
         rule: Rule::MaxLen(MAX_LINES),
-        message: Text::key("zeyn.validation.max_len").arg("label", meta.label_text()).arg("n", MAX_LINES.to_string()),
+        message: Text::key("zeyn.validation.max_len")
+            .arg("label", meta.label_text())
+            .arg("n", MAX_LINES.to_string()),
     }
 }
 
@@ -276,22 +330,33 @@ impl<L: Model> Lines<L> {
         line: Option<&L>,
     ) {
         let n = i + 1;
-        let row_label = r.i18n.text(r.locale, &Text::key("zeyn.ui.lines.row").arg("n", n.to_string()));
+        let row_label = r.i18n.text(
+            r.locale,
+            &Text::key("zeyn.ui.lines.row").arg("n", n.to_string()),
+        );
         out.push_str(&format!(
             r#"<tr data-zeyn-line><th scope="row" class="z-lines-n">{n}<input type="text" hidden name="{name}.{i}._i" value="{}"></th>"#,
             origin.map(|o| o.to_string()).unwrap_or_default()
         ));
         for &c in &self.columns {
             let m = &L::fields()[c];
-            let value = line.and_then(|l| l.value_at(c)).unwrap_or(Value::Null);
+            let value = line
+                .and_then(|l| l.value_at(c))
+                .unwrap_or(Value::Null);
             let cell_id = format!("{id}-{i}-{}", m.name);
             let label = format!("{}, {}", r.label(m), escape(&row_label));
             let readonly = if m.key || m.readonly { " readonly" } else { "" };
             let (class, mode, text) = match (&value, m.kind) {
-                (Value::Money(money), _) => (" z-num", r#" inputmode="decimal""#, money.format_plain(r.locale)),
+                (Value::Money(money), _) => (
+                    " z-num",
+                    r#" inputmode="decimal""#,
+                    money.format_plain(r.locale),
+                ),
                 (_, FieldKind::Money) => (" z-num", r#" inputmode="decimal""#, String::new()),
                 (Value::Int(v), _) => (" z-num", r#" inputmode="numeric""#, v.to_string()),
-                (_, FieldKind::Integer | FieldKind::Id) => (" z-num", r#" inputmode="numeric""#, String::new()),
+                (_, FieldKind::Integer | FieldKind::Id) => {
+                    (" z-num", r#" inputmode="numeric""#, String::new())
+                }
                 (Value::Text(s), _) => ("", "", s.clone()),
                 (Value::Choice(v), _) => ("", "", (*v).to_string()),
                 (Value::Null, _) => ("", "", String::new()),
@@ -302,7 +367,11 @@ impl<L: Model> Lines<L> {
                 FieldKind::Money => " data-zeyn-price",
                 _ => "",
             };
-            let required = if m.is_required() { r#" aria-required="true""# } else { "" };
+            let required = if m.is_required() {
+                r#" aria-required="true""#
+            } else {
+                ""
+            };
             out.push_str(&format!(
                 r#"<td><input type="text" class="z-cell{class}" id="{cell_id}" name="{name}.{i}.{}" data-col="{}" aria-label="{label}" aria-describedby="{cell_id}-error"{mode}{role}{required}{readonly} autocomplete="off" value="{}"><span class="z-cell-error" id="{cell_id}-error"></span></td>"#,
                 m.name,
@@ -311,11 +380,21 @@ impl<L: Model> Lines<L> {
             ));
         }
         if self.total.is_some() {
-            let total = line.and_then(|l| self.line_total(l)).map(|m| m.format_plain(r.locale)).unwrap_or_default();
-            out.push_str(&format!(r#"<td class="z-num z-lines-total" data-zeyn-line-total>{}</td>"#, escape(&total)));
+            let total = line
+                .and_then(|l| self.line_total(l))
+                .map(|m| m.format_plain(r.locale))
+                .unwrap_or_default();
+            out.push_str(&format!(
+                r#"<td class="z-num z-lines-total" data-zeyn-line-total>{}</td>"#,
+                escape(&total)
+            ));
         }
-        let t =
-            |k: &str| escape(&r.i18n.text(r.locale, &Text::key(format!("zeyn.ui.lines.{k}")).arg("n", n.to_string())));
+        let t = |k: &str| {
+            escape(&r.i18n.text(
+                r.locale,
+                &Text::key(format!("zeyn.ui.lines.{k}")).arg("n", n.to_string()),
+            ))
+        };
         out.push_str(&format!(
             r#"<td class="z-lines-actions"><button type="button" class="z-icon-button" data-zeyn-line-move="-1" aria-label="{}"><span aria-hidden="true">&#8593;</span></button><button type="button" class="z-icon-button" data-zeyn-line-move="1" aria-label="{}"><span aria-hidden="true">&#8595;</span></button><button type="button" class="z-icon-button z-danger" data-zeyn-line-remove aria-label="{}"><span class="z-icon z-icon-delete" aria-hidden="true"></span></button></td></tr>"#,
             t("up"),

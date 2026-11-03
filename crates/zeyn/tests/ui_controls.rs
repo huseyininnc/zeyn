@@ -104,7 +104,9 @@ fn every_field_kind_gets_a_control_with_a_native_element_underneath() {
     );
     assert!(tr.contains(r#"<select id="o-size" name="size""#));
     assert!(tr.contains(r#"<option value="Large" selected>"#));
-    assert!(tr.contains(r#"<fieldset class="z-radios z-segmented" aria-describedby="o-other-error">"#));
+    assert!(
+        tr.contains(r#"<fieldset class="z-radios z-segmented" aria-describedby="o-other-error">"#)
+    );
     assert!(
         tr.contains(r#"<input type="radio" id="o-other" name="other" value="Small""#),
         "the first radio carries the field id for error messages"
@@ -118,15 +120,22 @@ fn every_field_kind_gets_a_control_with_a_native_element_underneath() {
     assert!(tr.contains(r#"data-min="1" aria-valuemin="1" data-max="5000" aria-valuemax="5000""#));
     assert!(tr.contains(r#"inputmode="decimal""#) && tr.contains(r#"value="1.234,56""#));
     assert!(
-        tr.contains(r#"<textarea rows="3" class="z-textarea" data-zeyn-autosize"#) && tr.contains(r#"maxlength="400""#)
+        tr.contains(r#"<textarea rows="3" class="z-textarea" data-zeyn-autosize"#)
+            && tr.contains(r#"maxlength="400""#)
     );
-    assert!(tr.contains(r#"aria-describedby="o-note-count o-note-error""#) && tr.contains("0 / 400 karakter"));
+    assert!(
+        tr.contains(r#"aria-describedby="o-note-count o-note-error""#)
+            && tr.contains("0 / 400 karakter")
+    );
     assert!(
         tr.contains(r#"data-zeyn-lookup="customer" data-multiple="false""#)
             && tr.contains(r#"name="customer""#)
             && tr.contains(r#"value="2""#)
     );
-    assert!(tr.contains(r#"data-zeyn-lookup="tags" data-multiple="true""#) && tr.contains(r#"value="1,3""#));
+    assert!(
+        tr.contains(r#"data-zeyn-lookup="tags" data-multiple="true""#)
+            && tr.contains(r#"value="1,3""#)
+    );
     assert!(tr.contains(r#"<label for="o-customer" id="o-customer-label">"#));
     for native in [r#"type="number""#, r#"type="date""#] {
         assert!(!tr.contains(native));
@@ -140,32 +149,74 @@ fn submitted_plain_values_are_read_on_the_server() {
         "customer": "3", "tags": "1, 4", "quantity": "1.250", "price": "1.234,50", "size": "Small",
         "other": "", "urgent": true, "gift": false, "note": "ok"
     });
-    let order = f.form().read(values.as_object().unwrap(), "tr", TimeZone::UTC).unwrap();
+    let order = f
+        .form()
+        .read(values.as_object().unwrap(), "tr", TimeZone::UTC)
+        .unwrap();
     assert_eq!(order.customer, Some(CustomerId(3)));
     assert_eq!(order.tags, vec![1, 4]);
     assert_eq!(order.quantity, 1250);
     assert_eq!(order.price, Money::tl(123450));
     assert!(order.urgent);
 
-    let bad = serde_json::json!({ "customer": "", "tags": "1,x", "quantity": "9.999", "size": "Huge" });
-    let errors = f.form().read(bad.as_object().unwrap(), "tr", TimeZone::UTC).unwrap_err();
-    let fields: Vec<&str> = errors.errors.iter().map(|e| e.field).collect();
+    let bad =
+        serde_json::json!({ "customer": "", "tags": "1,x", "quantity": "9.999", "size": "Huge" });
+    let errors = f
+        .form()
+        .read(bad.as_object().unwrap(), "tr", TimeZone::UTC)
+        .unwrap_err();
+    let fields: Vec<&str> = errors
+        .errors
+        .iter()
+        .map(|e| e.field)
+        .collect();
     assert_eq!(fields, ["tags", "size", "customer", "quantity"]);
 }
 
 #[test]
 fn lookups_search_by_text_or_ids_and_cap_the_page() {
-    let q = |text: &str| LookupQuery { text: text.into(), limit: 10, ..Default::default() };
-    let labels = |p: Page<LookupItem>| p.items.into_iter().map(|i| i.label).collect::<Vec<_>>();
+    let q = |text: &str| LookupQuery {
+        text: text.into(),
+        limit: 10,
+        ..Default::default()
+    };
+    let labels = |p: Page<LookupItem>| {
+        p.items
+            .into_iter()
+            .map(|i| i.label)
+            .collect::<Vec<_>>()
+    };
     assert_eq!(labels(q("ilgaz").apply(customers())), ["Ilgaz Inşaat"]);
-    assert_eq!(labels(q("inci").apply(customers())), ["İnci Gıda"], "Turkish İ matches i");
-    assert_eq!(labels(q("C-3").apply(customers())), ["Mert Kaya"], "hints are searched too");
-    let by_ids = LookupQuery { ids: vec![4, 1], ..Default::default() }.apply(customers());
+    assert_eq!(
+        labels(q("inci").apply(customers())),
+        ["İnci Gıda"],
+        "Turkish İ matches i"
+    );
+    assert_eq!(
+        labels(q("C-3").apply(customers())),
+        ["Mert Kaya"],
+        "hints are searched too"
+    );
+    let by_ids = LookupQuery {
+        ids: vec![4, 1],
+        ..Default::default()
+    }
+    .apply(customers());
     assert_eq!(by_ids.items.len(), 2);
-    let big = LookupQuery { limit: 10_000, ..Default::default() };
+    let big = LookupQuery {
+        limit: 10_000,
+        ..Default::default()
+    };
     assert_eq!(big.limit(), zeyn::ui::MAX_LOOKUP_PAGE);
-    let paged = LookupQuery { limit: 3, ..Default::default() }.apply(customers());
-    assert_eq!((paged.items.len(), paged.total, paged.next.map(|c| c.0)), (3, Some(4), Some("3".to_string())));
+    let paged = LookupQuery {
+        limit: 3,
+        ..Default::default()
+    }
+    .apply(customers());
+    assert_eq!(
+        (paged.items.len(), paged.total, paged.next.map(|c| c.0)),
+        (3, Some(4), Some("3".to_string()))
+    );
 }
 
 const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -174,7 +225,13 @@ fn app() -> axum::Router {
     App::new("Test")
         .i18n(I18n::new("en"))
         .auth(|h: &HeaderMap| {
-            let perms: Vec<String> = h.get("x-perms")?.to_str().ok()?.split(',').map(String::from).collect();
+            let perms: Vec<String> = h
+                .get("x-perms")?
+                .to_str()
+                .ok()?
+                .split(',')
+                .map(String::from)
+                .collect();
             Some(Identity::user("u").with_permissions(perms))
         })
         .feature(Feature::new("orders").screen(orders))
@@ -192,27 +249,63 @@ async fn data(perms: &str, body: serde_json::Value) -> (StatusCode, serde_json::
         .unwrap();
     let res = app().oneshot(req).await.unwrap();
     let status = res.status();
-    let bytes = res.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    let bytes = res
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes();
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 #[tokio::test]
 async fn lookup_searches_go_through_the_actions_permission() {
     let call = |key: &str, input: serde_json::Value| serde_json::json!({ "screen": "orders", "node": "0.0", "key": key, "input": input });
-    let (status, body) =
-        data("customers.read", call("customer", serde_json::json!({ "text": "kaya", "limit": 5 }))).await;
+    let (status, body) = data(
+        "customers.read",
+        call(
+            "customer",
+            serde_json::json!({ "text": "kaya", "limit": 5 }),
+        ),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK, "{body}");
     assert_eq!(body["items"][0]["label"], "Mert Kaya");
     assert_eq!(body["total"], 1);
 
     let (status, _) = data("", call("customer", serde_json::json!({ "text": "kaya" }))).await;
-    assert_eq!(status, StatusCode::FORBIDDEN, "the lookup action's permission is checked");
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "the lookup action's permission is checked"
+    );
     let (status, _) = data("customers.read", call("quantity", serde_json::json!({}))).await;
-    assert_eq!(status, StatusCode::NOT_FOUND, "only lookup fields are data sources");
-    let (status, _) = data("customers.read", call("customer", serde_json::json!({ "text": 5 }))).await;
-    assert_eq!(status, StatusCode::NOT_FOUND, "input that does not fit the action is refused");
-    let (status, _) =
-        data("customers.read", serde_json::json!({ "screen": "orders", "node": "0", "key": "customer", "input": {} }))
-            .await;
-    assert_eq!(status, StatusCode::NOT_FOUND, "the panel itself has no data source");
+    assert_eq!(
+        status,
+        StatusCode::NOT_FOUND,
+        "only lookup fields are data sources"
+    );
+    let (status, _) = data(
+        "customers.read",
+        call("customer", serde_json::json!({ "text": 5 })),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::NOT_FOUND,
+        "input that does not fit the action is refused"
+    );
+    let (status, _) = data(
+        "customers.read",
+        serde_json::json!({ "screen": "orders", "node": "0", "key": "customer", "input": {} }),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::NOT_FOUND,
+        "the panel itself has no data source"
+    );
 }

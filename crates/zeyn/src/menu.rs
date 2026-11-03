@@ -49,7 +49,13 @@ impl ContextMenu {
     }
 
     fn push(mut self, label: Text, kind: Kind) -> Self {
-        self.items.push(Item { label, icon: None, hint: None, disabled: false, kind });
+        self.items.push(Item {
+            label,
+            icon: None,
+            hint: None,
+            disabled: false,
+            kind,
+        });
         self
     }
 
@@ -66,13 +72,20 @@ impl ContextMenu {
         A: Action,
         A::Output: Outcome,
     {
-        let run: Box<dyn FnOnce(Ctx) -> BoxFuture<crate::action::Result<()>> + Send> = Box::new(move |ctx| {
-            Box::pin(async move {
-                let output = A::call(ctx, input).await?;
-                output.failure().map_or(Ok(()), Err)
-            })
-        });
-        self.push(label.into(), Kind::Action { meta: A::META, run: Mutex::new(Some(run)) })
+        let run: Box<dyn FnOnce(Ctx) -> BoxFuture<crate::action::Result<()>> + Send> =
+            Box::new(move |ctx| {
+                Box::pin(async move {
+                    let output = A::call(ctx, input).await?;
+                    output.failure().map_or(Ok(()), Err)
+                })
+            });
+        self.push(
+            label.into(),
+            Kind::Action {
+                meta: A::META,
+                run: Mutex::new(Some(run)),
+            },
+        )
     }
 
     /// A submenu.
@@ -128,7 +141,10 @@ impl ContextMenu {
             let path = format!("{prefix}{i}");
             let mut entry = match &item.kind {
                 Kind::Separator => {
-                    if out.last().is_some_and(|e| e.get("separator").is_none()) {
+                    if out
+                        .last()
+                        .is_some_and(|e| e.get("separator").is_none())
+                    {
                         out.push(json!({ "separator": true }));
                     }
                     continue;
@@ -160,7 +176,10 @@ impl ContextMenu {
             }
             out.push(entry);
         }
-        while out.last().is_some_and(|e| e.get("separator").is_some()) {
+        while out
+            .last()
+            .is_some_and(|e| e.get("separator").is_some())
+        {
             out.pop();
         }
         out
@@ -172,7 +191,9 @@ impl ContextMenu {
         let mut menu = self;
         let mut parts = path.split('.').peekable();
         while let Some(part) = parts.next() {
-            let item = menu.items.get(part.parse::<usize>().ok()?)?;
+            let item = menu
+                .items
+                .get(part.parse::<usize>().ok()?)?;
             match (&item.kind, parts.peek()) {
                 (Kind::Sub(sub), Some(_)) => menu = sub,
                 (Kind::Action { meta, run }, None) if !item.disabled => {

@@ -10,12 +10,17 @@
 //! that set it up themselves on [`Surface::canvas`].
 
 use std::cell::{Cell, RefCell};
+
+/// A DOM event name and the closure that handles it, kept so it can be removed.
+type Listener = (&'static str, Closure<dyn FnMut(Event)>);
+/// The resize observer of a canvas and its callback.
+type Observer = (ResizeObserver, Closure<dyn FnMut()>);
 use std::rc::{Rc, Weak};
 use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::*;
 use web_sys::{
-    AddEventListenerOptions, CanvasRenderingContext2d, Element, Event, HtmlCanvasElement, KeyboardEvent, PointerEvent,
-    ResizeObserver, WebGl2RenderingContext, WheelEvent,
+    AddEventListenerOptions, CanvasRenderingContext2d, Element, Event, HtmlCanvasElement,
+    KeyboardEvent, PointerEvent, ResizeObserver, WebGl2RenderingContext, WheelEvent,
 };
 
 /// The context a scene draws with.
@@ -107,8 +112,8 @@ struct Shared<S: Scene> {
     frame: Cell<Frame>,
     pending: Cell<bool>,
     raf: RefCell<Option<Closure<dyn FnMut()>>>,
-    listeners: RefCell<Vec<(&'static str, Closure<dyn FnMut(Event)>)>>,
-    observer: RefCell<Option<(ResizeObserver, Closure<dyn FnMut()>)>>,
+    listeners: RefCell<Vec<Listener>>,
+    observer: RefCell<Option<Observer>>,
 }
 
 /// A canvas inside an island, drawing one scene. Cloning gives another handle to it.
@@ -118,7 +123,9 @@ pub struct Surface<S: Scene> {
 
 impl<S: Scene> Clone for Surface<S> {
     fn clone(&self) -> Self {
-        Surface { shared: self.shared.clone() }
+        Surface {
+            shared: self.shared.clone(),
+        }
     }
 }
 
@@ -134,8 +141,12 @@ impl<S: Scene> Surface<S> {
         described_by: &str,
         height: u32,
     ) -> Result<Self, JsValue> {
-        let doc = parent.owner_document().ok_or("no document")?;
-        let canvas: HtmlCanvasElement = doc.create_element("canvas")?.dyn_into()?;
+        let doc = parent
+            .owner_document()
+            .ok_or("no document")?;
+        let canvas: HtmlCanvasElement = doc
+            .create_element("canvas")?
+            .dyn_into()?;
         canvas.set_tab_index(0);
         canvas.set_attribute("role", "application")?;
         canvas.set_attribute("aria-label", label)?;
@@ -194,8 +205,16 @@ impl<S: Scene> Surface<S> {
 
     /// Removes the listeners and the canvas. Call it from the island's `unmount`.
     pub fn destroy(&self) {
-        for (kind, cb) in self.shared.listeners.borrow_mut().drain(..) {
-            let _ = self.shared.canvas.remove_event_listener_with_callback(kind, cb.as_ref().unchecked_ref());
+        for (kind, cb) in self
+            .shared
+            .listeners
+            .borrow_mut()
+            .drain(..)
+        {
+            let _ = self
+                .shared
+                .canvas
+                .remove_event_listener_with_callback(kind, cb.as_ref().unchecked_ref());
         }
         if let Some((observer, _)) = self.shared.observer.borrow_mut().take() {
             observer.disconnect();
@@ -225,7 +244,14 @@ impl<S: Scene> Surface<S> {
         let observer = ResizeObserver::new(resized.as_ref().unchecked_ref())?;
         observer.observe(&self.shared.canvas);
         *self.shared.observer.borrow_mut() = Some((observer, resized));
-        for kind in ["pointerdown", "pointermove", "pointerup", "pointercancel", "wheel", "keydown"] {
+        for kind in [
+            "pointerdown",
+            "pointermove",
+            "pointerup",
+            "pointercancel",
+            "wheel",
+            "keydown",
+        ] {
             let weak: Weak<Shared<S>> = weak.clone();
             let cb = Closure::<dyn FnMut(Event)>::new(move |e: Event| {
                 if let Some(s) = weak.upgrade() {
@@ -234,26 +260,39 @@ impl<S: Scene> Surface<S> {
             });
             let options = AddEventListenerOptions::new();
             options.set_passive(false);
-            self.shared.canvas.add_event_listener_with_callback_and_add_event_listener_options(
-                kind,
-                cb.as_ref().unchecked_ref(),
-                &options,
-            )?;
-            self.shared.listeners.borrow_mut().push((kind, cb));
+            self.shared
+                .canvas
+                .add_event_listener_with_callback_and_add_event_listener_options(
+                    kind,
+                    cb.as_ref().unchecked_ref(),
+                    &options,
+                )?;
+            self.shared
+                .listeners
+                .borrow_mut()
+                .push((kind, cb));
         }
         Ok(())
     }
 }
 
 fn context(canvas: &HtmlCanvasElement, prefer: Prefer) -> Result<Graphics, JsValue> {
-    if prefer == Prefer::Gl {
-        if let Some(gl) =
-            canvas.get_context("webgl2").ok().flatten().and_then(|c| c.dyn_into::<WebGl2RenderingContext>().ok())
-        {
-            return Ok(Graphics::Gl(gl));
-        }
+    if prefer == Prefer::Gl
+        && let Some(gl) = canvas
+            .get_context("webgl2")
+            .ok()
+            .flatten()
+            .and_then(|c| {
+                c.dyn_into::<WebGl2RenderingContext>()
+                    .ok()
+            })
+    {
+        return Ok(Graphics::Gl(gl));
     }
-    let ctx = canvas.get_context("2d")?.ok_or("no 2d context")?.dyn_into::<CanvasRenderingContext2d>()?;
+    let ctx = canvas
+        .get_context("2d")?
+        .ok_or("no 2d context")?
+        .dyn_into::<CanvasRenderingContext2d>()?;
     Ok(Graphics::TwoD(ctx))
 }
 
@@ -261,8 +300,11 @@ fn request<S: Scene>(s: &Shared<S>) {
     if s.pending.replace(true) {
         return;
     }
-    let scheduled =
-        web_sys::window().zip(s.raf.borrow().as_ref().map(|c| c.as_ref().unchecked_ref::<js_sys::Function>().clone()));
+    let scheduled = web_sys::window().zip(s.raf.borrow().as_ref().map(|c| {
+        c.as_ref()
+            .unchecked_ref::<js_sys::Function>()
+            .clone()
+    }));
     match scheduled {
         Some((w, f)) if w.request_animation_frame(&f).is_ok() => {}
         _ => s.pending.set(false),
@@ -275,14 +317,27 @@ fn paint<S: Scene>(s: &Shared<S>) {
     if !s.canvas.is_connected() {
         return;
     }
-    let ratio = web_sys::window().map(|w| w.device_pixel_ratio()).unwrap_or(1.0).max(1.0);
-    let (width, height) = (f64::from(s.canvas.client_width()), f64::from(s.canvas.client_height()));
-    let (pw, ph) = ((width * ratio).round() as u32, (height * ratio).round() as u32);
+    let ratio = web_sys::window()
+        .map(|w| w.device_pixel_ratio())
+        .unwrap_or(1.0)
+        .max(1.0);
+    let (width, height) = (
+        f64::from(s.canvas.client_width()),
+        f64::from(s.canvas.client_height()),
+    );
+    let (pw, ph) = (
+        (width * ratio).round() as u32,
+        (height * ratio).round() as u32,
+    );
     if s.canvas.width() != pw || s.canvas.height() != ph {
         s.canvas.set_width(pw);
         s.canvas.set_height(ph);
     }
-    let frame = Frame { width, height, ratio };
+    let frame = Frame {
+        width,
+        height,
+        ratio,
+    };
     s.frame.set(frame);
     match &s.graphics {
         Graphics::TwoD(ctx) => {
@@ -304,20 +359,35 @@ fn paint<S: Scene>(s: &Shared<S>) {
 fn handle<S: Scene>(s: &Shared<S>, kind: &str, e: &Event) {
     let input = match kind {
         "pointerdown" | "pointermove" | "pointerup" | "pointercancel" => {
-            let Some(p) = e.dyn_ref::<PointerEvent>() else { return };
+            let Some(p) = e.dyn_ref::<PointerEvent>() else {
+                return;
+            };
             let (x, y) = (f64::from(p.offset_x()), f64::from(p.offset_y()));
             match kind {
                 "pointerdown" => {
-                    let _ = s.canvas.set_pointer_capture(p.pointer_id());
+                    let _ = s
+                        .canvas
+                        .set_pointer_capture(p.pointer_id());
                     let _ = s.canvas.focus();
-                    Input::Down { x, y, button: p.button(), shift: p.shift_key() }
+                    Input::Down {
+                        x,
+                        y,
+                        button: p.button(),
+                        shift: p.shift_key(),
+                    }
                 }
-                "pointermove" => Input::Move { x, y, pressed: p.buttons() & 1 == 1 },
+                "pointermove" => Input::Move {
+                    x,
+                    y,
+                    pressed: p.buttons() & 1 == 1,
+                },
                 _ => Input::Up { x, y },
             }
         }
         "wheel" => {
-            let Some(w) = e.dyn_ref::<WheelEvent>() else { return };
+            let Some(w) = e.dyn_ref::<WheelEvent>() else {
+                return;
+            };
             let scale = match w.delta_mode() {
                 1 => 16.0,
                 2 => f64::from(s.canvas.client_height()),
@@ -332,11 +402,21 @@ fn handle<S: Scene>(s: &Shared<S>, kind: &str, e: &Event) {
             }
         }
         _ => {
-            let Some(k) = e.dyn_ref::<KeyboardEvent>() else { return };
-            Input::Key { key: k.key(), shift: k.shift_key(), ctrl: k.ctrl_key() || k.meta_key(), alt: k.alt_key() }
+            let Some(k) = e.dyn_ref::<KeyboardEvent>() else {
+                return;
+            };
+            Input::Key {
+                key: k.key(),
+                shift: k.shift_key(),
+                ctrl: k.ctrl_key() || k.meta_key(),
+                alt: k.alt_key(),
+            }
         }
     };
-    let used = s.scene.borrow_mut().input(&input, s.frame.get());
+    let used = s
+        .scene
+        .borrow_mut()
+        .input(&input, s.frame.get());
     if used {
         e.prevent_default();
         request(s);

@@ -34,7 +34,10 @@ struct DocQuery {
 pub(super) fn pdf_response(name: &str, bytes: Vec<u8>) -> Response {
     let mut response = bytes.into_response();
     let h = response.headers_mut();
-    h.insert(header::CONTENT_TYPE, HeaderValue::from_static("application/pdf"));
+    h.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/pdf"),
+    );
     h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     if let Ok(v) = HeaderValue::from_str(&format!("attachment; filename=\"{name}.pdf\"")) {
         h.insert(header::CONTENT_DISPOSITION, v);
@@ -44,7 +47,11 @@ pub(super) fn pdf_response(name: &str, bytes: Vec<u8>) -> Response {
 
 /// Renders the document of a `PdfLink` on a screen: its action loads the data for the user,
 /// with the action's access and interceptors, then the template is rendered.
-async fn document(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Query<DocQuery>) -> Response {
+async fn document(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(q): Query<DocQuery>,
+) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     let result = async {
         let params = match &q.params {
@@ -52,7 +59,10 @@ async fn document(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q):
             Some(p) => serde_json::from_str(p).map_err(|_| Failure::App(Error::NotFound))?,
         };
         let (_, entry, screen) = st.open(&ctx, &q.screen, params).await?;
-        let source = screen.node(&q.node).and_then(|n| n.pdf()).ok_or(Failure::App(Error::NotFound))?;
+        let source = screen
+            .node(&q.node)
+            .and_then(|n| n.pdf())
+            .ok_or(Failure::App(Error::NotFound))?;
         let action = source.action();
         if !ctx.identity().can(&action.access) {
             return Err(Failure::App(Error::Forbidden));
@@ -65,8 +75,12 @@ async fn document(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q):
         };
         let (state, user) = (&*st, &ctx);
         st.intercept(&ctx, &info, move || async move {
-            let (template, data) = state.timed(source.load(user.clone())).await?;
-            let bytes = state.timed(Pdf::of(user).render(template, &data)).await?;
+            let (template, data) = state
+                .timed(source.load(user.clone()))
+                .await?;
+            let bytes = state
+                .timed(Pdf::of(user).render(template, &data))
+                .await?;
             Ok((template, bytes))
         })
         .await
@@ -93,7 +107,10 @@ pub(super) async fn grid_report(
 ) -> Response {
     let started = Instant::now();
     let outcome = async {
-        let grid: &dyn GridSource = screen.node(node).and_then(|n| n.grid()).ok_or(Failure::App(Error::NotFound))?;
+        let grid: &dyn GridSource = screen
+            .node(node)
+            .and_then(|n| n.grid())
+            .ok_or(Failure::App(Error::NotFound))?;
         let view = view.map(|v| grid.clean_view(v));
         let r = super::user_render(name, ctx);
         let limit = grid.export_limit().min(MAX_PDF_ROWS);
@@ -102,8 +119,13 @@ pub(super) async fn grid_report(
         while rows.len() < limit {
             let size = (limit - rows.len()).min(crate::action::MAX_PAGE_SIZE as usize) as u32;
             let mut q = query.clone();
-            q.page = crate::action::PageRequest::Offset { offset: rows.len() as u64, limit: size };
-            let mut page = st.timed(grid.fetch(ctx.clone(), q)).await?;
+            q.page = crate::action::PageRequest::Offset {
+                offset: rows.len() as u64,
+                limit: size,
+            };
+            let mut page = st
+                .timed(grid.fetch(ctx.clone(), q))
+                .await?;
             page.view = view.clone();
             let n = page.count;
             rows.extend(grid.export_text(&page, &r));
@@ -118,7 +140,9 @@ pub(super) async fn grid_report(
             .map(|c| json!({ "label": c.label, "numeric": c.numeric }))
             .collect();
         super::grid::note_export(ctx, grid, "pdf", rows.len(), &query);
-        let note = more.then(|| ctx.t(&crate::i18n::Text::key("zeyn.export.pdf_cut").arg("max", limit.to_string())));
+        let note = more.then(|| {
+            ctx.t(&crate::i18n::Text::key("zeyn.export.pdf_cut").arg("max", limit.to_string()))
+        });
         let data = json!({
             "title": ctx.t(screen.title()),
             "lang": lang(ctx.locale()),
@@ -126,7 +150,8 @@ pub(super) async fn grid_report(
             "rows": rows,
             "note": note,
         });
-        st.timed(Pdf::of(ctx).render(PdfTemplate::LIST, &data)).await
+        st.timed(Pdf::of(ctx).render(PdfTemplate::LIST, &data))
+            .await
     }
     .await;
     st.after(ctx, info, started, &outcome);

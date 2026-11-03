@@ -17,7 +17,11 @@ pub async fn find_sales(q: DataQuery, restaurant: Restaurant) -> Result<Page<Sal
 pub fn reports(_: (), restaurant: Restaurant) -> Result<Screen> {
     let revenue = restaurant.revenue_by_category()?;
     let chart = Chart::bar(t!("reports.by_category"))
-        .labels(revenue.iter().map(|(c, _)| Text::key(format!("Category.{c:?}"))))
+        .labels(
+            revenue
+                .iter()
+                .map(|(c, _)| Text::key(format!("Category.{c:?}"))),
+        )
         .series(t!("reports.revenue"), revenue.iter().map(|(_, v)| *v))
         .decimals(2);
     Ok(Screen::new(t!("reports.title")).body(
@@ -27,7 +31,13 @@ pub fn reports(_: (), restaurant: Restaurant) -> Result<Screen> {
                 .column(Sale::at)
                 .column(Sale::table)
                 .column(Sale::method)
-                .badge(|m| if *m == PaymentMethod::Card { Tone::Info } else { Tone::Success })
+                .badge(|m| {
+                    if *m == PaymentMethod::Card {
+                        Tone::Info
+                    } else {
+                        Tone::Success
+                    }
+                })
                 .column(Sale::items)
                 .sum()
                 .column(Sale::total)
@@ -40,5 +50,8 @@ pub fn feature() -> Feature {
     Feature::new("reports")
         .screen(reports)
         .api(find_sales)
-        .menu(|m| m.group(t!("reports.menu"), Icon::Chart).item(t!("reports.title"), reports))
+        .menu(|m| {
+            m.group(t!("reports.menu"), Icon::Chart)
+                .item(t!("reports.title"), reports)
+        })
 }

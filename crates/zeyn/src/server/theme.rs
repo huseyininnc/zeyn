@@ -142,22 +142,36 @@ impl Theme {
 
     /// The built in light theme. Given to `App::theme` it locks the app to light.
     pub fn light() -> Self {
-        Theme { name: Some("light".into()), scheme: Some("light"), ..Theme::default() }
+        Theme {
+            name: Some("light".into()),
+            scheme: Some("light"),
+            ..Theme::default()
+        }
     }
 
     /// The built in dark theme. Given to `App::theme` it locks the app to dark.
     pub fn dark() -> Self {
-        Theme { name: Some("dark".into()), scheme: Some("dark"), ..Theme::default() }
+        Theme {
+            name: Some("dark".into()),
+            scheme: Some("dark"),
+            ..Theme::default()
+        }
     }
 
     /// An app theme built on the light theme: a name (`a` to `z`, digits and `-`, up to 32) and
     /// the tokens it changes, such as `[("--z-brand", "#0b5394"), ("--z-bg", "#eef4f8")]`. Bad
     /// names, unknown tokens, unsafe values and low contrast are reported by `App::check`.
     pub fn named<'a>(name: &str, tokens: impl IntoIterator<Item = (&'a str, &'a str)>) -> Self {
-        let mut theme = Theme { name: Some(name.to_string()), scheme: Some("light"), ..Theme::default() };
+        let mut theme = Theme {
+            name: Some(name.to_string()),
+            scheme: Some("light"),
+            ..Theme::default()
+        };
         let valid = !name.is_empty()
             && name.len() <= 32
-            && name.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
+            && name
+                .bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
         if !valid || matches!(name, "system" | "light" | "dark") {
             theme.problems.push(format!(
                 "theme name `{name}` is not allowed\n  = help: use `a` to `z`, digits and `-` (up to 32), and not `system`, `light` or `dark`"
@@ -183,7 +197,10 @@ impl Theme {
 
     /// Sets one token, such as `token("--z-surface", "#fbfaf7")`. Tokens are listed in `docs/theming.md`.
     pub fn token(mut self, name: &str, value: &str) -> Self {
-        let owner = self.name.clone().unwrap_or_else(|| "app".into());
+        let owner = self
+            .name
+            .clone()
+            .unwrap_or_else(|| "app".into());
         if !THEME_TOKENS.contains(&name) {
             self.problems.push(format!(
                 "theme `{owner}`: `{name}` is not a theme token\n  = help: use one of the tokens in docs/theming.md"
@@ -194,7 +211,8 @@ impl Theme {
             ));
         } else {
             self.tokens.retain(|(n, _)| n != name);
-            self.tokens.push((name.to_string(), value.trim().to_string()));
+            self.tokens
+                .push((name.to_string(), value.trim().to_string()));
         }
         self
     }
@@ -202,7 +220,11 @@ impl Theme {
     /// Brand color as `#rgb` or `#rrggbb`. Other values are ignored.
     pub fn brand(mut self, color: &str) -> Self {
         let hex = color.strip_prefix('#').unwrap_or("");
-        if matches!(hex.len(), 3 | 6) && hex.chars().all(|c| c.is_ascii_hexdigit()) {
+        if matches!(hex.len(), 3 | 6)
+            && hex
+                .chars()
+                .all(|c| c.is_ascii_hexdigit())
+        {
             self.brand = Some(format!("#{hex}"));
         }
         self
@@ -211,7 +233,11 @@ impl Theme {
     /// Font stack, such as `Inter, system-ui, sans-serif`. Fonts must be installed or served by
     /// the app; only letters, digits, spaces, commas, hyphens and quotes are allowed.
     pub fn font(mut self, stack: &str) -> Self {
-        if !stack.is_empty() && stack.len() <= 200 && stack.chars().all(|c| c.is_alphanumeric() || " ,-'\"".contains(c))
+        if !stack.is_empty()
+            && stack.len() <= 200
+            && stack
+                .chars()
+                .all(|c| c.is_alphanumeric() || " ,-'\"".contains(c))
         {
             self.font = Some(stack.to_string());
         }
@@ -258,12 +284,15 @@ impl Theme {
 
     /// The value this theme sets for a token, if any.
     fn get(&self, token: &str) -> Option<&str> {
-        if token == "--z-brand" {
-            if let Some(b) = &self.brand {
-                return Some(b);
-            }
+        if token == "--z-brand"
+            && let Some(b) = &self.brand
+        {
+            return Some(b);
         }
-        self.tokens.iter().find(|(n, _)| n == token).map(|(_, v)| v.as_str())
+        self.tokens
+            .iter()
+            .find(|(n, _)| n == token)
+            .map(|(_, v)| v.as_str())
     }
 
     fn is_builtin(&self) -> bool {
@@ -276,7 +305,8 @@ fn safe_value(v: &str) -> bool {
     let lower = v.to_ascii_lowercase();
     !v.trim().is_empty()
         && v.len() <= 200
-        && v.chars().all(|c| c.is_alphanumeric() || " #%.,()-+*/'\"".contains(c))
+        && v.chars()
+            .all(|c| c.is_alphanumeric() || " #%.,()-+*/'\"".contains(c))
         && !lower.contains("url")
         && !lower.contains("expression")
         && !lower.contains("image")
@@ -291,7 +321,11 @@ pub(super) struct Settings {
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { themes: Vec::new(), default: None, picker: true }
+        Settings {
+            themes: Vec::new(),
+            default: None,
+            picker: true,
+        }
     }
 }
 
@@ -346,14 +380,21 @@ impl App {
             let name = t.name.as_deref().unwrap_or("app");
             if t.name.is_none() {
                 problems.push("`App::themes` got `Theme::new()`, which has no name\n  = help: use `Theme::light()`, `Theme::dark()` or `Theme::named(...)`".into());
-            } else if offered[..i].iter().any(|o| o.name == t.name) {
+            } else if offered[..i]
+                .iter()
+                .any(|o| o.name == t.name)
+            {
                 problems.push(format!("theme `{name}` is offered twice"));
             }
             problems.extend(contrast_problems(name, t, &base));
         }
         if let Some(d) = &self.looks.default {
             let system = d == "system" && has_both(&offered);
-            if !system && !offered.iter().any(|t| t.name.as_deref() == Some(d)) {
+            if !system
+                && !offered
+                    .iter()
+                    .any(|t| t.name.as_deref() == Some(d))
+            {
                 problems.push(format!("default theme `{d}` is not one of the offered themes\n  = help: add it to `App::themes` or use `system`"));
             }
         }
@@ -370,7 +411,10 @@ impl App {
         if !root.is_empty() {
             css.push_str(&format!(":root{{{root}}}\n"));
         }
-        for t in offered.iter().filter(|_| base.scheme.is_none()) {
+        for t in offered
+            .iter()
+            .filter(|_| base.scheme.is_none())
+        {
             let body = t.declarations(true);
             let name = t.name.clone().unwrap_or_default();
             if body.is_empty() {
@@ -389,18 +433,30 @@ impl App {
             .filter_map(|t| {
                 let name = t.name.clone()?;
                 let label = match name.as_str() {
-                    "light" | "dark" => {
-                        t.label.clone().unwrap_or_else(|| Text::key(format!("zeyn.shell.theme_{name}")))
-                    }
-                    _ => t.label.clone().unwrap_or_else(|| Text::from(name.clone())),
+                    "light" | "dark" => t
+                        .label
+                        .clone()
+                        .unwrap_or_else(|| Text::key(format!("zeyn.shell.theme_{name}"))),
+                    _ => t
+                        .label
+                        .clone()
+                        .unwrap_or_else(|| Text::from(name.clone())),
                 };
-                Some(Choice { custom: !t.is_builtin(), name: name.into(), label, scheme: t.scheme.unwrap_or("light") })
+                Some(Choice {
+                    custom: !t.is_builtin(),
+                    name: name.into(),
+                    label,
+                    scheme: t.scheme.unwrap_or("light"),
+                })
             })
             .collect();
         let default: Arc<str> = match &self.looks.default {
             Some(d) => d.as_str().into(),
             None if system => "system".into(),
-            None => choices.first().map(|c| c.name.clone()).unwrap_or_else(|| "system".into()),
+            None => choices
+                .first()
+                .map(|c| c.name.clone())
+                .unwrap_or_else(|| "system".into()),
         };
         let locked = choices.len() == 1;
         Look {
@@ -421,7 +477,11 @@ impl App {
 }
 
 fn has_both(offered: &[Theme]) -> bool {
-    ["light", "dark"].iter().all(|n| offered.iter().any(|t| t.name.as_deref() == Some(n)))
+    ["light", "dark"].iter().all(|n| {
+        offered
+            .iter()
+            .any(|t| t.name.as_deref() == Some(n))
+    })
 }
 
 /// One entry of the theme picker.
@@ -448,23 +508,42 @@ impl Look {
     /// The theme of a request: the cookie when the picker is on and it names an offered theme,
     /// otherwise the default.
     pub(super) fn pick(&self, wanted: Option<&str>) -> Arc<str> {
-        wanted.filter(|_| self.picker).and_then(|w| self.allowed(w)).unwrap_or_else(|| self.default.clone())
+        wanted
+            .filter(|_| self.picker)
+            .and_then(|w| self.allowed(w))
+            .unwrap_or_else(|| self.default.clone())
     }
 
     fn allowed(&self, name: &str) -> Option<Arc<str>> {
         if name == "system" && self.system {
             return Some("system".into());
         }
-        self.choices.iter().find(|c| &*c.name == name).map(|c| c.name.clone())
+        self.choices
+            .iter()
+            .find(|c| &*c.name == name)
+            .map(|c| c.name.clone())
     }
 
     /// Attributes for `<html>` and the `color-scheme` meta value of a theme.
     pub(super) fn html(&self, name: &str) -> (String, &'static str) {
-        let density = if self.compact { r#" data-density="compact""# } else { "" };
-        match self.choices.iter().find(|c| &*c.name == name) {
-            Some(c) if c.custom => {
-                (format!(r#" data-theme="{}" data-zeyn-theme="{}"{density}"#, c.scheme, escape(&c.name)), c.scheme)
-            }
+        let density = if self.compact {
+            r#" data-density="compact""#
+        } else {
+            ""
+        };
+        match self
+            .choices
+            .iter()
+            .find(|c| &*c.name == name)
+        {
+            Some(c) if c.custom => (
+                format!(
+                    r#" data-theme="{}" data-zeyn-theme="{}"{density}"#,
+                    c.scheme,
+                    escape(&c.name)
+                ),
+                c.scheme,
+            ),
             Some(c) => (format!(r#" data-theme="{}"{density}"#, c.scheme), c.scheme),
             None => (density.to_string(), "light dark"),
         }
@@ -478,11 +557,19 @@ impl Look {
         let option = |value: &str, label: String, scheme: &str, custom: bool| {
             let selected = if value == current { " selected" } else { "" };
             let custom = if custom { " data-custom" } else { "" };
-            format!(r#"<option value="{}" data-scheme="{scheme}"{custom}{selected}>{label}</option>"#, escape(value))
+            format!(
+                r#"<option value="{}" data-scheme="{scheme}"{custom}{selected}>{label}</option>"#,
+                escape(value)
+            )
         };
         let mut options = String::new();
         if self.system {
-            options.push_str(&option("system", r.text(&Text::key("zeyn.shell.theme_system")), "", false));
+            options.push_str(&option(
+                "system",
+                r.text(&Text::key("zeyn.shell.theme_system")),
+                "",
+                false,
+            ));
         }
         for c in &self.choices {
             options.push_str(&option(&c.name, r.text(&c.label), c.scheme, c.custom));
@@ -501,12 +588,17 @@ fn contrast_problems(name: &str, theme: &Theme, base: &Theme) -> Vec<String> {
         if let Some(v) = theme.get(token) {
             return Some(v.to_string());
         }
-        if dark {
-            if let Some((_, v)) = DARK.iter().find(|(n, _)| *n == token) {
-                return Some(v.to_string());
-            }
+        if dark && let Some((_, v)) = DARK.iter().find(|(n, _)| *n == token) {
+            return Some(v.to_string());
         }
-        base.get(token).or_else(|| LIGHT.iter().find(|(n, _)| *n == token).map(|(_, v)| *v)).map(str::to_string)
+        base.get(token)
+            .or_else(|| {
+                LIGHT
+                    .iter()
+                    .find(|(n, _)| *n == token)
+                    .map(|(_, v)| *v)
+            })
+            .map(str::to_string)
     };
     let mut problems = Vec::new();
     let mut pairs: Vec<(&str, &str, f64)> = PAIRS.to_vec();
@@ -514,7 +606,12 @@ fn contrast_problems(name: &str, theme: &Theme, base: &Theme) -> Vec<String> {
         pairs.push(("--z-brand", "--z-surface", 4.5));
     }
     for (fg, bg, needed) in pairs {
-        let (Some(a), Some(b)) = (value(fg).and_then(|v| hex(&v)), value(bg).and_then(|v| hex(&v))) else { continue };
+        let (Some(a), Some(b)) = (
+            value(fg).and_then(|v| hex(&v)),
+            value(bg).and_then(|v| hex(&v)),
+        ) else {
+            continue;
+        };
         let ratio = contrast(a, b);
         if ratio + 1e-9 < needed {
             problems.push(format!(
@@ -528,10 +625,17 @@ fn contrast_problems(name: &str, theme: &Theme, base: &Theme) -> Vec<String> {
 /// `#rgb` or `#rrggbb` as red, green and blue.
 fn hex(v: &str) -> Option<[u8; 3]> {
     let h = v.trim().strip_prefix('#')?;
-    let digits: Vec<u8> = h.chars().map(|c| c.to_digit(16).map(|d| d as u8)).collect::<Option<_>>()?;
+    let digits: Vec<u8> = h
+        .chars()
+        .map(|c| c.to_digit(16).map(|d| d as u8))
+        .collect::<Option<_>>()?;
     match digits.len() {
         3 => Some([digits[0] * 17, digits[1] * 17, digits[2] * 17]),
-        6 => Some([digits[0] * 16 + digits[1], digits[2] * 16 + digits[3], digits[4] * 16 + digits[5]]),
+        6 => Some([
+            digits[0] * 16 + digits[1],
+            digits[2] * 16 + digits[3],
+            digits[4] * 16 + digits[5],
+        ]),
         _ => None,
     }
 }
@@ -541,7 +645,11 @@ fn contrast(a: [u8; 3], b: [u8; 3]) -> f64 {
     let lum = |c: [u8; 3]| {
         let ch = |v: u8| {
             let s = f64::from(v) / 255.0;
-            if s <= 0.04045 { s / 12.92 } else { ((s + 0.055) / 1.055).powf(2.4) }
+            if s <= 0.04045 {
+                s / 12.92
+            } else {
+                ((s + 0.055) / 1.055).powf(2.4)
+            }
         };
         0.2126 * ch(c[0]) + 0.7152 * ch(c[1]) + 0.0722 * ch(c[2])
     };
@@ -551,27 +659,46 @@ fn contrast(a: [u8; 3], b: [u8; 3]) -> f64 {
 
 /// Key of the saved theme in the app's view store.
 fn store_key(ctx: &Ctx) -> String {
-    format!("{}:~theme", ctx.tenant().map(|t| t.id().to_string()).unwrap_or_default())
+    format!(
+        "{}:~theme",
+        ctx.tenant()
+            .map(|t| t.id().to_string())
+            .unwrap_or_default()
+    )
 }
 
 const STORE_PREFIX: &str = "theme:";
 
 /// On a full page load without a `zeyn_theme` cookie, the signed in user's theme from the view
 /// store, with the cookie to set so later pages do not ask again.
-pub(super) async fn remember(st: &AppState, ctx: Ctx, headers: &HeaderMap) -> (Ctx, Option<String>) {
+pub(super) async fn remember(
+    st: &AppState,
+    ctx: Ctx,
+    headers: &HeaderMap,
+) -> (Ctx, Option<String>) {
     if !st.look.picker || cookie(headers, "zeyn_theme").is_some() {
         return (ctx, None);
     }
-    let (Some(store), Some(user)) = (st.views.as_ref(), ctx.identity().user.clone()) else { return (ctx, None) };
-    let saved = match st.timed(store.load(&user, &store_key(&ctx))).await {
+    let (Some(store), Some(user)) = (st.views.as_ref(), ctx.identity().user.clone()) else {
+        return (ctx, None);
+    };
+    let saved = match st
+        .timed(store.load(&user, &store_key(&ctx)))
+        .await
+    {
         Ok(v) => v,
         Err(_) => {
             eprintln!("warning: the view store failed to load a theme; using the default");
             return (ctx, None);
         }
     };
-    let name =
-        saved.and_then(|v| v.columns.into_iter().find_map(|c| c.field.strip_prefix(STORE_PREFIX).map(str::to_string)));
+    let name = saved.and_then(|v| {
+        v.columns.into_iter().find_map(|c| {
+            c.field
+                .strip_prefix(STORE_PREFIX)
+                .map(str::to_string)
+        })
+    });
     match name.and_then(|n| st.look.allowed(&n)) {
         Some(theme) => {
             let c = theme_cookie(st, &theme);
@@ -583,7 +710,10 @@ pub(super) async fn remember(st: &AppState, ctx: Ctx, headers: &HeaderMap) -> (C
 
 fn theme_cookie(st: &AppState, name: &str) -> String {
     let secure = if st.secure_cookies { "; Secure" } else { "" };
-    format!("zeyn_theme={name}; Path={}; Max-Age=31536000; SameSite=Lax{secure}", st.cookie_path())
+    format!(
+        "zeyn_theme={name}; Path={}; Max-Age=31536000; SameSite=Lax{secure}",
+        st.cookie_path()
+    )
 }
 
 #[derive(Deserialize)]
@@ -603,19 +733,34 @@ async fn set_theme(
     if let Err(f) = st.check_csrf(&headers) {
         return st.error_response(&ctx, f);
     }
-    let Some(theme) = st.look.allowed(&call.theme).filter(|_| st.look.picker) else {
+    let Some(theme) = st
+        .look
+        .allowed(&call.theme)
+        .filter(|_| st.look.picker)
+    else {
         return st.error_response(&ctx, Failure::App(Error::NotFound));
     };
     if let (Some(store), Some(user)) = (st.views.as_ref(), ctx.identity().user.clone()) {
         let view = DataGridView {
-            columns: vec![ColumnView { field: format!("{STORE_PREFIX}{theme}"), width: None, pin: None }],
+            columns: vec![ColumnView {
+                field: format!("{STORE_PREFIX}{theme}"),
+                width: None,
+                pin: None,
+            }],
             ..DataGridView::default()
         };
-        if st.timed(store.save(&user, &store_key(&ctx), Some(view))).await.is_err() {
+        if st
+            .timed(store.save(&user, &store_key(&ctx), Some(view)))
+            .await
+            .is_err()
+        {
             eprintln!("warning: the view store failed to save a theme; the cookie still keeps it");
         }
     }
-    with_cookie(StatusCode::NO_CONTENT.into_response(), Some(theme_cookie(&st, &theme)))
+    with_cookie(
+        StatusCode::NO_CONTENT.into_response(),
+        Some(theme_cookie(&st, &theme)),
+    )
 }
 
 pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {

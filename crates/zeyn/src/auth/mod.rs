@@ -73,13 +73,20 @@ impl RequireMfa {
     fn covers(&self, call: &Call) -> bool {
         (self.screens.is_empty() && self.actions.is_empty())
             || self.screens.contains(&call.screen)
-            || call.action.as_ref().is_some_and(|a| self.actions.contains(&a.name))
+            || call
+                .action
+                .as_ref()
+                .is_some_and(|a| self.actions.contains(&a.name))
     }
 }
 
 impl Guard for RequireMfa {
     fn check(&self, ctx: &Ctx) -> GuardResult {
-        if ctx.identity().mfa { GuardResult::Allow } else { GuardResult::Deny(Text::key(MFA_REQUIRED)) }
+        if ctx.identity().mfa {
+            GuardResult::Allow
+        } else {
+            GuardResult::Deny(Text::key(MFA_REQUIRED))
+        }
     }
 }
 
@@ -101,7 +108,9 @@ impl Interceptor for RequireMfa {
 /// counts when it is one of `mfa_acr`.
 #[cfg(feature = "oidc")]
 pub(crate) fn shows_mfa(amr: &[&str], acr: Option<&str>, mfa_acr: &[String]) -> bool {
-    const SECOND: &[&str] = &["mfa", "otp", "hwk", "swk", "sc", "sms", "fpt", "face", "iris", "retina", "vbm", "tel"];
+    const SECOND: &[&str] = &[
+        "mfa", "otp", "hwk", "swk", "sc", "sms", "fpt", "face", "iris", "retina", "vbm", "tel",
+    ];
     amr.iter().any(|m| SECOND.contains(m)) || acr.is_some_and(|a| mfa_acr.iter().any(|m| m == a))
 }
 
@@ -120,7 +129,10 @@ pub(crate) fn safe_return(target: &str) -> Option<&str> {
 /// Seconds since the Unix epoch.
 #[cfg(any(feature = "oidc", feature = "totp"))]
 pub(crate) fn now_secs() -> i64 {
-    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0)
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
 }
 
 /// Random bytes from the operating system.
@@ -137,8 +149,9 @@ pub(crate) fn b64url(bytes: &[u8]) -> String {
     const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
     let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
     for chunk in bytes.chunks(3) {
-        let n =
-            (chunk[0] as u32) << 16 | (*chunk.get(1).unwrap_or(&0) as u32) << 8 | *chunk.get(2).unwrap_or(&0) as u32;
+        let n = (chunk[0] as u32) << 16
+            | (*chunk.get(1).unwrap_or(&0) as u32) << 8
+            | *chunk.get(2).unwrap_or(&0) as u32;
         for i in 0..=chunk.len() {
             out.push(ALPHABET[(n >> (18 - 6 * i) & 63) as usize] as char);
         }

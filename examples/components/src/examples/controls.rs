@@ -34,18 +34,26 @@ pub async fn save_choices(choices: Valid<Choices>) -> Result<bool> {
 }
 
 pub fn overview(_ctx: &Ctx) -> Node {
-    Form::of(Choices { size: Size::Medium, ..Choices::default() })
-        .field(Choices::size)
-        .control(Choices::size, Control::Segmented)
-        .field(Choices::delivery)
-        .control(Choices::delivery, Control::Radio)
-        .field(Choices::gift)
-        .control(Choices::gift, Control::Switch)
-        .submit("Save", save_choices)
-        .on_success(|_, ui| ui.toast("Saved. Nothing was stored."))
-        .into()
+    Form::of(Choices {
+        size: Size::Medium,
+        ..Choices::default()
+    })
+    .field(Choices::size)
+    .control(Choices::size, Control::Segmented)
+    .field(Choices::delivery)
+    .control(Choices::delivery, Control::Radio)
+    .field(Choices::gift)
+    .control(Choices::gift, Control::Switch)
+    .submit("Save", save_choices)
+    .on_success(|_, ui| ui.toast("Saved. Nothing was stored."))
+    .into()
 }
 
 /// What the catalog shows of `Control`.
-pub const ENTRY: Entry =
-    Entry { name: "Controls", docs: "components/controls", api: &["Form"], overview: &[ex!(overview)], examples: &[] };
+pub const ENTRY: Entry = Entry {
+    name: "Controls",
+    docs: "components/controls",
+    api: &["Form"],
+    overview: &[ex!(overview)],
+    examples: &[],
+};

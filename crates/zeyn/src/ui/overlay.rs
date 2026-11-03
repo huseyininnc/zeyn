@@ -21,10 +21,18 @@ pub const MAX_TIP: usize = 200;
 /// The attributes of an element that has a tooltip and the tooltip itself, which the runtime
 /// places next to it. The text is escaped and cut at [`MAX_TIP`] characters.
 pub(crate) fn tip(r: &Render, id: &str, text: &Text) -> (String, String) {
-    let text: String = r.i18n.text(r.locale, text).chars().take(MAX_TIP).collect();
+    let text: String = r
+        .i18n
+        .text(r.locale, text)
+        .chars()
+        .take(MAX_TIP)
+        .collect();
     (
         format!(r#" aria-describedby="{id}" data-zeyn-tip="{id}""#),
-        format!(r#"<span role="tooltip" class="z-tip" id="{id}" hidden>{}</span>"#, escape(&text)),
+        format!(
+            r#"<span role="tooltip" class="z-tip" id="{id}" hidden>{}</span>"#,
+            escape(&text)
+        ),
     )
 }
 
@@ -44,7 +52,11 @@ pub struct Popover {
 
 impl Popover {
     pub fn new(label: impl Into<Text>) -> Self {
-        Self { label: label.into(), title: None, nodes: Vec::new() }
+        Self {
+            label: label.into(),
+            title: None,
+            nodes: Vec::new(),
+        }
     }
 
     /// Heading of the popover and its accessible name; the button label without it.
@@ -53,6 +65,10 @@ impl Popover {
         self
     }
 
+    #[allow(
+        clippy::should_implement_trait,
+        reason = "a builder method that appends a child component; it is not arithmetic and `add` is the public name"
+    )]
     pub fn add(mut self, node: impl Into<Node>) -> Self {
         self.nodes.push(node.into());
         self
@@ -63,7 +79,10 @@ impl Component for Popover {
     fn render(&self, out: &mut String, r: &Render) {
         let id = dom_id(r, "popover");
         let label = r.text(&self.label);
-        let title = self.title.as_ref().map_or_else(|| label.clone(), |t| r.text(t));
+        let title = self
+            .title
+            .as_ref()
+            .map_or_else(|| label.clone(), |t| r.text(t));
         out.push_str(&format!(
             r#"<div class="z-popover-wrap" data-zeyn-popover><button type="button" class="z-button z-popover-button" id="{id}-button" aria-haspopup="dialog" aria-expanded="false" aria-controls="{id}" data-testid="{}.popover.{}">{label}</button><div class="z-popover" id="{id}" role="dialog" aria-labelledby="{id}-title" tabindex="-1" hidden><div class="z-popover-head"><h2 class="z-popover-title" id="{id}-title">{title}</h2><button type="button" class="z-icon-button z-popover-close" data-zeyn-popover-close aria-label="{}"><span aria-hidden="true">&#215;</span></button></div><div class="z-popover-body">"#,
             r.scope,
@@ -77,7 +96,11 @@ impl Component for Popover {
     }
 
     fn schema(&self) -> Json {
-        let children: Vec<Json> = self.nodes.iter().map(Node::schema).collect();
+        let children: Vec<Json> = self
+            .nodes
+            .iter()
+            .map(Node::schema)
+            .collect();
         json!({ "type": "popover", "label": self.label, "title": self.title, "children": children })
     }
 
@@ -105,7 +128,10 @@ pub struct Busy {
 
 impl Default for Busy {
     fn default() -> Self {
-        Self { delay_ms: BUSY_DELAY_MS, nodes: Vec::new() }
+        Self {
+            delay_ms: BUSY_DELAY_MS,
+            nodes: Vec::new(),
+        }
     }
 }
 
@@ -120,6 +146,10 @@ impl Busy {
         self
     }
 
+    #[allow(
+        clippy::should_implement_trait,
+        reason = "a builder method that appends a child component; it is not arithmetic and `add` is the public name"
+    )]
     pub fn add(mut self, node: impl Into<Node>) -> Self {
         self.nodes.push(node.into());
         self
@@ -128,7 +158,10 @@ impl Busy {
 
 impl Component for Busy {
     fn render(&self, out: &mut String, r: &Render) {
-        out.push_str(&format!(r#"<div class="z-busy" data-zeyn-busy="{}">"#, self.delay_ms));
+        out.push_str(&format!(
+            r#"<div class="z-busy" data-zeyn-busy="{}">"#,
+            self.delay_ms
+        ));
         for (i, node) in self.nodes.iter().enumerate() {
             render_child(out, r, i, node);
         }
@@ -139,7 +172,11 @@ impl Component for Busy {
     }
 
     fn schema(&self) -> Json {
-        let children: Vec<Json> = self.nodes.iter().map(Node::schema).collect();
+        let children: Vec<Json> = self
+            .nodes
+            .iter()
+            .map(Node::schema)
+            .collect();
         json!({ "type": "busy", "delay_ms": self.delay_ms, "children": children })
     }
 

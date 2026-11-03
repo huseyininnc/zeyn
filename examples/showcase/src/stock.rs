@@ -80,13 +80,22 @@ impl ProductStore {
     }
 
     pub fn get(&self, id: ProductId) -> Result<Product> {
-        self.0.read().map_err(poisoned)?.iter().find(|p| p.id == id).cloned().ok_or(Error::NotFound)
+        self.0
+            .read()
+            .map_err(poisoned)?
+            .iter()
+            .find(|p| p.id == id)
+            .cloned()
+            .ok_or(Error::NotFound)
     }
 
     /// Adds ten units to a product's stock.
     pub fn restock(&self, id: ProductId) -> Result<()> {
         let mut rows = self.0.write().map_err(poisoned)?;
-        let product = rows.iter_mut().find(|p| p.id == id).ok_or(Error::NotFound)?;
+        let product = rows
+            .iter_mut()
+            .find(|p| p.id == id)
+            .ok_or(Error::NotFound)?;
         product.stock += 10;
         product.version += 1;
         Ok(())
@@ -96,7 +105,10 @@ impl ProductStore {
     pub fn deactivate(&self, ids: &[ProductId]) -> Result<usize> {
         let mut rows = self.0.write().map_err(poisoned)?;
         let mut n = 0;
-        for p in rows.iter_mut().filter(|p| ids.contains(&p.id) && p.active) {
+        for p in rows
+            .iter_mut()
+            .filter(|p| ids.contains(&p.id) && p.active)
+        {
             p.active = false;
             p.version += 1;
             n += 1;
@@ -106,18 +118,31 @@ impl ProductStore {
 
     pub fn save(&self, mut product: Product) -> Result<Product> {
         let mut rows = self.0.write().map_err(poisoned)?;
-        if rows.iter().any(|p| p.code.eq_ignore_ascii_case(&product.code) && p.id != product.id) {
+        if rows.iter().any(|p| {
+            p.code
+                .eq_ignore_ascii_case(&product.code)
+                && p.id != product.id
+        }) {
             let mut errors = ValidationErrors::default();
             errors.add(Product::code, t!("stock.code_taken", code = product.code));
             return Err(errors.into());
         }
         if product.id.0 == 0 {
-            product.id = ProductId(rows.iter().map(|p| p.id.0).max().unwrap_or(0) + 1);
+            product.id = ProductId(
+                rows.iter()
+                    .map(|p| p.id.0)
+                    .max()
+                    .unwrap_or(0)
+                    + 1,
+            );
             product.version = 1;
             rows.push(product.clone());
             return Ok(product);
         }
-        let current = rows.iter_mut().find(|p| p.id == product.id).ok_or(Error::NotFound)?;
+        let current = rows
+            .iter_mut()
+            .find(|p| p.id == product.id)
+            .ok_or(Error::NotFound)?;
         if current.version != product.version {
             return Err(Error::Conflict);
         }
@@ -152,16 +177,31 @@ pub async fn deactivate_products(ids: Vec<ProductId>, store: ProductStore) -> Re
 }
 
 /// Archives a product by its code: it stays in reports but can no longer be sold.
-#[action(permission = "stock.product.write", audit, confirm, ai = "Products are named by codes such as NW-0003.")]
+#[action(
+    permission = "stock.product.write",
+    audit,
+    confirm,
+    ai = "Products are named by codes such as NW-0003."
+)]
 pub async fn archive_product(code: String, store: ProductStore) -> Result<()> {
-    let product = store.all()?.into_iter().find(|p| p.code.eq_ignore_ascii_case(code.trim())).ok_or(Error::NotFound)?;
-    store.deactivate(&[product.id]).map(|_| ())
+    let product = store
+        .all()?
+        .into_iter()
+        .find(|p| p.code.eq_ignore_ascii_case(code.trim()))
+        .ok_or(Error::NotFound)?;
+    store
+        .deactivate(&[product.id])
+        .map(|_| ())
 }
 
 /// Adds ten units to every product with fewer than ten. From the product list's context menu.
 #[action(permission = "stock.product.write", audit)]
 pub async fn restock_low(_: (), store: ProductStore) -> Result<()> {
-    for p in store.all()?.into_iter().filter(|p| p.stock < 10) {
+    for p in store
+        .all()?
+        .into_iter()
+        .filter(|p| p.stock < 10)
+    {
         store.restock(p.id)?;
     }
     Ok(())
@@ -179,7 +219,10 @@ pub fn product_list() -> Screen {
     Screen::new(t!("stock.products"))
         .context_menu(
             ContextMenu::new()
-                .item(t!("stock.new_product"), Window::open(product_editor, ProductParams { id: None }))
+                .item(
+                    t!("stock.new_product"),
+                    Window::open(product_editor, ProductParams { id: None }),
+                )
                 .icon(Icon::Plus)
                 .shortcut("Alt+N")
                 .action(t!("stock.restock_low"), restock_low, ()),
@@ -200,7 +243,14 @@ pub fn product_list() -> Screen {
                 .width(120)
                 .pin_start()
                 .filter()
-                .link(|p| Effect::navigate(product_page, ProductPageParams { code: p.code.clone() }))
+                .link(|p| {
+                    Effect::navigate(
+                        product_page,
+                        ProductPageParams {
+                            code: p.code.clone(),
+                        },
+                    )
+                })
                 .column(Product::id)
                 .width(90)
                 .hidden()
@@ -239,7 +289,10 @@ pub fn product_list() -> Screen {
                 .bulk_action(t!("stock.deactivate"), deactivate_products, Product::id)
                 .row_menu(|p| {
                     ContextMenu::new()
-                        .item(t!("stock.edit"), Window::open(product_editor, ProductParams { id: Some(p.id) }))
+                        .item(
+                            t!("stock.edit"),
+                            Window::open(product_editor, ProductParams { id: Some(p.id) }),
+                        )
                         .icon(Icon::Edit)
                         .shortcut("Enter")
                         .action(t!("stock.restock"), restock_product, p.id)
@@ -266,16 +319,36 @@ pub struct ProductPageParams {
 /// case (`nw-0007`) moves permanently to the code as it is stored.
 #[screen(route = "/products/{code}", permission = "stock.product.read")]
 pub fn product_page(params: ProductPageParams, store: ProductStore) -> Result<Screen> {
-    let product =
-        store.all()?.into_iter().find(|p| p.code.eq_ignore_ascii_case(&params.code)).ok_or(Error::NotFound)?;
+    let product = store
+        .all()?
+        .into_iter()
+        .find(|p| {
+            p.code
+                .eq_ignore_ascii_case(&params.code)
+        })
+        .ok_or(Error::NotFound)?;
     if product.code != params.code {
-        return Ok(Screen::moved_to(product_page, ProductPageParams { code: product.code }));
+        return Ok(Screen::moved_to(
+            product_page,
+            ProductPageParams { code: product.code },
+        ));
     }
     Ok(Screen::new(t!("stock.product_title", code = product.code))
         .toolbar(|t| {
-            t.button(t!("stock.edit")).icon(Icon::Edit).opens(product_editor, ProductParams { id: Some(product.id) })
+            t.button(t!("stock.edit"))
+                .icon(Icon::Edit)
+                .opens(
+                    product_editor,
+                    ProductParams {
+                        id: Some(product.id),
+                    },
+                )
         })
-        .body(Breadcrumb::new().link(t!("stock.products"), product_list, ()).current(product.code.clone()))
+        .body(
+            Breadcrumb::new()
+                .link(t!("stock.products"), product_list, ())
+                .current(product.code.clone()),
+        )
         .body(
             DescriptionList::of(&product)
                 .field(Product::code)
@@ -292,21 +365,32 @@ pub fn product_page(params: ProductPageParams, store: ProductStore) -> Result<Sc
 pub fn product_editor(params: ProductParams, store: ProductStore) -> Result<Screen> {
     let product = match params.id {
         Some(id) => store.get(id)?,
-        None => Product { active: true, ..Product::default() },
+        None => Product {
+            active: true,
+            ..Product::default()
+        },
     };
-    Ok(Screen::window(t!("stock.product")).width(640).body(
-        Form::of(product)
-            .row(|r| r.field(Product::code).field(Product::unit))
-            .field(Product::name)
-            .row(|r| r.field(Product::price).field(Product::active))
-            .submit(t!("stock.save"), save_product)
-            .on_success(|saved, ui| {
-                if let Ok(p) = saved {
-                    ui.toast(t!("stock.saved", code = p.code));
-                }
-                ui.close_and_refresh();
-            }),
-    ))
+    Ok(Screen::window(t!("stock.product"))
+        .width(640)
+        .body(
+            Form::of(product)
+                .row(|r| {
+                    r.field(Product::code)
+                        .field(Product::unit)
+                })
+                .field(Product::name)
+                .row(|r| {
+                    r.field(Product::price)
+                        .field(Product::active)
+                })
+                .submit(t!("stock.save"), save_product)
+                .on_success(|saved, ui| {
+                    if let Ok(p) = saved {
+                        ui.toast(t!("stock.saved", code = p.code));
+                    }
+                    ui.close_and_refresh();
+                }),
+        ))
 }
 
 /// The stock feature, its menu and its public API.
@@ -321,5 +405,8 @@ pub fn feature() -> Feature {
         .api(save_product)
         .api(restock_product)
         .api(archive_product)
-        .menu(|m| m.group(t!("menu.stock"), Icon::Box).item(t!("stock.products"), product_list))
+        .menu(|m| {
+            m.group(t!("menu.stock"), Icon::Box)
+                .item(t!("stock.products"), product_list)
+        })
 }

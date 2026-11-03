@@ -54,7 +54,11 @@ pub struct ScriptedProvider {
 /// Lower case without the dot of `İ` and with `ı` read as `i`, so `İzmir`, `IZMIR` and `izmir`
 /// match.
 fn fold(text: &str) -> String {
-    text.to_lowercase().chars().filter(|c| *c != '\u{307}').map(|c| if c == 'ı' { 'i' } else { c }).collect()
+    text.to_lowercase()
+        .chars()
+        .filter(|c| *c != '\u{307}')
+        .map(|c| if c == 'ı' { 'i' } else { c })
+        .collect()
 }
 
 impl ScriptedProvider {
@@ -64,7 +68,13 @@ impl ScriptedProvider {
 
     /// Answers messages containing every word of `words`, round by round.
     pub fn when(mut self, words: &str, rounds: Vec<Vec<Say>>) -> Self {
-        self.rules.push((fold(words).split_whitespace().map(str::to_string).collect(), rounds));
+        self.rules.push((
+            fold(words)
+                .split_whitespace()
+                .map(str::to_string)
+                .collect(),
+            rounds,
+        ));
         self
     }
 
@@ -82,18 +92,39 @@ impl ScriptedProvider {
 
     /// What to do this round.
     fn plan(&self, request: &ChatRequest) -> Vec<Say> {
-        let last_user = request.messages.iter().rposition(|m| m.role == Role::User);
-        let text = last_user.map(|i| fold(&request.messages[i].text)).unwrap_or_default();
-        let round = last_user.map_or(0, |i| request.messages[i..].iter().filter(|m| m.role == Role::Assistant).count());
-        if request.messages.last().is_some_and(|m| m.role == Role::Tool && m.text.contains("declined")) {
+        let last_user = request
+            .messages
+            .iter()
+            .rposition(|m| m.role == Role::User);
+        let text = last_user
+            .map(|i| fold(&request.messages[i].text))
+            .unwrap_or_default();
+        let round = last_user.map_or(0, |i| {
+            request.messages[i..]
+                .iter()
+                .filter(|m| m.role == Role::Assistant)
+                .count()
+        });
+        if request
+            .messages
+            .last()
+            .is_some_and(|m| m.role == Role::Tool && m.text.contains("declined"))
+        {
             return vec![Say::text("All right, I left it as it was.")];
         }
         let rounds = self
             .rules
             .iter()
-            .find(|(words, _)| words.iter().all(|w| text.contains(w.as_str())))
+            .find(|(words, _)| {
+                words
+                    .iter()
+                    .all(|w| text.contains(w.as_str()))
+            })
             .map_or(&self.otherwise, |(_, r)| r);
-        rounds.get(round).cloned().unwrap_or_else(|| vec![Say::text("Done.")])
+        rounds
+            .get(round)
+            .cloned()
+            .unwrap_or_else(|| vec![Say::text("Done.")])
     }
 }
 
@@ -101,7 +132,13 @@ impl LlmProvider for ScriptedProvider {
     fn chat(&self, request: ChatRequest) -> BoxFuture<crate::Result<ChatStream>> {
         let plan = self.plan(&request);
         let delay = self.delay;
-        let input = (request.system.len() + request.messages.iter().map(|m| m.text.len()).sum::<usize>()) / 4;
+        let input = (request.system.len()
+            + request
+                .messages
+                .iter()
+                .map(|m| m.text.len())
+                .sum::<usize>())
+            / 4;
         let (tx, rx) = tokio::sync::mpsc::channel(STREAM_BUFFER);
         tokio::spawn(async move {
             let mut output = 0;
@@ -113,20 +150,37 @@ impl LlmProvider for ScriptedProvider {
                             if !delay.is_zero() {
                                 tokio::time::sleep(delay).await;
                             }
-                            if tx.send(Ok(ChatEvent::Text(word.to_string()))).await.is_err() {
+                            if tx
+                                .send(Ok(ChatEvent::Text(word.to_string())))
+                                .await
+                                .is_err()
+                            {
                                 return;
                             }
                         }
                     }
                     Say::Tool(name, arguments) => {
-                        let call = ToolCall { id: format!("script_{i}_{name}"), name, arguments };
-                        if tx.send(Ok(ChatEvent::ToolCall(call))).await.is_err() {
+                        let call = ToolCall {
+                            id: format!("script_{i}_{name}"),
+                            name,
+                            arguments,
+                        };
+                        if tx
+                            .send(Ok(ChatEvent::ToolCall(call)))
+                            .await
+                            .is_err()
+                        {
                             return;
                         }
                     }
                 }
             }
-            let _ = tx.send(Ok(ChatEvent::Usage { input: input as u32, output: output as u32 })).await;
+            let _ = tx
+                .send(Ok(ChatEvent::Usage {
+                    input: input as u32,
+                    output: output as u32,
+                }))
+                .await;
         });
         Box::pin(async move { Ok(rx) })
     }

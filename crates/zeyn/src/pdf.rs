@@ -106,13 +106,19 @@ impl Pdf {
     pub fn from_config(config: &Config) -> Result<Pdf> {
         let mut extra = Vec::new();
         if let Some(dir) = config.get("pdf.fonts") {
-            let entries = std::fs::read_dir(dir).map_err(|e| Error::Internal(format!("pdf.fonts: {e}")))?;
+            let entries =
+                std::fs::read_dir(dir).map_err(|e| Error::Internal(format!("pdf.fonts: {e}")))?;
             for entry in entries.flatten() {
                 let path = entry.path();
                 let font = path
                     .extension()
                     .and_then(|e| e.to_str())
-                    .is_some_and(|e| matches!(e.to_ascii_lowercase().as_str(), "ttf" | "otf" | "ttc" | "otc"));
+                    .is_some_and(|e| {
+                        matches!(
+                            e.to_ascii_lowercase().as_str(),
+                            "ttf" | "otf" | "ttc" | "otc"
+                        )
+                    });
                 if font && let Ok(data) = std::fs::read(&path) {
                     extra.extend(Font::iter(Bytes::new(data)));
                 }
@@ -130,7 +136,10 @@ impl Pdf {
     }
 
     fn build(extra: Vec<Font>, max: usize) -> Pdf {
-        let mut fonts: Vec<Font> = EMBEDDED.iter().flat_map(|data| Font::iter(Bytes::new(*data))).collect();
+        let mut fonts: Vec<Font> = EMBEDDED
+            .iter()
+            .flat_map(|data| Font::iter(Bytes::new(*data)))
+            .collect();
         fonts.extend(extra);
         let book = FontBook::from_fonts(&fonts);
         Pdf(Arc::new(Shared {
@@ -145,7 +154,11 @@ impl Pdf {
     /// The service registered for this request, or a shared default one.
     pub fn of(ctx: &Ctx) -> Pdf {
         static DEFAULT: OnceLock<Pdf> = OnceLock::new();
-        ctx.service::<Pdf>().unwrap_or_else(|| DEFAULT.get_or_init(Pdf::default).clone())
+        ctx.service::<Pdf>().unwrap_or_else(|| {
+            DEFAULT
+                .get_or_init(Pdf::default)
+                .clone()
+        })
     }
 
     /// Most documents rendered at the same time.
@@ -155,21 +168,32 @@ impl Pdf {
 
     /// Names of the font families templates may use.
     pub fn families(&self) -> Vec<String> {
-        let mut names: Vec<String> = self.0.book.families().map(|(name, _)| name.to_string()).collect();
+        let mut names: Vec<String> = self
+            .0
+            .book
+            .families()
+            .map(|(name, _)| name.to_string())
+            .collect();
         names.dedup();
         names
     }
 
     /// Renders `template` with `data` on a blocking thread, waiting for a free slot first.
     pub async fn render(&self, template: PdfTemplate, data: &impl Serialize) -> Result<Vec<u8>> {
-        let data = serde_json::to_vec(data).map_err(|e| Error::Internal(format!("pdf data: {e}")))?;
+        let data =
+            serde_json::to_vec(data).map_err(|e| Error::Internal(format!("pdf data: {e}")))?;
         if data.len() > MAX_PDF_DATA {
             return Err(Error::Internal(format!(
                 "pdf data for `{}` is larger than {MAX_PDF_DATA} bytes",
                 template.name
             )));
         }
-        let _permit = self.0.permits.acquire().await.map_err(|_| Error::Internal("pdf renderer closed".into()))?;
+        let _permit = self
+            .0
+            .permits
+            .acquire()
+            .await
+            .map_err(|_| Error::Internal("pdf renderer closed".into()))?;
         let pdf = self.clone();
         tokio::task::spawn_blocking(move || pdf.render_now(template, data))
             .await
@@ -185,7 +209,11 @@ impl Pdf {
                 Error::Internal(format!(
                     "pdf `{}`: {}",
                     template.name,
-                    errors.iter().map(|e| e.message.as_str()).collect::<Vec<_>>().join("; ")
+                    errors
+                        .iter()
+                        .map(|e| e.message.as_str())
+                        .collect::<Vec<_>>()
+                        .join("; ")
                 ))
             })
             .and_then(|doc| {
@@ -193,7 +221,11 @@ impl Pdf {
                     Error::Internal(format!(
                         "pdf `{}`: {}",
                         template.name,
-                        errors.iter().map(|e| e.message.as_str()).collect::<Vec<_>>().join("; ")
+                        errors
+                            .iter()
+                            .map(|e| e.message.as_str())
+                            .collect::<Vec<_>>()
+                            .join("; ")
                     ))
                 })
             });
@@ -206,7 +238,13 @@ impl Pdf {
 fn ids() -> (FileId, FileId) {
     static IDS: OnceLock<(FileId, FileId)> = OnceLock::new();
     *IDS.get_or_init(|| {
-        let id = |p: &str| RootedPath::new(VirtualRoot::Project, VirtualPath::new(p).expect("valid path")).intern();
+        let id = |p: &str| {
+            RootedPath::new(
+                VirtualRoot::Project,
+                VirtualPath::new(p).expect("valid path"),
+            )
+            .intern()
+        };
         (id("/main.typ"), id("/data.json"))
     })
 }
@@ -223,7 +261,11 @@ impl<'a> DocWorld<'a> {
     fn new(shared: &'a Shared, template: PdfTemplate, data: Vec<u8>) -> Self {
         let (main, _) = ids();
         let source = format!("#let data = json(\"/data.json\")\n{}", template.source);
-        DocWorld { shared, main: Source::new(main, source), data: Bytes::new(data) }
+        DocWorld {
+            shared,
+            main: Source::new(main, source),
+            data: Bytes::new(data),
+        }
     }
 }
 
@@ -241,11 +283,19 @@ impl World for DocWorld<'_> {
     }
 
     fn source(&self, id: FileId) -> FileResult<Source> {
-        if id == self.main.id() { Ok(self.main.clone()) } else { Err(FileError::AccessDenied) }
+        if id == self.main.id() {
+            Ok(self.main.clone())
+        } else {
+            Err(FileError::AccessDenied)
+        }
     }
 
     fn file(&self, id: FileId) -> FileResult<Bytes> {
-        if id == ids().1 { Ok(self.data.clone()) } else { Err(FileError::AccessDenied) }
+        if id == ids().1 {
+            Ok(self.data.clone())
+        } else {
+            Err(FileError::AccessDenied)
+        }
     }
 
     fn font(&self, index: usize) -> Option<Font> {
@@ -253,7 +303,9 @@ impl World for DocWorld<'_> {
     }
 
     fn today(&self, _offset: Option<typst::foundations::Duration>) -> Option<Datetime> {
-        let d = crate::time::DateTime::now().local(crate::time::TimeZone::UTC).date;
+        let d = crate::time::DateTime::now()
+            .local(crate::time::TimeZone::UTC)
+            .date;
         Datetime::from_ymd(d.year(), d.month(), d.day())
     }
 }
@@ -283,7 +335,12 @@ where
     T: Serialize + Send + 'static,
 {
     pub fn new(label: impl Into<Text>, template: PdfTemplate, _action: A, input: A::Input) -> Self {
-        PdfLink { label: label.into(), template, input, _action: PhantomData }
+        PdfLink {
+            label: label.into(),
+            template,
+            input,
+            _action: PhantomData,
+        }
     }
 }
 
@@ -301,7 +358,8 @@ where
         let (input, template) = (self.input.clone(), self.template);
         Box::pin(async move {
             let data = A::call(ctx, input).await??;
-            let data = serde_json::to_value(data).map_err(|e| Error::Internal(format!("pdf data: {e}")))?;
+            let data = serde_json::to_value(data)
+                .map_err(|e| Error::Internal(format!("pdf data: {e}")))?;
             Ok((template, data))
         })
     }
@@ -315,7 +373,9 @@ where
     Result<T>: Outcome,
 {
     fn render(&self, out: &mut String, r: &Render) {
-        if r.identity.is_some_and(|i| !i.can(&A::META.access)) {
+        if r.identity
+            .is_some_and(|i| !i.can(&A::META.access))
+        {
             return;
         }
         out.push_str(&format!(
@@ -349,8 +409,16 @@ where
 
 /// Language code Typst understands for a locale such as `tr-TR`; `en` when it has none.
 pub(crate) fn lang(locale: &str) -> String {
-    let code: String = locale.chars().take_while(char::is_ascii_alphabetic).collect::<String>().to_ascii_lowercase();
-    if (2..=3).contains(&code.len()) { code } else { "en".to_string() }
+    let code: String = locale
+        .chars()
+        .take_while(char::is_ascii_alphabetic)
+        .collect::<String>()
+        .to_ascii_lowercase();
+    if (2..=3).contains(&code.len()) {
+        code
+    } else {
+        "en".to_string()
+    }
 }
 
 #[cfg(test)]
@@ -371,10 +439,19 @@ mod tests {
     /// The text a template prints for `data`, without white space.
     fn printed(template: &'static str, data: Json) -> std::result::Result<String, String> {
         let pdf = Pdf::new();
-        let world = DocWorld::new(&pdf.0, PdfTemplate::new("t", template), serde_json::to_vec(&data).unwrap());
+        let world = DocWorld::new(
+            &pdf.0,
+            PdfTemplate::new("t", template),
+            serde_json::to_vec(&data).unwrap(),
+        );
         let doc = typst::compile::<PagedDocument>(&world)
             .output
-            .map_err(|e| e.iter().map(|e| e.message.to_string()).collect::<Vec<_>>().join("; "))?;
+            .map_err(|e| {
+                e.iter()
+                    .map(|e| e.message.to_string())
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            })?;
         let mut out = String::new();
         for page in doc.pages() {
             text_of(&page.frame, &mut out);
@@ -386,7 +463,10 @@ mod tests {
     fn user_data_is_printed_as_text_and_never_runs_as_typst() {
         let evil = "#panic(\"pwned\") ] #read(\"/etc/passwd\") $x$ *bold* \" \\ <x> @y // /* #let";
         let plain = evil.replace(char::is_whitespace, "");
-        assert_eq!(printed("#data.name", json!({ "name": evil })).unwrap(), plain);
+        assert_eq!(
+            printed("#data.name", json!({ "name": evil })).unwrap(),
+            plain
+        );
         let list = json!({ "title": evil, "lang": "tr", "note": evil, "columns": [{ "label": evil, "numeric": true }], "rows": [[evil], [evil]] });
         let text = printed(PdfTemplate::LIST.source, list).unwrap();
         assert!(text.matches(plain.as_str()).count() >= 5, "{text}");
@@ -403,14 +483,22 @@ mod tests {
     #[test]
     fn embedded_fonts_cover_turkish_text() {
         assert!(
-            Pdf::new().families().iter().any(|f| f.eq_ignore_ascii_case("libertinus serif")),
+            Pdf::new()
+                .families()
+                .iter()
+                .any(|f| f.eq_ignore_ascii_case("libertinus serif")),
             "{:?}",
             Pdf::new().families()
         );
-        let text =
-            printed("#set text(font: \"Libertinus Serif\")\n#data.t", json!({ "t": "Çağrı Şükrü İĞÖÜ ıi 1.234,56 ₺" }))
-                .unwrap();
+        let text = printed(
+            "#set text(font: \"Libertinus Serif\")\n#data.t",
+            json!({ "t": "Çağrı Şükrü İĞÖÜ ıi 1.234,56 ₺" }),
+        )
+        .unwrap();
         assert_eq!(text, "ÇağrıŞükrüİĞÖÜıi1.234,56₺");
-        assert_eq!((lang("tr-TR"), lang("en"), lang("*")), ("tr".to_string(), "en".to_string(), "en".to_string()));
+        assert_eq!(
+            (lang("tr-TR"), lang("en"), lang("*")),
+            ("tr".to_string(), "en".to_string(), "en".to_string())
+        );
     }
 }

@@ -66,8 +66,14 @@ pub fn order_lines_of(n: u64, products: &[Product]) -> Vec<OrderLine> {
 /// `WHERE order_id = ?`. Without that filter there are no lines.
 #[action(permission = "sales.order.read")]
 pub async fn search_lines(q: DataQuery, store: ProductStore) -> Result<Page<OrderLine>> {
-    let order = q.filters.iter().find(|f| f.field == "order_id").and_then(|f| f.from.as_deref()?.parse::<u64>().ok());
-    let Some(n) = order else { return Ok(Page::default()) };
+    let order = q
+        .filters
+        .iter()
+        .find(|f| f.field == "order_id")
+        .and_then(|f| f.from.as_deref()?.parse::<u64>().ok());
+    let Some(n) = order else {
+        return Ok(Page::default());
+    };
     Ok(q.apply(order_lines_of(n, &store.all()?)))
 }
 
@@ -92,7 +98,15 @@ const CUSTOMERS: [&str; 10] = [
     "Selin Öztürk",
     "Kaan Yıldız",
 ];
-const CITIES: [&str; 7] = ["İstanbul", "Ankara", "İzmir", "Bursa", "Antalya", "Konya", "Eskişehir"];
+const CITIES: [&str; 7] = [
+    "İstanbul",
+    "Ankara",
+    "İzmir",
+    "Bursa",
+    "Antalya",
+    "Konya",
+    "Eskişehir",
+];
 
 /// Order `n`, placed `minutes_ago` before `now`. Always the same for the same input.
 pub fn order(n: u64, now: DateTime, minutes_ago: i64) -> Order {
@@ -114,10 +128,15 @@ pub fn order(n: u64, now: DateTime, minutes_ago: i64) -> Order {
 /// Orders placed since midnight in the user's time zone, one every 9 minutes.
 pub fn todays_orders(ctx: &Ctx) -> Vec<Order> {
     let now = ctx.now();
-    let midnight =
-        DateTime::from_local(LocalDateTime::new(ctx.today(), Time::default()), ctx.time_zone()).unwrap_or(now);
+    let midnight = DateTime::from_local(
+        LocalDateTime::new(ctx.today(), Time::default()),
+        ctx.time_zone(),
+    )
+    .unwrap_or(now);
     let minutes = (now.unix_ms() - midnight.unix_ms()) / 60_000;
-    (0..=minutes / 9).map(|i| order(ARCHIVE + 1 + i as u64, now, minutes - i * 9)).collect()
+    (0..=minutes / 9)
+        .map(|i| order(ARCHIVE + 1 + i as u64, now, minutes - i * 9))
+        .collect()
 }
 
 #[action(permission = "sales.order.read")]
@@ -130,7 +149,10 @@ pub async fn search_archive(q: DataQuery, ctx: Ctx) -> Result<Page<Order>> {
     let desc = q.sort.first().is_none_or(|s| s.desc);
     let offset = match &q.page {
         PageRequest::Offset { offset, .. } => *offset,
-        PageRequest::After { cursor, .. } => cursor.as_ref().and_then(|c| c.0.parse().ok()).unwrap_or(0),
+        PageRequest::After { cursor, .. } => cursor
+            .as_ref()
+            .and_then(|c| c.0.parse().ok())
+            .unwrap_or(0),
     }
     .min(ARCHIVE);
     let end = (offset + u64::from(q.limit())).min(ARCHIVE);
@@ -142,7 +164,11 @@ pub async fn search_archive(q: DataQuery, ctx: Ctx) -> Result<Page<Order>> {
         })
         .collect();
     let page = Page::new(items).total(ARCHIVE);
-    Ok(if end < ARCHIVE { page.next(Cursor(end.to_string())) } else { page })
+    Ok(if end < ARCHIVE {
+        page.next(Cursor(end.to_string()))
+    } else {
+        page
+    })
 }
 
 fn status_tone(s: &OrderStatus) -> Tone {
@@ -264,7 +290,12 @@ pub async fn invoice_data(p: OrderParams, store: ProductStore, ctx: Ctx) -> Resu
     let o = order(n, ctx.now(), 0);
     let lines = order_lines_of(n, &store.all()?);
     let locale = ctx.locale().to_string();
-    let total = Money::tl(lines.iter().map(|l| l.amount.minor).sum());
+    let total = Money::tl(
+        lines
+            .iter()
+            .map(|l| l.amount.minor)
+            .sum(),
+    );
     let t = |key: &str| ctx.t(&Text::key(key.to_string()));
     Ok(InvoiceData {
         lang: locale.chars().take(2).collect(),
@@ -303,7 +334,12 @@ pub async fn invoice_data(p: OrderParams, store: ProductStore, ctx: Ctx) -> Resu
 pub fn order_lines(params: OrderParams) -> Screen {
     let screen = Screen::window(t!("sales.order_lines", id = params.id.0.to_string()));
     #[cfg(feature = "pdf")]
-    let screen = screen.body(PdfLink::new(t!("sales.invoice.print"), INVOICE, invoice_data, params.clone()));
+    let screen = screen.body(PdfLink::new(
+        t!("sales.invoice.print"),
+        INVOICE,
+        invoice_data,
+        params.clone(),
+    ));
     screen.body(
         DataGrid::of(search_lines)
             .scope(OrderLine::order_id, params.id)
@@ -320,7 +356,14 @@ pub fn order_lines(params: OrderParams) -> Screen {
             .column(OrderLine::amount)
             .width(170)
             .sum()
-            .detail(|l| (product_editor, ProductParams { id: Some(l.product_id) })),
+            .detail(|l| {
+                (
+                    product_editor,
+                    ProductParams {
+                        id: Some(l.product_id),
+                    },
+                )
+            }),
     )
 }
 
@@ -328,8 +371,14 @@ pub fn order_lines(params: OrderParams) -> Screen {
 pub fn archive() -> Screen {
     Screen::new(t!("sales.archive"))
         .toolbar(|t| {
-            let t = t.export(Export::Csv).export(Export::Xlsx);
-            if cfg!(feature = "pdf") { t.export(Export::Pdf) } else { t }
+            let t = t
+                .export(Export::Csv)
+                .export(Export::Xlsx);
+            if cfg!(feature = "pdf") {
+                t.export(Export::Pdf)
+            } else {
+                t
+            }
         })
         .body(
             DataGrid::of(search_archive)

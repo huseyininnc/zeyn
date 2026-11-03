@@ -7,7 +7,12 @@ pub fn overview(ctx: &Ctx) -> Node {
     let hour = 3_600_000;
     Timeline::new()
         .event(ctx.now().add_ms(-26 * hour), "Created", None, Tone::Info)
-        .event(ctx.now().add_ms(-3 * hour), "Approved", Some(Text::from("by the manager")), Tone::Success)
+        .event(
+            ctx.now().add_ms(-3 * hour),
+            "Approved",
+            Some(Text::from("by the manager")),
+            Tone::Success,
+        )
         .event(ctx.now(), "Shipped", None, Tone::Brand)
         .into()
 }

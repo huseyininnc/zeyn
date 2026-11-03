@@ -28,5 +28,10 @@ impl From<Intro> for Node {
 }
 
 pub fn feature() -> Feature {
-    Feature::new("home").screen(home).menu(|m| m.group(t!("home.menu"), Icon::Home).item(t!("home.title"), home))
+    Feature::new("home")
+        .screen(home)
+        .menu(|m| {
+            m.group(t!("home.menu"), Icon::Home)
+                .item(t!("home.title"), home)
+        })
 }

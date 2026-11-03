@@ -10,7 +10,9 @@ use crate::i18n::{I18n, Text};
 use crate::platform::{Config, License, LicenseSource, Tenant};
 use crate::render::{Render, escape};
 use crate::screen::{GridSource, LoadedPage, Screen, ScreenDef};
-use crate::security::{IpRange, MemoryRateStore, RateKey, RateLimit, RateStore, client_ip, parse_ranges};
+use crate::security::{
+    IpRange, MemoryRateStore, RateKey, RateLimit, RateStore, client_ip, parse_ranges,
+};
 use crate::time::{DateTime, TimeZone};
 use crate::ui::NodePath;
 use axum::Router;
@@ -203,34 +205,55 @@ impl ForwardAuth {
         I: IntoIterator<Item = S>,
         S: Into<String>,
     {
-        self.roles.entry(group.to_string()).or_default().extend(permissions.into_iter().map(Into::into));
+        self.roles
+            .entry(group.to_string())
+            .or_default()
+            .extend(permissions.into_iter().map(Into::into));
         self
     }
 }
 
 impl Authenticator for ForwardAuth {
     fn authenticate(&self, headers: &HeaderMap) -> Option<Identity> {
-        let text =
-            |name: &str| headers.get(name).and_then(|v| v.to_str().ok()).map(str::trim).filter(|v| !v.is_empty());
-        if let Some((name, value)) = &self.shared {
-            if !text(name).is_some_and(|v| same(v, value)) {
-                return None;
-            }
+        let text = |name: &str| {
+            headers
+                .get(name)
+                .and_then(|v| v.to_str().ok())
+                .map(str::trim)
+                .filter(|v| !v.is_empty())
+        };
+        if let Some((name, value)) = &self.shared
+            && !text(name).is_some_and(|v| same(v, value))
+        {
+            return None;
         }
         let mut identity = Identity::user(text(self.user)?);
         if let Some(groups) = self.groups.and_then(text) {
             for group in groups.split(',').map(str::trim) {
                 if let Some(perms) = self.roles.get(group) {
-                    identity.permissions.extend(perms.iter().cloned());
+                    identity
+                        .permissions
+                        .extend(perms.iter().cloned());
                 }
             }
         }
-        identity.tenant = self.tenant.and_then(text).map(str::to_string);
-        identity.time_zone = self.time_zone.and_then(text).map(str::to_string);
-        identity.authenticated_at = self.auth_time.and_then(text).and_then(|t| match t.parse::<i64>() {
-            Ok(secs) => secs.checked_mul(1000).map(DateTime::from_unix_ms),
-            Err(_) => DateTime::parse(t),
-        });
+        identity.tenant = self
+            .tenant
+            .and_then(text)
+            .map(str::to_string);
+        identity.time_zone = self
+            .time_zone
+            .and_then(text)
+            .map(str::to_string);
+        identity.authenticated_at = self
+            .auth_time
+            .and_then(text)
+            .and_then(|t| match t.parse::<i64>() {
+                Ok(secs) => secs
+                    .checked_mul(1000)
+                    .map(DateTime::from_unix_ms),
+                Err(_) => DateTime::parse(t),
+            });
         Some(identity)
     }
 }
@@ -254,7 +277,10 @@ pub struct HeaderTenant(pub &'static str);
 
 impl TenantResolver for HeaderTenant {
     fn resolve(&self, headers: &HeaderMap) -> Option<String> {
-        headers.get(self.0).and_then(|v| v.to_str().ok()).map(|v| v.trim().to_lowercase())
+        headers
+            .get(self.0)
+            .and_then(|v| v.to_str().ok())
+            .map(|v| v.trim().to_lowercase())
     }
 }
 
@@ -264,8 +290,16 @@ pub struct SubdomainTenant(pub &'static str);
 
 impl TenantResolver for SubdomainTenant {
     fn resolve(&self, headers: &HeaderMap) -> Option<String> {
-        let host = headers.get(header::HOST)?.to_str().ok()?.split(':').next()?.to_lowercase();
-        let label = host.strip_suffix(self.0)?.strip_suffix('.')?;
+        let host = headers
+            .get(header::HOST)?
+            .to_str()
+            .ok()?
+            .split(':')
+            .next()?
+            .to_lowercase();
+        let label = host
+            .strip_suffix(self.0)?
+            .strip_suffix('.')?;
         (!label.contains('.')).then(|| label.to_string())
     }
 }
@@ -287,7 +321,9 @@ impl DevAuth {
 impl Authenticator for DevAuth {
     fn authenticate(&self, _headers: &HeaderMap) -> Option<Identity> {
         let mut identity = self.0.clone();
-        identity.authenticated_at.get_or_insert_with(DateTime::now);
+        identity
+            .authenticated_at
+            .get_or_insert_with(DateTime::now);
         Some(identity)
     }
 
@@ -402,7 +438,10 @@ pub struct MemoryAudit(Arc<Mutex<Vec<AuditEntry>>>);
 
 impl MemoryAudit {
     pub fn entries(&self) -> Vec<AuditEntry> {
-        self.0.lock().map(|e| e.clone()).unwrap_or_default()
+        self.0
+            .lock()
+            .map(|e| e.clone())
+            .unwrap_or_default()
     }
 }
 
@@ -454,7 +493,10 @@ impl<S: AuditSink> Interceptor for AuditLog<S> {
             reason: trail.reason,
             transition: trail.transition,
             export: trail.export,
-            at_unix_ms: SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0),
+            at_unix_ms: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_millis())
+                .unwrap_or(0),
             user: ctx.identity().user.clone(),
             kind: call.kind,
             screen: call.screen,
@@ -489,7 +531,10 @@ pub struct Mcp {
 }
 
 /// Old name of [`Mcp`]; kept for one release.
-#[deprecated(since = "0.0.3", note = "renamed to `Mcp`; use `App::mcp(Mcp::on())` or `Mcp::read_only()`")]
+#[deprecated(
+    since = "0.0.3",
+    note = "renamed to `Mcp`; use `App::mcp(Mcp::on())` or `Mcp::read_only()`"
+)]
 pub type Agents = Mcp;
 
 impl Mcp {
@@ -500,12 +545,20 @@ impl Mcp {
 
     /// Agents may search grids and call API actions that only read, not save forms.
     pub fn read_only() -> Self {
-        Mcp { writes: false, server: true, browser: true }
+        Mcp {
+            writes: false,
+            server: true,
+            browser: true,
+        }
     }
 
     /// Agents may also save forms and call API actions that write. Audit records mark these calls.
     pub fn on() -> Self {
-        Mcp { writes: true, server: true, browser: true }
+        Mcp {
+            writes: true,
+            server: true,
+            browser: true,
+        }
     }
 
     /// Same as [`Mcp::on`].
@@ -550,7 +603,10 @@ pub struct StaticCredentials {
 
 impl StaticCredentials {
     pub fn new(user: &str, password: crate::Secret<String>) -> Self {
-        StaticCredentials { user: user.to_string(), password }
+        StaticCredentials {
+            user: user.to_string(),
+            password,
+        }
     }
 }
 
@@ -597,7 +653,10 @@ fn base64_decode(s: &str) -> Option<Vec<u8>> {
             _ => None,
         }
     };
-    let bytes = s.trim().trim_end_matches('=').as_bytes();
+    let bytes = s
+        .trim()
+        .trim_end_matches('=')
+        .as_bytes();
     let mut out = Vec::with_capacity(bytes.len() * 3 / 4);
     for chunk in bytes.chunks(4) {
         let mut n = 0u32;
@@ -722,7 +781,9 @@ impl App {
             csp: crate::csp::Csp::new(),
             robots_txt: None,
             site_url: String::new(),
-            time: TimePolicy::User { default: TimeZone::UTC },
+            time: TimePolicy::User {
+                default: TimeZone::UTC,
+            },
             fixed_now: None,
             zone_picker: false,
             api_prefix: "/api/v1".into(),
@@ -862,7 +923,8 @@ impl App {
         S: AsRef<str>,
     {
         parse_ranges(ranges).unwrap_or_else(|e| {
-            self.setup_problems.push(format!("{what}: {e}"));
+            self.setup_problems
+                .push(format!("{what}: {e}"));
             Vec::new()
         })
     }
@@ -922,7 +984,8 @@ impl App {
         I: IntoIterator<Item = S>,
         S: Into<String>,
     {
-        self.cors.extend(origins.into_iter().map(Into::into));
+        self.cors
+            .extend(origins.into_iter().map(Into::into));
         self
     }
 
@@ -958,7 +1021,10 @@ impl App {
 
     /// Path prefix of API endpoints and of `openapi.json`. Default `/api/v1`.
     pub fn api_prefix(mut self, prefix: impl Into<String>) -> Self {
-        self.api_prefix = prefix.into().trim_end_matches('/').to_string();
+        self.api_prefix = prefix
+            .into()
+            .trim_end_matches('/')
+            .to_string();
         self
     }
 
@@ -1053,7 +1119,10 @@ impl App {
     /// sitemap leaves them out.
     pub fn site_url(mut self, url: &str) -> Self {
         let url = url.trim_end_matches('/');
-        if crate::seo::valid_url(url) && url.starts_with("https://") && !url["https://".len()..].contains('/') {
+        if crate::seo::valid_url(url)
+            && url.starts_with("https://")
+            && !url["https://".len()..].contains('/')
+        {
             self.site_url = url.to_string();
         } else {
             self.setup_problems.push(format!(
@@ -1086,7 +1155,8 @@ impl App {
     }
 
     pub fn interceptor(mut self, interceptor: impl Interceptor) -> Self {
-        self.interceptors.push(Arc::new(interceptor));
+        self.interceptors
+            .push(Arc::new(interceptor));
         self
     }
 
@@ -1137,7 +1207,14 @@ impl App {
         problems.extend(self.csp.problems().iter().cloned());
         let mut paths: HashMap<String, &str> = HashMap::new();
         let mut names: HashMap<&str, &str> = HashMap::new();
-        let sitemaps: Vec<_> = self.features.iter().filter_map(|f| f.sitemap_source().map(|s| (f.name(), s))).collect();
+        let sitemaps: Vec<_> = self
+            .features
+            .iter()
+            .filter_map(|f| {
+                f.sitemap_source()
+                    .map(|s| (f.name(), s))
+            })
+            .collect();
         if sitemaps.len() > 1 {
             problems.push(
                 "more than one feature has a sitemap\n  = help: keep one `Feature::sitemap` that lists every URL"
@@ -1154,17 +1231,20 @@ impl App {
         }
         for f in &self.features {
             if let Err(p) = f.check() {
-                problems.extend(p.into_iter().map(|p| format!("feature `{}`: {p}", f.name())));
+                problems.extend(
+                    p.into_iter()
+                        .map(|p| format!("feature `{}`: {p}", f.name())),
+                );
             }
             for s in f.screens() {
-                if let Some(other) = names.insert(s.meta.name, f.name()) {
-                    if other != f.name() {
-                        problems.push(format!(
-                            "screen `{}` is registered in features `{other}` and `{}`",
-                            s.meta.name,
-                            f.name()
-                        ));
-                    }
+                if let Some(other) = names.insert(s.meta.name, f.name())
+                    && other != f.name()
+                {
+                    problems.push(format!(
+                        "screen `{}` is registered in features `{other}` and `{}`",
+                        s.meta.name,
+                        f.name()
+                    ));
                 }
                 if let Some(path) = f.path_of(&s.meta) {
                     let shape: String = path
@@ -1172,10 +1252,13 @@ impl App {
                         .map(|p| if p.starts_with('{') { "{}" } else { p })
                         .collect::<Vec<_>>()
                         .join("/");
-                    if let Some(other) = paths.insert(shape, s.meta.name) {
-                        if other != s.meta.name {
-                            problems.push(format!("route `{path}` is used by screens `{other}` and `{}`", s.meta.name));
-                        }
+                    if let Some(other) = paths.insert(shape, s.meta.name)
+                        && other != s.meta.name
+                    {
+                        problems.push(format!(
+                            "route `{path}` is used by screens `{other}` and `{}`",
+                            s.meta.name
+                        ));
                     }
                 }
                 for dep in (s.deps)() {
@@ -1190,8 +1273,15 @@ impl App {
         }
         for f in &self.features {
             for (i, a) in f.apis().iter().enumerate() {
-                if f.apis()[..i].iter().any(|b| b.meta.name == a.meta.name) {
-                    problems.push(format!("api `{}` is published twice in feature `{}`", a.meta.name, f.name()));
+                if f.apis()[..i]
+                    .iter()
+                    .any(|b| b.meta.name == a.meta.name)
+                {
+                    problems.push(format!(
+                        "api `{}` is published twice in feature `{}`",
+                        a.meta.name,
+                        f.name()
+                    ));
                 }
                 for dep in (a.deps)() {
                     if !self.services.contains(dep.id) {
@@ -1206,18 +1296,21 @@ impl App {
         let mut media: HashMap<&str, &str> = HashMap::new();
         for f in &self.features {
             for m in f.media_sources() {
-                if let Some(other) = media.insert(m.name, f.name()) {
-                    if other != f.name() {
-                        problems.push(format!(
-                            "media source `{}` is registered in features `{other}` and `{}`",
-                            m.name,
-                            f.name()
-                        ));
-                    }
+                if let Some(other) = media.insert(m.name, f.name())
+                    && other != f.name()
+                {
+                    problems.push(format!(
+                        "media source `{}` is registered in features `{other}` and `{}`",
+                        m.name,
+                        f.name()
+                    ));
                 }
             }
         }
-        for s in [self.errors.not_found, self.errors.server_error].into_iter().flatten() {
+        for s in [self.errors.not_found, self.errors.server_error]
+            .into_iter()
+            .flatten()
+        {
             for dep in (s.deps)() {
                 if !self.services.contains(dep.id) {
                     problems.push(format!(
@@ -1229,7 +1322,9 @@ impl App {
             }
         }
         for f in &self.features {
-            let Some(shell) = f.site_shell() else { continue };
+            let Some(shell) = f.site_shell() else {
+                continue;
+            };
             for screen in shell.linked_screens() {
                 if !names.contains_key(screen) {
                     problems.push(format!(
@@ -1246,9 +1341,14 @@ impl App {
             }
         }
         if let Some(home) = self.home {
-            if !self.features.iter().any(|f| f.screens().iter().any(|s| s.meta.name == home && s.meta.route.is_some()))
-            {
-                problems.push(format!("home screen `{home}` is not registered or has no route"));
+            if !self.features.iter().any(|f| {
+                f.screens()
+                    .iter()
+                    .any(|s| s.meta.name == home && s.meta.route.is_some())
+            }) {
+                problems.push(format!(
+                    "home screen `{home}` is not registered or has no route"
+                ));
             }
             if self
                 .features
@@ -1262,16 +1362,30 @@ impl App {
                 ));
             }
         }
-        let commands: Vec<(&str, &crate::command::Command)> =
-            self.features.iter().flat_map(|f| f.commands().iter().map(move |c| (f.name(), c))).collect();
-        problems.extend(crate::command::problems(&commands, false, &self.palette_keys));
+        let commands: Vec<(&str, &crate::command::Command)> = self
+            .features
+            .iter()
+            .flat_map(|f| {
+                f.commands()
+                    .iter()
+                    .map(move |c| (f.name(), c))
+            })
+            .collect();
+        problems.extend(crate::command::problems(
+            &commands,
+            false,
+            &self.palette_keys,
+        ));
         match crate::command::normalize_shortcut(&self.palette_keys) {
             None => problems.push(format!(
                 "the palette shortcut `{}` cannot be read
   = help: write modifiers and one key joined by `+`, such as `Alt+Shift+P`",
                 self.palette_keys
             )),
-            Some(k) if crate::command::browser_shortcut(&k) == Some(crate::command::BrowserShortcut::Reserved) => {
+            Some(k)
+                if crate::command::browser_shortcut(&k)
+                    == Some(crate::command::BrowserShortcut::Reserved) =>
+            {
                 problems.push(format!(
                     "the palette shortcut `{k}` is kept by the browser and never reaches the page
   = help: pick a free shortcut such as `Alt+Shift+P`"
@@ -1281,7 +1395,11 @@ impl App {
         }
         problems.extend(self.theme_problems());
         problems.dedup();
-        if problems.is_empty() { Ok(()) } else { Err(problems) }
+        if problems.is_empty() {
+            Ok(())
+        } else {
+            Err(problems)
+        }
     }
 
     /// Machine readable description of the app, used by `zeyn mcp` and `zeyn routes`.
@@ -1330,7 +1448,10 @@ impl App {
         self.check()?;
         let docs_enabled = self.api_docs.is_some();
         let mount = self.base_path.clone();
-        let url_prefix = self.public_path.clone().unwrap_or_else(|| self.base_path.clone());
+        let url_prefix = self
+            .public_path
+            .clone()
+            .unwrap_or_else(|| self.base_path.clone());
         auth::resolve(&mut self.sign_in, &url_prefix, &mut self.login_url);
         let mut screens = HashMap::new();
         let mut routes = HashMap::new();
@@ -1345,16 +1466,20 @@ impl App {
         let default_locale = self
             .locale_paths
             .then(|| Arc::from(self.i18n.default_locale()));
-        self.services.insert(crate::screen::Routes(Arc::new(routes), default_locale));
+        self.services
+            .insert(crate::screen::Routes(Arc::new(routes), default_locale));
         let look = self.look();
         #[cfg(feature = "islands")]
-        let islands = self.islands_dir.as_deref().and_then(|dir| match islands::Islands::load(dir, &url_prefix) {
-            Ok(i) => Some(i),
-            Err(e) => {
-                tracing::warn!("islands are not served, so they show their fallback: {e}");
-                None
-            }
-        });
+        let islands = self
+            .islands_dir
+            .as_deref()
+            .and_then(|dir| match islands::Islands::load(dir, &url_prefix) {
+                Ok(i) => Some(i),
+                Err(e) => {
+                    tracing::warn!("islands are not served, so they show their fallback: {e}");
+                    None
+                }
+            });
         let state = Arc::new(AppState {
             errors: self.errors,
             name: self.name,
@@ -1370,7 +1495,8 @@ impl App {
             csp_header: HeaderValue::from_str(&self.csp.header(false))
                 .unwrap_or(HeaderValue::from_static(guard::DEFAULT_CSP)),
             #[cfg(feature = "islands")]
-            island_csp: HeaderValue::from_str(&self.csp.header(true)).unwrap_or(HeaderValue::from_static(islands::CSP)),
+            island_csp: HeaderValue::from_str(&self.csp.header(true))
+                .unwrap_or(HeaderValue::from_static(islands::CSP)),
             csp: Arc::new(self.csp),
             time: self.time,
             fixed_now: self.fixed_now,
@@ -1445,40 +1571,68 @@ impl App {
                 let path = format!("{}/{}/{}", state.api_prefix, f.name(), a.meta.name);
                 router = router.route(
                     &path,
-                    post(move |st: State<Arc<AppState>>, h: HeaderMap, body: axum::body::Bytes| {
-                        agent::api_call(st, h, body, fi, ai)
-                    }),
+                    post(
+                        move |st: State<Arc<AppState>>, h: HeaderMap, body: axum::body::Bytes| {
+                            agent::api_call(st, h, body, fi, ai)
+                        },
+                    ),
                 );
             }
         }
         let cors = self.cors;
         if docs_enabled {
             router = router
-                .route(&format!("{}/openapi.json", state.api_prefix), get(agent::openapi))
-                .route(&format!("{}/docs", state.api_prefix), get(agent::api_reference));
+                .route(
+                    &format!("{}/openapi.json", state.api_prefix),
+                    get(agent::openapi),
+                )
+                .route(
+                    &format!("{}/docs", state.api_prefix),
+                    get(agent::api_reference),
+                );
         }
         let home = self.home.and_then(|name| {
-            state
-                .features
-                .iter()
-                .find_map(|f| f.screens().iter().find(|s| s.meta.name == name).and_then(|s| f.path_of(&s.meta)))
+            state.features.iter().find_map(|f| {
+                f.screens()
+                    .iter()
+                    .find(|s| s.meta.name == name)
+                    .and_then(|s| f.path_of(&s.meta))
+            })
         });
         if let Some(path) = home.filter(|p| p != "/") {
             let target = format!("{}{path}", state.prefix);
             router = router.route("/", get(move || async move { Redirect::to(&target) }));
         }
         if let Some(text) = self.llms_txt {
-            router = router.route("/llms.txt", get(move || async move { asset(text, "text/plain; charset=utf-8") }));
+            router = router.route(
+                "/llms.txt",
+                get(move || async move { asset(text, "text/plain; charset=utf-8") }),
+            );
         }
         if let Some(text) = self.robots_txt {
-            router = router.route("/robots.txt", get(move || async move { asset(text, "text/plain; charset=utf-8") }));
+            router = router.route(
+                "/robots.txt",
+                get(move || async move { asset(text, "text/plain; charset=utf-8") }),
+            );
         }
         let router = seo::routes(router, &state);
         let router = router
-            .route("/_zeyn/zeyn.js", get(|| async { asset(JS, "text/javascript; charset=utf-8") }))
-            .route("/_zeyn/grid.js", get(|| async { asset(GRID_JS, "text/javascript; charset=utf-8") }))
-            .route("/_zeyn/zeyn.css", get(|| async { asset(CSS, "text/css; charset=utf-8") }))
-            .route("/_zeyn/nav.js", get(|| async { asset(NAV, "text/javascript; charset=utf-8") }))
+            .route(
+                "/_zeyn/zeyn.js",
+                get(|| async { asset(JS, "text/javascript; charset=utf-8") }),
+            )
+            .route(
+                "/_zeyn/grid.js",
+                get(|| async { asset(GRID_JS, "text/javascript; charset=utf-8") }),
+            )
+            .route(
+                "/_zeyn/zeyn.css",
+                get(|| async { asset(CSS, "text/css; charset=utf-8") }),
+            )
+            .route(
+                "/_zeyn/nav.js",
+                get(|| async { asset(NAV, "text/javascript; charset=utf-8") }),
+            )
             .route("/_zeyn/theme.css", get(theme_css))
             .route("/favicon.ico", get(|| async { StatusCode::NO_CONTENT }))
             .route("/_zeyn/csrf", get(csrf_token))
@@ -1500,24 +1654,36 @@ impl App {
         #[cfg(feature = "pdf")]
         let router = pdf::routes(router);
         let router = site::routes(charts::routes(files::routes(router)));
-        let router = theme::routes(pro::routes(media::routes(ui::routes(session::routes(data::routes(ops::routes(
-            agent::routes(grid::routes(router)),
-        )))))))
+        let router = theme::routes(pro::routes(media::routes(ui::routes(session::routes(
+            data::routes(ops::routes(agent::routes(grid::routes(router)))),
+        )))))
         .fallback(not_found);
         #[cfg(feature = "accounts")]
         let router = if state.sign_in.accounts.is_some() {
-            router.layer(axum::middleware::from_fn_with_state(state.clone(), accounts::layer))
+            router.layer(axum::middleware::from_fn_with_state(
+                state.clone(),
+                accounts::layer,
+            ))
         } else {
             router
         };
         let router = auth::layers(router, &state);
         let router = router
-            .layer(axum::middleware::from_fn_with_state(state.clone(), catch_panics))
-            .layer(axum::middleware::from_fn_with_state(state.clone(), guard::guard_request))
+            .layer(axum::middleware::from_fn_with_state(
+                state.clone(),
+                catch_panics,
+            ))
+            .layer(axum::middleware::from_fn_with_state(
+                state.clone(),
+                guard::guard_request,
+            ))
             .layer(axum::middleware::from_fn(static_files))
             .layer(compression())
             .layer(axum::middleware::map_request(identity_for_ranges))
-            .layer(axum::middleware::map_response_with_state(state.clone(), guard::security_headers))
+            .layer(axum::middleware::map_response_with_state(
+                state.clone(),
+                guard::security_headers,
+            ))
             .layer(axum::middleware::map_response(ops::stamp))
             .layer(axum::middleware::from_fn(guard::trace_request))
             .with_state(state.clone());
@@ -1528,15 +1694,26 @@ impl App {
         } else {
             router
         };
-        let router = if mount.is_empty() { router } else { Router::new().nest(&mount, router) };
+        let router = if mount.is_empty() {
+            router
+        } else {
+            Router::new().nest(&mount, router)
+        };
         if cors.is_empty() {
             return Ok(router);
         }
-        let origins: Vec<HeaderValue> = cors.iter().filter_map(|o| HeaderValue::from_str(o).ok()).collect();
+        let origins: Vec<HeaderValue> = cors
+            .iter()
+            .filter_map(|o| HeaderValue::from_str(o).ok())
+            .collect();
         let layer = tower_http::cors::CorsLayer::new()
             .allow_origin(origins)
             .allow_methods([axum::http::Method::GET, axum::http::Method::POST])
-            .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE, header::ACCEPT_LANGUAGE])
+            .allow_headers([
+                header::AUTHORIZATION,
+                header::CONTENT_TYPE,
+                header::ACCEPT_LANGUAGE,
+            ])
             .max_age(Duration::from_secs(600));
         Ok(router.layer(layer))
     }
@@ -1544,7 +1721,10 @@ impl App {
     /// Checks the app and serves it. With `ZEYN_DESCRIBE=1` it prints `describe()` and exits instead.
     pub async fn serve(self, addr: &str) -> std::io::Result<()> {
         if std::env::var_os("ZEYN_DESCRIBE").is_some() {
-            println!("{}", serde_json::to_string_pretty(&self.describe()).unwrap_or_default());
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&self.describe()).unwrap_or_default()
+            );
             return Ok(());
         }
         let flush = self.start_telemetry();
@@ -1566,7 +1746,11 @@ impl App {
             _ => e,
         })?;
         tracing::info!("Zeyn is listening on http://{}", listener.local_addr()?);
-        let served = axum::serve(listener, router.into_make_service_with_connect_info::<std::net::SocketAddr>()).await;
+        let served = axum::serve(
+            listener,
+            router.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await;
         if let Some(f) = flush {
             f.shutdown().await;
         }
@@ -1576,20 +1760,37 @@ impl App {
     /// Installs the default log and trace subscriber (see `server::telemetry`) and logs the
     /// startup warnings.
     fn start_telemetry(&self) -> Option<telemetry::Flush> {
-        let flush = telemetry::init(&self.config, &self.i18n.text(self.i18n.default_locale(), &self.name));
+        let flush = telemetry::init(
+            &self.config,
+            &self
+                .i18n
+                .text(self.i18n.default_locale(), &self.name),
+        );
         for (locale, key) in self.i18n.missing_keys() {
             tracing::warn!("translation `{key}` is missing in `{locale}`");
         }
         #[cfg(debug_assertions)]
         if let Some(d) = self.extras.latency {
-            tracing::warn!("every call is delayed by {} ms (dev_latency)", d.as_millis());
+            tracing::warn!(
+                "every call is delayed by {} ms (dev_latency)",
+                d.as_millis()
+            );
         }
-        if self.auth.as_ref().is_some_and(|a| a.is_development()) {
-            tracing::warn!("DevAuth is on; every request has full access. Do not use it in production.");
+        if self
+            .auth
+            .as_ref()
+            .is_some_and(|a| a.is_development())
+        {
+            tracing::warn!(
+                "DevAuth is on; every request has full access. Do not use it in production."
+            );
         }
         flush
     }
 }
+
+/// A tenant's license as last read, with the time it was read.
+type CachedLicense = (Instant, Option<Arc<License>>);
 
 struct AppState {
     errors: ErrorScreens,
@@ -1616,7 +1817,7 @@ struct AppState {
     config: Config,
     tenancy: Option<Arc<dyn TenantResolver>>,
     license: Option<(Arc<dyn LicenseSource>, Duration)>,
-    licenses: Mutex<HashMap<String, (Instant, Option<Arc<License>>)>>,
+    licenses: Mutex<HashMap<String, CachedLicense>>,
     login_url: Option<String>,
     rate: Option<RateLimit>,
     write_rate: Option<RateLimit>,
@@ -1648,12 +1849,13 @@ fn percent_decode(s: &str) -> String {
     let mut out = Vec::with_capacity(bytes.len());
     let mut i = 0;
     while i < bytes.len() {
-        if bytes[i] == b'%' && i + 2 < bytes.len() {
-            if let Ok(b) = u8::from_str_radix(&s[i + 1..i + 3], 16) {
-                out.push(b);
-                i += 3;
-                continue;
-            }
+        if bytes[i] == b'%'
+            && i + 2 < bytes.len()
+            && let Ok(b) = u8::from_str_radix(&s[i + 1..i + 3], 16)
+        {
+            out.push(b);
+            i += 3;
+            continue;
         }
         out.push(bytes[i]);
         i += 1;
@@ -1683,7 +1885,11 @@ impl From<Error> for Failure {
     fn from(e: Error) -> Self {
         match e {
             Error::Denied(Text::Key { ref key, .. }) if key == crate::auth::MFA_REQUIRED => {
-                Failure::Status(StatusCode::UNAUTHORIZED, "mfa_required", Text::key(crate::auth::MFA_REQUIRED))
+                Failure::Status(
+                    StatusCode::UNAUTHORIZED,
+                    "mfa_required",
+                    Text::key(crate::auth::MFA_REQUIRED),
+                )
             }
             e => Failure::App(e),
         }
@@ -1721,18 +1927,29 @@ pub(crate) fn cookie<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> 
 
 /// Compares two strings in time that does not depend on where they differ.
 pub(crate) fn same(a: &str, b: &str) -> bool {
-    a.len() == b.len() && a.bytes().zip(b.bytes()).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
+    a.len() == b.len()
+        && a.bytes()
+            .zip(b.bytes())
+            .fold(0u8, |acc, (x, y)| acc | (x ^ y))
+            == 0
 }
 
 /// Compares two byte strings in time that does not depend on where they differ.
 pub(crate) fn same_bytes(a: &[u8], b: &[u8]) -> bool {
-    a.len() == b.len() && a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
+    a.len() == b.len()
+        && a.iter()
+            .zip(b)
+            .fold(0u8, |acc, (x, y)| acc | (x ^ y))
+            == 0
 }
 
 fn new_token() -> String {
     let mut bytes = [0u8; 32];
     getrandom::getrandom(&mut bytes).expect("the operating system random source must work");
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
+    bytes
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 fn valid_token(t: &str) -> bool {
@@ -1755,7 +1972,7 @@ fn hex32(s: &[u8]) -> Option<[u8; 32]> {
         return None;
     }
     let mut out = [0u8; 32];
-    for (i, pair) in s.chunks_exact(2).enumerate() {
+    for (i, pair) in s.as_chunks::<2>().0.iter().enumerate() {
         out[i] = hex_digit(pair[0])? << 4 | hex_digit(pair[1])?;
     }
     Some(out)
@@ -1766,11 +1983,17 @@ fn hex32(s: &[u8]) -> Option<[u8; 32]> {
 /// so compression cannot leak it (BREACH). A token that is already masked is masked again with a
 /// new pad; an empty token stays empty.
 fn mask_token(token: &str) -> String {
-    let Some(raw) = unmask_token(token).or_else(|| hex32(token.as_bytes())) else { return String::new() };
+    let Some(raw) = unmask_token(token).or_else(|| hex32(token.as_bytes())) else {
+        return String::new();
+    };
     let mut pad = [0u8; 32];
     getrandom::getrandom(&mut pad).expect("the operating system random source must work");
     let mut out = String::with_capacity(128);
-    for b in pad.into_iter().chain(raw.into_iter().zip(pad).map(|(r, p)| r ^ p)) {
+    for b in pad.into_iter().chain(
+        raw.into_iter()
+            .zip(pad)
+            .map(|(r, p)| r ^ p),
+    ) {
         use std::fmt::Write;
         let _ = write!(out, "{b:02x}");
     }
@@ -1794,7 +2017,9 @@ fn unmask_token(masked: &str) -> Option<[u8; 32]> {
 /// Whether a token sent with a request matches the `zeyn_csrf` cookie, in constant time. The
 /// token may be masked ([`mask_token`]) or raw, as pages from before masking send it.
 pub(crate) fn csrf_matches(cookie: &str, sent: &str) -> bool {
-    let Some(want) = hex32(cookie.as_bytes()) else { return false };
+    let Some(want) = hex32(cookie.as_bytes()) else {
+        return false;
+    };
     match unmask_token(sent).or_else(|| hex32(sent.as_bytes())) {
         Some(got) => same_bytes(&want, &got),
         None => false,
@@ -1823,13 +2048,27 @@ impl AppState {
 
     /// Params of a page request: the JSON `params` query with the route's path segments read
     /// into the fields of the same name. A segment that does not parse answers 404.
-    fn with_segments(&self, screen: &str, params: Json, segments: &[(String, String)]) -> Result<Json, Failure> {
+    fn with_segments(
+        &self,
+        screen: &str,
+        params: Json,
+        segments: &[(String, String)],
+    ) -> Result<Json, Failure> {
         if segments.is_empty() {
             return Ok(params);
         }
-        let (_, entry) = self.screens.get(screen).ok_or(Failure::App(Error::NotFound))?;
-        let mut params = if params.is_null() { Json::Object(Map::new()) } else { params };
-        let fields = params.as_object_mut().ok_or(Failure::App(Error::NotFound))?;
+        let (_, entry) = self
+            .screens
+            .get(screen)
+            .ok_or(Failure::App(Error::NotFound))?;
+        let mut params = if params.is_null() {
+            Json::Object(Map::new())
+        } else {
+            params
+        };
+        let fields = params
+            .as_object_mut()
+            .ok_or(Failure::App(Error::NotFound))?;
         for (name, raw) in segments {
             let value = (entry.path_value)(name, raw).ok_or(Failure::App(Error::NotFound))?;
             fields.insert(name.clone(), value);
@@ -1839,22 +2078,38 @@ impl AppState {
 
     /// Cookie `Path` attribute for this app.
     fn cookie_path(&self) -> &str {
-        if self.prefix.is_empty() { "/" } else { &self.prefix }
+        if self.prefix.is_empty() {
+            "/"
+        } else {
+            &self.prefix
+        }
     }
 
     fn ctx(&self, headers: &HeaderMap) -> Ctx {
-        let mut identity = self.auth.as_ref().and_then(|a| a.authenticate(headers)).unwrap_or_default();
+        let mut identity = self
+            .auth
+            .as_ref()
+            .and_then(|a| a.authenticate(headers))
+            .unwrap_or_default();
         auth::adjust(self, headers, &mut identity);
-        let accept = headers.get(header::ACCEPT_LANGUAGE).and_then(|v| v.to_str().ok());
+        let accept = headers
+            .get(header::ACCEPT_LANGUAGE)
+            .and_then(|v| v.to_str().ok());
         let locale = if self.locale_paths {
             headers
                 .get(locale::HEADER)
                 .and_then(|v| v.to_str().ok())
-                .filter(|l| self.i18n.locales().iter().any(|o| o.as_str() == *l))
+                .filter(|l| {
+                    self.i18n
+                        .locales()
+                        .iter()
+                        .any(|o| o.as_str() == *l)
+                })
                 .unwrap_or(self.i18n.default_locale())
                 .to_string()
         } else {
-            self.i18n.negotiate(cookie(headers, "zeyn_locale"), accept)
+            self.i18n
+                .negotiate(cookie(headers, "zeyn_locale"), accept)
         };
         let tz = match self.time {
             TimePolicy::Organization(zone) => zone,
@@ -1862,29 +2117,45 @@ impl AppState {
                 .time_zone
                 .as_deref()
                 .and_then(TimeZone::named)
-                .or_else(|| cookie(headers, "zeyn_tz_manual").and_then(|z| TimeZone::named(&percent_decode(z))))
-                .or_else(|| cookie(headers, "zeyn_tz").and_then(|z| TimeZone::named(&percent_decode(z))))
+                .or_else(|| {
+                    cookie(headers, "zeyn_tz_manual")
+                        .and_then(|z| TimeZone::named(&percent_decode(z)))
+                })
+                .or_else(|| {
+                    cookie(headers, "zeyn_tz").and_then(|z| TimeZone::named(&percent_decode(z)))
+                })
                 .unwrap_or(default),
         };
-        let resolved = self.tenancy.as_ref().and_then(|r| r.resolve(headers)).and_then(|t| Tenant::new(&t));
+        let resolved = self
+            .tenancy
+            .as_ref()
+            .and_then(|r| r.resolve(headers))
+            .and_then(|t| Tenant::new(&t));
         let tenant = match resolved {
             Some(t) if identity.is_signed_in() && !identity.member_of(t.id()) => {
-                tracing::debug!(tenant = t.id(), "the user is not a member of the request's tenant; signed out");
+                tracing::debug!(
+                    tenant = t.id(),
+                    "the user is not a member of the request's tenant; signed out"
+                );
                 identity = Identity::anonymous();
                 Some(t)
             }
             Some(t) => Some(t),
-            None => identity.tenant.as_deref().and_then(Tenant::new),
+            None => identity
+                .tenant
+                .as_deref()
+                .and_then(Tenant::new),
         };
         let ctx = Ctx::for_request(
             identity,
-            locale.into(),
+            locale,
             self.services.clone(),
             self.i18n.clone(),
             tz,
             tenant,
             self.config.clone(),
-            self.look.pick(cookie(headers, "zeyn_theme")),
+            self.look
+                .pick(cookie(headers, "zeyn_theme")),
             self.extras.session.reauth_within,
             self.csp.clone(),
         );
@@ -1897,13 +2168,22 @@ impl AppState {
 
     /// Context with the license that applies to the request, loading or refreshing it when due.
     async fn licensed(&self, ctx: Ctx) -> Ctx {
-        let Some((source, refresh)) = &self.license else { return ctx };
-        let key = ctx.tenant().map(|t| t.id().to_string()).unwrap_or_default();
-        let cached = self.licenses.lock().ok().and_then(|c| c.get(&key).cloned());
-        if let Some((at, license)) = &cached {
-            if at.elapsed() < *refresh {
-                return ctx.with_license(license.clone());
-            }
+        let Some((source, refresh)) = &self.license else {
+            return ctx;
+        };
+        let key = ctx
+            .tenant()
+            .map(|t| t.id().to_string())
+            .unwrap_or_default();
+        let cached = self
+            .licenses
+            .lock()
+            .ok()
+            .and_then(|c| c.get(&key).cloned());
+        if let Some((at, license)) = &cached
+            && at.elapsed() < *refresh
+        {
+            return ctx.with_license(license.clone());
         }
         let license = match source.load(ctx.tenant()).await {
             Ok(l) => l.map(Arc::new),
@@ -1931,14 +2211,20 @@ impl AppState {
             None => {
                 let t = new_token();
                 let secure = if self.secure_cookies { "; Secure" } else { "" };
-                let c = format!("zeyn_csrf={t}; Path={}; HttpOnly; SameSite=Strict{secure}", self.cookie_path());
+                let c = format!(
+                    "zeyn_csrf={t}; Path={}; HttpOnly; SameSite=Strict{secure}",
+                    self.cookie_path()
+                );
                 (t, Some(c))
             }
         }
     }
 
     fn check_csrf(&self, headers: &HeaderMap) -> Result<(), Failure> {
-        let header = headers.get("x-zeyn-csrf").and_then(|v| v.to_str().ok()).unwrap_or("");
+        let header = headers
+            .get("x-zeyn-csrf")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
         match cookie(headers, "zeyn_csrf") {
             Some(c) if csrf_matches(c, header) => Ok(()),
             _ => Err(Failure::App(Error::Denied(Text::key("zeyn.error.csrf")))),
@@ -1949,24 +2235,43 @@ impl AppState {
     /// limit, inside a `run` span.
     async fn timed<T>(&self, fut: impl Future<Output = crate::Result<T>>) -> Result<T, Failure> {
         use tracing::Instrument;
-        match tokio::time::timeout(self.timeout, fut).instrument(tracing::info_span!("run")).await {
+        match tokio::time::timeout(self.timeout, fut)
+            .instrument(tracing::info_span!("run"))
+            .await
+        {
             Ok(r) => r.map_err(Failure::App),
             Err(_) => Err(Failure::Timeout),
         }
     }
 
     /// Finds, checks and builds a screen: access, then feature guards.
-    async fn open(&self, ctx: &Ctx, name: &str, params: Json) -> Result<(&Feature, ScreenEntry, Screen), Failure> {
-        let (fi, entry) = *self.screens.get(name).ok_or(Failure::App(Error::NotFound))?;
+    async fn open(
+        &self,
+        ctx: &Ctx,
+        name: &str,
+        params: Json,
+    ) -> Result<(&Feature, ScreenEntry, Screen), Failure> {
+        let (fi, entry) = *self
+            .screens
+            .get(name)
+            .ok_or(Failure::App(Error::NotFound))?;
         let feature = &self.features[fi];
         if !ctx.identity().can(&entry.meta.access) {
             return Err(Failure::App(Error::Forbidden));
         }
         feature.check_guards(ctx)?;
         data::check_reason(ctx, &entry.meta)?;
-        let only_return_to = params.as_object().is_some_and(|o| o.len() == 1 && o.contains_key("return_to"));
-        let mut screen = match self.timed((entry.build)(ctx.clone(), params)).await {
-            Err(_) if only_return_to => self.timed((entry.build)(ctx.clone(), Json::Null)).await?,
+        let only_return_to = params
+            .as_object()
+            .is_some_and(|o| o.len() == 1 && o.contains_key("return_to"));
+        let mut screen = match self
+            .timed((entry.build)(ctx.clone(), params))
+            .await
+        {
+            Err(_) if only_return_to => {
+                self.timed((entry.build)(ctx.clone(), Json::Null))
+                    .await?
+            }
             other => other?,
         };
         if let Some((to, params)) = screen.take_moved() {
@@ -1992,7 +2297,8 @@ impl AppState {
         }
         session::check_reauth(self, ctx, call)?;
         for i in &self.interceptors {
-            let _span = tracing::debug_span!("interceptor", name = i.name(), stage = "before").entered();
+            let _span =
+                tracing::debug_span!("interceptor", name = i.name(), stage = "before").entered();
             i.before(ctx, call)?;
         }
         Ok(())
@@ -2013,7 +2319,12 @@ impl AppState {
     /// re-authentication and runs every interceptor; `work` starts only when they all pass;
     /// `after` sees the outcome, also when `before` refused the call. `work` is a closure so that
     /// nothing it builds (form validation, an action's input) runs before the interceptors.
-    async fn intercept<T, F>(&self, ctx: &Ctx, call: &Call, work: impl FnOnce() -> F) -> Result<T, Failure>
+    async fn intercept<T, F>(
+        &self,
+        ctx: &Ctx,
+        call: &Call,
+        work: impl FnOnce() -> F,
+    ) -> Result<T, Failure>
     where
         F: Future<Output = Result<T, Failure>>,
     {
@@ -2056,14 +2367,20 @@ impl AppState {
             "call finished"
         );
         for i in &self.interceptors {
-            let _span = tracing::debug_span!("interceptor", name = i.name(), stage = "after").entered();
+            let _span =
+                tracing::debug_span!("interceptor", name = i.name(), stage = "after").entered();
             i.after(ctx, call, &outcome);
         }
     }
 
     /// Key of a saved grid view: tenant, screen and node, so tenants never share views.
     fn view_key(ctx: &Ctx, screen: &str, node: &NodePath) -> String {
-        format!("{}:{screen}#{node}", ctx.tenant().map(|t| t.id().to_string()).unwrap_or_default())
+        format!(
+            "{}:{screen}#{node}",
+            ctx.tenant()
+                .map(|t| t.id().to_string())
+                .unwrap_or_default()
+        )
     }
 
     /// The signed in user's saved view of a grid, cleaned by the grid. `None` without a store,
@@ -2077,7 +2394,10 @@ impl AppState {
     ) -> Option<DataGridView> {
         let store = self.views.as_ref()?;
         let user = ctx.identity().user.clone()?;
-        match self.timed(store.load(&user, &Self::view_key(ctx, screen, node))).await {
+        match self
+            .timed(store.load(&user, &Self::view_key(ctx, screen, node)))
+            .await
+        {
             Ok(view) => view.map(|v| grid.clean_view(v)),
             Err(_) => {
                 tracing::warn!("grid view store failed to load a view");
@@ -2097,12 +2417,18 @@ impl AppState {
         let saved = self.views.is_some() && ctx.identity().is_signed_in();
         for (i, node) in nodes {
             let Some(grid) = node.grid() else { continue };
-            if !ctx.identity().can(&grid.action().access) {
+            if !ctx
+                .identity()
+                .can(&grid.action().access)
+            {
                 continue;
             }
-            let view = self.saved_view(ctx, grid, name, &i).await;
-            if let Ok(mut page) =
-                self.timed(grid.fetch_at(ctx.clone(), grid.first_query(view.as_ref()), Vec::new())).await
+            let view = self
+                .saved_view(ctx, grid, name, &i)
+                .await;
+            if let Ok(mut page) = self
+                .timed(grid.fetch_at(ctx.clone(), grid.first_query(view.as_ref()), Vec::new()))
+                .await
             {
                 page.view = view;
                 page.saved_views = saved;
@@ -2114,9 +2440,17 @@ impl AppState {
 
     fn error_response(&self, ctx: &Ctx, failure: Failure) -> Response {
         let (status, code, message) = match &failure {
-            Failure::Timeout => (StatusCode::GATEWAY_TIMEOUT, "timeout", Text::key("zeyn.error.timeout")),
+            Failure::Timeout => (
+                StatusCode::GATEWAY_TIMEOUT,
+                "timeout",
+                Text::key("zeyn.error.timeout"),
+            ),
             Failure::Status(status, code, message) => (*status, *code, message.clone()),
-            Failure::Moved(..) => (StatusCode::NOT_FOUND, "not_found", Text::key("zeyn.error.not_found")),
+            Failure::Moved(..) => (
+                StatusCode::NOT_FOUND,
+                "not_found",
+                Text::key("zeyn.error.not_found"),
+            ),
             Failure::App(e) => {
                 let status = match e {
                     Error::Forbidden | Error::Denied(_) => StatusCode::FORBIDDEN,
@@ -2139,7 +2473,11 @@ impl AppState {
                 .collect();
             return (status, axum::Json(json!({ "error": code, "errors": list }))).into_response();
         }
-        (status, axum::Json(json!({ "error": code, "message": ctx.t(&message) }))).into_response()
+        (
+            status,
+            axum::Json(json!({ "error": code, "message": ctx.t(&message) })),
+        )
+            .into_response()
     }
 
     /// The built in error page in the shell, for sign in flows. Pages use [`Self::error_screen`].
@@ -2186,7 +2524,13 @@ impl AppState {
     /// (`App::not_found`, `App::server_error`) when it has one the user may open, else the built
     /// in message. A partial request gets only the screen, so the runtime swaps it in without a
     /// page load; a full request gets it inside the shell. Both carry the failure's status.
-    async fn error_screen(&self, ctx: &Ctx, failure: Failure, csrf: &str, partial: bool) -> Response {
+    async fn error_screen(
+        &self,
+        ctx: &Ctx,
+        failure: Failure,
+        csrf: &str,
+        partial: bool,
+    ) -> Response {
         let (status, message) = Self::page_status(failure);
         let entry = match status {
             StatusCode::NOT_FOUND => self.errors.not_found,
@@ -2217,7 +2561,10 @@ impl AppState {
         };
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             let r = user_render(entry.meta.name, ctx);
-            (ctx.t(screen.title()), screen.render(&r, &entry.meta, &Json::Null, &HashMap::new()))
+            (
+                ctx.t(screen.title()),
+                screen.render(&r, &entry.meta, &Json::Null, &HashMap::new()),
+            )
         }))
         .ok()
     }
@@ -2241,12 +2588,19 @@ impl AppState {
                     .items
                     .iter()
                     .filter_map(|item| {
-                        let entry = f.screens().iter().find(|s| s.meta.name == item.screen)?;
+                        let entry = f
+                            .screens()
+                            .iter()
+                            .find(|s| s.meta.name == item.screen)?;
                         if !ctx.identity().can(&entry.meta.access) {
                             return None;
                         }
                         let path = f.path_of(&entry.meta)?;
-                        let aria = if current == Some(item.screen) { r#" aria-current="page""# } else { "" };
+                        let aria = if current == Some(item.screen) {
+                            r#" aria-current="page""#
+                        } else {
+                            ""
+                        };
                         Some(format!(
                             r#"<li><a href="{}"{aria}>{}</a></li>"#,
                             escape(&self.url(&locale::path(self, ctx, &path))),
@@ -2275,8 +2629,15 @@ impl AppState {
             .iter()
             .map(|l| {
                 let selected = if l == ctx.locale() { " selected" } else { "" };
-                let name = self.i18n.lookup(l, "zeyn.locale.name").unwrap_or(l);
-                format!(r#"<option value="{}"{selected}>{}</option>"#, escape(l), escape(name))
+                let name = self
+                    .i18n
+                    .lookup(l, "zeyn.locale.name")
+                    .unwrap_or(l);
+                format!(
+                    r#"<option value="{}"{selected}>{}</option>"#,
+                    escape(l),
+                    escape(name)
+                )
             })
             .collect();
         format!(
@@ -2287,48 +2648,79 @@ impl AppState {
 
     /// Full page around a screen: the app shell (side menu) or, for screens of a feature that
     /// chose it, the site shell; toasts and assets.
-    fn shell(&self, ctx: &Ctx, csrf: &str, title: &str, main: &str, current: Option<&str>) -> String {
-        let r = Render::new("shell", ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity());
+    fn shell(
+        &self,
+        ctx: &Ctx,
+        csrf: &str,
+        title: &str,
+        main: &str,
+        current: Option<&str>,
+    ) -> String {
+        let r = Render::new("shell", ctx.locale(), ctx.i18n())
+            .with_tz(ctx.time_zone())
+            .with_identity(ctx.identity());
         let site_shell = current
             .and_then(|n| self.screens.get(n))
-            .and_then(|(fi, _)| self.features[*fi].site_shell().map(|s| (*fi, s)));
+            .and_then(|(fi, _)| {
+                self.features[*fi]
+                    .site_shell()
+                    .map(|s| (*fi, s))
+            });
         let theme = ctx.theme().unwrap_or("system");
         let app = r.text(&self.name);
         let (palette, commands) = pro::shell_parts(self, ctx, &r);
         let (frame, site_head) = match site_shell {
-            Some((fi, shell)) => {
-                (site::frame(self, ctx, &r, shell, fi, main, current), site::head(&escape(&self.prefix)))
-            }
-            None => (self.app_frame(ctx, &r, theme, &app, &palette, main, current), String::new()),
+            Some((fi, shell)) => (
+                site::frame(self, ctx, &r, shell, fi, main, current),
+                site::head(&escape(&self.prefix)),
+            ),
+            None => (
+                self.app_frame(ctx, &r, theme, &app, &palette, main, current),
+                String::new(),
+            ),
         };
         let (theme_attrs, scheme) = self.look.html(theme);
         #[cfg(feature = "assistant")]
-        let (ai_head, ai_launcher) =
-            (assistant::head(self, ctx, &escape(&self.prefix)), assistant::launcher(self, ctx, &r));
+        let (ai_head, ai_launcher) = (
+            assistant::head(self, ctx, &escape(&self.prefix)),
+            assistant::launcher(self, ctx, &r),
+        );
         #[cfg(not(feature = "assistant"))]
         let (ai_head, ai_launcher) = (String::new(), String::new());
+        let base = escape(&self.prefix);
+        let components = format!(
+            "{}{}{}{}{}{site_head}{ai_head}",
+            ui::head(&base),
+            media::head(&base),
+            pro::head(&base),
+            files::head(&base),
+            charts::head(&base)
+        );
+        let native_menu = if self.native_menu {
+            ""
+        } else {
+            r#" data-zeyn-native-menu="off""#
+        };
+        let html_attrs = format!("{theme_attrs}{native_menu}");
         format!(
             r##"<!doctype html><html lang="{lang}"{dir}{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css{v}"><script type="module" src="{base}/_zeyn/zeyn.js{v}"></script><script type="module" src="{base}/_zeyn/nav.js{v}"></script>{components}{theme_link}{extra}</head><body><a class="z-skip" href="#z-main">{skip}</a>{frame}<div class="z-toasts" role="status" aria-live="polite" data-text-dismiss="{dismiss}"></div>{commands}{ai_launcher}</body></html>"##,
             lang = escape(ctx.locale()),
-            dir = if locale::rtl(ctx.locale()) { r#" dir="rtl""# } else { "" },
+            dir = if locale::rtl(ctx.locale()) {
+                r#" dir="rtl""#
+            } else {
+                ""
+            },
             csrf = mask_token(csrf),
             tz = escape(ctx.time_zone().name()),
-            base = escape(&self.prefix),
             v = ops::asset_version(),
-            components = format!(
-                "{}{}{}{}{}{site_head}{ai_head}",
-                ui::head(&escape(&self.prefix)),
-                media::head(&escape(&self.prefix)),
-                pro::head(&escape(&self.prefix)),
-                files::head(&escape(&self.prefix)),
-                charts::head(&escape(&self.prefix))
-            ),
-            html_attrs =
-                format!("{theme_attrs}{}", if self.native_menu { "" } else { r#" data-zeyn-native-menu="off""# }),
             theme_link = if self.look.css.is_empty() {
                 String::new()
             } else {
-                format!(r#"<link rel="stylesheet" href="{}/_zeyn/theme.css?v={}">"#, escape(&self.prefix), self.look.version)
+                format!(
+                    r#"<link rel="stylesheet" href="{}/_zeyn/theme.css?v={}">"#,
+                    escape(&self.prefix),
+                    self.look.version
+                )
             },
             title = escape(title),
             extra = ops::head(self, ctx),
@@ -2369,7 +2761,10 @@ impl AppState {
             let listed = TimeZone::names().any(|n| n == current);
             for name in TimeZone::names().chain((!listed).then_some(current)) {
                 let selected = if name == current { " selected" } else { "" };
-                options.push_str(&format!(r#"<option value="{name}"{selected}>{}</option>"#, name.replace('_', " ")));
+                options.push_str(&format!(
+                    r#"<option value="{name}"{selected}>{}</option>"#,
+                    name.replace('_', " ")
+                ));
             }
             nav.push_str(&format!(
                 r#"<div class="z-locale"><span id="z-timezone-label">{}</span><div class="z-select" data-text-none="{auto}"><select id="z-timezone" data-zeyn-timezone>{options}</select></div></div>"#,
@@ -2387,12 +2782,19 @@ impl AppState {
 /// Renders for the request's user: their language, time zone and permissions, with masked fields
 /// masked and reads of sensitive rows recorded for the audit.
 fn user_render<'a>(scope: &'a str, ctx: &'a Ctx) -> Render<'a> {
-    Render::new(scope, ctx.locale(), ctx.i18n()).with_tz(ctx.time_zone()).with_identity(ctx.identity()).with_ctx(ctx)
+    Render::new(scope, ctx.locale(), ctx.i18n())
+        .with_tz(ctx.time_zone())
+        .with_identity(ctx.identity())
+        .with_ctx(ctx)
 }
 
 fn normalize_base(path: &str) -> String {
     let trimmed = path.trim().trim_matches('/');
-    if trimmed.is_empty() { String::new() } else { format!("/{trimmed}") }
+    if trimmed.is_empty() {
+        String::new()
+    } else {
+        format!("/{trimmed}")
+    }
 }
 
 /// Framework files that are kept compressed, at most this many.
@@ -2401,8 +2803,10 @@ const STATIC_CACHE: usize = 64;
 /// The ETag and the gzip bytes of a framework file, by the address and length of its bytes.
 type StaticEntry = (HeaderValue, Option<axum::body::Bytes>);
 
-static STATIC_FILES: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<(usize, usize), Arc<StaticEntry>>>> =
-    std::sync::OnceLock::new();
+/// The framework files kept compressed, by the address and length of their bytes.
+type StaticCache = std::sync::Mutex<std::collections::HashMap<(usize, usize), Arc<StaticEntry>>>;
+
+static STATIC_FILES: std::sync::OnceLock<StaticCache> = std::sync::OnceLock::new();
 
 /// Revalidation and compression for the framework's own scripts and styles (`/_zeyn/*.js` and
 /// `*.css`, not media or uploads): `Cache-Control: public, max-age=31536000, immutable` when the
@@ -2427,18 +2831,33 @@ async fn static_files(req: axum::extract::Request, next: axum::middleware::Next)
         .flat_map(|v| v.split(','))
         .any(|e| {
             let mut p = e.split(';');
-            p.next().is_some_and(|n| n.trim().eq_ignore_ascii_case("gzip"))
-                && !p.any(|q| q.trim().strip_prefix("q=").is_some_and(|v| v.trim().parse::<f32>().is_ok_and(|v| v == 0.0)))
+            p.next()
+                .is_some_and(|n| n.trim().eq_ignore_ascii_case("gzip"))
+                && !p.any(|q| {
+                    q.trim()
+                        .strip_prefix("q=")
+                        .is_some_and(|v| {
+                            v.trim()
+                                .parse::<f32>()
+                                .is_ok_and(|v| v == 0.0)
+                        })
+                })
         });
     let headers = req.headers().clone();
     let current = req.uri().query() == Some(&ops::asset_version()[1..]);
     let mut response = next.run(req).await;
     if current && response.status() == StatusCode::OK {
-        response.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static(IMMUTABLE));
+        response
+            .headers_mut()
+            .insert(header::CACHE_CONTROL, HeaderValue::from_static(IMMUTABLE));
     }
     if response.status() != StatusCode::OK
-        || response.headers().contains_key(header::ETAG)
-        || response.headers().contains_key(header::CONTENT_ENCODING)
+        || response
+            .headers()
+            .contains_key(header::ETAG)
+        || response
+            .headers()
+            .contains_key(header::CONTENT_ENCODING)
     {
         return response;
     }
@@ -2448,40 +2867,61 @@ async fn static_files(req: axum::extract::Request, next: axum::middleware::Next)
     };
     let key = (bytes.as_ptr() as usize, bytes.len());
     let cache = STATIC_FILES.get_or_init(Default::default);
-    let known = cache.lock().ok().and_then(|c| c.get(&key).cloned());
+    let known = cache
+        .lock()
+        .ok()
+        .and_then(|c| c.get(&key).cloned());
     let entry = known.unwrap_or_else(|| {
         let text = std::str::from_utf8(&bytes).unwrap_or("");
-        let tag = HeaderValue::from_str(&etag("s", &[text])).unwrap_or(HeaderValue::from_static("\"s\""));
+        let tag =
+            HeaderValue::from_str(&etag("s", &[text])).unwrap_or(HeaderValue::from_static("\"s\""));
         let packed = (bytes.len() >= 1024).then(|| {
             use std::io::Write;
-            let mut z = flate2::write::GzEncoder::new(Vec::with_capacity(bytes.len() / 3), flate2::Compression::new(6));
+            let mut z = flate2::write::GzEncoder::new(
+                Vec::with_capacity(bytes.len() / 3),
+                flate2::Compression::new(6),
+            );
             z.write_all(&bytes).ok();
-            z.finish().ok().map(axum::body::Bytes::from)
+            z.finish()
+                .ok()
+                .map(axum::body::Bytes::from)
         });
         let entry = Arc::new((tag, packed.flatten()));
-        if let Ok(mut c) = cache.lock() {
-            if c.len() < STATIC_CACHE {
-                c.insert(key, entry.clone());
-            }
+        if let Ok(mut c) = cache.lock()
+            && c.len() < STATIC_CACHE
+        {
+            c.insert(key, entry.clone());
         }
         entry
     });
     let (tag, packed) = &*entry;
-    parts.headers.insert(header::ETAG, tag.clone());
-    parts.headers.insert(header::VARY, HeaderValue::from_static("accept-encoding"));
+    parts
+        .headers
+        .insert(header::ETAG, tag.clone());
+    parts
+        .headers
+        .insert(header::VARY, HeaderValue::from_static("accept-encoding"));
     if etag_matches(&headers, tag.to_str().unwrap_or("")) {
         parts.status = StatusCode::NOT_MODIFIED;
-        parts.headers.remove(header::CONTENT_LENGTH);
+        parts
+            .headers
+            .remove(header::CONTENT_LENGTH);
         return Response::from_parts(parts, axum::body::Body::empty());
     }
     match packed {
         Some(z) if gzip => {
-            parts.headers.insert(header::CONTENT_ENCODING, HeaderValue::from_static("gzip"));
-            parts.headers.insert(header::CONTENT_LENGTH, HeaderValue::from(z.len()));
+            parts
+                .headers
+                .insert(header::CONTENT_ENCODING, HeaderValue::from_static("gzip"));
+            parts
+                .headers
+                .insert(header::CONTENT_LENGTH, HeaderValue::from(z.len()));
             Response::from_parts(parts, axum::body::Body::from(z.clone()))
         }
         _ => {
-            parts.headers.insert(header::CONTENT_LENGTH, HeaderValue::from(bytes.len()));
+            parts
+                .headers
+                .insert(header::CONTENT_LENGTH, HeaderValue::from(bytes.len()));
             Response::from_parts(parts, axum::body::Body::from(bytes))
         }
     }
@@ -2509,37 +2949,73 @@ const UNCOMPRESSED: &[&str] = &[
 /// already have a `Content-Encoding` (the framework assets from [`static_files`]) or a
 /// `Content-Range` pass as they are, and so do the types in [`UNCOMPRESSED`], images other than
 /// SVG and protocol switches. Streamed bodies (exports) are compressed as they stream.
-fn compression() -> tower_http::compression::CompressionLayer<impl tower_http::compression::Predicate> {
-    use tower_http::compression::{CompressionLayer, CompressionLevel, Predicate, predicate::SizeAbove};
-    fn compressible(status: StatusCode, _: axum::http::Version, headers: &HeaderMap, _: &axum::http::Extensions) -> bool {
-        let kind = headers.get(header::CONTENT_TYPE).and_then(|v| v.to_str().ok()).unwrap_or("");
+fn compression()
+-> tower_http::compression::CompressionLayer<impl tower_http::compression::Predicate> {
+    use tower_http::compression::{
+        CompressionLayer, CompressionLevel, Predicate, predicate::SizeAbove,
+    };
+    fn compressible(
+        status: StatusCode,
+        _: axum::http::Version,
+        headers: &HeaderMap,
+        _: &axum::http::Extensions,
+    ) -> bool {
+        let kind = headers
+            .get(header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
         status != StatusCode::SWITCHING_PROTOCOLS
             && (!kind.starts_with("image/") || kind.starts_with("image/svg+xml"))
-            && !UNCOMPRESSED.iter().any(|p| kind.starts_with(p))
+            && !UNCOMPRESSED
+                .iter()
+                .any(|p| kind.starts_with(p))
     }
-    CompressionLayer::new().quality(CompressionLevel::Precise(2)).compress_when(SizeAbove::new(1024).and(compressible))
+    CompressionLayer::new()
+        .quality(CompressionLevel::Precise(2))
+        .compress_when(SizeAbove::new(1024).and(compressible))
 }
 
 /// Drops `Accept-Encoding` from requests with a `Range` header, so a byte range always refers to
 /// the bytes of the file and is never compressed.
 async fn identity_for_ranges(mut req: axum::extract::Request) -> axum::extract::Request {
-    if req.headers().contains_key(header::RANGE) {
-        req.headers_mut().remove(header::ACCEPT_ENCODING);
+    if req
+        .headers()
+        .contains_key(header::RANGE)
+    {
+        req.headers_mut()
+            .remove(header::ACCEPT_ENCODING);
     }
     req
 }
 
 fn asset(body: &'static str, content_type: &'static str) -> Response {
-    ([(header::CONTENT_TYPE, content_type), (header::CACHE_CONTROL, "no-cache")], body).into_response()
+    (
+        [
+            (header::CONTENT_TYPE, content_type),
+            (header::CACHE_CONTROL, "no-cache"),
+        ],
+        body,
+    )
+        .into_response()
 }
 
 /// `GET /_zeyn/theme.css`: the app's theme. Its URL carries a hash of the text (`?v=`), so the
 /// browser keeps it for a year when the hash matches; any other request revalidates.
 async fn theme_css(State(st): State<Arc<AppState>>, uri: axum::http::Uri) -> Response {
     let css = st.look.css.clone();
-    let current = uri.query().and_then(|q| q.strip_prefix("v=")).is_some_and(|v| v == st.look.version);
+    let current = uri
+        .query()
+        .and_then(|q| q.strip_prefix("v="))
+        .is_some_and(|v| v == st.look.version);
     let cache = if current { IMMUTABLE } else { "no-cache" };
-    ([(header::CONTENT_TYPE, "text/css; charset=utf-8"), (header::CACHE_CONTROL, cache)], css).into_response()
+    (
+        [
+            (header::CONTENT_TYPE, "text/css; charset=utf-8"),
+            (header::CACHE_CONTROL, cache),
+        ],
+        css,
+    )
+        .into_response()
 }
 
 /// `Cache-Control` of a framework file asked for by the URL of the running build.
@@ -2547,7 +3023,9 @@ const IMMUTABLE: &str = "public, max-age=31536000, immutable";
 
 fn with_cookie(mut response: Response, cookie: Option<String>) -> Response {
     if let Some(c) = cookie.and_then(|c| HeaderValue::from_str(&c).ok()) {
-        response.headers_mut().append(header::SET_COOKIE, c);
+        response
+            .headers_mut()
+            .append(header::SET_COOKIE, c);
     }
     response
 }
@@ -2562,19 +3040,38 @@ async fn page(
 ) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     let (ctx, theme_cookie) = theme::remember(&st, ctx, &headers).await;
-    let meta = st.screens.get(name).map(|(_, e)| e.meta);
-    let open =
-        !ctx.identity().is_signed_in() && meta.is_some_and(|m| matches!(m.access, crate::action::Access::Public));
-    let (csrf, set) = if open { (String::new(), None) } else { st.csrf(&headers) };
-    let cache = meta.map_or(0, |m| m.cache.min(crate::screen::MAX_SCREEN_CACHE));
+    let meta = st
+        .screens
+        .get(name)
+        .map(|(_, e)| e.meta);
+    let open = !ctx.identity().is_signed_in()
+        && meta.is_some_and(|m| matches!(m.access, crate::action::Access::Public));
+    let (csrf, set) = if open {
+        (String::new(), None)
+    } else {
+        st.csrf(&headers)
+    };
+    let cache = meta.map_or(0, |m| {
+        m.cache
+            .min(crate::screen::MAX_SCREEN_CACHE)
+    });
     let started = Instant::now();
-    let call = Call { kind: CallKind::Page, screen: name, action: None, via_agent: false };
+    let call = Call {
+        kind: CallKind::Page,
+        screen: name,
+        action: None,
+        via_agent: false,
+    };
     let result = async {
         let params = st.with_segments(name, q.value()?, &segments)?;
         st.before(&ctx, &call)?;
-        let (_, entry, screen) = st.open(&ctx, name, params.clone()).await?;
+        let (_, entry, screen) = st
+            .open(&ctx, name, params.clone())
+            .await?;
         data::note_screen_read(&ctx, &entry.meta, &params);
-        let loaded = st.preload(&ctx, screen.walk(), name).await;
+        let loaded = st
+            .preload(&ctx, screen.walk(), name)
+            .await;
         let r = user_render(name, &ctx);
         let html = screen.render(&r, &entry.meta, &params, &loaded);
         let head = screen.head_html(&r, &st.site_url, &st.prefix);
@@ -2582,7 +3079,9 @@ async fn page(
     }
     .await;
     st.after(&ctx, &call, started, &result);
-    let partial = headers.get("x-zeyn-partial").is_some_and(|v| v == "1");
+    let partial = headers
+        .get("x-zeyn-partial")
+        .is_some_and(|v| v == "1");
     let response = match result {
         Ok((title, html, head)) if partial => {
             let full = format!("{title} · {}", ctx.t(&st.name));
@@ -2590,13 +3089,23 @@ async fn page(
             let holds_island = islands::holds(&st, &html);
             #[cfg(feature = "realtime")]
             let holds_live = realtime::holds(&st, &html);
-            let html = if head.is_empty() { html } else { format!("<template data-zeyn-head>{head}</template>{html}") };
+            let html = if head.is_empty() {
+                html
+            } else {
+                format!("<template data-zeyn-head>{head}</template>{html}")
+            };
             let tag = (open && cache > 0).then(|| etag("p", &[&full, &html]));
             #[allow(unused_mut)]
             let mut r = partial_response(&full, html);
             let h = r.headers_mut();
-            let site = st.screens.get(name).is_some_and(|(fi, _)| st.features[*fi].site_shell().is_some());
-            h.insert("x-zeyn-shell", HeaderValue::from_static(if site { "site" } else { "app" }));
+            let site = st
+                .screens
+                .get(name)
+                .is_some_and(|(fi, _)| st.features[*fi].site_shell().is_some());
+            h.insert(
+                "x-zeyn-shell",
+                HeaderValue::from_static(if site { "site" } else { "app" }),
+            );
             #[cfg(feature = "islands")]
             if holds_island {
                 h.insert("x-zeyn-islands", HeaderValue::from_static("1"));
@@ -2639,27 +3148,45 @@ async fn page(
         Err(Failure::App(Error::Forbidden | Error::Denied(_)))
             if !ctx.identity().is_signed_in() && st.login_url.is_some() =>
         {
-            let here = st.url(uri.path_and_query().map_or(uri.path(), |p| p.as_str()));
+            let here = st.url(
+                uri.path_and_query()
+                    .map_or(uri.path(), |p| p.as_str()),
+            );
             let target = st.login_url.clone().unwrap_or_default();
             let sep = if target.contains('?') { '&' } else { '?' };
             Redirect::to(&format!("{target}{sep}return_to={}", encode(&here))).into_response()
         }
         Err(Failure::Status(_, "mfa_required", _)) if st.sign_in.mfa_url.is_some() => {
-            let here = st.url(uri.path_and_query().map_or(uri.path(), |p| p.as_str()));
-            let target = st.sign_in.mfa_url.clone().unwrap_or_default();
+            let here = st.url(
+                uri.path_and_query()
+                    .map_or(uri.path(), |p| p.as_str()),
+            );
+            let target = st
+                .sign_in
+                .mfa_url
+                .clone()
+                .unwrap_or_default();
             let sep = if target.contains('?') { '&' } else { '?' };
             Redirect::to(&format!("{target}{sep}return_to={}", encode(&here))).into_response()
         }
         Err(Failure::Status(_, "reason_required", _)) => data::reason_page(&st, &ctx, name, &csrf),
         Err(Failure::Moved(to, params)) => match st.page_url(to, &params) {
             Some(url) => (StatusCode::MOVED_PERMANENTLY, [(header::LOCATION, url)]).into_response(),
-            None => st.error_screen(&ctx, Failure::App(Error::NotFound), &csrf, partial).await,
+            None => {
+                st.error_screen(&ctx, Failure::App(Error::NotFound), &csrf, partial)
+                    .await
+            }
         },
-        Err(f) => st.error_screen(&ctx, f, &csrf, partial).await,
+        Err(f) => {
+            st.error_screen(&ctx, f, &csrf, partial)
+                .await
+        }
     };
     let mut response = response;
     if let Ok(lang) = HeaderValue::from_str(ctx.locale()) {
-        response.headers_mut().insert(header::CONTENT_LANGUAGE, lang);
+        response
+            .headers_mut()
+            .insert(header::CONTENT_LANGUAGE, lang);
     }
     with_cookie(with_cookie(response, set), theme_cookie)
 }
@@ -2680,17 +3207,24 @@ fn etag(kind: &str, parts: &[&str]) -> String {
 
 /// Whether `If-None-Match` names the ETag (or `*`). Weak tags compare by their value.
 fn etag_matches(headers: &HeaderMap, tag: &str) -> bool {
-    headers.get_all(header::IF_NONE_MATCH).iter().filter_map(|v| v.to_str().ok()).flat_map(|v| v.split(',')).any(|t| {
-        let t = t.trim();
-        t == "*" || t.strip_prefix("W/").unwrap_or(t) == tag
-    })
+    headers
+        .get_all(header::IF_NONE_MATCH)
+        .iter()
+        .filter_map(|v| v.to_str().ok())
+        .flat_map(|v| v.split(','))
+        .any(|t| {
+            let t = t.trim();
+            t == "*" || t.strip_prefix("W/").unwrap_or(t) == tag
+        })
 }
 
 /// Marks the page of a public screen opened without a session as cacheable: `Cache-Control:
 /// public, max-age`, the ETag, and `Vary` on what the page is rendered from. A matching
 /// `If-None-Match` gets `304 Not Modified` without the body.
 fn public_cache(mut response: Response, headers: &HeaderMap, tag: &str, seconds: u32) -> Response {
-    let Ok(tag_value) = HeaderValue::from_str(tag) else { return private_page(response) };
+    let Ok(tag_value) = HeaderValue::from_str(tag) else {
+        return private_page(response);
+    };
     if etag_matches(headers, tag) {
         response = StatusCode::NOT_MODIFIED.into_response();
     }
@@ -2699,13 +3233,19 @@ fn public_cache(mut response: Response, headers: &HeaderMap, tag: &str, seconds:
     if let Ok(v) = HeaderValue::from_str(&format!("public, max-age={seconds}")) {
         h.insert(header::CACHE_CONTROL, v);
     }
-    h.insert(header::VARY, HeaderValue::from_static("x-zeyn-partial, Accept-Language, Cookie"));
+    h.insert(
+        header::VARY,
+        HeaderValue::from_static("x-zeyn-partial, Accept-Language, Cookie"),
+    );
     response
 }
 
 /// A cacheable screen opened with a session: never stored.
 fn private_page(mut response: Response) -> Response {
-    response.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("private, no-store"));
+    response.headers_mut().insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("private, no-store"),
+    );
     response
 }
 
@@ -2713,14 +3253,17 @@ fn private_page(mut response: Response) -> Response {
 /// without a session), setting the `zeyn_csrf` cookie when the browser has none. Only same
 /// origin requests get it.
 async fn csrf_token(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
-    let site = headers.get("sec-fetch-site").and_then(|v| v.to_str().ok());
+    let site = headers
+        .get("sec-fetch-site")
+        .and_then(|v| v.to_str().ok());
     if site.is_some_and(|s| s != "same-origin" && s != "none") {
         let ctx = st.ctx(&headers);
         return st.error_response(&ctx, Failure::App(Error::Forbidden));
     }
     let (token, set) = st.csrf(&headers);
     let mut r = axum::Json(json!({ "token": mask_token(&token) })).into_response();
-    r.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    r.headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     with_cookie(r, set)
 }
 
@@ -2734,14 +3277,23 @@ async fn screen_fragment(
     let Some((&name, _)) = st.screens.get_key_value(name.as_str()) else {
         return st.error_response(&ctx, Failure::App(Error::NotFound));
     };
-    let call = Call { kind: CallKind::Screen, screen: name, action: None, via_agent: false };
+    let call = Call {
+        kind: CallKind::Screen,
+        screen: name,
+        action: None,
+        via_agent: false,
+    };
     let started = Instant::now();
     let result = async {
         let params = q.value()?;
         st.before(&ctx, &call)?;
-        let (_, entry, screen) = st.open(&ctx, name, params.clone()).await?;
+        let (_, entry, screen) = st
+            .open(&ctx, name, params.clone())
+            .await?;
         data::note_screen_read(&ctx, &entry.meta, &params);
-        let loaded = st.preload(&ctx, screen.walk(), entry.meta.name).await;
+        let loaded = st
+            .preload(&ctx, screen.walk(), entry.meta.name)
+            .await;
         let r = user_render(entry.meta.name, &ctx);
         Ok::<_, Failure>(screen.render(&r, &entry.meta, &params, &loaded))
     }
@@ -2763,7 +3315,10 @@ async fn route_redirect(
     let Some((fi, entry)) = st.screens.get(name.as_str()) else {
         return st.error_response(&ctx, Failure::App(Error::NotFound));
     };
-    if st.features[*fi].path_of(&entry.meta).is_none() {
+    if st.features[*fi]
+        .path_of(&entry.meta)
+        .is_none()
+    {
         return st.error_response(&ctx, Failure::App(Error::NotFound));
     }
     let params = match &q.params {
@@ -2795,10 +3350,12 @@ fn partial_response(full_title: &str, html: String) -> Response {
 /// Runs a future and turns a panic while it is polled into `Err`, without boxing it.
 async fn catch_panic<F: Future>(fut: F) -> std::thread::Result<F::Output> {
     let mut fut = std::pin::pin!(fut);
-    std::future::poll_fn(|cx| match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| fut.as_mut().poll(cx))) {
-        Ok(std::task::Poll::Ready(v)) => std::task::Poll::Ready(Ok(v)),
-        Ok(std::task::Poll::Pending) => std::task::Poll::Pending,
-        Err(e) => std::task::Poll::Ready(Err(e)),
+    std::future::poll_fn(|cx| {
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| fut.as_mut().poll(cx))) {
+            Ok(std::task::Poll::Ready(v)) => std::task::Poll::Ready(Ok(v)),
+            Ok(std::task::Poll::Pending) => std::task::Poll::Pending,
+            Err(e) => std::task::Poll::Ready(Err(e)),
+        }
     })
     .await
 }
@@ -2807,14 +3364,18 @@ async fn catch_panic<F: Future>(fut: F) -> std::thread::Result<F::Output> {
 fn encode(s: &str) -> String {
     s.bytes()
         .map(|b| match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => (b as char).to_string(),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                (b as char).to_string()
+            }
             _ => format!("%{b:02X}"),
         })
         .collect()
 }
 
 /// Body of a streamed export: chunks from a channel.
-pub(super) struct Chunks(pub(super) tokio::sync::mpsc::Receiver<Result<axum::body::Bytes, std::io::Error>>);
+pub(super) struct Chunks(
+    pub(super) tokio::sync::mpsc::Receiver<Result<axum::body::Bytes, std::io::Error>>,
+);
 
 impl futures_core::Stream for Chunks {
     type Item = Result<axum::body::Bytes, std::io::Error>;
@@ -2858,8 +3419,12 @@ impl AppState {
         if call.item.len() > 32 {
             return Err(Failure::App(Error::NotFound));
         }
-        let (_, entry, screen) = self.open(ctx, &call.screen, call.params).await?;
-        let item = screen.menu_call(&call.item).ok_or(Failure::App(Error::NotFound))?;
+        let (_, entry, screen) = self
+            .open(ctx, &call.screen, call.params)
+            .await?;
+        let item = screen
+            .menu_call(&call.item)
+            .ok_or(Failure::App(Error::NotFound))?;
         if !ctx.identity().can(&item.meta.access) {
             return Err(Failure::App(Error::Forbidden));
         }
@@ -2869,14 +3434,21 @@ impl AppState {
             action: Some(item.meta),
             via_agent: ctx.via_agent(),
         };
-        let result = self.intercept(ctx, &info, || self.timed((item.run)(ctx.clone()))).await;
+        let result = self
+            .intercept(ctx, &info, || self.timed((item.run)(ctx.clone())))
+            .await;
         result?;
         Ok(json!({ "effects": [] }))
     }
 
     async fn run_form(&self, ctx: &Ctx, call: FormCall) -> Result<Json, Failure> {
-        let (_, entry, screen) = self.open(ctx, &call.screen, call.params).await?;
-        let form = screen.node(&call.node).and_then(|n| n.form()).ok_or(Failure::App(Error::NotFound))?;
+        let (_, entry, screen) = self
+            .open(ctx, &call.screen, call.params)
+            .await?;
+        let form = screen
+            .node(&call.node)
+            .and_then(|n| n.form())
+            .ok_or(Failure::App(Error::NotFound))?;
         let action = form.action();
         if !ctx.identity().can(&action.access) {
             return Err(Failure::App(Error::Forbidden));
@@ -2884,9 +3456,17 @@ impl AppState {
         if ctx.via_agent() {
             agent::agent_policy(&entry.meta.ai, &action, call.confirmed)?;
         }
-        let info =
-            Call { kind: CallKind::Form, screen: entry.meta.name, action: Some(action), via_agent: ctx.via_agent() };
-        let result = self.intercept(ctx, &info, || self.timed(form.submit(ctx.clone(), call.values))).await;
+        let info = Call {
+            kind: CallKind::Form,
+            screen: entry.meta.name,
+            action: Some(action),
+            via_agent: ctx.via_agent(),
+        };
+        let result = self
+            .intercept(ctx, &info, || {
+                self.timed(form.submit(ctx.clone(), call.values))
+            })
+            .await;
         let effects = result?;
         let r = user_render(entry.meta.name, ctx);
         Ok(json!({ "effects": effects.iter().map(|e| e.to_json(&r)).collect::<Vec<_>>() }))
@@ -2943,20 +3523,32 @@ async fn set_locale(
     if let Err(f) = st.check_csrf(&headers) {
         return st.error_response(&ctx, f);
     }
-    if !st.i18n.locales().iter().any(|l| *l == call.locale) {
+    if !st.i18n.locales().contains(&call.locale) {
         return st.error_response(&ctx, Failure::App(Error::NotFound));
     }
     let secure = if st.secure_cookies { "; Secure" } else { "" };
-    let c = format!("zeyn_locale={}; Path={}; Max-Age=31536000; SameSite=Lax{secure}", call.locale, st.cookie_path());
+    let c = format!(
+        "zeyn_locale={}; Path={}; Max-Age=31536000; SameSite=Lax{secure}",
+        call.locale,
+        st.cookie_path()
+    );
     with_cookie(StatusCode::NO_CONTENT.into_response(), Some(c))
 }
 
 /// RFC 9457 problem details response.
 fn problem(ctx: &Ctx, failure: Failure) -> Response {
     let (status, code, message) = match &failure {
-        Failure::Timeout => (StatusCode::GATEWAY_TIMEOUT, "timeout", Text::key("zeyn.error.timeout")),
+        Failure::Timeout => (
+            StatusCode::GATEWAY_TIMEOUT,
+            "timeout",
+            Text::key("zeyn.error.timeout"),
+        ),
         Failure::Status(status, code, message) => (*status, *code, message.clone()),
-        Failure::Moved(..) => (StatusCode::NOT_FOUND, "not_found", Text::key("zeyn.error.not_found")),
+        Failure::Moved(..) => (
+            StatusCode::NOT_FOUND,
+            "not_found",
+            Text::key("zeyn.error.not_found"),
+        ),
         Failure::App(e) => (
             match e {
                 Error::Forbidden | Error::Denied(_) => StatusCode::FORBIDDEN,
@@ -2986,7 +3578,10 @@ fn problem(ctx: &Ctx, failure: Failure) -> Response {
             .collect();
     }
     let mut response = (status, body.to_string()).into_response();
-    response.headers_mut().insert(header::CONTENT_TYPE, HeaderValue::from_static("application/problem+json"));
+    response.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/problem+json"),
+    );
     response
 }
 
@@ -3007,7 +3602,10 @@ async fn set_time_zone(
     }
     let secure = if st.secure_cookies { "; Secure" } else { "" };
     if call.zone.is_empty() {
-        let c = format!("zeyn_tz_manual=; Path={}; Max-Age=0; SameSite=Lax{secure}", st.cookie_path());
+        let c = format!(
+            "zeyn_tz_manual=; Path={}; Max-Age=0; SameSite=Lax{secure}",
+            st.cookie_path()
+        );
         return with_cookie(StatusCode::NO_CONTENT.into_response(), Some(c));
     }
     let Some(zone) = TimeZone::named(&call.zone) else {
@@ -3024,8 +3622,14 @@ async fn set_time_zone(
 async fn not_found(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
     let ctx = st.ctx(&headers);
     let (csrf, set) = st.csrf(&headers);
-    let partial = headers.get("x-zeyn-partial").is_some_and(|v| v == "1");
-    with_cookie(st.error_screen(&ctx, Failure::App(Error::NotFound), &csrf, partial).await, set)
+    let partial = headers
+        .get("x-zeyn-partial")
+        .is_some_and(|v| v == "1");
+    with_cookie(
+        st.error_screen(&ctx, Failure::App(Error::NotFound), &csrf, partial)
+            .await,
+        set,
+    )
 }
 
 /// Turns a panic in any handler into a 500 without details: the app's server error page for a
@@ -3051,8 +3655,14 @@ async fn catch_panics(
                 return st.error_response(&ctx, failure);
             }
             let (csrf, set) = st.csrf(&headers);
-            let partial = headers.get("x-zeyn-partial").is_some_and(|v| v == "1");
-            with_cookie(st.error_screen(&ctx, failure, &csrf, partial).await, set)
+            let partial = headers
+                .get("x-zeyn-partial")
+                .is_some_and(|v| v == "1");
+            with_cookie(
+                st.error_screen(&ctx, failure, &csrf, partial)
+                    .await,
+                set,
+            )
         }
     }
 }

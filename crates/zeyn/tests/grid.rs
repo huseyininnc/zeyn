@@ -103,10 +103,21 @@ pub fn list() -> Screen {
 
 fn app(identity: Identity) -> App {
     App::new("Test")
-        .i18n(I18n::new("en").catalog("tr", "{}").unwrap())
+        .i18n(
+            I18n::new("en")
+                .catalog("tr", "{}")
+                .unwrap(),
+        )
         .service(Store::seeded())
-        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
-        .feature(Feature::new("items").screen(list).api(search))
+        .auth(move |h: &HeaderMap| {
+            h.contains_key("x-user")
+                .then(|| identity.clone())
+        })
+        .feature(
+            Feature::new("items")
+                .screen(list)
+                .api(search),
+        )
 }
 
 fn router(identity: Identity) -> Router {
@@ -130,11 +141,27 @@ impl Reply {
 }
 
 async fn send(router: &Router, req: Request<Body>) -> Reply {
-    let res = router.clone().oneshot(req).await.unwrap();
+    let res = router
+        .clone()
+        .oneshot(req)
+        .await
+        .unwrap();
     let status = res.status();
     let headers = res.headers().clone();
-    let body = String::from_utf8(res.into_body().collect().await.unwrap().to_bytes().to_vec()).unwrap();
-    Reply { status, headers, body }
+    let body = String::from_utf8(
+        res.into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes()
+            .to_vec(),
+    )
+    .unwrap();
+    Reply {
+        status,
+        headers,
+        body,
+    }
 }
 
 const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -143,7 +170,10 @@ fn post_as(path: &str, body: serde_json::Value, locale: &str) -> Request<Body> {
     Request::post(path)
         .header("x-user", "1")
         .header(header::CONTENT_TYPE, "application/json")
-        .header(header::COOKIE, format!("zeyn_csrf={TOKEN}; zeyn_locale={locale}"))
+        .header(
+            header::COOKIE,
+            format!("zeyn_csrf={TOKEN}; zeyn_locale={locale}"),
+        )
         .header("x-zeyn-csrf", TOKEN)
         .body(Body::from(body.to_string()))
         .unwrap()
@@ -154,11 +184,17 @@ fn post(path: &str, body: serde_json::Value) -> Request<Body> {
 }
 
 fn get(path: &str) -> Request<Body> {
-    Request::get(path).header("x-user", "1").body(Body::empty()).unwrap()
+    Request::get(path)
+        .header("x-user", "1")
+        .body(Body::empty())
+        .unwrap()
 }
 
 fn agg(field: &str, op: Aggregate) -> AggregateRequest {
-    AggregateRequest { field: field.into(), op }
+    AggregateRequest {
+        field: field.into(),
+        op,
+    }
 }
 
 fn query(json: serde_json::Value) -> DataQuery {
@@ -181,22 +217,43 @@ fn totals_cover_every_filtered_row_not_only_the_page() {
     ];
     let page = q.apply(rows);
     assert_eq!(page.items.len(), 2);
-    let value =
-        |field: &str, op: Aggregate| page.totals.iter().find(|t| t.field == field && t.op == op).unwrap().value.clone();
+    let value = |field: &str, op: Aggregate| {
+        page.totals
+            .iter()
+            .find(|t| t.field == field && t.op == op)
+            .unwrap()
+            .value
+            .clone()
+    };
     assert_eq!(value("qty", Aggregate::Sum), Value::Int(210));
     assert_eq!(value("qty", Aggregate::Avg), Value::Decimal(10.5));
     assert_eq!(value("qty", Aggregate::Min), Value::Int(1));
     assert_eq!(value("qty", Aggregate::Max), Value::Int(20));
-    assert_eq!(value("price", Aggregate::Sum), Value::Money(Money::tl(210_000)));
-    assert_eq!(value("price", Aggregate::Avg), Value::Money(Money::tl(10_500)));
+    assert_eq!(
+        value("price", Aggregate::Sum),
+        Value::Money(Money::tl(210_000))
+    );
+    assert_eq!(
+        value("price", Aggregate::Avg),
+        Value::Money(Money::tl(10_500))
+    );
     assert_eq!(value("due", Aggregate::Count), Value::Int(5));
-    assert_eq!(value("added", Aggregate::Max), Value::Date(Date::new(2026, 1, 20).unwrap()));
+    assert_eq!(
+        value("added", Aggregate::Max),
+        Value::Date(Date::new(2026, 1, 20).unwrap())
+    );
 }
 
 #[test]
 fn totals_ignore_unknown_fields_and_ops_that_do_not_fit() {
-    let mut q = DataQuery::default();
-    q.aggregates = vec![agg("nope", Aggregate::Sum), agg("code", Aggregate::Sum), agg("code", Aggregate::Count)];
+    let q = DataQuery {
+        aggregates: vec![
+            agg("nope", Aggregate::Sum),
+            agg("code", Aggregate::Sum),
+            agg("code", Aggregate::Count),
+        ],
+        ..DataQuery::default()
+    };
     let page = q.apply((1..=3).map(item).collect());
     assert_eq!(page.totals.len(), 1);
     assert_eq!(page.totals[0].value, Value::Int(3));
@@ -205,23 +262,49 @@ fn totals_ignore_unknown_fields_and_ops_that_do_not_fit() {
 #[test]
 fn money_average_rounds_half_away_from_zero() {
     let values = [Value::Money(Money::tl(1)), Value::Money(Money::tl(2))].into_iter();
-    assert_eq!(zeyn::total(values, Aggregate::Avg), Some(Value::Money(Money::tl(2))));
+    assert_eq!(
+        zeyn::total(values, Aggregate::Avg),
+        Some(Value::Money(Money::tl(2)))
+    );
     let values = [Value::Money(Money::tl(-1)), Value::Money(Money::tl(-2))].into_iter();
-    assert_eq!(zeyn::total(values, Aggregate::Avg), Some(Value::Money(Money::tl(-2))));
-    let mixed = [Value::Money(Money::tl(1)), Value::Money(Money::new(1, zeyn::Currency::Usd))].into_iter();
+    assert_eq!(
+        zeyn::total(values, Aggregate::Avg),
+        Some(Value::Money(Money::tl(-2)))
+    );
+    let mixed = [
+        Value::Money(Money::tl(1)),
+        Value::Money(Money::new(1, zeyn::Currency::Usd)),
+    ]
+    .into_iter();
     assert_eq!(zeyn::total(mixed, Aggregate::Sum), None);
-    assert_eq!(zeyn::total(std::iter::empty(), Aggregate::Avg), Some(Value::Null));
+    assert_eq!(
+        zeyn::total(std::iter::empty(), Aggregate::Avg),
+        Some(Value::Null)
+    );
 }
 
 #[tokio::test]
 async fn page_renders_footer_totals_with_the_first_page() {
     let r = send(&router(reader()), get("/items")).await;
     assert_eq!(r.status, StatusCode::OK);
-    assert!(r.body.contains(r#"<tfoot data-zeyn-foot>"#));
-    assert!(r.body.contains(r#"data-field="qty" data-agg="sum avg min max""#));
-    assert!(r.body.contains(r#"<span class="z-agg-label">Sum</span> <span class="z-agg-value">210</span>"#));
+    assert!(
+        r.body
+            .contains(r#"<tfoot data-zeyn-foot>"#)
+    );
+    assert!(
+        r.body
+            .contains(r#"data-field="qty" data-agg="sum avg min max""#)
+    );
+    assert!(
+        r.body.contains(
+            r#"<span class="z-agg-label">Sum</span> <span class="z-agg-value">210</span>"#
+        )
+    );
     assert!(r.body.contains("₺2,100.00"));
-    assert!(r.body.contains(r#"<span class="z-agg-value">10.50</span>"#));
+    assert!(
+        r.body
+            .contains(r#"<span class="z-agg-value">10.50</span>"#)
+    );
 }
 
 #[tokio::test]
@@ -254,14 +337,27 @@ async fn grid_endpoint_computes_only_totals_the_grid_declares() {
     let r = send(&router(reader()), post("/_zeyn/grid", body)).await;
     assert_eq!(r.status, StatusCode::OK);
     assert!(r.json()["foot"].is_null());
-    let r = send(&router(reader()), post("/_zeyn/grid", serde_json::json!({ "screen": "list", "node": 0 }))).await;
+    let r = send(
+        &router(reader()),
+        post(
+            "/_zeyn/grid",
+            serde_json::json!({ "screen": "list", "node": 0 }),
+        ),
+    )
+    .await;
     assert!(r.json()["foot"].is_null());
 }
 
 #[tokio::test]
 async fn grid_endpoint_needs_the_read_permission() {
-    let r = send(&router(Identity::user("x")), post("/_zeyn/grid", serde_json::json!({ "screen": "list", "node": 0 })))
-        .await;
+    let r = send(
+        &router(Identity::user("x")),
+        post(
+            "/_zeyn/grid",
+            serde_json::json!({ "screen": "list", "node": 0 }),
+        ),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::FORBIDDEN);
     let _ = r.headers;
 }
@@ -275,27 +371,61 @@ pub struct Event {
 }
 
 fn codes(page: &Page<Item>) -> Vec<String> {
-    page.items.iter().map(|i| i.code.clone()).collect()
+    page.items
+        .iter()
+        .map(|i| i.code.clone())
+        .collect()
 }
 
 fn filtered(filters: Vec<zeyn::Filter>) -> Page<Item> {
-    let q = DataQuery { filters, page: zeyn::PageRequest::Offset { offset: 0, limit: 100 }, ..DataQuery::default() };
+    let q = DataQuery {
+        filters,
+        page: zeyn::PageRequest::Offset {
+            offset: 0,
+            limit: 100,
+        },
+        ..DataQuery::default()
+    };
     q.apply((1..=20).map(item).collect())
 }
 
 #[test]
 fn number_and_money_ranges_are_inclusive_and_open_ended() {
     use zeyn::Filter;
-    assert_eq!(codes(&filtered(vec![Filter::range("qty", Some("18"), None)])), ["C-18", "C-19", "C-20"]);
-    assert_eq!(codes(&filtered(vec![Filter::range("price", Some("10"), Some("30.00"))])), ["C-01", "C-02", "C-03"]);
-    assert_eq!(filtered(vec![Filter::range("price", Some("10,5"), Some("20"))]).items.len(), 1);
-    assert_eq!(filtered(vec![Filter::range("qty", Some("abc"), Some("1e9"))]).items.len(), 20);
+    assert_eq!(
+        codes(&filtered(vec![Filter::range("qty", Some("18"), None)])),
+        ["C-18", "C-19", "C-20"]
+    );
+    assert_eq!(
+        codes(&filtered(vec![Filter::range(
+            "price",
+            Some("10"),
+            Some("30.00")
+        )])),
+        ["C-01", "C-02", "C-03"]
+    );
+    assert_eq!(
+        filtered(vec![Filter::range("price", Some("10,5"), Some("20"))])
+            .items
+            .len(),
+        1
+    );
+    assert_eq!(
+        filtered(vec![Filter::range("qty", Some("abc"), Some("1e9"))])
+            .items
+            .len(),
+        20
+    );
 }
 
 #[test]
 fn date_ranges_and_optional_dates() {
     use zeyn::Filter;
-    let page = filtered(vec![Filter::range("added", Some("2026-01-05"), Some("2026-01-07"))]);
+    let page = filtered(vec![Filter::range(
+        "added",
+        Some("2026-01-05"),
+        Some("2026-01-07"),
+    )]);
     assert_eq!(codes(&page), ["C-05", "C-06", "C-07"]);
     let page = filtered(vec![Filter::range("due", None, Some("2026-03-08"))]);
     assert_eq!(codes(&page), ["C-04", "C-08"]);
@@ -313,19 +443,46 @@ fn moment_date_filters_use_the_users_whole_day() {
     assert_eq!(q.apply(rows.clone()).items.len(), 0);
     q.time_zone = TimeZone::named("Europe/Istanbul").unwrap();
     assert_eq!(q.apply(rows.clone()).items.len(), 1);
-    q.filters = vec![Filter::range("at", Some("2026-03-02T01:00"), Some("2026-03-02T01:30"))];
+    q.filters = vec![Filter::range(
+        "at",
+        Some("2026-03-02T01:00"),
+        Some("2026-03-02T01:30"),
+    )];
     assert_eq!(q.apply(rows).items.len(), 1);
 }
 
 #[test]
 fn choices_booleans_and_text_operators() {
     use zeyn::Filter;
-    assert_eq!(filtered(vec![Filter::any_of("kind", ["Tool", "nope"])]).items.len(), 6);
-    assert_eq!(filtered(vec![Filter::any_of("kind", ["nope"])]).items.len(), 0);
-    assert_eq!(filtered(vec![Filter::is("active", true)]).items.len(), 10);
-    let starts = Filter { field: "code".into(), starts_with: Some("c-1".into()), ..Filter::default() };
+    assert_eq!(
+        filtered(vec![Filter::any_of("kind", ["Tool", "nope"])])
+            .items
+            .len(),
+        6
+    );
+    assert_eq!(
+        filtered(vec![Filter::any_of("kind", ["nope"])])
+            .items
+            .len(),
+        0
+    );
+    assert_eq!(
+        filtered(vec![Filter::is("active", true)])
+            .items
+            .len(),
+        10
+    );
+    let starts = Filter {
+        field: "code".into(),
+        starts_with: Some("c-1".into()),
+        ..Filter::default()
+    };
     assert_eq!(filtered(vec![starts]).items.len(), 10);
-    let equals = Filter { field: "code".into(), equals: Some("C-07".into()), ..Filter::default() };
+    let equals = Filter {
+        field: "code".into(),
+        equals: Some("C-07".into()),
+        ..Filter::default()
+    };
     assert_eq!(codes(&filtered(vec![equals])), ["C-07"]);
     let too_long = Filter::contains("code", "x".repeat(zeyn::MAX_FILTER_TEXT + 1));
     assert_eq!(filtered(vec![too_long]).items.len(), 20);
@@ -333,7 +490,8 @@ fn choices_booleans_and_text_operators() {
 
 #[test]
 fn old_contains_filters_still_read() {
-    let q: DataQuery = query(serde_json::json!({ "filters": [{ "field": "code", "contains": "C-2" }] }));
+    let q: DataQuery =
+        query(serde_json::json!({ "filters": [{ "field": "code", "contains": "C-2" }] }));
     assert_eq!(codes(&q.apply((1..=20).map(item).collect())), ["C-20"]);
 }
 
@@ -378,8 +536,14 @@ async fn grid_endpoint_sorts_by_several_columns() {
         "sort": [{ "field": "kind", "desc": false }, { "field": "qty", "desc": true }]
     });
     let r = send(&router(reader()), post("/_zeyn/grid", grid_call(q))).await;
-    let rows = r.json()["rows"].as_str().unwrap().to_string();
-    let order: Vec<usize> = ["C-20", "C-17", "C-14", "C-11"].iter().map(|c| rows.find(c).unwrap()).collect();
+    let rows = r.json()["rows"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let order: Vec<usize> = ["C-20", "C-17", "C-14", "C-11"]
+        .iter()
+        .map(|c| rows.find(c).unwrap())
+        .collect();
     assert!(order.windows(2).all(|w| w[0] < w[1]), "{rows}");
 }
 
@@ -392,11 +556,16 @@ async fn header_names_filter_kinds_and_localized_choices() {
         .unwrap();
     let r = send(&router(reader()), req).await;
     assert!(
-        r.body.contains(r#"data-field="price" aria-sort="none" aria-colindex="3" data-filter="money""#),
+        r.body.contains(
+            r#"data-field="price" aria-sort="none" aria-colindex="3" data-filter="money""#
+        ),
         "{}",
         r.body
     );
-    assert!(r.body.contains(r#"data-filter="choice" data-options=""#));
+    assert!(
+        r.body
+            .contains(r#"data-filter="choice" data-options=""#)
+    );
     assert!(r.body.contains(r#"data-filter="bool""#));
     assert!(r.body.contains(r#"data-filter="date""#));
     assert!(r.body.contains("data-zeyn-texts="));
@@ -408,8 +577,16 @@ fn views_router(store: zeyn::MemoryViewStore) -> Router {
         .service(Store::seeded())
         .datagrid_views(store)
         .auth(|h: &HeaderMap| {
-            let user = h.get("x-user")?.to_str().ok()?.to_string();
-            let perms: Vec<&str> = if user == "guest" { vec![] } else { vec!["items.read"] };
+            let user = h
+                .get("x-user")?
+                .to_str()
+                .ok()?
+                .to_string();
+            let perms: Vec<&str> = if user == "guest" {
+                vec![]
+            } else {
+                vec!["items.read"]
+            };
             Some(Identity::user(user).with_permissions(perms))
         })
         .feature(Feature::new("items").screen(list))
@@ -418,7 +595,8 @@ fn views_router(store: zeyn::MemoryViewStore) -> Router {
 }
 
 fn as_user(mut req: Request<Body>, user: &str) -> Request<Body> {
-    req.headers_mut().insert("x-user", user.parse().unwrap());
+    req.headers_mut()
+        .insert("x-user", user.parse().unwrap());
     req
 }
 
@@ -435,18 +613,46 @@ async fn saved_view_comes_back_on_the_next_page_load_with_its_sort_and_filters()
         "sort": [{ "field": "qty", "desc": true }, { "field": "note", "desc": false }],
         "filters": [{ "field": "kind", "any_of": ["Tool"] }, { "field": "note", "contains": "x" }]
     });
-    let r = send(&router, as_user(post("/_zeyn/grid/view", save_view(view)), "ayse")).await;
+    let r = send(
+        &router,
+        as_user(post("/_zeyn/grid/view", save_view(view)), "ayse"),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::NO_CONTENT, "{}", r.body);
 
     let page = send(&router, as_user(get("/items"), "ayse")).await;
-    assert!(page.body.contains(r#"data-zeyn-views="server""#));
-    let head = page.body.split("<thead>").nth(1).unwrap().split("</thead>").next().unwrap();
-    assert!(head.find(r#"data-field="code""#).unwrap() < head.find(r#"data-field="qty""#).unwrap());
+    assert!(
+        page.body
+            .contains(r#"data-zeyn-views="server""#)
+    );
+    let head = page
+        .body
+        .split("<thead>")
+        .nth(1)
+        .unwrap()
+        .split("</thead>")
+        .next()
+        .unwrap();
+    assert!(
+        head.find(r#"data-field="code""#)
+            .unwrap()
+            < head
+                .find(r#"data-field="qty""#)
+                .unwrap()
+    );
     assert!(head.contains(r#"data-pin="start""#));
     assert!(head.contains("width:1200px;"), "{head}");
     assert!(!head.contains(r#"data-field="kind""#));
-    assert!(page.body.contains(r#"data-zeyn-total="6""#), "only tools, the note filter is not offered");
-    let rows = page.body.split("<tbody data-zeyn-rows>").nth(1).unwrap();
+    assert!(
+        page.body
+            .contains(r#"data-zeyn-total="6""#),
+        "only tools, the note filter is not offered"
+    );
+    let rows = page
+        .body
+        .split("<tbody data-zeyn-rows>")
+        .nth(1)
+        .unwrap();
     assert!(
         rows.starts_with("<tr data-zeyn-key=\"18\"><td>C-18</td><td class=\"z-num\">18</td></tr>"),
         "{}",
@@ -455,9 +661,20 @@ async fn saved_view_comes_back_on_the_next_page_load_with_its_sort_and_filters()
 
     let other = send(&router, as_user(get("/items"), "mert")).await;
     assert!(!other.body.contains("data-zeyn-view="));
-    assert!(other.body.contains(r#"data-zeyn-total="20""#));
+    assert!(
+        other
+            .body
+            .contains(r#"data-zeyn-total="20""#)
+    );
 
-    let r = send(&router, as_user(post("/_zeyn/grid/view", save_view(serde_json::Value::Null)), "ayse")).await;
+    let r = send(
+        &router,
+        as_user(
+            post("/_zeyn/grid/view", save_view(serde_json::Value::Null)),
+            "ayse",
+        ),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::NO_CONTENT);
     let page = send(&router, as_user(get("/items"), "ayse")).await;
     assert!(!page.body.contains("data-zeyn-view="));
@@ -466,13 +683,30 @@ async fn saved_view_comes_back_on_the_next_page_load_with_its_sort_and_filters()
 #[tokio::test]
 async fn saving_a_view_needs_a_store_a_user_and_read_access() {
     let views = views_router(zeyn::MemoryViewStore::default());
-    let r = send(&views, as_user(post("/_zeyn/grid/view", save_view(serde_json::json!({}))), "guest")).await;
+    let r = send(
+        &views,
+        as_user(
+            post("/_zeyn/grid/view", save_view(serde_json::json!({}))),
+            "guest",
+        ),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::FORBIDDEN);
-    let r = send(&router(reader()), post("/_zeyn/grid/view", save_view(serde_json::json!({})))).await;
+    let r = send(
+        &router(reader()),
+        post("/_zeyn/grid/view", save_view(serde_json::json!({}))),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::NOT_FOUND);
     let r = send(
         &views,
-        as_user(post("/_zeyn/grid/view", serde_json::json!({ "screen": "list", "node": 7, "view": {} })), "ayse"),
+        as_user(
+            post(
+                "/_zeyn/grid/view",
+                serde_json::json!({ "screen": "list", "node": 7, "view": {} }),
+            ),
+            "ayse",
+        ),
     )
     .await;
     assert_eq!(r.status, StatusCode::NOT_FOUND);
@@ -487,12 +721,18 @@ async fn grid_endpoint_renders_rows_and_header_in_the_requested_layout() {
     });
     let r = send(&router(reader()), post("/_zeyn/grid", body)).await;
     let j = r.json();
-    assert_eq!(j["rows"], "<tr data-zeyn-key=\"1\"><td class=\"z-num\">1</td><td class=\"z-num\">₺10.00</td></tr>");
+    assert_eq!(
+        j["rows"],
+        "<tr data-zeyn-key=\"1\"><td class=\"z-num\">1</td><td class=\"z-num\">₺10.00</td></tr>"
+    );
     let head = j["head"].as_str().unwrap();
     assert!(head.find("qty").unwrap() < head.find("price").unwrap());
     assert!(head.contains(r#"data-pin="end""#));
     let foot = j["foot"].as_str().unwrap();
-    assert!(foot.find(">210<").unwrap() < foot.find("₺2,100.00").unwrap(), "{foot}");
+    assert!(
+        foot.find(">210<").unwrap() < foot.find("₺2,100.00").unwrap(),
+        "{foot}"
+    );
 }
 
 #[test]
@@ -509,16 +749,27 @@ fn at_most_three_columns_stay_pinned_per_side() {
         .iter()
         .map(|f| serde_json::json!({ "field": f, "pin": "start" }))
         .collect();
-    let view: DataGridView = serde_json::from_value(serde_json::json!({ "columns": columns })).unwrap();
+    let view: DataGridView =
+        serde_json::from_value(serde_json::json!({ "columns": columns })).unwrap();
     let clean = GridSource::clean_view(&grid, view);
-    assert_eq!(clean.columns.iter().filter(|c| c.pin.is_some()).count(), 3);
+    assert_eq!(
+        clean
+            .columns
+            .iter()
+            .filter(|c| c.pin.is_some())
+            .count(),
+        3
+    );
     assert_eq!(clean.columns.len(), 5);
 }
 
 #[action(permission = "items.write")]
 pub async fn bump(id: ItemId, store: Store) -> Result<()> {
     let mut rows = store.0.write().unwrap();
-    let row = rows.iter_mut().find(|r| r.id == id).ok_or(Error::NotFound)?;
+    let row = rows
+        .iter_mut()
+        .find(|r| r.id == id)
+        .ok_or(Error::NotFound)?;
     if row.qty > 100 {
         return Err(Error::Denied("too many".into()));
     }
@@ -546,49 +797,86 @@ pub fn act() -> Screen {
 
 #[screen(route = "/act-nested", permission = "items.read")]
 pub fn act_nested() -> Screen {
-    Screen::new("Act nested").body(Panel::new("Items").add(DataGrid::of(search).column(Item::code).row_action(
-        "Bump",
-        bump,
-        |i| i.id,
-    )))
+    Screen::new("Act nested").body(
+        Panel::new("Items").add(
+            DataGrid::of(search)
+                .column(Item::code)
+                .row_action("Bump", bump, |i| i.id),
+        ),
+    )
 }
 
 #[screen(route = "/sorted", permission = "items.read")]
 pub fn sorted() -> Screen {
-    Screen::new("Sorted").body(DataGrid::of(search).sort_by(Item::qty, true).column(Item::code).column(Item::qty))
+    Screen::new("Sorted").body(
+        DataGrid::of(search)
+            .sort_by(Item::qty, true)
+            .column(Item::code)
+            .column(Item::qty),
+    )
 }
 
 fn act_router(identity: Identity) -> (Router, Store) {
     let store = Store::seeded();
     let router = App::new("Test")
         .service(store.clone())
-        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
-        .feature(Feature::new("items").screen(act).screen(act_nested).screen(sorted))
+        .auth(move |h: &HeaderMap| {
+            h.contains_key("x-user")
+                .then(|| identity.clone())
+        })
+        .feature(
+            Feature::new("items")
+                .screen(act)
+                .screen(act_nested)
+                .screen(sorted),
+        )
         .router()
         .unwrap();
     (router, store)
 }
 
 fn run(key: &str, item: &str) -> Request<Body> {
-    post("/_zeyn/grid/run", serde_json::json!({ "screen": "act", "node": 0, "key": key, "item": item }))
+    post(
+        "/_zeyn/grid/run",
+        serde_json::json!({ "screen": "act", "node": 0, "key": key, "item": item }),
+    )
 }
 
 #[tokio::test]
 async fn cells_render_badges_progress_and_icons() {
     let (router, _) = act_router(reader());
     let r = send(&router, get("/act")).await;
-    assert!(r.body.contains(r#"<span class="z-badge z-tone-neutral">Part</span>"#));
-    assert!(r.body.contains(r#"<span class="z-badge z-tone-info">Tool</span>"#));
-    assert!(r.body.contains(r#"style="--z-pct:2.5%""#), "1 of 40");
-    assert!(r.body.contains(r#"<span class="z-bool z-bool-no" role="img" aria-label="No"></span>"#));
-    assert!(r.body.contains(r#"<tr data-zeyn-key="1">"#));
+    assert!(
+        r.body
+            .contains(r#"<span class="z-badge z-tone-neutral">Part</span>"#)
+    );
+    assert!(
+        r.body
+            .contains(r#"<span class="z-badge z-tone-info">Tool</span>"#)
+    );
+    assert!(
+        r.body
+            .contains(r#"style="--z-pct:2.5%""#),
+        "1 of 40"
+    );
+    assert!(
+        r.body
+            .contains(r#"<span class="z-bool z-bool-no" role="img" aria-label="No"></span>"#)
+    );
+    assert!(
+        r.body
+            .contains(r#"<tr data-zeyn-key="1">"#)
+    );
 }
 
 #[tokio::test]
 async fn row_action_buttons_show_only_with_the_actions_permission() {
     let (router, _) = act_router(reader());
     let r = send(&router, get("/act")).await;
-    assert!(r.body.contains(r#"<td class="z-row-actions"></td>"#));
+    assert!(
+        r.body
+            .contains(r#"<td class="z-row-actions"></td>"#)
+    );
     assert!(!r.body.contains("data-zeyn-run="));
     let writer = Identity::user("w").with_permissions(["items.read", "items.write"]);
     let (router, _) = act_router(writer);
@@ -604,7 +892,11 @@ async fn row_action_runs_with_input_built_from_the_row_on_the_server() {
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
     assert_eq!(store.0.read().unwrap()[6].qty, 107);
     let r = send(&router, run("7", "a0")).await;
-    assert_eq!(r.status, StatusCode::FORBIDDEN, "the action's own error comes back");
+    assert_eq!(
+        r.status,
+        StatusCode::FORBIDDEN,
+        "the action's own error comes back"
+    );
 }
 
 #[tokio::test]
@@ -616,47 +908,108 @@ async fn a_default_sort_orders_the_first_page_and_reaches_the_browser() {
         "{}",
         r.body
     );
-    let first = r.body.find(r#"<tr data-zeyn-key="#).map(|i| &r.body[i..i + 30]).unwrap_or_default();
-    let max = Store::seeded().0.read().unwrap().iter().max_by_key(|i| i.qty).map(|i| i.id.0).unwrap();
-    assert!(first.contains(&format!(r#"data-zeyn-key="{max}""#)), "{first}");
+    let first = r
+        .body
+        .find(r#"<tr data-zeyn-key="#)
+        .map(|i| &r.body[i..i + 30])
+        .unwrap_or_default();
+    let max = Store::seeded()
+        .0
+        .read()
+        .unwrap()
+        .iter()
+        .max_by_key(|i| i.qty)
+        .map(|i| i.id.0)
+        .unwrap();
+    assert!(
+        first.contains(&format!(r#"data-zeyn-key="{max}""#)),
+        "{first}"
+    );
 }
 
 #[tokio::test]
 async fn grid_endpoints_take_node_paths_as_the_browser_sends_them() {
     let writer = Identity::user("w").with_permissions(["items.read", "items.write"]);
     let (router, store) = act_router(writer);
-    let top = post("/_zeyn/grid/run", serde_json::json!({ "screen": "act", "node": "0", "key": "7", "item": "a0" }));
+    let top = post(
+        "/_zeyn/grid/run",
+        serde_json::json!({ "screen": "act", "node": "0", "key": "7", "item": "a0" }),
+    );
     assert_eq!(send(&router, top).await.status, StatusCode::OK);
     let page = send(&router, get("/act-nested")).await;
-    assert!(page.body.contains(r#"data-zeyn-node="0.0""#), "{}", page.body);
-    let nested =
-        post("/_zeyn/grid/run", serde_json::json!({ "screen": "act_nested", "node": "0.0", "key": "8", "item": "a0" }));
+    assert!(
+        page.body
+            .contains(r#"data-zeyn-node="0.0""#),
+        "{}",
+        page.body
+    );
+    let nested = post(
+        "/_zeyn/grid/run",
+        serde_json::json!({ "screen": "act_nested", "node": "0.0", "key": "8", "item": "a0" }),
+    );
     assert_eq!(send(&router, nested).await.status, StatusCode::OK);
-    assert_eq!((store.0.read().unwrap()[6].qty, store.0.read().unwrap()[7].qty), (107, 108));
-    let missing =
-        post("/_zeyn/grid/run", serde_json::json!({ "screen": "act_nested", "node": "0.5", "key": "7", "item": "a0" }));
+    assert_eq!(
+        (
+            store.0.read().unwrap()[6].qty,
+            store.0.read().unwrap()[7].qty
+        ),
+        (107, 108)
+    );
+    let missing = post(
+        "/_zeyn/grid/run",
+        serde_json::json!({ "screen": "act_nested", "node": "0.5", "key": "7", "item": "a0" }),
+    );
     assert_eq!(send(&router, missing).await.status, StatusCode::NOT_FOUND);
 }
 
 #[tokio::test]
 async fn row_action_is_refused_without_permission_unknown_items_or_rows() {
     let (router, store) = act_router(reader());
-    assert_eq!(send(&router, run("7", "a0")).await.status, StatusCode::FORBIDDEN);
+    assert_eq!(
+        send(&router, run("7", "a0"))
+            .await
+            .status,
+        StatusCode::FORBIDDEN
+    );
     assert_eq!(store.0.read().unwrap()[6].qty, 7);
     let writer = Identity::user("w").with_permissions(["items.read", "items.write"]);
     let (router, _) = act_router(writer.clone());
-    assert_eq!(send(&router, run("7", "a1")).await.status, StatusCode::NOT_FOUND);
-    assert_eq!(send(&router, run("7", "x")).await.status, StatusCode::NOT_FOUND);
-    assert_eq!(send(&router, run("999", "a0")).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(
+        send(&router, run("7", "a1"))
+            .await
+            .status,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        send(&router, run("7", "x"))
+            .await
+            .status,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        send(&router, run("999", "a0"))
+            .await
+            .status,
+        StatusCode::NOT_FOUND
+    );
     let (router, _) = act_router(Identity::user("w").with_permissions(["items.write"]));
-    assert_eq!(send(&router, run("7", "a0")).await.status, StatusCode::FORBIDDEN, "screen access first");
+    assert_eq!(
+        send(&router, run("7", "a0"))
+            .await
+            .status,
+        StatusCode::FORBIDDEN,
+        "screen access first"
+    );
 }
 
 #[action(permission = "items.write")]
 pub async fn deactivate(ids: Vec<ItemId>, store: Store) -> Result<usize> {
     let mut rows = store.0.write().unwrap();
     let mut n = 0;
-    for r in rows.iter_mut().filter(|r| ids.contains(&r.id)) {
+    for r in rows
+        .iter_mut()
+        .filter(|r| ids.contains(&r.id))
+    {
         r.active = false;
         n += 1;
     }
@@ -680,7 +1033,10 @@ fn pick_router(identity: Identity) -> (Router, Store) {
     let store = Store::seeded();
     let router = App::new("Test")
         .service(store.clone())
-        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .auth(move |h: &HeaderMap| {
+            h.contains_key("x-user")
+                .then(|| identity.clone())
+        })
         .feature(Feature::new("items").screen(pick))
         .router()
         .unwrap();
@@ -689,12 +1045,21 @@ fn pick_router(identity: Identity) -> (Router, Store) {
 
 fn bulk(body: serde_json::Value) -> Request<Body> {
     let mut call = serde_json::json!({ "screen": "pick", "node": 0, "action": 0 });
-    call.as_object_mut().unwrap().extend(body.as_object().unwrap().clone());
+    call.as_object_mut()
+        .unwrap()
+        .extend(body.as_object().unwrap().clone());
     post("/_zeyn/grid/bulk", call)
 }
 
 fn active_ids(store: &Store) -> Vec<i64> {
-    store.0.read().unwrap().iter().filter(|r| r.active).map(|r| r.id.0).collect()
+    store
+        .0
+        .read()
+        .unwrap()
+        .iter()
+        .filter(|r| r.active)
+        .map(|r| r.id.0)
+        .collect()
 }
 
 fn writer_items() -> Identity {
@@ -706,8 +1071,14 @@ async fn selectable_grid_renders_checkboxes_and_a_bar_with_permitted_actions_onl
     let (router, _) = pick_router(writer_items());
     let r = send(&router, get("/pick")).await;
     assert!(r.body.contains("data-zeyn-select-all"));
-    assert!(r.body.contains(r#"<td class="z-row-select"><input type="checkbox" data-zeyn-select"#));
-    assert!(r.body.contains(r#"data-zeyn-bulk-run="0""#));
+    assert!(
+        r.body
+            .contains(r#"<td class="z-row-select"><input type="checkbox" data-zeyn-select"#)
+    );
+    assert!(
+        r.body
+            .contains(r#"data-zeyn-bulk-run="0""#)
+    );
     assert!(r.body.contains(r#"aria-colcount="4""#));
     let (router, _) = pick_router(reader());
     let r = send(&router, get("/pick")).await;
@@ -718,7 +1089,11 @@ async fn selectable_grid_renders_checkboxes_and_a_bar_with_permitted_actions_onl
 #[tokio::test]
 async fn bulk_action_runs_with_picked_keys() {
     let (router, store) = pick_router(writer_items());
-    let r = send(&router, bulk(serde_json::json!({ "keys": ["2", "4", "4"] }))).await;
+    let r = send(
+        &router,
+        bulk(serde_json::json!({ "keys": ["2", "4", "4"] })),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
     assert_eq!(r.json()["count"], 2);
     assert!(!active_ids(&store).contains(&2) && !active_ids(&store).contains(&4));
@@ -731,29 +1106,59 @@ async fn bulk_action_on_every_matching_row_collects_keys_on_the_server() {
     let q = serde_json::json!({ "all": true, "keys": ["1"], "query": { "filters": [{ "field": "kind", "any_of": ["Tool"] }, { "field": "note", "contains": "zzz" }] } });
     let r = send(&router, bulk(q)).await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
-    assert_eq!(r.json()["count"], 6, "every tool, the note filter is not offered");
+    assert_eq!(
+        r.json()["count"],
+        6,
+        "every tool, the note filter is not offered"
+    );
     assert_eq!(active_ids(&store), [2, 4, 8, 10, 14, 16, 20]);
 }
 
 #[tokio::test]
 async fn bulk_action_is_refused_without_permission_bad_keys_unknown_actions_or_too_many() {
     let (router, store) = pick_router(reader());
-    assert_eq!(send(&router, bulk(serde_json::json!({ "keys": ["2"] }))).await.status, StatusCode::FORBIDDEN);
+    assert_eq!(
+        send(&router, bulk(serde_json::json!({ "keys": ["2"] })))
+            .await
+            .status,
+        StatusCode::FORBIDDEN
+    );
     assert_eq!(active_ids(&store).len(), 10);
     let (router, store) = pick_router(writer_items());
-    assert_eq!(send(&router, bulk(serde_json::json!({ "keys": ["x"] }))).await.status, StatusCode::NOT_FOUND);
     assert_eq!(
-        send(&router, bulk(serde_json::json!({ "action": 3, "keys": ["2"] }))).await.status,
+        send(&router, bulk(serde_json::json!({ "keys": ["x"] })))
+            .await
+            .status,
         StatusCode::NOT_FOUND
     );
-    let many: Vec<String> = (0..=zeyn::MAX_BULK).map(|i| i.to_string()).collect();
-    assert_eq!(send(&router, bulk(serde_json::json!({ "keys": many }))).await.status, StatusCode::FORBIDDEN);
+    assert_eq!(
+        send(
+            &router,
+            bulk(serde_json::json!({ "action": 3, "keys": ["2"] }))
+        )
+        .await
+        .status,
+        StatusCode::NOT_FOUND
+    );
+    let many: Vec<String> = (0..=zeyn::MAX_BULK)
+        .map(|i| i.to_string())
+        .collect();
+    assert_eq!(
+        send(&router, bulk(serde_json::json!({ "keys": many })))
+            .await
+            .status,
+        StatusCode::FORBIDDEN
+    );
     assert_eq!(active_ids(&store).len(), 10);
 }
 
 #[action(permission = "items.admin")]
 pub async fn wipe(id: ItemId, store: Store) -> Result<()> {
-    store.0.write().unwrap().retain(|r| r.id != id);
+    store
+        .0
+        .write()
+        .unwrap()
+        .retain(|r| r.id != id);
     Ok(())
 }
 
@@ -768,27 +1173,46 @@ pub async fn bump_all(_: (), store: Store) -> Result<()> {
 #[screen(route = "/menus", permission = "items.read")]
 pub fn menus() -> Screen {
     Screen::new("Menus")
-        .context_menu(ContextMenu::new().item("Open", Effect::Toast { message: "hi".into() }).action(
-            "Bump all",
-            bump_all,
-            (),
-        ))
-        .body(DataGrid::of(search).paging(Paging::pages(5)).column(Item::code).column(Item::qty).row_menu(|i| {
+        .context_menu(
             ContextMenu::new()
-                .item("Toast", Effect::Toast { message: "x".into() })
-                .separator()
-                .action("Bump", bump, i.id)
-                .disabled(i.qty > 3)
-                .submenu("Danger", ContextMenu::new().action("Wipe", wipe, i.id))
-                .separator()
-        }))
+                .item(
+                    "Open",
+                    Effect::Toast {
+                        message: "hi".into(),
+                    },
+                )
+                .action("Bump all", bump_all, ()),
+        )
+        .body(
+            DataGrid::of(search)
+                .paging(Paging::pages(5))
+                .column(Item::code)
+                .column(Item::qty)
+                .row_menu(|i| {
+                    ContextMenu::new()
+                        .item(
+                            "Toast",
+                            Effect::Toast {
+                                message: "x".into(),
+                            },
+                        )
+                        .separator()
+                        .action("Bump", bump, i.id)
+                        .disabled(i.qty > 3)
+                        .submenu("Danger", ContextMenu::new().action("Wipe", wipe, i.id))
+                        .separator()
+                }),
+        )
 }
 
 fn menu_router(identity: Identity) -> (Router, Store) {
     let store = Store::seeded();
     let router = App::new("Test")
         .service(store.clone())
-        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .auth(move |h: &HeaderMap| {
+            h.contains_key("x-user")
+                .then(|| identity.clone())
+        })
         .feature(Feature::new("items").screen(menus))
         .router()
         .unwrap();
@@ -796,7 +1220,10 @@ fn menu_router(identity: Identity) -> (Router, Store) {
 }
 
 fn menu_run(key: &str, item: &str) -> Request<Body> {
-    post("/_zeyn/grid/run", serde_json::json!({ "screen": "menus", "node": 0, "key": key, "item": item }))
+    post(
+        "/_zeyn/grid/run",
+        serde_json::json!({ "screen": "menus", "node": 0, "key": key, "item": item }),
+    )
 }
 
 #[tokio::test]
@@ -820,7 +1247,10 @@ async fn row_menus_leave_out_items_the_user_may_not_run() {
     );
     assert_eq!(items[2]["run"], "2");
     let r = send(&router, get("/menus")).await;
-    assert!(r.body.contains(r#"data-zeyn-screen="menus" data-zeyn-params="null" data-zeyn-menu=""#));
+    assert!(
+        r.body
+            .contains(r#"data-zeyn-screen="menus" data-zeyn-params="null" data-zeyn-menu=""#)
+    );
     let admin = Identity::user("a").with_permissions(["items.read", "items.write", "items.admin"]);
     let (router, _) = menu_router(admin);
     let r = send(&router, get("/menus")).await;
@@ -833,18 +1263,51 @@ async fn row_menu_actions_run_from_the_row_on_the_server_and_check_permission_ag
     let r = send(&router, menu_run("2", "m2")).await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
     assert_eq!(store.0.read().unwrap()[1].qty, 102);
-    assert_eq!(send(&router, menu_run("2", "m2")).await.status, StatusCode::NOT_FOUND, "disabled now that qty > 3");
-    assert_eq!(send(&router, menu_run("1", "m3.0")).await.status, StatusCode::FORBIDDEN, "admin only");
+    assert_eq!(
+        send(&router, menu_run("2", "m2"))
+            .await
+            .status,
+        StatusCode::NOT_FOUND,
+        "disabled now that qty > 3"
+    );
+    assert_eq!(
+        send(&router, menu_run("1", "m3.0"))
+            .await
+            .status,
+        StatusCode::FORBIDDEN,
+        "admin only"
+    );
     assert_eq!(store.0.read().unwrap().len(), 20);
-    assert_eq!(send(&router, menu_run("1", "m0")).await.status, StatusCode::NOT_FOUND, "effects run in the browser");
-    assert_eq!(send(&router, menu_run("1", "m9")).await.status, StatusCode::NOT_FOUND);
-    assert_eq!(send(&router, menu_run("1", "m3")).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(
+        send(&router, menu_run("1", "m0"))
+            .await
+            .status,
+        StatusCode::NOT_FOUND,
+        "effects run in the browser"
+    );
+    assert_eq!(
+        send(&router, menu_run("1", "m9"))
+            .await
+            .status,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        send(&router, menu_run("1", "m3"))
+            .await
+            .status,
+        StatusCode::NOT_FOUND
+    );
 }
 
 #[tokio::test]
 async fn screen_menu_actions_run_with_permission_checked() {
     let (router, store) = menu_router(writer_items());
-    let call = |item: &str| post("/_zeyn/menu", serde_json::json!({ "screen": "menus", "item": item }));
+    let call = |item: &str| {
+        post(
+            "/_zeyn/menu",
+            serde_json::json!({ "screen": "menus", "item": item }),
+        )
+    };
     assert_eq!(send(&router, call("1")).await.status, StatusCode::OK);
     assert_eq!(store.0.read().unwrap()[0].qty, 2);
     assert_eq!(send(&router, call("0")).await.status, StatusCode::NOT_FOUND);
@@ -857,7 +1320,12 @@ async fn screen_menu_actions_run_with_permission_checked() {
 #[tokio::test]
 async fn browser_menu_stays_unless_the_app_turns_it_off() {
     let (router, _) = menu_router(reader());
-    assert!(!send(&router, get("/menus")).await.body.contains("data-zeyn-native-menu"));
+    assert!(
+        !send(&router, get("/menus"))
+            .await
+            .body
+            .contains("data-zeyn-native-menu")
+    );
     let router = App::new("Test")
         .service(Store::seeded())
         .browser_context_menu(false)
@@ -865,13 +1333,21 @@ async fn browser_menu_stays_unless_the_app_turns_it_off() {
         .feature(Feature::new("items").screen(menus))
         .router()
         .unwrap();
-    assert!(send(&router, get("/menus")).await.body.contains(r#"data-zeyn-native-menu="off""#));
+    assert!(
+        send(&router, get("/menus"))
+            .await
+            .body
+            .contains(r#"data-zeyn-native-menu="off""#)
+    );
 }
 
 #[action(permission = "items.write")]
 pub async fn save_item(item: Valid<Item>, store: Store) -> Result<Item> {
     let mut rows = store.0.write().unwrap();
-    let current = rows.iter_mut().find(|r| r.id == item.id).ok_or(Error::NotFound)?;
+    let current = rows
+        .iter_mut()
+        .find(|r| r.id == item.id)
+        .ok_or(Error::NotFound)?;
     if current.version != item.version {
         return Err(Error::Conflict);
     }
@@ -903,8 +1379,15 @@ fn edit_router(identity: Identity) -> (Router, Store) {
     let store = Store::seeded();
     let router = App::new("Test")
         .service(store.clone())
-        .i18n(I18n::new("en").catalog("tr", "{}").unwrap())
-        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .i18n(
+            I18n::new("en")
+                .catalog("tr", "{}")
+                .unwrap(),
+        )
+        .auth(move |h: &HeaderMap| {
+            h.contains_key("x-user")
+                .then(|| identity.clone())
+        })
         .feature(Feature::new("items").screen(edit_list))
         .router()
         .unwrap();
@@ -912,19 +1395,34 @@ fn edit_router(identity: Identity) -> (Router, Store) {
 }
 
 fn edit(key: &str, values: serde_json::Value) -> Request<Body> {
-    post("/_zeyn/grid/edit", serde_json::json!({ "screen": "edit_list", "node": 0, "key": key, "values": values }))
+    post(
+        "/_zeyn/grid/edit",
+        serde_json::json!({ "screen": "edit_list", "node": 0, "key": key, "values": values }),
+    )
 }
 
 #[tokio::test]
 async fn editable_cells_carry_input_values_only_for_users_who_may_save() {
     let (router, _) = edit_router(writer_items());
     let r = send(&router, get("/edit")).await;
-    assert!(r.body.contains(r#"data-field="code" aria-sort="none" aria-colindex="1" data-edit="text""#), "{}", r.body);
-    assert!(r.body.contains(r#"data-zeyn-version-field="version""#));
+    assert!(
+        r.body
+            .contains(r#"data-field="code" aria-sort="none" aria-colindex="1" data-edit="text""#),
+        "{}",
+        r.body
+    );
+    assert!(
+        r.body
+            .contains(r#"data-zeyn-version-field="version""#)
+    );
     assert!(r.body.contains(
         r#"<tr data-zeyn-key="1" data-zeyn-version="1"><td data-v="C-01">C-01</td><td class="z-num" data-v="10.00">"#
     ));
-    assert!(!r.body.contains(r#"data-field="note" aria-sort="none" aria-colindex="4" data-edit"#), "read only");
+    assert!(
+        !r.body
+            .contains(r#"data-field="note" aria-sort="none" aria-colindex="4" data-edit"#),
+        "read only"
+    );
     let (router, _) = edit_router(reader());
     let r = send(&router, get("/edit")).await;
     assert!(!r.body.contains("data-edit=") && !r.body.contains("data-v="));
@@ -939,10 +1437,21 @@ async fn inline_edit_saves_through_valid_and_returns_the_row() {
     )
     .await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
-    assert!(r.json()["row"].as_str().unwrap().contains(r#"data-zeyn-version="2"><td data-v="NEW-3">NEW-3</td>"#));
+    assert!(
+        r.json()["row"]
+            .as_str()
+            .unwrap()
+            .contains(r#"data-zeyn-version="2"><td data-v="NEW-3">NEW-3</td>"#)
+    );
     let saved = store.0.read().unwrap()[2].clone();
     assert_eq!(
-        (saved.code.as_str(), saved.price, saved.active, saved.qty, saved.version),
+        (
+            saved.code.as_str(),
+            saved.price,
+            saved.active,
+            saved.qty,
+            saved.version
+        ),
         ("NEW-3", Money::tl(1250), true, 3, 2)
     );
 }
@@ -950,12 +1459,27 @@ async fn inline_edit_saves_through_valid_and_returns_the_row() {
 #[tokio::test]
 async fn inline_edit_reports_validation_and_conflicts() {
     let (router, store) = edit_router(writer_items());
-    let r = send(&router, edit("3", serde_json::json!({ "code": "", "price": "abc", "version": "1" }))).await;
+    let r = send(
+        &router,
+        edit(
+            "3",
+            serde_json::json!({ "code": "", "price": "abc", "version": "1" }),
+        ),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::UNPROCESSABLE_ENTITY);
-    let fields: Vec<String> =
-        r.json()["errors"].as_array().unwrap().iter().map(|e| e["field"].as_str().unwrap().to_string()).collect();
+    let fields: Vec<String> = r.json()["errors"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e["field"].as_str().unwrap().to_string())
+        .collect();
     assert_eq!(fields, ["price", "code"]);
-    let r = send(&router, edit("3", serde_json::json!({ "code": "X", "version": "7" }))).await;
+    let r = send(
+        &router,
+        edit("3", serde_json::json!({ "code": "X", "version": "7" })),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::CONFLICT);
     assert_eq!(store.0.read().unwrap()[2].code, "C-03");
 }
@@ -970,16 +1494,34 @@ async fn inline_edit_refuses_read_only_and_unknown_columns_and_missing_permissio
         serde_json::json!({ "secret": "1" }),
         serde_json::json!({}),
     ] {
-        assert_eq!(send(&router, edit("3", values)).await.status, StatusCode::FORBIDDEN);
+        assert_eq!(
+            send(&router, edit("3", values))
+                .await
+                .status,
+            StatusCode::FORBIDDEN
+        );
     }
-    assert_eq!(send(&router, edit("999", serde_json::json!({ "code": "X" }))).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(
+        send(&router, edit("999", serde_json::json!({ "code": "X" })))
+            .await
+            .status,
+        StatusCode::NOT_FOUND
+    );
     let (router, _) = edit_router(reader());
     assert_eq!(
-        send(&router, edit("3", serde_json::json!({ "code": "X", "version": "1" }))).await.status,
+        send(
+            &router,
+            edit("3", serde_json::json!({ "code": "X", "version": "1" }))
+        )
+        .await
+        .status,
         StatusCode::FORBIDDEN
     );
     let row = store.0.read().unwrap()[2].clone();
-    assert_eq!((row.note.as_str(), row.qty, row.code.as_str()), ("note 3", 3, "C-03"));
+    assert_eq!(
+        (row.note.as_str(), row.qty, row.code.as_str()),
+        ("note 3", 3, "C-03")
+    );
 }
 
 #[screen(route = "/export", permission = "items.read")]
@@ -995,7 +1537,13 @@ pub fn export_list() -> Screen {
                 .column(Item::active)
                 .exportable(),
         )
-        .body(DataGrid::of(search).column(Item::code).done().export_permission("items.export").export_limit(7))
+        .body(
+            DataGrid::of(search)
+                .column(Item::code)
+                .done()
+                .export_permission("items.export")
+                .export_limit(7),
+        )
         .body(DataGrid::of(search).column(Item::code))
 }
 
@@ -1005,8 +1553,18 @@ fn export_router(identity: Identity) -> (Router, Store) {
     store.0.write().unwrap()[1].code = "x;=cmd|' /C calc'!A0\t+1;-2".into();
     let router = App::new("Test")
         .service(store.clone())
-        .i18n(I18n::new("en").catalog("tr", r#"{ "Item": { "code": "Kod" }, "Kind": { "Tool": "Alet" } }"#).unwrap())
-        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .i18n(
+            I18n::new("en")
+                .catalog(
+                    "tr",
+                    r#"{ "Item": { "code": "Kod" }, "Kind": { "Tool": "Alet" } }"#,
+                )
+                .unwrap(),
+        )
+        .auth(move |h: &HeaderMap| {
+            h.contains_key("x-user")
+                .then(|| identity.clone())
+        })
         .feature(Feature::new("items").screen(export_list))
         .router()
         .unwrap();
@@ -1017,13 +1575,21 @@ fn export_get(node: usize, q: serde_json::Value, locale: &str) -> Request<Body> 
     let q = q.to_string();
     let enc: String = q
         .bytes()
-        .map(|b| if b.is_ascii_alphanumeric() { (b as char).to_string() } else { format!("%{b:02X}") })
+        .map(|b| {
+            if b.is_ascii_alphanumeric() {
+                (b as char).to_string()
+            } else {
+                format!("%{b:02X}")
+            }
+        })
         .collect();
-    Request::get(format!("/_zeyn/grid/export?screen=export_list&node={node}&q={enc}"))
-        .header("x-user", "1")
-        .header(header::COOKIE, format!("zeyn_locale={locale}"))
-        .body(Body::empty())
-        .unwrap()
+    Request::get(format!(
+        "/_zeyn/grid/export?screen=export_list&node={node}&q={enc}"
+    ))
+    .header("x-user", "1")
+    .header(header::COOKIE, format!("zeyn_locale={locale}"))
+    .body(Body::empty())
+    .unwrap()
 }
 
 #[tokio::test]
@@ -1032,36 +1598,94 @@ async fn export_streams_every_matching_row_in_the_users_layout_and_language() {
     let q = serde_json::json!({ "filters": [{ "field": "code", "starts_with": "C-1" }], "sort": [{ "field": "price", "desc": true }], "columns": [{ "field": "price" }, { "field": "code" }, { "field": "kind" }, { "field": "nope" }] });
     let r = send(&router, export_get(0, q, "tr")).await;
     assert_eq!(r.status, StatusCode::OK);
-    assert!(r.headers.get(header::CONTENT_TYPE).unwrap().to_str().unwrap().starts_with("text/csv"));
-    assert!(r.headers.get(header::CONTENT_DISPOSITION).unwrap().to_str().unwrap().contains("export_list.csv"));
-    let lines: Vec<&str> = r.body.trim_start_matches('\u{feff}').lines().collect();
+    assert!(
+        r.headers
+            .get(header::CONTENT_TYPE)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("text/csv")
+    );
+    assert!(
+        r.headers
+            .get(header::CONTENT_DISPOSITION)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .contains("export_list.csv")
+    );
+    let lines: Vec<&str> = r
+        .body
+        .trim_start_matches('\u{feff}')
+        .lines()
+        .collect();
     assert_eq!(lines[0], "Price,Kod,Kind");
-    assert_eq!(lines.len(), 11, "every C-1x row, not only the first page of 5");
+    assert_eq!(
+        lines.len(),
+        11,
+        "every C-1x row, not only the first page of 5"
+    );
     assert_eq!(lines[1], "\"190,00 ₺\",C-19,Part");
-    assert!(lines.iter().any(|l| l.ends_with(",Alet")));
+    assert!(
+        lines
+            .iter()
+            .any(|l| l.ends_with(",Alet"))
+    );
 }
 
 #[tokio::test]
 async fn export_defuses_formulas_and_respects_the_limit_and_permissions() {
     let (router, _) = export_router(reader());
     let r = send(&router, export_get(0, serde_json::json!({}), "en")).await;
-    assert!(r.body.contains("\"'=HYPERLINK(\"\"x\"\")\""), "{}", &r.body[..200]);
-    assert!(r.body.contains("\"x;'=cmd|' /C calc'!A0\t'+1;-2\""), "every part is defused: {}", &r.body[..300]);
-    assert_eq!(send(&router, export_get(1, serde_json::json!({}), "en")).await.status, StatusCode::FORBIDDEN);
-    assert_eq!(send(&router, export_get(2, serde_json::json!({}), "en")).await.status, StatusCode::NOT_FOUND);
-    let (router, _) = export_router(Identity::user("x").with_permissions(["items.read", "items.export"]));
+    assert!(
+        r.body
+            .contains("\"'=HYPERLINK(\"\"x\"\")\""),
+        "{}",
+        &r.body[..200]
+    );
+    assert!(
+        r.body
+            .contains("\"x;'=cmd|' /C calc'!A0\t'+1;-2\""),
+        "every part is defused: {}",
+        &r.body[..300]
+    );
+    assert_eq!(
+        send(&router, export_get(1, serde_json::json!({}), "en"))
+            .await
+            .status,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        send(&router, export_get(2, serde_json::json!({}), "en"))
+            .await
+            .status,
+        StatusCode::NOT_FOUND
+    );
+    let (router, _) =
+        export_router(Identity::user("x").with_permissions(["items.read", "items.export"]));
     let r = send(&router, export_get(1, serde_json::json!({}), "en")).await;
     assert_eq!(r.status, StatusCode::OK);
     assert_eq!(r.body.lines().count(), 8, "header and the limit of 7 rows");
     let (router, _) = export_router(Identity::user("x"));
-    assert_eq!(send(&router, export_get(0, serde_json::json!({}), "en")).await.status, StatusCode::FORBIDDEN);
+    assert_eq!(
+        send(&router, export_get(0, serde_json::json!({}), "en"))
+            .await
+            .status,
+        StatusCode::FORBIDDEN
+    );
 }
 
 #[tokio::test]
 async fn exportable_grids_tell_the_runtime() {
     let (router, _) = export_router(reader());
     let r = send(&router, get("/export")).await;
-    assert_eq!(r.body.matches(r#"data-zeyn-exportable="csv"#).count(), 1, "the second needs items.export");
+    assert_eq!(
+        r.body
+            .matches(r#"data-zeyn-exportable="csv"#)
+            .count(),
+        1,
+        "the second needs items.export"
+    );
 }
 
 /// Which item a detail screen shows.
@@ -1089,28 +1713,55 @@ pub fn master() -> Screen {
 
 #[screen(permission = "items.detail")]
 pub fn item_detail(params: ItemParams) -> Screen {
-    Screen::window("Detail").body(DataGrid::of(search).scope(Item::id, params.id).column(Item::code).column(Item::qty))
+    Screen::window("Detail").body(
+        DataGrid::of(search)
+            .scope(Item::id, params.id)
+            .column(Item::code)
+            .column(Item::qty),
+    )
 }
 
 fn master_router(identity: Identity) -> Router {
     App::new("Test")
         .service(Store::seeded())
-        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
-        .feature(Feature::new("items").screen(master).screen(item_detail))
+        .auth(move |h: &HeaderMap| {
+            h.contains_key("x-user")
+                .then(|| identity.clone())
+        })
+        .feature(
+            Feature::new("items")
+                .screen(master)
+                .screen(item_detail),
+        )
         .router()
         .unwrap()
 }
 
 #[tokio::test]
 async fn rows_expand_into_a_typed_detail_screen_only_for_users_who_may_open_it() {
-    let router = master_router(Identity::user("d").with_permissions(["items.read", "items.detail"]));
+    let router =
+        master_router(Identity::user("d").with_permissions(["items.read", "items.detail"]));
     let r = send(&router, get("/master")).await;
-    let paged = &r.body[..r.body.find(r#"data-zeyn-node="1""#).unwrap()];
-    assert!(paged.contains(r#"<th scope="col" class="z-expand-col" data-pin="start">"#), "{paged}");
+    let paged = &r.body[..r
+        .body
+        .find(r#"data-zeyn-node="1""#)
+        .unwrap()];
+    assert!(
+        paged.contains(r#"<th scope="col" class="z-expand-col" data-pin="start">"#),
+        "{paged}"
+    );
     assert!(paged.contains(r#"data-field="code" aria-sort="none" aria-colindex="2""#));
     assert!(paged.contains(r#"aria-expanded="false" data-zeyn-detail="{&quot;params&quot;:{&quot;id&quot;:1},&quot;screen&quot;:&quot;item_detail&quot;}""#), "{paged}");
-    assert_eq!(paged.matches("data-zeyn-expand").count(), 3);
-    let virtual_grid = &r.body[r.body.find(r#"data-zeyn-node="1""#).unwrap()..];
+    assert_eq!(
+        paged
+            .matches("data-zeyn-expand")
+            .count(),
+        3
+    );
+    let virtual_grid = &r.body[r
+        .body
+        .find(r#"data-zeyn-node="1""#)
+        .unwrap()..];
     assert!(
         !virtual_grid.contains("data-zeyn-detail") && !virtual_grid.contains("z-expand"),
         "virtual grids have no details"
@@ -1122,28 +1773,53 @@ async fn rows_expand_into_a_typed_detail_screen_only_for_users_who_may_open_it()
 
 #[tokio::test]
 async fn detail_screens_check_their_permission_and_keep_their_scope() {
-    let router = master_router(Identity::user("d").with_permissions(["items.read", "items.detail"]));
-    let r = send(&router, get("/_zeyn/screen/item_detail?params=%7B%22id%22%3A4%7D")).await;
+    let router =
+        master_router(Identity::user("d").with_permissions(["items.read", "items.detail"]));
+    let r = send(
+        &router,
+        get("/_zeyn/screen/item_detail?params=%7B%22id%22%3A4%7D"),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::OK);
-    assert!(r.body.contains("C-04") && !r.body.contains("C-05"), "{}", r.body);
-    let mut filters: Vec<serde_json::Value> =
-        (0..40).map(|_| serde_json::json!({ "field": "code", "contains": "C" })).collect();
+    assert!(
+        r.body.contains("C-04") && !r.body.contains("C-05"),
+        "{}",
+        r.body
+    );
+    let mut filters: Vec<serde_json::Value> = (0..40)
+        .map(|_| serde_json::json!({ "field": "code", "contains": "C" }))
+        .collect();
     filters.push(serde_json::json!({ "field": "id", "from": "1", "to": "20" }));
     let call = serde_json::json!({ "screen": "item_detail", "params": { "id": 4 }, "node": 0, "query": { "page": { "type": "offset", "offset": 0, "limit": 50 }, "filters": filters } });
     let r = send(&router, post("/_zeyn/grid", call)).await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
-    assert_eq!(r.json()["count"], 1, "the scope stays whatever the client sends");
+    assert_eq!(
+        r.json()["count"],
+        1,
+        "the scope stays whatever the client sends"
+    );
     let router = master_router(reader());
-    let r = send(&router, get("/_zeyn/screen/item_detail?params=%7B%22id%22%3A4%7D")).await;
+    let r = send(
+        &router,
+        get("/_zeyn/screen/item_detail?params=%7B%22id%22%3A4%7D"),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::FORBIDDEN);
 }
 
 #[test]
 fn blank_filters_keep_empty_or_set_values() {
     let rows: Vec<Item> = (1..=20).map(item).collect();
-    let empty =
-        DataQuery { filters: vec![zeyn::Filter::blank("due", true)], ..DataQuery::default() }.apply(rows.clone());
-    let set = DataQuery { filters: vec![zeyn::Filter::blank("due", false)], ..DataQuery::default() }.apply(rows);
+    let empty = DataQuery {
+        filters: vec![zeyn::Filter::blank("due", true)],
+        ..DataQuery::default()
+    }
+    .apply(rows.clone());
+    let set = DataQuery {
+        filters: vec![zeyn::Filter::blank("due", false)],
+        ..DataQuery::default()
+    }
+    .apply(rows);
     assert_eq!((empty.total, set.total), (Some(15), Some(5)));
 }
 
@@ -1157,12 +1833,24 @@ fn apply_groups_rows_with_counts_totals_sort_and_paging() {
     let page = q.apply(rows.clone());
     assert!(page.items.is_empty());
     assert_eq!(page.total, Some(3));
-    let seen: Vec<(Value, u64)> = page.groups.iter().map(|g| (g.value.clone(), g.count)).collect();
-    assert_eq!(seen, [(Value::Choice("Tool"), 6), (Value::Choice("Part"), 7)]);
-    assert_eq!(page.groups[0].totals[0].value, Value::Int(3 + 6 + 9 + 12 + 15 + 18));
+    let seen: Vec<(Value, u64)> = page
+        .groups
+        .iter()
+        .map(|g| (g.value.clone(), g.count))
+        .collect();
+    assert_eq!(
+        seen,
+        [(Value::Choice("Tool"), 6), (Value::Choice("Part"), 7)]
+    );
+    assert_eq!(
+        page.groups[0].totals[0].value,
+        Value::Int(3 + 6 + 9 + 12 + 15 + 18)
+    );
     assert!(page.next.is_some());
-    let mut q = DataQuery::default();
-    q.group = Some("due".into());
+    let q = DataQuery {
+        group: Some("due".into()),
+        ..DataQuery::default()
+    };
     let page = q.apply(rows);
     assert_eq!(
         (page.groups[0].value.clone(), page.groups[0].count),
@@ -1174,8 +1862,11 @@ fn apply_groups_rows_with_counts_totals_sort_and_paging() {
 #[test]
 fn any_of_matches_keys() {
     let rows: Vec<Item> = (1..=20).map(item).collect();
-    let page =
-        DataQuery { filters: vec![zeyn::Filter::any_of("id", ["3", "7", "99"])], ..DataQuery::default() }.apply(rows);
+    let page = DataQuery {
+        filters: vec![zeyn::Filter::any_of("id", ["3", "7", "99"])],
+        ..DataQuery::default()
+    }
+    .apply(rows);
     assert_eq!(codes(&page), ["C-03", "C-07"]);
 }
 
@@ -1208,19 +1899,39 @@ pub async fn search_nodes(q: DataQuery) -> Result<Page<Node>> {
         3..=5 => Some(NodeId(1)),
         _ => Some(NodeId(3)),
     };
-    Ok(q.apply((1..=8).map(|i| Node { id: NodeId(i), name: format!("N{i}"), parent: parent(i) }).collect()))
+    Ok(q.apply(
+        (1..=8)
+            .map(|i| Node {
+                id: NodeId(i),
+                name: format!("N{i}"),
+                parent: parent(i),
+            })
+            .collect(),
+    ))
 }
 
 #[screen(route = "/tree", permission = "items.read")]
 pub fn tree() -> Screen {
-    Screen::new("Tree").body(DataGrid::of(search_nodes).paging(Paging::pages(2)).tree(Node::parent).column(Node::name))
+    Screen::new("Tree").body(
+        DataGrid::of(search_nodes)
+            .paging(Paging::pages(2))
+            .tree(Node::parent)
+            .column(Node::name),
+    )
 }
 
 fn nested_router(identity: Identity) -> Router {
     App::new("Test")
         .service(Store::seeded())
-        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
-        .feature(Feature::new("items").screen(grouped).screen(tree))
+        .auth(move |h: &HeaderMap| {
+            h.contains_key("x-user")
+                .then(|| identity.clone())
+        })
+        .feature(
+            Feature::new("items")
+                .screen(grouped)
+                .screen(tree),
+        )
         .router()
         .unwrap()
 }
@@ -1236,29 +1947,65 @@ fn branch(screen: &str, path: serde_json::Value) -> Request<Body> {
 async fn grouped_grids_page_over_groups_and_open_them_level_by_level() {
     let router = nested_router(reader());
     let r = send(&router, get("/grouped")).await;
-    assert!(r.body.contains(r#"<table role="treegrid""#));
+    assert!(
+        r.body
+            .contains(r#"<table role="treegrid""#)
+    );
     assert!(r.body.contains(r#"<tr class="z-group" aria-level="1" data-zeyn-level="0" aria-expanded="false" data-zeyn-path="[&quot;Food&quot;]"><td colspan="1">"#), "{}", r.body);
-    assert!(r.body.contains("7 rows") && r.body.contains(r#"data-zeyn-total="3""#));
+    assert!(
+        r.body.contains("7 rows")
+            && r.body
+                .contains(r#"data-zeyn-total="3""#)
+    );
     let r = send(&router, branch("grouped", serde_json::json!(["Tool"]))).await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
-    let rows = r.json()["rows"].as_str().unwrap().to_string();
+    let rows = r.json()["rows"]
+        .as_str()
+        .unwrap()
+        .to_string();
     assert!(
-        rows.contains(r#"data-zeyn-path="[&quot;Tool&quot;,&quot;false&quot;]""#) && rows.contains(r#"aria-level="2""#),
+        rows.contains(r#"data-zeyn-path="[&quot;Tool&quot;,&quot;false&quot;]""#)
+            && rows.contains(r#"aria-level="2""#),
         "{rows}"
     );
     assert_eq!(r.json()["total"], 2);
-    let r = send(&router, branch("grouped", serde_json::json!(["Tool", "true"]))).await;
-    let rows = r.json()["rows"].as_str().unwrap().to_string();
-    assert!(rows.contains(r#"<tr aria-level="3" data-zeyn-level="2" data-zeyn-key="6">"#), "{rows}");
+    let r = send(
+        &router,
+        branch("grouped", serde_json::json!(["Tool", "true"])),
+    )
+    .await;
+    let rows = r.json()["rows"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert!(
+        rows.contains(r#"<tr aria-level="3" data-zeyn-level="2" data-zeyn-key="6">"#),
+        "{rows}"
+    );
     assert_eq!(r.json()["total"], 3, "tools 6, 12, 18 are active");
     assert_eq!(
-        send(&router, branch("grouped", serde_json::json!(["Tool", "true", "x"]))).await.status,
+        send(
+            &router,
+            branch("grouped", serde_json::json!(["Tool", "true", "x"]))
+        )
+        .await
+        .status,
         StatusCode::NOT_FOUND
     );
     let long: Vec<&str> = vec!["a"; 33];
-    assert_eq!(send(&router, branch("grouped", serde_json::json!(long))).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(
+        send(&router, branch("grouped", serde_json::json!(long)))
+            .await
+            .status,
+        StatusCode::NOT_FOUND
+    );
     let router = nested_router(Identity::user("n"));
-    assert_eq!(send(&router, branch("grouped", serde_json::json!(["Tool"]))).await.status, StatusCode::FORBIDDEN);
+    assert_eq!(
+        send(&router, branch("grouped", serde_json::json!(["Tool"])))
+            .await
+            .status,
+        StatusCode::FORBIDDEN
+    );
 }
 
 #[tokio::test]
@@ -1268,25 +2015,50 @@ async fn tree_grids_show_top_rows_and_load_children_lazily() {
     assert!(r.body.contains(r#"<tr aria-level="1" data-zeyn-level="0" aria-expanded="false" data-zeyn-path="[&quot;1&quot;]" data-zeyn-key="1">"#), "{}", r.body);
     assert!(r.body.contains(r#"<tr aria-level="1" data-zeyn-level="0" data-zeyn-key="2"><td class="z-tree-cell"><span class="z-tree" style="--z-level:0"><span class="z-tree-spacer""#), "N2 has no children");
     let r = send(&router, branch("tree", serde_json::json!(["1"]))).await;
-    let rows = r.json()["rows"].as_str().unwrap().to_string();
+    let rows = r.json()["rows"]
+        .as_str()
+        .unwrap()
+        .to_string();
     assert_eq!(r.json()["total"], 3);
     assert!(
-        rows.contains(r#"data-zeyn-path="[&quot;1&quot;,&quot;3&quot;]" data-zeyn-key="3""#) && !rows.contains("N5"),
+        rows.contains(r#"data-zeyn-path="[&quot;1&quot;,&quot;3&quot;]" data-zeyn-key="3""#)
+            && !rows.contains("N5"),
         "{rows}"
     );
     let r = send(&router, branch("tree", serde_json::json!(["1", "3"]))).await;
     assert_eq!(r.json()["total"], 3, "6, 7 and 8 report to 3");
-    assert_eq!(send(&router, branch("tree", serde_json::json!([null]))).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(
+        send(&router, branch("tree", serde_json::json!([null])))
+            .await
+            .status,
+        StatusCode::NOT_FOUND
+    );
 }
 
 #[tokio::test]
 async fn pasted_rows_are_saved_one_by_one_and_each_is_checked_on_its_own() {
     let (router, store) = edit_router(writer_items());
     let pastes = [
-        ("1", serde_json::json!({ "code": "P-1", "price": "1.234,50", "version": "1" }), StatusCode::OK),
-        ("2", serde_json::json!({ "code": "", "version": "1" }), StatusCode::UNPROCESSABLE_ENTITY),
-        ("3", serde_json::json!({ "code": "P-3", "qty": "99", "version": "1" }), StatusCode::FORBIDDEN),
-        ("4", serde_json::json!({ "code": "P-4", "version": "0" }), StatusCode::CONFLICT),
+        (
+            "1",
+            serde_json::json!({ "code": "P-1", "price": "1.234,50", "version": "1" }),
+            StatusCode::OK,
+        ),
+        (
+            "2",
+            serde_json::json!({ "code": "", "version": "1" }),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            "3",
+            serde_json::json!({ "code": "P-3", "qty": "99", "version": "1" }),
+            StatusCode::FORBIDDEN,
+        ),
+        (
+            "4",
+            serde_json::json!({ "code": "P-4", "version": "0" }),
+            StatusCode::CONFLICT,
+        ),
     ];
     for (key, values, status) in pastes {
         let r = send(
@@ -1307,7 +2079,12 @@ async fn pasted_rows_are_saved_one_by_one_and_each_is_checked_on_its_own() {
         "Turkish money as a spreadsheet copies it"
     );
     assert_eq!(
-        (rows[1].code.as_str(), rows[2].code.as_str(), rows[2].qty, rows[3].code.as_str()),
+        (
+            rows[1].code.as_str(),
+            rows[2].code.as_str(),
+            rows[2].qty,
+            rows[3].code.as_str()
+        ),
         ("C-02", "C-03", 3, "C-04")
     );
 }
@@ -1318,21 +2095,47 @@ async fn grid_writes_count_against_the_write_limit() {
     let identity = writer_items();
     let router = App::new("Test")
         .service(store)
-        .write_limit(zeyn::RateLimit::per_user(2, std::time::Duration::from_secs(60)))
-        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .write_limit(zeyn::RateLimit::per_user(
+            2,
+            std::time::Duration::from_secs(60),
+        ))
+        .auth(move |h: &HeaderMap| {
+            h.contains_key("x-user")
+                .then(|| identity.clone())
+        })
         .feature(Feature::new("items").screen(edit_list))
         .router()
         .unwrap();
     let mut statuses = Vec::new();
     for i in 1..=3 {
         statuses.push(
-            send(&router, edit(&i.to_string(), serde_json::json!({ "code": format!("W-{i}"), "version": "1" })))
-                .await
-                .status,
+            send(
+                &router,
+                edit(
+                    &i.to_string(),
+                    serde_json::json!({ "code": format!("W-{i}"), "version": "1" }),
+                ),
+            )
+            .await
+            .status,
         );
     }
-    assert_eq!(statuses, [StatusCode::OK, StatusCode::OK, StatusCode::TOO_MANY_REQUESTS]);
-    let r = send(&router, post("/_zeyn/grid", serde_json::json!({ "screen": "edit_list", "node": 0 }))).await;
+    assert_eq!(
+        statuses,
+        [
+            StatusCode::OK,
+            StatusCode::OK,
+            StatusCode::TOO_MANY_REQUESTS
+        ]
+    );
+    let r = send(
+        &router,
+        post(
+            "/_zeyn/grid",
+            serde_json::json!({ "screen": "edit_list", "node": 0 }),
+        ),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::OK, "reading rows is not a write");
 }
 
@@ -1356,24 +2159,41 @@ async fn an_export_refused_by_an_interceptor_still_reaches_its_after() {
     let identity = reader();
     let router = App::new("Test")
         .service(Store::seeded())
-        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .auth(move |h: &HeaderMap| {
+            h.contains_key("x-user")
+                .then(|| identity.clone())
+        })
         .interceptor(refuse.clone())
         .feature(Feature::new("items").screen(export_list))
         .router()
         .unwrap();
     let r = send(&router, export_get(0, serde_json::json!({}), "en")).await;
     assert_eq!(r.status, StatusCode::FORBIDDEN);
-    assert_eq!(*refuse.0.read().unwrap(), [false], "audit interceptors record the refused export");
+    assert_eq!(
+        *refuse.0.read().unwrap(),
+        [false],
+        "audit interceptors record the refused export"
+    );
 }
 
 #[screen(route = "/long", permission = "items.read")]
 pub fn long_list() -> Screen {
-    Screen::new("Long").body(DataGrid::of(search).paging(Paging::virtual_scroll()).column(Item::code))
+    Screen::new("Long").body(
+        DataGrid::of(search)
+            .paging(Paging::virtual_scroll())
+            .column(Item::code),
+    )
 }
 
 #[tokio::test]
 async fn virtual_grids_render_one_screen_of_rows_live_and_keep_the_rest_of_the_block_inert() {
-    let rows = (1..=150).map(|i| Item { id: ItemId(i), code: format!("R-{i:03}"), ..item(i % 28 + 1) }).collect();
+    let rows = (1..=150)
+        .map(|i| Item {
+            id: ItemId(i),
+            code: format!("R-{i:03}"),
+            ..item(i % 28 + 1)
+        })
+        .collect();
     let router = App::new("Test")
         .service(Store(Arc::new(RwLock::new(rows))))
         .auth(|h: &HeaderMap| h.contains_key("x-user").then(reader))
@@ -1381,9 +2201,16 @@ async fn virtual_grids_render_one_screen_of_rows_live_and_keep_the_rest_of_the_b
         .router()
         .unwrap();
     let r = send(&router, get("/long")).await;
-    let (live, later) = r.body.split_once("<template data-zeyn-rows-later>").expect("rows after the first screen wait in a template");
+    let (live, later) = r
+        .body
+        .split_once("<template data-zeyn-rows-later>")
+        .expect("rows after the first screen wait in a template");
     let later = &later[..later.find("</template>").unwrap()];
-    assert_eq!(live.matches("R-").count(), zeyn::VIRTUAL_LIVE_ROWS, "{live}");
+    assert_eq!(
+        live.matches("R-").count(),
+        zeyn::VIRTUAL_LIVE_ROWS,
+        "{live}"
+    );
     assert!(live.contains("R-064") && !live.contains("R-065"));
     assert_eq!(later.matches("R-").count(), 150 - zeyn::VIRTUAL_LIVE_ROWS);
     assert!(later.starts_with("<tr") && later.contains("R-150"));
@@ -1407,13 +2234,29 @@ async fn columns_without_sorting_get_no_sort_button_and_the_server_drops_their_s
         .feature(Feature::new("items").screen(unsorted))
         .router()
         .unwrap();
-    let page = send(&router, get("/unsorted")).await.body;
-    assert!(page.contains(r#"data-field="code" aria-sort="none""#), "{page}");
-    assert!(page.contains(r#"data-field="qty" data-sort="off""#), "{page}");
+    let page = send(&router, get("/unsorted"))
+        .await
+        .body;
+    assert!(
+        page.contains(r#"data-field="code" aria-sort="none""#),
+        "{page}"
+    );
+    assert!(
+        page.contains(r#"data-field="qty" data-sort="off""#),
+        "{page}"
+    );
     let q = serde_json::json!({ "sort": [{ "field": "qty", "desc": true }] });
     let call = serde_json::json!({ "screen": "unsorted", "node": 0, "query": q });
-    let rows = send(&router, post("/_zeyn/grid", call)).await.json()["rows"].as_str().unwrap().to_string();
-    assert!(rows.find("C-01").unwrap() < rows.find("C-20").unwrap(), "the action never saw the sort: {rows}");
+    let rows = send(&router, post("/_zeyn/grid", call))
+        .await
+        .json()["rows"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert!(
+        rows.find("C-01").unwrap() < rows.find("C-20").unwrap(),
+        "the action never saw the sort: {rows}"
+    );
 }
 
 /// Rows as `rows_html` rendered them before the row renderer wrote straight into its output:
@@ -1437,7 +2280,9 @@ fn row_html_stays_byte_for_byte_the_same() {
         .column(Item::due)
         .column(Item::note)
         .editable()
-        .on_open(|i| Effect::Toast { message: Text::from(format!("open {}", i.code)) })
+        .on_open(|i| Effect::Toast {
+            message: Text::from(format!("open {}", i.code)),
+        })
         .row_action("Bump", bump, |i| i.id)
         .edit_with(save_item);
     let mut rows: Vec<Item> = (3..=5).map(item).collect();
@@ -1449,7 +2294,10 @@ fn row_html_stays_byte_for_byte_the_same() {
 
 #[screen(route = "/wide", permission = "items.read")]
 pub fn wide_list() -> Screen {
-    let mut grid = DataGrid::of(search).paging(Paging::virtual_scroll()).column(Item::code).done();
+    let mut grid = DataGrid::of(search)
+        .paging(Paging::virtual_scroll())
+        .column(Item::code)
+        .done();
     for _ in 1..zeyn::VIRTUAL_WIDE_COLUMNS {
         grid = grid.column(Item::qty).done();
     }
@@ -1458,21 +2306,43 @@ pub fn wide_list() -> Screen {
 
 #[tokio::test]
 async fn wide_virtual_grids_keep_every_row_of_the_first_block_in_the_template() {
-    let rows = (1..=150).map(|i| Item { id: ItemId(i), code: format!("R-{i:03}"), ..item(i % 28 + 1) }).collect();
+    let rows = (1..=150)
+        .map(|i| Item {
+            id: ItemId(i),
+            code: format!("R-{i:03}"),
+            ..item(i % 28 + 1)
+        })
+        .collect();
     let router = App::new("Test")
         .service(Store(Arc::new(RwLock::new(rows))))
         .auth(|h: &HeaderMap| h.contains_key("x-user").then(reader))
-        .feature(Feature::new("items").screen(wide_list).screen(long_list))
+        .feature(
+            Feature::new("items")
+                .screen(wide_list)
+                .screen(long_list),
+        )
         .router()
         .unwrap();
     let r = send(&router, get("/wide")).await;
-    let (live, later) = r.body.split_once("<template data-zeyn-rows-later>").expect("the block waits in a template");
+    let (live, later) = r
+        .body
+        .split_once("<template data-zeyn-rows-later>")
+        .expect("the block waits in a template");
     let later = &later[..later.find("</template>").unwrap()];
-    let body = &live[live.find("<tbody data-zeyn-rows>").unwrap()..];
-    assert!(body.starts_with("<tbody data-zeyn-rows></tbody>"), "no live rows: {}", &body[..80]);
+    let body = &live[live
+        .find("<tbody data-zeyn-rows>")
+        .unwrap()..];
+    assert!(
+        body.starts_with("<tbody data-zeyn-rows></tbody>"),
+        "no live rows: {}",
+        &body[..80]
+    );
     assert_eq!(later.matches("R-").count(), 150);
     assert!(later.starts_with("<tr") && later.contains("R-001") && later.contains("R-150"));
 
     let narrow = send(&router, get("/long")).await.body;
-    assert!(narrow.contains("R-001</td>") && !narrow.contains("<tbody data-zeyn-rows></tbody>"), "narrow grids keep live rows");
+    assert!(
+        narrow.contains("R-001</td>") && !narrow.contains("<tbody data-zeyn-rows></tbody>"),
+        "narrow grids keep live rows"
+    );
 }

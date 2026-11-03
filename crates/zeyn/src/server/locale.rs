@@ -23,25 +23,39 @@ pub(super) const HEADER: &str = "x-zeyn-path-locale";
 /// Locales that get a path segment: every offered locale except the default one.
 fn path_locales(st: &AppState) -> impl Iterator<Item = &str> {
     let default = st.i18n.default_locale();
-    st.i18n.locales().iter().map(String::as_str).filter(move |l| *l != default)
+    st.i18n
+        .locales()
+        .iter()
+        .map(String::as_str)
+        .filter(move |l| *l != default)
 }
 
 /// The language segment at the start of an app path and the path without it: `/tr/orders`
 /// gives `("tr", "/orders")`, `/tr` and `/tr/` give `("tr", "/")`.
 fn split<'a>(st: &'a AppState, path: &'a str) -> Option<(&'a str, &'a str)> {
     let rest = path.strip_prefix('/')?;
-    let (first, tail) = rest.split_once('/').map_or((rest, ""), |(a, _)| (a, &rest[a.len()..]));
+    let (first, tail) = rest
+        .split_once('/')
+        .map_or((rest, ""), |(a, _)| (a, &rest[a.len()..]));
     let locale = path_locales(st).find(|l| *l == first)?;
     Some((locale, if tail.is_empty() { "/" } else { tail }))
 }
 
 /// Takes the language segment off the path before routing and records the language.
-pub(super) async fn layer(State(st): State<Arc<AppState>>, mut req: Request, next: Next) -> Response {
+pub(super) async fn layer(
+    State(st): State<Arc<AppState>>,
+    mut req: Request,
+    next: Next,
+) -> Response {
     req.headers_mut().remove(HEADER);
     let path = req.uri().path().to_string();
     let found = match split(&st, &path) {
         Some((locale, rest)) => {
-            let query = req.uri().query().map(|q| format!("?{q}")).unwrap_or_default();
+            let query = req
+                .uri()
+                .query()
+                .map(|q| format!("?{q}"))
+                .unwrap_or_default();
             let mut parts = req.uri().clone().into_parts();
             parts.path_and_query = PathAndQuery::try_from(format!("{rest}{query}")).ok();
             if let Ok(uri) = Uri::from_parts(parts) {
@@ -55,7 +69,9 @@ pub(super) async fn layer(State(st): State<Arc<AppState>>, mut req: Request, nex
             .and_then(|v| v.to_str().ok())
             .and_then(|r| r.parse::<Uri>().ok())
             .and_then(|u| {
-                let page = u.path().strip_prefix(st.prefix.as_str())?;
+                let page = u
+                    .path()
+                    .strip_prefix(st.prefix.as_str())?;
                 split(&st, page).map(|(l, _)| l.to_string())
             }),
         None => None,
@@ -69,7 +85,11 @@ pub(super) async fn layer(State(st): State<Arc<AppState>>, mut req: Request, nex
 /// Path segment of the request's language for links the server writes: empty for the default
 /// language or when the app keeps the language out of the URL, `/tr` otherwise.
 pub(super) fn segment<'a>(st: &AppState, ctx: &'a Ctx) -> &'a str {
-    if st.locale_paths && ctx.locale() != st.i18n.default_locale() { ctx.locale() } else { "" }
+    if st.locale_paths && ctx.locale() != st.i18n.default_locale() {
+        ctx.locale()
+    } else {
+        ""
+    }
 }
 
 /// App path with the request's language segment in front: `/orders` becomes `/tr/orders`.
@@ -90,8 +110,15 @@ pub(super) fn picker(st: &AppState, ctx: &Ctx, r: &Render) -> String {
         .iter()
         .map(|l| {
             let selected = if l == ctx.locale() { " selected" } else { "" };
-            let name = st.i18n.lookup(l, "zeyn.locale.name").unwrap_or(l);
-            format!(r#"<option value="{0}" lang="{0}"{selected}>{1}</option>"#, escape(l), escape(name))
+            let name = st
+                .i18n
+                .lookup(l, "zeyn.locale.name")
+                .unwrap_or(l);
+            format!(
+                r#"<option value="{0}" lang="{0}"{selected}>{1}</option>"#,
+                escape(l),
+                escape(name)
+            )
         })
         .collect();
     format!(
@@ -103,6 +130,12 @@ pub(super) fn picker(st: &AppState, ctx: &Ctx, r: &Render) -> String {
 
 /// Whether a language is written right to left, for `<html dir="rtl">`.
 pub(super) fn rtl(locale: &str) -> bool {
-    let primary = locale.split(['-', '_']).next().unwrap_or(locale);
-    matches!(primary, "ar" | "he" | "fa" | "ur" | "ps" | "sd" | "ug" | "yi" | "dv" | "ckb")
+    let primary = locale
+        .split(['-', '_'])
+        .next()
+        .unwrap_or(locale);
+    matches!(
+        primary,
+        "ar" | "he" | "fa" | "ur" | "ps" | "sd" | "ug" | "yi" | "dv" | "ckb"
+    )
 }

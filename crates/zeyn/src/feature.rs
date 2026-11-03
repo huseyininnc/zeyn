@@ -30,21 +30,36 @@ pub struct Menu {
 impl Menu {
     /// Starts a group; following `item` calls add to it.
     pub fn group(mut self, label: impl Into<Text>, icon: Icon) -> Self {
-        self.groups.push(MenuGroup { label: label.into(), icon, items: Vec::new() });
+        self.groups.push(MenuGroup {
+            label: label.into(),
+            icon,
+            items: Vec::new(),
+        });
         self
     }
 
     /// Adds a screen to the last group. A screen without a route cannot be added (compile error).
     pub fn item<S: ScreenDef>(mut self, label: impl Into<Text>, _screen: S) -> Self {
-        const { assert!(S::META.route.is_some(), "a menu item must point to a screen that has a route") };
+        const {
+            assert!(
+                S::META.route.is_some(),
+                "a menu item must point to a screen that has a route"
+            )
+        };
         const {
             assert!(
                 !crate::screen::route_has_segments(S::META.route),
                 "a menu item cannot point to a screen whose route has path segments; link to it from a grid or a screen with `Effect::navigate`"
             )
         };
-        let group = self.groups.last_mut().expect("call `group` before `item`");
-        group.items.push(MenuItem { label: label.into(), screen: S::META.name });
+        let group = self
+            .groups
+            .last_mut()
+            .expect("call `group` before `item`");
+        group.items.push(MenuItem {
+            label: label.into(),
+            screen: S::META.name,
+        });
         self
     }
 }
@@ -114,7 +129,12 @@ pub struct ScreenEntry {
 impl ScreenEntry {
     /// The entry of a screen, as `Feature::screen` registers it.
     pub fn of<S: ScreenDef>() -> Self {
-        ScreenEntry { meta: S::META, deps: S::deps, build: build_erased::<S>, path_value: S::path_value }
+        ScreenEntry {
+            meta: S::META,
+            deps: S::deps,
+            build: build_erased::<S>,
+            path_value: S::path_value,
+        }
     }
 }
 
@@ -186,9 +206,13 @@ impl Feature {
     /// the hits under the commands. Choosing a hit opens its page without a reload.
     pub fn search<A>(mut self, action: A) -> Self
     where
-        A: crate::action::Action<Input = String, Output = crate::action::Result<Vec<crate::command::SearchHit>>>,
+        A: crate::action::Action<
+                Input = String,
+                Output = crate::action::Result<Vec<crate::command::SearchHit>>,
+            >,
     {
-        self.searches.push(crate::command::Search::of(action));
+        self.searches
+            .push(crate::command::Search::of(action));
         self
     }
 
@@ -239,7 +263,13 @@ impl Feature {
         permission: &'static str,
         source: impl crate::media::MediaSource,
     ) -> Self {
-        self.media.push(crate::media::MediaEntry { name, permission, source: Arc::new(source), public_cache: None });
+        self.media
+            .push(crate::media::MediaEntry {
+                name,
+                permission,
+                source: Arc::new(source),
+                public_cache: None,
+            });
         self
     }
 
@@ -262,13 +292,19 @@ impl Feature {
     /// Feature::new("catalog").public_media("images", 86_400, ImageFolder::new("data/images"))
     /// ```
     /// The browser then loads `/_zeyn/media/images/{id}`.
-    pub fn public_media(mut self, name: &'static str, max_age: u32, source: impl crate::media::MediaSource) -> Self {
-        self.media.push(crate::media::MediaEntry {
-            name,
-            permission: "",
-            source: Arc::new(source),
-            public_cache: Some(max_age.min(crate::media::MAX_PUBLIC_MEDIA_CACHE)),
-        });
+    pub fn public_media(
+        mut self,
+        name: &'static str,
+        max_age: u32,
+        source: impl crate::media::MediaSource,
+    ) -> Self {
+        self.media
+            .push(crate::media::MediaEntry {
+                name,
+                permission: "",
+                source: Arc::new(source),
+                public_cache: Some(max_age.min(crate::media::MAX_PUBLIC_MEDIA_CACHE)),
+            });
         self
     }
 
@@ -290,7 +326,12 @@ impl Feature {
         permission: &'static str,
         store: impl crate::files::FileStore,
     ) -> Self {
-        self.files.push(crate::files::FileEntry { rules, permission, store: Arc::new(store) });
+        self.files
+            .push(crate::files::FileEntry {
+                rules,
+                permission,
+                store: Arc::new(store),
+            });
         self
     }
 
@@ -318,7 +359,10 @@ impl Feature {
 
     /// Prefix of all routes of the feature, such as `/stock`.
     pub fn route_prefix(mut self, prefix: impl Into<String>) -> Self {
-        self.prefix = prefix.into().trim_end_matches('/').to_string();
+        self.prefix = prefix
+            .into()
+            .trim_end_matches('/')
+            .to_string();
         self
     }
 
@@ -330,7 +374,8 @@ impl Feature {
 
     /// Registers a screen.
     pub fn screen<S: ScreenDef>(mut self, _screen: S) -> Self {
-        self.screens.push(ScreenEntry::of::<S>());
+        self.screens
+            .push(ScreenEntry::of::<S>());
         self
     }
 
@@ -376,14 +421,20 @@ impl Feature {
 
     /// Full path of a screen of this feature, if it has a route.
     pub fn path_of(&self, meta: &ScreenMeta) -> Option<String> {
-        meta.route.map(|r| format!("{}{r}", self.prefix))
+        meta.route
+            .map(|r| format!("{}{r}", self.prefix))
     }
 
     /// Full paths of the screens that have a route.
     pub fn routes(&self) -> Vec<Route> {
         self.screens
             .iter()
-            .filter_map(|s| self.path_of(&s.meta).map(|path| Route { path, screen: s.meta.name }))
+            .filter_map(|s| {
+                self.path_of(&s.meta).map(|path| Route {
+                    path,
+                    screen: s.meta.name,
+                })
+            })
             .collect()
     }
 
@@ -393,25 +444,44 @@ impl Feature {
         let mut problems = Vec::new();
         let routes = self.routes();
         for (i, r) in routes.iter().enumerate() {
-            if routes[..i].iter().any(|o| o.path == r.path) {
-                problems.push(format!("route `{}` is used by more than one screen", r.path));
+            if routes[..i]
+                .iter()
+                .any(|o| o.path == r.path)
+            {
+                problems.push(format!(
+                    "route `{}` is used by more than one screen",
+                    r.path
+                ));
             }
         }
         for (i, s) in self.screens.iter().enumerate() {
-            if self.screens[..i].iter().any(|o| o.meta.name == s.meta.name) {
+            if self.screens[..i]
+                .iter()
+                .any(|o| o.meta.name == s.meta.name)
+            {
                 problems.push(format!("screen `{}` is registered twice", s.meta.name));
             }
         }
         for (i, m) in self.media.iter().enumerate() {
             if !crate::media::valid_media_id(m.name) {
-                problems.push(format!("media source `{}` must use only letters, digits, `-`, `_` and `.`", m.name));
+                problems.push(format!(
+                    "media source `{}` must use only letters, digits, `-`, `_` and `.`",
+                    m.name
+                ));
             }
-            if self.media[..i].iter().any(|o| o.name == m.name) {
+            if self.media[..i]
+                .iter()
+                .any(|o| o.name == m.name)
+            {
                 problems.push(format!("media source `{}` is registered twice", m.name));
             }
         }
         for item in self.menu.iter().flat_map(|g| &g.items) {
-            match self.screens.iter().find(|s| s.meta.name == item.screen) {
+            match self
+                .screens
+                .iter()
+                .find(|s| s.meta.name == item.screen)
+            {
                 Some(s) if s.meta.route.is_none() => problems.push(format!(
                     "menu item `{}` points to screen `{}`, which has no route",
                     item.label.english(),
@@ -426,8 +496,20 @@ impl Feature {
                 )),
             }
         }
-        let commands: Vec<(&str, &crate::command::Command)> = self.commands.iter().map(|c| (self.name, c)).collect();
-        problems.extend(crate::command::problems(&commands, true, crate::command::PALETTE_SHORTCUT));
-        if problems.is_empty() { Ok(()) } else { Err(problems) }
+        let commands: Vec<(&str, &crate::command::Command)> = self
+            .commands
+            .iter()
+            .map(|c| (self.name, c))
+            .collect();
+        problems.extend(crate::command::problems(
+            &commands,
+            true,
+            crate::command::PALETTE_SHORTCUT,
+        ));
+        if problems.is_empty() {
+            Ok(())
+        } else {
+            Err(problems)
+        }
     }
 }

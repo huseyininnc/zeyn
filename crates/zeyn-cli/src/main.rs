@@ -17,67 +17,190 @@ const TEMPLATES: &[(&str, &str)] = &[
     ("CLAUDE.md", include_str!("../templates/CLAUDE.md.tmpl")),
     (".mcp.json", include_str!("../templates/mcp.json.tmpl")),
     (".gitignore", include_str!("../templates/gitignore.tmpl")),
-    (".gitlab-ci.yml", include_str!("../templates/gitlab-ci.yml.tmpl")),
-    (".github/workflows/ci.yml", include_str!("../templates/github/workflows/ci.yml")),
-    (".github/dependabot.yml", include_str!("../templates/github/dependabot.yml")),
-    (".github/pull_request_template.md", include_str!("../templates/github/pull_request_template.md")),
+    (
+        ".gitlab-ci.yml",
+        include_str!("../templates/gitlab-ci.yml.tmpl"),
+    ),
+    (
+        ".github/workflows/ci.yml",
+        include_str!("../templates/github/workflows/ci.yml"),
+    ),
+    (
+        ".github/dependabot.yml",
+        include_str!("../templates/github/dependabot.yml"),
+    ),
+    (
+        ".github/pull_request_template.md",
+        include_str!("../templates/github/pull_request_template.md"),
+    ),
     ("Jenkinsfile", include_str!("../templates/Jenkinsfile")),
-    ("sonar-project.properties", include_str!("../templates/sonar-project.properties.tmpl")),
+    (
+        "sonar-project.properties",
+        include_str!("../templates/sonar-project.properties.tmpl"),
+    ),
     ("SECURITY.md", include_str!("../templates/SECURITY.md.tmpl")),
-    ("CHANGELOG.md", include_str!("../templates/CHANGELOG.md.tmpl")),
+    (
+        "CHANGELOG.md",
+        include_str!("../templates/CHANGELOG.md.tmpl"),
+    ),
     ("rustfmt.toml", include_str!("../templates/rustfmt.toml")),
-    (".editorconfig", include_str!("../templates/editorconfig.tmpl")),
-    (".claude/skills/zeyn/SKILL.md", include_str!("../embedded/SKILL.md")),
-    (".gitattributes", include_str!("../templates/gitattributes.tmpl")),
-    ("rust-toolchain.toml", include_str!("../templates/rust-toolchain.toml")),
+    (
+        ".editorconfig",
+        include_str!("../templates/editorconfig.tmpl"),
+    ),
+    (
+        ".claude/skills/zeyn/SKILL.md",
+        include_str!("../embedded/SKILL.md"),
+    ),
+    (
+        ".gitattributes",
+        include_str!("../templates/gitattributes.tmpl"),
+    ),
+    (
+        "rust-toolchain.toml",
+        include_str!("../templates/rust-toolchain.toml"),
+    ),
     ("clippy.toml", include_str!("../templates/clippy.toml")),
     ("deny.toml", include_str!("../templates/deny.toml")),
     ("Dockerfile", include_str!("../templates/Dockerfile.tmpl")),
-    (".dockerignore", include_str!("../templates/dockerignore.tmpl")),
-    ("config/app.json", include_str!("../templates/config/app.json")),
-    ("locales/en.json", include_str!("../templates/locales/en.json")),
-    ("locales/tr.json", include_str!("../templates/locales/tr.json")),
+    (
+        ".dockerignore",
+        include_str!("../templates/dockerignore.tmpl"),
+    ),
+    (
+        "config/app.json",
+        include_str!("../templates/config/app.json"),
+    ),
+    (
+        "locales/en.json",
+        include_str!("../templates/locales/en.json"),
+    ),
+    (
+        "locales/tr.json",
+        include_str!("../templates/locales/tr.json"),
+    ),
     ("src/main.rs", include_str!("../templates/src/main.rs")),
     ("src/app.rs", include_str!("../templates/src/app.rs")),
-    ("src/features/mod.rs", include_str!("../templates/src/features/mod.rs")),
-    ("src/features/home/mod.rs", include_str!("../templates/src/features/home/mod.rs")),
-    ("src/features/notes/mod.rs", include_str!("../templates/src/features/notes/mod.rs")),
-    ("src/features/notes/models.rs", include_str!("../templates/src/features/notes/models.rs")),
-    ("src/features/notes/store.rs", include_str!("../templates/src/features/notes/store.rs")),
-    ("src/features/notes/actions.rs", include_str!("../templates/src/features/notes/actions.rs")),
-    ("src/features/notes/screens.rs", include_str!("../templates/src/features/notes/screens.rs")),
+    (
+        "src/features/mod.rs",
+        include_str!("../templates/src/features/mod.rs"),
+    ),
+    (
+        "src/features/home/mod.rs",
+        include_str!("../templates/src/features/home/mod.rs"),
+    ),
+    (
+        "src/features/notes/mod.rs",
+        include_str!("../templates/src/features/notes/mod.rs"),
+    ),
+    (
+        "src/features/notes/models.rs",
+        include_str!("../templates/src/features/notes/models.rs"),
+    ),
+    (
+        "src/features/notes/store.rs",
+        include_str!("../templates/src/features/notes/store.rs"),
+    ),
+    (
+        "src/features/notes/actions.rs",
+        include_str!("../templates/src/features/notes/actions.rs"),
+    ),
+    (
+        "src/features/notes/screens.rs",
+        include_str!("../templates/src/features/notes/screens.rs"),
+    ),
     ("tests/app.rs", include_str!("../templates/tests/app.rs")),
 ];
 
 const LIB_TEMPLATES: &[(&str, &str)] = &[
-    ("Cargo.toml", include_str!("../templates/lib/Cargo.toml.tmpl")),
+    (
+        "Cargo.toml",
+        include_str!("../templates/lib/Cargo.toml.tmpl"),
+    ),
     ("AGENTS.md", include_str!("../templates/lib/AGENTS.md.tmpl")),
     ("CLAUDE.md", include_str!("../templates/CLAUDE.md.tmpl")),
-    (".gitignore", include_str!("../templates/lib/gitignore.tmpl")),
-    (".gitlab-ci.yml", include_str!("../templates/gitlab-ci.yml.tmpl")),
-    (".github/workflows/ci.yml", include_str!("../templates/github/workflows/ci.yml")),
-    (".github/dependabot.yml", include_str!("../templates/github/dependabot.yml")),
-    (".github/pull_request_template.md", include_str!("../templates/github/pull_request_template.md")),
+    (
+        ".gitignore",
+        include_str!("../templates/lib/gitignore.tmpl"),
+    ),
+    (
+        ".gitlab-ci.yml",
+        include_str!("../templates/gitlab-ci.yml.tmpl"),
+    ),
+    (
+        ".github/workflows/ci.yml",
+        include_str!("../templates/github/workflows/ci.yml"),
+    ),
+    (
+        ".github/dependabot.yml",
+        include_str!("../templates/github/dependabot.yml"),
+    ),
+    (
+        ".github/pull_request_template.md",
+        include_str!("../templates/github/pull_request_template.md"),
+    ),
     ("Jenkinsfile", include_str!("../templates/Jenkinsfile")),
-    ("sonar-project.properties", include_str!("../templates/sonar-project.properties.tmpl")),
+    (
+        "sonar-project.properties",
+        include_str!("../templates/sonar-project.properties.tmpl"),
+    ),
     ("SECURITY.md", include_str!("../templates/SECURITY.md.tmpl")),
-    ("CHANGELOG.md", include_str!("../templates/CHANGELOG.md.tmpl")),
+    (
+        "CHANGELOG.md",
+        include_str!("../templates/CHANGELOG.md.tmpl"),
+    ),
     ("rustfmt.toml", include_str!("../templates/rustfmt.toml")),
-    (".editorconfig", include_str!("../templates/editorconfig.tmpl")),
-    (".claude/skills/zeyn/SKILL.md", include_str!("../embedded/SKILL.md")),
-    (".gitattributes", include_str!("../templates/gitattributes.tmpl")),
-    ("rust-toolchain.toml", include_str!("../templates/rust-toolchain.toml")),
+    (
+        ".editorconfig",
+        include_str!("../templates/editorconfig.tmpl"),
+    ),
+    (
+        ".claude/skills/zeyn/SKILL.md",
+        include_str!("../embedded/SKILL.md"),
+    ),
+    (
+        ".gitattributes",
+        include_str!("../templates/gitattributes.tmpl"),
+    ),
+    (
+        "rust-toolchain.toml",
+        include_str!("../templates/rust-toolchain.toml"),
+    ),
     ("clippy.toml", include_str!("../templates/clippy.toml")),
     ("deny.toml", include_str!("../templates/deny.toml")),
-    ("locales/en.json", include_str!("../templates/lib/locales/en.json")),
-    ("locales/tr.json", include_str!("../templates/lib/locales/tr.json")),
+    (
+        "locales/en.json",
+        include_str!("../templates/lib/locales/en.json"),
+    ),
+    (
+        "locales/tr.json",
+        include_str!("../templates/lib/locales/tr.json"),
+    ),
     ("src/lib.rs", include_str!("../templates/lib/src/lib.rs")),
-    ("src/customers/mod.rs", include_str!("../templates/lib/src/customers/mod.rs")),
-    ("src/customers/models.rs", include_str!("../templates/lib/src/customers/models.rs")),
-    ("src/customers/store.rs", include_str!("../templates/lib/src/customers/store.rs")),
-    ("src/customers/actions.rs", include_str!("../templates/lib/src/customers/actions.rs")),
-    ("src/customers/screens.rs", include_str!("../templates/lib/src/customers/screens.rs")),
-    ("tests/lib.rs", include_str!("../templates/lib/tests/lib.rs")),
+    (
+        "src/customers/mod.rs",
+        include_str!("../templates/lib/src/customers/mod.rs"),
+    ),
+    (
+        "src/customers/models.rs",
+        include_str!("../templates/lib/src/customers/models.rs"),
+    ),
+    (
+        "src/customers/store.rs",
+        include_str!("../templates/lib/src/customers/store.rs"),
+    ),
+    (
+        "src/customers/actions.rs",
+        include_str!("../templates/lib/src/customers/actions.rs"),
+    ),
+    (
+        "src/customers/screens.rs",
+        include_str!("../templates/lib/src/customers/screens.rs"),
+    ),
+    (
+        "tests/lib.rs",
+        include_str!("../templates/lib/tests/lib.rs"),
+    ),
 ];
 
 const DOCS: &[(&str, &str)] = &[
@@ -118,40 +241,61 @@ Usage:
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let words: Vec<&str> = args.iter().map(String::as_str).collect();
-    let result = match words.as_slice() {
-        ["new", name, rest @ ..] => {
-            new_project(name, flag(rest, "--zeyn-path"), rest.contains(&"--lib"), !rest.contains(&"--no-git"))
-        }
-        ["g" | "generate", "feature", name] => new_feature(Path::new("."), name).map(|m| println!("{m}")),
-        ["routes"] => describe(Path::new(".")).map(|d| print!("{}", routes_table(&d))),
-        ["check", rest @ ..] => fix_if(Path::new("."), rest.contains(&"--fix"))
-            .and_then(|fixed| check(Path::new(".")).map(|r| fixed + &r))
-            .and_then(|report| {
-                print!("{report}");
-                if report.contains("error") { Err("the app has problems".into()) } else { Ok(()) }
-            }),
-        ["dev"] => dev::run(Path::new(".")),
-        ["build-desktop", rest @ ..] => {
-            desktop::build(Path::new("."), flag(rest, "--package"), flag(rest, "--features").unwrap_or("desktop"))
-                .map(|r| print!("{r}"))
-        }
-        ["build-islands", rest @ ..] => build_islands(rest).map(|r| println!("{r}")),
-        ["mcp"] => mcp(),
-        ["license", "keygen", rest @ ..] => {
-            license::keygen(Path::new(flag(rest, "--out").unwrap_or(license::DEFAULT_KEY))).map(|m| print!("{m}"))
-        }
-        ["license", "sign", json, rest @ ..] => {
-            license::sign(json, flag(rest, "--key").map(Path::new)).and_then(|signed| match flag(rest, "--out") {
+    let words: Vec<&str> = args
+        .iter()
+        .map(String::as_str)
+        .collect();
+    let result =
+        match words.as_slice() {
+            ["new", name, rest @ ..] => new_project(
+                name,
+                flag(rest, "--zeyn-path"),
+                rest.contains(&"--lib"),
+                !rest.contains(&"--no-git"),
+            ),
+            ["g" | "generate", "feature", name] => {
+                new_feature(Path::new("."), name).map(|m| println!("{m}"))
+            }
+            ["routes"] => describe(Path::new(".")).map(|d| print!("{}", routes_table(&d))),
+            ["check", rest @ ..] => fix_if(Path::new("."), rest.contains(&"--fix"))
+                .and_then(|fixed| check(Path::new(".")).map(|r| fixed + &r))
+                .and_then(|report| {
+                    print!("{report}");
+                    if report.contains("error") {
+                        Err("the app has problems".into())
+                    } else {
+                        Ok(())
+                    }
+                }),
+            ["dev"] => dev::run(Path::new(".")),
+            ["build-desktop", rest @ ..] => desktop::build(
+                Path::new("."),
+                flag(rest, "--package"),
+                flag(rest, "--features").unwrap_or("desktop"),
+            )
+            .map(|r| print!("{r}")),
+            ["build-islands", rest @ ..] => build_islands(rest).map(|r| println!("{r}")),
+            ["mcp"] => mcp(),
+            ["license", "keygen", rest @ ..] => license::keygen(Path::new(
+                flag(rest, "--out").unwrap_or(license::DEFAULT_KEY),
+            ))
+            .map(|m| print!("{m}")),
+            ["license", "sign", json, rest @ ..] => license::sign(
+                json,
+                flag(rest, "--key").map(Path::new),
+            )
+            .and_then(|signed| match flag(rest, "--out") {
                 Some(out) => std::fs::write(out, signed + "\n").map_err(|e| format!("{out}: {e}")),
-                None => Ok(println!("{signed}")),
-            })
-        }
-        _ => {
-            print!("{HELP}");
-            Ok(())
-        }
-    };
+                None => {
+                    println!("{signed}");
+                    Ok(())
+                }
+            }),
+            _ => {
+                print!("{HELP}");
+                Ok(())
+            }
+        };
     match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
@@ -176,18 +320,28 @@ fn build_islands(rest: &[&str]) -> Result<String, String> {
             named.push(PathBuf::from(a));
         }
     }
-    let crates = if named.is_empty() { islands::default_crates(Path::new(".")) } else { named };
+    let crates = if named.is_empty() {
+        islands::default_crates(Path::new("."))
+    } else {
+        named
+    };
     islands::build(&crates, &out)
 }
 
 fn flag<'a>(rest: &[&'a str], name: &str) -> Option<&'a str> {
-    rest.iter().position(|a| *a == name).and_then(|i| rest.get(i + 1).copied())
+    rest.iter()
+        .position(|a| *a == name)
+        .and_then(|i| rest.get(i + 1).copied())
 }
 
 /// `notes`, `sales_orders`: lower case letters, digits and `_`, starting with a letter.
 fn valid_ident(name: &str) -> bool {
-    name.chars().next().is_some_and(|c| c.is_ascii_lowercase())
-        && name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+    name.chars()
+        .next()
+        .is_some_and(|c| c.is_ascii_lowercase())
+        && name
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
 }
 
 /// `acme-portal` becomes `Acme Portal`.
@@ -196,7 +350,9 @@ fn title_of(name: &str) -> String {
         .filter(|w| !w.is_empty())
         .map(|w| {
             let mut c = w.chars();
-            c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default()
+            c.next()
+                .map(|f| f.to_uppercase().collect::<String>() + c.as_str())
+                .unwrap_or_default()
         })
         .collect::<Vec<_>>()
         .join(" ")
@@ -207,11 +363,24 @@ fn new_project(name: &str, zeyn_path: Option<&str>, lib: bool, git: bool) -> Res
 }
 
 /// Writes a new project named `name` into `root`.
-fn new_project_at(root: &Path, name: &str, zeyn_path: Option<&str>, lib: bool, git: bool) -> Result<(), String> {
-    let ok = name.chars().next().is_some_and(|c| c.is_ascii_lowercase())
-        && name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_');
+fn new_project_at(
+    root: &Path,
+    name: &str,
+    zeyn_path: Option<&str>,
+    lib: bool,
+    git: bool,
+) -> Result<(), String> {
+    let ok = name
+        .chars()
+        .next()
+        .is_some_and(|c| c.is_ascii_lowercase())
+        && name
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_');
     if !ok {
-        return Err(format!("`{name}` is not a valid project name; use lower case letters, digits, `-` and `_`"));
+        return Err(format!(
+            "`{name}` is not a valid project name; use lower case letters, digits, `-` and `_`"
+        ));
     }
     if root.exists() {
         return Err(format!("`{name}` already exists"));
@@ -219,7 +388,10 @@ fn new_project_at(root: &Path, name: &str, zeyn_path: Option<&str>, lib: bool, g
     let dep = match zeyn_path {
         Some(p) => {
             let abs = std::fs::canonicalize(p).map_err(|e| format!("--zeyn-path {p}: {e}"))?;
-            let shown = abs.to_string_lossy().trim_start_matches(r"\\?\").replace('\\', "/");
+            let shown = abs
+                .to_string_lossy()
+                .trim_start_matches(r"\\?\")
+                .replace('\\', "/");
             format!("zeyn = {{ path = \"{shown}\" }}")
         }
         None => format!("zeyn = \"{}\"", env!("CARGO_PKG_VERSION")),
@@ -240,7 +412,7 @@ fn new_project_at(root: &Path, name: &str, zeyn_path: Option<&str>, lib: bool, g
         std::fs::write(&target, text).map_err(|e| format!("{}: {e}", target.display()))?;
     }
     if git {
-        println!("{}", git_init(&root));
+        println!("{}", git_init(root));
     }
     if lib {
         println!(
@@ -265,9 +437,13 @@ fn git_init(root: &Path) -> String {
             .output()
             .is_ok_and(|o| o.status.success())
     };
-    let here = root.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
+    let here = root
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
     if !run(here, &["--version"]) {
-        return "git is not installed, so no repository was created; run `git init -b main` later".into();
+        return "git is not installed, so no repository was created; run `git init -b main` later"
+            .into();
     }
     if run(here, &["rev-parse", "--is-inside-work-tree"]) {
         return "Inside an existing git repository, so no new one was created".into();
@@ -284,7 +460,9 @@ fn git_init(root: &Path) -> String {
 /// Adds `src/features/<name>` and registers the module. Returns what is left to do by hand.
 fn new_feature(root: &Path, name: &str) -> Result<String, String> {
     if !valid_ident(name) {
-        return Err(format!("`{name}` is not a valid feature name; use lower case letters, digits and `_`"));
+        return Err(format!(
+            "`{name}` is not a valid feature name; use lower case letters, digits and `_`"
+        ));
     }
     let dir = root.join("src/features").join(name);
     if dir.exists() {
@@ -342,25 +520,48 @@ fn describe(root: &Path) -> Result<Value, String> {
         .output()
         .map_err(|e| format!("cargo could not be started: {e}"))?;
     if !out.status.success() {
-        return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
+        return Err(String::from_utf8_lossy(&out.stderr)
+            .trim()
+            .to_string());
     }
-    serde_json::from_slice(&out.stdout).map_err(|e| format!("the app did not print a description: {e}"))
+    serde_json::from_slice(&out.stdout)
+        .map_err(|e| format!("the app did not print a description: {e}"))
 }
 
 fn routes_table(d: &Value) -> String {
     let mut out = String::new();
-    for f in d["features"].as_array().into_iter().flatten() {
-        out.push_str(&format!("feature {}  guards: {}\n", f["name"].as_str().unwrap_or(""), f["guards"]));
-        for s in f["screens"].as_array().into_iter().flatten() {
-            let access = s["access"]["permission"].as_str().unwrap_or("public");
+    for f in d["features"]
+        .as_array()
+        .into_iter()
+        .flatten()
+    {
+        out.push_str(&format!(
+            "feature {}  guards: {}\n",
+            f["name"].as_str().unwrap_or(""),
+            f["guards"]
+        ));
+        for s in f["screens"]
+            .as_array()
+            .into_iter()
+            .flatten()
+        {
+            let access = s["access"]["permission"]
+                .as_str()
+                .unwrap_or("public");
             out.push_str(&format!(
                 "  screen {:<28} {:<32} {access}\n",
                 s["name"].as_str().unwrap_or(""),
                 s["path"].as_str().unwrap_or("(window)")
             ));
         }
-        for a in f["apis"].as_array().into_iter().flatten() {
-            let access = a["access"]["permission"].as_str().unwrap_or("public");
+        for a in f["apis"]
+            .as_array()
+            .into_iter()
+            .flatten()
+        {
+            let access = a["access"]["permission"]
+                .as_str()
+                .unwrap_or("public");
             out.push_str(&format!(
                 "  api    {:<28} POST {:<27} {access}\n",
                 a["action"].as_str().unwrap_or(""),
@@ -372,8 +573,12 @@ fn routes_table(d: &Value) -> String {
 }
 
 /// Zeyn names that changed, old to new. `zeyn check --fix` rewrites them.
-const RENAMES: &[(&str, &str)] =
-    &[("GridQuery", "DataQuery"), ("GridMode", "DataMode"), ("GridColumn", "DataGridColumn"), ("Grid", "DataGrid")];
+const RENAMES: &[(&str, &str)] = &[
+    ("GridQuery", "DataQuery"),
+    ("GridMode", "DataMode"),
+    ("GridColumn", "DataGridColumn"),
+    ("Grid", "DataGrid"),
+];
 
 /// Runs [`fix_renames`] when asked and describes what changed.
 fn fix_if(root: &Path, fix: bool) -> Result<String, String> {
@@ -381,7 +586,10 @@ fn fix_if(root: &Path, fix: bool) -> Result<String, String> {
         return Ok(String::new());
     }
     let changed = fix_renames(root)?;
-    Ok(changed.iter().map(|(path, n)| format!("fixed: {n} renamed names in {}\n", path.display())).collect())
+    Ok(changed
+        .iter()
+        .map(|(path, n)| format!("fixed: {n} renamed names in {}\n", path.display()))
+        .collect())
 }
 
 /// Rewrites renamed Zeyn names in the `.rs` files under `src`, `tests` and `examples`.
@@ -392,7 +600,8 @@ fn fix_renames(root: &Path) -> Result<Vec<(PathBuf, usize)>, String> {
     }
     let mut changed = Vec::new();
     for path in files {
-        let text = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+        let text =
+            std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
         let (fixed, n) = rename_idents(&text, RENAMES);
         if n > 0 {
             std::fs::write(&path, fixed).map_err(|e| format!("{}: {e}", path.display()))?;
@@ -403,14 +612,22 @@ fn fix_renames(root: &Path) -> Result<Vec<(PathBuf, usize)>, String> {
 }
 
 fn rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
-    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
-            if path.file_name().is_some_and(|n| n != "target") {
+            if path
+                .file_name()
+                .is_some_and(|n| n != "target")
+            {
                 rust_files(&path, out);
             }
-        } else if path.extension().is_some_and(|e| e == "rs") {
+        } else if path
+            .extension()
+            .is_some_and(|e| e == "rs")
+        {
             out.push(path);
         }
     }
@@ -425,7 +642,9 @@ fn rename_idents(text: &str, renames: &[(&str, &str)]) -> (String, usize) {
     let mut i = 0;
     while i < chars.len() {
         let c = chars[i];
-        if c == '"' || (c == 'r' && matches!(chars.get(i + 1), Some('"' | '#')) && !ident_before(&chars, i)) {
+        if c == '"'
+            || (c == 'r' && matches!(chars.get(i + 1), Some('"' | '#')) && !ident_before(&chars, i))
+        {
             let end = string_end(&chars, i);
             out.extend(&chars[i..end]);
             i = end;
@@ -438,7 +657,10 @@ fn rename_idents(text: &str, renames: &[(&str, &str)]) -> (String, usize) {
                 i += 1;
             }
             let word: String = chars[start..i].iter().collect();
-            match renames.iter().find(|(old, _)| *old == word) {
+            match renames
+                .iter()
+                .find(|(old, _)| *old == word)
+            {
                 Some((_, new)) => {
                     out.push_str(new);
                     count += 1;
@@ -496,10 +718,18 @@ fn check(root: &Path) -> Result<String, String> {
         return Ok(report);
     }
     let d = describe(root)?;
-    for p in d["problems"].as_array().into_iter().flatten() {
+    for p in d["problems"]
+        .as_array()
+        .into_iter()
+        .flatten()
+    {
         report.push_str(&format!("error: {}\n", p.as_str().unwrap_or("")));
     }
-    for m in d["missing_translations"].as_array().into_iter().flatten() {
+    for m in d["missing_translations"]
+        .as_array()
+        .into_iter()
+        .flatten()
+    {
         report.push_str(&format!(
             "warning: translation `{}` is missing in `{}`\n",
             m[1].as_str().unwrap_or(""),
@@ -536,7 +766,12 @@ fn tools() -> Value {
             json!({ "fix": { "type": "boolean" } }),
             &[]
         ),
-        tool("zeyn_test", "Run cargo test and return the end of the output.", json!({}), &[]),
+        tool(
+            "zeyn_test",
+            "Run cargo test and return the end of the output.",
+            json!({}),
+            &[]
+        ),
         tool(
             "zeyn_new_feature",
             "Create src/features/<name> with models, actions and screens and register the module.",
@@ -550,26 +785,47 @@ fn call_tool(name: &str, args: &Value) -> Result<String, String> {
     let root = Path::new(".");
     match name {
         "zeyn_docs" => {
-            let topic = args["topic"].as_str().unwrap_or("rules");
+            let topic = args["topic"]
+                .as_str()
+                .unwrap_or("rules");
             DOCS.iter()
                 .find(|(t, _)| *t == topic)
                 .map(|(_, d)| d.to_string())
                 .ok_or_else(|| format!("unknown topic `{topic}`"))
         }
-        "zeyn_describe" => describe(root).map(|d| serde_json::to_string_pretty(&d).unwrap_or_default()),
-        "zeyn_check" => {
-            fix_if(root, args["fix"].as_bool().unwrap_or(false)).and_then(|fixed| check(root).map(|r| fixed + &r))
+        "zeyn_describe" => {
+            describe(root).map(|d| serde_json::to_string_pretty(&d).unwrap_or_default())
         }
+        "zeyn_check" => fix_if(root, args["fix"].as_bool().unwrap_or(false))
+            .and_then(|fixed| check(root).map(|r| fixed + &r)),
         "zeyn_test" => {
             let out = Command::new("cargo")
                 .args(["test", "--quiet"])
                 .current_dir(root)
                 .output()
                 .map_err(|e| e.to_string())?;
-            let text = format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
-            let tail: String =
-                text.lines().rev().take(80).collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join("\n");
-            Ok(format!("{}\n{tail}", if out.status.success() { "tests passed" } else { "tests failed" }))
+            let text = format!(
+                "{}{}",
+                String::from_utf8_lossy(&out.stdout),
+                String::from_utf8_lossy(&out.stderr)
+            );
+            let tail: String = text
+                .lines()
+                .rev()
+                .take(80)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect::<Vec<_>>()
+                .join("\n");
+            Ok(format!(
+                "{}\n{tail}",
+                if out.status.success() {
+                    "tests passed"
+                } else {
+                    "tests failed"
+                }
+            ))
         }
         "zeyn_new_feature" => new_feature(root, args["name"].as_str().unwrap_or("")),
         _ => Err(format!("unknown tool `{name}`")),
@@ -585,8 +841,12 @@ fn mcp() -> Result<(), String> {
         if line.trim().is_empty() {
             continue;
         }
-        let Ok(req) = serde_json::from_str::<Value>(&line) else { continue };
-        let Some(id) = req.get("id").cloned() else { continue };
+        let Ok(req) = serde_json::from_str::<Value>(&line) else {
+            continue;
+        };
+        let Some(id) = req.get("id").cloned() else {
+            continue;
+        };
         let result = match req["method"].as_str().unwrap_or("") {
             "initialize" => json!({
                 "protocolVersion": "2025-06-18",
@@ -596,21 +856,39 @@ fn mcp() -> Result<(), String> {
             }),
             "tools/list" => json!({ "tools": tools() }),
             "tools/call" => {
-                match call_tool(req["params"]["name"].as_str().unwrap_or(""), &req["params"]["arguments"]) {
-                    Ok(text) => json!({ "content": [{ "type": "text", "text": text }], "isError": false }),
-                    Err(e) => json!({ "content": [{ "type": "text", "text": e }], "isError": true }),
+                match call_tool(
+                    req["params"]["name"]
+                        .as_str()
+                        .unwrap_or(""),
+                    &req["params"]["arguments"],
+                ) {
+                    Ok(text) => {
+                        json!({ "content": [{ "type": "text", "text": text }], "isError": false })
+                    }
+                    Err(e) => {
+                        json!({ "content": [{ "type": "text", "text": e }], "isError": true })
+                    }
                 }
             }
             "ping" => json!({}),
             other => {
                 let reply = json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32601, "message": format!("method `{other}` not found") } });
                 writeln!(stdout, "{reply}").map_err(|e| e.to_string())?;
-                stdout.flush().map_err(|e| e.to_string())?;
+                stdout
+                    .flush()
+                    .map_err(|e| e.to_string())?;
                 continue;
             }
         };
-        writeln!(stdout, "{}", json!({ "jsonrpc": "2.0", "id": id, "result": result })).map_err(|e| e.to_string())?;
-        stdout.flush().map_err(|e| e.to_string())?;
+        writeln!(
+            stdout,
+            "{}",
+            json!({ "jsonrpc": "2.0", "id": id, "result": result })
+        )
+        .map_err(|e| e.to_string())?;
+        stdout
+            .flush()
+            .map_err(|e| e.to_string())?;
     }
     Ok(())
 }
@@ -625,7 +903,9 @@ mod tests {
             ("SKILL.md", "../../skills/zeyn/SKILL.md"),
             ("runtime-protocol.md", "../../docs/runtime-protocol.md"),
         ] {
-            let Ok(original) = std::fs::read_to_string(root.join(original)) else { continue };
+            let Ok(original) = std::fs::read_to_string(root.join(original)) else {
+                continue;
+            };
             let copy = std::fs::read_to_string(root.join("embedded").join(name)).unwrap();
             assert!(
                 copy == original,
@@ -650,7 +930,11 @@ const RAW: &str = r#"Grid "quoted" Grid"#; const C: char = 'G';"##;
         ));
         assert!(out.contains("struct MyGrid; impl GridSource for MyGrid {}"));
         assert!(out.contains(r##"r#"Grid "quoted" Grid"#"##));
-        assert_eq!(super::rename_idents(&out, super::RENAMES).1, 0, "a second run changes nothing");
+        assert_eq!(
+            super::rename_idents(&out, super::RENAMES).1,
+            0,
+            "a second run changes nothing"
+        );
     }
 
     use super::*;
@@ -675,7 +959,10 @@ const RAW: &str = r#"Grid "quoted" Grid"#; const C: char = 'G';"##;
             assert!(root.join(file).is_file(), "{file}");
         }
         let sonar = std::fs::read_to_string(root.join("sonar-project.properties")).unwrap();
-        assert!(sonar.contains("sonar.projectKey=ci_app") && sonar.contains("sonar.projectName=Ci App"), "{sonar}");
+        assert!(
+            sonar.contains("sonar.projectKey=ci_app") && sonar.contains("sonar.projectName=Ci App"),
+            "{sonar}"
+        );
         let has_git = Command::new("git")
             .arg("--version")
             .output()
@@ -698,7 +985,9 @@ const RAW: &str = r#"Grid "quoted" Grid"#; const C: char = 'G';"##;
     #[test]
     fn names_and_titles() {
         assert!(valid_ident("sales_orders"));
-        assert!(!valid_ident("Sales") && !valid_ident("1x") && !valid_ident("a-b") && !valid_ident(""));
+        assert!(
+            !valid_ident("Sales") && !valid_ident("1x") && !valid_ident("a-b") && !valid_ident("")
+        );
         assert_eq!(title_of("acme-portal"), "Acme Portal");
     }
 
@@ -706,7 +995,14 @@ const RAW: &str = r#"Grid "quoted" Grid"#; const C: char = 'G';"##;
     fn every_doc_topic_is_listed_in_the_tool_schema() {
         let topics = tools()[0]["inputSchema"]["properties"]["topic"]["enum"].clone();
         for (t, _) in DOCS {
-            assert!(topics.as_array().unwrap().iter().any(|v| v == t), "{t}");
+            assert!(
+                topics
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|v| v == t),
+                "{t}"
+            );
         }
     }
 }

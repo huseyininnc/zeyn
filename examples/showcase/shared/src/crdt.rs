@@ -49,25 +49,34 @@ pub fn write(doc: &Doc, diagram: &Diagram) -> Option<Vec<u8>> {
             }
             keep.push(key);
         }
-        for key in current.keys().filter(|k| !keep.contains(k)) {
+        for key in current
+            .keys()
+            .filter(|k| !keep.contains(k))
+        {
             map.remove(&mut txn, key);
         }
     }
-    let update = doc.transact().encode_state_as_update_v1(&before);
+    let update = doc
+        .transact()
+        .encode_state_as_update_v1(&before);
     (doc.transact().state_vector() != before).then_some(update)
 }
 
 /// Applies an update from the server. `false` when it cannot be read.
 pub fn apply(doc: &Doc, update: &[u8]) -> bool {
     match Update::decode_v1(update) {
-        Ok(u) => doc.transact_mut().apply_update(u).is_ok(),
+        Ok(u) => doc
+            .transact_mut()
+            .apply_update(u)
+            .is_ok(),
         Err(_) => false,
     }
 }
 
 /// The whole document as one update.
 pub fn state(doc: &Doc) -> Vec<u8> {
-    doc.transact().encode_state_as_update_v1(&StateVector::default())
+    doc.transact()
+        .encode_state_as_update_v1(&StateVector::default())
 }
 
 /// A document holding `diagram`.
@@ -83,22 +92,50 @@ mod tests {
     use crate::ShapeKind;
 
     fn shape(id: u32, x: i32) -> Shape {
-        Shape { id, kind: ShapeKind::Box, x, y: 10, w: 100, h: 50, label: format!("S{id}") }
+        Shape {
+            id,
+            kind: ShapeKind::Box,
+            x,
+            y: 10,
+            w: 100,
+            h: 50,
+            label: format!("S{id}"),
+        }
     }
 
     #[test]
     fn two_editors_converge_through_updates() {
-        let a = from_diagram(&Diagram { shapes: vec![shape(1, 10), shape(2, 20)] });
+        let a = from_diagram(&Diagram {
+            shapes: vec![shape(1, 10), shape(2, 20)],
+        });
         let b = Doc::new();
         assert!(apply(&b, &state(&a)));
         assert_eq!(read(&b), read(&a));
 
-        let ua = write(&a, &Diagram { shapes: vec![shape(1, 99), shape(2, 20)] }).unwrap();
-        let ub = write(&b, &Diagram { shapes: vec![shape(1, 10), shape(3, 30)] }).unwrap();
+        let ua = write(
+            &a,
+            &Diagram {
+                shapes: vec![shape(1, 99), shape(2, 20)],
+            },
+        )
+        .unwrap();
+        let ub = write(
+            &b,
+            &Diagram {
+                shapes: vec![shape(1, 10), shape(3, 30)],
+            },
+        )
+        .unwrap();
         assert!(apply(&a, &ub) && apply(&b, &ua));
         let both = read(&a);
         assert_eq!(both, read(&b));
-        assert_eq!(both.shapes.iter().map(|s| (s.id, s.x)).collect::<Vec<_>>(), [(1, 99), (3, 30)]);
+        assert_eq!(
+            both.shapes
+                .iter()
+                .map(|s| (s.id, s.x))
+                .collect::<Vec<_>>(),
+            [(1, 99), (3, 30)]
+        );
         assert!(write(&a, &both).is_none());
     }
 }

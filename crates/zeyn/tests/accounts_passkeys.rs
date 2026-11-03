@@ -23,7 +23,9 @@ fn b64(bytes: &[u8]) -> String {
 }
 
 fn unb64(s: &str) -> Vec<u8> {
-    base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(s).unwrap()
+    base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(s)
+        .unwrap()
 }
 
 /// CBOR head for a major type and length.
@@ -58,7 +60,8 @@ impl Authenticator {
         let rng = SystemRandom::new();
         let pkcs8 = EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, &rng).unwrap();
         Authenticator {
-            key: EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, pkcs8.as_ref(), &rng).unwrap(),
+            key: EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, pkcs8.as_ref(), &rng)
+                .unwrap(),
             id: vec![7; 32],
             count: 0,
         }
@@ -74,12 +77,16 @@ impl Authenticator {
     }
 
     fn client_data(kind: &str, challenge: &str, origin: &str) -> Vec<u8> {
-        json!({ "type": kind, "challenge": challenge, "origin": origin, "crossOrigin": false }).to_string().into_bytes()
+        json!({ "type": kind, "challenge": challenge, "origin": origin, "crossOrigin": false })
+            .to_string()
+            .into_bytes()
     }
 
     fn register(&self, options: &Json) -> Json {
         let rp = options["rp"]["id"].as_str().unwrap();
-        let mut auth = ring::digest::digest(&ring::digest::SHA256, rp.as_bytes()).as_ref().to_vec();
+        let mut auth = ring::digest::digest(&ring::digest::SHA256, rp.as_bytes())
+            .as_ref()
+            .to_vec();
         auth.push(0x45);
         auth.extend(0u32.to_be_bytes());
         auth.extend([0u8; 16]);
@@ -93,20 +100,38 @@ impl Authenticator {
         att.push(0xa0);
         cbor_text("authData", &mut att);
         cbor_bytes(&auth, &mut att);
-        let cd = Self::client_data("webauthn.create", options["challenge"].as_str().unwrap(), ORIGIN);
+        let cd = Self::client_data(
+            "webauthn.create",
+            options["challenge"].as_str().unwrap(),
+            ORIGIN,
+        );
         json!({ "id": b64(&self.id), "rawId": b64(&self.id), "type": "public-key", "response": { "clientDataJSON": b64(&cd), "attestationObject": b64(&att), "transports": ["internal"] } })
     }
 
     fn assert(&mut self, options: &Json, origin: &str) -> Json {
         self.count += 1;
-        let mut auth =
-            ring::digest::digest(&ring::digest::SHA256, options["rpId"].as_str().unwrap().as_bytes()).as_ref().to_vec();
+        let mut auth = ring::digest::digest(
+            &ring::digest::SHA256,
+            options["rpId"]
+                .as_str()
+                .unwrap()
+                .as_bytes(),
+        )
+        .as_ref()
+        .to_vec();
         auth.push(0x05);
         auth.extend(self.count.to_be_bytes());
-        let cd = Self::client_data("webauthn.get", options["challenge"].as_str().unwrap(), origin);
+        let cd = Self::client_data(
+            "webauthn.get",
+            options["challenge"].as_str().unwrap(),
+            origin,
+        );
         let mut signed = auth.clone();
         signed.extend(ring::digest::digest(&ring::digest::SHA256, &cd).as_ref());
-        let sig = self.key.sign(&SystemRandom::new(), &signed).unwrap();
+        let sig = self
+            .key
+            .sign(&SystemRandom::new(), &signed)
+            .unwrap();
         json!({ "id": b64(&self.id), "rawId": b64(&self.id), "type": "public-key", "response": { "clientDataJSON": b64(&cd), "authenticatorData": b64(&auth), "signature": b64(sig.as_ref()) } })
     }
 }
@@ -124,7 +149,13 @@ impl Reply {
             .iter()
             .map(|v| v.to_str().unwrap().to_string())
             .find(|c| c.starts_with(&format!("{name}=")))
-            .map(|c| c[name.len() + 1..].split(';').next().unwrap().to_string())
+            .map(|c| {
+                c[name.len() + 1..]
+                    .split(';')
+                    .next()
+                    .unwrap()
+                    .to_string()
+            })
     }
 }
 
@@ -135,19 +166,51 @@ async fn post(router: &Router, path: &str, body: Json, cookies: &str) -> Reply {
         .header("x-zeyn-csrf", CSRF)
         .body(Body::from(body.to_string()))
         .unwrap();
-    let res = router.clone().oneshot(req).await.unwrap();
+    let res = router
+        .clone()
+        .oneshot(req)
+        .await
+        .unwrap();
     let (status, headers) = (res.status(), res.headers().clone());
-    let body = String::from_utf8(res.into_body().collect().await.unwrap().to_bytes().to_vec()).unwrap();
-    Reply { status, headers, body }
+    let body = String::from_utf8(
+        res.into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes()
+            .to_vec(),
+    )
+    .unwrap();
+    Reply {
+        status,
+        headers,
+        body,
+    }
 }
 
 #[tokio::test]
 async fn passkeys_register_sign_in_and_refuse_replays_and_forgeries() {
     let a = Accounts::new(MemoryAccountStore::new(), Secret::new(KEY.into()))
-        .options(|o| o.hasher = PasswordHasher { memory_kib: 256, iterations: 1, parallelism: 1 })
+        .options(|o| {
+            o.hasher = PasswordHasher {
+                memory_kib: 256,
+                iterations: 1,
+                parallelism: 1,
+            }
+        })
         .public_url(ORIGIN);
-    a.users().create(User::new("pk@example.com").with_email("pk@example.com"), Some("Secret-123")).await.unwrap();
-    let router = App::new("T").accounts(a.clone()).feature(accounts::feature()).router().unwrap();
+    a.users()
+        .create(
+            User::new("pk@example.com").with_email("pk@example.com"),
+            Some("Secret-123"),
+        )
+        .await
+        .unwrap();
+    let router = App::new("T")
+        .accounts(a.clone())
+        .feature(accounts::feature())
+        .router()
+        .unwrap();
     let login = post(
         &router,
         "/_zeyn/account/login?useCookies=true",
@@ -158,13 +221,27 @@ async fn passkeys_register_sign_in_and_refuse_replays_and_forgeries() {
     let session = format!("zeyn_account={}", login.cookie("zeyn_account").unwrap());
 
     let mut device = Authenticator::new();
-    let options = post(&router, "/_zeyn/account/manage/passkeys/creationOptions", json!({}), &session).await;
+    let options = post(
+        &router,
+        "/_zeyn/account/manage/passkeys/creationOptions",
+        json!({}),
+        &session,
+    )
+    .await;
     assert_eq!(options.status, StatusCode::OK, "{}", options.body);
     let opts: Json = serde_json::from_str(&options.body).unwrap();
     assert_eq!(opts["rp"]["id"], "localhost");
-    assert_eq!(opts["authenticatorSelection"]["userVerification"], "required");
+    assert_eq!(
+        opts["authenticatorSelection"]["userVerification"],
+        "required"
+    );
     assert_eq!(unb64(opts["challenge"].as_str().unwrap()).len(), 32);
-    let ceremony = format!("zeyn_account_passkey={}", options.cookie("zeyn_account_passkey").unwrap());
+    let ceremony = format!(
+        "zeyn_account_passkey={}",
+        options
+            .cookie("zeyn_account_passkey")
+            .unwrap()
+    );
     let cred = device.register(&opts);
     let added = post(
         &router,
@@ -181,11 +258,26 @@ async fn passkeys_register_sign_in_and_refuse_replays_and_forgeries() {
         &session,
     )
     .await;
-    assert_eq!(again.status, StatusCode::BAD_REQUEST, "a registration needs its own challenge");
+    assert_eq!(
+        again.status,
+        StatusCode::BAD_REQUEST,
+        "a registration needs its own challenge"
+    );
 
-    let request = post(&router, "/_zeyn/account/passkeys/requestOptions", json!({}), "").await;
+    let request = post(
+        &router,
+        "/_zeyn/account/passkeys/requestOptions",
+        json!({}),
+        "",
+    )
+    .await;
     let ropts: Json = serde_json::from_str(&request.body).unwrap();
-    let ceremony = format!("zeyn_account_passkey={}", request.cookie("zeyn_account_passkey").unwrap());
+    let ceremony = format!(
+        "zeyn_account_passkey={}",
+        request
+            .cookie("zeyn_account_passkey")
+            .unwrap()
+    );
     let assertion = device.assert(&ropts, ORIGIN);
     let signed_in = post(
         &router,
@@ -195,7 +287,11 @@ async fn passkeys_register_sign_in_and_refuse_replays_and_forgeries() {
     )
     .await;
     assert_eq!(signed_in.status, StatusCode::OK, "{}", signed_in.body);
-    assert!(signed_in.cookie("zeyn_account").is_some_and(|c| !c.is_empty()));
+    assert!(
+        signed_in
+            .cookie("zeyn_account")
+            .is_some_and(|c| !c.is_empty())
+    );
 
     let replay = post(
         &router,
@@ -204,48 +300,113 @@ async fn passkeys_register_sign_in_and_refuse_replays_and_forgeries() {
         "",
     )
     .await;
-    assert_eq!(replay.status, StatusCode::BAD_REQUEST, "the challenge is used once");
+    assert_eq!(
+        replay.status,
+        StatusCode::BAD_REQUEST,
+        "the challenge is used once"
+    );
 
     let fresh = |r: &Reply| {
         (
             serde_json::from_str::<Json>(&r.body).unwrap(),
-            format!("zeyn_account_passkey={}", r.cookie("zeyn_account_passkey").unwrap()),
+            format!(
+                "zeyn_account_passkey={}",
+                r.cookie("zeyn_account_passkey")
+                    .unwrap()
+            ),
         )
     };
-    let (o, c) = fresh(&post(&router, "/_zeyn/account/passkeys/requestOptions", json!({}), "").await);
+    let (o, c) = fresh(
+        &post(
+            &router,
+            "/_zeyn/account/passkeys/requestOptions",
+            json!({}),
+            "",
+        )
+        .await,
+    );
     device.count -= 1;
     let same_count = device.assert(&o, ORIGIN);
     assert_eq!(
-        post(&router, "/_zeyn/account/passkeys/login", json!({ "credentialJson": same_count.to_string() }), &c)
-            .await
-            .status,
+        post(
+            &router,
+            "/_zeyn/account/passkeys/login",
+            json!({ "credentialJson": same_count.to_string() }),
+            &c
+        )
+        .await
+        .status,
         StatusCode::BAD_REQUEST,
         "a counter that does not grow is refused"
     );
 
-    let (o, c) = fresh(&post(&router, "/_zeyn/account/passkeys/requestOptions", json!({}), "").await);
+    let (o, c) = fresh(
+        &post(
+            &router,
+            "/_zeyn/account/passkeys/requestOptions",
+            json!({}),
+            "",
+        )
+        .await,
+    );
     let mut stale = device.assert(&o, ORIGIN);
-    let mut sig = unb64(stale["response"]["signature"].as_str().unwrap());
+    let mut sig = unb64(
+        stale["response"]["signature"]
+            .as_str()
+            .unwrap(),
+    );
     let last = sig.len() - 1;
     sig[last] ^= 1;
     stale["response"]["signature"] = json!(b64(&sig));
     assert_eq!(
-        post(&router, "/_zeyn/account/passkeys/login", json!({ "credentialJson": stale.to_string() }), &c).await.status,
+        post(
+            &router,
+            "/_zeyn/account/passkeys/login",
+            json!({ "credentialJson": stale.to_string() }),
+            &c
+        )
+        .await
+        .status,
         StatusCode::BAD_REQUEST,
         "a changed signature is refused"
     );
 
-    let (o, c) = fresh(&post(&router, "/_zeyn/account/passkeys/requestOptions", json!({}), "").await);
+    let (o, c) = fresh(
+        &post(
+            &router,
+            "/_zeyn/account/passkeys/requestOptions",
+            json!({}),
+            "",
+        )
+        .await,
+    );
     let phishing = device.assert(&o, "http://localhost.evil.example");
     assert_eq!(
-        post(&router, "/_zeyn/account/passkeys/login", json!({ "credentialJson": phishing.to_string() }), &c)
-            .await
-            .status,
+        post(
+            &router,
+            "/_zeyn/account/passkeys/login",
+            json!({ "credentialJson": phishing.to_string() }),
+            &c
+        )
+        .await
+        .status,
         StatusCode::BAD_REQUEST,
         "another origin is refused"
     );
 
-    let user = a.users().find_by_name("pk@example.com").await.unwrap().unwrap();
+    let user = a
+        .users()
+        .find_by_name("pk@example.com")
+        .await
+        .unwrap()
+        .unwrap();
     let stored = a.users().passkeys(&user).await.unwrap();
-    assert_eq!((stored.len(), stored[0].name.as_deref(), stored[0].sign_count), (1, Some("Laptop"), 1));
+    assert_eq!(
+        (
+            stored.len(),
+            stored[0].name.as_deref(),
+            stored[0].sign_count
+        ),
+        (1, Some("Laptop"), 1)
+    );
 }

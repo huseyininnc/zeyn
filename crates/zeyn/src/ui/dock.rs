@@ -23,7 +23,12 @@ pub enum DockArea {
 }
 
 impl DockArea {
-    pub const ALL: [DockArea; 4] = [DockArea::Left, DockArea::Center, DockArea::Bottom, DockArea::Right];
+    pub const ALL: [DockArea; 4] = [
+        DockArea::Left,
+        DockArea::Center,
+        DockArea::Bottom,
+        DockArea::Right,
+    ];
 
     pub fn code(self) -> &'static str {
         match self {
@@ -35,7 +40,9 @@ impl DockArea {
     }
 
     fn parse(s: &str) -> Option<DockArea> {
-        DockArea::ALL.into_iter().find(|a| a.code() == s)
+        DockArea::ALL
+            .into_iter()
+            .find(|a| a.code() == s)
     }
 }
 
@@ -50,7 +57,11 @@ pub struct DockSizes {
 
 impl Default for DockSizes {
     fn default() -> Self {
-        DockSizes { left: 22, right: 24, bottom: 30 }
+        DockSizes {
+            left: 22,
+            right: 24,
+            bottom: 30,
+        }
     }
 }
 
@@ -124,16 +135,25 @@ impl DockLayout {
     /// `width`, `panel:{area}:{id}` columns carry `width` 1 when open and 0 when closed and pin
     /// `start` on the active panel.
     pub fn to_view(&self) -> DataGridView {
-        let size =
-            |name: &str, v: u8| ColumnView { field: format!("{SIZE_PREFIX}{name}"), width: Some(v.into()), pin: None };
-        let mut columns =
-            vec![size("left", self.sizes.left), size("right", self.sizes.right), size("bottom", self.sizes.bottom)];
+        let size = |name: &str, v: u8| ColumnView {
+            field: format!("{SIZE_PREFIX}{name}"),
+            width: Some(v.into()),
+            pin: None,
+        };
+        let mut columns = vec![
+            size("left", self.sizes.left),
+            size("right", self.sizes.right),
+            size("bottom", self.sizes.bottom),
+        ];
         columns.extend(self.panels.iter().map(|p| ColumnView {
             field: format!("{PANEL_PREFIX}{}:{}", p.area.code(), p.id),
             width: Some(p.open.into()),
             pin: p.active.then_some(Pin::Start),
         }));
-        DataGridView { columns, ..DataGridView::default() }
+        DataGridView {
+            columns,
+            ..DataGridView::default()
+        }
     }
 
     /// Reads a layout written by [`DockLayout::to_view`]. `None` when it holds anything else.
@@ -149,7 +169,10 @@ impl DockLayout {
                     _ => return None,
                 }
             } else {
-                let (area, id) = c.field.strip_prefix(PANEL_PREFIX)?.split_once(':')?;
+                let (area, id) = c
+                    .field
+                    .strip_prefix(PANEL_PREFIX)?
+                    .split_once(':')?;
                 layout.panels.push(DockPanelState {
                     id: id.to_string(),
                     area: DockArea::parse(area)?,
@@ -197,13 +220,28 @@ pub struct Dock {
 impl Dock {
     /// A dock with an accessible name, such as "Workspace".
     pub fn new(label: impl Into<Text>) -> Self {
-        Self { label: label.into(), panels: Vec::new(), nodes: Vec::new(), sizes: DockSizes::default() }
+        Self {
+            label: label.into(),
+            panels: Vec::new(),
+            nodes: Vec::new(),
+            sizes: DockSizes::default(),
+        }
     }
 
     /// Adds a panel. `id` names it in saved layouts: keep it stable, lower case, unique in the
     /// dock.
-    pub fn panel(mut self, area: DockArea, id: &'static str, title: impl Into<Text>, node: impl Into<Node>) -> Self {
-        self.panels.push(DockPanel { id, title: title.into(), area });
+    pub fn panel(
+        mut self,
+        area: DockArea,
+        id: &'static str,
+        title: impl Into<Text>,
+        node: impl Into<Node>,
+    ) -> Self {
+        self.panels.push(DockPanel {
+            id,
+            title: title.into(),
+            area,
+        });
         self.nodes.push(node.into());
         self
     }
@@ -226,13 +264,25 @@ impl Dock {
 
     /// First sizes of the side areas in percent, each kept within [`DOCK_SIZE`].
     pub fn sizes(mut self, left: u8, right: u8, bottom: u8) -> Self {
-        self.sizes = DockLayout { sizes: DockSizes { left, right, bottom }, panels: Vec::new() }.clean(&[]).sizes;
+        self.sizes = DockLayout {
+            sizes: DockSizes {
+                left,
+                right,
+                bottom,
+            },
+            panels: Vec::new(),
+        }
+        .clean(&[])
+        .sizes;
         self
     }
 
     /// Ids of the panels, in order.
     pub fn panel_ids(&self) -> Vec<&'static str> {
-        self.panels.iter().map(|p| p.id).collect()
+        self.panels
+            .iter()
+            .map(|p| p.id)
+            .collect()
     }
 }
 
@@ -250,12 +300,16 @@ impl Component for Dock {
             s.bottom
         ));
         for key in [
-            "left", "right", "bottom", "center", "options", "move", "close", "show", "moved", "closed", "shown",
-            "empty",
+            "left", "right", "bottom", "center", "options", "move", "close", "show", "moved",
+            "closed", "shown", "empty",
         ] {
             out.push_str(&format!(r#" data-text-{key}="{}""#, t(key)));
         }
-        let titles: Vec<Json> = self.panels.iter().map(|p| json!({ "id": p.id, "title": r.text(&p.title) })).collect();
+        let titles: Vec<Json> = self
+            .panels
+            .iter()
+            .map(|p| json!({ "id": p.id, "title": r.text(&p.title) }))
+            .collect();
         out.push_str(&format!(r#" data-panels="{}">"#, attr(&titles)));
         for area in DockArea::ALL {
             let code = area.code();
@@ -265,8 +319,14 @@ impl Component for Dock {
             if area == DockArea::Right {
                 out.push_str(&self.bar(&id, "right", s.right, r));
             }
-            let mine: Vec<usize> = (0..self.panels.len()).filter(|i| self.panels[*i].area == area).collect();
-            let hidden = if mine.is_empty() && area != DockArea::Center { " hidden" } else { "" };
+            let mine: Vec<usize> = (0..self.panels.len())
+                .filter(|i| self.panels[*i].area == area)
+                .collect();
+            let hidden = if mine.is_empty() && area != DockArea::Center {
+                " hidden"
+            } else {
+                ""
+            };
             let area_name = t(code);
             out.push_str(&format!(
                 r#"<section class="z-dock-area" data-area="{code}" aria-label="{area_name}"{hidden}><div class="z-dock-head"><div class="z-dock-tabs" role="tablist" aria-label="{area_name}">"#
@@ -321,9 +381,15 @@ impl Component for Dock {
 
 impl Dock {
     fn bar(&self, id: &str, edge: &str, value: u8, r: &Render) -> String {
-        let orientation = if edge == "bottom" { "horizontal" } else { "vertical" };
-        let label =
-            r.text(&Text::key("zeyn.ui.dock.resize").arg("area", r.text(&Text::key(format!("zeyn.ui.dock.{edge}")))));
+        let orientation = if edge == "bottom" {
+            "horizontal"
+        } else {
+            "vertical"
+        };
+        let label = r.text(
+            &Text::key("zeyn.ui.dock.resize")
+                .arg("area", r.text(&Text::key(format!("zeyn.ui.dock.{edge}")))),
+        );
         format!(
             r#"<div class="z-dock-bar" data-edge="{edge}" role="separator" tabindex="0" aria-orientation="{orientation}" aria-valuenow="{value}" aria-valuemin="{}" aria-valuemax="{}" aria-label="{label}" data-testid="{}.dock.resize.{edge}" data-id="{id}"></div>"#,
             DOCK_SIZE.0, DOCK_SIZE.1, r.scope
@@ -336,5 +402,12 @@ pub(crate) fn panel_ids(schema: &Json) -> Option<Vec<String>> {
     if schema.get("type")?.as_str()? != "dock" {
         return None;
     }
-    Some(schema.get("panels")?.as_array()?.iter().filter_map(|p| p.get("id")?.as_str().map(String::from)).collect())
+    Some(
+        schema
+            .get("panels")?
+            .as_array()?
+            .iter()
+            .filter_map(|p| p.get("id")?.as_str().map(String::from))
+            .collect(),
+    )
 }

@@ -150,7 +150,10 @@ impl Dialect for Postgres {
             Cast::Int => ("CAST(", " AS BIGINT)"),
             Cast::Date => ("to_char(", ", 'YYYY-MM-DD')"),
             Cast::Time => ("to_char(", ", 'HH24:MI:SS')"),
-            Cast::Moment => ("to_char(", " AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"')"),
+            Cast::Moment => (
+                "to_char(",
+                " AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"')",
+            ),
             Cast::Local => ("to_char(", ", 'YYYY-MM-DD\"T\"HH24:MI:SS')"),
             Cast::Decimal => ("CAST(", " AS TEXT)"),
         };
@@ -266,7 +269,10 @@ impl Dialect for Oracle {
         let (start, end) = match cast {
             Cast::Plain | Cast::Int | Cast::Time => ("", ""),
             Cast::Date => ("TO_CHAR(", ", 'YYYY-MM-DD')"),
-            Cast::Moment => ("TO_CHAR(CAST(", " AS TIMESTAMP(3)), 'YYYY-MM-DD\"T\"HH24:MI:SS.FF3\"Z\"')"),
+            Cast::Moment => (
+                "TO_CHAR(CAST(",
+                " AS TIMESTAMP(3)), 'YYYY-MM-DD\"T\"HH24:MI:SS.FF3\"Z\"')",
+            ),
             Cast::Local => ("TO_CHAR(", ", 'YYYY-MM-DD\"T\"HH24:MI:SS')"),
             Cast::Decimal => ("TO_CHAR(", ", 'TM9', 'NLS_NUMERIC_CHARACTERS=''.,''')"),
         };
@@ -297,7 +303,10 @@ impl Dialect for Oracle {
                 sql.push(" ROWS ONLY");
             }
             OracleCompat::V11 => {
-                sql.wrap("SELECT * FROM (SELECT zq.*, ROWNUM zeyn_rn FROM (", ") zq WHERE ROWNUM <= ");
+                sql.wrap(
+                    "SELECT * FROM (SELECT zq.*, ROWNUM zeyn_rn FROM (",
+                    ") zq WHERE ROWNUM <= ",
+                );
                 sql.bind(self, Arg::Int(offset.saturating_add(limit)), Cast::Plain);
                 sql.push(") WHERE zeyn_rn > ");
                 sql.bind(self, Arg::Int(offset), Cast::Plain);
@@ -345,7 +354,10 @@ impl Dialect for Oracle {
 
     fn after_create(&self, table: &str) -> Result<Vec<String>> {
         Ok(match self.compat {
-            OracleCompat::V11 => vec![format!("CREATE SEQUENCE {}", ident(self, &Oracle::sequence(table))?)],
+            OracleCompat::V11 => vec![format!(
+                "CREATE SEQUENCE {}",
+                ident(self, &Oracle::sequence(table))?
+            )],
             OracleCompat::V12 => Vec::new(),
         })
     }
@@ -357,7 +369,12 @@ impl Dialect for Oracle {
 
 /// Room for the longest option value of a choice, at least 20 characters.
 pub(crate) fn choice_len(options: &[crate::value::ChoiceOption]) -> usize {
-    options.iter().map(|o| o.value.len()).max().unwrap_or(0).max(20)
+    options
+        .iter()
+        .map(|o| o.value.len())
+        .max()
+        .unwrap_or(0)
+        .max(20)
 }
 
 /// SQL text with its parameters and the types of the columns it returns.
@@ -370,7 +387,11 @@ pub struct Sql {
 
 impl Sql {
     fn new() -> Sql {
-        Sql { text: String::with_capacity(256), args: Vec::new(), cols: Vec::new() }
+        Sql {
+            text: String::with_capacity(256),
+            args: Vec::new(),
+            cols: Vec::new(),
+        }
     }
 
     /// Appends SQL text. Never called with values.
@@ -409,7 +430,9 @@ fn checked<'a>(d: &dyn Dialect, name: &'a str) -> Result<&'a str> {
             !part.is_empty()
                 && part.len() <= d.max_ident()
                 && !part.starts_with(|c: char| c.is_ascii_digit())
-                && part.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+                && part
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b == b'_')
         });
     if ok {
         Ok(name)
@@ -460,7 +483,11 @@ fn select_fields(d: &dyn Dialect, sql: &mut Sql, fields: &[FieldMeta]) -> Result
 }
 
 fn key_field(fields: &[FieldMeta]) -> Result<(usize, &FieldMeta)> {
-    fields.iter().enumerate().find(|(_, f)| f.key).ok_or_else(|| Error::Internal("entity has no key field".into()))
+    fields
+        .iter()
+        .enumerate()
+        .find(|(_, f)| f.key)
+        .ok_or_else(|| Error::Internal("entity has no key field".into()))
 }
 
 /// `LIKE` pattern with `\`, `%` and `_` escaped.
@@ -540,9 +567,10 @@ fn condition(d: &dyn Dialect, sql: &mut Sql, f: &FieldMeta, c: &Cond) -> Result<
             let mut expr = String::new();
             match f.kind {
                 FieldKind::Id | FieldKind::Integer => d.text(&mut expr, &col),
-                FieldKind::Date | FieldKind::Time | FieldKind::DateTime | FieldKind::LocalDateTime => {
-                    d.read(&mut expr, &col, Cast::of(&f.kind))
-                }
+                FieldKind::Date
+                | FieldKind::Time
+                | FieldKind::DateTime
+                | FieldKind::LocalDateTime => d.read(&mut expr, &col, Cast::of(&f.kind)),
                 _ => {
                     expr.push_str("LOWER(");
                     expr.push_str(&col);
@@ -582,7 +610,9 @@ fn condition(d: &dyn Dialect, sql: &mut Sql, f: &FieldMeta, c: &Cond) -> Result<
                 sql.push(&col);
                 sql.push(if upper { " <= " } else { " >= " });
                 let (arg, cast) = match *key {
-                    Key::Num(h) if matches!(f.kind, FieldKind::Money) => (Arg::Int(clamp(h)), Cast::Plain),
+                    Key::Num(h) if matches!(f.kind, FieldKind::Money) => {
+                        (Arg::Int(clamp(h)), Cast::Plain)
+                    }
                     Key::Num(h) if upper => (Arg::Int(clamp(h.div_euclid(100))), Cast::Plain),
                     Key::Num(h) => (Arg::Int(clamp(-((-h).div_euclid(100)))), Cast::Plain),
                     Key::Dec(v) => (Arg::Text(v.sql_text()), Cast::Decimal),
@@ -594,12 +624,25 @@ fn condition(d: &dyn Dialect, sql: &mut Sql, f: &FieldMeta, c: &Cond) -> Result<
                 sql.bind(d, arg, cast);
             }
         }
-        Cond::AnyOf(_, wanted) => in_list(d, sql, &col, wanted.iter().map(|w| Arg::Text(w.clone())).collect()),
+        Cond::AnyOf(_, wanted) => in_list(
+            d,
+            sql,
+            &col,
+            wanted
+                .iter()
+                .map(|w| Arg::Text(w.clone()))
+                .collect(),
+        ),
         Cond::AnyKey(_, keys) => {
             let args: Vec<Arg> = if matches!(f.kind, FieldKind::Id | FieldKind::Integer) {
-                keys.iter().filter_map(|k| k.trim().parse::<i64>().ok()).map(Arg::Int).collect()
+                keys.iter()
+                    .filter_map(|k| k.trim().parse::<i64>().ok())
+                    .map(Arg::Int)
+                    .collect()
             } else {
-                keys.iter().map(|k| Arg::Text(k.clone())).collect()
+                keys.iter()
+                    .map(|k| Arg::Text(k.clone()))
+                    .collect()
             };
             in_list(d, sql, &col, args);
         }
@@ -643,26 +686,49 @@ pub(crate) struct OrderKey {
 
 /// Sort keys of a query: the asked ones (known, sortable fields, each once, at most [`MAX_SORT`]),
 /// then the key field, so the order is total and keyset cursors are exact.
-pub(crate) fn order_keys(d: &dyn Dialect, fields: &[FieldMeta], q: &DataQuery) -> Result<Vec<OrderKey>> {
-    let nullable = |f: &FieldMeta| f.optional || (d.empty_is_null() && matches!(f.kind, FieldKind::Text));
+pub(crate) fn order_keys(
+    d: &dyn Dialect,
+    fields: &[FieldMeta],
+    q: &DataQuery,
+) -> Result<Vec<OrderKey>> {
+    let nullable =
+        |f: &FieldMeta| f.optional || (d.empty_is_null() && matches!(f.kind, FieldKind::Text));
     let mut keys: Vec<OrderKey> = Vec::new();
     for s in q.sort.iter().take(MAX_SORT) {
-        let Some(index) = fields.iter().position(|f| f.name == s.field) else { continue };
+        let Some(index) = fields
+            .iter()
+            .position(|f| f.name == s.field)
+        else {
+            continue;
+        };
         if fields[index].kind.is_json() || keys.iter().any(|k| k.index == index) {
             continue;
         }
-        keys.push(OrderKey { index, desc: s.desc, nullable: nullable(&fields[index]) });
+        keys.push(OrderKey {
+            index,
+            desc: s.desc,
+            nullable: nullable(&fields[index]),
+        });
     }
     let (key, _) = key_field(fields)?;
     if !keys.iter().any(|k| k.index == key) {
-        keys.push(OrderKey { index: key, desc: false, nullable: false });
+        keys.push(OrderKey {
+            index: key,
+            desc: false,
+            nullable: false,
+        });
     }
     Ok(keys)
 }
 
 /// `ORDER BY`. NULLs come first going up and last going down, as in memory; the clause is written
 /// only for columns that can hold NULL, so plain indexes still serve the sort.
-fn push_order(d: &dyn Dialect, sql: &mut Sql, fields: &[FieldMeta], keys: &[OrderKey]) -> Result<()> {
+fn push_order(
+    d: &dyn Dialect,
+    sql: &mut Sql,
+    fields: &[FieldMeta],
+    keys: &[OrderKey],
+) -> Result<()> {
     sql.push(" ORDER BY ");
     for (i, k) in keys.iter().enumerate() {
         if i > 0 {
@@ -771,21 +837,33 @@ struct SkipCursor {
 }
 
 fn order_of(fields: &[FieldMeta], keys: &[OrderKey]) -> Vec<(String, bool)> {
-    keys.iter().map(|k| (fields[k.index].name.to_string(), k.desc)).collect()
+    keys.iter()
+        .map(|k| (fields[k.index].name.to_string(), k.desc))
+        .collect()
 }
 
 /// Whether a sort key is a masked field. Such orders page by position, because a keyset cursor
 /// would carry the raw value to the client.
 fn masked_order(fields: &[FieldMeta], keys: &[OrderKey]) -> bool {
-    keys.iter().any(|k| fields[k.index].mask.is_some())
+    keys.iter()
+        .any(|k| fields[k.index].mask.is_some())
 }
 
 /// Next cursor of a row page that starts at row `skip` and holds `limit` rows: a keyset cursor
 /// after `last`, or a position when a sort key is masked.
-pub(crate) fn next_cursor<M: Model>(d: &dyn Dialect, keys: &[OrderKey], last: &M, skip: u64, limit: usize) -> Cursor {
+pub(crate) fn next_cursor<M: Model>(
+    d: &dyn Dialect,
+    keys: &[OrderKey],
+    last: &M,
+    skip: u64,
+    limit: usize,
+) -> Cursor {
     let fields = M::fields();
     if masked_order(fields, keys) {
-        return encode(&SkipCursor { o: order_of(fields, keys), s: skip.saturating_add(limit as u64) });
+        return encode(&SkipCursor {
+            o: order_of(fields, keys),
+            s: skip.saturating_add(limit as u64),
+        });
     }
     row_cursor(d, keys, last)
 }
@@ -798,7 +876,9 @@ fn decode<T: for<'de> Deserialize<'de>>(cursor: &Cursor) -> Result<T> {
     if cursor.0.len() > MAX_CURSOR {
         return Err(bad_cursor());
     }
-    let bytes = URL_SAFE_NO_PAD.decode(cursor.0.as_bytes()).map_err(|_| bad_cursor())?;
+    let bytes = URL_SAFE_NO_PAD
+        .decode(cursor.0.as_bytes())
+        .map_err(|_| bad_cursor())?;
     serde_json::from_slice(&bytes).map_err(|_| bad_cursor())
 }
 
@@ -814,32 +894,48 @@ pub(crate) fn row_cursor<M: Model>(d: &dyn Dialect, keys: &[OrderKey], row: &M) 
     let fields = M::fields();
     let v = keys
         .iter()
-        .map(|k| match row.value_at(k.index).unwrap_or(Value::Null) {
-            Value::Null => serde_json::Value::Null,
-            Value::Int(n) => n.into(),
-            Value::Money(m) => m.minor.into(),
-            Value::Bool(b) => b.into(),
-            Value::Text(s) if s.is_empty() && d.empty_is_null() => serde_json::Value::Null,
-            Value::Text(s) => s.into(),
-            Value::Choice(c) => c.into(),
-            Value::Date(x) => x.to_string().into(),
-            Value::Time(x) => x.to_string().into(),
-            Value::DateTime(x) => x.to_string().into(),
-            Value::LocalDateTime(x) => x.to_string().into(),
-            Value::Decimal(_) => serde_json::Value::Null,
-            Value::Number(x) => x.to_string().into(),
+        .map(|k| {
+            match row
+                .value_at(k.index)
+                .unwrap_or(Value::Null)
+            {
+                Value::Null => serde_json::Value::Null,
+                Value::Int(n) => n.into(),
+                Value::Money(m) => m.minor.into(),
+                Value::Bool(b) => b.into(),
+                Value::Text(s) if s.is_empty() && d.empty_is_null() => serde_json::Value::Null,
+                Value::Text(s) => s.into(),
+                Value::Choice(c) => c.into(),
+                Value::Date(x) => x.to_string().into(),
+                Value::Time(x) => x.to_string().into(),
+                Value::DateTime(x) => x.to_string().into(),
+                Value::LocalDateTime(x) => x.to_string().into(),
+                Value::Decimal(_) => serde_json::Value::Null,
+                Value::Number(x) => x.to_string().into(),
+            }
         })
         .collect();
-    encode(&RowCursor { o: order_of(fields, keys), v })
+    encode(&RowCursor {
+        o: order_of(fields, keys),
+        v,
+    })
 }
 
 /// Reads a row cursor back into one bound value per sort key. A cursor made for another order, or
 /// with a value its column cannot hold, is refused.
-pub(crate) fn read_cursor(fields: &[FieldMeta], keys: &[OrderKey], cursor: &Cursor) -> Result<Vec<Arg>> {
+pub(crate) fn read_cursor(
+    fields: &[FieldMeta],
+    keys: &[OrderKey],
+    cursor: &Cursor,
+) -> Result<Vec<Arg>> {
     let body: RowCursor = decode(cursor)?;
     let same = body.o.len() == keys.len()
         && body.v.len() == keys.len()
-        && body.o.iter().zip(keys).all(|((name, desc), k)| name == fields[k.index].name && *desc == k.desc);
+        && body
+            .o
+            .iter()
+            .zip(keys)
+            .all(|((name, desc), k)| name == fields[k.index].name && *desc == k.desc);
     if !same {
         return Err(bad_cursor());
     }
@@ -848,26 +944,36 @@ pub(crate) fn read_cursor(fields: &[FieldMeta], keys: &[OrderKey], cursor: &Curs
         .zip(keys)
         .map(|(v, k)| {
             let f = &fields[k.index];
-            let text = |v: &serde_json::Value| v.as_str().filter(|s| s.chars().count() <= 4000).map(str::to_string);
+            let text = |v: &serde_json::Value| {
+                v.as_str()
+                    .filter(|s| s.chars().count() <= 4000)
+                    .map(str::to_string)
+            };
             let arg = match (&f.kind, &v) {
                 (kind, serde_json::Value::Null) if k.nullable => Some(Arg::Null(Col::of(kind))),
-                (FieldKind::Id | FieldKind::Integer | FieldKind::Money, _) => v.as_i64().map(Arg::Int),
+                (FieldKind::Id | FieldKind::Integer | FieldKind::Money, _) => {
+                    v.as_i64().map(Arg::Int)
+                }
                 (FieldKind::Bool, _) => v.as_bool().map(Arg::Bool),
-                (FieldKind::Date, _) => text(&v).and_then(|s| Date::parse(&s)).map(|x| Arg::Text(x.to_string())),
-                (FieldKind::Time, _) => text(&v).and_then(|s| Time::parse(&s)).map(|x| Arg::Text(x.to_string())),
-                (FieldKind::DateTime, _) => {
-                    text(&v).and_then(|s| DateTime::parse(&s)).map(|x| Arg::Text(x.to_string()))
-                }
-                (FieldKind::LocalDateTime, _) => {
-                    text(&v).and_then(|s| LocalDateTime::parse(&s)).map(|x| Arg::Text(x.to_string()))
-                }
-                (FieldKind::Choice(options), _) => {
-                    text(&v).filter(|s| options.iter().any(|o| o.value == s)).map(Arg::Text)
-                }
+                (FieldKind::Date, _) => text(&v)
+                    .and_then(|s| Date::parse(&s))
+                    .map(|x| Arg::Text(x.to_string())),
+                (FieldKind::Time, _) => text(&v)
+                    .and_then(|s| Time::parse(&s))
+                    .map(|x| Arg::Text(x.to_string())),
+                (FieldKind::DateTime, _) => text(&v)
+                    .and_then(|s| DateTime::parse(&s))
+                    .map(|x| Arg::Text(x.to_string())),
+                (FieldKind::LocalDateTime, _) => text(&v)
+                    .and_then(|s| LocalDateTime::parse(&s))
+                    .map(|x| Arg::Text(x.to_string())),
+                (FieldKind::Choice(options), _) => text(&v)
+                    .filter(|s| options.iter().any(|o| o.value == s))
+                    .map(Arg::Text),
                 (FieldKind::Text, _) => text(&v).map(Arg::Text),
-                (FieldKind::Decimal, _) => {
-                    text(&v).and_then(|s| crate::Decimal::parse(&s)).map(|x| Arg::Text(x.sql_text()))
-                }
+                (FieldKind::Decimal, _) => text(&v)
+                    .and_then(|s| crate::Decimal::parse(&s))
+                    .map(|x| Arg::Text(x.sql_text())),
                 (FieldKind::Custom { .. } | FieldKind::Choices(_), _) => None,
             };
             arg.ok_or_else(bad_cursor)
@@ -885,15 +991,31 @@ pub(crate) struct Agg {
 /// Adds the select expressions of the totals that fit their column (the same ones the grid
 /// allows) and returns them. Money adds the lowest and highest currency, so mixed currencies are
 /// detected and not summed.
-fn push_aggs(d: &dyn Dialect, sql: &mut Sql, fields: &[FieldMeta], q: &DataQuery) -> Result<Vec<Agg>> {
+fn push_aggs(
+    d: &dyn Dialect,
+    sql: &mut Sql,
+    fields: &[FieldMeta],
+    q: &DataQuery,
+) -> Result<Vec<Agg>> {
     let mut out = Vec::new();
     for a in &q.aggregates {
-        let Some(field) = fields.iter().position(|f| f.name == a.field) else { continue };
+        let Some(field) = fields
+            .iter()
+            .position(|f| f.name == a.field)
+        else {
+            continue;
+        };
         let f = &fields[field];
         let col = column(d, f)?;
-        let numeric = matches!(f.kind, FieldKind::Integer | FieldKind::Money | FieldKind::Decimal);
+        let numeric = matches!(
+            f.kind,
+            FieldKind::Integer | FieldKind::Money | FieldKind::Decimal
+        );
         let ordered = numeric
-            || matches!(f.kind, FieldKind::Date | FieldKind::Time | FieldKind::DateTime | FieldKind::LocalDateTime);
+            || matches!(
+                f.kind,
+                FieldKind::Date | FieldKind::Time | FieldKind::DateTime | FieldKind::LocalDateTime
+            );
         let fits = match a.op {
             Aggregate::Count => true,
             Aggregate::Sum | Aggregate::Avg => numeric,
@@ -905,15 +1027,27 @@ fn push_aggs(d: &dyn Dialect, sql: &mut Sql, fields: &[FieldMeta], q: &DataQuery
         let money = matches!(f.kind, FieldKind::Money);
         match a.op {
             Aggregate::Count => sql.select(d, &format!("COUNT({col})"), Cast::Int, Col::Int),
-            Aggregate::Sum if f.kind == FieldKind::Decimal => {
-                sql.select(d, &format!("COALESCE(SUM({col}), 0)"), Cast::Decimal, Col::Text)
-            }
+            Aggregate::Sum if f.kind == FieldKind::Decimal => sql.select(
+                d,
+                &format!("COALESCE(SUM({col}), 0)"),
+                Cast::Decimal,
+                Col::Text,
+            ),
             Aggregate::Avg if f.kind == FieldKind::Decimal => {
                 let scale = f.decimal_limits().1;
-                sql.select(d, &format!("ROUND(AVG({col}), {scale})"), Cast::Decimal, Col::Text)
+                sql.select(
+                    d,
+                    &format!("ROUND(AVG({col}), {scale})"),
+                    Cast::Decimal,
+                    Col::Text,
+                )
             }
-            Aggregate::Sum => sql.select(d, &format!("COALESCE(SUM({col}), 0)"), Cast::Int, Col::Int),
-            Aggregate::Avg if money => sql.select(d, &format!("ROUND(AVG({col}))"), Cast::Int, Col::Int),
+            Aggregate::Sum => {
+                sql.select(d, &format!("COALESCE(SUM({col}), 0)"), Cast::Int, Col::Int)
+            }
+            Aggregate::Avg if money => {
+                sql.select(d, &format!("ROUND(AVG({col}))"), Cast::Int, Col::Int)
+            }
             Aggregate::Avg => {
                 let mut e = String::new();
                 d.float(&mut e, &format!("AVG({col})"));
@@ -951,7 +1085,10 @@ pub(crate) fn read_aggs(
         let first = cells.next().unwrap_or(Cell::Null);
         let money = matches!(f.kind, FieldKind::Money) && a.op != Aggregate::Count;
         let value = if money {
-            let (lo, hi) = (cells.next().unwrap_or(Cell::Null), cells.next().unwrap_or(Cell::Null));
+            let (lo, hi) = (
+                cells.next().unwrap_or(Cell::Null),
+                cells.next().unwrap_or(Cell::Null),
+            );
             match (&first, &lo) {
                 (_, Cell::Text(_)) if lo != hi => None,
                 (Cell::Int(n), Cell::Null) if a.op == Aggregate::Sum => Some(Value::Int(*n)),
@@ -970,7 +1107,11 @@ pub(crate) fn read_aggs(
             }
         };
         if let Some(value) = value {
-            out.push(crate::action::Total { field: f.name.to_string(), op: a.op, value });
+            out.push(crate::action::Total {
+                field: f.name.to_string(),
+                op: a.op,
+                value,
+            });
         }
     }
     out
@@ -991,7 +1132,11 @@ pub(crate) enum Shape {
     /// Rows; the keys make the next cursor.
     Rows(Vec<OrderKey>),
     /// Groups by a field, from an offset.
-    Groups { field: usize, aggs: Vec<Agg>, offset: u64 },
+    Groups {
+        field: usize,
+        aggs: Vec<Agg>,
+        offset: u64,
+    },
 }
 
 /// Next cursor of a group page.
@@ -1001,7 +1146,11 @@ pub(crate) fn group_cursor(offset: u64) -> Cursor {
 
 /// Plans a `find`: filters, sort, keyset or offset paging, a count capped at `count_cap`, totals
 /// and groups. One row more than the page is fetched to know whether more follow.
-pub(crate) fn plan_find<E: Entity>(d: &dyn Dialect, q: &DataQuery, count_cap: u64) -> Result<FindPlan> {
+pub(crate) fn plan_find<E: Entity>(
+    d: &dyn Dialect,
+    q: &DataQuery,
+    count_cap: u64,
+) -> Result<FindPlan> {
     let fields = E::fields();
     let limit = q.limit() as usize;
     let fetch = limit as i64 + 1;
@@ -1015,7 +1164,10 @@ pub(crate) fn plan_find<E: Entity>(d: &dyn Dialect, q: &DataQuery, count_cap: u6
         (!aggs.is_empty()).then_some((sql, aggs))
     };
     let cap = i64::try_from(count_cap).unwrap_or(i64::MAX);
-    let group = q.group.as_deref().and_then(|g| fields.iter().position(|f| f.name == g));
+    let group = q
+        .group
+        .as_deref()
+        .and_then(|g| fields.iter().position(|f| f.name == g));
 
     if let Some(gi) = group {
         let f = &fields[gi];
@@ -1027,7 +1179,9 @@ pub(crate) fn plan_find<E: Entity>(d: &dyn Dialect, q: &DataQuery, count_cap: u6
         let offset = match &q.page {
             PageRequest::Offset { offset, .. } => *offset,
             PageRequest::After { cursor: None, .. } => 0,
-            PageRequest::After { cursor: Some(c), .. } => decode::<GroupCursor>(c)?.g,
+            PageRequest::After {
+                cursor: Some(c), ..
+            } => decode::<GroupCursor>(c)?.g,
         };
         let mut main = Sql::new();
         main.push("SELECT ");
@@ -1038,12 +1192,19 @@ pub(crate) fn plan_find<E: Entity>(d: &dyn Dialect, q: &DataQuery, count_cap: u6
         main.select(d, "COUNT(*)", Cast::Int, Col::Int);
         let aggs = push_aggs(d, &mut main, fields, q)?;
         from_where::<E>(d, &mut main, q)?;
-        let desc = q.sort.iter().any(|s| s.desc && s.field == f.name);
+        let desc = q
+            .sort
+            .iter()
+            .any(|s| s.desc && s.field == f.name);
         main.push(" GROUP BY ");
         main.push(&group_by);
         main.push(" ORDER BY ");
         main.push(&column(d, f)?);
-        main.push(if desc { " DESC NULLS LAST" } else { " ASC NULLS FIRST" });
+        main.push(if desc {
+            " DESC NULLS LAST"
+        } else {
+            " ASC NULLS FIRST"
+        });
         d.page(&mut main, fetch, i64::try_from(offset).unwrap_or(i64::MAX));
         let count = if q.with_total {
             let mut c = Sql::new();
@@ -1059,7 +1220,11 @@ pub(crate) fn plan_find<E: Entity>(d: &dyn Dialect, q: &DataQuery, count_cap: u6
             main,
             limit,
             skip: offset,
-            shape: Shape::Groups { field: gi, aggs, offset },
+            shape: Shape::Groups {
+                field: gi,
+                aggs,
+                offset,
+            },
             count,
             totals,
         });
@@ -1072,7 +1237,9 @@ pub(crate) fn plan_find<E: Entity>(d: &dyn Dialect, q: &DataQuery, count_cap: u6
     let has_where = from_where::<E>(d, &mut main, q)?;
     let skip = match &q.page {
         PageRequest::Offset { offset, .. } => *offset,
-        PageRequest::After { cursor: Some(c), .. } if masked_order(fields, &keys) => {
+        PageRequest::After {
+            cursor: Some(c), ..
+        } if masked_order(fields, &keys) => {
             let body: SkipCursor = decode(c)?;
             if body.o != order_of(fields, &keys) {
                 return Err(bad_cursor());
@@ -1098,7 +1265,14 @@ pub(crate) fn plan_find<E: Entity>(d: &dyn Dialect, q: &DataQuery, count_cap: u6
     } else {
         None
     };
-    Ok(FindPlan { main, limit, skip, shape: Shape::Rows(keys), count, totals })
+    Ok(FindPlan {
+        main,
+        limit,
+        skip,
+        shape: Shape::Rows(keys),
+        count,
+        totals,
+    })
 }
 
 /// `SELECT COUNT(*)` over at most `cap` rows of `inner`, so counting a huge table stays cheap.
@@ -1153,7 +1327,10 @@ pub(crate) fn is_new_key(v: &Value) -> bool {
 /// Values of custom fields, which are stored as JSON text. Serialized only when the entity has
 /// such fields.
 fn custom_json<M: Model>(row: &M) -> Option<serde_json::Map<String, serde_json::Value>> {
-    if !M::fields().iter().any(|f| f.kind.is_json()) {
+    if !M::fields()
+        .iter()
+        .any(|f| f.kind.is_json())
+    {
         return None;
     }
     match serde_json::to_value(row) {
@@ -1170,7 +1347,10 @@ fn field_args<M: Model>(
 ) -> Vec<Arg> {
     let mut args = Vec::with_capacity(2);
     if f.kind.is_json() {
-        let v = json.as_ref().and_then(|m| m.get(f.name)).filter(|v| !v.is_null());
+        let v = json
+            .as_ref()
+            .and_then(|m| m.get(f.name))
+            .filter(|v| !v.is_null());
         args.push(v.map_or(Arg::Null(Col::Text), |v| Arg::Text(v.to_string())));
     } else {
         args_of(&f.kind, row.value_at(i).unwrap_or(Value::Null), &mut args);
@@ -1182,7 +1362,12 @@ fn field_args<M: Model>(
 /// version starts at 1, and `#[readonly]` fields are not written: they keep their column default
 /// until server code changes them with its own SQL. `returning` appends the dialect neutral
 /// `RETURNING` select list (PostgreSQL).
-pub(crate) fn plan_insert<E: Entity>(d: &dyn Dialect, row: &E, key: Option<Arg>, returning: bool) -> Result<Sql> {
+pub(crate) fn plan_insert<E: Entity>(
+    d: &dyn Dialect,
+    row: &E,
+    key: Option<Arg>,
+    returning: bool,
+) -> Result<Sql> {
     let fields = E::fields();
     let json = custom_json(row);
     let mut sql = Sql::new();
@@ -1242,7 +1427,11 @@ pub(crate) fn plan_insert<E: Entity>(d: &dyn Dialect, row: &E, key: Option<Arg>,
 
 /// `UPDATE ... WHERE key = $k AND version = $v`, raising the version by one. `#[readonly]` fields
 /// are not written. Without a `#[version]` field the row is matched by key only.
-pub(crate) fn plan_update<E: Entity>(d: &dyn Dialect, row: &E, returning: bool) -> Result<(Sql, bool)> {
+pub(crate) fn plan_update<E: Entity>(
+    d: &dyn Dialect,
+    row: &E,
+    returning: bool,
+) -> Result<(Sql, bool)> {
     let fields = E::fields();
     let json = custom_json(row);
     let mut sql = Sql::new();
@@ -1286,7 +1475,10 @@ pub(crate) fn plan_update<E: Entity>(d: &dyn Dialect, row: &E, returning: bool) 
         }
     }
     if first {
-        return Err(Error::Internal(format!("`{}` has no field that an update can write", E::NAME)));
+        return Err(Error::Internal(format!(
+            "`{}` has no field that an update can write",
+            E::NAME
+        )));
     }
     let (ki, _) = key_field(fields)?;
     push_key(d, &mut sql, fields, row.value_at(ki).unwrap_or(Value::Null))?;
@@ -1295,7 +1487,9 @@ pub(crate) fn plan_update<E: Entity>(d: &dyn Dialect, row: &E, returning: bool) 
         sql.push(" AND ");
         sql.push(&col);
         sql.push(" = ");
-        let Value::Int(n) = v else { return Err(Error::Internal("row version is not a whole number".into())) };
+        let Value::Int(n) = v else {
+            return Err(Error::Internal("row version is not a whole number".into()));
+        };
         sql.bind(d, Arg::Int(n), Cast::Plain);
     }
     if returning {
@@ -1319,8 +1513,13 @@ pub(crate) fn plan_delete<E: Entity>(d: &dyn Dialect, key: Value) -> Result<Sql>
 /// constraints `<table>_<column>_key`, as PostgreSQL does), or the only unique field. Otherwise
 /// the error belongs to the whole record.
 pub(crate) fn unique_error<M: Model>(constraint: Option<&str>) -> Error {
-    let constraint = constraint.unwrap_or_default().to_ascii_lowercase();
-    let unique: Vec<&FieldMeta> = M::fields().iter().filter(|f| f.rules.contains(&Rule::Unique)).collect();
+    let constraint = constraint
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let unique: Vec<&FieldMeta> = M::fields()
+        .iter()
+        .filter(|f| f.rules.contains(&Rule::Unique))
+        .collect();
     let field = unique
         .iter()
         .find(|f| !constraint.is_empty() && constraint.contains(&f.name.to_ascii_lowercase()))
@@ -1368,18 +1567,29 @@ pub(crate) fn duplicate_error() -> Error {
 /// ```
 pub fn create_table<E: Entity>(d: &dyn Dialect) -> Result<Vec<String>> {
     let table = ident(d, E::TABLE)?;
-    let bare = E::TABLE.rsplit('.').next().unwrap_or(E::TABLE);
+    let bare = E::TABLE
+        .rsplit('.')
+        .next()
+        .unwrap_or(E::TABLE);
     let mut cols = Vec::new();
     for f in E::fields() {
         let name = column(d, f)?;
-        let text_null = d.empty_is_null() && (matches!(f.kind, FieldKind::Text) || f.kind.is_json());
-        let not_null = if f.optional || text_null { "" } else { " NOT NULL" };
+        let text_null =
+            d.empty_is_null() && (matches!(f.kind, FieldKind::Text) || f.kind.is_json());
+        let not_null = if f.optional || text_null {
+            ""
+        } else {
+            " NOT NULL"
+        };
         if f.key && matches!(f.kind, FieldKind::Id | FieldKind::Integer) {
             cols.push(format!("{name} {} PRIMARY KEY", d.generated_key()));
             continue;
         }
         if f.key {
-            cols.push(format!("{name} {} PRIMARY KEY", d.column_type(&f.kind, f.max_len())));
+            cols.push(format!(
+                "{name} {} PRIMARY KEY",
+                d.column_type(&f.kind, f.max_len())
+            ));
             continue;
         }
         let default = match (&f.kind, f.version, f.readonly && !f.optional) {
@@ -1401,14 +1611,28 @@ pub fn create_table<E: Entity>(d: &dyn Dialect) -> Result<Vec<String>> {
         };
         cols.push(format!("{name} {ty}{default}{not_null}"));
         if matches!(f.kind, FieldKind::Money) {
-            let default = if f.readonly && !f.optional { " DEFAULT 'TRY'" } else { "" };
-            cols.push(format!("{} {}{default}{not_null}", currency(d, f)?, d.column_type(&FieldKind::Text, Some(3))));
+            let default = if f.readonly && !f.optional {
+                " DEFAULT 'TRY'"
+            } else {
+                ""
+            };
+            cols.push(format!(
+                "{} {}{default}{not_null}",
+                currency(d, f)?,
+                d.column_type(&FieldKind::Text, Some(3))
+            ));
         }
         if f.rules.contains(&Rule::Unique) {
-            cols.push(format!("CONSTRAINT {} UNIQUE ({name})", ident(d, &format!("{bare}_{}_key", f.name))?));
+            cols.push(format!(
+                "CONSTRAINT {} UNIQUE ({name})",
+                ident(d, &format!("{bare}_{}_key", f.name))?
+            ));
         }
     }
-    let mut out = vec![format!("CREATE TABLE {table} (\n    {}\n)", cols.join(",\n    "))];
+    let mut out = vec![format!(
+        "CREATE TABLE {table} (\n    {}\n)",
+        cols.join(",\n    ")
+    )];
     out.extend(d.after_create(E::TABLE)?);
     Ok(out)
 }

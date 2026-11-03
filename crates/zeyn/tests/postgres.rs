@@ -17,7 +17,10 @@ use sql_common::{Raw, urls};
 use zeyn::sql::{Arg, Db, PoolLimits};
 
 const RAW: Raw = Raw {
-    drop: &["DROP TABLE IF EXISTS zeyn_test_items", "DROP TABLE IF EXISTS zeyn_test_stream"],
+    drop: &[
+        "DROP TABLE IF EXISTS zeyn_test_items",
+        "DROP TABLE IF EXISTS zeyn_test_stream",
+    ],
     set_qty: "UPDATE zeyn_test_items SET qty = $1 WHERE id = $2",
     fill_stream: "INSERT INTO zeyn_test_stream (id, text) SELECT g, 'line ' || g FROM generate_series(1, 100000) g",
 };
@@ -33,16 +36,33 @@ async fn postgres_data_layer_matches_memory_and_saves_safely() {
 #[tokio::test(flavor = "multi_thread")]
 async fn postgres_runs_migrations() {
     for url in urls("ZEYN_TEST_PG") {
-        let db = Db::connect(&url, PoolLimits::default()).await.unwrap();
-        db.execute("DROP TABLE IF EXISTS zeyn_test_migrated", vec![]).await.unwrap();
-        db.execute("DROP TABLE IF EXISTS _sqlx_migrations", vec![]).await.unwrap();
+        let db = Db::connect(&url, PoolLimits::default())
+            .await
+            .unwrap();
+        db.execute("DROP TABLE IF EXISTS zeyn_test_migrated", vec![])
+            .await
+            .unwrap();
+        db.execute("DROP TABLE IF EXISTS _sqlx_migrations", vec![])
+            .await
+            .unwrap();
         let dir = std::env::temp_dir().join(format!("zeyn-migrations-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("0001_create.sql"), "CREATE TABLE zeyn_test_migrated (id BIGINT PRIMARY KEY);")
-            .unwrap();
+        std::fs::write(
+            dir.join("0001_create.sql"),
+            "CREATE TABLE zeyn_test_migrated (id BIGINT PRIMARY KEY);",
+        )
+        .unwrap();
         db.migrate_dir(&dir).await.unwrap();
         db.migrate_dir(&dir).await.unwrap();
-        assert_eq!(db.execute("INSERT INTO zeyn_test_migrated (id) VALUES ($1)", vec![Arg::Int(1)]).await.unwrap(), 1);
+        assert_eq!(
+            db.execute(
+                "INSERT INTO zeyn_test_migrated (id) VALUES ($1)",
+                vec![Arg::Int(1)]
+            )
+            .await
+            .unwrap(),
+            1
+        );
         std::fs::remove_dir_all(&dir).ok();
     }
 }

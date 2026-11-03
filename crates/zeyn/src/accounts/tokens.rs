@@ -60,7 +60,8 @@ pub(crate) struct Keys {
 impl Keys {
     pub(crate) fn new(secret: &[u8]) -> Keys {
         let root = hmac::Key::new(hmac::HMAC_SHA256, secret);
-        let derive = |label: &[u8]| hmac::Key::new(hmac::HMAC_SHA256, hmac::sign(&root, label).as_ref());
+        let derive =
+            |label: &[u8]| hmac::Key::new(hmac::HMAC_SHA256, hmac::sign(&root, label).as_ref());
         Keys {
             token: derive(b"zeyn accounts purpose token v1"),
             code: derive(b"zeyn accounts short code v1"),
@@ -84,7 +85,10 @@ impl Keys {
         let mut out = Vec::with_capacity(41);
         out.push(TOKEN_VERSION);
         out.extend_from_slice(&now.to_be_bytes());
-        out.extend_from_slice(self.token_mac(now, user, &purpose.name(), stamp).as_ref());
+        out.extend_from_slice(
+            self.token_mac(now, user, &purpose.name(), stamp)
+                .as_ref(),
+        );
         b64url(&out)
     }
 
@@ -102,11 +106,17 @@ impl Keys {
         if token.len() > 128 {
             return false;
         }
-        let Some(bytes) = b64url_decode(token.trim()) else { return false };
+        let Some(bytes) = b64url_decode(token.trim()) else {
+            return false;
+        };
         if bytes.len() != 41 || bytes[0] != TOKEN_VERSION {
             return false;
         }
-        let created = i64::from_be_bytes(bytes[1..9].try_into().unwrap_or_default());
+        let created = i64::from_be_bytes(
+            bytes[1..9]
+                .try_into()
+                .unwrap_or_default(),
+        );
         if created > now + 60 || created + lifetime < now {
             return false;
         }
@@ -123,18 +133,31 @@ impl Keys {
     /// The key of short codes for a user: depends on the security stamp, so a new stamp voids
     /// every code sent before.
     fn code_key(&self, stamp: &str) -> Vec<u8> {
-        hmac::sign(&self.code, stamp.as_bytes()).as_ref().to_vec()
+        hmac::sign(&self.code, stamp.as_bytes())
+            .as_ref()
+            .to_vec()
     }
 
     /// The six digit short code for `modifier` (such as `Email:TwoFactor:<address>`) at `now`.
     pub(crate) fn short_code(&self, now: i64, stamp: &str, modifier: &str) -> String {
         let step = (now.max(0) as u64) / SHORT_STEP;
-        format!("{:06}", totp(&self.code_key(stamp), step, modifier.as_bytes()))
+        format!(
+            "{:06}",
+            totp(&self.code_key(stamp), step, modifier.as_bytes())
+        )
     }
 
     /// Whether `code` is a short code for `modifier` within two steps of `now`.
-    pub(crate) fn check_short_code(&self, code: &str, now: i64, stamp: &str, modifier: &str) -> bool {
-        let Some(code) = six_digits(code) else { return false };
+    pub(crate) fn check_short_code(
+        &self,
+        code: &str,
+        now: i64,
+        stamp: &str,
+        modifier: &str,
+    ) -> bool {
+        let Some(code) = six_digits(code) else {
+            return false;
+        };
         let key = self.code_key(stamp);
         let step = (now.max(0) as u64) / SHORT_STEP;
         let mut hit = false;
@@ -147,7 +170,11 @@ impl Keys {
 
     /// Keyed hash of a recovery code, normalized first (upper case, no spaces).
     pub(crate) fn recovery_hash(&self, code: &str) -> String {
-        let normal: String = code.chars().filter(|c| !c.is_whitespace()).flat_map(char::to_uppercase).collect();
+        let normal: String = code
+            .chars()
+            .filter(|c| !c.is_whitespace())
+            .flat_map(char::to_uppercase)
+            .collect();
         hex(hmac::sign(&self.recovery, normal.as_bytes()).as_ref())
     }
 
@@ -168,7 +195,10 @@ const SHORT_STEP: u64 = 180;
 pub(crate) const AUTH_STEP: u64 = 30;
 
 fn six_digits(code: &str) -> Option<u32> {
-    let code: String = code.chars().filter(|c| !c.is_whitespace()).collect();
+    let code: String = code
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect();
     if code.len() != 6 || !code.bytes().all(|b| b.is_ascii_digit()) {
         return None;
     }
@@ -239,7 +269,10 @@ pub(crate) fn authenticator_key() -> String {
 pub(crate) fn base32_decode(s: &str) -> Option<Vec<u8>> {
     let mut out = Vec::with_capacity(s.len() * 5 / 8);
     let (mut buffer, mut bits) = (0u32, 0u32);
-    for c in s.chars().filter(|c| !c.is_whitespace() && *c != '=') {
+    for c in s
+        .chars()
+        .filter(|c| !c.is_whitespace() && *c != '=')
+    {
         let v = match c.to_ascii_uppercase() {
             c @ 'A'..='Z' => c as u32 - 'A' as u32,
             c @ '2'..='7' => c as u32 - '2' as u32 + 26,
@@ -256,7 +289,10 @@ pub(crate) fn base32_decode(s: &str) -> Option<Vec<u8>> {
 }
 
 pub(crate) fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
+    bytes
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 #[cfg(test)]
@@ -274,7 +310,10 @@ mod tests {
     #[test]
     fn base32_round_trips() {
         let bytes = random_bytes::<20>();
-        assert_eq!(base32_decode(&crate::auth::totp::base32(&bytes)).unwrap(), bytes);
+        assert_eq!(
+            base32_decode(&crate::auth::totp::base32(&bytes)).unwrap(),
+            bytes
+        );
     }
 
     #[test]
@@ -283,7 +322,11 @@ mod tests {
             let c = recovery_code();
             assert_eq!(c.len(), 11);
             assert_eq!(&c[5..6], "-");
-            assert!(c.chars().filter(|c| *c != '-').all(|c| RECOVERY_ALPHABET.contains(&(c as u8))));
+            assert!(
+                c.chars()
+                    .filter(|c| *c != '-')
+                    .all(|c| RECOVERY_ALPHABET.contains(&(c as u8)))
+            );
         }
     }
 }

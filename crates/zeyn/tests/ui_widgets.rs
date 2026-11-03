@@ -48,8 +48,16 @@ pub fn person(params: PersonParams) -> Screen {
         born: Date::new(1990, 5, 1),
     };
     Screen::new("Person")
-        .body(Breadcrumb::new().link("People", person, PersonParams { id: 0 }).current("Ada"))
-        .body(Alert::warning("Check <the> address").title("Address").dismissible())
+        .body(
+            Breadcrumb::new()
+                .link("People", person, PersonParams { id: 0 })
+                .current("Ada"),
+        )
+        .body(
+            Alert::warning("Check <the> address")
+                .title("Address")
+                .dismissible(),
+        )
         .body(
             DescriptionList::of(&p)
                 .field(Person::name)
@@ -62,7 +70,9 @@ pub fn person(params: PersonParams) -> Screen {
             ActionButton::new("Archive", archive_person, params.id)
                 .confirm("Archive this person?")
                 .tone(Tone::Danger)
-                .on_success(|_, ui| ui.effect(Effect::confirm("Open the list?", Effect::CloseAndRefresh))),
+                .on_success(|_, ui| {
+                    ui.effect(Effect::confirm("Open the list?", Effect::CloseAndRefresh))
+                }),
         )
         .body(
             Form::of(Person::default())
@@ -85,14 +95,19 @@ fn display_components_render_accessible_escaped_markup() {
     let h = html();
     assert!(h.contains(r#"<nav class="z-breadcrumb" aria-label="Breadcrumb"><ol><li><a href="/_zeyn/route/person?params=%7B%22id%22%3A0%7D" data-zeyn-base-href>People</a></li><li><span aria-current="page">Ada</span></li></ol></nav>"#));
     assert!(
-        h.contains(r#"<span class="z-sr-only">Warning: </span>Address</p><p>Check &lt;the&gt; address</p>"#),
+        h.contains(
+            r#"<span class="z-sr-only">Warning: </span>Address</p><p>Check &lt;the&gt; address</p>"#
+        ),
         "tone is spoken, not only colored"
     );
     assert!(h.contains(r#"data-zeyn-dismiss aria-label="Dismiss""#));
     assert!(h.contains(r#"<dl class="z-details" style="--z-columns:3">"#));
     assert!(h.contains("<dd>Ada &lt;b&gt;</dd>"));
     assert!(h.contains(r#"<dd><time datetime="1990-05-01">5/1/1990</time></dd>"#));
-    assert!(h.contains(r#"<dt>Note</dt><dd><span class="z-muted" aria-label="-">"#), "empty values show a dash");
+    assert!(
+        h.contains(r#"<dt>Note</dt><dd><span class="z-muted" aria-label="-">"#),
+        "empty values show a dash"
+    );
     let mut out = String::new();
     let r = Render::new("x", "tr", I18n::builtin());
     Progress::new("Import", 30, 120).render(&mut out, &r);
@@ -104,10 +119,14 @@ fn display_components_render_accessible_escaped_markup() {
             && out.matches("z-skeleton-line").count() == 2
     );
     out.clear();
-    Badge::new("Paid").tone(Tone::Success).render(&mut out, &r);
+    Badge::new("Paid")
+        .tone(Tone::Success)
+        .render(&mut out, &r);
     assert_eq!(out, r#"<span class="z-badge z-tone-success">Paid</span>"#);
     out.clear();
-    Timeline::new().event(Date::new(2024, 1, 5).unwrap(), "Created", None, Tone::Info).render(&mut out, &r);
+    Timeline::new()
+        .event(Date::new(2024, 1, 5).unwrap(), "Created", None, Tone::Info)
+        .render(&mut out, &r);
     assert!(out.contains(r#"<time datetime="2024-01-05">05.01.2024</time>"#));
 }
 
@@ -116,7 +135,9 @@ fn action_buttons_are_forms_that_confirm_first_and_steps_render_one_fieldset_eac
     let h = html();
     assert!(h.contains(r#"<form class="z-action" data-zeyn-submit="archive_person" data-zeyn-confirm="Archive this person?" data-text-title="Please confirm" data-text-ok="Archive" data-text-cancel="Cancel" novalidate><button type="submit" class="z-button z-danger-button""#));
     assert!(h.contains(r#"<ol class="z-steps" data-zeyn-steps aria-label="Steps""#));
-    assert!(h.contains(r#"<fieldset class="z-step" data-zeyn-step="0"><legend class="z-step-legend">Who</legend>"#));
+    assert!(h.contains(
+        r#"<fieldset class="z-step" data-zeyn-step="0"><legend class="z-step-legend">Who</legend>"#
+    ));
     assert!(h.contains(r#"<fieldset class="z-step" data-zeyn-step="1"><legend class="z-step-legend">Where</legend>"#));
     assert!(
         h.contains(r#"data-zeyn-step-next hidden"#),
@@ -130,13 +151,21 @@ fn action_buttons_are_forms_that_confirm_first_and_steps_render_one_fieldset_eac
 
 #[test]
 fn confirm_effects_carry_localized_texts_and_the_next_effect() {
-    let e = Effect::confirm("Delete?", Effect::Toast { message: "Done".into() });
+    let e = Effect::confirm(
+        "Delete?",
+        Effect::Toast {
+            message: "Done".into(),
+        },
+    );
     let json = e.to_json(&Render::new("x", "tr", I18n::builtin()));
     assert_eq!(json["effect"], "confirm");
     assert_eq!(json["message"], "Delete?");
     assert_eq!(json["ok"], "Onayla");
     assert_eq!(json["cancel"], "Vazgeç");
-    assert_eq!(json["then"], serde_json::json!({ "effect": "toast", "message": "Done" }));
+    assert_eq!(
+        json["then"],
+        serde_json::json!({ "effect": "toast", "message": "Done" })
+    );
 }
 
 const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -146,7 +175,13 @@ fn app(archive: Archive) -> axum::Router {
         .i18n(I18n::new("en"))
         .service(archive)
         .auth(|h: &HeaderMap| {
-            let perms: Vec<String> = h.get("x-perms")?.to_str().ok()?.split(',').map(String::from).collect();
+            let perms: Vec<String> = h
+                .get("x-perms")?
+                .to_str()
+                .ok()?
+                .split(',')
+                .map(String::from)
+                .collect();
             Some(Identity::user("u").with_permissions(perms))
         })
         .feature(Feature::new("people").screen(person))
@@ -167,10 +202,22 @@ async fn call(
         .header("x-zeyn-csrf", TOKEN)
         .body(Body::from(body.to_string()))
         .unwrap();
-    let res = router.clone().oneshot(req).await.unwrap();
+    let res = router
+        .clone()
+        .oneshot(req)
+        .await
+        .unwrap();
     let status = res.status();
-    let bytes = res.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    let bytes = res
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes();
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 #[tokio::test]
@@ -182,7 +229,11 @@ async fn action_buttons_run_with_the_servers_input_and_the_actions_permission() 
     assert_eq!(status, StatusCode::FORBIDDEN);
     let (status, json) = call(&router, "/_zeyn/form", "people.read,people.write", body).await;
     assert_eq!(status, StatusCode::OK, "{json}");
-    assert_eq!(*archive.0.lock().unwrap(), vec![7], "values from the client are ignored");
+    assert_eq!(
+        *archive.0.lock().unwrap(),
+        vec![7],
+        "values from the client are ignored"
+    );
     assert_eq!(json["effects"][0]["effect"], "confirm");
     assert_eq!(json["effects"][0]["then"]["effect"], "close_and_refresh");
 }
@@ -199,18 +250,46 @@ async fn step_checks_report_only_the_steps_fields_and_need_the_save_permission()
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    let fields: Vec<&str> = json["errors"].as_array().unwrap().iter().map(|e| e["field"].as_str().unwrap()).collect();
-    assert_eq!(fields, ["name", "email"], "city belongs to the next step and is not reported");
+    let fields: Vec<&str> = json["errors"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e["field"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        fields,
+        ["name", "email"],
+        "city belongs to the next step and is not reported"
+    );
     let (_, json) = call(
         &router,
         "/_zeyn/data",
         "people.read,people.write",
-        step(0, serde_json::json!({ "name": "Ada", "email": "ada@example.com" })),
+        step(
+            0,
+            serde_json::json!({ "name": "Ada", "email": "ada@example.com" }),
+        ),
     )
     .await;
     assert_eq!(json["errors"], serde_json::json!([]));
-    let (status, _) = call(&router, "/_zeyn/data", "people.read,people.write", step(5, serde_json::json!({}))).await;
+    let (status, _) = call(
+        &router,
+        "/_zeyn/data",
+        "people.read,people.write",
+        step(5, serde_json::json!({})),
+    )
+    .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
-    let (status, _) = call(&router, "/_zeyn/data", "people.read", step(0, serde_json::json!({}))).await;
-    assert_eq!(status, StatusCode::FORBIDDEN, "checking a step needs the save action's permission");
+    let (status, _) = call(
+        &router,
+        "/_zeyn/data",
+        "people.read",
+        step(0, serde_json::json!({})),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "checking a step needs the save action's permission"
+    );
 }

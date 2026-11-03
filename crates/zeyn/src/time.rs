@@ -50,8 +50,10 @@ fn days_in_month(y: i32, m: u8) -> u8 {
 impl Date {
     /// A valid date, or `None` for days such as February 30.
     pub fn new(year: i32, month: u8, day: u8) -> Option<Date> {
-        let valid =
-            (1..=9999).contains(&year) && (1..=12).contains(&month) && day >= 1 && day <= days_in_month(year, month);
+        let valid = (1..=9999).contains(&year)
+            && (1..=12).contains(&month)
+            && day >= 1
+            && day <= days_in_month(year, month);
         valid.then_some(Date { year, month, day })
     }
 
@@ -74,7 +76,11 @@ impl Date {
 
     /// The date of a `YYYYMMDD` number, or `None` when it is not a valid day.
     pub fn from_compact(n: i64) -> Option<Date> {
-        Date::new(i32::try_from(n / 10_000).ok()?, (n / 100 % 100) as u8, (n % 100) as u8)
+        Date::new(
+            i32::try_from(n / 10_000).ok()?,
+            (n / 100 % 100) as u8,
+            (n % 100) as u8,
+        )
     }
 
     /// Days since 1970-01-01 (negative before).
@@ -103,7 +109,10 @@ impl Date {
     }
 
     pub fn add_days(&self, days: i64) -> Option<Date> {
-        Date::from_days_since_epoch(self.days_since_epoch().checked_add(days)?)
+        Date::from_days_since_epoch(
+            self.days_since_epoch()
+                .checked_add(days)?,
+        )
     }
 
     /// Day of the week, 1 = Monday ... 7 = Sunday.
@@ -129,7 +138,10 @@ impl Date {
             return Some(d);
         }
         let style = DateStyle::for_locale(locale);
-        let parts: Vec<&str> = s.trim().split(['.', '/', '-']).collect();
+        let parts: Vec<&str> = s
+            .trim()
+            .split(['.', '/', '-'])
+            .collect();
         let [a, b, c] = parts[..] else { return None };
         let (d, m, y) = match style {
             DateStyle::DayMonthYear(_) => (a, b, c),
@@ -160,7 +172,9 @@ impl Date {
     /// Short form for a locale: `05.01.2024` in `tr`, `1/5/2024` in `en-US`, `05/01/2024` in `en-GB`.
     pub fn format(&self, locale: &str) -> String {
         match DateStyle::for_locale(locale) {
-            DateStyle::DayMonthYear(sep) => format!("{:02}{sep}{:02}{sep}{}", self.day, self.month, self.year),
+            DateStyle::DayMonthYear(sep) => {
+                format!("{:02}{sep}{:02}{sep}{}", self.day, self.month, self.year)
+            }
             DateStyle::MonthDayYear => format!("{}/{}/{}", self.month, self.day, self.year),
             DateStyle::Iso => self.to_string(),
         }
@@ -192,20 +206,44 @@ impl DateWords {
     /// year (año), and an English word is dropped when the locale already uses it for something
     /// else. Words in any script work (`завтра`, `明天`, `غدا`); input is compared in lower case.
     pub fn from_i18n(i18n: &crate::i18n::I18n, locale: &str) -> DateWords {
-        const KEYS: [&str; 8] = ["today", "tomorrow", "yesterday", "now", "day", "week", "month", "year"];
+        const KEYS: [&str; 8] = [
+            "today",
+            "tomorrow",
+            "yesterday",
+            "now",
+            "day",
+            "week",
+            "month",
+            "year",
+        ];
         let mut lists: [Vec<String>; 8] = Default::default();
         for l in [locale, "en"] {
             for (i, key) in KEYS.iter().enumerate() {
-                let Some(text) = i18n.lookup(l, &format!("zeyn.date.words.{key}")) else { continue };
-                for w in text.split(',').map(|w| lower(w.trim())).filter(|w| !w.is_empty()) {
-                    if !lists.iter().any(|list| list.contains(&w)) {
+                let Some(text) = i18n.lookup(l, &format!("zeyn.date.words.{key}")) else {
+                    continue;
+                };
+                for w in text
+                    .split(',')
+                    .map(|w| lower(w.trim()))
+                    .filter(|w| !w.is_empty())
+                {
+                    if !lists
+                        .iter()
+                        .any(|list| list.contains(&w))
+                    {
                         lists[i].push(w);
                     }
                 }
             }
         }
         let [today, tomorrow, yesterday, now, day, week, month, year] = lists;
-        DateWords { today, tomorrow, yesterday, now, units: [day, week, month, year] }
+        DateWords {
+            today,
+            tomorrow,
+            yesterday,
+            now,
+            units: [day, week, month, year],
+        }
     }
 
     /// English words only, from the built in catalog.
@@ -223,14 +261,18 @@ impl DateWords {
         if word.is_empty() {
             return Some(0);
         }
-        self.units.iter().position(|list| DateWords::is(list, word))
+        self.units
+            .iter()
+            .position(|list| DateWords::is(list, word))
     }
 }
 
 /// Lower case that keeps Turkish dotted and dotless i apart: `İ` becomes `i`, `I` becomes `ı`
 /// only when the text has other Turkish letters; plain ASCII words stay ASCII.
 fn lower(s: &str) -> String {
-    let turkish = s.chars().any(|c| "çğıöşüÇĞİÖŞÜ".contains(c));
+    let turkish = s
+        .chars()
+        .any(|c| "çğıöşüÇĞİÖŞÜ".contains(c));
     s.chars()
         .flat_map(|c| match c {
             'İ' => vec!['i'],
@@ -249,7 +291,10 @@ fn relative(s: &str) -> Option<(i64, String)> {
         _ => return None,
     };
     let rest = rest.trim_start();
-    let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
+    let digits: String = rest
+        .chars()
+        .take_while(char::is_ascii_digit)
+        .collect();
     if digits.is_empty() || digits.len() > 4 {
         return None;
     }
@@ -322,9 +367,14 @@ impl Date {
                 _ => return None,
             }
         } else {
-            s.split(['.', '/', '-', ' ']).filter(|p| !p.is_empty()).collect()
+            s.split(['.', '/', '-', ' '])
+                .filter(|p| !p.is_empty())
+                .collect()
         };
-        if parts.iter().any(|p| !p.bytes().all(|b| b.is_ascii_digit()) || p.len() > 4) {
+        if parts
+            .iter()
+            .any(|p| !p.bytes().all(|b| b.is_ascii_digit()) || p.len() > 4)
+        {
             return None;
         }
         let num = |p: &str| p.parse::<i64>().ok();
@@ -343,7 +393,11 @@ impl Date {
             (_, [d, m, y]) => (year(y)?, num(m)?, num(d)?),
             _ => return None,
         };
-        Date::new(i32::try_from(y).ok()?, u8::try_from(m).ok()?, u8::try_from(d).ok()?)
+        Date::new(
+            i32::try_from(y).ok()?,
+            u8::try_from(m).ok()?,
+            u8::try_from(d).ok()?,
+        )
     }
 }
 
@@ -358,7 +412,15 @@ pub fn range_presets(today: Date) -> Vec<(&'static str, Date, Date)> {
         ("today", Some(today), Some(today)),
         ("yesterday", today.add_days(-1), today.add_days(-1)),
         ("last_7_days", today.add_days(-6), Some(today)),
-        ("this_month", Some(first), Date::new(today.year, today.month, days_in_month(today.year, today.month))),
+        (
+            "this_month",
+            Some(first),
+            Date::new(
+                today.year,
+                today.month,
+                days_in_month(today.year, today.month),
+            ),
+        ),
         ("last_month", Some(last_month_first), first.add_days(-1)),
         ("this_year", Some(jan), Date::new(today.year, 12, 31)),
     ]
@@ -377,9 +439,14 @@ enum DateStyle {
 impl DateStyle {
     fn for_locale(locale: &str) -> Self {
         let lower = locale.to_ascii_lowercase();
-        let primary = lower.split(['-', '_']).next().unwrap_or("");
+        let primary = lower
+            .split(['-', '_'])
+            .next()
+            .unwrap_or("");
         match primary {
-            "tr" | "de" | "ru" | "pl" | "cs" | "fi" | "nb" | "uk" | "az" => DateStyle::DayMonthYear('.'),
+            "tr" | "de" | "ru" | "pl" | "cs" | "fi" | "nb" | "uk" | "az" => {
+                DateStyle::DayMonthYear('.')
+            }
             "fr" | "es" | "it" | "pt" | "el" | "ar" => DateStyle::DayMonthYear('/'),
             "nl" => DateStyle::DayMonthYear('-'),
             "en" if lower == "en" || lower.ends_with("us") => DateStyle::MonthDayYear,
@@ -404,7 +471,11 @@ pub struct Time {
 
 impl Time {
     pub fn new(hour: u8, minute: u8, second: u8) -> Option<Time> {
-        (hour < 24 && minute < 60 && second < 60).then_some(Time { hour, minute, second })
+        (hour < 24 && minute < 60 && second < 60).then_some(Time {
+            hour,
+            minute,
+            second,
+        })
     }
 
     pub fn hour(&self) -> u8 {
@@ -426,7 +497,11 @@ impl Time {
     /// Reads `14:30` or `14:30:15`.
     pub fn parse(s: &str) -> Option<Time> {
         let parts: Vec<&str> = s.trim().split(':').collect();
-        let num = |p: &str| (p.len() == 2).then(|| p.parse::<u8>().ok()).flatten();
+        let num = |p: &str| {
+            (p.len() == 2)
+                .then(|| p.parse::<u8>().ok())
+                .flatten()
+        };
         match parts[..] {
             [h, m] => Time::new(num(h)?, num(m)?, 0),
             [h, m, s] => Time::new(num(h)?, num(m)?, num(s)?),
@@ -464,13 +539,24 @@ impl Time {
             (_, Some(d)) => (d.to_string(), Some(12)),
             _ => (upper, None),
         };
-        if digits.is_empty() || digits.len() > 4 || !digits.bytes().all(|b| b.is_ascii_digit()) {
+        if digits.is_empty()
+            || digits.len() > 4
+            || !digits
+                .bytes()
+                .all(|b| b.is_ascii_digit())
+        {
             return None;
         }
         let (h, m) = match digits.len() {
             1 | 2 => (digits.parse::<u8>().ok()?, 0),
-            3 => (digits[..1].parse::<u8>().ok()?, digits[1..].parse::<u8>().ok()?),
-            _ => (digits[..2].parse::<u8>().ok()?, digits[2..].parse::<u8>().ok()?),
+            3 => (
+                digits[..1].parse::<u8>().ok()?,
+                digits[1..].parse::<u8>().ok()?,
+            ),
+            _ => (
+                digits[..2].parse::<u8>().ok()?,
+                digits[2..].parse::<u8>().ok()?,
+            ),
         };
         let hour = match half {
             Some(add) if (1..=12).contains(&h) => h % 12 + add,
@@ -513,7 +599,11 @@ impl Time {
 
     /// `14:30` in most locales, `2:30 PM` in `en-US`. Seconds are shown only when not zero.
     pub fn format(&self, locale: &str) -> String {
-        let secs = if self.second > 0 { format!(":{:02}", self.second) } else { String::new() };
+        let secs = if self.second > 0 {
+            format!(":{:02}", self.second)
+        } else {
+            String::new()
+        };
         if uses_12_hour(locale) {
             let h = match self.hour % 12 {
                 0 => 12,
@@ -549,7 +639,10 @@ impl LocalDateTime {
     /// Reads `2024-01-05T14:30` or `2024-01-05T14:30:15` (a space works instead of `T`).
     pub fn parse(s: &str) -> Option<LocalDateTime> {
         let (d, t) = s.trim().split_once(['T', ' '])?;
-        Some(LocalDateTime { date: Date::parse(d)?, time: Time::parse(t)? })
+        Some(LocalDateTime {
+            date: Date::parse(d)?,
+            time: Time::parse(t)?,
+        })
     }
 
     pub fn format(&self, locale: &str) -> String {
@@ -563,13 +656,21 @@ impl LocalDateTime {
             return Some(l);
         }
         let (d, t) = s.trim().split_once(['T', ' '])?;
-        Some(LocalDateTime { date: Date::parse_local(d, locale)?, time: Time::parse_local(t, locale)? })
+        Some(LocalDateTime {
+            date: Date::parse_local(d, locale)?,
+            time: Time::parse_local(t, locale)?,
+        })
     }
 
     /// Reads what a person types into a date and time field: a date as [`Date::parse_input`]
     /// reads it, optionally followed by a time as [`Time::parse_input`] reads it (`yarın 9`,
     /// `+1d 14:30`, `5.1 930`). A date alone means midnight; `now` is the current wall clock.
-    pub fn parse_input(s: &str, locale: &str, now: LocalDateTime, words: &DateWords) -> Option<LocalDateTime> {
+    pub fn parse_input(
+        s: &str,
+        locale: &str,
+        now: LocalDateTime,
+        words: &DateWords,
+    ) -> Option<LocalDateTime> {
         let s = s.trim();
         if let Some(l) = LocalDateTime::parse_local(s, locale) {
             return Some(l);
@@ -578,7 +679,10 @@ impl LocalDateTime {
             return Some(now);
         }
         if let Some(date) = Date::parse_input(s, locale, now.date, words) {
-            return Some(LocalDateTime { date, time: Time::default() });
+            return Some(LocalDateTime {
+                date,
+                time: Time::default(),
+            });
         }
         let (d, t) = s.split_once(['T', ' '])?;
         Some(LocalDateTime {
@@ -622,12 +726,17 @@ impl DateTime {
 
     /// Current moment from the system clock. Prefer `Ctx::now`, which tests can fix.
     pub fn now() -> DateTime {
-        let ms = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0);
+        let ms = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_millis() as i64)
+            .unwrap_or(0);
         DateTime { unix_ms: ms }
     }
 
     pub fn add_ms(&self, ms: i64) -> DateTime {
-        DateTime { unix_ms: self.unix_ms.saturating_add(ms) }
+        DateTime {
+            unix_ms: self.unix_ms.saturating_add(ms),
+        }
     }
 
     /// Wall clock date and time of this moment in a zone.
@@ -637,7 +746,11 @@ impl DateTime {
         let secs = local.rem_euclid(MS_PER_DAY) / 1000;
         LocalDateTime {
             date: Date::from_days_since_epoch(days).unwrap_or_default(),
-            time: Time { hour: (secs / 3600) as u8, minute: (secs / 60 % 60) as u8, second: (secs % 60) as u8 },
+            time: Time {
+                hour: (secs / 3600) as u8,
+                minute: (secs / 60 % 60) as u8,
+                second: (secs % 60) as u8,
+            },
         }
     }
 
@@ -645,20 +758,30 @@ impl DateTime {
     /// happens twice, the earlier moment is used.
     pub fn from_local(local: LocalDateTime, zone: TimeZone) -> Result<DateTime, LocalTimeError> {
         let offset = zone.offset_seconds_of(local)?;
-        Ok(DateTime { unix_ms: local.epoch_ms() - i64::from(offset) * 1000 })
+        Ok(DateTime {
+            unix_ms: local.epoch_ms() - i64::from(offset) * 1000,
+        })
     }
 
     /// Reads RFC 3339: `2024-01-05T11:30:00Z`, `2024-01-05T14:30:00+03:00`, with optional fractions.
     pub fn parse(s: &str) -> Option<DateTime> {
         let s = s.trim();
-        let (body, offset) = if let Some(b) = s.strip_suffix('Z').or_else(|| s.strip_suffix('z')) {
+        let (body, offset) = if let Some(b) = s
+            .strip_suffix('Z')
+            .or_else(|| s.strip_suffix('z'))
+        {
             (b, 0)
         } else {
-            let idx = s.rfind(['+', '-']).filter(|i| *i > 10)?;
+            let idx = s
+                .rfind(['+', '-'])
+                .filter(|i| *i > 10)?;
             let (b, off) = s.split_at(idx);
             let sign = if off.starts_with('-') { -1 } else { 1 };
             let (h, m) = off[1..].split_once(':')?;
-            (b, sign * (h.parse::<i32>().ok()? * 60 + m.parse::<i32>().ok()?))
+            (
+                b,
+                sign * (h.parse::<i32>().ok()? * 60 + m.parse::<i32>().ok()?),
+            )
         };
         let (main, fraction) = match body.split_once('.') {
             Some((m, f)) => (m, f),
@@ -668,12 +791,19 @@ impl DateTime {
         let ms: i64 = if fraction.is_empty() {
             0
         } else {
-            if !fraction.chars().all(|c| c.is_ascii_digit()) {
+            if !fraction
+                .chars()
+                .all(|c| c.is_ascii_digit())
+            {
                 return None;
             }
-            format!("{:0<3}", &fraction[..fraction.len().min(3)]).parse().ok()?
+            format!("{:0<3}", &fraction[..fraction.len().min(3)])
+                .parse()
+                .ok()?
         };
-        Some(DateTime { unix_ms: local.epoch_ms() + ms - i64::from(offset) * 60_000 })
+        Some(DateTime {
+            unix_ms: local.epoch_ms() + ms - i64::from(offset) * 60_000,
+        })
     }
 
     /// Wall clock text in a zone and locale: `05.01.2024 14:30` for `tr`.
@@ -685,7 +815,13 @@ impl DateTime {
 impl fmt::Display for DateTime {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let l = self.local(TimeZone::UTC);
-        write!(f, "{}T{}.{:03}Z", l.date, l.time, self.unix_ms.rem_euclid(1000))
+        write!(
+            f,
+            "{}T{}.{:03}Z",
+            l.date,
+            l.time,
+            self.unix_ms.rem_euclid(1000)
+        )
     }
 }
 
@@ -727,7 +863,9 @@ impl Eq for TimeZone {}
 
 impl fmt::Debug for TimeZone {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("TimeZone").field(&self.name).finish()
+        f.debug_tuple("TimeZone")
+            .field(&self.name)
+            .finish()
     }
 }
 
@@ -795,7 +933,10 @@ const PICKER: &[&str] = &[
 static LOADED: std::sync::Mutex<Vec<TimeZone>> = std::sync::Mutex::new(Vec::new());
 
 impl TimeZone {
-    pub const UTC: TimeZone = TimeZone { name: "UTC", zone: Zone::Fixed(0) };
+    pub const UTC: TimeZone = TimeZone {
+        name: "UTC",
+        zone: Zone::Fixed(0),
+    };
 
     /// A zone by IANA name (`Europe/Istanbul`, any case) or a fixed offset (`UTC+03:00`, `+05:30`).
     pub fn named(name: &str) -> Option<TimeZone> {
@@ -808,36 +949,58 @@ impl TimeZone {
         if name.is_empty() || name.len() > 64 {
             return None;
         }
-        let mut loaded = LOADED.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-        if let Some(z) = loaded.iter().find(|z| z.name.eq_ignore_ascii_case(name)) {
+        let mut loaded = LOADED
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some(z) = loaded
+            .iter()
+            .find(|z| z.name.eq_ignore_ascii_case(name))
+        {
             return Some(*z);
         }
         let tz = jiff::tz::db().get(name).ok()?;
         let canonical = tz.iana_name()?;
-        if let Some(z) = loaded.iter().find(|z| z.name == canonical) {
+        if let Some(z) = loaded
+            .iter()
+            .find(|z| z.name == canonical)
+        {
             return Some(*z);
         }
         let name: &'static str = Box::leak(canonical.into());
-        let zone = TimeZone { name, zone: Zone::Iana(Box::leak(Box::new(tz.clone()))) };
+        let zone = TimeZone {
+            name,
+            zone: Zone::Iana(Box::leak(Box::new(tz.clone()))),
+        };
         loaded.push(zone);
         Some(zone)
     }
 
     fn fixed(name: &str) -> Option<TimeZone> {
-        let offset = name.strip_prefix("UTC").or_else(|| name.strip_prefix("GMT")).unwrap_or(name);
+        let offset = name
+            .strip_prefix("UTC")
+            .or_else(|| name.strip_prefix("GMT"))
+            .unwrap_or(name);
         let sign = match offset.chars().next()? {
             '+' => 1,
             '-' => -1,
             _ => return None,
         };
-        let (h, m) = offset[1..].split_once(':').unwrap_or((&offset[1..], "0"));
+        let (h, m) = offset[1..]
+            .split_once(':')
+            .unwrap_or((&offset[1..], "0"));
         let (h, m): (i32, i32) = (h.parse().ok()?, m.parse().ok()?);
         if h > 14 || m > 59 {
             return None;
         }
         let minutes = sign * (h * 60 + m);
-        let name = FIXED.iter().find(|(_, mins)| *mins == minutes).map(|(n, _)| *n)?;
-        Some(TimeZone { name, zone: Zone::Fixed(minutes) })
+        let name = FIXED
+            .iter()
+            .find(|(_, mins)| *mins == minutes)
+            .map(|(n, _)| *n)?;
+        Some(TimeZone {
+            name,
+            zone: Zone::Fixed(minutes),
+        })
     }
 
     pub fn name(&self) -> &'static str {
@@ -859,15 +1022,22 @@ impl TimeZone {
         match self.zone {
             Zone::Fixed(minutes) => minutes * 60,
             Zone::Iana(tz) => {
-                let ms = at.unix_ms.clamp(jiff::Timestamp::MIN.as_millisecond(), jiff::Timestamp::MAX.as_millisecond());
-                jiff::Timestamp::from_millisecond(ms).map(|t| tz.to_offset(t).seconds()).unwrap_or(0)
+                let ms = at.unix_ms.clamp(
+                    jiff::Timestamp::MIN.as_millisecond(),
+                    jiff::Timestamp::MAX.as_millisecond(),
+                );
+                jiff::Timestamp::from_millisecond(ms)
+                    .map(|t| tz.to_offset(t).seconds())
+                    .unwrap_or(0)
             }
         }
     }
 
     /// Offset in seconds of a wall clock time; the earlier moment's when the time happens twice.
     fn offset_seconds_of(&self, local: LocalDateTime) -> Result<i32, LocalTimeError> {
-        let Zone::Iana(tz) = self.zone else { return Ok(self.offset_seconds_at(DateTime::default())) };
+        let Zone::Iana(tz) = self.zone else {
+            return Ok(self.offset_seconds_at(DateTime::default()));
+        };
         let (d, t) = (local.date, local.time);
         let civil = jiff::civil::DateTime::new(
             d.year as i16,
@@ -879,10 +1049,15 @@ impl TimeZone {
             0,
         )
         .map_err(|_| LocalTimeError::Skipped)?;
-        match tz.to_ambiguous_timestamp(civil).offset() {
+        match tz
+            .to_ambiguous_timestamp(civil)
+            .offset()
+        {
             jiff::tz::AmbiguousOffset::Unambiguous { offset } => Ok(offset.seconds()),
             jiff::tz::AmbiguousOffset::Gap { .. } => Err(LocalTimeError::Skipped),
-            jiff::tz::AmbiguousOffset::Fold { before, after } => Ok(before.seconds().max(after.seconds())),
+            jiff::tz::AmbiguousOffset::Fold { before, after } => {
+                Ok(before.seconds().max(after.seconds()))
+            }
         }
     }
 
@@ -951,7 +1126,8 @@ macro_rules! text_serde {
         impl<'de> Deserialize<'de> for $ty {
             fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
                 let text = String::deserialize(d)?;
-                $parse(&text).ok_or_else(|| serde::de::Error::custom(format!("invalid {}: `{text}`", $what)))
+                $parse(&text)
+                    .ok_or_else(|| serde::de::Error::custom(format!("invalid {}: `{text}`", $what)))
             }
         }
     };
@@ -959,5 +1135,13 @@ macro_rules! text_serde {
 
 text_serde!(Date, Date::parse, "date (expected YYYY-MM-DD)");
 text_serde!(Time, Time::parse, "time (expected HH:MM or HH:MM:SS)");
-text_serde!(LocalDateTime, LocalDateTime::parse, "local date time (expected YYYY-MM-DDTHH:MM:SS)");
-text_serde!(DateTime, DateTime::parse, "date time (expected RFC 3339 such as 2024-01-05T11:30:00Z)");
+text_serde!(
+    LocalDateTime,
+    LocalDateTime::parse,
+    "local date time (expected YYYY-MM-DDTHH:MM:SS)"
+);
+text_serde!(
+    DateTime,
+    DateTime::parse,
+    "date time (expected RFC 3339 such as 2024-01-05T11:30:00Z)"
+);

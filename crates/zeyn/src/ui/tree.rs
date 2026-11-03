@@ -33,11 +33,21 @@ pub struct TreeItem {
 
 impl TreeItem {
     pub fn branch(id: impl Into<String>, label: impl Into<String>) -> Self {
-        Self { id: id.into(), label: label.into(), has_children: true, hint: None }
+        Self {
+            id: id.into(),
+            label: label.into(),
+            has_children: true,
+            hint: None,
+        }
     }
 
     pub fn leaf(id: impl Into<String>, label: impl Into<String>) -> Self {
-        Self { id: id.into(), label: label.into(), has_children: false, hint: None }
+        Self {
+            id: id.into(),
+            label: label.into(),
+            has_children: false,
+            hint: None,
+        }
     }
 
     pub fn hint(mut self, hint: impl Into<String>) -> Self {
@@ -63,7 +73,11 @@ impl Tree {
     where
         A: Action<Input = TreeQuery, Output = Result<Vec<TreeItem>>>,
     {
-        Self { label: Text::from(""), source: Box::new(ActionSource::<A>::new()), action: A::META }
+        Self {
+            label: Text::from(""),
+            source: Box::new(ActionSource::<A>::new()),
+            action: A::META,
+        }
     }
 
     /// The tree's accessible name.
@@ -94,6 +108,7 @@ impl Component for Tree {
     }
 
     fn source(&self, key: &str) -> Option<&dyn DataSource> {
-        key.is_empty().then_some(self.source.as_ref())
+        key.is_empty()
+            .then_some(self.source.as_ref())
     }
 }

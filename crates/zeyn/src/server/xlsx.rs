@@ -29,13 +29,20 @@ impl XlsxSink {
                 let mut sheet = XlsxSheet::new(&columns, &locale).map_err(|e| e.to_string())?;
                 loop {
                     match rx.blocking_recv() {
-                        Some(Ok(page)) => sheet.write_rows(&page).map_err(|e| e.to_string())?,
+                        Some(Ok(page)) => sheet
+                            .write_rows(&page)
+                            .map_err(|e| e.to_string())?,
                         Some(Err(())) => return Err("export failed".to_string()),
                         None => break,
                     }
                 }
-                let mut w = ChannelWriter { out: out.clone(), buf: Vec::with_capacity(CHUNK) };
-                sheet.finish(&mut w).map_err(|e| e.to_string())?;
+                let mut w = ChannelWriter {
+                    out: out.clone(),
+                    buf: Vec::with_capacity(CHUNK),
+                };
+                sheet
+                    .finish(&mut w)
+                    .map_err(|e| e.to_string())?;
                 w.flush().map_err(|e| e.to_string())
             })();
             if result.is_err() {
@@ -58,7 +65,9 @@ impl XlsxSink {
             let _ = self.rows.send(Err(())).await;
         }
         drop(self.rows);
-        self.done.await.map_err(|e| e.to_string())?
+        self.done
+            .await
+            .map_err(|e| e.to_string())?
     }
 }
 
@@ -82,6 +91,8 @@ impl Write for ChannelWriter {
             return Ok(());
         }
         let chunk = Bytes::from(std::mem::replace(&mut self.buf, Vec::with_capacity(CHUNK)));
-        self.out.blocking_send(Ok(chunk)).map_err(|_| std::io::Error::other("the download was closed"))
+        self.out
+            .blocking_send(Ok(chunk))
+            .map_err(|_| std::io::Error::other("the download was closed"))
     }
 }

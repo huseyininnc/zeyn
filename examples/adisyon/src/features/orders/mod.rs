@@ -12,5 +12,8 @@ pub fn feature() -> Feature {
         .screen(screens::order)
         .screen(screens::payment)
         .api(actions::find_tables)
-        .menu(|m| m.group(t!("orders.menu"), Icon::Table).item(t!("floor.title"), screens::floor))
+        .menu(|m| {
+            m.group(t!("orders.menu"), Icon::Table)
+                .item(t!("floor.title"), screens::floor)
+        })
 }

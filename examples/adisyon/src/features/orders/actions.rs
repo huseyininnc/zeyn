@@ -29,13 +29,21 @@ pub async fn remove_line(id: OrderLineId, restaurant: Restaurant) -> Result<()> 
 
 /// Sends new lines to the kitchen and takes their portions out of stock.
 #[action(permission = "pos.order", audit)]
-pub async fn send_to_kitchen(table: DiningTableId, restaurant: Restaurant, ctx: Ctx) -> Result<i64> {
+pub async fn send_to_kitchen(
+    table: DiningTableId,
+    restaurant: Restaurant,
+    ctx: Ctx,
+) -> Result<i64> {
     restaurant.send(table, ctx.now())
 }
 
 /// Closes the bill and frees the table. Returns the change.
 #[action(permission = "pos.cashier", audit)]
-pub async fn take_payment(payment: Valid<Payment>, restaurant: Restaurant, ctx: Ctx) -> Result<Money> {
+pub async fn take_payment(
+    payment: Valid<Payment>,
+    restaurant: Restaurant,
+    ctx: Ctx,
+) -> Result<Money> {
     let p = payment.into_inner();
     restaurant.pay(p.table, p.method, p.received, ctx.now(), ctx.locale())
 }

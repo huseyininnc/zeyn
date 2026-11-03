@@ -11,7 +11,8 @@
 use super::{AppState, Chunks, Failure, Tool, ToolTarget, asset};
 use crate::action::{Error, Filter, MAX_FILTERS};
 use crate::assistant::{
-    Assistant, Audio, ChatEvent, ChatKey, ChatMessage, ChatRequest, Role, ToolCall, ToolSpec, chat, clip,
+    Assistant, Audio, ChatEvent, ChatKey, ChatMessage, ChatRequest, Role, ToolCall, ToolSpec, chat,
+    clip,
 };
 use crate::ctx::Ctx;
 use crate::i18n::Text;
@@ -43,8 +44,14 @@ const SUGGESTION_CHARS: usize = 120;
 
 pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
     router
-        .route("/_zeyn/assistant.js", get(|| async { asset(JS, "text/javascript; charset=utf-8") }))
-        .route("/_zeyn/assistant.css", get(|| async { asset(CSS, "text/css; charset=utf-8") }))
+        .route(
+            "/_zeyn/assistant.js",
+            get(|| async { asset(JS, "text/javascript; charset=utf-8") }),
+        )
+        .route(
+            "/_zeyn/assistant.css",
+            get(|| async { asset(CSS, "text/css; charset=utf-8") }),
+        )
         .route("/_zeyn/assistant/start", get(start))
         .route("/_zeyn/assistant/chat", post(chat_call))
         .route("/_zeyn/assistant/confirm", post(confirm_call))
@@ -59,8 +66,11 @@ pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
 /// The assistant, when the user may use it.
 fn usable<'a>(st: &'a AppState, ctx: &Ctx) -> Option<&'a Assistant> {
     let a = st.assistant.as_deref()?;
-    let user_ok =
-        ctx.identity().is_signed_in() && a.permission.is_none_or(|p| ctx.identity().can(&crate::Access::Permission(p)));
+    let user_ok = ctx.identity().is_signed_in()
+        && a.permission.is_none_or(|p| {
+            ctx.identity()
+                .can(&crate::Access::Permission(p))
+        });
     user_ok.then_some(a)
 }
 
@@ -85,12 +95,31 @@ pub(super) fn launcher(st: &AppState, ctx: &Ctx, r: &Render) -> String {
 
 /// The assistant and the user's conversation key, or why not.
 fn allowed<'a>(st: &'a AppState, ctx: &Ctx) -> Result<(&'a Assistant, ChatKey), Failure> {
-    let a = st.assistant.as_deref().ok_or(Failure::App(Error::NotFound))?;
-    let user = ctx.identity().user.clone().ok_or(Failure::App(Error::Forbidden))?;
-    if a.permission.is_some_and(|p| !ctx.identity().can(&crate::Access::Permission(p))) {
+    let a = st
+        .assistant
+        .as_deref()
+        .ok_or(Failure::App(Error::NotFound))?;
+    let user = ctx
+        .identity()
+        .user
+        .clone()
+        .ok_or(Failure::App(Error::Forbidden))?;
+    if a.permission.is_some_and(|p| {
+        !ctx.identity()
+            .can(&crate::Access::Permission(p))
+    }) {
         return Err(Failure::App(Error::Forbidden));
     }
-    Ok((a, ChatKey { tenant: ctx.tenant().map(|t| t.id().to_string()).unwrap_or_default(), user }))
+    Ok((
+        a,
+        ChatKey {
+            tenant: ctx
+                .tenant()
+                .map(|t| t.id().to_string())
+                .unwrap_or_default(),
+            user,
+        },
+    ))
 }
 
 fn rate_key(key: &ChatKey) -> String {
@@ -98,14 +127,25 @@ fn rate_key(key: &ChatKey) -> String {
 }
 
 fn rate_limited() -> Failure {
-    Failure::Status(StatusCode::TOO_MANY_REQUESTS, "rate_limited", Text::key("zeyn.error.rate_limited"))
+    Failure::Status(
+        StatusCode::TOO_MANY_REQUESTS,
+        "rate_limited",
+        Text::key("zeyn.error.rate_limited"),
+    )
 }
 
 /// CSRF, the assistant, the user and the assistant's rate limit, for every `POST`.
-async fn checked<'a>(st: &'a AppState, ctx: &Ctx, headers: &HeaderMap) -> Result<(&'a Assistant, ChatKey), Failure> {
+async fn checked<'a>(
+    st: &'a AppState,
+    ctx: &Ctx,
+    headers: &HeaderMap,
+) -> Result<(&'a Assistant, ChatKey), Failure> {
     st.check_csrf(headers)?;
     let (a, key) = allowed(st, ctx)?;
-    st.rate_store.take(&rate_key(&key), &a.rate).await.map_err(|_| rate_limited())?;
+    st.rate_store
+        .take(&rate_key(&key), &a.rate)
+        .await
+        .map_err(|_| rate_limited())?;
     Ok((a, key))
 }
 
@@ -131,7 +171,11 @@ struct StartQuery {
 
 /// What the chat shows when it opens: the visible history, a pending confirmation, starter
 /// prompts for the screen and how speech works.
-async fn start(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Query<StartQuery>) -> Response {
+async fn start(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(q): Query<StartQuery>,
+) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     let result = async {
         let (a, key) = allowed(&st, &ctx)?;
@@ -143,11 +187,10 @@ async fn start(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Qu
             .collect();
         let agent = ctx.as_agent();
         let mut pending = Json::Null;
-        if let Some(call) = pending_calls(&history).into_iter().next() {
-            if let Ok(tool) = st.find_tool(&agent, &call.name, a.writes).await {
+        if let Some(call) = pending_calls(&history).into_iter().next()
+            && let Ok(tool) = st.find_tool(&agent, &call.name, a.writes).await {
                 pending = card(&agent, &tool, &call);
             }
-        }
         let suggestions: Vec<String> =
             a.suggestions.iter().filter(|(s, _)| s.is_empty() || *s == q.screen).map(|(_, t)| ctx.t(t)).collect();
         let speech = |server: bool| {
@@ -208,11 +251,21 @@ async fn chat_call(
     let text = call.message.trim();
     if text.is_empty() || text.chars().count() > a.limits.message_chars {
         let mut errors = crate::model::ValidationErrors::default();
-        errors.add_general(ctx.t(&Text::key("zeyn.assistant.too_long").arg("max", a.limits.message_chars.to_string())));
+        errors.add_general(ctx.t(
+            &Text::key("zeyn.assistant.too_long").arg("max", a.limits.message_chars.to_string()),
+        ));
         return st.error_response(&ctx, Failure::App(Error::Validation(errors)));
     }
     let screen: String = call.screen.chars().take(100).collect();
-    stream(st.clone(), ctx, key, Start::Message { text: text.to_string(), screen })
+    stream(
+        st.clone(),
+        ctx,
+        key,
+        Start::Message {
+            text: text.to_string(),
+            screen,
+        },
+    )
 }
 
 async fn confirm_call(
@@ -228,7 +281,15 @@ async fn confirm_call(
     if call.id.len() > 200 {
         return st.error_response(&ctx, Failure::App(Error::NotFound));
     }
-    stream(st.clone(), ctx, key, Start::Confirm { id: call.id, approve: call.approve })
+    stream(
+        st.clone(),
+        ctx,
+        key,
+        Start::Confirm {
+            id: call.id,
+            approve: call.approve,
+        },
+    )
 }
 
 async fn clear_call(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
@@ -249,7 +310,10 @@ async fn stt_call(State(st): State<Arc<AppState>>, headers: HeaderMap, body: Byt
     let ctx = st.licensed(st.ctx(&headers)).await;
     let result = async {
         let (a, _) = checked(&st, &ctx, &headers).await?;
-        let stt = a.stt.clone().ok_or(Failure::App(Error::NotFound))?;
+        let stt = a
+            .stt
+            .clone()
+            .ok_or(Failure::App(Error::NotFound))?;
         if body.is_empty() || body.len() > a.limits.audio_bytes {
             return Err(Failure::Status(
                 StatusCode::PAYLOAD_TOO_LARGE,
@@ -257,11 +321,17 @@ async fn stt_call(State(st): State<Arc<AppState>>, headers: HeaderMap, body: Byt
                 Text::key("zeyn.assistant.audio_too_large"),
             ));
         }
-        let mime = headers.get(header::CONTENT_TYPE).and_then(|v| v.to_str().ok()).unwrap_or("").to_string();
+        let mime = headers
+            .get(header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .to_string();
         if !mime.starts_with("audio/") || mime.len() > 100 {
             return Err(Failure::App(Error::NotFound));
         }
-        let text = st.timed(stt.transcribe(Audio { bytes: body, mime }, ctx.locale().to_string())).await?;
+        let text = st
+            .timed(stt.transcribe(Audio { bytes: body, mime }, ctx.locale().to_string()))
+            .await?;
         Ok(clip(&text, a.limits.message_chars).to_string())
     }
     .await;
@@ -285,12 +355,16 @@ async fn tts_call(
     let ctx = st.licensed(st.ctx(&headers)).await;
     let result = async {
         let (a, _) = checked(&st, &ctx, &headers).await?;
-        let tts = a.tts.clone().ok_or(Failure::App(Error::NotFound))?;
+        let tts = a
+            .tts
+            .clone()
+            .ok_or(Failure::App(Error::NotFound))?;
         let text = clip(call.text.trim(), a.limits.speech_chars).to_string();
         if text.is_empty() {
             return Err(Failure::App(Error::NotFound));
         }
-        st.timed(tts.speak(text, ctx.locale().to_string())).await
+        st.timed(tts.speak(text, ctx.locale().to_string()))
+            .await
     }
     .await;
     let speech = match result {
@@ -326,7 +400,10 @@ impl Out {
     async fn send(&self, event: Json) -> bool {
         let mut line = event.to_string();
         line.push('\n');
-        self.0.send(Ok(Bytes::from(line))).await.is_ok()
+        self.0
+            .send(Ok(Bytes::from(line)))
+            .await
+            .is_ok()
     }
 }
 
@@ -337,13 +414,17 @@ fn stream(st: Arc<AppState>, ctx: Ctx, key: ChatKey, start: Start) -> Response {
         let out = Out(tx);
         let agent = ctx.as_agent();
         if let Err(f) = converse(&st, &agent, &key, start, &out).await {
-            out.send(json!({ "t": "error", "message": failure_text(&ctx, &f) })).await;
+            out.send(json!({ "t": "error", "message": failure_text(&ctx, &f) }))
+                .await;
         }
         out.send(json!({ "t": "done" })).await;
     });
     let mut r = axum::body::Body::from_stream(Chunks(rx)).into_response();
     let h = r.headers_mut();
-    h.insert(header::CONTENT_TYPE, HeaderValue::from_static("application/x-ndjson; charset=utf-8"));
+    h.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/x-ndjson; charset=utf-8"),
+    );
     h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     h.insert("x-accel-buffering", HeaderValue::from_static("no"));
     r
@@ -351,23 +432,50 @@ fn stream(st: Arc<AppState>, ctx: Ctx, key: ChatKey, start: Start) -> Response {
 
 /// Calls of the last assistant message that have no result yet.
 fn pending_calls(history: &[ChatMessage]) -> Vec<ToolCall> {
-    let Some(i) = history.iter().rposition(|m| m.role == Role::Assistant) else { return Vec::new() };
-    let answered: Vec<&str> = history[i + 1..].iter().filter_map(|m| m.tool_call_id.as_deref()).collect();
-    history[i].tool_calls.iter().filter(|c| !answered.contains(&c.id.as_str())).cloned().collect()
+    let Some(i) = history
+        .iter()
+        .rposition(|m| m.role == Role::Assistant)
+    else {
+        return Vec::new();
+    };
+    let answered: Vec<&str> = history[i + 1..]
+        .iter()
+        .filter_map(|m| m.tool_call_id.as_deref())
+        .collect();
+    history[i]
+        .tool_calls
+        .iter()
+        .filter(|c| !answered.contains(&c.id.as_str()))
+        .cloned()
+        .collect()
 }
 
 /// The messages sent to the model: whole turns, starting at a user message, at most `max` of them
 /// up to the latest user message plus everything after it. The start depends only on messages
 /// before the latest user message, so it stays put while a turn goes on.
 fn window(history: &[ChatMessage], max: usize) -> &[ChatMessage] {
-    let Some(last) = history.iter().rposition(|m| m.role == Role::User) else { return &[] };
-    let start = (0..=last).filter(|&i| history[i].role == Role::User && last - i < max.max(1)).min().unwrap_or(last);
+    let Some(last) = history
+        .iter()
+        .rposition(|m| m.role == Role::User)
+    else {
+        return &[];
+    };
+    let start = (0..=last)
+        .filter(|&i| history[i].role == Role::User && last - i < max.max(1))
+        .min()
+        .unwrap_or(last);
     &history[start..]
 }
 
 /// The confirmation card for a call that waits for the user.
 fn card(ctx: &Ctx, tool: &Tool, call: &ToolCall) -> Json {
-    let title = tool.description.split(". ").next().unwrap_or(&tool.description).trim_end_matches('.').to_string();
+    let title = tool
+        .description
+        .split(". ")
+        .next()
+        .unwrap_or(&tool.description)
+        .trim_end_matches('.')
+        .to_string();
     let details: Vec<Json> = match &call.arguments {
         Json::Object(o) => o
             .iter()
@@ -399,7 +507,9 @@ fn html_text(html: &str) -> String {
     let mut first_cell = true;
     while let Some(lt) = rest.find('<') {
         out.push_str(&decode(&rest[..lt]));
-        let Some(gt) = rest[lt..].find('>') else { break };
+        let Some(gt) = rest[lt..].find('>') else {
+            break;
+        };
         let tag = &rest[lt + 1..lt + gt];
         let name: String = tag
             .trim_start_matches('/')
@@ -427,7 +537,14 @@ fn html_text(html: &str) -> String {
     out.push_str(&decode(rest));
     out.lines()
         .map(|l| {
-            l.split('\t').map(|c| c.split_whitespace().collect::<Vec<_>>().join(" ")).collect::<Vec<_>>().join("\t")
+            l.split('\t')
+                .map(|c| {
+                    c.split_whitespace()
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                })
+                .collect::<Vec<_>>()
+                .join("\t")
         })
         .filter(|l| !l.trim().is_empty())
         .collect::<Vec<_>>()
@@ -457,12 +574,22 @@ fn result_text(ctx: &Ctx, tool: &Tool, result: Result<Json, Failure>, limit: usi
                     .map(html_text)
                     .unwrap_or_default();
                 let rows = html_text(v["rows"].as_str().unwrap_or(""));
-                let total = v["total"].as_u64().map(|t| format!(" of {t}")).unwrap_or_default();
-                format!("{} rows{total}.\n{head}\n{rows}", v["count"].as_u64().unwrap_or(0))
+                let total = v["total"]
+                    .as_u64()
+                    .map(|t| format!(" of {t}"))
+                    .unwrap_or_default();
+                format!(
+                    "{} rows{total}.\n{head}\n{rows}",
+                    v["count"].as_u64().unwrap_or(0)
+                )
             }
             ToolTarget::Form { .. } => {
-                let notes: Vec<&str> =
-                    v["effects"].as_array().into_iter().flatten().filter_map(|e| e["message"].as_str()).collect();
+                let notes: Vec<&str> = v["effects"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|e| e["message"].as_str())
+                    .collect();
                 format!("Saved. {}", notes.join(" "))
             }
             ToolTarget::Api { .. } => v.to_string(),
@@ -472,7 +599,9 @@ fn result_text(ctx: &Ctx, tool: &Tool, result: Result<Json, Failure>, limit: usi
     format!(
         "<tool_result name=\"{}\">\n{}\n</tool_result>",
         escape(&tool.name),
-        clip(&body, limit).replace('<', "&lt;").replace('>', "&gt;")
+        clip(&body, limit)
+            .replace('<', "&lt;")
+            .replace('>', "&gt;")
     )
 }
 
@@ -488,7 +617,10 @@ fn screens_for(st: &AppState, ctx: &Ctx) -> Vec<(&'static str, String, String)> 
             if !s.meta.ai.offered || !ctx.identity().can(&s.meta.access) {
                 continue;
             }
-            let Some(path) = f.path_of(&s.meta).filter(|p| !crate::screen::route_has_segments(Some(p))) else {
+            let Some(path) = f
+                .path_of(&s.meta)
+                .filter(|p| !crate::screen::route_has_segments(Some(p)))
+            else {
                 continue;
             };
             let label = f
@@ -511,7 +643,13 @@ fn builtin_specs(screens: &[(&'static str, String, String)]) -> Vec<ToolSpec> {
     if !screens.is_empty() {
         let list: Vec<String> = screens
             .iter()
-            .map(|(n, _, l)| if l.is_empty() { (*n).to_string() } else { format!("{n} ({l})") })
+            .map(|(n, _, l)| {
+                if l.is_empty() {
+                    (*n).to_string()
+                } else {
+                    format!("{n} ({l})")
+                }
+            })
             .collect();
         out.push(ToolSpec {
             name: "navigate".into(),
@@ -565,38 +703,65 @@ fn system_prompt(st: &AppState, a: &Assistant, ctx: &Ctx, screen: &str) -> Strin
         s.push_str("\n\nAbout this app (from its developers):\n");
         s.push_str(a.instructions.trim());
     }
-    if let Some((_, entry)) = st.screens.get(screen) {
-        if entry.meta.ai.offered && ctx.identity().can(&entry.meta.access) {
-            s.push_str(&format!("\n\nThe user has the screen `{}` open.", entry.meta.name));
-        }
+    if let Some((_, entry)) = st.screens.get(screen)
+        && entry.meta.ai.offered
+        && ctx.identity().can(&entry.meta.access)
+    {
+        s.push_str(&format!(
+            "\n\nThe user has the screen `{}` open.",
+            entry.meta.name
+        ));
     }
     s
 }
 
 /// Checks a `navigate` call and returns the event for the browser and the result for the model.
-fn navigate(st: &AppState, screens: &[(&'static str, String, String)], args: &Json) -> Result<(Json, String), String> {
+fn navigate(
+    st: &AppState,
+    screens: &[(&'static str, String, String)],
+    args: &Json,
+) -> Result<(Json, String), String> {
     let name = args["screen"].as_str().unwrap_or("");
     let (_, path, _) = screens
         .iter()
         .find(|(n, _, _)| *n == name)
         .ok_or_else(|| format!("There is no screen `{}` the user may open.", clip(name, 60)))?;
-    let mut filters: Vec<Filter> = serde_json::from_value(args["filters"].clone()).unwrap_or_default();
+    let mut filters: Vec<Filter> =
+        serde_json::from_value(args["filters"].clone()).unwrap_or_default();
     filters.retain(|f| !f.is_empty() && f.field.len() <= 64);
     filters.truncate(MAX_FILTERS);
     let note = format!(
         "Opened `{name}` for the user{}.",
-        if filters.is_empty() { String::new() } else { format!(" with {} filter(s)", filters.len()) }
+        if filters.is_empty() {
+            String::new()
+        } else {
+            format!(" with {} filter(s)", filters.len())
+        }
     );
-    Ok((json!({ "t": "navigate", "url": st.url(path), "screen": name, "filters": filters }), note))
+    Ok((
+        json!({ "t": "navigate", "url": st.url(path), "screen": name, "filters": filters }),
+        note,
+    ))
 }
 
 /// One conversation step: the user's message (or answer to a confirmation), then model rounds
 /// until the model answers without tools, a call waits for confirmation, or a limit is reached.
-async fn converse(st: &AppState, ctx: &Ctx, key: &ChatKey, start: Start, out: &Out) -> Result<(), Failure> {
-    let a = st.assistant.as_deref().ok_or(Failure::App(Error::NotFound))?;
+async fn converse(
+    st: &AppState,
+    ctx: &Ctx,
+    key: &ChatKey,
+    start: Start,
+    out: &Out,
+) -> Result<(), Failure> {
+    let a = st
+        .assistant
+        .as_deref()
+        .ok_or(Failure::App(Error::NotFound))?;
     let limits = a.limits;
     let load = limits.history + limits.rounds * (MAX_CALLS + 1) + 2;
-    let mut history = st.timed(a.store.load(key, load)).await?;
+    let mut history = st
+        .timed(a.store.load(key, load))
+        .await?;
     let mut screen = String::new();
     let tools = st.agent_tools(ctx, a.writes).await;
     let screens = screens_for(st, ctx);
@@ -607,38 +772,61 @@ async fn converse(st: &AppState, ctx: &Ctx, key: &ChatKey, start: Start, out: &O
                 .map(|c| ChatMessage::tool(c.id, "Not run: the user wrote a new message instead."))
                 .collect();
             added.push(ChatMessage::user(text));
-            st.timed(a.store.append(key, added.clone())).await?;
+            st.timed(a.store.append(key, added.clone()))
+                .await?;
             history.extend(added);
             screen = s;
         }
         Start::Confirm { id, approve } => {
-            let call = pending_calls(&history).into_iter().find(|c| c.id == id).ok_or(Failure::App(Error::NotFound))?;
-            let tool = tools.iter().find(|t| t.name == call.name).ok_or(Failure::App(Error::NotFound))?;
+            let call = pending_calls(&history)
+                .into_iter()
+                .find(|c| c.id == id)
+                .ok_or(Failure::App(Error::NotFound))?;
+            let tool = tools
+                .iter()
+                .find(|t| t.name == call.name)
+                .ok_or(Failure::App(Error::NotFound))?;
             let text = if approve {
-                out.send(json!({ "t": "tool", "name": tool.name, "id": id })).await;
-                let r = st.run_tool(ctx, tool, call.arguments.clone(), true).await;
+                out.send(json!({ "t": "tool", "name": tool.name, "id": id }))
+                    .await;
+                let r = st
+                    .run_tool(ctx, tool, call.arguments.clone(), true)
+                    .await;
                 result_text(ctx, tool, r, limits.tool_result_chars)
             } else {
                 "The user declined this action. It did not run.".to_string()
             };
-            out.send(json!({ "t": "resolved", "id": id, "approved": approve })).await;
+            out.send(json!({ "t": "resolved", "id": id, "approved": approve }))
+                .await;
             let m = ChatMessage::tool(call.id, text);
-            st.timed(a.store.append(key, vec![m.clone()])).await?;
+            st.timed(a.store.append(key, vec![m.clone()]))
+                .await?;
             history.push(m);
         }
     }
     let mut specs: Vec<ToolSpec> = tools
         .iter()
-        .map(|t| ToolSpec { name: t.name.clone(), description: t.description.clone(), schema: t.schema.clone() })
+        .map(|t| ToolSpec {
+            name: t.name.clone(),
+            description: t.description.clone(),
+            schema: t.schema.clone(),
+        })
         .collect();
     specs.extend(builtin_specs(&screens));
     let system = system_prompt(st, a, ctx, &screen);
     let budget = rate_key(key) + ":tokens";
     for _ in 0..limits.rounds {
         if let Some(limit) = &a.tokens {
-            st.rate_store.charge(&budget, limit, 0).await.map_err(|_| {
-                Failure::Status(StatusCode::TOO_MANY_REQUESTS, "token_limit", Text::key("zeyn.assistant.token_limit"))
-            })?;
+            st.rate_store
+                .charge(&budget, limit, 0)
+                .await
+                .map_err(|_| {
+                    Failure::Status(
+                        StatusCode::TOO_MANY_REQUESTS,
+                        "token_limit",
+                        Text::key("zeyn.assistant.token_limit"),
+                    )
+                })?;
         }
         let request = ChatRequest {
             system: system.clone(),
@@ -655,7 +843,9 @@ async fn converse(st: &AppState, ctx: &Ctx, key: &ChatKey, start: Start, out: &O
         let mut raw = None;
         let mut gone = false;
         loop {
-            let next = tokio::time::timeout(limits.idle, events.recv()).await.map_err(|_| Failure::Timeout)?;
+            let next = tokio::time::timeout(limits.idle, events.recv())
+                .await
+                .map_err(|_| Failure::Timeout)?;
             match next {
                 None => break,
                 Some(Err(e)) => return Err(Failure::App(e)),
@@ -664,7 +854,10 @@ async fn converse(st: &AppState, ctx: &Ctx, key: &ChatKey, start: Start, out: &O
                         continue;
                     }
                     text.push_str(&t);
-                    if !out.send(json!({ "t": "text", "v": t })).await {
+                    if !out
+                        .send(json!({ "t": "text", "v": t }))
+                        .await
+                    {
                         gone = true;
                         break;
                     }
@@ -673,7 +866,10 @@ async fn converse(st: &AppState, ctx: &Ctx, key: &ChatKey, start: Start, out: &O
                 Some(Ok(ChatEvent::ToolCall(_))) => {}
                 Some(Ok(ChatEvent::Usage { input, output })) => {
                     if let Some(limit) = &a.tokens {
-                        let _ = st.rate_store.charge(&budget, limit, input.saturating_add(output)).await;
+                        let _ = st
+                            .rate_store
+                            .charge(&budget, limit, input.saturating_add(output))
+                            .await;
                     }
                 }
                 Some(Ok(ChatEvent::Raw(r))) => raw = Some(r),
@@ -682,12 +878,17 @@ async fn converse(st: &AppState, ctx: &Ctx, key: &ChatKey, start: Start, out: &O
         drop(events);
         let mut message = ChatMessage::assistant(text);
         if gone {
-            st.timed(a.store.append(key, vec![message])).await?;
+            st.timed(a.store.append(key, vec![message]))
+                .await?;
             return Ok(());
         }
         message.tool_calls = calls.clone();
         message.raw = raw;
-        st.timed(a.store.append(key, vec![message.clone()])).await?;
+        st.timed(
+            a.store
+                .append(key, vec![message.clone()]),
+        )
+        .await?;
         history.push(message);
         if calls.is_empty() {
             return Ok(());
@@ -697,7 +898,10 @@ async fn converse(st: &AppState, ctx: &Ctx, key: &ChatKey, start: Start, out: &O
         let mut only_suggest = true;
         for c in calls {
             if waiting {
-                results.push(ChatMessage::tool(c.id, "Not run: an earlier action waits for the user's confirmation."));
+                results.push(ChatMessage::tool(
+                    c.id,
+                    "Not run: an earlier action waits for the user's confirmation.",
+                ));
                 continue;
             }
             match c.name.as_str() {
@@ -711,7 +915,8 @@ async fn converse(st: &AppState, ctx: &Ctx, key: &ChatKey, start: Start, out: &O
                         .filter(|s| !s.is_empty())
                         .take(MAX_SUGGESTIONS)
                         .collect();
-                    out.send(json!({ "t": "suggest", "v": items })).await;
+                    out.send(json!({ "t": "suggest", "v": items }))
+                        .await;
                     results.push(ChatMessage::tool(c.id, "Shown."));
                 }
                 "navigate" => {
@@ -730,30 +935,44 @@ async fn converse(st: &AppState, ctx: &Ctx, key: &ChatKey, start: Start, out: &O
                     match tools.iter().find(|t| t.name == name) {
                         None => results.push(ChatMessage::tool(
                             c.id,
-                            format!("Error: there is no tool `{}` for this user.", clip(name, 80)),
+                            format!(
+                                "Error: there is no tool `{}` for this user.",
+                                clip(name, 80)
+                            ),
                         )),
                         Some(tool) if tool.writes || tool.confirm => {
                             out.send(card(ctx, tool, &c)).await;
                             waiting = true;
                         }
                         Some(tool) => {
-                            out.send(json!({ "t": "tool", "name": tool.name, "id": c.id })).await;
-                            let r = st.run_tool(ctx, tool, c.arguments.clone(), false).await;
-                            results.push(ChatMessage::tool(c.id, result_text(ctx, tool, r, limits.tool_result_chars)));
+                            out.send(json!({ "t": "tool", "name": tool.name, "id": c.id }))
+                                .await;
+                            let r = st
+                                .run_tool(ctx, tool, c.arguments.clone(), false)
+                                .await;
+                            results.push(ChatMessage::tool(
+                                c.id,
+                                result_text(ctx, tool, r, limits.tool_result_chars),
+                            ));
                         }
                     }
                 }
             }
         }
         if !results.is_empty() {
-            st.timed(a.store.append(key, results.clone())).await?;
+            st.timed(a.store.append(key, results.clone()))
+                .await?;
             history.extend(results);
         }
         if waiting || only_suggest {
             return Ok(());
         }
     }
-    Err(Failure::Status(StatusCode::OK, "too_many_steps", Text::key("zeyn.assistant.too_many_steps")))
+    Err(Failure::Status(
+        StatusCode::OK,
+        "too_many_steps",
+        Text::key("zeyn.assistant.too_many_steps"),
+    ))
 }
 
 #[cfg(test)]

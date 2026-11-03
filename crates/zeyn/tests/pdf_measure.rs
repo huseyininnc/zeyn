@@ -30,14 +30,23 @@ unsafe impl GlobalAlloc for Counting {
 #[global_allocator]
 static A: Counting = Counting;
 
-const NOTE: PdfTemplate = PdfTemplate::new("note", "#set text(font: \"Libertinus Serif\")\n= #data.title\n#data.body");
+const NOTE: PdfTemplate = PdfTemplate::new(
+    "note",
+    "#set text(font: \"Libertinus Serif\")\n= #data.title\n#data.body",
+);
 
 /// Renders once and returns (peak heap above the start, heap kept afterwards, milliseconds, size).
-fn measure(pdf: &Pdf, template: PdfTemplate, data: &serde_json::Value) -> (usize, isize, u128, usize) {
+fn measure(
+    pdf: &Pdf,
+    template: PdfTemplate,
+    data: &serde_json::Value,
+) -> (usize, isize, u128, usize) {
     let base = LIVE.load(Ordering::Relaxed);
     PEAK.store(base, Ordering::Relaxed);
     let started = std::time::Instant::now();
-    let bytes = pdf.render_now(template, serde_json::to_vec(data).unwrap()).unwrap();
+    let bytes = pdf
+        .render_now(template, serde_json::to_vec(data).unwrap())
+        .unwrap();
     let ms = started.elapsed().as_millis();
     let size = bytes.len();
     drop(bytes);
@@ -50,7 +59,10 @@ fn measure(pdf: &Pdf, template: PdfTemplate, data: &serde_json::Value) -> (usize
 fn rendering_cost_is_bounded_and_does_not_leak() {
     let base = LIVE.load(Ordering::Relaxed);
     let pdf = Pdf::new();
-    eprintln!("fonts loaded: {} KiB of heap", (LIVE.load(Ordering::Relaxed) - base) / 1024);
+    eprintln!(
+        "fonts loaded: {} KiB of heap",
+        (LIVE.load(Ordering::Relaxed) - base) / 1024
+    );
     let mut kept = Vec::new();
     for round in 0..4 {
         let note = serde_json::json!({ "title": format!("Note {round}"), "body": "Short text with Turkish letters: çğıöşü İ." });
@@ -69,12 +81,23 @@ fn rendering_cost_is_bounded_and_does_not_leak() {
             "columns": [{ "label": "No", "numeric": false }, { "label": "Customer", "numeric": false }, { "label": "City", "numeric": false }, { "label": "Total", "numeric": true }],
         });
         let (peak, k, ms, size) = measure(&pdf, NOTE, &note);
-        eprintln!("note   round {round}: peak {} KiB, kept {} KiB, {ms} ms, {size} bytes", peak / 1024, k / 1024);
+        eprintln!(
+            "note   round {round}: peak {} KiB, kept {} KiB, {ms} ms, {size} bytes",
+            peak / 1024,
+            k / 1024
+        );
         let (peak, k, ms, size) = measure(&pdf, PdfTemplate::LIST, &list);
-        eprintln!("list   round {round}: peak {} KiB, kept {} KiB, {ms} ms, {size} bytes", peak / 1024, k / 1024);
+        eprintln!(
+            "list   round {round}: peak {} KiB, kept {} KiB, {ms} ms, {size} bytes",
+            peak / 1024,
+            k / 1024
+        );
         kept.push(LIVE.load(Ordering::Relaxed));
     }
     let growth = kept[3] as isize - kept[1] as isize;
     eprintln!("heap growth from round 1 to 3: {} KiB", growth / 1024);
-    assert!(growth < 8 * 1024 * 1024, "rendering keeps memory: {growth} bytes");
+    assert!(
+        growth < 8 * 1024 * 1024,
+        "rendering keeps memory: {growth} bytes"
+    );
 }

@@ -43,7 +43,9 @@ impl InFlight {
     /// The turn of `user`, or `None` while another request of the user is checking a code.
     pub(crate) fn enter(&self, user: &str) -> Option<Turn> {
         let mut users = self.0.lock().ok()?;
-        users.insert(user.to_string()).then(|| Turn(self.clone(), user.to_string()))
+        users
+            .insert(user.to_string())
+            .then(|| Turn(self.clone(), user.to_string()))
     }
 }
 
@@ -69,7 +71,11 @@ pub struct MemoryTotpStore(Arc<Mutex<HashMap<String, TotpRecord>>>);
 
 impl TotpStore for MemoryTotpStore {
     fn load(&self, user: &str) -> BoxFuture<crate::Result<Option<TotpRecord>>> {
-        let found = self.0.lock().ok().and_then(|m| m.get(user).cloned());
+        let found = self
+            .0
+            .lock()
+            .ok()
+            .and_then(|m| m.get(user).cloned());
         Box::pin(async move { Ok(found) })
     }
 
@@ -156,7 +162,10 @@ impl Totp {
 
     pub(crate) fn problems(&self) -> Vec<String> {
         if self.sealer.is_none() {
-            vec![format!("Totp: the key must be at least {} bytes", super::seal::MIN_SECRET)]
+            vec![format!(
+                "Totp: the key must be at least {} bytes",
+                super::seal::MIN_SECRET
+            )]
         } else {
             Vec::new()
         }
@@ -165,14 +174,23 @@ impl Totp {
     /// Marks the identity with `mfa` when the request carries a valid proof for the same user, and
     /// moves its sign in time to the proof's time when that is later.
     pub(crate) fn apply(&self, proof: Option<&str>, identity: &mut Identity) {
-        let (Some(sealer), Some(value), Some(user)) = (&self.sealer, proof, identity.user.as_deref()) else { return };
-        let Some(p) = sealer.open::<Proof>(PROOF, value) else { return };
+        let (Some(sealer), Some(value), Some(user)) =
+            (&self.sealer, proof, identity.user.as_deref())
+        else {
+            return;
+        };
+        let Some(p) = sealer.open::<Proof>(PROOF, value) else {
+            return;
+        };
         if p.user != user || p.expires <= super::now_secs() {
             return;
         }
         identity.mfa = true;
         let at = DateTime::from_unix_ms(p.at.saturating_mul(1000));
-        if identity.authenticated_at.is_none_or(|old| old.unix_ms() < at.unix_ms()) {
+        if identity
+            .authenticated_at
+            .is_none_or(|old| old.unix_ms() < at.unix_ms())
+        {
             identity.authenticated_at = Some(at);
         }
     }
@@ -189,11 +207,15 @@ impl Totp {
 
     /// The step a code matches now (one step of clock skew either way), if any.
     pub(crate) fn check(&self, secret: Vec<u8>, user: &str, code: &str) -> Option<u64> {
-        let code: String = code.chars().filter(|c| !c.is_whitespace()).collect();
+        let code: String = code
+            .chars()
+            .filter(|c| !c.is_whitespace())
+            .collect();
         if code.len() != 6 || !code.bytes().all(|b| b.is_ascii_digit()) {
             return None;
         }
-        self.generator(secret, user)?.check(&code, super::now_secs().max(0) as u64)
+        self.generator(secret, user)?
+            .check(&code, super::now_secs().max(0) as u64)
     }
 
     /// New recovery codes in the form `xxxxx-xxxxx`, and their keyed hashes for the store.
@@ -205,14 +227,28 @@ impl Totp {
                 format!("{}-{}", &b[..5], &b[5..10])
             })
             .collect();
-        let hashes = codes.iter().map(|c| sealer.hash(c)).collect();
+        let hashes = codes
+            .iter()
+            .map(|c| sealer.hash(c))
+            .collect();
         Some((codes, hashes))
     }
 
     /// Normalizes a typed recovery code: lower case, without spaces.
     pub(crate) fn recovery_hash(&self, code: &str) -> Option<String> {
-        let code: String = code.trim().to_lowercase().chars().filter(|c| !c.is_whitespace()).collect();
-        (code.len() == 11).then(|| self.sealer.as_ref().map(|s| s.hash(&code))).flatten()
+        let code: String = code
+            .trim()
+            .to_lowercase()
+            .chars()
+            .filter(|c| !c.is_whitespace())
+            .collect();
+        (code.len() == 11)
+            .then(|| {
+                self.sealer
+                    .as_ref()
+                    .map(|s| s.hash(&code))
+            })
+            .flatten()
     }
 }
 

@@ -26,8 +26,14 @@ pub(super) fn head(base: &str) -> String {
 
 pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
     router
-        .route("/_zeyn/site.js", get(|| async { asset(JS, "text/javascript; charset=utf-8") }))
-        .route("/_zeyn/site.css", get(|| async { asset(CSS, "text/css; charset=utf-8") }))
+        .route(
+            "/_zeyn/site.js",
+            get(|| async { asset(JS, "text/javascript; charset=utf-8") }),
+        )
+        .route(
+            "/_zeyn/site.css",
+            get(|| async { asset(CSS, "text/css; charset=utf-8") }),
+        )
 }
 
 /// Address of a screen the user may open, after its feature's guards; `None` otherwise.
@@ -37,16 +43,25 @@ fn screen_url(st: &AppState, ctx: &Ctx, name: &str) -> Option<String> {
     if f.check_guards(ctx).is_err() || !ctx.identity().can(&entry.meta.access) {
         return None;
     }
-    f.path_of(&entry.meta).map(|p| st.url(&p))
+    f.path_of(&entry.meta)
+        .map(|p| st.url(&p))
 }
 
 /// Where the brand links to: the screen at `/` when there is one, else the feature's first screen
 /// with a route.
 fn home_url(st: &AppState, fi: usize) -> String {
-    if st.features.iter().any(|f| f.routes().iter().any(|r| r.path == "/" || r.path.is_empty())) {
+    if st.features.iter().any(|f| {
+        f.routes()
+            .iter()
+            .any(|r| r.path == "/" || r.path.is_empty())
+    }) {
         return st.url("/");
     }
-    st.features[fi].routes().first().map(|r| st.url(&r.path)).unwrap_or_else(|| st.url("/"))
+    st.features[fi]
+        .routes()
+        .first()
+        .map(|r| st.url(&r.path))
+        .unwrap_or_else(|| st.url("/"))
 }
 
 /// The whole frame of a site shell page: top bar with the brand, menu button, menu and actions;
@@ -62,12 +77,23 @@ pub(super) fn frame(
 ) -> String {
     let menu_label = r.text(&Text::key("zeyn.shell.menu"));
     let mut menu = String::new();
-    for (i, (_, label, items)) in st.menu_links(ctx, r, current, true).into_iter().enumerate() {
+    for (i, (_, label, items)) in st
+        .menu_links(ctx, r, current, true)
+        .into_iter()
+        .enumerate()
+    {
         if items.len() == 1 {
             menu.push_str(&items[0]);
             continue;
         }
-        let here = if items.iter().any(|l| l.contains(r#"aria-current="page""#)) { " data-current" } else { "" };
+        let here = if items
+            .iter()
+            .any(|l| l.contains(r#"aria-current="page""#))
+        {
+            " data-current"
+        } else {
+            ""
+        };
         menu.push_str(&format!(
             r#"<li class="z-site-group"><button type="button" class="z-site-group-button" aria-expanded="false" aria-controls="z-site-group-{i}"{here}>{label}<span class="z-site-caret" aria-hidden="true"></span></button><ul class="z-site-sub" id="z-site-group-{i}" hidden>{}</ul></li>"#,
             items.join("")
@@ -76,9 +102,17 @@ pub(super) fn frame(
     let mut actions = String::new();
     if shell.header.sign_in {
         let signed_in = ctx.identity().is_signed_in();
-        let link = if signed_in { st.sign_in.logout_url.as_deref() } else { st.login_url.as_deref() };
+        let link = if signed_in {
+            st.sign_in.logout_url.as_deref()
+        } else {
+            st.login_url.as_deref()
+        };
         if let Some(href) = link {
-            let key = if signed_in { "zeyn.shell.site.sign_out" } else { "zeyn.shell.site.sign_in" };
+            let key = if signed_in {
+                "zeyn.shell.site.sign_out"
+            } else {
+                "zeyn.shell.site.sign_in"
+            };
             actions.push_str(&format!(
                 r#"<a class="z-button z-site-sign-in" href="{}" data-zeyn-reload>{}</a>"#,
                 escape(href),
@@ -90,10 +124,16 @@ pub(super) fn frame(
         actions.push_str(&st.locale_picker(ctx, r));
     }
     if shell.header.theme {
-        actions.push_str(&st.look.picker(r, ctx.theme().unwrap_or("system")));
+        actions.push_str(
+            &st.look
+                .picker(r, ctx.theme().unwrap_or("system")),
+        );
     }
-    let actions =
-        if actions.is_empty() { String::new() } else { format!(r#"<div class="z-site-actions">{actions}</div>"#) };
+    let actions = if actions.is_empty() {
+        String::new()
+    } else {
+        format!(r#"<div class="z-site-actions">{actions}</div>"#)
+    };
     let mut footer = String::new();
     for (i, column) in shell.footer.columns.iter().enumerate() {
         let links: String = column
@@ -104,7 +144,11 @@ pub(super) fn frame(
                     FooterTarget::Screen(name) => screen_url(st, ctx, name)?,
                     FooterTarget::Url(url) => url.to_string(),
                 };
-                Some(format!(r#"<li><a href="{}">{}</a></li>"#, escape(&href), r.text(&l.label)))
+                Some(format!(
+                    r#"<li><a href="{}">{}</a></li>"#,
+                    escape(&href),
+                    r.text(&l.label)
+                ))
             })
             .collect();
         if links.is_empty() {

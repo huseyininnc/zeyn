@@ -4,10 +4,14 @@ use crate::{Entry, ex};
 use zeyn::prelude::*;
 
 pub fn overview(_ctx: &Ctx) -> Node {
-    ["Orders", "Stock", "People", "Invoices", "Reports", "Settings"]
-        .into_iter()
-        .fold(AutoGrid::new().min(160), |tiles, title| tiles.add(Card::new().title(title)))
-        .into()
+    [
+        "Orders", "Stock", "People", "Invoices", "Reports", "Settings",
+    ]
+    .into_iter()
+    .fold(AutoGrid::new().min(160), |tiles, title| {
+        tiles.add(Card::new().title(title))
+    })
+    .into()
 }
 
 pub fn wide_columns(_ctx: &Ctx) -> Node {

@@ -71,22 +71,42 @@ pub async fn search_samples(q: DataQuery) -> Result<Page<Sample>> {
 /// Sample products for lookups.
 #[action(public)]
 pub async fn find_samples(q: LookupQuery) -> Result<Page<LookupItem>> {
-    Ok(q.apply(SAMPLES.iter().map(|s| LookupItem::new(s.id.0, s.name.clone()).hint(s.code.clone())).collect()))
+    Ok(q.apply(
+        SAMPLES
+            .iter()
+            .map(|s| LookupItem::new(s.id.0, s.name.clone()).hint(s.code.clone()))
+            .collect(),
+    ))
 }
 
 /// Sample products grouped by unit.
 #[action(public)]
 pub async fn sample_tree(q: TreeQuery) -> Result<Vec<TreeItem>> {
-    let units = [("piece", Unit::Piece, "Piece"), ("kg", Unit::Kg, "Kilogram"), ("liter", Unit::Liter, "Liter")];
+    let units = [
+        ("piece", Unit::Piece, "Piece"),
+        ("kg", Unit::Kg, "Kilogram"),
+        ("liter", Unit::Liter, "Liter"),
+    ];
     Ok(match q.parent.as_deref() {
         None => units
             .iter()
             .map(|(id, unit, label)| {
-                TreeItem::branch(*id, *label).hint(SAMPLES.iter().filter(|s| s.unit == *unit).count().to_string())
+                TreeItem::branch(*id, *label).hint(
+                    SAMPLES
+                        .iter()
+                        .filter(|s| s.unit == *unit)
+                        .count()
+                        .to_string(),
+                )
             })
             .collect(),
         Some(parent) => {
-            let Some((_, unit, _)) = units.iter().find(|(id, _, _)| *id == parent) else { return Err(Error::NotFound) };
+            let Some((_, unit, _)) = units
+                .iter()
+                .find(|(id, _, _)| *id == parent)
+            else {
+                return Err(Error::NotFound);
+            };
             SAMPLES
                 .iter()
                 .filter(|s| s.unit == *unit)
@@ -174,7 +194,13 @@ pub struct Invoice {
 
 #[action(public)]
 pub async fn save_invoice(invoice: Valid<Invoice>) -> Result<Money> {
-    Ok(Money::tl(invoice.lines.iter().map(|l| l.unit_price.minor * l.quantity).sum()))
+    Ok(Money::tl(
+        invoice
+            .lines
+            .iter()
+            .map(|l| l.unit_price.minor * l.quantity)
+            .sum(),
+    ))
 }
 
 #[action(public)]
@@ -222,23 +248,39 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
     let months = || ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
     Some(match name {
         "datagrid" => grid(),
-        "form" => Form::of(Contact { quantity: 1, ..Contact::default() })
-            .row(|r| r.field(Contact::name).field(Contact::email))
-            .row(|r| r.field(Contact::quantity).field(Contact::size))
-            .submit(t!("docs.live.send"), send_contact)
-            .on_success(|_, ui| ui.toast(t!("docs.live.sent")))
-            .into(),
-        "controls" => Form::of(Contact { quantity: 2, size: Size::Medium, ..Contact::default() })
-            .lookup(Contact::product, find_samples)
-            .row(|r| r.field(Contact::delivery).field(Contact::size))
-            .control(Contact::delivery, Control::Radio)
-            .control(Contact::size, Control::Segmented)
-            .field(Contact::newsletter)
-            .control(Contact::newsletter, Control::Switch)
-            .field(Contact::note)
-            .submit(t!("docs.live.send"), send_contact)
-            .on_success(|_, ui| ui.toast(t!("docs.live.sent")))
-            .into(),
+        "form" => Form::of(Contact {
+            quantity: 1,
+            ..Contact::default()
+        })
+        .row(|r| {
+            r.field(Contact::name)
+                .field(Contact::email)
+        })
+        .row(|r| {
+            r.field(Contact::quantity)
+                .field(Contact::size)
+        })
+        .submit(t!("docs.live.send"), send_contact)
+        .on_success(|_, ui| ui.toast(t!("docs.live.sent")))
+        .into(),
+        "controls" => Form::of(Contact {
+            quantity: 2,
+            size: Size::Medium,
+            ..Contact::default()
+        })
+        .lookup(Contact::product, find_samples)
+        .row(|r| {
+            r.field(Contact::delivery)
+                .field(Contact::size)
+        })
+        .control(Contact::delivery, Control::Radio)
+        .control(Contact::size, Control::Segmented)
+        .field(Contact::newsletter)
+        .control(Contact::newsletter, Control::Switch)
+        .field(Contact::note)
+        .submit(t!("docs.live.send"), send_contact)
+        .on_success(|_, ui| ui.toast(t!("docs.live.sent")))
+        .into(),
         "dates" => {
             let today = ctx.today();
             Form::of(Visit {
@@ -247,10 +289,18 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
                 slot: LocalDateTime::new(today, Time::new(14, 0, 0).unwrap_or_default()),
                 ..Visit::default()
             })
-            .row(|r| r.field(Visit::day).field(Visit::arrives))
+            .row(|r| {
+                r.field(Visit::day)
+                    .field(Visit::arrives)
+            })
             .field(Visit::slot)
             .range(Visit::stay_from, Visit::stay_to)
-            .date_options(Visit::day, DateOptions::new().no_weekends().week_numbers())
+            .date_options(
+                Visit::day,
+                DateOptions::new()
+                    .no_weekends()
+                    .week_numbers(),
+            )
             .date_options(Visit::arrives, DateOptions::new().step_minutes(15))
             .submit(t!("docs.live.book"), book_visit)
             .on_success(|_, ui| ui.toast(t!("docs.live.booked")))
@@ -259,13 +309,24 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
         "lines" => Form::of(Invoice {
             customer: "Northwind".into(),
             lines: vec![
-                Line { item: "Green tea".into(), quantity: 12, unit_price: Money::tl(8369) },
-                Line { item: "Olive oil".into(), quantity: 4, unit_price: Money::tl(24207) },
+                Line {
+                    item: "Green tea".into(),
+                    quantity: 12,
+                    unit_price: Money::tl(8369),
+                },
+                Line {
+                    item: "Olive oil".into(),
+                    quantity: 4,
+                    unit_price: Money::tl(24207),
+                },
             ],
         })
         .field(Invoice::customer)
         .lines(Invoice::lines, |l| {
-            l.column(Line::item).column(Line::quantity).column(Line::unit_price).total(Line::quantity, Line::unit_price)
+            l.column(Line::item)
+                .column(Line::quantity)
+                .column(Line::unit_price)
+                .total(Line::quantity, Line::unit_price)
         })
         .submit(t!("docs.live.save"), save_invoice)
         .on_success(|_, ui| ui.toast(t!("docs.live.saved")))
@@ -278,11 +339,17 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
                     .col(Card::new().title("People")),
             )
             .add(
-                Panel::new("Products").collapsible().add(
-                    Tabs::new("Views")
-                        .tab("Card", Card::new().title("A card inside a tab"))
-                        .tab("Split", Split::new(Card::new().title("Left"), Card::new().title("Right")).ratio(55)),
-                ),
+                Panel::new("Products")
+                    .collapsible()
+                    .add(
+                        Tabs::new("Views")
+                            .tab("Card", Card::new().title("A card inside a tab"))
+                            .tab(
+                                "Split",
+                                Split::new(Card::new().title("Left"), Card::new().title("Right"))
+                                    .ratio(55),
+                            ),
+                    ),
             )
             .into(),
         "display" => Stack::new()
@@ -296,12 +363,21 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
                     .col(Badge::new("Draft")),
             )
             .add(Progress::new("Import", 64, 100))
-            .add(Timeline::new().event(ctx.now().add_ms(-26 * 3_600_000), "Created", None, Tone::Info).event(
-                ctx.now().add_ms(-3_600_000),
-                "Approved",
-                Some(Text::from("by the manager")),
-                Tone::Success,
-            ))
+            .add(
+                Timeline::new()
+                    .event(
+                        ctx.now().add_ms(-26 * 3_600_000),
+                        "Created",
+                        None,
+                        Tone::Info,
+                    )
+                    .event(
+                        ctx.now().add_ms(-3_600_000),
+                        "Approved",
+                        Some(Text::from("by the manager")),
+                        Tone::Success,
+                    ),
+            )
             .add(Skeleton::lines(2))
             .into(),
         "action" => ActionButton::new(t!("docs.live.count"), count_samples, ())
@@ -311,7 +387,9 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
                 }
             })
             .into(),
-        "tree" => Tree::of(sample_tree).label("Products by unit").into(),
+        "tree" => Tree::of(sample_tree)
+            .label("Products by unit")
+            .into(),
         "chart" => Stack::new()
             .add(
                 Row::new()
@@ -321,7 +399,13 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
                             .target(200_000.0)
                             .trend([140.0, 152.0, 160.0, 184.0]),
                     )
-                    .col(Kpi::new("Average wait", 6.5).decimals(1).unit("min").delta(-9.0).lower_is_better()),
+                    .col(
+                        Kpi::new("Average wait", 6.5)
+                            .decimals(1)
+                            .unit("min")
+                            .delta(-9.0)
+                            .lower_is_better(),
+                    ),
             )
             .add(
                 Row::new()
@@ -331,7 +415,11 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
                             .series("2025", [120.0, 98.0, 143.0, 160.0, 151.0, 189.0])
                             .series("2026", [131.0, 122.0, 150.0, 171.0, 166.0, 204.0]),
                     )
-                    .col(Chart::donut("Units").labels(["Piece", "Kg", "Liter"]).series("Products", [40.0, 40.0, 40.0])),
+                    .col(
+                        Chart::donut("Units")
+                            .labels(["Piece", "Kg", "Liter"])
+                            .series("Products", [40.0, 40.0, 40.0]),
+                    ),
             )
             .add(
                 Row::new()
@@ -342,7 +430,12 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
                             .line_series("Margin %", [18.0, 14.0, 21.0, 22.0, 19.0, 24.0])
                             .right_axis(),
                     )
-                    .col(Chart::gauge("Capacity").value(72.0).range(0.0, 100.0).target(85.0)),
+                    .col(
+                        Chart::gauge("Capacity")
+                            .value(72.0)
+                            .range(0.0, 100.0)
+                            .target(85.0),
+                    ),
             )
             .into(),
         "shell" => Stack::new()
@@ -353,14 +446,29 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
                     .tool("draw", "Draw", Some(Icon::Edit))
                     .tool("text", "Text", None),
             )
-            .add(StatusBar::new("Status").left("Ready").right("UTF-8"))
+            .add(
+                StatusBar::new("Status")
+                    .left("Ready")
+                    .right("UTF-8"),
+            )
             .into(),
         "content" => Stack::new()
             .gap(2)
             .add(Heading::h3("Brewing green tea"))
-            .add(MetaLine::new().part("12 May 2026").part("5 min read").part("Guides"))
-            .add(Paragraph::new("Water just off the boil and two minutes of steeping keep the taste soft."))
-            .add(Paragraph::new("Times are a starting point.").muted().small())
+            .add(
+                MetaLine::new()
+                    .part("12 May 2026")
+                    .part("5 min read")
+                    .part("Guides"),
+            )
+            .add(Paragraph::new(
+                "Water just off the boil and two minutes of steeping keep the taste soft.",
+            ))
+            .add(
+                Paragraph::new("Times are a starting point.")
+                    .muted()
+                    .small(),
+            )
             .add(
                 PrevNext::new()
                     .prev(crate::introduction, ())
@@ -371,7 +479,9 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
             .into(),
         "autogrid" => ["Orders", "Stock", "People", "Invoices", "Reports"]
             .into_iter()
-            .fold(AutoGrid::new().min(160), |tiles, title| tiles.add(Card::new().title(title)))
+            .fold(AutoGrid::new().min(160), |tiles, title| {
+                tiles.add(Card::new().title(title))
+            })
             .into(),
         "list" => List::of(search_samples)
             .title("Products")
@@ -394,8 +504,9 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
                     .col(zeyn::ui::Avatar::new("Grace Hopper").size(zeyn::ui::AvatarSize::Small)),
             )
             .add(
-                zeyn::ui::Spoiler::new("Show the answer")
-                    .add(Paragraph::new("Water at about 80 degrees and two minutes of steeping.")),
+                zeyn::ui::Spoiler::new("Show the answer").add(Paragraph::new(
+                    "Water at about 80 degrees and two minutes of steeping.",
+                )),
             )
             .into(),
         "week" => WeekSchedule::of(search_samples)
@@ -408,12 +519,15 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
         "overlay" => overlay(),
         "menus" => menus(),
         "toasts" => toasts(),
-        "multi" => Form::of(Reach { channels: vec![Channel::Email], ..Reach::default() })
-            .field(Reach::channels)
-            .lookup_columns(Reach::product, find_sample_rows, ["Code", "Name", "Unit"])
-            .submit(t!("docs.live.save"), save_reach)
-            .on_success(|_, ui| ui.toast(t!("docs.live.saved")))
-            .into(),
+        "multi" => Form::of(Reach {
+            channels: vec![Channel::Email],
+            ..Reach::default()
+        })
+        .field(Reach::channels)
+        .lookup_columns(Reach::product, find_sample_rows, ["Code", "Name", "Unit"])
+        .submit(t!("docs.live.save"), save_reach)
+        .on_success(|_, ui| ui.toast(t!("docs.live.saved")))
+        .into(),
         _ => return None,
     })
 }
@@ -448,7 +562,10 @@ fn inputs() -> Node {
         phone: "5321234567".into(),
         ..Terms::default()
     })
-    .row(|r| r.field(Terms::rate).field(Terms::discount))
+    .row(|r| {
+        r.field(Terms::rate)
+            .field(Terms::discount)
+    })
     .control(Terms::discount, Control::Percent)
     .row(|r| r.field(Terms::phone).field(Terms::iban))
     .field(Terms::password)
@@ -493,7 +610,11 @@ pub async fn find_sample_rows(q: LookupQuery) -> Result<Page<LookupItem>> {
         SAMPLES
             .iter()
             .map(|s| {
-                LookupItem::new(s.id.0, s.name.clone()).cells([s.code.clone(), s.name.clone(), unit(s.unit).into()])
+                LookupItem::new(s.id.0, s.name.clone()).cells([
+                    s.code.clone(),
+                    s.name.clone(),
+                    unit(s.unit).into(),
+                ])
             })
             .collect(),
     ))
@@ -510,27 +631,33 @@ fn overlay() -> Node {
     let sample = &SAMPLES[0];
     Row::new()
         .compact()
-        .col(ActionButton::new(t!("docs.live.count"), count_samples, ()).tip(t!("docs.live.count_tip")).on_success(
-            |n, ui| {
+        .col(
+            ActionButton::new(t!("docs.live.count"), count_samples, ())
+                .tip(t!("docs.live.count_tip"))
+                .on_success(|n, ui| {
+                    if let Ok(n) = n {
+                        ui.toast(t!("docs.live.counted", n = n));
+                    }
+                }),
+        )
+        .col(
+            Popover::new(t!("docs.live.rules"))
+                .title(t!("docs.live.rules_title"))
+                .add(
+                    DescriptionList::of(sample)
+                        .field(Sample::code)
+                        .field(Sample::unit)
+                        .field(Sample::price)
+                        .field(Sample::stock),
+                ),
+        )
+        .col(Busy::new().add(
+            ActionButton::new(t!("docs.live.slow"), slow_count, ()).on_success(|n, ui| {
                 if let Ok(n) = n {
                     ui.toast(t!("docs.live.counted", n = n));
                 }
-            },
+            }),
         ))
-        .col(
-            Popover::new(t!("docs.live.rules")).title(t!("docs.live.rules_title")).add(
-                DescriptionList::of(sample)
-                    .field(Sample::code)
-                    .field(Sample::unit)
-                    .field(Sample::price)
-                    .field(Sample::stock),
-            ),
-        )
-        .col(Busy::new().add(ActionButton::new(t!("docs.live.slow"), slow_count, ()).on_success(|n, ui| {
-            if let Ok(n) = n {
-                ui.toast(t!("docs.live.counted", n = n));
-            }
-        })))
         .into()
 }
 
@@ -556,24 +683,32 @@ fn menus() -> Node {
                 })
                 .confirm(t!("docs.live.archive_confirm")),
         )
-        .col(MenuButton::split(t!("docs.live.save"), save_sample, ()).action_then(
-            t!("docs.live.save_copy"),
-            save_sample,
-            (),
-            |_, ui| ui.notify(Toast::success(t!("docs.live.saved"))),
-        ))
+        .col(
+            MenuButton::split(t!("docs.live.save"), save_sample, ()).action_then(
+                t!("docs.live.save_copy"),
+                save_sample,
+                (),
+                |_, ui| ui.notify(Toast::success(t!("docs.live.saved"))),
+            ),
+        )
         .into()
 }
 
 fn toasts() -> Node {
     Row::new()
         .compact()
-        .col(ActionButton::new(t!("docs.live.toast_success"), save_sample, ()).on_success(|_, ui| {
-            ui.notify(
-                Toast::success(t!("docs.live.saved"))
-                    .action(t!("docs.live.again"), Effect::Toast { message: t!("docs.live.sent") }),
-            )
-        }))
+        .col(
+            ActionButton::new(t!("docs.live.toast_success"), save_sample, ()).on_success(
+                |_, ui| {
+                    ui.notify(Toast::success(t!("docs.live.saved")).action(
+                        t!("docs.live.again"),
+                        Effect::Toast {
+                            message: t!("docs.live.sent"),
+                        },
+                    ))
+                },
+            ),
+        )
         .col(
             ActionButton::new(t!("docs.live.toast_warning"), save_sample, ())
                 .on_success(|_, ui| ui.notify(Toast::warning(t!("docs.live.archived")))),
@@ -587,6 +722,7 @@ fn toasts() -> Node {
 
 /// Names of every live example, for checks and tests.
 pub const EXAMPLES: &[&str] = &[
-    "datagrid", "form", "controls", "dates", "lines", "layout", "display", "action", "tree", "chart", "shell",
-    "inputs", "multi", "overlay", "menus", "toasts", "content", "autogrid", "list", "people", "week",
+    "datagrid", "form", "controls", "dates", "lines", "layout", "display", "action", "tree",
+    "chart", "shell", "inputs", "multi", "overlay", "menus", "toasts", "content", "autogrid",
+    "list", "people", "week",
 ];

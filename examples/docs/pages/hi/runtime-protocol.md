@@ -20,8 +20,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="zeyn-csrf" content="TOKEN">
   <title>Products · Inventory</title>
-  <link rel="stylesheet" href="/_zeyn/zeyn.css">
-  <script type="module" src="/_zeyn/zeyn.js"></script>
+  <link rel="stylesheet" href="/_zeyn/zeyn.css?v=BUILD">
+  <script type="module" src="/_zeyn/zeyn.js?v=BUILD"></script>
 </head>
 <body>
   <a class="z-skip" href="#z-main">Skip to content</a>
@@ -35,6 +35,10 @@
 ```
 
 मेनू केवल वही Screen सूचीबद्ध करता है जिन्हें मौजूदा उपयोगकर्ता खोल सकता है। मौजूदा आइटम में `aria-current="page"` होता है।
+
+हेड में हर फ़्रेमवर्क स्क्रिप्ट और स्टाइलशीट `?v=` और बिल्ड आईडी (`meta[name=zeyn-build]`, `ZEYN_BUILD_ID` से या एक्ज़ीक्यूटेबल के हैश से) रखती है; `theme.css` थीम टेक्स्ट का हैश रखती है। मौजूदा मान वाले अनुरोध को `Cache-Control: public, max-age=31536000, immutable` मिलता है, इसलिए वार्म पेज लोड इनमें से किसी को नहीं माँगता; कोई भी दूसरा अनुरोध (डिप्लॉय के बाद का पुराना टैब, बिना `v`) `no-cache` और ETag पाता है। रनटाइम जो मॉड्यूल बाद में इम्पोर्ट करता है वे उन्हें इम्पोर्ट करने वाली स्क्रिप्ट के URL से वही `v` लेते हैं।
+
+हर पेज `zeyn.js` (अनुरोध, इफ़ेक्ट, विंडो, फ़ॉर्म, मेनू, शॉर्टकट और इवेंट डेलिगेशन), `nav.js`, `components.js` और ऐप शेल में `pro.js` व `enterprise.js` लोड करता है। बाकी केवल उन पेजों पर लोड होता है जो उसे इस्तेमाल करते हैं, तब भी जब `nav.js` कोई स्क्रीन भीतर लाता है: `zeyn.js` ग्रिड रनटाइम `grid.js` को पहली बार तब इम्पोर्ट करता है जब कंटेंट में `[data-zeyn-grid]` हो (ग्रिड वाले पूरे पेज उसे `<link rel="modulepreload">` में नाम देते हैं), और `components.js` `catalog.js` (कार्ड ग्रिड, खोज बॉक्स), `media.js` (प्लेयर, एम्बेड), `files.js` (अपलोड), `charts.js` और `assistant.js` (चैट पैनल, या लॉन्चर का पहला दबाव) इम्पोर्ट करता है। उनकी स्टाइलशीट हेड में रहती हैं, इसलिए स्क्रिप्ट आने पर रूप नहीं बदलता। शोकेस डैशबोर्ड पर यह 9 स्क्रिप्ट और 403 KB (116 KB) की जगह 5 स्क्रिप्ट और 258 KB (नेटवर्क पर 74 KB) है।
 
 ## 2. Screen मार्कअप
 
@@ -161,13 +165,13 @@ Effect:
 
 ### 4.2.2 वर्चुअल स्क्रॉलिंग
 
-`data-zeyn-paging="virtual"` वाले ग्रिड हर पंक्ति पर एक स्क्रॉल होने योग्य सूची दिखाते हैं, चाहे कितनी भी हों। सर्वर `data-zeyn-total` के साथ पहला ब्लॉक (`data-zeyn-page-size` पंक्तियाँ, ऑफ़सेट 0) रेंडर करता है। ग्रिड रूट में `data-zeyn-row-height` (पिक्सेल) और CSS वेरिएबल `--z-row-height` भी होते हैं।
+`data-zeyn-paging="virtual"` वाले ग्रिड हर पंक्ति पर एक स्क्रॉल होने योग्य सूची दिखाते हैं, चाहे कितनी भी हों। सर्वर `data-zeyn-total` के साथ पहला ब्लॉक (`data-zeyn-page-size` पंक्तियाँ, ऑफ़सेट 0) रेंडर करता है: पहली 64 पंक्तियाँ टेबल में रहती हैं और बाकी उसके बाद `<template data-zeyn-rows-later>` में, या ग्रिड 40 या अधिक कॉलम दिखाए तो हर पंक्ति टेम्पलेट में। ग्रिड रूट में `data-zeyn-row-height` (पिक्सेल) और CSS वेरिएबल `--z-row-height` भी होते हैं।
 
 रनटाइम:
 
 - तालिका बॉडी को स्क्रॉल कंटेनर में रखता है जिसका भीतरी spacer `total * rowHeight` पिक्सेल ऊँचा है, 8,000,000 px पर सीमित। सीमा से ऊपर, स्क्रॉल स्थिति अनुपात से पंक्ति इंडेक्स से मैप होती है (`row = scrollTop / (spacerHeight - viewport) * (total - visibleRows)`), इसलिए 1,000,000 पंक्तियाँ भी अंत तक पहुँचती हैं।
 - DOM में केवल दिखती पंक्तियाँ और ऊपर-नीचे 20 पंक्तियाँ रखता है, `transform: translateY(...)` से स्थित। पंक्तियों की ऊँचाई निश्चित है; लंबा टेक्स्ट ellipsis से काटा जाता है।
-- `data-zeyn-page-size` पंक्तियों के ब्लॉक `POST /_zeyn/grid` से और `page: { "type": "offset", "offset": blockStart, "limit": blockSize }`, पहली कॉल के बाद `with_total: false` के साथ लोड करता है। कैश में 20 ब्लॉक तक रखता है (सबसे कम हाल में इस्तेमाल हुआ बाहर), स्क्रॉल दिशा में अगला ब्लॉक पहले से लाता है, और जो ब्लॉक दृश्य से बाहर गए उनके अनुरोध रद्द करता है (`AbortController`)।
+- `data-zeyn-page-size` पंक्तियों के ब्लॉक `POST /_zeyn/grid` से और `page: { "type": "offset", "offset": blockStart, "limit": blockSize }`, पहली कॉल के बाद `with_total: false` के साथ लोड करता है। कैश में 20 ब्लॉक और अधिकतम 100,000 सेल तक रखता है (सबसे कम हाल में इस्तेमाल हुआ बाहर; 63 कॉलम वाले ग्रिड के लिए 7 ब्लॉक, 3 से कम कभी नहीं), `reload` के लिए रखे गए ब्लॉक उसी सीमा में गिने जाते हैं और पहले हटते हैं, स्क्रॉल दिशा में अगला ब्लॉक पहले से लाता है, और जो ब्लॉक दृश्य से बाहर गए उनके अनुरोध रद्द करता है (`AbortController`)।
 - ब्लॉक लोड होते समय दिखती पंक्तियाँ कभी साफ़ नहीं करता। छूटी पंक्तियाँ ब्लॉक आने तक `aria-busy="true"` वाली प्लेसहोल्डर पंक्ति दिखाती हैं, इसलिए Screen झिलमिलाती नहीं।
 - क्रम और फ़िल्टर के बदलाव कैश छोड़ते हैं और शीर्ष पर स्क्रॉल करते हैं।
 - कीबोर्ड: तीर कुंजियाँ, Page Up, Page Down, Home और End सक्रिय पंक्ति चलाते हैं और उसे दृश्य में स्क्रॉल करते हैं। तालिका में `aria-rowcount` = total और हर पंक्ति में `aria-rowindex` है।
@@ -235,6 +239,8 @@ Effect:
 - हर उत्तर `Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`, `X-Content-Type-Options: nosniff` और `Referrer-Policy: same-origin` सेट करता है। `App::csp` नामित `https` होस्ट को `img-src`, `media-src` (और `blob:`), `frame-src`, `connect-src` और `font-src` में जोड़ता है; अन्य directive कभी नहीं बदलते। हेडर टेक्स्ट स्टार्टअप पर एक बार बनता है।
 - कोई इनलाइन स्क्रिप्ट या इनलाइन इवेंट हैंडलर नहीं। इनलाइन `style` एट्रिब्यूट केवल CSS custom properties (`--z-width`, `--z-flex`) और निश्चित कॉलम चौड़ाई के लिए इस्तेमाल होते हैं, इसलिए नीति `style-src-attr 'unsafe-inline'` जोड़ती है। स्क्रिप्ट सख़्त रहती हैं।
 - CSRF टोकन `HttpOnly`, `SameSite=Strict` कुकी में रखा जाता है और `x-zeyn-csrf` हेडर से constant time में तुलना होता है।
+- पेज, `totp` फ़ॉर्म और `GET /_zeyn/csrf` टोकन को कभी वैसा नहीं भेजते जैसा वह कुकी में है: हर प्रतिक्रिया को एक ताज़ा यादृच्छिक पैड मिलता है और उसके बाद टोकन XOR पैड (128 हेक्स अंक), ताकि gzip उसे लीक न कर सके (BREACH)। सर्वर तुलना से पहले मास्क हटाता है और अब भी सादा 64 अंकों का टोकन स्वीकार करता है।
+- 1 KB या अधिक की डायनामिक प्रतिक्रियाएँ (पेज, आंशिक स्क्रीन, ग्रिड ब्लॉक, निर्यात) ब्राउज़र के स्वीकार करने पर स्तर 2 पर gzip होती हैं, `Vary: Accept-Encoding` के साथ। कभी संपीड़ित नहीं होतीं: जिन प्रतिक्रियाओं में पहले से `Content-Encoding` है (फ़्रेमवर्क एसेट, एक बार संपीड़ित और कैश), रेंज (`Content-Range`, और `Range` वाला कोई भी अनुरोध), वीडियो, ऑडियो, SVG के अलावा इमेज, `application/octet-stream`, आर्काइव और PDF, `text/event-stream`, `application/x-ndjson` (असिस्टेंट की स्ट्रीम) और WebSocket अपग्रेड।
 - हर कॉल क्रम से जाँचती है: प्रमाणीकरण, Screen का एक्सेस, feature के गार्ड, नोड action का एक्सेस, फिर इंटरसेप्टर और action चलाती है।
 
 ## 6. रनटाइम व्यवहार

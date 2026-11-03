@@ -30,7 +30,9 @@ impl Sealer {
         }
         let root = hmac::Key::new(hmac::HMAC_SHA256, secret);
         let derive = |label: &[u8]| hmac::sign(&root, label);
-        let aead = LessSafeKey::new(UnboundKey::new(&AES_256_GCM, derive(b"zeyn cookie seal v1").as_ref()).ok()?);
+        let aead = LessSafeKey::new(
+            UnboundKey::new(&AES_256_GCM, derive(b"zeyn cookie seal v1").as_ref()).ok()?,
+        );
         let mac = hmac::Key::new(hmac::HMAC_SHA256, derive(b"zeyn keyed hash v1").as_ref());
         Some(Sealer { aead, mac })
     }
@@ -41,7 +43,11 @@ impl Sealer {
         let nonce: [u8; NONCE_LEN] = super::random();
         if self
             .aead
-            .seal_in_place_append_tag(Nonce::assume_unique_for_key(nonce), Aad::from(name.as_bytes()), &mut data)
+            .seal_in_place_append_tag(
+                Nonce::assume_unique_for_key(nonce),
+                Aad::from(name.as_bytes()),
+                &mut data,
+            )
             .is_err()
         {
             return String::new();
@@ -67,7 +73,10 @@ impl Sealer {
         let (nonce, data) = rest.split_at(NONCE_LEN);
         let mut data = data.to_vec();
         let nonce = Nonce::try_assume_unique_for_key(nonce).ok()?;
-        let plain = self.aead.open_in_place(nonce, Aad::from(name.as_bytes()), &mut data).ok()?;
+        let plain = self
+            .aead
+            .open_in_place(nonce, Aad::from(name.as_bytes()), &mut data)
+            .ok()?;
         serde_json::from_slice(plain).ok()
     }
 
@@ -75,6 +84,10 @@ impl Sealer {
     /// a copy of the store alone cannot be brute forced without the app secret.
     #[cfg_attr(not(feature = "totp"), allow(dead_code))]
     pub(crate) fn hash(&self, value: &str) -> String {
-        hmac::sign(&self.mac, value.as_bytes()).as_ref().iter().map(|b| format!("{b:02x}")).collect()
+        hmac::sign(&self.mac, value.as_bytes())
+            .as_ref()
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect()
     }
 }

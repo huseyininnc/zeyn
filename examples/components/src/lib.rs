@@ -24,7 +24,10 @@ pub struct Example {
 #[macro_export]
 macro_rules! ex {
     ($f:ident) => {
-        $crate::Example { func: stringify!($f), build: $f }
+        $crate::Example {
+            func: stringify!($f),
+            build: $f,
+        }
     };
 }
 
@@ -189,7 +192,10 @@ pub fn matching(q: &str, ctx: &Ctx) -> Vec<&'static Component> {
         .collect();
     let query = DataQuery {
         q: q.to_string(),
-        page: zeyn::PageRequest::Offset { offset: 0, limit: zeyn::MAX_PAGE_SIZE },
+        page: zeyn::PageRequest::Offset {
+            offset: 0,
+            limit: zeyn::MAX_PAGE_SIZE,
+        },
         ..DataQuery::default()
     };
     let names: Vec<String> = query

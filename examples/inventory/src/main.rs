@@ -35,10 +35,14 @@ async fn main() -> std::io::Result<()> {
     let addr = std::env::var("ZEYN_ADDR").unwrap_or_else(|_| "127.0.0.1:3001".into());
     let store = match std::env::var("ZEYN_DATABASE_URL") {
         #[cfg(any(feature = "postgres", feature = "oracle"))]
-        Ok(url) if !url.is_empty() => ProductStore::connect(&url).await.map_err(std::io::Error::other)?,
+        Ok(url) if !url.is_empty() => ProductStore::connect(&url)
+            .await
+            .map_err(std::io::Error::other)?,
         #[cfg(not(any(feature = "postgres", feature = "oracle")))]
         Ok(url) if !url.is_empty() => {
-            return Err(std::io::Error::other("ZEYN_DATABASE_URL is set; build with --features postgres or oracle"));
+            return Err(std::io::Error::other(
+                "ZEYN_DATABASE_URL is set; build with --features postgres or oracle",
+            ));
         }
         _ => ProductStore::seeded(),
     };

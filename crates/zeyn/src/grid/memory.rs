@@ -49,13 +49,17 @@ fn hundredths(s: &str) -> Option<i128> {
     if major.is_empty() || major.len() > 30 || minor.len() > 2 || !ok(major) || !ok(minor) {
         return None;
     }
-    let value = major.parse::<i128>().ok()? * 100 + format!("{minor:0<2}").parse::<i128>().ok()?;
+    let value = major.parse::<i128>().ok()? * 100
+        + format!("{minor:0<2}")
+            .parse::<i128>()
+            .ok()?;
     Some(if negative { -value } else { value })
 }
 
 /// Midnight starting `date` in `tz`; when the clocks skip midnight, the first hour that exists.
 fn day_start(date: Date, tz: TimeZone) -> Option<DateTime> {
-    (0..3u8).find_map(|h| DateTime::from_local(LocalDateTime::new(date, Time::new(h, 0, 0)?), tz).ok())
+    (0..3u8)
+        .find_map(|h| DateTime::from_local(LocalDateTime::new(date, Time::new(h, 0, 0)?), tz).ok())
 }
 
 /// Reads one range bound for a column kind. `upper` widens a date to the end of that day.
@@ -105,7 +109,10 @@ pub(crate) enum Cond {
 
 /// Text in the form free text search compares: `İ` and `ı` become `i`, then lower case.
 pub(crate) fn fold(s: &str) -> String {
-    s.chars().map(|c| if matches!(c, 'İ' | 'ı') { 'i' } else { c }).flat_map(char::to_lowercase).collect()
+    s.chars()
+        .map(|c| if matches!(c, 'İ' | 'ı') { 'i' } else { c })
+        .flat_map(char::to_lowercase)
+        .collect()
 }
 
 impl Cond {
@@ -129,8 +136,16 @@ impl Cond {
 impl Cond {
     /// Reads the conditions of one filter. Unknown fields, unreadable values and conditions that
     /// do not fit the column kind are dropped.
-    pub(crate) fn read(f: &Filter, fields: &[crate::model::FieldMeta], tz: TimeZone, out: &mut Vec<Cond>) {
-        let Some(i) = fields.iter().position(|m| m.name == f.field) else {
+    pub(crate) fn read(
+        f: &Filter,
+        fields: &[crate::model::FieldMeta],
+        tz: TimeZone,
+        out: &mut Vec<Cond>,
+    ) {
+        let Some(i) = fields
+            .iter()
+            .position(|m| m.name == f.field)
+        else {
             return;
         };
         let kind = &fields[i].kind;
@@ -150,22 +165,40 @@ impl Cond {
                 out.push(Cond::Text(i, TextOp::Equals, t));
             }
         }
-        let lo = f.from.as_deref().and_then(|s| bound(kind, s, tz, false));
-        let hi = f.to.as_deref().and_then(|s| bound(kind, s, tz, true));
+        let lo = f
+            .from
+            .as_deref()
+            .and_then(|s| bound(kind, s, tz, false));
+        let hi =
+            f.to.as_deref()
+                .and_then(|s| bound(kind, s, tz, true));
         if lo.is_some() || hi.is_some() {
             out.push(Cond::Range(i, lo, hi));
         }
-        if matches!(kind, FieldKind::Id | FieldKind::Integer | FieldKind::Text | FieldKind::Custom { .. })
-            && !f.any_of.is_empty()
+        if matches!(
+            kind,
+            FieldKind::Id | FieldKind::Integer | FieldKind::Text | FieldKind::Custom { .. }
+        ) && !f.any_of.is_empty()
         {
-            out.push(Cond::AnyKey(i, f.any_of.iter().take(MAX_PAGE_SIZE as usize).cloned().collect()));
+            out.push(Cond::AnyKey(
+                i,
+                f.any_of
+                    .iter()
+                    .take(MAX_PAGE_SIZE as usize)
+                    .cloned()
+                    .collect(),
+            ));
         }
         if let FieldKind::Choice(options) = kind {
             let wanted: Vec<String> = f
                 .any_of
                 .iter()
                 .take(MAX_FILTER_CHOICES)
-                .filter(|v| options.iter().any(|o| o.value == v.as_str()))
+                .filter(|v| {
+                    options
+                        .iter()
+                        .any(|o| o.value == v.as_str())
+                })
                 .cloned()
                 .collect();
             if !f.any_of.is_empty() {
@@ -247,7 +280,10 @@ fn compare(a: &Value, b: &Value) -> Ordering {
         (Value::Int(x), Value::Int(y)) => x.cmp(y),
         (Value::Money(x), Value::Money(y)) => x.minor.cmp(&y.minor),
         (Value::Bool(x), Value::Bool(y)) => x.cmp(y),
-        (Value::Text(x), Value::Text(y)) => x.to_lowercase().cmp(&y.to_lowercase()).then_with(|| x.cmp(y)),
+        (Value::Text(x), Value::Text(y)) => x
+            .to_lowercase()
+            .cmp(&y.to_lowercase())
+            .then_with(|| x.cmp(y)),
         (Value::Choice(x), Value::Choice(y)) => x.cmp(y),
         (Value::Date(x), Value::Date(y)) => x.cmp(y),
         (Value::Time(x), Value::Time(y)) => x.cmp(y),
@@ -263,12 +299,18 @@ fn compare(a: &Value, b: &Value) -> Ordering {
 /// the values (a sum of text, or money in different currencies). Money averages round half away
 /// from zero to the smallest unit.
 pub fn total(values: impl Iterator<Item = Value>, op: Aggregate) -> Option<Value> {
-    let mut values = values.filter(|v| *v != Value::Null).peekable();
+    let mut values = values
+        .filter(|v| *v != Value::Null)
+        .peekable();
     match op {
         Aggregate::Count => Some(Value::Int(values.count() as i64)),
         Aggregate::Min => values.min_by(compare),
         Aggregate::Max => values.max_by(compare),
-        Aggregate::Sum | Aggregate::Avg if values.peek().is_some_and(|v| matches!(v, Value::Number(_))) => {
+        Aggregate::Sum | Aggregate::Avg
+            if values
+                .peek()
+                .is_some_and(|v| matches!(v, Value::Number(_))) =>
+        {
             let (mut sum, mut n, mut scale) = (crate::Decimal::ZERO, 0i128, 0u8);
             for v in values {
                 let Value::Number(d) = v else { return None };
@@ -300,7 +342,11 @@ pub fn total(values: impl Iterator<Item = Value>, op: Aggregate) -> Option<Value
             }
             let clamp = |x: i128| x.clamp(i128::from(i64::MIN), i128::from(i64::MAX)) as i64;
             let wrap = |x: i64| {
-                if money { Value::Money(Money::new(x, currency.unwrap_or_default())) } else { Value::Int(x) }
+                if money {
+                    Value::Money(Money::new(x, currency.unwrap_or_default()))
+                } else {
+                    Value::Int(x)
+                }
             };
             match op {
                 Aggregate::Sum => Some(wrap(clamp(sum))),
@@ -319,21 +365,35 @@ impl DataQuery {
     /// key field so pages are stable.
     pub fn apply<M: Model>(&self, rows: Vec<M>) -> Page<M> {
         let fields = M::fields();
-        let index = |name: &str| fields.iter().position(|f| f.name == name);
+        let index = |name: &str| {
+            fields
+                .iter()
+                .position(|f| f.name == name)
+        };
         let mut conds = Vec::new();
         for f in self.filters.iter().take(MAX_FILTERS) {
             Cond::read(f, fields, self.time_zone, &mut conds);
         }
         conds.extend(Cond::search(&self.q, fields));
-        let mut rows: Vec<M> = rows.into_iter().filter(|row| conds.iter().all(|c| c.holds(row))).collect();
-        let mut order: Vec<(usize, bool)> =
-            self.sort.iter().take(MAX_SORT).filter_map(|s| index(&s.field).map(|i| (i, s.desc))).collect();
+        let mut rows: Vec<M> = rows
+            .into_iter()
+            .filter(|row| conds.iter().all(|c| c.holds(row)))
+            .collect();
+        let mut order: Vec<(usize, bool)> = self
+            .sort
+            .iter()
+            .take(MAX_SORT)
+            .filter_map(|s| index(&s.field).map(|i| (i, s.desc)))
+            .collect();
         if let Some(key) = fields.iter().position(|f| f.key) {
             order.push((key, false));
         }
         rows.sort_by(|a, b| {
             for (i, desc) in &order {
-                let (x, y) = (a.value_at(*i).unwrap_or(Value::Null), b.value_at(*i).unwrap_or(Value::Null));
+                let (x, y) = (
+                    a.value_at(*i).unwrap_or(Value::Null),
+                    b.value_at(*i).unwrap_or(Value::Null),
+                );
                 let o = compare(&x, &y);
                 let o = if *desc { o.reverse() } else { o };
                 if o != Ordering::Equal {
@@ -348,15 +408,29 @@ impl DataQuery {
             .iter()
             .filter_map(|a| {
                 let i = index(&a.field)?;
-                let value = total(rows.iter().filter_map(|r| r.value_at(i)), a.op)?;
-                Some(Total { field: a.field.clone(), op: a.op, value })
+                let value = total(
+                    rows.iter()
+                        .filter_map(|r| r.value_at(i)),
+                    a.op,
+                )?;
+                Some(Total {
+                    field: a.field.clone(),
+                    op: a.op,
+                    value,
+                })
             })
             .collect();
         if let Some(gi) = self.group.as_deref().and_then(index) {
-            let desc = self.sort.iter().any(|s| s.desc && Some(gi) == index(&s.field));
+            let desc = self
+                .sort
+                .iter()
+                .any(|s| s.desc && Some(gi) == index(&s.field));
             let mut sorted: Vec<&M> = rows.iter().collect();
             sorted.sort_by(|a, b| {
-                let o = compare(&a.value_at(gi).unwrap_or(Value::Null), &b.value_at(gi).unwrap_or(Value::Null));
+                let o = compare(
+                    &a.value_at(gi).unwrap_or(Value::Null),
+                    &b.value_at(gi).unwrap_or(Value::Null),
+                );
                 if desc { o.reverse() } else { o }
             });
             let mut buckets: Vec<(Value, Vec<&M>)> = Vec::new();
@@ -377,8 +451,16 @@ impl DataQuery {
                         .iter()
                         .filter_map(|a| {
                             let i = index(&a.field)?;
-                            let value = total(list.iter().filter_map(|r| r.value_at(i)), a.op)?;
-                            Some(Total { field: a.field.clone(), op: a.op, value })
+                            let value = total(
+                                list.iter()
+                                    .filter_map(|r| r.value_at(i)),
+                                a.op,
+                            )?;
+                            Some(Total {
+                                field: a.field.clone(),
+                                op: a.op,
+                                value,
+                            })
                         })
                         .collect(),
                 })

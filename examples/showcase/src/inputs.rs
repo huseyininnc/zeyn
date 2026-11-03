@@ -48,7 +48,10 @@ pub fn input_fields() -> Screen {
                         .field(SupplierTerms::minimum_order)
                 })
                 .control(SupplierTerms::discount, Control::Percent)
-                .row(|r| r.field(SupplierTerms::phone).field(SupplierTerms::iban))
+                .row(|r| {
+                    r.field(SupplierTerms::phone)
+                        .field(SupplierTerms::iban)
+                })
                 .field(SupplierTerms::portal_password)
                 .control(SupplierTerms::portal_password, Control::PasswordMeter)
                 .submit(t!("inputs.save"), save_terms)
@@ -106,7 +109,13 @@ pub async fn find_product_rows(
     let items = store
         .all()?
         .into_iter()
-        .map(|p| LookupItem::new(p.id.0, p.name.clone()).cells([p.code, p.name, p.price.format(ctx.locale())]))
+        .map(|p| {
+            LookupItem::new(p.id.0, p.name.clone()).cells([
+                p.code,
+                p.name,
+                p.price.format(ctx.locale()),
+            ])
+        })
         .collect();
     Ok(q.apply(items))
 }
@@ -123,11 +132,18 @@ pub fn input_choices() -> Screen {
         Panel::new(t!("inputs.panel_campaign")).add(
             Form::of(campaign)
                 .field(Campaign::name)
-                .row(|r| r.field(Campaign::channels).field(Campaign::regions))
+                .row(|r| {
+                    r.field(Campaign::channels)
+                        .field(Campaign::regions)
+                })
                 .lookup_columns(
                     Campaign::product,
                     find_product_rows,
-                    [t!("inputs.col_code"), t!("inputs.col_name"), t!("inputs.col_price")],
+                    [
+                        t!("inputs.col_code"),
+                        t!("inputs.col_name"),
+                        t!("inputs.col_price"),
+                    ],
                 )
                 .submit(t!("inputs.save_campaign"), save_campaign)
                 .on_success(|_, ui| ui.toast(t!("inputs.campaign_saved"))),
@@ -172,7 +188,11 @@ pub fn input_overlays() -> Screen {
         }
     };
     Screen::new(t!("inputs.overlays"))
-        .toolbar(|t| t.button(t!("inputs.new_note")).icon(Icon::Plus).tip(t!("inputs.new_note_tip")))
+        .toolbar(|t| {
+            t.button(t!("inputs.new_note"))
+                .icon(Icon::Plus)
+                .tip(t!("inputs.new_note_tip"))
+        })
         .body(
             Stack::new()
                 .add(
@@ -240,15 +260,23 @@ pub fn input_commands() -> Screen {
                 .compact()
                 .col(
                     MenuButton::split(t!("inputs.save_draft"), save_order_draft, code.clone())
-                        .action_then(t!("inputs.send"), send_to_supplier, code.clone(), |_, ui| {
-                            ui.notify(Toast::success(t!("inputs.sent")))
-                        })
-                        .action_then(t!("inputs.save_copy"), save_order_draft, code.clone(), |_, ui| {
-                            ui.notify(
-                                Toast::info(t!("inputs.copied"))
-                                    .action(t!("inputs.open_fields"), Effect::navigate(input_fields, ())),
-                            )
-                        }),
+                        .action_then(
+                            t!("inputs.send"),
+                            send_to_supplier,
+                            code.clone(),
+                            |_, ui| ui.notify(Toast::success(t!("inputs.sent"))),
+                        )
+                        .action_then(
+                            t!("inputs.save_copy"),
+                            save_order_draft,
+                            code.clone(),
+                            |_, ui| {
+                                ui.notify(Toast::info(t!("inputs.copied")).action(
+                                    t!("inputs.open_fields"),
+                                    Effect::navigate(input_fields, ()),
+                                ))
+                            },
+                        ),
                 )
                 .col(
                     MenuButton::new(t!("inputs.more"))

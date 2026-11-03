@@ -32,11 +32,19 @@ pub struct RateLimit {
 
 impl RateLimit {
     pub fn per_ip(requests: u32, window: Duration) -> Self {
-        RateLimit { requests: requests.max(1), window, key: RateKey::Ip }
+        RateLimit {
+            requests: requests.max(1),
+            window,
+            key: RateKey::Ip,
+        }
     }
 
     pub fn per_user(requests: u32, window: Duration) -> Self {
-        RateLimit { requests: requests.max(1), window, key: RateKey::User }
+        RateLimit {
+            requests: requests.max(1),
+            window,
+            key: RateKey::User,
+        }
     }
 }
 
@@ -67,17 +75,26 @@ pub struct MemoryRateStore {
 
 impl Default for MemoryRateStore {
     fn default() -> Self {
-        MemoryRateStore { buckets: Mutex::new(HashMap::new()), max_keys: 100_000 }
+        MemoryRateStore {
+            buckets: Mutex::new(HashMap::new()),
+            max_keys: 100_000,
+        }
     }
 }
 
 impl MemoryRateStore {
     pub fn with_max_keys(max_keys: usize) -> Self {
-        MemoryRateStore { max_keys: max_keys.max(1), ..Self::default() }
+        MemoryRateStore {
+            max_keys: max_keys.max(1),
+            ..Self::default()
+        }
     }
 
     pub fn len(&self) -> usize {
-        self.buckets.lock().map(|b| b.len()).unwrap_or(0)
+        self.buckets
+            .lock()
+            .map(|b| b.len())
+            .unwrap_or(0)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -120,27 +137,43 @@ impl MemoryRateStore {
 
     /// Refills the key's bucket and lets `use_tokens` take from it; `Err` with the wait until one
     /// unit is back when it says no.
-    fn bucket(&self, key: &str, limit: &RateLimit, use_tokens: impl FnOnce(&mut f64) -> bool) -> Result<(), Duration> {
+    fn bucket(
+        &self,
+        key: &str,
+        limit: &RateLimit,
+        use_tokens: impl FnOnce(&mut f64) -> bool,
+    ) -> Result<(), Duration> {
         let now = Instant::now();
         let capacity = f64::from(limit.requests);
         let per_sec = capacity / limit.window.as_secs_f64().max(0.001);
-        let Ok(mut buckets) = self.buckets.lock() else { return Ok(()) };
+        let Ok(mut buckets) = self.buckets.lock() else {
+            return Ok(());
+        };
         if buckets.len() >= self.max_keys && !buckets.contains_key(key) {
             buckets.retain(|_, (tokens, at)| {
                 let refilled = *tokens + now.duration_since(*at).as_secs_f64() * per_sec;
                 refilled < capacity
             });
             if buckets.len() >= self.max_keys {
-                let oldest = buckets.iter().min_by_key(|(_, (_, at))| *at).map(|(k, _)| k.clone());
+                let oldest = buckets
+                    .iter()
+                    .min_by_key(|(_, (_, at))| *at)
+                    .map(|(k, _)| k.clone());
                 if let Some(k) = oldest {
                     buckets.remove(&k);
                 }
             }
         }
-        let (tokens, at) = buckets.entry(key.to_string()).or_insert((capacity, now));
+        let (tokens, at) = buckets
+            .entry(key.to_string())
+            .or_insert((capacity, now));
         *tokens = (*tokens + now.duration_since(*at).as_secs_f64() * per_sec).min(capacity);
         *at = now;
-        if use_tokens(tokens) { Ok(()) } else { Err(Duration::from_secs_f64((1.0 - *tokens).max(0.0) / per_sec)) }
+        if use_tokens(tokens) {
+            Ok(())
+        } else {
+            Err(Duration::from_secs_f64((1.0 - *tokens).max(0.0) / per_sec))
+        }
     }
 }
 
@@ -195,18 +228,27 @@ where
 {
     ranges
         .into_iter()
-        .map(|r| IpRange::parse(r.as_ref()).ok_or_else(|| format!("`{}` is not an IP address or range", r.as_ref())))
+        .map(|r| {
+            IpRange::parse(r.as_ref())
+                .ok_or_else(|| format!("`{}` is not an IP address or range", r.as_ref()))
+        })
         .collect()
 }
 
 /// The client's address: the connection's peer, or, when the peer is a trusted proxy, the last
 /// address in `X-Forwarded-For` that is not a trusted proxy.
-pub fn client_ip(peer: Option<IpAddr>, forwarded_for: Option<&str>, trusted: &[IpRange]) -> Option<IpAddr> {
+pub fn client_ip(
+    peer: Option<IpAddr>,
+    forwarded_for: Option<&str>,
+    trusted: &[IpRange],
+) -> Option<IpAddr> {
     let peer = peer?;
     if !trusted.iter().any(|r| r.contains(peer)) {
         return Some(peer);
     }
-    let Some(chain) = forwarded_for else { return Some(peer) };
+    let Some(chain) = forwarded_for else {
+        return Some(peer);
+    };
     chain
         .rsplit(',')
         .filter_map(|p| p.trim().parse::<IpAddr>().ok())

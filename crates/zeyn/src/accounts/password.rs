@@ -50,7 +50,11 @@ pub struct PasswordHasher {
 
 impl Default for PasswordHasher {
     fn default() -> Self {
-        PasswordHasher { memory_kib: 19 * 1024, iterations: 2, parallelism: 1 }
+        PasswordHasher {
+            memory_kib: 19 * 1024,
+            iterations: 2,
+            parallelism: 1,
+        }
     }
 }
 
@@ -64,7 +68,9 @@ impl PasswordHasher {
     pub fn hash(&self, password: &str) -> crate::Result<String> {
         let salt = SaltString::encode_b64(&super::random_bytes::<16>())
             .map_err(|e| crate::Error::Internal(format!("salt: {e}")))?;
-        let argon = self.argon().ok_or_else(|| crate::Error::Internal("invalid Argon2 parameters".into()))?;
+        let argon = self
+            .argon()
+            .ok_or_else(|| crate::Error::Internal("invalid Argon2 parameters".into()))?;
         argon
             .hash_password(password.as_bytes(), &salt)
             .map(|h| h.to_string())
@@ -86,20 +92,33 @@ impl PasswordHasher {
     }
 
     fn verify_argon(&self, stored: &str, password: &str) -> Verification {
-        let Ok(parsed) = PasswordHash::new(stored) else { return Verification::Failed };
-        let Ok(params) = Params::try_from(&parsed) else { return Verification::Failed };
+        let Ok(parsed) = PasswordHash::new(stored) else {
+            return Verification::Failed;
+        };
+        let Ok(params) = Params::try_from(&parsed) else {
+            return Verification::Failed;
+        };
         if params.m_cost() > 1024 * 1024 || params.t_cost() > 64 || params.p_cost() > 16 {
             return Verification::Failed;
         }
-        let Some(argon) = self.argon() else { return Verification::Failed };
-        if argon.verify_password(password.as_bytes(), &parsed).is_err() {
+        let Some(argon) = self.argon() else {
+            return Verification::Failed;
+        };
+        if argon
+            .verify_password(password.as_bytes(), &parsed)
+            .is_err()
+        {
             return Verification::Failed;
         }
         let weaker = parsed.algorithm.as_str() != "argon2id"
             || params.m_cost() < self.memory_kib
             || params.t_cost() < self.iterations
             || params.p_cost() < self.parallelism;
-        if weaker { Verification::SuccessRehashNeeded } else { Verification::Success }
+        if weaker {
+            Verification::SuccessRehashNeeded
+        } else {
+            Verification::Success
+        }
     }
 }
 
@@ -133,20 +152,30 @@ pub mod dotnet {
     /// Whether `password` matches a v2 or v3 hash. Unknown markers, bad sizes and iteration
     /// counts above [`MAX_PBKDF2_ITERATIONS`] fail.
     pub fn verify(stored: &str, password: &str) -> bool {
-        let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(stored.trim()) else { return false };
+        let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(stored.trim()) else {
+            return false;
+        };
         match bytes.first() {
             Some(0x00) => {
                 if bytes.len() != 1 + 16 + 32 {
                     return false;
                 }
                 let iterations = NonZeroU32::new(1000).expect("non zero");
-                pbkdf2::verify(pbkdf2::PBKDF2_HMAC_SHA1, iterations, &bytes[1..17], password.as_bytes(), &bytes[17..])
-                    .is_ok()
+                pbkdf2::verify(
+                    pbkdf2::PBKDF2_HMAC_SHA1,
+                    iterations,
+                    &bytes[1..17],
+                    password.as_bytes(),
+                    &bytes[17..],
+                )
+                .is_ok()
             }
             Some(0x01) => {
-                let (Some(prf), Some(iterations), Some(salt_len)) =
-                    (read_u32(&bytes, 1), read_u32(&bytes, 5), read_u32(&bytes, 9))
-                else {
+                let (Some(prf), Some(iterations), Some(salt_len)) = (
+                    read_u32(&bytes, 1),
+                    read_u32(&bytes, 5),
+                    read_u32(&bytes, 9),
+                ) else {
                     return false;
                 };
                 let prf = match prf {
@@ -163,9 +192,18 @@ pub mod dotnet {
                 {
                     return false;
                 }
-                let Some(iterations) = NonZeroU32::new(iterations) else { return false };
+                let Some(iterations) = NonZeroU32::new(iterations) else {
+                    return false;
+                };
                 let (salt, subkey) = bytes[13..].split_at(salt_len);
-                pbkdf2::verify(prf.algorithm(), iterations, salt, password.as_bytes(), subkey).is_ok()
+                pbkdf2::verify(
+                    prf.algorithm(),
+                    iterations,
+                    salt,
+                    password.as_bytes(),
+                    subkey,
+                )
+                .is_ok()
             }
             _ => false,
         }
@@ -247,16 +285,32 @@ impl PasswordOptions {
         if password.len() > MAX_PASSWORD_BYTES {
             errors.push(("password_too_long", Some(MAX_PASSWORD_BYTES)));
         }
-        if self.require_non_alphanumeric && password.chars().all(|c| c.is_ascii_alphanumeric()) {
+        if self.require_non_alphanumeric
+            && password
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric())
+        {
             errors.push(("password_requires_non_alphanumeric", None));
         }
-        if self.require_digit && !password.chars().any(|c| c.is_ascii_digit()) {
+        if self.require_digit
+            && !password
+                .chars()
+                .any(|c| c.is_ascii_digit())
+        {
             errors.push(("password_requires_digit", None));
         }
-        if self.require_lowercase && !password.chars().any(|c| c.is_ascii_lowercase()) {
+        if self.require_lowercase
+            && !password
+                .chars()
+                .any(|c| c.is_ascii_lowercase())
+        {
             errors.push(("password_requires_lower", None));
         }
-        if self.require_uppercase && !password.chars().any(|c| c.is_ascii_uppercase()) {
+        if self.require_uppercase
+            && !password
+                .chars()
+                .any(|c| c.is_ascii_uppercase())
+        {
             errors.push(("password_requires_upper", None));
         }
         if self.required_unique_chars >= 1 {
@@ -264,7 +318,10 @@ impl PasswordOptions {
             seen.sort_unstable();
             seen.dedup();
             if seen.len() < self.required_unique_chars {
-                errors.push(("password_requires_unique_chars", Some(self.required_unique_chars)));
+                errors.push((
+                    "password_requires_unique_chars",
+                    Some(self.required_unique_chars),
+                ));
             }
         }
         errors
@@ -285,7 +342,12 @@ pub struct PasswordDenyList(Arc<std::collections::HashSet<String>>);
 
 impl PasswordDenyList {
     pub fn new<I: IntoIterator<Item = S>, S: Into<String>>(passwords: I) -> Self {
-        PasswordDenyList(Arc::new(passwords.into_iter().map(Into::into).collect()))
+        PasswordDenyList(Arc::new(
+            passwords
+                .into_iter()
+                .map(Into::into)
+                .collect(),
+        ))
     }
 }
 

@@ -43,7 +43,13 @@ impl Store {
     }
 
     fn get(&self, id: i64) -> Product {
-        self.0.read().unwrap().iter().find(|p| p.id.0 == id).cloned().unwrap()
+        self.0
+            .read()
+            .unwrap()
+            .iter()
+            .find(|p| p.id.0 == id)
+            .cloned()
+            .unwrap()
     }
 }
 
@@ -55,7 +61,10 @@ pub async fn search(q: DataQuery, store: Store) -> Result<Page<Product>> {
 #[action(permission = "stock.write", audit)]
 pub async fn save(p: Valid<Product>, store: Store) -> Result<Product> {
     let mut rows = store.0.write().unwrap();
-    let current = rows.iter_mut().find(|r| r.id == p.id).ok_or(Error::NotFound)?;
+    let current = rows
+        .iter_mut()
+        .find(|r| r.id == p.id)
+        .ok_or(Error::NotFound)?;
     if current.version != p.version {
         return Err(Error::Conflict);
     }
@@ -72,8 +81,13 @@ pub struct EditParams {
 
 #[screen(route = "/products", permission = "stock.read")]
 pub fn list() -> Screen {
-    Screen::new("Products")
-        .body(DataGrid::of(search).paging(Paging::pages(10)).column(Product::code).filter().column(Product::price))
+    Screen::new("Products").body(
+        DataGrid::of(search)
+            .paging(Paging::pages(10))
+            .column(Product::code)
+            .filter()
+            .column(Product::price),
+    )
 }
 
 #[screen(permission = "stock.write")]
@@ -95,7 +109,11 @@ pub fn closed() -> Screen {
 
 #[screen(route = "/clock", public)]
 pub fn clock(_: (), ctx: Ctx) -> Screen {
-    Screen::new(Text::from(format!("zone={} today={}", ctx.time_zone().name(), ctx.today())))
+    Screen::new(Text::from(format!(
+        "zone={} today={}",
+        ctx.time_zone().name(),
+        ctx.today()
+    )))
 }
 
 fn weekend_only(_: &Ctx) -> GuardResult {
@@ -103,14 +121,33 @@ fn weekend_only(_: &Ctx) -> GuardResult {
 }
 
 fn app(identity: Identity, audit: MemoryAudit, agents: bool) -> App {
-    let i18n = I18n::new("en").catalog("tr", r#"{ "Product": { "price": "Fiyat", "code": "Kod" } }"#).unwrap();
+    let i18n = I18n::new("en")
+        .catalog(
+            "tr",
+            r#"{ "Product": { "price": "Fiyat", "code": "Kod" } }"#,
+        )
+        .unwrap();
     let mut app = App::new("Test")
         .i18n(i18n)
         .service(Store::seeded())
-        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .auth(move |h: &HeaderMap| {
+            h.contains_key("x-user")
+                .then(|| identity.clone())
+        })
         .interceptor(AuditLog(audit))
-        .feature(Feature::new("stock").screen(list).screen(edit).screen(clock).api(search).api(save))
-        .feature(Feature::new("other").guard(weekend_only).screen(closed));
+        .feature(
+            Feature::new("stock")
+                .screen(list)
+                .screen(edit)
+                .screen(clock)
+                .api(search)
+                .api(save),
+        )
+        .feature(
+            Feature::new("other")
+                .guard(weekend_only)
+                .screen(closed),
+        );
     if agents {
         app = app.mcp(Mcp::on());
     }
@@ -118,7 +155,9 @@ fn app(identity: Identity, audit: MemoryAudit, agents: bool) -> App {
 }
 
 fn router(identity: Identity) -> Router {
-    app(identity, MemoryAudit::default(), false).router().unwrap()
+    app(identity, MemoryAudit::default(), false)
+        .router()
+        .unwrap()
 }
 
 fn writer() -> Identity {
@@ -138,15 +177,34 @@ impl Reply {
 }
 
 async fn send(router: &Router, req: Request<Body>) -> Reply {
-    let res = router.clone().oneshot(req).await.unwrap();
+    let res = router
+        .clone()
+        .oneshot(req)
+        .await
+        .unwrap();
     let status = res.status();
     let headers = res.headers().clone();
-    let body = String::from_utf8(res.into_body().collect().await.unwrap().to_bytes().to_vec()).unwrap();
-    Reply { status, headers, body }
+    let body = String::from_utf8(
+        res.into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes()
+            .to_vec(),
+    )
+    .unwrap();
+    Reply {
+        status,
+        headers,
+        body,
+    }
 }
 
 fn get(path: &str) -> Request<Body> {
-    Request::get(path).header("x-user", "1").body(Body::empty()).unwrap()
+    Request::get(path)
+        .header("x-user", "1")
+        .body(Body::empty())
+        .unwrap()
 }
 
 const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -165,21 +223,52 @@ fn post(path: &str, body: serde_json::Value) -> Request<Body> {
 async fn page_renders_first_page_with_security_headers_and_csrf_cookie() {
     let r = send(&router(writer()), get("/products")).await;
     assert_eq!(r.status, StatusCode::OK);
-    assert!(r.body.contains(r#"<meta name="zeyn-csrf" content=""#));
-    assert!(r.body.contains(r#"data-zeyn-total="30""#));
+    assert!(
+        r.body
+            .contains(r#"<meta name="zeyn-csrf" content=""#)
+    );
+    assert!(
+        r.body
+            .contains(r#"data-zeyn-total="30""#)
+    );
     assert!(r.body.contains("<td>P-01</td>"));
     assert!(!r.body.contains("<td>P-11</td>"));
-    let cookie = r.headers.get(header::SET_COOKIE).unwrap().to_str().unwrap();
-    assert!(cookie.starts_with("zeyn_csrf=") && cookie.contains("HttpOnly") && cookie.contains("SameSite=Strict"));
-    assert!(r.headers.get(header::CONTENT_SECURITY_POLICY).unwrap().to_str().unwrap().contains("script-src 'self'"));
-    assert_eq!(r.headers.get(header::X_CONTENT_TYPE_OPTIONS).unwrap(), "nosniff");
+    let cookie = r
+        .headers
+        .get(header::SET_COOKIE)
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert!(
+        cookie.starts_with("zeyn_csrf=")
+            && cookie.contains("HttpOnly")
+            && cookie.contains("SameSite=Strict")
+    );
+    assert!(
+        r.headers
+            .get(header::CONTENT_SECURITY_POLICY)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .contains("script-src 'self'")
+    );
+    assert_eq!(
+        r.headers
+            .get(header::X_CONTENT_TYPE_OPTIONS)
+            .unwrap(),
+        "nosniff"
+    );
 }
 
 #[tokio::test]
 async fn posts_without_matching_csrf_token_are_refused() {
     let router = router(writer());
-    let mut req = post("/_zeyn/grid", serde_json::json!({ "screen": "list", "node": 0 }));
-    req.headers_mut().insert("x-zeyn-csrf", "f".repeat(64).parse().unwrap());
+    let mut req = post(
+        "/_zeyn/grid",
+        serde_json::json!({ "screen": "list", "node": 0 }),
+    );
+    req.headers_mut()
+        .insert("x-zeyn-csrf", "f".repeat(64).parse().unwrap());
     let r = send(&router, req).await;
     assert_eq!(r.status, StatusCode::FORBIDDEN);
     assert_eq!(r.json()["error"], "forbidden");
@@ -206,7 +295,8 @@ async fn form_reports_unreadable_values_and_rule_errors_together_in_the_users_la
         "/_zeyn/form",
         serde_json::json!({ "screen": "edit", "params": { "id": 3 }, "node": 0, "values": { "code": "", "price": "abc", "version": "1" } }),
     );
-    req.headers_mut().insert(header::ACCEPT_LANGUAGE, "tr-TR,tr;q=0.9".parse().unwrap());
+    req.headers_mut()
+        .insert(header::ACCEPT_LANGUAGE, "tr-TR,tr;q=0.9".parse().unwrap());
     let r = send(&router(writer()), req).await;
     assert_eq!(r.status, StatusCode::UNPROCESSABLE_ENTITY);
     let errors = r.json()["errors"].clone();
@@ -219,7 +309,9 @@ async fn form_reports_unreadable_values_and_rule_errors_together_in_the_users_la
 #[tokio::test]
 async fn form_takes_only_editable_fields_and_detects_stale_versions() {
     let audit = MemoryAudit::default();
-    let router = app(writer(), audit.clone(), false).router().unwrap();
+    let router = app(writer(), audit.clone(), false)
+        .router()
+        .unwrap();
     let values = serde_json::json!({ "id": "99", "stock": "5000", "code": "NEW", "price": "12.50", "version": "1" });
     let r = send(
         &router,
@@ -233,8 +325,14 @@ async fn form_takes_only_editable_fields_and_detects_stale_versions() {
     assert_eq!(r.json()["effects"][0]["message"], "Saved");
 
     let grid = send(&router, post("/_zeyn/grid", serde_json::json!({ "screen": "list", "node": 0, "query": { "filters": [{ "field": "code", "contains": "new" }] } }))).await;
-    let rows = grid.json()["rows"].as_str().unwrap().to_string();
-    assert!(rows.contains("<td>NEW</td>") && rows.contains("₺12.50"), "{rows}");
+    let rows = grid.json()["rows"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert!(
+        rows.contains("<td>NEW</td>") && rows.contains("₺12.50"),
+        "{rows}"
+    );
 
     let again = serde_json::json!({ "screen": "edit", "params": { "id": 3 }, "node": 0, "values": { "code": "AGAIN", "price": "1", "version": "1" } });
     let r = send(&router, post("/_zeyn/form", again)).await;
@@ -252,7 +350,10 @@ async fn permissions_and_guards_are_enforced_on_the_server() {
     let reader = router(Identity::user("ali").with_permissions(["stock.read"]));
     let r = send(
         &reader,
-        post("/_zeyn/form", serde_json::json!({ "screen": "edit", "params": { "id": 1 }, "node": 0, "values": {} })),
+        post(
+            "/_zeyn/form",
+            serde_json::json!({ "screen": "edit", "params": { "id": 1 }, "node": 0, "values": {} }),
+        ),
     )
     .await;
     assert_eq!(r.status, StatusCode::FORBIDDEN);
@@ -279,32 +380,72 @@ async fn menu_hides_screens_the_user_cannot_open() {
                 Feature::new("stock")
                     .screen(list)
                     .screen(edit)
-                    .menu(|m| m.group("Stock", Icon::Box).item("Products", list)),
+                    .menu(|m| {
+                        m.group("Stock", Icon::Box)
+                            .item("Products", list)
+                    }),
             )
-            .feature(Feature::new("other").screen(closed).menu(|m| m.group("Other", Icon::Home).item("Closed", closed)))
+            .feature(
+                Feature::new("other")
+                    .screen(closed)
+                    .menu(|m| {
+                        m.group("Other", Icon::Home)
+                            .item("Closed", closed)
+                    }),
+            )
             .router()
             .unwrap()
     };
     let r = send(&app(Identity::user("x")), get("/closed")).await;
-    assert!(r.body.contains(r#"href="/closed" aria-current="page""#));
+    assert!(
+        r.body
+            .contains(r#"href="/closed" aria-current="page""#)
+    );
     assert!(!r.body.contains(r#"href="/products""#));
 }
 
 #[tokio::test]
 async fn locale_can_be_switched_only_to_offered_languages() {
     let router = router(writer());
-    let r = send(&router, post("/_zeyn/locale", serde_json::json!({ "locale": "tr" }))).await;
+    let r = send(
+        &router,
+        post("/_zeyn/locale", serde_json::json!({ "locale": "tr" })),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::NO_CONTENT);
-    assert!(r.headers.get(header::SET_COOKIE).unwrap().to_str().unwrap().starts_with("zeyn_locale=tr;"));
-    let r = send(&router, post("/_zeyn/locale", serde_json::json!({ "locale": "xx" }))).await;
+    assert!(
+        r.headers
+            .get(header::SET_COOKIE)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("zeyn_locale=tr;")
+    );
+    let r = send(
+        &router,
+        post("/_zeyn/locale", serde_json::json!({ "locale": "xx" })),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::NOT_FOUND);
 }
 
 #[tokio::test]
 async fn check_reports_missing_services_and_bad_home() {
-    let problems = App::new("T").feature(Feature::new("stock").screen(edit)).home(edit).check().unwrap_err();
-    assert!(problems.iter().any(|p| p.contains("needs service") && p.contains("Store")));
-    assert!(problems.iter().any(|p| p.contains("home screen `edit`")));
+    let problems = App::new("T")
+        .feature(Feature::new("stock").screen(edit))
+        .home(edit)
+        .check()
+        .unwrap_err();
+    assert!(
+        problems
+            .iter()
+            .any(|p| p.contains("needs service") && p.contains("Store"))
+    );
+    assert!(
+        problems
+            .iter()
+            .any(|p| p.contains("home screen `edit`"))
+    );
 }
 
 #[tokio::test]
@@ -312,41 +453,83 @@ async fn agent_tools_are_off_by_default_and_mcp_needs_an_authorization_header() 
     let r = send(&router(writer()), get("/_zeyn/tools?screen=list")).await;
     assert_eq!(r.status, StatusCode::NOT_FOUND);
 
-    let router = app(writer(), MemoryAudit::default(), true).router().unwrap();
+    let router = app(writer(), MemoryAudit::default(), true)
+        .router()
+        .unwrap();
     let r = send(&router, get("/_zeyn/tools?screen=list")).await;
     assert_eq!(r.json()["tools"][0]["name"], "list_0_search");
 
     let rpc = |auth: bool, body: serde_json::Value| {
-        let mut b = Request::post("/_zeyn/mcp").header("x-user", "1").header(header::CONTENT_TYPE, "application/json");
+        let mut b = Request::post("/_zeyn/mcp")
+            .header("x-user", "1")
+            .header(header::CONTENT_TYPE, "application/json");
         if auth {
             b = b.header(header::AUTHORIZATION, "Bearer test");
         }
-        b.body(Body::from(body.to_string())).unwrap()
+        b.body(Body::from(body.to_string()))
+            .unwrap()
     };
-    let r = send(&router, rpc(false, serde_json::json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" }))).await;
+    let r = send(
+        &router,
+        rpc(
+            false,
+            serde_json::json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" }),
+        ),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::UNAUTHORIZED);
 
-    let r = send(&router, rpc(true, serde_json::json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" }))).await;
+    let r = send(
+        &router,
+        rpc(
+            true,
+            serde_json::json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" }),
+        ),
+    )
+    .await;
     let names: Vec<String> = r.json()["result"]["tools"]
         .as_array()
         .unwrap()
         .iter()
         .map(|t| t["name"].as_str().unwrap().to_string())
         .collect();
-    assert_eq!(names, ["list_0_search", "api_stock_search", "api_stock_save"]);
+    assert_eq!(
+        names,
+        ["list_0_search", "api_stock_search", "api_stock_save"]
+    );
 
     let call = serde_json::json!({ "jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": { "name": "list_0_search", "arguments": { "page": { "type": "offset", "offset": 0, "limit": 1 } } } });
     let r = send(&router, rpc(true, call)).await;
     assert_eq!(r.json()["result"]["isError"], false);
-    assert!(r.json()["result"]["content"][0]["text"].as_str().unwrap().contains("P-01"));
+    assert!(
+        r.json()["result"]["content"][0]["text"]
+            .as_str()
+            .unwrap()
+            .contains("P-01")
+    );
 }
 
 #[tokio::test]
 async fn unknown_paths_and_screens_are_404() {
     let router = router(writer());
-    assert_eq!(send(&router, get("/nope")).await.status, StatusCode::NOT_FOUND);
-    assert_eq!(send(&router, get("/_zeyn/screen/nope")).await.status, StatusCode::NOT_FOUND);
-    let r = send(&router, post("/_zeyn/grid", serde_json::json!({ "screen": "list", "node": 7 }))).await;
+    assert_eq!(
+        send(&router, get("/nope")).await.status,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        send(&router, get("/_zeyn/screen/nope"))
+            .await
+            .status,
+        StatusCode::NOT_FOUND
+    );
+    let r = send(
+        &router,
+        post(
+            "/_zeyn/grid",
+            serde_json::json!({ "screen": "list", "node": 7 }),
+        ),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::NOT_FOUND);
 }
 
@@ -362,60 +545,135 @@ async fn time_zone_comes_from_profile_then_manual_choice_then_browser_then_defau
             .router()
             .unwrap()
     };
-    let user = TimePolicy::User { default: TimeZone::named("Europe/London").unwrap() };
-    let page =
-        |cookies: &str| Request::get("/clock").header(header::COOKIE, cookies.to_string()).body(Body::empty()).unwrap();
+    let user = TimePolicy::User {
+        default: TimeZone::named("Europe/London").unwrap(),
+    };
+    let page = |cookies: &str| {
+        Request::get("/clock")
+            .header(header::COOKIE, cookies.to_string())
+            .body(Body::empty())
+            .unwrap()
+    };
 
     let r = send(&build(Identity::user("a"), user), page("")).await;
-    assert!(r.body.contains("zone=Europe/London today=2024-01-05"), "{}", r.body);
+    assert!(
+        r.body
+            .contains("zone=Europe/London today=2024-01-05"),
+        "{}",
+        r.body
+    );
 
-    let r = send(&build(Identity::user("a"), user), page("zeyn_tz=Europe%2FIstanbul")).await;
-    assert!(r.body.contains("zone=Europe/Istanbul today=2024-01-06"));
-    assert!(r.body.contains(r#"<meta name="zeyn-tz" content="Europe/Istanbul">"#));
+    let r = send(
+        &build(Identity::user("a"), user),
+        page("zeyn_tz=Europe%2FIstanbul"),
+    )
+    .await;
+    assert!(
+        r.body
+            .contains("zone=Europe/Istanbul today=2024-01-06")
+    );
+    assert!(
+        r.body
+            .contains(r#"<meta name="zeyn-tz" content="Europe/Istanbul">"#)
+    );
 
-    let r =
-        send(&build(Identity::user("a"), user), page("zeyn_tz=Europe%2FIstanbul; zeyn_tz_manual=America%2FNew_York"))
-            .await;
+    let r = send(
+        &build(Identity::user("a"), user),
+        page("zeyn_tz=Europe%2FIstanbul; zeyn_tz_manual=America%2FNew_York"),
+    )
+    .await;
     assert!(r.body.contains("zone=America/New_York"));
 
     let profile = Identity::user("a").with_time_zone("Asia/Tokyo");
-    let r = send(&build(profile.clone(), user), page("zeyn_tz_manual=America%2FNew_York")).await;
+    let r = send(
+        &build(profile.clone(), user),
+        page("zeyn_tz_manual=America%2FNew_York"),
+    )
+    .await;
     assert!(r.body.contains("zone=Asia/Tokyo"));
 
     let org = TimePolicy::Organization(TimeZone::named("Europe/Istanbul").unwrap());
     let r = send(&build(profile, org), page("zeyn_tz=America%2FNew_York")).await;
     assert!(r.body.contains("zone=Europe/Istanbul"));
 
-    let r = send(&build(Identity::user("a"), user), page("zeyn_tz=Not%2FAZone")).await;
+    let r = send(
+        &build(Identity::user("a"), user),
+        page("zeyn_tz=Not%2FAZone"),
+    )
+    .await;
     assert!(r.body.contains("zone=Europe/London"));
 }
 
 #[tokio::test]
 async fn manual_time_zone_choice_is_validated_and_can_be_cleared() {
     let router = router(writer());
-    let r = send(&router, post("/_zeyn/timezone", serde_json::json!({ "zone": "Asia/Kolkata" }))).await;
+    let r = send(
+        &router,
+        post(
+            "/_zeyn/timezone",
+            serde_json::json!({ "zone": "Asia/Kolkata" }),
+        ),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::NO_CONTENT);
-    assert!(r.headers.get(header::SET_COOKIE).unwrap().to_str().unwrap().starts_with("zeyn_tz_manual=Asia%2FKolkata;"));
-    let r = send(&router, post("/_zeyn/timezone", serde_json::json!({ "zone": "Nowhere/Land" }))).await;
+    assert!(
+        r.headers
+            .get(header::SET_COOKIE)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("zeyn_tz_manual=Asia%2FKolkata;")
+    );
+    let r = send(
+        &router,
+        post(
+            "/_zeyn/timezone",
+            serde_json::json!({ "zone": "Nowhere/Land" }),
+        ),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::NOT_FOUND);
-    let r = send(&router, post("/_zeyn/timezone", serde_json::json!({ "zone": "" }))).await;
-    assert!(r.headers.get(header::SET_COOKIE).unwrap().to_str().unwrap().contains("Max-Age=0"));
+    let r = send(
+        &router,
+        post("/_zeyn/timezone", serde_json::json!({ "zone": "" })),
+    )
+    .await;
+    assert!(
+        r.headers
+            .get(header::SET_COOKIE)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .contains("Max-Age=0")
+    );
 }
 
 fn api(body: serde_json::Value, path: &str, auth: bool) -> Request<Body> {
-    let mut b = Request::post(path).header("x-user", "1").header(header::CONTENT_TYPE, "application/json");
+    let mut b = Request::post(path)
+        .header("x-user", "1")
+        .header(header::CONTENT_TYPE, "application/json");
     if auth {
         b = b.header(header::AUTHORIZATION, "Bearer t");
     }
-    b.body(Body::from(body.to_string())).unwrap()
+    b.body(Body::from(body.to_string()))
+        .unwrap()
 }
 
 #[tokio::test]
 async fn actions_published_as_api_need_authorization_and_return_problem_details() {
     let router = router(writer());
-    let r = send(&router, api(serde_json::json!({}), "/api/v1/stock/search", false)).await;
+    let r = send(
+        &router,
+        api(serde_json::json!({}), "/api/v1/stock/search", false),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::UNAUTHORIZED);
-    assert_eq!(r.headers.get(header::CONTENT_TYPE).unwrap(), "application/problem+json");
+    assert_eq!(
+        r.headers
+            .get(header::CONTENT_TYPE)
+            .unwrap(),
+        "application/problem+json"
+    );
 
     let q = serde_json::json!({ "page": { "type": "offset", "offset": 0, "limit": 2 }, "with_total": true });
     let r = send(&router, api(q, "/api/v1/stock/search", true)).await;
@@ -427,7 +685,12 @@ async fn actions_published_as_api_need_authorization_and_return_problem_details(
     let r = send(&router, api(bad, "/api/v1/stock/save", true)).await;
     assert_eq!(r.status, StatusCode::UNPROCESSABLE_ENTITY);
     let body = r.json();
-    let fields: Vec<&str> = body["errors"].as_array().unwrap().iter().map(|e| e["field"].as_str().unwrap()).collect();
+    let fields: Vec<&str> = body["errors"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e["field"].as_str().unwrap())
+        .collect();
     assert_eq!(fields, ["code", "price"]);
     assert_eq!(r.json()["type"], "urn:zeyn:problem:validation");
 
@@ -441,7 +704,11 @@ async fn actions_published_as_api_need_authorization_and_return_problem_details(
     assert_eq!(r.json()["version"], 2);
 
     let reader = super_reader();
-    let r = send(&reader, api(serde_json::json!({}), "/api/v1/stock/save", true)).await;
+    let r = send(
+        &reader,
+        api(serde_json::json!({}), "/api/v1/stock/save", true),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::FORBIDDEN);
 }
 
@@ -451,14 +718,41 @@ fn super_reader() -> Router {
 
 #[tokio::test]
 async fn openapi_describes_published_actions_from_the_models() {
-    let hidden = send(&router(writer()), Request::get("/api/v1/openapi.json").body(Body::empty()).unwrap()).await;
+    let hidden = send(
+        &router(writer()),
+        Request::get("/api/v1/openapi.json")
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
     assert_eq!(hidden.status, StatusCode::NOT_FOUND);
-    let docs_router = app(writer(), MemoryAudit::default(), false).api_docs(ApiDocs::open()).router().unwrap();
-    let r = send(&docs_router, Request::get("/api/v1/openapi.json").body(Body::empty()).unwrap()).await;
+    let docs_router = app(writer(), MemoryAudit::default(), false)
+        .api_docs(ApiDocs::open())
+        .router()
+        .unwrap();
+    let r = send(
+        &docs_router,
+        Request::get("/api/v1/openapi.json")
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
     let doc = r.json();
-    let page = send(&docs_router, Request::get("/api/v1/docs").body(Body::empty()).unwrap()).await;
-    assert!(page.body.contains("<code>POST /api/v1/stock/save</code>"));
-    assert!(page.body.contains("Permission: stock.write"));
+    let page = send(
+        &docs_router,
+        Request::get("/api/v1/docs")
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
+    assert!(
+        page.body
+            .contains("<code>POST /api/v1/stock/save</code>")
+    );
+    assert!(
+        page.body
+            .contains("Permission: stock.write")
+    );
     assert!(!page.body.contains("<script>"));
     assert_eq!(doc["openapi"], "3.1.0");
     let op = &doc["paths"]["/api/v1/stock/save"]["post"];
@@ -466,19 +760,32 @@ async fn openapi_describes_published_actions_from_the_models() {
     let schema = &op["requestBody"]["content"]["application/json"]["schema"];
     assert_eq!(schema["properties"]["code"]["maxLength"], 20);
     assert_eq!(schema["properties"]["stock"]["readOnly"], true);
-    assert_eq!(op["responses"]["200"]["content"]["application/json"]["schema"]["title"], "Product");
+    assert_eq!(
+        op["responses"]["200"]["content"]["application/json"]["schema"]["title"],
+        "Product"
+    );
     assert!(doc["paths"]["/api/v1/stock/search"]["post"]["responses"]["200"]["content"]["application/json"]["schema"]["properties"]["items"].is_object());
 }
 
 #[tokio::test]
 async fn check_reports_missing_services_of_published_actions() {
-    let problems = App::new("T").feature(Feature::new("stock").api(search)).check().unwrap_err();
-    assert!(problems.iter().any(|p| p.contains("api `search` needs service")));
+    let problems = App::new("T")
+        .feature(Feature::new("stock").api(search))
+        .check()
+        .unwrap_err();
+    assert!(
+        problems
+            .iter()
+            .any(|p| p.contains("api `search` needs service"))
+    );
 }
 
 /// Refuses every call in `before` and records what `after` sees.
 #[derive(Clone, Default)]
-struct Refuse(Arc<RwLock<Vec<(zeyn::server::CallKind, bool, Option<&'static str>)>>>);
+struct Refuse(Arc<RwLock<Vec<Seen>>>);
+
+/// What `after` saw: the kind of call, whether it succeeded, and the error code.
+type Seen = (zeyn::server::CallKind, bool, Option<&'static str>);
 
 impl zeyn::Interceptor for Refuse {
     fn before(&self, _ctx: &Ctx, _call: &zeyn::server::Call) -> Result<()> {
@@ -486,7 +793,10 @@ impl zeyn::Interceptor for Refuse {
     }
 
     fn after(&self, _ctx: &Ctx, call: &zeyn::server::Call, outcome: &zeyn::server::CallOutcome) {
-        self.0.write().unwrap().push((call.kind, outcome.ok, outcome.error));
+        self.0
+            .write()
+            .unwrap()
+            .push((call.kind, outcome.ok, outcome.error));
     }
 }
 
@@ -498,12 +808,26 @@ async fn a_call_refused_in_before_never_runs_and_after_still_sees_it() {
     let identity = writer();
     let router = App::new("Test")
         .service(store.clone())
-        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .auth(move |h: &HeaderMap| {
+            h.contains_key("x-user")
+                .then(|| identity.clone())
+        })
         .interceptor(refuse.clone())
-        .feature(Feature::new("stock").screen(list).screen(edit))
+        .feature(
+            Feature::new("stock")
+                .screen(list)
+                .screen(edit),
+        )
         .router()
         .unwrap();
-    let grid = send(&router, post("/_zeyn/grid", serde_json::json!({ "screen": "list", "node": 0 }))).await;
+    let grid = send(
+        &router,
+        post(
+            "/_zeyn/grid",
+            serde_json::json!({ "screen": "list", "node": 0 }),
+        ),
+    )
+    .await;
     assert_eq!(grid.status, StatusCode::FORBIDDEN);
     let values = serde_json::json!({ "code": "X-3", "price": "1", "version": "1" });
     let form = send(
@@ -517,22 +841,55 @@ async fn a_call_refused_in_before_never_runs_and_after_still_sees_it() {
     assert_eq!(form.status, StatusCode::FORBIDDEN);
     assert_eq!(store.get(3).code, "P-03", "the save action never ran");
     let seen = refuse.0.read().unwrap().clone();
-    assert_eq!(seen, [(CallKind::DataGrid, false, Some("forbidden")), (CallKind::Form, false, Some("forbidden"))]);
+    assert_eq!(
+        seen,
+        [
+            (CallKind::DataGrid, false, Some("forbidden")),
+            (CallKind::Form, false, Some("forbidden"))
+        ]
+    );
 }
 
 #[tokio::test]
 async fn llms_txt_is_served_as_plain_text_to_everyone_when_set() {
     let plain = router(writer());
-    assert_eq!(send(&plain, get("/llms.txt")).await.status, StatusCode::NOT_FOUND);
-    let with = app(writer(), MemoryAudit::default(), false).llms_txt("# Shop\n").router().unwrap();
-    let r = send(&with, Request::get("/llms.txt").body(Body::empty()).unwrap()).await;
+    assert_eq!(
+        send(&plain, get("/llms.txt"))
+            .await
+            .status,
+        StatusCode::NOT_FOUND
+    );
+    let with = app(writer(), MemoryAudit::default(), false)
+        .llms_txt("# Shop\n")
+        .router()
+        .unwrap();
+    let r = send(
+        &with,
+        Request::get("/llms.txt")
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::OK);
     assert_eq!(r.body, "# Shop\n");
-    assert!(r.headers.get(header::CONTENT_TYPE).unwrap().to_str().unwrap().starts_with("text/plain"));
+    assert!(
+        r.headers
+            .get(header::CONTENT_TYPE)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("text/plain")
+    );
 }
 
 fn csp_of(reply: &Reply) -> String {
-    reply.headers.get(header::CONTENT_SECURITY_POLICY).unwrap().to_str().unwrap().to_string()
+    reply
+        .headers
+        .get(header::CONTENT_SECURITY_POLICY)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string()
 }
 
 #[tokio::test]
@@ -546,13 +903,30 @@ async fn csp_allowlist_adds_named_hosts_to_the_header() {
             .font_src(["https://fonts.example.com"])
     });
     let policy = csp_of(&send(&app.router().unwrap(), get("/products")).await);
-    assert!(policy.contains("img-src 'self' data: blob: https://images.example.com;"), "{policy}");
-    assert!(policy.contains("frame-src 'self' https://www.youtube-nocookie.com https://*.vimeo.com;"), "{policy}");
-    assert!(policy.contains("media-src 'self' blob: https://media.example.com:8443;"), "{policy}");
-    assert!(policy.contains("connect-src 'self' https://api.example.com;"), "{policy}");
-    assert!(policy.contains("font-src 'self' https://fonts.example.com;"), "{policy}");
+    assert!(
+        policy.contains("img-src 'self' data: blob: https://images.example.com;"),
+        "{policy}"
+    );
+    assert!(
+        policy.contains("frame-src 'self' https://www.youtube-nocookie.com https://*.vimeo.com;"),
+        "{policy}"
+    );
+    assert!(
+        policy.contains("media-src 'self' blob: https://media.example.com:8443;"),
+        "{policy}"
+    );
+    assert!(
+        policy.contains("connect-src 'self' https://api.example.com;"),
+        "{policy}"
+    );
+    assert!(
+        policy.contains("font-src 'self' https://fonts.example.com;"),
+        "{policy}"
+    );
     assert!(policy.contains("script-src 'self';"));
-    assert!(policy.ends_with("object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"));
+    assert!(policy.ends_with(
+        "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    ));
 }
 
 #[tokio::test]
@@ -598,10 +972,20 @@ fn csp_refuses_every_value_that_would_weaken_the_policy() {
             App::new("T").csp(|c| c.font_src([value])),
         ] {
             let problems = app.check().expect_err(value);
-            assert!(problems.iter().any(|p| p.starts_with("csp ") && p.contains("= help:")), "{value}: {problems:?}");
+            assert!(
+                problems
+                    .iter()
+                    .any(|p| p.starts_with("csp ") && p.contains("= help:")),
+                "{value}: {problems:?}"
+            );
         }
     }
-    assert!(App::new("T").csp(|c| c.img_src(["https://CDN.example.com:443", "https://*.example.org"])).check().is_ok());
+    assert!(
+        App::new("T")
+            .csp(|c| c.img_src(["https://CDN.example.com:443", "https://*.example.org"]))
+            .check()
+            .is_ok()
+    );
 }
 
 #[test]
@@ -613,9 +997,18 @@ fn csp_fixed_directives_cannot_be_opened() {
         .media_blob();
     for wasm in [false, true] {
         let h = c.header(wasm);
-        let script = if wasm { "script-src 'self' 'wasm-unsafe-eval';" } else { "script-src 'self';" };
+        let script = if wasm {
+            "script-src 'self' 'wasm-unsafe-eval';"
+        } else {
+            "script-src 'self';"
+        };
         assert!(h.contains(script), "{h}");
-        assert!(h.ends_with("object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"), "{h}");
+        assert!(
+            h.ends_with(
+                "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+            ),
+            "{h}"
+        );
         assert_eq!(h.matches("script-src").count(), 1);
         assert_eq!(h.matches("object-src").count(), 1);
         assert_eq!(h.matches("base-uri").count(), 1);
@@ -627,33 +1020,87 @@ fn csp_fixed_directives_cannot_be_opened() {
 async fn framework_scripts_and_styles_are_gzipped_once_and_revalidate_with_304() {
     use std::io::Read;
     let router = router(writer());
-    let plain = send(&router, Request::get("/_zeyn/zeyn.js").body(Body::empty()).unwrap()).await;
+    let plain = send(
+        &router,
+        Request::get("/_zeyn/zeyn.js")
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
     assert_eq!(plain.status, StatusCode::OK);
-    assert!(plain.headers.get(header::CONTENT_ENCODING).is_none());
-    let tag = plain.headers.get(header::ETAG).expect("an ETag").to_str().unwrap().to_string();
+    assert!(
+        plain
+            .headers
+            .get(header::CONTENT_ENCODING)
+            .is_none()
+    );
+    let tag = plain
+        .headers
+        .get(header::ETAG)
+        .expect("an ETag")
+        .to_str()
+        .unwrap()
+        .to_string();
     assert_eq!(plain.headers.get(header::VARY).unwrap(), "accept-encoding");
 
     let res = router
         .clone()
-        .oneshot(Request::get("/_zeyn/zeyn.js").header(header::ACCEPT_ENCODING, "br, gzip;q=0.8").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::get("/_zeyn/zeyn.js")
+                .header(header::ACCEPT_ENCODING, "br, gzip;q=0.8")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
-    assert_eq!(res.headers().get(header::CONTENT_ENCODING).unwrap(), "gzip");
+    assert_eq!(
+        res.headers()
+            .get(header::CONTENT_ENCODING)
+            .unwrap(),
+        "gzip"
+    );
     assert_eq!(res.headers().get(header::ETAG).unwrap(), tag.as_str());
-    let packed = res.into_body().collect().await.unwrap().to_bytes();
-    assert!(packed.len() * 3 < plain.body.len(), "{} of {}", packed.len(), plain.body.len());
+    let packed = res
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes();
+    assert!(
+        packed.len() * 3 < plain.body.len(),
+        "{} of {}",
+        packed.len(),
+        plain.body.len()
+    );
     let mut text = String::new();
-    flate2::read::GzDecoder::new(&packed[..]).read_to_string(&mut text).unwrap();
+    flate2::read::GzDecoder::new(&packed[..])
+        .read_to_string(&mut text)
+        .unwrap();
     assert_eq!(text, plain.body);
 
     let refused = send(
         &router,
-        Request::get("/_zeyn/zeyn.js").header(header::ACCEPT_ENCODING, "gzip;q=0").body(Body::empty()).unwrap(),
+        Request::get("/_zeyn/zeyn.js")
+            .header(header::ACCEPT_ENCODING, "gzip;q=0")
+            .body(Body::empty())
+            .unwrap(),
     )
     .await;
-    assert!(refused.headers.get(header::CONTENT_ENCODING).is_none());
+    assert!(
+        refused
+            .headers
+            .get(header::CONTENT_ENCODING)
+            .is_none()
+    );
 
-    let again = send(&router, Request::get("/_zeyn/zeyn.js").header(header::IF_NONE_MATCH, &tag).body(Body::empty()).unwrap()).await;
+    let again = send(
+        &router,
+        Request::get("/_zeyn/zeyn.js")
+            .header(header::IF_NONE_MATCH, &tag)
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
     assert_eq!(again.status, StatusCode::NOT_MODIFIED);
     assert!(again.body.is_empty());
 }
@@ -684,7 +1131,10 @@ fn localized() -> Router {
             Feature::new("site")
                 .screen(hello)
                 .screen(linked)
-                .menu(|m| m.group("Site", Icon::Home).item("Hello", hello)),
+                .menu(|m| {
+                    m.group("Site", Icon::Home)
+                        .item("Hello", hello)
+                }),
         )
         .router()
         .unwrap()
@@ -697,16 +1147,42 @@ fn visitor(path: &str) -> axum::http::request::Builder {
 #[tokio::test]
 async fn the_language_in_the_path_decides_the_language_of_the_page() {
     let router = localized();
-    let r = send(&router, visitor("/tr/hello").body(Body::empty()).unwrap()).await;
+    let r = send(
+        &router,
+        visitor("/tr/hello")
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::OK);
     assert!(r.body.contains(r#"<html lang="tr""#), "{}", &r.body[..200]);
     assert!(r.body.contains("locale=tr"));
-    assert!(r.body.contains(r#"href="/tr/hello""#), "menu links keep the language");
-    assert!(r.body.contains("data-zeyn-locale-path"), "the picker opens the same page in another language");
-    assert_eq!(r.headers.get(header::CONTENT_LANGUAGE).unwrap(), "tr");
-    let partial = visitor("/tr/hello").header("x-zeyn-partial", "1").body(Body::empty()).unwrap();
+    assert!(
+        r.body.contains(r#"href="/tr/hello""#),
+        "menu links keep the language"
+    );
+    assert!(
+        r.body.contains("data-zeyn-locale-path"),
+        "the picker opens the same page in another language"
+    );
+    assert_eq!(
+        r.headers
+            .get(header::CONTENT_LANGUAGE)
+            .unwrap(),
+        "tr"
+    );
+    let partial = visitor("/tr/hello")
+        .header("x-zeyn-partial", "1")
+        .body(Body::empty())
+        .unwrap();
     let r = send(&router, partial).await;
-    assert_eq!(r.headers.get(header::CONTENT_LANGUAGE).unwrap(), "tr", "nav.js swaps the frame when the language changes");
+    assert_eq!(
+        r.headers
+            .get(header::CONTENT_LANGUAGE)
+            .unwrap(),
+        "tr",
+        "nav.js swaps the frame when the language changes"
+    );
 
     let english = visitor("/hello")
         .header(header::COOKIE, "zeyn_locale=tr")
@@ -715,17 +1191,41 @@ async fn the_language_in_the_path_decides_the_language_of_the_page() {
         .body(Body::empty())
         .unwrap();
     let r = send(&router, english).await;
-    assert!(r.body.contains(r#"<html lang="en""#), "no cookie, header or Accept-Language beats the path");
+    assert!(
+        r.body.contains(r#"<html lang="en""#),
+        "no cookie, header or Accept-Language beats the path"
+    );
     assert!(r.body.contains("locale=en"));
     assert!(r.body.contains(r#"href="/hello""#));
 
-    let r = send(&router, visitor("/ar/hello").body(Body::empty()).unwrap()).await;
-    assert!(r.body.contains(r#"<html lang="ar" dir="rtl""#));
-    let r = send(&router, visitor("/tr").body(Body::empty()).unwrap()).await;
+    let r = send(
+        &router,
+        visitor("/ar/hello")
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
+    assert!(
+        r.body
+            .contains(r#"<html lang="ar" dir="rtl""#)
+    );
+    let r = send(
+        &router,
+        visitor("/tr")
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
     assert_ne!(r.status, StatusCode::INTERNAL_SERVER_ERROR);
 
     for missing in ["/en/hello", "/xx/hello", "/TR/hello", "/tr/tr/hello"] {
-        let r = send(&router, visitor(missing).body(Body::empty()).unwrap()).await;
+        let r = send(
+            &router,
+            visitor(missing)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await;
         assert_eq!(r.status, StatusCode::NOT_FOUND, "{missing}");
     }
 }
@@ -750,36 +1250,85 @@ async fn runtime_requests_take_the_language_of_the_page_that_sent_them() {
 
 #[tokio::test]
 async fn pages_list_their_languages_for_search_engines() {
-    let r = send(&localized(), visitor("/tr/hello").body(Body::empty()).unwrap()).await;
-    assert!(r.body.contains(r#"<link rel="alternate" hreflang="en" href="/hello" data-zeyn-head>"#));
-    assert!(r.body.contains(r#"<link rel="alternate" hreflang="tr" href="/tr/hello" data-zeyn-head>"#));
-    assert!(r.body.contains(r#"<link rel="alternate" hreflang="x-default" href="/hello" data-zeyn-head>"#));
+    let r = send(
+        &localized(),
+        visitor("/tr/hello")
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
+    assert!(
+        r.body
+            .contains(r#"<link rel="alternate" hreflang="en" href="/hello" data-zeyn-head>"#)
+    );
+    assert!(
+        r.body
+            .contains(r#"<link rel="alternate" hreflang="tr" href="/tr/hello" data-zeyn-head>"#)
+    );
+    assert!(
+        r.body.contains(
+            r#"<link rel="alternate" hreflang="x-default" href="/hello" data-zeyn-head>"#
+        )
+    );
     assert!(!r.body.contains("bad"), "a bad language tag is dropped");
 }
 
 #[tokio::test]
 async fn without_locale_paths_the_cookie_still_picks_the_language() {
-    let i18n = I18n::new("en").catalog("tr", r#"{ "x": "x" }"#).unwrap();
+    let i18n = I18n::new("en")
+        .catalog("tr", r#"{ "x": "x" }"#)
+        .unwrap();
     let router = App::new("Test")
         .i18n(i18n)
         .feature(Feature::new("site").screen(hello))
         .router()
         .unwrap();
-    let r = send(&router, visitor("/hello").header(header::COOKIE, "zeyn_locale=tr").body(Body::empty()).unwrap()).await;
+    let r = send(
+        &router,
+        visitor("/hello")
+            .header(header::COOKIE, "zeyn_locale=tr")
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
     assert!(r.body.contains("locale=tr"));
-    let r = send(&router, visitor("/tr/hello").body(Body::empty()).unwrap()).await;
+    let r = send(
+        &router,
+        visitor("/tr/hello")
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::NOT_FOUND);
-    let r = send(&router, visitor("/hello").header("x-zeyn-path-locale", "tr").body(Body::empty()).unwrap()).await;
-    assert!(r.body.contains("locale=en"), "the internal header means nothing without locale_paths");
+    let r = send(
+        &router,
+        visitor("/hello")
+            .header("x-zeyn-path-locale", "tr")
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
+    assert!(
+        r.body.contains("locale=en"),
+        "the internal header means nothing without locale_paths"
+    );
 }
 
 #[cfg(feature = "lang-all")]
 #[test]
 fn every_framework_language_is_built_in_with_lang_all() {
     let locales: Vec<&str> = I18n::builtin_locales().collect();
-    assert_eq!(locales, ["en", "tr", "zh", "ru", "es", "ko", "ja", "hi", "ar"]);
-    let i18n = I18n::new("en").catalog("ru", "{}").unwrap();
-    assert_eq!(i18n.lookup("ru", "zeyn.date.words.tomorrow"), Some("завтра"));
+    assert_eq!(
+        locales,
+        ["en", "tr", "zh", "ru", "es", "ko", "ja", "hi", "ar"]
+    );
+    let i18n = I18n::new("en")
+        .catalog("ru", "{}")
+        .unwrap();
+    assert_eq!(
+        i18n.lookup("ru", "zeyn.date.words.tomorrow"),
+        Some("завтра")
+    );
     let i18n = I18n::new("ar");
     assert_eq!(i18n.lookup("ar", "zeyn.locale.name"), Some("العربية"));
 }
@@ -787,23 +1336,52 @@ fn every_framework_language_is_built_in_with_lang_all() {
 #[cfg(not(feature = "lang-zh"))]
 #[test]
 fn languages_without_their_feature_fall_back_to_the_default() {
-    let i18n = I18n::new("en").catalog("zh", "{}").unwrap();
-    assert_eq!(i18n.lookup("zh", "zeyn.shell.language"), i18n.lookup("en", "zeyn.shell.language"));
+    let i18n = I18n::new("en")
+        .catalog("zh", "{}")
+        .unwrap();
+    assert_eq!(
+        i18n.lookup("zh", "zeyn.shell.language"),
+        i18n.lookup("en", "zeyn.shell.language")
+    );
 }
 
 #[tokio::test]
 async fn links_to_screens_inside_components_keep_the_language_of_the_path() {
     let router = localized();
-    let tr = send(&router, visitor("/tr/linked").body(Body::empty()).unwrap()).await.body;
+    let tr = send(
+        &router,
+        visitor("/tr/linked")
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await
+    .body;
     assert!(tr.contains(r#"href="/tr/hello""#), "{tr}");
-    let en = send(&router, visitor("/linked").body(Body::empty()).unwrap()).await.body;
-    assert!(en.contains(r#"href="/hello""#) && !en.contains(r#"href="/en/hello""#), "{en}");
+    let en = send(
+        &router,
+        visitor("/linked")
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await
+    .body;
+    assert!(
+        en.contains(r#"href="/hello""#) && !en.contains(r#"href="/en/hello""#),
+        "{en}"
+    );
 }
 
 /// The `content` of `<meta name="zeyn-csrf">` in a page.
 fn page_token(body: &str) -> String {
-    let start = body.find(r#"<meta name="zeyn-csrf" content=""#).expect("a CSRF meta tag") + 32;
-    body[start..].split('"').next().unwrap().to_string()
+    let start = body
+        .find(r#"<meta name="zeyn-csrf" content=""#)
+        .expect("a CSRF meta tag")
+        + 32;
+    body[start..]
+        .split('"')
+        .next()
+        .unwrap()
+        .to_string()
 }
 
 #[tokio::test]
@@ -811,7 +1389,9 @@ async fn the_page_token_is_masked_differently_in_every_response() {
     let router = router(writer());
     let cookie = format!("zeyn_csrf={TOKEN}");
     let page = || {
-        let req = Request::get("/products").header("x-user", "1").header(header::COOKIE, &cookie);
+        let req = Request::get("/products")
+            .header("x-user", "1")
+            .header(header::COOKIE, &cookie);
         send(&router, req.body(Body::empty()).unwrap())
     };
     let first = page_token(&page().await.body);
@@ -819,21 +1399,43 @@ async fn the_page_token_is_masked_differently_in_every_response() {
     assert_ne!(first, second, "two responses carry different bytes");
     for t in [&first, &second] {
         assert_eq!(t.len(), 128, "{t}");
-        assert!(t.bytes().all(|b| b.is_ascii_hexdigit()) && !t.contains(TOKEN), "{t}");
+        assert!(
+            t.bytes().all(|b| b.is_ascii_hexdigit()) && !t.contains(TOKEN),
+            "{t}"
+        );
     }
 
     let call = |token: &str| {
-        let mut req = post("/_zeyn/grid", serde_json::json!({ "screen": "list", "node": 0 }));
-        req.headers_mut().insert("x-zeyn-csrf", token.parse().unwrap());
+        let mut req = post(
+            "/_zeyn/grid",
+            serde_json::json!({ "screen": "list", "node": 0 }),
+        );
+        req.headers_mut()
+            .insert("x-zeyn-csrf", token.parse().unwrap());
         send(&router, req)
     };
-    assert_eq!(call(&first).await.status, StatusCode::OK, "the masked token is accepted");
+    assert_eq!(
+        call(&first).await.status,
+        StatusCode::OK,
+        "the masked token is accepted"
+    );
     assert_eq!(call(&second).await.status, StatusCode::OK);
-    assert_eq!(call(TOKEN).await.status, StatusCode::OK, "the raw token of older pages is accepted");
+    assert_eq!(
+        call(TOKEN).await.status,
+        StatusCode::OK,
+        "the raw token of older pages is accepted"
+    );
     let mut flipped = first.clone().into_bytes();
     flipped[127] = if flipped[127] == b'0' { b'1' } else { b'0' };
     let flipped = String::from_utf8(flipped).unwrap();
-    for wrong in [flipped.as_str(), &first[..127], &first[..64], &first[64..], &"g".repeat(128), ""] {
+    for wrong in [
+        flipped.as_str(),
+        &first[..127],
+        &first[..64],
+        &first[64..],
+        &"g".repeat(128),
+        "",
+    ] {
         assert_eq!(call(wrong).await.status, StatusCode::FORBIDDEN, "{wrong}");
     }
 }
@@ -846,47 +1448,156 @@ async fn grid_blocks_and_pages_are_gzipped_when_the_browser_accepts_it() {
     let body = serde_json::json!({ "screen": "list", "node": 0, "query": query });
     let plain = send(&router, post("/_zeyn/grid", body.clone())).await;
     assert_eq!(plain.status, StatusCode::OK);
-    assert!(plain.headers.get(header::CONTENT_ENCODING).is_none());
+    assert!(
+        plain
+            .headers
+            .get(header::CONTENT_ENCODING)
+            .is_none()
+    );
     assert!(plain.body.len() > 1024, "{}", plain.body.len());
 
     let mut req = post("/_zeyn/grid", body);
-    req.headers_mut().insert(header::ACCEPT_ENCODING, "gzip, deflate, br".parse().unwrap());
-    let res = router.clone().oneshot(req).await.unwrap();
-    assert_eq!(res.headers().get(header::CONTENT_ENCODING).unwrap(), "gzip");
-    let vary = res.headers().get_all(header::VARY).iter().map(|v| v.to_str().unwrap().to_ascii_lowercase()).collect::<Vec<_>>();
-    assert!(vary.iter().any(|v| v.contains("accept-encoding")), "{vary:?}");
-    let packed = res.into_body().collect().await.unwrap().to_bytes();
-    assert!(packed.len() < plain.body.len(), "{} of {}", packed.len(), plain.body.len());
+    req.headers_mut().insert(
+        header::ACCEPT_ENCODING,
+        "gzip, deflate, br".parse().unwrap(),
+    );
+    let res = router
+        .clone()
+        .oneshot(req)
+        .await
+        .unwrap();
+    assert_eq!(
+        res.headers()
+            .get(header::CONTENT_ENCODING)
+            .unwrap(),
+        "gzip"
+    );
+    let vary = res
+        .headers()
+        .get_all(header::VARY)
+        .iter()
+        .map(|v| v.to_str().unwrap().to_ascii_lowercase())
+        .collect::<Vec<_>>();
+    assert!(
+        vary.iter()
+            .any(|v| v.contains("accept-encoding")),
+        "{vary:?}"
+    );
+    let packed = res
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes();
+    assert!(
+        packed.len() < plain.body.len(),
+        "{} of {}",
+        packed.len(),
+        plain.body.len()
+    );
     let mut text = String::new();
-    flate2::read::GzDecoder::new(&packed[..]).read_to_string(&mut text).unwrap();
-    assert_eq!(text, plain.body, "the compressed block decodes to the same body");
+    flate2::read::GzDecoder::new(&packed[..])
+        .read_to_string(&mut text)
+        .unwrap();
+    assert_eq!(
+        text, plain.body,
+        "the compressed block decodes to the same body"
+    );
 
-    let page = Request::get("/products").header("x-user", "1").header(header::ACCEPT_ENCODING, "gzip");
-    let res = router.clone().oneshot(page.body(Body::empty()).unwrap()).await.unwrap();
-    assert_eq!(res.headers().get(header::CONTENT_ENCODING).unwrap(), "gzip");
+    let page = Request::get("/products")
+        .header("x-user", "1")
+        .header(header::ACCEPT_ENCODING, "gzip");
+    let res = router
+        .clone()
+        .oneshot(page.body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(
+        res.headers()
+            .get(header::CONTENT_ENCODING)
+            .unwrap(),
+        "gzip"
+    );
 
     let small = Request::get("/_zeyn/csrf").header(header::ACCEPT_ENCODING, "gzip");
-    let res = router.clone().oneshot(small.body(Body::empty()).unwrap()).await.unwrap();
-    assert!(res.headers().get(header::CONTENT_ENCODING).is_none(), "bodies under 1 KB stay as they are");
+    let res = router
+        .clone()
+        .oneshot(small.body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert!(
+        res.headers()
+            .get(header::CONTENT_ENCODING)
+            .is_none(),
+        "bodies under 1 KB stay as they are"
+    );
 }
 
 #[tokio::test]
 async fn asset_links_carry_the_build_and_are_kept_for_a_year() {
     let router = router(writer());
-    let page = send(&router, get("/products")).await.body;
-    let start = page.find(r#"src="/_zeyn/zeyn.js?v="#).expect("a versioned runtime link") + 5;
-    let url = page[start..].split('"').next().unwrap().to_string();
+    let page = send(&router, get("/products"))
+        .await
+        .body;
+    let start = page
+        .find(r#"src="/_zeyn/zeyn.js?v="#)
+        .expect("a versioned runtime link")
+        + 5;
+    let url = page[start..]
+        .split('"')
+        .next()
+        .unwrap()
+        .to_string();
     let version = &url[url.find('?').unwrap()..];
-    for asset in ["zeyn.css", "nav.js", "components.js", "components.css", "enterprise.js", "media.css", "grid.js"] {
-        assert!(page.contains(&format!("/_zeyn/{asset}{version}")), "{asset}");
+    for asset in [
+        "zeyn.css",
+        "nav.js",
+        "components.js",
+        "components.css",
+        "enterprise.js",
+        "media.css",
+        "grid.js",
+    ] {
+        assert!(
+            page.contains(&format!("/_zeyn/{asset}{version}")),
+            "{asset}"
+        );
     }
-    let cache = |r: &Reply| r.headers.get(header::CACHE_CONTROL).unwrap().to_str().unwrap().to_string();
-    let current = send(&router, Request::get(&url).body(Body::empty()).unwrap()).await;
+    let cache = |r: &Reply| {
+        r.headers
+            .get(header::CACHE_CONTROL)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string()
+    };
+    let current = send(
+        &router,
+        Request::get(&url)
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
     assert_eq!(current.status, StatusCode::OK);
     assert_eq!(cache(&current), "public, max-age=31536000, immutable");
-    assert!(current.headers.get(header::ETAG).is_some());
-    for other in ["/_zeyn/zeyn.js", "/_zeyn/zeyn.js?v=old", "/_zeyn/zeyn.js?x=1"] {
-        let r = send(&router, Request::get(other).body(Body::empty()).unwrap()).await;
+    assert!(
+        current
+            .headers
+            .get(header::ETAG)
+            .is_some()
+    );
+    for other in [
+        "/_zeyn/zeyn.js",
+        "/_zeyn/zeyn.js?v=old",
+        "/_zeyn/zeyn.js?x=1",
+    ] {
+        let r = send(
+            &router,
+            Request::get(other)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await;
         assert_eq!(cache(&r), "no-cache", "{other} revalidates");
     }
 }
@@ -894,20 +1605,49 @@ async fn asset_links_carry_the_build_and_are_kept_for_a_year() {
 #[tokio::test]
 async fn only_pages_with_a_grid_preload_the_grid_runtime() {
     let router = router(writer());
-    let with_grid = send(&router, get("/products")).await.body;
+    let with_grid = send(&router, get("/products"))
+        .await
+        .body;
     assert!(with_grid.contains(r#"<link rel="modulepreload" href="/_zeyn/grid.js?v="#));
     let without = send(&router, get("/clock")).await.body;
-    assert!(!without.contains("grid.js"), "a page without a grid never names the grid runtime");
-    let js = send(&router, Request::get("/_zeyn/grid.js").body(Body::empty()).unwrap()).await;
+    assert!(
+        !without.contains("grid.js"),
+        "a page without a grid never names the grid runtime"
+    );
+    let js = send(
+        &router,
+        Request::get("/_zeyn/grid.js")
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
     assert_eq!(js.status, StatusCode::OK);
-    assert!(js.body.contains("export function install(z)") && js.body.contains("export {"));
-    let core = send(&router, Request::get("/_zeyn/zeyn.js").body(Body::empty()).unwrap()).await.body;
-    assert!(!core.contains("function renderVirtual"), "the grid runtime is not in zeyn.js");
+    assert!(
+        js.body
+            .contains("export function install(z)")
+            && js.body.contains("export {")
+    );
+    let core = send(
+        &router,
+        Request::get("/_zeyn/zeyn.js")
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await
+    .body;
+    assert!(
+        !core.contains("function renderVirtual"),
+        "the grid runtime is not in zeyn.js"
+    );
 }
 
 /// Names in a comma separated list, as in `let a, b;` or `{ a, b }`.
 fn names(text: &str) -> Vec<&str> {
-    let mut v: Vec<&str> = text.split(',').map(str::trim).filter(|n| !n.is_empty()).collect();
+    let mut v: Vec<&str> = text
+        .split(',')
+        .map(str::trim)
+        .filter(|n| !n.is_empty())
+        .collect();
     v.sort_unstable();
     v
 }
@@ -917,10 +1657,28 @@ fn the_two_halves_of_the_browser_runtime_agree_on_what_they_share() {
     let api = include_str!("../assets/zeyn/grid-api.js");
     let core = include_str!("../assets/zeyn/core.js");
     let exports = include_str!("../assets/zeyn/grid-exports.js");
-    let declared = api.lines().find_map(|l| l.strip_prefix("let ")?.strip_suffix(';')).expect("the let line");
-    let handed = core.split("m.install({ ").nth(1).and_then(|s| s.split(" })").next()).expect("the install call");
-    assert_eq!(names(declared), names(handed), "grid-api.js and the install call in core.js list the same names");
-    let exported = exports.split("export { ").nth(1).and_then(|s| s.split(" }").next()).expect("the export list");
+    let declared = api
+        .lines()
+        .find_map(|l| {
+            l.strip_prefix("let ")?
+                .strip_suffix(';')
+        })
+        .expect("the let line");
+    let handed = core
+        .split("m.install({ ")
+        .nth(1)
+        .and_then(|s| s.split(" })").next())
+        .expect("the install call");
+    assert_eq!(
+        names(declared),
+        names(handed),
+        "grid-api.js and the install call in core.js list the same names"
+    );
+    let exported = exports
+        .split("export { ")
+        .nth(1)
+        .and_then(|s| s.split(" }").next())
+        .expect("the export list");
     let exported = names(exported);
     for part in ["core.js", "menus.js", "page.js", "events.js"] {
         let src = match part {
@@ -930,11 +1688,17 @@ fn the_two_halves_of_the_browser_runtime_agree_on_what_they_share() {
             _ => include_str!("../assets/zeyn/events.js"),
         };
         for used in src.split("G?.").skip(1) {
-            let name: String = used.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
+            let name: String = used
+                .chars()
+                .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+                .collect();
             if name.is_empty() {
                 continue;
             }
-            assert!(exported.contains(&name.as_str()), "{part} calls G?.{name}, which grid-exports.js does not export");
+            assert!(
+                exported.contains(&name.as_str()),
+                "{part} calls G?.{name}, which grid-exports.js does not export"
+            );
         }
     }
 }

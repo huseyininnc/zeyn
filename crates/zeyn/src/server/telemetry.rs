@@ -29,26 +29,45 @@ pub(crate) fn init(config: &Config, service: &str) -> Option<Flush> {
     if tracing::dispatcher::has_been_set() {
         return None;
     }
-    let level = config.get("log.level").unwrap_or("info");
+    let level = config
+        .get("log.level")
+        .unwrap_or("info");
     let (filter, bad_level) = match level.parse::<Targets>() {
         Ok(f) => (f, false),
         Err(_) => (Targets::new().with_default(tracing::Level::INFO), true),
     };
-    let events_only = filter.clone().and(tracing_subscriber::filter::filter_fn(|m| m.is_event()));
-    let stderr =
-        tracing_subscriber::fmt::layer().with_writer(std::io::stderr).with_ansi(false).with_filter(events_only);
+    let events_only = filter
+        .clone()
+        .and(tracing_subscriber::filter::filter_fn(|m| m.is_event()));
+    let stderr = tracing_subscriber::fmt::layer()
+        .with_writer(std::io::stderr)
+        .with_ansi(false)
+        .with_filter(events_only);
     #[cfg(feature = "otel")]
     let (otel, provider, otel_error) = match otel::exporter(config, service) {
-        Ok(Some(provider)) => (Some(otel::layer(&provider).with_filter(filter)), Some(provider), None),
+        Ok(Some(provider)) => (
+            Some(otel::layer(&provider).with_filter(filter)),
+            Some(provider),
+            None,
+        ),
         Ok(None) => (None, None, None),
         Err(e) => (None, None, Some(e)),
     };
     #[cfg(not(feature = "otel"))]
-    let (otel, provider, otel_error): (Option<tracing_subscriber::layer::Identity>, Option<()>, Option<String>) = {
+    let (otel, provider, otel_error): (
+        Option<tracing_subscriber::layer::Identity>,
+        Option<()>,
+        Option<String>,
+    ) = {
         let _ = (service, filter);
         (None, None, None)
     };
-    if tracing_subscriber::registry().with(stderr).with(otel).try_init().is_err() {
+    if tracing_subscriber::registry()
+        .with(stderr)
+        .with(otel)
+        .try_init()
+        .is_err()
+    {
         return None;
     }
     if bad_level {
@@ -91,20 +110,38 @@ mod otel {
     use tracing_subscriber::registry::LookupSpan;
 
     /// The OTLP exporter when `otel.endpoint` is set.
-    pub(super) fn exporter(config: &Config, service: &str) -> Result<Option<SdkTracerProvider>, String> {
-        let Some(endpoint) = config.get("otel.endpoint").map(|e| e.trim_end_matches('/')) else { return Ok(None) };
-        let endpoint =
-            if endpoint.ends_with("/v1/traces") { endpoint.to_string() } else { format!("{endpoint}/v1/traces") };
+    pub(super) fn exporter(
+        config: &Config,
+        service: &str,
+    ) -> Result<Option<SdkTracerProvider>, String> {
+        let Some(endpoint) = config
+            .get("otel.endpoint")
+            .map(|e| e.trim_end_matches('/'))
+        else {
+            return Ok(None);
+        };
+        let endpoint = if endpoint.ends_with("/v1/traces") {
+            endpoint.to_string()
+        } else {
+            format!("{endpoint}/v1/traces")
+        };
         let exporter = opentelemetry_otlp::SpanExporter::builder()
             .with_http()
             .with_endpoint(endpoint)
             .build()
             .map_err(|e| e.to_string())?;
-        let name = config.get("otel.service_name").unwrap_or(service).to_string();
+        let name = config
+            .get("otel.service_name")
+            .unwrap_or(service)
+            .to_string();
         Ok(Some(
             SdkTracerProvider::builder()
                 .with_batch_exporter(exporter)
-                .with_resource(opentelemetry_sdk::Resource::builder().with_service_name(name).build())
+                .with_resource(
+                    opentelemetry_sdk::Resource::builder()
+                        .with_service_name(name)
+                        .build(),
+                )
                 .build(),
         ))
     }

@@ -58,16 +58,31 @@ impl ProductStore {
     pub async fn connect(url: &str) -> Result<Self> {
         let db = Db::connect(url, PoolLimits::default()).await?;
         if db.dialect().name() == "postgres" {
-            db.migrate_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/migrations")).await?;
-        } else if db.find::<Product>(&DataQuery::default()).await.is_err() {
+            db.migrate_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/migrations"))
+                .await?;
+        } else if db
+            .find::<Product>(&DataQuery::default())
+            .await
+            .is_err()
+        {
             db.create_table::<Product>().await?;
-            let ProductStore::Memory(samples) = ProductStore::seeded() else { unreachable!() };
-            let samples = samples.read().map_err(poisoned)?.clone();
+            let ProductStore::Memory(samples) = ProductStore::seeded() else {
+                unreachable!()
+            };
+            let samples = samples
+                .read()
+                .map_err(poisoned)?
+                .clone();
             let mut tx = db.begin().await?;
             for p in samples {
-                tx.insert(&Product { id: ProductId(0), ..p }).await?;
+                tx.insert(&Product {
+                    id: ProductId(0),
+                    ..p
+                })
+                .await?;
             }
-            tx.execute("UPDATE products SET stock = MOD(id * 7, 40)", vec![]).await?;
+            tx.execute("UPDATE products SET stock = MOD(id * 7, 40)", vec![])
+                .await?;
             tx.commit().await?;
         }
         Ok(ProductStore::Sql(db))
@@ -84,9 +99,13 @@ impl ProductStore {
 
     pub async fn get(&self, id: ProductId) -> Result<Product> {
         match self {
-            ProductStore::Memory(rows) => {
-                rows.read().map_err(poisoned)?.iter().find(|p| p.id == id).cloned().ok_or(Error::NotFound)
-            }
+            ProductStore::Memory(rows) => rows
+                .read()
+                .map_err(poisoned)?
+                .iter()
+                .find(|p| p.id == id)
+                .cloned()
+                .ok_or(Error::NotFound),
             #[cfg(any(feature = "postgres", feature = "oracle"))]
             ProductStore::Sql(db) => db.get(id).await,
         }
@@ -110,19 +129,32 @@ impl ProductStore {
 }
 
 fn save_in_memory(rows: &mut Vec<Product>, mut product: Product) -> Result<Product> {
-    if rows.iter().any(|p| p.code.eq_ignore_ascii_case(&product.code) && p.id != product.id) {
+    if rows.iter().any(|p| {
+        p.code
+            .eq_ignore_ascii_case(&product.code)
+            && p.id != product.id
+    }) {
         let mut errors = ValidationErrors::default();
         errors.add(Product::code, t!("stock.code_taken", code = product.code));
         return Err(errors.into());
     }
     if product.id.0 == 0 {
-        product.id = ProductId(rows.iter().map(|p| p.id.0).max().unwrap_or(0) + 1);
+        product.id = ProductId(
+            rows.iter()
+                .map(|p| p.id.0)
+                .max()
+                .unwrap_or(0)
+                + 1,
+        );
         product.version = 1;
         product.stock = 0;
         rows.push(product.clone());
         return Ok(product);
     }
-    let current = rows.iter_mut().find(|p| p.id == product.id).ok_or(Error::NotFound)?;
+    let current = rows
+        .iter_mut()
+        .find(|p| p.id == product.id)
+        .ok_or(Error::NotFound)?;
     if current.version != product.version {
         return Err(Error::Conflict);
     }
