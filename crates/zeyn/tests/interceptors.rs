@@ -29,5 +29,7 @@ impl AuditSink for Collect {
 #[test]
 fn custom_interceptors_and_audit_sinks_can_be_written_by_apps() {
     let seen = Arc::new(Mutex::new(Vec::new()));
-    let _app = zeyn::App::new("Test").interceptor(SlowCalls(seen)).interceptor(AuditLog(Collect));
+    let _app = zeyn::App::new("Test")
+        .interceptor(SlowCalls(seen))
+        .interceptor(AuditLog(Collect));
 }

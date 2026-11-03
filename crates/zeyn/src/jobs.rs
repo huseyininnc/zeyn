@@ -31,7 +31,8 @@ mod store;
 #[cfg(any(feature = "postgres", feature = "oracle"))]
 pub use sql::{SqlJobStore, create_job_tables};
 pub use store::{
-    ClaimedJob, JobStore, MAX_BACKOFF_MS, MAX_JOB_PAYLOAD, MEMORY_JOB_CAPACITY, MemoryJobStore, NewJob, NextRun,
+    ClaimedJob, JobStore, MAX_BACKOFF_MS, MAX_JOB_PAYLOAD, MEMORY_JOB_CAPACITY, MemoryJobStore,
+    NewJob, NextRun,
 };
 
 use crate::action::{Error, Result};
@@ -54,12 +55,20 @@ pub struct Schedule {
 impl Schedule {
     /// Runs every `interval`, the first time one interval after start, and when triggered.
     pub fn every(interval: Duration) -> Self {
-        Schedule { every: Some(interval.max(Duration::from_millis(10))), retries: 0, backoff: Duration::from_secs(1) }
+        Schedule {
+            every: Some(interval.max(Duration::from_millis(10))),
+            retries: 0,
+            backoff: Duration::from_secs(1),
+        }
     }
 
     /// Runs only when triggered with [`Jobs::trigger`].
     pub fn manual() -> Self {
-        Schedule { every: None, retries: 0, backoff: Duration::from_secs(1) }
+        Schedule {
+            every: None,
+            retries: 0,
+            backoff: Duration::from_secs(1),
+        }
     }
 
     /// Tries a failed run up to `times` more times, waiting `first_delay`, then twice as long
@@ -147,7 +156,10 @@ fn now_ms() -> i64 {
 pub(crate) fn random_id() -> String {
     let mut bytes = [0u8; 16];
     getrandom::getrandom(&mut bytes).expect("the operating system random source must work");
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
+    bytes
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 fn ms(d: Duration) -> i64 {
@@ -176,15 +188,24 @@ impl Jobs {
     /// `SqlJobStore`, instead of in memory. Set it once, before the jobs start.
     pub fn set_store(&self, store: impl JobStore) -> Result<()> {
         if self.0.started.load(Ordering::SeqCst) {
-            return Err(Error::Internal("set the job store before the jobs start".into()));
+            return Err(Error::Internal(
+                "set the job store before the jobs start".into(),
+            ));
         }
-        self.0.store.set(Arc::new(store)).map_err(|_| Error::Internal("the job store is already set".into()))?;
-        self.0.durable.store(true, Ordering::SeqCst);
+        self.0
+            .store
+            .set(Arc::new(store))
+            .map_err(|_| Error::Internal("the job store is already set".into()))?;
+        self.0
+            .durable
+            .store(true, Ordering::SeqCst);
         Ok(())
     }
 
     fn store(&self) -> &Arc<dyn JobStore> {
-        self.0.store.get_or_init(|| Arc::new(MemoryJobStore::default()))
+        self.0
+            .store
+            .get_or_init(|| Arc::new(MemoryJobStore::default()))
     }
 
     fn durable(&self) -> bool {
@@ -198,18 +219,28 @@ impl Jobs {
         F: Fn(Ctx, String) -> Fut + Send + Sync + 'static,
         Fut: std::future::Future<Output = Result<()>> + Send + 'static,
     {
-        self.register(name, schedule, Arc::new(move |ctx, payload| Box::pin(run(ctx, payload))));
+        self.register(
+            name,
+            schedule,
+            Arc::new(move |ctx, payload| Box::pin(run(ctx, payload))),
+        );
     }
 
     /// Queues a run of a registered job with `payload` (at most [`MAX_JOB_PAYLOAD`] bytes) and
     /// returns its id. The run is tried as the job's [`Schedule::retry`] says; with a durable store
     /// it survives restarts.
     pub async fn enqueue(&self, name: &str, payload: impl Into<String>) -> Result<String> {
-        self.enqueue_after(name, payload, Duration::ZERO).await
+        self.enqueue_after(name, payload, Duration::ZERO)
+            .await
     }
 
     /// Queues a run that starts no earlier than `delay` from now (see [`Jobs::enqueue`]).
-    pub async fn enqueue_after(&self, name: &str, payload: impl Into<String>, delay: Duration) -> Result<String> {
+    pub async fn enqueue_after(
+        &self,
+        name: &str,
+        payload: impl Into<String>,
+        delay: Duration,
+    ) -> Result<String> {
         if self.0.stopping.load(Ordering::SeqCst) {
             return Err(Error::Conflict);
         }
@@ -220,8 +251,15 @@ impl Jobs {
     }
 
     fn new_job(&self, name: &str, payload: String, delay: Duration) -> Result<NewJob> {
-        let jobs = self.0.jobs.lock().map_err(|_| Error::Internal("jobs lock".into()))?;
-        let job = jobs.iter().find(|j| j.name == name).ok_or(Error::NotFound)?;
+        let jobs = self
+            .0
+            .jobs
+            .lock()
+            .map_err(|_| Error::Internal("jobs lock".into()))?;
+        let job = jobs
+            .iter()
+            .find(|j| j.name == name)
+            .ok_or(Error::NotFound)?;
         Ok(NewJob {
             name: job.name.to_string(),
             payload,
@@ -241,11 +279,18 @@ impl Jobs {
     }
 
     fn register(&self, name: &'static str, schedule: Schedule, run: JobFn) {
-        let Ok(mut jobs) = self.0.jobs.lock() else { return };
+        let Ok(mut jobs) = self.0.jobs.lock() else {
+            return;
+        };
         if jobs.iter().any(|j| j.name == name) {
             return;
         }
-        jobs.push(Arc::new(Job { name, schedule, run, wake: Notify::new() }));
+        jobs.push(Arc::new(Job {
+            name,
+            schedule,
+            run,
+            wake: Notify::new(),
+        }));
         if let Ok(mut status) = self.0.status.lock() {
             status.insert(
                 name,
@@ -283,8 +328,15 @@ impl Jobs {
             });
             return Ok(());
         }
-        let jobs = self.0.jobs.lock().map_err(|_| Error::Internal("jobs lock".into()))?;
-        let job = jobs.iter().find(|j| j.name == name).ok_or(Error::NotFound)?;
+        let jobs = self
+            .0
+            .jobs
+            .lock()
+            .map_err(|_| Error::Internal("jobs lock".into()))?;
+        let job = jobs
+            .iter()
+            .find(|j| j.name == name)
+            .ok_or(Error::NotFound)?;
         job.wake.notify_one();
         self.set(job.name, |s| {
             if s.state != JobState::Running {
@@ -296,10 +348,22 @@ impl Jobs {
 
     /// Status of every job, in registration order.
     pub fn status(&self) -> Vec<JobStatus> {
-        let names: Vec<&'static str> =
-            self.0.jobs.lock().map(|j| j.iter().map(|j| j.name).collect()).unwrap_or_default();
+        let names: Vec<&'static str> = self
+            .0
+            .jobs
+            .lock()
+            .map(|j| j.iter().map(|j| j.name).collect())
+            .unwrap_or_default();
         let status = self.0.status.lock();
-        names.iter().filter_map(|n| status.as_ref().ok().and_then(|s| s.get(n).cloned())).collect()
+        names
+            .iter()
+            .filter_map(|n| {
+                status
+                    .as_ref()
+                    .ok()
+                    .and_then(|s| s.get(n).cloned())
+            })
+            .collect()
     }
 
     fn set(&self, name: &'static str, change: impl FnOnce(&mut JobStatus)) {
@@ -312,17 +376,32 @@ impl Jobs {
 
     /// Whether no job is registered and no store is set.
     pub(crate) fn is_empty(&self) -> bool {
-        !self.durable() && self.0.jobs.lock().map(|j| j.is_empty()).unwrap_or(true)
+        !self.durable()
+            && self
+                .0
+                .jobs
+                .lock()
+                .map(|j| j.is_empty())
+                .unwrap_or(true)
     }
 
     /// Starts the schedulers on the current Tokio runtime, once; `ctx` builds the context of each
     /// run from the job name. `App` does this when it builds its router.
     pub fn start(&self, ctx: impl Fn(&'static str) -> Ctx + Send + Sync + 'static) {
         let ctx: CtxFn = Arc::new(ctx);
-        if self.0.started.swap(true, Ordering::SeqCst) {
+        if self
+            .0
+            .started
+            .swap(true, Ordering::SeqCst)
+        {
             return;
         }
-        let jobs: Vec<Arc<Job>> = self.0.jobs.lock().map(|j| j.clone()).unwrap_or_default();
+        let jobs: Vec<Arc<Job>> = self
+            .0
+            .jobs
+            .lock()
+            .map(|j| j.clone())
+            .unwrap_or_default();
         if jobs.is_empty() {
             return;
         }
@@ -345,8 +424,15 @@ impl Jobs {
             for (name, every_ms, schedule) in every {
                 let first = now_ms().saturating_add(every_ms);
                 let retries = schedule.retries.saturating_add(1);
-                if let Err(e) = me.store().schedule(name, every_ms, first, retries, ms(schedule.backoff)).await {
-                    tracing::error!(job = name, "storing the schedule of job `{name}` failed: {e:?}");
+                if let Err(e) = me
+                    .store()
+                    .schedule(name, every_ms, first, retries, ms(schedule.backoff))
+                    .await
+                {
+                    tracing::error!(
+                        job = name,
+                        "storing the schedule of job `{name}` failed: {e:?}"
+                    );
                 }
             }
             me.work(names, ctx).await
@@ -369,7 +455,11 @@ impl Jobs {
                 permits.push(p);
             }
             let wanted = permits.len();
-            let claimed = match self.store().claim(&self.0.worker, &names, now_ms(), ms(JOB_LEASE), wanted).await {
+            let claimed = match self
+                .store()
+                .claim(&self.0.worker, &names, now_ms(), ms(JOB_LEASE), wanted)
+                .await
+            {
                 Ok(c) => c,
                 Err(e) => {
                     tracing::error!("claiming jobs failed: {e:?}");
@@ -380,10 +470,13 @@ impl Jobs {
             for job in claimed {
                 let Some(permit) = permits.pop() else { break };
                 let (me, ctx) = (self.clone(), ctx.clone());
-                self.0.running.fetch_add(1, Ordering::SeqCst);
+                self.0
+                    .running
+                    .fetch_add(1, Ordering::SeqCst);
                 tokio::spawn(async move {
                     me.run_claimed(job, &ctx).await;
-                    me.0.running.fetch_sub(1, Ordering::SeqCst);
+                    me.0.running
+                        .fetch_sub(1, Ordering::SeqCst);
                     drop(permit);
                 });
             }
@@ -403,13 +496,21 @@ impl Jobs {
     async fn run_claimed(&self, job: ClaimedJob, ctx: &CtxFn) {
         let store = self.store().clone();
         let worker = self.0.worker.as_str();
-        let found = self.0.jobs.lock().ok().and_then(|j| j.iter().find(|j| j.name == job.name).cloned());
+        let found = self.0.jobs.lock().ok().and_then(|j| {
+            j.iter()
+                .find(|j| j.name == job.name)
+                .cloned()
+        });
         let Some(handler) = found else {
-            let _ = store.fail(&job, worker, "not_found", now_ms()).await;
+            let _ = store
+                .fail(&job, worker, "not_found", now_ms())
+                .await;
             return;
         };
         if job.attempts > job.max_attempts {
-            let _ = store.fail(&job, worker, "abandoned", now_ms()).await;
+            let _ = store
+                .fail(&job, worker, "abandoned", now_ms())
+                .await;
             return;
         }
         self.set(handler.name, |s| {
@@ -421,7 +522,10 @@ impl Jobs {
         let beat = async {
             loop {
                 tokio::time::sleep(JOB_LEASE / 3).await;
-                match store.heartbeat(&job.id, worker, now_ms().saturating_add(ms(JOB_LEASE))).await {
+                match store
+                    .heartbeat(&job.id, worker, now_ms().saturating_add(ms(JOB_LEASE)))
+                    .await
+                {
                     Ok(false) => return,
                     Ok(true) => {}
                     Err(e) => tracing::warn!(job = handler.name, "job heartbeat failed: {e:?}"),
@@ -435,11 +539,18 @@ impl Jobs {
         let finished = now_ms();
         match result {
             None => {
-                tracing::warn!(job = handler.name, "job `{}` lost its lease and was stopped", handler.name);
+                tracing::warn!(
+                    job = handler.name,
+                    "job `{}` lost its lease and was stopped",
+                    handler.name
+                );
                 self.set(handler.name, |s| s.state = JobState::Waiting);
             }
             Some(Ok(())) => {
-                if let Err(e) = store.complete(&job, worker, finished).await {
+                if let Err(e) = store
+                    .complete(&job, worker, finished)
+                    .await
+                {
                     tracing::error!(job = handler.name, "storing a finished job failed: {e:?}");
                 }
                 self.set(handler.name, |s| {
@@ -450,9 +561,16 @@ impl Jobs {
             }
             Some(Err(e)) => {
                 if let Error::Internal(detail) = &e {
-                    tracing::error!(job = handler.name, "job `{}` failed: {detail}", handler.name);
+                    tracing::error!(
+                        job = handler.name,
+                        "job `{}` failed: {detail}",
+                        handler.name
+                    );
                 }
-                if let Err(e) = store.fail(&job, worker, e.code(), finished).await {
+                if let Err(e) = store
+                    .fail(&job, worker, e.code(), finished)
+                    .await
+                {
                     tracing::error!(job = handler.name, "storing a failed job failed: {e:?}");
                 }
                 let retry = job.attempts < job.max_attempts;
@@ -460,7 +578,11 @@ impl Jobs {
                     s.failures += 1;
                     s.last_finished_ms = Some(finished);
                     s.last_error = Some(e.code());
-                    s.state = if retry { JobState::Retrying } else { JobState::Failed };
+                    s.state = if retry {
+                        JobState::Retrying
+                    } else {
+                        JobState::Failed
+                    };
                 });
             }
         }
@@ -482,13 +604,19 @@ impl Jobs {
             if self.0.stopping.load(Ordering::SeqCst) {
                 return;
             }
-            let Ok(permit) = self.0.slots.acquire().await else { return };
+            let Ok(permit) = self.0.slots.acquire().await else {
+                return;
+            };
             if self.0.stopping.load(Ordering::SeqCst) {
                 return;
             }
-            self.0.running.fetch_add(1, Ordering::SeqCst);
+            self.0
+                .running
+                .fetch_add(1, Ordering::SeqCst);
             self.run_once(&job, ctx(job.name)).await;
-            self.0.running.fetch_sub(1, Ordering::SeqCst);
+            self.0
+                .running
+                .fetch_sub(1, Ordering::SeqCst);
             drop(permit);
         }
     }
@@ -516,12 +644,17 @@ impl Jobs {
                     if let Error::Internal(detail) = &e {
                         tracing::error!(job = job.name, "job `{}` failed: {detail}", job.name);
                     }
-                    let last = attempt == job.schedule.retries || self.0.stopping.load(Ordering::SeqCst);
+                    let last =
+                        attempt == job.schedule.retries || self.0.stopping.load(Ordering::SeqCst);
                     self.set(job.name, |s| {
                         s.failures += 1;
                         s.last_finished_ms = Some(finished);
                         s.last_error = Some(e.code());
-                        s.state = if last { JobState::Failed } else { JobState::Retrying };
+                        s.state = if last {
+                            JobState::Failed
+                        } else {
+                            JobState::Retrying
+                        };
                     });
                     if last {
                         return;
@@ -542,7 +675,9 @@ impl Jobs {
     /// Stops scheduling, cancels retry waits and waits up to `grace` for running jobs to finish.
     /// Returns whether every job finished in time.
     pub async fn shutdown(&self, grace: Duration) -> bool {
-        self.0.stopping.store(true, Ordering::SeqCst);
+        self.0
+            .stopping
+            .store(true, Ordering::SeqCst);
         self.0.stop.notify_waiters();
         self.0.slots.close();
         let deadline = tokio::time::Instant::now() + grace;

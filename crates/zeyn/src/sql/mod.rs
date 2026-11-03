@@ -100,19 +100,27 @@ impl PoolLimits {
         fn num(config: &Config, key: &str, default: u64) -> Result<u64> {
             match config.get(key) {
                 None => Ok(default),
-                Some(v) => v
-                    .trim()
-                    .parse()
-                    .map_err(|_| Error::Internal(format!("configuration `{key}` is not a whole number"))),
+                Some(v) => v.trim().parse().map_err(|_| {
+                    Error::Internal(format!("configuration `{key}` is not a whole number"))
+                }),
             }
         }
         let d = PoolLimits::default();
-        let max = num(config, "database.max_connections", u64::from(d.max_connections))?.clamp(1, 1000) as u32;
+        let max = num(
+            config,
+            "database.max_connections",
+            u64::from(d.max_connections),
+        )?
+        .clamp(1, 1000) as u32;
         let statement = num(config, "database.statement_timeout_ms", 30_000)?;
         Ok(PoolLimits {
             max_connections: max,
             min_connections: (num(config, "database.min_connections", 0)? as u32).min(max),
-            acquire_timeout: Duration::from_millis(num(config, "database.acquire_timeout_ms", 5_000)?),
+            acquire_timeout: Duration::from_millis(num(
+                config,
+                "database.acquire_timeout_ms",
+                5_000,
+            )?),
             idle_timeout: Duration::from_secs(num(config, "database.idle_timeout_s", 600)?),
             statement_timeout: (statement > 0).then(|| Duration::from_millis(statement)),
             count_cap: num(config, "database.count_cap", DEFAULT_COUNT_CAP)?.max(1),
@@ -183,10 +191,16 @@ impl Db {
     /// - `oracle://user:password@host:1521/service` (feature `oracle`); add `?compat=11` or
     ///   `?compat=12` to choose the SQL without asking the database for its version
     pub async fn connect(url: &str, limits: PoolLimits) -> Result<Db> {
-        let scheme = url.split("://").next().unwrap_or_default();
+        let scheme = url
+            .split("://")
+            .next()
+            .unwrap_or_default();
         let (backend, dialect): (Backend, Box<dyn Dialect>) = match scheme {
             #[cfg(feature = "postgres")]
-            "postgres" | "postgresql" => (Backend::Postgres(pg::connect(url, &limits).await?), Box::new(Postgres)),
+            "postgres" | "postgresql" => (
+                Backend::Postgres(pg::connect(url, &limits).await?),
+                Box::new(Postgres),
+            ),
             #[cfg(feature = "oracle")]
             "oracle" => {
                 let (pool, dialect) = ora::connect(url, &limits).await?;
@@ -198,7 +212,13 @@ impl Db {
                 )));
             }
         };
-        Ok(Db { inner: Arc::new(Inner { backend, dialect, count_cap: limits.count_cap }) })
+        Ok(Db {
+            inner: Arc::new(Inner {
+                backend,
+                dialect,
+                count_cap: limits.count_cap,
+            }),
+        })
     }
 
     /// Connects with `database.url` and the limits in `database.*` (see [`PoolLimits`]).
@@ -214,39 +234,58 @@ impl Db {
     async fn link(&self) -> Result<Link> {
         match &self.inner.backend {
             #[cfg(feature = "postgres")]
-            Backend::Postgres(pool) => {
-                pool.acquire().await.map(Link::Pg).map_err(|e| Error::Internal(format!("database connection: {e}")))
-            }
+            Backend::Postgres(pool) => pool
+                .acquire()
+                .await
+                .map(Link::Pg)
+                .map_err(|e| Error::Internal(format!("database connection: {e}"))),
             #[cfg(feature = "oracle")]
-            Backend::Oracle(pool, compat) => ora::OraLink::acquire(pool, *compat, false).await.map(Link::Ora),
+            Backend::Oracle(pool, compat) => ora::OraLink::acquire(pool, *compat, false)
+                .await
+                .map(Link::Ora),
         }
     }
 
     /// One page of entities matching the query: filters, sort, offset or keyset paging, a capped
     /// total when asked, totals and groups. See [`Page`].
     pub async fn find<E: Entity>(&self, q: &DataQuery) -> Result<Page<E>> {
-        self.link().await?.find(self.dialect(), q, self.inner.count_cap).await
+        self.link()
+            .await?
+            .find(self.dialect(), q, self.inner.count_cap)
+            .await
     }
 
     /// The entity with this key, or [`Error::NotFound`].
     pub async fn get<E: Entity>(&self, key: impl FieldType) -> Result<E> {
-        self.link().await?.get(self.dialect(), key).await
+        self.link()
+            .await?
+            .get(self.dialect(), key)
+            .await
     }
 
     /// Inserts a new entity and returns it as stored (generated key, version 1, defaults).
     pub async fn insert<E: Entity>(&self, row: &E) -> Result<E> {
-        self.link().await?.insert(self.dialect(), row).await
+        self.link()
+            .await?
+            .insert(self.dialect(), row)
+            .await
     }
 
     /// Updates an entity when its row version is still the stored one, and returns it with the new
     /// version. [`Error::Conflict`] when someone else saved it first (or it was deleted).
     pub async fn update<E: Entity>(&self, row: &E) -> Result<E> {
-        self.link().await?.update(self.dialect(), row).await
+        self.link()
+            .await?
+            .update(self.dialect(), row)
+            .await
     }
 
     /// Deletes the entity with this key; [`Error::NotFound`] when there is none.
     pub async fn delete<E: Entity>(&self, key: impl FieldType) -> Result<()> {
-        self.link().await?.delete::<E>(self.dialect(), key).await
+        self.link()
+            .await?
+            .delete::<E>(self.dialect(), key)
+            .await
     }
 
     /// Rows of a statement built inside the crate from fixed text and checked identifiers, such as
@@ -267,13 +306,26 @@ impl Db {
     /// Runs a statement built inside the crate (see [`Db::rows`]) and returns the changed rows.
     #[cfg(any(feature = "accounts", feature = "server"))]
     pub(crate) async fn run(&self, sql: Sql) -> Result<u64> {
-        self.link().await?.execute(sql, raw_error).await
+        self.link()
+            .await?
+            .execute(sql, raw_error)
+            .await
     }
 
     /// Runs a statement written by hand and returns the number of rows it changed. The SQL must
     /// be a literal, so values can only arrive as `args` (`$1`, `$2` in PostgreSQL).
     pub async fn execute(&self, sql: &'static str, args: Vec<Arg>) -> Result<u64> {
-        self.link().await?.execute(Sql { text: sql.to_string(), args, cols: Vec::new() }, raw_error).await
+        self.link()
+            .await?
+            .execute(
+                Sql {
+                    text: sql.to_string(),
+                    args,
+                    cols: Vec::new(),
+                },
+                raw_error,
+            )
+            .await
     }
 
     /// Starts a transaction. Writes through it are committed together by [`Tx::commit`]; dropping
@@ -281,13 +333,20 @@ impl Db {
     pub async fn begin(&self) -> Result<Tx> {
         let link = match &self.inner.backend {
             #[cfg(feature = "postgres")]
-            Backend::Postgres(pool) => {
-                Link::PgTx(pool.begin().await.map_err(|e| Error::Internal(format!("begin: {e}")))?)
-            }
+            Backend::Postgres(pool) => Link::PgTx(
+                pool.begin()
+                    .await
+                    .map_err(|e| Error::Internal(format!("begin: {e}")))?,
+            ),
             #[cfg(feature = "oracle")]
-            Backend::Oracle(pool, compat) => Link::Ora(ora::OraLink::acquire(pool, *compat, true).await?),
+            Backend::Oracle(pool, compat) => {
+                Link::Ora(ora::OraLink::acquire(pool, *compat, true).await?)
+            }
         };
-        Ok(Tx { db: self.clone(), link })
+        Ok(Tx {
+            db: self.clone(),
+            link,
+        })
     }
 
     /// Every entity matching the query's filters, in its order, without paging, as a stream.
@@ -314,7 +373,14 @@ impl Db {
         for statement in create_table::<E>(self.dialect())? {
             self.link()
                 .await?
-                .execute(Sql { text: statement, args: Vec::new(), cols: Vec::new() }, on_error::<E>)
+                .execute(
+                    Sql {
+                        text: statement,
+                        args: Vec::new(),
+                        cols: Vec::new(),
+                    },
+                    on_error::<E>,
+                )
                 .await?;
         }
         Ok(())
@@ -325,17 +391,23 @@ impl Db {
     #[cfg(feature = "postgres")]
     pub async fn migrate(&self, migrator: &sqlx::migrate::Migrator) -> Result<()> {
         match &self.inner.backend {
-            Backend::Postgres(pool) => migrator.run(pool).await.map_err(|e| Error::Internal(format!("migration: {e}"))),
+            Backend::Postgres(pool) => migrator
+                .run(pool)
+                .await
+                .map_err(|e| Error::Internal(format!("migration: {e}"))),
             #[cfg(feature = "oracle")]
-            Backend::Oracle(..) => Err(Error::Internal("sqlx migrations run on PostgreSQL only".into())),
+            Backend::Oracle(..) => Err(Error::Internal(
+                "sqlx migrations run on PostgreSQL only".into(),
+            )),
         }
     }
 
     /// Runs the migrations in a folder read at run time (`0001_create_products.sql`, ...).
     #[cfg(feature = "postgres")]
     pub async fn migrate_dir(&self, dir: impl AsRef<std::path::Path>) -> Result<()> {
-        let migrator =
-            sqlx::migrate::Migrator::new(dir.as_ref()).await.map_err(|e| Error::Internal(format!("migration: {e}")))?;
+        let migrator = sqlx::migrate::Migrator::new(dir.as_ref())
+            .await
+            .map_err(|e| Error::Internal(format!("migration: {e}")))?;
         self.migrate(&migrator).await
     }
 }
@@ -345,19 +417,29 @@ impl Db {
 #[cfg(any(feature = "accounts", feature = "server"))]
 pub(crate) fn checked_prefix(prefix: &str) -> Result<String> {
     let ok = prefix.len() <= 16
-        && prefix.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+        && prefix
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
         && !prefix.starts_with(|c: char| c.is_ascii_digit());
     if ok {
         Ok(prefix.to_string())
     } else {
-        Err(Error::Internal("a table prefix may hold lower case letters, digits and `_`, at most 16".into()))
+        Err(Error::Internal(
+            "a table prefix may hold lower case letters, digits and `_`, at most 16".into(),
+        ))
     }
 }
 
 /// SQL written inside the crate: `{p}` becomes the checked table prefix and each `?` the
 /// dialect's placeholder. Values arrive only as `args`.
 #[cfg(any(feature = "accounts", feature = "server"))]
-pub(crate) fn bind(d: &dyn Dialect, prefix: &str, template: &str, args: Vec<Arg>, cols: &[Col]) -> Sql {
+pub(crate) fn bind(
+    d: &dyn Dialect,
+    prefix: &str,
+    template: &str,
+    args: Vec<Arg>,
+    cols: &[Col],
+) -> Sql {
     let template = template.replace("{p}", prefix);
     let mut text = String::with_capacity(template.len() + 16);
     let mut n = 0;
@@ -369,7 +451,11 @@ pub(crate) fn bind(d: &dyn Dialect, prefix: &str, template: &str, args: Vec<Arg>
             text.push(ch);
         }
     }
-    Sql { text, args, cols: cols.to_vec() }
+    Sql {
+        text,
+        args,
+        cols: cols.to_vec(),
+    }
 }
 
 /// A transaction: the same calls as [`Db`], on one connection, committed together.
@@ -380,27 +466,46 @@ pub struct Tx {
 
 impl Tx {
     pub async fn find<E: Entity>(&mut self, q: &DataQuery) -> Result<Page<E>> {
-        self.link.find(&*self.db.inner.dialect, q, self.db.inner.count_cap).await
+        self.link
+            .find(&*self.db.inner.dialect, q, self.db.inner.count_cap)
+            .await
     }
 
     pub async fn get<E: Entity>(&mut self, key: impl FieldType) -> Result<E> {
-        self.link.get(&*self.db.inner.dialect, key).await
+        self.link
+            .get(&*self.db.inner.dialect, key)
+            .await
     }
 
     pub async fn insert<E: Entity>(&mut self, row: &E) -> Result<E> {
-        self.link.insert(&*self.db.inner.dialect, row).await
+        self.link
+            .insert(&*self.db.inner.dialect, row)
+            .await
     }
 
     pub async fn update<E: Entity>(&mut self, row: &E) -> Result<E> {
-        self.link.update(&*self.db.inner.dialect, row).await
+        self.link
+            .update(&*self.db.inner.dialect, row)
+            .await
     }
 
     pub async fn delete<E: Entity>(&mut self, key: impl FieldType) -> Result<()> {
-        self.link.delete::<E>(&*self.db.inner.dialect, key).await
+        self.link
+            .delete::<E>(&*self.db.inner.dialect, key)
+            .await
     }
 
     pub async fn execute(&mut self, sql: &'static str, args: Vec<Arg>) -> Result<u64> {
-        self.link.execute(Sql { text: sql.to_string(), args, cols: Vec::new() }, raw_error).await
+        self.link
+            .execute(
+                Sql {
+                    text: sql.to_string(),
+                    args,
+                    cols: Vec::new(),
+                },
+                raw_error,
+            )
+            .await
     }
 
     /// Rows of a statement built inside the crate, on this transaction (see [`Db::rows`]).
@@ -455,8 +560,20 @@ impl<E> futures_core::Stream for RowStream<E> {
 }
 
 impl Link {
-    async fn find<E: Entity>(&mut self, d: &dyn Dialect, q: &DataQuery, cap: u64) -> Result<Page<E>> {
-        let FindPlan { main, limit, skip, shape, count, totals } = build::plan_find::<E>(d, q, cap)?;
+    async fn find<E: Entity>(
+        &mut self,
+        d: &dyn Dialect,
+        q: &DataQuery,
+        cap: u64,
+    ) -> Result<Page<E>> {
+        let FindPlan {
+            main,
+            limit,
+            skip,
+            shape,
+            count,
+            totals,
+        } = build::plan_find::<E>(d, q, cap)?;
         let fields = E::fields();
         let mut page = Page::default();
         match shape {
@@ -475,7 +592,11 @@ impl Link {
                 }
                 page.items = items;
             }
-            Shape::Groups { field, aggs, offset } => {
+            Shape::Groups {
+                field,
+                aggs,
+                offset,
+            } => {
                 let kind = &fields[field].kind;
                 let money = matches!(kind, crate::value::FieldKind::Money);
                 let mut groups = Vec::with_capacity(limit + 1);
@@ -489,7 +610,11 @@ impl Link {
                         _ => 0,
                     };
                     let totals = build::read_aggs(fields, &aggs, &mut it);
-                    groups.push(crate::action::Group { value, count, totals });
+                    groups.push(crate::action::Group {
+                        value,
+                        count,
+                        totals,
+                    });
                     Ok(())
                 })
                 .await?;
@@ -538,7 +663,9 @@ impl Link {
     }
 
     async fn get_by<E: Entity>(&mut self, d: &dyn Dialect, key: crate::value::Value) -> Result<E> {
-        self.one(build::plan_get::<E>(d, key)?).await?.ok_or(Error::NotFound)
+        self.one(build::plan_get::<E>(d, key)?)
+            .await?
+            .ok_or(Error::NotFound)
     }
 
     async fn insert<E: Entity>(&mut self, d: &dyn Dialect, row: &E) -> Result<E> {
@@ -546,12 +673,18 @@ impl Link {
             #[cfg(feature = "postgres")]
             Link::Pg(_) | Link::PgTx(_) => {
                 let sql = build::plan_insert(d, row, None, true)?;
-                self.one(sql).await?.ok_or_else(|| Error::Internal("insert returned no row".into()))
+                self.one(sql)
+                    .await?
+                    .ok_or_else(|| Error::Internal("insert returned no row".into()))
             }
             #[cfg(feature = "oracle")]
             Link::Ora(link) => {
-                let dialect = Oracle { compat: link.compat() };
-                let key = link.insert(&dialect, row, on_error::<E>).await?;
+                let dialect = Oracle {
+                    compat: link.compat(),
+                };
+                let key = link
+                    .insert(&dialect, row, on_error::<E>)
+                    .await?;
                 self.get_by(d, key).await
             }
         }
@@ -562,20 +695,30 @@ impl Link {
     async fn update<E: Entity>(&mut self, d: &dyn Dialect, row: &E) -> Result<E> {
         let returning = d.returning();
         let (sql, versioned) = build::plan_update(d, row, returning)?;
-        let missing = if versioned { Error::Conflict } else { Error::NotFound };
+        let missing = if versioned {
+            Error::Conflict
+        } else {
+            Error::NotFound
+        };
         if returning {
             return self.one(sql).await?.ok_or(missing);
         }
         if self.execute(sql, on_error::<E>).await? == 0 {
             return Err(missing);
         }
-        let key =
-            E::fields().iter().position(|f| f.key).and_then(|i| row.value_at(i)).unwrap_or(crate::value::Value::Null);
+        let key = E::fields()
+            .iter()
+            .position(|f| f.key)
+            .and_then(|i| row.value_at(i))
+            .unwrap_or(crate::value::Value::Null);
         self.get_by(d, key).await
     }
 
     async fn delete<E: Entity>(&mut self, d: &dyn Dialect, key: impl FieldType) -> Result<()> {
-        match self.execute(build::plan_delete::<E>(d, key.to_value())?, on_error::<E>).await? {
+        match self
+            .execute(build::plan_delete::<E>(d, key.to_value())?, on_error::<E>)
+            .await?
+        {
             0 => Err(Error::NotFound),
             _ => Ok(()),
         }
@@ -611,7 +754,10 @@ impl Link {
     async fn commit(self) -> Result<()> {
         match self {
             #[cfg(feature = "postgres")]
-            Link::PgTx(t) => t.commit().await.map_err(|e| Error::Internal(format!("commit: {e}"))),
+            Link::PgTx(t) => t
+                .commit()
+                .await
+                .map_err(|e| Error::Internal(format!("commit: {e}"))),
             #[cfg(feature = "postgres")]
             Link::Pg(_) => Ok(()),
             #[cfg(feature = "oracle")]
@@ -622,7 +768,10 @@ impl Link {
     async fn rollback(self) -> Result<()> {
         match self {
             #[cfg(feature = "postgres")]
-            Link::PgTx(t) => t.rollback().await.map_err(|e| Error::Internal(format!("rollback: {e}"))),
+            Link::PgTx(t) => t
+                .rollback()
+                .await
+                .map_err(|e| Error::Internal(format!("rollback: {e}"))),
             #[cfg(feature = "postgres")]
             Link::Pg(_) => Ok(()),
             #[cfg(feature = "oracle")]

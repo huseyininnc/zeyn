@@ -75,14 +75,20 @@ impl Diagram {
     /// save; the island never needs to be trusted.
     pub fn clamped(mut self) -> Diagram {
         let mut seen = std::collections::HashSet::new();
-        self.shapes.retain(|s| seen.insert(s.id));
+        self.shapes
+            .retain(|s| seen.insert(s.id));
         self.shapes.truncate(MAX_SHAPES);
         for s in &mut self.shapes {
             s.x = s.x.clamp(0, MAX_COORD);
             s.y = s.y.clamp(0, MAX_COORD);
             s.w = s.w.clamp(16, 800);
             s.h = s.h.clamp(16, 800);
-            s.label = s.label.chars().filter(|c| !c.is_control()).take(MAX_LABEL).collect();
+            s.label = s
+                .label
+                .chars()
+                .filter(|c| !c.is_control())
+                .take(MAX_LABEL)
+                .collect();
         }
         self
     }
@@ -92,7 +98,11 @@ impl Diagram {
         self.shapes
             .iter()
             .map(|s| {
-                let kind = if s.kind == ShapeKind::Box { &kinds.kind_box } else { &kinds.kind_ellipse };
+                let kind = if s.kind == ShapeKind::Box {
+                    &kinds.kind_box
+                } else {
+                    &kinds.kind_ellipse
+                };
                 kinds
                     .line
                     .replace("{kind}", kind)
@@ -171,8 +181,18 @@ mod tests {
     #[test]
     fn clamped_keeps_saves_within_limits() {
         let long = "x".repeat(100);
-        let shape = |id, x| Shape { id, kind: ShapeKind::Box, x, y: -5, w: 1, h: 9000, label: format!("{long}\u{7}") };
-        let mut shapes: Vec<Shape> = (0..300).map(|i| shape(i, 99_999)).collect();
+        let shape = |id, x| Shape {
+            id,
+            kind: ShapeKind::Box,
+            x,
+            y: -5,
+            w: 1,
+            h: 9000,
+            label: format!("{long}\u{7}"),
+        };
+        let mut shapes: Vec<Shape> = (0..300)
+            .map(|i| shape(i, 99_999))
+            .collect();
         shapes.push(shape(0, 1));
         let d = Diagram { shapes }.clamped();
         assert_eq!(d.shapes.len(), MAX_SHAPES);

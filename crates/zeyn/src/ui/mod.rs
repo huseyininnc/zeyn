@@ -41,19 +41,23 @@ pub use live::Live;
 
 pub(crate) use dock::panel_ids as dock_panel_ids;
 pub use dock::{DOCK_SIZE, Dock, DockArea, DockLayout, DockPanelState, DockSizes};
-pub use embed::{Complete, EMBED_SANDBOX, Embed, MAX_EMBED_CONSENT, EmbedPermission, ExternalLink, Given, Image, NoAlt, NoSize, NoTitle};
+pub use embed::{
+    Complete, EMBED_SANDBOX, Embed, EmbedPermission, ExternalLink, Given, Image, MAX_EMBED_CONSENT,
+    NoAlt, NoSize, NoTitle,
+};
 pub use layout::{Card, Panel, Row, Split, Stack, Tabs};
 pub use shell::{MenuBar, MenuList, PropertyInspector, StatusBar, Toolbox};
 
+pub use alpha::{AlphaIndex, OTHER_LETTER, alphabet};
 #[allow(deprecated)]
 pub use catalog::PosterCard;
 pub use catalog::{CardGrid, ImageCard, MAX_SUGGESTIONS, Rail, SearchBox, SearchParams};
 pub use chart::{Better, BulletCell, Chart, ChartKind, Kpi, SparklineCell};
-pub use alpha::{AlphaIndex, OTHER_LETTER, alphabet};
 pub use content::{AutoGrid, Avatar, AvatarSize, Heading, MetaLine, Paragraph, PrevNext, Spoiler};
 pub use controls::Control;
 pub(crate) use controls::{
-    Slot, choices_text, read_choices, render_bool, render_choice, render_choices, render_number, render_text,
+    Slot, choices_text, read_choices, render_bool, render_choice, render_choices, render_number,
+    render_text,
 };
 pub use date::DateOptions;
 pub(crate) use date::{input_text, picker_config, range_reversed, render_date_input, render_range};
@@ -61,7 +65,9 @@ pub use inputs::{mask_example, mask_fits, mask_raw};
 pub(crate) use lines::LinesEditor;
 pub use lines::{Lines, MAX_LINES};
 pub use list::{List, ListItem};
-pub use lookup::{LookupItem, LookupQuery, LookupValue, MAX_LOOKUP_COLUMNS, MAX_LOOKUP_IDS, MAX_LOOKUP_PAGE};
+pub use lookup::{
+    LookupItem, LookupQuery, LookupValue, MAX_LOOKUP_COLUMNS, MAX_LOOKUP_IDS, MAX_LOOKUP_PAGE,
+};
 pub(crate) use lookup::{parse_ids, render_lookup};
 pub use media::{Audio, PLAYBACK_SPEEDS, Video};
 pub use menus::MenuButton;
@@ -70,7 +76,8 @@ pub use overlay::{BUSY_DELAY_MS, Busy, MAX_TIP, Popover};
 pub use tree::{MAX_TREE_CHILDREN, Tree, TreeItem, TreeQuery};
 pub use week::{MAX_WEEK_ROWS, WeekDay, WeekSchedule};
 pub use widgets::{
-    ActionButton, Alert, Badge, Breadcrumb, DescriptionList, DescriptionOf, EmptyState, Progress, Skeleton, Timeline,
+    ActionButton, Alert, Badge, Breadcrumb, DescriptionList, DescriptionOf, EmptyState, Progress,
+    Skeleton, Timeline,
 };
 
 use crate::action::{Action, ActionMeta, Result};
@@ -106,9 +113,21 @@ impl NodePath {
     pub fn parse(s: &str) -> Option<NodePath> {
         let parts: Vec<&str> = s.split('.').collect();
         let valid = parts.len() <= MAX_NODE_DEPTH
-            && parts.iter().all(|p| !p.is_empty() && p.len() <= 5 && p.bytes().all(|b| b.is_ascii_digit()));
+            && parts
+                .iter()
+                .all(|p| !p.is_empty() && p.len() <= 5 && p.bytes().all(|b| b.is_ascii_digit()));
         valid.then(|| {
-            NodePath(parts.iter().map(|p| p.parse::<usize>().unwrap_or(0).to_string()).collect::<Vec<_>>().join("."))
+            NodePath(
+                parts
+                    .iter()
+                    .map(|p| {
+                        p.parse::<usize>()
+                            .unwrap_or(0)
+                            .to_string()
+                    })
+                    .collect::<Vec<_>>()
+                    .join("."),
+            )
         })
     }
 
@@ -118,7 +137,9 @@ impl NodePath {
 
     /// Indexes from the screen body down.
     pub fn indexes(&self) -> impl Iterator<Item = usize> + '_ {
-        self.0.split('.').filter_map(|p| p.parse().ok())
+        self.0
+            .split('.')
+            .filter_map(|p| p.parse().ok())
     }
 }
 
@@ -135,7 +156,10 @@ impl fmt::Display for NodePath {
 }
 
 impl Serialize for NodePath {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
         serializer.serialize_str(&self.0)
     }
 }
@@ -152,8 +176,9 @@ impl<'de> Deserialize<'de> for NodePath {
             Raw::Index(i) => i.to_string(),
             Raw::Path(s) => s,
         };
-        NodePath::parse(&text)
-            .ok_or_else(|| serde::de::Error::custom("node must be an index or a dotted path such as 1.0.2"))
+        NodePath::parse(&text).ok_or_else(|| {
+            serde::de::Error::custom("node must be an index or a dotted path such as 1.0.2")
+        })
     }
 }
 
@@ -209,7 +234,11 @@ pub fn render_node(out: &mut String, r: &Render, path: &str, node: &Node) {
 
 /// Writes child `index` of the container being rendered. Containers call this for each child.
 pub fn render_child(out: &mut String, r: &Render, index: usize, node: &Node) {
-    let path = if r.path.is_empty() { index.to_string() } else { format!("{}.{index}", r.path) };
+    let path = if r.path.is_empty() {
+        index.to_string()
+    } else {
+        format!("{}.{index}", r.path)
+    };
     render_node(out, r, &path, node);
 }
 
@@ -250,9 +279,11 @@ where
 
     fn fetch(&self, ctx: Ctx, input: Json) -> BoxFuture<Result<Json>> {
         Box::pin(async move {
-            let input: A::Input = serde_json::from_value(input).map_err(|_| crate::action::Error::NotFound)?;
+            let input: A::Input =
+                serde_json::from_value(input).map_err(|_| crate::action::Error::NotFound)?;
             let output = A::call(ctx.clone(), input).await??;
-            crate::privacy::client_json(&output, &ctx).map_err(|e| crate::action::Error::Internal(e.to_string()))
+            crate::privacy::client_json(&output, &ctx)
+                .map_err(|e| crate::action::Error::Internal(e.to_string()))
         })
     }
 }

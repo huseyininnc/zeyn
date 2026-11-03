@@ -4,8 +4,8 @@
 //! the screens still work and show each island's fallback.
 
 use showcase_shared::{
-    Count, CounterProps, CounterTexts, Diagram, DiagramProps, DiagramTexts, SaveCount, SaveDiagram, Saved, Shape,
-    ShapeKind, crdt,
+    Count, CounterProps, CounterTexts, Diagram, DiagramProps, DiagramTexts, SaveCount, SaveDiagram,
+    Saved, Shape, ShapeKind, crdt,
 };
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, RwLock};
@@ -42,13 +42,15 @@ pub fn island_counter(_: (), store: CounterStore, ctx: Ctx) -> Screen {
         },
     };
     Screen::new(t!("islands.counter")).body(
-        Stack::new().add(Alert::info(t!("islands.counter_intro"))).add(
-            Island::new("counter")
-                .props(&props)
-                .label(t!("islands.counter"))
-                .fallback(Alert::info(t!("islands.fallback")))
-                .action::<SaveCount, _>(save_count),
-        ),
+        Stack::new()
+            .add(Alert::info(t!("islands.counter_intro")))
+            .add(
+                Island::new("counter")
+                    .props(&props)
+                    .label(t!("islands.counter"))
+                    .fallback(Alert::info(t!("islands.fallback")))
+                    .action::<SaveCount, _>(save_count),
+            ),
     )
 }
 
@@ -60,7 +62,15 @@ impl Service for DiagramStore {}
 
 impl Default for DiagramStore {
     fn default() -> Self {
-        let shape = |id, kind, x, y, label: &str| Shape { id, kind, x, y, w: 140, h: 64, label: label.into() };
+        let shape = |id, kind, x, y, label: &str| Shape {
+            id,
+            kind,
+            x,
+            y,
+            w: 140,
+            h: 64,
+            label: label.into(),
+        };
         DiagramStore(Arc::new(RwLock::new(Diagram {
             shapes: vec![
                 shape(1, ShapeKind::Ellipse, 40, 40, "Order placed"),
@@ -73,13 +83,19 @@ impl Default for DiagramStore {
 
 impl DiagramStore {
     pub fn get(&self) -> Diagram {
-        self.0.read().map(|d| d.clone()).unwrap_or_default()
+        self.0
+            .read()
+            .map(|d| d.clone())
+            .unwrap_or_default()
     }
 }
 
 impl DiagramStore {
     fn set(&self, diagram: Diagram) -> Result<()> {
-        *self.0.write().map_err(|_| Error::Internal("diagram lock".into()))? = diagram;
+        *self
+            .0
+            .write()
+            .map_err(|_| Error::Internal("diagram lock".into()))? = diagram;
         Ok(())
     }
 }
@@ -87,7 +103,12 @@ impl DiagramStore {
 /// Saves the diagram after clamping it to the limits of `Diagram::clamped`, and tells the
 /// screens that list its shapes to refresh.
 #[action(permission = "showcase.islands.write", ai = false)]
-pub async fn save_diagram(diagram: Diagram, store: DiagramStore, hub: Hub, ctx: Ctx) -> Result<Saved> {
+pub async fn save_diagram(
+    diagram: Diagram,
+    store: DiagramStore,
+    hub: Hub,
+    ctx: Ctx,
+) -> Result<Saved> {
     let diagram = diagram.clamped();
     let shapes = diagram.shapes.len() as u32;
     store.set(diagram)?;
@@ -121,16 +142,30 @@ impl DocStore for DiagramDocs {
         if let Ok(mut s) = self.state.write() {
             *s = Some(state);
         }
-        self.hub.notify_tenant(Some(key.tenant.as_str()).filter(|t| !t.is_empty()), "diagram");
-        Box::pin(async move { saved.unwrap_or(Err(Error::Internal("unreadable diagram state".into()))) })
+        self.hub.notify_tenant(
+            Some(key.tenant.as_str()).filter(|t| !t.is_empty()),
+            "diagram",
+        );
+        Box::pin(
+            async move { saved.unwrap_or(Err(Error::Internal("unreadable diagram state".into()))) },
+        )
     }
 }
 
 /// The realtime channel of the showcase: the live diagram and its change topic.
 pub fn realtime(store: DiagramStore) -> Realtime {
     let realtime = Realtime::new().topic("diagram", "showcase.islands.read");
-    let docs = DiagramDocs { store, hub: realtime.hub(), state: Arc::default() };
-    realtime.documents("diagram", "showcase.islands.read", "showcase.islands.write", docs)
+    let docs = DiagramDocs {
+        store,
+        hub: realtime.hub(),
+        state: Arc::default(),
+    };
+    realtime.documents(
+        "diagram",
+        "showcase.islands.read",
+        "showcase.islands.write",
+        docs,
+    )
 }
 
 /// A shape of the diagram as a grid row.
@@ -149,7 +184,12 @@ pub async fn diagram_rows(q: DataQuery, store: DiagramStore) -> Result<Page<Diag
         .get()
         .shapes
         .into_iter()
-        .map(|s| DiagramRow { label: s.label, kind: format!("{:?}", s.kind), x: i64::from(s.x), y: i64::from(s.y) })
+        .map(|s| DiagramRow {
+            label: s.label,
+            kind: format!("{:?}", s.kind),
+            x: i64::from(s.x),
+            y: i64::from(s.y),
+        })
         .collect();
     Ok(q.apply(rows))
 }
@@ -208,8 +248,16 @@ impl Component for Summary {
 pub fn island_diagram(_: (), store: DiagramStore, ctx: Ctx) -> Screen {
     let texts = diagram_texts(&ctx);
     let diagram = store.get();
-    let summary = Summary { title: t!("islands.summary"), lines: diagram.summary(&texts) };
-    let props = DiagramProps { diagram, texts, live: Some("main".into()), height: 420 };
+    let summary = Summary {
+        title: t!("islands.summary"),
+        lines: diagram.summary(&texts),
+    };
+    let props = DiagramProps {
+        diagram,
+        texts,
+        live: Some("main".into()),
+        height: 420,
+    };
     Screen::new(t!("islands.diagram")).body(
         Stack::new()
             .add(
@@ -236,9 +284,13 @@ pub fn island_diagram(_: (), store: DiagramStore, ctx: Ctx) -> Screen {
 }
 
 pub fn feature() -> Feature {
-    Feature::new("islands").route_prefix("/islands").screen(island_counter).screen(island_diagram).menu(|m| {
-        m.group(t!("menu.islands"), Icon::Chart)
-            .item(t!("islands.counter"), island_counter)
-            .item(t!("islands.diagram"), island_diagram)
-    })
+    Feature::new("islands")
+        .route_prefix("/islands")
+        .screen(island_counter)
+        .screen(island_diagram)
+        .menu(|m| {
+            m.group(t!("menu.islands"), Icon::Chart)
+                .item(t!("islands.counter"), island_counter)
+                .item(t!("islands.diagram"), island_diagram)
+        })
 }

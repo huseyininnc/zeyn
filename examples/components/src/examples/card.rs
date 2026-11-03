@@ -6,7 +6,9 @@ use zeyn::prelude::*;
 pub fn overview(_ctx: &Ctx) -> Node {
     Card::new()
         .title("Shipping")
-        .add(Paragraph::new("Orders placed before noon leave the same day."))
+        .add(Paragraph::new(
+            "Orders placed before noon leave the same day.",
+        ))
         .into()
 }
 

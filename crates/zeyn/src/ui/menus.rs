@@ -56,7 +56,13 @@ impl Command {
                 Ok(ui.into_effects())
             })
         });
-        Command { label, meta: A::META, run, confirm: None, primary }
+        Command {
+            label,
+            meta: A::META,
+            run,
+            confirm: None,
+            primary,
+        }
     }
 }
 
@@ -95,7 +101,11 @@ impl Component for CommandNode {
         } else {
             ("z-menu-entry", r#" role="menuitem" tabindex="-1""#)
         };
-        let disabled = if r.can(&c.meta.access) { "" } else { " disabled" };
+        let disabled = if r.can(&c.meta.access) {
+            ""
+        } else {
+            " disabled"
+        };
         out.push_str(&format!(
             r#"<form class="z-action" data-zeyn-submit="{}"{confirm} novalidate><button type="submit" class="{class}"{role}{disabled} data-testid="{}.menu.{}">{label}</button></form>"#,
             c.meta.name,
@@ -149,7 +159,13 @@ pub struct MenuButton {
 impl MenuButton {
     /// A drop down button labelled `label`.
     pub fn new(label: impl Into<Text>) -> Self {
-        Self { label: label.into(), split: false, entries: Vec::new(), commands: Vec::new(), nodes: OnceLock::new() }
+        Self {
+            label: label.into(),
+            split: false,
+            entries: Vec::new(),
+            commands: Vec::new(),
+            nodes: OnceLock::new(),
+        }
     }
 
     /// A split button: pressing `label` runs `action` with `input`; the arrow beside it opens the
@@ -163,7 +179,8 @@ impl MenuButton {
         let label = label.into();
         let mut b = Self::new(label.clone());
         b.split = true;
-        b.commands.push(Arc::new(Command::new::<A>(label, input, None, true)));
+        b.commands
+            .push(Arc::new(Command::new::<A>(label, input, None, true)));
         b
     }
 
@@ -190,18 +207,25 @@ impl MenuButton {
         A::Input: Clone + Sync,
         A::Output: Outcome,
     {
-        self.push(Command::new::<A>(label.into(), input, Some(Arc::new(on_success)), false))
+        self.push(Command::new::<A>(
+            label.into(),
+            input,
+            Some(Arc::new(on_success)),
+            false,
+        ))
     }
 
     fn push(mut self, command: Command) -> Self {
-        self.entries.push(Entry::Command(self.commands.len()));
+        self.entries
+            .push(Entry::Command(self.commands.len()));
         self.commands.push(Arc::new(command));
         self
     }
 
     /// A command that runs an effect in the browser, such as opening a window.
     pub fn item(mut self, label: impl Into<Text>, effect: Effect) -> Self {
-        self.entries.push(Entry::Effect(label.into(), effect));
+        self.entries
+            .push(Entry::Effect(label.into(), effect));
         self
     }
 
@@ -214,19 +238,30 @@ impl MenuButton {
     /// Asks the user to confirm with this message before the last action command runs (the main
     /// action of a split button when no command was added yet).
     pub fn confirm(mut self, message: impl Into<Text>) -> Self {
-        if let Some(c) = self.commands.last_mut().and_then(Arc::get_mut) {
+        if let Some(c) = self
+            .commands
+            .last_mut()
+            .and_then(Arc::get_mut)
+        {
             c.confirm = Some(message.into());
         }
         self
     }
 
     fn nodes(&self) -> &[Node] {
-        self.nodes.get_or_init(|| self.commands.iter().map(|c| Node::new(CommandNode(c.clone()))).collect())
+        self.nodes.get_or_init(|| {
+            self.commands
+                .iter()
+                .map(|c| Node::new(CommandNode(c.clone())))
+                .collect()
+        })
     }
 
     /// Whether the user may run the command at `index`.
     fn allowed(&self, r: &Render, index: usize) -> bool {
-        self.commands.get(index).is_some_and(|c| r.can(&c.meta.access))
+        self.commands
+            .get(index)
+            .is_some_and(|c| r.can(&c.meta.access))
     }
 }
 
@@ -235,20 +270,33 @@ impl Component for MenuButton {
         let id = super::dom_id(r, "menu");
         let label = r.text(&self.label);
         let nodes = self.nodes();
-        let path = |i: usize| if r.path.is_empty() { i.to_string() } else { format!("{}.{i}", r.path) };
+        let path = |i: usize| {
+            if r.path.is_empty() {
+                i.to_string()
+            } else {
+                format!("{}.{i}", r.path)
+            }
+        };
         let child = |out: &mut String, i: usize, tag: &str, attrs: &str| {
             let p = path(i);
-            out.push_str(&format!(r#"<{tag} class="z-node" data-zeyn-node="{p}"{attrs}>"#));
+            out.push_str(&format!(
+                r#"<{tag} class="z-node" data-zeyn-node="{p}"{attrs}>"#
+            ));
             nodes[i].render(out, &Render { path: &p, ..*r });
             out.push_str(&format!("</{tag}>"));
         };
         let trigger_label = if self.split {
-            format!(r#" aria-label="{}""#, r.text(&Text::key("zeyn.ui.menu.more").arg("label", self.label.clone())))
+            format!(
+                r#" aria-label="{}""#,
+                r.text(&Text::key("zeyn.ui.menu.more").arg("label", self.label.clone()))
+            )
         } else {
             String::new()
         };
         if self.split {
-            out.push_str(&format!(r#"<div class="z-split-button" role="group" aria-label="{label}">"#));
+            out.push_str(&format!(
+                r#"<div class="z-split-button" role="group" aria-label="{label}">"#
+            ));
             child(out, 0, "div", "");
         } else {
             out.push_str(r#"<div class="z-menu-button">"#);
@@ -301,11 +349,15 @@ impl Component for MenuButton {
             .iter()
             .map(|e| match e {
                 Entry::Command(i) => self.nodes()[*i].schema(),
-                Entry::Effect(label, effect) => json!({ "type": "menu_item", "label": label, "effect": effect }),
+                Entry::Effect(label, effect) => {
+                    json!({ "type": "menu_item", "label": label, "effect": effect })
+                }
                 Entry::Separator => json!({ "type": "separator" }),
             })
             .collect();
-        let primary = self.split.then(|| self.nodes()[0].schema());
+        let primary = self
+            .split
+            .then(|| self.nodes()[0].schema());
         json!({ "type": "menu_button", "label": self.label, "split": primary, "items": items })
     }
 

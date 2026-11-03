@@ -2,11 +2,14 @@
 //! `RoleManager<TRole>` with `UserValidator`, `PasswordValidator` and `RoleValidator`).
 
 use super::model::{
-    AUTHENTICATOR_KEY, AUTHENTICATOR_STEP, Claim, INTERNAL_PROVIDER, RECOVERY_CODES, Role, User, UserLogin,
+    AUTHENTICATOR_KEY, AUTHENTICATOR_STEP, Claim, INTERNAL_PROVIDER, RECOVERY_CODES, Role, User,
+    UserLogin,
 };
 use super::password::Verification;
 use super::tokens::{self, Purpose};
-use super::{AccountEventKind, Accounts, denied, invalid, invalid_n, new_id, new_stamp, normalize, now_secs};
+use super::{
+    AccountEventKind, Accounts, denied, invalid, invalid_n, new_id, new_stamp, normalize, now_secs,
+};
 use crate::ctx::Service;
 use crate::{Error, Result};
 
@@ -35,13 +38,17 @@ pub struct RoleManager(pub(crate) Accounts);
 impl Service for RoleManager {}
 
 fn valid_email(email: &str) -> bool {
-    let Some((local, domain)) = email.rsplit_once('@') else { return false };
+    let Some((local, domain)) = email.rsplit_once('@') else {
+        return false;
+    };
     !local.is_empty()
         && !domain.is_empty()
         && !domain.starts_with('.')
         && !domain.ends_with('.')
         && email.len() <= MAX_NAME
-        && !email.chars().any(|c| c.is_whitespace() || c.is_control() || c == '<' || c == '>')
+        && !email
+            .chars()
+            .any(|c| c.is_whitespace() || c.is_control() || c == '<' || c == '>')
 }
 
 impl UserManager {
@@ -63,14 +70,23 @@ impl UserManager {
     /// no other user has.
     pub async fn validate(&self, user: &User) -> Result<()> {
         let name = user.user_name.trim();
-        let allowed = &self.options().user.allowed_user_name_characters;
+        let allowed = &self
+            .options()
+            .user
+            .allowed_user_name_characters;
         if name.is_empty()
             || name.chars().count() > MAX_NAME
-            || (!allowed.is_empty() && name.chars().any(|c| !allowed.contains(c)))
+            || (!allowed.is_empty()
+                && name
+                    .chars()
+                    .any(|c| !allowed.contains(c)))
         {
             return Err(invalid("user_name", "invalid_user_name"));
         }
-        if let Some(owner) = self.store().user_by_name(&normalize(name)).await?
+        if let Some(owner) = self
+            .store()
+            .user_by_name(&normalize(name))
+            .await?
             && owner.id != user.id
         {
             return Err(invalid("user_name", "duplicate_user_name"));
@@ -81,14 +97,23 @@ impl UserManager {
             return Err(invalid("email", "invalid_email"));
         }
         if self.options().user.require_unique_email {
-            let Some(email) = &user.email else { return Err(invalid("email", "invalid_email")) };
-            if let Some(owner) = self.store().user_by_email(&normalize(email)).await?
+            let Some(email) = &user.email else {
+                return Err(invalid("email", "invalid_email"));
+            };
+            if let Some(owner) = self
+                .store()
+                .user_by_email(&normalize(email))
+                .await?
                 && owner.id != user.id
             {
                 return Err(invalid("email", "duplicate_email"));
             }
         }
-        if user.phone_number.as_deref().is_some_and(|p| p.len() > MAX_NAME) {
+        if user
+            .phone_number
+            .as_deref()
+            .is_some_and(|p| p.len() > MAX_NAME)
+        {
             return Err(invalid("phone_number", "invalid_phone"));
         }
         Ok(())
@@ -97,7 +122,13 @@ impl UserManager {
     /// Checks a password against the policy and, when set, the breached password check
     /// (`PasswordValidator`). Errors name the field `password`.
     pub async fn validate_password(&self, password: &str) -> Result<()> {
-        if let Some((code, n)) = self.options().password.check(password).into_iter().next() {
+        if let Some((code, n)) = self
+            .options()
+            .password
+            .check(password)
+            .into_iter()
+            .next()
+        {
             return Err(invalid_n("password", code, n));
         }
         if let Some(check) = &self.0.0.breached {
@@ -117,7 +148,10 @@ impl UserManager {
             user.id = new_id();
         }
         user.user_name = user.user_name.trim().to_string();
-        user.email = user.email.map(|e| e.trim().to_string()).filter(|e| !e.is_empty());
+        user.email = user
+            .email
+            .map(|e| e.trim().to_string())
+            .filter(|e| !e.is_empty());
         self.validate(&user).await?;
         if let Some(pw) = password {
             self.validate_password(pw).await?;
@@ -125,13 +159,19 @@ impl UserManager {
         }
         user.security_stamp = new_stamp();
         user.concurrency_stamp = new_stamp();
-        user.lockout_enabled = self.options().lockout.allowed_for_new_users;
+        user.lockout_enabled = self
+            .options()
+            .lockout
+            .allowed_for_new_users;
         user.normalized_user_name = normalize(&user.user_name);
         user.normalized_email = user.email.as_deref().map(normalize);
-        self.store().create_user(&user).await.map_err(|e| match e {
-            Error::Conflict => invalid("user_name", "duplicate_user_name"),
-            e => e,
-        })?;
+        self.store()
+            .create_user(&user)
+            .await
+            .map_err(|e| match e {
+                Error::Conflict => invalid("user_name", "duplicate_user_name"),
+                e => e,
+            })?;
         Ok(user)
     }
 
@@ -147,7 +187,11 @@ impl UserManager {
         user.normalized_user_name = normalize(&user.user_name);
         user.normalized_email = user.email.as_deref().map(normalize);
         let expected = std::mem::replace(&mut user.concurrency_stamp, new_stamp());
-        if let Err(e) = self.store().update_user(user, &expected).await {
+        if let Err(e) = self
+            .store()
+            .update_user(user, &expected)
+            .await
+        {
             user.concurrency_stamp = expected;
             return Err(e);
         }
@@ -156,8 +200,11 @@ impl UserManager {
 
     /// Deletes a user with its roles, claims, logins, tokens and passkeys.
     pub async fn delete(&self, user: &User) -> Result<()> {
-        self.store().delete_user(&user.id).await?;
-        self.0.event(AccountEventKind::Deleted, Some(&user.id));
+        self.store()
+            .delete_user(&user.id)
+            .await?;
+        self.0
+            .event(AccountEventKind::Deleted, Some(&user.id));
         Ok(())
     }
 
@@ -172,14 +219,18 @@ impl UserManager {
         if name.trim().is_empty() || name.len() > MAX_NAME {
             return Ok(None);
         }
-        self.store().user_by_name(&normalize(name)).await
+        self.store()
+            .user_by_name(&normalize(name))
+            .await
     }
 
     pub async fn find_by_email(&self, email: &str) -> Result<Option<User>> {
         if email.trim().is_empty() || email.len() > MAX_NAME {
             return Ok(None);
         }
-        self.store().user_by_email(&normalize(email)).await
+        self.store()
+            .user_by_email(&normalize(email))
+            .await
     }
 
     /// By user name, else by e-mail: what a sign in form accepts.
@@ -194,13 +245,24 @@ impl UserManager {
         if key.len() > MAX_NAME * 4 {
             return Ok(None);
         }
-        self.store().user_by_login(provider, key).await
+        self.store()
+            .user_by_login(provider, key)
+            .await
     }
 
     /// A page of users for administration.
-    pub async fn list(&self, search: Option<&str>, offset: u64, limit: u32) -> Result<(Vec<User>, u64)> {
-        let search = search.map(normalize).filter(|s| !s.is_empty());
-        self.store().users(search.as_deref(), offset, limit.min(crate::MAX_PAGE_SIZE)).await
+    pub async fn list(
+        &self,
+        search: Option<&str>,
+        offset: u64,
+        limit: u32,
+    ) -> Result<(Vec<User>, u64)> {
+        let search = search
+            .map(normalize)
+            .filter(|s| !s.is_empty());
+        self.store()
+            .users(search.as_deref(), offset, limit.min(crate::MAX_PAGE_SIZE))
+            .await
     }
 
     /// Checks a password. A correct password in an older format (Argon2 with weaker parameters,
@@ -211,7 +273,10 @@ impl UserManager {
             self.dummy_check(password).await;
             return Ok(false);
         };
-        match self.verify_password(&stored, password).await {
+        match self
+            .verify_password(&stored, password)
+            .await
+        {
             Verification::Failed => Ok(false),
             Verification::Success => Ok(true),
             Verification::SuccessRehashNeeded => {
@@ -228,14 +293,19 @@ impl UserManager {
     /// slowly as a wrong password.
     pub(crate) async fn dummy_check(&self, password: &str) {
         let dummy = self.0.0.dummy_hash.clone();
-        let _ = self.verify_password(&dummy, password).await;
+        let _ = self
+            .verify_password(&dummy, password)
+            .await;
     }
 
     /// Hashes a password off the async threads, at most [`MAX_HASHING`] at once, so a burst of
     /// sign ins can neither stall the server nor take more than that many times the Argon2 memory.
     pub async fn hash_password(&self, password: &str) -> Result<String> {
         let (hasher, password) = (self.options().hasher, password.to_string());
-        let _permit = HASHING.acquire().await.map_err(|_| Error::Internal("hashing closed".into()))?;
+        let _permit = HASHING
+            .acquire()
+            .await
+            .map_err(|_| Error::Internal("hashing closed".into()))?;
         tokio::task::spawn_blocking(move || hasher.hash(&password))
             .await
             .map_err(|e| Error::Internal(format!("hashing: {e}")))?
@@ -243,9 +313,17 @@ impl UserManager {
 
     /// Checks a password against a stored hash off the async threads (see [`Self::hash_password`]).
     pub async fn verify_password(&self, stored: &str, password: &str) -> Verification {
-        let (hasher, stored, password) = (self.options().hasher, stored.to_string(), password.to_string());
-        let Ok(_permit) = HASHING.acquire().await else { return Verification::Failed };
-        tokio::task::spawn_blocking(move || hasher.verify(&stored, &password)).await.unwrap_or(Verification::Failed)
+        let (hasher, stored, password) = (
+            self.options().hasher,
+            stored.to_string(),
+            password.to_string(),
+        );
+        let Ok(_permit) = HASHING.acquire().await else {
+            return Verification::Failed;
+        };
+        tokio::task::spawn_blocking(move || hasher.verify(&stored, &password))
+            .await
+            .unwrap_or(Verification::Failed)
     }
 
     pub fn has_password(&self, user: &User) -> bool {
@@ -263,11 +341,15 @@ impl UserManager {
     /// Changes the password after checking the current one (`ChangePasswordAsync`). The security
     /// stamp changes, which signs out every other session and voids outstanding links.
     pub async fn change_password(&self, user: &mut User, current: &str, new: &str) -> Result<()> {
-        if !self.check_password(user, current).await? {
+        if !self
+            .check_password(user, current)
+            .await?
+        {
             return Err(invalid("old_password", "password_mismatch"));
         }
         self.set_password(user, new).await?;
-        self.0.event(AccountEventKind::PasswordChanged, Some(&user.id));
+        self.0
+            .event(AccountEventKind::PasswordChanged, Some(&user.id));
         Ok(())
     }
 
@@ -290,19 +372,34 @@ impl UserManager {
     pub async fn update_security_stamp(&self, user: &mut User) -> Result<()> {
         user.security_stamp = new_stamp();
         self.save(user).await?;
-        self.0.event(AccountEventKind::StampChanged, Some(&user.id));
+        self.0
+            .event(AccountEventKind::StampChanged, Some(&user.id));
         Ok(())
     }
 
     /// A purpose token for the user (`GenerateUserTokenAsync` with the data protection provider).
     pub fn generate_token(&self, user: &User, purpose: &Purpose) -> String {
-        self.0.0.keys.token(now_secs(), &user.id, purpose, &user.security_stamp)
+        self.0
+            .0
+            .keys
+            .token(now_secs(), &user.id, purpose, &user.security_stamp)
     }
 
     /// Whether a purpose token is valid for the user now (`VerifyUserTokenAsync`).
     pub fn verify_token(&self, user: &User, purpose: &Purpose, token: &str) -> bool {
-        let life = self.options().tokens.token_lifespan.as_secs() as i64;
-        self.0.0.keys.check_token(token, now_secs(), life, &user.id, purpose, &user.security_stamp)
+        let life = self
+            .options()
+            .tokens
+            .token_lifespan
+            .as_secs() as i64;
+        self.0.0.keys.check_token(
+            token,
+            now_secs(),
+            life,
+            &user.id,
+            purpose,
+            &user.security_stamp,
+        )
     }
 
     pub fn generate_email_confirmation_token(&self, user: &User) -> String {
@@ -316,7 +413,8 @@ impl UserManager {
         }
         user.email_confirmed = true;
         self.save(user).await?;
-        self.0.event(AccountEventKind::EmailConfirmed, Some(&user.id));
+        self.0
+            .event(AccountEventKind::EmailConfirmed, Some(&user.id));
         Ok(())
     }
 
@@ -336,7 +434,8 @@ impl UserManager {
             user.access_failed_count = 0;
             self.save(user).await?;
         }
-        self.0.event(AccountEventKind::PasswordReset, Some(&user.id));
+        self.0
+            .event(AccountEventKind::PasswordReset, Some(&user.id));
         Ok(())
     }
 
@@ -371,14 +470,27 @@ impl UserManager {
         self.0.0.keys.short_code(
             now_secs(),
             &user.security_stamp,
-            &format!("Totp:{}:{}", Purpose::ChangePhone(phone.to_string()).name(), user.id),
+            &format!(
+                "Totp:{}:{}",
+                Purpose::ChangePhone(phone.to_string()).name(),
+                user.id
+            ),
         )
     }
 
     /// Sets and confirms the phone number when the code matches (`ChangePhoneNumberAsync`).
     pub async fn change_phone(&self, user: &mut User, phone: &str, code: &str) -> Result<()> {
-        let modifier = format!("Totp:{}:{}", Purpose::ChangePhone(phone.to_string()).name(), user.id);
-        if !self.0.0.keys.check_short_code(code, now_secs(), &user.security_stamp, &modifier) {
+        let modifier = format!(
+            "Totp:{}:{}",
+            Purpose::ChangePhone(phone.to_string()).name(),
+            user.id
+        );
+        if !self
+            .0
+            .0
+            .keys
+            .check_short_code(code, now_secs(), &user.security_stamp, &modifier)
+        {
             return Err(invalid("code", "invalid_code"));
         }
         user.phone_number = Some(phone.to_string());
@@ -398,30 +510,61 @@ impl UserManager {
     /// Adds the user to a role by name (`AddToRoleAsync`). [`Error::NotFound`] for an unknown
     /// role. The stamp changes so open sessions pick up the role at their next check.
     pub async fn add_to_role(&self, user: &mut User, role: &str) -> Result<()> {
-        let role = self.store().role_by_name(&normalize(role)).await?.ok_or(Error::NotFound)?;
-        self.store().add_to_role(&user.id, &role.id).await?;
+        let role = self
+            .store()
+            .role_by_name(&normalize(role))
+            .await?
+            .ok_or(Error::NotFound)?;
+        self.store()
+            .add_to_role(&user.id, &role.id)
+            .await?;
         self.update_security_stamp(user).await
     }
 
     pub async fn remove_from_role(&self, user: &mut User, role: &str) -> Result<()> {
-        let role = self.store().role_by_name(&normalize(role)).await?.ok_or(Error::NotFound)?;
-        self.store().remove_from_role(&user.id, &role.id).await?;
+        let role = self
+            .store()
+            .role_by_name(&normalize(role))
+            .await?
+            .ok_or(Error::NotFound)?;
+        self.store()
+            .remove_from_role(&user.id, &role.id)
+            .await?;
         self.update_security_stamp(user).await
     }
 
     /// Names of the user's roles.
     pub async fn roles(&self, user: &User) -> Result<Vec<String>> {
-        Ok(self.store().roles_of(&user.id).await?.into_iter().map(|r| r.name).collect())
+        Ok(self
+            .store()
+            .roles_of(&user.id)
+            .await?
+            .into_iter()
+            .map(|r| r.name)
+            .collect())
     }
 
     pub async fn is_in_role(&self, user: &User, role: &str) -> Result<bool> {
         let n = normalize(role);
-        Ok(self.store().roles_of(&user.id).await?.iter().any(|r| r.normalized_name == n))
+        Ok(self
+            .store()
+            .roles_of(&user.id)
+            .await?
+            .iter()
+            .any(|r| r.normalized_name == n))
     }
 
     pub async fn users_in_role(&self, role: &str, limit: u32) -> Result<Vec<User>> {
-        match self.store().role_by_name(&normalize(role)).await? {
-            Some(r) => self.store().users_in_role(&r.id, limit.min(crate::MAX_PAGE_SIZE)).await,
+        match self
+            .store()
+            .role_by_name(&normalize(role))
+            .await?
+        {
+            Some(r) => {
+                self.store()
+                    .users_in_role(&r.id, limit.min(crate::MAX_PAGE_SIZE))
+                    .await
+            }
             None => Ok(Vec::new()),
         }
     }
@@ -431,12 +574,16 @@ impl UserManager {
     }
 
     pub async fn add_claim(&self, user: &mut User, claim: Claim) -> Result<()> {
-        self.store().add_claim(&user.id, &claim).await?;
+        self.store()
+            .add_claim(&user.id, &claim)
+            .await?;
         self.update_security_stamp(user).await
     }
 
     pub async fn remove_claim(&self, user: &mut User, claim: &Claim) -> Result<()> {
-        self.store().remove_claim(&user.id, claim).await?;
+        self.store()
+            .remove_claim(&user.id, claim)
+            .await?;
         self.update_security_stamp(user).await
     }
 
@@ -479,7 +626,8 @@ impl UserManager {
         }
         self.save(user).await?;
         if locked {
-            self.0.event(AccountEventKind::LockedOut, Some(&user.id));
+            self.0
+                .event(AccountEventKind::LockedOut, Some(&user.id));
         }
         Ok(locked)
     }
@@ -499,7 +647,11 @@ impl UserManager {
         user.security_stamp = new_stamp();
         self.save(user).await?;
         self.0.event(
-            if enabled { AccountEventKind::TwoFactorEnabled } else { AccountEventKind::TwoFactorDisabled },
+            if enabled {
+                AccountEventKind::TwoFactorEnabled
+            } else {
+                AccountEventKind::TwoFactorDisabled
+            },
             Some(&user.id),
         );
         Ok(())
@@ -512,10 +664,19 @@ impl UserManager {
     /// The user's authenticator key in base32, if one was set (`GetAuthenticatorKeyAsync`). The
     /// store holds it sealed with the accounts key and bound to the user.
     pub async fn authenticator_key(&self, user: &User) -> Result<Option<String>> {
-        let Some(sealed) = self.store().token(&user.id, INTERNAL_PROVIDER, AUTHENTICATOR_KEY).await? else {
+        let Some(sealed) = self
+            .store()
+            .token(&user.id, INTERNAL_PROVIDER, AUTHENTICATOR_KEY)
+            .await?
+        else {
             return Ok(None);
         };
-        let sealer = self.0.0.sealer.as_ref().ok_or_else(|| Error::Internal("accounts key too short".into()))?;
+        let sealer = self
+            .0
+            .0
+            .sealer
+            .as_ref()
+            .ok_or_else(|| Error::Internal("accounts key too short".into()))?;
         Ok(sealer.open::<String>(&Self::key_name(user), &sealed))
     }
 
@@ -523,11 +684,23 @@ impl UserManager {
     /// stamp changes.
     pub async fn reset_authenticator_key(&self, user: &mut User) -> Result<String> {
         let key = tokens::authenticator_key();
-        let sealer = self.0.0.sealer.as_ref().ok_or_else(|| Error::Internal("accounts key too short".into()))?;
+        let sealer = self
+            .0
+            .0
+            .sealer
+            .as_ref()
+            .ok_or_else(|| Error::Internal("accounts key too short".into()))?;
         self.store()
-            .set_token(&user.id, INTERNAL_PROVIDER, AUTHENTICATOR_KEY, &sealer.seal(&Self::key_name(user), &key))
+            .set_token(
+                &user.id,
+                INTERNAL_PROVIDER,
+                AUTHENTICATOR_KEY,
+                &sealer.seal(&Self::key_name(user), &key),
+            )
             .await?;
-        self.store().remove_token(&user.id, INTERNAL_PROVIDER, AUTHENTICATOR_STEP).await?;
+        self.store()
+            .remove_token(&user.id, INTERNAL_PROVIDER, AUTHENTICATOR_STEP)
+            .await?;
         self.update_security_stamp(user).await?;
         Ok(key)
     }
@@ -535,17 +708,32 @@ impl UserManager {
     /// The `otpauth://` URI for the QR code of an authenticator key, in the format ASP.NET Core
     /// Identity's default UI uses.
     pub fn authenticator_uri(&self, user: &User, key: &str) -> String {
-        let issuer = super::pct(&self.options().tokens.authenticator_issuer);
-        let account = super::pct(user.email.as_deref().unwrap_or(&user.user_name));
+        let issuer = super::pct(
+            &self
+                .options()
+                .tokens
+                .authenticator_issuer,
+        );
+        let account = super::pct(
+            user.email
+                .as_deref()
+                .unwrap_or(&user.user_name),
+        );
         format!("otpauth://totp/{issuer}:{account}?secret={key}&issuer={issuer}&digits=6")
     }
 
     /// Checks an authenticator app code: 30 second steps, two steps either way, and a step is
     /// accepted only once (`VerifyTwoFactorTokenAsync` with the authenticator provider).
     pub async fn verify_authenticator_code(&self, user: &User, code: &str) -> Result<bool> {
-        let Some(_turn) = self.0.0.in_flight.enter(&user.id) else { return Ok(false) };
-        let Some(key) = self.authenticator_key(user).await? else { return Ok(false) };
-        let Some(bytes) = tokens::base32_decode(&key) else { return Ok(false) };
+        let Some(_turn) = self.0.0.in_flight.enter(&user.id) else {
+            return Ok(false);
+        };
+        let Some(key) = self.authenticator_key(user).await? else {
+            return Ok(false);
+        };
+        let Some(bytes) = tokens::base32_decode(&key) else {
+            return Ok(false);
+        };
         let last = self
             .store()
             .token(&user.id, INTERNAL_PROVIDER, AUTHENTICATOR_STEP)
@@ -554,7 +742,14 @@ impl UserManager {
             .unwrap_or(0);
         match tokens::check_authenticator(&bytes, code, now_secs(), last) {
             Some(step) => {
-                self.store().set_token(&user.id, INTERNAL_PROVIDER, AUTHENTICATOR_STEP, &step.to_string()).await?;
+                self.store()
+                    .set_token(
+                        &user.id,
+                        INTERNAL_PROVIDER,
+                        AUTHENTICATOR_STEP,
+                        &step.to_string(),
+                    )
+                    .await?;
                 Ok(true)
             }
             None => Ok(false),
@@ -571,9 +766,22 @@ impl UserManager {
                 codes.push(c);
             }
         }
-        let hashes: Vec<String> = codes.iter().map(|c| self.0.0.keys.recovery_hash(c)).collect();
-        self.store().set_token(&user.id, INTERNAL_PROVIDER, RECOVERY_CODES, &hashes.join(";")).await?;
-        self.0.event(super::AccountEventKind::RecoveryCodesRenewed, Some(&user.id));
+        let hashes: Vec<String> = codes
+            .iter()
+            .map(|c| self.0.0.keys.recovery_hash(c))
+            .collect();
+        self.store()
+            .set_token(
+                &user.id,
+                INTERNAL_PROVIDER,
+                RECOVERY_CODES,
+                &hashes.join(";"),
+            )
+            .await?;
+        self.0.event(
+            super::AccountEventKind::RecoveryCodesRenewed,
+            Some(&user.id),
+        );
         Ok(codes)
     }
 
@@ -583,8 +791,14 @@ impl UserManager {
         if code.len() > 64 {
             return Ok(false);
         }
-        let Some(_turn) = self.0.0.in_flight.enter(&user.id) else { return Ok(false) };
-        let stored = self.store().token(&user.id, INTERNAL_PROVIDER, RECOVERY_CODES).await?.unwrap_or_default();
+        let Some(_turn) = self.0.0.in_flight.enter(&user.id) else {
+            return Ok(false);
+        };
+        let stored = self
+            .store()
+            .token(&user.id, INTERNAL_PROVIDER, RECOVERY_CODES)
+            .await?
+            .unwrap_or_default();
         let hash = self.0.0.keys.recovery_hash(code);
         let mut found = false;
         let rest: Vec<&str> = stored
@@ -597,8 +811,11 @@ impl UserManager {
             })
             .collect();
         if found {
-            self.store().set_token(&user.id, INTERNAL_PROVIDER, RECOVERY_CODES, &rest.join(";")).await?;
-            self.0.event(super::AccountEventKind::RecoveryCodeUsed, Some(&user.id));
+            self.store()
+                .set_token(&user.id, INTERNAL_PROVIDER, RECOVERY_CODES, &rest.join(";"))
+                .await?;
+            self.0
+                .event(super::AccountEventKind::RecoveryCodeUsed, Some(&user.id));
         }
         Ok(found)
     }
@@ -638,7 +855,12 @@ impl UserManager {
         self.0.0.keys.short_code(
             now_secs(),
             &user.security_stamp,
-            &format!("Phone:TwoFactor:{}", user.phone_number.as_deref().unwrap_or("")),
+            &format!(
+                "Phone:TwoFactor:{}",
+                user.phone_number
+                    .as_deref()
+                    .unwrap_or("")
+            ),
         )
     }
 
@@ -647,14 +869,23 @@ impl UserManager {
             code,
             now_secs(),
             &user.security_stamp,
-            &format!("Phone:TwoFactor:{}", user.phone_number.as_deref().unwrap_or("")),
+            &format!(
+                "Phone:TwoFactor:{}",
+                user.phone_number
+                    .as_deref()
+                    .unwrap_or("")
+            ),
         )
     }
 
     /// The second factors the user can use now (`GetValidTwoFactorProvidersAsync`).
     pub async fn two_factor_kinds(&self, user: &User) -> Result<Vec<super::TwoFactorKind>> {
         let mut kinds = Vec::new();
-        if self.authenticator_key(user).await?.is_some() {
+        if self
+            .authenticator_key(user)
+            .await?
+            .is_some()
+        {
             kinds.push(super::TwoFactorKind::Authenticator);
         }
         if user.email_confirmed && user.email.is_some() {
@@ -668,12 +899,16 @@ impl UserManager {
 
     /// Links an external login (`AddLoginAsync`). Refused when another user has it.
     pub async fn add_login(&self, user: &mut User, login: UserLogin) -> Result<()> {
-        self.store().add_login(&user.id, &login).await.map_err(|e| match e {
-            Error::Conflict => denied("login_already_associated"),
-            e => e,
-        })?;
+        self.store()
+            .add_login(&user.id, &login)
+            .await
+            .map_err(|e| match e {
+                Error::Conflict => denied("login_already_associated"),
+                e => e,
+            })?;
         self.update_security_stamp(user).await?;
-        self.0.event(AccountEventKind::LoginLinked, Some(&user.id));
+        self.0
+            .event(AccountEventKind::LoginLinked, Some(&user.id));
         Ok(())
     }
 
@@ -681,13 +916,19 @@ impl UserManager {
     /// to sign in (no password, no other login, no passkey).
     pub async fn remove_login(&self, user: &mut User, provider: &str, key: &str) -> Result<()> {
         let logins = self.store().logins_of(&user.id).await?;
-        let passkeys = self.store().passkeys_of(&user.id).await?;
+        let passkeys = self
+            .store()
+            .passkeys_of(&user.id)
+            .await?;
         if user.password_hash.is_none() && logins.len() <= 1 && passkeys.is_empty() {
             return Err(denied("last_login"));
         }
-        self.store().remove_login(&user.id, provider, key).await?;
+        self.store()
+            .remove_login(&user.id, provider, key)
+            .await?;
         self.update_security_stamp(user).await?;
-        self.0.event(AccountEventKind::LoginUnlinked, Some(&user.id));
+        self.0
+            .event(AccountEventKind::LoginUnlinked, Some(&user.id));
         Ok(())
     }
 
@@ -702,14 +943,20 @@ impl UserManager {
 
     /// Removes a passkey (`RemovePasskeyAsync`). Refused when it is the user's last way to sign in.
     pub async fn remove_passkey(&self, user: &mut User, credential_id: &[u8]) -> Result<()> {
-        let passkeys = self.store().passkeys_of(&user.id).await?;
+        let passkeys = self
+            .store()
+            .passkeys_of(&user.id)
+            .await?;
         let logins = self.store().logins_of(&user.id).await?;
         if user.password_hash.is_none() && logins.is_empty() && passkeys.len() <= 1 {
             return Err(denied("last_login"));
         }
-        self.store().remove_passkey(&user.id, credential_id).await?;
+        self.store()
+            .remove_passkey(&user.id, credential_id)
+            .await?;
         self.update_security_stamp(user).await?;
-        self.0.event(AccountEventKind::PasskeyRemoved, Some(&user.id));
+        self.0
+            .event(AccountEventKind::PasskeyRemoved, Some(&user.id));
         Ok(())
     }
 
@@ -753,10 +1000,13 @@ impl RoleManager {
             normalized_name: normalize(name),
             concurrency_stamp: new_stamp(),
         };
-        self.store().create_role(&role).await.map_err(|e| match e {
-            Error::Conflict => invalid("name", "duplicate_role_name"),
-            e => e,
-        })?;
+        self.store()
+            .create_role(&role)
+            .await
+            .map_err(|e| match e {
+                Error::Conflict => invalid("name", "duplicate_role_name"),
+                e => e,
+            })?;
         Ok(role)
     }
 
@@ -774,7 +1024,9 @@ impl RoleManager {
         let expected = std::mem::replace(&mut role.concurrency_stamp, new_stamp());
         role.name = name.to_string();
         role.normalized_name = normalize(name);
-        self.store().update_role(role, &expected).await
+        self.store()
+            .update_role(role, &expected)
+            .await
     }
 
     pub async fn delete(&self, role: &Role) -> Result<()> {
@@ -786,7 +1038,9 @@ impl RoleManager {
     }
 
     pub async fn find_by_name(&self, name: &str) -> Result<Option<Role>> {
-        self.store().role_by_name(&normalize(name)).await
+        self.store()
+            .role_by_name(&normalize(name))
+            .await
     }
 
     pub async fn exists(&self, name: &str) -> Result<bool> {
@@ -794,7 +1048,9 @@ impl RoleManager {
     }
 
     pub async fn list(&self, offset: u64, limit: u32) -> Result<(Vec<Role>, u64)> {
-        self.store().roles(offset, limit.min(crate::MAX_PAGE_SIZE)).await
+        self.store()
+            .roles(offset, limit.min(crate::MAX_PAGE_SIZE))
+            .await
     }
 
     pub async fn claims(&self, role: &Role) -> Result<Vec<Claim>> {
@@ -804,10 +1060,14 @@ impl RoleManager {
     /// Adds a claim to a role. Claims of type `permission` grant that permission to the role's
     /// users from their next session check on.
     pub async fn add_claim(&self, role: &Role, claim: Claim) -> Result<()> {
-        self.store().add_role_claim(&role.id, &claim).await
+        self.store()
+            .add_role_claim(&role.id, &claim)
+            .await
     }
 
     pub async fn remove_claim(&self, role: &Role, claim: &Claim) -> Result<()> {
-        self.store().remove_role_claim(&role.id, claim).await
+        self.store()
+            .remove_role_claim(&role.id, claim)
+            .await
     }
 }

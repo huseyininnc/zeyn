@@ -35,10 +35,14 @@ impl App {
     /// a bearer token, checks security stamps, and serves the JSON endpoints under
     /// `/_zeyn/account`. Add [`crate::accounts::feature`] for the screens.
     pub fn accounts(mut self, accounts: Accounts) -> Self {
-        self.setup_problems.extend(accounts.problems());
+        self.setup_problems
+            .extend(accounts.problems());
         self.auth = Some(Arc::new(AccountsAuth(accounts.clone())));
         self.sign_in.accounts = Some(accounts.clone());
-        self.service(accounts.clone()).service(accounts.users()).service(accounts.roles()).service(accounts.sign_in())
+        self.service(accounts.clone())
+            .service(accounts.users())
+            .service(accounts.roles())
+            .service(accounts.sign_in())
     }
 }
 
@@ -50,7 +54,11 @@ fn replace_cookie(headers: &mut HeaderMap, name: &str, value: Option<&str>) {
         .filter_map(|v| v.to_str().ok())
         .flat_map(|v| v.split(';'))
         .map(str::trim)
-        .filter(|p| !p.is_empty() && p.split_once('=').is_none_or(|(k, _)| k != name))
+        .filter(|p| {
+            !p.is_empty()
+                && p.split_once('=')
+                    .is_none_or(|(k, _)| k != name)
+        })
         .map(str::to_string)
         .collect();
     if let Some(v) = value {
@@ -70,14 +78,28 @@ pub(super) async fn layer(
     mut req: axum::extract::Request,
     next: axum::middleware::Next,
 ) -> Response {
-    let Some(accounts) = st.sign_in.accounts.clone() else { return next.run(req).await };
-    let peer = req.extensions().get::<axum::extract::ConnectInfo<std::net::SocketAddr>>().map(|c| c.0.ip());
+    let Some(accounts) = st.sign_in.accounts.clone() else {
+        return next.run(req).await;
+    };
+    let peer = req
+        .extensions()
+        .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
+        .map(|c| c.0.ip());
     let forwarded = super::guard::forwarded_for(req.headers());
     let ip = crate::security::client_ip(peer, forwarded.as_deref(), &st.trusted);
     let manager = accounts.sign_in();
     let mut out = Vec::new();
-    let secure = st.secure_cookies || accounts.0.public_url.as_deref().is_some_and(|u| u.starts_with("https://"));
-    let interval = accounts.settings().session.validation_interval.as_secs() as i64;
+    let secure = st.secure_cookies
+        || accounts
+            .0
+            .public_url
+            .as_deref()
+            .is_some_and(|u| u.starts_with("https://"));
+    let interval = accounts
+        .settings()
+        .session
+        .validation_interval
+        .as_secs() as i64;
     if let Some(value) = cookie(req.headers(), SESSION).map(str::to_string)
         && let Some(s) = manager.open_session(&value)
         && now_secs() - s.validated >= interval
@@ -112,14 +134,29 @@ pub(super) async fn layer(
         }
     }
     if let Some(token) = bearer(req.headers()).map(str::to_string)
-        && let Some(s) = accounts.0.sealer.as_ref().and_then(|k| k.open::<Session>(BEARER, &token))
+        && let Some(s) = accounts
+            .0
+            .sealer
+            .as_ref()
+            .and_then(|k| k.open::<Session>(BEARER, &token))
         && now_secs() - s.validated >= interval
-        && matches!(manager.validate_security_stamp(&s.id, &s.stamp).await, Ok(None))
+        && matches!(
+            manager
+                .validate_security_stamp(&s.id, &s.stamp)
+                .await,
+            Ok(None)
+        )
     {
-        req.headers_mut().remove(header::AUTHORIZATION);
+        req.headers_mut()
+            .remove(header::AUTHORIZATION);
     }
-    let cookies =
-        req.headers().get_all(header::COOKIE).iter().filter_map(|v| v.to_str().ok()).collect::<Vec<_>>().join("; ");
+    let cookies = req
+        .headers()
+        .get_all(header::COOKIE)
+        .iter()
+        .filter_map(|v| v.to_str().ok())
+        .collect::<Vec<_>>()
+        .join("; ");
     let scope = Arc::new(Scope {
         cookies,
         out: Mutex::new(out),
@@ -132,7 +169,9 @@ pub(super) async fn layer(
     let mut response = scope::run(scope.clone(), next.run(req)).await;
     for c in scope::taken(&scope) {
         if let Ok(v) = HeaderValue::from_str(&c) {
-            response.headers_mut().append(header::SET_COOKIE, v);
+            response
+                .headers_mut()
+                .append(header::SET_COOKIE, v);
         }
     }
     response
@@ -155,16 +194,34 @@ pub(super) fn routes(router: Router<Arc<AppState>>, st: &Arc<AppState>) -> Route
         .route(&format!("{BASE}/manage/2fa"), post(two_factor))
         .route(&format!("{BASE}/manage/info"), get(info).post(update_info))
         .route(&format!("{BASE}/manage/personalData"), get(personal_data))
-        .route(&format!("{BASE}/passkeys/requestOptions"), post(passkey_request))
+        .route(
+            &format!("{BASE}/passkeys/requestOptions"),
+            post(passkey_request),
+        )
         .route(&format!("{BASE}/passkeys/login"), post(passkey_login))
-        .route(&format!("{BASE}/manage/passkeys/creationOptions"), post(passkey_creation))
-        .route(&format!("{BASE}/manage/passkeys"), get(passkey_list).post(passkey_add))
-        .route(&format!("{BASE}/manage/passkeys/remove"), post(passkey_remove))
+        .route(
+            &format!("{BASE}/manage/passkeys/creationOptions"),
+            post(passkey_creation),
+        )
+        .route(
+            &format!("{BASE}/manage/passkeys"),
+            get(passkey_list).post(passkey_add),
+        )
+        .route(
+            &format!("{BASE}/manage/passkeys/remove"),
+            post(passkey_remove),
+        )
         .route(&format!("{BASE}/accounts.js"), get(script));
     #[cfg(feature = "oidc")]
     let router = router
-        .route(&format!("{BASE}/external/{{provider}}"), get(external::start))
-        .route(&format!("{BASE}/external/{{provider}}/callback"), get(external::callback));
+        .route(
+            &format!("{BASE}/external/{{provider}}"),
+            get(external::start),
+        )
+        .route(
+            &format!("{BASE}/external/{{provider}}/callback"),
+            get(external::callback),
+        );
     router
 }
 
@@ -173,12 +230,21 @@ pub(super) fn routes(router: Router<Arc<AppState>>, st: &Arc<AppState>) -> Route
 const SCRIPT: &str = include_str!("../../assets/accounts.js");
 
 async fn script() -> Response {
-    ([(header::CONTENT_TYPE, "text/javascript; charset=utf-8"), (header::CACHE_CONTROL, "no-cache")], SCRIPT)
+    (
+        [
+            (header::CONTENT_TYPE, "text/javascript; charset=utf-8"),
+            (header::CACHE_CONTROL, "no-cache"),
+        ],
+        SCRIPT,
+    )
         .into_response()
 }
 
 fn accounts(st: &AppState) -> Accounts {
-    st.sign_in.accounts.clone().expect("routes exist only with accounts")
+    st.sign_in
+        .accounts
+        .clone()
+        .expect("routes exist only with accounts")
 }
 
 /// A JSON body, after the content type and, for cookie sessions, CSRF checks.
@@ -195,18 +261,30 @@ fn body<T: serde::de::DeserializeOwned>(
         return Err(StatusCode::UNSUPPORTED_MEDIA_TYPE.into_response());
     }
     if cookie(headers, SESSION).is_some() && st.check_csrf(headers).is_err() {
-        return Err(problem(StatusCode::FORBIDDEN, "csrf", "The CSRF token is missing or wrong."));
+        return Err(problem(
+            StatusCode::FORBIDDEN,
+            "csrf",
+            "The CSRF token is missing or wrong.",
+        ));
     }
     if raw.len() > 64 * 1024 {
         return Err(StatusCode::PAYLOAD_TOO_LARGE.into_response());
     }
-    serde_json::from_slice(raw)
-        .map_err(|_| problem(StatusCode::BAD_REQUEST, "bad_request", "The body is not valid JSON for this endpoint."))
+    serde_json::from_slice(raw).map_err(|_| {
+        problem(
+            StatusCode::BAD_REQUEST,
+            "bad_request",
+            "The body is not valid JSON for this endpoint.",
+        )
+    })
 }
 
 fn problem(status: StatusCode, code: &str, detail: &str) -> Response {
     let mut r = (status, axum::Json(json!({ "type": format!("urn:zeyn:problem:{code}"), "title": status.canonical_reason().unwrap_or(code), "status": status.as_u16(), "detail": detail }))).into_response();
-    r.headers_mut().insert(header::CONTENT_TYPE, HeaderValue::from_static("application/problem+json"));
+    r.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/problem+json"),
+    );
     r
 }
 
@@ -221,7 +299,13 @@ fn failed(ctx: &Ctx, e: Error) -> Response {
             .split('_')
             .map(|w| {
                 let mut c = w.chars();
-                c.next().map(|f| f.to_uppercase().chain(c).collect::<String>()).unwrap_or_default()
+                c.next()
+                    .map(|f| {
+                        f.to_uppercase()
+                            .chain(c)
+                            .collect::<String>()
+                    })
+                    .unwrap_or_default()
             })
             .collect::<String>(),
         _ => "Error".into(),
@@ -230,25 +314,41 @@ fn failed(ctx: &Ctx, e: Error) -> Response {
         Error::Validation(v) => {
             let mut errors = serde_json::Map::new();
             for f in &v.errors {
-                let entry = errors.entry(code_of(&f.message)).or_insert_with(|| Json::Array(Vec::new()));
+                let entry = errors
+                    .entry(code_of(&f.message))
+                    .or_insert_with(|| Json::Array(Vec::new()));
                 if let Json::Array(list) = entry {
                     list.push(Json::String(ctx.t(&f.message)));
                 }
             }
             let mut r = (StatusCode::BAD_REQUEST, axum::Json(json!({ "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1", "title": "One or more validation errors occurred.", "status": 400, "errors": errors }))).into_response();
-            r.headers_mut().insert(header::CONTENT_TYPE, HeaderValue::from_static("application/problem+json"));
+            r.headers_mut().insert(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("application/problem+json"),
+            );
             r
         }
         Error::Denied(t) => {
-            let status =
-                if code_of(&t) == "RateLimited" { StatusCode::TOO_MANY_REQUESTS } else { StatusCode::BAD_REQUEST };
+            let status = if code_of(&t) == "RateLimited" {
+                StatusCode::TOO_MANY_REQUESTS
+            } else {
+                StatusCode::BAD_REQUEST
+            };
             problem(status, &code_of(&t), &ctx.t(&t))
         }
         Error::Internal(detail) => {
             tracing::error!("accounts: {detail}");
-            problem(StatusCode::INTERNAL_SERVER_ERROR, "internal", "Something went wrong.")
+            problem(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "internal",
+                "Something went wrong.",
+            )
         }
-        other => problem(StatusCode::BAD_REQUEST, other.code(), &ctx.t(&other.message())),
+        other => problem(
+            StatusCode::BAD_REQUEST,
+            other.code(),
+            &ctx.t(&other.message()),
+        ),
     }
 }
 
@@ -256,9 +356,12 @@ fn failed(ctx: &Ctx, e: Error) -> Response {
 pub(crate) async fn current(accounts: &Accounts, headers: &HeaderMap) -> Result<Option<User>> {
     let manager = accounts.sign_in();
     let session = match bearer(headers) {
-        Some(t) => {
-            accounts.0.sealer.as_ref().and_then(|k| k.open::<Session>(BEARER, t)).filter(|s| s.expires > now_secs())
-        }
+        Some(t) => accounts
+            .0
+            .sealer
+            .as_ref()
+            .and_then(|k| k.open::<Session>(BEARER, t))
+            .filter(|s| s.expires > now_secs()),
         None => cookie(headers, SESSION).and_then(|v| manager.open_session(v)),
     };
     match session {
@@ -288,13 +391,27 @@ pub(crate) async fn send_confirmation(
                 "/account/confirm-email",
                 &json!({ "user": user.id, "code": code, "email": new }),
             );
-            accounts.0.sender.send(ctx, new, AccountMessage::ChangeEmail { link }).await
+            accounts
+                .0
+                .sender
+                .send(ctx, new, AccountMessage::ChangeEmail { link })
+                .await
         }
         None => {
-            let Some(to) = user.email.clone() else { return Ok(()) };
+            let Some(to) = user.email.clone() else {
+                return Ok(());
+            };
             let code = users.generate_email_confirmation_token(user);
-            let link = screen_link(accounts, "/account/confirm-email", &json!({ "user": user.id, "code": code }));
-            accounts.0.sender.send(ctx, &to, AccountMessage::ConfirmEmail { link }).await
+            let link = screen_link(
+                accounts,
+                "/account/confirm-email",
+                &json!({ "user": user.id, "code": code }),
+            );
+            accounts
+                .0
+                .sender
+                .send(ctx, &to, AccountMessage::ConfirmEmail { link })
+                .await
         }
     }
 }
@@ -302,27 +419,52 @@ pub(crate) async fn send_confirmation(
 /// Registers with an e-mail address and password. The answer does not say whether the address
 /// had an account: an existing address gets a notice by e-mail instead, after the same password
 /// hashing work.
-pub(crate) async fn register_user(ctx: &Ctx, accounts: &Accounts, email: &str, password: &str) -> Result<()> {
+pub(crate) async fn register_user(
+    ctx: &Ctx,
+    accounts: &Accounts,
+    email: &str,
+    password: &str,
+) -> Result<()> {
     if !accounts.settings().registration {
         return Err(Error::NotFound);
     }
     let users = accounts.users();
     accounts.sign_in().throttle_ip().await?;
-    users.validate_password(password).await?;
+    users
+        .validate_password(password)
+        .await?;
     let email = email.trim();
-    if users.find_by_name_or_email(email).await?.is_some() {
+    if users
+        .find_by_name_or_email(email)
+        .await?
+        .is_some()
+    {
         let _ = users.hash_password(password).await;
         let link = accounts.link("/account/login");
-        accounts.0.sender.send(ctx, email, AccountMessage::AlreadyRegistered { link }).await?;
+        accounts
+            .0
+            .sender
+            .send(ctx, email, AccountMessage::AlreadyRegistered { link })
+            .await?;
         return Ok(());
     }
-    let user = match users.create(User::new(email).with_email(email), Some(password)).await {
-        Err(Error::Validation(v)) if v.errors.iter().any(|e| e.field == "user_name") => {
+    let user = match users
+        .create(User::new(email).with_email(email), Some(password))
+        .await
+    {
+        Err(Error::Validation(v))
+            if v.errors
+                .iter()
+                .any(|e| e.field == "user_name") =>
+        {
             return Err(crate::accounts::invalid("email", "invalid_email"));
         }
         r => r?,
     };
-    accounts.event(crate::accounts::AccountEventKind::Registered, Some(&user.id));
+    accounts.event(
+        crate::accounts::AccountEventKind::Registered,
+        Some(&user.id),
+    );
     send_confirmation(ctx, accounts, &user, None).await
 }
 
@@ -330,13 +472,26 @@ pub(crate) async fn register_user(ctx: &Ctx, accounts: &Accounts, email: &str, p
 /// address, and answers the same in every case.
 pub(crate) async fn forgot_password(ctx: &Ctx, accounts: &Accounts, email: &str) -> Result<()> {
     accounts.sign_in().throttle_ip().await?;
-    if let Some(user) = accounts.users().find_by_email(email).await?
+    if let Some(user) = accounts
+        .users()
+        .find_by_email(email)
+        .await?
         && user.email_confirmed
         && let Some(to) = user.email.clone()
     {
-        let code = accounts.users().generate_password_reset_token(&user);
-        let link = screen_link(accounts, "/account/reset-password", &json!({ "user": user.id, "code": code }));
-        accounts.0.sender.send(ctx, &to, AccountMessage::ResetPassword { link }).await?;
+        let code = accounts
+            .users()
+            .generate_password_reset_token(&user);
+        let link = screen_link(
+            accounts,
+            "/account/reset-password",
+            &json!({ "user": user.id, "code": code }),
+        );
+        accounts
+            .0
+            .sender
+            .send(ctx, &to, AccountMessage::ResetPassword { link })
+            .await?;
     }
     Ok(())
 }
@@ -345,7 +500,10 @@ pub(crate) async fn forgot_password(ctx: &Ctx, accounts: &Accounts, email: &str)
 /// the same in every case.
 pub(crate) async fn resend_confirmation(ctx: &Ctx, accounts: &Accounts, email: &str) -> Result<()> {
     accounts.sign_in().throttle_ip().await?;
-    if let Some(user) = accounts.users().find_by_email(email).await?
+    if let Some(user) = accounts
+        .users()
+        .find_by_email(email)
+        .await?
         && !user.email_confirmed
     {
         send_confirmation(ctx, accounts, &user, None).await?;
@@ -360,7 +518,11 @@ struct RegisterRequest {
     password: String,
 }
 
-async fn register(State(st): State<Arc<AppState>>, headers: HeaderMap, raw: axum::body::Bytes) -> Response {
+async fn register(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    raw: axum::body::Bytes,
+) -> Response {
     let r: RegisterRequest = match body(&st, &headers, &raw) {
         Ok(r) => r,
         Err(e) => return e,
@@ -393,7 +555,10 @@ impl CookieQuery {
     /// (cookies, persistent) as `MapIdentityApi` reads the two flags.
     fn mode(&self) -> (bool, bool) {
         let cookies = self.use_cookies == Some(true) || self.use_session_cookies == Some(true);
-        (cookies, self.use_cookies == Some(true) && self.use_session_cookies != Some(true))
+        (
+            cookies,
+            self.use_cookies == Some(true) && self.use_session_cookies != Some(true),
+        )
     }
 }
 
@@ -402,11 +567,20 @@ async fn tokens_for(accounts: &Accounts, ctx: &Ctx, user_id: &str) -> Response {
     let manager = accounts.sign_in();
     let s = scope::cookie(SESSION).and_then(|v| manager.open_session(&v));
     scope::forget(SESSION);
-    let Ok(Some(user)) = accounts.users().find_by_id(user_id).await else {
+    let Ok(Some(user)) = accounts
+        .users()
+        .find_by_id(user_id)
+        .await
+    else {
         return failed(ctx, Error::Internal("signed in user vanished".into()));
     };
-    let (method, mfa) = s.map(|s| (s.method, s.mfa)).unwrap_or(("pwd".into(), false));
-    match manager.bearer(&user, &method, mfa).await {
+    let (method, mfa) = s
+        .map(|s| (s.method, s.mfa))
+        .unwrap_or(("pwd".into(), false));
+    match manager
+        .bearer(&user, &method, mfa)
+        .await
+    {
         Ok(t) => axum::Json(t).into_response(),
         Err(e) => failed(ctx, e),
     }
@@ -426,15 +600,34 @@ async fn login(
     let accounts = accounts(&st);
     let manager = accounts.sign_in();
     let (cookies, persistent) = q.mode();
-    let mut result = match manager.password_sign_in(&r.email, &r.password, persistent, true).await {
+    let mut result = match manager
+        .password_sign_in(&r.email, &r.password, persistent, true)
+        .await
+    {
         Ok(r) => r,
         Err(e) => return failed(&ctx, e),
     };
     if result == SignInResult::RequiresTwoFactor {
-        let step = if let Some(code) = r.two_factor_code.as_deref().filter(|c| !c.is_empty()) {
-            Some(manager.two_factor_sign_in(TwoFactorKind::Authenticator, code, persistent).await)
-        } else if let Some(code) = r.two_factor_recovery_code.as_deref().filter(|c| !c.is_empty()) {
-            Some(manager.recovery_code_sign_in(code).await)
+        let step = if let Some(code) = r
+            .two_factor_code
+            .as_deref()
+            .filter(|c| !c.is_empty())
+        {
+            Some(
+                manager
+                    .two_factor_sign_in(TwoFactorKind::Authenticator, code, persistent)
+                    .await,
+            )
+        } else if let Some(code) = r
+            .two_factor_recovery_code
+            .as_deref()
+            .filter(|c| !c.is_empty())
+        {
+            Some(
+                manager
+                    .recovery_code_sign_in(code)
+                    .await,
+            )
         } else {
             None
         };
@@ -457,7 +650,10 @@ async fn login(
     if cookies {
         return StatusCode::OK.into_response();
     }
-    let Some(id) = scope::cookie(SESSION).and_then(|v| manager.open_session(&v)).map(|s| s.id) else {
+    let Some(id) = scope::cookie(SESSION)
+        .and_then(|v| manager.open_session(&v))
+        .map(|s| s.id)
+    else {
         return failed(&ctx, Error::Internal("no session after sign in".into()));
     };
     tokens_for(&accounts, &ctx, &id).await
@@ -465,21 +661,41 @@ async fn login(
 
 async fn logout(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
     if cookie(&headers, SESSION).is_some() && st.check_csrf(&headers).is_err() {
-        return problem(StatusCode::FORBIDDEN, "csrf", "The CSRF token is missing or wrong.");
+        return problem(
+            StatusCode::FORBIDDEN,
+            "csrf",
+            "The CSRF token is missing or wrong.",
+        );
     }
     let accounts = accounts(&st);
-    let user = current(&accounts, &headers).await.ok().flatten();
-    accounts.sign_in().sign_out(user.as_ref().map(|u| u.id.as_str()));
+    let user = current(&accounts, &headers)
+        .await
+        .ok()
+        .flatten();
+    accounts
+        .sign_in()
+        .sign_out(user.as_ref().map(|u| u.id.as_str()));
     StatusCode::OK.into_response()
 }
 
 /// Ends the browser session and goes to the sign in page; the idle timeout sends users here.
 async fn signout(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
     let accounts = accounts(&st);
-    let user = current(&accounts, &headers).await.ok().flatten();
-    accounts.sign_in().sign_out(user.as_ref().map(|u| u.id.as_str()));
-    let mut r = Redirect::to(&st.login_url.clone().unwrap_or_else(|| st.url("/"))).into_response();
-    r.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    let user = current(&accounts, &headers)
+        .await
+        .ok()
+        .flatten();
+    accounts
+        .sign_in()
+        .sign_out(user.as_ref().map(|u| u.id.as_str()));
+    let mut r = Redirect::to(
+        &st.login_url
+            .clone()
+            .unwrap_or_else(|| st.url("/")),
+    )
+    .into_response();
+    r.headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     r
 }
 
@@ -489,13 +705,21 @@ struct RefreshRequest {
     refresh_token: String,
 }
 
-async fn refresh(State(st): State<Arc<AppState>>, headers: HeaderMap, raw: axum::body::Bytes) -> Response {
+async fn refresh(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    raw: axum::body::Bytes,
+) -> Response {
     let r: RefreshRequest = match body(&st, &headers, &raw) {
         Ok(r) => r,
         Err(e) => return e,
     };
     let ctx = st.ctx(&headers);
-    match accounts(&st).sign_in().refresh_bearer(&r.refresh_token).await {
+    match accounts(&st)
+        .sign_in()
+        .refresh_bearer(&r.refresh_token)
+        .await
+    {
         Ok(Some(t)) => axum::Json(t).into_response(),
         Ok(None) => StatusCode::UNAUTHORIZED.into_response(),
         Err(e) => failed(&ctx, e),
@@ -518,8 +742,16 @@ async fn confirm_email(State(st): State<Arc<AppState>>, Query(q): Query<ConfirmQ
         return StatusCode::UNAUTHORIZED.into_response();
     };
     let done = match &q.changed_email {
-        None => users.confirm_email(&mut user, &q.code).await,
-        Some(new) => users.change_email(&mut user, new, &q.code, true).await,
+        None => {
+            users
+                .confirm_email(&mut user, &q.code)
+                .await
+        }
+        Some(new) => {
+            users
+                .change_email(&mut user, new, &q.code, true)
+                .await
+        }
     };
     match done {
         Ok(()) => (StatusCode::OK, "Thank you for confirming your email.").into_response(),
@@ -532,7 +764,11 @@ struct EmailRequest {
     email: String,
 }
 
-async fn resend(State(st): State<Arc<AppState>>, headers: HeaderMap, raw: axum::body::Bytes) -> Response {
+async fn resend(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    raw: axum::body::Bytes,
+) -> Response {
     let r: EmailRequest = match body(&st, &headers, &raw) {
         Ok(r) => r,
         Err(e) => return e,
@@ -544,7 +780,11 @@ async fn resend(State(st): State<Arc<AppState>>, headers: HeaderMap, raw: axum::
     }
 }
 
-async fn forgot(State(st): State<Arc<AppState>>, headers: HeaderMap, raw: axum::body::Bytes) -> Response {
+async fn forgot(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    raw: axum::body::Bytes,
+) -> Response {
     let r: EmailRequest = match body(&st, &headers, &raw) {
         Ok(r) => r,
         Err(e) => return e,
@@ -564,7 +804,11 @@ struct ResetRequest {
     new_password: String,
 }
 
-async fn reset(State(st): State<Arc<AppState>>, headers: HeaderMap, raw: axum::body::Bytes) -> Response {
+async fn reset(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    raw: axum::body::Bytes,
+) -> Response {
     let r: ResetRequest = match body(&st, &headers, &raw) {
         Ok(r) => r,
         Err(e) => return e,
@@ -575,9 +819,19 @@ async fn reset(State(st): State<Arc<AppState>>, headers: HeaderMap, raw: axum::b
         return failed(&ctx, e);
     }
     let users = accounts.users();
-    let user = users.find_by_email(&r.email).await.ok().flatten().filter(|u| u.email_confirmed);
-    let Some(mut user) = user else { return failed(&ctx, crate::accounts::invalid("code", "invalid_token")) };
-    match users.reset_password(&mut user, &r.reset_code, &r.new_password).await {
+    let user = users
+        .find_by_email(&r.email)
+        .await
+        .ok()
+        .flatten()
+        .filter(|u| u.email_confirmed);
+    let Some(mut user) = user else {
+        return failed(&ctx, crate::accounts::invalid("code", "invalid_token"));
+    };
+    match users
+        .reset_password(&mut user, &r.reset_code, &r.new_password)
+        .await
+    {
         Ok(()) => StatusCode::OK.into_response(),
         Err(Error::Denied(_)) => failed(&ctx, crate::accounts::invalid("code", "invalid_token")),
         Err(e) => failed(&ctx, e),
@@ -594,14 +848,20 @@ struct TwoFactorRequest {
     forget_machine: bool,
 }
 
-async fn two_factor(State(st): State<Arc<AppState>>, headers: HeaderMap, raw: axum::body::Bytes) -> Response {
+async fn two_factor(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    raw: axum::body::Bytes,
+) -> Response {
     let r: TwoFactorRequest = match body(&st, &headers, &raw) {
         Ok(r) => r,
         Err(e) => return e,
     };
     let ctx = st.ctx(&headers);
     let accounts = accounts(&st);
-    let Ok(Some(mut user)) = current(&accounts, &headers).await else { return StatusCode::NOT_FOUND.into_response() };
+    let Ok(Some(mut user)) = current(&accounts, &headers).await else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
     let users = accounts.users();
     let manager = accounts.sign_in();
     let fresh = ctx.signed_in_recently();
@@ -677,25 +937,44 @@ struct InfoRequest {
     old_password: Option<String>,
 }
 
-async fn update_info(State(st): State<Arc<AppState>>, headers: HeaderMap, raw: axum::body::Bytes) -> Response {
+async fn update_info(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    raw: axum::body::Bytes,
+) -> Response {
     let r: InfoRequest = match body(&st, &headers, &raw) {
         Ok(r) => r,
         Err(e) => return e,
     };
     let ctx = st.ctx(&headers);
     let accounts = accounts(&st);
-    let Ok(Some(mut user)) = current(&accounts, &headers).await else { return StatusCode::NOT_FOUND.into_response() };
+    let Ok(Some(mut user)) = current(&accounts, &headers).await else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
     let result: Result<()> = async {
-        if let Some(new) = r.new_password.as_deref().filter(|p| !p.is_empty()) {
+        if let Some(new) = r
+            .new_password
+            .as_deref()
+            .filter(|p| !p.is_empty())
+        {
             let old = r
                 .old_password
                 .as_deref()
                 .filter(|p| !p.is_empty())
                 .ok_or_else(|| crate::accounts::invalid("old_password", "old_password_required"))?;
-            accounts.users().change_password(&mut user, old, new).await?;
-            accounts.sign_in().refresh_sign_in(&user).await?;
+            accounts
+                .users()
+                .change_password(&mut user, old, new)
+                .await?;
+            accounts
+                .sign_in()
+                .refresh_sign_in(&user)
+                .await?;
         }
-        if let Some(new) = r.new_email.as_deref().filter(|e| !e.is_empty())
+        if let Some(new) = r
+            .new_email
+            .as_deref()
+            .filter(|e| !e.is_empty())
             && Some(new) != user.email.as_deref()
         {
             send_confirmation(&ctx, &accounts, &user, Some(new)).await?;
@@ -712,8 +991,14 @@ async fn update_info(State(st): State<Arc<AppState>>, headers: HeaderMap, raw: a
 /// The signed in user's personal data as a JSON download.
 async fn personal_data(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
     let accounts = accounts(&st);
-    let Ok(Some(user)) = current(&accounts, &headers).await else { return StatusCode::NOT_FOUND.into_response() };
-    match accounts.users().personal_data(&user).await {
+    let Ok(Some(user)) = current(&accounts, &headers).await else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    match accounts
+        .users()
+        .personal_data(&user)
+        .await
+    {
         Ok(data) => {
             tracing::info!(target: "zeyn::accounts", user = %user.id, "personal data downloaded");
             let mut r = axum::Json(data).into_response();
@@ -721,7 +1006,8 @@ async fn personal_data(State(st): State<Arc<AppState>>, headers: HeaderMap) -> R
                 header::CONTENT_DISPOSITION,
                 HeaderValue::from_static("attachment; filename=\"PersonalData.json\""),
             );
-            r.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+            r.headers_mut()
+                .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
             r
         }
         Err(e) => failed(&st.ctx(&headers), e),
@@ -736,24 +1022,47 @@ fn party(accounts: &Accounts, st: &AppState) -> Option<Party> {
     }
     let url = accounts.0.public_url.as_deref()?;
     let name = st.name.english();
-    Party::from_url(&format!("{url}{}", st.prefix), o.server_domain.as_deref(), &name)
+    Party::from_url(
+        &format!("{url}{}", st.prefix),
+        o.server_domain.as_deref(),
+        &name,
+    )
 }
 
 fn start_ceremony(accounts: &Accounts, op: &str, user: Option<String>) -> Result<String> {
-    let size = accounts.settings().passkeys.challenge_size.clamp(16, 64);
+    let size = accounts
+        .settings()
+        .passkeys
+        .challenge_size
+        .clamp(16, 64);
     let mut challenge = random::<64>().to_vec();
     challenge.truncate(size);
     let state = PasskeyState {
         op: op.into(),
         challenge: b64url(&challenge),
         user,
-        expires: now_secs() + accounts.settings().passkeys.timeout.as_secs() as i64,
+        expires: now_secs()
+            + accounts
+                .settings()
+                .passkeys
+                .timeout
+                .as_secs() as i64,
     };
-    let sealer = accounts.0.sealer.as_ref().ok_or_else(|| Error::Internal("accounts key too short".into()))?;
+    let sealer = accounts
+        .0
+        .sealer
+        .as_ref()
+        .ok_or_else(|| Error::Internal("accounts key too short".into()))?;
     scope::set_cookie(
         CEREMONY,
         Some(&sealer.seal(CEREMONY, &state)),
-        Some(accounts.settings().passkeys.timeout.as_secs() as i64),
+        Some(
+            accounts
+                .settings()
+                .passkeys
+                .timeout
+                .as_secs() as i64,
+        ),
     );
     Ok(state.challenge)
 }
@@ -761,7 +1070,11 @@ fn start_ceremony(accounts: &Accounts, op: &str, user: Option<String>) -> Result
 fn take_ceremony(accounts: &Accounts, op: &str) -> Option<PasskeyState> {
     let value = scope::cookie(CEREMONY)?;
     scope::set_cookie(CEREMONY, None, None);
-    let s: PasskeyState = accounts.0.sealer.as_ref()?.open(CEREMONY, &value)?;
+    let s: PasskeyState = accounts
+        .0
+        .sealer
+        .as_ref()?
+        .open(CEREMONY, &value)?;
     (s.op == op && s.expires > now_secs()).then_some(s)
 }
 
@@ -769,7 +1082,12 @@ fn take_ceremony(accounts: &Accounts, op: &str) -> Option<PasskeyState> {
 fn passkey_request_options(accounts: &Accounts, st: &AppState) -> Result<Json> {
     let party = party(accounts, st).ok_or(Error::NotFound)?;
     let challenge = start_ceremony(accounts, "get", None)?;
-    Ok(passkey::request_options(&accounts.settings().passkeys, &party, &challenge, &[]))
+    Ok(passkey::request_options(
+        &accounts.settings().passkeys,
+        &party,
+        &challenge,
+        &[],
+    ))
 }
 
 async fn passkey_request(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
@@ -800,17 +1118,40 @@ async fn passkey_sign_in(
     remember: bool,
 ) -> Result<(SignInResult, String)> {
     let party = party(accounts, st).ok_or(Error::NotFound)?;
-    let state = take_ceremony(accounts, "get").ok_or_else(|| crate::accounts::denied("passkey_expired"))?;
-    let credential: Json = serde_json::from_str(credential).map_err(|_| crate::accounts::denied("passkey_invalid"))?;
+    let state =
+        take_ceremony(accounts, "get").ok_or_else(|| crate::accounts::denied("passkey_expired"))?;
+    let credential: Json =
+        serde_json::from_str(credential).map_err(|_| crate::accounts::denied("passkey_invalid"))?;
     let id = passkey::assertion_id(&credential)?;
-    let (user_id, stored) =
-        accounts.store().passkey(&id).await?.ok_or_else(|| crate::accounts::denied("passkey_invalid"))?;
-    let updated =
-        passkey::verify_assertion(&accounts.settings().passkeys, &party, &state, &credential, &user_id, &stored)?;
-    accounts.store().save_passkey(&user_id, &updated).await?;
-    let user =
-        accounts.users().find_by_id(&user_id).await?.ok_or_else(|| crate::accounts::denied("passkey_invalid"))?;
-    Ok((accounts.sign_in().passkey_sign_in(&user, updated.user_verified, remember).await?, user.id))
+    let (user_id, stored) = accounts
+        .store()
+        .passkey(&id)
+        .await?
+        .ok_or_else(|| crate::accounts::denied("passkey_invalid"))?;
+    let updated = passkey::verify_assertion(
+        &accounts.settings().passkeys,
+        &party,
+        &state,
+        &credential,
+        &user_id,
+        &stored,
+    )?;
+    accounts
+        .store()
+        .save_passkey(&user_id, &updated)
+        .await?;
+    let user = accounts
+        .users()
+        .find_by_id(&user_id)
+        .await?
+        .ok_or_else(|| crate::accounts::denied("passkey_invalid"))?;
+    Ok((
+        accounts
+            .sign_in()
+            .passkey_sign_in(&user, updated.user_verified, remember)
+            .await?,
+        user.id,
+    ))
 }
 
 async fn passkey_login(
@@ -827,11 +1168,17 @@ async fn passkey_login(
     let accounts = accounts(&st);
     let (cookies, persistent) = q.mode();
     match passkey_sign_in(&accounts, &st, &r.credential_json, persistent || r.remember).await {
-        Ok((SignInResult::Succeeded, id)) if !cookies && cookie(&headers, "zeyn_csrf").is_none() => {
+        Ok((SignInResult::Succeeded, id))
+            if !cookies && cookie(&headers, "zeyn_csrf").is_none() =>
+        {
             tokens_for(&accounts, &ctx, &id).await
         }
         Ok((SignInResult::Succeeded, _)) => StatusCode::OK.into_response(),
-        Ok((other, _)) => problem(StatusCode::UNAUTHORIZED, &format!("{other:?}"), &format!("{other:?}")),
+        Ok((other, _)) => problem(
+            StatusCode::UNAUTHORIZED,
+            &format!("{other:?}"),
+            &format!("{other:?}"),
+        ),
         Err(e) => failed(&ctx, e),
     }
 }
@@ -853,10 +1200,16 @@ async fn passkey_creation_options(accounts: &Accounts, st: &AppState, user: &Use
 
 async fn passkey_creation(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
     if cookie(&headers, SESSION).is_some() && st.check_csrf(&headers).is_err() {
-        return problem(StatusCode::FORBIDDEN, "csrf", "The CSRF token is missing or wrong.");
+        return problem(
+            StatusCode::FORBIDDEN,
+            "csrf",
+            "The CSRF token is missing or wrong.",
+        );
     }
     let accounts = accounts(&st);
-    let Ok(Some(user)) = current(&accounts, &headers).await else { return StatusCode::NOT_FOUND.into_response() };
+    let Ok(Some(user)) = current(&accounts, &headers).await else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
     let ctx = st.ctx(&headers);
     if let Err(f) = super::session::recent(&ctx) {
         return st.error_response(&ctx, f);
@@ -879,16 +1232,40 @@ async fn passkey_register(
     let state = take_ceremony(accounts, "create")
         .filter(|s| s.user.as_deref() == Some(user.id.as_str()))
         .ok_or_else(|| crate::accounts::denied("passkey_expired"))?;
-    let credential: Json = serde_json::from_str(credential).map_err(|_| crate::accounts::denied("passkey_invalid"))?;
-    let pk =
-        passkey::verify_registration(&accounts.settings().passkeys, &party, &state, &credential, name, now_secs())?;
-    if accounts.store().passkey(&pk.credential_id).await?.is_some() {
+    let credential: Json =
+        serde_json::from_str(credential).map_err(|_| crate::accounts::denied("passkey_invalid"))?;
+    let pk = passkey::verify_registration(
+        &accounts.settings().passkeys,
+        &party,
+        &state,
+        &credential,
+        name,
+        now_secs(),
+    )?;
+    if accounts
+        .store()
+        .passkey(&pk.credential_id)
+        .await?
+        .is_some()
+    {
         return Err(crate::accounts::denied("passkey_registered"));
     }
-    accounts.store().save_passkey(&user.id, &pk).await?;
-    accounts.users().update_security_stamp(user).await?;
-    accounts.sign_in().refresh_sign_in(user).await?;
-    accounts.event(crate::accounts::AccountEventKind::PasskeyAdded, Some(&user.id));
+    accounts
+        .store()
+        .save_passkey(&user.id, &pk)
+        .await?;
+    accounts
+        .users()
+        .update_security_stamp(user)
+        .await?;
+    accounts
+        .sign_in()
+        .refresh_sign_in(user)
+        .await?;
+    accounts.event(
+        crate::accounts::AccountEventKind::PasskeyAdded,
+        Some(&user.id),
+    );
     Ok(pk)
 }
 
@@ -896,14 +1273,20 @@ fn passkey_json(p: &crate::accounts::Passkey) -> Json {
     json!({ "credentialId": b64url(&p.credential_id), "name": p.name, "createdAt": p.created_at })
 }
 
-async fn passkey_add(State(st): State<Arc<AppState>>, headers: HeaderMap, raw: axum::body::Bytes) -> Response {
+async fn passkey_add(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    raw: axum::body::Bytes,
+) -> Response {
     let r: PasskeyRequest = match body(&st, &headers, &raw) {
         Ok(r) => r,
         Err(e) => return e,
     };
     let ctx = st.ctx(&headers);
     let accounts = accounts(&st);
-    let Ok(Some(mut user)) = current(&accounts, &headers).await else { return StatusCode::NOT_FOUND.into_response() };
+    let Ok(Some(mut user)) = current(&accounts, &headers).await else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
     if let Err(f) = super::session::recent(&ctx) {
         return st.error_response(&ctx, f);
     }
@@ -915,9 +1298,16 @@ async fn passkey_add(State(st): State<Arc<AppState>>, headers: HeaderMap, raw: a
 
 async fn passkey_list(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
     let accounts = accounts(&st);
-    let Ok(Some(user)) = current(&accounts, &headers).await else { return StatusCode::NOT_FOUND.into_response() };
+    let Ok(Some(user)) = current(&accounts, &headers).await else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
     match accounts.users().passkeys(&user).await {
-        Ok(list) => axum::Json(list.iter().map(passkey_json).collect::<Vec<_>>()).into_response(),
+        Ok(list) => axum::Json(
+            list.iter()
+                .map(passkey_json)
+                .collect::<Vec<_>>(),
+        )
+        .into_response(),
         Err(e) => failed(&st.ctx(&headers), e),
     }
 }
@@ -928,21 +1318,34 @@ struct RemovePasskey {
     credential_id: String,
 }
 
-async fn passkey_remove(State(st): State<Arc<AppState>>, headers: HeaderMap, raw: axum::body::Bytes) -> Response {
+async fn passkey_remove(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    raw: axum::body::Bytes,
+) -> Response {
     let r: RemovePasskey = match body(&st, &headers, &raw) {
         Ok(r) => r,
         Err(e) => return e,
     };
     let ctx = st.ctx(&headers);
     let accounts = accounts(&st);
-    let Ok(Some(mut user)) = current(&accounts, &headers).await else { return StatusCode::NOT_FOUND.into_response() };
+    let Ok(Some(mut user)) = current(&accounts, &headers).await else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
     if let Err(f) = super::session::recent(&ctx) {
         return st.error_response(&ctx, f);
     }
     let Some(id) = b64url_decode(r.credential_id.trim_end_matches('=')) else {
-        return failed(&ctx, crate::accounts::invalid("credential_id", "passkey_invalid"));
+        return failed(
+            &ctx,
+            crate::accounts::invalid("credential_id", "passkey_invalid"),
+        );
     };
-    match accounts.users().remove_passkey(&mut user, &id).await {
+    match accounts
+        .users()
+        .remove_passkey(&mut user, &id)
+        .await
+    {
         Ok(()) => StatusCode::OK.into_response(),
         Err(e) => failed(&ctx, e),
     }
@@ -973,7 +1376,11 @@ mod external {
     }
 
     fn redirect_uri(accounts: &Accounts, st: &AppState, provider: &str) -> Option<String> {
-        Some(format!("{}{}{BASE}/external/{provider}/callback", accounts.0.public_url.as_deref()?, st.prefix))
+        Some(format!(
+            "{}{}{BASE}/external/{provider}/callback",
+            accounts.0.public_url.as_deref()?,
+            st.prefix
+        ))
     }
 
     pub(super) async fn start(
@@ -982,11 +1389,21 @@ mod external {
         Query(q): Query<StartQuery>,
     ) -> Response {
         let accounts = accounts(&st);
-        let Some(oidc) = accounts.external_provider(&provider) else { return StatusCode::NOT_FOUND.into_response() };
-        let (Some(sealer), Some(redirect)) = (oidc.sealer.as_ref(), redirect_uri(&accounts, &st, &provider)) else {
+        let Some(oidc) = accounts.external_provider(&provider) else {
             return StatusCode::NOT_FOUND.into_response();
         };
-        let back = q.return_to.as_deref().and_then(safe_return).map(str::to_string).unwrap_or_else(|| st.url("/"));
+        let (Some(sealer), Some(redirect)) = (
+            oidc.sealer.as_ref(),
+            redirect_uri(&accounts, &st, &provider),
+        ) else {
+            return StatusCode::NOT_FOUND.into_response();
+        };
+        let back = q
+            .return_to
+            .as_deref()
+            .and_then(safe_return)
+            .map(str::to_string)
+            .unwrap_or_else(|| st.url("/"));
         let flow = Flow {
             state: b64url(&random::<32>()),
             nonce: b64url(&random::<32>()),
@@ -999,7 +1416,10 @@ mod external {
             mfa: false,
             expires: now_secs() + 600,
         };
-        match oidc.authorize_url(&flow, &redirect, false).await {
+        match oidc
+            .authorize_url(&flow, &redirect, false)
+            .await
+        {
             Ok(url) => {
                 scope::set_cookie(
                     &flow_cookie(&provider),
@@ -1047,33 +1467,67 @@ mod external {
         Query(q): Query<CallbackQuery>,
     ) -> Response {
         let accounts = accounts(&st);
-        let Some(oidc) = accounts.external_provider(&provider) else { return StatusCode::NOT_FOUND.into_response() };
+        let Some(oidc) = accounts.external_provider(&provider) else {
+            return StatusCode::NOT_FOUND.into_response();
+        };
         let name = flow_cookie(&provider);
-        let flow = scope::cookie(&name).and_then(|v| oidc.sealer.as_ref()?.open::<Flow>(&name, &v));
+        let flow = scope::cookie(&name).and_then(|v| {
+            oidc.sealer
+                .as_ref()?
+                .open::<Flow>(&name, &v)
+        });
         scope::set_cookie(&name, None, None);
-        let login = st.login_url.clone().unwrap_or_else(|| st.url("/"));
+        let login = st
+            .login_url
+            .clone()
+            .unwrap_or_else(|| st.url("/"));
         let fail = |why: String| {
             tracing::warn!("external sign in refused: {why}");
-            Redirect::to(&format!("{login}?params={}", encode(&json!({ "error": "external" }).to_string())))
-                .into_response()
+            Redirect::to(&format!(
+                "{login}?params={}",
+                encode(&json!({ "error": "external" }).to_string())
+            ))
+            .into_response()
         };
-        let Some(flow) = flow.filter(|f| f.expires > now_secs()) else { return fail("no flow".into()) };
-        if !q.state.as_deref().is_some_and(|s| crate::server::same(s, &flow.state)) {
+        let Some(flow) = flow.filter(|f| f.expires > now_secs()) else {
+            return fail("no flow".into());
+        };
+        if !q
+            .state
+            .as_deref()
+            .is_some_and(|s| crate::server::same(s, &flow.state))
+        {
             return fail("state mismatch".into());
         }
-        let Some(code) = q.code.as_deref().filter(|c| !c.is_empty() && c.len() <= 4096) else {
+        let Some(code) = q
+            .code
+            .as_deref()
+            .filter(|c| !c.is_empty() && c.len() <= 4096)
+        else {
             return fail("no code".into());
         };
-        let Some(redirect) = redirect_uri(&accounts, &st, &provider) else { return fail("no public url".into()) };
-        let claims = match oidc.exchange_claims(code, &flow, &redirect).await {
+        let Some(redirect) = redirect_uri(&accounts, &st, &provider) else {
+            return fail("no public url".into());
+        };
+        let claims = match oidc
+            .exchange_claims(code, &flow, &redirect)
+            .await
+        {
             Ok(c) => c,
             Err(e) => return fail(e),
         };
-        let Some(key) = claims.get("sub").and_then(Json::as_str).map(str::to_string) else {
+        let Some(key) = claims
+            .get("sub")
+            .and_then(Json::as_str)
+            .map(str::to_string)
+        else {
             return fail("no sub".into());
         };
-        let (link, remember, back) =
-            (flow.return_to.starts_with('L'), flow.return_to[1..].starts_with('R'), flow.return_to[2..].to_string());
+        let (link, remember, back) = (
+            flow.return_to.starts_with('L'),
+            flow.return_to[1..].starts_with('R'),
+            flow.return_to[2..].to_string(),
+        );
         let users = accounts.users();
         if link {
             let Ok(Some(mut user)) = current(&accounts, &headers).await else {
@@ -1086,13 +1540,20 @@ mod external {
             };
             return match users.add_login(&mut user, login).await {
                 Ok(()) => {
-                    let _ = accounts.sign_in().refresh_sign_in(&user).await;
+                    let _ = accounts
+                        .sign_in()
+                        .refresh_sign_in(&user)
+                        .await;
                     Redirect::to(&back).into_response()
                 }
                 Err(e) => fail(e.to_string()),
             };
         }
-        match accounts.sign_in().external_login_sign_in(&provider, &key, remember).await {
+        match accounts
+            .sign_in()
+            .external_login_sign_in(&provider, &key, remember)
+            .await
+        {
             Ok(SignInResult::Succeeded) => Redirect::to(&back).into_response(),
             Ok(SignInResult::RequiresTwoFactor) => Redirect::to(&format!(
                 "{}?params={}",
@@ -1100,19 +1561,32 @@ mod external {
                 encode(&json!({ "return_to": back, "remember": remember }).to_string())
             ))
             .into_response(),
-            Ok(SignInResult::LockedOut) => Redirect::to(&st.url("/account/lockout")).into_response(),
+            Ok(SignInResult::LockedOut) => {
+                Redirect::to(&st.url("/account/lockout")).into_response()
+            }
             Ok(SignInResult::NotAllowed) => fail("not allowed".into()),
             Ok(_) => {
                 let pending = External {
                     provider,
                     key,
-                    email: claims.get("email").and_then(Json::as_str).map(str::to_string),
-                    verified: claims.get("email_verified").and_then(Json::as_bool).unwrap_or(false),
-                    name: claims.get("name").and_then(Json::as_str).map(str::to_string),
+                    email: claims
+                        .get("email")
+                        .and_then(Json::as_str)
+                        .map(str::to_string),
+                    verified: claims
+                        .get("email_verified")
+                        .and_then(Json::as_bool)
+                        .unwrap_or(false),
+                    name: claims
+                        .get("name")
+                        .and_then(Json::as_str)
+                        .map(str::to_string),
                     return_to: back,
                     expires: now_secs() + 600,
                 };
-                let Some(sealer) = accounts.0.sealer.as_ref() else { return fail("no key".into()) };
+                let Some(sealer) = accounts.0.sealer.as_ref() else {
+                    return fail("no key".into());
+                };
                 scope::set_cookie(PENDING, Some(&sealer.seal(PENDING, &pending)), Some(600));
                 Redirect::to(&st.url("/account/external-login")).into_response()
             }

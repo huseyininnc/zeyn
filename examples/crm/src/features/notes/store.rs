@@ -18,19 +18,34 @@ impl NoteStore {
     }
 
     pub fn get(&self, id: NoteId) -> Result<Note> {
-        self.0.read().map_err(poisoned)?.iter().find(|n| n.id == id).cloned().ok_or(Error::NotFound)
+        self.0
+            .read()
+            .map_err(poisoned)?
+            .iter()
+            .find(|n| n.id == id)
+            .cloned()
+            .ok_or(Error::NotFound)
     }
 
     /// Inserts (id 0) or updates; a stale row version fails with `Conflict`.
     pub fn save(&self, mut note: Note) -> Result<Note> {
         let mut rows = self.0.write().map_err(poisoned)?;
         if note.id.0 == 0 {
-            note.id = NoteId(rows.iter().map(|n| n.id.0).max().unwrap_or(0) + 1);
+            note.id = NoteId(
+                rows.iter()
+                    .map(|n| n.id.0)
+                    .max()
+                    .unwrap_or(0)
+                    + 1,
+            );
             note.version = 1;
             rows.push(note.clone());
             return Ok(note);
         }
-        let current = rows.iter_mut().find(|n| n.id == note.id).ok_or(Error::NotFound)?;
+        let current = rows
+            .iter_mut()
+            .find(|n| n.id == note.id)
+            .ok_or(Error::NotFound)?;
         if current.version != note.version {
             return Err(Error::Conflict);
         }

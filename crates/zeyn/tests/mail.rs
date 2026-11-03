@@ -9,7 +9,9 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tower::ServiceExt;
 use zeyn::prelude::*;
-use zeyn::{Config, I18n, Identity, Mail, Mailer, StaticSource, TransitionRequest, Transitions, Workflow};
+use zeyn::{
+    Config, I18n, Identity, Mail, Mailer, StaticSource, TransitionRequest, Transitions, Workflow,
+};
 
 /// Stage of a request.
 #[choice]
@@ -38,10 +40,18 @@ fn flow() -> Workflow<Stage> {
 }
 
 #[action(permission = "req.read")]
-pub async fn move_req(r: TransitionRequest<ReqId>, store: Reqs, mailer: Mailer, ctx: Ctx) -> Result<Stage> {
+pub async fn move_req(
+    r: TransitionRequest<ReqId>,
+    store: Reqs,
+    mailer: Mailer,
+    ctx: Ctx,
+) -> Result<Stage> {
     let (stage, owner, title) = {
         let mut rows = store.0.write().unwrap();
-        let row = rows.iter_mut().find(|x| x.id == r.id).ok_or(Error::NotFound)?;
+        let row = rows
+            .iter_mut()
+            .find(|x| x.id == r.id)
+            .ok_or(Error::NotFound)?;
         row.stage = flow().apply(&ctx, row.stage, &r.transition, r.comment.as_deref())?;
         (row.stage, row.owner.clone(), row.title.clone())
     };
@@ -57,7 +67,14 @@ pub struct ReqParams {
 
 #[screen(permission = "req.read")]
 pub fn req_view(params: ReqParams, store: Reqs) -> Result<Screen> {
-    let row = store.0.read().unwrap().iter().find(|x| x.id.0 == params.id).cloned().ok_or(Error::NotFound)?;
+    let row = store
+        .0
+        .read()
+        .unwrap()
+        .iter()
+        .find(|x| x.id.0 == params.id)
+        .cloned()
+        .ok_or(Error::NotFound)?;
     Ok(Screen::window("Request").body(Transitions::of(flow(), row.stage, row.id, move_req)))
 }
 
@@ -78,9 +95,16 @@ fn app(mailer: Mailer) -> Router {
     }];
     App::new("Test")
         .service(Reqs(Arc::new(RwLock::new(rows))))
-        .i18n(I18n::new("en").catalog("tr", r#"{ "Stage": { "Submitted": "Gönderildi" } }"#).unwrap())
+        .i18n(
+            I18n::new("en")
+                .catalog("tr", r#"{ "Stage": { "Submitted": "Gönderildi" } }"#)
+                .unwrap(),
+        )
         .mailer(mailer)
-        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .auth(move |h: &HeaderMap| {
+            h.contains_key("x-user")
+                .then(|| identity.clone())
+        })
         .feature(Feature::new("req").screen(req_view))
         .router()
         .unwrap()
@@ -97,7 +121,11 @@ async fn submit(router: &Router, comment: &str) -> StatusCode {
         .header("x-zeyn-csrf", TOKEN)
         .body(Body::from(body.to_string()))
         .unwrap();
-    let res = router.clone().oneshot(req).await.unwrap();
+    let res = router
+        .clone()
+        .oneshot(req)
+        .await
+        .unwrap();
     let status = res.status();
     let _ = res.into_body().collect().await;
     status
@@ -105,8 +133,14 @@ async fn submit(router: &Router, comment: &str) -> StatusCode {
 
 async fn wait_for_file(d: &std::path::Path) -> String {
     for _ in 0..200 {
-        if let Some(e) =
-            std::fs::read_dir(d).unwrap().flatten().find(|e| e.path().extension().is_some_and(|x| x == "eml"))
+        if let Some(e) = std::fs::read_dir(d)
+            .unwrap()
+            .flatten()
+            .find(|e| {
+                e.path()
+                    .extension()
+                    .is_some_and(|x| x == "eml")
+            })
         {
             return std::fs::read_to_string(e.path()).unwrap();
         }
@@ -144,17 +178,30 @@ async fn a_workflow_move_sends_a_localized_mail_from_the_job() {
     let router = app(Mailer::to_files("Zeyn <no-reply@example.com>", &d).unwrap());
     assert_eq!(submit(&router, "please <approve>").await, StatusCode::OK);
     let eml = wait_for_file(&d).await;
-    assert!(eml.contains("To: =?utf-8?") || eml.contains("To: \"Ay"), "{eml}");
+    assert!(
+        eml.contains("To: =?utf-8?") || eml.contains("To: \"Ay"),
+        "{eml}"
+    );
     assert!(eml.contains("ayse@example.com"));
     assert!(eml.contains("From: Zeyn <no-reply@example.com>"));
-    assert!(eml.contains("multipart/alternative") && eml.contains("text/plain") && eml.contains("text/html"));
+    assert!(
+        eml.contains("multipart/alternative")
+            && eml.contains("text/plain")
+            && eml.contains("text/html")
+    );
     let body = decoded(&eml);
     assert!(
         body.contains("Laptop <b>& bag</b>, ali tarafından Draft durumundan Submitted durumuna taşındı (submit)."),
         "{body}"
     );
-    assert!(body.contains("<strong>Laptop &lt;b&gt;&amp; bag&lt;/b&gt;</strong>"), "{body}");
-    assert!(body.contains("please &lt;approve&gt;"), "HTML gets escaped data: {body}");
+    assert!(
+        body.contains("<strong>Laptop &lt;b&gt;&amp; bag&lt;/b&gt;</strong>"),
+        "{body}"
+    );
+    assert!(
+        body.contains("please &lt;approve&gt;"),
+        "HTML gets escaped data: {body}"
+    );
     assert!(!body.contains("<b>& bag</b></strong>"));
     let _ = std::fs::remove_dir_all(&d);
 }
@@ -175,10 +222,19 @@ async fn sending_never_waits_for_the_server_and_failures_stay_queued() {
     ))])
     .await
     .unwrap();
-    let mailer = Mailer::from_config(&config).unwrap().retry(0, Duration::from_millis(10));
-    let ctx = Ctx::new(Identity::user("x"), "en", Default::default(), Arc::new(I18n::new("en")));
+    let mailer = Mailer::from_config(&config)
+        .unwrap()
+        .retry(0, Duration::from_millis(10));
+    let ctx = Ctx::new(
+        Identity::user("x"),
+        "en",
+        Default::default(),
+        Arc::new(I18n::new("en")),
+    );
     let started = std::time::Instant::now();
-    mailer.send(&ctx, Mail::to("b@example.com").template("t")).unwrap();
+    mailer
+        .send(&ctx, Mail::to("b@example.com").template("t"))
+        .unwrap();
     assert!(started.elapsed() < Duration::from_millis(200));
     assert_eq!(mailer.queued(), 1);
     assert!(mailer.flush().await.is_err(), "nothing listens on port 1");
@@ -187,34 +243,68 @@ async fn sending_never_waits_for_the_server_and_failures_stay_queued() {
         let _ = mailer.flush().await;
     }
     assert_eq!(mailer.queued(), 0, "dropped after the last attempt");
-    assert!(mailer.send(&ctx, Mail::to("not an address").template("t")).is_err());
-    assert!(mailer.send(&ctx, Mail::to("x@example.com\r\nBcc: evil@example.com").template("t")).is_err());
+    assert!(
+        mailer
+            .send(&ctx, Mail::to("not an address").template("t"))
+            .is_err()
+    );
+    assert!(
+        mailer
+            .send(
+                &ctx,
+                Mail::to("x@example.com\r\nBcc: evil@example.com").template("t")
+            )
+            .is_err()
+    );
 }
 
 #[tokio::test]
 async fn configuration_is_checked() {
     let load = |pairs: &[(&str, &str)]| {
-        let pairs: std::collections::HashMap<String, String> =
-            pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect();
-        async move { Config::load(vec![Box::new(StaticSource(pairs))]).await.unwrap() }
+        let pairs: std::collections::HashMap<String, String> = pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        async move {
+            Config::load(vec![Box::new(StaticSource(pairs))])
+                .await
+                .unwrap()
+        }
     };
-    assert!(Mailer::from_config(&load(&[]).await).is_err(), "mail.from is required");
-    assert!(Mailer::from_config(&load(&[("mail.from", "nope")]).await).is_err());
-    assert!(Mailer::from_config(&load(&[("mail.from", "a@b.co")]).await).is_ok(), "log transport by default");
     assert!(
-        Mailer::from_config(&load(&[("mail.from", "a@b.co"), ("mail.transport", "file")]).await).is_err(),
+        Mailer::from_config(&load(&[]).await).is_err(),
+        "mail.from is required"
+    );
+    assert!(Mailer::from_config(&load(&[("mail.from", "nope")]).await).is_err());
+    assert!(
+        Mailer::from_config(&load(&[("mail.from", "a@b.co")]).await).is_ok(),
+        "log transport by default"
+    );
+    assert!(
+        Mailer::from_config(&load(&[("mail.from", "a@b.co"), ("mail.transport", "file")]).await)
+            .is_err(),
         "file needs a directory"
     );
-    assert!(Mailer::from_config(&load(&[("mail.from", "a@b.co"), ("mail.transport", "pigeon")]).await).is_err());
+    assert!(
+        Mailer::from_config(&load(&[("mail.from", "a@b.co"), ("mail.transport", "pigeon")]).await)
+            .is_err()
+    );
     let smtp = [
         ("mail.from", "a@b.co"),
         ("mail.transport", "smtp"),
         ("mail.smtp.host", "smtp.example.com"),
         ("mail.smtp.user", "u"),
     ];
-    assert!(Mailer::from_config(&load(&smtp).await).is_err(), "a user needs mail.smtp.password");
+    assert!(
+        Mailer::from_config(&load(&smtp).await).is_err(),
+        "a user needs mail.smtp.password"
+    );
     let mut full = smtp.to_vec();
-    full.extend([("mail.smtp.password", "p"), ("mail.smtp.port", "587"), ("mail.smtp.tls", "starttls")]);
+    full.extend([
+        ("mail.smtp.password", "p"),
+        ("mail.smtp.port", "587"),
+        ("mail.smtp.tls", "starttls"),
+    ]);
     assert!(Mailer::from_config(&load(&full).await).is_ok());
     full.push(("mail.smtp.tls", "maybe"));
     assert!(Mailer::from_config(&load(&full).await).is_err());

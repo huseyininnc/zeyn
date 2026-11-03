@@ -28,18 +28,34 @@ pub trait Entity: Model {
 
 /// Adds an error for every `#[rule(embed)]` field whose address is not on a host of the app's
 /// `frame-src`. Runs where the request context is known: forms and API inputs.
-pub(crate) fn check_embeds<M: Model>(model: &M, csp: &crate::csp::Csp, errors: &mut ValidationErrors) {
+pub(crate) fn check_embeds<M: Model>(
+    model: &M,
+    csp: &crate::csp::Csp,
+    errors: &mut ValidationErrors,
+) {
     for (i, meta) in M::fields().iter().enumerate() {
-        if !meta.rules.contains(&Rule::Embed) || errors.errors.iter().any(|e| e.field == meta.name) {
+        if !meta.rules.contains(&Rule::Embed)
+            || errors
+                .errors
+                .iter()
+                .any(|e| e.field == meta.name)
+        {
             continue;
         }
         if let Some(Value::Text(url)) = model.value_at(i) {
             if !url.trim().is_empty() && !csp.allows_frame(&url) {
-                let host = url.trim_start_matches("https://").split(['/', '?', '#']).next().unwrap_or("").to_string();
+                let host = url
+                    .trim_start_matches("https://")
+                    .split(['/', '?', '#'])
+                    .next()
+                    .unwrap_or("")
+                    .to_string();
                 errors.errors.push(FieldError {
                     field: meta.name,
                     rule: Rule::Embed,
-                    message: Text::key("zeyn.validation.embed_host").arg("label", meta.label_text()).arg("host", host),
+                    message: Text::key("zeyn.validation.embed_host")
+                        .arg("label", meta.label_text())
+                        .arg("host", host),
                 });
             }
         }
@@ -133,17 +149,38 @@ impl FieldMeta {
 
     /// Digits and decimals of a `Decimal` field: its `precision` and `scale` rules, or 18 and 2.
     pub fn decimal_limits(&self) -> (u8, u8) {
-        let scale = self.rules.iter().find_map(|r| if let Rule::Scale(n) = r { Some(*n) } else { None });
-        let precision = self.rules.iter().find_map(|r| if let Rule::Precision(n) = r { Some(*n) } else { None });
-        let scale = scale.unwrap_or(crate::decimal::DEFAULT_SCALE).min(crate::decimal::MAX_SCALE);
-        let precision =
-            precision.unwrap_or(crate::decimal::DEFAULT_PRECISION).clamp(scale.max(1), crate::decimal::MAX_PRECISION);
+        let scale = self.rules.iter().find_map(|r| {
+            if let Rule::Scale(n) = r {
+                Some(*n)
+            } else {
+                None
+            }
+        });
+        let precision = self.rules.iter().find_map(|r| {
+            if let Rule::Precision(n) = r {
+                Some(*n)
+            } else {
+                None
+            }
+        });
+        let scale = scale
+            .unwrap_or(crate::decimal::DEFAULT_SCALE)
+            .min(crate::decimal::MAX_SCALE);
+        let precision = precision
+            .unwrap_or(crate::decimal::DEFAULT_PRECISION)
+            .clamp(scale.max(1), crate::decimal::MAX_PRECISION);
         (precision, scale)
     }
 
     /// The pattern of the `mask` rule, if any.
     pub fn mask_pattern(&self) -> Option<&'static str> {
-        self.rules.iter().find_map(|r| if let Rule::Mask(p) = r { Some(*p) } else { None })
+        self.rules.iter().find_map(|r| {
+            if let Rule::Mask(p) = r {
+                Some(*p)
+            } else {
+                None
+            }
+        })
     }
 
     pub fn max(&self) -> Option<i64> {
@@ -214,26 +251,44 @@ impl ValidationErrors {
     /// }
     /// ```
     pub fn add<M, T>(&mut self, field: Field<M, T>, message: impl Into<Text>) {
-        self.errors.push(FieldError { field: field.meta().name, rule: Rule::Custom, message: message.into() });
+        self.errors.push(FieldError {
+            field: field.meta().name,
+            rule: Rule::Custom,
+            message: message.into(),
+        });
     }
 
     /// Adds an error that belongs to the whole model.
     pub fn add_general(&mut self, message: impl Into<Text>) {
-        self.errors.push(FieldError { field: "", rule: Rule::Custom, message: message.into() });
+        self.errors.push(FieldError {
+            field: "",
+            rule: Rule::Custom,
+            message: message.into(),
+        });
     }
 
     pub fn into_result(self) -> Result<(), ValidationErrors> {
-        if self.errors.is_empty() { Ok(()) } else { Err(self) }
+        if self.errors.is_empty() {
+            Ok(())
+        } else {
+            Err(self)
+        }
     }
 
     pub fn for_field(&self, field: &str) -> impl Iterator<Item = &FieldError> {
-        self.errors.iter().filter(move |e| e.field == field)
+        self.errors
+            .iter()
+            .filter(move |e| e.field == field)
     }
 }
 
 impl fmt::Display for ValidationErrors {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let messages: Vec<String> = self.errors.iter().map(|e| e.message.english()).collect();
+        let messages: Vec<String> = self
+            .errors
+            .iter()
+            .map(|e| e.message.english())
+            .collect();
         f.write_str(&messages.join(" "))
     }
 }
@@ -275,12 +330,16 @@ impl<'de, T: Model> Deserialize<'de> for Valid<T> {
 
 /// Basic email shape check: one `@`, a non-empty local part and a dotted domain, no spaces.
 fn looks_like_email(s: &str) -> bool {
-    let Some((local, domain)) = s.split_once('@') else { return false };
+    let Some((local, domain)) = s.split_once('@') else {
+        return false;
+    };
     !local.is_empty()
         && !domain.contains('@')
         && !s.chars().any(char::is_whitespace)
         && domain.split('.').count() >= 2
-        && domain.split('.').all(|part| !part.is_empty())
+        && domain
+            .split('.')
+            .all(|part| !part.is_empty())
 }
 
 #[doc(hidden)]
@@ -319,13 +378,27 @@ pub mod __rules {
         for rule in meta.rules {
             let text = match *rule {
                 Rule::Required if empty => Some(message("zeyn.validation.required")),
-                Rule::MinLen(n) if !empty && value.__text_len().is_some_and(|len| len < n) => {
+                Rule::MinLen(n)
+                    if !empty
+                        && value
+                            .__text_len()
+                            .is_some_and(|len| len < n) =>
+                {
                     Some(message("zeyn.validation.min_len").arg("n", n.to_string()))
                 }
-                Rule::MaxLen(n) if value.__text_len().is_some_and(|len| len > n) => {
+                Rule::MaxLen(n)
+                    if value
+                        .__text_len()
+                        .is_some_and(|len| len > n) =>
+                {
                     Some(message("zeyn.validation.max_len").arg("n", n.to_string()))
                 }
-                Rule::Email if !empty && value.__text().is_some_and(|s| !looks_like_email(s.trim())) => {
+                Rule::Email
+                    if !empty
+                        && value
+                            .__text()
+                            .is_some_and(|s| !looks_like_email(s.trim())) =>
+                {
                     Some(message("zeyn.validation.email"))
                 }
                 Rule::Min(n) if value.__compare(n) == Some(Ordering::Less) => {
@@ -334,32 +407,54 @@ pub mod __rules {
                 Rule::Max(n) if value.__compare(n) == Some(Ordering::Greater) => {
                     Some(message("zeyn.validation.max").arg("n", limit_text(meta, n)))
                 }
-                Rule::Mask(p) if !empty && value.__text().is_some_and(|s| !crate::ui::mask_fits(p, s)) => {
+                Rule::Mask(p)
+                    if !empty
+                        && value
+                            .__text()
+                            .is_some_and(|s| !crate::ui::mask_fits(p, s)) =>
+                {
                     Some(message("zeyn.validation.mask").arg("pattern", crate::ui::mask_example(p)))
                 }
                 Rule::Embed
-                    if !empty && value.__text().is_some_and(|s| crate::csp::embed_url(s).as_deref() != Some(s)) =>
+                    if !empty
+                        && value
+                            .__text()
+                            .is_some_and(|s| crate::csp::embed_url(s).as_deref() != Some(s)) =>
                 {
                     Some(message("zeyn.validation.embed"))
                 }
                 _ => None,
             };
             if let Some(message) = text {
-                errors.errors.push(FieldError { field: meta.name, rule: *rule, message });
+                errors.errors.push(FieldError {
+                    field: meta.name,
+                    rule: *rule,
+                    message,
+                });
             }
         }
         if let Some(d) = value.__decimal() {
             let (precision, scale) = meta.decimal_limits();
             let problem = if d.fraction_digits() > scale {
-                Some((Rule::Scale(scale), message("zeyn.validation.scale").arg("n", scale.to_string())))
+                Some((
+                    Rule::Scale(scale),
+                    message("zeyn.validation.scale").arg("n", scale.to_string()),
+                ))
             } else if d.integer_digits() > precision - scale {
                 let whole = (precision - scale).to_string();
-                Some((Rule::Precision(precision), message("zeyn.validation.precision").arg("n", whole)))
+                Some((
+                    Rule::Precision(precision),
+                    message("zeyn.validation.precision").arg("n", whole),
+                ))
             } else {
                 None
             };
             if let Some((rule, message)) = problem {
-                errors.errors.push(FieldError { field: meta.name, rule, message });
+                errors.errors.push(FieldError {
+                    field: meta.name,
+                    rule,
+                    message,
+                });
             }
         }
         value.__validate_items(meta, errors);

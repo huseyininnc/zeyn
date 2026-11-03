@@ -6,11 +6,13 @@ use zeyn::prelude::*;
 
 pub fn overview(_ctx: &Ctx) -> Node {
     Busy::new()
-        .add(ActionButton::new("Count slowly", slow_count, ()).on_success(|n, ui| {
-            if let Ok(n) = n {
-                ui.toast(format!("{n} products"));
-            }
-        }))
+        .add(
+            ActionButton::new("Count slowly", slow_count, ()).on_success(|n, ui| {
+                if let Ok(n) = n {
+                    ui.toast(format!("{n} products"));
+                }
+            }),
+        )
         .into()
 }
 

@@ -22,11 +22,36 @@ struct Item {
 }
 
 const CATALOG: [Item; 5] = [
-    Item { key: "harbor", video: true, title: "media.harbor", subtitle: "media.harbor_sub" },
-    Item { key: "zoom", video: true, title: "media.zoom", subtitle: "media.zoom_sub" },
-    Item { key: "dawn", video: false, title: "media.dawn", subtitle: "media.artist" },
-    Item { key: "tide", video: false, title: "media.tide", subtitle: "media.artist" },
-    Item { key: "lanterns", video: false, title: "media.lanterns", subtitle: "media.artist" },
+    Item {
+        key: "harbor",
+        video: true,
+        title: "media.harbor",
+        subtitle: "media.harbor_sub",
+    },
+    Item {
+        key: "zoom",
+        video: true,
+        title: "media.zoom",
+        subtitle: "media.zoom_sub",
+    },
+    Item {
+        key: "dawn",
+        video: false,
+        title: "media.dawn",
+        subtitle: "media.artist",
+    },
+    Item {
+        key: "tide",
+        video: false,
+        title: "media.tide",
+        subtitle: "media.artist",
+    },
+    Item {
+        key: "lanterns",
+        video: false,
+        title: "media.lanterns",
+        subtitle: "media.artist",
+    },
 ];
 
 /// Files of the sample folder. Ids are looked up in a fixed list; a client never names a path.
@@ -37,11 +62,19 @@ struct Folder {
 
 impl Folder {
     fn path(&self, id: &str) -> Option<PathBuf> {
-        self.files.contains(&id).then(|| PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/media")).join(id))
+        self.files
+            .contains(&id)
+            .then(|| PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/media")).join(id))
     }
 
     fn user_key(ctx: &Ctx, id: String) -> (String, String) {
-        (ctx.identity().user.clone().unwrap_or_default(), id)
+        (
+            ctx.identity()
+                .user
+                .clone()
+                .unwrap_or_default(),
+            id,
+        )
     }
 }
 
@@ -55,10 +88,14 @@ impl MediaSource for Folder {
     }
 
     fn position(&self, ctx: Ctx, id: String) -> BoxFuture<Result<Option<f64>>> {
-        let at = self
-            .positions
-            .as_ref()
-            .map(|p| p.lock().map(|m| m.get(&Self::user_key(&ctx, id)).copied()).unwrap_or(None));
+        let at = self.positions.as_ref().map(|p| {
+            p.lock()
+                .map(|m| {
+                    m.get(&Self::user_key(&ctx, id))
+                        .copied()
+                })
+                .unwrap_or(None)
+        });
         Box::pin(async move { at.ok_or(Error::NotFound) })
     }
 
@@ -92,8 +129,15 @@ impl Component for Shelf {
             r.text(&self.title)
         ));
         for (key, title, subtitle, video) in &self.items {
-            let effect = Effect::Navigate { screen: "media_play", params: serde_json::json!({ "item": key }) };
-            let current = if *key == self.current { r#" aria-current="true""# } else { "" };
+            let effect = Effect::Navigate {
+                screen: "media_play",
+                params: serde_json::json!({ "item": key }),
+            };
+            let current = if *key == self.current {
+                r#" aria-current="true""#
+            } else {
+                ""
+            };
             let kind = if *video { "video" } else { "audio" };
             out.push_str(&format!(
                 r#"<li><button type="button" class="z-shelf-tile z-shelf-{kind}" data-zeyn-effect="{}"{current} data-testid="{}.shelf.{}"><span class="z-shelf-name">{}</span><span class="z-shelf-sub">{}</span></button></li>"#,
@@ -150,19 +194,31 @@ fn player(item: &Item) -> Node {
             let audio = Audio::new("music", Text::key(item.title))
                 .subtitle(Text::key(item.subtitle))
                 .file(format!("{key}.mp3"));
-            if key == "dawn" { audio.captions("dawn.en.vtt", "en", "English").into() } else { audio.into() }
+            if key == "dawn" {
+                audio
+                    .captions("dawn.en.vtt", "en", "English")
+                    .into()
+            } else {
+                audio.into()
+            }
         }
     }
 }
 
 fn library_of(key: &str) -> Result<Screen> {
-    let item = CATALOG.iter().find(|i| i.key == key).ok_or(Error::NotFound)?;
+    let item = CATALOG
+        .iter()
+        .find(|i| i.key == key)
+        .ok_or(Error::NotFound)?;
     Ok(Screen::new(t!("media.title")).body(
-        Row::new().col(player(item)).weight(2).col(Stack::new().add(shelf("media.films", true, item.key)).add(shelf(
-            "media.songs",
-            false,
-            item.key,
-        ))),
+        Row::new()
+            .col(player(item))
+            .weight(2)
+            .col(
+                Stack::new()
+                    .add(shelf("media.films", true, item.key))
+                    .add(shelf("media.songs", false, item.key)),
+            ),
     ))
 }
 
@@ -187,17 +243,24 @@ pub fn media_external() -> Result<Screen> {
                 Panel::new(t!("media.embed_card")).add(
                     Embed::url("https://www.youtube-nocookie.com/embed/aqz-KE-bpKQ")
                         .title(t!("media.embed_title"))
-                        .allow([EmbedPermission::Fullscreen, EmbedPermission::PictureInPicture])
+                        .allow([
+                            EmbedPermission::Fullscreen,
+                            EmbedPermission::PictureInPicture,
+                        ])
                         .click_to_load("/_zeyn/media/films/harbor.jpg")
                         .notice(t!("media.embed_notice"))
-                        .remember("external-video", std::time::Duration::from_secs(24 * 60 * 60)),
+                        .remember(
+                            "external-video",
+                            std::time::Duration::from_secs(24 * 60 * 60),
+                        ),
                 ),
             )
             .col(
                 Stack::new()
                     .add(
                         Panel::new(t!("media.blocked_card")).add(
-                            Embed::url("https://maps.example.net/embed?q=harbor").title(t!("media.blocked_title")),
+                            Embed::url("https://maps.example.net/embed?q=harbor")
+                                .title(t!("media.blocked_title")),
                         ),
                     )
                     .add(
@@ -216,8 +279,14 @@ pub fn media_external() -> Result<Screen> {
                     )
                     .add(
                         Panel::new(t!("media.links_card"))
-                            .add(ExternalLink::new("https://github.com/", t!("media.link_repo")).new_tab())
-                            .add(ExternalLink::new("https://example.org/", t!("media.link_user")).user_content()),
+                            .add(
+                                ExternalLink::new("https://github.com/", t!("media.link_repo"))
+                                    .new_tab(),
+                            )
+                            .add(
+                                ExternalLink::new("https://example.org/", t!("media.link_user"))
+                                    .user_content(),
+                            ),
                     ),
             ),
     ))
@@ -248,7 +317,10 @@ pub fn feature() -> Feature {
         .media(
             "music",
             PLAY,
-            Folder { files: &["dawn.mp3", "tide.mp3", "lanterns.mp3", "dawn.en.vtt"], positions: None },
+            Folder {
+                files: &["dawn.mp3", "tide.mp3", "lanterns.mp3", "dawn.en.vtt"],
+                positions: None,
+            },
         )
         .screen(media_library)
         .screen(media_play)

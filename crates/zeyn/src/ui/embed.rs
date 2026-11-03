@@ -43,7 +43,9 @@ pub(super) fn policy<'a>(r: &Render<'a>) -> &'a Csp {
 /// Host of an `https` URL, for messages.
 fn host_of(url: &str) -> &str {
     let rest = url.get(8..).unwrap_or("");
-    rest.split(['/', '?', '#']).next().unwrap_or("")
+    rest.split(['/', '?', '#'])
+        .next()
+        .unwrap_or("")
 }
 
 /// What a framed page may use besides running scripts, written to the `allow` attribute.
@@ -177,7 +179,8 @@ impl<T> Embed<T> {
     /// ```
     pub fn notice(mut self, notice: impl Into<Text>) -> Self {
         self.notice = Some(notice.into());
-        self.poster.get_or_insert_with(String::new);
+        self.poster
+            .get_or_insert_with(String::new);
         self
     }
 
@@ -218,13 +221,15 @@ impl<T> Embed<T> {
             "Embed::remember: time {time:?} for scope `{scope}` is not valid. Use 1 second to 30 days (zeyn::ui::MAX_EMBED_CONSENT), such as Duration::from_secs(24 * 60 * 60)."
         );
         self.remember = Some((scope, time.as_millis() as u64));
-        self.poster.get_or_insert_with(String::new);
+        self.poster
+            .get_or_insert_with(String::new);
         self
     }
 }
 
 /// Longest time [`Embed::remember`] keeps a consent: 30 days.
-pub const MAX_EMBED_CONSENT: std::time::Duration = std::time::Duration::from_secs(30 * 24 * 60 * 60);
+pub const MAX_EMBED_CONSENT: std::time::Duration =
+    std::time::Duration::from_secs(30 * 24 * 60 * 60);
 
 /// Whether `scope` names a remembered consent: 1 to 40 ASCII letters, digits, `-` and `_`.
 const fn valid_scope(scope: &str) -> bool {
@@ -262,8 +267,16 @@ impl Component for Embed<Given> {
             Alert::warning(text).render(out, r);
             return;
         };
-        let allow: Vec<&str> = self.allow.iter().map(|p| p.feature()).collect();
-        let allow = if allow.is_empty() { String::new() } else { format!(r#" allow="{}""#, allow.join("; ")) };
+        let allow: Vec<&str> = self
+            .allow
+            .iter()
+            .map(|p| p.feature())
+            .collect();
+        let allow = if allow.is_empty() {
+            String::new()
+        } else {
+            format!(r#" allow="{}""#, allow.join("; "))
+        };
         let frame = format!(
             r#"<iframe src="{}" title="{title}" sandbox="{EMBED_SANDBOX}"{allow} referrerpolicy="no-referrer" loading="lazy"></iframe>"#,
             escape(&url)
@@ -271,7 +284,12 @@ impl Component for Embed<Given> {
         let (w, h) = self.aspect;
         let remember = self
             .remember
-            .map(|(s, ms)| format!(r#" data-zeyn-embed-remember="{}" data-zeyn-embed-for="{ms}""#, escape(s)))
+            .map(|(s, ms)| {
+                format!(
+                    r#" data-zeyn-embed-remember="{}" data-zeyn-embed-for="{ms}""#,
+                    escape(s)
+                )
+            })
             .unwrap_or_default();
         out.push_str(&format!(
             r#"<div class="z-embed" style="--z-aspect: {w} / {h}"{remember} data-testid="{}.embed">"#,
@@ -281,7 +299,10 @@ impl Component for Embed<Given> {
             None => out.push_str(&frame),
             Some(poster) => {
                 let image = if !poster.is_empty() && csp.allows_image(poster) {
-                    format!(r#"<img src="{}" alt="" decoding="async" loading="lazy">"#, escape(poster))
+                    format!(
+                        r#"<img src="{}" alt="" decoding="async" loading="lazy">"#,
+                        escape(poster)
+                    )
                 } else {
                     String::new()
                 };
@@ -388,7 +409,11 @@ impl<A, S> Image<A, S> {
 
     /// Other files of the same image, with a density (`2x`) or width (`800w`) descriptor.
     pub fn srcset<'a>(mut self, candidates: impl IntoIterator<Item = (&'a str, &'a str)>) -> Self {
-        self.srcset.extend(candidates.into_iter().map(|(u, d)| (u.to_string(), d.to_string())));
+        self.srcset.extend(
+            candidates
+                .into_iter()
+                .map(|(u, d)| (u.to_string(), d.to_string())),
+        );
         self
     }
 }
@@ -414,12 +439,14 @@ fn valid_descriptor(d: &str) -> bool {
     match d.strip_suffix('x') {
         Some(n) => {
             !n.starts_with('.')
-                && n.bytes().all(|b| b.is_ascii_digit() || b == b'.')
-                && n.parse::<f32>().is_ok_and(|v| v > 0.0 && v <= 8.0)
+                && n.bytes()
+                    .all(|b| b.is_ascii_digit() || b == b'.')
+                && n.parse::<f32>()
+                    .is_ok_and(|v| v > 0.0 && v <= 8.0)
         }
-        None => {
-            d.strip_suffix('w').is_some_and(|n| !n.is_empty() && n.len() <= 5 && n.bytes().all(|b| b.is_ascii_digit()))
-        }
+        None => d.strip_suffix('w').is_some_and(|n| {
+            !n.is_empty() && n.len() <= 5 && n.bytes().all(|b| b.is_ascii_digit())
+        }),
     }
 }
 
@@ -440,7 +467,10 @@ impl Component for Image<Given, Given> {
         let alt = r.text(&self.alt);
         let (w, h) = self.size;
         if !csp.allows_image(&self.src) {
-            out.push_str(&format!(r#"<span class="z-image-blocked" data-testid="{}.image">{alt}</span>"#, r.scope));
+            out.push_str(&format!(
+                r#"<span class="z-image-blocked" data-testid="{}.image">{alt}</span>"#,
+                r.scope
+            ));
             return;
         }
         let candidates: Vec<String> = self
@@ -452,7 +482,10 @@ impl Component for Image<Given, Given> {
         let srcset = if candidates.is_empty() {
             String::new()
         } else {
-            let sizes = if candidates.iter().any(|c| c.ends_with('w')) {
+            let sizes = if candidates
+                .iter()
+                .any(|c| c.ends_with('w'))
+            {
                 format!(r#" sizes="(max-width: {w}px) 100vw, {w}px""#)
             } else {
                 String::new()
@@ -496,7 +529,12 @@ pub struct ExternalLink {
 
 impl ExternalLink {
     pub fn new(url: impl Into<String>, text: impl Into<Text>) -> Self {
-        ExternalLink { url: url.into(), text: text.into(), user_content: false, new_tab: false }
+        ExternalLink {
+            url: url.into(),
+            text: text.into(),
+            user_content: false,
+            new_tab: false,
+        }
     }
 
     /// Marks an address a user entered: adds `nofollow ugc`.
@@ -515,14 +553,23 @@ impl ExternalLink {
     pub fn html(&self, r: &Render) -> String {
         let text = r.text(&self.text);
         let url = self.url.trim();
-        let lower = url.get(..8).unwrap_or(url).to_ascii_lowercase();
+        let lower = url
+            .get(..8)
+            .unwrap_or(url)
+            .to_ascii_lowercase();
         let web = (lower.starts_with("https://") || lower.starts_with("http://"))
             && url.len() > lower.find("//").unwrap_or(0) + 2
-            && !url.chars().any(|c| c.is_whitespace() || c.is_control());
+            && !url
+                .chars()
+                .any(|c| c.is_whitespace() || c.is_control());
         if !web {
             return format!(r#"<span class="z-link-text">{text}</span>"#);
         }
-        let rel = if self.user_content { "noopener noreferrer nofollow ugc" } else { "noopener noreferrer" };
+        let rel = if self.user_content {
+            "noopener noreferrer nofollow ugc"
+        } else {
+            "noopener noreferrer"
+        };
         let (target, spoken) = if self.new_tab {
             (r#" target="_blank""#, "zeyn.ui.link.external_new_tab")
         } else {

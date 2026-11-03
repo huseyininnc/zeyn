@@ -39,7 +39,12 @@ pub(crate) fn cookie(name: &str) -> Option<String> {
         let set = s.out.lock().ok().and_then(|out| {
             out.iter().rev().find_map(|c| {
                 let (k, rest) = c.split_once('=')?;
-                (k == name).then(|| rest.split(';').next().unwrap_or("").to_string())
+                (k == name).then(|| {
+                    rest.split(';')
+                        .next()
+                        .unwrap_or("")
+                        .to_string()
+                })
             })
         });
         match set {
@@ -63,10 +68,20 @@ pub(crate) fn set_cookie(name: &str, value: Option<&str>, max_age: Option<i64>) 
         let secure = if s.secure { "; Secure" } else { "" };
         let cookie = match (value, max_age) {
             (Some(v), Some(age)) => {
-                format!("{name}={v}; Path={}; HttpOnly; SameSite=Lax; Max-Age={}{secure}", s.path, age.max(0))
+                format!(
+                    "{name}={v}; Path={}; HttpOnly; SameSite=Lax; Max-Age={}{secure}",
+                    s.path,
+                    age.max(0)
+                )
             }
-            (Some(v), None) => format!("{name}={v}; Path={}; HttpOnly; SameSite=Lax{secure}", s.path),
-            (None, _) => format!("{name}=; Path={}; HttpOnly; SameSite=Lax; Max-Age=0{secure}", s.path),
+            (Some(v), None) => format!(
+                "{name}={v}; Path={}; HttpOnly; SameSite=Lax{secure}",
+                s.path
+            ),
+            (None, _) => format!(
+                "{name}=; Path={}; HttpOnly; SameSite=Lax; Max-Age=0{secure}",
+                s.path
+            ),
         };
         if let Ok(mut out) = s.out.lock() {
             out.retain(|c| !c.starts_with(&format!("{name}=")));
@@ -97,11 +112,17 @@ pub(crate) fn prefix() -> String {
 /// Takes one attempt from `key`'s allowance in the app's rate store. Always allowed outside a
 /// request.
 pub(crate) async fn limit(key: &str, limit: RateLimit) -> Result<(), Duration> {
-    let Some(store) = with(|s| s.rate.clone()) else { return Ok(()) };
+    let Some(store) = with(|s| s.rate.clone()) else {
+        return Ok(());
+    };
     store.take(key, &limit).await
 }
 
 /// The cookies set by the request.
 pub(crate) fn taken(scope: &Scope) -> Vec<String> {
-    scope.out.lock().map(|mut o| std::mem::take(&mut *o)).unwrap_or_default()
+    scope
+        .out
+        .lock()
+        .map(|mut o| std::mem::take(&mut *o))
+        .unwrap_or_default()
 }

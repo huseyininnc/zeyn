@@ -59,7 +59,10 @@ impl ClaimedJob {
     /// After a successful try: a schedule is due again one interval later, any other run is done.
     pub fn after_success(&self, now_ms: i64) -> NextRun {
         match self.every_ms {
-            Some(every) => NextRun::Queue { run_at_ms: now_ms.saturating_add(every), attempts: 0 },
+            Some(every) => NextRun::Queue {
+                run_at_ms: now_ms.saturating_add(every),
+                attempts: 0,
+            },
             None => NextRun::Done,
         }
     }
@@ -69,8 +72,15 @@ impl ClaimedJob {
     pub fn after_failure(&self, now_ms: i64) -> NextRun {
         if self.attempts < self.max_attempts {
             let shift = self.attempts.saturating_sub(1).min(20);
-            let wait = self.backoff_ms.max(0).saturating_mul(1 << shift).min(MAX_BACKOFF_MS);
-            return NextRun::Queue { run_at_ms: now_ms.saturating_add(wait), attempts: self.attempts };
+            let wait = self
+                .backoff_ms
+                .max(0)
+                .saturating_mul(1 << shift)
+                .min(MAX_BACKOFF_MS);
+            return NextRun::Queue {
+                run_at_ms: now_ms.saturating_add(wait),
+                attempts: self.attempts,
+            };
         }
         match self.every_ms {
             Some(_) => self.after_success(now_ms),
@@ -124,12 +134,20 @@ pub trait JobStore: Send + Sync + 'static {
     fn complete(&self, job: &ClaimedJob, worker: &str, now_ms: i64) -> BoxFuture<Result<bool>>;
 
     /// Finishes a failed try with an error code (see [`ClaimedJob::after_failure`]).
-    fn fail(&self, job: &ClaimedJob, worker: &str, error: &'static str, now_ms: i64) -> BoxFuture<Result<bool>>;
+    fn fail(
+        &self,
+        job: &ClaimedJob,
+        worker: &str,
+        error: &'static str,
+        now_ms: i64,
+    ) -> BoxFuture<Result<bool>>;
 }
 
 pub(crate) fn check_new(job: &NewJob) -> Result<()> {
     if job.payload.len() > MAX_JOB_PAYLOAD {
-        return Err(Error::Internal(format!("a job payload is at most {MAX_JOB_PAYLOAD} bytes")));
+        return Err(Error::Internal(format!(
+            "a job payload is at most {MAX_JOB_PAYLOAD} bytes"
+        )));
     }
     if job.name.is_empty() || job.name.len() > 64 {
         return Err(Error::Internal("a job name is 1 to 64 bytes".into()));
@@ -183,14 +201,20 @@ impl MemoryJobStore {
     /// A store of at most `capacity` runs.
     pub fn with_capacity(capacity: usize) -> Self {
         MemoryJobStore {
-            inner: Arc::new(Mutex::new(Mem { rows: HashMap::new(), next_id: 0 })),
+            inner: Arc::new(Mutex::new(Mem {
+                rows: HashMap::new(),
+                next_id: 0,
+            })),
             capacity: capacity.max(1),
         }
     }
 
     /// Runs held now, failed ones included.
     pub fn len(&self) -> usize {
-        self.inner.lock().map(|m| m.rows.len()).unwrap_or(0)
+        self.inner
+            .lock()
+            .map(|m| m.rows.len())
+            .unwrap_or(0)
     }
 
     /// Whether no run is held.
@@ -201,26 +225,48 @@ impl MemoryJobStore {
     /// Error code of a run kept as failed, `None` when it is not failed.
     pub fn failed(&self, id: &str) -> Option<&'static str> {
         let m = self.inner.lock().ok()?;
-        m.rows.get(id).filter(|r| r.state == State::Failed).map(|r| r.last_error.unwrap_or("internal"))
+        m.rows
+            .get(id)
+            .filter(|r| r.state == State::Failed)
+            .map(|r| r.last_error.unwrap_or("internal"))
     }
 
     fn make_room(&self, m: &mut Mem) -> Result<()> {
         if m.rows.len() < self.capacity {
             return Ok(());
         }
-        let oldest = m.rows.iter().filter(|(_, r)| r.state == State::Failed).min_by_key(|(_, r)| r.run_at);
+        let oldest = m
+            .rows
+            .iter()
+            .filter(|(_, r)| r.state == State::Failed)
+            .min_by_key(|(_, r)| r.run_at);
         match oldest.map(|(id, _)| id.clone()) {
             Some(id) => {
                 m.rows.remove(&id);
                 Ok(())
             }
-            None => Err(Error::Internal(format!("the job queue is full ({} runs)", self.capacity))),
+            None => Err(Error::Internal(format!(
+                "the job queue is full ({} runs)",
+                self.capacity
+            ))),
         }
     }
 
-    fn finish(&self, job: &ClaimedJob, worker: &str, next: NextRun, error: Option<&'static str>) -> Result<bool> {
-        let mut m = self.inner.lock().map_err(|_| Error::Internal("job store lock".into()))?;
-        let held = m.rows.get(&job.id).is_some_and(|r| r.state == State::Running && r.owner.as_deref() == Some(worker));
+    fn finish(
+        &self,
+        job: &ClaimedJob,
+        worker: &str,
+        next: NextRun,
+        error: Option<&'static str>,
+    ) -> Result<bool> {
+        let mut m = self
+            .inner
+            .lock()
+            .map_err(|_| Error::Internal("job store lock".into()))?;
+        let held = m
+            .rows
+            .get(&job.id)
+            .is_some_and(|r| r.state == State::Running && r.owner.as_deref() == Some(worker));
         if !held {
             return Ok(false);
         }
@@ -228,7 +274,10 @@ impl MemoryJobStore {
             NextRun::Done => {
                 m.rows.remove(&job.id);
             }
-            NextRun::Queue { run_at_ms, attempts } => {
+            NextRun::Queue {
+                run_at_ms,
+                attempts,
+            } => {
                 if let Some(r) = m.rows.get_mut(&job.id) {
                     r.state = State::Queued;
                     r.run_at = run_at_ms;
@@ -253,7 +302,10 @@ impl JobStore for MemoryJobStore {
     fn enqueue(&self, job: NewJob) -> BoxFuture<Result<String>> {
         let out = (|| {
             check_new(&job)?;
-            let mut m = self.inner.lock().map_err(|_| Error::Internal("job store lock".into()))?;
+            let mut m = self
+                .inner
+                .lock()
+                .map_err(|_| Error::Internal("job store lock".into()))?;
             self.make_room(&mut m)?;
             m.next_id += 1;
             let id = format!("m{}", m.next_id);
@@ -287,7 +339,10 @@ impl JobStore for MemoryJobStore {
         backoff_ms: i64,
     ) -> BoxFuture<Result<()>> {
         let out = (|| {
-            let mut m = self.inner.lock().map_err(|_| Error::Internal("job store lock".into()))?;
+            let mut m = self
+                .inner
+                .lock()
+                .map_err(|_| Error::Internal("job store lock".into()))?;
             let id = schedule_id(name);
             if let Some(r) = m.rows.get_mut(&id) {
                 r.every_ms = Some(every_ms);
@@ -326,7 +381,10 @@ impl JobStore for MemoryJobStore {
         limit: usize,
     ) -> BoxFuture<Result<Vec<ClaimedJob>>> {
         let out = (|| {
-            let mut m = self.inner.lock().map_err(|_| Error::Internal("job store lock".into()))?;
+            let mut m = self
+                .inner
+                .lock()
+                .map_err(|_| Error::Internal("job store lock".into()))?;
             let mut due: Vec<(i64, String)> = m
                 .rows
                 .iter()
@@ -364,15 +422,17 @@ impl JobStore for MemoryJobStore {
     }
 
     fn heartbeat(&self, id: &str, worker: &str, lease_until_ms: i64) -> BoxFuture<Result<bool>> {
-        let out = self.inner.lock().map_err(|_| Error::Internal("job store lock".into())).map(|mut m| {
-            match m.rows.get_mut(id) {
+        let out = self
+            .inner
+            .lock()
+            .map_err(|_| Error::Internal("job store lock".into()))
+            .map(|mut m| match m.rows.get_mut(id) {
                 Some(r) if r.state == State::Running && r.owner.as_deref() == Some(worker) => {
                     r.lease_until = lease_until_ms;
                     true
                 }
                 _ => false,
-            }
-        });
+            });
         Box::pin(async move { out })
     }
 
@@ -381,7 +441,13 @@ impl JobStore for MemoryJobStore {
         Box::pin(async move { out })
     }
 
-    fn fail(&self, job: &ClaimedJob, worker: &str, error: &'static str, now_ms: i64) -> BoxFuture<Result<bool>> {
+    fn fail(
+        &self,
+        job: &ClaimedJob,
+        worker: &str,
+        error: &'static str,
+        now_ms: i64,
+    ) -> BoxFuture<Result<bool>> {
         let out = self.finish(job, worker, job.after_failure(now_ms), Some(error));
         Box::pin(async move { out })
     }

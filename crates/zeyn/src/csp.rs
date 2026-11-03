@@ -13,8 +13,9 @@ pub const MAX_EMBED_URL: usize = 2048;
 
 /// Query parameters that only track the visitor. [`embed_url`] removes them, and every
 /// parameter whose name starts with `utm_`.
-pub const TRACKING_PARAMS: [&str; 10] =
-    ["fbclid", "gclid", "gclsrc", "dclid", "msclkid", "yclid", "igshid", "mc_cid", "mc_eid", "_ga"];
+pub const TRACKING_PARAMS: [&str; 10] = [
+    "fbclid", "gclid", "gclsrc", "dclid", "msclkid", "yclid", "igshid", "mc_cid", "mc_eid", "_ga",
+];
 
 /// One allowed host of a directive: `https://host`, `https://host:port` or `https://*.host`.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -101,7 +102,11 @@ impl Csp {
         }
     }
 
-    fn add<'a>(mut self, directive: &'static str, hosts: impl IntoIterator<Item = &'a str>) -> Self {
+    fn add<'a>(
+        mut self,
+        directive: &'static str,
+        hosts: impl IntoIterator<Item = &'a str>,
+    ) -> Self {
         for value in hosts {
             match parse_source(value) {
                 Ok(s) => {
@@ -116,9 +121,9 @@ impl Csp {
                         list.push(s);
                     }
                 }
-                Err(help) => {
-                    self.problems.push(format!("csp {directive}: `{value}` is not accepted\n  = help: {help}"))
-                }
+                Err(help) => self.problems.push(format!(
+                    "csp {directive}: `{value}` is not accepted\n  = help: {help}"
+                )),
             }
         }
         self
@@ -175,26 +180,39 @@ impl Csp {
         if wasm {
             h.push_str(" 'wasm-unsafe-eval'");
         }
-        h.push_str("; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:");
-        self.img.iter().for_each(|s| s.write(&mut h));
+        h.push_str(
+            "; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:",
+        );
+        self.img
+            .iter()
+            .for_each(|s| s.write(&mut h));
         h.push_str("; ");
         if !self.media.is_empty() || self.media_blob {
             h.push_str("media-src 'self'");
             if self.media_blob {
                 h.push_str(" blob:");
             }
-            self.media.iter().for_each(|s| s.write(&mut h));
+            self.media
+                .iter()
+                .for_each(|s| s.write(&mut h));
             h.push_str("; ");
         }
-        for (name, list) in [("frame-src", &self.frame), ("connect-src", &self.connect), ("font-src", &self.font)] {
+        for (name, list) in [
+            ("frame-src", &self.frame),
+            ("connect-src", &self.connect),
+            ("font-src", &self.font),
+        ] {
             if !list.is_empty() {
                 h.push_str(name);
                 h.push_str(" 'self'");
-                list.iter().for_each(|s| s.write(&mut h));
+                list.iter()
+                    .for_each(|s| s.write(&mut h));
                 h.push_str("; ");
             }
         }
-        h.push_str("object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
+        h.push_str(
+            "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+        );
         h
     }
 
@@ -207,29 +225,43 @@ impl Csp {
     /// Whether an image at `src` would load: a path on the app itself (`/logo.png`) or an
     /// `https` address on a host of `img-src`.
     pub fn allows_image(&self, src: &str) -> bool {
-        (src.starts_with('/') && !src.starts_with("//") && !src.contains('\\')) || allowed(&self.img, src)
+        (src.starts_with('/') && !src.starts_with("//") && !src.contains('\\'))
+            || allowed(&self.img, src)
     }
 }
 
 fn allowed(list: &[Source], url: &str) -> bool {
-    https_authority(url).is_some_and(|(host, port)| list.iter().any(|s| s.matches(&host, port)))
+    https_authority(url).is_some_and(|(host, port)| {
+        list.iter()
+            .any(|s| s.matches(&host, port))
+    })
 }
 
 /// Reads one allowlist value. The error is the help line of the problem.
 fn parse_source(value: &str) -> Result<Source, &'static str> {
     const HOST_ONLY: &str = "write `https://host`, `https://host:port` or `https://*.host`";
-    if value.is_empty() || value.chars().any(|c| c.is_whitespace() || c.is_control() || matches!(c, ';' | ',')) {
-        return Err("spaces, commas and semicolons would add other sources; give one host per entry");
+    if value.is_empty()
+        || value
+            .chars()
+            .any(|c| c.is_whitespace() || c.is_control() || matches!(c, ';' | ','))
+    {
+        return Err(
+            "spaces, commas and semicolons would add other sources; give one host per entry",
+        );
     }
     if value.contains('\'') || value.contains('"') {
         return Err("quoted keywords such as 'unsafe-inline' or 'unsafe-eval' are never allowed");
     }
     let lower = value.to_ascii_lowercase();
     if lower == "*" {
-        return Err("`*` allows every host; name the hosts you need, such as `https://cdn.example.com`");
+        return Err(
+            "`*` allows every host; name the hosts you need, such as `https://cdn.example.com`",
+        );
     }
     if lower.starts_with("http://") || lower == "http:" {
-        return Err("only `https` hosts are accepted; plain `http` can be read and changed on the way");
+        return Err(
+            "only `https` hosts are accepted; plain `http` can be read and changed on the way",
+        );
     }
     let Some(rest) = lower.strip_prefix("https://") else {
         return Err(
@@ -254,7 +286,11 @@ fn parse_source(value: &str) -> Result<Source, &'static str> {
     if !valid_host(host) || (wildcard && !host.contains('.')) {
         return Err(HOST_ONLY);
     }
-    Ok(Source { host: host.to_string(), wildcard, port })
+    Ok(Source {
+        host: host.to_string(),
+        wildcard,
+        port,
+    })
 }
 
 /// Host name labels of letters, digits and inner hyphens, such as `cdn.example.com`.
@@ -266,20 +302,33 @@ fn valid_host(host: &str) -> bool {
                 && l.len() <= 63
                 && !l.starts_with('-')
                 && !l.ends_with('-')
-                && l.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+                && l.bytes()
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
         })
 }
 
 /// Host (lower case) and port (`None` for 443) of an `https` URL, or `None` when it is not one.
 fn https_authority(url: &str) -> Option<(String, Option<u16>)> {
-    let rest = url.get(..8).filter(|s| s.eq_ignore_ascii_case("https://")).map(|_| &url[8..])?;
-    let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+    let rest = url
+        .get(..8)
+        .filter(|s| s.eq_ignore_ascii_case("https://"))
+        .map(|_| &url[8..])?;
+    let end = rest
+        .find(['/', '?', '#'])
+        .unwrap_or(rest.len());
     let authority = rest[..end].to_ascii_lowercase();
     if authority.contains(['@', '\\']) {
         return None;
     }
     let (host, port) = match authority.rsplit_once(':') {
-        Some((h, p)) => (h.to_string(), Some(p.parse::<u16>().ok().filter(|n| *n > 0)?)),
+        Some((h, p)) => (
+            h.to_string(),
+            Some(
+                p.parse::<u16>()
+                    .ok()
+                    .filter(|n| *n > 0)?,
+            ),
+        ),
         None => (authority, None),
     };
     valid_host(&host).then_some((host, port.filter(|p| *p != 443)))
@@ -302,7 +351,11 @@ fn https_authority(url: &str) -> Option<(String, Option<u16>)> {
 /// ```
 pub fn embed_url(input: &str) -> Option<String> {
     let input = input.trim();
-    let url = if input.starts_with('<') { iframe_src(input)? } else { input.to_string() };
+    let url = if input.starts_with('<') {
+        iframe_src(input)?
+    } else {
+        input.to_string()
+    };
     canonical(&url)
 }
 
@@ -325,20 +378,29 @@ fn iframe_src(html: &str) -> Option<String> {
     let value = tag[at..].trim_start();
     let raw = match value.chars().next()? {
         q @ ('"' | '\'') => &value[1..1 + value[1..].find(q)?],
-        _ => value.split(|c: char| c.is_whitespace() || c == '>').next()?,
+        _ => value
+            .split(|c: char| c.is_whitespace() || c == '>')
+            .next()?,
     };
-    Some(raw.replace("&amp;", "&").replace("&#38;", "&"))
+    Some(
+        raw.replace("&amp;", "&")
+            .replace("&#38;", "&"),
+    )
 }
 
 fn canonical(url: &str) -> Option<String> {
     if url.len() > MAX_EMBED_URL
-        || url.chars().any(|c| c.is_whitespace() || c.is_control() || matches!(c, '"' | '\'' | '<' | '>' | '`' | '\\'))
+        || url.chars().any(|c| {
+            c.is_whitespace() || c.is_control() || matches!(c, '"' | '\'' | '<' | '>' | '`' | '\\')
+        })
     {
         return None;
     }
     let (host, port) = https_authority(url)?;
     let rest = &url[8..];
-    let tail = &rest[rest.find(['/', '?', '#']).unwrap_or(rest.len())..];
+    let tail = &rest[rest
+        .find(['/', '?', '#'])
+        .unwrap_or(rest.len())..];
     let (before_fragment, fragment) = match tail.split_once('#') {
         Some((b, f)) => (b, Some(f)),
         None => (tail, None),
@@ -359,8 +421,14 @@ fn canonical(url: &str) -> Option<String> {
         .into_iter()
         .flat_map(|q| q.split('&'))
         .filter(|pair| {
-            let name = pair.split('=').next().unwrap_or("").to_ascii_lowercase();
-            !pair.is_empty() && !name.starts_with("utm_") && !TRACKING_PARAMS.contains(&name.as_str())
+            let name = pair
+                .split('=')
+                .next()
+                .unwrap_or("")
+                .to_ascii_lowercase();
+            !pair.is_empty()
+                && !name.starts_with("utm_")
+                && !TRACKING_PARAMS.contains(&name.as_str())
         })
         .collect();
     if !kept.is_empty() {
@@ -401,10 +469,14 @@ mod tests {
     #[test]
     fn iframe_src_reads_the_src_attribute_only() {
         assert_eq!(
-            embed_url(r#"<iframe data-src="https://evil.test/" src='https://ok.test/a'></iframe>"#).as_deref(),
+            embed_url(r#"<iframe data-src="https://evil.test/" src='https://ok.test/a'></iframe>"#)
+                .as_deref(),
             Some("https://ok.test/a")
         );
         assert_eq!(embed_url("<script>alert(1)</script>"), None);
-        assert_eq!(embed_url("https://ok.test:443?gclid=1#t=3").as_deref(), Some("https://ok.test/#t=3"));
+        assert_eq!(
+            embed_url("https://ok.test:443?gclid=1#t=3").as_deref(),
+            Some("https://ok.test/#t=3")
+        );
     }
 }

@@ -9,10 +9,14 @@ use tower::ServiceExt;
 use zeyn::prelude::*;
 use zeyn::{License, LicenseError, SignedLicenseFile};
 
-const PAYLOAD: &str = r#"{"holder":"Acme","valid_until":"2026-12-31","modules":["pos"],"max_users":25}"#;
+const PAYLOAD: &str =
+    r#"{"holder":"Acme","valid_until":"2026-12-31","modules":["pos"],"max_users":25}"#;
 
 fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
+    bytes
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 fn key(seed: u8) -> SigningKey {
@@ -27,7 +31,8 @@ fn public(key: &SigningKey) -> &'static str {
 fn signed(key: &SigningKey, payload: &str) -> String {
     let mut message = b"zeyn-license-v1\n".to_vec();
     message.extend_from_slice(payload.as_bytes());
-    serde_json::json!({ "payload": payload, "signature": hex(&key.sign(&message).to_bytes()) }).to_string()
+    serde_json::json!({ "payload": payload, "signature": hex(&key.sign(&message).to_bytes()) })
+        .to_string()
 }
 
 #[test]
@@ -45,16 +50,37 @@ fn tampering_and_the_wrong_key_are_refused() {
     let k = key(7);
     let file = signed(&k, PAYLOAD);
     let longer = file.replace("2026-12-31", "2099-12-31");
-    assert_eq!(License::from_signed(&longer, public(&k)), Err(LicenseError::BadSignature));
+    assert_eq!(
+        License::from_signed(&longer, public(&k)),
+        Err(LicenseError::BadSignature)
+    );
     let more_users = file.replace("25", "2500");
-    assert_eq!(License::from_signed(&more_users, public(&k)), Err(LicenseError::BadSignature));
-    assert_eq!(License::from_signed(&file, public(&key(8))), Err(LicenseError::BadSignature));
-    assert_eq!(License::from_signed(&file, "not a key"), Err(LicenseError::InvalidPublicKey));
-    assert!(matches!(License::from_signed("{}", public(&k)), Err(LicenseError::Malformed(_))));
+    assert_eq!(
+        License::from_signed(&more_users, public(&k)),
+        Err(LicenseError::BadSignature)
+    );
+    assert_eq!(
+        License::from_signed(&file, public(&key(8))),
+        Err(LicenseError::BadSignature)
+    );
+    assert_eq!(
+        License::from_signed(&file, "not a key"),
+        Err(LicenseError::InvalidPublicKey)
+    );
+    assert!(matches!(
+        License::from_signed("{}", public(&k)),
+        Err(LicenseError::Malformed(_))
+    ));
     let not_a_license = signed(&k, r#"{"holder":"Acme"}"#);
-    assert!(matches!(License::from_signed(&not_a_license, public(&k)), Err(LicenseError::Malformed(_))));
+    assert!(matches!(
+        License::from_signed(&not_a_license, public(&k)),
+        Err(LicenseError::Malformed(_))
+    ));
     let message = LicenseError::BadSignature.to_string();
-    assert!(message.contains("changed after signing") && message.contains("another key"), "{message}");
+    assert!(
+        message.contains("changed after signing") && message.contains("another key"),
+        "{message}"
+    );
 }
 
 #[screen(route = "/pos", public)]
@@ -69,20 +95,50 @@ async fn open(file: &str, public_key: &'static str, today: &str) -> (StatusCode,
     std::fs::write(&path, file).unwrap();
     let router = App::new("POS")
         .fixed_now(DateTime::parse(&format!("{today}T10:00:00Z")).unwrap())
-        .license(SignedLicenseFile::new(path, public_key), Duration::from_secs(60))
-        .feature(Feature::new("pos").guard(Licensed::module("pos")).screen(pos))
+        .license(
+            SignedLicenseFile::new(path, public_key),
+            Duration::from_secs(60),
+        )
+        .feature(
+            Feature::new("pos")
+                .guard(Licensed::module("pos"))
+                .screen(pos),
+        )
         .router()
         .unwrap();
-    let res = router.oneshot(Request::get("/pos").body(Body::empty()).unwrap()).await.unwrap();
+    let res = router
+        .oneshot(
+            Request::get("/pos")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
     let status = res.status();
-    (status, String::from_utf8(res.into_body().collect().await.unwrap().to_bytes().to_vec()).unwrap())
+    (
+        status,
+        String::from_utf8(
+            res.into_body()
+                .collect()
+                .await
+                .unwrap()
+                .to_bytes()
+                .to_vec(),
+        )
+        .unwrap(),
+    )
 }
 
 #[tokio::test]
 async fn the_app_is_locked_unless_the_license_is_genuine_and_current() {
     let k = key(7);
     let file = signed(&k, PAYLOAD);
-    assert_eq!(open(&file, public(&k), "2026-11-02").await.0, StatusCode::OK);
+    assert_eq!(
+        open(&file, public(&k), "2026-11-02")
+            .await
+            .0,
+        StatusCode::OK
+    );
 
     let (status, body) = open(&file, public(&k), "2027-01-01").await;
     assert_eq!(status, StatusCode::FORBIDDEN);
@@ -92,5 +148,10 @@ async fn the_app_is_locked_unless_the_license_is_genuine_and_current() {
     assert_eq!(status, StatusCode::FORBIDDEN);
     assert!(body.contains("Your license does not cover this."), "{body}");
 
-    assert_eq!(open(&file, public(&key(9)), "2026-11-04").await.0, StatusCode::FORBIDDEN);
+    assert_eq!(
+        open(&file, public(&key(9)), "2026-11-04")
+            .await
+            .0,
+        StatusCode::FORBIDDEN
+    );
 }

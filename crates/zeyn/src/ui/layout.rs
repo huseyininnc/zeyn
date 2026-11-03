@@ -67,9 +67,16 @@ impl Row {
 
 impl Component for Row {
     fn render(&self, out: &mut String, r: &Render) {
-        out.push_str(if self.compact { r#"<div class="z-row z-row-compact">"# } else { r#"<div class="z-row">"# });
+        out.push_str(if self.compact {
+            r#"<div class="z-row z-row-compact">"#
+        } else {
+            r#"<div class="z-row">"#
+        });
         for (i, node) in self.nodes.iter().enumerate() {
-            out.push_str(&format!(r#"<div class="z-col" style="--z-flex:{}">"#, self.weights[i]));
+            out.push_str(&format!(
+                r#"<div class="z-col" style="--z-flex:{}">"#,
+                self.weights[i]
+            ));
             render_child(out, r, i, node);
             out.push_str("</div>");
         }
@@ -77,8 +84,12 @@ impl Component for Row {
     }
 
     fn schema(&self) -> Json {
-        let columns: Vec<Json> =
-            self.nodes.iter().zip(&self.weights).map(|(n, w)| json!({ "weight": w, "node": n.schema() })).collect();
+        let columns: Vec<Json> = self
+            .nodes
+            .iter()
+            .zip(&self.weights)
+            .map(|(n, w)| json!({ "weight": w, "node": n.schema() }))
+            .collect();
         json!({ "type": "row", "columns": columns })
     }
 
@@ -96,7 +107,10 @@ pub struct Stack {
 
 impl Stack {
     pub fn new() -> Self {
-        Self { nodes: Vec::new(), gap: 3 }
+        Self {
+            nodes: Vec::new(),
+            gap: 3,
+        }
     }
 
     pub fn add(mut self, node: impl Into<Node>) -> Self {
@@ -113,7 +127,10 @@ impl Stack {
 
 impl Component for Stack {
     fn render(&self, out: &mut String, r: &Render) {
-        out.push_str(&format!(r#"<div class="z-stack" style="--z-stack-gap:{}">"#, self.gap));
+        out.push_str(&format!(
+            r#"<div class="z-stack" style="--z-stack-gap:{}">"#,
+            self.gap
+        ));
         for (i, node) in self.nodes.iter().enumerate() {
             render_child(out, r, i, node);
         }
@@ -140,7 +157,13 @@ pub struct Panel {
 
 impl Panel {
     pub fn new(title: impl Into<Text>) -> Self {
-        Self { title: title.into(), nodes: Vec::new(), toolbar: None, collapsible: false, collapsed: false }
+        Self {
+            title: title.into(),
+            nodes: Vec::new(),
+            toolbar: None,
+            collapsible: false,
+            collapsed: false,
+        }
     }
 
     pub fn add(mut self, node: impl Into<Node>) -> Self {
@@ -186,13 +209,17 @@ impl Component for Panel {
                 slug(&self.title.english())
             ));
         } else {
-            out.push_str(&format!(r#"<h2 class="z-panel-title" id="{id}-title">{title}</h2>"#));
+            out.push_str(&format!(
+                r#"<h2 class="z-panel-title" id="{id}-title">{title}</h2>"#
+            ));
         }
         if let Some(t) = &self.toolbar {
             t.render(out, r, &title);
         }
         let hidden = if self.collapsed { " hidden" } else { "" };
-        out.push_str(&format!(r#"</header><div class="z-panel-body" id="{id}-body"{hidden}>"#));
+        out.push_str(&format!(
+            r#"</header><div class="z-panel-body" id="{id}-body"{hidden}>"#
+        ));
         for (i, node) in self.nodes.iter().enumerate() {
             render_child(out, r, i, node);
         }
@@ -279,7 +306,11 @@ pub struct Tabs {
 impl Tabs {
     /// Tabs with an accessible name for the tab list, such as "Order details".
     pub fn new(label: impl Into<Text>) -> Self {
-        Self { label: label.into(), titles: Vec::new(), nodes: Vec::new() }
+        Self {
+            label: label.into(),
+            titles: Vec::new(),
+            nodes: Vec::new(),
+        }
     }
 
     pub fn tab(mut self, title: impl Into<Text>, node: impl Into<Node>) -> Self {
@@ -311,7 +342,11 @@ impl Component for Tabs {
         }
         out.push_str("</div>");
         for (i, node) in self.nodes.iter().enumerate() {
-            let path = if r.path.is_empty() { i.to_string() } else { format!("{}.{i}", r.path) };
+            let path = if r.path.is_empty() {
+                i.to_string()
+            } else {
+                format!("{}.{i}", r.path)
+            };
             if i == 0 {
                 out.push_str(&format!(r#"<div class="z-tabpanel" role="tabpanel" id="{id}-panel-{i}" aria-labelledby="{id}-tab-{i}" tabindex="0">"#));
                 render_child(out, r, i, node);
@@ -326,8 +361,12 @@ impl Component for Tabs {
     }
 
     fn schema(&self) -> Json {
-        let tabs: Vec<Json> =
-            self.titles.iter().zip(&self.nodes).map(|(t, n)| json!({ "title": t, "node": n.schema() })).collect();
+        let tabs: Vec<Json> = self
+            .titles
+            .iter()
+            .zip(&self.nodes)
+            .map(|(t, n)| json!({ "title": t, "node": n.schema() }))
+            .collect();
         json!({ "type": "tabs", "label": self.label, "tabs": tabs })
     }
 
@@ -351,7 +390,11 @@ pub struct Split {
 impl Split {
     /// Two panes side by side; the first takes 40 percent.
     pub fn new(first: impl Into<Node>, second: impl Into<Node>) -> Self {
-        Self { nodes: vec![first.into(), second.into()], ratio: 40, vertical: false }
+        Self {
+            nodes: vec![first.into(), second.into()],
+            ratio: 40,
+            vertical: false,
+        }
     }
 
     /// Share of the first pane in percent, 10 to 90.
@@ -370,9 +413,15 @@ impl Split {
 impl Component for Split {
     fn render(&self, out: &mut String, r: &Render) {
         let id = dom_id(r, "split");
-        let (class, orientation) =
-            if self.vertical { ("z-split z-split-v", "horizontal") } else { ("z-split", "vertical") };
-        out.push_str(&format!(r#"<div class="{class}" data-zeyn-split style="--z-split:{}%">"#, self.ratio));
+        let (class, orientation) = if self.vertical {
+            ("z-split z-split-v", "horizontal")
+        } else {
+            ("z-split", "vertical")
+        };
+        out.push_str(&format!(
+            r#"<div class="{class}" data-zeyn-split style="--z-split:{}%">"#,
+            self.ratio
+        ));
         out.push_str(&format!(r#"<div class="z-split-pane" id="{id}-first">"#));
         render_child(out, r, 0, &self.nodes[0]);
         out.push_str(&format!(

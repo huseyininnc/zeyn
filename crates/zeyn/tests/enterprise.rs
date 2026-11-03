@@ -42,7 +42,12 @@ impl Customers {
     }
 
     fn get(&self, id: i64) -> Option<Customer> {
-        self.0.read().unwrap().iter().find(|c| c.id.0 == id).cloned()
+        self.0
+            .read()
+            .unwrap()
+            .iter()
+            .find(|c| c.id.0 == id)
+            .cloned()
     }
 }
 
@@ -54,7 +59,10 @@ pub async fn find_customers(q: DataQuery, store: Customers) -> Result<Page<Custo
 #[action(permission = "crm.write", audit)]
 pub async fn save_customer(c: Valid<Customer>, store: Customers, ctx: Ctx) -> Result<Customer> {
     let mut rows = store.0.write().unwrap();
-    let current = rows.iter_mut().find(|r| r.id == c.id).ok_or(Error::NotFound)?;
+    let current = rows
+        .iter_mut()
+        .find(|r| r.id == c.id)
+        .ok_or(Error::NotFound)?;
     if current.version != c.version {
         return Err(Error::Conflict);
     }
@@ -73,14 +81,24 @@ pub struct CustomerParams {
 
 #[screen(route = "/customers", permission = "crm.read")]
 pub fn customers() -> Screen {
-    Screen::new("Customers").body(DataGrid::of(find_customers).column(Customer::name).column(Customer::credit))
+    Screen::new("Customers").body(
+        DataGrid::of(find_customers)
+            .column(Customer::name)
+            .column(Customer::credit),
+    )
 }
 
 #[screen(permission = "crm.write")]
 pub fn customer(params: CustomerParams, store: Customers) -> Result<Screen> {
-    let c = store.get(params.id).ok_or(Error::NotFound)?;
+    let c = store
+        .get(params.id)
+        .ok_or(Error::NotFound)?;
     Ok(Screen::window("Customer").body(
-        Form::of(c).field(Customer::name).field(Customer::credit).field(Customer::score).submit("Save", save_customer),
+        Form::of(c)
+            .field(Customer::name)
+            .field(Customer::credit)
+            .field(Customer::score)
+            .submit("Save", save_customer),
     ))
 }
 
@@ -91,9 +109,18 @@ fn crm_writer() -> Identity {
 fn crm_app(identity: Identity, audit: MemoryAudit) -> App {
     App::new("Test")
         .service(Customers::seeded())
-        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .auth(move |h: &HeaderMap| {
+            h.contains_key("x-user")
+                .then(|| identity.clone())
+        })
         .interceptor(AuditLog(audit))
-        .feature(Feature::new("crm").screen(customers).screen(customer).api(find_customers).api(save_customer))
+        .feature(
+            Feature::new("crm")
+                .screen(customers)
+                .screen(customer)
+                .api(find_customers)
+                .api(save_customer),
+        )
 }
 
 struct Reply {
@@ -109,15 +136,34 @@ impl Reply {
 }
 
 async fn send(router: &Router, req: Request<Body>) -> Reply {
-    let res = router.clone().oneshot(req).await.unwrap();
+    let res = router
+        .clone()
+        .oneshot(req)
+        .await
+        .unwrap();
     let status = res.status();
     let headers = res.headers().clone();
-    let body = String::from_utf8(res.into_body().collect().await.unwrap().to_bytes().to_vec()).unwrap();
-    Reply { status, headers, body }
+    let body = String::from_utf8(
+        res.into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes()
+            .to_vec(),
+    )
+    .unwrap();
+    Reply {
+        status,
+        headers,
+        body,
+    }
 }
 
 fn get(path: &str) -> Request<Body> {
-    Request::get(path).header("x-user", "1").body(Body::empty()).unwrap()
+    Request::get(path)
+        .header("x-user", "1")
+        .body(Body::empty())
+        .unwrap()
 }
 
 const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -142,13 +188,19 @@ fn api(path: &str, body: serde_json::Value) -> Request<Body> {
 }
 
 fn change(field: &'static str, old: &str, new: &str) -> FieldChange {
-    FieldChange { field, old: Some(old.into()), new: Some(new.into()) }
+    FieldChange {
+        field,
+        old: Some(old.into()),
+        new: Some(new.into()),
+    }
 }
 
 #[tokio::test]
 async fn form_save_records_the_record_key_and_changed_fields_from_the_loaded_record() {
     let audit = MemoryAudit::default();
-    let router = crm_app(crm_writer(), audit.clone()).router().unwrap();
+    let router = crm_app(crm_writer(), audit.clone())
+        .router()
+        .unwrap();
     let values = serde_json::json!({ "name": "Renamed", "credit": "2000", "score": "999", "id": "4", "version": "1" });
     let r = send(
         &router,
@@ -172,20 +224,30 @@ async fn form_save_records_the_record_key_and_changed_fields_from_the_loaded_rec
 #[tokio::test]
 async fn api_save_records_changes_against_the_stored_record_not_the_request() {
     let audit = MemoryAudit::default();
-    let router = crm_app(crm_writer(), audit.clone()).router().unwrap();
+    let router = crm_app(crm_writer(), audit.clone())
+        .router()
+        .unwrap();
     let body = serde_json::json!({ "id": 3, "name": "Customer 3", "credit": { "minor": 123456, "currency": "Try" }, "score": 77, "version": 1 });
     let r = send(&router, api("/api/v1/crm/save_customer", body)).await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
     let e = &audit.entries()[0];
     assert_eq!(e.model, Some("Customer"));
     assert_eq!(e.record.as_deref(), Some("3"));
-    assert_eq!(e.changes, vec![change("credit", "3000.00 TRY", "1234.56 TRY"), change("score", "3", "77")]);
+    assert_eq!(
+        e.changes,
+        vec![
+            change("credit", "3000.00 TRY", "1234.56 TRY"),
+            change("score", "3", "77")
+        ]
+    );
 }
 
 #[tokio::test]
 async fn failed_saves_are_recorded_without_inventing_changes() {
     let audit = MemoryAudit::default();
-    let router = crm_app(crm_writer(), audit.clone()).router().unwrap();
+    let router = crm_app(crm_writer(), audit.clone())
+        .router()
+        .unwrap();
     let body = serde_json::json!({ "id": 3, "name": "X", "credit": { "minor": 1, "currency": "Try" }, "score": 0, "version": 9 });
     let r = send(&router, api("/api/v1/crm/save_customer", body)).await;
     assert_eq!(r.status, StatusCode::CONFLICT);
@@ -236,7 +298,12 @@ impl People {
     }
 
     fn get(&self, id: i64) -> Option<Person> {
-        self.0.read().unwrap().iter().find(|c| c.id.0 == id).cloned()
+        self.0
+            .read()
+            .unwrap()
+            .iter()
+            .find(|c| c.id.0 == id)
+            .cloned()
     }
 }
 
@@ -253,7 +320,10 @@ pub async fn get_person(id: i64, store: People) -> Result<Person> {
 #[action(permission = "hr.write")]
 pub async fn save_person(p: Valid<Person>, store: People) -> Result<Person> {
     let mut rows = store.0.write().unwrap();
-    let current = rows.iter_mut().find(|r| r.id == p.id).ok_or(Error::NotFound)?;
+    let current = rows
+        .iter_mut()
+        .find(|r| r.id == p.id)
+        .ok_or(Error::NotFound)?;
     let mut saved = p.into_inner();
     saved.version += 1;
     *current = saved.clone();
@@ -276,9 +346,15 @@ pub fn people() -> Screen {
 
 #[screen(permission = "hr.read")]
 pub fn person(params: CustomerParams, store: People) -> Result<Screen> {
-    let p = store.get(params.id).ok_or(Error::NotFound)?;
+    let p = store
+        .get(params.id)
+        .ok_or(Error::NotFound)?;
     Ok(Screen::window("Person").body(
-        Form::of(p).field(Person::name).field(Person::national_id).field(Person::email).submit("Save", save_person),
+        Form::of(p)
+            .field(Person::name)
+            .field(Person::national_id)
+            .field(Person::email)
+            .submit("Save", save_person),
     ))
 }
 
@@ -287,7 +363,12 @@ pub fn people_tabs() -> Screen {
     Screen::new("People tabs").body(
         Tabs::new("Sections")
             .tab("Summary", Card::new())
-            .tab("People", DataGrid::of(find_people).column(Person::name).column(Person::national_id)),
+            .tab(
+                "People",
+                DataGrid::of(find_people)
+                    .column(Person::name)
+                    .column(Person::national_id),
+            ),
     )
 }
 
@@ -303,14 +384,21 @@ pub fn person_one() -> Screen {
 
 #[screen(route = "/people-grouped", permission = "hr.read")]
 pub fn people_grouped() -> Screen {
-    Screen::new("People grouped")
-        .body(DataGrid::of(find_people).column(Person::name).column(Person::national_id).group_by(Person::national_id))
+    Screen::new("People grouped").body(
+        DataGrid::of(find_people)
+            .column(Person::name)
+            .column(Person::national_id)
+            .group_by(Person::national_id),
+    )
 }
 
 fn hr_app(identity: Identity, audit: MemoryAudit) -> Router {
     App::new("Test")
         .service(People::seeded())
-        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .auth(move |h: &HeaderMap| {
+            h.contains_key("x-user")
+                .then(|| identity.clone())
+        })
         .interceptor(AuditLog(audit))
         .feature(
             Feature::new("hr")
@@ -345,14 +433,27 @@ async fn masked_fields_never_reach_users_without_the_unmask_permission() {
     assert!(!page.body.contains("12345678901") && !page.body.contains("person1@"));
     assert!(!page.body.contains("data-zeyn-reveal"));
 
-    let form = send(&router, get("/_zeyn/screen/person?params=%7B%22id%22%3A1%7D")).await;
-    assert!(form.body.contains(r#"readonly data-zeyn-masked value="•••• 8901""#), "{}", form.body);
+    let form = send(
+        &router,
+        get("/_zeyn/screen/person?params=%7B%22id%22%3A1%7D"),
+    )
+    .await;
+    assert!(
+        form.body
+            .contains(r#"readonly data-zeyn-masked value="•••• 8901""#),
+        "{}",
+        form.body
+    );
     assert!(!form.body.contains("12345678901"));
 
     let one = send(&router, api("/api/v1/hr/get_person", serde_json::json!(2))).await;
     assert_eq!(one.json()["national_id"], "•••• 8902");
     assert_eq!(one.json()["email"], "p••••@example.com");
-    let list = send(&router, api("/api/v1/hr/find_people", serde_json::json!({}))).await;
+    let list = send(
+        &router,
+        api("/api/v1/hr/find_people", serde_json::json!({})),
+    )
+    .await;
     assert_eq!(list.json()["items"][2]["national_id"], "•••• 8903");
 }
 
@@ -361,10 +462,13 @@ async fn masked_fields_cannot_be_searched_or_overwritten_without_the_permission(
     let router = hr_app(clerk(), MemoryAudit::default());
     let probe = serde_json::json!({ "screen": "people", "node": 0, "query": { "filters": [{ "field": "national_id", "contains": "12345678902" }], "with_total": true } });
     let r = send(&router, post("/_zeyn/grid", probe)).await;
-    assert_eq!(r.json()["total"], 4, "a filter on a masked field must be ignored");
+    assert_eq!(
+        r.json()["total"],
+        4,
+        "a filter on a masked field must be ignored"
+    );
 
-    let values =
-        serde_json::json!({ "name": "Renamed", "national_id": "99999999999", "email": "x@y.z", "version": "1" });
+    let values = serde_json::json!({ "name": "Renamed", "national_id": "99999999999", "email": "x@y.z", "version": "1" });
     let r = send(
         &router,
         post(
@@ -374,55 +478,116 @@ async fn masked_fields_cannot_be_searched_or_overwritten_without_the_permission(
     )
     .await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
-    let r = send(&router, post("/_zeyn/grid", serde_json::json!({ "screen": "people", "node": 0 }))).await;
-    let rows = r.json()["rows"].as_str().unwrap().to_string();
-    assert!(rows.contains("Renamed") && rows.contains("•••• 8901") && rows.contains("p••••@example.com"), "{rows}");
+    let r = send(
+        &router,
+        post(
+            "/_zeyn/grid",
+            serde_json::json!({ "screen": "people", "node": 0 }),
+        ),
+    )
+    .await;
+    let rows = r.json()["rows"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert!(
+        rows.contains("Renamed")
+            && rows.contains("•••• 8901")
+            && rows.contains("p••••@example.com"),
+        "{rows}"
+    );
 }
 
 fn query_string(value: serde_json::Value) -> String {
     value
         .to_string()
         .bytes()
-        .map(|b| if b.is_ascii_alphanumeric() { (b as char).to_string() } else { format!("%{b:02X}") })
+        .map(|b| {
+            if b.is_ascii_alphanumeric() {
+                (b as char).to_string()
+            } else {
+                format!("%{b:02X}")
+            }
+        })
         .collect()
 }
 
 #[tokio::test]
 async fn masked_fields_cannot_be_searched_or_sorted_through_the_api_or_exports() {
     let router = hr_app(clerk(), MemoryAudit::default());
-    let probe =
-        serde_json::json!({ "filters": [{ "field": "national_id", "contains": "12345678902" }], "with_total": true });
+    let probe = serde_json::json!({ "filters": [{ "field": "national_id", "contains": "12345678902" }], "with_total": true });
     let r = send(&router, api("/api/v1/hr/find_people", probe)).await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
-    assert_eq!(r.json()["total"], 4, "a filter on a masked field must be ignored by the API");
+    assert_eq!(
+        r.json()["total"],
+        4,
+        "a filter on a masked field must be ignored by the API"
+    );
 
     let sorted = serde_json::json!({ "sort": [{ "field": "national_id", "desc": true }] });
     let r = send(&router, api("/api/v1/hr/find_people", sorted)).await;
-    assert_eq!(r.json()["items"][0]["name"], "Person 1", "a sort on a masked field must be ignored by the API");
+    assert_eq!(
+        r.json()["items"][0]["name"],
+        "Person 1",
+        "a sort on a masked field must be ignored by the API"
+    );
 
-    let q = query_string(serde_json::json!({ "filters": [{ "field": "national_id", "equals": "12345678902" }] }));
-    let r = send(&router, get(&format!("/_zeyn/grid/export?screen=people&node=0&q={q}"))).await;
+    let q = query_string(
+        serde_json::json!({ "filters": [{ "field": "national_id", "equals": "12345678902" }] }),
+    );
+    let r = send(
+        &router,
+        get(&format!("/_zeyn/grid/export?screen=people&node=0&q={q}")),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
-    assert_eq!(r.body.trim_end().lines().count(), 5, "an export ignores filters on masked fields: {}", r.body);
+    assert_eq!(
+        r.body.trim_end().lines().count(),
+        5,
+        "an export ignores filters on masked fields: {}",
+        r.body
+    );
 
     let router = hr_app(officer(), MemoryAudit::default());
-    let r = send(&router, get(&format!("/_zeyn/grid/export?screen=people&node=0&q={q}"))).await;
-    assert_eq!(r.body.trim_end().lines().count(), 2, "users who may reveal can still filter: {}", r.body);
+    let r = send(
+        &router,
+        get(&format!("/_zeyn/grid/export?screen=people&node=0&q={q}")),
+    )
+    .await;
+    assert_eq!(
+        r.body.trim_end().lines().count(),
+        2,
+        "users who may reveal can still filter: {}",
+        r.body
+    );
 }
 
 #[tokio::test]
 async fn reveal_only_reaches_rows_and_columns_the_grid_shows() {
     let router = hr_app(officer(), MemoryAudit::default());
     let ask = |key: &str, field: &str| {
-        post("/_zeyn/reveal", serde_json::json!({ "screen": "person_one", "node": 0, "field": field, "key": key }))
+        post(
+            "/_zeyn/reveal",
+            serde_json::json!({ "screen": "person_one", "node": 0, "field": field, "key": key }),
+        )
     };
     let r = send(&router, ask("1", "national_id")).await;
     assert_eq!(r.json()["value"], "12345678901", "{}", r.body);
     let r = send(&router, ask("2", "national_id")).await;
-    assert_ne!(r.status, StatusCode::OK, "a row outside the grid's scope: {}", r.body);
+    assert_ne!(
+        r.status,
+        StatusCode::OK,
+        "a row outside the grid's scope: {}",
+        r.body
+    );
     assert!(!r.body.contains("12345678902"));
     let r = send(&router, ask("1", "email")).await;
-    assert_ne!(r.status, StatusCode::OK, "a column the grid does not show: {}", r.body);
+    assert_ne!(
+        r.status,
+        StatusCode::OK,
+        "a column the grid does not show: {}",
+        r.body
+    );
     assert!(!r.body.contains("person1@"));
 }
 
@@ -431,17 +596,41 @@ async fn reveals_and_exports_count_against_the_write_limit() {
     let identity = officer();
     let router = App::new("Test")
         .service(People::seeded())
-        .write_limit(zeyn::RateLimit::per_user(2, std::time::Duration::from_secs(60)))
-        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .write_limit(zeyn::RateLimit::per_user(
+            2,
+            std::time::Duration::from_secs(60),
+        ))
+        .auth(move |h: &HeaderMap| {
+            h.contains_key("x-user")
+                .then(|| identity.clone())
+        })
         .feature(Feature::new("hr").screen(people))
         .router()
         .unwrap();
-    let ask = serde_json::json!({ "screen": "people", "node": 0, "field": "national_id", "key": "1" });
-    assert_eq!(send(&router, post("/_zeyn/reveal", ask.clone())).await.status, StatusCode::OK);
-    assert_eq!(send(&router, get("/_zeyn/grid/export?screen=people&node=0")).await.status, StatusCode::OK);
-    assert_eq!(send(&router, post("/_zeyn/reveal", ask)).await.status, StatusCode::TOO_MANY_REQUESTS);
+    let ask =
+        serde_json::json!({ "screen": "people", "node": 0, "field": "national_id", "key": "1" });
     assert_eq!(
-        send(&router, get("/_zeyn/grid/export?screen=people&node=0")).await.status,
+        send(&router, post("/_zeyn/reveal", ask.clone()))
+            .await
+            .status,
+        StatusCode::OK
+    );
+    assert_eq!(
+        send(&router, get("/_zeyn/grid/export?screen=people&node=0"))
+            .await
+            .status,
+        StatusCode::OK
+    );
+    assert_eq!(
+        send(&router, post("/_zeyn/reveal", ask))
+            .await
+            .status,
+        StatusCode::TOO_MANY_REQUESTS
+    );
+    assert_eq!(
+        send(&router, get("/_zeyn/grid/export?screen=people&node=0"))
+            .await
+            .status,
         StatusCode::TOO_MANY_REQUESTS
     );
 }
@@ -451,11 +640,18 @@ async fn masked_fields_never_group_a_grid() {
     let router = hr_app(clerk(), MemoryAudit::default());
     let page = send(&router, get("/people-grouped")).await;
     assert_eq!(page.status, StatusCode::OK);
-    assert!(!page.body.contains("12345678901") && !page.body.contains("z-group"), "{}", page.body);
+    assert!(
+        !page.body.contains("12345678901") && !page.body.contains("z-group"),
+        "{}",
+        page.body
+    );
     assert!(page.body.contains("•••• 8901"));
     let r = send(
         &router,
-        post("/_zeyn/grid", serde_json::json!({ "screen": "people_grouped", "node": 0, "path": ["12345678902"] })),
+        post(
+            "/_zeyn/grid",
+            serde_json::json!({ "screen": "people_grouped", "node": 0, "path": ["12345678902"] }),
+        ),
     )
     .await;
     assert!(!r.body.contains("12345678902"), "{}", r.body);
@@ -476,24 +672,50 @@ async fn reveal_needs_the_permission_and_every_attempt_is_audited() {
     let audit = MemoryAudit::default();
     let router = hr_app(officer(), audit.clone());
     let page = send(&router, get("/people")).await;
-    assert!(page.body.contains(r#"data-zeyn-reveal="national_id" data-zeyn-key="2""#), "{}", page.body);
-    assert!(!page.body.contains("12345678902"), "permitted users still see masked values until they ask");
+    assert!(
+        page.body
+            .contains(r#"data-zeyn-reveal="national_id" data-zeyn-key="2""#),
+        "{}",
+        page.body
+    );
+    assert!(
+        !page.body.contains("12345678902"),
+        "permitted users still see masked values until they ask"
+    );
 
     let r = send(&router, post("/_zeyn/reveal", ask)).await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
     assert_eq!(r.json()["value"], "12345678901");
-    assert_eq!(r.headers.get(header::CACHE_CONTROL).unwrap(), "no-store");
+    assert_eq!(
+        r.headers
+            .get(header::CACHE_CONTROL)
+            .unwrap(),
+        "no-store"
+    );
 
-    let in_grid = serde_json::json!({ "screen": "people", "node": 0, "field": "email", "key": "3" });
+    let in_grid =
+        serde_json::json!({ "screen": "people", "node": 0, "field": "email", "key": "3" });
     let r = send(&router, post("/_zeyn/reveal", in_grid)).await;
     assert_eq!(r.json()["value"], "person3@example.com");
 
     let not_masked = serde_json::json!({ "screen": "person", "params": { "id": 1 }, "node": 0, "field": "name" });
-    assert_eq!(send(&router, post("/_zeyn/reveal", not_masked)).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(
+        send(&router, post("/_zeyn/reveal", not_masked))
+            .await
+            .status,
+        StatusCode::NOT_FOUND
+    );
 
     let e = audit.entries();
     assert_eq!(e.len(), 3);
-    assert_eq!(e[0].revealed, vec![zeyn::FieldRef { model: "Person", id: Some("1".into()), field: "national_id" }]);
+    assert_eq!(
+        e[0].revealed,
+        vec![zeyn::FieldRef {
+            model: "Person",
+            id: Some("1".into()),
+            field: "national_id"
+        }]
+    );
     assert_eq!(e[1].revealed[0].field, "email");
     assert!(!e[2].ok);
 }
@@ -501,20 +723,31 @@ async fn reveal_needs_the_permission_and_every_attempt_is_audited() {
 #[tokio::test]
 async fn permitted_api_clients_get_raw_values_and_the_reveal_is_audited() {
     let audit = MemoryAudit::default();
-    let router = hr_app(clerk().with_permissions(["person.national_id.unmask"]), audit.clone());
+    let router = hr_app(
+        clerk().with_permissions(["person.national_id.unmask"]),
+        audit.clone(),
+    );
     let r = send(&router, api("/api/v1/hr/get_person", serde_json::json!(2))).await;
     assert_eq!(r.json()["national_id"], "12345678902");
     assert_eq!(r.json()["email"], "p••••@example.com");
     let e = audit.entries();
     assert_eq!(e.len(), 1);
-    assert_eq!(e[0].revealed, vec![zeyn::FieldRef { model: "Person", id: Some("2".into()), field: "national_id" }]);
+    assert_eq!(
+        e[0].revealed,
+        vec![zeyn::FieldRef {
+            model: "Person",
+            id: Some("2".into()),
+            field: "national_id"
+        }]
+    );
 }
 
 #[tokio::test]
 async fn permitted_users_can_change_masked_fields_and_the_audit_keeps_them_masked() {
     let audit = MemoryAudit::default();
     let router = hr_app(officer(), audit.clone());
-    let values = serde_json::json!({ "name": "Person 1", "national_id": "55555555555", "version": "1" });
+    let values =
+        serde_json::json!({ "name": "Person 1", "national_id": "55555555555", "version": "1" });
     let r = send(
         &router,
         post(
@@ -525,7 +758,10 @@ async fn permitted_users_can_change_masked_fields_and_the_audit_keeps_them_maske
     .await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
     let e = audit.entries();
-    assert_eq!(e[0].changes, vec![change("national_id", "•••• 8901", "•••• 5555")]);
+    assert_eq!(
+        e[0].changes,
+        vec![change("national_id", "•••• 8901", "•••• 5555")]
+    );
     let line = serde_json::to_string(&e[0]).unwrap();
     assert!(!line.contains("55555555555") && !line.contains("12345678901"));
 }
@@ -550,24 +786,41 @@ pub async fn find_cases(q: DataQuery, store: Cases) -> Result<Page<Case>> {
 
 #[action(permission = "cases.read")]
 pub async fn get_case(id: i64, store: Cases) -> Result<Case> {
-    store.0.iter().find(|c| c.id.0 == id).cloned().ok_or(Error::NotFound)
+    store
+        .0
+        .iter()
+        .find(|c| c.id.0 == id)
+        .cloned()
+        .ok_or(Error::NotFound)
 }
 
 #[screen(route = "/cases", permission = "cases.read")]
 pub fn cases() -> Screen {
-    Screen::new("Cases").body(DataGrid::of(find_cases).column(Case::subject).done().exportable())
+    Screen::new("Cases").body(
+        DataGrid::of(find_cases)
+            .column(Case::subject)
+            .done()
+            .exportable(),
+    )
 }
 
 #[screen(route = "/cases-tabs", permission = "cases.read")]
 pub fn case_tabs() -> Screen {
     Screen::new("Case tabs").body(
-        Tabs::new("Sections").tab("Summary", Card::new()).tab("Cases", DataGrid::of(find_cases).column(Case::subject)),
+        Tabs::new("Sections")
+            .tab("Summary", Card::new())
+            .tab("Cases", DataGrid::of(find_cases).column(Case::subject)),
     )
 }
 
 #[screen(permission = "cases.read")]
 pub fn case(params: CustomerParams, store: Cases) -> Result<Screen> {
-    let c = store.0.iter().find(|c| c.id.0 == params.id).cloned().ok_or(Error::NotFound)?;
+    let c = store
+        .0
+        .iter()
+        .find(|c| c.id.0 == params.id)
+        .cloned()
+        .ok_or(Error::NotFound)?;
     Ok(Screen::window("Case").body(Form::of(c).field(Case::subject)))
 }
 
@@ -587,10 +840,20 @@ pub fn overview() -> Screen {
 }
 
 fn cases_app(identity: Identity, audit: MemoryAudit) -> Router {
-    let store = Cases((1..=2).map(|i| Case { id: CaseId(i), subject: format!("Subject {i}") }).collect());
+    let store = Cases(
+        (1..=2)
+            .map(|i| Case {
+                id: CaseId(i),
+                subject: format!("Subject {i}"),
+            })
+            .collect(),
+    );
     App::new("Test")
         .service(store)
-        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .auth(move |h: &HeaderMap| {
+            h.contains_key("x-user")
+                .then(|| identity.clone())
+        })
         .interceptor(AuditLog(audit))
         .feature(
             Feature::new("cases")
@@ -611,12 +874,16 @@ fn case_reader() -> Identity {
 }
 
 fn with_cookie(mut req: Request<Body>, cookie: &str) -> Request<Body> {
-    let existing = req.headers().get(header::COOKIE).map(|v| v.to_str().unwrap().to_string());
+    let existing = req
+        .headers()
+        .get(header::COOKIE)
+        .map(|v| v.to_str().unwrap().to_string());
     let value = match existing {
         Some(e) => format!("{e}; {cookie}"),
         None => cookie.to_string(),
     };
-    req.headers_mut().insert(header::COOKIE, value.parse().unwrap());
+    req.headers_mut()
+        .insert(header::COOKIE, value.parse().unwrap());
     req
 }
 
@@ -624,16 +891,32 @@ fn with_cookie(mut req: Request<Body>, cookie: &str) -> Request<Body> {
 async fn showing_a_sensitive_record_writes_a_read_record() {
     let audit = MemoryAudit::default();
     let router = cases_app(case_reader(), audit.clone());
-    assert_eq!(send(&router, get("/overview")).await.status, StatusCode::OK);
-    assert!(audit.entries().is_empty(), "screens without personal data are not audited");
+    assert_eq!(
+        send(&router, get("/overview"))
+            .await
+            .status,
+        StatusCode::OK
+    );
+    assert!(
+        audit.entries().is_empty(),
+        "screens without personal data are not audited"
+    );
 
     send(&router, get("/cases")).await;
     send(&router, get("/_zeyn/screen/case?params=%7B%22id%22%3A2%7D")).await;
     send(&router, api("/api/v1/cases/get_case", serde_json::json!(1))).await;
     let e = audit.entries();
     assert_eq!(e.len(), 3);
-    let ids = |i: usize| e[i].reads.iter().map(|r| (r.model, r.id.clone().unwrap())).collect::<Vec<_>>();
-    assert_eq!(ids(0), [("Case", "1".to_string()), ("Case", "2".to_string())]);
+    let ids = |i: usize| {
+        e[i].reads
+            .iter()
+            .map(|r| (r.model, r.id.clone().unwrap()))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        ids(0),
+        [("Case", "1".to_string()), ("Case", "2".to_string())]
+    );
     assert_eq!(e[0].user.as_deref(), Some("nurse"));
     assert_eq!(ids(1), [("Case", "2".to_string())]);
     assert_eq!(ids(2), [("Case", "1".to_string())]);
@@ -645,8 +928,21 @@ async fn lazy_tabs_go_through_interceptors_and_record_reads() {
     let audit = MemoryAudit::default();
     let router = cases_app(case_reader(), audit.clone());
     let page = send(&router, get("/cases-tabs")).await;
-    let lazy = page.body.split(r#"data-zeyn-lazy=""#).nth(1).and_then(|r| r.split('"').next()).unwrap().to_string();
-    let r = send(&router, post("/_zeyn/node", serde_json::json!({ "screen": "case_tabs", "node": lazy }))).await;
+    let lazy = page
+        .body
+        .split(r#"data-zeyn-lazy=""#)
+        .nth(1)
+        .and_then(|r| r.split('"').next())
+        .unwrap()
+        .to_string();
+    let r = send(
+        &router,
+        post(
+            "/_zeyn/node",
+            serde_json::json!({ "screen": "case_tabs", "node": lazy }),
+        ),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
     let e = audit.entries();
     assert_eq!(e.len(), 1, "{e:?}");
@@ -659,19 +955,32 @@ async fn exports_of_sensitive_records_write_one_audit_record_with_the_row_count(
     let audit = MemoryAudit::default();
     let router = cases_app(case_reader(), audit.clone());
     let q = query_string(serde_json::json!({ "filters": [] }));
-    let r = send(&router, get(&format!("/_zeyn/grid/export?screen=cases&node=0&q={q}"))).await;
+    let r = send(
+        &router,
+        get(&format!("/_zeyn/grid/export?screen=cases&node=0&q={q}")),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
     assert!(r.body.contains("Subject 2"));
     let e = audit.entries();
     assert_eq!(e.len(), 1, "{e:?}");
-    let export = e[0].export.as_ref().expect("an export record");
-    assert_eq!((export.model, export.format, export.rows), ("Case", "csv", 2));
+    let export = e[0]
+        .export
+        .as_ref()
+        .expect("an export record");
+    assert_eq!(
+        (export.model, export.format, export.rows),
+        ("Case", "csv", 2)
+    );
     assert!(e[0].reads.is_empty(), "no read per row");
 
     let audit = MemoryAudit::default();
     let router = hr_app(clerk(), audit.clone());
     send(&router, get("/_zeyn/grid/export?screen=people&node=0")).await;
-    assert!(audit.entries().is_empty(), "exports of other models are not audited");
+    assert!(
+        audit.entries().is_empty(),
+        "exports of other models are not audited"
+    );
 }
 
 #[tokio::test]
@@ -680,52 +989,120 @@ async fn a_screen_that_asks_for_a_reason_shows_no_data_until_one_is_given() {
     let router = cases_app(case_reader(), audit.clone());
     let r = send(&router, get("/cases/open")).await;
     assert_eq!(r.status, StatusCode::PRECONDITION_REQUIRED);
-    assert!(r.body.contains(r#"data-zeyn-reason="case_file""#) && !r.body.contains("Subject 1"), "{}", r.body);
+    assert!(
+        r.body
+            .contains(r#"data-zeyn-reason="case_file""#)
+            && !r.body.contains("Subject 1"),
+        "{}",
+        r.body
+    );
     let r = send(&router, get("/_zeyn/screen/case_file")).await;
     assert_eq!(r.status, StatusCode::PRECONDITION_REQUIRED);
     assert_eq!(r.json()["error"], "reason_required");
-    let r = send(&router, post("/_zeyn/grid", serde_json::json!({ "screen": "case_file", "node": 0 }))).await;
+    let r = send(
+        &router,
+        post(
+            "/_zeyn/grid",
+            serde_json::json!({ "screen": "case_file", "node": 0 }),
+        ),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::PRECONDITION_REQUIRED);
     assert!(!r.body.contains("Subject"));
 
-    let r = send(&router, post("/_zeyn/reason", serde_json::json!({ "screen": "case_file", "reason": "x" }))).await;
+    let r = send(
+        &router,
+        post(
+            "/_zeyn/reason",
+            serde_json::json!({ "screen": "case_file", "reason": "x" }),
+        ),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::UNPROCESSABLE_ENTITY);
-    let r =
-        send(&router, post("/_zeyn/reason", serde_json::json!({ "screen": "overview", "reason": "Checking" }))).await;
+    let r = send(
+        &router,
+        post(
+            "/_zeyn/reason",
+            serde_json::json!({ "screen": "overview", "reason": "Checking" }),
+        ),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::NOT_FOUND);
     let r = send(
         &router,
-        post("/_zeyn/reason", serde_json::json!({ "screen": "case_file", "reason": "Hasta çağrısı #42" })),
+        post(
+            "/_zeyn/reason",
+            serde_json::json!({ "screen": "case_file", "reason": "Hasta çağrısı #42" }),
+        ),
     )
     .await;
     assert_eq!(r.status, StatusCode::NO_CONTENT);
-    let cookie = r.headers.get(header::SET_COOKIE).unwrap().to_str().unwrap().to_string();
+    let cookie = r
+        .headers
+        .get(header::SET_COOKIE)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
     assert!(
-        cookie.contains("HttpOnly") && cookie.contains("SameSite=Strict") && cookie.contains("Max-Age=900"),
+        cookie.contains("HttpOnly")
+            && cookie.contains("SameSite=Strict")
+            && cookie.contains("Max-Age=900"),
         "{cookie}"
     );
-    let pair = cookie.split(';').next().unwrap().to_string();
+    let pair = cookie
+        .split(';')
+        .next()
+        .unwrap()
+        .to_string();
 
     let r = send(&router, with_cookie(get("/cases/open"), &pair)).await;
     assert_eq!(r.status, StatusCode::OK);
     assert!(r.body.contains("Subject 1"));
     let r = send(&router, with_cookie(get("/cases/other"), &pair)).await;
-    assert_eq!(r.status, StatusCode::PRECONDITION_REQUIRED, "a reason only opens the screen it was given for");
+    assert_eq!(
+        r.status,
+        StatusCode::PRECONDITION_REQUIRED,
+        "a reason only opens the screen it was given for"
+    );
 
     let e = audit.entries();
-    let opened = e.iter().find(|x| x.ok && x.screen == "case_file").unwrap();
+    let opened = e
+        .iter()
+        .find(|x| x.ok && x.screen == "case_file")
+        .unwrap();
     assert_eq!(opened.reason.as_deref(), Some("Hasta çağrısı #42"));
-    assert!(opened.reads.iter().any(|r| r.model == "case_file"));
-    assert!(opened.reads.iter().any(|r| r.model == "Case" && r.id.as_deref() == Some("2")));
+    assert!(
+        opened
+            .reads
+            .iter()
+            .any(|r| r.model == "case_file")
+    );
+    assert!(
+        opened
+            .reads
+            .iter()
+            .any(|r| r.model == "Case" && r.id.as_deref() == Some("2"))
+    );
 }
 
 #[tokio::test]
 async fn reasons_need_access_to_the_screen() {
     let router = cases_app(Identity::user("guest"), MemoryAudit::default());
-    let r =
-        send(&router, post("/_zeyn/reason", serde_json::json!({ "screen": "case_file", "reason": "Curious" }))).await;
+    let r = send(
+        &router,
+        post(
+            "/_zeyn/reason",
+            serde_json::json!({ "screen": "case_file", "reason": "Curious" }),
+        ),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::FORBIDDEN);
-    assert!(r.headers.get(header::SET_COOKIE).is_none());
+    assert!(
+        r.headers
+            .get(header::SET_COOKIE)
+            .is_none()
+    );
 }
 
 #[choice]
@@ -757,23 +1134,45 @@ pub struct Requests(Arc<RwLock<Vec<Request2>>>);
 impl Service for Requests {}
 
 #[action(permission = "req.read", audit)]
-pub async fn move_request(r: TransitionRequest<Request2Id>, store: Requests, ctx: Ctx) -> Result<Stage> {
+pub async fn move_request(
+    r: TransitionRequest<Request2Id>,
+    store: Requests,
+    ctx: Ctx,
+) -> Result<Stage> {
     let mut rows = store.0.write().unwrap();
-    let row = rows.iter_mut().find(|x| x.id == r.id).ok_or(Error::NotFound)?;
+    let row = rows
+        .iter_mut()
+        .find(|x| x.id == r.id)
+        .ok_or(Error::NotFound)?;
     row.stage = request_flow().apply(&ctx, row.stage, &r.transition, r.comment.as_deref())?;
     Ok(row.stage)
 }
 
 #[screen(permission = "req.read")]
 pub fn request_view(params: CustomerParams, store: Requests) -> Result<Screen> {
-    let row = store.0.read().unwrap().iter().find(|x| x.id.0 == params.id).cloned().ok_or(Error::NotFound)?;
-    Ok(Screen::window("Request").body(Transitions::of(request_flow(), row.stage, row.id, move_request)))
+    let row = store
+        .0
+        .read()
+        .unwrap()
+        .iter()
+        .find(|x| x.id.0 == params.id)
+        .cloned()
+        .ok_or(Error::NotFound)?;
+    Ok(Screen::window("Request").body(Transitions::of(
+        request_flow(),
+        row.stage,
+        row.id,
+        move_request,
+    )))
 }
 
 fn requests_app(identity: Identity, audit: MemoryAudit, store: Requests) -> Router {
     App::new("Test")
         .service(store)
-        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .auth(move |h: &HeaderMap| {
+            h.contains_key("x-user")
+                .then(|| identity.clone())
+        })
         .interceptor(AuditLog(audit))
         .feature(Feature::new("req").screen(request_view))
         .router()
@@ -782,8 +1181,16 @@ fn requests_app(identity: Identity, audit: MemoryAudit, store: Requests) -> Rout
 
 fn requests() -> Requests {
     let rows = vec![
-        Request2 { id: Request2Id(1), title: "Draft one".into(), stage: Stage::Draft },
-        Request2 { id: Request2Id(2), title: "Waiting".into(), stage: Stage::Submitted },
+        Request2 {
+            id: Request2Id(1),
+            title: "Draft one".into(),
+            stage: Stage::Draft,
+        },
+        Request2 {
+            id: Request2Id(2),
+            title: "Waiting".into(),
+            stage: Stage::Submitted,
+        },
     ];
     Requests(Arc::new(RwLock::new(rows)))
 }
@@ -808,14 +1215,29 @@ async fn only_the_moves_a_user_may_make_from_the_current_state_are_offered() {
     let store = requests();
     let view = |identity: Identity, id: u8| {
         let router = requests_app(identity, MemoryAudit::default(), store.clone());
-        async move { send(&router, get(&format!("/_zeyn/screen/request_view?params=%7B%22id%22%3A{id}%7D"))).await.body }
+        async move {
+            send(
+                &router,
+                get(&format!(
+                    "/_zeyn/screen/request_view?params=%7B%22id%22%3A{id}%7D"
+                )),
+            )
+            .await
+            .body
+        }
     };
     let html = view(requester(), 1).await;
-    assert!(html.contains(r#"data-zeyn-transition="submit""#) && !html.contains("approve"), "{html}");
+    assert!(
+        html.contains(r#"data-zeyn-transition="submit""#) && !html.contains("approve"),
+        "{html}"
+    );
     let html = view(approver(), 1).await;
     assert!(!html.contains("data-zeyn-transition"), "{html}");
     let html = view(approver(), 2).await;
-    assert!(html.contains(r#"data-zeyn-transition="approve""#) && html.contains(r#"data-zeyn-transition="reject""#));
+    assert!(
+        html.contains(r#"data-zeyn-transition="approve""#)
+            && html.contains(r#"data-zeyn-transition="reject""#)
+    );
     assert!(html.contains("<strong>Submitted</strong>"));
 }
 
@@ -826,9 +1248,24 @@ async fn moves_are_checked_on_the_server_and_audited() {
     let ali = requests_app(requester(), audit.clone(), store.clone());
     let mehmet = requests_app(approver(), audit.clone(), store.clone());
 
-    assert_eq!(send(&ali, move_to(2, "approve", "")).await.status, StatusCode::FORBIDDEN);
-    assert_eq!(send(&mehmet, move_to(1, "approve", "")).await.status, StatusCode::CONFLICT);
-    assert_eq!(send(&mehmet, move_to(2, "archive", "")).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(
+        send(&ali, move_to(2, "approve", ""))
+            .await
+            .status,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        send(&mehmet, move_to(1, "approve", ""))
+            .await
+            .status,
+        StatusCode::CONFLICT
+    );
+    assert_eq!(
+        send(&mehmet, move_to(2, "archive", ""))
+            .await
+            .status,
+        StatusCode::NOT_FOUND
+    );
 
     let r = send(&ali, move_to(1, "submit", "  Please approve  ")).await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
@@ -836,13 +1273,19 @@ async fn moves_are_checked_on_the_server_and_audited() {
     let r = send(&mehmet, move_to(1, "approve", "OK")).await;
     assert_eq!(r.status, StatusCode::OK);
     assert_eq!(
-        send(&mehmet, move_to(1, "reject", "")).await.status,
+        send(&mehmet, move_to(1, "reject", ""))
+            .await
+            .status,
         StatusCode::CONFLICT,
         "an approved request cannot be rejected"
     );
     assert_eq!(store.0.read().unwrap()[0].stage, Stage::Approved);
 
-    let done: Vec<_> = audit.entries().into_iter().filter(|e| e.ok).collect();
+    let done: Vec<_> = audit
+        .entries()
+        .into_iter()
+        .filter(|e| e.ok)
+        .collect();
     assert_eq!(done.len(), 2);
     let t = done[0].transition.as_ref().unwrap();
     assert_eq!(
@@ -852,7 +1295,13 @@ async fn moves_are_checked_on_the_server_and_audited() {
     assert_eq!(done[0].user.as_deref(), Some("ali"));
     assert_eq!(done[1].transition.as_ref().unwrap().to, "Approved");
     assert_eq!(done[1].user.as_deref(), Some("mehmet"));
-    assert!(audit.entries().iter().filter(|e| !e.ok).all(|e| e.transition.is_none()));
+    assert!(
+        audit
+            .entries()
+            .iter()
+            .filter(|e| !e.ok)
+            .all(|e| e.transition.is_none())
+    );
 }
 
 #[tokio::test]
@@ -865,23 +1314,38 @@ async fn long_comments_are_refused() {
 
 #[test]
 fn workflow_definitions_are_checked() {
-    let bad = Workflow::new().transition("go", Stage::Draft, Stage::Submitted, "Bad Permission").transition(
-        "go",
-        Stage::Draft,
-        Stage::Approved,
-        "req.go",
-    );
+    let bad = Workflow::new()
+        .transition("go", Stage::Draft, Stage::Submitted, "Bad Permission")
+        .transition("go", Stage::Draft, Stage::Approved, "req.go");
     let problems = bad.check().unwrap_err();
-    assert!(problems.iter().any(|p| p.contains("invalid permission")));
-    assert!(problems.iter().any(|p| p.contains("declared twice")));
+    assert!(
+        problems
+            .iter()
+            .any(|p| p.contains("invalid permission"))
+    );
+    assert!(
+        problems
+            .iter()
+            .any(|p| p.contains("declared twice"))
+    );
     assert!(request_flow().check().is_ok());
 }
 
 #[tokio::test]
 async fn empty_masked_fields_can_be_filled_in_but_not_overwritten_later() {
     let router = hr_app(clerk(), MemoryAudit::default());
-    let form = send(&router, get("/_zeyn/screen/person?params=%7B%22id%22%3A4%7D")).await;
-    assert!(form.body.contains(r#"name="national_id""#) && !form.body.contains("data-zeyn-masked"), "{}", form.body);
+    let form = send(
+        &router,
+        get("/_zeyn/screen/person?params=%7B%22id%22%3A4%7D"),
+    )
+    .await;
+    assert!(
+        form.body
+            .contains(r#"name="national_id""#)
+            && !form.body.contains("data-zeyn-masked"),
+        "{}",
+        form.body
+    );
     let values = serde_json::json!({ "name": "New person", "national_id": "98765432100", "email": "new@example.com", "version": "1" });
     let r = send(
         &router,
@@ -892,9 +1356,20 @@ async fn empty_masked_fields_can_be_filled_in_but_not_overwritten_later() {
     )
     .await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
-    let form = send(&router, get("/_zeyn/screen/person?params=%7B%22id%22%3A4%7D")).await;
-    assert!(form.body.contains(r#"value="•••• 2100""#) && !form.body.contains("98765432100"), "{}", form.body);
-    let again = serde_json::json!({ "name": "New person", "national_id": "11111111111", "version": "2" });
+    let form = send(
+        &router,
+        get("/_zeyn/screen/person?params=%7B%22id%22%3A4%7D"),
+    )
+    .await;
+    assert!(
+        form.body
+            .contains(r#"value="•••• 2100""#)
+            && !form.body.contains("98765432100"),
+        "{}",
+        form.body
+    );
+    let again =
+        serde_json::json!({ "name": "New person", "national_id": "11111111111", "version": "2" });
     send(
         &router,
         post(
@@ -903,32 +1378,88 @@ async fn empty_masked_fields_can_be_filled_in_but_not_overwritten_later() {
         ),
     )
     .await;
-    let form = send(&router, get("/_zeyn/screen/person?params=%7B%22id%22%3A4%7D")).await;
-    assert!(form.body.contains(r#"value="•••• 2100""#), "{}", form.body);
+    let form = send(
+        &router,
+        get("/_zeyn/screen/person?params=%7B%22id%22%3A4%7D"),
+    )
+    .await;
+    assert!(
+        form.body
+            .contains(r#"value="•••• 2100""#),
+        "{}",
+        form.body
+    );
 }
 
 #[tokio::test]
 async fn every_response_carries_the_build_id_that_the_page_was_built_with() {
-    let router = crm_app(crm_writer(), MemoryAudit::default()).router().unwrap();
+    let router = crm_app(crm_writer(), MemoryAudit::default())
+        .router()
+        .unwrap();
     let page = send(&router, get("/customers")).await;
-    let id = page.headers.get("x-zeyn-build").unwrap().to_str().unwrap().to_string();
+    let id = page
+        .headers
+        .get("x-zeyn-build")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
     assert_eq!(id, zeyn::server::build_id());
-    assert!(!id.is_empty() && id.len() <= 64 && id.chars().all(|c| c.is_ascii_alphanumeric() || ".-_".contains(c)));
-    assert!(page.body.contains(&format!(r#"<meta name="zeyn-build" content="{id}">"#)));
-    assert!(page.body.contains("/_zeyn/enterprise.js"));
-    let grid = send(&router, post("/_zeyn/grid", serde_json::json!({ "screen": "customers", "node": 0 }))).await;
-    assert_eq!(grid.headers.get("x-zeyn-build").unwrap(), id.as_str());
+    assert!(
+        !id.is_empty()
+            && id.len() <= 64
+            && id
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || ".-_".contains(c))
+    );
+    assert!(
+        page.body
+            .contains(&format!(r#"<meta name="zeyn-build" content="{id}">"#))
+    );
+    assert!(
+        page.body
+            .contains("/_zeyn/enterprise.js")
+    );
+    let grid = send(
+        &router,
+        post(
+            "/_zeyn/grid",
+            serde_json::json!({ "screen": "customers", "node": 0 }),
+        ),
+    )
+    .await;
+    assert_eq!(
+        grid.headers
+            .get("x-zeyn-build")
+            .unwrap(),
+        id.as_str()
+    );
     let missing = send(&router, get("/nope")).await;
-    assert_eq!(missing.headers.get("x-zeyn-build").unwrap(), id.as_str());
-    let js = send(&router, Request::get("/_zeyn/enterprise.js").body(Body::empty()).unwrap()).await;
+    assert_eq!(
+        missing
+            .headers
+            .get("x-zeyn-build")
+            .unwrap(),
+        id.as_str()
+    );
+    let js = send(
+        &router,
+        Request::get("/_zeyn/enterprise.js")
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
     assert_eq!(js.status, StatusCode::OK);
     assert!(js.body.contains("x-zeyn-build"));
 }
 
 fn from(path: &str, ip: &str) -> Request<Body> {
-    let mut req = Request::get(path).body(Body::empty()).unwrap();
+    let mut req = Request::get(path)
+        .body(Body::empty())
+        .unwrap();
     let addr: std::net::SocketAddr = format!("{ip}:5000").parse().unwrap();
-    req.extensions_mut().insert(axum::extract::ConnectInfo(addr));
+    req.extensions_mut()
+        .insert(axum::extract::ConnectInfo(addr));
     req
 }
 
@@ -949,20 +1480,63 @@ async fn health_is_always_up_and_ready_reports_failed_checks_by_name_only() {
         .feature(Feature::new("x").screen(overview))
         .router()
         .unwrap();
-    let r = send(&router, Request::get("/billing/_zeyn/health").body(Body::empty()).unwrap()).await;
+    let r = send(
+        &router,
+        Request::get("/billing/_zeyn/health")
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
     assert_eq!((r.status, r.body.as_str()), (StatusCode::OK, "ok"));
-    assert_eq!(r.headers.get(header::CACHE_CONTROL).unwrap(), "no-store");
-    let r = send(&router, Request::get("/billing/_zeyn/ready").body(Body::empty()).unwrap()).await;
+    assert_eq!(
+        r.headers
+            .get(header::CACHE_CONTROL)
+            .unwrap(),
+        "no-store"
+    );
+    let r = send(
+        &router,
+        Request::get("/billing/_zeyn/ready")
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::SERVICE_UNAVAILABLE);
-    assert_eq!(r.json(), serde_json::json!({ "status": "not_ready", "failed": ["database"] }));
+    assert_eq!(
+        r.json(),
+        serde_json::json!({ "status": "not_ready", "failed": ["database"] })
+    );
     db_up.store(true, std::sync::atomic::Ordering::SeqCst);
-    let r = send(&router, Request::get("/billing/_zeyn/ready").body(Body::empty()).unwrap()).await;
-    assert_eq!(r.status, StatusCode::SERVICE_UNAVAILABLE, "the result is reused for a short time");
+    let r = send(
+        &router,
+        Request::get("/billing/_zeyn/ready")
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(
+        r.status,
+        StatusCode::SERVICE_UNAVAILABLE,
+        "the result is reused for a short time"
+    );
     tokio::time::sleep(zeyn::READY_CACHE + std::time::Duration::from_millis(50)).await;
-    let r = send(&router, Request::get("/billing/_zeyn/ready").body(Body::empty()).unwrap()).await;
+    let r = send(
+        &router,
+        Request::get("/billing/_zeyn/ready")
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::OK);
     assert_eq!(
-        send(&router, Request::get("/_zeyn/health").body(Body::empty()).unwrap()).await.status,
+        send(
+            &router,
+            Request::get("/_zeyn/health")
+                .body(Body::empty())
+                .unwrap()
+        )
+        .await
+        .status,
         StatusCode::NOT_FOUND
     );
 }
@@ -978,28 +1552,57 @@ async fn probes_skip_rate_limits_but_not_ip_rules_unless_allowed() {
     };
     let router = app().router().unwrap();
     for _ in 0..5 {
-        assert_eq!(send(&router, from("/_zeyn/health", "10.1.1.1")).await.status, StatusCode::OK);
+        assert_eq!(
+            send(&router, from("/_zeyn/health", "10.1.1.1"))
+                .await
+                .status,
+            StatusCode::OK
+        );
     }
-    assert_eq!(send(&router, from("/_zeyn/health", "192.168.1.5")).await.status, StatusCode::FORBIDDEN);
-
-    assert_eq!(send(&router, from("/_zeyn/ready", "10.1.1.2")).await.status, StatusCode::OK);
     assert_eq!(
-        send(&router, from("/_zeyn/ready", "10.1.1.2")).await.status,
+        send(&router, from("/_zeyn/health", "192.168.1.5"))
+            .await
+            .status,
+        StatusCode::FORBIDDEN
+    );
+
+    assert_eq!(
+        send(&router, from("/_zeyn/ready", "10.1.1.2"))
+            .await
+            .status,
+        StatusCode::OK
+    );
+    assert_eq!(
+        send(&router, from("/_zeyn/ready", "10.1.1.2"))
+            .await
+            .status,
         StatusCode::TOO_MANY_REQUESTS,
         "readiness runs checks, so it is limited unless asked from a probe address"
     );
 
-    let router = app().probe_ips(["192.168.1.0/24", "10.9.9.9"]).router().unwrap();
+    let router = app()
+        .probe_ips(["192.168.1.0/24", "10.9.9.9"])
+        .router()
+        .unwrap();
     for _ in 0..3 {
-        assert_eq!(send(&router, from("/_zeyn/ready", "192.168.1.5")).await.status, StatusCode::OK);
+        assert_eq!(
+            send(&router, from("/_zeyn/ready", "192.168.1.5"))
+                .await
+                .status,
+            StatusCode::OK
+        );
     }
     assert_eq!(
-        send(&router, from("/overview", "192.168.1.5")).await.status,
+        send(&router, from("/overview", "192.168.1.5"))
+            .await
+            .status,
         StatusCode::FORBIDDEN,
         "probe addresses only reach the probes"
     );
     assert_eq!(
-        send(&router, from("/_zeyn/health", "10.9.9.9")).await.status,
+        send(&router, from("/_zeyn/health", "10.9.9.9"))
+            .await
+            .status,
         StatusCode::FORBIDDEN,
         "denied stays denied"
     );
@@ -1008,12 +1611,22 @@ async fn probes_skip_rate_limits_but_not_ip_rules_unless_allowed() {
 #[tokio::test]
 async fn dev_latency_slows_calls_in_debug_builds_but_not_probes_or_assets() {
     let delay = std::time::Duration::from_millis(120);
-    let router = App::new("T").dev_latency(delay).feature(Feature::new("x").screen(overview)).router().unwrap();
+    let router = App::new("T")
+        .dev_latency(delay)
+        .feature(Feature::new("x").screen(overview))
+        .router()
+        .unwrap();
     let timed = |path: &'static str| {
         let router = router.clone();
         async move {
             let started = std::time::Instant::now();
-            send(&router, Request::get(path).body(Body::empty()).unwrap()).await;
+            send(
+                &router,
+                Request::get(path)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await;
             started.elapsed()
         }
     };
@@ -1034,8 +1647,14 @@ pub async fn close_account(id: i64) -> Result<i64> {
 
 #[screen(permission = "crm.write")]
 pub fn closing(params: CustomerParams, store: Customers) -> Result<Screen> {
-    let c = store.get(params.id).ok_or(Error::NotFound)?;
-    Ok(Screen::window("Close").body(Form::of(c).field(Customer::name).submit("Close", save_after_reauth)))
+    let c = store
+        .get(params.id)
+        .ok_or(Error::NotFound)?;
+    Ok(Screen::window("Close").body(
+        Form::of(c)
+            .field(Customer::name)
+            .submit("Close", save_after_reauth),
+    ))
 }
 
 #[action(permission = "crm.write", reauth)]
@@ -1046,11 +1665,19 @@ pub async fn save_after_reauth(c: Valid<Customer>) -> Result<i64> {
 fn reauth_app(identity: Identity) -> Router {
     App::new("T")
         .service(Customers::seeded())
-        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .auth(move |h: &HeaderMap| {
+            h.contains_key("x-user")
+                .then(|| identity.clone())
+        })
         .login_url("https://sso.example.com/login")
         .idle_timeout(std::time::Duration::from_secs(900))
         .reauth_within(std::time::Duration::from_secs(300))
-        .feature(Feature::new("crm").screen(customers).screen(closing).api(close_account))
+        .feature(
+            Feature::new("crm")
+                .screen(customers)
+                .screen(closing)
+                .api(close_account),
+        )
         .router()
         .unwrap()
 }
@@ -1068,13 +1695,30 @@ async fn reauth_actions_need_a_recent_sign_in_reported_by_the_identity_provider(
         let r = send(&router, post("/_zeyn/form", form.clone())).await;
         assert_eq!(r.status, StatusCode::UNAUTHORIZED);
         assert_eq!(r.json()["error"], "reauth_required");
-        let r = send(&router, api("/api/v1/crm/close_account", serde_json::json!(5))).await;
+        let r = send(
+            &router,
+            api("/api/v1/crm/close_account", serde_json::json!(5)),
+        )
+        .await;
         assert_eq!(r.status, StatusCode::UNAUTHORIZED);
         assert_eq!(r.json()["type"], "urn:zeyn:problem:reauth_required");
     }
     let router = reauth_app(crm_writer().with_authenticated_at(now.add_ms(-60_000)));
-    assert_eq!(send(&router, post("/_zeyn/form", form)).await.status, StatusCode::OK);
-    assert_eq!(send(&router, api("/api/v1/crm/close_account", serde_json::json!(5))).await.json(), 5);
+    assert_eq!(
+        send(&router, post("/_zeyn/form", form))
+            .await
+            .status,
+        StatusCode::OK
+    );
+    assert_eq!(
+        send(
+            &router,
+            api("/api/v1/crm/close_account", serde_json::json!(5))
+        )
+        .await
+        .json(),
+        5
+    );
 }
 
 #[tokio::test]
@@ -1084,12 +1728,29 @@ async fn forward_auth_reads_the_sign_in_time_and_dev_auth_is_always_fresh() {
     let mut h = HeaderMap::new();
     h.insert("x-user", "ayse".parse().unwrap());
     h.insert("x-auth-time", "1700000000".parse().unwrap());
-    assert_eq!(auth.authenticate(&h).unwrap().authenticated_at, Some(DateTime::from_unix_ms(1_700_000_000_000)));
+    assert_eq!(
+        auth.authenticate(&h)
+            .unwrap()
+            .authenticated_at,
+        Some(DateTime::from_unix_ms(1_700_000_000_000))
+    );
     h.insert("x-auth-time", "2024-01-05T11:30:00Z".parse().unwrap());
-    assert_eq!(auth.authenticate(&h).unwrap().authenticated_at, DateTime::parse("2024-01-05T11:30:00Z"));
+    assert_eq!(
+        auth.authenticate(&h)
+            .unwrap()
+            .authenticated_at,
+        DateTime::parse("2024-01-05T11:30:00Z")
+    );
     h.insert("x-auth-time", "yesterday".parse().unwrap());
-    assert_eq!(auth.authenticate(&h).unwrap().authenticated_at, None);
-    let dev = DevAuth::superuser("dev").authenticate(&HeaderMap::new()).unwrap();
+    assert_eq!(
+        auth.authenticate(&h)
+            .unwrap()
+            .authenticated_at,
+        None
+    );
+    let dev = DevAuth::superuser("dev")
+        .authenticate(&HeaderMap::new())
+        .unwrap();
     assert!(dev.authenticated_at.is_some());
 }
 
@@ -1097,11 +1758,24 @@ async fn forward_auth_reads_the_sign_in_time_and_dev_auth_is_always_fresh() {
 async fn the_page_tells_the_runtime_about_the_idle_timeout_and_keepalive_needs_csrf() {
     let router = reauth_app(crm_writer());
     let page = send(&router, get("/customers")).await;
-    let start = page.body.find(r#"<meta name="zeyn-session" content=""#).expect("session meta");
+    let start = page
+        .body
+        .find(r#"<meta name="zeyn-session" content=""#)
+        .expect("session meta");
     let meta = &page.body[start..start + 300];
-    assert!(meta.contains("&quot;idle&quot;:900") && meta.contains("&quot;warn&quot;:60"), "{meta}");
+    assert!(
+        meta.contains("&quot;idle&quot;:900") && meta.contains("&quot;warn&quot;:60"),
+        "{meta}"
+    );
     assert!(meta.contains("https://sso.example.com/login"));
-    let r = send(&router, Request::post("/_zeyn/keepalive").header("x-user", "1").body(Body::empty()).unwrap()).await;
+    let r = send(
+        &router,
+        Request::post("/_zeyn/keepalive")
+            .header("x-user", "1")
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
     assert_eq!(r.status, StatusCode::FORBIDDEN);
     let r = send(&router, post("/_zeyn/keepalive", serde_json::json!({}))).await;
     assert_eq!(r.status, StatusCode::NO_CONTENT);
@@ -1110,20 +1784,35 @@ async fn the_page_tells_the_runtime_about_the_idle_timeout_and_keepalive_needs_c
         .feature(Feature::new("x").screen(overview))
         .router()
         .unwrap();
-    let r = send(&anonymous, Request::get("/overview").body(Body::empty()).unwrap()).await;
+    let r = send(
+        &anonymous,
+        Request::get("/overview")
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
     assert!(!r.body.contains("zeyn-session"));
 }
 
 #[test]
 fn csv_parsing_handles_bom_separators_quotes_and_turkish_text() {
     use zeyn::{CsvError, parse_csv};
-    assert_eq!(parse_csv("a,b\n1,2").unwrap(), vec![vec!["a", "b"], vec!["1", "2"]]);
+    assert_eq!(
+        parse_csv("a,b\n1,2").unwrap(),
+        vec![vec!["a", "b"], vec!["1", "2"]]
+    );
     assert_eq!(
         parse_csv("\u{feff}ad;şehir\r\nÇağrı;İĞÜŞÖ\r\n\r\n").unwrap(),
         vec![vec!["ad", "şehir"], vec!["Çağrı", "İĞÜŞÖ"]]
     );
-    assert_eq!(parse_csv("a,b\n\"x, y\",\"say \"\"hi\"\"\"\n").unwrap()[1], vec!["x, y", "say \"hi\""]);
-    assert_eq!(parse_csv("a;b\n\"line1\nline2\";2").unwrap()[1], vec!["line1\nline2", "2"]);
+    assert_eq!(
+        parse_csv("a,b\n\"x, y\",\"say \"\"hi\"\"\"\n").unwrap()[1],
+        vec!["x, y", "say \"hi\""]
+    );
+    assert_eq!(
+        parse_csv("a;b\n\"line1\nline2\";2").unwrap()[1],
+        vec!["line1\nline2", "2"]
+    );
     assert_eq!(parse_csv("a\tb\n1\t2").unwrap()[1], vec!["1", "2"]);
     assert_eq!(parse_csv("a,b\n\"open,2"), Err(CsvError::UnclosedQuote));
 }
@@ -1150,7 +1839,10 @@ pub fn customer_import() -> Screen {
 fn import_app(identity: Identity, audit: MemoryAudit, store: Customers) -> Router {
     App::new("T")
         .service(store)
-        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .auth(move |h: &HeaderMap| {
+            h.contains_key("x-user")
+                .then(|| identity.clone())
+        })
         .interceptor(AuditLog(audit))
         .feature(Feature::new("crm").screen(customer_import))
         .router()
@@ -1174,16 +1866,38 @@ async fn csv_rows_are_validated_with_the_model_rules_and_only_valid_rows_are_imp
     let audit = MemoryAudit::default();
     let router = import_app(importer(), audit.clone(), store.clone());
     let page = send(&router, get("/import")).await;
-    assert!(page.body.contains(r#"accept=".csv,text/csv"#) && page.body.contains("Name, Credit"));
+    assert!(
+        page.body
+            .contains(r#"accept=".csv,text/csv"#)
+            && page.body.contains("Name, Credit")
+    );
 
     let csv = "\u{feff}NAME;credit\r\nŞirin Gıda A.Ş.;1250.50\r\n;10\r\n=HYPERLINK(\"x\");abc\r\n";
     let r = send(&router, import_call(0, csv, false)).await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
     let j = r.json();
-    assert_eq!((j["total"].as_u64(), j["valid"].as_u64(), j["invalid"].as_u64()), (Some(3), Some(1), Some(2)));
+    assert_eq!(
+        (
+            j["total"].as_u64(),
+            j["valid"].as_u64(),
+            j["invalid"].as_u64()
+        ),
+        (Some(3), Some(1), Some(2))
+    );
     assert_eq!(j["can_import"], true);
-    assert!(j["preview"].as_str().unwrap().contains("Şirin Gıda A.Ş."));
-    assert!(j["preview"].as_str().unwrap().contains("=HYPERLINK(&quot;x&quot;)"), "preview html is escaped");
+    assert!(
+        j["preview"]
+            .as_str()
+            .unwrap()
+            .contains("Şirin Gıda A.Ş.")
+    );
+    assert!(
+        j["preview"]
+            .as_str()
+            .unwrap()
+            .contains("=HYPERLINK(&quot;x&quot;)"),
+        "preview html is escaped"
+    );
     let fields: Vec<(u64, &str)> = j["errors"]
         .as_array()
         .unwrap()
@@ -1193,12 +1907,20 @@ async fn csv_rows_are_validated_with_the_model_rules_and_only_valid_rows_are_imp
     assert_eq!(fields, [(2, "name"), (3, "credit")]);
     let report = j["report"].as_str().unwrap();
     assert!(report.starts_with("\u{feff}Row;Field;Message\r\n"));
-    assert!(!report.lines().any(|l| l.split(';').any(|c| c.starts_with('='))), "{report}");
+    assert!(
+        !report
+            .lines()
+            .any(|l| l.split(';').any(|c| c.starts_with('='))),
+        "{report}"
+    );
     assert_eq!(store.0.read().unwrap().len(), 5, "a preview saves nothing");
 
     let r = send(&router, import_call(0, csv, true)).await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.body);
-    assert_eq!((r.json()["imported"].as_u64(), r.json()["skipped"].as_u64()), (Some(1), Some(2)));
+    assert_eq!(
+        (r.json()["imported"].as_u64(), r.json()["skipped"].as_u64()),
+        (Some(1), Some(2))
+    );
     let rows = store.0.read().unwrap().clone();
     assert_eq!(rows.len(), 6);
     assert_eq!(rows[5].name, "Şirin Gıda A.Ş.");
@@ -1211,16 +1933,37 @@ async fn csv_rows_are_validated_with_the_model_rules_and_only_valid_rows_are_imp
 #[tokio::test]
 async fn imports_check_permission_columns_row_limits_and_all_or_nothing() {
     let store = Customers::seeded();
-    let reader = import_app(Identity::user("x").with_permissions(["crm.read"]), MemoryAudit::default(), store.clone());
-    assert_eq!(send(&reader, import_call(0, "name\nA", false)).await.status, StatusCode::FORBIDDEN);
-    assert_eq!(send(&reader, import_call(0, "name\nA", true)).await.status, StatusCode::FORBIDDEN);
+    let reader = import_app(
+        Identity::user("x").with_permissions(["crm.read"]),
+        MemoryAudit::default(),
+        store.clone(),
+    );
+    assert_eq!(
+        send(&reader, import_call(0, "name\nA", false))
+            .await
+            .status,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        send(&reader, import_call(0, "name\nA", true))
+            .await
+            .status,
+        StatusCode::FORBIDDEN
+    );
 
     let router = import_app(importer(), MemoryAudit::default(), store.clone());
     let r = send(&router, import_call(0, "name,secret\nA,1", false)).await;
     assert_eq!(r.status, StatusCode::UNPROCESSABLE_ENTITY);
-    assert!(r.body.contains("Unknown column: secret."));
+    assert!(
+        r.body
+            .contains("Unknown column: secret.")
+    );
     let r = send(&router, import_call(0, "name,score\nA,1", false)).await;
-    assert_eq!(r.status, StatusCode::UNPROCESSABLE_ENTITY, "read only fields cannot be imported");
+    assert_eq!(
+        r.status,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "read only fields cannot be imported"
+    );
     let r = send(&router, import_call(0, "name\nA\nB\nC\nD", false)).await;
     assert!(r.body.contains("more than 3 rows"));
 
@@ -1230,7 +1973,11 @@ async fn imports_check_permission_columns_row_limits_and_all_or_nothing() {
     let r = send(&router, import_call(1, mixed, true)).await;
     assert_eq!(r.status, StatusCode::UNPROCESSABLE_ENTITY);
     assert_eq!(store.0.read().unwrap().len(), 5);
-    let r = send(&router, import_call(1, "name,credit\nGood,1\nAlso good,2", true)).await;
+    let r = send(
+        &router,
+        import_call(1, "name,credit\nGood,1\nAlso good,2", true),
+    )
+    .await;
     assert_eq!(r.json()["imported"], 2);
 }
 
@@ -1261,7 +2008,10 @@ mod jobs {
     }
 
     fn status(jobs: &Jobs, name: &str) -> zeyn::JobStatus {
-        jobs.status().into_iter().find(|s| s.name == name).unwrap()
+        jobs.status()
+            .into_iter()
+            .find(|s| s.name == name)
+            .unwrap()
     }
 
     #[tokio::test]
@@ -1270,20 +2020,30 @@ mod jobs {
         let (t, r) = (ticks.clone(), ticks.clone());
         let app = App::new("T")
             .auth(|h: &HeaderMap| {
-                h.contains_key("x-user").then(|| Identity::user("op").with_permissions(["ops.run", "ops.jobs"]))
+                h.contains_key("x-user")
+                    .then(|| Identity::user("op").with_permissions(["ops.run", "ops.jobs"]))
             })
             .jobs_permission("ops.jobs")
-            .job("tick", Schedule::every(Duration::from_millis(20)), move |_ctx: Ctx| {
-                let t = t.clone();
-                async move {
-                    t.0.fetch_add(1, Ordering::SeqCst);
-                    Ok(())
-                }
-            })
+            .job(
+                "tick",
+                Schedule::every(Duration::from_millis(20)),
+                move |_ctx: Ctx| {
+                    let t = t.clone();
+                    async move {
+                        t.0.fetch_add(1, Ordering::SeqCst);
+                        Ok(())
+                    }
+                },
+            )
             .job("rebuild", Schedule::manual(), move |ctx: Ctx| {
                 let r = r.clone();
                 async move {
-                    r.1.write().unwrap().push(ctx.identity().user.clone().unwrap_or_default());
+                    r.1.write().unwrap().push(
+                        ctx.identity()
+                            .user
+                            .clone()
+                            .unwrap_or_default(),
+                    );
                     Ok(())
                 }
             })
@@ -1292,7 +2052,11 @@ mod jobs {
         wait_for(|| ticks.0.load(Ordering::SeqCst) >= 3).await;
         assert!(ticks.1.read().unwrap().is_empty());
 
-        let r = send(&router, api("/api/v1/ops/start_rebuild", serde_json::Value::Null)).await;
+        let r = send(
+            &router,
+            api("/api/v1/ops/start_rebuild", serde_json::Value::Null),
+        )
+        .await;
         assert_eq!(r.status, StatusCode::OK, "{}", r.body);
         wait_for(|| ticks.1.read().unwrap().len() == 1).await;
         assert_eq!(ticks.1.read().unwrap()[0], "job:rebuild");
@@ -1300,9 +2064,20 @@ mod jobs {
         let r = send(&router, get("/_zeyn/jobs")).await;
         assert_eq!(r.status, StatusCode::OK);
         let body = r.json();
-        let names: Vec<&str> = body["jobs"].as_array().unwrap().iter().map(|j| j["name"].as_str().unwrap()).collect();
+        let names: Vec<&str> = body["jobs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|j| j["name"].as_str().unwrap())
+            .collect();
         assert_eq!(names, ["tick", "rebuild"]);
-        let r = send(&router, Request::get("/_zeyn/jobs").body(Body::empty()).unwrap()).await;
+        let r = send(
+            &router,
+            Request::get("/_zeyn/jobs")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await;
         assert_eq!(r.status, StatusCode::FORBIDDEN);
     }
 
@@ -1311,27 +2086,49 @@ mod jobs {
         let jobs = Jobs::default();
         let tries = Arc::new(AtomicUsize::new(0));
         let t = tries.clone();
-        jobs.add("flaky", Schedule::manual().retry(3, Duration::from_millis(10)), move |_ctx: Ctx| {
-            let n = t.fetch_add(1, Ordering::SeqCst);
-            async move { if n < 2 { Err(Error::Internal("database password=secret unreachable".into())) } else { Ok(()) } }
-        });
-        jobs.add("broken", Schedule::manual().retry(1, Duration::from_millis(5)), |_ctx: Ctx| async {
-            Err(Error::Conflict)
-        });
+        jobs.add(
+            "flaky",
+            Schedule::manual().retry(3, Duration::from_millis(10)),
+            move |_ctx: Ctx| {
+                let n = t.fetch_add(1, Ordering::SeqCst);
+                async move {
+                    if n < 2 {
+                        Err(Error::Internal(
+                            "database password=secret unreachable".into(),
+                        ))
+                    } else {
+                        Ok(())
+                    }
+                }
+            },
+        );
+        jobs.add(
+            "broken",
+            Schedule::manual().retry(1, Duration::from_millis(5)),
+            |_ctx: Ctx| async { Err(Error::Conflict) },
+        );
         let started = std::time::Instant::now();
         jobs.start(|_| Ctx::for_tests(Identity::user("job"), zeyn::Services::default()));
         jobs.trigger("flaky").unwrap();
         jobs.trigger("broken").unwrap();
         wait_for(|| {
-            status(&jobs, "flaky").state == JobState::Succeeded && status(&jobs, "broken").state == JobState::Failed
+            status(&jobs, "flaky").state == JobState::Succeeded
+                && status(&jobs, "broken").state == JobState::Failed
         })
         .await;
-        assert!(started.elapsed() >= Duration::from_millis(30), "waits 10 then 20 ms between tries");
+        assert!(
+            started.elapsed() >= Duration::from_millis(30),
+            "waits 10 then 20 ms between tries"
+        );
         let s = status(&jobs, "flaky");
         assert_eq!((s.runs, s.failures, s.last_error), (3, 2, None));
         let b = status(&jobs, "broken");
         assert_eq!((b.runs, b.failures, b.last_error), (2, 2, Some("conflict")));
-        assert!(!serde_json::to_string(&jobs.status()).unwrap().contains("secret"));
+        assert!(
+            !serde_json::to_string(&jobs.status())
+                .unwrap()
+                .contains("secret")
+        );
         assert!(matches!(jobs.trigger("missing"), Err(Error::NotFound)));
     }
 
@@ -1360,9 +2157,16 @@ mod jobs {
             jobs.trigger(name).unwrap();
         }
         wait_for(|| done.load(Ordering::SeqCst) >= 1).await;
-        assert!(jobs.shutdown(Duration::from_secs(2)).await, "the running job finishes");
+        assert!(
+            jobs.shutdown(Duration::from_secs(2))
+                .await,
+            "the running job finishes"
+        );
         assert_eq!(most.load(Ordering::SeqCst), 1);
-        assert!(done.load(Ordering::SeqCst) < 3, "queued jobs do not start after shutdown");
+        assert!(
+            done.load(Ordering::SeqCst) < 3,
+            "queued jobs do not start after shutdown"
+        );
         assert!(matches!(jobs.trigger("a"), Err(Error::Conflict)));
     }
 }
@@ -1375,8 +2179,13 @@ fn masked_values_never_reach_html_through_custom_cells_or_inline_editing() {
         .editable()
         .cell(|v: &String, _r: &zeyn::Render| format!("RAW:{v}"))
         .edit_with(save_person);
-    let row =
-        Person { id: PersonId(1), name: "Ayse".into(), national_id: "12345678901".into(), email: None, version: 1 };
+    let row = Person {
+        id: PersonId(1),
+        name: "Ayse".into(),
+        national_id: "12345678901".into(),
+        email: None,
+        version: 1,
+    };
     let html = grid.rows_html(&[row]);
     assert!(!html.contains("12345678901"), "{html}");
     assert!(!html.contains("RAW:"), "{html}");
@@ -1395,11 +2204,22 @@ async fn lazy_tabs_mask_like_the_page_and_let_permitted_users_reveal() {
             .and_then(|r| r.split('"').next())
             .expect("a lazy tab")
             .to_string();
-        let node =
-            send(&router, post("/_zeyn/node", serde_json::json!({ "screen": "people_tabs", "node": lazy }))).await;
+        let node = send(
+            &router,
+            post(
+                "/_zeyn/node",
+                serde_json::json!({ "screen": "people_tabs", "node": lazy }),
+            ),
+        )
+        .await;
         assert_eq!(node.status, StatusCode::OK, "{}", node.body);
         assert!(node.body.contains("•••• 8901"), "{}", node.body);
         assert!(!node.body.contains("12345678901"));
-        assert_eq!(node.body.contains("data-zeyn-reveal"), revealable, "{}", node.body);
+        assert_eq!(
+            node.body.contains("data-zeyn-reveal"),
+            revealable,
+            "{}",
+            node.body
+        );
     }
 }

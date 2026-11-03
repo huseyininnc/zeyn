@@ -17,13 +17,17 @@ pub struct Rep {
 }
 
 static REPS: LazyLock<Vec<Rep>> = LazyLock::new(|| {
-    let names = ["Ada", "Can", "Deniz", "Ece", "Mert", "Nil", "Ozan", "Selin", "Tuna", "Zeynep"];
+    let names = [
+        "Ada", "Can", "Deniz", "Ece", "Mert", "Nil", "Ozan", "Selin", "Tuna", "Zeynep",
+    ];
     (1..=10_000)
         .map(|i| Rep {
             id: RepId(i),
             name: format!("{} {i}", names[(i % 10) as usize]),
             sales: (i * 7_919) % 120_000,
-            weeks: (0..12).map(|k| ((i * 31 + k * 17) % 90 + 10) as f64).collect(),
+            weeks: (0..12)
+                .map(|k| ((i * 31 + k * 17) % 90 + 10) as f64)
+                .collect(),
         })
         .collect()
 });
@@ -36,7 +40,14 @@ pub async fn search_reps(q: DataQuery) -> Result<Page<Rep>> {
 
 #[screen(route = "/charts", permission = "stock.product.read")]
 pub fn charts() -> Screen {
-    let months = [t!("ui.m1"), t!("ui.m2"), t!("ui.m3"), t!("ui.m4"), t!("ui.m5"), t!("ui.m6")];
+    let months = [
+        t!("ui.m1"),
+        t!("ui.m2"),
+        t!("ui.m3"),
+        t!("ui.m4"),
+        t!("ui.m5"),
+        t!("ui.m6"),
+    ];
     let card = |c: Chart| Card::new().add(c);
     Screen::new(t!("charts.title")).body(
         Stack::new()
@@ -74,8 +85,14 @@ pub fn charts() -> Screen {
                     .col(card(
                         Chart::combo(t!("charts.margin"))
                             .labels(months.clone())
-                            .series(t!("charts.sales"), [120.0, 98.0, 143.0, 160.0, 151.0, 189.0])
-                            .line_series(t!("charts.margin_pct"), [18.0, 14.0, 21.0, 22.0, 19.0, 24.0])
+                            .series(
+                                t!("charts.sales"),
+                                [120.0, 98.0, 143.0, 160.0, 151.0, 189.0],
+                            )
+                            .line_series(
+                                t!("charts.margin_pct"),
+                                [18.0, 14.0, 21.0, 22.0, 19.0, 24.0],
+                            )
                             .right_axis(),
                     )),
             )
@@ -84,18 +101,29 @@ pub fn charts() -> Screen {
                     .col(card(
                         Chart::area(t!("charts.visits"))
                             .labels(months)
-                            .series(t!("charts.visits"), [420.0, 510.0, 470.0, 630.0, 700.0, 660.0]),
+                            .series(
+                                t!("charts.visits"),
+                                [420.0, 510.0, 470.0, 630.0, 700.0, 660.0],
+                            ),
                     ))
                     .col(card(
                         Chart::scatter(t!("charts.price_units"))
                             .decimals(1)
-                            .points(t!("charts.tea"), [(1.5, 40.0), (2.0, 34.0), (2.5, 22.0), (3.0, 18.0)])
+                            .points(
+                                t!("charts.tea"),
+                                [(1.5, 40.0), (2.0, 34.0), (2.5, 22.0), (3.0, 18.0)],
+                            )
                             .points(t!("charts.coffee"), [(3.5, 30.0), (4.0, 26.0), (5.5, 12.0)]),
                     )),
             )
             .add(
                 Row::new()
-                    .col(card(Chart::gauge(t!("charts.capacity")).value(72.0).range(0.0, 100.0).target(85.0)))
+                    .col(card(
+                        Chart::gauge(t!("charts.capacity"))
+                            .value(72.0)
+                            .range(0.0, 100.0)
+                            .target(85.0),
+                    ))
                     .col(card(
                         Chart::funnel(t!("charts.funnel"))
                             .labels([
@@ -108,19 +136,21 @@ pub fn charts() -> Screen {
                     )),
             )
             .add(
-                Card::new().title(t!("charts.reps")).add(
-                    DataGrid::of(search_reps)
-                        .paging(Paging::virtual_scroll())
-                        .column(Rep::name)
-                        .flex(1)
-                        .filter()
-                        .column(Rep::sales)
-                        .width(220)
-                        .cell(BulletCell::new(80_000.0, 120_000.0))
-                        .column(Rep::weeks)
-                        .width(120)
-                        .cell(SparklineCell::new()),
-                ),
+                Card::new()
+                    .title(t!("charts.reps"))
+                    .add(
+                        DataGrid::of(search_reps)
+                            .paging(Paging::virtual_scroll())
+                            .column(Rep::name)
+                            .flex(1)
+                            .filter()
+                            .column(Rep::sales)
+                            .width(220)
+                            .cell(BulletCell::new(80_000.0, 120_000.0))
+                            .column(Rep::weeks)
+                            .width(120)
+                            .cell(SparklineCell::new()),
+                    ),
             ),
     )
 }
@@ -128,5 +158,8 @@ pub fn charts() -> Screen {
 pub fn feature() -> Feature {
     Feature::new("charts")
         .screen(charts)
-        .menu(|m| m.group(t!("menu.charts"), Icon::Chart).item(t!("charts.title"), charts))
+        .menu(|m| {
+            m.group(t!("menu.charts"), Icon::Chart)
+                .item(t!("charts.title"), charts)
+        })
 }

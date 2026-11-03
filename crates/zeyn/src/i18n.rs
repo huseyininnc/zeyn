@@ -29,12 +29,23 @@ pub enum Text {
 impl Text {
     /// Catalog key. Prefer the `t!` macro, which checks the key at compile time.
     pub fn key(key: impl Into<Cow<'static, str>>) -> Self {
-        Text::Key { key: key.into(), fallback: None, args: Vec::new() }
+        Text::Key {
+            key: key.into(),
+            fallback: None,
+            args: Vec::new(),
+        }
     }
 
     /// Catalog key with a text to use when no catalog has it.
-    pub fn key_or(key: impl Into<Cow<'static, str>>, fallback: impl Into<Cow<'static, str>>) -> Self {
-        Text::Key { key: key.into(), fallback: Some(fallback.into()), args: Vec::new() }
+    pub fn key_or(
+        key: impl Into<Cow<'static, str>>,
+        fallback: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Text::Key {
+            key: key.into(),
+            fallback: Some(fallback.into()),
+            args: Vec::new(),
+        }
     }
 
     /// Fills `{name}` in the message. No effect on literals.
@@ -82,13 +93,21 @@ impl NumberFormat {
     /// Format for a locale such as `tr`, `tr-TR` or `en-US`.
     pub fn for_locale(locale: &str) -> Self {
         match primary(locale) {
-            "tr" | "de" | "es" | "it" | "nl" | "pt" | "id" => {
-                NumberFormat { decimal: ',', group: '.', symbol_first: false }
-            }
-            "fr" | "ru" | "pl" | "cs" | "sv" | "fi" | "nb" | "uk" => {
-                NumberFormat { decimal: ',', group: '\u{202f}', symbol_first: false }
-            }
-            _ => NumberFormat { decimal: '.', group: ',', symbol_first: true },
+            "tr" | "de" | "es" | "it" | "nl" | "pt" | "id" => NumberFormat {
+                decimal: ',',
+                group: '.',
+                symbol_first: false,
+            },
+            "fr" | "ru" | "pl" | "cs" | "sv" | "fi" | "nb" | "uk" => NumberFormat {
+                decimal: ',',
+                group: '\u{202f}',
+                symbol_first: false,
+            },
+            _ => NumberFormat {
+                decimal: '.',
+                group: ',',
+                symbol_first: true,
+            },
         }
     }
 
@@ -99,7 +118,10 @@ impl NumberFormat {
 }
 
 fn primary(locale: &str) -> &str {
-    locale.split(['-', '_']).next().unwrap_or(locale)
+    locale
+        .split(['-', '_'])
+        .next()
+        .unwrap_or(locale)
 }
 
 /// The framework's own catalogs compiled into this build: English and Turkish always, the other
@@ -146,7 +168,11 @@ impl I18n {
     /// are read when the app adds a catalog for them, so a build with `lang-all` keeps in memory
     /// only the languages the app offers.
     pub fn new(default: &str) -> Self {
-        let mut i18n = I18n { default: default.to_string(), locales: Vec::new(), catalogs: HashMap::new() };
+        let mut i18n = I18n {
+            default: default.to_string(),
+            locales: Vec::new(),
+            catalogs: HashMap::new(),
+        };
         for locale in ["en", "tr", primary(default)] {
             i18n.load_builtin(locale);
         }
@@ -160,8 +186,12 @@ impl I18n {
         if self.catalogs.contains_key(locale) {
             return;
         }
-        if let Some((_, json)) = BUILTIN_CATALOGS.iter().find(|(l, _)| *l == locale) {
-            self.merge(locale, json, false).expect("built in catalog");
+        if let Some((_, json)) = BUILTIN_CATALOGS
+            .iter()
+            .find(|(l, _)| *l == locale)
+        {
+            self.merge(locale, json, false)
+                .expect("built in catalog");
         }
     }
 
@@ -171,7 +201,9 @@ impl I18n {
     /// assert!(zeyn::I18n::builtin_locales().any(|l| l == "tr"));
     /// ```
     pub fn builtin_locales() -> impl Iterator<Item = &'static str> {
-        BUILTIN_CATALOGS.iter().map(|(locale, _)| *locale)
+        BUILTIN_CATALOGS
+            .iter()
+            .map(|(locale, _)| *locale)
     }
 
     /// Shared catalogs with only the built in messages, default English.
@@ -206,9 +238,12 @@ impl I18n {
         if offered {
             self.load_builtin(locale);
         }
-        let value: serde_json::Value =
-            serde_json::from_str(json).map_err(|e| format!("catalog `{locale}` is not valid JSON: {e}"))?;
-        let catalog = self.catalogs.entry(locale.to_string()).or_default();
+        let value: serde_json::Value = serde_json::from_str(json)
+            .map_err(|e| format!("catalog `{locale}` is not valid JSON: {e}"))?;
+        let catalog = self
+            .catalogs
+            .entry(locale.to_string())
+            .or_default();
         flatten("", &value, catalog).map_err(|e| format!("catalog `{locale}`: {e}"))?;
         if offered && !self.locales.iter().any(|l| l == locale) {
             self.locales.push(locale.to_string());
@@ -229,7 +264,11 @@ impl I18n {
     pub fn lookup(&self, locale: &str, key: &str) -> Option<&str> {
         [locale, primary(locale), self.default.as_str()]
             .into_iter()
-            .find_map(|l| self.catalogs.get(l).and_then(|c| c.get(key)))
+            .find_map(|l| {
+                self.catalogs
+                    .get(l)
+                    .and_then(|c| c.get(key))
+            })
             .map(String::as_str)
     }
 
@@ -237,8 +276,15 @@ impl I18n {
     pub fn text(&self, locale: &str, text: &Text) -> String {
         match text {
             Text::Literal(s) => s.to_string(),
-            Text::Key { key, fallback, args } => {
-                let template = self.lookup(locale, key).or(fallback.as_deref()).unwrap_or(key);
+            Text::Key {
+                key,
+                fallback,
+                args,
+            } => {
+                let template = self
+                    .lookup(locale, key)
+                    .or(fallback.as_deref())
+                    .unwrap_or(key);
                 let mut out = template.to_string();
                 for (name, value) in args {
                     out = out.replace(&format!("{{{name}}}"), &self.text(locale, value));
@@ -259,17 +305,30 @@ impl I18n {
             .filter_map(|part| {
                 let mut pieces = part.trim().split(';');
                 let tag = pieces.next()?.trim();
-                let q =
-                    pieces.find_map(|p| p.trim().strip_prefix("q=").and_then(|q| q.parse::<f32>().ok())).unwrap_or(1.0);
+                let q = pieces
+                    .find_map(|p| {
+                        p.trim()
+                            .strip_prefix("q=")
+                            .and_then(|q| q.parse::<f32>().ok())
+                    })
+                    .unwrap_or(1.0);
                 (!tag.is_empty() && q > 0.0).then_some((q, tag))
             })
             .collect();
         wanted.sort_by(|a, b| b.0.total_cmp(&a.0));
         for (_, tag) in wanted {
-            if let Some(l) = self.locales.iter().find(|l| l.eq_ignore_ascii_case(tag)) {
+            if let Some(l) = self
+                .locales
+                .iter()
+                .find(|l| l.eq_ignore_ascii_case(tag))
+            {
                 return l.clone();
             }
-            if let Some(l) = self.locales.iter().find(|l| primary(l).eq_ignore_ascii_case(primary(tag))) {
+            if let Some(l) = self
+                .locales
+                .iter()
+                .find(|l| primary(l).eq_ignore_ascii_case(primary(tag)))
+            {
                 return l.clone();
             }
         }
@@ -278,9 +337,15 @@ impl I18n {
 
     /// Keys that exist in the default locale but are missing in another offered locale.
     pub fn missing_keys(&self) -> Vec<(String, String)> {
-        let Some(base) = self.catalogs.get(&self.default) else { return Vec::new() };
+        let Some(base) = self.catalogs.get(&self.default) else {
+            return Vec::new();
+        };
         let mut missing = Vec::new();
-        for locale in self.locales.iter().filter(|l| **l != self.default) {
+        for locale in self
+            .locales
+            .iter()
+            .filter(|l| **l != self.default)
+        {
             let catalog = self.catalogs.get(locale);
             for key in base.keys() {
                 if !catalog.is_some_and(|c| c.contains_key(key)) {
@@ -293,11 +358,19 @@ impl I18n {
     }
 }
 
-fn flatten(prefix: &str, value: &serde_json::Value, out: &mut HashMap<String, String>) -> Result<(), String> {
+fn flatten(
+    prefix: &str,
+    value: &serde_json::Value,
+    out: &mut HashMap<String, String>,
+) -> Result<(), String> {
     match value {
         serde_json::Value::Object(map) => {
             for (k, v) in map {
-                let key = if prefix.is_empty() { k.clone() } else { format!("{prefix}.{k}") };
+                let key = if prefix.is_empty() {
+                    k.clone()
+                } else {
+                    format!("{prefix}.{k}")
+                };
                 flatten(&key, v, out)?;
             }
             Ok(())

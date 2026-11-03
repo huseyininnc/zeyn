@@ -82,9 +82,15 @@ impl Party {
     /// From the public URL (`https://host[:port]`), with an optional explicit relying party id
     /// that must be the host or a parent domain of it.
     pub(crate) fn from_url(public_url: &str, domain: Option<&str>, name: &str) -> Option<Party> {
-        let rest = public_url.strip_prefix("https://").or_else(|| public_url.strip_prefix("http://"))?;
+        let rest = public_url
+            .strip_prefix("https://")
+            .or_else(|| public_url.strip_prefix("http://"))?;
         let authority = rest.split('/').next()?;
-        let host = authority.rsplit_once(':').map(|(h, _)| h).unwrap_or(authority).to_ascii_lowercase();
+        let host = authority
+            .rsplit_once(':')
+            .map(|(h, _)| h)
+            .unwrap_or(authority)
+            .to_ascii_lowercase();
         if public_url.starts_with("http://") && host != "localhost" {
             return None;
         }
@@ -93,8 +99,17 @@ impl Party {
             Some(_) => return None,
             None => host,
         };
-        let origin = public_url.trim_end_matches('/').split('/').take(3).collect::<Vec<_>>().join("/");
-        Some(Party { id, origin, name: name.to_string() })
+        let origin = public_url
+            .trim_end_matches('/')
+            .split('/')
+            .take(3)
+            .collect::<Vec<_>>()
+            .join("/");
+        Some(Party {
+            id,
+            origin,
+            name: name.to_string(),
+        })
     }
 }
 
@@ -121,7 +136,12 @@ pub(crate) fn creation_options(
 
 /// Request options for `navigator.credentials.get`. Empty `allow` lets the browser offer every
 /// passkey of the site (discoverable credentials).
-pub(crate) fn request_options(o: &PasskeyOptions, party: &Party, challenge: &str, allow: &[Passkey]) -> Json {
+pub(crate) fn request_options(
+    o: &PasskeyOptions,
+    party: &Party,
+    challenge: &str,
+    allow: &[Passkey],
+) -> Json {
     json!({
         "challenge": challenge,
         "timeout": o.timeout.as_millis() as u64,
@@ -158,14 +178,20 @@ fn client_data(raw: &[u8], kind: &str, challenge: &str, party: &Party) -> Result
     if c.get("type").and_then(Json::as_str) != Some(kind) {
         return Err(bad("wrong client data type"));
     }
-    let got = c.get("challenge").and_then(Json::as_str).unwrap_or("");
+    let got = c
+        .get("challenge")
+        .and_then(Json::as_str)
+        .unwrap_or("");
     if !crate::server::same(got.trim_end_matches('='), challenge) {
         return Err(bad("challenge mismatch"));
     }
     if c.get("origin").and_then(Json::as_str) != Some(party.origin.as_str()) {
         return Err(bad("origin mismatch"));
     }
-    if c.get("crossOrigin").and_then(Json::as_bool) == Some(true) {
+    if c.get("crossOrigin")
+        .and_then(Json::as_bool)
+        == Some(true)
+    {
         return Err(bad("cross origin"));
     }
     Ok(())
@@ -219,7 +245,11 @@ fn auth_data<'a>(data: &'a [u8], party: &Party, uv_required: bool) -> Result<Aut
     } else {
         None
     };
-    Ok(AuthData { flags, sign_count, attested })
+    Ok(AuthData {
+        flags,
+        sign_count,
+        attested,
+    })
 }
 
 /// A verified new passkey and the user handle the browser was given.
@@ -231,12 +261,22 @@ pub(crate) fn verify_registration(
     name: Option<String>,
     now: i64,
 ) -> Result<Passkey> {
-    client_data(&bytes(credential, &["response", "clientDataJSON"])?, "webauthn.create", &state.challenge, party)?;
+    client_data(
+        &bytes(credential, &["response", "clientDataJSON"])?,
+        "webauthn.create",
+        &state.challenge,
+        party,
+    )?;
     let att = bytes(credential, &["response", "attestationObject"])?;
     let (obj, _) = cbor::item(&att, 0)?;
-    let auth = obj.get_text("authData").and_then(cbor::Value::as_bytes).ok_or_else(|| bad("no authData"))?;
+    let auth = obj
+        .get_text("authData")
+        .and_then(cbor::Value::as_bytes)
+        .ok_or_else(|| bad("no authData"))?;
     let data = auth_data(auth, party, o.user_verification == "required")?;
-    let (id, key) = data.attested.ok_or_else(|| bad("no attested credential"))?;
+    let (id, key) = data
+        .attested
+        .ok_or_else(|| bad("no attested credential"))?;
     let raw_id = bytes(credential, &["rawId"])?;
     if raw_id != id {
         return Err(bad("credential id mismatch"));
@@ -246,7 +286,14 @@ pub(crate) fn verify_registration(
         .get("response")
         .and_then(|r| r.get("transports"))
         .and_then(Json::as_array)
-        .map(|a| a.iter().filter_map(Json::as_str).filter(|t| t.len() <= 16).take(8).map(str::to_string).collect())
+        .map(|a| {
+            a.iter()
+                .filter_map(Json::as_str)
+                .filter(|t| t.len() <= 16)
+                .take(8)
+                .map(str::to_string)
+                .collect()
+        })
         .unwrap_or_default();
     Ok(Passkey {
         credential_id: id.to_vec(),
@@ -281,7 +328,8 @@ pub(crate) fn verify_assertion(
     passkey: &Passkey,
 ) -> Result<Passkey> {
     if let Some(handle) = field(credential, &["response", "userHandle"]).filter(|h| !h.is_empty()) {
-        let handle = b64url_decode(handle.trim_end_matches('=')).ok_or_else(|| bad("bad user handle"))?;
+        let handle =
+            b64url_decode(handle.trim_end_matches('=')).ok_or_else(|| bad("bad user handle"))?;
         if handle != user_id.as_bytes() {
             return Err(bad("user handle mismatch"));
         }
@@ -298,7 +346,9 @@ pub(crate) fn verify_assertion(
     let mut signed = auth.clone();
     signed.extend_from_slice(hash.as_ref());
     let (alg, key) = public_key(&passkey.public_key)?;
-    UnparsedPublicKey::new(alg, &key).verify(&signed, &signature).map_err(|_| bad("signature"))?;
+    UnparsedPublicKey::new(alg, &key)
+        .verify(&signed, &signature)
+        .map_err(|_| bad("signature"))?;
     if (data.sign_count != 0 || passkey.sign_count != 0) && data.sign_count <= passkey.sign_count {
         return Err(bad("signature counter did not grow"));
     }
@@ -311,15 +361,24 @@ pub(crate) fn verify_assertion(
 /// The verification algorithm and key bytes of a COSE public key.
 fn public_key(cose: &[u8]) -> Result<(&'static dyn signature::VerificationAlgorithm, Vec<u8>)> {
     let (key, _) = cbor::item(cose, 0)?;
-    let int = |k: i64| key.get_int(k).and_then(cbor::Value::as_int);
-    let bin = |k: i64| key.get_int(k).and_then(cbor::Value::as_bytes);
+    let int = |k: i64| {
+        key.get_int(k)
+            .and_then(cbor::Value::as_int)
+    };
+    let bin = |k: i64| {
+        key.get_int(k)
+            .and_then(cbor::Value::as_bytes)
+    };
     let alg = int(3).ok_or_else(|| bad("no alg"))?;
     if !ALGORITHMS.contains(&alg) {
         return Err(bad("algorithm not allowed"));
     }
     match (int(1), alg) {
         (Some(2), -7) => {
-            let (x, y) = (bin(-2).ok_or_else(|| bad("no x"))?, bin(-3).ok_or_else(|| bad("no y"))?);
+            let (x, y) = (
+                bin(-2).ok_or_else(|| bad("no x"))?,
+                bin(-3).ok_or_else(|| bad("no y"))?,
+            );
             if int(-1) != Some(1) || x.len() != 32 || y.len() != 32 {
                 return Err(bad("not a P-256 key"));
             }
@@ -329,7 +388,10 @@ fn public_key(cose: &[u8]) -> Result<(&'static dyn signature::VerificationAlgori
             Ok((&signature::ECDSA_P256_SHA256_ASN1, point))
         }
         (Some(3), -257) => {
-            let (n, e) = (bin(-1).ok_or_else(|| bad("no n"))?, bin(-2).ok_or_else(|| bad("no e"))?);
+            let (n, e) = (
+                bin(-1).ok_or_else(|| bad("no n"))?,
+                bin(-2).ok_or_else(|| bad("no e"))?,
+            );
             if n.len() < 256 || n.len() > 1024 || e.is_empty() || e.len() > 8 {
                 return Err(bad("RSA key size"));
             }
@@ -400,45 +462,75 @@ pub(crate) mod cbor {
 
     impl<'a> Value<'a> {
         pub fn as_int(&self) -> Option<i64> {
-            if let Value::Int(n) = self { Some(*n) } else { None }
+            if let Value::Int(n) = self {
+                Some(*n)
+            } else {
+                None
+            }
         }
 
         pub fn as_bytes(&self) -> Option<&'a [u8]> {
-            if let Value::Bytes(b) = self { Some(b) } else { None }
+            if let Value::Bytes(b) = self {
+                Some(b)
+            } else {
+                None
+            }
         }
 
         pub fn get_int(&self, key: i64) -> Option<&Value<'a>> {
             let Value::Map(m) = self else { return None };
-            m.iter().find(|(k, _)| *k == Value::Int(key)).map(|(_, v)| v)
+            m.iter()
+                .find(|(k, _)| *k == Value::Int(key))
+                .map(|(_, v)| v)
         }
 
         pub fn get_text(&self, key: &str) -> Option<&Value<'a>> {
             let Value::Map(m) = self else { return None };
-            m.iter().find(|(k, _)| *k == Value::Text(key)).map(|(_, v)| v)
+            m.iter()
+                .find(|(k, _)| *k == Value::Text(key))
+                .map(|(_, v)| v)
         }
     }
 
     fn head(data: &[u8]) -> Result<(u8, u64, usize)> {
-        let first = *data.first().ok_or_else(|| bad("cbor: end of input"))?;
+        let first = *data
+            .first()
+            .ok_or_else(|| bad("cbor: end of input"))?;
         let (major, info) = (first >> 5, first & 0x1f);
         let (arg, used) = match info {
             0..=23 => (u64::from(info), 1),
-            24 => (u64::from(*data.get(1).ok_or_else(|| bad("cbor: short"))?), 2),
+            24 => (
+                u64::from(
+                    *data
+                        .get(1)
+                        .ok_or_else(|| bad("cbor: short"))?,
+                ),
+                2,
+            ),
             25 => (
                 u64::from(u16::from_be_bytes(
-                    data.get(1..3).ok_or_else(|| bad("cbor: short"))?.try_into().map_err(|_| bad("cbor"))?,
+                    data.get(1..3)
+                        .ok_or_else(|| bad("cbor: short"))?
+                        .try_into()
+                        .map_err(|_| bad("cbor"))?,
                 )),
                 3,
             ),
             26 => (
                 u64::from(u32::from_be_bytes(
-                    data.get(1..5).ok_or_else(|| bad("cbor: short"))?.try_into().map_err(|_| bad("cbor"))?,
+                    data.get(1..5)
+                        .ok_or_else(|| bad("cbor: short"))?
+                        .try_into()
+                        .map_err(|_| bad("cbor"))?,
                 )),
                 5,
             ),
             27 => (
                 u64::from_be_bytes(
-                    data.get(1..9).ok_or_else(|| bad("cbor: short"))?.try_into().map_err(|_| bad("cbor"))?,
+                    data.get(1..9)
+                        .ok_or_else(|| bad("cbor: short"))?
+                        .try_into()
+                        .map_err(|_| bad("cbor"))?,
                 ),
                 9,
             ),
@@ -455,7 +547,12 @@ pub(crate) mod cbor {
         let (major, arg, mut used) = head(data)?;
         let take = |used: usize, n: u64| -> Result<&[u8]> {
             let n = usize::try_from(n).map_err(|_| bad("cbor: length"))?;
-            data.get(used..used.checked_add(n).ok_or_else(|| bad("cbor: length"))?).ok_or_else(|| bad("cbor: short"))
+            data.get(
+                used..used
+                    .checked_add(n)
+                    .ok_or_else(|| bad("cbor: length"))?,
+            )
+            .ok_or_else(|| bad("cbor: short"))
         };
         let value = match major {
             0 => Value::Int(i64::try_from(arg).map_err(|_| bad("cbor: int"))?),
@@ -487,7 +584,11 @@ pub(crate) mod cbor {
                         items.push(a);
                     }
                 }
-                if major == 5 { Value::Map(pairs) } else { Value::Array(items) }
+                if major == 5 {
+                    Value::Map(pairs)
+                } else {
+                    Value::Array(items)
+                }
             }
             7 if arg <= 23 => Value::Simple(arg as u8),
             _ => return Err(bad("cbor: unsupported type")),
@@ -505,8 +606,16 @@ mod tests {
         let data = [0xa2, 0x01, 0x02, 0x20, 0x43, 1, 2, 3];
         let (v, used) = cbor::item(&data, 0).unwrap();
         assert_eq!(used, data.len());
-        assert_eq!(v.get_int(1).and_then(cbor::Value::as_int), Some(2));
-        assert_eq!(v.get_int(-1).and_then(cbor::Value::as_bytes), Some(&[1u8, 2, 3][..]));
+        assert_eq!(
+            v.get_int(1)
+                .and_then(cbor::Value::as_int),
+            Some(2)
+        );
+        assert_eq!(
+            v.get_int(-1)
+                .and_then(cbor::Value::as_bytes),
+            Some(&[1u8, 2, 3][..])
+        );
     }
 
     #[test]
@@ -518,10 +627,18 @@ mod tests {
     #[test]
     fn relying_party_comes_from_the_public_url() {
         let p = Party::from_url("https://shop.example.com", None, "Shop").unwrap();
-        assert_eq!((p.id.as_str(), p.origin.as_str()), ("shop.example.com", "https://shop.example.com"));
+        assert_eq!(
+            (p.id.as_str(), p.origin.as_str()),
+            ("shop.example.com", "https://shop.example.com")
+        );
         assert!(Party::from_url("https://shop.example.com", Some("example.com"), "Shop").is_some());
         assert!(Party::from_url("https://shop.example.com", Some("other.com"), "Shop").is_none());
         assert!(Party::from_url("http://shop.example.com", None, "Shop").is_none());
-        assert_eq!(Party::from_url("http://localhost:3071", None, "Shop").unwrap().origin, "http://localhost:3071");
+        assert_eq!(
+            Party::from_url("http://localhost:3071", None, "Shop")
+                .unwrap()
+                .origin,
+            "http://localhost:3071"
+        );
     }
 }

@@ -13,5 +13,10 @@ pub fn overview(_ctx: &Ctx) -> Node {
 }
 
 /// What the catalog shows of `Toolbox`.
-pub const ENTRY: Entry =
-    Entry { name: "Toolbox", docs: "components/shell", api: &["Toolbox"], overview: &[ex!(overview)], examples: &[] };
+pub const ENTRY: Entry = Entry {
+    name: "Toolbox",
+    docs: "components/shell",
+    api: &["Toolbox"],
+    overview: &[ex!(overview)],
+    examples: &[],
+};

@@ -42,7 +42,12 @@ impl People {
     }
 
     fn get(&self, id: i64) -> Option<Person> {
-        self.0.read().unwrap().iter().find(|c| c.id.0 == id).cloned()
+        self.0
+            .read()
+            .unwrap()
+            .iter()
+            .find(|c| c.id.0 == id)
+            .cloned()
     }
 }
 
@@ -59,7 +64,10 @@ pub async fn get_person(id: i64, store: People) -> Result<Person> {
 #[action(permission = "hr.write")]
 pub async fn save_person(p: Valid<Person>, store: People) -> Result<Person> {
     let mut rows = store.0.write().unwrap();
-    let current = rows.iter_mut().find(|r| r.id == p.id).ok_or(Error::NotFound)?;
+    let current = rows
+        .iter_mut()
+        .find(|r| r.id == p.id)
+        .ok_or(Error::NotFound)?;
     *current = p.into_inner();
     current.version += 1;
     Ok(current.clone())
@@ -72,15 +80,25 @@ pub struct PersonParams {
 
 #[screen(route = "/people", permission = "hr.read")]
 pub fn people() -> Screen {
-    Screen::new("People")
-        .body(DataGrid::of(find_people).column(Person::name).column(Person::national_id).column(Person::email))
+    Screen::new("People").body(
+        DataGrid::of(find_people)
+            .column(Person::name)
+            .column(Person::national_id)
+            .column(Person::email),
+    )
 }
 
 #[screen(permission = "hr.read")]
 pub fn person(params: PersonParams, store: People) -> Result<Screen> {
-    let p = store.get(params.id).ok_or(Error::NotFound)?;
+    let p = store
+        .get(params.id)
+        .ok_or(Error::NotFound)?;
     Ok(Screen::window("Person").body(
-        Form::of(p).field(Person::name).field(Person::national_id).field(Person::email).submit("Save", save_person),
+        Form::of(p)
+            .field(Person::name)
+            .field(Person::national_id)
+            .field(Person::email)
+            .submit("Save", save_person),
     ))
 }
 
@@ -93,9 +111,18 @@ fn app() -> Router {
     ]);
     App::new("Test")
         .service(People::seeded())
-        .auth(move |h: &HeaderMap| h.contains_key("x-user").then(|| identity.clone()))
+        .auth(move |h: &HeaderMap| {
+            h.contains_key("x-user")
+                .then(|| identity.clone())
+        })
         .interceptor(AuditLog(MemoryAudit::default()))
-        .feature(Feature::new("hr").screen(people).screen(person).api(get_person).api(save_person))
+        .feature(
+            Feature::new("hr")
+                .screen(people)
+                .screen(person)
+                .api(get_person)
+                .api(save_person),
+        )
         .router()
         .unwrap()
 }
@@ -103,19 +130,38 @@ fn app() -> Router {
 const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
 async fn send(router: &Router, req: Request<Body>) -> (StatusCode, String) {
-    let res = router.clone().oneshot(req).await.unwrap();
+    let res = router
+        .clone()
+        .oneshot(req)
+        .await
+        .unwrap();
     let status = res.status();
-    (status, String::from_utf8(res.into_body().collect().await.unwrap().to_bytes().to_vec()).unwrap())
+    (
+        status,
+        String::from_utf8(
+            res.into_body()
+                .collect()
+                .await
+                .unwrap()
+                .to_bytes()
+                .to_vec(),
+        )
+        .unwrap(),
+    )
 }
 
 fn post(path: &str, body: serde_json::Value, api: bool) -> Request<Body> {
-    let b = Request::post(path).header("x-user", "1").header(header::CONTENT_TYPE, "application/json");
+    let b = Request::post(path)
+        .header("x-user", "1")
+        .header(header::CONTENT_TYPE, "application/json");
     let b = if api {
         b.header(header::AUTHORIZATION, "Bearer t")
     } else {
-        b.header(header::COOKIE, format!("zeyn_csrf={TOKEN}")).header("x-zeyn-csrf", TOKEN)
+        b.header(header::COOKIE, format!("zeyn_csrf={TOKEN}"))
+            .header("x-zeyn-csrf", TOKEN)
     };
-    b.body(Body::from(body.to_string())).unwrap()
+    b.body(Body::from(body.to_string()))
+        .unwrap()
 }
 
 /// Collects everything a `tracing` subscriber writes.
@@ -124,7 +170,10 @@ struct Captured(Arc<Mutex<Vec<u8>>>);
 
 impl std::io::Write for Captured {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.0.lock().unwrap().extend_from_slice(buf);
+        self.0
+            .lock()
+            .unwrap()
+            .extend_from_slice(buf);
         Ok(buf.len())
     }
 
@@ -146,17 +195,31 @@ async fn masked_values_and_input_never_reach_the_logs() {
     let _default = tracing::subscriber::set_default(subscriber);
     let router = app();
 
-    let get = Request::get("/people?q=12345678901").header("x-user", "1").body(Body::empty()).unwrap();
+    let get = Request::get("/people?q=12345678901")
+        .header("x-user", "1")
+        .body(Body::empty())
+        .unwrap();
     assert_eq!(send(&router, get).await.0, StatusCode::OK);
-    let values = serde_json::json!({ "name": "Person 1", "national_id": "55555555555", "version": "1" });
+    let values =
+        serde_json::json!({ "name": "Person 1", "national_id": "55555555555", "version": "1" });
     let form = serde_json::json!({ "screen": "person", "params": { "id": 1 }, "node": 0, "values": values });
     let (status, body) = send(&router, post("/_zeyn/form", form, false)).await;
     assert_eq!(status, StatusCode::OK, "{body}");
-    let (status, body) = send(&router, post("/api/v1/hr/get_person", serde_json::json!(2), true)).await;
-    assert!(status == StatusCode::OK && body.contains("12345678902"), "{body}");
+    let (status, body) = send(
+        &router,
+        post("/api/v1/hr/get_person", serde_json::json!(2), true),
+    )
+    .await;
+    assert!(
+        status == StatusCode::OK && body.contains("12345678902"),
+        "{body}"
+    );
     let reveal = serde_json::json!({ "screen": "person", "params": { "id": 3 }, "node": 0, "field": "national_id" });
     let (status, body) = send(&router, post("/_zeyn/reveal", reveal, false)).await;
-    assert!(status == StatusCode::OK && body.contains("12345678903"), "{body}");
+    assert!(
+        status == StatusCode::OK && body.contains("12345678903"),
+        "{body}"
+    );
     let (status, _) = send(
         &router,
         post(
@@ -169,10 +232,20 @@ async fn masked_values_and_input_never_reach_the_logs() {
     assert_eq!(status, StatusCode::NOT_FOUND);
 
     let log = String::from_utf8(captured.0.lock().unwrap().clone()).unwrap();
-    for expected in
-        ["request", "action=\"save_person\"", "user=\"clerk\"", "status=200", "status=404", "interceptor", "run", "ms="]
-    {
-        assert!(log.contains(expected), "`{expected}` is missing from the log:\n{log}");
+    for expected in [
+        "request",
+        "action=\"save_person\"",
+        "user=\"clerk\"",
+        "status=200",
+        "status=404",
+        "interceptor",
+        "run",
+        "ms=",
+    ] {
+        assert!(
+            log.contains(expected),
+            "`{expected}` is missing from the log:\n{log}"
+        );
     }
     for secret in [
         "55555555555",

@@ -5,7 +5,9 @@ use zeyn::prelude::*;
 
 pub fn overview(_ctx: &Ctx) -> Node {
     Panel::new("Details")
-        .add(Paragraph::new("A panel groups related content under a title."))
+        .add(Paragraph::new(
+            "A panel groups related content under a title.",
+        ))
         .into()
 }
 

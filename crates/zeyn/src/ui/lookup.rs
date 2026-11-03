@@ -59,24 +59,41 @@ impl LookupQuery {
     pub fn apply(&self, items: Vec<LookupItem>) -> Page<LookupItem> {
         let needle = fold(self.text.trim());
         let matching: Vec<LookupItem> = if !self.ids.is_empty() {
-            items.into_iter().filter(|i| self.ids().contains(&i.id)).collect()
+            items
+                .into_iter()
+                .filter(|i| self.ids().contains(&i.id))
+                .collect()
         } else {
             items
                 .into_iter()
                 .filter(|i| {
                     needle.is_empty()
                         || fold(&i.label).contains(&needle)
-                        || i.hint.as_deref().is_some_and(|h| fold(h).contains(&needle))
-                        || i.cells.iter().any(|c| fold(c).contains(&needle))
+                        || i.hint
+                            .as_deref()
+                            .is_some_and(|h| fold(h).contains(&needle))
+                        || i.cells
+                            .iter()
+                            .any(|c| fold(c).contains(&needle))
                 })
                 .collect()
         };
         let total = matching.len();
-        let start = usize::try_from(self.offset).unwrap_or(usize::MAX).min(total);
-        let size = if self.ids.is_empty() { self.limit() as usize } else { MAX_LOOKUP_IDS };
+        let start = usize::try_from(self.offset)
+            .unwrap_or(usize::MAX)
+            .min(total);
+        let size = if self.ids.is_empty() {
+            self.limit() as usize
+        } else {
+            MAX_LOOKUP_IDS
+        };
         let end = start.saturating_add(size).min(total);
         let page = Page::new(matching[start..end].to_vec()).total(total as u64);
-        if end < total { page.next(Cursor(end.to_string())) } else { page }
+        if end < total {
+            page.next(Cursor(end.to_string()))
+        } else {
+            page
+        }
     }
 }
 
@@ -107,7 +124,12 @@ pub struct LookupItem {
 
 impl LookupItem {
     pub fn new(id: i64, label: impl Into<String>) -> Self {
-        Self { id, label: label.into(), hint: None, cells: Vec::new() }
+        Self {
+            id,
+            label: label.into(),
+            hint: None,
+            cells: Vec::new(),
+        }
     }
 
     pub fn hint(mut self, hint: impl Into<String>) -> Self {
@@ -128,7 +150,11 @@ impl LookupItem {
         I: IntoIterator,
         I::Item: Into<String>,
     {
-        self.cells = cells.into_iter().take(MAX_LOOKUP_COLUMNS).map(Into::into).collect();
+        self.cells = cells
+            .into_iter()
+            .take(MAX_LOOKUP_COLUMNS)
+            .map(Into::into)
+            .collect();
         self
     }
 }
@@ -148,7 +174,12 @@ impl FieldType for Vec<i64> {
     const KIND: FieldKind = FieldKind::Custom { editor: "ids" };
 
     fn to_value(&self) -> Value {
-        Value::Text(self.iter().map(i64::to_string).collect::<Vec<_>>().join(","))
+        Value::Text(
+            self.iter()
+                .map(i64::to_string)
+                .collect::<Vec<_>>()
+                .join(","),
+        )
     }
 
     fn __is_empty(&self) -> bool {
@@ -160,20 +191,33 @@ impl SupportsRequired for Vec<i64> {}
 
 /// Reads `3,7,9` as ids. At most 1000 ids; anything else is refused.
 pub(crate) fn parse_ids(text: &str) -> Option<Vec<i64>> {
-    let ids: Option<Vec<i64>> =
-        text.split(',').map(str::trim).filter(|p| !p.is_empty()).map(|p| p.parse().ok()).collect();
+    let ids: Option<Vec<i64>> = text
+        .split(',')
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .map(|p| p.parse().ok())
+        .collect();
     ids.filter(|v| v.len() <= 1000)
 }
 
 /// Writes a lookup: a plain text input holding the ids (what works without JavaScript and what
 /// the form submits) that the runtime turns into a searchable combobox.
-pub(crate) fn render_lookup(out: &mut String, r: &Render, s: &Slot, multiple: bool, columns: &[Text]) {
+pub(crate) fn render_lookup(
+    out: &mut String,
+    r: &Render,
+    s: &Slot,
+    multiple: bool,
+    columns: &[Text],
+) {
     let value = match s.value {
         Value::Int(n) => n.to_string(),
         Value::Text(t) => t.clone(),
         _ => String::new(),
     };
-    let t = |k: &str| r.i18n.text(r.locale, &Text::key(format!("zeyn.ui.lookup.{k}")));
+    let t = |k: &str| {
+        r.i18n
+            .text(r.locale, &Text::key(format!("zeyn.ui.lookup.{k}")))
+    };
     let texts = serde_json::json!({
         "open": t("open"),
         "no_results": t("no_results"),
@@ -187,7 +231,10 @@ pub(crate) fn render_lookup(out: &mut String, r: &Render, s: &Slot, multiple: bo
     let columns = if columns.is_empty() {
         String::new()
     } else {
-        let headers: Vec<String> = columns.iter().map(|c| r.i18n.text(r.locale, c)).collect();
+        let headers: Vec<String> = columns
+            .iter()
+            .map(|c| r.i18n.text(r.locale, c))
+            .collect();
         format!(r#" data-columns="{}""#, attr(&headers))
     };
     out.push_str(s.label);

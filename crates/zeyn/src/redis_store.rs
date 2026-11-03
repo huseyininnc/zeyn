@@ -87,22 +87,42 @@ impl RedisStore {
             .set_response_timeout(Some(Duration::from_millis(500)))
             .set_number_of_retries(1);
         let inner = &self.0;
-        inner.connection.get_or_try_init(|| inner.client.get_connection_manager_with_config(config)).await.cloned()
+        inner
+            .connection
+            .get_or_try_init(|| {
+                inner
+                    .client
+                    .get_connection_manager_with_config(config)
+            })
+            .await
+            .cloned()
     }
 
     /// Notes whether the last call reached Redis, logging only when that changes.
     fn health<T>(&self, result: redis::RedisResult<T>) -> Option<T> {
         match result {
             Ok(v) => {
-                if self.0.down.swap(false, Ordering::Relaxed) {
+                if self
+                    .0
+                    .down
+                    .swap(false, Ordering::Relaxed)
+                {
                     tracing::info!("redis is reachable again");
                 }
                 Some(v)
             }
             Err(e) => {
-                self.0.retry_at.store(self.elapsed_ms() + RETRY_AFTER_MS, Ordering::Relaxed);
-                if !self.0.down.swap(true, Ordering::Relaxed) {
-                    tracing::warn!("redis is unreachable, rate limits are off and views are not saved: {e}");
+                self.0
+                    .retry_at
+                    .store(self.elapsed_ms() + RETRY_AFTER_MS, Ordering::Relaxed);
+                if !self
+                    .0
+                    .down
+                    .swap(true, Ordering::Relaxed)
+                {
+                    tracing::warn!(
+                        "redis is unreachable, rate limits are off and views are not saved: {e}"
+                    );
                 }
                 None
             }
@@ -115,7 +135,8 @@ impl RedisStore {
 
     /// Whether Redis failed a moment ago, so calls skip it instead of waiting for a timeout.
     fn resting(&self) -> bool {
-        self.0.down.load(Ordering::Relaxed) && self.elapsed_ms() < self.0.retry_at.load(Ordering::Relaxed)
+        self.0.down.load(Ordering::Relaxed)
+            && self.elapsed_ms() < self.0.retry_at.load(Ordering::Relaxed)
     }
 
     /// Key of a saved view. The user part is length prefixed so no user and grid pair can
@@ -129,7 +150,10 @@ impl RateStore for RedisStore {
     fn take(&self, key: &str, limit: &RateLimit) -> BoxFuture<std::result::Result<(), Duration>> {
         let store = self.clone();
         let key = format!("{}rate:{key}", self.0.prefix);
-        let window_ms = limit.window.as_millis().clamp(1, u128::from(u32::MAX)) as u64;
+        let window_ms = limit
+            .window
+            .as_millis()
+            .clamp(1, u128::from(u32::MAX)) as u64;
         let per_ms = f64::from(limit.requests) / window_ms as f64;
         let capacity = limit.requests;
         Box::pin(async move {
@@ -138,7 +162,15 @@ impl RateStore for RedisStore {
             }
             let result = match store.connection().await {
                 Ok(mut con) => {
-                    store.0.script.key(key).arg(capacity).arg(per_ms).arg(window_ms).invoke_async::<u64>(&mut con).await
+                    store
+                        .0
+                        .script
+                        .key(key)
+                        .arg(capacity)
+                        .arg(per_ms)
+                        .arg(window_ms)
+                        .invoke_async::<u64>(&mut con)
+                        .await
                 }
                 Err(e) => Err(e),
             };
@@ -157,9 +189,17 @@ impl DataGridViewStore for RedisStore {
             if store.resting() {
                 return Err(unavailable());
             }
-            let mut con = store.health(store.connection().await).ok_or_else(unavailable)?;
-            let json: Option<String> =
-                store.health(redis::cmd("GET").arg(&key).query_async(&mut con).await).ok_or_else(unavailable)?;
+            let mut con = store
+                .health(store.connection().await)
+                .ok_or_else(unavailable)?;
+            let json: Option<String> = store
+                .health(
+                    redis::cmd("GET")
+                        .arg(&key)
+                        .query_async(&mut con)
+                        .await,
+                )
+                .ok_or_else(unavailable)?;
             Ok(json.and_then(|j| serde_json::from_str(&j).ok()))
         })
     }
@@ -170,7 +210,9 @@ impl DataGridViewStore for RedisStore {
             if store.resting() {
                 return Err(unavailable());
             }
-            let mut con = store.health(store.connection().await).ok_or_else(unavailable)?;
+            let mut con = store
+                .health(store.connection().await)
+                .ok_or_else(unavailable)?;
             let cmd = match view {
                 Some(v) => redis::cmd("SET")
                     .arg(&key)
@@ -178,7 +220,9 @@ impl DataGridViewStore for RedisStore {
                     .to_owned(),
                 None => redis::cmd("DEL").arg(&key).to_owned(),
             };
-            store.health(cmd.query_async::<()>(&mut con).await).ok_or_else(unavailable)
+            store
+                .health(cmd.query_async::<()>(&mut con).await)
+                .ok_or_else(unavailable)
         })
     }
 }

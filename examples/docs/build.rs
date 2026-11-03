@@ -20,7 +20,11 @@ fn main() {
         let mut files: Vec<_> = std::fs::read_dir(lang.path())
             .expect("language folder")
             .filter_map(Result::ok)
-            .filter(|e| e.path().extension().is_some_and(|x| x == "md"))
+            .filter(|e| {
+                e.path()
+                    .extension()
+                    .is_some_and(|x| x == "md")
+            })
             .collect();
         files.sort_by_key(|e| e.file_name());
         for file in files {

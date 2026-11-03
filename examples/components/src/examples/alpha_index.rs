@@ -4,10 +4,12 @@ use crate::{Entry, ex};
 use zeyn::prelude::*;
 
 pub fn overview(_ctx: &Ctx) -> Node {
-    AlphaIndex::new(crate::catalog_home, |letter| zeyn::ui::SearchParams { q: letter.to_string() })
-        .current("C")
-        .other()
-        .into()
+    AlphaIndex::new(crate::catalog_home, |letter| zeyn::ui::SearchParams {
+        q: letter.to_string(),
+    })
+    .current("C")
+    .other()
+    .into()
 }
 
 /// What the catalog shows of `AlphaIndex`.

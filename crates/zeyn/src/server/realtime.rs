@@ -179,13 +179,22 @@ impl Realtime {
         write: &'static str,
         store: impl DocStore,
     ) -> Self {
-        self.config.kinds.insert(kind, DocKind { read, write, store: Arc::new(store) });
+        self.config.kinds.insert(
+            kind,
+            DocKind {
+                read,
+                write,
+                store: Arc::new(store),
+            },
+        );
         self
     }
 
     /// A change topic screens may subscribe to (`ui::Live`), for users with `permission`.
     pub fn topic(mut self, name: &'static str, permission: &'static str) -> Self {
-        self.config.topics.insert(name, permission);
+        self.config
+            .topics
+            .insert(name, permission);
         self
     }
 
@@ -197,7 +206,12 @@ impl Realtime {
     /// Accepts sockets from another origin too (`https://app.example.com`), such as a public
     /// host name behind a proxy that rewrites `Host`. The page's own host is always accepted.
     pub fn allow_origin(mut self, origin: impl Into<String>) -> Self {
-        self.config.origins.push(origin.into().trim_end_matches('/').to_string());
+        self.config.origins.push(
+            origin
+                .into()
+                .trim_end_matches('/')
+                .to_string(),
+        );
         self
     }
 
@@ -274,20 +288,49 @@ impl Hub {
     }
 
     pub fn stats(&self) -> HubStats {
-        let rooms = self.0.rooms.lock().map(|r| r.values().cloned().collect::<Vec<_>>()).unwrap_or_default();
+        let rooms = self
+            .0
+            .rooms
+            .lock()
+            .map(|r| r.values().cloned().collect::<Vec<_>>())
+            .unwrap_or_default();
         HubStats {
             rooms: rooms.len(),
-            clients: rooms.iter().map(|r| r.clients.lock().map(|c| c.len()).unwrap_or(0)).sum(),
-            subscribers: self.0.topics.lock().map(|t| t.values().map(Vec::len).sum()).unwrap_or(0),
-            doc_bytes: rooms.iter().map(|r| r.bytes.load(Ordering::Relaxed)).sum(),
+            clients: rooms
+                .iter()
+                .map(|r| {
+                    r.clients
+                        .lock()
+                        .map(|c| c.len())
+                        .unwrap_or(0)
+                })
+                .sum(),
+            subscribers: self
+                .0
+                .topics
+                .lock()
+                .map(|t| t.values().map(Vec::len).sum())
+                .unwrap_or(0),
+            doc_bytes: rooms
+                .iter()
+                .map(|r| r.bytes.load(Ordering::Relaxed))
+                .sum(),
         }
     }
 
     /// Persists every changed document now; rooms stay open. Also runs on shutdown paths and in
     /// tests.
     pub async fn flush(&self) {
-        let rooms: Vec<(RoomKey, Arc<Room>)> =
-            self.0.rooms.lock().map(|r| r.iter().map(|(k, v)| (k.clone(), v.clone())).collect()).unwrap_or_default();
+        let rooms: Vec<(RoomKey, Arc<Room>)> = self
+            .0
+            .rooms
+            .lock()
+            .map(|r| {
+                r.iter()
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect()
+            })
+            .unwrap_or_default();
         for (key, room) in rooms {
             persist(&key, &room).await;
         }
@@ -298,8 +341,12 @@ impl Hub {
     }
 
     fn take_user(&self, user: &str, max: usize) -> bool {
-        let Ok(mut users) = self.0.users.lock() else { return false };
-        let n = users.entry(user.to_string()).or_default();
+        let Ok(mut users) = self.0.users.lock() else {
+            return false;
+        };
+        let n = users
+            .entry(user.to_string())
+            .or_default();
         if *n >= max {
             return false;
         }
@@ -327,13 +374,19 @@ impl Hub {
         if self.0.rooms.lock().ok()?.len() >= limits.rooms {
             return None;
         }
-        let state = kind.store.load(key.clone()).await.ok()?;
+        let state = kind
+            .store
+            .load(key.clone())
+            .await
+            .ok()?;
         let doc = Doc::new();
         let mut bytes = 0;
         if let Some(state) = state {
             bytes = state.len();
             let update = Update::decode_v1(&state).ok()?;
-            doc.transact_mut().apply_update(update).ok()?;
+            doc.transact_mut()
+                .apply_update(update)
+                .ok()?;
         }
         let room = Arc::new(Room {
             doc,
@@ -347,13 +400,22 @@ impl Hub {
         if rooms.len() >= limits.rooms && !rooms.contains_key(key) {
             return None;
         }
-        Some(rooms.entry(key.clone()).or_insert(room).clone())
+        Some(
+            rooms
+                .entry(key.clone())
+                .or_insert(room)
+                .clone(),
+        )
     }
 
     /// Persists changed rooms and evicts idle ones, every `persist_every`, for the life of the
     /// process. Started by the first connection.
     fn start_sweeper(&self, limits: Limits) {
-        if self.0.sweeping.swap(true, Ordering::AcqRel) {
+        if self
+            .0
+            .sweeping
+            .swap(true, Ordering::AcqRel)
+        {
             return;
         }
         let hub = Arc::downgrade(&self.0);
@@ -368,14 +430,31 @@ impl Hub {
     }
 
     async fn sweep(&self, idle: Duration) {
-        let rooms: Vec<(RoomKey, Arc<Room>)> =
-            self.0.rooms.lock().map(|r| r.iter().map(|(k, v)| (k.clone(), v.clone())).collect()).unwrap_or_default();
+        let rooms: Vec<(RoomKey, Arc<Room>)> = self
+            .0
+            .rooms
+            .lock()
+            .map(|r| {
+                r.iter()
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect()
+            })
+            .unwrap_or_default();
         for (key, room) in rooms {
             persist(&key, &room).await;
-            let expired = room.idle_since.lock().ok().and_then(|s| *s).is_some_and(|since| since.elapsed() >= idle);
+            let expired = room
+                .idle_since
+                .lock()
+                .ok()
+                .and_then(|s| *s)
+                .is_some_and(|since| since.elapsed() >= idle);
             if expired {
                 if let Ok(mut map) = self.0.rooms.lock() {
-                    let empty = room.clients.lock().map(|c| c.is_empty()).unwrap_or(true);
+                    let empty = room
+                        .clients
+                        .lock()
+                        .map(|c| c.is_empty())
+                        .unwrap_or(true);
                     if empty && !room.dirty.load(Ordering::Acquire) {
                         map.remove(&key);
                     }
@@ -390,17 +469,29 @@ async fn persist(key: &RoomKey, room: &Room) {
     if !room.dirty.swap(false, Ordering::AcqRel) {
         return;
     }
-    let state = room.doc.transact().encode_state_as_update_v1(&StateVector::default());
-    room.bytes.store(state.len(), Ordering::Relaxed);
-    if let Err(e) = room.store.save(key.clone(), state).await {
-        room.dirty.store(true, Ordering::Release);
+    let state = room
+        .doc
+        .transact()
+        .encode_state_as_update_v1(&StateVector::default());
+    room.bytes
+        .store(state.len(), Ordering::Relaxed);
+    if let Err(e) = room
+        .store
+        .save(key.clone(), state)
+        .await
+    {
+        room.dirty
+            .store(true, Ordering::Release);
         tracing::warn!("realtime: saving {}/{} failed: {e}", key.kind, key.doc);
     }
 }
 
 pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
     router
-        .route(LOADER, get(|| async { super::asset(JS, "text/javascript; charset=utf-8") }))
+        .route(
+            LOADER,
+            get(|| async { super::asset(JS, "text/javascript; charset=utf-8") }),
+        )
         .route("/_zeyn/live/doc/{kind}/{doc}", get(doc_socket))
         .route("/_zeyn/live/topics", get(topic_socket))
 }
@@ -412,12 +503,11 @@ pub(super) fn is_asset(path: &str) -> bool {
 /// Adds the topic script to a full page whose screen subscribes to a topic.
 pub(super) fn head(st: &AppState, screen: &str, page: &mut String) {
     if st.realtime.is_some() && screen.contains(MARKER) {
-        let tag =
-            format!(
-                r#"<script type="module" src="{}{LOADER}{}"></script></head>"#,
-                crate::render::escape(&st.prefix),
-                super::ops::asset_version()
-            );
+        let tag = format!(
+            r#"<script type="module" src="{}{LOADER}{}"></script></head>"#,
+            crate::render::escape(&st.prefix),
+            super::ops::asset_version()
+        );
         *page = page.replacen("</head>", &tag, 1);
     }
 }
@@ -438,25 +528,43 @@ struct LiveQuery {
 
 /// Document ids: 1 to 64 letters, digits, `-`, `_` or `.`.
 fn valid_doc(id: &str) -> bool {
-    (1..=64).contains(&id.len()) && id.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
+    (1..=64).contains(&id.len())
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
 }
 
 /// `Origin` must name the host the request came to, or an origin the app allows. Browsers always
 /// send it on WebSocket handshakes, so a missing one is refused.
 fn origin_allowed(headers: &HeaderMap, allowed: &[String]) -> bool {
-    let Some(origin) = headers.get(header::ORIGIN).and_then(|v| v.to_str().ok()) else { return false };
+    let Some(origin) = headers
+        .get(header::ORIGIN)
+        .and_then(|v| v.to_str().ok())
+    else {
+        return false;
+    };
     if allowed.iter().any(|a| a == origin) {
         return true;
     }
-    let host = headers.get(header::HOST).and_then(|v| v.to_str().ok()).unwrap_or("");
-    let bare = origin.split_once("://").map(|(_, rest)| rest).unwrap_or("");
+    let host = headers
+        .get(header::HOST)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    let bare = origin
+        .split_once("://")
+        .map(|(_, rest)| rest)
+        .unwrap_or("");
     !host.is_empty() && bare.eq_ignore_ascii_case(host)
 }
 
 /// The checks of every handshake: the channel is on, origin, CSRF token (in the query, since
 /// browsers cannot set headers on WebSockets), a signed in user and the per user limit. Returns
 /// the context and the user key, which the caller must release.
-async fn admit(st: &AppState, headers: &HeaderMap, csrf: &str) -> Result<(Ctx, Hub, String), Response> {
+async fn admit(
+    st: &AppState,
+    headers: &HeaderMap,
+    csrf: &str,
+) -> Result<(Ctx, Hub, String), Response> {
     let ctx = st.licensed(st.ctx(headers)).await;
     let Some(hub) = st.realtime.clone() else {
         return Err(st.error_response(&ctx, Failure::App(Error::NotFound)));
@@ -466,15 +574,27 @@ async fn admit(st: &AppState, headers: &HeaderMap, csrf: &str) -> Result<(Ctx, H
     };
     let token_ok = cookie(headers, "zeyn_csrf").is_some_and(|c| super::csrf_matches(c, csrf));
     if !origin_allowed(headers, &config.origins) || !token_ok {
-        return Err(st.error_response(&ctx, Failure::App(Error::Denied(crate::i18n::Text::key("zeyn.error.csrf")))));
+        return Err(st.error_response(
+            &ctx,
+            Failure::App(Error::Denied(crate::i18n::Text::key("zeyn.error.csrf"))),
+        ));
     }
     let Some(user) = ctx.identity().user.clone() else {
         return Err(st.error_response(&ctx, Failure::App(Error::Forbidden)));
     };
-    let user = format!("{}/{user}", ctx.tenant().map(|t| t.id()).unwrap_or(""));
+    let user = format!(
+        "{}/{user}",
+        ctx.tenant()
+            .map(|t| t.id())
+            .unwrap_or("")
+    );
     if !hub.take_user(&user, config.limits.per_user) {
-        let mut r =
-            st.error_response(&ctx, Failure::App(Error::Denied(crate::i18n::Text::key("zeyn.error.rate_limited"))));
+        let mut r = st.error_response(
+            &ctx,
+            Failure::App(Error::Denied(crate::i18n::Text::key(
+                "zeyn.error.rate_limited",
+            ))),
+        );
         *r.status_mut() = StatusCode::TOO_MANY_REQUESTS;
         return Err(r);
     }
@@ -482,7 +602,12 @@ async fn admit(st: &AppState, headers: &HeaderMap, csrf: &str) -> Result<(Ctx, H
 }
 
 fn busy() -> Response {
-    (StatusCode::SERVICE_UNAVAILABLE, [(header::RETRY_AFTER, "5")], "busy").into_response()
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        [(header::RETRY_AFTER, "5")],
+        "busy",
+    )
+        .into_response()
 }
 
 async fn doc_socket(
@@ -492,7 +617,9 @@ async fn doc_socket(
     headers: HeaderMap,
     ws: Result<WebSocketUpgrade, axum::extract::ws::rejection::WebSocketUpgradeRejection>,
 ) -> Response {
-    let csrf = query.map(|q| q.0.csrf).unwrap_or_default();
+    let csrf = query
+        .map(|q| q.0.csrf)
+        .unwrap_or_default();
     let (ctx, hub, user) = match admit(&st, &headers, &csrf).await {
         Ok(a) => a,
         Err(r) => return r,
@@ -502,13 +629,25 @@ async fn doc_socket(
         hub.release_user(&user);
         st.error_response(&ctx, failure)
     };
-    let Some((&kind_name, kind_def)) = config.kinds.get_key_value(kind.as_str()).filter(|_| valid_doc(&doc)) else {
+    let Some((&kind_name, kind_def)) = config
+        .kinds
+        .get_key_value(kind.as_str())
+        .filter(|_| valid_doc(&doc))
+    else {
         return refuse(&hub, Failure::App(Error::NotFound));
     };
-    if !ctx.identity().can(&crate::action::Access::Permission(kind_def.read)) {
+    if !ctx
+        .identity()
+        .can(&crate::action::Access::Permission(kind_def.read))
+    {
         return refuse(&hub, Failure::App(Error::Forbidden));
     }
-    let call = Call { kind: CallKind::Live, screen: kind_name, action: None, via_agent: ctx.via_agent() };
+    let call = Call {
+        kind: CallKind::Live,
+        screen: kind_name,
+        action: None,
+        via_agent: ctx.via_agent(),
+    };
     if let Err(f) = st.admit_call(&ctx, &call) {
         return refuse(&hub, f);
     }
@@ -520,16 +659,30 @@ async fn doc_socket(
         }
     };
     let limits = config.limits;
-    let key = RoomKey { tenant: ctx.tenant().map(|t| t.id().to_string()).unwrap_or_default(), kind, doc };
+    let key = RoomKey {
+        tenant: ctx
+            .tenant()
+            .map(|t| t.id().to_string())
+            .unwrap_or_default(),
+        kind,
+        doc,
+    };
     let Some(room) = hub.open(&key, kind_def, &limits).await else {
         hub.release_user(&user);
         return busy();
     };
     let (tx, rx) = mpsc::channel(limits.queue);
-    let id = hub.0.next.fetch_add(1, Ordering::Relaxed);
+    let id = hub
+        .0
+        .next
+        .fetch_add(1, Ordering::Relaxed);
     {
         let rooms = hub.0.rooms.lock();
-        let current = rooms.as_ref().ok().and_then(|r| r.get(&key)).is_some_and(|r| Arc::ptr_eq(r, &room));
+        let current = rooms
+            .as_ref()
+            .ok()
+            .and_then(|r| r.get(&key))
+            .is_some_and(|r| Arc::ptr_eq(r, &room));
         let clients = room.clients.lock();
         let (true, Ok(mut clients)) = (current, clients) else {
             hub.release_user(&user);
@@ -545,19 +698,22 @@ async fn doc_socket(
         }
     }
     hub.start_sweeper(limits);
-    let can_write = ctx.identity().can(&crate::action::Access::Permission(kind_def.write));
-    ws.max_message_size(limits.message_bytes).on_upgrade(move |socket| async move {
-        run_doc(socket, &room, id, rx, can_write, &limits).await;
-        if let Ok(mut clients) = room.clients.lock() {
-            clients.retain(|(c, _)| *c != id);
-            if clients.is_empty() {
-                if let Ok(mut idle) = room.idle_since.lock() {
-                    *idle = Some(Instant::now());
+    let can_write = ctx
+        .identity()
+        .can(&crate::action::Access::Permission(kind_def.write));
+    ws.max_message_size(limits.message_bytes)
+        .on_upgrade(move |socket| async move {
+            run_doc(socket, &room, id, rx, can_write, &limits).await;
+            if let Ok(mut clients) = room.clients.lock() {
+                clients.retain(|(c, _)| *c != id);
+                if clients.is_empty() {
+                    if let Ok(mut idle) = room.idle_since.lock() {
+                        *idle = Some(Instant::now());
+                    }
                 }
             }
-        }
-        hub.release_user(&user);
-    })
+            hub.release_user(&user);
+        })
 }
 
 fn frame(update: &[u8]) -> Message {
@@ -568,7 +724,10 @@ fn frame(update: &[u8]) -> Message {
 }
 
 fn close(code: u16, reason: &'static str) -> Message {
-    Message::Close(Some(CloseFrame { code, reason: reason.into() }))
+    Message::Close(Some(CloseFrame {
+        code,
+        reason: reason.into(),
+    }))
 }
 
 /// One document client: sends the whole document, then relays updates both ways until the
@@ -582,7 +741,10 @@ async fn run_doc(
     limits: &Limits,
 ) {
     let (mut sink, mut stream) = socket.split();
-    let state = room.doc.transact().encode_state_as_update_v1(&StateVector::default());
+    let state = room
+        .doc
+        .transact()
+        .encode_state_as_update_v1(&StateVector::default());
     if sink.send(frame(&state)).await.is_err() {
         return;
     }
@@ -628,15 +790,22 @@ async fn run_doc(
 /// Applies a client's update and passes it to the other clients. A client whose queue is full
 /// is dropped from the room; its socket then closes with 1013.
 fn apply(room: &Room, from: u64, data: &[u8], can_write: bool, limits: &Limits) -> Result<(), u16> {
-    let (Some(&FRAME_UPDATE), true) = (data.first(), can_write) else { return Err(CLOSE_POLICY) };
+    let (Some(&FRAME_UPDATE), true) = (data.first(), can_write) else {
+        return Err(CLOSE_POLICY);
+    };
     let body = &data[1..];
     if room.bytes.load(Ordering::Relaxed) + body.len() > limits.doc_bytes {
         return Err(CLOSE_TOO_BIG);
     }
     let update = Update::decode_v1(body).map_err(|_| CLOSE_POLICY)?;
-    room.doc.transact_mut().apply_update(update).map_err(|_| CLOSE_POLICY)?;
-    room.bytes.fetch_add(body.len(), Ordering::Relaxed);
-    room.dirty.store(true, Ordering::Release);
+    room.doc
+        .transact_mut()
+        .apply_update(update)
+        .map_err(|_| CLOSE_POLICY)?;
+    room.bytes
+        .fetch_add(body.len(), Ordering::Relaxed);
+    room.dirty
+        .store(true, Ordering::Release);
     let message = Message::Binary(axum::body::Bytes::copy_from_slice(data));
     if let Ok(mut clients) = room.clients.lock() {
         clients.retain(|(id, tx)| *id == from || tx.try_send(message.clone()).is_ok());
@@ -650,18 +819,28 @@ async fn topic_socket(
     headers: HeaderMap,
     ws: Result<WebSocketUpgrade, axum::extract::ws::rejection::WebSocketUpgradeRejection>,
 ) -> Response {
-    let q = query.map(|q| q.0).unwrap_or(LiveQuery { csrf: String::new(), t: String::new() });
+    let q = query.map(|q| q.0).unwrap_or(LiveQuery {
+        csrf: String::new(),
+        t: String::new(),
+    });
     let (ctx, hub, user) = match admit(&st, &headers, &q.csrf).await {
         Ok(a) => a,
         Err(r) => return r,
     };
     let config = hub.config().expect("checked in admit");
     let mut topics: Vec<&'static str> = Vec::new();
-    for name in q.t.split(',').filter(|t| !t.is_empty()).take(16) {
+    for name in
+        q.t.split(',')
+            .filter(|t| !t.is_empty())
+            .take(16)
+    {
         let allowed = config
             .topics
             .get_key_value(name)
-            .filter(|(_, p)| ctx.identity().can(&crate::action::Access::Permission(p)));
+            .filter(|(_, p)| {
+                ctx.identity()
+                    .can(&crate::action::Access::Permission(p))
+            });
         match allowed {
             Some((n, _)) if !topics.contains(n) => topics.push(n),
             Some(_) => {}
@@ -672,7 +851,12 @@ async fn topic_socket(
         }
     }
     if !topics.is_empty() {
-        let call = Call { kind: CallKind::Live, screen: "", action: None, via_agent: ctx.via_agent() };
+        let call = Call {
+            kind: CallKind::Live,
+            screen: "",
+            action: None,
+            via_agent: ctx.via_agent(),
+        };
         if let Err(f) = st.admit_call(&ctx, &call) {
             hub.release_user(&user);
             return st.error_response(&ctx, f);
@@ -689,13 +873,21 @@ async fn topic_socket(
             return e.into_response();
         }
     };
-    let tenant = ctx.tenant().map(|t| t.id().to_string()).unwrap_or_default();
+    let tenant = ctx
+        .tenant()
+        .map(|t| t.id().to_string())
+        .unwrap_or_default();
     let limits = config.limits;
     let (tx, mut rx) = mpsc::channel::<Message>(limits.queue);
-    let id = hub.0.next.fetch_add(1, Ordering::Relaxed);
+    let id = hub
+        .0
+        .next
+        .fetch_add(1, Ordering::Relaxed);
     if let Ok(mut map) = hub.0.topics.lock() {
         for t in &topics {
-            map.entry((tenant.clone(), t.to_string())).or_default().push((id, tx.clone()));
+            map.entry((tenant.clone(), t.to_string()))
+                .or_default()
+                .push((id, tx.clone()));
         }
     }
     drop(tx);
@@ -764,19 +956,45 @@ mod tests {
         };
         let (slow, _slow_rx) = mpsc::channel(1);
         let (fast, mut fast_rx) = mpsc::channel(8);
-        slow.try_send(Message::Ping(Default::default())).unwrap();
-        room.clients.lock().unwrap().extend([(1, slow), (2, fast)]);
+        slow.try_send(Message::Ping(Default::default()))
+            .unwrap();
+        room.clients
+            .lock()
+            .unwrap()
+            .extend([(1, slow), (2, fast)]);
         let other = Doc::new();
         let body = other.get_or_insert_text("t");
         yrs::Text::insert(&body, &mut other.transact_mut(), 0, "hi");
-        let update = other.transact().encode_state_as_update_v1(&StateVector::default());
+        let update = other
+            .transact()
+            .encode_state_as_update_v1(&StateVector::default());
         let frame = [vec![FRAME_UPDATE], update].concat();
         assert!(apply(&room, 3, &frame, true, &Limits::default()).is_ok());
-        assert_eq!(room.clients.lock().unwrap().iter().map(|(id, _)| *id).collect::<Vec<_>>(), [2]);
+        assert_eq!(
+            room.clients
+                .lock()
+                .unwrap()
+                .iter()
+                .map(|(id, _)| *id)
+                .collect::<Vec<_>>(),
+            [2]
+        );
         assert!(fast_rx.try_recv().is_ok());
         assert!(room.dirty.load(Ordering::Acquire));
-        assert_eq!(apply(&room, 3, &frame, false, &Limits::default()), Err(CLOSE_POLICY));
-        assert_eq!(apply(&room, 3, &[FRAME_UPDATE, 0xff, 0xff], true, &Limits::default()), Err(CLOSE_POLICY));
+        assert_eq!(
+            apply(&room, 3, &frame, false, &Limits::default()),
+            Err(CLOSE_POLICY)
+        );
+        assert_eq!(
+            apply(
+                &room,
+                3,
+                &[FRAME_UPDATE, 0xff, 0xff],
+                true,
+                &Limits::default()
+            ),
+            Err(CLOSE_POLICY)
+        );
     }
 
     #[test]

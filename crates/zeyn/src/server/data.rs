@@ -22,7 +22,10 @@ pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
     router
         .route("/_zeyn/reveal", post(reveal))
         .route("/_zeyn/reason", post(give_reason))
-        .route("/_zeyn/import", post(import).layer(axum::extract::DefaultBodyLimit::max(IMPORT_BODY_LIMIT)))
+        .route(
+            "/_zeyn/import",
+            post(import).layer(axum::extract::DefaultBodyLimit::max(IMPORT_BODY_LIMIT)),
+        )
 }
 
 /// Largest import request: the CSV text, or an XLSX file in base64.
@@ -43,8 +46,13 @@ fn valid_reason(reason: &str) -> bool {
 /// Reads the reason cookie (`<screen>.<reason>`) into the request's trail. The server only uses it
 /// for that screen.
 pub(super) fn read_reason(ctx: &Ctx, headers: &HeaderMap) {
-    let Some((screen, reason)) = cookie(headers, REASON_COOKIE).and_then(|v| v.split_once('.')) else { return };
-    let reason = percent_decode(reason).trim().to_string();
+    let Some((screen, reason)) = cookie(headers, REASON_COOKIE).and_then(|v| v.split_once('.'))
+    else {
+        return;
+    };
+    let reason = percent_decode(reason)
+        .trim()
+        .to_string();
     if valid_reason(&reason) {
         let screen = screen.to_string();
         ctx.update_trail(|t| t.given_reason = Some((screen, reason)));
@@ -73,7 +81,10 @@ pub(super) fn check_reason(ctx: &Ctx, meta: &ScreenMeta) -> Result<(), Failure> 
 pub(super) fn note_screen_read(ctx: &Ctx, meta: &ScreenMeta, params: &Json) {
     if meta.sensitive || meta.reason {
         let id = (!params.is_null()).then(|| params.to_string());
-        ctx.note_read(RecordRef { model: meta.name, id });
+        ctx.note_read(RecordRef {
+            model: meta.name,
+            id,
+        });
     }
 }
 
@@ -88,8 +99,14 @@ pub(super) fn reason_page(st: &AppState, ctx: &Ctx, screen: &str, csrf: &str) ->
         go = text("reason_continue"),
         screen = escape(screen),
     );
-    let mut r =
-        Html(st.shell(ctx, csrf, &ctx.t(&Text::key("zeyn.privacy.reason_title")), &body, Some(screen))).into_response();
+    let mut r = Html(st.shell(
+        ctx,
+        csrf,
+        &ctx.t(&Text::key("zeyn.privacy.reason_title")),
+        &body,
+        Some(screen),
+    ))
+    .into_response();
     *r.status_mut() = StatusCode::PRECONDITION_REQUIRED;
     r
 }
@@ -113,9 +130,13 @@ impl ImportCall {
     /// The uploaded file. An XLSX file needs the `xlsx` feature; bad base64 reads as a broken file.
     fn file(&mut self) -> Result<crate::import::ImportFile, Failure> {
         match self.xlsx.take() {
-            None => Ok(crate::import::ImportFile::Csv(std::mem::take(&mut self.csv))),
+            None => Ok(crate::import::ImportFile::Csv(std::mem::take(
+                &mut self.csv,
+            ))),
             #[cfg(feature = "xlsx")]
-            Some(b64) => Ok(crate::import::ImportFile::Xlsx(super::base64_decode(&b64).unwrap_or_default())),
+            Some(b64) => Ok(crate::import::ImportFile::Xlsx(
+                super::base64_decode(&b64).unwrap_or_default(),
+            )),
             #[cfg(not(feature = "xlsx"))]
             Some(_) => Err(Failure::App(Error::NotFound)),
         }
@@ -135,18 +156,31 @@ async fn import(
     }
     let file = call.file();
     let result = async {
-        let (_, entry, screen) = st.open(&ctx, &call.screen, call.params).await?;
-        let source = screen.node(&call.node).and_then(|n| n.import()).ok_or(Failure::App(Error::NotFound))?;
+        let (_, entry, screen) = st
+            .open(&ctx, &call.screen, call.params)
+            .await?;
+        let source = screen
+            .node(&call.node)
+            .and_then(|n| n.import())
+            .ok_or(Failure::App(Error::NotFound))?;
         let action = source.action();
         if !ctx.identity().can(&action.access) {
             return Err(Failure::App(Error::Forbidden));
         }
         let file = file?;
         if !call.commit {
-            return source.preview(&ctx, &file).map_err(Failure::App);
+            return source
+                .preview(&ctx, &file)
+                .map_err(Failure::App);
         }
-        let info = Call { kind: CallKind::Import, screen: entry.meta.name, action: Some(action), via_agent: false };
-        st.intercept(&ctx, &info, || st.timed(source.commit(ctx.clone(), file))).await
+        let info = Call {
+            kind: CallKind::Import,
+            screen: entry.meta.name,
+            action: Some(action),
+            via_agent: false,
+        };
+        st.intercept(&ctx, &info, || st.timed(source.commit(ctx.clone(), file)))
+            .await
     }
     .await;
     match result {
@@ -172,7 +206,10 @@ async fn give_reason(
     if let Err(f) = st.check_csrf(&headers) {
         return st.error_response(&ctx, f);
     }
-    let Some((name, (_, entry))) = st.screens.get_key_value(call.screen.as_str()) else {
+    let Some((name, (_, entry))) = st
+        .screens
+        .get_key_value(call.screen.as_str())
+    else {
         return st.error_response(&ctx, Failure::App(Error::NotFound));
     };
     if !entry.meta.reason {
@@ -222,30 +259,56 @@ async fn reveal(
     if let Err(f) = st.check_csrf(&headers) {
         return st.error_response(&ctx, f);
     }
-    let screen_name: &'static str = match st.screens.get_key_value(call.screen.as_str()) {
+    let screen_name: &'static str = match st
+        .screens
+        .get_key_value(call.screen.as_str())
+    {
         Some((name, _)) => *name,
         None => return st.error_response(&ctx, Failure::App(Error::NotFound)),
     };
-    let info = Call { kind: CallKind::Reveal, screen: screen_name, action: None, via_agent: false };
+    let info = Call {
+        kind: CallKind::Reveal,
+        screen: screen_name,
+        action: None,
+        via_agent: false,
+    };
     let (state, user) = (&*st, &ctx);
     let result = st
         .intercept(&ctx, &info, move || async move {
             let (st, ctx) = (state, user);
-            let (_, _, screen) = st.open(ctx, screen_name, call.params).await?;
-            let node = screen.node(&call.node).ok_or(Failure::App(Error::NotFound))?;
+            let (_, _, screen) = st
+                .open(ctx, screen_name, call.params)
+                .await?;
+            let node = screen
+                .node(&call.node)
+                .ok_or(Failure::App(Error::NotFound))?;
             let found = match node.grid() {
                 Some(grid) => {
-                    if !ctx.identity().can(&grid.action().access) {
+                    if !ctx
+                        .identity()
+                        .can(&grid.action().access)
+                    {
                         return Err(Failure::App(Error::Forbidden));
                     }
-                    let key = call.key.clone().ok_or(Failure::App(Error::NotFound))?;
-                    st.timed(grid.reveal(ctx.clone(), key, call.field.clone())).await?
+                    let key = call
+                        .key
+                        .clone()
+                        .ok_or(Failure::App(Error::NotFound))?;
+                    st.timed(grid.reveal(ctx.clone(), key, call.field.clone()))
+                        .await?
                 }
                 None => node.reveal(&call.field),
             };
             let found = found.ok_or(Failure::App(Error::NotFound))?;
-            let permission = found.meta.mask.map(|m| m.permission).ok_or(Failure::App(Error::NotFound))?;
-            if !ctx.identity().can(&Access::Permission(permission)) {
+            let permission = found
+                .meta
+                .mask
+                .map(|m| m.permission)
+                .ok_or(Failure::App(Error::NotFound))?;
+            if !ctx
+                .identity()
+                .can(&Access::Permission(permission))
+            {
                 return Err(Failure::App(Error::Forbidden));
             }
             ctx.update_trail(|t| {
@@ -261,7 +324,8 @@ async fn reveal(
     match result {
         Ok(value) => {
             let mut r = axum::Json(json!({ "value": value })).into_response();
-            r.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+            r.headers_mut()
+                .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
             r
         }
         Err(f) => st.error_response(&ctx, f),

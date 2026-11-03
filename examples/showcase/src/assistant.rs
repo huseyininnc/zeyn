@@ -13,13 +13,17 @@ use crate::{sales, stock};
 use serde_json::json;
 use std::time::Duration;
 use zeyn::Config;
-use zeyn::assistant::{Anthropic, Assistant, AssistantChat, OpenAiCompatible, Say, ScriptedProvider};
+use zeyn::assistant::{
+    Anthropic, Assistant, AssistantChat, OpenAiCompatible, Say, ScriptedProvider,
+};
 use zeyn::prelude::*;
 
 /// Talk to the app: ask about orders and products, open lists, archive a product.
 #[screen(route = "/assistant", permission = "stock.product.read", ai = false)]
 pub fn assistant_page() -> Screen {
-    Screen::new(t!("assistant.title")).body(Alert::info(t!("assistant.intro"))).body(AssistantChat::page())
+    Screen::new(t!("assistant.title"))
+        .body(Alert::info(t!("assistant.intro")))
+        .body(AssistantChat::page())
 }
 
 /// A scripted model that walks through the tour: filter today's orders, archive a product.
@@ -58,14 +62,29 @@ fn scripted() -> ScriptedProvider {
 /// The assistant from configuration: `assistant.provider` is `scripted` (default), `openai`,
 /// `anthropic` or `off`.
 pub fn assistant(config: &Config) -> std::io::Result<Option<Assistant>> {
-    let model = config.get("assistant.model").unwrap_or("").to_string();
-    let key = || config.secret("assistant.api_key").map_err(std::io::Error::other);
-    let assistant = match config.get("assistant.provider").unwrap_or("scripted") {
+    let model = config
+        .get("assistant.model")
+        .unwrap_or("")
+        .to_string();
+    let key = || {
+        config
+            .secret("assistant.api_key")
+            .map_err(std::io::Error::other)
+    };
+    let assistant = match config
+        .get("assistant.provider")
+        .unwrap_or("scripted")
+    {
         "off" => return Ok(None),
         "openai" => {
-            let base = config.get("assistant.base_url").unwrap_or("https://api.openai.com/v1");
+            let base = config
+                .get("assistant.base_url")
+                .unwrap_or("https://api.openai.com/v1");
             let mut p = OpenAiCompatible::new(base, model);
-            if config.get("assistant.api_key").is_some() {
+            if config
+                .get("assistant.api_key")
+                .is_some()
+            {
                 p = p.api_key(key()?);
             }
             if config.get("assistant.azure") == Some("true") {
@@ -92,5 +111,8 @@ pub fn feature() -> Feature {
     Feature::new("assistant")
         .guard(SignedIn)
         .screen(assistant_page)
-        .menu(|m| m.group(t!("menu.assistant"), Icon::Search).item(t!("assistant.title"), assistant_page))
+        .menu(|m| {
+            m.group(t!("menu.assistant"), Icon::Search)
+                .item(t!("assistant.title"), assistant_page)
+        })
 }

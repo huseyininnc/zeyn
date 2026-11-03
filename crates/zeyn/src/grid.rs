@@ -1,6 +1,7 @@
 use crate::action::{
-    Action, ActionMeta, Aggregate, AggregateRequest, Cursor, DEFAULT_PAGE_SIZE, DataQuery, Filter, MAX_FILTER_CHOICES,
-    MAX_FILTER_TEXT, MAX_FILTERS, MAX_PAGE_SIZE, Page, PageRequest, Result, Sort, Total,
+    Action, ActionMeta, Aggregate, AggregateRequest, Cursor, DEFAULT_PAGE_SIZE, DataQuery, Filter,
+    MAX_FILTER_CHOICES, MAX_FILTER_TEXT, MAX_FILTERS, MAX_PAGE_SIZE, Page, PageRequest, Result,
+    Sort, Total,
 };
 use crate::ctx::Outcome;
 use crate::ctx::{BoxFuture, Ctx};
@@ -12,7 +13,8 @@ use crate::screen::RowCall;
 use crate::screen::{Component, Effect, GridSource, LoadedPage, Node, ScreenDef};
 use crate::time::{Date, DateTime, LocalDateTime, Time, TimeZone};
 use crate::value::{
-    ChoiceType, FieldKind, FieldType, IsBool, IsMoment, Money, SupportsMinMaxTotal, SupportsSum, Value,
+    ChoiceType, FieldKind, FieldType, IsBool, IsMoment, Money, SupportsMinMaxTotal, SupportsSum,
+    Value,
 };
 use serde::Deserialize;
 use serde::Serialize;
@@ -81,7 +83,9 @@ pub enum Paging {
 
 impl Default for Paging {
     fn default() -> Self {
-        Paging::Pages { size: DEFAULT_PAGE_SIZE }
+        Paging::Pages {
+            size: DEFAULT_PAGE_SIZE,
+        }
     }
 }
 
@@ -99,12 +103,16 @@ const fn bounded(size: u32) -> u32 {
 impl Paging {
     /// Numbered pages of `size` rows.
     pub const fn pages(size: u32) -> Self {
-        Paging::Pages { size: bounded(size) }
+        Paging::Pages {
+            size: bounded(size),
+        }
     }
 
     /// Infinite scroll loading `batch` rows at a time.
     pub const fn infinite(batch: u32) -> Self {
-        Paging::Infinite { batch: bounded(batch) }
+        Paging::Infinite {
+            batch: bounded(batch),
+        }
     }
 
     /// No paging.
@@ -118,12 +126,18 @@ impl Paging {
     /// [`VIRTUAL_WIDE_COLUMNS`] columns or more puts every row there and the runtime inserts the
     /// rows once it has chosen the columns in view.
     pub const fn virtual_scroll() -> Self {
-        Paging::Virtual { row_height: 32, block: 200 }
+        Paging::Virtual {
+            row_height: 32,
+            block: 200,
+        }
     }
 
     /// Virtual scrolling with a custom row height in pixels.
     pub const fn virtual_rows(row_height: u32) -> Self {
-        Paging::Virtual { row_height: if row_height < 20 { 20 } else { row_height }, block: 200 }
+        Paging::Virtual {
+            row_height: if row_height < 20 { 20 } else { row_height },
+            block: 200,
+        }
     }
 
     fn code(self) -> &'static str {
@@ -228,7 +242,14 @@ pub struct MemoryViewStore(Arc<Mutex<HashMap<(String, String), DataGridView>>>);
 
 impl DataGridViewStore for MemoryViewStore {
     fn load(&self, user: &str, grid: &str) -> BoxFuture<Result<Option<DataGridView>>> {
-        let found = self.0.lock().map(|m| m.get(&(user.to_string(), grid.to_string())).cloned()).map_err(poisoned);
+        let found = self
+            .0
+            .lock()
+            .map(|m| {
+                m.get(&(user.to_string(), grid.to_string()))
+                    .cloned()
+            })
+            .map_err(poisoned);
         Box::pin(async move { found })
     }
 
@@ -309,7 +330,8 @@ where
 }
 
 type CellFn<E> = Box<dyn Fn(&E, &Render) -> String + Send + Sync>;
-type RunFn<E> = Box<dyn Fn(&E) -> Box<dyn FnOnce(Ctx) -> BoxFuture<Result<()>> + Send> + Send + Sync>;
+type RunFn<E> =
+    Box<dyn Fn(&E) -> Box<dyn FnOnce(Ctx) -> BoxFuture<Result<()>> + Send> + Send + Sync>;
 
 /// Most rows one bulk action may cover; larger selections are refused.
 pub const MAX_BULK: usize = 10_000;
@@ -325,8 +347,11 @@ pub trait BulkAction<K>: Action {}
 
 impl<K, A: Action<Input = Vec<K>>> BulkAction<K> for A {}
 
-type BulkFn =
-    Box<dyn Fn(Vec<serde_json::Value>) -> Option<Box<dyn FnOnce(Ctx) -> BoxFuture<Result<()>> + Send>> + Send + Sync>;
+type BulkFn = Box<
+    dyn Fn(Vec<serde_json::Value>) -> Option<Box<dyn FnOnce(Ctx) -> BoxFuture<Result<()>> + Send>>
+        + Send
+        + Sync,
+>;
 
 /// A button in the selection bar that runs an action with the selected keys.
 struct BulkDef {
@@ -400,15 +425,24 @@ struct Column<E> {
 }
 
 /// Old name of [`DataGrid`]; kept for one release.
-#[deprecated(since = "0.0.2", note = "renamed to `DataGrid`; `zeyn check --fix` rewrites it")]
+#[deprecated(
+    since = "0.0.2",
+    note = "renamed to `DataGrid`; `zeyn check --fix` rewrites it"
+)]
 pub type Grid<E> = DataGrid<E>;
 
 /// Old name of [`DataGridColumn`]; kept for one release.
-#[deprecated(since = "0.0.2", note = "renamed to `DataGridColumn`; `zeyn check --fix` rewrites it")]
+#[deprecated(
+    since = "0.0.2",
+    note = "renamed to `DataGridColumn`; `zeyn check --fix` rewrites it"
+)]
 pub type GridColumn<E, T> = DataGridColumn<E, T>;
 
 /// Old name of [`DataMode`]; kept for one release.
-#[deprecated(since = "0.0.2", note = "renamed to `DataMode`; `zeyn check --fix` rewrites it")]
+#[deprecated(
+    since = "0.0.2",
+    note = "renamed to `DataMode`; `zeyn check --fix` rewrites it"
+)]
 pub type GridMode = DataMode;
 
 /// Data grid. Its data source is an action that takes a `DataQuery` and returns `Page<E>`.
@@ -465,7 +499,12 @@ fn value_key(value: &Value) -> Option<String> {
         Value::Null => None,
         Value::Money(m) => {
             let a = m.minor.unsigned_abs();
-            Some(format!("{}{}.{:02}", if m.minor < 0 { "-" } else { "" }, a / 100, a % 100))
+            Some(format!(
+                "{}{}.{:02}",
+                if m.minor < 0 { "-" } else { "" },
+                a / 100,
+                a % 100
+            ))
         }
         other => Some(key_text(other)),
     }
@@ -474,11 +513,15 @@ fn value_key(value: &Value) -> Option<String> {
 /// Filter that keeps rows whose `meta` field equals `key` (from [`value_key`]), or is empty when
 /// `key` is `None`.
 fn key_filter(meta: &FieldMeta, key: Option<&str>) -> Filter {
-    let Some(key) = key else { return Filter::blank(meta.name, true) };
+    let Some(key) = key else {
+        return Filter::blank(meta.name, true);
+    };
     match meta.kind {
-        FieldKind::Text | FieldKind::Custom { .. } => {
-            Filter { field: meta.name.to_string(), equals: Some(key.to_string()), ..Filter::default() }
-        }
+        FieldKind::Text | FieldKind::Custom { .. } => Filter {
+            field: meta.name.to_string(),
+            equals: Some(key.to_string()),
+            ..Filter::default()
+        },
         FieldKind::Choice(_) => Filter::any_of(meta.name, [key]),
         FieldKind::Bool => Filter::is(meta.name, key == "true"),
         _ => Filter::range(meta.name, Some(key), Some(key)),
@@ -501,7 +544,11 @@ pub const DEFAULT_EXPORT_LIMIT: usize = 100_000;
 /// at the start and after every character a spreadsheet may split cells on (`,`, `;`, tab), since
 /// the list separator depends on the reader's locale.
 fn csv_cell(value: &str) -> String {
-    let numeric = |s: &str| !s.is_empty() && s.chars().all(|c| c.is_ascii_digit() || ".,- +".contains(c));
+    let numeric = |s: &str| {
+        !s.is_empty()
+            && s.chars()
+                .all(|c| c.is_ascii_digit() || ".,- +".contains(c))
+    };
     let formula = |s: &str| s.starts_with(['=', '+', '-', '@', '\t', '\r']) && !numeric(s);
     let mut v = String::with_capacity(value.len() + 2);
     let mut rest = value;
@@ -520,12 +567,18 @@ fn csv_cell(value: &str) -> String {
             }
         }
     }
-    if v.contains([',', ';', '\t', '"', '\r', '\n']) { format!("\"{}\"", v.replace('"', "\"\"")) } else { v }
+    if v.contains([',', ';', '\t', '"', '\r', '\n']) {
+        format!("\"{}\"", v.replace('"', "\"\""))
+    } else {
+        v
+    }
 }
 
 /// The masked text of a masked field's value, as its grid cell shows it.
 fn masked(meta: &FieldMeta, value: &Value) -> String {
-    crate::audit::plain(value).map(|v| crate::privacy::masked_text(meta, &v)).unwrap_or_default()
+    crate::audit::plain(value)
+        .map(|v| crate::privacy::masked_text(meta, &v))
+        .unwrap_or_default()
 }
 
 /// A value as the user reads it, escaped for HTML.
@@ -538,9 +591,14 @@ fn plain_html(value: &Value, kind: &FieldKind, r: &Render) -> String {
 fn plain(value: &Value, kind: &FieldKind, r: &Render) -> String {
     match value {
         Value::Null => String::new(),
-        Value::Bool(b) => r.i18n.text(r.locale, &Text::key(if *b { "zeyn.yes" } else { "zeyn.no" })),
+        Value::Bool(b) => r.i18n.text(
+            r.locale,
+            &Text::key(if *b { "zeyn.yes" } else { "zeyn.no" }),
+        ),
         Value::Int(n) => n.to_string(),
-        Value::Text(s) if matches!(kind, FieldKind::Choices(_)) => crate::ui::choices_text(s, kind, r),
+        Value::Text(s) if matches!(kind, FieldKind::Choices(_)) => {
+            crate::ui::choices_text(s, kind, r)
+        }
         Value::Text(s) => s.clone(),
         Value::Money(m) => m.format(r.locale),
         Value::Date(d) => d.format(r.locale),
@@ -553,14 +611,18 @@ fn plain(value: &Value, kind: &FieldKind, r: &Render) -> String {
             FieldKind::Choice(options) => options
                 .iter()
                 .find(|o| o.value == *c)
-                .map(|o| r.i18n.text(r.locale, &Text::key_or(o.key, o.label)))
+                .map(|o| {
+                    r.i18n
+                        .text(r.locale, &Text::key_or(o.key, o.label))
+                })
                 .unwrap_or_else(|| c.to_string()),
             _ => c.to_string(),
         },
     }
 }
 
-type SaveRun<E> = Box<dyn Fn(Valid<E>) -> Box<dyn FnOnce(Ctx) -> BoxFuture<Result<()>> + Send> + Send + Sync>;
+type SaveRun<E> =
+    Box<dyn Fn(Valid<E>) -> Box<dyn FnOnce(Ctx) -> BoxFuture<Result<()>> + Send> + Send + Sync>;
 
 /// The action that saves inline edits.
 struct SaveDef<E: Model> {
@@ -616,10 +678,18 @@ impl<E: Model> DataGrid<E> {
     pub fn group_by<T: FieldType>(mut self, field: Field<E, T>) -> Self {
         let meta = field.meta();
         if meta.mask.is_some() {
-            tracing::warn!("grid of `{}` cannot group by the masked field `{}`; ignored", E::NAME, meta.name);
+            tracing::warn!(
+                "grid of `{}` cannot group by the masked field `{}`; ignored",
+                E::NAME,
+                meta.name
+            );
             return self;
         }
-        if !self.group_by.iter().any(|m| m.name == meta.name) {
+        if !self
+            .group_by
+            .iter()
+            .any(|m| m.name == meta.name)
+        {
             self.group_by.push(meta);
         }
         self
@@ -640,7 +710,8 @@ impl<E: Model> DataGrid<E> {
 
     /// Whether rows are grouped or in a tree.
     fn nested(&self) -> bool {
-        !matches!(self.paging, Paging::Virtual { .. }) && (self.tree.is_some() || !self.group_by.is_empty())
+        !matches!(self.paging, Paging::Virtual { .. })
+            && (self.tree.is_some() || !self.group_by.is_empty())
     }
 
     /// Lets every row expand into a screen built from the row, loaded only when the user opens
@@ -653,11 +724,16 @@ impl<E: Model> DataGrid<E> {
     ///
     /// Virtual grids (`Paging::Virtual`) keep every row at one fixed height and show no expander;
     /// use pages or infinite paging for grids with details.
-    pub fn detail<S: ScreenDef>(mut self, detail: impl Fn(&E) -> (S, S::Params) + Send + Sync + 'static) -> Self {
+    pub fn detail<S: ScreenDef>(
+        mut self,
+        detail: impl Fn(&E) -> (S, S::Params) + Send + Sync + 'static,
+    ) -> Self {
         self.detail = Some(DetailDef {
             screen: S::META.name,
             access: S::META.access,
-            params: Box::new(move |row| serde_json::to_value(detail(row).1).unwrap_or(serde_json::Value::Null)),
+            params: Box::new(move |row| {
+                serde_json::to_value(detail(row).1).unwrap_or(serde_json::Value::Null)
+            }),
         });
         self
     }
@@ -667,7 +743,11 @@ impl<E: Model> DataGrid<E> {
     /// descending; other columns go back to this order on their third click. Call it again to add
     /// further keys. The action still receives it in `DataQuery::sort`.
     pub fn sort_by<T: FieldType>(mut self, field: Field<E, T>, desc: bool) -> Self {
-        self.default_sort.push(crate::action::Sort { field: field.meta().name.to_string(), desc });
+        self.default_sort
+            .push(crate::action::Sort {
+                field: field.meta().name.to_string(),
+                desc,
+            });
         self
     }
 
@@ -676,7 +756,10 @@ impl<E: Model> DataGrid<E> {
     /// first in `DataQuery::filters`, so a data layer that reads the filters keeps it. Text
     /// compares ignoring case.
     pub fn scope<T: FieldType>(mut self, field: Field<E, T>, value: T) -> Self {
-        self.scope.push(key_filter(field.meta(), value_key(&value.to_value()).as_deref()));
+        self.scope.push(key_filter(
+            field.meta(),
+            value_key(&value.to_value()).as_deref(),
+        ));
         self
     }
 
@@ -684,7 +767,10 @@ impl<E: Model> DataGrid<E> {
     fn expandable(&self, r: &Render) -> bool {
         !matches!(self.paging, Paging::Virtual { .. })
             && !(self.nested() && self.tree.is_some())
-            && self.detail.as_ref().is_some_and(|d| r.can(&d.access))
+            && self
+                .detail
+                .as_ref()
+                .is_some_and(|d| r.can(&d.access))
     }
 
     /// Cells before the first data column: the detail expander and the selection box.
@@ -695,7 +781,9 @@ impl<E: Model> DataGrid<E> {
     /// Puts the grid's scope filters in front of the client's.
     fn scoped(&self, query: &mut DataQuery) {
         if !self.scope.is_empty() {
-            query.filters.splice(0..0, self.scope.iter().cloned());
+            query
+                .filters
+                .splice(0..0, self.scope.iter().cloned());
         }
     }
 
@@ -710,14 +798,18 @@ impl<E: Model> DataGrid<E> {
 
     /// Like `exportable`, but exporting also needs `permission`.
     pub fn export_permission(mut self, permission: &'static str) -> Self {
-        let limit = self.export.map_or(DEFAULT_EXPORT_LIMIT, |e| e.1);
+        let limit = self
+            .export
+            .map_or(DEFAULT_EXPORT_LIMIT, |e| e.1);
         self.export = Some((crate::action::Access::Permission(permission), limit));
         self
     }
 
     /// Most rows one export may hold; bigger results are cut there. At most 1,000,000.
     pub fn export_limit(mut self, rows: usize) -> Self {
-        let access = self.export.map_or(self.action.access, |e| e.0);
+        let access = self
+            .export
+            .map_or(self.action.access, |e| e.0);
         self.export = Some((access, rows.clamp(1, 1_000_000)));
         self
     }
@@ -732,7 +824,10 @@ impl<E: Model> DataGrid<E> {
         A: crate::form::FormAction<E> + Action<Input = Valid<E>>,
         A::Output: Outcome,
     {
-        self.save = Some(SaveDef { meta: A::META, run: Box::new(|valid| runner::<A>(valid)) });
+        self.save = Some(SaveDef {
+            meta: A::META,
+            run: Box::new(|valid| runner::<A>(valid)),
+        });
         self
     }
 
@@ -742,18 +837,27 @@ impl<E: Model> DataGrid<E> {
         self.columns
             .iter()
             .filter(|c| c.editable && !c.meta.key && !c.meta.readonly && !c.meta.version)
-            .filter_map(|c| E::fields().iter().position(|f| f.name == c.meta.name))
+            .filter_map(|c| {
+                E::fields()
+                    .iter()
+                    .position(|f| f.name == c.meta.name)
+            })
             .collect()
     }
 
     /// Whether the page's user may save inline edits.
     fn can_edit(&self, r: &Render) -> bool {
-        self.save.as_ref().is_some_and(|s| r.can(&s.meta.access))
+        self.save
+            .as_ref()
+            .is_some_and(|s| r.can(&s.meta.access))
     }
 
     /// Context menu of each row, built on the server from the row. Right click, Shift+F10 or the
     /// context menu key opens it. See [`crate::ContextMenu`].
-    pub fn row_menu(mut self, menu: impl Fn(&E) -> crate::menu::ContextMenu + Send + Sync + 'static) -> Self {
+    pub fn row_menu(
+        mut self,
+        menu: impl Fn(&E) -> crate::menu::ContextMenu + Send + Sync + 'static,
+    ) -> Self {
         self.row_menu = Some(Box::new(menu));
         self
     }
@@ -765,8 +869,15 @@ impl<E: Model> DataGrid<E> {
         A: Action<Input = DataQuery, Output = Result<Page<E>>>,
     {
         let mut grid = Self::of(source);
-        for (i, meta) in E::fields().iter().enumerate().filter(|(_, m)| !m.version) {
-            let filter = matches!(meta.kind, crate::value::FieldKind::Text | crate::value::FieldKind::Choice(_));
+        for (i, meta) in E::fields()
+            .iter()
+            .enumerate()
+            .filter(|(_, m)| !m.version)
+        {
+            let filter = matches!(
+                meta.kind,
+                crate::value::FieldKind::Text | crate::value::FieldKind::Choice(_)
+            );
             grid.columns.push(Column {
                 meta,
                 value: Box::new(move |e: &E| e.value_at(i).unwrap_or(Value::Null)),
@@ -810,11 +921,18 @@ impl<E: Model> DataGrid<E> {
             cell: None,
             editable: false,
         });
-        DataGridColumn { grid: self, field, _type: PhantomData }
+        DataGridColumn {
+            grid: self,
+            field,
+            _type: PhantomData,
+        }
     }
 
     /// Picks a highlight per row.
-    pub fn row_style(mut self, style: impl Fn(&E) -> Option<RowStyle> + Send + Sync + 'static) -> Self {
+    pub fn row_style(
+        mut self,
+        style: impl Fn(&E) -> Option<RowStyle> + Send + Sync + 'static,
+    ) -> Self {
         self.row_style = Some(Box::new(style));
         self
     }
@@ -863,7 +981,12 @@ impl<E: Model> DataGrid<E> {
     /// row, the server collects the keys itself (at most [`MAX_BULK`]). Keys picked one by one come
     /// from the client, so the action must check that the user may change each record, as an API
     /// action would.
-    pub fn bulk_action<A, K>(mut self, label: impl Into<Text>, _action: A, _key: Field<E, K>) -> Self
+    pub fn bulk_action<A, K>(
+        mut self,
+        label: impl Into<Text>,
+        _action: A,
+        _key: Field<E, K>,
+    ) -> Self
     where
         A: BulkAction<K> + Action<Input = Vec<K>>,
         A::Output: Outcome,
@@ -874,8 +997,11 @@ impl<E: Model> DataGrid<E> {
             label: label.into(),
             meta: A::META,
             run: Box::new(|keys| {
-                let keys: Vec<K> =
-                    keys.into_iter().map(serde_json::from_value).collect::<std::result::Result<_, _>>().ok()?;
+                let keys: Vec<K> = keys
+                    .into_iter()
+                    .map(serde_json::from_value)
+                    .collect::<std::result::Result<_, _>>()
+                    .ok()?;
                 Some(runner::<A>(keys))
             }),
         });
@@ -902,7 +1028,12 @@ impl<E: Model> DataGrid<E> {
 
     /// Renders rows as HTML in English. For tests and tools; the server uses the user's language.
     pub fn rows_html(&self, rows: &[E]) -> String {
-        self.rows(rows, &Render::english("grid"), &self.layout(None), &Branch::default())
+        self.rows(
+            rows,
+            &Render::english("grid"),
+            &self.layout(None),
+            &Branch::default(),
+        )
     }
 
     /// Shown columns for a view: the view's columns that exist, in its order, with starts pinned
@@ -911,13 +1042,30 @@ impl<E: Model> DataGrid<E> {
         let mut shown: Vec<Shown> = match view.filter(|v| !v.columns.is_empty()) {
             Some(v) => {
                 let mut out: Vec<Shown> = Vec::new();
-                for cv in v.columns.iter().take(self.columns.len()) {
-                    let Some(index) = self.columns.iter().position(|c| c.meta.name == cv.field) else { continue };
+                for cv in v
+                    .columns
+                    .iter()
+                    .take(self.columns.len())
+                {
+                    let Some(index) = self
+                        .columns
+                        .iter()
+                        .position(|c| c.meta.name == cv.field)
+                    else {
+                        continue;
+                    };
                     if out.iter().any(|s| s.index == index) {
                         continue;
                     }
-                    let width = cv.width.map(|w| w.clamp(COLUMN_WIDTH.0, COLUMN_WIDTH.1)).or(self.columns[index].width);
-                    out.push(Shown { index, width, pin: cv.pin });
+                    let width = cv
+                        .width
+                        .map(|w| w.clamp(COLUMN_WIDTH.0, COLUMN_WIDTH.1))
+                        .or(self.columns[index].width);
+                    out.push(Shown {
+                        index,
+                        width,
+                        pin: cv.pin,
+                    });
                 }
                 out
             }
@@ -926,12 +1074,19 @@ impl<E: Model> DataGrid<E> {
                 .iter()
                 .enumerate()
                 .filter(|(_, c)| !c.hidden)
-                .map(|(index, c)| Shown { index, width: c.width, pin: c.pin })
+                .map(|(index, c)| Shown {
+                    index,
+                    width: c.width,
+                    pin: c.pin,
+                })
                 .collect(),
         };
         for side in [Pin::Start, Pin::End] {
             let mut n = 0;
-            for s in shown.iter_mut().filter(|s| s.pin == Some(side)) {
+            for s in shown
+                .iter_mut()
+                .filter(|s| s.pin == Some(side))
+            {
                 n += 1;
                 if n > MAX_PINNED {
                     s.pin = None;
@@ -953,21 +1108,41 @@ impl<E: Model> DataGrid<E> {
         let columns = self
             .layout(Some(&view))
             .into_iter()
-            .map(|s| ColumnView { field: self.columns[s.index].meta.name.to_string(), width: s.width, pin: s.pin })
+            .map(|s| ColumnView {
+                field: self.columns[s.index]
+                    .meta
+                    .name
+                    .to_string(),
+                width: s.width,
+                pin: s.pin,
+            })
             .collect();
-        let mut query = DataQuery { sort: view.sort, filters: view.filters, ..DataQuery::default() };
+        let mut query = DataQuery {
+            sort: view.sort,
+            filters: view.filters,
+            ..DataQuery::default()
+        };
         self.allow(&mut query, None);
         query.filters.retain(|f| {
-            let short = |s: &Option<String>| s.as_deref().is_none_or(|t| t.chars().count() <= MAX_FILTER_TEXT);
+            let short = |s: &Option<String>| {
+                s.as_deref()
+                    .is_none_or(|t| t.chars().count() <= MAX_FILTER_TEXT)
+            };
             f.contains.chars().count() <= MAX_FILTER_TEXT
                 && short(&f.starts_with)
                 && short(&f.equals)
                 && short(&f.from)
                 && short(&f.to)
                 && f.any_of.len() <= MAX_FILTER_CHOICES
-                && f.any_of.iter().all(|v| v.chars().count() <= MAX_FILTER_TEXT)
+                && f.any_of
+                    .iter()
+                    .all(|v| v.chars().count() <= MAX_FILTER_TEXT)
         });
-        DataGridView { columns, sort: query.sort, filters: query.filters }
+        DataGridView {
+            columns,
+            sort: query.sort,
+            filters: query.filters,
+        }
     }
 
     /// Keeps the totals, filters and sort keys this grid offers, within the limits. With a ctx,
@@ -978,11 +1153,23 @@ impl<E: Model> DataGrid<E> {
             crate::privacy::strip_masked(query, E::fields(), ctx);
         }
         let allowed = self.aggregate_requests();
-        query.aggregates.retain(|a| allowed.contains(a));
+        query
+            .aggregates
+            .retain(|a| allowed.contains(a));
         query.aggregates.dedup();
-        let sortable = |name: &str| self.columns.iter().any(|c| c.sort && c.meta.name == name);
-        let filterable = |name: &str| self.columns.iter().any(|c| c.filter && c.meta.name == name);
-        query.filters.retain(|f| filterable(&f.field) && !f.is_empty());
+        let sortable = |name: &str| {
+            self.columns
+                .iter()
+                .any(|c| c.sort && c.meta.name == name)
+        };
+        let filterable = |name: &str| {
+            self.columns
+                .iter()
+                .any(|c| c.filter && c.meta.name == name)
+        };
+        query
+            .filters
+            .retain(|f| filterable(&f.field) && !f.is_empty());
         query.filters.truncate(MAX_FILTERS);
         let mut seen = Vec::new();
         query.sort.retain(|s| {
@@ -1018,9 +1205,16 @@ impl<E: Model> DataGrid<E> {
             if let Some(f) = c.flex.filter(|_| s.width.is_none()) {
                 style.push_str(&format!("--z-flex:{f};"));
             }
-            let num = matches!(c.meta.kind, FieldKind::Integer | FieldKind::Money | FieldKind::Decimal);
+            let num = matches!(
+                c.meta.kind,
+                FieldKind::Integer | FieldKind::Money | FieldKind::Decimal
+            );
             let class = if num { r#" class="z-num""# } else { "" };
-            let sort = if c.sort { r#" aria-sort="none""# } else { r#" data-sort="off""# };
+            let sort = if c.sort {
+                r#" aria-sort="none""#
+            } else {
+                r#" data-sort="off""#
+            };
             out.push_str(&format!(
                 r#"<th scope="col"{class} data-field="{}"{sort} aria-colindex="{}""#,
                 c.meta.name,
@@ -1032,7 +1226,8 @@ impl<E: Model> DataGrid<E> {
             if let Some(p) = s.pin {
                 out.push_str(&format!(r#" data-pin="{}""#, p.code()));
             }
-            if self.can_edit(r) && c.editable && !c.meta.readonly && !c.meta.key && !c.meta.version {
+            if self.can_edit(r) && c.editable && !c.meta.readonly && !c.meta.key && !c.meta.version
+            {
                 out.push_str(&format!(r#" data-edit="{}""#, filter_kind(&c.meta.kind)));
                 if c.meta.optional {
                     out.push_str(r#" data-optional="true""#);
@@ -1078,8 +1273,17 @@ impl<E: Model> DataGrid<E> {
         let tree = nested && self.tree.is_some();
         let edit = self.can_edit(r);
         let key_at = Self::key_index();
-        let version_at = edit.then(|| E::fields().iter().position(|f| f.version)).flatten();
-        let detail = self.detail.as_ref().filter(|_| self.expandable(r));
+        let version_at = edit
+            .then(|| {
+                E::fields()
+                    .iter()
+                    .position(|f| f.version)
+            })
+            .flatten();
+        let detail = self
+            .detail
+            .as_ref()
+            .filter(|_| self.expandable(r));
         let expand_cell = detail.map(|_| {
             format!(
                 r#"<td class="z-expand"><button type="button" class="z-expander" data-zeyn-expand aria-expanded="false" aria-label="{}" tabindex="-1"></button></td>"#,
@@ -1115,7 +1319,11 @@ impl<E: Model> DataGrid<E> {
             .iter()
             .map(|s| {
                 let c = &self.columns[s.index];
-                edit && c.editable && !c.meta.readonly && !c.meta.key && !c.meta.version && c.meta.mask.is_none()
+                edit && c.editable
+                    && !c.meta.readonly
+                    && !c.meta.key
+                    && !c.meta.version
+                    && c.meta.mask.is_none()
             })
             .collect();
         for row in rows {
@@ -1125,25 +1333,47 @@ impl<E: Model> DataGrid<E> {
             out.push_str("<tr");
             let mut toggle = "";
             if nested {
-                let _ = write!(out, r#" aria-level="{}" data-zeyn-level="{}""#, b.depth + 1, b.depth);
+                let _ = write!(
+                    out,
+                    r#" aria-level="{}" data-zeyn-level="{}""#,
+                    b.depth + 1,
+                    b.depth
+                );
             }
             if tree {
-                let key = key_at.and_then(|i| row.value_at(i)).and_then(|v| value_key(&v));
-                toggle = match key.filter(|k| b.parents.contains(k) && b.depth + 1 < MAX_TREE_DEPTH) {
+                let key = key_at
+                    .and_then(|i| row.value_at(i))
+                    .and_then(|v| value_key(&v));
+                toggle = match key.filter(|k| b.parents.contains(k) && b.depth + 1 < MAX_TREE_DEPTH)
+                {
                     Some(k) => {
                         let mut path = b.path.to_vec();
                         path.push(Some(k));
-                        let _ = write!(out, r#" aria-expanded="false" data-zeyn-path="{}""#, attr(&path));
-                        tree_toggle.as_deref().unwrap_or_default()
+                        let _ = write!(
+                            out,
+                            r#" aria-expanded="false" data-zeyn-path="{}""#,
+                            attr(&path)
+                        );
+                        tree_toggle
+                            .as_deref()
+                            .unwrap_or_default()
                     }
                     None => r#"<span class="z-tree-spacer" aria-hidden="true"></span>"#,
                 };
             }
-            if let Some(style) = self.row_style.as_ref().and_then(|f| f(row)) {
+            if let Some(style) = self
+                .row_style
+                .as_ref()
+                .and_then(|f| f(row))
+            {
                 let _ = write!(out, r#" class="{}""#, style.css());
             }
             if let Some(effect) = self.open_effect(row) {
-                let _ = write!(out, r#" tabindex="-1" data-zeyn-effect="{}""#, attr(&effect));
+                let _ = write!(
+                    out,
+                    r#" tabindex="-1" data-zeyn-effect="{}""#,
+                    attr(&effect)
+                );
             }
             if let Some(k) = key_at.and_then(|i| row.value_at(i)) {
                 out.push_str(r#" data-zeyn-key=""#);
@@ -1157,17 +1387,32 @@ impl<E: Model> DataGrid<E> {
             }
             if let Some(menu) = self.row_menu.as_ref().map(|f| f(row)) {
                 let items = menu.to_json(r);
-                if items.as_array().is_some_and(|a| !a.is_empty()) {
+                if items
+                    .as_array()
+                    .is_some_and(|a| !a.is_empty())
+                {
                     let _ = write!(out, r#" data-zeyn-menu="{}""#, attr(&items));
                 }
             }
             if let Some(d) = detail {
                 let target = json!({ "screen": d.screen, "params": (d.params)(row) });
-                let _ = write!(out, r#" aria-expanded="false" data-zeyn-detail="{}""#, attr(&target));
+                let _ = write!(
+                    out,
+                    r#" aria-expanded="false" data-zeyn-detail="{}""#,
+                    attr(&target)
+                );
             }
             out.push('>');
-            out.push_str(expand_cell.as_deref().unwrap_or_default());
-            out.push_str(select_cell.as_deref().unwrap_or_default());
+            out.push_str(
+                expand_cell
+                    .as_deref()
+                    .unwrap_or_default(),
+            );
+            out.push_str(
+                select_cell
+                    .as_deref()
+                    .unwrap_or_default(),
+            );
             for (n, s) in cols.iter().enumerate() {
                 let c = &self.columns[s.index];
                 let value = (c.value)(row);
@@ -1186,7 +1431,11 @@ impl<E: Model> DataGrid<E> {
                 }
                 out.push('>');
                 if first {
-                    let _ = write!(out, r#"<span class="z-tree" style="--z-level:{}">{toggle}<span>"#, b.depth);
+                    let _ = write!(
+                        out,
+                        r#"<span class="z-tree" style="--z-level:{}">{toggle}<span>"#,
+                        b.depth
+                    );
                 }
                 match (c.meta.mask, &c.cell) {
                     (Some(_), _) => out.push_str(&crate::privacy::cell(r, c.meta, &value, row)),
@@ -1198,7 +1447,11 @@ impl<E: Model> DataGrid<E> {
                 }
                 out.push_str("</td>");
             }
-            out.push_str(actions_cell.as_deref().unwrap_or_default());
+            out.push_str(
+                actions_cell
+                    .as_deref()
+                    .unwrap_or_default(),
+            );
             out.push_str("</tr>");
         }
         out
@@ -1216,7 +1469,12 @@ impl<E: Model> DataGrid<E> {
                 t("select_matching"),
                 t("all_selected"),
             ));
-            for (i, b) in self.bulk.iter().enumerate().filter(|(_, b)| r.can(&b.meta.access)) {
+            for (i, b) in self
+                .bulk
+                .iter()
+                .enumerate()
+                .filter(|(_, b)| r.can(&b.meta.access))
+            {
                 out.push_str(&format!(
                     r#"<button type="button" class="z-button" data-zeyn-bulk-run="{i}" data-testid="{scope}.grid.bulk-{i}">{}</button>"#,
                     r.text(&b.label)
@@ -1240,10 +1498,15 @@ impl<E: Model> DataGrid<E> {
             grid_text("loaded"),
         ));
         if let Paging::Virtual { row_height, .. } = self.paging {
-            out.push_str(&format!(r#" data-zeyn-row-height="{row_height}" style="--z-row-height:{row_height}px""#));
+            out.push_str(&format!(
+                r#" data-zeyn-row-height="{row_height}" style="--z-row-height:{row_height}px""#
+            ));
         }
         if let Some(p) = page {
-            out.push_str(&format!(r#" data-zeyn-offset="{}" data-zeyn-count="{}""#, p.offset, p.count));
+            out.push_str(&format!(
+                r#" data-zeyn-offset="{}" data-zeyn-count="{}""#,
+                p.offset, p.count
+            ));
             if let Some(t) = p.total {
                 out.push_str(&format!(r#" data-zeyn-total="{t}""#));
             }
@@ -1262,7 +1525,10 @@ impl<E: Model> DataGrid<E> {
             out.push_str(&format!(r#" data-zeyn-view="{}""#, attr(v)));
         }
         if !self.default_sort.is_empty() {
-            out.push_str(&format!(r#" data-zeyn-sort-default="{}""#, attr(&self.default_sort)));
+            out.push_str(&format!(
+                r#" data-zeyn-sort-default="{}""#,
+                attr(&self.default_sort)
+            ));
         }
         if page.is_some_and(|p| p.saved_views) {
             out.push_str(r#" data-zeyn-views="server""#);
@@ -1288,11 +1554,21 @@ impl<E: Model> DataGrid<E> {
         ));
         let mut later = String::new();
         let shown = self.lead(r) + cols.len() + usize::from(!self.row_actions.is_empty());
-        let live_rows = if shown >= VIRTUAL_WIDE_COLUMNS { 0 } else { VIRTUAL_LIVE_ROWS };
+        let live_rows = if shown >= VIRTUAL_WIDE_COLUMNS {
+            0
+        } else {
+            VIRTUAL_LIVE_ROWS
+        };
         if let Some(p) = page {
             match (self.paging, p.items.downcast_ref::<Vec<E>>()) {
-                (Paging::Virtual { .. }, Some(rows)) if p.groups.is_none() && rows.len() > live_rows => {
-                    let branch = Branch { depth: p.depth, path: &p.path, parents: &p.parents };
+                (Paging::Virtual { .. }, Some(rows))
+                    if p.groups.is_none() && rows.len() > live_rows =>
+                {
+                    let branch = Branch {
+                        depth: p.depth,
+                        path: &p.path,
+                        parents: &p.parents,
+                    };
                     out.push_str(&self.rows(&rows[..live_rows], r, &cols, &branch));
                     later = self.rows(&rows[live_rows..], r, &cols, &branch);
                 }
@@ -1300,9 +1576,20 @@ impl<E: Model> DataGrid<E> {
             }
         }
         out.push_str("</tbody>");
-        if self.columns.iter().any(|c| !c.aggregates.is_empty()) {
+        if self
+            .columns
+            .iter()
+            .any(|c| !c.aggregates.is_empty())
+        {
             out.push_str("<tfoot data-zeyn-foot>");
-            out.push_str(&self.foot_row(r, page.map(|p| p.totals.as_slice()).unwrap_or_default(), &cols));
+            out.push_str(
+                &self.foot_row(
+                    r,
+                    page.map(|p| p.totals.as_slice())
+                        .unwrap_or_default(),
+                    &cols,
+                ),
+            );
             out.push_str("</tfoot>");
         }
         out.push_str("</table>");
@@ -1337,7 +1624,10 @@ impl<E: Model> DataGrid<E> {
         for _ in 0..self.lead(r) {
             out.push_str("<td></td>");
         }
-        for c in cols.iter().map(|s| &self.columns[s.index]) {
+        for c in cols
+            .iter()
+            .map(|s| &self.columns[s.index])
+        {
             out.push_str(&self.total_cell(c, totals, r));
         }
         if !self.row_actions.is_empty() {
@@ -1352,10 +1642,21 @@ impl<E: Model> DataGrid<E> {
         if c.aggregates.is_empty() {
             return "<td></td>".to_string();
         }
-        let ops: Vec<&str> = c.aggregates.iter().map(|a| a.code()).collect();
-        let num = matches!(c.meta.kind, FieldKind::Integer | FieldKind::Money | FieldKind::Decimal);
+        let ops: Vec<&str> = c
+            .aggregates
+            .iter()
+            .map(|a| a.code())
+            .collect();
+        let num = matches!(
+            c.meta.kind,
+            FieldKind::Integer | FieldKind::Money | FieldKind::Decimal
+        );
         let class = if num { r#" class="z-num""# } else { "" };
-        let mut out = format!(r#"<td{class} data-field="{}" data-agg="{}">"#, c.meta.name, ops.join(" "));
+        let mut out = format!(
+            r#"<td{class} data-field="{}" data-agg="{}">"#,
+            c.meta.name,
+            ops.join(" ")
+        );
         for op in &c.aggregates {
             let value = totals
                 .iter()
@@ -1386,9 +1687,18 @@ impl<E: Model> DataGrid<E> {
         depth: usize,
         path: &[Option<String>],
     ) -> String {
-        let Some(meta) = self.group_by.get(depth) else { return String::new() };
+        let Some(meta) = self.group_by.get(depth) else {
+            return String::new();
+        };
         let lead = self.lead(r);
-        let first = cols.iter().position(|s| !self.columns[s.index].aggregates.is_empty()).unwrap_or(cols.len());
+        let first = cols
+            .iter()
+            .position(|s| {
+                !self.columns[s.index]
+                    .aggregates
+                    .is_empty()
+            })
+            .unwrap_or(cols.len());
         let mut out = String::new();
         for g in groups {
             let mut here = path.to_vec();
@@ -1398,7 +1708,9 @@ impl<E: Model> DataGrid<E> {
                 ref v => plain_html(v, &meta.kind, r),
             };
             let label = r.label(meta);
-            let count = r.text(&Text::key("zeyn.grid.group_count").arg("n", grouped(g.count as i64, r.locale)));
+            let count = r.text(
+                &Text::key("zeyn.grid.group_count").arg("n", grouped(g.count as i64, r.locale)),
+            );
             out.push_str(&format!(
                 r#"<tr class="z-group" aria-level="{level}" data-zeyn-level="{depth}" aria-expanded="false" data-zeyn-path="{}"><td colspan="{}"><span class="z-group-head" style="--z-level:{depth}"><button type="button" class="z-expander" data-zeyn-expand aria-expanded="false" aria-label="{label}: {shown}" tabindex="-1"></button><span class="z-group-label">{label}: <strong>{shown}</strong></span> <span class="z-group-count">{count}</span></span></td>"#,
                 attr(&here),
@@ -1420,7 +1732,14 @@ impl<E: Model> DataGrid<E> {
     fn aggregate_requests(&self) -> Vec<AggregateRequest> {
         self.columns
             .iter()
-            .flat_map(|c| c.aggregates.iter().map(|op| AggregateRequest { field: c.meta.name.to_string(), op: *op }))
+            .flat_map(|c| {
+                c.aggregates
+                    .iter()
+                    .map(|op| AggregateRequest {
+                        field: c.meta.name.to_string(),
+                        op: *op,
+                    })
+            })
             .collect()
     }
 
@@ -1429,15 +1748,27 @@ impl<E: Model> DataGrid<E> {
         if let Some(groups) = &page.groups {
             return self.group_rows(groups, r, &cols, page.depth, &page.path);
         }
-        let branch = Branch { depth: page.depth, path: &page.path, parents: &page.parents };
-        page.items.downcast_ref::<Vec<E>>().map(|rows| self.rows(rows, r, &cols, &branch)).unwrap_or_default()
+        let branch = Branch {
+            depth: page.depth,
+            path: &page.path,
+            parents: &page.parents,
+        };
+        page.items
+            .downcast_ref::<Vec<E>>()
+            .map(|rows| self.rows(rows, r, &cols, &branch))
+            .unwrap_or_default()
     }
 
     /// Loads the groups or rows under `path` of a grouped or tree grid. Group values and parent
     /// keys become filters in front of the client's; a tree also asks which of the loaded rows
     /// have children (one grouped query on the parent field) and, at the top, the totals over
     /// every matching row.
-    fn fetch_nested(&self, ctx: Ctx, mut query: DataQuery, path: Vec<Option<String>>) -> BoxFuture<Result<LoadedPage>> {
+    fn fetch_nested(
+        &self,
+        ctx: Ctx,
+        mut query: DataQuery,
+        path: Vec<Option<String>>,
+    ) -> BoxFuture<Result<LoadedPage>> {
         use crate::action::Error;
         self.allow(&mut query, Some(&ctx));
         query.time_zone = ctx.time_zone();
@@ -1449,7 +1780,13 @@ impl<E: Model> DataGrid<E> {
                 if depth >= MAX_TREE_DEPTH || path.iter().any(Option::is_none) {
                     return Box::pin(async { Err(Error::NotFound) });
                 }
-                fixed.push(key_filter(parent, path.last().cloned().flatten().as_deref()));
+                fixed.push(key_filter(
+                    parent,
+                    path.last()
+                        .cloned()
+                        .flatten()
+                        .as_deref(),
+                ));
             }
             None => {
                 if depth > self.group_by.len() {
@@ -1474,31 +1811,50 @@ impl<E: Model> DataGrid<E> {
         let scope = self.scope.clone();
         Box::pin(async move {
             let grouped = query.group.is_some();
-            let totals_query = (parent.is_some() && depth == 0 && !query.aggregates.is_empty()).then(|| DataQuery {
-                page: PageRequest::Offset { offset: 0, limit: 1 },
-                filters: scope.iter().cloned().chain(user.iter().cloned()).collect(),
-                aggregates: query.aggregates.clone(),
-                time_zone: query.time_zone,
-                ..DataQuery::default()
-            });
+            let totals_query = (parent.is_some() && depth == 0 && !query.aggregates.is_empty())
+                .then(|| DataQuery {
+                    page: PageRequest::Offset {
+                        offset: 0,
+                        limit: 1,
+                    },
+                    filters: scope
+                        .iter()
+                        .cloned()
+                        .chain(user.iter().cloned())
+                        .collect(),
+                    aggregates: query.aggregates.clone(),
+                    time_zone: query.time_zone,
+                    ..DataQuery::default()
+                });
             let page = fetch(ctx.clone(), query.clone()).await?;
             let mut parents = Vec::new();
             if let (Some(parent), Some(ki)) = (parent, Self::key_index()) {
-                let keys: Vec<String> =
-                    page.items.iter().filter_map(|row| row.value_at(ki)).filter_map(|v| value_key(&v)).collect();
+                let keys: Vec<String> = page
+                    .items
+                    .iter()
+                    .filter_map(|row| row.value_at(ki))
+                    .filter_map(|v| value_key(&v))
+                    .collect();
                 if !keys.is_empty() {
                     let mut filters = scope.clone();
                     filters.extend(user.iter().cloned());
                     filters.push(Filter::any_of(parent.name, keys));
                     let ask = DataQuery {
-                        page: PageRequest::Offset { offset: 0, limit: MAX_PAGE_SIZE },
+                        page: PageRequest::Offset {
+                            offset: 0,
+                            limit: MAX_PAGE_SIZE,
+                        },
                         filters,
                         group: Some(parent.name.to_string()),
                         time_zone: query.time_zone,
                         ..DataQuery::default()
                     };
-                    parents =
-                        fetch(ctx.clone(), ask).await?.groups.iter().filter_map(|g| value_key(&g.value)).collect();
+                    parents = fetch(ctx.clone(), ask)
+                        .await?
+                        .groups
+                        .iter()
+                        .filter_map(|g| value_key(&g.value))
+                        .collect();
                 }
             }
             let totals = match totals_query {
@@ -1506,7 +1862,11 @@ impl<E: Model> DataGrid<E> {
                 None => page.totals,
             };
             Ok(LoadedPage {
-                count: if grouped { page.groups.len() } else { page.items.len() },
+                count: if grouped {
+                    page.groups.len()
+                } else {
+                    page.items.len()
+                },
                 total: page.total,
                 next: page.next,
                 offset,
@@ -1530,15 +1890,26 @@ impl<E: Model> GridSource for DataGrid<E> {
 
     fn first_query(&self, view: Option<&DataGridView>) -> DataQuery {
         let page = match self.paging {
-            Paging::Infinite { batch } => PageRequest::After { cursor: None, limit: batch },
-            other => PageRequest::Offset { offset: 0, limit: other.size() },
+            Paging::Infinite { batch } => PageRequest::After {
+                cursor: None,
+                limit: batch,
+            },
+            other => PageRequest::Offset {
+                offset: 0,
+                limit: other.size(),
+            },
         };
         DataQuery {
             page,
             with_total: !matches!(self.paging, Paging::Infinite { .. }),
             aggregates: self.aggregate_requests(),
-            sort: view.map(|v| v.sort.clone()).filter(|s| !s.is_empty()).unwrap_or_else(|| self.default_sort.clone()),
-            filters: view.map(|v| v.filters.clone()).unwrap_or_default(),
+            sort: view
+                .map(|v| v.sort.clone())
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| self.default_sort.clone()),
+            filters: view
+                .map(|v| v.filters.clone())
+                .unwrap_or_default(),
             ..DataQuery::default()
         }
     }
@@ -1558,10 +1929,17 @@ impl<E: Model> GridSource for DataGrid<E> {
         let meta = &E::fields()[i];
         let filter = match meta.kind {
             FieldKind::Id | FieldKind::Integer => Filter::range(meta.name, Some(&key), Some(&key)),
-            _ => Filter { field: meta.name.to_string(), equals: Some(key), ..Filter::default() },
+            _ => Filter {
+                field: meta.name.to_string(),
+                equals: Some(key),
+                ..Filter::default()
+            },
         };
         let mut query = DataQuery {
-            page: PageRequest::Offset { offset: 0, limit: 5 },
+            page: PageRequest::Offset {
+                offset: 0,
+                limit: 5,
+            },
             filters: vec![filter],
             time_zone: ctx.time_zone(),
             ..DataQuery::default()
@@ -1589,7 +1967,10 @@ impl<E: Model> GridSource for DataGrid<E> {
 
     fn bulk_call(&self, index: usize, keys: Vec<serde_json::Value>) -> Option<RowCall> {
         let b = self.bulk.get(index)?;
-        Some(RowCall { meta: b.meta, run: (b.run)(keys)? })
+        Some(RowCall {
+            meta: b.meta,
+            run: (b.run)(keys)?,
+        })
     }
 
     fn bulk_meta(&self, index: usize) -> Option<ActionMeta> {
@@ -1599,17 +1980,25 @@ impl<E: Model> GridSource for DataGrid<E> {
     fn key_json(&self, key: &str) -> Option<serde_json::Value> {
         let meta = &E::fields()[Self::key_index()?];
         match meta.kind {
-            FieldKind::Id | FieldKind::Integer => key.parse::<i64>().ok().map(serde_json::Value::from),
+            FieldKind::Id | FieldKind::Integer => key
+                .parse::<i64>()
+                .ok()
+                .map(serde_json::Value::from),
             _ => Some(serde_json::Value::String(key.to_string())),
         }
     }
 
     fn page_keys(&self, page: &LoadedPage) -> Vec<serde_json::Value> {
-        let Some(i) = Self::key_index() else { return Vec::new() };
+        let Some(i) = Self::key_index() else {
+            return Vec::new();
+        };
         page.items
             .downcast_ref::<Vec<E>>()
             .map(|rows| {
-                rows.iter().filter_map(|r| r.value_at(i)).filter_map(|v| serde_json::to_value(v).ok()).collect()
+                rows.iter()
+                    .filter_map(|r| r.value_at(i))
+                    .filter_map(|v| serde_json::to_value(v).ok())
+                    .collect()
             })
             .unwrap_or_default()
     }
@@ -1624,14 +2013,23 @@ impl<E: Model> GridSource for DataGrid<E> {
 
     fn csv_head(&self, r: &Render, view: Option<&DataGridView>) -> String {
         let cols = self.layout(view);
-        let line: Vec<String> =
-            cols.iter().map(|s| csv_cell(&r.i18n.text(r.locale, &self.columns[s.index].meta.label_text()))).collect();
+        let line: Vec<String> = cols
+            .iter()
+            .map(|s| {
+                csv_cell(
+                    &r.i18n
+                        .text(r.locale, &self.columns[s.index].meta.label_text()),
+                )
+            })
+            .collect();
         format!("{}\r\n", line.join(","))
     }
 
     fn csv_rows(&self, page: &LoadedPage, r: &Render) -> String {
         let cols = self.layout(page.view.as_ref());
-        let Some(rows) = page.items.downcast_ref::<Vec<E>>() else { return String::new() };
+        let Some(rows) = page.items.downcast_ref::<Vec<E>>() else {
+            return String::new();
+        };
         let mut out = String::new();
         for row in rows {
             let line: Vec<String> = cols
@@ -1639,7 +2037,11 @@ impl<E: Model> GridSource for DataGrid<E> {
                 .map(|s| {
                     let c = &self.columns[s.index];
                     let v = (c.value)(row);
-                    csv_cell(&if c.meta.mask.is_some() { masked(c.meta, &v) } else { plain(&v, &c.meta.kind, r) })
+                    csv_cell(&if c.meta.mask.is_some() {
+                        masked(c.meta, &v)
+                    } else {
+                        plain(&v, &c.meta.kind, r)
+                    })
                 })
                 .collect();
             out.push_str(&line.join(","));
@@ -1653,23 +2055,37 @@ impl<E: Model> GridSource for DataGrid<E> {
             .iter()
             .map(|s| {
                 let meta = &self.columns[s.index].meta;
-                let numeric = matches!(meta.kind, FieldKind::Integer | FieldKind::Money | FieldKind::Decimal)
-                    && meta.mask.is_none();
-                ExportColumn { label: r.i18n.text(r.locale, &meta.label_text()), width: s.width, numeric }
+                let numeric = matches!(
+                    meta.kind,
+                    FieldKind::Integer | FieldKind::Money | FieldKind::Decimal
+                ) && meta.mask.is_none();
+                ExportColumn {
+                    label: r
+                        .i18n
+                        .text(r.locale, &meta.label_text()),
+                    width: s.width,
+                    numeric,
+                }
             })
             .collect()
     }
 
     fn export_text(&self, page: &LoadedPage, r: &Render) -> Vec<Vec<String>> {
         let cols = self.layout(page.view.as_ref());
-        let Some(rows) = page.items.downcast_ref::<Vec<E>>() else { return Vec::new() };
+        let Some(rows) = page.items.downcast_ref::<Vec<E>>() else {
+            return Vec::new();
+        };
         rows.iter()
             .map(|row| {
                 cols.iter()
                     .map(|s| {
                         let c = &self.columns[s.index];
                         let v = (c.value)(row);
-                        if c.meta.mask.is_some() { masked(c.meta, &v) } else { plain(&v, &c.meta.kind, r) }
+                        if c.meta.mask.is_some() {
+                            masked(c.meta, &v)
+                        } else {
+                            plain(&v, &c.meta.kind, r)
+                        }
                     })
                     .collect()
             })
@@ -1678,7 +2094,9 @@ impl<E: Model> GridSource for DataGrid<E> {
 
     fn export_values(&self, page: &LoadedPage, r: &Render) -> Vec<Vec<Value>> {
         let cols = self.layout(page.view.as_ref());
-        let Some(rows) = page.items.downcast_ref::<Vec<E>>() else { return Vec::new() };
+        let Some(rows) = page.items.downcast_ref::<Vec<E>>() else {
+            return Vec::new();
+        };
         rows.iter()
             .map(|row| {
                 cols.iter()
@@ -1705,38 +2123,72 @@ impl<E: Model> GridSource for DataGrid<E> {
         tz: TimeZone,
     ) -> Result<RowCall> {
         use crate::action::Error;
-        let save = self.save.as_ref().ok_or(Error::NotFound)?;
+        let save = self
+            .save
+            .as_ref()
+            .ok_or(Error::NotFound)?;
         let i = Self::key_index().ok_or(Error::NotFound)?;
-        let rows = page.items.downcast_ref::<Vec<E>>().ok_or(Error::NotFound)?;
-        let row = rows.iter().find(|r| r.value_at(i).is_some_and(|v| key_text(&v) == key)).ok_or(Error::NotFound)?;
+        let rows = page
+            .items
+            .downcast_ref::<Vec<E>>()
+            .ok_or(Error::NotFound)?;
+        let row = rows
+            .iter()
+            .find(|r| {
+                r.value_at(i)
+                    .is_some_and(|v| key_text(&v) == key)
+            })
+            .ok_or(Error::NotFound)?;
         let editable = self.editable_fields();
         let fields = E::fields();
-        let allowed =
-            |name: &str| fields.iter().enumerate().any(|(j, f)| f.name == name && (f.version || editable.contains(&j)));
+        let allowed = |name: &str| {
+            fields
+                .iter()
+                .enumerate()
+                .any(|(j, f)| f.name == name && (f.version || editable.contains(&j)))
+        };
         if values.is_empty() || values.keys().any(|k| !allowed(k)) {
             return Err(Error::Forbidden);
         }
-        let valid = crate::form::Form::with_fields(row.clone(), &editable).read(values, locale, tz)?;
-        Ok(RowCall { meta: save.meta, run: (save.run)(valid) })
+        let valid =
+            crate::form::Form::with_fields(row.clone(), &editable).read(values, locale, tz)?;
+        Ok(RowCall {
+            meta: save.meta,
+            run: (save.run)(valid),
+        })
     }
 
     fn row_html(&self, page: &LoadedPage, key: &str, r: &Render) -> Option<String> {
         let i = Self::key_index()?;
         let rows = page.items.downcast_ref::<Vec<E>>()?;
-        let row = rows.iter().find(|row| row.value_at(i).is_some_and(|v| key_text(&v) == key))?;
-        Some(self.rows(std::slice::from_ref(row), r, &self.layout(page.view.as_ref()), &Branch::default()))
+        let row = rows.iter().find(|row| {
+            row.value_at(i)
+                .is_some_and(|v| key_text(&v) == key)
+        })?;
+        Some(self.rows(
+            std::slice::from_ref(row),
+            r,
+            &self.layout(page.view.as_ref()),
+            &Branch::default(),
+        ))
     }
 
     fn row_call(&self, page: &LoadedPage, key: &str, item: &str) -> Option<RowCall> {
         let i = Self::key_index()?;
         let rows = page.items.downcast_ref::<Vec<E>>()?;
-        let row = rows.iter().find(|r| r.value_at(i).is_some_and(|v| key_text(&v) == key))?;
+        let row = rows.iter().find(|r| {
+            r.value_at(i)
+                .is_some_and(|v| key_text(&v) == key)
+        })?;
         if let Some(path) = item.strip_prefix('m') {
             return self.row_menu.as_ref()?(row).take(path);
         }
         let index: usize = item.strip_prefix('a')?.parse().ok()?;
         let action = self.row_actions.get(index)?;
-        Some(RowCall { meta: action.meta, run: (action.run)(row) })
+        Some(RowCall {
+            meta: action.meta,
+            run: (action.run)(row),
+        })
     }
 
     fn fetch(&self, ctx: Ctx, mut query: DataQuery) -> BoxFuture<Result<LoadedPage>> {
@@ -1767,8 +2219,17 @@ impl<E: Model> GridSource for DataGrid<E> {
         })
     }
 
-    fn fetch_at(&self, ctx: Ctx, query: DataQuery, path: Vec<Option<String>>) -> BoxFuture<Result<LoadedPage>> {
-        if self.nested() { self.fetch_nested(ctx, query, path) } else { self.fetch(ctx, query) }
+    fn fetch_at(
+        &self,
+        ctx: Ctx,
+        query: DataQuery,
+        path: Vec<Option<String>>,
+    ) -> BoxFuture<Result<LoadedPage>> {
+        if self.nested() {
+            self.fetch_nested(ctx, query, path)
+        } else {
+            self.fetch(ctx, query)
+        }
     }
 
     fn rows_html(&self, page: &LoadedPage, r: &Render) -> String {
@@ -1780,8 +2241,12 @@ impl<E: Model> GridSource for DataGrid<E> {
     }
 
     fn foot_html(&self, page: &LoadedPage, r: &Render) -> Option<String> {
-        let has = self.columns.iter().any(|c| !c.aggregates.is_empty());
-        (has && !page.totals.is_empty()).then(|| self.foot_row(r, &page.totals, &self.layout(page.view.as_ref())))
+        let has = self
+            .columns
+            .iter()
+            .any(|c| !c.aggregates.is_empty());
+        (has && !page.totals.is_empty())
+            .then(|| self.foot_row(r, &page.totals, &self.layout(page.view.as_ref())))
     }
 
     fn fields(&self) -> &'static [FieldMeta] {
@@ -1794,8 +2259,17 @@ impl<E: Model> GridSource for DataGrid<E> {
 
     /// Reveals a masked column of one row. The row is loaded like a row action's, through the
     /// grid's scope, so only rows the grid shows can be revealed.
-    fn reveal(&self, ctx: Ctx, key: String, field: String) -> BoxFuture<Result<Option<crate::privacy::Revealed>>> {
-        if !self.columns.iter().any(|c| c.meta.name == field && c.meta.mask.is_some()) {
+    fn reveal(
+        &self,
+        ctx: Ctx,
+        key: String,
+        field: String,
+    ) -> BoxFuture<Result<Option<crate::privacy::Revealed>>> {
+        if !self
+            .columns
+            .iter()
+            .any(|c| c.meta.name == field && c.meta.mask.is_some())
+        {
             return Box::pin(async { Ok(None) });
         }
         let find = self.find_row(ctx, key.clone());
@@ -1803,15 +2277,29 @@ impl<E: Model> GridSource for DataGrid<E> {
             let page = find.await?;
             let rows = page.items.downcast_ref::<Vec<E>>();
             let row = rows.and_then(|rows| {
-                rows.iter().find(|r| crate::audit::RecordRef::of(*r).id.as_deref() == Some(key.as_str()))
+                rows.iter().find(|r| {
+                    crate::audit::RecordRef::of(*r)
+                        .id
+                        .as_deref()
+                        == Some(key.as_str())
+                })
             });
             Ok(row.and_then(|row| crate::privacy::reveal_in(row, &field)))
         })
     }
 
     fn tool_schema(&self) -> serde_json::Value {
-        let fields: Vec<&str> = self.columns.iter().map(|c| c.meta.name).collect();
-        let filterable: Vec<&str> = self.columns.iter().filter(|c| c.filter).map(|c| c.meta.name).collect();
+        let fields: Vec<&str> = self
+            .columns
+            .iter()
+            .map(|c| c.meta.name)
+            .collect();
+        let filterable: Vec<&str> = self
+            .columns
+            .iter()
+            .filter(|c| c.filter)
+            .map(|c| c.meta.name)
+            .collect();
         json!({
             "type": "object",
             "properties": {
@@ -1942,11 +2430,28 @@ fn filter_kind(kind: &FieldKind) -> &'static str {
 
 /// Localized texts the runtime needs for grid controls, sent once on the grid root.
 fn grid_texts(r: &Render) -> serde_json::Value {
-    let keys =
-        ["filter", "from", "to", "all", "contains", "starts_with", "equals", "match", "selected", "clear", "sorted"];
+    let keys = [
+        "filter",
+        "from",
+        "to",
+        "all",
+        "contains",
+        "starts_with",
+        "equals",
+        "match",
+        "selected",
+        "clear",
+        "sorted",
+    ];
     let mut map = serde_json::Map::new();
     for k in keys {
-        map.insert(k.to_string(), json!(r.i18n.text(r.locale, &Text::key(format!("zeyn.grid.filter.{k}")))));
+        map.insert(
+            k.to_string(),
+            json!(
+                r.i18n
+                    .text(r.locale, &Text::key(format!("zeyn.grid.filter.{k}")))
+            ),
+        );
     }
     let menu = [
         "options",
@@ -1965,9 +2470,21 @@ fn grid_texts(r: &Render) -> serde_json::Value {
         "filter",
     ];
     for k in menu {
-        map.insert(format!("menu_{k}"), json!(r.i18n.text(r.locale, &Text::key(format!("zeyn.grid.menu.{k}")))));
+        map.insert(
+            format!("menu_{k}"),
+            json!(
+                r.i18n
+                    .text(r.locale, &Text::key(format!("zeyn.grid.menu.{k}")))
+            ),
+        );
     }
-    map.insert("done".into(), json!(r.i18n.text(r.locale, &Text::key("zeyn.grid.done"))));
+    map.insert(
+        "done".into(),
+        json!(
+            r.i18n
+                .text(r.locale, &Text::key("zeyn.grid.done"))
+        ),
+    );
     for k in [
         "saved",
         "undo",
@@ -1986,9 +2503,27 @@ fn grid_texts(r: &Render) -> serde_json::Value {
         "paste_readonly",
         "paste_too_many",
     ] {
-        map.insert(k.into(), json!(r.i18n.text(r.locale, &Text::key(format!("zeyn.grid.{k}")))));
+        map.insert(
+            k.into(),
+            json!(
+                r.i18n
+                    .text(r.locale, &Text::key(format!("zeyn.grid.{k}")))
+            ),
+        );
     }
-    map.insert("yes".into(), json!(r.i18n.text(r.locale, &Text::key("zeyn.yes"))));
-    map.insert("no".into(), json!(r.i18n.text(r.locale, &Text::key("zeyn.no"))));
+    map.insert(
+        "yes".into(),
+        json!(
+            r.i18n
+                .text(r.locale, &Text::key("zeyn.yes"))
+        ),
+    );
+    map.insert(
+        "no".into(),
+        json!(
+            r.i18n
+                .text(r.locale, &Text::key("zeyn.no"))
+        ),
+    );
     serde_json::Value::Object(map)
 }

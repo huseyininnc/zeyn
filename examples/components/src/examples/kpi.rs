@@ -22,5 +22,10 @@ pub fn overview(_ctx: &Ctx) -> Node {
 }
 
 /// What the catalog shows of `Kpi`.
-pub const ENTRY: Entry =
-    Entry { name: "Kpi", docs: "components/data", api: &["Kpi"], overview: &[ex!(overview)], examples: &[] };
+pub const ENTRY: Entry = Entry {
+    name: "Kpi",
+    docs: "components/data",
+    api: &["Kpi"],
+    overview: &[ex!(overview)],
+    examples: &[],
+};

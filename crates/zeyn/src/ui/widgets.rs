@@ -12,7 +12,9 @@ use crate::value::{FieldKind, FieldType, Value};
 use serde_json::{Map, Value as Json, json};
 use std::sync::Arc;
 
-into_node!(Alert, Badge, EmptyState, Skeleton, Progress, Breadcrumb, Timeline);
+into_node!(
+    Alert, Badge, EmptyState, Skeleton, Progress, Breadcrumb, Timeline
+);
 
 pub use crate::grid::Tone;
 
@@ -31,7 +33,12 @@ pub struct Alert {
 
 impl Alert {
     pub fn new(tone: Tone, text: impl Into<Text>) -> Self {
-        Self { tone, title: None, text: text.into(), dismissible: false }
+        Self {
+            tone,
+            title: None,
+            text: text.into(),
+            dismissible: false,
+        }
     }
 
     pub fn info(text: impl Into<Text>) -> Self {
@@ -66,7 +73,10 @@ impl Component for Alert {
     fn render(&self, out: &mut String, r: &Render) {
         let tone = self.tone.code();
         out.push_str(&format!(r#"<div class="z-callout z-tone-{tone}" data-testid="{}.alert.{tone}"><span class="z-callout-icon" aria-hidden="true"></span><div class="z-callout-body">"#, r.scope));
-        let spoken = format!(r#"<span class="z-sr-only">{}: </span>"#, spoken(self.tone, r));
+        let spoken = format!(
+            r#"<span class="z-sr-only">{}: </span>"#,
+            spoken(self.tone, r)
+        );
         match &self.title {
             Some(t) => out.push_str(&format!(
                 r#"<p class="z-callout-title">{spoken}{}</p><p>{}</p>"#,
@@ -98,7 +108,10 @@ pub struct Badge {
 
 impl Badge {
     pub fn new(text: impl Into<Text>) -> Self {
-        Self { text: text.into(), tone: Tone::Neutral }
+        Self {
+            text: text.into(),
+            tone: Tone::Neutral,
+        }
     }
 
     pub fn tone(mut self, tone: Tone) -> Self {
@@ -108,7 +121,11 @@ impl Badge {
 
     /// Badge markup, for use inside other components.
     pub fn html(&self, r: &Render) -> String {
-        format!(r#"<span class="z-badge z-tone-{}">{}</span>"#, self.tone.code(), r.text(&self.text))
+        format!(
+            r#"<span class="z-badge z-tone-{}">{}</span>"#,
+            self.tone.code(),
+            r.text(&self.text)
+        )
     }
 }
 
@@ -131,7 +148,11 @@ pub struct EmptyState {
 
 impl EmptyState {
     pub fn new(title: impl Into<Text>) -> Self {
-        Self { title: title.into(), text: None, button: None }
+        Self {
+            title: title.into(),
+            text: None,
+            button: None,
+        }
     }
 
     pub fn text(mut self, text: impl Into<Text>) -> Self {
@@ -140,7 +161,12 @@ impl EmptyState {
     }
 
     /// A button that opens a screen as a window, such as "New product".
-    pub fn opens<S: ScreenDef>(mut self, label: impl Into<Text>, screen: S, params: S::Params) -> Self {
+    pub fn opens<S: ScreenDef>(
+        mut self,
+        label: impl Into<Text>,
+        screen: S,
+        params: S::Params,
+    ) -> Self {
         self.button = Some((label.into(), crate::screen::Window::open(screen, params)));
         self
     }
@@ -177,7 +203,9 @@ pub struct Skeleton {
 
 impl Skeleton {
     pub fn lines(lines: u8) -> Self {
-        Self { lines: lines.clamp(1, 20) }
+        Self {
+            lines: lines.clamp(1, 20),
+        }
     }
 }
 
@@ -211,7 +239,12 @@ pub struct Progress {
 
 impl Progress {
     pub fn new(label: impl Into<Text>, value: u64, max: u64) -> Self {
-        Self { label: label.into(), value: value.min(max.max(1)), max: max.max(1), tone: Tone::Info }
+        Self {
+            label: label.into(),
+            value: value.min(max.max(1)),
+            max: max.max(1),
+            tone: Tone::Info,
+        }
     }
 
     pub fn tone(mut self, tone: Tone) -> Self {
@@ -256,16 +289,26 @@ pub struct DescriptionOf<'a, M> {
 
 impl DescriptionList {
     pub fn of<M: Model>(model: &M) -> DescriptionOf<'_, M> {
-        DescriptionOf { model, list: DescriptionList { items: Vec::new(), columns: 2 } }
+        DescriptionOf {
+            model,
+            list: DescriptionList {
+                items: Vec::new(),
+                columns: 2,
+            },
+        }
     }
 
     pub fn new() -> Self {
-        DescriptionList { items: Vec::new(), columns: 2 }
+        DescriptionList {
+            items: Vec::new(),
+            columns: 2,
+        }
     }
 
     /// A free label and text.
     pub fn item(mut self, label: impl Into<Text>, text: impl Into<String>) -> Self {
-        self.items.push((label.into(), Value::Text(text.into()), FieldKind::Text));
+        self.items
+            .push((label.into(), Value::Text(text.into()), FieldKind::Text));
         self
     }
 
@@ -285,7 +328,11 @@ impl Default for DescriptionList {
 impl<M: Model> DescriptionOf<'_, M> {
     pub fn field<T: FieldType + 'static>(mut self, field: Field<M, T>) -> Self {
         let meta = field.meta();
-        self.list.items.push((meta.label_text(), field.get(self.model).to_value(), meta.kind));
+        self.list.items.push((
+            meta.label_text(),
+            field.get(self.model).to_value(),
+            meta.kind,
+        ));
         self
     }
 
@@ -314,7 +361,10 @@ impl From<DescriptionList> for Node {
 
 impl Component for DescriptionList {
     fn render(&self, out: &mut String, r: &Render) {
-        out.push_str(&format!(r#"<dl class="z-details" style="--z-columns:{}">"#, self.columns));
+        out.push_str(&format!(
+            r#"<dl class="z-details" style="--z-columns:{}">"#,
+            self.columns
+        ));
         for (label, value, kind) in &self.items {
             let shown = r.value(value, kind);
             let shown = if shown.is_empty() {
@@ -322,13 +372,20 @@ impl Component for DescriptionList {
             } else {
                 shown
             };
-            out.push_str(&format!(r#"<div class="z-details-item"><dt>{}</dt><dd>{shown}</dd></div>"#, r.text(label)));
+            out.push_str(&format!(
+                r#"<div class="z-details-item"><dt>{}</dt><dd>{shown}</dd></div>"#,
+                r.text(label)
+            ));
         }
         out.push_str("</dl>");
     }
 
     fn schema(&self) -> Json {
-        let items: Vec<Json> = self.items.iter().map(|(l, v, _)| json!({ "label": l, "value": v })).collect();
+        let items: Vec<Json> = self
+            .items
+            .iter()
+            .map(|(l, v, _)| json!({ "label": l, "value": v }))
+            .collect();
         json!({ "type": "description_list", "columns": self.columns, "items": items })
     }
 }
@@ -346,8 +403,17 @@ impl Breadcrumb {
     }
 
     /// A link to a screen. Params of the wrong type do not compile.
-    pub fn link<S: ScreenDef>(mut self, label: impl Into<Text>, _screen: S, params: S::Params) -> Self {
-        self.links.push((label.into(), S::META.name, serde_json::to_value(params).unwrap_or(Json::Null)));
+    pub fn link<S: ScreenDef>(
+        mut self,
+        label: impl Into<Text>,
+        _screen: S,
+        params: S::Params,
+    ) -> Self {
+        self.links.push((
+            label.into(),
+            S::META.name,
+            serde_json::to_value(params).unwrap_or(Json::Null),
+        ));
         self
     }
 
@@ -372,14 +438,20 @@ impl Component for Breadcrumb {
             ));
         }
         if let Some(c) = &self.current {
-            out.push_str(&format!(r#"<li><span aria-current="page">{}</span></li>"#, r.text(c)));
+            out.push_str(&format!(
+                r#"<li><span aria-current="page">{}</span></li>"#,
+                r.text(c)
+            ));
         }
         out.push_str("</ol></nav>");
     }
 
     fn schema(&self) -> Json {
-        let links: Vec<Json> =
-            self.links.iter().map(|(l, s, p)| json!({ "label": l, "screen": s, "params": p })).collect();
+        let links: Vec<Json> = self
+            .links
+            .iter()
+            .map(|(l, s, p)| json!({ "label": l, "screen": s, "params": p }))
+            .collect();
         json!({ "type": "breadcrumb", "links": links, "current": self.current })
     }
 }
@@ -388,7 +460,11 @@ impl Component for Breadcrumb {
 /// redirect otherwise. Links carry `data-zeyn-base-href` so they open without a page reload.
 pub(crate) fn screen_href(r: &Render, screen: &str, params: &Json) -> String {
     let href = crate::screen::Routes::href(r, screen, params).unwrap_or_else(|| {
-        let query = if params.is_null() { String::new() } else { format!("?params={}", encode(&params.to_string())) };
+        let query = if params.is_null() {
+            String::new()
+        } else {
+            format!("?params={}", encode(&params.to_string()))
+        };
         format!("/_zeyn/route/{screen}{query}")
     });
     escape(&href)
@@ -398,7 +474,9 @@ pub(crate) fn screen_href(r: &Render, screen: &str, params: &Json) -> String {
 pub(crate) fn encode(s: &str) -> String {
     s.bytes()
         .map(|b| match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => (b as char).to_string(),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                (b as char).to_string()
+            }
             _ => format!("%{b:02X}"),
         })
         .collect()
@@ -416,8 +494,15 @@ impl Timeline {
     }
 
     /// An event at a date or moment, with a title and an optional detail.
-    pub fn event<T: FieldType>(mut self, when: T, title: impl Into<Text>, detail: Option<Text>, tone: Tone) -> Self {
-        self.events.push((when.to_value(), title.into(), detail, tone));
+    pub fn event<T: FieldType>(
+        mut self,
+        when: T,
+        title: impl Into<Text>,
+        detail: Option<Text>,
+        tone: Tone,
+    ) -> Self {
+        self.events
+            .push((when.to_value(), title.into(), detail, tone));
         self
     }
 }
@@ -437,7 +522,10 @@ impl Component for Timeline {
                 r.value(when, &kind)
             ));
             if let Some(d) = detail {
-                out.push_str(&format!(r#"<p class="z-timeline-detail">{}</p>"#, r.text(d)));
+                out.push_str(&format!(
+                    r#"<p class="z-timeline-detail">{}</p>"#,
+                    r.text(d)
+                ));
             }
             out.push_str("</div></li>");
         }
@@ -480,7 +568,14 @@ where
     A::Input: Clone + Sync,
 {
     pub fn new(label: impl Into<Text>, _action: A, input: A::Input) -> Self {
-        Self { label: label.into(), input, confirm: None, tone: Tone::Neutral, tip: None, on_success: None }
+        Self {
+            label: label.into(),
+            input,
+            confirm: None,
+            tone: Tone::Neutral,
+            tip: None,
+            on_success: None,
+        }
     }
 
     /// Asks the user to confirm with this message before running.
@@ -502,7 +597,10 @@ where
         self
     }
 
-    pub fn on_success(mut self, handler: impl Fn(&A::Output, &mut UiCtx) + Send + Sync + 'static) -> Self {
+    pub fn on_success(
+        mut self,
+        handler: impl Fn(&A::Output, &mut UiCtx) + Send + Sync + 'static,
+    ) -> Self {
         self.on_success = Some(Arc::new(handler));
         self
     }
@@ -556,7 +654,11 @@ where
             ),
             None => String::new(),
         };
-        let class = if self.tone == Tone::Danger { "z-button z-danger-button" } else { "z-button" };
+        let class = if self.tone == Tone::Danger {
+            "z-button z-danger-button"
+        } else {
+            "z-button"
+        };
         let (tip_attrs, tip) = match &self.tip {
             Some(t) => crate::ui::tip(r, &crate::ui::dom_id(r, "tip"), t),
             None => (String::new(), String::new()),

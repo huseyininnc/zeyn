@@ -77,7 +77,10 @@ impl ConfigSource for EnvSource {
     fn load(&self) -> BoxFuture<std::result::Result<HashMap<String, String>, String>> {
         let prefix = format!("{}_", self.0);
         let values = std::env::vars()
-            .filter_map(|(k, v)| k.strip_prefix(&prefix).map(|rest| (rest.to_lowercase().replace("__", "."), v)))
+            .filter_map(|(k, v)| {
+                k.strip_prefix(&prefix)
+                    .map(|rest| (rest.to_lowercase().replace("__", "."), v))
+            })
             .collect();
         Box::pin(async move { Ok(values) })
     }
@@ -94,7 +97,8 @@ impl ConfigSource for JsonFileSource {
     fn load(&self) -> BoxFuture<std::result::Result<HashMap<String, String>, String>> {
         let path = self.0.clone();
         Box::pin(async move {
-            let text = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+            let text =
+                std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
             let json: serde_json::Value =
                 serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
             let mut out = HashMap::new();
@@ -122,7 +126,11 @@ fn flatten(prefix: &str, value: &serde_json::Value, out: &mut HashMap<String, St
     match value {
         serde_json::Value::Object(map) => {
             for (k, v) in map {
-                let key = if prefix.is_empty() { k.to_lowercase() } else { format!("{prefix}.{}", k.to_lowercase()) };
+                let key = if prefix.is_empty() {
+                    k.to_lowercase()
+                } else {
+                    format!("{prefix}.{}", k.to_lowercase())
+                };
                 flatten(&key, v, out);
             }
         }
@@ -170,13 +178,19 @@ impl Config {
         let mut values = HashMap::new();
         let mut origin = HashMap::new();
         for source in sources {
-            let loaded = source.load().await.map_err(|e| format!("config source `{}`: {e}", source.name()))?;
+            let loaded = source
+                .load()
+                .await
+                .map_err(|e| format!("config source `{}`: {e}", source.name()))?;
             for (k, v) in loaded {
                 origin.insert(k.clone(), source.name().to_string());
                 values.insert(k, v);
             }
         }
-        Ok(Config { values: Arc::new(values), origin: Arc::new(origin) })
+        Ok(Config {
+            values: Arc::new(values),
+            origin: Arc::new(origin),
+        })
     }
 
     pub fn get(&self, key: &str) -> Option<&str> {
@@ -185,12 +199,14 @@ impl Config {
 
     /// A required value; the error names the key, never the value.
     pub fn require(&self, key: &str) -> Result<&str> {
-        self.get(key).ok_or_else(|| Error::Internal(format!("configuration `{key}` is missing")))
+        self.get(key)
+            .ok_or_else(|| Error::Internal(format!("configuration `{key}` is missing")))
     }
 
     /// A value that must not be logged, such as a connection string or an API key.
     pub fn secret(&self, key: &str) -> Result<Secret<String>> {
-        self.require(key).map(|v| Secret::new(v.to_string()))
+        self.require(key)
+            .map(|v| Secret::new(v.to_string()))
     }
 
     /// Which source a key came from. Useful when checking an installation.
@@ -214,7 +230,9 @@ impl Tenant {
     /// an id can be used in file names, cache keys and schema names without escaping.
     pub fn new(id: &str) -> Option<Tenant> {
         let ok = (1..=63).contains(&id.len())
-            && id.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'_');
+            && id
+                .bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'_');
         ok.then(|| Tenant { id: id.to_string() })
     }
 
@@ -259,22 +277,36 @@ pub struct PerTenant<T> {
 
 impl<T> Clone for PerTenant<T> {
     fn clone(&self) -> Self {
-        PerTenant { cache: self.cache.clone(), make: self.make.clone() }
+        PerTenant {
+            cache: self.cache.clone(),
+            make: self.make.clone(),
+        }
     }
 }
 
 impl<T: Clone + Send + Sync + 'static> Service for PerTenant<T> {}
 
 impl<T: Clone + Send + Sync + 'static> PerTenant<T> {
-    pub fn new(make: impl Fn(Tenant, Config) -> BoxFuture<Result<T>> + Send + Sync + 'static) -> Self {
-        PerTenant { cache: Arc::new(Mutex::new(HashMap::new())), make: Arc::new(make) }
+    pub fn new(
+        make: impl Fn(Tenant, Config) -> BoxFuture<Result<T>> + Send + Sync + 'static,
+    ) -> Self {
+        PerTenant {
+            cache: Arc::new(Mutex::new(HashMap::new())),
+            make: Arc::new(make),
+        }
     }
 
     /// The value for the request's tenant, built on first use.
     pub async fn get(&self, ctx: &Ctx) -> Result<T> {
-        let tenant = ctx.tenant().cloned().ok_or(Error::Denied(Text::key("zeyn.error.tenant")))?;
-        if let Some(v) =
-            self.cache.lock().map_err(|_| Error::Internal("tenant cache poisoned".into()))?.get(tenant.id())
+        let tenant = ctx
+            .tenant()
+            .cloned()
+            .ok_or(Error::Denied(Text::key("zeyn.error.tenant")))?;
+        if let Some(v) = self
+            .cache
+            .lock()
+            .map_err(|_| Error::Internal("tenant cache poisoned".into()))?
+            .get(tenant.id())
         {
             return Ok(v.clone());
         }
@@ -321,14 +353,20 @@ impl License {
 /// Where licenses come from: a file, a license server, a vault, a database. Called with the
 /// request's tenant in multi tenant apps.
 pub trait LicenseSource: Send + Sync + 'static {
-    fn load(&self, tenant: Option<&Tenant>) -> BoxFuture<std::result::Result<Option<License>, String>>;
+    fn load(
+        &self,
+        tenant: Option<&Tenant>,
+    ) -> BoxFuture<std::result::Result<Option<License>, String>>;
 }
 
 /// A fixed license, for development and tests.
 pub struct FixedLicense(pub License);
 
 impl LicenseSource for FixedLicense {
-    fn load(&self, _tenant: Option<&Tenant>) -> BoxFuture<std::result::Result<Option<License>, String>> {
+    fn load(
+        &self,
+        _tenant: Option<&Tenant>,
+    ) -> BoxFuture<std::result::Result<Option<License>, String>> {
         let l = self.0.clone();
         Box::pin(async move { Ok(Some(l)) })
     }
@@ -353,7 +391,9 @@ impl Licensed {
 impl Guard for Licensed {
     fn check(&self, ctx: &Ctx) -> GuardResult {
         match ctx.license() {
-            Some(l) if !l.is_valid_on(ctx.today()) => GuardResult::Deny(Text::key("zeyn.error.license_expired")),
+            Some(l) if !l.is_valid_on(ctx.today()) => {
+                GuardResult::Deny(Text::key("zeyn.error.license_expired"))
+            }
             Some(l) if self.0.is_none_or(|m| l.allows(m)) => GuardResult::Allow,
             _ => GuardResult::Deny(Text::key("zeyn.error.license")),
         }
@@ -428,7 +468,8 @@ impl License {
             payload: String,
             signature: String,
         }
-        let signed: Signed = serde_json::from_str(file).map_err(|e| LicenseError::Malformed(e.to_string()))?;
+        let signed: Signed =
+            serde_json::from_str(file).map_err(|e| LicenseError::Malformed(e.to_string()))?;
         let signature = from_hex::<64>(&signed.signature)
             .ok_or_else(|| LicenseError::Malformed("`signature` is not 128 hex digits".into()))?;
         let mut message = Vec::with_capacity(LICENSE_CONTEXT.len() + signed.payload.len());
@@ -436,7 +477,8 @@ impl License {
         message.extend_from_slice(signed.payload.as_bytes());
         key.verify_strict(&message, &ed25519_dalek::Signature::from_bytes(&signature))
             .map_err(|_| LicenseError::BadSignature)?;
-        serde_json::from_str(&signed.payload).map_err(|e| LicenseError::Malformed(format!("payload: {e}")))
+        serde_json::from_str(&signed.payload)
+            .map_err(|e| LicenseError::Malformed(format!("payload: {e}")))
     }
 }
 
@@ -460,17 +502,29 @@ pub struct SignedLicenseFile {
 impl SignedLicenseFile {
     /// `public_key` is the 64 hex digits `zeyn license keygen` printed.
     pub fn new(path: impl Into<std::path::PathBuf>, public_key: &'static str) -> Self {
-        SignedLicenseFile { path: path.into(), public_key }
+        SignedLicenseFile {
+            path: path.into(),
+            public_key,
+        }
     }
 }
 
 #[cfg(feature = "signed-licenses")]
 impl LicenseSource for SignedLicenseFile {
-    fn load(&self, _tenant: Option<&Tenant>) -> BoxFuture<std::result::Result<Option<License>, String>> {
-        let result =
-            std::fs::read_to_string(&self.path).map_err(|e| format!("{}: {e}", self.path.display())).map(|text| {
+    fn load(
+        &self,
+        _tenant: Option<&Tenant>,
+    ) -> BoxFuture<std::result::Result<Option<License>, String>> {
+        let result = std::fs::read_to_string(&self.path)
+            .map_err(|e| format!("{}: {e}", self.path.display()))
+            .map(|text| {
                 License::from_signed(&text, self.public_key)
-                    .inspect_err(|e| tracing::error!("license {} refused, the app is locked: {e}", self.path.display()))
+                    .inspect_err(|e| {
+                        tracing::error!(
+                            "license {} refused, the app is locked: {e}",
+                            self.path.display()
+                        )
+                    })
                     .ok()
             });
         Box::pin(async move { result })

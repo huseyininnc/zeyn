@@ -144,8 +144,11 @@ impl Money {
     /// ignored; at most two decimals are accepted.
     pub fn parse(input: &str, locale: &str, currency: Currency) -> Result<Money, ()> {
         let f = NumberFormat::for_locale(locale);
-        let cleaned: String =
-            input.trim().chars().filter(|c| !c.is_whitespace() && *c != f.group && !"₺$€".contains(*c)).collect();
+        let cleaned: String = input
+            .trim()
+            .chars()
+            .filter(|c| !c.is_whitespace() && *c != f.group && !"₺$€".contains(*c))
+            .collect();
         let (negative, digits) = match cleaned.strip_prefix('-') {
             Some(rest) => (true, rest),
             None => (false, cleaned.as_str()),
@@ -159,8 +162,13 @@ impl Money {
             return Err(());
         }
         let major: i64 = major.parse().map_err(|_| ())?;
-        let minor: i64 = format!("{minor:0<2}").parse().map_err(|_| ())?;
-        let value = major.checked_mul(100).and_then(|m| m.checked_add(minor)).ok_or(())?;
+        let minor: i64 = format!("{minor:0<2}")
+            .parse()
+            .map_err(|_| ())?;
+        let value = major
+            .checked_mul(100)
+            .and_then(|m| m.checked_add(minor))
+            .ok_or(())?;
         Ok(Money::new(if negative { -value } else { value }, currency))
     }
 }
@@ -213,7 +221,12 @@ pub trait FieldType {
 
     /// Validates nested values, such as the lines of an order. Errors name the line and column.
     #[doc(hidden)]
-    fn __validate_items(&self, _meta: &crate::model::FieldMeta, _errors: &mut crate::model::ValidationErrors) {}
+    fn __validate_items(
+        &self,
+        _meta: &crate::model::FieldMeta,
+        _errors: &mut crate::model::ValidationErrors,
+    ) {
+    }
 }
 
 impl FieldType for String {
@@ -314,7 +327,8 @@ impl<T: FieldType> FieldType for Option<T> {
     const KIND: FieldKind = T::KIND;
     const OPTIONAL: bool = true;
     fn to_value(&self) -> Value {
-        self.as_ref().map_or(Value::Null, T::to_value)
+        self.as_ref()
+            .map_or(Value::Null, T::to_value)
     }
     fn __is_empty(&self) -> bool {
         self.as_ref().is_none_or(T::__is_empty)
@@ -323,7 +337,8 @@ impl<T: FieldType> FieldType for Option<T> {
         self.as_ref().and_then(T::__text)
     }
     fn __compare(&self, limit: i64) -> Option<std::cmp::Ordering> {
-        self.as_ref().and_then(|v| v.__compare(limit))
+        self.as_ref()
+            .and_then(|v| v.__compare(limit))
     }
     fn __decimal(&self) -> Option<crate::Decimal> {
         self.as_ref().and_then(T::__decimal)
@@ -449,7 +464,12 @@ pub trait VecItem: Sized {
     fn __vec_value(items: &[Self]) -> Value;
 
     #[doc(hidden)]
-    fn __vec_validate(_items: &[Self], _meta: &crate::model::FieldMeta, _errors: &mut crate::model::ValidationErrors) {}
+    fn __vec_validate(
+        _items: &[Self],
+        _meta: &crate::model::FieldMeta,
+        _errors: &mut crate::model::ValidationErrors,
+    ) {
+    }
 }
 
 impl<L: VecItem> FieldType for Vec<L> {
@@ -463,7 +483,11 @@ impl<L: VecItem> FieldType for Vec<L> {
         self.is_empty()
     }
 
-    fn __validate_items(&self, meta: &crate::model::FieldMeta, errors: &mut crate::model::ValidationErrors) {
+    fn __validate_items(
+        &self,
+        meta: &crate::model::FieldMeta,
+        errors: &mut crate::model::ValidationErrors,
+    ) {
         L::__vec_validate(self, meta, errors);
     }
 }

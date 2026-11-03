@@ -20,22 +20,25 @@ pub async fn book_visit(visit: Valid<Visit>) -> Result<Visit> {
 }
 
 pub fn overview(ctx: &Ctx) -> Node {
-    Form::of(Visit { day: Some(ctx.today()), ..Visit::default() })
-        .row(|r| {
-            r.field(Visit::day)
-                .field(Visit::arrives)
-        })
-        .range(Visit::stay_from, Visit::stay_to)
-        .date_options(
-            Visit::day,
-            DateOptions::new()
-                .no_weekends()
-                .week_numbers(),
-        )
-        .date_options(Visit::arrives, DateOptions::new().step_minutes(15))
-        .submit("Book", book_visit)
-        .on_success(|_, ui| ui.toast("Booked. Nothing was stored."))
-        .into()
+    Form::of(Visit {
+        day: Some(ctx.today()),
+        ..Visit::default()
+    })
+    .row(|r| {
+        r.field(Visit::day)
+            .field(Visit::arrives)
+    })
+    .range(Visit::stay_from, Visit::stay_to)
+    .date_options(
+        Visit::day,
+        DateOptions::new()
+            .no_weekends()
+            .week_numbers(),
+    )
+    .date_options(Visit::arrives, DateOptions::new().step_minutes(15))
+    .submit("Book", book_visit)
+    .on_success(|_, ui| ui.toast("Booked. Nothing was stored."))
+    .into()
 }
 
 /// What the catalog shows of `DateOptions`.

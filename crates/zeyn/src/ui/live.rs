@@ -29,7 +29,10 @@ pub struct Live {
 
 impl Live {
     pub fn new(topic: &'static str) -> Self {
-        Live { topic, nodes: Vec::new() }
+        Live {
+            topic,
+            nodes: Vec::new(),
+        }
     }
 
     pub fn add(mut self, node: impl Into<Node>) -> Self {
@@ -40,7 +43,10 @@ impl Live {
 
 impl Component for Live {
     fn render(&self, out: &mut String, r: &Render) {
-        out.push_str(&format!(r#"<div class="z-live" data-zeyn-live="{}">"#, escape(self.topic)));
+        out.push_str(&format!(
+            r#"<div class="z-live" data-zeyn-live="{}">"#,
+            escape(self.topic)
+        ));
         for (i, node) in self.nodes.iter().enumerate() {
             render_child(out, r, i, node);
         }

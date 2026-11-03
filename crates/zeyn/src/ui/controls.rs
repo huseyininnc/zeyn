@@ -67,7 +67,11 @@ fn ui(r: &Render, key: &str) -> String {
 
 /// `bool` fields: a checkbox, or a switch.
 pub(crate) fn render_bool(out: &mut String, s: &Slot) {
-    let checked = if *s.value == Value::Bool(true) { " checked" } else { "" };
+    let checked = if *s.value == Value::Bool(true) {
+        " checked"
+    } else {
+        ""
+    };
     let common = s.common;
     if s.control == Some(Control::Switch) {
         out.push_str(&format!(
@@ -84,12 +88,22 @@ pub(crate) fn render_bool(out: &mut String, s: &Slot) {
 
 /// `#[choice]` fields: select, radio buttons, segmented buttons or an open list.
 pub(crate) fn render_choice(out: &mut String, r: &Render, s: &Slot) {
-    let FieldKind::Choice(options) = s.m.kind else { return };
+    let FieldKind::Choice(options) = s.m.kind else {
+        return;
+    };
     let label_of = |key: &'static str, fallback: &'static str| r.text(&Text::key_or(key, fallback));
     match s.control {
         Some(Control::Radio | Control::Segmented) => {
-            let class = if s.control == Some(Control::Segmented) { "z-radios z-segmented" } else { "z-radios" };
-            let star = if s.m.is_required() { r#"<span class="z-required" aria-hidden="true">*</span>"# } else { "" };
+            let class = if s.control == Some(Control::Segmented) {
+                "z-radios z-segmented"
+            } else {
+                "z-radios"
+            };
+            let star = if s.m.is_required() {
+                r#"<span class="z-required" aria-hidden="true">*</span>"#
+            } else {
+                ""
+            };
             out.push_str(&format!(
                 r#"<fieldset class="{class}" aria-describedby="{}-error"><legend>{}{star}</legend><div class="z-radios-list">"#,
                 s.id,
@@ -97,8 +111,16 @@ pub(crate) fn render_choice(out: &mut String, r: &Render, s: &Slot) {
             ));
             let required = if s.m.is_required() { " required" } else { "" };
             for (i, o) in options.iter().enumerate() {
-                let id = if i == 0 { s.id.to_string() } else { format!("{}-{i}", s.id) };
-                let checked = if *s.value == Value::Choice(o.value) { " checked" } else { "" };
+                let id = if i == 0 {
+                    s.id.to_string()
+                } else {
+                    format!("{}-{i}", s.id)
+                };
+                let checked = if *s.value == Value::Choice(o.value) {
+                    " checked"
+                } else {
+                    ""
+                };
                 out.push_str(&format!(
                     r#"<label class="z-radio" for="{id}"><input type="radio" id="{id}" name="{}" value="{}" data-testid="{}.field.{}.{}"{checked}{required}><span>{}</span></label>"#,
                     s.m.name,
@@ -117,7 +139,10 @@ pub(crate) fn render_choice(out: &mut String, r: &Render, s: &Slot) {
             let (class, attr) = if listbox {
                 (
                     "z-listbox-field",
-                    format!(r#" data-zeyn-listbox size="{}""#, options.len().clamp(2, 8) + usize::from(s.m.optional)),
+                    format!(
+                        r#" data-zeyn-listbox size="{}""#,
+                        options.len().clamp(2, 8) + usize::from(s.m.optional)
+                    ),
                 )
             } else {
                 ("z-select", " data-zeyn-select".to_string())
@@ -130,10 +155,17 @@ pub(crate) fn render_choice(out: &mut String, r: &Render, s: &Slot) {
                 s.common
             ));
             if s.m.optional {
-                out.push_str(&format!(r#"<option value="">{}</option>"#, ui(r, "select.none")));
+                out.push_str(&format!(
+                    r#"<option value="">{}</option>"#,
+                    ui(r, "select.none")
+                ));
             }
             for o in options {
-                let selected = if *s.value == Value::Choice(o.value) { " selected" } else { "" };
+                let selected = if *s.value == Value::Choice(o.value) {
+                    " selected"
+                } else {
+                    ""
+                };
                 out.push_str(&format!(
                     r#"<option value="{}"{selected}>{}</option>"#,
                     o.value,
@@ -160,11 +192,13 @@ pub(crate) fn render_number(out: &mut String, r: &Render, s: &Slot) {
     let text = match s.value {
         Value::Money(m) => m.format_plain(r.locale),
         Value::Number(d) => d.format(r.locale),
-        Value::Int(n) if group => crate::value::Money::new(n.saturating_mul(100), Default::default())
-            .format_plain(r.locale)
-            .rsplit_once(f.decimal)
-            .map(|(a, _)| a.to_string())
-            .unwrap_or_default(),
+        Value::Int(n) if group => {
+            crate::value::Money::new(n.saturating_mul(100), Default::default())
+                .format_plain(r.locale)
+                .rsplit_once(f.decimal)
+                .map(|(a, _)| a.to_string())
+                .unwrap_or_default()
+        }
         Value::Int(n) => n.to_string(),
         _ => String::new(),
     };
@@ -176,7 +210,11 @@ pub(crate) fn render_number(out: &mut String, r: &Render, s: &Slot) {
     out.push_str(s.label);
     let (class, common) = if percent {
         let unit = format!("{}-unit", s.id);
-        let common = s.common.replacen(r#"aria-describedby=""#, &format!(r#"aria-describedby="{unit} "#), 1);
+        let common = s.common.replacen(
+            r#"aria-describedby=""#,
+            &format!(r#"aria-describedby="{unit} "#),
+            1,
+        );
         (
             if NumberFormat::percent_first(r.locale) {
                 "z-number z-percent z-affix-first"
@@ -225,13 +263,21 @@ pub(crate) fn render_text(out: &mut String, r: &Render, s: &Slot) {
         _ => String::new(),
     };
     let max = s.m.max_len();
-    let maxlength = max.map(|n| format!(r#" maxlength="{n}""#)).unwrap_or_default();
-    let minlength = s.m.min_len().map(|n| format!(r#" minlength="{n}""#)).unwrap_or_default();
+    let maxlength = max
+        .map(|n| format!(r#" maxlength="{n}""#))
+        .unwrap_or_default();
+    let minlength =
+        s.m.min_len()
+            .map(|n| format!(r#" minlength="{n}""#))
+            .unwrap_or_default();
     out.push_str(s.label);
     match max {
         Some(n)
             if n > 255
-                && !matches!(s.control, Some(Control::Password | Control::NewPassword | Control::OneTimeCode)) =>
+                && !matches!(
+                    s.control,
+                    Some(Control::Password | Control::NewPassword | Control::OneTimeCode)
+                ) =>
         {
             let id = s.id;
             let common = s.common.replace(
@@ -248,12 +294,24 @@ pub(crate) fn render_text(out: &mut String, r: &Render, s: &Slot) {
                 escape(&r.i18n.text(r.locale, &Text::key("zeyn.ui.text.count").arg("n", count.to_string()).arg("max", n.to_string())))
             ));
         }
-        _ if matches!(s.control, Some(Control::Password | Control::NewPassword | Control::PasswordMeter)) => {
-            let auto = if s.control == Some(Control::Password) { "current-password" } else { "new-password" };
+        _ if matches!(
+            s.control,
+            Some(Control::Password | Control::NewPassword | Control::PasswordMeter)
+        ) =>
+        {
+            let auto = if s.control == Some(Control::Password) {
+                "current-password"
+            } else {
+                "new-password"
+            };
             let meter = s.control == Some(Control::PasswordMeter);
             let id = s.id;
             let common = if meter {
-                s.common.replacen(r#"aria-describedby=""#, &format!(r#"aria-describedby="{id}-strength "#), 1)
+                s.common.replacen(
+                    r#"aria-describedby=""#,
+                    &format!(r#"aria-describedby="{id}-strength "#),
+                    1,
+                )
             } else {
                 s.common.to_string()
             };
@@ -264,7 +322,8 @@ pub(crate) fn render_text(out: &mut String, r: &Render, s: &Slot) {
                 s.m.name
             ));
             if meter {
-                let levels = ["weak", "fair", "good", "strong"].map(|k| ui(r, &format!("password.{k}")));
+                let levels =
+                    ["weak", "fair", "good", "strong"].map(|k| ui(r, &format!("password.{k}")));
                 out.push_str(&format!(
                     r#"<div class="z-strength" data-zeyn-strength="{id}" data-levels="{}" hidden><span class="z-strength-bar" aria-hidden="true"><span></span><span></span><span></span><span></span></span><span class="z-strength-text" id="{id}-strength" aria-live="polite"></span></div>"#,
                     crate::render::attr(&levels)
@@ -276,8 +335,19 @@ pub(crate) fn render_text(out: &mut String, r: &Render, s: &Slot) {
             out.push_str(&format!(r#"<input type="text" inputmode="text" autocomplete="one-time-code" spellcheck="false" {}{maxlength} value="">"#, s.common));
         }
         _ => {
-            let kind = if s.m.rules.contains(&crate::model::Rule::Email) { "email" } else { "text" };
-            out.push_str(&format!(r#"<input type="{kind}" {}{minlength}{maxlength} value="{text}">"#, s.common));
+            let kind = if s
+                .m
+                .rules
+                .contains(&crate::model::Rule::Email)
+            {
+                "email"
+            } else {
+                "text"
+            };
+            out.push_str(&format!(
+                r#"<input type="{kind}" {}{minlength}{maxlength} value="{text}">"#,
+                s.common
+            ));
         }
     }
 }
@@ -285,9 +355,14 @@ pub(crate) fn render_text(out: &mut String, r: &Render, s: &Slot) {
 /// Several options of a `#[choice]`: a native multiple select (what works without JavaScript)
 /// that the runtime turns into chips and a multi select list (APG listbox, `aria-multiselectable`).
 pub(crate) fn render_choices(out: &mut String, r: &Render, s: &Slot) {
-    let FieldKind::Choices(options) = s.m.kind else { return };
+    let FieldKind::Choices(options) = s.m.kind else {
+        return;
+    };
     let chosen: Vec<&str> = match s.value {
-        Value::Text(t) => t.split(',').filter(|v| !v.is_empty()).collect(),
+        Value::Text(t) => t
+            .split(',')
+            .filter(|v| !v.is_empty())
+            .collect(),
         _ => Vec::new(),
     };
     let texts = serde_json::json!({
@@ -305,7 +380,11 @@ pub(crate) fn render_choices(out: &mut String, r: &Render, s: &Slot) {
         s.common
     ));
     for o in options {
-        let selected = if chosen.contains(&o.value) { " selected" } else { "" };
+        let selected = if chosen.contains(&o.value) {
+            " selected"
+        } else {
+            ""
+        };
         out.push_str(&format!(
             r#"<option value="{}"{selected}>{}</option>"#,
             o.value,
@@ -322,16 +401,23 @@ pub(crate) fn read_choices(
     raw: &serde_json::Value,
 ) -> Option<serde_json::Value> {
     let parts: Vec<String> = match raw {
-        serde_json::Value::Array(items) => {
-            items.iter().map(|v| v.as_str().map(str::to_string)).collect::<Option<_>>()?
-        }
-        serde_json::Value::String(s) => s.split(',').map(|p| p.trim().to_string()).filter(|p| !p.is_empty()).collect(),
+        serde_json::Value::Array(items) => items
+            .iter()
+            .map(|v| v.as_str().map(str::to_string))
+            .collect::<Option<_>>()?,
+        serde_json::Value::String(s) => s
+            .split(',')
+            .map(|p| p.trim().to_string())
+            .filter(|p| !p.is_empty())
+            .collect(),
         serde_json::Value::Null => Vec::new(),
         _ => return None,
     };
     let mut values: Vec<&str> = Vec::with_capacity(parts.len().min(options.len()));
     for p in &parts {
-        let option = options.iter().find(|o| o.value == p.trim())?;
+        let option = options
+            .iter()
+            .find(|o| o.value == p.trim())?;
         if !values.contains(&option.value) {
             values.push(option.value);
         }
@@ -342,12 +428,16 @@ pub(crate) fn read_choices(
 /// Several choices as the user reads them: their labels in the user's language, joined with
 /// commas.
 pub(crate) fn choices_text(value: &str, kind: &FieldKind, r: &Render) -> String {
-    let FieldKind::Choices(options) = kind else { return value.to_string() };
+    let FieldKind::Choices(options) = kind else {
+        return value.to_string();
+    };
     value
         .split(',')
         .filter(|v| !v.is_empty())
         .map(|v| match options.iter().find(|o| o.value == v) {
-            Some(o) => r.i18n.text(r.locale, &Text::key_or(o.key, o.label)),
+            Some(o) => r
+                .i18n
+                .text(r.locale, &Text::key_or(o.key, o.label)),
             None => v.to_string(),
         })
         .collect::<Vec<_>>()

@@ -112,13 +112,20 @@ impl OidcAuth {
     /// it (scheme and host, such as `https://stock.example.com`); the redirect URI is built from it,
     /// never from the request's `Host` header. `session_key` seals the cookies; it must be at least
     /// 32 bytes, from configuration (`Config::secret`), never from code.
-    pub fn new(issuer: &str, client_id: &str, public_url: &str, session_key: Secret<String>) -> Self {
+    pub fn new(
+        issuer: &str,
+        client_id: &str,
+        public_url: &str,
+        session_key: Secret<String>,
+    ) -> Self {
         OidcAuth {
             issuer: Arc::new(Issuer::new(issuer)),
             client_id: client_id.to_string(),
             client_secret: None,
             sealer: Sealer::new(&session_key),
-            public_url: public_url.trim_end_matches('/').to_string(),
+            public_url: public_url
+                .trim_end_matches('/')
+                .to_string(),
             scopes: "openid profile email".into(),
             algorithms: vec![Algorithm::RS256],
             leeway: Duration::from_secs(60),
@@ -139,7 +146,10 @@ impl OidcAuth {
 
     /// Scopes asked for; `openid profile email` unless set. `openid` is always added.
     pub fn scopes(mut self, scopes: &str) -> Self {
-        self.scopes = if scopes.split_whitespace().any(|s| s == "openid") {
+        self.scopes = if scopes
+            .split_whitespace()
+            .any(|s| s == "openid")
+        {
             scopes.to_string()
         } else {
             format!("openid {scopes}")
@@ -203,7 +213,10 @@ impl OidcAuth {
     pub(crate) fn problems(&self) -> Vec<String> {
         let mut problems = Vec::new();
         if self.sealer.is_none() {
-            problems.push(format!("OidcAuth: the session key must be at least {} bytes", super::seal::MIN_SECRET));
+            problems.push(format!(
+                "OidcAuth: the session key must be at least {} bytes",
+                super::seal::MIN_SECRET
+            ));
         }
         if !(self.public_url.starts_with("https://") || self.public_url.starts_with("http://")) {
             problems
@@ -219,18 +232,32 @@ impl OidcAuth {
 
     /// The session in a cookie value, when it opens and has not ended.
     pub(crate) fn open_session(&self, value: &str) -> Option<Session> {
-        let s: Session = self.sealer.as_ref()?.open(SESSION, value)?;
+        let s: Session = self
+            .sealer
+            .as_ref()?
+            .open(SESSION, value)?;
         (s.expires > super::now_secs()).then_some(s)
     }
 
     /// The address of the provider's sign in page for a new flow.
-    pub(crate) async fn authorize_url(&self, flow: &Flow, redirect_uri: &str, reauth: bool) -> Result<String, String> {
+    pub(crate) async fn authorize_url(
+        &self,
+        flow: &Flow,
+        redirect_uri: &str,
+        reauth: bool,
+    ) -> Result<String, String> {
         let d = self.issuer.discovery().await?;
-        let challenge = super::b64url(ring::digest::digest(&ring::digest::SHA256, flow.verifier.as_bytes()).as_ref());
+        let challenge = super::b64url(
+            ring::digest::digest(&ring::digest::SHA256, flow.verifier.as_bytes()).as_ref(),
+        );
         let mut url = format!(
             "{}{}response_type=code&client_id={}&redirect_uri={}&scope={}&state={}&nonce={}&code_challenge={}&code_challenge_method=S256",
             d.authorization_endpoint,
-            if d.authorization_endpoint.contains('?') { '&' } else { '?' },
+            if d.authorization_endpoint.contains('?') {
+                '&'
+            } else {
+                '?'
+            },
             pct(&self.client_id),
             pct(redirect_uri),
             pct(&self.scopes),
@@ -239,7 +266,10 @@ impl OidcAuth {
             challenge,
         );
         if flow.mfa && !self.claims.mfa_acr_values().is_empty() {
-            url.push_str(&format!("&acr_values={}", pct(&self.claims.mfa_acr_values().join(" "))));
+            url.push_str(&format!(
+                "&acr_values={}",
+                pct(&self.claims.mfa_acr_values().join(" "))
+            ));
         }
         if flow.mfa || reauth {
             url.push_str("&prompt=login&max_age=0");
@@ -269,12 +299,23 @@ impl OidcAuth {
                 body.push_str(&pct(&self.client_id));
             }
         }
-        read_json(req.body(body).send().await.map_err(|e| format!("token endpoint: {e}"))?).await
+        read_json(
+            req.body(body)
+                .send()
+                .await
+                .map_err(|e| format!("token endpoint: {e}"))?,
+        )
+        .await
     }
 
     /// Exchanges the authorization code for tokens and builds the session. The ID token must carry
     /// the flow's nonce.
-    pub(crate) async fn exchange(&self, code: &str, flow: &Flow, redirect_uri: &str) -> Result<Session, String> {
+    pub(crate) async fn exchange(
+        &self,
+        code: &str,
+        flow: &Flow,
+        redirect_uri: &str,
+    ) -> Result<Session, String> {
         let tokens = self
             .token_call(&[
                 ("grant_type", "authorization_code"),
@@ -283,7 +324,8 @@ impl OidcAuth {
                 ("code_verifier", &flow.verifier),
             ])
             .await?;
-        self.session(&tokens, Some(&flow.nonce), None).await
+        self.session(&tokens, Some(&flow.nonce), None)
+            .await
     }
 
     /// Exchanges the authorization code and returns the checked ID token's claims, for linking
@@ -303,38 +345,71 @@ impl OidcAuth {
                 ("code_verifier", &flow.verifier),
             ])
             .await?;
-        let id_token = tokens.get("id_token").and_then(Json::as_str).ok_or("the token response has no ID token")?;
+        let id_token = tokens
+            .get("id_token")
+            .and_then(Json::as_str)
+            .ok_or("the token response has no ID token")?;
         let claims = self
             .issuer
             .validate_id_token(id_token, &self.client_id, &self.algorithms, self.leeway)
             .await
             .map_err(|why| format!("ID token refused: {why:?}"))?;
-        if !claims.get("nonce").and_then(Json::as_str).is_some_and(|n| crate::server::same(n, &flow.nonce)) {
-            return Err(format!("ID token refused: {:?}", super::jwt::Refusal::Nonce));
+        if !claims
+            .get("nonce")
+            .and_then(Json::as_str)
+            .is_some_and(|n| crate::server::same(n, &flow.nonce))
+        {
+            return Err(format!(
+                "ID token refused: {:?}",
+                super::jwt::Refusal::Nonce
+            ));
         }
         Ok(claims)
     }
 
     /// Uses the session's refresh token for new tokens and a renewed session.
     pub(crate) async fn renew(&self, old: &Session) -> Result<Session, String> {
-        let rt = old.refresh.as_deref().ok_or("no refresh token")?;
-        let tokens = self.token_call(&[("grant_type", "refresh_token"), ("refresh_token", rt)]).await?;
-        self.session(&tokens, None, Some(old)).await
+        let rt = old
+            .refresh
+            .as_deref()
+            .ok_or("no refresh token")?;
+        let tokens = self
+            .token_call(&[("grant_type", "refresh_token"), ("refresh_token", rt)])
+            .await?;
+        self.session(&tokens, None, Some(old))
+            .await
     }
 
-    async fn session(&self, tokens: &Json, nonce: Option<&str>, old: Option<&Session>) -> Result<Session, String> {
-        let id_token = tokens.get("id_token").and_then(Json::as_str).ok_or("the token response has no ID token")?;
+    async fn session(
+        &self,
+        tokens: &Json,
+        nonce: Option<&str>,
+        old: Option<&Session>,
+    ) -> Result<Session, String> {
+        let id_token = tokens
+            .get("id_token")
+            .and_then(Json::as_str)
+            .ok_or("the token response has no ID token")?;
         let claims = self
             .issuer
             .validate_id_token(id_token, &self.client_id, &self.algorithms, self.leeway)
             .await
             .map_err(|why| format!("ID token refused: {why:?}"))?;
         if let Some(nonce) = nonce
-            && !claims.get("nonce").and_then(Json::as_str).is_some_and(|n| crate::server::same(n, nonce))
+            && !claims
+                .get("nonce")
+                .and_then(Json::as_str)
+                .is_some_and(|n| crate::server::same(n, nonce))
         {
-            return Err(format!("ID token refused: {:?}", super::jwt::Refusal::Nonce));
+            return Err(format!(
+                "ID token refused: {:?}",
+                super::jwt::Refusal::Nonce
+            ));
         }
-        let mut s = self.claims.extract(&claims).ok_or("the ID token has no user claim")?;
+        let mut s = self
+            .claims
+            .extract(&claims)
+            .ok_or("the ID token has no user claim")?;
         if let Some(old) = old {
             if s.user != old.user {
                 return Err("refreshed ID token is for another user".into());
@@ -342,9 +417,18 @@ impl OidcAuth {
             s.mfa |= old.mfa;
         }
         let now = super::now_secs();
-        let exp = claims.get("exp").and_then(Json::as_i64).unwrap_or(now);
-        let access = tokens.get("expires_in").and_then(Json::as_i64).map(|s| now + s).unwrap_or(exp);
-        s.expires = old.map(|o| o.expires).unwrap_or(now + self.lifetime.as_secs() as i64);
+        let exp = claims
+            .get("exp")
+            .and_then(Json::as_i64)
+            .unwrap_or(now);
+        let access = tokens
+            .get("expires_in")
+            .and_then(Json::as_i64)
+            .map(|s| now + s)
+            .unwrap_or(exp);
+        s.expires = old
+            .map(|o| o.expires)
+            .unwrap_or(now + self.lifetime.as_secs() as i64);
         s.check = exp.min(access);
         if self.refresh {
             s.refresh = tokens
@@ -358,7 +442,10 @@ impl OidcAuth {
 
     /// Seals a session for the cookie. `Err` when it would be too large for a browser to keep.
     pub(crate) fn seal_session(&self, s: &Session) -> Result<String, String> {
-        let sealer = self.sealer.as_ref().ok_or("no session key")?;
+        let sealer = self
+            .sealer
+            .as_ref()
+            .ok_or("no session key")?;
         let value = sealer.seal(SESSION, s);
         if value.len() > MAX_COOKIE {
             return Err(format!(
@@ -372,7 +459,13 @@ impl OidcAuth {
     /// Where a signed out user goes: the provider's end session endpoint, which comes back to
     /// `back`, or `back` itself when the provider has none.
     pub(crate) async fn logout_url(&self, back: &str) -> String {
-        match self.issuer.discovery().await.ok().and_then(|d| d.end_session_endpoint.clone()) {
+        match self
+            .issuer
+            .discovery()
+            .await
+            .ok()
+            .and_then(|d| d.end_session_endpoint.clone())
+        {
             Some(end) => format!(
                 "{end}{}client_id={}&post_logout_redirect_uri={}",
                 if end.contains('?') { '&' } else { '?' },
@@ -395,8 +488,13 @@ impl Authenticator for OidcAuth {
         Some(self.claims.identity(&session))
     }
 
-    fn prepare<'a>(&'a self, headers: &'a HeaderMap) -> Option<Pin<Box<dyn Future<Output = ()> + Send + 'a>>> {
-        self.bearer_auth.as_ref()?.prepare(headers)
+    fn prepare<'a>(
+        &'a self,
+        headers: &'a HeaderMap,
+    ) -> Option<Pin<Box<dyn Future<Output = ()> + Send + 'a>>> {
+        self.bearer_auth
+            .as_ref()?
+            .prepare(headers)
     }
 }
 

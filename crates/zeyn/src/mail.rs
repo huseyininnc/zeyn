@@ -49,7 +49,12 @@ pub struct Mail {
 impl Mail {
     /// A message to `address`.
     pub fn to(address: &str) -> Mail {
-        Mail { to: vec![address.to_string()], template: String::new(), locale: None, args: Vec::new() }
+        Mail {
+            to: vec![address.to_string()],
+            template: String::new(),
+            locale: None,
+            args: Vec::new(),
+        }
     }
 
     /// Adds another recipient.
@@ -80,8 +85,15 @@ impl Mail {
     /// the built in `zeyn.mail.transition` template: `record` names the record for the reader.
     /// `NotFound` when the call made no move.
     pub fn transition(ctx: &Ctx, address: &str, record: &str) -> Result<Mail> {
-        let moved = ctx.trail().transition.ok_or(Error::NotFound)?;
-        let by = ctx.identity().user.clone().unwrap_or_default();
+        let moved = ctx
+            .trail()
+            .transition
+            .ok_or(Error::NotFound)?;
+        let by = ctx
+            .identity()
+            .user
+            .clone()
+            .unwrap_or_default();
         Ok(Mail::to(address)
             .template("zeyn.mail.transition")
             .locale(ctx.locale())
@@ -102,12 +114,21 @@ impl Mail {
             }
             i18n.text(locale, &t)
         };
-        let subject: String = text("subject", false).chars().filter(|c| !c.is_control()).collect();
+        let subject: String = text("subject", false)
+            .chars()
+            .filter(|c| !c.is_control())
+            .collect();
         let plain = text("text", false);
-        let body = if i18n.lookup(locale, &format!("{}.html", self.template)).is_some() {
+        let body = if i18n
+            .lookup(locale, &format!("{}.html", self.template))
+            .is_some()
+        {
             text("html", true)
         } else {
-            escape(&plain).split("\n\n").map(|p| format!("<p>{}</p>", p.replace('\n', "<br>"))).collect::<String>()
+            escape(&plain)
+                .split("\n\n")
+                .map(|p| format!("<p>{}</p>", p.replace('\n', "<br>")))
+                .collect::<String>()
         };
         let html = format!(
             "<!doctype html><html lang=\"{}\"><head><meta charset=\"utf-8\"><title>{}</title></head><body>{body}</body></html>",
@@ -162,18 +183,27 @@ impl Mailer {
             .require("mail.from")?
             .parse()
             .map_err(|_| Error::Internal("mail.from is not an e-mail address".into()))?;
-        let transport = match config.get("mail.transport").unwrap_or("log") {
+        let transport = match config
+            .get("mail.transport")
+            .unwrap_or("log")
+        {
             "log" => Transport::Log,
             "file" => Transport::File(config.require("mail.file.dir")?.into()),
             "smtp" => Transport::Smtp(smtp(config)?),
-            other => return Err(Error::Internal(format!("mail.transport `{other}` is not smtp, file or log"))),
+            other => {
+                return Err(Error::Internal(format!(
+                    "mail.transport `{other}` is not smtp, file or log"
+                )));
+            }
         };
         Ok(Mailer::new(from, transport))
     }
 
     /// A mailer that writes each message as an `.eml` file into `dir`.
     pub fn to_files(from: &str, dir: impl Into<std::path::PathBuf>) -> Result<Mailer> {
-        let from = from.parse().map_err(|_| Error::Internal("the sender is not an e-mail address".into()))?;
+        let from = from
+            .parse()
+            .map_err(|_| Error::Internal("the sender is not an e-mail address".into()))?;
         Ok(Mailer::new(from, Transport::File(dir.into())))
     }
 
@@ -191,31 +221,51 @@ impl Mailer {
     /// How often a failed delivery run is tried again and the first wait (doubled each time).
     /// Five times from ten seconds unless set. Call it before `App::mailer`.
     pub fn retry(self, times: u32, first_delay: Duration) -> Mailer {
-        self.0.retries.store(times, Ordering::Relaxed);
-        self.0.backoff_ms.store(first_delay.as_millis().min(u128::from(u64::MAX)) as u64, Ordering::Relaxed);
+        self.0
+            .retries
+            .store(times, Ordering::Relaxed);
+        self.0.backoff_ms.store(
+            first_delay
+                .as_millis()
+                .min(u128::from(u64::MAX)) as u64,
+            Ordering::Relaxed,
+        );
         self
     }
 
     /// Renders `mail` in the recipient's language (the user's unless set) and queues it. Returns
     /// at once; the mail job sends it. Fails when an address is invalid or the queue is full.
     pub fn send(&self, ctx: &Ctx, mail: Mail) -> Result<()> {
-        let locale = mail.locale.clone().unwrap_or_else(|| ctx.locale().to_string());
+        let locale = mail
+            .locale
+            .clone()
+            .unwrap_or_else(|| ctx.locale().to_string());
         let (subject, plain, html) = mail.render(ctx.i18n(), &locale);
-        let mut builder = Message::builder().from(self.0.from.clone()).subject(subject);
+        let mut builder = Message::builder()
+            .from(self.0.from.clone())
+            .subject(subject);
         for to in &mail.to {
-            let mailbox: Mailbox =
-                to.parse().map_err(|_| Error::Internal("a recipient is not an e-mail address".into()))?;
+            let mailbox: Mailbox = to
+                .parse()
+                .map_err(|_| Error::Internal("a recipient is not an e-mail address".into()))?;
             builder = builder.to(mailbox);
         }
         let message = builder
             .multipart(MultiPart::alternative_plain_html(plain, html))
             .map_err(|e| Error::Internal(format!("mail: {e}")))?;
         {
-            let mut queue = self.0.queue.lock().map_err(|_| Error::Internal("mail queue lock".into()))?;
+            let mut queue = self
+                .0
+                .queue
+                .lock()
+                .map_err(|_| Error::Internal("mail queue lock".into()))?;
             if queue.len() >= MAX_QUEUED {
                 return Err(Error::Internal("the mail queue is full".into()));
             }
-            queue.push_back(Queued { message, attempts: 0 });
+            queue.push_back(Queued {
+                message,
+                attempts: 0,
+            });
         }
         if let Some(jobs) = self.0.jobs.get() {
             let _ = jobs.trigger(MAIL_JOB);
@@ -225,13 +275,22 @@ impl Mailer {
 
     /// Messages waiting to be sent.
     pub fn queued(&self) -> usize {
-        self.0.queue.lock().map(|q| q.len()).unwrap_or(0)
+        self.0
+            .queue
+            .lock()
+            .map(|q| q.len())
+            .unwrap_or(0)
     }
 
     /// Sends what is queued now. Messages that fail go back to the queue, and the run fails so
     /// the job tries again later; a message is dropped after [`MAX_ATTEMPTS`] tries.
     pub async fn flush(&self) -> Result<()> {
-        let batch: Vec<Queued> = self.0.queue.lock().map(|mut q| q.drain(..).collect()).unwrap_or_default();
+        let batch: Vec<Queued> = self
+            .0
+            .queue
+            .lock()
+            .map(|mut q| q.drain(..).collect())
+            .unwrap_or_default();
         let mut failed = 0usize;
         for mut item in batch {
             match self.deliver(&item.message).await {
@@ -250,19 +309,33 @@ impl Mailer {
                 }
             }
         }
-        if failed > 0 { Err(Error::Internal(format!("{failed} mail(s) not sent"))) } else { Ok(()) }
+        if failed > 0 {
+            Err(Error::Internal(format!("{failed} mail(s) not sent")))
+        } else {
+            Ok(())
+        }
     }
 
     async fn deliver(&self, message: &Message) -> std::result::Result<(), String> {
         match &self.0.transport {
-            Transport::Smtp(smtp) => smtp.send(message.clone()).await.map(|_| ()).map_err(|e| e.to_string()),
+            Transport::Smtp(smtp) => smtp
+                .send(message.clone())
+                .await
+                .map(|_| ())
+                .map_err(|e| e.to_string()),
             Transport::File(dir) => {
                 let file = lettre::AsyncFileTransport::<lettre::Tokio1Executor>::new(dir);
-                file.send(message.clone()).await.map(|_| ()).map_err(|e| e.to_string())
+                file.send(message.clone())
+                    .await
+                    .map(|_| ())
+                    .map_err(|e| e.to_string())
             }
             Transport::Log => {
                 let size = message.formatted().len();
-                tracing::info!("mail (log transport): {} recipient(s), {size} bytes", message.envelope().to().len());
+                tracing::info!(
+                    "mail (log transport): {} recipient(s), {size} bytes",
+                    message.envelope().to().len()
+                );
                 Ok(())
             }
         }
@@ -273,25 +346,39 @@ impl Mailer {
     }
 
     pub(crate) fn schedule(&self) -> crate::jobs::Schedule {
-        let backoff = Duration::from_millis(self.0.backoff_ms.load(Ordering::Relaxed));
-        crate::jobs::Schedule::every(Duration::from_secs(60)).retry(self.0.retries.load(Ordering::Relaxed), backoff)
+        let backoff = Duration::from_millis(
+            self.0
+                .backoff_ms
+                .load(Ordering::Relaxed),
+        );
+        crate::jobs::Schedule::every(Duration::from_secs(60))
+            .retry(self.0.retries.load(Ordering::Relaxed), backoff)
     }
 }
 
 fn smtp(config: &Config) -> Result<lettre::AsyncSmtpTransport<lettre::Tokio1Executor>> {
     type T = lettre::AsyncSmtpTransport<lettre::Tokio1Executor>;
     let host = config.require("mail.smtp.host")?;
-    let builder = match config.get("mail.smtp.tls").unwrap_or("starttls") {
+    let builder = match config
+        .get("mail.smtp.tls")
+        .unwrap_or("starttls")
+    {
         "starttls" => T::starttls_relay(host),
         "tls" => T::relay(host),
         "none" => Ok(T::builder_dangerous(host)),
-        other => return Err(Error::Internal(format!("mail.smtp.tls `{other}` is not starttls, tls or none"))),
+        other => {
+            return Err(Error::Internal(format!(
+                "mail.smtp.tls `{other}` is not starttls, tls or none"
+            )));
+        }
     }
     .map_err(|e| Error::Internal(format!("mail.smtp.host: {e}")))?;
     let mut builder = builder.timeout(Some(Duration::from_secs(30)));
     if let Some(port) = config.get("mail.smtp.port") {
-        builder =
-            builder.port(port.parse().map_err(|_| Error::Internal("mail.smtp.port is not a port number".into()))?);
+        builder = builder.port(
+            port.parse()
+                .map_err(|_| Error::Internal("mail.smtp.port is not a port number".into()))?,
+        );
     }
     if let Some(user) = config.get("mail.smtp.user") {
         let password: Secret<String> = config.secret("mail.smtp.password")?;
@@ -312,13 +399,24 @@ mod tests {
         let i18n = I18n::new("en")
             .catalog("en", r#"{ "m": { "subject": "Hello {name}\r\nBcc: x@y", "text": "Dear {name},\n\nbye", "html": "<p>Dear <b>{name}</b></p>" } }"#)
             .unwrap();
-        let mail = Mail::to("a@b.c").template("m").arg("name", "<script>alert(1)</script>");
+        let mail = Mail::to("a@b.c")
+            .template("m")
+            .arg("name", "<script>alert(1)</script>");
         let (subject, plain, html) = mail.render(&i18n, "en");
-        assert_eq!(subject, "Hello <script>alert(1)</script>Bcc: x@y", "no line breaks reach the header");
+        assert_eq!(
+            subject, "Hello <script>alert(1)</script>Bcc: x@y",
+            "no line breaks reach the header"
+        );
         assert_eq!(plain, "Dear <script>alert(1)</script>,\n\nbye");
-        assert!(html.contains("<p>Dear <b>&lt;script&gt;alert(1)&lt;/script&gt;</b></p>"), "{html}");
+        assert!(
+            html.contains("<p>Dear <b>&lt;script&gt;alert(1)&lt;/script&gt;</b></p>"),
+            "{html}"
+        );
         assert!(!html.contains("<script>"));
-        let (_, _, html) = Mail::to("a@b.c").template("none").arg("x", "<i>").render(&I18n::new("en"), "en");
+        let (_, _, html) = Mail::to("a@b.c")
+            .template("none")
+            .arg("x", "<i>")
+            .render(&I18n::new("en"), "en");
         assert!(html.contains("<body><p>none.text</p></body>"), "{html}");
     }
 }

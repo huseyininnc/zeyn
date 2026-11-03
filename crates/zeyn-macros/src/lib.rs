@@ -6,7 +6,10 @@ use proc_macro::TokenStream;
 use proc_macro2::TokenStream as Ts;
 use quote::{format_ident, quote, quote_spanned};
 use syn::spanned::Spanned;
-use syn::{Fields, FnArg, Ident, Item, ItemEnum, ItemFn, ItemStruct, LitInt, LitStr, Path, ReturnType, Type};
+use syn::{
+    Fields, FnArg, Ident, Item, ItemEnum, ItemFn, ItemStruct, LitInt, LitStr, Path, ReturnType,
+    Type,
+};
 
 /// Holds and validates access options: `permission = "..."` or `public`.
 #[derive(Default)]
@@ -24,9 +27,10 @@ impl AccessArgs {
                 Ok(quote!(::zeyn::Access::Permission(#p)))
             }
             (None, true) => Ok(quote!(::zeyn::Access::Public)),
-            (Some(p), true) => {
-                Err(syn::Error::new(p.span(), format!("{kind} `{name}` cannot be both `public` and have a permission")))
-            }
+            (Some(p), true) => Err(syn::Error::new(
+                p.span(),
+                format!("{kind} `{name}` cannot be both `public` and have a permission"),
+            )),
             (None, false) => Err(syn::Error::new(
                 name.span(),
                 format!(
@@ -42,9 +46,11 @@ fn check_permission(lit: &LitStr) -> syn::Result<()> {
     let value = lit.value();
     let parts: Vec<&str> = value.split('.').collect();
     let valid = parts.len() >= 2
-        && parts
-            .iter()
-            .all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'));
+        && parts.iter().all(|p| {
+            !p.is_empty()
+                && p.chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+        });
     if valid {
         Ok(())
     } else {
@@ -60,7 +66,10 @@ fn check_permission(lit: &LitStr) -> syn::Result<()> {
 /// Returns the type of the first argument (input or params) and the return type.
 fn fn_types(f: &ItemFn, kind: &str) -> syn::Result<(Ts, Ts)> {
     if !f.sig.generics.params.is_empty() {
-        return Err(syn::Error::new(f.sig.generics.span(), format!("{kind}s cannot be generic")));
+        return Err(syn::Error::new(
+            f.sig.generics.span(),
+            format!("{kind}s cannot be generic"),
+        ));
     }
     let input = match f.sig.inputs.first() {
         None => quote!(()),
@@ -69,7 +78,10 @@ fn fn_types(f: &ItemFn, kind: &str) -> syn::Result<(Ts, Ts)> {
             quote!(#ty)
         }
         Some(FnArg::Receiver(r)) => {
-            return Err(syn::Error::new(r.span(), format!("{kind}s cannot take `self`")));
+            return Err(syn::Error::new(
+                r.span(),
+                format!("{kind}s cannot take `self`"),
+            ));
         }
     };
     let output = match &f.sig.output {
@@ -111,7 +123,10 @@ impl AiArgs {
                 b.span(),
                 "`ai = true` is the default\n  = help: remove it, write `ai = \"guidance for models\"`, or use `ai = false` to hide it from models",
             )),
-            other => Err(syn::Error::new(other.span(), "`ai` takes a string with guidance for models, or `false`")),
+            other => Err(syn::Error::new(
+                other.span(),
+                "`ai` takes a string with guidance for models, or `false`",
+            )),
         }
     }
 
@@ -126,7 +141,11 @@ impl AiArgs {
             ));
         }
         let offered = !self.hidden;
-        let hint = self.hint.as_ref().map(LitStr::value).unwrap_or_default();
+        let hint = self
+            .hint
+            .as_ref()
+            .map(LitStr::value)
+            .unwrap_or_default();
         let confirm = self.confirm.is_some();
         Ok(quote!(::zeyn::Ai { offered: #offered, hint: #hint, confirm: #confirm }))
     }
@@ -136,9 +155,20 @@ impl AiArgs {
 /// their description.
 fn doc_text(attrs: &[syn::Attribute]) -> String {
     let mut lines: Vec<String> = Vec::new();
-    for a in attrs.iter().filter(|a| a.path().is_ident("doc")) {
-        let syn::Meta::NameValue(nv) = &a.meta else { continue };
-        let syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Str(s), .. }) = &nv.value else { continue };
+    for a in attrs
+        .iter()
+        .filter(|a| a.path().is_ident("doc"))
+    {
+        let syn::Meta::NameValue(nv) = &a.meta else {
+            continue;
+        };
+        let syn::Expr::Lit(syn::ExprLit {
+            lit: syn::Lit::Str(s),
+            ..
+        }) = &nv.value
+        else {
+            continue;
+        };
         let value = s.value();
         let line = value.trim();
         if line.is_empty() {
@@ -156,9 +186,17 @@ fn doc_text(attrs: &[syn::Attribute]) -> String {
 ///
 /// `fn search_products(q: DataQuery)` becomes `struct search_products;` and `search_products::run(q)`.
 fn unit_and_run(f: &ItemFn) -> Ts {
-    let ItemFn { attrs, vis, sig, block } = f;
+    let ItemFn {
+        attrs,
+        vis,
+        sig,
+        block,
+    } = f;
     let name = &sig.ident;
-    let docs: Vec<_> = attrs.iter().filter(|a| a.path().is_ident("doc")).collect();
+    let docs: Vec<_> = attrs
+        .iter()
+        .filter(|a| a.path().is_ident("doc"))
+        .collect();
     let mut run_sig = sig.clone();
     run_sig.ident = format_ident!("run");
     quote! {
@@ -204,7 +242,11 @@ fn injected_call(f: &ItemFn, kind: &str) -> syn::Result<(Ts, Ts, Ts)> {
         deps.push(quote_spanned!(ty.span()=> <#ty as ::zeyn::Inject>::dep()));
     }
     let await_ = f.sig.asyncness.map(|_| quote!(.await));
-    let ignore = if f.sig.inputs.is_empty() { quote!(let _ = input;) } else { quote!() };
+    let ignore = if f.sig.inputs.is_empty() {
+        quote!(let _ = input;)
+    } else {
+        quote!()
+    };
     let call = quote!({ #ignore Self::run(#(#args),*) #await_ });
     let deps = quote!(::std::vec::Vec::<::core::option::Option<::zeyn::Dep>>::from([#(#deps),*]).into_iter().flatten().collect());
     Ok((quote!(#(#binds)*), call, deps))
@@ -266,7 +308,12 @@ pub fn action(attr: TokenStream, item: TokenStream) -> TokenStream {
     or_error(expand_action(&f, &access, (audit, reauth), &ai), original)
 }
 
-fn expand_action(f: &ItemFn, access: &AccessArgs, flags: (bool, bool), ai: &AiArgs) -> syn::Result<Ts> {
+fn expand_action(
+    f: &ItemFn,
+    access: &AccessArgs,
+    flags: (bool, bool),
+    ai: &AiArgs,
+) -> syn::Result<Ts> {
     let (audit, reauth) = flags;
     let (input, output) = fn_types(f, "action")?;
     let name = &f.sig.ident;
@@ -353,7 +400,17 @@ pub fn screen(attr: TokenStream, item: TokenStream) -> TokenStream {
         Ok(c) => c,
         Err(e) => return or_error(Err(e), original),
     };
-    or_error(expand_screen(&f, &access, route.as_ref(), (sensitive || reason, reason), &ai, cache), original)
+    or_error(
+        expand_screen(
+            &f,
+            &access,
+            route.as_ref(),
+            (sensitive || reason, reason),
+            &ai,
+            cache,
+        ),
+        original,
+    )
 }
 
 /// Checks `cache = N` of a screen: only on a public screen, 1 to 86400 seconds.
@@ -395,12 +452,22 @@ fn expand_screen(
     let name = &f.sig.ident;
     let access = access.tokens("screen", name)?;
     let path_value = match route {
-        Some(r) => path_value_fn(r, &params, params.to_string().replace(char::is_whitespace, "") == "()")?,
+        Some(r) => path_value_fn(
+            r,
+            &params,
+            params
+                .to_string()
+                .replace(char::is_whitespace, "")
+                == "()",
+        )?,
         None => quote!(),
     };
     let route = match route {
         Some(r) if !r.value().starts_with('/') => {
-            return Err(syn::Error::new(r.span(), "a screen route must start with `/`"));
+            return Err(syn::Error::new(
+                r.span(),
+                "a screen route must start with `/`",
+            ));
         }
         Some(r) => quote!(::core::option::Option::Some(#r)),
         None => quote!(::core::option::Option::None),
@@ -445,9 +512,14 @@ fn expand_screen(
 fn path_value_fn(route: &LitStr, params: &Ts, no_params: bool) -> syn::Result<Ts> {
     let value = route.value();
     let mut names: Vec<String> = Vec::new();
-    for seg in value.split('/').filter(|s| s.contains('{') || s.contains('}')) {
-        let name =
-            seg.strip_prefix('{').and_then(|s| s.strip_suffix('}')).filter(|n| syn::parse_str::<Ident>(n).is_ok());
+    for seg in value
+        .split('/')
+        .filter(|s| s.contains('{') || s.contains('}'))
+    {
+        let name = seg
+            .strip_prefix('{')
+            .and_then(|s| s.strip_suffix('}'))
+            .filter(|n| syn::parse_str::<Ident>(n).is_ok());
         let Some(name) = name else {
             return Err(syn::Error::new(
                 route.span(),
@@ -501,16 +573,21 @@ fn path_value_fn(route: &LitStr, params: &Ts, no_params: bool) -> syn::Result<Ts
 #[proc_macro_attribute]
 pub fn params(attr: TokenStream, item: TokenStream) -> TokenStream {
     if !attr.is_empty() {
-        return syn::Error::new(Ts::from(attr).span(), "`#[params]` takes no options").to_compile_error().into();
+        return syn::Error::new(Ts::from(attr).span(), "`#[params]` takes no options")
+            .to_compile_error()
+            .into();
     }
     let item = syn::parse_macro_input!(item as Item);
     let ident = match &item {
         Item::Struct(s) => &s.ident,
         Item::Enum(e) => &e.ident,
         other => {
-            return syn::Error::new(other.span(), "`#[params]` can only be used on a struct or an enum")
-                .to_compile_error()
-                .into();
+            return syn::Error::new(
+                other.span(),
+                "`#[params]` can only be used on a struct or an enum",
+            )
+            .to_compile_error()
+            .into();
         }
     };
     quote! {
@@ -537,7 +614,9 @@ pub fn params(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn choice(attr: TokenStream, item: TokenStream) -> TokenStream {
     if !attr.is_empty() {
-        return syn::Error::new(Ts::from(attr).span(), "`#[choice]` takes no options").to_compile_error().into();
+        return syn::Error::new(Ts::from(attr).span(), "`#[choice]` takes no options")
+            .to_compile_error()
+            .into();
     }
     let e = syn::parse_macro_input!(item as ItemEnum);
     let original = quote!(#e);
@@ -546,15 +625,25 @@ pub fn choice(attr: TokenStream, item: TokenStream) -> TokenStream {
 
 fn expand_choice(mut e: ItemEnum) -> syn::Result<Ts> {
     if e.variants.is_empty() {
-        return Err(syn::Error::new(e.ident.span(), "a choice needs at least one variant"));
+        return Err(syn::Error::new(
+            e.ident.span(),
+            "a choice needs at least one variant",
+        ));
     }
     let enum_name = e.ident.to_string();
-    let has_default = e.variants.iter().any(|v| v.attrs.iter().any(|a| a.path().is_ident("default")));
+    let has_default = e.variants.iter().any(|v| {
+        v.attrs
+            .iter()
+            .any(|a| a.path().is_ident("default"))
+    });
     let mut options = Vec::new();
     let mut arms = Vec::new();
     for (i, v) in e.variants.iter_mut().enumerate() {
         if !matches!(v.fields, Fields::Unit) {
-            return Err(syn::Error::new(v.span(), "choice variants cannot have fields"));
+            return Err(syn::Error::new(
+                v.span(),
+                "choice variants cannot have fields",
+            ));
         }
         let mut label: Option<LitStr> = None;
         let mut keep = Vec::new();
@@ -571,7 +660,9 @@ fn expand_choice(mut e: ItemEnum) -> syn::Result<Ts> {
         v.attrs = keep;
         let ident = &v.ident;
         let value = ident.to_string();
-        let label = label.map(|l| l.value()).unwrap_or_else(|| value.clone());
+        let label = label
+            .map(|l| l.value())
+            .unwrap_or_else(|| value.clone());
         let key = format!("{enum_name}.{value}");
         options.push(quote!(::zeyn::ChoiceOption { value: #value, label: #label, key: #key }));
         arms.push(quote!(Self::#ident => #value));
@@ -627,7 +718,9 @@ fn parse_model_args(attr: TokenStream, allow_table: bool) -> syn::Result<ModelAr
                 "unknown entity option\n  = help: expected `table = \"...\"`, `validate = path::to::fn` or `sensitive`",
             ));
         } else {
-            return Err(meta.error("unknown model option\n  = help: expected `validate = path::to::fn` or `sensitive`"));
+            return Err(meta.error(
+                "unknown model option\n  = help: expected `validate = path::to::fn` or `sensitive`",
+            ));
         }
         Ok(())
     });
@@ -713,13 +806,20 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
     let name = s.ident.clone();
     let kind = if is_entity { "entity" } else { "model" };
     let before = s.attrs.len();
-    s.attrs.retain(|a| !a.path().is_ident("sensitive"));
+    s.attrs
+        .retain(|a| !a.path().is_ident("sensitive"));
     let sensitive = args.sensitive || s.attrs.len() != before;
     if !s.generics.params.is_empty() {
-        return Err(syn::Error::new(s.generics.span(), format!("{kind}s cannot be generic")));
+        return Err(syn::Error::new(
+            s.generics.span(),
+            format!("{kind}s cannot be generic"),
+        ));
     }
     let Fields::Named(named) = &mut s.fields else {
-        return Err(syn::Error::new(name.span(), format!("a {kind} must have named fields")));
+        return Err(syn::Error::new(
+            name.span(),
+            format!("a {kind} must have named fields"),
+        ));
     };
 
     let id_name = format_ident!("{}Id", name);
@@ -733,7 +833,10 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
     let mut generate_id = false;
 
     for (idx, field) in named.named.iter_mut().enumerate() {
-        let fname = field.ident.clone().expect("named field");
+        let fname = field
+            .ident
+            .clone()
+            .expect("named field");
         let fname_str = fname.to_string();
         let ty: Type = field.ty.clone();
         let fvis = field.vis.clone();
@@ -779,7 +882,9 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
                 }
                 let permission = permission
                     .map(|p| p.value())
-                    .unwrap_or_else(|| format!("{}.{}.unmask", snake_case(&name.to_string()), fname_str));
+                    .unwrap_or_else(|| {
+                        format!("{}.{}.unmask", snake_case(&name.to_string()), fname_str)
+                    });
                 checks.push(quote_spanned!(ty.span()=> ::zeyn::__rules::text::<#ty>();));
                 mask = quote!(::core::option::Option::Some(::zeyn::Masking { style: #style, permission: #permission }));
                 masked = true;
@@ -858,9 +963,15 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
             }
         }
         let guard = if masked {
-            Some((format_ident!("__zeyn_mask_{}", fname), quote!(::zeyn::__privacy::masked_output)))
+            Some((
+                format_ident!("__zeyn_mask_{}", fname),
+                quote!(::zeyn::__privacy::masked_output),
+            ))
         } else if is_key && sensitive {
-            Some((format_ident!("__zeyn_read_{}", fname), quote!(::zeyn::__privacy::read_output)))
+            Some((
+                format_ident!("__zeyn_read_{}", fname),
+                quote!(::zeyn::__privacy::read_output),
+            ))
         } else {
             None
         };
@@ -891,7 +1002,9 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
             ));
         }
 
-        let label = label.map(|l| l.value()).unwrap_or_else(|| default_label(&fname_str));
+        let label = label
+            .map(|l| l.value())
+            .unwrap_or_else(|| default_label(&fname_str));
         let getter = format_ident!("__zeyn_get_{}", fname);
         let model_str = name.to_string();
         metas.push(quote! {
@@ -918,12 +1031,17 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
         validations.push(quote! {
             ::zeyn::__rules::validate(&self.#fname, &Self::__ZEYN_FIELDS[#idx], &mut errors);
         });
-        value_arms.push(quote!(#idx => ::core::option::Option::Some(::zeyn::FieldType::to_value(&self.#fname))));
+        value_arms.push(
+            quote!(#idx => ::core::option::Option::Some(::zeyn::FieldType::to_value(&self.#fname))),
+        );
     }
 
     let table_impl = if is_entity {
         let table = args.table.ok_or_else(|| {
-            syn::Error::new(name.span(), format!("entity `{name}` has no table\n  = help: add `table = \"...\"`"))
+            syn::Error::new(
+                name.span(),
+                format!("entity `{name}` has no table\n  = help: add `table = \"...\"`"),
+            )
         })?;
         if keys != 1 {
             return Err(syn::Error::new(
@@ -940,7 +1058,9 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
         None
     };
 
-    let custom = args.validate.map(|path| quote!(#path(self, &mut errors);));
+    let custom = args
+        .validate
+        .map(|path| quote!(#path(self, &mut errors);));
     let vis = &s.vis;
     let id_struct = generate_id.then(|| {
         let doc = format!("Key of a `{name}` record.");
@@ -1025,7 +1145,9 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
 #[proc_macro]
 pub fn t(input: TokenStream) -> TokenStream {
     let args = syn::parse_macro_input!(input as TArgs);
-    expand_t(args).unwrap_or_else(|e| e.to_compile_error()).into()
+    expand_t(args)
+        .unwrap_or_else(|e| e.to_compile_error())
+        .into()
 }
 
 struct TArgs {
@@ -1051,16 +1173,24 @@ impl syn::parse::Parse for TArgs {
 }
 
 fn lookup_key<'a>(value: &'a serde_json::Value, key: &str) -> Option<&'a str> {
-    key.split('.').try_fold(value, |v, part| v.get(part))?.as_str()
+    key.split('.')
+        .try_fold(value, |v, part| v.get(part))?
+        .as_str()
 }
 
 fn placeholders(message: &str) -> std::collections::BTreeSet<String> {
     let mut found = std::collections::BTreeSet::new();
     let mut rest = message;
     while let Some(start) = rest.find('{') {
-        let Some(len) = rest[start..].find('}') else { break };
+        let Some(len) = rest[start..].find('}') else {
+            break;
+        };
         let name = &rest[start + 1..start + len];
-        if !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        if !name.is_empty()
+            && name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_')
+        {
             found.insert(name.to_string());
         }
         rest = &rest[start + len..];
@@ -1071,40 +1201,65 @@ fn placeholders(message: &str) -> std::collections::BTreeSet<String> {
 fn expand_t(t: TArgs) -> syn::Result<Ts> {
     let key = t.key.value();
     let span = t.key.span();
-    let dir = std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default()).join("locales");
+    let dir = std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default())
+        .join("locales");
     let mut files: Vec<_> = std::fs::read_dir(&dir)
         .map_err(|_| {
             syn::Error::new(
                 span,
-                format!("t!: no `locales` folder at {}\n  = help: create locales/en.json", dir.display()),
+                format!(
+                    "t!: no `locales` folder at {}\n  = help: create locales/en.json",
+                    dir.display()
+                ),
             )
         })?
         .filter_map(|e| e.ok().map(|e| e.path()))
-        .filter(|p| p.extension().is_some_and(|x| x == "json"))
+        .filter(|p| {
+            p.extension()
+                .is_some_and(|x| x == "json")
+        })
         .collect();
     files.sort();
     if files.is_empty() {
-        return Err(syn::Error::new(span, "t!: the `locales` folder has no .json files"));
+        return Err(syn::Error::new(
+            span,
+            "t!: the `locales` folder has no .json files",
+        ));
     }
-    let given: std::collections::BTreeSet<String> = t.args.iter().map(|(n, _)| n.to_string()).collect();
+    let given: std::collections::BTreeSet<String> = t
+        .args
+        .iter()
+        .map(|(n, _)| n.to_string())
+        .collect();
     let mut tracked = Vec::new();
     for path in &files {
-        let text =
-            std::fs::read_to_string(path).map_err(|e| syn::Error::new(span, format!("t!: {}: {e}", path.display())))?;
-        let json: serde_json::Value = serde_json::from_str(&text)
-            .map_err(|e| syn::Error::new(span, format!("t!: {} is not valid JSON: {e}", path.display())))?;
-        let file = path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default();
+        let text = std::fs::read_to_string(path)
+            .map_err(|e| syn::Error::new(span, format!("t!: {}: {e}", path.display())))?;
+        let json: serde_json::Value = serde_json::from_str(&text).map_err(|e| {
+            syn::Error::new(
+                span,
+                format!("t!: {} is not valid JSON: {e}", path.display()),
+            )
+        })?;
+        let file = path
+            .file_name()
+            .map(|f| f.to_string_lossy().to_string())
+            .unwrap_or_default();
         let Some(message) = lookup_key(&json, &key) else {
             return Err(syn::Error::new(
                 span,
-                format!("t!: key `{key}` is missing in locales/{file}\n  = help: add it to every file in locales/"),
+                format!(
+                    "t!: key `{key}` is missing in locales/{file}\n  = help: add it to every file in locales/"
+                ),
             ));
         };
         let wanted = placeholders(message);
         if let Some(missing) = wanted.difference(&given).next() {
             return Err(syn::Error::new(
                 span,
-                format!("t!: `{key}` in locales/{file} uses {{{missing}}} but no `{missing} = ...` argument was given"),
+                format!(
+                    "t!: `{key}` in locales/{file} uses {{{missing}}} but no `{missing} = ...` argument was given"
+                ),
             ));
         }
         if let Some(extra) = given.difference(&wanted).next() {

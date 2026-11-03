@@ -233,14 +233,37 @@ pub struct Command {
 
 impl Command {
     /// Opens a screen as a window. Only users who may open the screen see the command.
-    pub fn open<S: ScreenDef>(id: &'static str, label: impl Into<Text>, screen: S, params: S::Params) -> Self {
-        Self::with(id, label.into(), S::META.access, Kind::Effect(Window::open(screen, params)))
+    pub fn open<S: ScreenDef>(
+        id: &'static str,
+        label: impl Into<Text>,
+        screen: S,
+        params: S::Params,
+    ) -> Self {
+        Self::with(
+            id,
+            label.into(),
+            S::META.access,
+            Kind::Effect(Window::open(screen, params)),
+        )
     }
 
     /// Goes to a screen. Only users who may open the screen see the command.
-    pub fn navigate<S: ScreenDef>(id: &'static str, label: impl Into<Text>, _screen: S, params: S::Params) -> Self {
+    pub fn navigate<S: ScreenDef>(
+        id: &'static str,
+        label: impl Into<Text>,
+        _screen: S,
+        params: S::Params,
+    ) -> Self {
         let params = serde_json::to_value(&params).expect("screen params must serialize to JSON");
-        Self::with(id, label.into(), S::META.access, Kind::Effect(Effect::Navigate { screen: S::META.name, params }))
+        Self::with(
+            id,
+            label.into(),
+            S::META.access,
+            Kind::Effect(Effect::Navigate {
+                screen: S::META.name,
+                params,
+            }),
+        )
     }
 
     /// Runs an effect in the browser, such as a toast. Every signed in user of the feature sees it.
@@ -264,11 +287,24 @@ impl Command {
                 output.failure().map_or(Ok(()), Err)
             })
         });
-        Self::with(id, label.into(), A::META.access, Kind::Action { meta: A::META, run })
+        Self::with(
+            id,
+            label.into(),
+            A::META.access,
+            Kind::Action { meta: A::META, run },
+        )
     }
 
     fn with(id: &'static str, label: Text, access: Access, kind: Kind) -> Self {
-        Self { id, label, shortcut: None, override_browser: false, icon: None, access, kind }
+        Self {
+            id,
+            label,
+            shortcut: None,
+            override_browser: false,
+            icon: None,
+            access,
+            kind,
+        }
     }
 
     /// Keyboard shortcut such as `"Ctrl+Shift+O"` or `"Alt+F2"`. `App::check` reports shortcuts
@@ -318,7 +354,10 @@ impl Command {
         match &self.kind {
             Kind::Action { meta, run } => {
                 let run = run.clone();
-                Some(RowCall { meta: *meta, run: Box::new(move |ctx| run(ctx)) })
+                Some(RowCall {
+                    meta: *meta,
+                    run: Box::new(move |ctx| run(ctx)),
+                })
             }
             Kind::Effect(_) => None,
         }
@@ -329,10 +368,18 @@ impl Command {
     pub(crate) fn attrs(&self, r: &Render) -> String {
         let mut out = format!(r#" data-zeyn-command="{}""#, escape(self.id));
         match &self.kind {
-            Kind::Effect(e) => out.push_str(&format!(r#" data-zeyn-effect="{}""#, attr(&e.to_json(r)))),
-            Kind::Action { .. } => out.push_str(&format!(r#" data-zeyn-command-run="{}""#, escape(self.id))),
+            Kind::Effect(e) => {
+                out.push_str(&format!(r#" data-zeyn-effect="{}""#, attr(&e.to_json(r))))
+            }
+            Kind::Action { .. } => {
+                out.push_str(&format!(r#" data-zeyn-command-run="{}""#, escape(self.id)))
+            }
         }
-        if let Some(keys) = self.shortcut.as_deref().and_then(|s| usable_shortcut(s, self.override_browser)) {
+        if let Some(keys) = self
+            .shortcut
+            .as_deref()
+            .and_then(|s| usable_shortcut(s, self.override_browser))
+        {
             out.push_str(&format!(r#" aria-keyshortcuts="{}""#, escape(&keys)));
         }
         out
@@ -340,19 +387,32 @@ impl Command {
 
     /// The shortcut as shown to users, such as `Ctrl+Shift+O`.
     pub(crate) fn hint(&self) -> Option<String> {
-        self.shortcut.as_deref().and_then(normalize_shortcut).map(|k| k.replace("Control", "Ctrl"))
+        self.shortcut
+            .as_deref()
+            .and_then(normalize_shortcut)
+            .map(|k| k.replace("Control", "Ctrl"))
     }
 
     /// A hidden button that runs the command, placed in the page shell for the palette and for
     /// the shortcut.
     pub(crate) fn button(&self, r: &Render) -> String {
-        let hint = self.hint().map(|h| format!(r#" data-hint="{}""#, escape(&h))).unwrap_or_default();
+        let hint = self
+            .hint()
+            .map(|h| format!(r#" data-hint="{}""#, escape(&h)))
+            .unwrap_or_default();
         let icon = self
             .icon
             .and_then(|i| serde_json::to_value(i).ok())
-            .and_then(|v| v.as_str().map(|s| format!(r#" data-icon="{s}""#)))
+            .and_then(|v| {
+                v.as_str()
+                    .map(|s| format!(r#" data-icon="{s}""#))
+            })
             .unwrap_or_default();
-        format!(r#"<button type="button" tabindex="-1"{}{hint}{icon}>{}</button>"#, self.attrs(r), r.text(&self.label))
+        format!(
+            r#"<button type="button" tabindex="-1"{}{hint}{icon}>{}</button>"#,
+            self.attrs(r),
+            r.text(&self.label)
+        )
     }
 
     pub(crate) fn schema(&self) -> Json {
@@ -400,8 +460,12 @@ pub fn normalize_shortcut(keys: &str) -> Option<String> {
         flags[i] = true;
     }
     let key = key_name(key)?;
-    let mut out: Vec<&str> =
-        ["Control", "Alt", "Shift", "Meta"].iter().zip(flags).filter(|(_, on)| *on).map(|(n, _)| *n).collect();
+    let mut out: Vec<&str> = ["Control", "Alt", "Shift", "Meta"]
+        .iter()
+        .zip(flags)
+        .filter(|(_, on)| *on)
+        .map(|(n, _)| *n)
+        .collect();
     out.push(&key);
     Some(out.join("+"))
 }
@@ -430,10 +494,18 @@ fn key_name(key: &str) -> Option<String> {
         (None, _) => return None,
         _ => {}
     }
-    if let Some(n) = key.strip_prefix(['F', 'f']).and_then(|n| n.parse::<u8>().ok()) {
-        return (1..=24).contains(&n).then(|| format!("F{n}"));
+    if let Some(n) = key
+        .strip_prefix(['F', 'f'])
+        .and_then(|n| n.parse::<u8>().ok())
+    {
+        return (1..=24)
+            .contains(&n)
+            .then(|| format!("F{n}"));
     }
-    NAMED_KEYS.iter().find(|k| k.eq_ignore_ascii_case(key)).map(|k| k.to_string())
+    NAMED_KEYS
+        .iter()
+        .find(|k| k.eq_ignore_ascii_case(key))
+        .map(|k| k.to_string())
 }
 
 /// Whether a normalized shortcut is a character key with no Control, Alt or Meta. WCAG 2.2
@@ -441,19 +513,29 @@ fn key_name(key: &str) -> Option<String> {
 fn character_only(keys: &str) -> bool {
     let parts: Vec<&str> = keys.split('+').collect();
     let key = parts.last().copied().unwrap_or("");
-    key.chars().count() == 1 && parts[..parts.len() - 1].iter().all(|m| *m == "Shift")
+    key.chars().count() == 1
+        && parts[..parts.len() - 1]
+            .iter()
+            .all(|m| *m == "Shift")
 }
 
 /// Problems of commands that belong together: ids that are not usable, ids or shortcuts used
 /// twice, shortcuts that cannot be read, single character shortcuts and shortcuts the palette
 /// keeps for itself. `owner` names where each command was registered, for the message.
-pub(crate) fn problems(commands: &[(&str, &Command)], check_each: bool, palette: &str) -> Vec<String> {
+pub(crate) fn problems(
+    commands: &[(&str, &Command)],
+    check_each: bool,
+    palette: &str,
+) -> Vec<String> {
     let mut out = Vec::new();
     let mut seen: Vec<(String, &str, &str)> = Vec::new();
     for (i, (owner, c)) in commands.iter().enumerate() {
         if check_each {
             if c.id.is_empty()
-                || !c.id.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"._-".contains(&b))
+                || !c
+                    .id
+                    .bytes()
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"._-".contains(&b))
             {
                 out.push(format!(
                     "command `{}` has an id that is not usable in HTML\n  = help: use lower case letters, digits, dots, dashes and underscores, such as `sales.new_order`",
@@ -461,10 +543,15 @@ pub(crate) fn problems(commands: &[(&str, &Command)], check_each: bool, palette:
                 ));
             }
         }
-        if let Some((other, _)) = commands[..i].iter().find(|(o, d)| d.id == c.id && (check_each || o != owner)) {
+        if let Some((other, _)) = commands[..i]
+            .iter()
+            .find(|(o, d)| d.id == c.id && (check_each || o != owner))
+        {
             out.push(format!("command id `{}` is registered twice (in `{other}` and `{owner}`)\n  = help: give each command its own id", c.id));
         }
-        let Some(raw) = c.shortcut.as_deref() else { continue };
+        let Some(raw) = c.shortcut.as_deref() else {
+            continue;
+        };
         let Some(keys) = normalize_shortcut(raw) else {
             if check_each {
                 out.push(format!(
@@ -502,7 +589,10 @@ pub(crate) fn problems(commands: &[(&str, &Command)], check_each: bool, palette:
                 ));
             }
         }
-        if let Some((_, other, other_owner)) = seen.iter().find(|(k, _, o)| *k == keys && (check_each || o != owner)) {
+        if let Some((_, other, other_owner)) = seen
+            .iter()
+            .find(|(k, _, o)| *k == keys && (check_each || o != owner))
+        {
             out.push(format!(
                 "commands `{other}` and `{}` both use the shortcut `{keys}` (in `{other_owner}` and `{owner}`)\n  = help: give one of them another shortcut",
                 c.id
@@ -531,7 +621,11 @@ pub struct SearchHit {
 
 impl SearchHit {
     pub fn new(label: impl Into<String>, group: impl Into<String>, url: impl Into<String>) -> Self {
-        SearchHit { label: label.into(), group: group.into(), url: url.into() }
+        SearchHit {
+            label: label.into(),
+            group: group.into(),
+            url: url.into(),
+        }
     }
 
     /// Whether the path stays in the app: it starts with one `/` and has no backslash or control
@@ -539,11 +633,15 @@ impl SearchHit {
     pub fn is_local(&self) -> bool {
         self.url.starts_with('/')
             && !self.url.starts_with("//")
-            && !self.url.chars().any(|c| c == '\\' || c.is_control())
+            && !self
+                .url
+                .chars()
+                .any(|c| c == '\\' || c.is_control())
     }
 }
 
-type Find = Arc<dyn Fn(Ctx, String) -> BoxFuture<crate::action::Result<Vec<SearchHit>>> + Send + Sync>;
+type Find =
+    Arc<dyn Fn(Ctx, String) -> BoxFuture<crate::action::Result<Vec<SearchHit>>> + Send + Sync>;
 
 /// A server search the command palette runs as the user types, registered with
 /// [`crate::Feature::search`]. The action takes the query and returns hits.
@@ -572,7 +670,10 @@ impl Search {
         A: Action<Input = String, Output = crate::action::Result<Vec<SearchHit>>>,
     {
         let find: Find = Arc::new(|ctx, query| Box::pin(async move { A::call(ctx, query).await? }));
-        Search { meta: A::META, find }
+        Search {
+            meta: A::META,
+            find,
+        }
     }
 
     pub fn meta(&self) -> &ActionMeta {

@@ -28,7 +28,8 @@ pub const HARD_MAX_ROWS: usize = 50_000;
 pub const MAX_CSV_BYTES: usize = 8 * 1024 * 1024;
 const PREVIEW_ROWS: usize = 10;
 #[cfg(feature = "xlsx")]
-const ACCEPT: &str = ".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+const ACCEPT: &str =
+    ".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 #[cfg(not(feature = "xlsx"))]
 const ACCEPT: &str = ".csv,text/csv";
 const MAX_ERRORS_SHOWN: usize = 200;
@@ -71,7 +72,12 @@ fn parse_limited(
     max_cells: usize,
     fit: bool,
 ) -> std::result::Result<Vec<Vec<String>>, ParseStop> {
-    fn add(row: &mut Vec<String>, cell: String, width: usize, fit: bool) -> std::result::Result<(), ParseStop> {
+    fn add(
+        row: &mut Vec<String>,
+        cell: String,
+        width: usize,
+        fit: bool,
+    ) -> std::result::Result<(), ParseStop> {
         if row.len() < width {
             row.push(cell);
         } else if !fit {
@@ -83,7 +89,9 @@ fn parse_limited(
         }
         Ok(())
     }
-    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
+    let text = text
+        .strip_prefix('\u{feff}')
+        .unwrap_or(text);
     let sep = separator(text);
     let mut rows: Vec<Vec<String>> = Vec::new();
     let mut row = Vec::new();
@@ -105,10 +113,20 @@ fn parse_limited(
         }
         match c {
             '"' if cell.is_empty() => quoted = true,
-            c if c == sep => add(&mut row, std::mem::take(&mut cell), width, fit && !rows.is_empty())?,
+            c if c == sep => add(
+                &mut row,
+                std::mem::take(&mut cell),
+                width,
+                fit && !rows.is_empty(),
+            )?,
             '\r' if chars.peek() == Some(&'\n') => {}
             '\n' | '\r' => {
-                add(&mut row, std::mem::take(&mut cell), width, fit && !rows.is_empty())?;
+                add(
+                    &mut row,
+                    std::mem::take(&mut cell),
+                    width,
+                    fit && !rows.is_empty(),
+                )?;
                 if row.iter().any(|v| !v.trim().is_empty()) {
                     if rows.len() >= max_rows {
                         return Err(ParseStop::TooMany);
@@ -153,12 +171,26 @@ fn separator(text: &str) -> char {
             _ => {}
         }
     }
-    counts.iter().max_by_key(|(s, n)| (*n, *s == ',')).map(|(s, _)| *s).unwrap_or(',')
+    counts
+        .iter()
+        .max_by_key(|(s, n)| (*n, *s == ','))
+        .map(|(s, _)| *s)
+        .unwrap_or(',')
 }
 
 /// Header text in a form that matches across case and Turkish dotted and dotless i.
 fn fold(s: &str) -> String {
-    s.trim().chars().map(|c| if matches!(c, 'İ' | 'I' | 'ı') { 'i' } else { c }).collect::<String>().to_lowercase()
+    s.trim()
+        .chars()
+        .map(|c| {
+            if matches!(c, 'İ' | 'I' | 'ı') {
+                'i'
+            } else {
+                c
+            }
+        })
+        .collect::<String>()
+        .to_lowercase()
 }
 
 /// One problem in one row. `row` counts data rows from 1; the header is not counted.
@@ -197,13 +229,17 @@ fn general(ctx: &Ctx, key: &str, args: &[(&'static str, String)]) -> Error {
 
 /// Fields a CSV may fill: what a form would take, never keys or row versions.
 fn importable<M: Model>() -> impl Iterator<Item = &'static FieldMeta> {
-    M::fields().iter().filter(|m| !m.key && !m.readonly && !m.version)
+    M::fields()
+        .iter()
+        .filter(|m| !m.key && !m.readonly && !m.version)
 }
 
 fn bool_text(cell: &str) -> Option<bool> {
     match fold(cell).as_str() {
         "true" | "1" | "yes" | "y" | "x" | "evet" | "e" | "doğru" => Some(true),
-        "false" | "0" | "no" | "n" | "" | "hayir" | "hayır" | "h" | "yanliş" | "yanlış" => Some(false),
+        "false" | "0" | "no" | "n" | "" | "hayir" | "hayır" | "h" | "yanliş" | "yanlış" => {
+            Some(false)
+        }
         _ => None,
     }
 }
@@ -223,11 +259,13 @@ pub fn check_csv<M: Model>(ctx: &Ctx, csv: &str, max_rows: usize) -> Result<Chec
         return Err(general(ctx, "too_large", &[]));
     }
     let too_many = || general(ctx, "too_many", &[("max", max_rows.to_string())]);
-    let mut rows = parse_limited(csv, max_rows.saturating_add(1), MAX_CSV_COLUMNS, true).map_err(|e| match e {
-        ParseStop::Quote => general(ctx, "bad_quotes", &[]),
-        ParseStop::TooMany => too_many(),
-        ParseStop::TooWide => general(ctx, "too_large", &[]),
-    })?;
+    let mut rows = parse_limited(csv, max_rows.saturating_add(1), MAX_CSV_COLUMNS, true).map_err(
+        |e| match e {
+            ParseStop::Quote => general(ctx, "bad_quotes", &[]),
+            ParseStop::TooMany => too_many(),
+            ParseStop::TooWide => general(ctx, "too_large", &[]),
+        },
+    )?;
     if rows.len() < 2 {
         return Err(general(ctx, "empty", &[]));
     }
@@ -247,10 +285,12 @@ pub fn check_file<M: Model>(ctx: &Ctx, file: &ImportFile, max_rows: usize) -> Re
         #[cfg(feature = "xlsx")]
         ImportFile::Xlsx(bytes) => {
             use crate::xlsx::XlsxReadError;
-            let (header, cells) =
-                crate::xlsx::read(bytes, max_rows, importable::<M>().count()).map_err(|e| match e {
+            let (header, cells) = crate::xlsx::read(bytes, max_rows, importable::<M>().count())
+                .map_err(|e| match e {
                     XlsxReadError::TooLarge => general(ctx, "too_large", &[]),
-                    XlsxReadError::TooMany => general(ctx, "too_many", &[("max", max_rows.to_string())]),
+                    XlsxReadError::TooMany => {
+                        general(ctx, "too_many", &[("max", max_rows.to_string())])
+                    }
                     XlsxReadError::Unreadable => general(ctx, "bad_file", &[]),
                 })?;
             if header.is_empty() {
@@ -284,11 +324,24 @@ fn columns_of<M: Model>(ctx: &Ctx, header: &[String]) -> Result<Vec<&'static Fie
     let mut columns = Vec::new();
     for name in header {
         let key = fold(name);
-        let meta = importable::<M>()
-            .find(|m| fold(m.name) == key || fold(m.label) == key || fold(&ctx.t(&m.label_text())) == key);
+        let meta = importable::<M>().find(|m| {
+            fold(m.name) == key || fold(m.label) == key || fold(&ctx.t(&m.label_text())) == key
+        });
         match meta {
-            Some(m) if !columns.iter().any(|c: &&FieldMeta| c.name == m.name) => columns.push(m),
-            _ => return Err(general(ctx, "unknown_column", &[("name", name.trim().to_string())])),
+            Some(m)
+                if !columns
+                    .iter()
+                    .any(|c: &&FieldMeta| c.name == m.name) =>
+            {
+                columns.push(m)
+            }
+            _ => {
+                return Err(general(
+                    ctx,
+                    "unknown_column",
+                    &[("name", name.trim().to_string())],
+                ));
+            }
         }
     }
     Ok(columns)
@@ -296,33 +349,55 @@ fn columns_of<M: Model>(ctx: &Ctx, header: &[String]) -> Result<Vec<&'static Fie
 
 /// A choice cell by value, or by label in the catalog or in the user's language, so exported
 /// files import again.
-fn choice_value(ctx: &Ctx, options: &[crate::value::ChoiceOption], cell: &str) -> Option<&'static str> {
+fn choice_value(
+    ctx: &Ctx,
+    options: &[crate::value::ChoiceOption],
+    cell: &str,
+) -> Option<&'static str> {
     let key = fold(cell);
     options
         .iter()
         .find(|o| o.value == cell.trim())
-        .or_else(|| options.iter().find(|o| fold(o.label) == key || fold(&ctx.t(&Text::key_or(o.key, o.label))) == key))
+        .or_else(|| {
+            options.iter().find(|o| {
+                fold(o.label) == key || fold(&ctx.t(&Text::key_or(o.key, o.label))) == key
+            })
+        })
         .map(|o| o.value)
 }
 
 /// Validates every data row as a form of `M` would.
-fn check_rows<M: Model>(ctx: &Ctx, columns: Vec<&'static FieldMeta>, rows: Vec<Vec<String>>) -> Checked<M> {
+fn check_rows<M: Model>(
+    ctx: &Ctx,
+    columns: Vec<&'static FieldMeta>,
+    rows: Vec<Vec<String>>,
+) -> Checked<M> {
     let form = Form::auto(M::default());
     let mut valid = Vec::new();
     let mut errors = Vec::new();
     for (i, row) in rows.iter().enumerate() {
         let mut values = Map::new();
-        for (meta, cell) in columns.iter().zip(row.iter().chain(std::iter::repeat(&String::new()))) {
+        for (meta, cell) in columns.iter().zip(
+            row.iter()
+                .chain(std::iter::repeat(&String::new())),
+        ) {
             let value = match meta.kind {
-                FieldKind::Bool => bool_text(cell).map(Json::Bool).unwrap_or_else(|| Json::String(cell.clone())),
+                FieldKind::Bool => bool_text(cell)
+                    .map(Json::Bool)
+                    .unwrap_or_else(|| Json::String(cell.clone())),
                 FieldKind::Choice(options) => Json::String(
-                    choice_value(ctx, options, cell).map_or_else(|| cell.trim().to_string(), str::to_string),
+                    choice_value(ctx, options, cell)
+                        .map_or_else(|| cell.trim().to_string(), str::to_string),
                 ),
                 _ => Json::String(cell.trim().to_string()),
             };
             values.insert(meta.name.to_string(), value);
         }
-        if row.len() > columns.len() && row[columns.len()..].iter().any(|c| !c.trim().is_empty()) {
+        if row.len() > columns.len()
+            && row[columns.len()..]
+                .iter()
+                .any(|c| !c.trim().is_empty())
+        {
             errors.push(RowError {
                 row: i + 1,
                 field: String::new(),
@@ -339,7 +414,13 @@ fn check_rows<M: Model>(ctx: &Ctx, columns: Vec<&'static FieldMeta>, rows: Vec<V
             })),
         }
     }
-    Checked { columns, valid, errors, total: rows.len(), raw: rows }
+    Checked {
+        columns,
+        valid,
+        errors,
+        total: rows.len(),
+        raw: rows,
+    }
 }
 
 /// Error report as CSV (`row;field;message`), safe to open in a spreadsheet.
@@ -349,12 +430,22 @@ pub fn error_report(ctx: &Ctx, errors: &[RowError]) -> String {
         if v.starts_with(['=', '+', '-', '@', '\t', '\r']) {
             v.insert(0, '\'');
         }
-        if v.contains([';', '"', '\n', '\r']) { format!("\"{}\"", v.replace('"', "\"\"")) } else { v }
+        if v.contains([';', '"', '\n', '\r']) {
+            format!("\"{}\"", v.replace('"', "\"\""))
+        } else {
+            v
+        }
     };
-    let head = ["row", "field", "message"].map(|k| cell(&ctx.t(&Text::key(format!("zeyn.import.report_{k}")))));
+    let head = ["row", "field", "message"]
+        .map(|k| cell(&ctx.t(&Text::key(format!("zeyn.import.report_{k}")))));
     let mut out = format!("\u{feff}{}\r\n", head.join(";"));
     for e in errors {
-        out.push_str(&format!("{};{};{}\r\n", e.row, cell(&e.field), cell(&e.message)));
+        out.push_str(&format!(
+            "{};{};{}\r\n",
+            e.row,
+            cell(&e.field),
+            cell(&e.message)
+        ));
     }
     out
 }
@@ -380,7 +471,11 @@ pub struct Import<M, A> {
 impl<M: Model, A: Action<Input = Vec<Valid<M>>>> Import<M, A> {
     /// Import that sends the valid rows to `action`; rows with errors are skipped and reported.
     pub fn of(_action: A) -> Self {
-        Import { max_rows: DEFAULT_MAX_ROWS, all_or_nothing: false, _types: PhantomData }
+        Import {
+            max_rows: DEFAULT_MAX_ROWS,
+            all_or_nothing: false,
+            _types: PhantomData,
+        }
     }
 
     /// Refuses files with more rows. 5000 unless set; never more than 50000.
@@ -407,19 +502,34 @@ where
 
     fn preview(&self, ctx: &Ctx, file: &ImportFile) -> Result<Json> {
         let checked = check_file::<M>(ctx, file, self.max_rows)?;
-        let mut table = String::from(r#"<table class="z-import-preview"><thead><tr><th scope="col">#</th>"#);
+        let mut table =
+            String::from(r#"<table class="z-import-preview"><thead><tr><th scope="col">#</th>"#);
         for m in &checked.columns {
-            table.push_str(&format!(r#"<th scope="col">{}</th>"#, escape(&ctx.t(&m.label_text()))));
+            table.push_str(&format!(
+                r#"<th scope="col">{}</th>"#,
+                escape(&ctx.t(&m.label_text()))
+            ));
         }
         table.push_str("</tr></thead><tbody>");
-        for (i, row) in checked.raw.iter().take(PREVIEW_ROWS).enumerate() {
-            let bad = checked.errors.iter().any(|e| e.row == i + 1);
+        for (i, row) in checked
+            .raw
+            .iter()
+            .take(PREVIEW_ROWS)
+            .enumerate()
+        {
+            let bad = checked
+                .errors
+                .iter()
+                .any(|e| e.row == i + 1);
             table.push_str(&format!(
                 r#"<tr{}><th scope="row">{}</th>"#,
                 if bad { r#" class="z-row-danger""# } else { "" },
                 i + 1
             ));
-            for (m, cell) in checked.columns.iter().zip(row.iter().chain(std::iter::repeat(&String::new()))) {
+            for (m, cell) in checked.columns.iter().zip(
+                row.iter()
+                    .chain(std::iter::repeat(&String::new())),
+            ) {
                 let shown = if m.mask.is_some() && !cell.trim().is_empty() {
                     crate::privacy::masked_text(m, cell)
                 } else {
@@ -453,18 +563,27 @@ where
         Box::pin(async move {
             let checked = checked?;
             if checked.valid.is_empty() || (all_or_nothing && checked.invalid() > 0) {
-                let key = if checked.valid.is_empty() { "nothing_valid" } else { "fix_first" };
+                let key = if checked.valid.is_empty() {
+                    "nothing_valid"
+                } else {
+                    "fix_first"
+                };
                 return Err(general(&ctx, key, &[]));
             }
             let skipped = checked.invalid();
-            let rows: Vec<Valid<M>> = checked.valid.into_iter().map(|(_, v)| v).collect();
+            let rows: Vec<Valid<M>> = checked
+                .valid
+                .into_iter()
+                .map(|(_, v)| v)
+                .collect();
             let count = rows.len();
             let output = A::call(ctx.clone(), rows).await?;
             if let Some(error) = output.failure() {
                 return Err(error);
             }
-            let message =
-                Text::key("zeyn.import.imported").arg("count", count.to_string()).arg("skipped", skipped.to_string());
+            let message = Text::key("zeyn.import.imported")
+                .arg("count", count.to_string())
+                .arg("skipped", skipped.to_string());
             Ok(json!({ "imported": count, "skipped": skipped, "message": ctx.t(&message) }))
         })
     }
@@ -478,9 +597,13 @@ where
     fn render(&self, out: &mut String, r: &Render) {
         let scope = r.scope;
         let text = |k: &str| r.text(&Text::key(format!("zeyn.import.{k}")));
-        let columns: Vec<String> = importable::<M>().map(|m| r.label(m)).collect();
+        let columns: Vec<String> = importable::<M>()
+            .map(|m| r.label(m))
+            .collect();
         let hint = r.text(
-            &Text::key("zeyn.import.hint").arg("columns", columns.join(", ")).arg("max", self.max_rows.to_string()),
+            &Text::key("zeyn.import.hint")
+                .arg("columns", columns.join(", "))
+                .arg("max", self.max_rows.to_string()),
         );
         out.push_str(&format!(
             r#"<div class="z-import" data-zeyn-import data-testid="{scope}.import"><div class="z-field"><label for="{scope}-import-file">{file}</label><input type="file" id="{scope}-import-file" accept="{ACCEPT}" data-testid="{scope}.import.file" aria-describedby="{scope}-import-hint"><p class="z-hint" id="{scope}-import-hint">{hint}</p></div><p class="z-import-status" role="status" aria-live="polite" data-zeyn-import-status></p><div data-zeyn-import-preview></div><div class="z-form-actions"><button type="button" class="z-button" data-zeyn-import-report hidden>{report}</button><button type="button" class="z-button z-primary" data-zeyn-import-commit data-testid="{scope}.import.commit" disabled>{commit}</button></div></div>"#,

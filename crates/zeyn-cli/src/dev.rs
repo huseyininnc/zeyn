@@ -43,7 +43,9 @@ pub fn run(root: &Path) -> Result<(), String> {
                 }
                 server = Some(start(root, &exe, &mut generation)?);
             }
-            None => println!("zeyn dev: build failed; the running server keeps the last good build"),
+            None => {
+                println!("zeyn dev: build failed; the running server keeps the last good build")
+            }
         }
     }
 }
@@ -65,7 +67,13 @@ fn watch_roots(root: &Path) -> Result<Vec<PathBuf>, String> {
         .into_iter()
         .flatten()
         .filter(|p| p["source"].is_null())
-        .filter_map(|p| p["manifest_path"].as_str().map(|m| Path::new(m).parent().map(Path::to_path_buf)))
+        .filter_map(|p| {
+            p["manifest_path"].as_str().map(|m| {
+                Path::new(m)
+                    .parent()
+                    .map(Path::to_path_buf)
+            })
+        })
         .flatten()
         .collect();
     roots.sort();
@@ -83,7 +91,9 @@ fn snapshot(roots: &[PathBuf]) -> HashMap<PathBuf, SystemTime> {
 }
 
 fn walk(dir: &Path, out: &mut HashMap<PathBuf, SystemTime>) {
-    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
     for entry in entries.flatten() {
         let path = entry.path();
         let name = entry.file_name();
@@ -113,7 +123,8 @@ fn build(root: &Path) -> Result<Option<PathBuf>, String> {
             }
         }
     }
-    let manifest = std::fs::canonicalize(root.join("Cargo.toml")).map_err(|e| format!("Cargo.toml: {e}"))?;
+    let manifest =
+        std::fs::canonicalize(root.join("Cargo.toml")).map_err(|e| format!("Cargo.toml: {e}"))?;
     let mut child = Command::new("cargo")
         .args(["build", "--message-format=json-render-diagnostics"])
         .current_dir(root)
@@ -122,12 +133,19 @@ fn build(root: &Path) -> Result<Option<PathBuf>, String> {
         .map_err(|e| format!("cargo could not be started: {e}"))?;
     let mut exe = None;
     if let Some(stdout) = child.stdout.take() {
-        for line in std::io::BufReader::new(stdout).lines().map_while(Result::ok) {
-            let Ok(msg) = serde_json::from_str::<Value>(&line) else { continue };
+        for line in std::io::BufReader::new(stdout)
+            .lines()
+            .map_while(Result::ok)
+        {
+            let Ok(msg) = serde_json::from_str::<Value>(&line) else {
+                continue;
+            };
             if msg["reason"] != "compiler-artifact" {
                 continue;
             }
-            let Some(path) = msg["executable"].as_str() else { continue };
+            let Some(path) = msg["executable"].as_str() else {
+                continue;
+            };
             let ours = msg["manifest_path"]
                 .as_str()
                 .and_then(|m| std::fs::canonicalize(m).ok())
@@ -137,7 +155,10 @@ fn build(root: &Path) -> Result<Option<PathBuf>, String> {
             }
         }
     }
-    let ok = child.wait().map_err(|e| e.to_string())?.success();
+    let ok = child
+        .wait()
+        .map_err(|e| e.to_string())?
+        .success();
     if ok && exe.is_none() {
         return Err("the package has no binary to run; `zeyn dev` runs apps, not libraries".into());
     }
@@ -146,7 +167,10 @@ fn build(root: &Path) -> Result<Option<PathBuf>, String> {
 
 /// Starts the server from a fresh copy of the binary with `ZEYN_DEV=1`.
 fn start(root: &Path, exe: &Path, generation: &mut u32) -> Result<Child, String> {
-    let dir = exe.parent().unwrap_or(root).join("zeyn-dev");
+    let dir = exe
+        .parent()
+        .unwrap_or(root)
+        .join("zeyn-dev");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     if let Ok(old) = std::fs::read_dir(&dir) {
         for f in old.flatten() {
@@ -157,5 +181,9 @@ fn start(root: &Path, exe: &Path, generation: &mut u32) -> Result<Child, String>
     let name = format!("run-{generation}{}", std::env::consts::EXE_SUFFIX);
     let copy = dir.join(name);
     std::fs::copy(exe, &copy).map_err(|e| format!("{}: {e}", copy.display()))?;
-    Command::new(&copy).current_dir(root).env("ZEYN_DEV", "1").spawn().map_err(|e| format!("{}: {e}", copy.display()))
+    Command::new(&copy)
+        .current_dir(root)
+        .env("ZEYN_DEV", "1")
+        .spawn()
+        .map_err(|e| format!("{}: {e}", copy.display()))
 }

@@ -7,7 +7,8 @@ use crate::render::{Render, escape};
 use crate::screen::{Component, Effect, FormSource, Node, UiCtx};
 use crate::time::{Date, DateTime, DateWords, LocalDateTime, LocalTimeError, Time, TimeZone};
 use crate::ui::{
-    ActionSource, Control, DataSource, DateOptions, Lines, LinesEditor, LookupItem, LookupQuery, LookupValue, Slot,
+    ActionSource, Control, DataSource, DateOptions, Lines, LinesEditor, LookupItem, LookupQuery,
+    LookupValue, Slot,
 };
 use crate::value::{Currency, FieldKind, FieldType, Money, Value};
 use serde_json::{Map, Value as Json, json};
@@ -33,11 +34,17 @@ struct FormField<M> {
 
 impl<M: Model> FormField<M> {
     fn of<T: FieldType + 'static>(field: Field<M, T>) -> Self {
-        Self { meta: field.meta(), value: Box::new(move |m| field.get(m).to_value()) }
+        Self {
+            meta: field.meta(),
+            value: Box::new(move |m| field.get(m).to_value()),
+        }
     }
 
     fn at(index: usize) -> Self {
-        Self { meta: &M::fields()[index], value: Box::new(move |m| m.value_at(index).unwrap_or(Value::Null)) }
+        Self {
+            meta: &M::fields()[index],
+            value: Box::new(move |m| m.value_at(index).unwrap_or(Value::Null)),
+        }
     }
 }
 
@@ -88,7 +95,10 @@ impl<M: Model> Form<M> {
     /// Form over the fields at these indexes of `M::fields()`. Used for grid row edits.
     pub(crate) fn with_fields(model: M, indexes: &[usize]) -> Self {
         let mut form = Self::of(model);
-        form.items = indexes.iter().map(|i| FormItem::Field(FormField::at(*i))).collect();
+        form.items = indexes
+            .iter()
+            .map(|i| FormItem::Field(FormField::at(*i)))
+            .collect();
         form
     }
 
@@ -128,13 +138,15 @@ impl<M: Model> Form<M> {
     }
 
     pub fn field<T: FieldType + 'static>(mut self, field: Field<M, T>) -> Self {
-        self.items.push(FormItem::Field(FormField::of(field)));
+        self.items
+            .push(FormItem::Field(FormField::of(field)));
         self
     }
 
     pub fn row(mut self, build: impl FnOnce(FormRow<M>) -> FormRow<M>) -> Self {
         let row = build(FormRow { fields: Vec::new() });
-        self.items.push(FormItem::Row(row.fields));
+        self.items
+            .push(FormItem::Row(row.fields));
         self
     }
 
@@ -142,7 +154,8 @@ impl<M: Model> Form<M> {
     /// quick ranges (today, last 7 days, this month...). The server checks that `to` is not
     /// before `from`.
     pub fn range<T: FieldType + 'static>(mut self, from: Field<M, T>, to: Field<M, T>) -> Self {
-        self.items.push(FormItem::Range(FormField::of(from), FormField::of(to)));
+        self.items
+            .push(FormItem::Range(FormField::of(from), FormField::of(to)));
         self
     }
 
@@ -157,7 +170,8 @@ impl<M: Model> Form<M> {
     ///     .submit("Apply", apply)
     /// ```
     pub fn step(mut self, title: impl Into<Text>) -> Self {
-        self.items.push(FormItem::Step(title.into()));
+        self.items
+            .push(FormItem::Step(title.into()));
         self
     }
 
@@ -169,7 +183,8 @@ impl<M: Model> Form<M> {
     ///     .section("Look").field(Shape::fill)
     /// ```
     pub fn section(mut self, title: impl Into<Text>) -> Self {
-        self.items.push(FormItem::Section(title.into()));
+        self.items
+            .push(FormItem::Section(title.into()));
         self
     }
 
@@ -180,13 +195,18 @@ impl<M: Model> Form<M> {
             match item {
                 FormItem::Step(_) => steps.push(Vec::new()),
                 FormItem::Section(_) => {}
-                FormItem::Field(f) => steps.last_mut().into_iter().for_each(|s| s.push(f.meta.name)),
-                FormItem::Row(fs) => {
-                    steps.last_mut().into_iter().for_each(|s| s.extend(fs.iter().map(|f| f.meta.name)))
-                }
-                FormItem::Range(a, b) => {
-                    steps.last_mut().into_iter().for_each(|s| s.extend([a.meta.name, b.meta.name]))
-                }
+                FormItem::Field(f) => steps
+                    .last_mut()
+                    .into_iter()
+                    .for_each(|s| s.push(f.meta.name)),
+                FormItem::Row(fs) => steps
+                    .last_mut()
+                    .into_iter()
+                    .for_each(|s| s.extend(fs.iter().map(|f| f.meta.name))),
+                FormItem::Range(a, b) => steps
+                    .last_mut()
+                    .into_iter()
+                    .for_each(|s| s.extend([a.meta.name, b.meta.name])),
             }
         }
         steps
@@ -198,7 +218,11 @@ impl<M: Model> Form<M> {
     /// ```ignore
     /// Form::of(visit).field(Visit::day).date_options(Visit::day, DateOptions::new().no_weekends())
     /// ```
-    pub fn date_options<T: FieldType + 'static>(mut self, field: Field<M, T>, options: DateOptions) -> Self {
+    pub fn date_options<T: FieldType + 'static>(
+        mut self,
+        field: Field<M, T>,
+        options: DateOptions,
+    ) -> Self {
         let name = field.meta().name;
         self.options.retain(|(n, _)| *n != name);
         self.options.push((name, options));
@@ -209,7 +233,8 @@ impl<M: Model> Form<M> {
     /// segmented control or an open list for a `#[choice]`. See [`Control`].
     pub fn control<T: FieldType + 'static>(mut self, field: Field<M, T>, control: Control) -> Self {
         let name = field.meta().name;
-        self.controls.retain(|(n, _)| *n != name);
+        self.controls
+            .retain(|(n, _)| *n != name);
         self.controls.push((name, control));
         self
     }
@@ -226,8 +251,10 @@ impl<M: Model> Form<M> {
         T: FieldType + LookupValue + 'static,
         A: Action<Input = LookupQuery, Output = Result<Page<LookupItem>>>,
     {
-        self.items.push(FormItem::Field(FormField::of(field)));
-        self.lookups.push((field.meta().name, Box::new(ActionSource::<A>::new()), false));
+        self.items
+            .push(FormItem::Field(FormField::of(field)));
+        self.lookups
+            .push((field.meta().name, Box::new(ActionSource::<A>::new()), false));
         self
     }
 
@@ -239,7 +266,11 @@ impl<M: Model> Form<M> {
     /// ```ignore
     /// Form::of(order).field(Order::reference).tip(Order::reference, t!("orders.reference_help"))
     /// ```
-    pub fn tip<T: FieldType + 'static>(mut self, field: Field<M, T>, text: impl Into<Text>) -> Self {
+    pub fn tip<T: FieldType + 'static>(
+        mut self,
+        field: Field<M, T>,
+        text: impl Into<Text>,
+    ) -> Self {
         let name = field.meta().name;
         self.tips.retain(|(n, _)| *n != name);
         self.tips.push((name, text.into()));
@@ -261,8 +292,13 @@ impl<M: Model> Form<M> {
         C: IntoIterator,
         C::Item: Into<Text>,
     {
-        let headers: Vec<Text> = columns.into_iter().take(crate::ui::MAX_LOOKUP_COLUMNS).map(Into::into).collect();
-        self.lookup_columns.push((field.meta().name, headers));
+        let headers: Vec<Text> = columns
+            .into_iter()
+            .take(crate::ui::MAX_LOOKUP_COLUMNS)
+            .map(Into::into)
+            .collect();
+        self.lookup_columns
+            .push((field.meta().name, headers));
         self.lookup(field, action)
     }
 
@@ -272,8 +308,10 @@ impl<M: Model> Form<M> {
     where
         A: Action<Input = LookupQuery, Output = Result<Page<LookupItem>>>,
     {
-        self.items.push(FormItem::Field(FormField::of(field)));
-        self.lookups.push((field.meta().name, Box::new(ActionSource::<A>::new()), true));
+        self.items
+            .push(FormItem::Field(FormField::of(field)));
+        self.lookups
+            .push((field.meta().name, Box::new(ActionSource::<A>::new()), true));
         self
     }
 
@@ -286,9 +324,15 @@ impl<M: Model> Form<M> {
     ///         .total(OrderLine::quantity, OrderLine::price)
     /// })
     /// ```
-    pub fn lines<L: Model>(mut self, field: Field<M, Vec<L>>, build: impl FnOnce(Lines<L>) -> Lines<L>) -> Self {
-        self.items.push(FormItem::Field(FormField::of(field)));
-        self.lines.push((field.meta().name, Box::new(build(Lines::new()))));
+    pub fn lines<L: Model>(
+        mut self,
+        field: Field<M, Vec<L>>,
+        build: impl FnOnce(Lines<L>) -> Lines<L>,
+    ) -> Self {
+        self.items
+            .push(FormItem::Field(FormField::of(field)));
+        self.lines
+            .push((field.meta().name, Box::new(build(Lines::new()))));
         self
     }
 
@@ -305,34 +349,56 @@ impl<M: Model> Form<M> {
     where
         T: FieldType + crate::files::UploadValue + 'static,
     {
-        self.items.push(FormItem::Field(FormField::of(field)));
-        self.files.push((field.meta().name, rules, T::MANY));
+        self.items
+            .push(FormItem::Field(FormField::of(field)));
+        self.files
+            .push((field.meta().name, rules, T::MANY));
         self
     }
 
     fn files_of(&self, name: &str) -> Option<(crate::files::FileRules, bool)> {
-        self.files.iter().find(|(n, _, _)| *n == name).map(|(_, r, many)| (*r, *many))
+        self.files
+            .iter()
+            .find(|(n, _, _)| *n == name)
+            .map(|(_, r, many)| (*r, *many))
     }
 
     fn lines_of(&self, name: &str) -> Option<&dyn LinesEditor> {
-        self.lines.iter().find(|(n, _)| *n == name).map(|(_, e)| e.as_ref())
+        self.lines
+            .iter()
+            .find(|(n, _)| *n == name)
+            .map(|(_, e)| e.as_ref())
     }
 
     fn control_of(&self, name: &str) -> Option<Control> {
-        self.controls.iter().find(|(n, _)| *n == name).map(|(_, c)| *c)
+        self.controls
+            .iter()
+            .find(|(n, _)| *n == name)
+            .map(|(_, c)| *c)
     }
 
     fn lookup_of(&self, name: &str) -> Option<(&dyn DataSource, bool)> {
-        self.lookups.iter().find(|(n, _, _)| *n == name).map(|(_, s, many)| (s.as_ref(), *many))
+        self.lookups
+            .iter()
+            .find(|(n, _, _)| *n == name)
+            .map(|(_, s, many)| (s.as_ref(), *many))
     }
 
     fn options_of(&self, name: &str) -> Option<&DateOptions> {
-        self.options.iter().find(|(n, _)| *n == name).map(|(_, o)| o)
+        self.options
+            .iter()
+            .find(|(n, _)| *n == name)
+            .map(|(_, o)| o)
     }
 
     /// Submit button and action. Does not compile unless the action takes `Valid<M>`.
     pub fn submit<A: FormAction<M>>(self, label: impl Into<Text>, _action: A) -> SubmitForm<M, A> {
-        SubmitForm { form: self, label: label.into(), on_success: None, _action: PhantomData }
+        SubmitForm {
+            form: self,
+            label: label.into(),
+            on_success: None,
+            _action: PhantomData,
+        }
     }
 
     fn fields(&self) -> impl Iterator<Item = &FormField<M>> {
@@ -344,10 +410,14 @@ impl<M: Model> Form<M> {
                 FormItem::Range(a, _) => std::slice::from_ref(a).iter(),
                 FormItem::Step(_) | FormItem::Section(_) => [].iter(),
             })
-            .chain(self.items.iter().filter_map(|item| match item {
-                FormItem::Range(_, b) => Some(b),
-                _ => None,
-            }))
+            .chain(
+                self.items
+                    .iter()
+                    .filter_map(|item| match item {
+                        FormItem::Range(_, b) => Some(b),
+                        _ => None,
+                    }),
+            )
     }
 
     fn render_fields(&self, out: &mut String, r: &Render) {
@@ -356,8 +426,17 @@ impl<M: Model> Form<M> {
                 ctx.record_read(&self.model);
             }
         }
-        let titles: Vec<&Text> =
-            self.items.iter().filter_map(|i| if let FormItem::Step(t) = i { Some(t) } else { None }).collect();
+        let titles: Vec<&Text> = self
+            .items
+            .iter()
+            .filter_map(|i| {
+                if let FormItem::Step(t) = i {
+                    Some(t)
+                } else {
+                    None
+                }
+            })
+            .collect();
         if !titles.is_empty() {
             out.push_str(&format!(
                 r#"<ol class="z-steps" data-zeyn-steps aria-label="{}" data-text-progress="{}">"#,
@@ -365,7 +444,11 @@ impl<M: Model> Form<M> {
                 r.text(&Text::key("zeyn.ui.steps.progress"))
             ));
             for (i, t) in titles.iter().enumerate() {
-                let current = if i == 0 { r#" aria-current="step""# } else { "" };
+                let current = if i == 0 {
+                    r#" aria-current="step""#
+                } else {
+                    ""
+                };
                 out.push_str(&format!(r#"<li data-step="{i}"{current}><span class="z-step-n" aria-hidden="true">{}</span><span class="z-step-title">{}</span></li>"#, i + 1, r.text(t)));
             }
             out.push_str("</ol>");
@@ -401,7 +484,10 @@ impl<M: Model> Form<M> {
                 FormItem::Range(from, to) => crate::ui::render_range(
                     out,
                     r,
-                    [(from.meta, (from.value)(&self.model)), (to.meta, (to.value)(&self.model))],
+                    [
+                        (from.meta, (from.value)(&self.model)),
+                        (to.meta, (to.value)(&self.model)),
+                    ],
                     self.options_of(from.meta.name),
                 ),
                 FormItem::Row(fields) => {
@@ -419,12 +505,19 @@ impl<M: Model> Form<M> {
         if open {
             out.push_str("</fieldset>");
         }
-        for (i, meta) in M::fields().iter().enumerate().filter(|(_, m)| m.version) {
+        for (i, meta) in M::fields()
+            .iter()
+            .enumerate()
+            .filter(|(_, m)| m.version)
+        {
             let v = match self.model.value_at(i) {
                 Some(Value::Int(n)) => n.to_string(),
                 _ => String::new(),
             };
-            out.push_str(&format!(r#"<input type="hidden" name="{}" value="{v}" data-zeyn-version>"#, meta.name));
+            out.push_str(&format!(
+                r#"<input type="hidden" name="{}" value="{v}" data-zeyn-version>"#,
+                meta.name
+            ));
         }
     }
 
@@ -472,7 +565,12 @@ impl<M: Model> Form<M> {
     ) -> std::result::Result<Valid<M>, ValidationErrors> {
         self.read_with(
             values,
-            &Reading::new(locale, tz, DateTime::now(), &DateWords::from_i18n(crate::i18n::I18n::builtin(), locale)),
+            &Reading::new(
+                locale,
+                tz,
+                DateTime::now(),
+                &DateWords::from_i18n(crate::i18n::I18n::builtin(), locale),
+            ),
             &|_| false,
             None,
         )
@@ -481,7 +579,11 @@ impl<M: Model> Form<M> {
     /// [`Form::read`] for the user of a request: their language, time zone, clock and catalogs
     /// (so `today`, `+3d` and `now` are read as they mean it), and masked fields only when they
     /// have the field's unmask permission.
-    pub fn read_for(&self, values: &Map<String, Json>, ctx: &Ctx) -> std::result::Result<Valid<M>, ValidationErrors> {
+    pub fn read_for(
+        &self,
+        values: &Map<String, Json>,
+        ctx: &Ctx,
+    ) -> std::result::Result<Valid<M>, ValidationErrors> {
         let words = DateWords::from_i18n(ctx.i18n(), ctx.locale());
         self.read_with(
             values,
@@ -501,11 +603,22 @@ impl<M: Model> Form<M> {
         let (model, mut errors) = self.merge(values, reading, unmask)?;
         self.check_pickers(&model, reading.tz, &mut errors);
         if let Err(rules) = model.validate() {
-            let unreadable: Vec<(&str, Rule)> = errors.errors.iter().map(|e| (e.field, e.rule)).collect();
+            let unreadable: Vec<(&str, Rule)> = errors
+                .errors
+                .iter()
+                .map(|e| (e.field, e.rule))
+                .collect();
             let shadowed = |e: &FieldError| {
-                unreadable.iter().any(|(f, r)| *f == e.field && (!matches!(r, Rule::Line { .. }) || *r == e.rule))
+                unreadable.iter().any(|(f, r)| {
+                    *f == e.field && (!matches!(r, Rule::Line { .. }) || *r == e.rule)
+                })
             };
-            errors.errors.extend(rules.errors.into_iter().filter(|e| !shadowed(e)));
+            errors.errors.extend(
+                rules
+                    .errors
+                    .into_iter()
+                    .filter(|e| !shadowed(e)),
+            );
         }
         if let Some(csp) = csp {
             crate::model::check_embeds(&model, csp, &mut errors);
@@ -517,12 +630,25 @@ impl<M: Model> Form<M> {
     /// Server side checks of picker options and ranges: days that cannot be chosen, minute
     /// steps and a `to` before its `from`.
     fn check_pickers(&self, model: &M, tz: TimeZone, errors: &mut ValidationErrors) {
-        let unreadable: Vec<&str> = errors.errors.iter().map(|e| e.field).collect();
+        let unreadable: Vec<&str> = errors
+            .errors
+            .iter()
+            .map(|e| e.field)
+            .collect();
         let value_of = |name: &str| {
-            M::fields().iter().position(|m| m.name == name).and_then(|i| model.value_at(i)).unwrap_or(Value::Null)
+            M::fields()
+                .iter()
+                .position(|m| m.name == name)
+                .and_then(|i| model.value_at(i))
+                .unwrap_or(Value::Null)
         };
         for (name, options) in &self.options {
-            let Some(meta) = M::fields().iter().find(|m| m.name == *name) else { continue };
+            let Some(meta) = M::fields()
+                .iter()
+                .find(|m| m.name == *name)
+            else {
+                continue;
+            };
             if unreadable.contains(name) {
                 continue;
             }
@@ -531,14 +657,26 @@ impl<M: Model> Form<M> {
                 if key == "zeyn.validation.time_step" {
                     message = message.arg("n", options.step().to_string());
                 }
-                errors.errors.push(FieldError { field: meta.name, rule: Rule::Custom, message });
+                errors.errors.push(FieldError {
+                    field: meta.name,
+                    rule: Rule::Custom,
+                    message,
+                });
             }
         }
         if !self.files.is_empty() {
             let object = serde_json::to_value(model).unwrap_or(Json::Null);
             for (name, rules, many) in &self.files {
-                let count = object.get(*name).and_then(Json::as_array).map_or(0, Vec::len);
-                let Some(meta) = M::fields().iter().find(|m| m.name == *name) else { continue };
+                let count = object
+                    .get(*name)
+                    .and_then(Json::as_array)
+                    .map_or(0, Vec::len);
+                let Some(meta) = M::fields()
+                    .iter()
+                    .find(|m| m.name == *name)
+                else {
+                    continue;
+                };
                 if *many && count > rules.files() as usize && !unreadable.contains(name) {
                     errors.errors.push(FieldError {
                         field: meta.name,
@@ -551,7 +689,9 @@ impl<M: Model> Form<M> {
             }
         }
         for item in &self.items {
-            let FormItem::Range(from, to) = item else { continue };
+            let FormItem::Range(from, to) = item else {
+                continue;
+            };
             let (a, b) = (value_of(from.meta.name), value_of(to.meta.name));
             if crate::ui::range_reversed(&a, &b) && !unreadable.contains(&to.meta.name) {
                 errors.errors.push(FieldError {
@@ -583,20 +723,33 @@ impl<M: Model> Form<M> {
         let editable: Vec<&FieldMeta> = self
             .fields()
             .map(|f| f.meta)
-            .filter(|m| !m.key && !m.readonly && !m.version && (m.mask.is_none() || unmask(m) || empty(m.name)))
+            .filter(|m| {
+                !m.key
+                    && !m.readonly
+                    && !m.version
+                    && (m.mask.is_none() || unmask(m) || empty(m.name))
+            })
             .collect();
         let versions = M::fields().iter().filter(|m| m.version);
         for meta in editable.into_iter().chain(versions) {
             if let Some(editor) = self.lines_of(meta.name) {
-                let current = object.get(meta.name).cloned().unwrap_or(Json::Null);
+                let current = object
+                    .get(meta.name)
+                    .cloned()
+                    .unwrap_or(Json::Null);
                 if let Some((lines, problems)) = editor.read(values, meta, reading, &current) {
                     object.insert(meta.name.to_string(), lines);
                     errors.errors.extend(problems);
                 }
                 continue;
             }
-            let Some(raw) = values.get(meta.name) else { continue };
-            let current = object.get(meta.name).cloned().unwrap_or(Json::Null);
+            let Some(raw) = values.get(meta.name) else {
+                continue;
+            };
+            let current = object
+                .get(meta.name)
+                .cloned()
+                .unwrap_or(Json::Null);
             match parse_value(meta, raw, reading, &current) {
                 Ok(Json::String(s)) if meta.rules.contains(&Rule::Embed) => {
                     let url = crate::csp::embed_url(&s).unwrap_or(s);
@@ -651,27 +804,45 @@ pub(crate) struct Reading<'a> {
 
 impl<'a> Reading<'a> {
     pub(crate) fn new(locale: &'a str, tz: TimeZone, now: DateTime, words: &'a DateWords) -> Self {
-        Reading { locale, tz, now: now.local(tz), words }
+        Reading {
+            locale,
+            tz,
+            now: now.local(tz),
+            words,
+        }
     }
 }
 
 /// Reads a typed date, time or date time the way form fields do, for the picker's check endpoint.
 /// `Err(true)` means the wall clock time does not exist in the zone (daylight saving).
-pub(crate) fn read_moment(kind: FieldKind, text: &str, reading: &Reading) -> std::result::Result<Value, bool> {
+pub(crate) fn read_moment(
+    kind: FieldKind,
+    text: &str,
+    reading: &Reading,
+) -> std::result::Result<Value, bool> {
     let locale = reading.locale;
     let t = text.trim();
     match kind {
-        FieldKind::Date => Date::parse_input(t, locale, reading.now.date, reading.words).map(Value::Date).ok_or(false),
-        FieldKind::Time => Time::parse_input(t, locale, reading.now.time, reading.words).map(Value::Time).ok_or(false),
+        FieldKind::Date => Date::parse_input(t, locale, reading.now.date, reading.words)
+            .map(Value::Date)
+            .ok_or(false),
+        FieldKind::Time => Time::parse_input(t, locale, reading.now.time, reading.words)
+            .map(Value::Time)
+            .ok_or(false),
         FieldKind::LocalDateTime => {
-            LocalDateTime::parse_input(t, locale, reading.now, reading.words).map(Value::LocalDateTime).ok_or(false)
+            LocalDateTime::parse_input(t, locale, reading.now, reading.words)
+                .map(Value::LocalDateTime)
+                .ok_or(false)
         }
         FieldKind::DateTime => {
             if let Some(exact) = DateTime::parse(t) {
                 return Ok(Value::DateTime(exact));
             }
-            let local = LocalDateTime::parse_input(t, locale, reading.now, reading.words).ok_or(false)?;
-            DateTime::from_local(local, reading.tz).map(Value::DateTime).map_err(|LocalTimeError::Skipped| true)
+            let local =
+                LocalDateTime::parse_input(t, locale, reading.now, reading.words).ok_or(false)?;
+            DateTime::from_local(local, reading.tz)
+                .map(Value::DateTime)
+                .map_err(|LocalTimeError::Skipped| true)
         }
         _ => Err(false),
     }
@@ -687,10 +858,17 @@ pub(crate) fn parse_value(
 ) -> std::result::Result<Json, Unreadable> {
     let locale = reading.locale;
     if let FieldKind::Bool = meta.kind {
-        return raw.as_bool().map(Json::Bool).ok_or(Unreadable::Format);
+        return raw
+            .as_bool()
+            .map(Json::Bool)
+            .ok_or(Unreadable::Format);
     }
-    if let FieldKind::Custom { editor: editor @ ("file" | "files") } = meta.kind {
-        return crate::files::parse_files(raw, editor == "files", meta.optional).ok_or(Unreadable::Format);
+    if let FieldKind::Custom {
+        editor: editor @ ("file" | "files"),
+    } = meta.kind
+    {
+        return crate::files::parse_files(raw, editor == "files", meta.optional)
+            .ok_or(Unreadable::Format);
     }
     if let FieldKind::Choices(options) = meta.kind {
         return crate::ui::read_choices(options, raw).ok_or(Unreadable::Format);
@@ -706,9 +884,9 @@ pub(crate) fn parse_value(
         return Ok(Json::Null);
     }
     match meta.kind {
-        FieldKind::Custom { editor: "ids" } => {
-            crate::ui::parse_ids(trimmed).map(|ids| Json::from(ids)).ok_or(Unreadable::Format)
-        }
+        FieldKind::Custom { editor: "ids" } => crate::ui::parse_ids(trimmed)
+            .map(|ids| Json::from(ids))
+            .ok_or(Unreadable::Format),
         FieldKind::Text => match meta.mask_pattern() {
             Some(pattern) => Ok(Json::String(crate::ui::mask_raw(pattern, &text))),
             None => Ok(Json::String(text)),
@@ -722,8 +900,14 @@ pub(crate) fn parse_value(
         }
         FieldKind::Integer | FieldKind::Id => {
             let group = crate::i18n::NumberFormat::for_locale(locale).group;
-            let digits: String = trimmed.chars().filter(|c| *c != group && !c.is_whitespace()).collect();
-            digits.parse::<i64>().map(Json::from).map_err(|_| Unreadable::Format)
+            let digits: String = trimmed
+                .chars()
+                .filter(|c| *c != group && !c.is_whitespace())
+                .collect();
+            digits
+                .parse::<i64>()
+                .map(Json::from)
+                .map_err(|_| Unreadable::Format)
         }
         FieldKind::Date | FieldKind::Time | FieldKind::LocalDateTime | FieldKind::DateTime => {
             match read_moment(meta.kind, trimmed, reading) {
@@ -733,8 +917,10 @@ pub(crate) fn parse_value(
             }
         }
         FieldKind::Money => {
-            let currency: Currency =
-                current.get("currency").and_then(|c| serde_json::from_value(c.clone()).ok()).unwrap_or_default();
+            let currency: Currency = current
+                .get("currency")
+                .and_then(|c| serde_json::from_value(c.clone()).ok())
+                .unwrap_or_default();
             let money = Money::parse(trimmed, locale, currency)?;
             serde_json::to_value(money).map_err(|_| Unreadable::Format)
         }
@@ -780,7 +966,10 @@ fn render_field<M: Model>(out: &mut String, r: &Render, f: &FormField<M>, form: 
             Value::Int(n) => n.to_string(),
             _ => String::new(),
         };
-        out.push_str(&format!(r#"<input type="hidden" name="{}" value="{v}">"#, m.name));
+        out.push_str(&format!(
+            r#"<input type="hidden" name="{}" value="{v}">"#,
+            m.name
+        ));
         return;
     }
     if m.mask.is_some() && value != Value::Null && value != Value::Text(String::new()) {
@@ -789,8 +978,10 @@ fn render_field<M: Model>(out: &mut String, r: &Render, f: &FormField<M>, form: 
     }
 
     let required = m.is_required();
-    let mut common =
-        format!(r#"id="{id}" name="{}" data-testid="{scope}.field.{}" aria-describedby="{id}-error""#, m.name, m.name);
+    let mut common = format!(
+        r#"id="{id}" name="{}" data-testid="{scope}.field.{}" aria-describedby="{id}-error""#,
+        m.name, m.name
+    );
     if required {
         common.push_str(r#" required aria-required="true""#);
     }
@@ -804,38 +995,72 @@ fn render_field<M: Model>(out: &mut String, r: &Render, f: &FormField<M>, form: 
         (format!(r#"<button type="button" class="z-tip-button" aria-label="{about}"{attrs}><span aria-hidden="true">i</span></button>"#), html)
     });
     if tip.is_some() {
-        common = common.replacen(r#"aria-describedby=""#, &format!(r#"aria-describedby="{id}-tip "#), 1);
+        common = common.replacen(
+            r#"aria-describedby=""#,
+            &format!(r#"aria-describedby="{id}-tip "#),
+            1,
+        );
     }
     out.push_str(r#"<div class="z-field">"#);
-    let star = if required { r#"<span class="z-required" aria-hidden="true">*</span>"# } else { "" };
+    let star = if required {
+        r#"<span class="z-required" aria-hidden="true">*</span>"#
+    } else {
+        ""
+    };
     let label = match &tip {
         Some((button, html)) => format!(
             r#"<span class="z-label-row"><label for="{id}" id="{id}-label">{}{star}</label>{button}</span>{html}"#,
             r.label(m)
         ),
-        None => format!(r#"<label for="{id}" id="{id}-label">{}{star}</label>"#, r.label(m)),
+        None => format!(
+            r#"<label for="{id}" id="{id}-label">{}{star}</label>"#,
+            r.label(m)
+        ),
     };
     let text = |v: &Value| match v {
         Value::Text(s) => escape(s),
         _ => String::new(),
     };
-    let slot = Slot { m, value: &value, common: &common, id: &id, label: &label, control: form.control_of(m.name) };
+    let slot = Slot {
+        m,
+        value: &value,
+        common: &common,
+        id: &id,
+        label: &label,
+        control: form.control_of(m.name),
+    };
     if let Some(editor) = form.lines_of(m.name) {
-        let current = serde_json::to_value(&form.model).ok().and_then(|v| v.get(m.name).cloned()).unwrap_or(Json::Null);
+        let current = serde_json::to_value(&form.model)
+            .ok()
+            .and_then(|v| v.get(m.name).cloned())
+            .unwrap_or(Json::Null);
         editor.render(out, r, m, &current);
-        out.push_str(&format!(r#"<p class="z-field-error" id="{id}-error" aria-live="polite"></p></div>"#));
+        out.push_str(&format!(
+            r#"<p class="z-field-error" id="{id}-error" aria-live="polite"></p></div>"#
+        ));
         return;
     }
     if let Some((rules, many)) = form.files_of(m.name) {
-        let current = serde_json::to_value(&form.model).ok().and_then(|v| v.get(m.name).cloned()).unwrap_or(Json::Null);
+        let current = serde_json::to_value(&form.model)
+            .ok()
+            .and_then(|v| v.get(m.name).cloned())
+            .unwrap_or(Json::Null);
         crate::files::render_upload(out, r, m, &id, &rules, many, &current);
-        out.push_str(&format!(r#"<p class="z-field-error" id="{id}-error" aria-live="polite"></p></div>"#));
+        out.push_str(&format!(
+            r#"<p class="z-field-error" id="{id}-error" aria-live="polite"></p></div>"#
+        ));
         return;
     }
     if let Some((_, many)) = form.lookup_of(m.name) {
-        let columns = form.lookup_columns.iter().find(|(n, _)| *n == m.name).map(|(_, c)| c.as_slice());
+        let columns = form
+            .lookup_columns
+            .iter()
+            .find(|(n, _)| *n == m.name)
+            .map(|(_, c)| c.as_slice());
         crate::ui::render_lookup(out, r, &slot, many, columns.unwrap_or_default());
-        out.push_str(&format!(r#"<p class="z-field-error" id="{id}-error" aria-live="polite"></p></div>"#));
+        out.push_str(&format!(
+            r#"<p class="z-field-error" id="{id}-error" aria-live="polite"></p></div>"#
+        ));
         return;
     }
 
@@ -860,7 +1085,9 @@ fn render_field<M: Model>(out: &mut String, r: &Render, f: &FormField<M>, form: 
             ));
         }
     }
-    out.push_str(&format!(r#"<p class="z-field-error" id="{id}-error" aria-live="polite"></p></div>"#));
+    out.push_str(&format!(
+        r#"<p class="z-field-error" id="{id}-error" aria-live="polite"></p></div>"#
+    ));
 }
 
 type SuccessFn<O> = Arc<dyn Fn(&O, &mut UiCtx) + Send + Sync>;
@@ -875,7 +1102,10 @@ pub struct SubmitForm<M: Model, A: Action> {
 
 impl<M: Model, A: Action> SubmitForm<M, A> {
     /// What happens after a successful save.
-    pub fn on_success(mut self, handler: impl Fn(&A::Output, &mut UiCtx) + Send + Sync + 'static) -> Self {
+    pub fn on_success(
+        mut self,
+        handler: impl Fn(&A::Output, &mut UiCtx) + Send + Sync + 'static,
+    ) -> Self {
         self.on_success = Some(Arc::new(handler));
         self
     }
@@ -926,7 +1156,11 @@ where
     fn tool_schema(&self) -> Json {
         let mut properties = Map::new();
         let mut required = Vec::new();
-        for m in self.form.fields().map(|f| f.meta).filter(|m| !m.key && !m.readonly && !m.version && m.mask.is_none())
+        for m in self
+            .form
+            .fields()
+            .map(|f| f.meta)
+            .filter(|m| !m.key && !m.readonly && !m.version && m.mask.is_none())
         {
             let (kind, hint) = match m.kind {
                 FieldKind::Bool => ("boolean", String::new()),
@@ -1016,8 +1250,15 @@ where
     }
 
     fn fetch(&self, ctx: Ctx, input: Json) -> BoxFuture<Result<Json>> {
-        let step = input.get("step").and_then(Json::as_u64).unwrap_or(u64::MAX) as usize;
-        let values = input.get("values").and_then(Json::as_object).cloned().unwrap_or_default();
+        let step = input
+            .get("step")
+            .and_then(Json::as_u64)
+            .unwrap_or(u64::MAX) as usize;
+        let values = input
+            .get("values")
+            .and_then(Json::as_object)
+            .cloned()
+            .unwrap_or_default();
         let fields = self.form.steps().get(step).cloned();
         let result = fields.map(|fields| match self.form.read_for(&values, &ctx) {
             Ok(_) => Vec::new(),
@@ -1041,7 +1282,10 @@ impl<M: Model> Component for Form<M> {
     }
 
     fn render(&self, out: &mut String, r: &Render) {
-        out.push_str(&format!(r#"<form class="z-form" data-testid="{}.form" novalidate>"#, r.scope));
+        out.push_str(&format!(
+            r#"<form class="z-form" data-testid="{}.form" novalidate>"#,
+            r.scope
+        ));
         self.render_fields(out, r);
         out.push_str("</form>");
     }
@@ -1051,7 +1295,8 @@ impl<M: Model> Component for Form<M> {
     }
 
     fn reveal(&self, field: &str) -> Option<crate::privacy::Revealed> {
-        self.fields().find(|f| f.meta.name == field)?;
+        self.fields()
+            .find(|f| f.meta.name == field)?;
         crate::privacy::reveal_in(&self.model, field)
     }
 }

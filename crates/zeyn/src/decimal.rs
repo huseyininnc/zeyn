@@ -47,17 +47,24 @@ pub struct Decimal {
 }
 
 impl Decimal {
-    pub const ZERO: Decimal = Decimal { mantissa: 0, scale: 0 };
+    pub const ZERO: Decimal = Decimal {
+        mantissa: 0,
+        scale: 0,
+    };
 
     /// `mantissa / 10^scale`, or `None` when the scale is over [`MAX_SCALE`] or the number has
     /// more than [`MAX_PRECISION`] digits.
     pub fn new(mantissa: i128, scale: u8) -> Option<Decimal> {
-        (scale <= MAX_SCALE && digits(mantissa) <= MAX_PRECISION).then_some(Decimal { mantissa, scale })
+        (scale <= MAX_SCALE && digits(mantissa) <= MAX_PRECISION)
+            .then_some(Decimal { mantissa, scale })
     }
 
     /// A whole number.
     pub const fn from_int(n: i64) -> Decimal {
-        Decimal { mantissa: n as i128, scale: 0 }
+        Decimal {
+            mantissa: n as i128,
+            scale: 0,
+        }
     }
 
     pub fn mantissa(&self) -> i128 {
@@ -81,7 +88,9 @@ impl Decimal {
             Some(_) => return None,
             None => (s, 0),
         };
-        let (whole, frac) = number.split_once('.').unwrap_or((number, ""));
+        let (whole, frac) = number
+            .split_once('.')
+            .unwrap_or((number, ""));
         let digits_only = |p: &str| p.bytes().all(|b| b.is_ascii_digit());
         if (whole.is_empty() && frac.is_empty()) || !digits_only(whole) || !digits_only(frac) {
             return None;
@@ -97,7 +106,9 @@ impl Decimal {
             mantissa = mantissa.checked_mul(10i128.checked_pow(u32::try_from(-scale).ok()?)?)?;
             scale = 0;
         }
-        let scale = u8::try_from(scale).ok().filter(|s| *s <= MAX_SCALE)?;
+        let scale = u8::try_from(scale)
+            .ok()
+            .filter(|s| *s <= MAX_SCALE)?;
         Decimal::new(if negative { -mantissa } else { mantissa }, scale)
     }
 
@@ -125,7 +136,9 @@ impl Decimal {
             Some(r) => ("-", r),
             None => ("", plain.as_str()),
         };
-        let (whole, frac) = rest.split_once('.').unwrap_or((rest, ""));
+        let (whole, frac) = rest
+            .split_once('.')
+            .unwrap_or((rest, ""));
         let mut out = String::with_capacity(plain.len() + whole.len() / 3);
         out.push_str(sign);
         for (i, c) in whole.chars().enumerate() {
@@ -162,7 +175,11 @@ impl Decimal {
         let div = pow10(self.scale - scale);
         let q = self.mantissa / div;
         let r = self.mantissa % div;
-        let q = if r.abs() * 2 >= div { q + self.mantissa.signum() } else { q };
+        let q = if r.abs() * 2 >= div {
+            q + self.mantissa.signum()
+        } else {
+            q
+        };
         Decimal { mantissa: q, scale }
     }
 
@@ -189,8 +206,12 @@ impl Decimal {
     /// The sum, with the larger scale, or `None` when it does not fit.
     pub fn checked_add(self, other: Decimal) -> Option<Decimal> {
         let scale = self.scale.max(other.scale);
-        let a = self.mantissa.checked_mul(pow10(scale - self.scale))?;
-        let b = other.mantissa.checked_mul(pow10(scale - other.scale))?;
+        let a = self
+            .mantissa
+            .checked_mul(pow10(scale - self.scale))?;
+        let b = other
+            .mantissa
+            .checked_mul(pow10(scale - other.scale))?;
         Decimal::new(a.checked_add(b)?, scale)
     }
 
@@ -201,9 +222,15 @@ impl Decimal {
             return None;
         }
         let work = scale.min(MAX_SCALE).max(self.scale);
-        let num = self.mantissa.checked_mul(pow10(work - self.scale))?;
+        let num = self
+            .mantissa
+            .checked_mul(pow10(work - self.scale))?;
         let (q, r) = (num / by, num % by);
-        let q = if r.unsigned_abs() * 2 >= by.unsigned_abs() { q + num.signum() * by.signum() } else { q };
+        let q = if r.unsigned_abs() * 2 >= by.unsigned_abs() {
+            q + num.signum() * by.signum()
+        } else {
+            q
+        };
         Decimal::new(q, work).map(|d| d.round(scale))
     }
 
@@ -222,7 +249,11 @@ impl Decimal {
     /// read it exactly and without depending on session language settings.
     #[cfg(any(feature = "postgres", feature = "oracle"))]
     pub(crate) fn sql_text(&self) -> String {
-        if self.scale == 0 { self.mantissa.to_string() } else { format!("{}E-{}", self.mantissa, self.scale) }
+        if self.scale == 0 {
+            self.mantissa.to_string()
+        } else {
+            format!("{}E-{}", self.mantissa, self.scale)
+        }
     }
 
     /// Whole part and the fraction scaled to 28 decimals, both with the number's sign.

@@ -34,24 +34,48 @@ const RAW: Raw = Raw {
 #[tokio::test(flavor = "multi_thread")]
 async fn oracle_data_layer_matches_memory_and_saves_safely() {
     for url in urls("ZEYN_TEST_ORACLE") {
-        eprintln!("oracle: {}", url.rsplit('@').next().unwrap_or_default());
+        eprintln!(
+            "oracle: {}",
+            url.rsplit('@')
+                .next()
+                .unwrap_or_default()
+        );
         sql_common::data_layer(&url, &RAW).await;
         sql_common::streams(&url, &RAW).await;
 
-        let auto = Db::connect(&url, PoolLimits::default()).await.unwrap();
-        let rownum = Db::connect(&format!("{url}?compat=11"), PoolLimits::default()).await.unwrap();
+        let auto = Db::connect(&url, PoolLimits::default())
+            .await
+            .unwrap();
+        let rownum = Db::connect(&format!("{url}?compat=11"), PoolLimits::default())
+            .await
+            .unwrap();
         let q = DataQuery {
-            page: PageRequest::Offset { offset: 40, limit: 15 },
-            sort: vec![Sort { field: "name".into(), desc: true }],
+            page: PageRequest::Offset {
+                offset: 40,
+                limit: 15,
+            },
+            sort: vec![Sort {
+                field: "name".into(),
+                desc: true,
+            }],
             with_total: true,
             ..DataQuery::default()
         };
         let a: Page<Item> = auto.find(&q).await.unwrap();
         let b: Page<Item> = rownum.find(&q).await.unwrap();
         assert_eq!(a.items.len(), 15);
-        assert!(a.items == b.items && a.total == b.total, "ROWNUM paging matches the version's own paging");
+        assert!(
+            a.items == b.items && a.total == b.total,
+            "ROWNUM paging matches the version's own paging"
+        );
 
-        let all = DataQuery { page: PageRequest::Offset { offset: 0, limit: 500 }, ..DataQuery::default() };
+        let all = DataQuery {
+            page: PageRequest::Offset {
+                offset: 0,
+                limit: 500,
+            },
+            ..DataQuery::default()
+        };
         let version = auto
             .find::<Component>(&all)
             .await
@@ -61,12 +85,29 @@ async fn oracle_data_layer_matches_memory_and_saves_safely() {
             .find(|c| c.product.starts_with("Oracle"))
             .unwrap()
             .version;
-        let major: u32 = version.split('.').next().unwrap().parse().unwrap();
-        let sequences: Vec<String> =
-            auto.find::<Sequence>(&all).await.unwrap().items.into_iter().map(|s| s.sequence_name).collect();
-        let own = sequences.iter().any(|s| s == "ZEYN_TEST_ITEMS_SEQ");
+        let major: u32 = version
+            .split('.')
+            .next()
+            .unwrap()
+            .parse()
+            .unwrap();
+        let sequences: Vec<String> = auto
+            .find::<Sequence>(&all)
+            .await
+            .unwrap()
+            .items
+            .into_iter()
+            .map(|s| s.sequence_name)
+            .collect();
+        let own = sequences
+            .iter()
+            .any(|s| s == "ZEYN_TEST_ITEMS_SEQ");
         eprintln!("oracle {version}: key sequence {own}");
-        assert_eq!(own, major < 12, "11g keys come from a sequence, later versions from identity columns");
+        assert_eq!(
+            own,
+            major < 12,
+            "11g keys come from a sequence, later versions from identity columns"
+        );
     }
 }
 

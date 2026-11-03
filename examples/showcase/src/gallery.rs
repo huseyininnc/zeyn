@@ -64,18 +64,39 @@ pub fn fields(_: (), ctx: Ctx) -> Screen {
         start_date: today,
         reminder: Time::new(9, 30, 0).unwrap_or_default(),
         created_at: ctx.now(),
-        meeting: LocalDateTime::new(today.add_days(2).unwrap_or(today), Time::new(14, 0, 0).unwrap_or_default()),
+        meeting: LocalDateTime::new(
+            today.add_days(2).unwrap_or(today),
+            Time::new(14, 0, 0).unwrap_or_default(),
+        ),
         phone: Phone("+90 212 555 01 02".into()),
         reference: "REF-2026-0042".into(),
         ..Sample::default()
     };
     Screen::new(t!("gallery.fields")).body(
         Form::of(sample)
-            .row(|r| r.field(Sample::full_name).field(Sample::email))
-            .row(|r| r.field(Sample::quantity).field(Sample::budget).field(Sample::priority))
-            .row(|r| r.field(Sample::start_date).field(Sample::reminder).field(Sample::due))
-            .row(|r| r.field(Sample::created_at).field(Sample::meeting))
-            .row(|r| r.field(Sample::phone).field(Sample::reference).field(Sample::approved))
+            .row(|r| {
+                r.field(Sample::full_name)
+                    .field(Sample::email)
+            })
+            .row(|r| {
+                r.field(Sample::quantity)
+                    .field(Sample::budget)
+                    .field(Sample::priority)
+            })
+            .row(|r| {
+                r.field(Sample::start_date)
+                    .field(Sample::reminder)
+                    .field(Sample::due)
+            })
+            .row(|r| {
+                r.field(Sample::created_at)
+                    .field(Sample::meeting)
+            })
+            .row(|r| {
+                r.field(Sample::phone)
+                    .field(Sample::reference)
+                    .field(Sample::approved)
+            })
             .field(Sample::comment)
             .submit(t!("gallery.check"), check_sample)
             .on_success(|name, ui| {
@@ -106,7 +127,10 @@ pub fn infinite() -> Screen {
 }
 
 #[action(permission = "stock.product.read")]
-pub async fn top_products(q: DataQuery, store: crate::stock::ProductStore) -> Result<Page<Product>> {
+pub async fn top_products(
+    q: DataQuery,
+    store: crate::stock::ProductStore,
+) -> Result<Page<Product>> {
     let mut all = store.all()?;
     all.sort_by(|a, b| b.price.minor.cmp(&a.price.minor));
     all.truncate(8);
@@ -124,7 +148,11 @@ pub fn compact() -> Screen {
                 .column(Product::price)
                 .width(160),
         )
-        .body(DataGrid::auto(search_products).mode(DataMode::Server).paging(Paging::pages(10)))
+        .body(
+            DataGrid::auto(search_products)
+                .mode(DataMode::Server)
+                .paging(Paging::pages(10)),
+        )
 }
 
 pub fn feature() -> Feature {

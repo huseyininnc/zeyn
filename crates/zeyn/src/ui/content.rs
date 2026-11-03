@@ -10,7 +10,9 @@ use crate::render::{Render, escape};
 use crate::screen::{Component, Node, ScreenDef};
 use serde_json::{Value as Json, json};
 
-into_node!(Heading, Paragraph, MetaLine, PrevNext, AutoGrid, Avatar, Spoiler);
+into_node!(
+    Heading, Paragraph, MetaLine, PrevNext, AutoGrid, Avatar, Spoiler
+);
 
 /// A section heading with an explicit level, `h2` to `h6`. The screen title is the page's only
 /// `h1`, so there is no `h1` here; pick the level that follows the outline instead of the size
@@ -35,7 +37,11 @@ pub struct Heading {
 
 impl Heading {
     fn level(level: u8, text: impl Into<Text>) -> Self {
-        Heading { level, text: text.into(), id: None }
+        Heading {
+            level,
+            text: text.into(),
+            id: None,
+        }
     }
 
     /// A heading of a section of the screen.
@@ -108,7 +114,11 @@ pub struct Paragraph {
 
 impl Paragraph {
     pub fn new(text: impl Into<Text>) -> Self {
-        Paragraph { text: text.into(), muted: false, small: false }
+        Paragraph {
+            text: text.into(),
+            muted: false,
+            small: false,
+        }
     }
 
     /// Secondary text color.
@@ -156,7 +166,10 @@ pub struct MetaLine {
 
 impl Default for MetaLine {
     fn default() -> Self {
-        MetaLine { parts: Vec::new(), separator: "\u{00b7}" }
+        MetaLine {
+            parts: Vec::new(),
+            separator: "\u{00b7}",
+        }
     }
 }
 
@@ -189,7 +202,9 @@ impl Component for MetaLine {
                 continue;
             }
             if !first {
-                out.push_str(&format!(r#"<span class="z-meta-sep" aria-hidden="true">{sep}</span>"#));
+                out.push_str(&format!(
+                    r#"<span class="z-meta-sep" aria-hidden="true">{sep}</span>"#
+                ));
             }
             first = false;
             out.push_str(&format!(r#"<span class="z-meta-part">{text}</span>"#));
@@ -282,8 +297,14 @@ impl PrevNext {
 impl Component for PrevNext {
     fn render(&self, out: &mut String, r: &Render) {
         let t = |key: &str| r.text(&Text::key(format!("zeyn.ui.prevnext.{key}")));
-        out.push_str(&format!(r#"<nav class="z-prevnext" aria-label="{}">"#, t("label")));
-        for (step, rel, arrow) in [(&self.prev, "prev", "&#8592;"), (&self.next, "next", "&#8594;")] {
+        out.push_str(&format!(
+            r#"<nav class="z-prevnext" aria-label="{}">"#,
+            t("label")
+        ));
+        for (step, rel, arrow) in [
+            (&self.prev, "prev", "&#8592;"),
+            (&self.next, "next", "&#8594;"),
+        ] {
             let Some(s) = step else {
                 out.push_str(r#"<span class="z-prevnext-gap"></span>"#);
                 continue;
@@ -334,7 +355,11 @@ pub struct AutoGrid {
 
 impl Default for AutoGrid {
     fn default() -> Self {
-        AutoGrid { nodes: Vec::new(), min: 240, gap: 4 }
+        AutoGrid {
+            nodes: Vec::new(),
+            min: 240,
+            gap: 4,
+        }
     }
 }
 
@@ -430,7 +455,12 @@ pub struct Avatar {
 
 impl Avatar {
     pub fn new(name: impl Into<Text>) -> Self {
-        Avatar { name: name.into(), image: None, size: AvatarSize::Medium, decorative: false }
+        Avatar {
+            name: name.into(),
+            image: None,
+            size: AvatarSize::Medium,
+            decorative: false,
+        }
     }
 
     /// The picture. Without one, or when it is not allowed, the initials are shown.
@@ -481,7 +511,11 @@ impl Component for Avatar {
                 .wrapping_add(u32::from(b))
         }) % 5;
         let class = format!("z-avatar z-avatar-{} z-avatar-tone-{tone}", px);
-        let hidden = if self.decorative { r#" aria-hidden="true""# } else { "" };
+        let hidden = if self.decorative {
+            r#" aria-hidden="true""#
+        } else {
+            ""
+        };
         let image = self
             .image
             .as_deref()
@@ -524,7 +558,10 @@ pub struct Spoiler {
 
 impl Spoiler {
     pub fn new(label: impl Into<Text>) -> Self {
-        Spoiler { label: label.into(), nodes: Vec::new() }
+        Spoiler {
+            label: label.into(),
+            nodes: Vec::new(),
+        }
     }
 
     pub fn add(mut self, node: impl Into<Node>) -> Self {

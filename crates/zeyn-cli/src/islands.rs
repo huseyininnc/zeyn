@@ -38,7 +38,9 @@ pub fn default_crates(root: &Path) -> Vec<PathBuf> {
 /// Builds every crate into `out` and returns a report with the file sizes.
 pub fn build(crates: &[PathBuf], out: &Path) -> Result<String, String> {
     if crates.is_empty() {
-        return Err(format!("no island crates found; put each one in {CRATES_DIR}/<name>/ or name the folders"));
+        return Err(format!(
+            "no island crates found; put each one in {CRATES_DIR}/<name>/ or name the folders"
+        ));
     }
     std::fs::create_dir_all(out).map_err(|e| format!("{}: {e}", out.display()))?;
     let manifest_path = out.join("manifest.json");
@@ -47,7 +49,10 @@ pub fn build(crates: &[PathBuf], out: &Path) -> Result<String, String> {
         .and_then(|t| serde_json::from_str::<Value>(&t).ok())
         .and_then(|v| v["islands"].as_object().cloned())
         .unwrap_or_default();
-    let optimizer = Command::new("wasm-opt").arg("--version").output().is_ok_and(|o| o.status.success());
+    let optimizer = Command::new("wasm-opt")
+        .arg("--version")
+        .output()
+        .is_ok_and(|o| o.status.success());
     let mut report = String::new();
     for dir in crates {
         let (name, wasm) = compile(dir)?;
@@ -82,7 +87,8 @@ pub fn build(crates: &[PathBuf], out: &Path) -> Result<String, String> {
                 .arg(&bg)
                 .arg(&bg))?;
         }
-        let js_bytes = std::fs::read(staging.join(format!("{name}.js"))).map_err(|e| e.to_string())?;
+        let js_bytes =
+            std::fs::read(staging.join(format!("{name}.js"))).map_err(|e| e.to_string())?;
         let wasm_bytes = std::fs::read(&bg).map_err(|e| e.to_string())?;
         remove_old(out, &name);
         let js_file = format!("{name}.{}.js", hash(&js_bytes));
@@ -98,8 +104,11 @@ pub fn build(crates: &[PathBuf], out: &Path) -> Result<String, String> {
         islands.insert(name, json!({ "js": js_file, "wasm": wasm_file }));
     }
     let manifest = json!({ "islands": islands });
-    std::fs::write(&manifest_path, serde_json::to_string_pretty(&manifest).unwrap_or_default() + "\n")
-        .map_err(|e| e.to_string())?;
+    std::fs::write(
+        &manifest_path,
+        serde_json::to_string_pretty(&manifest).unwrap_or_default() + "\n",
+    )
+    .map_err(|e| e.to_string())?;
     if !optimizer {
         report.push_str("wasm-opt was not found on the PATH; install binaryen for smaller files\n");
     }
@@ -109,9 +118,16 @@ pub fn build(crates: &[PathBuf], out: &Path) -> Result<String, String> {
 
 /// Builds one crate for the browser; returns the island name (the library name) and its `.wasm`.
 fn compile(dir: &Path) -> Result<(String, PathBuf), String> {
-    let manifest = std::fs::canonicalize(dir.join("Cargo.toml")).map_err(|e| format!("{}: {e}", dir.display()))?;
+    let manifest = std::fs::canonicalize(dir.join("Cargo.toml"))
+        .map_err(|e| format!("{}: {e}", dir.display()))?;
     let out = Command::new("cargo")
-        .args(["metadata", "--format-version", "1", "--no-deps", "--manifest-path"])
+        .args([
+            "metadata",
+            "--format-version",
+            "1",
+            "--no-deps",
+            "--manifest-path",
+        ])
         .arg(&manifest)
         .output()
         .map_err(|e| format!("cargo could not be started: {e}"))?;
@@ -124,39 +140,82 @@ fn compile(dir: &Path) -> Result<(String, PathBuf), String> {
         .into_iter()
         .flatten()
         .find(|p| {
-            p["manifest_path"].as_str().and_then(|m| std::fs::canonicalize(m).ok()).is_some_and(|m| m == manifest)
+            p["manifest_path"]
+                .as_str()
+                .and_then(|m| std::fs::canonicalize(m).ok())
+                .is_some_and(|m| m == manifest)
         })
         .ok_or_else(|| format!("{}: package not found", manifest.display()))?;
     let lib = package["targets"]
         .as_array()
         .into_iter()
         .flatten()
-        .find(|t| t["kind"].as_array().is_some_and(|k| k.iter().any(|k| k == "cdylib")))
+        .find(|t| {
+            t["kind"]
+                .as_array()
+                .is_some_and(|k| k.iter().any(|k| k == "cdylib"))
+        })
         .and_then(|t| t["name"].as_str())
-        .ok_or_else(|| format!("{}: an island needs `[lib] crate-type = [\"cdylib\"]`", manifest.display()))?
+        .ok_or_else(|| {
+            format!(
+                "{}: an island needs `[lib] crate-type = [\"cdylib\"]`",
+                manifest.display()
+            )
+        })?
         .replace('-', "_");
-    let target =
-        meta["target_directory"].as_str().map(PathBuf::from).ok_or("cargo metadata has no target directory")?;
+    let target = meta["target_directory"]
+        .as_str()
+        .map(PathBuf::from)
+        .ok_or("cargo metadata has no target directory")?;
     let mut cargo = Command::new("cargo");
-    cargo.args(["build", "--lib", "--release", "--target", "wasm32-unknown-unknown", "--manifest-path"]).arg(&manifest);
+    cargo
+        .args([
+            "build",
+            "--lib",
+            "--release",
+            "--target",
+            "wasm32-unknown-unknown",
+            "--manifest-path",
+        ])
+        .arg(&manifest);
     for setting in SIZE_PROFILE {
         cargo.args(["--config", setting]);
     }
     run(&mut cargo)?;
-    Ok((lib.clone(), target.join("wasm32-unknown-unknown").join("release").join(format!("{lib}.wasm"))))
+    Ok((
+        lib.clone(),
+        target
+            .join("wasm32-unknown-unknown")
+            .join("release")
+            .join(format!("{lib}.wasm")),
+    ))
 }
 
 fn run(cmd: &mut Command) -> Result<(), String> {
-    let program = cmd.get_program().to_string_lossy().into_owned();
-    let status = cmd.status().map_err(|e| format!("{program} could not be started: {e}"))?;
-    if status.success() { Ok(()) } else { Err(format!("{program} failed ({status})")) }
+    let program = cmd
+        .get_program()
+        .to_string_lossy()
+        .into_owned();
+    let status = cmd
+        .status()
+        .map_err(|e| format!("{program} could not be started: {e}"))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("{program} failed ({status})"))
+    }
 }
 
 /// Deletes the earlier hashed files of an island.
 fn remove_old(out: &Path, name: &str) {
-    let Ok(entries) = std::fs::read_dir(out) else { return };
+    let Ok(entries) = std::fs::read_dir(out) else {
+        return;
+    };
     for e in entries.flatten() {
-        let file = e.file_name().to_string_lossy().into_owned();
+        let file = e
+            .file_name()
+            .to_string_lossy()
+            .into_owned();
         let ours = (file.starts_with(&format!("{name}.")) && file.ends_with(".js"))
             || (file.starts_with(&format!("{name}_bg.")) && file.ends_with(".wasm"));
         if ours {
@@ -194,8 +253,15 @@ mod tests {
             std::fs::write(dir.join(f), "x").unwrap();
         }
         remove_old(&dir, "a");
-        let mut left: Vec<String> =
-            std::fs::read_dir(&dir).unwrap().flatten().map(|e| e.file_name().to_string_lossy().into_owned()).collect();
+        let mut left: Vec<String> = std::fs::read_dir(&dir)
+            .unwrap()
+            .flatten()
+            .map(|e| {
+                e.file_name()
+                    .to_string_lossy()
+                    .into_owned()
+            })
+            .collect();
         left.sort();
         assert_eq!(left, ["ab.222.js", "manifest.json"]);
         std::fs::remove_dir_all(&dir).unwrap();

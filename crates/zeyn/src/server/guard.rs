@@ -37,7 +37,13 @@ const COSTLY_GETS: [&str; 3] = ["/_zeyn/grid/export", "/_zeyn/pdf", "/sitemap.xm
 fn is_public_asset(path: &str) -> bool {
     matches!(
         path,
-        "/_zeyn/zeyn.js" | "/_zeyn/grid.js" | "/_zeyn/zeyn.css" | "/_zeyn/nav.js" | "/_zeyn/theme.css" | "/favicon.ico" | "/llms.txt"
+        "/_zeyn/zeyn.js"
+            | "/_zeyn/grid.js"
+            | "/_zeyn/zeyn.css"
+            | "/_zeyn/nav.js"
+            | "/_zeyn/theme.css"
+            | "/favicon.ico"
+            | "/llms.txt"
     ) || ops::is_asset(path)
         || ui::ASSETS.contains(&path)
         || media::ASSETS.contains(&path)
@@ -79,7 +85,10 @@ fn is_island_asset(path: &str) -> bool {
 /// Every `X-Forwarded-For` line of a request as one chain, in order. Proxies may add their own
 /// line instead of extending the last one, so reading only the first would trust the client's.
 pub(super) fn forwarded_for(headers: &HeaderMap) -> Option<std::borrow::Cow<'_, str>> {
-    let mut lines = headers.get_all("x-forwarded-for").iter().filter_map(|v| v.to_str().ok());
+    let mut lines = headers
+        .get_all("x-forwarded-for")
+        .iter()
+        .filter_map(|v| v.to_str().ok());
     let first = lines.next()?;
     match lines.next() {
         None => Some(std::borrow::Cow::Borrowed(first)),
@@ -107,15 +116,25 @@ pub(super) async fn guard_request(
     let path = parts.uri.path();
     let headers = &parts.headers;
     ops::delay(&st, path).await;
-    if let Some(ready) = st.auth.as_ref().and_then(|a| a.prepare(headers)) {
+    if let Some(ready) = st
+        .auth
+        .as_ref()
+        .and_then(|a| a.prepare(headers))
+    {
         ready.await;
     }
-    let peer = parts.extensions.get::<axum::extract::ConnectInfo<std::net::SocketAddr>>().map(|c| c.0.ip());
+    let peer = parts
+        .extensions
+        .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
+        .map(|c| c.0.ip());
     let forwarded = forwarded_for(headers);
     let ip = client_ip(peer, forwarded.as_deref(), &st.trusted);
     let probe = ops::is_probe(path);
     let unlimited = ops::probe_unlimited(&st.extras, path, ip)
-        || (matches!(parts.method, axum::http::Method::GET | axum::http::Method::HEAD) && media::is_public(&st, path));
+        || (matches!(
+            parts.method,
+            axum::http::Method::GET | axum::http::Method::HEAD
+        ) && media::is_public(&st, path));
     let blocked = match ip {
         Some(ip) => {
             st.deny.iter().any(|r| r.contains(ip))
@@ -136,42 +155,66 @@ pub(super) async fn guard_request(
                 || files::is_upload(path)
                 || path.starts_with("/_zeyn/assistant/")
                 || path.starts_with("/_zeyn/account/")
-                || path.strip_prefix(st.api_prefix.as_str()).is_some_and(|rest| rest.starts_with('/')));
+                || path
+                    .strip_prefix(st.api_prefix.as_str())
+                    .is_some_and(|rest| rest.starts_with('/')));
     let limits = if unlimited {
         [(None, "all"), (None, "write")]
     } else {
-        [(st.rate, "all"), (if is_write { st.write_rate } else { None }, "write")]
+        [
+            (st.rate, "all"),
+            (if is_write { st.write_rate } else { None }, "write"),
+        ]
     };
     for (limit, scope) in limits {
         let Some(limit) = limit else { continue };
-        let ip_key = ip.map(|i| i.to_string()).unwrap_or_else(|| "unknown".into());
+        let ip_key = ip
+            .map(|i| i.to_string())
+            .unwrap_or_else(|| "unknown".into());
         let key = match limit.key {
             RateKey::Ip => format!("{scope}:ip:{ip_key}"),
-            RateKey::User => match st.auth.as_ref().and_then(|a| a.authenticate(headers)).and_then(|i| i.user) {
+            RateKey::User => match st
+                .auth
+                .as_ref()
+                .and_then(|a| a.authenticate(headers))
+                .and_then(|i| i.user)
+            {
                 Some(user) => format!("{scope}:user:{user}"),
                 None => format!("{scope}:ip:{ip_key}"),
             },
         };
         if let Err(wait) = st.rate_store.take(&key, &limit).await {
             let ctx = st.ctx(headers);
-            let mut response = problem(&ctx, Failure::App(Error::Denied(Text::key("zeyn.error.rate_limited"))));
+            let mut response = problem(
+                &ctx,
+                Failure::App(Error::Denied(Text::key("zeyn.error.rate_limited"))),
+            );
             *response.status_mut() = StatusCode::TOO_MANY_REQUESTS;
-            if let Some(body) = response.headers_mut().get_mut(header::CONTENT_TYPE) {
+            if let Some(body) = response
+                .headers_mut()
+                .get_mut(header::CONTENT_TYPE)
+            {
                 *body = HeaderValue::from_static("application/problem+json");
             }
             let secs = wait.as_secs_f64().ceil().max(1.0) as u64;
             if let Ok(v) = HeaderValue::from_str(&secs.to_string()) {
-                response.headers_mut().insert(header::RETRY_AFTER, v);
+                response
+                    .headers_mut()
+                    .insert(header::RETRY_AFTER, v);
             }
             return response;
         }
     }
-    next.run(axum::extract::Request::from_parts(parts, body)).await
+    next.run(axum::extract::Request::from_parts(parts, body))
+        .await
 }
 
 /// One `request` span per request: method, path without the query string, status and duration,
 /// plus the call's kind, screen, action, user, tenant and outcome once the handler knows them.
-pub(super) async fn trace_request(req: axum::extract::Request, next: axum::middleware::Next) -> Response {
+pub(super) async fn trace_request(
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> Response {
     use tracing::Instrument;
     use tracing::field::Empty;
     let span = tracing::info_span!(
@@ -192,18 +235,31 @@ pub(super) async fn trace_request(req: axum::extract::Request, next: axum::middl
         return next.run(req).await;
     }
     let started = Instant::now();
-    let response = next.run(req).instrument(span.clone()).await;
+    let response = next
+        .run(req)
+        .instrument(span.clone())
+        .await;
     span.record("status", response.status().as_u16());
     span.record("ms", started.elapsed().as_millis() as u64);
     response
 }
 
 /// Security headers on every response. The policy is the one built at startup from `App::csp`.
-pub(super) async fn security_headers(State(st): State<Arc<AppState>>, mut response: Response) -> Response {
+pub(super) async fn security_headers(
+    State(st): State<Arc<AppState>>,
+    mut response: Response,
+) -> Response {
     let h = response.headers_mut();
-    h.entry(header::CONTENT_SECURITY_POLICY).or_insert_with(|| st.csp_header.clone());
-    h.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
-    h.insert(header::REFERRER_POLICY, HeaderValue::from_static("same-origin"));
+    h.entry(header::CONTENT_SECURITY_POLICY)
+        .or_insert_with(|| st.csp_header.clone());
+    h.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
+    h.insert(
+        header::REFERRER_POLICY,
+        HeaderValue::from_static("same-origin"),
+    );
     h.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
     response
 }

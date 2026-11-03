@@ -44,9 +44,24 @@ pub enum LeaveState {
 /// Who may move a leave request, and from where to where. Checked on the server.
 pub fn leave_flow() -> Workflow<LeaveState> {
     Workflow::new()
-        .transition("submit", LeaveState::Draft, LeaveState::Submitted, "people.leave.request")
-        .transition("approve", LeaveState::Submitted, LeaveState::Approved, "people.leave.approve")
-        .transition("reject", LeaveState::Submitted, LeaveState::Rejected, "people.leave.approve")
+        .transition(
+            "submit",
+            LeaveState::Draft,
+            LeaveState::Submitted,
+            "people.leave.request",
+        )
+        .transition(
+            "approve",
+            LeaveState::Submitted,
+            LeaveState::Approved,
+            "people.leave.approve",
+        )
+        .transition(
+            "reject",
+            LeaveState::Submitted,
+            LeaveState::Rejected,
+            "people.leave.approve",
+        )
 }
 
 impl LeaveRequest {
@@ -100,16 +115,32 @@ impl LeaveStore {
 
 /// Saves a new request as a draft, or changes a draft. Submitted requests cannot be changed.
 #[action(permission = "people.leave.request", audit)]
-pub async fn save_leave(request: Valid<LeaveRequest>, store: LeaveStore, ctx: Ctx) -> Result<LeaveRequestId> {
-    let mut rows = store.0.write().map_err(|_| Error::Internal("leave store lock".into()))?;
+pub async fn save_leave(
+    request: Valid<LeaveRequest>,
+    store: LeaveStore,
+    ctx: Ctx,
+) -> Result<LeaveRequestId> {
+    let mut rows = store
+        .0
+        .write()
+        .map_err(|_| Error::Internal("leave store lock".into()))?;
     let mut saved = request.into_inner();
     if saved.id.0 == 0 {
-        saved.id = LeaveRequestId(rows.iter().map(|r| r.id.0).max().unwrap_or(0) + 1);
+        saved.id = LeaveRequestId(
+            rows.iter()
+                .map(|r| r.id.0)
+                .max()
+                .unwrap_or(0)
+                + 1,
+        );
         saved.state = LeaveState::Draft;
         rows.push(saved.clone());
         return Ok(saved.id);
     }
-    let current = rows.iter_mut().find(|r| r.id == saved.id).ok_or(Error::NotFound)?;
+    let current = rows
+        .iter_mut()
+        .find(|r| r.id == saved.id)
+        .ok_or(Error::NotFound)?;
     if current.state != LeaveState::Draft {
         return Err(Error::Conflict);
     }
@@ -129,9 +160,20 @@ pub async fn move_leave(
     ctx: Ctx,
 ) -> Result<LeaveState> {
     let (state, manager, employee) = {
-        let mut rows = store.0.write().map_err(|_| Error::Internal("leave store lock".into()))?;
-        let row = rows.iter_mut().find(|r| r.id == request.id).ok_or(Error::NotFound)?;
-        row.state = leave_flow().apply(&ctx, row.state, &request.transition, request.comment.as_deref())?;
+        let mut rows = store
+            .0
+            .write()
+            .map_err(|_| Error::Internal("leave store lock".into()))?;
+        let row = rows
+            .iter_mut()
+            .find(|r| r.id == request.id)
+            .ok_or(Error::NotFound)?;
+        row.state = leave_flow().apply(
+            &ctx,
+            row.state,
+            &request.transition,
+            request.comment.as_deref(),
+        )?;
         (row.state, row.manager_email.clone(), row.employee.clone())
     };
     mailer.send(&ctx, Mail::transition(&ctx, &manager, &employee)?)?;
@@ -141,11 +183,20 @@ pub async fn move_leave(
 /// Imports leave requests from a CSV file as drafts.
 #[action(permission = "people.leave.import", audit)]
 pub async fn import_leaves(rows: Vec<Valid<LeaveRequest>>, store: LeaveStore) -> Result<usize> {
-    let mut all = store.0.write().map_err(|_| Error::Internal("leave store lock".into()))?;
+    let mut all = store
+        .0
+        .write()
+        .map_err(|_| Error::Internal("leave store lock".into()))?;
     let count = rows.len();
     for row in rows {
         let mut r = row.into_inner();
-        r.id = LeaveRequestId(all.iter().map(|x| x.id.0).max().unwrap_or(0) + 1);
+        r.id = LeaveRequestId(
+            all.iter()
+                .map(|x| x.id.0)
+                .max()
+                .unwrap_or(0)
+                + 1,
+        );
         r.state = LeaveState::Draft;
         all.push(r);
     }
@@ -159,7 +210,11 @@ pub fn leave_import() -> Screen {
 
 #[action(permission = "people.leave.request")]
 pub async fn search_leaves(q: DataQuery, store: LeaveStore) -> Result<Page<LeaveRequest>> {
-    let rows = store.0.read().map_err(|_| Error::Internal("leave store lock".into()))?.clone();
+    let rows = store
+        .0
+        .read()
+        .map_err(|_| Error::Internal("leave store lock".into()))?
+        .clone();
     Ok(q.apply(rows))
 }
 
@@ -172,15 +227,26 @@ pub struct LeaveParams {
 pub fn leave(_: (), ctx: Ctx) -> Screen {
     let today = ctx.today();
     let request = LeaveRequest {
-        employee: ctx.identity().user.clone().unwrap_or_default(),
+        employee: ctx
+            .identity()
+            .user
+            .clone()
+            .unwrap_or_default(),
         first_day: today.add_days(7).unwrap_or(today),
         last_day: today.add_days(11).unwrap_or(today),
         ..LeaveRequest::default()
     };
     Screen::new(t!("people.leave")).body(
         Form::of(request)
-            .row(|r| r.field(LeaveRequest::employee).field(LeaveRequest::manager_email))
-            .row(|r| r.field(LeaveRequest::first_day).field(LeaveRequest::last_day).field(LeaveRequest::kind))
+            .row(|r| {
+                r.field(LeaveRequest::employee)
+                    .field(LeaveRequest::manager_email)
+            })
+            .row(|r| {
+                r.field(LeaveRequest::first_day)
+                    .field(LeaveRequest::last_day)
+                    .field(LeaveRequest::kind)
+            })
             .field(LeaveRequest::note)
             .submit(t!("people.send"), save_leave)
             .on_success(|saved, ui| {
@@ -203,9 +269,13 @@ pub struct Employee {
     pub salary: Money,
 }
 
-const FIRST: [&str; 12] =
-    ["Ada", "Can", "Elif", "Mert", "Zeynep", "Ömer", "İpek", "Deniz", "Selin", "Kaan", "Derya", "Emre"];
-const LAST: [&str; 9] = ["Yılmaz", "Demir", "Şahin", "Kaya", "Arslan", "Çelik", "Aydın", "Koç", "Öztürk"];
+const FIRST: [&str; 12] = [
+    "Ada", "Can", "Elif", "Mert", "Zeynep", "Ömer", "İpek", "Deniz", "Selin", "Kaan", "Derya",
+    "Emre",
+];
+const LAST: [&str; 9] = [
+    "Yılmaz", "Demir", "Şahin", "Kaya", "Arslan", "Çelik", "Aydın", "Koç", "Öztürk",
+];
 
 /// The organization: one chief, five directors, four managers under each and six people under
 /// every manager, 146 people in all.
@@ -214,7 +284,11 @@ pub fn employees() -> Vec<Employee> {
     let mut add = |id: i64, manager: Option<i64>, title: &str, salary: i64| {
         all.push(Employee {
             id: EmployeeId(id),
-            name: format!("{} {}", FIRST[(id % 12) as usize], LAST[(id * 7 % 9) as usize]),
+            name: format!(
+                "{} {}",
+                FIRST[(id % 12) as usize],
+                LAST[(id * 7 % 9) as usize]
+            ),
             title: title.to_string(),
             manager_id: manager.map(EmployeeId),
             salary: Money::tl(salary + id * 1_300),
@@ -284,17 +358,30 @@ pub fn leaves() -> Screen {
 pub fn leave_view(params: LeaveParams, store: LeaveStore) -> Result<Screen> {
     let request = store.get(LeaveRequestId(params.id))?;
     let form = Form::of(request.clone())
-        .row(|r| r.field(LeaveRequest::employee).field(LeaveRequest::manager_email))
-        .row(|r| r.field(LeaveRequest::first_day).field(LeaveRequest::last_day).field(LeaveRequest::kind))
+        .row(|r| {
+            r.field(LeaveRequest::employee)
+                .field(LeaveRequest::manager_email)
+        })
+        .row(|r| {
+            r.field(LeaveRequest::first_day)
+                .field(LeaveRequest::last_day)
+                .field(LeaveRequest::kind)
+        })
         .field(LeaveRequest::note);
     let details: Node = if request.state == LeaveState::Draft {
-        form.submit(t!("people.save"), save_leave).on_success(|_, ui| ui.close_and_refresh()).into()
+        form.submit(t!("people.save"), save_leave)
+            .on_success(|_, ui| ui.close_and_refresh())
+            .into()
     } else {
         form.into()
     };
-    Ok(Screen::window(t!("people.leave")).width(640).body(details).body(
-        Transitions::of(leave_flow(), request.state, request.id, move_leave).on_success(|_, ui| ui.close_and_refresh()),
-    ))
+    Ok(Screen::window(t!("people.leave"))
+        .width(640)
+        .body(details)
+        .body(
+            Transitions::of(leave_flow(), request.state, request.id, move_leave)
+                .on_success(|_, ui| ui.close_and_refresh()),
+        ))
 }
 
 pub fn feature() -> Feature {

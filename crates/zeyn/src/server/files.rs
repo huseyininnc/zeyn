@@ -12,8 +12,8 @@ use crate::action::{Access, Error};
 use crate::audit::RecordRef;
 use crate::ctx::Ctx;
 use crate::files::{
-    FileChunks, FileEntry, FileMeta, FileType, SNIFF_BYTES, ScanVerdict, UPLOAD_CHUNK, clean_file_name, new_file_id,
-    too_large, valid_file_id,
+    FileChunks, FileEntry, FileMeta, FileType, SNIFF_BYTES, ScanVerdict, UPLOAD_CHUNK,
+    clean_file_name, new_file_id, too_large, valid_file_id,
 };
 use crate::i18n::Text;
 use crate::media::{Media, inline_type};
@@ -39,32 +39,52 @@ const IDLE: Duration = Duration::from_secs(30);
 /// Links placed in the page head.
 pub(super) fn head(base: &str) -> String {
     let v = super::ops::asset_version();
-    format!(
-        r#"<link rel="stylesheet" href="{base}/_zeyn/files.css{v}">"#
-    )
+    format!(r#"<link rel="stylesheet" href="{base}/_zeyn/files.css{v}">"#)
 }
 
 pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
     router
-        .route("/_zeyn/files.js", get(|| async { asset(JS, "text/javascript; charset=utf-8") }))
-        .route("/_zeyn/files.css", get(|| async { asset(CSS, "text/css; charset=utf-8") }))
-        .route("/_zeyn/files/{store}", post(upload).layer(DefaultBodyLimit::disable()))
+        .route(
+            "/_zeyn/files.js",
+            get(|| async { asset(JS, "text/javascript; charset=utf-8") }),
+        )
+        .route(
+            "/_zeyn/files.css",
+            get(|| async { asset(CSS, "text/css; charset=utf-8") }),
+        )
+        .route(
+            "/_zeyn/files/{store}",
+            post(upload).layer(DefaultBodyLimit::disable()),
+        )
         .route("/_zeyn/files/{store}/{id}", get(download))
 }
 
 /// Whether a path is an upload, for the write limit.
 pub(super) fn is_upload(path: &str) -> bool {
-    path.strip_prefix("/_zeyn/files/").is_some_and(|rest| !rest.is_empty() && !rest.contains('/'))
+    path.strip_prefix("/_zeyn/files/")
+        .is_some_and(|rest| !rest.is_empty() && !rest.contains('/'))
 }
 
 /// The store behind a request and its feature, after the permission and the guards.
-fn entry<'a>(st: &'a AppState, ctx: &Ctx, store: &str) -> Result<(&'a crate::Feature, FileEntry), Failure> {
+fn entry<'a>(
+    st: &'a AppState,
+    ctx: &Ctx,
+    store: &str,
+) -> Result<(&'a crate::Feature, FileEntry), Failure> {
     let (feature, entry) = st
         .features
         .iter()
-        .find_map(|f| f.file_stores().iter().find(|e| e.rules.store() == store).map(|e| (f, e)))
+        .find_map(|f| {
+            f.file_stores()
+                .iter()
+                .find(|e| e.rules.store() == store)
+                .map(|e| (f, e))
+        })
         .ok_or(Failure::App(Error::NotFound))?;
-    if !ctx.identity().can(&Access::Permission(entry.permission)) {
+    if !ctx
+        .identity()
+        .can(&Access::Permission(entry.permission))
+    {
         return Err(Failure::App(Error::Forbidden));
     }
     feature.check_guards(ctx)?;
@@ -87,16 +107,24 @@ async fn upload(
     }
     let result = async {
         let (feature, entry) = entry(&st, &ctx, &store)?;
-        let call =
-            Call { kind: CallKind::Upload, screen: entry.rules.store(), action: None, via_agent: ctx.via_agent() };
+        let call = Call {
+            kind: CallKind::Upload,
+            screen: entry.rules.store(),
+            action: None,
+            via_agent: ctx.via_agent(),
+        };
         let scanner = feature.file_scanner().cloned();
-        st.intercept(&ctx, &call, || receive(&ctx, entry, scanner, &headers, body)).await
+        st.intercept(&ctx, &call, || {
+            receive(&ctx, entry, scanner, &headers, body)
+        })
+        .await
     }
     .await;
     match result {
         Ok(file) => {
             let mut r = (StatusCode::CREATED, axum::Json(file)).into_response();
-            r.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+            r.headers_mut()
+                .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
             r
         }
         Err(f) => st.error_response(&ctx, f),
@@ -113,13 +141,26 @@ async fn receive(
 ) -> Result<crate::File, Failure> {
     let rules = entry.rules;
     let max = rules.limit();
-    let big = || status(StatusCode::PAYLOAD_TOO_LARGE, "too_large", too_large(&rules, ctx.locale()));
-    let declared =
-        headers.get(header::CONTENT_LENGTH).and_then(|v| v.to_str().ok()).and_then(|v| v.parse::<u64>().ok());
+    let big = || {
+        status(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "too_large",
+            too_large(&rules, ctx.locale()),
+        )
+    };
+    let declared = headers
+        .get(header::CONTENT_LENGTH)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.parse::<u64>().ok());
     if declared.is_some_and(|n| n > max) {
         return Err(big());
     }
-    let name = clean_file_name(&decode(headers.get("x-zeyn-file-name").and_then(|v| v.to_str().ok()).unwrap_or("")));
+    let name = clean_file_name(&decode(
+        headers
+            .get("x-zeyn-file-name")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or(""),
+    ));
     let mut stream = body.into_data_stream();
     let mut head: Vec<u8> = Vec::with_capacity(SNIFF_BYTES);
     let mut pending: Vec<Bytes> = Vec::new();
@@ -127,7 +168,11 @@ async fn receive(
     while head.len() < SNIFF_BYTES {
         match next(&mut stream).await? {
             Some(chunk) => {
-                head.extend_from_slice(&chunk[..chunk.len().min(SNIFF_BYTES - head.len())]);
+                head.extend_from_slice(
+                    &chunk[..chunk
+                        .len()
+                        .min(SNIFF_BYTES - head.len())],
+                );
                 pending.push(chunk);
             }
             None => {
@@ -137,11 +182,21 @@ async fn receive(
         }
     }
     if head.is_empty() {
-        return Err(status(StatusCode::UNPROCESSABLE_ENTITY, "empty_file", Text::key("zeyn.files.empty")));
+        return Err(status(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "empty_file",
+            Text::key("zeyn.files.empty"),
+        ));
     }
     let kind = FileType::detect(&name, &head)
         .filter(|t| rules.allows(*t))
-        .ok_or_else(|| status(StatusCode::UNSUPPORTED_MEDIA_TYPE, "file_type", Text::key("zeyn.files.type")))?;
+        .ok_or_else(|| {
+            status(
+                StatusCode::UNSUPPORTED_MEDIA_TYPE,
+                "file_type",
+                Text::key("zeyn.files.type"),
+            )
+        })?;
     drop(head);
     let meta = FileMeta {
         id: new_file_id(),
@@ -150,10 +205,17 @@ async fn receive(
         size: 0,
         tenant: ctx.tenant().map(|t| t.id().to_string()),
         owner: ctx.identity().user.clone(),
-        created: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0),
+        created: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0),
     };
     let (tx, rx) = tokio::sync::mpsc::channel::<std::io::Result<Bytes>>(4);
-    let put = tokio::spawn(entry.store.put(meta.clone(), FileChunks(rx)));
+    let put = tokio::spawn(
+        entry
+            .store
+            .put(meta.clone(), FileChunks(rx)),
+    );
     let mut size = 0u64;
     let mut failure: Option<Failure> = None;
     let mut queue = pending.into_iter();
@@ -178,44 +240,79 @@ async fn receive(
         let mut at = 0;
         while at < chunk.len() {
             let end = (at + UPLOAD_CHUNK).min(chunk.len());
-            if tx.send(Ok(chunk.slice(at..end))).await.is_err() {
+            if tx
+                .send(Ok(chunk.slice(at..end)))
+                .await
+                .is_err()
+            {
                 break;
             }
             at = end;
         }
     }
     if failure.is_some() {
-        let _ = tx.send(Err(std::io::Error::other("upload stopped"))).await;
+        let _ = tx
+            .send(Err(std::io::Error::other("upload stopped")))
+            .await;
     }
     drop(tx);
-    let stored = put.await.map_err(|e| Failure::App(Error::Internal(e.to_string())))?;
+    let stored = put
+        .await
+        .map_err(|e| Failure::App(Error::Internal(e.to_string())))?;
     if let Some(f) = failure {
-        let _ = entry.store.delete(meta.id.clone()).await;
+        let _ = entry
+            .store
+            .delete(meta.id.clone())
+            .await;
         return Err(f);
     }
     stored.map_err(Failure::App)?;
     if let Some(scanner) = scanner {
-        let refuse = || status(StatusCode::UNPROCESSABLE_ENTITY, "file_refused", Text::key("zeyn.files.refused"));
+        let refuse = || {
+            status(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "file_refused",
+                Text::key("zeyn.files.refused"),
+            )
+        };
         let verdict = match entry.store.get(meta.id.clone()).await {
-            Ok(file) => scanner.scan(file.meta, file.reader).await,
+            Ok(file) => {
+                scanner
+                    .scan(file.meta, file.reader)
+                    .await
+            }
             Err(e) => Err(e),
         };
         match verdict {
             Ok(ScanVerdict::Clean) => {}
             Ok(ScanVerdict::Refused(reason)) => {
                 tracing::warn!(store = rules.store(), reason = %reason, "uploaded file refused by the scanner");
-                let _ = entry.store.delete(meta.id.clone()).await;
+                let _ = entry
+                    .store
+                    .delete(meta.id.clone())
+                    .await;
                 return Err(refuse());
             }
             Err(e) => {
                 tracing::warn!(store = rules.store(), error = ?e, "file scanner failed; the file was refused");
-                let _ = entry.store.delete(meta.id.clone()).await;
+                let _ = entry
+                    .store
+                    .delete(meta.id.clone())
+                    .await;
                 return Err(refuse());
             }
         }
     }
-    ctx.update_trail(|t| t.record = Some(RecordRef { model: "file", id: Some(meta.id.clone()) }));
-    Ok(crate::File { size, ..meta.file() })
+    ctx.update_trail(|t| {
+        t.record = Some(RecordRef {
+            model: "file",
+            id: Some(meta.id.clone()),
+        })
+    });
+    Ok(crate::File {
+        size,
+        ..meta.file()
+    })
 }
 
 /// The next part of the body. A client that stops sending for [`IDLE`] or breaks the
@@ -225,7 +322,13 @@ where
     S: Stream<Item = Result<Bytes, axum::Error>> + Unpin,
 {
     let read = std::future::poll_fn(|cx| std::pin::Pin::new(&mut *stream).poll_next(cx));
-    let aborted = || Failure::Status(StatusCode::BAD_REQUEST, "upload_aborted", Text::key("zeyn.files.aborted"));
+    let aborted = || {
+        Failure::Status(
+            StatusCode::BAD_REQUEST,
+            "upload_aborted",
+            Text::key("zeyn.files.aborted"),
+        )
+    };
     match tokio::time::timeout(IDLE, read).await {
         Ok(Some(Ok(chunk))) => Ok(Some(chunk)),
         Ok(None) => Ok(None),
@@ -239,7 +342,11 @@ fn decode(s: &str) -> String {
     let mut out = Vec::with_capacity(b.len());
     let mut i = 0;
     while i < b.len() {
-        let hex = |c: u8| (c as char).to_digit(16).map(|d| d as u8);
+        let hex = |c: u8| {
+            (c as char)
+                .to_digit(16)
+                .map(|d| d as u8)
+        };
         if b[i] == b'%' && i + 3 <= b.len() {
             if let (Some(hi), Some(lo)) = (hex(b[i + 1]), hex(b[i + 2])) {
                 out.push(hi * 16 + lo);
@@ -258,7 +365,13 @@ fn decode(s: &str) -> String {
 fn disposition(kind: &str, name: &str) -> String {
     let ascii: String = name
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | ' ' | '(' | ')') { c } else { '_' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | ' ' | '(' | ')') {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
     let encoded: String = name
         .bytes()
@@ -281,11 +394,17 @@ async fn download(
             return Err(Failure::App(Error::NotFound));
         }
         let (_, entry) = entry(&st, &ctx, &store)?;
-        let call =
-            Call { kind: CallKind::Media, screen: entry.rules.store(), action: None, via_agent: ctx.via_agent() };
+        let call = Call {
+            kind: CallKind::Media,
+            screen: entry.rules.store(),
+            action: None,
+            via_agent: ctx.via_agent(),
+        };
         let tenant = ctx.tenant().map(|t| t.id().to_string());
         st.intercept(&ctx, &call, || async {
-            let file = st.timed(entry.store.get(id.clone())).await?;
+            let file = st
+                .timed(entry.store.get(id.clone()))
+                .await?;
             if file.meta.tenant != tenant || file.meta.id != id {
                 return Err(Failure::App(Error::NotFound));
             }
@@ -299,12 +418,19 @@ async fn download(
         Err(f) => return st.error_response(&ctx, f),
     };
     let inline = inline_type(&file.meta.content_type);
-    let media = Media::new(file.reader, file.meta.size, file.meta.content_type.clone()).etag(file.meta.id.clone());
+    let media = Media::new(file.reader, file.meta.size, file.meta.content_type.clone())
+        .etag(file.meta.id.clone());
     let mut r = media::respond(media, &headers);
     let h = r.headers_mut();
-    if let Ok(v) = HeaderValue::from_str(&disposition(if inline { "inline" } else { "attachment" }, &file.meta.name)) {
+    if let Ok(v) = HeaderValue::from_str(&disposition(
+        if inline { "inline" } else { "attachment" },
+        &file.meta.name,
+    )) {
         h.insert(header::CONTENT_DISPOSITION, v);
     }
-    h.insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static("default-src 'none'; sandbox"));
+    h.insert(
+        header::CONTENT_SECURITY_POLICY,
+        HeaderValue::from_static("default-src 'none'; sandbox"),
+    );
     r
 }

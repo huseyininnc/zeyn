@@ -75,7 +75,8 @@ pub const READINGS: u64 = 100_000;
 
 /// Reading of sensor `n` in week `w`, always the same for the same input.
 fn figure(n: u64, w: u64) -> i64 {
-    ((n.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ w.wrapping_mul(0xC2B2_AE3D_27D4_EB4F)) >> 40) as i64 % 10_000
+    ((n.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ w.wrapping_mul(0xC2B2_AE3D_27D4_EB4F)) >> 40) as i64
+        % 10_000
 }
 
 fn reading(n: u64) -> Reading {
@@ -149,7 +150,10 @@ fn reading(n: u64) -> Reading {
 pub async fn search_readings(q: DataQuery) -> Result<Page<Reading>> {
     let offset = match &q.page {
         PageRequest::Offset { offset, .. } => *offset,
-        PageRequest::After { cursor, .. } => cursor.as_ref().and_then(|c| c.0.parse().ok()).unwrap_or(0),
+        PageRequest::After { cursor, .. } => cursor
+            .as_ref()
+            .and_then(|c| c.0.parse().ok())
+            .unwrap_or(0),
     }
     .min(READINGS);
     let end = (offset + u64::from(q.limit())).min(READINGS);
@@ -160,7 +164,11 @@ pub async fn search_readings(q: DataQuery) -> Result<Page<Reading>> {
             .collect(),
     )
     .total(READINGS);
-    Ok(if end < READINGS { page.next(Cursor(end.to_string())) } else { page })
+    Ok(if end < READINGS {
+        page.next(Cursor(end.to_string()))
+    } else {
+        page
+    })
 }
 
 /// Sixty weeks of readings side by side. Only the columns in view (and a few around them) are in

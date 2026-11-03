@@ -39,8 +39,16 @@ pub fn overview(_ctx: &Ctx) -> Node {
     Form::of(Invoice {
         customer: "Northwind".into(),
         lines: vec![
-            Line { item: "Notebook".into(), quantity: 12, unit_price: Money::tl(8_369) },
-            Line { item: "Pencil".into(), quantity: 40, unit_price: Money::tl(1_250) },
+            Line {
+                item: "Notebook".into(),
+                quantity: 12,
+                unit_price: Money::tl(8_369),
+            },
+            Line {
+                item: "Pencil".into(),
+                quantity: 40,
+                unit_price: Money::tl(1_250),
+            },
         ],
     })
     .field(Invoice::customer)
@@ -56,5 +64,10 @@ pub fn overview(_ctx: &Ctx) -> Node {
 }
 
 /// What the catalog shows of `Lines`.
-pub const ENTRY: Entry =
-    Entry { name: "Line editor", docs: "components/lines", api: &["Lines"], overview: &[ex!(overview)], examples: &[] };
+pub const ENTRY: Entry = Entry {
+    name: "Line editor",
+    docs: "components/lines",
+    api: &["Lines"],
+    overview: &[ex!(overview)],
+    examples: &[],
+};

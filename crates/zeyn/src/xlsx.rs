@@ -58,10 +58,18 @@ impl Formats {
             "mdy" => format!("{m}{sep}{d}{sep}yyyy"),
             _ => "yyyy-mm-dd".to_string(),
         };
-        let time = if Time::twelve_hour(locale) { "h:mm:ss AM/PM" } else { "hh:mm:ss" };
+        let time = if Time::twelve_hour(locale) {
+            "h:mm:ss AM/PM"
+        } else {
+            "hh:mm:ss"
+        };
         Formats {
             head: Format::new().set_bold(),
-            money: [money(Currency::Try), money(Currency::Usd), money(Currency::Eur)],
+            money: [
+                money(Currency::Try),
+                money(Currency::Usd),
+                money(Currency::Eur),
+            ],
             decimal: Format::new().set_num_format("#,##0.00"),
             local: Format::new().set_num_format(format!("{date} {time}")),
             date: Format::new().set_num_format(date),
@@ -103,7 +111,12 @@ impl XlsxSheet {
             sheet.write_string_with_format(0, col, clip(&c.label), &formats.head)?;
         }
         sheet.set_freeze_panes(1, 0)?;
-        Ok(XlsxSheet { workbook, sheet, formats, row: 1 })
+        Ok(XlsxSheet {
+            workbook,
+            sheet,
+            formats,
+            row: 1,
+        })
     }
 
     /// Writes rows under the ones already written. Choices should already be labels and moments
@@ -153,12 +166,20 @@ impl XlsxSheet {
                 s.write_datetime_with_format(row, col, t, &f.time)?;
             }
             Value::LocalDateTime(l) => {
-                let at = excel_date(&l.date)?.and_hms(l.time.hour().into(), l.time.minute(), l.time.second())?;
+                let at = excel_date(&l.date)?.and_hms(
+                    l.time.hour().into(),
+                    l.time.minute(),
+                    l.time.second(),
+                )?;
                 s.write_datetime_with_format(row, col, at, &f.local)?;
             }
             Value::DateTime(d) => {
                 let l = d.local(crate::time::TimeZone::default());
-                let at = excel_date(&l.date)?.and_hms(l.time.hour().into(), l.time.minute(), l.time.second())?;
+                let at = excel_date(&l.date)?.and_hms(
+                    l.time.hour().into(),
+                    l.time.minute(),
+                    l.time.second(),
+                )?;
                 s.write_datetime_with_format(row, col, at, &f.local)?;
             }
         }
@@ -224,13 +245,23 @@ pub(crate) fn read(
     }
     check_unpacked(std::io::Cursor::new(bytes))?;
     use calamine::Reader;
-    let mut book = calamine::Xlsx::new(std::io::Cursor::new(bytes)).map_err(|_| XlsxReadError::Unreadable)?;
-    let first = book.sheet_names().into_iter().next().ok_or(XlsxReadError::Unreadable)?;
-    let mut cells = book.worksheet_cells_reader(&first).map_err(|_| XlsxReadError::Unreadable)?;
+    let mut book =
+        calamine::Xlsx::new(std::io::Cursor::new(bytes)).map_err(|_| XlsxReadError::Unreadable)?;
+    let first = book
+        .sheet_names()
+        .into_iter()
+        .next()
+        .ok_or(XlsxReadError::Unreadable)?;
+    let mut cells = book
+        .worksheet_cells_reader(&first)
+        .map_err(|_| XlsxReadError::Unreadable)?;
     let mut rows: Vec<Vec<XlsxCell>> = Vec::new();
     let mut current: Option<(u32, Vec<XlsxCell>)> = None;
     let push = |rows: &mut Vec<Vec<XlsxCell>>, row: Vec<XlsxCell>| -> Result<(), XlsxReadError> {
-        if row.iter().any(|c| *c != XlsxCell::Empty && *c != XlsxCell::Text(String::new())) {
+        if row
+            .iter()
+            .any(|c| *c != XlsxCell::Empty && *c != XlsxCell::Text(String::new()))
+        {
             if rows.len() > max_rows {
                 return Err(XlsxReadError::TooMany);
             }
@@ -238,24 +269,41 @@ pub(crate) fn read(
         }
         Ok(())
     };
-    while let Some(cell) = cells.next_cell().map_err(|_| XlsxReadError::Unreadable)? {
+    while let Some(cell) = cells
+        .next_cell()
+        .map_err(|_| XlsxReadError::Unreadable)?
+    {
         let (r, c) = cell.get_position();
-        if current.as_ref().is_some_and(|(at, _)| *at != r) {
+        if current
+            .as_ref()
+            .is_some_and(|(at, _)| *at != r)
+        {
             let (_, row) = current.take().unwrap_or_default();
             push(&mut rows, row)?;
             if rows.len() == 1 {
                 let header = &mut rows[0];
-                while header.last().is_some_and(|c| *c == XlsxCell::Empty) {
+                while header
+                    .last()
+                    .is_some_and(|c| *c == XlsxCell::Empty)
+                {
                     header.pop();
                 }
                 if header.len() > max_columns {
-                    let header = rows.remove(0).into_iter().map(|c| text_of(&c)).collect();
+                    let header = rows
+                        .remove(0)
+                        .into_iter()
+                        .map(|c| text_of(&c))
+                        .collect();
                     return Ok((header, Vec::new()));
                 }
             }
         }
-        let width = rows.first().map_or(MAX_COLUMNS, Vec::len);
-        let row = &mut current.get_or_insert_with(|| (r, Vec::new())).1;
+        let width = rows
+            .first()
+            .map_or(MAX_COLUMNS, Vec::len);
+        let row = &mut current
+            .get_or_insert_with(|| (r, Vec::new()))
+            .1;
         let c = (c as usize).min(width);
         if row.len() <= c {
             row.resize(c + 1, XlsxCell::Empty);
@@ -271,7 +319,11 @@ pub(crate) fn read(
     if rows.is_empty() {
         return Ok((Vec::new(), rows));
     }
-    let header = rows.remove(0).into_iter().map(|c| text_of(&c)).collect();
+    let header = rows
+        .remove(0)
+        .into_iter()
+        .map(|c| text_of(&c))
+        .collect();
     Ok((header, rows))
 }
 
@@ -284,9 +336,13 @@ fn check_unpacked<R: Read + Seek>(reader: R) -> Result<(), XlsxReadError> {
     }
     let mut total = 0u64;
     for i in 0..zip.len() {
-        let part = zip.by_index_raw(i).map_err(|_| XlsxReadError::Unreadable)?;
+        let part = zip
+            .by_index_raw(i)
+            .map_err(|_| XlsxReadError::Unreadable)?;
         total = total.saturating_add(part.size());
-        let shared = part.name().is_ok_and(|n| n.eq_ignore_ascii_case("xl/sharedStrings.xml"));
+        let shared = part
+            .name()
+            .is_ok_and(|n| n.eq_ignore_ascii_case("xl/sharedStrings.xml"));
         if total > MAX_UNPACKED || (shared && part.size() > MAX_SHARED_STRINGS) {
             return Err(XlsxReadError::TooLarge);
         }
@@ -319,7 +375,9 @@ fn text_of(cell: &XlsxCell) -> String {
         XlsxCell::Text(s) => s.clone(),
         XlsxCell::Number(x) => x.to_string(),
         XlsxCell::Bool(b) => b.to_string(),
-        XlsxCell::Moment(y, mo, d, h, mi, s, _) => format!("{y:04}-{mo:02}-{d:02}T{h:02}:{mi:02}:{s:02}"),
+        XlsxCell::Moment(y, mo, d, h, mi, s, _) => {
+            format!("{y:04}-{mo:02}-{d:02}T{h:02}:{mi:02}:{s:02}")
+        }
     }
 }
 
@@ -335,12 +393,17 @@ pub(crate) fn cell_text(cell: &XlsxCell, kind: &FieldKind, locale: &str) -> Stri
         (XlsxCell::Number(x), _) if x.fract() == 0.0 && x.abs() < 1e15 => format!("{}", *x as i64),
         (XlsxCell::Number(x), _) => {
             let decimal = NumberFormat::for_locale(locale).decimal;
-            x.to_string().replace('.', &decimal.to_string())
+            x.to_string()
+                .replace('.', &decimal.to_string())
         }
         (XlsxCell::Moment(y, mo, d, ..), FieldKind::Date) => format!("{y:04}-{mo:02}-{d:02}"),
         (XlsxCell::Moment(.., h, mi, s, _), FieldKind::Time) => format!("{h:02}:{mi:02}:{s:02}"),
-        (XlsxCell::Moment(y, mo, d, h, mi, s, false), FieldKind::Text) if *h == 0 && *mi == 0 && *s == 0 => {
-            Date::new((*y).into(), *mo, *d).map(|d| d.format(locale)).unwrap_or_default()
+        (XlsxCell::Moment(y, mo, d, h, mi, s, false), FieldKind::Text)
+            if *h == 0 && *mi == 0 && *s == 0 =>
+        {
+            Date::new((*y).into(), *mo, *d)
+                .map(|d| d.format(locale))
+                .unwrap_or_default()
         }
         (XlsxCell::Moment(y, mo, d, h, mi, s, _), FieldKind::Text) => {
             match (Date::new((*y).into(), *mo, *d), Time::new(*h, *mi, *s)) {
@@ -361,13 +424,25 @@ mod tests {
         let n = XlsxCell::Number(1234.5);
         assert_eq!(cell_text(&n, &FieldKind::Money, "tr"), "1234,50");
         assert_eq!(cell_text(&n, &FieldKind::Money, "en"), "1234.50");
-        assert_eq!(cell_text(&XlsxCell::Number(42.0), &FieldKind::Integer, "tr"), "42");
-        assert_eq!(cell_text(&XlsxCell::Number(42.0), &FieldKind::Text, "tr"), "42");
+        assert_eq!(
+            cell_text(&XlsxCell::Number(42.0), &FieldKind::Integer, "tr"),
+            "42"
+        );
+        assert_eq!(
+            cell_text(&XlsxCell::Number(42.0), &FieldKind::Text, "tr"),
+            "42"
+        );
         let m = XlsxCell::Moment(2026, 3, 9, 14, 30, 0, false);
         assert_eq!(cell_text(&m, &FieldKind::Date, "tr"), "2026-03-09");
-        assert_eq!(cell_text(&m, &FieldKind::DateTime, "tr"), "2026-03-09T14:30:00");
+        assert_eq!(
+            cell_text(&m, &FieldKind::DateTime, "tr"),
+            "2026-03-09T14:30:00"
+        );
         assert_eq!(cell_text(&m, &FieldKind::Time, "tr"), "14:30:00");
-        assert_eq!(cell_text(&XlsxCell::Bool(true), &FieldKind::Bool, "tr"), "true");
+        assert_eq!(
+            cell_text(&XlsxCell::Bool(true), &FieldKind::Bool, "tr"),
+            "true"
+        );
     }
 
     #[test]

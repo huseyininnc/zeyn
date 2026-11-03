@@ -46,7 +46,9 @@ impl MaskStyle {
                 if chars.len() <= 4 {
                     return DOTS.into();
                 }
-                let tail: String = chars[chars.len() - 4..].iter().collect();
+                let tail: String = chars[chars.len() - 4..]
+                    .iter()
+                    .collect();
                 format!("{DOTS} {tail}")
             }
             MaskStyle::Email => match value.split_once('@') {
@@ -75,7 +77,11 @@ pub struct Masking {
 pub fn can_unmask(ctx: Option<&Ctx>, meta: &FieldMeta) -> bool {
     match meta.mask {
         None => true,
-        Some(m) => ctx.is_some_and(|c| !c.via_agent() && c.identity().can(&Access::Permission(m.permission))),
+        Some(m) => ctx.is_some_and(|c| {
+            !c.via_agent()
+                && c.identity()
+                    .can(&Access::Permission(m.permission))
+        }),
     }
 }
 
@@ -96,9 +102,19 @@ pub struct Revealed {
 
 /// The raw value of a masked field of `model`, for an audited reveal.
 pub fn reveal_in<M: Model>(model: &M, field: &str) -> Option<Revealed> {
-    let (i, meta) = M::fields().iter().enumerate().find(|(_, m)| m.name == field && m.mask.is_some())?;
-    let value = model.value_at(i).and_then(|v| plain(&v)).unwrap_or_default();
-    Some(Revealed { meta, value, record: RecordRef::of(model) })
+    let (i, meta) = M::fields()
+        .iter()
+        .enumerate()
+        .find(|(_, m)| m.name == field && m.mask.is_some())?;
+    let value = model
+        .value_at(i)
+        .and_then(|v| plain(&v))
+        .unwrap_or_default();
+    Some(Revealed {
+        meta,
+        value,
+        record: RecordRef::of(model),
+    })
 }
 
 thread_local! {
@@ -142,7 +158,13 @@ pub mod output {
             c.borrow().as_ref().map(|ctx| {
                 let shown = can_unmask(Some(ctx), meta);
                 if shown {
-                    ctx.update_trail(|t| t.revealed.push(FieldRef { model: meta.model, id: None, field: meta.name }));
+                    ctx.update_trail(|t| {
+                        t.revealed.push(FieldRef {
+                            model: meta.model,
+                            id: None,
+                            field: meta.name,
+                        })
+                    });
                 }
                 !shown
             })
@@ -161,7 +183,10 @@ pub mod output {
     {
         CLIENT.with(|c| {
             if let Some(ctx) = c.borrow().as_ref() {
-                ctx.note_read(RecordRef { model: meta.model, id: plain(&value.to_value()) });
+                ctx.note_read(RecordRef {
+                    model: meta.model,
+                    id: plain(&value.to_value()),
+                });
             }
         });
         value.serialize(s)
@@ -171,8 +196,14 @@ pub mod output {
 /// Removes filters and sorts on masked fields the user may not reveal, so a value cannot be
 /// guessed by searching for it.
 pub(crate) fn strip_masked(query: &mut DataQuery, fields: &[FieldMeta], ctx: &Ctx) {
-    let hidden = |name: &str| fields.iter().any(|m| m.name == name && !can_unmask(Some(ctx), m));
-    query.filters.retain(|f| !hidden(&f.field));
+    let hidden = |name: &str| {
+        fields
+            .iter()
+            .any(|m| m.name == name && !can_unmask(Some(ctx), m))
+    };
+    query
+        .filters
+        .retain(|f| !hidden(&f.field));
     query.sort.retain(|s| !hidden(&s.field));
 }
 
@@ -180,7 +211,9 @@ fn reveal_button(r: &Render, meta: &FieldMeta, key: Option<&str>) -> String {
     if !can_unmask(r.ctx, meta) {
         return String::new();
     }
-    let key = key.map(|k| format!(r#" data-zeyn-key="{}""#, escape(k))).unwrap_or_default();
+    let key = key
+        .map(|k| format!(r#" data-zeyn-key="{}""#, escape(k)))
+        .unwrap_or_default();
     let label = r.text(&Text::key("zeyn.privacy.reveal").arg("label", meta.label_text()));
     format!(
         r#"<button type="button" class="z-reveal" data-zeyn-reveal="{}"{key} aria-label="{label}" title="{label}"><span class="z-icon z-icon-eye" aria-hidden="true"></span></button>"#,
@@ -190,16 +223,24 @@ fn reveal_button(r: &Render, meta: &FieldMeta, key: Option<&str>) -> String {
 
 /// DataGrid cell of a masked field: the masked text and, for users who may, a reveal button.
 pub(crate) fn cell<E: Model>(r: &Render, meta: &FieldMeta, value: &Value, row: &E) -> String {
-    let text = plain(value).map(|v| masked_text(meta, &v)).unwrap_or_default();
+    let text = plain(value)
+        .map(|v| masked_text(meta, &v))
+        .unwrap_or_default();
     let key = RecordRef::of(row).id;
-    format!(r#"<span data-zeyn-masked>{}</span>{}"#, escape(&text), reveal_button(r, meta, key.as_deref()))
+    format!(
+        r#"<span data-zeyn-masked>{}</span>{}"#,
+        escape(&text),
+        reveal_button(r, meta, key.as_deref())
+    )
 }
 
 /// Form field of a masked field: read only masked text and, for users who may, a reveal button.
 /// The input is read only, so the runtime does not send it back and the stored value is kept.
 pub(crate) fn form_field(out: &mut String, r: &Render, meta: &FieldMeta, value: &Value) {
     let id = format!("{}-{}", r.scope, meta.name);
-    let text = plain(value).map(|v| masked_text(meta, &v)).unwrap_or_default();
+    let text = plain(value)
+        .map(|v| masked_text(meta, &v))
+        .unwrap_or_default();
     out.push_str(&format!(
         r#"<div class="z-field"><label for="{id}">{}</label><div class="z-masked-field"><input type="text" id="{id}" name="{}" data-testid="{}.field.{}" aria-describedby="{id}-error" readonly data-zeyn-masked value="{}">{}</div><p class="z-field-error" id="{id}-error" aria-live="polite"></p></div>"#,
         r.label(meta),
@@ -216,19 +257,33 @@ fn key_of<M: Model>(object: &serde_json::Map<String, Json>) -> Option<String> {
         .iter()
         .find(|m| m.key)
         .and_then(|m| object.get(m.name))
-        .map(|v| v.as_str().map(str::to_string).unwrap_or_else(|| v.to_string()))
+        .map(|v| {
+            v.as_str()
+                .map(str::to_string)
+                .unwrap_or_else(|| v.to_string())
+        })
 }
 
 /// Masks the masked fields of one serialized model in place. Users with the unmask permission
 /// get raw values; each field they receive is recorded as revealed.
 pub(crate) fn protect_object<M: Model>(value: &mut Json, ctx: &Ctx) {
-    let Some(object) = value.as_object_mut() else { return };
+    let Some(object) = value.as_object_mut() else {
+        return;
+    };
     if M::SENSITIVE {
-        ctx.note_read(RecordRef { model: M::NAME, id: key_of::<M>(object) });
+        ctx.note_read(RecordRef {
+            model: M::NAME,
+            id: key_of::<M>(object),
+        });
     }
     let mut revealed = Vec::new();
-    for meta in M::fields().iter().filter(|m| m.mask.is_some()) {
-        let Some(Json::String(text)) = object.get(meta.name) else { continue };
+    for meta in M::fields()
+        .iter()
+        .filter(|m| m.mask.is_some())
+    {
+        let Some(Json::String(text)) = object.get(meta.name) else {
+            continue;
+        };
         if can_unmask(Some(ctx), meta) {
             revealed.push(meta.name);
         } else {
@@ -240,7 +295,11 @@ pub(crate) fn protect_object<M: Model>(value: &mut Json, ctx: &Ctx) {
         let id = key_of::<M>(object);
         ctx.update_trail(|t| {
             for field in revealed {
-                t.revealed.push(crate::audit::FieldRef { model: M::NAME, id: id.clone(), field });
+                t.revealed.push(crate::audit::FieldRef {
+                    model: M::NAME,
+                    id: id.clone(),
+                    field,
+                });
             }
         });
     }

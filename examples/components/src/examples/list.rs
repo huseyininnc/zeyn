@@ -23,7 +23,9 @@ pub fn fixed(_ctx: &Ctx) -> Node {
     people()
         .iter()
         .take(3)
-        .fold(List::new(), |list, p| list.item(ListItem::new(p.name.clone()).subtitle(p.role.clone())))
+        .fold(List::new(), |list, p| {
+            list.item(ListItem::new(p.name.clone()).subtitle(p.role.clone()))
+        })
         .into()
 }
 

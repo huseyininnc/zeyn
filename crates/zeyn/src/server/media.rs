@@ -10,7 +10,8 @@ use crate::action::{Access, Error};
 use crate::ctx::Ctx;
 use crate::i18n::Text;
 use crate::media::{
-    ByteRange, MAX_POSITION_SECONDS, MEDIA_CHUNK, Media, MediaEntry, MediaReader, inline_type, valid_media_id,
+    ByteRange, MAX_POSITION_SECONDS, MEDIA_CHUNK, Media, MediaEntry, MediaReader, inline_type,
+    valid_media_id,
 };
 use axum::Router;
 use axum::body::{Body, Bytes};
@@ -32,26 +33,39 @@ pub(super) const ASSETS: [&str; 2] = ["/_zeyn/media.js", "/_zeyn/media.css"];
 /// Links placed in the page head after the component library's own.
 pub(super) fn head(base: &str) -> String {
     let v = super::ops::asset_version();
-    format!(
-        r#"<link rel="stylesheet" href="{base}/_zeyn/media.css{v}">"#
-    )
+    format!(r#"<link rel="stylesheet" href="{base}/_zeyn/media.css{v}">"#)
 }
 
 pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
     router
-        .route("/_zeyn/media.js", get(|| async { asset(JS, "text/javascript; charset=utf-8") }))
-        .route("/_zeyn/media.css", get(|| async { asset(CSS, "text/css; charset=utf-8") }))
-        .route("/_zeyn/media/position", get(position_get).post(position_save))
+        .route(
+            "/_zeyn/media.js",
+            get(|| async { asset(JS, "text/javascript; charset=utf-8") }),
+        )
+        .route(
+            "/_zeyn/media.css",
+            get(|| async { asset(CSS, "text/css; charset=utf-8") }),
+        )
+        .route(
+            "/_zeyn/media/position",
+            get(position_get).post(position_save),
+        )
         .route("/_zeyn/media/{source}/{id}", get(media_file))
 }
 
 /// Whether `path` reads a file of a public media source. These requests skip the rate limit:
 /// one page loads many images, and many visitors can share one address behind carrier NAT.
 pub(super) fn is_public(st: &AppState, path: &str) -> bool {
-    path.strip_prefix("/_zeyn/media/").and_then(|rest| rest.split_once('/')).is_some_and(|(source, id)| {
-        !id.contains('/')
-            && st.features.iter().any(|f| f.media_sources().iter().any(|m| m.name == source && m.public_cache.is_some()))
-    })
+    path.strip_prefix("/_zeyn/media/")
+        .and_then(|rest| rest.split_once('/'))
+        .is_some_and(|(source, id)| {
+            !id.contains('/')
+                && st.features.iter().any(|f| {
+                    f.media_sources()
+                        .iter()
+                        .any(|m| m.name == source && m.public_cache.is_some())
+                })
+        })
 }
 
 /// The source behind a request, after the id shape, the permission and the guards.
@@ -62,9 +76,18 @@ fn entry(st: &AppState, ctx: &Ctx, source: &str, id: &str) -> Result<MediaEntry,
     let (feature, entry) = st
         .features
         .iter()
-        .find_map(|f| f.media_sources().iter().find(|m| m.name == source).map(|m| (f, m)))
+        .find_map(|f| {
+            f.media_sources()
+                .iter()
+                .find(|m| m.name == source)
+                .map(|m| (f, m))
+        })
         .ok_or(Failure::App(Error::NotFound))?;
-    if entry.public_cache.is_none() && !ctx.identity().can(&Access::Permission(entry.permission)) {
+    if entry.public_cache.is_none()
+        && !ctx
+            .identity()
+            .can(&Access::Permission(entry.permission))
+    {
         return Err(Failure::App(Error::Forbidden));
     }
     feature.check_guards(ctx)?;
@@ -78,8 +101,14 @@ async fn intercepted<T>(
     entry: &MediaEntry,
     work: impl Future<Output = crate::Result<T>>,
 ) -> Result<T, Failure> {
-    let call = Call { kind: CallKind::Media, screen: entry.name, action: None, via_agent: ctx.via_agent() };
-    st.intercept(ctx, &call, || st.timed(work)).await
+    let call = Call {
+        kind: CallKind::Media,
+        screen: entry.name,
+        action: None,
+        via_agent: ctx.via_agent(),
+    };
+    st.intercept(ctx, &call, || st.timed(work))
+        .await
 }
 
 async fn media_file(
@@ -97,8 +126,11 @@ async fn media_file(
     match opened {
         Ok((media, public)) => {
             let mut r = respond(media, &headers);
-            if let Some(v) = public.and_then(|s| HeaderValue::from_str(&format!("public, max-age={s}")).ok()) {
-                r.headers_mut().insert(header::CACHE_CONTROL, v);
+            if let Some(v) =
+                public.and_then(|s| HeaderValue::from_str(&format!("public, max-age={s}")).ok())
+            {
+                r.headers_mut()
+                    .insert(header::CACHE_CONTROL, v);
             }
             r
         }
@@ -109,8 +141,15 @@ async fn media_file(
 /// The response for an opened media file and the request's `Range`, `If-Range` and
 /// `If-None-Match` headers.
 pub(super) fn respond(media: Media, headers: &HeaderMap) -> Response {
-    let read = |name: header::HeaderName| headers.get(name).and_then(|v| v.to_str().ok());
-    let etag = media.etag.as_ref().map(|t| format!("\"{t}\""));
+    let read = |name: header::HeaderName| {
+        headers
+            .get(name)
+            .and_then(|v| v.to_str().ok())
+    };
+    let etag = media
+        .etag
+        .as_ref()
+        .map(|t| format!("\"{t}\""));
     let len = media.len;
     let mut range = ByteRange::parse(read(header::RANGE), len);
     if read(header::IF_RANGE).is_some_and(|v| etag.as_deref() != Some(v.trim())) {
@@ -119,21 +158,40 @@ pub(super) fn respond(media: Media, headers: &HeaderMap) -> Response {
     let inline = inline_type(&media.content_type);
     let mut response = Response::new(Body::empty());
     let h = response.headers_mut();
-    let content_type = if inline { media.content_type.as_str() } else { "application/octet-stream" };
+    let content_type = if inline {
+        media.content_type.as_str()
+    } else {
+        "application/octet-stream"
+    };
     if let Ok(v) = HeaderValue::from_str(content_type) {
         h.insert(header::CONTENT_TYPE, v);
     }
     h.insert(header::ACCEPT_RANGES, HeaderValue::from_static("bytes"));
-    h.insert(header::CACHE_CONTROL, HeaderValue::from_static("private, no-cache"));
-    h.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+    h.insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("private, no-cache"),
+    );
+    h.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
     if !inline {
-        h.insert(header::CONTENT_DISPOSITION, HeaderValue::from_static("attachment"));
+        h.insert(
+            header::CONTENT_DISPOSITION,
+            HeaderValue::from_static("attachment"),
+        );
     }
-    if let Some(v) = etag.as_deref().and_then(|t| HeaderValue::from_str(t).ok()) {
+    if let Some(v) = etag
+        .as_deref()
+        .and_then(|t| HeaderValue::from_str(t).ok())
+    {
         h.insert(header::ETAG, v);
     }
     if let (Some(tag), Some(wanted)) = (etag.as_deref(), read(header::IF_NONE_MATCH)) {
-        if wanted.split(',').any(|w| w.trim() == tag || w.trim() == "*") {
+        if wanted
+            .split(',')
+            .any(|w| w.trim() == tag || w.trim() == "*")
+        {
             *response.status_mut() = StatusCode::NOT_MODIFIED;
             return response;
         }
@@ -142,7 +200,9 @@ pub(super) fn respond(media: Media, headers: &HeaderMap) -> Response {
         ByteRange::Unsatisfiable => {
             *response.status_mut() = StatusCode::RANGE_NOT_SATISFIABLE;
             if let Ok(v) = HeaderValue::from_str(&format!("bytes */{len}")) {
-                response.headers_mut().insert(header::CONTENT_RANGE, v);
+                response
+                    .headers_mut()
+                    .insert(header::CONTENT_RANGE, v);
             }
             return response;
         }
@@ -150,12 +210,16 @@ pub(super) fn respond(media: Media, headers: &HeaderMap) -> Response {
         ByteRange::Part(first, last) => {
             *response.status_mut() = StatusCode::PARTIAL_CONTENT;
             if let Ok(v) = HeaderValue::from_str(&format!("bytes {first}-{last}/{len}")) {
-                response.headers_mut().insert(header::CONTENT_RANGE, v);
+                response
+                    .headers_mut()
+                    .insert(header::CONTENT_RANGE, v);
             }
             (first, last - first + 1)
         }
     };
-    response.headers_mut().insert(header::CONTENT_LENGTH, HeaderValue::from(count));
+    response
+        .headers_mut()
+        .insert(header::CONTENT_LENGTH, HeaderValue::from(count));
     *response.body_mut() = stream(media.reader, start, count);
     response
 }
@@ -184,7 +248,11 @@ fn stream(mut reader: Box<dyn MediaReader>, start: u64, count: u64) -> Body {
                 Ok((r, buf)) => {
                     reader = r;
                     left -= n as u64;
-                    if tx.send(Ok(Bytes::from(buf))).await.is_err() {
+                    if tx
+                        .send(Ok(Bytes::from(buf)))
+                        .await
+                        .is_err()
+                    {
                         return;
                     }
                 }
@@ -215,7 +283,11 @@ struct PositionCall {
 /// Where the signed in user stopped: `{"at": seconds or null, "kept": true}`. When nobody is
 /// signed in or the source keeps no positions the answer is `{"at": null, "kept": false}`, and the
 /// player uses the browser's storage instead. Unknown sources and ids are `404`.
-async fn position_get(State(st): State<Arc<AppState>>, headers: HeaderMap, Query(q): Query<PositionQuery>) -> Response {
+async fn position_get(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(q): Query<PositionQuery>,
+) -> Response {
     let ctx = st.licensed(st.ctx(&headers)).await;
     let result = async {
         let entry = entry(&st, &ctx, &q.source, &q.id)?;
@@ -232,7 +304,8 @@ async fn position_get(State(st): State<Arc<AppState>>, headers: HeaderMap, Query
     match result {
         Ok(body) => {
             let mut r = axum::Json(body).into_response();
-            r.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+            r.headers_mut()
+                .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
             r
         }
         Err(f) => st.error_response(&ctx, f),
@@ -262,7 +335,15 @@ async fn position_save(
                 Text::key("zeyn.ui.media.bad_position"),
             ));
         }
-        intercepted(&st, &ctx, &entry, entry.source.save_position(ctx.clone(), call.id, call.at)).await
+        intercepted(
+            &st,
+            &ctx,
+            &entry,
+            entry
+                .source
+                .save_position(ctx.clone(), call.id, call.at),
+        )
+        .await
     }
     .await;
     match result {

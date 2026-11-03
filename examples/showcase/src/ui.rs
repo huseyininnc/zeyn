@@ -22,25 +22,40 @@ pub fn layout() -> Screen {
         Stack::new()
             .add(
                 Row::new()
-                    .col(Card::new().title(t!("ui.card_orders")).add(Card::new().title(t!("ui.card_hint"))))
+                    .col(
+                        Card::new()
+                            .title(t!("ui.card_orders"))
+                            .add(Card::new().title(t!("ui.card_hint"))),
+                    )
                     .col(Card::new().title(t!("ui.card_stock")))
                     .col(Card::new().title(t!("ui.card_people"))),
             )
             .add(
-                Panel::new(t!("ui.panel_products")).collapsible().toolbar(|t| t.export(Export::Csv)).add(
-                    Tabs::new(t!("ui.tabs_label"))
-                        .tab(t!("ui.tab_all"), products())
-                        .tab(
-                            t!("ui.tab_split"),
-                            Split::new(products(), Card::new().title(t!("ui.card_detail"))).ratio(55),
-                        )
-                        .tab(
-                            t!("ui.tab_columns"),
-                            Row::new().col(products()).weight(2).col(Card::new().title(t!("ui.card_hint"))),
-                        ),
-                ),
+                Panel::new(t!("ui.panel_products"))
+                    .collapsible()
+                    .toolbar(|t| t.export(Export::Csv))
+                    .add(
+                        Tabs::new(t!("ui.tabs_label"))
+                            .tab(t!("ui.tab_all"), products())
+                            .tab(
+                                t!("ui.tab_split"),
+                                Split::new(products(), Card::new().title(t!("ui.card_detail")))
+                                    .ratio(55),
+                            )
+                            .tab(
+                                t!("ui.tab_columns"),
+                                Row::new()
+                                    .col(products())
+                                    .weight(2)
+                                    .col(Card::new().title(t!("ui.card_hint"))),
+                            ),
+                    ),
             )
-            .add(Panel::new(t!("ui.panel_collapsed")).collapsed().add(Card::new().title(t!("ui.card_hint")))),
+            .add(
+                Panel::new(t!("ui.panel_collapsed"))
+                    .collapsed()
+                    .add(Card::new().title(t!("ui.card_hint"))),
+            ),
     )
 }
 
@@ -74,10 +89,21 @@ pub fn editors(_: (), ctx: Ctx) -> Screen {
     Screen::new(t!("ui.editors")).body(
         Panel::new(t!("ui.panel_dates")).add(
             Form::of(visit)
-                .row(|r| r.field(Visit::day).field(Visit::arrives))
-                .row(|r| r.field(Visit::slot).field(Visit::confirmed_at))
+                .row(|r| {
+                    r.field(Visit::day)
+                        .field(Visit::arrives)
+                })
+                .row(|r| {
+                    r.field(Visit::slot)
+                        .field(Visit::confirmed_at)
+                })
                 .range(Visit::stay_from, Visit::stay_to)
-                .date_options(Visit::day, DateOptions::new().no_weekends().week_numbers())
+                .date_options(
+                    Visit::day,
+                    DateOptions::new()
+                        .no_weekends()
+                        .week_numbers(),
+                )
                 .date_options(Visit::arrives, DateOptions::new().step_minutes(15))
                 .submit(t!("ui.book"), book_visit)
                 .on_success(|_, ui| ui.toast(t!("ui.booked"))),
@@ -139,8 +165,15 @@ pub struct StockRequest {
 }
 
 #[action(permission = "stock.product.read")]
-pub async fn find_products(q: LookupQuery, store: crate::stock::ProductStore) -> Result<Page<LookupItem>> {
-    let items = store.all()?.into_iter().map(|p| LookupItem::new(p.id.0, p.name).hint(p.code)).collect();
+pub async fn find_products(
+    q: LookupQuery,
+    store: crate::stock::ProductStore,
+) -> Result<Page<LookupItem>> {
+    let items = store
+        .all()?
+        .into_iter()
+        .map(|p| LookupItem::new(p.id.0, p.name).hint(p.code))
+        .collect();
     Ok(q.apply(items))
 }
 
@@ -164,13 +197,23 @@ pub fn controls() -> Screen {
             Form::of(request)
                 .lookup(StockRequest::product, find_products)
                 .lookup_many(StockRequest::alternatives, find_products)
-                .row(|r| r.field(StockRequest::quantity).field(StockRequest::budget).field(StockRequest::priority))
-                .row(|r| r.field(StockRequest::delivery).field(StockRequest::size))
+                .row(|r| {
+                    r.field(StockRequest::quantity)
+                        .field(StockRequest::budget)
+                        .field(StockRequest::priority)
+                })
+                .row(|r| {
+                    r.field(StockRequest::delivery)
+                        .field(StockRequest::size)
+                })
                 .control(StockRequest::delivery, Control::Radio)
                 .control(StockRequest::size, Control::Segmented)
                 .field(StockRequest::warehouse)
                 .control(StockRequest::warehouse, Control::Listbox)
-                .row(|r| r.field(StockRequest::urgent).field(StockRequest::insured))
+                .row(|r| {
+                    r.field(StockRequest::urgent)
+                        .field(StockRequest::insured)
+                })
                 .control(StockRequest::urgent, Control::Switch)
                 .field(StockRequest::note)
                 .submit(t!("ui.send"), send_request)
@@ -202,22 +245,37 @@ pub struct Invoice {
 
 #[action(public)]
 pub async fn save_invoice(invoice: Valid<Invoice>) -> Result<Money> {
-    let minor = invoice.lines.iter().map(|l| l.unit_price.minor * l.quantity).sum();
+    let minor = invoice
+        .lines
+        .iter()
+        .map(|l| l.unit_price.minor * l.quantity)
+        .sum();
     Ok(Money::tl(minor))
 }
 
 #[screen(route = "/invoice", public)]
 pub fn invoice_form(_: (), ctx: Ctx) -> Screen {
-    let line = |item: &str, quantity, kurus| InvoiceLine { item: item.into(), quantity, unit_price: Money::tl(kurus) };
+    let line = |item: &str, quantity, kurus| InvoiceLine {
+        item: item.into(),
+        quantity,
+        unit_price: Money::tl(kurus),
+    };
     let invoice = Invoice {
         customer: "Anadolu Gıda".into(),
         issued: ctx.today(),
-        lines: vec![line("Green tea 105", 12, 8369), line("Olive oil 115", 4, 24207), line("Pine honey 120", 2, 32126)],
+        lines: vec![
+            line("Green tea 105", 12, 8369),
+            line("Olive oil 115", 4, 24207),
+            line("Pine honey 120", 2, 32126),
+        ],
     };
     Screen::new(t!("ui.invoice")).body(
         Panel::new(t!("ui.panel_invoice")).add(
             Form::of(invoice)
-                .row(|r| r.field(Invoice::customer).field(Invoice::issued))
+                .row(|r| {
+                    r.field(Invoice::customer)
+                        .field(Invoice::issued)
+                })
                 .lines(Invoice::lines, |l| {
                     l.column(InvoiceLine::item)
                         .column(InvoiceLine::quantity)
@@ -248,10 +306,18 @@ pub async fn check_stock(_: ()) -> Result<i64> {
 pub fn widgets(_: (), ctx: Ctx) -> Screen {
     let now = ctx.now();
     let hour = 3_600_000;
-    let invoice = Invoice { customer: "Anadolu Gıda".into(), issued: ctx.today(), lines: Vec::new() };
+    let invoice = Invoice {
+        customer: "Anadolu Gıda".into(),
+        issued: ctx.today(),
+        lines: Vec::new(),
+    };
     Screen::new(t!("ui.widgets")).body(
         Stack::new()
-            .add(Breadcrumb::new().link(t!("ui.layout"), layout, ()).current(t!("ui.widgets")))
+            .add(
+                Breadcrumb::new()
+                    .link(t!("ui.layout"), layout, ())
+                    .current(t!("ui.widgets")),
+            )
             .add(
                 Row::new()
                     .col(
@@ -259,7 +325,10 @@ pub fn widgets(_: (), ctx: Ctx) -> Screen {
                             .gap(2)
                             .add(Alert::info(t!("ui.alert_info")).dismissible())
                             .add(Alert::success(t!("ui.alert_success")))
-                            .add(Alert::warning(t!("ui.alert_warning")).title(t!("ui.alert_warning_title")))
+                            .add(
+                                Alert::warning(t!("ui.alert_warning"))
+                                    .title(t!("ui.alert_warning_title")),
+                            )
                             .add(Alert::danger(t!("ui.alert_danger"))),
                     )
                     .col(
@@ -279,25 +348,43 @@ pub fn widgets(_: (), ctx: Ctx) -> Screen {
                                     .col(Badge::new(t!("ui.badge_draft"))),
                             )
                             .add(Progress::new(t!("ui.progress_import"), 64, 100))
-                            .add(Progress::new(t!("ui.progress_quota"), 92, 100).tone(Tone::Warning)),
+                            .add(
+                                Progress::new(t!("ui.progress_quota"), 92, 100).tone(Tone::Warning),
+                            ),
                     ),
             )
             .add(
                 Row::new()
                     .col(
-                        Card::new().title(t!("ui.card_history")).add(
-                            Timeline::new()
-                                .event(now.add_ms(-26 * hour), t!("ui.event_created"), None, Tone::Info)
-                                .event(
-                                    now.add_ms(-5 * hour),
-                                    t!("ui.event_approved"),
-                                    Some(t!("ui.event_approved_by")),
-                                    Tone::Success,
-                                )
-                                .event(now.add_ms(-hour), t!("ui.event_shipped"), None, Tone::Neutral),
-                        ),
+                        Card::new()
+                            .title(t!("ui.card_history"))
+                            .add(
+                                Timeline::new()
+                                    .event(
+                                        now.add_ms(-26 * hour),
+                                        t!("ui.event_created"),
+                                        None,
+                                        Tone::Info,
+                                    )
+                                    .event(
+                                        now.add_ms(-5 * hour),
+                                        t!("ui.event_approved"),
+                                        Some(t!("ui.event_approved_by")),
+                                        Tone::Success,
+                                    )
+                                    .event(
+                                        now.add_ms(-hour),
+                                        t!("ui.event_shipped"),
+                                        None,
+                                        Tone::Neutral,
+                                    ),
+                            ),
                     )
-                    .col(Card::new().title(t!("ui.card_notes")).add(Markdown::new(t!("ui.notes"))))
+                    .col(
+                        Card::new()
+                            .title(t!("ui.card_notes"))
+                            .add(Markdown::new(t!("ui.notes"))),
+                    )
                     .col(
                         Card::new()
                             .title(t!("ui.card_actions"))
@@ -311,19 +398,31 @@ pub fn widgets(_: (), ctx: Ctx) -> Screen {
                                         }
                                     }),
                             )
-                            .add(ActionButton::new(t!("ui.check_stock"), check_stock, ()).on_success(|_, ui| {
-                                ui.effect(Effect::confirm(
-                                    t!("ui.low_stock_confirm"),
-                                    Effect::Navigate { screen: "product_list", params: serde_json::Value::Null },
-                                ));
-                            }))
+                            .add(
+                                ActionButton::new(t!("ui.check_stock"), check_stock, ())
+                                    .on_success(|_, ui| {
+                                        ui.effect(Effect::confirm(
+                                            t!("ui.low_stock_confirm"),
+                                            Effect::Navigate {
+                                                screen: "product_list",
+                                                params: serde_json::Value::Null,
+                                            },
+                                        ));
+                                    }),
+                            )
                             .add(Skeleton::lines(3)),
                     )
-                    .col(Card::new().add(EmptyState::new(t!("ui.empty_title")).text(t!("ui.empty_text")).opens(
-                        t!("ui.empty_button"),
-                        crate::stock::product_editor,
-                        crate::stock::ProductParams { id: None },
-                    ))),
+                    .col(
+                        Card::new().add(
+                            EmptyState::new(t!("ui.empty_title"))
+                                .text(t!("ui.empty_text"))
+                                .opens(
+                                    t!("ui.empty_button"),
+                                    crate::stock::product_editor,
+                                    crate::stock::ProductParams { id: None },
+                                ),
+                        ),
+                    ),
             ),
     )
 }
@@ -357,7 +456,10 @@ pub fn wizard() -> Screen {
                 .field(Application::full_name)
                 .field(Application::email)
                 .step(t!("ui.step_work"))
-                .row(|r| r.field(Application::city).field(Application::start))
+                .row(|r| {
+                    r.field(Application::city)
+                        .field(Application::start)
+                })
                 .field(Application::remote)
                 .control(Application::remote, Control::Switch)
                 .step(t!("ui.step_motivation"))
@@ -370,20 +472,35 @@ pub fn wizard() -> Screen {
 
 /// Products grouped by unit: units at the top, their products load when a unit opens.
 #[action(permission = "stock.product.read")]
-pub async fn product_tree(q: TreeQuery, store: crate::stock::ProductStore) -> Result<Vec<TreeItem>> {
+pub async fn product_tree(
+    q: TreeQuery,
+    store: crate::stock::ProductStore,
+) -> Result<Vec<TreeItem>> {
     use crate::stock::Unit;
     let all = store.all()?;
-    let units = [("piece", Unit::Piece, "Piece"), ("kg", Unit::Kg, "Kilogram"), ("liter", Unit::Liter, "Liter")];
+    let units = [
+        ("piece", Unit::Piece, "Piece"),
+        ("kg", Unit::Kg, "Kilogram"),
+        ("liter", Unit::Liter, "Liter"),
+    ];
     Ok(match q.parent.as_deref() {
         None => units
             .iter()
             .map(|(id, unit, label)| {
-                let count = all.iter().filter(|p| p.unit == *unit).count();
+                let count = all
+                    .iter()
+                    .filter(|p| p.unit == *unit)
+                    .count();
                 TreeItem::branch(*id, *label).hint(count.to_string())
             })
             .collect(),
         Some(parent) => {
-            let Some((_, unit, _)) = units.iter().find(|(id, _, _)| *id == parent) else { return Err(Error::NotFound) };
+            let Some((_, unit, _)) = units
+                .iter()
+                .find(|(id, _, _)| *id == parent)
+            else {
+                return Err(Error::NotFound);
+            };
             all.iter()
                 .filter(|p| p.unit == *unit)
                 .take(25)
@@ -395,10 +512,21 @@ pub async fn product_tree(q: TreeQuery, store: crate::stock::ProductStore) -> Re
 
 #[screen(route = "/data", permission = "stock.product.read")]
 pub fn data() -> Screen {
-    let months = [t!("ui.m1"), t!("ui.m2"), t!("ui.m3"), t!("ui.m4"), t!("ui.m5"), t!("ui.m6")];
+    let months = [
+        t!("ui.m1"),
+        t!("ui.m2"),
+        t!("ui.m3"),
+        t!("ui.m4"),
+        t!("ui.m5"),
+        t!("ui.m6"),
+    ];
     Screen::new(t!("ui.data")).body(
         Row::new()
-            .col(Card::new().title(t!("ui.card_tree")).add(Tree::of(product_tree).label(t!("ui.card_tree"))))
+            .col(
+                Card::new()
+                    .title(t!("ui.card_tree"))
+                    .add(Tree::of(product_tree).label(t!("ui.card_tree"))),
+            )
             .weight(1)
             .col(
                 Stack::new()
@@ -406,8 +534,14 @@ pub fn data() -> Screen {
                         Card::new().add(
                             Chart::bar(t!("ui.chart_sales"))
                                 .labels(months.clone())
-                                .series(t!("ui.series_2025"), [120.0, 98.0, 143.0, 160.0, 151.0, 189.0])
-                                .series(t!("ui.series_2026"), [131.0, 122.0, 150.0, 171.0, 166.0, 204.0]),
+                                .series(
+                                    t!("ui.series_2025"),
+                                    [120.0, 98.0, 143.0, 160.0, 151.0, 189.0],
+                                )
+                                .series(
+                                    t!("ui.series_2026"),
+                                    [131.0, 122.0, 150.0, 171.0, 166.0, 204.0],
+                                ),
                         ),
                     )
                     .add(
@@ -416,13 +550,20 @@ pub fn data() -> Screen {
                                 Card::new().add(
                                     Chart::line(t!("ui.chart_orders"))
                                         .labels(months)
-                                        .series(t!("ui.series_orders"), [42.0, 51.0, 47.0, 63.0, 70.0, 66.0]),
+                                        .series(
+                                            t!("ui.series_orders"),
+                                            [42.0, 51.0, 47.0, 63.0, 70.0, 66.0],
+                                        ),
                                 ),
                             )
                             .col(
                                 Card::new().add(
                                     Chart::donut(t!("ui.chart_units"))
-                                        .labels([t!("ui.unit_piece"), t!("ui.unit_kg"), t!("ui.unit_liter")])
+                                        .labels([
+                                            t!("ui.unit_piece"),
+                                            t!("ui.unit_kg"),
+                                            t!("ui.unit_liter"),
+                                        ])
                                         .series(t!("ui.series_products"), [80.0, 80.0, 80.0]),
                                 ),
                             ),

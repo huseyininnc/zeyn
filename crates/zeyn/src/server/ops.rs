@@ -41,14 +41,21 @@ async fn dev_events() -> Response {
         }
         loop {
             tokio::time::sleep(std::time::Duration::from_secs(15)).await;
-            if tx.send(Ok(": ping\n\n".into())).await.is_err() {
+            if tx
+                .send(Ok(": ping\n\n".into()))
+                .await
+                .is_err()
+            {
                 return;
             }
         }
     });
     let mut response = axum::body::Body::from_stream(super::Chunks(rx)).into_response();
     let h = response.headers_mut();
-    h.insert(header::CONTENT_TYPE, HeaderValue::from_static("text/event-stream"));
+    h.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("text/event-stream"),
+    );
     h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     response
 }
@@ -89,7 +96,9 @@ pub(super) fn dev_auth_problem(release: bool, development: bool, allowed: bool) 
 impl Extras {
     /// Whether an address may reach the health endpoints despite `allow_only_ips`.
     pub(super) fn probe_ip(&self, ip: std::net::IpAddr) -> bool {
-        self.probe_ips.iter().any(|r| r.contains(ip))
+        self.probe_ips
+            .iter()
+            .any(|r| r.contains(ip))
     }
 }
 
@@ -122,7 +131,9 @@ impl App {
     pub(super) fn dev_auth_check(&self) -> Option<String> {
         dev_auth_problem(
             !cfg!(debug_assertions),
-            self.auth.as_ref().is_some_and(|a| a.is_development()),
+            self.auth
+                .as_ref()
+                .is_some_and(|a| a.is_development()),
             self.extras.allow_dev_auth,
         )
     }
@@ -141,7 +152,9 @@ impl App {
         F: Fn() -> Fut + Send + Sync + 'static,
         Fut: Future<Output = bool> + Send + 'static,
     {
-        self.extras.readiness.push((name, Arc::new(move || Box::pin(check()))));
+        self.extras
+            .readiness
+            .push((name, Arc::new(move || Box::pin(check()))));
         self
     }
 
@@ -165,12 +178,21 @@ impl App {
     /// Adds a background job that runs in this process. See [`crate::Schedule`] for intervals,
     /// triggers and retries. Actions trigger jobs through the injectable [`crate::Jobs`] service.
     /// Jobs start with the router and stop with [`App::serve_until`].
-    pub fn job<F, Fut>(mut self, name: &'static str, schedule: crate::jobs::Schedule, run: F) -> Self
+    pub fn job<F, Fut>(
+        mut self,
+        name: &'static str,
+        schedule: crate::jobs::Schedule,
+        run: F,
+    ) -> Self
     where
         F: Fn(Ctx) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = crate::Result<()>> + Send + 'static,
     {
-        let jobs = self.extras.jobs.get_or_insert_with(crate::jobs::Jobs::default).clone();
+        let jobs = self
+            .extras
+            .jobs
+            .get_or_insert_with(crate::jobs::Jobs::default)
+            .clone();
         jobs.add(name, schedule, run);
         self.services.insert(jobs);
         self
@@ -178,12 +200,21 @@ impl App {
 
     /// Adds a job whose queued runs carry a payload, such as a record id. Actions queue runs with
     /// [`crate::Jobs::enqueue`]; the schedule gives the retries (and an interval, if any).
-    pub fn queued_job<F, Fut>(mut self, name: &'static str, schedule: crate::jobs::Schedule, run: F) -> Self
+    pub fn queued_job<F, Fut>(
+        mut self,
+        name: &'static str,
+        schedule: crate::jobs::Schedule,
+        run: F,
+    ) -> Self
     where
         F: Fn(Ctx, String) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = crate::Result<()>> + Send + 'static,
     {
-        let jobs = self.extras.jobs.get_or_insert_with(crate::jobs::Jobs::default).clone();
+        let jobs = self
+            .extras
+            .jobs
+            .get_or_insert_with(crate::jobs::Jobs::default)
+            .clone();
         jobs.add_queued(name, schedule, run);
         self.services.insert(jobs);
         self
@@ -193,9 +224,14 @@ impl App {
     /// `SqlJobStore`, so they survive restarts and run once across servers. In memory unless set.
     /// Call [`App::job_concurrency`] first when you set both.
     pub fn job_store(mut self, store: impl crate::jobs::JobStore) -> Self {
-        let jobs = self.extras.jobs.get_or_insert_with(crate::jobs::Jobs::default).clone();
+        let jobs = self
+            .extras
+            .jobs
+            .get_or_insert_with(crate::jobs::Jobs::default)
+            .clone();
         if let Err(e) = jobs.set_store(store) {
-            self.setup_problems.push(format!("job_store: {e:?}"));
+            self.setup_problems
+                .push(format!("job_store: {e:?}"));
         }
         self.services.insert(jobs);
         self
@@ -205,7 +241,8 @@ impl App {
     pub fn job_concurrency(mut self, limit: usize) -> Self {
         match &self.extras.jobs {
             Some(jobs) if !jobs.is_empty() => {
-                self.setup_problems.push("job_concurrency must be set before the first job is added".into());
+                self.setup_problems
+                    .push("job_concurrency must be set before the first job is added".into());
             }
             _ => {
                 let jobs = crate::jobs::Jobs::with_limit(limit);
@@ -244,11 +281,17 @@ impl App {
         })?;
         let listener = tokio::net::TcpListener::bind(addr).await?;
         tracing::info!("Zeyn is listening on http://{}", listener.local_addr()?);
-        axum::serve(listener, router.into_make_service_with_connect_info::<std::net::SocketAddr>())
-            .with_graceful_shutdown(shutdown)
-            .await?;
+        axum::serve(
+            listener,
+            router.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .with_graceful_shutdown(shutdown)
+        .await?;
         if let Some(jobs) = jobs {
-            if !jobs.shutdown(Duration::from_secs(30)).await {
+            if !jobs
+                .shutdown(Duration::from_secs(30))
+                .await
+            {
                 tracing::warn!("some jobs were still running at shutdown");
             }
         }
@@ -273,7 +316,11 @@ impl App {
 /// Waits for the simulated latency, if set. Compiled out of release builds.
 #[cfg(debug_assertions)]
 pub(super) async fn delay(st: &AppState, path: &str) {
-    if let Some(d) = st.extras.latency.filter(|_| !is_probe(path)) {
+    if let Some(d) = st
+        .extras
+        .latency
+        .filter(|_| !is_probe(path))
+    {
         tokio::time::sleep(d).await;
     }
 }
@@ -291,8 +338,13 @@ pub(super) fn start_jobs(st: &Arc<AppState>) {
     let (services, i18n, config) = (st.services.clone(), st.i18n.clone(), st.config.clone());
     jobs.start(move |name| {
         let locale = i18n.default_locale().to_string();
-        Ctx::new(crate::ctx::Identity::user(format!("job:{name}")), locale, services.clone(), i18n.clone())
-            .with_config(config.clone())
+        Ctx::new(
+            crate::ctx::Identity::user(format!("job:{name}")),
+            locale,
+            services.clone(),
+            i18n.clone(),
+        )
+        .with_config(config.clone())
     });
 }
 
@@ -302,14 +354,18 @@ async fn jobs_status(State(st): State<Arc<AppState>>, headers: axum::http::Heade
     let (Some(jobs), Some(permission)) = (&st.extras.jobs, st.extras.jobs_permission) else {
         return st.error_response(&ctx, super::Failure::App(crate::Error::NotFound));
     };
-    if !ctx.identity().can(&crate::Access::Permission(permission)) {
+    if !ctx
+        .identity()
+        .can(&crate::Access::Permission(permission))
+    {
         return st.error_response(&ctx, super::Failure::App(crate::Error::Forbidden));
     }
     no_store(axum::Json(json!({ "jobs": jobs.status() })).into_response())
 }
 
 fn no_store(mut r: Response) -> Response {
-    r.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    r.headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     r
 }
 
@@ -331,8 +387,11 @@ async fn ready(State(st): State<Arc<AppState>>) -> Response {
                 .iter()
                 .map(|(name, check)| {
                     let fut = check();
-                    let task =
-                        tokio::spawn(async move { tokio::time::timeout(CHECK_TIMEOUT, fut).await.unwrap_or(false) });
+                    let task = tokio::spawn(async move {
+                        tokio::time::timeout(CHECK_TIMEOUT, fut)
+                            .await
+                            .unwrap_or(false)
+                    });
                     (*name, task)
                 })
                 .collect();
@@ -350,7 +409,10 @@ async fn ready(State(st): State<Arc<AppState>>) -> Response {
     let r = if failed.is_empty() {
         (StatusCode::OK, axum::Json(json!({ "status": "ready" }))).into_response()
     } else {
-        (StatusCode::SERVICE_UNAVAILABLE, axum::Json(json!({ "status": "not_ready", "failed": failed })))
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            axum::Json(json!({ "status": "not_ready", "failed": failed })),
+        )
             .into_response()
     };
     no_store(r)
@@ -361,11 +423,20 @@ pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
         .route("/_zeyn/health", get(health))
         .route("/_zeyn/ready", get(ready))
         .route("/_zeyn/jobs", get(jobs_status))
-        .route("/_zeyn/enterprise.js", get(|| async { asset(JS, "text/javascript; charset=utf-8") }))
-        .route("/_zeyn/enterprise.css", get(|| async { asset(CSS, "text/css; charset=utf-8") }));
+        .route(
+            "/_zeyn/enterprise.js",
+            get(|| async { asset(JS, "text/javascript; charset=utf-8") }),
+        )
+        .route(
+            "/_zeyn/enterprise.css",
+            get(|| async { asset(CSS, "text/css; charset=utf-8") }),
+        );
     if dev_mode() {
         router
-            .route("/_zeyn/dev.js", get(|| async { asset(DEV_JS, "text/javascript; charset=utf-8") }))
+            .route(
+                "/_zeyn/dev.js",
+                get(|| async { asset(DEV_JS, "text/javascript; charset=utf-8") }),
+            )
             .route("/_zeyn/dev/events", get(dev_events))
     } else {
         router
@@ -384,9 +455,16 @@ pub fn probe(addr: &str) -> std::io::Result<()> {
     use std::io::{Read, Write};
     use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
     use std::time::Duration;
-    let mut target: SocketAddr = addr.to_socket_addrs()?.next().ok_or_else(|| std::io::Error::other("no address"))?;
+    let mut target: SocketAddr = addr
+        .to_socket_addrs()?
+        .next()
+        .ok_or_else(|| std::io::Error::other("no address"))?;
     if target.ip().is_unspecified() {
-        target.set_ip(if target.is_ipv4() { [127, 0, 0, 1].into() } else { std::net::Ipv6Addr::LOCALHOST.into() });
+        target.set_ip(if target.is_ipv4() {
+            [127, 0, 0, 1].into()
+        } else {
+            std::net::Ipv6Addr::LOCALHOST.into()
+        });
     }
     let limit = Duration::from_secs(2);
     let mut stream = TcpStream::connect_timeout(&target, limit)?;
@@ -394,7 +472,10 @@ pub fn probe(addr: &str) -> std::io::Result<()> {
     stream.write_all(b"GET /_zeyn/health HTTP/1.0\r\nHost: localhost\r\n\r\n")?;
     let mut head = [0u8; 16];
     let n = stream.read(&mut head)?;
-    match head.get(..n).and_then(|h| std::str::from_utf8(h).ok()) {
+    match head
+        .get(..n)
+        .and_then(|h| std::str::from_utf8(h).ok())
+    {
         Some(line) if line.starts_with("HTTP/1.") && line.get(9..12) == Some("200") => Ok(()),
         _ => Err(std::io::Error::other("health check failed")),
     }
@@ -425,16 +506,29 @@ fn fnv(bytes: &[u8], mut hash: u64) -> u64 {
 pub fn build_id() -> &'static str {
     static ID: OnceLock<String> = OnceLock::new();
     ID.get_or_init(|| {
-        let from_env = std::env::var("ZEYN_BUILD_ID").ok().map(|v| v.trim().to_string()).filter(|v| {
-            !v.is_empty() && v.len() <= 64 && v.chars().all(|c| c.is_ascii_alphanumeric() || ".-_".contains(c))
-        });
+        let from_env = std::env::var("ZEYN_BUILD_ID")
+            .ok()
+            .map(|v| v.trim().to_string())
+            .filter(|v| {
+                !v.is_empty()
+                    && v.len() <= 64
+                    && v.chars()
+                        .all(|c| c.is_ascii_alphanumeric() || ".-_".contains(c))
+            });
         from_env.unwrap_or_else(|| {
             let seed = 0xcbf2_9ce4_8422_2325;
             let hash = match std::env::current_exe().and_then(std::fs::read) {
                 Ok(bytes) => fnv(&bytes, seed),
-                Err(_) => [super::JS, super::GRID_JS, super::CSS, JS, CSS, env!("CARGO_PKG_VERSION")]
-                    .iter()
-                    .fold(seed, |h, s| fnv(s.as_bytes(), h)),
+                Err(_) => [
+                    super::JS,
+                    super::GRID_JS,
+                    super::CSS,
+                    JS,
+                    CSS,
+                    env!("CARGO_PKG_VERSION"),
+                ]
+                .iter()
+                .fold(seed, |h, s| fnv(s.as_bytes(), h)),
             };
             format!("{hash:016x}")
         })
@@ -444,7 +538,9 @@ pub fn build_id() -> &'static str {
 /// Adds the build id header to a response, so the runtime notices a new deploy.
 pub(super) async fn stamp(mut response: Response) -> Response {
     if let Ok(v) = HeaderValue::from_str(build_id()) {
-        response.headers_mut().insert(BUILD_HEADER, v);
+        response
+            .headers_mut()
+            .insert(BUILD_HEADER, v);
     }
     response
 }
@@ -483,8 +579,16 @@ const TEXTS: &[&str] = &[
 
 /// Extra `<head>` markup: the enterprise runtime and its texts.
 pub(super) fn head(st: &AppState, ctx: &Ctx) -> String {
-    let texts: serde_json::Map<String, serde_json::Value> =
-        TEXTS.iter().map(|k| (k.to_string(), ctx.t(&Text::key(format!("zeyn.{k}"))).into())).collect();
+    let texts: serde_json::Map<String, serde_json::Value> = TEXTS
+        .iter()
+        .map(|k| {
+            (
+                k.to_string(),
+                ctx.t(&Text::key(format!("zeyn.{k}")))
+                    .into(),
+            )
+        })
+        .collect();
     format!(
         r#"{session}<meta name="zeyn-build" content="{build}"><meta name="zeyn-texts" content="{texts}"><link rel="stylesheet" href="{base}/_zeyn/enterprise.css{v}"><script type="module" src="{base}/_zeyn/enterprise.js{v}"></script>{dev}"#,
         dev = if dev_mode() {
@@ -526,7 +630,10 @@ mod tests {
     fn development_sign_in_is_refused_in_release_builds_unless_allowed() {
         assert!(dev_auth_problem(true, true, false).is_some_and(|p| p.contains("allow_dev_auth")));
         assert!(dev_auth_problem(true, true, true).is_none());
-        assert!(dev_auth_problem(false, true, false).is_none(), "debug builds keep it");
+        assert!(
+            dev_auth_problem(false, true, false).is_none(),
+            "debug builds keep it"
+        );
         assert!(dev_auth_problem(true, false, false).is_none());
     }
 }

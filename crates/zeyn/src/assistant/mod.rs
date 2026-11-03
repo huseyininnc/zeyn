@@ -63,11 +63,23 @@ pub struct ChatMessage {
 
 impl ChatMessage {
     pub fn user(text: impl Into<String>) -> Self {
-        ChatMessage { role: Role::User, text: text.into(), tool_calls: Vec::new(), tool_call_id: None, raw: None }
+        ChatMessage {
+            role: Role::User,
+            text: text.into(),
+            tool_calls: Vec::new(),
+            tool_call_id: None,
+            raw: None,
+        }
     }
 
     pub fn assistant(text: impl Into<String>) -> Self {
-        ChatMessage { role: Role::Assistant, text: text.into(), tool_calls: Vec::new(), tool_call_id: None, raw: None }
+        ChatMessage {
+            role: Role::Assistant,
+            text: text.into(),
+            tool_calls: Vec::new(),
+            tool_call_id: None,
+            raw: None,
+        }
     }
 
     pub fn tool(call_id: impl Into<String>, text: impl Into<String>) -> Self {
@@ -196,7 +208,10 @@ impl MemoryChatStore {
 
     /// Number of conversations held.
     pub fn len(&self) -> usize {
-        self.chats.lock().map(|c| c.len()).unwrap_or(0)
+        self.chats
+            .lock()
+            .map(|c| c.len())
+            .unwrap_or(0)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -219,7 +234,14 @@ impl ChatStore for MemoryChatStore {
             .chats
             .lock()
             .ok()
-            .and_then(|c| c.get(key).map(|(_, m)| m.iter().skip(m.len().saturating_sub(limit)).cloned().collect()))
+            .and_then(|c| {
+                c.get(key).map(|(_, m)| {
+                    m.iter()
+                        .skip(m.len().saturating_sub(limit))
+                        .cloned()
+                        .collect()
+                })
+            })
             .unwrap_or_default();
         Box::pin(async move { Ok(list) })
     }
@@ -228,7 +250,10 @@ impl ChatStore for MemoryChatStore {
         let tick = TICK.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         if let Ok(mut chats) = self.chats.lock() {
             if !chats.contains_key(key) && chats.len() >= self.max_users {
-                let oldest = chats.iter().min_by_key(|(_, (at, _))| *at).map(|(k, _)| k.clone());
+                let oldest = chats
+                    .iter()
+                    .min_by_key(|(_, (at, _))| *at)
+                    .map(|(k, _)| k.clone());
                 if let Some(k) = oldest {
                     chats.remove(&k);
                 }
@@ -380,13 +405,15 @@ impl Assistant {
 
     /// A starter prompt shown as a chip while the user is on `screen`.
     pub fn suggest<S: ScreenDef>(mut self, _screen: S, prompt: impl Into<Text>) -> Self {
-        self.suggestions.push((S::META.name, prompt.into()));
+        self.suggestions
+            .push((S::META.name, prompt.into()));
         self
     }
 
     /// A starter prompt shown on every screen.
     pub fn suggest_anywhere(mut self, prompt: impl Into<Text>) -> Self {
-        self.suggestions.push(("", prompt.into()));
+        self.suggestions
+            .push(("", prompt.into()));
         self
     }
 
@@ -405,7 +432,10 @@ impl Assistant {
 
     /// Size and cost limits.
     pub fn limits(mut self, limits: Limits) -> Self {
-        self.limits = Limits { audio_bytes: limits.audio_bytes.min(MAX_AUDIO_BYTES), ..limits };
+        self.limits = Limits {
+            audio_bytes: limits.audio_bytes.min(MAX_AUDIO_BYTES),
+            ..limits
+        };
         self
     }
 

@@ -43,7 +43,10 @@ impl Identity {
     }
 
     pub fn user(name: impl Into<String>) -> Self {
-        Self { user: Some(name.into()), ..Self::default() }
+        Self {
+            user: Some(name.into()),
+            ..Self::default()
+        }
     }
 
     pub fn with_permissions<I, S>(mut self, permissions: I) -> Self
@@ -51,13 +54,18 @@ impl Identity {
         I: IntoIterator<Item = S>,
         S: Into<String>,
     {
-        self.permissions.extend(permissions.into_iter().map(Into::into));
+        self.permissions
+            .extend(permissions.into_iter().map(Into::into));
         self
     }
 
     /// Identity that may do everything. Only for development and tests.
     pub fn superuser(name: impl Into<String>) -> Self {
-        Self { user: Some(name.into()), superuser: true, ..Self::default() }
+        Self {
+            user: Some(name.into()),
+            superuser: true,
+            ..Self::default()
+        }
     }
 
     pub fn with_tenant(mut self, tenant: impl Into<String>) -> Self {
@@ -71,7 +79,8 @@ impl Identity {
         I: IntoIterator<Item = S>,
         S: Into<String>,
     {
-        self.tenants.extend(tenants.into_iter().map(Into::into));
+        self.tenants
+            .extend(tenants.into_iter().map(Into::into));
         self
     }
 
@@ -129,12 +138,17 @@ pub struct Services {
 
 impl Services {
     pub fn insert<T: Service>(&mut self, service: T) {
-        self.map.insert(TypeId::of::<T>(), Box::new(service));
-        self.names.insert(TypeId::of::<T>(), std::any::type_name::<T>());
+        self.map
+            .insert(TypeId::of::<T>(), Box::new(service));
+        self.names
+            .insert(TypeId::of::<T>(), std::any::type_name::<T>());
     }
 
     pub fn get<T: Service>(&self) -> Option<T> {
-        self.map.get(&TypeId::of::<T>()).and_then(|b| b.downcast_ref::<T>()).cloned()
+        self.map
+            .get(&TypeId::of::<T>())
+            .and_then(|b| b.downcast_ref::<T>())
+            .cloned()
     }
 
     pub fn contains(&self, id: TypeId) -> bool {
@@ -151,7 +165,10 @@ pub struct Dep {
 
 impl Dep {
     pub fn of<T: 'static>() -> Self {
-        Dep { id: TypeId::of::<T>(), name: std::any::type_name::<T>() }
+        Dep {
+            id: TypeId::of::<T>(),
+            name: std::any::type_name::<T>(),
+        }
     }
 }
 
@@ -181,7 +198,12 @@ const REAUTH_WITHIN: std::time::Duration = std::time::Duration::from_secs(300);
 pub struct Ctx(Arc<CtxInner>);
 
 impl Ctx {
-    pub fn new(identity: Identity, locale: impl Into<String>, services: Arc<Services>, i18n: Arc<I18n>) -> Self {
+    pub fn new(
+        identity: Identity,
+        locale: impl Into<String>,
+        services: Arc<Services>,
+        i18n: Arc<I18n>,
+    ) -> Self {
         Ctx(Arc::new(CtxInner {
             identity,
             locale: locale.into(),
@@ -238,7 +260,10 @@ impl Ctx {
     pub fn signed_in_recently(&self) -> bool {
         let limit = i64::try_from(self.0.reauth_within.as_millis()).unwrap_or(i64::MAX);
         let now = DateTime::now().unix_ms();
-        self.0.identity.authenticated_at.is_some_and(|at| at.unix_ms() <= now && now - at.unix_ms() < limit)
+        self.0
+            .identity
+            .authenticated_at
+            .is_some_and(|at| at.unix_ms() <= now && now - at.unix_ms() < limit)
     }
 
     /// Same context in another time zone.
@@ -271,7 +296,10 @@ impl Ctx {
 
     /// The app's content security policy; the strict default outside a request.
     pub fn csp(&self) -> &crate::csp::Csp {
-        self.0.csp.as_deref().unwrap_or(&crate::csp::EMPTY)
+        self.0
+            .csp
+            .as_deref()
+            .unwrap_or(&crate::csp::EMPTY)
     }
 
     fn rebuild(&self, change: impl FnOnce(&mut CtxInner)) -> Self {
@@ -340,7 +368,12 @@ impl Ctx {
 
     /// Context for tests: the given identity, English, built in catalogs and the given services.
     pub fn for_tests(identity: Identity, services: Services) -> Self {
-        Ctx::new(identity, "en", Arc::new(services), Arc::new(I18n::new("en")))
+        Ctx::new(
+            identity,
+            "en",
+            Arc::new(services),
+            Arc::new(I18n::new("en")),
+        )
     }
 
     /// Same context, marked as a call made by an AI agent (WebMCP or MCP). Audit logs record it.
@@ -370,7 +403,11 @@ impl Ctx {
 
     /// What this call did to data so far: the saved record and its changed fields.
     pub fn trail(&self) -> crate::audit::Trail {
-        self.0.trail.lock().map(|t| t.clone()).unwrap_or_default()
+        self.0
+            .trail
+            .lock()
+            .map(|t| t.clone())
+            .unwrap_or_default()
     }
 
     pub(crate) fn update_trail(&self, change: impl FnOnce(&mut crate::audit::Trail)) {
@@ -439,8 +476,12 @@ impl Inject for Ctx {
 
 impl<T: Service> Inject for T {
     fn inject(ctx: &Ctx) -> Result<Self> {
-        ctx.service::<T>()
-            .ok_or_else(|| Error::Internal(format!("service `{}` is not registered", std::any::type_name::<T>())))
+        ctx.service::<T>().ok_or_else(|| {
+            Error::Internal(format!(
+                "service `{}` is not registered",
+                std::any::type_name::<T>()
+            ))
+        })
     }
 
     fn dep() -> Option<Dep> {

@@ -55,7 +55,10 @@ impl Player {
 
     /// The id positions are saved under: the first file, else the adaptive playlist.
     fn key(&self) -> Option<&String> {
-        self.files.first().or(self.hls.as_ref()).or(self.dash.as_ref())
+        self.files
+            .first()
+            .or(self.hls.as_ref())
+            .or(self.dash.as_ref())
     }
 
     fn schema(&self, kind: &str) -> Json {
@@ -91,7 +94,15 @@ impl Player {
             "captions_off",
         ]
         .iter()
-        .map(|k| (k.to_string(), json!(r.i18n.text(r.locale, &Text::key(format!("zeyn.ui.media.{k}"))))))
+        .map(|k| {
+            (
+                k.to_string(),
+                json!(
+                    r.i18n
+                        .text(r.locale, &Text::key(format!("zeyn.ui.media.{k}")))
+                ),
+            )
+        })
         .collect::<serde_json::Map<_, _>>()
         .into();
         out.push_str(&format!(
@@ -110,8 +121,11 @@ impl Player {
         }
         out.push('>');
         out.push_str(r#"<div class="z-player-stage">"#);
-        let poster =
-            self.poster.as_ref().map(|p| format!(r#" data-zeyn-poster="{}""#, self.url(p))).unwrap_or_default();
+        let poster = self
+            .poster
+            .as_ref()
+            .map(|p| format!(r#" data-zeyn-poster="{}""#, self.url(p)))
+            .unwrap_or_default();
         out.push_str(&format!(
             r#"<{kind} class="z-player-media" preload="metadata" playsinline aria-label="{title}"{poster}>"#
         ));
@@ -119,7 +133,12 @@ impl Player {
             out.push_str(&format!(
                 r#"<source data-zeyn-src="{}" type="{}">"#,
                 self.url(id),
-                escape(media_type(id).split(';').next().unwrap_or(""))
+                escape(
+                    media_type(id)
+                        .split(';')
+                        .next()
+                        .unwrap_or("")
+                )
             ));
         }
         for c in &self.captions {
@@ -130,11 +149,18 @@ impl Player {
                 r.text(&c.label)
             ));
         }
-        out.push_str(&format!(r#"</{kind}><div class="z-player-captions" data-zeyn-player-captions hidden></div>"#));
+        out.push_str(&format!(
+            r#"</{kind}><div class="z-player-captions" data-zeyn-player-captions hidden></div>"#
+        ));
         out.push_str("</div>");
-        out.push_str(&format!(r#"<div class="z-player-info"><p class="z-player-title">{title}</p>"#));
+        out.push_str(&format!(
+            r#"<div class="z-player-info"><p class="z-player-title">{title}</p>"#
+        ));
         if let Some(s) = &self.subtitle {
-            out.push_str(&format!(r#"<p class="z-player-subtitle">{}</p>"#, r.text(s)));
+            out.push_str(&format!(
+                r#"<p class="z-player-subtitle">{}</p>"#,
+                r.text(s)
+            ));
         }
         out.push_str("</div>");
         out.push_str(&format!(
@@ -159,7 +185,10 @@ impl Player {
             t("volume")
         ));
         let speed_id = dom_id(r, "speed");
-        let speed_label = r.i18n.text(r.locale, &Text::key("zeyn.ui.media.speed_value").arg("value", "1×"));
+        let speed_label = r.i18n.text(
+            r.locale,
+            &Text::key("zeyn.ui.media.speed_value").arg("value", "1×"),
+        );
         out.push_str(&format!(
             r#"<div class="z-player-menu"><button type="button" class="z-player-button z-player-text" data-zeyn-player-menu aria-haspopup="menu" aria-expanded="false" aria-controls="{speed_id}" aria-label="{}" data-zeyn-player-speed>1×</button><ul class="z-player-list" role="menu" id="{speed_id}" aria-label="{}" hidden>"#,
             escape(&speed_label),
@@ -245,10 +274,19 @@ macro_rules! player_builder {
             }
 
             /// A captions file in WebVTT, its language (`en`, `tr`) and its name in the menu.
-            pub fn captions(mut self, id: impl Into<String>, lang: &str, label: impl Into<Text>) -> Self {
+            pub fn captions(
+                mut self,
+                id: impl Into<String>,
+                lang: &str,
+                label: impl Into<Text>,
+            ) -> Self {
                 let id = id.into();
                 if valid_media_id(&id) {
-                    self.0.captions.push(Captions { id, lang: lang.to_string(), label: label.into() });
+                    self.0.captions.push(Captions {
+                        id,
+                        lang: lang.to_string(),
+                        label: label.into(),
+                    });
                 }
                 self
             }

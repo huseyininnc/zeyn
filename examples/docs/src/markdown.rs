@@ -53,8 +53,18 @@ pub fn render(source: &str, link: &dyn Fn(&str) -> String) -> Rendered {
 /// `security.md#csrf-csp-and-headers` work in every language. Headings past the end of `ids`
 /// get an anchor from their text.
 pub fn render_with_ids(source: &str, link: &dyn Fn(&str) -> String, ids: &[String]) -> Rendered {
-    let mut r = Renderer { link, out: Rendered::default(), html: String::new(), ids: Vec::new(), fixed: ids };
-    r.out.sections.push(Section { id: String::new(), heading: String::new(), text: String::new() });
+    let mut r = Renderer {
+        link,
+        out: Rendered::default(),
+        html: String::new(),
+        ids: Vec::new(),
+        fixed: ids,
+    };
+    r.out.sections.push(Section {
+        id: String::new(),
+        heading: String::new(),
+        text: String::new(),
+    });
     let lines: Vec<&str> = source.lines().collect();
     let mut i = 0;
     while i < lines.len() {
@@ -79,10 +89,16 @@ fn indent_of(line: &str) -> usize {
 /// The marker of a list item: ordered or not, and the text after it.
 fn list_item(line: &str) -> Option<(bool, &str)> {
     let t = line.trim_start();
-    if let Some(rest) = t.strip_prefix("- ").or_else(|| t.strip_prefix("* ")) {
+    if let Some(rest) = t
+        .strip_prefix("- ")
+        .or_else(|| t.strip_prefix("* "))
+    {
         return Some((false, rest));
     }
-    let digits = t.bytes().take_while(u8::is_ascii_digit).count();
+    let digits = t
+        .bytes()
+        .take_while(u8::is_ascii_digit)
+        .count();
     if digits > 0 && digits < 4 {
         if let Some(rest) = t[digits..].strip_prefix(". ") {
             return Some((true, rest));
@@ -98,7 +114,10 @@ fn is_rule(line: &str) -> bool {
 
 fn is_table_separator(line: &str) -> bool {
     let t = line.trim();
-    t.starts_with('|') && t.contains('-') && t.chars().all(|c| matches!(c, '|' | '-' | ':' | ' '))
+    t.starts_with('|')
+        && t.contains('-')
+        && t.chars()
+            .all(|c| matches!(c, '|' | '-' | ':' | ' '))
 }
 
 /// Cells of a table row. `|` inside inline code and `\|` do not split.
@@ -119,7 +138,11 @@ fn cells(line: &str) -> Vec<String> {
                 code = !code;
                 cell.push(c);
             }
-            '|' if !code => cells.push(std::mem::take(&mut cell).trim().to_string()),
+            '|' if !code => cells.push(
+                std::mem::take(&mut cell)
+                    .trim()
+                    .to_string(),
+            ),
             _ => cell.push(c),
         }
     }
@@ -138,7 +161,11 @@ pub fn slug(text: &str) -> String {
         }
     }
     let out = out.trim_end_matches('-').to_string();
-    if out.is_empty() { "section".into() } else { out }
+    if out.is_empty() {
+        "section".into()
+    } else {
+        out
+    }
 }
 
 /// Text without Markdown marks, for headings in search and "On this page".
@@ -166,12 +193,18 @@ impl Renderer<'_> {
     /// Moves the HTML written so far into a part.
     fn flush(&mut self) {
         if !self.html.is_empty() {
-            self.out.parts.push(Part::Html(std::mem::take(&mut self.html)));
+            self.out
+                .parts
+                .push(Part::Html(std::mem::take(&mut self.html)));
         }
     }
 
     fn words(&mut self, text: &str) {
-        let section = self.out.sections.last_mut().expect("there is always a section");
+        let section = self
+            .out
+            .sections
+            .last_mut()
+            .expect("there is always a section");
         if !section.text.is_empty() {
             section.text.push(' ');
         }
@@ -188,11 +221,19 @@ impl Renderer<'_> {
         if let Some(fence) = t.strip_prefix("```") {
             let lang = fence.trim();
             let mut end = i + 1;
-            while end < lines.len() && !lines[end].trim_start().starts_with("```") {
+            while end < lines.len()
+                && !lines[end]
+                    .trim_start()
+                    .starts_with("```")
+            {
                 end += 1;
             }
             let code = lines[i + 1..end].join("\n");
-            let class = if lang.is_empty() { String::new() } else { format!(r#" class="language-{}""#, escape(lang)) };
+            let class = if lang.is_empty() {
+                String::new()
+            } else {
+                format!(r#" class="language-{}""#, escape(lang))
+            };
             self.html.push_str(&format!(
                 r#"<pre class="z-code" tabindex="0"><code{class}>{}</code></pre>"#,
                 highlight(lang, &code)
@@ -202,10 +243,15 @@ impl Renderer<'_> {
         }
         if let Some(name) = t.strip_prefix("@live ") {
             self.flush();
-            self.out.parts.push(Part::Live(name.trim().to_string()));
+            self.out
+                .parts
+                .push(Part::Live(name.trim().to_string()));
             return i + 1;
         }
-        let hashes = t.bytes().take_while(|b| *b == b'#').count();
+        let hashes = t
+            .bytes()
+            .take_while(|b| *b == b'#')
+            .count();
         if (1..=4).contains(&hashes) && t[hashes..].starts_with(' ') {
             let text = t[hashes..].trim();
             if hashes == 1 && self.out.title.is_empty() {
@@ -213,7 +259,11 @@ impl Renderer<'_> {
                 return i + 1;
             }
             let level = hashes.max(2) as u8;
-            let mut id = self.fixed.get(self.out.headings.len()).cloned().unwrap_or_else(|| slug(&plain(text)));
+            let mut id = self
+                .fixed
+                .get(self.out.headings.len())
+                .cloned()
+                .unwrap_or_else(|| slug(&plain(text)));
             if self.ids.contains(&id) {
                 let mut n = 2;
                 while self.ids.contains(&format!("{id}-{n}")) {
@@ -222,9 +272,20 @@ impl Renderer<'_> {
                 id = format!("{id}-{n}");
             }
             self.ids.push(id.clone());
-            self.html.push_str(&format!(r#"<h{level} id="{id}">{}</h{level}>"#, self.inline(text)));
-            self.out.headings.push(Heading { level, id: id.clone(), text: plain(text) });
-            self.out.sections.push(Section { id, heading: plain(text), text: String::new() });
+            self.html.push_str(&format!(
+                r#"<h{level} id="{id}">{}</h{level}>"#,
+                self.inline(text)
+            ));
+            self.out.headings.push(Heading {
+                level,
+                id: id.clone(),
+                text: plain(text),
+            });
+            self.out.sections.push(Section {
+                id,
+                heading: plain(text),
+                text: String::new(),
+            });
             return i + 1;
         }
         if is_rule(t) {
@@ -241,12 +302,20 @@ impl Renderer<'_> {
             let mut end = i;
             let mut text = Vec::new();
             while end < lines.len() && lines[end].trim().starts_with('>') {
-                text.push(lines[end].trim().trim_start_matches('>').trim());
+                text.push(
+                    lines[end]
+                        .trim()
+                        .trim_start_matches('>')
+                        .trim(),
+                );
                 end += 1;
             }
             let joined = text.join(" ");
             self.words(&joined);
-            self.html.push_str(&format!("<blockquote><p>{}</p></blockquote>", self.inline(&joined)));
+            self.html.push_str(&format!(
+                "<blockquote><p>{}</p></blockquote>",
+                self.inline(&joined)
+            ));
             return end;
         }
         let mut end = i;
@@ -273,7 +342,8 @@ impl Renderer<'_> {
         }
         let joined = text.join(" ");
         self.words(&joined);
-        self.html.push_str(&format!("<p>{}</p>", self.inline(&joined)));
+        self.html
+            .push_str(&format!("<p>{}</p>", self.inline(&joined)));
         end
     }
 
@@ -282,15 +352,18 @@ impl Renderer<'_> {
         self.html.push_str("<table><thead><tr>");
         for c in &head {
             self.words(c);
-            self.html.push_str(&format!(r#"<th scope="col">{}</th>"#, self.inline(c)));
+            self.html
+                .push_str(&format!(r#"<th scope="col">{}</th>"#, self.inline(c)));
         }
-        self.html.push_str("</tr></thead><tbody>");
+        self.html
+            .push_str("</tr></thead><tbody>");
         let mut end = i + 2;
         while end < lines.len() && lines[end].trim().starts_with('|') {
             self.html.push_str("<tr>");
             for c in cells(lines[end]) {
                 self.words(&c);
-                self.html.push_str(&format!("<td>{}</td>", self.inline(&c)));
+                self.html
+                    .push_str(&format!("<td>{}</td>", self.inline(&c)));
             }
             self.html.push_str("</tr>");
             end += 1;
@@ -302,13 +375,17 @@ impl Renderer<'_> {
     /// A list whose items start at `indent`. Deeper items become nested lists; indented lines
     /// that are not items continue the item before them.
     fn list(&mut self, lines: &[&str], i: usize, indent: usize) -> usize {
-        let ordered = list_item(lines[i]).map(|(o, _)| o).unwrap_or(false);
+        let ordered = list_item(lines[i])
+            .map(|(o, _)| o)
+            .unwrap_or(false);
         let tag = if ordered { "ol" } else { "ul" };
         self.html.push_str(&format!("<{tag}>"));
         let mut at = i;
         while at < lines.len() {
             let line = lines[at];
-            let Some((_, text)) = list_item(line).filter(|(o, _)| indent_of(line) == indent && *o == ordered) else {
+            let Some((_, text)) =
+                list_item(line).filter(|(o, _)| indent_of(line) == indent && *o == ordered)
+            else {
                 break;
             };
             let mut item = text.trim().to_string();
@@ -327,7 +404,8 @@ impl Renderer<'_> {
                 at += 1;
             }
             self.words(&item);
-            self.html.push_str(&format!("<li>{}", self.inline(&item)));
+            self.html
+                .push_str(&format!("<li>{}", self.inline(&item)));
             if at < lines.len() && list_item(lines[at]).is_some() && indent_of(lines[at]) > indent {
                 at = self.list(lines, at, indent_of(lines[at]));
             }
@@ -335,7 +413,8 @@ impl Renderer<'_> {
             if at < lines.len()
                 && lines[at].trim().is_empty()
                 && at + 1 < lines.len()
-                && list_item(lines[at + 1]).is_some_and(|(o, _)| o == ordered && indent_of(lines[at + 1]) == indent)
+                && list_item(lines[at + 1])
+                    .is_some_and(|(o, _)| o == ordered && indent_of(lines[at + 1]) == indent)
             {
                 at += 1;
             }
@@ -349,8 +428,9 @@ impl Renderer<'_> {
         let mut out = String::with_capacity(text.len() + 16);
         let chars: Vec<char> = text.chars().collect();
         let mut i = 0;
-        let find =
-            |from: usize, pat: &[char]| -> Option<usize> { (from..chars.len()).find(|&k| chars[k..].starts_with(pat)) };
+        let find = |from: usize, pat: &[char]| -> Option<usize> {
+            (from..chars.len()).find(|&k| chars[k..].starts_with(pat))
+        };
         let collect = |a: usize, b: usize| -> String { chars[a..b].iter().collect() };
         while i < chars.len() {
             let c = chars[i];
@@ -362,11 +442,17 @@ impl Renderer<'_> {
             if c == '`' {
                 if let Some(end) = find(i + 1, &['`']) {
                     let code = collect(i + 1, end);
-                    let page = code.split('#').next().is_some_and(|p| p.ends_with(".md")).then(|| (self.link)(&code));
+                    let page = code
+                        .split('#')
+                        .next()
+                        .is_some_and(|p| p.ends_with(".md"))
+                        .then(|| (self.link)(&code));
                     match page.filter(|p| p.starts_with('/')) {
-                        Some(route) => {
-                            out.push_str(&format!(r#"<a href="{}"><code>{}</code></a>"#, escape(&route), escape(&code)))
-                        }
+                        Some(route) => out.push_str(&format!(
+                            r#"<a href="{}"><code>{}</code></a>"#,
+                            escape(&route),
+                            escape(&code)
+                        )),
                         None => out.push_str(&format!("<code>{}</code>", escape(&code))),
                     }
                     i = end + 1;
@@ -390,12 +476,19 @@ impl Renderer<'_> {
             }
             if c == '*' && chars.get(i + 1) == Some(&'*') {
                 if let Some(end) = find(i + 2, &['*', '*']).filter(|e| *e > i + 2) {
-                    out.push_str(&format!("<strong>{}</strong>", self.inline(&collect(i + 2, end))));
+                    out.push_str(&format!(
+                        "<strong>{}</strong>",
+                        self.inline(&collect(i + 2, end))
+                    ));
                     i = end + 2;
                     continue;
                 }
             }
-            if c == '*' && chars.get(i + 1).is_some_and(|n| !n.is_whitespace() && *n != '*') {
+            if c == '*'
+                && chars
+                    .get(i + 1)
+                    .is_some_and(|n| !n.is_whitespace() && *n != '*')
+            {
                 if let Some(end) = find(i + 1, &['*']) {
                     out.push_str(&format!("<em>{}</em>", self.inline(&collect(i + 1, end))));
                     i = end + 1;
@@ -420,7 +513,11 @@ impl Renderer<'_> {
         if !allowed {
             return label.to_string();
         }
-        let rel = if external { r#" rel="noopener noreferrer""# } else { "" };
+        let rel = if external {
+            r#" rel="noopener noreferrer""#
+        } else {
+            ""
+        };
         format!(r#"<a href="{}"{rel}>{label}</a>"#, escape(&target))
     }
 }
@@ -447,13 +544,34 @@ mod tests {
             &|t| t.to_string(),
         );
         assert_eq!(out.title, "Title");
-        let h: String =
-            out.parts.iter().map(|p| if let Part::Html(h) = p { h.clone() } else { String::new() }).collect();
-        assert!(h.starts_with("<p>Some <strong>bold</strong>, <em>it</em> and <code>a&lt;b&gt;</code>.</p>"));
+        let h: String = out
+            .parts
+            .iter()
+            .map(|p| {
+                if let Part::Html(h) = p {
+                    h.clone()
+                } else {
+                    String::new()
+                }
+            })
+            .collect();
+        assert!(h.starts_with(
+            "<p>Some <strong>bold</strong>, <em>it</em> and <code>a&lt;b&gt;</code>.</p>"
+        ));
         assert!(h.contains(r#"<h2 id="a-b-c">A b C</h2>"#));
-        assert!(h.contains("<ul><li>one more</li><li>two<ul><li>deep</li></ul></li></ul>"), "{h}");
+        assert!(
+            h.contains("<ul><li>one more</li><li>two<ul><li>deep</li></ul></li></ul>"),
+            "{h}"
+        );
         assert!(h.contains("<ol><li>first</li><li>second</li></ol>"));
-        assert_eq!(out.headings, vec![Heading { level: 2, id: "a-b-c".into(), text: "A b C".into() }]);
+        assert_eq!(
+            out.headings,
+            vec![Heading {
+                level: 2,
+                id: "a-b-c".into(),
+                text: "A b C".into()
+            }]
+        );
     }
 
     #[test]
@@ -467,7 +585,9 @@ mod tests {
 
     #[test]
     fn raw_html_and_unsafe_links_are_text() {
-        let out = html("<script>alert(1)</script> [x](javascript:alert(1)) [y](https://e.org) [z](/a#b)\n");
+        let out = html(
+            "<script>alert(1)</script> [x](javascript:alert(1)) [y](https://e.org) [z](/a#b)\n",
+        );
         assert!(!out.contains("<script"));
         assert!(out.contains("&lt;script&gt;alert(1)&lt;/script&gt;"));
         assert!(!out.contains("javascript:"));
@@ -486,6 +606,12 @@ mod tests {
     #[test]
     fn heading_ids_are_unique() {
         let out = render("## Same\n\n## Same\n", &|t| t.to_string());
-        assert_eq!(out.headings.iter().map(|h| h.id.as_str()).collect::<Vec<_>>(), ["same", "same-2"]);
+        assert_eq!(
+            out.headings
+                .iter()
+                .map(|h| h.id.as_str())
+                .collect::<Vec<_>>(),
+            ["same", "same-2"]
+        );
     }
 }

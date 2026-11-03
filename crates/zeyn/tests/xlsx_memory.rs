@@ -64,7 +64,11 @@ fn page(start: usize) -> Vec<Vec<Value>> {
 fn exporting_100k_rows_keeps_memory_flat() {
     let columns: Vec<ExportColumn> = ["Text", "Int", "Money", "Bool", "Date", "Moment"]
         .iter()
-        .map(|l| ExportColumn { label: l.to_string(), width: None, numeric: false })
+        .map(|l| ExportColumn {
+            label: l.to_string(),
+            width: None,
+            numeric: false,
+        })
         .collect();
     let started = std::time::Instant::now();
     let base = LIVE.load(Ordering::Relaxed);
@@ -92,7 +96,13 @@ fn exporting_100k_rows_keeps_memory_flat() {
         late / 1024,
         finish_peak / 1024
     );
-    assert!(late < early + 256 * 1024, "memory grew with rows: {early} -> {late}");
-    assert!(finish_peak < 8 * 1024 * 1024, "zipping held {finish_peak} bytes");
+    assert!(
+        late < early + 256 * 1024,
+        "memory grew with rows: {early} -> {late}"
+    );
+    assert!(
+        finish_peak < 8 * 1024 * 1024,
+        "zipping held {finish_peak} bytes"
+    );
     assert!(out.0 > 1_000_000);
 }

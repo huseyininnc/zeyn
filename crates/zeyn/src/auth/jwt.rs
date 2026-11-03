@@ -96,8 +96,14 @@ impl Jwk {
         }
         let material = match (text("kty")?, text("crv")) {
             ("RSA", _) => {
-                let n: Vec<u8> = bytes("n")?.into_iter().skip_while(|b| *b == 0).collect();
-                let e: Vec<u8> = bytes("e")?.into_iter().skip_while(|b| *b == 0).collect();
+                let n: Vec<u8> = bytes("n")?
+                    .into_iter()
+                    .skip_while(|b| *b == 0)
+                    .collect();
+                let e: Vec<u8> = bytes("e")?
+                    .into_iter()
+                    .skip_while(|b| *b == 0)
+                    .collect();
                 Material::Rsa { n, e }
             }
             ("EC", Some(crv @ ("P-256" | "P-384"))) => {
@@ -110,24 +116,38 @@ impl Jwk {
                 point.push(4);
                 point.extend_from_slice(&x);
                 point.extend_from_slice(&y);
-                if crv == "P-256" { Material::P256(point) } else { Material::P384(point) }
+                if crv == "P-256" {
+                    Material::P256(point)
+                } else {
+                    Material::P384(point)
+                }
             }
             ("OKP", Some("Ed25519")) => Material::Ed25519(bytes("x")?),
             _ => return None,
         };
-        Some(Jwk { kid: text("kid").map(str::to_string), alg: text("alg").map(str::to_string), material })
+        Some(Jwk {
+            kid: text("kid").map(str::to_string),
+            alg: text("alg").map(str::to_string),
+            material,
+        })
     }
 
     /// Whether this key can check a signature made with `alg`.
     fn fits(&self, alg: Algorithm) -> bool {
-        if self.alg.as_deref().is_some_and(|a| a != alg.name()) {
+        if self
+            .alg
+            .as_deref()
+            .is_some_and(|a| a != alg.name())
+        {
             return false;
         }
         use Algorithm::*;
         matches!(
             (&self.material, alg),
-            (Material::Rsa { .. }, RS256 | RS384 | RS512 | PS256 | PS384 | PS512)
-                | (Material::P256(_), ES256)
+            (
+                Material::Rsa { .. },
+                RS256 | RS384 | RS512 | PS256 | PS384 | PS512
+            ) | (Material::P256(_), ES256)
                 | (Material::P384(_), ES384)
                 | (Material::Ed25519(_), EdDSA)
         )
@@ -136,7 +156,9 @@ impl Jwk {
     fn verify(&self, alg: Algorithm, message: &[u8], sig: &[u8]) -> bool {
         use Algorithm::*;
         let rsa = |params: &'static signature::RsaParameters| match &self.material {
-            Material::Rsa { n, e } => RsaPublicKeyComponents { n, e }.verify(params, message, sig).is_ok(),
+            Material::Rsa { n, e } => RsaPublicKeyComponents { n, e }
+                .verify(params, message, sig)
+                .is_ok(),
             _ => false,
         };
         match (alg, &self.material) {
@@ -147,14 +169,18 @@ impl Jwk {
             (PS384, _) => rsa(&signature::RSA_PSS_2048_8192_SHA384),
             (PS512, _) => rsa(&signature::RSA_PSS_2048_8192_SHA512),
             (ES256, Material::P256(p)) => {
-                UnparsedPublicKey::new(&signature::ECDSA_P256_SHA256_FIXED, p).verify(message, sig).is_ok()
+                UnparsedPublicKey::new(&signature::ECDSA_P256_SHA256_FIXED, p)
+                    .verify(message, sig)
+                    .is_ok()
             }
             (ES384, Material::P384(p)) => {
-                UnparsedPublicKey::new(&signature::ECDSA_P384_SHA384_FIXED, p).verify(message, sig).is_ok()
+                UnparsedPublicKey::new(&signature::ECDSA_P384_SHA384_FIXED, p)
+                    .verify(message, sig)
+                    .is_ok()
             }
-            (EdDSA, Material::Ed25519(p)) => {
-                UnparsedPublicKey::new(&signature::ED25519, p).verify(message, sig).is_ok()
-            }
+            (EdDSA, Material::Ed25519(p)) => UnparsedPublicKey::new(&signature::ED25519, p)
+                .verify(message, sig)
+                .is_ok(),
             _ => false,
         }
     }
@@ -183,8 +209,12 @@ struct Head {
 }
 
 fn head(token: &str) -> Result<Head, Refusal> {
-    let first = token.split('.').next().ok_or(Refusal::Malformed)?;
-    serde_json::from_slice(&super::b64url_decode(first).ok_or(Refusal::Malformed)?).map_err(|_| Refusal::Malformed)
+    let first = token
+        .split('.')
+        .next()
+        .ok_or(Refusal::Malformed)?;
+    serde_json::from_slice(&super::b64url_decode(first).ok_or(Refusal::Malformed)?)
+        .map_err(|_| Refusal::Malformed)
 }
 
 /// Key id of a token, read without checking anything.
@@ -194,31 +224,42 @@ fn key_id(token: &str) -> Option<String> {
 
 /// Checks the signature of a compact JWS with one of `keys` and returns its claims. Nothing else
 /// about the claims is checked here.
-pub(crate) fn verify(token: &str, keys: &[Jwk], allowed: &[Algorithm]) -> Result<Map<String, Json>, Refusal> {
+pub(crate) fn verify(
+    token: &str,
+    keys: &[Jwk],
+    allowed: &[Algorithm],
+) -> Result<Map<String, Json>, Refusal> {
     if token.len() > MAX_TOKEN {
         return Err(Refusal::Malformed);
     }
     let mut parts = token.split('.');
-    let (Some(h), Some(p), Some(s), None) = (parts.next(), parts.next(), parts.next(), parts.next()) else {
+    let (Some(h), Some(p), Some(s), None) =
+        (parts.next(), parts.next(), parts.next(), parts.next())
+    else {
         return Err(Refusal::Malformed);
     };
     let head = head(token)?;
     if head.crit.is_some() {
         return Err(Refusal::Malformed);
     }
-    let alg = Algorithm::parse(&head.alg).filter(|a| allowed.contains(a)).ok_or(Refusal::Algorithm)?;
+    let alg = Algorithm::parse(&head.alg)
+        .filter(|a| allowed.contains(a))
+        .ok_or(Refusal::Algorithm)?;
     let sig = super::b64url_decode(s).ok_or(Refusal::Malformed)?;
     let message = &token.as_bytes()[..h.len() + 1 + p.len()];
-    let mut candidates =
-        keys.iter().filter(|k| k.fits(alg)).filter(|k| head.kid.is_none() || k.kid == head.kid).peekable();
+    let mut candidates = keys
+        .iter()
+        .filter(|k| k.fits(alg))
+        .filter(|k| head.kid.is_none() || k.kid == head.kid)
+        .peekable();
     if candidates.peek().is_none() {
         return Err(Refusal::UnknownKey);
     }
     if !candidates.any(|k| k.verify(alg, message, &sig)) {
         return Err(Refusal::Signature);
     }
-    let claims: Json =
-        serde_json::from_slice(&super::b64url_decode(p).ok_or(Refusal::Malformed)?).map_err(|_| Refusal::Malformed)?;
+    let claims: Json = serde_json::from_slice(&super::b64url_decode(p).ok_or(Refusal::Malformed)?)
+        .map_err(|_| Refusal::Malformed)?;
     match claims {
         Json::Object(map) => Ok(map),
         _ => Err(Refusal::Malformed),
@@ -240,12 +281,20 @@ pub(crate) struct Expect<'a> {
 /// `exp` is required. `iss` must be the configured issuer; only a trailing `/` may differ, since
 /// some providers (Authentik) put one there.
 pub(crate) fn check_claims(claims: &Map<String, Json>, expect: &Expect) -> Result<(), Refusal> {
-    if claims.get("iss").and_then(Json::as_str).map(|i| i.trim_end_matches('/')) != Some(expect.issuer) {
+    if claims
+        .get("iss")
+        .and_then(Json::as_str)
+        .map(|i| i.trim_end_matches('/'))
+        != Some(expect.issuer)
+    {
         return Err(Refusal::Issuer);
     }
     let audiences: Vec<&str> = match claims.get("aud") {
         Some(Json::String(a)) => vec![a.as_str()],
-        Some(Json::Array(list)) => list.iter().filter_map(Json::as_str).collect(),
+        Some(Json::Array(list)) => list
+            .iter()
+            .filter_map(Json::as_str)
+            .collect(),
         _ => Vec::new(),
     };
     if !audiences.contains(&expect.audience) {
@@ -253,7 +302,10 @@ pub(crate) fn check_claims(claims: &Map<String, Json>, expect: &Expect) -> Resul
     }
     if expect.id_token
         && audiences.len() > 1
-        && claims.get("azp").and_then(Json::as_str).is_some_and(|azp| azp != expect.audience)
+        && claims
+            .get("azp")
+            .and_then(Json::as_str)
+            .is_some_and(|azp| azp != expect.audience)
     {
         return Err(Refusal::Audience);
     }
@@ -283,8 +335,15 @@ fn at<'a>(claims: &'a Map<String, Json>, path: &str) -> Option<&'a Json> {
 /// Strings of a claim that is a list, or one space separated string (as `scope` is).
 fn strings(value: Option<&Json>) -> Vec<String> {
     match value {
-        Some(Json::Array(list)) => list.iter().filter_map(Json::as_str).map(str::to_string).collect(),
-        Some(Json::String(s)) => s.split_whitespace().map(str::to_string).collect(),
+        Some(Json::Array(list)) => list
+            .iter()
+            .filter_map(Json::as_str)
+            .map(str::to_string)
+            .collect(),
+        Some(Json::String(s)) => s
+            .split_whitespace()
+            .map(str::to_string)
+            .collect(),
         _ => Vec::new(),
     }
 }
@@ -367,7 +426,10 @@ impl ClaimMap {
         I: IntoIterator<Item = S>,
         S: Into<String>,
     {
-        self.role_map.entry(role.to_string()).or_default().extend(permissions.into_iter().map(Into::into));
+        self.role_map
+            .entry(role.to_string())
+            .or_default()
+            .extend(permissions.into_iter().map(Into::into));
         self
     }
 
@@ -379,7 +441,10 @@ impl ClaimMap {
         I: IntoIterator<Item = S>,
         S: Into<String>,
     {
-        self.mfa_acr = values.into_iter().map(Into::into).collect();
+        self.mfa_acr = values
+            .into_iter()
+            .map(Into::into)
+            .collect();
         self
     }
 
@@ -390,23 +455,46 @@ impl ClaimMap {
     /// The parts of the claims a session keeps: user, tenant, time zone, the roles this map knows,
     /// the direct permissions, the sign in time and whether a second factor was used.
     pub(crate) fn extract(&self, claims: &Map<String, Json>) -> Option<super::Session> {
-        let user = self.user.iter().find_map(|c| claims.get(c).and_then(Json::as_str)).filter(|u| !u.is_empty())?;
-        let roles = strings(self.roles.as_deref().and_then(|p| at(claims, p)))
-            .into_iter()
-            .filter(|r| self.role_map.contains_key(r))
-            .collect();
+        let user = self
+            .user
+            .iter()
+            .find_map(|c| claims.get(c).and_then(Json::as_str))
+            .filter(|u| !u.is_empty())?;
+        let roles = strings(
+            self.roles
+                .as_deref()
+                .and_then(|p| at(claims, p)),
+        )
+        .into_iter()
+        .filter(|r| self.role_map.contains_key(r))
+        .collect();
         let amr = strings(claims.get("amr"));
         let amr: Vec<&str> = amr.iter().map(String::as_str).collect();
         let acr = claims.get("acr").and_then(Json::as_str);
-        let at_time = claims.get("auth_time").or_else(|| claims.get("iat")).and_then(Json::as_i64);
-        let mut tenants = strings(self.tenant.as_deref().and_then(|c| at(claims, c))).into_iter();
+        let at_time = claims
+            .get("auth_time")
+            .or_else(|| claims.get("iat"))
+            .and_then(Json::as_i64);
+        let mut tenants = strings(
+            self.tenant
+                .as_deref()
+                .and_then(|c| at(claims, c)),
+        )
+        .into_iter();
         Some(super::Session {
             user: user.to_string(),
             tenant: tenants.next(),
             tenants: tenants.collect(),
-            time_zone: claims.get(&self.time_zone).and_then(Json::as_str).map(str::to_string),
+            time_zone: claims
+                .get(&self.time_zone)
+                .and_then(Json::as_str)
+                .map(str::to_string),
             roles,
-            permissions: strings(self.permissions.as_deref().and_then(|p| at(claims, p))),
+            permissions: strings(
+                self.permissions
+                    .as_deref()
+                    .and_then(|p| at(claims, p)),
+            ),
             auth_time: at_time,
             mfa: super::shows_mfa(&amr, acr, &self.mfa_acr),
             ..Default::default()
@@ -416,16 +504,25 @@ impl ClaimMap {
     /// The identity of a session.
     pub(crate) fn identity(&self, s: &super::Session) -> Identity {
         let mut identity = Identity::user(s.user.clone());
-        identity.permissions.extend(s.permissions.iter().cloned());
+        identity
+            .permissions
+            .extend(s.permissions.iter().cloned());
         for role in &s.roles {
             if let Some(perms) = self.role_map.get(role) {
-                identity.permissions.extend(perms.iter().cloned());
+                identity
+                    .permissions
+                    .extend(perms.iter().cloned());
             }
         }
         identity.tenant = s.tenant.clone();
-        identity.tenants.extend(s.tenants.iter().cloned());
+        identity
+            .tenants
+            .extend(s.tenants.iter().cloned());
         identity.time_zone = s.time_zone.clone();
-        identity.authenticated_at = s.auth_time.and_then(|t| t.checked_mul(1000)).map(DateTime::from_unix_ms);
+        identity.authenticated_at = s
+            .auth_time
+            .and_then(|t| t.checked_mul(1000))
+            .map(DateTime::from_unix_ms);
         identity.mfa = s.mfa;
         identity
     }
@@ -476,20 +573,31 @@ pub(crate) fn client() -> reqwest::Client {
 /// Reads a JSON response of at most [`MAX_RESPONSE`] bytes.
 pub(crate) async fn read_json(res: reqwest::Response) -> Result<Json, String> {
     let status = res.status();
-    if res.content_length().is_some_and(|n| n > MAX_RESPONSE as u64) {
+    if res
+        .content_length()
+        .is_some_and(|n| n > MAX_RESPONSE as u64)
+    {
         return Err("response too large".into());
     }
     let mut res = res;
     let mut body = Vec::new();
-    while let Some(chunk) = res.chunk().await.map_err(|e| e.to_string())? {
+    while let Some(chunk) = res
+        .chunk()
+        .await
+        .map_err(|e| e.to_string())?
+    {
         if body.len() + chunk.len() > MAX_RESPONSE {
             return Err("response too large".into());
         }
         body.extend_from_slice(&chunk);
     }
-    let json: Json = serde_json::from_slice(&body).map_err(|_| format!("status {status}, not JSON"))?;
+    let json: Json =
+        serde_json::from_slice(&body).map_err(|_| format!("status {status}, not JSON"))?;
     if !status.is_success() {
-        let error = json.get("error").and_then(Json::as_str).unwrap_or("unknown");
+        let error = json
+            .get("error")
+            .and_then(Json::as_str)
+            .unwrap_or("unknown");
         return Err(format!("status {status}, error `{error}`"));
     }
     Ok(json)
@@ -514,16 +622,30 @@ impl Issuer {
 
     /// The discovery document, fetched once per `ttl`. Its `issuer` must be the configured one.
     pub(crate) async fn discovery(&self) -> Result<Arc<Discovery>, String> {
-        if let Some((at, d)) = self.cache.read().ok().and_then(|c| c.discovery.clone())
+        if let Some((at, d)) = self
+            .cache
+            .read()
+            .ok()
+            .and_then(|c| c.discovery.clone())
             && at.elapsed() < self.ttl
         {
             return Ok(d);
         }
         let url = format!("{}/.well-known/openid-configuration", self.issuer);
-        let json = read_json(self.http.get(&url).send().await.map_err(|e| format!("discovery: {e}"))?).await?;
+        let json = read_json(
+            self.http
+                .get(&url)
+                .send()
+                .await
+                .map_err(|e| format!("discovery: {e}"))?,
+        )
+        .await?;
         let d: Discovery = serde_json::from_value(json).map_err(|e| format!("discovery: {e}"))?;
         if d.issuer.trim_end_matches('/') != self.issuer {
-            return Err(format!("discovery names issuer `{}`, expected `{}`", d.issuer, self.issuer));
+            return Err(format!(
+                "discovery names issuer `{}`, expected `{}`",
+                d.issuer, self.issuer
+            ));
         }
         let d = Arc::new(d);
         if let Ok(mut c) = self.cache.write() {
@@ -533,15 +655,27 @@ impl Issuer {
     }
 
     pub(crate) fn keys(&self) -> Arc<Vec<Jwk>> {
-        self.cache.read().map(|c| c.keys.clone()).unwrap_or_default()
+        self.cache
+            .read()
+            .map(|c| c.keys.clone())
+            .unwrap_or_default()
     }
 
     /// Whether keys should be fetched before checking a token with this key id.
     pub(crate) fn wants_keys(&self, kid: Option<&str>) -> bool {
-        let Ok(c) = self.cache.read() else { return false };
-        let stale = c.fetched.is_none_or(|at| at.elapsed() >= self.ttl);
-        let unknown = !c.keys.iter().any(|k| kid.is_none() || k.kid.as_deref() == kid);
-        let may_try = c.tried.is_none_or(|at| at.elapsed() >= self.min_refresh);
+        let Ok(c) = self.cache.read() else {
+            return false;
+        };
+        let stale = c
+            .fetched
+            .is_none_or(|at| at.elapsed() >= self.ttl);
+        let unknown = !c
+            .keys
+            .iter()
+            .any(|k| kid.is_none() || k.kid.as_deref() == kid);
+        let may_try = c
+            .tried
+            .is_none_or(|at| at.elapsed() >= self.min_refresh);
         (stale || unknown) && may_try
     }
 
@@ -573,9 +707,23 @@ impl Issuer {
             Some(u) => u.clone(),
             None => self.discovery().await?.jwks_uri.clone(),
         };
-        let json = read_json(self.http.get(&url).send().await.map_err(|e| format!("jwks: {e}"))?).await?;
-        let keys = json.get("keys").and_then(Json::as_array).ok_or("jwks: no `keys`")?;
-        Ok(keys.iter().filter_map(Jwk::parse).take(MAX_KEYS).collect())
+        let json = read_json(
+            self.http
+                .get(&url)
+                .send()
+                .await
+                .map_err(|e| format!("jwks: {e}"))?,
+        )
+        .await?;
+        let keys = json
+            .get("keys")
+            .and_then(Json::as_array)
+            .ok_or("jwks: no `keys`")?;
+        Ok(keys
+            .iter()
+            .filter_map(Jwk::parse)
+            .take(MAX_KEYS)
+            .collect())
     }
 
     /// Checks a token's signature with the cached keys and its registered claims.
@@ -698,13 +846,25 @@ impl JwtAuth {
         leeway: Duration,
         claims: ClaimMap,
     ) -> Self {
-        JwtAuth { issuer, audience: audience.to_string(), algorithms, leeway, claims }
+        JwtAuth {
+            issuer,
+            audience: audience.to_string(),
+            algorithms,
+            leeway,
+            claims,
+        }
     }
 
     fn bearer(headers: &HeaderMap) -> Option<&str> {
-        let value = headers.get(header::AUTHORIZATION)?.to_str().ok()?;
+        let value = headers
+            .get(header::AUTHORIZATION)?
+            .to_str()
+            .ok()?;
         let (scheme, token) = value.split_once(' ')?;
-        scheme.eq_ignore_ascii_case("bearer").then(|| token.trim()).filter(|t| !t.is_empty())
+        scheme
+            .eq_ignore_ascii_case("bearer")
+            .then(|| token.trim())
+            .filter(|t| !t.is_empty())
     }
 
     /// Whether the request carries a bearer token.
@@ -716,8 +876,14 @@ impl JwtAuth {
 impl Authenticator for JwtAuth {
     fn authenticate(&self, headers: &HeaderMap) -> Option<Identity> {
         let token = Self::bearer(headers)?;
-        match self.issuer.validate(token, &self.audience, &self.algorithms, self.leeway, false) {
-            Ok(claims) => self.claims.extract(&claims).map(|s| self.claims.identity(&s)),
+        match self
+            .issuer
+            .validate(token, &self.audience, &self.algorithms, self.leeway, false)
+        {
+            Ok(claims) => self
+                .claims
+                .extract(&claims)
+                .map(|s| self.claims.identity(&s)),
             Err(why) => {
                 tracing::debug!(?why, "bearer token refused");
                 None
@@ -725,11 +891,18 @@ impl Authenticator for JwtAuth {
         }
     }
 
-    fn prepare<'a>(&'a self, headers: &'a HeaderMap) -> Option<Pin<Box<dyn Future<Output = ()> + Send + 'a>>> {
+    fn prepare<'a>(
+        &'a self,
+        headers: &'a HeaderMap,
+    ) -> Option<Pin<Box<dyn Future<Output = ()> + Send + 'a>>> {
         let kid = key_id(Self::bearer(headers)?);
         if !self.issuer.wants_keys(kid.as_deref()) {
             return None;
         }
-        Some(Box::pin(async move { self.issuer.refresh(kid.as_deref()).await }))
+        Some(Box::pin(async move {
+            self.issuer
+                .refresh(kid.as_deref())
+                .await
+        }))
     }
 }

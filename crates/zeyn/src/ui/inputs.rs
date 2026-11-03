@@ -71,7 +71,9 @@ impl Tok {
 /// assert!(!mask_fits("AA99", "tr33"));
 /// ```
 pub fn mask_fits(pattern: &str, raw: &str) -> bool {
-    let mut slots = tokens(pattern).into_iter().filter(|t| !matches!(t, Tok::Lit(_)));
+    let mut slots = tokens(pattern)
+        .into_iter()
+        .filter(|t| !matches!(t, Tok::Lit(_)));
     let mut chars = raw.chars();
     loop {
         match (slots.next(), chars.next()) {
@@ -121,7 +123,10 @@ pub fn mask_raw(pattern: &str, typed: &str) -> String {
 /// assert_eq!(mask_example("(999) 999 99 99"), "(___) ___ __ __");
 /// ```
 pub fn mask_example(pattern: &str) -> String {
-    tokens(pattern).into_iter().map(|t| if let Tok::Lit(c) = t { c } else { '_' }).collect()
+    tokens(pattern)
+        .into_iter()
+        .map(|t| if let Tok::Lit(c) = t { c } else { '_' })
+        .collect()
 }
 
 /// Writes a masked text input, always left to right (phone numbers, IBANs and codes read the same
@@ -132,7 +137,9 @@ pub(crate) fn render_mask(out: &mut String, s: &Slot, pattern: &str) {
         crate::value::Value::Text(t) => t.as_str(),
         _ => "",
     };
-    let numeric = tokens(pattern).iter().all(|t| matches!(t, Tok::Digit | Tok::Lit(_)));
+    let numeric = tokens(pattern)
+        .iter()
+        .all(|t| matches!(t, Tok::Digit | Tok::Lit(_)));
     let example = mask_example(pattern);
     out.push_str(s.label);
     out.push_str(&format!(

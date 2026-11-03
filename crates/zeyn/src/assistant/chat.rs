@@ -106,7 +106,10 @@ pub(crate) fn launcher(r: &Render) -> String {
     let label = r.text(&Text::key("zeyn.assistant.open"));
     format!(
         r#"<button type="button" class="z-assistant-launch" data-zeyn-assistant-launch aria-expanded="false" aria-controls="z-assistant-dock" aria-label="{label}" title="{label}">{ICON_SPARK}</button><aside id="z-assistant-dock" class="z-assistant-dock" aria-label="{title}" hidden>{panel}</aside>"#,
-        title = escape(&r.i18n.text(r.locale, &Text::key("zeyn.assistant.title"))),
+        title = escape(
+            &r.i18n
+                .text(r.locale, &Text::key("zeyn.assistant.title"))
+        ),
         panel = markup(r, "dock"),
     )
 }

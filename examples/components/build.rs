@@ -85,11 +85,17 @@ fn first_doc(lines: &[&str], at: usize) -> String {
         .trim_end_matches('.')
         .trim()
         .to_string();
-    if first.is_empty() { first } else { format!("{first}.") }
+    if first.is_empty() {
+        first
+    } else {
+        format!("{first}.")
+    }
 }
 
 fn scan(path: &Path, api: &mut BTreeMap<String, Vec<(String, String)>>) {
-    let Ok(source) = std::fs::read_to_string(path) else { return };
+    let Ok(source) = std::fs::read_to_string(path) else {
+        return;
+    };
     let lines: Vec<&str> = source.lines().collect();
     let mut current: Option<String> = None;
     for (i, line) in lines.iter().enumerate() {
@@ -112,7 +118,9 @@ fn scan(path: &Path, api: &mut BTreeMap<String, Vec<(String, String)>>) {
 /// Scans every `.rs` file under `dir`, in name order.
 fn walk(dir: &Path, api: &mut BTreeMap<String, Vec<(String, String)>>) {
     println!("cargo:rerun-if-changed={}", dir.display());
-    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
     let mut paths: Vec<_> = entries
         .filter_map(|e| e.ok())
         .map(|e| e.path())
@@ -135,7 +143,8 @@ fn main() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../crates/zeyn/src");
     let mut api = BTreeMap::new();
     walk(&root, &mut api);
-    let mut out = String::from("/// Public methods of each framework type: signature and first doc line.\n");
+    let mut out =
+        String::from("/// Public methods of each framework type: signature and first doc line.\n");
     out.push_str("pub static API: &[(&str, &[(&str, &str)])] = &[\n");
     for (ty, methods) in &api {
         out.push_str(&format!("    ({ty:?}, &["));

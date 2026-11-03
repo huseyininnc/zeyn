@@ -10,5 +10,8 @@ pub fn feature() -> Feature {
     Feature::new("menu")
         .screen(screens::menu_list)
         .api(actions::find_menu)
-        .menu(|m| m.group(t!("menu.menu"), Icon::Box).item(t!("menu.list"), screens::menu_list))
+        .menu(|m| {
+            m.group(t!("menu.menu"), Icon::Box)
+                .item(t!("menu.list"), screens::menu_list)
+        })
 }

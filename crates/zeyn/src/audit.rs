@@ -26,7 +26,11 @@ pub struct RecordRef {
 impl RecordRef {
     /// The record `value` stands for.
     pub fn of<M: Model>(value: &M) -> Self {
-        let id = M::fields().iter().position(|f| f.key).and_then(|i| value.value_at(i)).and_then(|v| plain(&v));
+        let id = M::fields()
+            .iter()
+            .position(|f| f.key)
+            .and_then(|i| value.value_at(i))
+            .and_then(|v| plain(&v));
         RecordRef { model: M::NAME, id }
     }
 }
@@ -92,7 +96,12 @@ pub fn plain(value: &Value) -> Option<String> {
         Value::Money(m) => {
             let sign = if m.minor < 0 { "-" } else { "" };
             let abs = m.minor.unsigned_abs();
-            format!("{sign}{}.{:02} {}", abs / 100, abs % 100, format!("{:?}", m.currency).to_uppercase())
+            format!(
+                "{sign}{}.{:02} {}",
+                abs / 100,
+                abs % 100,
+                format!("{:?}", m.currency).to_uppercase()
+            )
         }
         Value::Date(d) => d.to_string(),
         Value::Time(t) => t.to_string(),
@@ -110,12 +119,19 @@ pub fn diff<M: Model>(old: &M, new: &M) -> Vec<FieldChange> {
         .enumerate()
         .filter(|(_, meta)| !meta.version)
         .filter_map(|(i, meta)| {
-            let (a, b) = (old.value_at(i).unwrap_or(Value::Null), new.value_at(i).unwrap_or(Value::Null));
+            let (a, b) = (
+                old.value_at(i).unwrap_or(Value::Null),
+                new.value_at(i).unwrap_or(Value::Null),
+            );
             if a == b {
                 return None;
             }
             let shown = |v: &Value| plain(v).map(|s| crate::privacy::masked_text(meta, &s));
-            Some(FieldChange { field: meta.name, old: shown(&a), new: shown(&b) })
+            Some(FieldChange {
+                field: meta.name,
+                old: shown(&a),
+                new: shown(&b),
+            })
         })
         .collect()
 }

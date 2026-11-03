@@ -35,7 +35,14 @@ pub struct ListItem {
 
 impl ListItem {
     pub fn new(title: impl Into<Text>) -> Self {
-        ListItem { title: title.into(), subtitle: None, meta: None, image: None, alt: Text::from(""), link: None }
+        ListItem {
+            title: title.into(),
+            subtitle: None,
+            meta: None,
+            image: None,
+            alt: Text::from(""),
+            link: None,
+        }
     }
 
     /// A line under the title, in a quieter color.
@@ -66,7 +73,10 @@ impl ListItem {
 
     /// The screen the row opens, without a page reload. Params of the wrong type do not compile.
     pub fn link<S: ScreenDef>(mut self, _screen: S, params: S::Params) -> Self {
-        self.link = Some((S::META.name, serde_json::to_value(params).unwrap_or(Json::Null)));
+        self.link = Some((
+            S::META.name,
+            serde_json::to_value(params).unwrap_or(Json::Null),
+        ));
         self
     }
 
@@ -176,7 +186,10 @@ impl Component for List {
         out.push_str(r#"<section class="z-list-section">"#);
         let labelled = match &self.title {
             Some(t) => {
-                out.push_str(&format!(r#"<h2 class="z-cards-title" id="{id}-title">{}</h2>"#, r.text(t)));
+                out.push_str(&format!(
+                    r#"<h2 class="z-cards-title" id="{id}-title">{}</h2>"#,
+                    r.text(t)
+                ));
                 format!(r#" aria-labelledby="{id}-title""#)
             }
             None => String::new(),

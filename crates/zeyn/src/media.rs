@@ -41,7 +41,12 @@ pub struct Media {
 impl Media {
     /// Media read from `reader`, which must hold exactly `len` bytes.
     pub fn new(reader: impl MediaReader, len: u64, content_type: impl Into<String>) -> Self {
-        Media { reader: Box::new(reader), len, content_type: content_type.into(), etag: None }
+        Media {
+            reader: Box::new(reader),
+            len,
+            content_type: content_type.into(),
+            etag: None,
+        }
     }
 
     /// Media held in memory, such as `include_bytes!` data.
@@ -50,7 +55,10 @@ impl Media {
     /// let m = zeyn::Media::bytes(&b"WEBVTT\n"[..], "text/vtt");
     /// assert_eq!(m.len(), 7);
     /// ```
-    pub fn bytes<T: AsRef<[u8]> + Send + 'static>(data: T, content_type: impl Into<String>) -> Self {
+    pub fn bytes<T: AsRef<[u8]> + Send + 'static>(
+        data: T,
+        content_type: impl Into<String>,
+    ) -> Self {
         let len = data.as_ref().len() as u64;
         Media::new(Cursor::new(data), len, content_type)
     }
@@ -68,17 +76,27 @@ impl Media {
         let modified = meta
             .modified()
             .ok()
-            .and_then(|m| m.duration_since(std::time::UNIX_EPOCH).ok())
+            .and_then(|m| {
+                m.duration_since(std::time::UNIX_EPOCH)
+                    .ok()
+            })
             .map(|d| d.as_secs())
             .unwrap_or(0);
-        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-        Ok(Media::new(file, meta.len(), media_type(name)).etag(format!("{:x}-{modified:x}", meta.len())))
+        let name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("");
+        Ok(Media::new(file, meta.len(), media_type(name))
+            .etag(format!("{:x}-{modified:x}", meta.len())))
     }
 
     /// Sets a strong entity tag (without quotes). It must change whenever the bytes change.
     pub fn etag(mut self, tag: impl Into<String>) -> Self {
-        let tag: String =
-            tag.into().chars().filter(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.')).collect();
+        let tag: String = tag
+            .into()
+            .chars()
+            .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+            .collect();
         self.etag = (!tag.is_empty()).then_some(tag);
         self
     }
@@ -149,7 +167,9 @@ pub fn valid_media_id(id: &str) -> bool {
         && id.len() <= MAX_MEDIA_ID
         && !id.starts_with('.')
         && !id.contains("..")
-        && id.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
 }
 
 /// Content type for a file name, by its extension; `application/octet-stream` when unknown.
@@ -159,7 +179,10 @@ pub fn valid_media_id(id: &str) -> bool {
 /// assert_eq!(zeyn::media_type("a.VTT"), "text/vtt; charset=utf-8");
 /// ```
 pub fn media_type(name: &str) -> &'static str {
-    let ext = name.rsplit_once('.').map(|(_, e)| e.to_ascii_lowercase()).unwrap_or_default();
+    let ext = name
+        .rsplit_once('.')
+        .map(|(_, e)| e.to_ascii_lowercase())
+        .unwrap_or_default();
     match ext.as_str() {
         "mp4" | "m4v" => "video/mp4",
         "webm" => "video/webm",
@@ -188,8 +211,15 @@ pub fn media_type(name: &str) -> &'static str {
 /// images, captions and streaming playlists. Anything else (HTML, SVG, scripts) is sent as a
 /// download so it can never run as a page of the app.
 pub(crate) fn inline_type(content_type: &str) -> bool {
-    let t = content_type.split(';').next().unwrap_or("").trim().to_ascii_lowercase();
-    (t.starts_with("audio/") || t.starts_with("video/") || (t.starts_with("image/") && t != "image/svg+xml"))
+    let t = content_type
+        .split(';')
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_ascii_lowercase();
+    (t.starts_with("audio/")
+        || t.starts_with("video/")
+        || (t.starts_with("image/") && t != "image/svg+xml"))
         || matches!(
             t.as_str(),
             "text/vtt"
@@ -226,19 +256,34 @@ impl ByteRange {
     /// assert_eq!(ByteRange::parse(None, 1000), ByteRange::Full);
     /// ```
     pub fn parse(header: Option<&str>, len: u64) -> ByteRange {
-        let Some(spec) = header.map(str::trim) else { return ByteRange::Full };
-        let Some(spec) = spec.strip_prefix("bytes=") else { return ByteRange::Full };
+        let Some(spec) = header.map(str::trim) else {
+            return ByteRange::Full;
+        };
+        let Some(spec) = spec.strip_prefix("bytes=") else {
+            return ByteRange::Full;
+        };
         if spec.contains(',') {
             return ByteRange::Full;
         }
-        let Some((a, b)) = spec.trim().split_once('-') else { return ByteRange::Unsatisfiable };
-        let num =
-            |s: &str| (!s.is_empty() && s.bytes().all(|c| c.is_ascii_digit())).then(|| s.parse::<u64>().ok()).flatten();
+        let Some((a, b)) = spec.trim().split_once('-') else {
+            return ByteRange::Unsatisfiable;
+        };
+        let num = |s: &str| {
+            (!s.is_empty() && s.bytes().all(|c| c.is_ascii_digit()))
+                .then(|| s.parse::<u64>().ok())
+                .flatten()
+        };
         let (a, b) = (a.trim(), b.trim());
         match (a.is_empty(), num(a), num(b)) {
-            (true, _, Some(n)) if n > 0 && len > 0 => ByteRange::Part(len.saturating_sub(n), len - 1),
-            (false, Some(start), None) if b.is_empty() && start < len => ByteRange::Part(start, len - 1),
-            (false, Some(start), Some(end)) if start <= end && start < len => ByteRange::Part(start, end.min(len - 1)),
+            (true, _, Some(n)) if n > 0 && len > 0 => {
+                ByteRange::Part(len.saturating_sub(n), len - 1)
+            }
+            (false, Some(start), None) if b.is_empty() && start < len => {
+                ByteRange::Part(start, len - 1)
+            }
+            (false, Some(start), Some(end)) if start <= end && start < len => {
+                ByteRange::Part(start, end.min(len - 1))
+            }
             _ => ByteRange::Unsatisfiable,
         }
     }

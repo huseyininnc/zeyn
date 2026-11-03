@@ -10,7 +10,9 @@
 //! ```
 
 use super::signin::SESSION;
-use super::{Accounts, SignInManager, SignInResult, TwoFactorKind, User, UserManager, denied, invalid, scope};
+use super::{
+    Accounts, SignInManager, SignInResult, TwoFactorKind, User, UserManager, denied, invalid, scope,
+};
 use crate::prelude::*;
 use crate::render::{Render, escape};
 use crate::screen::Component;
@@ -36,7 +38,11 @@ pub struct AccountsUi {
 
 /// The default UI with every screen except administration.
 pub fn ui() -> AccountsUi {
-    AccountsUi { registration: true, admin: false, off: Vec::new() }
+    AccountsUi {
+        registration: true,
+        admin: false,
+        off: Vec::new(),
+    }
 }
 
 /// The default UI as a feature: [`ui`] with its defaults.
@@ -81,7 +87,13 @@ impl AccountsUi {
             account_confirm_email,
             account_resend_confirmation
         );
-        add!(account_check_email, account_login_2fa, account_login_recovery, account_lockout, account_access_denied);
+        add!(
+            account_check_email,
+            account_login_2fa,
+            account_login_recovery,
+            account_lockout,
+            account_access_denied
+        );
         add!(
             account_manage,
             account_email,
@@ -100,7 +112,11 @@ impl AccountsUi {
             f = f.screen(account_external_login);
         }
         if self.admin {
-            add!(account_admin_users, account_admin_user_roles, account_admin_roles);
+            add!(
+                account_admin_users,
+                account_admin_user_roles,
+                account_admin_roles
+            );
             f = f.menu(|m| {
                 m.group(t!("zeyn.accounts.admin.menu"), Icon::Table)
                     .item(t!("zeyn.accounts.admin.users"), account_admin_users)
@@ -128,7 +144,9 @@ fn path(p: &str) -> String {
 
 /// The local path to go to after signing in: `return_to` when it is local, else the start page.
 fn back(return_to: &str) -> String {
-    crate::auth::safe_return(return_to).map(str::to_string).unwrap_or_else(|| path("/"))
+    crate::auth::safe_return(return_to)
+        .map(str::to_string)
+        .unwrap_or_else(|| path("/"))
 }
 
 fn with_params(p: &str, params: Json) -> String {
@@ -169,7 +187,11 @@ async fn me(accounts: &Accounts) -> Result<User> {
         .and_then(|v| accounts.sign_in().open_session(&v))
         .map(|s| s.id)
         .ok_or(Error::Forbidden)?;
-    accounts.users().find_by_id(&id).await?.ok_or(Error::Forbidden)
+    accounts
+        .users()
+        .find_by_id(&id)
+        .await?
+        .ok_or(Error::Forbidden)
 }
 
 /// A screen with the narrow account layout.
@@ -193,11 +215,23 @@ fn manage_nav(current: &'static str) -> Node {
         let items: String = ITEMS
             .iter()
             .map(|(key, to)| {
-                let mark = if *to == current { r#" aria-current="page""# } else { "" };
-                format!(r#"<li><a href="{}{}"{mark}>{}</a></li>"#, escape(&prefix), to, tx(r, key))
+                let mark = if *to == current {
+                    r#" aria-current="page""#
+                } else {
+                    ""
+                };
+                format!(
+                    r#"<li><a href="{}{}"{mark}>{}</a></li>"#,
+                    escape(&prefix),
+                    to,
+                    tx(r, key)
+                )
             })
             .collect();
-        format!(r#"<nav class="z-account-nav" aria-label="{}"><ul>{items}</ul></nav>"#, tx(r, "manage.title"))
+        format!(
+            r#"<nav class="z-account-nav" aria-label="{}"><ul>{items}</ul></nav>"#,
+            tx(r, "manage.title")
+        )
     })
 }
 
@@ -213,7 +247,9 @@ fn notice(code: Option<&str>) -> Option<Node> {
         "check_email" => "notice.check_email",
         _ => return None,
     };
-    Some(Node::new(Alert::info(Text::key(format!("zeyn.accounts.{key}")))))
+    Some(Node::new(Alert::info(Text::key(format!(
+        "zeyn.accounts.{key}"
+    )))))
 }
 
 /// Screen params whose fields are all optional, so the screen also opens without any params (a
@@ -274,10 +310,16 @@ pub struct LoginParams {
 /// Signs in with a user name or e-mail and a password; lockout counts failures.
 #[action(public, ai = false)]
 pub async fn account_sign_in(input: Valid<AccountLogin>, sign_in: SignInManager) -> Result<Next> {
-    match sign_in.password_sign_in(&input.user_name, &input.password, input.remember_me, true).await? {
+    match sign_in
+        .password_sign_in(&input.user_name, &input.password, input.remember_me, true)
+        .await?
+    {
         SignInResult::Succeeded => go(back(&input.return_to), true),
         SignInResult::RequiresTwoFactor => go(
-            with_params("/account/login-2fa", json!({ "return_to": input.return_to, "remember": input.remember_me })),
+            with_params(
+                "/account/login-2fa",
+                json!({ "return_to": input.return_to, "remember": input.remember_me }),
+            ),
             false,
         ),
         SignInResult::LockedOut => go(path("/account/lockout"), false),
@@ -305,13 +347,16 @@ pub async fn account_login(p: LoginParams, accounts: Accounts) -> Result<Screen>
         body = body.add(n);
     }
     body = body.add(
-        Form::of(AccountLogin { return_to: return_to.clone(), ..AccountLogin::default() })
-            .field(AccountLogin::user_name)
-            .field(AccountLogin::password)
-            .control(AccountLogin::password, Control::Password)
-            .field(AccountLogin::remember_me)
-            .submit(t!("zeyn.accounts.login.submit"), account_sign_in)
-            .on_success(next_effect),
+        Form::of(AccountLogin {
+            return_to: return_to.clone(),
+            ..AccountLogin::default()
+        })
+        .field(AccountLogin::user_name)
+        .field(AccountLogin::password)
+        .control(AccountLogin::password, Control::Password)
+        .field(AccountLogin::remember_me)
+        .submit(t!("zeyn.accounts.login.submit"), account_sign_in)
+        .on_success(next_effect),
     );
     if accounts.settings().passkeys.enabled && accounts.0.public_url.is_some() {
         let back = back(&return_to);
@@ -360,7 +405,11 @@ pub struct AccountRegister {
 /// Creates an account and sends the confirmation link. The answer is the same when the address
 /// already has an account; that address gets a notice instead.
 #[action(public, ai = false)]
-pub async fn account_sign_up(input: Valid<AccountRegister>, accounts: Accounts, ctx: Ctx) -> Result<Next> {
+pub async fn account_sign_up(
+    input: Valid<AccountRegister>,
+    accounts: Accounts,
+    ctx: Ctx,
+) -> Result<Next> {
     if input.password != input.confirm_password {
         return Err(invalid("confirm_password", "password_confirm_mismatch"));
     }
@@ -404,7 +453,11 @@ pub struct AccountEmailOnly {
 
 /// Sends a password reset link when the address has a confirmed account; answers the same either way.
 #[action(public, ai = false)]
-pub async fn account_forgot(input: Valid<AccountEmailOnly>, accounts: Accounts, ctx: Ctx) -> Result<Next> {
+pub async fn account_forgot(
+    input: Valid<AccountEmailOnly>,
+    accounts: Accounts,
+    ctx: Ctx,
+) -> Result<Next> {
     crate::server::accounts::forgot_password(&ctx, &accounts, &input.email).await?;
     go(path("/account/check-email"), false)
 }
@@ -412,18 +465,24 @@ pub async fn account_forgot(input: Valid<AccountEmailOnly>, accounts: Accounts, 
 #[screen(route = "/account/forgot-password", public)]
 pub fn account_forgot_password(_: ()) -> Screen {
     page("forgot.title").body(
-        Stack::new().add(para("zeyn.accounts.forgot.intro")).add(
-            Form::of(AccountEmailOnly::default())
-                .field(AccountEmailOnly::email)
-                .submit(t!("zeyn.accounts.forgot.submit"), account_forgot)
-                .on_success(next_effect),
-        ),
+        Stack::new()
+            .add(para("zeyn.accounts.forgot.intro"))
+            .add(
+                Form::of(AccountEmailOnly::default())
+                    .field(AccountEmailOnly::email)
+                    .submit(t!("zeyn.accounts.forgot.submit"), account_forgot)
+                    .on_success(next_effect),
+            ),
     )
 }
 
 /// Sends the confirmation link again; answers the same either way.
 #[action(public, ai = false)]
-pub async fn account_resend(input: Valid<AccountEmailOnly>, accounts: Accounts, ctx: Ctx) -> Result<Next> {
+pub async fn account_resend(
+    input: Valid<AccountEmailOnly>,
+    accounts: Accounts,
+    ctx: Ctx,
+) -> Result<Next> {
     crate::server::accounts::resend_confirmation(&ctx, &accounts, &input.email).await?;
     go(path("/account/check-email"), false)
 }
@@ -460,20 +519,34 @@ pub struct AccountReset {
 
 /// Sets a new password with a reset link.
 #[action(public, ai = false)]
-pub async fn account_reset(input: Valid<AccountReset>, users: UserManager, sign_in: SignInManager) -> Result<Next> {
+pub async fn account_reset(
+    input: Valid<AccountReset>,
+    users: UserManager,
+    sign_in: SignInManager,
+) -> Result<Next> {
     sign_in.throttle_ip().await?;
     if input.password != input.confirm_password {
         return Err(invalid("confirm_password", "password_confirm_mismatch"));
     }
-    let Some(mut user) = users.find_by_id(&input.user).await? else { return Err(denied("invalid_token")) };
-    users.reset_password(&mut user, &input.code, &input.password).await?;
-    go(with_params("/account/login", json!({ "notice": "reset" })), false)
+    let Some(mut user) = users.find_by_id(&input.user).await? else {
+        return Err(denied("invalid_token"));
+    };
+    users
+        .reset_password(&mut user, &input.code, &input.password)
+        .await?;
+    go(
+        with_params("/account/login", json!({ "notice": "reset" })),
+        false,
+    )
 }
 
 #[screen(route = "/account/reset-password", public)]
 pub fn account_reset_password(p: LinkParams) -> Screen {
-    let model =
-        AccountReset { user: p.user.unwrap_or_default(), code: p.code.unwrap_or_default(), ..AccountReset::default() };
+    let model = AccountReset {
+        user: p.user.unwrap_or_default(),
+        code: p.code.unwrap_or_default(),
+        ..AccountReset::default()
+    };
     page("reset.title").body(
         Form::of(model)
             .field(AccountReset::password)
@@ -487,7 +560,11 @@ pub fn account_reset_password(p: LinkParams) -> Screen {
 
 /// Confirms an e-mail address, or an e-mail change, from the link in the message.
 #[screen(route = "/account/confirm-email", public)]
-pub async fn account_confirm_email(p: LinkParams, users: UserManager, sign_in: SignInManager) -> Result<Screen> {
+pub async fn account_confirm_email(
+    p: LinkParams,
+    users: UserManager,
+    sign_in: SignInManager,
+) -> Result<Screen> {
     sign_in.throttle_ip().await?;
     let found = match &p.user {
         Some(id) => users.find_by_id(id).await?,
@@ -497,9 +574,15 @@ pub async fn account_confirm_email(p: LinkParams, users: UserManager, sign_in: S
         (Some(mut user), Some(code)) => match p.email.as_deref() {
             Some(new) => {
                 let same = user.email.as_deref() == Some(user.user_name.as_str());
-                users.change_email(&mut user, new, code, same).await.is_ok()
+                users
+                    .change_email(&mut user, new, code, same)
+                    .await
+                    .is_ok()
             }
-            None => users.confirm_email(&mut user, code).await.is_ok(),
+            None => users
+                .confirm_email(&mut user, code)
+                .await
+                .is_ok(),
         },
         _ => false,
     };
@@ -508,7 +591,11 @@ pub async fn account_confirm_email(p: LinkParams, users: UserManager, sign_in: S
     } else {
         Alert::danger(t!("zeyn.accounts.confirm.failed"))
     };
-    Ok(page("confirm.title").body(Stack::new().add(alert).add(link("register.login", "/account/login"))))
+    Ok(page("confirm.title").body(
+        Stack::new()
+            .add(alert)
+            .add(link("register.login", "/account/login")),
+    ))
 }
 
 optional_params! {
@@ -530,8 +617,18 @@ pub struct AccountCode {
 
 /// Completes a sign in with an authenticator code.
 #[action(public, ai = false)]
-pub async fn account_verify_code(input: Valid<AccountCode>, sign_in: SignInManager) -> Result<Next> {
-    match sign_in.two_factor_sign_in(TwoFactorKind::Authenticator, &input.code, input.remember_machine).await? {
+pub async fn account_verify_code(
+    input: Valid<AccountCode>,
+    sign_in: SignInManager,
+) -> Result<Next> {
+    match sign_in
+        .two_factor_sign_in(
+            TwoFactorKind::Authenticator,
+            &input.code,
+            input.remember_machine,
+        )
+        .await?
+    {
         SignInResult::Succeeded => go(back(&input.return_to), true),
         SignInResult::LockedOut => go(path("/account/lockout"), false),
         _ => Err(invalid("code", "invalid_code")),
@@ -549,8 +646,14 @@ pub struct AccountEmailCode {
 
 /// Completes a sign in with a code sent by e-mail.
 #[action(public, ai = false)]
-pub async fn account_verify_email_code(input: Valid<AccountEmailCode>, sign_in: SignInManager) -> Result<Next> {
-    match sign_in.two_factor_sign_in(TwoFactorKind::Email, &input.code, input.remember_machine).await? {
+pub async fn account_verify_email_code(
+    input: Valid<AccountEmailCode>,
+    sign_in: SignInManager,
+) -> Result<Next> {
+    match sign_in
+        .two_factor_sign_in(TwoFactorKind::Email, &input.code, input.remember_machine)
+        .await?
+    {
         SignInResult::Succeeded => go(back(&input.return_to), true),
         SignInResult::LockedOut => go(path("/account/lockout"), false),
         _ => Err(invalid("code", "invalid_code")),
@@ -560,7 +663,9 @@ pub async fn account_verify_email_code(input: Valid<AccountEmailCode>, sign_in: 
 /// Sends a sign in code to the user's confirmed e-mail address.
 #[action(public, ai = false)]
 pub async fn account_send_email_code(_input: (), sign_in: SignInManager, ctx: Ctx) -> Result<()> {
-    sign_in.send_two_factor_code(&ctx, TwoFactorKind::Email).await
+    sign_in
+        .send_two_factor_code(&ctx, TwoFactorKind::Email)
+        .await
 }
 
 #[screen(route = "/account/login-2fa", public)]
@@ -572,39 +677,62 @@ pub async fn account_login_2fa(p: TwoFactorParams, sign_in: SignInManager) -> Re
                 .add(link("register.login", "/account/login")),
         ));
     };
-    let kinds = sign_in.0.users().two_factor_kinds(&user).await?;
+    let kinds = sign_in
+        .0
+        .users()
+        .two_factor_kinds(&user)
+        .await?;
     let return_to = p.return_to.unwrap_or_default();
-    let model = AccountCode { return_to: return_to.clone(), ..AccountCode::default() };
+    let model = AccountCode {
+        return_to: return_to.clone(),
+        ..AccountCode::default()
+    };
     let mut body = Stack::new();
     if kinds.contains(&TwoFactorKind::Authenticator) {
-        body = body.add(para("zeyn.accounts.two_factor.intro")).add(
-            Form::of(model.clone())
-                .field(AccountCode::code)
-                .control(AccountCode::code, Control::OneTimeCode)
-                .field(AccountCode::remember_machine)
-                .submit(t!("zeyn.accounts.two_factor.submit"), account_verify_code)
-                .on_success(next_effect),
-        );
+        body = body
+            .add(para("zeyn.accounts.two_factor.intro"))
+            .add(
+                Form::of(model.clone())
+                    .field(AccountCode::code)
+                    .control(AccountCode::code, Control::OneTimeCode)
+                    .field(AccountCode::remember_machine)
+                    .submit(t!("zeyn.accounts.two_factor.submit"), account_verify_code)
+                    .on_success(next_effect),
+            );
     }
     if kinds.contains(&TwoFactorKind::Email) {
         body = body
             .add(para("zeyn.accounts.two_factor.email_intro"))
             .add(
-                ActionButton::new(t!("zeyn.accounts.two_factor.send_email"), account_send_email_code, ())
-                    .on_success(|_, ui| ui.toast(t!("zeyn.accounts.two_factor.sent"))),
+                ActionButton::new(
+                    t!("zeyn.accounts.two_factor.send_email"),
+                    account_send_email_code,
+                    (),
+                )
+                .on_success(|_, ui| ui.toast(t!("zeyn.accounts.two_factor.sent"))),
             )
             .add(
-                Form::of(AccountEmailCode { return_to: model.return_to.clone(), ..AccountEmailCode::default() })
-                    .field(AccountEmailCode::code)
-                    .control(AccountEmailCode::code, Control::OneTimeCode)
-                    .field(AccountEmailCode::remember_machine)
-                    .submit(t!("zeyn.accounts.two_factor.submit_email"), account_verify_email_code)
-                    .on_success(next_effect),
+                Form::of(AccountEmailCode {
+                    return_to: model.return_to.clone(),
+                    ..AccountEmailCode::default()
+                })
+                .field(AccountEmailCode::code)
+                .control(AccountEmailCode::code, Control::OneTimeCode)
+                .field(AccountEmailCode::remember_machine)
+                .submit(
+                    t!("zeyn.accounts.two_factor.submit_email"),
+                    account_verify_email_code,
+                )
+                .on_success(next_effect),
             );
     }
     let recovery = with_params("/account/login-recovery", json!({ "return_to": return_to }));
     body = body.add(markup(move |r| {
-        format!(r#"<p><a href="{}">{}</a></p>"#, escape(&recovery), tx(r, "two_factor.use_recovery"))
+        format!(
+            r#"<p><a href="{}">{}</a></p>"#,
+            escape(&recovery),
+            tx(r, "two_factor.use_recovery")
+        )
     }));
     Ok(page("two_factor.title").body(body))
 }
@@ -619,8 +747,14 @@ pub struct AccountRecovery {
 
 /// Completes a sign in with a recovery code, which is used up.
 #[action(public, ai = false)]
-pub async fn account_use_recovery(input: Valid<AccountRecovery>, sign_in: SignInManager) -> Result<Next> {
-    match sign_in.recovery_code_sign_in(&input.code).await? {
+pub async fn account_use_recovery(
+    input: Valid<AccountRecovery>,
+    sign_in: SignInManager,
+) -> Result<Next> {
+    match sign_in
+        .recovery_code_sign_in(&input.code)
+        .await?
+    {
         SignInResult::Succeeded => go(back(&input.return_to), true),
         SignInResult::LockedOut => go(path("/account/lockout"), false),
         _ => Err(invalid("code", "invalid_recovery_code")),
@@ -630,13 +764,18 @@ pub async fn account_use_recovery(input: Valid<AccountRecovery>, sign_in: SignIn
 #[screen(route = "/account/login-recovery", public)]
 pub fn account_login_recovery(p: TwoFactorParams) -> Screen {
     page("recovery.title").body(
-        Stack::new().add(para("zeyn.accounts.recovery.intro")).add(
-            Form::of(AccountRecovery { return_to: p.return_to.unwrap_or_default(), ..AccountRecovery::default() })
+        Stack::new()
+            .add(para("zeyn.accounts.recovery.intro"))
+            .add(
+                Form::of(AccountRecovery {
+                    return_to: p.return_to.unwrap_or_default(),
+                    ..AccountRecovery::default()
+                })
                 .field(AccountRecovery::code)
                 .control(AccountRecovery::code, Control::OneTimeCode)
                 .submit(t!("zeyn.accounts.recovery.submit"), account_use_recovery)
                 .on_success(next_effect),
-        ),
+            ),
     )
 }
 
@@ -658,8 +797,13 @@ pub fn account_access_denied(_: ()) -> Screen {
 #[action(public, ai = false)]
 pub async fn account_sign_out(_input: (), accounts: Accounts) -> Result<Next> {
     let user = me(&accounts).await.ok();
-    accounts.sign_in().sign_out(user.as_ref().map(|u| u.id.as_str()));
-    go(with_params("/account/login", json!({ "notice": "signed_out" })), true)
+    accounts
+        .sign_in()
+        .sign_out(user.as_ref().map(|u| u.id.as_str()));
+    go(
+        with_params("/account/login", json!({ "notice": "signed_out" })),
+        true,
+    )
 }
 
 #[screen(route = "/account/logout", public)]
@@ -667,7 +811,10 @@ pub fn account_logout(_: ()) -> Screen {
     page("logout.title").body(
         Stack::new()
             .add(para("zeyn.accounts.logout.body"))
-            .add(ActionButton::new(t!("zeyn.accounts.logout.submit"), account_sign_out, ()).on_success(next_effect)),
+            .add(
+                ActionButton::new(t!("zeyn.accounts.logout.submit"), account_sign_out, ())
+                    .on_success(next_effect),
+            ),
     )
 }
 
@@ -684,14 +831,24 @@ pub struct AccountProfile {
 #[action(public, ai = false)]
 pub async fn account_save_profile(input: Valid<AccountProfile>, accounts: Accounts) -> Result<()> {
     let mut user = me(&accounts).await?;
-    let phone = input.phone_number.clone().map(|p| p.trim().to_string()).filter(|p| !p.is_empty());
+    let phone = input
+        .phone_number
+        .clone()
+        .map(|p| p.trim().to_string())
+        .filter(|p| !p.is_empty());
     if phone != user.phone_number {
-        if phone.as_deref().is_some_and(|p| !p.chars().all(|c| c.is_ascii_digit() || " +-()".contains(c))) {
+        if phone.as_deref().is_some_and(|p| {
+            !p.chars()
+                .all(|c| c.is_ascii_digit() || " +-()".contains(c))
+        }) {
             return Err(invalid("phone_number", "invalid_phone"));
         }
         user.phone_number = phone;
         user.phone_number_confirmed = false;
-        accounts.users().update(&mut user).await?;
+        accounts
+            .users()
+            .update(&mut user)
+            .await?;
     }
     Ok(())
 }
@@ -700,13 +857,18 @@ pub async fn account_save_profile(input: Valid<AccountProfile>, accounts: Accoun
 pub async fn account_manage(_: (), accounts: Accounts) -> Result<Screen> {
     let user = me(&accounts).await?;
     Ok(page("manage.profile").body(
-        Stack::new().add(manage_nav("/account/manage")).add(
-            Form::of(AccountProfile { user_name: user.user_name.clone(), phone_number: user.phone_number.clone() })
+        Stack::new()
+            .add(manage_nav("/account/manage"))
+            .add(
+                Form::of(AccountProfile {
+                    user_name: user.user_name.clone(),
+                    phone_number: user.phone_number.clone(),
+                })
                 .field(AccountProfile::user_name)
                 .field(AccountProfile::phone_number)
                 .submit(t!("zeyn.accounts.save"), account_save_profile)
                 .on_success(|_, ui| ui.toast(t!("zeyn.accounts.saved"))),
-        ),
+            ),
     ))
 }
 
@@ -719,7 +881,11 @@ pub struct AccountNewEmail {
 
 /// Sends a confirmation link to the new address; the address changes when the link is opened.
 #[action(public, ai = false)]
-pub async fn account_change_email(input: Valid<AccountNewEmail>, accounts: Accounts, ctx: Ctx) -> Result<()> {
+pub async fn account_change_email(
+    input: Valid<AccountNewEmail>,
+    accounts: Accounts,
+    ctx: Ctx,
+) -> Result<()> {
     let user = me(&accounts).await?;
     accounts.sign_in().throttle_ip().await?;
     if Some(input.new_email.as_str()) == user.email.as_deref() {
@@ -741,14 +907,28 @@ pub async fn account_email(_: (), accounts: Accounts) -> Result<Screen> {
     let user = me(&accounts).await?;
     let current = user.email.clone().unwrap_or_default();
     let confirmed = user.email_confirmed;
-    let mut body = Stack::new().add(manage_nav("/account/manage/email")).add(markup(move |r| {
-        let state = if confirmed { tx(r, "email.confirmed") } else { tx(r, "email.unconfirmed") };
-        format!(r#"<p>{} <strong>{}</strong> ({state})</p>"#, tx(r, "email.current"), escape(&current))
-    }));
+    let mut body = Stack::new()
+        .add(manage_nav("/account/manage/email"))
+        .add(markup(move |r| {
+            let state = if confirmed {
+                tx(r, "email.confirmed")
+            } else {
+                tx(r, "email.unconfirmed")
+            };
+            format!(
+                r#"<p>{} <strong>{}</strong> ({state})</p>"#,
+                tx(r, "email.current"),
+                escape(&current)
+            )
+        }));
     if !confirmed {
         body = body.add(
-            ActionButton::new(t!("zeyn.accounts.email.send_verification"), account_send_verification, ())
-                .on_success(|_, ui| ui.toast(t!("zeyn.accounts.email.sent"))),
+            ActionButton::new(
+                t!("zeyn.accounts.email.send_verification"),
+                account_send_verification,
+                (),
+            )
+            .on_success(|_, ui| ui.toast(t!("zeyn.accounts.email.sent"))),
         );
     }
     body = body.add(
@@ -774,18 +954,30 @@ pub struct AccountPassword {
 /// Changes the password, or sets one for a user without one. Other sessions are signed out by
 /// the new security stamp; this one is renewed.
 #[action(public, ai = false)]
-pub async fn account_change_password(input: Valid<AccountPassword>, accounts: Accounts) -> Result<()> {
+pub async fn account_change_password(
+    input: Valid<AccountPassword>,
+    accounts: Accounts,
+) -> Result<()> {
     let mut user = me(&accounts).await?;
     accounts.sign_in().throttle_ip().await?;
     if input.new_password != input.confirm_password {
         return Err(invalid("confirm_password", "password_confirm_mismatch"));
     }
     if user.password_hash.is_some() {
-        accounts.users().change_password(&mut user, &input.old_password, &input.new_password).await?;
+        accounts
+            .users()
+            .change_password(&mut user, &input.old_password, &input.new_password)
+            .await?;
     } else {
-        accounts.users().add_password(&mut user, &input.new_password).await?;
+        accounts
+            .users()
+            .add_password(&mut user, &input.new_password)
+            .await?;
     }
-    accounts.sign_in().refresh_sign_in(&user).await
+    accounts
+        .sign_in()
+        .refresh_sign_in(&user)
+        .await
 }
 
 #[screen(route = "/account/manage/password", public)]
@@ -793,20 +985,24 @@ pub async fn account_password(_: (), accounts: Accounts) -> Result<Screen> {
     let user = me(&accounts).await?;
     let mut form = Form::of(AccountPassword::default());
     if user.password_hash.is_some() {
-        form = form.field(AccountPassword::old_password).control(AccountPassword::old_password, Control::Password);
+        form = form
+            .field(AccountPassword::old_password)
+            .control(AccountPassword::old_password, Control::Password);
     }
     Ok(page("manage.password").body(
-        Stack::new().add(manage_nav("/account/manage/password")).add(
-            form.field(AccountPassword::new_password)
-                .control(AccountPassword::new_password, Control::NewPassword)
-                .field(AccountPassword::confirm_password)
-                .control(AccountPassword::confirm_password, Control::NewPassword)
-                .submit(t!("zeyn.accounts.password.submit"), account_change_password)
-                .on_success(|_, ui| {
-                    ui.toast(t!("zeyn.accounts.password.changed"));
-                    ui.effect(Effect::go(&path("/account/manage/password"), false));
-                }),
-        ),
+        Stack::new()
+            .add(manage_nav("/account/manage/password"))
+            .add(
+                form.field(AccountPassword::new_password)
+                    .control(AccountPassword::new_password, Control::NewPassword)
+                    .field(AccountPassword::confirm_password)
+                    .control(AccountPassword::confirm_password, Control::NewPassword)
+                    .submit(t!("zeyn.accounts.password.submit"), account_change_password)
+                    .on_success(|_, ui| {
+                        ui.toast(t!("zeyn.accounts.password.changed"));
+                        ui.effect(Effect::go(&path("/account/manage/password"), false));
+                    }),
+            ),
     ))
 }
 
@@ -822,24 +1018,53 @@ struct FreshCodes {
 
 /// Makes new recovery codes and hands them to the screen that shows them once.
 async fn new_codes(accounts: &Accounts, user: &User) -> Result<Next> {
-    let codes = accounts.users().generate_recovery_codes(user, 10).await?;
-    let sealer = accounts.0.sealer.as_ref().ok_or_else(|| Error::Internal("accounts key too short".into()))?;
-    let fresh = FreshCodes { user: user.id.clone(), codes, expires: super::now_secs() + 300 };
+    let codes = accounts
+        .users()
+        .generate_recovery_codes(user, 10)
+        .await?;
+    let sealer = accounts
+        .0
+        .sealer
+        .as_ref()
+        .ok_or_else(|| Error::Internal("accounts key too short".into()))?;
+    let fresh = FreshCodes {
+        user: user.id.clone(),
+        codes,
+        expires: super::now_secs() + 300,
+    };
     scope::set_cookie(CODES, Some(&sealer.seal(CODES, &fresh)), Some(300));
     go(path("/account/manage/recovery-codes"), false)
 }
 
 /// Turns on two factor sign in with the authenticator app code shown on the screen.
 #[action(public, reauth, ai = false)]
-pub async fn account_enable_authenticator(input: Valid<AccountCode>, accounts: Accounts) -> Result<Next> {
+pub async fn account_enable_authenticator(
+    input: Valid<AccountCode>,
+    accounts: Accounts,
+) -> Result<Next> {
     let mut user = me(&accounts).await?;
     accounts.sign_in().throttle_ip().await?;
-    if !accounts.users().verify_authenticator_code(&user, &input.code).await? {
+    if !accounts
+        .users()
+        .verify_authenticator_code(&user, &input.code)
+        .await?
+    {
         return Err(invalid("code", "invalid_code"));
     }
-    accounts.users().set_two_factor_enabled(&mut user, true).await?;
-    accounts.sign_in().refresh_sign_in(&user).await?;
-    if accounts.users().count_recovery_codes(&user).await? == 0 {
+    accounts
+        .users()
+        .set_two_factor_enabled(&mut user, true)
+        .await?;
+    accounts
+        .sign_in()
+        .refresh_sign_in(&user)
+        .await?;
+    if accounts
+        .users()
+        .count_recovery_codes(&user)
+        .await?
+        == 0
+    {
         return new_codes(&accounts, &user).await;
     }
     go(path("/account/manage/two-factor"), false)
@@ -849,8 +1074,14 @@ pub async fn account_enable_authenticator(input: Valid<AccountCode>, accounts: A
 #[action(public, reauth, ai = false)]
 pub async fn account_disable_two_factor(_input: (), accounts: Accounts) -> Result<Next> {
     let mut user = me(&accounts).await?;
-    accounts.users().set_two_factor_enabled(&mut user, false).await?;
-    accounts.sign_in().refresh_sign_in(&user).await?;
+    accounts
+        .users()
+        .set_two_factor_enabled(&mut user, false)
+        .await?;
+    accounts
+        .sign_in()
+        .refresh_sign_in(&user)
+        .await?;
     go(path("/account/manage/two-factor"), false)
 }
 
@@ -858,9 +1089,18 @@ pub async fn account_disable_two_factor(_input: (), accounts: Accounts) -> Resul
 #[action(public, reauth, ai = false)]
 pub async fn account_reset_authenticator(_input: (), accounts: Accounts) -> Result<Next> {
     let mut user = me(&accounts).await?;
-    accounts.users().set_two_factor_enabled(&mut user, false).await?;
-    accounts.users().reset_authenticator_key(&mut user).await?;
-    accounts.sign_in().refresh_sign_in(&user).await?;
+    accounts
+        .users()
+        .set_two_factor_enabled(&mut user, false)
+        .await?;
+    accounts
+        .users()
+        .reset_authenticator_key(&mut user)
+        .await?;
+    accounts
+        .sign_in()
+        .refresh_sign_in(&user)
+        .await?;
     go(path("/account/manage/two-factor"), false)
 }
 
@@ -868,7 +1108,9 @@ pub async fn account_reset_authenticator(_input: (), accounts: Accounts) -> Resu
 #[action(public, ai = false)]
 pub async fn account_forget_browser(_input: (), accounts: Accounts) -> Result<()> {
     me(&accounts).await?;
-    accounts.sign_in().forget_two_factor_client();
+    accounts
+        .sign_in()
+        .forget_two_factor_client();
     Ok(())
 }
 
@@ -885,52 +1127,90 @@ pub async fn account_two_factor(_: (), accounts: Accounts, ctx: Ctx) -> Result<S
     let users = accounts.users();
     let mut body = Stack::new().add(manage_nav("/account/manage/two-factor"));
     if user.two_factor_enabled {
-        let left = users.count_recovery_codes(&user).await?;
+        let left = users
+            .count_recovery_codes(&user)
+            .await?;
         body = body
             .add(Alert::success(t!("zeyn.accounts.two_factor.on")))
             .add(markup(move |r| {
                 format!(
                     "<p>{}</p>",
-                    r.text(&Text::key("zeyn.accounts.two_factor.codes_left").arg("n", left.to_string()))
+                    r.text(
+                        &Text::key("zeyn.accounts.two_factor.codes_left")
+                            .arg("n", left.to_string())
+                    )
                 )
             }))
             .add(
                 Row::new()
                     .col(
-                        ActionButton::new(t!("zeyn.accounts.two_factor.new_codes"), account_new_recovery_codes, ())
-                            .confirm(t!("zeyn.accounts.two_factor.new_codes_confirm"))
-                            .on_success(next_effect),
+                        ActionButton::new(
+                            t!("zeyn.accounts.two_factor.new_codes"),
+                            account_new_recovery_codes,
+                            (),
+                        )
+                        .confirm(t!("zeyn.accounts.two_factor.new_codes_confirm"))
+                        .on_success(next_effect),
                     )
                     .col(
-                        ActionButton::new(t!("zeyn.accounts.two_factor.forget"), account_forget_browser, ())
-                            .on_success(|_, ui| ui.toast(t!("zeyn.accounts.saved"))),
+                        ActionButton::new(
+                            t!("zeyn.accounts.two_factor.forget"),
+                            account_forget_browser,
+                            (),
+                        )
+                        .on_success(|_, ui| ui.toast(t!("zeyn.accounts.saved"))),
                     )
                     .col(
-                        ActionButton::new(t!("zeyn.accounts.two_factor.disable"), account_disable_two_factor, ())
-                            .confirm(t!("zeyn.accounts.two_factor.disable_confirm"))
-                            .tone(Tone::Danger)
-                            .on_success(next_effect),
+                        ActionButton::new(
+                            t!("zeyn.accounts.two_factor.disable"),
+                            account_disable_two_factor,
+                            (),
+                        )
+                        .confirm(t!("zeyn.accounts.two_factor.disable_confirm"))
+                        .tone(Tone::Danger)
+                        .on_success(next_effect),
                     )
                     .col(
-                        ActionButton::new(t!("zeyn.accounts.two_factor.reset_key"), account_reset_authenticator, ())
-                            .confirm(t!("zeyn.accounts.two_factor.reset_key_confirm"))
-                            .on_success(next_effect),
+                        ActionButton::new(
+                            t!("zeyn.accounts.two_factor.reset_key"),
+                            account_reset_authenticator,
+                            (),
+                        )
+                        .confirm(t!("zeyn.accounts.two_factor.reset_key_confirm"))
+                        .on_success(next_effect),
                     ),
             );
     } else if !ctx.signed_in_recently() {
         let again = path("/account/login?return_to=%2Faccount%2Fmanage%2Ftwo-factor");
-        body = body.add(Alert::info(t!("zeyn.accounts.two_factor.reauth"))).add(markup(move |r| {
-            format!(r#"<p><a href="{}">{}</a></p>"#, escape(&again), tx(r, "two_factor.reauth_link"))
-        }));
+        body = body
+            .add(Alert::info(t!("zeyn.accounts.two_factor.reauth")))
+            .add(markup(move |r| {
+                format!(
+                    r#"<p><a href="{}">{}</a></p>"#,
+                    escape(&again),
+                    tx(r, "two_factor.reauth_link")
+                )
+            }));
     } else {
         let key = match users.authenticator_key(&user).await? {
             Some(k) => k,
-            None => users.reset_authenticator_key(&mut user).await?,
+            None => {
+                users
+                    .reset_authenticator_key(&mut user)
+                    .await?
+            }
         };
-        accounts.sign_in().refresh_sign_in(&user).await?;
+        accounts
+            .sign_in()
+            .refresh_sign_in(&user)
+            .await?;
         let uri = users.authenticator_uri(&user, &key);
-        let grouped: Vec<String> =
-            key.to_lowercase().as_bytes().chunks(4).map(|c| String::from_utf8_lossy(c).into_owned()).collect();
+        let grouped: Vec<String> = key
+            .to_lowercase()
+            .as_bytes()
+            .chunks(4)
+            .map(|c| String::from_utf8_lossy(c).into_owned())
+            .collect();
         body = body
             .add(para("zeyn.accounts.two_factor.setup"))
             .add(markup(move |r| {
@@ -957,16 +1237,28 @@ pub async fn account_two_factor(_: (), accounts: Accounts, ctx: Ctx) -> Result<S
 pub async fn account_recovery_codes(_: (), accounts: Accounts) -> Result<Screen> {
     let user = me(&accounts).await?;
     let fresh = scope::cookie(CODES)
-        .and_then(|v| accounts.0.sealer.as_ref()?.open::<FreshCodes>(CODES, &v))
+        .and_then(|v| {
+            accounts
+                .0
+                .sealer
+                .as_ref()?
+                .open::<FreshCodes>(CODES, &v)
+        })
         .filter(|f| f.user == user.id && f.expires > super::now_secs());
     scope::set_cookie(CODES, None, None);
     let mut body = Stack::new().add(manage_nav("/account/manage/two-factor"));
     match fresh {
         Some(f) => {
-            body = body.add(Alert::warning(t!("zeyn.accounts.codes.keep"))).add(markup(move |_| {
-                let items: String = f.codes.iter().map(|c| format!("<li><code>{}</code></li>", escape(c))).collect();
-                format!(r#"<ul class="z-totp-codes">{items}</ul>"#)
-            }));
+            body = body
+                .add(Alert::warning(t!("zeyn.accounts.codes.keep")))
+                .add(markup(move |_| {
+                    let items: String = f
+                        .codes
+                        .iter()
+                        .map(|c| format!("<li><code>{}</code></li>", escape(c)))
+                        .collect();
+                    format!(r#"<ul class="z-totp-codes">{items}</ul>"#)
+                }));
         }
         None => body = body.add(Alert::info(t!("zeyn.accounts.codes.gone"))),
     }
@@ -978,8 +1270,14 @@ pub async fn account_recovery_codes(_: (), accounts: Accounts) -> Result<Screen>
 pub async fn account_remove_passkey(id: String, accounts: Accounts) -> Result<Next> {
     let mut user = me(&accounts).await?;
     let raw = crate::auth::b64url_decode(&id).ok_or(Error::NotFound)?;
-    accounts.users().remove_passkey(&mut user, &raw).await?;
-    accounts.sign_in().refresh_sign_in(&user).await?;
+    accounts
+        .users()
+        .remove_passkey(&mut user, &raw)
+        .await?;
+    accounts
+        .sign_in()
+        .refresh_sign_in(&user)
+        .await?;
     go(path("/account/manage/passkeys"), false)
 }
 
@@ -987,12 +1285,17 @@ pub async fn account_remove_passkey(id: String, accounts: Accounts) -> Result<Ne
 pub async fn account_passkeys(_: (), accounts: Accounts) -> Result<Screen> {
     let user = me(&accounts).await?;
     let list = accounts.users().passkeys(&user).await?;
-    let mut body = Stack::new().add(manage_nav("/account/manage/passkeys")).add(para("zeyn.accounts.passkeys.intro"));
+    let mut body = Stack::new()
+        .add(manage_nav("/account/manage/passkeys"))
+        .add(para("zeyn.accounts.passkeys.intro"));
     if list.is_empty() {
         body = body.add(EmptyState::new(t!("zeyn.accounts.passkeys.none")));
     }
     for p in list {
-        let name = p.name.clone().unwrap_or_else(|| "Passkey".into());
+        let name = p
+            .name
+            .clone()
+            .unwrap_or_else(|| "Passkey".into());
         let created = crate::time::DateTime::from_unix_ms(p.created_at.saturating_mul(1000));
         body = body.add(
             Row::new()
@@ -1000,7 +1303,10 @@ pub async fn account_passkeys(_: (), accounts: Accounts) -> Result<Screen> {
                     format!(
                         "<p><strong>{}</strong> {}</p>",
                         escape(&name),
-                        r.value(&crate::value::Value::DateTime(created), &crate::value::FieldKind::DateTime)
+                        r.value(
+                            &crate::value::Value::DateTime(created),
+                            &crate::value::FieldKind::DateTime
+                        )
                     )
                 }))
                 .col(
@@ -1040,8 +1346,14 @@ pub struct LoginRef {
 #[action(public, reauth, ai = false)]
 pub async fn account_remove_login(login: LoginRef, accounts: Accounts) -> Result<Next> {
     let mut user = me(&accounts).await?;
-    accounts.users().remove_login(&mut user, &login.provider, &login.key).await?;
-    accounts.sign_in().refresh_sign_in(&user).await?;
+    accounts
+        .users()
+        .remove_login(&mut user, &login.provider, &login.key)
+        .await?;
+    accounts
+        .sign_in()
+        .refresh_sign_in(&user)
+        .await?;
     go(path("/account/manage/logins"), false)
 }
 
@@ -1053,22 +1365,40 @@ pub async fn account_logins(_: (), accounts: Accounts) -> Result<Screen> {
     if logins.is_empty() {
         body = body.add(EmptyState::new(t!("zeyn.accounts.logins.none")));
     }
-    let linked: Vec<String> = logins.iter().map(|l| l.provider.clone()).collect();
+    let linked: Vec<String> = logins
+        .iter()
+        .map(|l| l.provider.clone())
+        .collect();
     for l in logins {
-        let label = format!("{} {}", l.provider, l.display_name.clone().unwrap_or_default());
+        let label = format!(
+            "{} {}",
+            l.provider,
+            l.display_name
+                .clone()
+                .unwrap_or_default()
+        );
         body = body.add(
-            Row::new().col(markup(move |_| format!("<p>{}</p>", escape(&label)))).col(
-                ActionButton::new(
-                    t!("zeyn.accounts.logins.remove"),
-                    account_remove_login,
-                    LoginRef { provider: l.provider, key: l.provider_key },
-                )
-                .confirm(t!("zeyn.accounts.logins.remove_confirm"))
-                .on_success(next_effect),
-            ),
+            Row::new()
+                .col(markup(move |_| format!("<p>{}</p>", escape(&label))))
+                .col(
+                    ActionButton::new(
+                        t!("zeyn.accounts.logins.remove"),
+                        account_remove_login,
+                        LoginRef {
+                            provider: l.provider,
+                            key: l.provider_key,
+                        },
+                    )
+                    .confirm(t!("zeyn.accounts.logins.remove_confirm"))
+                    .on_success(next_effect),
+                ),
         );
     }
-    let available: Vec<String> = accounts.external_names().into_iter().filter(|p| !linked.contains(p)).collect();
+    let available: Vec<String> = accounts
+        .external_names()
+        .into_iter()
+        .filter(|p| !linked.contains(p))
+        .collect();
     if !available.is_empty() {
         let prefix = scope::prefix();
         body = body.add(markup(move |r| {
@@ -1094,12 +1424,22 @@ pub struct AccountDelete {
 pub async fn account_delete(input: Valid<AccountDelete>, accounts: Accounts) -> Result<Next> {
     let mut user = me(&accounts).await?;
     accounts.sign_in().throttle_ip().await?;
-    if user.password_hash.is_some() && !accounts.users().check_password(&mut user, &input.password).await? {
+    if user.password_hash.is_some()
+        && !accounts
+            .users()
+            .check_password(&mut user, &input.password)
+            .await?
+    {
         return Err(invalid("password", "password_mismatch"));
     }
     accounts.users().delete(&user).await?;
-    accounts.sign_in().sign_out(Some(&user.id));
-    go(with_params("/account/login", json!({ "notice": "deleted" })), true)
+    accounts
+        .sign_in()
+        .sign_out(Some(&user.id));
+    go(
+        with_params("/account/login", json!({ "notice": "deleted" })),
+        true,
+    )
 }
 
 #[screen(route = "/account/manage/personal-data", public)]
@@ -1108,7 +1448,9 @@ pub async fn account_personal_data(_: (), accounts: Accounts) -> Result<Screen> 
     let download = path("/_zeyn/account/manage/personalData");
     let mut form = Form::of(AccountDelete::default());
     if user.password_hash.is_some() {
-        form = form.field(AccountDelete::password).control(AccountDelete::password, Control::Password);
+        form = form
+            .field(AccountDelete::password)
+            .control(AccountDelete::password, Control::Password);
     }
     Ok(page("manage.personal_data").body(
         Stack::new()
@@ -1122,7 +1464,10 @@ pub async fn account_personal_data(_: (), accounts: Accounts) -> Result<Screen> 
                 )
             }))
             .add(Alert::danger(t!("zeyn.accounts.data.delete_warning")))
-            .add(form.submit(t!("zeyn.accounts.data.delete"), account_delete).on_success(next_effect)),
+            .add(
+                form.submit(t!("zeyn.accounts.data.delete"), account_delete)
+                    .on_success(next_effect),
+            ),
     ))
 }
 
@@ -1146,11 +1491,22 @@ pub async fn account_admin_list(q: DataQuery, accounts: Accounts) -> Result<Page
         crate::action::PageRequest::Offset { offset, limit } => (offset, limit),
         crate::action::PageRequest::After { limit, .. } => (0, limit),
     };
-    let search = q.filters.iter().find(|f| !f.contains.is_empty()).map(|f| f.contains.clone());
-    let (users, total) = accounts.users().list(search.as_deref(), offset, limit.min(crate::MAX_PAGE_SIZE)).await?;
+    let search = q
+        .filters
+        .iter()
+        .find(|f| !f.contains.is_empty())
+        .map(|f| f.contains.clone());
+    let (users, total) = accounts
+        .users()
+        .list(search.as_deref(), offset, limit.min(crate::MAX_PAGE_SIZE))
+        .await?;
     let mut rows = Vec::with_capacity(users.len());
     for u in users {
-        let roles = accounts.users().roles(&u).await?.join(", ");
+        let roles = accounts
+            .users()
+            .roles(&u)
+            .await?
+            .join(", ");
         rows.push(AccountUserRow {
             locked: u.is_locked_out(super::now_secs()),
             id: u.id,
@@ -1165,7 +1521,11 @@ pub async fn account_admin_list(q: DataQuery, accounts: Accounts) -> Result<Page
 }
 
 async fn admin_user(accounts: &Accounts, id: &str) -> Result<User> {
-    accounts.users().find_by_id(id).await?.ok_or(Error::NotFound)
+    accounts
+        .users()
+        .find_by_id(id)
+        .await?
+        .ok_or(Error::NotFound)
 }
 
 /// Locks a user out for a hundred years and signs out their sessions.
@@ -1173,8 +1533,14 @@ async fn admin_user(accounts: &Accounts, id: &str) -> Result<User> {
 pub async fn account_admin_lock(id: String, accounts: Accounts) -> Result<()> {
     let mut user = admin_user(&accounts, &id).await?;
     user.lockout_enabled = true;
-    accounts.users().set_lockout_end(&mut user, Some(super::now_secs() + 100 * 365 * 86_400)).await?;
-    accounts.users().update_security_stamp(&mut user).await
+    accounts
+        .users()
+        .set_lockout_end(&mut user, Some(super::now_secs() + 100 * 365 * 86_400))
+        .await?;
+    accounts
+        .users()
+        .update_security_stamp(&mut user)
+        .await
 }
 
 /// Ends a lockout.
@@ -1182,21 +1548,33 @@ pub async fn account_admin_lock(id: String, accounts: Accounts) -> Result<()> {
 pub async fn account_admin_unlock(id: String, accounts: Accounts) -> Result<()> {
     let mut user = admin_user(&accounts, &id).await?;
     user.lockout_enabled = true;
-    accounts.users().set_lockout_end(&mut user, None).await
+    accounts
+        .users()
+        .set_lockout_end(&mut user, None)
+        .await
 }
 
 /// Sends the user a password reset link.
 #[action(permission = "accounts.users.write", audit, ai = false)]
 pub async fn account_admin_reset(id: String, accounts: Accounts, ctx: Ctx) -> Result<()> {
     let user = admin_user(&accounts, &id).await?;
-    let to = user.email.clone().ok_or_else(|| invalid("email", "invalid_email"))?;
-    let code = accounts.users().generate_password_reset_token(&user);
+    let to = user
+        .email
+        .clone()
+        .ok_or_else(|| invalid("email", "invalid_email"))?;
+    let code = accounts
+        .users()
+        .generate_password_reset_token(&user);
     let link = crate::server::accounts::screen_link(
         &accounts,
         "/account/reset-password",
         &json!({ "user": user.id, "code": code }),
     );
-    accounts.0.sender.send(&ctx, &to, super::AccountMessage::ResetPassword { link }).await
+    accounts
+        .0
+        .sender
+        .send(&ctx, &to, super::AccountMessage::ResetPassword { link })
+        .await
 }
 
 #[screen(route = "/account/admin/users", permission = "accounts.users.read")]
@@ -1211,9 +1589,21 @@ pub fn account_admin_users(_: ()) -> Screen {
             .column(AccountUserRow::two_factor)
             .column(AccountUserRow::locked)
             .column(AccountUserRow::roles)
-            .row_action(t!("zeyn.accounts.admin.lock"), account_admin_lock, |u: &AccountUserRow| u.id.clone())
-            .row_action(t!("zeyn.accounts.admin.unlock"), account_admin_unlock, |u: &AccountUserRow| u.id.clone())
-            .row_action(t!("zeyn.accounts.admin.reset"), account_admin_reset, |u: &AccountUserRow| u.id.clone())
+            .row_action(
+                t!("zeyn.accounts.admin.lock"),
+                account_admin_lock,
+                |u: &AccountUserRow| u.id.clone(),
+            )
+            .row_action(
+                t!("zeyn.accounts.admin.unlock"),
+                account_admin_unlock,
+                |u: &AccountUserRow| u.id.clone(),
+            )
+            .row_action(
+                t!("zeyn.accounts.admin.reset"),
+                account_admin_reset,
+                |u: &AccountUserRow| u.id.clone(),
+            )
             .on_open(|u| Window::open(account_admin_user_roles, UserParams { id: u.id.clone() })),
     )
 }
@@ -1235,10 +1625,18 @@ pub struct AccountUserRoles {
 
 /// Sets a user's roles to the listed ones (which must exist).
 #[action(permission = "accounts.users.write", audit, ai = false)]
-pub async fn account_admin_save_roles(input: Valid<AccountUserRoles>, accounts: Accounts) -> Result<()> {
+pub async fn account_admin_save_roles(
+    input: Valid<AccountUserRoles>,
+    accounts: Accounts,
+) -> Result<()> {
     let mut user = admin_user(&accounts, &input.id).await?;
-    let wanted: Vec<String> =
-        input.roles.split(',').map(str::trim).filter(|r| !r.is_empty()).map(str::to_string).collect();
+    let wanted: Vec<String> = input
+        .roles
+        .split(',')
+        .map(str::trim)
+        .filter(|r| !r.is_empty())
+        .map(str::to_string)
+        .collect();
     for name in &wanted {
         if !accounts.roles().exists(name).await? {
             return Err(invalid("roles", "unknown_role"));
@@ -1246,13 +1644,25 @@ pub async fn account_admin_save_roles(input: Valid<AccountUserRoles>, accounts: 
     }
     let current = accounts.users().roles(&user).await?;
     for r in &current {
-        if !wanted.iter().any(|w| super::normalize(w) == super::normalize(r)) {
-            accounts.users().remove_from_role(&mut user, r).await?;
+        if !wanted
+            .iter()
+            .any(|w| super::normalize(w) == super::normalize(r))
+        {
+            accounts
+                .users()
+                .remove_from_role(&mut user, r)
+                .await?;
         }
     }
     for w in &wanted {
-        if !current.iter().any(|r| super::normalize(w) == super::normalize(r)) {
-            accounts.users().add_to_role(&mut user, w).await?;
+        if !current
+            .iter()
+            .any(|r| super::normalize(w) == super::normalize(r))
+        {
+            accounts
+                .users()
+                .add_to_role(&mut user, w)
+                .await?;
         }
     }
     Ok(())
@@ -1261,13 +1671,19 @@ pub async fn account_admin_save_roles(input: Valid<AccountUserRoles>, accounts: 
 #[screen(permission = "accounts.users.write")]
 pub async fn account_admin_user_roles(p: UserParams, accounts: Accounts) -> Result<Screen> {
     let user = admin_user(&accounts, &p.id).await?;
-    let roles = accounts.users().roles(&user).await?.join(", ");
-    Ok(Screen::window(Text::Literal(user.user_name.clone().into())).body(
-        Form::of(AccountUserRoles { id: user.id, roles })
-            .field(AccountUserRoles::roles)
-            .submit(t!("zeyn.accounts.save"), account_admin_save_roles)
-            .on_success(|_, ui| ui.close_and_refresh()),
-    ))
+    let roles = accounts
+        .users()
+        .roles(&user)
+        .await?
+        .join(", ");
+    Ok(
+        Screen::window(Text::Literal(user.user_name.clone().into())).body(
+            Form::of(AccountUserRoles { id: user.id, roles })
+                .field(AccountUserRoles::roles)
+                .submit(t!("zeyn.accounts.save"), account_admin_save_roles)
+                .on_success(|_, ui| ui.close_and_refresh()),
+        ),
+    )
 }
 
 /// A role in the administration.
@@ -1282,28 +1698,56 @@ pub struct AccountRoleRow {
 
 /// Roles for the administration grid.
 #[action(permission = "accounts.roles.write", ai = false)]
-pub async fn account_admin_role_list(q: DataQuery, accounts: Accounts) -> Result<Page<AccountRoleRow>> {
+pub async fn account_admin_role_list(
+    q: DataQuery,
+    accounts: Accounts,
+) -> Result<Page<AccountRoleRow>> {
     let (offset, limit) = match q.page {
         crate::action::PageRequest::Offset { offset, limit } => (offset, limit),
         crate::action::PageRequest::After { limit, .. } => (0, limit),
     };
-    let (roles, total) = accounts.roles().list(offset, limit).await?;
+    let (roles, total) = accounts
+        .roles()
+        .list(offset, limit)
+        .await?;
     let mut rows = Vec::with_capacity(roles.len());
     for r in roles {
         let claims = accounts.roles().claims(&r).await?;
-        let permissions =
-            claims.into_iter().filter(|c| c.kind == "permission").map(|c| c.value).collect::<Vec<_>>().join(", ");
-        rows.push(AccountRoleRow { id: r.id, name: r.name, permissions });
+        let permissions = claims
+            .into_iter()
+            .filter(|c| c.kind == "permission")
+            .map(|c| c.value)
+            .collect::<Vec<_>>()
+            .join(", ");
+        rows.push(AccountRoleRow {
+            id: r.id,
+            name: r.name,
+            permissions,
+        });
     }
     Ok(Page::new(rows).total(total))
 }
 
 /// Creates a role with permission claims (comma separated).
 #[action(permission = "accounts.roles.write", audit, ai = false)]
-pub async fn account_admin_create_role(input: Valid<AccountRoleRow>, accounts: Accounts) -> Result<()> {
-    let role = accounts.roles().create(&input.name).await?;
-    for p in input.permissions.split(',').map(str::trim).filter(|p| !p.is_empty()) {
-        accounts.roles().add_claim(&role, super::Claim::new("permission", p)).await?;
+pub async fn account_admin_create_role(
+    input: Valid<AccountRoleRow>,
+    accounts: Accounts,
+) -> Result<()> {
+    let role = accounts
+        .roles()
+        .create(&input.name)
+        .await?;
+    for p in input
+        .permissions
+        .split(',')
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+    {
+        accounts
+            .roles()
+            .add_claim(&role, super::Claim::new("permission", p))
+            .await?;
     }
     Ok(())
 }
@@ -1311,7 +1755,11 @@ pub async fn account_admin_create_role(input: Valid<AccountRoleRow>, accounts: A
 /// Deletes a role; its users lose it.
 #[action(permission = "accounts.roles.write", audit, ai = false)]
 pub async fn account_admin_delete_role(id: String, accounts: Accounts) -> Result<()> {
-    let role = accounts.roles().find_by_id(&id).await?.ok_or(Error::NotFound)?;
+    let role = accounts
+        .roles()
+        .find_by_id(&id)
+        .await?
+        .ok_or(Error::NotFound)?;
     accounts.roles().delete(&role).await
 }
 
@@ -1334,8 +1782,13 @@ pub fn account_admin_roles(_: ()) -> Screen {
                 Form::of(AccountRoleRow::default())
                     .field(AccountRoleRow::name)
                     .field(AccountRoleRow::permissions)
-                    .submit(t!("zeyn.accounts.admin.create_role"), account_admin_create_role)
-                    .on_success(|_, ui| ui.effect(Effect::go(&path("/account/admin/roles"), false))),
+                    .submit(
+                        t!("zeyn.accounts.admin.create_role"),
+                        account_admin_create_role,
+                    )
+                    .on_success(|_, ui| {
+                        ui.effect(Effect::go(&path("/account/admin/roles"), false))
+                    }),
             ),
     )
 }
@@ -1353,24 +1806,49 @@ pub struct AccountExternal {
 /// screen, so nobody takes over an account through a provider.
 #[cfg(feature = "oidc")]
 #[action(public, ai = false)]
-pub async fn account_external_create(input: Valid<AccountExternal>, accounts: Accounts) -> Result<Next> {
+pub async fn account_external_create(
+    input: Valid<AccountExternal>,
+    accounts: Accounts,
+) -> Result<Next> {
     use crate::server::accounts::{EXTERNAL_PENDING, External};
     let pending = scope::cookie(EXTERNAL_PENDING)
-        .and_then(|v| accounts.0.sealer.as_ref()?.open::<External>(EXTERNAL_PENDING, &v))
+        .and_then(|v| {
+            accounts
+                .0
+                .sealer
+                .as_ref()?
+                .open::<External>(EXTERNAL_PENDING, &v)
+        })
         .filter(|e| e.expires > super::now_secs());
-    let Some(p) = pending else { return Err(denied("external_expired")) };
-    if accounts.users().find_by_name_or_email(&input.email).await?.is_some() {
+    let Some(p) = pending else {
+        return Err(denied("external_expired"));
+    };
+    if accounts
+        .users()
+        .find_by_name_or_email(&input.email)
+        .await?
+        .is_some()
+    {
         return Err(invalid("email", "external_email_taken"));
     }
     let mut user = User::new(&input.email).with_email(&input.email);
-    user.email_confirmed =
-        p.verified && p.email.as_deref().is_some_and(|e| super::normalize(e) == super::normalize(&input.email));
-    let mut user = accounts.users().create(user, None).await?;
+    user.email_confirmed = p.verified
+        && p.email
+            .as_deref()
+            .is_some_and(|e| super::normalize(e) == super::normalize(&input.email));
+    let mut user = accounts
+        .users()
+        .create(user, None)
+        .await?;
     accounts
         .users()
         .add_login(
             &mut user,
-            super::UserLogin { provider: p.provider.clone(), provider_key: p.key, display_name: p.email.clone() },
+            super::UserLogin {
+                provider: p.provider.clone(),
+                provider_key: p.key,
+                display_name: p.email.clone(),
+            },
         )
         .await?;
     scope::set_cookie(EXTERNAL_PENDING, None, None);
@@ -1378,7 +1856,10 @@ pub async fn account_external_create(input: Valid<AccountExternal>, accounts: Ac
     if !accounts.sign_in().can_sign_in(&user) {
         return go(path("/account/check-email"), false);
     }
-    accounts.sign_in().sign_in(&user, false, &p.provider, false).await?;
+    accounts
+        .sign_in()
+        .sign_in(&user, false, &p.provider, false)
+        .await?;
     go(back(&p.return_to), true)
 }
 
@@ -1387,7 +1868,13 @@ pub async fn account_external_create(input: Valid<AccountExternal>, accounts: Ac
 pub fn account_external_login(_: (), accounts: Accounts) -> Screen {
     use crate::server::accounts::{EXTERNAL_PENDING, External};
     let pending = scope::cookie(EXTERNAL_PENDING)
-        .and_then(|v| accounts.0.sealer.as_ref()?.open::<External>(EXTERNAL_PENDING, &v))
+        .and_then(|v| {
+            accounts
+                .0
+                .sealer
+                .as_ref()?
+                .open::<External>(EXTERNAL_PENDING, &v)
+        })
         .filter(|e| e.expires > super::now_secs());
     let Some(p) = pending else {
         return page("external.title").body(
@@ -1399,12 +1886,20 @@ pub fn account_external_login(_: (), accounts: Accounts) -> Screen {
     let provider = p.provider.clone();
     page("external.title").body(
         Stack::new()
-            .add(markup(move |r| format!("<p>{} <strong>{}</strong></p>", tx(r, "external.intro"), escape(&provider))))
+            .add(markup(move |r| {
+                format!(
+                    "<p>{} <strong>{}</strong></p>",
+                    tx(r, "external.intro"),
+                    escape(&provider)
+                )
+            }))
             .add(
-                Form::of(AccountExternal { email: p.email.unwrap_or_default() })
-                    .field(AccountExternal::email)
-                    .submit(t!("zeyn.accounts.external.submit"), account_external_create)
-                    .on_success(next_effect),
+                Form::of(AccountExternal {
+                    email: p.email.unwrap_or_default(),
+                })
+                .field(AccountExternal::email)
+                .submit(t!("zeyn.accounts.external.submit"), account_external_create)
+                .on_success(next_effect),
             ),
     )
 }

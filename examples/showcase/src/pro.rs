@@ -1,28 +1,49 @@
 //! Desktop class shell: the command palette and the commands it runs.
 
-use crate::stock::{Product, ProductParams, product_editor, product_list, restock_low, search_products};
+use crate::stock::{
+    Product, ProductParams, product_editor, product_list, restock_low, search_products,
+};
 use zeyn::prelude::*;
 
 /// Opens the product editor for a new product.
 pub fn new_product() -> Command {
-    Command::open("stock.new_product", t!("pro.cmd_new_product"), product_editor, ProductParams { id: None })
-        .shortcut("Ctrl+Alt+N")
-        .icon(Icon::Plus)
+    Command::open(
+        "stock.new_product",
+        t!("pro.cmd_new_product"),
+        product_editor,
+        ProductParams { id: None },
+    )
+    .shortcut("Ctrl+Alt+N")
+    .icon(Icon::Plus)
 }
 
 /// Restocks every product below 10 on the server.
 pub fn restock() -> Command {
-    Command::action("stock.restock_low", t!("pro.cmd_restock"), restock_low, ()).shortcut("Ctrl+Alt+R")
+    Command::action("stock.restock_low", t!("pro.cmd_restock"), restock_low, ())
+        .shortcut("Ctrl+Alt+R")
 }
 
 /// Goes to the product list.
 pub fn go_products() -> Command {
-    Command::navigate("stock.go_products", t!("pro.cmd_products"), product_list, ()).shortcut("Ctrl+Alt+P")
+    Command::navigate(
+        "stock.go_products",
+        t!("pro.cmd_products"),
+        product_list,
+        (),
+    )
+    .shortcut("Ctrl+Alt+P")
 }
 
 /// Shows a greeting; runs in the browser only.
 pub fn hello() -> Command {
-    Command::effect("pro.hello", t!("pro.cmd_hello"), Effect::Toast { message: t!("pro.hello") }).shortcut("Alt+H")
+    Command::effect(
+        "pro.hello",
+        t!("pro.cmd_hello"),
+        Effect::Toast {
+            message: t!("pro.hello"),
+        },
+    )
+    .shortcut("Alt+H")
 }
 
 #[screen(route = "/palette", permission = "stock.product.read")]
@@ -34,11 +55,16 @@ pub fn palette() -> Screen {
                 .shortcut("Ctrl+Alt+E")
                 .opens(product_editor, ProductParams { id: None })
         })
-        .context_menu(ContextMenu::new().item(t!("pro.cmd_hello"), Effect::Toast { message: t!("pro.hello") }).action(
-            t!("pro.cmd_restock"),
-            restock_low,
-            (),
-        ))
+        .context_menu(
+            ContextMenu::new()
+                .item(
+                    t!("pro.cmd_hello"),
+                    Effect::Toast {
+                        message: t!("pro.hello"),
+                    },
+                )
+                .action(t!("pro.cmd_restock"), restock_low, ()),
+        )
         .body(
             Stack::new()
                 .add(Alert::info(t!("pro.palette_intro")).title(t!("pro.palette_title")))
@@ -70,14 +96,25 @@ pub async fn save_shape(shape: Valid<Shape>) -> Result<Shape> {
 /// The designer's menu bar: the same commands the palette lists.
 fn menubar() -> MenuBar {
     MenuBar::new(t!("pro.menubar"))
-        .menu(t!("pro.menu_file"), |m| m.command(new_product()).separator().command(restock()))
+        .menu(t!("pro.menu_file"), |m| {
+            m.command(new_product())
+                .separator()
+                .command(restock())
+        })
         .menu(t!("pro.menu_go"), |m| m.command(go_products()))
         .menu(t!("pro.menu_help"), |m| m.command(hello()))
 }
 
 #[screen(route = "/designer", permission = "stock.product.read")]
 pub fn designer() -> Screen {
-    let shape = Shape { name: "Header".into(), x: 40, y: 24, width: 640, height: 80, visible: true };
+    let shape = Shape {
+        name: "Header".into(),
+        x: 40,
+        y: 24,
+        width: 640,
+        height: 80,
+        visible: true,
+    };
     Screen::new(t!("pro.designer")).body(
         Stack::new()
             .gap(2)
@@ -91,7 +128,11 @@ pub fn designer() -> Screen {
                             .tool("box", t!("pro.tool_box"), Some(Icon::Box))
                             .tool("text", t!("pro.tool_text"), None),
                     )
-                    .col(Card::new().title(t!("pro.canvas")).add(Alert::new(Tone::Neutral, t!("pro.canvas_hint"))))
+                    .col(
+                        Card::new()
+                            .title(t!("pro.canvas"))
+                            .add(Alert::new(Tone::Neutral, t!("pro.canvas_hint"))),
+                    )
                     .col(PropertyInspector::new(
                         t!("pro.properties"),
                         Form::of(shape)
@@ -101,7 +142,10 @@ pub fn designer() -> Screen {
                             .section(t!("pro.section_position"))
                             .row(|r| r.field(Shape::x).field(Shape::y))
                             .section(t!("pro.section_size"))
-                            .row(|r| r.field(Shape::width).field(Shape::height))
+                            .row(|r| {
+                                r.field(Shape::width)
+                                    .field(Shape::height)
+                            })
                             .submit(t!("pro.apply"), save_shape)
                             .on_success(|_, ui| ui.toast(t!("pro.applied"))),
                     )),
@@ -117,7 +161,14 @@ pub fn designer() -> Screen {
 }
 
 fn shape_inspector() -> PropertyInspector {
-    let shape = Shape { name: "Header".into(), x: 40, y: 24, width: 640, height: 80, visible: true };
+    let shape = Shape {
+        name: "Header".into(),
+        x: 40,
+        y: 24,
+        width: 640,
+        height: 80,
+        visible: true,
+    };
     PropertyInspector::new(
         t!("pro.properties"),
         Form::of(shape)
@@ -125,7 +176,10 @@ fn shape_inspector() -> PropertyInspector {
             .field(Shape::name)
             .field(Shape::visible)
             .section(t!("pro.section_size"))
-            .row(|r| r.field(Shape::width).field(Shape::height))
+            .row(|r| {
+                r.field(Shape::width)
+                    .field(Shape::height)
+            })
             .submit(t!("pro.apply"), save_shape)
             .on_success(|_, ui| ui.toast(t!("pro.applied"))),
     )
@@ -147,18 +201,38 @@ pub fn workspace() -> Screen {
             .gap(2)
             .add(
                 MenuBar::new(t!("pro.menubar"))
-                    .menu(t!("pro.menu_file"), |m| m.command(new_product()).separator().command(restock()))
+                    .menu(t!("pro.menu_file"), |m| {
+                        m.command(new_product())
+                            .separator()
+                            .command(restock())
+                    })
                     .menu(t!("pro.menu_view"), |m| m.panels()),
             )
             .add(
                 Dock::new(t!("pro.workspace"))
-                    .left("explorer", t!("pro.panel_explorer"), Alert::new(Tone::Neutral, t!("pro.dock_hint")))
+                    .left(
+                        "explorer",
+                        t!("pro.panel_explorer"),
+                        Alert::new(Tone::Neutral, t!("pro.dock_hint")),
+                    )
                     .center("products", t!("pro.panel_products"), products)
-                    .center("notes", t!("pro.panel_notes"), Card::new().title(t!("pro.canvas_hint")))
-                    .bottom("output", t!("pro.panel_output"), Alert::info(t!("pro.output_text")))
+                    .center(
+                        "notes",
+                        t!("pro.panel_notes"),
+                        Card::new().title(t!("pro.canvas_hint")),
+                    )
+                    .bottom(
+                        "output",
+                        t!("pro.panel_output"),
+                        Alert::info(t!("pro.output_text")),
+                    )
                     .right("properties", t!("pro.properties"), shape_inspector()),
             )
-            .add(StatusBar::new(t!("pro.status")).left(t!("pro.status_ready")).right("UTF-8")),
+            .add(
+                StatusBar::new(t!("pro.status"))
+                    .left(t!("pro.status_ready"))
+                    .right("UTF-8"),
+            ),
     )
 }
 

@@ -15,5 +15,8 @@ pub fn feature() -> Feature {
         .guard(SignedIn)
         .screen(product_list)
         .screen(product_form)
-        .menu(|m| m.group(t!("stock.menu"), Icon::Box).item(t!("stock.products"), product_list))
+        .menu(|m| {
+            m.group(t!("stock.menu"), Icon::Box)
+                .item(t!("stock.products"), product_list)
+        })
 }

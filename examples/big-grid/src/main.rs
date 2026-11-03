@@ -28,8 +28,16 @@ pub enum Status {
 }
 
 const TOTAL: u64 = 1_000_000;
-const CUSTOMERS: [&str; 8] =
-    ["Ada Yılmaz", "Can Demir", "Elif Şahin", "Mert Kaya", "Zeynep Arslan", "Ömer Çelik", "İpek Aydın", "Deniz Koç"];
+const CUSTOMERS: [&str; 8] = [
+    "Ada Yılmaz",
+    "Can Demir",
+    "Elif Şahin",
+    "Mert Kaya",
+    "Zeynep Arslan",
+    "Ömer Çelik",
+    "İpek Aydın",
+    "Deniz Koç",
+];
 const CITIES: [&str; 6] = ["İstanbul", "Ankara", "İzmir", "Bursa", "Antalya", "Konya"];
 
 /// Order number `n`, always the same for the same number.
@@ -50,16 +58,28 @@ fn order(n: u64) -> Order {
 
 #[action(permission = "sales.order.read")]
 pub async fn search_orders(q: DataQuery) -> Result<Page<Order>> {
-    let desc = q.sort.first().is_some_and(|s| s.field == "id" && s.desc);
+    let desc = q
+        .sort
+        .first()
+        .is_some_and(|s| s.field == "id" && s.desc);
     let offset = match &q.page {
         PageRequest::Offset { offset, .. } => *offset,
-        PageRequest::After { cursor, .. } => cursor.as_ref().and_then(|c| c.0.parse().ok()).unwrap_or(0),
+        PageRequest::After { cursor, .. } => cursor
+            .as_ref()
+            .and_then(|c| c.0.parse().ok())
+            .unwrap_or(0),
     }
     .min(TOTAL);
     let end = (offset + u64::from(q.limit())).min(TOTAL);
-    let items = (offset..end).map(|i| order(if desc { TOTAL - i } else { i + 1 })).collect();
+    let items = (offset..end)
+        .map(|i| order(if desc { TOTAL - i } else { i + 1 }))
+        .collect();
     let page = Page::new(items).total(TOTAL);
-    Ok(if end < TOTAL { page.next(Cursor(end.to_string())) } else { page })
+    Ok(if end < TOTAL {
+        page.next(Cursor(end.to_string()))
+    } else {
+        page
+    })
 }
 
 #[screen(route = "/orders", permission = "sales.order.read")]
@@ -97,7 +117,10 @@ async fn main() -> std::io::Result<()> {
         .feature(
             Feature::new("sales")
                 .screen(order_list)
-                .menu(|m| m.group(t!("orders.menu"), Icon::Cart).item(t!("orders.list"), order_list)),
+                .menu(|m| {
+                    m.group(t!("orders.menu"), Icon::Cart)
+                        .item(t!("orders.list"), order_list)
+                }),
         )
         .serve(&addr)
         .await

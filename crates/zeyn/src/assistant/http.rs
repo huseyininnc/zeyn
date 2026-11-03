@@ -4,8 +4,8 @@
 //! errors or logs.
 
 use super::{
-    Audio, ChatEvent, ChatMessage, ChatRequest, ChatStream, LlmProvider, Role, STREAM_BUFFER, SpeechStream,
-    SpeechToText, TextToSpeech, ToolCall,
+    Audio, ChatEvent, ChatMessage, ChatRequest, ChatStream, LlmProvider, Role, STREAM_BUFFER,
+    SpeechStream, SpeechToText, TextToSpeech, ToolCall,
 };
 use crate::action::Error;
 use crate::ctx::BoxFuture;
@@ -40,7 +40,11 @@ enum KeyHeader {
     ApiKey,
 }
 
-fn authorize(req: reqwest::RequestBuilder, key: Option<&Secret<String>>, header: KeyHeader) -> reqwest::RequestBuilder {
+fn authorize(
+    req: reqwest::RequestBuilder,
+    key: Option<&Secret<String>>,
+    header: KeyHeader,
+) -> reqwest::RequestBuilder {
     match (key, header) {
         (None, _) => req,
         (Some(k), KeyHeader::Bearer) => req.bearer_auth(k.expose()),
@@ -51,13 +55,19 @@ fn authorize(req: reqwest::RequestBuilder, key: Option<&Secret<String>>, header:
 /// Sends a request and returns the response when it succeeded; otherwise an internal error with
 /// the status and the start of the body, for the server log only.
 async fn send(req: reqwest::RequestBuilder, what: &str) -> crate::Result<reqwest::Response> {
-    let res = req.send().await.map_err(|e| Error::Internal(format!("{what}: request failed: {}", e.without_url())))?;
+    let res = req
+        .send()
+        .await
+        .map_err(|e| Error::Internal(format!("{what}: request failed: {}", e.without_url())))?;
     if res.status().is_success() {
         return Ok(res);
     }
     let status = res.status();
     let body = res.text().await.unwrap_or_default();
-    Err(Error::Internal(format!("{what}: {status}: {}", super::clip(&body, ERROR_BODY))))
+    Err(Error::Internal(format!(
+        "{what}: {status}: {}",
+        super::clip(&body, ERROR_BODY)
+    )))
 }
 
 /// Reads a streamed body as server sent events, one data line at a time, with a buffer that
@@ -70,13 +80,21 @@ struct Sse {
 
 impl Sse {
     fn new(res: reqwest::Response) -> Self {
-        Sse { res, buf: Vec::with_capacity(4096), event: String::new() }
+        Sse {
+            res,
+            buf: Vec::with_capacity(4096),
+            event: String::new(),
+        }
     }
 
     /// The next event name and data line; `None` at the end of the body.
     async fn next(&mut self) -> crate::Result<Option<(String, String)>> {
         loop {
-            while let Some(end) = self.buf.iter().position(|b| *b == b'\n') {
+            while let Some(end) = self
+                .buf
+                .iter()
+                .position(|b| *b == b'\n')
+            {
                 let raw: Vec<u8> = self.buf.drain(..=end).collect();
                 let line = String::from_utf8_lossy(&raw);
                 let line = line.trim_end_matches(['\n', '\r']);
@@ -91,11 +109,10 @@ impl Sse {
             if self.buf.len() > MAX_LINE {
                 return Err(Error::Internal("model stream line too long".into()));
             }
-            let chunk = self
-                .res
-                .chunk()
-                .await
-                .map_err(|e| Error::Internal(format!("model stream broke: {}", e.without_url())))?;
+            let chunk =
+                self.res.chunk().await.map_err(|e| {
+                    Error::Internal(format!("model stream broke: {}", e.without_url()))
+                })?;
             match chunk {
                 Some(c) => self.buf.extend_from_slice(&c),
                 None => return Ok(None),
@@ -131,7 +148,10 @@ where
 
 /// Index of the first message of the current turn: the one after the last user message.
 fn turn_start(messages: &[ChatMessage]) -> usize {
-    messages.iter().rposition(|m| m.role == Role::User).map_or(0, |i| i + 1)
+    messages
+        .iter()
+        .rposition(|m| m.role == Role::User)
+        .map_or(0, |i| i + 1)
 }
 
 /// Any server with the OpenAI chat completions API: OpenAI, Azure OpenAI (v1 API), Ollama, vLLM,
@@ -154,7 +174,10 @@ pub struct OpenAiCompatible {
 impl OpenAiCompatible {
     pub fn new(base_url: impl Into<String>, model: impl Into<String>) -> Self {
         OpenAiCompatible {
-            base: base_url.into().trim_end_matches('/').to_string(),
+            base: base_url
+                .into()
+                .trim_end_matches('/')
+                .to_string(),
             model: model.into(),
             key: None,
             header: KeyHeader::Bearer,
@@ -187,8 +210,12 @@ impl OpenAiCompatible {
         for m in &request.messages {
             messages.push(match m.role {
                 Role::User => json!({ "role": "user", "content": m.text }),
-                Role::Tool => json!({ "role": "tool", "tool_call_id": m.tool_call_id, "content": m.text }),
-                Role::Assistant if m.tool_calls.is_empty() => json!({ "role": "assistant", "content": m.text }),
+                Role::Tool => {
+                    json!({ "role": "tool", "tool_call_id": m.tool_call_id, "content": m.text })
+                }
+                Role::Assistant if m.tool_calls.is_empty() => {
+                    json!({ "role": "assistant", "content": m.text })
+                }
                 Role::Assistant => json!({
                     "role": "assistant",
                     "content": if m.text.is_empty() { Json::Null } else { json!(m.text) },
@@ -206,7 +233,11 @@ impl OpenAiCompatible {
             "stream_options": { "include_usage": true },
             "messages": messages,
         });
-        let field = if self.legacy_max_tokens { "max_tokens" } else { "max_completion_tokens" };
+        let field = if self.legacy_max_tokens {
+            "max_tokens"
+        } else {
+            "max_completion_tokens"
+        };
         body[field] = json!(request.max_tokens);
         if !request.tools.is_empty() {
             body["tools"] = request
@@ -224,16 +255,41 @@ type Partial = Vec<(String, String, String)>;
 
 /// Reads one chunk of an OpenAI compatible stream into events.
 fn openai_chunk(data: &Json, partial: &mut Partial, out: &mut Vec<ChatEvent>) {
-    if let Some(u) = data.get("usage").filter(|u| !u.is_null()) {
-        let n = |k: &str| u.get(k).and_then(Json::as_u64).unwrap_or(0) as u32;
-        out.push(ChatEvent::Usage { input: n("prompt_tokens"), output: n("completion_tokens") });
+    if let Some(u) = data
+        .get("usage")
+        .filter(|u| !u.is_null())
+    {
+        let n = |k: &str| {
+            u.get(k)
+                .and_then(Json::as_u64)
+                .unwrap_or(0) as u32
+        };
+        out.push(ChatEvent::Usage {
+            input: n("prompt_tokens"),
+            output: n("completion_tokens"),
+        });
     }
-    let Some(delta) = data.pointer("/choices/0/delta") else { return };
-    if let Some(text) = delta.get("content").and_then(Json::as_str).filter(|t| !t.is_empty()) {
+    let Some(delta) = data.pointer("/choices/0/delta") else {
+        return;
+    };
+    if let Some(text) = delta
+        .get("content")
+        .and_then(Json::as_str)
+        .filter(|t| !t.is_empty())
+    {
         out.push(ChatEvent::Text(text.to_string()));
     }
-    for call in delta.get("tool_calls").and_then(Json::as_array).into_iter().flatten() {
-        let i = call.get("index").and_then(Json::as_u64).unwrap_or(0).min(63) as usize;
+    for call in delta
+        .get("tool_calls")
+        .and_then(Json::as_array)
+        .into_iter()
+        .flatten()
+    {
+        let i = call
+            .get("index")
+            .and_then(Json::as_u64)
+            .unwrap_or(0)
+            .min(63) as usize;
         while partial.len() <= i {
             partial.push(Default::default());
         }
@@ -241,10 +297,16 @@ fn openai_chunk(data: &Json, partial: &mut Partial, out: &mut Vec<ChatEvent>) {
         if let Some(id) = call.get("id").and_then(Json::as_str) {
             p.0 = id.to_string();
         }
-        if let Some(name) = call.pointer("/function/name").and_then(Json::as_str) {
+        if let Some(name) = call
+            .pointer("/function/name")
+            .and_then(Json::as_str)
+        {
             p.1.push_str(name);
         }
-        if let Some(args) = call.pointer("/function/arguments").and_then(Json::as_str) {
+        if let Some(args) = call
+            .pointer("/function/arguments")
+            .and_then(Json::as_str)
+        {
             p.2.push_str(args);
         }
     }
@@ -263,16 +325,29 @@ fn finish_calls(partial: Partial) -> Vec<ChatEvent> {
             } else {
                 serde_json::from_str(&args).unwrap_or_else(|_| json!({}))
             };
-            let id = if id.is_empty() { format!("call_{i}") } else { id };
-            ChatEvent::ToolCall(ToolCall { id, name, arguments })
+            let id = if id.is_empty() {
+                format!("call_{i}")
+            } else {
+                id
+            };
+            ChatEvent::ToolCall(ToolCall {
+                id,
+                name,
+                arguments,
+            })
         })
         .collect()
 }
 
 impl LlmProvider for OpenAiCompatible {
     fn chat(&self, request: ChatRequest) -> BoxFuture<crate::Result<ChatStream>> {
-        let req = authorize(self.http.post(format!("{}/chat/completions", self.base)), self.key.as_ref(), self.header)
-            .json(&self.body(&request));
+        let req = authorize(
+            self.http
+                .post(format!("{}/chat/completions", self.base)),
+            self.key.as_ref(),
+            self.header,
+        )
+        .json(&self.body(&request));
         Box::pin(async move {
             let res = send(req, "chat model").await?;
             Ok(spawn_stream(|tx| async move {
@@ -312,7 +387,12 @@ pub struct Anthropic {
 
 impl Anthropic {
     pub fn new(model: impl Into<String>) -> Self {
-        Anthropic { base: "https://api.anthropic.com".into(), model: model.into(), key: None, http: client() }
+        Anthropic {
+            base: "https://api.anthropic.com".into(),
+            model: model.into(),
+            key: None,
+            http: client(),
+        }
     }
 
     pub fn api_key(mut self, key: Secret<String>) -> Self {
@@ -322,7 +402,10 @@ impl Anthropic {
 
     /// Another address with the same API, such as a gateway.
     pub fn base_url(mut self, base: impl Into<String>) -> Self {
-        self.base = base.into().trim_end_matches('/').to_string();
+        self.base = base
+            .into()
+            .trim_end_matches('/')
+            .to_string();
         self
     }
 
@@ -337,9 +420,17 @@ impl Anthropic {
                 Role::User => messages.push(json!({ "role": "user", "content": m.text })),
                 Role::Tool => {
                     let block = json!({ "type": "tool_result", "tool_use_id": m.tool_call_id, "content": m.text });
-                    let joined = messages.last_mut().filter(|l| l["role"] == "user" && l["content"].is_array());
+                    let joined = messages
+                        .last_mut()
+                        .filter(|l| l["role"] == "user" && l["content"].is_array());
                     match joined.and_then(|l| l["content"].as_array_mut()) {
-                        Some(blocks) if blocks.iter().all(|b| b["type"] == "tool_result") => blocks.push(block),
+                        Some(blocks)
+                            if blocks
+                                .iter()
+                                .all(|b| b["type"] == "tool_result") =>
+                        {
+                            blocks.push(block)
+                        }
                         _ => messages.push(json!({ "role": "user", "content": [block] })),
                     }
                 }
@@ -359,7 +450,10 @@ impl Anthropic {
                             Json::Array(blocks)
                         }
                     };
-                    if content.as_array().is_some_and(|b| !b.is_empty()) {
+                    if content
+                        .as_array()
+                        .is_some_and(|b| !b.is_empty())
+                    {
                         messages.push(json!({ "role": "assistant", "content": content }));
                     }
                 }
@@ -396,23 +490,38 @@ struct Blocks {
 impl Blocks {
     /// Reads one event into `out`. Returns `false` at the end of the message.
     fn event(&mut self, name: &str, data: &Json, out: &mut Vec<ChatEvent>) -> crate::Result<bool> {
-        let kind = data.get("type").and_then(Json::as_str).unwrap_or(name);
+        let kind = data
+            .get("type")
+            .and_then(Json::as_str)
+            .unwrap_or(name);
         match kind {
             "message_start" => {
-                self.input_tokens =
-                    data.pointer("/message/usage/input_tokens").and_then(Json::as_u64).unwrap_or(0) as u32;
+                self.input_tokens = data
+                    .pointer("/message/usage/input_tokens")
+                    .and_then(Json::as_u64)
+                    .unwrap_or(0) as u32;
             }
             "content_block_start" => {
-                let block = data.get("content_block").cloned().unwrap_or(Json::Null);
-                if matches!(block["type"].as_str(), Some("thinking" | "redacted_thinking")) {
+                let block = data
+                    .get("content_block")
+                    .cloned()
+                    .unwrap_or(Json::Null);
+                if matches!(
+                    block["type"].as_str(),
+                    Some("thinking" | "redacted_thinking")
+                ) {
                     self.keep = true;
                 }
                 self.blocks.push(block);
                 self.inputs.push(String::new());
             }
             "content_block_delta" => {
-                let i = data.get("index").and_then(Json::as_u64).unwrap_or(0) as usize;
-                let (Some(block), Some(input)) = (self.blocks.get_mut(i), self.inputs.get_mut(i)) else {
+                let i = data
+                    .get("index")
+                    .and_then(Json::as_u64)
+                    .unwrap_or(0) as usize;
+                let (Some(block), Some(input)) = (self.blocks.get_mut(i), self.inputs.get_mut(i))
+                else {
                     return Ok(true);
                 };
                 let delta = &data["delta"];
@@ -424,14 +533,23 @@ impl Blocks {
                             out.push(ChatEvent::Text(text.to_string()));
                         }
                     }
-                    Some("input_json_delta") => input.push_str(delta["partial_json"].as_str().unwrap_or("")),
-                    Some("thinking_delta") => append(block, "thinking", delta["thinking"].as_str().unwrap_or("")),
+                    Some("input_json_delta") => input.push_str(
+                        delta["partial_json"]
+                            .as_str()
+                            .unwrap_or(""),
+                    ),
+                    Some("thinking_delta") => {
+                        append(block, "thinking", delta["thinking"].as_str().unwrap_or(""))
+                    }
                     Some("signature_delta") => block["signature"] = delta["signature"].clone(),
                     _ => {}
                 }
             }
             "content_block_stop" => {
-                let i = data.get("index").and_then(Json::as_u64).unwrap_or(0) as usize;
+                let i = data
+                    .get("index")
+                    .and_then(Json::as_u64)
+                    .unwrap_or(0) as usize;
                 if let (Some(block), Some(input)) = (self.blocks.get_mut(i), self.inputs.get(i)) {
                     if block["type"] == "tool_use" {
                         let arguments = if input.trim().is_empty() {
@@ -441,26 +559,46 @@ impl Blocks {
                         };
                         block["input"] = arguments.clone();
                         out.push(ChatEvent::ToolCall(ToolCall {
-                            id: block["id"].as_str().unwrap_or_default().to_string(),
-                            name: block["name"].as_str().unwrap_or_default().to_string(),
+                            id: block["id"]
+                                .as_str()
+                                .unwrap_or_default()
+                                .to_string(),
+                            name: block["name"]
+                                .as_str()
+                                .unwrap_or_default()
+                                .to_string(),
                             arguments,
                         }));
                     }
                 }
             }
             "message_delta" => {
-                self.output_tokens = data.pointer("/usage/output_tokens").and_then(Json::as_u64).unwrap_or(0) as u32;
+                self.output_tokens = data
+                    .pointer("/usage/output_tokens")
+                    .and_then(Json::as_u64)
+                    .unwrap_or(0) as u32;
             }
             "message_stop" => {
-                out.push(ChatEvent::Usage { input: self.input_tokens, output: self.output_tokens });
+                out.push(ChatEvent::Usage {
+                    input: self.input_tokens,
+                    output: self.output_tokens,
+                });
                 if self.keep {
-                    out.push(ChatEvent::Raw(Json::Array(std::mem::take(&mut self.blocks))));
+                    out.push(ChatEvent::Raw(Json::Array(std::mem::take(
+                        &mut self.blocks,
+                    ))));
                 }
                 return Ok(false);
             }
             "error" => {
-                let message = data.pointer("/error/message").and_then(Json::as_str).unwrap_or("unknown");
-                return Err(Error::Internal(format!("chat model error: {}", super::clip(message, ERROR_BODY))));
+                let message = data
+                    .pointer("/error/message")
+                    .and_then(Json::as_str)
+                    .unwrap_or("unknown");
+                return Err(Error::Internal(format!(
+                    "chat model error: {}",
+                    super::clip(message, ERROR_BODY)
+                )));
             }
             _ => {}
         }
@@ -469,7 +607,11 @@ impl Blocks {
 }
 
 fn append(block: &mut Json, key: &str, text: &str) {
-    let mut s = block.get(key).and_then(Json::as_str).unwrap_or("").to_string();
+    let mut s = block
+        .get(key)
+        .and_then(Json::as_str)
+        .unwrap_or("")
+        .to_string();
     s.push_str(text);
     if let Some(o) = block.as_object_mut() {
         o.insert(key.to_string(), Json::String(s));
@@ -493,7 +635,9 @@ impl LlmProvider for Anthropic {
                 let mut state = Blocks::default();
                 let mut events = Vec::new();
                 while let Some((name, data)) = sse.next().await? {
-                    let Ok(event) = serde_json::from_str::<Json>(&data) else { continue };
+                    let Ok(event) = serde_json::from_str::<Json>(&data) else {
+                        continue;
+                    };
                     let more = state.event(&name, &event, &mut events)?;
                     if !forward(&tx, &mut events).await || !more {
                         return Ok(());
@@ -518,7 +662,10 @@ pub struct OpenAiTranscription {
 impl OpenAiTranscription {
     pub fn new(base_url: impl Into<String>, model: impl Into<String>) -> Self {
         OpenAiTranscription {
-            base: base_url.into().trim_end_matches('/').to_string(),
+            base: base_url
+                .into()
+                .trim_end_matches('/')
+                .to_string(),
             model: model.into(),
             key: None,
             header: KeyHeader::Bearer,
@@ -541,22 +688,36 @@ impl OpenAiTranscription {
 fn multipart(fields: &[(&str, &str)], file: &Audio) -> (String, Vec<u8>) {
     let mut bytes = [0u8; 16];
     let _ = getrandom::getrandom(&mut bytes);
-    let boundary: String =
-        std::iter::once("zeyn".to_string()).chain(bytes.iter().map(|b| format!("{b:02x}"))).collect();
+    let boundary: String = std::iter::once("zeyn".to_string())
+        .chain(bytes.iter().map(|b| format!("{b:02x}")))
+        .collect();
     let mut body = Vec::with_capacity(file.bytes.len() + 512);
     for (name, value) in fields {
         body.extend_from_slice(
-            format!("--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n{value}\r\n").as_bytes(),
+            format!(
+                "--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n{value}\r\n"
+            )
+            .as_bytes(),
         );
     }
-    let ext = match file.mime.split(';').next().unwrap_or("") {
+    let ext = match file
+        .mime
+        .split(';')
+        .next()
+        .unwrap_or("")
+    {
         "audio/ogg" => "ogg",
         "audio/mp4" | "audio/m4a" => "m4a",
         "audio/mpeg" => "mp3",
         "audio/wav" | "audio/x-wav" => "wav",
         _ => "webm",
     };
-    let mime: String = file.mime.chars().filter(|c| c.is_ascii_graphic() || *c == ' ').take(100).collect();
+    let mime: String = file
+        .mime
+        .chars()
+        .filter(|c| c.is_ascii_graphic() || *c == ' ')
+        .take(100)
+        .collect();
     body.extend_from_slice(format!("--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"speech.{ext}\"\r\nContent-Type: {mime}\r\n\r\n").as_bytes());
     body.extend_from_slice(&file.bytes);
     body.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
@@ -565,18 +726,39 @@ fn multipart(fields: &[(&str, &str)], file: &Audio) -> (String, Vec<u8>) {
 
 impl SpeechToText for OpenAiTranscription {
     fn transcribe(&self, audio: Audio, locale: String) -> BoxFuture<crate::Result<String>> {
-        let language: String = locale.chars().take_while(|c| c.is_ascii_alphabetic()).take(3).collect();
-        let (content_type, body) =
-            multipart(&[("model", &self.model), ("language", &language), ("response_format", "json")], &audio);
-        let req =
-            authorize(self.http.post(format!("{}/audio/transcriptions", self.base)), self.key.as_ref(), self.header)
-                .header(reqwest::header::CONTENT_TYPE, content_type)
-                .body(body);
+        let language: String = locale
+            .chars()
+            .take_while(|c| c.is_ascii_alphabetic())
+            .take(3)
+            .collect();
+        let (content_type, body) = multipart(
+            &[
+                ("model", &self.model),
+                ("language", &language),
+                ("response_format", "json"),
+            ],
+            &audio,
+        );
+        let req = authorize(
+            self.http
+                .post(format!("{}/audio/transcriptions", self.base)),
+            self.key.as_ref(),
+            self.header,
+        )
+        .header(reqwest::header::CONTENT_TYPE, content_type)
+        .body(body);
         Box::pin(async move {
             let res = send(req, "speech to text").await?;
-            let value: Json =
-                res.json().await.map_err(|_| Error::Internal("speech to text: unreadable answer".into()))?;
-            Ok(value.get("text").and_then(Json::as_str).unwrap_or_default().trim().to_string())
+            let value: Json = res
+                .json()
+                .await
+                .map_err(|_| Error::Internal("speech to text: unreadable answer".into()))?;
+            Ok(value
+                .get("text")
+                .and_then(Json::as_str)
+                .unwrap_or_default()
+                .trim()
+                .to_string())
         })
     }
 }
@@ -593,9 +775,16 @@ pub struct OpenAiSpeech {
 }
 
 impl OpenAiSpeech {
-    pub fn new(base_url: impl Into<String>, model: impl Into<String>, voice: impl Into<String>) -> Self {
+    pub fn new(
+        base_url: impl Into<String>,
+        model: impl Into<String>,
+        voice: impl Into<String>,
+    ) -> Self {
         OpenAiSpeech {
-            base: base_url.into().trim_end_matches('/').to_string(),
+            base: base_url
+                .into()
+                .trim_end_matches('/')
+                .to_string(),
             model: model.into(),
             voice: voice.into(),
             key: None,
@@ -622,8 +811,13 @@ impl TextToSpeech for OpenAiSpeech {
         body.insert("voice".into(), json!(self.voice));
         body.insert("input".into(), json!(text));
         body.insert("response_format".into(), json!("mp3"));
-        let req = authorize(self.http.post(format!("{}/audio/speech", self.base)), self.key.as_ref(), self.header)
-            .json(&body);
+        let req = authorize(
+            self.http
+                .post(format!("{}/audio/speech", self.base)),
+            self.key.as_ref(),
+            self.header,
+        )
+        .json(&body);
         Box::pin(async move {
             let mut res = send(req, "text to speech").await?;
             let (tx, rx) = channel::<crate::Result<Bytes>>(STREAM_BUFFER);
@@ -632,7 +826,10 @@ impl TextToSpeech for OpenAiSpeech {
                     let next = match res.chunk().await {
                         Ok(Some(c)) => Ok(c),
                         Ok(None) => return,
-                        Err(e) => Err(Error::Internal(format!("text to speech stream broke: {}", e.without_url()))),
+                        Err(e) => Err(Error::Internal(format!(
+                            "text to speech stream broke: {}",
+                            e.without_url()
+                        ))),
                     };
                     let stop = next.is_err();
                     if tx.send(next).await.is_err() || stop {
@@ -640,7 +837,10 @@ impl TextToSpeech for OpenAiSpeech {
                     }
                 }
             });
-            Ok(SpeechStream { mime: "audio/mpeg".into(), chunks: rx })
+            Ok(SpeechStream {
+                mime: "audio/mpeg".into(),
+                chunks: rx,
+            })
         })
     }
 }
@@ -663,7 +863,13 @@ mod tests {
         }
         out.extend(finish_calls(partial));
         assert_eq!(out[0], ChatEvent::Text("Hi".into()));
-        assert_eq!(out[1], ChatEvent::Usage { input: 10, output: 3 });
+        assert_eq!(
+            out[1],
+            ChatEvent::Usage {
+                input: 10,
+                output: 3
+            }
+        );
         assert_eq!(
             out[2],
             ChatEvent::ToolCall(ToolCall {
@@ -692,7 +898,11 @@ mod tests {
         ] {
             assert!(state.event("", &e, &mut out).unwrap());
         }
-        assert!(!state.event("", &json!({ "type": "message_stop" }), &mut out).unwrap());
+        assert!(
+            !state
+                .event("", &json!({ "type": "message_stop" }), &mut out)
+                .unwrap()
+        );
         assert_eq!(out[0], ChatEvent::Text("Opening".into()));
         assert_eq!(
             out[1],
@@ -702,8 +912,16 @@ mod tests {
                 arguments: json!({ "screen": "today" })
             })
         );
-        assert_eq!(out[2], ChatEvent::Usage { input: 12, output: 7 });
-        let ChatEvent::Raw(Json::Array(blocks)) = &out[3] else { panic!("{out:?}") };
+        assert_eq!(
+            out[2],
+            ChatEvent::Usage {
+                input: 12,
+                output: 7
+            }
+        );
+        let ChatEvent::Raw(Json::Array(blocks)) = &out[3] else {
+            panic!("{out:?}")
+        };
         assert_eq!(blocks[0]["signature"], "sig");
         assert_eq!(blocks[2]["input"], json!({ "screen": "today" }));
     }
@@ -717,8 +935,16 @@ mod tests {
         );
         let mut call = ChatMessage::assistant("");
         call.tool_calls = vec![
-            ToolCall { id: "a".into(), name: "x".into(), arguments: json!({}) },
-            ToolCall { id: "b".into(), name: "y".into(), arguments: json!({}) },
+            ToolCall {
+                id: "a".into(),
+                name: "x".into(),
+                arguments: json!({}),
+            },
+            ToolCall {
+                id: "b".into(),
+                name: "y".into(),
+                arguments: json!({}),
+            },
         ];
         call.raw = Some(
             json!([{ "type": "thinking", "thinking": "", "signature": "new" }, { "type": "tool_use", "id": "a", "name": "x", "input": {} }, { "type": "tool_use", "id": "b", "name": "y", "input": {} }]),
@@ -731,12 +957,26 @@ mod tests {
             ChatMessage::tool("a", "r1"),
             ChatMessage::tool("b", "r2"),
         ];
-        let body = a.body(&ChatRequest { system: "s".into(), messages, tools: Vec::new(), max_tokens: 10 });
+        let body = a.body(&ChatRequest {
+            system: "s".into(),
+            messages,
+            tools: Vec::new(),
+            max_tokens: 10,
+        });
         let m = body["messages"].as_array().unwrap();
         assert_eq!(m.len(), 5);
-        assert_eq!(m[1]["content"], json!([{ "type": "text", "text": "earlier" }]));
+        assert_eq!(
+            m[1]["content"],
+            json!([{ "type": "text", "text": "earlier" }])
+        );
         assert_eq!(m[3]["content"][0]["signature"], "new");
-        assert_eq!(m[4]["content"].as_array().unwrap().len(), 2);
+        assert_eq!(
+            m[4]["content"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
         assert_eq!(body["system"], "s");
     }
 }

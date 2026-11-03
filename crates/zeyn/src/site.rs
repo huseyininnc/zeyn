@@ -63,24 +63,34 @@ impl SiteShell {
 
     /// Screens the footer links to, for the app's structure check.
     pub(crate) fn linked_screens(&self) -> impl Iterator<Item = &'static str> + '_ {
-        self.footer.columns.iter().flat_map(|c| &c.links).filter_map(|l| match l.target {
-            FooterTarget::Screen(s) => Some(s),
-            FooterTarget::Url(_) => None,
-        })
+        self.footer
+            .columns
+            .iter()
+            .flat_map(|c| &c.links)
+            .filter_map(|l| match l.target {
+                FooterTarget::Screen(s) => Some(s),
+                FooterTarget::Url(_) => None,
+            })
     }
 
     /// Footer addresses that are not a path, `https:`, `http:` or `mailto:`.
     pub(crate) fn bad_urls(&self) -> impl Iterator<Item = &'static str> + '_ {
-        self.footer.columns.iter().flat_map(|c| &c.links).filter_map(|l| match l.target {
-            FooterTarget::Url(u) if !safe_url(u) => Some(u),
-            _ => None,
-        })
+        self.footer
+            .columns
+            .iter()
+            .flat_map(|c| &c.links)
+            .filter_map(|l| match l.target {
+                FooterTarget::Url(u) if !safe_url(u) => Some(u),
+                _ => None,
+            })
     }
 }
 
 fn safe_url(url: &str) -> bool {
     (url.starts_with('/') && !url.starts_with("//"))
-        || ["https://", "http://", "mailto:"].iter().any(|p| url.starts_with(p))
+        || ["https://", "http://", "mailto:"]
+            .iter()
+            .any(|p| url.starts_with(p))
 }
 
 /// Actions of the site shell's top bar. None is shown unless asked for.
@@ -121,8 +131,15 @@ pub struct SiteFooter {
 
 impl SiteFooter {
     /// A column of links under a heading.
-    pub fn column(mut self, title: impl Into<Text>, build: impl FnOnce(FooterColumn) -> FooterColumn) -> Self {
-        self.columns.push(build(FooterColumn { title: title.into(), links: Vec::new() }));
+    pub fn column(
+        mut self,
+        title: impl Into<Text>,
+        build: impl FnOnce(FooterColumn) -> FooterColumn,
+    ) -> Self {
+        self.columns.push(build(FooterColumn {
+            title: title.into(),
+            links: Vec::new(),
+        }));
         self
     }
 
@@ -154,15 +171,26 @@ impl FooterColumn {
     /// A link to a screen of the app. Users who may not open it do not see it. A screen without
     /// a route cannot be linked (compile error).
     pub fn link<S: ScreenDef>(mut self, label: impl Into<Text>, _screen: S) -> Self {
-        const { assert!(S::META.route.is_some(), "a footer link must point to a screen that has a route") };
-        self.links.push(FooterLink { label: label.into(), target: FooterTarget::Screen(S::META.name) });
+        const {
+            assert!(
+                S::META.route.is_some(),
+                "a footer link must point to a screen that has a route"
+            )
+        };
+        self.links.push(FooterLink {
+            label: label.into(),
+            target: FooterTarget::Screen(S::META.name),
+        });
         self
     }
 
     /// A link to an address outside the app, or a path of it: `/...`, `https://...`, `http://...`
     /// or `mailto:...`. Other schemes fail the app's structure check.
     pub fn url(mut self, label: impl Into<Text>, href: &'static str) -> Self {
-        self.links.push(FooterLink { label: label.into(), target: FooterTarget::Url(href) });
+        self.links.push(FooterLink {
+            label: label.into(),
+            target: FooterTarget::Url(href),
+        });
         self
     }
 }
