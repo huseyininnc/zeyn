@@ -84,7 +84,8 @@
       "status_bar": "Kısa durum metinleri çubuğu.",
       "relative_time": "Sayfanın dilinde \"5 dakika önce\" gibi gösterilen an.",
       "share": "Bağlantıyı paylaşır, paylaşım yoksa kopyalar.",
-      "rating": "Yıldızlarla gösterilen 1 ile N arası tam sayı."
+      "rating": "Yıldızlarla gösterilen 1 ile N arası tam sayı.",
+      "chips": "Bağlantı çipleri ve ekran parametresini süzen çipler."
     },
     "ex": {
       "action_button": {
@@ -126,6 +127,10 @@
         "overview": "Örnek",
         "donut": "Halka",
         "gauge": "Gösterge"
+      },
+      "chips": {
+        "overview": "Süzme çipleri",
+        "links": "Bağlantı çipleri"
       },
       "controls": {
         "overview": "Örnek"

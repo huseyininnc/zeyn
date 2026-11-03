@@ -117,6 +117,7 @@ catalog! {
         breadcrumb "/ui/breadcrumb";
         prev_next "/ui/prev-next";
         alpha_index "/ui/alpha-index";
+        chips "/ui/chips";
         menu_button "/ui/menu-button";
         menu_bar "/ui/menu-bar";
         external_link "/ui/external-link";

@@ -165,7 +165,7 @@ async fn get(path: &str) -> (StatusCode, String) {
 #[tokio::test]
 async fn the_lazy_modules_are_served_and_stay_out_of_the_page_head() {
     let (_, page) = get("/items/1").await;
-    for name in ["share"] {
+    for name in ["share", "chips"] {
         let (status, body) = get(&format!("/_zeyn/{name}.js")).await;
         assert_eq!(status, StatusCode::OK, "{name}");
         assert!(body.contains("@module"), "{name}");
@@ -173,4 +173,93 @@ async fn the_lazy_modules_are_served_and_stay_out_of_the_page_head() {
     }
     let (_, components) = get("/_zeyn/components.js").await;
     assert!(components.contains("['button[data-zeyn-share]', 'share']"));
+    assert!(components.contains("['a[data-zeyn-chip]', 'chips']"));
+}
+
+#[params]
+pub struct TagParams {
+    pub tags: String,
+}
+
+#[screen(route = "/tagged", public)]
+pub fn tagged(p: TagParams) -> Screen {
+    Screen::new("Tagged").body(Paragraph::new(p.tags))
+}
+
+fn tag_chips(current: &str) -> Chips {
+    Chips::filter("Tags", tagged, |tags| TagParams { tags: tags.join(",") })
+        .current(current.split(','))
+        .option("guide", "Guides")
+        .option("news", "<News>")
+        .option("release", "Releases")
+}
+
+/// The href of the chip with this value.
+fn chip_href<'a>(html: &'a str, value: &str) -> &'a str {
+    let at = html
+        .find(&format!(r#"data-value="{value}""#))
+        .unwrap();
+    let start = html[..at].rfind("href=\"").unwrap() + 6;
+    &html[start..start + html[start..].find('"').unwrap()]
+}
+
+/// The params of a `/_zeyn/route/...?params=` link, decoded.
+fn params_of(href: &str) -> String {
+    let encoded = href
+        .split("?params=")
+        .nth(1)
+        .unwrap_or("");
+    let mut out = Vec::new();
+    let bytes = encoded.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' {
+            out.push(u8::from_str_radix(&encoded[i + 1..i + 3], 16).unwrap());
+            i += 3;
+        } else {
+            out.push(bytes[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8(out).unwrap()
+}
+
+#[test]
+fn filter_chips_render_the_pressed_state_and_the_toggled_params_from_the_server() {
+    let one = html(&tag_chips("news,unknown"), "en");
+    assert!(one.contains(r#"<div class="z-chips z-chips-filter" role="group" aria-label="Tags">"#), "{one}");
+    assert_eq!(
+        one.matches(r#"aria-pressed="true""#)
+            .count(),
+        1,
+        "unknown values are ignored"
+    );
+    assert!(one.contains("&lt;News&gt;"), "texts are escaped");
+    assert_eq!(params_of(chip_href(&one, "news")), r#"{"tags":""}"#, "pressing the pressed chip clears it");
+    assert_eq!(params_of(chip_href(&one, "guide")), r#"{"tags":"guide"}"#, "one value at a time");
+
+    let many = html(&tag_chips("release,guide").multiple(), "en");
+    assert_eq!(
+        many.matches(r#"aria-pressed="true""#)
+            .count(),
+        2
+    );
+    assert_eq!(params_of(chip_href(&many, "news")), r#"{"tags":"guide,news,release"}"#, "in the order of the options");
+    assert_eq!(params_of(chip_href(&many, "guide")), r#"{"tags":"release"}"#);
+    assert!(many.contains("data-zeyn-chip") && many.contains("data-zeyn-base-href"));
+}
+
+#[test]
+fn link_chips_are_plain_links_in_a_named_nav() {
+    let links = html(
+        &Chips::links("Topics")
+            .link("Guides", tagged, TagParams { tags: "guide".into() })
+            .link("News", item, ItemParams { id: 3 }),
+        "en",
+    );
+    assert!(
+        links.starts_with(r#"<nav class="z-chips" aria-label="Topics"><ul class="z-chips-list"><li><a class="z-chip" href="/_zeyn/route/tagged?params="#),
+        "{links}"
+    );
+    assert!(!links.contains("aria-pressed") && !links.contains("data-zeyn-chip"));
 }

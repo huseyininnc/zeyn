@@ -8,12 +8,26 @@ use axum::Router;
 use axum::routing::get;
 use std::sync::Arc;
 
-const SHARE_JS: &str = include_str!("../../assets/share.js");
+/// The modules by path.
+const MODULES: [(&str, &str); 2] = [
+    ("/_zeyn/share.js", include_str!("../../assets/share.js")),
+    ("/_zeyn/chips.js", include_str!("../../assets/chips.js")),
+];
 
 /// Asset paths served without authentication, like the runtime itself.
-pub(super) const ASSETS: [&str; 1] = ["/_zeyn/share.js"];
+pub(super) const ASSETS: [&str; MODULES.len()] = {
+    let mut paths = [""; MODULES.len()];
+    let mut i = 0;
+    while i < MODULES.len() {
+        paths[i] = MODULES[i].0;
+        i += 1;
+    }
+    paths
+};
 
-pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
-    let js = "text/javascript; charset=utf-8";
-    router.route("/_zeyn/share.js", get(move || async move { asset(SHARE_JS, js) }))
+pub(super) fn routes(mut router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
+    for (path, body) in MODULES {
+        router = router.route(path, get(move || async move { asset(body, "text/javascript; charset=utf-8") }));
+    }
+    router
 }

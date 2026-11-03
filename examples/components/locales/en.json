@@ -84,7 +84,8 @@
       "status_bar": "A bar of short status texts.",
       "relative_time": "A moment shown as \"5 minutes ago\" in the page language.",
       "share": "Share a link, or copy it where sharing is missing.",
-      "rating": "A whole number from 1 to N shown as stars."
+      "rating": "A whole number from 1 to N shown as stars.",
+      "chips": "Link chips and filter chips over a screen param."
     },
     "ex": {
       "action_button": {
@@ -126,6 +127,10 @@
         "overview": "Example",
         "donut": "Donut",
         "gauge": "Gauge"
+      },
+      "chips": {
+        "overview": "Filter chips",
+        "links": "Link chips"
       },
       "controls": {
         "overview": "Example"

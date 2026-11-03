@@ -441,3 +441,62 @@ span.z-avatar-tone-4 { background: var(--z-danger-subtle); }
 .z-relative { white-space: nowrap; }
 
 .z-share { gap: 6px; }
+
+/* Chips ------------------------------------------------------------------------------------- */
+
+.z-chips { margin: 0 0 16px; min-width: 0; }
+
+.z-chips-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.z-chips-list > li { margin: 0; }
+
+.z-chips .z-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--z-border);
+  border-radius: 999px;
+  background: var(--z-surface);
+  color: var(--z-text);
+  font-size: var(--z-font-size-sm);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.z-chips .z-chip:hover { border-color: var(--z-border-strong); color: var(--z-accent); }
+
+.z-chips .z-chip:focus-visible {
+  outline: 2px solid var(--z-focus);
+  outline-offset: 2px;
+}
+
+.z-chips .z-chip[aria-pressed="true"] {
+  border-color: var(--z-primary);
+  background: var(--z-primary);
+  color: var(--z-on-primary);
+}
+
+.z-chip-check { display: none; }
+
+.z-chips .z-chip[aria-pressed="true"] .z-chip-check {
+  display: inline-block;
+  width: 10px;
+  height: 6px;
+  border-bottom: 2px solid currentColor;
+  border-inline-start: 2px solid currentColor;
+  transform: translateY(-2px) rotate(-45deg);
+}
+
+@media (forced-colors: active) {
+  .z-chips .z-chip[aria-pressed="true"] { outline: 2px solid Highlight; }
+}

@@ -102,6 +102,25 @@ Spoiler::new(t!("quiz.show_answer")).add(Paragraph::new(answer.clone()))
 
 @live people
 
+## Chips
+
+A row of small rounded links that wrap onto more lines. `Chips::links(label)` holds plain links to screens, such as the tags of an article, in a `nav` named by the label. `Chips::filter(label, screen, params)` makes toggle buttons over a screen param: each chip is a link to the same screen with its value added to or taken out of the param, so the server renders `aria-pressed` from the params it got and nothing is kept in the browser. Pressing a chip opens the new address through `nav.js` without a page reload, and focus and the scroll position stay on the chip. One value is pressed at a time unless `.multiple()` is called; values in the params that are not options are ignored. Keyboard: Tab moves between chips, Enter or Space presses one. A pressed chip also shows a check mark, so the state does not rest on color. The script (`chips.js`, under 1 KB) loads only on pages with filter chips.
+
+```rust
+#[screen(route = "/articles", public)]
+pub fn articles(p: ArticleParams) -> Screen {
+    Screen::new(t!("blog.articles")).body(
+        Chips::filter(t!("blog.tags"), articles, |tags| ArticleParams { tags: tags.join(",") })
+            .current(p.tags.split(','))
+            .option("guide", t!("blog.guides"))
+            .option("news", t!("blog.news"))
+            .multiple(),
+    )
+}
+```
+
+@live chips
+
 ## RelativeTime
 
 A moment shown as relative time, such as "3 minutes ago" or "in 2 days", in the page's language. The server writes the exact date and time in the user's time zone inside `<time datetime="...">`, so the HTML stays the same from minute to minute and a cached page is still right. The runtime rewrites the text with `Intl.RelativeTimeFormat` when the page loads, when `nav.js` swaps in a screen and once a minute; the exact time stays in the tooltip. Without script the exact time is the text.

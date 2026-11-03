@@ -506,7 +506,10 @@ pub async fn docs_sitemap(part: SitemapPart, docs: Docs) -> Result<Vec<SitemapUr
 
 /// The documentation feature: every page, the sidebar, the palette search and the sitemap.
 pub fn feature() -> Feature {
-    with_pages(Feature::new("docs")).search(search_docs).sitemap(docs_sitemap)
+    with_pages(Feature::new("docs"))
+        .screen(live_engage::tagged)
+        .search(search_docs)
+        .sitemap(docs_sitemap)
 }
 
 /// The documentation app. `docs` is built once with [`Docs::build`]. English pages stay at their

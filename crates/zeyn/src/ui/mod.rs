@@ -7,6 +7,7 @@
 mod alpha;
 mod catalog;
 mod chart;
+mod chips;
 mod content;
 mod controls;
 mod date;
@@ -51,6 +52,7 @@ pub use shell::{MenuBar, MenuList, PropertyInspector, StatusBar, Toolbox};
 #[allow(deprecated)]
 pub use catalog::PosterCard;
 pub use catalog::{CardGrid, ImageCard, MAX_SUGGESTIONS, Rail, SearchBox, SearchParams};
+pub use chips::{Chips, MAX_CHIPS};
 pub use chart::{Better, BulletCell, Chart, ChartKind, Kpi, SparklineCell};
 pub use alpha::{AlphaIndex, OTHER_LETTER, alphabet};
 pub use content::{AutoGrid, Avatar, AvatarSize, Heading, MetaLine, Paragraph, PrevNext, Spoiler};

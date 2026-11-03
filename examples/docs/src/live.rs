@@ -410,6 +410,7 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
         "toasts" => toasts(),
         "rating" => crate::live_engage::rating(),
         "engage" => crate::live_engage::engage(ctx),
+        "chips" => crate::live_engage::chips(""),
         "multi" => Form::of(Reach { channels: vec![Channel::Email], ..Reach::default() })
             .field(Reach::channels)
             .lookup_columns(Reach::product, find_sample_rows, ["Code", "Name", "Unit"])
@@ -591,5 +592,5 @@ fn toasts() -> Node {
 pub const EXAMPLES: &[&str] = &[
     "datagrid", "form", "controls", "dates", "lines", "layout", "display", "action", "tree", "chart", "shell",
     "inputs", "multi", "overlay", "menus", "toasts", "content", "autogrid", "list", "people", "week",
-    "rating", "engage",
+    "rating", "engage", "chips",
 ];

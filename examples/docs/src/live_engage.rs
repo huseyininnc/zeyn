@@ -34,3 +34,38 @@ pub fn engage(ctx: &Ctx) -> Node {
         .col(Share::page())
         .into()
 }
+
+/// The tags of the chips example, joined with commas.
+#[params]
+pub struct TagParams {
+    pub tags: String,
+}
+
+/// Filter chips over the tags of [`tagged`] and link chips to it.
+pub fn chips(current: &str) -> Node {
+    Stack::new()
+        .gap(2)
+        .add(
+            Chips::filter("Tags", tagged, |tags| TagParams { tags: tags.join(",") })
+                .current(current.split(','))
+                .option("guide", "Guides")
+                .option("news", "News")
+                .option("release", "Releases")
+                .multiple(),
+        )
+        .add(
+            Chips::links("Topics")
+                .link("Only guides", tagged, TagParams { tags: "guide".into() })
+                .link("Only news", tagged, TagParams { tags: "news".into() }),
+        )
+        .into()
+}
+
+/// The screen the chips example filters: the chips again and the tags they chose.
+#[screen(route = "/examples/tagged", public)]
+pub fn tagged(p: TagParams) -> Screen {
+    let chosen = if p.tags.is_empty() { "No tag chosen.".to_string() } else { format!("Chosen: {}", p.tags) };
+    Screen::new("Chips example")
+        .body(chips(&p.tags))
+        .body(Paragraph::new(chosen))
+}
