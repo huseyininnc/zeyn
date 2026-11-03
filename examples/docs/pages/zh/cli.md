@@ -68,7 +68,7 @@ cargo run
 
 `zeyn check` 先运行编译器，再运行应用自己的检查（`App::check`）：重复的路由、被注册两次的 screen、screen 需要但没人注册的服务、无法使用的快捷键、低于 WCAG AA 对比度的主题令牌，以及某种语言中缺失的翻译键。出现任何问题时它都会以错误退出，因此 CI 可以运行它。
 
-当 Zeyn 版本重命名某个 API 时，旧名称会作为已弃用的别名保留一个版本。`zeyn check --fix` 会改写旧名称，例如把 `Grid` 改为 `DataGrid`，把 `GridQuery` 改为 `DataQuery`，然后再次检查。
+当 Zeyn 版本重命名某个 API 时，`zeyn check --fix` 会改写旧名称，例如把 `Grid` 改为 `DataGrid`，把 `GridQuery` 改为 `DataQuery`，然后再次检查。
 
 ```sh
 zeyn check --fix

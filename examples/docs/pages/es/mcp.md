@@ -29,13 +29,13 @@ error[E0277]: `min()` and `max()` cannot be used on a `bool` column
 ## Agentes que usan una aplicación
 
 ```rust
-App::new(t!("app.name")).agents(Agents::read_only())
+App::new(t!("app.name")).mcp(Mcp::read_only())
 ```
 
 Con `agents`, las pantallas de la aplicación se convierten en herramientas:
 
 - una herramienta de búsqueda por cada tabla,
-- una herramienta de guardado por cada formulario, con los campos y las reglas del formulario como esquema (solo con `Agents::read_write()`).
+- una herramienta de guardado por cada formulario, con los campos y las reglas del formulario como esquema (solo con `Mcp::read_write()`).
 
 Los agentes llegan a ellas de dos maneras:
 
@@ -47,4 +47,4 @@ Los agentes llegan a ellas de dos maneras:
 - Un agente recibe exactamente los permisos del usuario en cuyo nombre actúa. Las herramientas de pantallas y acciones que el usuario no puede abrir no se listan.
 - Las llamadas ejecutan los guards, los interceptores, la validación y los límites de frecuencia de una llamada normal.
 - Los registros de auditoría marcan las llamadas hechas por agentes, de modo que un revisor pueda distinguirlas.
-- `Agents::read_only()` permite a los agentes buscar pero no guardar. Elige `read_write()` solo para aplicaciones en las que un agente deba cambiar datos.
+- `Mcp::read_only()` permite a los agentes buscar pero no guardar. Elige `read_write()` solo para aplicaciones en las que un agente deba cambiar datos.

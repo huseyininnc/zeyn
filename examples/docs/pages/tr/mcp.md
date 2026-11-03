@@ -29,13 +29,13 @@ error[E0277]: `min()` and `max()` cannot be used on a `bool` column
 ## Bir uygulamayı kullanan ajanlar
 
 ```rust
-App::new(t!("app.name")).agents(Agents::read_only())
+App::new(t!("app.name")).mcp(Mcp::read_only())
 ```
 
 `agents` ile uygulamanın ekranları araca dönüşür:
 
 - her grid için bir arama aracı,
-- her form için, formun alanları ve kuralları şeması olan bir kaydetme aracı (yalnızca `Agents::read_write()` ile).
+- her form için, formun alanları ve kuralları şeması olan bir kaydetme aracı (yalnızca `Mcp::read_write()` ile).
 
 Ajanlar bunlara iki yoldan ulaşır:
 
@@ -47,4 +47,4 @@ Ajanlar bunlara iki yoldan ulaşır:
 - Bir ajan, adına hareket ettiği kullanıcının izinlerinin tam olarak aynısını alır. Kullanıcının açamayacağı ekranlar ve action'lar için araçlar listelenmez.
 - Çağrılar, normal bir çağrının guard'larını, interceptor'larını, doğrulamasını ve hız sınırlarını çalıştırır.
 - Denetim kayıtları ajanların yaptığı çağrıları işaretler; böylece bir gözden geçiren onları ayırt edebilir.
-- `Agents::read_only()` ajanların aramasına izin verir ama kaydetmesine izin vermez. `read_write()` seçeneğini yalnızca bir ajanın veriyi değiştirmesi gereken uygulamalar için seçin.
+- `Mcp::read_only()` ajanların aramasına izin verir ama kaydetmesine izin vermez. `read_write()` seçeneğini yalnızca bir ajanın veriyi değiştirmesi gereken uygulamalar için seçin.

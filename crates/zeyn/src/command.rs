@@ -71,13 +71,6 @@ use std::sync::Arc;
 /// choose another with `App::palette_shortcut`.
 pub const PALETTE_SHORTCUT: &str = "Alt+Shift+P";
 
-/// Old name of the palette's shortcut list.
-#[deprecated(
-    since = "0.0.3",
-    note = "the palette shortcut is now `PALETTE_SHORTCUT` and can be changed with `App::palette_shortcut`"
-)]
-pub const RESERVED_SHORTCUTS: [&str; 1] = [PALETTE_SHORTCUT];
-
 /// Shortcuts browsers keep for themselves and never pass to a page: new window, new tab, close
 /// tab, switch tab, quit. A command or button with one of them would never run.
 pub const BROWSER_RESERVED: &[&str] = &[

@@ -272,13 +272,6 @@ impl Default for PageRequest {
     }
 }
 
-/// Old name of [`DataQuery`]; kept for one release.
-#[deprecated(
-    since = "0.0.2",
-    note = "renamed to `DataQuery`; `zeyn check --fix` rewrites it"
-)]
-pub type GridQuery = DataQuery;
-
 /// Query a grid sends to the server.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct DataQuery {

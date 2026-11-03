@@ -68,7 +68,7 @@ Consulta [Estructura del proyecto](structure.md) para ver cada carpeta.
 
 `zeyn check` ejecuta el compilador y después las comprobaciones propias de la aplicación (`App::check`): rutas duplicadas, pantallas registradas dos veces, servicios que una pantalla necesita pero nadie registró, atajos inutilizables, tokens de tema por debajo del contraste WCAG AA y claves de traducción que faltan en un idioma. Termina con error cuando algo está mal, así que la CI puede ejecutarlo.
 
-Cuando una versión de Zeyn renombra una API, el nombre antiguo se mantiene durante una versión como alias obsoleto. `zeyn check --fix` reescribe los nombres antiguos, por ejemplo `Grid` por `DataGrid` y `GridQuery` por `DataQuery`, y vuelve a comprobar.
+Cuando una versión de Zeyn renombra una API, `zeyn check --fix` reescribe los nombres antiguos, por ejemplo `Grid` por `DataGrid` y `GridQuery` por `DataQuery`, y vuelve a comprobar.
 
 ```sh
 zeyn check --fix

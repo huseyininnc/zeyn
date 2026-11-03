@@ -68,7 +68,7 @@ cargo run
 
 `zeyn check`는 컴파일러를 실행한 다음 앱 자체의 검사(`App::check`)를 실행합니다. 중복된 경로, 두 번 등록된 Screen, Screen에 필요하지만 아무도 등록하지 않은 서비스, 사용할 수 없는 단축키, WCAG AA 대비에 못 미치는 테마 토큰, 어떤 언어에서 누락된 번역 키를 검사합니다. 문제가 있으면 오류로 종료하므로 CI에서 실행할 수 있습니다.
 
-Zeyn 릴리스에서 API 이름이 바뀌면 이전 이름은 한 릴리스 동안 사용 중단된 별칭으로 남습니다. `zeyn check --fix`는 예를 들어 `Grid`를 `DataGrid`로, `GridQuery`를 `DataQuery`로 이전 이름을 다시 쓴 다음 다시 검사합니다.
+Zeyn 릴리스에서 API 이름이 바뀌면 `zeyn check --fix`는 예를 들어 `Grid`를 `DataGrid`로, `GridQuery`를 `DataQuery`로 이전 이름을 다시 쓴 다음 다시 검사합니다.
 
 ```sh
 zeyn check --fix

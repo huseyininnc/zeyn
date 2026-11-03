@@ -68,7 +68,7 @@ See [Project structure](structure.md) for each folder.
 
 `zeyn check` runs the compiler and then the app's own checks (`App::check`): duplicate routes, screens registered twice, services a screen needs but nobody registered, unusable shortcuts, theme tokens below WCAG AA contrast and translation keys missing in a language. It exits with an error when anything is wrong, so CI can run it.
 
-When a Zeyn release renames an API, the old name stays for one release as a deprecated alias. `zeyn check --fix` rewrites the old names, for example `Grid` to `DataGrid` and `GridQuery` to `DataQuery`, then checks again.
+When a Zeyn release renames an API, `zeyn check --fix` rewrites the old names, for example `Grid` to `DataGrid` and `GridQuery` to `DataQuery`, then checks again.
 
 ```sh
 zeyn check --fix

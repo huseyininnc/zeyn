@@ -29,13 +29,13 @@ error[E0277]: `min()` and `max()` cannot be used on a `bool` column
 ## 使用应用的智能体
 
 ```rust
-App::new(t!("app.name")).agents(Agents::read_only())
+App::new(t!("app.name")).mcp(Mcp::read_only())
 ```
 
 使用 `agents` 后，应用的界面会成为工具：
 
 - 每个表格对应一个搜索工具，
-- 每个表单对应一个保存工具，以表单的字段和规则作为其模式（仅限 `Agents::read_write()`）。
+- 每个表单对应一个保存工具，以表单的字段和规则作为其模式（仅限 `Mcp::read_write()`）。
 
 智能体通过两种方式访问它们：
 
@@ -47,4 +47,4 @@ App::new(t!("app.name")).agents(Agents::read_only())
 - 智能体获得的权限与其所代表用户的权限完全一致。用户无权打开的界面和 action 所对应的工具不会被列出。
 - 调用会运行普通调用所具有的 guard、拦截器、校验和速率限制。
 - 审计记录会标记由智能体发起的调用，以便审查者区分它们。
-- `Agents::read_only()` 允许智能体搜索但不能保存。只有在希望智能体修改数据的应用中才选择 `read_write()`。
+- `Mcp::read_only()` 允许智能体搜索但不能保存。只有在希望智能体修改数据的应用中才选择 `read_write()`。

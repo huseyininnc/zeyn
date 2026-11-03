@@ -66,7 +66,7 @@ Her klasör için [Project structure](structure.md) sayfasına bakın.
 
 `zeyn check` önce derleyiciyi, sonra uygulamanın kendi denetimlerini çalıştırır (`App::check`): yinelenen rotalar, iki kez kaydedilmiş screen'ler, bir screen'in ihtiyaç duyduğu ama kimsenin kaydetmediği servisler, kullanılamaz kısayollar, WCAG AA kontrastının altındaki tema belirteçleri ve bir dilde eksik çeviri anahtarları. Bir şey yanlışsa hata ile çıkar; böylece CI bunu çalıştırabilir.
 
-Bir Zeyn sürümü bir API'nin adını değiştirdiğinde, eski ad bir sürüm boyunca kullanımdan kaldırılmış bir takma ad olarak kalır. `zeyn check --fix` eski adları yeniden yazar, örneğin `Grid` yerine `DataGrid` ve `GridQuery` yerine `DataQuery`, sonra yeniden denetler.
+Bir Zeyn sürümü bir API'nin adını değiştirdiğinde `zeyn check --fix` eski adları yeniden yazar, örneğin `Grid` yerine `DataGrid` ve `GridQuery` yerine `DataQuery`, sonra yeniden denetler.
 
 ```sh
 zeyn check --fix

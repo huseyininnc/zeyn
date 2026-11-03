@@ -102,17 +102,7 @@ impl Card {
             preview: None,
         }
     }
-
-    /// The old name of [`Card::image`].
-    #[deprecated(since = "0.0.5", note = "use Card::image(image, title)")]
-    pub fn poster(image: impl Into<String>, title: impl Into<Text>) -> ImageCard {
-        Card::image(image, title)
-    }
 }
-
-/// The old name of [`ImageCard`].
-#[deprecated(since = "0.0.5", note = "use ImageCard")]
-pub type PosterCard = ImageCard;
 
 impl ImageCard {
     /// A line under the title, such as a price.
@@ -314,7 +304,7 @@ pub(crate) fn check_masks<E: Model>(ctx: &Ctx) -> Result<()> {
 /// ```ignore
 /// CardGrid::of(search_products)
 ///     .title(t!("shop.products"))
-///     .card(|p: &Product| Card::poster(p.image.clone(), p.name.clone()).text(p.price.to_string())
+///     .card(|p: &Product| Card::image(p.image.clone(), p.name.clone()).text(p.price.to_string())
 ///         .badge(Badge::new(t!("shop.new")).tone(Tone::Success))
 ///         .link(product_page, ProductParams { id: p.id }))
 ///     .sort_option(t!("shop.by_name"), Product::name, false)
@@ -342,7 +332,7 @@ pub struct CardGrid<E: Model> {
 /// previous and next buttons scroll by a view's width.
 ///
 /// ```ignore
-/// Rail::of(search_products).title(t!("shop.new_arrivals")).card(|p: &Product| Card::poster(p.image.clone(), p.name.clone()))
+/// Rail::of(search_products).title(t!("shop.new_arrivals")).card(|p: &Product| Card::image(p.image.clone(), p.name.clone()))
 /// ```
 pub struct Rail;
 

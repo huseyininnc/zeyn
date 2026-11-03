@@ -115,8 +115,6 @@ mod workflow;
 #[cfg(feature = "xlsx")]
 mod xlsx;
 
-#[allow(deprecated)]
-pub use action::GridQuery;
 pub use action::{
     Access, Action, ActionMeta, Aggregate, AggregateRequest, Ai, Cursor, DEFAULT_PAGE_SIZE,
     DataQuery, Error, Filter, MAX_FILTER_CHOICES, MAX_FILTER_TEXT, MAX_FILTERS, MAX_PAGE_SIZE,
@@ -132,8 +130,6 @@ pub use auth::RequireMfa;
 pub use auth::{Algorithm, ClaimMap, JwtAuth, OidcAuth};
 #[cfg(feature = "totp")]
 pub use auth::{MemoryTotpStore, Totp, TotpRecord, TotpStore};
-#[allow(deprecated)]
-pub use command::RESERVED_SHORTCUTS;
 pub use command::{
     BROWSER_DEFAULTS, BROWSER_RESERVED, BrowserShortcut, Command, PALETTE_SHORTCUT,
     browser_shortcut, normalize_shortcut,
@@ -161,8 +157,6 @@ pub use grid::{
     MAX_SORT, MemoryViewStore, Paging, Pin, RowStyle, Tone, VIRTUAL_LIVE_ROWS,
     VIRTUAL_WIDE_COLUMNS, position_cursor, total,
 };
-#[allow(deprecated)]
-pub use grid::{Grid, GridColumn, GridMode};
 pub use i18n::{I18n, NumberFormat, Text};
 pub use import::{
     Checked, CsvError, DEFAULT_MAX_ROWS, HARD_MAX_ROWS, Import, ImportFile, ImportSource,
@@ -208,9 +202,6 @@ pub use screen::{
 pub use security::{
     IpRange, MemoryRateStore, RateKey, RateLimit, RateStore, client_ip, parse_ranges,
 };
-#[cfg(feature = "server")]
-#[allow(deprecated)]
-pub use server::Agents;
 /// Realtime channel: WebSocket rooms with Y-CRDT documents and change topics.
 #[cfg(feature = "realtime")]
 pub use server::realtime;
@@ -247,9 +238,6 @@ pub use serde_json as __serde_json;
 
 /// Everything application code needs: `use zeyn::prelude::*;`
 pub mod prelude {
-    #[cfg(feature = "server")]
-    #[allow(deprecated)]
-    pub use crate::Agents;
     pub use crate::seo::{Robots, SitemapPart, SitemapUrl};
     #[cfg(feature = "markdown")]
     pub use crate::ui::Markdown;
@@ -276,6 +264,4 @@ pub mod prelude {
         ApiDocs, App, AuditLog, DevAuth, DiskStore, Mcp, MemoryAudit, MemoryStore, Plugin,
         RateLimit, StaticCredentials, StderrAudit, Theme, TimePolicy,
     };
-    #[allow(deprecated)]
-    pub use crate::{Grid, GridMode, GridQuery};
 }

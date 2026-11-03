@@ -29,13 +29,13 @@ error[E0277]: `min()` and `max()` cannot be used on a `bool` column
 ## Agents that use an app
 
 ```rust
-App::new(t!("app.name")).agents(Agents::read_only())
+App::new(t!("app.name")).mcp(Mcp::read_only())
 ```
 
 With `agents`, the app's screens become tools:
 
 - one search tool for each grid,
-- one save tool for each form, with the form's fields and rules as its schema (only with `Agents::read_write()`).
+- one save tool for each form, with the form's fields and rules as its schema (only with `Mcp::read_write()`).
 
 Agents reach them in two ways:
 
@@ -47,4 +47,4 @@ Agents reach them in two ways:
 - An agent gets exactly the permissions of the user it acts for. Tools for screens and actions the user may not open are not listed.
 - Calls run the guards, interceptors, validation and rate limits of a normal call.
 - Audit records mark calls made by agents, so a reviewer can tell them apart.
-- `Agents::read_only()` lets agents search but not save. Choose `read_write()` only for apps where an agent should change data.
+- `Mcp::read_only()` lets agents search but not save. Choose `read_write()` only for apps where an agent should change data.

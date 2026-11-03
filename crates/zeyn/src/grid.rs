@@ -424,27 +424,6 @@ struct Column<E> {
     editable: bool,
 }
 
-/// Old name of [`DataGrid`]; kept for one release.
-#[deprecated(
-    since = "0.0.2",
-    note = "renamed to `DataGrid`; `zeyn check --fix` rewrites it"
-)]
-pub type Grid<E> = DataGrid<E>;
-
-/// Old name of [`DataGridColumn`]; kept for one release.
-#[deprecated(
-    since = "0.0.2",
-    note = "renamed to `DataGridColumn`; `zeyn check --fix` rewrites it"
-)]
-pub type GridColumn<E, T> = DataGridColumn<E, T>;
-
-/// Old name of [`DataMode`]; kept for one release.
-#[deprecated(
-    since = "0.0.2",
-    note = "renamed to `DataMode`; `zeyn check --fix` rewrites it"
-)]
-pub type GridMode = DataMode;
-
 /// Data grid. Its data source is an action that takes a `DataQuery` and returns `Page<E>`.
 ///
 /// Example:

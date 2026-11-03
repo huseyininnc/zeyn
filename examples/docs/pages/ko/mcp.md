@@ -29,13 +29,13 @@ error[E0277]: `min()` and `max()` cannot be used on a `bool` column
 ## 앱을 사용하는 에이전트
 
 ```rust
-App::new(t!("app.name")).agents(Agents::read_only())
+App::new(t!("app.name")).mcp(Mcp::read_only())
 ```
 
 `agents`를 사용하면 앱의 Screen이 도구가 됩니다.
 
 - 그리드마다 검색 도구 하나,
-- 폼마다 저장 도구 하나. 폼의 필드와 규칙이 스키마가 됩니다(`Agents::read_write()`에서만).
+- 폼마다 저장 도구 하나. 폼의 필드와 규칙이 스키마가 됩니다(`Mcp::read_write()`에서만).
 
 에이전트는 두 가지 방법으로 이 도구에 접근합니다.
 
@@ -47,4 +47,4 @@ App::new(t!("app.name")).agents(Agents::read_only())
 - 에이전트는 자신이 대행하는 사용자의 권한만 정확히 가집니다. 사용자가 열 수 없는 Screen과 action의 도구는 목록에 나타나지 않습니다.
 - 호출은 일반 호출의 가드, 인터셉터, 검증, 속도 제한을 거칩니다.
 - 감사 기록은 에이전트가 한 호출을 표시하므로 검토자가 구분할 수 있습니다.
-- `Agents::read_only()`는 에이전트가 검색은 할 수 있지만 저장은 못 하게 합니다. 에이전트가 데이터를 변경해야 하는 앱에서만 `read_write()`를 선택하십시오.
+- `Mcp::read_only()`는 에이전트가 검색은 할 수 있지만 저장은 못 하게 합니다. 에이전트가 데이터를 변경해야 하는 앱에서만 `read_write()`를 선택하십시오.

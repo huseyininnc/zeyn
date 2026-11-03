@@ -531,13 +531,6 @@ pub struct Mcp {
     browser: bool,
 }
 
-/// Old name of [`Mcp`]; kept for one release.
-#[deprecated(
-    since = "0.0.3",
-    note = "renamed to `Mcp`; use `App::mcp(Mcp::on())` or `Mcp::read_only()`"
-)]
-pub type Agents = Mcp;
-
 impl Mcp {
     /// No MCP endpoint and no WebMCP tools. The default.
     pub fn off() -> Self {
@@ -1192,13 +1185,6 @@ impl App {
     pub fn assistant(mut self, assistant: crate::assistant::Assistant) -> Self {
         self.assistant = Some(Arc::new(assistant));
         self
-    }
-
-    /// Old name of [`App::mcp`]; kept for one release.
-    #[deprecated(since = "0.0.3", note = "renamed to `App::mcp`")]
-    #[allow(deprecated)]
-    pub fn agents(self, agents: Agents) -> Self {
-        self.mcp(agents)
     }
 
     /// Checks routes, screen names, menus and that every service a screen needs is registered.

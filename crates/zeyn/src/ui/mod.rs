@@ -56,8 +56,6 @@ pub use layout::{Card, Panel, Row, Split, Stack, Tabs};
 pub use shell::{MenuBar, MenuList, PropertyInspector, StatusBar, Toolbox};
 
 pub use alpha::{AlphaIndex, OTHER_LETTER, alphabet};
-#[allow(deprecated)]
-pub use catalog::PosterCard;
 pub use catalog::{CardGrid, ImageCard, MAX_SUGGESTIONS, Rail, SearchBox, SearchParams};
 pub use chart::{Better, BulletCell, Chart, ChartKind, Kpi, SparklineCell};
 pub use chips::{Chips, MAX_CHIPS};
