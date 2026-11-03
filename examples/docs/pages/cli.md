@@ -53,7 +53,14 @@ cargo run
   ```
 
   not `DataGrid::of(search_items).paging(Paging::pages(25)).column(Item::code).column(Item::qty)`.
-- `Dockerfile`, `.dockerignore`, `.gitlab-ci.yml`: a container and a pipeline.
+- `Dockerfile` and `.dockerignore`: a small container image.
+- Pipelines for the common CI servers, all running the same checks (`cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, `cargo deny check`) and refusing a tag `vX.Y.Z` that does not match `Cargo.toml`:
+  - `.github/workflows/ci.yml` for GitHub Actions, with `.github/dependabot.yml` (weekly Cargo and action updates) and a pull request checklist;
+  - `.gitlab-ci.yml` for GitLab;
+  - `Jenkinsfile` for Jenkins (Docker agent, coverage with `cargo llvm-cov`).
+- `sonar-project.properties`: SonarQube analysis (Clippy issues and LCOV coverage from `target/lcov.info`). The GitHub workflow runs it when the repository variable `SONAR_HOST_URL` and the secret `SONAR_TOKEN` are set; Jenkins runs it when the job sets `SONAR_ENABLED=true`.
+- `SECURITY.md` and `CHANGELOG.md` (Keep a Changelog).
+- A local git repository on branch `main`, when git is installed (Windows, macOS or Linux) and the folder is not already inside a repository. Nothing is committed, so the first commit carries your own name and email. `--no-git` skips it.
 
 See [Project structure](structure.md) for each folder.
 

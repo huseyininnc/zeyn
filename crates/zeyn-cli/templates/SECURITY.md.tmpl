@@ -1,0 +1,16 @@
+# Security policy
+
+## Reporting a vulnerability
+
+Do not open a public issue for a security problem. Write to the maintainers of {{title}}
+privately (fill in the address: `security@example.com`) with the steps to reproduce, the
+affected version and what an attacker could do. You get an answer within five working days.
+
+## Supported versions
+
+Only the latest release gets security fixes.
+
+## What CI checks
+
+`cargo deny check` refuses dependencies with known advisories (RustSec) and licenses outside
+`deny.toml`. Dependabot or Renovate opens weekly update pull requests.

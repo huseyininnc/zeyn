@@ -1,0 +1,73 @@
+// Jenkins pipeline for a Zeyn project (app or library): format, lint, test with coverage,
+// licenses and advisories. Needs the Docker Pipeline plugin. SonarQube runs when the job sets
+// SONAR_ENABLED=true; it needs the SonarQube Scanner plugin, a server named "sonarqube" under
+// Manage Jenkins > System and a scanner tool named "sonar-scanner" under Tools.
+pipeline {
+    agent {
+        docker {
+            image 'rust:1.98'
+            args '-v zeyn-cargo-registry:/usr/local/cargo/registry'
+        }
+    }
+    options {
+        timeout(time: 45, unit: 'MINUTES')
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '20'))
+    }
+    environment {
+        CARGO_TERM_COLOR = 'always'
+    }
+    stages {
+        stage('Toolchain') {
+            steps {
+                sh 'rustup show && rustup component add llvm-tools-preview'
+            }
+        }
+        stage('Format') {
+            steps {
+                sh 'cargo fmt --check'
+            }
+        }
+        stage('Lint') {
+            steps {
+                sh 'cargo clippy --all-targets -- -D warnings'
+            }
+        }
+        stage('Test and coverage') {
+            steps {
+                sh 'command -v cargo-llvm-cov || cargo install cargo-llvm-cov --locked'
+                sh 'cargo llvm-cov --lcov --output-path target/lcov.info'
+            }
+        }
+        stage('Licenses and advisories') {
+            steps {
+                sh 'command -v cargo-deny || cargo install cargo-deny --locked'
+                sh 'cargo deny check'
+            }
+        }
+        stage('SonarQube') {
+            when {
+                environment name: 'SONAR_ENABLED', value: 'true'
+            }
+            steps {
+                withSonarQubeEnv('sonarqube') {
+                    sh "${tool 'sonar-scanner'}/bin/sonar-scanner"
+                }
+                timeout(time: 10, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+        stage('Tag matches version') {
+            when {
+                buildingTag()
+            }
+            steps {
+                sh '''
+                    VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+                    test "v$VERSION" = "$TAG_NAME" || { echo "Tag $TAG_NAME does not match Cargo.toml version $VERSION"; exit 1; }
+                '''
+            }
+        }
+    }
+}

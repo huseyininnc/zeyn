@@ -18,6 +18,13 @@ const TEMPLATES: &[(&str, &str)] = &[
     (".mcp.json", include_str!("../templates/mcp.json.tmpl")),
     (".gitignore", include_str!("../templates/gitignore.tmpl")),
     (".gitlab-ci.yml", include_str!("../templates/gitlab-ci.yml.tmpl")),
+    (".github/workflows/ci.yml", include_str!("../templates/github/workflows/ci.yml")),
+    (".github/dependabot.yml", include_str!("../templates/github/dependabot.yml")),
+    (".github/pull_request_template.md", include_str!("../templates/github/pull_request_template.md")),
+    ("Jenkinsfile", include_str!("../templates/Jenkinsfile")),
+    ("sonar-project.properties", include_str!("../templates/sonar-project.properties.tmpl")),
+    ("SECURITY.md", include_str!("../templates/SECURITY.md.tmpl")),
+    ("CHANGELOG.md", include_str!("../templates/CHANGELOG.md.tmpl")),
     ("rustfmt.toml", include_str!("../templates/rustfmt.toml")),
     (".editorconfig", include_str!("../templates/editorconfig.tmpl")),
     (".claude/skills/zeyn/SKILL.md", include_str!("../embedded/SKILL.md")),
@@ -48,6 +55,13 @@ const LIB_TEMPLATES: &[(&str, &str)] = &[
     ("CLAUDE.md", include_str!("../templates/CLAUDE.md.tmpl")),
     (".gitignore", include_str!("../templates/lib/gitignore.tmpl")),
     (".gitlab-ci.yml", include_str!("../templates/gitlab-ci.yml.tmpl")),
+    (".github/workflows/ci.yml", include_str!("../templates/github/workflows/ci.yml")),
+    (".github/dependabot.yml", include_str!("../templates/github/dependabot.yml")),
+    (".github/pull_request_template.md", include_str!("../templates/github/pull_request_template.md")),
+    ("Jenkinsfile", include_str!("../templates/Jenkinsfile")),
+    ("sonar-project.properties", include_str!("../templates/sonar-project.properties.tmpl")),
+    ("SECURITY.md", include_str!("../templates/SECURITY.md.tmpl")),
+    ("CHANGELOG.md", include_str!("../templates/CHANGELOG.md.tmpl")),
     ("rustfmt.toml", include_str!("../templates/rustfmt.toml")),
     (".editorconfig", include_str!("../templates/editorconfig.tmpl")),
     (".claude/skills/zeyn/SKILL.md", include_str!("../embedded/SKILL.md")),
@@ -76,8 +90,12 @@ const DOCS: &[(&str, &str)] = &[
 const HELP: &str = "zeyn: command line tool for Zeyn Framework
 
 Usage:
-  zeyn new <name> [--zeyn-path <path>]   create an app with the standard feature structure
-  zeyn new <name> --lib [--zeyn-path <path>]   create a shared library (models, features, texts) for several apps
+  zeyn new <name> [--zeyn-path <path>] [--no-git]
+                                          create an app with the standard feature structure, CI for
+                                          GitHub Actions, GitLab and Jenkins, SonarQube settings, and a
+                                          local git repository on branch main when git is installed
+  zeyn new <name> --lib [--zeyn-path <path>] [--no-git]
+                                          the same for a shared library (models, features, texts)
   zeyn g feature <name>                   add src/features/<name> with models, store, actions and screens
   zeyn routes                             list features, screens, routes, APIs and access
   zeyn check [--fix]                      compile and report structural problems and missing translations;
@@ -103,7 +121,9 @@ fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let words: Vec<&str> = args.iter().map(String::as_str).collect();
     let result = match words.as_slice() {
-        ["new", name, rest @ ..] => new_project(name, flag(rest, "--zeyn-path"), rest.contains(&"--lib")),
+        ["new", name, rest @ ..] => {
+            new_project(name, flag(rest, "--zeyn-path"), rest.contains(&"--lib"), !rest.contains(&"--no-git"))
+        }
         ["g" | "generate", "feature", name] => new_feature(Path::new("."), name).map(|m| println!("{m}")),
         ["routes"] => describe(Path::new(".")).map(|d| print!("{}", routes_table(&d))),
         ["check", rest @ ..] => fix_if(Path::new("."), rest.contains(&"--fix"))
@@ -183,13 +203,17 @@ fn title_of(name: &str) -> String {
         .join(" ")
 }
 
-fn new_project(name: &str, zeyn_path: Option<&str>, lib: bool) -> Result<(), String> {
+fn new_project(name: &str, zeyn_path: Option<&str>, lib: bool, git: bool) -> Result<(), String> {
+    new_project_at(&PathBuf::from(name), name, zeyn_path, lib, git)
+}
+
+/// Writes a new project named `name` into `root`.
+fn new_project_at(root: &Path, name: &str, zeyn_path: Option<&str>, lib: bool, git: bool) -> Result<(), String> {
     let ok = name.chars().next().is_some_and(|c| c.is_ascii_lowercase())
         && name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_');
     if !ok {
         return Err(format!("`{name}` is not a valid project name; use lower case letters, digits, `-` and `_`"));
     }
-    let root = PathBuf::from(name);
     if root.exists() {
         return Err(format!("`{name}` already exists"));
     }
@@ -216,6 +240,9 @@ fn new_project(name: &str, zeyn_path: Option<&str>, lib: bool) -> Result<(), Str
             .replace("{{zeyn_dep}}", &dep);
         std::fs::write(&target, text).map_err(|e| format!("{}: {e}", target.display()))?;
     }
+    if git {
+        println!("{}", git_init(&root));
+    }
     if lib {
         println!(
             "Created library {name}/\n\n  cd {name}\n  cargo test\n\nUse it from an app: {crate_name} = {{ git = \"<repo url>\", tag = \"v0.1.0\" }}"
@@ -226,6 +253,33 @@ fn new_project(name: &str, zeyn_path: Option<&str>, lib: bool) -> Result<(), Str
         );
     }
     Ok(())
+}
+
+/// Starts a local git repository on branch `main` in a new project, when git is installed and the
+/// project is not inside another repository. Never commits: the author's name and email are the
+/// user's to set. Returns the line to print.
+fn git_init(root: &Path) -> String {
+    let run = |dir: &Path, args: &[&str]| {
+        Command::new("git")
+            .args(args)
+            .current_dir(dir)
+            .output()
+            .is_ok_and(|o| o.status.success())
+    };
+    let here = root.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
+    if !run(here, &["--version"]) {
+        return "git is not installed, so no repository was created; run `git init -b main` later".into();
+    }
+    if run(here, &["rev-parse", "--is-inside-work-tree"]) {
+        return "Inside an existing git repository, so no new one was created".into();
+    }
+    let started = run(root, &["init", "-b", "main"])
+        || (run(root, &["init"]) && run(root, &["symbolic-ref", "HEAD", "refs/heads/main"]));
+    if started {
+        "Started a git repository on branch main; nothing is committed yet".into()
+    } else {
+        "git init failed; run `git init -b main` in the project".into()
+    }
 }
 
 /// Adds `src/features/<name>` and registers the module. Returns what is left to do by hand.
@@ -602,6 +656,46 @@ const RAW: &str = r#"Grid "quoted" Grid"#; const C: char = 'G';"##;
     }
 
     use super::*;
+
+    #[test]
+    fn new_projects_get_ci_for_every_platform_and_their_own_git_repository() {
+        let base = std::env::temp_dir().join(format!("zeyn-new-{}", std::process::id()));
+        std::fs::create_dir_all(&base).unwrap();
+        let root = base.join("ci-app");
+        let created = new_project_at(&root, "ci-app", None, false, true);
+        assert!(created.is_ok(), "{created:?}");
+        for file in [
+            ".github/workflows/ci.yml",
+            ".github/dependabot.yml",
+            ".github/pull_request_template.md",
+            ".gitlab-ci.yml",
+            "Jenkinsfile",
+            "sonar-project.properties",
+            "SECURITY.md",
+            "CHANGELOG.md",
+        ] {
+            assert!(root.join(file).is_file(), "{file}");
+        }
+        let sonar = std::fs::read_to_string(root.join("sonar-project.properties")).unwrap();
+        assert!(sonar.contains("sonar.projectKey=ci_app") && sonar.contains("sonar.projectName=Ci App"), "{sonar}");
+        let has_git = Command::new("git")
+            .arg("--version")
+            .output()
+            .is_ok_and(|o| o.status.success());
+        let inside = Command::new("git")
+            .args(["rev-parse", "--is-inside-work-tree"])
+            .current_dir(&base)
+            .output()
+            .is_ok_and(|o| o.status.success());
+        if has_git && !inside {
+            let head = std::fs::read_to_string(root.join(".git/HEAD")).unwrap();
+            assert_eq!(head.trim(), "ref: refs/heads/main");
+        }
+        let lib = base.join("ci-lib");
+        new_project_at(&lib, "ci-lib", None, true, false).unwrap();
+        assert!(lib.join("Jenkinsfile").is_file() && !lib.join(".git").exists());
+        std::fs::remove_dir_all(&base).ok();
+    }
 
     #[test]
     fn names_and_titles() {

@@ -1,0 +1,10 @@
+# SonarQube analysis of {{title}}. The Rust analyzer runs Clippy itself (cargo and clippy
+# must be on the PATH of the scanner) and reads coverage from target/lcov.info, written by
+# `cargo llvm-cov --lcov --output-path target/lcov.info` in CI.
+sonar.projectKey={{crate}}
+sonar.projectName={{title}}
+sonar.sources=src
+sonar.tests=tests
+sonar.sourceEncoding=UTF-8
+sonar.exclusions=target/**
+sonar.rust.lcov.reportPaths=target/lcov.info
