@@ -6,12 +6,22 @@
 <meta name="color-scheme" content="light dark">
 <title>Zeyn: фреймворк на Rust для бизнес-приложений, которые пишут ИИ-агенты</title>
 <meta name="description" content="Zeyn: веб-фреймворк на Rust с открытым исходным кодом для бизнес-приложений с большими объёмами данных, построенный на axum. Код пишут ИИ-агенты, проверяют люди, а безопасность обеспечивает фреймворк.">
-<link rel="canonical" href="https://zeynsoft.com/">
+<link rel="canonical" href="https://zeynsoft.com/ru/">
+<link rel="alternate" hreflang="en" href="https://zeynsoft.com/">
+<link rel="alternate" hreflang="tr" href="https://zeynsoft.com/tr/">
+<link rel="alternate" hreflang="zh-Hans" href="https://zeynsoft.com/zh/">
+<link rel="alternate" hreflang="ru" href="https://zeynsoft.com/ru/">
+<link rel="alternate" hreflang="es" href="https://zeynsoft.com/es/">
+<link rel="alternate" hreflang="ko" href="https://zeynsoft.com/ko/">
+<link rel="alternate" hreflang="ja" href="https://zeynsoft.com/ja/">
+<link rel="alternate" hreflang="hi" href="https://zeynsoft.com/hi/">
+<link rel="alternate" hreflang="ar" href="https://zeynsoft.com/ar/">
+<link rel="alternate" hreflang="x-default" href="https://zeynsoft.com/">
 <meta name="theme-color" content="#eef2f1" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0c1a1c" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Zeyn">
-<meta property="og:url" content="https://zeynsoft.com/">
+<meta property="og:url" content="https://zeynsoft.com/ru/">
 <meta property="og:title" content="Zeyn: фреймворк на Rust для бизнес-приложений, которые пишут ИИ-агенты">
 <meta property="og:description" content="Открытый исходный код, основа: axum. Одно действие становится экраном, конечной точкой API и инструментом для ИИ, с одинаковой проверкой прав.">
 <meta property="og:image" content="https://zeynsoft.com/og.png">
@@ -31,13 +41,13 @@
   "@type": "SoftwareSourceCode",
   "name": "Zeyn",
   "description": "Веб-фреймворк на Rust с открытым исходным кодом для бизнес-приложений с большими объёмами данных. Код приложения пишут ИИ-агенты, проверяют люди, а безопасность обеспечивает фреймворк.",
-  "url": "https://zeynsoft.com/",
+  "url": "https://zeynsoft.com/ru/",
   "programmingLanguage": "Rust",
   "runtimePlatform": "axum",
   "license": ["https://opensource.org/licenses/MIT", "https://www.apache.org/licenses/LICENSE-2.0"],
   "creativeWorkStatus": "Alpha",
   "author": { "@type": "Person", "name": "Huseyin Inanc", "url": "https://github.com/huseyininnc" },
-  "documentation": "https://docs.zeynsoft.com/",
+  "documentation": "https://docs.zeynsoft.com/ru/",
   "sameAs": ["https://docs.zeynsoft.com/", "https://framework.zeynsoft.com/", "https://crates.io/crates/zeyn", "https://docs.rs/zeyn"]
 }
 </script>
@@ -47,13 +57,29 @@
 
 <header class="top">
   <div class="wrap top-in">
-    <a class="brand" href="/" aria-label="Zeyn, главная">
+    <a class="brand" href="/ru/" aria-label="Zeyn, главная">
       <svg class="mark" viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#0e6a74"/><path d="M9.5 9.5h13L9.5 22.5h13" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="square"/><circle cx="22.5" cy="9.5" r="2.6" fill="#ffd84a"/></svg>
       <span>Zeyn</span>
     </a>
     <nav aria-label="Основное">
-      <a href="https://docs.zeynsoft.com">Документация</a>
+      <a href="https://docs.zeynsoft.com/ru/">Документация</a>
       <a href="https://framework.zeynsoft.com">Живая демо</a>
+    </nav>
+    <nav class="langs" aria-label="Язык">
+      <details>
+        <summary><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3 12h18M12 3c2.6 2.6 3.9 5.6 3.9 9s-1.3 6.4-3.9 9c-2.6-2.6-3.9-5.6-3.9-9S9.4 5.6 12 3z" fill="none" stroke="currentColor" stroke-width="1.8"/></svg><span lang="ru">Русский</span></summary>
+      <ul>
+        <li><a href="/" hreflang="en" lang="en">English</a></li>
+        <li><a href="/tr/" hreflang="tr" lang="tr">Türkçe</a></li>
+        <li><a href="/zh/" hreflang="zh-Hans" lang="zh-Hans">简体中文</a></li>
+        <li><a href="/ru/" hreflang="ru" lang="ru" aria-current="page">Русский</a></li>
+        <li><a href="/es/" hreflang="es" lang="es">Español</a></li>
+        <li><a href="/ko/" hreflang="ko" lang="ko">한국어</a></li>
+        <li><a href="/ja/" hreflang="ja" lang="ja">日本語</a></li>
+        <li><a href="/hi/" hreflang="hi" lang="hi">हिन्दी</a></li>
+        <li><a href="/ar/" hreflang="ar" lang="ar">العربية</a></li>
+      </ul>
+      </details>
     </nav>
   </div>
 </header>
@@ -65,7 +91,7 @@
       <h1 id="hero-title">Фреймворк на Rust для бизнес-приложений, которые пишут ИИ-агенты</h1>
       <p class="lead">Код проверяют люди. Безопасность обеспечивают компилятор и фреймворк. Zeyn с открытым исходным кодом построен на axum и предназначен для приложений, полных таблиц, форм и рабочих процессов.</p>
       <p class="actions">
-        <a class="button primary" href="https://docs.zeynsoft.com">Читать документацию</a>
+        <a class="button primary" href="https://docs.zeynsoft.com/ru/">Читать документацию</a>
         <a class="button" href="https://framework.zeynsoft.com">Живая демо</a>
       </p>
     </div>
@@ -205,7 +231,7 @@ Authorization: Bearer &lt;token&gt;
     <div class="wrap">
       <div class="grid-text">
         <h2 id="grid-title">DataGrid, который остаётся быстрым на миллионе строк</h2>
-        <p>В архиве заказов демо один миллион заказов. Таблица прокручивает их с виртуальной прокруткой, а сортировку, фильтрацию и разбиение на страницы выполняет сервер. Как это работает, объясняет <a href="https://docs.zeynsoft.com/language/datagrid">документация DataGrid</a>.</p>
+        <p>В архиве заказов демо один миллион заказов. Таблица прокручивает их с виртуальной прокруткой, а сортировку, фильтрацию и разбиение на страницы выполняет сервер. Как это работает, объясняет <a href="https://docs.zeynsoft.com/ru/language/datagrid">документация DataGrid</a>.</p>
         <ul class="ticks">
           <li>Типизированные фильтры для каждого столбца</li>
           <li>Итоги по всем подходящим строкам</li>
@@ -230,7 +256,7 @@ Authorization: Bearer &lt;token&gt;
       <h2 id="sheet-title">Что входит в комплект</h2>
       <p class="intro">Zeyn в целом находится в альфа-версии. Части с пометкой «стабильно» составляют ядро и меняются реже всего. Экспериментальные части работают и протестированы, но между версиями возможны более крупные изменения.</p>
       <dl class="spec">
-        <div><dt>DataGrid <span class="tag stable">Стабильно</span></dt><dd>Виртуальная прокрутка <a href="https://docs.zeynsoft.com/language/datagrid">миллиона строк</a>, типизированные фильтры, итоги, группировка, редактирование в таблице, экспорт в CSV и Excel</dd></div>
+        <div><dt>DataGrid <span class="tag stable">Стабильно</span></dt><dd>Виртуальная прокрутка <a href="https://docs.zeynsoft.com/ru/language/datagrid">миллиона строк</a>, типизированные фильтры, итоги, группировка, редактирование в таблице, экспорт в CSV и Excel</dd></div>
         <div><dt>Формы <span class="tag stable">Стабильно</span></dt><dd>Все типы полей, проверка, общая для сервера, браузера и API, обнаружение конфликтов версий строк</dd></div>
         <div><dt>Действия <span class="tag stable">Стабильно</span></dt><dd>Типизированные входные данные, JSON API с OpenAPI и инструменты для ИИ-агентов, работающие с правами пользователя</dd></div>
         <div><dt>Ядро безопасности <span class="tag stable">Стабильно</span></dt><dd>Права на каждое действие, CSRF, строгий CSP, аудит и аудит чтения, маскирование полей, ограничение частоты запросов</dd></div>
@@ -241,7 +267,7 @@ Authorization: Bearer &lt;token&gt;
         <div><dt>Реальное время <span class="tag exp">Экспериментально</span></dt><dd>Комнаты WebSocket с документами CRDT для совместного редактирования, с ограниченным объёмом памяти</dd></div>
         <div><dt>ИИ-ассистент <span class="tag exp">Экспериментально</span></dt><dd>Встроенный ассистент для любой LLM, который спрашивает пользователя перед записью</dd></div>
       </dl>
-      <p class="aside">Образ контейнера сгенерированного приложения занимает около 43 МБ, а простаивающее приложение использует несколько МБ памяти. См. <a href="https://docs.zeynsoft.com/start/cli#docker">Docker в документации CLI</a>.</p>
+      <p class="aside">Образ контейнера сгенерированного приложения занимает около 43 МБ, а простаивающее приложение использует несколько МБ памяти. См. <a href="https://docs.zeynsoft.com/ru/start/cli#docker">Docker в документации CLI</a>.</p>
     </div>
   </section>
 
@@ -255,7 +281,7 @@ cd my-app
 cargo run</code></pre>
       <p>Работаете с агентом-программистом? Дайте ему <a href="https://docs.zeynsoft.com/llms.txt">docs.zeynsoft.com/llms.txt</a>. Файл предписывает агенту установить CLI, создать проект и следовать правилам проекта.</p>
       <p class="actions">
-        <a class="button primary" href="https://docs.zeynsoft.com">Читать документацию</a>
+        <a class="button primary" href="https://docs.zeynsoft.com/ru/">Читать документацию</a>
         <a class="button" href="https://framework.zeynsoft.com">Живая демо</a>
       </p>
     </div>
@@ -266,7 +292,7 @@ cargo run</code></pre>
   <div class="wrap foot-in">
     <p>Автор: Huseyin Inanc. Связаться с ним можно через <a href="https://github.com/huseyininnc">его профиль на GitHub</a>. Открытый исходный код под лицензией MIT или Apache 2.0.</p>
     <nav aria-label="Нижнее меню">
-      <a href="https://docs.zeynsoft.com">Документация</a>
+      <a href="https://docs.zeynsoft.com/ru/">Документация</a>
       <a href="https://framework.zeynsoft.com">Живая демо</a>
       <a href="https://crates.io/crates/zeyn">crates.io</a>
       <a href="https://docs.rs/zeyn">docs.rs</a>

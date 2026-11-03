@@ -472,3 +472,40 @@ h1 {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+.langs { position: relative; margin-inline-end: -12px; }
+.langs summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: var(--ink);
+  font-weight: 550;
+  cursor: pointer;
+  list-style: none;
+}
+.langs summary::-webkit-details-marker { display: none; }
+.langs summary:hover, .langs details[open] summary { background: var(--teal-wash); }
+.langs ul {
+  position: absolute;
+  inset-inline-end: 0;
+  top: calc(100% + 4px);
+  z-index: 10;
+  min-width: 11rem;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.14);
+}
+.top .langs a { display: block; padding: 8px 12px; }
+.top .langs a[aria-current="page"] { background: var(--teal-wash); font-weight: 700; box-shadow: inset 3px 0 0 var(--teal); }
+[dir="rtl"] .top .langs a[aria-current="page"] { box-shadow: inset -3px 0 0 var(--teal); }
+.top-in .brand { margin-inline-end: auto; }
+.top nav:has(+ .langs) { margin-right: 0; }
+@media (max-width: 640px) {
+  .langs ul { position: static; margin-top: 4px; box-shadow: none; }
+}

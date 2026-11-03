@@ -6,12 +6,22 @@
 <meta name="color-scheme" content="light dark">
 <title>Zeyn：由 AI 智能体编写的业务应用 Rust 框架</title>
 <meta name="description" content="Zeyn 是基于 axum 的开源 Rust Web 框架，面向数据密集型业务应用。代码由 AI 智能体编写，由人审查，由框架保障安全。">
-<link rel="canonical" href="https://zeynsoft.com/">
+<link rel="canonical" href="https://zeynsoft.com/zh/">
+<link rel="alternate" hreflang="en" href="https://zeynsoft.com/">
+<link rel="alternate" hreflang="tr" href="https://zeynsoft.com/tr/">
+<link rel="alternate" hreflang="zh-Hans" href="https://zeynsoft.com/zh/">
+<link rel="alternate" hreflang="ru" href="https://zeynsoft.com/ru/">
+<link rel="alternate" hreflang="es" href="https://zeynsoft.com/es/">
+<link rel="alternate" hreflang="ko" href="https://zeynsoft.com/ko/">
+<link rel="alternate" hreflang="ja" href="https://zeynsoft.com/ja/">
+<link rel="alternate" hreflang="hi" href="https://zeynsoft.com/hi/">
+<link rel="alternate" hreflang="ar" href="https://zeynsoft.com/ar/">
+<link rel="alternate" hreflang="x-default" href="https://zeynsoft.com/">
 <meta name="theme-color" content="#eef2f1" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0c1a1c" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Zeyn">
-<meta property="og:url" content="https://zeynsoft.com/">
+<meta property="og:url" content="https://zeynsoft.com/zh/">
 <meta property="og:title" content="Zeyn：由 AI 智能体编写的业务应用 Rust 框架">
 <meta property="og:description" content="开源，基于 axum。一个 action 同时成为界面、API 端点和 AI 工具，并使用相同的权限检查。">
 <meta property="og:image" content="https://zeynsoft.com/og.png">
@@ -31,13 +41,13 @@
   "@type": "SoftwareSourceCode",
   "name": "Zeyn",
   "description": "面向数据密集型业务应用的开源 Rust Web 框架。应用代码由 AI 智能体编写，由人审查，由框架保障安全。",
-  "url": "https://zeynsoft.com/",
+  "url": "https://zeynsoft.com/zh/",
   "programmingLanguage": "Rust",
   "runtimePlatform": "axum",
   "license": ["https://opensource.org/licenses/MIT", "https://www.apache.org/licenses/LICENSE-2.0"],
   "creativeWorkStatus": "Alpha",
   "author": { "@type": "Person", "name": "Huseyin Inanc", "url": "https://github.com/huseyininnc" },
-  "documentation": "https://docs.zeynsoft.com/",
+  "documentation": "https://docs.zeynsoft.com/zh/",
   "sameAs": ["https://docs.zeynsoft.com/", "https://framework.zeynsoft.com/", "https://crates.io/crates/zeyn", "https://docs.rs/zeyn"]
 }
 </script>
@@ -47,13 +57,29 @@
 
 <header class="top">
   <div class="wrap top-in">
-    <a class="brand" href="/" aria-label="Zeyn 首页">
+    <a class="brand" href="/zh/" aria-label="Zeyn 首页">
       <svg class="mark" viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#0e6a74"/><path d="M9.5 9.5h13L9.5 22.5h13" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="square"/><circle cx="22.5" cy="9.5" r="2.6" fill="#ffd84a"/></svg>
       <span>Zeyn</span>
     </a>
     <nav aria-label="主导航">
-      <a href="https://docs.zeynsoft.com">文档</a>
+      <a href="https://docs.zeynsoft.com/zh/">文档</a>
       <a href="https://framework.zeynsoft.com">在线演示</a>
+    </nav>
+    <nav class="langs" aria-label="语言">
+      <details>
+        <summary><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3 12h18M12 3c2.6 2.6 3.9 5.6 3.9 9s-1.3 6.4-3.9 9c-2.6-2.6-3.9-5.6-3.9-9S9.4 5.6 12 3z" fill="none" stroke="currentColor" stroke-width="1.8"/></svg><span lang="zh-Hans">简体中文</span></summary>
+      <ul>
+        <li><a href="/" hreflang="en" lang="en">English</a></li>
+        <li><a href="/tr/" hreflang="tr" lang="tr">Türkçe</a></li>
+        <li><a href="/zh/" hreflang="zh-Hans" lang="zh-Hans" aria-current="page">简体中文</a></li>
+        <li><a href="/ru/" hreflang="ru" lang="ru">Русский</a></li>
+        <li><a href="/es/" hreflang="es" lang="es">Español</a></li>
+        <li><a href="/ko/" hreflang="ko" lang="ko">한국어</a></li>
+        <li><a href="/ja/" hreflang="ja" lang="ja">日本語</a></li>
+        <li><a href="/hi/" hreflang="hi" lang="hi">हिन्दी</a></li>
+        <li><a href="/ar/" hreflang="ar" lang="ar">العربية</a></li>
+      </ul>
+      </details>
     </nav>
   </div>
 </header>
@@ -65,7 +91,7 @@
       <h1 id="hero-title">由 AI&nbsp;智能体编写的业务应用&nbsp;Rust&nbsp;框架</h1>
       <p class="lead">代码由人审查，安全由编译器和框架保障。Zeyn 开源，基于 axum，面向充满表格、表单和工作流的应用。</p>
       <p class="actions">
-        <a class="button primary" href="https://docs.zeynsoft.com">阅读文档</a>
+        <a class="button primary" href="https://docs.zeynsoft.com/zh/">阅读文档</a>
         <a class="button" href="https://framework.zeynsoft.com">在线演示</a>
       </p>
     </div>
@@ -205,7 +231,7 @@ Authorization: Bearer &lt;token&gt;
     <div class="wrap">
       <div class="grid-text">
         <h2 id="grid-title">百万行数据下依然流畅的 DataGrid</h2>
-        <p>演示中的订单归档包含一百万条订单。表格通过虚拟滚动浏览这些数据，排序、筛选和分页由服务器完成。具体做法见 <a href="https://docs.zeynsoft.com/language/datagrid">DataGrid 文档</a>。</p>
+        <p>演示中的订单归档包含一百万条订单。表格通过虚拟滚动浏览这些数据，排序、筛选和分页由服务器完成。具体做法见 <a href="https://docs.zeynsoft.com/zh/language/datagrid">DataGrid 文档</a>。</p>
         <ul class="ticks">
           <li>每一列都有类型化筛选器</li>
           <li>对所有匹配行进行合计</li>
@@ -230,7 +256,7 @@ Authorization: Bearer &lt;token&gt;
       <h2 id="sheet-title">功能一览</h2>
       <p class="intro">Zeyn 整体处于 alpha 阶段。标记为稳定的部分是核心，最不容易变化。实验性部分可用且经过测试，但版本之间可能有较大变更。</p>
       <dl class="spec">
-        <div><dt>DataGrid <span class="tag stable">稳定</span></dt><dd>对<a href="https://docs.zeynsoft.com/language/datagrid">百万行数据</a>的虚拟滚动、类型化筛选器、合计、分组、行内编辑、CSV 和 Excel 导出</dd></div>
+        <div><dt>DataGrid <span class="tag stable">稳定</span></dt><dd>对<a href="https://docs.zeynsoft.com/zh/language/datagrid">百万行数据</a>的虚拟滚动、类型化筛选器、合计、分组、行内编辑、CSV 和 Excel 导出</dd></div>
         <div><dt>表单 <span class="tag stable">稳定</span></dt><dd>所有字段类型，服务器、浏览器和 API 共用的校验，行版本冲突检查</dd></div>
         <div><dt>Action <span class="tag stable">稳定</span></dt><dd>类型化输入，带 OpenAPI 的 JSON API，以及以用户权限运行的 AI 智能体工具</dd></div>
         <div><dt>安全核心 <span class="tag stable">稳定</span></dt><dd>每个 action 的权限、CSRF、严格的 CSP、审计和读取审计、字段脱敏、限流</dd></div>
@@ -241,7 +267,7 @@ Authorization: Bearer &lt;token&gt;
         <div><dt>实时 <span class="tag exp">实验性</span></dt><dd>用于实时编辑的 WebSocket 房间和 CRDT 文档，内存有上限</dd></div>
         <div><dt>AI 助手 <span class="tag exp">实验性</span></dt><dd>适用于任意 LLM 的内嵌助手，写入前会询问用户</dd></div>
       </dl>
-      <p class="aside">生成的应用的容器镜像约 43 MB，空闲时只占用几 MB 内存。参见 <a href="https://docs.zeynsoft.com/start/cli#docker">CLI 文档中的 Docker</a>。</p>
+      <p class="aside">生成的应用的容器镜像约 43 MB，空闲时只占用几 MB 内存。参见 <a href="https://docs.zeynsoft.com/zh/start/cli#docker">CLI 文档中的 Docker</a>。</p>
     </div>
   </section>
 
@@ -255,7 +281,7 @@ cd my-app
 cargo run</code></pre>
       <p>正在使用编码智能体？把 <a href="https://docs.zeynsoft.com/llms.txt">docs.zeynsoft.com/llms.txt</a> 交给它。其中会告诉智能体安装 CLI、创建项目并遵循项目规则。</p>
       <p class="actions">
-        <a class="button primary" href="https://docs.zeynsoft.com">阅读文档</a>
+        <a class="button primary" href="https://docs.zeynsoft.com/zh/">阅读文档</a>
         <a class="button" href="https://framework.zeynsoft.com">在线演示</a>
       </p>
     </div>
@@ -266,7 +292,7 @@ cargo run</code></pre>
   <div class="wrap foot-in">
     <p>作者 Huseyin Inanc，可通过<a href="https://github.com/huseyininnc">其 GitHub 主页</a>联系。以 MIT 或 Apache 2.0 许可开源。</p>
     <nav aria-label="页脚">
-      <a href="https://docs.zeynsoft.com">文档</a>
+      <a href="https://docs.zeynsoft.com/zh/">文档</a>
       <a href="https://framework.zeynsoft.com">在线演示</a>
       <a href="https://crates.io/crates/zeyn">crates.io</a>
       <a href="https://docs.rs/zeyn">docs.rs</a>

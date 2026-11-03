@@ -6,12 +6,22 @@
 <meta name="color-scheme" content="light dark">
 <title>Zeyn: yapay zeka ajanlarının yazdığı iş uygulamaları için bir Rust framework'ü</title>
 <meta name="description" content="Zeyn, veri yoğun iş uygulamaları için axum üzerine kurulu, açık kaynaklı bir Rust web framework'üdür. Kodu yapay zeka ajanları yazar, insanlar gözden geçirir, güvenliği framework sağlar.">
-<link rel="canonical" href="https://zeynsoft.com/">
+<link rel="canonical" href="https://zeynsoft.com/tr/">
+<link rel="alternate" hreflang="en" href="https://zeynsoft.com/">
+<link rel="alternate" hreflang="tr" href="https://zeynsoft.com/tr/">
+<link rel="alternate" hreflang="zh-Hans" href="https://zeynsoft.com/zh/">
+<link rel="alternate" hreflang="ru" href="https://zeynsoft.com/ru/">
+<link rel="alternate" hreflang="es" href="https://zeynsoft.com/es/">
+<link rel="alternate" hreflang="ko" href="https://zeynsoft.com/ko/">
+<link rel="alternate" hreflang="ja" href="https://zeynsoft.com/ja/">
+<link rel="alternate" hreflang="hi" href="https://zeynsoft.com/hi/">
+<link rel="alternate" hreflang="ar" href="https://zeynsoft.com/ar/">
+<link rel="alternate" hreflang="x-default" href="https://zeynsoft.com/">
 <meta name="theme-color" content="#eef2f1" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0c1a1c" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Zeyn">
-<meta property="og:url" content="https://zeynsoft.com/">
+<meta property="og:url" content="https://zeynsoft.com/tr/">
 <meta property="og:title" content="Zeyn: yapay zeka ajanlarının yazdığı iş uygulamaları için bir Rust framework'ü">
 <meta property="og:description" content="Açık kaynak, axum üzerine kurulu. Tek bir action; ekrana, API uç noktasına ve yapay zeka aracına dönüşür, hepsinde aynı yetki denetimleriyle.">
 <meta property="og:image" content="https://zeynsoft.com/og.png">
@@ -31,13 +41,13 @@
   "@type": "SoftwareSourceCode",
   "name": "Zeyn",
   "description": "Veri yoğun iş uygulamaları için açık kaynaklı bir Rust web framework'ü. Uygulama kodunu yapay zeka ajanları yazar, insanlar gözden geçirir, güvenliği framework sağlar.",
-  "url": "https://zeynsoft.com/",
+  "url": "https://zeynsoft.com/tr/",
   "programmingLanguage": "Rust",
   "runtimePlatform": "axum",
   "license": ["https://opensource.org/licenses/MIT", "https://www.apache.org/licenses/LICENSE-2.0"],
   "creativeWorkStatus": "Alpha",
   "author": { "@type": "Person", "name": "Huseyin Inanc", "url": "https://github.com/huseyininnc" },
-  "documentation": "https://docs.zeynsoft.com/",
+  "documentation": "https://docs.zeynsoft.com/tr/",
   "sameAs": ["https://docs.zeynsoft.com/", "https://framework.zeynsoft.com/", "https://crates.io/crates/zeyn", "https://docs.rs/zeyn"]
 }
 </script>
@@ -47,13 +57,29 @@
 
 <header class="top">
   <div class="wrap top-in">
-    <a class="brand" href="/" aria-label="Zeyn ana sayfa">
+    <a class="brand" href="/tr/" aria-label="Zeyn ana sayfa">
       <svg class="mark" viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#0e6a74"/><path d="M9.5 9.5h13L9.5 22.5h13" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="square"/><circle cx="22.5" cy="9.5" r="2.6" fill="#ffd84a"/></svg>
       <span>Zeyn</span>
     </a>
     <nav aria-label="Ana">
-      <a href="https://docs.zeynsoft.com">Belgeler</a>
+      <a href="https://docs.zeynsoft.com/tr/">Belgeler</a>
       <a href="https://framework.zeynsoft.com">Canlı demo</a>
+    </nav>
+    <nav class="langs" aria-label="Dil">
+      <details>
+        <summary><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3 12h18M12 3c2.6 2.6 3.9 5.6 3.9 9s-1.3 6.4-3.9 9c-2.6-2.6-3.9-5.6-3.9-9S9.4 5.6 12 3z" fill="none" stroke="currentColor" stroke-width="1.8"/></svg><span lang="tr">Türkçe</span></summary>
+      <ul>
+        <li><a href="/" hreflang="en" lang="en">English</a></li>
+        <li><a href="/tr/" hreflang="tr" lang="tr" aria-current="page">Türkçe</a></li>
+        <li><a href="/zh/" hreflang="zh-Hans" lang="zh-Hans">简体中文</a></li>
+        <li><a href="/ru/" hreflang="ru" lang="ru">Русский</a></li>
+        <li><a href="/es/" hreflang="es" lang="es">Español</a></li>
+        <li><a href="/ko/" hreflang="ko" lang="ko">한국어</a></li>
+        <li><a href="/ja/" hreflang="ja" lang="ja">日本語</a></li>
+        <li><a href="/hi/" hreflang="hi" lang="hi">हिन्दी</a></li>
+        <li><a href="/ar/" hreflang="ar" lang="ar">العربية</a></li>
+      </ul>
+      </details>
     </nav>
   </div>
 </header>
@@ -65,7 +91,7 @@
       <h1 id="hero-title">Yapay&nbsp;zeka&nbsp;ajanlarının yazdığı iş uygulamaları için Rust framework'ü</h1>
       <p class="lead">Kodu insanlar gözden geçirir. Güvenliği derleyici ve framework sağlar. Zeyn açık kaynaklıdır ve axum üzerine kuruludur; grid, form ve iş akışlarıyla dolu uygulamalar içindir.</p>
       <p class="actions">
-        <a class="button primary" href="https://docs.zeynsoft.com">Belgeleri oku</a>
+        <a class="button primary" href="https://docs.zeynsoft.com/tr/">Belgeleri oku</a>
         <a class="button" href="https://framework.zeynsoft.com">Canlı demo</a>
       </p>
     </div>
@@ -205,7 +231,7 @@ Authorization: Bearer &lt;token&gt;
     <div class="wrap">
       <div class="grid-text">
         <h2 id="grid-title">Bir milyon satırda bile hızlı kalan DataGrid</h2>
-        <p>Demodaki sipariş arşivi bir milyon sipariş içerir. Grid, sanal kaydırmayla bunların içinde gezinirken sıralamayı, filtrelemeyi ve sayfalamayı sunucu yapar. Nasıl çalıştığı <a href="https://docs.zeynsoft.com/language/datagrid">DataGrid belgelerinde</a> anlatılıyor.</p>
+        <p>Demodaki sipariş arşivi bir milyon sipariş içerir. Grid, sanal kaydırmayla bunların içinde gezinirken sıralamayı, filtrelemeyi ve sayfalamayı sunucu yapar. Nasıl çalıştığı <a href="https://docs.zeynsoft.com/tr/language/datagrid">DataGrid belgelerinde</a> anlatılıyor.</p>
         <ul class="ticks">
           <li>Her sütun için türlü filtreler</li>
           <li>Eşleşen tüm satırlar üzerinde toplamlar</li>
@@ -230,7 +256,7 @@ Authorization: Bearer &lt;token&gt;
       <h2 id="sheet-title">Kutudan neler çıkıyor</h2>
       <p class="intro">Zeyn bütün olarak alfa aşamasındadır. Kararlı işaretli bölümler çekirdektir ve en az değişmesi beklenenlerdir. Deneysel bölümler çalışır ve test edilmiştir, ancak sürümler arasında daha büyük değişiklikler bekleyin.</p>
       <dl class="spec">
-        <div><dt>DataGrid <span class="tag stable">Kararlı</span></dt><dd><a href="https://docs.zeynsoft.com/language/datagrid">Bir milyon satır</a> üzerinde sanal kaydırma, türlü filtreler, toplamlar, gruplama, satır içi düzenleme, CSV ve Excel dışa aktarma</dd></div>
+        <div><dt>DataGrid <span class="tag stable">Kararlı</span></dt><dd><a href="https://docs.zeynsoft.com/tr/language/datagrid">Bir milyon satır</a> üzerinde sanal kaydırma, türlü filtreler, toplamlar, gruplama, satır içi düzenleme, CSV ve Excel dışa aktarma</dd></div>
         <div><dt>Forms <span class="tag stable">Kararlı</span></dt><dd>Tüm alan türleri, sunucu, tarayıcı ve API arasında paylaşılan doğrulama, satır sürümü çakışma denetimleri</dd></div>
         <div><dt>Actions <span class="tag stable">Kararlı</span></dt><dd>Türlü girdiler, OpenAPI'li bir JSON API ve kullanıcının yetkileriyle çalışan yapay zeka ajanı araçları</dd></div>
         <div><dt>Güvenlik çekirdeği <span class="tag stable">Kararlı</span></dt><dd>Her action'da yetki, CSRF, sıkı CSP, denetim ve okuma denetimi, alan maskeleme, hız sınırları</dd></div>
@@ -241,7 +267,7 @@ Authorization: Bearer &lt;token&gt;
         <div><dt>Gerçek zamanlı <span class="tag exp">Deneysel</span></dt><dd>Canlı düzenleme için CRDT belgeli WebSocket odaları, sınırlı bellekle</dd></div>
         <div><dt>Yapay zeka asistanı <span class="tag exp">Deneysel</span></dt><dd>Yazmadan önce kullanıcıya soran, her LLM ile çalışan gömülü bir asistan</dd></div>
       </dl>
-      <p class="aside">Üretilen bir uygulamanın konteyner imajı yaklaşık 43 MB'tır ve boşta bir uygulama birkaç MB bellek kullanır. Bkz. <a href="https://docs.zeynsoft.com/start/cli#docker">CLI belgelerinde Docker</a>.</p>
+      <p class="aside">Üretilen bir uygulamanın konteyner imajı yaklaşık 43 MB'tır ve boşta bir uygulama birkaç MB bellek kullanır. Bkz. <a href="https://docs.zeynsoft.com/tr/start/cli#docker">CLI belgelerinde Docker</a>.</p>
     </div>
   </section>
 
@@ -255,7 +281,7 @@ cd my-app
 cargo run</code></pre>
       <p>Bir kodlama ajanıyla mı çalışıyorsunuz? Ona <a href="https://docs.zeynsoft.com/llms.txt">docs.zeynsoft.com/llms.txt</a> adresini verin. Ajana CLI'yi kurmasını, projeyi oluşturmasını ve projenin kurallarına uymasını söyler.</p>
       <p class="actions">
-        <a class="button primary" href="https://docs.zeynsoft.com">Belgeleri oku</a>
+        <a class="button primary" href="https://docs.zeynsoft.com/tr/">Belgeleri oku</a>
         <a class="button" href="https://framework.zeynsoft.com">Canlı demo</a>
       </p>
     </div>
@@ -266,7 +292,7 @@ cargo run</code></pre>
   <div class="wrap foot-in">
     <p>Huseyin Inanc tarafından yapıldı. Ona <a href="https://github.com/huseyininnc">GitHub profili</a> üzerinden ulaşabilirsiniz. MIT veya Apache 2.0 lisansıyla açık kaynak.</p>
     <nav aria-label="Alt bilgi">
-      <a href="https://docs.zeynsoft.com">Belgeler</a>
+      <a href="https://docs.zeynsoft.com/tr/">Belgeler</a>
       <a href="https://framework.zeynsoft.com">Canlı demo</a>
       <a href="https://crates.io/crates/zeyn">crates.io</a>
       <a href="https://docs.rs/zeyn">docs.rs</a>

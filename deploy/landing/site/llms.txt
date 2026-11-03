@@ -24,6 +24,10 @@ Then read `my-app/AGENTS.md` and `my-app/.claude/skills/zeyn/SKILL.md`, and run 
 - [Documentation](https://docs.zeynsoft.com/): introduction, project structure, CLI, the language (entities, actions, screens, forms, DataGrid), components and guides
 - [Live demo](https://framework.zeynsoft.com/): every component and feature in one running app
 
+## Languages
+
+This page and the docs are written in English. Translations of the site and the docs are at `/tr/`, `/zh/`, `/ru/`, `/es/`, `/ko/`, `/ja/`, `/hi/` and `/ar/` (for example https://zeynsoft.com/tr/ and https://docs.zeynsoft.com/tr/). The English pages are the source; prefer them when a translation and the English page differ.
+
 ## Key facts
 
 - Built on axum

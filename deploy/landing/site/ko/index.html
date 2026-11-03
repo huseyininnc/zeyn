@@ -6,12 +6,22 @@
 <meta name="color-scheme" content="light dark">
 <title>Zeyn: AI 에이전트가 작성하는 업무용 앱을 위한 Rust 프레임워크</title>
 <meta name="description" content="Zeyn은 데이터가 많은 업무용 앱을 위한 오픈 소스 Rust 웹 프레임워크이며 axum 위에 만들어졌습니다. AI 에이전트가 코드를 작성하고, 사람이 검토하며, 프레임워크가 안전을 지킵니다.">
-<link rel="canonical" href="https://zeynsoft.com/">
+<link rel="canonical" href="https://zeynsoft.com/ko/">
+<link rel="alternate" hreflang="en" href="https://zeynsoft.com/">
+<link rel="alternate" hreflang="tr" href="https://zeynsoft.com/tr/">
+<link rel="alternate" hreflang="zh-Hans" href="https://zeynsoft.com/zh/">
+<link rel="alternate" hreflang="ru" href="https://zeynsoft.com/ru/">
+<link rel="alternate" hreflang="es" href="https://zeynsoft.com/es/">
+<link rel="alternate" hreflang="ko" href="https://zeynsoft.com/ko/">
+<link rel="alternate" hreflang="ja" href="https://zeynsoft.com/ja/">
+<link rel="alternate" hreflang="hi" href="https://zeynsoft.com/hi/">
+<link rel="alternate" hreflang="ar" href="https://zeynsoft.com/ar/">
+<link rel="alternate" hreflang="x-default" href="https://zeynsoft.com/">
 <meta name="theme-color" content="#eef2f1" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0c1a1c" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Zeyn">
-<meta property="og:url" content="https://zeynsoft.com/">
+<meta property="og:url" content="https://zeynsoft.com/ko/">
 <meta property="og:title" content="Zeyn: AI 에이전트가 작성하는 업무용 앱을 위한 Rust 프레임워크">
 <meta property="og:description" content="오픈 소스이며 axum 위에 만들어졌습니다. action 하나가 같은 권한 검사와 함께 Screen, API 엔드포인트, AI 도구가 됩니다.">
 <meta property="og:image" content="https://zeynsoft.com/og.png">
@@ -31,13 +41,13 @@
   "@type": "SoftwareSourceCode",
   "name": "Zeyn",
   "description": "데이터가 많은 업무용 앱을 위한 오픈 소스 Rust 웹 프레임워크입니다. AI 에이전트가 애플리케이션 코드를 작성하고, 사람이 검토하며, 프레임워크가 안전을 지킵니다.",
-  "url": "https://zeynsoft.com/",
+  "url": "https://zeynsoft.com/ko/",
   "programmingLanguage": "Rust",
   "runtimePlatform": "axum",
   "license": ["https://opensource.org/licenses/MIT", "https://www.apache.org/licenses/LICENSE-2.0"],
   "creativeWorkStatus": "Alpha",
   "author": { "@type": "Person", "name": "Huseyin Inanc", "url": "https://github.com/huseyininnc" },
-  "documentation": "https://docs.zeynsoft.com/",
+  "documentation": "https://docs.zeynsoft.com/ko/",
   "sameAs": ["https://docs.zeynsoft.com/", "https://framework.zeynsoft.com/", "https://crates.io/crates/zeyn", "https://docs.rs/zeyn"]
 }
 </script>
@@ -47,13 +57,29 @@
 
 <header class="top">
   <div class="wrap top-in">
-    <a class="brand" href="/" aria-label="Zeyn 홈">
+    <a class="brand" href="/ko/" aria-label="Zeyn 홈">
       <svg class="mark" viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#0e6a74"/><path d="M9.5 9.5h13L9.5 22.5h13" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="square"/><circle cx="22.5" cy="9.5" r="2.6" fill="#ffd84a"/></svg>
       <span>Zeyn</span>
     </a>
     <nav aria-label="메인">
-      <a href="https://docs.zeynsoft.com">문서</a>
+      <a href="https://docs.zeynsoft.com/ko/">문서</a>
       <a href="https://framework.zeynsoft.com">라이브 데모</a>
+    </nav>
+    <nav class="langs" aria-label="언어">
+      <details>
+        <summary><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3 12h18M12 3c2.6 2.6 3.9 5.6 3.9 9s-1.3 6.4-3.9 9c-2.6-2.6-3.9-5.6-3.9-9S9.4 5.6 12 3z" fill="none" stroke="currentColor" stroke-width="1.8"/></svg><span lang="ko">한국어</span></summary>
+      <ul>
+        <li><a href="/" hreflang="en" lang="en">English</a></li>
+        <li><a href="/tr/" hreflang="tr" lang="tr">Türkçe</a></li>
+        <li><a href="/zh/" hreflang="zh-Hans" lang="zh-Hans">简体中文</a></li>
+        <li><a href="/ru/" hreflang="ru" lang="ru">Русский</a></li>
+        <li><a href="/es/" hreflang="es" lang="es">Español</a></li>
+        <li><a href="/ko/" hreflang="ko" lang="ko" aria-current="page">한국어</a></li>
+        <li><a href="/ja/" hreflang="ja" lang="ja">日本語</a></li>
+        <li><a href="/hi/" hreflang="hi" lang="hi">हिन्दी</a></li>
+        <li><a href="/ar/" hreflang="ar" lang="ar">العربية</a></li>
+      </ul>
+      </details>
     </nav>
   </div>
 </header>
@@ -65,7 +91,7 @@
       <h1 id="hero-title">AI&nbsp;에이전트가&nbsp;작성하는 업무용 앱을 위한 Rust 프레임워크</h1>
       <p class="lead">사람이 코드를 검토합니다. 컴파일러와 프레임워크가 안전을 지킵니다. Zeyn은 오픈 소스이며 axum 위에 만들어졌고, 그리드, 폼, 워크플로로 가득한 앱을 위한 것입니다.</p>
       <p class="actions">
-        <a class="button primary" href="https://docs.zeynsoft.com">문서 읽기</a>
+        <a class="button primary" href="https://docs.zeynsoft.com/ko/">문서 읽기</a>
         <a class="button" href="https://framework.zeynsoft.com">라이브 데모</a>
       </p>
     </div>
@@ -205,7 +231,7 @@ Authorization: Bearer &lt;token&gt;
     <div class="wrap">
       <div class="grid-text">
         <h2 id="grid-title">백만 행에서도 빠르게 유지되는 DataGrid</h2>
-        <p>데모의 주문 아카이브에는 주문 백만 건이 있습니다. 서버가 정렬, 필터링, 페이징을 하는 동안 그리드는 가상 스크롤로 이를 훑습니다. 방법은 <a href="https://docs.zeynsoft.com/language/datagrid">DataGrid 문서</a>에서 설명합니다.</p>
+        <p>데모의 주문 아카이브에는 주문 백만 건이 있습니다. 서버가 정렬, 필터링, 페이징을 하는 동안 그리드는 가상 스크롤로 이를 훑습니다. 방법은 <a href="https://docs.zeynsoft.com/ko/language/datagrid">DataGrid 문서</a>에서 설명합니다.</p>
         <ul class="ticks">
           <li>모든 열에 대한 타입이 있는 필터</li>
           <li>일치하는 모든 행에 대한 합계</li>
@@ -230,7 +256,7 @@ Authorization: Bearer &lt;token&gt;
       <h2 id="sheet-title">포함된 것</h2>
       <p class="intro">Zeyn은 전체적으로 알파입니다. 안정으로 표시된 부분은 코어이며 가장 바뀔 가능성이 낮습니다. 실험적인 부분은 동작하고 테스트되었지만 버전 사이에 더 큰 변경이 있을 것으로 예상하십시오.</p>
       <dl class="spec">
-        <div><dt>DataGrid <span class="tag stable">안정</span></dt><dd><a href="https://docs.zeynsoft.com/language/datagrid">백만 행</a>에 대한 가상 스크롤, 타입이 있는 필터, 합계, 그룹화, 인라인 편집, CSV 및 Excel 내보내기</dd></div>
+        <div><dt>DataGrid <span class="tag stable">안정</span></dt><dd><a href="https://docs.zeynsoft.com/ko/language/datagrid">백만 행</a>에 대한 가상 스크롤, 타입이 있는 필터, 합계, 그룹화, 인라인 편집, CSV 및 Excel 내보내기</dd></div>
         <div><dt>폼 <span class="tag stable">안정</span></dt><dd>모든 필드 타입, 서버, 브라우저, API가 공유하는 검증, 행 버전 충돌 검사</dd></div>
         <div><dt>Action <span class="tag stable">안정</span></dt><dd>타입이 있는 입력, OpenAPI가 있는 JSON API, 사용자의 권한으로 실행되는 AI 에이전트용 도구</dd></div>
         <div><dt>보안 코어 <span class="tag stable">안정</span></dt><dd>모든 action의 권한, CSRF, 엄격한 CSP, 감사와 읽기 감사, 필드 마스킹, 속도 제한</dd></div>
@@ -241,7 +267,7 @@ Authorization: Bearer &lt;token&gt;
         <div><dt>실시간 <span class="tag exp">실험적</span></dt><dd>제한된 메모리로 실시간 편집을 위한 CRDT 문서가 있는 WebSocket 룸</dd></div>
         <div><dt>AI 어시스턴트 <span class="tag exp">실험적</span></dt><dd>쓰기 전에 사용자에게 묻는, 모든 LLM을 위한 내장 어시스턴트</dd></div>
       </dl>
-      <p class="aside">생성된 앱의 컨테이너 이미지는 약 43 MB이고, 유휴 상태의 앱은 메모리를 몇 MB만 사용합니다. <a href="https://docs.zeynsoft.com/start/cli#docker">CLI 문서의 Docker</a>를 참고하십시오.</p>
+      <p class="aside">생성된 앱의 컨테이너 이미지는 약 43 MB이고, 유휴 상태의 앱은 메모리를 몇 MB만 사용합니다. <a href="https://docs.zeynsoft.com/ko/start/cli#docker">CLI 문서의 Docker</a>를 참고하십시오.</p>
     </div>
   </section>
 
@@ -255,7 +281,7 @@ cd my-app
 cargo run</code></pre>
       <p>코딩 에이전트와 작업하십니까? <a href="https://docs.zeynsoft.com/llms.txt">docs.zeynsoft.com/llms.txt</a>를 전달하십시오. 에이전트에게 CLI를 설치하고, 프로젝트를 만들고, 프로젝트의 규칙을 따르라고 알려 줍니다.</p>
       <p class="actions">
-        <a class="button primary" href="https://docs.zeynsoft.com">문서 읽기</a>
+        <a class="button primary" href="https://docs.zeynsoft.com/ko/">문서 읽기</a>
         <a class="button" href="https://framework.zeynsoft.com">라이브 데모</a>
       </p>
     </div>
@@ -266,7 +292,7 @@ cargo run</code></pre>
   <div class="wrap foot-in">
     <p>Huseyin Inanc가 만들었습니다. 연락은 <a href="https://github.com/huseyininnc">그의 GitHub 프로필</a>을 통해 주십시오. MIT 또는 Apache 2.0에 따른 오픈 소스입니다.</p>
     <nav aria-label="푸터">
-      <a href="https://docs.zeynsoft.com">문서</a>
+      <a href="https://docs.zeynsoft.com/ko/">문서</a>
       <a href="https://framework.zeynsoft.com">라이브 데모</a>
       <a href="https://crates.io/crates/zeyn">crates.io</a>
       <a href="https://docs.rs/zeyn">docs.rs</a>
