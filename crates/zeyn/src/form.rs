@@ -421,10 +421,10 @@ impl<M: Model> Form<M> {
     }
 
     fn render_fields(&self, out: &mut String, r: &Render) {
-        if M::SENSITIVE {
-            if let Some(ctx) = r.ctx {
-                ctx.record_read(&self.model);
-            }
+        if M::SENSITIVE
+            && let Some(ctx) = r.ctx
+        {
+            ctx.record_read(&self.model);
         }
         let titles: Vec<&Text> = self
             .items
@@ -885,7 +885,7 @@ pub(crate) fn parse_value(
     }
     match meta.kind {
         FieldKind::Custom { editor: "ids" } => crate::ui::parse_ids(trimmed)
-            .map(|ids| Json::from(ids))
+            .map(Json::from)
             .ok_or(Unreadable::Format),
         FieldKind::Text => match meta.mask_pattern() {
             Some(pattern) => Ok(Json::String(crate::ui::mask_raw(pattern, &text))),

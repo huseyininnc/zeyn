@@ -263,7 +263,7 @@ async fn reveal(
         .screens
         .get_key_value(call.screen.as_str())
     {
-        Some((name, _)) => *name,
+        Some((name, _)) => name,
         None => return st.error_response(&ctx, Failure::App(Error::NotFound)),
     };
     let info = Call {

@@ -12,6 +12,11 @@ use showcase_shared::{Diagram, DiagramProps, DiagramTexts, SaveDiagram, Shape, S
 use std::cell::RefCell;
 use std::f64::consts::TAU;
 use std::rc::Rc;
+
+/// Shares a change made in this editor.
+type OnEdit = Rc<dyn Fn(&Diagram)>;
+/// What one toolbar button does to the editor.
+type EditorAction = Box<dyn Fn(&mut Editor)>;
 use wasm_bindgen::prelude::*;
 use web_sys::{CanvasRenderingContext2d, Document, Element};
 use zeyn_island::Island;
@@ -69,7 +74,7 @@ pub struct Editor {
     host: Element,
     view: View,
     /// Runs after every change made here (not for changes from others), to share it.
-    on_edit: Option<Rc<dyn Fn(&Diagram)>>,
+    on_edit: Option<OnEdit>,
 }
 
 impl Editor {
@@ -237,7 +242,7 @@ impl Scene for Editor {
         );
         ctx.set_fill_style_str(&bg);
         ctx.fill_rect(0.0, 0.0, frame.width, frame.height);
-        let _ = ctx.save();
+        ctx.save();
         let _ = ctx.translate(self.pan.0, self.pan.1);
         let _ = ctx.scale(self.zoom, self.zoom);
         ctx.set_font("14px system-ui, sans-serif");
@@ -259,7 +264,7 @@ impl Scene for Editor {
                 f64::from(s.w - 12),
             );
         }
-        let _ = ctx.restore();
+        ctx.restore();
     }
 
     fn input(&mut self, input: &Input, _frame: Frame) -> bool {
@@ -484,7 +489,7 @@ pub fn mount(root: Element) -> Result<(), JsValue> {
         .canvas()
         .set_attribute("aria-roledescription", &texts.canvas)?;
 
-    let actions: [Box<dyn Fn(&mut Editor)>; 4] = [
+    let actions: [EditorAction; 4] = [
         Box::new(|e| e.add(ShapeKind::Box)),
         Box::new(|e| e.add(ShapeKind::Ellipse)),
         Box::new(|e| e.step(1)),

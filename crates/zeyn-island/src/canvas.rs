@@ -10,6 +10,11 @@
 //! that set it up themselves on [`Surface::canvas`].
 
 use std::cell::{Cell, RefCell};
+
+/// A DOM event name and the closure that handles it, kept so it can be removed.
+type Listener = (&'static str, Closure<dyn FnMut(Event)>);
+/// The resize observer of a canvas and its callback.
+type Observer = (ResizeObserver, Closure<dyn FnMut()>);
 use std::rc::{Rc, Weak};
 use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::*;
@@ -107,8 +112,8 @@ struct Shared<S: Scene> {
     frame: Cell<Frame>,
     pending: Cell<bool>,
     raf: RefCell<Option<Closure<dyn FnMut()>>>,
-    listeners: RefCell<Vec<(&'static str, Closure<dyn FnMut(Event)>)>>,
-    observer: RefCell<Option<(ResizeObserver, Closure<dyn FnMut()>)>>,
+    listeners: RefCell<Vec<Listener>>,
+    observer: RefCell<Option<Observer>>,
 }
 
 /// A canvas inside an island, drawing one scene. Cloning gives another handle to it.
@@ -272,8 +277,8 @@ impl<S: Scene> Surface<S> {
 }
 
 fn context(canvas: &HtmlCanvasElement, prefer: Prefer) -> Result<Graphics, JsValue> {
-    if prefer == Prefer::Gl {
-        if let Some(gl) = canvas
+    if prefer == Prefer::Gl
+        && let Some(gl) = canvas
             .get_context("webgl2")
             .ok()
             .flatten()
@@ -281,9 +286,8 @@ fn context(canvas: &HtmlCanvasElement, prefer: Prefer) -> Result<Graphics, JsVal
                 c.dyn_into::<WebGl2RenderingContext>()
                     .ok()
             })
-        {
-            return Ok(Graphics::Gl(gl));
-        }
+    {
+        return Ok(Graphics::Gl(gl));
     }
     let ctx = canvas
         .get_context("2d")?

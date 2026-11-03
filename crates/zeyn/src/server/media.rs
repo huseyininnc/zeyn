@@ -187,14 +187,13 @@ pub(super) fn respond(media: Media, headers: &HeaderMap) -> Response {
     {
         h.insert(header::ETAG, v);
     }
-    if let (Some(tag), Some(wanted)) = (etag.as_deref(), read(header::IF_NONE_MATCH)) {
-        if wanted
+    if let (Some(tag), Some(wanted)) = (etag.as_deref(), read(header::IF_NONE_MATCH))
+        && wanted
             .split(',')
             .any(|w| w.trim() == tag || w.trim() == "*")
-        {
-            *response.status_mut() = StatusCode::NOT_MODIFIED;
-            return response;
-        }
+    {
+        *response.status_mut() = StatusCode::NOT_MODIFIED;
+        return response;
     }
     let (start, count) = match range {
         ByteRange::Unsatisfiable => {

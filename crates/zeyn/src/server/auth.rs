@@ -681,6 +681,10 @@ mod totp {
     }
 
     /// Common checks of a posted code: the CSRF token, a signed in user and the attempt limit.
+    #[allow(
+        clippy::result_large_err,
+        reason = "the error is the HTTP response, returned to the client at once and never stored; boxing it would allocate on every refusal"
+    )]
     async fn admit(
         st: &AppState,
         headers: &HeaderMap,

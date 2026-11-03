@@ -530,18 +530,17 @@ pub(crate) fn problems(
     let mut out = Vec::new();
     let mut seen: Vec<(String, &str, &str)> = Vec::new();
     for (i, (owner, c)) in commands.iter().enumerate() {
-        if check_each {
-            if c.id.is_empty()
+        if check_each
+            && (c.id.is_empty()
                 || !c
                     .id
                     .bytes()
-                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"._-".contains(&b))
-            {
-                out.push(format!(
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"._-".contains(&b)))
+        {
+            out.push(format!(
                     "command `{}` has an id that is not usable in HTML\n  = help: use lower case letters, digits, dots, dashes and underscores, such as `sales.new_order`",
                     c.id
                 ));
-            }
         }
         if let Some((other, _)) = commands[..i]
             .iter()

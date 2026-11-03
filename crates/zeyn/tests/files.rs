@@ -126,7 +126,7 @@ fn json(body: &[u8]) -> serde_json::Value {
     serde_json::from_slice(body).unwrap()
 }
 
-fn h<'a>(headers: &'a HeaderMap, name: header::HeaderName) -> &'a str {
+fn h(headers: &HeaderMap, name: header::HeaderName) -> &str {
     headers
         .get(name)
         .and_then(|v| v.to_str().ok())

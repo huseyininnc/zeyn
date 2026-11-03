@@ -274,17 +274,19 @@ fn macro_options_land_in_the_metadata() {
             confirm: false
         }
     );
-    assert!(
-        <archive_customer as Action>::META
-            .ai
-            .confirm
-    );
-    assert!(!<reindex as Action>::META.ai.offered);
+    const {
+        assert!(
+            <archive_customer as Action>::META
+                .ai
+                .confirm
+        );
+        assert!(!<reindex as Action>::META.ai.offered);
+    }
     assert_eq!(
         <customers as ScreenDef>::META.doc,
         "Every customer of the company."
     );
-    assert!(!<hidden as ScreenDef>::META.ai.offered);
+    const { assert!(!<hidden as ScreenDef>::META.ai.offered) };
     assert_eq!(<internal as ScreenDef>::META.doc, "");
     assert_eq!(Ai::default(), Ai::DEFAULT);
 }

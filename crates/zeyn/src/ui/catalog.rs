@@ -366,7 +366,7 @@ impl<E: Model> CardGrid<E> {
     }
 
     /// Lays the rows out as a [`super::List`]: see [`super::List::of`].
-    pub(crate) fn as_list(mut self) -> Self {
+    pub(crate) fn into_list(mut self) -> Self {
         self.list = true;
         self.paging = Paging::infinite(20);
         self

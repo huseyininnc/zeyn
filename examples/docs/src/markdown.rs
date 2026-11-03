@@ -99,10 +99,11 @@ fn list_item(line: &str) -> Option<(bool, &str)> {
         .bytes()
         .take_while(u8::is_ascii_digit)
         .count();
-    if digits > 0 && digits < 4 {
-        if let Some(rest) = t[digits..].strip_prefix(". ") {
-            return Some((true, rest));
-        }
+    if digits > 0
+        && digits < 4
+        && let Some(rest) = t[digits..].strip_prefix(". ")
+    {
+        return Some((true, rest));
     }
     None
 }
@@ -439,61 +440,60 @@ impl Renderer<'_> {
                 i += 2;
                 continue;
             }
-            if c == '`' {
-                if let Some(end) = find(i + 1, &['`']) {
-                    let code = collect(i + 1, end);
-                    let page = code
-                        .split('#')
-                        .next()
-                        .is_some_and(|p| p.ends_with(".md"))
-                        .then(|| (self.link)(&code));
-                    match page.filter(|p| p.starts_with('/')) {
-                        Some(route) => out.push_str(&format!(
-                            r#"<a href="{}"><code>{}</code></a>"#,
-                            escape(&route),
-                            escape(&code)
-                        )),
-                        None => out.push_str(&format!("<code>{}</code>", escape(&code))),
-                    }
-                    i = end + 1;
-                    continue;
+            if c == '`'
+                && let Some(end) = find(i + 1, &['`'])
+            {
+                let code = collect(i + 1, end);
+                let page = code
+                    .split('#')
+                    .next()
+                    .is_some_and(|p| p.ends_with(".md"))
+                    .then(|| (self.link)(&code));
+                match page.filter(|p| p.starts_with('/')) {
+                    Some(route) => out.push_str(&format!(
+                        r#"<a href="{}"><code>{}</code></a>"#,
+                        escape(&route),
+                        escape(&code)
+                    )),
+                    None => out.push_str(&format!("<code>{}</code>", escape(&code))),
                 }
+                i = end + 1;
+                continue;
             }
             if c == '!' && chars.get(i + 1) == Some(&'[') {
                 i += 1;
                 continue;
             }
-            if c == '[' {
-                if let Some(close) = find(i + 1, &[']', '(']) {
-                    if let Some(end) = find(close + 2, &[')']) {
-                        let label = self.inline(&collect(i + 1, close));
-                        let target = collect(close + 2, end);
-                        out.push_str(&self.anchor(&label, target.trim()));
-                        i = end + 1;
-                        continue;
-                    }
-                }
+            if c == '['
+                && let Some(close) = find(i + 1, &[']', '('])
+                && let Some(end) = find(close + 2, &[')'])
+            {
+                let label = self.inline(&collect(i + 1, close));
+                let target = collect(close + 2, end);
+                out.push_str(&self.anchor(&label, target.trim()));
+                i = end + 1;
+                continue;
             }
-            if c == '*' && chars.get(i + 1) == Some(&'*') {
-                if let Some(end) = find(i + 2, &['*', '*']).filter(|e| *e > i + 2) {
-                    out.push_str(&format!(
-                        "<strong>{}</strong>",
-                        self.inline(&collect(i + 2, end))
-                    ));
-                    i = end + 2;
-                    continue;
-                }
+            if c == '*'
+                && chars.get(i + 1) == Some(&'*')
+                && let Some(end) = find(i + 2, &['*', '*']).filter(|e| *e > i + 2)
+            {
+                out.push_str(&format!(
+                    "<strong>{}</strong>",
+                    self.inline(&collect(i + 2, end))
+                ));
+                i = end + 2;
+                continue;
             }
             if c == '*'
                 && chars
                     .get(i + 1)
                     .is_some_and(|n| !n.is_whitespace() && *n != '*')
+                && let Some(end) = find(i + 1, &['*'])
             {
-                if let Some(end) = find(i + 1, &['*']) {
-                    out.push_str(&format!("<em>{}</em>", self.inline(&collect(i + 1, end))));
-                    i = end + 1;
-                    continue;
-                }
+                out.push_str(&format!("<em>{}</em>", self.inline(&collect(i + 1, end))));
+                i = end + 1;
+                continue;
             }
             out.push_str(&escape(&c.to_string()));
             i += 1;

@@ -132,7 +132,7 @@ pub async fn top_products(
     store: crate::stock::ProductStore,
 ) -> Result<Page<Product>> {
     let mut all = store.all()?;
-    all.sort_by(|a, b| b.price.minor.cmp(&a.price.minor));
+    all.sort_by_key(|p| std::cmp::Reverse(p.price.minor));
     all.truncate(8);
     Ok(q.apply(all))
 }

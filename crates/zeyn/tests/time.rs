@@ -463,14 +463,12 @@ fn english_date_words_work_in_every_language_unless_the_language_uses_the_word()
                 "{input} in {locale}"
             );
         }
-        assert_eq!(
+        assert!(
             Date::parse_input("+2m", &locale, today, &words).is_some(),
-            true,
             "+2m in {locale}"
         );
-        assert_eq!(
+        assert!(
             Date::parse_input("+1y", &locale, today, &words).is_some(),
-            true,
             "+1y in {locale}"
         );
     }

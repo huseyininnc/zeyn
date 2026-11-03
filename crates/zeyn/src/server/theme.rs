@@ -284,10 +284,10 @@ impl Theme {
 
     /// The value this theme sets for a token, if any.
     fn get(&self, token: &str) -> Option<&str> {
-        if token == "--z-brand" {
-            if let Some(b) = &self.brand {
-                return Some(b);
-            }
+        if token == "--z-brand"
+            && let Some(b) = &self.brand
+        {
+            return Some(b);
         }
         self.tokens
             .iter()
@@ -588,10 +588,8 @@ fn contrast_problems(name: &str, theme: &Theme, base: &Theme) -> Vec<String> {
         if let Some(v) = theme.get(token) {
             return Some(v.to_string());
         }
-        if dark {
-            if let Some((_, v)) = DARK.iter().find(|(n, _)| *n == token) {
-                return Some(v.to_string());
-            }
+        if dark && let Some((_, v)) = DARK.iter().find(|(n, _)| *n == token) {
+            return Some(v.to_string());
         }
         base.get(token)
             .or_else(|| {

@@ -248,6 +248,10 @@ fn accounts(st: &AppState) -> Accounts {
 }
 
 /// A JSON body, after the content type and, for cookie sessions, CSRF checks.
+#[allow(
+    clippy::result_large_err,
+    reason = "the error is the HTTP response, returned to the client at once and never stored; boxing it would allocate on every refusal"
+)]
 fn body<T: serde::de::DeserializeOwned>(
     st: &AppState,
     headers: &HeaderMap,
@@ -865,10 +869,10 @@ async fn two_factor(
     let users = accounts.users();
     let manager = accounts.sign_in();
     let fresh = ctx.signed_in_recently();
-    if r.enable.is_some() || r.reset_shared_key || r.reset_recovery_codes {
-        if let Err(f) = super::session::recent(&ctx) {
-            return st.error_response(&ctx, f);
-        }
+    if (r.enable.is_some() || r.reset_shared_key || r.reset_recovery_codes)
+        && let Err(f) = super::session::recent(&ctx)
+    {
+        return st.error_response(&ctx, f);
     }
     let result: Result<Json> = async {
         if r.enable == Some(true) {

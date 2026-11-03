@@ -374,6 +374,9 @@ async fn a_request_with_a_session_never_gets_public_cache_headers() {
     );
 }
 
+/// A kind of visit and the request it sends.
+type Case = (&'static str, fn(&str) -> Request<Body>);
+
 /// Render cost of a public page: run with `--release --ignored --nocapture` to print the fastest
 /// of 20 batches of 1000 requests, which is the least disturbed by other work on the machine.
 #[tokio::test]
@@ -384,7 +387,7 @@ async fn measure_public_page_render_cost() {
         .await
         .header(header::ETAG)
         .to_string();
-    let cases: [(&str, fn(&str) -> Request<Body>); 4] = [
+    let cases: [Case; 4] = [
         ("public, cache = 300", |_| visitor("/about")),
         ("public", |_| visitor("/news")),
         ("signed in", |_| member("/news")),

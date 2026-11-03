@@ -10,6 +10,10 @@ use serde_json::{Value as Json, json};
 
 super::layout::into_node!(MenuBar, Toolbox, PropertyInspector, StatusBar);
 
+#[allow(
+    clippy::large_enum_variant,
+    reason = "nearly every entry of the list is the large variant, so boxing it would add an allocation per entry and save no memory"
+)]
 enum Entry {
     Command(Command),
     Separator,

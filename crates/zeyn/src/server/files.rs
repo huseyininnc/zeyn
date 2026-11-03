@@ -347,12 +347,13 @@ fn decode(s: &str) -> String {
                 .to_digit(16)
                 .map(|d| d as u8)
         };
-        if b[i] == b'%' && i + 3 <= b.len() {
-            if let (Some(hi), Some(lo)) = (hex(b[i + 1]), hex(b[i + 2])) {
-                out.push(hi * 16 + lo);
-                i += 3;
-                continue;
-            }
+        if b[i] == b'%'
+            && i + 3 <= b.len()
+            && let (Some(hi), Some(lo)) = (hex(b[i + 1]), hex(b[i + 2]))
+        {
+            out.push(hi * 16 + lo);
+            i += 3;
+            continue;
         }
         out.push(b[i]);
         i += 1;

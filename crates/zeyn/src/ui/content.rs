@@ -368,6 +368,10 @@ impl AutoGrid {
         Self::default()
     }
 
+    #[allow(
+        clippy::should_implement_trait,
+        reason = "a builder method that appends a child component; it is not arithmetic and `add` is the public name"
+    )]
     pub fn add(mut self, node: impl Into<Node>) -> Self {
         self.nodes.push(node.into());
         self
@@ -564,6 +568,10 @@ impl Spoiler {
         }
     }
 
+    #[allow(
+        clippy::should_implement_trait,
+        reason = "a builder method that appends a child component; it is not arithmetic and `add` is the public name"
+    )]
     pub fn add(mut self, node: impl Into<Node>) -> Self {
         self.nodes.push(node.into());
         self

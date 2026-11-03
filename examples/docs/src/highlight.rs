@@ -175,15 +175,16 @@ impl Tokens {
         let n = self.chars.len();
         while i < n {
             let c = self.chars[i];
-            if let Some(lc) = self.lang.line_comment() {
-                if self.at(i, lc) && (lc != "#" || i == 0 || self.chars[i - 1].is_whitespace()) {
-                    let end = (i..n)
-                        .find(|&k| self.chars[k] == '\n')
-                        .unwrap_or(n);
-                    self.span("com", i, end);
-                    i = end;
-                    continue;
-                }
+            if let Some(lc) = self.lang.line_comment()
+                && self.at(i, lc)
+                && (lc != "#" || i == 0 || self.chars[i - 1].is_whitespace())
+            {
+                let end = (i..n)
+                    .find(|&k| self.chars[k] == '\n')
+                    .unwrap_or(n);
+                self.span("com", i, end);
+                i = end;
+                continue;
             }
             if matches!(self.lang, Lang::Rust | Lang::Js) && self.at(i, "/*") {
                 let end = (i + 2..n)

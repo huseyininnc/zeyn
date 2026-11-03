@@ -117,7 +117,7 @@ impl Money {
         let major = (abs / 100).to_string();
         let mut grouped = String::with_capacity(major.len() + major.len() / 3);
         for (i, c) in major.chars().enumerate() {
-            if i > 0 && (major.len() - i) % 3 == 0 {
+            if i > 0 && (major.len() - i).is_multiple_of(3) {
                 grouped.push(f.group);
             }
             grouped.push(c);
@@ -142,6 +142,10 @@ impl Money {
 
     /// Reads an amount typed in the locale's format. Group separators, spaces and the symbol are
     /// ignored; at most two decimals are accepted.
+    #[allow(
+        clippy::result_unit_err,
+        reason = "the only failure is text that is not an amount; callers turn it into their own field error"
+    )]
     pub fn parse(input: &str, locale: &str, currency: Currency) -> Result<Money, ()> {
         let f = NumberFormat::for_locale(locale);
         let cleaned: String = input

@@ -392,8 +392,10 @@ fn action_meta_and_run() {
         save_product::META.access,
         Access::Permission("stock.product.write")
     );
-    assert!(save_product::META.audit);
-    assert!(!search_products::META.audit);
+    const {
+        assert!(save_product::META.audit);
+        assert!(!search_products::META.audit);
+    }
 
     let saved = block_on(save_product::run(Valid::new(sample()).unwrap())).unwrap();
     assert_eq!(saved.code, "P-001");

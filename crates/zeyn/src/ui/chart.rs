@@ -492,16 +492,14 @@ impl Chart {
             .iter()
             .map(|(x, y)| format!("{x:.1},{y:.1}"))
             .collect();
-        if fill {
-            if let (Some((x0, _)), Some((x1, _))) = (points.first(), points.last()) {
-                let base = TOP + plot_h;
-                let _ = write!(
-                    out,
-                    r#"<polygon class="z-chart-area z-series-{}" points="{x0:.1},{base:.1} {} {x1:.1},{base:.1}"/>"#,
-                    s % 6,
-                    path.join(" ")
-                );
-            }
+        if fill && let (Some((x0, _)), Some((x1, _))) = (points.first(), points.last()) {
+            let base = TOP + plot_h;
+            let _ = write!(
+                out,
+                r#"<polygon class="z-chart-area z-series-{}" points="{x0:.1},{base:.1} {} {x1:.1},{base:.1}"/>"#,
+                s % 6,
+                path.join(" ")
+            );
         }
         let _ = write!(
             out,

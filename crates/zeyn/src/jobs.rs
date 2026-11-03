@@ -367,10 +367,10 @@ impl Jobs {
     }
 
     fn set(&self, name: &'static str, change: impl FnOnce(&mut JobStatus)) {
-        if let Ok(mut status) = self.0.status.lock() {
-            if let Some(s) = status.get_mut(name) {
-                change(s);
-            }
+        if let Ok(mut status) = self.0.status.lock()
+            && let Some(s) = status.get_mut(name)
+        {
+            change(s);
         }
     }
 

@@ -647,10 +647,9 @@ impl AppState {
                 if let Some((user, password)) = pair
                     .as_deref()
                     .and_then(|p| p.split_once(':'))
+                    && credentials.verify(user, password).await
                 {
-                    if credentials.verify(user, password).await {
-                        return None;
-                    }
+                    return None;
                 }
                 let mut r = StatusCode::UNAUTHORIZED.into_response();
                 r.headers_mut().insert(

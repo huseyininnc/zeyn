@@ -286,7 +286,10 @@ fn main() -> ExitCode {
             )
             .and_then(|signed| match flag(rest, "--out") {
                 Some(out) => std::fs::write(out, signed + "\n").map_err(|e| format!("{out}: {e}")),
-                None => Ok(println!("{signed}")),
+                None => {
+                    println!("{signed}");
+                    Ok(())
+                }
             }),
             _ => {
                 print!("{HELP}");
@@ -409,7 +412,7 @@ fn new_project_at(
         std::fs::write(&target, text).map_err(|e| format!("{}: {e}", target.display()))?;
     }
     if git {
-        println!("{}", git_init(&root));
+        println!("{}", git_init(root));
     }
     if lib {
         println!(

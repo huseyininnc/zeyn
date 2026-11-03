@@ -287,13 +287,12 @@ impl App {
         )
         .with_graceful_shutdown(shutdown)
         .await?;
-        if let Some(jobs) = jobs {
-            if !jobs
+        if let Some(jobs) = jobs
+            && !jobs
                 .shutdown(Duration::from_secs(30))
                 .await
-            {
-                tracing::warn!("some jobs were still running at shutdown");
-            }
+        {
+            tracing::warn!("some jobs were still running at shutdown");
         }
         if let Some(f) = flush {
             f.shutdown().await;

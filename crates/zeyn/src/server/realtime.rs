@@ -238,12 +238,15 @@ struct Room {
     store: Arc<dyn DocStore>,
 }
 
+/// A connection that listens to a topic: its id and its outgoing queue.
+type Subscriber = (u64, Outbox);
+
 #[derive(Default)]
 struct Inner {
     config: OnceLock<Config>,
     rooms: Mutex<HashMap<RoomKey, Arc<Room>>>,
     users: Mutex<HashMap<String, usize>>,
-    topics: Mutex<HashMap<(String, String), Vec<(u64, Outbox)>>>,
+    topics: Mutex<HashMap<(String, String), Vec<Subscriber>>>,
     next: AtomicU64,
     sweeping: AtomicBool,
 }
@@ -275,15 +278,15 @@ impl Hub {
     pub fn notify_tenant(&self, tenant: Option<&str>, topic: &str) {
         let key = (tenant.unwrap_or("").to_string(), topic.to_string());
         let text = serde_json::json!({ "topic": topic }).to_string();
-        if let Ok(mut topics) = self.0.topics.lock() {
-            if let Some(subs) = topics.get_mut(&key) {
-                subs.retain(|(_, tx)| {
-                    !matches!(
-                        tx.try_send(Message::Text(text.clone().into())),
-                        Err(mpsc::error::TrySendError::Closed(_))
-                    )
-                });
-            }
+        if let Ok(mut topics) = self.0.topics.lock()
+            && let Some(subs) = topics.get_mut(&key)
+        {
+            subs.retain(|(_, tx)| {
+                !matches!(
+                    tx.try_send(Message::Text(text.clone().into())),
+                    Err(mpsc::error::TrySendError::Closed(_))
+                )
+            });
         }
     }
 
@@ -355,12 +358,12 @@ impl Hub {
     }
 
     fn release_user(&self, user: &str) {
-        if let Ok(mut users) = self.0.users.lock() {
-            if let Some(n) = users.get_mut(user) {
-                *n -= 1;
-                if *n == 0 {
-                    users.remove(user);
-                }
+        if let Ok(mut users) = self.0.users.lock()
+            && let Some(n) = users.get_mut(user)
+        {
+            *n -= 1;
+            if *n == 0 {
+                users.remove(user);
             }
         }
     }
@@ -448,16 +451,14 @@ impl Hub {
                 .ok()
                 .and_then(|s| *s)
                 .is_some_and(|since| since.elapsed() >= idle);
-            if expired {
-                if let Ok(mut map) = self.0.rooms.lock() {
-                    let empty = room
-                        .clients
-                        .lock()
-                        .map(|c| c.is_empty())
-                        .unwrap_or(true);
-                    if empty && !room.dirty.load(Ordering::Acquire) {
-                        map.remove(&key);
-                    }
+            if expired && let Ok(mut map) = self.0.rooms.lock() {
+                let empty = room
+                    .clients
+                    .lock()
+                    .map(|c| c.is_empty())
+                    .unwrap_or(true);
+                if empty && !room.dirty.load(Ordering::Acquire) {
+                    map.remove(&key);
                 }
             }
         }
@@ -560,6 +561,10 @@ fn origin_allowed(headers: &HeaderMap, allowed: &[String]) -> bool {
 /// The checks of every handshake: the channel is on, origin, CSRF token (in the query, since
 /// browsers cannot set headers on WebSockets), a signed in user and the per user limit. Returns
 /// the context and the user key, which the caller must release.
+#[allow(
+    clippy::result_large_err,
+    reason = "the error is the HTTP response, returned to the client at once and never stored; boxing it would allocate on every refusal"
+)]
 async fn admit(
     st: &AppState,
     headers: &HeaderMap,
@@ -706,10 +711,10 @@ async fn doc_socket(
             run_doc(socket, &room, id, rx, can_write, &limits).await;
             if let Ok(mut clients) = room.clients.lock() {
                 clients.retain(|(c, _)| *c != id);
-                if clients.is_empty() {
-                    if let Ok(mut idle) = room.idle_since.lock() {
-                        *idle = Some(Instant::now());
-                    }
+                if clients.is_empty()
+                    && let Ok(mut idle) = room.idle_since.lock()
+                {
+                    *idle = Some(Instant::now());
                 }
             }
             hub.release_user(&user);

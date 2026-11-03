@@ -42,22 +42,23 @@ pub(crate) fn check_embeds<M: Model>(
         {
             continue;
         }
-        if let Some(Value::Text(url)) = model.value_at(i) {
-            if !url.trim().is_empty() && !csp.allows_frame(&url) {
-                let host = url
-                    .trim_start_matches("https://")
-                    .split(['/', '?', '#'])
-                    .next()
-                    .unwrap_or("")
-                    .to_string();
-                errors.errors.push(FieldError {
-                    field: meta.name,
-                    rule: Rule::Embed,
-                    message: Text::key("zeyn.validation.embed_host")
-                        .arg("label", meta.label_text())
-                        .arg("host", host),
-                });
-            }
+        if let Some(Value::Text(url)) = model.value_at(i)
+            && !url.trim().is_empty()
+            && !csp.allows_frame(&url)
+        {
+            let host = url
+                .trim_start_matches("https://")
+                .split(['/', '?', '#'])
+                .next()
+                .unwrap_or("")
+                .to_string();
+            errors.errors.push(FieldError {
+                field: meta.name,
+                rule: Rule::Embed,
+                message: Text::key("zeyn.validation.embed_host")
+                    .arg("label", meta.label_text())
+                    .arg("host", host),
+            });
         }
     }
 }

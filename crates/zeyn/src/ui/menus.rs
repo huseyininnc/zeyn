@@ -17,6 +17,7 @@ use std::sync::{Arc, OnceLock};
 
 into_node!(MenuButton);
 
+type SuccessFn<O> = Arc<dyn Fn(&O, &mut UiCtx) + Send + Sync>;
 type Run = Arc<dyn Fn(Ctx) -> BoxFuture<Result<Vec<Effect>>> + Send + Sync>;
 
 /// One command that runs an action. It becomes a child node of the menu button.
@@ -33,7 +34,7 @@ impl Command {
     fn new<A>(
         label: Text,
         input: A::Input,
-        on_success: Option<Arc<dyn Fn(&A::Output, &mut UiCtx) + Send + Sync>>,
+        on_success: Option<SuccessFn<A::Output>>,
         primary: bool,
     ) -> Self
     where
@@ -123,6 +124,10 @@ impl Component for CommandNode {
     }
 }
 
+#[allow(
+    clippy::large_enum_variant,
+    reason = "nearly every entry of the list is the large variant, so boxing it would add an allocation per entry and save no memory"
+)]
 enum Entry {
     /// An action command: the index of its node.
     Command(usize),

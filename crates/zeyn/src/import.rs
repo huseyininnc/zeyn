@@ -220,7 +220,7 @@ impl<M> Checked<M> {
 fn general(ctx: &Ctx, key: &str, args: &[(&'static str, String)]) -> Error {
     let mut text = Text::key(format!("zeyn.import.{key}"));
     for (k, v) in args {
-        text = text.arg(*k, v.clone());
+        text = text.arg(k, v.clone());
     }
     let mut errors = ValidationErrors::default();
     errors.add_general(ctx.t(&text));

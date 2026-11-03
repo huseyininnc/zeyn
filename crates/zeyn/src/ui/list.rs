@@ -165,7 +165,7 @@ impl List {
             >,
         E: Model,
     {
-        super::CardGrid::of(source).as_list()
+        super::CardGrid::of(source).into_list()
     }
 
     /// A heading over the list, which also names it for screen readers.

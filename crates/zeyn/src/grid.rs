@@ -1541,10 +1541,10 @@ impl<E: Model> DataGrid<E> {
                 (false, false) => r#" data-zeyn-exportable="csv""#,
             });
         }
-        if self.can_edit(r) {
-            if let Some(v) = E::fields().iter().find(|f| f.version) {
-                out.push_str(&format!(r#" data-zeyn-version-field="{}""#, v.name));
-            }
+        if self.can_edit(r)
+            && let Some(v) = E::fields().iter().find(|f| f.version)
+        {
+            out.push_str(&format!(r#" data-zeyn-version-field="{}""#, v.name));
         }
         out.push_str(&format!(
             r#"><table role="{}" aria-colcount="{}"><thead>{}</thead><tbody data-zeyn-rows>"#,

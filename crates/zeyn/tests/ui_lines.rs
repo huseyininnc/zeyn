@@ -40,6 +40,10 @@ fn line(id: i64, item: &str, quantity: i64, kurus: i64) -> OrderLine {
     }
 }
 
+#[allow(
+    clippy::inconsistent_digit_grouping,
+    reason = "money in minor units is written with the cents after the underscore"
+)]
 fn order() -> Order {
     Order {
         customer: "Acme".into(),

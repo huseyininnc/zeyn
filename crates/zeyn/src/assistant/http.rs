@@ -550,26 +550,26 @@ impl Blocks {
                     .get("index")
                     .and_then(Json::as_u64)
                     .unwrap_or(0) as usize;
-                if let (Some(block), Some(input)) = (self.blocks.get_mut(i), self.inputs.get(i)) {
-                    if block["type"] == "tool_use" {
-                        let arguments = if input.trim().is_empty() {
-                            json!({})
-                        } else {
-                            serde_json::from_str(input).unwrap_or_else(|_| json!({}))
-                        };
-                        block["input"] = arguments.clone();
-                        out.push(ChatEvent::ToolCall(ToolCall {
-                            id: block["id"]
-                                .as_str()
-                                .unwrap_or_default()
-                                .to_string(),
-                            name: block["name"]
-                                .as_str()
-                                .unwrap_or_default()
-                                .to_string(),
-                            arguments,
-                        }));
-                    }
+                if let (Some(block), Some(input)) = (self.blocks.get_mut(i), self.inputs.get(i))
+                    && block["type"] == "tool_use"
+                {
+                    let arguments = if input.trim().is_empty() {
+                        json!({})
+                    } else {
+                        serde_json::from_str(input).unwrap_or_else(|_| json!({}))
+                    };
+                    block["input"] = arguments.clone();
+                    out.push(ChatEvent::ToolCall(ToolCall {
+                        id: block["id"]
+                            .as_str()
+                            .unwrap_or_default()
+                            .to_string(),
+                        name: block["name"]
+                            .as_str()
+                            .unwrap_or_default()
+                            .to_string(),
+                        arguments,
+                    }));
                 }
             }
             "message_delta" => {

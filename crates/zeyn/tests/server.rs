@@ -782,7 +782,10 @@ async fn check_reports_missing_services_of_published_actions() {
 
 /// Refuses every call in `before` and records what `after` sees.
 #[derive(Clone, Default)]
-struct Refuse(Arc<RwLock<Vec<(zeyn::server::CallKind, bool, Option<&'static str>)>>>);
+struct Refuse(Arc<RwLock<Vec<Seen>>>);
+
+/// What `after` saw: the kind of call, whether it succeeded, and the error code.
+type Seen = (zeyn::server::CallKind, bool, Option<&'static str>);
 
 impl zeyn::Interceptor for Refuse {
     fn before(&self, _ctx: &Ctx, _call: &zeyn::server::Call) -> Result<()> {

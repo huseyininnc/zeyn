@@ -14,15 +14,20 @@ use web_sys::{BinaryType, CloseEvent, MessageEvent, WebSocket};
 /// Tag of a frame holding a Y update.
 pub const FRAME_UPDATE: u8 = 1;
 
+/// Called with every update frame from the room.
+type OnUpdate = Box<dyn FnMut(&[u8])>;
+/// A WebSocket event handler, kept alive as long as the socket.
+type Handler = Closure<dyn FnMut(JsValue)>;
+
 struct Shared {
     url: String,
     ws: RefCell<Option<WebSocket>>,
     on_open: RefCell<Box<dyn FnMut()>>,
-    on_update: RefCell<Box<dyn FnMut(&[u8])>>,
+    on_update: RefCell<OnUpdate>,
     on_state: RefCell<Box<dyn FnMut(bool)>>,
     closed: Cell<bool>,
     wait: Cell<i32>,
-    handlers: RefCell<Vec<Closure<dyn FnMut(JsValue)>>>,
+    handlers: RefCell<Vec<Handler>>,
     retry: RefCell<Option<Closure<dyn FnMut()>>>,
 }
 

@@ -222,10 +222,10 @@ impl Authenticator for ForwardAuth {
                 .map(str::trim)
                 .filter(|v| !v.is_empty())
         };
-        if let Some((name, value)) = &self.shared {
-            if !text(name).is_some_and(|v| same(v, value)) {
-                return None;
-            }
+        if let Some((name, value)) = &self.shared
+            && !text(name).is_some_and(|v| same(v, value))
+        {
+            return None;
         }
         let mut identity = Identity::user(text(self.user)?);
         if let Some(groups) = self.groups.and_then(text) {
@@ -1237,14 +1237,14 @@ impl App {
                 );
             }
             for s in f.screens() {
-                if let Some(other) = names.insert(s.meta.name, f.name()) {
-                    if other != f.name() {
-                        problems.push(format!(
-                            "screen `{}` is registered in features `{other}` and `{}`",
-                            s.meta.name,
-                            f.name()
-                        ));
-                    }
+                if let Some(other) = names.insert(s.meta.name, f.name())
+                    && other != f.name()
+                {
+                    problems.push(format!(
+                        "screen `{}` is registered in features `{other}` and `{}`",
+                        s.meta.name,
+                        f.name()
+                    ));
                 }
                 if let Some(path) = f.path_of(&s.meta) {
                     let shape: String = path
@@ -1252,13 +1252,13 @@ impl App {
                         .map(|p| if p.starts_with('{') { "{}" } else { p })
                         .collect::<Vec<_>>()
                         .join("/");
-                    if let Some(other) = paths.insert(shape, s.meta.name) {
-                        if other != s.meta.name {
-                            problems.push(format!(
-                                "route `{path}` is used by screens `{other}` and `{}`",
-                                s.meta.name
-                            ));
-                        }
+                    if let Some(other) = paths.insert(shape, s.meta.name)
+                        && other != s.meta.name
+                    {
+                        problems.push(format!(
+                            "route `{path}` is used by screens `{other}` and `{}`",
+                            s.meta.name
+                        ));
                     }
                 }
                 for dep in (s.deps)() {
@@ -1296,14 +1296,14 @@ impl App {
         let mut media: HashMap<&str, &str> = HashMap::new();
         for f in &self.features {
             for m in f.media_sources() {
-                if let Some(other) = media.insert(m.name, f.name()) {
-                    if other != f.name() {
-                        problems.push(format!(
-                            "media source `{}` is registered in features `{other}` and `{}`",
-                            m.name,
-                            f.name()
-                        ));
-                    }
+                if let Some(other) = media.insert(m.name, f.name())
+                    && other != f.name()
+                {
+                    problems.push(format!(
+                        "media source `{}` is registered in features `{other}` and `{}`",
+                        m.name,
+                        f.name()
+                    ));
                 }
             }
         }
@@ -1789,6 +1789,9 @@ impl App {
     }
 }
 
+/// A tenant's license as last read, with the time it was read.
+type CachedLicense = (Instant, Option<Arc<License>>);
+
 struct AppState {
     errors: ErrorScreens,
     name: Text,
@@ -1814,7 +1817,7 @@ struct AppState {
     config: Config,
     tenancy: Option<Arc<dyn TenantResolver>>,
     license: Option<(Arc<dyn LicenseSource>, Duration)>,
-    licenses: Mutex<HashMap<String, (Instant, Option<Arc<License>>)>>,
+    licenses: Mutex<HashMap<String, CachedLicense>>,
     login_url: Option<String>,
     rate: Option<RateLimit>,
     write_rate: Option<RateLimit>,
@@ -1846,12 +1849,13 @@ fn percent_decode(s: &str) -> String {
     let mut out = Vec::with_capacity(bytes.len());
     let mut i = 0;
     while i < bytes.len() {
-        if bytes[i] == b'%' && i + 2 < bytes.len() {
-            if let Ok(b) = u8::from_str_radix(&s[i + 1..i + 3], 16) {
-                out.push(b);
-                i += 3;
-                continue;
-            }
+        if bytes[i] == b'%'
+            && i + 2 < bytes.len()
+            && let Ok(b) = u8::from_str_radix(&s[i + 1..i + 3], 16)
+        {
+            out.push(b);
+            i += 3;
+            continue;
         }
         out.push(bytes[i]);
         i += 1;
@@ -1968,7 +1972,7 @@ fn hex32(s: &[u8]) -> Option<[u8; 32]> {
         return None;
     }
     let mut out = [0u8; 32];
-    for (i, pair) in s.chunks_exact(2).enumerate() {
+    for (i, pair) in s.as_chunks::<2>().0.iter().enumerate() {
         out[i] = hex_digit(pair[0])? << 4 | hex_digit(pair[1])?;
     }
     Some(out)
@@ -2144,7 +2148,7 @@ impl AppState {
         };
         let ctx = Ctx::for_request(
             identity,
-            locale.into(),
+            locale,
             self.services.clone(),
             self.i18n.clone(),
             tz,
@@ -2176,10 +2180,10 @@ impl AppState {
             .lock()
             .ok()
             .and_then(|c| c.get(&key).cloned());
-        if let Some((at, license)) = &cached {
-            if at.elapsed() < *refresh {
-                return ctx.with_license(license.clone());
-            }
+        if let Some((at, license)) = &cached
+            && at.elapsed() < *refresh
+        {
+            return ctx.with_license(license.clone());
         }
         let license = match source.load(ctx.tenant()).await {
             Ok(l) => l.map(Arc::new),
@@ -2683,6 +2687,21 @@ impl AppState {
         );
         #[cfg(not(feature = "assistant"))]
         let (ai_head, ai_launcher) = (String::new(), String::new());
+        let base = escape(&self.prefix);
+        let components = format!(
+            "{}{}{}{}{}{site_head}{ai_head}",
+            ui::head(&base),
+            media::head(&base),
+            pro::head(&base),
+            files::head(&base),
+            charts::head(&base)
+        );
+        let native_menu = if self.native_menu {
+            ""
+        } else {
+            r#" data-zeyn-native-menu="off""#
+        };
+        let html_attrs = format!("{theme_attrs}{native_menu}");
         format!(
             r##"<!doctype html><html lang="{lang}"{dir}{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css{v}"><script type="module" src="{base}/_zeyn/zeyn.js{v}"></script><script type="module" src="{base}/_zeyn/nav.js{v}"></script>{components}{theme_link}{extra}</head><body><a class="z-skip" href="#z-main">{skip}</a>{frame}<div class="z-toasts" role="status" aria-live="polite" data-text-dismiss="{dismiss}"></div>{commands}{ai_launcher}</body></html>"##,
             lang = escape(ctx.locale()),
@@ -2693,24 +2712,7 @@ impl AppState {
             },
             csrf = mask_token(csrf),
             tz = escape(ctx.time_zone().name()),
-            base = escape(&self.prefix),
             v = ops::asset_version(),
-            components = format!(
-                "{}{}{}{}{}{site_head}{ai_head}",
-                ui::head(&escape(&self.prefix)),
-                media::head(&escape(&self.prefix)),
-                pro::head(&escape(&self.prefix)),
-                files::head(&escape(&self.prefix)),
-                charts::head(&escape(&self.prefix))
-            ),
-            html_attrs = format!(
-                "{theme_attrs}{}",
-                if self.native_menu {
-                    ""
-                } else {
-                    r#" data-zeyn-native-menu="off""#
-                }
-            ),
             theme_link = if self.look.css.is_empty() {
                 String::new()
             } else {
@@ -2801,9 +2803,10 @@ const STATIC_CACHE: usize = 64;
 /// The ETag and the gzip bytes of a framework file, by the address and length of its bytes.
 type StaticEntry = (HeaderValue, Option<axum::body::Bytes>);
 
-static STATIC_FILES: std::sync::OnceLock<
-    std::sync::Mutex<std::collections::HashMap<(usize, usize), Arc<StaticEntry>>>,
-> = std::sync::OnceLock::new();
+/// The framework files kept compressed, by the address and length of their bytes.
+type StaticCache = std::sync::Mutex<std::collections::HashMap<(usize, usize), Arc<StaticEntry>>>;
+
+static STATIC_FILES: std::sync::OnceLock<StaticCache> = std::sync::OnceLock::new();
 
 /// Revalidation and compression for the framework's own scripts and styles (`/_zeyn/*.js` and
 /// `*.css`, not media or uploads): `Cache-Control: public, max-age=31536000, immutable` when the
@@ -2884,10 +2887,10 @@ async fn static_files(req: axum::extract::Request, next: axum::middleware::Next)
                 .map(axum::body::Bytes::from)
         });
         let entry = Arc::new((tag, packed.flatten()));
-        if let Ok(mut c) = cache.lock() {
-            if c.len() < STATIC_CACHE {
-                c.insert(key, entry.clone());
-            }
+        if let Ok(mut c) = cache.lock()
+            && c.len() < STATIC_CACHE
+        {
+            c.insert(key, entry.clone());
         }
         entry
     });
@@ -3520,12 +3523,7 @@ async fn set_locale(
     if let Err(f) = st.check_csrf(&headers) {
         return st.error_response(&ctx, f);
     }
-    if !st
-        .i18n
-        .locales()
-        .iter()
-        .any(|l| *l == call.locale)
-    {
+    if !st.i18n.locales().contains(&call.locale) {
         return st.error_response(&ctx, Failure::App(Error::NotFound));
     }
     let secure = if st.secure_cookies { "; Secure" } else { "" };

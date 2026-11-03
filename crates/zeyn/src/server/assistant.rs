@@ -187,11 +187,10 @@ async fn start(
             .collect();
         let agent = ctx.as_agent();
         let mut pending = Json::Null;
-        if let Some(call) = pending_calls(&history).into_iter().next() {
-            if let Ok(tool) = st.find_tool(&agent, &call.name, a.writes).await {
+        if let Some(call) = pending_calls(&history).into_iter().next()
+            && let Ok(tool) = st.find_tool(&agent, &call.name, a.writes).await {
                 pending = card(&agent, &tool, &call);
             }
-        }
         let suggestions: Vec<String> =
             a.suggestions.iter().filter(|(s, _)| s.is_empty() || *s == q.screen).map(|(_, t)| ctx.t(t)).collect();
         let speech = |server: bool| {
@@ -704,13 +703,14 @@ fn system_prompt(st: &AppState, a: &Assistant, ctx: &Ctx, screen: &str) -> Strin
         s.push_str("\n\nAbout this app (from its developers):\n");
         s.push_str(a.instructions.trim());
     }
-    if let Some((_, entry)) = st.screens.get(screen) {
-        if entry.meta.ai.offered && ctx.identity().can(&entry.meta.access) {
-            s.push_str(&format!(
-                "\n\nThe user has the screen `{}` open.",
-                entry.meta.name
-            ));
-        }
+    if let Some((_, entry)) = st.screens.get(screen)
+        && entry.meta.ai.offered
+        && ctx.identity().can(&entry.meta.access)
+    {
+        s.push_str(&format!(
+            "\n\nThe user has the screen `{}` open.",
+            entry.meta.name
+        ));
     }
     s
 }

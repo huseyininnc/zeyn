@@ -54,10 +54,13 @@ const CATALOG: [Item; 5] = [
     },
 ];
 
+/// Saved positions by user and media id.
+type Positions = Arc<Mutex<HashMap<(String, String), f64>>>;
+
 /// Files of the sample folder. Ids are looked up in a fixed list; a client never names a path.
 struct Folder {
     files: &'static [&'static str],
-    positions: Option<Arc<Mutex<HashMap<(String, String), f64>>>>,
+    positions: Option<Positions>,
 }
 
 impl Folder {

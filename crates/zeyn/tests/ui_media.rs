@@ -19,10 +19,13 @@ fn bytes(len: usize) -> Vec<u8> {
         .collect()
 }
 
+/// Saved positions by user and media id.
+type Positions = Arc<Mutex<HashMap<(String, String), f64>>>;
+
 #[derive(Clone, Default)]
 struct Files {
     opened: Arc<Mutex<Vec<String>>>,
-    positions: Option<Arc<Mutex<HashMap<(String, String), f64>>>>,
+    positions: Option<Positions>,
 }
 
 impl MediaSource for Files {
@@ -149,7 +152,7 @@ async fn send(router: &Router, req: Request<Body>) -> (StatusCode, HeaderMap, Ve
     )
 }
 
-fn h<'a>(headers: &'a HeaderMap, name: header::HeaderName) -> &'a str {
+fn h(headers: &HeaderMap, name: header::HeaderName) -> &str {
     headers
         .get(name)
         .and_then(|v| v.to_str().ok())

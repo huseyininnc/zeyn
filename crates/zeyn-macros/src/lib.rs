@@ -728,6 +728,29 @@ fn parse_model_args(attr: TokenStream, allow_table: bool) -> syn::Result<ModelAr
     Ok(args)
 }
 
+/// A `min` or `max` limit with the underscores of an integer literal taken out, so dates written
+/// `2026_01_01` (year, month, day) do not trip clippy's digit grouping lint; the literal takes
+/// the span of the macro call, which clippy leaves alone as generated code.
+fn without_digit_groups(expr: syn::Expr) -> syn::Expr {
+    match expr {
+        syn::Expr::Lit(syn::ExprLit {
+            lit: syn::Lit::Int(n),
+            attrs,
+        }) => {
+            let plain = format!("{}{}", n.base10_digits(), n.suffix());
+            syn::Expr::Lit(syn::ExprLit {
+                lit: syn::Lit::Int(LitInt::new(&plain, proc_macro2::Span::call_site())),
+                attrs,
+            })
+        }
+        syn::Expr::Unary(mut u) => {
+            *u.expr = without_digit_groups(*u.expr);
+            syn::Expr::Unary(u)
+        }
+        other => other,
+    }
+}
+
 /// Defines validated data that is not tied to a table: form input, filters, wizard steps, report rows.
 ///
 /// Field rules: `required`, `min_len = N`, `max_len = N`, `email`, `min = N`, `max = N`,
@@ -911,7 +934,7 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
                         }
                         checks.push(text_check);
                     } else if m.path.is_ident("min") || m.path.is_ident("max") {
-                        let n: syn::Expr = m.value()?.parse()?;
+                        let n = without_digit_groups(m.value()?.parse()?);
                         if m.path.is_ident("min") {
                             rules.push(quote!(::zeyn::Rule::Min(#n)));
                         } else {
@@ -989,10 +1012,11 @@ fn expand_model(mut s: ItemStruct, args: ModelArgs, is_entity: bool) -> syn::Res
 
         if is_key {
             keys += 1;
-            if let Type::Path(p) = &ty {
-                if p.qself.is_none() && p.path.is_ident(&id_name) {
-                    generate_id = true;
-                }
+            if let Type::Path(p) = &ty
+                && p.qself.is_none()
+                && p.path.is_ident(&id_name)
+            {
+                generate_id = true;
             }
         }
         if is_key && !is_entity {

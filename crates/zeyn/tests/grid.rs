@@ -246,12 +246,14 @@ fn totals_cover_every_filtered_row_not_only_the_page() {
 
 #[test]
 fn totals_ignore_unknown_fields_and_ops_that_do_not_fit() {
-    let mut q = DataQuery::default();
-    q.aggregates = vec![
-        agg("nope", Aggregate::Sum),
-        agg("code", Aggregate::Sum),
-        agg("code", Aggregate::Count),
-    ];
+    let q = DataQuery {
+        aggregates: vec![
+            agg("nope", Aggregate::Sum),
+            agg("code", Aggregate::Sum),
+            agg("code", Aggregate::Count),
+        ],
+        ..DataQuery::default()
+    };
     let page = q.apply((1..=3).map(item).collect());
     assert_eq!(page.totals.len(), 1);
     assert_eq!(page.totals[0].value, Value::Int(3));
@@ -1845,8 +1847,10 @@ fn apply_groups_rows_with_counts_totals_sort_and_paging() {
         Value::Int(3 + 6 + 9 + 12 + 15 + 18)
     );
     assert!(page.next.is_some());
-    let mut q = DataQuery::default();
-    q.group = Some("due".into());
+    let q = DataQuery {
+        group: Some("due".into()),
+        ..DataQuery::default()
+    };
     let page = q.apply(rows);
     assert_eq!(
         (page.groups[0].value.clone(), page.groups[0].count),

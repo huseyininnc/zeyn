@@ -118,10 +118,11 @@ fn list_item(line: &str) -> Option<(bool, &str)> {
         .bytes()
         .take_while(u8::is_ascii_digit)
         .count();
-    if digits > 0 && digits < 4 {
-        if let Some(rest) = t[digits..].strip_prefix(". ") {
-            return Some((true, rest));
-        }
+    if digits > 0
+        && digits < 4
+        && let Some(rest) = t[digits..].strip_prefix(". ")
+    {
+        return Some((true, rest));
     }
     None
 }
@@ -473,55 +474,53 @@ impl Renderer {
                 i += 2;
                 continue;
             }
-            if c == '`' {
-                if let Some(end) = marks.find(i + 1, &['`']) {
-                    out.push_str(&format!("<code>{}</code>", escape(&collect(i + 1, end))));
-                    i = end + 1;
-                    continue;
-                }
+            if c == '`'
+                && let Some(end) = marks.find(i + 1, &['`'])
+            {
+                out.push_str(&format!("<code>{}</code>", escape(&collect(i + 1, end))));
+                i = end + 1;
+                continue;
             }
             let image = c == '!' && chars.get(i + 1) == Some(&'[');
             if c == '[' || image {
                 let open = if image { i + 1 } else { i };
-                if let Some(close) = marks.find(open + 1, &[']', '(']) {
-                    if let Some(end) = marks.find(close + 2, &[')']) {
-                        let label = collect(open + 1, close);
-                        let target = collect(close + 2, end);
-                        if image {
-                            out.push_str(&self.image(&label, target.trim()));
-                        } else {
-                            out.push_str(
-                                &self.anchor(&self.inline(&label, depth + 1), target.trim()),
-                            );
-                        }
-                        i = end + 1;
-                        continue;
+                if let Some(close) = marks.find(open + 1, &[']', '('])
+                    && let Some(end) = marks.find(close + 2, &[')'])
+                {
+                    let label = collect(open + 1, close);
+                    let target = collect(close + 2, end);
+                    if image {
+                        out.push_str(&self.image(&label, target.trim()));
+                    } else {
+                        out.push_str(&self.anchor(&self.inline(&label, depth + 1), target.trim()));
                     }
-                }
-            }
-            if c == '*' && chars.get(i + 1) == Some(&'*') {
-                if let Some(end) = marks.find(i + 3, &['*', '*']) {
-                    out.push_str(&format!(
-                        "<strong>{}</strong>",
-                        self.inline(&collect(i + 2, end), depth + 1)
-                    ));
-                    i = end + 2;
+                    i = end + 1;
                     continue;
                 }
+            }
+            if c == '*'
+                && chars.get(i + 1) == Some(&'*')
+                && let Some(end) = marks.find(i + 3, &['*', '*'])
+            {
+                out.push_str(&format!(
+                    "<strong>{}</strong>",
+                    self.inline(&collect(i + 2, end), depth + 1)
+                ));
+                i = end + 2;
+                continue;
             }
             if c == '*'
                 && chars
                     .get(i + 1)
                     .is_some_and(|n| !n.is_whitespace() && *n != '*')
+                && let Some(end) = marks.find(i + 1, &['*'])
             {
-                if let Some(end) = marks.find(i + 1, &['*']) {
-                    out.push_str(&format!(
-                        "<em>{}</em>",
-                        self.inline(&collect(i + 1, end), depth + 1)
-                    ));
-                    i = end + 1;
-                    continue;
-                }
+                out.push_str(&format!(
+                    "<em>{}</em>",
+                    self.inline(&collect(i + 1, end), depth + 1)
+                ));
+                i = end + 1;
+                continue;
             }
             push_escaped(&mut out, c);
             i += 1;

@@ -82,10 +82,10 @@ impl DateOptions {
             }
             _ => (None, None),
         };
-        if let Some(d) = date {
-            if (self.no_weekends && d.weekday() >= 6) || self.disabled.contains(&d) {
-                return Some("zeyn.validation.disabled_day");
-            }
+        if let Some(d) = date
+            && ((self.no_weekends && d.weekday() >= 6) || self.disabled.contains(&d))
+        {
+            return Some("zeyn.validation.disabled_day");
         }
         if let Some(t) = time {
             let step = self.step();
