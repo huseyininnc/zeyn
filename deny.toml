@@ -4,11 +4,19 @@ all-features = true
 [advisories]
 version = 2
 yanked = "deny"
+# Unmaintained crates are reported only when the workspace depends on them directly.
+unmaintained = "workspace"
+ignore = [
+    { id = "RUSTSEC-2026-0194", reason = "quick-xml 0.38 comes only from Typst's bibliography reader (feature pdf); no safe upgrade exists and Zeyn never passes user XML to it" },
+    { id = "RUSTSEC-2026-0195", reason = "same quick-xml 0.38 path through Typst (feature pdf); calamine uses the fixed 0.42" },
+]
 
 [licenses]
 version = 2
 allow = ["MIT", "MIT-0", "Apache-2.0", "Apache-2.0 WITH LLVM-exception", "BSD-2-Clause", "BSD-3-Clause", "0BSD", "ISC", "Zlib", "Unicode-3.0", "CC0-1.0", "MPL-2.0", "CDLA-Permissive-2.0", "Unlicense", "BSL-1.0"]
 confidence-threshold = 0.9
+# Example and test crates are not published.
+private = { ignore = true }
 
 [bans]
 multiple-versions = "warn"
