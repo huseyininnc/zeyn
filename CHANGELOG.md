@@ -1,0 +1,118 @@
+# Changelog
+
+All notable changes to Zeyn are recorded here. The format follows [Keep a Changelog 1.1](https://keepachangelog.com/en/1.1.0/). The project is in alpha, so APIs can change between versions.
+
+## [Unreleased]
+
+## [0.0.7] - 2026-11-03
+
+### Changed
+- Rail hides its scrollbar by default and scrolls by mouse drag; `Rail::scrollbar(true)` keeps a thin bar.
+- Card links to screens with a route use the canonical path instead of the route redirect.
+- JSON-LD address properties are written as absolute URLs with the site URL.
+
+### Fixed
+- The phone menu, automatic loading of more cards and the sort picker no longer shift the layout (CLS stays at 0).
+
+## [0.0.6] - 2026-11-03
+
+### Added
+- Content components: List, ImageCard extras (subtitle, badges, progress, horizontal), Heading, Paragraph, MetaLine, PrevNext, AutoGrid, Avatar, Spoiler, AlphaIndex, WeekSchedule, Rating, RelativeTime, Share, Chips, Hero and Reactions.
+- Bottom navigation bar for the site shell on phones and card hover preview.
+- Docs and landing page in nine languages; framework texts in Chinese, Russian, Spanish, Korean, Japanese, Hindi and Arabic behind the `lang-*` Cargo features; `App::locale_paths` puts the language in the URL.
+- Right to left layout for every framework component.
+- Component catalog site (`zeyn-example-components`).
+- `DataGridColumn` can opt out of sorting with `no_sort()`.
+- `zeyn new` sets up CI, Dependabot, a pull request checklist, `SECURITY.md` and `CHANGELOG.md` for new projects.
+- GitHub Actions CI for this repository.
+
+### Changed
+- Dynamic responses are gzipped and the CSRF token is masked in every response.
+- Framework asset URLs carry the build id and are cached for a year.
+- Grids open faster: grid setup reads geometry once, rows are written without a string per cell, wide virtual grids send their first block in the row template, and the virtual block cache is capped.
+- Browser modules load only on pages that use them.
+- The repository is formatted with `max_width = 100` and `chain_width = 40`.
+
+### Removed
+- The old names kept as deprecated aliases (`Grid`, `GridColumn`, `GridMode`, `GridQuery`, `Agents`, `App::agents`, `RESERVED_SHORTCUTS`, `Card::poster`, `PosterCard`). `zeyn check --fix` still rewrites them.
+
+## [0.0.5] - 2026-11-03
+
+### Added
+- `Feature::public_media` serves posters, covers and logos to anyone with no cookie and with public cache headers.
+- Embed notice text on the click to load button, and `Embed::remember` and `Embed::remember_for_session` to keep a consent for a limited time or for the tab.
+- `Card::image`.
+
+### Changed
+- Reads of public media sources skip the per IP rate limit.
+- Wide grids open about three times faster, and assets support ETag and gzip.
+
+## [0.0.4] - 2026-11-03
+
+### Added
+- Path parameter routes and the `Slug` type.
+- Custom error pages: `App::not_found` and `App::server_error`.
+- `App::csp` allow lists for images, media, frames, connections and fonts.
+- `Embed` and `Image` components, `ExternalLink`, and a safe `Markdown` component (feature `markdown`).
+- Public screens are sent with no cookie and no token and can be cached; the runtime fetches the CSRF token on its first POST.
+- SEO and head support: description, canonical, `og_image`, JSON-LD and robots; sitemap.
+- Site shell with a top bar, navigation menu, language and theme actions and footer links.
+- `CardGrid`, `Rail` and `SearchBox`.
+- Persistent jobs with a `JobStore` trait, leases, heartbeats and retries.
+- `App::llms_txt` serves `/llms.txt` as public plain text.
+- Docs pages for sign in, operations, assistant, islands, realtime, desktop and database.
+
+## [0.0.3] - 2026-11-02
+
+### Added
+- Accounts (feature `accounts`): users, roles, passkeys, sign in, registration, recovery, two factor and a default UI, with memory and SQL stores.
+- PostgreSQL data layer (feature `postgres`) and Oracle driver (feature `oracle`).
+- Redis store for shared rate limits and saved views (feature `redis`).
+- OIDC sign in, bearer JWT validation and MFA.
+- Embedded AI assistant (feature `assistant`) and MCP server, off by default.
+- Signed licenses with ed25519.
+- tracing and OpenTelemetry spans.
+- XLSX export and import (feature `xlsx`), PDF documents from Typst templates (feature `pdf`), e-mail notifications (feature `email`).
+- WASM islands (`zeyn-island`), canvas surface, realtime rooms with Y-CRDT documents (feature `realtime`) and desktop packaging (`zeyn-desktop`).
+- File upload fields with a `FileStore` trait, decimal, percent, masked and password inputs, multi select, drop down and split buttons, tooltip, popover, busy overlay and more chart types.
+- Video and Audio players with ranged media serving.
+- Command palette, central keyboard shortcuts, dockable panels, menu bar, toolbox, property inspector and status bar.
+- Time zones from the bundled IANA database; `zeyn dev` with hot reload.
+- The documentation site written with Zeyn (`zeyn-example-docs`), `AGENTS.md` and the `zeyn` skill for AI agents, Docker files for new projects, and installation from crates.io with `cargo install zeyn-cli`.
+
+### Changed
+- `server.rs` and the browser runtime were split into modules with no change in behavior.
+- Every endpoint goes through the interceptors, and one masking filter covers every output path.
+
+### Fixed
+- Double counting of totals in virtual grids after sorting.
+- Smaller security fixes: the page shell escapes its CSRF value, CSV import checks row and column limits while reading, and the per tenant license cache is capped.
+
+## [0.0.2] - 2026-11-02
+
+### Changed
+- The grid API is named `DataGrid` (`DataGridColumn`, `DataQuery`, `DataMode`); the old names stay one release as deprecated aliases.
+
+### Added
+- `zeyn check --fix` rewrites old Zeyn names in `src`, `tests` and `examples`.
+- `zeyn new --lib` creates a library of features shared by several apps; GitLab CI and rustfmt templates for new projects.
+- Polyrepo guide.
+
+## [0.0.1] - 2026-11-02
+
+### Added
+- First working version: the language (entities, actions, screens, forms), the server, the browser runtime, the CLI and the examples.
+- DataGrid with server side paging, sorting, typed filters, multi sort, subtotals, grouping, tree data, pinning, resizing, hiding and moving columns, saved views, row selection, bulk actions, inline editing, CSV export and import, and cell navigation with TSV copy and paste.
+- Layout components (Row, Stack, Panel, Card, Tabs, Split), form controls, date and time pickers, master and detail rows, tree view and SVG charts.
+- Role based access, field masking, audit of reads and writes, typed approval workflows, idle warning and re-authentication.
+- Navigation without page reloads.
+- MIT and Apache-2.0 licenses.
+
+[Unreleased]: https://github.com/huseyininnc/zeyn/compare/v0.0.7...HEAD
+[0.0.7]: https://github.com/huseyininnc/zeyn/compare/v0.0.6...v0.0.7
+[0.0.6]: https://github.com/huseyininnc/zeyn/compare/v0.0.5...v0.0.6
+[0.0.5]: https://github.com/huseyininnc/zeyn/compare/v0.0.4...v0.0.5
+[0.0.4]: https://github.com/huseyininnc/zeyn/compare/v0.0.3...v0.0.4
+[0.0.3]: https://github.com/huseyininnc/zeyn/compare/v0.0.2...v0.0.3
+[0.0.2]: https://github.com/huseyininnc/zeyn/compare/v0.0.1...v0.0.2
+[0.0.1]: https://github.com/huseyininnc/zeyn/releases/tag/v0.0.1

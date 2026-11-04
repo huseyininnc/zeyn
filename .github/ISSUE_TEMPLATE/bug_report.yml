@@ -1,0 +1,56 @@
+name: Bug report
+description: Something does not work as documented.
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Zeyn version
+      description: The crate version, for example 0.0.7, or the commit.
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system and Rust version
+      description: For example Windows 11, Ubuntu 24.04 or macOS 15, and the output of rustc --version.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include error messages and, for browser problems, console output.
+    validations:
+      required: true
+  - type: textarea
+    id: sample
+    attributes:
+      label: Minimal code sample
+      description: The smallest app, screen or test that shows the problem.
+      render: rust
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: This is not a security problem. Those go through the private security report form.
+          required: true

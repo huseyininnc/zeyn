@@ -1,5 +1,7 @@
 # Zeyn Framework
 
+[![crates.io](https://img.shields.io/crates/v/zeyn.svg)](https://crates.io/crates/zeyn) [![docs.rs](https://img.shields.io/docsrs/zeyn)](https://docs.rs/zeyn) [![CI](https://github.com/huseyininnc/zeyn/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/huseyininnc/zeyn/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
+
 Zeyn is an open source Rust web framework for data heavy applications: grids, forms and workflows. AI agents write the application code. People read it, review it and change it when they need to.
 
 Status: alpha, on crates.io as 0.0.7. APIs still change between versions. Everything below compiles and is tested.
@@ -65,6 +67,14 @@ cargo run -p zeyn-cli -- new my-domain --lib   # a library of features shared by
 - Secure defaults: CSRF, CSP, role based access and audit logging in the core
 - Predictable memory use and a single binary deployment
 - A modern default UI kit, with headless components so teams can ship their own kit
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to build, test and send a change, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for how we work together. Questions are answered as described in [SUPPORT.md](SUPPORT.md). The changes of each release are in [CHANGELOG.md](CHANGELOG.md).
+
+## Security
+
+Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md), never in a public issue.
 
 ## License
 

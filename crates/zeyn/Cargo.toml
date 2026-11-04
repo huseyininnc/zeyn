@@ -3,6 +3,7 @@ name = "zeyn"
 description = "Rust web framework for data heavy applications, written by AI agents and reviewed by people"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 readme.workspace = true
