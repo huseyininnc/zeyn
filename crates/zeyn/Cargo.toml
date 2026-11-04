@@ -106,7 +106,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-util"] }
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["std", "fmt", "registry"] }
-tokio-tungstenite = "0.29"
+tokio-tungstenite = "0.30"
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
 yrs = "0.28"
 calamine = { version = "0.38", default-features = false }
