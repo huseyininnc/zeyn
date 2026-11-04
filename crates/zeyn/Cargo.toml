@@ -82,7 +82,7 @@ opentelemetry_sdk = { version = "0.33", default-features = false, features = ["t
 opentelemetry-otlp = { version = "0.33", default-features = false, features = ["http-proto", "trace", "reqwest-blocking-client"], optional = true }
 tracing-opentelemetry = { version = "0.34", default-features = false, optional = true }
 sqlx = { version = "0.9", default-features = false, features = ["postgres", "runtime-tokio", "migrate"], optional = true }
-base64 = { version = "0.22", optional = true }
+base64 = { version = "0.23", optional = true }
 futures-util = { version = "0.3", default-features = false, optional = true }
 oracle = { version = "0.6", optional = true }
 yrs = { version = "0.28", optional = true }
@@ -98,7 +98,7 @@ lettre = { version = "0.11", default-features = false, features = ["builder", "s
 
 [dev-dependencies]
 ring = "0.17"
-base64 = "0.22"
+base64 = "0.23"
 ed25519-dalek = { version = "3", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
