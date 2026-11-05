@@ -234,6 +234,7 @@
         "sort": "الفرز حسب",
         "pages": "الصفحات",
         "page": "الصفحة {page} من {pages}",
+        "page_only": "الصفحة {page}",
         "previous_page": "الصفحة السابقة",
         "next_page": "الصفحة التالية",
         "previous": "تمرير للخلف",

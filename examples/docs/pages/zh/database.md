@@ -35,7 +35,13 @@ impl ProductStore {
 | `time_zone` | `DateTime` 列上日期过滤所用的时区，由服务器设置 |
 | `group` | 按某个字段对行分组，由 grid 设置 |
 
-`DataQuery::apply(vec)` 在内存中完成全部处理。对于 SQL 数据库，请使用 `zeyn::sql`：`Db::find` 会把同样的查询转换成适用于 PostgreSQL 或 Oracle 的 `WHERE`、`ORDER BY`、`LIMIT` 和 `GROUP BY`。只有实体自己的字段可以被过滤或排序，每个值都作为参数绑定，页面大小由服务器限定上限，因此客户端输入永远不会进入 SQL 文本。只有在 `Db::find` 无法表达的查询中才手写 SQL，而且绝不要把来自客户端的字段名或值粘贴进去。
+`DataQuery::apply(vec)` 在内存中完成全部处理。对于 SQL 数据库，请使用 `zeyn::sql`：`Db::find` 会把同样的查询转换成适用于 PostgreSQL 或 Oracle 的 `WHERE`、`ORDER BY`、`LIMIT` 和 `GROUP BY`。只有实体自己的字段可以被过滤或排序，每个值都作为参数绑定，页面大小由服务器限定上限，因此客户端输入永远不会进入 SQL 文本。只有在 `Db::find` 无法表达的查询中才手写 SQL：`Db::query::<M>(sql, args)` 把一条 `SELECT` 的行读入 model，只接受字符串字面量形式的 SQL，每个值都作为参数传入，并且最多读取 1000 行。
+
+```rust
+let hits: Vec<Hit> = db
+    .query("SELECT id, title FROM items WHERE title % $1 ORDER BY similarity(title, $1) DESC LIMIT 20", vec![q.into()])
+    .await?;
+```
 
 ```toml
 zeyn = { version = "0.0.7", features = ["postgres"] }   # or ["oracle"]

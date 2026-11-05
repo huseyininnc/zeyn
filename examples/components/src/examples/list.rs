@@ -19,6 +19,18 @@ pub fn overview(_ctx: &Ctx) -> Node {
         .into()
 }
 
+pub fn numbered_pages(ctx: &Ctx) -> Node {
+    let now = ctx.now();
+    List::of(crate::data::people_uncounted)
+        .item(move |p: &Person| {
+            ListItem::new(p.name.clone())
+                .subtitle(p.role.clone())
+                .meta(RelativeTime::new(now.add_ms(-p.id.0 * 3_600_000)))
+        })
+        .paging(Paging::pages(5))
+        .into()
+}
+
 pub fn fixed(_ctx: &Ctx) -> Node {
     people()
         .iter()
@@ -35,5 +47,5 @@ pub const ENTRY: Entry = Entry {
     docs: "components/content#list",
     api: &["List", "ListItem"],
     overview: &[ex!(overview)],
-    examples: &[ex!(fixed)],
+    examples: &[ex!(numbered_pages), ex!(fixed)],
 };

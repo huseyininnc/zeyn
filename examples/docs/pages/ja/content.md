@@ -58,7 +58,7 @@ AutoGrid::new()
 
 ## List
 
-`<ul>` の中に行を縦に並べます。各 `ListItem` にはタイトルがあり、先頭の小さな画像（カード画像と同じ安全なアドレス：パス、`https:`、`data:image/`）、サブタイトル、末尾の短いメタテキストを付けることもできます。`.link(screen, params)` を使うと行全体が 1 つのリンクになり、タブ順では 1 か所、フォーカスリングは見え、ページを再読み込みせずに開きます。長いテキストは折り返され、スマートフォンではメタテキストがタイトルの下に移り、右から左に書くページでは行が左右反転します。
+`<ul>` の中に行を縦に並べます。各 `ListItem` にはタイトルがあり、先頭の小さな画像（カード画像と同じ安全なアドレス：パス、`https:`、`data:image/`）、サブタイトル、末尾の短いメタを付けることもできます。テキストか、`RelativeTime` のようなインラインコンポーネントです。`.link(screen, params)` を使うと行全体が 1 つのリンクになり、タブ順では 1 か所、フォーカスリングは見え、ページを再読み込みせずに開きます。長いテキストは折り返され、スマートフォンではメタテキストがタイトルの下に移り、右から左に書くページでは行が左右反転します。
 
 `List::new()` は渡された項目をそのまま保持します。`List::of(action)` は DataGrid と同じ種類の action で行を読み込み、[カードグリッド](catalog.md#card-grid)と同じようにページングします。`paging` で指定しない限り 20 行と「Show more」ボタン、並べ替えオプション、`.search(text)` によるサーバー側の検索があり、ページごとに action のアクセス権が確認されます。
 
@@ -74,7 +74,7 @@ List::of(search_people)
         ListItem::new(p.name.clone())
             .image(p.photo.clone())
             .subtitle(p.city.clone())
-            .meta(p.joined.format(&locale))
+            .meta(RelativeTime::new(p.joined))
             .link(person, PersonParams { id: p.id })
     })
     .sort_option(t!("people.by_name"), Person::name, false)

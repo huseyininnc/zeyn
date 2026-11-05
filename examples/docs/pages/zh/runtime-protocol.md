@@ -8,7 +8,7 @@
 
 `GET {route}?params={json}` 返回完整的 HTML 文档。`params` 是 Screen 参数经 URL 编码的 JSON；Screen 没有参数时省略。
 
-带路径段的路由，例如 `/orders/{id}`，从路径（`/orders/42`）读取对应的 params 字段，其余字段从 `params` 读取。无法解析的路径段值返回 404。值经过百分号编码，包括点号（`%2E`），因此 Screen 的 URL 在运行时看来永远不像文件。返回 `Screen::moved_to` 的 Screen 会得到 `301 Moved Permanently`，新 URL 位于 `Location` 中。
+带路径段的路由，例如 `/orders/{id}`，从路径（`/orders/42`）读取对应的 params 字段，其余字段从 `params` 读取。无法解析的路径段值返回 404。值经过百分号编码，包括点号（`%2E`），因此 Screen 的 URL 在运行时看来永远不像文件。返回 `Screen::moved_to` 的 Screen 会得到 `301 Moved Permanently`，新 URL 位于 `Location` 中；返回 `Screen::redirect` 的 Screen 会得到带有 `Cache-Control: no-store` 的 `303 See Other`。`nav.js` 会无需整页加载地跟随这两种响应，并显示目标地址，即使该加载没有新增历史记录条目（后退和前进）。
 
 失败的页面以对应状态码（404、403、500 等）返回，内容是应用的错误 Screen（`App::not_found`、`App::server_error`）或内置的简短提示，并置于外壳（shell）之内。带有 `x-zeyn-partial: 1` 的请求只会得到该 Screen，响应带有 `x-zeyn-partial: 1` 和 `x-zeyn-title`，运行时据此无需整页加载即可换入。错误详情绝不会到达浏览器。
 

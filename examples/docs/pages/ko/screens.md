@@ -87,6 +87,18 @@ pub fn catalog_page(p: CatalogParams, store: Catalog) -> Result<Screen> {
 }
 ```
 
+`Screen::redirect(screen, params)`는 주소 자체는 유효하게 둔 채 요청 하나를 다른 Screen으로 넘깁니다. 예를 들어 무작위 선택이나 최신 항목이 있습니다. 브라우저는 대상의 정식 경로와 `Cache-Control: no-store`가 있는 `303 See Other`를 받으며, 앱 내 이동은 페이지 로드 없이 이를 따라가고 주소 표시줄에는 대상이 표시됩니다. 대상은 항상 경로가 있는 타입이 지정된 Screen이므로 리디렉션이 앱 밖의 주소로 이어질 수 없으며, 앱이 제공하지 않는 대상은 404로 응답합니다.
+
+```rust
+#[screen(route = "/random", public)]
+pub async fn random_item(store: Catalog) -> Result<Screen> {
+    let item = store.random().await?.ok_or(Error::NotFound)?;
+    Ok(Screen::redirect(catalog_page, CatalogParams { slug: item.slug, n: item.n }))
+}
+```
+
+@live redirect
+
 ## 접근 권한
 
 | 옵션 | 의미 |

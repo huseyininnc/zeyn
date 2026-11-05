@@ -473,7 +473,7 @@ struct DetailDef<E> {
 
 /// A value in the fixed machine form group paths and scopes use: numbers and money as `1234.56`,
 /// dates and times in ISO form, choices by value. `None` for an empty value.
-fn value_key(value: &Value) -> Option<String> {
+pub(crate) fn value_key(value: &Value) -> Option<String> {
     match value {
         Value::Null => None,
         Value::Money(m) => {
@@ -491,7 +491,7 @@ fn value_key(value: &Value) -> Option<String> {
 
 /// Filter that keeps rows whose `meta` field equals `key` (from [`value_key`]), or is empty when
 /// `key` is `None`.
-fn key_filter(meta: &FieldMeta, key: Option<&str>) -> Filter {
+pub(crate) fn key_filter(meta: &FieldMeta, key: Option<&str>) -> Filter {
     let Some(key) = key else {
         return Filter::blank(meta.name, true);
     };

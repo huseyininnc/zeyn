@@ -58,7 +58,7 @@ AutoGrid::new()
 
 ## List
 
-Filas una debajo de otra en un `<ul>`. Cada `ListItem` tiene un título y puede tener una pequeña imagen al inicio (las mismas direcciones seguras que las imágenes de las tarjetas: una ruta, `https:` o `data:image/`), un subtítulo y un texto breve de metadatos al final. Con `.link(screen, params)` toda la fila es un único enlace, de modo que es una sola parada en el orden de tabulación, con un anillo de foco visible, y se abre sin recargar la página. El texto largo se ajusta; en los teléfonos el texto de metadatos pasa bajo el título, y las páginas de derecha a izquierda reflejan la fila.
+Filas una debajo de otra en un `<ul>`. Cada `ListItem` tiene un título y puede tener una pequeña imagen al inicio (las mismas direcciones seguras que las imágenes de las tarjetas: una ruta, `https:` o `data:image/`), un subtítulo y metadatos breves al final: texto o un componente en línea como `RelativeTime`. Con `.link(screen, params)` toda la fila es un único enlace, de modo que es una sola parada en el orden de tabulación, con un anillo de foco visible, y se abre sin recargar la página. El texto largo se ajusta; en los teléfonos el texto de metadatos pasa bajo el título, y las páginas de derecha a izquierda reflejan la fila.
 
 `List::new()` contiene los elementos que se le dan. `List::of(action)` carga filas mediante el mismo tipo de action que usa un DataGrid y pagina como una [cuadrícula de tarjetas](catalog.md#card-grid): 20 filas con un botón «Show more» salvo que `paging` diga otra cosa, opciones de orden, búsqueda en el servidor con `.search(text)` y el acceso de la action comprobado en cada página.
 
@@ -74,7 +74,7 @@ List::of(search_people)
         ListItem::new(p.name.clone())
             .image(p.photo.clone())
             .subtitle(p.city.clone())
-            .meta(p.joined.format(&locale))
+            .meta(RelativeTime::new(p.joined))
             .link(person, PersonParams { id: p.id })
     })
     .sort_option(t!("people.by_name"), Person::name, false)

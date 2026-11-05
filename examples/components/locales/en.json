@@ -183,6 +183,7 @@
       },
       "list": {
         "overview": "Example",
+        "numbered_pages": "Numbered pages without a total",
         "fixed": "Fixed items"
       },
       "lookup": {
@@ -224,7 +225,8 @@
       },
       "rail": {
         "overview": "Example",
-        "with_scrollbar": "Visible scrollbar"
+        "with_scrollbar": "Visible scrollbar",
+        "scoped": "Fixed to one kind"
       },
       "rating": {
         "overview": "Example",

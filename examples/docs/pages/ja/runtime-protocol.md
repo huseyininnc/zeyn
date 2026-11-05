@@ -8,7 +8,7 @@
 
 `GET {route}?params={json}` は完全な HTML ドキュメントを返します。`params` は Screen params の URL エンコードされた JSON で、Screen に params がない場合は省略されます。
 
-`/orders/{id}` のようにパスセグメントを持つルートでは、params のうちそのフィールドをパス（`/orders/42`）から、それ以外のフィールドを `params` から読み取ります。解釈できないセグメント値は 404 を返します。値はドットも含めてパーセントエンコードされる（`%2E`）ため、Screen の URL がランタイムにファイルとして扱われることはありません。`Screen::moved_to` を返す Screen には、新しい URL を `Location` に入れた `301 Moved Permanently` が返ります。
+`/orders/{id}` のようにパスセグメントを持つルートでは、params のうちそのフィールドをパス（`/orders/42`）から、それ以外のフィールドを `params` から読み取ります。解釈できないセグメント値は 404 を返します。値はドットも含めてパーセントエンコードされる（`%2E`）ため、Screen の URL がランタイムにファイルとして扱われることはありません。`Screen::moved_to` を返す Screen には、新しい URL を `Location` に入れた `301 Moved Permanently` が返り、`Screen::redirect` を返す Screen には `Cache-Control: no-store` 付きの `303 See Other` が返ります。`nav.js` はどちらもページを読み込まずにたどり、読み込みが履歴エントリを追加しない場合（戻ると進む）も、遷移先のアドレスを表示します。
 
 失敗したページは、そのステータス（404、403、500 など）と、アプリのエラー Screen（`App::not_found`、`App::server_error`）または組み込みの短いメッセージをシェル内に表示して返します。`x-zeyn-partial: 1` を付けたリクエストには、その Screen だけが `x-zeyn-partial: 1` と `x-zeyn-title` を付けて返るため、ランタイムはページを読み込み直さずに差し替えられます。エラーの詳細がブラウザに届くことはありません。
 

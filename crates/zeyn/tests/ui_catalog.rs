@@ -173,6 +173,45 @@ pub fn goods_list() -> Screen {
         )
 }
 
+/// Fourteen rows paged by the list without a total, as an action that does not count.
+#[action(permission = "shop.read")]
+pub async fn uncounted_goods(q: DataQuery) -> Result<Page<Good>> {
+    let all: Vec<Good> = goods().into_iter().take(14).collect();
+    let mut page = Page::from_slice(&all, &q);
+    page.total = None;
+    Ok(page)
+}
+
+#[screen(route = "/uncounted", public)]
+pub fn uncounted_list() -> Screen {
+    Screen::new("Uncounted").body(
+        List::of(uncounted_goods)
+            .item(|g: &Good| {
+                zeyn::ui::ListItem::new(g.name.clone()).meta(zeyn::ui::RelativeTime::new(
+                    DateTime::from_unix_ms(1_778_580_000_000),
+                ))
+            })
+            .paging(Paging::pages(10)),
+    )
+}
+
+#[screen(route = "/ankara", public)]
+pub fn ankara_goods() -> Screen {
+    Screen::new("Ankara")
+        .body(
+            Rail::of(search_goods)
+                .card(|g: &Good| Card::image("/x.png", format!("{} in {}", g.name, g.city)))
+                .scope(Good::city, "ankara".to_string())
+                .paging(Paging::infinite(4)),
+        )
+        .body(
+            List::of(search_goods)
+                .item(|g: &Good| zeyn::ui::ListItem::new(format!("{} in {}", g.name, g.city)))
+                .scope(Good::city, "Ankara".to_string())
+                .paging(Paging::pages(4)),
+        )
+}
+
 const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
 fn app(limit: Option<RateLimit>) -> axum::Router {
@@ -194,7 +233,9 @@ fn app(limit: Option<RateLimit>) -> axum::Router {
                 .screen(results)
                 .screen(picks)
                 .screen(good_page)
-                .screen(goods_list),
+                .screen(goods_list)
+                .screen(uncounted_list)
+                .screen(ankara_goods),
         );
     if let Some(l) = limit {
         app = app.write_limit(l);
@@ -485,6 +526,101 @@ async fn the_catalog_script_is_served_without_sign_in() {
         js.contains("window.zeynCsrf()"),
         "public pages come without a CSRF token, so paging and suggestions must ask the runtime for one"
     );
+}
+
+#[tokio::test]
+async fn paged_lists_without_a_total_offer_the_next_page_while_there_is_a_cursor() {
+    let router = app(None);
+    let (status, page) = send(&router, get("/uncounted")).await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert!(page.contains(r#"data-zeyn-paging="pages""#), "{page}");
+    assert!(page.contains(r#" data-zeyn-next="10""#), "{page}");
+    assert!(
+        !page.contains("data-zeyn-total"),
+        "the action did not count"
+    );
+    assert!(
+        page.contains(r#"<span class="z-cards-page" data-zeyn-cards-page>Page 1</span>"#),
+        "without a total the label leaves out the page count: {page}"
+    );
+    assert!(
+        page.contains(r#"data-zeyn-cards-next aria-disabled="false""#),
+        "Next works while there is a cursor: {page}"
+    );
+    assert!(page.contains(r#"data-text-page-only="Page {page}""#));
+    assert!(
+        page.contains(r#"<span class="z-list-meta"><time"#),
+        "the meta of a row takes an inline component: {page}"
+    );
+    let (status, body) = send(
+        &router,
+        post(
+            "/_zeyn/grid",
+            "shop.read",
+            serde_json::json!({ "screen": "uncounted_list", "node": "0", "query": { "page": { "type": "offset", "offset": 10, "limit": 10 }, "with_total": true } }),
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(
+        json["rows"]
+            .as_str()
+            .unwrap()
+            .matches(r#"<li class="z-list-item">"#)
+            .count(),
+        4,
+        "page 2 holds the last four rows: {body}"
+    );
+    assert!(json["next"].is_null(), "{body}");
+    let (_, js) = send(
+        &router,
+        Request::get("/_zeyn/catalog.js")
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
+    assert!(
+        js.contains("known ? offset + size >= total : !d.zeynNext"),
+        "the browser enables Next from the cursor when there is no total"
+    );
+}
+
+#[tokio::test]
+async fn scoped_rails_and_lists_keep_their_filter_whatever_the_client_sends() {
+    let router = app(None);
+    let (status, page) = send(&router, get("/ankara")).await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert_eq!(
+        page.matches(" in Ankara").count(),
+        8,
+        "four cards and four rows of the scope: {page}"
+    );
+    assert!(!page.contains(" in Bursa"), "{page}");
+    for node in ["0", "1"] {
+        for filters in [
+            serde_json::json!([]),
+            serde_json::json!([{ "field": "city", "equals": "Bursa" }]),
+            serde_json::json!([{ "field": "id", "range": { "from": "1", "to": "30" } }]),
+        ] {
+            let (status, body) = send(
+                &router,
+                post(
+                    "/_zeyn/grid",
+                    "shop.read",
+                    serde_json::json!({ "screen": "ankara_goods", "node": node, "query": { "page": { "type": "offset", "offset": 4, "limit": 99 }, "filters": filters } }),
+                ),
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK, "{body}");
+            let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+            let rows = json["rows"].as_str().unwrap();
+            assert!(
+                rows.contains(" in Ankara") && !rows.contains(" in Bursa"),
+                "node {node} with {filters}: {rows}"
+            );
+        }
+    }
 }
 
 #[tokio::test]

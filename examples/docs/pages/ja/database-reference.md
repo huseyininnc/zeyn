@@ -130,6 +130,37 @@ db.migrate_dir("./migrations").await?;
 
 `get(key)` は 1 行を読み取り、該当する行がなければ `Error::NotFound` で失敗します。テーブルやビューは、エンティティを通じてどれでも読み取れます。たとえば Oracle の `user_sequences` です。
 
+## 手書きのクエリ
+
+類似度検索、結合など、`find` では表現できないクエリは `db.query::<M>(sql, args)` を通します。`M` は `#[model]` またはエンティティで、フィールドは `find` と同じ変換で、同じ名前の列から読み取られます。SQL は文字列リテラルでなければならないため、値はパラメータ（PostgreSQL では `$1`、`$2`、Oracle では `:1`、`:2`）としてのみ渡せます。`String` や `format!` はコンパイルできません。
+
+```rust
+#[model]
+pub struct Hit {
+    pub id: ItemId,
+    pub slug: String,
+    pub title: String,
+}
+
+#[action(public)]
+pub async fn search_items(q: String, db: Db) -> Result<Vec<Hit>> {
+    db.query(
+        "SELECT i.id, i.slug, i.title, similarity(i.search_key, $1) AS score \
+         FROM items i WHERE i.search_key % $1 \
+         ORDER BY score DESC, i.id LIMIT 20",
+        vec![zeyn::text::fold(&q).into()],
+    )
+    .await
+}
+```
+
+`search_key` には、アプリが行を保存するときに書き込む `zeyn::text::fold(&title)` が入っているため、キーと畳み込み済みの検索テキストは同じ形で比較されます（`İ` と `ı` は `i`、アクセントなし、小文字）。この例には `CREATE EXTENSION pg_trgm` とトライグラムインデックス `CREATE INDEX items_search_key ON items USING gin (search_key gin_trgm_ops)` が必要です。`score` のようにモデルにフィールドがない列は、データベースが読み取って破棄します。
+
+- `query_one` は 1 行または `None` を返します。2 行以上はエラーです。
+- 読み込まれるのは最大 `QUERY_ROW_CAP`（1000）行です。文は `SELECT <fields> FROM (<sql>) zeyn_q LIMIT 1001` で包まれるため、上限を 1 行でも超えるとリストが黙って増えるのではなく、その旨を伝えるエラーになります。`query_max(sql, args, n)` は別の上限を設定します。
+- 列のないフィールドや、型の違う列はエラーです。
+- プールの文タイムアウトが適用されます。`Tx` にも同じ 3 つの呼び出しがあります。
+
 ## カーソル
 
 番号付きページはオフセットを使います。無限スクロールと仮想スクロールはキーセットカーソルを使います。これは、リストの深い位置でも遅くならず、他の人が行を挿入しても行を飛ばしたり重複させたりしません。
@@ -179,7 +210,7 @@ tx.commit().await?;
 
 - 識別子（テーブル名と列名）は、エンティティからのみ取得されます。`E::TABLE` とその `FieldMeta` のリストです。クライアントがフィルターや並べ替えで送る名前は、そのリストで検索され、そこにない場合は破棄されます。すべての識別子は、検証（英字、数字、`_`、最大でも Dialect の長さまで）されたうえで、引用符で囲まれます。
 - 値は常にバインドパラメータです。`LIKE` パターン、カーソルの値、上限、オフセットも含みます。値が SQL テキストに書き込まれることは一切ありません。
-- 手書きの SQL は `execute(&'static str, args)` を通します。文はリテラルでなければなりません。
+- 手書きの SQL は `execute(&'static str, args)` と `query(&'static str, args)` を通します。文はリテラルでなければなりません。
 - 上限は、クライアントが何を要求してもサーバー側で制限されます（`MAX_PAGE_SIZE`、`MAX_FILTERS`、`MAX_SORT`、フィルターテキストの長さ、`any_of` のサイズ）。
 - ドライバーのエラーは `Error::Internal` としてログに記録され、ユーザーには決して表示されません。接続 URL は `Secret` として読み取られ、ログには決して出力されません。
 

@@ -131,6 +131,37 @@ db.migrate_dir("./migrations").await?;
 
 `get(key)` 读取一行，没有时以 `Error::NotFound` 失败。任何表或视图都可以通过 entity 读取，例如 Oracle 的 `user_sequences`。
 
+## 手写查询
+
+按相似度搜索、联接以及 `find` 无法表达的其他查询，通过 `db.query::<M>(sql, args)` 执行。`M` 是任意 `#[model]` 或 entity；其字段从同名列读取，转换方式与 `find` 相同。SQL 必须是字符串字面量，因此值只能作为参数传入（PostgreSQL 中为 `$1`、`$2`，Oracle 中为 `:1`、`:2`）；`String` 或 `format!` 无法编译。
+
+```rust
+#[model]
+pub struct Hit {
+    pub id: ItemId,
+    pub slug: String,
+    pub title: String,
+}
+
+#[action(public)]
+pub async fn search_items(q: String, db: Db) -> Result<Vec<Hit>> {
+    db.query(
+        "SELECT i.id, i.slug, i.title, similarity(i.search_key, $1) AS score \
+         FROM items i WHERE i.search_key % $1 \
+         ORDER BY score DESC, i.id LIMIT 20",
+        vec![zeyn::text::fold(&q).into()],
+    )
+    .await
+}
+```
+
+`search_key` 保存 `zeyn::text::fold(&title)` 的结果，由应用在保存该行时写入，这样键与折叠后的搜索文本以同样的形式比较（`İ` 和 `ı` 视为 `i`，无重音，小写）。该示例需要 `CREATE EXTENSION pg_trgm` 和一个 trigram 索引：`CREATE INDEX items_search_key ON items USING gin (search_key gin_trgm_ops)`。model 中没有对应字段的列，例如 `score`，会由数据库读取后丢弃。
+
+- `query_one` 返回唯一的一行或 `None`；多于一行则是错误。
+- 最多读取 `QUERY_ROW_CAP`（1000）行。语句被包装为 `SELECT <fields> FROM (<sql>) zeyn_q LIMIT 1001`，因此超出上限一行就是一个明确说明此事的错误，而不是悄悄变长的列表；`query_max(sql, args, n)` 可设置其他上限。
+- 没有对应列的字段，或类型错误的列，都是错误。
+- 连接池的语句超时同样适用。`Tx` 有相同的三个调用。
+
 ## 游标
 
 编号分页使用偏移量。无限滚动和虚拟滚动使用键集（keyset）游标，它在列表深处不会变慢，也不会在他人插入数据时跳过或重复行：
@@ -180,7 +211,7 @@ tx.commit().await?;
 
 - 标识符（表名和列名）只来自 entity：`E::TABLE` 及其 `FieldMeta` 列表。客户端在筛选和排序中发送的名称会在该列表中查找，不在其中的会被丢弃。每个标识符都会被检查（字母、数字、`_`，长度不超过方言的限制）并加引号。
 - 值始终是绑定参数，包括 `LIKE` 模式、游标值、limit 和 offset。任何值都不会被写入 SQL 文本。
-- 手写的 SQL 通过 `execute(&'static str, args)` 执行：语句必须是字面量。
+- 手写的 SQL 通过 `execute(&'static str, args)` 和 `query(&'static str, args)` 执行：语句必须是字面量。
 - 限制在服务器上被钳制（`MAX_PAGE_SIZE`、`MAX_FILTERS`、`MAX_SORT`、筛选文本长度、`any_of` 大小），无论客户端要求什么。
 - 驱动错误会作为 `Error::Internal` 记录日志，绝不展示给用户。连接 URL 作为 `Secret` 读取，绝不记录日志。
 

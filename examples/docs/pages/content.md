@@ -58,7 +58,7 @@ AutoGrid::new()
 
 ## List
 
-Rows one under the other in a `<ul>`. Each `ListItem` has a title and may have a small leading image (the same safe addresses as card images: a path, `https:` or `data:image/`), a subtitle and short meta text at the end. With `.link(screen, params)` the whole row is one link, so it is one stop in the tab order with a visible focus ring, and it opens without a page reload. Long text wraps; on phones the meta text moves under the title, and right to left pages mirror the row.
+Rows one under the other in a `<ul>`. Each `ListItem` has a title and may have a small leading image (the same safe addresses as card images: a path, `https:` or `data:image/`), a subtitle and short meta at the end: text, or an inline component such as `RelativeTime`. With `.link(screen, params)` the whole row is one link, so it is one stop in the tab order with a visible focus ring, and it opens without a page reload. Long text wraps; on phones the meta text moves under the title, and right to left pages mirror the row.
 
 `List::new()` holds the items it is given. `List::of(action)` loads rows through the same kind of action a DataGrid uses and pages like a [card grid](catalog.md#card-grid): 20 rows with a "Show more" button unless `paging` says otherwise, sort options, server side search with `.search(text)`, and the action's access checked for every page.
 
@@ -74,7 +74,7 @@ List::of(search_people)
         ListItem::new(p.name.clone())
             .image(p.photo.clone())
             .subtitle(p.city.clone())
-            .meta(p.joined.format(&locale))
+            .meta(RelativeTime::new(p.joined))
             .link(person, PersonParams { id: p.id })
     })
     .sort_option(t!("people.by_name"), Person::name, false)

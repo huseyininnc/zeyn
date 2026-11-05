@@ -38,8 +38,9 @@ Card::image(c.cover.clone(), c.title.clone())
     .horizontal()
 ```
 - **First page on the server.** The first page (24 cards in a card grid, 12 in a rail, or the size given to `paging`) is part of the page's HTML, so search engines and visitors without JavaScript see the cards and their links, and the images carry their size so nothing moves while they load. Later pages come from the browser. A public page stays the same HTML for every visitor, so it can be cached. A card linked to a screen with a route links to its canonical address (`/items/{slug}`), never to a redirect.
-- **Paging.** `Paging::infinite(n)` (the default, 24) shows a "Show more" button that also fires when it scrolls into view; focus moves to the first new card when the button is pressed. `Paging::pages(n)` shows previous and next buttons and the page number. The server sets the page size; the client only says where to continue.
+- **Paging.** `Paging::infinite(n)` (the default, 24) shows a "Show more" button that also fires when it scrolls into view; focus moves to the first new card when the button is pressed. `Paging::pages(n)` shows previous and next buttons and the page number: "Page 2 of 5" when the action returns a total, "Page 2" when it does not, and then Next works as long as the action returns a cursor. The server sets the page size; the client only says where to continue.
 - **Sorting.** Each `sort_option` is an order users can pick from a select; the first is the order the cards start in. The server accepts only these orders, and drops filters and search text sent by the client.
+- **Scope.** `.scope(field, value)` keeps only the rows whose field has that value, on every request, like [`DataGrid::scope`](datagrid.md): `.scope(Article::author_id, author.id)` for the articles of one author. Card grids, rails and data bound lists drop every filter the client sends, so the client can neither change nor remove the scope. Text compares ignoring case.
 - **Search.** `.search(text)` shows only rows that match the free text ([`DataQuery::q`](#free-text)), such as the text of a results screen.
 - **Masked fields.** Cards are built by a closure that sees the raw row. For a model with `#[mask]` fields, only users who may reveal them get the cards; everyone else gets `Forbidden`. Use a model without masked fields for public cards.
 
@@ -95,4 +96,14 @@ The results screen takes `SearchParams` (`q`, empty when the screen is opened fr
 
 ## Free text
 
-`DataQuery::q` is free text: rows whose text fields contain it, ignoring case. The Turkish dotted and dotless `i` (`İ`, `ı`) match `i`, so "istanbul" finds "İSTANBUL". Fields with `#[mask]` are never searched, blank text matches every row and text longer than 100 characters is ignored. `DataQuery::apply` and the SQL data layers (`LOWER(TRANSLATE(column, 'İı', 'ii')) LIKE ...` with bound parameters) read it the same way.
+`DataQuery::q` is free text: rows whose text fields contain it. Both the text and the fields are compared in the form `zeyn::text::fold` gives: lower case, the Turkish dotted and dotless `i` (`İ`, `ı`) as `i`, accented Latin letters without their accents, and `ß`, `æ`, `œ`, `þ` written out. So "istanbul" finds "İSTANBUL", "nino" finds "Niño" and "strasse" finds "Straße". Fields with `#[mask]` are never searched, blank text matches every row and text longer than 100 characters is ignored. `DataQuery::apply` and the SQL data layers (`TRANSLATE`, `LOWER` and `REPLACE` over the column, `LIKE` with a bound parameter) read it the same way.
+
+```rust
+use zeyn::text::fold;
+
+assert_eq!(fold("İSTANBUL Işık"), "istanbul isik");
+assert_eq!(fold("Año Pequeño"), "ano pequeno");
+assert_eq!(fold("Straße MÜLLER"), "strasse muller");
+```
+
+Use `fold` also for a search key column that the app writes itself, such as the trigram column of a [hand written query](database.md), so the key matches what users type. Punctuation and other scripts stay as they are; `Slug::from_title` is the form for addresses.

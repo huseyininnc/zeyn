@@ -58,7 +58,7 @@ AutoGrid::new()
 
 ## List
 
-一行接一行排列，位于一个 `<ul>` 中。每个 `ListItem` 有一个标题，还可以有一张开头的小图片（与卡片图片相同的安全地址：路径、`https:` 或 `data:image/`）、一个副标题和末尾的简短附注文本。使用 `.link(screen, params)` 时，整行就是一个链接，因此在 Tab 顺序中只占一个位置，有可见的焦点环，并且无需重新加载页面即可打开。长文本会换行；在手机上附注文本移到标题下方，从右到左的页面中该行会镜像。
+一行接一行排列，位于一个 `<ul>` 中。每个 `ListItem` 有一个标题，还可以有一张开头的小图片（与卡片图片相同的安全地址：路径、`https:` 或 `data:image/`）、一个副标题和末尾的简短附注：文本，或 `RelativeTime` 这样的行内组件。使用 `.link(screen, params)` 时，整行就是一个链接，因此在 Tab 顺序中只占一个位置，有可见的焦点环，并且无需重新加载页面即可打开。长文本会换行；在手机上附注文本移到标题下方，从右到左的页面中该行会镜像。
 
 `List::new()` 保存传给它的项。`List::of(action)` 通过与 DataGrid 相同类型的 action 加载行，并像[卡片网格](catalog.md#card-grid)一样分页：除非 `paging` 另有设置，否则每次 20 行并带有“Show more”按钮，还有排序选项、用 `.search(text)` 实现的服务器端搜索，并且每一页都会检查该 action 的访问权限。
 
@@ -74,7 +74,7 @@ List::of(search_people)
         ListItem::new(p.name.clone())
             .image(p.photo.clone())
             .subtitle(p.city.clone())
-            .meta(p.joined.format(&locale))
+            .meta(RelativeTime::new(p.joined))
             .link(person, PersonParams { id: p.id })
     })
     .sort_option(t!("people.by_name"), Person::name, false)

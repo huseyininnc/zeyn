@@ -35,7 +35,13 @@ Una acción de lista recibe un `DataQuery` y devuelve `Page<M>`:
 | `time_zone` | Zona para los filtros de fecha en columnas `DateTime`, fijada por el servidor |
 | `group` | Agrupa las filas por un campo, fijado por la tabla |
 
-`DataQuery::apply(vec)` lo hace todo en memoria. Para una base de datos SQL usa `zeyn::sql`: `Db::find` convierte la misma consulta en `WHERE`, `ORDER BY`, `LIMIT` y `GROUP BY` para PostgreSQL u Oracle. Solo se pueden filtrar u ordenar los campos propios de la entidad, cada valor se enlaza como parámetro y el servidor limita el tamaño de página, de modo que la entrada del cliente nunca llega al texto SQL. Escribe SQL a mano solo para las consultas que `Db::find` no puede expresar, y entonces no pegues nunca en él un nombre de campo o un valor del cliente.
+`DataQuery::apply(vec)` lo hace todo en memoria. Para una base de datos SQL usa `zeyn::sql`: `Db::find` convierte la misma consulta en `WHERE`, `ORDER BY`, `LIMIT` y `GROUP BY` para PostgreSQL u Oracle. Solo se pueden filtrar u ordenar los campos propios de la entidad, cada valor se enlaza como parámetro y el servidor limita el tamaño de página, de modo que la entrada del cliente nunca llega al texto SQL. Escribe SQL a mano solo para las consultas que `Db::find` no puede expresar: `Db::query::<M>(sql, args)` lee las filas de un `SELECT` en un modelo, acepta el SQL solo como literal de cadena y cada valor solo como parámetro, y lee como máximo 1000 filas.
+
+```rust
+let hits: Vec<Hit> = db
+    .query("SELECT id, title FROM items WHERE title % $1 ORDER BY similarity(title, $1) DESC LIMIT 20", vec![q.into()])
+    .await?;
+```
 
 ```toml
 zeyn = { version = "0.0.7", features = ["postgres"] }   # or ["oracle"]

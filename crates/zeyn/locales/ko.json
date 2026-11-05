@@ -234,6 +234,7 @@
         "sort": "정렬 기준",
         "pages": "페이지",
         "page": "{pages}페이지 중 {page}페이지",
+        "page_only": "{page}페이지",
         "previous_page": "이전 페이지",
         "next_page": "다음 페이지",
         "previous": "뒤로 스크롤",

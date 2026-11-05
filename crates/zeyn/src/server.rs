@@ -1863,8 +1863,9 @@ enum Failure {
     App(Error),
     Timeout,
     Status(StatusCode, &'static str, Text),
-    /// The screen answered [`Screen::moved_to`]: a permanent redirect to this screen and params.
-    Moved(&'static str, Json),
+    /// The screen answered [`Screen::moved_to`] (permanent) or [`Screen::redirect`]: a redirect
+    /// to this screen and params.
+    Moved(&'static str, Json, bool),
 }
 
 impl From<Error> for Failure {
@@ -2261,8 +2262,8 @@ impl AppState {
             }
             other => other?,
         };
-        if let Some((to, params)) = screen.take_moved() {
-            return Err(Failure::Moved(to, params));
+        if let Some((to, params, permanent)) = screen.take_moved() {
+            return Err(Failure::Moved(to, params, permanent));
         }
         Ok((feature, entry, screen))
     }
@@ -3157,8 +3158,22 @@ async fn page(
             Redirect::to(&format!("{target}{sep}return_to={}", encode(&here))).into_response()
         }
         Err(Failure::Status(_, "reason_required", _)) => data::reason_page(&st, &ctx, name, &csrf),
-        Err(Failure::Moved(to, params)) => match st.page_url(to, &params) {
+        Err(Failure::Moved(to, params, true)) => match st.page_url(to, &params) {
             Some(url) => (StatusCode::MOVED_PERMANENTLY, [(header::LOCATION, url)]).into_response(),
+            None => {
+                st.error_screen(&ctx, Failure::App(Error::NotFound), &csrf, partial)
+                    .await
+            }
+        },
+        Err(Failure::Moved(to, params, false)) => match st.page_url(to, &params) {
+            Some(url) => (
+                StatusCode::SEE_OTHER,
+                [
+                    (header::LOCATION, url),
+                    (header::CACHE_CONTROL, "no-store".to_string()),
+                ],
+            )
+                .into_response(),
             None => {
                 st.error_screen(&ctx, Failure::App(Error::NotFound), &csrf, partial)
                     .await

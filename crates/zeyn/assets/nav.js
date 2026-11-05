@@ -99,6 +99,7 @@ async function visit(url, push) {
   const finalUrl = new URL(res.url || url.href);
   if (url.hash && !finalUrl.hash) finalUrl.hash = url.hash;
   if (push) history.pushState({ zeyn: true }, '', finalUrl.href);
+  else if (res.redirected) history.replaceState({ zeyn: true }, '', finalUrl.href);
   const title = res.headers.get('x-zeyn-title');
   if (title) document.title = decodeURIComponent(title);
   main.innerHTML = html;
@@ -178,6 +179,8 @@ async function swapFrame(url, push, hash) {
     const finalUrl = new URL(res.url || url.href);
     if (hash && !finalUrl.hash) finalUrl.hash = hash;
     history.pushState({ zeyn: true }, '', finalUrl.href);
+  } else if (res.redirected) {
+    history.replaceState({ zeyn: true }, '', res.url);
   }
   document.documentElement.lang = doc.documentElement.lang;
   if (doc.documentElement.dir) document.documentElement.dir = doc.documentElement.dir;

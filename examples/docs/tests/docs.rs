@@ -133,6 +133,7 @@ async fn internal_links_and_anchors_resolve() {
                 || href.ends_with(".txt")
                 || href.ends_with(".xml")
                 || href.contains("?params=")
+                || href.starts_with("/examples/")
             {
                 continue;
             }

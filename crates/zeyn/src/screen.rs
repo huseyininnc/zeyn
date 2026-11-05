@@ -783,6 +783,38 @@ impl Node {
     }
 }
 
+/// Plain text where a node is expected, escaped and in the user's language, so a slot that takes
+/// any inline component, such as [`crate::ui::ListItem::meta`], also takes text.
+struct TextNode(Text);
+
+impl Component for TextNode {
+    fn render(&self, out: &mut String, r: &Render) {
+        out.push_str(&r.text(&self.0));
+    }
+
+    fn schema(&self) -> serde_json::Value {
+        json!({ "type": "text", "text": self.0 })
+    }
+}
+
+impl From<Text> for Node {
+    fn from(text: Text) -> Self {
+        Node::new(TextNode(text))
+    }
+}
+
+impl From<&'static str> for Node {
+    fn from(text: &'static str) -> Self {
+        Node::new(TextNode(text.into()))
+    }
+}
+
+impl From<String> for Node {
+    fn from(text: String) -> Self {
+        Node::new(TextNode(text.into()))
+    }
+}
+
 /// Icons.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -1029,7 +1061,7 @@ pub struct Screen {
     toolbar: Option<Toolbar>,
     body: Vec<Node>,
     menu: Option<crate::menu::ContextMenu>,
-    moved: Option<(&'static str, serde_json::Value)>,
+    moved: Option<(&'static str, serde_json::Value, bool)>,
     head: Option<Box<crate::seo::Head>>,
 }
 
@@ -1058,13 +1090,34 @@ impl Screen {
     /// ```
     pub fn moved_to<S: ScreenDef>(_screen: S, params: S::Params) -> Self {
         Self {
-            moved: Some((S::META.name, params_json(&params))),
+            moved: Some((S::META.name, params_json(&params), true)),
             ..Self::new("")
         }
     }
 
-    /// Screen and params of [`Screen::moved_to`], if this screen moved.
-    pub(crate) fn take_moved(&mut self) -> Option<(&'static str, serde_json::Value)> {
+    /// Sends the browser on to another screen for this one request, such as a random pick or the
+    /// newest item: `303 See Other` to the target's canonical path, never cached. In app
+    /// navigation follows it without a page load and the address bar shows the target. The
+    /// target is a typed screen with a route, so an address from outside can never be one; params
+    /// of the wrong type do not compile. For an address that changed for good, use
+    /// [`Screen::moved_to`].
+    ///
+    /// ```ignore
+    /// #[screen(route = "/random", public)]
+    /// pub async fn random(store: Store) -> Result<Screen> {
+    ///     let item = store.random().await?.ok_or(Error::NotFound)?;
+    ///     Ok(Screen::redirect(item_page, ItemParams { slug: item.slug }))
+    /// }
+    /// ```
+    pub fn redirect<S: ScreenDef>(_screen: S, params: S::Params) -> Self {
+        Self {
+            moved: Some((S::META.name, params_json(&params), false)),
+            ..Self::new("")
+        }
+    }
+
+    /// Screen, params and permanence of [`Screen::moved_to`] or [`Screen::redirect`], if any.
+    pub(crate) fn take_moved(&mut self) -> Option<(&'static str, serde_json::Value, bool)> {
         self.moved.take()
     }
 

@@ -4,6 +4,7 @@
 
 use super::{ChatEvent, ChatRequest, ChatStream, LlmProvider, Role, STREAM_BUFFER, ToolCall};
 use crate::ctx::BoxFuture;
+use crate::text::fold;
 use serde_json::Value as Json;
 use std::time::Duration;
 
@@ -49,16 +50,6 @@ pub struct ScriptedProvider {
     rules: Vec<(Vec<String>, Vec<Vec<Say>>)>,
     otherwise: Vec<Vec<Say>>,
     delay: Duration,
-}
-
-/// Lower case without the dot of `İ` and with `ı` read as `i`, so `İzmir`, `IZMIR` and `izmir`
-/// match.
-fn fold(text: &str) -> String {
-    text.to_lowercase()
-        .chars()
-        .filter(|c| *c != '\u{307}')
-        .map(|c| if c == 'ı' { 'i' } else { c })
-        .collect()
 }
 
 impl ScriptedProvider {

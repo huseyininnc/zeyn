@@ -87,6 +87,18 @@ pub fn catalog_page(p: CatalogParams, store: Catalog) -> Result<Screen> {
 }
 ```
 
+`Screen::redirect(screen, params)` отправляет один запрос дальше на другой screen, например на случайный выбор или на самый новый элемент, при этом сам адрес остаётся действительным. Браузер получает `303 See Other` с каноническим путём цели и `Cache-Control: no-store`; навигация внутри приложения следует за ним без загрузки страницы, а адресная строка показывает цель. Цель всегда типизированный screen с маршрутом, поэтому перенаправление никогда не ведёт на адрес вне приложения, а цель, которую приложение не обслуживает, получает ответ 404.
+
+```rust
+#[screen(route = "/random", public)]
+pub async fn random_item(store: Catalog) -> Result<Screen> {
+    let item = store.random().await?.ok_or(Error::NotFound)?;
+    Ok(Screen::redirect(catalog_page, CatalogParams { slug: item.slug, n: item.n }))
+}
+```
+
+@live redirect
+
 ## Доступ
 
 | Параметр | Значение |

@@ -38,8 +38,9 @@ Card::image(c.cover.clone(), c.title.clone())
     .horizontal()
 ```
 - **Primera página en el servidor.** La primera página (24 tarjetas en una cuadrícula, 12 en un rail, o el tamaño indicado en `paging`) forma parte del HTML de la página, así que los buscadores y los visitantes sin JavaScript ven las tarjetas y sus enlaces, y las imágenes llevan su tamaño para que nada se mueva al cargarse. Las páginas siguientes llegan desde el navegador. Una página pública es el mismo HTML para todos los visitantes, así que puede almacenarse en caché. Una tarjeta enlazada a una screen con ruta enlaza a su dirección canónica (`/items/{slug}`), nunca a una redirección.
-- **Paginación.** `Paging::infinite(n)` (el valor por defecto, 24) muestra un botón "Show more" que también se activa cuando entra en la vista al desplazarse; el foco pasa a la primera tarjeta nueva cuando se pulsa el botón. `Paging::pages(n)` muestra los botones anterior y siguiente y el número de página. El servidor fija el tamaño de página; el cliente solo indica dónde continuar.
+- **Paginación.** `Paging::infinite(n)` (el valor por defecto, 24) muestra un botón "Show more" que también se activa cuando entra en la vista al desplazarse; el foco pasa a la primera tarjeta nueva cuando se pulsa el botón. `Paging::pages(n)` muestra los botones anterior y siguiente y el número de página: "Page 2 of 5" cuando la action devuelve un total, "Page 2" cuando no, y entonces Siguiente funciona mientras la action devuelva un cursor. El servidor fija el tamaño de página; el cliente solo indica dónde continuar.
 - **Ordenación.** Cada `sort_option` es un orden que los usuarios pueden elegir en un select; el primero es el orden con el que empiezan las tarjetas. El servidor acepta solo estos órdenes y descarta los filtros y el texto de búsqueda que envíe el cliente.
+- **Alcance.** `.scope(field, value)` conserva solo las filas cuyo campo tiene ese valor, en cada petición, como [`DataGrid::scope`](datagrid.md): `.scope(Article::author_id, author.id)` para los artículos de un autor. Las cuadrículas de tarjetas, los rails y las listas enlazadas a datos descartan todos los filtros que envía el cliente, de modo que el cliente no puede cambiar ni quitar el alcance. El texto se compara sin distinguir mayúsculas de minúsculas.
 - **Búsqueda.** `.search(text)` muestra solo las filas que coinciden con el texto libre ([`DataQuery::q`](#free-text)), como el texto de una pantalla de resultados.
 - **Campos enmascarados.** Las tarjetas las construye un closure que ve la fila sin procesar. Para un modelo con campos `#[mask]`, solo los usuarios que pueden revelarlos reciben las tarjetas; todos los demás reciben `Forbidden`. Usa un modelo sin campos enmascarados para las tarjetas públicas.
 
@@ -96,4 +97,14 @@ La pantalla de resultados recibe `SearchParams` (`q`, vacío cuando la pantalla 
 
 ## Texto libre
 
-`DataQuery::q` es texto libre: filas cuyos campos de texto lo contienen, sin distinguir mayúsculas de minúsculas. La `i` turca con punto y sin punto (`İ`, `ı`) coincide con `i`, así que "istanbul" encuentra "İSTANBUL". Los campos con `#[mask]` nunca se buscan, un texto en blanco coincide con todas las filas y un texto de más de 100 caracteres se ignora. `DataQuery::apply` y las capas de datos SQL (`LOWER(TRANSLATE(column, 'İı', 'ii')) LIKE ...` con parámetros enlazados) lo leen de la misma manera.
+`DataQuery::q` es texto libre: filas cuyos campos de texto lo contienen. Tanto el texto como los campos se comparan en la forma que da `zeyn::text::fold`: minúsculas, la `i` turca con punto y sin punto (`İ`, `ı`) como `i`, las letras latinas acentuadas sin sus acentos, y `ß`, `æ`, `œ`, `þ` escritas con letras. Así, "istanbul" encuentra "İSTANBUL", "nino" encuentra "Niño" y "strasse" encuentra "Straße". Los campos con `#[mask]` nunca se buscan, un texto en blanco coincide con todas las filas y un texto de más de 100 caracteres se ignora. `DataQuery::apply` y las capas de datos SQL (`TRANSLATE`, `LOWER` y `REPLACE` sobre la columna, `LIKE` con un parámetro enlazado) lo leen de la misma manera.
+
+```rust
+use zeyn::text::fold;
+
+assert_eq!(fold("İSTANBUL Işık"), "istanbul isik");
+assert_eq!(fold("Año Pequeño"), "ano pequeno");
+assert_eq!(fold("Straße MÜLLER"), "strasse muller");
+```
+
+Usa `fold` también para una columna de clave de búsqueda que la app escribe por sí misma, como la columna de trigramas de una [consulta escrita a mano](database.md), para que la clave coincida con lo que escriben los usuarios. La puntuación y otras escrituras se mantienen como están; `Slug::from_title` es la forma para las direcciones.
