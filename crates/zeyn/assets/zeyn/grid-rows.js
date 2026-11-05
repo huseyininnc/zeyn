@@ -106,7 +106,7 @@ function confirmed(button, s) {
   const message = button?.dataset.zeynConfirm;
   if (!message) return Promise.resolve(true);
   const t = s?.texts ?? {};
-  return new Promise((resolve) => {
+  return loadModule('components').then(() => new Promise((resolve) => {
     const detail = {
       title: t.confirm_title || '',
       message,
@@ -116,7 +116,7 @@ function confirmed(button, s) {
       resolve,
     };
     if (!ask('zeyn:confirm', detail)) resolve(window.confirm(message));
-  });
+  }));
 }
 
 /**
