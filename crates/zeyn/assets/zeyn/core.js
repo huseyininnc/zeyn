@@ -13,7 +13,7 @@ const BASE = (document.querySelector('meta[name="zeyn-base"]')?.content ?? '').r
 const TOAST_MS = 4000;
 /** Most toasts shown at once (`MAX_TOASTS` on the server); the oldest goes first. */
 const MAX_TOASTS = 3;
-const FILTER_DELAY_MS = 300;
+const FILTER_DELAY_MS = 150;
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 const UNREACHABLE = 'The server could not be reached.';
@@ -427,11 +427,33 @@ async function runEffects(effects, source) {
   for (const effect of effects ?? []) await runEffect(effect, source);
 }
 
+/** Requests that keep the page pending (`html[data-zeyn-loading]`): windows and form submits. */
+let pendingCount = 0;
+
+/**
+ * Runs `work` with the page marked pending, the same mark `nav.js` sets while a screen loads:
+ * `zeyn.css` shows a progress bar after 150 ms, so quick answers never flash.
+ */
+async function whilePending(work) {
+  pendingCount++;
+  document.documentElement.setAttribute('data-zeyn-loading', '');
+  try {
+    return await work();
+  } finally {
+    if (--pendingCount === 0) document.documentElement.removeAttribute('data-zeyn-loading');
+  }
+}
+
+/** Opens a window, with the page pending until it shows. */
+function openWindow(screen, params, opener) {
+  return whilePending(() => loadWindow(screen, params, opener));
+}
+
 /**
  * Loads a screen fragment into a modal `<dialog>` on top of the stack.
  * The native dialog carries the dialog role, so the role is removed from the inner window.
  */
-async function openWindow(screen, params, opener) {
+async function loadWindow(screen, params, opener) {
   let res;
   try {
     res = await fetch(`${BASE}/_zeyn/screen/${encodeURIComponent(screen)}${paramsQuery(params)}`, {

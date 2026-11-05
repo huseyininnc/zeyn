@@ -119,7 +119,7 @@ async function submitForm(form, submitter) {
   if (button) button.disabled = true;
   form.setAttribute('aria-busy', 'true');
   try {
-    const r = await post(BASE + '/_zeyn/form', { ...address(form), values: formValues(form) });
+    const r = await whilePending(() => post(BASE + '/_zeyn/form', { ...address(form), values: formValues(form) }));
     if (r.status === 422) showErrors(form, r.data?.errors ?? []);
     else if (r.ok) await runEffects(r.data?.effects, form);
   } finally {

@@ -59,8 +59,26 @@ function replaceHead(tags) {
   document.head.append(...tags);
 }
 
-/** Loads a screen into `#z-main`. Falls back to a full page load whenever that is safer. */
+/** Number of the latest `visit`, so only it clears the pending state. */
+let visits = 0;
+
+/**
+ * Loads a screen into `#z-main`. The pending state shows in the frame of the click: the link of
+ * the target is marked current and `html[data-zeyn-loading]` is set, which `zeyn.css` turns into
+ * a progress bar only when the answer takes longer than 150 ms.
+ */
 async function visit(url, push) {
+  const seq = ++visits;
+  document.documentElement.setAttribute('data-zeyn-loading', '');
+  try {
+    await swapScreen(url, push);
+  } finally {
+    if (seq === visits) document.documentElement.removeAttribute('data-zeyn-loading');
+  }
+}
+
+/** Swaps the screen of `url` in. Falls back to a full page load whenever that is safer. */
+async function swapScreen(url, push) {
   const main = document.getElementById('z-main');
   if (!main) {
     location.assign(url.href);
@@ -71,6 +89,7 @@ async function visit(url, push) {
   controller = new AbortController();
   const { signal } = controller;
   main.setAttribute('aria-busy', 'true');
+  markCurrent(url);
   let res;
   try {
     res = (await takePrefetched(url)) ?? await fetch(url.href, {

@@ -265,6 +265,7 @@ Effects：
 - 键盘：方向键在 grid 行之间移动，Enter 打开一行，Escape 关闭最上层的 dialog，来自 `aria-keyshortcuts` 的快捷键在除文本输入框之外的任何位置都有效。在 grid 中：Space 选择该行，F2 编辑，Ctrl+Z 撤销上一次编辑，Shift+F10 或上下文菜单键打开该行或表头的菜单，Shift+点击按多列排序，Right 和 Left（在从右到左的页面中镜像）打开和关闭行的详情、分组或子项，在子行上按 Left 回到其父行。在某一行上按 Right 进入其单元格：方向键、Home、End、Ctrl+Home、Ctrl+End、Tab 和 Shift+Tab 移动单元格光标，Shift 扩展范围（单元格上的 `aria-selected`），Ctrl+C 把该范围复制为以制表符分隔的文本，Ctrl+V 粘贴到可编辑单元格，每个变更的行对应一次 `POST /_zeyn/grid/edit`。有 40 列或更多列的 grid 只在页面中保留视野内的列（带固定宽度的 `colgroup`，带 `colspan` 的 `td.z-col-gap` 占位单元格，单元格上的 `aria-colindex`）。
 - 在定义了 Zeyn 菜单的地方，右键会打开该菜单（表头、带 `data-zeyn-menu` 的行、带 `data-zeyn-menu` 的 Screen）；其他任何地方保留浏览器自带的菜单。
 - dialog 打开时焦点移入其中，关闭时焦点回到打开它的元素。
+- 点击的同一帧内即显示等待状态：屏幕加载时 `nav.js` 将目标链接标记为当前并设置 `html[data-zeyn-loading]`，窗口和表单提交也会设置它；grid 在按下排序、翻页或筛选按键后立即淡化行（`aria-busy`）（筛选会再等待 150 ms 的按键，新请求会取消旧请求）。窗口顶部的细条只在响应超过 150 ms 时出现；它是固定定位的，不会让任何内容移动，在 `prefers-reduced-motion` 下不做动画。
 - 客户端检查（`required`、`minlength`、`maxlength`、`min`、`max`、`type="email"`）在提交前通过浏览器的约束验证 API 运行。服务端始终会再次校验。
 
 ## 7. Component library（组件库）
