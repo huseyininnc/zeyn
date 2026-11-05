@@ -34,7 +34,10 @@ fn sizes(dir: &Path, out: &mut Vec<(String, usize)>) {
         let path = entry.path();
         if path.is_dir() {
             sizes(&path, out);
-        } else if path.extension().is_some_and(|e| e == "rs") {
+        } else if path
+            .extension()
+            .is_some_and(|e| e == "rs")
+        {
             let text = fs::read_to_string(&path).unwrap_or_default();
             let lines = text
                 .lines()
@@ -49,7 +52,10 @@ fn sizes(dir: &Path, out: &mut Vec<(String, usize)>) {
 fn source_files_stay_small() {
     let max = max_file_lines();
     let mut files = Vec::new();
-    sizes(&Path::new(env!("CARGO_MANIFEST_DIR")).join("src"), &mut files);
+    sizes(
+        &Path::new(env!("CARGO_MANIFEST_DIR")).join("src"),
+        &mut files,
+    );
     let big: Vec<String> = files
         .into_iter()
         .filter(|(_, n)| *n > max)
