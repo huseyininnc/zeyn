@@ -182,7 +182,7 @@ Gösterge, tarayıcıda uzunluktan, karakter türlerinden ve bariz desenlerden h
 
 | | |
 |---|---|
-| Eklenen betik | `components.js` içinde maskeler, anahtar ve gösterge için yaklaşık 2 KB gzip (7 KB ham); decimal ve yüzde girişleri sayı kontrolünü kullanır |
+| Eklenen betik | `inputs.js` içinde maskeler, anahtar ve gösterge için yaklaşık 2 KB gzip (7 KB ham); decimal ve yüzde girişleri sayı kontrolünü kullanır |
 | DOM node'ları | maskeli giriş için 3, anahtarlı parola için 4, göstergeyle 11 |
 | İstekler | yazarken yok |
 | Sunucu denetimleri | `scale`, `precision`, `min`, `max` ve `mask` her kayıtta çalışır; sayfadan, API'den ve AI araçlarından aynı şekilde |

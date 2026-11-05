@@ -112,15 +112,21 @@ async function loadGrid(grid, kind) {
   const filters = filterList(s);
   const seq = ++s.seq;
   s.loading = true;
+  s.abort?.abort();
+  s.abort = new AbortController();
   grid.setAttribute('aria-busy', 'true');
   const layout = kind === 'layout';
   const totals = kind === 'reset' || kind === 'reload' || layout || (infinite && !append);
-  const r = await post(BASE + '/_zeyn/grid', {
-    ...address(grid),
-    query: { page, sort: s.sort, filters, with_total: !infinite, aggregates: totals ? aggregatesOf(grid, layout) : [] },
-    view: s.columns ? { columns: s.columns } : null,
-    head: layout,
-  });
+  const r = await post(
+    BASE + '/_zeyn/grid',
+    {
+      ...address(grid),
+      query: { page, sort: s.sort, filters, with_total: !infinite, aggregates: totals ? aggregatesOf(grid, layout) : [] },
+      view: s.columns ? { columns: s.columns } : null,
+      head: layout,
+    },
+    { signal: s.abort.signal },
+  );
   if (seq !== s.seq) return;
   s.loading = false;
   grid.removeAttribute('aria-busy');
@@ -138,6 +144,7 @@ async function loadGrid(grid, kind) {
     s.anchor = s.cursor = null;
     if (kind !== 'reload' && !layout) s.active = 0;
   }
+  loadModules(body);
   s.offset = offset;
   s.count = rows(grid).length;
   s.total = r.data.total ?? null;

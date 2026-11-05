@@ -2524,3 +2524,212 @@ async fn a_grid_over_a_computed_million_rows_loads_only_its_page() {
     assert_eq!(page.total, Some(1_000_000));
     assert_eq!(page.next.unwrap().0, "750025");
 }
+
+/// Person with a nullable name, for comparing sort orders with ties, nulls and Turkish letters.
+#[entity(table = "people")]
+pub struct Person {
+    #[key]
+    pub id: PersonId,
+    pub name: Option<String>,
+    pub city: String,
+    pub score: i64,
+}
+
+/// The order of `DataQuery::apply` before it read each sort value once: a stable sort that reads
+/// both values for every comparison, text by lower case then as written, nulls first, ties by
+/// the key.
+fn reference_order(rows: &[Person], sort: &[(usize, bool)]) -> Vec<i64> {
+    fn compare(a: &Value, b: &Value) -> std::cmp::Ordering {
+        use std::cmp::Ordering;
+        match (a, b) {
+            (Value::Null, Value::Null) => Ordering::Equal,
+            (Value::Null, _) => Ordering::Less,
+            (_, Value::Null) => Ordering::Greater,
+            (Value::Int(x), Value::Int(y)) => x.cmp(y),
+            (Value::Text(x), Value::Text(y)) => x
+                .to_lowercase()
+                .cmp(&y.to_lowercase())
+                .then_with(|| x.cmp(y)),
+            _ => Ordering::Equal,
+        }
+    }
+    let mut order = sort.to_vec();
+    order.push((0, false));
+    let mut rows = rows.to_vec();
+    rows.sort_by(|a, b| {
+        for (i, desc) in &order {
+            let o = compare(
+                &a.value_at(*i).unwrap_or(Value::Null),
+                &b.value_at(*i).unwrap_or(Value::Null),
+            );
+            let o = if *desc { o.reverse() } else { o };
+            if o.is_ne() {
+                return o;
+            }
+        }
+        std::cmp::Ordering::Equal
+    });
+    rows.iter().map(|p| p.id.0).collect()
+}
+
+#[test]
+fn sorted_pages_match_a_full_stable_sort_with_ties_nulls_and_turkish_text() {
+    let names = [
+        Some("ılık"),
+        Some("Ilık"),
+        Some("İpek"),
+        Some("ipek"),
+        Some("Çınar"),
+        Some("çınar"),
+        Some("Zeynep"),
+        Some("ÖMER"),
+        Some("ömer"),
+        None,
+        Some(""),
+        Some("ǅemal"),
+    ];
+    let cities = ["İzmir", "izmir", "Ankara", "ankara", "Şile"];
+    let people: Vec<Person> = (1..=500i64)
+        .rev()
+        .map(|i| {
+            let h = (i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) >> 33;
+            Person {
+                id: PersonId(i),
+                name: names[(h % names.len() as u64) as usize].map(String::from),
+                city: cities[(h / 16 % cities.len() as u64) as usize].to_string(),
+                score: (h % 7) as i64,
+            }
+        })
+        .collect();
+    let field = |i: usize| Person::fields()[i].name.to_string();
+    for sort in [
+        vec![(1, false)],
+        vec![(1, true)],
+        vec![(2, false), (1, true)],
+        vec![(3, true), (2, false)],
+        vec![],
+    ] {
+        let all = reference_order(&people, &sort);
+        for (offset, limit) in [(0, 25), (0, 500), (230, 40), (480, 50), (600, 10)] {
+            let q = DataQuery {
+                page: zeyn::PageRequest::Offset { offset, limit },
+                sort: sort
+                    .iter()
+                    .map(|(i, desc)| zeyn::Sort {
+                        field: field(*i),
+                        desc: *desc,
+                    })
+                    .collect(),
+                ..DataQuery::default()
+            };
+            let page = q.apply(people.clone());
+            let got: Vec<i64> = page
+                .items
+                .iter()
+                .map(|p| p.id.0)
+                .collect();
+            let start = (offset as usize).min(all.len());
+            let end = (start + limit as usize).min(all.len());
+            assert_eq!(got, all[start..end], "sort {sort:?}, offset {offset}");
+            assert_eq!(page.total, Some(500));
+            assert_eq!(page.next.is_some(), end < all.len());
+        }
+        let after = DataQuery {
+            page: zeyn::PageRequest::After {
+                cursor: Some(zeyn::Cursor("100".into())),
+                limit: 30,
+            },
+            sort: sort
+                .iter()
+                .map(|(i, desc)| zeyn::Sort {
+                    field: field(*i),
+                    desc: *desc,
+                })
+                .collect(),
+            with_total: true,
+            ..DataQuery::default()
+        };
+        let got: Vec<i64> = after
+            .apply(people.clone())
+            .items
+            .iter()
+            .map(|p| p.id.0)
+            .collect();
+        assert_eq!(got, all[100..130], "after cursor, sort {sort:?}");
+    }
+}
+
+/// More rows than `DataQuery::apply` sorts in place on a tokio worker (50,000).
+fn many_people() -> Vec<Person> {
+    (1..=50_010i64)
+        .map(|i| Person {
+            id: PersonId(i),
+            name: Some(format!("P{}", i % 977)),
+            city: String::new(),
+            score: i % 13,
+        })
+        .collect()
+}
+
+fn by_name_desc() -> DataQuery {
+    DataQuery {
+        sort: vec![zeyn::Sort {
+            field: "name".into(),
+            desc: true,
+        }],
+        ..DataQuery::default()
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn large_lists_sort_off_the_worker_on_the_multi_threaded_runtime() {
+    let page = by_name_desc().apply(many_people());
+    assert_eq!(page.total, Some(50_010));
+    assert_eq!(page.items[0].name.as_deref(), Some("P99"));
+    assert_eq!(page.items[0].id.0, 99);
+}
+
+#[tokio::test]
+async fn large_lists_sort_in_place_on_a_current_thread_runtime() {
+    let page = by_name_desc().apply(many_people());
+    assert_eq!(page.items[0].name.as_deref(), Some("P99"));
+}
+
+#[test]
+fn groups_keep_their_order_and_totals_after_the_cached_sort() {
+    let people: Vec<Person> = (1..=40i64)
+        .map(|i| Person {
+            id: PersonId(i),
+            name: None,
+            city: ["İzmir", "Ankara", "izmir", "Şile"][(i % 4) as usize].to_string(),
+            score: i,
+        })
+        .collect();
+    let q = DataQuery {
+        group: Some("city".into()),
+        aggregates: vec![AggregateRequest {
+            field: "score".into(),
+            op: Aggregate::Sum,
+        }],
+        ..DataQuery::default()
+    };
+    let page = q.apply(people);
+    let cities: Vec<String> = page
+        .groups
+        .iter()
+        .map(|g| match &g.value {
+            Value::Text(t) => t.clone(),
+            v => format!("{v:?}"),
+        })
+        .collect();
+    assert_eq!(cities, ["Ankara", "izmir", "İzmir", "Şile"]);
+    assert!(page.items.is_empty());
+    assert_eq!(
+        page.groups
+            .iter()
+            .map(|g| g.count)
+            .sum::<u64>(),
+        40
+    );
+    assert_eq!(page.totals[0].value, Value::Int(820));
+}

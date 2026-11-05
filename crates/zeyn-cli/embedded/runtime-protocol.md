@@ -38,7 +38,23 @@ The menu lists only the screens the current user may open. The current item has 
 
 Every framework script and stylesheet in the head carries `?v=` and the build id (`meta[name=zeyn-build]`, from `ZEYN_BUILD_ID` or a hash of the executable); `theme.css` carries a hash of the theme text. A request with the current value gets `Cache-Control: public, max-age=31536000, immutable`, so a warm page load asks for none of them; any other request (an old tab after a deploy, no `v`) gets `no-cache` and the ETag. Modules the runtime imports later take the same `v` from the URL of the script that imports them.
 
-Every page loads `zeyn.js` (requests, effects, windows, forms, menus, shortcuts and the event delegation), `nav.js`, `components.js` and, in the app shell, `pro.js` and `enterprise.js`. The rest loads only on pages that use it, also when `nav.js` swaps a screen in: `zeyn.js` imports the grid runtime `grid.js` the first time content holds a `[data-zeyn-grid]` (full pages with a grid name it in `<link rel="modulepreload">`), and `components.js` imports `catalog.js` (card grids, search boxes), `media.js` (players, embeds), `files.js` (uploads), `charts.js` and `assistant.js` (chat panels, or the first press of the launcher). Their stylesheets stay in the head, so nothing changes look when the script arrives. On the showcase dashboard this is 5 scripts and 258 KB (74 KB on the wire) instead of 9 scripts and 403 KB (116 KB).
+### 1.1 Browser modules
+
+A page loads and runs only the browser code its screen uses. Every page runs the core: `zeyn.js` (requests, effects, windows, forms, menus, shortcuts, the event delegation and the module loader), `nav.js` and `enterprise.js` (response hooks on `fetch` and the idle timeout of the session), 90 KB raw and 29 KB gzip together. Everything else is a module of a component, `/_zeyn/{name}.js` and for some `/_zeyn/{name}.css`, declared in `MODULES` of `crates/zeyn/src/server/modules.rs` with the markers its HTML carries: attribute names (`data-zeyn-date`) and classes (`z-select`), matched as whole names.
+
+| Module | Components |
+|---|---|
+| `components.js` | the shared part every control module imports: helpers, the popup and listbox cores, selects (the pickers of the app shell), confirm dialogs, alerts, breadcrumbs |
+| `tabs.js`, `dates.js`, `choices.js`, `inputs.js`, `lines.js`, `steps.js`, `tree.js`, `overlays.js`, `menubutton.js`, `busy.js` | panels, tabs and split panes; date and time pickers (also grid date filters); listboxes, lookups and multiple selects; numbers, growing text areas, masks and passwords; the lines editor; forms in steps; trees; tooltips and popovers; menu and split buttons; busy overlays |
+| `grid.js` | grids, linked as `<link rel="modulepreload">` because `zeyn.js` imports it itself |
+| `palette.js`, `pro.js` | the command palette and command buttons; menu bars, toolboxes, status bars, docks and property inspectors |
+| `forms.js`, `reveal.js`, `import.js` | drafts and workflow transitions of forms; revealing masked values; imports |
+| `catalog.js`, `media.js`, `files.js`, `charts.js` and their stylesheets | card grids, rails and search boxes; players, embeds and images; uploads; charts, sparklines, KPI cards and bullets |
+| `share.js`, `chips.js`, `reactions.js`, `hero.js`, `state.js`, `preview.js`, `assistant.js` | share buttons, filter chips, reactions, hero slides, the preference store, card previews (first hover), the assistant (chat panels, or the first press of the launcher) |
+
+A full page links, in its head, the stylesheets every page uses (`zeyn.css`, `components.css`, `content.css`, `pro.css`, `enterprise.css`), the stylesheets of the modules whose markers are in its HTML, and their scripts after the modules they import. `zeyn.js` is served with the same table (`[name, script selector, style selector]`) and loads what is missing when content arrives later: `nav.js` fires `zeyn:need` with `{ root, waits }` before it swaps a screen in and waits for the new stylesheets, windows wait the same way before they open, and `zeyn:content`, grid pages and grid filters load the scripts of what they hold. The browser keeps one instance per URL, so a module runs once. A module sets up what it finds in the document when it runs and listens to `zeyn:content` after that; it never scans for, or listens to, components that are not on the page. Modules import the shared part with the `?v=` of their own URL. `tests/ui_modules.rs` fails when a page links a module it does not use or a module stylesheet styles a class outside its markers.
+
+Measured on the showcase (raw, wire with gzip): a page with only text loads 132 KB of scripts (46 KB) instead of 269 KB (80 KB), a grid page 223 KB (74 KB) instead of 357 KB (106 KB), a form page 186 KB (65 KB) instead of 269 KB (80 KB), and every page 151 KB of styles (35 KB) instead of 177 KB (44 KB). A page that holds every component, such as the component catalog, loads more files than before (68 requests instead of 41, 836 KB instead of 774 KB raw), since each module is a file of its own.
 
 ## 2. Screen markup
 
@@ -251,11 +267,12 @@ the request).
 - Keyboard: arrow keys move between grid rows, Enter opens a row, Escape closes the top dialog, shortcuts from `aria-keyshortcuts` work everywhere except inside text inputs. In grids: Space selects the row, F2 edits it, Ctrl+Z undoes the last edit, Shift+F10 or the context menu key opens the menu of the row or header, Shift+click sorts by several columns, Right and Left (mirrored in right to left pages) open and close a row's detail, group or children, and Left on a child row goes to its parent. Right on a row moves into its cells: arrows, Home, End, Ctrl+Home, Ctrl+End, Tab and Shift+Tab move the cell cursor, Shift grows a range (`aria-selected` on cells), Ctrl+C copies the range as tab separated text and Ctrl+V pastes into editable cells, one `POST /_zeyn/grid/edit` per changed row. Grids with 40 or more columns keep only the columns in view in the page (a `colgroup` with fixed widths, `td.z-col-gap` spacers with `colspan`, `aria-colindex` on cells).
 - Right click opens Zeyn's menu where one is defined (headers, rows with `data-zeyn-menu`, screens with `data-zeyn-menu`); everywhere else the browser's own menu stays.
 - Focus moves into a dialog when it opens and returns to the opener when it closes.
+- Pending state in the frame of the click: `nav.js` marks the target link current and sets `html[data-zeyn-loading]` while a screen loads, windows and form submits set it too, and grids fade their rows (`aria-busy`) as soon as a sort, page or filter key is pressed (filters wait 150 ms for more keys, and a newer request cancels the older one). A thin bar at the top of the window shows only when the answer takes longer than 150 ms; it is fixed, so nothing moves, and it does not run with `prefers-reduced-motion`.
 - Client side checks (`required`, `minlength`, `maxlength`, `min`, `max`, `type="email"`) run before submit with the browser's constraint validation API. The server always validates again.
 
 ## 7. Component library
 
-`zeyn::ui` components are served by two more assets, linked in the page head after the runtime: `/_zeyn/components.js` and `/_zeyn/components.css`. Like the runtime, they need no sign in.
+`zeyn::ui` components are served by the modules of section 1.1 and the stylesheet `/_zeyn/components.css`. Like the runtime, they need no sign in.
 
 ### 7.1 Endpoints
 
@@ -278,7 +295,7 @@ All are `POST` with JSON and the CSRF header, and check the screen's access and 
 
 | Event | On | Detail |
 |---|---|---|
-| `zeyn:content` | `document` | Element with new content (navigation, lazy panels). Both scripts set up what it holds. |
+| `zeyn:content` | `document` | Element with new content (navigation, lazy panels). The runtime loads the modules it needs and every loaded module sets up what it holds. |
 | `zeyn:errors` | the form | The `422` errors, after the runtime showed them. The line editor and stepped forms use it. |
 | `zeyn:effect` | `document` | An effect the runtime does not know: `{ effect, source, run }`. `run(next)` runs another effect. Used by `confirm`. |
 

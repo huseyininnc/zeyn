@@ -38,7 +38,23 @@ El menú enumera solo las pantallas que el usuario actual puede abrir. El elemen
 
 Cada script y hoja de estilos del framework en el head lleva `?v=` y el id de compilación (`meta[name=zeyn-build]`, de `ZEYN_BUILD_ID` o un hash del ejecutable); `theme.css` lleva un hash del texto del tema. Una petición con el valor actual recibe `Cache-Control: public, max-age=31536000, immutable`, así que una carga de página en caliente no pide ninguno de ellos; cualquier otra petición (una pestaña antigua tras un despliegue, sin `v`) recibe `no-cache` y el ETag. Los módulos que el runtime importa más tarde toman el mismo `v` de la URL del script que los importa.
 
-Cada página carga `zeyn.js` (peticiones, efectos, ventanas, formularios, menús, atajos y la delegación de eventos), `nav.js`, `components.js` y, en el shell de la aplicación, `pro.js` y `enterprise.js`. El resto se carga solo en las páginas que lo usan, también cuando `nav.js` intercambia una pantalla: `zeyn.js` importa el runtime del grid `grid.js` la primera vez que el contenido tiene un `[data-zeyn-grid]` (las páginas completas con un grid lo nombran en `<link rel="modulepreload">`), y `components.js` importa `catalog.js` (rejillas de tarjetas, cajas de búsqueda), `media.js` (reproductores, incrustaciones), `files.js` (subidas), `charts.js` y `assistant.js` (paneles de chat, o la primera pulsación del lanzador). Sus hojas de estilos se quedan en el head, así que nada cambia de aspecto cuando llega el script. En el panel del showcase son 5 scripts y 258 KB (74 KB por la red) en lugar de 9 scripts y 403 KB (116 KB).
+### 1.1 Browser modules
+
+Una página carga y ejecuta solo el código de navegador que usa su pantalla. Todas las páginas ejecutan el núcleo: `zeyn.js` (peticiones, efectos, ventanas, formularios, menús, atajos, la delegación de eventos y el cargador de módulos), `nav.js` y `enterprise.js` (ganchos de respuesta sobre `fetch` y el tiempo de inactividad de la sesión), 90 KB sin comprimir y 29 KB con gzip en total. Todo lo demás es un módulo de un componente, `/_zeyn/{name}.js` y en algunos casos `/_zeyn/{name}.css`, declarado en `MODULES` de `crates/zeyn/src/server/modules.rs` con las marcas que lleva su HTML: nombres de atributos (`data-zeyn-date`) y clases (`z-select`), comparados como nombres completos.
+
+| Módulo | Componentes |
+|---|---|
+| `components.js` | la parte compartida que importa cada módulo de controles: utilidades, los núcleos de ventanas emergentes y listas, los selectores (los de la estructura de la aplicación), los diálogos de confirmación, las alertas y las migas de pan |
+| `tabs.js`, `dates.js`, `choices.js`, `inputs.js`, `lines.js`, `steps.js`, `tree.js`, `overlays.js`, `menubutton.js`, `busy.js` | paneles, pestañas y paneles divididos; selectores de fecha y hora (también los filtros de fecha de los grids); listas, búsquedas y selecciones múltiples; números, áreas de texto que crecen, máscaras y contraseñas; el editor de líneas; formularios por pasos; árboles; tooltips y popovers; botones de menú y botones divididos; capas de espera |
+| `grid.js` | grids, enlazado como `<link rel="modulepreload">` porque `zeyn.js` lo importa por sí mismo |
+| `palette.js`, `pro.js` | la paleta de comandos y los botones de comando; barras de menú, cajas de herramientas, barras de estado, paneles acoplables e inspectores de propiedades |
+| `forms.js`, `reveal.js`, `import.js` | borradores y transiciones de flujo de los formularios; mostrar valores enmascarados; importaciones |
+| `catalog.js`, `media.js`, `files.js`, `charts.js` y sus hojas de estilo | cuadrículas de tarjetas, carriles y cajas de búsqueda; reproductores, contenido incrustado e imágenes; subidas; gráficos, minigráficos, tarjetas KPI y gráficos de bala |
+| `share.js`, `chips.js`, `reactions.js`, `hero.js`, `state.js`, `preview.js`, `assistant.js` | botones de compartir, chips de filtro, reacciones, diapositivas hero, el almacén de preferencias, vistas previas de tarjetas (primer paso del puntero), el asistente (paneles de chat o la primera pulsación del lanzador) |
+
+Una página completa enlaza en su head las hojas de estilo que usan todas las páginas (`zeyn.css`, `components.css`, `content.css`, `pro.css`, `enterprise.css`), las hojas de estilo de los módulos cuyas marcas están en su HTML y sus scripts después de los módulos que importan. `zeyn.js` se sirve con la misma tabla (`[name, script selector, style selector]`) y carga lo que falta cuando llega contenido después: `nav.js` lanza `zeyn:need` con `{ root, waits }` antes de colocar una pantalla y espera las hojas de estilo nuevas, las ventanas esperan igual antes de abrirse, y `zeyn:content`, las páginas de grid y los filtros de grid cargan los scripts de lo que contienen. El navegador guarda una instancia por URL, así que un módulo se ejecuta una vez. Un módulo prepara lo que encuentra en el documento al ejecutarse y después escucha `zeyn:content`; nunca busca ni escucha componentes que no están en la página. Los módulos importan la parte compartida con el `?v=` de su propia URL. `tests/ui_modules.rs` falla cuando una página enlaza un módulo que no usa o cuando la hoja de estilo de un módulo da estilo a una clase fuera de sus marcas.
+
+Medido en el showcase (sin comprimir, en la red con gzip): una página solo con texto carga 132 KB de scripts (46 KB) en lugar de 269 KB (80 KB), una página con grid 223 KB (74 KB) en lugar de 357 KB (106 KB), una página con formulario 186 KB (65 KB) en lugar de 269 KB (80 KB), y todas las páginas 151 KB de estilos (35 KB) en lugar de 177 KB (44 KB). Una página que contiene todos los componentes, como el catálogo de componentes, carga más archivos que antes (68 peticiones en lugar de 41, 836 KB en lugar de 774 KB sin comprimir), porque cada módulo es un archivo propio.
 
 ## 2. Marcado de la pantalla
 
@@ -251,11 +267,12 @@ la petición).
 - Teclado: las teclas de flecha se mueven entre las filas del grid, Enter abre una fila, Escape cierra el diálogo superior, y los atajos de `aria-keyshortcuts` funcionan en todas partes salvo dentro de las entradas de texto. En los grids: Space selecciona la fila, F2 la edita, Ctrl+Z deshace la última edición, Shift+F10 o la tecla de menú contextual abre el menú de la fila o del encabezado, Shift+clic ordena por varias columnas, Derecha e Izquierda (invertidas en páginas de derecha a izquierda) abren y cierran el detalle, el grupo o los hijos de una fila, e Izquierda en una fila hija va a su padre. Derecha en una fila entra en sus celdas: las flechas, Home, End, Ctrl+Home, Ctrl+End, Tab y Shift+Tab mueven el cursor de celda, Shift amplía un rango (`aria-selected` en las celdas), Ctrl+C copia el rango como texto separado por tabuladores y Ctrl+V pega en las celdas editables, un `POST /_zeyn/grid/edit` por fila modificada. Los grids con 40 o más columnas mantienen en la página solo las columnas a la vista (un `colgroup` con anchos fijos, espaciadores `td.z-col-gap` con `colspan`, `aria-colindex` en las celdas).
 - El clic derecho abre el menú de Zeyn donde haya uno definido (encabezados, filas con `data-zeyn-menu`, pantallas con `data-zeyn-menu`); en cualquier otro lugar se mantiene el menú propio del navegador.
 - El foco se mueve a un diálogo cuando se abre y vuelve a quien lo abrió cuando se cierra.
+- Estado pendiente en el mismo fotograma del clic: `nav.js` marca el enlace de destino como actual y pone `html[data-zeyn-loading]` mientras carga una pantalla, las ventanas y los envíos de formularios también lo ponen, y los grids atenúan sus filas (`aria-busy`) en cuanto se pulsa una ordenación, una página o una tecla de filtro (los filtros esperan 150 ms por más teclas y una petición nueva cancela la anterior). Una barra fina en la parte superior de la ventana aparece solo cuando la respuesta tarda más de 150 ms; es fija, así que nada se mueve, y no se anima con `prefers-reduced-motion`.
 - Las comprobaciones del lado del cliente (`required`, `minlength`, `maxlength`, `min`, `max`, `type="email"`) se ejecutan antes del envío con la API de validación de restricciones del navegador. El servidor siempre vuelve a validar.
 
 ## 7. Biblioteca de componentes
 
-Los componentes de `zeyn::ui` se sirven con dos recursos más, enlazados en el head de la página después del runtime: `/_zeyn/components.js` y `/_zeyn/components.css`. Igual que el runtime, no requieren inicio de sesión.
+Los componentes de `zeyn::ui` se sirven con los módulos de la sección 1.1 y la hoja de estilo `/_zeyn/components.css`. Como el runtime, no necesitan inicio de sesión.
 
 ### 7.1 Endpoints
 
@@ -278,7 +295,7 @@ Todos son `POST` con JSON y la cabecera CSRF, y comprueban primero el acceso de 
 
 | Evento | En | Detalle |
 |---|---|---|
-| `zeyn:content` | `document` | Elemento con contenido nuevo (navegación, paneles diferidos). Ambos scripts preparan lo que contiene. |
+| `zeyn:content` | `document` | Elemento con contenido nuevo (navegación, paneles diferidos). El runtime carga los módulos que necesita y cada módulo cargado prepara lo que contiene. |
 | `zeyn:errors` | el formulario | Los errores `422`, después de que el runtime los mostró. Lo usan el editor de líneas y los formularios por pasos. |
 | `zeyn:effect` | `document` | Un effect que el runtime no conoce: `{ effect, source, run }`. `run(next)` ejecuta otro effect. Lo usa `confirm`. |
 

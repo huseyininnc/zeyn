@@ -101,6 +101,13 @@ Performance and a small memory footprint are the most important rule.
   signed cookie or the browser.
 - Every cache, queue and map that grows with traffic has a cap.
 - Heavy integrations go behind a Cargo feature, so apps that do not use them pay nothing.
+- A page loads and runs only the browser code its screen uses. A component with browser code
+  gets a module of its own, declared in `MODULES` of `crates/zeyn/src/server/modules.rs` with the
+  markers of its HTML (`data-zeyn-*` attributes, `z-*` classes); full pages link the modules
+  their HTML holds and `zeyn.js` loads missing ones when content arrives. No module scans the
+  document for, or listens to, components that are not on the page; the core (`zeyn.js`,
+  `nav.js`, `enterprise.js`) holds only what every page needs. `tests/ui_modules.rs` fails when
+  a page links a module it does not use.
 - When you add something that costs memory, binary size or time, measure it before and after and
   say the numbers in the commit or the report.
 

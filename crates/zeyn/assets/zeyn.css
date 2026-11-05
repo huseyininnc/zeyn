@@ -2090,3 +2090,47 @@ select[data-zeyn-theme-picker] {
   .z-hl-kw, .z-hl-str, .z-hl-num, .z-hl-com, .z-hl-ty, .z-hl-key, .z-hl-mac { color: CanvasText; }
   .z-code { border-color: CanvasText; }
 }
+
+/* Pending states ----------------------------------------------------------------------------- */
+
+/*
+ * While a screen, a window or a form answer loads (`html[data-zeyn-loading]`, set in the frame of
+ * the click), a thin bar runs along the top of the window. It appears only after 150 ms, so quick
+ * answers never flash, and it is fixed, so nothing on the page moves.
+ */
+html[data-zeyn-loading] body::before {
+  content: "";
+  position: fixed;
+  inset-block-start: 0;
+  inset-inline: 0;
+  z-index: 1000;
+  block-size: 3px;
+  background: linear-gradient(90deg, transparent, var(--z-accent), transparent) no-repeat;
+  background-size: 40% 100%;
+  opacity: 0;
+  pointer-events: none;
+  animation: z-pending-show 0s linear 150ms forwards, z-pending-run 1.2s ease-in-out 150ms infinite;
+}
+
+html[data-zeyn-loading],
+.z-grid[aria-busy="true"] { cursor: progress; }
+
+@keyframes z-pending-show {
+  to { opacity: 1; }
+}
+
+@keyframes z-pending-run {
+  from { background-position: -40% 0; }
+  to { background-position: 140% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-zeyn-loading] body::before {
+    background: var(--z-accent);
+    animation: z-pending-show 0s linear 150ms forwards !important;
+  }
+}
+
+@media (forced-colors: active) {
+  html[data-zeyn-loading] body::before { background: Highlight; }
+}

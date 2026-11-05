@@ -182,7 +182,7 @@ pub struct Contact {
 
 | | |
 |---|---|
-| 新增脚本 | `components.js` 中约 2 KB gzip（7 KB 原始），用于掩码、切换和指示条；decimal 和百分比输入框使用 number 控件 |
+| 新增脚本 | `inputs.js` 中约 2 KB gzip（7 KB 原始），用于掩码、切换和指示条；decimal 和百分比输入框使用 number 控件 |
 | DOM 节点 | 掩码输入框 3 个，带切换按钮的密码 4 个，带指示条 11 个 |
 | 请求 | 输入时没有 |
 | 服务器检查 | `scale`、`precision`、`min`、`max` 和 `mask` 在每次保存时运行，页面、API 和 AI 工具一视同仁 |

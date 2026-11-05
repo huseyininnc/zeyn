@@ -36,12 +36,6 @@ pub(super) const ASSETS: [&str; 2] = ["/_zeyn/files.js", "/_zeyn/files.css"];
 /// Longest wait for the next part of an upload before it is dropped.
 const IDLE: Duration = Duration::from_secs(30);
 
-/// Links placed in the page head.
-pub(super) fn head(base: &str) -> String {
-    let v = super::ops::asset_version();
-    format!(r#"<link rel="stylesheet" href="{base}/_zeyn/files.css{v}">"#)
-}
-
 pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
     router
         .route(

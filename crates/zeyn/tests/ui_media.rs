@@ -411,8 +411,8 @@ async fn page_loads_the_player_assets() {
     let html = String::from_utf8(body).unwrap();
     assert!(html.contains("/_zeyn/media.css"));
     assert!(
-        !html.contains("/_zeyn/media.js"),
-        "components.js imports the player script when a page holds a player"
+        html.contains(r#"<script type="module" src="/_zeyn/media.js?v="#),
+        "a page that holds a player links the player script"
     );
     assert!(html.contains(r#"data-zeyn-player="video""#));
     let (status, headers, _) = send(

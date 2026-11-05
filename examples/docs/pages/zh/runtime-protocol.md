@@ -38,7 +38,23 @@
 
 head 中每个框架脚本和样式表都带有 `?v=` 和构建 id（`meta[name=zeyn-build]`，来自 `ZEYN_BUILD_ID` 或可执行文件的哈希）；`theme.css` 带有主题文本的哈希。带当前值的请求会得到 `Cache-Control: public, max-age=31536000, immutable`，因此热页面加载不会再请求它们；其他任何请求（部署后的旧标签页、没有 `v`）得到 `no-cache` 和 ETag。运行时稍后导入的模块，会从导入它们的脚本的 URL 中沿用同一个 `v`。
 
-每个页面都会加载 `zeyn.js`（请求、效果、窗口、表单、菜单、快捷键和事件委托）、`nav.js`、`components.js`，以及在应用外壳中加载 `pro.js` 和 `enterprise.js`。其余的只在用到它们的页面上加载，`nav.js` 换入某个 Screen 时也是如此：内容第一次包含 `[data-zeyn-grid]` 时，`zeyn.js` 会导入 grid 运行时 `grid.js`（带有 grid 的完整页面在 `<link rel="modulepreload">` 中指明它），而 `components.js` 会导入 `catalog.js`（卡片 grid、搜索框）、`media.js`（播放器、嵌入内容）、`files.js`（上传）、`charts.js` 和 `assistant.js`（聊天面板，或第一次点击启动器时）。它们的样式表仍留在 head 中，所以脚本到达时外观不会变化。在展示库仪表板上，这意味着 5 个脚本、258 KB（传输 74 KB），而不是 9 个脚本、403 KB（116 KB）。
+### 1.1 Browser modules
+
+页面只加载并运行其屏幕用到的浏览器代码。每个页面都运行核心：`zeyn.js`（请求、效果、窗口、表单、菜单、快捷键、事件委托和模块加载器）、`nav.js` 和 `enterprise.js`（`fetch` 上的响应钩子和会话空闲超时），合计未压缩 90 KB，gzip 后 29 KB。其余都是组件的模块：`/_zeyn/{name}.js`，部分还有 `/_zeyn/{name}.css`，在 `crates/zeyn/src/server/modules.rs` 的 `MODULES` 中声明，并带有其 HTML 中的标记：属性名（`data-zeyn-date`）和类名（`z-select`），按完整名称匹配。
+
+| 模块 | 组件 |
+|---|---|
+| `components.js` | 每个控件模块都会导入的共享部分：辅助函数、弹出层和列表框核心、下拉选择（应用外壳中的选择器）、确认对话框、提示和面包屑 |
+| `tabs.js`, `dates.js`, `choices.js`, `inputs.js`, `lines.js`, `steps.js`, `tree.js`, `overlays.js`, `menubutton.js`, `busy.js` | 面板、标签页和分割面板；日期和时间选择器（也用于 grid 的日期筛选）；列表框、查找和多选；数字、自动增高的文本区、掩码和密码；行编辑器；分步表单；树；工具提示和弹出框；菜单按钮和分割按钮；忙碌遮罩 |
+| `grid.js` | grid，以 `<link rel="modulepreload">` 链接，因为 `zeyn.js` 会自己导入它 |
+| `palette.js`, `pro.js` | 命令面板和命令按钮；菜单栏、工具箱、状态栏、停靠面板和属性检查器 |
+| `forms.js`, `reveal.js`, `import.js` | 表单草稿和流程转换；显示被遮蔽的值；导入 |
+| `catalog.js`, `media.js`, `files.js`, `charts.js` 及其样式表 | 卡片网格、横向列表和搜索框；播放器、嵌入内容和图片；上传；图表、迷你图、KPI 卡片和子弹图 |
+| `share.js`, `chips.js`, `reactions.js`, `hero.js`, `state.js`, `preview.js`, `assistant.js` | 分享按钮、筛选标签、反应、hero 幻灯片、偏好存储、卡片预览（首次悬停）、助手（聊天面板，或首次按下启动按钮） |
+
+完整页面在 head 中链接所有页面都用的样式表（`zeyn.css`、`components.css`、`content.css`、`pro.css`、`enterprise.css`）、其 HTML 中出现标记的模块的样式表，以及这些模块的脚本（放在它们导入的模块之后）。`zeyn.js` 带着同一张表（`[name, script selector, style selector]`）提供，并在之后到来的内容中加载缺少的部分：`nav.js` 在替换屏幕前发出带 `{ root, waits }` 的 `zeyn:need` 并等待新的样式表，窗口在打开前同样等待，`zeyn:content`、grid 页和 grid 筛选会加载其内容所需的脚本。浏览器对每个 URL 只保留一个实例，因此模块只运行一次。模块运行时设置它在文档中找到的内容，之后监听 `zeyn:content`；它从不扫描或监听页面上不存在的组件。模块用自身 URL 的 `?v=` 导入共享部分。当页面链接了它不使用的模块，或某个模块的样式表为其标记之外的类设置样式时，`tests/ui_modules.rs` 会失败。
+
+在 showcase 上测得（未压缩，网络上 gzip 后）：只有文字的页面加载 132 KB 脚本（46 KB），原来是 269 KB（80 KB）；grid 页面 223 KB（74 KB），原来是 357 KB（106 KB）；表单页面 186 KB（65 KB），原来是 269 KB（80 KB）；每个页面的样式为 151 KB（35 KB），原来是 177 KB（44 KB）。包含所有组件的页面（例如组件目录）加载的文件比以前多（68 个请求而不是 41 个，未压缩 836 KB 而不是 774 KB），因为每个模块都是单独的文件。
 
 ## 2. Screen markup（Screen 标记）
 
@@ -249,11 +265,12 @@ Effects：
 - 键盘：方向键在 grid 行之间移动，Enter 打开一行，Escape 关闭最上层的 dialog，来自 `aria-keyshortcuts` 的快捷键在除文本输入框之外的任何位置都有效。在 grid 中：Space 选择该行，F2 编辑，Ctrl+Z 撤销上一次编辑，Shift+F10 或上下文菜单键打开该行或表头的菜单，Shift+点击按多列排序，Right 和 Left（在从右到左的页面中镜像）打开和关闭行的详情、分组或子项，在子行上按 Left 回到其父行。在某一行上按 Right 进入其单元格：方向键、Home、End、Ctrl+Home、Ctrl+End、Tab 和 Shift+Tab 移动单元格光标，Shift 扩展范围（单元格上的 `aria-selected`），Ctrl+C 把该范围复制为以制表符分隔的文本，Ctrl+V 粘贴到可编辑单元格，每个变更的行对应一次 `POST /_zeyn/grid/edit`。有 40 列或更多列的 grid 只在页面中保留视野内的列（带固定宽度的 `colgroup`，带 `colspan` 的 `td.z-col-gap` 占位单元格，单元格上的 `aria-colindex`）。
 - 在定义了 Zeyn 菜单的地方，右键会打开该菜单（表头、带 `data-zeyn-menu` 的行、带 `data-zeyn-menu` 的 Screen）；其他任何地方保留浏览器自带的菜单。
 - dialog 打开时焦点移入其中，关闭时焦点回到打开它的元素。
+- 点击的同一帧内即显示等待状态：屏幕加载时 `nav.js` 将目标链接标记为当前并设置 `html[data-zeyn-loading]`，窗口和表单提交也会设置它；grid 在按下排序、翻页或筛选按键后立即淡化行（`aria-busy`）（筛选会再等待 150 ms 的按键，新请求会取消旧请求）。窗口顶部的细条只在响应超过 150 ms 时出现；它是固定定位的，不会让任何内容移动，在 `prefers-reduced-motion` 下不做动画。
 - 客户端检查（`required`、`minlength`、`maxlength`、`min`、`max`、`type="email"`）在提交前通过浏览器的约束验证 API 运行。服务端始终会再次校验。
 
 ## 7. Component library（组件库）
 
-`zeyn::ui` 组件由另外两个资源提供，它们在页面 head 中链接在运行时之后：`/_zeyn/components.js` 和 `/_zeyn/components.css`。与运行时一样，它们无需登录。
+`zeyn::ui` 组件由第 1.1 节的模块和样式表 `/_zeyn/components.css` 提供。和运行时一样，它们不需要登录。
 
 ### 7.1 Endpoints（端点）
 
@@ -276,7 +293,7 @@ Effects：
 
 | Event | On | Detail |
 |---|---|---|
-| `zeyn:content` | `document` | 带有新内容的元素（导航、懒加载面板）。两个脚本都会初始化其中的内容。 |
+| `zeyn:content` | `document` | 带有新内容的元素（导航、懒加载面板）。运行时加载所需的模块，每个已加载的模块初始化其中的内容。 |
 | `zeyn:errors` | the form | `422` 错误，在运行时显示之后触发。line 编辑器和分步表单使用它。 |
 | `zeyn:effect` | `document` | 运行时不认识的 effect：`{ effect, source, run }`。`run(next)` 执行另一个 effect。`confirm` 使用它。 |
 
