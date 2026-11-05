@@ -96,4 +96,14 @@ The results screen takes `SearchParams` (`q`, empty when the screen is opened fr
 
 ## Free text
 
-`DataQuery::q` is free text: rows whose text fields contain it, ignoring case. The Turkish dotted and dotless `i` (`İ`, `ı`) match `i`, so "istanbul" finds "İSTANBUL". Fields with `#[mask]` are never searched, blank text matches every row and text longer than 100 characters is ignored. `DataQuery::apply` and the SQL data layers (`LOWER(TRANSLATE(column, 'İı', 'ii')) LIKE ...` with bound parameters) read it the same way.
+`DataQuery::q` is free text: rows whose text fields contain it. Both the text and the fields are compared in the form `zeyn::text::fold` gives: lower case, the Turkish dotted and dotless `i` (`İ`, `ı`) as `i`, accented Latin letters without their accents, and `ß`, `æ`, `œ`, `þ` written out. So "istanbul" finds "İSTANBUL", "nino" finds "Niño" and "strasse" finds "Straße". Fields with `#[mask]` are never searched, blank text matches every row and text longer than 100 characters is ignored. `DataQuery::apply` and the SQL data layers (`TRANSLATE`, `LOWER` and `REPLACE` over the column, `LIKE` with a bound parameter) read it the same way.
+
+```rust
+use zeyn::text::fold;
+
+assert_eq!(fold("İSTANBUL Işık"), "istanbul isik");
+assert_eq!(fold("Año Pequeño"), "ano pequeno");
+assert_eq!(fold("Straße MÜLLER"), "strasse muller");
+```
+
+Use `fold` also for a search key column that the app writes itself, such as the trigram column of a [hand written query](database.md), so the key matches what users type. Punctuation and other scripts stay as they are; `Slug::from_title` is the form for addresses.

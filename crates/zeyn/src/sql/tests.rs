@@ -154,9 +154,19 @@ fn free_text_searches_every_text_field_with_one_bound_pattern_each() {
         ..DataQuery::default()
     };
     let sql = rows(&q);
-    assert!(sql.text.contains(
-        r#" WHERE "active" = $1 AND (LOWER(TRANSLATE("code", 'İı', 'ii')) LIKE $2 ESCAPE '\' OR LOWER(TRANSLATE("note", 'İı', 'ii')) LIKE $3 ESCAPE '\') ORDER BY"#
-    ), "{}", sql.text);
+    let fold = |col: &str| {
+        format!(
+            "REPLACE(REPLACE(REPLACE(REPLACE(LOWER(TRANSLATE({col}, '{}', '{}')), 'ß', 'ss'), 'æ', 'ae'), 'œ', 'oe'), 'þ', 'th')",
+            crate::text::SQL_FROM,
+            crate::text::SQL_TO
+        )
+    };
+    let want = format!(
+        r#" WHERE "active" = $1 AND ({} LIKE $2 ESCAPE '\' OR {} LIKE $3 ESCAPE '\') ORDER BY"#,
+        fold(r#""code""#),
+        fold(r#""note""#)
+    );
+    assert!(sql.text.contains(&want), "{}", sql.text);
     assert_eq!(sql.args[1], Arg::Text(r"%istanbul\_\%%".into()));
     let long = DataQuery {
         q: "x".repeat(crate::MAX_SEARCH_QUERY + 1),

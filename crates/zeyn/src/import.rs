@@ -180,17 +180,7 @@ fn separator(text: &str) -> char {
 
 /// Header text in a form that matches across case and Turkish dotted and dotless i.
 fn fold(s: &str) -> String {
-    s.trim()
-        .chars()
-        .map(|c| {
-            if matches!(c, 'İ' | 'I' | 'ı') {
-                'i'
-            } else {
-                c
-            }
-        })
-        .collect::<String>()
-        .to_lowercase()
+    crate::text::fold(s.trim())
 }
 
 /// One problem in one row. `row` counts data rows from 1; the header is not counted.

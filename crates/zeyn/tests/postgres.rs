@@ -30,6 +30,7 @@ async fn postgres_data_layer_matches_memory_and_saves_safely() {
     for url in urls("ZEYN_TEST_PG") {
         sql_common::data_layer(&url, &RAW).await;
         sql_common::streams(&url, &RAW).await;
+        sql_common::folded_search(&url, &RAW).await;
     }
 }
 

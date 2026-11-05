@@ -9,6 +9,7 @@ use super::controls::Slot;
 use crate::action::{Cursor, Page};
 use crate::i18n::Text;
 use crate::render::{Render, attr};
+use crate::text::fold;
 use crate::value::{FieldKind, FieldType, SupportsRequired, Value};
 use serde::{Deserialize, Serialize};
 
@@ -95,18 +96,6 @@ impl LookupQuery {
             page
         }
     }
-}
-
-/// Lower case for searching, with Turkish dotted and dotless i treated as plain i.
-fn fold(s: &str) -> String {
-    s.chars()
-        .flat_map(char::to_lowercase)
-        .map(|c| match c {
-            'ı' | 'i' | '\u{307}' => 'i',
-            c => c,
-        })
-        .filter(|c| *c != '\u{307}')
-        .collect()
 }
 
 /// One lookup option.

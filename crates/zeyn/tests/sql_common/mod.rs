@@ -606,6 +606,54 @@ impl PartialEq for Item {
 }
 
 /// Streams a large result in order and drops a stream early without losing the connection.
+/// Free text search folds Turkish, Spanish and German letters in SQL the way
+/// `zeyn::text::fold` does in memory.
+pub async fn folded_search(url: &str, raw: &Raw) {
+    let db = fresh(url, raw, PoolLimits::default()).await;
+    let names = [
+        "İSTANBUL çay",
+        "Işık ve ızgara",
+        "Año Pequeño",
+        "Straße Größe",
+        "ÆBLE Œuvre",
+        "Plain tea",
+    ];
+    for (i, name) in names.iter().enumerate() {
+        db.insert(&Item {
+            name: (*name).to_string(),
+            ..item(i as i64 + 1)
+        })
+        .await
+        .unwrap();
+    }
+    let all: Vec<Item> = db
+        .find(&DataQuery::default())
+        .await
+        .unwrap()
+        .items;
+    for (text, want) in [
+        ("istanbul cay", 1),
+        ("ISIK", 1),
+        ("izgara", 1),
+        ("ano peque", 1),
+        ("AÑO", 1),
+        ("strasse", 1),
+        ("grösse", 1),
+        ("aeble", 1),
+        ("oeuvre", 1),
+        ("tea", 1),
+        ("xyz", 0),
+    ] {
+        let q = DataQuery {
+            q: text.into(),
+            ..DataQuery::default()
+        };
+        let sql: Page<Item> = db.find(&q).await.unwrap();
+        assert_eq!(sql.items.len(), want, "{text}");
+        same(&db, &all, q).await;
+    }
+}
+
 pub async fn streams(url: &str, raw: &Raw) {
     let db = Db::connect(
         url,

@@ -491,6 +491,21 @@ fn key_field(fields: &[FieldMeta]) -> Result<(usize, &FieldMeta)> {
 }
 
 /// `LIKE` pattern with `\`, `%` and `_` escaped.
+/// `col` folded in SQL the way [`crate::text::fold`] folds text: accented and Turkish letters
+/// translated to plain ones before `LOWER`, the written out letters replaced after it. Only
+/// constant text goes into the statement.
+fn search_fold(col: &str) -> String {
+    let mut out = format!(
+        "LOWER(TRANSLATE({col}, '{}', '{}'))",
+        crate::text::SQL_FROM,
+        crate::text::SQL_TO
+    );
+    for (from, to) in crate::text::SQL_PAIRS {
+        out = format!("REPLACE({out}, '{from}', '{to}')");
+    }
+    out
+}
+
 fn like_escape(s: &str, out: &mut String) {
     for c in s.chars() {
         if matches!(c, '\\' | '%' | '_') {
@@ -531,9 +546,8 @@ fn from_where<E: Entity>(d: &dyn Dialect, sql: &mut Sql, q: &DataQuery) -> Resul
                 if n > 0 {
                     sql.push(" OR ");
                 }
-                sql.push("LOWER(TRANSLATE(");
-                sql.push(&column(d, &fields[*i])?);
-                sql.push(", 'İı', 'ii')) LIKE ");
+                sql.push(&search_fold(&column(d, &fields[*i])?));
+                sql.push(" LIKE ");
                 sql.bind(d, Arg::Text(pattern.clone()), Cast::Plain);
                 sql.push(" ESCAPE '\\'");
             }

@@ -127,6 +127,7 @@ async fn oracle_data_layer_matches_memory_and_saves_safely() {
             major < 12,
             "11g keys come from a sequence, later versions from identity columns"
         );
+        sql_common::folded_search(&url, &RAW).await;
     }
 }
 

@@ -108,6 +108,7 @@ mod slug;
 /// Data layer for SQL databases (`postgres` and `oracle` features).
 #[cfg(any(feature = "postgres", feature = "oracle"))]
 pub mod sql;
+pub mod text;
 mod time;
 pub mod ui;
 mod value;

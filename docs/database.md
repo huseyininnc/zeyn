@@ -191,13 +191,15 @@ pub async fn search_items(q: String, db: Db) -> Result<Vec<Hit>> {
         "SELECT i.id, i.slug, i.title, similarity(i.search_key, $1) AS score \
          FROM items i WHERE i.search_key % $1 \
          ORDER BY score DESC, i.id LIMIT 20",
-        vec![q.into()],
+        vec![zeyn::text::fold(&q).into()],
     )
     .await
 }
 ```
 
-The example needs `CREATE EXTENSION pg_trgm` and a trigram index:
+`search_key` holds `zeyn::text::fold(&title)`, written by the app when it saves the row, so the
+key and the folded search text compare in the same form (`İ` and `ı` as `i`, no accents, lower
+case). The example needs `CREATE EXTENSION pg_trgm` and a trigram index:
 `CREATE INDEX items_search_key ON items USING gin (search_key gin_trgm_ops)`. Columns the model
 has no field for, such as `score`, are read by the database and dropped.
 
