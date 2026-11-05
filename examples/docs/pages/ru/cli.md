@@ -54,6 +54,7 @@ cargo run
   ```
 
   а не `DataGrid::of(search_items).paging(Paging::pages(25)).column(Item::code).column(Item::qty)`.
+- `build.rs` и `max_file_lines = 300` в `[package.metadata.zeyn]` в `Cargo.toml`: `cargo build` останавливается, если в файле из `src/` больше непустых строк; clippy `too_many_lines` (60, в `clippy.toml`) делает то же для функций. См. [Project structure](structure.md).
 - `Dockerfile` и `.dockerignore`: небольшой образ контейнера.
 - Конвейеры для распространённых CI-серверов, все выполняют одни и те же проверки (`cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, `cargo deny check`) и отклоняют тег `vX.Y.Z`, не совпадающий с `Cargo.toml`:
   - `.github/workflows/ci.yml` для GitHub Actions, с `.github/dependabot.yml` (еженедельные обновления Cargo и actions) и чек-листом для pull request;

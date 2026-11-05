@@ -52,6 +52,7 @@ cargo run
   ```
 
   şöyle değil: `DataGrid::of(search_items).paging(Paging::pages(25)).column(Item::code).column(Item::qty)`.
+- `build.rs` ve `Cargo.toml` içinde `[package.metadata.zeyn]` altındaki `max_file_lines = 300`: `src/` içindeki bir dosya daha fazla boş olmayan satıra sahipse `cargo build` durur; clippy `too_many_lines` (60, `clippy.toml` içinde) aynısını fonksiyonlar için yapar. Bkz. [Project structure](structure.md).
 - `Dockerfile` ve `.dockerignore`: küçük bir konteyner imajı.
 - Yaygın CI sunucuları için, hepsi aynı denetimleri çalıştıran (`cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, `cargo deny check`) ve `Cargo.toml` ile eşleşmeyen bir `vX.Y.Z` etiketini reddeden pipeline'lar:
   - GitHub Actions için `.github/workflows/ci.yml`; yanında `.github/dependabot.yml` (haftalık Cargo ve action güncellemeleri) ve bir pull request kontrol listesi;

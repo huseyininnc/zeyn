@@ -54,6 +54,7 @@ cargo run
   ```
 
   而不是 `DataGrid::of(search_items).paging(Paging::pages(25)).column(Item::code).column(Item::qty)`。
+- `build.rs` 以及 `Cargo.toml` 中 `[package.metadata.zeyn]` 下的 `max_file_lines = 300`：当 `src/` 中某个文件的非空行更多时，`cargo build` 会停止；clippy `too_many_lines`（60，在 `clippy.toml` 中）对函数做同样的检查。参见 [Project structure](structure.md)。
 - `Dockerfile` 和 `.dockerignore`：体积小的容器镜像。
 - 适用于常见 CI 服务器的流水线，全部运行相同的检查（`cargo fmt --check`、`cargo clippy -D warnings`、`cargo test`、`cargo deny check`），并拒绝与 `Cargo.toml` 不匹配的标签 `vX.Y.Z`：
   - 用于 GitHub Actions 的 `.github/workflows/ci.yml`，以及 `.github/dependabot.yml`（每周的 Cargo 和 action 更新）和拉取请求检查清单；

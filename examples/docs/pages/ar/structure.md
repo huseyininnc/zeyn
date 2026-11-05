@@ -3,6 +3,8 @@
 لكل تطبيق Zeyn التخطيط نفسه، فيجد الشخص أو الوكيل الأشياء في المكان نفسه في كل مشروع.
 
 ```
+Cargo.toml               dependencies, lints and [package.metadata.zeyn] (max_file_lines)
+build.rs                 stops cargo build when a file in src/ is longer than max_file_lines
 config/app.json          defaults; APP_* environment variables override them
 locales/<lang>.json      every user facing text; all files have the same keys
 src/main.rs              loads configuration and starts the app
@@ -17,6 +19,14 @@ src/features/<name>/     one folder per feature
     components/          parts of screens (a toolbar, a panel), added by hand when needed
 tests/                   tests that drive the app through its router
 ```
+
+## المولدات
+
+ينشئ `zeyn g feature <name>` المجلدات `models/` و`services/` و`actions/` و`screens/` مع شاشة قائمة تعمل، ويسجل الميزة وخدمتها في `src/app.rs`. ويضيف `zeyn g screen <feature> <name>` شاشة واحدة ويسجلها. أضف `components/` يدويًا عندما يُستخدم جزء من شاشة في أكثر من مكان أو يطول ملف شاشة، واحذف المجلدات التي لا تحتاجها الميزة مع سطر `mod` الخاص بها. انظر [CLI and projects](cli.md) للتفاصيل.
+
+## حدود الحجم
+
+الملفات والدوال الصغيرة تجعل مراجعة الكود سهلة. القيمة `max_file_lines` تحت `[package.metadata.zeyn]` في `Cargo.toml` (افتراضيًا 300 سطر غير فارغ) تجعل `build.rs` يوقف `cargo build` ويسرد الملفات التي تتجاوز الحد. ويفعل `too_many_lines` في Clippy (60 سطرًا، `too-many-lines-threshold` في `clippy.toml`) الشيء نفسه للدوال. يمكن رفع الحدين في هذين الملفين، لكن على الوكيل أن يقسم الكود بدلًا من ذلك: شاشة أو مكوّن أو مجموعة إجراءات في كل ملف، والأجزاء الكبيرة من الشاشة في دوال خاصة بها.
 
 ## التطبيق
 

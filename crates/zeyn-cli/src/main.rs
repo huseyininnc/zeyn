@@ -1116,6 +1116,13 @@ const RAW: &str = r#"Grid "quoted" Grid"#; const C: char = 'G';"##;
             assert!(dir.join(file).is_file(), "{file}");
         }
         assert!(!dir.join("components").exists());
+        let app = read(&root, "src/app.rs");
+        assert!(
+            app.contains(
+                "        .feature(features::notes::feature())\n        .service(features::orders::services::OrdersStore::default())\n        .feature(features::orders::feature());\n"
+            ),
+            "{app}"
+        );
         let json: Value = serde_json::from_str(&read(&root, "locales/tr.json")).unwrap();
         assert_eq!(json["orders"]["menu"], "Orders");
         assert_eq!(json["orders"]["list"]["title"], "Orders");
@@ -1165,6 +1172,36 @@ const RAW: &str = r#"Grid "quoted" Grid"#; const C: char = 'G';"##;
         );
         assert!(warnings.is_empty(), "{warnings:#?}");
         assert!(generate::new_feature(&root, "orders").is_err());
+        std::fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn a_new_feature_is_printed_instead_when_app_rs_has_no_feature_line() {
+        let (base, root) = app_at("app-rs");
+        let custom = "pub fn app() -> App {\n    build(App::new(\"x\"))\n}\n";
+        std::fs::write(root.join("src/app.rs"), custom).unwrap();
+        let out = generate::new_feature(&root, "orders").unwrap();
+        assert_eq!(read(&root, "src/app.rs"), custom);
+        assert!(
+            out.contains("add `.service(features::orders::services::OrdersStore::default())` and `.feature(features::orders::feature())` to the App in src/app.rs"),
+            "{out}"
+        );
+        let open = "    let app = App::new(\"x\")\n        .feature(features::a::feature())\n        .service(S::default());\n";
+        std::fs::write(root.join("src/app.rs"), open).unwrap();
+        generate::new_feature(&root, "tags").unwrap();
+        let app = read(&root, "src/app.rs");
+        assert!(
+            app.contains("        .feature(features::a::feature())\n        .service(features::tags::services::TagsStore::default())\n        .feature(features::tags::feature())\n        .service(S::default());\n"),
+            "{app}"
+        );
+        let calls = [
+            ".service(features::tags::services::TagsStore::default())".to_string(),
+            ".feature(features::tags::feature())".to_string(),
+        ];
+        assert_eq!(
+            generate::register_feature(&app, &calls).as_deref(),
+            Some(app.as_str())
+        );
         std::fs::remove_dir_all(&base).ok();
     }
 

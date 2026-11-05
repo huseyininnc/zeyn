@@ -3,6 +3,8 @@
 Her Zeyn uygulaması aynı düzene sahiptir; böylece bir insan ya da ajan her projede şeyleri aynı yerde bulur.
 
 ```
+Cargo.toml               dependencies, lints and [package.metadata.zeyn] (max_file_lines)
+build.rs                 stops cargo build when a file in src/ is longer than max_file_lines
 config/app.json          defaults; APP_* environment variables override them
 locales/<lang>.json      every user facing text; all files have the same keys
 src/main.rs              loads configuration and starts the app
@@ -17,6 +19,14 @@ src/features/<name>/     one folder per feature
     components/          parts of screens (a toolbar, a panel), added by hand when needed
 tests/                   tests that drive the app through its router
 ```
+
+## Üreticiler
+
+`zeyn g feature <name>`, çalışan bir liste screen'iyle `models/`, `services/`, `actions/` ve `screens/` klasörlerini oluşturur ve feature'ı servisiyle birlikte `src/app.rs` içine kaydeder. `zeyn g screen <feature> <name>` bir screen ekler ve onu kaydeder. Bir screen parçası paylaşıldığında ya da bir screen dosyası büyüdüğünde `components/` klasörünü elle ekleyin; bir feature'ın ihtiyaç duymadığı klasörleri `mod` satırlarıyla birlikte silin. Ayrıntılar için [CLI and projects](cli.md) sayfasına bakın.
+
+## Boyut sınırları
+
+Küçük dosyalar ve fonksiyonlar kodun incelenmesini kolaylaştırır. `Cargo.toml` içinde `[package.metadata.zeyn]` altındaki `max_file_lines` (varsayılan 300 boş olmayan satır), `build.rs` ile `cargo build` işlemini durdurur ve sınırı aşan dosyaları listeler. Clippy'nin `too_many_lines` kuralı (60 satır, `clippy.toml` içinde `too-many-lines-threshold`) aynısını fonksiyonlar için yapar. İki sınır da bu dosyalarda yükseltilebilir, ama bir ajan bunun yerine kodu bölmelidir: dosya başına bir screen, component ya da bir grup action, ve bir screen'in büyük parçaları kendi fonksiyonlarında.
 
 ## Uygulama
 

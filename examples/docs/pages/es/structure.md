@@ -3,6 +3,8 @@
 Toda aplicación Zeyn tiene la misma disposición, de modo que una persona o un agente encuentra las cosas en el mismo lugar en cada proyecto.
 
 ```
+Cargo.toml               dependencies, lints and [package.metadata.zeyn] (max_file_lines)
+build.rs                 stops cargo build when a file in src/ is longer than max_file_lines
 config/app.json          defaults; APP_* environment variables override them
 locales/<lang>.json      every user facing text; all files have the same keys
 src/main.rs              loads configuration and starts the app
@@ -17,6 +19,14 @@ src/features/<name>/     one folder per feature
     components/          parts of screens (a toolbar, a panel), added by hand when needed
 tests/                   tests that drive the app through its router
 ```
+
+## Generadores
+
+`zeyn g feature <name>` crea `models/`, `services/`, `actions/` y `screens/` con una pantalla de lista que funciona y registra la feature y su servicio en `src/app.rs`. `zeyn g screen <feature> <name>` añade una pantalla y la registra. Añade `components/` a mano cuando una parte de una pantalla se comparte o un archivo de pantalla crece, y borra las carpetas que una feature no necesita, con su línea `mod`. Consulta [CLI and projects](cli.md) para más detalles.
+
+## Límites de tamaño
+
+Los archivos y funciones pequeños hacen que el código sea fácil de revisar. `max_file_lines` en `[package.metadata.zeyn]` de `Cargo.toml` (por defecto 300 líneas no vacías) hace que `build.rs` detenga `cargo build` y liste los archivos que superan el límite. `too_many_lines` de Clippy (60 líneas, `too-many-lines-threshold` en `clippy.toml`) hace lo mismo con las funciones. Ambos límites se pueden subir en esos archivos, pero un agente debe dividir el código: una pantalla, un componente o un grupo de acciones por archivo, y las partes grandes de una pantalla en sus propias funciones.
 
 ## La aplicación
 

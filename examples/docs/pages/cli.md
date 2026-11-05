@@ -54,6 +54,7 @@ cargo run
   ```
 
   not `DataGrid::of(search_items).paging(Paging::pages(25)).column(Item::code).column(Item::qty)`.
+- `build.rs` and `max_file_lines = 300` under `[package.metadata.zeyn]` in `Cargo.toml`: `cargo build` stops when a file in `src/` has more non blank lines; clippy `too_many_lines` (60, in `clippy.toml`) does the same for functions. See [Project structure](structure.md).
 - `Dockerfile` and `.dockerignore`: a small container image.
 - Pipelines for the common CI servers, all running the same checks (`cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, `cargo deny check`) and refusing a tag `vX.Y.Z` that does not match `Cargo.toml`:
   - `.github/workflows/ci.yml` for GitHub Actions, with `.github/dependabot.yml` (weekly Cargo and action updates) and a pull request checklist;

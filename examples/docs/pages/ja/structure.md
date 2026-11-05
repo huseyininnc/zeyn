@@ -3,6 +3,8 @@
 すべての Zeyn アプリは同じ構成を持つため、人もエージェントも、どのプロジェクトでも同じ場所にものを見つけられます。
 
 ```
+Cargo.toml               dependencies, lints and [package.metadata.zeyn] (max_file_lines)
+build.rs                 stops cargo build when a file in src/ is longer than max_file_lines
 config/app.json          defaults; APP_* environment variables override them
 locales/<lang>.json      every user facing text; all files have the same keys
 src/main.rs              loads configuration and starts the app
@@ -17,6 +19,14 @@ src/features/<name>/     one folder per feature
     components/          parts of screens (a toolbar, a panel), added by hand when needed
 tests/                   tests that drive the app through its router
 ```
+
+## ジェネレーター
+
+`zeyn g feature <name>` は、動作する一覧画面とともに `models/`、`services/`、`actions/`、`screens/` を作り、feature とそのサービスを `src/app.rs` に登録します。`zeyn g screen <feature> <name>` は画面を 1 つ追加して登録します。画面の一部を共有するときや画面ファイルが長くなったときは `components/` を手で追加し、feature に不要なフォルダーは `mod` 行とともに削除します。詳しくは [CLI and projects](cli.md) を参照してください。
+
+## サイズの上限
+
+小さなファイルと関数はコードをレビューしやすくします。`Cargo.toml` の `[package.metadata.zeyn]` にある `max_file_lines`（既定は空でない行が 300 行）を超えると、`build.rs` が `cargo build` を止め、上限を超えたファイルを一覧にします。Clippy の `too_many_lines`（60 行、`clippy.toml` の `too-many-lines-threshold`）は関数について同じことをします。どちらの上限もそれらのファイルで引き上げられますが、エージェントは代わりにコードを分割すべきです。1 ファイルに画面、コンポーネント、またはアクションのまとまりを 1 つ置き、画面の大きな部分はそれぞれの関数に分けます。
 
 ## アプリ
 

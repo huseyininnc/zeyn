@@ -174,7 +174,7 @@ impl Service for OrderStore {}
 
 ### Recipes
 
-- New feature: `zeyn g feature <name>`, then `.service(...)` for its store and `.feature(...)` in `src/app.rs`, then translate its texts in every `locales/*.json`. Delete the folders it does not need.
+- New feature: `zeyn g feature <name>`. It registers the feature and its service in `src/app.rs` (or prints the two lines when `src/app.rs` has no `.feature(features::...)` line); then translate its texts in every `locales/*.json`. Delete the folders it does not need.
 - New screen: `zeyn g screen <feature> <name>` writes `screens/<name>.rs`, registers it and adds its title to every `locales/*.json`; translate the copies in languages other than English.
 - New field: add it to the struct with rules, add `Model.field` labels to every locale, add `.field(...)` to the form and `.column(...)` to the list.
 - New permission: name it `feature.resource.verb` in the macro; grant it in the authenticator or identity provider.

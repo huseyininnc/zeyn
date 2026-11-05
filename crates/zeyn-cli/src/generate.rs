@@ -136,17 +136,71 @@ pub fn new_feature(root: &Path, name: &str) -> Result<String, String> {
         "Created src/features/{name}/ with models/, services/, actions/ and screens/ and \
          registered it in src/features/mod.rs"
     )];
-    let mut todo = vec![
-        format!(
-            "add `.service(features::{name}::services::{model}Store::default())` and \
-             `.feature(features::{name}::feature())` in src/app.rs"
-        ),
+    let mut todo = Vec::new();
+    let calls = [
+        format!(".service(features::{name}::services::{model}Store::default())"),
+        format!(".feature(features::{name}::feature())"),
+    ];
+    let app_rs = root.join("src/app.rs");
+    let registered = std::fs::read_to_string(&app_rs)
+        .ok()
+        .and_then(|t| register_feature(&t, &calls));
+    match registered {
+        Some(t) => {
+            write(&app_rs, &t)?;
+            done.push(format!(
+                "Registered `{}` and `{}` in src/app.rs",
+                calls[0], calls[1]
+            ));
+        }
+        None => todo.push(format!(
+            "add `{}` and `{}` to the App in src/app.rs",
+            calls[0], calls[1]
+        )),
+    }
+    todo.push(
         "delete a folder and its `pub mod` line in the feature's mod.rs if the feature does not \
          need it"
             .to_string(),
-    ];
+    );
     report_texts(root, texts, &entries, &mut done, &mut todo)?;
     Ok(summary(done, todo))
+}
+
+/// Adds `calls` to the App builder in `app` after the last `.feature(features::<x>::feature())`
+/// line, with its indentation, moving a closing `;` to the last new line. Calls already present
+/// are skipped. `None` when there is no such line, so nothing is guessed.
+pub fn register_feature(app: &str, calls: &[String]) -> Option<String> {
+    let lines: Vec<&str> = app.split_inclusive('\n').collect();
+    let i = lines.iter().rposition(|l| {
+        let t = l.trim();
+        let t = t.strip_suffix(';').unwrap_or(t);
+        t.strip_prefix(".feature(features::")
+            .and_then(|r| r.strip_suffix("::feature())"))
+            .is_some_and(super::valid_ident)
+    })?;
+    let missing: Vec<&String> = calls
+        .iter()
+        .filter(|c| !app.contains(c.as_str()))
+        .collect();
+    if missing.is_empty() {
+        return Some(app.to_string());
+    }
+    let line = lines[i].trim_end();
+    let indent = &line[..line.len() - line.trim_start().len()];
+    let (head, end) = match line.strip_suffix(';') {
+        Some(h) => (h, ";"),
+        None => (line, ""),
+    };
+    let mut out: String = lines[..i].concat();
+    out.push_str(head);
+    out.push('\n');
+    for (n, c) in missing.iter().enumerate() {
+        let last = if n + 1 == missing.len() { end } else { "" };
+        out.push_str(&format!("{indent}{c}{last}\n"));
+    }
+    out.push_str(&lines[i + 1..].concat());
+    Some(out)
 }
 
 /// Writes the locale files and says which keys were added and which need translating.

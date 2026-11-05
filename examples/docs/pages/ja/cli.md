@@ -52,6 +52,7 @@ cargo run
   ```
 
   次のような書き方ではありません: `DataGrid::of(search_items).paging(Paging::pages(25)).column(Item::code).column(Item::qty)`。
+- `build.rs` と、`Cargo.toml` の `[package.metadata.zeyn]` にある `max_file_lines = 300`: `src/` のファイルの空でない行がそれより多いと `cargo build` が止まります。clippy の `too_many_lines`（60、`clippy.toml`）は関数について同じことをします。[Project structure](structure.md) を参照してください。
 - `Dockerfile` と `.dockerignore`: 小さなコンテナイメージ。
 - 代表的な CI サーバー向けのパイプライン。いずれも同じ検査（`cargo fmt --check`、`cargo clippy -D warnings`、`cargo test`、`cargo deny check`）を実行し、`Cargo.toml` と一致しない `vX.Y.Z` タグを拒否します。
   - `.github/workflows/ci.yml`: GitHub Actions 用。`.github/dependabot.yml`（Cargo とアクションの週次更新）とプルリクエストのチェックリストが付きます。
