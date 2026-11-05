@@ -70,6 +70,7 @@ fn entry<'a>(
     st: &'a AppState,
     ctx: &Ctx,
     store: &str,
+    write: bool,
 ) -> Result<(&'a crate::Feature, FileEntry), Failure> {
     let (feature, entry) = st
         .features
@@ -81,9 +82,14 @@ fn entry<'a>(
                 .map(|e| (f, e))
         })
         .ok_or(Failure::App(Error::NotFound))?;
+    let permission = if write {
+        entry.access.write
+    } else {
+        entry.access.read
+    };
     if !ctx
         .identity()
-        .can(&Access::Permission(entry.permission))
+        .can(&Access::Permission(permission))
     {
         return Err(Failure::App(Error::Forbidden));
     }
@@ -106,7 +112,7 @@ async fn upload(
         return st.error_response(&ctx, f);
     }
     let result = async {
-        let (feature, entry) = entry(&st, &ctx, &store)?;
+        let (feature, entry) = entry(&st, &ctx, &store, true)?;
         let call = Call {
             kind: CallKind::Upload,
             screen: entry.rules.store(),
@@ -394,7 +400,7 @@ async fn download(
         if !valid_file_id(&id) {
             return Err(Failure::App(Error::NotFound));
         }
-        let (_, entry) = entry(&st, &ctx, &store)?;
+        let (_, entry) = entry(&st, &ctx, &store, false)?;
         let call = Call {
             kind: CallKind::Media,
             screen: entry.rules.store(),

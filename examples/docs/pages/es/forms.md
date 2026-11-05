@@ -60,6 +60,8 @@ Feature::new("support")
 Form::of(ticket).field(Ticket::title).file(Ticket::attachments, ATTACHMENTS)
 ```
 
+Un nombre de permiso permite a los mismos usuarios subir y descargar. Para que los lectores abran archivos que no pueden añadir, divídalo: `.files(ATTACHMENTS, FileAccess::read("support.ticket.read").write("support.ticket.files"), store)`.
+
 El control es una entrada de archivo nativa dentro de una zona de arrastre. Cada archivo se sube por separado con una barra de progreso, se puede cancelar mientras se ejecuta, reintentar si falló y quitar cuando termina. Las imágenes muestran una vista previa hecha a partir de una URL de objeto del archivo elegido. El progreso y los resultados se anuncian en una región en vivo educada. El showcase tiene un ejemplo funcional en `/uploads`; este sitio de documentación no tiene ningún usuario con sesión iniciada, así que no muestra ninguna subida en vivo.
 
 | Tecla | Qué hace |

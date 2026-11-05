@@ -60,6 +60,8 @@ Feature::new("support")
 Form::of(ticket).field(Ticket::title).file(Ticket::attachments, ATTACHMENTS)
 ```
 
+一个权限名让同一批用户既能上传也能下载。若要让读者打开他们无权添加的文件，请将其拆分：`.files(ATTACHMENTS, FileAccess::read("support.ticket.read").write("support.ticket.files"), store)`。
+
 该控件是放在拖放区域内的原生文件输入。每个文件独立上传并带进度条，上传过程中可以取消，失败后可以重试，完成后可以移除。图片会显示由所选文件的对象 URL 生成的预览。进度和结果通过一个 polite 实时区域播报。showcase 在 `/uploads` 有一个可运行的示例；本文档站点没有已登录的用户，因此不显示实时上传。
 
 | 按键 | 作用 |
