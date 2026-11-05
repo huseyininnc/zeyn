@@ -218,6 +218,7 @@
       "theme_system": "System",
       "theme_light": "Light",
       "theme_dark": "Dark",
+      "primary_actions": "Main actions",
       "site": {
         "sign_in": "Sign in",
         "sign_out": "Sign out",

@@ -39,6 +39,8 @@ pub fn product_editor(params: ProductParams, store: ProductStore) -> Result<Scre
 
 パラメータは、使われるあらゆる場所で型が付きます。`Window::open(product_editor, 7)` はコンパイルできません。エディタは `ProductParams` を受け取るからです。
 
+`#[params]` 構造体のすべてのフィールドが `Option` なら、画面はメニューのリンクや単純なアドレスからパラメーターなしでも開き、すべてのフィールドが `None` になります。省略できないフィールドには引き続き値が必要で、ない場合は 404 を返します。
+
 `route` のない画面には URL がありません。リンク、ツールバーのボタン、メニュー、コマンドからウィンドウとして開きます。
 
 ## パス内のパラメータ
@@ -138,6 +140,21 @@ Screen::new(t!("stock.products"))
 ```
 
 `Alt+N` のようなショートカットは画面上で動作し、パレットに表示されます。ブラウザが使うショートカット（`Ctrl+P`、`Ctrl+S`、`F5`）は、ボタンが `.override_browser()` を呼ばない限り割り当てられません。ブラウザがページに渡さないもの（`Ctrl+N`、`Ctrl+T`、`Ctrl+W`）は決して割り当てられません。空いている組み合わせは `Alt+Shift+<letter>` と `Ctrl+Alt+<letter>` です。
+
+ボタン、メニューグループ、ツールのアイコンは `Icon` から選びます: `Plus`, `Edit`, `Delete`, `Save`, `Search`, `Box`, `Cart`, `Table`, `Home`, `Chart`, `Users`, `Settings`, `Bell`, `Shield`, `Clock`, `Tag`, `Mail`, `SignOut`, `ArrowUp`, `ArrowDown`。これらは `zeyn.css` のマスクで、24 px のグリッドに 2 px の丸い線で描かれ、文字色を使い、スクリーンリーダーからは隠されます。意味は常にラベルが伝えます。
+
+## ヘッダー
+
+`.subtitle(text)` はタイトルの下に短い 1 行を置き、`.primary(|t| ...)` は画面の主要な操作をプライマリボタンとしてタイトル行の末尾に置きます。この 2 つで、ほとんどの管理画面にあるページヘッダーになります。
+
+```rust
+Screen::new(t!("orders.title"))
+    .subtitle(t!("orders.intro"))
+    .primary(|t| t.button(t!("orders.new")).icon(Icon::Plus).shortcut("Alt+N").opens(order_editor, OrderParams { id: None }))
+    .toolbar(|t| t.export(Export::Csv))
+```
+
+`.primary` は `.toolbar` と同じボタンを、同じショートカットとパレット項目で受け取ります。ツールバーはその他のツール用にヘッダーの下に残ります。サブタイトルはスクリーンリーダー向けの画面の説明です（`aria-describedby`）。行の幅が足りないと操作はタイトルの下に折り返し、スマートフォンでは先頭側にそろいます。サブタイトルも主要な操作もない画面は、これまでどおり普通の見出しで描かれます。
 
 ## Feature とメニュー
 

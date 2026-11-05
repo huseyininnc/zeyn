@@ -252,41 +252,6 @@ fn notice(code: Option<&str>) -> Option<Node> {
     )))))
 }
 
-/// Screen params whose fields are all optional, so the screen also opens without any params (a
-/// plain link, or a sign in redirect with only `?return_to=`).
-macro_rules! optional_params {
-    ($(#[$m:meta])* pub struct $name:ident { $($(#[$fm:meta])* pub $f:ident: $t:ty,)* }) => {
-        $(#[$m])*
-        #[derive(Clone, Debug, Default, Serialize)]
-        pub struct $name { $($(#[$fm])* pub $f: $t,)* }
-
-        impl<'de> Deserialize<'de> for $name {
-            fn deserialize<D: serde::Deserializer<'de>>(d: D) -> std::result::Result<Self, D::Error> {
-                #[derive(Deserialize, Default)]
-                #[serde(default)]
-                struct Raw { $($f: $t,)* }
-                let raw = Option::<Raw>::deserialize(d)?.unwrap_or_default();
-                Ok($name { $($f: raw.$f,)* })
-            }
-        }
-
-        impl crate::screen::Params for $name {}
-
-        impl crate::api::ApiInput for $name {
-            fn schema() -> Json {
-                json!({ "type": "object", "title": stringify!($name) })
-            }
-
-            fn from_json(value: Json) -> Result<Self> {
-                if value.is_null() {
-                    return Ok(Self::default());
-                }
-                serde_json::from_value(value).map_err(|_| Error::NotFound)
-            }
-        }
-    };
-}
-
 /// Sign in form.
 #[model]
 pub struct AccountLogin {
@@ -298,13 +263,12 @@ pub struct AccountLogin {
     pub return_to: String,
 }
 
-optional_params! {
 /// Where the sign in screen sends the user afterwards, and a notice to show.
+#[params]
 pub struct LoginParams {
     pub return_to: Option<String>,
     pub notice: Option<String>,
     pub error: Option<String>,
-}
 }
 
 /// Signs in with a user name or e-mail and a password; lockout counts failures.
@@ -497,13 +461,12 @@ pub fn account_resend_confirmation(_: ()) -> Screen {
     )
 }
 
-optional_params! {
 /// The link of a reset or confirmation message.
+#[params]
 pub struct LinkParams {
     pub user: Option<String>,
     pub code: Option<String>,
     pub email: Option<String>,
-}
 }
 
 /// New password from a reset link.
@@ -598,12 +561,11 @@ pub async fn account_confirm_email(
     ))
 }
 
-optional_params! {
 /// Where a two factor step goes afterwards.
+#[params]
 pub struct TwoFactorParams {
     pub return_to: Option<String>,
     pub remember: Option<bool>,
-}
 }
 
 /// A code from an authenticator app, e-mail or text message.

@@ -62,6 +62,19 @@ Her çubuk, nokta, dilim, aşama ve gauge değeri, etiketi ve değeri adı olan 
 ```rust
 Kpi::new("Revenue this month", 184_250.0).delta(12.4).target(200_000.0).trend([140.0, 152.0, 160.0, 184.0])
 Kpi::new("Average wait", 6.5).decimals(1).unit("min").delta(-9.0).lower_is_better()
+Kpi::money("Revenue", Money::tl(18_425_050)).delta(4.2).target(200_000.0)
+```
+
+`Kpi::money` bir tutarı kullanıcının yerel ayarında para birimiyle gösterir (İngilizcede `₺184,250.50`, Türkçede `184.250,50 ₺`); hedefi de aynı para birimindedir.
+
+Bir `Row` ya da `AutoGrid` içindeki Kpi'lar, eğilimleri olsun ya da olmasın, en uzun olan kadar yüksektir ve sparkline her kartın altında durur. Kpi'lardan oluşan bir `Row` her birine genişliğin dörtte birini verir: masaüstünde dördü satırı doldurur, satır yaklaşık 830 px altında iki, 480 px altında bir sütuna iner (satır üzerinde container query ile; bu yüzden dar bir sütundaki Kpi satırı daha erken kırılır). Grafikler kapsayıcılarının genişliğini doldurur ve oranlarını korur. Halka ve gösterge grafikleri en fazla 18rem yüksekliğinde kalır ve ortada durur.
+
+```rust
+Row::new()
+    .col(Kpi::money("Revenue", revenue).delta(12.4).trend(weekly))
+    .col(Kpi::new("Orders", 1_284.0).delta(3.1))
+    .col(Kpi::new("New customers", 312.0).delta(-2.0))
+    .col(Kpi::money("Average order", average).delta(0.0))
 ```
 
 Bir `DataGrid` içinde `Vec<f64>` sütunu sparkline olarak, sayı veya para sütunu ise bir hedefe karşı bullet olarak çizilir:
@@ -72,4 +85,4 @@ DataGrid::of(search_reps)
     .column(Rep::weeks).cell(SparklineCell::new())
 ```
 
-İkisi de hücre başına tek bir küçük SVG'dir ve "Trend of 12 values from 40 to 61, lowest 12, highest 99" gibi bir adı vardır. Bütçe: iki hücre için satır başına yaklaşık 0,65 KB HTML; her iki hücreli 10.000 satır debug derlemesinde yaklaşık 0,4 sn'de çizilir (`sparkline_and_bullet_cells_render_ten_thousand_rows_quickly`) ve gridler yalnızca görünen satırları çizer. `charts.js` ham 3,7 KB (gzip ile 1,4 KB), `charts.css` 3,3 KB (gzip ile 1,1 KB) ekler.
+İkisi de hücre başına tek bir küçük SVG'dir ve "Trend of 12 values from 40 to 61, lowest 12, highest 99" gibi bir adı vardır. Bütçe: iki hücre için satır başına yaklaşık 0,65 KB HTML; her iki hücreli 10.000 satır debug derlemesinde yaklaşık 0,4 sn'de çizilir (`sparkline_and_bullet_cells_render_ten_thousand_rows_quickly`) ve gridler yalnızca görünen satırları çizer. `charts.js` ham 3,7 KB (gzip ile 1,4 KB), `charts.css` 4,1 KB (gzip ile 1,3 KB) ekler.

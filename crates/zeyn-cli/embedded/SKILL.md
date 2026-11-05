@@ -197,18 +197,33 @@ pub fn feature() -> Feature {
 What to remember:
 - The first argument of an action is its input; of a screen, its params (`#[params]` struct or
   `_: ()`). Every other argument is injected: `Ctx` or a registered `Service`.
-- A screen with a `route` is a page; without one it opens as a window.
+- A screen with a `route` is a page; without one it opens as a window. A `#[params]` struct whose
+  fields are all `Option` also opens from a menu link or a plain address (every field `None`).
+- Page header: `.subtitle(t!("..."))` under the title and `.primary(|t| t.button(..))` for the
+  main actions on the right; `.toolbar(..)` stays for the other tools.
 - Path params: `#[screen(route = "/orders/{id}", ...)]` binds `{id}` to the params field `id`
   (integers, entity keys, `String`, `Slug`). `Slug::from_title("Çay Bardağı")` is `cay-bardagi`.
   Return `Err(Error::NotFound)` for a missing record, `Screen::moved_to(screen, params)` for a 301, `Screen::redirect(screen, params)` for a 303 that is never cached.
 - Errors: `Error::NotFound`, `Error::Forbidden`, `Error::Conflict` (stale row version),
   `Error::Denied(t!("..."))`, `Error::Validation(errors)`, `Error::Internal("for the log")`.
 - Quick screens: `DataGrid::auto(action)` and `Form::auto(model)`.
+- Computed or very large tables: `let span = q.span();` build only those rows, then
+  `Ok(Page::window(rows, total, span))`.
 - Paging: `Paging::pages(25)`, `Paging::infinite(100)`, `Paging::virtual_scroll()` for very large
   lists. Grid extras: `.sort_by(field, desc)`, `.exportable()`, `.row_action(...)`,
-  `.bulk_action(...)`, `.editable()` with `.edit_with(action)`, `.detail(screen)`, `.group_by(field)`.
+  `.bulk_action(...)`, `.editable()` with `.edit_with(action)`, `.detail(screen)`, `.group_by(field)`,
+  `.plain()` on a whole number column that holds codes or years (others are grouped by locale).
 - Buttons that run an action: `ActionButton::new(t!("..."), action, input)`, with `.confirm(...)`.
+  Destructive grid actions: `.row_action(..)` or `.bulk_action(..)` then `.confirm(t!("..."))`
+  `.tone(Tone::Danger)`; workflow moves: `Transitions::of(..).confirm("cancel", t!("..."))`.
 - Layouts: `Row`, `Stack`, `Panel`, `Card`, `Tabs`, `Split`.
+- App shell top bar: `App::header(|h| h.center(SearchBox::of(..)).end(LinkButton::new(..)))`,
+  the same slots as the site header.
+- Settings pages: `ThemePicker::new()` is the theme choice inside a screen, in step with the shell.
+- Icons (`Icon::`): Plus, Edit, Delete, Save, Search, Box, Cart, Table, Home, Chart, Users,
+  Settings, Bell, Shield, Clock, Tag, Mail, SignOut, ArrowUp, ArrowDown.
+- Key figures: `Kpi::new(t!("..."), value)` or `Kpi::money(t!("..."), money)` with `.delta(..)`
+  and `.trend(..)`; four in a `Row` fill a desktop row and wrap two, then one per line.
 - The app (`src/app.rs`): `App::new(t!("app.name")).i18n(i18n).service(store).feature(sales::feature())`,
   plus what the app needs: `.auth(...)`, `.mcp(Mcp::read_only())`, `.themes([...])`,
   `.datagrid_views(store)`, `.assistant(...)`.

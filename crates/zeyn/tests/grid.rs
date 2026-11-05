@@ -2346,3 +2346,181 @@ async fn wide_virtual_grids_keep_every_row_of_the_first_block_in_the_template() 
         "narrow grids keep live rows"
     );
 }
+
+#[test]
+fn row_and_bulk_actions_can_ask_for_a_confirmation_and_look_destructive() {
+    let grid = DataGrid::of(search)
+        .column(Item::code)
+        .row_action("Bump", bump, |i| i.id)
+        .row_action("Bump <again>", bump, |i| i.id)
+        .confirm("Bump <this> row?")
+        .tone(zeyn::Tone::Danger)
+        .bulk_action("Deactivate", deactivate, Item::id)
+        .confirm("Deactivate the selected rows?")
+        .tone(zeyn::Tone::Danger)
+        .bulk_action("Deactivate quietly", deactivate, Item::id);
+    let rows = Store::seeded()
+        .0
+        .read()
+        .unwrap()
+        .clone();
+    let html = grid.rows_html(&rows[..1]);
+    assert!(
+        html.contains(
+            r#"<button type="button" class="z-row-action" data-zeyn-run="a0" tabindex="-1">"#
+        ),
+        "{html}"
+    );
+    assert!(
+        html.contains(r#"<button type="button" class="z-row-action z-danger" data-zeyn-run="a1" data-zeyn-confirm="Bump &lt;this&gt; row?" tabindex="-1">"#),
+        "{html}"
+    );
+    let mut page = String::new();
+    zeyn::Component::render(&grid, &mut page, &zeyn::Render::english("s"));
+    assert!(page.contains(r#"class="z-button z-danger-button" data-zeyn-bulk-run="0" data-testid="s.grid.bulk-0" data-zeyn-confirm="Deactivate the selected rows?">Deactivate</button>"#), "{page}");
+    assert!(page.contains(r#"class="z-button" data-zeyn-bulk-run="1" data-testid="s.grid.bulk-1">Deactivate quietly</button>"#));
+    assert!(
+        page.contains("&quot;confirm_title&quot;:&quot;Please confirm&quot;"),
+        "the dialog texts come with the grid"
+    );
+}
+
+#[test]
+fn whole_numbers_are_grouped_by_locale_right_aligned_and_plain_on_request() {
+    let mut row = Store::seeded().0.read().unwrap()[0].clone();
+    row.id = ItemId(1_000_002);
+    row.qty = -1_234_567;
+    let by_locale = DataGrid::of(search)
+        .column(Item::id)
+        .column(Item::qty);
+    let en = by_locale
+        .done()
+        .rows_html(std::slice::from_ref(&row));
+    assert!(
+        en.contains(r#"<td class="z-num">1000002</td>"#),
+        "keys stay plain: {en}"
+    );
+    assert!(en.contains(r#"<td class="z-num">-1,234,567</td>"#), "{en}");
+    let i18n = I18n::builtin();
+    let mut tr = String::new();
+    zeyn::Render::new("s", "tr", i18n).value_into(
+        &mut tr,
+        &Value::Int(1_234_567),
+        &zeyn::FieldKind::Integer,
+    );
+    assert_eq!(tr, "1.234.567");
+    let mut fr = String::new();
+    zeyn::Render::new("s", "fr", i18n).value_into(
+        &mut fr,
+        &Value::Int(12_345),
+        &zeyn::FieldKind::Integer,
+    );
+    assert_eq!(fr, "12\u{202f}345");
+    let plain = DataGrid::of(search)
+        .column(Item::qty)
+        .plain()
+        .done()
+        .rows_html(std::slice::from_ref(&row));
+    assert!(
+        plain.contains(r#"<td class="z-num">-1234567</td>"#),
+        "{plain}"
+    );
+    let mut small = String::new();
+    zeyn::render::push_grouped(&mut small, 999, "en");
+    zeyn::render::push_grouped(&mut small, i64::MIN, "en");
+    assert_eq!(small, "999-9,223,372,036,854,775,808");
+}
+
+/// A million computed rows; only the asked page is ever built.
+#[action(permission = "items.read")]
+pub async fn million(q: DataQuery) -> Result<Page<Item>> {
+    const TOTAL: u64 = 1_000_000;
+    let span = q.span();
+    let rows = (span.offset..span.end().min(TOTAL))
+        .map(|n| {
+            let mut row = item((n % 20 + 1) as i64);
+            row.id = ItemId(n as i64 + 1);
+            row
+        })
+        .collect();
+    Ok(Page::window(rows, TOTAL, span))
+}
+
+#[test]
+fn computed_tables_page_through_span_and_window_with_either_page_form() {
+    let query = |page: serde_json::Value| -> DataQuery {
+        serde_json::from_value(serde_json::json!({ "page": page })).unwrap()
+    };
+    let numbered = query(serde_json::json!({ "type": "offset", "offset": 999_990, "limit": 50 }));
+    assert_eq!(
+        numbered.span(),
+        zeyn::Span {
+            offset: 999_990,
+            limit: 50
+        }
+    );
+    let after = query(serde_json::json!({ "type": "after", "cursor": "120", "limit": 100_000 }));
+    assert_eq!(
+        after.span(),
+        zeyn::Span {
+            offset: 120,
+            limit: zeyn::MAX_PAGE_SIZE
+        },
+        "the client cannot ask for more than the cap"
+    );
+    let odd = query(serde_json::json!({ "type": "after", "cursor": "x", "limit": 10 }));
+    assert_eq!(odd.span().offset, 0);
+
+    let last = Page::window(
+        vec![1, 2, 3],
+        10,
+        zeyn::Span {
+            offset: 7,
+            limit: 5,
+        },
+    );
+    assert_eq!((last.total, last.next), (Some(10), None));
+    let middle = Page::window(
+        vec![1, 2],
+        10,
+        zeyn::Span {
+            offset: 2,
+            limit: 2,
+        },
+    );
+    assert_eq!(middle.next.unwrap().0, "4");
+    let past = Page::<i32>::window(
+        Vec::new(),
+        10,
+        zeyn::Span {
+            offset: 50,
+            limit: 5,
+        },
+    );
+    assert!(
+        past.next.is_none() && past.items.is_empty(),
+        "no cursor that loops"
+    );
+    let all = [1, 2, 3, 4, 5];
+    let slice = Page::from_slice(
+        &all,
+        &query(serde_json::json!({ "type": "offset", "offset": 3, "limit": 2 })),
+    );
+    assert_eq!((slice.items, slice.next), (vec![4, 5], None));
+}
+
+#[tokio::test]
+async fn a_grid_over_a_computed_million_rows_loads_only_its_page() {
+    let page = million::run(
+        serde_json::from_value(
+            serde_json::json!({ "page": { "type": "offset", "offset": 750_000, "limit": 25 } }),
+        )
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(page.items.len(), 25);
+    assert_eq!(page.items[0].id, ItemId(750_001));
+    assert_eq!(page.total, Some(1_000_000));
+    assert_eq!(page.next.unwrap().0, "750025");
+}

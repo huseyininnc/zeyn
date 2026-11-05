@@ -141,6 +141,7 @@ pub async fn move_leave(req: TransitionRequest<LeaveRequestId>, store: LeaveStor
   botón por cada transición que el usuario puede hacer desde ese estado (`Workflow::allowed`). La clave del registro la toma
   la pantalla en el servidor, así que un cliente no puede mover otro registro. Los agentes lo ven como una herramienta de formulario.
 - Las etiquetas de los botones provienen de `workflow.<name>` en los catálogos; `.label(...)` establece una a mano.
+- `.confirm(name, message)` pregunta antes de que el paso `name` se ejecute, en el diálogo de `ActionButton::confirm`, y `.tone(name, Tone::Danger)` dibuja su botón en rojo. El servidor comprueba el paso y su permiso en cualquier caso.
 - `Workflow::check` informa de permisos no válidos y de transiciones declaradas dos veces desde el mismo estado;
   llámalo en una prueba.
 - Las solicitudes de permiso del showcase usan esto: guardar como borrador, enviar y luego aprobar o rechazar.

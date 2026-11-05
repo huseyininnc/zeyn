@@ -51,6 +51,33 @@ Feature::new("shop")
 
 사이트 셸 Screen과 앱 셸 Screen 사이의 이동은 페이지 로드 없이 `nav.js`를 거칩니다. 부분 응답이 어느 셸에 속하는지 알려 주고(`x-zeyn-shell`), 이것이 현재 프레임과 다르면 런타임은 언어 변경과 같은 방식으로 전체 프레임을 교체하고 다른 셸의 스타일시트와 스크립트를 불러옵니다. `/_zeyn/route/{screen}`으로 가는 링크(이동 경로의 링크)도 같은 방식으로 따라갑니다.
 
+## 화면 안의 테마 선택기
+
+`ThemePicker::new()`는 설정 페이지의 모양 섹션처럼 화면 안에 테마 선택기를 둡니다. `App::themes`의 테마를 제공하며(앱이 기기를 따르면 시스템 포함) 사용 중인 테마를 보여 줍니다.
+
+```rust
+#[screen(route = "/settings/appearance", permission = "settings.read")]
+pub fn appearance() -> Screen {
+    Screen::new(t!("settings.appearance")).body(Panel::new(t!("settings.theme")).add(ThemePicker::new()))
+}
+```
+
+셸의 선택기와 같은 컨트롤입니다. 선택은 페이지를 다시 불러오지 않고 바로 적용되고, `zeyn_theme` 쿠키에(로그인한 사용자는 뷰 저장소에도) 저장되며, 페이지의 다른 선택기에도 함께 표시됩니다. 앱이 선택을 제공하지 않으면(`theme_picker(false)` 또는 테마 하나) 아무것도 그리지 않습니다.
+
+## 앱 헤더
+
+`App::header(|h| ...)`는 앱 셸의 화면 위에 사이트 헤더와 같은 슬롯(`start`, `center`, `end`, `bottom`)을 가진 막대를 둡니다. 가운데에는 검색 상자를, 끝에는 알림 링크를 둡니다. `sign_in()`, `language()`, `theme()`도 여기서 쓸 수 있지만, 선택기는 이미 사이드 메뉴에 있습니다.
+
+```rust
+App::new(t!("app.name"))
+    .header(|h| {
+        h.center(SearchBox::of(search_all).results(search_results))
+            .end(LinkButton::new(t!("app.notifications"), notifications, ()))
+    })
+```
+
+화면을 스크롤해도 막대는 위에 남고, 화면은 페이지를 다시 불러오지 않고 그 아래에서 바뀝니다. 휴대폰에서는 메뉴 버튼 아래에 놓이고 가운데 슬롯은 한 줄을 따로 차지합니다. 막대의 컴포넌트는 화면의 컴포넌트처럼 사용자 기준으로 그려지며, 검색 상자는 자기 액션으로 제안을 불러오고 서버가 그 액션의 권한을 확인합니다. `App::header`가 없으면 앱 셸에는 상단 막대가 없습니다.
+
 ## 명령
 
 명령은 레이블, 단축키, 동작과 함께 Rust로 한 번 선언합니다. Feature에 등록하면 팔레트가 이를 나열하고 단축키는 모든 페이지에서 동작합니다.

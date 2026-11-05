@@ -39,6 +39,8 @@ pub fn product_editor(params: ProductParams, store: ProductStore) -> Result<Scre
 
 Parametreler kullanıldıkları her yerde tiplidir: `Window::open(product_editor, 7)` derlenmez, çünkü editör `ProductParams` alır.
 
+Bir `#[params]` yapısının bütün alanları `Option` olduğunda ekran parametresiz de açılır (bir menü bağlantısından ya da düz bir adresten); bütün alanlar `None` olur. İsteğe bağlı olmayan bir alanın değeri yine gerekir: değer yoksa ekran 404 döner.
+
 `route` olmayan bir screen'in URL'si yoktur. Bir bağlantıdan, araç çubuğu düğmesinden, menüden ya da komuttan pencere olarak açılır.
 
 ## Yolda parametreler
@@ -138,6 +140,21 @@ Screen::new(t!("stock.products"))
 ```
 
 `Alt+N` gibi kısayollar screen üzerinde çalışır ve palette'te gösterilir. Tarayıcının kullandığı kısayollar (`Ctrl+P`, `Ctrl+S`, `F5`), düğme `.override_browser()` çağırmadıkça bağlanmaz ve tarayıcının hiç iletmediği kısayollar (`Ctrl+N`, `Ctrl+T`, `Ctrl+W`) hiçbir zaman bağlanmaz; serbest kombinasyonlar `Alt+Shift+<harf>` ve `Ctrl+Alt+<harf>` biçimindedir.
+
+Düğmeler, menü grupları ve araçlar için simgeler `Icon` içinden gelir: `Plus`, `Edit`, `Delete`, `Save`, `Search`, `Box`, `Cart`, `Table`, `Home`, `Chart`, `Users`, `Settings`, `Bell`, `Shield`, `Clock`, `Tag`, `Mail`, `SignOut`, `ArrowUp`, `ArrowDown`. Bunlar `zeyn.css` içinde 24 px'lik bir ızgarada 2 px yuvarlak çizgiyle çizilmiş maskelerdir, metnin rengini alır ve ekran okuyuculardan gizlenir; anlamı her zaman etiket taşır.
+
+## Başlık
+
+`.subtitle(text)` başlığın altına kısa bir satır koyar, `.primary(|t| ...)` ise ekranın ana işlemlerini başlık satırının sonuna birincil düğmeler olarak yerleştirir. İkisi birlikte çoğu yönetim ekranında olan sayfa başlığını oluşturur.
+
+```rust
+Screen::new(t!("orders.title"))
+    .subtitle(t!("orders.intro"))
+    .primary(|t| t.button(t!("orders.new")).icon(Icon::Plus).shortcut("Alt+N").opens(order_editor, OrderParams { id: None }))
+    .toolbar(|t| t.export(Export::Csv))
+```
+
+`.primary`, `.toolbar` ile aynı düğmeleri, aynı kısayolları ve palet girdileriyle alır; araç çubuğu diğer araçlar için başlığın altında kalır. Alt başlık, ekran okuyucular için ekranın açıklamasıdır (`aria-describedby`). Satır dar geldiğinde işlemler başlığın altına kayar, telefonda başa hizalanır. Alt başlık ya da ana işlem yoksa ekran eskisi gibi düz bir başlıkla çizilir.
 
 ## Feature'lar ve menü
 

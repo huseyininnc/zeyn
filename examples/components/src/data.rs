@@ -50,6 +50,58 @@ pub struct Event {
     pub starts: String,
 }
 
+/// A warehouse total of the sample shop: large whole numbers, a year and a decimal.
+#[entity(table = "warehouses")]
+pub struct Warehouse {
+    #[key]
+    pub id: WarehouseId,
+    pub city: String,
+    pub units: i64,
+    pub opened: i64,
+    #[rule(scale = 1)]
+    pub tons: Decimal,
+}
+
+/// Sample warehouses.
+#[action(public)]
+pub async fn search_warehouses(q: DataQuery) -> Result<Page<Warehouse>> {
+    let rows = [
+        ("Istanbul", 1_284_310, 1998, 48_215),
+        ("Izmir", 642_005, 2006, 23_904),
+        ("Ankara", 98_760, 2014, 3_506),
+        ("Bursa", 7_250, 2021, 412),
+    ]
+    .into_iter()
+    .zip(1..)
+    .map(|((city, units, opened, tons), id)| Warehouse {
+        id: WarehouseId(id),
+        city: city.into(),
+        units,
+        opened,
+        tons: Decimal::new(tons, 1).unwrap_or_default(),
+    })
+    .collect();
+    Ok(q.apply(rows))
+}
+
+/// A million computed products: only the rows of the asked page are built, from their number.
+#[action(public)]
+pub async fn million_products(q: DataQuery) -> Result<Page<Product>> {
+    const TOTAL: u64 = 1_000_000;
+    let span = q.span();
+    let rows = (span.offset..span.end().min(TOTAL))
+        .map(|n| {
+            let base = &PRODUCTS[(n % PRODUCTS.len() as u64) as usize];
+            Product {
+                id: ProductId(n as i64 + 1),
+                code: format!("M-{:07}", n + 1),
+                ..base.clone()
+            }
+        })
+        .collect();
+    Ok(Page::window(rows, TOTAL, span))
+}
+
 /// The address of sample picture `n` (1 to 12), served by the site as an SVG.
 pub fn picture(n: i64) -> String {
     format!("/site/img/{}.svg", n.rem_euclid(12) + 1)
@@ -246,5 +298,17 @@ pub async fn slow_count(_: ()) -> Result<i64> {
 /// Pretends to save. Nothing is stored.
 #[action(public)]
 pub async fn pretend_save(_: ()) -> Result<()> {
+    Ok(())
+}
+
+/// Pretends to delete one product. Nothing changes.
+#[action(public)]
+pub async fn pretend_delete(_: ProductId) -> Result<()> {
+    Ok(())
+}
+
+/// Pretends to delete the selected products. Nothing changes.
+#[action(public)]
+pub async fn pretend_delete_all(_: Vec<ProductId>) -> Result<()> {
     Ok(())
 }

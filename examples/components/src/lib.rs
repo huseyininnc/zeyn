@@ -103,6 +103,7 @@ catalog! {
         tabs "/ui/tabs";
         split "/ui/split";
         auto_grid "/ui/auto-grid";
+        screen_header "/ui/screen-header";
     }
     "text" Edit {
         heading "/ui/heading";
@@ -110,6 +111,7 @@ catalog! {
         meta_line "/ui/meta-line";
         badge "/ui/badge";
         avatar "/ui/avatar";
+        icon "/ui/icon";
         description_list "/ui/description-list";
         timeline "/ui/timeline";
         markdown "/ui/markdown";
@@ -170,6 +172,8 @@ catalog! {
     "shell" Box {
         toolbox "/ui/toolbox";
         status_bar "/ui/status-bar";
+        app_header "/ui/app-header";
+        theme_picker "/ui/theme-picker";
     }
 }
 
@@ -244,7 +248,8 @@ pub fn feature() -> Feature {
     with_screens(
         Feature::new("components")
             .screen(catalog_home)
-            .screen(examples::image_card::product),
+            .screen(examples::image_card::product)
+            .screen(examples::screen_header::orders_page),
     )
 }
 
@@ -257,6 +262,7 @@ pub fn app() -> std::result::Result<App, String> {
         .i18n(i18n)
         .csp(|c| c.frame_src(["https://www.openstreetmap.org"]))
         .home(catalog_home)
+        .header(examples::app_header::catalog_header)
         .prefetch(zeyn::Prefetch::Moderate)
         .client_prefs(|p| {
             p.key(examples::tabs::DELIVERY_TAB)

@@ -13,7 +13,16 @@ use serde_json::{Map, Value as Json, json};
 use std::sync::Arc;
 
 into_node!(
-    Alert, Badge, EmptyState, Skeleton, Progress, Breadcrumb, Timeline, LinkButton, ClearPrefs
+    Alert,
+    Badge,
+    EmptyState,
+    Skeleton,
+    Progress,
+    Breadcrumb,
+    Timeline,
+    LinkButton,
+    ClearPrefs,
+    ThemePicker
 );
 
 pub use crate::grid::Tone;
@@ -270,6 +279,40 @@ impl Component for ClearPrefs {
 
     fn schema(&self) -> Json {
         json!({ "type": "clear_prefs", "label": self.label })
+    }
+}
+
+/// The theme picker inside a screen, such as an Appearance section of a settings page. It offers
+/// the themes of `App::themes` like the picker of the shell, and both stay in step: a choice in
+/// either is shown in the other at once, applied without a page load and kept in the theme
+/// cookie. Renders nothing when the app offers no theme choice.
+///
+/// ```
+/// use zeyn::ui::ThemePicker;
+/// let picker = ThemePicker::new();
+/// ```
+#[derive(Default)]
+pub struct ThemePicker;
+
+impl ThemePicker {
+    pub fn new() -> Self {
+        ThemePicker
+    }
+}
+
+impl Component for ThemePicker {
+    fn render(&self, out: &mut String, r: &Render) {
+        if let Some(ctx) = r.ctx {
+            out.push_str(&crate::server::theme_picker(
+                ctx,
+                r,
+                &crate::ui::dom_id(r, "theme"),
+            ));
+        }
+    }
+
+    fn schema(&self) -> Json {
+        json!({ "type": "theme_picker" })
     }
 }
 

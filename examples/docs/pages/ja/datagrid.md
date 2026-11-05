@@ -63,12 +63,16 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 | `.link(\|row\| effect)` | セルを、エフェクトを実行するリンクにします |
 | `.pin_start()`, `.hidden()` | 先頭に固定する、またはユーザーが表示するまで非表示にします |
 | `.editable()` | その場で編集でき、`.edit_with(action)` で保存されます |
+| `.plain()` | 整数を桁区切りなしで表示します。コードや年に |
+
+数値と金額は右寄せで、等幅の数字で表示されます。整数はグリッドのセルや `DescriptionList` などの表示値で、ユーザーのロケールに従って桁区切りされます（英語は `1,234,567`、トルコ語は `1.234.567`）。`#[key]` の ID は区切らず、`.plain()` で 1 列だけ区切りをやめられます。
 
 ## 行
 
 - `.on_open(|row| effect)`: 行のダブルクリックまたは Enter。
 - `.row_action(label, action, |row| input)`: 各行のボタン。
 - `.bulk_action(label, action, M::id)`: 選択した行に対して実行します。
+- `.row_action` または `.bulk_action` の直後の `.confirm(message)` と `.tone(Tone::Danger)`: その操作の実行前に `ActionButton::confirm` と同じダイアログで確認し（フォーカスは最初にキャンセル）、ボタンを赤で描きます。
 - `.row_menu(|row| ContextMenu)`: 行の右クリックメニュー。
 - `.row_style(|row| Option<RowStyle>)`: danger、warning、success の行。
 - `.exportable()`: フィルター後の行の CSV エクスポート。サーバーがストリーミングします。

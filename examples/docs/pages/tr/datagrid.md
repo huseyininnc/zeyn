@@ -63,12 +63,16 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 | `.link(\|row\| effect)` | Hücreyi, bir effect çalıştıran bağlantı yapar |
 | `.pin_start()`, `.hidden()` | Başa sabitlenir ya da kullanıcı gösterene kadar gizlenir |
 | `.editable()` | Yerinde düzenlenebilir, `.edit_with(action)` ile kaydedilir |
+| `.plain()` | Tam sayıları grup ayırıcısı olmadan gösterir; kodlar ve yıllar için |
+
+Sayılar ve para tutarları sağa hizalanır ve sabit genişlikli rakamlarla yazılır. Tam sayılar kullanıcının yerel ayarına göre gruplanır (İngilizcede `1,234,567`, Türkçede `1.234.567`); bu, grid hücrelerinde ve `DescriptionList` gibi görüntüleme değerlerinde geçerlidir. `#[key]` kimlikleri hiç gruplanmaz, `.plain()` ise tek bir sütunda gruplamayı kapatır.
 
 ## Satırlar
 
 - `.on_open(|row| effect)`: bir satırda çift tıklama veya Enter.
 - `.row_action(label, action, |row| input)`: her satırda bir düğme.
 - `.bulk_action(label, action, M::id)`: seçili satırlarda çalışır.
+- `.row_action` ya da `.bulk_action` hemen ardından `.confirm(message)` ve `.tone(Tone::Danger)`: o işlem çalışmadan önce `ActionButton::confirm` ile aynı pencerede sorar (odak önce İptal'dedir) ve düğmesini kırmızı çizer.
 - `.row_menu(|row| ContextMenu)`: bir satırın sağ tık menüsü.
 - `.row_style(|row| Option<RowStyle>)`: danger, warning veya success satırlar.
 - `.exportable()`: filtrelenmiş satırların CSV dışa aktarımı, sunucu tarafından akıtılır.

@@ -63,12 +63,16 @@ El servidor limita el tamaño de página pida lo que pida el cliente.
 | `.link(\|row\| effect)` | Convierte la celda en un enlace que ejecuta un effect |
 | `.pin_start()`, `.hidden()` | Fijada al inicio, u oculta hasta que el usuario la muestre |
 | `.editable()` | Editable en el sitio, se guarda con `.edit_with(action)` |
+| `.plain()` | Números enteros sin separadores de miles, para códigos y años |
+
+Los números y los importes se alinean a la derecha con cifras tabulares. Los enteros se agrupan según la configuración regional del usuario (`1,234,567` en inglés, `1.234.567` en turco), en las celdas de la tabla y en valores mostrados como `DescriptionList`; los identificadores `#[key]` nunca se agrupan, y `.plain()` desactiva la agrupación en una columna.
 
 ## Filas
 
 - `.on_open(|row| effect)`: doble clic o Enter en una fila.
 - `.row_action(label, action, |row| input)`: un botón en cada fila.
 - `.bulk_action(label, action, M::id)`: se ejecuta sobre las filas seleccionadas.
+- `.confirm(message)` y `.tone(Tone::Danger)` justo después de `.row_action` o `.bulk_action`: pregunta antes de que esa acción se ejecute, en el mismo diálogo que `ActionButton::confirm` (el foco empieza en Cancelar), y dibuja su botón en rojo.
 - `.row_menu(|row| ContextMenu)`: el menú contextual de una fila.
 - `.row_style(|row| Option<RowStyle>)`: filas de peligro, advertencia o éxito.
 - `.exportable()`: exportación CSV de las filas filtradas, enviada en streaming por el servidor.

@@ -39,6 +39,8 @@ pub fn product_editor(params: ProductParams, store: ProductStore) -> Result<Scre
 
 Los params están tipados en todos los sitios donde se usan: `Window::open(product_editor, 7)` no compila, porque el editor recibe `ProductParams`.
 
+Cuando todos los campos de una estructura `#[params]` son `Option`, la pantalla también se abre sin parámetros, desde un enlace del menú o una dirección simple, con todos los campos en `None`. Un campo que no es opcional sigue necesitando su valor: sin él, la pantalla responde 404.
+
 Una pantalla sin `route` no tiene URL. Se abre como ventana desde un enlace, un botón de la barra de herramientas, un menú o un comando.
 
 ## Params in the path
@@ -138,6 +140,21 @@ Screen::new(t!("stock.products"))
 ```
 
 Los atajos como `Alt+N` funcionan en la pantalla y se muestran en la paleta. Los atajos que usa el navegador (`Ctrl+P`, `Ctrl+S`, `F5`) no se enlazan salvo que el botón llame a `.override_browser()`, y los que el navegador nunca deja pasar (`Ctrl+N`, `Ctrl+T`, `Ctrl+W`) nunca se enlazan; las combinaciones libres son `Alt+Shift+<letra>` y `Ctrl+Alt+<letra>`.
+
+Los iconos de botones, grupos de menú y herramientas vienen de `Icon`: `Plus`, `Edit`, `Delete`, `Save`, `Search`, `Box`, `Cart`, `Table`, `Home`, `Chart`, `Users`, `Settings`, `Bell`, `Shield`, `Clock`, `Tag`, `Mail`, `SignOut`, `ArrowUp`, `ArrowDown`. Son máscaras en `zeyn.css` dibujadas en una cuadrícula de 24 px con un trazo redondeado de 2 px, toman el color del texto y se ocultan a los lectores de pantalla, así que la etiqueta siempre lleva el significado.
+
+## Cabecera
+
+`.subtitle(text)` pone una línea breve bajo el título, y `.primary(|t| ...)` coloca las acciones principales de la pantalla al final de la fila del título, como botones primarios. Juntos forman la cabecera de página que tienen casi todas las pantallas de administración.
+
+```rust
+Screen::new(t!("orders.title"))
+    .subtitle(t!("orders.intro"))
+    .primary(|t| t.button(t!("orders.new")).icon(Icon::Plus).shortcut("Alt+N").opens(order_editor, OrderParams { id: None }))
+    .toolbar(|t| t.export(Export::Csv))
+```
+
+`.primary` acepta los mismos botones que `.toolbar`, con los mismos atajos y entradas de la paleta; la barra de herramientas sigue bajo la cabecera para las demás herramientas. El subtítulo es la descripción de la pantalla para los lectores de pantalla (`aria-describedby`). Si la fila es demasiado estrecha, las acciones pasan bajo el título, y en el teléfono se alinean al inicio. Sin subtítulo ni acciones principales, la pantalla se muestra como antes, con un título sencillo.
 
 ## Features y el menú
 

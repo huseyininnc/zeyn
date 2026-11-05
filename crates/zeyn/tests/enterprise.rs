@@ -2286,3 +2286,33 @@ async fn password_values_never_reach_the_audit_trail() {
     assert_eq!((&password.old, &password.new), (&None, &None));
     assert!(line.contains("a@example.com"));
 }
+
+#[test]
+fn workflow_transitions_can_ask_for_a_confirmation_and_look_destructive() {
+    let identity = Identity::user("m").with_permissions(["req.approve"]);
+    let ctx = Ctx::for_tests(identity.clone(), zeyn::Services::default());
+    let moves = Transitions::of(
+        request_flow(),
+        Stage::Submitted,
+        Request2Id(1),
+        move_request,
+    )
+    .confirm("reject", "Reject <this> request?")
+    .tone("reject", zeyn::Tone::Danger);
+    let mut html = String::new();
+    zeyn::Component::render(
+        &moves,
+        &mut html,
+        &zeyn::Render::english("s")
+            .with_identity(&identity)
+            .with_ctx(&ctx),
+    );
+    assert!(
+        html.contains(r#"<button type="submit" class="z-button" data-zeyn-transition="approve" data-testid="s.transition.approve">"#),
+        "{html}"
+    );
+    assert!(
+        html.contains(r#"<button type="submit" class="z-button z-danger-button" data-zeyn-transition="reject" data-testid="s.transition.reject" data-zeyn-confirm="Reject &lt;this&gt; request?" data-text-title="Please confirm" data-text-ok="#),
+        "{html}"
+    );
+}

@@ -63,12 +63,16 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 | `.link(\|row\| effect)` | सेल को ऐसा लिंक बनाता है जो effect चलाता है |
 | `.pin_start()`, `.hidden()` | शुरुआत में पिन, या उपयोगकर्ता के दिखाने तक छिपा |
 | `.editable()` | उसी जगह संपादन योग्य, `.edit_with(action)` से सहेजा जाता है |
+| `.plain()` | पूर्णांक बिना समूह विभाजक के, कोड और वर्षों के लिए |
+
+संख्याएँ और राशियाँ दाईं ओर संरेखित होती हैं और समान चौड़ाई वाले अंकों में दिखती हैं। पूर्णांक ग्रिड सेल में और `DescriptionList` जैसे प्रदर्शित मानों में उपयोगकर्ता के लोकेल के अनुसार समूहित होते हैं (अंग्रेज़ी में `1,234,567`, तुर्की में `1.234.567`); `#[key]` id कभी समूहित नहीं होते, और `.plain()` एक कॉलम के लिए समूहन बंद करता है।
 
 ## पंक्तियाँ
 
 - `.on_open(|row| effect)`: पंक्ति पर डबल क्लिक या Enter।
 - `.row_action(label, action, |row| input)`: हर पंक्ति पर एक बटन।
 - `.bulk_action(label, action, M::id)`: चुनी गई पंक्तियों पर चलती है।
+- `.row_action` या `.bulk_action` के ठीक बाद `.confirm(message)` और `.tone(Tone::Danger)`: वह क्रिया चलने से पहले `ActionButton::confirm` वाले संवाद में ही पूछता है (फ़ोकस पहले रद्द करें पर रहता है), और उसका बटन लाल दिखाता है।
 - `.row_menu(|row| ContextMenu)`: पंक्ति का राइट क्लिक मेनू।
 - `.row_style(|row| Option<RowStyle>)`: danger, warning या success पंक्तियाँ।
 - `.exportable()`: फ़िल्टर की गई पंक्तियों का CSV निर्यात, सर्वर द्वारा स्ट्रीम किया गया।

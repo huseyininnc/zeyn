@@ -30,6 +30,14 @@ impl<E: Model, T> DataGridColumn<E, T> {
         self
     }
 
+    /// Shows whole numbers without the locale's group separators (`1000002`, not `1,000,002`),
+    /// for codes, years and numbers people copy. Integer columns are grouped unless set; keys
+    /// (`#[key]` ids) are never grouped.
+    pub fn plain(mut self) -> Self {
+        self.last().plain = true;
+        self
+    }
+
     /// Adds a filter box to the column.
     pub fn filter(mut self) -> Self {
         self.last().filter = true;

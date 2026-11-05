@@ -63,12 +63,16 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 | `.link(\|row\| effect)` | 셀을 effect를 실행하는 링크로 만듭니다 |
 | `.pin_start()`, `.hidden()` | 시작 쪽에 고정하거나, 사용자가 표시할 때까지 숨깁니다 |
 | `.editable()` | 그 자리에서 편집할 수 있으며 `.edit_with(action)`으로 저장됩니다 |
+| `.plain()` | 정수를 자릿수 구분 기호 없이 표시합니다. 코드와 연도용 |
+
+숫자와 금액은 오른쪽 정렬되고 고정폭 숫자로 표시됩니다. 정수는 그리드 셀과 `DescriptionList` 같은 표시 값에서 사용자 로캘에 따라 묶어 표시됩니다(영어 `1,234,567`, 터키어 `1.234.567`). `#[key]` id는 묶지 않으며, `.plain()`은 한 열의 묶음 표시를 끕니다.
 
 ## 행
 
 - `.on_open(|row| effect)`: 행에서 더블 클릭 또는 Enter.
 - `.row_action(label, action, |row| input)`: 각 행의 버튼.
 - `.bulk_action(label, action, M::id)`: 선택한 행에서 실행됩니다.
+- `.row_action`이나 `.bulk_action` 바로 뒤의 `.confirm(message)`와 `.tone(Tone::Danger)`: 그 작업이 실행되기 전에 `ActionButton::confirm`과 같은 대화 상자로 묻고(포커스는 먼저 취소에 있음), 버튼을 빨간색으로 그립니다.
 - `.row_menu(|row| ContextMenu)`: 행의 오른쪽 클릭 메뉴.
 - `.row_style(|row| Option<RowStyle>)`: danger, warning, success 행.
 - `.exportable()`: 필터링된 행의 CSV 내보내기이며 서버가 스트리밍합니다.

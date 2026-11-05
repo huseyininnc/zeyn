@@ -62,6 +62,19 @@ Chart::funnel("Checkout").labels(["Visited", "Cart", "Paid"]).series("People", [
 ```rust
 Kpi::new("Revenue this month", 184_250.0).delta(12.4).target(200_000.0).trend([140.0, 152.0, 160.0, 184.0])
 Kpi::new("Average wait", 6.5).decimals(1).unit("min").delta(-9.0).lower_is_better()
+Kpi::money("Revenue", Money::tl(18_425_050)).delta(4.2).target(200_000.0)
+```
+
+`Kpi::money` показывает сумму с валютой в локали пользователя (`₺184,250.50` по-английски, `184.250,50 ₺` по-турецки), а цель в той же валюте.
+
+Kpi в одном `Row` или `AutoGrid` одной высоты с самым высоким, есть у них тренд или нет, и спарклайн стоит внизу каждой карточки. `Row` из Kpi даёт каждому четверть ширины: на компьютере четыре заполняют строку, ниже примерно 830 px строка переносится по два, ниже 480 px по одному (через container query на строке, поэтому строка Kpi в узкой колонке переносится раньше). Графики занимают всю ширину контейнера и сохраняют пропорции. Кольцевые диаграммы и шкалы не выше 18rem и стоят по центру.
+
+```rust
+Row::new()
+    .col(Kpi::money("Revenue", revenue).delta(12.4).trend(weekly))
+    .col(Kpi::new("Orders", 1_284.0).delta(3.1))
+    .col(Kpi::new("New customers", 312.0).delta(-2.0))
+    .col(Kpi::money("Average order", average).delta(0.0))
 ```
 
 В `DataGrid` колонка `Vec<f64>` рисуется как спарклайн, а колонка с числом или деньгами как bullet относительно цели:
@@ -72,4 +85,4 @@ DataGrid::of(search_reps)
     .column(Rep::weeks).cell(SparklineCell::new())
 ```
 
-Оба это один небольшой SVG на ячейку с именем вроде "Trend of 12 values from 40 to 61, lowest 12, highest 99". Бюджет: около 0,65 КБ HTML на строку для обеих ячеек; 10 000 строк с обеими отрисовываются примерно за 0,4 с в отладочной сборке (`sparkline_and_bullet_cells_render_ten_thousand_rows_quickly`), а таблицы отрисовывают только видимые строки. `charts.js` добавляет 3,7 КБ исходного (1,4 КБ gzip), а `charts.css` 3,3 КБ (1,1 КБ gzip).
+Оба это один небольшой SVG на ячейку с именем вроде "Trend of 12 values from 40 to 61, lowest 12, highest 99". Бюджет: около 0,65 КБ HTML на строку для обеих ячеек; 10 000 строк с обеими отрисовываются примерно за 0,4 с в отладочной сборке (`sparkline_and_bullet_cells_render_ten_thousand_rows_quickly`), а таблицы отрисовывают только видимые строки. `charts.js` добавляет 3,7 КБ исходного (1,4 КБ gzip), а `charts.css` 4,1 КБ (1,3 КБ gzip).

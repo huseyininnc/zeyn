@@ -61,6 +61,17 @@ return Err(errors.into());
 
 Listeler bir `DataQuery` alır ve `Page<M>` döndürür. Bir liste action'ı asla her satırı döndürmez; grid sayfa ister ve istemci ne gönderirse göndersin sunucu sayfa boyutunu sınırlar.
 
+Uygulamanın hesapladığı ya da kendi dizininde tuttuğu bir tablo için (milyonlarca satır, kimliklerinden üretilen olaylar) `q.span()` istenen satırları, numaralı sayfalardan da imleçten de, bir başlangıç ve bir sınır olarak verir; `Page::window(rows, total, span)` bunları toplamla ve bir sonraki satırın imleciyle döndürür. Yalnızca sayfanın satırları oluşturulur; sıralama ve süzgeçleri uygulama `q.sort` ve `q.filters` üzerinden kendisi uygular.
+
+```rust
+#[action(permission = "audit.read")]
+pub async fn search_events(q: DataQuery, log: EventLog) -> Result<Page<Event>> {
+    let span = q.span();
+    let rows = log.range(span.offset, span.limit)?;
+    Ok(Page::window(rows, log.len()?, span))
+}
+```
+
 ## Bağlam
 
 `Ctx` istektir: `ctx.identity()`, `ctx.locale()`, `ctx.time_zone()`, `ctx.now()`, `ctx.today()`, `ctx.tenant()`, `ctx.license()`, `ctx.config()`, `ctx.theme()` ve `ctx.t(&text)`. Testler zamanı `App::fixed_now` ile sabitleyebilsin diye sistem saati yerine `ctx.now()` ve `ctx.today()` kullanın.

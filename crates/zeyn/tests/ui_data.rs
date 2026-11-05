@@ -341,6 +341,65 @@ fn kpi_cards_show_value_direction_target_and_trend() {
 }
 
 #[test]
+fn kpi_money_shows_the_currency_in_the_users_locale() {
+    let render = |k: Kpi, locale: &str| {
+        let mut out = String::new();
+        k.render(&mut out, &Render::new("s", locale, I18n::builtin()));
+        out
+    };
+    let en = render(
+        Kpi::money("Revenue", Money::tl(18_425_050)).target(200_000.0),
+        "en",
+    );
+    assert!(
+        en.contains(r#"<p class="z-kpi-value">₺184,250.50</p>"#),
+        "{en}"
+    );
+    assert!(en.contains("Target ₺200,000.00, 92% reached"), "{en}");
+    let tr = render(Kpi::money("Ciro", Money::tl(-1_050)), "tr");
+    assert!(tr.contains("-10,50 ₺"), "{tr}");
+    let schema = Kpi::money("Revenue", Money::tl(100)).schema();
+    assert_eq!(schema["currency"], "Try");
+    assert_eq!(schema["value"], 1.0);
+}
+
+#[test]
+fn kpis_share_the_height_of_their_row_and_wrap_four_two_one() {
+    let css = include_str!("../assets/charts.css");
+    assert!(css.contains(".z-col > .z-node:has(> .z-kpi) { height: 100%; }"));
+    assert!(css.contains(".z-autogrid > .z-node:has(> .z-kpi)"));
+    assert!(css.contains("align-items: stretch"));
+    assert!(css.contains(".z-kpi-trend { margin-top: auto; }"));
+    for basis in [
+        "calc((100% - 3 * var(--z-gap)) / 4 - 0.1px)",
+        "calc((100% - var(--z-gap)) / 2 - 0.1px)",
+        "flex-basis: 100%",
+    ] {
+        assert!(css.contains(basis), "{basis}");
+    }
+    let components = include_str!("../assets/components.css");
+    assert!(
+        components.contains(
+            ".z-chart-svg { display: block; width: 100%; height: auto; overflow: visible; }"
+        ),
+        "charts fill the width of their container"
+    );
+    assert!(components.contains(".z-chart-round { max-height: 18rem; }"));
+    let mut donut = String::new();
+    Chart::donut("Units")
+        .labels(["A"])
+        .series("N", [1.0])
+        .render(&mut donut, &Render::english("s"));
+    assert!(donut.contains(r#"<svg class="z-chart-svg z-chart-round""#));
+    let mut bar = String::new();
+    Chart::bar("Sales")
+        .labels(["A"])
+        .series("N", [1.0])
+        .render(&mut bar, &Render::english("s"));
+    assert!(bar.contains(r#"<svg class="z-chart-svg" viewBox"#));
+}
+
+#[test]
 fn sparkline_and_bullet_cells_are_small_named_svgs() {
     use zeyn::CellRenderer;
     let r = Render::english("s");

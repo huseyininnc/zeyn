@@ -61,6 +61,17 @@ return Err(errors.into());
 
 सूचियाँ `DataQuery` लेती हैं और `Page<M>` लौटाती हैं। सूची action कभी हर पंक्ति नहीं लौटाती; ग्रिड पृष्ठ माँगता है, और क्लाइंट कुछ भी भेजे, सर्वर पृष्ठ का आकार सीमित रखता है।
 
+ऐसी तालिका के लिए जिसे ऐप ख़ुद गणना करता है या अपने इंडेक्स में रखता है (लाखों पंक्तियाँ, id से बनी घटनाएँ), `q.span()` माँगी गई पंक्तियाँ एक ऑफ़सेट और एक सीमा के रूप में देता है, चाहे वे क्रमांकित पेजों से हों या कर्सर से, और `Page::window(rows, total, span)` उन्हें कुल संख्या और अगली पंक्ति के कर्सर के साथ लौटाता है। केवल पेज की पंक्तियाँ बनती हैं; क्रम और फ़िल्टर ऐप `q.sort` और `q.filters` पढ़कर ख़ुद लगाता है।
+
+```rust
+#[action(permission = "audit.read")]
+pub async fn search_events(q: DataQuery, log: EventLog) -> Result<Page<Event>> {
+    let span = q.span();
+    let rows = log.range(span.offset, span.limit)?;
+    Ok(Page::window(rows, log.len()?, span))
+}
+```
+
 ## कॉन्टेक्स्ट
 
 `Ctx` अनुरोध है: `ctx.identity()`, `ctx.locale()`, `ctx.time_zone()`, `ctx.now()`, `ctx.today()`, `ctx.tenant()`, `ctx.license()`, `ctx.config()`, `ctx.theme()` और `ctx.t(&text)`। सिस्टम घड़ी के बजाय `ctx.now()` और `ctx.today()` इस्तेमाल करें, ताकि टेस्ट `App::fixed_now` से समय तय कर सकें।

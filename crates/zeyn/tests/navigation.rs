@@ -766,3 +766,75 @@ async fn prefetch_sends_speculation_rules_by_header_and_screens_see_prefetches()
     let (status, _) = get_with(&router, "/checkout", ("accept", "text/html")).await;
     assert_eq!(status, StatusCode::OK);
 }
+
+/// Params whose fields are all optional, such as a filter a menu link leaves out.
+#[params]
+pub struct FeedParams {
+    pub show: Option<String>,
+    pub page: Option<u32>,
+}
+
+#[screen(route = "/feed", public)]
+pub fn feed(p: FeedParams) -> Screen {
+    Screen::new(format!(
+        "Feed {} {}",
+        p.show.unwrap_or_else(|| "all".into()),
+        p.page.unwrap_or(1)
+    ))
+}
+
+/// Params with a required field.
+#[params]
+pub struct NeedsId {
+    pub id: i64,
+}
+
+#[screen(route = "/needs-id", public)]
+pub fn needs_id(p: NeedsId) -> Screen {
+    Screen::new(format!("Item {}", p.id))
+}
+
+#[tokio::test]
+async fn screens_whose_params_are_all_optional_open_without_params() {
+    let router = App::new("Opt")
+        .feature(
+            Feature::new("o")
+                .screen(feed)
+                .screen(needs_id)
+                .menu(|m| {
+                    m.group("Feed", Icon::Home)
+                        .item("Feed", feed)
+                }),
+        )
+        .router()
+        .unwrap();
+    let (status, _, page) = get(&router, "/feed", false).await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert!(page.contains("Feed all 1"), "{page}");
+    let (status, _, page) = get(
+        &router,
+        "/feed?params=%7B%22show%22%3A%22unread%22%7D",
+        false,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(page.contains("Feed unread 1"));
+    let (status, _, _) = get(&router, "/_zeyn/screen/feed", true).await;
+    assert_eq!(status, StatusCode::OK, "fragments open without params too");
+    let (status, _, _) = get(&router, "/needs-id", false).await;
+    assert_eq!(
+        status,
+        StatusCode::NOT_FOUND,
+        "a required field still needs its value"
+    );
+    let (status, _, _) = get(&router, "/feed?params=%7B%22page%22%3A%22x%22%7D", false).await;
+    assert_eq!(
+        status,
+        StatusCode::NOT_FOUND,
+        "values of the wrong type are refused"
+    );
+    assert!(
+        <FeedParams as zeyn::ApiInput>::from_json(serde_json::Value::Null).is_ok(),
+        "the API reads a missing value the same way"
+    );
+}

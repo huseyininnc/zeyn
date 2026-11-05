@@ -80,6 +80,10 @@
       "toast": "A short notice after an action.",
       "chart": "Bar, donut, combo and gauge charts.",
       "kpi": "A number with its change and trend.",
+      "app_header": "A bar over the screens of the app shell, with a search box and links.",
+      "theme_picker": "The theme choice inside a screen, in step with the menu.",
+      "icon": "The icons of buttons, menus and tools.",
+      "screen_header": "The title row of a screen: a subtitle and the main actions.",
       "toolbox": "A group of tool buttons, one selected.",
       "status_bar": "A bar of short status texts.",
       "relative_time": "A moment shown as \"5 minutes ago\" in the page language.",
@@ -130,7 +134,8 @@
       "chart": {
         "overview": "Example",
         "donut": "Donut",
-        "gauge": "Gauge"
+        "gauge": "Gauge",
+        "side_by_side": "Side by side, filling the width"
       },
       "chips": {
         "overview": "Filter chips",
@@ -143,7 +148,10 @@
         "overview": "Example"
       },
       "data_grid": {
-        "overview": "Example"
+        "overview": "Example",
+        "confirm_actions": "Row and bulk actions that ask first",
+        "numbers": "Numbers grouped by locale, a plain year",
+        "computed_million": "A million computed rows, built a page at a time"
       },
       "date_pickers": {
         "overview": "Example"
@@ -181,8 +189,23 @@
         "horizontal": "Horizontal",
         "with_preview": "With a hover preview"
       },
+      "screen_header": {
+        "orders_page": "A page header"
+      },
+      "theme_picker": {
+        "overview": "An Appearance section"
+      },
+      "app_header": {
+        "catalog_header": "The header of this catalog"
+      },
+      "icon": {
+        "overview": "Common icons",
+        "admin": "Admin icons"
+      },
       "kpi": {
-        "overview": "Example"
+        "overview": "Example",
+        "money": "Money",
+        "row_of_four": "A row of four, equal heights"
       },
       "line_editor": {
         "overview": "Example"

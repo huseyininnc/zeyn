@@ -61,6 +61,17 @@ return Err(errors.into());
 
 列表接受 `DataQuery` 并返回 `Page<M>`。列表 action 绝不会返回所有行；表格按页请求，并且无论客户端发送什么，服务器都会限制页大小。
 
+对于应用自己计算或保存在自身索引中的表（数百万行、由 id 生成的事件），`q.span()` 以偏移量和数量给出所请求的行，无论来自页码还是游标；`Page::window(rows, total, span)` 返回这些行，并带上总数和指向下一行的游标。只会构建本页的行；排序和筛选由应用读取 `q.sort` 和 `q.filters` 自行处理。
+
+```rust
+#[action(permission = "audit.read")]
+pub async fn search_events(q: DataQuery, log: EventLog) -> Result<Page<Event>> {
+    let span = q.span();
+    let rows = log.range(span.offset, span.limit)?;
+    Ok(Page::window(rows, log.len()?, span))
+}
+```
+
 ## 上下文
 
 `Ctx` 代表请求：`ctx.identity()`、`ctx.locale()`、`ctx.time_zone()`、`ctx.now()`、`ctx.today()`、`ctx.tenant()`、`ctx.license()`、`ctx.config()`、`ctx.theme()` 和 `ctx.t(&text)`。请使用 `ctx.now()` 和 `ctx.today()` 而不是系统时钟，这样测试可以通过 `App::fixed_now` 固定时间。

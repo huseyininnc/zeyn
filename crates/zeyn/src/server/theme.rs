@@ -551,6 +551,12 @@ impl Look {
 
     /// The theme picker for the menu, as the Zeyn select control. Empty when hidden.
     pub(super) fn picker(&self, r: &Render, current: &str) -> String {
+        self.picker_as(r, current, "z-theme", "z-locale")
+    }
+
+    /// The theme picker with the select's DOM id and the class of its wrapper. Every picker on
+    /// a page carries `data-zeyn-theme-picker`, so the runtime keeps them in step.
+    pub(crate) fn picker_as(&self, r: &Render, current: &str, id: &str, class: &str) -> String {
         if !self.picker {
             return String::new();
         }
@@ -575,10 +581,31 @@ impl Look {
             options.push_str(&option(&c.name, r.text(&c.label), c.scheme, c.custom));
         }
         format!(
-            r#"<div class="z-locale"><span id="z-theme-label">{}</span><div class="z-select" data-text-none=""><select id="z-theme" data-zeyn-theme-picker>{options}</select></div></div>"#,
+            r#"<div class="{class}"><span id="{id}-label">{}</span><div class="z-select" data-text-none=""><select id="{id}" data-zeyn-theme-picker>{options}</select></div></div>"#,
             r.text(&Text::key("zeyn.shell.theme"))
         )
     }
+}
+
+/// The app's themes as a service, so a [`crate::ui::ThemePicker`] in a screen offers the same
+/// choices as the shell's picker.
+#[derive(Clone)]
+pub(crate) struct Looks(pub(crate) Arc<Look>);
+
+impl crate::ctx::Service for Looks {}
+
+/// The theme picker of a screen for the request's user, empty when the app offers no choice.
+pub(crate) fn screen_picker(ctx: &crate::ctx::Ctx, r: &Render, id: &str) -> String {
+    ctx.service::<Looks>()
+        .map(|l| {
+            l.0.picker_as(
+                r,
+                ctx.theme().unwrap_or("system"),
+                id,
+                "z-field z-theme-field",
+            )
+        })
+        .unwrap_or_default()
 }
 
 /// Contrast problems of a theme, with the organization's look and the kit's values under it.

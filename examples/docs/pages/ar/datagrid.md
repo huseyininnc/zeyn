@@ -63,12 +63,16 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 | `.link(\|row\| effect)` | يجعل الخلية رابطًا يشغّل تأثيرًا (effect) |
 | `.pin_start()`, `.hidden()` | مثبّت في البداية، أو مخفي إلى أن يُظهره المستخدم |
 | `.editable()` | قابل للتحرير في مكانه، ويُحفظ بـ `.edit_with(action)` |
+| `.plain()` | أعداد صحيحة دون فواصل الآلاف، للرموز والسنوات |
+
+تُحاذى الأرقام والمبالغ إلى اليمين بأرقام متساوية العرض. وتُجمَّع الأعداد الصحيحة حسب إعدادات المستخدم المحلية (`1,234,567` بالإنجليزية و`1.234.567` بالتركية) في خلايا الجدول وفي القيم المعروضة مثل `DescriptionList`؛ ولا تُجمَّع معرّفات `#[key]` أبدًا، ويوقف `.plain()` التجميع في عمود واحد.
 
 ## الصفوف
 
 - `.on_open(|row| effect)`: نقر مزدوج أو Enter على صف.
 - `.row_action(label, action, |row| input)`: زر على كل صف.
 - `.bulk_action(label, action, M::id)`: يعمل على الصفوف المحددة.
+- `.confirm(message)` و`.tone(Tone::Danger)` مباشرةً بعد `.row_action` أو `.bulk_action`: يسأل قبل تشغيل ذلك الإجراء في مربع الحوار نفسه الذي يستخدمه `ActionButton::confirm` (يبدأ التركيز على الإلغاء)، ويرسم زره باللون الأحمر.
 - `.row_menu(|row| ContextMenu)`: قائمة النقر الأيمن للصف.
 - `.row_style(|row| Option<RowStyle>)`: صفوف الخطر أو التحذير أو النجاح.
 - `.exportable()`: تصدير CSV للصفوف المصفّاة، يبثه الخادم (stream).

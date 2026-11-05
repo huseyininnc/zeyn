@@ -54,7 +54,7 @@ function initGrids(root) {
   if (!G && !root.querySelector?.('[data-zeyn-grid]')) return Promise.resolve();
   gridLoad ??= import(`${BASE}/_zeyn/grid.js${VERSION}`)
     .then((m) => {
-      m.install({ BASE, FILTER_DELAY_MS, MAX_COLUMN, MIN_COLUMN, UNREACHABLE, VIEW_SAVE_DELAY_MS, V_CACHE, V_CACHE_CELLS, V_CAP, V_FETCH_DELAY_MS, V_OVERSCAN, address, fill, fmt, grids, make, num, openMenu, paramsQuery, parseEffect, place, post, readJson, relativeTimes, runEffect, runEffects, str, toast });
+      m.install({ BASE, FILTER_DELAY_MS, MAX_COLUMN, MIN_COLUMN, UNREACHABLE, VIEW_SAVE_DELAY_MS, V_CACHE, V_CACHE_CELLS, V_CAP, V_FETCH_DELAY_MS, V_OVERSCAN, address, ask, fill, fmt, grids, make, num, openMenu, paramsQuery, parseEffect, place, post, readJson, relativeTimes, runEffect, runEffects, str, toast });
       return (G = m);
     })
     .catch((e) => {

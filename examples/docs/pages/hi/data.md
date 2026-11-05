@@ -62,6 +62,19 @@ Chart::funnel("Checkout").labels(["Visited", "Cart", "Paid"]).series("People", [
 ```rust
 Kpi::new("Revenue this month", 184_250.0).delta(12.4).target(200_000.0).trend([140.0, 152.0, 160.0, 184.0])
 Kpi::new("Average wait", 6.5).decimals(1).unit("min").delta(-9.0).lower_is_better()
+Kpi::money("Revenue", Money::tl(18_425_050)).delta(4.2).target(200_000.0)
+```
+
+`Kpi::money` किसी राशि को उपयोगकर्ता के लोकेल में उसकी मुद्रा के साथ दिखाता है (अंग्रेज़ी में `₺184,250.50`, तुर्की में `184.250,50 ₺`), और उसका लक्ष्य भी उसी मुद्रा में।
+
+एक `Row` या `AutoGrid` के Kpi सबसे ऊँचे Kpi जितने ऊँचे होते हैं, चाहे उनमें ट्रेंड हो या न हो, और स्पार्कलाइन हर कार्ड के नीचे रहती है। Kpi की एक `Row` हर Kpi को चौड़ाई का एक चौथाई देती है: डेस्कटॉप पर चार Kpi पंक्ति भर देते हैं, लगभग 830 px से कम पर पंक्ति दो-दो में और 480 px से कम पर एक-एक में टूटती है (पंक्ति पर container query से, इसलिए किसी संकरे कॉलम में Kpi की पंक्ति जल्दी टूटती है)। चार्ट अपने कंटेनर की पूरी चौड़ाई लेते हैं और अपना अनुपात बनाए रखते हैं। डोनट और गेज अधिकतम 18rem ऊँचे रहते हैं और बीच में दिखते हैं।
+
+```rust
+Row::new()
+    .col(Kpi::money("Revenue", revenue).delta(12.4).trend(weekly))
+    .col(Kpi::new("Orders", 1_284.0).delta(3.1))
+    .col(Kpi::new("New customers", 312.0).delta(-2.0))
+    .col(Kpi::money("Average order", average).delta(0.0))
 ```
 
 `DataGrid` में, `Vec<f64>` कॉलम स्पार्कलाइन के रूप में और संख्या या मुद्रा कॉलम लक्ष्य के विरुद्ध बुलेट के रूप में बनता है:
@@ -72,4 +85,4 @@ DataGrid::of(search_reps)
     .column(Rep::weeks).cell(SparklineCell::new())
 ```
 
-दोनों प्रति सेल एक छोटा SVG हैं, जिनका नाम "Trend of 12 values from 40 to 61, lowest 12, highest 99" जैसा होता है। बजट: दोनों सेल के लिए प्रति पंक्ति लगभग 0.65 KB HTML; दोनों की 10,000 पंक्तियाँ डिबग बिल्ड में लगभग 0.4 सेकंड में रेंडर होती हैं (`sparkline_and_bullet_cells_render_ten_thousand_rows_quickly`), और ग्रिड केवल दिख रही पंक्तियाँ रेंडर करते हैं। `charts.js` 3.7 KB कच्चा (1.4 KB gzip) और `charts.css` 3.3 KB (1.1 KB gzip) जोड़ते हैं।
+दोनों प्रति सेल एक छोटा SVG हैं, जिनका नाम "Trend of 12 values from 40 to 61, lowest 12, highest 99" जैसा होता है। बजट: दोनों सेल के लिए प्रति पंक्ति लगभग 0.65 KB HTML; दोनों की 10,000 पंक्तियाँ डिबग बिल्ड में लगभग 0.4 सेकंड में रेंडर होती हैं (`sparkline_and_bullet_cells_render_ten_thousand_rows_quickly`), और ग्रिड केवल दिख रही पंक्तियाँ रेंडर करते हैं। `charts.js` 3.7 KB कच्चा (1.4 KB gzip) और `charts.css` 4.1 KB (1.3 KB gzip) जोड़ते हैं।

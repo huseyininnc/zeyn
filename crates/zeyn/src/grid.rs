@@ -358,6 +358,25 @@ struct BulkDef {
     label: Text,
     meta: ActionMeta,
     run: BulkFn,
+    ask: Ask,
+}
+
+/// What a row or bulk action asks before it runs: a confirmation message, and whether it is
+/// drawn as destructive.
+#[derive(Default)]
+struct Ask {
+    confirm: Option<Text>,
+    danger: bool,
+}
+
+impl Ask {
+    /// The ` data-zeyn-confirm="..."` attribute of the button, or nothing.
+    fn attr(&self, r: &Render) -> String {
+        self.confirm
+            .as_ref()
+            .map(|m| format!(r#" data-zeyn-confirm="{}""#, r.text(m)))
+            .unwrap_or_default()
+    }
 }
 
 /// A button on every row that runs an action with input built from the row.
@@ -366,6 +385,7 @@ struct RowAction<E> {
     icon: Option<Icon>,
     meta: ActionMeta,
     run: RunFn<E>,
+    ask: Ask,
 }
 
 /// Runs action `A` with `input` and turns a failed outcome into an error.
@@ -422,6 +442,8 @@ struct Column<E> {
     hidden: bool,
     cell: Option<CellFn<E>>,
     editable: bool,
+    /// Whole numbers shown without group separators, for codes and years.
+    plain: bool,
 }
 
 /// Data grid. Its data source is an action that takes a `DataQuery` and returns `Page<E>`.
@@ -441,6 +463,8 @@ pub struct DataGrid<E: Model> {
     row_actions: Vec<RowAction<E>>,
     selectable: bool,
     bulk: Vec<BulkDef>,
+    /// Whether the last added action is a bulk action, the one `confirm` and `tone` set.
+    last_bulk: bool,
     row_menu: Option<MenuFn<E>>,
     save: Option<SaveDef<E>>,
     export: Option<(crate::action::Access, usize)>,
@@ -636,6 +660,7 @@ impl<E: Model> DataGrid<E> {
             row_actions: Vec::new(),
             selectable: false,
             bulk: Vec::new(),
+            last_bulk: false,
             row_menu: None,
             save: None,
             export: None,
@@ -869,6 +894,7 @@ impl<E: Model> DataGrid<E> {
                 hidden: false,
                 cell: None,
                 editable: false,
+                plain: false,
             });
         }
         grid
@@ -899,6 +925,7 @@ impl<E: Model> DataGrid<E> {
             hidden: false,
             cell: None,
             editable: false,
+            plain: false,
         });
         DataGridColumn {
             grid: self,
@@ -942,7 +969,9 @@ impl<E: Model> DataGrid<E> {
             icon: None,
             meta: A::META,
             run: Box::new(move |row| runner::<A>(input(row))),
+            ask: Ask::default(),
         });
+        self.last_bulk = false;
         self
     }
 
@@ -983,7 +1012,47 @@ impl<E: Model> DataGrid<E> {
                     .ok()?;
                 Some(runner::<A>(keys))
             }),
+            ask: Ask::default(),
         });
+        self.last_bulk = true;
+        self
+    }
+
+    /// The ask of the last added row or bulk action.
+    fn last_ask(&mut self) -> Option<&mut Ask> {
+        if self.last_bulk {
+            self.bulk.last_mut().map(|b| &mut b.ask)
+        } else {
+            self.row_actions
+                .last_mut()
+                .map(|a| &mut a.ask)
+        }
+    }
+
+    /// Asks the user to confirm with this message before the last added row or bulk action
+    /// runs, in the same dialog as [`crate::ui::ActionButton::confirm`]. Cancel has the focus
+    /// first. The question is asked in the browser; an action that must never run without a
+    /// person also declares `confirm` for AI agents.
+    ///
+    /// ```ignore
+    /// DataGrid::of(search_customers)
+    ///     .bulk_action(t!("customers.delete"), delete_customers, Customer::id)
+    ///     .confirm(t!("customers.delete_confirm"))
+    ///     .tone(Tone::Danger)
+    /// ```
+    pub fn confirm(mut self, message: impl Into<Text>) -> Self {
+        if let Some(a) = self.last_ask() {
+            a.confirm = Some(message.into());
+        }
+        self
+    }
+
+    /// `Tone::Danger` draws the last added row or bulk action, and its confirmation, in red for
+    /// actions that remove or cancel things. Other tones keep the normal look.
+    pub fn tone(mut self, tone: Tone) -> Self {
+        if let Some(a) = self.last_ask() {
+            a.danger = tone == Tone::Danger;
+        }
         self
     }
 
@@ -1286,9 +1355,15 @@ impl<E: Model> DataGrid<E> {
             for (i, a) in self.row_actions.iter().enumerate().filter(|(_, a)| r.can(&a.meta.access)) {
                 let label = r.text(&a.label);
                 let icon = a.icon.map(Icon::html).unwrap_or_default();
+                let class = if a.ask.danger {
+                    "z-row-action z-danger"
+                } else {
+                    "z-row-action"
+                };
                 let _ = write!(
                     cell,
-                    r#"<button type="button" class="z-row-action" data-zeyn-run="a{i}" tabindex="-1">{icon}<span>{label}</span></button>"#
+                    r#"<button type="button" class="{class}" data-zeyn-run="a{i}"{} tabindex="-1">{icon}<span>{label}</span></button>"#,
+                    a.ask.attr(r)
                 );
             }
             cell.push_str("</td>");
@@ -1395,7 +1470,10 @@ impl<E: Model> DataGrid<E> {
             for (n, s) in cols.iter().enumerate() {
                 let c = &self.columns[s.index];
                 let value = (c.value)(row);
-                let num = matches!(value, Value::Int(_) | Value::Money(_));
+                let num = matches!(
+                    value,
+                    Value::Int(_) | Value::Money(_) | Value::Decimal(_) | Value::Number(_)
+                );
                 let first = tree && n == 0;
                 out.push_str(match (num, first) {
                     (true, true) => r#"<td class="z-num z-tree-cell""#,
@@ -1419,7 +1497,12 @@ impl<E: Model> DataGrid<E> {
                 match (c.meta.mask, &c.cell) {
                     (Some(_), _) => out.push_str(&crate::privacy::cell(r, c.meta, &value, row)),
                     (None, Some(cell)) => out.push_str(&cell(row, r)),
-                    (None, None) => r.value_into(&mut out, &value, &c.meta.kind),
+                    (None, None) => match value {
+                        Value::Int(n) if c.plain => {
+                            let _ = write!(out, "{n}");
+                        }
+                        _ => r.value_into(&mut out, &value, &c.meta.kind),
+                    },
                 }
                 if first {
                     out.push_str("</span></span>");
@@ -1454,8 +1537,14 @@ impl<E: Model> DataGrid<E> {
                 .enumerate()
                 .filter(|(_, b)| r.can(&b.meta.access))
             {
+                let class = if b.ask.danger {
+                    "z-button z-danger-button"
+                } else {
+                    "z-button"
+                };
                 out.push_str(&format!(
-                    r#"<button type="button" class="z-button" data-zeyn-bulk-run="{i}" data-testid="{scope}.grid.bulk-{i}">{}</button>"#,
+                    r#"<button type="button" class="{class}" data-zeyn-bulk-run="{i}" data-testid="{scope}.grid.bulk-{i}"{}>{}</button>"#,
+                    b.ask.attr(r),
                     r.text(&b.label)
                 ));
             }
@@ -2381,13 +2470,9 @@ impl<E: Model> From<DataGrid<E>> for Node {
 
 /// Whole number with the locale's group separator: `4.680` in `tr`, `4,680` in `en`.
 fn grouped(n: i64, locale: &str) -> String {
-    match n.checked_mul(100) {
-        Some(h) => {
-            let text = Money::new(h, Default::default()).format_plain(locale);
-            text[..text.len() - 3].to_string()
-        }
-        None => n.to_string(),
-    }
+    let mut out = String::new();
+    crate::render::push_grouped(&mut out, n, locale);
+    out
 }
 
 /// Most sort keys one query may carry.
@@ -2487,6 +2572,15 @@ fn grid_texts(r: &Render) -> serde_json::Value {
             json!(
                 r.i18n
                     .text(r.locale, &Text::key(format!("zeyn.grid.{k}")))
+            ),
+        );
+    }
+    for k in ["title", "cancel"] {
+        map.insert(
+            format!("confirm_{k}"),
+            json!(
+                r.i18n
+                    .text(r.locale, &Text::key(format!("zeyn.ui.confirm.{k}")))
             ),
         );
     }

@@ -13,11 +13,22 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 - Size limits in new projects: `build.rs` stops the build when a source file has more than `max_file_lines` (default 300) non blank lines, set under `[package.metadata.zeyn]` in `Cargo.toml`, and clippy `too_many_lines` denies functions longer than 60 lines (`too-many-lines-threshold` in `clippy.toml`). AGENTS.md and the skill tell agents to keep one component or screen per file.
 - `zeyn g screen <feature> <name>` (short form `g s`, MCP tool `zeyn_new_screen`) adds `screens/<name>.rs`, registers the screen in the feature and adds its title to every locale file. A flat `screens.rs` is first moved to `screens/mod.rs`, and a deleted `screens/` is created again. It never overwrites a file.
 - `zeyn check` warns about a `#[screen]` or `#[action]` that no feature registers and about a flat `screens.rs` or `actions.rs` with several items in more than about 150 lines.
+- `Kpi::money(title, Money)`: the value and the target with the currency in the user's locale.
+- Confirmation for destructive grid and workflow actions: `.confirm(message)` and `.tone(Tone::Danger)` after `DataGrid::row_action` or `bulk_action`, and `Transitions::confirm(name, message)` with `Transitions::tone(name, Tone::Danger)`, in the dialog `ActionButton::confirm` uses.
+- `DataQuery::span()` and `Page::window(rows, total, span)` for tables the app computes or indexes itself: the asked rows as an offset and a limit from either page form, and a page with its total and next cursor. `Page::from_slice` uses them.
+- `App::header(|h| ...)`: a top bar over the screens of the app shell with the site header's slots (`start`, `center`, `end`, `bottom`), for a search box and a notifications link. Components there load data through their action's permission, like in the site header.
+- `ThemePicker::new()`: the theme picker inside a screen (a settings page), with the shell's themes; both pickers stay in step.
+- Ten more icons for admin screens: `Icon::Users`, `Settings`, `Bell`, `Shield`, `Clock`, `Tag`, `Mail`, `SignOut`, `ArrowUp` and `ArrowDown`, drawn like the others (24 px grid, 2 px round stroke). They add 2.9 KB to `zeyn.css` (0.4 KB gzip).
+- `DataGridColumn::plain()` shows whole numbers without group separators, for codes and years.
+- Screen header: `Screen::subtitle(text)` and `Screen::primary(|t| ...)` put a subtitle under the title and the main actions at the end of the title row, wrapping under the title on phones.
 
 ### Changed
 
 - `zeyn g feature` (short form `g f`) creates `models/`, `services/`, `actions/` and `screens/`, each with a `mod.rs`, holding a working starter: a model, an in memory data service, a search action and a list screen with its menu entry and texts in every locale file. It registers the feature and its service in `src/app.rs` after the last `.feature(features::...)` line, or prints the two lines when there is none. A feature that does not need a folder deletes it with its `mod` line; `components/` is added by hand when a part of a screen is shared or a screen file grows.
 - The `store.rs` of a feature is now `services/` in the app and library templates; services shared by several features go in `src/services/<name>.rs`.
+- Whole numbers are grouped by the user's locale in grid cells and display values (`1,234,567`, `1.234.567` in Turkish); entity ids stay plain. Decimal cells are right aligned like whole numbers and money.
+- A screen whose `#[params]` fields are all `Option` opens without params (menu links, plain addresses) with every field `None`, instead of answering 404. The accounts screens use plain `#[params]` for this now.
+- Kpis in one `Row` or `AutoGrid` are as tall as the tallest, with or without a trend; a `Row` of four Kpis fills the width and wraps to two, then one per line. Bar, line, area, combo, scatter and funnel charts fill the width of their container instead of stopping at 18rem of height; donuts and gauges keep the 18rem cap and sit centered.
 
 ### Fixed
 

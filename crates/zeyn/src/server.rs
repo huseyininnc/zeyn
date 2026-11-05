@@ -46,6 +46,7 @@ mod seo;
 mod session;
 mod telemetry;
 mod theme;
+pub(crate) use theme::screen_picker as theme_picker;
 
 pub use theme::Theme;
 #[cfg(feature = "email")]
@@ -769,6 +770,7 @@ pub struct App {
     locale_paths: bool,
     palette_keys: String,
     client_prefs: crate::prefs::ClientPrefs,
+    header: Option<crate::site::SiteHeader>,
     prefetch: Prefetch,
     extras: ops::Extras,
     sign_in: auth::Extras,
@@ -826,6 +828,7 @@ impl App {
             locale_paths: false,
             palette_keys: crate::command::PALETTE_SHORTCUT.into(),
             client_prefs: crate::prefs::ClientPrefs::default(),
+            header: None,
             prefetch: Prefetch::Off,
             extras: ops::Extras::default(),
             sign_in: auth::Extras::default(),
@@ -936,6 +939,33 @@ impl App {
     /// counts as a prefetch when the user then opens it.
     pub fn prefetch(mut self, prefetch: Prefetch) -> Self {
         self.prefetch = prefetch;
+        self
+    }
+
+    /// A top bar over the screens of the app shell, with the slots of the site header:
+    /// `start`, `center` (such as a search box), `end` (such as a notifications link) and
+    /// `bottom`, see [`crate::SiteHeader`]. `sign_in()` adds the sign in or out link;
+    /// `language()` and `theme()` add pickers there too, which the side menu already has. On
+    /// phones the bar sits under the menu button and the center slot takes a row of its own
+    /// (`center_on_phone` is for the site shell). Components in the bar render for the user like
+    /// a screen's; those that load data through an action check the action's permission. Without
+    /// it the app shell has no top bar.
+    ///
+    /// ```
+    /// use zeyn::prelude::*;
+    ///
+    /// #[screen(route = "/inbox", public)]
+    /// pub fn inbox() -> Screen { Screen::new("Inbox") }
+    ///
+    /// let app = App::new("Admin")
+    ///     .header(|h| h.end(LinkButton::new("Notifications (3)", inbox, ())))
+    ///     .feature(Feature::new("inbox").screen(inbox));
+    /// ```
+    pub fn header(
+        mut self,
+        build: impl FnOnce(crate::site::SiteHeader) -> crate::site::SiteHeader,
+    ) -> Self {
+        self.header = Some(build(crate::site::SiteHeader::default()));
         self
     }
 
@@ -1310,15 +1340,23 @@ impl App {
                 }
             }
         }
+        if let Some(header) = &self.header {
+            for (s, nodes) in header.slots.iter().enumerate() {
+                for (i, node) in nodes.iter().enumerate() {
+                    node.all_shortcuts(format!("a{s}.{i}"), &mut found);
+                }
+            }
+        }
         for (i, node) in screen.nodes().iter().enumerate() {
             node.all_shortcuts(i.to_string(), &mut found);
         }
         let links: Vec<(String, &str)> = found
             .into_iter()
             .map(|(path, keys)| {
-                let place = match path.strip_prefix('h') {
-                    Some(p) => format!("in the site header (node {p})"),
-                    None => format!("at node {path}"),
+                let place = match (path.strip_prefix('h'), path.strip_prefix('a')) {
+                    (Some(p), _) => format!("in the site header (node {p})"),
+                    (_, Some(p)) => format!("in the app header (node {p})"),
+                    _ => format!("at node {path}"),
                 };
                 (place, keys)
             })
@@ -1511,25 +1549,16 @@ impl App {
             let Some(shell) = f.site_shell() else {
                 continue;
             };
-            let mut links = Vec::new();
-            for (s, nodes) in shell.header.slots.iter().enumerate() {
-                let mut found = Vec::new();
-                for (i, node) in nodes.iter().enumerate() {
-                    node.all_shortcuts(format!("{s}.{i}"), &mut found);
-                }
-                links.extend(found.into_iter().map(|(path, keys)| {
-                    (
-                        format!(
-                            "in the {} slot of the site header of feature `{}` (node {path})",
-                            crate::site::SLOT_NAMES[s],
-                            f.name()
-                        ),
-                        keys,
-                    )
-                }));
-            }
+            let owner = format!("the site header of feature `{}`", f.name());
             problems.extend(crate::command::link_problems(
-                &links,
+                &header_links(&shell.header, &owner),
+                &commands,
+                &self.palette_keys,
+            ));
+        }
+        if let Some(header) = &self.header {
+            problems.extend(crate::command::link_problems(
+                &header_links(header, "the app header"),
                 &commands,
                 &self.palette_keys,
             ));
@@ -1629,7 +1658,9 @@ impl App {
             .insert(crate::screen::Routes(Arc::new(routes), default_locale));
         self.services
             .insert(self.client_prefs.clone());
-        let look = self.look();
+        let look = Arc::new(self.look());
+        self.services
+            .insert(theme::Looks(look.clone()));
         #[cfg(feature = "islands")]
         let islands = self
             .islands_dir
@@ -1680,6 +1711,7 @@ impl App {
             look,
             views: self.views,
             native_menu: self.native_menu,
+            header: self.header,
             locale_paths: self.locale_paths,
             prefetch: self.prefetch,
             palette_keys: crate::command::normalize_shortcut(&self.palette_keys)
@@ -1990,9 +2022,11 @@ struct AppState {
     api_docs: Option<ApiDocs>,
     prefix: String,
     site_url: String,
-    look: theme::Look,
+    look: Arc<theme::Look>,
     views: Option<Arc<dyn crate::grid::DataGridViewStore>>,
     native_menu: bool,
+    /// The top bar of the app shell, from `App::header`.
+    header: Option<crate::site::SiteHeader>,
     locale_paths: bool,
     prefetch: Prefetch,
     palette_keys: String,
@@ -2965,11 +2999,49 @@ impl AppState {
                 r.text(&Text::key("zeyn.shell.time_zone"))
             ));
         }
+        let header = self
+            .header
+            .as_ref()
+            .map(|h| {
+                let [start, center, end, bottom] = site::header_slots(h, ctx, "app", "z-app-header");
+                let actions = site::header_actions(self, h, ctx, &r);
+                let actions = if actions.is_empty() {
+                    actions
+                } else {
+                    format!(r#"<div class="z-app-header-actions">{actions}</div>"#)
+                };
+                format!(
+                    r#"<header class="z-app-header" data-zeyn-screen="_app" data-zeyn-params="null">{start}{center}{end}{actions}{bottom}</header>"#
+                )
+            })
+            .unwrap_or_default();
         format!(
-            r#"<div class="z-app" data-zeyn-shell="app"><nav class="z-nav" aria-label="{menu}"><div class="z-nav-bar"><p class="z-app-name">{app}</p><button type="button" class="z-nav-toggle" aria-expanded="false" aria-controls="z-nav-body" data-zeyn-nav-toggle hidden><span class="z-nav-burger" aria-hidden="true"></span><span class="z-sr-only">{menu}</span></button></div><div class="z-nav-body" id="z-nav-body">{palette}{nav}</div></nav><main class="z-main" id="z-main">{main}</main></div>"#,
+            r#"<div class="z-app" data-zeyn-shell="app"><nav class="z-nav" aria-label="{menu}"><div class="z-nav-bar"><p class="z-app-name">{app}</p><button type="button" class="z-nav-toggle" aria-expanded="false" aria-controls="z-nav-body" data-zeyn-nav-toggle hidden><span class="z-nav-burger" aria-hidden="true"></span><span class="z-sr-only">{menu}</span></button></div><div class="z-nav-body" id="z-nav-body">{palette}{nav}</div></nav>{header}<main class="z-main" id="z-main">{main}</main></div>"#,
             menu = r.text(&Text::key("zeyn.shell.menu")),
         )
     }
+}
+
+/// The link shortcuts in a header's slots, each with where it is (`owner` names the header),
+/// for the startup check.
+fn header_links<'a>(header: &'a crate::site::SiteHeader, owner: &str) -> Vec<(String, &'a str)> {
+    let mut links = Vec::new();
+    for (s, nodes) in header.slots.iter().enumerate() {
+        let mut found = Vec::new();
+        for (i, node) in nodes.iter().enumerate() {
+            node.all_shortcuts(format!("{s}.{i}"), &mut found);
+        }
+        links.extend(found.into_iter().map(|(path, keys)| {
+            (
+                format!(
+                    "in the {} slot of {owner} (node {path})",
+                    crate::site::SLOT_NAMES[s]
+                ),
+                keys,
+            )
+        }));
+    }
+    links
 }
 
 /// `inventory/`, `/inventory` and `/inventory/` all become `/inventory`; `/` and empty become empty.

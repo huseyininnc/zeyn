@@ -51,6 +51,33 @@ Feature::new("shop")
 
 El paso entre una pantalla del shell del sitio y una del shell de la aplicación se hace a través de `nav.js` sin cargar la página: la respuesta parcial dice a qué shell pertenece (`x-zeyn-shell`), y cuando eso difiere del marco actual, el runtime sustituye todo el marco como lo hace un cambio de idioma y carga la hoja de estilo y el script del otro shell. Los enlaces a `/_zeyn/route/{screen}` (los de las migas de pan) se siguen de la misma manera.
 
+## Selector de tema en una pantalla
+
+`ThemePicker::new()` pone el selector de tema dentro de una pantalla, como la sección Apariencia de una página de ajustes. Ofrece los temas de `App::themes` (con Sistema cuando la aplicación sigue al dispositivo) y muestra el que está en uso.
+
+```rust
+#[screen(route = "/settings/appearance", permission = "settings.read")]
+pub fn appearance() -> Screen {
+    Screen::new(t!("settings.appearance")).body(Panel::new(t!("settings.theme")).add(ThemePicker::new()))
+}
+```
+
+Es el mismo control que el selector del shell: la elección se aplica al momento sin recargar la página, se guarda en la cookie `zeyn_theme` (y en el almacén de vistas para usuarios con sesión), y el otro selector de la página también la muestra. Si la aplicación no ofrece elección (`theme_picker(false)` o un solo tema), no muestra nada.
+
+## La cabecera de la aplicación
+
+`App::header(|h| ...)` pone una barra sobre las pantallas del shell de la aplicación, con las ranuras de la cabecera del sitio: `start`, `center`, `end` y `bottom`. Un cuadro de búsqueda va en el centro y un enlace a las notificaciones al final. `sign_in()`, `language()` y `theme()` también funcionan ahí, aunque el menú lateral ya tiene los selectores.
+
+```rust
+App::new(t!("app.name"))
+    .header(|h| {
+        h.center(SearchBox::of(search_all).results(search_results))
+            .end(LinkButton::new(t!("app.notifications"), notifications, ()))
+    })
+```
+
+La barra queda arriba mientras la pantalla se desplaza, y las pantallas cambian debajo sin recargar la página. En el teléfono se coloca bajo el botón del menú y la ranura central ocupa una fila propia. Los componentes de la barra se muestran para el usuario como los de una pantalla; un cuadro de búsqueda carga sus sugerencias con su acción, cuyo permiso comprueba el servidor. Sin `App::header`, el shell de la aplicación no tiene barra superior.
+
 ## Comandos
 
 Un comando se declara una sola vez en Rust con su etiqueta, su atajo y lo que hace. Registrado en una feature, la paleta lo lista y su atajo funciona en todas las páginas.

@@ -39,6 +39,8 @@ pub fn product_editor(params: ProductParams, store: ProductStore) -> Result<Scre
 
 Params are typed everywhere they are used: `Window::open(product_editor, 7)` does not compile, because the editor takes `ProductParams`.
 
+When every field of a `#[params]` struct is an `Option`, the screen also opens without params, from a menu link or a plain address, with every field `None`. A field that is not optional still needs its value: without it the screen answers 404.
+
 A screen without `route` has no URL. It opens as a window from a link, a toolbar button, a menu or a command.
 
 ## Params in the path
@@ -138,6 +140,21 @@ Screen::new(t!("stock.products"))
 ```
 
 Shortcuts like `Alt+N` work on the screen and are shown in the palette. Shortcuts the browser uses (`Ctrl+P`, `Ctrl+S`, `F5`) are not bound unless the button calls `.override_browser()`, and ones it never passes on (`Ctrl+N`, `Ctrl+T`, `Ctrl+W`) are never bound; free combinations are `Alt+Shift+<letter>` and `Ctrl+Alt+<letter>`.
+
+Icons for buttons, menu groups and tools come from `Icon`: `Plus`, `Edit`, `Delete`, `Save`, `Search`, `Box`, `Cart`, `Table`, `Home`, `Chart`, `Users`, `Settings`, `Bell`, `Shield`, `Clock`, `Tag`, `Mail`, `SignOut`, `ArrowUp`, `ArrowDown`. They are masks in `zeyn.css` drawn on a 24 px grid with a 2 px round stroke, take the text color, and are hidden from screen readers, so the label always carries the meaning.
+
+## Header
+
+`.subtitle(text)` puts a short line under the title, and `.primary(|t| ...)` puts the screen's main actions at the end of the title row, as primary buttons. Together they make the page header most admin screens have.
+
+```rust
+Screen::new(t!("orders.title"))
+    .subtitle(t!("orders.intro"))
+    .primary(|t| t.button(t!("orders.new")).icon(Icon::Plus).shortcut("Alt+N").opens(order_editor, OrderParams { id: None }))
+    .toolbar(|t| t.export(Export::Csv))
+```
+
+`.primary` takes the same buttons as `.toolbar`, with the same shortcuts and palette entries; the toolbar stays under the header for the other tools. The subtitle is the screen's description for screen readers (`aria-describedby`). When the row is too narrow, the actions wrap under the title, and on phones they line up at the start. Without a subtitle or primary actions the screen renders as before, a plain heading.
 
 ## Features and the menu
 

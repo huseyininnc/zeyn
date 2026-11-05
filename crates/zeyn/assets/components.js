@@ -1892,21 +1892,26 @@ function confirmDialog(t) {
   });
 }
 
-/** Asks before submitting forms that carry `data-zeyn-confirm` (action buttons). */
+/**
+ * Asks before submitting forms that carry `data-zeyn-confirm` (action buttons), or through a
+ * submit button that carries it (workflow transitions).
+ */
 async function confirmSubmit(e) {
   const form = e.target;
-  if (!(form instanceof HTMLFormElement) || !form.dataset.zeynConfirm) return;
+  if (!(form instanceof HTMLFormElement)) return;
+  const by = e.submitter instanceof HTMLElement && e.submitter.dataset.zeynConfirm ? e.submitter : null;
+  const d = (by ?? form).dataset;
+  if (!d.zeynConfirm) return;
   if (form.zeynConfirmed) {
     form.zeynConfirmed = false;
     return;
   }
   e.preventDefault();
   e.stopImmediatePropagation();
-  const d = form.dataset;
-  const danger = !!form.querySelector('.z-danger-button');
+  const danger = by ? by.matches('.z-danger-button') : !!form.querySelector('.z-danger-button');
   if (await confirmDialog({ title: d.textTitle, message: d.zeynConfirm, ok: d.textOk, cancel: d.textCancel, danger })) {
     form.zeynConfirmed = true;
-    form.requestSubmit();
+    form.requestSubmit(by ?? undefined);
   }
 }
 

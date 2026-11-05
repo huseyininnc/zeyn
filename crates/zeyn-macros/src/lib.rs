@@ -608,7 +608,7 @@ pub fn params(attr: TokenStream, item: TokenStream) -> TokenStream {
             }
 
             fn from_json(value: ::zeyn::__serde_json::Value) -> ::zeyn::Result<Self> {
-                ::zeyn::__serde_json::from_value(value).map_err(|_| ::zeyn::Error::NotFound)
+                ::zeyn::__read_params(value).ok_or(::zeyn::Error::NotFound)
             }
         }
     }

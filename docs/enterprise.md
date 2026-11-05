@@ -141,6 +141,9 @@ pub async fn move_leave(req: TransitionRequest<LeaveRequestId>, store: LeaveStor
   button per move the user may make from it (`Workflow::allowed`). The record key comes from the
   screen on the server, so a client cannot move another record. Agents see it as a form tool.
 - Button labels come from `workflow.<name>` in the catalogs; `.label(...)` sets one by hand.
+- `.confirm(name, message)` asks before the move `name` runs, in the dialog of
+  `ActionButton::confirm`, and `.tone(name, Tone::Danger)` draws its button in red. The server
+  checks the move and its permission either way.
 - `Workflow::check` reports invalid permissions and moves declared twice from the same state;
   call it in a test.
 - The showcase leave requests use this: save as draft, submit, then approve or reject.

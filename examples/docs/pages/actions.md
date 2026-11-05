@@ -61,6 +61,17 @@ return Err(errors.into());
 
 Lists take a `DataQuery` and return `Page<M>`. A list action never returns every row; the grid asks for pages, and the server caps the page size whatever the client sends.
 
+For a table the app computes or keeps in its own index (millions of rows, events built from their ids), `q.span()` gives the rows asked for as an offset and a limit, from numbered pages or a cursor alike, and `Page::window(rows, total, span)` returns them with the total and the cursor to the next row. Only the rows of the page are built; sort and filters are the app's to apply, read from `q.sort` and `q.filters`.
+
+```rust
+#[action(permission = "audit.read")]
+pub async fn search_events(q: DataQuery, log: EventLog) -> Result<Page<Event>> {
+    let span = q.span();
+    let rows = log.range(span.offset, span.limit)?;
+    Ok(Page::window(rows, log.len()?, span))
+}
+```
+
 ## The context
 
 `Ctx` is the request: `ctx.identity()`, `ctx.locale()`, `ctx.time_zone()`, `ctx.now()`, `ctx.today()`, `ctx.tenant()`, `ctx.license()`, `ctx.config()`, `ctx.theme()` and `ctx.t(&text)`. Use `ctx.now()` and `ctx.today()` instead of the system clock, so tests can fix the time with `App::fixed_now`.
