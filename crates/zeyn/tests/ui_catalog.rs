@@ -782,3 +782,63 @@ async fn header_slots_take_any_component_and_a_search_box_suggests_from_there() 
     assert!(page.contains(r#"<button type="button" class="z-site-toggle z-site-center-toggle" aria-expanded="false" aria-controls="z-site-slot-center" data-zeyn-site-center-toggle hidden>"#), "{page}");
     assert!(page.contains(r#"<span class="z-sr-only">Search</span>"#));
 }
+
+#[screen(route = "/finder", public)]
+pub fn finder() -> Screen {
+    Screen::new("Finder").body(
+        SearchBox::of(search_goods)
+            .results(results)
+            .item(|g: &Good| {
+                zeyn::ui::ListItem::new(g.name.clone())
+                    .subtitle(g.city.clone())
+                    .image(if g.id.0 == 5 {
+                        "javascript:alert(1)".to_string()
+                    } else if g.id.0 == 10 {
+                        "https://elsewhere.example/x.png".to_string()
+                    } else {
+                        format!("/img/{}.png", g.id.0)
+                    })
+                    .link(good_page, GoodParams { id: g.id.0 })
+            }),
+    )
+}
+
+#[tokio::test]
+async fn rich_suggestions_carry_text_subtitle_an_allowed_image_and_the_canonical_link() {
+    let router = App::new("Test")
+        .auth(|h: &HeaderMap| {
+            let perms = h.get("x-perms")?.to_str().ok()?;
+            Some(Identity::user("u").with_permissions(perms.split(',').map(String::from)))
+        })
+        .feature(
+            Feature::new("shop")
+                .screen(finder)
+                .screen(results)
+                .screen(good_page),
+        )
+        .router()
+        .unwrap();
+    let (status, body) = send(
+        &router,
+        post(
+            "/_zeyn/data",
+            "shop.read",
+            serde_json::json!({ "screen": "finder", "node": "0", "key": "suggest", "input": "coffee" }),
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let hits: Vec<serde_json::Value> = serde_json::from_str(&body).unwrap();
+    assert_eq!(
+        hits[0],
+        serde_json::json!({ "text": "Coffee 5", "subtitle": "Bursa", "image": null, "href": "/goods/5" }),
+        "an unsafe image is left out"
+    );
+    assert_eq!(
+        hits[1]["image"],
+        serde_json::Value::Null,
+        "a host outside img-src is left out"
+    );
+    assert_eq!(hits[2]["image"], "/img/15.png");
+    assert_eq!(hits[2]["href"], "/goods/15");
+}

@@ -323,3 +323,37 @@ a.z-poster-link:focus-visible {
   .z-poster-progress { border-top: 1px solid CanvasText; }
   .z-poster-progress-bar { background: Highlight; }
 }
+
+/* Rich search suggestions (SearchBox::item) */
+
+.z-search-option.z-search-rich { padding: 0; }
+
+.z-search-rich-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 4px 10px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.z-search-rich-img {
+  flex: none;
+  width: 40px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: var(--z-radius-sm);
+  background: var(--z-surface-2);
+}
+
+.z-search-rich-body { display: grid; min-width: 0; }
+
+.z-search-rich-title,
+.z-search-rich-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.z-search-rich-sub { font-size: var(--z-font-size-sm); color: var(--z-text-muted); }

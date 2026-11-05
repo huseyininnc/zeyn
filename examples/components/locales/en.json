@@ -253,7 +253,8 @@
         "compact": "Compact"
       },
       "search_box": {
-        "overview": "Example"
+        "overview": "Example",
+        "rich": "Rows with an image and a link"
       },
       "share": {
         "overview": "Example",
