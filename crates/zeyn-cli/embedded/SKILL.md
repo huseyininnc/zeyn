@@ -185,7 +185,7 @@ What to remember:
 - A screen with a `route` is a page; without one it opens as a window.
 - Path params: `#[screen(route = "/orders/{id}", ...)]` binds `{id}` to the params field `id`
   (integers, entity keys, `String`, `Slug`). `Slug::from_title("Çay Bardağı")` is `cay-bardagi`.
-  Return `Err(Error::NotFound)` for a missing record, `Screen::moved_to(screen, params)` for a 301.
+  Return `Err(Error::NotFound)` for a missing record, `Screen::moved_to(screen, params)` for a 301, `Screen::redirect(screen, params)` for a 303 that is never cached.
 - Errors: `Error::NotFound`, `Error::Forbidden`, `Error::Conflict` (stale row version),
   `Error::Denied(t!("..."))`, `Error::Validation(errors)`, `Error::Internal("for the log")`.
 - Quick screens: `DataGrid::auto(action)` and `Form::auto(model)`.

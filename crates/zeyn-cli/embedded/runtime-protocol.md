@@ -8,7 +8,7 @@ This is the contract between the Zeyn server and the browser runtime. Screens ar
 
 `GET {route}?params={json}` returns a full HTML document. `params` is the URL encoded JSON of the screen params and is omitted when the screen has none.
 
-A route with path segments, such as `/orders/{id}`, reads those params fields from the path (`/orders/42`) and the other fields from `params`. A segment value that does not parse answers 404. Values are percent encoded, dots included (`%2E`), so a screen URL never looks like a file to the runtime. A screen that answers `Screen::moved_to` gets `301 Moved Permanently` with the new URL in `Location`.
+A route with path segments, such as `/orders/{id}`, reads those params fields from the path (`/orders/42`) and the other fields from `params`. A segment value that does not parse answers 404. Values are percent encoded, dots included (`%2E`), so a screen URL never looks like a file to the runtime. A screen that answers `Screen::moved_to` gets `301 Moved Permanently` with the new URL in `Location`; one that answers `Screen::redirect` gets `303 See Other` with `Cache-Control: no-store`. `nav.js` follows both without a page load and shows the target's address, also when the load adds no history entry (back and forward).
 
 A failed page answers with its status (404, 403, 500, ...) and the app's error screen (`App::not_found`, `App::server_error`) or a short built in message, inside the shell. A request with `x-zeyn-partial: 1` gets only that screen with `x-zeyn-partial: 1` and `x-zeyn-title`, so the runtime swaps it in without a page load. Error details never reach the browser.
 

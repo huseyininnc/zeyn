@@ -280,6 +280,30 @@ pub fn catalog(p: CatalogParams) -> Screen {
     Screen::new(format!("Catalog {} page {}", p.slug, p.n))
 }
 
+/// Sends every visit on to one catalog page, like a random pick.
+#[screen(route = "/pick", public)]
+pub fn pick() -> Screen {
+    Screen::redirect(
+        catalog,
+        CatalogParams {
+            slug: Slug::from_title("New Name"),
+            n: 7,
+        },
+    )
+}
+
+/// A screen with a route that the app does not register.
+#[screen(route = "/orphan", public)]
+pub fn orphan() -> Screen {
+    Screen::new("Orphan")
+}
+
+/// Redirects to a screen the app does not have.
+#[screen(route = "/lost", public)]
+pub fn lost() -> Screen {
+    Screen::redirect(orphan, ())
+}
+
 #[params]
 pub struct SecretParams {
     pub id: i64,
@@ -298,6 +322,8 @@ fn path_app() -> axum::Router {
                 .screen(one)
                 .screen(order)
                 .screen(catalog)
+                .screen(pick)
+                .screen(lost)
                 .screen(secret),
         )
         .router()
@@ -357,6 +383,55 @@ async fn a_screen_can_answer_a_permanent_redirect_to_its_new_address() {
     assert_eq!(
         headers.get(header::LOCATION).unwrap(),
         "/catalog/new-name/3"
+    );
+}
+
+#[tokio::test]
+async fn a_screen_can_send_one_request_on_to_another_screen_without_caching() {
+    let router = path_app();
+    for partial in [false, true] {
+        let (status, headers, _) = get(&router, "/pick", partial).await;
+        assert_eq!(status, StatusCode::SEE_OTHER, "partial {partial}");
+        assert_eq!(
+            headers.get(header::LOCATION).unwrap(),
+            "/catalog/new-name/7"
+        );
+        assert_eq!(
+            headers
+                .get(header::CACHE_CONTROL)
+                .unwrap(),
+            "no-store"
+        );
+    }
+    let (status, headers, _) = get(&router, "/lost", false).await;
+    assert_eq!(
+        status,
+        StatusCode::NOT_FOUND,
+        "a target the app does not serve is not followed"
+    );
+    assert!(headers.get(header::LOCATION).is_none());
+    let req = Request::get("/_zeyn/nav.js")
+        .body(Body::empty())
+        .unwrap();
+    let res = router
+        .clone()
+        .oneshot(req)
+        .await
+        .unwrap();
+    let js = String::from_utf8(
+        res.into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes()
+            .to_vec(),
+    )
+    .unwrap();
+    assert!(
+        js.contains(
+            "else if (res.redirected) history.replaceState({ zeyn: true }, '', finalUrl.href);"
+        ),
+        "a redirected partial load that adds no history entry still shows the target's address"
     );
 }
 
