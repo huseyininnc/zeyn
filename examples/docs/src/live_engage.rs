@@ -88,6 +88,24 @@ pub fn tagged(p: TagParams) -> Screen {
         .body(Paragraph::new(chosen))
 }
 
+/// A link to [`any_tag`], which sends the visit on to [`tagged`].
+pub fn redirect() -> Node {
+    List::new()
+        .item(zeyn::ui::ListItem::new("Open any tag").link(any_tag, ()))
+        .into()
+}
+
+/// Picks a tag and sends the visit on to its page with a 303 redirect.
+#[screen(route = "/examples/any-tag", public)]
+pub fn any_tag() -> Screen {
+    Screen::redirect(
+        tagged,
+        TagParams {
+            tags: "guide".into(),
+        },
+    )
+}
+
 /// A hero with three slides that rotate every eight seconds, with a pause button.
 pub fn hero() -> Node {
     Hero::new("Fresh every morning")

@@ -36,6 +36,9 @@ pub struct ScreenMeta {
     /// Seconds a shared cache may keep the page of a public screen opened without a session
     /// (`cache = N`, at most [`MAX_SCREEN_CACHE`]); 0 sends no public cache headers.
     pub cache: u32,
+    /// `no_prefetch`: the browser never loads the screen ahead of a click (`App::prefetch`); the
+    /// server refuses such requests before the screen runs.
+    pub no_prefetch: bool,
 }
 
 /// Longest `cache = N` a screen may ask for: one day.
@@ -147,12 +150,14 @@ pub const fn route_has_segments(route: Option<&str>) -> bool {
 
 /// URL of a screen at `path` (its route with the feature prefix) with these params: path segments
 /// filled from the params fields of the same name, the other fields in the JSON `params` query.
-/// `None` when a segment's field is missing or not a number or a usable string.
+/// Fields that are `null` (an empty `Option`) are left out of the query, so the address stays
+/// canonical. `None` when a segment's field is missing or not a number or a usable string.
 ///
 /// ```
 /// use serde_json::json;
 /// use zeyn::screen_url;
 /// assert_eq!(screen_url("/orders/{id}", &json!({ "id": 42, "tab": "lines" })).unwrap(), "/orders/42?params=%7B%22tab%22%3A%22lines%22%7D");
+/// assert_eq!(screen_url("/orders/{id}", &json!({ "id": 42, "tab": null })).unwrap(), "/orders/42");
 /// assert_eq!(screen_url("/catalog/{slug}/{n}", &json!({ "slug": "cay-bardagi", "n": 2 })).unwrap(), "/catalog/cay-bardagi/2");
 /// assert_eq!(screen_url("/orders", &json!({ "q": 1 })).unwrap(), "/orders?params=%7B%22q%22%3A1%7D");
 /// assert_eq!(screen_url("/orders/{id}", &json!({})), None);
@@ -189,7 +194,7 @@ pub fn screen_url(path: &str, params: &serde_json::Value) -> Option<String> {
     let segments: Vec<&str> = route_segments(path).collect();
     let rest: serde_json::Map<String, serde_json::Value> = fields
         .iter()
-        .filter(|(k, _)| !segments.contains(&k.as_str()))
+        .filter(|(k, v)| !v.is_null() && !segments.contains(&k.as_str()))
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect();
     if !rest.is_empty() {
@@ -731,6 +736,12 @@ pub trait Component: Send + Sync {
     fn source(&self, _key: &str) -> Option<&dyn crate::ui::DataSource> {
         None
     }
+
+    /// Keyboard shortcuts of the component's own links, as declared, for the clash checks of
+    /// `App::check` and `App::check_page`.
+    fn shortcuts(&self) -> Vec<&str> {
+        Vec::new()
+    }
 }
 
 /// Type erased component: a node of the screen tree.
@@ -780,6 +791,53 @@ impl Node {
 
     pub fn source(&self, key: &str) -> Option<&dyn crate::ui::DataSource> {
         self.0.source(key)
+    }
+
+    pub fn shortcuts(&self) -> Vec<&str> {
+        self.0.shortcuts()
+    }
+
+    /// Link shortcuts of this node and every node below it, lazy ones included, with the path
+    /// of the node that declares each.
+    pub(crate) fn all_shortcuts<'a>(&'a self, path: String, out: &mut Vec<(String, &'a str)>) {
+        for keys in self.shortcuts() {
+            out.push((path.clone(), keys));
+        }
+        for (i, child) in self.children().iter().enumerate() {
+            child.all_shortcuts(format!("{path}.{i}"), out);
+        }
+    }
+}
+
+/// Plain text where a node is expected, escaped and in the user's language, so a slot that takes
+/// any inline component, such as [`crate::ui::ListItem::meta`], also takes text.
+struct TextNode(Text);
+
+impl Component for TextNode {
+    fn render(&self, out: &mut String, r: &Render) {
+        out.push_str(&r.text(&self.0));
+    }
+
+    fn schema(&self) -> serde_json::Value {
+        json!({ "type": "text", "text": self.0 })
+    }
+}
+
+impl From<Text> for Node {
+    fn from(text: Text) -> Self {
+        Node::new(TextNode(text))
+    }
+}
+
+impl From<&'static str> for Node {
+    fn from(text: &'static str) -> Self {
+        Node::new(TextNode(text.into()))
+    }
+}
+
+impl From<String> for Node {
+    fn from(text: String) -> Self {
+        Node::new(TextNode(text.into()))
     }
 }
 
@@ -1029,7 +1087,7 @@ pub struct Screen {
     toolbar: Option<Toolbar>,
     body: Vec<Node>,
     menu: Option<crate::menu::ContextMenu>,
-    moved: Option<(&'static str, serde_json::Value)>,
+    moved: Option<(&'static str, serde_json::Value, bool)>,
     head: Option<Box<crate::seo::Head>>,
 }
 
@@ -1058,13 +1116,34 @@ impl Screen {
     /// ```
     pub fn moved_to<S: ScreenDef>(_screen: S, params: S::Params) -> Self {
         Self {
-            moved: Some((S::META.name, params_json(&params))),
+            moved: Some((S::META.name, params_json(&params), true)),
             ..Self::new("")
         }
     }
 
-    /// Screen and params of [`Screen::moved_to`], if this screen moved.
-    pub(crate) fn take_moved(&mut self) -> Option<(&'static str, serde_json::Value)> {
+    /// Sends the browser on to another screen for this one request, such as a random pick or the
+    /// newest item: `303 See Other` to the target's canonical path, never cached. In app
+    /// navigation follows it without a page load and the address bar shows the target. The
+    /// target is a typed screen with a route, so an address from outside can never be one; params
+    /// of the wrong type do not compile. For an address that changed for good, use
+    /// [`Screen::moved_to`].
+    ///
+    /// ```ignore
+    /// #[screen(route = "/random", public)]
+    /// pub async fn random(store: Store) -> Result<Screen> {
+    ///     let item = store.random().await?.ok_or(Error::NotFound)?;
+    ///     Ok(Screen::redirect(item_page, ItemParams { slug: item.slug }))
+    /// }
+    /// ```
+    pub fn redirect<S: ScreenDef>(_screen: S, params: S::Params) -> Self {
+        Self {
+            moved: Some((S::META.name, params_json(&params), false)),
+            ..Self::new("")
+        }
+    }
+
+    /// Screen, params and permanence of [`Screen::moved_to`] or [`Screen::redirect`], if any.
+    pub(crate) fn take_moved(&mut self) -> Option<(&'static str, serde_json::Value, bool)> {
         self.moved.take()
     }
 

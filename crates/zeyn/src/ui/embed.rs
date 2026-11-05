@@ -104,7 +104,7 @@ pub struct Embed<T = Given> {
     aspect: (u32, u32),
     poster: Option<String>,
     notice: Option<Text>,
-    remember: Option<(&'static str, u64)>,
+    remember: Option<crate::prefs::ClientPref<crate::prefs::Consent>>,
     _title: PhantomData<T>,
 }
 
@@ -184,67 +184,37 @@ impl<T> Embed<T> {
         self
     }
 
-    /// Remembers for `time` that the user pressed the click to load button, so embeds with the
-    /// same `scope` load at once on later pages and in other tabs. Use it for a notice that should
-    /// be confirmed once in a while, not on every page that shows such an embed.
+    /// Remembers that the user pressed the click to load button, under a consent key declared
+    /// with [`crate::ClientPref::consent`] and registered with `App::client_prefs`, so embeds
+    /// bound to the same key load at once on later pages and in other tabs for the key's
+    /// lifetime. Use it for a notice that should be confirmed once in a while, not on every page
+    /// that shows such an embed.
     ///
     /// ```
     /// # use zeyn::ui::Embed;
-    /// # use zeyn::Text;
+    /// # use zeyn::{ClientPref, Consent, Purpose, Text};
     /// # use std::time::Duration;
+    /// pub const EXTERNAL_VIDEO: ClientPref<Consent> =
+    ///     ClientPref::consent("external-video", Duration::from_secs(24 * 60 * 60), Purpose::Necessary);
+    ///
     /// let tour = Embed::url("https://video.example.com/embed/tour")
     ///     .title(Text::from("Product tour"))
     ///     .notice(Text::from("This video is served by another site."))
-    ///     .remember("external-video", Duration::from_secs(24 * 60 * 60));
+    ///     .remember(EXTERNAL_VIDEO);
     /// ```
     ///
-    /// The browser keeps only the end time (Unix milliseconds) in `localStorage` under
-    /// `zeyn.consent.{scope}`; no cookie is set and the server never sees it, so cached public
-    /// pages stay the same for everyone. A remembered frame loads without moving focus (WCAG 2.2
-    /// 3.2.1 On Focus and 2.4.3 Focus Order); focus moves to the frame only after a real press.
-    /// The button stays when the time has passed, when the stored value is not a whole number or
-    /// lies further ahead than `time` (changed by hand), when storage is blocked or unavailable,
-    /// and without JavaScript. Without [`Embed::click_to_load`] it turns the button on with no
-    /// poster.
-    ///
-    /// # Panics
-    ///
-    /// When `scope` is empty, longer than 40 characters or holds anything but ASCII letters,
-    /// digits, `-` and `_`, and when `time` is under one second or over [`MAX_EMBED_CONSENT`].
-    pub fn remember(mut self, scope: &'static str, time: std::time::Duration) -> Self {
-        assert!(
-            valid_scope(scope),
-            "Embed::remember: scope `{scope}` is not valid. Use 1 to 40 ASCII letters, digits, `-` or `_`, such as \"external-video\"; embeds that share a notice share a scope."
-        );
-        assert!(
-            time.as_secs() >= 1 && time <= MAX_EMBED_CONSENT,
-            "Embed::remember: time {time:?} for scope `{scope}` is not valid. Use 1 second to 30 days (zeyn::ui::MAX_EMBED_CONSENT), such as Duration::from_secs(24 * 60 * 60)."
-        );
-        self.remember = Some((scope, time.as_millis() as u64));
+    /// The browser keeps the record in `zeyn.state` (see [`crate::ClientPref`]); no cookie is set
+    /// and the server never sees it, so cached public pages stay the same for everyone. A
+    /// remembered frame loads without moving focus (WCAG 2.2 3.2.1 On Focus and 2.4.3 Focus
+    /// Order); focus moves to the frame only after a real press. The button stays when the
+    /// record has ended or does not pass its checks, when the app did not register the key, and
+    /// without JavaScript. Without [`Embed::click_to_load`] it turns the button on with no poster.
+    pub fn remember(mut self, key: crate::prefs::ClientPref<crate::prefs::Consent>) -> Self {
+        self.remember = Some(key);
         self.poster
             .get_or_insert_with(String::new);
         self
     }
-}
-
-/// Longest time [`Embed::remember`] keeps a consent: 30 days.
-pub const MAX_EMBED_CONSENT: std::time::Duration =
-    std::time::Duration::from_secs(30 * 24 * 60 * 60);
-
-/// Whether `scope` names a remembered consent: 1 to 40 ASCII letters, digits, `-` and `_`.
-const fn valid_scope(scope: &str) -> bool {
-    let b = scope.as_bytes();
-    if b.is_empty() || b.len() > 40 {
-        return false;
-    }
-    let mut i = 0;
-    while i < b.len() {
-        if !(b[i].is_ascii_alphanumeric() || b[i] == b'-' || b[i] == b'_') {
-            return false;
-        }
-        i += 1;
-    }
-    true
 }
 
 impl Complete for Embed<Given> {}
@@ -284,12 +254,7 @@ impl Component for Embed<Given> {
         let (w, h) = self.aspect;
         let remember = self
             .remember
-            .map(|(s, ms)| {
-                format!(
-                    r#" data-zeyn-embed-remember="{}" data-zeyn-embed-for="{ms}""#,
-                    escape(s)
-                )
-            })
+            .map(|k| k.attrs(r))
             .unwrap_or_default();
         out.push_str(&format!(
             r#"<div class="z-embed" style="--z-aspect: {w} / {h}"{remember} data-testid="{}.embed">"#,
@@ -329,7 +294,7 @@ impl Component for Embed<Given> {
             "aspect": [self.aspect.0, self.aspect.1],
             "click_to_load": self.poster.is_some(),
             "notice": self.notice,
-            "remember": self.remember.map(|(scope, ms)| json!({ "scope": scope, "ms": ms })),
+            "remember": self.remember.map(|k| k.info()),
         })
     }
 }

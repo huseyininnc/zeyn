@@ -43,7 +43,7 @@ impl Slug {
                     push(&mut out, &mut gap, c.encode_utf8(&mut buf));
                 } else if c.is_whitespace() || c.is_ascii_punctuation() {
                     gap = true;
-                } else if let Some(folded) = fold(c) {
+                } else if let Some(folded) = crate::text::letter(c) {
                     push(&mut out, &mut gap, folded);
                 }
             }
@@ -81,33 +81,6 @@ fn push(out: &mut String, gap: &mut bool, part: &str) {
     }
     *gap = false;
     out.push_str(part);
-}
-
-/// The plain ASCII form of an accented Latin letter (lowercase), or `None` to drop it.
-fn fold(c: char) -> Option<&'static str> {
-    Some(match c {
-        'ı' => "i",
-        'ş' | 'ș' | 'ś' | 'š' => "s",
-        'ğ' => "g",
-        'ç' | 'ć' | 'č' => "c",
-        'ö' | 'ò' | 'ó' | 'ô' | 'õ' | 'ø' | 'ō' | 'ő' => "o",
-        'ü' | 'ù' | 'ú' | 'û' | 'ū' | 'ů' | 'ű' | 'ų' => "u",
-        'à' | 'á' | 'â' | 'ã' | 'ä' | 'å' | 'ā' | 'ă' | 'ą' => "a",
-        'è' | 'é' | 'ê' | 'ë' | 'ē' | 'ė' | 'ę' | 'ě' => "e",
-        'ì' | 'í' | 'î' | 'ï' | 'ī' | 'į' => "i",
-        'ñ' | 'ń' | 'ň' => "n",
-        'ý' | 'ÿ' => "y",
-        'ź' | 'ż' | 'ž' => "z",
-        'ď' | 'đ' | 'ð' => "d",
-        'ť' | 'ţ' | 'ț' => "t",
-        'ł' => "l",
-        'ř' => "r",
-        'ß' => "ss",
-        'æ' => "ae",
-        'œ' => "oe",
-        'þ' => "th",
-        _ => return None,
-    })
 }
 
 impl fmt::Display for Slug {

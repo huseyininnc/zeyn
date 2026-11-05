@@ -47,7 +47,19 @@ DescriptionList::of(&invoice)
 
 ## EmptyState와 Skeleton
 
-`EmptyState::new(title).text(text).opens(label, screen, params)`는 빈 영역을 다음 단계로 채웁니다. `Skeleton::lines(n)`은 무언가를 불러오는 동안의 자리 표시자입니다.
+`EmptyState::new(title).text(text)`는 빈 영역을 다음 단계로 채웁니다. `.link(label, screen, params)`는 `LinkButton`을 통해 다른 페이지로 이동하고, `.opens(label, screen, params)`는 앱의 Screen을 창(Window)으로 엽니다. `Skeleton::lines(n)`은 무언가를 불러오는 동안의 자리 표시자입니다.
+
+## LinkButton
+
+어딘가로 가는 것은 링크이고, 무언가를 하는 것은 버튼입니다. `LinkButton::new(label, screen, params)`는 Screen의 정식 경로(예: `/products/42`)로 가는 실제 `<a href>`이며 버튼처럼 보이므로, 가운데 클릭, "새 탭에서 열기", 검색 엔진이 모두 이것을 링크로 취급합니다. `nav.js`를 통해 페이지 새로고침 없이 열리고 Enter로 따라갑니다. 모양은 기본적으로 보조(secondary)이며, `.primary()`를 쓰면 주요 동작의 채워진 모양이 됩니다. Screen에는 route가 있어야 하며, 없으면 코드가 컴파일되지 않습니다. `EmptyState::link`와 `Hero::link`가 이것을 사용합니다.
+
+```rust
+LinkButton::new(t!("cart.browse"), products, ()).primary()
+```
+
+## ClearPrefs
+
+`ClearPrefs::new(label)`은 이 브라우저가 앱을 위해 보관하는 모든 클라이언트 환경설정을 지우는 버튼이며, 예를 들어 개인정보 페이지에서 `App::client_prefs_table()`의 목록 옆에 둡니다. 토스트가 이를 확인해 줍니다. 서버가 설정하는 쿠키(테마, 언어, 세션)는 건드리지 않습니다. 스크립트에서는 `zeyn.prefs.clear()`로 같은 일을 할 수 있습니다.
 
 ## Breadcrumb
 
@@ -100,7 +112,7 @@ Embed::url("https://www.youtube-nocookie.com/embed/abc")
 - 모든 프레임에는 `sandbox="allow-scripts allow-same-origin allow-presentation"`, `referrerpolicy="no-referrer"`, `loading="lazy"`가 붙습니다. 팝업, 최상위 탐색, 폼, 다운로드는 절대 허용할 수 없습니다. `.allow(...)`는 브라우저 기능을 추가합니다. `Fullscreen`, `PictureInPicture`, `Autoplay`, `EncryptedMedia`가 있습니다.
 - `.click_to_load(poster)`는 먼저 포스터 이미지(앱의 경로 또는 `img-src`의 호스트, 없으면 `""`)와 다른 사이트의 이름이 있는 버튼을 보여 줍니다. 버튼을 누르기 전에는 다른 사이트에 접속하지 않으며, 누르면 프레임이 그 자리를 차지하고 포커스를 받습니다. 스크립트는 `media.js`의 일부이므로 추가 요청이 들지 않습니다.
 - `.notice(t!(...))`는 콘텐츠 경고처럼 앱의 텍스트를 그 버튼에 표시합니다. 이스케이프되고, 다른 모든 텍스트처럼 번역되며, 버튼의 접근 가능한 이름의 일부이므로 스크린 리더가 사용자가 결정하기 전에 이를 읽습니다. `.click_to_load` 없이 사용하면 포스터 없는 버튼이 켜집니다.
-- `.remember("external-video", Duration::from_secs(24 * 60 * 60))`는 페이지마다가 아니라 그 시간 동안 한 번만 묻습니다. 브라우저는 종료 시각(Unix 밀리초)만 `localStorage`의 `zeyn.consent.{scope}`에 보관하며, 쿠키는 설정되지 않고 서버는 이를 보지 못하므로 캐시된 공개 페이지는 모두에게 같게 유지됩니다. 이후의 페이지, 앱 내 탐색, 다른 탭은 그 범위의 프레임을 포커스를 옮기지 않고 스스로 불러옵니다(WCAG 2.2 3.2.1 On Focus, 2.4.3 Focus Order). 포커스는 실제로 누른 후에만 프레임으로 이동합니다. 시간이 지났을 때, 저장된 값이 정수가 아니거나 embed의 시간보다 더 먼 미래일 때(직접 바꾼 경우), 저장소가 차단되었을 때, JavaScript가 없을 때 버튼이 다시 나타납니다. 범위는 ASCII 문자, 숫자, `-`, `_`로 이루어진 1자에서 40자이고, 시간은 1초에서 30일(`MAX_EMBED_CONSENT`)입니다. 그 밖의 값은 그렇게 알리는 메시지와 함께 panic을 일으킵니다. 같은 notice를 공유하는 embed는 범위를 공유합니다.
+- `.remember(EXTERNAL_VIDEO)`는 페이지마다가 아니라 키의 수명 동안 한 번만 묻습니다. 키는 `ClientPref::consent`로 선언하고 `App::client_prefs`에 등록한 동의 키입니다([클라이언트 환경설정](security.md#client-preferences) 참고). 같은 키에 바인딩된 embed는 응답을 공유합니다. 이후의 페이지, 앱 내 탐색, 다른 탭은 그 프레임을 포커스를 옮기지 않고 스스로 불러옵니다(WCAG 2.2 3.2.1 On Focus, 2.4.3 Focus Order). 포커스는 실제로 누른 후에만 프레임으로 이동합니다. 기록이 끝났거나 검사에 실패할 때, 앱이 키를 등록하지 않았을 때, 저장소가 차단되었고 페이지가 새것일 때, JavaScript가 없을 때 버튼이 다시 나타납니다. 일반 문자열이나 choice 키는 컴파일되지 않습니다.
 - embed할 주소를 담는 필드에는 `#[rule(embed)]`를 붙입니다. 폼은 URL 또는 붙여 넣은 embed 코드를 받아 `src`만 남기고, `https`와 목록에 있는 호스트를 요구하며, 추적 매개변수(`utm_*`, `fbclid`, `gclid` 등)를 제거하고, HTML이 아니라 정규 주소를 저장합니다. API 입력은 정규 주소를 보내야 합니다.
 
 ```rust

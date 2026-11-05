@@ -40,6 +40,8 @@ Panel::new(t!("ui.panel_products")).collapsible().toolbar(|t| t.export(Export::C
 
 `Tabs::new(label)` 搭配 `.tab(title, node)`。方向键在标签页之间移动，与 ARIA tabs 模式的描述一致。已关闭标签页的内容在首次打开之前不会渲染，因此包含大量标签页的界面依然轻量。
 
+`.remember(KEY)` 以选择（choice）键保存用户打开的标签页（参见[客户端偏好设置](security.md#client-preferences)），因此之后的页面会打开同一个标签页。URL 哈希中指定的标签页优先。
+
 ## Split
 
 `Split::new(start, end)` 显示两个节点，中间有一个拖动手柄。`.ratio(percent)` 设置起始部分的大小。手柄可通过指针或方向键移动。

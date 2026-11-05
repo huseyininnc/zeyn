@@ -87,6 +87,18 @@ pub fn catalog_page(p: CatalogParams, store: Catalog) -> Result<Screen> {
 }
 ```
 
+`Screen::redirect(screen, params)` 把一个请求转交给另一个 screen，例如随机选取或最新条目，同时地址本身依然有效。浏览器收到 `303 See Other`，其中带有目标的规范路径，以及 `Cache-Control: no-store`；应用内导航会无需整页加载地跟随它，地址栏显示目标地址。目标始终是带路由的类型化 screen，因此重定向绝不会指向应用之外的地址，应用未提供的目标会返回 404。
+
+```rust
+#[screen(route = "/random", public)]
+pub async fn random_item(store: Catalog) -> Result<Screen> {
+    let item = store.random().await?.ok_or(Error::NotFound)?;
+    Ok(Screen::redirect(catalog_page, CatalogParams { slug: item.slug, n: item.n }))
+}
+```
+
+@live redirect
+
 ## 访问权限
 
 | 选项 | 含义 |

@@ -38,8 +38,9 @@ Card::image(c.cover.clone(), c.title.clone())
     .horizontal()
 ```
 - **首页在服务器端渲染。** 第一页（卡片网格 24 张、rail 12 张，或 `paging` 指定的数量）是页面 HTML 的一部分，因此搜索引擎和未启用 JavaScript 的访客也能看到卡片及其链接；图片带有尺寸，加载时页面不会跳动。后续页面由浏览器加载。公开页面对每位访客都是相同的 HTML，因此可以缓存。链接到带路由的 screen 的卡片会直接使用其规范地址（`/items/{slug}`），而不是重定向。
-- **分页。** `Paging::infinite(n)`（默认，24）显示一个“显示更多”按钮，该按钮滚动到视野中时也会触发；按下按钮后，焦点会移到第一张新卡片。`Paging::pages(n)` 显示上一页和下一页按钮以及页码。页面大小由服务器设置；客户端只说明从哪里继续。
+- **分页。** `Paging::infinite(n)`（默认，24）显示一个“显示更多”按钮，该按钮滚动到视野中时也会触发；按下按钮后，焦点会移到第一张新卡片。`Paging::pages(n)` 显示上一页和下一页按钮以及页码：action 返回总数时为 "Page 2 of 5"，不返回时为 "Page 2"，此时只要 action 返回游标，Next 就可用。页面大小由服务器设置；客户端只说明从哪里继续。
 - **排序。** 每个 `sort_option` 是用户可以从下拉框中选择的一种顺序；第一个是卡片起始的顺序。服务器只接受这些顺序，并丢弃客户端发送的过滤条件和搜索文本。
+- **范围。** `.scope(field, value)` 在每个请求中只保留该字段等于此值的行，与 [`DataGrid::scope`](datagrid.md) 相同：`.scope(Article::author_id, author.id)` 表示某位作者的文章。卡片网格、rail 和数据绑定列表会丢弃客户端发送的所有过滤条件，因此客户端既不能更改也不能移除该范围。文本比较时忽略大小写。
 - **搜索。** `.search(text)` 只显示与自由文本相匹配的行（[`DataQuery::q`](#free-text)），例如结果 screen 的文本。
 - **掩码字段。** 卡片由一个能看到原始行的闭包构建。对于带有 `#[mask]` 字段的 model，只有有权揭示这些字段的用户才能得到卡片；其他人会得到 `Forbidden`。公开卡片请使用不含掩码字段的 model。
 
@@ -94,6 +95,31 @@ SearchBox::of(catalog_products)
 
 结果 screen 接收 `SearchParams`（`q`，从菜单打开该 screen 时为空）。服务器会把文本截断到 `MAX_SEARCH_QUERY`（100）个字符，决定发送多少条建议（默认 8 条，除非 `limit` 另有指定，最多 20 条），检查 screen 的访问权限、Feature 的 guard 和 action 的权限，并把每次建议调用都计入写入频率限制（`App::write_limit`）。
 
+### 富建议
+
+`.item(|row| ListItem::new(title).subtitle(text).image(src).link(screen, params))` 将每条建议显示为一行，包含小图片（40 x 56 像素，延迟加载，遵循 `img-src` 规则，替代文本为空，因为标题已经为该行命名；没有图片时不显示占位图）、标题和副标题。服务器返回 `[{text, subtitle, image, href}]`，其中包含记录的规范地址。通过点击或 Enter 选中某一行，会经由 `nav.js` 打开它的链接；由于每一行都是真正的链接，中键点击和“在新标签页中打开”同样可用。没有高亮行时按 Enter 仍会打开结果 screen。combobox 模式保持不变：每一行是以标题和副标题命名的选项，行高至少 44 像素。没有 `.item` 时，建议为上文所述的纯文本。
+
+```rust
+SearchBox::of(catalog_products)
+    .item(|p: &Product| {
+        ListItem::new(p.name.clone())
+            .subtitle(p.code.clone())
+            .image(p.image.clone())
+            .link(shop_product, ProductPage { id: p.id })
+    })
+    .results(shop_search)
+```
+
 ## 自由文本
 
-`DataQuery::q` 是自由文本：其文本字段包含它的行，忽略大小写。土耳其语带点和不带点的 `i`（`İ`、`ı`）都与 `i` 匹配，因此“istanbul”能找到“İSTANBUL”。带有 `#[mask]` 的字段永远不会被搜索，空白文本匹配每一行，超过 100 个字符的文本会被忽略。`DataQuery::apply` 和 SQL 数据层（`LOWER(TRANSLATE(column, 'İı', 'ii')) LIKE ...`，使用绑定参数）以同样的方式读取它。
+`DataQuery::q` 是自由文本：其文本字段包含它的行。文本和字段都按 `zeyn::text::fold` 给出的形式比较：小写，土耳其语带点和不带点的 `i`（`İ`、`ı`）视为 `i`，带重音的拉丁字母去掉重音，`ß`、`æ`、`œ`、`þ` 展开书写。因此“istanbul”能找到“İSTANBUL”，“nino”能找到“Niño”，“strasse”能找到“Straße”。带有 `#[mask]` 的字段永远不会被搜索，空白文本匹配每一行，超过 100 个字符的文本会被忽略。`DataQuery::apply` 和 SQL 数据层（对列使用 `TRANSLATE`、`LOWER` 和 `REPLACE`，`LIKE` 使用绑定参数）以同样的方式读取它。
+
+```rust
+use zeyn::text::fold;
+
+assert_eq!(fold("İSTANBUL Işık"), "istanbul isik");
+assert_eq!(fold("Año Pequeño"), "ano pequeno");
+assert_eq!(fold("Straße MÜLLER"), "strasse muller");
+```
+
+对于应用自己写入的搜索键列，例如[手写查询](database.md)的 trigram 列，也请使用 `fold`，这样键就与用户输入的内容一致。标点和其他文字保持不变；地址使用的形式是 `Slug::from_title`。

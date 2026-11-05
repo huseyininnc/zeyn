@@ -6,7 +6,7 @@ PostgreSQL `postgres` Cargo feature'ının, Oracle ise `oracle` feature'ının a
 veritabanı olmayan bir uygulama bunların hiçbirini derlemez.
 
 ```toml
-zeyn = { version = "0.0.7", features = ["postgres"] }   # or ["oracle"], or both
+zeyn = { version = "0.0.8", features = ["postgres"] }   # or ["oracle"], or both
 ```
 
 ## Kurulum
@@ -169,6 +169,37 @@ indeksler diğer sıralamalara hizmet eder.
 `get(key)` bir satırı okur ve hiç yoksa `Error::NotFound` ile başarısız olur. Herhangi bir tablo veya
 view bir entity üzerinden okunabilir, örneğin Oracle'ın `user_sequences` görünümü.
 
+## Elle yazılmış sorgular
+
+Benzerliğe göre aramalar, join'ler ve `find`'ın ifade edemediği diğer sorgular `db.query::<M>(sql, args)` üzerinden geçer. `M` herhangi bir `#[model]` ya da entity'dir; alanları, `find` ile aynı dönüşümlerle, aynı adlı sütunlardan okunur. SQL bir string literal olmalıdır, bu yüzden değerler yalnızca parametre olarak gelebilir (PostgreSQL'de `$1`, `$2`, Oracle'da `:1`, `:2`); bir `String` ya da `format!` derlenmez.
+
+```rust
+#[model]
+pub struct Hit {
+    pub id: ItemId,
+    pub slug: String,
+    pub title: String,
+}
+
+#[action(public)]
+pub async fn search_items(q: String, db: Db) -> Result<Vec<Hit>> {
+    db.query(
+        "SELECT i.id, i.slug, i.title, similarity(i.search_key, $1) AS score \
+         FROM items i WHERE i.search_key % $1 \
+         ORDER BY score DESC, i.id LIMIT 20",
+        vec![zeyn::text::fold(&q).into()],
+    )
+    .await
+}
+```
+
+`search_key`, uygulamanın satırı kaydederken yazdığı `zeyn::text::fold(&title)` değerini tutar; böylece anahtar ile katlanmış arama metni aynı biçimde karşılaştırılır (`İ` ve `ı` `i` olarak, aksansız, küçük harf). Örnek `CREATE EXTENSION pg_trgm` ve bir trigram indeksi gerektirir: `CREATE INDEX items_search_key ON items USING gin (search_key gin_trgm_ops)`. Modelde alanı olmayan sütunlar, örneğin `score`, veritabanı tarafından okunur ve atılır.
+
+- `query_one` tek satırı ya da `None` döndürür; birden fazla satır hatadır.
+- En fazla `QUERY_ROW_CAP` (1000) satır okunur. İfade `SELECT <fields> FROM (<sql>) zeyn_q LIMIT 1001` olarak sarılır; böylece sınırı aşan bir satır, sessizce büyüyen bir liste yerine bunu söyleyen bir hatadır; `query_max(sql, args, n)` başka bir sınır belirler.
+- Sütunu olmayan bir alan ya da türü yanlış bir sütun hatadır.
+- Havuzun ifade zaman aşımı geçerlidir. `Tx` aynı üç çağrıya sahiptir.
+
 ## İmleçler (cursor)
 
 Numaralı sayfalar offset kullanır. Sonsuz ve sanal kaydırma keyset imleçleri kullanır; bunlar bir
@@ -241,7 +272,7 @@ bırakır. `RowStream`, `futures_core::Stream` uygular.
   tırnak içine alınır.
 - Değerler her zaman bağlı parametrelerdir; `LIKE` kalıpları, imleç değerleri, limitler ve offset'ler
   dahil. Hiçbir değer asla SQL metnine yazılmaz.
-- Elle yazılmış SQL `execute(&'static str, args)` üzerinden geçer: ifade bir sabit olmalıdır.
+- Elle yazılmış SQL `execute(&'static str, args)` ve `query(&'static str, args)` üzerinden geçer: ifade bir sabit olmalıdır.
 - Limitler sunucuda sıkıştırılır (`MAX_PAGE_SIZE`, `MAX_FILTERS`, `MAX_SORT`, filtre metni uzunluğu,
   `any_of` boyutu), istemci ne isterse istesin.
 - Sürücü hataları `Error::Internal` olarak günlüğe yazılır ve kullanıcılara asla gösterilmez. Bağlantı

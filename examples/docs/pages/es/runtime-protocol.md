@@ -8,7 +8,7 @@ Este es el contrato entre el servidor de Zeyn y el runtime del navegador. Las pa
 
 `GET {route}?params={json}` devuelve un documento HTML completo. `params` es el JSON de los parámetros de la pantalla codificado como URL y se omite cuando la pantalla no tiene ninguno.
 
-Una ruta con segmentos de path, como `/orders/{id}`, lee esos campos de params desde el path (`/orders/42`) y los demás campos desde `params`. Un valor de segmento que no se puede interpretar responde 404. Los valores se codifican con porcentaje, incluidos los puntos (`%2E`), de modo que la URL de una pantalla nunca parece un archivo para el runtime. Una pantalla que responde `Screen::moved_to` recibe `301 Moved Permanently` con la nueva URL en `Location`.
+Una ruta con segmentos de path, como `/orders/{id}`, lee esos campos de params desde el path (`/orders/42`) y los demás campos desde `params`. Un valor de segmento que no se puede interpretar responde 404. Los valores se codifican con porcentaje, incluidos los puntos (`%2E`), de modo que la URL de una pantalla nunca parece un archivo para el runtime. Una pantalla que responde `Screen::moved_to` recibe `301 Moved Permanently` con la nueva URL en `Location`; una que responde `Screen::redirect` recibe `303 See Other` con `Cache-Control: no-store`. `nav.js` sigue ambas sin cargar la página y muestra la dirección del destino, también cuando la carga no añade una entrada al historial (atrás y adelante).
 
 Una página fallida responde con su estado (404, 403, 500, ...) y la pantalla de error de la aplicación (`App::not_found`, `App::server_error`) o un mensaje breve integrado, dentro del shell. Una petición con `x-zeyn-partial: 1` recibe solo esa pantalla con `x-zeyn-partial: 1` y `x-zeyn-title`, de modo que el runtime la intercambia sin cargar la página. Los detalles de los errores nunca llegan al navegador.
 
@@ -265,6 +265,7 @@ Todos son `POST` con JSON y la cabecera CSRF, y comprueban primero el acceso de 
 |---|---|---|
 | `/_zeyn/node` | `{ screen, params, node }` | HTML de un nodo con la primera página de sus grids. Lo usan las pestañas diferidas. |
 | `/_zeyn/data` | `{ screen, params, node, key, input }` | JSON de la fuente de datos `key` del nodo: opciones de lookup (`key` es el nombre del campo), hijos de un árbol (`key` está vacío), comprobaciones de paso (`key` es `_step`). Se comprueba el permiso de la action de la fuente y se ejecutan los interceptores, como en los grids. La entrada que no encaja con la action se rechaza con `404`. |
+| `/_zeyn/data` con `screen` = `_site.{feature}` | como arriba | Lo mismo para un componente en una ranura de la cabecera del sitio: `node` es la ranura (0 start, 1 center, 2 end, 3 bottom), el índice del nodo en ella y después los índices de los hijos. Se comprueban los guards de la feature y el permiso de la action. |
 | `/_zeyn/parse` | `{ kind, text, label }` | Cómo lee el servidor una fecha u hora escrita, según el idioma, la zona y el reloj del usuario: `{ ok, text, iso, utc, zone }` o `{ ok: false, message }`. `kind` es `date`, `time`, `datetime`, `local` o `presets` (hoy y rangos rápidos). |
 
 ### 7.2 Valores que envían los formularios
@@ -282,6 +283,8 @@ Todos son `POST` con JSON y la cabecera CSRF, y comprueban primero el acceso de 
 | `zeyn:effect` | `document` | Un effect que el runtime no conoce: `{ effect, source, run }`. `run(next)` ejecuta otro effect. Lo usa `confirm`. |
 
 El effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":"...","then":{...}}` pregunta en un cuadro de diálogo modal de alerta y ejecuta `then` solo después de que el usuario confirma.
+
+Las preferencias del cliente (`zeyn::ClientPref`) viven en el módulo del navegador `/_zeyn/state.js`, que las páginas importan solo cuando contienen un elemento con `data-zeyn-remember` o `data-zeyn-prefs-clear`. `GET /_zeyn/prefs` responde `{ preferences }`, que indica si el hook de consentimiento de la aplicación permite conservar valores de preferencias más allá de la sesión, con `Cache-Control: no-store`. El servidor no lee ningún valor guardado.
 
 ### 7.4 Medios
 

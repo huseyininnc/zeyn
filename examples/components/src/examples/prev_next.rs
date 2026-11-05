@@ -12,6 +12,15 @@ pub fn overview(_ctx: &Ctx) -> Node {
         .into()
 }
 
+pub fn with_shortcuts(_ctx: &Ctx) -> Node {
+    PrevNext::new()
+        .prev(crate::breadcrumb, ())
+        .shortcut("Alt+Shift+B")
+        .next(crate::alpha_index, ())
+        .shortcut("Alt+Shift+N")
+        .into()
+}
+
 pub fn one_side(_ctx: &Ctx) -> Node {
     PrevNext::new()
         .next(crate::alpha_index, ())
@@ -24,5 +33,5 @@ pub const ENTRY: Entry = Entry {
     docs: "components/content#prevnext",
     api: &["PrevNext"],
     overview: &[ex!(overview)],
-    examples: &[ex!(one_side)],
+    examples: &[ex!(one_side), ex!(with_shortcuts)],
 };

@@ -7,7 +7,7 @@ use axum::http::{HeaderMap, Request, StatusCode, header};
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 use zeyn::prelude::*;
-use zeyn::{I18n, Identity, MAX_SEARCH_QUERY, PageRequest};
+use zeyn::{CenterOnPhone, I18n, Identity, MAX_SEARCH_QUERY, PageRequest};
 
 #[entity(table = "goods")]
 pub struct Good {
@@ -173,6 +173,45 @@ pub fn goods_list() -> Screen {
         )
 }
 
+/// Fourteen rows paged by the list without a total, as an action that does not count.
+#[action(permission = "shop.read")]
+pub async fn uncounted_goods(q: DataQuery) -> Result<Page<Good>> {
+    let all: Vec<Good> = goods().into_iter().take(14).collect();
+    let mut page = Page::from_slice(&all, &q);
+    page.total = None;
+    Ok(page)
+}
+
+#[screen(route = "/uncounted", public)]
+pub fn uncounted_list() -> Screen {
+    Screen::new("Uncounted").body(
+        List::of(uncounted_goods)
+            .item(|g: &Good| {
+                zeyn::ui::ListItem::new(g.name.clone()).meta(zeyn::ui::RelativeTime::new(
+                    DateTime::from_unix_ms(1_778_580_000_000),
+                ))
+            })
+            .paging(Paging::pages(10)),
+    )
+}
+
+#[screen(route = "/ankara", public)]
+pub fn ankara_goods() -> Screen {
+    Screen::new("Ankara")
+        .body(
+            Rail::of(search_goods)
+                .card(|g: &Good| Card::image("/x.png", format!("{} in {}", g.name, g.city)))
+                .scope(Good::city, "ankara".to_string())
+                .paging(Paging::infinite(4)),
+        )
+        .body(
+            List::of(search_goods)
+                .item(|g: &Good| zeyn::ui::ListItem::new(format!("{} in {}", g.name, g.city)))
+                .scope(Good::city, "Ankara".to_string())
+                .paging(Paging::pages(4)),
+        )
+}
+
 const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
 fn app(limit: Option<RateLimit>) -> axum::Router {
@@ -194,7 +233,9 @@ fn app(limit: Option<RateLimit>) -> axum::Router {
                 .screen(results)
                 .screen(picks)
                 .screen(good_page)
-                .screen(goods_list),
+                .screen(goods_list)
+                .screen(uncounted_list)
+                .screen(ankara_goods),
         );
     if let Some(l) = limit {
         app = app.write_limit(l);
@@ -488,6 +529,101 @@ async fn the_catalog_script_is_served_without_sign_in() {
 }
 
 #[tokio::test]
+async fn paged_lists_without_a_total_offer_the_next_page_while_there_is_a_cursor() {
+    let router = app(None);
+    let (status, page) = send(&router, get("/uncounted")).await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert!(page.contains(r#"data-zeyn-paging="pages""#), "{page}");
+    assert!(page.contains(r#" data-zeyn-next="10""#), "{page}");
+    assert!(
+        !page.contains("data-zeyn-total"),
+        "the action did not count"
+    );
+    assert!(
+        page.contains(r#"<span class="z-cards-page" data-zeyn-cards-page>Page 1</span>"#),
+        "without a total the label leaves out the page count: {page}"
+    );
+    assert!(
+        page.contains(r#"data-zeyn-cards-next aria-disabled="false""#),
+        "Next works while there is a cursor: {page}"
+    );
+    assert!(page.contains(r#"data-text-page-only="Page {page}""#));
+    assert!(
+        page.contains(r#"<span class="z-list-meta"><time"#),
+        "the meta of a row takes an inline component: {page}"
+    );
+    let (status, body) = send(
+        &router,
+        post(
+            "/_zeyn/grid",
+            "shop.read",
+            serde_json::json!({ "screen": "uncounted_list", "node": "0", "query": { "page": { "type": "offset", "offset": 10, "limit": 10 }, "with_total": true } }),
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(
+        json["rows"]
+            .as_str()
+            .unwrap()
+            .matches(r#"<li class="z-list-item">"#)
+            .count(),
+        4,
+        "page 2 holds the last four rows: {body}"
+    );
+    assert!(json["next"].is_null(), "{body}");
+    let (_, js) = send(
+        &router,
+        Request::get("/_zeyn/catalog.js")
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
+    assert!(
+        js.contains("known ? offset + size >= total : !d.zeynNext"),
+        "the browser enables Next from the cursor when there is no total"
+    );
+}
+
+#[tokio::test]
+async fn scoped_rails_and_lists_keep_their_filter_whatever_the_client_sends() {
+    let router = app(None);
+    let (status, page) = send(&router, get("/ankara")).await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert_eq!(
+        page.matches(" in Ankara").count(),
+        8,
+        "four cards and four rows of the scope: {page}"
+    );
+    assert!(!page.contains(" in Bursa"), "{page}");
+    for node in ["0", "1"] {
+        for filters in [
+            serde_json::json!([]),
+            serde_json::json!([{ "field": "city", "equals": "Bursa" }]),
+            serde_json::json!([{ "field": "id", "range": { "from": "1", "to": "30" } }]),
+        ] {
+            let (status, body) = send(
+                &router,
+                post(
+                    "/_zeyn/grid",
+                    "shop.read",
+                    serde_json::json!({ "screen": "ankara_goods", "node": node, "query": { "page": { "type": "offset", "offset": 4, "limit": 99 }, "filters": filters } }),
+                ),
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK, "{body}");
+            let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+            let rows = json["rows"].as_str().unwrap();
+            assert!(
+                rows.contains(" in Ankara") && !rows.contains(" in Bursa"),
+                "node {node} with {filters}: {rows}"
+            );
+        }
+    }
+}
+
+#[tokio::test]
 async fn rails_hide_their_scrollbar_unless_kept_and_drag_only_with_a_mouse() {
     let router = app(None);
     let (_, shop_page) = send(&router, get("/shop")).await;
@@ -672,4 +808,173 @@ async fn lists_render_rows_as_single_links_and_page_through_the_grid_endpoint() 
         StatusCode::FORBIDDEN,
         "reading needs the action's permission"
     );
+}
+
+#[screen(route = "/store", public)]
+pub fn store() -> Screen {
+    Screen::new("Store")
+}
+
+fn header_app(icon: bool) -> axum::Router {
+    let place = if icon {
+        CenterOnPhone::Icon
+    } else {
+        CenterOnPhone::Row
+    };
+    App::new("Test")
+        .auth(|h: &HeaderMap| {
+            let perms = h.get("x-perms")?.to_str().ok()?;
+            Some(Identity::user("u").with_permissions(perms.split(',').map(String::from)))
+        })
+        .feature(
+            Feature::new("store")
+                .screen(store)
+                .screen(results)
+                .screen(good_page)
+                .shell(Shell::site().header(|h| {
+                    h.start(Paragraph::new("Hi <there>"))
+                        .center(SearchBox::of(search_goods).results(results))
+                        .center(Paragraph::new("Second"))
+                        .center_on_phone(place)
+                        .end(LinkButton::new("Good", good_page, GoodParams { id: 3 }))
+                        .bottom(Chips::links("Topics").link(
+                            "Results",
+                            results,
+                            SearchParams::default(),
+                        ))
+                        .theme()
+                })),
+        )
+        .router()
+        .unwrap()
+}
+
+#[tokio::test]
+async fn header_slots_take_any_component_and_a_search_box_suggests_from_there() {
+    let router = header_app(false);
+    let (status, page) = send(&router, get("/store")).await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert!(
+        page.contains(
+            r#"data-zeyn-screen="_site.store" data-zeyn-params="null" data-center-phone="row""#
+        ),
+        "{page}"
+    );
+    let at = |s: &str| {
+        page.find(s)
+            .unwrap_or_else(|| panic!("{s} missing: {page}"))
+    };
+    assert!(at(r#"class="z-site-slot z-site-slot-start""#) < at(r#"class="z-site-brand""#));
+    assert!(at(r#"class="z-site-brand""#) < at(r#"<nav class="z-site-nav""#));
+    assert!(at(r#"<nav class="z-site-nav""#) < at(r#"id="z-site-slot-center""#));
+    assert!(at(r#"id="z-site-slot-center""#) < at(r#"id="z-site-slot-end""#));
+    assert!(at(r#"id="z-site-slot-end""#) < at(r#"id="z-site-actions""#));
+    assert!(at(r#"id="z-site-actions""#) < at(r#"id="z-site-slot-bottom""#));
+    assert!(page.contains("Hi &lt;there&gt;"));
+    assert!(page.contains(r#"data-zeyn-node="1.0"><form class="z-search""#));
+    assert!(page.contains(r#"data-zeyn-node="1.1""#));
+    assert!(
+        page.contains(r#"href="/goods/3""#),
+        "links in slots use path routes"
+    );
+    assert!(page.contains(r#"aria-controls="z-site-nav z-site-actions""#));
+    assert!(
+        !page.contains("data-zeyn-site-center-toggle"),
+        "a row needs no button"
+    );
+
+    let ask = |screen: &str, node: &str, perms: &str| {
+        post(
+            "/_zeyn/data",
+            perms,
+            serde_json::json!({ "screen": screen, "node": node, "key": "suggest", "input": "coffee" }),
+        )
+    };
+    let (status, body) = send(&router, ask("_site.store", "1.0", "shop.read")).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(
+        serde_json::from_str::<Vec<String>>(&body)
+            .unwrap()
+            .len(),
+        6
+    );
+    let (status, _) = send(&router, ask("_site.store", "1.0", "")).await;
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "the action's permission counts"
+    );
+    for (screen, node) in [
+        ("_site.store", "1.1"),
+        ("_site.store", "4.0"),
+        ("_site.other", "1.0"),
+    ] {
+        let (status, _) = send(&router, ask(screen, node, "shop.read")).await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "{screen} {node}");
+    }
+
+    let (_, page) = send(&header_app(true), get("/store")).await;
+    assert!(page.contains(r#"data-center-phone="icon""#));
+    assert!(page.contains(r#"<button type="button" class="z-site-toggle z-site-center-toggle" aria-expanded="false" aria-controls="z-site-slot-center" data-zeyn-site-center-toggle hidden>"#), "{page}");
+    assert!(page.contains(r#"<span class="z-sr-only">Search</span>"#));
+}
+
+#[screen(route = "/finder", public)]
+pub fn finder() -> Screen {
+    Screen::new("Finder").body(
+        SearchBox::of(search_goods)
+            .results(results)
+            .item(|g: &Good| {
+                zeyn::ui::ListItem::new(g.name.clone())
+                    .subtitle(g.city.clone())
+                    .image(if g.id.0 == 5 {
+                        "javascript:alert(1)".to_string()
+                    } else if g.id.0 == 10 {
+                        "https://elsewhere.example/x.png".to_string()
+                    } else {
+                        format!("/img/{}.png", g.id.0)
+                    })
+                    .link(good_page, GoodParams { id: g.id.0 })
+            }),
+    )
+}
+
+#[tokio::test]
+async fn rich_suggestions_carry_text_subtitle_an_allowed_image_and_the_canonical_link() {
+    let router = App::new("Test")
+        .auth(|h: &HeaderMap| {
+            let perms = h.get("x-perms")?.to_str().ok()?;
+            Some(Identity::user("u").with_permissions(perms.split(',').map(String::from)))
+        })
+        .feature(
+            Feature::new("shop")
+                .screen(finder)
+                .screen(results)
+                .screen(good_page),
+        )
+        .router()
+        .unwrap();
+    let (status, body) = send(
+        &router,
+        post(
+            "/_zeyn/data",
+            "shop.read",
+            serde_json::json!({ "screen": "finder", "node": "0", "key": "suggest", "input": "coffee" }),
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let hits: Vec<serde_json::Value> = serde_json::from_str(&body).unwrap();
+    assert_eq!(
+        hits[0],
+        serde_json::json!({ "text": "Coffee 5", "subtitle": "Bursa", "image": null, "href": "/goods/5" }),
+        "an unsafe image is left out"
+    );
+    assert_eq!(
+        hits[1]["image"],
+        serde_json::Value::Null,
+        "a host outside img-src is left out"
+    );
+    assert_eq!(hits[2]["image"], "/img/15.png");
+    assert_eq!(hits[2]["href"], "/goods/15");
 }

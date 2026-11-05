@@ -221,7 +221,8 @@
       "site": {
         "sign_in": "Sign in",
         "sign_out": "Sign out",
-        "bottom": "Quick links"
+        "bottom": "Quick links",
+        "center": "Search"
       }
     },
     "ui": {
@@ -234,6 +235,7 @@
         "sort": "Sort by",
         "pages": "Pages",
         "page": "Page {page} of {pages}",
+        "page_only": "Page {page}",
         "previous_page": "Previous page",
         "next_page": "Next page",
         "previous": "Scroll back",
@@ -518,6 +520,9 @@
       "reactions": {
         "label": "Reactions",
         "failed": "The reaction could not be saved."
+      },
+      "prefs": {
+        "cleared": "The choices this browser kept for this site were removed."
       }
     },
     "date": {

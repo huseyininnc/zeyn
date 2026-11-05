@@ -597,6 +597,7 @@ pub async fn docs_sitemap(part: SitemapPart, docs: Docs) -> Result<Vec<SitemapUr
 pub fn feature() -> Feature {
     with_pages(Feature::new("docs"))
         .screen(live_engage::tagged)
+        .screen(live_engage::any_tag)
         .search(search_docs)
         .sitemap(docs_sitemap)
 }

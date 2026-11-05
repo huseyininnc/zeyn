@@ -578,6 +578,7 @@ const RENAMES: &[(&str, &str)] = &[
     ("GridMode", "DataMode"),
     ("GridColumn", "DataGridColumn"),
     ("Grid", "DataGrid"),
+    ("MAX_EMBED_CONSENT", "MAX_PREF_LIFETIME"),
 ];
 
 /// Runs [`fix_renames`] when asked and describes what changed.

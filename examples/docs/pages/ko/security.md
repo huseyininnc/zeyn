@@ -95,6 +95,30 @@ App::new(t!("app.name"))
 
 필드 마스킹, 민감한 레코드를 열기 전의 사유, 필드 수준 감사, 읽기 감사는 [감사, 마스킹, 작업](enterprise.md)에서 다룹니다.
 
+## 클라이언트 환경설정
+
+일부 작은 선택은 서버가 아니라 브라우저에 속합니다. 임베드된 콘텐츠를 불러오기 전에 사용자가 확인한 안내, 마지막으로 연 탭이 그 예입니다. Zeyn은 이를 한 곳, 즉 `zeyn.state`(`/_zeyn/state.js`, 이를 쓰는 페이지에서만 로드됨)에 보관하며 서버는 이를 읽지 않으므로 캐시된 공개 페이지는 모두에게 같게 유지됩니다. 테마와 언어처럼 HTML을 바꾸는 환경설정은 쿠키에 남습니다.
+
+키는 종류, 수명, 목적과 함께 상수로 한 번 선언하고 앱에 등록하며 `.remember(KEY)`로 컴포넌트에 바인딩합니다. `Embed::remember`는 consent 키를, `Tabs::remember`는 choice 키를 받습니다. 일반 문자열이나 다른 종류의 키는 컴파일되지 않으며, ASCII 문자, 숫자, `-`, `_`로 이루어진 1자에서 40자를 벗어나는 이름이나 1초에서 400일(`MAX_PREF_LIFETIME`)을 벗어나는 수명은 상수를 만들 때 실패합니다. 앱이 등록하지 않은 키에 바인딩된 컴포넌트는 기억되지 않으므로 개인정보 목록은 항상 완전합니다.
+
+```rust
+pub const VIDEO_NOTICE: ClientPref<Consent> =
+    ClientPref::consent("video-notice", Duration::from_secs(86_400), Purpose::Necessary);
+pub const ORDER_TAB: ClientPref<Choice> =
+    ClientPref::choice("order-tab", Duration::from_secs(30 * 86_400), Purpose::Preference);
+
+App::new(t!("app.name")).client_prefs(|p| {
+    p.key(VIDEO_NOTICE)
+        .key(ORDER_TAB)
+        .allowed_when(|headers| consent_cookie(headers) == Some("all"))
+})
+```
+
+- **레코드.** 각 값은 `zeyn.v1.{key}` 아래의 `{v, exp, val}`입니다. 읽을 때마다 버전, 값(`true` 또는 최대 200자의 텍스트), 종료 시각을 확인하며, 종료 시각은 지나지 않았어야 하고 키의 수명보다 더 먼 미래여서는 안 됩니다. 직접 바꾼 경우처럼 검사에 실패한 레코드는 제거됩니다. 형식의 새 버전은 오래된 레코드를 무시합니다.
+- **목적.** `Purpose::Necessary`는 다른 사이트의 콘텐츠를 불러오기 전에 안내를 확인하는 것처럼 사용자가 요청한 것을 위한 것이며, 수명 동안 보관됩니다. `Purpose::Preference`는 인터페이스 선택입니다. ePrivacy 지침(제5조 3항)은 사용자가 요청한 서비스에 꼭 필요한 경우에만 동의 없이 브라우저에 데이터를 저장하도록 허용하며, EU 개인정보 보호 당국(Article 29 Working Party, 의견 04/2012)은 인터페이스 선택을 세션 동안이나 몇 시간 동안만 필수로 간주합니다. 따라서 환경설정 값은 앱의 훅 `allowed_when(|headers| ...)`이 사용자가 동의했다고 알려 줄 때까지 `sessionStorage`에 저장됩니다. 브라우저는 페이지마다 한 번 `GET /_zeyn/prefs`를 요청하고, 응답은 캐시되지 않으며, 훅이 없으면 응답은 아니요입니다.
+- **탭과 차단된 저장소.** 다른 탭은 `storage` 이벤트를 통해 변경을 따라갑니다. 저장소가 차단되면(비공개 창, 엄격한 설정) 값은 페이지 동안 메모리에 있습니다. JavaScript가 없으면 컴포넌트는 기본 상태를 보여 줍니다.
+- **공개성.** `App::client_prefs_table()`은 개인정보 페이지를 위해 모든 키를 종류, 목적, 초 단위 수명과 함께 나열하며, `ClearPrefs`(또는 `zeyn.prefs.clear()`)는 이를 브라우저에서 모두 제거합니다.
+
 ## API와 에이전트
 
 API 호출에는 `Authorization` 헤더가 필요합니다. 브라우저 세션 쿠키만으로는 API나 MCP 엔드포인트를 호출할 수 없으므로 CSRF 토큰이 필요하지 않습니다. 에이전트는 자신이 대행하는 사용자의 권한만 정확히 가집니다. [API와 OpenAPI](api.md)와 [MCP와 AI 에이전트](mcp.md)를 참고하십시오.

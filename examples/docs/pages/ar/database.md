@@ -35,10 +35,16 @@ impl ProductStore {
 | `time_zone` | المنطقة الزمنية لمرشحات التاريخ على أعمدة `DateTime`، يضبطها الخادم |
 | `group` | تجميع الصفوف حسب حقل، تضبطه الشبكة |
 
-تنفذ `DataQuery::apply(vec)` كل ذلك في الذاكرة. ولقاعدة بيانات SQL استخدم `zeyn::sql`: تحوّل `Db::find` الاستعلام نفسه إلى `WHERE` و`ORDER BY` و`LIMIT` و`GROUP BY` لقاعدة PostgreSQL أو Oracle. لا يمكن ترشيح أو فرز إلا حقول الكيان نفسه، وكل قيمة تُربط معاملًا (parameter)، ويضع الخادم حدًا أعلى لحجم الصفحة، فلا يصل مدخل العميل إلى نص SQL أبدًا. اكتب SQL يدويًا فقط للاستعلامات التي لا تستطيع `Db::find` التعبير عنها، وعندها لا تلصق فيه اسم حقل أو قيمة من العميل أبدًا.
+تنفذ `DataQuery::apply(vec)` كل ذلك في الذاكرة. ولقاعدة بيانات SQL استخدم `zeyn::sql`: تحوّل `Db::find` الاستعلام نفسه إلى `WHERE` و`ORDER BY` و`LIMIT` و`GROUP BY` لقاعدة PostgreSQL أو Oracle. لا يمكن ترشيح أو فرز إلا حقول الكيان نفسه، وكل قيمة تُربط معاملًا (parameter)، ويضع الخادم حدًا أعلى لحجم الصفحة، فلا يصل مدخل العميل إلى نص SQL أبدًا. اكتب SQL يدويًا فقط للاستعلامات التي لا تستطيع `Db::find` التعبير عنها: تقرأ `Db::query::<M>(sql, args)` صفوف `SELECT` في نموذج، ولا تقبل SQL إلا سلسلة حرفية وكل قيمة معاملًا، وتقرأ 1000 صف على الأكثر.
+
+```rust
+let hits: Vec<Hit> = db
+    .query("SELECT id, title FROM items WHERE title % $1 ORDER BY similarity(title, $1) DESC LIMIT 20", vec![q.into()])
+    .await?;
+```
 
 ```toml
-zeyn = { version = "0.0.7", features = ["postgres"] }   # or ["oracle"]
+zeyn = { version = "0.0.8", features = ["postgres"] }   # or ["oracle"]
 ```
 
 ```rust

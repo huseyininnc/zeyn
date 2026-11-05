@@ -8,7 +8,7 @@
 
 `GET {route}?params={json}` は完全な HTML ドキュメントを返します。`params` は Screen params の URL エンコードされた JSON で、Screen に params がない場合は省略されます。
 
-`/orders/{id}` のようにパスセグメントを持つルートでは、params のうちそのフィールドをパス（`/orders/42`）から、それ以外のフィールドを `params` から読み取ります。解釈できないセグメント値は 404 を返します。値はドットも含めてパーセントエンコードされる（`%2E`）ため、Screen の URL がランタイムにファイルとして扱われることはありません。`Screen::moved_to` を返す Screen には、新しい URL を `Location` に入れた `301 Moved Permanently` が返ります。
+`/orders/{id}` のようにパスセグメントを持つルートでは、params のうちそのフィールドをパス（`/orders/42`）から、それ以外のフィールドを `params` から読み取ります。解釈できないセグメント値は 404 を返します。値はドットも含めてパーセントエンコードされる（`%2E`）ため、Screen の URL がランタイムにファイルとして扱われることはありません。`Screen::moved_to` を返す Screen には、新しい URL を `Location` に入れた `301 Moved Permanently` が返り、`Screen::redirect` を返す Screen には `Cache-Control: no-store` 付きの `303 See Other` が返ります。`nav.js` はどちらもページを読み込まずにたどり、読み込みが履歴エントリを追加しない場合（戻ると進む）も、遷移先のアドレスを表示します。
 
 失敗したページは、そのステータス（404、403、500 など）と、アプリのエラー Screen（`App::not_found`、`App::server_error`）または組み込みの短いメッセージをシェル内に表示して返します。`x-zeyn-partial: 1` を付けたリクエストには、その Screen だけが `x-zeyn-partial: 1` と `x-zeyn-title` を付けて返るため、ランタイムはページを読み込み直さずに差し替えられます。エラーの詳細がブラウザに届くことはありません。
 
@@ -263,6 +263,7 @@ Effects:
 |---|---|---|
 | `/_zeyn/node` | `{ screen, params, node }` | 1 つのノードの HTML（その grid の最初のページ付き）。遅延 tabs で使われます。 |
 | `/_zeyn/data` | `{ screen, params, node, key, input }` | ノードのデータソース `key` からの JSON。lookup の選択肢（`key` はフィールド名）、tree の子（`key` は空）、ステップの確認（`key` は `_step`）。ソースの action 権限が確認され、grid と同様にインターセプターが実行されます。action に合わない入力は `404` で拒否されます。 |
+| `screen` = `_site.{feature}` の `/_zeyn/data` | 上と同じ | サイトヘッダーのスロット内のコンポーネント向けの同じ処理。`node` はスロット（0 は start、1 は center、2 は end、3 は bottom）、その中でのノードのインデックス、続いて子のインデックスです。Feature のガードと action の権限が確認されます。 |
 | `/_zeyn/parse` | `{ kind, text, label }` | 入力された日付または時刻を、サーバーがユーザーの言語、ゾーン、時計でどう解釈するか。`{ ok, text, iso, utc, zone }` または `{ ok: false, message }`。`kind` は `date`、`time`、`datetime`、`local`、`presets`（今日とクイック範囲）です。 |
 
 ### 7.2 Values the forms submit
@@ -280,6 +281,8 @@ Effects:
 | `zeyn:effect` | `document` | ランタイムが知らない effect: `{ effect, source, run }`。`run(next)` は別の effect を実行します。`confirm` で使われます。 |
 
 Effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":"...","then":{...}}` は、モーダルのアラートダイアログで確認し、ユーザーが承諾した後にのみ `then` を実行します。
+
+クライアント設定（`zeyn::ClientPref`）はブラウザーのモジュール `/_zeyn/state.js` にあり、ページはこのモジュールを、`data-zeyn-remember` または `data-zeyn-prefs-clear` を持つ要素がある場合にだけインポートします。`GET /_zeyn/prefs` は `{ preferences }` を返します。これは、アプリの同意フックが、設定値をセッションを越えて保持することを許可するかどうかを表し、`Cache-Control: no-store` が付きます。サーバーは保存された値を読み取りません。
 
 ### 7.4 Media
 

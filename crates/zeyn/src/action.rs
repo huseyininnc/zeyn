@@ -281,8 +281,9 @@ pub struct DataQuery {
     pub sort: Vec<Sort>,
     #[serde(default)]
     pub filters: Vec<Filter>,
-    /// Free text: rows whose text fields contain it, ignoring case, where the Turkish dotted and
-    /// dotless `i` (`İ`, `ı`) match `i`. Fields with `#[mask]` are never searched. Text longer than
+    /// Free text: rows whose text fields contain it, both sides compared in the form of
+    /// [`crate::text::fold`] (lower case, `İ` and `ı` as `i`, accents dropped, `ß` as `ss`).
+    /// Fields with `#[mask]` are never searched. Text longer than
     /// [`MAX_SEARCH_QUERY`](crate::MAX_SEARCH_QUERY) characters is ignored; blank text matches
     /// every row. [`DataQuery::apply`] and the SQL data layers read it the same way.
     ///

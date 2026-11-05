@@ -6,7 +6,7 @@ detrás de la feature de Cargo `postgres` y Oracle detrás de `oracle`, de modo 
 no compila nada de esto.
 
 ```toml
-zeyn = { version = "0.0.7", features = ["postgres"] }   # or ["oracle"], or both
+zeyn = { version = "0.0.8", features = ["postgres"] }   # or ["oracle"], or both
 ```
 
 ## Configuración
@@ -169,6 +169,37 @@ sirven para las demás ordenaciones.
 `get(key)` lee una fila y falla con `Error::NotFound` cuando no hay ninguna. Cualquier tabla o vista
 puede leerse a través de una entity, por ejemplo `user_sequences` de Oracle.
 
+## Consultas escritas a mano
+
+Las búsquedas por similitud, los joins y otras consultas que `find` no puede expresar pasan por `db.query::<M>(sql, args)`. `M` es cualquier `#[model]` o entity; sus campos se leen de las columnas del mismo nombre, con las mismas conversiones que `find`. El SQL debe ser un literal de cadena, así que los valores solo pueden llegar como parámetros (`$1`, `$2` en PostgreSQL, `:1`, `:2` en Oracle); un `String` o un `format!` no compila.
+
+```rust
+#[model]
+pub struct Hit {
+    pub id: ItemId,
+    pub slug: String,
+    pub title: String,
+}
+
+#[action(public)]
+pub async fn search_items(q: String, db: Db) -> Result<Vec<Hit>> {
+    db.query(
+        "SELECT i.id, i.slug, i.title, similarity(i.search_key, $1) AS score \
+         FROM items i WHERE i.search_key % $1 \
+         ORDER BY score DESC, i.id LIMIT 20",
+        vec![zeyn::text::fold(&q).into()],
+    )
+    .await
+}
+```
+
+`search_key` contiene `zeyn::text::fold(&title)`, que la app escribe al guardar la fila, de modo que la clave y el texto de búsqueda plegado se comparan en la misma forma (`İ` y `ı` como `i`, sin acentos, en minúsculas). El ejemplo necesita `CREATE EXTENSION pg_trgm` y un índice de trigramas: `CREATE INDEX items_search_key ON items USING gin (search_key gin_trgm_ops)`. Las columnas para las que el modelo no tiene campo, como `score`, las lee la base de datos y se descartan.
+
+- `query_one` devuelve la única fila o `None`; más de una fila es un error.
+- Se leen como máximo `QUERY_ROW_CAP` (1000) filas. La sentencia se envuelve como `SELECT <fields> FROM (<sql>) zeyn_q LIMIT 1001`, de modo que una fila por encima del límite es un error que lo dice, en lugar de una lista que crece en silencio; `query_max(sql, args, n)` fija otro límite.
+- Un campo sin columna, o una columna de tipo incorrecto, es un error.
+- Se aplica el tiempo de espera de sentencias del pool. `Tx` tiene las mismas tres llamadas.
+
 ## Cursores
 
 Las páginas numeradas usan offsets. El scroll infinito y el virtual usan cursores keyset, que no se ralentizan
@@ -241,7 +272,8 @@ conexión. `RowStream` implementa `futures_core::Stream`.
   longitud del dialecto) y se entrecomilla.
 - Los valores son siempre parámetros enlazados, incluidos los patrones `LIKE`, los valores de cursor, los límites y
   los offsets. Ningún valor se escribe nunca en el texto SQL.
-- El SQL escrito a mano pasa por `execute(&'static str, args)`: la sentencia debe ser un literal.
+- El SQL escrito a mano pasa por `execute(&'static str, args)` y `query(&'static str, args)`:
+  la sentencia debe ser un literal.
 - Los límites se acotan en el servidor (`MAX_PAGE_SIZE`, `MAX_FILTERS`, `MAX_SORT`, longitud del texto del filtro,
   tamaño de `any_of`), pida lo que pida el cliente.
 - Los errores del driver se registran como `Error::Internal` y nunca se muestran a los usuarios. La URL de conexión se

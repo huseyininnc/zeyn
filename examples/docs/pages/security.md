@@ -95,6 +95,30 @@ App::new(t!("app.name"))
 
 Field masking, reasons before opening sensitive records, field level audit and read audit are covered in [Audit, masking and jobs](enterprise.md).
 
+## Client preferences
+
+Some small choices belong in the browser, not on the server: a notice the user confirmed before embedded content loads, the tab opened last. Zeyn keeps them in one place, `zeyn.state` (`/_zeyn/state.js`, loaded only on pages that use it), and the server never reads them, so cached public pages stay the same for everyone. Preferences that change the HTML, such as the theme and the language, stay in cookies.
+
+A key is declared once as a constant with its kind, lifetime and purpose, registered on the app, and bound to components with `.remember(KEY)`: `Embed::remember` takes a consent key, `Tabs::remember` a choice key. A plain string or a key of the other kind does not compile, and a name outside 1 to 40 ASCII letters, digits, `-` and `_` or a lifetime outside one second to 400 days (`MAX_PREF_LIFETIME`) fails when the constant is built. A component bound to a key the app did not register is not remembered, so the privacy list is always complete.
+
+```rust
+pub const VIDEO_NOTICE: ClientPref<Consent> =
+    ClientPref::consent("video-notice", Duration::from_secs(86_400), Purpose::Necessary);
+pub const ORDER_TAB: ClientPref<Choice> =
+    ClientPref::choice("order-tab", Duration::from_secs(30 * 86_400), Purpose::Preference);
+
+App::new(t!("app.name")).client_prefs(|p| {
+    p.key(VIDEO_NOTICE)
+        .key(ORDER_TAB)
+        .allowed_when(|headers| consent_cookie(headers) == Some("all"))
+})
+```
+
+- **Records.** Each value is `{v, exp, val}` under `zeyn.v1.{key}`. Every read checks the version, the value (`true` or a text of at most 200 characters) and the end time, which must not have passed and must lie no further ahead than the key's lifetime. A record that fails, such as one changed by hand, is removed. A new version of the format ignores old records.
+- **Purpose.** `Purpose::Necessary` is for something the user asked for, such as confirming a notice before content from another site loads; it is kept for its lifetime. `Purpose::Preference` is an interface choice. The ePrivacy Directive (article 5(3)) allows storing data in the browser without consent only when it is strictly necessary for a service the user asked for, and the EU data protection authorities (Article 29 Working Party, opinion 04/2012) count interface choices as necessary only for the session or a few hours. So preference values go to `sessionStorage` until the app's hook, `allowed_when(|headers| ...)`, says the user consented; the browser asks `GET /_zeyn/prefs` once per page, the answer is never cached, and without a hook the answer is no.
+- **Tabs and blocked storage.** Other tabs follow changes through the `storage` event. When storage is blocked (private windows, strict settings) the values live in memory for the page. Without JavaScript components show their default state.
+- **Openness.** `App::client_prefs_table()` lists every key with its kind, purpose and lifetime in seconds for a privacy page, and `ClearPrefs` (or `zeyn.prefs.clear()`) removes them all from the browser.
+
 ## The API and agents
 
 API calls need an `Authorization` header; a browser session cookie alone never calls the API or the MCP endpoint, so they need no CSRF token. Agents get exactly the permissions of the user they act for. See [API and OpenAPI](api.md) and [MCP and AI agents](mcp.md).

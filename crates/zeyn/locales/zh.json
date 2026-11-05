@@ -221,7 +221,8 @@
       "site": {
         "sign_in": "登录",
         "sign_out": "退出登录",
-        "bottom": "快捷链接"
+        "bottom": "快捷链接",
+        "center": "搜索"
       }
     },
     "ui": {
@@ -234,6 +235,7 @@
         "sort": "排序方式",
         "pages": "页",
         "page": "第 {page} 页，共 {pages} 页",
+        "page_only": "第 {page} 页",
         "previous_page": "上一页",
         "next_page": "下一页",
         "previous": "向前滚动",
@@ -495,6 +497,9 @@
       "reactions": {
         "label": "回应",
         "failed": "无法保存回应。"
+      },
+      "prefs": {
+        "cleared": "已删除此浏览器为本网站保存的选择。"
       }
     },
     "date": {

@@ -221,7 +221,8 @@
       "site": {
         "sign_in": "サインイン",
         "sign_out": "サインアウト",
-        "bottom": "クイックリンク"
+        "bottom": "クイックリンク",
+        "center": "検索"
       }
     },
     "ui": {
@@ -234,6 +235,7 @@
         "sort": "並べ替え",
         "pages": "ページ",
         "page": "{page} / {pages}ページ",
+        "page_only": "{page}ページ",
         "previous_page": "前のページ",
         "next_page": "次のページ",
         "previous": "前へスクロール",
@@ -495,6 +497,9 @@
       "reactions": {
         "label": "リアクション",
         "failed": "リアクションを保存できませんでした。"
+      },
+      "prefs": {
+        "cleared": "このブラウザーがこのサイト用に保存していた選択を削除しました。"
       }
     },
     "date": {

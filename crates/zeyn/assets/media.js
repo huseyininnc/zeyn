@@ -17,8 +17,8 @@
  *
  * Embeds: `zeyn::ui::Embed` with `click_to_load` renders a poster button and the frame inside an
  * inert `<template>`. Pressing the button puts the frame in its place and moves focus to it. With
- * `remember` the end time of the consent is kept in `localStorage`, and later pages and tabs load
- * the frames of that scope by themselves without moving focus.
+ * `remember(KEY)` the consent is kept in `zeyn.state` (`state.js`), and later pages and other
+ * tabs load the frames bound to that key by themselves without moving focus.
  * @module media
  */
 
@@ -28,8 +28,20 @@ const RESUME_MARGIN_S = 5;
 const SEEK_STEP_S = 5;
 const JUMP_STEP_S = 10;
 const VOLUME_STEP = 5;
-/** Prefix of the `localStorage` keys that hold the end time of a remembered embed consent. */
-const CONSENT = 'zeyn.consent.';
+/** The `?v=` build query this script was loaded with, for the modules it imports. */
+const VERSION = new URL(import.meta.url).search;
+
+/** The client preference store, imported the first time a page holds a remembered embed. */
+let store = null;
+
+/** The store module, imported once. */
+function state() {
+  store ??= import(`${BASE}/_zeyn/state.js${VERSION}`).then((m) => {
+    m.on(() => restoreEmbeds(document));
+    return m;
+  });
+  return store;
+}
 
 /** Player state by root element. */
 const players = new WeakMap();
@@ -574,23 +586,6 @@ new MutationObserver((records) => {
 
 init(document);
 
-/**
- * Whether the embeds of `e`'s scope hold a consent that has not ended. False when the stored
- * value is not a whole number, has passed, lies further ahead than the embed's own time (changed
- * by hand), or storage is missing or blocked, so the button stays.
- */
-function consented(e) {
-  const ms = Number(e.dataset.zeynEmbedFor);
-  try {
-    const v = localStorage.getItem(CONSENT + e.dataset.zeynEmbedRemember);
-    if (!v || !/^[0-9]{1,15}$/.test(v) || !(ms > 0)) return false;
-    const left = Number(v) - Date.now();
-    return left > 0 && left <= ms;
-  } catch {
-    return false;
-  }
-}
-
 /** Puts the frame of a click to load embed in place of its button; `focus` moves focus to it. */
 function loadEmbed(root, focus) {
   const template = root.querySelector(':scope > template[data-zeyn-embed]');
@@ -604,30 +599,32 @@ function loadEmbed(root, focus) {
  * focus. An embed that holds focus keeps its button, so focus is never lost.
  */
 function restoreEmbeds(root) {
-  root.querySelectorAll('.z-embed[data-zeyn-embed-remember]').forEach((e) => {
-    if (!e.contains(document.activeElement) && consented(e)) loadEmbed(e, false);
+  const embeds = [...root.querySelectorAll('.z-embed[data-zeyn-remember]')];
+  if (!embeds.length) return;
+  state().then((m) => {
+    for (const e of embeds) {
+      const key = m.keyOf(e);
+      if (key && !e.contains(document.activeElement) && m.get(key) === true) loadEmbed(e, false);
+    }
   });
 }
 
 /**
  * Loads a click to load embed when its button is pressed and moves focus to the frame. With a
- * remembered scope the end time of the consent is stored and the other embeds of that scope load too.
+ * remembered key the consent is stored and the other embeds bound to that key load too.
  * @example
- * // <div class="z-embed" data-zeyn-embed-remember="external-video" data-zeyn-embed-for="86400000"><button data-zeyn-embed-load>..</button><template data-zeyn-embed><iframe ..></template></div>
+ * // <div class="z-embed" data-zeyn-remember="external-video" data-zeyn-remember-for="86400000" data-zeyn-remember-purpose="necessary"><button data-zeyn-embed-load>..</button><template data-zeyn-embed><iframe ..></template></div>
  */
 document.addEventListener('click', (e) => {
   const button = e.target instanceof Element ? e.target.closest('[data-zeyn-embed-load]') : null;
   const root = button?.closest('.z-embed');
   if (!root) return;
   loadEmbed(root, true);
-  const scope = root.dataset.zeynEmbedRemember;
-  if (!scope) return;
-  const ms = Number(root.dataset.zeynEmbedFor);
-  if (!(ms > 0)) return;
-  try {
-    localStorage.setItem(CONSENT + scope, String(Date.now() + ms));
-  } catch {
-    return;
-  }
-  restoreEmbeds(document);
+  if (!root.dataset.zeynRemember) return;
+  state().then(async (m) => {
+    const key = m.keyOf(root);
+    if (!key) return;
+    await m.set(key, true);
+    restoreEmbeds(document);
+  });
 });
