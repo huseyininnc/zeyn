@@ -133,11 +133,23 @@ async function swapScreen(url, push) {
   head?.remove();
   main.removeAttribute('aria-busy');
   markCurrent(finalUrl);
-  announce(main);
-  const target = finalUrl.hash && document.getElementById(decodeURIComponent(finalUrl.hash.slice(1)));
-  if (target) target.scrollIntoView();
-  else window.scrollTo(0, 0);
   document.dispatchEvent(new CustomEvent('zeyn:content', { detail: main }));
+  arrive(main, finalUrl.hash);
+}
+
+/**
+ * Scrolls to the anchor or the top and focuses the new screen's heading. Both read the layout,
+ * so they wait for every write of the swap (the screen, the head, the menu and what
+ * `zeyn:content` sets up): the scroll runs in the next animation frame, before it paints, and
+ * the focus right after that paint, when the layout is already done and costs nothing.
+ */
+function arrive(main, hash) {
+  requestAnimationFrame(() => {
+    const target = hash && document.getElementById(decodeURIComponent(hash.slice(1)));
+    if (target) target.scrollIntoView();
+    else window.scrollTo(0, 0);
+    setTimeout(() => announce(main));
+  });
 }
 
 document.addEventListener('click', (e) => {
@@ -222,14 +234,9 @@ async function swapFrame(url, push, hash) {
   const app = document.importNode(next, true);
   current.replaceWith(app);
   markCurrent(new URL(location.href));
-  if (push) {
-    const main = document.getElementById('z-main');
-    if (main) announce(main);
-    const target = hash && document.getElementById(decodeURIComponent(hash.slice(1)));
-    if (target) target.scrollIntoView();
-    else window.scrollTo(0, 0);
-  }
   document.dispatchEvent(new CustomEvent('zeyn:content', { detail: app }));
+  const main = document.getElementById('z-main');
+  if (push && main) arrive(main, hash);
 }
 
 /** Reloads the whole app frame in place, such as after the language or the time zone changed. */
