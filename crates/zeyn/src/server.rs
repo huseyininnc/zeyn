@@ -1187,6 +1187,70 @@ impl App {
         self
     }
 
+    /// Checks the link shortcuts of a built screen (`Chips::shortcut`, `PrevNext::shortcut`)
+    /// against each other, the commands, the palette and the links of the site headers: the
+    /// page level half of [`App::check`], which cannot build screens because they need params.
+    /// Call it in a test with the params the screen gets.
+    ///
+    /// ```
+    /// use zeyn::prelude::*;
+    ///
+    /// #[screen(route = "/", public)]
+    /// pub fn home() -> Screen {
+    ///     Screen::new("Home").body(
+    ///         Chips::links("Topics")
+    ///             .link("One", home, ())
+    ///             .shortcut("Alt+Shift+N")
+    ///             .link("Two", home, ())
+    ///             .shortcut("Alt+Shift+N"),
+    ///     )
+    /// }
+    ///
+    /// let app = App::new("Shop").feature(Feature::new("shop").screen(home));
+    /// let problems = app.check_page(&home::run()).unwrap_err();
+    /// assert!(problems[0].contains("is also used by the link at node 0"));
+    /// ```
+    pub fn check_page(&self, screen: &Screen) -> Result<(), Vec<String>> {
+        let commands: Vec<(&str, &crate::command::Command)> = self
+            .features
+            .iter()
+            .flat_map(|f| {
+                f.commands()
+                    .iter()
+                    .map(move |c| (f.name(), c))
+            })
+            .collect();
+        let mut found = Vec::new();
+        for f in &self.features {
+            if let Some(shell) = f.site_shell() {
+                for (s, nodes) in shell.header.slots.iter().enumerate() {
+                    for (i, node) in nodes.iter().enumerate() {
+                        node.all_shortcuts(format!("h{s}.{i}"), &mut found);
+                    }
+                }
+            }
+        }
+        for (i, node) in screen.nodes().iter().enumerate() {
+            node.all_shortcuts(i.to_string(), &mut found);
+        }
+        let links: Vec<(String, &str)> = found
+            .into_iter()
+            .map(|(path, keys)| {
+                let place = match path.strip_prefix('h') {
+                    Some(p) => format!("in the site header (node {p})"),
+                    None => format!("at node {path}"),
+                };
+                (place, keys)
+            })
+            .collect();
+        let problems = crate::command::link_problems(&links, &commands, &self.palette_keys);
+        if problems.is_empty() {
+            Ok(())
+        } else {
+            Err(problems)
+        }
+    }
+
     /// Checks routes, screen names, menus and that every service a screen needs is registered.
     pub fn check(&self) -> Result<(), Vec<String>> {
         let mut problems = self.setup_problems.clone();
@@ -1363,6 +1427,33 @@ impl App {
             false,
             &self.palette_keys,
         ));
+        for f in &self.features {
+            let Some(shell) = f.site_shell() else {
+                continue;
+            };
+            let mut links = Vec::new();
+            for (s, nodes) in shell.header.slots.iter().enumerate() {
+                let mut found = Vec::new();
+                for (i, node) in nodes.iter().enumerate() {
+                    node.all_shortcuts(format!("{s}.{i}"), &mut found);
+                }
+                links.extend(found.into_iter().map(|(path, keys)| {
+                    (
+                        format!(
+                            "in the {} slot of the site header of feature `{}` (node {path})",
+                            crate::site::SLOT_NAMES[s],
+                            f.name()
+                        ),
+                        keys,
+                    )
+                }));
+            }
+            problems.extend(crate::command::link_problems(
+                &links,
+                &commands,
+                &self.palette_keys,
+            ));
+        }
         match crate::command::normalize_shortcut(&self.palette_keys) {
             None => problems.push(format!(
                 "the palette shortcut `{}` cannot be read

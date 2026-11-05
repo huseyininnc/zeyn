@@ -39,7 +39,14 @@ PrevNext::new()
     .prev_title(prev.title.clone())
     .next(article, ArticleParams { id: next.id })
     .next_title(next.title.clone())
+    .shortcut("Alt+Shift+N")
 ```
+
+### Link shortcuts
+
+`.shortcut(keys)` gives the side set last a keyboard shortcut, and `Chips::links(...).link(...).shortcut(keys)` gives one to the link chip added last. Pressing the keys follows the link through `nav.js` without a page reload, on app shell and site shell pages alike. The keys do nothing while focus is in an input, a text area, a select or an editable area, so typing is never taken over. The link carries `aria-keyshortcuts` for screen readers and shows the keys in a `<kbd>` hint, which touch screens hide. Shortcuts are read like `Command::shortcut`: shortcuts the browser keeps (`Ctrl+T`, `Ctrl+W`) or uses (`Ctrl+P`, `F5`) are not bound. `App::check` reports link shortcuts in the site header slots that cannot be read, belong to the browser, are a single character key (WCAG 2.2, 2.1.4: `Shift+N` counts, `Alt+Shift+N` does not) or clash with a command, the palette or another link; `App::check_page(&screen)` does the same for a screen built in a test with its params, since `App::check` cannot build screens itself.
+
+Keys pressed while focus is inside a frame from another origin, such as an embedded video player, go to that frame's document and never reach the page; no script can change that. Tell users to click outside the frame, or press Tab to leave it, before using a shortcut.
 
 ## AutoGrid
 
@@ -104,7 +111,7 @@ Spoiler::new(t!("quiz.show_answer")).add(Paragraph::new(answer.clone()))
 
 ## Chips
 
-A row of small rounded links that wrap onto more lines. `Chips::links(label)` holds plain links to screens, such as the tags of an article, in a `nav` named by the label. `Chips::filter(label, screen, params)` makes toggle buttons over a screen param: each chip is a link to the same screen with its value added to or taken out of the param, so the server renders `aria-pressed` from the params it got and nothing is kept in the browser. Pressing a chip opens the new address through `nav.js` without a page reload, and focus and the scroll position stay on the chip. One value is pressed at a time unless `.multiple()` is called; values in the params that are not options are ignored. Keyboard: Tab moves between chips, Enter or Space presses one. A pressed chip also shows a check mark, so the state does not rest on color. The script (`chips.js`, under 1 KB) loads only on pages with filter chips.
+A row of small rounded links that wrap onto more lines. `Chips::links(label)` holds plain links to screens, such as the tags of an article, in a `nav` named by the label. `Chips::filter(label, screen, params)` makes toggle buttons over a screen param: each chip is a link to the same screen with its value added to or taken out of the param, so the server renders `aria-pressed` from the params it got and nothing is kept in the browser. Pressing a chip opens the new address through `nav.js` without a page reload, and focus and the scroll position stay on the chip. One value is pressed at a time unless `.multiple()` is called; values in the params that are not options are ignored. Keyboard: Tab moves between chips, Enter or Space presses one, and a link chip can have its own shortcut (see [Link shortcuts](#link-shortcuts)). A pressed chip also shows a check mark, so the state does not rest on color. The script (`chips.js`, under 1 KB) loads only on pages with filter chips.
 
 ```rust
 #[screen(route = "/articles", public)]

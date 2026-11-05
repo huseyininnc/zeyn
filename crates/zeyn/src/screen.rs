@@ -733,6 +733,12 @@ pub trait Component: Send + Sync {
     fn source(&self, _key: &str) -> Option<&dyn crate::ui::DataSource> {
         None
     }
+
+    /// Keyboard shortcuts of the component's own links, as declared, for the clash checks of
+    /// `App::check` and `App::check_page`.
+    fn shortcuts(&self) -> Vec<&str> {
+        Vec::new()
+    }
 }
 
 /// Type erased component: a node of the screen tree.
@@ -782,6 +788,21 @@ impl Node {
 
     pub fn source(&self, key: &str) -> Option<&dyn crate::ui::DataSource> {
         self.0.source(key)
+    }
+
+    pub fn shortcuts(&self) -> Vec<&str> {
+        self.0.shortcuts()
+    }
+
+    /// Link shortcuts of this node and every node below it, lazy ones included, with the path
+    /// of the node that declares each.
+    pub(crate) fn all_shortcuts<'a>(&'a self, path: String, out: &mut Vec<(String, &'a str)>) {
+        for keys in self.shortcuts() {
+            out.push((path.clone(), keys));
+        }
+        for (i, child) in self.children().iter().enumerate() {
+            child.all_shortcuts(format!("{path}.{i}"), out);
+        }
     }
 }
 

@@ -221,7 +221,8 @@
       },
       "prev_next": {
         "overview": "Example",
-        "one_side": "Only one side"
+        "one_side": "Only one side",
+        "with_shortcuts": "With keyboard shortcuts"
       },
       "progress": {
         "overview": "Example"

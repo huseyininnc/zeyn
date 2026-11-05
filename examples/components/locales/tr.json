@@ -221,7 +221,8 @@
       },
       "prev_next": {
         "overview": "Örnek",
-        "one_side": "Yalnızca bir yan"
+        "one_side": "Yalnızca bir yan",
+        "with_shortcuts": "Klavye kısayollarıyla"
       },
       "progress": {
         "overview": "Örnek"
