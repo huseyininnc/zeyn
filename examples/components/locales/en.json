@@ -150,7 +150,8 @@
       "data_grid": {
         "overview": "Example",
         "confirm_actions": "Row and bulk actions that ask first",
-        "numbers": "Numbers grouped by locale, a plain year"
+        "numbers": "Numbers grouped by locale, a plain year",
+        "computed_million": "A million computed rows, built a page at a time"
       },
       "date_pickers": {
         "overview": "Example"

@@ -61,6 +61,17 @@ return Err(errors.into());
 
 Las listas reciben un `DataQuery` y devuelven `Page<M>`. Una acción de lista nunca devuelve todas las filas; la tabla pide páginas y el servidor limita el tamaño de página sea lo que sea que envíe el cliente.
 
+Para una tabla que la aplicación calcula o guarda en su propio índice (millones de filas, eventos construidos a partir de sus ids), `q.span()` da las filas pedidas como un desplazamiento y un límite, tanto si vienen de páginas numeradas como de un cursor, y `Page::window(rows, total, span)` las devuelve con el total y el cursor a la fila siguiente. Solo se construyen las filas de la página; el orden y los filtros los aplica la aplicación leyendo `q.sort` y `q.filters`.
+
+```rust
+#[action(permission = "audit.read")]
+pub async fn search_events(q: DataQuery, log: EventLog) -> Result<Page<Event>> {
+    let span = q.span();
+    let rows = log.range(span.offset, span.limit)?;
+    Ok(Page::window(rows, log.len()?, span))
+}
+```
+
 ## El contexto
 
 `Ctx` es la petición: `ctx.identity()`, `ctx.locale()`, `ctx.time_zone()`, `ctx.now()`, `ctx.today()`, `ctx.tenant()`, `ctx.license()`, `ctx.config()`, `ctx.theme()` y `ctx.t(&text)`. Usa `ctx.now()` y `ctx.today()` en lugar del reloj del sistema, para que las pruebas puedan fijar la hora con `App::fixed_now`.

@@ -84,6 +84,24 @@ pub async fn search_warehouses(q: DataQuery) -> Result<Page<Warehouse>> {
     Ok(q.apply(rows))
 }
 
+/// A million computed products: only the rows of the asked page are built, from their number.
+#[action(public)]
+pub async fn million_products(q: DataQuery) -> Result<Page<Product>> {
+    const TOTAL: u64 = 1_000_000;
+    let span = q.span();
+    let rows = (span.offset..span.end().min(TOTAL))
+        .map(|n| {
+            let base = &PRODUCTS[(n % PRODUCTS.len() as u64) as usize];
+            Product {
+                id: ProductId(n as i64 + 1),
+                code: format!("M-{:07}", n + 1),
+                ..base.clone()
+            }
+        })
+        .collect();
+    Ok(Page::window(rows, TOTAL, span))
+}
+
 /// The address of sample picture `n` (1 to 12), served by the site as an SVG.
 pub fn picture(n: i64) -> String {
     format!("/site/img/{}.svg", n.rem_euclid(12) + 1)

@@ -207,6 +207,8 @@ What to remember:
 - Errors: `Error::NotFound`, `Error::Forbidden`, `Error::Conflict` (stale row version),
   `Error::Denied(t!("..."))`, `Error::Validation(errors)`, `Error::Internal("for the log")`.
 - Quick screens: `DataGrid::auto(action)` and `Form::auto(model)`.
+- Computed or very large tables: `let span = q.span();` build only those rows, then
+  `Ok(Page::window(rows, total, span))`.
 - Paging: `Paging::pages(25)`, `Paging::infinite(100)`, `Paging::virtual_scroll()` for very large
   lists. Grid extras: `.sort_by(field, desc)`, `.exportable()`, `.row_action(...)`,
   `.bulk_action(...)`, `.editable()` with `.edit_with(action)`, `.detail(screen)`, `.group_by(field)`,

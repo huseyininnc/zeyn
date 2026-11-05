@@ -61,6 +61,17 @@ return Err(errors.into());
 
 一覧は `DataQuery` を受け取り、`Page<M>` を返します。一覧アクションがすべての行を返すことはありません。グリッドはページ単位で要求し、サーバーはクライアントが何を送ってもページサイズに上限を設けます。
 
+アプリが自分で計算する、または独自のインデックスに持つテーブル（数百万行、ID から組み立てるイベント）では、`q.span()` が要求された行を、ページ番号でもカーソルでも、オフセットと件数で返し、`Page::window(rows, total, span)` がそれらを総数と次の行へのカーソル付きで返します。作られるのはそのページの行だけです。並べ替えとフィルターは、アプリが `q.sort` と `q.filters` を読んで自分で適用します。
+
+```rust
+#[action(permission = "audit.read")]
+pub async fn search_events(q: DataQuery, log: EventLog) -> Result<Page<Event>> {
+    let span = q.span();
+    let rows = log.range(span.offset, span.limit)?;
+    Ok(Page::window(rows, log.len()?, span))
+}
+```
+
 ## コンテキスト
 
 `Ctx` はリクエストを表します。`ctx.identity()`、`ctx.locale()`、`ctx.time_zone()`、`ctx.now()`、`ctx.today()`、`ctx.tenant()`、`ctx.license()`、`ctx.config()`、`ctx.theme()`、`ctx.t(&text)` があります。システムクロックの代わりに `ctx.now()` と `ctx.today()` を使うと、テストで `App::fixed_now` により時刻を固定できます。

@@ -2430,3 +2430,97 @@ fn whole_numbers_are_grouped_by_locale_right_aligned_and_plain_on_request() {
     zeyn::render::push_grouped(&mut small, i64::MIN, "en");
     assert_eq!(small, "999-9,223,372,036,854,775,808");
 }
+
+/// A million computed rows; only the asked page is ever built.
+#[action(permission = "items.read")]
+pub async fn million(q: DataQuery) -> Result<Page<Item>> {
+    const TOTAL: u64 = 1_000_000;
+    let span = q.span();
+    let rows = (span.offset..span.end().min(TOTAL))
+        .map(|n| {
+            let mut row = item((n % 20 + 1) as i64);
+            row.id = ItemId(n as i64 + 1);
+            row
+        })
+        .collect();
+    Ok(Page::window(rows, TOTAL, span))
+}
+
+#[test]
+fn computed_tables_page_through_span_and_window_with_either_page_form() {
+    let query = |page: serde_json::Value| -> DataQuery {
+        serde_json::from_value(serde_json::json!({ "page": page })).unwrap()
+    };
+    let numbered = query(serde_json::json!({ "type": "offset", "offset": 999_990, "limit": 50 }));
+    assert_eq!(
+        numbered.span(),
+        zeyn::Span {
+            offset: 999_990,
+            limit: 50
+        }
+    );
+    let after = query(serde_json::json!({ "type": "after", "cursor": "120", "limit": 100_000 }));
+    assert_eq!(
+        after.span(),
+        zeyn::Span {
+            offset: 120,
+            limit: zeyn::MAX_PAGE_SIZE
+        },
+        "the client cannot ask for more than the cap"
+    );
+    let odd = query(serde_json::json!({ "type": "after", "cursor": "x", "limit": 10 }));
+    assert_eq!(odd.span().offset, 0);
+
+    let last = Page::window(
+        vec![1, 2, 3],
+        10,
+        zeyn::Span {
+            offset: 7,
+            limit: 5,
+        },
+    );
+    assert_eq!((last.total, last.next), (Some(10), None));
+    let middle = Page::window(
+        vec![1, 2],
+        10,
+        zeyn::Span {
+            offset: 2,
+            limit: 2,
+        },
+    );
+    assert_eq!(middle.next.unwrap().0, "4");
+    let past = Page::<i32>::window(
+        Vec::new(),
+        10,
+        zeyn::Span {
+            offset: 50,
+            limit: 5,
+        },
+    );
+    assert!(
+        past.next.is_none() && past.items.is_empty(),
+        "no cursor that loops"
+    );
+    let all = [1, 2, 3, 4, 5];
+    let slice = Page::from_slice(
+        &all,
+        &query(serde_json::json!({ "type": "offset", "offset": 3, "limit": 2 })),
+    );
+    assert_eq!((slice.items, slice.next), (vec![4, 5], None));
+}
+
+#[tokio::test]
+async fn a_grid_over_a_computed_million_rows_loads_only_its_page() {
+    let page = million::run(
+        serde_json::from_value(
+            serde_json::json!({ "page": { "type": "offset", "offset": 750_000, "limit": 25 } }),
+        )
+        .unwrap(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(page.items.len(), 25);
+    assert_eq!(page.items[0].id, ItemId(750_001));
+    assert_eq!(page.total, Some(1_000_000));
+    assert_eq!(page.next.unwrap().0, "750025");
+}

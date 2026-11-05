@@ -227,29 +227,67 @@ impl<M> Page<M> {
     }
 }
 
+impl<M> Page<M> {
+    /// The rows of `span` out of `total` matching rows, for a table the app computes or reads
+    /// in its own order (millions of generated rows, an index of its own): only the rows of the
+    /// page are built, the total is set, and the cursor points at the next row while there are
+    /// more, as [`DataQuery::span`] reads it back.
+    ///
+    /// ```
+    /// use zeyn::{DataQuery, Page};
+    /// let q: DataQuery = serde_json::from_value(serde_json::json!({ "page": { "type": "offset", "offset": 40, "limit": 20 } })).unwrap();
+    /// let span = q.span();
+    /// let rows: Vec<u64> = (span.offset..span.end().min(1_000_000)).collect();
+    /// let page = Page::window(rows, 1_000_000, span);
+    /// assert_eq!((page.items[0], page.total, page.next.unwrap().0), (40, Some(1_000_000), "60".to_string()));
+    /// ```
+    pub fn window(items: Vec<M>, total: u64, span: Span) -> Self {
+        let end = span
+            .offset
+            .saturating_add(items.len() as u64);
+        let more = !items.is_empty() && end < total;
+        let page = Page::new(items).total(total);
+        if more {
+            page.next(Cursor(end.to_string()))
+        } else {
+            page
+        }
+    }
+}
+
 impl<M: Clone> Page<M> {
     /// Pages an in memory list. Meant for small data, samples and tests; databases page in SQL.
     ///
     /// The cursor here is a row position, which is only stable because the list does not change.
     pub fn from_slice(all: &[M], query: &DataQuery) -> Self {
-        let limit = query.limit() as usize;
-        let start = match &query.page {
-            PageRequest::Offset { offset, .. } => usize::try_from(*offset).unwrap_or(usize::MAX),
-            PageRequest::After { cursor, .. } => cursor
-                .as_ref()
-                .and_then(|c| c.0.parse().ok())
-                .unwrap_or(0),
-        }
-        .min(all.len());
-        let end = start
-            .saturating_add(limit)
-            .min(all.len());
-        let page = Page::new(all[start..end].to_vec()).total(all.len() as u64);
-        if end < all.len() {
-            page.next(Cursor(end.to_string()))
-        } else {
-            page
-        }
+        let span = query.span();
+        let len = all.len() as u64;
+        let start = span.offset.min(len);
+        let end = span.end().min(len);
+        Page::window(
+            all[start as usize..end as usize].to_vec(),
+            len,
+            Span {
+                offset: start,
+                ..span
+            },
+        )
+    }
+}
+
+/// The rows a query asks for, from either page form: the first row and how many.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Span {
+    pub offset: u64,
+    /// Between 1 and [`MAX_PAGE_SIZE`], whatever the client sent.
+    pub limit: u32,
+}
+
+impl Span {
+    /// The row after the last one asked for.
+    pub fn end(self) -> u64 {
+        self.offset
+            .saturating_add(self.limit as u64)
     }
 }
 
@@ -314,6 +352,23 @@ pub struct DataQuery {
 }
 
 impl DataQuery {
+    /// The rows this query asks for as an offset and a limit, from numbered pages or from a
+    /// cursor holding a row position, as [`Page::window`] writes it. A cursor that is not a
+    /// position starts at the first row; the limit is [`DataQuery::limit`].
+    pub fn span(&self) -> Span {
+        let offset = match &self.page {
+            PageRequest::Offset { offset, .. } => *offset,
+            PageRequest::After { cursor, .. } => cursor
+                .as_ref()
+                .and_then(|c| c.0.parse().ok())
+                .unwrap_or(0),
+        };
+        Span {
+            offset,
+            limit: self.limit(),
+        }
+    }
+
     /// Requested page size, kept between 1 and [`MAX_PAGE_SIZE`]. Never use the raw value.
     pub fn limit(&self) -> u32 {
         let raw = match &self.page {

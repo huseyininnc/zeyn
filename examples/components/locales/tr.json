@@ -150,7 +150,8 @@
       "data_grid": {
         "overview": "Örnek",
         "confirm_actions": "Önce soran satır ve toplu işlemler",
-        "numbers": "Yerel ayara göre gruplanmış sayılar, düz bir yıl"
+        "numbers": "Yerel ayara göre gruplanmış sayılar, düz bir yıl",
+        "computed_million": "Sayfa sayfa üretilen bir milyon hesaplanmış satır"
       },
       "date_pickers": {
         "overview": "Örnek"
