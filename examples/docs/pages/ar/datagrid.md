@@ -69,6 +69,7 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 - `.on_open(|row| effect)`: نقر مزدوج أو Enter على صف.
 - `.row_action(label, action, |row| input)`: زر على كل صف.
 - `.bulk_action(label, action, M::id)`: يعمل على الصفوف المحددة.
+- `.confirm(message)` و`.tone(Tone::Danger)` مباشرةً بعد `.row_action` أو `.bulk_action`: يسأل قبل تشغيل ذلك الإجراء في مربع الحوار نفسه الذي يستخدمه `ActionButton::confirm` (يبدأ التركيز على الإلغاء)، ويرسم زره باللون الأحمر.
 - `.row_menu(|row| ContextMenu)`: قائمة النقر الأيمن للصف.
 - `.row_style(|row| Option<RowStyle>)`: صفوف الخطر أو التحذير أو النجاح.
 - `.exportable()`: تصدير CSV للصفوف المصفّاة، يبثه الخادم (stream).

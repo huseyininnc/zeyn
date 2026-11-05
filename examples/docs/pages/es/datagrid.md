@@ -69,6 +69,7 @@ El servidor limita el tamaño de página pida lo que pida el cliente.
 - `.on_open(|row| effect)`: doble clic o Enter en una fila.
 - `.row_action(label, action, |row| input)`: un botón en cada fila.
 - `.bulk_action(label, action, M::id)`: se ejecuta sobre las filas seleccionadas.
+- `.confirm(message)` y `.tone(Tone::Danger)` justo después de `.row_action` o `.bulk_action`: pregunta antes de que esa acción se ejecute, en el mismo diálogo que `ActionButton::confirm` (el foco empieza en Cancelar), y dibuja su botón en rojo.
 - `.row_menu(|row| ContextMenu)`: el menú contextual de una fila.
 - `.row_style(|row| Option<RowStyle>)`: filas de peligro, advertencia o éxito.
 - `.exportable()`: exportación CSV de las filas filtradas, enviada en streaming por el servidor.

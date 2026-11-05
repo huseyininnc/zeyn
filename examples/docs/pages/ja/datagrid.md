@@ -69,6 +69,7 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 - `.on_open(|row| effect)`: 行のダブルクリックまたは Enter。
 - `.row_action(label, action, |row| input)`: 各行のボタン。
 - `.bulk_action(label, action, M::id)`: 選択した行に対して実行します。
+- `.row_action` または `.bulk_action` の直後の `.confirm(message)` と `.tone(Tone::Danger)`: その操作の実行前に `ActionButton::confirm` と同じダイアログで確認し（フォーカスは最初にキャンセル）、ボタンを赤で描きます。
 - `.row_menu(|row| ContextMenu)`: 行の右クリックメニュー。
 - `.row_style(|row| Option<RowStyle>)`: danger、warning、success の行。
 - `.exportable()`: フィルター後の行の CSV エクスポート。サーバーがストリーミングします。

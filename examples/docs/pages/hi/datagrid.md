@@ -69,6 +69,7 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 - `.on_open(|row| effect)`: पंक्ति पर डबल क्लिक या Enter।
 - `.row_action(label, action, |row| input)`: हर पंक्ति पर एक बटन।
 - `.bulk_action(label, action, M::id)`: चुनी गई पंक्तियों पर चलती है।
+- `.row_action` या `.bulk_action` के ठीक बाद `.confirm(message)` और `.tone(Tone::Danger)`: वह क्रिया चलने से पहले `ActionButton::confirm` वाले संवाद में ही पूछता है (फ़ोकस पहले रद्द करें पर रहता है), और उसका बटन लाल दिखाता है।
 - `.row_menu(|row| ContextMenu)`: पंक्ति का राइट क्लिक मेनू।
 - `.row_style(|row| Option<RowStyle>)`: danger, warning या success पंक्तियाँ।
 - `.exportable()`: फ़िल्टर की गई पंक्तियों का CSV निर्यात, सर्वर द्वारा स्ट्रीम किया गया।

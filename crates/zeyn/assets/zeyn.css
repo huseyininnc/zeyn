@@ -1189,6 +1189,10 @@ th[aria-sort="descending"] .z-sort::after {
 
 .z-row-action:hover { background: var(--z-brand-subtle); border-color: color-mix(in oklab, var(--z-accent) 30%, transparent); }
 
+.z-row-action.z-danger { color: var(--z-danger); }
+
+.z-row-action.z-danger:hover { background: var(--z-danger-subtle); border-color: color-mix(in oklab, var(--z-danger) 30%, transparent); }
+
 .z-row-action:disabled { opacity: 0.5; cursor: progress; }
 
 /**

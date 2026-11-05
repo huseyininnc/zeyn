@@ -210,6 +210,8 @@ What to remember:
   lists. Grid extras: `.sort_by(field, desc)`, `.exportable()`, `.row_action(...)`,
   `.bulk_action(...)`, `.editable()` with `.edit_with(action)`, `.detail(screen)`, `.group_by(field)`.
 - Buttons that run an action: `ActionButton::new(t!("..."), action, input)`, with `.confirm(...)`.
+  Destructive grid actions: `.row_action(..)` or `.bulk_action(..)` then `.confirm(t!("..."))`
+  `.tone(Tone::Danger)`; workflow moves: `Transitions::of(..).confirm("cancel", t!("..."))`.
 - Layouts: `Row`, `Stack`, `Panel`, `Card`, `Tabs`, `Split`.
 - Key figures: `Kpi::new(t!("..."), value)` or `Kpi::money(t!("..."), money)` with `.delta(..)`
   and `.trend(..)`; four in a `Row` fill a desktop row and wrap two, then one per line.

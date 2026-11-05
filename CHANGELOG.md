@@ -14,6 +14,7 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 - `zeyn g screen <feature> <name>` (short form `g s`, MCP tool `zeyn_new_screen`) adds `screens/<name>.rs`, registers the screen in the feature and adds its title to every locale file. A flat `screens.rs` is first moved to `screens/mod.rs`, and a deleted `screens/` is created again. It never overwrites a file.
 - `zeyn check` warns about a `#[screen]` or `#[action]` that no feature registers and about a flat `screens.rs` or `actions.rs` with several items in more than about 150 lines.
 - `Kpi::money(title, Money)`: the value and the target with the currency in the user's locale.
+- Confirmation for destructive grid and workflow actions: `.confirm(message)` and `.tone(Tone::Danger)` after `DataGrid::row_action` or `bulk_action`, and `Transitions::confirm(name, message)` with `Transitions::tone(name, Tone::Danger)`, in the dialog `ActionButton::confirm` uses.
 - Screen header: `Screen::subtitle(text)` and `Screen::primary(|t| ...)` put a subtitle under the title and the main actions at the end of the title row, wrapping under the title on phones.
 
 ### Changed

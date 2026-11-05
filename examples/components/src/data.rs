@@ -248,3 +248,15 @@ pub async fn slow_count(_: ()) -> Result<i64> {
 pub async fn pretend_save(_: ()) -> Result<()> {
     Ok(())
 }
+
+/// Pretends to delete one product. Nothing changes.
+#[action(public)]
+pub async fn pretend_delete(_: ProductId) -> Result<()> {
+    Ok(())
+}
+
+/// Pretends to delete the selected products. Nothing changes.
+#[action(public)]
+pub async fn pretend_delete_all(_: Vec<ProductId>) -> Result<()> {
+    Ok(())
+}

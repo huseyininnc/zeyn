@@ -70,6 +70,7 @@ The server caps the page size whatever the client asks for.
 - `.on_open(|row| effect)`: double click or Enter on a row.
 - `.row_action(label, action, |row| input)`: a button on each row.
 - `.bulk_action(label, action, M::id)`: runs on the selected rows.
+- `.confirm(message)` and `.tone(Tone::Danger)` right after `.row_action` or `.bulk_action`: asks before that action runs, in the same dialog as `ActionButton::confirm` (Cancel has the focus first), and draws its button in red.
 - `.row_menu(|row| ContextMenu)`: the right click menu of a row.
 - `.row_style(|row| Option<RowStyle>)`: danger, warning or success rows.
 - `.exportable()`: CSV export of the filtered rows, streamed by the server.

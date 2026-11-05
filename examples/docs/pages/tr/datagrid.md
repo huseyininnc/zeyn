@@ -69,6 +69,7 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 - `.on_open(|row| effect)`: bir satırda çift tıklama veya Enter.
 - `.row_action(label, action, |row| input)`: her satırda bir düğme.
 - `.bulk_action(label, action, M::id)`: seçili satırlarda çalışır.
+- `.row_action` ya da `.bulk_action` hemen ardından `.confirm(message)` ve `.tone(Tone::Danger)`: o işlem çalışmadan önce `ActionButton::confirm` ile aynı pencerede sorar (odak önce İptal'dedir) ve düğmesini kırmızı çizer.
 - `.row_menu(|row| ContextMenu)`: bir satırın sağ tık menüsü.
 - `.row_style(|row| Option<RowStyle>)`: danger, warning veya success satırlar.
 - `.exportable()`: filtrelenmiş satırların CSV dışa aktarımı, sunucu tarafından akıtılır.

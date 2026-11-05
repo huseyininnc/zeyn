@@ -69,6 +69,7 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 - `.on_open(|row| effect)`: 행에서 더블 클릭 또는 Enter.
 - `.row_action(label, action, |row| input)`: 각 행의 버튼.
 - `.bulk_action(label, action, M::id)`: 선택한 행에서 실행됩니다.
+- `.row_action`이나 `.bulk_action` 바로 뒤의 `.confirm(message)`와 `.tone(Tone::Danger)`: 그 작업이 실행되기 전에 `ActionButton::confirm`과 같은 대화 상자로 묻고(포커스는 먼저 취소에 있음), 버튼을 빨간색으로 그립니다.
 - `.row_menu(|row| ContextMenu)`: 행의 오른쪽 클릭 메뉴.
 - `.row_style(|row| Option<RowStyle>)`: danger, warning, success 행.
 - `.exportable()`: 필터링된 행의 CSV 내보내기이며 서버가 스트리밍합니다.

@@ -1,6 +1,6 @@
 //! DataGrid examples: rows of an action with paging, sorting and filters.
 
-use crate::data::{Kind, Product, search_products};
+use crate::data::{Kind, Product, pretend_delete, pretend_delete_all, search_products};
 use crate::{Entry, ex};
 use zeyn::prelude::*;
 
@@ -27,11 +27,28 @@ pub fn overview(_ctx: &Ctx) -> Node {
         .into()
 }
 
+pub fn confirm_actions(_ctx: &Ctx) -> Node {
+    DataGrid::of(search_products)
+        .paging(Paging::pages(4))
+        .column(Product::code)
+        .width(100)
+        .column(Product::name)
+        .flex(1)
+        .row_action("Delete", pretend_delete, |p| p.id)
+        .icon(Icon::Delete)
+        .confirm("Delete this product? Nothing is stored in the catalog.")
+        .tone(Tone::Danger)
+        .bulk_action("Delete selected", pretend_delete_all, Product::id)
+        .confirm("Delete the selected products?")
+        .tone(Tone::Danger)
+        .into()
+}
+
 /// What the catalog shows of `DataGrid`.
 pub const ENTRY: Entry = Entry {
     name: "DataGrid",
     docs: "language/datagrid",
     api: &["DataGrid", "DataGridColumn", "Paging"],
     overview: &[ex!(overview)],
-    examples: &[],
+    examples: &[ex!(confirm_actions)],
 };

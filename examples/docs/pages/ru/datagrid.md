@@ -69,6 +69,7 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 - `.on_open(|row| effect)`: двойной щелчок или Enter на строке.
 - `.row_action(label, action, |row| input)`: кнопка на каждой строке.
 - `.bulk_action(label, action, M::id)`: выполняется над выбранными строками.
+- `.confirm(message)` и `.tone(Tone::Danger)` сразу после `.row_action` или `.bulk_action`: спрашивает перед запуском этого действия в том же диалоге, что и `ActionButton::confirm` (фокус сначала на «Отмена»), и рисует его кнопку красной.
 - `.row_menu(|row| ContextMenu)`: контекстное меню строки по правому щелчку.
 - `.row_style(|row| Option<RowStyle>)`: строки danger, warning или success.
 - `.exportable()`: экспорт отфильтрованных строк в CSV, потоком с сервера.

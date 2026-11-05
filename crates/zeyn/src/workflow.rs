@@ -239,6 +239,8 @@ pub struct Transitions<S, K, A: Action> {
     current: S,
     id: K,
     on_success: Option<SuccessFn<A::Output>>,
+    /// Per transition name: the confirmation message and whether the button is destructive.
+    asks: Vec<(&'static str, Option<Text>, bool)>,
     _action: PhantomData<fn() -> A>,
 }
 
@@ -254,8 +256,44 @@ where
             current,
             id,
             on_success: None,
+            asks: Vec::new(),
             _action: PhantomData,
         }
+    }
+
+    fn ask(&mut self, name: &'static str) -> &mut (&'static str, Option<Text>, bool) {
+        let at = match self
+            .asks
+            .iter()
+            .position(|a| a.0 == name)
+        {
+            Some(at) => at,
+            None => {
+                self.asks.push((name, None, false));
+                self.asks.len() - 1
+            }
+        };
+        &mut self.asks[at]
+    }
+
+    /// Asks the user to confirm with this message before the transition `name` runs, in the same
+    /// dialog as [`crate::ui::ActionButton::confirm`]. The question is asked in the browser; the
+    /// server still checks the move and its permission.
+    ///
+    /// ```ignore
+    /// Transitions::of(order_flow(), order.state, order.id, move_order)
+    ///     .confirm("cancel", t!("orders.cancel_confirm"))
+    ///     .tone("cancel", Tone::Danger)
+    /// ```
+    pub fn confirm(mut self, name: &'static str, message: impl Into<Text>) -> Self {
+        self.ask(name).1 = Some(message.into());
+        self
+    }
+
+    /// `Tone::Danger` draws the button of transition `name`, and its confirmation, in red.
+    pub fn tone(mut self, name: &'static str, tone: crate::grid::Tone) -> Self {
+        self.ask(name).2 = tone == crate::grid::Tone::Danger;
+        self
     }
 
     /// What happens after a successful move. Shows a short confirmation unless set.
@@ -296,9 +334,30 @@ where
                 label = r.text(&Text::key("zeyn.workflow.comment")),
             ));
             for t in allowed {
+                let (confirm, danger) = self
+                    .asks
+                    .iter()
+                    .find(|a| a.0 == t.name)
+                    .map(|a| (a.1.as_ref(), a.2))
+                    .unwrap_or((None, false));
+                let label = r.text(&t.label);
+                let confirm = confirm
+                    .map(|m| {
+                        format!(
+                            r#" data-zeyn-confirm="{}" data-text-title="{}" data-text-ok="{label}" data-text-cancel="{}""#,
+                            r.text(m),
+                            r.text(&Text::key("zeyn.ui.confirm.title")),
+                            r.text(&Text::key("zeyn.ui.confirm.cancel"))
+                        )
+                    })
+                    .unwrap_or_default();
+                let class = if danger {
+                    "z-button z-danger-button"
+                } else {
+                    "z-button"
+                };
                 out.push_str(&format!(
-                    r#"<button type="submit" class="z-button" data-zeyn-transition="{name}" data-testid="{scope}.transition.{name}">{}</button>"#,
-                    r.text(&t.label),
+                    r#"<button type="submit" class="{class}" data-zeyn-transition="{name}" data-testid="{scope}.transition.{name}"{confirm}>{label}</button>"#,
                     name = escape(t.name),
                 ));
             }

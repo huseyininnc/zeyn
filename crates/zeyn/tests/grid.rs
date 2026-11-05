@@ -2346,3 +2346,41 @@ async fn wide_virtual_grids_keep_every_row_of_the_first_block_in_the_template() 
         "narrow grids keep live rows"
     );
 }
+
+#[test]
+fn row_and_bulk_actions_can_ask_for_a_confirmation_and_look_destructive() {
+    let grid = DataGrid::of(search)
+        .column(Item::code)
+        .row_action("Bump", bump, |i| i.id)
+        .row_action("Bump <again>", bump, |i| i.id)
+        .confirm("Bump <this> row?")
+        .tone(zeyn::Tone::Danger)
+        .bulk_action("Deactivate", deactivate, Item::id)
+        .confirm("Deactivate the selected rows?")
+        .tone(zeyn::Tone::Danger)
+        .bulk_action("Deactivate quietly", deactivate, Item::id);
+    let rows = Store::seeded()
+        .0
+        .read()
+        .unwrap()
+        .clone();
+    let html = grid.rows_html(&rows[..1]);
+    assert!(
+        html.contains(
+            r#"<button type="button" class="z-row-action" data-zeyn-run="a0" tabindex="-1">"#
+        ),
+        "{html}"
+    );
+    assert!(
+        html.contains(r#"<button type="button" class="z-row-action z-danger" data-zeyn-run="a1" data-zeyn-confirm="Bump &lt;this&gt; row?" tabindex="-1">"#),
+        "{html}"
+    );
+    let mut page = String::new();
+    zeyn::Component::render(&grid, &mut page, &zeyn::Render::english("s"));
+    assert!(page.contains(r#"class="z-button z-danger-button" data-zeyn-bulk-run="0" data-testid="s.grid.bulk-0" data-zeyn-confirm="Deactivate the selected rows?">Deactivate</button>"#), "{page}");
+    assert!(page.contains(r#"class="z-button" data-zeyn-bulk-run="1" data-testid="s.grid.bulk-1">Deactivate quietly</button>"#));
+    assert!(
+        page.contains("&quot;confirm_title&quot;:&quot;Please confirm&quot;"),
+        "the dialog texts come with the grid"
+    );
+}

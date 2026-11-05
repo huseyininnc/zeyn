@@ -145,7 +145,8 @@
         "overview": "Example"
       },
       "data_grid": {
-        "overview": "Example"
+        "overview": "Example",
+        "confirm_actions": "Row and bulk actions that ask first"
       },
       "date_pickers": {
         "overview": "Example"

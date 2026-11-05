@@ -97,6 +97,7 @@ pub async fn move_leave(req: TransitionRequest<LeaveRequestId>, store: LeaveStor
 - 각 이동은 `transition`의 감사 기록에 기록됩니다. 이름, from, to, 댓글이 들어가며, 사용자와 시각은 기록 자체에 있습니다.
 - `Transitions::of(flow, state, id, action)`은 현재 상태, 선택적 댓글, 그 상태에서 사용자가 할 수 있는 이동마다 버튼 하나를 보여 줍니다(`Workflow::allowed`). 레코드 키는 서버의 Screen에서 오므로 클라이언트가 다른 레코드를 이동시킬 수 없습니다. 에이전트는 이를 폼 도구로 봅니다.
 - 버튼 레이블은 카탈로그의 `workflow.<name>`에서 가져오며, `.label(...)`로 직접 설정할 수 있습니다.
+- `.confirm(name, message)`는 전환 `name`이 실행되기 전에 `ActionButton::confirm` 대화 상자로 묻고, `.tone(name, Tone::Danger)`는 그 버튼을 빨간색으로 그립니다. 서버는 어떤 경우든 전환과 권한을 확인합니다.
 - `Workflow::check`는 잘못된 권한과 같은 상태에서 두 번 선언된 이동을 보고합니다. 테스트에서 호출하십시오.
 - 쇼케이스의 휴가 신청이 이를 사용합니다. 초안으로 저장하고, 제출한 다음, 승인하거나 거부합니다.
 
