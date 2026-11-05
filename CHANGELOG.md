@@ -6,6 +6,7 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 ### Security
 
+- `Feature::files` takes a `FileAccess`: `FileAccess::read(p).write(q)` lets readers download files they may not upload. A plain permission name still covers both. Before, a store readable by a role was also writable by it.
 - Form submits no longer write the values of password and one time code fields (`Control::Password`, `NewPassword`, `PasswordMeter`, `OneTimeCode`) into the audit trail; the change is recorded with both values left out. This covered the sign in, register, reset and change password forms of the `accounts` feature.
 
 ### Added

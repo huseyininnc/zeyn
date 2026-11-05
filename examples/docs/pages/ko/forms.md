@@ -60,6 +60,8 @@ Feature::new("support")
 Form::of(ticket).field(Ticket::title).file(Ticket::attachments, ATTACHMENTS)
 ```
 
+권한 이름 하나는 같은 사용자에게 업로드와 다운로드를 모두 허용합니다. 추가할 수 없는 파일을 읽기 사용자가 열 수 있게 하려면 나누십시오: `.files(ATTACHMENTS, FileAccess::read("support.ticket.read").write("support.ticket.files"), store)`.
+
 컨트롤은 드롭 영역 안의 기본 파일 입력입니다. 각 파일은 진행 막대와 함께 독립적으로 업로드되고, 진행 중에는 취소할 수 있으며, 실패하면 다시 시도할 수 있고, 완료되면 제거할 수 있습니다. 이미지는 선택한 파일의 object URL로 만든 미리 보기를 보여 줍니다. 진행 상황과 결과는 정중한 라이브 리전에서 안내됩니다. 쇼케이스의 `/uploads`에 동작하는 예제가 있습니다. 이 문서 사이트에는 로그인한 사용자가 없으므로 라이브 업로드는 표시되지 않습니다.
 
 | 키 | 동작 |

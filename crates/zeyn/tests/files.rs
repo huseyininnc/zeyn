@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 use tower::ServiceExt;
 use zeyn::prelude::*;
 use zeyn::{
-    BoxFuture, Component, FileChunks, FileMeta, FileScanner, FileStore, I18n, Identity,
+    BoxFuture, Component, FileAccess, FileChunks, FileMeta, FileScanner, FileStore, I18n, Identity,
     MediaReader, Render, ScanVerdict,
 };
 
@@ -735,4 +735,53 @@ fn rules_detect_types_and_clean_names() {
             .limit(),
         zeyn::MAX_UPLOAD_BYTES
     );
+}
+
+#[tokio::test]
+async fn readers_download_but_only_writers_upload() {
+    let store = MemoryStore::default();
+    let router = App::new("Test")
+        .i18n(I18n::new("en"))
+        .auth(|h: &HeaderMap| {
+            let perms: Vec<String> = h
+                .get("x-perms")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("")
+                .split(',')
+                .map(String::from)
+                .collect();
+            Some(Identity::user("ada").with_permissions(perms))
+        })
+        .feature(Feature::new("crm").files(
+            DOCS,
+            FileAccess::read("crm.files.read").write("crm.files.write"),
+            store.clone(),
+        ))
+        .router()
+        .unwrap();
+    let (status, _, _) = send(
+        &router,
+        upload("a.png", "crm.files.read")
+            .body(png(100).into())
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert!(store.ids().is_empty());
+    let (status, _, body) = send(
+        &router,
+        upload("a.png", "crm.files.write")
+            .body(png(100).into())
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let id = json(&body)["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let (status, _, _) = send(&router, download(&id, "crm.files.write")).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let (status, _, _) = send(&router, download(&id, "crm.files.read")).await;
+    assert_eq!(status, StatusCode::OK);
 }

@@ -60,6 +60,8 @@ Feature::new("support")
 Form::of(ticket).field(Ticket::title).file(Ticket::attachments, ATTACHMENTS)
 ```
 
+A permission name lets the same users upload and download. To let readers open files they may not add to, split it: `.files(ATTACHMENTS, FileAccess::read("support.ticket.read").write("support.ticket.files"), store)`.
+
 The control is a native file input inside a drop zone. Each file uploads on its own with a progress bar, can be canceled while it runs, retried when it failed and removed when it is done. Images show a preview made from an object URL of the chosen file. Progress and results are announced in a polite live region. The showcase has a working example at `/uploads`; this documentation site has no signed in user, so it shows no live upload.
 
 | Key | What it does |

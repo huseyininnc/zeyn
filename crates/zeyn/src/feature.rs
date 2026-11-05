@@ -327,8 +327,10 @@ impl Feature {
     }
 
     /// Keeps uploads for fields with these `rules` in `store`, served at
-    /// `/_zeyn/files/{rules.store()}`. Uploading and downloading need `permission` and the
-    /// feature's guards. The store name must be unique in the app.
+    /// `/_zeyn/files/{rules.store()}`. Uploading and downloading need `access` and the
+    /// feature's guards: a permission name for both, or
+    /// [`FileAccess::read`](crate::files::FileAccess::read) with `.write(..)` for a separate
+    /// upload permission. The store name must be unique in the app.
     ///
     /// ```ignore
     /// Feature::new("crm").files(CONTRACTS, "crm.contract.write", DiskStore::new("data/contracts"))
@@ -337,13 +339,13 @@ impl Feature {
     pub fn files(
         mut self,
         rules: crate::files::FileRules,
-        permission: &'static str,
+        access: impl Into<crate::files::FileAccess>,
         store: impl crate::files::FileStore,
     ) -> Self {
         self.files
             .push(crate::files::FileEntry {
                 rules,
-                permission,
+                access: access.into(),
                 store: Arc::new(store),
             });
         self

@@ -60,6 +60,8 @@ Feature::new("support")
 Form::of(ticket).field(Ticket::title).file(Ticket::attachments, ATTACHMENTS)
 ```
 
+Tek bir izin adı aynı kullanıcılara hem yükleme hem indirme verir. Okuyucuların ekleyemedikleri dosyaları açabilmesi için ikiye ayırın: `.files(ATTACHMENTS, FileAccess::read("support.ticket.read").write("support.ticket.files"), store)`.
+
 Kontrol, bir bırakma alanının içindeki yerel bir dosya girdisidir. Her dosya kendi ilerleme çubuğuyla ayrı ayrı yüklenir; çalışırken iptal edilebilir, başarısız olduysa yeniden denenebilir ve bittiğinde kaldırılabilir. Görseller, seçilen dosyanın bir nesne URL'sinden üretilen bir önizleme gösterir. İlerleme ve sonuçlar, nazik (polite) bir canlı bölgede duyurulur. Showcase'in `/uploads` adresinde çalışan bir örnek vardır; bu dokümantasyon sitesinde oturum açmış kullanıcı olmadığı için canlı yükleme göstermez.
 
 | Tuş | Ne yapar |

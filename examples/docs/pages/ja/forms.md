@@ -60,6 +60,8 @@ Feature::new("support")
 Form::of(ticket).field(Ticket::title).file(Ticket::attachments, ATTACHMENTS)
 ```
 
+権限名を 1 つ指定すると、同じユーザーがアップロードとダウンロードの両方を行えます。追加はできないが閲覧はできるようにするには分けます: `.files(ATTACHMENTS, FileAccess::read("support.ticket.read").write("support.ticket.files"), store)`。
+
 コントロールは、ドロップゾーン内のネイティブなファイル入力です。各ファイルは進捗バー付きで個別にアップロードされ、実行中はキャンセルでき、失敗したら再試行でき、完了したら削除できます。画像は、選択したファイルのオブジェクト URL から作られたプレビューを表示します。進捗と結果は、丁寧なライブリージョンで通知されます。showcaseの `/uploads` に動作する例があります。このドキュメントサイトにはサインインしたユーザーがいないため、ライブのアップロードは表示されません。
 
 | キー | 動作 |
