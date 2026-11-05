@@ -289,7 +289,10 @@ fn main() -> ExitCode {
             .and_then(|fixed| check(Path::new(".")).map(|r| fixed + &r))
             .and_then(|report| {
                 print!("{report}");
-                if report.contains("error") {
+                if report
+                    .lines()
+                    .any(|l| l.starts_with("error") || l.contains(": error"))
+                {
                     Err("the app has problems".into())
                 } else {
                     Ok(())
