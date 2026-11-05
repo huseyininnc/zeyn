@@ -13,7 +13,7 @@ the `zeyn` MCP server). Extra rules for a library:
 4. The library and every app must use the same Zeyn version.
 5. Keep app specific code out: a library knows nothing about the apps that use it.
 6. Keep files and functions small: one component, screen or group of related actions per
-   file. A source file holds at most 300 non blank lines (`tests/structure.rs` checks it) and a
+   file. A source file holds at most 300 non blank lines (`build.rs` stops the build otherwise) and a
    function at most 60 lines (clippy `too_many_lines`). When `screens.rs` or `actions.rs` grows,
    turn it into a folder (`screens/mod.rs` plus one file per screen) and move large parts of a
    screen, such as a toolbar, a form or a panel, into their own functions in their own files.

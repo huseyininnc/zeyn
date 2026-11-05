@@ -10,7 +10,7 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 ### Added
 
-- Size limits in new projects: `tests/structure.rs` fails when a source file has more than `max_file_lines` (default 300) non blank lines, set under `[package.metadata.zeyn]` in `Cargo.toml`, and clippy `too_many_lines` denies functions longer than 60 lines (`too-many-lines-threshold` in `clippy.toml`). AGENTS.md and the skill tell agents to keep one component or screen per file.
+- Size limits in new projects: `build.rs` stops the build when a source file has more than `max_file_lines` (default 300) non blank lines, set under `[package.metadata.zeyn]` in `Cargo.toml`, and clippy `too_many_lines` denies functions longer than 60 lines (`too-many-lines-threshold` in `clippy.toml`). AGENTS.md and the skill tell agents to keep one component or screen per file.
 - Generators for one file per screen, action and component: `zeyn g screen <feature> <name>`, `zeyn g action <feature> <name>` and `zeyn g component <feature> <name>` (short forms `g s`, `g a`, `g c`, `g f`), also as the MCP tools `zeyn_new_screen`, `zeyn_new_action` and `zeyn_new_component`. They register the screen or action in the feature, add new texts to every locale file, move a flat `screens.rs` or `actions.rs` to `screens/mod.rs` (`actions/mod.rs`) first, and never overwrite a file. The folder layout is the default, not a rule.
 - `zeyn check` warns about a `#[screen]` or `#[action]` that no feature registers and about a flat `screens.rs` or `actions.rs` with several items in more than about 150 lines.
 

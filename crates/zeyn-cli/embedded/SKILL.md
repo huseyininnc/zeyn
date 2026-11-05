@@ -102,7 +102,7 @@ These hold in every Zeyn app. `zeyn check` and the compiler enforce many of them
 
     `cargo fmt` keeps this shape with `chain_width = 40` in `rustfmt.toml`; do not raise it.
 13. **Small files, small functions.** One component, screen or group of related actions per file.
-    A source file holds at most 300 non blank lines (`tests/structure.rs` checks it) and a
+    A source file holds at most 300 non blank lines (`build.rs` stops the build otherwise) and a
     function at most 60 lines (clippy `too_many_lines`). When `screens.rs` or `actions.rs` grows,
     turn it into a folder (`screens/mod.rs` plus one file per screen) and move large parts of a
     screen (a toolbar, a form, a panel) into their own functions in their own files. The limits
