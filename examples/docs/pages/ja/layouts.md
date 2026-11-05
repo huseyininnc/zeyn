@@ -40,6 +40,8 @@ Panel::new(t!("ui.panel_products")).collapsible().toolbar(|t| t.export(Export::C
 
 `Tabs::new(label)` に `.tab(title, node)` を付けて使います。矢印キーでタブ間を移動できます。これは ARIA の tabs パターンに沿っています。閉じているタブの内容は、最初に開かれるまでレンダリングされないため、タブが多い画面でも軽いままです。
 
+`.remember(KEY)` は、ユーザーが開いたタブを choice キーの下に保持するため（[クライアント設定](security.md#client-preferences) を参照）、以降のページでも同じタブが開きます。URL のハッシュで指定されたタブが優先されます。
+
 ## Split
 
 `Split::new(start, end)` は、2 つのノードをハンドルを挟んで表示します。`.ratio(percent)` で開始側のサイズを設定します。ハンドルはポインターまたは矢印キーで動かせます。

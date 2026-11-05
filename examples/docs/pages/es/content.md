@@ -39,7 +39,14 @@ PrevNext::new()
     .prev_title(prev.title.clone())
     .next(article, ArticleParams { id: next.id })
     .next_title(next.title.clone())
+    .shortcut("Alt+Shift+N")
 ```
+
+### Atajos de enlace
+
+`.shortcut(keys)` da un atajo de teclado al lado establecido en último lugar, y `Chips::links(...).link(...).shortcut(keys)` da uno al chip de enlace añadido en último lugar. Al pulsar las teclas se sigue el enlace mediante `nav.js` sin recargar la página, tanto en las páginas del shell de la aplicación como en las del shell del sitio. Las teclas no hacen nada mientras el foco está en un input, un text area, un select o un área editable, así que nunca se le quita al usuario lo que escribe. El enlace lleva `aria-keyshortcuts` para los lectores de pantalla y muestra las teclas en una pista `<kbd>`, que las pantallas táctiles ocultan. Los atajos se leen como `Command::shortcut`: los atajos que el navegador se reserva (`Ctrl+T`, `Ctrl+W`) o usa (`Ctrl+P`, `F5`) no se enlazan. `App::check` informa de los atajos de enlace en las ranuras de la cabecera del sitio que no se pueden leer, que pertenecen al navegador, que son una tecla de un solo carácter (WCAG 2.2, 2.1.4: `Shift+N` cuenta, `Alt+Shift+N` no) o que chocan con un comando, la paleta u otro enlace; `App::check_page(&screen)` hace lo mismo para una pantalla construida en un test con sus params, ya que `App::check` no puede construir pantallas por sí mismo.
+
+Las teclas pulsadas mientras el foco está dentro de un marco de otro origen, como un reproductor de vídeo incrustado, van al documento de ese marco y nunca llegan a la página; ningún script puede cambiarlo. Indica a los usuarios que hagan clic fuera del marco, o que pulsen Tab para salir de él, antes de usar un atajo.
 
 ## AutoGrid
 
@@ -104,7 +111,7 @@ Spoiler::new(t!("quiz.show_answer")).add(Paragraph::new(answer.clone()))
 
 ## Chips
 
-Una fila de pequeños enlaces redondeados que pasan a más líneas. `Chips::links(label)` contiene enlaces simples a pantallas, como las etiquetas de un artículo, dentro de un `nav` nombrado por la etiqueta. `Chips::filter(label, screen, params)` crea botones de alternancia sobre un parámetro de pantalla: cada chip es un enlace a la misma pantalla con su valor añadido al parámetro o quitado de él, de modo que el servidor genera `aria-pressed` a partir de los parámetros recibidos y no se guarda nada en el navegador. Pulsar un chip abre la nueva dirección mediante `nav.js` sin recargar la página, y el foco y la posición de desplazamiento se quedan en el chip. Solo hay un valor pulsado a la vez salvo que se llame a `.multiple()`; los valores de los parámetros que no son opciones se ignoran. Teclado: Tab se mueve entre chips, Enter o Space pulsa uno. Un chip pulsado también muestra una marca de verificación, así que el estado no depende solo del color. El script (`chips.js`, menos de 1 KB) se carga solo en páginas con chips de filtro.
+Una fila de pequeños enlaces redondeados que pasan a más líneas. `Chips::links(label)` contiene enlaces simples a pantallas, como las etiquetas de un artículo, dentro de un `nav` nombrado por la etiqueta. `Chips::filter(label, screen, params)` crea botones de alternancia sobre un parámetro de pantalla: cada chip es un enlace a la misma pantalla con su valor añadido al parámetro o quitado de él, de modo que el servidor genera `aria-pressed` a partir de los parámetros recibidos y no se guarda nada en el navegador. Pulsar un chip abre la nueva dirección mediante `nav.js` sin recargar la página, y el foco y la posición de desplazamiento se quedan en el chip. Solo hay un valor pulsado a la vez salvo que se llame a `.multiple()`; los valores de los parámetros que no son opciones se ignoran. Teclado: Tab se mueve entre chips, Enter o Space pulsa uno, y un chip de enlace puede tener su propio atajo (consulta [Atajos de enlace](#link-shortcuts)). Un chip pulsado también muestra una marca de verificación, así que el estado no depende solo del color. El script (`chips.js`, menos de 1 KB) se carga solo en páginas con chips de filtro.
 
 ```rust
 #[screen(route = "/articles", public)]
@@ -124,14 +131,15 @@ pub fn articles(p: ArticleParams) -> Screen {
 
 ## Hero
 
-Una sección grande en la parte superior de una página: una imagen de fondo con un título, una línea de texto y acciones como botones. Es estática por defecto. `.slide(title)` añade otra diapositiva, y `.text`, `.image` y `.action` siempre afectan a la última. Con varias diapositivas sigue el patrón de carrusel de W3C APG: botones para elegir diapositiva, cada diapositiva es un grupo llamado «2 de 3» y la diapositiva elegida se anuncia con cortesía. Las diapositivas cambian solo cuando el usuario elige una, salvo que la app llame a `.rotate(seconds)` (de 4 a 30). Entonces va primero un botón de pausa y reproducción (WCAG 2.2.2), la rotación se detiene mientras el puntero está sobre el hero o el foco está dentro y mientras la pestaña está oculta, y nunca empieza si el usuario prefiere movimiento reducido; las diapositivas no se anuncian mientras se mueven. Sin script se muestra la primera diapositiva.
+Una sección grande en la parte superior de una página: una imagen de fondo con un título, una línea de texto y acciones como botones. `.link(label, screen, params)` añade un `LinkButton` a otra página: el primero de una diapositiva tiene el aspecto primario, los siguientes el secundario. Es estática por defecto. `.slide(title)` añade otra diapositiva, y `.text`, `.image` y `.action` siempre afectan a la última. Con varias diapositivas sigue el patrón de carrusel de W3C APG: botones para elegir diapositiva, cada diapositiva es un grupo llamado «2 de 3» y la diapositiva elegida se anuncia con cortesía. Las diapositivas cambian solo cuando el usuario elige una, salvo que la app llame a `.rotate(seconds)` (de 4 a 30). Entonces va primero un botón de pausa y reproducción (WCAG 2.2.2), la rotación se detiene mientras el puntero está sobre el hero o el foco está dentro y mientras la pestaña está oculta, y nunca empieza si el usuario prefiere movimiento reducido; las diapositivas no se anuncian mientras se mueven. Sin script se muestra la primera diapositiva.
 
-La imagen sigue las reglas de `Image` (una ruta de la app o una dirección `https` en un host del `img-src` de la app). Es decoración tras el texto, así que su texto alternativo está vacío: pon lo importante en el título y el texto, que se sitúan sobre un degradado oscuro para dar contraste. La imagen de la primera diapositiva se carga con prioridad alta para un primer pintado rápido, las demás de forma diferida. El script (`hero.js`, 1,6 KB gzip) se carga solo en páginas con diapositivas.
+La imagen sigue las reglas de `Image` (una ruta de la app o una dirección `https` en un host del `img-src` de la app). Es decoración tras el texto, así que su texto alternativo está vacío: pon lo importante en el título y el texto, que se sitúan sobre un velo oscuro que mantiene el texto blanco con un contraste de al menos 4,5:1 sobre cualquier imagen. Los botones de enlace conservan sus colores sólidos y reciben un anillo de foco blanco sobre la imagen. La imagen de la primera diapositiva se carga con prioridad alta para un primer pintado rápido, las demás de forma diferida. El script (`hero.js`, 1,6 KB gzip) se carga solo en páginas con diapositivas.
 
 ```rust
 Hero::new(t!("home.fresh"))
     .text(t!("home.fresh_text"))
     .image("/img/hero/kitchen.jpg")
+    .link(t!("home.menu"), menu, ())
     .action(ActionButton::new(t!("home.order"), start_order, ()))
     .slide(t!("home.new_teas"))
     .image("/img/hero/teas.jpg")

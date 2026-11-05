@@ -94,6 +94,21 @@ SearchBox::of(catalog_products)
 
 結果画面は `SearchParams` を受け取ります（`q`。メニューから開いた場合は空）。サーバーはテキストを `MAX_SEARCH_QUERY`（100）文字で切り詰め、送る候補の数を決め（`limit` で指定しない限り 8、最大 20）、画面のアクセス権、Feature のガード、アクションの権限を検査し、すべての候補の呼び出しを書き込みのレート制限（`App::write_limit`）に数えます。
 
+### リッチな候補
+
+`.item(|row| ListItem::new(title).subtitle(text).image(src).link(screen, params))` は、各候補を、小さな画像（40 x 56 ピクセル、遅延読み込み、`img-src` のルールに従い、タイトルが行の名前になるため代替テキストは空で、画像がなければプレースホルダーは表示しません）、タイトル、サブタイトルを持つ行として表示します。サーバーは、レコードの正規アドレスを付けた `[{text, subtitle, image, href}]` を返します。クリックまたは Enter で行を選ぶと、`nav.js` を通じてそのリンクが開き、各行は本物のリンクなので、中クリックや「新しいタブで開く」も使えます。ハイライトされた行がない状態で Enter を押すと、従来どおり結果画面が開きます。combobox パターンは変わりません。各行はタイトルとサブタイトルで名前が付いた option で、行の高さは 44 ピクセル以上です。`.item` がなければ、候補は上記のようにプレーンテキストです。
+
+```rust
+SearchBox::of(catalog_products)
+    .item(|p: &Product| {
+        ListItem::new(p.name.clone())
+            .subtitle(p.code.clone())
+            .image(p.image.clone())
+            .link(shop_product, ProductPage { id: p.id })
+    })
+    .results(shop_search)
+```
+
 ## 自由テキスト
 
 `DataQuery::q` は自由テキストです。大文字小文字を区別せず、テキストフィールドにそれを含む行が対象になります。トルコ語の点付きと点なしの `i`（`İ`、`ı`）は `i` に一致するため、「istanbul」で「İSTANBUL」が見つかります。`#[mask]` を持つフィールドは検索されません。空白のテキストはすべての行に一致し、100 文字より長いテキストは無視されます。`DataQuery::apply` と SQL のデータ層（バインドされたパラメータ付きの `LOWER(TRANSLATE(column, 'İı', 'ii')) LIKE ...`）も、同じように読み取ります。

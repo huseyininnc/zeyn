@@ -22,7 +22,15 @@ Feature::new("shop")
             .item(t!("shop.delivery.title"), shop_delivery)
             .item(t!("shop.returns.title"), shop_returns)
     })
-    .shell(Shell::site().header(|h| h.sign_in().language().theme()).footer(|f| {
+    .shell(Shell::site().header(|h| {
+        h.center(SearchBox::of(search_products).results(shop_search))
+            .center_on_phone(CenterOnPhone::Icon)
+            .end(LinkButton::new(t!("shop.cart"), shop_cart, ()))
+            .sign_in()
+            .language()
+            .theme()
+    })
+    .footer(|f| {
         f.column(t!("shop.menu.help"), |c| {
             c.link(t!("shop.delivery.title"), shop_delivery).url(t!("shop.footer.source"), "https://example.com")
         })
@@ -36,7 +44,8 @@ Feature::new("shop")
 
 - **Menú.** El menú superior lista los menús de todas las features en el shell del sitio. Un grupo de un solo elemento es un enlace simple; un grupo mayor es un botón que abre sus enlaces (el patrón APG de W3C de navegación con disclosure). Enter, Espacio o un clic alternan un grupo, Abajo lo abre y pasa a su primer enlace, Arriba, Abajo, Inicio y Fin se mueven entre sus enlaces, Escape lo cierra y vuelve al botón, y salir del grupo con Tab o hacer clic fuera lo cierra. Izquierda y Derecha se mueven entre los elementos superiores.
 - **Pantallas estrechas.** Por debajo de 800 px el menú se pliega tras un botón de menú con `aria-expanded`; Escape lo cierra. Sin el script el menú permanece abierto, de modo que nada queda inalcanzable.
-- **Acciones.** `sign_in()` muestra un enlace de inicio de sesión a los visitantes y un enlace de cierre de sesión a los usuarios con sesión iniciada cuando la aplicación tiene una página de inicio de sesión; `language()` y `theme()` muestran los mismos selectores que el shell de la aplicación.
+- **Ranuras de la cabecera.** La barra superior tiene cuatro ranuras que aceptan cualquier componente, como una app bar con nombres lógicos: `start(node)` antes de la marca, `center(node)` entre el menú y el final, `end(node)` al final de la barra y `bottom(node)` como una fila de ancho completo debajo de ella, por ejemplo con chips. Cada ranura contiene varios nodos en orden, y start y end cambian de lado en los idiomas de derecha a izquierda. Los componentes en las ranuras se renderizan con el idioma, los permisos y las máscaras del usuario; los que cargan datos mediante su propia action, como un `SearchBox`, funcionan ahí, comprobados contra los guards de la feature y el permiso de la action. Los grids y los formularios pertenecen a la pantalla. En los teléfonos las ranuras start y end se quedan en la barra, y la ranura center va donde la aplicación indique: `center_on_phone(CenterOnPhone::Row)` (el valor por defecto) la coloca en una fila bajo la barra, `CenterOnPhone::Icon` tras un botón de lupa que la abre (disclosure de W3C APG) y mueve el foco a ella; Escape la cierra y vuelve al botón. `center_button(icon, label)` cambia ese botón. La disposición en teléfono la fija el CSS antes de que se ejecute el script, así que la cabecera no se mueve mientras se carga la página.
+- **Acciones.** `sign_in()` muestra un enlace de inicio de sesión a los visitantes y un enlace de cierre de sesión a los usuarios con sesión iniciada cuando la aplicación tiene una página de inicio de sesión; `language()` y `theme()` muestran los mismos selectores que el shell de la aplicación. Van después de la ranura end y se pliegan en el menú en los teléfonos.
 - **Barra inferior.** `bottom_nav([...])` añade hasta cinco enlaces fijos en la parte inferior de la pantalla en teléfonos (800 px de ancho o menos), para los lugares a los que más se va; más de cinco no compila. Cada elemento es un `BottomNavItem` con una etiqueta, una pantalla con ruta y un icono opcional. El enlace de la página mostrada lleva `aria-current="page"` (lo mantiene al día `nav.js`), los enlaces a pantallas que el usuario no puede abrir se omiten, la barra se mantiene alejada del indicador de inicio con `env(safe-area-inset-bottom)` y la página deja espacio abajo para que la barra no oculte nada. El menú superior sigue para el resto. La barra no necesita script.
 - **Pie de página.** Columnas de enlaces a pantallas (`link`, omitido para los usuarios que no pueden abrirlas) o a direcciones (`url`: una ruta, `https:`, `http:` o `mailto:`; `App::check` rechaza otros esquemas y los enlaces a pantallas que no están registradas), y una línea de texto.
 

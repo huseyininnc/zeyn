@@ -94,6 +94,21 @@ SearchBox::of(catalog_products)
 
 结果 screen 接收 `SearchParams`（`q`，从菜单打开该 screen 时为空）。服务器会把文本截断到 `MAX_SEARCH_QUERY`（100）个字符，决定发送多少条建议（默认 8 条，除非 `limit` 另有指定，最多 20 条），检查 screen 的访问权限、Feature 的 guard 和 action 的权限，并把每次建议调用都计入写入频率限制（`App::write_limit`）。
 
+### 富建议
+
+`.item(|row| ListItem::new(title).subtitle(text).image(src).link(screen, params))` 将每条建议显示为一行，包含小图片（40 x 56 像素，延迟加载，遵循 `img-src` 规则，替代文本为空，因为标题已经为该行命名；没有图片时不显示占位图）、标题和副标题。服务器返回 `[{text, subtitle, image, href}]`，其中包含记录的规范地址。通过点击或 Enter 选中某一行，会经由 `nav.js` 打开它的链接；由于每一行都是真正的链接，中键点击和“在新标签页中打开”同样可用。没有高亮行时按 Enter 仍会打开结果 screen。combobox 模式保持不变：每一行是以标题和副标题命名的选项，行高至少 44 像素。没有 `.item` 时，建议为上文所述的纯文本。
+
+```rust
+SearchBox::of(catalog_products)
+    .item(|p: &Product| {
+        ListItem::new(p.name.clone())
+            .subtitle(p.code.clone())
+            .image(p.image.clone())
+            .link(shop_product, ProductPage { id: p.id })
+    })
+    .results(shop_search)
+```
+
 ## 自由文本
 
 `DataQuery::q` 是自由文本：其文本字段包含它的行，忽略大小写。土耳其语带点和不带点的 `i`（`İ`、`ı`）都与 `i` 匹配，因此“istanbul”能找到“İSTANBUL”。带有 `#[mask]` 的字段永远不会被搜索，空白文本匹配每一行，超过 100 个字符的文本会被忽略。`DataQuery::apply` 和 SQL 数据层（`LOWER(TRANSLATE(column, 'İı', 'ii')) LIKE ...`，使用绑定参数）以同样的方式读取它。

@@ -47,7 +47,19 @@ DescriptionList::of(&invoice)
 
 ## EmptyState と Skeleton
 
-`EmptyState::new(title).text(text).opens(label, screen, params)` は、空の領域を次のステップで埋めます。`Skeleton::lines(n)` は、何かを読み込んでいる間のプレースホルダーです。
+`EmptyState::new(title).text(text)` は、空の領域を次のステップで埋めます。`.link(label, screen, params)` は `LinkButton` を通じて別のページへ移動し、`.opens(label, screen, params)` はアプリの画面をウィンドウとして開きます。`Skeleton::lines(n)` は、何かを読み込んでいる間のプレースホルダーです。
+
+## LinkButton
+
+どこかへ移動するのはリンクで、何かを実行するのはボタンです。`LinkButton::new(label, screen, params)` は、画面の正規パス（`/products/42` など）への本物の `<a href>` で、見た目はボタンです。そのため、中クリック、「新しいタブで開く」、検索エンジンは、これをリンクとして扱います。`nav.js` を通じてページを再読み込みせずに開き、Enter で辿れます。外観は、主要なアクションの塗りつぶしの外観を `.primary()` で求めない限り、セカンダリです。画面にはルートが必要で、なければコンパイルできません。`EmptyState::link` と `Hero::link` がこれを使います。
+
+```rust
+LinkButton::new(t!("cart.browse"), products, ()).primary()
+```
+
+## ClearPrefs
+
+`ClearPrefs::new(label)` は、このブラウザーがアプリのために保持しているクライアント設定をすべて削除するボタンです。たとえば、プライバシーのページで `App::client_prefs_table()` の一覧の横に置きます。トーストで確認が表示されます。サーバーが設定する Cookie（テーマ、言語、セッション）には触れません。スクリプトからは `zeyn.prefs.clear()` で同じことができます。
 
 ## Breadcrumb
 
@@ -100,7 +112,7 @@ Embed::url("https://www.youtube-nocookie.com/embed/abc")
 - すべてのフレームに `sandbox="allow-scripts allow-same-origin allow-presentation"`、`referrerpolicy="no-referrer"`、`loading="lazy"` が付きます。ポップアップ、トップレベルのナビゲーション、フォーム、ダウンロードを許可することはできません。`.allow(...)` はブラウザの機能を追加します: `Fullscreen`、`PictureInPicture`、`Autoplay`、`EncryptedMedia` です。
 - `.click_to_load(poster)` は、まずボタンを、ポスター画像（アプリ上のパス、または `img-src` のホスト。なしの場合は `""`）と相手のサイトの名前とともに表示します。ボタンが押されるまで、相手のサイトには接続されません。押されるとフレームがその場所に入り、フォーカスを受け取ります。このスクリプトは `media.js` の一部なので、追加のリクエストは発生しません。
 - `.notice(t!(...))` は、コンテンツに関する警告のような、アプリのテキストをそのボタンに表示します。エスケープされ、他のすべてのテキストと同様に翻訳され、ボタンのアクセシブルな名前の一部になるため、ユーザーが判断する前にスクリーンリーダーがそれを読み上げます。`.click_to_load` がない場合は、ポスターなしでボタンが有効になります。
-- `.remember("external-video", Duration::from_secs(24 * 60 * 60))` は、ページごとではなく、その時間につき一度だけ確認します。ブラウザは終了時刻（Unix ミリ秒）だけを `localStorage` の `zeyn.consent.{scope}` に保持します。Cookie は設定されず、サーバーがそれを見ることもないため、キャッシュされた公開ページは全員にとって同じままです。その後のページ、アプリ内ナビゲーション、他のタブは、そのスコープのフレームを自動的に、フォーカスを動かさずに読み込みます（WCAG 2.2 の 3.2.1 フォーカス時、2.4.3 フォーカス順序）。フォーカスがフレームに移るのは、実際に押された後だけです。時間が過ぎたとき、保存された値が整数でない、または埋め込みの時間より先の時刻になっているとき（手で書き換えられた場合）、ストレージがブロックされているとき、JavaScript がないときには、ボタンが再び表示されます。スコープは ASCII の英字、数字、`-`、`_` の 1 から 40 文字で、時間は 1 秒から 30 日（`MAX_EMBED_CONSENT`）です。それ以外はパニックとなり、メッセージでその旨が示されます。同じ notice を共有する埋め込みは、スコープを共有します。
+- `.remember(EXTERNAL_VIDEO)` は、ページごとではなく、キーの有効期間につき一度だけ確認します。キーは `ClientPref::consent` で宣言し `App::client_prefs` に登録した同意キーです（[クライアント設定](security.md#client-preferences) を参照）。同じキーに結び付けられた埋め込みは、答えを共有します。その後のページ、アプリ内ナビゲーション、他のタブは、それらのフレームを自動的に、フォーカスを動かさずに読み込みます（WCAG 2.2 の 3.2.1 フォーカス時、2.4.3 フォーカス順序）。フォーカスがフレームに移るのは、実際に押された後だけです。レコードの期限が切れたとき、または検査に失敗したとき、アプリがキーを登録していないとき、ストレージがブロックされていてページが新規のとき、JavaScript がないときには、ボタンが再び表示されます。単なる文字列や choice キーはコンパイルできません。
 - 埋め込むアドレスを保持するフィールドには `#[rule(embed)]` を付けます。フォームは URL または貼り付けられた埋め込みコードを受け付け、`src` だけを残し、`https` と一覧にあるホストを要求し、トラッキングパラメータ（`utm_*`、`fbclid`、`gclid` など）を取り除き、HTML ではなく正規のアドレスを保存します。API の入力は、正規のアドレスを送る必要があります。
 
 ```rust

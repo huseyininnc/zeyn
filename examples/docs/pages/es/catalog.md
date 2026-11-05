@@ -94,6 +94,21 @@ Teclado: Abajo y Arriba se mueven por las sugerencias (Abajo las abre), Enter bu
 
 La pantalla de resultados recibe `SearchParams` (`q`, vacío cuando la pantalla se abre desde un menú). El servidor recorta el texto a `MAX_SEARCH_QUERY` (100) caracteres, decide cuántas sugerencias enviar (8 salvo que `limit` indique otra cosa, como máximo 20), comprueba el acceso de la pantalla, los guards de la feature y el permiso de la acción, y cuenta cada llamada de sugerencias contra el límite de escritura (`App::write_limit`).
 
+### Sugerencias enriquecidas
+
+`.item(|row| ListItem::new(title).subtitle(text).image(src).link(screen, params))` muestra cada sugerencia como una fila con una imagen pequeña (40 por 56 píxeles, de carga diferida, sujeta a las reglas de `img-src`, con texto alternativo vacío porque el título nombra la fila; sin marcador de posición si no hay imagen), el título y el subtítulo. El servidor responde `[{text, subtitle, image, href}]` con la dirección canónica del registro. Elegir una fila con un clic o con Enter abre su enlace mediante `nav.js`, y como cada fila es un enlace real, funcionan el clic central y «abrir en una pestaña nueva». Enter sin ninguna fila resaltada sigue abriendo la pantalla de resultados. El patrón combobox no cambia: cada fila es una opción nombrada por su título y su subtítulo, y las filas miden al menos 44 píxeles de alto. Sin `.item` las sugerencias son texto simple, como arriba.
+
+```rust
+SearchBox::of(catalog_products)
+    .item(|p: &Product| {
+        ListItem::new(p.name.clone())
+            .subtitle(p.code.clone())
+            .image(p.image.clone())
+            .link(shop_product, ProductPage { id: p.id })
+    })
+    .results(shop_search)
+```
+
 ## Texto libre
 
 `DataQuery::q` es texto libre: filas cuyos campos de texto lo contienen, sin distinguir mayúsculas de minúsculas. La `i` turca con punto y sin punto (`İ`, `ı`) coincide con `i`, así que "istanbul" encuentra "İSTANBUL". Los campos con `#[mask]` nunca se buscan, un texto en blanco coincide con todas las filas y un texto de más de 100 caracteres se ignora. `DataQuery::apply` y las capas de datos SQL (`LOWER(TRANSLATE(column, 'İı', 'ii')) LIKE ...` con parámetros enlazados) lo leen de la misma manera.

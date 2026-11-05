@@ -219,6 +219,7 @@ impl<K> ClientPref<K> {
     }
 }
 
+#[cfg(feature = "server")]
 type ConsentHook = std::sync::Arc<dyn Fn(&axum::http::HeaderMap) -> bool + Send + Sync>;
 
 /// The client preference keys of an app and its consent hook, built with
@@ -226,6 +227,7 @@ type ConsentHook = std::sync::Arc<dyn Fn(&axum::http::HeaderMap) -> bool + Send 
 #[derive(Clone, Default)]
 pub struct ClientPrefs {
     pub(crate) keys: Vec<PrefInfo>,
+    #[cfg(feature = "server")]
     pub(crate) allowed: Option<ConsentHook>,
 }
 
@@ -238,6 +240,7 @@ impl ClientPrefs {
         self
     }
 
+    #[cfg(feature = "server")]
     /// Whether the user consented to keeping [`Purpose::Preference`] values beyond the session,
     /// read from the request (usually the cookie the app's consent banner sets). The browser asks
     /// `GET /_zeyn/prefs` the first time it would keep such a value; the answer is never cached.

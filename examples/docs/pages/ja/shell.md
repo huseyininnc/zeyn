@@ -22,7 +22,15 @@ Feature::new("shop")
             .item(t!("shop.delivery.title"), shop_delivery)
             .item(t!("shop.returns.title"), shop_returns)
     })
-    .shell(Shell::site().header(|h| h.sign_in().language().theme()).footer(|f| {
+    .shell(Shell::site().header(|h| {
+        h.center(SearchBox::of(search_products).results(shop_search))
+            .center_on_phone(CenterOnPhone::Icon)
+            .end(LinkButton::new(t!("shop.cart"), shop_cart, ()))
+            .sign_in()
+            .language()
+            .theme()
+    })
+    .footer(|f| {
         f.column(t!("shop.menu.help"), |c| {
             c.link(t!("shop.delivery.title"), shop_delivery).url(t!("shop.footer.source"), "https://example.com")
         })
@@ -36,7 +44,8 @@ Feature::new("shop")
 
 - **メニュー**。上部のメニューには、サイトシェル内のすべての Feature のメニューが並びます。項目が 1 つのグループは通常のリンクで、それより大きなグループは、リンクを開くボタンです（W3C APG の disclosure navigation パターン）。Enter、Space、クリックでグループを切り替え、下矢印で開いて最初のリンクへ移動し、上矢印、下矢印、Home、End でリンク間を移動し、Escape で閉じてボタンに戻り、Tab でグループの外へ出るか外側をクリックすると閉じます。左矢印と右矢印は、最上位の項目間を移動します。
 - **狭い画面**。800 px 未満では、メニューは `aria-expanded` を持つメニューボタンの陰に折りたたまれ、Escape で閉じます。スクリプトがなければメニューは開いたままになるため、到達できなくなるものはありません。
-- **アクション**。`sign_in()` は、アプリにサインインページがあれば、訪問者にはサインインのリンクを、サインイン済みのユーザーにはサインアウトのリンクを表示します。`language()` と `theme()` は、アプリシェルと同じピッカーを表示します。
+- **ヘッダースロット**。上部のバーには、論理的な名前を持つアプリバーのように、任意のコンポーネントを受け取る四つのスロットがあります。ブランドの前の `start(node)`、メニューと end の間の `center(node)`、バーの末端の `end(node)`、その下の全幅の行となる `bottom(node)`（chips など）です。各スロットは複数のノードを順に保持し、start と end は右から左に書く言語では左右が入れ替わります。スロット内のコンポーネントは、ユーザーの言語、権限、マスクで描画されます。`SearchBox` のように自身の action でデータを読み込むものはそこで動作し、Feature のガードと action の権限が確認されます。grid と form は画面に置くものです。スマートフォンでは、start と end のスロットはバーに残り、center スロットはアプリが指定した場所に移ります。`center_on_phone(CenterOnPhone::Row)`（デフォルト）はバーの下の行に置き、`CenterOnPhone::Icon` はそれを開く虫眼鏡ボタンの陰に置いて（W3C APG の disclosure）フォーカスを中へ移し、Escape で閉じてボタンに戻ります。`center_button(icon, label)` はそのボタンを変更します。スマートフォンのレイアウトはスクリプトが実行される前に CSS で決まるため、ページの読み込み中にヘッダーが動くことはありません。
+- **アクション**。`sign_in()` は、アプリにサインインページがあれば、訪問者にはサインインのリンクを、サインイン済みのユーザーにはサインアウトのリンクを表示します。`language()` と `theme()` は、アプリシェルと同じピッカーを表示します。これらは end スロットの後ろに来て、スマートフォンではメニューに折りたたまれます。
 - **ボトムバー**。`bottom_nav([...])` は、スマートフォン（幅 800 px 以下）で画面の下部に固定される最大五つのリンクを追加します。人が最もよく行く場所のためのもので、六つ以上はコンパイルできません。各項目は、ラベル、ルートを持つ画面、任意のアイコンを持つ `BottomNavItem` です。表示中のページのリンクには `aria-current="page"` が付き（`nav.js` が最新に保ちます）、ユーザーが開けない画面へのリンクは除かれ、バーは `env(safe-area-inset-bottom)` でホームインジケーターを避け、バーが何も隠さないようにページの下に余白が確保されます。残りの場所にはトップメニューが残ります。バーにスクリプトは不要です。
 - **フッター**。画面へのリンク（`link`。開けないユーザーには省かれます）またはアドレス（`url`: パス、`https:`、`http:`、`mailto:`。`App::check` は他のスキームや、登録されていない画面へのリンクを拒否します）の列と、テキスト 1 行です。
 

@@ -95,6 +95,30 @@ App::new(t!("app.name"))
 
 字段掩码、打开敏感记录前的原因说明、字段级审计和读取审计，详见[审计、掩码与作业](enterprise.md)。
 
+## 客户端偏好设置
+
+有些小的选择属于浏览器而不是服务器：例如用户在加载嵌入内容之前确认过的提示，或最后打开的标签页。Zeyn 把它们保存在一个地方，即 `zeyn.state`（`/_zeyn/state.js`，只在使用它的页面上加载），服务器从不读取它们，因此缓存的公共页面对所有人保持一致。会改变 HTML 的偏好，例如主题和语言，仍保存在 cookie 中。
+
+键只需声明一次，作为常量，带有其种类、有效期和用途，在应用上注册，并通过 `.remember(KEY)` 绑定到组件：`Embed::remember` 接受同意（consent）键，`Tabs::remember` 接受选择（choice）键。普通字符串或另一种类的键无法编译；名称不在 1 到 40 个 ASCII 字母、数字、`-` 和 `_` 之内，或有效期不在 1 秒到 400 天（`MAX_PREF_LIFETIME`）之内，则在构建该常量时失败。绑定到应用未注册的键的组件不会被记住，因此隐私列表始终是完整的。
+
+```rust
+pub const VIDEO_NOTICE: ClientPref<Consent> =
+    ClientPref::consent("video-notice", Duration::from_secs(86_400), Purpose::Necessary);
+pub const ORDER_TAB: ClientPref<Choice> =
+    ClientPref::choice("order-tab", Duration::from_secs(30 * 86_400), Purpose::Preference);
+
+App::new(t!("app.name")).client_prefs(|p| {
+    p.key(VIDEO_NOTICE)
+        .key(ORDER_TAB)
+        .allowed_when(|headers| consent_cookie(headers) == Some("all"))
+})
+```
+
+- **记录。** 每个值是 `zeyn.v1.{key}` 下的 `{v, exp, val}`。每次读取都会检查版本、值（`true` 或最多 200 个字符的文本）和结束时间，结束时间不得已过，且不得比该键的有效期更晚。未通过检查的记录（例如被手动修改的）会被移除。新版本的格式会忽略旧记录。
+- **用途。** `Purpose::Necessary` 用于用户请求的内容，例如在加载来自其他站点的内容之前确认提示；它在其有效期内保留。`Purpose::Preference` 是界面选择。ePrivacy 指令（第 5(3) 条）仅在对用户所请求的服务严格必要时，才允许在未经同意的情况下在浏览器中存储数据，而欧盟数据保护机构（第 29 条工作组，意见 04/2012）认为界面选择仅在会话期间或几个小时内才算必要。因此偏好值会保存在 `sessionStorage` 中，直到应用的钩子 `allowed_when(|headers| ...)` 表示用户已同意；浏览器每个页面请求一次 `GET /_zeyn/prefs`，该应答从不缓存，没有钩子时答案为否。
+- **标签页与被阻止的存储。** 其他标签页通过 `storage` 事件跟随变化。当存储被阻止（隐私窗口、严格设置）时，值只在页面的内存中保存。没有 JavaScript 时，组件显示其默认状态。
+- **公开透明。** `App::client_prefs_table()` 为隐私页面列出每个键及其种类、用途和以秒计的有效期，`ClearPrefs`（或 `zeyn.prefs.clear()`）会从浏览器中移除所有这些值。
+
 ## API 与智能体
 
 API 调用需要 `Authorization` 请求头；仅凭浏览器会话 cookie 永远无法调用 API 或 MCP 端点，因此它们不需要 CSRF 令牌。智能体（agent）获得的权限与它所代表的用户完全相同。参见 [API 与 OpenAPI](api.md) 和 [MCP 与 AI 智能体](mcp.md)。

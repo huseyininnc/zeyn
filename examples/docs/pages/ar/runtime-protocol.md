@@ -263,6 +263,7 @@
 |---|---|---|
 | `/_zeyn/node` | `{ screen, params, node }` | HTML لعقدة واحدة مع الصفحة الأولى من شبكاتها. تُستخدم في التبويبات الكسولة. |
 | `/_zeyn/data` | `{ screen, params, node, key, input }` | JSON من مصدر البيانات `key` للعقدة: خيارات البحث (lookup) (`key` هو اسم الحقل)، وأبناء الشجرة (`key` فارغ)، وفحوص الخطوات (`key` هو `_step`). تُفحص صلاحية action المصدر وتعمل المعترضات، كما في الشبكات. والإدخال الذي لا يناسب الـ action يُرفض بـ `404`. |
+| `/_zeyn/data` مع `screen` = `_site.{feature}` | كما سبق | الشيء نفسه لمكوّن في خانة رأس الموقع: `node` هو الخانة (0 start، 1 center، 2 end، 3 bottom)، ثم فهرس العقدة فيها، ثم فهارس الأبناء. تُفحص حراس الميزة وصلاحية الـ action. |
 | `/_zeyn/parse` | `{ kind, text, label }` | كيف يقرأ الخادم تاريخًا أو وقتًا مكتوبًا بلغة المستخدم ومنطقته وساعته: `{ ok, text, iso, utc, zone }` أو `{ ok: false, message }`. و`kind` هو `date` أو `time` أو `datetime` أو `local` أو `presets` (اليوم والنطاقات السريعة). |
 
 ### 7.2 القيم التي ترسلها النماذج
@@ -280,6 +281,8 @@
 | `zeyn:effect` | `document` | effect لا يعرفه وقت التشغيل: `{ effect, source, run }`. تشغّل `run(next)` effect آخر. يستخدمه `confirm`. |
 
 يسأل الـ effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":"...","then":{...}}` في مربع حوار تنبيه مشروط ولا يشغّل `then` إلا بعد أن يؤكد المستخدم.
+
+تعيش تفضيلات العميل (`zeyn::ClientPref`) في وحدة المتصفح `/_zeyn/state.js`، التي لا تستوردها الصفحات إلا عندما تحتوي عنصرًا فيه `data-zeyn-remember` أو `data-zeyn-prefs-clear`. يجيب `GET /_zeyn/prefs` بـ `{ preferences }`، أي هل يسمح خطّاف الموافقة في التطبيق بالاحتفاظ بقيم التفضيلات بعد انتهاء الجلسة، مع `Cache-Control: no-store`. ولا يقرأ الخادم أي قيمة مخزنة.
 
 ### 7.4 الوسائط
 

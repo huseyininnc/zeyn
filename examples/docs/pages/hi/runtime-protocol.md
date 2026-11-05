@@ -263,6 +263,7 @@ Effect:
 |---|---|---|
 | `/_zeyn/node` | `{ screen, params, node }` | एक नोड का HTML उसके ग्रिड के पहले पृष्ठ के साथ। lazy टैब द्वारा इस्तेमाल। |
 | `/_zeyn/data` | `{ screen, params, node, key, input }` | नोड के डेटा स्रोत `key` से JSON: lookup विकल्प (`key` फ़ील्ड नाम है), ट्री संतानें (`key` खाली है), चरण जाँच (`key` `_step` है)। स्रोत की action अनुमति जाँची जाती है और इंटरसेप्टर चलते हैं, जैसे ग्रिड के लिए। जो इनपुट action में न बैठे वह `404` से अस्वीकार होता है। |
+| `/_zeyn/data` जिसमें `screen` = `_site.{feature}` | ऊपर जैसा | साइट हेडर स्लॉट के कंपोनेंट के लिए वही: `node` में स्लॉट (0 start, 1 center, 2 end, 3 bottom), उसमें नोड का इंडेक्स और फिर चाइल्ड इंडेक्स होते हैं। feature के गार्ड और action की अनुमति जाँची जाती है। |
 | `/_zeyn/parse` | `{ kind, text, label }` | सर्वर टाइप की गई तारीख़ या समय को उपयोगकर्ता की भाषा, क्षेत्र और घड़ी में कैसे पढ़ता है: `{ ok, text, iso, utc, zone }` या `{ ok: false, message }`। `kind` `date`, `time`, `datetime`, `local` या `presets` (आज और त्वरित सीमाएँ) है। |
 
 ### 7.2 मान जो फ़ॉर्म सबमिट करते हैं
@@ -280,6 +281,8 @@ Effect:
 | `zeyn:effect` | `document` | वह effect जिसे रनटाइम नहीं जानता: `{ effect, source, run }`। `run(next)` दूसरा effect चलाता है। `confirm` द्वारा इस्तेमाल। |
 
 Effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":"...","then":{...}}` मोडल alert डायलॉग में पूछता है और उपयोगकर्ता के पुष्टि करने के बाद ही `then` चलाता है।
+
+क्लाइंट प्राथमिकताएँ (`zeyn::ClientPref`) ब्राउज़र मॉड्यूल `/_zeyn/state.js` में रहती हैं, जिसे पेज केवल तभी इम्पोर्ट करते हैं जब उनमें `data-zeyn-remember` या `data-zeyn-prefs-clear` वाला एलिमेंट हो। `GET /_zeyn/prefs` `{ preferences }` लौटाता है, यानी क्या ऐप का consent hook प्राथमिकता मानों को सत्र से आगे रखने देता है, `Cache-Control: no-store` के साथ। सर्वर कोई संग्रहीत मान नहीं पढ़ता।
 
 ### 7.4 मीडिया
 

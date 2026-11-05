@@ -265,6 +265,7 @@ Todos son `POST` con JSON y la cabecera CSRF, y comprueban primero el acceso de 
 |---|---|---|
 | `/_zeyn/node` | `{ screen, params, node }` | HTML de un nodo con la primera página de sus grids. Lo usan las pestañas diferidas. |
 | `/_zeyn/data` | `{ screen, params, node, key, input }` | JSON de la fuente de datos `key` del nodo: opciones de lookup (`key` es el nombre del campo), hijos de un árbol (`key` está vacío), comprobaciones de paso (`key` es `_step`). Se comprueba el permiso de la action de la fuente y se ejecutan los interceptores, como en los grids. La entrada que no encaja con la action se rechaza con `404`. |
+| `/_zeyn/data` con `screen` = `_site.{feature}` | como arriba | Lo mismo para un componente en una ranura de la cabecera del sitio: `node` es la ranura (0 start, 1 center, 2 end, 3 bottom), el índice del nodo en ella y después los índices de los hijos. Se comprueban los guards de la feature y el permiso de la action. |
 | `/_zeyn/parse` | `{ kind, text, label }` | Cómo lee el servidor una fecha u hora escrita, según el idioma, la zona y el reloj del usuario: `{ ok, text, iso, utc, zone }` o `{ ok: false, message }`. `kind` es `date`, `time`, `datetime`, `local` o `presets` (hoy y rangos rápidos). |
 
 ### 7.2 Valores que envían los formularios
@@ -282,6 +283,8 @@ Todos son `POST` con JSON y la cabecera CSRF, y comprueban primero el acceso de 
 | `zeyn:effect` | `document` | Un effect que el runtime no conoce: `{ effect, source, run }`. `run(next)` ejecuta otro effect. Lo usa `confirm`. |
 
 El effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":"...","then":{...}}` pregunta en un cuadro de diálogo modal de alerta y ejecuta `then` solo después de que el usuario confirma.
+
+Las preferencias del cliente (`zeyn::ClientPref`) viven en el módulo del navegador `/_zeyn/state.js`, que las páginas importan solo cuando contienen un elemento con `data-zeyn-remember` o `data-zeyn-prefs-clear`. `GET /_zeyn/prefs` responde `{ preferences }`, que indica si el hook de consentimiento de la aplicación permite conservar valores de preferencias más allá de la sesión, con `Cache-Control: no-store`. El servidor no lee ningún valor guardado.
 
 ### 7.4 Medios
 
