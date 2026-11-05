@@ -1,8 +1,8 @@
-use super::models::{Note, NoteId};
+use super::super::models::{Note, NoteId};
 use std::sync::{Arc, RwLock};
 use zeyn::prelude::*;
 
-/// Notes kept in memory. Replace it with a database backed store.
+/// Notes kept in memory. Replace it with a database backed service.
 #[derive(Clone, Default)]
 pub struct NoteStore(Arc<RwLock<Vec<Note>>>);
 

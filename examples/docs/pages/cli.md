@@ -8,10 +8,8 @@ The `zeyn` command creates projects, adds features, checks an app and runs an MC
 |---|---|
 | `zeyn new <name>` | Creates an app with the standard feature structure |
 | `zeyn new <name> --lib` | Creates a library of models, features and texts shared by several apps |
-| `zeyn g feature <name>` | Adds `src/features/<name>` with models, actions and screens, one file per screen and action |
+| `zeyn g feature <name>` | Adds `src/features/<name>` with `models`, `services`, `actions` and `screens` and a working list screen |
 | `zeyn g screen <feature> <name>` | Adds `screens/<name>.rs` to a feature, registers it and adds its title to every locale file |
-| `zeyn g action <feature> <name>` | Adds `actions/<name>.rs` to a feature and registers it as an API |
-| `zeyn g component <feature> <name>` | Adds `components/<name>.rs`, a function that returns a part of a screen |
 | `zeyn routes` | Lists features, screens, routes, APIs and access |
 | `zeyn check` | Compiles and reports structural problems and missing translations |
 | `zeyn check --fix` | Rewrites renamed Zeyn APIs in `src`, `tests` and `examples`, then checks |
@@ -69,15 +67,14 @@ See [Project structure](structure.md) for each folder.
 
 ## Generators
 
-One file per screen, action and component is the default layout the generators produce:
+`zeyn g feature` creates a feature with one file per model, service, action and screen:
 
 ```sh
-zeyn g screen notes detail       # src/features/notes/screens/detail.rs
-zeyn g action notes archive      # src/features/notes/actions/archive.rs
-zeyn g component notes summary   # src/features/notes/components/summary.rs
+zeyn g feature orders            # src/features/orders/: models/, services/, actions/, screens/
+zeyn g screen orders detail      # src/features/orders/screens/detail.rs
 ```
 
-The short forms `zeyn g s`, `zeyn g a`, `zeyn g c` and `zeyn g f` do the same. A screen gets the permission `<feature>.<name>.view` and its title in every file in `locales/`; languages other than English get the English text and a note to translate it. An action gets `<feature>.<name>.run` and is registered with `.api(...)`. The layout is not enforced: when a feature still has a flat `screens.rs` or `actions.rs`, the generator first moves it to `screens/mod.rs` (or `actions/mod.rs`) with its content, then adds the new file. Generators never overwrite a file and refuse names that are not snake case.
+The short forms `zeyn g f` and `zeyn g s` do the same. The new feature works at once: a model, an in memory data service, a search action and a list screen with its menu entry. A feature that does not need a folder deletes it (the folder and its `mod` line in the feature's `mod.rs`). `components/` is never generated: add it by hand, one function that returns a `Node` per file (`components/<name>.rs`), when a part of a screen is shared or a screen file grows. A screen gets the permission `<feature>.<name>.view` and its title in every file in `locales/`; languages other than English get the English text and a note to translate it. The layout is not enforced: when a feature has a flat `screens.rs`, `zeyn g screen` first moves it to `screens/mod.rs` with its content, and when `screens/` was deleted it creates it again. Generators never overwrite a file and refuse names that are not snake case.
 
 ## Checking an app
 

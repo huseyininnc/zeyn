@@ -8,10 +8,8 @@ El comando `zeyn` crea proyectos, añade features, comprueba una aplicación y e
 |---|---|
 | `zeyn new <name>` | Crea una aplicación con la estructura estándar de features |
 | `zeyn new <name> --lib` | Crea una biblioteca de modelos, features y textos compartida por varias aplicaciones |
-| `zeyn g feature <name>` | Añade `src/features/<name>` con modelos, acciones y pantallas, un archivo por pantalla y por acción |
+| `zeyn g feature <name>` | Añade `src/features/<name>` con `models`, `services`, `actions` y `screens` y una pantalla de lista que funciona |
 | `zeyn g screen <feature> <name>` | Añade `screens/<name>.rs` a una feature, lo registra y añade su título a cada archivo de idioma |
-| `zeyn g action <feature> <name>` | Añade `actions/<name>.rs` a una feature y lo registra como API |
-| `zeyn g component <feature> <name>` | Añade `components/<name>.rs`, una función que devuelve una parte de una pantalla |
 | `zeyn routes` | Lista features, pantallas, rutas, APIs y accesos |
 | `zeyn check` | Compila e informa de problemas estructurales y traducciones que faltan |
 | `zeyn check --fix` | Reescribe las APIs de Zeyn renombradas en `src`, `tests` y `examples`, y luego comprueba |
@@ -69,15 +67,14 @@ Consulta [Estructura del proyecto](structure.md) para ver cada carpeta.
 
 ## Generadores
 
-Un archivo por pantalla, acción y componente es la estructura por defecto que crean los generadores:
+`zeyn g feature` crea una feature con un archivo por modelo, servicio, acción y pantalla:
 
 ```sh
-zeyn g screen notes detail       # src/features/notes/screens/detail.rs
-zeyn g action notes archive      # src/features/notes/actions/archive.rs
-zeyn g component notes summary   # src/features/notes/components/summary.rs
+zeyn g feature orders            # src/features/orders/: models/, services/, actions/, screens/
+zeyn g screen orders detail      # src/features/orders/screens/detail.rs
 ```
 
-Las formas cortas `zeyn g s`, `zeyn g a`, `zeyn g c` y `zeyn g f` hacen lo mismo. Una pantalla recibe el permiso `<feature>.<name>.view` y su título en cada archivo de `locales/`; los idiomas distintos del inglés reciben el texto en inglés y una nota para traducirlo. Una acción recibe `<feature>.<name>.run` y se registra con `.api(...)`. La estructura no es obligatoria: si una feature todavía tiene un único `screens.rs` o `actions.rs`, el generador primero lo mueve con su contenido a `screens/mod.rs` (o `actions/mod.rs`) y después añade el archivo nuevo. Los generadores nunca sobrescriben un archivo y rechazan los nombres que no están en snake case.
+Las formas cortas `zeyn g f` y `zeyn g s` hacen lo mismo. La feature nueva funciona desde el principio: un modelo, un servicio de datos en memoria, una acción de búsqueda y una pantalla de lista con su entrada de menú. Una feature que no necesita una carpeta la borra (la carpeta y su línea `mod` en el `mod.rs` de la feature). `components/` nunca se genera: añádela a mano, una función que devuelve un `Node` por archivo (`components/<name>.rs`), cuando una parte de una pantalla se comparte o un archivo de pantalla crece. Una pantalla recibe el permiso `<feature>.<name>.view` y su título en cada archivo de `locales/`; los idiomas distintos del inglés reciben el texto en inglés y una nota para traducirlo. La estructura no es obligatoria: si una feature tiene un único `screens.rs`, `zeyn g screen` primero lo mueve con su contenido a `screens/mod.rs`, y si `screens/` se borró, la vuelve a crear. Los generadores nunca sobrescriben un archivo y rechazan los nombres que no están en snake case.
 
 ## Comprobar una aplicación
 

@@ -8,10 +8,8 @@
 |---|---|
 | `zeyn new <name>` | 创建带有标准 feature 结构的应用 |
 | `zeyn new <name> --lib` | 创建由多个应用共享的 model、feature 和文本库 |
-| `zeyn g feature <name>` | 添加 `src/features/<name>`，包含 model、action 和 screen，每个 screen 和 action 一个文件 |
+| `zeyn g feature <name>` | 添加 `src/features/<name>`，包含 `models`、`services`、`actions` 和 `screens` 文件夹以及一个可用的列表 screen |
 | `zeyn g screen <feature> <name>` | 向 feature 添加 `screens/<name>.rs`，注册它，并把标题加入每个语言文件 |
-| `zeyn g action <feature> <name>` | 向 feature 添加 `actions/<name>.rs` 并注册为 API |
-| `zeyn g component <feature> <name>` | 添加 `components/<name>.rs`，其中的函数返回 screen 的一部分 |
 | `zeyn routes` | 列出 feature、screen、路由、API 和访问权限 |
 | `zeyn check` | 编译并报告结构问题和缺失的翻译 |
 | `zeyn check --fix` | 改写 `src`、`tests` 和 `examples` 中已重命名的 Zeyn API，然后检查 |
@@ -69,15 +67,14 @@ cargo run
 
 ## 生成器
 
-每个 screen、action 和 component 一个文件，是生成器默认生成的布局：
+`zeyn g feature` 创建一个 feature，每个 model、service、action 和 screen 一个文件：
 
 ```sh
-zeyn g screen notes detail       # src/features/notes/screens/detail.rs
-zeyn g action notes archive      # src/features/notes/actions/archive.rs
-zeyn g component notes summary   # src/features/notes/components/summary.rs
+zeyn g feature orders            # src/features/orders/: models/, services/, actions/, screens/
+zeyn g screen orders detail      # src/features/orders/screens/detail.rs
 ```
 
-简写 `zeyn g s`、`zeyn g a`、`zeyn g c` 和 `zeyn g f` 的作用相同。screen 获得权限 `<feature>.<name>.view`，其标题写入 `locales/` 中的每个文件；英语以外的语言先得到英文文本，并提示需要翻译。action 获得 `<feature>.<name>.run`，并通过 `.api(...)` 注册。这种布局不是强制的：如果 feature 仍然使用单个 `screens.rs` 或 `actions.rs`，生成器会先把它连同内容移动到 `screens/mod.rs`（或 `actions/mod.rs`），然后再添加新文件。生成器从不覆盖文件，并拒绝不是 snake case 的名称。
+简写 `zeyn g f` 和 `zeyn g s` 的作用相同。新 feature 立即可用：一个 model、一个内存数据 service、一个搜索 action，以及带菜单项的列表 screen。不需要某个文件夹的 feature 会删除它（文件夹以及 feature 的 `mod.rs` 中对应的 `mod` 行）。`components/` 从不生成：当 screen 的某个部分被共享或 screen 文件变长时，手动添加它，每个文件一个返回 `Node` 的函数（`components/<name>.rs`）。screen 获得权限 `<feature>.<name>.view`，其标题写入 `locales/` 中的每个文件；英语以外的语言先得到英文文本，并提示需要翻译。这种布局不是强制的：如果 feature 使用单个 `screens.rs`，`zeyn g screen` 会先把它连同内容移动到 `screens/mod.rs`；如果 `screens/` 已被删除，则重新创建它。生成器从不覆盖文件，并拒绝不是 snake case 的名称。
 
 ## 检查应用
 

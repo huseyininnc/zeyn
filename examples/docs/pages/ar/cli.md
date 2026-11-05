@@ -8,10 +8,8 @@
 |---|---|
 | `zeyn new <name>` | ينشئ تطبيقًا ببنية الميزات القياسية |
 | `zeyn new <name> --lib` | ينشئ مكتبة من النماذج والميزات والنصوص تشترك فيها عدة تطبيقات |
-| `zeyn g feature <name>` | يضيف `src/features/<name>` مع النماذج والإجراءات والشاشات، بملف واحد لكل شاشة وإجراء |
+| `zeyn g feature <name>` | يضيف `src/features/<name>` مع `models` و`services` و`actions` و`screens` وشاشة قائمة تعمل |
 | `zeyn g screen <feature> <name>` | يضيف `screens/<name>.rs` إلى ميزة ويسجله ويضيف عنوانه إلى كل ملف لغة |
-| `zeyn g action <feature> <name>` | يضيف `actions/<name>.rs` إلى ميزة ويسجله كواجهة API |
-| `zeyn g component <feature> <name>` | يضيف `components/<name>.rs`، وهو دالة تعيد جزءًا من شاشة |
 | `zeyn routes` | يسرد الميزات والشاشات والمسارات وواجهات API والوصول |
 | `zeyn check` | يصرّف المشروع ويبلّغ عن المشكلات البنيوية والترجمات الناقصة |
 | `zeyn check --fix` | يعيد كتابة واجهات Zeyn المعاد تسميتها في `src` و`tests` و`examples`، ثم يفحص |
@@ -69,15 +67,14 @@ cargo run
 
 ## المولدات
 
-ملف واحد لكل شاشة وإجراء ومكوّن هو البنية الافتراضية التي تنشئها المولدات:
+ينشئ `zeyn g feature` ميزة بملف واحد لكل نموذج وخدمة وإجراء وشاشة:
 
 ```sh
-zeyn g screen notes detail       # src/features/notes/screens/detail.rs
-zeyn g action notes archive      # src/features/notes/actions/archive.rs
-zeyn g component notes summary   # src/features/notes/components/summary.rs
+zeyn g feature orders            # src/features/orders/: models/, services/, actions/, screens/
+zeyn g screen orders detail      # src/features/orders/screens/detail.rs
 ```
 
-الصيغ القصيرة `zeyn g s` و`zeyn g a` و`zeyn g c` و`zeyn g f` تفعل الشيء نفسه. تحصل الشاشة على الإذن `<feature>.<name>.view` وعلى عنوانها في كل ملف في `locales/`؛ وتحصل اللغات غير الإنجليزية على النص الإنجليزي مع ملاحظة لترجمته. يحصل الإجراء على `<feature>.<name>.run` ويُسجَّل بـ `.api(...)`. هذه البنية ليست إلزامية: إذا كانت الميزة لا تزال تستخدم ملفًا واحدًا `screens.rs` أو `actions.rs`، ينقله المولد أولًا بمحتواه إلى `screens/mod.rs` (أو `actions/mod.rs`) ثم يضيف الملف الجديد. لا تكتب المولدات فوق أي ملف أبدًا، وترفض الأسماء التي ليست بصيغة snake case.
+الصيغتان القصيرتان `zeyn g f` و`zeyn g s` تفعلان الشيء نفسه. تعمل الميزة الجديدة فورًا: نموذج وخدمة بيانات في الذاكرة وإجراء بحث وشاشة قائمة مع عنصرها في القائمة. والميزة التي لا تحتاج مجلدًا تحذفه (المجلد وسطر `mod` الخاص به في `mod.rs` للميزة). لا يُنشأ `components/` أبدًا: أضفه يدويًا، بدالة واحدة تعيد `Node` في كل ملف (`components/<name>.rs`)، عندما يُستخدم جزء من شاشة في أكثر من مكان أو يطول ملف شاشة. تحصل الشاشة على الإذن `<feature>.<name>.view` وعلى عنوانها في كل ملف في `locales/`؛ وتحصل اللغات غير الإنجليزية على النص الإنجليزي مع ملاحظة لترجمته. هذه البنية ليست إلزامية: إذا كانت الميزة تستخدم ملفًا واحدًا `screens.rs`، ينقله `zeyn g screen` أولًا بمحتواه إلى `screens/mod.rs`، وإذا حُذف `screens/` ينشئه من جديد. لا تكتب المولدات فوق أي ملف أبدًا، وترفض الأسماء التي ليست بصيغة snake case.
 
 ## فحص تطبيق
 

@@ -55,13 +55,17 @@ Which page answers what:
 
 These hold in every Zeyn app. `zeyn check` and the compiler enforce many of them.
 
-1. **One folder per feature.** `src/features/<name>/` holds `mod.rs` (the `Feature`), `models.rs`,
-   `store.rs`, and by default one file per screen, action and component in `screens/`, `actions/`
-   and `components/`. Register screens in the feature's `mod.rs` and the feature in `src/app.rs`.
-   Create a feature with `zeyn g feature <name>`, and its parts with `zeyn g screen <feature> <name>`,
-   `zeyn g action <feature> <name>` and `zeyn g component <feature> <name>`: they register the
-   screen or action and add new texts to every locale file. A single `screens.rs` still works; the
-   generators move it to `screens/mod.rs` before they add a file.
+1. **One folder per feature.** `src/features/<name>/` holds `mod.rs` (module declarations and the
+   `Feature`) and the folders `models/`, `services/`, `actions/` and `screens/`, one file per
+   model, service, action and screen. `zeyn g feature <name>` creates them with a working starter
+   (a model, an in memory data service, a search action and a list screen); a feature that does
+   not need a folder deletes it (the folder and its `mod` line in the feature's `mod.rs`). Add
+   `components/` by hand, one function returning a `Node` per file (`components/<name>.rs`), when
+   a part of a screen is shared or a screen file grows. `zeyn g screen <feature> <name>` adds
+   `screens/<name>.rs`, registers it and adds its title to every locale file. Register screens in the feature's `mod.rs` and the
+   feature and its services in `src/app.rs`. A service that several features use goes in
+   `src/services/<name>.rs`, registered once in `src/app.rs`. The layout is a default: a single
+   `screens.rs` still works, and `zeyn g screen` moves it to `screens/mod.rs` before it adds a file.
 2. **Every action and screen declares access**: `permission = "feature.resource.verb"` or
    `public`. The server checks it on every call, from the page, the API and AI agents alike.
 3. **Inputs are validated by type.** Saving takes `Valid<Model>`. Put rules on fields

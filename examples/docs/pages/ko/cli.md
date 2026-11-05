@@ -8,10 +8,8 @@
 |---|---|
 | `zeyn new <name>` | 표준 Feature 구조의 앱을 만듭니다 |
 | `zeyn new <name> --lib` | 여러 앱이 공유하는 모델, Feature, 텍스트 라이브러리를 만듭니다 |
-| `zeyn g feature <name>` | 모델, action, Screen이 있는 `src/features/<name>`을 추가하며, Screen과 action마다 파일이 하나입니다 |
+| `zeyn g feature <name>` | `models`, `services`, `actions`, `screens` 폴더와 동작하는 목록 Screen이 있는 `src/features/<name>`을 추가합니다 |
 | `zeyn g screen <feature> <name>` | feature에 `screens/<name>.rs`를 추가하고 등록한 뒤 제목을 모든 로케일 파일에 추가합니다 |
-| `zeyn g action <feature> <name>` | feature에 `actions/<name>.rs`를 추가하고 API로 등록합니다 |
-| `zeyn g component <feature> <name>` | Screen의 일부를 반환하는 함수가 있는 `components/<name>.rs`를 추가합니다 |
 | `zeyn routes` | Feature, Screen, 경로, API, 접근 권한을 나열합니다 |
 | `zeyn check` | 컴파일하고 구조적 문제와 누락된 번역을 보고합니다 |
 | `zeyn check --fix` | `src`, `tests`, `examples`에서 이름이 바뀐 Zeyn API를 다시 쓴 다음 검사합니다 |
@@ -69,15 +67,14 @@ cargo run
 
 ## 생성기
 
-Screen, action, 컴포넌트마다 파일 하나를 두는 것이 생성기가 만드는 기본 구조입니다.
+`zeyn g feature`는 모델, 서비스, action, Screen마다 파일이 하나인 feature를 만듭니다.
 
 ```sh
-zeyn g screen notes detail       # src/features/notes/screens/detail.rs
-zeyn g action notes archive      # src/features/notes/actions/archive.rs
-zeyn g component notes summary   # src/features/notes/components/summary.rs
+zeyn g feature orders            # src/features/orders/: models/, services/, actions/, screens/
+zeyn g screen orders detail      # src/features/orders/screens/detail.rs
 ```
 
-짧은 형태 `zeyn g s`, `zeyn g a`, `zeyn g c`, `zeyn g f`도 같은 일을 합니다. Screen은 `<feature>.<name>.view` 권한을 받고 `locales/`의 모든 파일에 제목이 들어갑니다. 영어가 아닌 언어에는 영어 문장과 번역하라는 안내가 들어갑니다. action은 `<feature>.<name>.run`을 받고 `.api(...)`로 등록됩니다. 이 구조는 강제가 아닙니다. feature에 아직 하나의 `screens.rs`나 `actions.rs`가 있으면 생성기는 먼저 내용을 그대로 `screens/mod.rs`(또는 `actions/mod.rs`)로 옮긴 다음 새 파일을 추가합니다. 생성기는 파일을 덮어쓰지 않으며 snake case가 아닌 이름은 거부합니다.
+짧은 형태 `zeyn g f`와 `zeyn g s`도 같은 일을 합니다. 새 feature는 바로 동작합니다. 모델, 메모리 데이터 서비스, 검색 action, 메뉴 항목이 있는 목록 Screen이 들어 있습니다. 필요 없는 폴더는 feature에서 삭제합니다(폴더와 feature의 `mod.rs`에 있는 `mod` 줄). `components/`는 생성되지 않습니다. Screen의 일부를 여러 곳에서 쓰거나 Screen 파일이 길어지면 직접 추가하고, 파일마다 `Node`를 반환하는 함수 하나를 둡니다(`components/<name>.rs`). Screen은 `<feature>.<name>.view` 권한을 받고 `locales/`의 모든 파일에 제목이 들어갑니다. 영어가 아닌 언어에는 영어 문장과 번역하라는 안내가 들어갑니다. 이 구조는 강제가 아닙니다. feature에 하나의 `screens.rs`가 있으면 `zeyn g screen`은 먼저 내용을 그대로 `screens/mod.rs`로 옮기고, `screens/`가 삭제되었으면 다시 만듭니다. 생성기는 파일을 덮어쓰지 않으며 snake case가 아닌 이름은 거부합니다.
 
 ## 앱 검사하기
 

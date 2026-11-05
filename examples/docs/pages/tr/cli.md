@@ -8,10 +8,8 @@
 |---|---|
 | `zeyn new <name>` | Standart Feature yapısıyla bir uygulama oluşturur |
 | `zeyn new <name> --lib` | Birkaç uygulamanın paylaştığı model, Feature ve metin kütüphanesi oluşturur |
-| `zeyn g feature <name>` | Modeller, action'lar ve screen'lerle `src/features/<name>` ekler, her screen ve action için bir dosya |
+| `zeyn g feature <name>` | `models`, `services`, `actions` ve `screens` klasörleri ve çalışan bir liste screen'iyle `src/features/<name>` ekler |
 | `zeyn g screen <feature> <name>` | Bir feature'a `screens/<name>.rs` ekler, kaydeder ve başlığını her dil dosyasına ekler |
-| `zeyn g action <feature> <name>` | Bir feature'a `actions/<name>.rs` ekler ve API olarak kaydeder |
-| `zeyn g component <feature> <name>` | Bir screen parçası döndüren fonksiyonla `components/<name>.rs` ekler |
 | `zeyn routes` | Feature'ları, screen'leri, rotaları, API'leri ve erişimi listeler |
 | `zeyn check` | Derler ve yapısal sorunları ile eksik çevirileri bildirir |
 | `zeyn check --fix` | `src`, `tests` ve `examples` içinde adı değişen Zeyn API'lerini yeniden yazar, sonra denetler |
@@ -67,15 +65,14 @@ Her klasör için [Project structure](structure.md) sayfasına bakın.
 
 ## Üreticiler
 
-Her screen, action ve component için bir dosya, üreticilerin oluşturduğu varsayılan düzendir:
+`zeyn g feature` her model, servis, action ve screen için bir dosya içeren bir feature oluşturur:
 
 ```sh
-zeyn g screen notes detail       # src/features/notes/screens/detail.rs
-zeyn g action notes archive      # src/features/notes/actions/archive.rs
-zeyn g component notes summary   # src/features/notes/components/summary.rs
+zeyn g feature orders            # src/features/orders/: models/, services/, actions/, screens/
+zeyn g screen orders detail      # src/features/orders/screens/detail.rs
 ```
 
-`zeyn g s`, `zeyn g a`, `zeyn g c` ve `zeyn g f` kısa biçimleri aynı işi yapar. Bir screen `<feature>.<name>.view` iznini ve `locales/` içindeki her dosyada başlığını alır; İngilizce dışındaki diller İngilizce metni ve çevrilmesi gerektiğini söyleyen bir not alır. Bir action `<feature>.<name>.run` iznini alır ve `.api(...)` ile kaydedilir. Bu düzen zorunlu değildir: bir feature hâlâ tek bir `screens.rs` veya `actions.rs` dosyası kullanıyorsa üretici önce onu içeriğiyle birlikte `screens/mod.rs` (veya `actions/mod.rs`) konumuna taşır, sonra yeni dosyayı ekler. Üreticiler hiçbir dosyanın üzerine yazmaz ve snake case olmayan adları reddeder.
+`zeyn g f` ve `zeyn g s` kısa biçimleri aynı işi yapar. Yeni feature hemen çalışır: bir model, bellekte tutulan bir veri servisi, bir arama action'ı ve menü kaydıyla bir liste screen'i. İhtiyaç duymadığı bir klasörü feature siler (klasörü ve feature'ın `mod.rs` dosyasındaki `mod` satırını). `components/` hiçbir zaman üretilmez: bir screen parçası paylaşıldığında ya da bir screen dosyası büyüdüğünde onu elle ekleyin, her dosyada `Node` döndüren bir fonksiyon (`components/<name>.rs`). Bir screen `<feature>.<name>.view` iznini ve `locales/` içindeki her dosyada başlığını alır; İngilizce dışındaki diller İngilizce metni ve çevrilmesi gerektiğini söyleyen bir not alır. Bu düzen zorunlu değildir: bir feature tek bir `screens.rs` kullanıyorsa `zeyn g screen` önce onu içeriğiyle birlikte `screens/mod.rs` konumuna taşır, `screens/` silinmişse yeniden oluşturur. Üreticiler hiçbir dosyanın üzerine yazmaz ve snake case olmayan adları reddeder.
 
 ## Bir uygulamayı denetleme
 

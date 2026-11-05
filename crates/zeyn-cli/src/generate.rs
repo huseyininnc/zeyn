@@ -1,58 +1,21 @@
-//! `zeyn g screen|action|component <feature> <name>`: one file per screen, action and component.
+//! `zeyn g feature <name>` and `zeyn g screen <feature> <name>`.
 //!
-//! The folder layout (`screens/mod.rs` plus `screens/<name>.rs`) is the default these generators
-//! produce, not a rule: a feature that keeps a flat `screens.rs` still builds, and the generators
-//! turn it into a folder the first time they add a file to it.
+//! A new feature gets `models/`, `services/`, `actions/` and `screens/`, each with a `mod.rs` and
+//! a working starter. A feature that does not need a folder deletes it and its `mod` line;
+//! `components/` is added by hand when a part of a screen is shared or a screen file grows. The
+//! layout is a default, not a rule: a flat `screens.rs` still builds, and `zeyn g screen` turns it
+//! into a folder the first time it adds a screen.
 
 use super::{title_of, valid_ident};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 
-/// What a generator adds to a feature.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Kind {
-    Screen,
-    Action,
-    Component,
-}
-
-/// The generator a word names: `feature` or `f`, `screen` or `s`, `action` or `a`, `component`
-/// or `c`. Returns the full name.
+/// The generator a word names: `feature` or `f`, `screen` or `s`. Returns the full name.
 pub fn kind_of(word: &str) -> Option<&'static str> {
     match word {
         "feature" | "f" => Some("feature"),
         "screen" | "s" => Some("screen"),
-        "action" | "a" => Some("action"),
-        "component" | "c" => Some("component"),
         _ => None,
-    }
-}
-
-impl Kind {
-    /// The kind for a full generator name from [`kind_of`].
-    pub fn named(name: &str) -> Option<Kind> {
-        match name {
-            "screen" => Some(Kind::Screen),
-            "action" => Some(Kind::Action),
-            "component" => Some(Kind::Component),
-            _ => None,
-        }
-    }
-
-    fn word(self) -> &'static str {
-        match self {
-            Kind::Screen => "screen",
-            Kind::Action => "action",
-            Kind::Component => "component",
-        }
-    }
-
-    fn folder(self) -> &'static str {
-        match self {
-            Kind::Screen => "screens",
-            Kind::Action => "actions",
-            Kind::Component => "components",
-        }
     }
 }
 
@@ -65,17 +28,170 @@ const KEYWORDS: &[&str] = &[
     "priv", "try", "typeof", "unsized", "virtual", "yield",
 ];
 
-/// Adds `src/features/<feature>/<folder>/<name>.rs` and wires it up. Never overwrites a file.
-/// Returns what was done and what is left to do by hand.
-pub fn generate(root: &Path, kind: Kind, feature: &str, name: &str) -> Result<String, String> {
-    for (what, value) in [("feature", feature), (kind.word(), name)] {
-        if !valid_ident(value) || KEYWORDS.contains(&value) {
-            return Err(format!(
-                "`{value}` is not a valid {what} name. Use snake case: lower case letters, digits \
-                 and `_`, starting with a letter, and not a Rust keyword, for example `order_lines`"
+/// Fails with a message an agent can act on when `value` cannot name a module.
+fn check_name(what: &str, value: &str) -> Result<(), String> {
+    if valid_ident(value) && !KEYWORDS.contains(&value) {
+        return Ok(());
+    }
+    Err(format!(
+        "`{value}` is not a valid {what} name. Use snake case: lower case letters, digits and \
+         `_`, starting with a letter, and not a Rust keyword, for example `order_lines`"
+    ))
+}
+
+/// Adds `src/features/<name>` with `models/`, `services/`, `actions/` and `screens/` holding a
+/// working starter (a model, an in memory data service, a search action and a list screen) and
+/// registers the module in `src/features/mod.rs`. Returns what was done and what is left to do by
+/// hand.
+pub fn new_feature(root: &Path, name: &str) -> Result<String, String> {
+    check_name("feature", name)?;
+    let dir = root.join("src/features").join(name);
+    if dir.exists() {
+        return Err(format!(
+            "{} already exists, so nothing was changed. Pick another name, or add screens to it \
+             with `zeyn g screen {name} <name>`",
+            shown(root, &dir)
+        ));
+    }
+    let model = title_of(name).replace(' ', "");
+    let ident = format!("{name}_list");
+    let title_key = format!("{name}.list.title");
+    let entries = [
+        (format!("{name}.menu"), title_of(name)),
+        (title_key.clone(), title_of(name)),
+    ];
+    let texts = locale_updates(root, &entries)?;
+    let mods = "pub mod actions;\npub mod models;\npub mod screens;\npub mod services;\n";
+    let files = [
+        (
+            "mod.rs".to_string(),
+            format!(
+                "//! {model}.\n\n{mods}\nuse zeyn::prelude::*;\n\npub fn feature() -> Feature {{\n    Feature::new(\"{name}\")\n        .route_prefix(\"/{name}\")\n        .guard(SignedIn)\n        .screen(screens::{ident})\n        .menu(|m| {{\n            m.group(t!(\"{name}.menu\"), Icon::Box)\n                .item(t!(\"{title_key}\"), screens::{ident})\n        }})\n}}\n"
+            ),
+        ),
+        (
+            "screens/mod.rs".to_string(),
+            format!(
+                "//! Screens of the feature, one file each. A part of a screen that is shared or makes a\n//! screen file long goes in `components/<name>.rs`, a folder added by hand.\n\nmod list;\npub use list::{ident};\n"
+            ),
+        ),
+        (
+            "screens/list.rs".to_string(),
+            format!(
+                "use super::super::actions::search_{name};\nuse zeyn::prelude::*;\n\n/// List screen.\n#[screen(route = \"/\", permission = \"{name}.view\")]\npub fn {ident}() -> Screen {{\n    Screen::new(t!(\"{title_key}\")).body(DataGrid::auto(search_{name}).mode(DataMode::Server))\n}}\n"
+            ),
+        ),
+        (
+            "actions/mod.rs".to_string(),
+            format!(
+                "//! Actions of the feature, one file each.\n\nmod search;\npub use search::search_{name};\n"
+            ),
+        ),
+        (
+            "actions/search.rs".to_string(),
+            format!(
+                "use super::super::models::{model};\nuse super::super::services::{model}Store;\nuse zeyn::prelude::*;\n\n/// Records for the list.\n#[action(permission = \"{name}.view\")]\npub async fn search_{name}(q: DataQuery, store: {model}Store) -> Result<Page<{model}>> {{\n    Ok(q.apply(store.all()?))\n}}\n"
+            ),
+        ),
+        (
+            "models/mod.rs".to_string(),
+            format!(
+                "//! Models of the feature, one file each.\n\nmod {name};\npub use {name}::{model};\n"
+            ),
+        ),
+        (
+            format!("models/{name}.rs"),
+            format!(
+                "use zeyn::prelude::*;\n\n/// A {name} record.\n#[entity(table = \"{name}\")]\npub struct {model} {{\n    #[key]\n    pub id: {model}Id,\n    #[rule(required, max_len = 120)]\n    pub name: String,\n    #[version]\n    pub version: i64,\n}}\n"
+            ),
+        ),
+        (
+            "services/mod.rs".to_string(),
+            format!(
+                "//! Services of the feature: stores and clients that read and write data. Register\n//! each one in `src/app.rs` with `.service(...)`.\n\nmod {name}_store;\npub use {name}_store::{model}Store;\n"
+            ),
+        ),
+        (
+            format!("services/{name}_store.rs"),
+            format!(
+                "use super::super::models::{model};\nuse std::sync::{{Arc, RwLock}};\nuse zeyn::prelude::*;\n\n/// Records kept in memory. Replace it with a database backed service.\n#[derive(Clone, Default)]\npub struct {model}Store(Arc<RwLock<Vec<{model}>>>);\n\nimpl Service for {model}Store {{}}\n\nfn poisoned<T>(_: T) -> Error {{\n    Error::Internal(\"{name} store lock is poisoned\".into())\n}}\n\nimpl {model}Store {{\n    pub fn all(&self) -> Result<Vec<{model}>> {{\n        Ok(self.0.read().map_err(poisoned)?.clone())\n    }}\n}}\n"
+            ),
+        ),
+    ];
+    for (file, body) in files {
+        let path = dir.join(file);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        write(&path, &body)?;
+    }
+    let mod_rs = root.join("src/features/mod.rs");
+    let mut text = std::fs::read_to_string(&mod_rs).unwrap_or_default();
+    if !text.ends_with('\n') && !text.is_empty() {
+        text.push('\n');
+    }
+    text.push_str(&format!("pub mod {name};\n"));
+    write(&mod_rs, &text)?;
+    let mut done = vec![format!(
+        "Created src/features/{name}/ with models/, services/, actions/ and screens/ and \
+         registered it in src/features/mod.rs"
+    )];
+    let mut todo = vec![
+        format!(
+            "add `.service(features::{name}::services::{model}Store::default())` and \
+             `.feature(features::{name}::feature())` in src/app.rs"
+        ),
+        "delete a folder and its `pub mod` line in the feature's mod.rs if the feature does not \
+         need it"
+            .to_string(),
+    ];
+    report_texts(root, texts, &entries, &mut done, &mut todo)?;
+    Ok(summary(done, todo))
+}
+
+/// Writes the locale files and says which keys were added and which need translating.
+fn report_texts(
+    root: &Path,
+    texts: Vec<(PathBuf, String, bool)>,
+    entries: &[(String, String)],
+    done: &mut Vec<String>,
+    todo: &mut Vec<String>,
+) -> Result<(), String> {
+    let keys = entries
+        .iter()
+        .map(|(k, _)| format!("`{k}`"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    for (path, new, english) in texts {
+        write(&path, &new)?;
+        done.push(format!("Added {keys} to {}", shown(root, &path)));
+        if !english {
+            todo.push(format!(
+                "translate {keys} in {}: it has the English text for now",
+                shown(root, &path)
             ));
         }
     }
+    Ok(())
+}
+
+/// What was done, then the next steps, ending with `cargo test`.
+fn summary(done: Vec<String>, mut todo: Vec<String>) -> String {
+    todo.push("cargo test".into());
+    let mut out = done.join("\n");
+    out.push_str("\nNext:\n");
+    for t in todo {
+        out.push_str(&format!("  - {t}\n"));
+    }
+    out.trim_end().to_string()
+}
+
+/// Adds `src/features/<feature>/screens/<name>.rs`, registers the screen in the feature and adds
+/// its title to every locale file. Never overwrites a file. Returns what was done and what is
+/// left to do by hand.
+pub fn new_screen(root: &Path, feature: &str, name: &str) -> Result<String, String> {
+    check_name("feature", feature)?;
+    check_name("screen", name)?;
     let dir = root.join("src/features").join(feature);
     let feature_mod = dir.join("mod.rs");
     if !feature_mod.is_file() {
@@ -85,8 +201,8 @@ pub fn generate(root: &Path, kind: Kind, feature: &str, name: &str) -> Result<St
             shown(root, &feature_mod)
         ));
     }
-    let folder = dir.join(kind.folder());
-    let flat = dir.join(format!("{}.rs", kind.folder()));
+    let folder = dir.join("screens");
+    let flat = dir.join("screens.rs");
     let file = folder.join(format!("{name}.rs"));
     if file.exists() {
         return Err(format!(
@@ -102,10 +218,7 @@ pub fn generate(root: &Path, kind: Kind, feature: &str, name: &str) -> Result<St
             shown(root, &folder)
         ));
     }
-    let ident = match kind {
-        Kind::Component => name.to_string(),
-        _ => format!("{feature}_{name}"),
-    };
+    let ident = format!("{feature}_{name}");
     if let Some(owner) = defines(&[flat.clone(), folder.clone()], &ident) {
         return Err(format!(
             "`{ident}` is already defined in {}, so nothing was changed. Pick another name",
@@ -113,10 +226,8 @@ pub fn generate(root: &Path, kind: Kind, feature: &str, name: &str) -> Result<St
         ));
     }
     let key = format!("{feature}.{name}.title");
-    let texts = match kind {
-        Kind::Action => Vec::new(),
-        _ => locale_updates(root, &key, &title_of(name))?,
-    };
+    let entries = [(key.clone(), title_of(name))];
+    let texts = locale_updates(root, &entries)?;
     let mut done = Vec::new();
     std::fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
     if flat.is_file() {
@@ -127,83 +238,41 @@ pub fn generate(root: &Path, kind: Kind, feature: &str, name: &str) -> Result<St
             shown(root, &folder)
         ));
     }
-    write(&file, &body(kind, feature, name, &ident))?;
+    write(
+        &file,
+        &format!(
+            "use zeyn::prelude::*;\n\n/// {title} screen.\n#[screen(route = \"/{route}\", permission = \"{feature}.{name}.view\")]\npub fn {ident}() -> Screen {{\n    Screen::new(t!(\"{key}\"))\n}}\n",
+            title = title_of(name),
+            route = name.replace('_', "-")
+        ),
+    )?;
     done.push(format!("Created {}", shown(root, &file)));
     let sub_mod = folder.join("mod.rs");
-    let block = match kind {
-        Kind::Component => format!(
-            "mod {name};\n#[expect(unused_imports, reason = \"remove once a screen uses it\")]\npub use {name}::{name};\n"
-        ),
-        _ => format!("mod {name};\npub use {name}::{ident};\n"),
-    };
     let sub_text = std::fs::read_to_string(&sub_mod).unwrap_or_default();
+    let block = format!("mod {name};\npub use {name}::{ident};\n");
     write(&sub_mod, &insert_mod(&sub_text, name, &block))?;
     let mut text = std::fs::read_to_string(&feature_mod).map_err(|e| e.to_string())?;
-    if !declares(&text, kind.folder()) {
-        let decl = match kind {
-            Kind::Component => "mod components;\n".to_string(),
-            _ => format!("pub mod {};\n", kind.folder()),
-        };
-        text = insert_mod(&text, kind.folder(), &decl);
+    if !declares(&text, "screens") {
+        text = insert_mod(&text, "screens", "pub mod screens;\n");
     }
-    let call = match kind {
-        Kind::Screen => Some((format!(".screen(screens::{ident})"), &[".screen("][..])),
-        Kind::Action => Some((
-            format!(".api(actions::{ident})"),
-            &[".api(", ".screen("][..],
-        )),
-        Kind::Component => None,
-    };
+    let call = format!(".screen(screens::{ident})");
     let mut todo = Vec::new();
-    if let Some((call, anchors)) = call {
-        match register(&text, &call, anchors) {
-            Some(t) => {
-                text = t;
-                done.push(format!(
-                    "Registered `{call}` in feature() in {}",
-                    shown(root, &feature_mod)
-                ));
-            }
-            None => todo.push(format!(
-                "add `{call}` to feature() in {}",
+    match register(&text, &call, &[".screen("]) {
+        Some(t) => {
+            text = t;
+            done.push(format!(
+                "Registered `{call}` in feature() in {}",
                 shown(root, &feature_mod)
-            )),
-        }
-    }
-    write(&feature_mod, &text)?;
-    if kind == Kind::Action {
-        todo.push(format!(
-            "`{ident}` is also an API at /api/v1/{feature}/{ident}; remove `.api(actions::{ident})` \
-             if only screens run it, and use it from a screen"
-        ));
-    }
-    if kind == Kind::Component {
-        todo.push(format!(
-            "use `{name}()` in a screen of the feature (`use super::components::{name};`), then \
-             remove the two `#[expect(...)]` attributes"
-        ));
-    }
-    for (path, new, english) in texts {
-        write(&path, &new)?;
-        done.push(format!("Added `{key}` to {}", shown(root, &path)));
-        if !english {
-            todo.push(format!(
-                "translate `{key}` in {}: it has the English text for now",
-                shown(root, &path)
             ));
         }
+        None => todo.push(format!(
+            "add `{call}` to feature() in {}",
+            shown(root, &feature_mod)
+        )),
     }
-    let mut out = done.join("\n");
-    if !todo.is_empty() {
-        out.push_str("\nNext:\n");
-        for t in todo {
-            out.push_str(&format!("  - {t}\n"));
-        }
-        out.push_str("  - cargo test");
-    } else {
-        out.push_str("\nNext: cargo test");
-    }
-    Ok(out)
+    write(&feature_mod, &text)?;
+    report_texts(root, texts, &entries, &mut done, &mut todo)?;
+    Ok(summary(done, todo))
 }
 
 fn shown(root: &Path, path: &Path) -> String {
@@ -216,23 +285,6 @@ fn shown(root: &Path, path: &Path) -> String {
 
 fn write(path: &Path, text: &str) -> Result<(), String> {
     std::fs::write(path, text).map_err(|e| format!("{}: {e}", path.display()))
-}
-
-/// The source of a new screen, action or component.
-fn body(kind: Kind, feature: &str, name: &str, ident: &str) -> String {
-    let title = title_of(name);
-    match kind {
-        Kind::Screen => format!(
-            "use zeyn::prelude::*;\n\n/// {title} screen.\n#[screen(route = \"/{route}\", permission = \"{feature}.{name}.view\")]\npub fn {ident}() -> Screen {{\n    Screen::new(t!(\"{feature}.{name}.title\"))\n}}\n",
-            route = name.replace('_', "-")
-        ),
-        Kind::Action => format!(
-            "use zeyn::prelude::*;\n\n/// {title}. Say what the action does: this paragraph also describes it to AI models.\n#[action(permission = \"{feature}.{name}.run\")]\npub async fn {ident}(_: ()) -> Result<()> {{\n    Ok(())\n}}\n"
-        ),
-        Kind::Component => format!(
-            "use zeyn::prelude::*;\n\n/// {title}: a part of a screen, such as a panel or a toolbar.\n#[expect(dead_code, reason = \"remove once a screen uses it\")]\npub fn {name}() -> Node {{\n    Panel::new(t!(\"{feature}.{name}.title\")).into()\n}}\n"
-        ),
-    }
 }
 
 /// The first file under `paths` (files or folders) that defines `fn <ident>(`.
@@ -280,10 +332,8 @@ fn insert_mod(text: &str, name: &str, block: &str) -> String {
     let mut before = None;
     for (i, l) in lines.iter().enumerate() {
         let t = l.trim();
-        let modish = t.starts_with("mod ")
-            || t.starts_with("pub mod ")
-            || t.starts_with("pub use ")
-            || t.starts_with("#[expect(");
+        let modish =
+            t.starts_with("mod ") || t.starts_with("pub mod ") || t.starts_with("pub use ");
         if !(t.is_empty() || t.starts_with("//!") || modish) {
             break;
         }
@@ -345,13 +395,12 @@ fn register(text: &str, call: &str, anchors: &[&str]) -> Option<String> {
     Some(out)
 }
 
-/// The new text of every `locales/*.json` that lacks `key`, with `english` as its text, and
-/// whether the file is `en.json`. Fails before anything is written when a file is invalid or a
-/// part of the key is already a text.
+/// The new text of every `locales/*.json` that lacks one of the `entries` (key, English text),
+/// and whether the file is `en.json`. Fails before anything is written when a file is invalid or
+/// a part of a key is already a text.
 fn locale_updates(
     root: &Path,
-    key: &str,
-    english: &str,
+    entries: &[(String, String)],
 ) -> Result<Vec<(PathBuf, String, bool)>, String> {
     let dir = root.join("locales");
     let mut files: Vec<PathBuf> = std::fs::read_dir(&dir)
@@ -366,55 +415,68 @@ fn locale_updates(
     if files.is_empty() {
         return Err("locales/ has no .json files; create locales/en.json first".into());
     }
-    let parts: Vec<&str> = key.split('.').collect();
     let mut out = Vec::new();
     for path in files {
-        let text =
+        let original =
             std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
         let file = shown(root, &path);
-        let json: Value = serde_json::from_str(&text).map_err(|e| {
-            format!("{file} is not valid JSON ({e}); fix it, then run the generator again")
-        })?;
-        let mut node = &json;
-        let mut depth = 0;
-        while let Some(next) = parts
-            .get(depth)
-            .and_then(|p| node.get(p))
-        {
-            node = next;
-            depth += 1;
+        let mut text = original.clone();
+        for (key, english) in entries {
+            if let Some(new) = add_key(&text, key, english, &file)? {
+                text = new;
+            }
         }
-        if depth == parts.len() {
-            continue;
+        if text != original {
+            let english_file = path
+                .file_stem()
+                .is_some_and(|s| s == "en");
+            out.push((path, text, english_file));
         }
-        if !node.is_object() {
-            return Err(format!(
-                "`{}` in {file} is a text, so `{key}` cannot be added. Pick another name",
-                parts[..depth].join(".")
-            ));
-        }
-        let mut value = serde_json::to_string(english).unwrap_or_default();
-        for p in parts[depth + 1..].iter().rev() {
-            value = format!("{{ \"{p}\": {value} }}");
-        }
-        let member = format!("\"{}\": {value}", parts[depth]);
-        let (open, close) = object_at(&text, &parts[..depth]);
-        let new = add_member(&text, open, close, &member);
-        let ok = serde_json::from_str::<Value>(&new).is_ok_and(|v| {
-            parts
-                .iter()
-                .try_fold(&v, |v, p| v.get(p))
-                .is_some_and(Value::is_string)
-        });
-        if !ok {
-            return Err(format!("could not add `{key}` to {file}; add it by hand"));
-        }
-        let english_file = path
-            .file_stem()
-            .is_some_and(|s| s == "en");
-        out.push((path, new, english_file));
     }
     Ok(out)
+}
+
+/// `text` with `key` added as `english`, or `None` when the key is already there.
+fn add_key(text: &str, key: &str, english: &str, file: &str) -> Result<Option<String>, String> {
+    let json: Value = serde_json::from_str(text).map_err(|e| {
+        format!("{file} is not valid JSON ({e}); fix it, then run the generator again")
+    })?;
+    let parts: Vec<&str> = key.split('.').collect();
+    let mut node = &json;
+    let mut depth = 0;
+    while let Some(next) = parts
+        .get(depth)
+        .and_then(|p| node.get(p))
+    {
+        node = next;
+        depth += 1;
+    }
+    if depth == parts.len() {
+        return Ok(None);
+    }
+    if !node.is_object() {
+        return Err(format!(
+            "`{}` in {file} is a text, so `{key}` cannot be added. Pick another name",
+            parts[..depth].join(".")
+        ));
+    }
+    let mut value = serde_json::to_string(english).unwrap_or_default();
+    for p in parts[depth + 1..].iter().rev() {
+        value = format!("{{ \"{p}\": {value} }}");
+    }
+    let member = format!("\"{}\": {value}", parts[depth]);
+    let (open, close) = object_at(text, &parts[..depth]);
+    let new = add_member(text, open, close, &member);
+    let ok = serde_json::from_str::<Value>(&new).is_ok_and(|v| {
+        parts
+            .iter()
+            .try_fold(&v, |v, p| v.get(p))
+            .is_some_and(Value::is_string)
+    });
+    if !ok {
+        return Err(format!("could not add `{key}` to {file}; add it by hand"));
+    }
+    Ok(Some(new))
 }
 
 fn skip_ws(b: &[u8], mut i: usize) -> usize {
@@ -575,9 +637,10 @@ pub fn layout_warnings(files: &[(PathBuf, String)], registered: &[String]) -> Ve
             .and_then(Path::file_name)
             .map(|f| f.to_string_lossy().to_string())
             .unwrap_or_default();
-        for (file, kind, n) in [
-            ("screens.rs", "screen", screens),
-            ("actions.rs", "action", actions),
+        let generator = format!("run `zeyn g screen {feature} <name>` for the next one, or ");
+        for (file, kind, n, first) in [
+            ("screens.rs", "screen", screens, generator.as_str()),
+            ("actions.rs", "action", actions, ""),
         ] {
             if path
                 .file_name()
@@ -586,8 +649,9 @@ pub fn layout_warnings(files: &[(PathBuf, String)], registered: &[String]) -> Ve
                 && lines > 150
             {
                 out.push(format!(
-                    "{shown} has {n} #[{kind}] functions in {lines} lines; run `zeyn g {kind} {feature} <name>` \
-                     for the next one, or move each {kind} into {}/<name>.rs",
+                    "{shown} has {n} #[{kind}] functions in {lines} lines; {first}move each \
+                     {kind} into {}/<name>.rs and shared parts of screens into \
+                     components/<name>.rs",
                     file.trim_end_matches(".rs")
                 ));
             }

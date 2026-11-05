@@ -14,7 +14,7 @@ runtime in the browser applies changes, and there is no JavaScript to write.
 - Standards are fixed by the project files: `rustfmt.toml`, `clippy.toml` and `[lints]` in `Cargo.toml`, `.editorconfig`, `deny.toml` (licenses and advisories), `rust-toolchain.toml`. CI runs all of them; do not loosen them to make a change pass.
 - Show every route, screen, API and missing translation: `zeyn routes`
 - New feature folder: `zeyn g feature <name>`
-- New screen, action or component, one file each: `zeyn g screen <feature> <name>`, `zeyn g action <feature> <name>`, `zeyn g component <feature> <name>`. They register the screen or action in the feature and add new texts to every locale file (other languages get the English text to translate).
+- New screen, one file: `zeyn g screen <feature> <name>`. It registers the screen in the feature and adds its title to every locale file (other languages get the English text to translate).
 
 The `zeyn` MCP server (see `.mcp.json`) gives agents the same commands plus the framework reference.
 `.claude/skills/zeyn/SKILL.md` is the Zeyn skill: where to read the docs, the rules, the language in
@@ -27,20 +27,27 @@ config/app.json          defaults; environment variables APP_* override them (AP
 locales/<lang>.json      every user facing text; all files must have the same keys
 src/main.rs              loads configuration and starts the app
 src/app.rs               the App: services, features, security settings
+src/services/<name>.rs   services shared by several features, registered in src/app.rs
 src/features/<name>/     one folder per feature
-    mod.rs               the Feature: route prefix, guards, screens, APIs, menu
-    models.rs            #[entity] and #[model] types
-    store.rs             services that read and write data
-    actions/             #[action] functions, one file each: mod.rs lists them, <name>.rs holds one
-    screens/             #[screen] functions, one file each: mod.rs lists them, <name>.rs holds one
-    components/          parts of screens (a toolbar, a panel): functions that return a Node
+    mod.rs               module declarations and the Feature: route prefix, guards, screens, APIs, menu
+    models/              #[entity] and #[model] types, one file each
+    services/            services of the feature that read and write data (stores, clients)
+    actions/             #[action] functions, one file each
+    screens/             #[screen] functions, one file each
+    components/          parts of screens (a toolbar, a panel), added by hand when needed
 tests/                   tests that drive the app through its router
 ```
 
-This folder layout is the default: `zeyn g feature`, `zeyn g screen`, `zeyn g action` and
-`zeyn g component` create it. It is not enforced. A small feature can keep a single `screens.rs` or
-`actions.rs` (the sample `notes` feature does); the generators turn it into a folder the first time
-they add a file to it.
+Each folder has a `mod.rs` that lists its files. `zeyn g feature` creates `models/`, `services/`,
+`actions/` and `screens/` with a working starter: a model, an in memory data service, a search
+action and a list screen. A feature that does not need a folder deletes it (the folder and its
+`mod` line in the feature's `mod.rs`). `components/` is never generated: add it by hand, with one
+function that returns a `Node` per file (`components/<name>.rs`), when a part of a screen is shared
+or a screen file grows. `zeyn g screen` adds a file to `screens/` and recreates `screens/mod.rs`
+when it was deleted. The layout is a default, not a rule: a small feature can keep a single `models.rs`,
+`screens.rs` or `actions.rs` (the sample `notes` feature does), and `zeyn g screen` turns a flat
+`screens.rs` into a folder the first time it adds a screen. A service that several features use
+goes in `src/services/<name>.rs` and is registered once in `src/app.rs` with `.service(...)`.
 
 ## Rules
 
@@ -167,7 +174,7 @@ impl Service for OrderStore {}
 
 ### Recipes
 
-- New feature: `zeyn g feature <name>`, then `.feature(...)` in `src/app.rs`, then texts in every `locales/*.json`.
+- New feature: `zeyn g feature <name>`, then `.service(...)` for its store and `.feature(...)` in `src/app.rs`, then translate its texts in every `locales/*.json`. Delete the folders it does not need.
 - New screen: `zeyn g screen <feature> <name>` writes `screens/<name>.rs`, registers it and adds its title to every `locales/*.json`; translate the copies in languages other than English.
 - New field: add it to the struct with rules, add `Model.field` labels to every locale, add `.field(...)` to the form and `.column(...)` to the list.
 - New permission: name it `feature.resource.verb` in the macro; grant it in the authenticator or identity provider.

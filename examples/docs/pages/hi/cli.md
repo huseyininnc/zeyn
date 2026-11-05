@@ -8,10 +8,8 @@
 |---|---|
 | `zeyn new <name>` | मानक feature संरचना वाला ऐप बनाता है |
 | `zeyn new <name> --lib` | कई ऐप में साझा मॉडल, feature और टेक्स्ट की लाइब्रेरी बनाता है |
-| `zeyn g feature <name>` | मॉडल, action और Screen के साथ `src/features/<name>` जोड़ता है, हर Screen और action के लिए एक फ़ाइल |
+| `zeyn g feature <name>` | `models`, `services`, `actions` और `screens` फ़ोल्डरों और एक चालू सूची Screen के साथ `src/features/<name>` जोड़ता है |
 | `zeyn g screen <feature> <name>` | किसी feature में `screens/<name>.rs` जोड़ता है, उसे रजिस्टर करता है और उसका शीर्षक हर लोकेल फ़ाइल में जोड़ता है |
-| `zeyn g action <feature> <name>` | किसी feature में `actions/<name>.rs` जोड़ता है और उसे API के रूप में रजिस्टर करता है |
-| `zeyn g component <feature> <name>` | `components/<name>.rs` जोड़ता है, एक फ़ंक्शन जो Screen का एक हिस्सा लौटाता है |
 | `zeyn routes` | feature, Screen, रूट, API और एक्सेस सूचीबद्ध करता है |
 | `zeyn check` | कंपाइल करता है और संरचनात्मक समस्याएँ तथा छूटे हुए अनुवाद बताता है |
 | `zeyn check --fix` | `src`, `tests` और `examples` में नाम बदले गए Zeyn API को फिर से लिखता है, फिर जाँचता है |
@@ -67,15 +65,14 @@ cargo run
 
 ## जनरेटर
 
-हर Screen, action और कंपोनेंट के लिए एक फ़ाइल, जनरेटर का बनाया डिफ़ॉल्ट ढाँचा है:
+`zeyn g feature` एक feature बनाता है जिसमें हर मॉडल, सर्विस, action और Screen के लिए एक फ़ाइल होती है:
 
 ```sh
-zeyn g screen notes detail       # src/features/notes/screens/detail.rs
-zeyn g action notes archive      # src/features/notes/actions/archive.rs
-zeyn g component notes summary   # src/features/notes/components/summary.rs
+zeyn g feature orders            # src/features/orders/: models/, services/, actions/, screens/
+zeyn g screen orders detail      # src/features/orders/screens/detail.rs
 ```
 
-छोटे रूप `zeyn g s`, `zeyn g a`, `zeyn g c` और `zeyn g f` भी यही करते हैं। Screen को अनुमति `<feature>.<name>.view` मिलती है और उसका शीर्षक `locales/` की हर फ़ाइल में जाता है; अंग्रेज़ी के अलावा भाषाओं को अंग्रेज़ी पाठ और उसे अनुवाद करने का नोट मिलता है। action को `<feature>.<name>.run` मिलता है और वह `.api(...)` से रजिस्टर होता है। यह ढाँचा अनिवार्य नहीं है: अगर किसी feature में अब भी एक ही `screens.rs` या `actions.rs` है, तो जनरेटर पहले उसे उसकी सामग्री के साथ `screens/mod.rs` (या `actions/mod.rs`) में ले जाता है, फिर नई फ़ाइल जोड़ता है। जनरेटर कभी किसी फ़ाइल को ओवरराइट नहीं करते और snake case से अलग नाम अस्वीकार करते हैं।
+छोटे रूप `zeyn g f` और `zeyn g s` भी यही करते हैं। नया feature तुरंत चलता है: एक मॉडल, मेमोरी में डेटा रखने वाली एक सर्विस, एक खोज action और मेनू प्रविष्टि के साथ एक सूची Screen। जिस feature को किसी फ़ोल्डर की ज़रूरत नहीं, वह उसे हटा देता है (फ़ोल्डर और feature की `mod.rs` में उसकी `mod` पंक्ति)। `components/` कभी नहीं बनाया जाता: जब Screen का कोई हिस्सा कई जगह इस्तेमाल हो या कोई Screen फ़ाइल लंबी हो जाए, तब इसे हाथ से जोड़ें, हर फ़ाइल में `Node` लौटाने वाला एक फ़ंक्शन (`components/<name>.rs`)। Screen को अनुमति `<feature>.<name>.view` मिलती है और उसका शीर्षक `locales/` की हर फ़ाइल में जाता है; अंग्रेज़ी के अलावा भाषाओं को अंग्रेज़ी पाठ और उसे अनुवाद करने का नोट मिलता है। यह ढाँचा अनिवार्य नहीं है: अगर किसी feature में एक ही `screens.rs` है, तो `zeyn g screen` पहले उसे उसकी सामग्री के साथ `screens/mod.rs` में ले जाता है, और अगर `screens/` हटा दिया गया था तो उसे फिर से बनाता है। जनरेटर कभी किसी फ़ाइल को ओवरराइट नहीं करते और snake case से अलग नाम अस्वीकार करते हैं।
 
 ## ऐप की जाँच
 
