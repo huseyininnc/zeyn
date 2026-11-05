@@ -33,6 +33,10 @@ pub fn pricing() -> Screen {
 
 每个到达服务器的请求仍然会构建并渲染该 screen；标签节省的是传输，应用前面的缓存节省的是请求。请让被缓存的 screen 不包含任何依赖访客的内容：一天中的时间、计数器、随机选择。
 
+## 预取
+
+`App::prefetch(Prefetch::Moderate)` 在点击之前加载下一个 screen；默认关闭。`nav.js` 会在悬停 100 毫秒后、键盘获得焦点时或触摸时获取链接的局部 screen，保留 10 秒，同时最多运行两个这样的获取，并在指针先离开时取消。只有指向应用中按路径路由的 screen 的链接会被预取，`/_zeyn/*`、登录和退出链接、下载、带 `target` 的链接以及标记为 `#[screen(no_prefetch)]` 的 screen 永远不会被预取，服务器会在它们运行之前拒绝。在 Save-Data、`prefers-reduced-data`、2g 连接或隐藏标签页下不会预取任何内容。在脚本缺失的情况下，Chromium 会通过 `Speculation-Rules` 响应头获得 Speculation Rules（只预取，从不预渲染），因此内容安全策略保持不变。服务器会标记这些请求：`ctx.is_prefetch()` 为 true，因此 screen 可以不统计一次浏览。公共缓存规则照常适用。
+
 ## 搜索引擎与链接预览
 
 ```rust

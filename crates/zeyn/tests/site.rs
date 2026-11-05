@@ -144,7 +144,9 @@ async fn the_site_menu_is_a_disclosure_navigation_with_one_link_groups_inline() 
         !page.contains(r#"href="/staff""#),
         "screens the visitor may not open are left out"
     );
-    assert!(page.contains(r#"aria-controls="z-site-nav" data-zeyn-site-toggle hidden"#));
+    assert!(
+        page.contains(r#"aria-controls="z-site-nav z-site-actions" data-zeyn-site-toggle hidden"#)
+    );
 }
 
 #[tokio::test]

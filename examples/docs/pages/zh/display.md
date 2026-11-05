@@ -47,7 +47,19 @@ DescriptionList::of(&invoice)
 
 ## EmptyState 和 Skeleton
 
-`EmptyState::new(title).text(text).opens(label, screen, params)` 用下一步操作填充空白区域。`Skeleton::lines(n)` 是内容加载期间的占位。
+`EmptyState::new(title).text(text)` 用下一步操作填充空白区域：`.link(label, screen, params)` 通过 `LinkButton` 前往另一个页面，`.opens(label, screen, params)` 则以窗口形式打开应用的一个 screen。`Skeleton::lines(n)` 是内容加载期间的占位。
+
+## LinkButton
+
+去往某处用链接，执行某事用按钮。`LinkButton::new(label, screen, params)` 是指向该 screen 规范路径（例如 `/products/42`）的真正的 `<a href>`，外观像按钮，因此中键点击、“在新标签页中打开”和搜索引擎都把它当作链接处理。它通过 `nav.js` 打开，无需重新加载页面，按 Enter 即可跟随。除非用 `.primary()` 要求主要操作的实心样式，否则外观为次要样式。该 screen 必须有路由，否则无法编译。`EmptyState::link` 和 `Hero::link` 使用它。
+
+```rust
+LinkButton::new(t!("cart.browse"), products, ()).primary()
+```
+
+## ClearPrefs
+
+`ClearPrefs::new(label)` 是一个按钮，用于移除此浏览器为该应用保存的所有客户端偏好，例如放在隐私页面中，紧挨着 `App::client_prefs_table()` 生成的列表。会有一条 toast 提示确认。服务器设置的 cookie（主题、语言、会话）不受影响。脚本可以用 `zeyn.prefs.clear()` 做同样的事。
 
 ## Breadcrumb
 
@@ -100,7 +112,7 @@ Embed::url("https://www.youtube-nocookie.com/embed/abc")
 - 每个框架都会带上 `sandbox="allow-scripts allow-same-origin allow-presentation"`、`referrerpolicy="no-referrer"` 和 `loading="lazy"`。弹出窗口、顶层导航、表单和下载永远不能被允许。`.allow(...)` 添加浏览器功能：`Fullscreen`、`PictureInPicture`、`Autoplay` 和 `EncryptedMedia`。
 - `.click_to_load(poster)` 先显示一个按钮，带有海报图片（应用上的路径或 `img-src` 中的主机；传 `""` 表示没有）以及对方站点的名称。在按下按钮之前不会联系对方站点；按下后框架取代按钮并获得焦点。该脚本是 `media.js` 的一部分，因此不会产生额外请求。
 - `.notice(t!(...))` 在该按钮上放置应用自己的文本，例如内容警告。它会被转义，与所有文本一样可翻译，并且是按钮可访问名称的一部分，因此屏幕阅读器会在用户做出决定之前读出它。没有 `.click_to_load` 时，它会启用无海报的按钮。
-- `.remember("external-video", Duration::from_secs(24 * 60 * 60))` 在该时间内只询问一次，而不是每个页面都问。浏览器只在 `localStorage` 的 `zeyn.consent.{scope}` 下保存结束时间（Unix 毫秒）；不设置 cookie，服务器也看不到它，因此缓存的公共页面对所有人保持一致。之后的页面、应用内导航和其他标签页会自行加载该 scope 的框架，且不移动焦点（WCAG 2.2 3.2.1 获得焦点时、2.4.3 焦点顺序）；只有在真正按下之后焦点才会移到框架。以下情况按钮会重新出现：时间已过；保存的值不是整数，或超出 embed 所设时间（被手动修改）；存储被阻止；以及没有 JavaScript 时。scope 为 1 到 40 个 ASCII 字母、数字、`-` 或 `_`；时间为 1 秒到 30 天（`MAX_EMBED_CONSENT`）。其他情况会 panic 并给出相应提示。共用同一 notice 的 embed 共用一个 scope。
+- `.remember(EXTERNAL_VIDEO)` 在该键的有效期内只询问一次，而不是每个页面都问。该键是用 `ClientPref::consent` 声明并通过 `App::client_prefs` 注册的同意键（参见[客户端偏好设置](security.md#client-preferences)）；绑定到同一个键的 embed 共用该答案。之后的页面、应用内导航和其他标签页会自行加载这些框架，且不移动焦点（WCAG 2.2 3.2.1 获得焦点时、2.4.3 焦点顺序）；只有在真正按下之后焦点才会移到框架。以下情况按钮会重新出现：记录已结束或未通过检查；应用没有注册该键；存储被阻止且页面是新的；以及没有 JavaScript 时。普通字符串或选择（choice）键无法编译。
 - 保存待嵌入地址的字段使用 `#[rule(embed)]`。表单接受 URL 或粘贴的嵌入代码，只保留 `src`，要求 `https` 和已列出的主机，丢弃跟踪参数（`utm_*`、`fbclid`、`gclid` 等），并保存规范地址，绝不保存 HTML。API 输入必须发送规范地址。
 
 ```rust

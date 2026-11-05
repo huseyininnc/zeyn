@@ -44,6 +44,10 @@ The screen is still built and rendered for every request that reaches the server
 transfer, and a cache in front of the app saves the request. Keep cached screens free of anything
 that depends on the visitor: the time of day, a counter, a random pick.
 
+## Prefetch
+
+`App::prefetch(Prefetch::Moderate)` loads the next screen before the click; it is off by default. `nav.js` fetches the partial screen of a link after 100 ms of hover, on keyboard focus or on touch, keeps it for 10 seconds, runs at most two such fetches at once and cancels one when the pointer leaves first. Only links to path routed screens of the app are prefetched, never `/_zeyn/*`, sign in and out links, downloads, links with a `target` or screens marked `#[screen(no_prefetch)]`, which the server refuses before they run. Nothing is prefetched with Save-Data, `prefers-reduced-data`, a 2g connection or in a hidden tab. Where the script is missing, Chromium gets Speculation Rules (prefetch only, never prerender) through a `Speculation-Rules` header, so the content security policy stays as it is. The server marks these requests: `ctx.is_prefetch()` is true, so a screen can skip counting a view. Public cache rules apply as usual.
+
 ## Search engines and link previews
 
 ```rust

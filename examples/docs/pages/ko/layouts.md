@@ -40,6 +40,8 @@ Panel::new(t!("ui.panel_products")).collapsible().toolbar(|t| t.export(Export::C
 
 `Tabs::new(label)`과 `.tab(title, node)`입니다. ARIA 탭 패턴에 설명된 대로 화살표 키로 탭 사이를 이동합니다. 닫힌 탭의 내용은 탭이 처음 열릴 때까지 렌더링되지 않으므로 탭이 많은 Screen도 가볍게 유지됩니다.
 
+`.remember(KEY)`는 사용자가 연 탭을 choice 키로 보관하므로([클라이언트 환경설정](security.md#client-preferences) 참고) 이후 페이지에서도 같은 탭이 열립니다. URL 해시에 지정된 탭이 우선합니다.
+
 ## Split
 
 `Split::new(start, end)`는 두 노드를 그 사이의 핸들과 함께 보여 줍니다. `.ratio(percent)`는 시작 쪽의 크기를 설정합니다. 핸들은 포인터나 화살표 키로 움직입니다.

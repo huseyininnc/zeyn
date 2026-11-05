@@ -95,6 +95,21 @@ Klavye: Aşağı ve Yukarı önerilerde gezinir (Aşağı onları açar), Enter 
 
 Sonuç screen'i `SearchParams` alır (`q`, screen bir menüden açıldığında boştur). Sunucu metni `MAX_SEARCH_QUERY` (100) karaktere keser, kaç öneri göndereceğine karar verir (`limit` başka türlü söylemedikçe 8, en çok 20), screen'in erişimini, Feature'ın guard'larını ve action'ın iznini denetler ve her öneri çağrısını yazma hız sınırına sayar (`App::write_limit`).
 
+### Zengin öneriler
+
+`.item(|row| ListItem::new(title).subtitle(text).image(src).link(screen, params))` her öneriyi küçük bir görsel (40 x 56 piksel, tembel yüklenir, `img-src` kurallarını izler; satırı başlık adlandırdığı için alternatif metni boştur, görseli olmayan satırda yer tutucu yoktur), başlık ve alt başlıkla bir satır olarak gösterir. Sunucu, kaydın kanonik adresiyle `[{text, subtitle, image, href}]` döndürür. Bir satırı tıklamak ya da Enter ile seçmek bağlantısını `nav.js` üzerinden açar; her satır gerçek bir bağlantı olduğu için orta tık ve "yeni sekmede aç" da çalışır. Vurgulanan satır yokken Enter yine sonuç screen'ini açar. Combobox deseni aynı kalır: her satır, başlığı ve alt başlığıyla adlandırılmış bir seçenektir ve satırlar en az 44 piksel yüksekliktedir. `.item` olmadan öneriler yukarıdaki gibi düz metindir.
+
+```rust
+SearchBox::of(catalog_products)
+    .item(|p: &Product| {
+        ListItem::new(p.name.clone())
+            .subtitle(p.code.clone())
+            .image(p.image.clone())
+            .link(shop_product, ProductPage { id: p.id })
+    })
+    .results(shop_search)
+```
+
 ## Serbest metin
 
 `DataQuery::q` serbest metindir: metin alanları onu içeren satırlar. Hem metin hem alanlar `zeyn::text::fold`'un verdiği biçimde karşılaştırılır: küçük harf, Türkçe noktalı ve noktasız `i` (`İ`, `ı`) `i` olarak, aksanlı Latin harfleri aksansız ve `ß`, `æ`, `œ`, `þ` açık yazılmış olarak. Böylece "istanbul", "İSTANBUL" kaydını, "nino" "Niño" kaydını ve "strasse" "Straße" kaydını bulur. `#[mask]` alanları asla aranmaz, boş metin her satırla eşleşir ve 100 karakterden uzun metin yok sayılır. `DataQuery::apply` ve SQL veri katmanları (sütun üzerinde `TRANSLATE`, `LOWER` ve `REPLACE`, bağlı parametreyle `LIKE`) bunu aynı şekilde okur.

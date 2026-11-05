@@ -104,6 +104,29 @@ impl ListItem {
         self
     }
 
+    /// The row as a rich search suggestion: `{text, subtitle, image, href}`, texts in the user's
+    /// language, the image only when the app's `img-src` allows it, the canonical address.
+    pub(crate) fn suggestion(&self, r: &Render) -> Json {
+        let plain = |t: &Text| r.i18n.text(r.locale, t);
+        let href = self
+            .link
+            .as_ref()
+            .map(|(screen, params)| {
+                crate::screen::Routes::href(r, screen, params)
+                    .unwrap_or_else(|| format!("/_zeyn/route/{screen}"))
+            });
+        let image = self
+            .image
+            .as_deref()
+            .filter(|src| safe_image(src) && super::embed::policy(r).allows_image(src));
+        json!({
+            "text": plain(&self.title),
+            "subtitle": self.subtitle.as_ref().map(plain),
+            "image": image,
+            "href": href,
+        })
+    }
+
     /// Writes the row as an `<li>`.
     pub(crate) fn html(&self, out: &mut String, r: &Render) {
         let image = match &self.image {

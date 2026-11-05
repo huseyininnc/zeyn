@@ -571,6 +571,26 @@ dialog.z-dialog::backdrop { background: var(--z-backdrop); }
   border-color: var(--z-primary);
 }
 
+a.z-button { text-decoration: none; }
+
+/** The keys of a link's shortcut (`aria-keyshortcuts` tells screen readers). */
+.z-kbd {
+  margin-inline-start: 6px;
+  padding: 1px 4px;
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius-sm);
+  font: inherit;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--z-text-muted);
+  white-space: nowrap;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .z-kbd { display: none; }
+}
+
 .z-button[aria-keyshortcuts]::after {
   content: attr(aria-keyshortcuts) / "";
   margin-inline-start: 2px;

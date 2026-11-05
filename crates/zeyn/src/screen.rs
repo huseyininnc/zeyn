@@ -36,6 +36,9 @@ pub struct ScreenMeta {
     /// Seconds a shared cache may keep the page of a public screen opened without a session
     /// (`cache = N`, at most [`MAX_SCREEN_CACHE`]); 0 sends no public cache headers.
     pub cache: u32,
+    /// `no_prefetch`: the browser never loads the screen ahead of a click (`App::prefetch`); the
+    /// server refuses such requests before the screen runs.
+    pub no_prefetch: bool,
 }
 
 /// Longest `cache = N` a screen may ask for: one day.
@@ -147,12 +150,14 @@ pub const fn route_has_segments(route: Option<&str>) -> bool {
 
 /// URL of a screen at `path` (its route with the feature prefix) with these params: path segments
 /// filled from the params fields of the same name, the other fields in the JSON `params` query.
-/// `None` when a segment's field is missing or not a number or a usable string.
+/// Fields that are `null` (an empty `Option`) are left out of the query, so the address stays
+/// canonical. `None` when a segment's field is missing or not a number or a usable string.
 ///
 /// ```
 /// use serde_json::json;
 /// use zeyn::screen_url;
 /// assert_eq!(screen_url("/orders/{id}", &json!({ "id": 42, "tab": "lines" })).unwrap(), "/orders/42?params=%7B%22tab%22%3A%22lines%22%7D");
+/// assert_eq!(screen_url("/orders/{id}", &json!({ "id": 42, "tab": null })).unwrap(), "/orders/42");
 /// assert_eq!(screen_url("/catalog/{slug}/{n}", &json!({ "slug": "cay-bardagi", "n": 2 })).unwrap(), "/catalog/cay-bardagi/2");
 /// assert_eq!(screen_url("/orders", &json!({ "q": 1 })).unwrap(), "/orders?params=%7B%22q%22%3A1%7D");
 /// assert_eq!(screen_url("/orders/{id}", &json!({})), None);
@@ -189,7 +194,7 @@ pub fn screen_url(path: &str, params: &serde_json::Value) -> Option<String> {
     let segments: Vec<&str> = route_segments(path).collect();
     let rest: serde_json::Map<String, serde_json::Value> = fields
         .iter()
-        .filter(|(k, _)| !segments.contains(&k.as_str()))
+        .filter(|(k, v)| !v.is_null() && !segments.contains(&k.as_str()))
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect();
     if !rest.is_empty() {
@@ -731,6 +736,12 @@ pub trait Component: Send + Sync {
     fn source(&self, _key: &str) -> Option<&dyn crate::ui::DataSource> {
         None
     }
+
+    /// Keyboard shortcuts of the component's own links, as declared, for the clash checks of
+    /// `App::check` and `App::check_page`.
+    fn shortcuts(&self) -> Vec<&str> {
+        Vec::new()
+    }
 }
 
 /// Type erased component: a node of the screen tree.
@@ -780,6 +791,21 @@ impl Node {
 
     pub fn source(&self, key: &str) -> Option<&dyn crate::ui::DataSource> {
         self.0.source(key)
+    }
+
+    pub fn shortcuts(&self) -> Vec<&str> {
+        self.0.shortcuts()
+    }
+
+    /// Link shortcuts of this node and every node below it, lazy ones included, with the path
+    /// of the node that declares each.
+    pub(crate) fn all_shortcuts<'a>(&'a self, path: String, out: &mut Vec<(String, &'a str)>) {
+        for keys in self.shortcuts() {
+            out.push((path.clone(), keys));
+        }
+        for (i, child) in self.children().iter().enumerate() {
+            child.all_shortcuts(format!("{path}.{i}"), out);
+        }
     }
 }
 

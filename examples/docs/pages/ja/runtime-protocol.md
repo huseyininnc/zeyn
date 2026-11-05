@@ -263,6 +263,7 @@ Effects:
 |---|---|---|
 | `/_zeyn/node` | `{ screen, params, node }` | 1 つのノードの HTML（その grid の最初のページ付き）。遅延 tabs で使われます。 |
 | `/_zeyn/data` | `{ screen, params, node, key, input }` | ノードのデータソース `key` からの JSON。lookup の選択肢（`key` はフィールド名）、tree の子（`key` は空）、ステップの確認（`key` は `_step`）。ソースの action 権限が確認され、grid と同様にインターセプターが実行されます。action に合わない入力は `404` で拒否されます。 |
+| `screen` = `_site.{feature}` の `/_zeyn/data` | 上と同じ | サイトヘッダーのスロット内のコンポーネント向けの同じ処理。`node` はスロット（0 は start、1 は center、2 は end、3 は bottom）、その中でのノードのインデックス、続いて子のインデックスです。Feature のガードと action の権限が確認されます。 |
 | `/_zeyn/parse` | `{ kind, text, label }` | 入力された日付または時刻を、サーバーがユーザーの言語、ゾーン、時計でどう解釈するか。`{ ok, text, iso, utc, zone }` または `{ ok: false, message }`。`kind` は `date`、`time`、`datetime`、`local`、`presets`（今日とクイック範囲）です。 |
 
 ### 7.2 Values the forms submit
@@ -280,6 +281,8 @@ Effects:
 | `zeyn:effect` | `document` | ランタイムが知らない effect: `{ effect, source, run }`。`run(next)` は別の effect を実行します。`confirm` で使われます。 |
 
 Effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":"...","then":{...}}` は、モーダルのアラートダイアログで確認し、ユーザーが承諾した後にのみ `then` を実行します。
+
+クライアント設定（`zeyn::ClientPref`）はブラウザーのモジュール `/_zeyn/state.js` にあり、ページはこのモジュールを、`data-zeyn-remember` または `data-zeyn-prefs-clear` を持つ要素がある場合にだけインポートします。`GET /_zeyn/prefs` は `{ preferences }` を返します。これは、アプリの同意フックが、設定値をセッションを越えて保持することを許可するかどうかを表し、`Cache-Control: no-store` が付きます。サーバーは保存された値を読み取りません。
 
 ### 7.4 Media
 

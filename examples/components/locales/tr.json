@@ -87,7 +87,9 @@
       "rating": "Yıldızlarla gösterilen 1 ile N arası tam sayı.",
       "chips": "Bağlantı çipleri ve ekran parametresini süzen çipler.",
       "hero": "Büyük görselli bölüm; slaytlar yalnızca istenince döner.",
-      "reactions": "Sayıları bir eylemle saklanan tepki düğmeleri."
+      "reactions": "Sayıları bir eylemle saklanan tepki düğmeleri.",
+      "link_button": "Buton görünümlü, başka sayfaya giden bağlantı.",
+      "clear_prefs": "Tarayıcının uygulama için tuttuğu seçimleri silen düğme."
     },
     "ex": {
       "action_button": {
@@ -134,6 +136,9 @@
         "overview": "Süzme çipleri",
         "links": "Bağlantı çipleri"
       },
+      "clear_prefs": {
+        "overview": "Örnek"
+      },
       "controls": {
         "overview": "Örnek"
       },
@@ -147,7 +152,8 @@
         "overview": "Örnek"
       },
       "embed": {
-        "overview": "Örnek"
+        "overview": "Örnek",
+        "remembered": "Günde bir kez sorulur"
       },
       "empty_state": {
         "overview": "Örnek"
@@ -179,6 +185,9 @@
         "overview": "Örnek"
       },
       "line_editor": {
+        "overview": "Örnek"
+      },
+      "link_button": {
         "overview": "Örnek"
       },
       "list": {
@@ -218,7 +227,8 @@
       },
       "prev_next": {
         "overview": "Örnek",
-        "one_side": "Yalnızca bir yan"
+        "one_side": "Yalnızca bir yan",
+        "with_shortcuts": "Klavye kısayollarıyla"
       },
       "progress": {
         "overview": "Örnek"
@@ -245,7 +255,8 @@
         "compact": "Sıkışık"
       },
       "search_box": {
-        "overview": "Örnek"
+        "overview": "Örnek",
+        "rich": "Görselli ve bağlantılı satırlar"
       },
       "share": {
         "overview": "Örnek",
@@ -268,7 +279,8 @@
         "overview": "Örnek"
       },
       "tabs": {
-        "overview": "Örnek"
+        "overview": "Örnek",
+        "remembered": "Açık sekmeyi hatırlar"
       },
       "timeline": {
         "overview": "Örnek"

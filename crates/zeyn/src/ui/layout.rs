@@ -309,10 +309,29 @@ impl Component for Card {
 ///
 /// Keyboard (ARIA tabs pattern): Left and Right move between tabs and open them, Home and End go
 /// to the first and last tab, Tab moves into the open panel.
+///
+/// `.remember(KEY)` keeps the tab the user opened under a choice key (see
+/// [`crate::ClientPref::choice`]), so the same tabs open on it on later pages; a tab named in the
+/// URL hash wins.
+///
+/// ```
+/// use std::time::Duration;
+/// use zeyn::prelude::*;
+/// use zeyn::{ClientPref, Choice, Purpose};
+///
+/// pub const ORDER_TAB: ClientPref<Choice> =
+///     ClientPref::choice("order-tab", Duration::from_secs(30 * 86_400), Purpose::Preference);
+///
+/// let tabs = Tabs::new("Order")
+///     .tab("Lines", Paragraph::new("..."))
+///     .tab("History", Paragraph::new("..."))
+///     .remember(ORDER_TAB);
+/// ```
 pub struct Tabs {
     label: Text,
     titles: Vec<Text>,
     nodes: Vec<Node>,
+    remember: Option<crate::prefs::ClientPref<crate::prefs::Choice>>,
 }
 
 impl Tabs {
@@ -322,6 +341,7 @@ impl Tabs {
             label: label.into(),
             titles: Vec::new(),
             nodes: Vec::new(),
+            remember: None,
         }
     }
 
@@ -330,13 +350,22 @@ impl Tabs {
         self.nodes.push(node.into());
         self
     }
+
+    /// Keeps the opened tab under a choice key registered with `App::client_prefs`.
+    pub fn remember(mut self, key: crate::prefs::ClientPref<crate::prefs::Choice>) -> Self {
+        self.remember = Some(key);
+        self
+    }
 }
 
 impl Component for Tabs {
     fn render(&self, out: &mut String, r: &Render) {
         let id = dom_id(r, "tabs");
         out.push_str(&format!(
-            r#"<div class="z-tabs" data-zeyn-tabs="{id}" data-zeyn-loading="{}" data-zeyn-failed="{}"><div class="z-tablist" role="tablist" aria-label="{}">"#,
+            r#"<div class="z-tabs" data-zeyn-tabs="{id}"{} data-zeyn-loading="{}" data-zeyn-failed="{}"><div class="z-tablist" role="tablist" aria-label="{}">"#,
+            self.remember
+                .map(|k| k.attrs(r))
+                .unwrap_or_default(),
             r.text(&Text::key("zeyn.ui.loading")),
             r.text(&Text::key("zeyn.ui.load_failed")),
             r.text(&self.label)
@@ -379,7 +408,7 @@ impl Component for Tabs {
             .zip(&self.nodes)
             .map(|(t, n)| json!({ "title": t, "node": n.schema() }))
             .collect();
-        json!({ "type": "tabs", "label": self.label, "tabs": tabs })
+        json!({ "type": "tabs", "label": self.label, "tabs": tabs, "remember": self.remember.map(|k| k.info()) })
     }
 
     fn children(&self) -> &[Node] {

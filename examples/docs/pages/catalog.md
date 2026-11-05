@@ -94,6 +94,21 @@ Keyboard: Down and Up move through the suggestions (Down opens them), Enter sear
 
 The results screen takes `SearchParams` (`q`, empty when the screen is opened from a menu). The server cuts the text to `MAX_SEARCH_QUERY` (100) characters, decides how many suggestions to send (8 unless `limit` says otherwise, at most 20), checks the screen's access, the feature's guards and the action's permission, and counts every suggestion call against the write rate limit (`App::write_limit`).
 
+### Rich suggestions
+
+`.item(|row| ListItem::new(title).subtitle(text).image(src).link(screen, params))` shows each suggestion as a row with a small image (40 by 56 pixels, loaded lazily, following the `img-src` rules, with an empty alternative text because the title names the row; no placeholder without one), the title and the subtitle. The server answers `[{text, subtitle, image, href}]` with the record's canonical address. Picking a row with a click or Enter opens its link through `nav.js`, and since each row is a real link, middle click and "open in new tab" work. Enter with no highlighted row still opens the results screen. The combobox pattern stays the same: each row is an option named by its title and subtitle, rows are at least 44 pixels tall. Without `.item` the suggestions are plain text as above.
+
+```rust
+SearchBox::of(catalog_products)
+    .item(|p: &Product| {
+        ListItem::new(p.name.clone())
+            .subtitle(p.code.clone())
+            .image(p.image.clone())
+            .link(shop_product, ProductPage { id: p.id })
+    })
+    .results(shop_search)
+```
+
 ## Free text
 
 `DataQuery::q` is free text: rows whose text fields contain it. Both the text and the fields are compared in the form `zeyn::text::fold` gives: lower case, the Turkish dotted and dotless `i` (`İ`, `ı`) as `i`, accented Latin letters without their accents, and `ß`, `æ`, `œ`, `þ` written out. So "istanbul" finds "İSTANBUL", "nino" finds "Niño" and "strasse" finds "Straße". Fields with `#[mask]` are never searched, blank text matches every row and text longer than 100 characters is ignored. `DataQuery::apply` and the SQL data layers (`TRANSLATE`, `LOWER` and `REPLACE` over the column, `LIKE` with a bound parameter) read it the same way.

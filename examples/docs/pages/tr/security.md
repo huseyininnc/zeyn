@@ -95,6 +95,30 @@ App::new(t!("app.name"))
 
 Alan maskeleme, hassas kayıtları açmadan önce gerekçe sorma, alan düzeyinde denetim ve okuma denetimi [Audit, masking and jobs](enterprise.md) sayfasında anlatılır.
 
+## İstemci tercihleri
+
+Bazı küçük seçimler sunucuya değil tarayıcıya aittir: gömülü içerik yüklenmeden önce kullanıcının onayladığı bir bildirim, en son açılan sekme. Zeyn bunları tek yerde tutar, `zeyn.state` (`/_zeyn/state.js`, yalnızca onu kullanan sayfalarda yüklenir); sunucu bunları hiç okumaz, bu yüzden önbelleğe alınmış herkese açık sayfalar herkes için aynı kalır. HTML'i değiştiren tercihler, örneğin tema ve dil, çerezlerde kalır.
+
+Bir anahtar bir kez, türü, ömrü ve amacıyla bir sabit olarak bildirilir, uygulamaya kaydedilir ve `.remember(KEY)` ile bileşenlere bağlanır: `Embed::remember` bir consent anahtarı, `Tabs::remember` bir choice anahtarı alır. Düz bir string ya da diğer türden bir anahtar derlenmez; 1 ile 40 arası ASCII harf, rakam, `-` ve `_` dışındaki bir ad ya da bir saniye ile 400 gün (`MAX_PREF_LIFETIME`) dışındaki bir ömür, sabit oluşturulurken hata verir. Uygulamanın kaydetmediği bir anahtara bağlı bir bileşen hatırlanmaz, böylece gizlilik listesi her zaman eksiksizdir.
+
+```rust
+pub const VIDEO_NOTICE: ClientPref<Consent> =
+    ClientPref::consent("video-notice", Duration::from_secs(86_400), Purpose::Necessary);
+pub const ORDER_TAB: ClientPref<Choice> =
+    ClientPref::choice("order-tab", Duration::from_secs(30 * 86_400), Purpose::Preference);
+
+App::new(t!("app.name")).client_prefs(|p| {
+    p.key(VIDEO_NOTICE)
+        .key(ORDER_TAB)
+        .allowed_when(|headers| consent_cookie(headers) == Some("all"))
+})
+```
+
+- **Kayıtlar.** Her değer `zeyn.v1.{key}` altında `{v, exp, val}` olarak tutulur. Her okuma sürümü, değeri (`true` ya da en çok 200 karakterlik bir metin) ve bitiş zamanını denetler; bitiş zamanı geçmemiş olmalı ve anahtarın ömründen daha ileride olmamalıdır. Denetimden geçemeyen bir kayıt, örneğin elle değiştirilmiş biri, kaldırılır. Biçimin yeni bir sürümü eski kayıtları yok sayar.
+- **Amaç.** `Purpose::Necessary`, kullanıcının istediği bir şey içindir, örneğin başka bir siteden içerik yüklenmeden önce bir bildirimi onaylamak; ömrü boyunca tutulur. `Purpose::Preference` bir arayüz seçimidir. ePrivacy Direktifi (madde 5(3)), tarayıcıda veri saklamaya yalnızca kullanıcının istediği bir hizmet için kesinlikle gerekli olduğunda onaysız izin verir; AB veri koruma otoriteleri (Article 29 Working Party, görüş 04/2012) arayüz seçimlerini yalnızca oturum ya da birkaç saat için gerekli sayar. Bu yüzden tercih değerleri, uygulamanın kancası `allowed_when(|headers| ...)` kullanıcının onay verdiğini söyleyene kadar `sessionStorage` içine gider; tarayıcı sayfa başına bir kez `GET /_zeyn/prefs` sorar, cevap asla önbelleğe alınmaz ve kanca yoksa cevap hayırdır.
+- **Sekmeler ve engellenen depolama.** Diğer sekmeler değişiklikleri `storage` olayıyla izler. Depolama engellendiğinde (gizli pencereler, katı ayarlar) değerler sayfa için bellekte tutulur. JavaScript olmadan bileşenler varsayılan durumlarını gösterir.
+- **Açıklık.** `App::client_prefs_table()`, bir gizlilik sayfası için her anahtarı türü, amacı ve saniye cinsinden ömrüyle listeler; `ClearPrefs` (ya da `zeyn.prefs.clear()`) hepsini tarayıcıdan kaldırır.
+
 ## API ve ajanlar
 
 API çağrıları bir `Authorization` başlığı gerektirir; tarayıcı oturum çerezi tek başına API'yi ya da MCP uç noktasını asla çağırmaz, bu yüzden CSRF belirteci gerekmez. Ajanlar, adına çalıştıkları kullanıcının izinlerinin aynısına sahip olur. [API and OpenAPI](api.md) ve [MCP and AI agents](mcp.md) sayfalarına bakın.

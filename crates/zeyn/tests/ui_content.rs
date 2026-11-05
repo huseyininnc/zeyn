@@ -301,3 +301,119 @@ async fn week_schedules_place_rows_by_day_in_the_locales_week_and_mark_today() {
         "reading needs the action's permission"
     );
 }
+
+#[test]
+fn link_shortcuts_carry_aria_keyshortcuts_and_a_hint_and_browser_keys_are_not_bound() {
+    let p = PrevNext::new()
+        .prev(article, ArticleParams { id: 1 })
+        .shortcut("alt+shift+b")
+        .next(article, ArticleParams { id: 3 })
+        .shortcut("Ctrl+W");
+    let out = html(&p, "en");
+    assert!(
+        out.contains(r#"rel="prev" data-zeyn-base-href aria-keyshortcuts="Alt+Shift+B">"#),
+        "{out}"
+    );
+    assert!(out.contains(r#"<kbd class="z-kbd" aria-hidden="true">Alt+Shift+B</kbd>"#));
+    assert!(
+        out.contains(r#"rel="next" data-zeyn-base-href>"#),
+        "a shortcut the browser keeps is not bound: {out}"
+    );
+    let chips = Chips::links("Topics")
+        .link("One", article, ArticleParams { id: 1 })
+        .link("Two", article, ArticleParams { id: 2 })
+        .shortcut("Ctrl+Alt+2");
+    let out = html(&chips, "en");
+    assert!(out.contains(r#"data-zeyn-base-href>One</a>"#), "{out}");
+    assert!(
+        out.contains(r#"aria-keyshortcuts="Control+Alt+2">Two<kbd class="z-kbd" aria-hidden="true">Ctrl+Alt+2</kbd></a>"#),
+        "{out}"
+    );
+    assert_eq!(chips.shortcuts(), ["Ctrl+Alt+2"]);
+}
+
+#[screen(route = "/linked", public)]
+pub fn linked() -> Screen {
+    Screen::new("Linked").body(
+        Stack::new().add(
+            PrevNext::new()
+                .prev(article, ArticleParams { id: 1 })
+                .shortcut("Alt+Shift+P")
+                .next(article, ArticleParams { id: 2 })
+                .shortcut("Shift+N"),
+        ),
+    )
+}
+
+#[screen(route = "/other", public)]
+pub fn other() -> Screen {
+    Screen::new("Other").body(
+        Chips::links("Topics")
+            .link("One", article, ArticleParams { id: 1 })
+            .shortcut("Ctrl+Alt+K")
+            .link("Two", article, ArticleParams { id: 2 })
+            .shortcut("Ctrl+T"),
+    )
+}
+
+#[test]
+fn app_check_reports_link_shortcut_clashes_in_the_header_and_check_page_on_a_screen() {
+    let app = App::new("Links").feature(
+        Feature::new("site")
+            .screen(article)
+            .screen(linked)
+            .screen(other)
+            .command(
+                Command::navigate("go.k", "Go", article, ArticleParams { id: 9 })
+                    .shortcut("Ctrl+Alt+K"),
+            )
+            .shell(Shell::site().header(|h| {
+                h.bottom(
+                    Chips::links("Top")
+                        .link("Top", article, ArticleParams { id: 1 })
+                        .shortcut("Ctrl+Alt+K"),
+                )
+            })),
+    );
+    let problems = app.check().unwrap_err();
+    assert!(
+        problems.iter().any(|p| p.contains("`Control+Alt+K` in the bottom slot of the site header of feature `site` (node 3.0) is also used by command `go.k`")),
+        "{problems:?}"
+    );
+    let page = app
+        .check_page(&linked::run())
+        .unwrap_err()
+        .join("\n");
+    assert!(
+        page.contains("`Alt+Shift+P` at node 0.0 is also used by the command palette"),
+        "{page}"
+    );
+    assert!(
+        page.contains("`Shift+N` at node 0.0 is a single character key"),
+        "{page}"
+    );
+    let page = app
+        .check_page(&other::run())
+        .unwrap_err()
+        .join("\n");
+    assert!(
+        page.contains("`Control+T` at node 0 is kept by the browser"),
+        "{page}"
+    );
+    assert!(
+        page.contains("`Control+Alt+K` at node 0 is also used by command `go.k`"),
+        "{page}"
+    );
+    assert!(
+        page.contains(
+            "`Control+Alt+K` in the site header (node 3.0) is also used by command `go.k`"
+        ),
+        "{page}"
+    );
+    let clean = App::new("Clean").feature(Feature::new("c").screen(linked));
+    assert!(
+        clean
+            .check_page(&article::run(ArticleParams { id: 1 }))
+            .is_ok()
+    );
+}

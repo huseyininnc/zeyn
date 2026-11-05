@@ -22,7 +22,15 @@ Feature::new("shop")
             .item(t!("shop.delivery.title"), shop_delivery)
             .item(t!("shop.returns.title"), shop_returns)
     })
-    .shell(Shell::site().header(|h| h.sign_in().language().theme()).footer(|f| {
+    .shell(Shell::site().header(|h| {
+        h.center(SearchBox::of(search_products).results(shop_search))
+            .center_on_phone(CenterOnPhone::Icon)
+            .end(LinkButton::new(t!("shop.cart"), shop_cart, ()))
+            .sign_in()
+            .language()
+            .theme()
+    })
+    .footer(|f| {
         f.column(t!("shop.menu.help"), |c| {
             c.link(t!("shop.delivery.title"), shop_delivery).url(t!("shop.footer.source"), "https://example.com")
         })
@@ -36,7 +44,8 @@ Feature::new("shop")
 
 - **메뉴.** 상단 메뉴는 사이트 셸에 있는 모든 Feature의 메뉴를 나열합니다. 항목이 하나뿐인 그룹은 일반 링크이고, 더 큰 그룹은 링크를 여는 버튼입니다(W3C APG 디스클로저 내비게이션 패턴). Enter, Space, 클릭은 그룹을 토글하고, 아래쪽 화살표는 그룹을 열어 첫 번째 링크로 이동하며, 위쪽 화살표, 아래쪽 화살표, Home, End는 그룹의 링크 사이를 이동하고, Escape는 그룹을 닫고 버튼으로 돌아가며, 그룹 밖으로 Tab하거나 바깥을 클릭하면 닫힙니다. 왼쪽과 오른쪽 화살표는 상단 항목 사이를 이동합니다.
 - **좁은 화면.** 800 px 미만에서는 메뉴가 `aria-expanded`가 있는 메뉴 버튼 뒤로 접히며, Escape로 닫습니다. 스크립트가 없으면 메뉴가 열린 채로 유지되므로 접근할 수 없게 되는 것이 없습니다.
-- **Action.** `sign_in()`은 앱에 로그인 페이지가 있으면 방문자에게 로그인 링크를, 로그인한 사용자에게 로그아웃 링크를 표시합니다. `language()`와 `theme()`는 앱 셸과 같은 선택기를 표시합니다.
+- **헤더 슬롯.** 상단 바에는 논리적인 이름을 가진 앱 바처럼 어떤 컴포넌트든 받는 슬롯이 넷 있습니다. `start(node)`는 브랜드 앞, `center(node)`는 메뉴와 끝 사이, `end(node)`는 바의 끝, `bottom(node)`는 그 아래의 전체 너비 행(예: chips)입니다. 각 슬롯은 여러 노드를 순서대로 담으며, start와 end는 오른쪽에서 왼쪽으로 쓰는 언어에서 자리를 바꿉니다. 슬롯의 컴포넌트는 사용자의 언어, 권한, 마스크로 렌더링됩니다. `SearchBox`처럼 자체 action으로 데이터를 불러오는 컴포넌트도 그곳에서 동작하며, Feature의 가드와 action의 권한을 기준으로 검사됩니다. 그리드와 폼은 Screen에 속합니다. 휴대폰에서는 start와 end 슬롯이 바에 남고, center 슬롯은 앱이 정한 곳으로 갑니다. `center_on_phone(CenterOnPhone::Row)`(기본값)는 바 아래의 행에 두고, `CenterOnPhone::Icon`은 이를 여는 돋보기 버튼 뒤에 두며(W3C APG 디스클로저) 포커스를 그 안으로 옮깁니다. Escape는 이를 닫고 버튼으로 돌아갑니다. `center_button(icon, label)`은 그 버튼을 바꿉니다. 휴대폰 레이아웃은 스크립트가 실행되기 전에 CSS로 정해지므로 페이지를 불러오는 동안 헤더가 움직이지 않습니다.
+- **Action.** `sign_in()`은 앱에 로그인 페이지가 있으면 방문자에게 로그인 링크를, 로그인한 사용자에게 로그아웃 링크를 표시합니다. `language()`와 `theme()`는 앱 셸과 같은 선택기를 표시합니다. 이들은 end 슬롯 뒤에 오며 휴대폰에서는 메뉴로 접힙니다.
 - **하단 바.** `bottom_nav([...])`는 휴대폰(너비 800 px 이하)에서 화면 아래에 고정되는 링크를 최대 다섯 개 추가하며, 사람들이 가장 자주 가는 곳을 위한 것입니다. 다섯 개를 넘으면 컴파일되지 않습니다. 각 항목은 레이블, 라우트가 있는 화면, 선택적 아이콘을 가진 `BottomNavItem`입니다. 표시 중인 페이지의 링크에는 `aria-current="page"`가 있고(`nav.js`가 최신으로 유지), 사용자가 열 수 없는 화면으로의 링크는 제외되며, 바는 `env(safe-area-inset-bottom)`으로 홈 인디케이터를 피하고, 바가 아무것도 가리지 않도록 페이지 아래에 여백이 생깁니다. 나머지를 위해 상단 메뉴는 그대로 있습니다. 바는 스크립트가 필요 없습니다.
 - **바닥글.** Screen으로 가는 링크(`link`, 열 수 없는 사용자에게는 제외됨) 또는 주소(`url`: 경로, `https:`, `http:`, `mailto:`. `App::check`는 다른 스킴과 등록되지 않은 Screen으로의 링크를 거부합니다)의 열, 그리고 한 줄의 텍스트입니다.
 

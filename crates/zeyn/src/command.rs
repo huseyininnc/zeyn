@@ -595,6 +595,74 @@ pub(crate) fn problems(
     out
 }
 
+/// The `aria-keyshortcuts` attribute and the `<kbd>` hint of a link with the shortcut `raw`.
+/// Both are empty when the shortcut cannot be read or belongs to the browser (logged).
+pub(crate) fn link_shortcut(raw: Option<&str>) -> (String, String) {
+    let Some(keys) = raw.and_then(|s| usable_shortcut(s, false)) else {
+        return (String::new(), String::new());
+    };
+    (
+        format!(r#" aria-keyshortcuts="{}""#, escape(&keys)),
+        format!(
+            r#"<kbd class="z-kbd" aria-hidden="true">{}</kbd>"#,
+            escape(&keys.replace("Control", "Ctrl"))
+        ),
+    )
+}
+
+/// Problems of link shortcuts (`Chips::link`, `PrevNext`): shortcuts that cannot be read, that
+/// the browser keeps or uses, single character ones, and ones another link of the same set, a
+/// command or the palette already uses. `links` holds where each link is and its shortcut.
+pub(crate) fn link_problems(
+    links: &[(String, &str)],
+    commands: &[(&str, &Command)],
+    palette: &str,
+) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut seen: Vec<(String, String)> = commands
+        .iter()
+        .filter_map(|(_, c)| {
+            c.shortcut
+                .as_deref()
+                .and_then(normalize_shortcut)
+                .map(|k| (k, format!("command `{}`", c.id)))
+        })
+        .collect();
+    if let Some(k) = normalize_shortcut(palette) {
+        seen.push((k, "the command palette".into()));
+    }
+    for (place, raw) in links {
+        let Some(keys) = normalize_shortcut(raw) else {
+            out.push(format!(
+                "the link shortcut `{raw}` {place} cannot be read\n  = help: write modifiers and one key joined by `+`, such as `Alt+Shift+N`"
+            ));
+            continue;
+        };
+        let key = keys.rsplit('+').next().unwrap_or("");
+        match browser_shortcut(&keys) {
+            Some(BrowserShortcut::Reserved) => out.push(format!(
+                "the link shortcut `{keys}` {place} is kept by the browser and never reaches the page\n  = help: pick a free shortcut such as `Alt+Shift+{key}`"
+            )),
+            Some(BrowserShortcut::Default) => out.push(format!(
+                "the link shortcut `{keys}` {place} belongs to the browser (print, find, reload and the like)\n  = help: pick a free shortcut such as `Alt+Shift+{key}`"
+            )),
+            None => {}
+        }
+        if character_only(&keys) {
+            out.push(format!(
+                "the link shortcut `{keys}` {place} is a single character key; WCAG 2.2 (2.1.4) does not allow it\n  = help: add Alt or Ctrl, such as `Alt+Shift+{key}`"
+            ));
+        }
+        if let Some((_, other)) = seen.iter().find(|(k, _)| *k == keys) {
+            out.push(format!(
+                "the link shortcut `{keys}` {place} is also used by {other}\n  = help: give one of them another shortcut"
+            ));
+        }
+        seen.push((keys, format!("the link {place}")));
+    }
+    out
+}
+
 /// Longest palette search query, in characters. Longer queries are cut.
 pub const MAX_SEARCH_QUERY: usize = 100;
 

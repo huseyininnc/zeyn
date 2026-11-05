@@ -229,6 +229,38 @@
   border-top: 1px solid var(--z-border);
 }
 
+/* Header slots (SiteHeader::start, center, end, bottom) -------------------------------------- */
+
+.z-site-header { flex-wrap: wrap; }
+
+.z-site-slot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.z-site-slot > .z-node { min-width: 0; }
+
+.z-site-slot-center {
+  flex: 1 1 280px;
+  justify-content: center;
+  max-width: 560px;
+  margin-inline: auto;
+}
+
+.z-site-slot-center > .z-node { flex: 1 1 auto; }
+
+.z-site-slot .z-search { margin: 0; }
+
+.z-site-header:has(> .z-site-slot-center) .z-site-nav { flex: 0 1 auto; }
+
+.z-site-slot-bottom {
+  flex: 0 0 100%;
+  padding-bottom: 8px;
+}
+
 @media (min-width: 801px) {
   .z-site-toggle { display: none; }
 }
@@ -263,6 +295,28 @@
   }
   .z-site-sub a { white-space: normal; }
   .z-site-actions { padding-top: 8px; border-top: 1px solid var(--z-border); }
+  .z-site-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 8px;
+  }
+  .z-site-bar { grid-area: 1 / 1; justify-content: flex-start; }
+  .z-site-brand { margin-inline-end: auto; }
+  .z-site-slot-end { grid-area: 1 / 2; }
+  .z-site-slot-center { grid-area: 2 / 1 / 3 / -1; max-width: none; margin: 0; padding-bottom: 8px; }
+  .z-site-nav { grid-area: 3 / 1 / 4 / -1; }
+  .z-site-actions { grid-area: 4 / 1 / 5 / -1; padding-bottom: 12px; }
+  .z-site-slot-bottom { grid-area: 5 / 1 / 6 / -1; }
+  .z-site-header[data-zeyn-collapsible]:not([data-open]) .z-site-actions { display: none; }
+  .z-site-header[data-center-phone="icon"][data-zeyn-collapsible] .z-site-slot-center:not([data-open]) { display: none; }
+}
+
+/* With script the phone layout is set by CSS before the script runs, so nothing moves. */
+@media (max-width: 800px) and (scripting: enabled) {
+  .z-site-header .z-site-toggle[hidden] { display: inline-flex; }
+  .z-site-header:not([data-open]) .z-site-nav,
+  .z-site-header:not([data-open]) .z-site-actions { display: none; }
+  .z-site-header[data-center-phone="icon"] .z-site-slot-center:not([data-open]) { display: none; }
 }
 
 @media (prefers-reduced-motion: no-preference) {

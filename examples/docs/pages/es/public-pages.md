@@ -44,6 +44,10 @@ La pantalla se sigue construyendo y renderizando para cada petición que llega a
 transferencia y una caché delante de la aplicación ahorra la petición. Mantén las pantallas en caché libres de cualquier cosa
 que dependa del visitante: la hora del día, un contador, una elección al azar.
 
+## Prefetch
+
+`App::prefetch(Prefetch::Moderate)` carga la pantalla siguiente antes del clic; está desactivado por defecto. `nav.js` obtiene la pantalla parcial de un enlace tras 100 ms de hover, con el foco del teclado o al tocar, la conserva 10 segundos, ejecuta como máximo dos de estas obtenciones a la vez y cancela una cuando el puntero se va antes. Solo se precargan los enlaces a pantallas de la aplicación con ruta de path, nunca `/_zeyn/*`, los enlaces de inicio y cierre de sesión, las descargas, los enlaces con `target` ni las pantallas marcadas con `#[screen(no_prefetch)]`, que el servidor rechaza antes de ejecutarlas. No se precarga nada con Save-Data, `prefers-reduced-data`, una conexión 2g o en una pestaña oculta. Donde falta el script, Chromium recibe Speculation Rules (solo prefetch, nunca prerender) mediante una cabecera `Speculation-Rules`, de modo que la política de seguridad de contenido no cambia. El servidor marca estas peticiones: `ctx.is_prefetch()` es true, así que una pantalla puede omitir el recuento de una visita. Las reglas de caché pública se aplican como siempre.
+
 ## Buscadores y vistas previas de enlaces
 
 ```rust

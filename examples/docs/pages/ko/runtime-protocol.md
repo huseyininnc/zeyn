@@ -263,6 +263,7 @@ Effect:
 |---|---|---|
 | `/_zeyn/node` | `{ screen, params, node }` | 그리드의 첫 페이지가 포함된 노드 하나의 HTML. 지연 탭에서 사용됩니다. |
 | `/_zeyn/data` | `{ screen, params, node, key, input }` | 노드의 데이터 소스 `key`에서 온 JSON: lookup 옵션(`key`는 필드 이름), 트리 자식(`key`는 비어 있음), 단계 검사(`key`는 `_step`). 소스 action의 권한이 검사되고 그리드와 마찬가지로 인터셉터가 실행됩니다. action에 맞지 않는 입력은 `404`로 거부됩니다. |
+| `screen` = `_site.{feature}`와 함께 `/_zeyn/data` | 위와 같음 | 사이트 헤더 슬롯의 컴포넌트에 대해서도 같습니다. `node`는 슬롯(0 start, 1 center, 2 end, 3 bottom), 그 안에서의 노드 인덱스, 그리고 자식 인덱스들입니다. Feature의 가드와 action의 권한이 검사됩니다. |
 | `/_zeyn/parse` | `{ kind, text, label }` | 서버가 입력된 날짜나 시간을 사용자의 언어, 시간대, 시계로 읽는 방식: `{ ok, text, iso, utc, zone }` 또는 `{ ok: false, message }`. `kind`는 `date`, `time`, `datetime`, `local`, `presets`(오늘과 빠른 범위)입니다. |
 
 ### 7.2 폼이 제출하는 값
@@ -280,6 +281,8 @@ Effect:
 | `zeyn:effect` | `document` | 런타임이 모르는 effect: `{ effect, source, run }`. `run(next)`는 다른 effect를 실행합니다. `confirm`이 사용합니다. |
 
 Effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":"...","then":{...}}`는 모달 알림 대화 상자에서 묻고 사용자가 확인한 후에만 `then`을 실행합니다.
+
+클라이언트 환경설정(`zeyn::ClientPref`)은 브라우저 모듈 `/_zeyn/state.js`에 있으며, 페이지는 `data-zeyn-remember` 또는 `data-zeyn-prefs-clear`가 있는 요소가 있을 때만 이를 import합니다. `GET /_zeyn/prefs`는 앱의 동의 훅이 세션을 넘겨 환경설정 값을 보관하도록 허용하는지를 `{ preferences }`로 응답하며 `Cache-Control: no-store`를 붙입니다. 서버는 저장된 값을 읽지 않습니다.
 
 ### 7.4 미디어
 

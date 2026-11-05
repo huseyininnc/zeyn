@@ -352,6 +352,7 @@ async function suggest(form) {
   if (controller.signal.aborted || !Array.isArray(hits)) return;
   list.replaceChildren(
     ...hits.map((hit, i) => {
+      if (hit && typeof hit === 'object') return richOption(hit, `${list.id}-${i}`);
       const li = document.createElement('li');
       li.id = `${list.id}-${i}`;
       li.setAttribute('role', 'option');
@@ -364,6 +365,62 @@ async function suggest(form) {
   const status = form.querySelector('[data-zeyn-search-status]');
   if (status) status.textContent = hits.length ? fill(form.dataset.textCount, { count: hits.length }) : form.dataset.textNone ?? '';
   if (document.activeElement === input && !openList(form)) closeList(form);
+}
+
+/**
+ * A rich suggestion of `SearchBox::item`: an option holding a real link (middle click and new
+ * tab work) with an optional small image, the title and the subtitle. The option's name is its
+ * text, the title and the subtitle; the image has an empty alternative text.
+ * @param {{text: string, subtitle?: string, image?: string, href?: string}} hit
+ */
+function richOption(hit, id) {
+  const li = document.createElement('li');
+  li.id = id;
+  li.setAttribute('role', 'option');
+  li.setAttribute('aria-selected', 'false');
+  li.className = 'z-search-option z-search-rich';
+  const a = document.createElement(hit.href ? 'a' : 'span');
+  a.className = 'z-search-rich-row';
+  if (hit.href) {
+    a.href = BASE + hit.href;
+    a.tabIndex = -1;
+  }
+  if (hit.image) {
+    const img = document.createElement('img');
+    img.className = 'z-search-rich-img';
+    img.src = hit.image;
+    img.alt = '';
+    img.width = 40;
+    img.height = 56;
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    a.append(img);
+  }
+  const body = document.createElement('span');
+  body.className = 'z-search-rich-body';
+  const title = document.createElement('span');
+  title.className = 'z-search-rich-title';
+  title.textContent = String(hit.text ?? '');
+  body.append(title);
+  if (hit.subtitle) {
+    const sub = document.createElement('span');
+    sub.className = 'z-search-rich-sub';
+    sub.textContent = ` ${hit.subtitle}`;
+    body.append(sub);
+  }
+  a.append(body);
+  li.append(a);
+  return li;
+}
+
+/** Follows the link of a rich suggestion through `nav.js`; false when the option has none. */
+function followOption(form, option) {
+  const a = option?.querySelector('a[href]');
+  if (!a) return false;
+  closeList(form);
+  const event = new CustomEvent('zeyn:navigate', { detail: { url: a.href }, cancelable: true });
+  if (document.dispatchEvent(event)) location.assign(a.href);
+  return true;
 }
 
 /** Opens the results screen with `text`, without a page reload. */
@@ -403,6 +460,7 @@ document.addEventListener('keydown', (e) => {
     highlight(form, next);
   } else if (e.key === 'Enter') {
     e.preventDefault();
+    if (!list.hidden && at >= 0 && followOption(form, options[at])) return;
     search(form, !list.hidden && at >= 0 ? options[at].textContent : input.value);
   } else if (e.key === 'Escape') {
     if (!list.hidden) {
@@ -422,6 +480,11 @@ document.addEventListener('mousedown', (e) => {
 
 document.addEventListener('click', (e) => {
   const option = e.target.closest?.('.z-search-option');
+  if (option?.querySelector('a[href]')) {
+    if (!e.target.closest('a[href]')) followOption(option.closest('[data-zeyn-searchbox]'), option);
+    else closeList(option.closest('[data-zeyn-searchbox]'));
+    return;
+  }
   if (option) search(option.closest('[data-zeyn-searchbox]'), option.textContent);
 });
 

@@ -5,7 +5,7 @@ use super::{AppState, asset};
 use crate::ctx::Ctx;
 use crate::i18n::Text;
 use crate::render::{Render, escape};
-use crate::site::{FooterTarget, SiteShell};
+use crate::site::{CenterOnPhone, FooterTarget, SiteShell};
 use axum::Router;
 use axum::routing::get;
 use std::sync::Arc;
@@ -167,8 +167,51 @@ pub(super) fn frame(
     let actions = if actions.is_empty() {
         String::new()
     } else {
-        format!(r#"<div class="z-site-actions">{actions}</div>"#)
+        format!(r#"<div class="z-site-actions" id="z-site-actions">{actions}</div>"#)
     };
+    let header = &shell.header;
+    let sr = Render::new("site", ctx.locale(), ctx.i18n())
+        .with_tz(ctx.time_zone())
+        .with_identity(ctx.identity())
+        .with_ctx(ctx);
+    let slot = |i: usize| -> String {
+        if header.slots[i].is_empty() {
+            return String::new();
+        }
+        let name = crate::site::SLOT_NAMES[i];
+        let mut out =
+            format!(r#"<div class="z-site-slot z-site-slot-{name}" id="z-site-slot-{name}">"#);
+        for (n, node) in header.slots[i].iter().enumerate() {
+            crate::ui::render_node(&mut out, &sr, &format!("{i}.{n}"), node);
+        }
+        out.push_str("</div>");
+        out
+    };
+    let (start, center, end, bottom) = (slot(0), slot(1), slot(2), slot(3));
+    let icon = !center.is_empty() && header.center_on_phone == CenterOnPhone::Icon;
+    let center_button = if icon {
+        let (glyph, label) = header
+            .center_button
+            .as_ref()
+            .map(|(i, l)| (i.html(), r.text(l)))
+            .unwrap_or_else(|| {
+                (
+                    crate::screen::Icon::Search.html(),
+                    r.text(&Text::key("zeyn.shell.site.center")),
+                )
+            });
+        format!(
+            r#"<button type="button" class="z-site-toggle z-site-center-toggle" aria-expanded="false" aria-controls="z-site-slot-center" data-zeyn-site-center-toggle hidden>{glyph}<span class="z-sr-only">{label}</span></button>"#
+        )
+    } else {
+        String::new()
+    };
+    let controls = if actions.is_empty() {
+        "z-site-nav"
+    } else {
+        "z-site-nav z-site-actions"
+    };
+    let phone = if icon { "icon" } else { "row" };
     let mut footer = String::new();
     for (i, column) in shell.footer.columns.iter().enumerate() {
         let links: String = column
@@ -205,7 +248,8 @@ pub(super) fn frame(
     }
     footer.push_str(&bottom_nav(st, ctx, r, shell, current));
     format!(
-        r#"<div class="z-app z-site" data-zeyn-shell="site"><header class="z-site-header" data-zeyn-site-header><div class="z-site-bar"><a class="z-site-brand" href="{home}">{app}</a><button type="button" class="z-site-toggle" aria-expanded="false" aria-controls="z-site-nav" data-zeyn-site-toggle hidden><span class="z-site-burger" aria-hidden="true"></span><span class="z-sr-only">{menu_label}</span></button></div><nav class="z-site-nav" id="z-site-nav" aria-label="{menu_label}"><ul class="z-site-menu">{menu}</ul>{actions}</nav></header><main class="z-main z-site-main" id="z-main">{main}</main>{footer}</div>"#,
+        r#"<div class="z-app z-site" data-zeyn-shell="site"><header class="z-site-header" data-zeyn-site-header data-zeyn-screen="_site.{feature}" data-zeyn-params="null" data-center-phone="{phone}"><div class="z-site-bar">{start}<a class="z-site-brand" href="{home}">{app}</a>{center_button}<button type="button" class="z-site-toggle" aria-expanded="false" aria-controls="{controls}" data-zeyn-site-toggle hidden><span class="z-site-burger" aria-hidden="true"></span><span class="z-sr-only">{menu_label}</span></button></div><nav class="z-site-nav" id="z-site-nav" aria-label="{menu_label}"><ul class="z-site-menu">{menu}</ul></nav>{center}{end}{actions}{bottom}</header><main class="z-main z-site-main" id="z-main">{main}</main>{footer}</div>"#,
+        feature = escape(st.features[fi].name()),
         home = escape(&home_url(st, fi)),
         app = r.text(&st.name),
     )

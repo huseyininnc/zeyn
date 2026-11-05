@@ -697,6 +697,28 @@ pub enum TimePolicy {
     Organization(TimeZone),
 }
 
+/// Whether the browser loads screens ahead of a click, see [`App::prefetch`].
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Prefetch {
+    /// Nothing is loaded ahead.
+    #[default]
+    Off,
+    /// A screen loads when the pointer rests on its link, the link gets focus or is touched.
+    Moderate,
+}
+
+/// Whether a request was sent ahead of a click: `Sec-Purpose: prefetch` from the browser, or
+/// `x-zeyn-prefetch: 1` from the fallback of `nav.js`.
+fn is_prefetch(headers: &HeaderMap) -> bool {
+    headers
+        .get("sec-purpose")
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| v.contains("prefetch"))
+        || headers
+            .get("x-zeyn-prefetch")
+            .is_some_and(|v| v == "1")
+}
+
 /// A Zeyn application.
 ///
 /// ```ignore
@@ -746,6 +768,8 @@ pub struct App {
     native_menu: bool,
     locale_paths: bool,
     palette_keys: String,
+    client_prefs: crate::prefs::ClientPrefs,
+    prefetch: Prefetch,
     extras: ops::Extras,
     sign_in: auth::Extras,
     #[cfg(feature = "assistant")]
@@ -801,6 +825,8 @@ impl App {
             native_menu: true,
             locale_paths: false,
             palette_keys: crate::command::PALETTE_SHORTCUT.into(),
+            client_prefs: crate::prefs::ClientPrefs::default(),
+            prefetch: Prefetch::Off,
             extras: ops::Extras::default(),
             sign_in: auth::Extras::default(),
             #[cfg(feature = "assistant")]
@@ -864,6 +890,60 @@ impl App {
     pub fn palette_shortcut(mut self, keys: &str) -> Self {
         self.palette_keys = keys.to_string();
         self
+    }
+
+    /// Registers the app's client preference keys and its consent hook (see [`crate::ClientPref`]).
+    /// Components bound to a key that is not registered are not remembered.
+    ///
+    /// ```
+    /// use std::time::Duration;
+    /// use zeyn::prelude::*;
+    /// use zeyn::{ClientPref, Choice, Consent, Purpose};
+    ///
+    /// pub const VIDEO_NOTICE: ClientPref<Consent> =
+    ///     ClientPref::consent("video-notice", Duration::from_secs(86_400), Purpose::Necessary);
+    /// pub const ORDER_TAB: ClientPref<Choice> =
+    ///     ClientPref::choice("order-tab", Duration::from_secs(30 * 86_400), Purpose::Preference);
+    ///
+    /// let app = App::new("Shop").client_prefs(|p| {
+    ///     p.key(VIDEO_NOTICE)
+    ///         .key(ORDER_TAB)
+    ///         .allowed_when(|h| h.get("cookie").and_then(|c| c.to_str().ok()).is_some_and(|c| c.contains("consent=yes")))
+    /// });
+    /// assert_eq!(app.client_prefs_table().len(), 2);
+    /// ```
+    pub fn client_prefs(
+        mut self,
+        build: impl FnOnce(crate::prefs::ClientPrefs) -> crate::prefs::ClientPrefs,
+    ) -> Self {
+        self.client_prefs = build(std::mem::take(&mut self.client_prefs));
+        self
+    }
+
+    /// Lets the browser load screens ahead of a click, off by default. With
+    /// [`Prefetch::Moderate`] `nav.js` fetches the partial screen of a link after 100 ms of
+    /// hover, on keyboard focus or on touch, keeps it 10 seconds for the click, runs at most two
+    /// such fetches at once and cancels one when the pointer leaves first. For pages where the
+    /// script is missing, Chromium gets Speculation Rules (prefetch only, never prerender, so no
+    /// script of the next page runs early) through a `Speculation-Rules` header pointing to
+    /// `/_zeyn/speculation.json`, so the CSP stays as it is; the rules leave out pages the
+    /// script runs on, so nothing is fetched twice. Only links to path routed screens of the app
+    /// are prefetched; never `/_zeyn/*`, links with `data-zeyn-reload` (sign in and out),
+    /// `download` or a `target`, and never screens marked `#[screen(no_prefetch)]`, which the
+    /// server refuses before they run. Nothing is prefetched with Save-Data,
+    /// `prefers-reduced-data`, a 2g connection or in a hidden tab. Screens see it in
+    /// [`Ctx::is_prefetch`], so they can skip counting views; the page a prefetch served
+    /// counts as a prefetch when the user then opens it.
+    pub fn prefetch(mut self, prefetch: Prefetch) -> Self {
+        self.prefetch = prefetch;
+        self
+    }
+
+    /// The registered client preference keys with their kind, purpose and lifetime, for a
+    /// privacy page. The browser removes all of them with `zeyn.prefs.clear()` or an element
+    /// with `data-zeyn-prefs-clear`.
+    pub fn client_prefs_table(&self) -> &[crate::prefs::PrefInfo] {
+        &self.client_prefs.keys
     }
 
     /// Saves each signed in user's grid layout, sort and filters on the server, so they come
@@ -1187,6 +1267,70 @@ impl App {
         self
     }
 
+    /// Checks the link shortcuts of a built screen (`Chips::shortcut`, `PrevNext::shortcut`)
+    /// against each other, the commands, the palette and the links of the site headers: the
+    /// page level half of [`App::check`], which cannot build screens because they need params.
+    /// Call it in a test with the params the screen gets.
+    ///
+    /// ```
+    /// use zeyn::prelude::*;
+    ///
+    /// #[screen(route = "/", public)]
+    /// pub fn home() -> Screen {
+    ///     Screen::new("Home").body(
+    ///         Chips::links("Topics")
+    ///             .link("One", home, ())
+    ///             .shortcut("Alt+Shift+N")
+    ///             .link("Two", home, ())
+    ///             .shortcut("Alt+Shift+N"),
+    ///     )
+    /// }
+    ///
+    /// let app = App::new("Shop").feature(Feature::new("shop").screen(home));
+    /// let problems = app.check_page(&home::run()).unwrap_err();
+    /// assert!(problems[0].contains("is also used by the link at node 0"));
+    /// ```
+    pub fn check_page(&self, screen: &Screen) -> Result<(), Vec<String>> {
+        let commands: Vec<(&str, &crate::command::Command)> = self
+            .features
+            .iter()
+            .flat_map(|f| {
+                f.commands()
+                    .iter()
+                    .map(move |c| (f.name(), c))
+            })
+            .collect();
+        let mut found = Vec::new();
+        for f in &self.features {
+            if let Some(shell) = f.site_shell() {
+                for (s, nodes) in shell.header.slots.iter().enumerate() {
+                    for (i, node) in nodes.iter().enumerate() {
+                        node.all_shortcuts(format!("h{s}.{i}"), &mut found);
+                    }
+                }
+            }
+        }
+        for (i, node) in screen.nodes().iter().enumerate() {
+            node.all_shortcuts(i.to_string(), &mut found);
+        }
+        let links: Vec<(String, &str)> = found
+            .into_iter()
+            .map(|(path, keys)| {
+                let place = match path.strip_prefix('h') {
+                    Some(p) => format!("in the site header (node {p})"),
+                    None => format!("at node {path}"),
+                };
+                (place, keys)
+            })
+            .collect();
+        let problems = crate::command::link_problems(&links, &commands, &self.palette_keys);
+        if problems.is_empty() {
+            Ok(())
+        } else {
+            Err(problems)
+        }
+    }
+
     /// Checks routes, screen names, menus and that every service a screen needs is registered.
     pub fn check(&self) -> Result<(), Vec<String>> {
         let mut problems = self.setup_problems.clone();
@@ -1363,6 +1507,33 @@ impl App {
             false,
             &self.palette_keys,
         ));
+        for f in &self.features {
+            let Some(shell) = f.site_shell() else {
+                continue;
+            };
+            let mut links = Vec::new();
+            for (s, nodes) in shell.header.slots.iter().enumerate() {
+                let mut found = Vec::new();
+                for (i, node) in nodes.iter().enumerate() {
+                    node.all_shortcuts(format!("{s}.{i}"), &mut found);
+                }
+                links.extend(found.into_iter().map(|(path, keys)| {
+                    (
+                        format!(
+                            "in the {} slot of the site header of feature `{}` (node {path})",
+                            crate::site::SLOT_NAMES[s],
+                            f.name()
+                        ),
+                        keys,
+                    )
+                }));
+            }
+            problems.extend(crate::command::link_problems(
+                &links,
+                &commands,
+                &self.palette_keys,
+            ));
+        }
         match crate::command::normalize_shortcut(&self.palette_keys) {
             None => problems.push(format!(
                 "the palette shortcut `{}` cannot be read
@@ -1381,6 +1552,7 @@ impl App {
             _ => {}
         }
         problems.extend(self.theme_problems());
+        problems.extend(self.client_prefs.problems());
         problems.dedup();
         if problems.is_empty() {
             Ok(())
@@ -1455,6 +1627,8 @@ impl App {
             .then(|| Arc::from(self.i18n.default_locale()));
         self.services
             .insert(crate::screen::Routes(Arc::new(routes), default_locale));
+        self.services
+            .insert(self.client_prefs.clone());
         let look = self.look();
         #[cfg(feature = "islands")]
         let islands = self
@@ -1507,6 +1681,7 @@ impl App {
             views: self.views,
             native_menu: self.native_menu,
             locale_paths: self.locale_paths,
+            prefetch: self.prefetch,
             palette_keys: crate::command::normalize_shortcut(&self.palette_keys)
                 .unwrap_or_else(|| crate::command::PALETTE_SHORTCUT.into()),
             extras: self.extras,
@@ -1819,6 +1994,7 @@ struct AppState {
     views: Option<Arc<dyn crate::grid::DataGridViewStore>>,
     native_menu: bool,
     locale_paths: bool,
+    prefetch: Prefetch,
     palette_keys: String,
     extras: ops::Extras,
     sign_in: auth::Extras,
@@ -2148,6 +2324,11 @@ impl AppState {
             self.csp.clone(),
         );
         data::read_reason(&ctx, headers);
+        let ctx = if is_prefetch(headers) {
+            ctx.as_prefetch()
+        } else {
+            ctx
+        };
         match self.fixed_now {
             Some(now) => ctx.with_now(now),
             None => ctx,
@@ -2604,6 +2785,20 @@ impl AppState {
         groups
     }
 
+    /// Adds the `Speculation-Rules` header of `App::prefetch` to a full page.
+    fn speculation(&self, mut page: Response) -> Response {
+        if self.prefetch == Prefetch::Moderate
+            && let Ok(v) = HeaderValue::from_str(&format!(
+                r#""{}/_zeyn/speculation.json""#,
+                self.prefix.trim_end_matches('/')
+            ))
+        {
+            page.headers_mut()
+                .insert("speculation-rules", v);
+        }
+        page
+    }
+
     /// The language picker, when the app has more than one language.
     fn locale_picker(&self, ctx: &Ctx, r: &Render) -> String {
         let locales = self.i18n.locales();
@@ -2691,7 +2886,7 @@ impl AppState {
         };
         let html_attrs = format!("{theme_attrs}{native_menu}");
         format!(
-            r##"<!doctype html><html lang="{lang}"{dir}{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css{v}"><script type="module" src="{base}/_zeyn/zeyn.js{v}"></script><script type="module" src="{base}/_zeyn/nav.js{v}"></script>{components}{theme_link}{extra}</head><body><a class="z-skip" href="#z-main">{skip}</a>{frame}<div class="z-toasts" role="status" aria-live="polite" data-text-dismiss="{dismiss}"></div>{commands}{ai_launcher}</body></html>"##,
+            r##"<!doctype html><html lang="{lang}"{dir}{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css{v}"><script type="module" src="{base}/_zeyn/zeyn.js{v}"></script><script type="module" src="{base}/_zeyn/nav.js{v}"></script>{components}{theme_link}{extra}{prefetch}</head><body><a class="z-skip" href="#z-main">{skip}</a>{frame}<div class="z-toasts" role="status" aria-live="polite" data-text-dismiss="{dismiss}"></div>{commands}{ai_launcher}</body></html>"##,
             lang = escape(ctx.locale()),
             dir = if locale::rtl(ctx.locale()) {
                 r#" dir="rtl""#
@@ -2712,6 +2907,11 @@ impl AppState {
             },
             title = escape(title),
             extra = ops::head(self, ctx),
+            prefetch = if self.prefetch == Prefetch::Moderate {
+                r#"<meta name="zeyn-prefetch" content="moderate">"#
+            } else {
+                ""
+            },
             skip = r.text(&Text::key("zeyn.shell.skip")),
             dismiss = r.text(&Text::key("zeyn.ui.toast.dismiss")),
         )
@@ -3032,6 +3232,13 @@ async fn page(
         .screens
         .get(name)
         .map(|(_, e)| e.meta);
+    if ctx.is_prefetch() && meta.is_none_or(|m| m.no_prefetch) {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            [(header::CACHE_CONTROL, "no-store")],
+        )
+            .into_response();
+    }
     let open = !ctx.identity().is_signed_in()
         && meta.is_some_and(|m| matches!(m.access, crate::action::Access::Public));
     let (csrf, set) = if open {
@@ -3127,6 +3334,7 @@ async fn page(
             let page = islands::page(&st, page, &html);
             #[cfg(not(feature = "islands"))]
             let page = Html(page).into_response();
+            let page = st.speculation(page);
             match tag {
                 Some(tag) => public_cache(page, &headers, &tag, cache),
                 None if cache > 0 => private_page(page),

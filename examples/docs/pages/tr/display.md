@@ -47,7 +47,19 @@ Değerler grid hücreleri gibi biçimlenir: para, tarih ve seçimler kullanıcı
 
 ## EmptyState ve Skeleton
 
-`EmptyState::new(title).text(text).opens(label, screen, params)` boş bir alanı sonraki adımla doldurur. `Skeleton::lines(n)`, bir şey yüklenirken kullanılan yer tutucudur.
+`EmptyState::new(title).text(text)` boş bir alanı sonraki adımla doldurur: `.link(label, screen, params)` bir `LinkButton` ile başka bir sayfaya gider, `.opens(label, screen, params)` ise uygulamanın bir screen'ini pencere olarak açar. `Skeleton::lines(n)`, bir şey yüklenirken kullanılan yer tutucudur.
+
+## LinkButton
+
+Bir yere gitmek bağlantıdır; bir şey yapmak düğmedir. `LinkButton::new(label, screen, params)`, screen'in kanonik yoluna (örneğin `/products/42`) giden, düğme gibi görünen gerçek bir `<a href>` öğesidir; bu yüzden orta tık, "yeni sekmede aç" ve arama motorları onu olduğu gibi bir bağlantı olarak ele alır. `nav.js` üzerinden sayfa yenilemeden açılır ve Enter onu izler. Görünüm, `.primary()` ana eylemin dolu görünümünü istemedikçe ikincildir. Screen'in bir rotası olmalıdır, yoksa kod derlenmez. `EmptyState::link` ve `Hero::link` bunu kullanır.
+
+```rust
+LinkButton::new(t!("cart.browse"), products, ()).primary()
+```
+
+## ClearPrefs
+
+`ClearPrefs::new(label)`, bu tarayıcının uygulama için tuttuğu her istemci tercihini kaldıran bir düğmedir; örneğin bir gizlilik sayfasında `App::client_prefs_table()` listesinin yanında kullanılır. Bir toast onaylar. Sunucunun koyduğu çerezlere (tema, dil, oturum) dokunulmaz. Betikler aynısını `zeyn.prefs.clear()` ile yapabilir.
 
 ## Breadcrumb
 
@@ -100,7 +112,7 @@ Embed::url("https://www.youtube-nocookie.com/embed/abc")
 - Her çerçeve `sandbox="allow-scripts allow-same-origin allow-presentation"`, `referrerpolicy="no-referrer"` ve `loading="lazy"` alır. Açılır pencerelere, üst düzey gezinmeye, formlara ve indirmelere hiçbir zaman izin verilemez. `.allow(...)` tarayıcı özellikleri ekler: `Fullscreen`, `PictureInPicture`, `Autoplay` ve `EncryptedMedia`.
 - `.click_to_load(poster)` önce bir düğme gösterir; üzerinde poster görseli (uygulamadaki bir yol ya da `img-src` içindeki bir host; yoksa `""`) ve diğer sitenin adı bulunur. Düğmeye basılana kadar diğer siteyle iletişim kurulmaz; ardından çerçeve onun yerini alır ve odağı alır. Betik `media.js` içindedir, bu yüzden ek bir istek maliyeti yoktur.
 - `.notice(t!(...))` o düğmeye uygulamanın bir metnini, örneğin bir içerik uyarısını, koyar. Kaçışlanır, diğer tüm metinler gibi çevrilir ve düğmenin erişilebilir adının parçasıdır; böylece ekran okuyucular kullanıcı karar vermeden önce onu okur. `.click_to_load` olmadan, posteri olmayan düğmeyi açar.
-- `.remember("external-video", Duration::from_secs(24 * 60 * 60))`, her sayfada yerine o süre içinde bir kez sorar. Tarayıcı yalnızca bitiş zamanını (Unix milisaniye) `zeyn.consent.{scope}` anahtarıyla `localStorage` içinde tutar; çerez konmaz ve sunucu bunu hiçbir zaman görmez, bu yüzden önbelleğe alınmış herkese açık sayfalar herkes için aynı kalır. Sonraki sayfalar, uygulama içi gezinmeler ve diğer sekmeler o scope'un çerçevelerini kendiliğinden, odağı taşımadan yükler (WCAG 2.2 3.2.1 On Focus, 2.4.3 Focus Order); odak çerçeveye yalnızca gerçek bir basıştan sonra geçer. Süre dolduğunda, saklanan değer tam sayı olmadığında ya da embed'in süresinden ileri bir zamanı gösterdiğinde (elle değiştirilmiş), depolama engellendiğinde ve JavaScript olmadığında düğme geri gelir. Scope 1 ile 40 arası ASCII harf, rakam, `-` ya da `_` olur; süre 1 saniye ile 30 gün arasındadır (`MAX_EMBED_CONSENT`). Başka her şey bunu söyleyen bir mesajla panic eder. Aynı notice'i paylaşan embed'ler aynı scope'u paylaşır.
+- `.remember(EXTERNAL_VIDEO)`, her sayfada yerine anahtarın ömrü boyunca bir kez sorar. Anahtar, `ClientPref::consent` ile bildirilen ve `App::client_prefs` ile kaydedilen bir onay anahtarıdır (bkz. [İstemci tercihleri](security.md#client-preferences)); aynı anahtara bağlı embed'ler cevabı paylaşır. Sonraki sayfalar, uygulama içi gezinmeler ve diğer sekmeler bu çerçeveleri kendiliğinden, odağı taşımadan yükler (WCAG 2.2 3.2.1 On Focus, 2.4.3 Focus Order); odak çerçeveye yalnızca gerçek bir basıştan sonra geçer. Kaydın süresi dolduğunda ya da denetimlerinden geçemediğinde, uygulama anahtarı kaydetmediğinde, depolama engellendiğinde ve sayfa yeni olduğunda ve JavaScript olmadığında düğme geri gelir. Düz bir string ya da bir choice anahtarı derlenmez.
 - Embed edilecek bir adresi tutan alan `#[rule(embed)]` alır. Formlar bir URL ya da yapıştırılmış embed kodu kabul eder, yalnızca `src` değerini tutar, `https` ve listedeki bir host ister, izleme parametrelerini (`utm_*`, `fbclid`, `gclid` ve diğerleri) atar ve HTML'i değil, kanonik adresi saklar. API girdileri kanonik adresi göndermelidir.
 
 ```rust

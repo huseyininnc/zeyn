@@ -221,7 +221,8 @@
       "site": {
         "sign_in": "Sign in",
         "sign_out": "Sign out",
-        "bottom": "Quick links"
+        "bottom": "Quick links",
+        "center": "Search"
       }
     },
     "ui": {
@@ -519,6 +520,9 @@
       "reactions": {
         "label": "Reactions",
         "failed": "The reaction could not be saved."
+      },
+      "prefs": {
+        "cleared": "The choices this browser kept for this site were removed."
       }
     },
     "date": {

@@ -87,7 +87,9 @@
       "rating": "A whole number from 1 to N shown as stars.",
       "chips": "Link chips and filter chips over a screen param.",
       "hero": "A large image section, with slides that move only when asked.",
-      "reactions": "Reaction buttons with counts stored by an action."
+      "reactions": "Reaction buttons with counts stored by an action.",
+      "link_button": "A link to another page that looks like a button.",
+      "clear_prefs": "A button that removes the choices this browser keeps for the app."
     },
     "ex": {
       "action_button": {
@@ -134,6 +136,9 @@
         "overview": "Filter chips",
         "links": "Link chips"
       },
+      "clear_prefs": {
+        "overview": "Example"
+      },
       "controls": {
         "overview": "Example"
       },
@@ -147,7 +152,8 @@
         "overview": "Example"
       },
       "embed": {
-        "overview": "Example"
+        "overview": "Example",
+        "remembered": "Asked once a day"
       },
       "empty_state": {
         "overview": "Example"
@@ -179,6 +185,9 @@
         "overview": "Example"
       },
       "line_editor": {
+        "overview": "Example"
+      },
+      "link_button": {
         "overview": "Example"
       },
       "list": {
@@ -218,7 +227,8 @@
       },
       "prev_next": {
         "overview": "Example",
-        "one_side": "Only one side"
+        "one_side": "Only one side",
+        "with_shortcuts": "With keyboard shortcuts"
       },
       "progress": {
         "overview": "Example"
@@ -245,7 +255,8 @@
         "compact": "Compact"
       },
       "search_box": {
-        "overview": "Example"
+        "overview": "Example",
+        "rich": "Rows with an image and a link"
       },
       "share": {
         "overview": "Example",
@@ -268,7 +279,8 @@
         "overview": "Example"
       },
       "tabs": {
-        "overview": "Example"
+        "overview": "Example",
+        "remembered": "Remembers the open tab"
       },
       "timeline": {
         "overview": "Example"

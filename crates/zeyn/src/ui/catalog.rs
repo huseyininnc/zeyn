@@ -786,6 +786,7 @@ impl<E: Model> From<CardGrid<E>> for Node {
 pub const MAX_SUGGESTIONS: u32 = 20;
 
 type SuggestFn<E> = std::sync::Arc<dyn Fn(&E) -> Option<String> + Send + Sync>;
+type SuggestItemFn<E> = std::sync::Arc<dyn Fn(&E) -> ListItem + Send + Sync>;
 
 /// A search field with suggestions (W3C APG combobox with a list box popup). As the user types,
 /// it waits `instant` milliseconds, then asks the server for suggestions: the action runs with the
@@ -801,6 +802,11 @@ type SuggestFn<E> = std::sync::Arc<dyn Fn(&E) -> Option<String> + Send + Sync>;
 /// highlighted suggestion or the typed text, Escape closes the suggestions and then clears the
 /// field.
 ///
+/// `.item(|row| ListItem::new(title).image(src).subtitle(text).link(screen, params))` turns the
+/// suggestions into rows with a small image, a title and a subtitle that go straight to the
+/// record: picking one (click or Enter) opens its link through `nav.js`, middle click opens it
+/// in a new tab, and Enter without a highlighted row still opens the results screen.
+///
 /// ```ignore
 /// SearchBox::of(search_products).instant(150).results(search_results).suggestion(|p: &Product| p.name.clone())
 /// ```
@@ -813,6 +819,7 @@ pub struct SearchBox<E: Model> {
     limit: u32,
     value: String,
     suggestion: SuggestFn<E>,
+    item: Option<SuggestItemFn<E>>,
 }
 
 impl<E: Model> SearchBox<E> {
@@ -829,6 +836,7 @@ impl<E: Model> SearchBox<E> {
             limit: 8,
             value: String::new(),
             suggestion: std::sync::Arc::new(first_text::<E>),
+            item: None,
         }
     }
 
@@ -866,6 +874,14 @@ impl<E: Model> SearchBox<E> {
     /// How many suggestions to show, at most [`MAX_SUGGESTIONS`].
     pub fn limit(mut self, n: u32) -> Self {
         self.limit = n.clamp(1, MAX_SUGGESTIONS);
+        self
+    }
+
+    /// Rich suggestions: each row as a [`ListItem`] with its title, subtitle, image (shown 40 by
+    /// 56 pixels, following the `img-src` rules, with an empty alternative text because the
+    /// title names the row) and link (its canonical address). Replaces [`SearchBox::suggestion`].
+    pub fn item(mut self, item: impl Fn(&E) -> ListItem + Send + Sync + 'static) -> Self {
+        self.item = Some(std::sync::Arc::new(item));
         self
     }
 
@@ -911,6 +927,8 @@ impl<E: Model> DataSource for SearchBox<E> {
         };
         let fetch = self.fetch;
         let suggest = self.suggestion.clone();
+        let item = self.item.clone();
+        let view = ctx.clone();
         let rows = async move {
             if text.is_empty() {
                 return Ok(Page::default());
@@ -920,6 +938,15 @@ impl<E: Model> DataSource for SearchBox<E> {
         };
         Box::pin(async move {
             let page = rows.await?;
+            if let Some(item) = item {
+                let r = Render::new("s", view.locale(), view.i18n()).with_ctx(&view);
+                return Ok(Json::Array(
+                    page.items
+                        .iter()
+                        .map(|row| item(row).suggestion(&r))
+                        .collect(),
+                ));
+            }
             let mut out: Vec<String> = Vec::new();
             for s in page
                 .items

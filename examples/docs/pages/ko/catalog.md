@@ -95,6 +95,21 @@ SearchBox::of(catalog_products)
 
 결과 화면은 `SearchParams`를 받습니다(`q`이며, 메뉴에서 화면을 열면 비어 있습니다). 서버는 텍스트를 `MAX_SEARCH_QUERY`(100)자로 자르고, 보낼 제안의 개수를 정하며(`limit`으로 달리 지정하지 않으면 8개, 최대 20개), Screen의 접근 권한, Feature의 가드, action의 권한을 검사하고, 모든 제안 호출을 쓰기 속도 제한(`App::write_limit`)에 포함합니다.
 
+### 풍부한 제안
+
+`.item(|row| ListItem::new(title).subtitle(text).image(src).link(screen, params))`는 각 제안을 작은 이미지(40 x 56 픽셀, 지연 로딩, `img-src` 규칙을 따르며 제목이 행의 이름을 대신하므로 대체 텍스트는 비어 있고, 이미지가 없으면 자리 표시자도 없음), 제목, 부제목이 있는 행으로 표시합니다. 서버는 레코드의 정식 주소와 함께 `[{text, subtitle, image, href}]`로 응답합니다. 클릭이나 Enter로 행을 고르면 `nav.js`를 통해 그 링크가 열리며, 각 행이 실제 링크이므로 가운데 클릭과 "새 탭에서 열기"도 동작합니다. 강조된 행 없이 Enter를 누르면 여전히 결과 화면이 열립니다. 콤보박스 패턴은 그대로입니다. 각 행은 제목과 부제목으로 이름이 붙은 옵션이며, 행의 높이는 최소 44픽셀입니다. `.item`이 없으면 제안은 위에서 본 것처럼 일반 텍스트입니다.
+
+```rust
+SearchBox::of(catalog_products)
+    .item(|p: &Product| {
+        ListItem::new(p.name.clone())
+            .subtitle(p.code.clone())
+            .image(p.image.clone())
+            .link(shop_product, ProductPage { id: p.id })
+    })
+    .results(shop_search)
+```
+
 ## 자유 텍스트
 
 `DataQuery::q`는 자유 텍스트입니다. 텍스트 필드에 이 텍스트가 포함된 행을 찾습니다. 텍스트와 필드는 모두 `zeyn::text::fold`가 만드는 형태로 비교됩니다. 소문자, 터키어의 점 있는 `i`와 점 없는 `i`(`İ`, `ı`)는 `i`로, 악센트가 있는 라틴 문자는 악센트 없이, `ß`, `æ`, `œ`, `þ`는 풀어 쓴 형태입니다. 따라서 "istanbul"로 "İSTANBUL"을, "nino"로 "Niño"를, "strasse"로 "Straße"를 찾을 수 있습니다. `#[mask]`가 있는 필드는 검색하지 않으며, 빈 텍스트는 모든 행과 일치하고, 100자보다 긴 텍스트는 무시됩니다. `DataQuery::apply`와 SQL 데이터 계층(컬럼에 대한 `TRANSLATE`, `LOWER`, `REPLACE`와 바인드 매개변수를 쓰는 `LIKE`)은 이를 같은 방식으로 읽습니다.

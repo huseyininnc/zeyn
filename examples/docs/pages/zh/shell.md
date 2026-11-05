@@ -22,7 +22,15 @@ Feature::new("shop")
             .item(t!("shop.delivery.title"), shop_delivery)
             .item(t!("shop.returns.title"), shop_returns)
     })
-    .shell(Shell::site().header(|h| h.sign_in().language().theme()).footer(|f| {
+    .shell(Shell::site().header(|h| {
+        h.center(SearchBox::of(search_products).results(shop_search))
+            .center_on_phone(CenterOnPhone::Icon)
+            .end(LinkButton::new(t!("shop.cart"), shop_cart, ()))
+            .sign_in()
+            .language()
+            .theme()
+    })
+    .footer(|f| {
         f.column(t!("shop.menu.help"), |c| {
             c.link(t!("shop.delivery.title"), shop_delivery).url(t!("shop.footer.source"), "https://example.com")
         })
@@ -36,7 +44,8 @@ Feature::new("shop")
 
 - **菜单。** 顶部菜单在站点 shell 中列出每个 feature 的菜单。只有一项的组是普通链接；较大的组是打开其链接的按钮（W3C APG 披露式导航模式）。Enter、Space 或点击切换一个组，Down 打开它并移到其第一个链接，Up、Down、Home 和 End 在其链接之间移动，Escape 关闭它并回到按钮，用 Tab 离开该组或点击外部会将其关闭。Left 和 Right 在顶层项之间移动。
 - **窄屏幕。** 在 800 px 以下，菜单折叠到带 `aria-expanded` 的菜单按钮后面；Escape 将其关闭。没有脚本时菜单保持展开，因此没有任何内容变得无法访问。
-- **操作。** 当应用有登录页面时，`sign_in()` 对访客显示登录链接，对已登录用户显示退出链接；`language()` 和 `theme()` 显示与应用 shell 相同的选择器。
+- **头部插槽。** 顶部栏有四个可放置任意组件的插槽，类似使用逻辑名称的应用栏：`start(node)` 在品牌之前，`center(node)` 在菜单与末端之间，`end(node)` 在栏的末端，`bottom(node)` 是其下方的整宽一行，例如放 chip。每个插槽按顺序容纳多个节点，在从右到左的语言中 start 和 end 会交换位置。插槽中的组件使用用户的语言、权限和掩码渲染；通过自己的 action 加载数据的组件（例如 `SearchBox`）也能在其中工作，并按该 feature 的 guard 和 action 的权限检查。grid 和表单属于 screen。在手机上，start 和 end 插槽留在栏中，center 插槽则按应用指定的位置放置：`center_on_phone(CenterOnPhone::Row)`（默认）把它放在栏下方的一行，`CenterOnPhone::Icon` 把它放在放大镜按钮之后，由按钮打开（W3C APG 披露模式）并把焦点移入其中；Escape 将其关闭并回到按钮。`center_button(icon, label)` 可更改该按钮。手机布局由 CSS 在脚本运行之前设定，因此页面加载时头部不会移动。
+- **操作。** 当应用有登录页面时，`sign_in()` 对访客显示登录链接，对已登录用户显示退出链接；`language()` 和 `theme()` 显示与应用 shell 相同的选择器。它们排在 end 插槽之后，并在手机上折叠进菜单。
 - **底部栏。** `bottom_nav([...])` 添加最多五个固定在手机屏幕底部（宽度 800 px 及以下）的链接，用于人们最常去的地方；超过五个则无法编译。每个条目是 `BottomNavItem`，包含标签、带路由的屏幕和可选图标。当前显示页面的链接带有 `aria-current="page"`（由 `nav.js` 保持更新），用户无权打开的屏幕的链接会被省略，底部栏通过 `env(safe-area-inset-bottom)` 避开主屏指示条，页面底部会留出空间，因此底部栏不会遮挡任何内容。顶部菜单仍用于其余内容。底部栏不需要脚本。
 - **页脚。** 若干列链接，指向 screen（`link`，对无权打开的用户省略）或地址（`url`：路径、`https:`、`http:` 或 `mailto:`；`App::check` 会拒绝其他协议以及指向未注册 screen 的链接），外加一行文字。
 

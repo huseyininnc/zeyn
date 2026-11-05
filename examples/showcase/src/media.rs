@@ -235,6 +235,13 @@ pub fn media_play(p: PlayParams) -> Result<Screen> {
     library_of(&p.item)
 }
 
+/// The notice of the external video, confirmed once a day.
+pub const EXTERNAL_VIDEO: zeyn::ClientPref<zeyn::Consent> = zeyn::ClientPref::consent(
+    "external-video",
+    std::time::Duration::from_secs(24 * 60 * 60),
+    zeyn::Purpose::Necessary,
+);
+
 /// Content from other sites: a click to load player on a host of the app's `frame-src` with a
 /// notice that is asked once per tab, and an embed whose host is not listed, which renders a
 /// warning instead of a frame.
@@ -252,10 +259,7 @@ pub fn media_external() -> Result<Screen> {
                         ])
                         .click_to_load("/_zeyn/media/films/harbor.jpg")
                         .notice(t!("media.embed_notice"))
-                        .remember(
-                            "external-video",
-                            std::time::Duration::from_secs(24 * 60 * 60),
-                        ),
+                        .remember(EXTERNAL_VIDEO),
                 ),
             )
             .col(

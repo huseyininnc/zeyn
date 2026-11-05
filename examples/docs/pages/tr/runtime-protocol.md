@@ -263,6 +263,7 @@ Hepsi JSON ve CSRF başlığıyla `POST`'tur ve önce ekranın erişimini ve Fea
 |---|---|---|
 | `/_zeyn/node` | `{ screen, params, node }` | Bir düğümün, grid'lerinin ilk sayfasıyla birlikte HTML'i. Tembel (lazy) sekmeler tarafından kullanılır. |
 | `/_zeyn/data` | `{ screen, params, node, key, input }` | Düğümün `key` veri kaynağından JSON: arama seçenekleri (`key` alan adıdır), ağaç çocukları (`key` boştur), adım denetimleri (`key` `_step` olur). Kaynağın eylem izni denetlenir ve interceptor'lar, grid'lerde olduğu gibi çalışır. Eyleme uymayan girdi `404` ile reddedilir. |
+| `/_zeyn/data` ve `screen` = `_site.{feature}` | yukarıdaki gibi | Bir site üst bilgisi slotundaki bileşen için aynısı: `node` slottur (0 start, 1 center, 2 end, 3 bottom), ardından düğümün içindeki sırası, sonra alt öğe sıraları. Feature'ın guard'ları ve action'ın izni denetlenir. |
 | `/_zeyn/parse` | `{ kind, text, label }` | Sunucunun yazılmış bir tarihi veya saati kullanıcının dilinde, saat diliminde ve saat biçiminde nasıl okuduğu: `{ ok, text, iso, utc, zone }` veya `{ ok: false, message }`. `kind` değeri `date`, `time`, `datetime`, `local` veya `presets` (bugün ve hızlı aralıklar) olur. |
 
 ### 7.2 Values the forms submit
@@ -280,6 +281,8 @@ Hepsi JSON ve CSRF başlığıyla `POST`'tur ve önce ekranın erişimini ve Fea
 | `zeyn:effect` | `document` | Runtime'ın tanımadığı bir effect: `{ effect, source, run }`. `run(next)` başka bir effect çalıştırır. `confirm` tarafından kullanılır. |
 
 `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":"...","then":{...}}` effect'i modal bir uyarı diyaloğunda sorar ve `then` değerini yalnızca kullanıcı onayladıktan sonra çalıştırır.
+
+İstemci tercihleri (`zeyn::ClientPref`), sayfaların yalnızca `data-zeyn-remember` ya da `data-zeyn-prefs-clear` taşıyan bir eleman içerdiğinde içe aktardığı `/_zeyn/state.js` tarayıcı modülünde yaşar. `GET /_zeyn/prefs`, `Cache-Control: no-store` ile `{ preferences }` döndürür; bu, uygulamanın onay kancasının tercih değerlerinin oturumun ötesinde tutulmasına izin verip vermediğidir. Sunucu saklanan hiçbir değeri okumaz.
 
 ### 7.4 Media
 

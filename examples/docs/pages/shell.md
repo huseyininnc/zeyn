@@ -22,7 +22,15 @@ Feature::new("shop")
             .item(t!("shop.delivery.title"), shop_delivery)
             .item(t!("shop.returns.title"), shop_returns)
     })
-    .shell(Shell::site().header(|h| h.sign_in().language().theme()).footer(|f| {
+    .shell(Shell::site().header(|h| {
+        h.center(SearchBox::of(search_products).results(shop_search))
+            .center_on_phone(CenterOnPhone::Icon)
+            .end(LinkButton::new(t!("shop.cart"), shop_cart, ()))
+            .sign_in()
+            .language()
+            .theme()
+    })
+    .footer(|f| {
         f.column(t!("shop.menu.help"), |c| {
             c.link(t!("shop.delivery.title"), shop_delivery).url(t!("shop.footer.source"), "https://example.com")
         })
@@ -36,7 +44,8 @@ Feature::new("shop")
 
 - **Menu.** The top menu lists the menus of every feature in the site shell. A group of one item is a plain link; a larger group is a button that opens its links (the W3C APG disclosure navigation pattern). Enter, Space or a click toggle a group, Down opens it and moves to its first link, Up, Down, Home and End move between its links, Escape closes it and returns to the button, and Tab out of the group or a click outside closes it. Left and Right move between the top items.
 - **Narrow screens.** Below 800 px the menu folds behind a menu button with `aria-expanded`; Escape closes it. Without the script the menu stays open, so nothing becomes unreachable.
-- **Actions.** `sign_in()` shows a sign in link for visitors and a sign out link for signed in users when the app has a sign in page; `language()` and `theme()` show the same pickers as the app shell.
+- **Header slots.** The top bar has four slots that take any component, like an app bar with logical names: `start(node)` before the brand, `center(node)` between the menu and the end, `end(node)` at the end of the bar and `bottom(node)` as a full width row under it, such as chips. Each slot holds several nodes in order, and start and end swap sides in right to left languages. Components in slots render with the user's language, permissions and masks; those that load data through their own action, such as a `SearchBox`, work there, checked against the feature's guards and the action's permission. Grids and forms belong in the screen. On phones the start and end slots stay in the bar, and the center slot goes where the app says: `center_on_phone(CenterOnPhone::Row)` (the default) puts it in a row under the bar, `CenterOnPhone::Icon` behind a magnifier button that opens it (W3C APG disclosure) and moves focus into it; Escape closes it and returns to the button. `center_button(icon, label)` changes that button. The phone layout is set by CSS before the script runs, so the header does not move while the page loads.
+- **Actions.** `sign_in()` shows a sign in link for visitors and a sign out link for signed in users when the app has a sign in page; `language()` and `theme()` show the same pickers as the app shell. They come after the end slot and fold into the menu on phones.
 - **Bottom bar.** `bottom_nav([...])` adds up to five links fixed to the bottom of the screen on phones (800 px wide and less), for the places people go most; more than five do not compile. Each item is a `BottomNavItem` with a label, a screen with a route and an optional icon. The link of the page being shown has `aria-current="page"` (kept up to date by `nav.js`), links to screens the user may not open are left out, the bar keeps clear of the home indicator with `env(safe-area-inset-bottom)`, and the page gets room at its bottom so the bar hides nothing. The top menu stays for the rest. The bar needs no script.
 - **Footer.** Columns of links to screens (`link`, left out for users who may not open them) or addresses (`url`: a path, `https:`, `http:` or `mailto:`; `App::check` refuses other schemes and links to screens that are not registered), and a line of text.
 

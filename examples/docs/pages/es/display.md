@@ -47,7 +47,19 @@ Los valores se formatean como las celdas de una tabla: dinero, fechas y choices 
 
 ## EmptyState y Skeleton
 
-`EmptyState::new(title).text(text).opens(label, screen, params)` llena un área vacía con un siguiente paso. `Skeleton::lines(n)` es un marcador de posición mientras algo se carga.
+`EmptyState::new(title).text(text)` llena un área vacía con un siguiente paso: `.link(label, screen, params)` va a otra página mediante un `LinkButton`, y `.opens(label, screen, params)` abre una pantalla de la aplicación como ventana. `Skeleton::lines(n)` es un marcador de posición mientras algo se carga.
+
+## LinkButton
+
+Ir a un sitio es un enlace; hacer algo es un botón. `LinkButton::new(label, screen, params)` es un `<a href>` real a la ruta canónica de la pantalla (como `/products/42`) con aspecto de botón, de modo que el clic central, «abrir en una pestaña nueva» y los buscadores lo tratan como el enlace que es. Se abre mediante `nav.js` sin recargar la página, y Enter lo sigue. El aspecto es secundario salvo que `.primary()` pida el aspecto relleno de la acción principal. La pantalla debe tener una ruta, o el código no compila. `EmptyState::link` y `Hero::link` lo usan.
+
+```rust
+LinkButton::new(t!("cart.browse"), products, ()).primary()
+```
+
+## ClearPrefs
+
+`ClearPrefs::new(label)` es un botón que elimina todas las preferencias del cliente que este navegador guarda para la aplicación, por ejemplo en una página de privacidad junto a la lista de `App::client_prefs_table()`. Un toast lo confirma. Las cookies que establece el servidor (tema, idioma, sesión) no se tocan. Los scripts pueden hacer lo mismo con `zeyn.prefs.clear()`.
 
 ## Breadcrumb
 
@@ -100,7 +112,7 @@ Embed::url("https://www.youtube-nocookie.com/embed/abc")
 - Cada marco recibe `sandbox="allow-scripts allow-same-origin allow-presentation"`, `referrerpolicy="no-referrer"` y `loading="lazy"`. Las ventanas emergentes, la navegación del nivel superior, los formularios y las descargas nunca se pueden permitir. `.allow(...)` añade funciones del navegador: `Fullscreen`, `PictureInPicture`, `Autoplay` y `EncryptedMedia`.
 - `.click_to_load(poster)` muestra primero un botón, con la imagen de póster (una ruta de la aplicación o un host de `img-src`; `""` para ninguna) y el nombre del otro sitio. No se contacta con el otro sitio hasta que se pulsa el botón; entonces el marco ocupa su lugar y recibe el foco. El script forma parte de `media.js`, así que no cuesta ninguna petición extra.
 - `.notice(t!(...))` pone un texto de la aplicación en ese botón, como una advertencia de contenido. Se escapa, se traduce como cualquier texto y forma parte del nombre accesible del botón, de modo que los lectores de pantalla lo leen antes de que el usuario decida. Sin `.click_to_load` activa el botón sin póster.
-- `.remember("external-video", Duration::from_secs(24 * 60 * 60))` pregunta una vez en ese tiempo en lugar de en cada página. El navegador guarda solo la hora de fin (milisegundos Unix) en `localStorage` bajo `zeyn.consent.{scope}`; no se establece ninguna cookie y el servidor nunca la ve, así que las páginas públicas en caché siguen siendo iguales para todos. Las páginas posteriores, las navegaciones dentro de la aplicación y otras pestañas cargan por sí solas los marcos de ese scope, sin mover el foco (WCAG 2.2 3.2.1 On Focus, 2.4.3 Focus Order); el foco pasa al marco solo tras una pulsación real. El botón vuelve cuando ha pasado el tiempo, cuando el valor guardado no es un número entero o queda más lejos en el futuro que el tiempo del embed (cambiado a mano), cuando el almacenamiento está bloqueado y sin JavaScript. El scope son de 1 a 40 letras ASCII, dígitos, `-` o `_`; el tiempo va de 1 segundo a 30 días (`MAX_EMBED_CONSENT`). Cualquier otra cosa provoca un panic con un mensaje que lo dice. Los embeds que comparten un aviso comparten un scope.
+- `.remember(EXTERNAL_VIDEO)` pregunta una vez durante la vida útil de la clave en lugar de en cada página. La clave es una clave de consentimiento declarada con `ClientPref::consent` y registrada con `App::client_prefs` (consulta [Preferencias del cliente](security.md#client-preferences)); los embeds vinculados a la misma clave comparten la respuesta. Las páginas posteriores, las navegaciones dentro de la aplicación y otras pestañas cargan por sí solas esos marcos, sin mover el foco (WCAG 2.2 3.2.1 On Focus, 2.4.3 Focus Order); el foco pasa al marco solo tras una pulsación real. El botón vuelve cuando el registro ha terminado o no supera sus comprobaciones, cuando la aplicación no registró la clave, cuando el almacenamiento está bloqueado y la página es nueva, y sin JavaScript. Una cadena simple o una clave de elección no compila.
 - Un campo que contiene una dirección para incrustar lleva `#[rule(embed)]`. Los formularios aceptan una URL o código de embed pegado, conservan solo el `src`, exigen `https` y un host de la lista, descartan los parámetros de seguimiento (`utm_*`, `fbclid`, `gclid` y otros) y guardan la dirección canónica, nunca el HTML. Las entradas de la API deben enviar la dirección canónica.
 
 ```rust

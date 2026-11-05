@@ -263,6 +263,7 @@ Effects：
 |---|---|---|
 | `/_zeyn/node` | `{ screen, params, node }` | 一个节点的 HTML，包含其 grid 的第一页。用于懒加载标签页。 |
 | `/_zeyn/data` | `{ screen, params, node, key, input }` | 来自该节点数据源 `key` 的 JSON：查找（lookup）选项（`key` 为字段名）、树的子节点（`key` 为空）、步骤检查（`key` 为 `_step`）。会检查数据源 action 的权限并运行拦截器，与 grid 相同。不符合 action 的输入以 `404` 拒绝。 |
+| `/_zeyn/data` with `screen` = `_site.{feature}` | 同上 | 对站点头部插槽中的组件执行相同操作：`node` 为插槽（0 start、1 center、2 end、3 bottom）、节点在其中的索引，随后是子节点索引。会检查该 feature 的 guard 和 action 的权限。 |
 | `/_zeyn/parse` | `{ kind, text, label }` | 服务端如何按用户的语言、时区和时钟解读键入的日期或时间：`{ ok, text, iso, utc, zone }` 或 `{ ok: false, message }`。`kind` 为 `date`、`time`、`datetime`、`local` 或 `presets`（今天和快捷范围）。 |
 
 ### 7.2 Values the forms submit（表单提交的值）
@@ -280,6 +281,8 @@ Effects：
 | `zeyn:effect` | `document` | 运行时不认识的 effect：`{ effect, source, run }`。`run(next)` 执行另一个 effect。`confirm` 使用它。 |
 
 Effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":"...","then":{...}}` 会在模态警告对话框中询问，只有在用户确认后才执行 `then`。
+
+客户端偏好（`zeyn::ClientPref`）位于浏览器模块 `/_zeyn/state.js` 中，只有包含带 `data-zeyn-remember` 或 `data-zeyn-prefs-clear` 的元素的页面才会导入它。`GET /_zeyn/prefs` 返回 `{ preferences }`，表示应用的同意钩子是否允许在会话之外保留偏好值，并带有 `Cache-Control: no-store`。服务器不读取任何已保存的值。
 
 ### 7.4 Media（媒体）
 

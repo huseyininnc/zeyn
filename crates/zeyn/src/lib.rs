@@ -92,6 +92,7 @@ mod model;
 #[cfg(feature = "pdf")]
 mod pdf;
 mod platform;
+mod prefs;
 mod privacy;
 #[cfg(feature = "redis")]
 mod redis_store;
@@ -188,6 +189,9 @@ pub use platform::{
 };
 #[cfg(feature = "signed-licenses")]
 pub use platform::{LicenseError, SignedLicenseFile};
+pub use prefs::{
+    Choice, ClientPref, ClientPrefs, Consent, MAX_PREF_LIFETIME, PrefInfo, PrefKind, Purpose,
+};
 #[doc(hidden)]
 pub use privacy::output as __privacy;
 pub use privacy::{MaskStyle, Masking, Revealed, can_unmask, masked_text, reveal_in};
@@ -210,10 +214,12 @@ pub use server::realtime;
 pub use server::{
     ApiDocs, App, AuditEntry, AuditLog, AuditSink, Authenticator, BasicCredentials, Call, CallKind,
     CallOutcome, DevAuth, ForwardAuth, HeaderTenant, Interceptor, Mcp, MemoryAudit, Plugin,
-    READY_CACHE, StaticCredentials, StderrAudit, SubdomainTenant, TenantResolver, Theme,
+    Prefetch, READY_CACHE, StaticCredentials, StderrAudit, SubdomainTenant, TenantResolver, Theme,
     TimePolicy, probe,
 };
-pub use site::{BottomNavItem, FooterColumn, Shell, SiteFooter, SiteHeader, SiteShell};
+pub use site::{
+    BottomNavItem, CenterOnPhone, FooterColumn, Shell, SiteFooter, SiteHeader, SiteShell,
+};
 pub use slug::Slug;
 pub use time::{Date, DateTime, LocalDateTime, LocalTimeError, Time, TimeZone};
 pub use time::{DateWords, range_presets};
@@ -245,11 +251,11 @@ pub mod prelude {
     pub use crate::ui::{
         ActionButton, Alert, AlphaIndex, Audio, AutoGrid, Avatar, Badge, Breadcrumb, Busy, Card,
         CardGrid, Chart, Chips, Control, DateOptions, DescriptionList, Dock, Embed,
-        EmbedPermission, EmptyState, ExternalLink, Heading, Hero, Image, Kpi, List, LookupItem,
-        LookupQuery, MenuBar, MenuButton, MetaLine, Panel, Paragraph, Popover, PrevNext, Progress,
-        PropertyInspector, Rail, Reactions, RelativeTime, Row, SearchBox, SearchParams, Share,
-        Skeleton, Split, Spoiler, Stack, StatusBar, Tabs, Timeline, Toolbox, Tree, TreeItem,
-        TreeQuery, Video, WeekSchedule,
+        EmbedPermission, EmptyState, ExternalLink, Heading, Hero, Image, Kpi, LinkButton, List,
+        LookupItem, LookupQuery, MenuBar, MenuButton, MetaLine, Panel, Paragraph, Popover,
+        PrevNext, Progress, PropertyInspector, Rail, Reactions, RelativeTime, Row, SearchBox,
+        SearchParams, Share, Skeleton, Split, Spoiler, Stack, StatusBar, Tabs, Timeline, Toolbox,
+        Tree, TreeItem, TreeQuery, Video, WeekSchedule,
     };
     pub use crate::{
         Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime,

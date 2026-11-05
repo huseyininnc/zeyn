@@ -39,7 +39,14 @@ PrevNext::new()
     .prev_title(prev.title.clone())
     .next(article, ArticleParams { id: next.id })
     .next_title(next.title.clone())
+    .shortcut("Alt+Shift+N")
 ```
+
+### Bağlantı kısayolları
+
+`.shortcut(keys)` en son eklenen yan bağlantıya, `Chips::links(...).link(...).shortcut(keys)` ise en son eklenen bağlantı chip'ine bir klavye kısayolu verir. Tuşlara basmak bağlantıyı `nav.js` ile sayfa yenilemeden izler; uygulama shell'i ve site shell'i sayfalarında aynı şekilde çalışır. Odak bir girdide, metin alanında, seçim kutusunda ya da düzenlenebilir bir alandayken tuşlar hiçbir şey yapmaz, böylece yazma hiçbir zaman ele geçirilmez. Bağlantı ekran okuyucular için `aria-keyshortcuts` taşır ve tuşları, dokunmatik ekranların gizlediği bir `<kbd>` ipucunda gösterir. Kısayollar `Command::shortcut` gibi okunur: tarayıcının kendine ayırdığı (`Ctrl+T`, `Ctrl+W`) ya da kullandığı (`Ctrl+P`, `F5`) kısayollar bağlanmaz. `App::check`, site üst bilgisi slotlarındaki okunamayan, tarayıcıya ait olan, tek karakterli tuş olan (WCAG 2.2, 2.1.4: `Shift+N` sayılır, `Alt+Shift+N` sayılmaz) ya da bir komutla, paletle veya başka bir bağlantıyla çakışan bağlantı kısayollarını bildirir; `App::check` screen'leri kendisi kuramadığından, `App::check_page(&screen)` aynısını bir testte parametreleriyle kurulmuş bir screen için yapar.
+
+Odak başka bir kökene ait bir çerçevenin, örneğin gömülü bir video oynatıcının içindeyken basılan tuşlar o çerçevenin belgesine gider ve sayfaya hiç ulaşmaz; hiçbir betik bunu değiştiremez. Kullanıcılara, kısayol kullanmadan önce çerçevenin dışına tıklamalarını ya da Tab ile çıkmalarını söyleyin.
 
 ## AutoGrid
 
@@ -104,7 +111,7 @@ Spoiler::new(t!("quiz.show_answer")).add(Paragraph::new(answer.clone()))
 
 ## Chips
 
-Birden çok satıra sarılan küçük yuvarlak bağlantılardan oluşan bir sıra. `Chips::links(label)`, bir makalenin etiketleri gibi ekranlara giden düz bağlantıları, etiketiyle adlandırılmış bir `nav` içinde tutar. `Chips::filter(label, screen, params)`, bir ekran parametresi üzerinde aç/kapa düğmeleri yapar: her chip aynı ekrana giden bir bağlantıdır, değeri parametreye eklenir ya da çıkarılır; böylece sunucu `aria-pressed` değerini aldığı parametrelerden üretir ve tarayıcıda hiçbir şey tutulmaz. Bir chip'e basmak yeni adresi `nav.js` ile sayfa yenilemeden açar, odak ve kaydırma konumu chip üzerinde kalır. `.multiple()` çağrılmadıkça aynı anda tek değer basılı olur; parametrelerde seçenek olmayan değerler yok sayılır. Klavye: Tab chip'ler arasında gezer, Enter veya Space birine basar. Basılı bir chip ayrıca onay işareti gösterir, böylece durum yalnızca renge dayanmaz. Betik (`chips.js`, 1 KB altında) yalnızca filtre chip'i olan sayfalarda yüklenir.
+Birden çok satıra sarılan küçük yuvarlak bağlantılardan oluşan bir sıra. `Chips::links(label)`, bir makalenin etiketleri gibi ekranlara giden düz bağlantıları, etiketiyle adlandırılmış bir `nav` içinde tutar. `Chips::filter(label, screen, params)`, bir ekran parametresi üzerinde aç/kapa düğmeleri yapar: her chip aynı ekrana giden bir bağlantıdır, değeri parametreye eklenir ya da çıkarılır; böylece sunucu `aria-pressed` değerini aldığı parametrelerden üretir ve tarayıcıda hiçbir şey tutulmaz. Bir chip'e basmak yeni adresi `nav.js` ile sayfa yenilemeden açar, odak ve kaydırma konumu chip üzerinde kalır. `.multiple()` çağrılmadıkça aynı anda tek değer basılı olur; parametrelerde seçenek olmayan değerler yok sayılır. Klavye: Tab chip'ler arasında gezer, Enter veya Space birine basar ve bir bağlantı chip'inin kendi kısayolu olabilir (bkz. [Bağlantı kısayolları](#link-shortcuts)). Basılı bir chip ayrıca onay işareti gösterir, böylece durum yalnızca renge dayanmaz. Betik (`chips.js`, 1 KB altında) yalnızca filtre chip'i olan sayfalarda yüklenir.
 
 ```rust
 #[screen(route = "/articles", public)]
@@ -124,14 +131,15 @@ pub fn articles(p: ArticleParams) -> Screen {
 
 ## Hero
 
-Bir sayfanın üstünde büyük bir bölüm: bir başlık, bir metin satırı ve düğme gibi eylemlerle arka plan görseli. Varsayılan olarak durağandır. `.slide(title)` bir slayt daha ekler; `.text`, `.image` ve `.action` her zaman sonuncuyu ayarlar. Birden çok slaytla W3C APG carousel desenini izler: slayt seçici düğmeler, "2 / 3" adlı bir grup olan her slayt ve nazikçe duyurulan seçili slayt. Uygulama `.rotate(seconds)` (4 ile 30) çağırmadıkça slaytlar yalnızca kullanıcı seçince değişir. Çağrılırsa önce bir duraklat ve oynat düğmesi gelir (WCAG 2.2.2), işaretçi hero üzerindeyken, odak içindeyken ve sekme gizliyken döndürme durur, kullanıcı azaltılmış hareketi tercih ediyorsa hiç başlamaz; slaytlar hareket ederken duyurulmaz. Betik olmadan ilk slayt görünür.
+Bir sayfanın üstünde büyük bir bölüm: bir başlık, bir metin satırı ve düğme gibi eylemlerle arka plan görseli. `.link(label, screen, params)` başka bir sayfaya bir `LinkButton` ekler: bir slaytın ilki birincil görünümde, sonrakiler ikincil görünümde olur. Varsayılan olarak durağandır. `.slide(title)` bir slayt daha ekler; `.text`, `.image` ve `.action` her zaman sonuncuyu ayarlar. Birden çok slaytla W3C APG carousel desenini izler: slayt seçici düğmeler, "2 / 3" adlı bir grup olan her slayt ve nazikçe duyurulan seçili slayt. Uygulama `.rotate(seconds)` (4 ile 30) çağırmadıkça slaytlar yalnızca kullanıcı seçince değişir. Çağrılırsa önce bir duraklat ve oynat düğmesi gelir (WCAG 2.2.2), işaretçi hero üzerindeyken, odak içindeyken ve sekme gizliyken döndürme durur, kullanıcı azaltılmış hareketi tercih ediyorsa hiç başlamaz; slaytlar hareket ederken duyurulmaz. Betik olmadan ilk slayt görünür.
 
-Görsel `Image` kurallarını izler (uygulamanın bir yolu ya da uygulamanın `img-src` listesindeki bir ana bilgisayarda `https` adresi). Metnin arkasında bir süstür, bu yüzden alternatif metni boştur: önemli olanı, kontrast için koyu bir geçişin üzerinde duran başlığa ve metne yazın. İlk slaytın görseli hızlı ilk çizim için yüksek öncelikle, diğerleri tembel yüklenir. Betik (`hero.js`, 1,6 KB gzip) yalnızca slaytı olan sayfalarda yüklenir.
+Görsel `Image` kurallarını izler (uygulamanın bir yolu ya da uygulamanın `img-src` listesindeki bir ana bilgisayarda `https` adresi). Metnin arkasında bir süstür, bu yüzden alternatif metni boştur: önemli olanı, herhangi bir resmin üzerinde beyaz metni en az 4,5:1 kontrastta tutan koyu bir perdenin üzerinde duran başlığa ve metne yazın. Bağlantı düğmeleri dolu renklerini korur ve görselin üzerinde beyaz bir odak halkası alır. İlk slaytın görseli hızlı ilk çizim için yüksek öncelikle, diğerleri tembel yüklenir. Betik (`hero.js`, 1,6 KB gzip) yalnızca slaytı olan sayfalarda yüklenir.
 
 ```rust
 Hero::new(t!("home.fresh"))
     .text(t!("home.fresh_text"))
     .image("/img/hero/kitchen.jpg")
+    .link(t!("home.menu"), menu, ())
     .action(ActionButton::new(t!("home.order"), start_order, ()))
     .slide(t!("home.new_teas"))
     .image("/img/hero/teas.jpg")

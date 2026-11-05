@@ -221,7 +221,8 @@
       "site": {
         "sign_in": "Giriş yap",
         "sign_out": "Çıkış yap",
-        "bottom": "Hızlı bağlantılar"
+        "bottom": "Hızlı bağlantılar",
+        "center": "Ara"
       }
     },
     "ui": {
@@ -519,6 +520,9 @@
       "reactions": {
         "label": "Tepkiler",
         "failed": "Tepki kaydedilemedi."
+      },
+      "prefs": {
+        "cleared": "Bu tarayıcının bu site için tuttuğu seçimler silindi."
       }
     },
     "date": {
