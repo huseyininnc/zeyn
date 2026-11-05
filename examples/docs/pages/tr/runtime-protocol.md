@@ -8,7 +8,7 @@ Bu, Zeyn sunucusu ile tarayıcı çalışma zamanı (runtime) arasındaki sözle
 
 `GET {route}?params={json}` tam bir HTML belgesi döndürür. `params`, ekran parametrelerinin URL kodlu JSON halidir; ekranın parametresi yoksa atlanır.
 
-`/orders/{id}` gibi yol segmentleri olan bir route, bu `params` alanlarını yoldan (`/orders/42`) okur, diğer alanları `params` içinden alır. Ayrıştırılamayan bir segment değeri 404 döndürür. Değerler yüzde kodludur, noktalar dahil (`%2E`); böylece bir ekran URL'si runtime'a hiçbir zaman dosya gibi görünmez. `Screen::moved_to` yanıtı veren bir ekran, yeni URL'yi `Location` içinde taşıyan `301 Moved Permanently` alır.
+`/orders/{id}` gibi yol segmentleri olan bir route, bu `params` alanlarını yoldan (`/orders/42`) okur, diğer alanları `params` içinden alır. Ayrıştırılamayan bir segment değeri 404 döndürür. Değerler yüzde kodludur, noktalar dahil (`%2E`); böylece bir ekran URL'si runtime'a hiçbir zaman dosya gibi görünmez. `Screen::moved_to` yanıtı veren bir ekran, yeni URL'yi `Location` içinde taşıyan `301 Moved Permanently` alır; `Screen::redirect` yanıtı veren bir ekran, `Cache-Control: no-store` ile `303 See Other` alır. `nav.js` ikisini de sayfa yüklemeden izler ve hedefin adresini gösterir, yükleme bir geçmiş girişi eklemediğinde de (geri ve ileri).
 
 Başarısız bir sayfa kendi durum koduyla (404, 403, 500, ...) ve uygulamanın hata ekranıyla (`App::not_found`, `App::server_error`) ya da kabuğun (shell) içinde kısa, yerleşik bir iletiyle yanıtlanır. `x-zeyn-partial: 1` başlığı olan bir istek, yalnızca o ekranı `x-zeyn-partial: 1` ve `x-zeyn-title` ile alır; böylece runtime ekranı sayfa yüklemeden yerine koyar. Hata ayrıntıları tarayıcıya asla ulaşmaz.
 

@@ -87,6 +87,18 @@ pub fn catalog_page(p: CatalogParams, store: Catalog) -> Result<Screen> {
 }
 ```
 
+`Screen::redirect(screen, params)`, adresin kendisi geçerli kalırken bir isteği başka bir screen'e gönderir, örneğin rastgele bir seçime ya da en yeni öğeye. Tarayıcı, hedefin kanonik yolunu taşıyan `303 See Other` ve `Cache-Control: no-store` alır; uygulama içi gezinme onu sayfa yüklemeden izler ve adres çubuğu hedefi gösterir. Hedef her zaman route'u olan tipli bir screen'dir, bu yüzden bir yönlendirme uygulamanın dışındaki bir adrese asla götüremez ve uygulamanın sunmadığı bir hedef 404 yanıtlar.
+
+```rust
+#[screen(route = "/random", public)]
+pub async fn random_item(store: Catalog) -> Result<Screen> {
+    let item = store.random().await?.ok_or(Error::NotFound)?;
+    Ok(Screen::redirect(catalog_page, CatalogParams { slug: item.slug, n: item.n }))
+}
+```
+
+@live redirect
+
 ## Erişim
 
 | Seçenek | Anlamı |

@@ -87,6 +87,18 @@ pub fn catalog_page(p: CatalogParams, store: Catalog) -> Result<Screen> {
 }
 ```
 
+تحوّل `Screen::redirect(screen, params)` طلبًا واحدًا إلى شاشة أخرى، مثل اختيار عشوائي أو أحدث عنصر، بينما يبقى العنوان نفسه صالحًا. يحصل المتصفح على `303 See Other` مع المسار القانوني للهدف و`Cache-Control: no-store`؛ ويتبعه التنقل داخل التطبيق دون تحميل الصفحة، ويعرض شريط العنوان الهدف. الهدف دائمًا شاشة مكتوبة لها route، فلا يمكن أن يقود التحويل إلى عنوان خارج التطبيق، والهدف الذي لا يخدمه التطبيق يجيب بـ 404.
+
+```rust
+#[screen(route = "/random", public)]
+pub async fn random_item(store: Catalog) -> Result<Screen> {
+    let item = store.random().await?.ok_or(Error::NotFound)?;
+    Ok(Screen::redirect(catalog_page, CatalogParams { slug: item.slug, n: item.n }))
+}
+```
+
+@live redirect
+
 ## الوصول (Access)
 
 | الخيار | المعنى |

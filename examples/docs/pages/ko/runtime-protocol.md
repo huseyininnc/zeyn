@@ -8,7 +8,7 @@
 
 `GET {route}?params={json}`은 전체 HTML 문서를 반환합니다. `params`는 Screen 매개변수의 URL 인코딩된 JSON이며, Screen에 매개변수가 없으면 생략됩니다.
 
-`/orders/{id}`처럼 경로 세그먼트가 있는 경로는 해당 params 필드를 경로(`/orders/42`)에서, 나머지 필드를 `params`에서 읽습니다. 파싱되지 않는 세그먼트 값은 404로 응답합니다. 값은 점도 포함하여 퍼센트 인코딩되므로(`%2E`) Screen URL이 런타임에 파일처럼 보이는 일이 없습니다. `Screen::moved_to`로 응답하는 Screen은 `Location`에 새 URL이 있는 `301 Moved Permanently`를 받습니다.
+`/orders/{id}`처럼 경로 세그먼트가 있는 경로는 해당 params 필드를 경로(`/orders/42`)에서, 나머지 필드를 `params`에서 읽습니다. 파싱되지 않는 세그먼트 값은 404로 응답합니다. 값은 점도 포함하여 퍼센트 인코딩되므로(`%2E`) Screen URL이 런타임에 파일처럼 보이는 일이 없습니다. `Screen::moved_to`로 응답하는 Screen은 `Location`에 새 URL이 있는 `301 Moved Permanently`를 받고, `Screen::redirect`로 응답하는 Screen은 `Cache-Control: no-store`가 있는 `303 See Other`를 받습니다. `nav.js`는 둘 다 페이지 로드 없이 따라가며, 로드가 기록 항목을 추가하지 않는 경우(뒤로 가기와 앞으로 가기)에도 대상의 주소를 표시합니다.
 
 실패한 페이지는 해당 상태(404, 403, 500, ...)와 셸 안의 앱 오류 Screen(`App::not_found`, `App::server_error`) 또는 짧은 내장 메시지로 응답합니다. `x-zeyn-partial: 1`이 있는 요청은 `x-zeyn-partial: 1`과 `x-zeyn-title`이 있는 그 Screen만 받으므로 런타임이 페이지 로드 없이 이를 교체합니다. 오류의 세부 정보는 브라우저에 도달하지 않습니다.
 

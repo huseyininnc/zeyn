@@ -87,6 +87,18 @@ pub fn catalog_page(p: CatalogParams, store: Catalog) -> Result<Screen> {
 }
 ```
 
+`Screen::redirect(screen, params)` は、アドレス自体は有効なまま、1 つのリクエストを別の Screen へ送ります。たとえばランダムな選択や最新の項目です。ブラウザは、遷移先の正規パスと `Cache-Control: no-store` を伴う `303 See Other` を受け取り、アプリ内ナビゲーションはページを読み込まずにそれをたどり、アドレスバーには遷移先が表示されます。遷移先は常にルートを持つ型付きの Screen なので、リダイレクトがアプリ外のアドレスへ向かうことはなく、アプリが提供していない遷移先には 404 が返ります。
+
+```rust
+#[screen(route = "/random", public)]
+pub async fn random_item(store: Catalog) -> Result<Screen> {
+    let item = store.random().await?.ok_or(Error::NotFound)?;
+    Ok(Screen::redirect(catalog_page, CatalogParams { slug: item.slug, n: item.n }))
+}
+```
+
+@live redirect
+
 ## アクセス
 
 | オプション | 意味 |

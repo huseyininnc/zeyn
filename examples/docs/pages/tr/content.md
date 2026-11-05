@@ -58,7 +58,7 @@ AutoGrid::new()
 
 ## List
 
-Alt alta dizilen satırlar, bir `<ul>` içinde. Her `ListItem`'ın bir başlığı vardır; küçük bir baştaki görseli (kart görselleriyle aynı güvenli adresler: bir yol, `https:` ya da `data:image/`), bir alt başlığı ve sonda kısa bir meta metni olabilir. `.link(screen, params)` ile satırın tamamı tek bir bağlantı olur: sekme sırasında tek durak, görünür odak halkası vardır ve sayfa yenilenmeden açılır. Uzun metin satır kırar; telefonlarda meta metin başlığın altına geçer, sağdan sola yazılan sayfalarda satır aynalanır.
+Alt alta dizilen satırlar, bir `<ul>` içinde. Her `ListItem`'ın bir başlığı vardır; küçük bir baştaki görseli (kart görselleriyle aynı güvenli adresler: bir yol, `https:` ya da `data:image/`), bir alt başlığı ve sonda kısa bir meta olabilir: metin ya da `RelativeTime` gibi bir satır içi bileşen. `.link(screen, params)` ile satırın tamamı tek bir bağlantı olur: sekme sırasında tek durak, görünür odak halkası vardır ve sayfa yenilenmeden açılır. Uzun metin satır kırar; telefonlarda meta metin başlığın altına geçer, sağdan sola yazılan sayfalarda satır aynalanır.
 
 `List::new()` kendisine verilen öğeleri tutar. `List::of(action)` satırları DataGrid'in kullandığı türden bir action ile yükler ve [kart ızgarası](catalog.md#card-grid) gibi sayfalar: `paging` başka türlü söylemedikçe 20 satır ve bir "Show more" düğmesi, sıralama seçenekleri, `.search(text)` ile sunucu tarafı arama ve her sayfa için action'ın erişim denetimi.
 
@@ -74,7 +74,7 @@ List::of(search_people)
         ListItem::new(p.name.clone())
             .image(p.photo.clone())
             .subtitle(p.city.clone())
-            .meta(p.joined.format(&locale))
+            .meta(RelativeTime::new(p.joined))
             .link(person, PersonParams { id: p.id })
     })
     .sort_option(t!("people.by_name"), Person::name, false)

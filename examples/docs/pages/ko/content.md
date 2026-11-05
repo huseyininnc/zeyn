@@ -58,7 +58,7 @@ AutoGrid::new()
 
 ## List
 
-`<ul>` 안에 행을 위아래로 나열합니다. 각 `ListItem`에는 제목이 있고, 시작 부분의 작은 이미지(카드 이미지와 같은 안전한 주소: 경로, `https:` 또는 `data:image/`), 부제목, 끝에 짧은 메타 텍스트를 둘 수 있습니다. `.link(screen, params)`를 쓰면 행 전체가 하나의 링크가 되므로 탭 순서에서 한 지점이고, 포커스 링이 눈에 보이며, 페이지를 다시 불러오지 않고 열립니다. 긴 텍스트는 줄 바꿈되며, 휴대폰에서는 메타 텍스트가 제목 아래로 이동하고, 오른쪽에서 왼쪽으로 쓰는 페이지에서는 행이 좌우 반전됩니다.
+`<ul>` 안에 행을 위아래로 나열합니다. 각 `ListItem`에는 제목이 있고, 시작 부분의 작은 이미지(카드 이미지와 같은 안전한 주소: 경로, `https:` 또는 `data:image/`), 부제목, 끝에 짧은 메타를 둘 수 있습니다. 텍스트나 `RelativeTime` 같은 인라인 컴포넌트를 쓸 수 있습니다. `.link(screen, params)`를 쓰면 행 전체가 하나의 링크가 되므로 탭 순서에서 한 지점이고, 포커스 링이 눈에 보이며, 페이지를 다시 불러오지 않고 열립니다. 긴 텍스트는 줄 바꿈되며, 휴대폰에서는 메타 텍스트가 제목 아래로 이동하고, 오른쪽에서 왼쪽으로 쓰는 페이지에서는 행이 좌우 반전됩니다.
 
 `List::new()`는 받은 항목을 그대로 담습니다. `List::of(action)`는 DataGrid가 쓰는 것과 같은 종류의 action으로 행을 불러오고 [카드 그리드](catalog.md#card-grid)처럼 페이징합니다. `paging`이 달리 지정하지 않으면 20행과 "Show more" 버튼, 정렬 옵션, `.search(text)`를 이용한 서버 측 검색을 제공하며, 페이지마다 action의 접근 권한을 확인합니다.
 
@@ -74,7 +74,7 @@ List::of(search_people)
         ListItem::new(p.name.clone())
             .image(p.photo.clone())
             .subtitle(p.city.clone())
-            .meta(p.joined.format(&locale))
+            .meta(RelativeTime::new(p.joined))
             .link(person, PersonParams { id: p.id })
     })
     .sort_option(t!("people.by_name"), Person::name, false)

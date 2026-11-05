@@ -35,7 +35,13 @@ Bir liste action'ı `DataQuery` alır ve `Page<M>` döndürür:
 | `time_zone` | `DateTime` sütunlarındaki tarih süzgeçleri için saat dilimi, sunucu tarafından atanır |
 | `group` | Satırları bir alana göre gruplar, grid tarafından atanır |
 
-`DataQuery::apply(vec)` bunların hepsini bellekte yapar. Bir SQL veritabanı için `zeyn::sql` kullanın: `Db::find`, aynı sorguyu PostgreSQL ya da Oracle için `WHERE`, `ORDER BY`, `LIMIT` ve `GROUP BY` ifadelerine çevirir. Yalnızca entity'nin kendi alanları süzülebilir ya da sıralanabilir, her değer parametre olarak bağlanır ve sayfa boyutu sunucuda sınırlanır; böylece istemci girdisi SQL metnine hiç ulaşmaz. SQL'i yalnızca `Db::find`'ın ifade edemediği sorgular için elle yazın ve o zaman istemciden gelen hiçbir alan adını ya da değeri içine yapıştırmayın.
+`DataQuery::apply(vec)` bunların hepsini bellekte yapar. Bir SQL veritabanı için `zeyn::sql` kullanın: `Db::find`, aynı sorguyu PostgreSQL ya da Oracle için `WHERE`, `ORDER BY`, `LIMIT` ve `GROUP BY` ifadelerine çevirir. Yalnızca entity'nin kendi alanları süzülebilir ya da sıralanabilir, her değer parametre olarak bağlanır ve sayfa boyutu sunucuda sınırlanır; böylece istemci girdisi SQL metnine hiç ulaşmaz. SQL'i yalnızca `Db::find`'ın ifade edemediği sorgular için elle yazın: `Db::query::<M>(sql, args)` bir `SELECT`'in satırlarını bir modele okur, SQL'i yalnızca string literal olarak, her değeri parametre olarak alır ve en fazla 1000 satır okur.
+
+```rust
+let hits: Vec<Hit> = db
+    .query("SELECT id, title FROM items WHERE title % $1 ORDER BY similarity(title, $1) DESC LIMIT 20", vec![q.into()])
+    .await?;
+```
 
 ```toml
 zeyn = { version = "0.0.7", features = ["postgres"] }   # or ["oracle"]
