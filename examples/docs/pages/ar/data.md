@@ -62,6 +62,19 @@ Chart::funnel("Checkout").labels(["Visited", "Cart", "Paid"]).series("People", [
 ```rust
 Kpi::new("Revenue this month", 184_250.0).delta(12.4).target(200_000.0).trend([140.0, 152.0, 160.0, 184.0])
 Kpi::new("Average wait", 6.5).decimals(1).unit("min").delta(-9.0).lower_is_better()
+Kpi::money("Revenue", Money::tl(18_425_050)).delta(4.2).target(200_000.0)
+```
+
+يعرض `Kpi::money` مبلغًا بعملته وفق لغة المستخدم وإعداداته المحلية (`₺184,250.50` بالإنجليزية و`184.250,50 ₺` بالتركية)، ويُقرأ الهدف بالعملة نفسها.
+
+تكون مؤشرات Kpi في `Row` أو `AutoGrid` واحد بطول أطولها، سواء كان لها اتجاه أم لا، ويبقى خط الاتجاه المصغّر أسفل كل بطاقة. يمنح `Row` من مؤشرات Kpi كل مؤشر ربع العرض: تملأ أربعة منها الصف على سطح المكتب، وينكسر الصف إلى اثنين في السطر تحت نحو 830 px وإلى واحد تحت 480 px (باستعلامات الحاوية على الصف، لذلك ينكسر صف Kpi داخل عمود ضيق أبكر). تملأ المخططات عرض حاويتها وتحافظ على نسبها. تبقى المخططات الحلقية والمقاييس بارتفاع 18rem على الأكثر وفي المنتصف.
+
+```rust
+Row::new()
+    .col(Kpi::money("Revenue", revenue).delta(12.4).trend(weekly))
+    .col(Kpi::new("Orders", 1_284.0).delta(3.1))
+    .col(Kpi::new("New customers", 312.0).delta(-2.0))
+    .col(Kpi::money("Average order", average).delta(0.0))
 ```
 
 في `DataGrid` يُرسم عمود `Vec<f64>` خطًا موجزًا، ويُرسم عمود الرقم أو المال مخططًا نقطيًا (bullet) مقابل هدف:
@@ -72,4 +85,4 @@ DataGrid::of(search_reps)
     .column(Rep::weeks).cell(SparklineCell::new())
 ```
 
-كلاهما SVG صغير واحد لكل خلية باسم مثل "Trend of 12 values from 40 to 61, lowest 12, highest 99". الميزانية: نحو 0.65 كيلوبايت من HTML لكل صف للخليتين معًا؛ وعرض 10,000 صف منهما يستغرق نحو 0.4 ثانية في بناء التنقيح (`sparkline_and_bullet_cells_render_ten_thousand_rows_quickly`)، وتعرض الشبكات الصفوف الظاهرة فقط. يضيف `charts.js` 3.7 كيلوبايت خامًا (1.4 كيلوبايت gzip) و`charts.css` 3.3 كيلوبايت (1.1 كيلوبايت gzip).
+كلاهما SVG صغير واحد لكل خلية باسم مثل "Trend of 12 values from 40 to 61, lowest 12, highest 99". الميزانية: نحو 0.65 كيلوبايت من HTML لكل صف للخليتين معًا؛ وعرض 10,000 صف منهما يستغرق نحو 0.4 ثانية في بناء التنقيح (`sparkline_and_bullet_cells_render_ten_thousand_rows_quickly`)، وتعرض الشبكات الصفوف الظاهرة فقط. يضيف `charts.js` 3.7 كيلوبايت خامًا (1.4 كيلوبايت gzip) و`charts.css` 4.1 كيلوبايت (1.3 كيلوبايت gzip).

@@ -62,6 +62,19 @@ El cursor, el foco y un toque muestran el mismo texto en un tooltip, que se ocul
 ```rust
 Kpi::new("Revenue this month", 184_250.0).delta(12.4).target(200_000.0).trend([140.0, 152.0, 160.0, 184.0])
 Kpi::new("Average wait", 6.5).decimals(1).unit("min").delta(-9.0).lower_is_better()
+Kpi::money("Revenue", Money::tl(18_425_050)).delta(4.2).target(200_000.0)
+```
+
+`Kpi::money` muestra un importe con su moneda en la configuración regional del usuario (`₺184,250.50` en inglés, `184.250,50 ₺` en turco), y su objetivo en la misma moneda.
+
+Los Kpi de un mismo `Row` o `AutoGrid` tienen la altura del más alto, tengan o no tendencia, y el sparkline queda al pie de cada tarjeta. Un `Row` de Kpi da a cada uno un cuarto del ancho: cuatro llenan la fila en un escritorio, y la fila pasa a dos por línea por debajo de unos 830 px y a uno por debajo de 480 px (con container queries sobre la fila, así que una fila de Kpi en una columna estrecha se reparte antes). Los gráficos ocupan el ancho de su contenedor y mantienen sus proporciones. Los de anillo y los indicadores miden como mucho 18rem de alto y quedan centrados.
+
+```rust
+Row::new()
+    .col(Kpi::money("Revenue", revenue).delta(12.4).trend(weekly))
+    .col(Kpi::new("Orders", 1_284.0).delta(3.1))
+    .col(Kpi::new("New customers", 312.0).delta(-2.0))
+    .col(Kpi::money("Average order", average).delta(0.0))
 ```
 
 En un `DataGrid`, una columna `Vec<f64>` se dibuja como sparkline y una columna de número o dinero como bullet frente a un objetivo:
@@ -72,4 +85,4 @@ DataGrid::of(search_reps)
     .column(Rep::weeks).cell(SparklineCell::new())
 ```
 
-Ambos son un SVG pequeño por celda con un nombre como "Trend of 12 values from 40 to 61, lowest 12, highest 99". Presupuesto: unos 0,65 KB de HTML por fila para las dos celdas; 10.000 filas de ambas se renderizan en unos 0,4 s en una compilación de depuración (`sparkline_and_bullet_cells_render_ten_thousand_rows_quickly`), y las tablas solo renderizan las filas visibles. `charts.js` añade 3,7 KB sin comprimir (1,4 KB con gzip) y `charts.css` 3,3 KB (1,1 KB con gzip).
+Ambos son un SVG pequeño por celda con un nombre como "Trend of 12 values from 40 to 61, lowest 12, highest 99". Presupuesto: unos 0,65 KB de HTML por fila para las dos celdas; 10.000 filas de ambas se renderizan en unos 0,4 s en una compilación de depuración (`sparkline_and_bullet_cells_render_ten_thousand_rows_quickly`), y las tablas solo renderizan las filas visibles. `charts.js` añade 3,7 KB sin comprimir (1,4 KB con gzip) y `charts.css` 4,1 KB (1,3 KB con gzip).

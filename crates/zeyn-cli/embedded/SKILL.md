@@ -209,6 +209,8 @@ What to remember:
   `.bulk_action(...)`, `.editable()` with `.edit_with(action)`, `.detail(screen)`, `.group_by(field)`.
 - Buttons that run an action: `ActionButton::new(t!("..."), action, input)`, with `.confirm(...)`.
 - Layouts: `Row`, `Stack`, `Panel`, `Card`, `Tabs`, `Split`.
+- Key figures: `Kpi::new(t!("..."), value)` or `Kpi::money(t!("..."), money)` with `.delta(..)`
+  and `.trend(..)`; four in a `Row` fill a desktop row and wrap two, then one per line.
 - The app (`src/app.rs`): `App::new(t!("app.name")).i18n(i18n).service(store).feature(sales::feature())`,
   plus what the app needs: `.auth(...)`, `.mcp(Mcp::read_only())`, `.themes([...])`,
   `.datagrid_views(store)`, `.assistant(...)`.

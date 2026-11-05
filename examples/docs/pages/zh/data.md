@@ -62,6 +62,19 @@ Chart::funnel("Checkout").labels(["Visited", "Cart", "Paid"]).series("People", [
 ```rust
 Kpi::new("Revenue this month", 184_250.0).delta(12.4).target(200_000.0).trend([140.0, 152.0, 160.0, 184.0])
 Kpi::new("Average wait", 6.5).decimals(1).unit("min").delta(-9.0).lower_is_better()
+Kpi::money("Revenue", Money::tl(18_425_050)).delta(4.2).target(200_000.0)
+```
+
+`Kpi::money` 按用户的区域设置显示带货币的金额（英语中为 `₺184,250.50`，土耳其语中为 `184.250,50 ₺`），目标也使用同一货币。
+
+同一个 `Row` 或 `AutoGrid` 中的 Kpi 与最高的一个等高，无论是否有趋势线，迷你折线图都位于每张卡片的底部。由 Kpi 组成的 `Row` 给每个 Kpi 四分之一的宽度：在桌面上四个正好填满一行，宽度小于约 830 px 时每行两个，小于 480 px 时每行一个（基于该行的容器查询，因此窄列中的 Kpi 行会更早换行）。图表与其容器同宽，并保持比例。环形图和仪表盘最高 18rem，并居中显示。
+
+```rust
+Row::new()
+    .col(Kpi::money("Revenue", revenue).delta(12.4).trend(weekly))
+    .col(Kpi::new("Orders", 1_284.0).delta(3.1))
+    .col(Kpi::new("New customers", 312.0).delta(-2.0))
+    .col(Kpi::money("Average order", average).delta(0.0))
 ```
 
 在 `DataGrid` 中，`Vec<f64>` 列会绘制为迷你图，数字或金额列会绘制为针对目标的子弹图（bullet）：
@@ -72,4 +85,4 @@ DataGrid::of(search_reps)
     .column(Rep::weeks).cell(SparklineCell::new())
 ```
 
-两者每个单元格都是一个小型 SVG，名称形如 "Trend of 12 values from 40 to 61, lowest 12, highest 99"。预算：这两种单元格每行约 0.65 KB 的 HTML；在调试构建中渲染 10,000 行的两种单元格约需 0.4 秒（`sparkline_and_bullet_cells_render_ten_thousand_rows_quickly`），而且表格只渲染视野内的行。`charts.js` 增加 3.7 KB 原始大小（1.4 KB gzip），`charts.css` 增加 3.3 KB（1.1 KB gzip）。
+两者每个单元格都是一个小型 SVG，名称形如 "Trend of 12 values from 40 to 61, lowest 12, highest 99"。预算：这两种单元格每行约 0.65 KB 的 HTML；在调试构建中渲染 10,000 行的两种单元格约需 0.4 秒（`sparkline_and_bullet_cells_render_ten_thousand_rows_quickly`），而且表格只渲染视野内的行。`charts.js` 增加 3.7 KB 原始大小（1.4 KB gzip），`charts.css` 增加 4.1 KB（1.3 KB gzip）。

@@ -62,6 +62,19 @@ Chart::funnel("Checkout").labels(["Visited", "Cart", "Paid"]).series("People", [
 ```rust
 Kpi::new("Revenue this month", 184_250.0).delta(12.4).target(200_000.0).trend([140.0, 152.0, 160.0, 184.0])
 Kpi::new("Average wait", 6.5).decimals(1).unit("min").delta(-9.0).lower_is_better()
+Kpi::money("Revenue", Money::tl(18_425_050)).delta(4.2).target(200_000.0)
+```
+
+`Kpi::money` は金額をユーザーのロケールで通貨付きで表示します（英語では `₺184,250.50`、トルコ語では `184.250,50 ₺`）。目標も同じ通貨で扱います。
+
+同じ `Row` や `AutoGrid` に並ぶ Kpi は、トレンドの有無にかかわらず一番高いものと同じ高さになり、スパークラインは各カードの下端に置かれます。Kpi の `Row` は各 Kpi に幅の 4 分の 1 を割り当てます。デスクトップでは 4 つで行が埋まり、約 830 px 未満では 1 行に 2 つ、480 px 未満では 1 つに折り返します（行に対するコンテナクエリなので、狭い列の中の Kpi 行はより早く折り返します）。チャートはコンテナの幅いっぱいに広がり、縦横比を保ちます。ドーナツとゲージは高さ 18rem までで、中央に配置されます。
+
+```rust
+Row::new()
+    .col(Kpi::money("Revenue", revenue).delta(12.4).trend(weekly))
+    .col(Kpi::new("Orders", 1_284.0).delta(3.1))
+    .col(Kpi::new("New customers", 312.0).delta(-2.0))
+    .col(Kpi::money("Average order", average).delta(0.0))
 ```
 
 `DataGrid` では、`Vec<f64>` の列はスパークラインとして、数値または金額の列は目標に対するブレットとして描画されます。
@@ -72,4 +85,4 @@ DataGrid::of(search_reps)
     .column(Rep::weeks).cell(SparklineCell::new())
 ```
 
-どちらも、セルごとに小さな SVG 1 つで、「Trend of 12 values from 40 to 61, lowest 12, highest 99」のような名前が付きます。予算: 両方のセルで 1 行あたり約 0.65 KB の HTML です。両方を持つ 10,000 行は、デバッグビルドで約 0.4 秒でレンダリングされ（`sparkline_and_bullet_cells_render_ten_thousand_rows_quickly`）、グリッドは表示範囲の行だけをレンダリングします。`charts.js` は生で 3.7 KB（gzip で 1.4 KB）、`charts.css` は 3.3 KB（gzip で 1.1 KB）追加します。
+どちらも、セルごとに小さな SVG 1 つで、「Trend of 12 values from 40 to 61, lowest 12, highest 99」のような名前が付きます。予算: 両方のセルで 1 行あたり約 0.65 KB の HTML です。両方を持つ 10,000 行は、デバッグビルドで約 0.4 秒でレンダリングされ（`sparkline_and_bullet_cells_render_ten_thousand_rows_quickly`）、グリッドは表示範囲の行だけをレンダリングします。`charts.js` は生で 3.7 KB（gzip で 1.4 KB）、`charts.css` は 4.1 KB（gzip で 1.3 KB）追加します。

@@ -62,6 +62,19 @@ Hover, focus and a tap show the same text in a tooltip, which is hidden from scr
 ```rust
 Kpi::new("Revenue this month", 184_250.0).delta(12.4).target(200_000.0).trend([140.0, 152.0, 160.0, 184.0])
 Kpi::new("Average wait", 6.5).decimals(1).unit("min").delta(-9.0).lower_is_better()
+Kpi::money("Revenue", Money::tl(18_425_050)).delta(4.2).target(200_000.0)
+```
+
+`Kpi::money` shows an amount with its currency in the user's locale (`₺184,250.50` in English, `184.250,50 ₺` in Turkish), and its target in the same currency.
+
+Kpis in one `Row` or `AutoGrid` are as tall as the tallest, whether or not they have a trend, and the sparkline sits at the bottom of each card. A `Row` of Kpis gives each one a quarter of the width: four fill the row on a desktop, and the row wraps to two per line below about 830 px and to one below 480 px (container queries on the row, so a Kpi row in a narrow column wraps sooner). Charts are as wide as their container and keep their proportions. Donuts and gauges stay at most 18rem tall and sit in the middle.
+
+```rust
+Row::new()
+    .col(Kpi::money("Revenue", revenue).delta(12.4).trend(weekly))
+    .col(Kpi::new("Orders", 1_284.0).delta(3.1))
+    .col(Kpi::new("New customers", 312.0).delta(-2.0))
+    .col(Kpi::money("Average order", average).delta(0.0))
 ```
 
 In a `DataGrid`, a `Vec<f64>` column draws as a sparkline and a number or money column as a bullet against a target:
@@ -72,4 +85,4 @@ DataGrid::of(search_reps)
     .column(Rep::weeks).cell(SparklineCell::new())
 ```
 
-Both are one small SVG per cell with a name such as "Trend of 12 values from 40 to 61, lowest 12, highest 99". Budget: about 0.65 KB of HTML per row for both cells; 10,000 rows of both render in about 0.4 s in a debug build (`sparkline_and_bullet_cells_render_ten_thousand_rows_quickly`), and grids only render the rows in view. `charts.js` adds 3.7 KB raw (1.4 KB gzip) and `charts.css` 3.3 KB (1.1 KB gzip).
+Both are one small SVG per cell with a name such as "Trend of 12 values from 40 to 61, lowest 12, highest 99". Budget: about 0.65 KB of HTML per row for both cells; 10,000 rows of both render in about 0.4 s in a debug build (`sparkline_and_bullet_cells_render_ten_thousand_rows_quickly`), and grids only render the rows in view. `charts.js` adds 3.7 KB raw (1.4 KB gzip) and `charts.css` 4.1 KB (1.3 KB gzip).

@@ -62,6 +62,19 @@ Chart::funnel("Checkout").labels(["Visited", "Cart", "Paid"]).series("People", [
 ```rust
 Kpi::new("Revenue this month", 184_250.0).delta(12.4).target(200_000.0).trend([140.0, 152.0, 160.0, 184.0])
 Kpi::new("Average wait", 6.5).decimals(1).unit("min").delta(-9.0).lower_is_better()
+Kpi::money("Revenue", Money::tl(18_425_050)).delta(4.2).target(200_000.0)
+```
+
+`Kpi::money`는 금액을 사용자 로캘에 맞춰 통화와 함께 보여 주며(영어에서 `₺184,250.50`, 터키어에서 `184.250,50 ₺`), 목표도 같은 통화로 읽습니다.
+
+한 `Row`나 `AutoGrid` 안의 Kpi는 추세가 있든 없든 가장 높은 것과 같은 높이이며, 스파크라인은 각 카드의 아래쪽에 놓입니다. Kpi로 된 `Row`는 각 Kpi에 너비의 4분의 1을 줍니다. 데스크톱에서는 네 개가 한 줄을 채우고, 약 830 px보다 좁으면 한 줄에 두 개, 480 px보다 좁으면 한 개로 줄바꿈합니다(행에 대한 컨테이너 쿼리이므로 좁은 열 안의 Kpi 행은 더 일찍 줄바꿈합니다). 차트는 컨테이너 너비를 채우고 비율을 유지합니다. 도넛과 게이지는 높이가 최대 18rem이며 가운데에 놓입니다.
+
+```rust
+Row::new()
+    .col(Kpi::money("Revenue", revenue).delta(12.4).trend(weekly))
+    .col(Kpi::new("Orders", 1_284.0).delta(3.1))
+    .col(Kpi::new("New customers", 312.0).delta(-2.0))
+    .col(Kpi::money("Average order", average).delta(0.0))
 ```
 
 `DataGrid`에서 `Vec<f64>` 열은 스파크라인으로, 숫자 또는 금액 열은 목표에 대한 불릿으로 그려집니다.
@@ -72,4 +85,4 @@ DataGrid::of(search_reps)
     .column(Rep::weeks).cell(SparklineCell::new())
 ```
 
-둘 다 셀당 작은 SVG 하나이며 "Trend of 12 values from 40 to 61, lowest 12, highest 99" 같은 이름을 가집니다. 예산: 두 셀을 합쳐 행당 HTML 약 0.65 KB입니다. 둘 다 있는 10,000행은 디버그 빌드에서 약 0.4초에 렌더링되며(`sparkline_and_bullet_cells_render_ten_thousand_rows_quickly`), 그리드는 보이는 행만 렌더링합니다. `charts.js`는 원본 3.7 KB(gzip 1.4 KB), `charts.css`는 3.3 KB(gzip 1.1 KB)를 추가합니다.
+둘 다 셀당 작은 SVG 하나이며 "Trend of 12 values from 40 to 61, lowest 12, highest 99" 같은 이름을 가집니다. 예산: 두 셀을 합쳐 행당 HTML 약 0.65 KB입니다. 둘 다 있는 10,000행은 디버그 빌드에서 약 0.4초에 렌더링되며(`sparkline_and_bullet_cells_render_ten_thousand_rows_quickly`), 그리드는 보이는 행만 렌더링합니다. `charts.js`는 원본 3.7 KB(gzip 1.4 KB), `charts.css`는 4.1 KB(gzip 1.3 KB)를 추가합니다.

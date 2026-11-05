@@ -1607,7 +1607,9 @@ dialog.z-confirm::backdrop { background: var(--z-backdrop); }
 
 .z-chart-title { font-weight: 600; }
 
-.z-chart-svg { width: 100%; height: auto; max-height: 18rem; overflow: visible; }
+.z-chart-svg { display: block; width: 100%; height: auto; overflow: visible; }
+
+.z-chart-round { max-height: 18rem; }
 
 .z-chart-grid { stroke: var(--z-border); stroke-width: 1; }
 

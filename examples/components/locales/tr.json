@@ -130,7 +130,8 @@
       "chart": {
         "overview": "Örnek",
         "donut": "Halka",
-        "gauge": "Gösterge"
+        "gauge": "Gösterge",
+        "side_by_side": "Yan yana, genişliği dolduran"
       },
       "chips": {
         "overview": "Süzme çipleri",
@@ -182,7 +183,9 @@
         "with_preview": "Üzerine gelince önizleme"
       },
       "kpi": {
-        "overview": "Örnek"
+        "overview": "Örnek",
+        "money": "Para",
+        "row_of_four": "Eşit yükseklikte dörtlü satır"
       },
       "line_editor": {
         "overview": "Örnek"

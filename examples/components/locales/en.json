@@ -130,7 +130,8 @@
       "chart": {
         "overview": "Example",
         "donut": "Donut",
-        "gauge": "Gauge"
+        "gauge": "Gauge",
+        "side_by_side": "Side by side, filling the width"
       },
       "chips": {
         "overview": "Filter chips",
@@ -182,7 +183,9 @@
         "with_preview": "With a hover preview"
       },
       "kpi": {
-        "overview": "Example"
+        "overview": "Example",
+        "money": "Money",
+        "row_of_four": "A row of four, equal heights"
       },
       "line_editor": {
         "overview": "Example"

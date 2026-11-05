@@ -60,8 +60,10 @@
 .z-bullet-text { font-variant-numeric: tabular-nums; }
 
 .z-kpi {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: var(--z-space);
+  height: 100%;
   min-width: 0;
   padding: calc(var(--z-space) * 3);
   border: 1px solid var(--z-border);
@@ -87,7 +89,26 @@
 
 .z-kpi-target { color: var(--z-text-muted); font-size: var(--z-font-size-sm); }
 
+.z-kpi-trend { margin-top: auto; }
+
 .z-kpi-trend .z-spark { width: 100%; max-width: 12rem; height: 28px; }
+
+/* Kpis in a row or an auto grid: as tall as the tallest; a row of four wraps to two, then one. */
+
+.z-autogrid > .z-node:has(> .z-kpi),
+.z-col > .z-node:has(> .z-kpi) { height: 100%; }
+
+.z-row:has(> .z-col > .z-node > .z-kpi) { container-type: inline-size; align-items: stretch; }
+
+.z-row:has(> .z-col > .z-node > .z-kpi) > .z-col { flex: 1 1 calc((100% - 3 * var(--z-gap)) / 4 - 0.1px); }
+
+@container (max-width: 52rem) {
+  .z-row:has(> .z-col > .z-node > .z-kpi) > .z-col { flex-basis: calc((100% - var(--z-gap)) / 2 - 0.1px); }
+}
+
+@container (max-width: 30rem) {
+  .z-row:has(> .z-col > .z-node > .z-kpi) > .z-col { flex-basis: 100%; }
+}
 
 @media (forced-colors: active) {
   .z-chart-mark:focus-visible { outline-color: Highlight; }

@@ -13,7 +13,7 @@ use crate::grid::CellRenderer;
 use crate::i18n::{NumberFormat, Text};
 use crate::render::{Render, escape};
 use crate::screen::{Component, Node};
-use crate::value::{FieldKind, FieldType, SupportsSum, Value};
+use crate::value::{Currency, FieldKind, FieldType, Money, SupportsSum, Value};
 use serde::Serialize;
 use serde_json::{Value as Json, json};
 use std::fmt::Write as _;
@@ -927,9 +927,14 @@ impl Component for Chart {
     fn render(&self, out: &mut String, r: &Render) {
         let id = dom_id(r, "chart");
         let title = r.text(&self.title);
+        let round = if matches!(self.kind, ChartKind::Donut | ChartKind::Gauge) {
+            " z-chart-round"
+        } else {
+            ""
+        };
         let _ = write!(
             out,
-            r#"<figure class="z-chart" data-zeyn-chart><figcaption class="z-chart-title" id="{id}-title">{title}</figcaption><svg class="z-chart-svg" viewBox="0 0 {W} {H}" role="group" aria-roledescription="{}" aria-labelledby="{id}-title {id}-desc" focusable="false"><desc id="{id}-desc">{}</desc>"#,
+            r#"<figure class="z-chart" data-zeyn-chart><figcaption class="z-chart-title" id="{id}-title">{title}</figcaption><svg class="z-chart-svg{round}" viewBox="0 0 {W} {H}" role="group" aria-roledescription="{}" aria-labelledby="{id}-title {id}-desc" focusable="false"><desc id="{id}-desc">{}</desc>"#,
             r.text(&Text::key("zeyn.ui.chart.role")),
             self.summary(r)
         );
@@ -1135,9 +1140,14 @@ pub enum Better {
 /// zeyn::Component::render(&k, &mut out, &zeyn::Render::english("s"));
 /// assert!(out.contains("1,234.5") && out.contains("Up 12.5%"));
 /// ```
+///
+/// Kpis in one [`crate::ui::Row`] or [`crate::ui::AutoGrid`] are as tall as the tallest, with or
+/// without a trend. A row of four fills the width on a desktop and wraps to two and then one per
+/// line as it narrows.
 pub struct Kpi {
     title: Text,
     value: f64,
+    currency: Option<Currency>,
     decimals: u8,
     unit: Option<Text>,
     delta: Option<f64>,
@@ -1151,12 +1161,40 @@ impl Kpi {
         Self {
             title: title.into(),
             value: finite(value),
+            currency: None,
             decimals: 0,
             unit: None,
             delta: None,
             better: Better::Higher,
             target: None,
             trend: Vec::new(),
+        }
+    }
+
+    /// An amount of money, shown with its currency in the user's locale; the target is read in
+    /// the same currency.
+    ///
+    /// ```
+    /// use zeyn::ui::Kpi;
+    /// let k = Kpi::money("Revenue", zeyn::Money::tl(18_425_050)).delta(4.0);
+    /// let mut out = String::new();
+    /// zeyn::Component::render(&k, &mut out, &zeyn::Render::english("s"));
+    /// assert!(out.contains("₺184,250.50"));
+    /// ```
+    pub fn money(title: impl Into<Text>, amount: Money) -> Self {
+        Self {
+            currency: Some(amount.currency),
+            decimals: 2,
+            ..Self::new(title, amount.minor as f64 / 100.0)
+        }
+    }
+
+    /// The value or the target as shown: money with its currency, other numbers with the
+    /// decimals asked for.
+    fn shown(&self, v: f64, locale: &str) -> String {
+        match self.currency {
+            Some(c) => Money::new((v * 100.0).round() as i64, c).format(locale),
+            None => format_number(v, self.decimals, locale),
         }
     }
 
@@ -1208,7 +1246,7 @@ impl Component for Kpi {
             out,
             r#"<div class="z-kpi" role="group" aria-labelledby="{id}-title"><p class="z-kpi-title" id="{id}-title">{}</p><p class="z-kpi-value">{}{unit}</p>"#,
             r.text(&self.title),
-            escape(&format_number(self.value, self.decimals, r.locale))
+            escape(&self.shown(self.value, r.locale))
         );
         if let Some(d) = self.delta {
             let (dir, arrow) = if d > 0.0 {
@@ -1243,7 +1281,7 @@ impl Component for Kpi {
                 r#"<p class="z-kpi-target">{}</p>"#,
                 r.text(
                     &Text::key("zeyn.ui.kpi.target")
-                        .arg("target", format_number(t, self.decimals, r.locale))
+                        .arg("target", self.shown(t, r.locale))
                         .arg("pct", format_number(share, 0, r.locale))
                 )
             );
@@ -1261,6 +1299,7 @@ impl Component for Kpi {
             "type": "kpi",
             "title": self.title,
             "value": self.value,
+            "currency": self.currency,
             "delta": self.delta,
             "better": self.better,
             "target": self.target,
