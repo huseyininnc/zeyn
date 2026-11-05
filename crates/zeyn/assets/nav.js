@@ -337,7 +337,7 @@ initAppMenu();
  * script prefetches that partial screen in every browser and marks the page with
  * `data-zeyn-nav`, which the Speculation Rules of the `Speculation-Rules` header leave out; they
  * only act when this script is missing and links load whole pages. The partial
- * screen of a link is fetched after 100 ms of hover, on keyboard focus or on touch, kept for 10
+ * screen of a link is fetched after 100 ms of hover, on keyboard focus or when pressed, kept for 10
  * seconds and used by `visit`. At most two fetches run at once; leaving the link first cancels
  * its fetch. Nothing is fetched with Save-Data, `prefers-reduced-data`, a 2g connection or a
  * hidden tab.
@@ -426,10 +426,16 @@ document.addEventListener('pointerout', (e) => {
   }
 });
 
+/**
+ * Pressing a link starts its fetch at once, with any pointer: the click follows about 80 ms
+ * later, and a press shorter than the hover delay would otherwise fetch nothing ahead.
+ */
 document.addEventListener('pointerdown', (e) => {
-  if (e.pointerType !== 'touch' || !prefetchOn()) return;
+  if (e.button !== 0 || !prefetchOn()) return;
   const url = prefetchUrl(linkOf(e));
-  if (url) prefetch(url);
+  if (!url) return;
+  clearTimeout(hoverTimer);
+  prefetch(url);
 });
 
 document.addEventListener('focusin', (e) => {

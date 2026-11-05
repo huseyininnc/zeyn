@@ -926,7 +926,7 @@ impl App {
 
     /// Lets the browser load screens ahead of a click, off by default. With
     /// [`Prefetch::Moderate`] `nav.js` fetches the partial screen of a link after 100 ms of
-    /// hover, on keyboard focus or on touch, keeps it 10 seconds for the click, runs at most two
+    /// hover, on keyboard focus or when pressed (mouse, pen or touch), keeps it 10 seconds for the click, runs at most two
     /// such fetches at once and cancels one when the pointer leaves first. For pages where the
     /// script is missing, Chromium gets Speculation Rules (prefetch only, never prerender, so no
     /// script of the next page runs early) through a `Speculation-Rules` header pointing to
