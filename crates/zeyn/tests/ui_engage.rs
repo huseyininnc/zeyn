@@ -212,14 +212,14 @@ async fn the_lazy_modules_are_served_and_stay_out_of_the_page_head() {
             "{name} loads only when a page holds it"
         );
     }
-    let (_, components) = get("/_zeyn/components.js").await;
-    assert!(components.contains("['button[data-zeyn-share]', 'share']"));
-    assert!(components.contains("['a[data-zeyn-chip]', 'chips']"));
-    assert!(components.contains("['[data-zeyn-hero]', 'hero']"));
-    assert!(components.contains("['[data-zeyn-reactions]', 'reactions']"));
+    let (_, runtime) = get("/_zeyn/zeyn.js").await;
+    assert!(runtime.contains(r#"["share","[data-zeyn-share]",""]"#));
+    assert!(runtime.contains(r#"["chips","[data-zeyn-chip]",""]"#));
+    assert!(runtime.contains(r#"["hero","[data-zeyn-hero]",""]"#));
+    assert!(runtime.contains(r#"["reactions","[data-zeyn-reactions]",""]"#));
     assert!(
-        components.contains("loadLazy('preview')")
-            && components.contains("(hover: hover) and (pointer: fine)")
+        runtime.contains("/_zeyn/preview.js")
+            && runtime.contains("(hover: hover) and (pointer: fine)")
     );
 }
 

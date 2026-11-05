@@ -1,12 +1,15 @@
 /**
  * Zeyn enterprise runtime.
  *
- * Works next to `zeyn.js` and never changes how it behaves: revealing masked values on request.
- * Every decision is made on the server; this file only asks and shows. Texts come from
- * `meta[name=zeyn-texts]` in the user's language.
+ * Works next to `zeyn.js` and never changes how it behaves. Runs on every page because it is
+ * about the page, not a component: response hooks on `fetch` (reasons for opening a screen,
+ * signing in again, a new deployed version) and the idle timeout of the session. Every decision
+ * is made on the server; this file only asks and shows. Texts come from `meta[name=zeyn-texts]`
+ * in the user's language. The parts for components are modules of their own, loaded by pages
+ * that hold them: `reveal.js` (masked values), `forms.js` (drafts and workflow transitions) and
+ * `import.js` (CSV and XLSX import).
  * @module zeyn-enterprise
  */
-
 /** Path the app is served under, from `meta[name=zeyn-base]`. */
 const BASE = (document.querySelector('meta[name="zeyn-base"]')?.content ?? '').replace(/\/$/, '');
 
@@ -67,6 +70,11 @@ async function post(path, body) {
   }
 }
 
+/** Asks `forms.js` to keep the drafts of the forms on the page before it goes away. */
+function saveAllDrafts() {
+  document.dispatchEvent(new CustomEvent('zeyn:save-drafts'));
+}
+
 /** Announces a message in the page's polite live region. */
 function announce(message, error = false) {
   const region = document.querySelector('dialog[open] .z-toasts') ?? document.querySelector('.z-toasts');
@@ -77,52 +85,6 @@ function announce(message, error = false) {
   region.append(el);
   setTimeout(() => el.remove(), 5000);
 }
-
-/**
- * Asks the server for the raw value of a masked field. The server checks the unmask permission
- * and audits the request; the value replaces the masked text only in this page.
- */
-async function reveal(button) {
-  const field = button.dataset.zeynReveal;
-  const r = await post('/_zeyn/reveal', { ...address(button), field, key: button.dataset.zeynKey ?? null });
-  if (!r.ok || typeof r.data?.value !== 'string') {
-    announce(r.data?.message || t('privacy.reveal_failed'), true);
-    return;
-  }
-  const box = button.closest('.z-masked-field');
-  const input = box?.querySelector('input[data-zeyn-masked]');
-  if (input) {
-    input.value = r.data.value;
-    input.readOnly = false;
-    input.removeAttribute('data-zeyn-masked');
-    button.remove();
-    input.focus();
-  } else {
-    const span = button.previousElementSibling;
-    if (span?.matches('[data-zeyn-masked]')) {
-      span.textContent = r.data.value;
-      span.removeAttribute('data-zeyn-masked');
-      span.tabIndex = -1;
-      button.remove();
-      span.focus();
-    }
-  }
-  announce(t('privacy.revealed'));
-}
-
-document.addEventListener('click', (e) => {
-  const el = e.target instanceof Element ? e.target.closest('button[data-zeyn-reveal]') : null;
-  if (!el) return;
-  e.preventDefault();
-  e.stopPropagation();
-  reveal(el);
-});
-
-document.addEventListener('click', (e) => {
-  const button = e.target instanceof Element ? e.target.closest('button[data-zeyn-transition]') : null;
-  const field = button?.form?.elements.namedItem('transition');
-  if (field instanceof HTMLInputElement) field.value = button.dataset.zeynTransition;
-});
 
 /**
  * Sends a reason for opening a screen. Shows the server's message under the field when it is
@@ -271,173 +233,6 @@ hooks.push(async (res) => {
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && !noticeShown) fetch(`${BASE}/_zeyn/health`, { cache: 'no-store' }).catch(() => {});
 });
-
-const DRAFT_PREFIX = 'zeyn-draft:';
-const DRAFT_DAY_MS = 24 * 60 * 60 * 1000;
-
-/** Storage key of a form's draft: base path, screen, params and node. */
-function draftKey(a) {
-  return `${DRAFT_PREFIX}${BASE}|${a.screen}|${JSON.stringify(a.params ?? null)}|${a.node}`;
-}
-
-/** Inputs a draft keeps: what the user typed, never masked, secret or hidden values. */
-function draftFields(form) {
-  return [...form.elements].filter(
-    (el) =>
-      el.name &&
-      !el.disabled &&
-      !el.readOnly &&
-      !el.hidden &&
-      !el.matches('[data-zeyn-masked], [type="password"], [autocomplete="one-time-code"], [type="file"], [type="hidden"], button, fieldset, output'),
-  );
-}
-
-/** Reads one input as a draft value. */
-function fieldValue(el) {
-  if (el.type === 'checkbox') return el.checked;
-  if (el.type === 'radio') return el.checked ? el.value : undefined;
-  return el.value;
-}
-
-/** Writes one draft value back into an input. Returns true when it changed the input. */
-function setField(el, value) {
-  if (value === undefined) return false;
-  if (el.type === 'checkbox') {
-    if (el.checked === value) return false;
-    el.checked = value;
-  } else if (el.type === 'radio') {
-    if (el.checked === (el.value === value)) return false;
-    el.checked = el.value === value;
-  } else {
-    if (el.value === value) return false;
-    el.value = value;
-  }
-  return true;
-}
-
-/** Keeps what was typed in a form in `sessionStorage`, with the row version it was typed on. */
-function saveDraft(form) {
-  const a = address(form);
-  if (!a.screen || secretForm(form)) return;
-  const values = {};
-  for (const el of draftFields(form)) {
-    const v = fieldValue(el);
-    if (v !== undefined) values[el.name] = v;
-  }
-  const version = form.querySelector('input[data-zeyn-version]')?.value ?? null;
-  try {
-    sessionStorage.setItem(draftKey(a), JSON.stringify({ at: Date.now(), version, values }));
-  } catch {
-    return;
-  }
-}
-
-/** Sign in and code forms keep no drafts at all: nothing of them is worth restoring. */
-function secretForm(form) {
-  return !!form.querySelector('[type="password"], [autocomplete="one-time-code"]');
-}
-
-function saveAllDrafts() {
-  document.querySelectorAll('form[data-zeyn-submit].z-dirty').forEach(saveDraft);
-}
-
-/**
- * Puts a draft back into a form after a reload. The row version of the draft is restored too, so
- * saving a draft of a record someone else changed in the meantime is refused as a conflict.
- */
-function restoreDraft(form) {
-  if (form.dataset.zeynDraftChecked) return;
-  form.dataset.zeynDraftChecked = '1';
-  const a = address(form);
-  if (!a.screen) return;
-  let draft = null;
-  try {
-    draft = JSON.parse(sessionStorage.getItem(draftKey(a)) ?? 'null');
-  } catch {
-    draft = null;
-  }
-  if (!draft?.values) return;
-  if (Date.now() - (draft.at ?? 0) > DRAFT_DAY_MS) {
-    sessionStorage.removeItem(draftKey(a));
-    return;
-  }
-  const fields = draftFields(form);
-  const before = new Map(fields.map((el) => [el, fieldValue(el)]));
-  let changed = false;
-  for (const el of fields) changed = setField(el, draft.values[el.name]) || changed;
-  if (!changed) return;
-  const versionInput = form.querySelector('input[data-zeyn-version]');
-  const originalVersion = versionInput?.value;
-  if (versionInput && draft.version != null) versionInput.value = draft.version;
-  form.classList.add('z-dirty');
-  const note = document.createElement('div');
-  note.className = 'z-draft-note';
-  note.setAttribute('role', 'status');
-  const text = document.createElement('span');
-  text.textContent = t('draft.restored');
-  const discard = document.createElement('button');
-  discard.type = 'button';
-  discard.className = 'z-button';
-  discard.textContent = t('draft.discard');
-  discard.addEventListener('click', () => {
-    for (const [el, v] of before) setField(el, v);
-    if (versionInput) versionInput.value = originalVersion;
-    sessionStorage.removeItem(draftKey(a));
-    form.classList.remove('z-dirty');
-    note.remove();
-    form.querySelector('input:not([type="hidden"]):not([readonly]), select, textarea')?.focus();
-  });
-  note.append(text, discard);
-  form.prepend(note);
-}
-
-let draftTimer = 0;
-document.addEventListener('input', (e) => {
-  const form = e.target instanceof Element ? e.target.closest('form[data-zeyn-submit]') : null;
-  if (!form) return;
-  form.classList.add('z-dirty');
-  clearTimeout(draftTimer);
-  draftTimer = setTimeout(() => saveDraft(form), 300);
-});
-document.addEventListener('change', (e) => {
-  const form = e.target instanceof Element ? e.target.closest('form[data-zeyn-submit]') : null;
-  if (form) {
-    form.classList.add('z-dirty');
-    saveDraft(form);
-  }
-});
-window.addEventListener('pagehide', saveAllDrafts);
-
-hooks.push(async (res, input, init) => {
-  const url = typeof input === 'string' ? input : input?.url ?? '';
-  if (!res.ok || !url.endsWith('/_zeyn/form')) return null;
-  try {
-    const body = JSON.parse(init?.body ?? 'null');
-    sessionStorage.removeItem(draftKey(body));
-    document.querySelectorAll('form[data-zeyn-submit].z-dirty').forEach((f) => {
-      const a = address(f);
-      if (draftKey(a) === draftKey(body)) {
-        f.classList.remove('z-dirty');
-        f.querySelector('.z-draft-note')?.remove();
-      }
-    });
-  } catch {
-    return null;
-  }
-  return null;
-});
-
-document.querySelectorAll('form[data-zeyn-submit]').forEach(restoreDraft);
-new MutationObserver((records) => {
-  for (const r of records) {
-    for (const n of r.addedNodes) {
-      if (!(n instanceof Element)) continue;
-      if (n.matches('form[data-zeyn-submit]')) restoreDraft(n);
-      n.querySelectorAll('form[data-zeyn-submit]').forEach(restoreDraft);
-    }
-  }
-}).observe(document.body, { childList: true, subtree: true });
-
 /** Session settings from `meta[name=zeyn-session]`, present for signed in users. */
 const SESSION = (() => {
   try {
@@ -618,105 +413,5 @@ hooks.push(async (res, input, init) => {
   return next;
 });
 
-const MAX_CSV_BYTES = 8 * 1024 * 1024;
 
-/** Reads a binary file (an XLSX workbook) as base64 for `POST /_zeyn/import`. */
-function readBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result).slice(String(reader.result).indexOf(',') + 1));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
-
-/**
- * Reads a CSV file as text: UTF-8 when it is valid UTF-8, otherwise Windows-1254, the code page
- * spreadsheet programs often save Turkish text in.
- */
-async function readCsv(file) {
-  const bytes = await file.arrayBuffer();
-  try {
-    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-  } catch {
-    return new TextDecoder('windows-1254').decode(bytes);
-  }
-}
-
-/** State of each import component: the file text sent for preview, then for import. */
-const imports = new WeakMap();
-
-/** Shows the server's answer to a preview or an import. */
-function showImport(box, r) {
-  const status = box.querySelector('[data-zeyn-import-status]');
-  const preview = box.querySelector('[data-zeyn-import-preview]');
-  const commit = box.querySelector('[data-zeyn-import-commit]');
-  const report = box.querySelector('[data-zeyn-import-report]');
-  const data = r.data ?? {};
-  commit.disabled = !(r.ok && data.can_import);
-  report.hidden = !(r.ok && data.report);
-  if (!r.ok) {
-    status.textContent = data.errors?.map((e) => e.message).join(' ') || data.message || '';
-    status.classList.add('z-import-error');
-    preview.innerHTML = '';
-    return;
-  }
-  status.classList.toggle('z-import-error', data.invalid > 0);
-  status.textContent = data.summary ?? data.message ?? '';
-  preview.innerHTML = data.preview ?? '';
-  if (data.errors?.length) {
-    const list = document.createElement('ul');
-    list.className = 'z-import-errors';
-    for (const e of data.errors) {
-      const li = document.createElement('li');
-      li.textContent = `${e.row}${e.field ? ` / ${e.field}` : ''}: ${e.message}`;
-      list.append(li);
-    }
-    preview.append(list);
-  }
-  const state = imports.get(box) ?? {};
-  state.report = data.report ?? null;
-  imports.set(box, state);
-}
-
-document.addEventListener('change', async (e) => {
-  const input = e.target;
-  const box = input instanceof HTMLInputElement && input.type === 'file' ? input.closest('[data-zeyn-import]') : null;
-  const file = box && input.files?.[0];
-  if (!file) return;
-  const status = box.querySelector('[data-zeyn-import-status]');
-  if (file.size > MAX_CSV_BYTES) {
-    status.textContent = t('import.too_large');
-    return;
-  }
-  status.textContent = t('import.reading');
-  const content = /\.xlsx$/i.test(file.name) ? { xlsx: await readBase64(file) } : { csv: await readCsv(file) };
-  imports.set(box, { content, name: file.name.replace(/\.[^.]*$/, '') });
-  showImport(box, await post('/_zeyn/import', { ...address(box), ...content, commit: false }));
-});
-
-document.addEventListener('click', async (e) => {
-  const el = e.target instanceof Element ? e.target.closest('[data-zeyn-import-commit], [data-zeyn-import-report]') : null;
-  const box = el?.closest('[data-zeyn-import]');
-  const state = box && imports.get(box);
-  if (!state) return;
-  if (el.matches('[data-zeyn-import-report]')) {
-    if (!state.report) return;
-    const url = URL.createObjectURL(new Blob([state.report], { type: 'text/csv;charset=utf-8' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${state.name || 'import'}-errors.csv`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    return;
-  }
-  el.disabled = true;
-  const r = await post('/_zeyn/import', { ...address(box), ...state.content, commit: true });
-  showImport(box, r);
-  if (r.ok) {
-    box.querySelector('input[type="file"]').value = '';
-    imports.delete(box);
-    box.querySelector('[data-zeyn-import-report]').hidden = true;
-    announce(r.data?.message ?? '');
-  }
-});
+export { BASE, address, announce, hooks, post, t };

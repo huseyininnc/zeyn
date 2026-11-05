@@ -182,7 +182,7 @@ El medidor es una pista calculada en el navegador a partir de la longitud, los t
 
 | | |
 |---|---|
-| Script añadido | unos 2 KB con gzip (7 KB sin comprimir) en `components.js` para las máscaras, la alternancia y el medidor; las entradas decimales y de porcentaje usan el control numérico |
+| Script añadido | unos 2 KB con gzip (7 KB sin comprimir) en `inputs.js` para las máscaras, la alternancia y el medidor; las entradas decimales y de porcentaje usan el control numérico |
 | Nodos DOM | 3 para una entrada con máscara, 4 para una contraseña con su botón, 11 con el medidor |
 | Peticiones | ninguna mientras se escribe |
 | Comprobaciones del servidor | `scale`, `precision`, `min`, `max` y `mask` se ejecutan en cada guardado, desde la página, la API y las herramientas de IA por igual |

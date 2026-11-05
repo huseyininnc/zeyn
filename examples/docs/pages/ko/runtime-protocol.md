@@ -38,7 +38,23 @@
 
 head의 모든 프레임워크 스크립트와 스타일시트에는 `?v=`와 빌드 id(`meta[name=zeyn-build]`, `ZEYN_BUILD_ID` 또는 실행 파일의 해시)가 붙고, `theme.css`에는 테마 텍스트의 해시가 붙습니다. 현재 값을 가진 요청은 `Cache-Control: public, max-age=31536000, immutable`을 받으므로 웜 페이지 로드는 그중 어느 것도 요청하지 않습니다. 그 밖의 요청(배포 후의 오래된 탭, `v` 없음)은 `no-cache`와 ETag를 받습니다. 런타임이 나중에 가져오는 모듈은 자신을 가져오는 스크립트의 URL에서 같은 `v`를 이어받습니다.
 
-모든 페이지는 `zeyn.js`(요청, effect, 창, 폼, 메뉴, 단축키, 이벤트 위임), `nav.js`, `components.js`를 불러오고, 앱 셸에서는 `pro.js`와 `enterprise.js`도 불러옵니다. 나머지는 그것을 사용하는 페이지에서만 불러오며, `nav.js`가 Screen을 끼워 넣을 때도 마찬가지입니다. `zeyn.js`는 콘텐츠에 `[data-zeyn-grid]`가 처음 들어올 때 그리드 런타임 `grid.js`를 가져오고(그리드가 있는 전체 페이지는 `<link rel="modulepreload">`에 이를 명시합니다), `components.js`는 `catalog.js`(카드 그리드, 검색 상자), `media.js`(플레이어, 임베드), `files.js`(업로드), `charts.js`, `assistant.js`(채팅 패널 또는 런처를 처음 누를 때)를 가져옵니다. 이들의 스타일시트는 head에 남아 있으므로 스크립트가 도착해도 모양은 바뀌지 않습니다. 쇼케이스 대시보드에서는 스크립트 9개 403 KB(116 KB) 대신 5개 258 KB(전송 74 KB)입니다.
+### 1.1 Browser modules
+
+페이지는 화면이 쓰는 브라우저 코드만 불러와 실행합니다. 모든 페이지는 코어를 실행합니다: `zeyn.js`(요청, 효과, 창, 폼, 메뉴, 단축키, 이벤트 위임, 모듈 로더), `nav.js`, `enterprise.js`(`fetch`의 응답 훅과 세션 유휴 시간 제한)로, 합쳐서 원본 90 KB, gzip 29 KB입니다. 나머지는 모두 컴포넌트의 모듈로, `/_zeyn/{name}.js`와 일부는 `/_zeyn/{name}.css`입니다. `crates/zeyn/src/server/modules.rs`의 `MODULES`에 HTML이 지닌 표식과 함께 선언됩니다: 속성 이름(`data-zeyn-date`)과 클래스(`z-select`)이며, 이름 전체로 비교합니다.
+
+| 모듈 | 컴포넌트 |
+|---|---|
+| `components.js` | 모든 컨트롤 모듈이 import하는 공유 부분: 도우미, 팝업과 리스트박스 코어, 셀렉트(앱 셸의 선택기), 확인 대화상자, 알림, 이동 경로 |
+| `tabs.js`, `dates.js`, `choices.js`, `inputs.js`, `lines.js`, `steps.js`, `tree.js`, `overlays.js`, `menubutton.js`, `busy.js` | 패널, 탭, 분할 창; 날짜와 시간 선택기(grid 날짜 필터 포함); 리스트박스, 조회, 다중 선택; 숫자, 늘어나는 텍스트 영역, 마스크, 비밀번호; 줄 편집기; 단계별 폼; 트리; 툴팁과 팝오버; 메뉴 버튼과 분할 버튼; 처리 중 오버레이 |
+| `grid.js` | grid. `zeyn.js`가 직접 import하므로 `<link rel="modulepreload">`로 링크됩니다 |
+| `palette.js`, `pro.js` | 명령 팔레트와 명령 버튼; 메뉴 막대, 도구 상자, 상태 표시줄, 도킹 패널, 속성 검사기 |
+| `forms.js`, `reveal.js`, `import.js` | 폼의 초안과 워크플로 전환; 가려진 값 보기; 가져오기 |
+| `catalog.js`, `media.js`, `files.js`, `charts.js` 및 스타일시트 | 카드 그리드, 레일, 검색 상자; 플레이어, 임베드, 이미지; 업로드; 차트, 스파크라인, KPI 카드, 불릿 차트 |
+| `share.js`, `chips.js`, `reactions.js`, `hero.js`, `state.js`, `preview.js`, `assistant.js` | 공유 버튼, 필터 칩, 반응, 히어로 슬라이드, 환경 설정 저장소, 카드 미리보기(처음 마우스를 올릴 때), 어시스턴트(채팅 패널 또는 런처를 처음 누를 때) |
+
+전체 페이지는 head에 모든 페이지가 쓰는 스타일시트(`zeyn.css`, `components.css`, `content.css`, `pro.css`, `enterprise.css`), HTML에 표식이 있는 모듈의 스타일시트, 그리고 그 스크립트를 import하는 모듈 뒤에 링크합니다. `zeyn.js`는 같은 표(`[name, script selector, style selector]`)와 함께 제공되며 나중에 도착하는 콘텐츠에 빠진 것을 불러옵니다: `nav.js`는 화면을 바꾸기 전에 `{ root, waits }`와 함께 `zeyn:need`를 보내고 새 스타일시트를 기다리며, 창도 열리기 전에 같은 방식으로 기다리고, `zeyn:content`, grid 페이지, grid 필터는 담고 있는 것의 스크립트를 불러옵니다. 브라우저는 URL마다 인스턴스를 하나만 유지하므로 모듈은 한 번만 실행됩니다. 모듈은 실행될 때 문서에서 찾은 것을 설정하고 그 뒤에는 `zeyn:content`를 듣습니다. 페이지에 없는 컴포넌트를 찾거나 듣지 않습니다. 모듈은 자신의 URL에 있는 `?v=`로 공유 부분을 import합니다. `tests/ui_modules.rs`는 페이지가 쓰지 않는 모듈을 링크하거나 모듈 스타일시트가 표식 밖의 클래스를 꾸밀 때 실패합니다.
+
+showcase에서 측정(원본, gzip 전송량): 텍스트만 있는 페이지는 스크립트를 269 KB(80 KB) 대신 132 KB(46 KB), grid 페이지는 357 KB(106 KB) 대신 223 KB(74 KB), 폼 페이지는 269 KB(80 KB) 대신 186 KB(65 KB) 불러오고, 모든 페이지의 스타일은 177 KB(44 KB) 대신 151 KB(35 KB)입니다. 컴포넌트 카탈로그처럼 모든 컴포넌트를 담은 페이지는 모듈마다 파일이 따로 있으므로 이전보다 많은 파일을 불러옵니다(요청 41개 대신 68개, 원본 774 KB 대신 836 KB).
 
 ## 2. Screen 마크업
 
@@ -253,7 +269,7 @@ Effect:
 
 ## 7. 컴포넌트 라이브러리
 
-`zeyn::ui` 컴포넌트는 런타임 뒤의 페이지 head에 링크되는 두 개의 에셋 `/_zeyn/components.js`와 `/_zeyn/components.css`로 제공됩니다. 런타임처럼 로그인이 필요 없습니다.
+`zeyn::ui` 컴포넌트는 1.1절의 모듈과 스타일시트 `/_zeyn/components.css`로 제공됩니다. 런타임처럼 로그인이 필요 없습니다.
 
 ### 7.1 엔드포인트
 
@@ -276,7 +292,7 @@ Effect:
 
 | 이벤트 | 대상 | 상세 |
 |---|---|---|
-| `zeyn:content` | `document` | 새 콘텐츠가 있는 요소(탐색, 지연 패널). 두 스크립트가 그 안의 것을 설정합니다. |
+| `zeyn:content` | `document` | 새 콘텐츠가 있는 요소(탐색, 지연 패널). 런타임이 필요한 모듈을 불러오고, 불러온 각 모듈이 그 안의 것을 설정합니다. |
 | `zeyn:errors` | 폼 | 런타임이 표시한 후의 `422` 오류. 라인 편집기와 단계별 폼이 사용합니다. |
 | `zeyn:effect` | `document` | 런타임이 모르는 effect: `{ effect, source, run }`. `run(next)`는 다른 effect를 실행합니다. `confirm`이 사용합니다. |
 

@@ -181,7 +181,7 @@ The meter is a hint computed in the browser from the length, the kinds of charac
 
 | | |
 |---|---|
-| Added script | about 2 KB gzip (7 KB raw) in `components.js` for masks, the toggle and the meter; the decimal and percent inputs use the number control |
+| Added script | about 2 KB gzip (7 KB raw) in `inputs.js` for masks, the toggle and the meter; the decimal and percent inputs use the number control |
 | DOM nodes | 3 for a masked input, 4 for a password with its toggle, 11 with the meter |
 | Requests | none while typing |
 | Server checks | `scale`, `precision`, `min`, `max` and `mask` run on every save, from the page, the API and AI tools alike |

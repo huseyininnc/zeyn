@@ -246,7 +246,7 @@ async fn commands_the_user_may_not_run_never_reach_the_html() {
         html.contains(r#"data-zeyn-palette-open"#),
         "the palette button is in the menu"
     );
-    assert!(html.contains(r#"/_zeyn/pro.js"#));
+    assert!(html.contains(r#"/_zeyn/palette.js"#));
     assert!(html.contains(r#"data-zeyn-command="orders.hello""#));
     assert!(!html.contains("orders.new"), "needs orders.write");
     assert!(!html.contains("orders.archive"), "needs orders.admin");

@@ -11,12 +11,6 @@ const CSS: &str = include_str!("../../assets/charts.css");
 /// Asset paths served without authentication, like the runtime itself.
 pub(super) const ASSETS: [&str; 2] = ["/_zeyn/charts.js", "/_zeyn/charts.css"];
 
-/// Links placed in the page head.
-pub(super) fn head(base: &str) -> String {
-    let v = super::ops::asset_version();
-    format!(r#"<link rel="stylesheet" href="{base}/_zeyn/charts.css{v}">"#)
-}
-
 pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
     router
         .route(

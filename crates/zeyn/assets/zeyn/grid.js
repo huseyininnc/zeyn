@@ -138,6 +138,7 @@ async function loadGrid(grid, kind) {
     s.anchor = s.cursor = null;
     if (kind !== 'reload' && !layout) s.active = 0;
   }
+  loadModules(body);
   s.offset = offset;
   s.count = rows(grid).length;
   s.total = r.data.total ?? null;

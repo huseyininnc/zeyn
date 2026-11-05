@@ -94,6 +94,7 @@ function filterControls(cell, th, t) {
     if (type === 'text') wrap.querySelectorAll('input').forEach((i) => (i.dataset.zeynFilterDate = kind === 'time' ? 'time' : 'date'));
     cell.append(wrap);
   }
+  loadModules(cell);
 }
 
 /** Reads the controls of a filter cell into a filter object without `field`; `null` when empty. */

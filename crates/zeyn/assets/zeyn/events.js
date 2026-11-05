@@ -280,7 +280,10 @@ document.addEventListener('zeyn:leave', () => {
   for (const d of dialogs.slice().reverse()) finishDialog(d.dialog);
 });
 
+if (document.querySelector(ASSISTANT[1])) loadFile('assistant.js');
+
 document.addEventListener('zeyn:content', (e) => {
+  loadModules(e.detail ?? document);
   initGrids(e.detail);
   if (e.detail instanceof Element) relativeTimes(e.detail);
   syncAgentTools();

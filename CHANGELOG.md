@@ -35,6 +35,10 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 - App shell: menu groups with the same label from several features are merged under one heading, and elastic overscroll no longer drags the sticky side menu down.
 
+### Changed
+
+- Pages load only the browser modules of the components they hold. `components.js` is split into a shared part and one module per component (`tabs.js`, `dates.js`, `choices.js`, `inputs.js`, `lines.js`, `steps.js`, `tree.js`, `overlays.js`, `menubutton.js`, `busy.js`), `pro.js` into `palette.js` and `pro.js`, and the form drafts, masked value reveal and import of `enterprise.js` into `forms.js`, `reveal.js` and `import.js`. Modules are declared with their HTML markers in `server/modules.rs`; full pages link what their HTML holds, and `zeyn.js` loads missing modules (and stylesheets) when `nav.js`, a window, a lazy panel or a grid brings new content. The media, files, charts and catalog stylesheets are linked only where used. A page with only text now loads 132 KB of scripts instead of 269 KB (46 KB instead of 80 KB with gzip), a grid page 223 KB instead of 357 KB, a form page 186 KB instead of 269 KB; see section 1.1 of `docs/runtime-protocol.md`.
+
 ## [0.0.8] - 2026-11-05
 
 ### Added

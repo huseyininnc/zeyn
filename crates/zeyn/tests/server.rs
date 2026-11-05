@@ -1589,7 +1589,7 @@ async fn asset_links_carry_the_build_and_are_kept_for_a_year() {
         "components.js",
         "components.css",
         "enterprise.js",
-        "media.css",
+        "content.css",
         "grid.js",
     ] {
         assert!(

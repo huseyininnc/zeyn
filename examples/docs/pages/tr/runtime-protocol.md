@@ -38,7 +38,23 @@ Menü yalnızca geçerli kullanıcının açabileceği ekranları listeler. Geç
 
 Head içindeki her framework script'i ve stil dosyası `?v=` ile build kimliğini taşır (`meta[name=zeyn-build]`; `ZEYN_BUILD_ID`'den ya da çalıştırılabilir dosyanın hash'inden gelir); `theme.css` tema metninin hash'ini taşır. Güncel değerli bir istek `Cache-Control: public, max-age=31536000, immutable` alır, bu yüzden sıcak bir sayfa yüklemesi bunların hiçbirini istemez; başka her istek (bir dağıtımdan sonra eski bir sekme, `v` yok) `no-cache` ve ETag alır. Çalışma zamanının sonradan import ettiği modüller, onları import eden script'in URL'sinden aynı `v` değerini alır.
 
-Her sayfa `zeyn.js` (istekler, efektler, pencereler, formlar, menüler, kısayollar ve olay delegasyonu), `nav.js`, `components.js` ve uygulama kabuğunda `pro.js` ile `enterprise.js` dosyalarını yükler. Geri kalanı yalnızca onu kullanan sayfalarda yüklenir; `nav.js` bir ekranı yerine koyduğunda da böyledir: `zeyn.js`, içerik ilk kez bir `[data-zeyn-grid]` taşıdığında grid çalışma zamanı `grid.js` dosyasını import eder (grid içeren tam sayfalar onu `<link rel="modulepreload">` içinde belirtir), `components.js` ise `catalog.js` (kart gridleri, arama kutuları), `media.js` (oynatıcılar, gömülü içerik), `files.js` (yüklemeler), `charts.js` ve `assistant.js` (sohbet panelleri ya da başlatıcının ilk basışı) dosyalarını import eder. Stil dosyaları head içinde kalır, bu yüzden script geldiğinde görünüm değişmez. Showcase panosunda bu, 9 script ve 403 KB (116 KB) yerine 5 script ve 258 KB (ağda 74 KB) demektir.
+### 1.1 Browser modules
+
+Bir sayfa yalnızca ekranının kullandığı tarayıcı kodunu yükler ve çalıştırır. Her sayfa çekirdeği çalıştırır: `zeyn.js` (istekler, efektler, pencereler, formlar, menüler, kısayollar, olay delegasyonu ve modül yükleyici), `nav.js` ve `enterprise.js` (`fetch` üzerindeki yanıt kancaları ve oturumun boşta kalma süresi); hepsi birlikte 90 KB ham, 29 KB gzip. Geri kalan her şey bir bileşenin modülüdür: `/_zeyn/{name}.js` ve bazıları için `/_zeyn/{name}.css`. Modüller `crates/zeyn/src/server/modules.rs` içindeki `MODULES` listesinde, HTML'lerinin taşıdığı işaretlerle tanımlanır: öznitelik adları (`data-zeyn-date`) ve sınıflar (`z-select`), tam ad olarak eşlenir.
+
+| Modül | Bileşenler |
+|---|---|
+| `components.js` | her kontrol modülünün import ettiği ortak bölüm: yardımcılar, açılır pencere ve liste kutusu çekirdekleri, seçim kutuları (uygulama kabuğunun seçicileri), onay pencereleri, uyarılar, içerik yolu |
+| `tabs.js`, `dates.js`, `choices.js`, `inputs.js`, `lines.js`, `steps.js`, `tree.js`, `overlays.js`, `menubutton.js`, `busy.js` | paneller, sekmeler ve bölünmüş alanlar; tarih ve saat seçiciler (grid tarih filtreleri dahil); liste kutuları, aramalı seçimler ve çoklu seçimler; sayılar, büyüyen metin alanları, maskeler ve parolalar; satır düzenleyici; adımlı formlar; ağaçlar; ipuçları ve açılır kutular; menü ve bölünmüş düğmeler; meşgul katmanları |
+| `grid.js` | gridler; `zeyn.js` onu kendisi import ettiği için `<link rel="modulepreload">` olarak bağlanır |
+| `palette.js`, `pro.js` | komut paleti ve komut düğmeleri; menü çubukları, araç kutuları, durum çubukları, yerleştirme panelleri ve özellik denetçileri |
+| `forms.js`, `reveal.js`, `import.js` | formların taslakları ve iş akışı geçişleri; maskeli değerleri gösterme; içe aktarmalar |
+| `catalog.js`, `media.js`, `files.js`, `charts.js` ve stil dosyaları | kart gridleri, raylar ve arama kutuları; oynatıcılar, gömülü içerik ve görseller; yüklemeler; grafikler, mini grafikler, KPI kartları ve bullet grafikler |
+| `share.js`, `chips.js`, `reactions.js`, `hero.js`, `state.js`, `preview.js`, `assistant.js` | paylaşım düğmeleri, filtre çipleri, tepkiler, hero slaytları, tercih deposu, kart önizlemeleri (ilk üzerine gelme), asistan (sohbet panelleri ya da başlatıcının ilk basışı) |
+
+Tam bir sayfa, head içinde her sayfanın kullandığı stil dosyalarını (`zeyn.css`, `components.css`, `content.css`, `pro.css`, `enterprise.css`), işaretleri HTML'inde bulunan modüllerin stil dosyalarını ve onların scriptlerini, import ettikleri modüllerden sonra bağlar. `zeyn.js` aynı tabloyla (`[name, script selector, style selector]`) sunulur ve sonradan gelen içerik için eksik olanı yükler: `nav.js` bir ekranı yerine koymadan önce `{ root, waits }` ile `zeyn:need` olayını gönderir ve yeni stil dosyalarını bekler, pencereler açılmadan önce aynı şekilde bekler; `zeyn:content`, grid sayfaları ve grid filtreleri taşıdıklarının scriptlerini yükler. Tarayıcı her URL için tek bir örnek tutar, bu yüzden bir modül bir kez çalışır. Bir modül çalıştığında belgede bulduklarını kurar, ardından `zeyn:content` olayını dinler; sayfada olmayan bileşenleri asla taramaz ve onlar için dinlemez. Modüller ortak bölümü kendi URL'lerinin `?v=` değeriyle import eder. `tests/ui_modules.rs`, bir sayfa kullanmadığı bir modülü bağladığında ya da bir modül stil dosyası işaretlerinin dışındaki bir sınıfa stil verdiğinde başarısız olur.
+
+Showcase üzerinde ölçüldü (ham, gzip ile ağda): yalnızca metin olan bir sayfa 269 KB (80 KB) yerine 132 KB (46 KB) script, bir grid sayfası 357 KB (106 KB) yerine 223 KB (74 KB), bir form sayfası 269 KB (80 KB) yerine 186 KB (65 KB) yükler; her sayfa 177 KB (44 KB) yerine 151 KB (35 KB) stil yükler. Bileşen kataloğu gibi her bileşeni taşıyan bir sayfa öncekinden daha çok dosya yükler (41 yerine 68 istek, ham 774 KB yerine 836 KB), çünkü her modül ayrı bir dosyadır.
 
 ## 2. Screen markup
 
@@ -253,7 +269,7 @@ Her yanıt `x-zeyn-build` taşır. Runtime'ın üzerinde işlem yaptığı retle
 
 ## 7. Component library
 
-`zeyn::ui` bileşenleri, sayfa head'inde runtime'dan sonra bağlanan iki varlık daha ile sunulur: `/_zeyn/components.js` ve `/_zeyn/components.css`. Runtime gibi bunlar da oturum açmayı gerektirmez.
+`zeyn::ui` bileşenleri bölüm 1.1'deki modüllerle ve `/_zeyn/components.css` stil dosyasıyla sunulur. Runtime gibi bunlar da oturum açmayı gerektirmez.
 
 ### 7.1 Endpoints
 
@@ -276,7 +292,7 @@ Hepsi JSON ve CSRF başlığıyla `POST`'tur ve önce ekranın erişimini ve Fea
 
 | Event | On | Detail |
 |---|---|---|
-| `zeyn:content` | `document` | Yeni içeriği olan eleman (gezinme, tembel paneller). Her iki betik de içerdiklerini kurar. |
+| `zeyn:content` | `document` | Yeni içeriği olan eleman (gezinme, tembel paneller). Runtime gereken modülleri yükler ve yüklü her modül içerdiklerini kurar. |
 | `zeyn:errors` | the form | Runtime onları gösterdikten sonra `422` hataları. Satır düzenleyici ve adımlı formlar bunu kullanır. |
 | `zeyn:effect` | `document` | Runtime'ın tanımadığı bir effect: `{ effect, source, run }`. `run(next)` başka bir effect çalıştırır. `confirm` tarafından kullanılır. |
 

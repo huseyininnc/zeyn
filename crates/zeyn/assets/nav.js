@@ -69,13 +69,14 @@ async function visit(url, push) {
   document.dispatchEvent(new CustomEvent('zeyn:leave'));
   controller?.abort();
   controller = new AbortController();
+  const { signal } = controller;
   main.setAttribute('aria-busy', 'true');
   let res;
   try {
     res = (await takePrefetched(url)) ?? await fetch(url.href, {
       headers: { 'x-zeyn-partial': '1' },
       credentials: 'same-origin',
-      signal: controller.signal,
+      signal,
     });
   } catch (err) {
     if (err?.name === 'AbortError') return;
@@ -95,14 +96,19 @@ async function visit(url, push) {
     return;
   }
   if (res.headers.get('x-zeyn-live') === '1') import(`${BASE}/_zeyn/live.js${VERSION}`);
-  const html = await res.text();
+  const next = document.createElement('template');
+  next.innerHTML = await res.text();
+  const waits = [];
+  document.dispatchEvent(new CustomEvent('zeyn:need', { detail: { root: next.content, waits } }));
+  await Promise.all(waits);
+  if (signal.aborted) return;
   const finalUrl = new URL(res.url || url.href);
   if (url.hash && !finalUrl.hash) finalUrl.hash = url.hash;
   if (push) history.pushState({ zeyn: true }, '', finalUrl.href);
   else if (res.redirected) history.replaceState({ zeyn: true }, '', finalUrl.href);
   const title = res.headers.get('x-zeyn-title');
   if (title) document.title = decodeURIComponent(title);
-  main.innerHTML = html;
+  main.replaceChildren(next.content);
   const head = main.querySelector(':scope > template[data-zeyn-head]');
   replaceHead(head ? head.content.childNodes : []);
   head?.remove();

@@ -314,6 +314,7 @@ async function syncAgentTools() {
       }
       let confirmed = false;
       if (tool.confirm) {
+        await loadModule('components');
         confirmed = await new Promise((resolve) => {
           if (!ask('zeyn:confirm', { ...texts, message: tool.description, danger: true, resolve })) resolve(false);
         });

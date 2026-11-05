@@ -1813,7 +1813,7 @@ impl App {
         let router = router
             .route(
                 "/_zeyn/zeyn.js",
-                get(|| async { asset(JS, "text/javascript; charset=utf-8") }),
+                get(|| async { asset(modules::runtime(JS), "text/javascript; charset=utf-8") }),
             )
             .route(
                 "/_zeyn/grid.js",
@@ -2911,14 +2911,14 @@ impl AppState {
         #[cfg(not(feature = "assistant"))]
         let (ai_head, ai_launcher) = (String::new(), String::new());
         let base = escape(&self.prefix);
-        let components = format!(
-            "{}{}{}{}{}{site_head}{ai_head}",
-            ui::head(&base),
-            media::head(&base),
-            pro::head(&base),
-            files::head(&base),
-            charts::head(&base)
-        );
+        let mut used = modules::Used::default();
+        for part in [&frame, &commands, &ai_launcher] {
+            used.scan(part);
+        }
+        let mut components = String::with_capacity(2048);
+        used.head(&base, &mut components);
+        components.push_str(&site_head);
+        components.push_str(&ai_head);
         let native_menu = if self.native_menu {
             ""
         } else {
@@ -3396,14 +3396,6 @@ async fn page(
             let mut page = st.shell(&ctx, &csrf, &title, &html, Some(name));
             if !head.is_empty() {
                 page = page.replacen("</head>", &format!("{head}</head>"), 1);
-            }
-            if html.contains("data-zeyn-grid") {
-                let preload = format!(
-                    r#"<link rel="modulepreload" href="{}/_zeyn/grid.js{}"></head>"#,
-                    escape(&st.prefix),
-                    ops::asset_version()
-                );
-                page = page.replacen("</head>", &preload, 1);
             }
             #[cfg(feature = "realtime")]
             realtime::head(&st, &html, &mut page);
