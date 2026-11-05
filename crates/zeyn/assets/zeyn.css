@@ -143,6 +143,9 @@
 
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 
+/** The app shell does not bounce: elastic overscroll would drag the sticky side menu with the page. */
+html:has(.z-app) { overscroll-behavior-y: none; }
+
 body {
   margin: 0;
   font-family: var(--z-font);

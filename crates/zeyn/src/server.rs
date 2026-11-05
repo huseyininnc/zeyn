@@ -2739,7 +2739,8 @@ impl AppState {
     }
 
     /// Menu links of the features in one shell (the site shell when `site`) whose guards the user
-    /// passes, per group: the group's icon, its label and its `<li>` links.
+    /// passes, per group: the group's icon, its label and its `<li>` links. Groups with the same
+    /// label are merged into the first one, so several features can share one menu heading.
     fn menu_links(
         &self,
         ctx: &Ctx,
@@ -2747,7 +2748,7 @@ impl AppState {
         current: Option<&str>,
         site: bool,
     ) -> Vec<(String, String, Vec<String>)> {
-        let mut groups = Vec::new();
+        let mut groups: Vec<(String, String, Vec<String>)> = Vec::new();
         for f in &self.features {
             if f.site_shell().is_some() != site || f.check_guards(ctx).is_err() {
                 continue;
@@ -2777,8 +2778,13 @@ impl AppState {
                         ))
                     })
                     .collect();
-                if !items.is_empty() {
-                    groups.push((g.icon.html(), r.text(&g.label), items));
+                if items.is_empty() {
+                    continue;
+                }
+                let label = r.text(&g.label);
+                match groups.iter_mut().find(|g| g.1 == label) {
+                    Some(group) => group.2.extend(items),
+                    None => groups.push((g.icon.html(), label, items)),
                 }
             }
         }

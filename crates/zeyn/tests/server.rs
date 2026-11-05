@@ -405,6 +405,40 @@ async fn menu_hides_screens_the_user_cannot_open() {
 }
 
 #[tokio::test]
+async fn menu_groups_with_the_same_label_share_one_heading() {
+    let app = App::new("T")
+        .service(Store::seeded())
+        .auth(|_: &HeaderMap| Some(writer()))
+        .feature(
+            Feature::new("stock")
+                .screen(list)
+                .menu(|m| {
+                    m.group("Stock", Icon::Box)
+                        .item("Products", list)
+                }),
+        )
+        .feature(
+            Feature::new("other")
+                .screen(closed)
+                .menu(|m| {
+                    m.group("Stock", Icon::Box)
+                        .item("Closed", closed)
+                }),
+        )
+        .router()
+        .unwrap();
+    let r = send(&app, get("/products")).await;
+    assert_eq!(
+        r.body
+            .matches(r#"<div class="z-nav-group">"#)
+            .count(),
+        1
+    );
+    assert!(r.body.contains(r#"href="/products""#));
+    assert!(r.body.contains(r#"href="/closed""#));
+}
+
+#[tokio::test]
 async fn locale_can_be_switched_only_to_offered_languages() {
     let router = router(writer());
     let r = send(
