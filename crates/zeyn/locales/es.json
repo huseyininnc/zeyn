@@ -234,6 +234,7 @@
         "sort": "Ordenar por",
         "pages": "Páginas",
         "page": "Página {page} de {pages}",
+        "page_only": "Página {page}",
         "previous_page": "Página anterior",
         "next_page": "Página siguiente",
         "previous": "Desplazar atrás",

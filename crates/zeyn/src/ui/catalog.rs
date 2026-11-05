@@ -518,6 +518,18 @@ impl<E: Model> CardGrid<E> {
         out
     }
 
+    /// "Page 2 of 5" when the action counted its rows, "Page 2" when it did not.
+    fn page_label(&self, page: &LoadedPage, t: &dyn Fn(&str) -> String) -> String {
+        let size = u64::from(self.size().max(1));
+        let at = (page.offset / size + 1).to_string();
+        match page.total {
+            Some(total) => t("page")
+                .replace("{page}", &at)
+                .replace("{pages}", &total.div_ceil(size).max(1).to_string()),
+            None => t("page_only").replace("{page}", &at),
+        }
+    }
+
     fn render_with(&self, out: &mut String, r: &Render, page: Option<&LoadedPage>) {
         let id = dom_id(r, "cards");
         let t = |key: &str| r.text(&Text::key(format!("zeyn.ui.cards.{key}")));
@@ -533,11 +545,12 @@ impl<E: Model> CardGrid<E> {
             String::new()
         };
         out.push_str(&format!(
-            r#"<section class="{class}" data-zeyn-cards data-zeyn-paging="{}" data-testid="{}.cards"{labelled} data-text-loaded="{}" data-text-page="{}" data-text-error="{}""#,
+            r#"<section class="{class}" data-zeyn-cards data-zeyn-paging="{}" data-testid="{}.cards"{labelled} data-text-loaded="{}" data-text-page="{}" data-text-page-only="{}" data-text-error="{}""#,
             if self.pages() { "pages" } else { "infinite" },
             r.scope,
             t("loaded"),
             t("page"),
+            t("page_only"),
             t("error"),
         ));
         if let Some(p) = page {
@@ -617,9 +630,11 @@ impl<E: Model> CardGrid<E> {
         let more = page.is_some_and(|p| p.next.is_some());
         if self.pages() {
             out.push_str(&format!(
-                r#"<nav class="z-cards-pager" aria-label="{}"><button type="button" class="z-button" data-zeyn-cards-prev aria-disabled="true">{}</button><span class="z-cards-page" data-zeyn-cards-page></span><button type="button" class="z-button" data-zeyn-cards-next aria-disabled="{}">{}</button></nav>"#,
+                r#"<nav class="z-cards-pager" aria-label="{}"><button type="button" class="z-button" data-zeyn-cards-prev aria-disabled="true">{}</button><span class="z-cards-page" data-zeyn-cards-page>{}</span><button type="button" class="z-button" data-zeyn-cards-next aria-disabled="{}">{}</button></nav>"#,
                 t("pages"),
                 t("previous_page"),
+                page.map(|p| self.page_label(p, &t))
+                    .unwrap_or_default(),
                 !more,
                 t("next_page")
             ));

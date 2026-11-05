@@ -64,17 +64,22 @@ function sortOf(section) {
   }
 }
 
-/** Shows the page position of a paged card grid and which of its buttons work. */
+/**
+ * Shows the page position of a paged card grid and which of its buttons work. Without a total
+ * from the action the label leaves out the page count and Next works while there is a cursor.
+ */
 function pager(section) {
   const d = section.dataset;
   const size = Number(d.zeynSize) || 1;
   const offset = Number(d.zeynOffset) || 0;
+  const known = d.zeynTotal != null;
   const total = Number(d.zeynTotal) || 0;
-  const pages = Math.max(1, Math.ceil(total / size));
+  const page = Math.floor(offset / size) + 1;
   const label = section.querySelector('[data-zeyn-cards-page]');
-  if (label) label.textContent = fill(d.textPage, { page: Math.floor(offset / size) + 1, pages });
+  if (label) label.textContent = known ? fill(d.textPage, { page, pages: Math.max(1, Math.ceil(total / size)) }) : fill(d.textPageOnly, { page });
+  const last = known ? offset + size >= total : !d.zeynNext;
   section.querySelector('[data-zeyn-cards-prev]')?.setAttribute('aria-disabled', String(offset <= 0));
-  section.querySelector('[data-zeyn-cards-next]')?.setAttribute('aria-disabled', String(offset + size >= total));
+  section.querySelector('[data-zeyn-cards-next]')?.setAttribute('aria-disabled', String(last));
 }
 
 /**
@@ -113,6 +118,7 @@ async function load(section, how, focus) {
   else delete d.zeynNext;
   d.zeynOffset = String(body.offset ?? 0);
   if (body.total != null) d.zeynTotal = String(body.total);
+  else delete d.zeynTotal;
   section.querySelector('[data-zeyn-cards-more]')?.toggleAttribute('hidden', !body.next);
   section.querySelector('[data-zeyn-cards-empty]')?.toggleAttribute('hidden', list.children.length > 0);
   if (paged) pager(section);

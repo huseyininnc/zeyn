@@ -234,6 +234,7 @@
         "sort": "並べ替え",
         "pages": "ページ",
         "page": "{page} / {pages}ページ",
+        "page_only": "{page}ページ",
         "previous_page": "前のページ",
         "next_page": "次のページ",
         "previous": "前へスクロール",

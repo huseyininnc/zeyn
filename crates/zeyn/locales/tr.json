@@ -234,6 +234,7 @@
         "sort": "Sıralama",
         "pages": "Sayfalar",
         "page": "Sayfa {page} / {pages}",
+        "page_only": "Sayfa {page}",
         "previous_page": "Önceki sayfa",
         "next_page": "Sonraki sayfa",
         "previous": "Geri kaydır",

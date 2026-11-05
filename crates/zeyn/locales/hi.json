@@ -234,6 +234,7 @@
         "sort": "क्रमबद्ध करें",
         "pages": "पृष्ठ",
         "page": "{pages} में से पृष्ठ {page}",
+        "page_only": "पृष्ठ {page}",
         "previous_page": "पिछला पृष्ठ",
         "next_page": "अगला पृष्ठ",
         "previous": "पीछे स्क्रॉल करें",

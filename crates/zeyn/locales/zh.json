@@ -234,6 +234,7 @@
         "sort": "排序方式",
         "pages": "页",
         "page": "第 {page} 页，共 {pages} 页",
+        "page_only": "第 {page} 页",
         "previous_page": "上一页",
         "next_page": "下一页",
         "previous": "向前滚动",

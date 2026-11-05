@@ -783,6 +783,38 @@ impl Node {
     }
 }
 
+/// Plain text where a node is expected, escaped and in the user's language, so a slot that takes
+/// any inline component, such as [`crate::ui::ListItem::meta`], also takes text.
+struct TextNode(Text);
+
+impl Component for TextNode {
+    fn render(&self, out: &mut String, r: &Render) {
+        out.push_str(&r.text(&self.0));
+    }
+
+    fn schema(&self) -> serde_json::Value {
+        json!({ "type": "text", "text": self.0 })
+    }
+}
+
+impl From<Text> for Node {
+    fn from(text: Text) -> Self {
+        Node::new(TextNode(text))
+    }
+}
+
+impl From<&'static str> for Node {
+    fn from(text: &'static str) -> Self {
+        Node::new(TextNode(text.into()))
+    }
+}
+
+impl From<String> for Node {
+    fn from(text: String) -> Self {
+        Node::new(TextNode(text.into()))
+    }
+}
+
 /// Icons.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
