@@ -1,11 +1,11 @@
-//! Customers: a shared entity with its store, actions, screens and feature.
+//! Customers: a shared entity with its services, actions, screens and feature.
 
 pub mod actions;
 pub mod models;
 pub mod screens;
-pub mod store;
+pub mod services;
 
-pub use store::CustomerStore;
+pub use services::CustomerStore;
 
 use zeyn::prelude::*;
 

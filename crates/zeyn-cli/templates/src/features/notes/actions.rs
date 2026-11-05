@@ -1,5 +1,5 @@
 use super::models::Note;
-use super::store::NoteStore;
+use super::services::NoteStore;
 use zeyn::prelude::*;
 
 /// Notes for the list and the API.

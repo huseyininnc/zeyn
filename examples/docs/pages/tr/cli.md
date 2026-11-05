@@ -8,7 +8,8 @@
 |---|---|
 | `zeyn new <name>` | Standart Feature yapısıyla bir uygulama oluşturur |
 | `zeyn new <name> --lib` | Birkaç uygulamanın paylaştığı model, Feature ve metin kütüphanesi oluşturur |
-| `zeyn g feature <name>` | Modeller, store, action'lar ve screen'lerle `src/features/<name>` ekler |
+| `zeyn g feature <name>` | `models`, `services`, `actions` ve `screens` klasörleri ve çalışan bir liste screen'iyle `src/features/<name>` ekler |
+| `zeyn g screen <feature> <name>` | Bir feature'a `screens/<name>.rs` ekler, kaydeder ve başlığını her dil dosyasına ekler |
 | `zeyn routes` | Feature'ları, screen'leri, rotaları, API'leri ve erişimi listeler |
 | `zeyn check` | Derler ve yapısal sorunları ile eksik çevirileri bildirir |
 | `zeyn check --fix` | `src`, `tests` ve `examples` içinde adı değişen Zeyn API'lerini yeniden yazar, sonra denetler |
@@ -51,6 +52,7 @@ cargo run
   ```
 
   şöyle değil: `DataGrid::of(search_items).paging(Paging::pages(25)).column(Item::code).column(Item::qty)`.
+- `build.rs` ve `Cargo.toml` içinde `[package.metadata.zeyn]` altındaki `max_file_lines = 300`: `src/` içindeki bir dosya daha fazla boş olmayan satıra sahipse `cargo build` durur; clippy `too_many_lines` (60, `clippy.toml` içinde) aynısını fonksiyonlar için yapar. Bkz. [Project structure](structure.md).
 - `Dockerfile` ve `.dockerignore`: küçük bir konteyner imajı.
 - Yaygın CI sunucuları için, hepsi aynı denetimleri çalıştıran (`cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, `cargo deny check`) ve `Cargo.toml` ile eşleşmeyen bir `vX.Y.Z` etiketini reddeden pipeline'lar:
   - GitHub Actions için `.github/workflows/ci.yml`; yanında `.github/dependabot.yml` (haftalık Cargo ve action güncellemeleri) ve bir pull request kontrol listesi;
@@ -62,9 +64,22 @@ cargo run
 
 Her klasör için [Project structure](structure.md) sayfasına bakın.
 
+## Üreticiler
+
+`zeyn g feature` her model, servis, action ve screen için bir dosya içeren bir feature oluşturur:
+
+```sh
+zeyn g feature orders            # src/features/orders/: models/, services/, actions/, screens/
+zeyn g screen orders detail      # src/features/orders/screens/detail.rs
+```
+
+`zeyn g f` ve `zeyn g s` kısa biçimleri aynı işi yapar. Yeni feature hemen çalışır: bir model, bellekte tutulan bir veri servisi, bir arama action'ı ve menü kaydıyla bir liste screen'i. İhtiyaç duymadığı bir klasörü feature siler (klasörü ve feature'ın `mod.rs` dosyasındaki `mod` satırını). `components/` hiçbir zaman üretilmez: bir screen parçası paylaşıldığında ya da bir screen dosyası büyüdüğünde onu elle ekleyin, her dosyada `Node` döndüren bir fonksiyon (`components/<name>.rs`). Bir screen `<feature>.<name>.view` iznini ve `locales/` içindeki her dosyada başlığını alır; İngilizce dışındaki diller İngilizce metni ve çevrilmesi gerektiğini söyleyen bir not alır. Bu düzen zorunlu değildir: bir feature tek bir `screens.rs` kullanıyorsa `zeyn g screen` önce onu içeriğiyle birlikte `screens/mod.rs` konumuna taşır, `screens/` silinmişse yeniden oluşturur. Üreticiler hiçbir dosyanın üzerine yazmaz ve snake case olmayan adları reddeder.
+
 ## Bir uygulamayı denetleme
 
 `zeyn check` önce derleyiciyi, sonra uygulamanın kendi denetimlerini çalıştırır (`App::check`): yinelenen rotalar, iki kez kaydedilmiş screen'ler, bir screen'in ihtiyaç duyduğu ama kimsenin kaydetmediği servisler, kullanılamaz kısayollar, WCAG AA kontrastının altındaki tema belirteçleri ve bir dilde eksik çeviri anahtarları. Bir şey yanlışsa hata ile çıkar; böylece CI bunu çalıştırabilir.
+
+Denetimi hiçbir zaman başarısız yapmayan uyarılar da yazar: hiçbir feature'ın kaydetmediği bir `#[screen]` veya `#[action]`, ve yaklaşık 150 satırı geçmiş, içinde birden çok öğe olan tek bir `screens.rs` veya `actions.rs`.
 
 Bir Zeyn sürümü bir API'nin adını değiştirdiğinde `zeyn check --fix` eski adları yeniden yazar, örneğin `Grid` yerine `DataGrid` ve `GridQuery` yerine `DataQuery`, sonra yeniden denetler.
 

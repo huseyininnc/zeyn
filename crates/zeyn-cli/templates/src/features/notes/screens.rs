@@ -1,6 +1,6 @@
 use super::actions::{save_note, search_notes};
 use super::models::{Note, NoteId};
-use super::store::NoteStore;
+use super::services::NoteStore;
 use zeyn::prelude::*;
 
 /// Which note the editor opens; `None` creates one.

@@ -1,19 +1,18 @@
-//! Keeps source files small, so code is split into one file per component or screen.
+//! Stops the build when a source file grows too large, so code is split into one file per
+//! screen, group of actions or component.
 //!
 //! The limit is `max_file_lines` under `[package.metadata.zeyn]` in `Cargo.toml`. Raise it there
 //! only when a file really cannot be split. Long functions are caught by clippy's
 //! `too_many_lines` (threshold in `clippy.toml`).
 
 use std::fs;
-use std::path::Path;
+use std::path::{Component, Path};
 
 /// Default when `Cargo.toml` sets no `max_file_lines`.
 const DEFAULT_MAX_FILE_LINES: usize = 300;
 
 /// Reads `max_file_lines` from `[package.metadata.zeyn]`.
-fn max_file_lines() -> usize {
-    let manifest = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml"))
-        .unwrap_or_default();
+fn max_file_lines(manifest: &str) -> usize {
     manifest
         .lines()
         .skip_while(|l| l.trim() != "[package.metadata.zeyn]")
@@ -48,25 +47,39 @@ fn sizes(dir: &Path, out: &mut Vec<(String, usize)>) {
     }
 }
 
-#[test]
-fn source_files_stay_small() {
-    let max = max_file_lines();
+/// Whether this crate is built as a downloaded dependency, whose layout is not ours to check.
+fn is_dependency(root: &Path) -> bool {
+    root.components().any(|c| {
+        c == Component::Normal("registry".as_ref()) || c == Component::Normal("checkouts".as_ref())
+    })
+}
+
+fn main() {
+    println!("cargo::rerun-if-changed=src");
+    println!("cargo::rerun-if-changed=Cargo.toml");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    if is_dependency(root) {
+        return;
+    }
+    let manifest = fs::read_to_string(root.join("Cargo.toml")).unwrap_or_default();
+    let max = max_file_lines(&manifest);
     let mut files = Vec::new();
-    sizes(
-        &Path::new(env!("CARGO_MANIFEST_DIR")).join("src"),
-        &mut files,
-    );
+    sizes(&root.join("src"), &mut files);
     let big: Vec<String> = files
         .into_iter()
         .filter(|(_, n)| *n > max)
         .map(|(f, n)| format!("  {f}: {n} lines"))
         .collect();
-    assert!(
-        big.is_empty(),
+    if big.is_empty() {
+        return;
+    }
+    eprintln!(
         "these files have more than {max} non blank lines:\n{}\n\
-         Split them: move each component, screen or group of actions into its own file in \
-         the same feature folder and `mod` it from there. Raise `max_file_lines` under \
-         `[package.metadata.zeyn]` in Cargo.toml only if the owner agrees.",
+         Split them: move each screen, group of actions or component into its own file in the \
+         same feature folder (screens/<name>.rs, actions/<name>.rs, components/<name>.rs) and \
+         `mod` it from there. Raise `max_file_lines` under `[package.metadata.zeyn]` in \
+         Cargo.toml only if the owner agrees.",
         big.join("\n")
     );
+    std::process::exit(1);
 }

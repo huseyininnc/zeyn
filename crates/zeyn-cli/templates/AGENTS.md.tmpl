@@ -8,12 +8,13 @@ runtime in the browser applies changes, and there is no JavaScript to write.
 - Run: `cargo run` then open the address printed in the terminal
 - Test: `cargo test`
 - Develop with `zeyn dev`: it runs the app and rebuilds and restarts it on every saved change; the open browser follows without a page reload. A failed build keeps the last good server running.
-- Check the app without starting it: `zeyn check`. After a Zeyn upgrade, `zeyn check --fix` rewrites renamed APIs (deprecation warnings name them).
+- Check the app without starting it: `zeyn check`. It also warns about a `#[screen]` or `#[action]` that no feature registers, and about a flat `screens.rs` or `actions.rs` that has grown past about 150 lines with several items in it. After a Zeyn upgrade, `zeyn check --fix` rewrites renamed APIs (deprecation warnings name them).
 - Container: `docker build -t {{name}} .` then `docker run -p 3000:3000 {{name}}` (distroless, non root, `{{name}} health` is the health check). Configure with `APP_*` variables, such as `APP_SERVER__ADDR`.
 - Sign in: debug builds use `DevAuth` (every request is a developer with full access); release builds, the container included, have no sign in until `src/app.rs` adds a real authenticator (`OidcAuth`, `JwtAuth`, `ForwardAuth` or `App::accounts`). Never move `DevAuth` out of `#[cfg(debug_assertions)]`: the framework refuses it in release builds.
 - Standards are fixed by the project files: `rustfmt.toml`, `clippy.toml` and `[lints]` in `Cargo.toml`, `.editorconfig`, `deny.toml` (licenses and advisories), `rust-toolchain.toml`. CI runs all of them; do not loosen them to make a change pass.
 - Show every route, screen, API and missing translation: `zeyn routes`
 - New feature folder: `zeyn g feature <name>`
+- New screen, one file: `zeyn g screen <feature> <name>`. It registers the screen in the feature and adds its title to every locale file (other languages get the English text to translate).
 
 The `zeyn` MCP server (see `.mcp.json`) gives agents the same commands plus the framework reference.
 `.claude/skills/zeyn/SKILL.md` is the Zeyn skill: where to read the docs, the rules, the language in
@@ -26,14 +27,27 @@ config/app.json          defaults; environment variables APP_* override them (AP
 locales/<lang>.json      every user facing text; all files must have the same keys
 src/main.rs              loads configuration and starts the app
 src/app.rs               the App: services, features, security settings
+src/services/<name>.rs   services shared by several features, registered in src/app.rs
 src/features/<name>/     one folder per feature
-    mod.rs               the Feature: route prefix, guards, screens, APIs, menu
-    models.rs            #[entity] and #[model] types
-    store.rs             services that read and write data
-    actions.rs           #[action] functions
-    screens.rs           #[screen] functions
+    mod.rs               module declarations and the Feature: route prefix, guards, screens, APIs, menu
+    models/              #[entity] and #[model] types, one file each
+    services/            services of the feature that read and write data (stores, clients)
+    actions/             #[action] functions, one file each
+    screens/             #[screen] functions, one file each
+    components/          parts of screens (a toolbar, a panel), added by hand when needed
 tests/                   tests that drive the app through its router
 ```
+
+Each folder has a `mod.rs` that lists its files. `zeyn g feature` creates `models/`, `services/`,
+`actions/` and `screens/` with a working starter: a model, an in memory data service, a search
+action and a list screen. A feature that does not need a folder deletes it (the folder and its
+`mod` line in the feature's `mod.rs`). `components/` is never generated: add it by hand, with one
+function that returns a `Node` per file (`components/<name>.rs`), when a part of a screen is shared
+or a screen file grows. `zeyn g screen` adds a file to `screens/` and recreates `screens/mod.rs`
+when it was deleted. The layout is a default, not a rule: a small feature can keep a single `models.rs`,
+`screens.rs` or `actions.rs` (the sample `notes` feature does), and `zeyn g screen` turns a flat
+`screens.rs` into a folder the first time it adds a screen. A service that several features use
+goes in `src/services/<name>.rs` and is registered once in `src/app.rs` with `.service(...)`.
 
 ## Rules
 
@@ -56,7 +70,7 @@ tests/                   tests that drive the app through its router
    on each line, so a line holds one or two dots on average. `cargo fmt` does this with
    `chain_width = 40` in `rustfmt.toml`; do not raise it.
 12. Keep files and functions small: one component, screen or group of related actions per
-   file. A source file holds at most 300 non blank lines (`tests/structure.rs` checks it) and a
+   file. A source file holds at most 300 non blank lines (`build.rs` stops the build otherwise) and a
    function at most 60 lines (clippy `too_many_lines`). When `screens.rs` or `actions.rs` grows,
    turn it into a folder (`screens/mod.rs` plus one file per screen) and move large parts of a
    screen, such as a toolbar, a form or a panel, into their own functions in their own files.
@@ -160,7 +174,8 @@ impl Service for OrderStore {}
 
 ### Recipes
 
-- New feature: `zeyn g feature <name>`, then `.feature(...)` in `src/app.rs`, then texts in every `locales/*.json`.
+- New feature: `zeyn g feature <name>`. It registers the feature and its service in `src/app.rs` (or prints the two lines when `src/app.rs` has no `.feature(features::...)` line); then translate its texts in every `locales/*.json`. Delete the folders it does not need.
+- New screen: `zeyn g screen <feature> <name>` writes `screens/<name>.rs`, registers it and adds its title to every `locales/*.json`; translate the copies in languages other than English.
 - New field: add it to the struct with rules, add `Model.field` labels to every locale, add `.field(...)` to the form and `.column(...)` to the list.
 - New permission: name it `feature.resource.verb` in the macro; grant it in the authenticator or identity provider.
 - Publish an action as JSON API: `.api(action)` on the feature; calls need an `Authorization` header.

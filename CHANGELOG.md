@@ -10,7 +10,14 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 ### Added
 
-- Size limits in new projects: `tests/structure.rs` fails when a source file has more than `max_file_lines` (default 300) non blank lines, set under `[package.metadata.zeyn]` in `Cargo.toml`, and clippy `too_many_lines` denies functions longer than 60 lines (`too-many-lines-threshold` in `clippy.toml`). AGENTS.md and the skill tell agents to keep one component or screen per file.
+- Size limits in new projects: `build.rs` stops the build when a source file has more than `max_file_lines` (default 300) non blank lines, set under `[package.metadata.zeyn]` in `Cargo.toml`, and clippy `too_many_lines` denies functions longer than 60 lines (`too-many-lines-threshold` in `clippy.toml`). AGENTS.md and the skill tell agents to keep one component or screen per file.
+- `zeyn g screen <feature> <name>` (short form `g s`, MCP tool `zeyn_new_screen`) adds `screens/<name>.rs`, registers the screen in the feature and adds its title to every locale file. A flat `screens.rs` is first moved to `screens/mod.rs`, and a deleted `screens/` is created again. It never overwrites a file.
+- `zeyn check` warns about a `#[screen]` or `#[action]` that no feature registers and about a flat `screens.rs` or `actions.rs` with several items in more than about 150 lines.
+
+### Changed
+
+- `zeyn g feature` (short form `g f`) creates `models/`, `services/`, `actions/` and `screens/`, each with a `mod.rs`, holding a working starter: a model, an in memory data service, a search action and a list screen with its menu entry and texts in every locale file. It registers the feature and its service in `src/app.rs` after the last `.feature(features::...)` line, or prints the two lines when there is none. A feature that does not need a folder deletes it with its `mod` line; `components/` is added by hand when a part of a screen is shared or a screen file grows.
+- The `store.rs` of a feature is now `services/` in the app and library templates; services shared by several features go in `src/services/<name>.rs`.
 
 ### Fixed
 

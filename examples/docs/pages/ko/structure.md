@@ -3,18 +3,30 @@
 모든 Zeyn 앱은 같은 레이아웃을 가지므로 사람이나 에이전트가 모든 프로젝트에서 같은 위치에서 원하는 것을 찾습니다.
 
 ```
+Cargo.toml               dependencies, lints and [package.metadata.zeyn] (max_file_lines)
+build.rs                 stops cargo build when a file in src/ is longer than max_file_lines
 config/app.json          defaults; APP_* environment variables override them
 locales/<lang>.json      every user facing text; all files have the same keys
 src/main.rs              loads configuration and starts the app
 src/app.rs               the App: services, features, security settings
+src/services/<name>.rs   services shared by several features, registered in src/app.rs
 src/features/<name>/     one folder per feature
-    mod.rs               the Feature: route prefix, guards, screens, APIs, menu
-    models.rs            #[entity] and #[model] types
-    store.rs             services that read and write data
-    actions.rs           #[action] functions
-    screens.rs           #[screen] functions
+    mod.rs               module declarations and the Feature: route prefix, guards, screens, APIs, menu
+    models/              #[entity] and #[model] types, one file each
+    services/            services of the feature that read and write data (stores, clients)
+    actions/             #[action] functions, one file each
+    screens/             #[screen] functions, one file each
+    components/          parts of screens (a toolbar, a panel), added by hand when needed
 tests/                   tests that drive the app through its router
 ```
+
+## 생성기
+
+`zeyn g feature <name>`는 동작하는 목록 Screen과 함께 `models/`, `services/`, `actions/`, `screens/`를 만들고 feature와 서비스를 `src/app.rs`에 등록합니다. `zeyn g screen <feature> <name>`은 Screen 하나를 추가하고 등록합니다. Screen의 일부를 여러 곳에서 쓰거나 Screen 파일이 길어지면 `components/`를 직접 추가하고, feature에 필요 없는 폴더는 `mod` 줄과 함께 삭제합니다. 자세한 내용은 [CLI and projects](cli.md)를 참고하세요.
+
+## 크기 제한
+
+작은 파일과 함수는 코드를 검토하기 쉽게 합니다. `Cargo.toml`의 `[package.metadata.zeyn]`에 있는 `max_file_lines`(기본값은 비어 있지 않은 줄 300개)를 넘으면 `build.rs`가 `cargo build`를 멈추고 한도를 넘은 파일을 나열합니다. Clippy의 `too_many_lines`(60줄, `clippy.toml`의 `too-many-lines-threshold`)는 함수에 같은 일을 합니다. 두 한도 모두 이 파일들에서 올릴 수 있지만, 에이전트는 대신 코드를 나눠야 합니다. 파일마다 Screen, 컴포넌트 또는 action 묶음 하나를 두고, Screen의 큰 부분은 각자의 함수로 뺍니다.
 
 ## 앱
 

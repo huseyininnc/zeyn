@@ -8,7 +8,8 @@
 |---|---|
 | `zeyn new <name>` | 创建带有标准 feature 结构的应用 |
 | `zeyn new <name> --lib` | 创建由多个应用共享的 model、feature 和文本库 |
-| `zeyn g feature <name>` | 添加 `src/features/<name>`，包含 model、store、action 和 screen |
+| `zeyn g feature <name>` | 添加 `src/features/<name>`，包含 `models`、`services`、`actions` 和 `screens` 文件夹以及一个可用的列表 screen |
+| `zeyn g screen <feature> <name>` | 向 feature 添加 `screens/<name>.rs`，注册它，并把标题加入每个语言文件 |
 | `zeyn routes` | 列出 feature、screen、路由、API 和访问权限 |
 | `zeyn check` | 编译并报告结构问题和缺失的翻译 |
 | `zeyn check --fix` | 改写 `src`、`tests` 和 `examples` 中已重命名的 Zeyn API，然后检查 |
@@ -53,6 +54,7 @@ cargo run
   ```
 
   而不是 `DataGrid::of(search_items).paging(Paging::pages(25)).column(Item::code).column(Item::qty)`。
+- `build.rs` 以及 `Cargo.toml` 中 `[package.metadata.zeyn]` 下的 `max_file_lines = 300`：当 `src/` 中某个文件的非空行更多时，`cargo build` 会停止；clippy `too_many_lines`（60，在 `clippy.toml` 中）对函数做同样的检查。参见 [Project structure](structure.md)。
 - `Dockerfile` 和 `.dockerignore`：体积小的容器镜像。
 - 适用于常见 CI 服务器的流水线，全部运行相同的检查（`cargo fmt --check`、`cargo clippy -D warnings`、`cargo test`、`cargo deny check`），并拒绝与 `Cargo.toml` 不匹配的标签 `vX.Y.Z`：
   - 用于 GitHub Actions 的 `.github/workflows/ci.yml`，以及 `.github/dependabot.yml`（每周的 Cargo 和 action 更新）和拉取请求检查清单；
@@ -64,9 +66,22 @@ cargo run
 
 各个文件夹的说明参见[项目结构](structure.md)。
 
+## 生成器
+
+`zeyn g feature` 创建一个 feature，每个 model、service、action 和 screen 一个文件：
+
+```sh
+zeyn g feature orders            # src/features/orders/: models/, services/, actions/, screens/
+zeyn g screen orders detail      # src/features/orders/screens/detail.rs
+```
+
+简写 `zeyn g f` 和 `zeyn g s` 的作用相同。新 feature 立即可用：一个 model、一个内存数据 service、一个搜索 action，以及带菜单项的列表 screen。不需要某个文件夹的 feature 会删除它（文件夹以及 feature 的 `mod.rs` 中对应的 `mod` 行）。`components/` 从不生成：当 screen 的某个部分被共享或 screen 文件变长时，手动添加它，每个文件一个返回 `Node` 的函数（`components/<name>.rs`）。screen 获得权限 `<feature>.<name>.view`，其标题写入 `locales/` 中的每个文件；英语以外的语言先得到英文文本，并提示需要翻译。这种布局不是强制的：如果 feature 使用单个 `screens.rs`，`zeyn g screen` 会先把它连同内容移动到 `screens/mod.rs`；如果 `screens/` 已被删除，则重新创建它。生成器从不覆盖文件，并拒绝不是 snake case 的名称。
+
 ## 检查应用
 
 `zeyn check` 先运行编译器，再运行应用自己的检查（`App::check`）：重复的路由、被注册两次的 screen、screen 需要但没人注册的服务、无法使用的快捷键、低于 WCAG AA 对比度的主题令牌，以及某种语言中缺失的翻译键。出现任何问题时它都会以错误退出，因此 CI 可以运行它。
+
+它还会输出警告，但警告从不让检查失败：没有任何 feature 注册的 `#[screen]` 或 `#[action]`，以及超过约 150 行且包含多个条目的单个 `screens.rs` 或 `actions.rs`。
 
 当 Zeyn 版本重命名某个 API 时，`zeyn check --fix` 会改写旧名称，例如把 `Grid` 改为 `DataGrid`，把 `GridQuery` 改为 `DataQuery`，然后再次检查。
 

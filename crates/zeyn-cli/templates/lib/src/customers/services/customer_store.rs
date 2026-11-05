@@ -1,8 +1,8 @@
-use super::models::{Customer, CustomerId};
+use super::super::models::{Customer, CustomerId};
 use std::sync::{Arc, RwLock};
 use zeyn::prelude::*;
 
-/// Customers kept in memory. Replace it with a database backed store.
+/// Customers kept in memory. Replace it with a database backed service.
 #[derive(Clone, Default)]
 pub struct CustomerStore(Arc<RwLock<Vec<Customer>>>);
 

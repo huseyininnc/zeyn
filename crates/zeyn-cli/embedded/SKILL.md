@@ -55,9 +55,17 @@ Which page answers what:
 
 These hold in every Zeyn app. `zeyn check` and the compiler enforce many of them.
 
-1. **One folder per feature.** `src/features/<name>/` holds `mod.rs` (the `Feature`), `models.rs`,
-   `store.rs`, `actions.rs` and `screens.rs`. Register screens in the feature's `mod.rs` and the
-   feature in `src/app.rs`. Create one with `zeyn g feature <name>`.
+1. **One folder per feature.** `src/features/<name>/` holds `mod.rs` (module declarations and the
+   `Feature`) and the folders `models/`, `services/`, `actions/` and `screens/`, one file per
+   model, service, action and screen. `zeyn g feature <name>` creates them with a working starter
+   (a model, an in memory data service, a search action and a list screen); a feature that does
+   not need a folder deletes it (the folder and its `mod` line in the feature's `mod.rs`). Add
+   `components/` by hand, one function returning a `Node` per file (`components/<name>.rs`), when
+   a part of a screen is shared or a screen file grows. `zeyn g screen <feature> <name>` adds
+   `screens/<name>.rs`, registers it and adds its title to every locale file. Register screens in the feature's `mod.rs` and the
+   feature and its services in `src/app.rs`. A service that several features use goes in
+   `src/services/<name>.rs`, registered once in `src/app.rs`. The layout is a default: a single
+   `screens.rs` still works, and `zeyn g screen` moves it to `screens/mod.rs` before it adds a file.
 2. **Every action and screen declares access**: `permission = "feature.resource.verb"` or
    `public`. The server checks it on every call, from the page, the API and AI agents alike.
 3. **Inputs are validated by type.** Saving takes `Valid<Model>`. Put rules on fields
@@ -98,7 +106,7 @@ These hold in every Zeyn app. `zeyn check` and the compiler enforce many of them
 
     `cargo fmt` keeps this shape with `chain_width = 40` in `rustfmt.toml`; do not raise it.
 13. **Small files, small functions.** One component, screen or group of related actions per file.
-    A source file holds at most 300 non blank lines (`tests/structure.rs` checks it) and a
+    A source file holds at most 300 non blank lines (`build.rs` stops the build otherwise) and a
     function at most 60 lines (clippy `too_many_lines`). When `screens.rs` or `actions.rs` grows,
     turn it into a folder (`screens/mod.rs` plus one file per screen) and move large parts of a
     screen (a toolbar, a form, a panel) into their own functions in their own files. The limits
@@ -226,7 +234,8 @@ What to remember:
 
 1. `cargo test`: the app's tests drive it through its router; add a test for new behavior.
 2. `zeyn check` (or the `zeyn_check` MCP tool): compiles, then reports structural problems and
-   missing translations. It must say `ok`.
+   missing translations. It must say `ok`. Its warnings name a `#[screen]` or `#[action]` that no
+   feature registers and a flat `screens.rs` or `actions.rs` that has grown too large to stay flat.
 3. `zeyn dev` and open the screen in a browser: the page follows each rebuild without reloading.
    Check that the screen works by keyboard, in both themes, and that the console has no errors.
 4. For a container: `docker build -t <app> .` and `docker run -p 3000:3000 <app>`.

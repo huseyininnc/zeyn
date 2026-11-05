@@ -1,6 +1,6 @@
 use super::actions::{save_customer, search_customers};
 use super::models::{Customer, CustomerId};
-use super::store::CustomerStore;
+use super::services::CustomerStore;
 use zeyn::prelude::*;
 
 /// Which customer the editor opens; `None` creates one.
