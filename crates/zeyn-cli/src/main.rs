@@ -110,6 +110,10 @@ const TEMPLATES: &[(&str, &str)] = &[
         include_str!("../templates/src/features/notes/screens.rs"),
     ),
     ("tests/app.rs", include_str!("../templates/tests/app.rs")),
+    (
+        "tests/structure.rs",
+        include_str!("../templates/common/structure.rs"),
+    ),
 ];
 
 const LIB_TEMPLATES: &[(&str, &str)] = &[
@@ -200,6 +204,10 @@ const LIB_TEMPLATES: &[(&str, &str)] = &[
     (
         "tests/lib.rs",
         include_str!("../templates/lib/tests/lib.rs"),
+    ),
+    (
+        "tests/structure.rs",
+        include_str!("../templates/common/structure.rs"),
     ),
 ];
 

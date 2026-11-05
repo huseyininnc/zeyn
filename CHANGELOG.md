@@ -4,6 +4,10 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 ## [Unreleased]
 
+### Added
+
+- Size limits in new projects: `tests/structure.rs` fails when a source file has more than `max_file_lines` (default 300) non blank lines, set under `[package.metadata.zeyn]` in `Cargo.toml`, and clippy `too_many_lines` denies functions longer than 60 lines (`too-many-lines-threshold` in `clippy.toml`). AGENTS.md and the skill tell agents to keep one component or screen per file.
+
 ## [0.0.8] - 2026-11-05
 
 ### Added
