@@ -198,6 +198,8 @@ What to remember:
 - The first argument of an action is its input; of a screen, its params (`#[params]` struct or
   `_: ()`). Every other argument is injected: `Ctx` or a registered `Service`.
 - A screen with a `route` is a page; without one it opens as a window.
+- Page header: `.subtitle(t!("..."))` under the title and `.primary(|t| t.button(..))` for the
+  main actions on the right; `.toolbar(..)` stays for the other tools.
 - Path params: `#[screen(route = "/orders/{id}", ...)]` binds `{id}` to the params field `id`
   (integers, entity keys, `String`, `Slug`). `Slug::from_title("Çay Bardağı")` is `cay-bardagi`.
   Return `Err(Error::NotFound)` for a missing record, `Screen::moved_to(screen, params)` for a 301, `Screen::redirect(screen, params)` for a 303 that is never cached.

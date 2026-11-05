@@ -139,6 +139,19 @@ Screen::new(t!("stock.products"))
 
 `Alt+N` 같은 단축키는 Screen에서 동작하며 팔레트에 표시됩니다. 브라우저가 사용하는 단축키(`Ctrl+P`, `Ctrl+S`, `F5`)는 버튼이 `.override_browser()`를 호출하지 않는 한 바인드되지 않으며, 브라우저가 전달하지 않는 단축키(`Ctrl+N`, `Ctrl+T`, `Ctrl+W`)는 절대 바인드되지 않습니다. 사용할 수 있는 조합은 `Alt+Shift+<letter>`와 `Ctrl+Alt+<letter>`입니다.
 
+## 헤더
+
+`.subtitle(text)`는 제목 아래에 짧은 한 줄을 넣고, `.primary(|t| ...)`는 화면의 주요 작업을 기본 버튼으로 제목 줄 끝에 둡니다. 둘을 함께 쓰면 대부분의 관리 화면에 있는 페이지 헤더가 됩니다.
+
+```rust
+Screen::new(t!("orders.title"))
+    .subtitle(t!("orders.intro"))
+    .primary(|t| t.button(t!("orders.new")).icon(Icon::Plus).shortcut("Alt+N").opens(order_editor, OrderParams { id: None }))
+    .toolbar(|t| t.export(Export::Csv))
+```
+
+`.primary`는 `.toolbar`와 같은 버튼을 같은 단축키와 팔레트 항목으로 받습니다. 도구 모음은 다른 도구를 위해 헤더 아래에 그대로 남습니다. 부제목은 스크린 리더가 읽는 화면 설명입니다(`aria-describedby`). 줄이 좁으면 작업이 제목 아래로 내려가고, 휴대폰에서는 시작 쪽에 맞춰 정렬됩니다. 부제목도 주요 작업도 없으면 화면은 이전처럼 일반 제목으로 그려집니다.
+
 ## Feature와 메뉴
 
 Screen은 Feature에 속합니다. Feature의 경로 접두사가 경로 앞에 붙고, Feature의 가드는 Screen이 열리기 전에 실행되며, Feature의 메뉴가 Screen을 나열합니다.

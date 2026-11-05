@@ -80,6 +80,7 @@
       "toast": "A short notice after an action.",
       "chart": "Bar, donut, combo and gauge charts.",
       "kpi": "A number with its change and trend.",
+      "screen_header": "The title row of a screen: a subtitle and the main actions.",
       "toolbox": "A group of tool buttons, one selected.",
       "status_bar": "A bar of short status texts.",
       "relative_time": "A moment shown as \"5 minutes ago\" in the page language.",
@@ -181,6 +182,9 @@
         "overview": "Example",
         "horizontal": "Horizontal",
         "with_preview": "With a hover preview"
+      },
+      "screen_header": {
+        "orders_page": "A page header"
       },
       "kpi": {
         "overview": "Example",

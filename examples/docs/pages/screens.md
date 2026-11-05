@@ -139,6 +139,19 @@ Screen::new(t!("stock.products"))
 
 Shortcuts like `Alt+N` work on the screen and are shown in the palette. Shortcuts the browser uses (`Ctrl+P`, `Ctrl+S`, `F5`) are not bound unless the button calls `.override_browser()`, and ones it never passes on (`Ctrl+N`, `Ctrl+T`, `Ctrl+W`) are never bound; free combinations are `Alt+Shift+<letter>` and `Ctrl+Alt+<letter>`.
 
+## Header
+
+`.subtitle(text)` puts a short line under the title, and `.primary(|t| ...)` puts the screen's main actions at the end of the title row, as primary buttons. Together they make the page header most admin screens have.
+
+```rust
+Screen::new(t!("orders.title"))
+    .subtitle(t!("orders.intro"))
+    .primary(|t| t.button(t!("orders.new")).icon(Icon::Plus).shortcut("Alt+N").opens(order_editor, OrderParams { id: None }))
+    .toolbar(|t| t.export(Export::Csv))
+```
+
+`.primary` takes the same buttons as `.toolbar`, with the same shortcuts and palette entries; the toolbar stays under the header for the other tools. The subtitle is the screen's description for screen readers (`aria-describedby`). When the row is too narrow, the actions wrap under the title, and on phones they line up at the start. Without a subtitle or primary actions the screen renders as before, a plain heading.
+
 ## Features and the menu
 
 A screen belongs to a feature. The feature's route prefix comes before the route, its guards run before the screen opens, and its menu lists the screens:

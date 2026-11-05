@@ -45,6 +45,7 @@ pub mod rating;
 pub mod reactions;
 pub mod relative_time;
 pub mod row;
+pub mod screen_header;
 pub mod search_box;
 pub mod share;
 pub mod skeleton;

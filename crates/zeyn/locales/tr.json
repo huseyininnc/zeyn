@@ -215,6 +215,7 @@
       "time_zone": "Saat dilimi",
       "time_zone_auto": "Otomatik (bu cihaz)",
       "theme": "Tema",
+      "primary_actions": "Ana işlemler",
       "theme_system": "Sistem",
       "theme_light": "Açık",
       "theme_dark": "Koyu",

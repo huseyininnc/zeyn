@@ -139,6 +139,19 @@ Screen::new(t!("stock.products"))
 
 `Alt+N` gibi kısayollar screen üzerinde çalışır ve palette'te gösterilir. Tarayıcının kullandığı kısayollar (`Ctrl+P`, `Ctrl+S`, `F5`), düğme `.override_browser()` çağırmadıkça bağlanmaz ve tarayıcının hiç iletmediği kısayollar (`Ctrl+N`, `Ctrl+T`, `Ctrl+W`) hiçbir zaman bağlanmaz; serbest kombinasyonlar `Alt+Shift+<harf>` ve `Ctrl+Alt+<harf>` biçimindedir.
 
+## Başlık
+
+`.subtitle(text)` başlığın altına kısa bir satır koyar, `.primary(|t| ...)` ise ekranın ana işlemlerini başlık satırının sonuna birincil düğmeler olarak yerleştirir. İkisi birlikte çoğu yönetim ekranında olan sayfa başlığını oluşturur.
+
+```rust
+Screen::new(t!("orders.title"))
+    .subtitle(t!("orders.intro"))
+    .primary(|t| t.button(t!("orders.new")).icon(Icon::Plus).shortcut("Alt+N").opens(order_editor, OrderParams { id: None }))
+    .toolbar(|t| t.export(Export::Csv))
+```
+
+`.primary`, `.toolbar` ile aynı düğmeleri, aynı kısayolları ve palet girdileriyle alır; araç çubuğu diğer araçlar için başlığın altında kalır. Alt başlık, ekran okuyucular için ekranın açıklamasıdır (`aria-describedby`). Satır dar geldiğinde işlemler başlığın altına kayar, telefonda başa hizalanır. Alt başlık ya da ana işlem yoksa ekran eskisi gibi düz bir başlıkla çizilir.
+
 ## Feature'lar ve menü
 
 Bir screen bir feature'a aittir. Feature'ın rota öneki rotadan önce gelir, guard'ları screen açılmadan önce çalışır ve menüsü screen'leri listeler:

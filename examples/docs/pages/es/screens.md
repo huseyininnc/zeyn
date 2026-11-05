@@ -139,6 +139,19 @@ Screen::new(t!("stock.products"))
 
 Los atajos como `Alt+N` funcionan en la pantalla y se muestran en la paleta. Los atajos que usa el navegador (`Ctrl+P`, `Ctrl+S`, `F5`) no se enlazan salvo que el botón llame a `.override_browser()`, y los que el navegador nunca deja pasar (`Ctrl+N`, `Ctrl+T`, `Ctrl+W`) nunca se enlazan; las combinaciones libres son `Alt+Shift+<letra>` y `Ctrl+Alt+<letra>`.
 
+## Cabecera
+
+`.subtitle(text)` pone una línea breve bajo el título, y `.primary(|t| ...)` coloca las acciones principales de la pantalla al final de la fila del título, como botones primarios. Juntos forman la cabecera de página que tienen casi todas las pantallas de administración.
+
+```rust
+Screen::new(t!("orders.title"))
+    .subtitle(t!("orders.intro"))
+    .primary(|t| t.button(t!("orders.new")).icon(Icon::Plus).shortcut("Alt+N").opens(order_editor, OrderParams { id: None }))
+    .toolbar(|t| t.export(Export::Csv))
+```
+
+`.primary` acepta los mismos botones que `.toolbar`, con los mismos atajos y entradas de la paleta; la barra de herramientas sigue bajo la cabecera para las demás herramientas. El subtítulo es la descripción de la pantalla para los lectores de pantalla (`aria-describedby`). Si la fila es demasiado estrecha, las acciones pasan bajo el título, y en el teléfono se alinean al inicio. Sin subtítulo ni acciones principales, la pantalla se muestra como antes, con un título sencillo.
+
 ## Features y el menú
 
 Una pantalla pertenece a una feature. El prefijo de ruta de la feature va antes de la ruta, sus guards se ejecutan antes de que se abra la pantalla y su menú lista las pantallas:

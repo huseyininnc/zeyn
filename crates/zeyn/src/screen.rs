@@ -951,9 +951,20 @@ impl Toolbar {
     }
 
     pub(crate) fn render(&self, out: &mut String, r: &Render, title: &str) {
+        self.render_as(out, r, title, "toolbar");
+    }
+
+    /// Writes the bar; `kind` is `toolbar`, or `primary` for the main actions of a screen
+    /// header, drawn as primary buttons.
+    fn render_as(&self, out: &mut String, r: &Render, title: &str, kind: &str) {
         let scope = r.scope;
+        let (bar, button) = if kind == "primary" {
+            ("z-toolbar z-screen-primary", "z-button z-primary")
+        } else {
+            ("z-toolbar", "z-button")
+        };
         out.push_str(&format!(
-            r#"<div class="z-toolbar" role="toolbar" aria-label="{title}">"#
+            r#"<div class="{bar}" role="toolbar" aria-label="{title}">"#
         ));
         for (n, item) in self.items.iter().enumerate() {
             match item {
@@ -964,7 +975,7 @@ impl Toolbar {
                     }
                     let english = b.label.english();
                     out.push_str(&format!(
-                        r#"<button type="button" class="z-button" data-testid="{scope}.toolbar.{}""#,
+                        r#"<button type="button" class="{button}" data-testid="{scope}.{kind}.{}""#,
                         slug(&english)
                     ));
                     if let Some(keys) = b.shortcut.as_deref().and_then(|s| crate::command::usable_shortcut(s, b.override_browser)) {
@@ -988,7 +999,7 @@ impl Toolbar {
                     }
                 }
                 ToolItem::Export(e) => out.push_str(&format!(
-                    r#"<button type="button" class="z-button" data-testid="{scope}.toolbar.export-{code}" data-zeyn-export="{code}">{}</button>"#,
+                    r#"<button type="button" class="{button}" data-testid="{scope}.{kind}.export-{code}" data-zeyn-export="{code}">{}</button>"#,
                     r.text(&Text::key(format!("zeyn.export.{}", e.code()))),
                     code = e.code()
                 )),
@@ -1083,8 +1094,10 @@ enum ScreenKind {
 /// Content of a screen. Screen functions return this.
 pub struct Screen {
     title: Text,
+    subtitle: Option<Text>,
     kind: ScreenKind,
     toolbar: Option<Toolbar>,
+    primary: Option<Toolbar>,
     body: Vec<Node>,
     menu: Option<crate::menu::ContextMenu>,
     moved: Option<(&'static str, serde_json::Value, bool)>,
@@ -1096,8 +1109,10 @@ impl Screen {
     pub fn new(title: impl Into<Text>) -> Self {
         Self {
             title: title.into(),
+            subtitle: None,
             kind: ScreenKind::Page,
             toolbar: None,
+            primary: None,
             body: Vec::new(),
             menu: None,
             moved: None,
@@ -1246,6 +1261,35 @@ impl Screen {
         self
     }
 
+    /// A short line under the title, read as the screen's description.
+    ///
+    /// ```
+    /// use zeyn::Screen;
+    /// let s = Screen::new("Orders").subtitle("Every order of the last 90 days.");
+    /// ```
+    pub fn subtitle(mut self, text: impl Into<Text>) -> Self {
+        self.subtitle = Some(text.into());
+        self
+    }
+
+    /// The screen's main actions, as primary buttons at the end of the title row (the page
+    /// header pattern). They take the same buttons as [`Screen::toolbar`], which stays under
+    /// the title for the other tools. On narrow screens the actions wrap under the title.
+    ///
+    /// ```ignore
+    /// Screen::new(t!("orders.title"))
+    ///     .subtitle(t!("orders.intro"))
+    ///     .primary(|t| t.button(t!("orders.new")).icon(Icon::Plus).opens(order_editor, OrderParams { id: None }))
+    /// ```
+    pub fn primary<F, R>(mut self, build: F) -> Self
+    where
+        F: FnOnce(Toolbar) -> R,
+        R: Into<Toolbar>,
+    {
+        self.primary = Some(build(Toolbar::default()).into());
+        self
+    }
+
     pub fn body(mut self, node: impl Into<Node>) -> Self {
         self.body.push(node.into());
         self
@@ -1310,20 +1354,44 @@ impl Screen {
             _ => attr(params),
         };
         let mut out = String::new();
-        let close = match self.kind {
+        let described = if self.subtitle.is_some() {
+            format!(r#" aria-describedby="{scope}-subtitle""#)
+        } else {
+            String::new()
+        };
+        let (close, level) = match self.kind {
             ScreenKind::Page => {
                 out.push_str(&format!(
-                    r#"<section class="z-screen" data-zeyn-screen="{scope}" data-zeyn-params="{params}" aria-labelledby="{scope}-title"><h1 id="{scope}-title">{title}</h1>"#
+                    r#"<section class="z-screen" data-zeyn-screen="{scope}" data-zeyn-params="{params}" aria-labelledby="{scope}-title"{described}>"#
                 ));
-                "</section>"
+                ("</section>", "h1")
             }
             ScreenKind::Window { width } => {
                 out.push_str(&format!(
-                    r#"<div class="z-window" role="dialog" aria-modal="true" data-zeyn-screen="{scope}" data-zeyn-params="{params}" aria-labelledby="{scope}-title" style="--z-width:{width}px"><h2 id="{scope}-title">{title}</h2>"#
+                    r#"<div class="z-window" role="dialog" aria-modal="true" data-zeyn-screen="{scope}" data-zeyn-params="{params}" aria-labelledby="{scope}-title"{described} style="--z-width:{width}px">"#
                 ));
-                "</div>"
+                ("</div>", "h2")
             }
         };
+        let heading = format!(r#"<{level} id="{scope}-title">{title}</{level}>"#);
+        if self.subtitle.is_none() && self.primary.is_none() {
+            out.push_str(&heading);
+        } else {
+            out.push_str(r#"<header class="z-screen-head"><div class="z-screen-heading">"#);
+            out.push_str(&heading);
+            if let Some(s) = &self.subtitle {
+                out.push_str(&format!(
+                    r#"<p class="z-screen-subtitle" id="{scope}-subtitle">{}</p>"#,
+                    r.text(s)
+                ));
+            }
+            out.push_str("</div>");
+            if let Some(p) = &self.primary {
+                let label = r.text(&Text::key("zeyn.shell.primary_actions"));
+                p.render_as(&mut out, &r, &label, "primary");
+            }
+            out.push_str("</header>");
+        }
         if let Some(t) = &self.toolbar {
             t.render(&mut out, &r, &title);
         }
@@ -1343,8 +1411,10 @@ impl Screen {
         json!({
             "screen": meta,
             "title": self.title,
+            "subtitle": self.subtitle,
             "kind": kind,
             "width": width,
+            "primary": self.primary.as_ref().map(Toolbar::schema),
             "toolbar": self.toolbar.as_ref().map(Toolbar::schema),
             "body": self.body.iter().map(Node::schema).collect::<Vec<_>>(),
         })

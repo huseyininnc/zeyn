@@ -348,3 +348,57 @@ async fn lazy_tab_panels_load_through_the_node_endpoint_with_access_checks() {
     let (status, _) = send(&router, no_csrf).await;
     assert_eq!(status, StatusCode::FORBIDDEN, "posts need the CSRF token");
 }
+
+#[screen(route = "/orders-head", public)]
+pub fn orders_head() -> Screen {
+    header_screen()
+}
+
+/// The screen of `orders_head`, built where the test can call it.
+fn header_screen() -> Screen {
+    Screen::new("Orders <all>")
+        .subtitle("Every order of the last <90> days.")
+        .primary(|t| {
+            t.button("New order")
+                .icon(Icon::Plus)
+                .shortcut("Alt+N")
+        })
+        .toolbar(|t| t.export(Export::Csv))
+}
+
+#[test]
+fn a_screen_header_has_the_title_a_subtitle_and_primary_actions_in_one_row() {
+    let meta = <orders_head as ScreenDef>::META;
+    let html = header_screen().html(&meta);
+    assert!(
+        html.contains(
+            r#"aria-labelledby="orders_head-title" aria-describedby="orders_head-subtitle">"#
+        ),
+        "{html}"
+    );
+    assert!(html.contains(r#"<header class="z-screen-head"><div class="z-screen-heading"><h1 id="orders_head-title">Orders &lt;all&gt;</h1><p class="z-screen-subtitle" id="orders_head-subtitle">Every order of the last &lt;90&gt; days.</p></div><div class="z-toolbar z-screen-primary" role="toolbar" aria-label="Main actions">"#), "{html}");
+    assert!(
+        html.contains(r#"<button type="button" class="z-button z-primary" data-testid="orders_head.primary.new-order" aria-keyshortcuts="Alt+N">"#),
+        "{html}"
+    );
+    let head_end = html.find("</header>").unwrap();
+    let tools = html
+        .find(r#"data-testid="orders_head.toolbar.export-csv""#)
+        .unwrap();
+    assert!(tools > head_end, "the toolbar stays under the header");
+    let schema = header_screen().schema(&meta);
+    assert_eq!(schema["subtitle"], "Every order of the last <90> days.");
+    assert_eq!(schema["primary"][0]["label"], "New order");
+    let plain = Screen::new("Plain").html(&meta);
+    assert!(
+        plain.contains(
+            r#"aria-labelledby="orders_head-title"><h1 id="orders_head-title">Plain</h1>"#
+        ),
+        "a screen without a header keeps its markup"
+    );
+    assert!(!plain.contains("z-screen-head"));
+    let window = Screen::window("Edit")
+        .subtitle("One order")
+        .html(&meta);
+    assert!(window.contains(r#"<header class="z-screen-head"><div class="z-screen-heading"><h2 id="orders_head-title">Edit</h2>"#));
+}

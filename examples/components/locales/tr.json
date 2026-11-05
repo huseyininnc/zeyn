@@ -80,6 +80,7 @@
       "toast": "Bir eylemden sonra kısa bildirim.",
       "chart": "Çubuk, halka, karma ve gösterge grafikleri.",
       "kpi": "Değişimi ve eğilimiyle bir sayı.",
+      "screen_header": "Ekranın başlık satırı: bir alt başlık ve ana işlemler.",
       "toolbox": "Biri seçili araç düğmeleri grubu.",
       "status_bar": "Kısa durum metinleri çubuğu.",
       "relative_time": "Sayfanın dilinde \"5 dakika önce\" gibi gösterilen an.",
@@ -181,6 +182,9 @@
         "overview": "Örnek",
         "horizontal": "Yatay",
         "with_preview": "Üzerine gelince önizleme"
+      },
+      "screen_header": {
+        "orders_page": "Sayfa başlığı"
       },
       "kpi": {
         "overview": "Örnek",

@@ -103,6 +103,7 @@ catalog! {
         tabs "/ui/tabs";
         split "/ui/split";
         auto_grid "/ui/auto-grid";
+        screen_header "/ui/screen-header";
     }
     "text" Edit {
         heading "/ui/heading";
@@ -244,7 +245,8 @@ pub fn feature() -> Feature {
     with_screens(
         Feature::new("components")
             .screen(catalog_home)
-            .screen(examples::image_card::product),
+            .screen(examples::image_card::product)
+            .screen(examples::screen_header::orders_page),
     )
 }
 
