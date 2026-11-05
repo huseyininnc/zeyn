@@ -244,11 +244,11 @@ pub mod prelude {
     pub use crate::ui::{
         ActionButton, Alert, AlphaIndex, Audio, AutoGrid, Avatar, Badge, Breadcrumb, Busy, Card,
         CardGrid, Chart, Chips, Control, DateOptions, DescriptionList, Dock, Embed,
-        EmbedPermission, EmptyState, ExternalLink, Heading, Hero, Image, Kpi, List, LookupItem,
-        LookupQuery, MenuBar, MenuButton, MetaLine, Panel, Paragraph, Popover, PrevNext, Progress,
-        PropertyInspector, Rail, Reactions, RelativeTime, Row, SearchBox, SearchParams, Share,
-        Skeleton, Split, Spoiler, Stack, StatusBar, Tabs, Timeline, Toolbox, Tree, TreeItem,
-        TreeQuery, Video, WeekSchedule,
+        EmbedPermission, EmptyState, ExternalLink, Heading, Hero, Image, Kpi, LinkButton, List,
+        LookupItem, LookupQuery, MenuBar, MenuButton, MetaLine, Panel, Paragraph, Popover,
+        PrevNext, Progress, PropertyInspector, Rail, Reactions, RelativeTime, Row, SearchBox,
+        SearchParams, Share, Skeleton, Split, Spoiler, Stack, StatusBar, Tabs, Timeline, Toolbox,
+        Tree, TreeItem, TreeQuery, Video, WeekSchedule,
     };
     pub use crate::{
         Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime,

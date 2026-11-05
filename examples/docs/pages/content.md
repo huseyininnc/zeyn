@@ -123,14 +123,15 @@ pub fn articles(p: ArticleParams) -> Screen {
 
 ## Hero
 
-A large section at the top of a page: a background image with a title, a line of text and actions such as buttons. It is static by default. `.slide(title)` adds another slide, and `.text`, `.image` and `.action` always set the last one. With several slides it follows the W3C APG carousel pattern: slide picker buttons, each slide a group named "2 of 3", and the picked slide announced politely. Slides change only when the user picks one unless the app calls `.rotate(seconds)` (4 to 30). Then a pause and play button comes first (WCAG 2.2.2), rotation stops while the pointer is over the hero or focus is inside it and while the tab is hidden, and it never starts when the user prefers reduced motion; the slides are not announced while they move. Without script the first slide shows.
+A large section at the top of a page: a background image with a title, a line of text and actions such as buttons. `.link(label, screen, params)` adds a `LinkButton` to another page: the first one of a slide has the primary look, later ones the secondary look. It is static by default. `.slide(title)` adds another slide, and `.text`, `.image` and `.action` always set the last one. With several slides it follows the W3C APG carousel pattern: slide picker buttons, each slide a group named "2 of 3", and the picked slide announced politely. Slides change only when the user picks one unless the app calls `.rotate(seconds)` (4 to 30). Then a pause and play button comes first (WCAG 2.2.2), rotation stops while the pointer is over the hero or focus is inside it and while the tab is hidden, and it never starts when the user prefers reduced motion; the slides are not announced while they move. Without script the first slide shows.
 
-The image follows the `Image` rules (a path of the app or an `https` address on a host of the app's `img-src`). It is decoration behind the text, so its alternative text is empty: put what matters into the title and the text, which sit on a dark gradient for contrast. The first slide's image loads with high priority for a fast first paint, the others lazily. The script (`hero.js`, 1.6 KB gzip) loads only on pages with slides.
+The image follows the `Image` rules (a path of the app or an `https` address on a host of the app's `img-src`). It is decoration behind the text, so its alternative text is empty: put what matters into the title and the text, which sit on a dark scrim that keeps white text at a contrast of at least 4.5:1 over any picture. Link buttons keep their solid colors and get a white focus ring over the image. The first slide's image loads with high priority for a fast first paint, the others lazily. The script (`hero.js`, 1.6 KB gzip) loads only on pages with slides.
 
 ```rust
 Hero::new(t!("home.fresh"))
     .text(t!("home.fresh_text"))
     .image("/img/hero/kitchen.jpg")
+    .link(t!("home.menu"), menu, ())
     .action(ActionButton::new(t!("home.order"), start_order, ()))
     .slide(t!("home.new_teas"))
     .image("/img/hero/teas.jpg")

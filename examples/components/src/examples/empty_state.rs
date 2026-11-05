@@ -6,6 +6,7 @@ use zeyn::prelude::*;
 pub fn overview(_ctx: &Ctx) -> Node {
     EmptyState::new("No orders yet")
         .text("Orders you place show up here.")
+        .link("Browse the list component", crate::list, ())
         .into()
 }
 

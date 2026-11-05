@@ -47,7 +47,15 @@ Values are formatted like grid cells: money, dates and choices in the user's lan
 
 ## EmptyState and Skeleton
 
-`EmptyState::new(title).text(text).opens(label, screen, params)` fills an empty area with a next step. `Skeleton::lines(n)` is a placeholder while something loads.
+`EmptyState::new(title).text(text)` fills an empty area with a next step: `.link(label, screen, params)` goes to another page through a `LinkButton`, and `.opens(label, screen, params)` opens a screen of the app as a window. `Skeleton::lines(n)` is a placeholder while something loads.
+
+## LinkButton
+
+Going somewhere is a link; doing something is a button. `LinkButton::new(label, screen, params)` is a real `<a href>` to the screen's canonical path (such as `/products/42`) that looks like a button, so middle click, "open in new tab" and search engines treat it as the link it is. It opens through `nav.js` without a page reload, and Enter follows it. The look is secondary unless `.primary()` asks for the filled look of the main action. The screen must have a route, or the code does not compile. `EmptyState::link` and `Hero::link` use it.
+
+```rust
+LinkButton::new(t!("cart.browse"), products, ()).primary()
+```
 
 ## Breadcrumb
 

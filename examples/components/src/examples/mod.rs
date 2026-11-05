@@ -26,6 +26,7 @@ pub mod image;
 pub mod image_card;
 pub mod kpi;
 pub mod line_editor;
+pub mod link_button;
 pub mod list;
 pub mod lookup;
 pub mod markdown;

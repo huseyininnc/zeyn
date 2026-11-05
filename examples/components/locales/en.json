@@ -87,7 +87,8 @@
       "rating": "A whole number from 1 to N shown as stars.",
       "chips": "Link chips and filter chips over a screen param.",
       "hero": "A large image section, with slides that move only when asked.",
-      "reactions": "Reaction buttons with counts stored by an action."
+      "reactions": "Reaction buttons with counts stored by an action.",
+      "link_button": "A link to another page that looks like a button."
     },
     "ex": {
       "action_button": {
@@ -179,6 +180,9 @@
         "overview": "Example"
       },
       "line_editor": {
+        "overview": "Example"
+      },
+      "link_button": {
         "overview": "Example"
       },
       "list": {

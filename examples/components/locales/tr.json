@@ -87,7 +87,8 @@
       "rating": "Yıldızlarla gösterilen 1 ile N arası tam sayı.",
       "chips": "Bağlantı çipleri ve ekran parametresini süzen çipler.",
       "hero": "Büyük görselli bölüm; slaytlar yalnızca istenince döner.",
-      "reactions": "Sayıları bir eylemle saklanan tepki düğmeleri."
+      "reactions": "Sayıları bir eylemle saklanan tepki düğmeleri.",
+      "link_button": "Buton görünümlü, başka sayfaya giden bağlantı."
     },
     "ex": {
       "action_button": {
@@ -179,6 +180,9 @@
         "overview": "Örnek"
       },
       "line_editor": {
+        "overview": "Örnek"
+      },
+      "link_button": {
         "overview": "Örnek"
       },
       "list": {

@@ -4,7 +4,7 @@ use super::layout::into_node;
 use super::render_child;
 use crate::i18n::Text;
 use crate::render::{Render, escape};
-use crate::screen::{Component, Node};
+use crate::screen::{Component, Node, ScreenDef};
 use serde_json::{Value as Json, json};
 
 into_node!(Hero);
@@ -36,14 +36,21 @@ struct Slide {
 /// The image follows the [`super::Image`] rules (a path of the app or an `https` address on a
 /// host of the app's `img-src`; anything else is left out). It is decoration behind the text,
 /// so its alternative text is empty; put what matters into the title and text. The first slide's
-/// image loads with high priority, the others lazily.
+/// image loads with high priority, the others lazily. Over an image a dark scrim sits behind the
+/// text, so white text keeps a contrast of at least 4.5:1 over any picture, and link buttons
+/// keep their own solid colors and a white focus ring.
 ///
 /// ```
 /// use zeyn::prelude::*;
 /// use zeyn::ui::Hero;
+///
+/// #[screen(route = "/menu", public)]
+/// pub fn menu() -> Screen { Screen::new("Menu") }
+///
 /// let welcome = Hero::new("Fresh every morning")
 ///     .text("Order before nine and it is at your door by noon.")
 ///     .image("/img/hero/kitchen.jpg")
+///     .link("See the menu", menu, ())
 ///     .action(Paragraph::new("Open daily"));
 ///
 /// let promos = Hero::new("Spring sale")
@@ -107,6 +114,14 @@ impl Hero {
         self.last().actions += 1;
         self.actions.push(node.into());
         self
+    }
+
+    /// A [`super::LinkButton`] to another page under the text. The first link of a slide has
+    /// the primary look and later ones the secondary look. The screen must have a route.
+    pub fn link<S: ScreenDef>(self, label: impl Into<Text>, screen: S, params: S::Params) -> Self {
+        let first = self.slides[self.slides.len() - 1].actions == 0;
+        let link = super::LinkButton::new(label, screen, params);
+        self.action(if first { link.primary() } else { link })
     }
 
     /// Moves to the next slide every `seconds` ([`HERO_SECONDS`] bounds it), with a pause

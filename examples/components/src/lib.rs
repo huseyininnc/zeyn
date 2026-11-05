@@ -118,6 +118,7 @@ catalog! {
     }
     "navigation" Home {
         breadcrumb "/ui/breadcrumb";
+        link_button "/ui/link-button";
         prev_next "/ui/prev-next";
         alpha_index "/ui/alpha-index";
         chips "/ui/chips";

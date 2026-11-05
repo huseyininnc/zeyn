@@ -7,6 +7,8 @@ pub fn overview(_ctx: &Ctx) -> Node {
     Hero::new("Fresh every morning")
         .text("Order before nine and it is at your door by noon.")
         .image(crate::data::picture(1))
+        .link("See the image component", crate::image, ())
+        .link("Card", crate::card, ())
         .into()
 }
 

@@ -13,7 +13,7 @@ use serde_json::{Map, Value as Json, json};
 use std::sync::Arc;
 
 into_node!(
-    Alert, Badge, EmptyState, Skeleton, Progress, Breadcrumb, Timeline
+    Alert, Badge, EmptyState, Skeleton, Progress, Breadcrumb, Timeline, LinkButton
 );
 
 pub use crate::grid::Tone;
@@ -139,11 +139,129 @@ impl Component for Badge {
     }
 }
 
-/// What a list or area shows when it has nothing yet, with an optional button.
+/// A link that looks like a button: a real `<a href>` to a screen's canonical path, for going
+/// somewhere ("Back to the catalog", "See all products"). Doing something on the page stays a
+/// button. The link opens through `nav.js` without a page reload; middle click, Ctrl click and
+/// "open in new tab" work as on any link, and Enter follows it.
+///
+/// The secondary look is the default; `.primary()` gives the filled look of the main action.
+/// The screen must have a route (compile error otherwise), so the address is the path people
+/// and search engines see, such as `/products/42`, and not a framework redirect.
+///
+/// ```
+/// use zeyn::prelude::*;
+/// use zeyn::ui::LinkButton;
+///
+/// #[params]
+/// pub struct ProductParams {
+///     pub id: i64,
+/// }
+///
+/// #[screen(route = "/products/{id}", public)]
+/// pub fn product(p: ProductParams) -> Screen {
+///     Screen::new("Product")
+/// }
+///
+/// let back = LinkButton::new("Back to the product", product, ProductParams { id: 42 }).primary();
+/// ```
+///
+/// A screen without a route does not compile:
+///
+/// ```compile_fail
+/// use zeyn::prelude::*;
+/// use zeyn::ui::LinkButton;
+///
+/// #[screen(permission = "orders.write")]
+/// pub fn order_form() -> Screen {
+///     Screen::window("Order")
+/// }
+///
+/// let link = LinkButton::new("New order", order_form, ());
+/// ```
+pub struct LinkButton {
+    label: Text,
+    screen: &'static str,
+    params: Json,
+    primary: bool,
+}
+
+impl LinkButton {
+    /// A link to `screen` with `params`. Params of the wrong type do not compile.
+    pub fn new<S: ScreenDef>(label: impl Into<Text>, _screen: S, params: S::Params) -> Self {
+        const {
+            assert!(
+                S::META.route.is_some(),
+                "a LinkButton must point to a screen that has a route; to open a window use EmptyState::opens or a toolbar button"
+            )
+        };
+        LinkButton {
+            label: label.into(),
+            screen: S::META.name,
+            params: serde_json::to_value(params).unwrap_or(Json::Null),
+            primary: false,
+        }
+    }
+
+    /// The filled look of the main action of a page or section.
+    pub fn primary(mut self) -> Self {
+        self.primary = true;
+        self
+    }
+
+    /// The outlined look, the default. For a link beside a primary one.
+    pub fn secondary(mut self) -> Self {
+        self.primary = false;
+        self
+    }
+
+    /// The link's markup, for use inside other components.
+    pub(crate) fn html(&self, r: &Render) -> String {
+        format!(
+            r#"<a class="z-button z-link-button{}" href="{}" data-zeyn-base-href data-testid="{}.link.{}">{}</a>"#,
+            if self.primary { " z-primary" } else { "" },
+            screen_href(r, self.screen, &self.params),
+            r.scope,
+            slug(&self.label.english()),
+            r.text(&self.label)
+        )
+    }
+}
+
+impl Component for LinkButton {
+    fn render(&self, out: &mut String, r: &Render) {
+        out.push_str(&self.html(r));
+    }
+
+    fn schema(&self) -> Json {
+        json!({ "type": "link_button", "label": self.label, "screen": self.screen, "params": self.params, "primary": self.primary })
+    }
+}
+
+enum EmptyAction {
+    Opens(Text, Effect),
+    Link(LinkButton),
+}
+
+/// What a list or area shows when it has nothing yet, with an optional action under the text:
+/// a link to another page ([`EmptyState::link`]) or a button that opens a window
+/// ([`EmptyState::opens`]).
+///
+/// ```
+/// use zeyn::prelude::*;
+///
+/// #[screen(route = "/products", public)]
+/// pub fn products() -> Screen {
+///     Screen::new("Products")
+/// }
+///
+/// let empty = EmptyState::new("Your cart is empty")
+///     .text("Products you add show up here.")
+///     .link("Browse products", products, ());
+/// ```
 pub struct EmptyState {
     title: Text,
     text: Option<Text>,
-    button: Option<(Text, Effect)>,
+    action: Option<EmptyAction>,
 }
 
 impl EmptyState {
@@ -151,7 +269,7 @@ impl EmptyState {
         Self {
             title: title.into(),
             text: None,
-            button: None,
+            action: None,
         }
     }
 
@@ -160,14 +278,32 @@ impl EmptyState {
         self
     }
 
-    /// A button that opens a screen as a window, such as "New product".
+    /// A button that opens a screen as a window, such as "New product". For going to another
+    /// page use [`EmptyState::link`].
     pub fn opens<S: ScreenDef>(
         mut self,
         label: impl Into<Text>,
         screen: S,
         params: S::Params,
     ) -> Self {
-        self.button = Some((label.into(), crate::screen::Window::open(screen, params)));
+        self.action = Some(EmptyAction::Opens(
+            label.into(),
+            crate::screen::Window::open(screen, params),
+        ));
+        self
+    }
+
+    /// A [`LinkButton`] in the primary look that goes to another page, such as "Browse
+    /// products". The screen must have a route.
+    pub fn link<S: ScreenDef>(
+        mut self,
+        label: impl Into<Text>,
+        screen: S,
+        params: S::Params,
+    ) -> Self {
+        self.action = Some(EmptyAction::Link(
+            LinkButton::new(label, screen, params).primary(),
+        ));
         self
     }
 }
@@ -178,20 +314,27 @@ impl Component for EmptyState {
         if let Some(t) = &self.text {
             out.push_str(&format!(r#"<p class="z-empty-text">{}</p>"#, r.text(t)));
         }
-        if let Some((label, effect)) = &self.button {
-            out.push_str(&format!(
+        match &self.action {
+            Some(EmptyAction::Opens(label, effect)) => out.push_str(&format!(
                 r#"<button type="button" class="z-button z-primary" data-zeyn-effect="{}" data-testid="{}.empty.{}">{}</button>"#,
                 attr(&effect.to_json(r)),
                 r.scope,
                 slug(&label.english()),
                 r.text(label)
-            ));
+            )),
+            Some(EmptyAction::Link(link)) => out.push_str(&link.html(r)),
+            None => {}
         }
         out.push_str("</div>");
     }
 
     fn schema(&self) -> Json {
-        json!({ "type": "empty_state", "title": self.title, "text": self.text, "button": self.button.as_ref().map(|(l, e)| json!({ "label": l, "effect": e })) })
+        let action = match &self.action {
+            Some(EmptyAction::Opens(l, e)) => json!({ "label": l, "effect": e }),
+            Some(EmptyAction::Link(link)) => link.schema(),
+            None => Json::Null,
+        };
+        json!({ "type": "empty_state", "title": self.title, "text": self.text, "button": action })
     }
 }
 

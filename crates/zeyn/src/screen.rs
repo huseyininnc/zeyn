@@ -147,12 +147,14 @@ pub const fn route_has_segments(route: Option<&str>) -> bool {
 
 /// URL of a screen at `path` (its route with the feature prefix) with these params: path segments
 /// filled from the params fields of the same name, the other fields in the JSON `params` query.
-/// `None` when a segment's field is missing or not a number or a usable string.
+/// Fields that are `null` (an empty `Option`) are left out of the query, so the address stays
+/// canonical. `None` when a segment's field is missing or not a number or a usable string.
 ///
 /// ```
 /// use serde_json::json;
 /// use zeyn::screen_url;
 /// assert_eq!(screen_url("/orders/{id}", &json!({ "id": 42, "tab": "lines" })).unwrap(), "/orders/42?params=%7B%22tab%22%3A%22lines%22%7D");
+/// assert_eq!(screen_url("/orders/{id}", &json!({ "id": 42, "tab": null })).unwrap(), "/orders/42");
 /// assert_eq!(screen_url("/catalog/{slug}/{n}", &json!({ "slug": "cay-bardagi", "n": 2 })).unwrap(), "/catalog/cay-bardagi/2");
 /// assert_eq!(screen_url("/orders", &json!({ "q": 1 })).unwrap(), "/orders?params=%7B%22q%22%3A1%7D");
 /// assert_eq!(screen_url("/orders/{id}", &json!({})), None);
@@ -189,7 +191,7 @@ pub fn screen_url(path: &str, params: &serde_json::Value) -> Option<String> {
     let segments: Vec<&str> = route_segments(path).collect();
     let rest: serde_json::Map<String, serde_json::Value> = fields
         .iter()
-        .filter(|(k, _)| !segments.contains(&k.as_str()))
+        .filter(|(k, v)| !v.is_null() && !segments.contains(&k.as_str()))
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect();
     if !rest.is_empty() {

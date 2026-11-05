@@ -87,8 +87,8 @@ pub use share::Share;
 pub use tree::{MAX_TREE_CHILDREN, Tree, TreeItem, TreeQuery};
 pub use week::{MAX_WEEK_ROWS, WeekDay, WeekSchedule};
 pub use widgets::{
-    ActionButton, Alert, Badge, Breadcrumb, DescriptionList, DescriptionOf, EmptyState, Progress,
-    Skeleton, Timeline,
+    ActionButton, Alert, Badge, Breadcrumb, DescriptionList, DescriptionOf, EmptyState, LinkButton,
+    Progress, Skeleton, Timeline,
 };
 
 use crate::action::{Action, ActionMeta, Result};

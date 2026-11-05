@@ -571,6 +571,8 @@ dialog.z-dialog::backdrop { background: var(--z-backdrop); }
   border-color: var(--z-primary);
 }
 
+a.z-button { text-decoration: none; }
+
 .z-button[aria-keyshortcuts]::after {
   content: attr(aria-keyshortcuts) / "";
   margin-inline-start: 2px;

@@ -290,11 +290,31 @@ pub fn secret(p: SecretParams) -> Screen {
     Screen::new(format!("Secret {}", p.id))
 }
 
+#[screen(route = "/empty", public)]
+pub fn empty_page() -> Screen {
+    Screen::new("Empty")
+        .body(
+            Hero::new("Welcome")
+                .image("/hero.jpg")
+                .link("See order", order, OrderParams { id: 7, tab: None })
+                .link("Home", one, ()),
+        )
+        .body(EmptyState::new("Nothing here").link(
+            "Browse cups",
+            catalog,
+            CatalogParams {
+                slug: Slug::from_title("Cups"),
+                n: 1,
+            },
+        ))
+}
+
 fn path_app() -> axum::Router {
     App::new("Nav")
         .login_url("/login")
         .feature(
             Feature::new("n")
+                .screen(empty_page)
                 .screen(one)
                 .screen(order)
                 .screen(catalog)
@@ -536,4 +556,24 @@ async fn the_side_menu_folds_behind_a_menu_button_that_only_the_script_shows() {
         !body.contains(r#"id="z-nav-body" data-open"#),
         "the menu starts closed only when the script folds it"
     );
+}
+
+#[tokio::test]
+async fn link_buttons_are_real_links_to_canonical_paths_in_empty_states_and_heroes() {
+    let (status, _, body) = get(&path_app(), "/empty", true).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert!(
+        body.contains(r#"<a class="z-button z-link-button z-primary" href="/orders/7" data-zeyn-base-href data-testid="empty_page.link.see-order">See order</a>"#),
+        "{body}"
+    );
+    assert!(
+        body.contains(r#"<a class="z-button z-link-button" href="/one" data-zeyn-base-href"#),
+        "a second hero link has the secondary look: {body}"
+    );
+    assert!(
+        body.contains(r#"<a class="z-button z-link-button z-primary" href="/catalog/cups/1""#),
+        "{body}"
+    );
+    assert!(!body.contains("/_zeyn/route/"), "{body}");
+    assert!(!body.contains("data-zeyn-effect"), "{body}");
 }
