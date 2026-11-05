@@ -80,6 +80,7 @@
       "toast": "Bir eylemden sonra kısa bildirim.",
       "chart": "Çubuk, halka, karma ve gösterge grafikleri.",
       "kpi": "Değişimi ve eğilimiyle bir sayı.",
+      "icon": "Düğmelerin, menülerin ve araçların simgeleri.",
       "screen_header": "Ekranın başlık satırı: bir alt başlık ve ana işlemler.",
       "toolbox": "Biri seçili araç düğmeleri grubu.",
       "status_bar": "Kısa durum metinleri çubuğu.",
@@ -187,6 +188,10 @@
       },
       "screen_header": {
         "orders_page": "Sayfa başlığı"
+      },
+      "icon": {
+        "overview": "Sık kullanılan simgeler",
+        "admin": "Yönetim simgeleri"
       },
       "kpi": {
         "overview": "Örnek",

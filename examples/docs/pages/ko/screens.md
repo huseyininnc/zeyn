@@ -141,6 +141,8 @@ Screen::new(t!("stock.products"))
 
 `Alt+N` 같은 단축키는 Screen에서 동작하며 팔레트에 표시됩니다. 브라우저가 사용하는 단축키(`Ctrl+P`, `Ctrl+S`, `F5`)는 버튼이 `.override_browser()`를 호출하지 않는 한 바인드되지 않으며, 브라우저가 전달하지 않는 단축키(`Ctrl+N`, `Ctrl+T`, `Ctrl+W`)는 절대 바인드되지 않습니다. 사용할 수 있는 조합은 `Alt+Shift+<letter>`와 `Ctrl+Alt+<letter>`입니다.
 
+버튼, 메뉴 그룹, 도구의 아이콘은 `Icon`에서 가져옵니다: `Plus`, `Edit`, `Delete`, `Save`, `Search`, `Box`, `Cart`, `Table`, `Home`, `Chart`, `Users`, `Settings`, `Bell`, `Shield`, `Clock`, `Tag`, `Mail`, `SignOut`, `ArrowUp`, `ArrowDown`. 이들은 `zeyn.css`의 마스크로, 24 px 격자에 2 px 둥근 선으로 그려지고 텍스트 색을 따르며 스크린 리더에서는 숨겨지므로 의미는 항상 레이블이 전달합니다.
+
 ## 헤더
 
 `.subtitle(text)`는 제목 아래에 짧은 한 줄을 넣고, `.primary(|t| ...)`는 화면의 주요 작업을 기본 버튼으로 제목 줄 끝에 둡니다. 둘을 함께 쓰면 대부분의 관리 화면에 있는 페이지 헤더가 됩니다.

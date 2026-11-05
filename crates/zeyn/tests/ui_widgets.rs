@@ -293,3 +293,51 @@ async fn step_checks_report_only_the_steps_fields_and_need_the_save_permission()
         "checking a step needs the save action's permission"
     );
 }
+
+#[test]
+fn every_icon_has_a_mask_in_the_stylesheet_drawn_with_the_same_stroke() {
+    let css = include_str!("../assets/zeyn.css");
+    let all = [
+        Icon::Plus,
+        Icon::Edit,
+        Icon::Delete,
+        Icon::Save,
+        Icon::Search,
+        Icon::Box,
+        Icon::Cart,
+        Icon::Table,
+        Icon::Home,
+        Icon::Chart,
+        Icon::Users,
+        Icon::Settings,
+        Icon::Bell,
+        Icon::Shield,
+        Icon::Clock,
+        Icon::Tag,
+        Icon::Mail,
+        Icon::SignOut,
+        Icon::ArrowUp,
+        Icon::ArrowDown,
+    ];
+    for icon in all {
+        let html = icon.html();
+        assert!(html.ends_with(r#"" aria-hidden="true"></span>"#), "{html}");
+        let class = html
+            .split("z-icon z-icon-")
+            .nth(1)
+            .and_then(|s| s.split('"').next())
+            .unwrap();
+        let rule = css
+            .lines()
+            .find(|l| l.starts_with(&format!(".z-icon-{class} {{")))
+            .unwrap_or_else(|| panic!("no mask for {class}"));
+        assert!(
+            rule.contains("viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'"),
+            "{class}"
+        );
+    }
+    assert_eq!(
+        Icon::SignOut.html(),
+        r#"<span class="z-icon z-icon-sign-out" aria-hidden="true"></span>"#
+    );
+}

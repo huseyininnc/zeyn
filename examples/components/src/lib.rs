@@ -111,6 +111,7 @@ catalog! {
         meta_line "/ui/meta-line";
         badge "/ui/badge";
         avatar "/ui/avatar";
+        icon "/ui/icon";
         description_list "/ui/description-list";
         timeline "/ui/timeline";
         markdown "/ui/markdown";

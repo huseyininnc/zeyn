@@ -141,6 +141,8 @@ Screen::new(t!("stock.products"))
 
 像 `Alt+N` 这样的快捷键在 screen 上生效，并显示在命令面板中。浏览器自己使用的快捷键（`Ctrl+P`、`Ctrl+S`、`F5`）不会被绑定，除非按钮调用 `.override_browser()`；浏览器从不转交的快捷键（`Ctrl+N`、`Ctrl+T`、`Ctrl+W`）则永远不会被绑定；可用的组合是 `Alt+Shift+<字母>` 和 `Ctrl+Alt+<字母>`。
 
+按钮、菜单组和工具的图标来自 `Icon`：`Plus`, `Edit`, `Delete`, `Save`, `Search`, `Box`, `Cart`, `Table`, `Home`, `Chart`, `Users`, `Settings`, `Bell`, `Shield`, `Clock`, `Tag`, `Mail`, `SignOut`, `ArrowUp`, `ArrowDown`。它们是 `zeyn.css` 中的遮罩，在 24 px 网格上用 2 px 圆角线条绘制，使用文字颜色，并对屏幕阅读器隐藏，因此含义始终由标签表达。
+
 ## 页眉
 
 `.subtitle(text)` 在标题下方放一行简短说明，`.primary(|t| ...)` 把屏幕的主要操作作为主按钮放在标题行的末尾。两者合起来就是大多数管理界面都有的页眉。

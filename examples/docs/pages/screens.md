@@ -141,6 +141,8 @@ Screen::new(t!("stock.products"))
 
 Shortcuts like `Alt+N` work on the screen and are shown in the palette. Shortcuts the browser uses (`Ctrl+P`, `Ctrl+S`, `F5`) are not bound unless the button calls `.override_browser()`, and ones it never passes on (`Ctrl+N`, `Ctrl+T`, `Ctrl+W`) are never bound; free combinations are `Alt+Shift+<letter>` and `Ctrl+Alt+<letter>`.
 
+Icons for buttons, menu groups and tools come from `Icon`: `Plus`, `Edit`, `Delete`, `Save`, `Search`, `Box`, `Cart`, `Table`, `Home`, `Chart`, `Users`, `Settings`, `Bell`, `Shield`, `Clock`, `Tag`, `Mail`, `SignOut`, `ArrowUp`, `ArrowDown`. They are masks in `zeyn.css` drawn on a 24 px grid with a 2 px round stroke, take the text color, and are hidden from screen readers, so the label always carries the meaning.
+
 ## Header
 
 `.subtitle(text)` puts a short line under the title, and `.primary(|t| ...)` puts the screen's main actions at the end of the title row, as primary buttons. Together they make the page header most admin screens have.

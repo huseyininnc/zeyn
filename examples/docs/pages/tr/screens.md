@@ -141,6 +141,8 @@ Screen::new(t!("stock.products"))
 
 `Alt+N` gibi kısayollar screen üzerinde çalışır ve palette'te gösterilir. Tarayıcının kullandığı kısayollar (`Ctrl+P`, `Ctrl+S`, `F5`), düğme `.override_browser()` çağırmadıkça bağlanmaz ve tarayıcının hiç iletmediği kısayollar (`Ctrl+N`, `Ctrl+T`, `Ctrl+W`) hiçbir zaman bağlanmaz; serbest kombinasyonlar `Alt+Shift+<harf>` ve `Ctrl+Alt+<harf>` biçimindedir.
 
+Düğmeler, menü grupları ve araçlar için simgeler `Icon` içinden gelir: `Plus`, `Edit`, `Delete`, `Save`, `Search`, `Box`, `Cart`, `Table`, `Home`, `Chart`, `Users`, `Settings`, `Bell`, `Shield`, `Clock`, `Tag`, `Mail`, `SignOut`, `ArrowUp`, `ArrowDown`. Bunlar `zeyn.css` içinde 24 px'lik bir ızgarada 2 px yuvarlak çizgiyle çizilmiş maskelerdir, metnin rengini alır ve ekran okuyuculardan gizlenir; anlamı her zaman etiket taşır.
+
 ## Başlık
 
 `.subtitle(text)` başlığın altına kısa bir satır koyar, `.primary(|t| ...)` ise ekranın ana işlemlerini başlık satırının sonuna birincil düğmeler olarak yerleştirir. İkisi birlikte çoğu yönetim ekranında olan sayfa başlığını oluşturur.

@@ -141,6 +141,8 @@ Screen::new(t!("stock.products"))
 
 `Alt+N` のようなショートカットは画面上で動作し、パレットに表示されます。ブラウザが使うショートカット（`Ctrl+P`、`Ctrl+S`、`F5`）は、ボタンが `.override_browser()` を呼ばない限り割り当てられません。ブラウザがページに渡さないもの（`Ctrl+N`、`Ctrl+T`、`Ctrl+W`）は決して割り当てられません。空いている組み合わせは `Alt+Shift+<letter>` と `Ctrl+Alt+<letter>` です。
 
+ボタン、メニューグループ、ツールのアイコンは `Icon` から選びます: `Plus`, `Edit`, `Delete`, `Save`, `Search`, `Box`, `Cart`, `Table`, `Home`, `Chart`, `Users`, `Settings`, `Bell`, `Shield`, `Clock`, `Tag`, `Mail`, `SignOut`, `ArrowUp`, `ArrowDown`。これらは `zeyn.css` のマスクで、24 px のグリッドに 2 px の丸い線で描かれ、文字色を使い、スクリーンリーダーからは隠されます。意味は常にラベルが伝えます。
+
 ## ヘッダー
 
 `.subtitle(text)` はタイトルの下に短い 1 行を置き、`.primary(|t| ...)` は画面の主要な操作をプライマリボタンとしてタイトル行の末尾に置きます。この 2 つで、ほとんどの管理画面にあるページヘッダーになります。

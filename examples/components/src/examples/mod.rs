@@ -23,6 +23,7 @@ pub mod external_link;
 pub mod form;
 pub mod heading;
 pub mod hero;
+pub mod icon;
 pub mod image;
 pub mod image_card;
 pub mod kpi;

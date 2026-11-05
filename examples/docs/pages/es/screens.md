@@ -141,6 +141,8 @@ Screen::new(t!("stock.products"))
 
 Los atajos como `Alt+N` funcionan en la pantalla y se muestran en la paleta. Los atajos que usa el navegador (`Ctrl+P`, `Ctrl+S`, `F5`) no se enlazan salvo que el botón llame a `.override_browser()`, y los que el navegador nunca deja pasar (`Ctrl+N`, `Ctrl+T`, `Ctrl+W`) nunca se enlazan; las combinaciones libres son `Alt+Shift+<letra>` y `Ctrl+Alt+<letra>`.
 
+Los iconos de botones, grupos de menú y herramientas vienen de `Icon`: `Plus`, `Edit`, `Delete`, `Save`, `Search`, `Box`, `Cart`, `Table`, `Home`, `Chart`, `Users`, `Settings`, `Bell`, `Shield`, `Clock`, `Tag`, `Mail`, `SignOut`, `ArrowUp`, `ArrowDown`. Son máscaras en `zeyn.css` dibujadas en una cuadrícula de 24 px con un trazo redondeado de 2 px, toman el color del texto y se ocultan a los lectores de pantalla, así que la etiqueta siempre lleva el significado.
+
 ## Cabecera
 
 `.subtitle(text)` pone una línea breve bajo el título, y `.primary(|t| ...)` coloca las acciones principales de la pantalla al final de la fila del título, como botones primarios. Juntos forman la cabecera de página que tienen casi todas las pantallas de administración.

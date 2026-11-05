@@ -80,6 +80,7 @@
       "toast": "A short notice after an action.",
       "chart": "Bar, donut, combo and gauge charts.",
       "kpi": "A number with its change and trend.",
+      "icon": "The icons of buttons, menus and tools.",
       "screen_header": "The title row of a screen: a subtitle and the main actions.",
       "toolbox": "A group of tool buttons, one selected.",
       "status_bar": "A bar of short status texts.",
@@ -187,6 +188,10 @@
       },
       "screen_header": {
         "orders_page": "A page header"
+      },
+      "icon": {
+        "overview": "Common icons",
+        "admin": "Admin icons"
       },
       "kpi": {
         "overview": "Example",

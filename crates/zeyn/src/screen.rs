@@ -855,6 +855,16 @@ pub enum Icon {
     Table,
     Home,
     Chart,
+    Users,
+    Settings,
+    Bell,
+    Shield,
+    Clock,
+    Tag,
+    Mail,
+    SignOut,
+    ArrowUp,
+    ArrowDown,
 }
 
 impl Icon {
@@ -870,6 +880,16 @@ impl Icon {
             Icon::Table => "table",
             Icon::Home => "home",
             Icon::Chart => "chart",
+            Icon::Users => "users",
+            Icon::Settings => "settings",
+            Icon::Bell => "bell",
+            Icon::Shield => "shield",
+            Icon::Clock => "clock",
+            Icon::Tag => "tag",
+            Icon::Mail => "mail",
+            Icon::SignOut => "sign-out",
+            Icon::ArrowUp => "arrow-up",
+            Icon::ArrowDown => "arrow-down",
         }
     }
 
