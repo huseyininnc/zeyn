@@ -319,6 +319,7 @@ pub struct CardGrid<E: Model> {
     rail: bool,
     list: bool,
     scrollbar: bool,
+    scope: Vec<crate::action::Filter>,
 }
 
 /// A horizontal list of cards that scrolls sideways, with previous and next buttons and scroll
@@ -374,6 +375,7 @@ impl<E: Model> CardGrid<E> {
             rail: false,
             list: false,
             scrollbar: false,
+            scope: Vec::new(),
         }
     }
 
@@ -431,6 +433,22 @@ impl<E: Model> CardGrid<E> {
                 field: field.meta().name.to_string(),
                 desc,
             },
+        ));
+        self
+    }
+
+    /// Keeps only the rows whose `field` equals `value`, on every request, like
+    /// [`crate::DataGrid::scope`]: `.scope(Article::author_id, author.id)` for the articles of one
+    /// author. Client filters are dropped, so the client can neither change nor remove it. Text
+    /// compares ignoring case.
+    pub fn scope<T: crate::value::FieldType>(
+        mut self,
+        field: crate::model::Field<E, T>,
+        value: T,
+    ) -> Self {
+        self.scope.push(crate::grid::key_filter(
+            field.meta(),
+            crate::grid::value_key(&value.to_value()).as_deref(),
         ));
         self
     }
@@ -494,7 +512,7 @@ impl<E: Model> CardGrid<E> {
                     .map(|(_, s)| s.clone()),
             );
         }
-        query.filters.clear();
+        query.filters.clone_from(&self.scope);
         query.q = self.search.clone();
         query.with_total = self.pages();
         query.aggregates.clear();

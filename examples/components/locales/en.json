@@ -225,7 +225,8 @@
       },
       "rail": {
         "overview": "Example",
-        "with_scrollbar": "Visible scrollbar"
+        "with_scrollbar": "Visible scrollbar",
+        "scoped": "Fixed to one kind"
       },
       "rating": {
         "overview": "Example",

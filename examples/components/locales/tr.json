@@ -225,7 +225,8 @@
       },
       "rail": {
         "overview": "Örnek",
-        "with_scrollbar": "Görünür kaydırma çubuğu"
+        "with_scrollbar": "Görünür kaydırma çubuğu",
+        "scoped": "Tek türe sabit"
       },
       "rating": {
         "overview": "Örnek",
