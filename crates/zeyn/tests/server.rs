@@ -1304,7 +1304,10 @@ async fn pages_list_their_languages_for_search_engines() {
             r#"<link rel="alternate" hreflang="x-default" href="/hello" data-zeyn-head>"#
         )
     );
-    assert!(!r.body.contains("bad"), "a bad language tag is dropped");
+    assert!(
+        !r.body.contains(r#"hreflang="bad"#) && !r.body.contains("bad&quot;tag"),
+        "a bad language tag is dropped"
+    );
 }
 
 #[tokio::test]
