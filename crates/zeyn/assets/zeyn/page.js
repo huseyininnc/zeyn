@@ -213,6 +213,12 @@ async function changeTheme(select) {
   else delete root.dataset.zeynTheme;
   const meta = document.querySelector('meta[name="color-scheme"]');
   if (meta) meta.content = scheme || 'light dark';
+  for (const other of document.querySelectorAll('select[data-zeyn-theme-picker]')) {
+    if (other === select) continue;
+    other.value = select.value;
+    const shown = other.closest('.z-select')?.querySelector('.z-select-value');
+    if (shown && other.selectedOptions[0]) shown.textContent = other.selectedOptions[0].text;
+  }
   await post(BASE + '/_zeyn/theme', { theme: select.value });
 }
 

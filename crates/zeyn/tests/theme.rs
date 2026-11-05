@@ -280,3 +280,52 @@ fn bad_tokens_names_defaults_and_low_contrast_are_reported_by_check() {
         "{all}"
     );
 }
+
+#[screen(route = "/appearance", public)]
+pub fn appearance() -> Screen {
+    Screen::new("Appearance").body(Panel::new("Theme").add(ThemePicker::new()))
+}
+
+fn with_appearance(app: App) -> Router {
+    app.feature(Feature::new("a").screen(appearance))
+        .router()
+        .unwrap()
+}
+
+#[tokio::test]
+async fn a_theme_picker_in_a_screen_offers_the_shells_themes_and_shows_the_current_one() {
+    let r = with_appearance(App::new("T").themes([Theme::light(), Theme::dark(), ocean()]));
+    let (status, _, page) = get(&r, "/appearance", "zeyn_theme=ocean").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        page.matches("data-zeyn-theme-picker>")
+            .count(),
+        2,
+        "the shell's picker and the screen's"
+    );
+    let at = page
+        .find(r#"<div class="z-field z-theme-field"><span id="appearance-theme-0-0-label">"#)
+        .unwrap_or_else(|| panic!("{page}"));
+    let screen_picker = &page[at..];
+    assert!(
+        screen_picker.contains(r#"data-zeyn-theme-picker><option value="system" data-scheme="">"#)
+    );
+    assert!(
+        screen_picker.contains(
+            r#"<option value="ocean" data-scheme="light" data-custom selected>Ocean</option>"#
+        ),
+        "{screen_picker}"
+    );
+    let locked = with_appearance(App::new("T").theme_picker(false));
+    let (_, _, page) = get(&locked, "/appearance", "").await;
+    assert!(
+        !page.contains("data-zeyn-theme-picker"),
+        "no choice, no picker"
+    );
+    let mut alone = String::new();
+    zeyn::Component::render(&ThemePicker::new(), &mut alone, &zeyn::Render::english("s"));
+    assert!(
+        alone.is_empty(),
+        "without a request there is nothing to offer"
+    );
+}

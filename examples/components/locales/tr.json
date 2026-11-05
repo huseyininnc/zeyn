@@ -80,6 +80,7 @@
       "toast": "Bir eylemden sonra kısa bildirim.",
       "chart": "Çubuk, halka, karma ve gösterge grafikleri.",
       "kpi": "Değişimi ve eğilimiyle bir sayı.",
+      "theme_picker": "Menüyle uyumlu, ekran içinde tema seçimi.",
       "icon": "Düğmelerin, menülerin ve araçların simgeleri.",
       "screen_header": "Ekranın başlık satırı: bir alt başlık ve ana işlemler.",
       "toolbox": "Biri seçili araç düğmeleri grubu.",
@@ -188,6 +189,9 @@
       },
       "screen_header": {
         "orders_page": "Sayfa başlığı"
+      },
+      "theme_picker": {
+        "overview": "Görünüm bölümü"
       },
       "icon": {
         "overview": "Sık kullanılan simgeler",

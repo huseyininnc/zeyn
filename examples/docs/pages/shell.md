@@ -51,6 +51,19 @@ Feature::new("shop")
 
 Moving between a site shell screen and an app shell screen goes through `nav.js` without a page load: the partial response says which shell it belongs to (`x-zeyn-shell`), and when that differs from the current frame, the runtime swaps the whole frame the way a language change does and loads the other shell's stylesheet and script. Links to `/_zeyn/route/{screen}` (the breadcrumb's) are followed the same way.
 
+## Theme picker in a screen
+
+`ThemePicker::new()` puts the theme picker inside a screen, such as the Appearance section of a settings page. It offers the themes of `App::themes` (with System when the app follows the device) and shows the one in use.
+
+```rust
+#[screen(route = "/settings/appearance", permission = "settings.read")]
+pub fn appearance() -> Screen {
+    Screen::new(t!("settings.appearance")).body(Panel::new(t!("settings.theme")).add(ThemePicker::new()))
+}
+```
+
+It is the same control as the shell's picker: a choice applies at once without a page load, is kept in the `zeyn_theme` cookie (and the view store for signed in users), and the other picker on the page shows it too. When the app offers no choice (`theme_picker(false)` or a single theme), it renders nothing.
+
 ## Commands
 
 A command is declared once in Rust with its label, shortcut and what it does. Registered on a feature, the palette lists it and its shortcut works on every page.

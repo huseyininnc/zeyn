@@ -46,6 +46,7 @@ mod seo;
 mod session;
 mod telemetry;
 mod theme;
+pub(crate) use theme::screen_picker as theme_picker;
 
 pub use theme::Theme;
 #[cfg(feature = "email")]
@@ -1629,7 +1630,9 @@ impl App {
             .insert(crate::screen::Routes(Arc::new(routes), default_locale));
         self.services
             .insert(self.client_prefs.clone());
-        let look = self.look();
+        let look = Arc::new(self.look());
+        self.services
+            .insert(theme::Looks(look.clone()));
         #[cfg(feature = "islands")]
         let islands = self
             .islands_dir
@@ -1990,7 +1993,7 @@ struct AppState {
     api_docs: Option<ApiDocs>,
     prefix: String,
     site_url: String,
-    look: theme::Look,
+    look: Arc<theme::Look>,
     views: Option<Arc<dyn crate::grid::DataGridViewStore>>,
     native_menu: bool,
     locale_paths: bool,

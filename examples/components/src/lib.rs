@@ -172,6 +172,7 @@ catalog! {
     "shell" Box {
         toolbox "/ui/toolbox";
         status_bar "/ui/status-bar";
+        theme_picker "/ui/theme-picker";
     }
 }
 

@@ -51,6 +51,19 @@ Feature::new("shop")
 
 Bir site shell screen'i ile bir uygulama shell screen'i arasında geçiş, sayfa yüklemeden `nav.js` üzerinden olur: kısmi yanıt hangi shell'e ait olduğunu söyler (`x-zeyn-shell`) ve bu geçerli çerçeveden farklı olduğunda runtime, bir dil değişikliğinin yaptığı gibi tüm çerçeveyi değiştirir ve diğer shell'in stil sayfasını ve betiğini yükler. `/_zeyn/route/{screen}` bağlantıları (breadcrumb'ınki) aynı şekilde izlenir.
 
+## Ekran içinde tema seçici
+
+`ThemePicker::new()` tema seçiciyi bir ekranın içine koyar, örneğin bir ayarlar sayfasının Görünüm bölümüne. `App::themes` temalarını sunar (uygulama cihazı izliyorsa Sistem seçeneğiyle) ve kullanılan temayı gösterir.
+
+```rust
+#[screen(route = "/settings/appearance", permission = "settings.read")]
+pub fn appearance() -> Screen {
+    Screen::new(t!("settings.appearance")).body(Panel::new(t!("settings.theme")).add(ThemePicker::new()))
+}
+```
+
+Kabuktaki seçiciyle aynı denetimdir: seçim sayfa yenilenmeden hemen uygulanır, `zeyn_theme` çerezinde (oturum açmış kullanıcılar için görünüm deposunda da) tutulur ve sayfadaki diğer seçici de onu gösterir. Uygulama seçim sunmuyorsa (`theme_picker(false)` ya da tek tema) hiçbir şey çizmez.
+
 ## Komutlar
 
 Bir komut, etiketi, kısayolu ve ne yaptığıyla Rust'ta bir kez bildirilir. Bir feature'a kaydedildiğinde palet onu listeler ve kısayolu her sayfada çalışır.

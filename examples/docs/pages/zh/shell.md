@@ -51,6 +51,19 @@ Feature::new("shop")
 
 在站点 shell screen 与应用 shell screen 之间切换，通过 `nav.js` 进行，无需整页加载：局部响应会说明它属于哪个 shell（`x-zeyn-shell`），当它与当前框架不同时，运行时会像切换语言那样替换整个框架，并加载另一个 shell 的样式表和脚本。指向 `/_zeyn/route/{screen}` 的链接（面包屑的链接）也以同样方式被跟随。
 
+## 屏幕中的主题选择器
+
+`ThemePicker::new()` 把主题选择器放进屏幕里，例如设置页面的“外观”部分。它提供 `App::themes` 中的主题（应用跟随设备时还有“系统”），并显示当前使用的主题。
+
+```rust
+#[screen(route = "/settings/appearance", permission = "settings.read")]
+pub fn appearance() -> Screen {
+    Screen::new(t!("settings.appearance")).body(Panel::new(t!("settings.theme")).add(ThemePicker::new()))
+}
+```
+
+它与外壳中的选择器是同一个控件：选择会立即生效，不重新加载页面，保存在 `zeyn_theme` cookie 中（已登录用户还会保存在视图存储中），页面上的另一个选择器也会同步显示。应用不提供选择时（`theme_picker(false)` 或只有一个主题），它不渲染任何内容。
+
 ## 命令
 
 命令在 Rust 中一次性声明，包含其标签、快捷键以及它要做的事情。在 feature 上注册后，命令面板会列出它，其快捷键在每个页面都有效。

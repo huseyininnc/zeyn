@@ -1715,6 +1715,12 @@ select[data-zeyn-theme-picker] {
 
 .z-locale + .z-locale { margin-top: 0; }
 
+.z-theme-field { max-width: 20rem; }
+
+.z-theme-field > span { display: block; margin-bottom: 4px; font-weight: 500; }
+
+.z-theme-field select[data-zeyn-theme-picker] { min-height: var(--z-control); font-size: inherit; }
+
 select[data-zeyn-locale],
 select[data-zeyn-locale-path],
 select[data-zeyn-timezone],

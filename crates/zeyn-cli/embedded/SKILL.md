@@ -215,6 +215,7 @@ What to remember:
   Destructive grid actions: `.row_action(..)` or `.bulk_action(..)` then `.confirm(t!("..."))`
   `.tone(Tone::Danger)`; workflow moves: `Transitions::of(..).confirm("cancel", t!("..."))`.
 - Layouts: `Row`, `Stack`, `Panel`, `Card`, `Tabs`, `Split`.
+- Settings pages: `ThemePicker::new()` is the theme choice inside a screen, in step with the shell.
 - Icons (`Icon::`): Plus, Edit, Delete, Save, Search, Box, Cart, Table, Home, Chart, Users,
   Settings, Bell, Shield, Clock, Tag, Mail, SignOut, ArrowUp, ArrowDown.
 - Key figures: `Kpi::new(t!("..."), value)` or `Kpi::money(t!("..."), money)` with `.delta(..)`

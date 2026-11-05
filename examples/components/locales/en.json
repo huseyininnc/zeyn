@@ -80,6 +80,7 @@
       "toast": "A short notice after an action.",
       "chart": "Bar, donut, combo and gauge charts.",
       "kpi": "A number with its change and trend.",
+      "theme_picker": "The theme choice inside a screen, in step with the menu.",
       "icon": "The icons of buttons, menus and tools.",
       "screen_header": "The title row of a screen: a subtitle and the main actions.",
       "toolbox": "A group of tool buttons, one selected.",
@@ -188,6 +189,9 @@
       },
       "screen_header": {
         "orders_page": "A page header"
+      },
+      "theme_picker": {
+        "overview": "An Appearance section"
       },
       "icon": {
         "overview": "Common icons",

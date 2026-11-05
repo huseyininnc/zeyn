@@ -256,8 +256,8 @@ pub mod prelude {
         EmbedPermission, EmptyState, ExternalLink, Heading, Hero, Image, Kpi, LinkButton, List,
         LookupItem, LookupQuery, MenuBar, MenuButton, MetaLine, Panel, Paragraph, Popover,
         PrevNext, Progress, PropertyInspector, Rail, Reactions, RelativeTime, Row, SearchBox,
-        SearchParams, Share, Skeleton, Split, Spoiler, Stack, StatusBar, Tabs, Timeline, Toolbox,
-        Tree, TreeItem, TreeQuery, Video, WeekSchedule,
+        SearchParams, Share, Skeleton, Split, Spoiler, Stack, StatusBar, Tabs, ThemePicker,
+        Timeline, Toolbox, Tree, TreeItem, TreeQuery, Video, WeekSchedule,
     };
     pub use crate::{
         Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime,

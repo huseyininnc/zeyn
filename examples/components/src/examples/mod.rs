@@ -55,6 +55,7 @@ pub mod spoiler;
 pub mod stack;
 pub mod status_bar;
 pub mod tabs;
+pub mod theme_picker;
 pub mod timeline;
 pub mod toast;
 pub mod toolbox;
