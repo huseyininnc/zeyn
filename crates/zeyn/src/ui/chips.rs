@@ -14,8 +14,15 @@ pub const MAX_CHIPS: usize = 50;
 
 type FilterFn = Box<dyn Fn(&[&str]) -> Json + Send + Sync>;
 
+struct LinkChip {
+    text: Text,
+    screen: &'static str,
+    params: Json,
+    shortcut: Option<String>,
+}
+
 enum Kind {
-    Links(Vec<(Text, &'static str, Json)>),
+    Links(Vec<LinkChip>),
     Filter {
         screen: &'static str,
         params: FilterFn,
@@ -59,7 +66,8 @@ enum Kind {
 ///
 /// let topics = Chips::links("Topics")
 ///     .link("Guides", articles, ArticleParams { tags: "guide".into() })
-///     .link("News", articles, ArticleParams { tags: "news".into() });
+///     .link("News", articles, ArticleParams { tags: "news".into() })
+///     .shortcut("Alt+Shift+N");
 /// ```
 pub struct Chips {
     label: Text,
@@ -85,11 +93,26 @@ impl Chips {
         if let Kind::Links(links) = &mut self.kind
             && links.len() < MAX_CHIPS
         {
-            links.push((
-                text.into(),
-                S::META.name,
-                serde_json::to_value(params).unwrap_or(Json::Null),
-            ));
+            links.push(LinkChip {
+                text: text.into(),
+                screen: S::META.name,
+                params: serde_json::to_value(params).unwrap_or(Json::Null),
+                shortcut: None,
+            });
+        }
+        self
+    }
+
+    /// A keyboard shortcut such as `"Alt+Shift+N"` for the link chip added last. Pressing it
+    /// follows the link through `nav.js`, unless focus is in a text field. The link carries
+    /// `aria-keyshortcuts` and shows the keys in a `<kbd>` hint. Shortcuts the browser keeps
+    /// or uses are not bound; `App::check` (header slots) and `App::check_page` (screens)
+    /// report them, single character keys and clashes with commands or other links.
+    pub fn shortcut(mut self, keys: impl Into<String>) -> Self {
+        if let Kind::Links(links) = &mut self.kind
+            && let Some(last) = links.last_mut()
+        {
+            last.shortcut = Some(keys.into());
         }
         self
     }
@@ -156,11 +179,12 @@ impl Component for Chips {
                 out.push_str(&format!(
                     r#"<nav class="z-chips" aria-label="{label}"><ul class="z-chips-list">"#
                 ));
-                for (text, screen, params) in links {
+                for chip in links {
+                    let (keys, hint) = crate::command::link_shortcut(chip.shortcut.as_deref());
                     out.push_str(&format!(
-                        r#"<li><a class="z-chip" href="{}" data-zeyn-base-href>{}</a></li>"#,
-                        screen_href(r, screen, params),
-                        r.text(text)
+                        r#"<li><a class="z-chip" href="{}" data-zeyn-base-href{keys}>{}{hint}</a></li>"#,
+                        screen_href(r, chip.screen, &chip.params),
+                        r.text(&chip.text)
                     ));
                 }
                 out.push_str("</ul></nav>");
@@ -212,7 +236,7 @@ impl Component for Chips {
                 "label": self.label,
                 "links": links
                     .iter()
-                    .map(|(t, s, p)| json!({ "text": t, "screen": s, "params": p }))
+                    .map(|c| json!({ "text": c.text, "screen": c.screen, "params": c.params, "shortcut": c.shortcut }))
                     .collect::<Vec<_>>(),
             }),
             Kind::Filter {
@@ -232,6 +256,16 @@ impl Component for Chips {
                 "current": current,
                 "multiple": many,
             }),
+        }
+    }
+
+    fn shortcuts(&self) -> Vec<&str> {
+        match &self.kind {
+            Kind::Links(links) => links
+                .iter()
+                .filter_map(|c| c.shortcut.as_deref())
+                .collect(),
+            Kind::Filter { .. } => Vec::new(),
         }
     }
 }

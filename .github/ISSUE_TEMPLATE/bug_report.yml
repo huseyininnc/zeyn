@@ -6,7 +6,7 @@ body:
     id: version
     attributes:
       label: Zeyn version
-      description: The crate version, for example 0.0.7, or the commit.
+      description: The crate version, for example 0.0.8, or the commit.
     validations:
       required: true
   - type: input

@@ -49,8 +49,8 @@ pub use live::Live;
 pub(crate) use dock::panel_ids as dock_panel_ids;
 pub use dock::{DOCK_SIZE, Dock, DockArea, DockLayout, DockPanelState, DockSizes};
 pub use embed::{
-    Complete, EMBED_SANDBOX, Embed, EmbedPermission, ExternalLink, Given, Image, MAX_EMBED_CONSENT,
-    NoAlt, NoSize, NoTitle,
+    Complete, EMBED_SANDBOX, Embed, EmbedPermission, ExternalLink, Given, Image, NoAlt, NoSize,
+    NoTitle,
 };
 pub use layout::{Card, Panel, Row, Split, Stack, Tabs};
 pub use shell::{MenuBar, MenuList, PropertyInspector, StatusBar, Toolbox};
@@ -87,8 +87,8 @@ pub use share::Share;
 pub use tree::{MAX_TREE_CHILDREN, Tree, TreeItem, TreeQuery};
 pub use week::{MAX_WEEK_ROWS, WeekDay, WeekSchedule};
 pub use widgets::{
-    ActionButton, Alert, Badge, Breadcrumb, DescriptionList, DescriptionOf, EmptyState, Progress,
-    Skeleton, Timeline,
+    ActionButton, Alert, Badge, Breadcrumb, ClearPrefs, DescriptionList, DescriptionOf, EmptyState,
+    LinkButton, Progress, Skeleton, Timeline,
 };
 
 use crate::action::{Action, ActionMeta, Result};

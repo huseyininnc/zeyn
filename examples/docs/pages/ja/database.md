@@ -35,10 +35,16 @@ impl ProductStore {
 | `time_zone` | `DateTime` 列の日付フィルター用のゾーン。サーバーが設定します |
 | `group` | フィールドで行をグループ化します。グリッドが設定します |
 
-`DataQuery::apply(vec)` は、そのすべてをメモリ上で行います。SQL データベースには `zeyn::sql` を使います。`Db::find` は、同じクエリを PostgreSQL または Oracle 向けの `WHERE`、`ORDER BY`、`LIMIT`、`GROUP BY` に変換します。フィルターや並べ替えができるのはエンティティ自身のフィールドだけで、すべての値はパラメータとしてバインドされ、ページサイズにはサーバーが上限を設けるため、クライアントの入力が SQL の文字列に届くことはありません。`Db::find` では表現できないクエリに限って SQL を手で書き、その場合もクライアントからのフィールド名や値を貼り付けてはいけません。
+`DataQuery::apply(vec)` は、そのすべてをメモリ上で行います。SQL データベースには `zeyn::sql` を使います。`Db::find` は、同じクエリを PostgreSQL または Oracle 向けの `WHERE`、`ORDER BY`、`LIMIT`、`GROUP BY` に変換します。フィルターや並べ替えができるのはエンティティ自身のフィールドだけで、すべての値はパラメータとしてバインドされ、ページサイズにはサーバーが上限を設けるため、クライアントの入力が SQL の文字列に届くことはありません。`Db::find` では表現できないクエリに限って SQL を手で書きます。`Db::query::<M>(sql, args)` は `SELECT` の行をモデルに読み込み、SQL は文字列リテラルとしてのみ受け取り、すべての値をパラメータとして受け取り、最大 1000 行を読み込みます。
+
+```rust
+let hits: Vec<Hit> = db
+    .query("SELECT id, title FROM items WHERE title % $1 ORDER BY similarity(title, $1) DESC LIMIT 20", vec![q.into()])
+    .await?;
+```
 
 ```toml
-zeyn = { version = "0.0.7", features = ["postgres"] }   # or ["oracle"]
+zeyn = { version = "0.0.8", features = ["postgres"] }   # or ["oracle"]
 ```
 
 ```rust

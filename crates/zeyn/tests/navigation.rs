@@ -2,6 +2,7 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode, header};
 use http_body_util::BodyExt;
 use tower::ServiceExt;
+use zeyn::Prefetch;
 use zeyn::prelude::*;
 
 #[screen(route = "/one", public)]
@@ -280,6 +281,30 @@ pub fn catalog(p: CatalogParams) -> Screen {
     Screen::new(format!("Catalog {} page {}", p.slug, p.n))
 }
 
+/// Sends every visit on to one catalog page, like a random pick.
+#[screen(route = "/pick", public)]
+pub fn pick() -> Screen {
+    Screen::redirect(
+        catalog,
+        CatalogParams {
+            slug: Slug::from_title("New Name"),
+            n: 7,
+        },
+    )
+}
+
+/// A screen with a route that the app does not register.
+#[screen(route = "/orphan", public)]
+pub fn orphan() -> Screen {
+    Screen::new("Orphan")
+}
+
+/// Redirects to a screen the app does not have.
+#[screen(route = "/lost", public)]
+pub fn lost() -> Screen {
+    Screen::redirect(orphan, ())
+}
+
 #[params]
 pub struct SecretParams {
     pub id: i64,
@@ -290,14 +315,36 @@ pub fn secret(p: SecretParams) -> Screen {
     Screen::new(format!("Secret {}", p.id))
 }
 
+#[screen(route = "/empty", public)]
+pub fn empty_page() -> Screen {
+    Screen::new("Empty")
+        .body(
+            Hero::new("Welcome")
+                .image("/hero.jpg")
+                .link("See order", order, OrderParams { id: 7, tab: None })
+                .link("Home", one, ()),
+        )
+        .body(EmptyState::new("Nothing here").link(
+            "Browse cups",
+            catalog,
+            CatalogParams {
+                slug: Slug::from_title("Cups"),
+                n: 1,
+            },
+        ))
+}
+
 fn path_app() -> axum::Router {
     App::new("Nav")
         .login_url("/login")
         .feature(
             Feature::new("n")
+                .screen(empty_page)
                 .screen(one)
                 .screen(order)
                 .screen(catalog)
+                .screen(pick)
+                .screen(lost)
                 .screen(secret),
         )
         .router()
@@ -357,6 +404,55 @@ async fn a_screen_can_answer_a_permanent_redirect_to_its_new_address() {
     assert_eq!(
         headers.get(header::LOCATION).unwrap(),
         "/catalog/new-name/3"
+    );
+}
+
+#[tokio::test]
+async fn a_screen_can_send_one_request_on_to_another_screen_without_caching() {
+    let router = path_app();
+    for partial in [false, true] {
+        let (status, headers, _) = get(&router, "/pick", partial).await;
+        assert_eq!(status, StatusCode::SEE_OTHER, "partial {partial}");
+        assert_eq!(
+            headers.get(header::LOCATION).unwrap(),
+            "/catalog/new-name/7"
+        );
+        assert_eq!(
+            headers
+                .get(header::CACHE_CONTROL)
+                .unwrap(),
+            "no-store"
+        );
+    }
+    let (status, headers, _) = get(&router, "/lost", false).await;
+    assert_eq!(
+        status,
+        StatusCode::NOT_FOUND,
+        "a target the app does not serve is not followed"
+    );
+    assert!(headers.get(header::LOCATION).is_none());
+    let req = Request::get("/_zeyn/nav.js")
+        .body(Body::empty())
+        .unwrap();
+    let res = router
+        .clone()
+        .oneshot(req)
+        .await
+        .unwrap();
+    let js = String::from_utf8(
+        res.into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes()
+            .to_vec(),
+    )
+    .unwrap();
+    assert!(
+        js.contains(
+            "else if (res.redirected) history.replaceState({ zeyn: true }, '', finalUrl.href);"
+        ),
+        "a redirected partial load that adds no history entry still shows the target's address"
     );
 }
 
@@ -536,4 +632,137 @@ async fn the_side_menu_folds_behind_a_menu_button_that_only_the_script_shows() {
         !body.contains(r#"id="z-nav-body" data-open"#),
         "the menu starts closed only when the script folds it"
     );
+}
+
+#[tokio::test]
+async fn link_buttons_are_real_links_to_canonical_paths_in_empty_states_and_heroes() {
+    let (status, _, body) = get(&path_app(), "/empty", true).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert!(
+        body.contains(r#"<a class="z-button z-link-button z-primary" href="/orders/7" data-zeyn-base-href data-testid="empty_page.link.see-order">See order</a>"#),
+        "{body}"
+    );
+    assert!(
+        body.contains(r#"<a class="z-button z-link-button" href="/one" data-zeyn-base-href"#),
+        "a second hero link has the secondary look: {body}"
+    );
+    assert!(
+        body.contains(r#"<a class="z-button z-link-button z-primary" href="/catalog/cups/1""#),
+        "{body}"
+    );
+    assert!(!body.contains("/_zeyn/route/"), "{body}");
+    assert!(!body.contains("data-zeyn-effect"), "{body}");
+}
+
+#[screen(route = "/counted", public)]
+pub fn counted(_: (), ctx: Ctx) -> Screen {
+    Screen::new(if ctx.is_prefetch() { "Ahead" } else { "Seen" })
+}
+
+#[screen(route = "/checkout", public, no_prefetch)]
+pub fn checkout() -> Screen {
+    Screen::new("Checkout")
+}
+
+fn prefetch_app(on: bool) -> axum::Router {
+    let app = App::new("Nav").feature(
+        Feature::new("n")
+            .screen(counted)
+            .screen(checkout),
+    );
+    let app = if on {
+        app.prefetch(Prefetch::Moderate)
+    } else {
+        app
+    };
+    app.router().unwrap()
+}
+
+async fn get_with(router: &axum::Router, path: &str, header: (&str, &str)) -> (StatusCode, String) {
+    let res = router
+        .clone()
+        .oneshot(
+            Request::get(path)
+                .header(header.0, header.1)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = res.status();
+    let body = res
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes();
+    (status, String::from_utf8_lossy(&body).into_owned())
+}
+
+#[tokio::test]
+async fn prefetch_sends_speculation_rules_by_header_and_screens_see_prefetches() {
+    let (_, headers, page) = get(&prefetch_app(false), "/counted", false).await;
+    assert!(
+        headers
+            .get("speculation-rules")
+            .is_none(),
+        "off by default"
+    );
+    assert!(!page.contains("zeyn-prefetch"));
+
+    let router = prefetch_app(true);
+    let (_, headers, page) = get(&router, "/counted", false).await;
+    assert_eq!(
+        headers
+            .get("speculation-rules")
+            .unwrap(),
+        r#""/_zeyn/speculation.json""#
+    );
+    assert!(page.contains(r#"<meta name="zeyn-prefetch" content="moderate">"#));
+    assert!(
+        !page.contains("speculationrules"),
+        "no inline rules, the CSP stays"
+    );
+    let (_, partial_headers, _) = get(&router, "/counted", true).await;
+    assert!(
+        partial_headers
+            .get("speculation-rules")
+            .is_none()
+    );
+
+    let (status, headers, rules) = get(&router, "/_zeyn/speculation.json", false).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        headers
+            .get(header::CONTENT_TYPE)
+            .unwrap(),
+        "application/speculationrules+json"
+    );
+    let rules: serde_json::Value = serde_json::from_str(&rules).unwrap();
+    assert!(rules.get("prerender").is_none());
+    assert_eq!(rules["prefetch"][0]["eagerness"], "moderate");
+    let text = rules.to_string();
+    assert!(
+        text.contains("/_zeyn/*")
+            && text.contains("data-zeyn-reload")
+            && text.contains("[download]")
+    );
+
+    let (status, body) = get_with(&router, "/counted", ("sec-purpose", "prefetch")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(body.contains("Ahead"), "{body}");
+    let (_, body) = get_with(&router, "/counted", ("x-zeyn-prefetch", "1")).await;
+    assert!(body.contains("Ahead"));
+    let (_, body) = get_with(&router, "/counted", ("accept", "text/html")).await;
+    assert!(body.contains("Seen"));
+    let (status, body) = get_with(
+        &router,
+        "/checkout",
+        ("sec-purpose", "prefetch;anonymous-client-ip"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert!(!body.contains("Checkout"), "refused before the screen runs");
+    let (status, _) = get_with(&router, "/checkout", ("accept", "text/html")).await;
+    assert_eq!(status, StatusCode::OK);
 }

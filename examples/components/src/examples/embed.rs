@@ -12,11 +12,26 @@ pub fn overview(_ctx: &Ctx) -> Node {
         .into()
 }
 
+/// The confirmed map notice, kept for a day.
+pub const MAP_NOTICE: zeyn::ClientPref<zeyn::Consent> = zeyn::ClientPref::consent(
+    "catalog-map",
+    std::time::Duration::from_secs(24 * 60 * 60),
+    zeyn::Purpose::Necessary,
+);
+
+pub fn remembered(_ctx: &Ctx) -> Node {
+    Embed::url("https://www.openstreetmap.org/export/embed.html?bbox=28.97,41.0,29.0,41.02")
+        .title("Map of the harbor")
+        .notice("Asked once a day: the map is served by OpenStreetMap.")
+        .remember(MAP_NOTICE)
+        .into()
+}
+
 /// What the catalog shows of `Embed`.
 pub const ENTRY: Entry = Entry {
     name: "Embed",
     docs: "components/display#embed",
     api: &["Embed"],
     overview: &[ex!(overview)],
-    examples: &[],
+    examples: &[ex!(remembered)],
 };

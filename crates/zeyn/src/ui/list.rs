@@ -14,7 +14,7 @@ use serde_json::{Value as Json, json};
 into_node!(List);
 
 /// One row of a [`List`]: an optional leading image, a title, an optional subtitle and trailing
-/// meta text, and the screen the row opens. The whole row is one link, so it is one stop in the
+/// meta (text or an inline component), and the screen the row opens. The whole row is one link, so it is one stop in the
 /// tab order; long text wraps.
 ///
 /// ```
@@ -27,7 +27,7 @@ into_node!(List);
 pub struct ListItem {
     title: Text,
     subtitle: Option<Text>,
-    meta: Option<Text>,
+    meta: Option<Node>,
     image: Option<String>,
     alt: Text,
     link: Option<(&'static str, Json)>,
@@ -53,9 +53,17 @@ impl ListItem {
         self
     }
 
-    /// Short text at the end of the row, such as a date or a count.
-    pub fn meta(mut self, text: impl Into<Text>) -> Self {
-        self.meta = Some(text.into());
+    /// Short text at the end of the row, such as a date or a count, or an inline component such
+    /// as a [`super::RelativeTime`]. The row is one link, so nothing interactive goes here.
+    ///
+    /// ```
+    /// use zeyn::DateTime;
+    /// use zeyn::ui::{ListItem, RelativeTime};
+    /// let row = ListItem::new("Release notes")
+    ///     .meta(RelativeTime::new(DateTime::from_unix_ms(1_778_580_000_000)));
+    /// ```
+    pub fn meta(mut self, meta: impl Into<Node>) -> Self {
+        self.meta = Some(meta.into());
         self
     }
 
@@ -96,6 +104,29 @@ impl ListItem {
         self
     }
 
+    /// The row as a rich search suggestion: `{text, subtitle, image, href}`, texts in the user's
+    /// language, the image only when the app's `img-src` allows it, the canonical address.
+    pub(crate) fn suggestion(&self, r: &Render) -> Json {
+        let plain = |t: &Text| r.i18n.text(r.locale, t);
+        let href = self
+            .link
+            .as_ref()
+            .map(|(screen, params)| {
+                crate::screen::Routes::href(r, screen, params)
+                    .unwrap_or_else(|| format!("/_zeyn/route/{screen}"))
+            });
+        let image = self
+            .image
+            .as_deref()
+            .filter(|src| safe_image(src) && super::embed::policy(r).allows_image(src));
+        json!({
+            "text": plain(&self.title),
+            "subtitle": self.subtitle.as_ref().map(plain),
+            "image": image,
+            "href": href,
+        })
+    }
+
     /// Writes the row as an `<li>`.
     pub(crate) fn html(&self, out: &mut String, r: &Render) {
         let image = match &self.image {
@@ -112,11 +143,16 @@ impl ListItem {
                 .map(|t| format!(r#"<span class="{class}">{}</span>"#, r.text(t)))
                 .unwrap_or_default()
         };
+        let mut meta = String::new();
+        if let Some(node) = &self.meta {
+            meta.push_str(r#"<span class="z-list-meta">"#);
+            node.render(&mut meta, r);
+            meta.push_str("</span>");
+        }
         let body = format!(
-            r#"{image}<span class="z-list-body"><span class="z-list-title">{}</span>{}</span>{}"#,
+            r#"{image}<span class="z-list-body"><span class="z-list-title">{}</span>{}</span>{meta}"#,
             r.text(&self.title),
             line(&self.subtitle, "z-list-subtitle"),
-            line(&self.meta, "z-list-meta")
         );
         match &self.link {
             Some((screen, params)) => out.push_str(&format!(
@@ -132,7 +168,10 @@ impl ListItem {
         json!({
             "title": self.title,
             "subtitle": self.subtitle,
-            "meta": self.meta,
+            "meta": self
+                .meta
+                .as_ref()
+                .map(Node::schema),
             "image": self.image,
             "link": self.link.as_ref().map(|(s, p)| json!({ "screen": s, "params": p })),
         })

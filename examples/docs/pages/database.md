@@ -35,10 +35,16 @@ A list action takes a `DataQuery` and returns `Page<M>`:
 | `time_zone` | Zone for date filters on `DateTime` columns, set by the server |
 | `group` | Group rows by a field, set by the grid |
 
-`DataQuery::apply(vec)` does all of it in memory. For a SQL database use `zeyn::sql`: `Db::find` turns the same query into `WHERE`, `ORDER BY`, `LIMIT` and `GROUP BY` for PostgreSQL or Oracle. Only the entity's own fields can be filtered or sorted, every value is bound as a parameter, and the page size is capped by the server, so client input never reaches the SQL text. Write SQL by hand only for queries `Db::find` cannot express, and then never paste a field name or value from the client into it.
+`DataQuery::apply(vec)` does all of it in memory. For a SQL database use `zeyn::sql`: `Db::find` turns the same query into `WHERE`, `ORDER BY`, `LIMIT` and `GROUP BY` for PostgreSQL or Oracle. Only the entity's own fields can be filtered or sorted, every value is bound as a parameter, and the page size is capped by the server, so client input never reaches the SQL text. Write SQL by hand only for queries `Db::find` cannot express: `Db::query::<M>(sql, args)` reads the rows of a `SELECT` into a model, takes the SQL only as a string literal and every value as a parameter, and reads at most 1000 rows.
+
+```rust
+let hits: Vec<Hit> = db
+    .query("SELECT id, title FROM items WHERE title % $1 ORDER BY similarity(title, $1) DESC LIMIT 20", vec![q.into()])
+    .await?;
+```
 
 ```toml
-zeyn = { version = "0.0.7", features = ["postgres"] }   # or ["oracle"]
+zeyn = { version = "0.0.8", features = ["postgres"] }   # or ["oracle"]
 ```
 
 ```rust

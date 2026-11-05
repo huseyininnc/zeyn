@@ -221,7 +221,8 @@
       "site": {
         "sign_in": "Giriş yap",
         "sign_out": "Çıkış yap",
-        "bottom": "Hızlı bağlantılar"
+        "bottom": "Hızlı bağlantılar",
+        "center": "Ara"
       }
     },
     "ui": {
@@ -234,6 +235,7 @@
         "sort": "Sıralama",
         "pages": "Sayfalar",
         "page": "Sayfa {page} / {pages}",
+        "page_only": "Sayfa {page}",
         "previous_page": "Önceki sayfa",
         "next_page": "Sonraki sayfa",
         "previous": "Geri kaydır",
@@ -518,6 +520,9 @@
       "reactions": {
         "label": "Tepkiler",
         "failed": "Tepki kaydedilemedi."
+      },
+      "prefs": {
+        "cleared": "Bu tarayıcının bu site için tuttuğu seçimler silindi."
       }
     },
     "date": {

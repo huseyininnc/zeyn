@@ -87,6 +87,18 @@ pub fn catalog_page(p: CatalogParams, store: Catalog) -> Result<Screen> {
 }
 ```
 
+`Screen::redirect(screen, params)` envía una petición a otro screen, como una elección aleatoria o el elemento más reciente, mientras la dirección en sí sigue siendo válida. El navegador recibe `303 See Other` con el path canónico del destino y `Cache-Control: no-store`; la navegación dentro de la app lo sigue sin cargar la página, y la barra de direcciones muestra el destino. El destino es siempre un screen tipado con una ruta, de modo que una redirección nunca puede llevar a una dirección fuera de la app, y un destino que la app no sirve responde 404.
+
+```rust
+#[screen(route = "/random", public)]
+pub async fn random_item(store: Catalog) -> Result<Screen> {
+    let item = store.random().await?.ok_or(Error::NotFound)?;
+    Ok(Screen::redirect(catalog_page, CatalogParams { slug: item.slug, n: item.n }))
+}
+```
+
+@live redirect
+
 ## Acceso
 
 | Opción | Significado |

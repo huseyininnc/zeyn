@@ -52,6 +52,10 @@ use std::time::Duration;
 /// Rows a [`RowStream`] buffers ahead of its reader. Memory stays bounded whatever the result size.
 pub const STREAM_BUFFER: usize = 64;
 
+/// Rows [`Db::query`] reads at most. A statement that returns more is an error, so a missing
+/// `LIMIT` shows up in tests instead of filling memory; [`Db::query_max`] sets another cap.
+pub const QUERY_ROW_CAP: usize = 1000;
+
 /// Largest total a `find` counts by default; beyond it `Page::total` is this number.
 pub const DEFAULT_COUNT_CAP: u64 = 1_000_000;
 
@@ -312,6 +316,63 @@ impl Db {
             .await
     }
 
+    /// Rows of a `SELECT` written by hand, read by column name into `M` (a `#[model]` or an
+    /// entity) with the same conversions as [`Db::find`]. The SQL must be a literal, so values can
+    /// only arrive as `args` (`$1`, `$2` in PostgreSQL, `:1`, `:2` in Oracle). At most
+    /// [`QUERY_ROW_CAP`] rows: one more is an error. The statement timeout applies. Columns the
+    /// model has no field for are ignored; a field without a column is a database error.
+    ///
+    /// ```no_run
+    /// use zeyn::prelude::*;
+    /// use zeyn::sql::Db;
+    ///
+    /// #[model]
+    /// pub struct Hit {
+    ///     pub id: i64,
+    ///     pub title: String,
+    /// }
+    ///
+    /// # async fn run(db: Db, q: String) -> Result<()> {
+    /// let hits: Vec<Hit> = db
+    ///     .query(
+    ///         "SELECT id, title FROM items WHERE title % $1 \
+    ///          ORDER BY similarity(title, $1) DESC LIMIT 20",
+    ///         vec![q.into()],
+    ///     )
+    ///     .await?;
+    /// # Ok(()) }
+    /// ```
+    pub async fn query<M: Model>(&self, sql: &'static str, args: Vec<Arg>) -> Result<Vec<M>> {
+        self.query_max(sql, args, QUERY_ROW_CAP)
+            .await
+    }
+
+    /// [`Db::query`] with a cap of `max` rows instead of [`QUERY_ROW_CAP`].
+    pub async fn query_max<M: Model>(
+        &self,
+        sql: &'static str,
+        args: Vec<Arg>,
+        max: usize,
+    ) -> Result<Vec<M>> {
+        self.link()
+            .await?
+            .query(self.dialect(), sql, args, max)
+            .await
+    }
+
+    /// The one row of a hand written `SELECT` (see [`Db::query`]), or `None` when there is none.
+    /// More than one row is an error.
+    pub async fn query_one<M: Model>(
+        &self,
+        sql: &'static str,
+        args: Vec<Arg>,
+    ) -> Result<Option<M>> {
+        Ok(self
+            .query_max(sql, args, 1)
+            .await?
+            .pop())
+    }
+
     /// Runs a statement written by hand and returns the number of rows it changed. The SQL must
     /// be a literal, so values can only arrive as `args` (`$1`, `$2` in PostgreSQL).
     pub async fn execute(&self, sql: &'static str, args: Vec<Arg>) -> Result<u64> {
@@ -508,6 +569,36 @@ impl Tx {
             .await
     }
 
+    /// [`Db::query`] on this transaction.
+    pub async fn query<M: Model>(&mut self, sql: &'static str, args: Vec<Arg>) -> Result<Vec<M>> {
+        self.query_max(sql, args, QUERY_ROW_CAP)
+            .await
+    }
+
+    /// [`Db::query_max`] on this transaction.
+    pub async fn query_max<M: Model>(
+        &mut self,
+        sql: &'static str,
+        args: Vec<Arg>,
+        max: usize,
+    ) -> Result<Vec<M>> {
+        self.link
+            .query(&*self.db.inner.dialect, sql, args, max)
+            .await
+    }
+
+    /// [`Db::query_one`] on this transaction.
+    pub async fn query_one<M: Model>(
+        &mut self,
+        sql: &'static str,
+        args: Vec<Arg>,
+    ) -> Result<Option<M>> {
+        Ok(self
+            .query_max(sql, args, 1)
+            .await?
+            .pop())
+    }
+
     /// Rows of a statement built inside the crate, on this transaction (see [`Db::rows`]).
     #[cfg(feature = "server")]
     pub(crate) async fn rows(&mut self, sql: Sql) -> Result<Vec<Vec<Cell>>> {
@@ -646,6 +737,28 @@ impl Link {
             page.totals = out;
         }
         Ok(page)
+    }
+
+    /// Rows of a hand written query as `M`, at most `max`; reading stops at the first row over.
+    async fn query<M: Model>(
+        &mut self,
+        d: &dyn Dialect,
+        sql: &'static str,
+        args: Vec<Arg>,
+        max: usize,
+    ) -> Result<Vec<M>> {
+        let max = max.max(1);
+        let plan = build::plan_query::<M>(d, sql, args, max + 1)?;
+        let mut rows = Vec::with_capacity(max.min(STREAM_BUFFER));
+        self.fetch(plan, raw_error, &mut |cells| {
+            if rows.len() == max {
+                return Err(build::over_cap(M::NAME, max));
+            }
+            rows.push(decode::decode_row::<M>(cells)?);
+            Ok(())
+        })
+        .await?;
+        Ok(rows)
     }
 
     async fn one<E: Entity>(&mut self, sql: Sql) -> Result<Option<E>> {

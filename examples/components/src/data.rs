@@ -143,6 +143,14 @@ pub async fn search_people(q: DataQuery) -> Result<Page<Person>> {
     Ok(q.apply(PEOPLE.clone()))
 }
 
+/// Sample people without a total, like an action that does not count its rows.
+#[action(public)]
+pub async fn people_uncounted(q: DataQuery) -> Result<Page<Person>> {
+    let mut page = q.apply(PEOPLE.clone());
+    page.total = None;
+    Ok(page)
+}
+
 /// Events of the current week, a few each day.
 #[action(public)]
 pub async fn week_events(q: DataQuery, ctx: Ctx) -> Result<Page<Event>> {

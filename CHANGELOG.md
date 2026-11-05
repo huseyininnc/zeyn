@@ -4,6 +4,30 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 ## [Unreleased]
 
+## [0.0.8] - 2026-11-05
+
+### Added
+
+- `Db::query`, `query_one` and `query_max` (also on `Tx`): hand written SELECTs with a static SQL string, bound parameters only and a row cap.
+- `Screen::redirect(screen, params)`: 303 to the target's canonical path, never cached, typed targets only.
+- `.scope(field, value)` on `CardGrid`, `Rail` and `List::of`.
+- `zeyn::text::fold` for search keys and queries (Turkish dotted and dotless i, accents, lower case).
+- `LinkButton`, `EmptyState::link` and `Hero::link`.
+- Site header slots `start`, `center`, `end` and `bottom` that take any component, with a phone layout for the center slot.
+- `.shortcut(keys)` on link chips and `PrevNext`, and `App::check_page`.
+- Client preference store: `App::client_prefs`, `Embed::remember(KEY)`, `Tabs::remember(KEY)`, `App::client_prefs_table()` and `zeyn.prefs.clear()` in the browser.
+- `App::prefetch(Prefetch::Moderate)`, `#[screen(no_prefetch)]` and `ctx.is_prefetch()`.
+- `SearchBox::item(|row| ListItem ...)`: suggestions with an image, a subtitle and a link straight to the record.
+
+### Changed
+
+- `ListItem::meta` takes any inline component.
+- `MAX_EMBED_CONSENT` is now `MAX_PREF_LIFETIME` (`zeyn check --fix` rewrites it).
+
+### Fixed
+
+- Paged card grids and lists without a known total show "Page 1" and keep Next enabled while a cursor exists.
+
 ## [0.0.7] - 2026-11-03
 
 ### Changed

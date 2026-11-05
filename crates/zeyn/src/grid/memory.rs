@@ -2,6 +2,7 @@
 //! and tests, and the filter conditions (`Cond`, `Key`) that the SQL builder shares.
 
 use super::*;
+use crate::text::fold;
 
 /// A comparable bound or value for range filters. Numbers and money compare in hundredths.
 #[derive(Clone, Copy, PartialEq, PartialOrd)]
@@ -105,14 +106,6 @@ pub(crate) enum Cond {
     AnyKey(usize, Vec<String>),
     /// Free text ([`DataQuery::q`]), folded, in any of these text fields.
     Search(Vec<usize>, String),
-}
-
-/// Text in the form free text search compares: `İ` and `ı` become `i`, then lower case.
-pub(crate) fn fold(s: &str) -> String {
-    s.chars()
-        .map(|c| if matches!(c, 'İ' | 'ı') { 'i' } else { c })
-        .flat_map(char::to_lowercase)
-        .collect()
 }
 
 impl Cond {

@@ -91,6 +91,7 @@ async fn main() -> std::io::Result<()> {
         zeyn::Pdf::from_config(&config).map_err(|e| std::io::Error::other(format!("{e:?}")))?;
     let mut app = App::new(t!("app.name"))
         .plugin(CompanyStandard { config: config.clone() })
+        .client_prefs(|p| p.key(media::EXTERNAL_VIDEO))
         .theme(Theme::new().radius(6))
         .themes([
             Theme::light(),

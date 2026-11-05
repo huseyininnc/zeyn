@@ -525,6 +525,7 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
         "hero" => crate::live_engage::hero(),
         "reactions" => crate::live_engage::reactions(),
         "preview" => crate::live_engage::preview(),
+        "redirect" => crate::live_engage::redirect(),
         "multi" => Form::of(Reach {
             channels: vec![Channel::Email],
             ..Reach::default()
@@ -755,4 +756,5 @@ pub const EXAMPLES: &[&str] = &[
     "hero",
     "reactions",
     "preview",
+    "redirect",
 ];

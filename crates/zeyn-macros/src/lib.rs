@@ -360,7 +360,8 @@ fn expand_action(
 /// ```
 ///
 /// `cache = N` (seconds, public screens only) lets browsers and shared caches keep the page of a
-/// request without a session.
+/// request without a session. `no_prefetch` keeps the browser from loading the screen ahead of a
+/// click (see `App::prefetch`).
 #[proc_macro_attribute]
 pub fn screen(attr: TokenStream, item: TokenStream) -> TokenStream {
     let f = syn::parse_macro_input!(item as ItemFn);
@@ -370,9 +371,12 @@ pub fn screen(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut reason = false;
     let mut ai = AiArgs::default();
     let mut cache: Option<syn::LitInt> = None;
+    let mut no_prefetch = false;
     let parser = syn::meta::parser(|meta| {
         if meta.path.is_ident("permission") {
             access.permission = Some(meta.value()?.parse()?);
+        } else if meta.path.is_ident("no_prefetch") {
+            no_prefetch = true;
         } else if meta.path.is_ident("public") {
             access.public = true;
         } else if meta.path.is_ident("cache") {
@@ -389,7 +393,7 @@ pub fn screen(attr: TokenStream, item: TokenStream) -> TokenStream {
             return Err(meta.error("`confirm` belongs on the action that writes\n  = help: put `confirm` on the `#[action]` that the screen's form or button runs"));
         } else {
             return Err(meta.error(
-                "unknown screen option\n  = help: expected `route = \"/...\"`, `permission = \"...\"`, `public`, `cache = 300`, `sensitive`, `reason`, `ai = \"...\"` or `ai = false`",
+                "unknown screen option\n  = help: expected `route = \"/...\"`, `permission = \"...\"`, `public`, `cache = 300`, `sensitive`, `reason`, `no_prefetch`, `ai = \"...\"` or `ai = false`",
             ));
         }
         Ok(())
@@ -407,7 +411,7 @@ pub fn screen(attr: TokenStream, item: TokenStream) -> TokenStream {
             route.as_ref(),
             (sensitive || reason, reason),
             &ai,
-            cache,
+            (cache, no_prefetch),
         ),
         original,
     )
@@ -437,7 +441,7 @@ fn expand_screen(
     route: Option<&LitStr>,
     privacy: (bool, bool),
     ai: &AiArgs,
-    cache: u32,
+    (cache, no_prefetch): (u32, bool),
 ) -> syn::Result<Ts> {
     let ai = ai.tokens("screen")?;
     let doc = doc_text(&f.attrs);
@@ -489,6 +493,7 @@ fn expand_screen(
                 doc: #doc,
                 ai: #ai,
                 cache: #cache,
+                no_prefetch: #no_prefetch,
             };
 
             fn deps() -> ::std::vec::Vec<::zeyn::Dep> {

@@ -8,7 +8,7 @@ Bu, Zeyn sunucusu ile tarayıcı çalışma zamanı (runtime) arasındaki sözle
 
 `GET {route}?params={json}` tam bir HTML belgesi döndürür. `params`, ekran parametrelerinin URL kodlu JSON halidir; ekranın parametresi yoksa atlanır.
 
-`/orders/{id}` gibi yol segmentleri olan bir route, bu `params` alanlarını yoldan (`/orders/42`) okur, diğer alanları `params` içinden alır. Ayrıştırılamayan bir segment değeri 404 döndürür. Değerler yüzde kodludur, noktalar dahil (`%2E`); böylece bir ekran URL'si runtime'a hiçbir zaman dosya gibi görünmez. `Screen::moved_to` yanıtı veren bir ekran, yeni URL'yi `Location` içinde taşıyan `301 Moved Permanently` alır.
+`/orders/{id}` gibi yol segmentleri olan bir route, bu `params` alanlarını yoldan (`/orders/42`) okur, diğer alanları `params` içinden alır. Ayrıştırılamayan bir segment değeri 404 döndürür. Değerler yüzde kodludur, noktalar dahil (`%2E`); böylece bir ekran URL'si runtime'a hiçbir zaman dosya gibi görünmez. `Screen::moved_to` yanıtı veren bir ekran, yeni URL'yi `Location` içinde taşıyan `301 Moved Permanently` alır; `Screen::redirect` yanıtı veren bir ekran, `Cache-Control: no-store` ile `303 See Other` alır. `nav.js` ikisini de sayfa yüklemeden izler ve hedefin adresini gösterir, yükleme bir geçmiş girişi eklemediğinde de (geri ve ileri).
 
 Başarısız bir sayfa kendi durum koduyla (404, 403, 500, ...) ve uygulamanın hata ekranıyla (`App::not_found`, `App::server_error`) ya da kabuğun (shell) içinde kısa, yerleşik bir iletiyle yanıtlanır. `x-zeyn-partial: 1` başlığı olan bir istek, yalnızca o ekranı `x-zeyn-partial: 1` ve `x-zeyn-title` ile alır; böylece runtime ekranı sayfa yüklemeden yerine koyar. Hata ayrıntıları tarayıcıya asla ulaşmaz.
 
@@ -263,6 +263,7 @@ Hepsi JSON ve CSRF başlığıyla `POST`'tur ve önce ekranın erişimini ve Fea
 |---|---|---|
 | `/_zeyn/node` | `{ screen, params, node }` | Bir düğümün, grid'lerinin ilk sayfasıyla birlikte HTML'i. Tembel (lazy) sekmeler tarafından kullanılır. |
 | `/_zeyn/data` | `{ screen, params, node, key, input }` | Düğümün `key` veri kaynağından JSON: arama seçenekleri (`key` alan adıdır), ağaç çocukları (`key` boştur), adım denetimleri (`key` `_step` olur). Kaynağın eylem izni denetlenir ve interceptor'lar, grid'lerde olduğu gibi çalışır. Eyleme uymayan girdi `404` ile reddedilir. |
+| `/_zeyn/data` ve `screen` = `_site.{feature}` | yukarıdaki gibi | Bir site üst bilgisi slotundaki bileşen için aynısı: `node` slottur (0 start, 1 center, 2 end, 3 bottom), ardından düğümün içindeki sırası, sonra alt öğe sıraları. Feature'ın guard'ları ve action'ın izni denetlenir. |
 | `/_zeyn/parse` | `{ kind, text, label }` | Sunucunun yazılmış bir tarihi veya saati kullanıcının dilinde, saat diliminde ve saat biçiminde nasıl okuduğu: `{ ok, text, iso, utc, zone }` veya `{ ok: false, message }`. `kind` değeri `date`, `time`, `datetime`, `local` veya `presets` (bugün ve hızlı aralıklar) olur. |
 
 ### 7.2 Values the forms submit
@@ -280,6 +281,8 @@ Hepsi JSON ve CSRF başlığıyla `POST`'tur ve önce ekranın erişimini ve Fea
 | `zeyn:effect` | `document` | Runtime'ın tanımadığı bir effect: `{ effect, source, run }`. `run(next)` başka bir effect çalıştırır. `confirm` tarafından kullanılır. |
 
 `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":"...","then":{...}}` effect'i modal bir uyarı diyaloğunda sorar ve `then` değerini yalnızca kullanıcı onayladıktan sonra çalıştırır.
+
+İstemci tercihleri (`zeyn::ClientPref`), sayfaların yalnızca `data-zeyn-remember` ya da `data-zeyn-prefs-clear` taşıyan bir eleman içerdiğinde içe aktardığı `/_zeyn/state.js` tarayıcı modülünde yaşar. `GET /_zeyn/prefs`, `Cache-Control: no-store` ile `{ preferences }` döndürür; bu, uygulamanın onay kancasının tercih değerlerinin oturumun ötesinde tutulmasına izin verip vermediğidir. Sunucu saklanan hiçbir değeri okumaz.
 
 ### 7.4 Media
 

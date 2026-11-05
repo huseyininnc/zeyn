@@ -39,7 +39,14 @@ PrevNext::new()
     .prev_title(prev.title.clone())
     .next(article, ArticleParams { id: next.id })
     .next_title(next.title.clone())
+    .shortcut("Alt+Shift+N")
 ```
+
+### 链接快捷键
+
+`.shortcut(keys)` 为最后设置的一侧链接指定键盘快捷键，`Chips::links(...).link(...).shortcut(keys)` 则为最后添加的链接 chip 指定快捷键。按下这些键会通过 `nav.js` 跟随该链接，无需重新加载页面，应用 shell 和站点 shell 页面均适用。焦点位于输入框、文本区域、下拉选择框或可编辑区域时，这些键不起作用，因此输入永远不会被抢占。链接带有供屏幕阅读器使用的 `aria-keyshortcuts`，并以 `<kbd>` 提示显示按键，触屏设备会隐藏该提示。快捷键的解析方式与 `Command::shortcut` 相同：浏览器保留（`Ctrl+T`、`Ctrl+W`）或使用（`Ctrl+P`、`F5`）的快捷键不会被绑定。`App::check` 会报告站点头部插槽中的链接快捷键存在以下问题：无法解析、属于浏览器、是单字符按键（WCAG 2.2，2.1.4：`Shift+N` 算，`Alt+Shift+N` 不算），或与命令、命令面板或其他链接冲突；`App::check_page(&screen)` 对在测试中带参数构建的 screen 做同样的检查，因为 `App::check` 无法自己构建 screen。
+
+当焦点位于来自其他源的框架内（例如嵌入的视频播放器）时，按键会交给该框架的文档，永远不会到达页面；任何脚本都无法改变这一点。请告诉用户在使用快捷键之前，先点击框架之外，或按 Tab 离开该框架。
 
 ## AutoGrid
 
@@ -58,7 +65,7 @@ AutoGrid::new()
 
 ## List
 
-一行接一行排列，位于一个 `<ul>` 中。每个 `ListItem` 有一个标题，还可以有一张开头的小图片（与卡片图片相同的安全地址：路径、`https:` 或 `data:image/`）、一个副标题和末尾的简短附注文本。使用 `.link(screen, params)` 时，整行就是一个链接，因此在 Tab 顺序中只占一个位置，有可见的焦点环，并且无需重新加载页面即可打开。长文本会换行；在手机上附注文本移到标题下方，从右到左的页面中该行会镜像。
+一行接一行排列，位于一个 `<ul>` 中。每个 `ListItem` 有一个标题，还可以有一张开头的小图片（与卡片图片相同的安全地址：路径、`https:` 或 `data:image/`）、一个副标题和末尾的简短附注：文本，或 `RelativeTime` 这样的行内组件。使用 `.link(screen, params)` 时，整行就是一个链接，因此在 Tab 顺序中只占一个位置，有可见的焦点环，并且无需重新加载页面即可打开。长文本会换行；在手机上附注文本移到标题下方，从右到左的页面中该行会镜像。
 
 `List::new()` 保存传给它的项。`List::of(action)` 通过与 DataGrid 相同类型的 action 加载行，并像[卡片网格](catalog.md#card-grid)一样分页：除非 `paging` 另有设置，否则每次 20 行并带有“Show more”按钮，还有排序选项、用 `.search(text)` 实现的服务器端搜索，并且每一页都会检查该 action 的访问权限。
 
@@ -74,7 +81,7 @@ List::of(search_people)
         ListItem::new(p.name.clone())
             .image(p.photo.clone())
             .subtitle(p.city.clone())
-            .meta(p.joined.format(&locale))
+            .meta(RelativeTime::new(p.joined))
             .link(person, PersonParams { id: p.id })
     })
     .sort_option(t!("people.by_name"), Person::name, false)
@@ -104,7 +111,7 @@ Spoiler::new(t!("quiz.show_answer")).add(Paragraph::new(answer.clone()))
 
 ## Chips
 
-一排可换行的圆角小链接。`Chips::links(label)` 在以 label 命名的 `nav` 中放置指向屏幕的普通链接，例如文章的标签。`Chips::filter(label, screen, params)` 基于屏幕参数生成切换按钮：每个 chip 都是指向同一屏幕的链接，其值会被加入或移出参数，因此服务器根据收到的参数渲染 `aria-pressed`，浏览器中不保存任何状态。按下 chip 会通过 `nav.js` 在不刷新页面的情况下打开新地址，焦点和滚动位置保持在该 chip 上。除非调用 `.multiple()`，否则同一时间只能按下一个值；参数中不属于选项的值会被忽略。键盘：Tab 在 chip 之间移动，Enter 或 Space 按下其中一个。被按下的 chip 还会显示对勾，因此状态不只依赖颜色。脚本（`chips.js`，小于 1 KB）只在带有筛选 chip 的页面上加载。
+一排可换行的圆角小链接。`Chips::links(label)` 在以 label 命名的 `nav` 中放置指向屏幕的普通链接，例如文章的标签。`Chips::filter(label, screen, params)` 基于屏幕参数生成切换按钮：每个 chip 都是指向同一屏幕的链接，其值会被加入或移出参数，因此服务器根据收到的参数渲染 `aria-pressed`，浏览器中不保存任何状态。按下 chip 会通过 `nav.js` 在不刷新页面的情况下打开新地址，焦点和滚动位置保持在该 chip 上。除非调用 `.multiple()`，否则同一时间只能按下一个值；参数中不属于选项的值会被忽略。键盘：Tab 在 chip 之间移动，Enter 或 Space 按下其中一个，链接 chip 还可以有自己的快捷键（参见[链接快捷键](#link-shortcuts)）。被按下的 chip 还会显示对勾，因此状态不只依赖颜色。脚本（`chips.js`，小于 1 KB）只在带有筛选 chip 的页面上加载。
 
 ```rust
 #[screen(route = "/articles", public)]
@@ -124,14 +131,15 @@ pub fn articles(p: ArticleParams) -> Screen {
 
 ## Hero
 
-页面顶部的大型区块：背景图，加上标题、一行文字和按钮等操作。默认是静态的。`.slide(title)` 会添加另一张幻灯片，而 `.text`、`.image` 和 `.action` 始终作用于最后一张。有多张幻灯片时，它遵循 W3C APG 轮播模式：幻灯片选择按钮，每张幻灯片是名为“2 / 3”的分组，被选中的幻灯片会以礼貌方式播报。除非应用调用 `.rotate(seconds)`（4 到 30），幻灯片只在用户选择时切换。调用后，暂停与播放按钮排在最前（WCAG 2.2.2），指针位于 hero 上、焦点位于其中以及标签页隐藏时轮播会停止，用户偏好减少动态效果时则完全不会启动；幻灯片在切换过程中不会被播报。没有脚本时显示第一张幻灯片。
+页面顶部的大型区块：背景图，加上标题、一行文字和按钮等操作。`.link(label, screen, params)` 添加指向其他页面的 `LinkButton`：每张幻灯片的第一个采用主要样式，之后的采用次要样式。默认是静态的。`.slide(title)` 会添加另一张幻灯片，而 `.text`、`.image` 和 `.action` 始终作用于最后一张。有多张幻灯片时，它遵循 W3C APG 轮播模式：幻灯片选择按钮，每张幻灯片是名为“2 / 3”的分组，被选中的幻灯片会以礼貌方式播报。除非应用调用 `.rotate(seconds)`（4 到 30），幻灯片只在用户选择时切换。调用后，暂停与播放按钮排在最前（WCAG 2.2.2），指针位于 hero 上、焦点位于其中以及标签页隐藏时轮播会停止，用户偏好减少动态效果时则完全不会启动；幻灯片在切换过程中不会被播报。没有脚本时显示第一张幻灯片。
 
-图片遵循 `Image` 的规则（应用的路径，或位于应用 `img-src` 允许的主机上的 `https` 地址）。它是文字后面的装饰，因此替代文本为空：重要内容请写入标题和文字，它们位于深色渐变之上以保证对比度。第一张幻灯片的图片以高优先级加载以加快首次绘制，其他的则延迟加载。脚本（`hero.js`，1.6 KB gzip）只在带有幻灯片的页面上加载。
+图片遵循 `Image` 的规则（应用的路径，或位于应用 `img-src` 允许的主机上的 `https` 地址）。它是文字后面的装饰，因此替代文本为空：重要内容请写入标题和文字，它们位于深色遮罩之上，该遮罩可保证白色文字在任何图片上的对比度至少为 4.5:1。链接按钮保持其实心颜色，并在图片上带有白色焦点环。第一张幻灯片的图片以高优先级加载以加快首次绘制，其他的则延迟加载。脚本（`hero.js`，1.6 KB gzip）只在带有幻灯片的页面上加载。
 
 ```rust
 Hero::new(t!("home.fresh"))
     .text(t!("home.fresh_text"))
     .image("/img/hero/kitchen.jpg")
+    .link(t!("home.menu"), menu, ())
     .action(ActionButton::new(t!("home.order"), start_order, ()))
     .slide(t!("home.new_teas"))
     .image("/img/hero/teas.jpg")

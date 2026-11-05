@@ -40,6 +40,8 @@ Panel::new(t!("ui.panel_products")).collapsible().toolbar(|t| t.export(Export::C
 
 `Tabs::new(label)` ile `.tab(title, node)`. Ok tuşları, ARIA tabs deseninin tarif ettiği gibi sekmeler arasında gezinir. Kapalı bir sekmenin içeriği, sekme ilk açılana kadar render edilmez; böylece çok sekmeli bir ekran hafif kalır.
 
+`.remember(KEY)`, kullanıcının açtığı sekmeyi bir choice anahtarı altında tutar (bkz. [İstemci tercihleri](security.md#client-preferences)); böylece sonraki sayfalarda aynı sekmeler onun üzerinde açılır. URL karmasında adı geçen sekme önceliklidir.
+
 ## Split
 
 `Split::new(start, end)` aralarında bir tutamaç olan iki düğüm gösterir. `.ratio(percent)` başlangıç boyutunu belirler. Tutamaç işaretçiyle veya ok tuşlarıyla hareket eder.

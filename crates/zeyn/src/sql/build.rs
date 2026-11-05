@@ -491,6 +491,21 @@ fn key_field(fields: &[FieldMeta]) -> Result<(usize, &FieldMeta)> {
 }
 
 /// `LIKE` pattern with `\`, `%` and `_` escaped.
+/// `col` folded in SQL the way [`crate::text::fold`] folds text: accented and Turkish letters
+/// translated to plain ones before `LOWER`, the written out letters replaced after it. Only
+/// constant text goes into the statement.
+fn search_fold(col: &str) -> String {
+    let mut out = format!(
+        "LOWER(TRANSLATE({col}, '{}', '{}'))",
+        crate::text::SQL_FROM,
+        crate::text::SQL_TO
+    );
+    for (from, to) in crate::text::SQL_PAIRS {
+        out = format!("REPLACE({out}, '{from}', '{to}')");
+    }
+    out
+}
+
 fn like_escape(s: &str, out: &mut String) {
     for c in s.chars() {
         if matches!(c, '\\' | '%' | '_') {
@@ -531,9 +546,8 @@ fn from_where<E: Entity>(d: &dyn Dialect, sql: &mut Sql, q: &DataQuery) -> Resul
                 if n > 0 {
                     sql.push(" OR ");
                 }
-                sql.push("LOWER(TRANSLATE(");
-                sql.push(&column(d, &fields[*i])?);
-                sql.push(", 'İı', 'ii')) LIKE ");
+                sql.push(&search_fold(&column(d, &fields[*i])?));
+                sql.push(" LIKE ");
                 sql.bind(d, Arg::Text(pattern.clone()), Cast::Plain);
                 sql.push(" ESCAPE '\\'");
             }
@@ -1317,6 +1331,33 @@ pub(crate) fn plan_get<E: Entity>(d: &dyn Dialect, key: Value) -> Result<Sql> {
     sql.push(&ident(d, E::TABLE)?);
     push_key(d, &mut sql, E::fields(), key)?;
     Ok(sql)
+}
+
+/// A hand written `SELECT` read as rows of `M`: the statement becomes a subquery, the outer select
+/// reads every field of `M` by name with the dialect's conversions, and at most `limit` rows come
+/// back. `args` are the statement's own parameters; the limit is bound after them.
+pub(crate) fn plan_query<M: Model>(
+    d: &dyn Dialect,
+    text: &str,
+    args: Vec<Arg>,
+    limit: usize,
+) -> Result<Sql> {
+    let mut sql = Sql::new();
+    sql.args = args;
+    sql.push("SELECT ");
+    select_fields(d, &mut sql, M::fields())?;
+    sql.push(" FROM (");
+    sql.push(text.trim().trim_end_matches(';'));
+    sql.push(") zeyn_q");
+    d.page(&mut sql, i64::try_from(limit).unwrap_or(i64::MAX), 0);
+    Ok(sql)
+}
+
+/// The error of a hand written query that returned more rows than its cap.
+pub(crate) fn over_cap(model: &str, max: usize) -> Error {
+    Error::Internal(format!(
+        "a query read into `{model}` returned more than its cap of {max} rows: add a LIMIT, or pass a larger cap to `query_max`"
+    ))
 }
 
 /// Whether a key value means "not saved yet": 0 or empty.

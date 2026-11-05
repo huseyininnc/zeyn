@@ -221,7 +221,8 @@
       "site": {
         "sign_in": "로그인",
         "sign_out": "로그아웃",
-        "bottom": "바로 가기"
+        "bottom": "바로 가기",
+        "center": "검색"
       }
     },
     "ui": {
@@ -234,6 +235,7 @@
         "sort": "정렬 기준",
         "pages": "페이지",
         "page": "{pages}페이지 중 {page}페이지",
+        "page_only": "{page}페이지",
         "previous_page": "이전 페이지",
         "next_page": "다음 페이지",
         "previous": "뒤로 스크롤",
@@ -495,6 +497,9 @@
       "reactions": {
         "label": "반응",
         "failed": "반응을 저장하지 못했습니다."
+      },
+      "prefs": {
+        "cleared": "이 브라우저가 이 사이트를 위해 보관하던 선택을 삭제했습니다."
       }
     },
     "date": {

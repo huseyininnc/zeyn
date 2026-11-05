@@ -221,6 +221,7 @@ struct Step {
     screen: &'static str,
     params: Json,
     title: Option<Text>,
+    shortcut: Option<String>,
 }
 
 /// A pair of links to the previous and the next item, such as the article before and after this
@@ -242,7 +243,9 @@ struct Step {
 ///         PrevNext::new()
 ///             .prev(article, ArticleParams { id: p.id - 1 })
 ///             .prev_title("Getting started")
-///             .next(article, ArticleParams { id: p.id + 1 }),
+///             .shortcut("Alt+Shift+B")
+///             .next(article, ArticleParams { id: p.id + 1 })
+///             .shortcut("Alt+Shift+N"),
 ///     )
 /// }
 /// ```
@@ -250,6 +253,7 @@ struct Step {
 pub struct PrevNext {
     prev: Option<Step>,
     next: Option<Step>,
+    next_last: bool,
 }
 
 impl PrevNext {
@@ -263,7 +267,9 @@ impl PrevNext {
             screen: S::META.name,
             params: serde_json::to_value(params).unwrap_or(Json::Null),
             title: None,
+            shortcut: None,
         });
+        self.next_last = false;
         self
     }
 
@@ -273,7 +279,9 @@ impl PrevNext {
             screen: S::META.name,
             params: serde_json::to_value(params).unwrap_or(Json::Null),
             title: None,
+            shortcut: None,
         });
+        self.next_last = true;
         self
     }
 
@@ -289,6 +297,22 @@ impl PrevNext {
     pub fn next_title(mut self, title: impl Into<Text>) -> Self {
         if let Some(s) = &mut self.next {
             s.title = Some(title.into());
+        }
+        self
+    }
+
+    /// A keyboard shortcut such as `"Alt+Shift+N"` for the side set last (`prev` or
+    /// `next`). It works like [`super::Chips::shortcut`]: pressing it follows the link through
+    /// `nav.js` unless focus is in a text field, and the link carries `aria-keyshortcuts` and a
+    /// `<kbd>` hint.
+    pub fn shortcut(mut self, keys: impl Into<String>) -> Self {
+        let side = if self.next_last {
+            &mut self.next
+        } else {
+            &mut self.prev
+        };
+        if let Some(s) = side {
+            s.shortcut = Some(keys.into());
         }
         self
     }
@@ -315,8 +339,9 @@ impl Component for PrevNext {
                 .as_ref()
                 .map(|title| format!(r#"<span class="z-prevnext-title">{}</span>"#, r.text(title)))
                 .unwrap_or_default();
+            let (keys, hint) = crate::command::link_shortcut(s.shortcut.as_deref());
             out.push_str(&format!(
-                r#"<a class="z-prevnext-link z-prevnext-{rel}" href="{}" rel="{rel}" data-zeyn-base-href><span class="z-prevnext-arrow" aria-hidden="true">{arrow}</span><span class="z-prevnext-text"><span class="z-prevnext-word">{word}</span>{title}</span></a>"#,
+                r#"<a class="z-prevnext-link z-prevnext-{rel}" href="{}" rel="{rel}" data-zeyn-base-href{keys}><span class="z-prevnext-arrow" aria-hidden="true">{arrow}</span><span class="z-prevnext-text"><span class="z-prevnext-word">{word}{hint}</span>{title}</span></a>"#,
                 screen_href(r, s.screen, &s.params)
             ));
         }
@@ -326,9 +351,17 @@ impl Component for PrevNext {
     fn schema(&self) -> Json {
         let side = |s: &Option<Step>| {
             s.as_ref()
-                .map(|s| json!({ "screen": s.screen, "params": s.params, "title": s.title }))
+                .map(|s| json!({ "screen": s.screen, "params": s.params, "title": s.title, "shortcut": s.shortcut }))
         };
         json!({ "type": "prev_next", "prev": side(&self.prev), "next": side(&self.next) })
+    }
+
+    fn shortcuts(&self) -> Vec<&str> {
+        [&self.prev, &self.next]
+            .into_iter()
+            .flatten()
+            .filter_map(|s| s.shortcut.as_deref())
+            .collect()
     }
 }
 

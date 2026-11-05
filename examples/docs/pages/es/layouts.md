@@ -40,6 +40,8 @@ Panel::new(t!("ui.panel_products")).collapsible().toolbar(|t| t.export(Export::C
 
 `Tabs::new(label)` con `.tab(title, node)`. Las teclas de flecha se mueven entre pestañas, como describe el patrón ARIA de tabs. El contenido de una pestaña cerrada no se renderiza hasta que se abre por primera vez, así que una pantalla con muchas pestañas se mantiene ligera.
 
+`.remember(KEY)` guarda la pestaña que abrió el usuario bajo una clave de elección (consulta [Preferencias del cliente](security.md#client-preferences)), de modo que las mismas pestañas se abren en ella en páginas posteriores. Una pestaña indicada en el hash de la URL tiene prioridad.
+
 ## Split
 
 `Split::new(start, end)` muestra dos nodos con un tirador entre ellos. `.ratio(percent)` fija el tamaño inicial. El tirador se mueve con el puntero o con las teclas de flecha.

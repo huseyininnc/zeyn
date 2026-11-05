@@ -38,8 +38,9 @@ Card::image(c.cover.clone(), c.title.clone())
     .horizontal()
 ```
 - **첫 페이지는 서버에서.** 첫 페이지(카드 그리드는 24개, rail은 12개, 또는 `paging`에 준 크기)는 페이지 HTML에 포함되므로 검색 엔진과 JavaScript가 없는 방문자도 카드와 링크를 볼 수 있고, 이미지는 크기를 가지고 있어 로드되는 동안 아무것도 움직이지 않습니다. 이후 페이지는 브라우저가 가져옵니다. 공개 페이지는 모든 방문자에게 같은 HTML이므로 캐시할 수 있습니다. 라우트가 있는 screen으로 연결된 카드는 리디렉션이 아니라 그 screen의 정식 주소(`/items/{slug}`)로 연결됩니다.
-- **페이징.** `Paging::infinite(n)`(기본값이며 24)은 "더 보기" 버튼을 표시하고, 이 버튼이 화면에 스크롤되어 들어오면 자동으로도 동작합니다. 버튼을 누르면 포커스가 첫 번째 새 카드로 이동합니다. `Paging::pages(n)`은 이전과 다음 버튼 및 페이지 번호를 표시합니다. 페이지 크기는 서버가 정하며, 클라이언트는 어디서부터 이어갈지만 알립니다.
+- **페이징.** `Paging::infinite(n)`(기본값이며 24)은 "더 보기" 버튼을 표시하고, 이 버튼이 화면에 스크롤되어 들어오면 자동으로도 동작합니다. 버튼을 누르면 포커스가 첫 번째 새 카드로 이동합니다. `Paging::pages(n)`은 이전과 다음 버튼 및 페이지 번호를 표시합니다. action이 총계를 반환하면 "Page 2 of 5", 반환하지 않으면 "Page 2"로 표시되며, 이 경우 action이 커서를 반환하는 동안 다음 버튼이 동작합니다. 페이지 크기는 서버가 정하며, 클라이언트는 어디서부터 이어갈지만 알립니다.
 - **정렬.** 각 `sort_option`은 사용자가 선택 목록에서 고를 수 있는 순서입니다. 첫 번째가 카드가 처음 나열되는 순서입니다. 서버는 이 순서만 받아들이고, 클라이언트가 보낸 필터와 검색 텍스트는 버립니다.
+- **범위.** `.scope(field, value)`는 해당 필드가 그 값인 행만 남기며, 모든 요청에서 [`DataGrid::scope`](datagrid.md)처럼 동작합니다. 예를 들어 `.scope(Article::author_id, author.id)`는 한 저자의 글만 남깁니다. 카드 그리드, rail, 데이터에 바인딩된 리스트는 클라이언트가 보내는 모든 필터를 버리므로 클라이언트는 범위를 바꾸거나 없앨 수 없습니다. 텍스트는 대소문자를 구분하지 않고 비교합니다.
 - **검색.** `.search(text)`는 자유 텍스트([`DataQuery::q`](#free-text))와 일치하는 행만 표시합니다. 예를 들어 검색 결과 화면의 텍스트가 있습니다.
 - **마스킹된 필드.** 카드는 원본 행을 보는 클로저가 만듭니다. `#[mask]` 필드가 있는 모델에서는 이를 공개할 수 있는 사용자만 카드를 받고, 그 외에는 `Forbidden`을 받습니다. 공개 카드에는 마스킹된 필드가 없는 모델을 사용하십시오.
 
@@ -94,6 +95,31 @@ SearchBox::of(catalog_products)
 
 결과 화면은 `SearchParams`를 받습니다(`q`이며, 메뉴에서 화면을 열면 비어 있습니다). 서버는 텍스트를 `MAX_SEARCH_QUERY`(100)자로 자르고, 보낼 제안의 개수를 정하며(`limit`으로 달리 지정하지 않으면 8개, 최대 20개), Screen의 접근 권한, Feature의 가드, action의 권한을 검사하고, 모든 제안 호출을 쓰기 속도 제한(`App::write_limit`)에 포함합니다.
 
+### 풍부한 제안
+
+`.item(|row| ListItem::new(title).subtitle(text).image(src).link(screen, params))`는 각 제안을 작은 이미지(40 x 56 픽셀, 지연 로딩, `img-src` 규칙을 따르며 제목이 행의 이름을 대신하므로 대체 텍스트는 비어 있고, 이미지가 없으면 자리 표시자도 없음), 제목, 부제목이 있는 행으로 표시합니다. 서버는 레코드의 정식 주소와 함께 `[{text, subtitle, image, href}]`로 응답합니다. 클릭이나 Enter로 행을 고르면 `nav.js`를 통해 그 링크가 열리며, 각 행이 실제 링크이므로 가운데 클릭과 "새 탭에서 열기"도 동작합니다. 강조된 행 없이 Enter를 누르면 여전히 결과 화면이 열립니다. 콤보박스 패턴은 그대로입니다. 각 행은 제목과 부제목으로 이름이 붙은 옵션이며, 행의 높이는 최소 44픽셀입니다. `.item`이 없으면 제안은 위에서 본 것처럼 일반 텍스트입니다.
+
+```rust
+SearchBox::of(catalog_products)
+    .item(|p: &Product| {
+        ListItem::new(p.name.clone())
+            .subtitle(p.code.clone())
+            .image(p.image.clone())
+            .link(shop_product, ProductPage { id: p.id })
+    })
+    .results(shop_search)
+```
+
 ## 자유 텍스트
 
-`DataQuery::q`는 자유 텍스트입니다. 텍스트 필드에 이 텍스트가 포함된 행을 대소문자를 구분하지 않고 찾습니다. 터키어의 점 있는 `i`와 점 없는 `i`(`İ`, `ı`)는 `i`와 일치하므로 "istanbul"로 "İSTANBUL"을 찾을 수 있습니다. `#[mask]`가 있는 필드는 검색하지 않으며, 빈 텍스트는 모든 행과 일치하고, 100자보다 긴 텍스트는 무시됩니다. `DataQuery::apply`와 SQL 데이터 계층(바인드 매개변수를 쓰는 `LOWER(TRANSLATE(column, 'İı', 'ii')) LIKE ...`)은 이를 같은 방식으로 읽습니다.
+`DataQuery::q`는 자유 텍스트입니다. 텍스트 필드에 이 텍스트가 포함된 행을 찾습니다. 텍스트와 필드는 모두 `zeyn::text::fold`가 만드는 형태로 비교됩니다. 소문자, 터키어의 점 있는 `i`와 점 없는 `i`(`İ`, `ı`)는 `i`로, 악센트가 있는 라틴 문자는 악센트 없이, `ß`, `æ`, `œ`, `þ`는 풀어 쓴 형태입니다. 따라서 "istanbul"로 "İSTANBUL"을, "nino"로 "Niño"를, "strasse"로 "Straße"를 찾을 수 있습니다. `#[mask]`가 있는 필드는 검색하지 않으며, 빈 텍스트는 모든 행과 일치하고, 100자보다 긴 텍스트는 무시됩니다. `DataQuery::apply`와 SQL 데이터 계층(컬럼에 대한 `TRANSLATE`, `LOWER`, `REPLACE`와 바인드 매개변수를 쓰는 `LIKE`)은 이를 같은 방식으로 읽습니다.
+
+```rust
+use zeyn::text::fold;
+
+assert_eq!(fold("İSTANBUL Işık"), "istanbul isik");
+assert_eq!(fold("Año Pequeño"), "ano pequeno");
+assert_eq!(fold("Straße MÜLLER"), "strasse muller");
+```
+
+앱이 직접 쓰는 검색 키 컬럼, 예를 들어 [직접 작성한 쿼리](database.md)의 트라이그램 컬럼에도 `fold`를 사용하면 키가 사용자가 입력하는 것과 일치합니다. 문장 부호와 다른 문자 체계는 그대로 유지되며, 주소에는 `Slug::from_title`을 사용합니다.

@@ -95,6 +95,30 @@ App::new(t!("app.name"))
 
 El enmascarado de campos, los motivos antes de abrir registros sensibles, la auditoría a nivel de campo y la auditoría de lectura se tratan en [Auditoría, enmascarado y jobs](enterprise.md).
 
+## Preferencias del cliente
+
+Algunas decisiones pequeñas pertenecen al navegador y no al servidor: un aviso que el usuario confirmó antes de que se cargue contenido incrustado, la última pestaña abierta. Zeyn las guarda en un solo lugar, `zeyn.state` (`/_zeyn/state.js`, cargado solo en las páginas que lo usan), y el servidor nunca las lee, así que las páginas públicas en caché siguen siendo iguales para todos. Las preferencias que cambian el HTML, como el tema y el idioma, se quedan en cookies.
+
+Una clave se declara una sola vez como constante con su tipo, su vida útil y su propósito, se registra en la aplicación y se vincula a los componentes con `.remember(KEY)`: `Embed::remember` recibe una clave de consentimiento, `Tabs::remember` una clave de elección. Una cadena simple o una clave del otro tipo no compila, y un nombre fuera de 1 a 40 letras ASCII, dígitos, `-` y `_` o una vida útil fuera del rango de un segundo a 400 días (`MAX_PREF_LIFETIME`) falla cuando se construye la constante. Un componente vinculado a una clave que la aplicación no registró no se recuerda, así que la lista de privacidad siempre está completa.
+
+```rust
+pub const VIDEO_NOTICE: ClientPref<Consent> =
+    ClientPref::consent("video-notice", Duration::from_secs(86_400), Purpose::Necessary);
+pub const ORDER_TAB: ClientPref<Choice> =
+    ClientPref::choice("order-tab", Duration::from_secs(30 * 86_400), Purpose::Preference);
+
+App::new(t!("app.name")).client_prefs(|p| {
+    p.key(VIDEO_NOTICE)
+        .key(ORDER_TAB)
+        .allowed_when(|headers| consent_cookie(headers) == Some("all"))
+})
+```
+
+- **Registros.** Cada valor es `{v, exp, val}` bajo `zeyn.v1.{key}`. Cada lectura comprueba la versión, el valor (`true` o un texto de como máximo 200 caracteres) y la hora de fin, que no debe haber pasado y no debe quedar más lejos en el futuro que la vida útil de la clave. Un registro que no lo cumple, como uno cambiado a mano, se elimina. Una nueva versión del formato ignora los registros antiguos.
+- **Propósito.** `Purpose::Necessary` es para algo que el usuario pidió, como confirmar un aviso antes de que se cargue contenido de otro sitio; se conserva durante su vida útil. `Purpose::Preference` es una elección de interfaz. La Directiva ePrivacy (artículo 5(3)) permite almacenar datos en el navegador sin consentimiento solo cuando es estrictamente necesario para un servicio que el usuario pidió, y las autoridades de protección de datos de la UE (Grupo de Trabajo del Artículo 29, dictamen 04/2012) consideran las elecciones de interfaz necesarias solo durante la sesión o unas pocas horas. Por eso los valores de preferencias van a `sessionStorage` hasta que el hook de la aplicación, `allowed_when(|headers| ...)`, indique que el usuario dio su consentimiento; el navegador pregunta a `GET /_zeyn/prefs` una vez por página, la respuesta nunca se guarda en caché y, sin hook, la respuesta es no.
+- **Pestañas y almacenamiento bloqueado.** Las otras pestañas siguen los cambios mediante el evento `storage`. Cuando el almacenamiento está bloqueado (ventanas privadas, ajustes estrictos) los valores viven en memoria durante la página. Sin JavaScript los componentes muestran su estado por defecto.
+- **Transparencia.** `App::client_prefs_table()` lista cada clave con su tipo, su propósito y su vida útil en segundos para una página de privacidad, y `ClearPrefs` (o `zeyn.prefs.clear()`) las elimina todas del navegador.
+
 ## La API y los agentes
 
 Las llamadas a la API necesitan una cabecera `Authorization`; una cookie de sesión del navegador por sí sola nunca llama a la API ni al endpoint MCP, así que no necesitan token CSRF. Los agentes reciben exactamente los permisos del usuario en cuyo nombre actúan. Consulta [API y OpenAPI](api.md) y [MCP y agentes de IA](mcp.md).

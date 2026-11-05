@@ -22,7 +22,15 @@ Feature::new("shop")
             .item(t!("shop.delivery.title"), shop_delivery)
             .item(t!("shop.returns.title"), shop_returns)
     })
-    .shell(Shell::site().header(|h| h.sign_in().language().theme()).footer(|f| {
+    .shell(Shell::site().header(|h| {
+        h.center(SearchBox::of(search_products).results(shop_search))
+            .center_on_phone(CenterOnPhone::Icon)
+            .end(LinkButton::new(t!("shop.cart"), shop_cart, ()))
+            .sign_in()
+            .language()
+            .theme()
+    })
+    .footer(|f| {
         f.column(t!("shop.menu.help"), |c| {
             c.link(t!("shop.delivery.title"), shop_delivery).url(t!("shop.footer.source"), "https://example.com")
         })
@@ -36,7 +44,8 @@ Feature::new("shop")
 
 - **Menü.** Üst menü, site shell'indeki her feature'ın menüsünü listeler. Tek öğeli bir grup düz bir bağlantıdır; daha büyük bir grup bağlantılarını açan bir düğmedir (W3C APG disclosure navigation deseni). Enter, Boşluk ya da bir tıklama grubu açıp kapatır, Aşağı ok açar ve ilk bağlantıya geçer, Yukarı ok, Aşağı ok, Home ve End bağlantıları arasında gezdirir, Escape kapatır ve düğmeye döner, gruptan Tab ile çıkmak ya da dışına tıklamak kapatır. Sol ve Sağ ok üst öğeler arasında gezdirir.
 - **Dar ekranlar.** 800 px altında menü, `aria-expanded` taşıyan bir menü düğmesinin arkasına katlanır; Escape kapatır. Betik olmadan menü açık kalır, böylece hiçbir şey erişilemez olmaz.
-- **Eylemler.** `sign_in()`, uygulamanın bir oturum açma sayfası olduğunda ziyaretçilere bir oturum açma bağlantısı, oturum açmış kullanıcılara bir oturum kapatma bağlantısı gösterir; `language()` ve `theme()` uygulama shell'indekiyle aynı seçicileri gösterir.
+- **Üst bilgi slotları.** Üst çubuğun, mantıksal adlara sahip bir uygulama çubuğu gibi her bileşeni alan dört slotu vardır: markadan önce `start(node)`, menü ile uç arasında `center(node)`, çubuğun sonunda `end(node)` ve altında tam genişlikte bir satır olarak `bottom(node)`, örneğin chip'ler. Her slot birden çok düğümü sırayla tutar; start ve end, sağdan sola yazılan dillerde yer değiştirir. Slotlardaki bileşenler kullanıcının diliyle, izinleriyle ve maskeleriyle render edilir; verisini kendi action'ı ile yükleyenler, örneğin bir `SearchBox`, orada çalışır ve Feature'ın guard'larına ve action'ın iznine karşı denetlenir. Grid'ler ve formlar screen'e aittir. Telefonlarda start ve end slotları çubukta kalır, center slotu uygulamanın söylediği yere gider: `center_on_phone(CenterOnPhone::Row)` (varsayılan) onu çubuğun altında bir satıra koyar, `CenterOnPhone::Icon` onu açan bir büyüteç düğmesinin arkasına koyar (W3C APG disclosure) ve odağı içine taşır; Escape kapatır ve düğmeye döner. `center_button(icon, label)` bu düğmeyi değiştirir. Telefon yerleşimi betik çalışmadan önce CSS ile belirlenir, bu yüzden sayfa yüklenirken üst bilgi oynamaz.
+- **Eylemler.** `sign_in()`, uygulamanın bir oturum açma sayfası olduğunda ziyaretçilere bir oturum açma bağlantısı, oturum açmış kullanıcılara bir oturum kapatma bağlantısı gösterir; `language()` ve `theme()` uygulama shell'indekiyle aynı seçicileri gösterir. Bunlar end slotundan sonra gelir ve telefonlarda menüye katlanır.
 - **Alt çubuk.** `bottom_nav([...])`, telefonlarda (800 px ve altı) ekranın altına sabitlenmiş en fazla beş bağlantı ekler; insanların en çok gittiği yerler içindir, beşten fazlası derlenmez. Her öğe, bir etiket, rotası olan bir ekran ve isteğe bağlı bir simge içeren bir `BottomNavItem`'dır. Gösterilen sayfanın bağlantısında `aria-current="page"` bulunur (`nav.js` güncel tutar), kullanıcının açamayacağı ekranlara giden bağlantılar çıkarılır, çubuk `env(safe-area-inset-bottom)` ile ana ekran göstergesinden uzak durur ve sayfanın altında çubuğun hiçbir şeyi gizlememesi için boşluk bırakılır. Üst menü geri kalan yerler için kalır. Çubuk betik gerektirmez.
 - **Alt bilgi.** Screen'lere bağlantılardan (`link`, açma izni olmayan kullanıcılar için çıkarılır) ya da adreslerden (`url`: bir yol, `https:`, `http:` ya da `mailto:`; `App::check` diğer şemaları ve kayıtlı olmayan screen'lere bağlantıları reddeder) oluşan sütunlar ve bir metin satırı.
 
