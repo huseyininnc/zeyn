@@ -370,6 +370,20 @@ impl<M: Model> Form<M> {
             .map(|(_, e)| e.as_ref())
     }
 
+    /// Whether the field is edited with a password or one time code control. Its values never
+    /// reach the audit trail.
+    fn is_secret(&self, name: &str) -> bool {
+        matches!(
+            self.control_of(name),
+            Some(
+                Control::Password
+                    | Control::NewPassword
+                    | Control::PasswordMeter
+                    | Control::OneTimeCode
+            )
+        )
+    }
+
     fn control_of(&self, name: &str) -> Option<Control> {
         self.controls
             .iter()
@@ -1137,6 +1151,16 @@ where
         let valid = self.form.read_for(&values, &ctx);
         if let Ok(saved) = &valid {
             ctx.record_changes(&self.form.model, saved);
+            ctx.update_trail(|t| {
+                for c in t
+                    .changes
+                    .iter_mut()
+                    .filter(|c| self.form.is_secret(c.field))
+                {
+                    c.old = None;
+                    c.new = None;
+                }
+            });
         }
         let on_success = self.on_success.clone();
         Box::pin(async move {
