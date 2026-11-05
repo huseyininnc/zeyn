@@ -15,6 +15,7 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 - `zeyn check` warns about a `#[screen]` or `#[action]` that no feature registers and about a flat `screens.rs` or `actions.rs` with several items in more than about 150 lines.
 - `Kpi::money(title, Money)`: the value and the target with the currency in the user's locale.
 - Confirmation for destructive grid and workflow actions: `.confirm(message)` and `.tone(Tone::Danger)` after `DataGrid::row_action` or `bulk_action`, and `Transitions::confirm(name, message)` with `Transitions::tone(name, Tone::Danger)`, in the dialog `ActionButton::confirm` uses.
+- `App::header(|h| ...)`: a top bar over the screens of the app shell with the site header's slots (`start`, `center`, `end`, `bottom`), for a search box and a notifications link. Components there load data through their action's permission, like in the site header.
 - `ThemePicker::new()`: the theme picker inside a screen (a settings page), with the shell's themes; both pickers stay in step.
 - Ten more icons for admin screens: `Icon::Users`, `Settings`, `Bell`, `Shield`, `Clock`, `Tag`, `Mail`, `SignOut`, `ArrowUp` and `ArrowDown`, drawn like the others (24 px grid, 2 px round stroke). They add 2.9 KB to `zeyn.css` (0.4 KB gzip).
 - `DataGridColumn::plain()` shows whole numbers without group separators, for codes and years.

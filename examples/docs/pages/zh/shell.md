@@ -64,6 +64,20 @@ pub fn appearance() -> Screen {
 
 它与外壳中的选择器是同一个控件：选择会立即生效，不重新加载页面，保存在 `zeyn_theme` cookie 中（已登录用户还会保存在视图存储中），页面上的另一个选择器也会同步显示。应用不提供选择时（`theme_picker(false)` 或只有一个主题），它不渲染任何内容。
 
+## 应用页眉
+
+`App::header(|h| ...)` 在应用外壳的屏幕上方放一个栏，带有站点页眉的插槽：`start`、`center`、`end` 和 `bottom`。搜索框放在中间，通知链接放在末尾。`sign_in()`、`language()` 和 `theme()` 在这里同样可用，不过侧边菜单里已经有这些选择器。
+
+```rust
+App::new(t!("app.name"))
+    .header(|h| {
+        h.center(SearchBox::of(search_all).results(search_results))
+            .end(LinkButton::new(t!("app.notifications"), notifications, ()))
+    })
+```
+
+屏幕滚动时，这个栏固定在顶部，屏幕在它下方切换，不重新加载页面。在手机上，它位于菜单按钮下方，中间插槽单独占一行。栏中的组件像屏幕中的组件一样按用户渲染；搜索框通过自己的动作加载建议，服务器会检查该动作的权限。没有 `App::header` 时，应用外壳没有顶栏。
+
 ## 命令
 
 命令在 Rust 中一次性声明，包含其标签、快捷键以及它要做的事情。在 feature 上注册后，命令面板会列出它，其快捷键在每个页面都有效。

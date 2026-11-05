@@ -5,7 +5,7 @@ use super::{AppState, asset};
 use crate::ctx::Ctx;
 use crate::i18n::Text;
 use crate::render::{Render, escape};
-use crate::site::{CenterOnPhone, FooterTarget, SiteShell};
+use crate::site::{CenterOnPhone, FooterTarget, SiteHeader, SiteShell};
 use axum::Router;
 use axum::routing::get;
 use std::sync::Arc;
@@ -99,6 +99,70 @@ fn bottom_nav(
     )
 }
 
+/// The ready actions a header asks for: a sign in or sign out link, the language picker and the
+/// theme picker. Empty when it asks for none.
+pub(super) fn header_actions(st: &AppState, header: &SiteHeader, ctx: &Ctx, r: &Render) -> String {
+    let mut actions = String::new();
+    if header.sign_in {
+        let signed_in = ctx.identity().is_signed_in();
+        let link = if signed_in {
+            st.sign_in.logout_url.as_deref()
+        } else {
+            st.login_url.as_deref()
+        };
+        if let Some(href) = link {
+            let key = if signed_in {
+                "zeyn.shell.site.sign_out"
+            } else {
+                "zeyn.shell.site.sign_in"
+            };
+            actions.push_str(&format!(
+                r#"<a class="z-button z-site-sign-in" href="{}" data-zeyn-reload>{}</a>"#,
+                escape(href),
+                r.text(&Text::key(key))
+            ));
+        }
+    }
+    if header.language {
+        actions.push_str(&st.locale_picker(ctx, r));
+    }
+    if header.theme {
+        actions.push_str(
+            &st.look
+                .picker(r, ctx.theme().unwrap_or("system")),
+        );
+    }
+    actions
+}
+
+/// The start, center, end and bottom slots of a header, rendered for the request's user with
+/// render scope `scope`, each in `<div class="{class}-slot {class}-slot-{name}">`; empty slots
+/// are empty strings. Node paths are `{slot}.{index}`, as [`SiteHeader::node`] reads them.
+pub(super) fn header_slots(
+    header: &SiteHeader,
+    ctx: &Ctx,
+    scope: &str,
+    class: &str,
+) -> [String; 4] {
+    let sr = Render::new(scope, ctx.locale(), ctx.i18n())
+        .with_tz(ctx.time_zone())
+        .with_identity(ctx.identity())
+        .with_ctx(ctx);
+    std::array::from_fn(|i| {
+        if header.slots[i].is_empty() {
+            return String::new();
+        }
+        let name = crate::site::SLOT_NAMES[i];
+        let mut out =
+            format!(r#"<div class="{class}-slot {class}-slot-{name}" id="{class}-slot-{name}">"#);
+        for (n, node) in header.slots[i].iter().enumerate() {
+            crate::ui::render_node(&mut out, &sr, &format!("{i}.{n}"), node);
+        }
+        out.push_str("</div>");
+        out
+    })
+}
+
 /// The whole frame of a site shell page: top bar with the brand, menu button, menu and actions;
 /// the screen; the footer.
 pub(super) fn frame(
@@ -134,60 +198,14 @@ pub(super) fn frame(
             items.join("")
         ));
     }
-    let mut actions = String::new();
-    if shell.header.sign_in {
-        let signed_in = ctx.identity().is_signed_in();
-        let link = if signed_in {
-            st.sign_in.logout_url.as_deref()
-        } else {
-            st.login_url.as_deref()
-        };
-        if let Some(href) = link {
-            let key = if signed_in {
-                "zeyn.shell.site.sign_out"
-            } else {
-                "zeyn.shell.site.sign_in"
-            };
-            actions.push_str(&format!(
-                r#"<a class="z-button z-site-sign-in" href="{}" data-zeyn-reload>{}</a>"#,
-                escape(href),
-                r.text(&Text::key(key))
-            ));
-        }
-    }
-    if shell.header.language {
-        actions.push_str(&st.locale_picker(ctx, r));
-    }
-    if shell.header.theme {
-        actions.push_str(
-            &st.look
-                .picker(r, ctx.theme().unwrap_or("system")),
-        );
-    }
+    let actions = header_actions(st, &shell.header, ctx, r);
     let actions = if actions.is_empty() {
         String::new()
     } else {
         format!(r#"<div class="z-site-actions" id="z-site-actions">{actions}</div>"#)
     };
     let header = &shell.header;
-    let sr = Render::new("site", ctx.locale(), ctx.i18n())
-        .with_tz(ctx.time_zone())
-        .with_identity(ctx.identity())
-        .with_ctx(ctx);
-    let slot = |i: usize| -> String {
-        if header.slots[i].is_empty() {
-            return String::new();
-        }
-        let name = crate::site::SLOT_NAMES[i];
-        let mut out =
-            format!(r#"<div class="z-site-slot z-site-slot-{name}" id="z-site-slot-{name}">"#);
-        for (n, node) in header.slots[i].iter().enumerate() {
-            crate::ui::render_node(&mut out, &sr, &format!("{i}.{n}"), node);
-        }
-        out.push_str("</div>");
-        out
-    };
-    let (start, center, end, bottom) = (slot(0), slot(1), slot(2), slot(3));
+    let [start, center, end, bottom] = header_slots(header, ctx, "site", "z-site");
     let icon = !center.is_empty() && header.center_on_phone == CenterOnPhone::Icon;
     let center_button = if icon {
         let (glyph, label) = header

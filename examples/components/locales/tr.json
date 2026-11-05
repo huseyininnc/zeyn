@@ -80,6 +80,7 @@
       "toast": "Bir eylemden sonra kısa bildirim.",
       "chart": "Çubuk, halka, karma ve gösterge grafikleri.",
       "kpi": "Değişimi ve eğilimiyle bir sayı.",
+      "app_header": "Uygulama kabuğundaki ekranların üstünde, arama kutusu ve bağlantılar içeren bir çubuk.",
       "theme_picker": "Menüyle uyumlu, ekran içinde tema seçimi.",
       "icon": "Düğmelerin, menülerin ve araçların simgeleri.",
       "screen_header": "Ekranın başlık satırı: bir alt başlık ve ana işlemler.",
@@ -192,6 +193,9 @@
       },
       "theme_picker": {
         "overview": "Görünüm bölümü"
+      },
+      "app_header": {
+        "catalog_header": "Bu kataloğun başlığı"
       },
       "icon": {
         "overview": "Sık kullanılan simgeler",

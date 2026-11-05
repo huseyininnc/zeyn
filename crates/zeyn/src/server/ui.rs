@@ -225,25 +225,32 @@ async fn node_call(
 }
 
 /// Runs the action behind a component's data source and returns its JSON.
-/// A data source of a component in a site header slot (`screen` is `_site.{feature}`). The
-/// feature's guards and the action's permission are checked as for a screen's components.
+/// A data source of a component in a header slot: a site header (`screen` is
+/// `_site.{feature}`, `feature` is `Some`), where the feature's guards are checked, or the app
+/// header (`screen` is `_app`, `feature` is `None`). The action's permission is checked in both,
+/// as for a screen's components.
 async fn site_data(
     st: &AppState,
     ctx: &crate::ctx::Ctx,
-    feature: &str,
+    feature: Option<&str>,
     call: &DataCall,
 ) -> Response {
     let result = async {
-        let f = st
-            .features
-            .iter()
-            .find(|f| f.name() == feature)
-            .ok_or(Failure::App(Error::NotFound))?;
-        f.check_guards(ctx)
-            .map_err(Failure::App)?;
-        let source = f
-            .site_shell()
-            .and_then(|s| s.header.node(&call.node))
+        let (name, header) = match feature {
+            Some(feature) => {
+                let f = st
+                    .features
+                    .iter()
+                    .find(|f| f.name() == feature)
+                    .ok_or(Failure::App(Error::NotFound))?;
+                f.check_guards(ctx)
+                    .map_err(Failure::App)?;
+                (f.name(), f.site_shell().map(|s| &s.header))
+            }
+            None => ("_app", st.header.as_ref()),
+        };
+        let source = header
+            .and_then(|h| h.node(&call.node))
             .and_then(|n| n.source(&call.key))
             .ok_or(Failure::App(Error::NotFound))?;
         let action = source.action();
@@ -252,7 +259,7 @@ async fn site_data(
         }
         let info = Call {
             kind: CallKind::DataGrid,
-            screen: f.name(),
+            screen: name,
             action: Some(action),
             via_agent: ctx.via_agent(),
         };
@@ -278,7 +285,10 @@ async fn data_call(
         return st.error_response(&ctx, f);
     }
     if let Some(feature) = call.screen.strip_prefix("_site.") {
-        return site_data(&st, &ctx, feature, &call).await;
+        return site_data(&st, &ctx, Some(feature), &call).await;
+    }
+    if call.screen == "_app" {
+        return site_data(&st, &ctx, None, &call).await;
     }
     let result = async {
         let (_, entry, screen) = st

@@ -172,6 +172,7 @@ catalog! {
     "shell" Box {
         toolbox "/ui/toolbox";
         status_bar "/ui/status-bar";
+        app_header "/ui/app-header";
         theme_picker "/ui/theme-picker";
     }
 }
@@ -261,6 +262,7 @@ pub fn app() -> std::result::Result<App, String> {
         .i18n(i18n)
         .csp(|c| c.frame_src(["https://www.openstreetmap.org"]))
         .home(catalog_home)
+        .header(examples::app_header::catalog_header)
         .prefetch(zeyn::Prefetch::Moderate)
         .client_prefs(|p| {
             p.key(examples::tabs::DELIVERY_TAB)

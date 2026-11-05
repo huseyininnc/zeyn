@@ -356,11 +356,50 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; direction: ltr; u
 .z-nav-toggle[aria-expanded="true"] .z-nav-burger::before { top: 0; transform: rotate(45deg); }
 .z-nav-toggle[aria-expanded="true"] .z-nav-burger::after { top: 0; transform: rotate(-45deg); }
 
+/**
+ * The app header of `App::header`: a bar over the screens with the slots of the site header.
+ * On wide screens the side menu spans its row and the screen's.
+ */
+.z-app:has(> .z-app-header) { grid-template-rows: auto 1fr; }
+
+.z-app:has(> .z-app-header) > .z-nav { grid-row: 1 / span 2; }
+
+.z-app-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--z-space) * 2) calc(var(--z-space) * 3);
+  min-height: 52px;
+  padding: calc(var(--z-space) * 2) calc(var(--z-space) * 7);
+  border-bottom: 1px solid var(--z-border);
+  background: var(--z-surface);
+}
+
+.z-app-header-slot,
+.z-app-header-actions { display: flex; align-items: center; gap: calc(var(--z-space) * 2); min-width: 0; }
+
+.z-app-header-slot > .z-node { min-width: 0; }
+
+.z-app-header-slot-center { flex: 1 1 16rem; max-width: 40rem; }
+
+.z-app-header-slot-center > .z-node { flex: 1 1 auto; }
+
+.z-app-header-slot-end { margin-inline-start: auto; }
+
+.z-app-header-slot-bottom { flex-basis: 100%; }
+
 @media (max-width: 800px) {
   .z-app {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto 1fr;
   }
+  .z-app:has(> .z-app-header) { grid-template-rows: auto auto 1fr; }
+  .z-app:has(> .z-app-header) > .z-nav { grid-row: auto; }
+  .z-app-header { position: static; padding: 8px 16px; }
+  .z-app-header-slot-center { order: 10; flex-basis: 100%; max-width: none; }
   .z-nav {
     z-index: 30;
     height: auto;

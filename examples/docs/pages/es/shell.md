@@ -64,6 +64,20 @@ pub fn appearance() -> Screen {
 
 Es el mismo control que el selector del shell: la elección se aplica al momento sin recargar la página, se guarda en la cookie `zeyn_theme` (y en el almacén de vistas para usuarios con sesión), y el otro selector de la página también la muestra. Si la aplicación no ofrece elección (`theme_picker(false)` o un solo tema), no muestra nada.
 
+## La cabecera de la aplicación
+
+`App::header(|h| ...)` pone una barra sobre las pantallas del shell de la aplicación, con las ranuras de la cabecera del sitio: `start`, `center`, `end` y `bottom`. Un cuadro de búsqueda va en el centro y un enlace a las notificaciones al final. `sign_in()`, `language()` y `theme()` también funcionan ahí, aunque el menú lateral ya tiene los selectores.
+
+```rust
+App::new(t!("app.name"))
+    .header(|h| {
+        h.center(SearchBox::of(search_all).results(search_results))
+            .end(LinkButton::new(t!("app.notifications"), notifications, ()))
+    })
+```
+
+La barra queda arriba mientras la pantalla se desplaza, y las pantallas cambian debajo sin recargar la página. En el teléfono se coloca bajo el botón del menú y la ranura central ocupa una fila propia. Los componentes de la barra se muestran para el usuario como los de una pantalla; un cuadro de búsqueda carga sus sugerencias con su acción, cuyo permiso comprueba el servidor. Sin `App::header`, el shell de la aplicación no tiene barra superior.
+
 ## Comandos
 
 Un comando se declara una sola vez en Rust con su etiqueta, su atajo y lo que hace. Registrado en una feature, la paleta lo lista y su atajo funciona en todas las páginas.

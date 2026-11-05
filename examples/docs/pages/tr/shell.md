@@ -64,6 +64,20 @@ pub fn appearance() -> Screen {
 
 Kabuktaki seçiciyle aynı denetimdir: seçim sayfa yenilenmeden hemen uygulanır, `zeyn_theme` çerezinde (oturum açmış kullanıcılar için görünüm deposunda da) tutulur ve sayfadaki diğer seçici de onu gösterir. Uygulama seçim sunmuyorsa (`theme_picker(false)` ya da tek tema) hiçbir şey çizmez.
 
+## Uygulama başlığı
+
+`App::header(|h| ...)` uygulama kabuğundaki ekranların üstüne, site başlığının yuvalarıyla bir çubuk koyar: `start`, `center`, `end` ve `bottom`. Ortaya bir arama kutusu, sona bir bildirim bağlantısı gelir. `sign_in()`, `language()` ve `theme()` burada da çalışır, ama yan menüde seçiciler zaten vardır.
+
+```rust
+App::new(t!("app.name"))
+    .header(|h| {
+        h.center(SearchBox::of(search_all).results(search_results))
+            .end(LinkButton::new(t!("app.notifications"), notifications, ()))
+    })
+```
+
+Ekran kaydırılırken çubuk üstte kalır ve ekranlar sayfa yenilenmeden altında değişir. Telefonda menü düğmesinin altında durur ve orta yuva kendi satırına geçer. Çubuktaki bileşenler bir ekrandakiler gibi kullanıcı için çizilir; bir arama kutusu önerilerini kendi eylemiyle yükler ve sunucu o eylemin iznini denetler. `App::header` olmadan uygulama kabuğunda üst çubuk olmaz.
+
 ## Komutlar
 
 Bir komut, etiketi, kısayolu ve ne yaptığıyla Rust'ta bir kez bildirilir. Bir feature'a kaydedildiğinde palet onu listeler ve kısayolu her sayfada çalışır.

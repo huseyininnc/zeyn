@@ -80,6 +80,7 @@
       "toast": "A short notice after an action.",
       "chart": "Bar, donut, combo and gauge charts.",
       "kpi": "A number with its change and trend.",
+      "app_header": "A bar over the screens of the app shell, with a search box and links.",
       "theme_picker": "The theme choice inside a screen, in step with the menu.",
       "icon": "The icons of buttons, menus and tools.",
       "screen_header": "The title row of a screen: a subtitle and the main actions.",
@@ -192,6 +193,9 @@
       },
       "theme_picker": {
         "overview": "An Appearance section"
+      },
+      "app_header": {
+        "catalog_header": "The header of this catalog"
       },
       "icon": {
         "overview": "Common icons",

@@ -3,6 +3,7 @@
 pub mod action_button;
 pub mod alert;
 pub mod alpha_index;
+pub mod app_header;
 pub mod auto_grid;
 pub mod avatar;
 pub mod badge;

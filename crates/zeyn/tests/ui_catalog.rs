@@ -978,3 +978,75 @@ async fn rich_suggestions_carry_text_subtitle_an_allowed_image_and_the_canonical
     assert_eq!(hits[2]["image"], "/img/15.png");
     assert_eq!(hits[2]["href"], "/goods/15");
 }
+
+fn app_header_app() -> axum::Router {
+    App::new("Test")
+        .auth(|h: &HeaderMap| {
+            let perms = h.get("x-perms")?.to_str().ok()?;
+            Some(Identity::user("u").with_permissions(perms.split(',').map(String::from)))
+        })
+        .header(|h| {
+            h.center(SearchBox::of(search_goods).results(results))
+                .end(LinkButton::new("Good <3>", good_page, GoodParams { id: 3 }))
+                .end(Stack::new().add(Paragraph::new("Nested")))
+        })
+        .feature(
+            Feature::new("store")
+                .screen(store)
+                .screen(results)
+                .screen(good_page),
+        )
+        .router()
+        .unwrap()
+}
+
+#[tokio::test]
+async fn the_app_header_takes_the_site_header_slots_and_checks_data_permissions() {
+    let router = app_header_app();
+    let (status, page) = send(&router, get("/store")).await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert!(page.contains(r#"<div class="z-app" data-zeyn-shell="app">"#));
+    let at = |s: &str| {
+        page.find(s)
+            .unwrap_or_else(|| panic!("{s} missing: {page}"))
+    };
+    assert!(
+        at("</nav>")
+            < at(
+                r#"<header class="z-app-header" data-zeyn-screen="_app" data-zeyn-params="null">"#
+            )
+    );
+    assert!(at(r#"id="z-app-header-slot-center""#) < at(r#"id="z-app-header-slot-end""#));
+    assert!(at(r#"id="z-app-header-slot-end""#) < at(r#"<main class="z-main" id="z-main">"#));
+    assert!(page.contains(r#"data-zeyn-node="1.0"><form class="z-search""#));
+    assert!(page.contains("Good &lt;3&gt;"));
+
+    let ask = |node: &str, perms: &str| {
+        post(
+            "/_zeyn/data",
+            perms,
+            serde_json::json!({ "screen": "_app", "node": node, "key": "suggest", "input": "coffee" }),
+        )
+    };
+    let (status, body) = send(&router, ask("1.0", "shop.read")).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let (status, _) = send(&router, ask("1.0", "")).await;
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "the action's permission counts"
+    );
+    for node in ["1.1", "2.1.0", "4.0", "2.0.0"] {
+        let (status, _) = send(&router, ask(node, "shop.read")).await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "{node}");
+    }
+
+    let plain = App::new("Test")
+        .feature(Feature::new("store").screen(store))
+        .router()
+        .unwrap();
+    let (_, page) = send(&plain, get("/store")).await;
+    assert!(!page.contains("z-app-header"), "no header unless asked for");
+    let (status, _) = send(&plain, ask("1.0", "shop.read")).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
