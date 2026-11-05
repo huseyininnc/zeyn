@@ -21,6 +21,7 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 - `zeyn g feature` (short form `g f`) creates `models/`, `services/`, `actions/` and `screens/`, each with a `mod.rs`, holding a working starter: a model, an in memory data service, a search action and a list screen with its menu entry and texts in every locale file. It registers the feature and its service in `src/app.rs` after the last `.feature(features::...)` line, or prints the two lines when there is none. A feature that does not need a folder deletes it with its `mod` line; `components/` is added by hand when a part of a screen is shared or a screen file grows.
 - The `store.rs` of a feature is now `services/` in the app and library templates; services shared by several features go in `src/services/<name>.rs`.
+- A screen whose `#[params]` fields are all `Option` opens without params (menu links, plain addresses) with every field `None`, instead of answering 404. The accounts screens use plain `#[params]` for this now.
 - Kpis in one `Row` or `AutoGrid` are as tall as the tallest, with or without a trend; a `Row` of four Kpis fills the width and wraps to two, then one per line. Bar, line, area, combo, scatter and funnel charts fill the width of their container instead of stopping at 18rem of height; donuts and gauges keep the 18rem cap and sit centered.
 
 ### Fixed

@@ -39,6 +39,8 @@ pub fn product_editor(params: ProductParams, store: ProductStore) -> Result<Scre
 
 매개변수는 사용되는 모든 곳에서 타입이 있습니다. 편집기가 `ProductParams`를 받으므로 `Window::open(product_editor, 7)`은 컴파일되지 않습니다.
 
+`#[params]` 구조체의 모든 필드가 `Option`이면 화면은 메뉴 링크나 일반 주소에서 매개변수 없이도 열리며, 모든 필드는 `None`이 됩니다. 선택 사항이 아닌 필드는 여전히 값이 필요하며, 값이 없으면 화면은 404로 응답합니다.
+
 `route`가 없는 Screen에는 URL이 없습니다. 링크, 툴바 버튼, 메뉴, 명령에서 창으로 열립니다.
 
 ## 경로의 매개변수

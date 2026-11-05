@@ -39,6 +39,8 @@ pub fn product_editor(params: ProductParams, store: ProductStore) -> Result<Scre
 
 参数在所有使用之处都带有类型：`Window::open(product_editor, 7)` 无法编译，因为编辑器接受的是 `ProductParams`。
 
+当 `#[params]` 结构体的所有字段都是 `Option` 时，屏幕也可以不带参数打开（来自菜单链接或普通地址），所有字段都是 `None`。非可选字段仍然需要值：缺少时屏幕返回 404。
+
 没有 `route` 的 screen 没有 URL。它通过链接、工具栏按钮、菜单或命令以窗口形式打开。
 
 ## 路径中的参数

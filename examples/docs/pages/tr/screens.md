@@ -39,6 +39,8 @@ pub fn product_editor(params: ProductParams, store: ProductStore) -> Result<Scre
 
 Parametreler kullanıldıkları her yerde tiplidir: `Window::open(product_editor, 7)` derlenmez, çünkü editör `ProductParams` alır.
 
+Bir `#[params]` yapısının bütün alanları `Option` olduğunda ekran parametresiz de açılır (bir menü bağlantısından ya da düz bir adresten); bütün alanlar `None` olur. İsteğe bağlı olmayan bir alanın değeri yine gerekir: değer yoksa ekran 404 döner.
+
 `route` olmayan bir screen'in URL'si yoktur. Bir bağlantıdan, araç çubuğu düğmesinden, menüden ya da komuttan pencere olarak açılır.
 
 ## Yolda parametreler

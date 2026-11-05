@@ -39,6 +39,8 @@ pub fn product_editor(params: ProductParams, store: ProductStore) -> Result<Scre
 
 Params हर उस जगह टाइप्ड हैं जहाँ वे इस्तेमाल होते हैं: `Window::open(product_editor, 7)` कंपाइल नहीं होता, क्योंकि एडिटर `ProductParams` लेता है।
 
+जब किसी `#[params]` struct के सभी फ़ील्ड `Option` हों, तो स्क्रीन बिना params के भी खुलती है, मेनू लिंक या सादे पते से, और हर फ़ील्ड `None` होता है। जो फ़ील्ड वैकल्पिक नहीं है उसे अब भी अपना मान चाहिए: उसके बिना स्क्रीन 404 लौटाती है।
+
 बिना `route` वाली Screen का कोई URL नहीं होता। वह लिंक, टूलबार बटन, मेनू या कमांड से Window के रूप में खुलती है।
 
 ## पथ में Params

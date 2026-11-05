@@ -39,6 +39,8 @@ pub fn product_editor(params: ProductParams, store: ProductStore) -> Result<Scre
 
 Los params están tipados en todos los sitios donde se usan: `Window::open(product_editor, 7)` no compila, porque el editor recibe `ProductParams`.
 
+Cuando todos los campos de una estructura `#[params]` son `Option`, la pantalla también se abre sin parámetros, desde un enlace del menú o una dirección simple, con todos los campos en `None`. Un campo que no es opcional sigue necesitando su valor: sin él, la pantalla responde 404.
+
 Una pantalla sin `route` no tiene URL. Se abre como ventana desde un enlace, un botón de la barra de herramientas, un menú o un comando.
 
 ## Params in the path

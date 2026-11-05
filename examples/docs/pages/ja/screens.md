@@ -39,6 +39,8 @@ pub fn product_editor(params: ProductParams, store: ProductStore) -> Result<Scre
 
 パラメータは、使われるあらゆる場所で型が付きます。`Window::open(product_editor, 7)` はコンパイルできません。エディタは `ProductParams` を受け取るからです。
 
+`#[params]` 構造体のすべてのフィールドが `Option` なら、画面はメニューのリンクや単純なアドレスからパラメーターなしでも開き、すべてのフィールドが `None` になります。省略できないフィールドには引き続き値が必要で、ない場合は 404 を返します。
+
 `route` のない画面には URL がありません。リンク、ツールバーのボタン、メニュー、コマンドからウィンドウとして開きます。
 
 ## パス内のパラメータ

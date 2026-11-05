@@ -139,9 +139,23 @@ impl ScreenEntry {
 }
 
 fn build_erased<S: ScreenDef>(ctx: Ctx, params: serde_json::Value) -> BoxFuture<Result<Screen>> {
-    match serde_json::from_value::<S::Params>(params) {
-        Ok(p) => S::build(ctx, p),
-        Err(_) => Box::pin(async { Err(Error::NotFound) }),
+    match read_params::<S::Params>(params) {
+        Some(p) => S::build(ctx, p),
+        None => Box::pin(async { Err(Error::NotFound) }),
+    }
+}
+
+/// Reads screen params. A screen opened without any (a menu link, a plain address) gets `null`;
+/// when its params do not read from `null`, they are read from `{}`, so a `#[params]` struct
+/// whose fields are all `Option` opens with every field `None`.
+pub fn read_params<P: serde::de::DeserializeOwned>(params: serde_json::Value) -> Option<P> {
+    let none = params.is_null();
+    match serde_json::from_value(params) {
+        Ok(p) => Some(p),
+        Err(_) if none => {
+            serde_json::from_value(serde_json::Value::Object(Default::default())).ok()
+        }
+        Err(_) => None,
     }
 }
 

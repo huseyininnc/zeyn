@@ -39,6 +39,8 @@ pub fn product_editor(params: ProductParams, store: ProductStore) -> Result<Scre
 
 Params are typed everywhere they are used: `Window::open(product_editor, 7)` does not compile, because the editor takes `ProductParams`.
 
+When every field of a `#[params]` struct is an `Option`, the screen also opens without params, from a menu link or a plain address, with every field `None`. A field that is not optional still needs its value: without it the screen answers 404.
+
 A screen without `route` has no URL. It opens as a window from a link, a toolbar button, a menu or a command.
 
 ## Params in the path

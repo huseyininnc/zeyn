@@ -239,6 +239,8 @@ pub use xlsx::{MAX_XLSX_BYTES, XlsxReadError, XlsxSheet};
 pub use zeyn_macros::{action, choice, entity, model, params, screen, t};
 
 #[doc(hidden)]
+pub use feature::read_params as __read_params;
+#[doc(hidden)]
 pub use serde as __serde;
 #[doc(hidden)]
 pub use serde_json as __serde_json;
