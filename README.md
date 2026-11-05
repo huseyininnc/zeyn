@@ -4,7 +4,7 @@
 
 Zeyn is an open source Rust web framework for data heavy applications: grids, forms and workflows. AI agents write the application code. People read it, review it and change it when they need to.
 
-Status: alpha, on crates.io as 0.0.7. APIs still change between versions. Everything below compiles and is tested.
+Status: alpha, on crates.io as 0.0.8. APIs still change between versions. Everything below compiles and is tested.
 
 ## Start a project
 
