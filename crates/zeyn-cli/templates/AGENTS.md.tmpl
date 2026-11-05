@@ -55,6 +55,13 @@ tests/                   tests that drive the app through its router
 11. Write code top to bottom. Once a chain of calls is longer than about 40 characters, put one call
    on each line, so a line holds one or two dots on average. `cargo fmt` does this with
    `chain_width = 40` in `rustfmt.toml`; do not raise it.
+12. Keep files and functions small: one component, screen or group of related actions per
+   file. A source file holds at most 300 non blank lines (`tests/structure.rs` checks it) and a
+   function at most 60 lines (clippy `too_many_lines`). When `screens.rs` or `actions.rs` grows,
+   turn it into a folder (`screens/mod.rs` plus one file per screen) and move large parts of a
+   screen, such as a toolbar, a form or a panel, into their own functions in their own files.
+   The limits live in `Cargo.toml` (`[package.metadata.zeyn] max_file_lines`) and `clippy.toml`
+   (`too-many-lines-threshold`); raise them only when the owner agrees.
 
 ## Before you finish
 

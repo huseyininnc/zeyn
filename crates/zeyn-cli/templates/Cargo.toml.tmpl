@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2024"
 publish = false
 
+[package.metadata.zeyn]
+max_file_lines = 300
+
 [dependencies]
 {{zeyn_dep}}
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
@@ -29,6 +32,7 @@ clone_on_ref_ptr = "warn"
 large_futures = "warn"
 needless_collect = "warn"
 redundant_clone = "warn"
+too_many_lines = "deny"
 
 [profile.release]
 lto = "thin"

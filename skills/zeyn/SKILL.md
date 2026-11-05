@@ -97,7 +97,14 @@ These hold in every Zeyn app. `zeyn check` and the compiler enforce many of them
     ```
 
     `cargo fmt` keeps this shape with `chain_width = 40` in `rustfmt.toml`; do not raise it.
-13. **Every change is tested and checked** before you finish (section 5).
+13. **Small files, small functions.** One component, screen or group of related actions per file.
+    A source file holds at most 300 non blank lines (`tests/structure.rs` checks it) and a
+    function at most 60 lines (clippy `too_many_lines`). When `screens.rs` or `actions.rs` grows,
+    turn it into a folder (`screens/mod.rs` plus one file per screen) and move large parts of a
+    screen (a toolbar, a form, a panel) into their own functions in their own files. The limits
+    live in `Cargo.toml` (`[package.metadata.zeyn] max_file_lines`) and `clippy.toml`
+    (`too-many-lines-threshold`); raise them only when the owner agrees.
+14. **Every change is tested and checked** before you finish (section 5).
 
 ## 3. The language in short
 
