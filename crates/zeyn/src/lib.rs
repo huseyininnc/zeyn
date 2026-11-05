@@ -213,7 +213,7 @@ pub use server::realtime;
 pub use server::{
     ApiDocs, App, AuditEntry, AuditLog, AuditSink, Authenticator, BasicCredentials, Call, CallKind,
     CallOutcome, DevAuth, ForwardAuth, HeaderTenant, Interceptor, Mcp, MemoryAudit, Plugin,
-    READY_CACHE, StaticCredentials, StderrAudit, SubdomainTenant, TenantResolver, Theme,
+    Prefetch, READY_CACHE, StaticCredentials, StderrAudit, SubdomainTenant, TenantResolver, Theme,
     TimePolicy, probe,
 };
 pub use site::{

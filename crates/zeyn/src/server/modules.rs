@@ -42,7 +42,38 @@ pub(super) fn routes(mut router: Router<Arc<AppState>>) -> Router<Arc<AppState>>
             get(move || async move { asset(body, "text/javascript; charset=utf-8") }),
         );
     }
-    router.route("/_zeyn/prefs", get(prefs))
+    router
+        .route("/_zeyn/prefs", get(prefs))
+        .route("/_zeyn/speculation.json", get(speculation))
+}
+
+/// The Speculation Rules of `App::prefetch`: prefetch (never prerender) links to the app's own
+/// path routed screens with moderate eagerness. Empty when prefetching is off.
+async fn speculation(State(st): State<Arc<AppState>>) -> Response {
+    let base = st.prefix.trim_end_matches('/');
+    let rules = if st.prefetch == super::Prefetch::Moderate {
+        serde_json::json!({ "prefetch": [{
+            "source": "document",
+            "where": { "and": [
+                { "href_matches": format!("{base}/*") },
+                { "not": { "href_matches": format!("{base}/_zeyn/*") } },
+                { "not": { "href_matches": format!("{base}/api/*") } },
+                { "not": { "href_matches": "/*.*" } },
+                { "not": { "selector_matches": "[data-zeyn-reload], [download], [target], [data-zeyn-no-prefetch], [data-zeyn-nav] a" } },
+            ] },
+            "eagerness": "moderate",
+        }] })
+    } else {
+        serde_json::json!({})
+    };
+    let mut r = axum::Json(rules).into_response();
+    let h = r.headers_mut();
+    h.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/speculationrules+json"),
+    );
+    h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
+    r
 }
 
 /// Whether the user consented to keeping preference values beyond the session, by the app's

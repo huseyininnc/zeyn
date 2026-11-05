@@ -72,7 +72,7 @@ async function visit(url, push) {
   main.setAttribute('aria-busy', 'true');
   let res;
   try {
-    res = await fetch(url.href, {
+    res = (await takePrefetched(url)) ?? await fetch(url.href, {
       headers: { 'x-zeyn-partial': '1' },
       credentials: 'same-origin',
       signal: controller.signal,
@@ -296,3 +296,109 @@ document.addEventListener('keydown', (e) => {
 
 document.addEventListener('zeyn:content', initAppMenu);
 initAppMenu();
+
+/*
+ * Prefetch (`App::prefetch`). Links open through `visit`, which loads the partial screen, so this
+ * script prefetches that partial screen in every browser and marks the page with
+ * `data-zeyn-nav`, which the Speculation Rules of the `Speculation-Rules` header leave out; they
+ * only act when this script is missing and links load whole pages. The partial
+ * screen of a link is fetched after 100 ms of hover, on keyboard focus or on touch, kept for 10
+ * seconds and used by `visit`. At most two fetches run at once; leaving the link first cancels
+ * its fetch. Nothing is fetched with Save-Data, `prefers-reduced-data`, a 2g connection or a
+ * hidden tab.
+ */
+
+document.documentElement.setAttribute('data-zeyn-nav', '');
+
+const PREFETCH_MS = 10000;
+const HOVER_MS = 100;
+const MAX_PREFETCH = 2;
+
+/** @type {Map<string, {at: number, done: boolean, controller: AbortController, res: Promise<Response | null>}>} */
+const prefetched = new Map();
+let hoverTimer = null;
+
+/** Whether this page prefetches through the script. */
+function prefetchOn() {
+  if (document.querySelector('meta[name="zeyn-prefetch"]')?.content !== 'moderate') return false;
+  const c = navigator.connection;
+  if (c?.saveData || /2g/.test(c?.effectiveType ?? '')) return false;
+  if (matchMedia('(prefers-reduced-data: reduce)').matches) return false;
+  return document.visibilityState === 'visible';
+}
+
+/** The address a link would prefetch, without its hash, or `null` when it must not. */
+function prefetchUrl(a) {
+  if (!a || a.target || a.hasAttribute('download') || a.hasAttribute('data-zeyn-reload') || a.closest('[data-zeyn-no-prefetch]')) return null;
+  const url = new URL(a.href, location.href);
+  const local = url.pathname.slice(BASE.length) || '/';
+  if (!isScreenUrl(url) || local.startsWith('/_zeyn/')) return null;
+  url.hash = '';
+  if (url.pathname === location.pathname && url.search === location.search) return null;
+  return url;
+}
+
+/** Fetches the partial screen of `url` ahead, unless it is kept or two fetches already run. */
+function prefetch(url) {
+  const now = Date.now();
+  for (const [key, e] of prefetched) if (now - e.at > PREFETCH_MS) prefetched.delete(key);
+  if (prefetched.has(url.href) || [...prefetched.values()].filter((e) => !e.done).length >= MAX_PREFETCH) return;
+  const controller = new AbortController();
+  const entry = { at: now, done: false, controller, res: null };
+  entry.res = fetch(url.href, {
+    headers: { 'x-zeyn-partial': '1', 'x-zeyn-prefetch': '1' },
+    credentials: 'same-origin',
+    signal: controller.signal,
+  })
+    .then((r) => (r.ok && r.headers.get('x-zeyn-partial') === '1' ? r : null))
+    .catch(() => null)
+    .finally(() => (entry.done = true));
+  prefetched.set(url.href, entry);
+}
+
+/** The kept response for `url`, used once; `null` when there is none or it is too old. */
+function takePrefetched(url) {
+  const key = new URL(url.href);
+  key.hash = '';
+  const entry = prefetched.get(key.href);
+  if (!entry) return null;
+  prefetched.delete(key.href);
+  return Date.now() - entry.at > PREFETCH_MS ? null : entry.res;
+}
+
+/** The link under an event's target. */
+function linkOf(e) {
+  return e.target instanceof Element ? e.target.closest('a[href]') : null;
+}
+
+document.addEventListener('pointerover', (e) => {
+  if (e.pointerType === 'touch' || !prefetchOn()) return;
+  const url = prefetchUrl(linkOf(e));
+  if (!url) return;
+  clearTimeout(hoverTimer);
+  hoverTimer = setTimeout(() => prefetch(url), HOVER_MS);
+});
+
+document.addEventListener('pointerout', (e) => {
+  const a = linkOf(e);
+  if (!a || a.contains(e.relatedTarget)) return;
+  clearTimeout(hoverTimer);
+  const url = prefetchUrl(a);
+  const entry = url && prefetched.get(url.href);
+  if (entry && !entry.done) {
+    entry.controller.abort();
+    prefetched.delete(url.href);
+  }
+});
+
+document.addEventListener('pointerdown', (e) => {
+  if (e.pointerType !== 'touch' || !prefetchOn()) return;
+  const url = prefetchUrl(linkOf(e));
+  if (url) prefetch(url);
+});
+
+document.addEventListener('focusin', (e) => {
+  if (!prefetchOn()) return;
+  const url = prefetchUrl(linkOf(e));
+  if (url) prefetch(url);
+});

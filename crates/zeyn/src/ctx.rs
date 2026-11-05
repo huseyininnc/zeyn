@@ -187,6 +187,7 @@ struct CtxInner {
     theme: Option<Arc<str>>,
     reauth_within: std::time::Duration,
     csp: Option<Arc<crate::csp::Csp>>,
+    prefetch: bool,
 }
 
 /// How recent a sign in counts as recent unless the app sets another age.
@@ -219,6 +220,7 @@ impl Ctx {
             theme: None,
             reauth_within: REAUTH_WITHIN,
             csp: None,
+            prefetch: false,
         }))
     }
 
@@ -251,6 +253,7 @@ impl Ctx {
             theme: Some(theme),
             reauth_within,
             csp: Some(csp),
+            prefetch: false,
         }))
     }
 
@@ -264,6 +267,18 @@ impl Ctx {
             .identity
             .authenticated_at
             .is_some_and(|at| at.unix_ms() <= now && now - at.unix_ms() < limit)
+    }
+
+    /// Whether the browser asked for the page ahead of a click (`Sec-Purpose: prefetch`, or the
+    /// fallback of `nav.js`), see `App::prefetch`. The user may never see the page, so skip
+    /// counting views and other side effects when it is true.
+    pub fn is_prefetch(&self) -> bool {
+        self.0.prefetch
+    }
+
+    /// Same context marked as a prefetch.
+    pub(crate) fn as_prefetch(&self) -> Self {
+        self.rebuild(|i| i.prefetch = true)
     }
 
     /// Same context in another time zone.
@@ -319,6 +334,7 @@ impl Ctx {
             theme: i.theme.clone(),
             reauth_within: i.reauth_within,
             csp: i.csp.clone(),
+            prefetch: i.prefetch,
         };
         change(&mut inner);
         Ctx(Arc::new(inner))

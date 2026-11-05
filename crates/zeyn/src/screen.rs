@@ -36,6 +36,9 @@ pub struct ScreenMeta {
     /// Seconds a shared cache may keep the page of a public screen opened without a session
     /// (`cache = N`, at most [`MAX_SCREEN_CACHE`]); 0 sends no public cache headers.
     pub cache: u32,
+    /// `no_prefetch`: the browser never loads the screen ahead of a click (`App::prefetch`); the
+    /// server refuses such requests before the screen runs.
+    pub no_prefetch: bool,
 }
 
 /// Longest `cache = N` a screen may ask for: one day.
