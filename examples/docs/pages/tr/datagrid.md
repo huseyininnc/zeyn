@@ -63,6 +63,9 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 | `.link(\|row\| effect)` | Hücreyi, bir effect çalıştıran bağlantı yapar |
 | `.pin_start()`, `.hidden()` | Başa sabitlenir ya da kullanıcı gösterene kadar gizlenir |
 | `.editable()` | Yerinde düzenlenebilir, `.edit_with(action)` ile kaydedilir |
+| `.plain()` | Tam sayıları grup ayırıcısı olmadan gösterir; kodlar ve yıllar için |
+
+Sayılar ve para tutarları sağa hizalanır ve sabit genişlikli rakamlarla yazılır. Tam sayılar kullanıcının yerel ayarına göre gruplanır (İngilizcede `1,234,567`, Türkçede `1.234.567`); bu, grid hücrelerinde ve `DescriptionList` gibi görüntüleme değerlerinde geçerlidir. `#[key]` kimlikleri hiç gruplanmaz, `.plain()` ise tek bir sütunda gruplamayı kapatır.
 
 ## Satırlar
 

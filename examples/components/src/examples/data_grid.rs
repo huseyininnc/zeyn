@@ -1,6 +1,9 @@
 //! DataGrid examples: rows of an action with paging, sorting and filters.
 
-use crate::data::{Kind, Product, pretend_delete, pretend_delete_all, search_products};
+use crate::data::{
+    Kind, Product, Warehouse, pretend_delete, pretend_delete_all, search_products,
+    search_warehouses,
+};
 use crate::{Entry, ex};
 use zeyn::prelude::*;
 
@@ -44,11 +47,26 @@ pub fn confirm_actions(_ctx: &Ctx) -> Node {
         .into()
 }
 
+pub fn numbers(_ctx: &Ctx) -> Node {
+    DataGrid::of(search_warehouses)
+        .column(Warehouse::city)
+        .flex(1)
+        .column(Warehouse::units)
+        .width(140)
+        .sum()
+        .column(Warehouse::tons)
+        .width(120)
+        .column(Warehouse::opened)
+        .width(110)
+        .plain()
+        .into()
+}
+
 /// What the catalog shows of `DataGrid`.
 pub const ENTRY: Entry = Entry {
     name: "DataGrid",
     docs: "language/datagrid",
     api: &["DataGrid", "DataGridColumn", "Paging"],
     overview: &[ex!(overview)],
-    examples: &[ex!(confirm_actions)],
+    examples: &[ex!(confirm_actions), ex!(numbers)],
 };

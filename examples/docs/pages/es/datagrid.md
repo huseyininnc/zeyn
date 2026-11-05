@@ -63,6 +63,9 @@ El servidor limita el tamaño de página pida lo que pida el cliente.
 | `.link(\|row\| effect)` | Convierte la celda en un enlace que ejecuta un effect |
 | `.pin_start()`, `.hidden()` | Fijada al inicio, u oculta hasta que el usuario la muestre |
 | `.editable()` | Editable en el sitio, se guarda con `.edit_with(action)` |
+| `.plain()` | Números enteros sin separadores de miles, para códigos y años |
+
+Los números y los importes se alinean a la derecha con cifras tabulares. Los enteros se agrupan según la configuración regional del usuario (`1,234,567` en inglés, `1.234.567` en turco), en las celdas de la tabla y en valores mostrados como `DescriptionList`; los identificadores `#[key]` nunca se agrupan, y `.plain()` desactiva la agrupación en una columna.
 
 ## Filas
 

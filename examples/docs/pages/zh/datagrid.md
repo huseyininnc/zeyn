@@ -63,6 +63,9 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 | `.link(\|row\| effect)` | 使单元格成为运行某个 effect 的链接 |
 | `.pin_start()`、`.hidden()` | 固定在起始侧，或隐藏直到用户将其显示 |
 | `.editable()` | 可就地编辑，通过 `.edit_with(action)` 保存 |
+| `.plain()` | 整数不带分组分隔符，用于编码和年份 |
+
+数字和金额右对齐，并使用等宽数字。整数按用户的区域设置分组（英语为 `1,234,567`，土耳其语为 `1.234.567`），适用于表格单元格以及 `DescriptionList` 等显示值；`#[key]` 标识从不分组，`.plain()` 可为单个列关闭分组。
 
 ## 行
 

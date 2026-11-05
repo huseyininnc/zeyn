@@ -7,6 +7,38 @@ pub fn escape(s: &str) -> String {
     out
 }
 
+/// Appends a whole number with the locale's group separator (`1,234,567` in `en`, `1.234.567`
+/// in `tr`), without a new string, for grid cells and display values.
+///
+/// ```
+/// let mut out = String::new();
+/// zeyn::render::push_grouped(&mut out, -1_234_567, "tr");
+/// assert_eq!(out, "-1.234.567");
+/// ```
+pub fn push_grouped(out: &mut String, n: i64, locale: &str) {
+    let group = crate::i18n::NumberFormat::for_locale(locale).group;
+    let mut digits = [0u8; 20];
+    let mut len = 0;
+    let mut v = n.unsigned_abs();
+    loop {
+        digits[len] = b'0' + (v % 10) as u8;
+        len += 1;
+        v /= 10;
+        if v == 0 {
+            break;
+        }
+    }
+    if n < 0 {
+        out.push('-');
+    }
+    for i in (0..len).rev() {
+        out.push(digits[i] as char);
+        if i > 0 && i % 3 == 0 {
+            out.push(group);
+        }
+    }
+}
+
 /// Appends `s` to `out` escaped for HTML, as [`escape`] does, without a new string: runs without
 /// a character to escape are copied in one piece.
 pub fn escape_into(out: &mut String, s: &str) {
@@ -164,6 +196,9 @@ impl<'a> Render<'a> {
                     .i18n
                     .text(self.locale, &Text::key("zeyn.no")),
             ),
+            (Value::Int(n), FieldKind::Integer | FieldKind::Money | FieldKind::Decimal) => {
+                push_grouped(out, *n, self.locale)
+            }
             (Value::Int(n), _) => {
                 let _ = write!(out, "{n}");
             }

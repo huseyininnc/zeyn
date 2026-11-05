@@ -63,6 +63,9 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 | `.link(\|row\| effect)` | セルを、エフェクトを実行するリンクにします |
 | `.pin_start()`, `.hidden()` | 先頭に固定する、またはユーザーが表示するまで非表示にします |
 | `.editable()` | その場で編集でき、`.edit_with(action)` で保存されます |
+| `.plain()` | 整数を桁区切りなしで表示します。コードや年に |
+
+数値と金額は右寄せで、等幅の数字で表示されます。整数はグリッドのセルや `DescriptionList` などの表示値で、ユーザーのロケールに従って桁区切りされます（英語は `1,234,567`、トルコ語は `1.234.567`）。`#[key]` の ID は区切らず、`.plain()` で 1 列だけ区切りをやめられます。
 
 ## 行
 

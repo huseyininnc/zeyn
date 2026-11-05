@@ -2384,3 +2384,49 @@ fn row_and_bulk_actions_can_ask_for_a_confirmation_and_look_destructive() {
         "the dialog texts come with the grid"
     );
 }
+
+#[test]
+fn whole_numbers_are_grouped_by_locale_right_aligned_and_plain_on_request() {
+    let mut row = Store::seeded().0.read().unwrap()[0].clone();
+    row.id = ItemId(1_000_002);
+    row.qty = -1_234_567;
+    let by_locale = DataGrid::of(search)
+        .column(Item::id)
+        .column(Item::qty);
+    let en = by_locale
+        .done()
+        .rows_html(std::slice::from_ref(&row));
+    assert!(
+        en.contains(r#"<td class="z-num">1000002</td>"#),
+        "keys stay plain: {en}"
+    );
+    assert!(en.contains(r#"<td class="z-num">-1,234,567</td>"#), "{en}");
+    let i18n = I18n::builtin();
+    let mut tr = String::new();
+    zeyn::Render::new("s", "tr", i18n).value_into(
+        &mut tr,
+        &Value::Int(1_234_567),
+        &zeyn::FieldKind::Integer,
+    );
+    assert_eq!(tr, "1.234.567");
+    let mut fr = String::new();
+    zeyn::Render::new("s", "fr", i18n).value_into(
+        &mut fr,
+        &Value::Int(12_345),
+        &zeyn::FieldKind::Integer,
+    );
+    assert_eq!(fr, "12\u{202f}345");
+    let plain = DataGrid::of(search)
+        .column(Item::qty)
+        .plain()
+        .done()
+        .rows_html(std::slice::from_ref(&row));
+    assert!(
+        plain.contains(r#"<td class="z-num">-1234567</td>"#),
+        "{plain}"
+    );
+    let mut small = String::new();
+    zeyn::render::push_grouped(&mut small, 999, "en");
+    zeyn::render::push_grouped(&mut small, i64::MIN, "en");
+    assert_eq!(small, "999-9,223,372,036,854,775,808");
+}

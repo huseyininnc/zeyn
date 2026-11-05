@@ -15,12 +15,14 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 - `zeyn check` warns about a `#[screen]` or `#[action]` that no feature registers and about a flat `screens.rs` or `actions.rs` with several items in more than about 150 lines.
 - `Kpi::money(title, Money)`: the value and the target with the currency in the user's locale.
 - Confirmation for destructive grid and workflow actions: `.confirm(message)` and `.tone(Tone::Danger)` after `DataGrid::row_action` or `bulk_action`, and `Transitions::confirm(name, message)` with `Transitions::tone(name, Tone::Danger)`, in the dialog `ActionButton::confirm` uses.
+- `DataGridColumn::plain()` shows whole numbers without group separators, for codes and years.
 - Screen header: `Screen::subtitle(text)` and `Screen::primary(|t| ...)` put a subtitle under the title and the main actions at the end of the title row, wrapping under the title on phones.
 
 ### Changed
 
 - `zeyn g feature` (short form `g f`) creates `models/`, `services/`, `actions/` and `screens/`, each with a `mod.rs`, holding a working starter: a model, an in memory data service, a search action and a list screen with its menu entry and texts in every locale file. It registers the feature and its service in `src/app.rs` after the last `.feature(features::...)` line, or prints the two lines when there is none. A feature that does not need a folder deletes it with its `mod` line; `components/` is added by hand when a part of a screen is shared or a screen file grows.
 - The `store.rs` of a feature is now `services/` in the app and library templates; services shared by several features go in `src/services/<name>.rs`.
+- Whole numbers are grouped by the user's locale in grid cells and display values (`1,234,567`, `1.234.567` in Turkish); entity ids stay plain. Decimal cells are right aligned like whole numbers and money.
 - A screen whose `#[params]` fields are all `Option` opens without params (menu links, plain addresses) with every field `None`, instead of answering 404. The accounts screens use plain `#[params]` for this now.
 - Kpis in one `Row` or `AutoGrid` are as tall as the tallest, with or without a trend; a `Row` of four Kpis fills the width and wraps to two, then one per line. Bar, line, area, combo, scatter and funnel charts fill the width of their container instead of stopping at 18rem of height; donuts and gauges keep the 18rem cap and sit centered.
 

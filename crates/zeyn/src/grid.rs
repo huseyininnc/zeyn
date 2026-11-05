@@ -442,6 +442,8 @@ struct Column<E> {
     hidden: bool,
     cell: Option<CellFn<E>>,
     editable: bool,
+    /// Whole numbers shown without group separators, for codes and years.
+    plain: bool,
 }
 
 /// Data grid. Its data source is an action that takes a `DataQuery` and returns `Page<E>`.
@@ -892,6 +894,7 @@ impl<E: Model> DataGrid<E> {
                 hidden: false,
                 cell: None,
                 editable: false,
+                plain: false,
             });
         }
         grid
@@ -922,6 +925,7 @@ impl<E: Model> DataGrid<E> {
             hidden: false,
             cell: None,
             editable: false,
+            plain: false,
         });
         DataGridColumn {
             grid: self,
@@ -1466,7 +1470,10 @@ impl<E: Model> DataGrid<E> {
             for (n, s) in cols.iter().enumerate() {
                 let c = &self.columns[s.index];
                 let value = (c.value)(row);
-                let num = matches!(value, Value::Int(_) | Value::Money(_));
+                let num = matches!(
+                    value,
+                    Value::Int(_) | Value::Money(_) | Value::Decimal(_) | Value::Number(_)
+                );
                 let first = tree && n == 0;
                 out.push_str(match (num, first) {
                     (true, true) => r#"<td class="z-num z-tree-cell""#,
@@ -1490,7 +1497,12 @@ impl<E: Model> DataGrid<E> {
                 match (c.meta.mask, &c.cell) {
                     (Some(_), _) => out.push_str(&crate::privacy::cell(r, c.meta, &value, row)),
                     (None, Some(cell)) => out.push_str(&cell(row, r)),
-                    (None, None) => r.value_into(&mut out, &value, &c.meta.kind),
+                    (None, None) => match value {
+                        Value::Int(n) if c.plain => {
+                            let _ = write!(out, "{n}");
+                        }
+                        _ => r.value_into(&mut out, &value, &c.meta.kind),
+                    },
                 }
                 if first {
                     out.push_str("</span></span>");
@@ -2458,13 +2470,9 @@ impl<E: Model> From<DataGrid<E>> for Node {
 
 /// Whole number with the locale's group separator: `4.680` in `tr`, `4,680` in `en`.
 fn grouped(n: i64, locale: &str) -> String {
-    match n.checked_mul(100) {
-        Some(h) => {
-            let text = Money::new(h, Default::default()).format_plain(locale);
-            text[..text.len() - 3].to_string()
-        }
-        None => n.to_string(),
-    }
+    let mut out = String::new();
+    crate::render::push_grouped(&mut out, n, locale);
+    out
 }
 
 /// Most sort keys one query may carry.

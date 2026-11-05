@@ -146,7 +146,8 @@
       },
       "data_grid": {
         "overview": "Example",
-        "confirm_actions": "Row and bulk actions that ask first"
+        "confirm_actions": "Row and bulk actions that ask first",
+        "numbers": "Numbers grouped by locale, a plain year"
       },
       "date_pickers": {
         "overview": "Example"

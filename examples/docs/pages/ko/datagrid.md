@@ -63,6 +63,9 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 | `.link(\|row\| effect)` | 셀을 effect를 실행하는 링크로 만듭니다 |
 | `.pin_start()`, `.hidden()` | 시작 쪽에 고정하거나, 사용자가 표시할 때까지 숨깁니다 |
 | `.editable()` | 그 자리에서 편집할 수 있으며 `.edit_with(action)`으로 저장됩니다 |
+| `.plain()` | 정수를 자릿수 구분 기호 없이 표시합니다. 코드와 연도용 |
+
+숫자와 금액은 오른쪽 정렬되고 고정폭 숫자로 표시됩니다. 정수는 그리드 셀과 `DescriptionList` 같은 표시 값에서 사용자 로캘에 따라 묶어 표시됩니다(영어 `1,234,567`, 터키어 `1.234.567`). `#[key]` id는 묶지 않으며, `.plain()`은 한 열의 묶음 표시를 끕니다.
 
 ## 행
 

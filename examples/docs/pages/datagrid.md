@@ -64,6 +64,9 @@ The server caps the page size whatever the client asks for.
 | `.link(\|row\| effect)` | Makes the cell a link that runs an effect |
 | `.pin_start()`, `.hidden()` | Pinned to the start, or hidden until the user shows it |
 | `.editable()` | Editable in place, saved with `.edit_with(action)` |
+| `.plain()` | Whole numbers without group separators, for codes and years |
+
+Numbers and money are right aligned with tabular digits. Whole numbers are grouped by the user's locale (`1,234,567` in English, `1.234.567` in Turkish), in grid cells and in display values such as `DescriptionList`; `#[key]` ids are never grouped, and `.plain()` turns grouping off for one column.
 
 ## Rows
 
