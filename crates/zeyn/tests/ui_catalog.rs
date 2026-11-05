@@ -7,7 +7,7 @@ use axum::http::{HeaderMap, Request, StatusCode, header};
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 use zeyn::prelude::*;
-use zeyn::{I18n, Identity, MAX_SEARCH_QUERY, PageRequest};
+use zeyn::{CenterOnPhone, I18n, Identity, MAX_SEARCH_QUERY, PageRequest};
 
 #[entity(table = "goods")]
 pub struct Good {
@@ -672,4 +672,113 @@ async fn lists_render_rows_as_single_links_and_page_through_the_grid_endpoint() 
         StatusCode::FORBIDDEN,
         "reading needs the action's permission"
     );
+}
+
+#[screen(route = "/store", public)]
+pub fn store() -> Screen {
+    Screen::new("Store")
+}
+
+fn header_app(icon: bool) -> axum::Router {
+    let place = if icon {
+        CenterOnPhone::Icon
+    } else {
+        CenterOnPhone::Row
+    };
+    App::new("Test")
+        .auth(|h: &HeaderMap| {
+            let perms = h.get("x-perms")?.to_str().ok()?;
+            Some(Identity::user("u").with_permissions(perms.split(',').map(String::from)))
+        })
+        .feature(
+            Feature::new("store")
+                .screen(store)
+                .screen(results)
+                .screen(good_page)
+                .shell(Shell::site().header(|h| {
+                    h.start(Paragraph::new("Hi <there>"))
+                        .center(SearchBox::of(search_goods).results(results))
+                        .center(Paragraph::new("Second"))
+                        .center_on_phone(place)
+                        .end(LinkButton::new("Good", good_page, GoodParams { id: 3 }))
+                        .bottom(Chips::links("Topics").link(
+                            "Results",
+                            results,
+                            SearchParams::default(),
+                        ))
+                        .theme()
+                })),
+        )
+        .router()
+        .unwrap()
+}
+
+#[tokio::test]
+async fn header_slots_take_any_component_and_a_search_box_suggests_from_there() {
+    let router = header_app(false);
+    let (status, page) = send(&router, get("/store")).await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert!(
+        page.contains(
+            r#"data-zeyn-screen="_site.store" data-zeyn-params="null" data-center-phone="row""#
+        ),
+        "{page}"
+    );
+    let at = |s: &str| {
+        page.find(s)
+            .unwrap_or_else(|| panic!("{s} missing: {page}"))
+    };
+    assert!(at(r#"class="z-site-slot z-site-slot-start""#) < at(r#"class="z-site-brand""#));
+    assert!(at(r#"class="z-site-brand""#) < at(r#"<nav class="z-site-nav""#));
+    assert!(at(r#"<nav class="z-site-nav""#) < at(r#"id="z-site-slot-center""#));
+    assert!(at(r#"id="z-site-slot-center""#) < at(r#"id="z-site-slot-end""#));
+    assert!(at(r#"id="z-site-slot-end""#) < at(r#"id="z-site-actions""#));
+    assert!(at(r#"id="z-site-actions""#) < at(r#"id="z-site-slot-bottom""#));
+    assert!(page.contains("Hi &lt;there&gt;"));
+    assert!(page.contains(r#"data-zeyn-node="1.0"><form class="z-search""#));
+    assert!(page.contains(r#"data-zeyn-node="1.1""#));
+    assert!(
+        page.contains(r#"href="/goods/3""#),
+        "links in slots use path routes"
+    );
+    assert!(page.contains(r#"aria-controls="z-site-nav z-site-actions""#));
+    assert!(
+        !page.contains("data-zeyn-site-center-toggle"),
+        "a row needs no button"
+    );
+
+    let ask = |screen: &str, node: &str, perms: &str| {
+        post(
+            "/_zeyn/data",
+            perms,
+            serde_json::json!({ "screen": screen, "node": node, "key": "suggest", "input": "coffee" }),
+        )
+    };
+    let (status, body) = send(&router, ask("_site.store", "1.0", "shop.read")).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(
+        serde_json::from_str::<Vec<String>>(&body)
+            .unwrap()
+            .len(),
+        6
+    );
+    let (status, _) = send(&router, ask("_site.store", "1.0", "")).await;
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "the action's permission counts"
+    );
+    for (screen, node) in [
+        ("_site.store", "1.1"),
+        ("_site.store", "4.0"),
+        ("_site.other", "1.0"),
+    ] {
+        let (status, _) = send(&router, ask(screen, node, "shop.read")).await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "{screen} {node}");
+    }
+
+    let (_, page) = send(&header_app(true), get("/store")).await;
+    assert!(page.contains(r#"data-center-phone="icon""#));
+    assert!(page.contains(r#"<button type="button" class="z-site-toggle z-site-center-toggle" aria-expanded="false" aria-controls="z-site-slot-center" data-zeyn-site-center-toggle hidden>"#), "{page}");
+    assert!(page.contains(r#"<span class="z-sr-only">Search</span>"#));
 }

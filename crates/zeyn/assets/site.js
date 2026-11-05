@@ -35,14 +35,28 @@ function setGroup(button, open) {
   return list;
 }
 
-/** Opens or closes the folded menu on narrow screens. */
+/** Opens or closes the folded menu (and the actions after it) on narrow screens. */
 function setMenu(open) {
   const toggle = document.querySelector('[data-zeyn-site-toggle]');
-  const nav = toggle && document.getElementById(toggle.getAttribute('aria-controls'));
+  const nav = toggle && document.getElementById(toggle.getAttribute('aria-controls').split(' ')[0]);
   if (!toggle || !nav) return;
   toggle.setAttribute('aria-expanded', String(open));
-  if (open) nav.setAttribute('data-open', '');
-  else nav.removeAttribute('data-open');
+  nav.toggleAttribute('data-open', open);
+  toggle.closest('[data-zeyn-site-header]')?.toggleAttribute('data-open', open);
+}
+
+/**
+ * Opens or closes the center slot that hides behind an icon button on phones
+ * (`CenterOnPhone::Icon`, W3C APG disclosure). Opening moves focus to its first control.
+ */
+function setCenter(open, focus) {
+  const toggle = document.querySelector('[data-zeyn-site-center-toggle]');
+  const slot = toggle && document.getElementById(toggle.getAttribute('aria-controls'));
+  if (!toggle || !slot) return;
+  toggle.setAttribute('aria-expanded', String(open));
+  slot.toggleAttribute('data-open', open);
+  if (open && focus) slot.querySelector('input, select, textarea, button, a[href], [tabindex="0"]')?.focus();
+  if (!open && focus) toggle.focus();
 }
 
 /** Shows the menu button, so the menu can fold on narrow screens, and marks the group that
@@ -52,6 +66,8 @@ function init() {
     const list = document.getElementById(b.getAttribute('aria-controls'));
     b.toggleAttribute('data-current', Boolean(list?.querySelector('a[aria-current="page"]')));
   }
+  const center = document.querySelector('[data-zeyn-site-center-toggle]');
+  if (center) center.hidden = false;
   const toggle = document.querySelector('[data-zeyn-site-toggle]');
   if (!toggle || !toggle.hidden) return;
   toggle.hidden = false;
@@ -64,6 +80,11 @@ function topItems() {
 }
 
 document.addEventListener('click', (e) => {
+  const center = e.target.closest?.('[data-zeyn-site-center-toggle]');
+  if (center) {
+    setCenter(center.getAttribute('aria-expanded') !== 'true', true);
+    return;
+  }
   const toggle = e.target.closest?.('[data-zeyn-site-toggle]');
   if (toggle) {
     setMenu(toggle.getAttribute('aria-expanded') !== 'true');
@@ -134,9 +155,23 @@ document.addEventListener('focusout', (e) => {
   }
 });
 
+/**
+ * Escape inside the opened center slot closes it and returns focus to its button. It listens on
+ * the window, so components in the slot (a search box closing its suggestions) handle Escape first.
+ */
+window.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape' || e.defaultPrevented) return;
+  const slot = e.target.closest?.('.z-site-slot-center[data-open]');
+  if (slot) {
+    e.preventDefault();
+    setCenter(false, true);
+  }
+});
+
 document.addEventListener('zeyn:leave', () => {
   closeGroups();
   setMenu(false);
+  setCenter(false, false);
 });
 document.addEventListener('zeyn:content', init);
 init();

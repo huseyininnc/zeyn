@@ -212,7 +212,9 @@ pub use server::{
     READY_CACHE, StaticCredentials, StderrAudit, SubdomainTenant, TenantResolver, Theme,
     TimePolicy, probe,
 };
-pub use site::{BottomNavItem, FooterColumn, Shell, SiteFooter, SiteHeader, SiteShell};
+pub use site::{
+    BottomNavItem, CenterOnPhone, FooterColumn, Shell, SiteFooter, SiteHeader, SiteShell,
+};
 pub use slug::Slug;
 pub use time::{Date, DateTime, LocalDateTime, LocalTimeError, Time, TimeZone};
 pub use time::{DateWords, range_presets};

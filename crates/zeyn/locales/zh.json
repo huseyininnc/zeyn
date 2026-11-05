@@ -221,7 +221,8 @@
       "site": {
         "sign_in": "登录",
         "sign_out": "退出登录",
-        "bottom": "快捷链接"
+        "bottom": "快捷链接",
+        "center": "搜索"
       }
     },
     "ui": {

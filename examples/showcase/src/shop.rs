@@ -91,7 +91,6 @@ impl From<ShellLink> for Node {
 pub fn shop_home(_: (), ctx: Ctx) -> Screen {
     Screen::new(t!("shop.home.title"))
         .body(Alert::info(t!("shop.home.text")).title(t!("shop.home.lead")))
-        .body(search_box(String::new()))
         .body(
             Rail::of(catalog_products)
                 .title(t!("shop.new_arrivals"))
@@ -105,17 +104,15 @@ pub fn shop_home(_: (), ctx: Ctx) -> Screen {
 
 #[screen(route = "/shop/products", public)]
 pub fn shop_catalog(_: (), ctx: Ctx) -> Screen {
-    Screen::new(t!("shop.products"))
-        .body(search_box(String::new()))
-        .body(
-            CardGrid::of(catalog_products)
-                .card(card(ctx.locale().to_string()))
-                .sort_option(t!("shop.sort.name"), Product::name, false)
-                .sort_option(t!("shop.sort.cheapest"), Product::price, false)
-                .sort_option(t!("shop.sort.dearest"), Product::price, true)
-                .image_size(300, 300)
-                .paging(Paging::infinite(24)),
-        )
+    Screen::new(t!("shop.products")).body(
+        CardGrid::of(catalog_products)
+            .card(card(ctx.locale().to_string()))
+            .sort_option(t!("shop.sort.name"), Product::name, false)
+            .sort_option(t!("shop.sort.cheapest"), Product::price, false)
+            .sort_option(t!("shop.sort.dearest"), Product::price, true)
+            .image_size(300, 300)
+            .paging(Paging::infinite(24)),
+    )
 }
 
 #[screen(route = "/shop/search", public)]
@@ -187,7 +184,13 @@ pub fn feature() -> Feature {
         })
         .shell(
             Shell::site()
-                .header(|h| h.sign_in().language().theme())
+                .header(|h| {
+                    h.center(search_box(String::new()))
+                        .center_on_phone(zeyn::CenterOnPhone::Icon)
+                        .sign_in()
+                        .language()
+                        .theme()
+                })
                 .footer(|f| {
                     f.column(t!("shop.menu.help"), |c| {
                         c.link(t!("shop.delivery.title"), shop_delivery)

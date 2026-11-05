@@ -221,7 +221,8 @@
       "site": {
         "sign_in": "Iniciar sesión",
         "sign_out": "Cerrar sesión",
-        "bottom": "Accesos rápidos"
+        "bottom": "Accesos rápidos",
+        "center": "Buscar"
       }
     },
     "ui": {

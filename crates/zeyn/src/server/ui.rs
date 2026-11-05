@@ -225,6 +225,49 @@ async fn node_call(
 }
 
 /// Runs the action behind a component's data source and returns its JSON.
+/// A data source of a component in a site header slot (`screen` is `_site.{feature}`). The
+/// feature's guards and the action's permission are checked as for a screen's components.
+async fn site_data(
+    st: &AppState,
+    ctx: &crate::ctx::Ctx,
+    feature: &str,
+    call: &DataCall,
+) -> Response {
+    let result = async {
+        let f = st
+            .features
+            .iter()
+            .find(|f| f.name() == feature)
+            .ok_or(Failure::App(Error::NotFound))?;
+        f.check_guards(ctx)
+            .map_err(Failure::App)?;
+        let source = f
+            .site_shell()
+            .and_then(|s| s.header.node(&call.node))
+            .and_then(|n| n.source(&call.key))
+            .ok_or(Failure::App(Error::NotFound))?;
+        let action = source.action();
+        if !ctx.identity().can(&action.access) {
+            return Err(Failure::App(Error::Forbidden));
+        }
+        let info = Call {
+            kind: CallKind::DataGrid,
+            screen: f.name(),
+            action: Some(action),
+            via_agent: ctx.via_agent(),
+        };
+        st.intercept(ctx, &info, || {
+            st.timed(source.fetch(ctx.clone(), call.input.clone()))
+        })
+        .await
+    }
+    .await;
+    match result {
+        Ok(json) => axum::Json(json).into_response(),
+        Err(f) => st.error_response(ctx, f),
+    }
+}
+
 async fn data_call(
     State(st): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -233,6 +276,9 @@ async fn data_call(
     let ctx = st.licensed(st.ctx(&headers)).await;
     if let Err(f) = st.check_csrf(&headers) {
         return st.error_response(&ctx, f);
+    }
+    if let Some(feature) = call.screen.strip_prefix("_site.") {
+        return site_data(&st, &ctx, feature, &call).await;
     }
     let result = async {
         let (_, entry, screen) = st

@@ -5,7 +5,7 @@
 //! them goes through the browser runtime without a page reload.
 
 use crate::i18n::Text;
-use crate::screen::{Icon, ScreenDef};
+use crate::screen::{Icon, Node, ScreenDef};
 
 /// Chooses the page frame of a feature's screens. The app shell is the default; call
 /// [`Shell::site`] for public pages.
@@ -50,7 +50,7 @@ pub struct SiteShell {
 }
 
 impl SiteShell {
-    /// Actions in the top bar.
+    /// The top bar's slots and ready actions, see [`SiteHeader`].
     pub fn header(mut self, build: impl FnOnce(SiteHeader) -> SiteHeader) -> Self {
         self.header = build(self.header);
         self
@@ -139,15 +139,126 @@ fn safe_url(url: &str) -> bool {
             .any(|p| url.starts_with(p))
 }
 
-/// Actions of the site shell's top bar. None is shown unless asked for.
+/// Where the center slot of the site header goes on phones (800 px wide and less).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum CenterOnPhone {
+    /// A full width row under the top bar. Needs no script.
+    #[default]
+    Row,
+    /// Behind an icon button in the top bar that opens it as a row (W3C APG disclosure). The
+    /// button is a magnifier named "Search" unless [`SiteHeader::center_button`] sets another.
+    Icon,
+}
+
+/// The site shell's top bar, in slots that take any component, modeled on an app bar with
+/// logical names: `start` comes before the brand, `center` sits between the menu and the end,
+/// `end` closes the bar and `bottom` is a full width row under it, such as tabs or chips. Start
+/// and end follow the writing direction, so they swap sides in right to left languages. Each
+/// slot holds several nodes in order. Nothing is shown unless asked for.
+///
+/// `sign_in`, `language` and `theme` add ready components after the end slot. On phones they
+/// fold into the menu with the menu's links; the slots stay in the bar, and the center slot goes
+/// where [`SiteHeader::center_on_phone`] says.
+///
+/// Components in slots render with the user's language, permissions and masks like a screen's.
+/// Those that load data through their own action (a [`crate::ui::SearchBox`], a
+/// [`crate::ui::Tree`]) work there, checked against the feature's guards and the action's
+/// permission; grids and forms belong in the screen.
+///
+/// ```
+/// use zeyn::prelude::*;
+/// use zeyn::CenterOnPhone;
+///
+/// #[model]
+/// pub struct Product {
+///     pub name: String,
+/// }
+///
+/// #[action(public)]
+/// pub async fn search_products(q: DataQuery) -> Result<Page<Product>> {
+///     Ok(Page::default())
+/// }
+///
+/// #[screen(route = "/search", public)]
+/// pub fn results(p: SearchParams) -> Screen { Screen::new("Results") }
+///
+/// #[screen(route = "/cart", public)]
+/// pub fn cart() -> Screen { Screen::new("Cart") }
+///
+/// let shell = Shell::site().header(|h| {
+///     h.center(SearchBox::of(search_products).results(results))
+///         .center_on_phone(CenterOnPhone::Icon)
+///         .end(LinkButton::new("Cart", cart, ()))
+///         .language()
+///         .theme()
+/// });
+/// ```
 #[derive(Default)]
 pub struct SiteHeader {
     pub(crate) sign_in: bool,
     pub(crate) language: bool,
     pub(crate) theme: bool,
+    pub(crate) slots: [Vec<Node>; 4],
+    pub(crate) center_on_phone: CenterOnPhone,
+    pub(crate) center_button: Option<(Icon, Text)>,
 }
 
+/// Index of each slot in [`SiteHeader`]: the first number of a slot node's path.
+pub(crate) const SLOT_NAMES: [&str; 4] = ["start", "center", "end", "bottom"];
+
 impl SiteHeader {
+    fn put(mut self, slot: usize, node: impl Into<Node>) -> Self {
+        self.slots[slot].push(node.into());
+        self
+    }
+
+    /// A component before the brand, such as a back link or a logo.
+    pub fn start(self, node: impl Into<Node>) -> Self {
+        self.put(0, node)
+    }
+
+    /// A component in the middle of the bar, such as a search box.
+    pub fn center(self, node: impl Into<Node>) -> Self {
+        self.put(1, node)
+    }
+
+    /// A component at the end of the bar, such as a cart link.
+    pub fn end(self, node: impl Into<Node>) -> Self {
+        self.put(2, node)
+    }
+
+    /// A full width row under the bar, such as chips or tabs.
+    pub fn bottom(self, node: impl Into<Node>) -> Self {
+        self.put(3, node)
+    }
+
+    /// Where the center slot goes on phones: a row under the bar (the default) or behind an
+    /// icon button.
+    pub fn center_on_phone(mut self, place: CenterOnPhone) -> Self {
+        self.center_on_phone = place;
+        self
+    }
+
+    /// The icon and the name of the button that opens the center slot on phones, with
+    /// [`CenterOnPhone::Icon`]. A magnifier named "Search" unless set.
+    pub fn center_button(mut self, icon: Icon, label: impl Into<Text>) -> Self {
+        self.center_button = Some((icon, label.into()));
+        self
+    }
+
+    /// The slot node at `path`: the slot index, the node's index in it, then child indexes.
+    pub(crate) fn node(&self, path: &crate::ui::NodePath) -> Option<&Node> {
+        let mut at = path.indexes();
+        let mut node = self
+            .slots
+            .get(at.next()?)?
+            .get(at.next()?)?;
+        for i in at {
+            node = node.children().get(i)?;
+        }
+        Some(node)
+    }
+
     /// A sign in link for visitors and a sign out link for signed in users, when the app has a
     /// sign in page (`App::login_url`, OIDC or accounts).
     pub fn sign_in(mut self) -> Self {
