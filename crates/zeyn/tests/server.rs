@@ -1474,6 +1474,74 @@ async fn the_page_token_is_masked_differently_in_every_response() {
     }
 }
 
+#[tokio::test(flavor = "current_thread")]
+async fn the_reused_compressor_starts_fresh_for_every_response() {
+    use std::io::Read;
+    let router = router(writer());
+    let query = |limit: u32| {
+        let q = serde_json::json!({ "page": { "type": "offset", "offset": 0, "limit": limit } });
+        serde_json::json!({ "screen": "list", "node": 0, "query": q })
+    };
+    for (path, limit) in [
+        ("/products", 0),
+        ("/_zeyn/grid", 30),
+        ("/products", 0),
+        ("/_zeyn/grid", 25),
+    ] {
+        let req = |gzip: bool| {
+            let mut r = if limit == 0 {
+                get(path)
+            } else {
+                post(path, query(limit))
+            };
+            if gzip {
+                r.headers_mut()
+                    .insert(header::ACCEPT_ENCODING, "gzip".parse().unwrap());
+            }
+            r
+        };
+        let plain = send(&router, req(false)).await;
+        let res = router
+            .clone()
+            .oneshot(req(true))
+            .await
+            .unwrap();
+        assert_eq!(
+            res.headers()
+                .get(header::CONTENT_ENCODING)
+                .map(|v| v.to_str().unwrap()),
+            Some("gzip"),
+            "{path}"
+        );
+        let length: usize = res
+            .headers()
+            .get(header::CONTENT_LENGTH)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .parse()
+            .unwrap();
+        let packed = res
+            .into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes();
+        assert_eq!(packed.len(), length);
+        let mut text = String::new();
+        flate2::read::GzDecoder::new(&packed[..])
+            .read_to_string(&mut text)
+            .unwrap();
+        let csrf = |s: &str| {
+            s.split("zeyn-csrf\" content=\"")
+                .next()
+                .unwrap()
+                .to_string()
+        };
+        assert_eq!(csrf(&text), csrf(&plain.body), "{path}");
+    }
+}
+
 #[tokio::test]
 async fn grid_blocks_and_pages_are_gzipped_when_the_browser_accepts_it() {
     use std::io::Read;

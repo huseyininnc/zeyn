@@ -38,6 +38,7 @@ mod data;
 mod files;
 mod grid;
 mod guard;
+mod gzip;
 mod locale;
 mod media;
 mod modules;
@@ -1872,6 +1873,9 @@ impl App {
                 guard::guard_request,
             ))
             .layer(axum::middleware::from_fn(static_files))
+            .layer(axum::middleware::from_fn(|req, next| {
+                gzip::whole(req, next, compressible)
+            }))
             .layer(compression())
             .layer(axum::middleware::map_request(identity_for_ranges))
             .layer(axum::middleware::map_response_with_state(
@@ -3089,26 +3093,7 @@ async fn static_files(req: axum::extract::Request, next: axum::middleware::Next)
     if req.method() != axum::http::Method::GET || !framework {
         return next.run(req).await;
     }
-    let gzip = req
-        .headers()
-        .get_all(header::ACCEPT_ENCODING)
-        .iter()
-        .filter_map(|v| v.to_str().ok())
-        .flat_map(|v| v.split(','))
-        .any(|e| {
-            let mut p = e.split(';');
-            p.next()
-                .is_some_and(|n| n.trim().eq_ignore_ascii_case("gzip"))
-                && !p.any(|q| {
-                    q.trim()
-                        .strip_prefix("q=")
-                        .is_some_and(|v| {
-                            v.trim()
-                                .parse::<f32>()
-                                .is_ok_and(|v| v == 0.0)
-                        })
-                })
-        });
+    let gzip = gzip::accepts_gzip(req.headers());
     let headers = req.headers().clone();
     let current = req.uri().query() == Some(&ops::asset_version()[1..]);
     let mut response = next.run(req).await;
@@ -3209,36 +3194,38 @@ const UNCOMPRESSED: &[&str] = &[
     "font/woff",
 ];
 
-/// Gzip for pages, partial screens, grid blocks and other dynamic responses of 1 KB or more, at the
-/// level 2 (a 362 KB grid block becomes 37 KB for 0.8 ms of CPU; level 1 gives 54 KB for 0.6 ms
-/// and level 6 35 KB for 1.4 ms). Responses that
-/// already have a `Content-Encoding` (the framework assets from [`static_files`]) or a
-/// `Content-Range` pass as they are, and so do the types in [`UNCOMPRESSED`], images other than
-/// SVG and protocol switches. Streamed bodies (exports) are compressed as they stream.
+/// Whether a dynamic response may be compressed: not the types in [`UNCOMPRESSED`], images other
+/// than SVG or protocol switches.
+fn compressible(status: StatusCode, headers: &HeaderMap) -> bool {
+    let kind = headers
+        .get(header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    status != StatusCode::SWITCHING_PROTOCOLS
+        && (!kind.starts_with("image/") || kind.starts_with("image/svg+xml"))
+        && !UNCOMPRESSED
+            .iter()
+            .any(|p| kind.starts_with(p))
+}
+
+/// Gzip for pages, partial screens, grid blocks and other dynamic responses of 1 KB or more, at
+/// [`gzip::LEVEL`], for the [`compressible`] ones. Bodies of a known size are compressed whole
+/// by [`gzip::whole`] with a reused compressor; this layer compresses the streamed ones (exports)
+/// as they stream. Responses that already have a `Content-Encoding` (the framework assets from
+/// [`static_files`], the whole bodies) or a `Content-Range` pass as they are.
 fn compression()
 -> tower_http::compression::CompressionLayer<impl tower_http::compression::Predicate> {
     use tower_http::compression::{
         CompressionLayer, CompressionLevel, Predicate, predicate::SizeAbove,
     };
-    fn compressible(
-        status: StatusCode,
-        _: axum::http::Version,
-        headers: &HeaderMap,
-        _: &axum::http::Extensions,
-    ) -> bool {
-        let kind = headers
-            .get(header::CONTENT_TYPE)
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("");
-        status != StatusCode::SWITCHING_PROTOCOLS
-            && (!kind.starts_with("image/") || kind.starts_with("image/svg+xml"))
-            && !UNCOMPRESSED
-                .iter()
-                .any(|p| kind.starts_with(p))
-    }
     CompressionLayer::new()
-        .quality(CompressionLevel::Precise(2))
-        .compress_when(SizeAbove::new(1024).and(compressible))
+        .quality(CompressionLevel::Precise(gzip::LEVEL as i32))
+        .compress_when(SizeAbove::new(gzip::MIN_BYTES as u16).and(
+            |status: StatusCode,
+             _: axum::http::Version,
+             headers: &HeaderMap,
+             _: &axum::http::Extensions| compressible(status, headers),
+        ))
 }
 
 /// Drops `Accept-Encoding` from requests with a `Range` header, so a byte range always refers to
