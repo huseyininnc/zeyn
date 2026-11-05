@@ -57,6 +57,10 @@ Going somewhere is a link; doing something is a button. `LinkButton::new(label, 
 LinkButton::new(t!("cart.browse"), products, ()).primary()
 ```
 
+## ClearPrefs
+
+`ClearPrefs::new(label)` is a button that removes every client preference this browser keeps for the app, such as on a privacy page beside the list from `App::client_prefs_table()`. A toast confirms it. Cookies the server sets (theme, language, session) are not touched. Scripts can do the same with `zeyn.prefs.clear()`.
+
 ## Breadcrumb
 
 `Breadcrumb::new().link(label, screen, params).current(label)`: links are typed screen references, so a renamed screen does not leave a broken link.
@@ -108,7 +112,7 @@ Embed::url("https://www.youtube-nocookie.com/embed/abc")
 - Every frame gets `sandbox="allow-scripts allow-same-origin allow-presentation"`, `referrerpolicy="no-referrer"` and `loading="lazy"`. Popups, top navigation, forms and downloads can never be allowed. `.allow(...)` adds browser features: `Fullscreen`, `PictureInPicture`, `Autoplay` and `EncryptedMedia`.
 - `.click_to_load(poster)` shows a button first, with the poster image (a path on the app or a host of `img-src`; `""` for none) and the other site's name. The other site is not contacted until the button is pressed; then the frame takes its place and receives focus. The script is part of `media.js`, so it costs no extra request.
 - `.notice(t!(...))` puts a text of the app on that button, such as a content warning. It is escaped, translated like every text and part of the button's accessible name, so screen readers read it before the user decides. Without `.click_to_load` it turns the button on with no poster.
-- `.remember("external-video", Duration::from_secs(24 * 60 * 60))` asks once in that time instead of on every page. The browser keeps only the end time (Unix milliseconds) in `localStorage` under `zeyn.consent.{scope}`; no cookie is set and the server never sees it, so cached public pages stay the same for everyone. Later pages, in-app navigations and other tabs load the frames of that scope by themselves, without moving focus (WCAG 2.2 3.2.1 On Focus, 2.4.3 Focus Order); focus moves to the frame only after a real press. The button comes back when the time has passed, when the stored value is not a whole number or lies further ahead than the embed's time (changed by hand), when storage is blocked, and without JavaScript. The scope is 1 to 40 ASCII letters, digits, `-` or `_`; the time is 1 second to 30 days (`MAX_EMBED_CONSENT`). Anything else panics with a message that says so. Embeds that share a notice share a scope.
+- `.remember(EXTERNAL_VIDEO)` asks once in the key's lifetime instead of on every page. The key is a consent key declared with `ClientPref::consent` and registered with `App::client_prefs` (see [Client preferences](security.md#client-preferences)); embeds bound to the same key share the answer. Later pages, in-app navigations and other tabs load those frames by themselves, without moving focus (WCAG 2.2 3.2.1 On Focus, 2.4.3 Focus Order); focus moves to the frame only after a real press. The button comes back when the record has ended or fails its checks, when the app did not register the key, when storage is blocked and the page is new, and without JavaScript. A plain string or a choice key does not compile.
 - A field that holds an address to embed takes `#[rule(embed)]`. Forms accept a URL or pasted embed code, keep only the `src`, require `https` and a listed host, drop tracking parameters (`utm_*`, `fbclid`, `gclid` and others) and store the canonical address, never the HTML. API inputs must send the canonical address.
 
 ```rust

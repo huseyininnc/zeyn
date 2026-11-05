@@ -13,7 +13,7 @@ use serde_json::{Map, Value as Json, json};
 use std::sync::Arc;
 
 into_node!(
-    Alert, Badge, EmptyState, Skeleton, Progress, Breadcrumb, Timeline, LinkButton
+    Alert, Badge, EmptyState, Skeleton, Progress, Breadcrumb, Timeline, LinkButton, ClearPrefs
 );
 
 pub use crate::grid::Tone;
@@ -234,6 +234,42 @@ impl Component for LinkButton {
 
     fn schema(&self) -> Json {
         json!({ "type": "link_button", "label": self.label, "screen": self.screen, "params": self.params, "primary": self.primary })
+    }
+}
+
+/// A button that removes every client preference this browser keeps for the app (see
+/// [`crate::ClientPref`]), such as on a privacy page next to `App::client_prefs_table`. A toast
+/// confirms it. Cookies the server sets (theme, language, session) are not touched.
+///
+/// ```
+/// use zeyn::ui::ClearPrefs;
+/// let clear = ClearPrefs::new("Forget my choices in this browser");
+/// ```
+pub struct ClearPrefs {
+    label: Text,
+}
+
+impl ClearPrefs {
+    pub fn new(label: impl Into<Text>) -> Self {
+        ClearPrefs {
+            label: label.into(),
+        }
+    }
+}
+
+impl Component for ClearPrefs {
+    fn render(&self, out: &mut String, r: &Render) {
+        let done: Effect = crate::screen::Toast::success(Text::key("zeyn.ui.prefs.cleared")).into();
+        out.push_str(&format!(
+            r#"<button type="button" class="z-button" data-zeyn-prefs-clear data-zeyn-effect="{}" data-testid="{}.prefs.clear">{}</button>"#,
+            attr(&done.to_json(r)),
+            r.scope,
+            r.text(&self.label)
+        ));
+    }
+
+    fn schema(&self) -> Json {
+        json!({ "type": "clear_prefs", "label": self.label })
     }
 }
 

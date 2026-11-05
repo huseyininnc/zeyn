@@ -519,6 +519,9 @@
       "reactions": {
         "label": "Reactions",
         "failed": "The reaction could not be saved."
+      },
+      "prefs": {
+        "cleared": "The choices this browser kept for this site were removed."
       }
     },
     "date": {

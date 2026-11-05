@@ -496,6 +496,9 @@
       "reactions": {
         "label": "回应",
         "failed": "无法保存回应。"
+      },
+      "prefs": {
+        "cleared": "已删除此浏览器为本网站保存的选择。"
       }
     },
     "date": {

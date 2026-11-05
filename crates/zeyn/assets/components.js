@@ -126,6 +126,7 @@ function selectTab(tab, { focus = false, remember = true } = {}) {
     if (on && panel?.dataset.zeynLazy) loadPanel(panel, root);
   }
   if (focus) tab.focus();
+  if (remember && root?.dataset.zeynRemember) rememberTab(root, tab);
   if (remember && root) {
     const state = hashState();
     if (tab === tabsOf(tab)[0]) state.delete(root.dataset.zeynTabs);
@@ -176,13 +177,32 @@ function tabKey(e, tab) {
   return true;
 }
 
-/** Opens the tabs named in the URL hash. */
+/** The client preference store (`state.js`), imported by the first tabs bound to a key. */
+function prefStore() {
+  return import(`${BASE}/_zeyn/state.js${VERSION}`);
+}
+
+/** Keeps the tab a user opened under the key of tabs with `Tabs::remember`. */
+function rememberTab(root, tab) {
+  prefStore().then((m) => {
+    const key = m.keyOf(root);
+    if (key) m.set(key, tab.dataset.zeynTab);
+  });
+}
+
+/** Opens the tabs named in the URL hash, else the remembered tab of tabs bound to a key. */
 function restoreTabs(root) {
   const state = hashState();
+  const find = (tabs, wanted) => wanted && [...tabs.querySelectorAll('[role="tab"]')].find((t) => t.dataset.zeynTab === wanted);
   root.querySelectorAll('[data-zeyn-tabs]').forEach((tabs) => {
-    const wanted = state.get(tabs.dataset.zeynTabs);
-    const tab = wanted && [...tabs.querySelectorAll('[role="tab"]')].find((t) => t.dataset.zeynTab === wanted);
+    const tab = find(tabs, state.get(tabs.dataset.zeynTabs));
     if (tab && tab.getAttribute('aria-selected') !== 'true') selectTab(tab, { remember: false });
+    if (tab || !tabs.dataset.zeynRemember) return;
+    prefStore().then((m) => {
+      const key = m.keyOf(tabs);
+      const kept = key && find(tabs, m.get(key));
+      if (kept && kept.getAttribute('aria-selected') !== 'true') selectTab(kept, { remember: false });
+    });
   });
 }
 
@@ -2176,6 +2196,7 @@ const LAZY = [
   ['a[data-zeyn-chip]', 'chips'],
   ['[data-zeyn-reactions]', 'reactions'],
   ['[data-zeyn-hero]', 'hero'],
+  ['[data-zeyn-prefs-clear]', 'state'],
 ];
 
 /** @type {Set<string>} Modules of `LAZY` already asked for. */

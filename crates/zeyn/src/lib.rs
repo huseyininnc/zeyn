@@ -92,6 +92,7 @@ mod model;
 #[cfg(feature = "pdf")]
 mod pdf;
 mod platform;
+mod prefs;
 mod privacy;
 #[cfg(feature = "redis")]
 mod redis_store;
@@ -187,6 +188,9 @@ pub use platform::{
 };
 #[cfg(feature = "signed-licenses")]
 pub use platform::{LicenseError, SignedLicenseFile};
+pub use prefs::{
+    Choice, ClientPref, ClientPrefs, Consent, MAX_PREF_LIFETIME, PrefInfo, PrefKind, Purpose,
+};
 #[doc(hidden)]
 pub use privacy::output as __privacy;
 pub use privacy::{MaskStyle, Masking, Revealed, can_unmask, masked_text, reveal_in};

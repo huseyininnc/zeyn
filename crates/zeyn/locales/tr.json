@@ -519,6 +519,9 @@
       "reactions": {
         "label": "Tepkiler",
         "failed": "Tepki kaydedilemedi."
+      },
+      "prefs": {
+        "cleared": "Bu tarayıcının bu site için tuttuğu seçimler silindi."
       }
     },
     "date": {

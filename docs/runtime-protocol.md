@@ -265,6 +265,7 @@ All are `POST` with JSON and the CSRF header, and check the screen's access and 
 |---|---|---|
 | `/_zeyn/node` | `{ screen, params, node }` | HTML of one node with the first page of its grids. Used by lazy tabs. |
 | `/_zeyn/data` | `{ screen, params, node, key, input }` | JSON from the data source `key` of the node: lookup options (`key` is the field name), tree children (`key` is empty), step checks (`key` is `_step`). The source's action permission is checked and the interceptors run, as for grids. Input that does not fit the action is refused with `404`. |
+| `/_zeyn/data` with `screen` = `_site.{feature}` | as above | The same for a component in a site header slot: `node` is the slot (0 start, 1 center, 2 end, 3 bottom), the node's index in it, then child indexes. The feature's guards and the action's permission are checked. |
 | `/_zeyn/parse` | `{ kind, text, label }` | How the server reads a typed date or time in the user's language, zone and clock: `{ ok, text, iso, utc, zone }` or `{ ok: false, message }`. `kind` is `date`, `time`, `datetime`, `local` or `presets` (today and quick ranges). |
 
 ### 7.2 Values the forms submit
@@ -282,6 +283,8 @@ All are `POST` with JSON and the CSRF header, and check the screen's access and 
 | `zeyn:effect` | `document` | An effect the runtime does not know: `{ effect, source, run }`. `run(next)` runs another effect. Used by `confirm`. |
 
 Effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":"...","then":{...}}` asks in a modal alert dialog and runs `then` only after the user confirms.
+
+Client preferences (`zeyn::ClientPref`) live in the browser module `/_zeyn/state.js`, which pages import only when they hold an element with `data-zeyn-remember` or `data-zeyn-prefs-clear`. `GET /_zeyn/prefs` answers `{ preferences }`, whether the app's consent hook allows keeping preference values beyond the session, with `Cache-Control: no-store`. The server reads no stored value.
 
 ### 7.4 Media
 

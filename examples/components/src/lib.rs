@@ -160,6 +160,7 @@ catalog! {
         popover "/ui/popover";
         busy "/ui/busy";
         toast "/ui/toast";
+        clear_prefs "/ui/clear-prefs";
         reactions "/ui/reactions";
     }
     "charts" Chart {
@@ -256,5 +257,9 @@ pub fn app() -> std::result::Result<App, String> {
         .i18n(i18n)
         .csp(|c| c.frame_src(["https://www.openstreetmap.org"]))
         .home(catalog_home)
+        .client_prefs(|p| {
+            p.key(examples::tabs::DELIVERY_TAB)
+                .key(examples::embed::MAP_NOTICE)
+        })
         .feature(feature()))
 }

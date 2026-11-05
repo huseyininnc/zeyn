@@ -746,6 +746,7 @@ pub struct App {
     native_menu: bool,
     locale_paths: bool,
     palette_keys: String,
+    client_prefs: crate::prefs::ClientPrefs,
     extras: ops::Extras,
     sign_in: auth::Extras,
     #[cfg(feature = "assistant")]
@@ -801,6 +802,7 @@ impl App {
             native_menu: true,
             locale_paths: false,
             palette_keys: crate::command::PALETTE_SHORTCUT.into(),
+            client_prefs: crate::prefs::ClientPrefs::default(),
             extras: ops::Extras::default(),
             sign_in: auth::Extras::default(),
             #[cfg(feature = "assistant")]
@@ -864,6 +866,41 @@ impl App {
     pub fn palette_shortcut(mut self, keys: &str) -> Self {
         self.palette_keys = keys.to_string();
         self
+    }
+
+    /// Registers the app's client preference keys and its consent hook (see [`crate::ClientPref`]).
+    /// Components bound to a key that is not registered are not remembered.
+    ///
+    /// ```
+    /// use std::time::Duration;
+    /// use zeyn::prelude::*;
+    /// use zeyn::{ClientPref, Choice, Consent, Purpose};
+    ///
+    /// pub const VIDEO_NOTICE: ClientPref<Consent> =
+    ///     ClientPref::consent("video-notice", Duration::from_secs(86_400), Purpose::Necessary);
+    /// pub const ORDER_TAB: ClientPref<Choice> =
+    ///     ClientPref::choice("order-tab", Duration::from_secs(30 * 86_400), Purpose::Preference);
+    ///
+    /// let app = App::new("Shop").client_prefs(|p| {
+    ///     p.key(VIDEO_NOTICE)
+    ///         .key(ORDER_TAB)
+    ///         .allowed_when(|h| h.get("cookie").and_then(|c| c.to_str().ok()).is_some_and(|c| c.contains("consent=yes")))
+    /// });
+    /// assert_eq!(app.client_prefs_table().len(), 2);
+    /// ```
+    pub fn client_prefs(
+        mut self,
+        build: impl FnOnce(crate::prefs::ClientPrefs) -> crate::prefs::ClientPrefs,
+    ) -> Self {
+        self.client_prefs = build(std::mem::take(&mut self.client_prefs));
+        self
+    }
+
+    /// The registered client preference keys with their kind, purpose and lifetime, for a
+    /// privacy page. The browser removes all of them with `zeyn.prefs.clear()` or an element
+    /// with `data-zeyn-prefs-clear`.
+    pub fn client_prefs_table(&self) -> &[crate::prefs::PrefInfo] {
+        &self.client_prefs.keys
     }
 
     /// Saves each signed in user's grid layout, sort and filters on the server, so they come
@@ -1472,6 +1509,7 @@ impl App {
             _ => {}
         }
         problems.extend(self.theme_problems());
+        problems.extend(self.client_prefs.problems());
         problems.dedup();
         if problems.is_empty() {
             Ok(())
@@ -1546,6 +1584,8 @@ impl App {
             .then(|| Arc::from(self.i18n.default_locale()));
         self.services
             .insert(crate::screen::Routes(Arc::new(routes), default_locale));
+        self.services
+            .insert(self.client_prefs.clone());
         let look = self.look();
         #[cfg(feature = "islands")]
         let islands = self

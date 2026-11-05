@@ -8,7 +8,10 @@ use std::sync::Arc;
 use tower::ServiceExt;
 use zeyn::prelude::*;
 use zeyn::ui::{EMBED_SANDBOX, Embed, EmbedPermission, ExternalLink, Image};
-use zeyn::{Component, Csp, Identity, Render, Rule, Services, embed_url};
+use zeyn::{
+    Choice, ClientPref, ClientPrefs, Component, Consent, Csp, Identity, Purpose, Render, Rule,
+    Services, embed_url,
+};
 
 fn ctx(csp: Csp) -> Ctx {
     Ctx::for_tests(Identity::anonymous(), Services::default()).with_csp(Arc::new(csp))
@@ -166,14 +169,20 @@ fn a_notice_on_the_gate_is_escaped_translated_and_part_of_the_button_name() {
     );
 }
 
+const NOTICE: ClientPref<Consent> =
+    ClientPref::consent("external_video-2", DAY, Purpose::Necessary);
+
 #[test]
-fn a_remembered_gate_names_its_scope_and_keeps_the_frame_inert() {
+fn a_remembered_gate_names_its_key_and_keeps_the_frame_inert() {
     let e = Embed::url("https://www.youtube-nocookie.com/embed/abc")
         .title("Product tour")
         .notice("Served by another site")
-        .remember("external_video-2", DAY);
-    let out = html(&e, &ctx(frames()));
-    assert!(out.starts_with(r#"<div class="z-embed" style="--z-aspect: 16 / 9" data-zeyn-embed-remember="external_video-2" data-zeyn-embed-for="86400000""#), "{out}");
+        .remember(NOTICE);
+    let mut services = Services::default();
+    services.insert(ClientPrefs::default().key(NOTICE));
+    let registered = Ctx::for_tests(Identity::anonymous(), services).with_csp(Arc::new(frames()));
+    let out = html(&e, &registered);
+    assert!(out.starts_with(r#"<div class="z-embed" style="--z-aspect: 16 / 9" data-zeyn-remember="external_video-2" data-zeyn-remember-for="86400000" data-zeyn-remember-purpose="necessary""#), "{out}");
     assert!(
         out.contains("data-zeyn-embed-load") && out.contains("<template data-zeyn-embed><iframe"),
         "{out}"
@@ -185,40 +194,21 @@ fn a_remembered_gate_names_its_scope_and_keeps_the_frame_inert() {
     );
     assert_eq!(
         e.schema()["remember"],
-        serde_json::json!({ "scope": "external_video-2", "ms": 86_400_000 })
+        serde_json::json!({ "name": "external_video-2", "kind": "consent", "purpose": "necessary", "lifetime": 86_400 })
+    );
+    let unregistered = html(&e, &ctx(frames()));
+    assert!(
+        !unregistered.contains("data-zeyn-remember")
+            && unregistered.contains("data-zeyn-embed-load"),
+        "a key the app did not register is not remembered: {unregistered}"
     );
     let plain = html(
         &Embed::url("https://www.youtube-nocookie.com/embed/abc")
             .title("T")
             .click_to_load(""),
-        &ctx(frames()),
+        &registered,
     );
-    assert!(!plain.contains("data-zeyn-embed-remember"), "{plain}");
-    let max: &'static str = "a".repeat(40).leak();
-    let _ = Embed::url("https://a.test/")
-        .title("T")
-        .remember(max, zeyn::ui::MAX_EMBED_CONSENT);
-}
-
-#[test]
-fn remember_scopes_outside_letters_digits_dash_and_underscore_panic() {
-    let long: &'static str = "a".repeat(41).leak();
-    for bad in ["", long, "a b", "a.b", "a\"b", "ç", "a/b", "<x>"] {
-        let panic = std::panic::catch_unwind(|| {
-            Embed::url("https://a.test/")
-                .title("T")
-                .remember(bad, DAY)
-        });
-        let message = *panic
-            .err()
-            .expect(bad)
-            .downcast::<String>()
-            .unwrap();
-        assert!(
-            message.contains("scope") && message.contains("1 to 40 ASCII letters, digits"),
-            "{bad}: {message}"
-        );
-    }
+    assert!(!plain.contains("data-zeyn-remember"), "{plain}");
 }
 
 #[test]
@@ -475,29 +465,88 @@ fn external_links_never_hand_over_the_window() {
 const DAY: std::time::Duration = std::time::Duration::from_secs(24 * 60 * 60);
 
 #[test]
-fn remember_times_outside_one_second_to_thirty_days_panic() {
-    let too_long = zeyn::ui::MAX_EMBED_CONSENT + std::time::Duration::from_secs(1);
-    for bad in [
-        std::time::Duration::ZERO,
-        std::time::Duration::from_millis(999),
-        too_long,
-    ] {
-        let panic = std::panic::catch_unwind(|| {
-            Embed::url("https://a.test/")
-                .title("T")
-                .remember("notice", bad)
-        });
-        let message = *panic
-            .err()
-            .expect("panics")
-            .downcast::<String>()
+fn client_prefs_are_listed_for_the_privacy_page_and_keys_registered_twice_are_problems() {
+    const TAB: ClientPref<Choice> =
+        ClientPref::choice("order-tab", zeyn::MAX_PREF_LIFETIME, Purpose::Preference);
+    let app = App::new("Prefs").client_prefs(|p| p.key(NOTICE).key(TAB));
+    let table = app.client_prefs_table();
+    assert_eq!(
+        serde_json::to_value(table).unwrap(),
+        serde_json::json!([
+            { "name": "external_video-2", "kind": "consent", "purpose": "necessary", "lifetime": 86_400 },
+            { "name": "order-tab", "kind": "choice", "purpose": "preference", "lifetime": 400 * 86_400 },
+        ])
+    );
+    let twice = App::new("Twice").client_prefs(|p| p.key(NOTICE).key(NOTICE));
+    let problems = twice.check().unwrap_err();
+    assert!(
+        problems
+            .iter()
+            .any(|p| p.contains("client preference `external_video-2` is registered twice")),
+        "{problems:?}"
+    );
+}
+
+#[tokio::test]
+async fn the_consent_answer_comes_from_the_apps_hook_and_is_never_cached() {
+    let app = |hook: bool| {
+        App::new("Prefs")
+            .client_prefs(|p| {
+                let p = p.key(NOTICE);
+                if hook {
+                    p.allowed_when(|h| {
+                        h.get(header::COOKIE)
+                            .and_then(|c| c.to_str().ok())
+                            .is_some_and(|c| c.contains("consent=all"))
+                    })
+                } else {
+                    p
+                }
+            })
+            .router()
+            .unwrap()
+    };
+    let ask = |router: axum::Router, cookie: &'static str| async move {
+        let res = router
+            .oneshot(
+                Request::get("/_zeyn/prefs")
+                    .header(header::COOKIE, cookie)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
             .unwrap();
-        assert!(
-            message.contains("1 second to 30 days"),
-            "{bad:?}: {message}"
-        );
-    }
-    let _ = Embed::url("https://a.test/")
-        .title("T")
-        .remember("notice", std::time::Duration::from_secs(1));
+        assert_eq!(res.headers()[header::CACHE_CONTROL], "no-store");
+        let body = res
+            .into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes();
+        serde_json::from_slice::<serde_json::Value>(&body).unwrap()["preferences"].clone()
+    };
+    assert_eq!(ask(app(true), "consent=all").await, true);
+    assert_eq!(ask(app(true), "consent=none").await, false);
+    assert_eq!(
+        ask(app(false), "consent=all").await,
+        false,
+        "without a hook preferences stay for the session"
+    );
+    let js = app(false)
+        .oneshot(
+            Request::get("/_zeyn/state.js")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(js.status(), 200);
+    let js = js
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes();
+    let js = String::from_utf8_lossy(&js);
+    assert!(js.contains("'zeyn.v1.'") && js.contains("sessionStorage"));
 }

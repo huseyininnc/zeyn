@@ -40,6 +40,8 @@ Panel::new(t!("ui.panel_products")).collapsible().toolbar(|t| t.export(Export::C
 
 `Tabs::new(label)` with `.tab(title, node)`. Arrow keys move between tabs, as the ARIA tabs pattern describes. The content of a closed tab is not rendered until the tab is first opened, so a screen with many tabs stays light.
 
+`.remember(KEY)` keeps the tab the user opened under a choice key (see [Client preferences](security.md#client-preferences)), so the same tabs open on it on later pages. A tab named in the URL hash wins.
+
 ## Split
 
 `Split::new(start, end)` shows two nodes with a handle between them. `.ratio(percent)` sets the start size. The handle moves with the pointer or the arrow keys.
