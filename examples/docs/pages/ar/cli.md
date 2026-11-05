@@ -8,7 +8,10 @@
 |---|---|
 | `zeyn new <name>` | ينشئ تطبيقًا ببنية الميزات القياسية |
 | `zeyn new <name> --lib` | ينشئ مكتبة من النماذج والميزات والنصوص تشترك فيها عدة تطبيقات |
-| `zeyn g feature <name>` | يضيف `src/features/<name>` مع النماذج والمخزن والإجراءات والشاشات |
+| `zeyn g feature <name>` | يضيف `src/features/<name>` مع النماذج والإجراءات والشاشات، بملف واحد لكل شاشة وإجراء |
+| `zeyn g screen <feature> <name>` | يضيف `screens/<name>.rs` إلى ميزة ويسجله ويضيف عنوانه إلى كل ملف لغة |
+| `zeyn g action <feature> <name>` | يضيف `actions/<name>.rs` إلى ميزة ويسجله كواجهة API |
+| `zeyn g component <feature> <name>` | يضيف `components/<name>.rs`، وهو دالة تعيد جزءًا من شاشة |
 | `zeyn routes` | يسرد الميزات والشاشات والمسارات وواجهات API والوصول |
 | `zeyn check` | يصرّف المشروع ويبلّغ عن المشكلات البنيوية والترجمات الناقصة |
 | `zeyn check --fix` | يعيد كتابة واجهات Zeyn المعاد تسميتها في `src` و`tests` و`examples`، ثم يفحص |
@@ -64,9 +67,23 @@ cargo run
 
 راجع [بنية المشروع](structure.md) لمعرفة كل مجلد.
 
+## المولدات
+
+ملف واحد لكل شاشة وإجراء ومكوّن هو البنية الافتراضية التي تنشئها المولدات:
+
+```sh
+zeyn g screen notes detail       # src/features/notes/screens/detail.rs
+zeyn g action notes archive      # src/features/notes/actions/archive.rs
+zeyn g component notes summary   # src/features/notes/components/summary.rs
+```
+
+الصيغ القصيرة `zeyn g s` و`zeyn g a` و`zeyn g c` و`zeyn g f` تفعل الشيء نفسه. تحصل الشاشة على الإذن `<feature>.<name>.view` وعلى عنوانها في كل ملف في `locales/`؛ وتحصل اللغات غير الإنجليزية على النص الإنجليزي مع ملاحظة لترجمته. يحصل الإجراء على `<feature>.<name>.run` ويُسجَّل بـ `.api(...)`. هذه البنية ليست إلزامية: إذا كانت الميزة لا تزال تستخدم ملفًا واحدًا `screens.rs` أو `actions.rs`، ينقله المولد أولًا بمحتواه إلى `screens/mod.rs` (أو `actions/mod.rs`) ثم يضيف الملف الجديد. لا تكتب المولدات فوق أي ملف أبدًا، وترفض الأسماء التي ليست بصيغة snake case.
+
 ## فحص تطبيق
 
 يشغّل `zeyn check` المصرّف (compiler) ثم فحوص التطبيق نفسه (`App::check`): المسارات المكررة، والشاشات المسجلة مرتين، والخدمات التي تحتاجها شاشة ولم يسجلها أحد، والاختصارات غير القابلة للاستخدام، ورموز السمة (theme tokens) التي يقل تباينها عن WCAG AA، ومفاتيح الترجمة الناقصة في لغة ما. ينتهي بخطأ عند وجود أي خلل، ليتمكن CI من تشغيله.
+
+ويطبع أيضًا تحذيرات لا تُفشل الفحص أبدًا: `#[screen]` أو `#[action]` لا تسجله أي ميزة، وملف واحد `screens.rs` أو `actions.rs` فيه عدة عناصر وتجاوز نحو 150 سطرًا.
 
 عندما يعيد إصدار من Zeyn تسمية واجهة API، يعيد `zeyn check --fix` كتابة الأسماء القديمة، مثل `Grid` إلى `DataGrid` و`GridQuery` إلى `DataQuery`، ثم يفحص مرة أخرى.
 

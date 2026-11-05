@@ -8,7 +8,10 @@
 |---|---|
 | `zeyn new <name>` | 创建带有标准 feature 结构的应用 |
 | `zeyn new <name> --lib` | 创建由多个应用共享的 model、feature 和文本库 |
-| `zeyn g feature <name>` | 添加 `src/features/<name>`，包含 model、store、action 和 screen |
+| `zeyn g feature <name>` | 添加 `src/features/<name>`，包含 model、action 和 screen，每个 screen 和 action 一个文件 |
+| `zeyn g screen <feature> <name>` | 向 feature 添加 `screens/<name>.rs`，注册它，并把标题加入每个语言文件 |
+| `zeyn g action <feature> <name>` | 向 feature 添加 `actions/<name>.rs` 并注册为 API |
+| `zeyn g component <feature> <name>` | 添加 `components/<name>.rs`，其中的函数返回 screen 的一部分 |
 | `zeyn routes` | 列出 feature、screen、路由、API 和访问权限 |
 | `zeyn check` | 编译并报告结构问题和缺失的翻译 |
 | `zeyn check --fix` | 改写 `src`、`tests` 和 `examples` 中已重命名的 Zeyn API，然后检查 |
@@ -64,9 +67,23 @@ cargo run
 
 各个文件夹的说明参见[项目结构](structure.md)。
 
+## 生成器
+
+每个 screen、action 和 component 一个文件，是生成器默认生成的布局：
+
+```sh
+zeyn g screen notes detail       # src/features/notes/screens/detail.rs
+zeyn g action notes archive      # src/features/notes/actions/archive.rs
+zeyn g component notes summary   # src/features/notes/components/summary.rs
+```
+
+简写 `zeyn g s`、`zeyn g a`、`zeyn g c` 和 `zeyn g f` 的作用相同。screen 获得权限 `<feature>.<name>.view`，其标题写入 `locales/` 中的每个文件；英语以外的语言先得到英文文本，并提示需要翻译。action 获得 `<feature>.<name>.run`，并通过 `.api(...)` 注册。这种布局不是强制的：如果 feature 仍然使用单个 `screens.rs` 或 `actions.rs`，生成器会先把它连同内容移动到 `screens/mod.rs`（或 `actions/mod.rs`），然后再添加新文件。生成器从不覆盖文件，并拒绝不是 snake case 的名称。
+
 ## 检查应用
 
 `zeyn check` 先运行编译器，再运行应用自己的检查（`App::check`）：重复的路由、被注册两次的 screen、screen 需要但没人注册的服务、无法使用的快捷键、低于 WCAG AA 对比度的主题令牌，以及某种语言中缺失的翻译键。出现任何问题时它都会以错误退出，因此 CI 可以运行它。
+
+它还会输出警告，但警告从不让检查失败：没有任何 feature 注册的 `#[screen]` 或 `#[action]`，以及超过约 150 行且包含多个条目的单个 `screens.rs` 或 `actions.rs`。
 
 当 Zeyn 版本重命名某个 API 时，`zeyn check --fix` 会改写旧名称，例如把 `Grid` 改为 `DataGrid`，把 `GridQuery` 改为 `DataQuery`，然后再次检查。
 

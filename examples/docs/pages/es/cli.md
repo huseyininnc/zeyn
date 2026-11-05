@@ -8,7 +8,10 @@ El comando `zeyn` crea proyectos, añade features, comprueba una aplicación y e
 |---|---|
 | `zeyn new <name>` | Crea una aplicación con la estructura estándar de features |
 | `zeyn new <name> --lib` | Crea una biblioteca de modelos, features y textos compartida por varias aplicaciones |
-| `zeyn g feature <name>` | Añade `src/features/<name>` con modelos, store, acciones y pantallas |
+| `zeyn g feature <name>` | Añade `src/features/<name>` con modelos, acciones y pantallas, un archivo por pantalla y por acción |
+| `zeyn g screen <feature> <name>` | Añade `screens/<name>.rs` a una feature, lo registra y añade su título a cada archivo de idioma |
+| `zeyn g action <feature> <name>` | Añade `actions/<name>.rs` a una feature y lo registra como API |
+| `zeyn g component <feature> <name>` | Añade `components/<name>.rs`, una función que devuelve una parte de una pantalla |
 | `zeyn routes` | Lista features, pantallas, rutas, APIs y accesos |
 | `zeyn check` | Compila e informa de problemas estructurales y traducciones que faltan |
 | `zeyn check --fix` | Reescribe las APIs de Zeyn renombradas en `src`, `tests` y `examples`, y luego comprueba |
@@ -64,9 +67,23 @@ cargo run
 
 Consulta [Estructura del proyecto](structure.md) para ver cada carpeta.
 
+## Generadores
+
+Un archivo por pantalla, acción y componente es la estructura por defecto que crean los generadores:
+
+```sh
+zeyn g screen notes detail       # src/features/notes/screens/detail.rs
+zeyn g action notes archive      # src/features/notes/actions/archive.rs
+zeyn g component notes summary   # src/features/notes/components/summary.rs
+```
+
+Las formas cortas `zeyn g s`, `zeyn g a`, `zeyn g c` y `zeyn g f` hacen lo mismo. Una pantalla recibe el permiso `<feature>.<name>.view` y su título en cada archivo de `locales/`; los idiomas distintos del inglés reciben el texto en inglés y una nota para traducirlo. Una acción recibe `<feature>.<name>.run` y se registra con `.api(...)`. La estructura no es obligatoria: si una feature todavía tiene un único `screens.rs` o `actions.rs`, el generador primero lo mueve con su contenido a `screens/mod.rs` (o `actions/mod.rs`) y después añade el archivo nuevo. Los generadores nunca sobrescriben un archivo y rechazan los nombres que no están en snake case.
+
 ## Comprobar una aplicación
 
 `zeyn check` ejecuta el compilador y después las comprobaciones propias de la aplicación (`App::check`): rutas duplicadas, pantallas registradas dos veces, servicios que una pantalla necesita pero nadie registró, atajos inutilizables, tokens de tema por debajo del contraste WCAG AA y claves de traducción que faltan en un idioma. Termina con error cuando algo está mal, así que la CI puede ejecutarlo.
+
+También muestra avisos, que nunca hacen fallar la comprobación: un `#[screen]` o `#[action]` que ninguna feature registra, y un único `screens.rs` o `actions.rs` con varios elementos en más de unas 150 líneas.
 
 Cuando una versión de Zeyn renombra una API, `zeyn check --fix` reescribe los nombres antiguos, por ejemplo `Grid` por `DataGrid` y `GridQuery` por `DataQuery`, y vuelve a comprobar.
 

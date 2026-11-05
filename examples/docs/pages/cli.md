@@ -8,7 +8,10 @@ The `zeyn` command creates projects, adds features, checks an app and runs an MC
 |---|---|
 | `zeyn new <name>` | Creates an app with the standard feature structure |
 | `zeyn new <name> --lib` | Creates a library of models, features and texts shared by several apps |
-| `zeyn g feature <name>` | Adds `src/features/<name>` with models, store, actions and screens |
+| `zeyn g feature <name>` | Adds `src/features/<name>` with models, actions and screens, one file per screen and action |
+| `zeyn g screen <feature> <name>` | Adds `screens/<name>.rs` to a feature, registers it and adds its title to every locale file |
+| `zeyn g action <feature> <name>` | Adds `actions/<name>.rs` to a feature and registers it as an API |
+| `zeyn g component <feature> <name>` | Adds `components/<name>.rs`, a function that returns a part of a screen |
 | `zeyn routes` | Lists features, screens, routes, APIs and access |
 | `zeyn check` | Compiles and reports structural problems and missing translations |
 | `zeyn check --fix` | Rewrites renamed Zeyn APIs in `src`, `tests` and `examples`, then checks |
@@ -64,9 +67,23 @@ cargo run
 
 See [Project structure](structure.md) for each folder.
 
+## Generators
+
+One file per screen, action and component is the default layout the generators produce:
+
+```sh
+zeyn g screen notes detail       # src/features/notes/screens/detail.rs
+zeyn g action notes archive      # src/features/notes/actions/archive.rs
+zeyn g component notes summary   # src/features/notes/components/summary.rs
+```
+
+The short forms `zeyn g s`, `zeyn g a`, `zeyn g c` and `zeyn g f` do the same. A screen gets the permission `<feature>.<name>.view` and its title in every file in `locales/`; languages other than English get the English text and a note to translate it. An action gets `<feature>.<name>.run` and is registered with `.api(...)`. The layout is not enforced: when a feature still has a flat `screens.rs` or `actions.rs`, the generator first moves it to `screens/mod.rs` (or `actions/mod.rs`) with its content, then adds the new file. Generators never overwrite a file and refuse names that are not snake case.
+
 ## Checking an app
 
 `zeyn check` runs the compiler and then the app's own checks (`App::check`): duplicate routes, screens registered twice, services a screen needs but nobody registered, unusable shortcuts, theme tokens below WCAG AA contrast and translation keys missing in a language. It exits with an error when anything is wrong, so CI can run it.
+
+It also prints warnings, which never fail the check: a `#[screen]` or `#[action]` that no feature registers, and a flat `screens.rs` or `actions.rs` with several items in more than about 150 lines.
 
 When a Zeyn release renames an API, `zeyn check --fix` rewrites the old names, for example `Grid` to `DataGrid` and `GridQuery` to `DataQuery`, then checks again.
 

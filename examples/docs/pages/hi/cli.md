@@ -8,7 +8,10 @@
 |---|---|
 | `zeyn new <name>` | मानक feature संरचना वाला ऐप बनाता है |
 | `zeyn new <name> --lib` | कई ऐप में साझा मॉडल, feature और टेक्स्ट की लाइब्रेरी बनाता है |
-| `zeyn g feature <name>` | मॉडल, स्टोर, action और Screen के साथ `src/features/<name>` जोड़ता है |
+| `zeyn g feature <name>` | मॉडल, action और Screen के साथ `src/features/<name>` जोड़ता है, हर Screen और action के लिए एक फ़ाइल |
+| `zeyn g screen <feature> <name>` | किसी feature में `screens/<name>.rs` जोड़ता है, उसे रजिस्टर करता है और उसका शीर्षक हर लोकेल फ़ाइल में जोड़ता है |
+| `zeyn g action <feature> <name>` | किसी feature में `actions/<name>.rs` जोड़ता है और उसे API के रूप में रजिस्टर करता है |
+| `zeyn g component <feature> <name>` | `components/<name>.rs` जोड़ता है, एक फ़ंक्शन जो Screen का एक हिस्सा लौटाता है |
 | `zeyn routes` | feature, Screen, रूट, API और एक्सेस सूचीबद्ध करता है |
 | `zeyn check` | कंपाइल करता है और संरचनात्मक समस्याएँ तथा छूटे हुए अनुवाद बताता है |
 | `zeyn check --fix` | `src`, `tests` और `examples` में नाम बदले गए Zeyn API को फिर से लिखता है, फिर जाँचता है |
@@ -62,9 +65,23 @@ cargo run
 
 हर फ़ोल्डर के लिए [प्रोजेक्ट संरचना](structure.md) देखें।
 
+## जनरेटर
+
+हर Screen, action और कंपोनेंट के लिए एक फ़ाइल, जनरेटर का बनाया डिफ़ॉल्ट ढाँचा है:
+
+```sh
+zeyn g screen notes detail       # src/features/notes/screens/detail.rs
+zeyn g action notes archive      # src/features/notes/actions/archive.rs
+zeyn g component notes summary   # src/features/notes/components/summary.rs
+```
+
+छोटे रूप `zeyn g s`, `zeyn g a`, `zeyn g c` और `zeyn g f` भी यही करते हैं। Screen को अनुमति `<feature>.<name>.view` मिलती है और उसका शीर्षक `locales/` की हर फ़ाइल में जाता है; अंग्रेज़ी के अलावा भाषाओं को अंग्रेज़ी पाठ और उसे अनुवाद करने का नोट मिलता है। action को `<feature>.<name>.run` मिलता है और वह `.api(...)` से रजिस्टर होता है। यह ढाँचा अनिवार्य नहीं है: अगर किसी feature में अब भी एक ही `screens.rs` या `actions.rs` है, तो जनरेटर पहले उसे उसकी सामग्री के साथ `screens/mod.rs` (या `actions/mod.rs`) में ले जाता है, फिर नई फ़ाइल जोड़ता है। जनरेटर कभी किसी फ़ाइल को ओवरराइट नहीं करते और snake case से अलग नाम अस्वीकार करते हैं।
+
 ## ऐप की जाँच
 
 `zeyn check` कंपाइलर चलाता है और फिर ऐप की अपनी जाँचें (`App::check`): दोहराए गए रूट, दो बार पंजीकृत Screen, ऐसी सेवाएँ जो Screen को चाहिए लेकिन किसी ने पंजीकृत नहीं कीं, अनुपयोगी शॉर्टकट, WCAG AA कंट्रास्ट से नीचे के थीम टोकन और किसी भाषा में छूटी अनुवाद कुंजियाँ। कुछ भी गलत हो तो यह त्रुटि के साथ बाहर निकलता है, इसलिए CI इसे चला सकता है।
+
+यह चेतावनियाँ भी दिखाता है, जो जाँच को कभी विफल नहीं करतीं: ऐसा `#[screen]` या `#[action]` जिसे कोई feature रजिस्टर नहीं करता, और कई आइटम वाली एक ही `screens.rs` या `actions.rs` फ़ाइल जो लगभग 150 पंक्तियों से लंबी हो गई है।
 
 जब Zeyn रिलीज़ किसी API का नाम बदलती है, तो `zeyn check --fix` पुराने नाम फिर से लिखता है, जैसे `Grid` को `DataGrid` और `GridQuery` को `DataQuery`, फिर दोबारा जाँचता है।
 

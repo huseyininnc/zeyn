@@ -56,8 +56,12 @@ Which page answers what:
 These hold in every Zeyn app. `zeyn check` and the compiler enforce many of them.
 
 1. **One folder per feature.** `src/features/<name>/` holds `mod.rs` (the `Feature`), `models.rs`,
-   `store.rs`, `actions.rs` and `screens.rs`. Register screens in the feature's `mod.rs` and the
-   feature in `src/app.rs`. Create one with `zeyn g feature <name>`.
+   `store.rs`, and by default one file per screen, action and component in `screens/`, `actions/`
+   and `components/`. Register screens in the feature's `mod.rs` and the feature in `src/app.rs`.
+   Create a feature with `zeyn g feature <name>`, and its parts with `zeyn g screen <feature> <name>`,
+   `zeyn g action <feature> <name>` and `zeyn g component <feature> <name>`: they register the
+   screen or action and add new texts to every locale file. A single `screens.rs` still works; the
+   generators move it to `screens/mod.rs` before they add a file.
 2. **Every action and screen declares access**: `permission = "feature.resource.verb"` or
    `public`. The server checks it on every call, from the page, the API and AI agents alike.
 3. **Inputs are validated by type.** Saving takes `Valid<Model>`. Put rules on fields
@@ -226,7 +230,8 @@ What to remember:
 
 1. `cargo test`: the app's tests drive it through its router; add a test for new behavior.
 2. `zeyn check` (or the `zeyn_check` MCP tool): compiles, then reports structural problems and
-   missing translations. It must say `ok`.
+   missing translations. It must say `ok`. Its warnings name a `#[screen]` or `#[action]` that no
+   feature registers and a flat `screens.rs` or `actions.rs` that has grown too large to stay flat.
 3. `zeyn dev` and open the screen in a browser: the page follows each rebuild without reloading.
    Check that the screen works by keyboard, in both themes, and that the console has no errors.
 4. For a container: `docker build -t <app> .` and `docker run -p 3000:3000 <app>`.

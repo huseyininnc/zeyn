@@ -2,6 +2,7 @@
 
 mod desktop;
 mod dev;
+mod generate;
 mod islands;
 
 use serde_json::{Value, json};
@@ -226,9 +227,19 @@ Usage:
                                           local git repository on branch main when git is installed
   zeyn new <name> --lib [--zeyn-path <path>] [--no-git]
                                           the same for a shared library (models, features, texts)
-  zeyn g feature <name>                   add src/features/<name> with models, store, actions and screens
+  zeyn g feature <name>                   add src/features/<name> with models, actions and screens,
+                                          one file per screen and action (screens/list.rs, ...)
+  zeyn g screen <feature> <name>          add src/features/<feature>/screens/<name>.rs, register it in
+                                          the feature and add its title to every file in locales/
+  zeyn g action <feature> <name>          add src/features/<feature>/actions/<name>.rs and register it
+  zeyn g component <feature> <name>       add src/features/<feature>/components/<name>.rs, a function
+                                          that returns a Node (a toolbar, a panel)
+                                          Short forms: g f, g s, g a, g c. A flat screens.rs or
+                                          actions.rs is first moved to screens/mod.rs (actions/mod.rs)
   zeyn routes                             list features, screens, routes, APIs and access
   zeyn check [--fix]                      compile and report structural problems and missing translations;
+                                          warns about unregistered screens and actions and crowded flat
+                                          screens.rs or actions.rs files;
                                           --fix first rewrites renamed Zeyn APIs in src, tests and examples
   zeyn dev                                run the app, rebuild and restart on every change; the browser
                                           follows without a page reload
@@ -253,57 +264,68 @@ fn main() -> ExitCode {
         .iter()
         .map(String::as_str)
         .collect();
-    let result =
-        match words.as_slice() {
-            ["new", name, rest @ ..] => new_project(
-                name,
-                flag(rest, "--zeyn-path"),
-                rest.contains(&"--lib"),
-                !rest.contains(&"--no-git"),
-            ),
-            ["g" | "generate", "feature", name] => {
-                new_feature(Path::new("."), name).map(|m| println!("{m}"))
+    let result = match words.as_slice() {
+        ["new", name, rest @ ..] => new_project(
+            name,
+            flag(rest, "--zeyn-path"),
+            rest.contains(&"--lib"),
+            !rest.contains(&"--no-git"),
+        ),
+        ["g" | "generate", kind, name] if generate::kind_of(kind) == Some("feature") => {
+            new_feature(Path::new("."), name).map(|m| println!("{m}"))
+        }
+        ["g" | "generate", kind, feature, name] => {
+            match generate::kind_of(kind).and_then(generate::Kind::named) {
+                Some(k) => {
+                    generate::generate(Path::new("."), k, feature, name).map(|m| println!("{m}"))
+                }
+                None => Err(format!(
+                    "unknown generator `{kind}`; use feature (f), screen (s), action (a) or component (c)"
+                )),
             }
-            ["routes"] => describe(Path::new(".")).map(|d| print!("{}", routes_table(&d))),
-            ["check", rest @ ..] => fix_if(Path::new("."), rest.contains(&"--fix"))
-                .and_then(|fixed| check(Path::new(".")).map(|r| fixed + &r))
-                .and_then(|report| {
-                    print!("{report}");
-                    if report.contains("error") {
-                        Err("the app has problems".into())
-                    } else {
-                        Ok(())
-                    }
-                }),
-            ["dev"] => dev::run(Path::new(".")),
-            ["build-desktop", rest @ ..] => desktop::build(
-                Path::new("."),
-                flag(rest, "--package"),
-                flag(rest, "--features").unwrap_or("desktop"),
-            )
-            .map(|r| print!("{r}")),
-            ["build-islands", rest @ ..] => build_islands(rest).map(|r| println!("{r}")),
-            ["mcp"] => mcp(),
-            ["license", "keygen", rest @ ..] => license::keygen(Path::new(
-                flag(rest, "--out").unwrap_or(license::DEFAULT_KEY),
-            ))
-            .map(|m| print!("{m}")),
-            ["license", "sign", json, rest @ ..] => license::sign(
-                json,
-                flag(rest, "--key").map(Path::new),
-            )
-            .and_then(|signed| match flag(rest, "--out") {
-                Some(out) => std::fs::write(out, signed + "\n").map_err(|e| format!("{out}: {e}")),
-                None => {
-                    println!("{signed}");
+        }
+        ["routes"] => describe(Path::new(".")).map(|d| print!("{}", routes_table(&d))),
+        ["check", rest @ ..] => fix_if(Path::new("."), rest.contains(&"--fix"))
+            .and_then(|fixed| check(Path::new(".")).map(|r| fixed + &r))
+            .and_then(|report| {
+                print!("{report}");
+                if report.contains("error") {
+                    Err("the app has problems".into())
+                } else {
                     Ok(())
                 }
             }),
-            _ => {
-                print!("{HELP}");
-                Ok(())
-            }
-        };
+        ["dev"] => dev::run(Path::new(".")),
+        ["build-desktop", rest @ ..] => desktop::build(
+            Path::new("."),
+            flag(rest, "--package"),
+            flag(rest, "--features").unwrap_or("desktop"),
+        )
+        .map(|r| print!("{r}")),
+        ["build-islands", rest @ ..] => build_islands(rest).map(|r| println!("{r}")),
+        ["mcp"] => mcp(),
+        ["license", "keygen", rest @ ..] => license::keygen(Path::new(
+            flag(rest, "--out").unwrap_or(license::DEFAULT_KEY),
+        ))
+        .map(|m| print!("{m}")),
+        ["license", "sign", json, rest @ ..] => {
+            license::sign(json, flag(rest, "--key").map(Path::new)).and_then(|signed| {
+                match flag(rest, "--out") {
+                    Some(out) => {
+                        std::fs::write(out, signed + "\n").map_err(|e| format!("{out}: {e}"))
+                    }
+                    None => {
+                        println!("{signed}");
+                        Ok(())
+                    }
+                }
+            })
+        }
+        _ => {
+            print!("{HELP}");
+            Ok(())
+        }
+    };
     match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
@@ -465,7 +487,8 @@ fn git_init(root: &Path) -> String {
     }
 }
 
-/// Adds `src/features/<name>` and registers the module. Returns what is left to do by hand.
+/// Adds `src/features/<name>` with one file per screen and action (`screens/list.rs`,
+/// `actions/search.rs`) and registers the module. Returns what is left to do by hand.
 fn new_feature(root: &Path, name: &str) -> Result<String, String> {
     if !valid_ident(name) {
         return Err(format!(
@@ -491,21 +514,32 @@ fn new_feature(root: &Path, name: &str) -> Result<String, String> {
             ),
         ),
         (
-            "actions.rs",
+            "actions/mod.rs",
+            format!("mod search;\npub use search::search_{name};\n"),
+        ),
+        (
+            "actions/search.rs",
             format!(
-                "use super::models::{model};\nuse zeyn::prelude::*;\n\n/// Records for the list. Replace the empty page with your store or database.\n#[action(permission = \"{name}.record.read\")]\npub async fn search_{name}(q: DataQuery) -> Result<Page<{model}>> {{\n    Ok(q.apply(Vec::new()))\n}}\n"
+                "use super::super::models::{model};\nuse zeyn::prelude::*;\n\n/// Records for the list. Replace the empty page with your store or database.\n#[action(permission = \"{name}.record.read\")]\npub async fn search_{name}(q: DataQuery) -> Result<Page<{model}>> {{\n    Ok(q.apply(Vec::new()))\n}}\n"
             ),
         ),
         (
-            "screens.rs",
+            "screens/mod.rs",
+            format!("mod list;\npub use list::{name}_list;\n"),
+        ),
+        (
+            "screens/list.rs",
             format!(
-                "use super::actions::search_{name};\nuse zeyn::prelude::*;\n\n/// List screen.\n#[screen(route = \"/\", permission = \"{name}.record.read\")]\npub fn {name}_list() -> Screen {{\n    Screen::new(\"{model}\").body(DataGrid::auto(search_{name}).mode(DataMode::Server))\n}}\n"
+                "use super::super::actions::search_{name};\nuse zeyn::prelude::*;\n\n/// List screen.\n#[screen(route = \"/\", permission = \"{name}.record.read\")]\npub fn {name}_list() -> Screen {{\n    Screen::new(\"{model}\").body(DataGrid::auto(search_{name}).mode(DataMode::Server))\n}}\n"
             ),
         ),
     ];
-    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     for (file, body) in files {
-        std::fs::write(dir.join(file), body).map_err(|e| e.to_string())?;
+        let path = dir.join(file);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        std::fs::write(path, body).map_err(|e| e.to_string())?;
     }
     let mod_rs = root.join("src/features/mod.rs");
     let mut text = std::fs::read_to_string(&mod_rs).unwrap_or_default();
@@ -745,6 +779,42 @@ fn check(root: &Path) -> Result<String, String> {
             m[0].as_str().unwrap_or("")
         ));
     }
+    let registered: Vec<String> = d["features"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .flat_map(|f| {
+            let screens = f["screens"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|s| &s["name"]);
+            let apis = f["apis"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|a| &a["action"]);
+            screens.chain(apis)
+        })
+        .filter_map(|n| n.as_str().map(str::to_string))
+        .collect();
+    let mut paths = Vec::new();
+    rust_files(&root.join("src"), &mut paths);
+    let files: Vec<(PathBuf, String)> = paths
+        .into_iter()
+        .filter_map(|p| {
+            let text = std::fs::read_to_string(&p).ok()?;
+            Some((
+                p.strip_prefix(root)
+                    .unwrap_or(&p)
+                    .to_path_buf(),
+                text,
+            ))
+        })
+        .collect();
+    for w in generate::layout_warnings(&files, &registered) {
+        report.push_str(&format!("warning: {w}\n"));
+    }
     if report.is_empty() {
         report.push_str("ok: no problems found\n");
     }
@@ -783,11 +853,36 @@ fn tools() -> Value {
         ),
         tool(
             "zeyn_new_feature",
-            "Create src/features/<name> with models, actions and screens and register the module.",
+            "Create src/features/<name> with models, actions and screens (one file per screen and action) and register the module.",
             json!({ "name": { "type": "string", "description": "lower case, digits and _" } }),
             &["name"]
         ),
+        tool(
+            "zeyn_new_screen",
+            "Create src/features/<feature>/screens/<name>.rs with a #[screen] skeleton, register it in the feature and add its title to every locale file. A flat screens.rs is first moved to screens/mod.rs.",
+            generator_args(),
+            &["feature", "name"]
+        ),
+        tool(
+            "zeyn_new_action",
+            "Create src/features/<feature>/actions/<name>.rs with an #[action] skeleton and register it in the feature. A flat actions.rs is first moved to actions/mod.rs.",
+            generator_args(),
+            &["feature", "name"]
+        ),
+        tool(
+            "zeyn_new_component",
+            "Create src/features/<feature>/components/<name>.rs with a function that returns a Node (a part of a screen such as a toolbar or a panel) and wire components/mod.rs.",
+            generator_args(),
+            &["feature", "name"]
+        ),
     ])
+}
+
+fn generator_args() -> Value {
+    json!({
+        "feature": { "type": "string", "description": "an existing feature in src/features" },
+        "name": { "type": "string", "description": "snake case: lower case, digits and _" }
+    })
 }
 
 fn call_tool(name: &str, args: &Value) -> Result<String, String> {
@@ -837,6 +932,13 @@ fn call_tool(name: &str, args: &Value) -> Result<String, String> {
             ))
         }
         "zeyn_new_feature" => new_feature(root, args["name"].as_str().unwrap_or("")),
+        "zeyn_new_screen" | "zeyn_new_action" | "zeyn_new_component" => generate::generate(
+            root,
+            generate::Kind::named(name.trim_start_matches("zeyn_new_"))
+                .unwrap_or(generate::Kind::Screen),
+            args["feature"].as_str().unwrap_or(""),
+            args["name"].as_str().unwrap_or(""),
+        ),
         _ => Err(format!("unknown tool `{name}`")),
     }
 }
@@ -989,6 +1091,194 @@ const RAW: &str = r#"Grid "quoted" Grid"#; const C: char = 'G';"##;
         new_project_at(&lib, "ci-lib", None, true, false).unwrap();
         assert!(lib.join("Jenkinsfile").is_file() && !lib.join(".git").exists());
         std::fs::remove_dir_all(&base).ok();
+    }
+
+    /// A project from the app template in a fresh temp folder.
+    fn app_at(tag: &str) -> (PathBuf, PathBuf) {
+        let base = std::env::temp_dir().join(format!("zeyn-gen-{tag}-{}", std::process::id()));
+        std::fs::remove_dir_all(&base).ok();
+        std::fs::create_dir_all(&base).unwrap();
+        let root = base.join("app");
+        new_project_at(&root, "app", None, false, false).unwrap();
+        (base, root)
+    }
+
+    fn read(root: &Path, file: &str) -> String {
+        std::fs::read_to_string(root.join(file)).unwrap()
+    }
+
+    #[test]
+    fn generator_aliases_name_the_full_generators() {
+        for (short, full) in [
+            ("f", "feature"),
+            ("s", "screen"),
+            ("a", "action"),
+            ("c", "component"),
+        ] {
+            assert_eq!(generate::kind_of(short), Some(full));
+            assert_eq!(generate::kind_of(full), Some(full));
+        }
+        assert_eq!(generate::kind_of("x"), None);
+        assert_eq!(
+            generate::Kind::named("component"),
+            Some(generate::Kind::Component)
+        );
+        assert_eq!(generate::Kind::named("feature"), None);
+    }
+
+    #[test]
+    fn generators_add_one_file_each_and_move_a_flat_screens_file() {
+        use generate::{Kind, generate};
+        let (base, root) = app_at("files");
+        let flat = read(&root, "src/features/notes/screens.rs");
+        let out = generate(&root, Kind::Screen, "notes", "detail").unwrap();
+        assert!(out.contains("Moved src/features/notes/screens.rs"), "{out}");
+        assert!(
+            out.contains("translate `notes.detail.title` in locales/tr.json"),
+            "{out}"
+        );
+        assert!(
+            !root
+                .join("src/features/notes/screens.rs")
+                .exists()
+        );
+        let moved = read(&root, "src/features/notes/screens/mod.rs");
+        assert!(
+            moved.starts_with("mod detail;\npub use detail::notes_detail;\n\n"),
+            "{moved}"
+        );
+        assert!(moved.ends_with(&flat));
+        let screen = read(&root, "src/features/notes/screens/detail.rs");
+        assert!(
+            screen.contains("#[screen(route = \"/detail\", permission = \"notes.detail.view\")]")
+        );
+        assert!(screen.contains("pub fn notes_detail() -> Screen"));
+        let feature = read(&root, "src/features/notes/mod.rs");
+        assert!(feature.contains(
+            "        .screen(screens::note_editor)\n        .screen(screens::notes_detail)\n"
+        ));
+        for locale in ["en", "tr"] {
+            let json: Value =
+                serde_json::from_str(&read(&root, &format!("locales/{locale}.json"))).unwrap();
+            assert_eq!(json["notes"]["detail"]["title"], "Detail");
+            assert!(json["notes"]["saved"].is_string());
+        }
+        assert!(read(&root, "locales/en.json").contains(
+            "    \"saved\": \"Note saved.\",\n    \"detail\": { \"title\": \"Detail\" }\n  },"
+        ));
+
+        generate(&root, Kind::Action, "notes", "archive").unwrap();
+        assert!(
+            read(&root, "src/features/notes/actions/mod.rs").starts_with(
+                "mod archive;\npub use archive::notes_archive;\n\nuse super::models::Note;"
+            )
+        );
+        assert!(read(&root, "src/features/notes/actions/archive.rs").contains("#[action(permission = \"notes.archive.run\")]\npub async fn notes_archive(_: ()) -> Result<()>"));
+        assert!(
+            read(&root, "src/features/notes/mod.rs")
+                .contains(".api(actions::save_note)\n        .api(actions::notes_archive)\n")
+        );
+
+        generate(&root, Kind::Component, "notes", "summary").unwrap();
+        let feature = read(&root, "src/features/notes/mod.rs");
+        assert!(
+            feature.contains("pub mod actions;\nmod components;\npub mod models;"),
+            "{feature}"
+        );
+        assert!(
+            read(&root, "src/features/notes/components/mod.rs")
+                .starts_with("mod summary;\n#[expect(unused_imports")
+        );
+        assert!(
+            read(&root, "src/features/notes/components/summary.rs")
+                .contains("pub fn summary() -> Node")
+        );
+        generate(&root, Kind::Component, "notes", "header").unwrap();
+        assert!(read(&root, "src/features/notes/components/mod.rs").starts_with("mod header;\n#[expect(unused_imports, reason = \"remove once a screen uses it\")]\npub use header::header;\nmod summary;"));
+
+        generate(&root, Kind::Screen, "home", "about").unwrap();
+        let home = read(&root, "src/features/home/mod.rs");
+        assert!(home.starts_with("//! Home: the first screen after sign in.\n\npub mod screens;\n\nuse zeyn::prelude::*;"), "{home}");
+        assert!(home.contains("        .screen(home)\n        .screen(screens::home_about)\n"));
+        assert_eq!(
+            read(&root, "src/features/home/screens/mod.rs"),
+            "mod about;\npub use about::home_about;\n"
+        );
+        std::fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn generators_refuse_bad_names_missing_features_and_existing_files() {
+        use generate::{Kind, generate};
+        let (base, root) = app_at("refuse");
+        let before = read(&root, "locales/en.json");
+        for (feature, name, says) in [
+            ("notes", "Detail", "not a valid screen name"),
+            ("notes", "type", "not a valid screen name"),
+            ("bad-name", "x", "not a valid feature name"),
+            ("orders", "list", "feature `orders` does not exist"),
+            (
+                "notes",
+                "editor",
+                "`notes.editor` in locales/en.json is a text",
+            ),
+        ] {
+            let err = generate(&root, Kind::Screen, feature, name).unwrap_err();
+            assert!(err.contains(says), "{err}");
+        }
+        assert_eq!(read(&root, "locales/en.json"), before);
+        assert!(
+            root.join("src/features/notes/screens.rs")
+                .is_file(),
+            "a refusal moves nothing"
+        );
+        new_feature(&root, "orders").unwrap();
+        assert!(
+            root.join("src/features/orders/screens/list.rs")
+                .is_file()
+        );
+        assert!(
+            root.join("src/features/orders/actions/search.rs")
+                .is_file()
+        );
+        let err = generate(&root, Kind::Screen, "orders", "list").unwrap_err();
+        assert!(
+            err.contains("src/features/orders/screens/list.rs already exists"),
+            "{err}"
+        );
+        std::fs::write(
+            root.join("src/features/notes/actions.rs"),
+            "pub fn notes_save() {}\n",
+        )
+        .unwrap();
+        let err = generate(&root, Kind::Action, "notes", "save").unwrap_err();
+        assert!(err.contains("`notes_save` is already defined"), "{err}");
+        std::fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn check_warns_about_unregistered_items_and_crowded_flat_files() {
+        let mut crowded = String::from(
+            "#[screen(permission = \"a.b.c\")]\npub fn one() -> Screen {}\n/// Doc.\n#[screen(permission = \"a.b.c\")]\npub fn two() -> Screen {}\n",
+        );
+        crowded.push_str(&"let x = 1;\n".repeat(150));
+        let files = vec![
+            (PathBuf::from("src/features/sales/screens.rs"), crowded),
+            (PathBuf::from("src/features/sales/actions.rs"), "#[action(public)]\npub async fn lost(_: ()) -> Result<()> {}\n#[action(public)]\npub async fn used(_: ()) -> Result<()> {}\n".into()),
+            (PathBuf::from("src/features/sales/other.rs"), "fn f() { used; }\n".into()),
+        ];
+        let w = generate::layout_warnings(&files, &["one".into()]);
+        assert_eq!(w.len(), 3, "{w:#?}");
+        assert!(
+            w[0].contains("#[screen] `two` in src/features/sales/screens.rs is not registered")
+        );
+        assert!(w[1].contains("src/features/sales/screens.rs has 2 #[screen] functions in 155 lines; run `zeyn g screen sales <name>`"));
+        assert!(
+            w[2].contains("#[action] `lost` in src/features/sales/actions.rs is not registered")
+        );
+        assert!(w.iter().all(|w| !w.contains("error")));
+        let small = generate::layout_warnings(&files[1..], &["lost".into()]);
+        assert!(small.is_empty(), "{small:#?}");
     }
 
     #[test]

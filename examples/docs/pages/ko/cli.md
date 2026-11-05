@@ -8,7 +8,10 @@
 |---|---|
 | `zeyn new <name>` | 표준 Feature 구조의 앱을 만듭니다 |
 | `zeyn new <name> --lib` | 여러 앱이 공유하는 모델, Feature, 텍스트 라이브러리를 만듭니다 |
-| `zeyn g feature <name>` | 모델, 스토어, action, Screen이 있는 `src/features/<name>`을 추가합니다 |
+| `zeyn g feature <name>` | 모델, action, Screen이 있는 `src/features/<name>`을 추가하며, Screen과 action마다 파일이 하나입니다 |
+| `zeyn g screen <feature> <name>` | feature에 `screens/<name>.rs`를 추가하고 등록한 뒤 제목을 모든 로케일 파일에 추가합니다 |
+| `zeyn g action <feature> <name>` | feature에 `actions/<name>.rs`를 추가하고 API로 등록합니다 |
+| `zeyn g component <feature> <name>` | Screen의 일부를 반환하는 함수가 있는 `components/<name>.rs`를 추가합니다 |
 | `zeyn routes` | Feature, Screen, 경로, API, 접근 권한을 나열합니다 |
 | `zeyn check` | 컴파일하고 구조적 문제와 누락된 번역을 보고합니다 |
 | `zeyn check --fix` | `src`, `tests`, `examples`에서 이름이 바뀐 Zeyn API를 다시 쓴 다음 검사합니다 |
@@ -64,9 +67,23 @@ cargo run
 
 각 폴더에 대해서는 [프로젝트 구조](structure.md)를 참고하십시오.
 
+## 생성기
+
+Screen, action, 컴포넌트마다 파일 하나를 두는 것이 생성기가 만드는 기본 구조입니다.
+
+```sh
+zeyn g screen notes detail       # src/features/notes/screens/detail.rs
+zeyn g action notes archive      # src/features/notes/actions/archive.rs
+zeyn g component notes summary   # src/features/notes/components/summary.rs
+```
+
+짧은 형태 `zeyn g s`, `zeyn g a`, `zeyn g c`, `zeyn g f`도 같은 일을 합니다. Screen은 `<feature>.<name>.view` 권한을 받고 `locales/`의 모든 파일에 제목이 들어갑니다. 영어가 아닌 언어에는 영어 문장과 번역하라는 안내가 들어갑니다. action은 `<feature>.<name>.run`을 받고 `.api(...)`로 등록됩니다. 이 구조는 강제가 아닙니다. feature에 아직 하나의 `screens.rs`나 `actions.rs`가 있으면 생성기는 먼저 내용을 그대로 `screens/mod.rs`(또는 `actions/mod.rs`)로 옮긴 다음 새 파일을 추가합니다. 생성기는 파일을 덮어쓰지 않으며 snake case가 아닌 이름은 거부합니다.
+
 ## 앱 검사하기
 
 `zeyn check`는 컴파일러를 실행한 다음 앱 자체의 검사(`App::check`)를 실행합니다. 중복된 경로, 두 번 등록된 Screen, Screen에 필요하지만 아무도 등록하지 않은 서비스, 사용할 수 없는 단축키, WCAG AA 대비에 못 미치는 테마 토큰, 어떤 언어에서 누락된 번역 키를 검사합니다. 문제가 있으면 오류로 종료하므로 CI에서 실행할 수 있습니다.
+
+검사를 실패시키지 않는 경고도 출력합니다. 어떤 feature도 등록하지 않은 `#[screen]`이나 `#[action]`, 그리고 여러 항목이 있으면서 약 150줄을 넘은 하나의 `screens.rs`나 `actions.rs`입니다.
 
 Zeyn 릴리스에서 API 이름이 바뀌면 `zeyn check --fix`는 예를 들어 `Grid`를 `DataGrid`로, `GridQuery`를 `DataQuery`로 이전 이름을 다시 쓴 다음 다시 검사합니다.
 

@@ -8,7 +8,10 @@
 |---|---|
 | `zeyn new <name>` | 標準の Feature 構成でアプリを作成します |
 | `zeyn new <name> --lib` | 複数のアプリで共有するモデル、Feature、テキストのライブラリを作成します |
-| `zeyn g feature <name>` | モデル、ストア、アクション、画面を備えた `src/features/<name>` を追加します |
+| `zeyn g feature <name>` | モデル、アクション、画面を備えた `src/features/<name>` を追加します。画面とアクションはそれぞれ 1 ファイルです |
+| `zeyn g screen <feature> <name>` | feature に `screens/<name>.rs` を追加して登録し、タイトルをすべてのロケールファイルに追加します |
+| `zeyn g action <feature> <name>` | feature に `actions/<name>.rs` を追加し、API として登録します |
+| `zeyn g component <feature> <name>` | 画面の一部を返す関数を持つ `components/<name>.rs` を追加します |
 | `zeyn routes` | Feature、画面、ルート、API、アクセス権を一覧表示します |
 | `zeyn check` | コンパイルし、構造上の問題と翻訳の欠落を報告します |
 | `zeyn check --fix` | `src`、`tests`、`examples` 内で名前が変わった Zeyn API を書き換えてから検査します |
@@ -62,9 +65,23 @@ cargo run
 
 各フォルダについては [プロジェクト構造](structure.md) を参照してください。
 
+## ジェネレーター
+
+画面、アクション、コンポーネントごとに 1 ファイルという構成が、ジェネレーターが作る既定のレイアウトです。
+
+```sh
+zeyn g screen notes detail       # src/features/notes/screens/detail.rs
+zeyn g action notes archive      # src/features/notes/actions/archive.rs
+zeyn g component notes summary   # src/features/notes/components/summary.rs
+```
+
+短い形 `zeyn g s`、`zeyn g a`、`zeyn g c`、`zeyn g f` も同じ動作をします。画面には権限 `<feature>.<name>.view` が付き、タイトルが `locales/` のすべてのファイルに入ります。英語以外の言語には英語の文と翻訳を促すメモが入ります。アクションには `<feature>.<name>.run` が付き、`.api(...)` で登録されます。このレイアウトは強制ではありません。feature がまだ 1 つの `screens.rs` や `actions.rs` を使っている場合、ジェネレーターはまずその内容ごと `screens/mod.rs`（または `actions/mod.rs`）へ移し、それから新しいファイルを追加します。ジェネレーターはファイルを上書きせず、snake case でない名前は受け付けません。
+
 ## アプリの検査
 
 `zeyn check` はコンパイラを実行し、続いてアプリ自身の検査（`App::check`）を行います。対象は、重複したルート、二重に登録された画面、画面が必要としているのに誰も登録していないサービス、使えないショートカット、WCAG AA のコントラストを下回るテーマトークン、ある言語で欠けている翻訳キーです。問題があればエラーで終了するため、CI で実行できます。
+
+検査を失敗させない警告も出します。どの feature も登録していない `#[screen]` や `#[action]`、そして複数の項目を持ち約 150 行を超えた 1 つの `screens.rs` や `actions.rs` です。
 
 Zeyn のリリースで API の名前が変わったときは、`zeyn check --fix` が、たとえば `Grid` から `DataGrid`、`GridQuery` から `DataQuery` のように古い名前を書き換え、もう一度検査します。
 
