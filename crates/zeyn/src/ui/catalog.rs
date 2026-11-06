@@ -663,7 +663,10 @@ impl<E: Model> CardGrid<E> {
 
     /// The rows of a page as `<li>`s. Built rows and the rows of a virtual list carry their model
     /// key in `data-zeyn-key`; in a virtual list also their position (`aria-posinset`) and the
-    /// row count (`aria-setsize`). Typed cards and items are links, found again by position.
+    /// row count (`aria-setsize`). The cards of a card grid carry their key too, because a long
+    /// grid keeps only the rows near the viewport in the page (`catalog.js`), so a refresh finds
+    /// the focused card by its key, not by its position. Items of lists and cards of rails are
+    /// links, found again by position.
     /// Separators go before each row; the stylesheet hides the one before the first row, so a
     /// batch appended later still gets one.
     fn cards(&self, page: &LoadedPage, r: &Render, first: bool) -> String {
@@ -699,7 +702,7 @@ impl<E: Model> CardGrid<E> {
                 ),
                 _ => continue,
             }
-            if self.builder.is_none() && place.is_none() {
+            if self.builder.is_none() && place.is_none() && (self.list || self.rail) {
                 continue;
             }
             let mut attrs = key

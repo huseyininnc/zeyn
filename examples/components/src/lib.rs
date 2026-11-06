@@ -291,6 +291,7 @@ pub fn feature() -> Feature {
             .screen(catalog_home)
             .screen(examples::image_card::product)
             .screen(examples::card_grid::large_catalog)
+            .screen(examples::card_grid::live_catalog)
             .screen(examples::screen_header::orders_page),
     )
 }

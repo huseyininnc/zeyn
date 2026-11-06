@@ -9,6 +9,8 @@
  *
  * A card grid with 200 cards or more is windowed: only the rows near the viewport are in the DOM
  * and the rows above and below are padding of their height, as the rows of a virtual DataGrid.
+ * Built rows (`CardGrid::builder`) are windowed the same way and keep their `data-zeyn-key`; a
+ * grid with separators is not windowed, since a separator would take a cell of its own.
  * Every row has the height of the tallest of the first cards; each card carries `aria-posinset`
  * and `aria-setsize`; a focused card stays in the DOM while it is out of view; cards that "Show
  * more" or the next page bring are taken in the same way. During a fling (over 3 px per ms) cards
@@ -384,7 +386,7 @@ function paint(w, at, width) {
   const last = Math.min(rows, Math.max(first, Math.ceil((innerHeight - top + WINDOW_MARGIN) / w.rowH)));
   const from = first * w.cols;
   const to = Math.min(cards.length, last * w.cols);
-  const focused = document.activeElement?.closest?.('.z-poster');
+  const focused = document.activeElement?.closest?.('[data-zeyn-window] > li');
   const keep = focused && w.index.has(focused) ? focused : null;
   if (from === w.from && to === w.to && keep === w.kept) return;
   const outside = (c) => {
@@ -470,7 +472,7 @@ function windowCards(section, how) {
   if (!list || !section.matches('.z-cards:not(.z-cards-rows)')) return;
   let w = windows.get(list);
   if (!w) {
-    if (list.children.length < WINDOW_MIN) return;
+    if (list.children.length < WINDOW_MIN || list.querySelector(':scope > .z-separator')) return;
     w = { list, cards: [], index: new Map(), from: 0, to: 0, kept: null, cols: 1, rowH: 1, cardH: 0, gap: 0, colGap: 0, width: -1 };
     windows.set(list, w);
     list.dataset.zeynWindow = '';

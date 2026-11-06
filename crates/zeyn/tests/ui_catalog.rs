@@ -259,6 +259,10 @@ async fn product_cards_reserve_their_box_show_a_placeholder_and_load_only_the_fi
         "a low file outside img-src is left out"
     );
     assert!(
+        page.contains(r#"<li data-zeyn-key="1" class="z-poster">"#),
+        "card grid cards carry their model key, so a refresh of a windowed grid finds the focused card"
+    );
+    assert!(
         page.contains(r#"style="--z-card-ratio:1.333""#),
         "the section carries the image ratio that sizes off screen cards"
     );
@@ -367,7 +371,7 @@ async fn card_grids_render_their_first_page_as_linked_lazy_images() {
     assert!(page.contains(r#"<span class="z-badge z-tone-neutral">New</span>"#));
     assert!(page.contains("Black &lt;tea&gt;"), "row text is escaped");
     assert_eq!(
-        page.matches(r#"<li class="z-poster">"#)
+        page.matches(r#"class="z-poster">"#)
             .count(),
         4 + 12,
         "four cards and the rail's twelve"
@@ -402,7 +406,7 @@ async fn more_cards_load_through_the_grid_endpoint_with_the_servers_page_size_an
     let json: serde_json::Value = serde_json::from_str(&body).unwrap();
     let rows = json["rows"].as_str().unwrap();
     assert_eq!(
-        rows.matches(r#"<li class="z-poster">"#)
+        rows.matches(r#"class="z-poster">"#)
             .count(),
         4,
         "the client's limit is ignored"
@@ -456,7 +460,7 @@ async fn results_screens_search_on_the_server_and_page_by_number() {
         "{page}"
     );
     assert_eq!(
-        page.matches(r#"<li class="z-poster">"#)
+        page.matches(r#"class="z-poster">"#)
             .count(),
         5
     );

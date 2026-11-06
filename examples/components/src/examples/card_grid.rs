@@ -54,6 +54,29 @@ pub fn large_catalog() -> Screen {
     (0..SHELVES).fold(Screen::new("2,000 products"), |s, n| s.body(shelf(n)))
 }
 
+/// The large catalog again with built rows and a shelf that a button refreshes through a topic,
+/// to check windowing with builders and with `.listens`.
+#[screen(route = "/ui/card-grid/catalog-live", public)]
+pub fn live_catalog() -> Screen {
+    Screen::new("2,000 products, live")
+        .body(
+            ActionButton::new("Refresh the first shelf", crate::data::count_products, ())
+                .on_success(|_, ui| ui.refresh("catalog")),
+        )
+        .body(shelf(0).listens("catalog"))
+        .body(shelf(1).builder(|i: &Item| {
+            Stack::new()
+                .add(
+                    Image::new(i.photo())
+                        .alt(i.name.clone())
+                        .size(300, 300)
+                        .lazy()
+                        .placeholder(Placeholder::color("--z-surface-2")),
+                )
+                .add(Paragraph::new(i.name.clone()))
+        }))
+}
+
 /// What the catalog shows of `CardGrid`.
 pub const ENTRY: Entry = Entry {
     name: "CardGrid",
