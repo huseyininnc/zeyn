@@ -17,6 +17,19 @@ Price::new(p.price)
 - **書式。** 金額はページの数値書式に従う `Money` です。英語では `₺1,299.00`、トルコ語では `1.299,00 ₺` となり、パーセント記号を前に置く言語では前に付きます（`%19`）。`large()` は商品ページ向けに現在の価格を大きくします。
 - **スクリプトなし。** 価格はただの HTML です。
 
+
+### カード上の価格
+
+`ImageCard::price(Price)` は同じ価格を `CardGrid` や `Rail` のカードのテキストの下、カードのリンクの中に置くので、スクリーンリーダーにはタイトルと価格の文が一緒に読み上げられます。スクリプトは追加されず、ショップのスタイルシートは価格のある最初のカードと一緒に読み込まれます。
+
+```rust
+CardGrid::of(catalog_products).card(|p: &Product| {
+    Card::image(p.photo.clone(), p.name.clone())
+        .price(Price::new(p.price).was(p.list_price))
+        .link(product_page, ProductPage { id: p.id })
+})
+```
+
 ## 範囲スライダー
 
 ```rust

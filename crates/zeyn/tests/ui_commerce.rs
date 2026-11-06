@@ -73,6 +73,44 @@ pub fn cart_line(p: ItemParams) -> Screen {
     )
 }
 
+#[entity(table = "goods")]
+pub struct Good {
+    #[key]
+    pub id: GoodId,
+    pub name: String,
+    pub color: String,
+    pub price: Money,
+}
+
+/// Sample goods: a color each of red, blue and green, prices rising with the id.
+fn goods() -> Vec<Good> {
+    (1..=30)
+        .map(|i| Good {
+            id: GoodId(i),
+            name: format!("Good {i}"),
+            color: ["red", "blue", "green"][(i % 3) as usize].to_string(),
+            price: Money::tl(i * 1_000),
+        })
+        .collect()
+}
+
+#[action(public)]
+pub async fn search_goods(q: DataQuery) -> Result<Page<Good>> {
+    Ok(q.apply(goods()))
+}
+
+#[screen(route = "/goods", public)]
+pub fn good_cards() -> Screen {
+    Screen::new("Goods").body(
+        CardGrid::of(search_goods)
+            .card(|g: &Good| {
+                Card::image("/g.webp", g.name.clone())
+                    .price(Price::new(g.price).was(Money::tl(g.price.minor * 2)))
+            })
+            .paging(Paging::infinite(4)),
+    )
+}
+
 fn shop_app() -> App {
     App::new("Test")
         .i18n(I18n::new("en"))
@@ -95,7 +133,8 @@ fn shop_app() -> App {
                 .screen(plain)
                 .screen(priced)
                 .screen(ranged)
-                .screen(cart_line),
+                .screen(cart_line)
+                .screen(good_cards),
         )
 }
 
@@ -411,4 +450,19 @@ async fn a_quantity_change_runs_the_action_with_the_screens_target_clamped_throu
     assert!(links(&page).contains(&"quantity.js".to_string()));
     let (_, price) = get("/price").await;
     assert!(!links(&price).contains(&"quantity.js".to_string()));
+}
+
+#[tokio::test]
+async fn a_card_shows_its_price_inside_its_body_with_no_script_of_its_own() {
+    let (status, page) = get("/goods").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        page.contains(r#"<span class="z-poster-title">Good 1</span><span class="z-price"><span class="z-sr-only">Was ₺20.00, now ₺10.00, 50% off</span>"#),
+        "{page}"
+    );
+    let linked = links(&page);
+    assert!(linked.contains(&"commerce.css".to_string()));
+    for name in ["range.js", "quantity.js"] {
+        assert!(!linked.contains(&name.to_string()), "{name}");
+    }
 }

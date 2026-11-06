@@ -17,6 +17,19 @@ Price::new(p.price)
 - **格式。** 金额是采用页面数字格式的 `Money`：英语为 `₺1,299.00`，土耳其语为 `1.299,00 ₺`；在把百分号放在前面的语言中，百分号在前（`%19`）。`large()` 为商品页面放大当前价格。
 - **无脚本。** 价格是纯 HTML。
 
+
+### 卡片上的价格
+
+`ImageCard::price(Price)` 把同样的价格放在 `CardGrid` 或 `Rail` 中卡片文字的下方、卡片链接之内，因此屏幕阅读器会一起读出标题和价格那句话。它不增加脚本；商店样式表随第一张带价格的卡片一起加载。
+
+```rust
+CardGrid::of(catalog_products).card(|p: &Product| {
+    Card::image(p.photo.clone(), p.name.clone())
+        .price(Price::new(p.price).was(p.list_price))
+        .link(product_page, ProductPage { id: p.id })
+})
+```
+
 ## 范围滑块
 
 ```rust

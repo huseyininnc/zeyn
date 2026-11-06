@@ -17,6 +17,19 @@ Price::new(p.price)
 - **Formato.** Los importes son `Money` en el formato numérico de la página: `₺1,299.00` en inglés, `1.299,00 ₺` en turco, y el signo de porcentaje va delante donde el idioma lo pone delante (`%19`). `large()` agranda el precio actual para una página de producto.
 - **Sin script.** El precio es HTML simple.
 
+
+### Precios en tarjetas
+
+`ImageCard::price(Price)` pone el mismo precio bajo el texto de la tarjeta en un `CardGrid` o un `Rail`, dentro del enlace de la tarjeta, así que los lectores de pantalla oyen juntos el título y la frase del precio. No añade script; la hoja de estilos de tienda llega con la primera tarjeta que tiene precio.
+
+```rust
+CardGrid::of(catalog_products).card(|p: &Product| {
+    Card::image(p.photo.clone(), p.name.clone())
+        .price(Price::new(p.price).was(p.list_price))
+        .link(product_page, ProductPage { id: p.id })
+})
+```
+
 ## Control deslizante de rango
 
 ```rust

@@ -17,6 +17,19 @@ Price::new(p.price)
 - **형식.** 금액은 페이지의 숫자 형식을 따르는 `Money`입니다. 영어는 `₺1,299.00`, 터키어는 `1.299,00 ₺`이며, 퍼센트 기호를 앞에 두는 언어에서는 앞에 옵니다(`%19`). `large()`는 상품 페이지에서 현재 가격을 크게 표시합니다.
 - **스크립트 없음.** 가격은 일반 HTML입니다.
 
+
+### 카드의 가격
+
+`ImageCard::price(Price)`는 같은 가격을 `CardGrid`나 `Rail` 카드의 텍스트 아래, 카드 링크 안에 넣으므로 스크린 리더는 제목과 가격 문장을 함께 듣습니다. 스크립트는 추가되지 않으며, 쇼핑 스타일시트는 가격이 있는 첫 카드와 함께 불러옵니다.
+
+```rust
+CardGrid::of(catalog_products).card(|p: &Product| {
+    Card::image(p.photo.clone(), p.name.clone())
+        .price(Price::new(p.price).was(p.list_price))
+        .link(product_page, ProductPage { id: p.id })
+})
+```
+
 ## 범위 슬라이더
 
 ```rust

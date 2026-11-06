@@ -209,7 +209,8 @@
       "image_card": {
         "overview": "Example",
         "horizontal": "Horizontal",
-        "with_preview": "With a hover preview"
+        "with_preview": "With a hover preview",
+        "with_price": "With a price"
       },
       "screen_header": {
         "orders_page": "A page header"

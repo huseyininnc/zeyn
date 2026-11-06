@@ -17,6 +17,19 @@ Price::new(p.price)
 - **Biçim.** Tutarlar sayfanın sayı biçimindeki `Money` değerleridir: İngilizcede `₺1,299.00`, Türkçede `1.299,00 ₺`; dil yüzde işaretini öne koyuyorsa işaret öne gelir (`%19`). `large()` ürün sayfası için güncel fiyatı büyütür.
 - **Script yok.** Fiyat düz HTML'dir.
 
+
+### Kartlarda fiyat
+
+`ImageCard::price(Price)` aynı fiyatı bir `CardGrid` ya da `Rail` içindeki kartın metninin altına, kartın bağlantısının içine koyar; böylece ekran okuyucular başlığı ve fiyat cümlesini birlikte duyar. Script eklemez; mağaza stil dosyası fiyatı olan ilk kartla gelir.
+
+```rust
+CardGrid::of(catalog_products).card(|p: &Product| {
+    Card::image(p.photo.clone(), p.name.clone())
+        .price(Price::new(p.price).was(p.list_price))
+        .link(product_page, ProductPage { id: p.id })
+})
+```
+
 ## Aralık kaydırıcısı
 
 ```rust

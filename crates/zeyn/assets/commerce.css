@@ -48,6 +48,8 @@
   font-weight: 600;
 }
 
+.z-poster-body .z-price { margin-block-start: 4px; }
+
 .z-price-unit {
   font-size: var(--z-text-xs);
   line-height: var(--z-leading-xs);

@@ -209,7 +209,8 @@
       "image_card": {
         "overview": "Örnek",
         "horizontal": "Yatay",
-        "with_preview": "Üzerine gelince önizleme"
+        "with_preview": "Üzerine gelince önizleme",
+        "with_price": "Fiyatlı"
       },
       "screen_header": {
         "orders_page": "Sayfa başlığı"

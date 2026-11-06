@@ -34,6 +34,23 @@ pub fn horizontal(_ctx: &Ctx) -> Node {
         .into()
 }
 
+pub fn with_price(_ctx: &Ctx) -> Node {
+    CardGrid::of(search_products)
+        .card(|p: &Product| {
+            let price = Price::new(p.price);
+            let price = match p.id.0 % 3 {
+                0 => price.was(Money::tl(p.price.minor + p.price.minor / 4)),
+                _ => price,
+            };
+            Card::image(p.image.clone(), p.name.clone())
+                .subtitle(p.code.clone())
+                .price(price)
+        })
+        .image_size(300, 300)
+        .paging(Paging::infinite(4))
+        .into()
+}
+
 /// The product of a preview.
 #[params]
 pub struct ProductParams {
@@ -77,5 +94,5 @@ pub const ENTRY: Entry = Entry {
     docs: "components/catalog#card-grid",
     api: &["ImageCard", "Card"],
     overview: &[ex!(overview)],
-    examples: &[ex!(horizontal), ex!(with_preview)],
+    examples: &[ex!(horizontal), ex!(with_price), ex!(with_preview)],
 };

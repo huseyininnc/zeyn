@@ -17,6 +17,19 @@ Price::new(p.price)
 - **Format.** Amounts are `Money` in the page's number format: `₺1,299.00` in English, `1.299,00 ₺` in Turkish, and the percent sign goes first where the language puts it first (`%19`). `large()` makes the current price bigger for a product page.
 - **No script.** The price is plain HTML.
 
+
+### Prices on cards
+
+`ImageCard::price(Price)` puts the same price under the card's text in a `CardGrid` or `Rail`, inside the card's link, so screen readers hear the title and the price sentence together. It adds no script; the shop stylesheet comes with the first card that has a price.
+
+```rust
+CardGrid::of(catalog_products).card(|p: &Product| {
+    Card::image(p.photo.clone(), p.name.clone())
+        .price(Price::new(p.price).was(p.list_price))
+        .link(product_page, ProductPage { id: p.id })
+})
+```
+
 ## Range slider
 
 ```rust
