@@ -315,6 +315,8 @@ Client preferences (`zeyn::ClientPref`) live in the browser module `/_zeyn/state
 
 `Video` and `Audio` are served by `/_zeyn/media.js` and `/_zeyn/media.css`, linked after the component library. See `docs/media.md`.
 
+Players set their sources and poster (`data-zeyn-poster`, `data-zeyn-poster-low` first) when they first come into view, through one `IntersectionObserver` for the page; a root with `data-zeyn-preview` plays muted and looping while a quarter of it is visible, unless `prefers-reduced-motion`, `prefers-reduced-data` or Save-Data says otherwise, until the visitor uses its controls. Images with loading options sit in a box (`.z-img-host`) that shows the placeholder without script and carry `data-zeyn-img`, the marker that loads `media.js`. One capture listener on the document handles `load` and `error` of those images: loaded marks the box `z-img-done` (and `z-img-fade` for a fade over a low file); failed tries `data-zeyn-fallback` once, then shows the box's `<template data-zeyn-img-error>` or the alt text with an icon. Images that ended before the module ran are checked once when it starts.
+
 | Endpoint | Does |
 |---|---|
 | `GET /_zeyn/media/{source}/{id}` | A file of a registered media source with range requests: `200`, `206`, `304`, `416`. |

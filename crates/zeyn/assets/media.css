@@ -498,6 +498,8 @@
 
 .z-img-contain > img:not(.z-img-under) { width: 100%; height: 100%; object-fit: contain; }
 
+.z-img-failed > img[data-zeyn-img] { display: none; }
+
 .z-img-done::before,
 .z-img-done > .z-img-under,
 .z-img-failed::before,
@@ -524,10 +526,21 @@
   justify-content: center;
   gap: calc(var(--z-space) / 2);
   padding: var(--z-space);
-  color: var(--z-text-muted);
   font-size: 0.875rem;
   text-align: center;
   overflow: hidden;
+}
+
+.z-img-error-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--z-space) / 2);
+  max-width: 100%;
+  padding: calc(var(--z-space) / 2) var(--z-space);
+  border-radius: var(--z-radius);
+  background: var(--z-surface);
+  color: var(--z-text-muted);
 }
 
 .z-img-error-icon {

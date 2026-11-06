@@ -141,6 +141,32 @@ Image::new("https://images.example.com/logo.png")
 - 모든 이미지에는 `decoding="async"`가 붙으며, `.lazy()`는 화면 아래쪽 이미지에 `loading="lazy"`를 추가합니다. `srcset`은 밀도(`2x`) 또는 너비(`800w`) 설명자를 받으며, 다른 호스트의 항목이나 다른 설명자를 쓴 항목은 제외됩니다. 너비 설명자는 이미지 너비로 `sizes`를 추가합니다.
 - 순전히 장식용인 이미지는 빈 대체 텍스트를 사용합니다. `.alt(Text::from(""))`.
 
+### 사진이 많은 긴 목록
+
+제품 사진이 수천 장인 카탈로그에서는 이미지가 로드되는 동안 무언가를 보여 주고, 실패하면 복구할 수 있습니다. 모두 브라우저의 기본 기능을 사용하며, 미디어 모듈의 리스너 하나가 페이지의 모든 이미지를 처리합니다.
+
+```rust
+Image::new(p.photo_800.clone())
+    .alt(p.name.clone())
+    .size(400, 500)
+    .lazy()
+    .srcset([(p.photo_400.as_str(), "400w"), (p.photo_800.as_str(), "800w")])
+    .sizes("(min-width: 800px) 25vw, 50vw")
+    .placeholder(Placeholder::color("#d9dde3"))
+    .low(p.photo_40.clone())
+    .fallback("/static/no-photo.webp")
+    .on_error(t!("shop.no_photo"))
+    .fit(Fit::Cover)
+```
+
+- `.placeholder(...)`는 파일이 로드되는 동안 스크립트 없이 상자를 채웁니다. `Placeholder::color("#d9dde3")` 또는 테마 토큰(`"--z-surface-2"`), 앱이 만든 아주 작은 이미지를 위한 `Placeholder::blur(data_uri)`(최대 600바이트의 base64 `data:image/webp`, `avif`, `jpeg` 또는 `png` URI이며 SVG는 허용되지 않음), 모든 이미지가 함께 쓰는 파일 하나를 위한 `Placeholder::image(src)`가 있습니다. 규칙을 어기는 자리 표시자는 제외됩니다.
+- `.low(src)`는 작은 저해상도 파일을 전체 파일 아래에 즉시 보여 줍니다. 전체 파일은 동시에 로드되며(이미지가 지연 로드이면 지연 로드됨) 준비되면 서서히 나타납니다. 동작 줄이기 설정에서는 페이드 없이 나타납니다.
+- `.fallback(src)`는 이미지가 실패하면 다른 파일을 한 번 시도합니다. 그 후에는 `.on_error(text or component)`가 표시되며, 이것이 없으면 자리 표시자 위에 아이콘과 함께 대체 텍스트가 표시됩니다. 다시 시도하지는 않습니다.
+- `.priority()`는 방문자가 처음 보는 이미지(가장 큰 페인트)를 표시합니다. `loading="eager"`와 `fetchpriority="high"`가 붙으며 지연 로드되지 않습니다. 페이지당 한 번만 사용하십시오.
+- `.sizes(...)`는 레이아웃에서 이미지의 너비를 알려 주므로 브라우저가 알맞은 `srcset` 너비를 고릅니다. 이것이 없으면 지연 로드 이미지는 `sizes="auto"`를 받고 브라우저가 자리의 크기를 잽니다.
+- `.fit(Fit::Cover)`는 상자를 채우고 넘치는 부분을 잘라 냅니다. `Fit::Contain`은 파일 전체를 보여 줍니다.
+- `low`, `fallback`, `Placeholder::image`는 `src`와 같은 주소 규칙을 따르며, 그 밖의 주소는 제외됩니다. 상자는 항상 이미지의 크기를 유지하므로 파일이 로드되거나 실패하는 동안 아무것도 움직이지 않습니다.
+
 ## ExternalLink
 
 `ExternalLink::new(url, text)`는 `rel="noopener noreferrer"`로 다른 사이트에 연결하므로, 다른 사이트는 페이지 주소도 창에 대한 핸들도 얻지 못합니다. 스크린 리더는 텍스트 뒤에 "external site"를 읽고, 시각적으로는 화살표가 이를 표시합니다.

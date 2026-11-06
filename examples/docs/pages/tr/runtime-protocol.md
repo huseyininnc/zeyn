@@ -313,6 +313,8 @@ Sanal bir liste `data-zeyn-row-height`, `data-zeyn-block` ve `data-zeyn-total` t
 
 `Video` ve `Audio`, bileşen kitaplığından sonra bağlanan `/_zeyn/media.js` ve `/_zeyn/media.css` ile sunulur. Bkz. `docs/media.md`.
 
+Oynatıcılar kaynaklarını ve afişlerini (önce `data-zeyn-poster-low`, sonra `data-zeyn-poster`) ilk kez görünüme girdiklerinde, sayfa için tek bir `IntersectionObserver` aracılığıyla ayarlar; `data-zeyn-preview` taşıyan bir kök, dörtte biri görünür olduğu sürece sessiz ve döngüde oynar, `prefers-reduced-motion`, `prefers-reduced-data` ya da Save-Data aksini söylemedikçe ve ziyaretçi kontrollerini kullanana kadar. Yükleme seçenekleri olan görseller, yer tutucuyu betik olmadan gösteren bir kutuda (`.z-img-host`) durur ve `media.js`'i yükleyen işaret olan `data-zeyn-img` özniteliğini taşır. Belgedeki tek bir capture dinleyicisi bu görsellerin `load` ve `error` olaylarını işler: yüklenen görsel kutuyu `z-img-done` (düşük dosyanın üzerinde belirerek geçiş için ayrıca `z-img-fade`) olarak işaretler; başarısız olan bir kez `data-zeyn-fallback` dener, ardından kutunun `<template data-zeyn-img-error>` öğesini ya da bir simgeyle alt metni gösterir. Modül çalışmadan önce sonlanmış görseller, modül başladığında bir kez denetlenir.
+
 | Endpoint | Does |
 |---|---|
 | `GET /_zeyn/media/{source}/{id}` | Kayıtlı bir medya kaynağının dosyası, aralık (range) isteklerini destekler: `200`, `206`, `304`, `416`. |

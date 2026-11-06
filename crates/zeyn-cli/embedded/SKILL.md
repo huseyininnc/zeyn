@@ -227,6 +227,9 @@ What to remember:
 - Rows of another shape: `List::of(action).builder(|row| node)` (or on `CardGrid`, `Rail`), with
   `.separator(node)`; `Repeat::of(items, |item| node)` for in memory data. Virtual lists with a
   builder need `.row_height(px)`. Keep `.item`/`.card` when they fit.
+- Product photos: `Image::new(src).alt(..).size(w, h).lazy()` with `.placeholder(Placeholder::color(..))`,
+  `.low(small_src)`, `.fallback(src)`, `.priority()` on the first one only; in a `CardGrid`
+  `.placeholder(..)` and `.priority(n)`, on a card `.low(..)` and `.fallback(..)`.
 - App shell top bar: `App::header(|h| h.center(SearchBox::of(..)).end(LinkButton::new(..)))`,
   the same slots as the site header.
 - File uploads: `.files(RULES, FileAccess::read("x.file.read").write("x.file.write"), store)`

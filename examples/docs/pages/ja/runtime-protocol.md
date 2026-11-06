@@ -313,6 +313,8 @@ Effect `{"effect":"refresh","topics":["sales"]}` はトピックのリスナー�
 
 `Video` と `Audio` は `/_zeyn/media.js` と `/_zeyn/media.css` で配信され、コンポーネントライブラリの後にリンクされます。`docs/media.md` を参照してください。
 
+プレーヤーは、最初に表示範囲に入ったときに、ページで 1 つの `IntersectionObserver` を通じてソースとポスター（`data-zeyn-poster`、先に `data-zeyn-poster-low`）を設定します。`data-zeyn-preview` を持つルートは、4 分の 1 が見えている間ミュートでループ再生します。ただし `prefers-reduced-motion`、`prefers-reduced-data`、Save-Data がそれを望まない場合は除き、訪問者がコントロールを操作するまでに限ります。読み込みオプションを持つ画像は、スクリプトなしでプレースホルダーを表示するボックス（`.z-img-host`）の中にあり、`media.js` を読み込む目印である `data-zeyn-img` を持ちます。document 上の 1 つのキャプチャリスナーが、それらの画像の `load` と `error` を扱います。読み込みが終わるとボックスに `z-img-done` を付け（低解像度ファイルの上でフェードするときは `z-img-fade` も）、失敗すると `data-zeyn-fallback` を 1 回試し、その後ボックスの `<template data-zeyn-img-error>` か、アイコン付きの代替テキストを表示します。モジュールの実行前に終わっていた画像は、モジュールの開始時に 1 回確認されます。
+
 | エンドポイント | 動作 |
 |---|---|
 | `GET /_zeyn/media/{source}/{id}` | 登録された media ソースのファイルを range リクエストで返します。`200`、`206`、`304`、`416`。 |

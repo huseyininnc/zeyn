@@ -37,6 +37,18 @@ Card::image(c.cover.clone(), c.title.clone())
     .progress(c.done, t!("courses.done"))
     .horizontal()
 ```
+- **Fast product grids.** `.placeholder(...)` on the grid fills every card image while it loads, and a card can set its own. On a card, `.low(src)` shows a small file first and `.fallback(src)` tries another file once, before the card shows its alt text with an icon. `.priority(n)` loads the images of the first `n` cards (at most 12) at once with `fetchpriority="high"`; every other card image stays lazy, and pages loaded later never come first. They work like the options of [`Image`](display.md#image), with one listener for every card.
+
+```rust
+CardGrid::of(catalog_products)
+    .card(|p: &Product| {
+        Card::image(p.photo.clone(), p.name.clone())
+            .low(p.photo_small.clone())
+            .fallback("/static/no-photo.webp")
+    })
+    .placeholder(Placeholder::color("--z-surface-2"))
+    .priority(4)
+```
 - **First page on the server.** The first page (24 cards in a card grid, 12 in a rail, or the size given to `paging`) is part of the page's HTML, so search engines and visitors without JavaScript see the cards and their links, and the images carry their size so nothing moves while they load. Later pages come from the browser. A public page stays the same HTML for every visitor, so it can be cached. A card linked to a screen with a route links to its canonical address (`/items/{slug}`), never to a redirect.
 - **Paging.** `Paging::infinite(n)` (the default, 24) shows a "Show more" button that also fires when it scrolls into view; focus moves to the first new card when the button is pressed. `Paging::pages(n)` shows previous and next buttons and the page number: "Page 2 of 5" when the action returns a total, "Page 2" when it does not, and then Next works as long as the action returns a cursor. The server sets the page size; the client only says where to continue.
 - **Sorting.** Each `sort_option` is an order users can pick from a select; the first is the order the cards start in. The server accepts only these orders, and drops filters and search text sent by the client.

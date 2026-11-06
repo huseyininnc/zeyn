@@ -15,8 +15,9 @@
  * Resume: the position is read from and saved to `/_zeyn/media/position` when the media source
  * keeps positions for the signed in user; otherwise it is kept in this browser's local storage.
  *
- * Posters and previews: a poster is set when its player first comes into view, the low resolution
- * file first (`data-zeyn-poster-low`). A player with `data-zeyn-preview` plays muted and looping
+ * Posters and previews: the sources and the poster are set when a player first comes into view,
+ * so a page of many players fetches nothing for those off screen; the low resolution poster
+ * (`data-zeyn-poster-low`) comes first. A player with `data-zeyn-preview` plays muted and looping
  * while at least a quarter of it is visible, unless the visitor prefers reduced motion or saves
  * data; once the visitor uses its controls it no longer starts or stops by itself. One
  * IntersectionObserver serves every player of the page.
@@ -24,8 +25,8 @@
  * Progressive images: an `<img data-zeyn-img>` sits in a box (`.z-img-host`) that shows its
  * placeholder without script. One capture listener on the document handles `load` and `error` for
  * every such image: a loaded image marks its box `z-img-done` (and `z-img-fade` when it arrived
- * after this script, so it fades in over the low resolution file); a failed one tries
- * `data-zeyn-fallback` once, then shows the box's `<template data-zeyn-img-error>` or its alt text
+ * after this script over a low resolution file or a blur and is not the priority image, so it
+ * fades in); a failed one tries `data-zeyn-fallback` once, then shows the box's `<template data-zeyn-img-error>` or its alt text
  * with an icon. Images that finished before this script ran are checked once when it starts.
  *
  * Embeds: `zeyn::ui::Embed` with `click_to_load` renders a poster button and the frame inside an
@@ -129,7 +130,8 @@ function settle(img, fresh) {
   if (!host) return;
   if (img.naturalWidth > 0) {
     host.classList.add('z-img-done');
-    if (fresh) host.classList.add('z-img-fade');
+    const under = host.classList.contains('z-img-blur') || host.querySelector(':scope > .z-img-under');
+    if (fresh && under && img.fetchPriority !== 'high') host.classList.add('z-img-fade');
     return;
   }
   if (!img.getAttribute('src')) return;
@@ -146,16 +148,19 @@ function settle(img, fresh) {
   img.hidden = true;
   const box = document.createElement('span');
   box.className = 'z-img-error';
+  const body = document.createElement('span');
+  body.className = 'z-img-error-body';
   const custom = host.querySelector(':scope > template[data-zeyn-img-error]');
   if (custom) {
-    box.append(custom.content.cloneNode(true));
+    body.append(custom.content.cloneNode(true));
   } else {
     const icon = document.createElement('span');
     icon.className = 'z-img-error-icon';
     icon.setAttribute('aria-hidden', 'true');
-    box.append(icon);
-    if (img.alt) box.append(img.alt);
+    body.append(icon);
+    if (img.alt) body.append(img.alt);
   }
+  box.append(body);
   img.after(box);
 }
 
@@ -196,7 +201,10 @@ function seen(entries) {
   for (const e of entries) {
     const p = players.get(e.target);
     if (!p) continue;
-    if (e.isIntersecting && !p.postered) poster(p);
+    if (e.isIntersecting && !p.postered) {
+      poster(p);
+      load(p);
+    }
     if (!p.preview || p.user) continue;
     if (e.isIntersecting && e.intersectionRatio >= 0.25) {
       if (p.media.paused && !quiet()) {
@@ -292,7 +300,6 @@ function setup(root) {
   );
   const pip = root.querySelector('[data-zeyn-player-pip]');
   if (pip && document.pictureInPictureEnabled && !media.disablePictureInPicture) pip.hidden = false;
-  load(p);
   paint(p);
   paintVolume(p);
   paintTime(p);

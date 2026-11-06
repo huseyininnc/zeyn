@@ -37,6 +37,18 @@ Card::image(c.cover.clone(), c.title.clone())
     .progress(c.done, t!("courses.done"))
     .horizontal()
 ```
+- **빠른 제품 그리드.** 그리드의 `.placeholder(...)`는 로드되는 동안 모든 카드 이미지를 채우며, 카드는 자기만의 자리 표시자를 지정할 수 있습니다. 카드에서 `.low(src)`는 작은 파일을 먼저 보여 주고, `.fallback(src)`는 카드가 아이콘과 함께 대체 텍스트를 표시하기 전에 다른 파일을 한 번 시도합니다. `.priority(n)`은 처음 `n`개 카드(최대 12개)의 이미지를 `fetchpriority="high"`로 즉시 로드합니다. 다른 모든 카드 이미지는 지연 로드로 남으며, 나중에 로드되는 페이지가 먼저 오는 일은 없습니다. 이 옵션들은 [`Image`](display.md#image)의 옵션처럼 동작하며, 모든 카드에 리스너 하나를 씁니다.
+
+```rust
+CardGrid::of(catalog_products)
+    .card(|p: &Product| {
+        Card::image(p.photo.clone(), p.name.clone())
+            .low(p.photo_small.clone())
+            .fallback("/static/no-photo.webp")
+    })
+    .placeholder(Placeholder::color("--z-surface-2"))
+    .priority(4)
+```
 - **첫 페이지는 서버에서.** 첫 페이지(카드 그리드는 24개, rail은 12개, 또는 `paging`에 준 크기)는 페이지 HTML에 포함되므로 검색 엔진과 JavaScript가 없는 방문자도 카드와 링크를 볼 수 있고, 이미지는 크기를 가지고 있어 로드되는 동안 아무것도 움직이지 않습니다. 이후 페이지는 브라우저가 가져옵니다. 공개 페이지는 모든 방문자에게 같은 HTML이므로 캐시할 수 있습니다. 라우트가 있는 screen으로 연결된 카드는 리디렉션이 아니라 그 screen의 정식 주소(`/items/{slug}`)로 연결됩니다.
 - **페이징.** `Paging::infinite(n)`(기본값이며 24)은 "더 보기" 버튼을 표시하고, 이 버튼이 화면에 스크롤되어 들어오면 자동으로도 동작합니다. 버튼을 누르면 포커스가 첫 번째 새 카드로 이동합니다. `Paging::pages(n)`은 이전과 다음 버튼 및 페이지 번호를 표시합니다. action이 총계를 반환하면 "Page 2 of 5", 반환하지 않으면 "Page 2"로 표시되며, 이 경우 action이 커서를 반환하는 동안 다음 버튼이 동작합니다. 페이지 크기는 서버가 정하며, 클라이언트는 어디서부터 이어갈지만 알립니다.
 - **정렬.** 각 `sort_option`은 사용자가 선택 목록에서 고를 수 있는 순서입니다. 첫 번째가 카드가 처음 나열되는 순서입니다. 서버는 이 순서만 받아들이고, 클라이언트가 보낸 필터와 검색 텍스트는 버립니다.

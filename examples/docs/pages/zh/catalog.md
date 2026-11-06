@@ -37,6 +37,18 @@ Card::image(c.cover.clone(), c.title.clone())
     .progress(c.done, t!("courses.done"))
     .horizontal()
 ```
+- **快速的商品网格。** 网格上的 `.placeholder(...)` 在每张卡片图片加载期间填充它，卡片也可以设置自己的占位符。在卡片上，`.low(src)` 先显示一个小文件，`.fallback(src)` 会在卡片显示替代文本和图标之前尝试另一个文件一次。`.priority(n)` 使用 `fetchpriority="high"` 立即加载前 `n` 张卡片（最多 12 张）的图片；其他卡片图片保持懒加载，之后加载的页面永远不会优先。它们的作用与 [`Image`](display.md#image) 的选项相同，所有卡片共用一个监听器。
+
+```rust
+CardGrid::of(catalog_products)
+    .card(|p: &Product| {
+        Card::image(p.photo.clone(), p.name.clone())
+            .low(p.photo_small.clone())
+            .fallback("/static/no-photo.webp")
+    })
+    .placeholder(Placeholder::color("--z-surface-2"))
+    .priority(4)
+```
 - **首页在服务器端渲染。** 第一页（卡片网格 24 张、rail 12 张，或 `paging` 指定的数量）是页面 HTML 的一部分，因此搜索引擎和未启用 JavaScript 的访客也能看到卡片及其链接；图片带有尺寸，加载时页面不会跳动。后续页面由浏览器加载。公开页面对每位访客都是相同的 HTML，因此可以缓存。链接到带路由的 screen 的卡片会直接使用其规范地址（`/items/{slug}`），而不是重定向。
 - **分页。** `Paging::infinite(n)`（默认，24）显示一个“显示更多”按钮，该按钮滚动到视野中时也会触发；按下按钮后，焦点会移到第一张新卡片。`Paging::pages(n)` 显示上一页和下一页按钮以及页码：action 返回总数时为 "Page 2 of 5"，不返回时为 "Page 2"，此时只要 action 返回游标，Next 就可用。页面大小由服务器设置；客户端只说明从哪里继续。
 - **排序。** 每个 `sort_option` 是用户可以从下拉框中选择的一种顺序；第一个是卡片起始的顺序。服务器只接受这些顺序，并丢弃客户端发送的过滤条件和搜索文本。

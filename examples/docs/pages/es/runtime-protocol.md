@@ -315,6 +315,8 @@ Las preferencias del cliente (`zeyn::ClientPref`) viven en el módulo del navega
 
 `Video` y `Audio` se sirven con `/_zeyn/media.js` y `/_zeyn/media.css`, enlazados después de la biblioteca de componentes. Véase `docs/media.md`.
 
+Los reproductores asignan sus fuentes y su póster (`data-zeyn-poster`, antes `data-zeyn-poster-low`) la primera vez que entran en la vista, mediante un único `IntersectionObserver` para la página; una raíz con `data-zeyn-preview` se reproduce silenciada y en bucle mientras una cuarta parte es visible, salvo que `prefers-reduced-motion`, `prefers-reduced-data` o Save-Data indiquen lo contrario, hasta que el visitante usa sus controles. Las imágenes con opciones de carga están dentro de una caja (`.z-img-host`) que muestra el placeholder sin script y llevan `data-zeyn-img`, la marca que carga `media.js`. Un único listener de captura en el documento gestiona `load` y `error` de esas imágenes: al cargar marca la caja con `z-img-done` (y `z-img-fade` para un fundido sobre un archivo de baja resolución); al fallar prueba `data-zeyn-fallback` una vez y luego muestra el `<template data-zeyn-img-error>` de la caja o el texto alternativo con un icono. Las imágenes que terminaron antes de que se ejecutara el módulo se comprueban una vez al arrancar.
+
 | Endpoint | Hace |
 |---|---|
 | `GET /_zeyn/media/{source}/{id}` | Un archivo de una fuente de medios registrada con peticiones de rango: `200`, `206`, `304`, `416`. |

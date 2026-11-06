@@ -313,6 +313,8 @@ Effect `{"effect":"refresh","topics":["sales"]}` 刷新这些主题的监听者�
 
 `Video` 和 `Audio` 由 `/_zeyn/media.js` 和 `/_zeyn/media.css` 提供，链接在组件库之后。参见 `docs/media.md`。
 
+播放器在第一次进入视野时，通过页面共用的一个 `IntersectionObserver` 设置其来源和海报（先 `data-zeyn-poster-low`，再 `data-zeyn-poster`）；带有 `data-zeyn-preview` 的根元素在四分之一可见时静音并循环播放，除非 `prefers-reduced-motion`、`prefers-reduced-data` 或 Save-Data 另有要求，直到访客使用它的控件为止。带加载选项的图片位于一个无需脚本即可显示占位符的框（`.z-img-host`）中，并带有 `data-zeyn-img`，这是加载 `media.js` 的标记。文档上的一个捕获阶段监听器处理这些图片的 `load` 和 `error`：加载成功时把框标记为 `z-img-done`（在低分辨率文件上淡入时还有 `z-img-fade`）；失败时尝试 `data-zeyn-fallback` 一次，然后显示框中的 `<template data-zeyn-img-error>`，或替代文本加图标。在模块运行之前就已结束的图片，会在模块启动时检查一次。
+
 | Endpoint | Does |
 |---|---|
 | `GET /_zeyn/media/{source}/{id}` | 已注册媒体源的文件，支持 range 请求：`200`、`206`、`304`、`416`。 |
