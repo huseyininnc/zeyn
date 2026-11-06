@@ -113,3 +113,41 @@ Kanban::of(task_flow(), search_tasks, move_task)
 | Home, End | 列中可见的第一张或最后一张卡片 |
 | Enter, Space | 打开移动菜单：Up 和 Down 选择列，Enter 移动，Escape 关闭 |
 | Shift + Left, Shift + Right | 在工作流允许时把卡片移到前一列或后一列 |
+
+## Calendar
+
+`Calendar::of(action)` 在用户时区中按月、周或日显示事件。动作与 DataGrid 使用的类型相同，只获取可见范围：一个过滤条件保留在最后一个可见日之前开始的事件，另一个保留在第一个可见日之后结束的事件（日期边界是用户时区中的整天，所以由数据库完成过滤），按开始时间排序，最多 `MAX_CALENDAR_EVENTS`（500）个。服务器放置每个事件并渲染整个视图；时间按 `Ctx` 的时区（`TimePolicy`）显示，所以 UTC 23:30 的事件在柏林属于第二天。
+
+```rust
+#[action(permission = "events.write")]
+pub async fn new_event(slot: CalendarSlot) -> Result<Option<Effect>> {
+    Ok(Some(Window::open(event_form, EventFormParams { start: slot.start, end: slot.end })))
+}
+
+#[screen(route = "/planner", permission = "events.read")]
+pub fn planner(p: CalendarParams) -> Screen {
+    Screen::new(t!("planner.title")).body(
+        Calendar::of(search_events)
+            .start(Event::starts)
+            .end(Event::ends)
+            .label(|e: &Event| e.title.clone())
+            .open(|e: &Event| Window::open(event, EventParams { id: e.id }))
+            .create(new_event)
+            .at(p),
+    )
+}
+```
+
+视图和日期是屏幕参数（`CalendarParams`，或名为 `view` 和 `date` 的字段）。工具栏的链接（上一个、今天、下一个、月、周、日）通过日历的主题（`"calendar"`，`.topic(..)`）就地修改它们：一个 `POST /_zeyn/nodes` 重新渲染日历，地址随之更新，因此视图可以分享，没有脚本也能使用。`.open(|e| effect)` 让每个事件成为执行某个效果的按钮，比如打开一个窗口，其屏幕会检查自身的访问权限。使用 `.create(action)` 时，用户选择一个时段：点击某天、在小时上拖动，或用 Shift 加方向键，然后按 Enter 或 N。时段以本地挂钟时间通过 `POST /_zeyn/data` 发送（CSRF、写入限制、动作权限）；服务器在用户时区中读取它，拒绝时钟跳过的小时和超过 31 天的时段，并把 `CalendarSlot` 交给动作，动作的效果会在日历重新渲染之前执行。没有权限的用户不能选择时段。`.hours(from, to)` 设置周视图和日视图的行（7 到 21）。
+
+在组件目录中测得（debug 服务器）：在月、周、日之间切换时，点击后新视图在全速 CPU 下 21 到 34 ms 显示，在 4 倍降速下 60 到 163 ms 显示。`calendar.js`（9.6 KB，gzip 后 3.3 KB）和 `calendar.css`（4.4 KB）只随日历加载。
+
+| 按键 | 作用 |
+|---|---|
+| Tab | 进入网格，到选中的日期（整个网格一个停靠点） |
+| 方向键 | 下一天或下一小时；在 `dir="rtl"` 下 Left 和 Right 互换 |
+| Home, End | 行的第一个或最后一个单元格 |
+| Page Up, Page Down | 上一个或下一个月、周或日 |
+| Enter | 进入单元格中的事件（用 Up 和 Down 在其间移动，Escape 返回）；在空单元格上则创建 |
+| Shift + 方向键 | 日历可以创建时，扩大选中的时段 |
+| N | 日历可以创建时，在选中的时段创建事件 |

@@ -113,3 +113,41 @@ Kanban::of(task_flow(), search_tasks, move_task)
 | Home, End | 열에서 보이는 첫 번째 또는 마지막 카드 |
 | Enter, Space | 이동 메뉴를 엽니다: Up과 Down으로 열을 고르고 Enter로 옮기며 Escape로 닫습니다 |
 | Shift + Left, Shift + Right | 워크플로가 허용하면 카드를 이전 또는 다음 열로 옮깁니다 |
+
+## Calendar
+
+`Calendar::of(action)`은 사용자 시간대에서 월, 주, 일 단위로 일정을 보여 줍니다. 액션은 DataGrid가 쓰는 종류이며 보이는 범위만 받습니다. 한 필터는 마지막으로 보이는 날까지 시작하는 일정을, 다른 필터는 첫날부터 끝나는 일정을 남깁니다(날짜 경계는 사용자 시간대의 하루 전체이므로 데이터베이스가 일을 합니다). 결과는 시작 시각순으로 정렬되며 최대 `MAX_CALENDAR_EVENTS`(500)개입니다. 서버가 모든 일정을 배치하고 보기 전체를 그립니다. 시각은 `Ctx`의 시간대(`TimePolicy`)로 표시되므로 UTC 23:30의 일정은 베를린에서는 다음 날입니다.
+
+```rust
+#[action(permission = "events.write")]
+pub async fn new_event(slot: CalendarSlot) -> Result<Option<Effect>> {
+    Ok(Some(Window::open(event_form, EventFormParams { start: slot.start, end: slot.end })))
+}
+
+#[screen(route = "/planner", permission = "events.read")]
+pub fn planner(p: CalendarParams) -> Screen {
+    Screen::new(t!("planner.title")).body(
+        Calendar::of(search_events)
+            .start(Event::starts)
+            .end(Event::ends)
+            .label(|e: &Event| e.title.clone())
+            .open(|e: &Event| Window::open(event, EventParams { id: e.id }))
+            .create(new_event)
+            .at(p),
+    )
+}
+```
+
+보기와 날짜는 화면 매개변수입니다(`CalendarParams`, 또는 `view`와 `date`라는 필드). 도구 모음의 링크(이전, 오늘, 다음, 월, 주, 일)는 달력의 토픽(`"calendar"`, `.topic(..)`)을 통해 이를 제자리에서 바꿉니다. 한 번의 `POST /_zeyn/nodes`로 달력이 다시 그려지고 주소도 따라 바뀌므로 보기를 공유할 수 있으며 스크립트 없이도 동작합니다. `.open(|e| effect)`은 각 일정을 효과를 실행하는 버튼으로 만듭니다. 예를 들어 창을 여는데, 그 화면은 자체 접근 권한을 확인합니다. `.create(action)`을 쓰면 사용자가 시간대를 고릅니다. 날짜를 클릭하거나 시간 위를 끌거나 Shift와 화살표 키를 쓴 뒤 Enter나 N을 누릅니다. 시간대는 현지 벽시계 시각으로 `POST /_zeyn/data`를 통해 전송되며(CSRF, 쓰기 제한, 액션 권한), 서버는 이를 사용자 시간대에서 읽고 시계가 건너뛰는 시각과 31일보다 긴 구간을 거부한 뒤 `CalendarSlot`을 액션에 넘깁니다. 액션의 효과는 달력이 다시 그려지기 전에 실행됩니다. 권한이 없는 사용자는 시간대를 고를 수 없습니다. `.hours(from, to)`는 주 보기와 일 보기의 행을 정합니다(7시부터 21시).
+
+컴포넌트 카탈로그에서 측정(debug 서버): 월, 주, 일 보기 사이를 전환하면 클릭 후 새 보기가 전체 CPU에서 21~34 ms, 4배 느린 CPU에서 60~163 ms 뒤에 보입니다. `calendar.js`(9.6 KB, gzip 3.3 KB)와 `calendar.css`(4.4 KB)는 달력과 함께일 때만 불러옵니다.
+
+| 키 | 동작 |
+|---|---|
+| Tab | 그리드로, 선택한 날짜로 이동합니다(그리드 전체에 탭 정지 하나) |
+| 화살표 키 | 다음 날 또는 다음 시간; `dir="rtl"`에서는 Left와 Right가 바뀝니다 |
+| Home, End | 행의 첫 번째 또는 마지막 셀 |
+| Page Up, Page Down | 이전 또는 다음 월, 주, 일 |
+| Enter | 셀의 일정으로 들어갑니다(Up과 Down으로 이동, Escape로 돌아옴). 빈 셀에서는 일정을 만듭니다 |
+| Shift + 화살표 키 | 달력이 만들 수 있을 때 선택한 시간대를 넓힙니다 |
+| N | 달력이 만들 수 있을 때 선택한 시간대에 일정을 만듭니다 |

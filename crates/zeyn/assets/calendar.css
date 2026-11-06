@@ -1,0 +1,55 @@
+/* Calendars (`zeyn::ui::Calendar`): linked only by pages that hold `.z-cal`. */
+
+.z-cal { display: grid; gap: var(--z-s-3); min-inline-size: 0; }
+.z-cal-title { margin: 0; font-size: var(--z-text-lg); }
+.z-cal-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--z-s-2) var(--z-s-4); }
+.z-cal-nav, .z-cal-views { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--z-border); border-radius: var(--z-radius); background: var(--z-surface); }
+.z-cal-views { margin-inline-start: auto; }
+.z-cal-link {
+  display: inline-flex; align-items: center; min-block-size: 32px; padding-inline: var(--z-s-3); border-radius: var(--z-radius-sm);
+  color: var(--z-text); text-decoration: none; font-size: var(--z-text-sm); font-weight: 500;
+}
+.z-cal-link:hover { background: var(--z-hover); }
+.z-cal-link:focus-visible { outline: 2px solid var(--z-focus); outline-offset: 1px; }
+.z-cal-link[aria-current="page"] { background: var(--z-primary); color: var(--z-on-primary); }
+.z-cal-period { margin: 0; font-size: var(--z-text-md); font-weight: 600; }
+.z-cal-scroll { overflow: auto; max-block-size: 75vh; border: 1px solid var(--z-border); border-radius: var(--z-radius); background: var(--z-surface); }
+.z-cal-grid { inline-size: 100%; border-collapse: collapse; table-layout: fixed; font-size: var(--z-text-sm); }
+.z-cal-grid th { padding: var(--z-s-2); font-size: var(--z-text-xs); font-weight: 600; color: var(--z-text-muted); text-align: start; background: var(--z-surface-2); border-block-end: 1px solid var(--z-border); position: sticky; inset-block-start: 0; z-index: 1; }
+.z-cal-grid th[aria-current="date"] { color: var(--z-primary); }
+.z-cal-grid td { text-align: start; vertical-align: top; border: 1px solid var(--z-border); padding: var(--z-s-1); min-inline-size: 0; overflow: hidden; }
+.z-cal-grid [role="gridcell"]:focus-visible { outline: 2px solid var(--z-focus); outline-offset: -2px; }
+.z-cal-month td { block-size: 104px; }
+.z-cal-day { cursor: default; }
+.z-cal-out { background: var(--z-surface-2); color: var(--z-text-muted); }
+.z-cal-num { display: inline-grid; place-items: center; min-inline-size: 24px; block-size: 24px; border-radius: var(--z-radius-full); font-variant-numeric: tabular-nums; font-weight: 600; }
+.z-cal-day[aria-current="date"] .z-cal-num { background: var(--z-primary); color: var(--z-on-primary); }
+.z-cal-events { display: grid; gap: 2px; margin-block-start: 2px; }
+.z-cal-event {
+  display: block; inline-size: 100%; box-sizing: border-box; padding: 2px var(--z-s-2); border: 0; border-inline-start: 3px solid var(--z-primary);
+  border-radius: var(--z-radius-sm); background: var(--z-brand-subtle); color: var(--z-text); font: inherit; font-size: var(--z-text-xs);
+  text-align: start; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-block-size: 24px; cursor: pointer;
+}
+span.z-cal-event { cursor: default; }
+.z-cal-event:focus-visible { outline: 2px solid var(--z-focus); outline-offset: 1px; }
+.z-cal-time { font-variant-numeric: tabular-nums; color: var(--z-text-muted); }
+.z-cal-more { display: block; font-size: var(--z-text-xs); color: var(--z-text-muted); padding-inline: var(--z-s-1); }
+.z-cal-corner { inline-size: 64px; background: var(--z-surface-2); position: sticky; inset-block-start: 0; }
+.z-cal-week .z-cal-corner, .z-cal-day-view .z-cal-corner { inline-size: 64px; }
+.z-cal-hour { inline-size: 64px; font-variant-numeric: tabular-nums; position: static; }
+.z-cal-slot { block-size: 44px; }
+.z-cal-allday td, .z-cal-allday th { background: var(--z-surface-2); }
+[data-create] .z-cal-slot, [data-create] .z-cal-day { cursor: cell; }
+.z-cal-chosen { background: var(--z-brand-subtle); box-shadow: inset 0 0 0 2px var(--z-primary); }
+.z-cal-cut { margin: 0; padding: var(--z-s-2) var(--z-s-3); border-radius: var(--z-radius); background: var(--z-warning-subtle); font-size: var(--z-text-sm); }
+.z-cal-wd { font-weight: 500; }
+@media (max-width: 640px) {
+  .z-cal-views { margin-inline-start: 0; }
+  .z-cal-month td { block-size: 64px; }
+  .z-cal-month .z-cal-event .z-cal-time { display: none; }
+  .z-cal-week { min-inline-size: 640px; }
+}
+@media (forced-colors: active) {
+  .z-cal-chosen { outline: 2px solid Highlight; outline-offset: -2px; }
+  .z-cal-day[aria-current="date"] .z-cal-num { forced-color-adjust: none; background: Highlight; color: HighlightText; }
+}

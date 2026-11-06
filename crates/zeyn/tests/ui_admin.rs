@@ -8,9 +8,10 @@ use std::sync::{Arc, Mutex};
 use tower::ServiceExt;
 use zeyn::prelude::*;
 use zeyn::ui::{
-    Barcode, CodeLang, CodeView, DiffLayout, DiffView, Inbox, InboxSelection, JsonView, ListItem,
-    MAX_CODE_LINES, NotificationCenter, QrCode, QrLevel, QrMatrix, UnreadCount, code128_symbols,
-    highlight, qr_error_correction, qr_format_bits, qr_version_bits,
+    Barcode, CalendarParams, CalendarSlot, CodeLang, CodeView, DiffLayout, DiffView, Inbox,
+    InboxSelection, JsonView, ListItem, MAX_CODE_LINES, NotificationCenter, QrCode, QrLevel,
+    QrMatrix, UnreadCount, code128_symbols, highlight, qr_error_correction, qr_format_bits,
+    qr_version_bits,
 };
 use zeyn::{Component, FieldChange, I18n, Identity, Render};
 
@@ -793,5 +794,313 @@ async fn moving_a_card_runs_the_transition_with_its_permission_and_refuses_stale
     assert!(
         html.contains(r#"data-zeyn-key=\"1\""#) && html.contains("Write &lt;docs&gt;"),
         "{html}"
+    );
+}
+
+#[entity(table = "events")]
+pub struct Meeting {
+    #[key]
+    pub id: MeetingId,
+    pub title: String,
+    pub starts: DateTime,
+    pub ends: DateTime,
+}
+
+#[params]
+pub struct MeetingParams {
+    pub id: i64,
+}
+
+#[derive(Clone, Default)]
+pub struct Meetings {
+    rows: Arc<Mutex<Vec<Meeting>>>,
+    queries: Arc<Mutex<Vec<DataQuery>>>,
+    slots: Arc<Mutex<Vec<CalendarSlot>>>,
+}
+
+impl Service for Meetings {}
+
+fn at(s: &str) -> DateTime {
+    DateTime::parse(s).unwrap()
+}
+
+impl Meetings {
+    fn seeded() -> Meetings {
+        let m = |id: i64, title: &str, a: &str, b: &str| Meeting {
+            id: MeetingId(id),
+            title: title.into(),
+            starts: at(a),
+            ends: at(b),
+        };
+        let store = Meetings::default();
+        *store.rows.lock().unwrap() = vec![
+            m(
+                1,
+                "Stand up",
+                "2026-11-06T08:00:00Z",
+                "2026-11-06T08:15:00Z",
+            ),
+            m(
+                2,
+                "Late <call>",
+                "2026-11-06T23:30:00Z",
+                "2026-11-07T00:30:00Z",
+            ),
+            m(3, "Trip", "2026-11-09T00:00:00Z", "2026-11-11T12:00:00Z"),
+            m(
+                4,
+                "Next year",
+                "2027-01-20T09:00:00Z",
+                "2027-01-20T10:00:00Z",
+            ),
+        ];
+        store
+    }
+}
+
+#[action(permission = "events.read")]
+pub async fn search_meetings(q: DataQuery, store: Meetings) -> Result<Page<Meeting>> {
+    store
+        .queries
+        .lock()
+        .unwrap()
+        .push(q.clone());
+    Ok(q.apply(store.rows.lock().unwrap().clone()))
+}
+
+#[action(permission = "events.write")]
+pub async fn new_meeting(slot: CalendarSlot, store: Meetings) -> Result<Option<Effect>> {
+    store.slots.lock().unwrap().push(slot);
+    Ok(Some(Window::open(meeting, MeetingParams { id: 9 })))
+}
+
+#[screen(permission = "events.read")]
+pub fn meeting(p: MeetingParams) -> Screen {
+    Screen::window(format!("Meeting {}", p.id))
+}
+
+#[screen(route = "/planner", permission = "admin.read")]
+pub fn planner(p: CalendarParams) -> Screen {
+    Screen::new("Planner").body(
+        Card::new().add(
+            Calendar::of(search_meetings)
+                .start(Meeting::starts)
+                .end(Meeting::ends)
+                .label(|m: &Meeting| m.title.clone())
+                .open(|m: &Meeting| Window::open(meeting, MeetingParams { id: m.id.0 }))
+                .create(new_meeting)
+                .at(p),
+        ),
+    )
+}
+
+fn planner_app(store: Meetings) -> axum::Router {
+    App::new("Admin")
+        .i18n(I18n::new("en"))
+        .service(store)
+        .time_policy(TimePolicy::Organization(
+            TimeZone::named("Europe/Berlin").unwrap(),
+        ))
+        .auth(|h: &HeaderMap| {
+            let perms: Vec<String> = h
+                .get("x-perms")?
+                .to_str()
+                .ok()?
+                .split(',')
+                .map(String::from)
+                .collect();
+            Some(Identity::user("u").with_permissions(perms))
+        })
+        .feature(
+            Feature::new("planner")
+                .screen(planner)
+                .screen(meeting),
+        )
+        .router()
+        .unwrap()
+}
+
+const PLANNER: &str = "admin.read,events.read,events.write";
+
+#[tokio::test]
+async fn the_month_view_places_events_by_day_in_the_users_zone_and_asks_only_for_the_range() {
+    let store = Meetings::seeded();
+    let router = planner_app(store.clone());
+    let (status, page) = get_as(
+        &router,
+        "/planner?params=%7B%22view%22%3A%22month%22%2C%22date%22%3A%222026-11-06%22%7D",
+        PLANNER,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert!(page.contains(r#"role="grid""#) && page.contains(">November 2026</h2>"));
+    assert_eq!(
+        page.matches(r#"role="gridcell""#)
+            .count(),
+        42
+    );
+    let day7 = page
+        .split(r#"data-day="2026-11-07""#)
+        .nth(1)
+        .unwrap()
+        .split("</td>")
+        .next()
+        .unwrap();
+    assert!(
+        day7.contains("Late &lt;call&gt;"),
+        "23:30 UTC is the 7th in Berlin"
+    );
+    assert!(day7.contains(">12:30 AM</time>"), "{day7}");
+    let trip_days = page.matches(">Trip</span>").count();
+    assert_eq!(trip_days, 3, "a multi day event shows on each of its days");
+    assert!(!page.contains("Next year"));
+    assert!(page.contains(r#"data-day="2026-11-06" tabindex="0""#));
+    assert!(page.contains(r#"data-zeyn-effect=""#) && page.contains("open_window"));
+    assert!(
+        page.contains(r#"data-zeyn-drives="calendar""#)
+            && page.contains(r#"data-zeyn-listens="calendar""#)
+    );
+    assert!(page.contains(" data-create"));
+    for name in ["calendar.js", "calendar.css", "topics.js"] {
+        assert!(page.contains(&format!("/_zeyn/{name}?v=")), "{name}");
+    }
+    let q = store
+        .queries
+        .lock()
+        .unwrap()
+        .last()
+        .cloned()
+        .unwrap();
+    assert_eq!(q.filters.len(), 2);
+    assert_eq!(q.filters[0].field, "starts");
+    assert_eq!(q.filters[0].to.as_deref(), Some("2026-12-12"));
+    assert_eq!(q.filters[1].field, "ends");
+    assert_eq!(q.filters[1].from.as_deref(), Some("2026-11-01"));
+    assert_eq!(q.time_zone.name(), "Europe/Berlin");
+    let (_, reader) = get_as(&router, "/planner", "admin.read,events.read").await;
+    assert!(
+        !reader.contains(" data-create"),
+        "no slots without the create permission"
+    );
+}
+
+#[tokio::test]
+async fn the_week_view_has_hour_rows_and_comes_back_through_the_nodes_endpoint() {
+    let router = planner_app(Meetings::seeded());
+    let res = router
+        .clone()
+        .oneshot(
+            Request::post("/_zeyn/nodes")
+                .header("x-perms", PLANNER)
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::COOKIE, format!("zeyn_csrf={TOKEN}"))
+                .header("x-zeyn-csrf", TOKEN)
+                .body(Body::from(
+                    serde_json::json!({ "screen": "planner", "params": { "view": "week", "date": "2026-11-06" }, "nodes": ["0.0"] }).to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let (status, json) = body(res).await;
+    assert_eq!(status, StatusCode::OK);
+    let html: serde_json::Value = serde_json::from_str(&json).unwrap();
+    let html = html["nodes"]["0.0"].as_str().unwrap();
+    assert!(html.contains("z-cal-week"));
+    assert_eq!(
+        html.matches(r#"data-slot="2026-11-06T"#)
+            .count(),
+        14
+    );
+    assert!(
+        html.contains(r#"data-slot="2026-11-06T09:00""#),
+        "08:00 UTC is 09:00 in Berlin"
+    );
+    assert!(
+        html.contains(r#"data-slot="2026-11-01T07:00""#)
+            && html.contains(r#"data-slot="2026-11-07T20:00""#),
+        "en weeks start on Sunday"
+    );
+    assert!(html.contains(r#"aria-current="page">Week</a>"#));
+}
+
+#[tokio::test]
+async fn creating_by_a_slot_reads_local_times_on_the_server_with_csrf_and_the_permission() {
+    let store = Meetings::seeded();
+    let router = planner_app(store.clone());
+    let call = |start: &str, end: &str, all_day: bool| serde_json::json!({ "screen": "planner", "params": null, "node": "0.0", "key": "create", "input": { "start": start, "end": end, "all_day": all_day } });
+    let (status, _) = data(
+        &router,
+        PLANNER,
+        Csrf::Missing,
+        call("2026-11-06T10:00", "2026-11-06T11:00", false),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let (status, _) = data(
+        &router,
+        "admin.read,events.read",
+        Csrf::Sent,
+        call("2026-11-06T10:00", "2026-11-06T11:00", false),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let (status, reply) = data(
+        &router,
+        PLANNER,
+        Csrf::Sent,
+        call("2026-11-06T10:00", "2026-11-06T11:00", false),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{reply}");
+    assert!(reply.contains("open_window") && reply.contains(r#""id":9"#));
+    assert_eq!(
+        store.slots.lock().unwrap()[0],
+        CalendarSlot {
+            start: at("2026-11-06T09:00:00Z"),
+            end: at("2026-11-06T10:00:00Z"),
+            all_day: false
+        }
+    );
+    let (status, _) = data(
+        &router,
+        PLANNER,
+        Csrf::Sent,
+        call("2026-11-06", "2026-11-07", true),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let day = store.slots.lock().unwrap()[1];
+    assert_eq!(
+        (day.start, day.end),
+        (at("2026-11-05T23:00:00Z"), at("2026-11-07T23:00:00Z"))
+    );
+    let (status, _) = data(
+        &router,
+        PLANNER,
+        Csrf::Sent,
+        call("2026-03-29T02:00", "2026-03-29T03:00", false),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "a skipped hour");
+    let (status, _) = data(
+        &router,
+        PLANNER,
+        Csrf::Sent,
+        call("2026-11-06T11:00", "2026-11-06T10:00", false),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    let (status, _) = data(
+        &router,
+        PLANNER,
+        Csrf::Sent,
+        call("2026-01-01", "2026-03-01", true),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "more than 31 days"
     );
 }

@@ -24,6 +24,8 @@ pub struct Demo {
     pub from: Option<Date>,
     pub to: Option<Date>,
     pub q: Option<String>,
+    pub view: Option<zeyn::ui::CalendarView>,
+    pub date: Option<Date>,
 }
 
 /// One live example: the function of the component's file that builds it.
@@ -222,6 +224,7 @@ catalog! {
         barcode "/ui/barcode";
         inbox "/ui/inbox";
         kanban "/ui/kanban";
+        calendar "/ui/calendar" (Demo);
     }
 }
 
@@ -299,7 +302,8 @@ pub fn feature() -> Feature {
             .screen(examples::image_card::product)
             .screen(examples::card_grid::large_catalog)
             .screen(examples::card_grid::live_catalog)
-            .screen(examples::screen_header::orders_page),
+            .screen(examples::screen_header::orders_page)
+            .screen(examples::calendar::appointment),
     )
 }
 

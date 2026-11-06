@@ -6,6 +6,7 @@
 
 mod alpha;
 mod barcode;
+mod calendar;
 mod catalog;
 mod chart;
 mod chips;
@@ -66,6 +67,7 @@ pub use barcode::{
     Barcode, CODE128_QUIET, MAX_BARCODE_CHARS, MAX_QR_BYTES, QR_QUIET, QrCode, QrLevel, QrMatrix,
     code128_symbols, qr_error_correction, qr_format_bits, qr_version_bits,
 };
+pub use calendar::{Calendar, CalendarParams, CalendarSlot, CalendarView, MAX_CALENDAR_EVENTS};
 pub use catalog::{CardGrid, ImageCard, MAX_SUGGESTIONS, Rail, SearchBox, SearchParams};
 pub use chart::{Better, BulletCell, Chart, ChartKind, Kpi, SparklineCell};
 pub use chips::{Chips, MAX_CHIPS};

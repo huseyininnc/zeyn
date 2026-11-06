@@ -113,3 +113,41 @@ A mouse or pen drags a card; the columns it may go to are outlined, the others d
 | Home, End | First or last card in view in the column |
 | Enter, Space | Opens the move menu: Up and Down choose a column, Enter moves, Escape closes |
 | Shift + Left, Shift + Right | Moves the card to the column before or after, when the workflow allows it |
+
+## Calendar
+
+`Calendar::of(action)` shows events in a month, week or day, in the user's time zone. The action is the kind a DataGrid uses and gets only the visible range: one filter keeps events that start up to the last visible day, one keeps those that end from the first one (date bounds are whole days in the user's zone, so the database does the work), sorted by start, at most `MAX_CALENDAR_EVENTS` (500). The server places every event and renders the whole view; times are shown in the zone of `Ctx` (`TimePolicy`), so an event at 23:30 UTC is on the next day in Berlin.
+
+```rust
+#[action(permission = "events.write")]
+pub async fn new_event(slot: CalendarSlot) -> Result<Option<Effect>> {
+    Ok(Some(Window::open(event_form, EventFormParams { start: slot.start, end: slot.end })))
+}
+
+#[screen(route = "/planner", permission = "events.read")]
+pub fn planner(p: CalendarParams) -> Screen {
+    Screen::new(t!("planner.title")).body(
+        Calendar::of(search_events)
+            .start(Event::starts)
+            .end(Event::ends)
+            .label(|e: &Event| e.title.clone())
+            .open(|e: &Event| Window::open(event, EventParams { id: e.id }))
+            .create(new_event)
+            .at(p),
+    )
+}
+```
+
+The view and the date are screen params (`CalendarParams`, or fields named `view` and `date`). The toolbar's links (previous, today, next, month, week, day) change them in place through the calendar's topic (`"calendar"`, `.topic(..)`): one `POST /_zeyn/nodes` renders the calendar again and the address follows, so a view can be shared and works without script. `.open(|e| effect)` makes every event a button that runs the effect, such as a window, whose screen checks its own access. With `.create(action)` the user chooses a slot: a click on a day, a drag over hours, or Shift with the arrow keys, then Enter or N. The slot goes as local wall times through `POST /_zeyn/data` (CSRF, write limit, the action's permission); the server reads it in the user's zone, refuses an hour that the clocks skip and slots longer than 31 days, and passes a `CalendarSlot` to the action, whose effect runs before the calendar renders again. Users without the permission cannot choose slots. `.hours(from, to)` sets the rows of the week and day views (7 to 21).
+
+Measured in the component catalog (debug server): switching between month, week and day shows the new view 21 to 34 ms after the click at full CPU and 60 to 163 ms at 4x slowdown. `calendar.js` (9.6 KB, 3.3 KB gzip) and `calendar.css` (4.4 KB) load only with a calendar.
+
+| Key | What it does |
+|---|---|
+| Tab | Moves into the grid, to the chosen day (one stop for the grid) |
+| Arrow keys | The next day or hour; Left and Right swap under `dir="rtl"` |
+| Home, End | First or last cell of the row |
+| Page Up, Page Down | Previous or next month, week or day |
+| Enter | Into the events of the cell (Up and Down between them, Escape back); on an empty cell it creates |
+| Shift + arrow keys | Widens the chosen slot, when the calendar can create |
+| N | Creates an event in the chosen slot, when the calendar can create |

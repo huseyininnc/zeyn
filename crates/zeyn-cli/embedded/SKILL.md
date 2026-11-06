@@ -263,6 +263,9 @@ What to remember:
 - Boards: `Kanban::of(flow(), search_tasks, move_task).state(Task::state).card(|t| node)`; the
   move action takes `TransitionRequest<TaskId>`, loads the record and calls `flow().apply(..)`.
   Never write drag and drop yourself.
+- Calendars: the screen takes `p: CalendarParams` and builds
+  `Calendar::of(search_events).start(Event::starts).end(Event::ends).label(..).open(..).create(new_event).at(p)`;
+  the create action takes `CalendarSlot` (moments, already in UTC) and returns `Result<Option<Effect>>`.
 - The app (`src/app.rs`): `App::new(t!("app.name")).i18n(i18n).service(store).feature(sales::feature())`,
   plus what the app needs: `.auth(...)`, `.mcp(Mcp::read_only())`, `.themes([...])`,
   `.datagrid_views(store)`, `.assistant(...)`.

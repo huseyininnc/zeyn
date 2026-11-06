@@ -604,6 +604,39 @@
         "no_moves": "This card cannot be moved from here",
         "count": "{n}",
         "count_wip": "{n} of {wip}"
+      },
+      "calendar": {
+        "navigation": "Period",
+        "views": "View",
+        "previous": "Previous",
+        "next": "Next",
+        "today": "Today",
+        "month": "Month",
+        "week": "Week",
+        "day": "Day",
+        "all_day": "All day",
+        "more": "{n} more",
+        "range": "{from} to {to}",
+        "cut": "Only the first {n} events of this period are shown.",
+        "help": "Arrow keys move between days, Page Up and Page Down change the period, Enter goes to the events of a day.",
+        "help_create": "Arrow keys move between days, Page Up and Page Down change the period, Enter goes to the events of a day, N creates an event, Shift with the arrow keys widens the slot.",
+        "created": "Event created",
+        "skipped": "That time does not exist in your time zone, because the clocks change then.",
+        "invalid_slot": "Choose a slot of at most 31 days that ends after it starts.",
+        "months": {
+          "1": "January",
+          "2": "February",
+          "3": "March",
+          "4": "April",
+          "5": "May",
+          "6": "June",
+          "7": "July",
+          "8": "August",
+          "9": "September",
+          "10": "October",
+          "11": "November",
+          "12": "December"
+        }
       }
     },
     "date": {

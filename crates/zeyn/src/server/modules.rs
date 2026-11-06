@@ -180,6 +180,12 @@ pub(crate) const MODULES: &[Module] = &[
         style: &["z-kanban"],
         needs: &[],
     },
+    Module {
+        name: "calendar",
+        script: &["data-zeyn-calendar"],
+        style: &["z-cal"],
+        needs: &[],
+    },
 ];
 
 const _: () = assert!(MODULES.len() <= 64, "Used keeps one bit per module");
@@ -188,7 +194,7 @@ const _: () = assert!(MODULES.len() <= 64, "Used keeps one bit per module");
 /// are linked only when the page uses them; the others style components without markers of
 /// their own (layouts, display widgets, form sections, the palette) and every page links them,
 /// as `zeyn.css` and `enterprise.css`.
-const STYLES: [&str; 12] = [
+const STYLES: [&str; 13] = [
     "components",
     "catalog",
     "content",
@@ -201,6 +207,7 @@ const STYLES: [&str; 12] = [
     "barcode",
     "inbox",
     "kanban",
+    "calendar",
 ];
 
 /// The modules a page uses, one bit each in the order of [`MODULES`].
@@ -365,7 +372,15 @@ pub(crate) fn runtime(js: &'static str) -> &'static str {
 
 /// Script and style files of component modules, by path; the others are served next to their
 /// endpoints.
-const FILES: [(&str, &str); 29] = [
+const FILES: [(&str, &str); 31] = [
+    (
+        "/_zeyn/calendar.css",
+        include_str!("../../assets/calendar.css"),
+    ),
+    (
+        "/_zeyn/calendar.js",
+        include_str!("../../assets/calendar.js"),
+    ),
     ("/_zeyn/kanban.css", include_str!("../../assets/kanban.css")),
     ("/_zeyn/kanban.js", include_str!("../../assets/kanban.js")),
     ("/_zeyn/inbox.css", include_str!("../../assets/inbox.css")),

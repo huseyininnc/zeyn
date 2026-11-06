@@ -113,3 +113,41 @@ Un ratón o un lápiz arrastran la tarjeta; las columnas a las que puede ir se r
 | Home, End | Primera o última tarjeta visible de la columna |
 | Enter, Space | Abre el menú de mover: Up y Down eligen columna, Enter mueve, Escape cierra |
 | Shift + Left, Shift + Right | Mueve la tarjeta a la columna anterior o siguiente, cuando el flujo lo permite |
+
+## Calendar
+
+`Calendar::of(action)` muestra eventos en un mes, una semana o un día, en la zona horaria del usuario. La acción es del tipo que usa un DataGrid y recibe solo el rango visible: un filtro conserva los eventos que empiezan hasta el último día visible y otro los que terminan desde el primero (los límites de fecha son días completos en la zona del usuario, así que el trabajo lo hace la base de datos), ordenados por inicio, como mucho `MAX_CALENDAR_EVENTS` (500). El servidor coloca cada evento y dibuja la vista entera; las horas se muestran en la zona de `Ctx` (`TimePolicy`), así que un evento a las 23:30 UTC cae al día siguiente en Berlín.
+
+```rust
+#[action(permission = "events.write")]
+pub async fn new_event(slot: CalendarSlot) -> Result<Option<Effect>> {
+    Ok(Some(Window::open(event_form, EventFormParams { start: slot.start, end: slot.end })))
+}
+
+#[screen(route = "/planner", permission = "events.read")]
+pub fn planner(p: CalendarParams) -> Screen {
+    Screen::new(t!("planner.title")).body(
+        Calendar::of(search_events)
+            .start(Event::starts)
+            .end(Event::ends)
+            .label(|e: &Event| e.title.clone())
+            .open(|e: &Event| Window::open(event, EventParams { id: e.id }))
+            .create(new_event)
+            .at(p),
+    )
+}
+```
+
+La vista y la fecha son parámetros de la pantalla (`CalendarParams`, o campos llamados `view` y `date`). Los enlaces de la barra (anterior, hoy, siguiente, mes, semana, día) los cambian en su sitio a través del tema del calendario (`"calendar"`, `.topic(..)`): un solo `POST /_zeyn/nodes` vuelve a dibujar el calendario y la dirección lo sigue, así que una vista se puede compartir y funciona sin script. `.open(|e| effect)` convierte cada evento en un botón que ejecuta el efecto, como una ventana cuya pantalla comprueba su propio acceso. Con `.create(action)` el usuario elige un intervalo: un clic en un día, arrastrar sobre las horas o Shift con las flechas, y después Enter o N. El intervalo viaja como hora local a través de `POST /_zeyn/data` (CSRF, límite de escritura, permiso de la acción); el servidor lo lee en la zona del usuario, rechaza una hora que el cambio de reloj se salta y los intervalos de más de 31 días, y entrega un `CalendarSlot` a la acción, cuyo efecto se ejecuta antes de que el calendario se vuelva a dibujar. Los usuarios sin el permiso no pueden elegir intervalos. `.hours(from, to)` fija las filas de las vistas de semana y día (de 7 a 21).
+
+Medido en el catálogo de componentes (servidor debug): cambiar entre mes, semana y día muestra la nueva vista de 21 a 34 ms después del clic a plena CPU y de 60 a 163 ms con la CPU 4 veces más lenta. `calendar.js` (9,6 KB, 3,3 KB con gzip) y `calendar.css` (4,4 KB) se cargan solo con un calendario.
+
+| Tecla | Qué hace |
+|---|---|
+| Tab | Entra en la cuadrícula, en el día elegido (una parada para la cuadrícula) |
+| Flechas | El día o la hora siguiente; Left y Right se invierten con `dir="rtl"` |
+| Home, End | Primera o última celda de la fila |
+| Page Up, Page Down | Mes, semana o día anterior o siguiente |
+| Enter | Entra en los eventos de la celda (Up y Down entre ellos, Escape para volver); en una celda vacía crea |
+| Shift + flechas | Amplía el intervalo elegido, cuando el calendario puede crear |
+| N | Crea un evento en el intervalo elegido, cuando el calendario puede crear |

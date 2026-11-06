@@ -113,3 +113,41 @@ Kanban::of(task_flow(), search_tasks, move_task)
 | Home, End | 列で見えている最初または最後のカード |
 | Enter, Space | 移動メニューを開きます: Up と Down で列を選び、Enter で移動、Escape で閉じます |
 | Shift + Left, Shift + Right | ワークフローが許す場合、カードを前または次の列へ移します |
+
+## Calendar
+
+`Calendar::of(action)` はユーザーのタイムゾーンで、月、週、日の単位で予定を表示します。アクションは DataGrid と同じ種類で、見えている範囲だけを受け取ります。一つのフィルターは最後に見える日までに始まる予定を、もう一つは最初の日以降に終わる予定を残します（日付の境界はユーザーのタイムゾーンでの丸一日なので、絞り込みはデータベースが行います）。結果は開始順に並び、最大 `MAX_CALENDAR_EVENTS`（500）件です。サーバーがすべての予定を配置して表示全体を描きます。時刻は `Ctx` のタイムゾーン（`TimePolicy`）で表示されるので、UTC 23:30 の予定はベルリンでは翌日になります。
+
+```rust
+#[action(permission = "events.write")]
+pub async fn new_event(slot: CalendarSlot) -> Result<Option<Effect>> {
+    Ok(Some(Window::open(event_form, EventFormParams { start: slot.start, end: slot.end })))
+}
+
+#[screen(route = "/planner", permission = "events.read")]
+pub fn planner(p: CalendarParams) -> Screen {
+    Screen::new(t!("planner.title")).body(
+        Calendar::of(search_events)
+            .start(Event::starts)
+            .end(Event::ends)
+            .label(|e: &Event| e.title.clone())
+            .open(|e: &Event| Window::open(event, EventParams { id: e.id }))
+            .create(new_event)
+            .at(p),
+    )
+}
+```
+
+表示と日付は画面のパラメーターです（`CalendarParams`、または `view` と `date` という名前のフィールド）。ツールバーのリンク（前へ、今日、次へ、月、週、日）は、カレンダーのトピック（`"calendar"`、`.topic(..)`）を通してその場で変更します。一回の `POST /_zeyn/nodes` でカレンダーが描き直され、アドレスも追随するので、表示を共有でき、スクリプトなしでも動きます。`.open(|e| effect)` は各予定を、効果を実行するボタンにします。たとえばウィンドウを開き、その画面は自分のアクセスを確認します。`.create(action)` を付けると、ユーザーは枠を選べます。日をクリックするか、時間の上をドラッグするか、Shift と矢印キーを使い、Enter か N を押します。枠は現地の壁時計の時刻として `POST /_zeyn/data` で送られ（CSRF、書き込み制限、アクションの権限）、サーバーはそれをユーザーのタイムゾーンで読み、時計の切り替えで飛ばされる時刻と 31 日を超える枠を拒否し、`CalendarSlot` をアクションに渡します。アクションの効果はカレンダーが描き直される前に実行されます。権限のないユーザーは枠を選べません。`.hours(from, to)` で週と日の表示の行を決めます（7 時から 21 時）。
+
+コンポーネントカタログでの測定（debug サーバー）: 月、週、日の切り替えでは、クリックから新しい表示まで CPU 等倍で 21〜34 ms、4 倍の減速で 60〜163 ms でした。`calendar.js`（9.6 KB、gzip で 3.3 KB）と `calendar.css`（4.4 KB）はカレンダーと一緒の場合だけ読み込まれます。
+
+| キー | 動作 |
+|---|---|
+| Tab | グリッドの選択中の日へ移動します（グリッド全体で一つのタブ位置） |
+| 矢印キー | 次の日または時間。`dir="rtl"` では Left と Right が入れ替わります |
+| Home, End | 行の最初または最後のセル |
+| Page Up, Page Down | 前または次の月、週、日 |
+| Enter | セルの予定に入ります（Up と Down で移動、Escape で戻る）。空のセルでは作成します |
+| Shift + 矢印キー | カレンダーが作成できる場合、選んだ枠を広げます |
+| N | カレンダーが作成できる場合、選んだ枠に予定を作ります |

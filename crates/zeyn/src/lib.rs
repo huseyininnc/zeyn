@@ -260,8 +260,9 @@ pub mod prelude {
         Tabs, ThemePicker, Timeline, Toolbox, Tree, TreeItem, TreeQuery, Video, WeekSchedule,
     };
     pub use crate::ui::{
-        Barcode, CodeLang, CodeView, DiffLayout, DiffView, Inbox, InboxSelection, JsonView, Kanban,
-        NotificationCenter, QrCode, QrLevel, UnreadCount,
+        Barcode, Calendar, CalendarParams, CalendarSlot, CalendarView, CodeLang, CodeView,
+        DiffLayout, DiffView, Inbox, InboxSelection, JsonView, Kanban, NotificationCenter, QrCode,
+        QrLevel, UnreadCount,
     };
     pub use crate::{
         Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime,

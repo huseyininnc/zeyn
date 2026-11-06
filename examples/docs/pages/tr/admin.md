@@ -113,3 +113,41 @@ Fare ya da kalem kartı sürükler; gidebileceği sütunlar çerçevelenir, diğ
 | Home, End | Sütunda görünen ilk veya son kart |
 | Enter, Space | Taşıma menüsünü açar: Up ve Down sütun seçer, Enter taşır, Escape kapatır |
 | Shift + Left, Shift + Right | İş akışı izin veriyorsa kartı önceki veya sonraki sütuna taşır |
+
+## Calendar
+
+`Calendar::of(action)` etkinlikleri kullanıcının saat diliminde ay, hafta veya gün olarak gösterir. Eylem DataGrid'in kullandığı türdendir ve yalnızca görünen aralığı alır: bir süzgeç son görünen güne kadar başlayan etkinlikleri, bir diğeri ilk günden itibaren biten etkinlikleri tutar (tarih sınırları kullanıcının saat diliminde tam günlerdir, böylece işi veritabanı yapar); sonuçlar başlangıca göre sıralanır, en fazla `MAX_CALENDAR_EVENTS` (500). Sunucu her etkinliği yerleştirir ve görünümün tamamını çizer; saatler `Ctx` saat diliminde (`TimePolicy`) gösterilir, bu yüzden UTC 23:30'daki bir etkinlik Berlin'de ertesi gündedir.
+
+```rust
+#[action(permission = "events.write")]
+pub async fn new_event(slot: CalendarSlot) -> Result<Option<Effect>> {
+    Ok(Some(Window::open(event_form, EventFormParams { start: slot.start, end: slot.end })))
+}
+
+#[screen(route = "/planner", permission = "events.read")]
+pub fn planner(p: CalendarParams) -> Screen {
+    Screen::new(t!("planner.title")).body(
+        Calendar::of(search_events)
+            .start(Event::starts)
+            .end(Event::ends)
+            .label(|e: &Event| e.title.clone())
+            .open(|e: &Event| Window::open(event, EventParams { id: e.id }))
+            .create(new_event)
+            .at(p),
+    )
+}
+```
+
+Görünüm ve tarih ekran parametreleridir (`CalendarParams` ya da `view` ve `date` adlı alanlar). Araç çubuğunun bağlantıları (önceki, bugün, sonraki, ay, hafta, gün) bunları takvimin konusu (`"calendar"`, `.topic(..)`) üzerinden yerinde değiştirir: tek bir `POST /_zeyn/nodes` takvimi yeniden çizer ve adres de izler, böylece bir görünüm paylaşılabilir ve betik olmadan da çalışır. `.open(|e| effect)` her etkinliği, kendi erişimini denetleyen bir ekranın penceresi gibi bir etkiyi çalıştıran bir düğme yapar. `.create(action)` ile kullanıcı bir aralık seçer: bir güne tıklama, saatler üzerinde sürükleme ya da Shift ile ok tuşları, ardından Enter veya N. Aralık yerel duvar saati olarak `POST /_zeyn/data` üzerinden gider (CSRF, yazma sınırı, eylemin izni); sunucu onu kullanıcının saat diliminde okur, saatlerin atladığı bir saati ve 31 günden uzun aralıkları reddeder ve eyleme bir `CalendarSlot` verir; eylemin etkisi takvim yeniden çizilmeden önce çalışır. İzni olmayan kullanıcılar aralık seçemez. `.hours(from, to)` hafta ve gün görünümlerinin satırlarını belirler (7 ile 21).
+
+Bileşen kataloğunda ölçüldü (debug sunucu): ay, hafta ve gün arasında geçiş, tıklamadan sonra yeni görünümü tam işlemci hızında 21 ile 34 ms, 4 kat yavaşlatmada 60 ile 163 ms içinde gösterir. `calendar.js` (9,6 KB, gzip ile 3,3 KB) ve `calendar.css` (4,4 KB) yalnızca bir takvimle yüklenir.
+
+| Tuş | Ne yapar |
+|---|---|
+| Tab | Izgaraya, seçili güne geçer (ızgara için tek durak) |
+| Ok tuşları | Sonraki gün veya saat; Left ve Right `dir="rtl"` altında yer değiştirir |
+| Home, End | Satırın ilk veya son hücresi |
+| Page Up, Page Down | Önceki veya sonraki ay, hafta ya da gün |
+| Enter | Hücrenin etkinliklerine geçer (aralarında Up ve Down, geri dönmek için Escape); boş bir hücrede oluşturur |
+| Shift + ok tuşları | Takvim oluşturabiliyorsa seçili aralığı genişletir |
+| N | Takvim oluşturabiliyorsa seçili aralıkta bir etkinlik oluşturur |

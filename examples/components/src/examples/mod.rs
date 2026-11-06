@@ -10,6 +10,7 @@ pub mod badge;
 pub mod barcode;
 pub mod breadcrumb;
 pub mod busy;
+pub mod calendar;
 pub mod card;
 pub mod card_grid;
 pub mod chart;
