@@ -661,6 +661,16 @@
           "increase": "Artır",
           "limit": "Yalnızca {n} adet var.",
           "failed": "Adet değiştirilemedi."
+        },
+        "gallery": {
+          "swipe": "Fotoğraflar, ok tuşlarıyla ya da kaydırarak gezin",
+          "full": "Tam ekran",
+          "choose": "Bir fotoğraf seçin",
+          "show": "{count} fotoğraftan {n}. fotoğrafı göster",
+          "close": "Kapat",
+          "prev": "Önceki fotoğraf",
+          "next": "Sonraki fotoğraf",
+          "zoom": "Yakınlaştır"
         }
       }
     },

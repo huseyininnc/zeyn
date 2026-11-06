@@ -92,3 +92,23 @@ VariantPicker::new()
 - **Unavailable options** are turned off with a reason (`unavailable(value, reason)`), which screen readers read with the option and the tooltip shows; swatches get a diagonal line and chips a strike through.
 - **Price, photo and stock follow.** The picker drives its topics and listens to them itself. Choosing an option puts its value into the screen params of the group's name, keeps the address in step, so the link to the chosen variant can be shared, and refreshes every node that listens to the topic in one request: put `.listens("variant")` on the price, the gallery and the stock line, and the screen turns options off again for the new choice. It needs no script beyond the topics module.
 - **Checks.** `App::check_page` reports a picker that drives nothing and a swatch without a valid color.
+
+## Product gallery
+
+```rust
+p.photos.iter().fold(ProductGallery::new(p.name.clone()), |g, photo| {
+    g.image(
+        Image::new(photo.large.clone())
+            .alt(photo.alt.clone())
+            .size(800, 800)
+            .low(photo.tiny.clone())
+            .placeholder(Placeholder::color("--z-surface-2")),
+    )
+    .thumb(photo.thumb.clone())
+})
+```
+
+- **One image at a time.** The slides sit in a scroll snapping track, so phones swipe between them without script. Thumbnails under the image are buttons ("Show photo 2 of 5", the current one with `aria-current`); the arrow keys on the focused image move between slides, in the reading direction of the page. The gallery is a named carousel region whose slides say "2 of 5" (W3C APG carousel pattern). Without thumbnails (`thumb`) it shows numbered dots.
+- **Only what is seen loads.** The first image is eager with `fetchpriority="high"`, because it is usually the largest thing on a product page; the others wait in inert templates, and `gallery.js` puts in the image on screen and its two neighbors, watched by one IntersectionObserver. A gallery of 12 photos loads three at first. The images are `Image`s, so they keep their placeholder, low resolution file and fallback.
+- **Zoom and full screen.** A mouse zooms the image under the pointer (the slide's box is read once when the pointer enters, never while it moves). A press on the image, or the "Full screen" button, opens a modal dialog with the image, previous and next buttons, a zoom toggle and a close button; it keeps focus inside, closes with Escape and gives focus back to what opened it. Under reduced motion nothing slides or grows.
+- **Script.** `gallery.js` (about 1.5 KB gzip) loads only on pages with a gallery.

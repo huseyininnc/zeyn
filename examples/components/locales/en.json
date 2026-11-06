@@ -110,7 +110,8 @@
       "price": "A price with a struck old price, the percent off and a unit price.",
       "range_slider": "Two handles over one track for price and date ranges.",
       "quantity_stepper": "Minus and plus buttons around a number whose stock the server checks.",
-      "variant_picker": "Color swatches and size chips that change the price, photo and stock in place."
+      "variant_picker": "Color swatches and size chips that change the price, photo and stock in place.",
+      "product_gallery": "Product photos with thumbnails, zoom, swipe and a full screen view."
     },
     "ex": {
       "action_button": {
@@ -391,6 +392,10 @@
       },
       "variant_picker": {
         "overview": "Example"
+      },
+      "product_gallery": {
+        "overview": "Example",
+        "dots": "Without thumbnails"
       }
     }
   }

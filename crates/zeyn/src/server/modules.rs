@@ -188,10 +188,18 @@ pub(crate) const MODULES: &[Module] = &[
     },
     script("range", &["data-zeyn-range"]),
     script("quantity", &["data-zeyn-quantity"]),
+    script("gallery", &["data-zeyn-gallery"]),
     Module {
         name: "commerce",
         script: &[],
-        style: &["z-price", "z-range", "z-qty", "z-variant", "z-variants"],
+        style: &[
+            "z-price",
+            "z-range",
+            "z-qty",
+            "z-variant",
+            "z-variants",
+            "z-gallery",
+        ],
         needs: &[],
     },
 ];
@@ -381,7 +389,7 @@ pub(crate) fn runtime(js: &'static str) -> &'static str {
 
 /// Script and style files of component modules, by path; the others are served next to their
 /// endpoints.
-const FILES: [(&str, &str); 34] = [
+const FILES: [(&str, &str); 35] = [
     (
         "/_zeyn/commerce.css",
         include_str!("../../assets/commerce.css"),
@@ -404,6 +412,7 @@ const FILES: [(&str, &str); 34] = [
     ),
     ("/_zeyn/code.css", include_str!("../../assets/code.css")),
     ("/_zeyn/diff.css", include_str!("../../assets/diff.css")),
+    ("/_zeyn/gallery.js", include_str!("../../assets/gallery.js")),
     (
         "/_zeyn/quantity.js",
         include_str!("../../assets/quantity.js"),

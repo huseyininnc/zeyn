@@ -48,6 +48,7 @@ pub mod paragraph;
 pub mod popover;
 pub mod prev_next;
 pub mod price;
+pub mod product_gallery;
 pub mod progress;
 pub mod quantity_stepper;
 pub mod rail;

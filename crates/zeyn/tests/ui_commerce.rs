@@ -153,6 +153,26 @@ pub fn shirt(p: ShirtParams) -> Screen {
     )
 }
 
+fn gallery() -> ProductGallery {
+    (1..=4).fold(ProductGallery::new("Linen shirt"), |g, i| {
+        let g = g.image(
+            Image::new(format!("/p/{i}.webp"))
+                .alt(format!("View {i}"))
+                .size(800, 800)
+                .lazy(),
+        );
+        match i {
+            3 => g.thumb("javascript:alert(1)"),
+            _ => g.thumb(format!("/p/{i}-t.webp")),
+        }
+    })
+}
+
+#[screen(route = "/gallery", public)]
+pub fn galleried() -> Screen {
+    Screen::new("Gallery").body(gallery())
+}
+
 fn shop_app() -> App {
     App::new("Test")
         .i18n(I18n::new("en"))
@@ -177,7 +197,8 @@ fn shop_app() -> App {
                 .screen(ranged)
                 .screen(cart_line)
                 .screen(good_cards)
-                .screen(shirt),
+                .screen(shirt)
+                .screen(galleried),
         )
 }
 
@@ -604,4 +625,65 @@ async fn a_variant_choice_refreshes_the_picker_and_its_listeners_from_the_new_pa
             .contains("₺349.00"),
         "{body}"
     );
+}
+
+#[test]
+fn a_gallery_puts_only_its_first_image_in_the_page_and_loads_it_first() {
+    let out = html(&gallery(), "en");
+    assert!(
+        out.starts_with(r#"<section class="z-gallery" id="s-gallery-" aria-roledescription="carousel" aria-label="Linen shirt" data-zeyn-gallery"#),
+        "{out}"
+    );
+    assert_eq!(
+        out.matches(r#"<img class="z-image""#)
+            .count(),
+        4
+    );
+    assert_eq!(
+        out.matches("<template>").count(),
+        3,
+        "three images wait in templates"
+    );
+    let first = out.find("<template>").unwrap();
+    assert!(out[..first].contains(r#"src="/p/1.webp" alt="View 1" width="800" height="800" decoding="async" loading="eager" fetchpriority="high""#), "{out}");
+    assert!(
+        !out[..first].contains(r#"loading="lazy""#),
+        "the first image is never lazy"
+    );
+    assert!(out.contains(r#"<div class="z-gallery-slide" role="group" aria-roledescription="slide" aria-label="2 of 4" data-index="1"><template>"#));
+    assert!(out.contains(r#"<button type="button" class="z-gallery-thumb" data-index="0" aria-label="Show photo 1 of 4" aria-current="true"><img src="/p/1-t.webp" alt="" width="64" height="64" loading="lazy""#), "{out}");
+    assert!(
+        out.contains(r#"class="z-gallery-thumb z-gallery-thumb-dot" data-index="2""#)
+            && !out.contains("javascript"),
+        "an unsafe thumbnail becomes a dot"
+    );
+    assert!(out.contains(r#"<button type="button" class="z-gallery-open" aria-haspopup="dialog""#));
+    let one = html(
+        &ProductGallery::new("One").image(
+            Image::new("/a.webp")
+                .alt("A")
+                .size(10, 10),
+        ),
+        "en",
+    );
+    assert!(
+        !one.contains("z-gallery-thumbs"),
+        "one image needs no thumbnails"
+    );
+}
+
+#[tokio::test]
+async fn the_gallery_module_loads_only_with_a_gallery() {
+    let (status, page) = get("/gallery").await;
+    assert_eq!(status, StatusCode::OK);
+    let linked = links(&page);
+    assert!(
+        linked.contains(&"gallery.js".to_string()) && linked.contains(&"commerce.css".to_string())
+    );
+    assert!(
+        !linked.contains(&"media.js".to_string()),
+        "plain images need no media script"
+    );
+    let (_, other) = get("/shirt").await;
+    assert!(!links(&other).contains(&"gallery.js".to_string()));
 }

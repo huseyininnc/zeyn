@@ -201,6 +201,7 @@ catalog! {
         range_slider "/ui/range-slider" (Demo);
         quantity_stepper "/ui/quantity-stepper";
         variant_picker "/ui/variant-picker" (Demo);
+        product_gallery "/ui/product-gallery";
     }
     "media" Image {
         image "/ui/image";

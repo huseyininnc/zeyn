@@ -526,6 +526,16 @@
           "increase": "Aumentar",
           "limit": "Solo hay {n} disponibles.",
           "failed": "No se pudo cambiar la cantidad."
+        },
+        "gallery": {
+          "swipe": "Fotos, usa las flechas o desliza",
+          "full": "Pantalla completa",
+          "choose": "Elige una foto",
+          "show": "Mostrar foto {n} de {count}",
+          "close": "Cerrar",
+          "prev": "Foto anterior",
+          "next": "Foto siguiente",
+          "zoom": "Ampliar"
         }
       }
     },

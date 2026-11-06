@@ -92,3 +92,23 @@ VariantPicker::new()
 - **Las opciones no disponibles** se desactivan con un motivo (`unavailable(value, reason)`), que los lectores de pantalla leen con la opción y que muestra la descripción emergente; las muestras reciben una línea diagonal y las fichas un tachado.
 - **Precio, foto y stock acompañan.** El selector impulsa sus temas y también los escucha. Elegir una opción pone su valor en el parámetro de pantalla con el nombre del grupo, mantiene la dirección al día, de modo que se puede compartir el enlace de la variante elegida, y refresca en una sola petición cada nodo que escucha el tema: pon `.listens("variant")` en el precio, la galería y la línea de stock, y la pantalla vuelve a desactivar opciones para la nueva elección. No necesita más script que el módulo de temas.
 - **Comprobaciones.** `App::check_page` avisa de un selector que no impulsa nada y de una muestra sin un color válido.
+
+## Galería de producto
+
+```rust
+p.photos.iter().fold(ProductGallery::new(p.name.clone()), |g, photo| {
+    g.image(
+        Image::new(photo.large.clone())
+            .alt(photo.alt.clone())
+            .size(800, 800)
+            .low(photo.tiny.clone())
+            .placeholder(Placeholder::color("--z-surface-2")),
+    )
+    .thumb(photo.thumb.clone())
+})
+```
+
+- **Una imagen cada vez.** Las diapositivas están en una pista con ajuste de desplazamiento, así que en el móvil se pasa de una a otra deslizando, sin script. Las miniaturas bajo la imagen son botones ("Mostrar foto 2 de 5", la actual con `aria-current`); las flechas sobre la imagen con foco pasan de diapositiva en el sentido de lectura de la página. La galería es una región de carrusel con nombre cuyas diapositivas dicen "2 of 5" (patrón carousel de W3C APG). Sin miniaturas (`thumb`) muestra puntos numerados.
+- **Solo carga lo que se ve.** La primera imagen se carga enseguida con `fetchpriority="high"`, porque suele ser lo más grande de una página de producto; las demás esperan en plantillas inertes y `gallery.js` pone la imagen en pantalla y sus dos vecinas, vigiladas por un único IntersectionObserver. Una galería de 12 fotos carga tres al principio. Las imágenes son `Image`, así que conservan su marcador de posición, su archivo de baja resolución y su alternativa.
+- **Zoom y pantalla completa.** El ratón amplía la imagen bajo el puntero (el tamaño de la diapositiva se lee una vez al entrar el puntero, nunca mientras se mueve). Pulsar la imagen, o el botón "Pantalla completa", abre un diálogo modal con la imagen, botones de anterior y siguiente, un conmutador de zoom y un botón de cerrar; mantiene el foco dentro, se cierra con Escape y devuelve el foco a lo que lo abrió. Con movimiento reducido nada se desliza ni crece.
+- **Script.** `gallery.js` (cerca de 1,5 KB con gzip) se carga solo en páginas con una galería.

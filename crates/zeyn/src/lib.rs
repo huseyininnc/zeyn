@@ -265,7 +265,7 @@ pub mod prelude {
         QrLevel, UnreadCount,
     };
     pub use crate::ui::{
-        Price, PriceUnit, QuantityStepper, RangeSlider, VariantGroup, VariantPicker,
+        Price, PriceUnit, ProductGallery, QuantityStepper, RangeSlider, VariantGroup, VariantPicker,
     };
     pub use crate::{
         Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime,

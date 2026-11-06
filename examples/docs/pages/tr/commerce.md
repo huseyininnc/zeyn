@@ -92,3 +92,23 @@ VariantPicker::new()
 - **Olmayan seçenekler** bir gerekçeyle kapatılır (`unavailable(value, reason)`); ekran okuyucular gerekçeyi seçenekle birlikte okur, ipucu da gösterir. Renk örneklerine çapraz çizgi, çiplere üstü çizili yazı gelir.
 - **Fiyat, fotoğraf ve stok izler.** Seçici konularını sürer ve kendisi de onları dinler. Bir seçeneği seçmek değerini grubun adındaki ekran parametresine yazar, adresi güncel tutar (böylece seçili varyantın bağlantısı paylaşılabilir) ve konuyu dinleyen her node'u tek istekte yeniler: fiyata, galeriye ve stok satırına `.listens("variant")` koyun; ekran yeni seçim için seçenekleri yeniden kapatır. Konular modülünden başka script gerekmez.
 - **Denetimler.** `App::check_page` hiçbir şey sürmeyen bir seçiciyi ve geçerli rengi olmayan bir renk örneğini bildirir.
+
+## Ürün galerisi
+
+```rust
+p.photos.iter().fold(ProductGallery::new(p.name.clone()), |g, photo| {
+    g.image(
+        Image::new(photo.large.clone())
+            .alt(photo.alt.clone())
+            .size(800, 800)
+            .low(photo.tiny.clone())
+            .placeholder(Placeholder::color("--z-surface-2")),
+    )
+    .thumb(photo.thumb.clone())
+})
+```
+
+- **Bir seferde bir görsel.** Slaytlar kaydırınca yerine oturan bir şeritte durur; telefonlar script olmadan aralarında kaydırır. Görselin altındaki küçük resimler düğmedir ("5 fotoğraftan 2. fotoğrafı göster", geçerli olanda `aria-current`); odaktaki görselde ok tuşları sayfanın okuma yönünde slaytlar arasında gezer. Galeri adlandırılmış bir carousel bölgesidir, slaytları "2 / 5" der (W3C APG carousel deseni). Küçük resimler (`thumb`) yoksa numaralı noktalar gösterilir.
+- **Yalnızca görülen yüklenir.** İlk görsel `fetchpriority="high"` ile hemen yüklenir, çünkü genellikle ürün sayfasındaki en büyük öğedir; diğerleri etkisiz şablonlarda bekler ve `gallery.js` ekrandaki görseli ve iki komşusunu tek bir IntersectionObserver ile izleyerek yerleştirir. 12 fotoğraflık bir galeri başta üçünü yükler. Görseller `Image` olduğu için yer tutucularını, düşük çözünürlüklü dosyalarını ve yedeklerini korur.
+- **Yakınlaştırma ve tam ekran.** Fare, imlecin altındaki görseli yakınlaştırır (slaytın kutusu imleç girince bir kez okunur, hareket ederken hiç okunmaz). Görsele basmak ya da "Tam ekran" düğmesi görseli, önceki ve sonraki düğmelerini, yakınlaştırma düğmesini ve kapatma düğmesini içeren modal bir diyalog açar; odağı içeride tutar, Escape ile kapanır ve odağı açan öğeye geri verir. Azaltılmış hareket tercihinde hiçbir şey kaymaz ya da büyümez.
+- **Script.** `gallery.js` (gzip ile yaklaşık 1,5 KB) yalnızca galeri olan sayfalarda yüklenir.
