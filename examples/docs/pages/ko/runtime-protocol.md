@@ -194,6 +194,8 @@ Effect:
 - 키보드: 화살표 키, Page Up, Page Down, Home, End는 활성 행을 이동하고 보이는 곳으로 스크롤합니다. 테이블에는 `aria-rowcount` = total이, 각 행에는 `aria-rowindex`가 있습니다.
 - 위치 텍스트(`data-zeyn-page-info`)는 `data-zeyn-text-range-total`을 사용합니다.
 
+카드 그리드(`zeyn::ui::CardGrid`이며 rail이나 행 목록은 해당하지 않음)는 카드가 200개가 되면 스크롤 컨테이너 대신 페이지 자체의 스크롤에 윈도우를 적용합니다. `catalog.js`는 목록에 `data-zeyn-window`를 표시하고, 뷰포트에서 800 px 이내의 행을 그 안에 유지하며 위아래 행은 패딩으로 바꾸고, 모든 행에 처음 카드들 중 가장 높은 카드의 높이를 주며(`grid-auto-rows`), 각 카드에 `aria-posinset`과 `aria-setsize`(페이지가 더 올 수 있는 동안은 `-1`)를 설정합니다. 윈도우 밖에 있는 포커스된 카드는 `z-cards-kept`와 함께 DOM에 남아 자기 셀 위에 배치됩니다. "더 보기"나 다른 페이지에서 온 카드도 같은 윈도우에 합류합니다. 페이지가 ms당 3 px보다 빠르게 스크롤되는 동안 카드는 이미지를 보류한 채 들어오고(`data-zeyn-park`, `src`와 `srcset`은 따로 보관) 120 ms 동안 스크롤이 없으면 이미지를 되찾습니다.
+
 ### 4.3 폼 제출
 
 `POST /_zeyn/form`

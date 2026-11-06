@@ -194,6 +194,8 @@ Effects：
 - 键盘：方向键、Page Up、Page Down、Home 和 End 移动活动行并将其滚动到可见位置。表格带有 `aria-rowcount` = total，每一行带有 `aria-rowindex`。
 - 位置文本（`data-zeyn-page-info`）使用 `data-zeyn-text-range-total`。
 
+卡片网格（`zeyn::ui::CardGrid`，不包括 rail 和行列表）在包含 200 张卡片后，会对页面本身的滚动而不是滚动容器进行窗口化：`catalog.js` 给列表加上 `data-zeyn-window`，在其中保留距视口 800 px 以内的行，把上方和下方的行变成内边距，让每一行的高度等于前几张卡片中最高的那张（`grid-auto-rows`），并在每张卡片上设置 `aria-posinset` 和 `aria-setsize`（在可能还有更多页面时为 `-1`）。窗口之外获得焦点的卡片会带着 `z-cards-kept` 留在 DOM 中，并放在它自己的单元格上方。来自“显示更多”或其他页面的卡片会加入同一个窗口。当页面滚动速度超过每 ms 3 px 时，卡片进入时会暂缓加载图片（`data-zeyn-park`，`src` 和 `srcset` 先另存起来），在 120 ms 内没有滚动后再取回图片。
+
 ### 4.3 Form submit（表单提交）
 
 `POST /_zeyn/form`

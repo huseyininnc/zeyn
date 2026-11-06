@@ -194,6 +194,8 @@ Effects:
 - キーボード: 矢印キー、Page Up、Page Down、Home、End でアクティブな行が移動し、表示範囲にスクロールされます。テーブルには `aria-rowcount` = total が、各行には `aria-rowindex` が付きます。
 - 位置を示すテキスト（`data-zeyn-page-info`）は `data-zeyn-text-range-total` を使います。
 
+カードグリッド（`zeyn::ui::CardGrid`。rail や行のリストは含みません）は、カードが 200 枚になると、スクロールコンテナではなくページ自体のスクロールに対してウィンドウ処理を行います。`catalog.js` はリストに `data-zeyn-window` を付け、ビューポートから 800 px 以内の行をその中に保持し、上下の行はパディングに置き換え、各行に最初のカードのうち最も高いものの高さを与え（`grid-auto-rows`）、各カードに `aria-posinset` と `aria-setsize`（まだページが続く可能性がある間は `-1`）を設定します。ウィンドウの外にあるフォーカス中のカードは `z-cards-kept` 付きで DOM に残り、自分のセルの上に配置されます。「もっと見る」や別のページから来たカードも同じウィンドウに加わります。ページが 1 ms あたり 3 px より速くスクロールしている間、カードは画像を保留した状態で入り（`data-zeyn-park`。`src` と `srcset` は別に保持）、スクロールが 120 ms 止まると画像を取り戻します。
+
 ### 4.3 Form submit
 
 `POST /_zeyn/form`

@@ -194,6 +194,8 @@ El runtime:
 - Teclado: las teclas de flecha, Page Up, Page Down, Home y End mueven la fila activa y la desplazan hasta dejarla a la vista. La tabla tiene `aria-rowcount` = total y cada fila `aria-rowindex`.
 - El texto de posición (`data-zeyn-page-info`) usa `data-zeyn-text-range-total`.
 
+Las cuadrículas de tarjetas (`zeyn::ui::CardGrid`, no los rails ni las listas de filas) aplican la ventana al scroll de la propia página en lugar de a un contenedor con scroll en cuanto contienen 200 tarjetas: `catalog.js` marca la lista con `data-zeyn-window`, mantiene en ella las filas a menos de 800 px de la vista y convierte las filas de arriba y de abajo en relleno, da a cada fila la altura de la más alta de las primeras tarjetas (`grid-auto-rows`) y pone `aria-posinset` y `aria-setsize` (`-1` mientras puedan llegar más páginas) en cada tarjeta. Una tarjeta con el foco fuera de la ventana se queda en el DOM con `z-cards-kept`, colocada sobre su propia celda. Las tarjetas de "Show more" o de otra página se unen a la misma ventana. Mientras la página se desplaza a más de 3 px por ms, las tarjetas entran con sus imágenes retenidas (`data-zeyn-park`, con `src` y `srcset` guardados aparte) y las recuperan tras 120 ms sin desplazamiento.
+
 ### 4.3 Envío de formulario
 
 `POST /_zeyn/form`

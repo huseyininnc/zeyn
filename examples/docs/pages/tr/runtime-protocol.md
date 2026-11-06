@@ -194,6 +194,8 @@ Runtime:
 - Klavye: Ok tuşları, Page Up, Page Down, Home ve End etkin satırı taşır ve görünüme kaydırır. Tabloda `aria-rowcount` = total, her satırda `aria-rowindex` bulunur.
 - Konum metni (`data-zeyn-page-info`) `data-zeyn-text-range-total` değerini kullanır.
 
+Kart ızgaraları (`zeyn::ui::CardGrid`; şeritler veya satır listeleri değil) 200 karta ulaştığında bir kaydırma kapsayıcısı yerine sayfanın kendi kaydırmasında pencereleme yapar: `catalog.js` listeyi `data-zeyn-window` ile işaretler, içinde görüntü alanına en fazla 800 px uzaklıktaki satırları tutar ve üstteki ile alttaki satırları dolguya çevirir, her satıra ilk kartların en uzununun yüksekliğini verir (`grid-auto-rows`) ve her kartta `aria-posinset` ile `aria-setsize` değerlerini ayarlar (daha fazla sayfa gelebilecekken `-1`). Pencerenin dışındaki odaklı bir kart `z-cards-kept` ile DOM'da kalır ve kendi hücresinin üzerine yerleştirilir. "Show more" ile veya başka bir sayfadan gelen kartlar aynı pencereye katılır. Sayfa ms başına 3 px'ten hızlı kayarken kartlar görselleri bekletilerek gelir (`data-zeyn-park`; `src` ve `srcset` bir kenarda tutulur) ve 120 ms boyunca kaydırma olmayınca görsellerini geri alır.
+
 ### 4.3 Form submit
 
 `POST /_zeyn/form`

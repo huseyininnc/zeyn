@@ -194,6 +194,8 @@ The runtime:
 - Keyboard: Arrow keys, Page Up, Page Down, Home and End move the active row and scroll it into view. The table has `aria-rowcount` = total and each row `aria-rowindex`.
 - The position text (`data-zeyn-page-info`) uses `data-zeyn-text-range-total`.
 
+Card grids (`zeyn::ui::CardGrid`, not rails or lists of rows) window the page instead of a scroll container once they hold 200 cards: `catalog.js` marks the list `data-zeyn-window`, keeps the rows within 800 px of the viewport in it and turns the rows above and below into padding, gives every row the height of the tallest of the first cards (`grid-auto-rows`), and sets `aria-posinset` and `aria-setsize` (`-1` while more pages may come) on each card. A focused card out of the window stays in the DOM with `z-cards-kept`, placed over its own cell. Cards from "Show more" or another page join the same window. While the page scrolls faster than 3 px per ms, cards come in with their images held back (`data-zeyn-park`, the `src` and `srcset` kept aside) and get them back after 120 ms without scrolling.
+
 ### 4.3 Form submit
 
 `POST /_zeyn/form`
