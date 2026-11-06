@@ -101,7 +101,8 @@
       "diff_view": "Bir kayıtta değişen alanlar, eski ve yeni yan yana ya da satır içinde.",
       "code_view": "Salt okunur kod ve JSON, sunucuda renklendirilmiş, numaralı ve katlanır.",
       "barcode": "Sunucuda SVG olarak çizilen Code 128 barkodları ve QR kodları.",
-      "inbox": "Güne göre bildirimler, toplu okundu işaretleme ve arşivleme, okunmamış sayısıyla zil."
+      "inbox": "Güne göre bildirimler, toplu okundu işaretleme ve arşivleme, okunmamış sayısıyla zil.",
+      "kanban": "Bir iş akışının sütunlarında kartlar, sürükleyerek, menüyle veya klavyeyle taşınır."
     },
     "ex": {
       "action_button": {
@@ -360,6 +361,9 @@
       "inbox": {
         "overview": "Örnek",
         "bell": "Bildirim zili"
+      },
+      "kanban": {
+        "overview": "Örnek"
       }
     }
   }

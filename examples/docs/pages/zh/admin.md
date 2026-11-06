@@ -81,3 +81,35 @@ App::new("Admin").header(|h| h.end(NotificationCenter::of(count_unread, inbox, (
 使用 `.mark_read(action)` 和 `.archive(action)` 后，每行会有一个复选框，收件箱会有一个带“全选”的工具栏。按钮把选中的键作为 `InboxSelection` 通过 `POST /_zeyn/data` 发送，该端点检查 CSRF，计入写入限制，并检查屏幕的访问权限和动作的权限；最多接受 200 个键，每个最多 200 个字符。这些键来自浏览器，所以动作只能修改 `ctx.identity()` 用户的通知。用户无权执行的按钮及复选框都不会显示。
 
 批量操作之后，收件箱会触发它的主题（`"notifications"`，可用 `.topic(..)` 更改）：收件箱和所有 `.listens` 该主题的节点就地重新渲染，铃铛也会重新加载计数。铃铛用一个接收 `UnreadCount { limit }` 并在上限（100）处停止的动作计数，只需一次有上限的查询；超过 99 时显示 `99+`，链接的名称会为屏幕阅读器读出计数。它在页面显示后用一个请求加载计数，并在主题被收件箱、`ui.refresh("notifications")`，或在启用 `.live()` 和 `realtime` 特性时被任意动作中的 `hub.notify(&ctx, "notifications")` 触发时重新加载（主题需用 `Realtime::topic` 声明）。`inbox.js`（6.1 KB，gzip 后 2.3 KB）和 `inbox.css`（3.1 KB）只随这些组件加载。
+
+## Kanban
+
+`Kanban::of(flow, cards, move_card)` 把一个动作返回的记录显示为分列的卡片，工作流 `#[choice]` 枚举的每个状态一列，按枚举顺序排列。每一列都是该状态下卡片的虚拟列表：动作收到限定于该状态的 `DataQuery`，因此在数据库中过滤，卡片随列滚动按每块 50 张（`KANBAN_BLOCK`）加载。列头显示卡片数和 WIP 上限；超过上限的列会被标出。
+
+```rust
+#[action(permission = "tasks.work")]
+pub async fn move_task(r: TransitionRequest<TaskId>, store: Tasks, ctx: Ctx) -> Result<TaskId> {
+    let mut task = store.get(r.id)?;
+    task.state = task_flow().apply(&ctx, task.state, &r.transition, r.comment.as_deref())?;
+    store.save(task)
+}
+
+Kanban::of(task_flow(), search_tasks, move_task)
+    .state(Task::state)
+    .card(|t: &Task| Stack::new().add(Paragraph::new(t.title.clone())).add(Badge::new(t.owner.clone())))
+    .wip(TaskState::Doing, 5)
+    .confirm("reopen", t!("tasks.reopen_confirm"))
+```
+
+把卡片从一列移到另一列，会像 `Transitions` 一样用 `TransitionRequest` 运行两个状态之间的转换。看板只提供用户可以执行的移动；服务器找到转换，检查它的权限和移动动作的权限（通过 `POST /_zeyn/data` 检查 CSRF 和写入限制），动作再用 `Workflow::apply` 应用转换，如果卡片此时已处于其他状态就会被拒绝。`.confirm(name, message)` 会先在共享对话框中询问。卡片会立即移动；服务器拒绝时，卡片带着原因回到原列，接受时两列用一个请求重新渲染。
+
+鼠标或触控笔可以拖动卡片；可去的列会加轮廓，其他列变暗。在触摸屏上各列照常滚动，每张卡片上的按钮会打开与键盘相同的菜单（WCAG 2.5.7）。`kanban.js`（15.5 KB，gzip 后 5 KB）和 `kanban.css`（4 KB）只随看板加载，`vlist.js` 随其各列加载。
+
+| 按键 | 作用 |
+|---|---|
+| Tab | 进入看板，到最后获得焦点的卡片（整个看板一个停靠点） |
+| Up, Down | 列中的上一张或下一张卡片 |
+| Left, Right | 前一列或后一列中相同位置的卡片（在 `dir="rtl"` 下互换） |
+| Home, End | 列中可见的第一张或最后一张卡片 |
+| Enter, Space | 打开移动菜单：Up 和 Down 选择列，Enter 移动，Escape 关闭 |
+| Shift + Left, Shift + Right | 在工作流允许时把卡片移到前一列或后一列 |

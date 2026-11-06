@@ -81,3 +81,35 @@ App::new("Admin").header(|h| h.end(NotificationCenter::of(count_unread, inbox, (
 `.mark_read(action)` ve `.archive(action)` ile her satıra bir onay kutusu, gelen kutusuna da "Tümünü seç" içeren bir araç çubuğu gelir. Düğmeler seçilen anahtarları bir `InboxSelection` olarak `POST /_zeyn/data` üzerinden gönderir; bu uç nokta CSRF'yi denetler, yazma sınırına sayılır, ekranın erişimini ve eylemin iznini denetler; en fazla 200 karakterlik en fazla 200 anahtar kabul edilir. Anahtarlar tarayıcıdan gelir, bu yüzden eylem yalnızca `ctx.identity()` kullanıcısının bildirimlerini değiştirir. Kullanıcının çalıştıramayacağı düğmeler, onay kutularıyla birlikte dışarıda kalır.
 
 Bir toplu işlemden sonra gelen kutusu konusunu adlandırır (`"notifications"`, değiştirmek için `.topic(..)`): gelen kutusu ve onu `.listens` ile dinleyen her düğüm yerinde yeniden çizilir, zil de sayısını yeniden yükler. Zil, `UnreadCount { limit }` alan ve sınırda (100) duran bir eylemle sayar, yani tek ve sınırlı bir sorgu; 99'un üstünde `99+` gösterir ve bağlantının adı ekran okuyucular için sayıyı söyler. Sayıyı sayfa göründükten sonra tek bir istekle yükler; konusu bir gelen kutusu, `ui.refresh("notifications")` ya da `.live()` ve `realtime` özelliğiyle herhangi bir eylemdeki `hub.notify(&ctx, "notifications")` tarafından adlandırıldığında yeniden yükler (konuyu `Realtime::topic` ile bildirin). `inbox.js` (6,1 KB, gzip ile 2,3 KB) ve `inbox.css` (3,1 KB) yalnızca bileşenlerle yüklenir.
+
+## Kanban
+
+`Kanban::of(flow, cards, move_card)` bir eylemin kayıtlarını, iş akışının `#[choice]` enum'unun her durumu için bir sütun olmak üzere, enum sırasıyla sütunlarda kartlar olarak gösterir. Her sütun, o durumdaki kartlar üzerinde sanal bir listedir: eylem duruma kapsamlanmış bir `DataQuery` alır, böylece süzme veritabanında yapılır ve kartlar sütun kaydıkça 50'lik bloklar (`KANBAN_BLOCK`) hâlinde yüklenir. Sütun başlığı kart sayısını ve WIP sınırını gösterir; sınırını aşan sütun işaretlenir.
+
+```rust
+#[action(permission = "tasks.work")]
+pub async fn move_task(r: TransitionRequest<TaskId>, store: Tasks, ctx: Ctx) -> Result<TaskId> {
+    let mut task = store.get(r.id)?;
+    task.state = task_flow().apply(&ctx, task.state, &r.transition, r.comment.as_deref())?;
+    store.save(task)
+}
+
+Kanban::of(task_flow(), search_tasks, move_task)
+    .state(Task::state)
+    .card(|t: &Task| Stack::new().add(Paragraph::new(t.title.clone())).add(Badge::new(t.owner.clone())))
+    .wip(TaskState::Doing, 5)
+    .confirm("reopen", t!("tasks.reopen_confirm"))
+```
+
+Bir kartı bir sütundan diğerine taşımak, `Transitions` gibi bir `TransitionRequest` ile iki durum arasındaki geçişi çalıştırır. Pano yalnızca kullanıcının yapabileceği taşımaları sunar; sunucu geçişi bulur, geçişin iznini ve taşıma eyleminin iznini denetler (`POST /_zeyn/data` üzerinden CSRF ve yazma sınırı), eylem de geçişi `Workflow::apply` ile uygular; bu, o sırada başka bir durumda olan kartı reddeder. `.confirm(name, message)` önce ortak iletişim kutusunda sorar. Kart hemen taşınır; sunucu reddederse kart gerekçesiyle birlikte sütununa döner, kabul ederse iki sütun tek bir istekle yeniden çizilir.
+
+Fare ya da kalem kartı sürükler; gidebileceği sütunlar çerçevelenir, diğerleri soluklaşır. Dokunmatik ekranlarda sütunlar kaymaya devam eder ve her karttaki düğme klavyedekiyle aynı menüyü açar (WCAG 2.5.7). `kanban.js` (15,5 KB, gzip ile 5 KB) ve `kanban.css` (4 KB) yalnızca panoyla, `vlist.js` de sütunlarıyla yüklenir.
+
+| Tuş | Ne yapar |
+|---|---|
+| Tab | Panoya, en son odaklanan karta geçer (pano için tek durak) |
+| Up, Down | Sütundaki önceki veya sonraki kart |
+| Left, Right | Önceki veya sonraki sütunda aynı yerdeki kart (`dir="rtl"` altında yer değiştirir) |
+| Home, End | Sütunda görünen ilk veya son kart |
+| Enter, Space | Taşıma menüsünü açar: Up ve Down sütun seçer, Enter taşır, Escape kapatır |
+| Shift + Left, Shift + Right | İş akışı izin veriyorsa kartı önceki veya sonraki sütuna taşır |

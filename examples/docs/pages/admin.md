@@ -81,3 +81,35 @@ App::new("Admin").header(|h| h.end(NotificationCenter::of(count_unread, inbox, (
 With `.mark_read(action)` and `.archive(action)` every row gets a check box and the inbox a toolbar with "Select all". The buttons send the chosen keys as an `InboxSelection` through `POST /_zeyn/data`, which checks CSRF, counts against the write limit and checks the screen's access and the action's permission; at most 200 keys of 200 characters each are taken. The keys come from the browser, so the action changes only notifications of `ctx.identity()`. Buttons the user may not run are left out, check boxes too.
 
 After a bulk action the inbox names its topic (`"notifications"`, `.topic(..)` to change it): the inbox and every node that `.listens` to it render again in place, and the bell loads its count again. The bell counts with an action that takes `UnreadCount { limit }` and stops at the limit (100), one bounded query; above 99 it shows `99+`, and the link's name says the count for screen readers. It loads the count with one request after the page shows and again when its topic is named by an inbox, by `ui.refresh("notifications")` or, with `.live()` and the `realtime` feature, by `hub.notify(&ctx, "notifications")` from any action (declare the topic with `Realtime::topic`). `inbox.js` (6.1 KB, 2.3 KB gzip) and `inbox.css` (3.1 KB) load only with the components.
+
+## Kanban
+
+`Kanban::of(flow, cards, move_card)` shows the records of an action as cards in columns, one for every state of the workflow's `#[choice]` enum, in its order. Each column is a virtual list over the cards in its state: the action gets a `DataQuery` scoped to the state, so it filters in the database, and the cards load in blocks of 50 (`KANBAN_BLOCK`) as the column scrolls. The column head shows the number of cards and the WIP limit; a column above its limit is marked.
+
+```rust
+#[action(permission = "tasks.work")]
+pub async fn move_task(r: TransitionRequest<TaskId>, store: Tasks, ctx: Ctx) -> Result<TaskId> {
+    let mut task = store.get(r.id)?;
+    task.state = task_flow().apply(&ctx, task.state, &r.transition, r.comment.as_deref())?;
+    store.save(task)
+}
+
+Kanban::of(task_flow(), search_tasks, move_task)
+    .state(Task::state)
+    .card(|t: &Task| Stack::new().add(Paragraph::new(t.title.clone())).add(Badge::new(t.owner.clone())))
+    .wip(TaskState::Doing, 5)
+    .confirm("reopen", t!("tasks.reopen_confirm"))
+```
+
+Moving a card from one column to another runs the transition between the two states with a `TransitionRequest`, as `Transitions` does. The board offers only the moves the user may make; the server finds the transition, checks its permission and the move action's permission (CSRF and the write limit through `POST /_zeyn/data`), and the action applies it with `Workflow::apply`, which refuses a card that is in another state by now. `.confirm(name, message)` asks first in the shared dialog. The card moves at once; when the server refuses, it goes back to its column with the reason, and when it accepts, both columns render again with one request.
+
+A mouse or pen drags a card; the columns it may go to are outlined, the others dimmed. On touch screens the columns keep scrolling, and the button on each card opens the same menu as the keyboard (WCAG 2.5.7). `kanban.js` (15.5 KB, 5 KB gzip) and `kanban.css` (4 KB) load only with the board, `vlist.js` with its columns.
+
+| Key | What it does |
+|---|---|
+| Tab | Moves into the board, to the card last focused (one stop for the board) |
+| Up, Down | Previous or next card in the column |
+| Left, Right | The card at the same place in the column before or after (swapped under `dir="rtl"`) |
+| Home, End | First or last card in view in the column |
+| Enter, Space | Opens the move menu: Up and Down choose a column, Enter moves, Escape closes |
+| Shift + Left, Shift + Right | Moves the card to the column before or after, when the workflow allows it |

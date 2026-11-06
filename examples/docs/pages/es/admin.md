@@ -81,3 +81,35 @@ App::new("Admin").header(|h| h.end(NotificationCenter::of(count_unread, inbox, (
 Con `.mark_read(action)` y `.archive(action)` cada fila recibe una casilla y la bandeja una barra con "Seleccionar todo". Los botones envían las claves elegidas como `InboxSelection` a través de `POST /_zeyn/data`, que comprueba el CSRF, cuenta para el límite de escritura y comprueba el acceso a la pantalla y el permiso de la acción; se aceptan como mucho 200 claves de hasta 200 caracteres. Las claves vienen del navegador, así que la acción solo cambia notificaciones de `ctx.identity()`. Los botones que el usuario no puede ejecutar no se muestran, tampoco las casillas.
 
 Después de una acción masiva la bandeja nombra su tema (`"notifications"`, `.topic(..)` para cambiarlo): la bandeja y todos los nodos que lo `.listens` se vuelven a dibujar en su sitio, y la campana vuelve a cargar su número. La campana cuenta con una acción que recibe `UnreadCount { limit }` y se detiene en el límite (100), una sola consulta acotada; por encima de 99 muestra `99+`, y el nombre del enlace dice el número a los lectores de pantalla. Carga el número con una petición cuando se muestra la página y otra vez cuando su tema lo nombra una bandeja, `ui.refresh("notifications")` o, con `.live()` y la característica `realtime`, `hub.notify(&ctx, "notifications")` en cualquier acción (declara el tema con `Realtime::topic`). `inbox.js` (6,1 KB, 2,3 KB con gzip) e `inbox.css` (3,1 KB) se cargan solo con los componentes.
+
+## Kanban
+
+`Kanban::of(flow, cards, move_card)` muestra los registros de una acción como tarjetas en columnas, una por cada estado del enum `#[choice]` del flujo de trabajo, en su orden. Cada columna es una lista virtual sobre las tarjetas de su estado: la acción recibe un `DataQuery` limitado al estado, así que filtra en la base de datos, y las tarjetas se cargan en bloques de 50 (`KANBAN_BLOCK`) a medida que la columna se desplaza. La cabecera de la columna muestra el número de tarjetas y el límite WIP; una columna por encima de su límite se marca.
+
+```rust
+#[action(permission = "tasks.work")]
+pub async fn move_task(r: TransitionRequest<TaskId>, store: Tasks, ctx: Ctx) -> Result<TaskId> {
+    let mut task = store.get(r.id)?;
+    task.state = task_flow().apply(&ctx, task.state, &r.transition, r.comment.as_deref())?;
+    store.save(task)
+}
+
+Kanban::of(task_flow(), search_tasks, move_task)
+    .state(Task::state)
+    .card(|t: &Task| Stack::new().add(Paragraph::new(t.title.clone())).add(Badge::new(t.owner.clone())))
+    .wip(TaskState::Doing, 5)
+    .confirm("reopen", t!("tasks.reopen_confirm"))
+```
+
+Mover una tarjeta de una columna a otra ejecuta la transición entre los dos estados con un `TransitionRequest`, como hace `Transitions`. El tablero solo ofrece los movimientos que el usuario puede hacer; el servidor encuentra la transición, comprueba su permiso y el de la acción de mover (CSRF y límite de escritura a través de `POST /_zeyn/data`), y la acción la aplica con `Workflow::apply`, que rechaza una tarjeta que ya está en otro estado. `.confirm(name, message)` pregunta antes en el diálogo compartido. La tarjeta se mueve al instante; si el servidor se niega, vuelve a su columna con el motivo, y si acepta, las dos columnas se vuelven a dibujar con una sola petición.
+
+Un ratón o un lápiz arrastran la tarjeta; las columnas a las que puede ir se resaltan y las demás se atenúan. En pantallas táctiles las columnas siguen desplazándose, y el botón de cada tarjeta abre el mismo menú que el teclado (WCAG 2.5.7). `kanban.js` (15,5 KB, 5 KB con gzip) y `kanban.css` (4 KB) se cargan solo con el tablero, `vlist.js` con sus columnas.
+
+| Tecla | Qué hace |
+|---|---|
+| Tab | Entra en el tablero, en la última tarjeta con foco (una parada para todo el tablero) |
+| Up, Down | Tarjeta anterior o siguiente de la columna |
+| Left, Right | La tarjeta en el mismo lugar de la columna anterior o siguiente (se invierten con `dir="rtl"`) |
+| Home, End | Primera o última tarjeta visible de la columna |
+| Enter, Space | Abre el menú de mover: Up y Down eligen columna, Enter mueve, Escape cierra |
+| Shift + Left, Shift + Right | Mueve la tarjeta a la columna anterior o siguiente, cuando el flujo lo permite |

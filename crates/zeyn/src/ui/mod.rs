@@ -21,6 +21,7 @@ mod inbox;
 pub(crate) mod inputs;
 #[cfg(feature = "islands")]
 mod island;
+mod kanban;
 mod layout;
 mod lines;
 mod list;
@@ -81,6 +82,7 @@ pub use diff::{DiffLayout, DiffView, MAX_DIFF_FIELDS};
 pub use hero::{HERO_SECONDS, Hero, MAX_HERO_SLIDES};
 pub use inbox::{Inbox, InboxSelection, MAX_INBOX, MAX_UNREAD, NotificationCenter, UnreadCount};
 pub use inputs::{mask_example, mask_fits, mask_raw};
+pub use kanban::{KANBAN_BLOCK, Kanban};
 pub(crate) use lines::LinesEditor;
 pub use lines::{Lines, MAX_LINES};
 pub use list::{List, ListItem, MAX_REPEAT, Repeat};

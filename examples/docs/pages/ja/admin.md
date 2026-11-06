@@ -81,3 +81,35 @@ App::new("Admin").header(|h| h.end(NotificationCenter::of(count_unread, inbox, (
 `.mark_read(action)` と `.archive(action)` を付けると、各行にチェックボックスが、受信箱に「すべて選択」付きのツールバーが付きます。ボタンは選んだキーを `InboxSelection` として `POST /_zeyn/data` に送ります。このエンドポイントは CSRF を確認し、書き込み制限に数えられ、画面のアクセスとアクションの権限を確認します。受け付けるのは 200 文字までのキーを最大 200 個です。キーはブラウザーから来るので、アクションは `ctx.identity()` の通知だけを変更します。ユーザーが実行できないボタンは、チェックボックスと一緒に表示されません。
 
 一括操作の後、受信箱は自分のトピック（`"notifications"`、変更は `.topic(..)`）を告げます。受信箱とそのトピックを `.listens` するすべてのノードがその場で描き直され、ベルも件数を読み込み直します。ベルは `UnreadCount { limit }` を受け取って上限（100）で止まるアクション、つまり一回の上限付きクエリで数えます。99 を超えると `99+` と表示し、リンクの名前がスクリーンリーダーに件数を伝えます。件数はページの表示後に一回のリクエストで読み込み、受信箱、`ui.refresh("notifications")`、または `.live()` と `realtime` 機能を使う場合はどのアクションの `hub.notify(&ctx, "notifications")` でも、トピックが告げられると読み込み直します（トピックは `Realtime::topic` で宣言します）。`inbox.js`（6.1 KB、gzip で 2.3 KB）と `inbox.css`（3.1 KB）はこれらのコンポーネントと一緒の場合だけ読み込まれます。
+
+## Kanban
+
+`Kanban::of(flow, cards, move_card)` はアクションのレコードを列の中のカードとして表示します。列はワークフローの `#[choice]` 列挙型の状態ごとに一つ、列挙型の順に並びます。各列はその状態のカードの仮想リストです。アクションは状態で範囲を絞った `DataQuery` を受け取るのでデータベースで絞り込み、カードは列のスクロールに合わせて 50 件ずつ（`KANBAN_BLOCK`）読み込まれます。列の見出しにはカード数と WIP 制限が表示され、制限を超えた列には印が付きます。
+
+```rust
+#[action(permission = "tasks.work")]
+pub async fn move_task(r: TransitionRequest<TaskId>, store: Tasks, ctx: Ctx) -> Result<TaskId> {
+    let mut task = store.get(r.id)?;
+    task.state = task_flow().apply(&ctx, task.state, &r.transition, r.comment.as_deref())?;
+    store.save(task)
+}
+
+Kanban::of(task_flow(), search_tasks, move_task)
+    .state(Task::state)
+    .card(|t: &Task| Stack::new().add(Paragraph::new(t.title.clone())).add(Badge::new(t.owner.clone())))
+    .wip(TaskState::Doing, 5)
+    .confirm("reopen", t!("tasks.reopen_confirm"))
+```
+
+カードをある列から別の列へ移すと、`Transitions` と同じく `TransitionRequest` で二つの状態の間の遷移が実行されます。ボードはユーザーが行える移動だけを示します。サーバーは遷移を見つけ、その権限と移動アクションの権限を確認し（`POST /_zeyn/data` による CSRF と書き込み制限）、アクションは `Workflow::apply` で遷移を適用します。その時点ですでに別の状態にあるカードは拒否されます。`.confirm(name, message)` は共通のダイアログでまず確認します。カードはすぐに移動し、サーバーが拒否すると理由とともに元の列に戻り、受け入れると両方の列が一回のリクエストで描き直されます。
+
+マウスやペンでカードをドラッグでき、移動できる列は枠で示され、ほかの列は薄くなります。タッチスクリーンでは列は普通にスクロールし、各カードのボタンでキーボードと同じメニューが開きます（WCAG 2.5.7）。`kanban.js`（15.5 KB、gzip で 5 KB）と `kanban.css`（4 KB）はボードと一緒の場合だけ、`vlist.js` はその列と一緒に読み込まれます。
+
+| キー | 動作 |
+|---|---|
+| Tab | ボードへ、最後にフォーカスのあったカードへ移動します（ボード全体で一つのタブ位置） |
+| Up, Down | 列の前または次のカード |
+| Left, Right | 前または次の列の同じ位置にあるカード（`dir="rtl"` では入れ替わります） |
+| Home, End | 列で見えている最初または最後のカード |
+| Enter, Space | 移動メニューを開きます: Up と Down で列を選び、Enter で移動、Escape で閉じます |
+| Shift + Left, Shift + Right | ワークフローが許す場合、カードを前または次の列へ移します |

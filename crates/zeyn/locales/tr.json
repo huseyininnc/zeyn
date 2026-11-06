@@ -593,6 +593,17 @@
         "bell": "Bildirimler",
         "bell_count": "Bildirimler, {n} okunmamış",
         "bell_many": "Bildirimler, 99'dan fazla okunmamış"
+      },
+      "kanban": {
+        "label": "Pano",
+        "help": "Ok tuşları kartlar arasında gezer. Enter taşıma menüsünü açar; Shift ile Sol veya Sağ kartı yandaki sütuna taşır.",
+        "move": "Taşı",
+        "move_to": "Şuraya taşı",
+        "moved": "{card}, {column} sütununa taşındı",
+        "refused": "Kart taşınamadı ve sütununa geri döndü",
+        "no_moves": "Bu kart buradan taşınamaz",
+        "count": "{n}",
+        "count_wip": "{n} / {wip}"
       }
     },
     "date": {

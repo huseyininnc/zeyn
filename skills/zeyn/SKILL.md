@@ -260,6 +260,9 @@ What to remember:
   `.mark_read(action)` and `.archive(action)` (input `InboxSelection`; change only rows of
   `ctx.identity()`); the bell is `h.end(NotificationCenter::of(count_unread, inbox, ()))` with a
   count action that takes `UnreadCount` and stops at `q.limit`.
+- Boards: `Kanban::of(flow(), search_tasks, move_task).state(Task::state).card(|t| node)`; the
+  move action takes `TransitionRequest<TaskId>`, loads the record and calls `flow().apply(..)`.
+  Never write drag and drop yourself.
 - The app (`src/app.rs`): `App::new(t!("app.name")).i18n(i18n).service(store).feature(sales::feature())`,
   plus what the app needs: `.auth(...)`, `.mcp(Mcp::read_only())`, `.themes([...])`,
   `.datagrid_views(store)`, `.assistant(...)`.

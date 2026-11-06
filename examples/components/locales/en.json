@@ -101,7 +101,8 @@
       "diff_view": "The fields that changed in a record, old and new side by side or inline.",
       "code_view": "Read only code and JSON, highlighted, numbered and folded on the server.",
       "barcode": "Code 128 barcodes and QR codes drawn as SVG on the server.",
-      "inbox": "Notifications by day with bulk mark read and archive, and the bell with the unread count."
+      "inbox": "Notifications by day with bulk mark read and archive, and the bell with the unread count.",
+      "kanban": "Cards in columns of a workflow, moved by drag, a menu or the keyboard."
     },
     "ex": {
       "action_button": {
@@ -360,6 +361,9 @@
       "inbox": {
         "overview": "Example",
         "bell": "Notification bell"
+      },
+      "kanban": {
+        "overview": "Example"
       }
     }
   }

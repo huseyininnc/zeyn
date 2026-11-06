@@ -221,6 +221,7 @@ catalog! {
         code_view "/ui/code-view";
         barcode "/ui/barcode";
         inbox "/ui/inbox";
+        kanban "/ui/kanban";
     }
 }
 
@@ -302,6 +303,10 @@ pub fn feature() -> Feature {
     )
 }
 
+/// Writes one visitor may make per minute to the shared sample stores of the examples (Kanban
+/// moves, inbox read and archive, calendar slots): every `POST /_zeyn/data` counts.
+pub const WRITES_PER_MINUTE: u32 = 60;
+
 /// The catalog app.
 pub fn app() -> std::result::Result<App, String> {
     let i18n = zeyn::I18n::new("en")
@@ -310,6 +315,13 @@ pub fn app() -> std::result::Result<App, String> {
     Ok(App::new(t!("cx.app"))
         .i18n(i18n)
         .csp(|c| c.frame_src(["https://www.openstreetmap.org"]))
+        .auth(|_: &axum::http::HeaderMap| {
+            Some(zeyn::Identity::user("visitor").with_permissions(["catalog.demo"]))
+        })
+        .write_limit(zeyn::RateLimit::per_ip(
+            WRITES_PER_MINUTE,
+            std::time::Duration::from_secs(60),
+        ))
         .home(catalog_home)
         .header(examples::app_header::catalog_header)
         .prefetch(zeyn::Prefetch::Moderate)

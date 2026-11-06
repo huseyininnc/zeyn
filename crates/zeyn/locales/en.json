@@ -593,6 +593,17 @@
         "bell": "Notifications",
         "bell_count": "Notifications, {n} unread",
         "bell_many": "Notifications, more than 99 unread"
+      },
+      "kanban": {
+        "label": "Board",
+        "help": "Arrow keys move between cards. Enter opens the move menu; Shift with Left or Right moves the card to the next column.",
+        "move": "Move",
+        "move_to": "Move to",
+        "moved": "{card} moved to {column}",
+        "refused": "The card could not be moved and is back in its column",
+        "no_moves": "This card cannot be moved from here",
+        "count": "{n}",
+        "count_wip": "{n} of {wip}"
       }
     },
     "date": {

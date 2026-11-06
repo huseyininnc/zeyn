@@ -594,3 +594,204 @@ async fn the_bell_counts_unread_in_the_top_bar_with_the_actions_permission() {
     let (status, _) = data(&router, "admin.read", Csrf::Sent, count).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
 }
+
+#[choice]
+pub enum TaskState {
+    Todo,
+    Doing,
+    Done,
+}
+
+#[entity(table = "tasks")]
+pub struct Task {
+    #[key]
+    pub id: TaskId,
+    pub title: String,
+    pub state: TaskState,
+}
+
+#[derive(Clone, Default)]
+pub struct Tasks(Arc<Mutex<Vec<Task>>>);
+
+impl Service for Tasks {}
+
+impl Tasks {
+    fn seeded() -> Tasks {
+        let task = |id: i64, title: &str, state: TaskState| Task {
+            id: TaskId(id),
+            title: title.into(),
+            state,
+        };
+        Tasks(Arc::new(Mutex::new(vec![
+            task(1, "Write <docs>", TaskState::Todo),
+            task(2, "Review", TaskState::Doing),
+            task(3, "Ship", TaskState::Doing),
+            task(4, "Plan", TaskState::Done),
+        ])))
+    }
+}
+
+fn task_flow() -> Workflow<TaskState> {
+    Workflow::new()
+        .transition("start", TaskState::Todo, TaskState::Doing, "tasks.work")
+        .transition("finish", TaskState::Doing, TaskState::Done, "tasks.work")
+        .transition("reopen", TaskState::Done, TaskState::Todo, "tasks.admin")
+}
+
+#[action(permission = "tasks.read")]
+pub async fn search_tasks(q: DataQuery, tasks: Tasks) -> Result<Page<Task>> {
+    Ok(q.apply(tasks.0.lock().unwrap().clone()))
+}
+
+#[action(permission = "tasks.work")]
+pub async fn move_task(r: TransitionRequest<TaskId>, tasks: Tasks, ctx: Ctx) -> Result<TaskId> {
+    let mut all = tasks.0.lock().unwrap();
+    let task = all
+        .iter_mut()
+        .find(|t| t.id == r.id)
+        .ok_or(Error::NotFound)?;
+    task.state = task_flow().apply(&ctx, task.state, &r.transition, r.comment.as_deref())?;
+    Ok(task.id)
+}
+
+#[screen(route = "/board", permission = "admin.read")]
+pub fn board() -> Screen {
+    Screen::new("Board").body(
+        Card::new().add(
+            Kanban::of(task_flow(), search_tasks, move_task)
+                .title("Tasks")
+                .state(Task::state)
+                .card(|t: &Task| Paragraph::new(t.title.clone()))
+                .wip(TaskState::Doing, 1)
+                .confirm("reopen", "Open it again?"),
+        ),
+    )
+}
+
+fn board_app(tasks: Tasks) -> axum::Router {
+    App::new("Admin")
+        .i18n(I18n::new("en"))
+        .service(tasks)
+        .auth(|h: &HeaderMap| {
+            let perms: Vec<String> = h
+                .get("x-perms")?
+                .to_str()
+                .ok()?
+                .split(',')
+                .map(String::from)
+                .collect();
+            Some(Identity::user("u").with_permissions(perms))
+        })
+        .feature(Feature::new("board").screen(board))
+        .router()
+        .unwrap()
+}
+
+const WORKER: &str = "admin.read,tasks.read,tasks.work";
+
+#[tokio::test]
+async fn a_kanban_has_a_column_per_state_with_counts_wip_and_the_users_moves() {
+    let router = board_app(Tasks::seeded());
+    let (status, page) = get_as(&router, "/board", WORKER).await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert_eq!(
+        page.matches(r#"<section class="z-kanban-col"#)
+            .count(),
+        3
+    );
+    assert!(page.contains(
+        r#"class="z-kanban-col z-kanban-over" data-state="Doing" data-count="2" data-wip="1""#
+    ));
+    assert!(page.contains(">2 of 1</span>"));
+    assert!(page.contains(r#"data-state="Todo" data-count="1""#));
+    assert!(page.contains("Write &lt;docs&gt;") && !page.contains("<docs>"));
+    assert_eq!(
+        page.matches("data-zeyn-kanban-card")
+            .count(),
+        4
+    );
+    assert!(
+        page.contains(r#"data-zeyn-node="0.0.1""#),
+        "columns are nested nodes"
+    );
+    assert!(
+        page.contains("&quot;Todo&quot;:[{&quot;confirm&quot;:null"),
+        "{page}"
+    );
+    assert!(
+        !page.contains("&quot;Done&quot;:["),
+        "reopen needs tasks.admin"
+    );
+    assert!(
+        page.contains("data-zeyn-confirm"),
+        "the confirm dialog comes along"
+    );
+    for name in ["kanban.js", "kanban.css", "vlist.js", "components.js"] {
+        assert!(page.contains(&format!("/_zeyn/{name}?v=")), "{name}");
+    }
+    let (_, admin) = get_as(
+        &router,
+        "/board",
+        "admin.read,tasks.read,tasks.work,tasks.admin",
+    )
+    .await;
+    assert!(admin.contains("&quot;Done&quot;:[{&quot;confirm&quot;:&quot;Open it again?&quot;"));
+}
+
+#[tokio::test]
+async fn moving_a_card_runs_the_transition_with_its_permission_and_refuses_stale_moves() {
+    let tasks = Tasks::seeded();
+    let router = board_app(tasks.clone());
+    let call = |key: &str, from: &str, to: &str| serde_json::json!({ "screen": "board", "params": null, "node": "0.0", "key": "move", "input": { "key": key, "from": from, "to": to } });
+    let (status, _) = data(&router, WORKER, Csrf::Missing, call("1", "Todo", "Doing")).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let (status, _) = data(
+        &router,
+        "admin.read,tasks.read",
+        Csrf::Sent,
+        call("1", "Todo", "Doing"),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "the move action's permission"
+    );
+    let (status, _) = data(&router, WORKER, Csrf::Sent, call("1", "Todo", "Done")).await;
+    assert_eq!(
+        status,
+        StatusCode::NOT_FOUND,
+        "no transition from Todo to Done"
+    );
+    let (status, _) = data(&router, WORKER, Csrf::Sent, call("4", "Done", "Todo")).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "reopen needs tasks.admin");
+    let (status, reply) = data(&router, WORKER, Csrf::Sent, call("1", "Todo", "Doing")).await;
+    assert_eq!(status, StatusCode::OK, "{reply}");
+    assert_eq!(tasks.0.lock().unwrap()[0].state, TaskState::Doing);
+    let (status, _) = data(&router, WORKER, Csrf::Sent, call("1", "Todo", "Doing")).await;
+    assert_eq!(status, StatusCode::CONFLICT, "the card moved already");
+    let (status, _) = data(&router, WORKER, Csrf::Sent, call("99", "Todo", "Doing")).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    let res = router
+        .clone()
+        .oneshot(
+            Request::post("/_zeyn/nodes")
+                .header("x-perms", WORKER)
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::COOKIE, format!("zeyn_csrf={TOKEN}"))
+                .header("x-zeyn-csrf", TOKEN)
+                .body(Body::from(
+                    serde_json::json!({ "screen": "board", "params": null, "nodes": ["0.0.1"] })
+                        .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let (status, html) = body(res).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        html.contains(r#"data-zeyn-key=\"1\""#) && html.contains("Write &lt;docs&gt;"),
+        "{html}"
+    );
+}
