@@ -11,6 +11,7 @@ mod chips;
 mod content;
 mod controls;
 mod date;
+mod diff;
 mod dock;
 mod embed;
 mod hero;
@@ -68,6 +69,7 @@ pub(crate) use controls::{
 };
 pub use date::DateOptions;
 pub(crate) use date::{input_text, picker_config, range_reversed, render_date_input, render_range};
+pub use diff::{DiffLayout, DiffView, MAX_DIFF_FIELDS};
 pub use hero::{HERO_SECONDS, Hero, MAX_HERO_SLIDES};
 pub use inputs::{mask_example, mask_fits, mask_raw};
 pub(crate) use lines::LinesEditor;

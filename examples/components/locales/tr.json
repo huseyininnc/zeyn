@@ -31,7 +31,8 @@
       "media": "Medya",
       "feedback": "Geri bildirim ve katmanlar",
       "charts": "Grafikler",
-      "shell": "Kabuk"
+      "shell": "Kabuk",
+      "admin": "Yönetim"
     },
     "summary": {
       "stack": "Aralarında boşluk olan, alt alta düğümler.",
@@ -96,7 +97,8 @@
       "hero": "Büyük görselli bölüm; slaytlar yalnızca istenince döner.",
       "reactions": "Sayıları bir eylemle saklanan tepki düğmeleri.",
       "link_button": "Buton görünümlü, başka sayfaya giden bağlantı.",
-      "clear_prefs": "Tarayıcının uygulama için tuttuğu seçimleri silen düğme."
+      "clear_prefs": "Tarayıcının uygulama için tuttuğu seçimleri silen düğme.",
+      "diff_view": "Bir kayıtta değişen alanlar, eski ve yeni yan yana ya da satır içinde."
     },
     "ex": {
       "action_button": {
@@ -337,6 +339,10 @@
       },
       "week_schedule": {
         "overview": "Örnek"
+      },
+      "diff_view": {
+        "overview": "Örnek",
+        "inline": "Satır içinde"
       }
     }
   }

@@ -547,6 +547,15 @@
       },
       "prefs": {
         "cleared": "Bu tarayıcının bu site için tuttuğu seçimler silindi."
+      },
+      "diff": {
+        "label": "Değişiklikler",
+        "none": "Değişiklik yok",
+        "field": "Alan",
+        "before": "Önce",
+        "after": "Sonra",
+        "empty": "(boş)",
+        "more": "Değişen {n} alan daha gösterilmiyor"
       }
     },
     "date": {

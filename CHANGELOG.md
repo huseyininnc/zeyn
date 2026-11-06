@@ -38,6 +38,7 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 - Ten more icons for admin screens: `Icon::Users`, `Settings`, `Bell`, `Shield`, `Clock`, `Tag`, `Mail`, `SignOut`, `ArrowUp` and `ArrowDown`, drawn like the others (24 px grid, 2 px round stroke). They add 2.9 KB to `zeyn.css` (0.4 KB gzip).
 - `DataGridColumn::plain()` shows whole numbers without group separators, for codes and years.
 - Screen header: `Screen::subtitle(text)` and `Screen::primary(|t| ...)` put a subtitle under the title and the main actions at the end of the title row, wrapping under the title on phones.
+- `DiffView` shows the fields that changed in a record, old struck out and new marked as added, side by side in a table or inline (`DiffLayout::Inline`): `DiffView::of(&before, &after)` compares two model values like the audit trail, `DiffView::changes(entry.changes)` takes an audit record and `.model::<M>()` adds field and choice labels. Masked fields stay masked, also in a hand built change list. No script; `diff.css` (1.9 KB, 0.7 KB gzip) loads only on pages that hold one.
 
 ### Changed
 

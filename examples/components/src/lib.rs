@@ -216,6 +216,9 @@ catalog! {
         app_header "/ui/app-header";
         theme_picker "/ui/theme-picker";
     }
+    "admin" Settings {
+        diff_view "/ui/diff-view";
+    }
 }
 
 /// The component with this slug.

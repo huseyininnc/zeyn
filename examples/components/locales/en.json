@@ -31,7 +31,8 @@
       "media": "Media",
       "feedback": "Feedback and overlays",
       "charts": "Charts",
-      "shell": "Shell"
+      "shell": "Shell",
+      "admin": "Admin"
     },
     "summary": {
       "stack": "Nodes one under the other with a gap.",
@@ -96,7 +97,8 @@
       "hero": "A large image section, with slides that move only when asked.",
       "reactions": "Reaction buttons with counts stored by an action.",
       "link_button": "A link to another page that looks like a button.",
-      "clear_prefs": "A button that removes the choices this browser keeps for the app."
+      "clear_prefs": "A button that removes the choices this browser keeps for the app.",
+      "diff_view": "The fields that changed in a record, old and new side by side or inline."
     },
     "ex": {
       "action_button": {
@@ -337,6 +339,10 @@
       },
       "week_schedule": {
         "overview": "Example"
+      },
+      "diff_view": {
+        "overview": "Example",
+        "inline": "Inline"
       }
     }
   }

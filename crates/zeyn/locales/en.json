@@ -547,6 +547,15 @@
       },
       "prefs": {
         "cleared": "The choices this browser kept for this site were removed."
+      },
+      "diff": {
+        "label": "Changes",
+        "none": "No changes",
+        "field": "Field",
+        "before": "Before",
+        "after": "After",
+        "empty": "(empty)",
+        "more": "{n} more changed fields are not shown"
       }
     },
     "date": {

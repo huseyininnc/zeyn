@@ -259,6 +259,7 @@ pub mod prelude {
         Repeat, Row, SearchBox, SearchParams, Share, Skeleton, Split, Spoiler, Stack, StatusBar,
         Tabs, ThemePicker, Timeline, Toolbox, Tree, TreeItem, TreeQuery, Video, WeekSchedule,
     };
+    pub use crate::ui::{DiffLayout, DiffView};
     pub use crate::{
         Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime,
         Decimal, Effect, Entity, Error, Export, Feature, Field, File, FileRules, FileType, Form,

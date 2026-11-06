@@ -1,0 +1,25 @@
+/* DiffView (`zeyn::ui::DiffView`): linked only by pages that hold `.z-diff`. */
+
+.z-diff { display: grid; gap: var(--z-s-2); min-inline-size: 0; }
+.z-diff-title { margin: 0; font-size: var(--z-text-md); line-height: var(--z-leading-md); }
+.z-diff-none, .z-diff-more { margin: 0; color: var(--z-text-muted); font-size: var(--z-text-sm); }
+.z-diff-scroll { overflow-x: auto; border: 1px solid var(--z-border); border-radius: var(--z-radius); }
+.z-diff-table { inline-size: 100%; border-collapse: collapse; font-size: var(--z-text-sm); }
+.z-diff-table th, .z-diff-table td { padding: var(--z-s-2) var(--z-s-3); text-align: start; vertical-align: top; border-block-end: 1px solid var(--z-border); overflow-wrap: anywhere; }
+.z-diff-table tr:last-child > * { border-block-end: 0; }
+.z-diff-table thead th { background: var(--z-surface-2); color: var(--z-text-muted); font-weight: 600; font-size: var(--z-text-xs); }
+.z-diff-table tbody th { font-weight: 600; inline-size: 25%; }
+.z-diff del, .z-diff ins { text-decoration-thickness: 1px; border-radius: var(--z-radius-sm); padding-inline: 2px; }
+.z-diff del { background: var(--z-danger-subtle); color: var(--z-text); text-decoration-line: line-through; }
+.z-diff ins { background: var(--z-success-subtle); color: var(--z-text); text-decoration: none; }
+.z-diff-empty { color: var(--z-text-muted); font-style: italic; }
+.z-diff-list { display: grid; gap: var(--z-s-2); margin: 0; }
+.z-diff-item { display: grid; gap: 2px; }
+.z-diff-item dt { font-weight: 600; font-size: var(--z-text-sm); }
+.z-diff-item dd { margin: 0; overflow-wrap: anywhere; }
+.z-diff-arrow { color: var(--z-text-muted); display: inline-block; }
+[dir="rtl"] .z-diff-arrow { transform: scaleX(-1); }
+@media (forced-colors: active) {
+  .z-diff del, .z-diff ins { forced-color-adjust: none; background: Canvas; color: CanvasText; border: 1px solid CanvasText; }
+  .z-diff ins { text-decoration: underline; }
+}
