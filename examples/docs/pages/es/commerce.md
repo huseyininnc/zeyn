@@ -180,3 +180,15 @@ Form::of(Review::default())
     .field(Review::text)
     .submit(t!("reviews.send"), save_review)
 ```
+
+## Cuenta atrás
+
+```rust
+Countdown::until(sale.ends_at)
+    .label(t!("shop.sale_ends"))
+    .ended(Badge::new(t!("shop.sale_over")))
+```
+
+- **Hora del servidor.** El servidor escribe el tiempo restante con su propio reloj ("2d 03:14:09"), y la página lleva ese reloj, así que un reloj equivocado en el dispositivo no mueve el final. Cuando el momento ha pasado, el servidor muestra el estado final dado a `ended` en lugar del reloj, sin script.
+- **Un solo temporizador.** `countdown.js` (cerca de 1 KB con gzip, solo en páginas con una cuenta atrás en marcha) mantiene un temporizador para todas las cuentas atrás de la página, avanza en el segundo exacto y se detiene mientras la pestaña está oculta. Al llegar a cero el estado final sustituye al reloj; los oyentes de un tema pueden refrescar lo demás que cambia con el final.
+- **Lectores de pantalla.** Los dígitos se les ocultan. Una región en vivo educada dice el tiempo restante con palabras ("Quedan 2 d 3 h 14 min") y solo cambia cuando cambia el minuto, así que nunca habla cada segundo.

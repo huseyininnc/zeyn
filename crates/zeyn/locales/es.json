@@ -553,6 +553,10 @@
         },
         "rating": {
           "half": "{label} admite estrellas enteras o medias."
+        },
+        "countdown": {
+          "day": "d",
+          "left": "Quedan {d} d {h} h {m} min"
         }
       }
     },

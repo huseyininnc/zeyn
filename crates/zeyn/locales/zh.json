@@ -553,6 +553,10 @@
         },
         "rating": {
           "half": "{label}只能是整星或半星。"
+        },
+        "countdown": {
+          "day": "天",
+          "left": "剩余 {d} 天 {h} 小时 {m} 分钟"
         }
       }
     },

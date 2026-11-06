@@ -113,7 +113,8 @@
       "variant_picker": "Color swatches and size chips that change the price, photo and stock in place.",
       "product_gallery": "Product photos with thumbnails, zoom, swipe and a full screen view.",
       "facet_panel": "Counted filters, a price range and chosen filter chips that refresh product cards in place.",
-      "review_summary": "The average rating, the number of reviews and a bar for each star from 5 to 1."
+      "review_summary": "The average rating, the number of reviews and a bar for each star from 5 to 1.",
+      "countdown": "The time left until a moment on the server's clock, with an end state."
     },
     "ex": {
       "action_button": {
@@ -406,6 +407,10 @@
       "review_summary": {
         "overview": "Example",
         "few": "A few reviews"
+      },
+      "countdown": {
+        "overview": "Example",
+        "short": "A minute and more"
       }
     }
   }

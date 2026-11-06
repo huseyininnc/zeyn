@@ -688,6 +688,10 @@
         },
         "rating": {
           "half": "{label} takes whole or half stars."
+        },
+        "countdown": {
+          "day": "d",
+          "left": "{d} d {h} h {m} min left"
         }
       }
     },

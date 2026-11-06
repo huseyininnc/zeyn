@@ -206,6 +206,7 @@ catalog! {
         product_gallery "/ui/product-gallery";
         facet_panel "/ui/facet-panel" (Demo);
         review_summary "/ui/review-summary";
+        countdown "/ui/countdown";
     }
     "media" Image {
         image "/ui/image";

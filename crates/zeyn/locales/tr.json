@@ -688,6 +688,10 @@
         },
         "rating": {
           "half": "{label} tam ya da yarım yıldız alır."
+        },
+        "countdown": {
+          "day": "g",
+          "left": "{d} g {h} sa {m} dk kaldı"
         }
       }
     },

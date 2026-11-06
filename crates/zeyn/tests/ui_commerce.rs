@@ -892,3 +892,83 @@ fn a_decimal_rating_takes_half_stars_and_the_server_turns_away_values_between_th
         "a value between the halves is turned away"
     );
 }
+
+#[test]
+fn a_countdown_writes_the_time_left_by_the_server_clock_and_the_end_state_once_over() {
+    let left = ((2 * 24 + 3) * 3_600 + 14 * 60 + 9) * 1_000 + 600;
+    let end = DateTime::now().add_ms(left);
+    let timer = zeyn::ui::Countdown::until(end)
+        .label("Sale ends in")
+        .ended(Badge::new("Ended"));
+    let out = html(&timer, "en");
+    assert!(
+        out.starts_with(&format!(
+            r#"<div class="z-countdown" data-zeyn-countdown data-end="{}" data-now=""#,
+            end.unix_ms()
+        )),
+        "{out}"
+    );
+    assert!(out.contains(r#"<span class="z-countdown-label">Sale ends in</span><span class="z-countdown-time" aria-hidden="true"><span class="z-countdown-d">2</span>d <span class="z-countdown-h">03</span>:<span class="z-countdown-m">14</span>:"#), "{out}");
+    assert!(out.contains(r#"<span class="z-sr-only z-countdown-words" aria-live="polite" aria-atomic="true">2 d 3 h 14 min left</span>"#), "{out}");
+    assert!(
+        out.contains(r#"data-text-left="{d} d {h} h {m} min left""#),
+        "{out}"
+    );
+    assert!(
+        out.contains(r#"<template class="z-countdown-end"><span class="z-badge"#),
+        "{out}"
+    );
+    let over = html(
+        &zeyn::ui::Countdown::until(DateTime::now().add_ms(-1_000)).ended(Badge::new("Ended")),
+        "tr",
+    );
+    assert!(
+        over.starts_with(r#"<div class="z-countdown z-countdown-over"><span class="z-badge"#),
+        "{over}"
+    );
+    assert!(
+        !over.contains("data-zeyn-countdown"),
+        "a finished countdown needs no script"
+    );
+    assert!(html(&timer, "tr").contains("2 g 3 sa 14 dk kaldı"));
+}
+
+#[screen(route = "/sale", public)]
+pub fn sale() -> Screen {
+    Screen::new("Sale").body(zeyn::ui::Countdown::until(DateTime::now().add_ms(60_000)))
+}
+
+#[tokio::test]
+async fn the_countdown_module_loads_only_with_a_running_countdown() {
+    let res = App::new("Test")
+        .i18n(I18n::new("en"))
+        .feature(
+            Feature::new("shop")
+                .screen(sale)
+                .screen(plain),
+        )
+        .router()
+        .unwrap();
+    for (path, wanted) in [("/sale", true), ("/plain", false)] {
+        let page = res
+            .clone()
+            .oneshot(
+                Request::get(path)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap()
+            .into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes();
+        let page = String::from_utf8_lossy(&page).into_owned();
+        assert_eq!(
+            links(&page).contains(&"countdown.js".to_string()),
+            wanted,
+            "{path}"
+        );
+    }
+}

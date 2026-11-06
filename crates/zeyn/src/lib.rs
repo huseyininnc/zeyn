@@ -265,8 +265,8 @@ pub mod prelude {
         QrLevel, UnreadCount,
     };
     pub use crate::ui::{
-        Facet, FacetPanel, Price, PriceUnit, ProductGallery, QuantityStepper, RangeSlider,
-        ReviewSummary, VariantGroup, VariantPicker,
+        Countdown, Facet, FacetPanel, Price, PriceUnit, ProductGallery, QuantityStepper,
+        RangeSlider, ReviewSummary, VariantGroup, VariantPicker,
     };
     pub use crate::{
         Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime,

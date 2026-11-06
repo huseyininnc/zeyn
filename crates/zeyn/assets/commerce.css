@@ -742,6 +742,25 @@
   .z-reviews-fill { background: Highlight; }
 }
 
+.z-countdown {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  color: var(--z-text);
+}
+
+.z-countdown-label { color: var(--z-text-muted); font-size: var(--z-text-sm); }
+
+.z-countdown-time {
+  font-size: var(--z-text-lg);
+  line-height: var(--z-leading-lg);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.z-countdown-over { color: var(--z-text-muted); }
+
 .z-facet-range .z-range-label {
   position: absolute;
   width: 1px;

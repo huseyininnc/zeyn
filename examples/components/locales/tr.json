@@ -113,7 +113,8 @@
       "variant_picker": "Fiyatı, fotoğrafı ve stoğu yerinde değiştiren renk örnekleri ve beden çipleri.",
       "product_gallery": "Küçük resimler, yakınlaştırma, kaydırma ve tam ekran görünümüyle ürün fotoğrafları.",
       "facet_panel": "Ürün kartlarını yerinde yenileyen sayılı filtreler, fiyat aralığı ve seçili filtre çipleri.",
-      "review_summary": "Ortalama puan, değerlendirme sayısı ve 5'ten 1'e her yıldız için bir çubuk."
+      "review_summary": "Ortalama puan, değerlendirme sayısı ve 5'ten 1'e her yıldız için bir çubuk.",
+      "countdown": "Sunucu saatindeki bir ana kalan süre ve bitiş durumu."
     },
     "ex": {
       "action_button": {
@@ -406,6 +407,10 @@
       "review_summary": {
         "overview": "Örnek",
         "few": "Birkaç değerlendirme"
+      },
+      "countdown": {
+        "overview": "Örnek",
+        "short": "Bir dakikadan biraz fazla"
       }
     }
   }

@@ -180,3 +180,15 @@ Form::of(Review::default())
     .field(Review::text)
     .submit(t!("reviews.send"), save_review)
 ```
+
+## Geri sayım
+
+```rust
+Countdown::until(sale.ends_at)
+    .label(t!("shop.sale_ends"))
+    .ended(Badge::new(t!("shop.sale_over")))
+```
+
+- **Sunucu saati.** Sunucu kalan süreyi kendi saatiyle yazar ("2g 03:14:09") ve sayfa bu saati taşır; böylece cihazdaki yanlış bir saat bitişi kaydırmaz. An geçtiğinde sunucu saatin yerine `ended` ile verilen bitiş durumunu script olmadan çizer.
+- **Tek zamanlayıcı.** `countdown.js` (gzip ile yaklaşık 1 KB, yalnızca çalışan bir geri sayım olan sayfalarda) sayfadaki tüm geri sayımlar için tek bir zamanlayıcı tutar; tam saniyede ilerler ve sekme gizliyken durur. Sıfırda bitiş durumu saatin yerini alır; bitişin değiştirdiği başka şeyleri bir konunun dinleyicileri yenileyebilir.
+- **Ekran okuyucular.** Rakamlar onlardan gizlenir. Kibar bir canlı bölge kalan süreyi sözcüklerle söyler ("2 g 3 sa 14 dk kaldı") ve yalnızca dakika değişince değişir; böylece her saniye konuşmaz.

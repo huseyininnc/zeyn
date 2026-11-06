@@ -180,3 +180,15 @@ Form::of(Review::default())
     .field(Review::text)
     .submit(t!("reviews.send"), save_review)
 ```
+
+## Countdown
+
+```rust
+Countdown::until(sale.ends_at)
+    .label(t!("shop.sale_ends"))
+    .ended(Badge::new(t!("shop.sale_over")))
+```
+
+- **Server time.** The server writes the time left with its own clock ("2d 03:14:09"), and the page carries that clock, so a wrong clock on the device does not move the end. Once the moment has passed, the server renders the end state given to `ended` instead of the clock, with no script.
+- **One timer.** `countdown.js` (about 1 KB gzip, only on pages with a running countdown) keeps one timer for every countdown of the page, ticking on the whole second and stopped while the tab is hidden. At zero the end state replaces the clock; listeners of a topic can refresh what else the end changes.
+- **Screen readers.** The digits are hidden from them. A polite live region says the time left in words ("2 d 3 h 14 min left") and changes only when the minute changes, so it never talks every second.

@@ -210,7 +210,7 @@ fn gallery(id: i64, color: &str) -> ProductGallery {
 /// A product page: gallery, price, variants, quantity and the add to cart button. Choosing a
 /// color or a size refreshes the photos, the price and the stock in place.
 #[screen(route = "/shop/product/{id}", public)]
-pub fn shop_product(p: ProductPage) -> Screen {
+pub fn shop_product(p: ProductPage, ctx: Ctx) -> Screen {
     let Some(item) = items().iter().find(|i| i.id.0 == p.id) else {
         return Screen::new("Product").body(EmptyState::new("No such product"));
     };
@@ -244,7 +244,14 @@ pub fn shop_product(p: ProductPage) -> Screen {
         .current(Some(&color));
     let left = stock(item.id.0, &size);
     let extra = if size == "xl" { 2_000 } else { 0 };
+    let every = 6 * 3_600_000;
+    let sale_ends = DateTime::from_unix_ms((ctx.now().unix_ms() / every + 1) * every);
     let buy = Stack::new()
+        .add(
+            Countdown::until(sale_ends)
+                .label("Sale ends in")
+                .ended(Badge::new("The sale has ended")),
+        )
         .add(
             price(item)
                 .large()
