@@ -2,7 +2,8 @@
  * Product galleries (`zeyn::ui::ProductGallery`). Loaded only by pages that hold
  * `[data-zeyn-gallery]`. The slides sit in a scroll snapping track, so phones swipe between
  * them without script. This module watches which slide is on screen with one
- * IntersectionObserver per gallery (no layout reads while scrolling), puts in the images of that
+ * IntersectionObserver per gallery (the scroll position is read only when a slide crosses the
+ * threshold, never per scroll frame), puts in the images of that
  * slide and its two neighbors from their templates, marks the current thumbnail, moves with the
  * thumbnails and the arrow keys, zooms the image under a fine pointer (the slide's box is read
  * once when the pointer enters) and opens a full screen view: a modal `<dialog>` with the image,
@@ -54,7 +55,9 @@ function watch(gallery) {
   if (!track || !('IntersectionObserver' in window)) return;
   const io = new IntersectionObserver(
     (entries) => {
-      for (const e of entries) if (e.isIntersecting) current(gallery, Number(e.target.dataset.index));
+      if (!entries.some((e) => e.isIntersecting)) return;
+      const at = Math.round(Math.abs(track.scrollLeft) / (track.clientWidth || 1));
+      current(gallery, Math.min(slides(gallery).length - 1, at));
     },
     { root: track, threshold: 0.6 },
   );

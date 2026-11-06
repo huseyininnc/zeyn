@@ -461,6 +461,12 @@ impl<A, S> Image<A, S> {
         self
     }
 
+    /// Drops the low resolution file, so nothing competes with an image that must load first.
+    pub(crate) fn without_low(mut self) -> Self {
+        self.loading.low = None;
+        self
+    }
+
     /// How the file fills the box when its shape differs from the size: cut to fill
     /// ([`Fit::Cover`]) or shown whole ([`Fit::Contain`]).
     pub fn fit(mut self, fit: Fit) -> Self {

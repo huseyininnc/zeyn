@@ -26,6 +26,8 @@ pub const MAX_GALLERY_IMAGES: usize = 24;
 /// in inert templates and `gallery.js` (loaded only on pages with a gallery) puts in the image on
 /// screen and its two neighbors, so a gallery of 12 photos loads three. Thumbnails are small
 /// files of their own ([`ProductGallery::thumb`]); without them the gallery shows numbered dots.
+/// The first image drops its low resolution file ([`Image::low`]), which would only compete with
+/// it for the network; its placeholder color stays.
 ///
 /// ```
 /// use zeyn::prelude::*;
@@ -55,7 +57,7 @@ impl ProductGallery {
     pub fn image(mut self, image: Image<Given, Given>) -> Self {
         if self.images.len() < MAX_GALLERY_IMAGES {
             let image = if self.images.is_empty() {
-                image.priority()
+                image.priority().without_low()
             } else {
                 image
             };
