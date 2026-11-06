@@ -571,6 +571,10 @@
         "failed": "Could not copy",
         "fold": "Fold or unfold this block",
         "truncated": "Showing the first {shown} of {total} lines. The rest is too long to show here."
+      },
+      "barcode": {
+        "code128_invalid": "This value cannot be shown as a barcode: it must be 1 to 80 printable ASCII characters.",
+        "qr_too_long": "This value is too long for a QR code."
       }
     },
     "date": {

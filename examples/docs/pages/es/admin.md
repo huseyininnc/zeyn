@@ -38,3 +38,17 @@ El resaltador (`zeyn::ui::highlight`) está escrito a mano para Rust, JSON, TOML
 |---|---|
 | Tab | Pasa al texto (una parada, se desplaza con las flechas) y después por los botones de plegado y el de copiar |
 | Enter, Space | En un botón de plegado: pliega o despliega el bloque |
+
+## Barcode y QrCode
+
+`Barcode::code128(value)` y `QrCode::new(value)` dibujan un símbolo como SVG en el servidor. Los dos codificadores están escritos a mano siguiendo los estándares públicos (Code 128 y QR Code), así que no se añade ningún crate ni script.
+
+```rust
+Row::new()
+    .col(Barcode::code128(order.number.clone()).height(56))
+    .col(QrCode::new(order_url).level(QrLevel::Quartile).label(t!("orders.scan")))
+```
+
+`Barcode` codifica de 1 a 80 caracteres ASCII imprimibles (`MAX_BARCODE_CHARS`) y empaqueta las series de dígitos de dos en dos por símbolo (conjunto C), con el símbolo de control y una zona de silencio de 10 módulos a cada lado. `QrCode` codifica el texto como bytes UTF-8 en la versión más pequeña (de 1 a 40) que lo contiene en el nivel elegido (`QrLevel::Low`, `Medium` por defecto, `Quartile`, `High`), con corrección de errores Reed Solomon, la máscara de menor penalización y 4 módulos de zona de silencio; como mucho `MAX_QR_BYTES` (2.953) bytes. Un valor que no se puede codificar muestra una nota breve en lugar de un símbolo roto.
+
+Cada símbolo es una figura que los lectores de pantalla oyen como una sola imagen con el nombre del texto que lleva debajo: el valor, o `.label(text)` cuando se indica. Las barras siguen negras sobre una placa blanca en los dos temas, porque los lectores de códigos necesitan barras oscuras sobre fondo claro. `barcode.css` (1 KB) se carga solo con los componentes; `.height(px)` y `.size(px)` fijan el tamaño dibujado, y el símbolo se encoge en un contenedor estrecho.

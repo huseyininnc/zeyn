@@ -38,3 +38,17 @@ The highlighter (`zeyn::ui::highlight`) is written by hand for Rust, JSON, TOML,
 |---|---|
 | Tab | Moves to the text (one stop, it scrolls with the arrow keys), then through the fold buttons and the copy button |
 | Enter, Space | On a fold button: folds or unfolds the block |
+
+## Barcode and QrCode
+
+`Barcode::code128(value)` and `QrCode::new(value)` draw a symbol as SVG on the server. Both encoders are written by hand after the public standards (Code 128 and QR Code), so no crate and no script is added.
+
+```rust
+Row::new()
+    .col(Barcode::code128(order.number.clone()).height(56))
+    .col(QrCode::new(order_url).level(QrLevel::Quartile).label(t!("orders.scan")))
+```
+
+`Barcode` encodes 1 to 80 printable ASCII characters (`MAX_BARCODE_CHARS`) and packs runs of digits two to a symbol (code set C), with the check symbol and 10 modules of quiet zone on each side. `QrCode` encodes the text as UTF-8 bytes at the smallest version (1 to 40) that holds it at the chosen level (`QrLevel::Low`, `Medium` by default, `Quartile`, `High`), with Reed Solomon error correction, the mask with the lowest penalty and 4 modules of quiet zone; at most `MAX_QR_BYTES` (2,953) bytes. A value that cannot be encoded shows a short notice instead of a broken symbol.
+
+Each symbol is a figure that screen readers hear as one image named by the text under it: the value, or `.label(text)` when it is set. The bars stay black on a white plate in both themes, because scanners need dark bars on a light ground. `barcode.css` (1 KB) loads only with the components; `.height(px)` and `.size(px)` set the drawn size, and the symbol shrinks with a narrow container.

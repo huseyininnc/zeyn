@@ -38,3 +38,17 @@ Renklendirici (`zeyn::ui::highlight`) Rust, JSON, TOML, SQL, JavaScript ve kabuk
 |---|---|
 | Tab | Metne geçer (tek durak, ok tuşlarıyla kayar), sonra katlama düğmelerinden ve kopyalama düğmesinden geçer |
 | Enter, Space | Bir katlama düğmesinde: bloğu katlar veya açar |
+
+## Barcode ve QrCode
+
+`Barcode::code128(value)` ve `QrCode::new(value)` bir sembolü sunucuda SVG olarak çizer. İki kodlayıcı da herkese açık standartlara (Code 128 ve QR Code) göre elle yazılmıştır; bu yüzden ne crate ne de betik eklenir.
+
+```rust
+Row::new()
+    .col(Barcode::code128(order.number.clone()).height(56))
+    .col(QrCode::new(order_url).level(QrLevel::Quartile).label(t!("orders.scan")))
+```
+
+`Barcode` 1 ile 80 arasında yazdırılabilir ASCII karakteri (`MAX_BARCODE_CHARS`) kodlar ve rakam dizilerini bir sembolde iki rakam olacak şekilde paketler (C kod kümesi); kontrol sembolünü ve her iki yanda 10 modüllük boşluk bölgesini ekler. `QrCode` metni UTF-8 bayt olarak, seçilen düzeyde (`QrLevel::Low`, varsayılan `Medium`, `Quartile`, `High`) onu taşıyan en küçük sürümle (1 ile 40) kodlar; Reed Solomon hata düzeltmesi, en düşük cezalı maske ve 4 modüllük boşluk bölgesi kullanır; en fazla `MAX_QR_BYTES` (2.953) bayt. Kodlanamayan bir değer bozuk bir sembol yerine kısa bir not gösterir.
+
+Her sembol, ekran okuyucuların altındaki metinle adlandırılmış tek bir görsel olarak duyduğu bir figürdür: değerin kendisi ya da verilmişse `.label(text)`. Çubuklar iki temada da beyaz bir zemin üzerinde siyah kalır, çünkü tarayıcı cihazlar açık zemin üzerinde koyu çubuk ister. `barcode.css` (1 KB) yalnızca bileşenlerle yüklenir; `.height(px)` ve `.size(px)` çizilen boyutu belirler ve sembol dar bir kapsayıcıda küçülür.

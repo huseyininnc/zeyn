@@ -99,7 +99,8 @@
       "link_button": "Buton görünümlü, başka sayfaya giden bağlantı.",
       "clear_prefs": "Tarayıcının uygulama için tuttuğu seçimleri silen düğme.",
       "diff_view": "Bir kayıtta değişen alanlar, eski ve yeni yan yana ya da satır içinde.",
-      "code_view": "Salt okunur kod ve JSON, sunucuda renklendirilmiş, numaralı ve katlanır."
+      "code_view": "Salt okunur kod ve JSON, sunucuda renklendirilmiş, numaralı ve katlanır.",
+      "barcode": "Sunucuda SVG olarak çizilen Code 128 barkodları ve QR kodları."
     },
     "ex": {
       "action_button": {
@@ -349,6 +350,11 @@
         "overview": "Örnek",
         "rust": "Rust",
         "json": "JSON"
+      },
+      "barcode": {
+        "overview": "Örnek",
+        "levels": "Hata düzeltme düzeyleri",
+        "digits": "Rakamlar"
       }
     }
   }

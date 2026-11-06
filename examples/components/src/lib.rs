@@ -219,6 +219,7 @@ catalog! {
     "admin" Settings {
         diff_view "/ui/diff-view";
         code_view "/ui/code-view";
+        barcode "/ui/barcode";
     }
 }
 

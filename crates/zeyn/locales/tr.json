@@ -571,6 +571,10 @@
         "failed": "Kopyalanamadı",
         "fold": "Bu bloğu daralt veya genişlet",
         "truncated": "{total} satırın ilk {shown} satırı gösteriliyor. Gerisi burada gösterilemeyecek kadar uzun."
+      },
+      "barcode": {
+        "code128_invalid": "Bu değer barkod olarak gösterilemez: 1 ile 80 arasında yazdırılabilir ASCII karakter olmalıdır.",
+        "qr_too_long": "Bu değer QR kod için fazla uzun."
       }
     },
     "date": {

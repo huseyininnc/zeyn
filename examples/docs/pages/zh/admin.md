@@ -38,3 +38,17 @@ JsonView::of(&customer, &ctx)
 |---|---|
 | Tab | 移到文本（一个停靠点，可用方向键滚动），然后依次经过折叠按钮和复制按钮 |
 | Enter, Space | 在折叠按钮上：折叠或展开该块 |
+
+## Barcode 和 QrCode
+
+`Barcode::code128(value)` 和 `QrCode::new(value)` 在服务器上把符号绘制成 SVG。两个编码器都按照公开标准（Code 128 和 QR Code）手写，因此不增加任何 crate，也不需要脚本。
+
+```rust
+Row::new()
+    .col(Barcode::code128(order.number.clone()).height(56))
+    .col(QrCode::new(order_url).level(QrLevel::Quartile).label(t!("orders.scan")))
+```
+
+`Barcode` 编码 1 到 80 个可打印 ASCII 字符（`MAX_BARCODE_CHARS`），把连续数字两个一组打包（C 码集），并加上校验符号和两侧各 10 个模块的静区。`QrCode` 把文本按 UTF-8 字节编码，在所选级别（`QrLevel::Low`、默认的 `Medium`、`Quartile`、`High`）下选择能容纳它的最小版本（1 到 40），使用 Reed Solomon 纠错、罚分最低的掩码和 4 个模块的静区；最多 `MAX_QR_BYTES`（2,953）字节。无法编码的值会显示一条简短说明，而不是损坏的符号。
+
+每个符号都是一个 figure，屏幕阅读器把它当作一张图片读出，名称是下方的文字：即值本身，或设置了 `.label(text)` 时的标签。在两种主题下条码都保持白底黑条，因为扫描器需要浅底深条。`barcode.css`（1 KB）只随这些组件加载；`.height(px)` 和 `.size(px)` 设置绘制尺寸，容器较窄时符号会缩小。

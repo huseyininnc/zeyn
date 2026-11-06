@@ -38,3 +38,17 @@ JsonView::of(&customer, &ctx)
 |---|---|
 | Tab | 텍스트로 이동(한 번의 탭 정지, 화살표 키로 스크롤)한 뒤 접기 버튼과 복사 버튼을 차례로 지납니다 |
 | Enter, Space | 접기 버튼에서: 블록을 접거나 펼칩니다 |
+
+## Barcode와 QrCode
+
+`Barcode::code128(value)`와 `QrCode::new(value)`는 서버에서 심볼을 SVG로 그립니다. 두 인코더 모두 공개 표준(Code 128과 QR Code)을 따라 직접 작성되었으므로 크레이트도 스크립트도 추가되지 않습니다.
+
+```rust
+Row::new()
+    .col(Barcode::code128(order.number.clone()).height(56))
+    .col(QrCode::new(order_url).level(QrLevel::Quartile).label(t!("orders.scan")))
+```
+
+`Barcode`는 출력 가능한 ASCII 문자 1~80자(`MAX_BARCODE_CHARS`)를 인코딩하며, 연속된 숫자는 한 심볼에 두 자리씩 묶고(코드 세트 C) 검사 심볼과 양쪽 10모듈의 여백 영역을 붙입니다. `QrCode`는 텍스트를 UTF-8 바이트로, 선택한 수준(`QrLevel::Low`, 기본값 `Medium`, `Quartile`, `High`)에서 담을 수 있는 가장 작은 버전(1~40)으로 인코딩하며, 리드 솔로몬 오류 정정, 벌점이 가장 낮은 마스크, 4모듈의 여백 영역을 씁니다. 최대 `MAX_QR_BYTES`(2,953)바이트입니다. 인코딩할 수 없는 값은 깨진 심볼 대신 짧은 안내를 보여 줍니다.
+
+각 심볼은 figure이며, 스크린 리더는 아래 텍스트로 이름 붙은 하나의 이미지로 읽습니다. 그 텍스트는 값 자체이거나, 지정했다면 `.label(text)`입니다. 스캐너는 밝은 바탕의 어두운 막대가 필요하므로 두 테마 모두에서 막대는 흰 판 위에 검게 유지됩니다. `barcode.css`(1 KB)는 이 컴포넌트와 함께일 때만 불러오며, `.height(px)`와 `.size(px)`로 그리는 크기를 정하고 좁은 컨테이너에서는 심볼이 줄어듭니다.
