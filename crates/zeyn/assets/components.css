@@ -1316,6 +1316,7 @@ tr:last-child > .z-lines-actions [data-zeyn-line-move="1"] { visibility: hidden;
 .z-tone-success { --z-tone: var(--z-success); --z-tone-bg: var(--z-success-subtle); }
 .z-tone-warning { --z-tone: var(--z-warning); --z-tone-bg: var(--z-warning-subtle); }
 .z-tone-danger { --z-tone: var(--z-danger); --z-tone-bg: var(--z-danger-subtle); }
+.z-tone-brand { --z-tone: var(--z-accent); --z-tone-bg: color-mix(in oklab, var(--z-accent) var(--z-tint), var(--z-surface)); }
 .z-tone-brand { --z-tone-bg: var(--z-brand-subtle); }
 
 .z-callout {

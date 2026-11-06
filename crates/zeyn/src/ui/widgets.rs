@@ -848,6 +848,8 @@ where
     }
 
     /// `Danger` draws a red button for actions that remove or cancel things.
+    /// The look of the button: `Tone::Brand` draws it as the main action of its area,
+    /// `Tone::Danger` as a destructive one; other tones keep the quiet default.
     pub fn tone(mut self, tone: Tone) -> Self {
         self.tone = tone;
         self
@@ -910,10 +912,10 @@ where
             ),
             None => String::new(),
         };
-        let class = if self.tone == Tone::Danger {
-            "z-button z-danger-button"
-        } else {
-            "z-button"
+        let class = match self.tone {
+            Tone::Danger => "z-button z-danger-button",
+            Tone::Brand => "z-button z-primary",
+            _ => "z-button",
         };
         let (tip_attrs, tip) = match &self.tip {
             Some(t) => crate::ui::tip(r, &crate::ui::dom_id(r, "tip"), t),

@@ -67,7 +67,7 @@ LinkButton::new(t!("cart.browse"), products, ()).primary()
 
 ## ActionButton
 
-`ActionButton::new(label, action, input)` एक action चलाता है। `.confirm(text)` पहले पूछता है, `.tone(Tone::Danger)` विनाशकारी बटन को चिह्नित करता है, और `.on_success(|result, ui| ...)` effect चलाता है। इनपुट सर्वर पर तय होता है और क्लाइंट से कभी नहीं आता; action की अनुमति सर्वर पर किसी भी फ़ॉर्म की तरह जाँची जाती है।
+`ActionButton::new(label, action, input)` एक action चलाता है। `.confirm(text)` पहले पूछता है, `.tone(Tone::Danger)` विनाशकारी बटन को चिह्नित करता है, और `.on_success(|result, ui| ...)` effect चलाता है। इनपुट सर्वर पर तय होता है और क्लाइंट से कभी नहीं आता; action की अनुमति सर्वर पर किसी भी फ़ॉर्म की तरह जाँची जाती है। `.tone(Tone::Brand)` इसे अपने क्षेत्र, जैसे किसी कार्ड, की मुख्य क्रिया के रूप में दिखाता है।
 
 ```rust
 ActionButton::new(t!("docs.live.count"), count_samples, ())

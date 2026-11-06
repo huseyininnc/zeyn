@@ -67,7 +67,7 @@ LinkButton::new(t!("cart.browse"), products, ()).primary()
 
 ## ActionButton
 
-`ActionButton::new(label, action, input)` ejecuta una acción. `.confirm(text)` pregunta primero, `.tone(Tone::Danger)` marca una destructiva y `.on_success(|result, ui| ...)` ejecuta effects. La entrada se fija en el servidor y nunca viene del cliente; el permiso de la acción se comprueba en el servidor como en cualquier formulario.
+`ActionButton::new(label, action, input)` ejecuta una acción. `.confirm(text)` pregunta primero, `.tone(Tone::Danger)` marca una destructiva y `.on_success(|result, ui| ...)` ejecuta effects. La entrada se fija en el servidor y nunca viene del cliente; el permiso de la acción se comprueba en el servidor como en cualquier formulario. `.tone(Tone::Brand)` lo dibuja como la acción principal de su zona, por ejemplo una tarjeta.
 
 ```rust
 ActionButton::new(t!("docs.live.count"), count_samples, ())

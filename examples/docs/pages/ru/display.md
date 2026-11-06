@@ -67,7 +67,7 @@ LinkButton::new(t!("cart.browse"), products, ()).primary()
 
 ## ActionButton
 
-`ActionButton::new(label, action, input)` запускает действие (action). `.confirm(text)` сначала спрашивает подтверждение, `.tone(Tone::Danger)` отмечает разрушительное действие, а `.on_success(|result, ui| ...)` выполняет эффекты. Входные данные фиксируются на сервере и никогда не приходят от клиента; разрешение действия проверяется на сервере, как у любой формы.
+`ActionButton::new(label, action, input)` запускает действие (action). `.confirm(text)` сначала спрашивает подтверждение, `.tone(Tone::Danger)` отмечает разрушительное действие, а `.on_success(|result, ui| ...)` выполняет эффекты. Входные данные фиксируются на сервере и никогда не приходят от клиента; разрешение действия проверяется на сервере, как у любой формы. `.tone(Tone::Brand)` рисует её как главное действие своей области, например карточки.
 
 ```rust
 ActionButton::new(t!("docs.live.count"), count_samples, ())

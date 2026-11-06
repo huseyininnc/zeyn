@@ -67,7 +67,7 @@ LinkButton::new(t!("cart.browse"), products, ()).primary()
 
 ## ActionButton
 
-`ActionButton::new(label, action, input)` はアクションを実行します。`.confirm(text)` は先に確認を求め、`.tone(Tone::Danger)` は破壊的な操作であることを示し、`.on_success(|result, ui| ...)` はエフェクトを実行します。入力はサーバー上で固定され、クライアントから来ることはありません。アクションの権限は、他のフォームと同様にサーバー上で検査されます。
+`ActionButton::new(label, action, input)` はアクションを実行します。`.confirm(text)` は先に確認を求め、`.tone(Tone::Danger)` は破壊的な操作であることを示し、`.on_success(|result, ui| ...)` はエフェクトを実行します。入力はサーバー上で固定され、クライアントから来ることはありません。アクションの権限は、他のフォームと同様にサーバー上で検査されます。 `.tone(Tone::Brand)` はカードなど、その領域の主要な操作として描画します。
 
 ```rust
 ActionButton::new(t!("docs.live.count"), count_samples, ())

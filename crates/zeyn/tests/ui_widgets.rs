@@ -310,3 +310,14 @@ async fn step_checks_report_only_the_steps_fields_and_need_the_save_permission()
         "checking a step needs the save action's permission"
     );
 }
+
+#[test]
+fn a_brand_action_button_is_drawn_as_the_main_action() {
+    let h = Screen::new("Start")
+        .body(ActionButton::new("Start lesson", archive_person, 7).tone(Tone::Brand))
+        .html(&person::META);
+    assert!(
+        h.contains(r#"<button type="submit" class="z-button z-primary""#),
+        "{h}"
+    );
+}
