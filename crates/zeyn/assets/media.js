@@ -15,6 +15,21 @@
  * Resume: the position is read from and saved to `/_zeyn/media/position` when the media source
  * keeps positions for the signed in user; otherwise it is kept in this browser's local storage.
  *
+ * Posters and previews: the sources and the poster are set when a player first comes into view,
+ * so a page of many players fetches nothing for those off screen; the low resolution poster
+ * (`data-zeyn-poster-low`) comes first. A player with `data-zeyn-preview` plays muted and looping
+ * while at least a quarter of it is visible, unless the visitor prefers reduced motion or saves
+ * data; once the visitor uses its controls it no longer starts or stops by itself. One
+ * IntersectionObserver serves every player of the page.
+ *
+ * Progressive images: an `<img data-zeyn-img>` sits in a box (`.z-img-host`) that shows its
+ * placeholder without script. One capture listener on the document handles `load` and `error` for
+ * every such image: a loaded image marks its box `z-img-done`, and `z-img-fade` when an `Image`
+ * (not a card) arrived after this script over a low resolution file or a blur and is not the
+ * priority image, so it fades in. Cards never fade: in a fast scroll through a grid of 2,000
+ * cards the fades alone halved the frame rate. A failed image tries `data-zeyn-fallback` once,
+ * then shows the box's `<template data-zeyn-img-error>` or its alt text with an icon. Images that finished before this script ran are checked once when it starts.
+ *
  * Embeds: `zeyn::ui::Embed` with `click_to_load` renders a poster button and the frame inside an
  * inert `<template>`. Pressing the button puts the frame in its place and moves focus to it. With
  * `remember(KEY)` the consent is kept in `zeyn.state` (`state.js`), and later pages and other
@@ -96,10 +111,139 @@ const local = {
   },
 };
 
-/** Sets up every player and remembered embed inside `root`. Safe to call more than once. */
+/** Sets up every player, progressive image and remembered embed inside `root`. Safe to call more than once. */
 function init(root) {
   root.querySelectorAll('[data-zeyn-player]').forEach(setup);
+  root.querySelectorAll('img[data-zeyn-img]').forEach((img) => {
+    if (img.complete && img.currentSrc) settle(img, false);
+  });
   restoreEmbeds(root);
+}
+
+/* Progressive images ------------------------------------------------------------------------- */
+
+/**
+ * Marks an image loaded or failed once its request has ended; `fresh` when it ended after this
+ * script started, so the image may fade in.
+ */
+function settle(img, fresh) {
+  const host = img.parentElement;
+  if (!host) return;
+  if (img.naturalWidth > 0) {
+    host.classList.add('z-img-done');
+    const under = host.classList.contains('z-img-blur') || host.querySelector(':scope > .z-img-under');
+    if (fresh && under && host.classList.contains('z-img') && img.fetchPriority !== 'high') host.classList.add('z-img-fade');
+    return;
+  }
+  if (!img.getAttribute('src')) return;
+  const fallback = img.getAttribute('data-zeyn-fallback');
+  if (fallback) {
+    img.removeAttribute('data-zeyn-fallback');
+    img.removeAttribute('srcset');
+    img.removeAttribute('sizes');
+    img.src = fallback;
+    return;
+  }
+  if (host.classList.contains('z-img-failed')) return;
+  host.classList.add('z-img-failed');
+  img.hidden = true;
+  const box = document.createElement('span');
+  box.className = 'z-img-error';
+  const body = document.createElement('span');
+  body.className = 'z-img-error-body';
+  const custom = host.querySelector(':scope > template[data-zeyn-img-error]');
+  if (custom) {
+    body.append(custom.content.cloneNode(true));
+  } else {
+    const icon = document.createElement('span');
+    icon.className = 'z-img-error-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    body.append(icon);
+    if (img.alt) body.append(img.alt);
+  }
+  box.append(body);
+  img.after(box);
+}
+
+/**
+ * One listener for the `load` and `error` of every progressive image; neither event bubbles, so
+ * it listens in the capture phase.
+ * @example
+ * // <span class="z-img z-img-host"><img class="z-img-under" src="/p/1-40.webp" alt=""><img src="/p/1.webp" alt="Shirt" data-zeyn-img data-zeyn-fallback="/p/none.webp"></span>
+ */
+function onImage(e) {
+  const img = e.target;
+  if (img instanceof HTMLImageElement && img.hasAttribute('data-zeyn-img')) settle(img, true);
+}
+
+document.addEventListener('load', onImage, true);
+document.addEventListener('error', onImage, true);
+
+/* Posters and previews ----------------------------------------------------------------------- */
+
+/** Whether players may not start by themselves: reduced motion or data saving. */
+function quiet() {
+  return (
+    matchMedia('(prefers-reduced-motion: reduce)').matches ||
+    matchMedia('(prefers-reduced-data: reduce)').matches ||
+    navigator.connection?.saveData === true
+  );
+}
+
+/** The shared observer of every player: sets posters on first sight and runs previews. */
+let viewer = null;
+
+function watch(root) {
+  viewer ??= new IntersectionObserver(seen, { threshold: [0, 0.25] });
+  viewer.observe(root);
+}
+
+function seen(entries) {
+  for (const e of entries) {
+    const p = players.get(e.target);
+    if (!p) continue;
+    if (e.isIntersecting && !p.postered) {
+      poster(p);
+      load(p);
+    }
+    if (!p.preview || p.user) continue;
+    if (e.isIntersecting && e.intersectionRatio >= 0.25) {
+      if (p.media.paused && !quiet()) {
+        p.media.muted = true;
+        p.media.play().catch(() => {});
+      }
+    } else if (!p.media.paused) {
+      p.media.pause();
+    }
+  }
+}
+
+/** Sets the poster: the low resolution file at once, the full one when it has decoded. */
+function poster(p) {
+  p.postered = true;
+  const { media } = p;
+  const high = media.dataset.zeynPoster;
+  const low = media.dataset.zeynPosterLow;
+  if (low) media.poster = BASE + low;
+  if (!high) return;
+  if (!low) {
+    media.poster = BASE + high;
+    return;
+  }
+  const img = new Image();
+  img.src = BASE + high;
+  img.decode().then(
+    () => {
+      media.poster = img.src;
+    },
+    () => {},
+  );
+}
+
+/** Hands a preview to the visitor: it no longer starts or stops by itself. */
+function own(p) {
+  if (!p.preview || p.user) return;
+  p.user = true;
 }
 
 /** Wires one player: sources, tracks, events and the saved position. */
@@ -117,9 +261,13 @@ function setup(root) {
     savedAt: 0,
     track: preferredTrack(media),
     seeking: false,
+    preview: root.hasAttribute('data-zeyn-preview'),
+    user: false,
+    postered: false,
   };
   players.set(root, p);
-  if (media.dataset.zeynPoster) media.poster = BASE + media.dataset.zeynPoster;
+  if (p.preview) media.muted = true;
+  watch(root);
   media.querySelectorAll('track[data-zeyn-src]').forEach((t) => {
     t.src = BASE + t.dataset.zeynSrc;
   });
@@ -153,7 +301,6 @@ function setup(root) {
   );
   const pip = root.querySelector('[data-zeyn-player-pip]');
   if (pip && document.pictureInPictureEnabled && !media.disablePictureInPicture) pip.hidden = false;
-  load(p);
   paint(p);
   paintVolume(p);
   paintTime(p);
@@ -246,6 +393,7 @@ function announce(p, text) {
 /* Actions ------------------------------------------------------------------------------------ */
 
 function toggle(p) {
+  own(p);
   if (p.media.paused) p.media.play().catch(() => {});
   else p.media.pause();
 }
@@ -321,7 +469,7 @@ function localKey(p) {
 
 /** Jumps to where the user stopped, from the server when the source keeps positions. */
 async function resume(p) {
-  if (!p.id) return;
+  if (!p.id || (p.preview && !p.user)) return;
   let at = null;
   try {
     const q = `?source=${encodeURIComponent(p.source)}&id=${encodeURIComponent(p.id)}`;
@@ -344,7 +492,7 @@ async function resume(p) {
 
 /** Saves the position; `keepalive` lets the request finish while the page unloads. */
 function save(p, at, keepalive = false) {
-  if (!p.id || !Number.isFinite(at)) return;
+  if (!p.id || !Number.isFinite(at) || (p.preview && !p.user)) return;
   p.savedAt = Date.now();
   const seconds = Math.round(at * 10) / 10;
   if (!p.server) {
@@ -517,6 +665,7 @@ document.addEventListener('click', (e) => {
   if (openMenu) closeMenu(false);
   if (t.closest('[data-zeyn-player-play]') || t.closest('.z-player-stage')) return toggle(p);
   if (t.closest('[data-zeyn-player-mute]')) {
+    own(p);
     p.media.muted = !p.media.muted;
     if (!p.media.muted && p.media.volume === 0) p.media.volume = 1;
     return;
@@ -556,6 +705,7 @@ document.addEventListener('keydown', (e) => {
     j: () => seekTo(p, p.media.currentTime - JUMP_STEP_S),
     l: () => seekTo(p, p.media.currentTime + JUMP_STEP_S),
     m: () => {
+      own(p);
       p.media.muted = !p.media.muted;
     },
     c: () => p.root.querySelector('[data-zeyn-player-cc]') && setCaptions(p, p.captionsOn ? -1 : p.track),

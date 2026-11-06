@@ -130,7 +130,8 @@
       },
       "card_grid": {
         "overview": "Örnek",
-        "pages": "Numaralı sayfalar"
+        "pages": "Numaralı sayfalar",
+        "fast_catalog": "Hızlı ürün kataloğu"
       },
       "chart": {
         "overview": "Örnek",
@@ -183,7 +184,10 @@
         "rotating": "Dönen slaytlar"
       },
       "image": {
-        "overview": "Örnek"
+        "overview": "Örnek",
+        "progressive": "Yer tutucu ve düşük çözünürlüklü dosya",
+        "fallback": "Yedek dosya ve hata",
+        "first_image": "İlk görsel"
       },
       "image_card": {
         "overview": "Örnek",

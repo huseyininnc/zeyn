@@ -37,6 +37,19 @@ Card::image(c.cover.clone(), c.title.clone())
     .progress(c.done, t!("courses.done"))
     .horizontal()
 ```
+- **Cuadrículas de productos rápidas.** `.placeholder(...)` en la cuadrícula rellena cada imagen de tarjeta mientras se carga, y una tarjeta puede definir el suyo. En una tarjeta, `.low(src)` muestra primero un archivo pequeño y `.fallback(src)` prueba otro archivo una vez, antes de que la tarjeta muestre su texto alternativo con un icono. `.priority(n)` carga las imágenes de las primeras `n` tarjetas (12 como máximo) de inmediato con `fetchpriority="high"`; las demás imágenes de tarjeta siguen siendo diferidas, y las páginas cargadas después nunca van primero. Funcionan como las opciones de [`Image`](display.md#image), con un solo listener para todas las tarjetas.
+
+```rust
+CardGrid::of(catalog_products)
+    .card(|p: &Product| {
+        Card::image(p.photo.clone(), p.name.clone())
+            .low(p.photo_small.clone())
+            .fallback("/static/no-photo.webp")
+    })
+    .placeholder(Placeholder::color("--z-surface-2"))
+    .priority(4)
+```
+- **Cuadrículas largas.** Las tarjetas y las filas de lista fuera de la pantalla se saltan el diseño y el pintado (`content-visibility: auto`), con su tamaño reservado a partir del tamaño de la imagen, así que una cuadrícula larga cuesta poco hasta que se ve. Una cuadrícula de tarjetas con 200 tarjetas o más mantiene en la página solo las filas cercanas a la vista, como hace un [DataGrid](datagrid.md) virtual: las demás filas son espacio de la misma altura, cada fila tiene la altura de la más alta de las primeras tarjetas y cada tarjeta indica su posición a los lectores de pantalla (`aria-posinset`, `aria-setsize`). Tab y Shift+Tab llegan a todas las tarjetas, una tarjeta con el foco se queda mientras sale de la vista al desplazarse y "Show more" añade a la misma ventana. Durante un desplazamiento rápido, las tarjetas que solo pasan de largo no descargan imágenes; se cargan cuando el desplazamiento se detiene. Buscar en la página solo ve las tarjetas cercanas a la vista; para las demás, use la búsqueda de la cuadrícula.
 - **Primera página en el servidor.** La primera página (24 tarjetas en una cuadrícula, 12 en un rail, o el tamaño indicado en `paging`) forma parte del HTML de la página, así que los buscadores y los visitantes sin JavaScript ven las tarjetas y sus enlaces, y las imágenes llevan su tamaño para que nada se mueva al cargarse. Las páginas siguientes llegan desde el navegador. Una página pública es el mismo HTML para todos los visitantes, así que puede almacenarse en caché. Una tarjeta enlazada a una screen con ruta enlaza a su dirección canónica (`/items/{slug}`), nunca a una redirección.
 - **Paginación.** `Paging::infinite(n)` (el valor por defecto, 24) muestra un botón "Show more" que también se activa cuando entra en la vista al desplazarse; el foco pasa a la primera tarjeta nueva cuando se pulsa el botón. `Paging::pages(n)` muestra los botones anterior y siguiente y el número de página: "Page 2 of 5" cuando la action devuelve un total, "Page 2" cuando no, y entonces Siguiente funciona mientras la action devuelva un cursor. El servidor fija el tamaño de página; el cliente solo indica dónde continuar.
 - **Ordenación.** Cada `sort_option` es un orden que los usuarios pueden elegir en un select; el primero es el orden con el que empiezan las tarjetas. El servidor acepta solo estos órdenes y descarta los filtros y el texto de búsqueda que envíe el cliente.

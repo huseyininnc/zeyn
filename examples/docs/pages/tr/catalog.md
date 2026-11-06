@@ -37,6 +37,19 @@ Card::image(c.cover.clone(), c.title.clone())
     .progress(c.done, t!("courses.done"))
     .horizontal()
 ```
+- **Hızlı ürün ızgaraları.** Izgaradaki `.placeholder(...)` her kart görselini yüklenirken doldurur ve bir kart kendi yer tutucusunu belirleyebilir. Bir kartta `.low(src)` önce küçük bir dosya gösterir, `.fallback(src)` ise kart alt metnini bir simgeyle göstermeden önce bir kez başka bir dosyayı dener. `.priority(n)` ilk `n` kartın (en fazla 12) görsellerini `fetchpriority="high"` ile hemen yükler; diğer her kart görseli tembel kalır ve sonradan yüklenen sayfalar hiçbir zaman öne geçmez. [`Image`](display.md#image) seçenekleri gibi çalışırlar ve tüm kartlar için tek bir dinleyici vardır.
+
+```rust
+CardGrid::of(catalog_products)
+    .card(|p: &Product| {
+        Card::image(p.photo.clone(), p.name.clone())
+            .low(p.photo_small.clone())
+            .fallback("/static/no-photo.webp")
+    })
+    .placeholder(Placeholder::color("--z-surface-2"))
+    .priority(4)
+```
+- **Uzun ızgaralar.** Ekran dışındaki kartlar ve liste satırları yerleşim ve boyama adımlarını atlar (`content-visibility: auto`) ve boyutları görsel boyutundan ayrılır; böylece uzun bir ızgara görülene kadar çok az maliyet getirir. 200 veya daha fazla kartı olan bir kart ızgarası, sanal bir [DataGrid](datagrid.md) gibi sayfada yalnızca görüntü alanına yakın satırları tutar: diğer satırlar aynı yükseklikte boşluktur, her satır ilk kartların en uzununun yüksekliğini alır ve her kart ekran okuyuculara konumunu bildirir (`aria-posinset`, `aria-setsize`). Tab ve Shift+Tab her karta ulaşır, odaktaki kart kaydırılıp görünümden çıkarken de yerinde kalır ve "Show more" aynı pencereye ekler. Hızlı bir kaydırma sırasında yalnızca geçip giden kartlar görsel getirmez; görseller kaydırma durunca yüklenir. Sayfada bul yalnızca görüntü alanına yakın kartları görür; diğerleri için ızgaranın aramasını kullanın.
 - **İlk sayfa sunucuda.** İlk sayfa (kart ızgarasında 24, şeritte 12 kart ya da `paging` ile verilen boyut) sayfanın HTML'inin parçasıdır; arama motorları ve JavaScript'i olmayan ziyaretçiler kartları ve bağlantılarını görür, görseller boyutlarını taşıdığı için yüklenirken hiçbir şey kaymaz. Sonraki sayfalar tarayıcıdan gelir. Public bir sayfa her ziyaretçi için aynı HTML'dir, bu yüzden önbelleğe alınabilir. Route'u olan bir ekrana bağlanan kart, yönlendirmeye değil o ekranın kanonik adresine (`/items/{slug}`) bağlanır.
 - **Sayfalama.** `Paging::infinite(n)` (varsayılan, 24) ekranda göründüğünde de tetiklenen bir "Show more" düğmesi gösterir; düğmeye basıldığında odak ilk yeni karta geçer. `Paging::pages(n)` önceki ve sonraki düğmelerini ve sayfa numarasını gösterir: action bir toplam döndürürse "Page 2 of 5", döndürmezse "Page 2"; o zaman Next, action bir imleç döndürdüğü sürece çalışır. Sayfa boyutunu sunucu belirler; istemci yalnızca nereden devam edileceğini söyler.
 - **Sıralama.** Her `sort_option`, kullanıcıların bir seçim listesinden seçebileceği bir sıradır; ilki kartların başladığı sıradır. Sunucu yalnızca bu sıraları kabul eder ve istemcinin gönderdiği süzgeçleri ve arama metnini atar.

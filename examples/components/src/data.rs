@@ -189,6 +189,65 @@ pub async fn search_products(q: DataQuery) -> Result<Page<Product>> {
     Ok(q.apply(PRODUCTS.clone()))
 }
 
+/// How many items the large catalog has, on [`SHELVES`] shelves of equal size.
+pub const ITEMS: i64 = 2000;
+
+/// Shelves of the large catalog; a shelf fits one page of a card grid.
+pub const SHELVES: i64 = 4;
+
+/// An item of the large catalog, with a photo of its own.
+#[entity(table = "items")]
+pub struct Item {
+    #[key]
+    pub id: ItemId,
+    pub name: String,
+    pub price: Money,
+    pub shelf: i64,
+}
+
+impl Item {
+    /// The full photo of the item. Every 97th item has none, to show the fallback.
+    pub fn photo(&self) -> String {
+        match self.id.0 % 97 {
+            0 => format!("/site/photo/missing-{}.svg", self.id.0),
+            _ => format!("/site/photo/{}.svg", self.id.0),
+        }
+    }
+
+    /// The small, low resolution photo shown first.
+    pub fn low(&self) -> String {
+        format!("/site/photo/{}-low.svg", self.id.0)
+    }
+}
+
+static ITEM_ROWS: LazyLock<Vec<Item>> = LazyLock::new(|| {
+    (1..=ITEMS)
+        .map(|i| Item {
+            id: ItemId(i),
+            name: format!("Item {i}"),
+            price: Money::tl(990 + (i * 7_919) % 90_000),
+            shelf: (i - 1) * SHELVES / ITEMS,
+        })
+        .collect()
+});
+
+/// The items of the large catalog: filter, sort and page.
+#[action(public)]
+pub async fn search_items(q: DataQuery) -> Result<Page<Item>> {
+    Ok(q.apply(ITEM_ROWS.clone()))
+}
+
+/// Photo `n` of the large catalog, full (a gradient with a circle) or low (one color).
+pub fn photo_svg(n: u32, low: bool) -> String {
+    let hue = (n * 47) % 360;
+    match low {
+        true => format!(
+            r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3 3" width="3" height="3"><rect width="3" height="3" fill="hsl({hue} 65% 62%)"/></svg>"#
+        ),
+        false => svg(n),
+    }
+}
+
 /// Sample people: filter, sort and page.
 #[action(public)]
 pub async fn search_people(q: DataQuery) -> Result<Page<Person>> {

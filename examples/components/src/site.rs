@@ -50,6 +50,35 @@ async fn picture(Path(file): Path<String>) -> Response<Body> {
     res
 }
 
+/// A photo of the large catalog: `{n}.svg` or `{n}-low.svg` for items 1 to
+/// [`crate::data::ITEMS`]; anything else is not found.
+async fn photo(Path(file): Path<String>) -> Response<Body> {
+    let name = file.strip_suffix(".svg").unwrap_or("");
+    let (n, low) = match name.strip_suffix("-low") {
+        Some(n) => (n, true),
+        None => (name, false),
+    };
+    let n = n
+        .parse::<u32>()
+        .ok()
+        .filter(|n| (1..=crate::data::ITEMS as u32).contains(n));
+    let Some(n) = n else {
+        let mut res = Response::new(Body::empty());
+        *res.status_mut() = StatusCode::NOT_FOUND;
+        return res;
+    };
+    let mut res = Response::new(Body::from(crate::data::photo_svg(n, low)));
+    res.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("image/svg+xml"),
+    );
+    res.headers_mut().insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("public, max-age=86400"),
+    );
+    res
+}
+
 /// Adds the catalog's stylesheet and script to an HTML page.
 async fn with_head(res: Response<Body>) -> Response<Body> {
     let html = res
@@ -92,5 +121,6 @@ pub fn router(app: Router) -> Router {
         get(|| async { asset(JS, "text/javascript; charset=utf-8") }),
     )
     .route("/site/img/{file}", get(picture))
+    .route("/site/photo/{file}", get(photo))
     .layer(axum::middleware::map_response(with_head))
 }

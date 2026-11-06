@@ -141,6 +141,32 @@ Image::new("https://images.example.com/logo.png")
 - Cada imagen recibe `decoding="async"`; `.lazy()` añade `loading="lazy"` para las imágenes que quedan fuera de la primera vista. `srcset` admite descriptores de densidad (`2x`) o de ancho (`800w`); las entradas en otros hosts o con otros descriptores se omiten. Los descriptores de ancho añaden `sizes` a partir del ancho de la imagen.
 - Una imagen puramente decorativa recibe un texto alternativo vacío: `.alt(Text::from(""))`.
 
+### Listas largas de fotos
+
+En un catálogo con miles de fotos de productos, una imagen puede mostrar algo mientras se carga y recuperarse cuando falla. Todo usa funciones nativas del navegador; un solo listener del módulo de medios atiende a todas las imágenes de la página.
+
+```rust
+Image::new(p.photo_800.clone())
+    .alt(p.name.clone())
+    .size(400, 500)
+    .lazy()
+    .srcset([(p.photo_400.as_str(), "400w"), (p.photo_800.as_str(), "800w")])
+    .sizes("(min-width: 800px) 25vw, 50vw")
+    .placeholder(Placeholder::color("#d9dde3"))
+    .low(p.photo_40.clone())
+    .fallback("/static/no-photo.webp")
+    .on_error(t!("shop.no_photo"))
+    .fit(Fit::Cover)
+```
+
+- `.placeholder(...)` rellena la caja mientras se carga el archivo, sin script: `Placeholder::color("#d9dde3")` o un token del tema (`"--z-surface-2"`), `Placeholder::blur(data_uri)` para una imagen diminuta creada por la aplicación (una URI base64 `data:image/webp`, `avif`, `jpeg` o `png` de 600 bytes como máximo, nunca SVG), o `Placeholder::image(src)` para un único archivo compartido por todas las imágenes. Un placeholder que incumple una regla se omite.
+- `.low(src)` muestra al instante un archivo pequeño de baja resolución bajo el completo. El archivo completo se carga a la vez (de forma diferida cuando la imagen es diferida) y aparece con un fundido cuando está listo; con movimiento reducido aparece sin fundido.
+- `.fallback(src)` prueba otro archivo una vez cuando la imagen falla. Después se muestra `.on_error(text or component)`; sin él, el texto alternativo con un icono sobre el placeholder. No se vuelve a intentar nada.
+- `.priority()` marca la primera imagen que ve un visitante (el pintado más grande): `loading="eager"` y `fetchpriority="high"`, nunca diferida. Úsalo una vez por página.
+- `.sizes(...)` indica el ancho de la imagen en el diseño, para que el navegador elija el ancho correcto de `srcset`. Sin él, una imagen diferida recibe `sizes="auto"` y el navegador mide el hueco.
+- `.fit(Fit::Cover)` rellena la caja y recorta lo que sobra; `Fit::Contain` muestra el archivo entero.
+- `low`, `fallback` y `Placeholder::image` siguen las mismas reglas de dirección que `src`; los demás se omiten. La caja conserva siempre el tamaño de la imagen, así que nada se mueve mientras los archivos se cargan o fallan.
+
 ## ExternalLink
 
 `ExternalLink::new(url, text)` enlaza con otro sitio con `rel="noopener noreferrer"`, de modo que el otro sitio no recibe ni la dirección de la página ni un control sobre la ventana. Los lectores de pantalla oyen "external site" tras el texto; una flecha lo marca visualmente.

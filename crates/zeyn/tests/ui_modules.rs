@@ -50,6 +50,25 @@ pub fn trip() -> Screen {
     )
 }
 
+#[screen(route = "/photo", permission = "trips.read")]
+pub fn photo() -> Screen {
+    Screen::new("Photo").body(
+        Image::new("/p.webp")
+            .alt("Photo")
+            .size(40, 40),
+    )
+}
+
+#[screen(route = "/photos", permission = "trips.read")]
+pub fn photos() -> Screen {
+    Screen::new("Photos").body(
+        Image::new("/p.webp")
+            .alt("Photo")
+            .size(40, 40)
+            .placeholder(Placeholder::color("#d9dde3")),
+    )
+}
+
 fn app() -> axum::Router {
     App::new("Test")
         .i18n(I18n::new("en"))
@@ -59,7 +78,9 @@ fn app() -> axum::Router {
             Feature::new("trips")
                 .screen(plain)
                 .screen(trips)
-                .screen(trip),
+                .screen(trip)
+                .screen(photo)
+                .screen(photos),
         )
         .router()
         .unwrap()
@@ -236,4 +257,24 @@ async fn every_rule_of_a_module_stylesheet_is_under_one_of_its_markers() {
             }
         }
     }
+}
+
+#[tokio::test]
+async fn the_media_script_comes_only_with_images_that_need_it() {
+    let (_, simple) = get("/photo").await;
+    let linked = links(&simple);
+    assert!(linked.contains(&"media.css".to_string()));
+    assert!(
+        !linked.contains(&"media.js".to_string()),
+        "a plain image needs no script"
+    );
+    let (_, progressive) = get("/photos").await;
+    let linked = links(&progressive);
+    assert!(linked.contains(&"media.css".to_string()) && linked.contains(&"media.js".to_string()));
+    let table = table().await;
+    let media = table
+        .iter()
+        .find(|(name, _, _)| name == "media")
+        .unwrap();
+    assert!(media.1.contains("[data-zeyn-img]") && media.2.contains(".z-img-host"));
 }

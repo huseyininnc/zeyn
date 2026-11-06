@@ -6,6 +6,16 @@
  * only; the server sets the page size and the search text. Search boxes ask `POST /_zeyn/data`
  * for suggestions and follow the W3C APG combobox pattern with a list box popup. A mouse can drag
  * a rail sideways; touch keeps native scrolling.
+ *
+ * A card grid with 200 cards or more is windowed: only the rows near the viewport are in the DOM
+ * and the rows above and below are padding of their height, as the rows of a virtual DataGrid.
+ * Built rows (`CardGrid::builder`) are windowed the same way and keep their `data-zeyn-key`; a
+ * grid with separators is not windowed, since a separator would take a cell of its own.
+ * Every row has the height of the tallest of the first cards; each card carries `aria-posinset`
+ * and `aria-setsize`; a focused card stays in the DOM while it is out of view; cards that "Show
+ * more" or the next page bring are taken in the same way. During a fling (over 3 px per ms) cards
+ * come in with their images held back (`data-zeyn-park`) and show their placeholder; the images
+ * load once the scroll rests for 120 ms, so files of cards that only flew by are never fetched.
  * @module catalog
  */
 
@@ -114,17 +124,19 @@ async function load(section, how, focus) {
   const before = how === 'more' ? list.children.length : 0;
   if (how === 'more') list.insertAdjacentHTML('beforeend', body.rows ?? '');
   else list.innerHTML = body.rows ?? '';
+  const firstNew = list.children[before];
   if (body.next) d.zeynNext = body.next;
   else delete d.zeynNext;
   d.zeynOffset = String(body.offset ?? 0);
   if (body.total != null) d.zeynTotal = String(body.total);
   else delete d.zeynTotal;
   section.querySelector('[data-zeyn-cards-more]')?.toggleAttribute('hidden', !body.next);
-  section.querySelector('[data-zeyn-cards-empty]')?.toggleAttribute('hidden', list.children.length > 0);
-  if (paged) pager(section);
-  if (status) status.textContent = fill(d.textLoaded, { count: list.children.length });
   document.dispatchEvent(new CustomEvent('zeyn:content', { detail: list }));
-  if (focus) list.children[before]?.querySelector('a')?.focus();
+  windowCards(section, how === 'more' ? 'more' : 'first');
+  section.querySelector('[data-zeyn-cards-empty]')?.toggleAttribute('hidden', cardCount(list) > 0);
+  if (paged) pager(section);
+  if (status) status.textContent = fill(d.textLoaded, { count: cardCount(list) });
+  if (focus) firstNew?.querySelector('a')?.focus();
   if (section.classList.contains('z-rail')) railButtons(section);
 }
 
@@ -254,6 +266,249 @@ document.addEventListener(
   { passive: true, once: true, capture: true },
 );
 
+/* Windowed card grids ------------------------------------------------------------------------ */
+
+/** A card grid with at least this many cards keeps only the rows near the viewport in the DOM. */
+const WINDOW_MIN = 200;
+
+/** Pixels above and below the viewport whose rows stay in the DOM. */
+const WINDOW_MARGIN = 800;
+
+/** Scroll speed in pixels per millisecond above which cards come in with their images parked. */
+const FLING = 3;
+
+/** Milliseconds without scrolling after which parked images load, at least two frames on slow devices. */
+const SETTLE_MS = 120;
+
+/** Whether the page scrolls faster than `FLING` in this frame. */
+let flying = false;
+
+/** Windowing state by list element. */
+const windows = new WeakMap();
+
+/**
+ * Prefixes app relative card links with the path the app is served under, as components.js does
+ * for content in the DOM: cards that were out of the DOM when it ran get it here.
+ */
+function baseCards(nodes) {
+  for (const n of nodes) {
+    for (const a of n.querySelectorAll('a[data-zeyn-base-href]')) {
+      a.setAttribute('href', BASE + a.getAttribute('href'));
+      a.removeAttribute('data-zeyn-base-href');
+    }
+  }
+}
+
+/**
+ * Measures the columns and the row height of a windowed list from the cards in the DOM: the
+ * tallest card of the first rows sets one fixed height for every row, so any row can be placed
+ * without measuring it, as the rows of a virtual DataGrid.
+ */
+function measure(w) {
+  const { list } = w;
+  const style = getComputedStyle(list);
+  w.cols = Math.max(1, style.gridTemplateColumns.split(' ').filter(Boolean).length);
+  w.gap = parseFloat(style.rowGap) || 0;
+  w.colGap = parseFloat(style.columnGap) || 0;
+  list.style.gridAutoRows = '';
+  let tallest = 0;
+  for (const card of [...list.children].slice(0, w.cols * 2)) {
+    if (!card.classList.contains('z-cards-kept')) tallest = Math.max(tallest, card.getBoundingClientRect().height);
+  }
+  if (tallest > 0) w.cardH = tallest;
+  list.style.gridAutoRows = `${w.cardH}px`;
+  w.rowH = w.cardH + w.gap;
+  w.width = list.clientWidth;
+}
+
+/** Numbers the cards for screen readers: the position of each and the size of the set. */
+function number(w) {
+  const d = w.list.closest('[data-zeyn-cards]')?.dataset ?? {};
+  const size = d.zeynTotal != null ? d.zeynTotal : d.zeynNext ? '-1' : String(w.cards.length);
+  w.cards.forEach((card, i) => {
+    card.setAttribute('aria-posinset', String(i + 1));
+    card.setAttribute('aria-setsize', size);
+  });
+}
+
+/**
+ * Holds back the images of a card that comes in during a fling: the files of cards that only
+ * pass by are never requested. The card shows its placeholder until the scroll settles. Images
+ * that already loaded are left alone.
+ */
+function park(card) {
+  for (const img of card.querySelectorAll('img[src]')) {
+    if (img.complete) continue;
+    img.dataset.zeynPark = img.getAttribute('src');
+    if (img.hasAttribute('srcset')) img.dataset.zeynParkSet = img.getAttribute('srcset');
+    img.removeAttribute('srcset');
+    img.removeAttribute('src');
+  }
+}
+
+/** Gives a card its parked images back, so the browser loads them as usual. */
+function unpark(card) {
+  for (const img of card.querySelectorAll('img[data-zeyn-park]')) {
+    if (img.dataset.zeynParkSet) img.setAttribute('srcset', img.dataset.zeynParkSet);
+    img.setAttribute('src', img.dataset.zeynPark);
+    delete img.dataset.zeynPark;
+    delete img.dataset.zeynParkSet;
+  }
+}
+
+/** Places a focused card that is outside the window over its own grid cell, out of the flow. */
+function keepAt(w, card, out) {
+  card.classList.toggle('z-cards-kept', out);
+  if (!out) {
+    card.style.top = card.style.insetInlineStart = card.style.width = card.style.height = '';
+    return;
+  }
+  const i = w.index.get(card);
+  const colW = (w.list.clientWidth - w.colGap * (w.cols - 1)) / w.cols;
+  card.style.top = `${Math.floor(i / w.cols) * w.rowH}px`;
+  card.style.insetInlineStart = `${(i % w.cols) * (colW + w.colGap)}px`;
+  card.style.width = `${colW}px`;
+  card.style.height = `${w.cardH}px`;
+}
+
+/**
+ * Shows the rows near the viewport: the cards of those rows are in the list, the rows above and
+ * below are padding of their height. Cards that stay are not touched. A focused card that leaves
+ * the window stays in the DOM over its own cell, so focus is never lost; the cards around it are
+ * inserted next to it, never it next to them.
+ */
+function paint(w, at, width) {
+  const { list, cards } = w;
+  if ((width ?? list.clientWidth) !== w.width) measure(w);
+  const rows = Math.ceil(cards.length / w.cols);
+  const top = at ?? list.getBoundingClientRect().top;
+  const first = Math.min(rows, Math.max(0, Math.floor((-top - WINDOW_MARGIN) / w.rowH)));
+  const last = Math.min(rows, Math.max(first, Math.ceil((innerHeight - top + WINDOW_MARGIN) / w.rowH)));
+  const from = first * w.cols;
+  const to = Math.min(cards.length, last * w.cols);
+  const focused = document.activeElement?.closest?.('[data-zeyn-window] > li');
+  const keep = focused && w.index.has(focused) ? focused : null;
+  if (from === w.from && to === w.to && keep === w.kept) return;
+  const outside = (c) => {
+    const i = w.index.get(c);
+    return i < from || i >= to;
+  };
+  for (let i = w.from; i < w.to; i++) if (cards[i] !== keep && outside(cards[i])) cards[i].remove();
+  if (w.kept && w.kept !== keep) {
+    keepAt(w, w.kept, false);
+    if (outside(w.kept)) w.kept.remove();
+  }
+  let prev = null;
+  let run = [];
+  const flush = (before) => {
+    if (!run.length) return;
+    baseCards(run);
+    for (const card of run) (flying ? park : unpark)(card);
+    if (before) before.before(...run);
+    else if (prev) prev.after(...run);
+    else if (keep && w.index.get(keep) < from) keep.after(...run);
+    else if (keep) keep.before(...run);
+    else list.append(...run);
+    run = [];
+  };
+  for (let i = from; i < to; i++) {
+    const c = cards[i];
+    if (c.isConnected) {
+      flush(c);
+      prev = c;
+    } else {
+      run.push(c);
+    }
+  }
+  flush(null);
+  if (keep) keepAt(w, keep, outside(keep));
+  w.kept = keep;
+  w.from = from;
+  w.to = to;
+  list.style.paddingBlockStart = `${first * w.rowH}px`;
+  list.style.paddingBlockEnd = `${Math.max(0, rows - last) * w.rowH}px`;
+}
+
+/**
+ * One scroll, resize and focus listener for every windowed list of the page, once per frame. The
+ * positions of all lists are read before any of them changes, so a frame lays out once.
+ */
+let windowFrame = 0;
+
+let lastY = 0;
+let lastAt = 0;
+let lastGap = 0;
+let settle = 0;
+
+function paintAll() {
+  clearTimeout(settle);
+  settle = setTimeout(() => {
+    flying = false;
+    for (const list of document.querySelectorAll('[data-zeyn-window]')) for (const card of list.children) unpark(card);
+  }, Math.max(SETTLE_MS, 2 * lastGap));
+  if (windowFrame) return;
+  windowFrame = requestAnimationFrame((now) => {
+    windowFrame = 0;
+    lastGap = Math.min(1000, now - lastAt);
+    flying = Math.abs(scrollY - lastY) / Math.max(1, now - lastAt) > FLING;
+    lastY = scrollY;
+    lastAt = now;
+    const lists = [...document.querySelectorAll('[data-zeyn-window]')];
+    const boxes = lists.map((list) => [list.getBoundingClientRect().top, list.clientWidth]);
+    lists.forEach((list, i) => {
+      const w = windows.get(list);
+      if (w) paint(w, boxes[i][0], boxes[i][1]);
+    });
+  });
+}
+
+/**
+ * Turns windowing on for a card grid with many cards, or takes in the cards `load` appended
+ * (`more`) or replaced (`first`). Rails and lists of rows are never windowed. A focused card
+ * paints at once, so the next Tab finds the next card in the DOM.
+ */
+function windowCards(section, how) {
+  const list = section.querySelector('[data-zeyn-rows]');
+  if (!list || !section.matches('.z-cards:not(.z-cards-rows)')) return;
+  let w = windows.get(list);
+  if (!w) {
+    if (list.children.length < WINDOW_MIN || list.querySelector(':scope > .z-separator')) return;
+    w = { list, cards: [], index: new Map(), from: 0, to: 0, kept: null, cols: 1, rowH: 1, cardH: 0, gap: 0, colGap: 0, width: -1 };
+    windows.set(list, w);
+    list.dataset.zeynWindow = '';
+    list.addEventListener('focusin', () => paint(w));
+    if (!windowFrame && !windows.listening) {
+      windows.listening = true;
+      addEventListener('scroll', paintAll, { passive: true });
+      addEventListener('resize', paintAll, { passive: true });
+      document.addEventListener('focusout', paintAll);
+    }
+    how = 'first';
+  }
+  if (how === 'first') {
+    w.cards = [...list.children];
+    w.index = new Map(w.cards.map((c, i) => [c, i]));
+    w.from = 0;
+    w.to = w.cards.length;
+    w.kept = null;
+    measure(w);
+  } else {
+    for (const card of [...list.children]) {
+      if (w.index.has(card)) continue;
+      w.index.set(card, w.cards.length);
+      w.cards.push(card);
+      card.remove();
+    }
+  }
+  number(w);
+  paint(w);
+}
+
+/** How many cards a list holds, also those a windowed list keeps out of the DOM. */
+function cardCount(list) {
+  return windows.get(list)?.cards.length ?? list.children.length;
+}
+
 /** Sets up the card grids and rails inside `root`. */
 function initCards(root) {
   for (const section of root.querySelectorAll?.('[data-zeyn-cards]:not([data-zeyn-ready])') ?? []) {
@@ -277,6 +532,8 @@ function initCards(root) {
       );
       if (list) railDrag(list);
       railButtons(section);
+    } else {
+      windowCards(section, 'first');
     }
   }
 }

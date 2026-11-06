@@ -194,6 +194,8 @@ El runtime:
 - Teclado: las teclas de flecha, Page Up, Page Down, Home y End mueven la fila activa y la desplazan hasta dejarla a la vista. La tabla tiene `aria-rowcount` = total y cada fila `aria-rowindex`.
 - El texto de posición (`data-zeyn-page-info`) usa `data-zeyn-text-range-total`.
 
+Las cuadrículas de tarjetas (`zeyn::ui::CardGrid`, no los rails ni las listas de filas) aplican la ventana al scroll de la propia página en lugar de a un contenedor con scroll en cuanto contienen 200 tarjetas: `catalog.js` marca la lista con `data-zeyn-window`, mantiene en ella las filas a menos de 800 px de la vista y convierte las filas de arriba y de abajo en relleno, da a cada fila la altura de la más alta de las primeras tarjetas (`grid-auto-rows`) y pone `aria-posinset` y `aria-setsize` (`-1` mientras puedan llegar más páginas) en cada tarjeta. Una tarjeta con el foco fuera de la ventana se queda en el DOM con `z-cards-kept`, colocada sobre su propia celda. Las tarjetas de "Show more" o de otra página se unen a la misma ventana. Mientras la página se desplaza a más de 3 px por ms, las tarjetas entran con sus imágenes retenidas (`data-zeyn-park`, con `src` y `srcset` guardados aparte) y las recuperan tras 120 ms sin desplazamiento.
+
 ### 4.3 Envío de formulario
 
 `POST /_zeyn/form`
@@ -314,6 +316,8 @@ Las preferencias del cliente (`zeyn::ClientPref`) viven en el módulo del navega
 ### 7.4 Medios
 
 `Video` y `Audio` se sirven con `/_zeyn/media.js` y `/_zeyn/media.css`, enlazados después de la biblioteca de componentes. Véase `docs/media.md`.
+
+Los reproductores asignan sus fuentes y su póster (`data-zeyn-poster`, antes `data-zeyn-poster-low`) la primera vez que entran en la vista, mediante un único `IntersectionObserver` para la página; una raíz con `data-zeyn-preview` se reproduce silenciada y en bucle mientras una cuarta parte es visible, salvo que `prefers-reduced-motion`, `prefers-reduced-data` o Save-Data indiquen lo contrario, hasta que el visitante usa sus controles. Las imágenes con opciones de carga están dentro de una caja (`.z-img-host`) que muestra el placeholder sin script y llevan `data-zeyn-img`, la marca que carga `media.js`. Un único listener de captura en el documento gestiona `load` y `error` de esas imágenes: al cargar marca la caja con `z-img-done` (y `z-img-fade` para un fundido sobre un archivo de baja resolución); al fallar prueba `data-zeyn-fallback` una vez y luego muestra el `<template data-zeyn-img-error>` de la caja o el texto alternativo con un icono. Las imágenes que terminaron antes de que se ejecutara el módulo se comprueban una vez al arrancar.
 
 | Endpoint | Hace |
 |---|---|

@@ -5,6 +5,7 @@
 //! same action a DataGrid uses. Paging, sorting, free text search and permissions run on the
 //! server; the browser never chooses a page size, a field or a filter on its own.
 
+use super::embed::{Loading, Placeholder};
 use super::layout::Card;
 use super::list::ListItem;
 use super::widgets::{Badge, screen_href};
@@ -79,6 +80,7 @@ pub struct ImageCard {
     horizontal: bool,
     link: Option<(&'static str, Json)>,
     preview: super::preview::PreviewTarget,
+    loading: Loading,
 }
 
 impl Card {
@@ -100,6 +102,7 @@ impl Card {
             horizontal: false,
             link: None,
             preview: None,
+            loading: Loading::default(),
         }
     }
 }
@@ -188,14 +191,61 @@ impl ImageCard {
         self
     }
 
-    fn html(&self, out: &mut String, r: &Render, size: (u32, u32)) {
+    /// What the image shows while it loads, when the card grid's [`CardGrid::placeholder`] does
+    /// not fit this card. See [`Placeholder`].
+    pub fn placeholder(mut self, placeholder: Placeholder) -> Self {
+        self.loading.placeholder = Some(placeholder);
+        self
+    }
+
+    /// A small, low resolution file of the image, shown at once while the full one loads. It
+    /// follows the app's `img-src` rules, as [`crate::ui::Image::low`].
+    pub fn low(mut self, src: impl Into<String>) -> Self {
+        self.loading.low = Some(src.into());
+        self
+    }
+
+    /// Another file tried once when the image fails, before the alt text or title is shown with
+    /// an icon. It follows the app's `img-src` rules.
+    pub fn fallback(mut self, src: impl Into<String>) -> Self {
+        self.loading.fallback = Some(src.into());
+        self
+    }
+
+    /// Loads this card's image at once with `fetchpriority="high"` instead of lazily. Prefer
+    /// [`CardGrid::priority`], which marks the first cards of the first page.
+    pub fn priority(mut self) -> Self {
+        self.loading.priority = true;
+        self
+    }
+
+    fn html(
+        mut self,
+        out: &mut String,
+        r: &Render,
+        size: (u32, u32),
+        placeholder: Option<&Placeholder>,
+        priority: bool,
+    ) {
+        if self.loading.placeholder.is_none() {
+            self.loading.placeholder = placeholder.cloned();
+        }
+        self.loading.priority |= priority;
+        let wrap = self.loading.wraps() && safe_image(&self.image);
         let img = if safe_image(&self.image) {
             format!(
-                r#"<img class="z-poster-img" src="{}" alt="{}" width="{}" height="{}" loading="lazy" decoding="async" draggable="false">"#,
+                r#"{}<img class="z-poster-img" src="{}" alt="{}" width="{}" height="{}"{} decoding="async" draggable="false">{}"#,
+                if wrap {
+                    self.loading.layers(r, true)
+                } else {
+                    String::new()
+                },
                 escape(&self.image),
                 r.text(&self.alt),
                 size.0,
-                size.1
+                size.1,
+                self.loading.img_attrs(r, true),
+                self.loading.error(r),
             )
         } else {
             format!(
@@ -241,8 +291,17 @@ impl ImageCard {
                 .collect();
             format!(r#"<span class="z-poster-badges">{all}</span>"#)
         };
+        let media = if wrap {
+            format!(
+                r#"<span class="z-poster-media{}" style="{}">"#,
+                self.loading.host_class(),
+                self.loading.host_style(size)
+            )
+        } else {
+            String::from(r#"<span class="z-poster-media">"#)
+        };
         let body = format!(
-            r#"<span class="z-poster-media">{img}{badge}{corner}{progress}</span><span class="z-poster-body"><span class="z-poster-title">{}</span>{subtitle}{text}{badges}</span>"#,
+            r#"{media}{img}{badge}{corner}{progress}</span><span class="z-poster-body"><span class="z-poster-title">{}</span>{subtitle}{text}{badges}</span>"#,
             r.text(&self.title)
         );
         let class = if self.horizontal {
@@ -323,6 +382,8 @@ pub struct CardGrid<E: Model> {
     builder: Option<BuildFn<E>>,
     separator: Option<Node>,
     row_height: Option<u32>,
+    placeholder: Option<Placeholder>,
+    priority: usize,
 }
 
 type BuildFn<E> = Box<dyn Fn(&E) -> Node + Send + Sync>;
@@ -384,6 +445,8 @@ impl<E: Model> CardGrid<E> {
             builder: None,
             separator: None,
             row_height: None,
+            placeholder: None,
+            priority: 0,
         }
     }
 
@@ -529,6 +592,21 @@ impl<E: Model> CardGrid<E> {
         self
     }
 
+    /// What every card image shows while it loads, unless the card sets its own. See
+    /// [`Placeholder`].
+    pub fn placeholder(mut self, placeholder: Placeholder) -> Self {
+        self.placeholder = Some(placeholder);
+        self
+    }
+
+    /// Loads the images of the first `n` cards at once with `fetchpriority="high"`, for the cards
+    /// a visitor sees without scrolling; every other card image stays lazy. Only the page
+    /// rendered with the screen counts, never pages loaded later. 0 unless set; at most 12.
+    pub fn priority(mut self, n: usize) -> Self {
+        self.priority = n.min(12);
+        self
+    }
+
     fn size(&self) -> u32 {
         match self.paging {
             Paging::Pages { size } => size,
@@ -585,10 +663,13 @@ impl<E: Model> CardGrid<E> {
 
     /// The rows of a page as `<li>`s. Built rows and the rows of a virtual list carry their model
     /// key in `data-zeyn-key`; in a virtual list also their position (`aria-posinset`) and the
-    /// row count (`aria-setsize`). Typed cards and items are links, found again by position.
+    /// row count (`aria-setsize`). The cards of a card grid carry their key too, because a long
+    /// grid keeps only the rows near the viewport in the page (`catalog.js`), so a refresh finds
+    /// the focused card by its key, not by its position. Items of lists and cards of rails are
+    /// links, found again by position.
     /// Separators go before each row; the stylesheet hides the one before the first row, so a
     /// batch appended later still gets one.
-    fn cards(&self, page: &LoadedPage, r: &Render) -> String {
+    fn cards(&self, page: &LoadedPage, r: &Render, first: bool) -> String {
         let mut out = String::new();
         let Some(rows) = page.items.downcast_ref::<Vec<E>>() else {
             return out;
@@ -612,10 +693,16 @@ impl<E: Model> CardGrid<E> {
                     out.push_str("</li>");
                 }
                 (None, _, Some(item)) if self.list => item(row).html(&mut out, r),
-                (None, Some(card), _) if !self.list => card(row).html(&mut out, r, self.image),
+                (None, Some(card), _) if !self.list => card(row).html(
+                    &mut out,
+                    r,
+                    self.image,
+                    self.placeholder.as_ref(),
+                    first && i < self.priority,
+                ),
                 _ => continue,
             }
-            if self.builder.is_none() && place.is_none() {
+            if self.builder.is_none() && place.is_none() && (self.list || self.rail) {
                 continue;
             }
             let mut attrs = key
@@ -679,7 +766,7 @@ impl<E: Model> CardGrid<E> {
             r#"<div class="z-vlist-view" data-zeyn-vlist-view tabindex="0" role="region" aria-label="{title}"><ul class="z-list" id="{id}-list" role="list" data-zeyn-rows>"#
         ));
         if let Some(p) = page {
-            out.push_str(&self.cards(p, r));
+            out.push_str(&self.cards(p, r, true));
         }
         out.push_str(&format!(
             r#"</ul></div><p class="z-cards-empty" data-zeyn-cards-empty{}>{}</p><p class="z-sr-only" role="status" aria-live="polite" data-zeyn-cards-status></p></section>"#,
@@ -713,6 +800,10 @@ impl<E: Model> CardGrid<E> {
             t("page"),
             t("page_only"),
             t("error"),
+        ));
+        out.push_str(&format!(
+            r#" style="--z-card-ratio:{:.3}""#,
+            f64::from(self.image.1) / f64::from(self.image.0)
         ));
         if let Some(p) = page {
             out.push_str(&format!(
@@ -779,7 +870,7 @@ impl<E: Model> CardGrid<E> {
             r#"<ul class="{list}" id="{id}-list" data-zeyn-rows>"#
         ));
         if let Some(p) = page {
-            out.push_str(&self.cards(p, r));
+            out.push_str(&self.cards(p, r, true));
         }
         out.push_str("</ul>");
         let empty = page.is_none_or(|p| p.count == 0);
@@ -858,7 +949,7 @@ impl<E: Model> GridSource for CardGrid<E> {
     }
 
     fn rows_html(&self, page: &LoadedPage, r: &Render) -> String {
-        self.cards(page, r)
+        self.cards(page, r, false)
     }
 
     fn foot_html(&self, _page: &LoadedPage, _r: &Render) -> Option<String> {

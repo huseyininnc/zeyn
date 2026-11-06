@@ -212,6 +212,78 @@ pub fn ankara_goods() -> Screen {
         )
 }
 
+/// A product grid with placeholders, low resolution files, fallbacks and priority cards.
+#[screen(route = "/fast", public)]
+pub fn fast_goods() -> Screen {
+    Screen::new("Fast").body(
+        CardGrid::of(search_goods)
+            .card(|g: &Good| {
+                let card = Card::image(format!("/img/{}.webp", g.id.0), g.name.clone())
+                    .low(format!("/img/{}-40.webp", g.id.0))
+                    .fallback("/img/none.webp");
+                match g.id.0 {
+                    3 => card.placeholder(Placeholder::color("--z-surface")),
+                    4 => card.low("https://other.test/x.webp"),
+                    _ => card,
+                }
+            })
+            .placeholder(Placeholder::color("#d9dde3"))
+            .priority(2)
+            .paging(Paging::infinite(6)),
+    )
+}
+
+#[tokio::test]
+async fn product_cards_reserve_their_box_show_a_placeholder_and_load_only_the_first_cards_first() {
+    let router = app(None);
+    let (status, page) = send(&router, get("/fast")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(page.contains(
+        r#"<span class="z-poster-media z-img-host" style="aspect-ratio:300 / 400;--z-ph:#d9dde3"><img class="z-img-under" src="/img/1-40.webp" alt="" decoding="async" fetchpriority="high"><img class="z-poster-img" src="/img/1.webp" alt="" width="300" height="400" loading="eager" fetchpriority="high" data-zeyn-img data-zeyn-fallback="/img/none.webp" decoding="async" draggable="false">"#
+    ), "{page}");
+    assert_eq!(
+        page.matches(r#"fetchpriority="high" data-zeyn-img"#)
+            .count(),
+        2,
+        "only the first two cards come first"
+    );
+    assert!(page.contains(
+        r#"<img class="z-poster-img" src="/img/3.webp" alt="" width="300" height="400" loading="lazy" data-zeyn-img"#
+    ));
+    assert!(
+        page.contains(r#"style="aspect-ratio:300 / 400;--z-ph:var(--z-surface)""#),
+        "a card's own placeholder wins over the grid's"
+    );
+    assert!(
+        !page.contains("other.test"),
+        "a low file outside img-src is left out"
+    );
+    assert!(
+        page.contains(r#"<li data-zeyn-key="1" class="z-poster">"#),
+        "card grid cards carry their model key, so a refresh of a windowed grid finds the focused card"
+    );
+    assert!(
+        page.contains(r#"style="--z-card-ratio:1.333""#),
+        "the section carries the image ratio that sizes off screen cards"
+    );
+    let linked = |name: &str| page.contains(&format!("/_zeyn/{name}?v="));
+    assert!(linked("media.js") && linked("media.css"));
+    let (status, body) = send(
+        &router,
+        post(
+            "/_zeyn/grid",
+            "shop.read",
+            serde_json::json!({ "screen": "fast_goods", "node": "0", "query": { "page": { "type": "after", "cursor": "6", "limit": 6 } } }),
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert!(
+        body.contains("data-zeyn-img") && !body.contains("fetchpriority"),
+        "pages loaded later never come first: {body}"
+    );
+}
+
 const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
 fn app(limit: Option<RateLimit>) -> axum::Router {
@@ -235,7 +307,8 @@ fn app(limit: Option<RateLimit>) -> axum::Router {
                 .screen(good_page)
                 .screen(goods_list)
                 .screen(uncounted_list)
-                .screen(ankara_goods),
+                .screen(ankara_goods)
+                .screen(fast_goods),
         );
     if let Some(l) = limit {
         app = app.write_limit(l);
@@ -298,7 +371,7 @@ async fn card_grids_render_their_first_page_as_linked_lazy_images() {
     assert!(page.contains(r#"<span class="z-badge z-tone-neutral">New</span>"#));
     assert!(page.contains("Black &lt;tea&gt;"), "row text is escaped");
     assert_eq!(
-        page.matches(r#"<li class="z-poster">"#)
+        page.matches(r#"class="z-poster">"#)
             .count(),
         4 + 12,
         "four cards and the rail's twelve"
@@ -333,7 +406,7 @@ async fn more_cards_load_through_the_grid_endpoint_with_the_servers_page_size_an
     let json: serde_json::Value = serde_json::from_str(&body).unwrap();
     let rows = json["rows"].as_str().unwrap();
     assert_eq!(
-        rows.matches(r#"<li class="z-poster">"#)
+        rows.matches(r#"class="z-poster">"#)
             .count(),
         4,
         "the client's limit is ignored"
@@ -387,7 +460,7 @@ async fn results_screens_search_on_the_server_and_page_by_number() {
         "{page}"
     );
     assert_eq!(
-        page.matches(r#"<li class="z-poster">"#)
+        page.matches(r#"class="z-poster">"#)
             .count(),
         5
     );

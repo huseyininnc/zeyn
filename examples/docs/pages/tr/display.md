@@ -141,6 +141,32 @@ Image::new("https://images.example.com/logo.png")
 - Her görsel `decoding="async"` alır; `.lazy()` ekranın altındaki görseller için `loading="lazy"` ekler. `srcset` yoğunluk (`2x`) ya da genişlik (`800w`) tanımlayıcıları alır; başka hostlardaki ya da başka tanımlayıcılı girdiler dışarıda bırakılır. Genişlik tanımlayıcıları, görsel genişliğinden `sizes` ekler.
 - Tamamen süslemeli bir görsel boş alt metin alır: `.alt(Text::from(""))`.
 
+### Uzun fotoğraf listeleri
+
+Binlerce ürün fotoğrafı olan bir katalogda görsel, yüklenirken bir şey gösterebilir ve yüklenemediğinde toparlanabilir. Hepsi tarayıcının yerleşik özelliklerini kullanır; sayfadaki her görsele medya modülünün tek bir dinleyicisi hizmet eder.
+
+```rust
+Image::new(p.photo_800.clone())
+    .alt(p.name.clone())
+    .size(400, 500)
+    .lazy()
+    .srcset([(p.photo_400.as_str(), "400w"), (p.photo_800.as_str(), "800w")])
+    .sizes("(min-width: 800px) 25vw, 50vw")
+    .placeholder(Placeholder::color("#d9dde3"))
+    .low(p.photo_40.clone())
+    .fallback("/static/no-photo.webp")
+    .on_error(t!("shop.no_photo"))
+    .fit(Fit::Cover)
+```
+
+- `.placeholder(...)` dosya yüklenirken kutuyu betik olmadan doldurur: `Placeholder::color("#d9dde3")` ya da bir tema token'ı (`"--z-surface-2"`), uygulamanın ürettiği çok küçük bir görsel için `Placeholder::blur(data_uri)` (en fazla 600 baytlık base64 bir `data:image/webp`, `avif`, `jpeg` ya da `png` URI'si, asla SVG değil) veya her görselin paylaştığı tek bir dosya için `Placeholder::image(src)`. Bir kuralı çiğneyen yer tutucu dışarıda bırakılır.
+- `.low(src)` tam dosyanın altında hemen küçük, düşük çözünürlüklü bir dosya gösterir. Tam dosya aynı anda yüklenir (görsel tembelse tembel olarak) ve hazır olduğunda belirerek gelir; azaltılmış hareket tercihinde geçiş efekti olmadan görünür.
+- `.fallback(src)` görsel yüklenemediğinde bir kez başka bir dosyayı dener. Ondan sonra `.on_error(text or component)` gösterilir; o yoksa yer tutucunun üzerinde bir simgeyle birlikte alt metin. Hiçbir şey yeniden denenmez.
+- `.priority()` ziyaretçinin gördüğü ilk görseli (en büyük boyama) işaretler: `loading="eager"` ve `fetchpriority="high"`, asla tembel değil. Sayfa başına bir kez kullanın.
+- `.sizes(...)` görselin yerleşimde ne kadar geniş olduğunu söyler, böylece tarayıcı doğru `srcset` genişliğini seçer. O olmadan tembel bir görsel `sizes="auto"` alır ve tarayıcı yuvayı ölçer.
+- `.fit(Fit::Cover)` kutuyu doldurur ve taşan kısmı keser; `Fit::Contain` dosyanın tamamını gösterir.
+- `low`, `fallback` ve `Placeholder::image`, `src` ile aynı adres kurallarına uyar; diğerleri dışarıda bırakılır. Kutu her zaman görselin boyutunu korur, böylece dosyalar yüklenirken ya da yüklenemediğinde hiçbir şey kaymaz.
+
 ## ExternalLink
 
 `ExternalLink::new(url, text)` başka bir siteye `rel="noopener noreferrer"` ile bağlanır; böylece diğer site ne sayfa adresini ne de pencere üzerinde bir tutamaç alır. Ekran okuyucular metinden sonra "external site" (harici site) der; görsel olarak bir ok bunu işaretler.

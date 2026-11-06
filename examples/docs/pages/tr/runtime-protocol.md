@@ -194,6 +194,8 @@ Runtime:
 - Klavye: Ok tuşları, Page Up, Page Down, Home ve End etkin satırı taşır ve görünüme kaydırır. Tabloda `aria-rowcount` = total, her satırda `aria-rowindex` bulunur.
 - Konum metni (`data-zeyn-page-info`) `data-zeyn-text-range-total` değerini kullanır.
 
+Kart ızgaraları (`zeyn::ui::CardGrid`; şeritler veya satır listeleri değil) 200 karta ulaştığında bir kaydırma kapsayıcısı yerine sayfanın kendi kaydırmasında pencereleme yapar: `catalog.js` listeyi `data-zeyn-window` ile işaretler, içinde görüntü alanına en fazla 800 px uzaklıktaki satırları tutar ve üstteki ile alttaki satırları dolguya çevirir, her satıra ilk kartların en uzununun yüksekliğini verir (`grid-auto-rows`) ve her kartta `aria-posinset` ile `aria-setsize` değerlerini ayarlar (daha fazla sayfa gelebilecekken `-1`). Pencerenin dışındaki odaklı bir kart `z-cards-kept` ile DOM'da kalır ve kendi hücresinin üzerine yerleştirilir. "Show more" ile veya başka bir sayfadan gelen kartlar aynı pencereye katılır. Sayfa ms başına 3 px'ten hızlı kayarken kartlar görselleri bekletilerek gelir (`data-zeyn-park`; `src` ve `srcset` bir kenarda tutulur) ve 120 ms boyunca kaydırma olmayınca görsellerini geri alır.
+
 ### 4.3 Form submit
 
 `POST /_zeyn/form`
@@ -312,6 +314,8 @@ Sanal bir liste `data-zeyn-row-height`, `data-zeyn-block` ve `data-zeyn-total` t
 ### 7.4 Media
 
 `Video` ve `Audio`, bileşen kitaplığından sonra bağlanan `/_zeyn/media.js` ve `/_zeyn/media.css` ile sunulur. Bkz. `docs/media.md`.
+
+Oynatıcılar kaynaklarını ve afişlerini (önce `data-zeyn-poster-low`, sonra `data-zeyn-poster`) ilk kez görünüme girdiklerinde, sayfa için tek bir `IntersectionObserver` aracılığıyla ayarlar; `data-zeyn-preview` taşıyan bir kök, dörtte biri görünür olduğu sürece sessiz ve döngüde oynar, `prefers-reduced-motion`, `prefers-reduced-data` ya da Save-Data aksini söylemedikçe ve ziyaretçi kontrollerini kullanana kadar. Yükleme seçenekleri olan görseller, yer tutucuyu betik olmadan gösteren bir kutuda (`.z-img-host`) durur ve `media.js`'i yükleyen işaret olan `data-zeyn-img` özniteliğini taşır. Belgedeki tek bir capture dinleyicisi bu görsellerin `load` ve `error` olaylarını işler: yüklenen görsel kutuyu `z-img-done` (düşük dosyanın üzerinde belirerek geçiş için ayrıca `z-img-fade`) olarak işaretler; başarısız olan bir kez `data-zeyn-fallback` dener, ardından kutunun `<template data-zeyn-img-error>` öğesini ya da bir simgeyle alt metni gösterir. Modül çalışmadan önce sonlanmış görseller, modül başladığında bir kez denetlenir.
 
 | Endpoint | Does |
 |---|---|

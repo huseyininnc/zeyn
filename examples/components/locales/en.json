@@ -130,7 +130,8 @@
       },
       "card_grid": {
         "overview": "Example",
-        "pages": "Numbered pages"
+        "pages": "Numbered pages",
+        "fast_catalog": "A fast product catalog"
       },
       "chart": {
         "overview": "Example",
@@ -183,7 +184,10 @@
         "rotating": "Rotating slides"
       },
       "image": {
-        "overview": "Example"
+        "overview": "Example",
+        "progressive": "Placeholder and low resolution file",
+        "fallback": "Fallback and error",
+        "first_image": "The first image"
       },
       "image_card": {
         "overview": "Example",

@@ -194,6 +194,8 @@ Effect:
 - 키보드: 화살표 키, Page Up, Page Down, Home, End는 활성 행을 이동하고 보이는 곳으로 스크롤합니다. 테이블에는 `aria-rowcount` = total이, 각 행에는 `aria-rowindex`가 있습니다.
 - 위치 텍스트(`data-zeyn-page-info`)는 `data-zeyn-text-range-total`을 사용합니다.
 
+카드 그리드(`zeyn::ui::CardGrid`이며 rail이나 행 목록은 해당하지 않음)는 카드가 200개가 되면 스크롤 컨테이너 대신 페이지 자체의 스크롤에 윈도우를 적용합니다. `catalog.js`는 목록에 `data-zeyn-window`를 표시하고, 뷰포트에서 800 px 이내의 행을 그 안에 유지하며 위아래 행은 패딩으로 바꾸고, 모든 행에 처음 카드들 중 가장 높은 카드의 높이를 주며(`grid-auto-rows`), 각 카드에 `aria-posinset`과 `aria-setsize`(페이지가 더 올 수 있는 동안은 `-1`)를 설정합니다. 윈도우 밖에 있는 포커스된 카드는 `z-cards-kept`와 함께 DOM에 남아 자기 셀 위에 배치됩니다. "더 보기"나 다른 페이지에서 온 카드도 같은 윈도우에 합류합니다. 페이지가 ms당 3 px보다 빠르게 스크롤되는 동안 카드는 이미지를 보류한 채 들어오고(`data-zeyn-park`, `src`와 `srcset`은 따로 보관) 120 ms 동안 스크롤이 없으면 이미지를 되찾습니다.
+
 ### 4.3 폼 제출
 
 `POST /_zeyn/form`
@@ -312,6 +314,8 @@ Effect `{"effect":"refresh","topics":["sales"]}`는 토픽의 리스너를 새�
 ### 7.4 미디어
 
 `Video`와 `Audio`는 컴포넌트 라이브러리 뒤에 링크되는 `/_zeyn/media.js`와 `/_zeyn/media.css`로 제공됩니다. `docs/media.md`를 참고하십시오.
+
+플레이어는 처음 화면에 들어올 때 페이지에 하나뿐인 `IntersectionObserver`를 통해 소스와 포스터(`data-zeyn-poster`, 먼저 `data-zeyn-poster-low`)를 설정합니다. `data-zeyn-preview`가 있는 루트는 4분의 1이 보이는 동안 음소거 상태로 반복 재생하며, `prefers-reduced-motion`, `prefers-reduced-data` 또는 Save-Data가 이를 막으면 재생하지 않고, 방문자가 컨트롤을 사용하면 그때부터는 그렇게 동작하지 않습니다. 로드 옵션이 있는 이미지는 스크립트 없이 자리 표시자를 보여 주는 상자(`.z-img-host`) 안에 있으며, `media.js`를 로드하게 하는 표시인 `data-zeyn-img`를 가집니다. 문서의 캡처 리스너 하나가 이 이미지들의 `load`와 `error`를 처리합니다. 로드되면 상자에 `z-img-done`(저해상도 파일 위로 페이드할 때는 `z-img-fade`)을 표시하고, 실패하면 `data-zeyn-fallback`을 한 번 시도한 다음 상자의 `<template data-zeyn-img-error>` 또는 아이콘과 함께 대체 텍스트를 보여 줍니다. 모듈이 실행되기 전에 이미 끝난 이미지는 모듈이 시작될 때 한 번 확인합니다.
 
 | 엔드포인트 | 기능 |
 |---|---|

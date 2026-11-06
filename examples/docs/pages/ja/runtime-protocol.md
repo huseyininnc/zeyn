@@ -194,6 +194,8 @@ Effects:
 - キーボード: 矢印キー、Page Up、Page Down、Home、End でアクティブな行が移動し、表示範囲にスクロールされます。テーブルには `aria-rowcount` = total が、各行には `aria-rowindex` が付きます。
 - 位置を示すテキスト（`data-zeyn-page-info`）は `data-zeyn-text-range-total` を使います。
 
+カードグリッド（`zeyn::ui::CardGrid`。rail や行のリストは含みません）は、カードが 200 枚になると、スクロールコンテナではなくページ自体のスクロールに対してウィンドウ処理を行います。`catalog.js` はリストに `data-zeyn-window` を付け、ビューポートから 800 px 以内の行をその中に保持し、上下の行はパディングに置き換え、各行に最初のカードのうち最も高いものの高さを与え（`grid-auto-rows`）、各カードに `aria-posinset` と `aria-setsize`（まだページが続く可能性がある間は `-1`）を設定します。ウィンドウの外にあるフォーカス中のカードは `z-cards-kept` 付きで DOM に残り、自分のセルの上に配置されます。「もっと見る」や別のページから来たカードも同じウィンドウに加わります。ページが 1 ms あたり 3 px より速くスクロールしている間、カードは画像を保留した状態で入り（`data-zeyn-park`。`src` と `srcset` は別に保持）、スクロールが 120 ms 止まると画像を取り戻します。
+
 ### 4.3 Form submit
 
 `POST /_zeyn/form`
@@ -312,6 +314,8 @@ Effect `{"effect":"refresh","topics":["sales"]}` はトピックのリスナー�
 ### 7.4 Media
 
 `Video` と `Audio` は `/_zeyn/media.js` と `/_zeyn/media.css` で配信され、コンポーネントライブラリの後にリンクされます。`docs/media.md` を参照してください。
+
+プレーヤーは、最初に表示範囲に入ったときに、ページで 1 つの `IntersectionObserver` を通じてソースとポスター（`data-zeyn-poster`、先に `data-zeyn-poster-low`）を設定します。`data-zeyn-preview` を持つルートは、4 分の 1 が見えている間ミュートでループ再生します。ただし `prefers-reduced-motion`、`prefers-reduced-data`、Save-Data がそれを望まない場合は除き、訪問者がコントロールを操作するまでに限ります。読み込みオプションを持つ画像は、スクリプトなしでプレースホルダーを表示するボックス（`.z-img-host`）の中にあり、`media.js` を読み込む目印である `data-zeyn-img` を持ちます。document 上の 1 つのキャプチャリスナーが、それらの画像の `load` と `error` を扱います。読み込みが終わるとボックスに `z-img-done` を付け（低解像度ファイルの上でフェードするときは `z-img-fade` も）、失敗すると `data-zeyn-fallback` を 1 回試し、その後ボックスの `<template data-zeyn-img-error>` か、アイコン付きの代替テキストを表示します。モジュールの実行前に終わっていた画像は、モジュールの開始時に 1 回確認されます。
 
 | エンドポイント | 動作 |
 |---|---|

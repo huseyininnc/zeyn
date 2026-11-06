@@ -7,7 +7,10 @@ use http_body_util::BodyExt;
 use std::sync::Arc;
 use tower::ServiceExt;
 use zeyn::prelude::*;
-use zeyn::ui::{EMBED_SANDBOX, Embed, EmbedPermission, ExternalLink, Image};
+use zeyn::ui::{
+    EMBED_SANDBOX, Embed, EmbedPermission, ExternalLink, Fit, Image, PLACEHOLDER_BLUR_MAX,
+    Placeholder,
+};
 use zeyn::{
     Choice, ClientPref, ClientPrefs, Component, Consent, Csp, Identity, Purpose, Render, Rule,
     Services, embed_url,
@@ -386,7 +389,7 @@ fn images_render_with_size_alt_and_async_decoding() {
         ]);
     let out = html(&img, &ctx(frames()));
     assert!(out.starts_with(r#"<img class="z-image" src="https://i.example.com/logo.png" alt="Northwind logo" width="240" height="80" decoding="async" loading="lazy""#), "{out}");
-    assert!(out.contains(r#"srcset="https://i.example.com/logo@2x.png 2x, https://i.example.com/w.png 800w" sizes="(max-width: 240px) 100vw, 240px""#), "{out}");
+    assert!(out.contains(r#"srcset="https://i.example.com/logo@2x.png 2x, https://i.example.com/w.png 800w" sizes="auto, (max-width: 240px) 100vw, 240px""#), "{out}");
     assert!(!out.contains("other.test"), "{out}");
     let local = html(
         &Image::new("/static/logo.png")
@@ -399,6 +402,111 @@ fn images_render_with_size_alt_and_async_decoding() {
             && !local.contains("loading=")
             && !local.contains("srcset")
     );
+}
+
+const TINY: &str = "data:image/webp;base64,UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA==";
+
+#[test]
+fn progressive_images_sit_in_a_reserved_box_with_their_placeholder_low_file_and_fallback() {
+    let img = Image::new("https://i.example.com/p/1-800.webp")
+        .alt("Blue <shirt>")
+        .size(400, 500)
+        .lazy()
+        .srcset([
+            ("https://i.example.com/p/1-400.webp", "400w"),
+            ("https://i.example.com/p/1-800.webp", "800w"),
+        ])
+        .sizes("(min-width: 800px) 25vw, 50vw")
+        .placeholder(Placeholder::blur(TINY))
+        .low("/p/1-40.webp")
+        .fallback("/p/none.webp")
+        .on_error(Text::from("No <photo>"))
+        .fit(Fit::Cover);
+    let out = html(&img, &ctx(frames()));
+    assert_eq!(
+        out,
+        format!(
+            r#"<span class="z-img z-img-host z-img-blur z-img-cover" style="width:400px;aspect-ratio:400 / 500;--z-ph-img:url({TINY})"><img class="z-img-under" src="/p/1-40.webp" alt="" decoding="async" loading="lazy"><img class="z-image" src="https://i.example.com/p/1-800.webp" alt="Blue &lt;shirt&gt;" width="400" height="500" decoding="async" loading="lazy" data-zeyn-img data-zeyn-fallback="/p/none.webp" srcset="https://i.example.com/p/1-400.webp 400w, https://i.example.com/p/1-800.webp 800w" sizes="(min-width: 800px) 25vw, 50vw" data-testid="s.image"><template data-zeyn-img-error>No &lt;photo&gt;</template></span>"#
+        )
+    );
+}
+
+#[test]
+fn the_first_image_loads_at_once_and_a_plain_image_keeps_its_markup() {
+    let first = html(
+        &Image::new("/hero.webp")
+            .alt("Hero")
+            .size(1200, 600)
+            .lazy()
+            .priority(),
+        &ctx(Csp::new()),
+    );
+    assert_eq!(
+        first,
+        r#"<img class="z-image" src="/hero.webp" alt="Hero" width="1200" height="600" decoding="async" loading="eager" fetchpriority="high" data-testid="s.image">"#
+    );
+    let plain = html(
+        &Image::new("/a.webp")
+            .alt("A")
+            .size(10, 10),
+        &ctx(Csp::new()),
+    );
+    assert!(!plain.contains("z-img") && !plain.contains("data-zeyn-img"));
+}
+
+#[test]
+fn placeholders_and_extra_files_follow_the_image_rules() {
+    let long = format!("data:image/png;base64,{}", "A".repeat(PLACEHOLDER_BLUR_MAX));
+    for bad in [
+        Placeholder::blur("data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+"),
+        Placeholder::blur("data:image/svg+xml,<svg onload=alert(1)>"),
+        Placeholder::blur(&long),
+        Placeholder::blur("data:image/png;base64,AAA)\" onload=x"),
+        Placeholder::blur("https://i.example.com/tiny.png"),
+        Placeholder::color("red;background:url(https://other.test/x)"),
+        Placeholder::color("#12345"),
+        Placeholder::color("--z-Surface;x"),
+        Placeholder::image("https://other.test/outline.png"),
+    ] {
+        let out = html(
+            &Image::new("/a.webp")
+                .alt("A")
+                .size(10, 10)
+                .placeholder(bad.clone()),
+            &ctx(frames()),
+        );
+        assert!(
+            out.starts_with(r#"<span class="z-img z-img-host" style="width:10px;aspect-ratio:10 / 10"><img class="z-image""#),
+            "{bad:?} is left out: {out}"
+        );
+    }
+    let out = html(
+        &Image::new("/a.webp")
+            .alt("A")
+            .size(10, 10)
+            .placeholder(Placeholder::image("https://i.example.com/outline.png"))
+            .low("javascript:alert(1)")
+            .fallback("//other.test/x.png")
+            .sizes(r#"50vw" onerror="alert(1)"#)
+            .srcset([("/a-20.webp", "20w")]),
+        &ctx(frames()),
+    );
+    assert!(
+        out.contains(r#"<img class="z-img-under" src="https://i.example.com/outline.png" alt="""#)
+    );
+    assert!(!out.contains("javascript") && !out.contains("other.test") && !out.contains("onerror"));
+    assert!(
+        out.contains(r#"sizes="(max-width: 10px) 100vw, 10px""#),
+        "{out}"
+    );
+    let token = html(
+        &Image::new("/a.webp")
+            .alt("A")
+            .size(10, 10)
+            .placeholder(Placeholder::color("--z-surface-2")),
+        &ctx(Csp::new()),
+    );
+    assert!(token.contains("--z-ph:var(--z-surface-2)"));
 }
 
 #[test]
