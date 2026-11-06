@@ -139,9 +139,11 @@ Screen::new(t!("stock.products"))
     .context_menu(ContextMenu::new().item(t!("stock.new_product"), Window::open(product_editor, ProductParams { id: None })).action(t!("stock.restock_low"), restock_low, ()))
 ```
 
-`Alt+N` のようなショートカットは画面上で動作し、パレットに表示されます。ブラウザが使うショートカット（`Ctrl+P`、`Ctrl+S`、`F5`）は、ボタンが `.override_browser()` を呼ばない限り割り当てられません。ブラウザがページに渡さないもの（`Ctrl+N`、`Ctrl+T`、`Ctrl+W`）は決して割り当てられません。空いている組み合わせは `Alt+Shift+<letter>` と `Ctrl+Alt+<letter>` です。
+`Alt+N` のようなショートカットは画面上で動作し、パレットに表示され、ボタンのラベルではなくツールチップに表示されます（ボタンに `.tip(text)` があればそれと一緒に）。ブラウザが使うショートカット（`Ctrl+P`、`Ctrl+S`、`F5`）は、ボタンが `.override_browser()` を呼ばない限り割り当てられません。ブラウザがページに渡さないもの（`Ctrl+N`、`Ctrl+T`、`Ctrl+W`）は決して割り当てられません。空いている組み合わせは `Alt+Shift+<letter>` と `Ctrl+Alt+<letter>` です。
 
-ボタン、メニューグループ、ツールのアイコンは `Icon` から選びます: `Plus`, `Edit`, `Delete`, `Save`, `Search`, `Box`, `Cart`, `Table`, `Home`, `Chart`, `Users`, `Settings`, `Bell`, `Shield`, `Clock`, `Tag`, `Mail`, `SignOut`, `ArrowUp`, `ArrowDown`。これらは `zeyn.css` のマスクで、24 px のグリッドに 2 px の丸い線で描かれ、文字色を使い、スクリーンリーダーからは隠されます。意味は常にラベルが伝えます。
+ボタン、メニューグループ、ツールのアイコンは `Icon` から選びます。`Icon::ALL` が一覧にする 82 個の図柄のセットです（`Plus`、`Edit`、`Trash`、`Search`、`Filter`、`Download`、`ChartBar`、`Users`、`Settings`、`Bell`、`SignOut` など。コンポーネントカタログですべてを確認できます）。これらは `/_zeyn/icons.css` のマスクで、20 px のグリッドに 1.5 px の丸い線で描かれ、文字色を使い、スクリーンリーダーからは隠されます。意味は常にラベルが伝えます。
+
+ボタンの高さは 36 px（コンパクトな密度では 32 px）で、控えめな輪郭線を持ちます。プライマリボタンはブランドカラーになります。`.button(..)` の後に `.ghost()` を付けると、密集したバーの補助的な操作向けに輪郭線がなくなります。`.danger()` は、削除や取り消しを行う操作を危険色で描きます。
 
 ## ヘッダー
 
@@ -154,7 +156,7 @@ Screen::new(t!("orders.title"))
     .toolbar(|t| t.export(Export::Csv))
 ```
 
-`.primary` は `.toolbar` と同じボタンを、同じショートカットとパレット項目で受け取ります。ツールバーはその他のツール用にヘッダーの下に残ります。サブタイトルはスクリーンリーダー向けの画面の説明です（`aria-describedby`）。行の幅が足りないと操作はタイトルの下に折り返し、スマートフォンでは先頭側にそろいます。サブタイトルも主要な操作もない画面は、これまでどおり普通の見出しで描かれます。
+`.primary` は `.toolbar` と同じボタンを、同じショートカットとパレット項目で受け取ります。ツールバーはその他のツール用にヘッダーの下に残ります。1 つのバーで `.export(..)` を 2 回以上呼ぶと、形式ごとに 1 項目を持つ 1 つの「Export」メニューボタンにまとまります。サブタイトルはスクリーンリーダー向けの画面の説明です（`aria-describedby`）。行の幅が足りないと操作はタイトルの下に折り返し、スマートフォンでは先頭側にそろいます。サブタイトルも主要な操作もない画面は、これまでどおり普通の見出しで描かれます。
 
 ## Feature とメニュー
 

@@ -41,7 +41,7 @@ Chart::funnel("Checkout").labels(["Visited", "Cart", "Paid"]).series("People", [
 
 @live chart
 
-Cada gráfico tiene un título, un resumen en texto para lectores de pantalla, una leyenda y sus números como tabla bajo *Show data*. Los colores de las series son los tokens `--z-chart-1` a `--z-chart-6`; una prueba (`chart_colors_reach_three_to_one_in_both_themes`) comprueba 3:1 frente a `--z-surface` y `--z-surface-2` en el tema claro y en los dos temas oscuros (consulta [Theming](theming.md)).
+Cada gráfico tiene un título, un resumen en texto para lectores de pantalla, una leyenda cuando tiene dos series o más, y sus números como tabla bajo *Show data*. Los gráficos de barras, líneas, áreas y combinados dibujan en SVG solo su geometría, que se estira con la tarjeta (`--z-chart-h`, 240 px, 200 px en teléfonos); las etiquetas de los ejes son HTML a su lado, así que se mantienen en 12 px a cualquier ancho, se abrevian a partir de diez mil (`600K`, `1.2M`), y las etiquetas de categoría se reducen para que se vean como mucho doce (la mitad en gráficos de menos de 480 px). Las barras ocupan el 60% de su banda; las líneas miden 2 px y no llevan puntos, salvo un punto redondo en el último valor y en la categoría bajo el cursor; las áreas se desvanecen. El foco del puntero o del teclado sobre una categoría dibuja una cruz y un tooltip con todas las series en esa categoría. Los colores de las series son los tokens `--z-chart-1` a `--z-chart-8`, en un orden cuyos cinco primeros siguen distinguiéndose con daltonismo; las series 7 y 8 además dibujan sus líneas discontinuas. La comprobación de arranque y una prueba (`chart_colors_reach_three_to_one_in_both_themes`) exigen a cada serie 3:1 frente a `--z-surface` (consulta [Theming](theming.md)).
 
 Cada barra, punto, porción, etapa y valor de gauge es una marca con su etiqueta y su valor como nombre. El SVG es un grupo con el nombre del título y del resumen, y el gráfico es una sola parada de tabulación:
 
@@ -57,7 +57,7 @@ El cursor, el foco y un toque muestran el mismo texto en un tooltip, que se ocul
 
 ## Cifras clave, sparklines y bullets
 
-`Kpi` muestra un valor, su cambio frente al periodo anterior con una flecha y palabras para la dirección (verde cuando el cambio es bueno, rojo cuando no; `.lower_is_better()` para costes y esperas), un objetivo con la proporción alcanzada y un sparkline de valores recientes.
+`Kpi` muestra un valor como el texto más grande de la tarjeta (30 px, cifras tabulares, el símbolo de moneda o la unidad más pequeños y atenuados), su cambio frente al periodo anterior como una pequeña etiqueta como `+48.8%` con "vs previous period" al lado (verde cuando el cambio es bueno, rojo cuando no, gris por debajo de medio punto porcentual; `.lower_is_better()` para costes y esperas; los lectores de pantalla oyen la frase completa), un objetivo con la proporción alcanzada y una tendencia a todo el ancho de los valores recientes, del color de la etiqueta, sobre un área que se desvanece. Los valores de siete cifras o más se abrevian (`$1.23M`, `1,23 Mn` en turco), con el valor completo en el tooltip y para los lectores de pantalla.
 
 ```rust
 Kpi::new("Revenue this month", 184_250.0).delta(12.4).target(200_000.0).trend([140.0, 152.0, 160.0, 184.0])
@@ -65,9 +65,9 @@ Kpi::new("Average wait", 6.5).decimals(1).unit("min").delta(-9.0).lower_is_bette
 Kpi::money("Revenue", Money::tl(18_425_050)).delta(4.2).target(200_000.0)
 ```
 
-`Kpi::money` muestra un importe con su moneda en la configuración regional del usuario (`₺184,250.50` en inglés, `184.250,50 ₺` en turco), y su objetivo en la misma moneda.
+`Kpi::money` muestra un importe con su moneda en la configuración regional del usuario (`₺184,250.50` en inglés, `184.250,50 ₺` en turco, con el símbolo más pequeño), y su objetivo en la misma moneda.
 
-Los Kpi de un mismo `Row` o `AutoGrid` tienen la altura del más alto, tengan o no tendencia, y el sparkline queda al pie de cada tarjeta. Un `Row` de Kpi da a cada uno un cuarto del ancho: cuatro llenan la fila en un escritorio, y la fila pasa a dos por línea por debajo de unos 830 px y a uno por debajo de 480 px (con container queries sobre la fila, así que una fila de Kpi en una columna estrecha se reparte antes). Los gráficos ocupan el ancho de su contenedor y mantienen sus proporciones. Los de anillo y los indicadores miden como mucho 18rem de alto y quedan centrados.
+Los Kpi de un mismo `Row` o `AutoGrid` tienen la altura del más alto, tengan o no tendencia, y el sparkline queda al pie de cada tarjeta. Un `Row` de Kpi da a cada uno un cuarto del ancho: cuatro llenan la fila en un escritorio, y la fila pasa a dos por línea por debajo de unos 830 px; por debajo de 360 px las tarjetas quitan su tendencia (con container queries sobre la fila, así que una fila de Kpi en una columna estrecha se reparte antes). Cada tarjeta conserva al menos 132 px, con o sin tendencia. Los gráficos ocupan el ancho de su contenedor. Los de anillo, los indicadores, los embudos y los de dispersión mantienen sus proporciones; los de anillo y los indicadores miden como mucho 18rem de alto y quedan centrados.
 
 ```rust
 Row::new()

@@ -57,13 +57,17 @@ El servidor limita el tamaño de página pida lo que pida el cliente.
 | `.width(px)`, `.flex(n)` | Ancho fijo o una parte del ancho libre |
 | `.filter()` | Un cuadro de filtro adecuado al tipo: texto, rango numérico, rango de fechas, lista de opciones |
 | `.sum()`, `.avg()`, `.min()`, `.max()` | Totales en el pie. `sum` sobre una columna de texto no compila |
-| `.badge(\|v\| tone)` | Muestra el valor como una insignia de color |
+| `.badge(\|v\| tone)` | Muestra el valor como una etiqueta en el tono, sobre su tinte sutil |
+| `.status(\|v\| tone)` | Muestra el valor como estado: un punto en el tono antes del texto normal, más discreto que una insignia |
 | `.progress(max)` | Una barra de 0 a `max` |
 | `.check_icon()` | Una marca de verificación para `true` |
 | `.link(\|row\| effect)` | Convierte la celda en un enlace que ejecuta un effect |
 | `.pin_start()`, `.hidden()` | Fijada al inicio, u oculta hasta que el usuario la muestre |
 | `.editable()` | Editable en el sitio, se guarda con `.edit_with(action)` |
 | `.plain()` | Números enteros sin separadores de miles, para códigos y años |
+| `.wrap()` | Los valores largos pasan a varias líneas. Si no se establece, las celdas quedan en una línea y terminan en puntos suspensivos, así que todas las filas tienen la misma altura |
+
+Las filas miden 40 px (32 px en densidad compacta) y solo las separan líneas; `DataGrid::zebra()` sombrea una fila de cada dos en grids muy anchos. Los enlaces de las celdas se leen como texto de peso 500 y se subrayan al pasar el cursor.
 
 Los números y los importes se alinean a la derecha con cifras tabulares. Los enteros se agrupan según la configuración regional del usuario (`1,234,567` en inglés, `1.234.567` en turco), en las celdas de la tabla y en valores mostrados como `DescriptionList`; los identificadores `#[key]` nunca se agrupan, y `.plain()` desactiva la agrupación en una columna.
 

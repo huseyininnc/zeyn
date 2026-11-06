@@ -30,7 +30,7 @@ Row::new().col(customer_form).weight(2).col(order_totals)
 
 ## Card and Panel
 
-`Card` is a plain surface with an optional title. `Panel` is a titled section with an optional toolbar; `.collapsible()` lets the user fold it and `.collapsed()` starts it folded.
+`Card` is a plain surface with an optional title: 20 px padding, one border and no shadow. `.action(node)` puts one action at the end of the title row (a link button or a menu), `.footer(node)` adds a footer under a divider, such as a "View all" link. A grid or list that is the content of a card runs edge to edge, so there is one border, not two; a card inside a card drops its own box; cards in a `Row` stretch to the tallest one. `Panel` is a titled section with an optional toolbar; `.collapsible()` lets the user fold it and `.collapsed()` starts it folded.
 
 ```rust
 Panel::new(t!("ui.panel_products")).collapsible().toolbar(|t| t.export(Export::Csv)).add(products())

@@ -27,6 +27,8 @@ Adı boş bırakın ya da yanlış bir e-posta yazıp *Send* düğmesine basın:
 | `.range(M::from, M::to)` | Tek bir aralık seçici olarak iki tarih |
 | `Form::auto(value)` | Her alan, tanım sırasıyla |
 
+Formlar en fazla 720 px genişliğindedir ve yalnızca bir form içeren bir kart ya da panel formun genişliğinde olur, böylece kartın yarısı boş kalmaz. Etiketler 36 px'lik girdilerin 6 px üstünde durur; alanlar arasında 20 px vardır. Odaklanmış bir girdi odak renginde bir kenarlık ve yumuşak 3 px'lik bir halka alır, geçersiz bir girdi ise tehlike renginde bir kenarlık. Birimler, para birimi ve `%` girdinin içinde soluk çizilir; sayı alanları eksi ve artı düğmelerini (28 px) alanın sonunun içine koyar; ok tuşları yine adım adım değiştirir.
+
 ## Kaydetme
 
 `.submit(label, action)` kaydeden action'ı adlandırır. Action, form'un modeli için `Valid<M>` almalıdır; başka bir şey derlenmez. Runtime değerleri gönderir, sunucu her kuralı, ardından action'ı çalıştırır.

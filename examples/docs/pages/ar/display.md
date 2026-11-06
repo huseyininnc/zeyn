@@ -22,7 +22,7 @@ Stack::new()
 
 ## Badge
 
-`Badge::new(text).tone(Tone::...)`. النبرات: `Neutral` و `Info` و `Success` و `Warning` و `Danger` و `Brand`. تعرض الجداول القيم كشارات بالاستدعاء `.badge(|v| tone)`.
+`Badge::new(text).tone(Tone::...)`. النبرات: `Neutral` و `Info` و `Success` و `Warning` و `Danger` و `Brand`. تعرض الشارة ذات النبرة نص النبرة على تدرجها الخفيف؛ و`Neutral` تسمية باهتة بإطار واحد، للقيم العادية مثل الخطة. يرسم `.dot()` نقطة بقطر 8 px بلون النبرة قبل نص عادي، وهي الصيغة الأهدأ لعرض الحالة في القوائم؛ ويرسم `.count()` قرصاً مستديراً لعدد. تعرض الجداول القيم كشارات بالاستدعاء `.badge(|v| tone)` وكنقاط بالاستدعاء `.status(|v| tone)`.
 
 ## Progress
 

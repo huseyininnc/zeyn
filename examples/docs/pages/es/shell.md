@@ -4,7 +4,17 @@ El shell es el marco que rodea cada pantalla: el menú, los selectores de idioma
 
 ## El menú
 
-El menú sale de las llamadas `.menu(...)` de las features. Los elementos que el usuario no puede abrir se omiten del HTML, y una feature cuyos guards deniegan al usuario no muestra nada. El enlace de la pantalla actual lleva `aria-current="page"`.
+El menú sale de las llamadas `.menu(...)` de las features. Los elementos que el usuario no puede abrir se omiten del HTML, y una feature cuyos guards deniegan al usuario no muestra nada. El enlace de la pantalla actual lleva `aria-current="page"` y se dibuja sobre el tinte sutil de la marca.
+
+`.icon(Icon::...)` después de `.item(...)` pone un icono antes de la etiqueta del elemento; cuando los elementos de un grupo tienen iconos, la etiqueta del grupo se dibuja sin el suyo. El menú lateral empieza con el logotipo y el nombre de la aplicación: `App::logo("/static/logo.svg")` (y `App::logo_dark(...)` para el tema oscuro) establece una marca servida por la aplicación; si no, el shell dibuja un cuadrado redondeado en `--z-brand` con la primera letra del nombre. El shell se mantiene neutro; el color de marca señala el elemento actual, los botones primarios, el anillo de foco y el logotipo.
+
+Los iconos vienen de un único conjunto de 82 dibujos (`Icon::ALL`) en una cuadrícula de 20 px con un trazo redondeado de 1.5 px, mostrados a 16 o 20 px en el color del texto actual. Cada uno es una máscara CSS en `/_zeyn/icons.css`, una hoja de estilo en caché de unos 25 KB (3 KB comprimida) generada a partir de `crates/zeyn/assets/icons/*.svg`, así que un icono cuesta una clase en el HTML y nada en script.
+
+```rust
+Feature::new("sales")
+    .screen(orders)
+    .menu(|m| m.group(t!("sales.menu"), Icon::Cart).item(t!("sales.orders"), orders).icon(Icon::Table))
+```
 
 ## El shell del sitio
 
@@ -43,13 +53,25 @@ Feature::new("shop")
 ```
 
 - **Menú.** El menú superior lista los menús de todas las features en el shell del sitio. Un grupo de un solo elemento es un enlace simple; un grupo mayor es un botón que abre sus enlaces (el patrón APG de W3C de navegación con disclosure). Enter, Espacio o un clic alternan un grupo, Abajo lo abre y pasa a su primer enlace, Arriba, Abajo, Inicio y Fin se mueven entre sus enlaces, Escape lo cierra y vuelve al botón, y salir del grupo con Tab o hacer clic fuera lo cierra. Izquierda y Derecha se mueven entre los elementos superiores.
-- **Pantallas estrechas.** Por debajo de 800 px el menú se pliega tras un botón de menú con `aria-expanded`; Escape lo cierra. Sin el script el menú permanece abierto, de modo que nada queda inalcanzable.
+- **Pantallas estrechas.** Por debajo de 1024 px el menú se pliega tras un botón de menú con `aria-expanded`; Escape lo cierra. Sin el script el menú permanece abierto, de modo que nada queda inalcanzable.
 - **Ranuras de la cabecera.** La barra superior tiene cuatro ranuras que aceptan cualquier componente, como una app bar con nombres lógicos: `start(node)` antes de la marca, `center(node)` entre el menú y el final, `end(node)` al final de la barra y `bottom(node)` como una fila de ancho completo debajo de ella, por ejemplo con chips. Cada ranura contiene varios nodos en orden, y start y end cambian de lado en los idiomas de derecha a izquierda. Los componentes en las ranuras se renderizan con el idioma, los permisos y las máscaras del usuario; los que cargan datos mediante su propia action, como un `SearchBox`, funcionan ahí, comprobados contra los guards de la feature y el permiso de la action. Los grids y los formularios pertenecen a la pantalla. En los teléfonos las ranuras start y end se quedan en la barra, y la ranura center va donde la aplicación indique: `center_on_phone(CenterOnPhone::Row)` (el valor por defecto) la coloca en una fila bajo la barra, `CenterOnPhone::Icon` tras un botón de lupa que la abre (disclosure de W3C APG) y mueve el foco a ella; Escape la cierra y vuelve al botón. `center_button(icon, label)` cambia ese botón. La disposición en teléfono la fija el CSS antes de que se ejecute el script, así que la cabecera no se mueve mientras se carga la página.
 - **Acciones.** `sign_in()` muestra un enlace de inicio de sesión a los visitantes y un enlace de cierre de sesión a los usuarios con sesión iniciada cuando la aplicación tiene una página de inicio de sesión; `language()` y `theme()` muestran los mismos selectores que el shell de la aplicación. Van después de la ranura end y se pliegan en el menú en los teléfonos.
-- **Barra inferior.** `bottom_nav([...])` añade hasta cinco enlaces fijos en la parte inferior de la pantalla en teléfonos (800 px de ancho o menos), para los lugares a los que más se va; más de cinco no compila. Cada elemento es un `BottomNavItem` con una etiqueta, una pantalla con ruta y un icono opcional. El enlace de la página mostrada lleva `aria-current="page"` (lo mantiene al día `nav.js`), los enlaces a pantallas que el usuario no puede abrir se omiten, la barra se mantiene alejada del indicador de inicio con `env(safe-area-inset-bottom)` y la página deja espacio abajo para que la barra no oculte nada. El menú superior sigue para el resto. La barra no necesita script.
+- **Barra inferior.** `bottom_nav([...])` añade hasta cinco enlaces fijos en la parte inferior de la pantalla en teléfonos y tabletas (con menos de 1024 px de ancho), para los lugares a los que más se va; más de cinco no compila. Cada elemento es un `BottomNavItem` con una etiqueta, una pantalla con ruta y un icono opcional. El enlace de la página mostrada lleva `aria-current="page"` (lo mantiene al día `nav.js`), los enlaces a pantallas que el usuario no puede abrir se omiten, la barra se mantiene alejada del indicador de inicio con `env(safe-area-inset-bottom)` y la página deja espacio abajo para que la barra no oculte nada. El menú superior sigue para el resto. La barra no necesita script.
 - **Pie de página.** Columnas de enlaces a pantallas (`link`, omitido para los usuarios que no pueden abrirlas) o a direcciones (`url`: una ruta, `https:`, `http:` o `mailto:`; `App::check` rechaza otros esquemas y los enlaces a pantallas que no están registradas), y una línea de texto.
 
 El paso entre una pantalla del shell del sitio y una del shell de la aplicación se hace a través de `nav.js` sin cargar la página: la respuesta parcial dice a qué shell pertenece (`x-zeyn-shell`), y cuando eso difiere del marco actual, el runtime sustituye todo el marco como lo hace un cambio de idioma y carga la hoja de estilo y el script del otro shell. Los enlaces a `/_zeyn/route/{screen}` (los de las migas de pan) se siguen de la misma manera.
+
+## El shell de inicio de sesión
+
+Las páginas de inicio de sesión tienen un marco propio: `Shell::auth()` no tiene menú, ni barra superior, ni paleta de comandos. El logotipo de la aplicación (`App::logo`) y su nombre quedan sobre una única tarjeta de 400 px de ancho, y los selectores de idioma y de tema quedan al pie de la página, así que ambos siguen al alcance antes de iniciar sesión. `.split()` pone el formulario en una mitad y un panel de marca en `--z-brand` en la otra a partir de 1024 px; las pantallas más estrechas muestran la tarjeta centrada. En los teléfonos la tarjeta se convierte en la página y sus entradas y botones miden 44 px de alto. Sus estilos (`auth.css`, 3.5 KB) se cargan solo en estas páginas.
+
+Todas las pantallas de inicio de sesión de `zeyn::accounts::ui` (inicio de sesión, registro, contraseña olvidada y restablecimiento, inicio de sesión en dos pasos, código de recuperación, bloqueo, confirmación y cierre de sesión) se abren en él, mientras que las pantallas de cuenta y de administración mantienen el shell de la aplicación. Una pantalla de inicio de sesión propia lo obtiene de su feature:
+
+```rust
+Feature::new("entry").screen(sign_in).shell(Shell::auth())
+```
+
+El formulario de inicio de sesión rellena el nombre de usuario con `Control::Username` (`autocomplete="username"`) y la contraseña con `current-password`, muestra el botón para ver la contraseña como un ojo dentro del campo y dice "Caps Lock is on" debajo mientras Bloq Mayús está activado (una región viva cortés).
 
 ## Selector de tema en una pantalla
 
@@ -74,6 +96,16 @@ App::new(t!("app.name"))
         h.center(SearchBox::of(search_all).results(search_results))
             .end(LinkButton::new(t!("app.notifications"), notifications, ()))
     })
+```
+
+Tres piezas listas convierten la barra en un marco de aplicación:
+
+- `breadcrumb()` empieza la barra con el grupo del menú y el título de la pantalla actual; `nav.js` la reescribe después de cada navegación.
+- `search()` añade un campo de búsqueda que abre la paleta de comandos, con su atajo a la vista; el botón de la paleta sale del menú lateral. En los teléfonos es un botón de icono.
+- `account()` termina la barra con las iniciales del usuario en un botón redondo. Abre un diálogo (diálogo no modal de W3C APG; Escape y el botón de cierre lo cierran) con quién ha iniciado sesión, los selectores de tema e idioma y el enlace de cierre de sesión, o un enlace de inicio de sesión para los visitantes. Los selectores salen del menú lateral.
+
+```rust
+App::new(t!("app.name")).header(|h| h.breadcrumb().search().account())
 ```
 
 La barra queda arriba mientras la pantalla se desplaza, y las pantallas cambian debajo sin recargar la página. En el teléfono se coloca bajo el botón del menú y la ranura central ocupa una fila propia. Los componentes de la barra se muestran para el usuario como los de una pantalla; un cuadro de búsqueda carga sus sugerencias con su acción, cuyo permiso comprueba el servidor. Sin `App::header`, el shell de la aplicación no tiene barra superior.
@@ -107,7 +139,7 @@ Feature::new("pro").command(new_product()).command(restock())
 
 ## La paleta de comandos
 
-**Alt+Shift+P** abre la paleta por defecto (`App::palette_shortcut` lo cambia, también a una tecla del navegador como `Ctrl+Shift+P` a propósito): un combobox ARIA que busca en los comandos de la aplicación, en la barra de herramientas y el menú contextual de la pantalla actual y en las pantallas del menú. Los comandos usados recientemente van primero.
+**Alt+Shift+P** abre la paleta por defecto (`App::palette_shortcut` lo cambia, también a una tecla del navegador como `Ctrl+Shift+P` a propósito): un combobox ARIA que busca en los comandos de la aplicación, en la barra de herramientas y el menú contextual de la pantalla actual y en las pantallas del menú. Los comandos usados recientemente van primero. `/` también la abre cuando el foco no está en un campo, y lo mismo hace el campo de búsqueda de `App::header(|h| h.search())`. Los resultados se agrupan bajo su lugar ("Go to · Sales", el título de la pantalla, "Commands"), cada uno con su icono, las letras que coinciden en negrita y su atajo al final. Los elementos del menú se buscan en la propia página, así que la primera pulsación ya los encuentra.
 
 Una feature puede añadirle una búsqueda de servidor. Mientras el usuario escribe, la paleta llama a la acción y lista sus resultados bajo los comandos; al elegir uno se abre la página en el sitio. Este sitio busca así en sus propias páginas:
 

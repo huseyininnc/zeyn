@@ -22,7 +22,7 @@ Stack::new()
 
 ## Badge
 
-`Badge::new(text).tone(Tone::...)`. Tones: `Neutral`, `Info`, `Success`, `Warning`, `Danger` and `Brand`. Grids show values as badges with `.badge(|v| tone)`.
+`Badge::new(text).tone(Tone::...)`. Tones: `Neutral`, `Info`, `Success`, `Warning`, `Danger` and `Brand`. A toned badge shows the tone's text on its subtle tint; `Neutral` is a muted label with one outline, for plain values such as a plan. `.dot()` draws an 8 px dot in the tone before plain text, the quieter form for status in lists; `.count()` draws a round pill for a number. Grids show values as badges with `.badge(|v| tone)` and as dots with `.status(|v| tone)`.
 
 ## Progress
 

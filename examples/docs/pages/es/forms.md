@@ -27,6 +27,8 @@ Deja el nombre vacío o escribe un correo incorrecto y pulsa *Send*: el navegado
 | `.range(M::from, M::to)` | Dos fechas como un selector de rango |
 | `Form::auto(value)` | Todos los campos, en el orden de declaración |
 
+Los formularios miden como mucho 720 px de ancho, y una tarjeta o un panel que solo contiene un formulario es tan ancho como el formulario, así que ninguna mitad de la tarjeta queda vacía. Las etiquetas quedan 6 px por encima de entradas de 36 px; los campos están a 20 px unos de otros. Una entrada con foco recibe un borde en el color de foco y un anillo suave de 3 px; una inválida, un borde de peligro. Las unidades, la moneda y `%` se dibujan atenuados dentro de la entrada, y los campos numéricos ponen sus botones de menos y más (28 px) dentro del final del campo; las teclas de flecha siguen cambiando el valor.
+
 ## Guardado
 
 `.submit(label, action)` nombra la acción que guarda. La acción debe recibir `Valid<M>` para el modelo del formulario; cualquier otra cosa no compila. El runtime envía los valores, el servidor ejecuta todas las reglas y después la acción.

@@ -30,7 +30,7 @@ Row::new().col(customer_form).weight(2).col(order_totals)
 
 ## Card ve Panel
 
-`Card`, isteğe bağlı başlığı olan düz bir yüzeydir. `Panel`, isteğe bağlı araç çubuğu olan başlıklı bir bölümdür; `.collapsible()` kullanıcının onu katlamasına izin verir, `.collapsed()` katlı başlatır.
+`Card`, isteğe bağlı başlığı olan düz bir yüzeydir: 20 px iç boşluk, tek kenarlık ve gölge yok. `.action(node)` başlık satırının sonuna tek bir eylem koyar (bir bağlantı düğmesi ya da bir menü), `.footer(node)` bir ayırıcının altına bir alt bilgi ekler, örneğin "Tümünü gör" bağlantısı. Bir kartın içeriği olan grid ya da liste kenardan kenara uzanır, böylece iki değil tek kenarlık olur; kart içindeki bir kart kendi kutusunu bırakır; bir `Row` içindeki kartlar en uzun olanın boyuna uzar. `Panel`, isteğe bağlı araç çubuğu olan başlıklı bir bölümdür; `.collapsible()` kullanıcının onu katlamasına izin verir, `.collapsed()` katlı başlatır.
 
 ```rust
 Panel::new(t!("ui.panel_products")).collapsible().toolbar(|t| t.export(Export::Csv)).add(products())

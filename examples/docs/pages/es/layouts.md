@@ -30,7 +30,7 @@ Row::new().col(customer_form).weight(2).col(order_totals)
 
 ## Card y Panel
 
-`Card` es una superficie simple con un título opcional. `Panel` es una sección con título y una barra de herramientas opcional; `.collapsible()` permite al usuario plegarla y `.collapsed()` la inicia plegada.
+`Card` es una superficie simple con un título opcional: relleno de 20 px, un borde y sin sombra. `.action(node)` pone una acción al final de la fila del título (un botón de enlace o un menú), `.footer(node)` añade un pie bajo un divisor, como un enlace "View all". Un grid o una lista que es el contenido de una tarjeta llega de borde a borde, así que hay un solo borde y no dos; una tarjeta dentro de otra pierde su propia caja; las tarjetas de un `Row` se estiran hasta la más alta. `Panel` es una sección con título y una barra de herramientas opcional; `.collapsible()` permite al usuario plegarla y `.collapsed()` la inicia plegada.
 
 ```rust
 Panel::new(t!("ui.panel_products")).collapsible().toolbar(|t| t.export(Export::Csv)).add(products())

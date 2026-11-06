@@ -139,9 +139,11 @@ Screen::new(t!("stock.products"))
     .context_menu(ContextMenu::new().item(t!("stock.new_product"), Window::open(product_editor, ProductParams { id: None })).action(t!("stock.restock_low"), restock_low, ()))
 ```
 
-`Alt+N` gibi kısayollar screen üzerinde çalışır ve palette'te gösterilir. Tarayıcının kullandığı kısayollar (`Ctrl+P`, `Ctrl+S`, `F5`), düğme `.override_browser()` çağırmadıkça bağlanmaz ve tarayıcının hiç iletmediği kısayollar (`Ctrl+N`, `Ctrl+T`, `Ctrl+W`) hiçbir zaman bağlanmaz; serbest kombinasyonlar `Alt+Shift+<harf>` ve `Ctrl+Alt+<harf>` biçimindedir.
+`Alt+N` gibi kısayollar screen üzerinde çalışır, palette'te gösterilir ve etiketinde değil düğmenin araç ipucunda görünür (düğmenin `.tip(text)` ile bir ipucu varsa onunla birlikte). Tarayıcının kullandığı kısayollar (`Ctrl+P`, `Ctrl+S`, `F5`), düğme `.override_browser()` çağırmadıkça bağlanmaz ve tarayıcının hiç iletmediği kısayollar (`Ctrl+N`, `Ctrl+T`, `Ctrl+W`) hiçbir zaman bağlanmaz; serbest kombinasyonlar `Alt+Shift+<harf>` ve `Ctrl+Alt+<harf>` biçimindedir.
 
-Düğmeler, menü grupları ve araçlar için simgeler `Icon` içinden gelir: `Plus`, `Edit`, `Delete`, `Save`, `Search`, `Box`, `Cart`, `Table`, `Home`, `Chart`, `Users`, `Settings`, `Bell`, `Shield`, `Clock`, `Tag`, `Mail`, `SignOut`, `ArrowUp`, `ArrowDown`. Bunlar `zeyn.css` içinde 24 px'lik bir ızgarada 2 px yuvarlak çizgiyle çizilmiş maskelerdir, metnin rengini alır ve ekran okuyuculardan gizlenir; anlamı her zaman etiket taşır.
+Düğmeler, menü grupları ve araçlar için simgeler `Icon` içinden gelir; bu, `Icon::ALL` ile listelenen 82 çizimlik bir settir (`Plus`, `Edit`, `Trash`, `Search`, `Filter`, `Download`, `ChartBar`, `Users`, `Settings`, `Bell`, `SignOut` ve daha fazlası; bileşen kataloğu hepsini gösterir). Bunlar `/_zeyn/icons.css` içinde 20 px'lik bir ızgarada 1,5 px yuvarlak çizgiyle çizilmiş maskelerdir, metnin rengini alır ve ekran okuyuculardan gizlenir; anlamı her zaman etiket taşır.
+
+Düğmeler 36 px'tir (kompakt yoğunlukta 32 px) ve sakin bir dış çizgileri vardır; birincil düğmeler markayı taşır. `.button(..)` sonrasında `.ghost()` yoğun çubuklardaki ikincil eylemler için dış çizgiyi kaldırır, `.danger()` ise silen ya da iptal eden bir eylemi tehlike renginde çizer.
 
 ## Başlık
 
@@ -154,7 +156,7 @@ Screen::new(t!("orders.title"))
     .toolbar(|t| t.export(Export::Csv))
 ```
 
-`.primary`, `.toolbar` ile aynı düğmeleri, aynı kısayolları ve palet girdileriyle alır; araç çubuğu diğer araçlar için başlığın altında kalır. Alt başlık, ekran okuyucular için ekranın açıklamasıdır (`aria-describedby`). Satır dar geldiğinde işlemler başlığın altına kayar, telefonda başa hizalanır. Alt başlık ya da ana işlem yoksa ekran eskisi gibi düz bir başlıkla çizilir.
+`.primary`, `.toolbar` ile aynı düğmeleri, aynı kısayolları ve palet girdileriyle alır; araç çubuğu diğer araçlar için başlığın altında kalır. Bir çubuktaki iki ya da daha fazla `.export(..)` çağrısı, her biçim için bir öğe içeren tek bir "Dışa aktar" menü düğmesinde toplanır. Alt başlık, ekran okuyucular için ekranın açıklamasıdır (`aria-describedby`). Satır dar geldiğinde işlemler başlığın altına kayar, telefonda başa hizalanır. Alt başlık ya da ana işlem yoksa ekran eskisi gibi düz bir başlıkla çizilir.
 
 ## Feature'lar ve menü
 

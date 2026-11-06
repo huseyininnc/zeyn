@@ -22,7 +22,7 @@ Stack::new()
 
 ## Badge
 
-`Badge::new(text).tone(Tone::...)`입니다. 톤은 `Neutral`, `Info`, `Success`, `Warning`, `Danger`, `Brand`입니다. 그리드는 `.badge(|v| tone)`으로 값을 배지로 표시합니다.
+`Badge::new(text).tone(Tone::...)`입니다. 톤은 `Neutral`, `Info`, `Success`, `Warning`, `Danger`, `Brand`입니다. 톤이 있는 배지는 톤의 텍스트를 은은한 색조 위에 보여 줍니다. `Neutral`은 윤곽선 하나가 있는 흐린 레이블로, 요금제 같은 일반 값에 씁니다. `.dot()`은 일반 텍스트 앞에 톤 색의 8 px 점을 그리며, 목록의 상태를 위한 차분한 형태입니다. `.count()`는 숫자를 위한 둥근 알약을 그립니다. 그리드는 `.badge(|v| tone)`으로 값을 배지로, `.status(|v| tone)`으로 점으로 표시합니다.
 
 ## Progress
 
