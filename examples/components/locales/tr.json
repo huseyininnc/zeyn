@@ -98,7 +98,8 @@
       "reactions": "Sayıları bir eylemle saklanan tepki düğmeleri.",
       "link_button": "Buton görünümlü, başka sayfaya giden bağlantı.",
       "clear_prefs": "Tarayıcının uygulama için tuttuğu seçimleri silen düğme.",
-      "diff_view": "Bir kayıtta değişen alanlar, eski ve yeni yan yana ya da satır içinde."
+      "diff_view": "Bir kayıtta değişen alanlar, eski ve yeni yan yana ya da satır içinde.",
+      "code_view": "Salt okunur kod ve JSON, sunucuda renklendirilmiş, numaralı ve katlanır."
     },
     "ex": {
       "action_button": {
@@ -343,6 +344,11 @@
       "diff_view": {
         "overview": "Örnek",
         "inline": "Satır içinde"
+      },
+      "code_view": {
+        "overview": "Örnek",
+        "rust": "Rust",
+        "json": "JSON"
       }
     }
   }

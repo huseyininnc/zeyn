@@ -39,6 +39,7 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 - `DataGridColumn::plain()` shows whole numbers without group separators, for codes and years.
 - Screen header: `Screen::subtitle(text)` and `Screen::primary(|t| ...)` put a subtitle under the title and the main actions at the end of the title row, wrapping under the title on phones.
 - `DiffView` shows the fields that changed in a record, old struck out and new marked as added, side by side in a table or inline (`DiffLayout::Inline`): `DiffView::of(&before, &after)` compares two model values like the audit trail, `DiffView::changes(entry.changes)` takes an audit record and `.model::<M>()` adds field and choice labels. Masked fields stay masked, also in a hand built change list. No script; `diff.css` (1.9 KB, 0.7 KB gzip) loads only on pages that hold one.
+- `CodeView` and `JsonView` show read only code and data: highlighted on the server by a hand written highlighter for Rust, JSON, TOML, SQL, JavaScript and shell (`zeyn::ui::highlight`, which the documentation app now uses too), with line numbers, folding of bracketed blocks through `<details>` (no script) and a copy button in `share.js`. At most 10,000 lines and 1 MB, with a notice when cut. `JsonView::of(value, &ctx)` masks masked fields first. A 5,000 line Rust file renders in 30 ms (debug build) into 645 KB of HTML; `code.css` is 2.7 KB (0.8 KB gzip) and loads only with it.
 
 ### Changed
 

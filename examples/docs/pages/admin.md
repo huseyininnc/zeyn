@@ -17,3 +17,24 @@ DiffView::changes(entry.changes.clone())
 `.model::<M>()` gives the fields their labels in the user's language and choices their option labels. The side by side layout is a table with a column for the old values and one for the new values; `DiffLayout::Inline` puts the new value after the old one, for narrow places such as a window. At most `MAX_DIFF_FIELDS` (200) fields are shown, with a note for the rest.
 
 Masked fields stay masked. The values are the masked text the audit trail holds, and a field the model marks `#[mask]` is masked again before it is shown, so even a change list built by hand never puts a raw value into the page. The component needs no script; `diff.css` (1.9 KB) loads only with it.
+
+## CodeView and JsonView
+
+`CodeView` shows source text read only: highlighted on the server, with line numbers, folding and a copy button. `JsonView` shows a JSON value indented the same way.
+
+```rust
+CodeView::new(CodeLang::Sql, query_text).title("report.sql")
+
+JsonView::new(&payload).title(t!("webhooks.last_payload"))
+
+JsonView::of(&customer, &ctx)
+```
+
+The highlighter (`zeyn::ui::highlight`) is written by hand for Rust, JSON, TOML, SQL, JavaScript and shell; `CodeLang::Plain` and any other name show escaped text. It wraps keywords, strings, numbers, comments, types and keys in `z-hl-*` spans whose colors are theme tokens, so both themes work and the browser does no work. Blocks between brackets (`{}` and `[]`) that span lines fold with a native `<details>` element, which needs no script: the first line is the button (Enter or Space), and a folded block ends with an ellipsis.
+
+`JsonView::of(value, &ctx)` serializes any value the way the endpoints send it to the browser, so masked fields stay masked. At most `MAX_CODE_LINES` (10,000) lines and `MAX_CODE_BYTES` (1 MB) are shown; a longer text is cut at a line end with a notice that says how many lines are shown. The copy button (`share.js`, which also serves `Share`) copies the lines shown and confirms in a toast; it is hidden until its script runs. `code.css` (2.7 KB) loads only with the component.
+
+| Key | What it does |
+|---|---|
+| Tab | Moves to the text (one stop, it scrolls with the arrow keys), then through the fold buttons and the copy button |
+| Enter, Space | On a fold button: folds or unfolds the block |

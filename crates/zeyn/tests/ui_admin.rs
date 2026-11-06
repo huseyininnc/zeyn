@@ -6,7 +6,7 @@ use axum::http::{HeaderMap, Request, StatusCode};
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 use zeyn::prelude::*;
-use zeyn::ui::{DiffLayout, DiffView};
+use zeyn::ui::{CodeLang, CodeView, DiffLayout, DiffView, JsonView, MAX_CODE_LINES, highlight};
 use zeyn::{Component, FieldChange, I18n, Identity, Render};
 
 #[choice]
@@ -83,6 +83,83 @@ fn a_diff_without_changes_says_so_and_escapes_values() {
         new: Some("x".into()),
     }]));
     assert!(page.contains("<del>&lt;b&gt;</del>") && page.contains(">note<"));
+}
+
+#[test]
+fn code_is_highlighted_numbered_and_folded_without_script() {
+    let src =
+        "fn main() {\n    let s = \"<x>\";\n    if s.is_empty() {\n        run();\n    }\n}\n";
+    let page = html(&CodeView::new(CodeLang::Rust, src).title("main.rs"));
+    assert!(page.contains(r#"<span class="z-hl-kw">fn</span> main() {"#));
+    assert!(page.contains("&quot;&lt;x&gt;&quot;") && !page.contains("<x>"));
+    assert_eq!(
+        page.matches(r#"<details class="z-codeview-fold" open>"#)
+            .count(),
+        2
+    );
+    assert_eq!(page.matches("</details>").count(), 2);
+    assert_eq!(
+        page.matches(r#"<code class="z-codeview-l">"#)
+            .count(),
+        6
+    );
+    assert!(
+        page.contains(r#"data-zeyn-copy="s-code--body""#) && page.contains("hidden>Copy</button>")
+    );
+    assert!(page.contains(r#"role="region" tabindex="0" aria-labelledby="s-code--title""#));
+    assert!(page.contains("6 lines") && !page.contains("z-codeview-truncated"));
+}
+
+#[test]
+fn a_block_comment_over_lines_is_closed_and_opened_on_each_line() {
+    let page = html(&CodeView::new(
+        CodeLang::Sql,
+        "/* a\nb */ SELECT 'it''s' FROM t",
+    ));
+    assert!(
+        page.contains(r#"<span class="z-hl-com">/* a</span></code>"#),
+        "{page}"
+    );
+    assert!(page.contains(r#"<code class="z-codeview-l"><span class="z-hl-com">b */</span> <span class="z-hl-kw">SELECT</span> <span class="z-hl-str">&#39;it&#39;&#39;s&#39;</span>"#), "{page}");
+}
+
+#[test]
+fn long_text_is_cut_with_a_notice_and_json_is_folded_per_object() {
+    let text: String = (0..MAX_CODE_LINES + 5)
+        .map(|i| format!("line {i}\n"))
+        .collect();
+    let view = CodeView::new(CodeLang::Plain, text);
+    assert!(view.truncated());
+    let page = html(&view);
+    assert!(page.contains(&format!(
+        "Showing the first {MAX_CODE_LINES} of {} lines",
+        MAX_CODE_LINES + 5
+    )));
+    let json = html(&JsonView::new(
+        &serde_json::json!({ "a": [1, 2], "b": { "c": true } }),
+    ));
+    assert_eq!(json.matches("<details").count(), 3);
+    assert!(json.contains(r#"<span class="z-hl-kw">true</span>"#));
+}
+
+#[test]
+fn the_highlighter_knows_rust_json_toml_and_sql() {
+    assert!(
+        highlight(CodeLang::Toml, "[dependencies]\nzeyn = 1 # x")
+            .starts_with(r#"<span class="z-hl-kw">[dependencies]</span>"#)
+    );
+    assert!(
+        highlight(CodeLang::Json, r#"{"k": "v"}"#)
+            .contains(r#"<span class="z-hl-key">&quot;k&quot;</span>"#)
+    );
+    assert!(
+        highlight(CodeLang::Sql, "select \"Name\" from t")
+            .contains(r#"<span class="z-hl-key">&quot;Name&quot;</span>"#)
+    );
+    assert!(
+        highlight(CodeLang::Rust, "println!(\"x\")")
+            .starts_with(r#"<span class="z-hl-mac">println!</span>"#)
+    );
 }
 
 #[screen(route = "/plain", permission = "admin.read")]

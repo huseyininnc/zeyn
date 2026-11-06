@@ -252,6 +252,8 @@ What to remember:
   and `.trend(..)`; four in a `Row` fill a desktop row and wrap two, then one per line.
 - Audit history: `DiffView::of(&before, &after)` or `DiffView::changes(entry.changes).model::<M>()`;
   masked fields stay masked, never print raw values next to it.
+- Read only code and JSON: `CodeView::new(CodeLang::Sql, text)`, `JsonView::of(&value, &ctx)` (masks
+  masked fields); never build highlighted HTML yourself.
 - The app (`src/app.rs`): `App::new(t!("app.name")).i18n(i18n).service(store).feature(sales::feature())`,
   plus what the app needs: `.auth(...)`, `.mcp(Mcp::read_only())`, `.themes([...])`,
   `.datagrid_views(store)`, `.assistant(...)`.

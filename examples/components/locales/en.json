@@ -98,7 +98,8 @@
       "reactions": "Reaction buttons with counts stored by an action.",
       "link_button": "A link to another page that looks like a button.",
       "clear_prefs": "A button that removes the choices this browser keeps for the app.",
-      "diff_view": "The fields that changed in a record, old and new side by side or inline."
+      "diff_view": "The fields that changed in a record, old and new side by side or inline.",
+      "code_view": "Read only code and JSON, highlighted, numbered and folded on the server."
     },
     "ex": {
       "action_button": {
@@ -343,6 +344,11 @@
       "diff_view": {
         "overview": "Example",
         "inline": "Inline"
+      },
+      "code_view": {
+        "overview": "Example",
+        "rust": "Rust",
+        "json": "JSON"
       }
     }
   }

@@ -556,6 +556,21 @@
         "after": "Sonra",
         "empty": "(boş)",
         "more": "Değişen {n} alan daha gösterilmiyor"
+      },
+      "code": {
+        "plain": "Metin",
+        "rust": "Rust",
+        "json": "JSON",
+        "toml": "TOML",
+        "sql": "SQL",
+        "javascript": "JavaScript",
+        "shell": "Kabuk",
+        "lines": "{n} satır",
+        "copy": "Kopyala",
+        "copied": "Panoya kopyalandı",
+        "failed": "Kopyalanamadı",
+        "fold": "Bu bloğu daralt veya genişlet",
+        "truncated": "{total} satırın ilk {shown} satırı gösteriliyor. Gerisi burada gösterilemeyecek kadar uzun."
       }
     },
     "date": {

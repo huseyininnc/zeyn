@@ -8,6 +8,7 @@ mod alpha;
 mod catalog;
 mod chart;
 mod chips;
+mod code;
 mod content;
 mod controls;
 mod date;
@@ -61,6 +62,7 @@ pub use alpha::{AlphaIndex, OTHER_LETTER, alphabet};
 pub use catalog::{CardGrid, ImageCard, MAX_SUGGESTIONS, Rail, SearchBox, SearchParams};
 pub use chart::{Better, BulletCell, Chart, ChartKind, Kpi, SparklineCell};
 pub use chips::{Chips, MAX_CHIPS};
+pub use code::{CodeLang, CodeView, JsonView, MAX_CODE_BYTES, MAX_CODE_LINES, highlight};
 pub use content::{AutoGrid, Avatar, AvatarSize, Heading, MetaLine, Paragraph, PrevNext, Spoiler};
 pub use controls::Control;
 pub(crate) use controls::{

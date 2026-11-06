@@ -158,7 +158,7 @@ pub(crate) const MODULES: &[Module] = &[
         style: &["z-chart", "z-spark", "z-kpi", "z-bullet"],
         needs: &[],
     },
-    script("share", &["data-zeyn-share"]),
+    script("share", &["data-zeyn-share", "data-zeyn-copy"]),
     script("chips", &["data-zeyn-chip"]),
     script("reactions", &["data-zeyn-reactions"]),
     script("hero", &["data-zeyn-hero"]),
@@ -166,6 +166,7 @@ pub(crate) const MODULES: &[Module] = &[
     script("topics", &["data-zeyn-listens", "data-zeyn-drives"]),
     script("vlist", &["data-zeyn-vlist"]),
     style("diff", &["z-diff"]),
+    style("code", &["z-codeview"]),
 ];
 
 const _: () = assert!(MODULES.len() <= 64, "Used keeps one bit per module");
@@ -174,7 +175,7 @@ const _: () = assert!(MODULES.len() <= 64, "Used keeps one bit per module");
 /// are linked only when the page uses them; the others style components without markers of
 /// their own (layouts, display widgets, form sections, the palette) and every page links them,
 /// as `zeyn.css` and `enterprise.css`.
-const STYLES: [&str; 8] = [
+const STYLES: [&str; 9] = [
     "components",
     "catalog",
     "content",
@@ -183,6 +184,7 @@ const STYLES: [&str; 8] = [
     "files",
     "charts",
     "diff",
+    "code",
 ];
 
 /// The modules a page uses, one bit each in the order of [`MODULES`].
@@ -347,7 +349,8 @@ pub(crate) fn runtime(js: &'static str) -> &'static str {
 
 /// Script and style files of component modules, by path; the others are served next to their
 /// endpoints.
-const FILES: [(&str, &str); 23] = [
+const FILES: [(&str, &str); 24] = [
+    ("/_zeyn/code.css", include_str!("../../assets/code.css")),
     ("/_zeyn/diff.css", include_str!("../../assets/diff.css")),
     ("/_zeyn/topics.js", include_str!("../../assets/topics.js")),
     ("/_zeyn/vlist.js", include_str!("../../assets/vlist.js")),

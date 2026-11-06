@@ -1,0 +1,35 @@
+/* CodeView and JsonView (`zeyn::ui::CodeView`): linked only by pages that hold `.z-codeview`. */
+
+.z-codeview { display: grid; gap: var(--z-s-2); min-inline-size: 0; }
+.z-codeview-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--z-s-2) var(--z-s-3); }
+.z-codeview-title { margin: 0; font-size: var(--z-text-sm); font-weight: 600; font-family: var(--z-font-mono); overflow-wrap: anywhere; }
+.z-codeview-meta { color: var(--z-text-muted); font-size: var(--z-text-xs); margin-inline-end: auto; }
+.z-codeview-body {
+  overflow: auto; max-block-size: min(70vh, 40rem); padding-block: var(--z-s-2); counter-reset: z-codeview-line;
+  background: var(--z-surface-2); border: 1px solid var(--z-border); border-radius: var(--z-radius);
+  font-family: var(--z-font-mono); font-size: var(--z-text-sm); line-height: 1.5; tab-size: 4;
+}
+.z-codeview-body:focus-visible { outline: 2px solid var(--z-focus); outline-offset: 2px; }
+.z-codeview-l {
+  display: block; min-inline-size: max-content; white-space: pre; font: inherit; background: none; color: var(--z-text);
+  padding-block: 0; padding-inline: 0 var(--z-s-3); counter-increment: z-codeview-line;
+}
+.z-codeview-l::before {
+  content: counter(z-codeview-line); content: counter(z-codeview-line) / "";
+  display: inline-block; box-sizing: content-box; inline-size: calc(var(--z-codeview-digits, 3) * 1ch);
+  padding-inline: var(--z-s-4) var(--z-s-4); margin-inline-end: var(--z-s-1);
+  color: var(--z-text-muted); text-align: end; user-select: none; position: sticky; inset-inline-start: 0; background: inherit;
+}
+.z-codeview-body > .z-codeview-l::before, .z-codeview-fold .z-codeview-l::before { background: var(--z-surface-2); }
+.z-codeview-fold > summary { list-style: none; cursor: pointer; position: relative; }
+.z-codeview-fold > summary::-webkit-details-marker { display: none; }
+.z-codeview-fold > summary::before { content: "\25BE"; position: absolute; z-index: 1; inset-inline-start: 4px; color: var(--z-text-muted); line-height: 1.5; }
+.z-codeview-fold:not([open]) > summary::before { content: "\25B8"; }
+[dir="rtl"] .z-codeview-fold:not([open]) > summary::before { content: "\25C2"; }
+.z-codeview-fold:not([open]) > summary .z-codeview-l::after { content: " \2026"; color: var(--z-text-muted); }
+.z-codeview-fold > summary:hover .z-codeview-l, .z-codeview-fold > summary:hover .z-codeview-l::before { background: var(--z-hover); }
+.z-codeview-fold > summary:focus-visible { outline: 2px solid var(--z-focus); outline-offset: -2px; }
+.z-codeview-truncated { margin: 0; padding: var(--z-s-2) var(--z-s-3); border-radius: var(--z-radius); background: var(--z-warning-subtle); color: var(--z-text); font-size: var(--z-text-sm); }
+@media (forced-colors: active) {
+  .z-codeview-fold > summary:focus-visible, .z-codeview-body:focus-visible { outline-color: Highlight; }
+}

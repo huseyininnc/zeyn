@@ -14,6 +14,7 @@ pub mod card_grid;
 pub mod chart;
 pub mod chips;
 pub mod clear_prefs;
+pub mod code_view;
 pub mod controls;
 pub mod data_grid;
 pub mod date_pickers;

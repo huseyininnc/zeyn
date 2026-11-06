@@ -556,6 +556,21 @@
         "after": "After",
         "empty": "(empty)",
         "more": "{n} more changed fields are not shown"
+      },
+      "code": {
+        "plain": "Text",
+        "rust": "Rust",
+        "json": "JSON",
+        "toml": "TOML",
+        "sql": "SQL",
+        "javascript": "JavaScript",
+        "shell": "Shell",
+        "lines": "{n} lines",
+        "copy": "Copy",
+        "copied": "Copied to the clipboard",
+        "failed": "Could not copy",
+        "fold": "Fold or unfold this block",
+        "truncated": "Showing the first {shown} of {total} lines. The rest is too long to show here."
       }
     },
     "date": {
