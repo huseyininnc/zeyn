@@ -654,6 +654,13 @@
           "to": "ile",
           "low": "{label}, başlangıç",
           "high": "{label}, bitiş"
+        },
+        "quantity": {
+          "label": "Adet",
+          "decrease": "Azalt",
+          "increase": "Artır",
+          "limit": "Yalnızca {n} adet var.",
+          "failed": "Adet değiştirilemedi."
         }
       }
     },

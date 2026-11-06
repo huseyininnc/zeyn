@@ -32,3 +32,25 @@ RangeSlider::new(t!("shop.price"), ["min_price", "max_price"], 0, 5_000)
 - **Değerler.** `value(low, high)` parametreleri alır (`None` ilgili ucu korur). Sınır dışındaki değerler kırpılır, yüksekten büyük alt değer yer değiştirir; böylece elle düzenlenmiş bir adres kaydırıcıyı bozamaz. `money(currency)` bir para biriminin tam birimlerini sayfanın biçiminde gösterir.
 - **Tarihler.** `RangeSlider::dates(label, names, first, last)` ve `.date_value(from, to)` gün seçer; form `2026-03-31` gibi ISO tarihleri gizli alanlarla gönderir.
 - **Script.** `range.js` (gzip ile yaklaşık 1 KB) yalnızca kaydırıcı olan sayfalarda yüklenir. Alt tutamacı üsttekinin altında tutar, tutamaçlar arasını doldurur, değerleri etiketin yanına yazar ve çubuğun boş yerine basılınca yakın tutamacı taşır. Çubuğun boyutunu her basışta bir kez okur, tutamaç kayarken hiç okumaz.
+
+## Adet seçici
+
+```rust
+#[action(permission = "cart.edit")]
+pub async fn set_quantity(change: QuantityChange, cart: CartStore) -> Result<QuantityState> {
+    let stock = cart.stock(&change.target)?;
+    let kept = change.quantity.min(stock);
+    cart.set(&change.target, kept)?;
+    Ok(QuantityState::new(kept).max(stock))
+}
+
+QuantityStepper::of(set_quantity, line.sku.clone())
+    .label(t!("cart.quantity"))
+    .range(1, 20)
+    .value(line.quantity)
+```
+
+- **Sunucuda denetlenir.** Bir değişiklik (eksi ya da artıya basmak veya bir sayı yazmak) kullanıcı durduktan 400 ms sonra `POST /_zeyn/data` ile gönderilir: CSRF denetimi ve yazma hız sınırıyla, kullanıcı olarak, action'ın izni denetlenerek. Sunucu action çalışmadan önce adedi seçicinin aralığına kırpar; action yalnızca kendisinin bildiği şeyi, örneğin stoğu denetler. Kalem (`target`) ekran tarafından verilir ve tarayıcıdan hiç okunmaz.
+- **Son söz cevabındır.** Action tuttuğu adedi ve izin verilen en çok adedi döndürür (`QuantityState::new(kept).max(stock)`). Bu, kullanıcının istediğinden azsa seçici onu gösterir ve bir canlı bölgede "Yalnızca 7 adet var." der. Yeni bir değişiklik yoldaki isteği iptal eder; böylece yalnızca son cevap gösterilir. Başarısız bir istek son tutulan adedi geri koyar ve bunu söyler.
+- **Klavye ve dokunma.** Düğmeler en az 24 x 24 pikseldir (WCAG 2.5.8), "Azalt" ve "Artır" adlarını taşır ve aralığın uçlarında kapanır; basılan düğme kapanınca odak alana geçer. Alan rakamları ve ok tuşlarını kabul eder.
+- **Script.** `quantity.js` (gzip ile yaklaşık 1 KB) yalnızca seçici olan sayfalarda yüklenir.

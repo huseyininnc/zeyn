@@ -197,6 +197,7 @@ catalog! {
     "shop" Cart {
         price "/ui/price";
         range_slider "/ui/range-slider" (Demo);
+        quantity_stepper "/ui/quantity-stepper";
     }
     "media" Image {
         image "/ui/image";

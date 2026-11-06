@@ -108,7 +108,8 @@
       "calendar": "Kullanıcının saat diliminde ay, hafta veya gün görünümünde etkinlikler, etkinlik pencereleri ve aralık seçimiyle.",
       "clear_prefs": "Tarayıcının uygulama için tuttuğu seçimleri silen düğme.",
       "price": "Üstü çizili eski fiyat, indirim yüzdesi ve birim fiyatla bir fiyat.",
-      "range_slider": "Fiyat ve tarih aralıkları için tek çubukta iki tutamaç."
+      "range_slider": "Fiyat ve tarih aralıkları için tek çubukta iki tutamaç.",
+      "quantity_stepper": "Stoğu sunucuda denetlenen bir sayının iki yanında eksi ve artı düğmeleri."
     },
     "ex": {
       "action_button": {
@@ -382,6 +383,9 @@
       "range_slider": {
         "overview": "Örnek",
         "dates": "Tarihler"
+      },
+      "quantity_stepper": {
+        "overview": "Örnek"
       }
     }
   }

@@ -32,3 +32,25 @@ RangeSlider::new(t!("shop.price"), ["min_price", "max_price"], 0, 5_000)
 - **値。** `value(low, high)` はパラメーターを受け取ります（`None` ならトラックの端のまま）。範囲外の値は切り詰められ、下限が上限より大きければ入れ替わるので、手で書き換えたアドレスでスライダーが壊れることはありません。`money(currency)` は通貨の整数単位をページの書式で表示します。
 - **日付。** `RangeSlider::dates(label, names, first, last)` と `.date_value(from, to)` で日を選びます。フォームは `2026-03-31` のような ISO 日付を隠しフィールドで送ります。
 - **スクリプト。** `range.js`（gzip で約 1 KB）はスライダーのあるページでだけ読み込まれます。下のつまみが上のつまみを超えないようにし、つまみの間のトラックを塗り、値をラベルの横に書き、何もないトラックが押されたら近いほうのつまみを動かします。トラックの大きさは押すたびに 1 回だけ読み、つまみが動いている間は読みません。
+
+## 数量ステッパー
+
+```rust
+#[action(permission = "cart.edit")]
+pub async fn set_quantity(change: QuantityChange, cart: CartStore) -> Result<QuantityState> {
+    let stock = cart.stock(&change.target)?;
+    let kept = change.quantity.min(stock);
+    cart.set(&change.target, kept)?;
+    Ok(QuantityState::new(kept).max(stock))
+}
+
+QuantityStepper::of(set_quantity, line.sku.clone())
+    .label(t!("cart.quantity"))
+    .range(1, 20)
+    .value(line.quantity)
+```
+
+- **サーバーで確認。** 変更（マイナスやプラスを押す、数字を入力する）は、ユーザーが手を止めてから 400 ms 後に `POST /_zeyn/data` で送られます。CSRF の確認と書き込みのレート制限を通り、ユーザーとして、アクションの権限を確認して実行されます。サーバーはアクションの実行前に数量をステッパーの範囲に収め、アクションは在庫のように自分だけが知ることを確認します。対象の品目（`target`）は画面が決め、ブラウザーからは読みません。
+- **答えが優先。** アクションは保持した数量と上限（`QuantityState::new(kept).max(stock)`）を返します。それがユーザーの求めた数より少なければ、ステッパーはその数を表示し、ライブリージョンで「在庫は 7 個だけです。」と伝えます。新しい変更はまだ途中のリクエストを取り消すので、表示されるのは最後の答えだけです。リクエストが失敗すると最後に保持された数量に戻し、そのことを伝えます。
+- **キーボードとタッチ。** ボタンは 24 × 24 ピクセル以上（WCAG 2.5.8）で、「減らす」「増やす」という名前を持ち、範囲の端では無効になります。押したボタンが無効になるとフォーカスは入力欄に移ります。入力欄は数字と矢印キーを受け付けます。
+- **スクリプト。** `quantity.js`（gzip で約 1 KB）はステッパーのあるページでだけ読み込まれます。

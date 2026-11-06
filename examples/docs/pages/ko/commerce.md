@@ -32,3 +32,25 @@ RangeSlider::new(t!("shop.price"), ["min_price", "max_price"], 0, 5_000)
 - **값.** `value(low, high)`는 매개변수를 받습니다(`None`이면 트랙 끝을 유지). 범위를 벗어난 값은 잘리고, 낮은 값이 높은 값보다 크면 서로 바뀌므로 손으로 고친 주소가 슬라이더를 망가뜨릴 수 없습니다. `money(currency)`는 통화의 정수 단위를 페이지 형식으로 보여 줍니다.
 - **날짜.** `RangeSlider::dates(label, names, first, last)`와 `.date_value(from, to)`로 날짜를 고릅니다. 폼은 `2026-03-31` 같은 ISO 날짜를 숨은 필드로 보냅니다.
 - **스크립트.** `range.js`(gzip으로 약 1 KB)는 슬라이더가 있는 페이지에서만 불러옵니다. 낮은 핸들이 높은 핸들을 넘지 않게 하고, 두 핸들 사이의 트랙을 채우고, 레이블 옆에 값을 쓰고, 빈 트랙을 누르면 가까운 핸들을 옮깁니다. 트랙 크기는 누를 때마다 한 번만 읽고 핸들이 움직이는 동안에는 읽지 않습니다.
+
+## 수량 선택기
+
+```rust
+#[action(permission = "cart.edit")]
+pub async fn set_quantity(change: QuantityChange, cart: CartStore) -> Result<QuantityState> {
+    let stock = cart.stock(&change.target)?;
+    let kept = change.quantity.min(stock);
+    cart.set(&change.target, kept)?;
+    Ok(QuantityState::new(kept).max(stock))
+}
+
+QuantityStepper::of(set_quantity, line.sku.clone())
+    .label(t!("cart.quantity"))
+    .range(1, 20)
+    .value(line.quantity)
+```
+
+- **서버에서 확인.** 변경(빼기나 더하기 누르기, 숫자 입력)은 사용자가 멈춘 뒤 400 ms 후에 `POST /_zeyn/data`로 전송되며, CSRF 확인과 쓰기 속도 제한을 거치고, 사용자로서 액션의 권한을 확인합니다. 서버는 액션이 실행되기 전에 수량을 선택기의 범위로 자르고, 액션은 재고처럼 자신만 아는 것을 확인합니다. 항목(`target`)은 화면이 정하며 브라우저에서 읽지 않습니다.
+- **응답이 우선.** 액션은 유지한 수량과 허용되는 최대값(`QuantityState::new(kept).max(stock)`)으로 응답합니다. 사용자가 요청한 것보다 적으면 선택기가 그 값을 보여 주고 라이브 영역에서 "7개만 남아 있습니다."라고 알립니다. 새 변경은 아직 진행 중인 요청을 취소하므로 마지막 응답만 표시되며, 요청이 실패하면 마지막으로 유지된 수량으로 되돌리고 그 사실을 알립니다.
+- **키보드와 터치.** 버튼은 최소 24 × 24 픽셀(WCAG 2.5.8)이고 "줄이기", "늘리기"라는 이름을 가지며 범위 끝에서 꺼집니다. 누른 버튼이 꺼지면 포커스가 입력란으로 갑니다. 입력란은 숫자와 화살표 키를 받습니다.
+- **스크립트.** `quantity.js`(gzip으로 약 1 KB)는 선택기가 있는 페이지에서만 불러옵니다.

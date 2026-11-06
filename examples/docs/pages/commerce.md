@@ -32,3 +32,25 @@ RangeSlider::new(t!("shop.price"), ["min_price", "max_price"], 0, 5_000)
 - **Values.** `value(low, high)` takes the params (`None` keeps the end of the track). Values out of the bounds are clamped and a low value above the high one is swapped, so a hand edited address cannot break the slider. `money(currency)` shows whole units of a currency in the page's format.
 - **Dates.** `RangeSlider::dates(label, names, first, last)` with `.date_value(from, to)` picks days; the form sends ISO dates such as `2026-03-31` through hidden inputs.
 - **Script.** `range.js` (about 1 KB gzip) loads only on pages with a slider. It keeps the low handle at or below the high one, fills the track between the handles, writes the values next to the label and moves the nearer handle when the bare track is pressed. It reads the track's size once per press and never while a handle moves.
+
+## Quantity stepper
+
+```rust
+#[action(permission = "cart.edit")]
+pub async fn set_quantity(change: QuantityChange, cart: CartStore) -> Result<QuantityState> {
+    let stock = cart.stock(&change.target)?;
+    let kept = change.quantity.min(stock);
+    cart.set(&change.target, kept)?;
+    Ok(QuantityState::new(kept).max(stock))
+}
+
+QuantityStepper::of(set_quantity, line.sku.clone())
+    .label(t!("cart.quantity"))
+    .range(1, 20)
+    .value(line.quantity)
+```
+
+- **Checked on the server.** A change (a press of minus or plus, or a typed number) is sent 400 ms after the user stops, through `POST /_zeyn/data` with the CSRF check and the write rate limit, as the user, with the action's permission checked. The server clamps the quantity to the stepper's range before the action runs, and the action checks what only it knows, such as the stock. The item (`target`) is set by the screen and never read from the browser.
+- **The answer wins.** The action answers with the quantity it kept and the most allowed (`QuantityState::new(kept).max(stock)`). When that is less than the user asked for, the stepper shows it and says "Only 7 available." in a live region. A newer change cancels the request still on its way, so only the last answer is shown; a failed request puts the last kept quantity back and says so.
+- **Keyboard and touch.** The buttons are at least 24 by 24 pixels (WCAG 2.5.8), named "Decrease" and "Increase", and turn off at the ends of the range; focus moves to the field when the pressed button turns off. The field takes digits and the arrow keys.
+- **Script.** `quantity.js` (about 1 KB gzip) loads only on pages with a stepper.

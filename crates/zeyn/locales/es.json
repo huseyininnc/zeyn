@@ -519,6 +519,13 @@
           "to": "a",
           "low": "{label}, desde",
           "high": "{label}, hasta"
+        },
+        "quantity": {
+          "label": "Cantidad",
+          "decrease": "Reducir",
+          "increase": "Aumentar",
+          "limit": "Solo hay {n} disponibles.",
+          "failed": "No se pudo cambiar la cantidad."
         }
       }
     },

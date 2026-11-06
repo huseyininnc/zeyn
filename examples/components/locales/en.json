@@ -108,7 +108,8 @@
       "calendar": "Events in a month, week or day in the user time zone, with event windows and slots.",
       "clear_prefs": "A button that removes the choices this browser keeps for the app.",
       "price": "A price with a struck old price, the percent off and a unit price.",
-      "range_slider": "Two handles over one track for price and date ranges."
+      "range_slider": "Two handles over one track for price and date ranges.",
+      "quantity_stepper": "Minus and plus buttons around a number whose stock the server checks."
     },
     "ex": {
       "action_button": {
@@ -382,6 +383,9 @@
       "range_slider": {
         "overview": "Example",
         "dates": "Dates"
+      },
+      "quantity_stepper": {
+        "overview": "Example"
       }
     }
   }

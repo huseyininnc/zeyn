@@ -32,3 +32,25 @@ RangeSlider::new(t!("shop.price"), ["min_price", "max_price"], 0, 5_000)
 - **取值。** `value(low, high)` 接收参数（`None` 保留轨道的端点）。超出范围的值会被截断，低值大于高值时会互换，因此手动修改的地址无法破坏滑块。`money(currency)` 按页面格式显示货币的整数单位。
 - **日期。** `RangeSlider::dates(label, names, first, last)` 配合 `.date_value(from, to)` 选择日期；表单通过隐藏字段提交 `2026-03-31` 这样的 ISO 日期。
 - **脚本。** `range.js`（gzip 后约 1 KB）只在有滑块的页面加载。它让低值滑块不超过高值滑块，填充两个滑块之间的轨道，把值写在标签旁边，并在按下空白轨道时移动较近的滑块。它每次按下只读取一次轨道尺寸，滑块移动时从不读取。
+
+## 数量步进器
+
+```rust
+#[action(permission = "cart.edit")]
+pub async fn set_quantity(change: QuantityChange, cart: CartStore) -> Result<QuantityState> {
+    let stock = cart.stock(&change.target)?;
+    let kept = change.quantity.min(stock);
+    cart.set(&change.target, kept)?;
+    Ok(QuantityState::new(kept).max(stock))
+}
+
+QuantityStepper::of(set_quantity, line.sku.clone())
+    .label(t!("cart.quantity"))
+    .range(1, 20)
+    .value(line.quantity)
+```
+
+- **在服务器上检查。** 一次更改（按下减号或加号，或输入数字）在用户停止 400 毫秒后通过 `POST /_zeyn/data` 发送，经过 CSRF 检查和写入速率限制，以用户身份运行，并检查 action 的权限。服务器在 action 运行前把数量限制在步进器的范围内，action 检查只有它知道的内容，例如库存。条目（`target`）由屏幕设定，从不从浏览器读取。
+- **以服务器的回答为准。** action 返回它保留的数量和允许的最大值（`QuantityState::new(kept).max(stock)`）。如果少于用户要求的数量，步进器显示该数量，并在实时区域中说“仅剩 7 件。”。较新的更改会取消仍在途中的请求，因此只显示最后一次回答；请求失败时会恢复上次保留的数量并加以说明。
+- **键盘与触控。** 按钮至少为 24 × 24 像素（WCAG 2.5.8），名为“减少”和“增加”，在范围两端会禁用；被按下的按钮禁用时，焦点移到输入框。输入框接受数字和方向键。
+- **脚本。** `quantity.js`（gzip 后约 1 KB）只在有步进器的页面加载。

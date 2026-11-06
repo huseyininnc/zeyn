@@ -264,7 +264,7 @@ pub mod prelude {
         DiffLayout, DiffView, Inbox, InboxSelection, JsonView, Kanban, NotificationCenter, QrCode,
         QrLevel, UnreadCount,
     };
-    pub use crate::ui::{Price, PriceUnit, RangeSlider};
+    pub use crate::ui::{Price, PriceUnit, QuantityStepper, RangeSlider};
     pub use crate::{
         Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime,
         Decimal, Effect, Entity, Error, Export, Feature, Field, File, FileRules, FileType, Form,

@@ -519,6 +519,13 @@
           "to": "〜",
           "low": "{label}、下限",
           "high": "{label}、上限"
+        },
+        "quantity": {
+          "label": "数量",
+          "decrease": "減らす",
+          "increase": "増やす",
+          "limit": "在庫は {n} 個だけです。",
+          "failed": "数量を変更できませんでした。"
         }
       }
     },

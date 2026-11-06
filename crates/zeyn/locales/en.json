@@ -654,6 +654,13 @@
           "to": "to",
           "low": "{label}, from",
           "high": "{label}, to"
+        },
+        "quantity": {
+          "label": "Quantity",
+          "decrease": "Decrease",
+          "increase": "Increase",
+          "limit": "Only {n} available.",
+          "failed": "The quantity could not be changed."
         }
       }
     },

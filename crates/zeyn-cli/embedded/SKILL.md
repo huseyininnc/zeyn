@@ -236,6 +236,9 @@ What to remember:
   by hand; screen readers hear "was X, now Y"). Ranges:
   `RangeSlider::new(t!("..."), ["min_price", "max_price"], 0, 5_000).money(Currency::Try)`
   `.value(p.min_price, p.max_price).drives("products")`; the names are screen params.
+  Cart amounts: `QuantityStepper::of(set_quantity, sku).range(1, 20).value(n)` with an action
+  `fn(QuantityChange) -> Result<QuantityState>` that checks the stock (the target comes from
+  the screen, the range is enforced on the server).
 - App shell top bar: `App::header(|h| h.center(SearchBox::of(..)).end(LinkButton::new(..)))`,
   the same slots as the site header; `h.breadcrumb().search().account()` adds the breadcrumb, the
   search field that opens the palette and the account menu with theme, language and sign out.

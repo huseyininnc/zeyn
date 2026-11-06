@@ -519,6 +519,13 @@
           "to": "至",
           "low": "{label}，起",
           "high": "{label}，止"
+        },
+        "quantity": {
+          "label": "数量",
+          "decrease": "减少",
+          "increase": "增加",
+          "limit": "仅剩 {n} 件。",
+          "failed": "无法更改数量。"
         }
       }
     },

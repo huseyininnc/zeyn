@@ -48,6 +48,31 @@ pub fn ranged(p: Listing) -> Screen {
         .body(Kpi::new("Shown", 1.0).listens("listing"))
 }
 
+/// Keeps at most 7 units and echoes the target, so tests see what the action got.
+#[action(permission = "cart.edit")]
+pub async fn set_quantity(change: zeyn::ui::QuantityChange) -> Result<zeyn::ui::QuantityState> {
+    if change.target != "sku-7" {
+        return Err(Error::NotFound);
+    }
+    Ok(zeyn::ui::QuantityState::new(change.quantity.min(7)).max(7))
+}
+
+#[params]
+pub struct ItemParams {
+    pub id: i64,
+}
+
+#[screen(route = "/cart/{id}", public)]
+pub fn cart_line(p: ItemParams) -> Screen {
+    Screen::new("Cart").body(
+        Stack::new().add(
+            QuantityStepper::of(set_quantity, format!("sku-{}", p.id))
+                .range(1, 20)
+                .value(2),
+        ),
+    )
+}
+
 fn shop_app() -> App {
     App::new("Test")
         .i18n(I18n::new("en"))
@@ -69,7 +94,8 @@ fn shop_app() -> App {
             Feature::new("shop")
                 .screen(plain)
                 .screen(priced)
-                .screen(ranged),
+                .screen(ranged)
+                .screen(cart_line),
         )
 }
 
@@ -95,7 +121,6 @@ async fn get(path: &str) -> (StatusCode, String) {
 }
 
 /// Posts a component data call and returns the status and the JSON answer.
-#[allow(dead_code)]
 async fn data(
     router: &axum::Router,
     perms: &str,
@@ -291,4 +316,99 @@ async fn a_driving_range_slider_is_a_filter_form_and_loads_its_module_only_where
     let bad = Screen::new("Bad").body(RangeSlider::new("Same", ["a", "a"], 1, 1));
     let problems = app.check_page(&bad).unwrap_err();
     assert_eq!(problems.len(), 2, "{problems:?}");
+}
+
+#[test]
+fn a_quantity_stepper_has_named_buttons_off_at_the_ends_of_its_range() {
+    let stepper = QuantityStepper::of(set_quantity, "sku-<7>")
+        .range(3, 1)
+        .value(1);
+    let en = html(&stepper, "en");
+    assert!(
+        en.starts_with(r#"<div class="z-qty" role="group" aria-labelledby="s-qty--label" data-zeyn-quantity data-text-limit="Only {n} available.""#),
+        "{en}"
+    );
+    assert!(en.contains(r#"<button type="button" class="z-qty-step" data-step="-1" aria-label="Decrease" aria-controls="s-qty-" disabled>"#), "{en}");
+    assert!(
+        en.contains(r#"min="1" max="3" step="1" value="1" data-testid="s.quantity.sku-&lt;7&gt;""#),
+        "{en}"
+    );
+    assert!(en.contains(r#"aria-label="Increase" aria-controls="s-qty-"><span"#));
+    assert!(en.contains(r#"<span class="z-qty-status" role="status"></span>"#));
+    assert!(html(&stepper, "tr").contains(r#"aria-label="Azalt""#));
+}
+
+#[tokio::test]
+async fn a_quantity_change_runs_the_action_with_the_screens_target_clamped_through_the_write_checks()
+ {
+    let router = shop_app().router().unwrap();
+    let call = |quantity: serde_json::Value| serde_json::json!({ "screen": "cart_line", "params": { "id": 7 }, "node": "0.0", "key": "quantity", "input": quantity });
+    let (status, state) = data(
+        &router,
+        "cart.edit",
+        true,
+        call(serde_json::json!({ "quantity": 5 })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{state}");
+    assert_eq!(state, serde_json::json!({ "quantity": 5, "max": 7 }));
+    let (_, state) = data(
+        &router,
+        "cart.edit",
+        true,
+        call(serde_json::json!({ "quantity": 500, "target": "sku-1" })),
+    )
+    .await;
+    assert_eq!(
+        state["quantity"], 7,
+        "the server clamps to the range (20), the action to the stock, and the target comes from the screen: {state}"
+    );
+    let (status, _) = data(
+        &router,
+        "cart.edit",
+        true,
+        call(serde_json::json!({ "quantity": "many" })),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::NOT_FOUND,
+        "a quantity that is no number never reaches the action"
+    );
+    let (status, _) = data(
+        &router,
+        "",
+        true,
+        call(serde_json::json!({ "quantity": 2 })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "the action's permission");
+    let (status, _) = data(
+        &router,
+        "cart.edit",
+        false,
+        call(serde_json::json!({ "quantity": 2 })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "the CSRF check");
+    let mut last = StatusCode::OK;
+    for _ in 0..6 {
+        last = data(
+            &router,
+            "cart.edit",
+            true,
+            call(serde_json::json!({ "quantity": 2 })),
+        )
+        .await
+        .0;
+    }
+    assert_eq!(
+        last,
+        StatusCode::TOO_MANY_REQUESTS,
+        "changes count against the write limit"
+    );
+    let (_, page) = get("/cart/7").await;
+    assert!(links(&page).contains(&"quantity.js".to_string()));
+    let (_, price) = get("/price").await;
+    assert!(!links(&price).contains(&"quantity.js".to_string()));
 }

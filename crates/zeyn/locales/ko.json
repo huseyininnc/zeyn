@@ -519,6 +519,13 @@
           "to": "~",
           "low": "{label}, 시작",
           "high": "{label}, 끝"
+        },
+        "quantity": {
+          "label": "수량",
+          "decrease": "줄이기",
+          "increase": "늘리기",
+          "limit": "{n}개만 남아 있습니다.",
+          "failed": "수량을 바꾸지 못했습니다."
         }
       }
     },
