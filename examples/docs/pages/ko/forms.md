@@ -39,6 +39,52 @@ Form::of(Contact { quantity: 1, ..Contact::default() })
 
 각 필드 타입에는 기본 컨트롤이 있습니다. 텍스트 입력, 숫자 입력, 통화가 있는 금액, 날짜 및 시간 피커, `bool`용 체크박스, choice용 선택 목록입니다. `.control(M::f, Control::...)`은 다른 컨트롤을 고르고, `.lookup(M::f, action)`은 서버에서 레코드를 검색합니다. [컨트롤과 피커](controls.md)를 참고하십시오.
 
+## 의존하는 lookup
+
+`.depends_on(field, source)`는 lookup `field`의 선택지가 다른 필드에 따라 달라지게 합니다. 국가의 도시처럼요. 검색할 때마다 `source`의 값이 `LookupQuery::parent`로 전송되고(`q.parent_id()`는 이를 id로 읽습니다), `source`가 바뀌면 `field`가 비워져 새 값에 맞는 선택지가 다시 불러와집니다.
+
+```rust
+#[action(permission = "geo.read")]
+pub async fn find_cities(q: LookupQuery, store: Cities) -> Result<Page<LookupItem>> {
+    Ok(q.apply(store.of_country(q.parent_id())))
+}
+
+Form::of(address)
+    .lookup(Address::country, find_countries)
+    .lookup(Address::city, find_cities)
+    .depends_on(Address::city, Address::country)
+    .submit(t!("save"), save_address)
+```
+
+이 짝은 브라우저에 맡길 수 없으므로, 제출 시 서버는 선택된 도시를 제출된 국가와 함께 lookup action에 그 action의 권한으로 다시 물어보고, 반환되지 않는 도시는 필드 오류로 거부합니다. `q.apply` 전에 필터링하듯이 id 조회에서도 부모로 필터링하세요. `App::check_page`는 필드가 폼의 lookup이 아니거나 원본이 폼의 다른 필드가 아닌 `depends_on`을 보고합니다.
+
+## 필터 폼
+
+제출 버튼이 없는 폼으로 Screen을 필터링할 수 있습니다. `.drives(topic)`은 폼의 필드를 Screen params로 만듭니다. 필드가 바뀌면(선택 상자, 날짜 범위, Enter를 누른 텍스트 필드) 그 값이 같은 이름의 Screen param에 들어가고, 주소도 맞춰지며, `.listens(topic)`을 가진 노드가 제자리에서 새로 고쳐져 자신의 params에서 값을 읽습니다([토픽](effects.md#topics) 참고). 숫자와 불리언은 그대로, 빈 필드는 `null`로 보내지며, 서버는 params를 Screen의 타입이 있는 params로 읽으므로 맞지 않는 값은 거부됩니다.
+
+```rust
+#[params]
+pub struct SalesParams {
+    pub region: Option<Region>,
+    pub from: Option<Date>,
+    pub to: Option<Date>,
+}
+
+#[screen(route = "/sales", permission = "sales.read")]
+pub fn sales(p: SalesParams, store: Sales) -> Screen {
+    Screen::new(t!("sales.title"))
+        .body(
+            Form::of(SalesFilter { region: p.region, from: p.from, to: p.to })
+                .field(SalesFilter::region)
+                .range(SalesFilter::from, SalesFilter::to)
+                .drives("sales"),
+        )
+        .body(Kpi::new(t!("sales.total"), store.total(&p)).listens("sales"))
+}
+```
+
+`submit`이 있는 폼은 drive할 수 없습니다. 대신 저장한 뒤 `on_success`에서 `ui.refresh(topic)`으로 새로 고치세요.
+
 ## 읽기 전용 필드
 
 `#[readonly]` 필드는 폼에 표시되지만 편집할 수 없습니다. 재고 이동만 바꾸는 재고 수준이 그 예입니다.

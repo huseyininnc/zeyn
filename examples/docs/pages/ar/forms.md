@@ -39,6 +39,52 @@ Form::of(Contact { quantity: 1, ..Contact::default() })
 
 لكل نوع حقل عنصر تحكم افتراضي: حقول نص، وحقول أرقام، ومال مع العملة، ومنتقيات تاريخ ووقت، وخانات اختيار لـ `bool`، وقوائم منسدلة للاختيارات. يختار `.control(M::f, Control::...)` عنصرًا آخر، ويبحث `.lookup(M::f, action)` عن السجلات على الخادم. راجع [عناصر التحكم والمنتقيات](controls.md).
 
+## حقول lookup التابعة
+
+يجعل `.depends_on(field, source)` خيارات حقل lookup `field` تابعة لحقل آخر، مثل مدن دولة ما. يرسل كل بحث قيمة `source` في `LookupQuery::parent` (يقرؤها `q.parent_id()` على أنها id)، ويُفرَّغ `field` عند تغيّر `source`، فتُحمَّل خياراته من جديد للقيمة الجديدة.
+
+```rust
+#[action(permission = "geo.read")]
+pub async fn find_cities(q: LookupQuery, store: Cities) -> Result<Page<LookupItem>> {
+    Ok(q.apply(store.of_country(q.parent_id())))
+}
+
+Form::of(address)
+    .lookup(Address::country, find_countries)
+    .lookup(Address::city, find_cities)
+    .depends_on(Address::city, Address::country)
+    .submit(t!("save"), save_address)
+```
+
+لا يمكن ائتمان المتصفح على هذا الزوج، لذا يسأل الخادم عند الإرسال action الخاص بـ lookup مرة أخرى عن المدينة المختارة مع الدولة المرسلة، بصلاحية ذلك action، ويرفض بخطأ في الحقل أي مدينة لا يعيدها. صفِّ حسب الأصل في استعلامات id أيضًا، كما يفعل `q.apply` بعد التصفية. يبلّغ `App::check_page` عن `depends_on` لا يكون حقله lookup في النموذج أو لا يكون مصدره حقلًا آخر فيه.
+
+## نماذج التصفية
+
+يمكن لنموذج بلا زر إرسال أن يصفّي الشاشة: يجعل `.drives(topic)` حقوله params للشاشة. عندما يتغير حقل (قائمة اختيار، نطاق تواريخ، حقل نص عند الضغط على Enter)، تدخل قيمته في param الشاشة الذي يحمل الاسم نفسه، ويبقى العنوان متزامنًا، وتتحدث في مكانها العقد التي تحمل `.listens(topic)` وتقرأ القيمة من params الخاصة بها (انظر [المواضيع](effects.md#topics)). تُرسل الأرقام والقيم المنطقية كما هي والحقول الفارغة على أنها `null`؛ ويقرأ الخادم params على أنها params الشاشة ذات الأنواع، فتُرفض القيمة التي لا تناسب.
+
+```rust
+#[params]
+pub struct SalesParams {
+    pub region: Option<Region>,
+    pub from: Option<Date>,
+    pub to: Option<Date>,
+}
+
+#[screen(route = "/sales", permission = "sales.read")]
+pub fn sales(p: SalesParams, store: Sales) -> Screen {
+    Screen::new(t!("sales.title"))
+        .body(
+            Form::of(SalesFilter { region: p.region, from: p.from, to: p.to })
+                .field(SalesFilter::region)
+                .range(SalesFilter::from, SalesFilter::to)
+                .drives("sales"),
+        )
+        .body(Kpi::new(t!("sales.total"), store.total(&p)).listens("sales"))
+}
+```
+
+لا يستطيع نموذج يحتوي `submit` أن يقود موضوعًا؛ بدلًا من ذلك حدّث بعد الحفظ باستخدام `ui.refresh(topic)` في `on_success`.
+
 ## الحقول للقراءة فقط
 
 حقول `#[readonly]` تُعرض في النماذج لكن لا يمكن تحريرها، مثل مستوى مخزون لا تغيّره إلا الحركات.

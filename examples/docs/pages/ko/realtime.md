@@ -88,6 +88,8 @@ pub async fn save_order(o: Valid<Order>, store: Orders, hub: Hub, ctx: Ctx) -> R
 
 알림은 토픽 이름만 담고 데이터는 절대 담지 않습니다. 새로 고침은 모든 권한 검사가 있는 일반 그리드 엔드포인트를 거칩니다. `notify`는 호출자의 테넌트에만 도달하며, `notify_tenant(Some(id), topic)`은 하나를 지정하고 `None`은 테넌시가 없는 앱입니다.
 
+같은 토픽 이름은 채널 없이도 동작합니다. `.listens("orders")`로 표시한 노드는 알림이 토픽을 지정할 때(`live.js`가 이를 `zeyn:topics`로 전달합니다) 제자리에서 새로 고쳐지며, action이 `ui.refresh("orders")`로 끝나거나 `.drives("orders")`를 가진 필터가 바뀔 때도 새로 고쳐집니다. 그리드는 현재 페이지를 다시 불러오고, 다른 리스너는 Screen마다 한 번의 `POST /_zeyn/nodes`로 다시 렌더링됩니다(`examples/docs/pages/effects.md`의 Topics 참고). 소켓은 `Realtime::topic`으로 선언해야 하는 `Live` 노드의 토픽만 구독합니다. 그리드가 아닌 부분에는 그 안이나 옆에서 `.listens`를 쓰세요.
+
 ## 5. 메모리와 백프레셔
 
 모든 상태에는 제한이 있습니다(`Limits`, 괄호 안은 기본값).

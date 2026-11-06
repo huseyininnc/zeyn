@@ -217,6 +217,16 @@ What to remember:
   Destructive grid actions: `.row_action(..)` or `.bulk_action(..)` then `.confirm(t!("..."))`
   `.tone(Tone::Danger)`; workflow moves: `Transitions::of(..).confirm("cancel", t!("..."))`.
 - Layouts: `Row`, `Stack`, `Panel`, `Card`, `Tabs`, `Split`.
+- Refresh other parts of a screen with topics, never with JavaScript: mark what shows the data
+  with `.listens("sales")` (last call, any component), then name the topic with
+  `ui.refresh("sales")` in `on_success`, a filter that `.drives("sales")` (`Chips::filter`,
+  `SearchBox`, a `Form` without submit whose fields are screen params) or `hub.notify`. Listeners
+  read filters from the screen params. `zeyn check` warns about topics nobody listens to.
+- A lookup whose options depend on another field: `.depends_on(Address::city, Address::country)`;
+  the action filters by `q.parent_id()` and the submit checks the pair again.
+- Rows of another shape: `List::of(action).builder(|row| node)` (or on `CardGrid`, `Rail`), with
+  `.separator(node)`; `Repeat::of(items, |item| node)` for in memory data. Virtual lists with a
+  builder need `.row_height(px)`. Keep `.item`/`.card` when they fit.
 - App shell top bar: `App::header(|h| h.center(SearchBox::of(..)).end(LinkButton::new(..)))`,
   the same slots as the site header.
 - Settings pages: `ThemePicker::new()` is the theme choice inside a screen, in step with the shell.
@@ -241,7 +251,7 @@ What to remember:
 | Checking permissions inside the action body | `permission = "..."` on the attribute, guards on the feature |
 | Saving a plain model | `Valid<Model>`; it is validated before your code runs |
 | Writing JavaScript for a behavior | Effects, components, or a `Component` in Rust |
-| `location.reload()` style refreshes | `ui.close_and_refresh()`, `ui.navigate(...)` |
+| `location.reload()` style refreshes | `ui.close_and_refresh()`, `ui.navigate(...)`, `ui.refresh("topic")` with `.listens("topic")` |
 | A secret in `config/app.json` or code | `config.secret("key")` from the environment or a vault |
 | Forgetting to register | Screens in the feature's `mod.rs`, features and services in `src/app.rs` |
 

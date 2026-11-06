@@ -104,6 +104,7 @@
       "max": "{label}不能大于 {n}。",
       "format": "{label}的值无效。",
       "skipped_time": "{label}：由于时钟调整，该时间在您的时区中不存在。",
+      "depends_on": "此选项不适用于其所依赖字段的值。",
       "line": "第 {n} 行：{message}",
       "disabled_day": "{label}：不能选择这一天。",
       "time_step": "{label}必须以 {n} 分钟为步长。",
@@ -229,6 +230,7 @@
       "resize": "调整窗格大小",
       "cards": {
         "load_more": "显示更多",
+        "list": "列表",
         "loaded": "已显示 {count} 项",
         "empty": "没有可显示的内容。",
         "error": "无法加载列表，请重试。",

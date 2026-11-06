@@ -14,15 +14,39 @@ use zeyn::ui::SearchParams;
 
 include!(concat!(env!("OUT_DIR"), "/api.rs"));
 
+/// The params of every component page. Examples whose filters drive other nodes keep their
+/// values here, so the listeners read them from the screen params; the other examples ignore
+/// them.
+#[params]
+#[derive(Default)]
+pub struct Demo {
+    pub kind: Option<data::Kind>,
+    pub from: Option<Date>,
+    pub to: Option<Date>,
+    pub q: Option<String>,
+}
+
 /// One live example: the function of the component's file that builds it.
 pub struct Example {
     pub func: &'static str,
-    pub build: fn(&Ctx) -> Node,
+    pub build: fn(&Ctx, &Demo) -> Node,
 }
 
-/// An [`Example`] of the function `f` of the current file.
+/// An [`Example`] of the function `f(ctx)` of the current file.
 #[macro_export]
 macro_rules! ex {
+    ($f:ident) => {
+        $crate::Example {
+            func: stringify!($f),
+            build: |ctx, _| $f(ctx),
+        }
+    };
+}
+
+/// An [`Example`] of the function `f(ctx, demo)` of the current file, which reads the page's
+/// params.
+#[macro_export]
+macro_rules! exd {
     ($f:ident) => {
         $crate::Example {
             func: stringify!($f),
@@ -61,13 +85,29 @@ impl Component {
     }
 }
 
+/// The params type of a catalog page: `()` unless the entry names one.
+macro_rules! page_params {
+    () => {
+        ()
+    };
+    ($p:ty) => {
+        $p
+    };
+}
+
+impl From<()> for Demo {
+    fn from(_: ()) -> Demo {
+        Demo::default()
+    }
+}
+
 macro_rules! catalog {
-    ($( $cat:literal $icon:ident { $( $slug:ident $route:literal ; )* } )*) => {
+    ($( $cat:literal $icon:ident { $( $slug:ident $route:literal $( ($p:ty) )? ; )* } )*) => {
         $( $(
             #[doc = concat!("The page of `", stringify!($slug), "`.")]
             #[screen(route = $route, public)]
-            pub fn $slug(_: (), ctx: Ctx) -> Screen {
-                page::component_screen(stringify!($slug), &ctx)
+            pub fn $slug(demo: page_params!($($p)?), ctx: Ctx) -> Screen {
+                page::component_screen(stringify!($slug), &ctx, &Demo::from(demo))
             }
         )* )*
 
@@ -146,6 +186,7 @@ catalog! {
         rail "/ui/rail";
         list "/ui/list";
         search_box "/ui/search-box";
+        topics "/ui/topics" (Demo);
         tree "/ui/tree";
         week_schedule "/ui/week-schedule";
     }

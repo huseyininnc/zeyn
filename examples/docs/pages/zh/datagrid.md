@@ -77,4 +77,16 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 - `.row_style(|row| Option<RowStyle>)`：危险、警告或成功样式的行。
 - `.exportable()`：将筛选后的行导出为 CSV，由服务器以流方式输出。
 
+## 就地刷新
+
+最后调用的 `.listens(topic)` 让网格在主题被点名时就地重新加载（见 [主题](effects.md#topics)）：`ui.refresh(topic)` 之后，它保留排序和筛选重新加载当前页；带 `.drives(topic)` 的筛选控件变化之后，它以新的界面 params 从第一页开始。网格经由带有全部权限检查的 `POST /_zeyn/grid` 重新加载，筛选改变的界面 param 通过界面函数传给网格，例如作为 scope：
+
+```rust
+let mut grid = DataGrid::of(search_orders);
+if let Some(region) = p.region {
+    grid = grid.scope(Order::region, region);
+}
+grid.column(Order::number).column(Order::total).listens("orders")
+```
+
 [DataGrid 参考](grid.md)涵盖了已保存的视图、主从明细、分组、树形数据、就地编辑、单元格导航、复制和粘贴、列虚拟化以及无障碍。

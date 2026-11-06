@@ -39,6 +39,52 @@ Deja el nombre vacío o escribe un correo incorrecto y pulsa *Send*: el navegado
 
 Cada tipo de campo tiene un control por defecto: entradas de texto, entradas numéricas, dinero con la moneda, selectores de fecha y hora, casillas de verificación para `bool` y selects para choices. `.control(M::f, Control::...)` elige otro, y `.lookup(M::f, action)` busca registros en el servidor. Consulta [Controles y selectores](controls.md).
 
+## Lookups dependientes
+
+`.depends_on(field, source)` hace que las opciones del lookup `field` dependan de otro campo, como las ciudades de un país. Cada búsqueda envía el valor de `source` en `LookupQuery::parent` (`q.parent_id()` lo lee como un id), y al cambiar `source` se vacía `field`, así que sus opciones se cargan de nuevo para el valor nuevo.
+
+```rust
+#[action(permission = "geo.read")]
+pub async fn find_cities(q: LookupQuery, store: Cities) -> Result<Page<LookupItem>> {
+    Ok(q.apply(store.of_country(q.parent_id())))
+}
+
+Form::of(address)
+    .lookup(Address::country, find_countries)
+    .lookup(Address::city, find_cities)
+    .depends_on(Address::city, Address::country)
+    .submit(t!("save"), save_address)
+```
+
+No se puede confiar el par al navegador, así que al enviar el servidor vuelve a preguntar a la action del lookup por la ciudad elegida con el país enviado, con el permiso de la action, y rechaza con un error de campo una ciudad que no devuelve. Filtra por el padre también en las consultas por id, como hace `q.apply` después de filtrar. `App::check_page` informa de un `depends_on` cuyo campo no es un lookup del formulario o cuyo origen no es otro campo del formulario.
+
+## Formularios de filtro
+
+Un formulario sin botón de envío puede filtrar la pantalla: `.drives(topic)` convierte sus campos en params de la pantalla. Cuando un campo cambia (un select, un rango de fechas, un campo de texto con Enter), su valor pasa al param de la pantalla con el mismo nombre, la dirección se mantiene al día y los nodos que `.listens(topic)` se refrescan en su sitio y leen el valor de sus params (consulta [Topics](effects.md#topics)). Los números y los booleanos se envían como tales y los campos vacíos como `null`; el servidor lee los params como los params tipados de la pantalla, así que un valor que no encaja se rechaza.
+
+```rust
+#[params]
+pub struct SalesParams {
+    pub region: Option<Region>,
+    pub from: Option<Date>,
+    pub to: Option<Date>,
+}
+
+#[screen(route = "/sales", permission = "sales.read")]
+pub fn sales(p: SalesParams, store: Sales) -> Screen {
+    Screen::new(t!("sales.title"))
+        .body(
+            Form::of(SalesFilter { region: p.region, from: p.from, to: p.to })
+                .field(SalesFilter::region)
+                .range(SalesFilter::from, SalesFilter::to)
+                .drives("sales"),
+        )
+        .body(Kpi::new(t!("sales.total"), store.total(&p)).listens("sales"))
+}
+```
+
+Un formulario con `submit` no puede conducir; en su lugar, refresca después de guardar con `ui.refresh(topic)` en `on_success`.
+
 ## Campos de solo lectura
 
 Los campos `#[readonly]` se muestran en los formularios pero no se pueden editar, como un nivel de existencias que solo cambian los movimientos.

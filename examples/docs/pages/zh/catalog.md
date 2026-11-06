@@ -59,6 +59,22 @@ Rail::of(search_products).card(|p: &Product| {
 @live preview
 
 
+### 构建器
+
+`.card` 和 `.item` 仍是默认方式：链接、图片和读屏文本都现成可用。当一行需要别的形状时，`.builder(|row| node)` 像 Flutter 的 `ListView.builder` 那样把每一行构建成任意节点，可用于 `List::of`、`CardGrid` 和 `Rail`。`.separator(node)` 在行与行之间放一个节点（对读屏软件隐藏，它们自己会数行），`Repeat::of(items, |item| node)` 对界面已经在内存中持有的列表做同样的事，最多 500 项。
+
+```rust
+List::of(search_people)
+    .builder(|p: &Person| Row::new().compact().col(Avatar::new(p.name.clone())).col(Paragraph::new(p.city.clone())))
+    .separator(Paragraph::new("·"))
+
+Repeat::of(order.steps.iter(), |s| Badge::new(s.name.clone())).separator(Paragraph::new("→"))
+```
+
+- **键。** 构建的行和虚拟列表的行都在 `data-zeyn-key` 中带有模型的键，因此列表刷新（[主题](effects.md#topics)）时，无论记录移到哪里，焦点和展开的 details 都留在同一条记录上。
+- **构建的行只用于展示。** 其中的节点不通过节点路径寻址，所以网格、表单或 lookup 要放在别处。`Repeat` 的节点是子节点（`p.0`、`p.1` ...），可以正常工作。
+- **虚拟滚动。** 带 `.paging(Paging::virtual_scroll())` 的列表只把可见的行放在页面中，置于一个与全部行一样高的滚动区域内，并随用户滚动按 offset 获取数据块。行只有一个固定高度，没有逐行高度：使用构建器时必须写 `.row_height(px)`，缺少时 `App::check_page` 会报告（那里不使用 `separator`）。每一行都带有 `aria-posinset` 和 `aria-setsize`，读屏软件会读出它在整个列表中的位置；滚动区域是以标题命名、可获得焦点的 region。
+
 ## Rail
 
 rail 是排成一行并可横向滚动的卡片网格，带有滚动吸附，以及按一个视图宽度滚动的上一个和下一个按钮（除非用户要求减少动画，否则为平滑滚动）。当用户滚动到接近末尾时，它每次加载下一批，每批 12 张。卡片是处于 Tab 顺序中的链接，获得焦点时会滚动到视野中。
@@ -94,6 +110,8 @@ SearchBox::of(catalog_products)
 键盘：向下和向上键在建议之间移动（向下键会打开建议），Enter 以高亮的建议或输入的文本进行搜索，Escape 先关闭建议，再清空字段。实时区域会告诉屏幕阅读器有多少条建议。
 
 结果 screen 接收 `SearchParams`（`q`，从菜单打开该 screen 时为空）。服务器会把文本截断到 `MAX_SEARCH_QUERY`（100）个字符，决定发送多少条建议（默认 8 条，除非 `limit` 另有指定，最多 20 条），检查 screen 的访问权限、Feature 的 guard 和 action 的权限，并把每次建议调用都计入写入频率限制（`App::write_limit`）。
+
+`.drives(topic)` 会就地搜索，而不是打开结果界面：按 Enter、选择建议或清空字段，都会把文本放入界面的 `q` param，并刷新监听该主题的节点（见 [主题](effects.md#topics)）。界面的 params 需要一个 `q: String` 字段，就像 `SearchParams` 那样。
 
 ### 富建议
 

@@ -51,6 +51,7 @@ A page loads and runs only the browser code its screen uses. Every page runs the
 | `forms.js`, `reveal.js`, `import.js` | drafts and workflow transitions of forms; revealing masked values; imports |
 | `catalog.js`, `media.js`, `files.js`, `charts.js` and their stylesheets | card grids, rails and search boxes; players, embeds and images; uploads; charts, sparklines, KPI cards and bullets |
 | `share.js`, `chips.js`, `reactions.js`, `hero.js`, `state.js`, `preview.js`, `assistant.js` | share buttons, filter chips, reactions, hero slides, the preference store, card previews (first hover), the assistant (chat panels, or the first press of the launcher) |
+| `topics.js`, `vlist.js` | nodes that listen to topics and the controls that drive them (`data-zeyn-listens`, `data-zeyn-drives`); virtual lists (`data-zeyn-vlist`) |
 
 A full page links, in its head, the stylesheets every page uses (`zeyn.css`, `components.css`, `content.css`, `pro.css`, `enterprise.css`), the stylesheets of the modules whose markers are in its HTML, and their scripts after the modules they import. `zeyn.js` is served with the same table (`[name, script selector, style selector]`) and loads what is missing when content arrives later: `nav.js` fires `zeyn:need` with `{ root, waits }` before it swaps a screen in and waits for the new stylesheets, windows wait the same way before they open, and `zeyn:content`, grid pages and grid filters load the scripts of what they hold. The browser keeps one instance per URL, so a module runs once. A module sets up what it finds in the document when it runs and listens to `zeyn:content` after that; it never scans for, or listens to, components that are not on the page. Modules import the shared part with the `?v=` of their own URL. `tests/ui_modules.rs` fails when a page links a module it does not use or a module stylesheet styles a class outside its markers.
 
@@ -281,6 +282,7 @@ All are `POST` with JSON and the CSRF header, and check the screen's access and 
 | Endpoint | Body | Answer |
 |---|---|---|
 | `/_zeyn/node` | `{ screen, params, node }` | HTML of one node with the first page of its grids. Used by lazy tabs. |
+| `/_zeyn/nodes` | `{ screen, params, nodes: ["1.0", "2"] }` | `{ nodes: { "1.0": "<div class=\"z-node\" ...>" } }`: several nodes rendered from one run of the screen, for the listeners of a refreshed or driven topic. At most 32 distinct paths; a path not in the screen answers `404`. The screen's access, guards and interceptors run once, and params are read as the screen's typed params. |
 | `/_zeyn/data` | `{ screen, params, node, key, input }` | JSON from the data source `key` of the node: lookup options (`key` is the field name), tree children (`key` is empty), step checks (`key` is `_step`). The source's action permission is checked and the interceptors run, as for grids. Input that does not fit the action is refused with `404`. |
 | `/_zeyn/data` with `screen` = `_site.{feature}` | as above | The same for a component in a site header slot: `node` is the slot (0 start, 1 center, 2 end, 3 bottom), the node's index in it, then child indexes. The feature's guards and the action's permission are checked. |
 | `/_zeyn/parse` | `{ kind, text, label }` | How the server reads a typed date or time in the user's language, zone and clock: `{ ok, text, iso, utc, zone }` or `{ ok: false, message }`. `kind` is `date`, `time`, `datetime`, `local` or `presets` (today and quick ranges). |
@@ -298,8 +300,14 @@ All are `POST` with JSON and the CSRF header, and check the screen's access and 
 | `zeyn:content` | `document` | Element with new content (navigation, lazy panels). The runtime loads the modules it needs and every loaded module sets up what it holds. |
 | `zeyn:errors` | the form | The `422` errors, after the runtime showed them. The line editor and stepped forms use it. |
 | `zeyn:effect` | `document` | An effect the runtime does not know: `{ effect, source, run }`. `run(next)` runs another effect. Used by `confirm`. |
+| `zeyn:topics` | `document` | `{ topics }`: topics to refresh, from another script (`live.js` on a notification). |
+| `zeyn:reload` | an element | Reloads the grids inside it in place: the current page, or the first one with `{ reset: true }`. |
 
 Effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":"...","then":{...}}` asks in a modal alert dialog and runs `then` only after the user confirms.
+
+Effect `{"effect":"refresh","topics":["sales"]}` refreshes the listeners of the topics. `[data-zeyn-listens="a,b"]` marks a listener (the node at its `data-zeyn-node` parent); `[data-zeyn-drives="a"]` marks a control that drives topics: a filter form (`data-zeyn-kinds` says which params are numbers or booleans), a search box (its field is named `q`) or filter chips (each chip carries its params in `data-zeyn-params`). Driving merges the control's values into the screen root's `data-zeyn-params`, replaces the address with them when the screen is the main one, and refreshes the listeners. `topics.js` handles the topics named in one animation frame at once: a listener holding a grid gets `zeyn:reload`, the others of a screen go in one `POST /_zeyn/nodes`, and a newer one for the same screen aborts it and takes over its nodes. Focus and open `<details>` are kept by id, test id, `data-zeyn-key` row and position.
+
+A virtual list is `section[data-zeyn-vlist]` with `data-zeyn-row-height`, `data-zeyn-block` and `data-zeyn-total`; `vlist.js` asks `POST /_zeyn/grid` for blocks with `{ page: { type: "offset", offset }, with_total: true }` and places each `<li>` at `(aria-posinset - 1) * height`. Lookups that depend on another field carry `data-depends-on="field"` and send that field's value as `parent` in their `/_zeyn/data` input.
 
 Client preferences (`zeyn::ClientPref`) live in the browser module `/_zeyn/state.js`, which pages import only when they hold an element with `data-zeyn-remember` or `data-zeyn-prefs-clear`. `GET /_zeyn/prefs` answers `{ preferences }`, whether the app's consent hook allows keeping preference values beyond the session, with `Cache-Control: no-store`. The server reads no stored value.
 

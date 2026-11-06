@@ -32,7 +32,7 @@ pub const ENTRY: Entry = Entry {
     api: &["SiteHeader"],
     overview: &[Example {
         func: "catalog_header",
-        build: this_page,
+        build: |ctx, _| this_page(ctx),
     }],
     examples: &[],
 };

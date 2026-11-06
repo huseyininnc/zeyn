@@ -39,6 +39,52 @@ Form::of(Contact { quantity: 1, ..Contact::default() })
 
 每种字段类型都有默认控件：文本输入、数字输入、带币种的金额、日期和时间选择器、`bool` 的复选框以及选项的下拉框。`.control(M::f, Control::...)` 选择另一种控件，`.lookup(M::f, action)` 在服务器上搜索记录。参见[控件与选择器](controls.md)。
 
+## 依赖的 lookup
+
+`.depends_on(field, source)` 让 lookup `field` 的选项依赖于另一个字段，例如某个国家的城市。每次搜索都会在 `LookupQuery::parent` 中发送 `source` 的值（`q.parent_id()` 把它读作 id），`source` 改变时会清空 `field`，使其选项按新值重新加载。
+
+```rust
+#[action(permission = "geo.read")]
+pub async fn find_cities(q: LookupQuery, store: Cities) -> Result<Page<LookupItem>> {
+    Ok(q.apply(store.of_country(q.parent_id())))
+}
+
+Form::of(address)
+    .lookup(Address::country, find_countries)
+    .lookup(Address::city, find_cities)
+    .depends_on(Address::city, Address::country)
+    .submit(t!("save"), save_address)
+```
+
+这一对值不能交给浏览器信任，因此提交时服务器会带着提交的国家，以该 action 的权限再次向 lookup 的 action 查询所选城市，对它不返回的城市给出字段错误并拒绝。按 id 查询时也要按父值筛选，就像筛选后再调用 `q.apply` 那样。`App::check_page` 会报告字段不是表单 lookup、或来源不是表单另一个字段的 `depends_on`。
+
+## 筛选表单
+
+没有提交按钮的表单可以筛选界面：`.drives(topic)` 把它的字段变成界面的 params。字段变化时（选择框、日期范围、按 Enter 的文本框），其值进入同名的界面 param，地址保持同步，`.listens(topic)` 的节点就地刷新并从自己的 params 中读取该值（见 [主题](effects.md#topics)）。数字和布尔值按原样发送，空字段发送为 `null`；服务器把 params 读作界面的类型化 params，不合适的值会被拒绝。
+
+```rust
+#[params]
+pub struct SalesParams {
+    pub region: Option<Region>,
+    pub from: Option<Date>,
+    pub to: Option<Date>,
+}
+
+#[screen(route = "/sales", permission = "sales.read")]
+pub fn sales(p: SalesParams, store: Sales) -> Screen {
+    Screen::new(t!("sales.title"))
+        .body(
+            Form::of(SalesFilter { region: p.region, from: p.from, to: p.to })
+                .field(SalesFilter::region)
+                .range(SalesFilter::from, SalesFilter::to)
+                .drives("sales"),
+        )
+        .body(Kpi::new(t!("sales.total"), store.total(&p)).listens("sales"))
+}
+```
+
+带 `submit` 的表单不能驱动主题；请改为在保存后于 `on_success` 中用 `ui.refresh(topic)` 刷新。
+
 ## 只读字段
 
 `#[readonly]` 字段会在表单中显示但不能编辑，例如只由库存变动来改变的库存量。

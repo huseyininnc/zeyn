@@ -104,6 +104,7 @@
       "max": "{label} debe ser como máximo {n}.",
       "format": "{label} tiene un valor no válido.",
       "skipped_time": "{label}: esta hora no existe en tu zona horaria porque cambió el reloj.",
+      "depends_on": "Esta opción no está disponible para el valor del campo del que depende.",
       "line": "Línea {n}: {message}",
       "disabled_day": "{label}: este día no se puede elegir.",
       "time_step": "{label} debe ir en intervalos de {n} minutos.",
@@ -229,6 +230,7 @@
       "resize": "Cambiar tamaño de los paneles",
       "cards": {
         "load_more": "Mostrar más",
+        "list": "Lista",
         "loaded": "{count} elementos mostrados",
         "empty": "Nada que mostrar.",
         "error": "No se pudo cargar la lista. Inténtalo de nuevo.",

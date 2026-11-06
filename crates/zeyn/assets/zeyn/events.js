@@ -314,10 +314,14 @@ document.addEventListener('zeyn:filter', (e) => {
   G?.loadGrid(grid, 'reset');
 });
 
-/** `zeyn:reload` on an element reloads the grids inside it in place (`live.js` sends it). */
+/**
+ * `zeyn:reload` on an element reloads the grids inside it in place (`live.js` and `topics.js`
+ * send it): the current page, or the first one with `detail.reset` (after a filter changed).
+ */
 document.addEventListener('zeyn:reload', (e) => {
   const root = e.target instanceof Element ? e.target : document;
-  root.querySelectorAll('[data-zeyn-grid]').forEach((g) => G?.loadGrid(g, 'reload'));
+  const how = e.detail?.reset ? 'reset' : 'reload';
+  root.querySelectorAll('[data-zeyn-grid]').forEach((g) => G?.loadGrid(g, how));
 });
 
 /**

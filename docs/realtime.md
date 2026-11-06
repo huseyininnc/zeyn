@@ -115,6 +115,14 @@ Notifications carry only the topic name, never data: the refresh goes through th
 endpoint with every permission check. `notify` reaches the caller's tenant only;
 `notify_tenant(Some(id), topic)` names one, `None` is the app without tenancy.
 
+The same topic names work without the channel. Nodes marked with `.listens("orders")` refresh in
+place when a notification names the topic (`live.js` passes it on as `zeyn:topics`), and also
+when an action ends with `ui.refresh("orders")` or a filter that `.drives("orders")` changes:
+grids reload their current page, other listeners are rendered again with one `POST /_zeyn/nodes`
+per screen (see Topics in `examples/docs/pages/effects.md`). The socket subscribes only to the
+topics of `Live` nodes, which must be declared with `Realtime::topic`; use `.listens` inside or
+next to them for the parts that are not grids.
+
 ## 5. Memory and backpressure
 
 Every piece of state has a bound (`Limits`, defaults in brackets):

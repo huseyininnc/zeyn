@@ -206,7 +206,11 @@ pub async fn people_uncounted(q: DataQuery) -> Result<Page<Person>> {
 /// Events of the current week, a few each day.
 #[action(public)]
 pub async fn week_events(q: DataQuery, ctx: Ctx) -> Result<Page<Event>> {
-    let today = ctx.today();
+    Ok(q.apply(week(ctx.today())))
+}
+
+/// The sample events of the week of `today`, Monday first.
+pub fn week(today: Date) -> Vec<Event> {
     let monday = today
         .add_days(1 - i64::from(today.weekday()))
         .unwrap_or(today);
@@ -220,8 +224,7 @@ pub async fn week_events(q: DataQuery, ctx: Ctx) -> Result<Page<Event>> {
         (4, "Demo day", "15:00"),
         (5, "Open house", "11:00"),
     ];
-    let events = plan
-        .iter()
+    plan.iter()
         .enumerate()
         .map(|(i, (offset, title, starts))| Event {
             id: EventId(i as i64 + 1),
@@ -229,8 +232,7 @@ pub async fn week_events(q: DataQuery, ctx: Ctx) -> Result<Page<Event>> {
             day: monday.add_days(*offset),
             starts: starts.to_string(),
         })
-        .collect();
-    Ok(q.apply(events))
+        .collect()
 }
 
 /// Sample products for lookups.

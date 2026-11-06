@@ -60,5 +60,6 @@ pub mod theme_picker;
 pub mod timeline;
 pub mod toast;
 pub mod toolbox;
+pub mod topics;
 pub mod tree;
 pub mod week_schedule;

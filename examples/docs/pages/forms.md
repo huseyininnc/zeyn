@@ -39,6 +39,52 @@ Leave the name empty or type a wrong email and press *Send*: the browser shows t
 
 Each field type has a default control: text inputs, number inputs, money with the currency, date and time pickers, checkboxes for `bool` and selects for choices. `.control(M::f, Control::...)` picks another one, and `.lookup(M::f, action)` searches records on the server. See [Controls and pickers](controls.md).
 
+## Dependent lookups
+
+`.depends_on(field, source)` makes the options of the lookup `field` depend on another field, such as the cities of a country. Every search sends the value of `source` in `LookupQuery::parent` (`q.parent_id()` reads it as an id), and changing `source` clears `field`, so its options load again for the new value.
+
+```rust
+#[action(permission = "geo.read")]
+pub async fn find_cities(q: LookupQuery, store: Cities) -> Result<Page<LookupItem>> {
+    Ok(q.apply(store.of_country(q.parent_id())))
+}
+
+Form::of(address)
+    .lookup(Address::country, find_countries)
+    .lookup(Address::city, find_cities)
+    .depends_on(Address::city, Address::country)
+    .submit(t!("save"), save_address)
+```
+
+The browser cannot be trusted with the pair, so on submit the server asks the lookup action again for the chosen city with the submitted country, with the action's permission, and refuses a city it does not return with a field error. Filter by the parent for id queries too, as `q.apply` after filtering does. `App::check_page` reports a `depends_on` whose field is not a lookup of the form or whose source is not another field of it.
+
+## Filter forms
+
+A form without a submit button can filter the screen: `.drives(topic)` makes its fields screen params. When a field changes (a select, a date range, a text field on Enter), its value goes into the screen's param of the same name, the address is kept in step, and the nodes that `.listens(topic)` refresh in place and read the value from their params (see [Topics](effects.md#topics)). Numbers and booleans are sent as such and empty fields as `null`; the server reads the params as the screen's typed params, so a value that does not fit is refused.
+
+```rust
+#[params]
+pub struct SalesParams {
+    pub region: Option<Region>,
+    pub from: Option<Date>,
+    pub to: Option<Date>,
+}
+
+#[screen(route = "/sales", permission = "sales.read")]
+pub fn sales(p: SalesParams, store: Sales) -> Screen {
+    Screen::new(t!("sales.title"))
+        .body(
+            Form::of(SalesFilter { region: p.region, from: p.from, to: p.to })
+                .field(SalesFilter::region)
+                .range(SalesFilter::from, SalesFilter::to)
+                .drives("sales"),
+        )
+        .body(Kpi::new(t!("sales.total"), store.total(&p)).listens("sales"))
+}
+```
+
+A form with `submit` cannot drive; refresh after saving with `ui.refresh(topic)` in `on_success` instead.
+
 ## Read only fields
 
 `#[readonly]` fields are shown in forms but cannot be edited, such as a stock level that only movements change.

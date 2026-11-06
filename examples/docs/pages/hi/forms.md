@@ -39,6 +39,52 @@ Form::of(Contact { quantity: 1, ..Contact::default() })
 
 हर फ़ील्ड प्रकार का एक डिफ़ॉल्ट कंट्रोल है: टेक्स्ट इनपुट, नंबर इनपुट, करेंसी के साथ मुद्रा, तारीख़ और समय पिकर, `bool` के लिए चेकबॉक्स और choice के लिए select। `.control(M::f, Control::...)` दूसरा चुनता है, और `.lookup(M::f, action)` सर्वर पर रिकॉर्ड खोजता है। देखें [कंट्रोल और पिकर](controls.md)।
 
+## निर्भर lookup
+
+`.depends_on(field, source)` lookup `field` के विकल्पों को किसी दूसरे फ़ील्ड पर निर्भर बनाता है, जैसे किसी देश के शहर। हर खोज `source` का मान `LookupQuery::parent` में भेजती है (`q.parent_id()` उसे id के रूप में पढ़ता है), और `source` बदलने पर `field` ख़ाली हो जाता है, ताकि नए मान के लिए उसके विकल्प फिर से लोड हों।
+
+```rust
+#[action(permission = "geo.read")]
+pub async fn find_cities(q: LookupQuery, store: Cities) -> Result<Page<LookupItem>> {
+    Ok(q.apply(store.of_country(q.parent_id())))
+}
+
+Form::of(address)
+    .lookup(Address::country, find_countries)
+    .lookup(Address::city, find_cities)
+    .depends_on(Address::city, Address::country)
+    .submit(t!("save"), save_address)
+```
+
+इस जोड़ी पर ब्राउज़र का भरोसा नहीं किया जा सकता, इसलिए सबमिट पर सर्वर चुने गए शहर के बारे में भेजे गए देश के साथ lookup action से, उस action की अनुमति के साथ, फिर से पूछता है और जो शहर वह नहीं लौटाता उसे फ़ील्ड त्रुटि के साथ अस्वीकार करता है। id वाले अनुरोधों में भी parent से फ़िल्टर करें, जैसा फ़िल्टर करने के बाद `q.apply` करता है। `App::check_page` ऐसा `depends_on` बताता है जिसका फ़ील्ड फ़ॉर्म का lookup न हो या जिसका स्रोत फ़ॉर्म का कोई दूसरा फ़ील्ड न हो।
+
+## फ़िल्टर फ़ॉर्म
+
+बिना सबमिट बटन वाला फ़ॉर्म Screen को फ़िल्टर कर सकता है: `.drives(topic)` उसके फ़ील्ड को Screen params बना देता है। जब कोई फ़ील्ड बदलता है (सेलेक्ट, तारीख की सीमा, Enter दबाने पर टेक्स्ट फ़ील्ड), उसका मान Screen के उसी नाम वाले param में जाता है, पता साथ में अपडेट रहता है, और `.listens(topic)` वाले node उसी जगह रिफ़्रेश होकर मान अपने params से पढ़ते हैं ([Topic](effects.md#topics) देखें)। संख्याएँ और boolean वैसे ही भेजे जाते हैं और ख़ाली फ़ील्ड `null` के रूप में; सर्वर params को Screen के typed params के रूप में पढ़ता है, इसलिए जो मान फ़िट न हो वह अस्वीकार होता है।
+
+```rust
+#[params]
+pub struct SalesParams {
+    pub region: Option<Region>,
+    pub from: Option<Date>,
+    pub to: Option<Date>,
+}
+
+#[screen(route = "/sales", permission = "sales.read")]
+pub fn sales(p: SalesParams, store: Sales) -> Screen {
+    Screen::new(t!("sales.title"))
+        .body(
+            Form::of(SalesFilter { region: p.region, from: p.from, to: p.to })
+                .field(SalesFilter::region)
+                .range(SalesFilter::from, SalesFilter::to)
+                .drives("sales"),
+        )
+        .body(Kpi::new(t!("sales.total"), store.total(&p)).listens("sales"))
+}
+```
+
+`submit` वाला फ़ॉर्म drive नहीं कर सकता; उसके बजाय सहेजने के बाद `on_success` में `ui.refresh(topic)` से रिफ़्रेश करें।
+
 ## केवल पढ़ने योग्य फ़ील्ड
 
 `#[readonly]` फ़ील्ड फ़ॉर्म में दिखते हैं लेकिन संपादित नहीं हो सकते, जैसे स्टॉक स्तर जिसे केवल मूवमेंट बदलते हैं।

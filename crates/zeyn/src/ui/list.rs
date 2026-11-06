@@ -236,6 +236,78 @@ impl List {
     }
 }
 
+/// Most items one [`Repeat`] builds; more are left out.
+pub const MAX_REPEAT: usize = 500;
+
+into_node!(Repeat);
+
+/// One node per item of an in memory list, one under the other, like Flutter's
+/// `ListView.builder` over a list the screen already has. For rows an action loads, use
+/// `List::of(...).builder(...)`, which pages. The nodes are children of the repeat, so a form
+/// or a lookup in them keeps working (child `i` has the path `p.i`). At most [`MAX_REPEAT`]
+/// items.
+///
+/// ```
+/// use zeyn::prelude::*;
+/// use zeyn::{Component, I18n, Render};
+///
+/// let steps = Repeat::of(["Pack", "Ship", "Deliver"], |s| Badge::new(s))
+///     .separator(Paragraph::new("→"));
+/// let mut html = String::new();
+/// steps.render(&mut html, &Render::new("s", "en", I18n::builtin()));
+/// assert_eq!(html.matches(r#"class="z-separator""#).count(), 2);
+/// assert_eq!(steps.children().len(), 3);
+/// ```
+pub struct Repeat {
+    nodes: Vec<Node>,
+    separator: Option<Node>,
+}
+
+impl Repeat {
+    pub fn of<T, N: Into<Node>>(
+        items: impl IntoIterator<Item = T>,
+        build: impl Fn(T) -> N,
+    ) -> Self {
+        Repeat {
+            nodes: items
+                .into_iter()
+                .take(MAX_REPEAT)
+                .map(|item| build(item).into())
+                .collect(),
+            separator: None,
+        }
+    }
+
+    /// A node shown between two items, hidden from screen readers.
+    pub fn separator(mut self, node: impl Into<Node>) -> Self {
+        self.separator = Some(node.into());
+        self
+    }
+}
+
+impl Component for Repeat {
+    fn render(&self, out: &mut String, r: &Render) {
+        out.push_str(r#"<div class="z-stack z-repeat">"#);
+        for (i, node) in self.nodes.iter().enumerate() {
+            if let (Some(sep), true) = (&self.separator, i > 0) {
+                out.push_str(r#"<div class="z-separator" aria-hidden="true">"#);
+                sep.render(out, r);
+                out.push_str("</div>");
+            }
+            super::render_child(out, r, i, node);
+        }
+        out.push_str("</div>");
+    }
+
+    fn schema(&self) -> Json {
+        json!({ "type": "repeat", "children": self.nodes.iter().map(Node::schema).collect::<Vec<_>>() })
+    }
+
+    fn children(&self) -> &[Node] {
+        &self.nodes
+    }
+}
+
 impl Component for List {
     fn render(&self, out: &mut String, r: &Render) {
         let id = super::dom_id(r, "list");

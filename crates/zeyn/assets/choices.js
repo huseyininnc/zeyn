@@ -103,13 +103,30 @@ function initLookups(root) {
     wrap.zeynLabels = new Map();
     const ids = idsOf(wrap);
     if (ids.length) {
-      fetchData(wrap, wrap.dataset.zeynLookup, { ids: ids.map(Number), limit: ids.length }).then((page) => {
+      fetchData(wrap, wrap.dataset.zeynLookup, { ids: ids.map(Number), limit: ids.length, parent: parentOf(wrap) }).then((page) => {
         for (const item of page?.items ?? []) wrap.zeynLabels.set(String(item.id), item.label);
         renderLookup(wrap);
       });
     }
   });
 }
+
+/** The value of the field a lookup depends on (`Form::depends_on`), or `null` when empty. */
+function parentOf(wrap) {
+  const name = wrap.dataset.dependsOn;
+  const field = name ? wrap.closest('form')?.elements.namedItem(name) : null;
+  const value = field && 'value' in field ? String(field.value).trim() : '';
+  return value || null;
+}
+
+/** When a field changes, clears the lookups that depend on it, so their options load again. */
+document.addEventListener('change', (e) => {
+  const { name, form } = e.target;
+  if (!name || !form) return;
+  for (const wrap of form.querySelectorAll(`[data-depends-on="${CSS.escape(name)}"]`)) {
+    if (idsOf(wrap).length) setIds(wrap, []);
+  }
+});
 
 /** Ids held by a lookup, as strings. */
 function idsOf(wrap) {
@@ -170,7 +187,7 @@ async function searchLookup(wrap, offset = 0, keep = []) {
   }
   wrap.zeynAbort?.abort();
   wrap.zeynAbort = new AbortController();
-  const page = await fetchData(wrap, wrap.dataset.zeynLookup, { text, offset, limit: 20 }, wrap.zeynAbort.signal);
+  const page = await fetchData(wrap, wrap.dataset.zeynLookup, { text, offset, limit: 20, parent: parentOf(wrap) }, wrap.zeynAbort.signal);
   if (!page || K.lb?.combo !== combo) return;
   const chosen = new Set(idsOf(wrap));
   const items = [...keep];

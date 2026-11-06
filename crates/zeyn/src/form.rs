@@ -89,6 +89,10 @@ pub struct Form<M: Model> {
     files: Vec<(&'static str, crate::files::FileRules, bool)>,
     /// Tooltips of fields, by field.
     tips: Vec<(&'static str, Text)>,
+    /// Lookups whose options depend on another field: (field, source field).
+    depends: Vec<(&'static str, &'static str)>,
+    /// Topics a filter form refreshes when a field changes.
+    drives: Vec<&'static str>,
 }
 
 impl<M: Model> Form<M> {
@@ -114,6 +118,8 @@ impl<M: Model> Form<M> {
             lines: Vec::new(),
             files: Vec::new(),
             tips: Vec::new(),
+            depends: Vec::new(),
+            drives: Vec::new(),
         }
     }
 
@@ -125,15 +131,8 @@ impl<M: Model> Form<M> {
             .map(|i| FormItem::Field(FormField::at(i)))
             .collect();
         Self {
-            model,
             items,
-            options: Vec::new(),
-            controls: Vec::new(),
-            lookups: Vec::new(),
-            lookup_columns: Vec::new(),
-            lines: Vec::new(),
-            files: Vec::new(),
-            tips: Vec::new(),
+            ..Self::of(model)
         }
     }
 
@@ -313,6 +312,94 @@ impl<M: Model> Form<M> {
         self.lookups
             .push((field.meta().name, Box::new(ActionSource::<A>::new()), true));
         self
+    }
+
+    /// The options of the lookup `field` depend on `source`, as the cities of a country: its
+    /// action gets the value of `source` in [`LookupQuery::parent`] with every search, and when
+    /// `source` changes the chosen value of `field` is cleared, so options load again for the new
+    /// value. On submit the server asks the lookup action once more for the chosen id with the
+    /// submitted `source` (and the action's permission), and refuses a pair it does not return.
+    /// `field` must be a lookup of this form and `source` a field of it; `App::check_page`
+    /// reports anything else.
+    ///
+    /// ```ignore
+    /// Form::of(address)
+    ///     .lookup(Address::country, find_countries)
+    ///     .lookup(Address::city, find_cities)
+    ///     .depends_on(Address::city, Address::country)
+    /// ```
+    pub fn depends_on<T, S>(mut self, field: Field<M, T>, source: Field<M, S>) -> Self
+    where
+        T: FieldType + 'static,
+        S: FieldType + 'static,
+    {
+        let name = field.meta().name;
+        self.depends.retain(|(n, _)| *n != name);
+        self.depends
+            .push((name, source.meta().name));
+        self
+    }
+
+    /// A filter form: a form without a submit button whose fields are screen params. When a
+    /// field changes (a select, a date range, a text field on Enter), its value goes into the
+    /// screen's param of the same name, the address is kept in step, and every node listening to
+    /// `topics` refreshes in place and reads the new value from its screen params. Numbers and
+    /// booleans are sent as such, empty fields as `null`; the server reads the params as the
+    /// screen's typed params.
+    ///
+    /// ```ignore
+    /// Form::of(SalesFilter { region: p.region, from: p.from, to: p.to })
+    ///     .field(SalesFilter::region)
+    ///     .range(SalesFilter::from, SalesFilter::to)
+    ///     .drives("sales")
+    /// ```
+    pub fn drives(mut self, topics: impl crate::ui::Topics) -> Self {
+        self.drives = crate::ui::topic_list(topics);
+        self
+    }
+
+    /// The `page_check` of the form: its topics and its dependent lookups.
+    fn check_form(&self, check: &mut crate::ui::PageCheck) {
+        for t in &self.drives {
+            check.drives(t);
+        }
+        for (field, source) in &self.depends {
+            if self.lookup_of(field).is_none() {
+                check.problem(format!(
+                    "`depends_on` names `{field}`, which is not a lookup of this form; add it with `.lookup({field}, ...)` first"
+                ));
+            }
+            if field == source
+                || !self
+                    .fields()
+                    .any(|f| f.meta.name == *source)
+            {
+                check.problem(format!(
+                    "lookup `{field}` depends on `{source}`, which is not another field of this form; add the field it depends on"
+                ));
+            }
+        }
+    }
+
+    /// The `data-zeyn-kinds` attribute of a filter form: which params are numbers or booleans,
+    /// so the browser sends them typed. Empty when no field is.
+    fn drive_kinds(&self) -> String {
+        let kinds: serde_json::Map<String, Json> = self
+            .fields()
+            .filter_map(|f| {
+                let kind = match f.meta.kind {
+                    FieldKind::Integer | FieldKind::Id => "number",
+                    FieldKind::Bool => "bool",
+                    _ => return None,
+                };
+                Some((f.meta.name.to_string(), Json::from(kind)))
+            })
+            .collect();
+        if kinds.is_empty() {
+            String::new()
+        } else {
+            format!(r#" data-zeyn-kinds="{}""#, crate::render::attr(&kinds))
+        }
     }
 
     /// Adds a lines field (order lines, invoice lines) edited as a table: add, remove and move
@@ -1071,7 +1158,12 @@ fn render_field<M: Model>(out: &mut String, r: &Render, f: &FormField<M>, form: 
             .iter()
             .find(|(n, _)| *n == m.name)
             .map(|(_, c)| c.as_slice());
-        crate::ui::render_lookup(out, r, &slot, many, columns.unwrap_or_default());
+        let depends = form
+            .depends
+            .iter()
+            .find(|(n, _)| *n == m.name)
+            .map(|(_, s)| *s);
+        crate::ui::render_lookup(out, r, &slot, many, columns.unwrap_or_default(), depends);
         out.push_str(&format!(
             r#"<p class="z-field-error" id="{id}-error" aria-live="polite"></p></div>"#
         ));
@@ -1102,6 +1194,94 @@ fn render_field<M: Model>(out: &mut String, r: &Render, f: &FormField<M>, form: 
     out.push_str(&format!(
         r#"<p class="z-field-error" id="{id}-error" aria-live="polite"></p></div>"#
     ));
+}
+
+/// A dependent lookup to check again on submit: the field, the chosen ids and the lookup's answer
+/// for them with the submitted parent (`None` when the user may not run the lookup's action).
+type PairCheck = (
+    &'static str,
+    Vec<i64>,
+    Option<crate::ctx::BoxFuture<Result<Json>>>,
+);
+
+impl<M: Model> Form<M> {
+    /// Starts the checks of the dependent lookups of a read form: for each one with a value, the
+    /// lookup's action runs with the chosen ids and the submitted value of its source field.
+    fn pair_checks(&self, saved: &M, values: &Map<String, Json>, ctx: &Ctx) -> Vec<PairCheck> {
+        let mut out = Vec::new();
+        for (field, source) in &self.depends {
+            let Some((lookup, _)) = self.lookup_of(field) else {
+                continue;
+            };
+            let ids = match M::fields()
+                .iter()
+                .position(|f| f.name == *field)
+                .and_then(|i| saved.value_at(i))
+            {
+                Some(Value::Int(n)) => vec![n],
+                Some(Value::Text(t)) => crate::ui::parse_ids(&t).unwrap_or_default(),
+                _ => Vec::new(),
+            };
+            if ids.is_empty() {
+                continue;
+            }
+            let parent = match values.get(*source) {
+                Some(Json::String(s)) if !s.trim().is_empty() => Some(s.trim().to_string()),
+                Some(Json::Number(n)) => Some(n.to_string()),
+                _ => None,
+            };
+            let fetch = ctx
+                .identity()
+                .can(&lookup.action().access)
+                .then(|| {
+                    lookup.fetch(
+                        ctx.clone(),
+                        json!({ "ids": ids, "parent": parent, "limit": ids.len() }),
+                    )
+                });
+            out.push((*field, ids, fetch));
+        }
+        out
+    }
+}
+
+/// Refuses a submit whose dependent lookups hold an id their lookup does not return for the
+/// submitted parent, such as a city of another country.
+async fn check_pairs(pairs: Vec<PairCheck>) -> Result<()> {
+    let mut errors = ValidationErrors::default();
+    for (field, ids, fetch) in pairs {
+        let found: Vec<i64> = match fetch {
+            Some(f) => f
+                .await
+                .ok()
+                .and_then(|page| {
+                    page.get("items")
+                        .and_then(Json::as_array)
+                        .map(|items| {
+                            items
+                                .iter()
+                                .filter_map(|i| i.get("id").and_then(Json::as_i64))
+                                .collect()
+                        })
+                })
+                .unwrap_or_default(),
+            None => Vec::new(),
+        };
+        if !ids.iter().all(|id| found.contains(id)) {
+            errors
+                .errors
+                .push(crate::model::FieldError {
+                    field,
+                    rule: Rule::Custom,
+                    message: Text::key("zeyn.validation.depends_on"),
+                });
+        }
+    }
+    if errors.errors.is_empty() {
+        Ok(())
+    } else {
+        Err(Error::Validation(errors))
+    }
 }
 
 type SuccessFn<O> = Arc<dyn Fn(&O, &mut UiCtx) + Send + Sync>;
@@ -1162,9 +1342,16 @@ where
                 }
             });
         }
+        let pairs = match &valid {
+            Ok(saved) => self
+                .form
+                .pair_checks(saved, &values, &ctx),
+            Err(_) => Vec::new(),
+        };
         let on_success = self.on_success.clone();
         Box::pin(async move {
             let valid = valid.map_err(Error::Validation)?;
+            check_pairs(pairs).await?;
             let output = A::call(ctx, valid).await?;
             if let Some(error) = output.failure() {
                 return Err(error);
@@ -1306,8 +1493,13 @@ impl<M: Model> Component for Form<M> {
     }
 
     fn render(&self, out: &mut String, r: &Render) {
+        let drives = if self.drives.is_empty() {
+            String::new()
+        } else {
+            crate::ui::topics_attr("data-zeyn-drives", &self.drives) + &self.drive_kinds()
+        };
         out.push_str(&format!(
-            r#"<form class="z-form" data-testid="{}.form" novalidate>"#,
+            r#"<form class="z-form" data-testid="{}.form"{drives} novalidate>"#,
             r.scope
         ));
         self.render_fields(out, r);
@@ -1315,7 +1507,11 @@ impl<M: Model> Component for Form<M> {
     }
 
     fn schema(&self) -> Json {
-        json!({ "type": "form", "model": M::NAME, "fields": self.fields_schema(), "submit": null })
+        json!({ "type": "form", "model": M::NAME, "fields": self.fields_schema(), "submit": null, "drives": self.drives })
+    }
+
+    fn page_check(&self, check: &mut crate::ui::PageCheck) {
+        self.check_form(check);
     }
 
     fn reveal(&self, field: &str) -> Option<crate::privacy::Revealed> {
@@ -1376,6 +1572,13 @@ where
             return Some(self);
         }
         self.form.lookup_of(key).map(|(s, _)| s)
+    }
+
+    fn page_check(&self, check: &mut crate::ui::PageCheck) {
+        if !self.form.drives.is_empty() {
+            check.problem("a form with `submit` cannot also `drive` topics; drive with a form without submit, or refresh after saving with `ui.refresh(...)` in `on_success`");
+        }
+        self.form.check_form(check);
     }
 }
 

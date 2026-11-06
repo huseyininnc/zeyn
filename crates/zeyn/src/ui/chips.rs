@@ -3,7 +3,7 @@
 use super::layout::into_node;
 use super::widgets::screen_href;
 use crate::i18n::Text;
-use crate::render::{Render, escape};
+use crate::render::{Render, attr, escape};
 use crate::screen::{Component, Node, ScreenDef};
 use serde_json::{Value as Json, json};
 
@@ -72,6 +72,7 @@ enum Kind {
 pub struct Chips {
     label: Text,
     kind: Kind,
+    drives: Vec<&'static str>,
 }
 
 impl Chips {
@@ -80,6 +81,7 @@ impl Chips {
         Chips {
             label: label.into(),
             kind: Kind::Links(Vec::new()),
+            drives: Vec::new(),
         }
     }
 
@@ -136,7 +138,43 @@ impl Chips {
                 current: Vec::new(),
                 many: false,
             },
+            drives: Vec::new(),
         }
+    }
+
+    /// Filter chips that refresh the nodes listening to `topics` instead of opening the screen
+    /// again: pressing a chip puts its params into the screen's params, replaces the address
+    /// in the history and refreshes the listeners (and the chips) in place, so the listeners
+    /// read the value from their screen params. Only for [`Chips::filter`]; `App::check_page`
+    /// reports it on link chips and when nothing on the page listens.
+    ///
+    /// ```
+    /// use zeyn::prelude::*;
+    ///
+    /// #[params]
+    /// pub struct SalesParams {
+    ///     pub region: Option<String>,
+    /// }
+    ///
+    /// #[screen(route = "/sales", public)]
+    /// pub fn sales(p: SalesParams) -> Screen {
+    ///     Screen::new("Sales")
+    ///         .body(
+    ///             Chips::filter("Region", sales, |v| SalesParams { region: v.first().map(|s| s.to_string()) })
+    ///                 .current(p.region.clone())
+    ///                 .option("north", "North")
+    ///                 .option("south", "South")
+    ///                 .drives("sales"),
+    ///         )
+    ///         .body(Kpi::new("Orders", 12.0).listens("sales"))
+    /// }
+    ///
+    /// let app = App::new("Shop").feature(Feature::new("shop").screen(sales));
+    /// assert!(app.check_page(&sales::run(SalesParams { region: None })).is_ok());
+    /// ```
+    pub fn drives(mut self, topics: impl super::Topics) -> Self {
+        self.drives = super::topic_list(topics);
+        self
     }
 
     /// A filter chip: the value it puts in the param and its text.
@@ -202,7 +240,8 @@ impl Component for Chips {
                     .filter(|v| current.iter().any(|c| c == v))
                     .collect();
                 out.push_str(&format!(
-                    r#"<div class="z-chips z-chips-filter" role="group" aria-label="{label}"><ul class="z-chips-list">"#
+                    r#"<div class="z-chips z-chips-filter" role="group" aria-label="{label}"{}><ul class="z-chips-list">"#,
+                    super::topics_attr("data-zeyn-drives", &self.drives)
                 ));
                 for (value, text) in options {
                     let on = pressed.contains(&value.as_str());
@@ -217,9 +256,15 @@ impl Component for Chips {
                     } else {
                         vec![value.as_str()]
                     };
+                    let next = params(&next);
+                    let driven = if self.drives.is_empty() {
+                        String::new()
+                    } else {
+                        format!(r#" data-zeyn-params="{}""#, attr(&next))
+                    };
                     out.push_str(&format!(
-                        r#"<li><a class="z-chip" role="button" aria-pressed="{on}" href="{}" data-zeyn-chip data-value="{}" data-zeyn-base-href><span class="z-chip-check" aria-hidden="true"></span>{}</a></li>"#,
-                        screen_href(r, screen, &params(&next)),
+                        r#"<li><a class="z-chip" role="button" aria-pressed="{on}" href="{}" data-zeyn-chip data-value="{}" data-zeyn-base-href{driven}><span class="z-chip-check" aria-hidden="true"></span>{}</a></li>"#,
+                        screen_href(r, screen, &next),
                         escape(value),
                         r.text(text)
                     ));
@@ -255,7 +300,19 @@ impl Component for Chips {
                     .collect::<Vec<_>>(),
                 "current": current,
                 "multiple": many,
+                "drives": self.drives,
             }),
+        }
+    }
+
+    fn page_check(&self, check: &mut super::PageCheck) {
+        if matches!(self.kind, Kind::Links(_)) && !self.drives.is_empty() {
+            check.problem(
+                "`Chips::drives` works on filter chips only; make them with `Chips::filter`",
+            );
+        }
+        for t in &self.drives {
+            check.drives(t);
         }
     }
 

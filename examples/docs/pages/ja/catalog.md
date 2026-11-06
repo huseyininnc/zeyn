@@ -59,6 +59,22 @@ Rail::of(search_products).card(|p: &Product| {
 @live preview
 
 
+### ビルダー
+
+既定は `.card` と `.item` のままです。リンク、画像、スクリーンリーダー向けのテキストが手間なく得られます。行に別の形が必要なときは、`.builder(|row| node)` が Flutter の `ListView.builder` のように各行を任意のノードとして組み立てます。`List::of`、`CardGrid`、`Rail` で使えます。`.separator(node)` は行と行の間にノードを置き（行を数えるスクリーンリーダーからは隠されます）、`Repeat::of(items, |item| node)` は画面がすでにメモリーに持っているリストについて、最大 500 項目まで同じことをします。
+
+```rust
+List::of(search_people)
+    .builder(|p: &Person| Row::new().compact().col(Avatar::new(p.name.clone())).col(Paragraph::new(p.city.clone())))
+    .separator(Paragraph::new("·"))
+
+Repeat::of(order.steps.iter(), |s| Badge::new(s.name.clone())).separator(Paragraph::new("→"))
+```
+
+- **キー。** 組み立てた行と仮想リストの行はモデルのキーを `data-zeyn-key` に持つため、リストの更新（[トピック](effects.md#topics)）でも、レコードがどこへ移動しても、フォーカスと開いている details は同じレコードに残ります。
+- **組み立てた行は表示用です。** そのノードはノードパスでアドレス指定されないため、グリッド、フォーム、lookup は別の場所に置いてください。`Repeat` のノードは子（`p.0`、`p.1`、...）なので、そのまま動作します。
+- **仮想スクロール。** `.paging(Paging::virtual_scroll())` を持つリストは、全行分の高さを持つスクロール領域の中で、見えている行だけをページに置き、ユーザーのスクロールに合わせてブロックを offset で取得します。行の高さは 1 つの固定値で、行ごとの高さはありません。ビルダーでは `.row_height(px)` が必須で、ない場合は `App::check_page` が報告します（そこでは `separator` は使われません）。各行は `aria-posinset` と `aria-setsize` を持つため、スクリーンリーダーはリスト全体の中での位置を読み上げます。スクロール領域は、タイトルで名前が付いたフォーカス可能な region です。
+
 ## レール
 
 レールは、横にスクロールする 1 行に並べたカードグリッドで、スクロールスナップと、1 画面分の幅ずつスクロールする前へ・次へのボタンがあります（ユーザーがモーションの軽減を求めていない限り滑らかに動きます）。ユーザーが末尾の近くまでスクロールすると、次のバッチを 12 件ずつ読み込みます。カードはタブ順に含まれるリンクで、フォーカスされると表示範囲へスクロールされます。
@@ -94,6 +110,8 @@ SearchBox::of(catalog_products)
 キーボード: 下矢印と上矢印で候補間を移動し（下矢印で候補が開きます）、Enter は強調表示された候補か入力したテキストで検索し、Escape は候補を閉じ、続けて押すとフィールドを消去します。ライブリージョンが、スクリーンリーダーに候補の数を伝えます。
 
 結果画面は `SearchParams` を受け取ります（`q`。メニューから開いた場合は空）。サーバーはテキストを `MAX_SEARCH_QUERY`（100）文字で切り詰め、送る候補の数を決め（`limit` で指定しない限り 8、最大 20）、画面のアクセス権、Feature のガード、アクションの権限を検査し、すべての候補の呼び出しを書き込みのレート制限（`App::write_limit`）に数えます。
+
+`.drives(topic)` は、結果画面を開く代わりにその場で検索します。Enter、候補の選択、フィールドのクリアのどれでも、テキストが画面の `q` param に入り、トピックを listen しているノードが更新されます（[トピック](effects.md#topics) を参照）。画面の params には、`SearchParams` と同じく `q: String` フィールドが必要です。
 
 ### リッチな候補
 

@@ -2,6 +2,17 @@
  * Card grids, rails and search boxes. Colors come from the theme tokens, so both themes work.
  */
 
+/* Separators between rows (`CardGrid::separator`): one before every row, none before the first. */
+.z-cards [data-zeyn-rows] > .z-separator,
+.z-rail [data-zeyn-rows] > .z-separator {
+  list-style: none;
+  color: var(--z-text-muted);
+}
+.z-cards [data-zeyn-rows] > .z-separator:first-child,
+.z-rail [data-zeyn-rows] > .z-separator:first-child {
+  display: none;
+}
+
 .z-cards,
 .z-rail {
   display: flex;

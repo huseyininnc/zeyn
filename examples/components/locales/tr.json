@@ -67,6 +67,7 @@
       "rail": "Yana kayan kart sırası.",
       "list": "Resim, başlık ve ek bilgi içeren satırlar.",
       "search_box": "Önerili arama alanı.",
+      "topics": "Ekranın diğer bölümlerini yerinde yenileyen süzgeçler ve eylemler.",
       "tree": "Açıldıkça sunucudan yüklenen dallar.",
       "week_schedule": "Eylem satırlarından yedi günlük sütunlar.",
       "image": "Alternatif metni ve boyutu zorunlu resim.",
@@ -216,10 +217,14 @@
       "list": {
         "overview": "Örnek",
         "numbered_pages": "Toplamı olmayan numaralı sayfalar",
-        "fixed": "Sabit öğeler"
+        "fixed": "Sabit öğeler",
+        "builder": "Herhangi bir düğümle kurulan satırlar ve ayraç",
+        "virtual_rows": "Sabit satır yüksekliğiyle sanal kaydırma",
+        "repeat": "Bellekteki listenin her öğesi için bir düğüm"
       },
       "lookup": {
-        "overview": "Örnek"
+        "overview": "Örnek",
+        "country_city": "Seçilen ülkenin şehirleri"
       },
       "markdown": {
         "overview": "Örnek"
@@ -313,6 +318,12 @@
       },
       "toolbox": {
         "overview": "Örnek"
+      },
+      "topics": {
+        "overview": "Bir KPI, bir grafik ve bir tabloyu yöneten süzgeç çipleri",
+        "select": "Aynı dinleyicileri yöneten bir seçim kutusu",
+        "date_range_and_search": "Bir listeyi yöneten tarih aralığı ve arama kutusu",
+        "refresh_after_an_action": "Bir düğümü yenileyen eylem"
       },
       "tree": {
         "overview": "Örnek"

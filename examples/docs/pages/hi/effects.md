@@ -12,6 +12,7 @@ Effect वे हैं जो ब्राउज़र क्लिक या �
 | टोन वाला टोस्ट | `Toast::success(message).action(label, effect).into()` | टोन (info, success, warning, danger) में टोस्ट, और एक वैकल्पिक बटन जो दूसरा effect चलाता है |
 | Confirm | `Effect::confirm(message, then)` | उपयोगकर्ता के पुष्टि करने के बाद `then` चलाता है |
 | बंद करें और रिफ़्रेश | `Effect::CloseAndRefresh` | Window बंद करता है और जिस Screen ने उसे खोला उसे रीलोड करता है |
+| Topic रिफ़्रेश करें | `Effect::refresh("orders")` या `ui.refresh(["orders", "stock"])` | पेज के उन node को उसी जगह रिफ़्रेश करता है जो किसी topic को सुनते हैं ([Topic](#topics) देखें) |
 
 Params टाइप्ड हैं: गलत params वाली Screen का effect कंपाइल नहीं होता।
 
@@ -65,6 +66,31 @@ pub fn product_editor(params: ProductParams, store: ProductStore) -> Result<Scre
 - फ़ॉर्म और action बटन के `on_success` हैंडलर।
 
 Effect कभी पृष्ठ रीलोड नहीं करते। नेविगेशन केवल नई Screen लोड करता है; रिफ़्रेश केवल Window के नीचे की Screen रीलोड करता है।
+
+## Topic
+
+जब Screen का एक हिस्सा बदलता है, तो दूसरे हिस्से अक्सर वही डेटा दिखाते हैं: सहेजा गया ऑर्डर कुल बदल देता है, फ़िल्टर ग्रिड और चार्ट बदल देता है। Topic इन्हें जोड़ता है, और डेटा ब्राउज़र से होकर नहीं जाता। डेटा दिखाने वाले node को `.listens(topic)` से चिह्नित करें; topic का नाम लिए जाने पर वे उसी जगह रिफ़्रेश होते हैं।
+
+```rust
+Screen::new(t!("sales.title"))
+    .body(Kpi::new(t!("sales.total"), total).listens("sales"))
+    .body(Chart::bar(t!("sales.by_month")).labels(months).series(t!("sales.amount"), amounts).listens("sales"))
+    .body(DataGrid::of(search_sales).column(Sale::amount).listens("sales"))
+```
+
+Topic का नाम तीन तरीकों से लिया जाता है:
+
+- किसी action के डेटा बदलने के बाद, `on_success` हैंडलर में `ui.refresh("sales")` (या `Effect::refresh`)।
+- एक फ़िल्टर कंट्रोल जो `.drives("sales")` करता है: फ़िल्टर चिप, सर्च बॉक्स, या बिना सबमिट बटन वाला फ़ॉर्म (सेलेक्ट, तारीख की सीमा, टेक्स्ट)। [फ़िल्टर फ़ॉर्म](forms.md#filter-forms) देखें।
+- जब किसी और ने डेटा बदला हो, तब realtime चैनल (feature `realtime`) से `hub.notify(&ctx, "sales")`। `docs/realtime.md` देखें।
+
+`.listens` हर component पर काम करता है: इसे component के अपने builder method के बाद, सबसे आख़िर में कॉल करें। ग्रिड वाला listener अपने ग्रिड को ग्रिड endpoint से फिर से लोड करता है और पेज, क्रम और फ़िल्टर बनाए रखता है (फ़िल्टर से हुआ बदलाव पहले पेज से शुरू होता है)। बाक़ी हर listener सर्वर पर फिर से render होता है, सबके लिए एक ही `POST /_zeyn/nodes` से, इसलिए एक KPI और एक चार्ट का ख़र्च एक अनुरोध है। सिर्फ़ topic के नाम भेजे जाते हैं; सर्वर हर अनुरोध की तरह उपयोगकर्ता की पहुँच और params के साथ Screen खोलता है, इसलिए रिफ़्रेश कभी वह नहीं दिखाता जो उपयोगकर्ता नहीं देख सकता।
+
+एक animation frame के भीतर नाम लिए गए topic एक बार संभाले जाते हैं, उसी Screen पर नया रिफ़्रेश अभी चल रहे रिफ़्रेश को रद्द कर देता है, और सिर्फ़ वही node रिफ़्रेश होते हैं जो पेज पर हैं। नई सामग्री में वही तत्व हो (id, test id या सूची की पंक्ति कुंजी से), तो फ़ोकस और खुले `<details>` अपनी जगह रहते हैं।
+
+Topic के नाम 1 से 64 अक्षर, अंक, `-`, `_` या `.` होते हैं। `App::check_page` ऐसा topic बताता है जिसे किसी पेज पर drive किया गया हो पर उस पेज पर कोई उसे न सुनता हो, और `zeyn check` ऐसे topic के बारे में चेतावनी देता है जो रिफ़्रेश या drive होता है पर कभी सुना नहीं जाता, या सुना जाता है पर कभी रिफ़्रेश, drive या notify नहीं होता।
+
+@live topics
 
 ## टोस्ट
 

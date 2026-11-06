@@ -77,4 +77,16 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 - `.row_style(|row| Option<RowStyle>)`: danger, warning, success 행.
 - `.exportable()`: 필터링된 행의 CSV 내보내기이며 서버가 스트리밍합니다.
 
+## 제자리 새로 고침
+
+마지막에 호출한 `.listens(topic)`은 토픽이 지정될 때 그리드를 제자리에서 다시 불러오게 합니다([토픽](effects.md#topics) 참고). `ui.refresh(topic)` 뒤에는 정렬과 필터를 유지한 채 현재 페이지를 다시 불러오고, `.drives(topic)`을 가진 필터 컨트롤이 바뀐 뒤에는 새 Screen params로 첫 페이지부터 시작합니다. 그리드는 모든 권한 검사를 거치는 `POST /_zeyn/grid`로 다시 불러와지며, 필터가 바꾼 Screen param은 Screen 함수를 거쳐, 예를 들어 scope로 그리드에 전달됩니다.
+
+```rust
+let mut grid = DataGrid::of(search_orders);
+if let Some(region) = p.region {
+    grid = grid.scope(Order::region, region);
+}
+grid.column(Order::number).column(Order::total).listens("orders")
+```
+
 [DataGrid 레퍼런스](grid.md)는 저장된 뷰, 마스터 디테일, 그룹화, 트리 데이터, 인라인 편집, 셀 탐색, 복사와 붙여넣기, 열 가상화, 접근성을 다룹니다.

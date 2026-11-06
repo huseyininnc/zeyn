@@ -151,6 +151,8 @@ pub(crate) const MODULES: &[Module] = &[
     script("reactions", &["data-zeyn-reactions"]),
     script("hero", &["data-zeyn-hero"]),
     script("state", &["data-zeyn-prefs-clear"]),
+    script("topics", &["data-zeyn-listens", "data-zeyn-drives"]),
+    script("vlist", &["data-zeyn-vlist"]),
 ];
 
 const _: () = assert!(MODULES.len() <= 64, "Used keeps one bit per module");
@@ -330,7 +332,9 @@ pub(crate) fn runtime(js: &'static str) -> &'static str {
 }
 
 /// Script files of component modules, by path; the others are served next to their endpoints.
-const FILES: [(&str, &str); 20] = [
+const FILES: [(&str, &str); 22] = [
+    ("/_zeyn/topics.js", include_str!("../../assets/topics.js")),
+    ("/_zeyn/vlist.js", include_str!("../../assets/vlist.js")),
     ("/_zeyn/share.js", include_str!("../../assets/share.js")),
     ("/_zeyn/chips.js", include_str!("../../assets/chips.js")),
     ("/_zeyn/preview.js", include_str!("../../assets/preview.js")),

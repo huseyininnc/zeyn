@@ -51,6 +51,7 @@
 | `forms.js`, `reveal.js`, `import.js` | फ़ॉर्म के ड्राफ़्ट और वर्कफ़्लो बदलाव; छिपे मान दिखाना; इम्पोर्ट |
 | `catalog.js`, `media.js`, `files.js`, `charts.js` और उनकी स्टाइलशीट | कार्ड ग्रिड, रेल और सर्च बॉक्स; प्लेयर, एम्बेड और इमेज; अपलोड; चार्ट, स्पार्कलाइन, KPI कार्ड और बुलेट चार्ट |
 | `share.js`, `chips.js`, `reactions.js`, `hero.js`, `state.js`, `preview.js`, `assistant.js` | शेयर बटन, फ़िल्टर चिप, रिएक्शन, हीरो स्लाइड, प्राथमिकता स्टोर, कार्ड पूर्वावलोकन (पहली बार होवर पर), असिस्टेंट (चैट पैनल, या लॉन्चर का पहला दबाव) |
+| `topics.js`, `vlist.js` | topic सुनने वाले node और उन्हें drive करने वाले कंट्रोल (`data-zeyn-listens`, `data-zeyn-drives`); वर्चुअल सूचियाँ (`data-zeyn-vlist`) |
 
 पूरा पेज अपने head में वे स्टाइलशीट लिंक करता है जिन्हें हर पेज इस्तेमाल करता है (`zeyn.css`, `components.css`, `content.css`, `pro.css`, `enterprise.css`), उन मॉड्यूल की स्टाइलशीट जिनके निशान उसके HTML में हैं, और उनकी स्क्रिप्ट उन मॉड्यूल के बाद जिन्हें वे import करती हैं। `zeyn.js` उसी तालिका (`[name, script selector, style selector]`) के साथ दिया जाता है और बाद में आने वाली सामग्री के लिए जो कमी है उसे लोड करता है: `nav.js` स्क्रीन बदलने से पहले `{ root, waits }` के साथ `zeyn:need` भेजता है और नई स्टाइलशीट का इंतज़ार करता है, विंडो खुलने से पहले इसी तरह इंतज़ार करती हैं, और `zeyn:content`, ग्रिड पेज और ग्रिड फ़िल्टर अपनी सामग्री की स्क्रिप्ट लोड करते हैं। ब्राउज़र हर URL का एक ही इंस्टेंस रखता है, इसलिए मॉड्यूल एक बार चलता है। मॉड्यूल चलते समय दस्तावेज़ में जो पाता है उसे सेट करता है और फिर `zeyn:content` सुनता है; वह उन कंपोनेंट को कभी नहीं खोजता या सुनता जो पेज पर नहीं हैं। मॉड्यूल साझा हिस्से को अपने URL के `?v=` के साथ import करते हैं। `tests/ui_modules.rs` तब विफल होता है जब कोई पेज ऐसा मॉड्यूल लिंक करे जिसे वह इस्तेमाल नहीं करता, या किसी मॉड्यूल की स्टाइलशीट अपने निशानों के बाहर की क्लास को स्टाइल करे।
 
@@ -279,6 +280,7 @@ Effect:
 | एंडपॉइंट | बॉडी | उत्तर |
 |---|---|---|
 | `/_zeyn/node` | `{ screen, params, node }` | एक नोड का HTML उसके ग्रिड के पहले पृष्ठ के साथ। lazy टैब द्वारा इस्तेमाल। |
+| `/_zeyn/nodes` | `{ screen, params, nodes: ["1.0", "2"] }` | `{ nodes: { "1.0": "<div class=\"z-node\" ...>" } }`: Screen के एक ही रन से render हुए कई node, रिफ़्रेश या drive हुए topic के listener के लिए। अधिकतम 32 अलग path; Screen में न होने वाला path `404` देता है। Screen की पहुँच, guard और interceptor एक बार चलते हैं, और params को Screen के typed params के रूप में पढ़ा जाता है। |
 | `/_zeyn/data` | `{ screen, params, node, key, input }` | नोड के डेटा स्रोत `key` से JSON: lookup विकल्प (`key` फ़ील्ड नाम है), ट्री संतानें (`key` खाली है), चरण जाँच (`key` `_step` है)। स्रोत की action अनुमति जाँची जाती है और इंटरसेप्टर चलते हैं, जैसे ग्रिड के लिए। जो इनपुट action में न बैठे वह `404` से अस्वीकार होता है। |
 | `/_zeyn/data` जिसमें `screen` = `_site.{feature}` | ऊपर जैसा | साइट हेडर स्लॉट के कंपोनेंट के लिए वही: `node` में स्लॉट (0 start, 1 center, 2 end, 3 bottom), उसमें नोड का इंडेक्स और फिर चाइल्ड इंडेक्स होते हैं। feature के गार्ड और action की अनुमति जाँची जाती है। |
 | `/_zeyn/parse` | `{ kind, text, label }` | सर्वर टाइप की गई तारीख़ या समय को उपयोगकर्ता की भाषा, क्षेत्र और घड़ी में कैसे पढ़ता है: `{ ok, text, iso, utc, zone }` या `{ ok: false, message }`। `kind` `date`, `time`, `datetime`, `local` या `presets` (आज और त्वरित सीमाएँ) है। |
@@ -296,8 +298,14 @@ Effect:
 | `zeyn:content` | `document` | नई सामग्री वाला एलिमेंट (नेविगेशन, लेज़ी पैनल)। रनटाइम ज़रूरी मॉड्यूल लोड करता है और हर लोड हुआ मॉड्यूल उसकी सामग्री सेट करता है। |
 | `zeyn:errors` | फ़ॉर्म | `422` त्रुटियाँ, रनटाइम के उन्हें दिखाने के बाद। लाइन एडिटर और चरणबद्ध फ़ॉर्म इसका उपयोग करते हैं। |
 | `zeyn:effect` | `document` | वह effect जिसे रनटाइम नहीं जानता: `{ effect, source, run }`। `run(next)` दूसरा effect चलाता है। `confirm` द्वारा इस्तेमाल। |
+| `zeyn:topics` | `document` | `{ topics }`: किसी दूसरी स्क्रिप्ट (सूचना पर `live.js`) से रिफ़्रेश करने वाले topic। |
+| `zeyn:reload` | कोई तत्व | उसके अंदर के ग्रिड उसी जगह फिर से लोड करता है: मौजूदा पेज, या `{ reset: true }` के साथ पहला पेज। |
 
 Effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":"...","then":{...}}` मोडल alert डायलॉग में पूछता है और उपयोगकर्ता के पुष्टि करने के बाद ही `then` चलाता है।
+
+Effect `{"effect":"refresh","topics":["sales"]}` topic के listener को रिफ़्रेश करता है। `[data-zeyn-listens="a,b"]` एक listener को चिह्नित करता है (उसके `data-zeyn-node` parent वाला node); `[data-zeyn-drives="a"]` topic drive करने वाले कंट्रोल को चिह्नित करता है: फ़िल्टर फ़ॉर्म (`data-zeyn-kinds` बताता है कि कौन से params संख्या या boolean हैं), सर्च बॉक्स (उसके फ़ील्ड का नाम `q` है) या फ़िल्टर चिप (हर चिप अपने params `data-zeyn-params` में रखता है)। Drive करने पर कंट्रोल के मान Screen root के `data-zeyn-params` में मिलाए जाते हैं, Screen मुख्य हो तो पता उनसे बदल दिया जाता है, और listener रिफ़्रेश होते हैं। `topics.js` एक animation frame में नाम लिए गए topic एक साथ संभालता है: ग्रिड वाले listener को `zeyn:reload` मिलता है, Screen के बाक़ी listener एक `POST /_zeyn/nodes` में जाते हैं, और उसी Screen का नया अनुरोध पुराने को रोककर उसके node ले लेता है। फ़ोकस और खुले `<details>` id, test id, `data-zeyn-key` पंक्ति और स्थिति से बनाए रखे जाते हैं।
+
+वर्चुअल सूची `data-zeyn-row-height`, `data-zeyn-block` और `data-zeyn-total` वाला `section[data-zeyn-vlist]` है; `vlist.js` `{ page: { type: "offset", offset }, with_total: true }` के साथ `POST /_zeyn/grid` से ब्लॉक माँगता है और हर `<li>` को `(aria-posinset - 1) * height` पर रखता है। किसी दूसरे फ़ील्ड पर निर्भर lookup में `data-depends-on="field"` होता है और वे उस फ़ील्ड का मान अपने `/_zeyn/data` इनपुट में `parent` के रूप में भेजते हैं।
 
 क्लाइंट प्राथमिकताएँ (`zeyn::ClientPref`) ब्राउज़र मॉड्यूल `/_zeyn/state.js` में रहती हैं, जिसे पेज केवल तभी इम्पोर्ट करते हैं जब उनमें `data-zeyn-remember` या `data-zeyn-prefs-clear` वाला एलिमेंट हो। `GET /_zeyn/prefs` `{ preferences }` लौटाता है, यानी क्या ऐप का consent hook प्राथमिकता मानों को सत्र से आगे रखने देता है, `Cache-Control: no-store` के साथ। सर्वर कोई संग्रहीत मान नहीं पढ़ता।
 

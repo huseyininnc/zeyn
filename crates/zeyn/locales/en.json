@@ -104,6 +104,7 @@
       "max": "{label} must be at most {n}.",
       "format": "{label} has an invalid value.",
       "skipped_time": "{label}: this time does not exist in your time zone because the clocks changed.",
+      "depends_on": "This choice is not available for the value of the field it depends on.",
       "line": "Line {n}: {message}",
       "disabled_day": "{label}: this day cannot be chosen.",
       "time_step": "{label} must be on a {n} minute step.",
@@ -230,6 +231,7 @@
       "resize": "Resize panes",
       "cards": {
         "load_more": "Show more",
+        "list": "List",
         "loaded": "{count} items shown",
         "empty": "Nothing to show.",
         "error": "The list could not be loaded. Try again.",
