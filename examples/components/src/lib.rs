@@ -26,6 +26,8 @@ pub struct Demo {
     pub q: Option<String>,
     pub view: Option<zeyn::ui::CalendarView>,
     pub date: Option<Date>,
+    pub min_price: Option<i64>,
+    pub max_price: Option<i64>,
 }
 
 /// One live example: the function of the component's file that builds it.
@@ -194,6 +196,7 @@ catalog! {
     }
     "shop" Cart {
         price "/ui/price";
+        range_slider "/ui/range-slider" (Demo);
     }
     "media" Image {
         image "/ui/image";

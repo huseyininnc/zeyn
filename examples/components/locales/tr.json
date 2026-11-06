@@ -107,7 +107,8 @@
       "kanban": "Bir iş akışının sütunlarında kartlar, sürükleyerek, menüyle veya klavyeyle taşınır.",
       "calendar": "Kullanıcının saat diliminde ay, hafta veya gün görünümünde etkinlikler, etkinlik pencereleri ve aralık seçimiyle.",
       "clear_prefs": "Tarayıcının uygulama için tuttuğu seçimleri silen düğme.",
-      "price": "Üstü çizili eski fiyat, indirim yüzdesi ve birim fiyatla bir fiyat."
+      "price": "Üstü çizili eski fiyat, indirim yüzdesi ve birim fiyatla bir fiyat.",
+      "range_slider": "Fiyat ve tarih aralıkları için tek çubukta iki tutamaç."
     },
     "ex": {
       "action_button": {
@@ -377,6 +378,10 @@
         "overview": "Örnek",
         "unit_price": "Birim fiyat",
         "large": "Ürün sayfasında"
+      },
+      "range_slider": {
+        "overview": "Örnek",
+        "dates": "Tarihler"
       }
     }
   }

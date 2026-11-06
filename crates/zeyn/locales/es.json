@@ -514,6 +514,11 @@
             "ml100": "{price} por 100 ml",
             "m": "{price} por metro"
           }
+        },
+        "range": {
+          "to": "a",
+          "low": "{label}, desde",
+          "high": "{label}, hasta"
         }
       }
     },

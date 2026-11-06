@@ -649,6 +649,11 @@
             "ml100": "100 ml fiyatı {price}",
             "m": "Metre fiyatı {price}"
           }
+        },
+        "range": {
+          "to": "ile",
+          "low": "{label}, başlangıç",
+          "high": "{label}, bitiş"
         }
       }
     },

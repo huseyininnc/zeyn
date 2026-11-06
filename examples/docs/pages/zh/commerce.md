@@ -16,3 +16,19 @@ Price::new(p.price)
 - **单位价格。** `unit(price, PriceUnit::Kg)` 添加一行较淡的文字，例如“每千克 ₺259.80”。单位有 `Item`、`Kg`、`Grams100`、`Liter`、`Ml100` 和 `Meter`。
 - **格式。** 金额是采用页面数字格式的 `Money`：英语为 `₺1,299.00`，土耳其语为 `1.299,00 ₺`；在把百分号放在前面的语言中，百分号在前（`%19`）。`large()` 为商品页面放大当前价格。
 - **无脚本。** 价格是纯 HTML。
+
+## 范围滑块
+
+```rust
+RangeSlider::new(t!("shop.price"), ["min_price", "max_price"], 0, 5_000)
+    .step(50)
+    .money(Currency::Try)
+    .value(p.min_price, p.max_price)
+    .drives("products")
+```
+
+- **两个原生滑块。** 每个滑块都是一个带有两个名称之一的 `<input type="range">`，因此浏览器为它提供 W3C APG 滑块行为：各占一个 Tab 停靠点，方向键按步长移动，Home 和 End 移到两端，屏幕阅读器读出格式化后的值（`aria-valuetext`，例如“₺500.00”）和标签（“Price，起”“Price，止”）。Page Up 和 Page Down 按范围的十分之一移动。
+- **作为筛选。** `.drives(topic)` 把滑块放进筛选表单：松开滑块时，两个值写入同名的屏幕参数，该主题的监听者就地刷新。在分面面板中由面板的表单完成这一步；在其他表单中，滑块像其他字段一样提交。
+- **取值。** `value(low, high)` 接收参数（`None` 保留轨道的端点）。超出范围的值会被截断，低值大于高值时会互换，因此手动修改的地址无法破坏滑块。`money(currency)` 按页面格式显示货币的整数单位。
+- **日期。** `RangeSlider::dates(label, names, first, last)` 配合 `.date_value(from, to)` 选择日期；表单通过隐藏字段提交 `2026-03-31` 这样的 ISO 日期。
+- **脚本。** `range.js`（gzip 后约 1 KB）只在有滑块的页面加载。它让低值滑块不超过高值滑块，填充两个滑块之间的轨道，把值写在标签旁边，并在按下空白轨道时移动较近的滑块。它每次按下只读取一次轨道尺寸，滑块移动时从不读取。

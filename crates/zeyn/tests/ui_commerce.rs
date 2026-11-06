@@ -27,6 +27,27 @@ pub fn priced() -> Screen {
         .body(Stack::new().add(Price::new(Money::tl(129_900)).was(Money::tl(159_900))))
 }
 
+#[params]
+#[derive(Default)]
+pub struct Listing {
+    pub min_price: Option<i64>,
+    pub max_price: Option<i64>,
+}
+
+fn price_slider(p: &Listing) -> RangeSlider {
+    RangeSlider::new("Price", ["min_price", "max_price"], 0, 5_000)
+        .step(50)
+        .money(Currency::Try)
+        .value(p.min_price, p.max_price)
+}
+
+#[screen(route = "/range", public)]
+pub fn ranged(p: Listing) -> Screen {
+    Screen::new("Range")
+        .body(price_slider(&p).drives("listing"))
+        .body(Kpi::new("Shown", 1.0).listens("listing"))
+}
+
 fn shop_app() -> App {
     App::new("Test")
         .i18n(I18n::new("en"))
@@ -47,7 +68,8 @@ fn shop_app() -> App {
         .feature(
             Feature::new("shop")
                 .screen(plain)
-                .screen(priced),
+                .screen(priced)
+                .screen(ranged),
         )
 }
 
@@ -177,4 +199,96 @@ async fn the_shop_stylesheet_comes_only_with_shop_components() {
     let (status, css) = get("/_zeyn/commerce.css").await;
     assert_eq!(status, StatusCode::OK);
     assert!(css.contains(".z-price"));
+}
+
+#[test]
+fn a_range_slider_is_two_named_native_sliders_with_formatted_values() {
+    let slider = price_slider(&Listing {
+        min_price: Some(500),
+        max_price: Some(9_000),
+    });
+    let en = html(&slider, "en");
+    assert!(
+        en.starts_with(
+            r#"<div class="z-range" role="group" aria-labelledby="s-range--label" data-zeyn-range"#
+        ),
+        "{en}"
+    );
+    assert!(
+        en.contains(r#"style="--z-lo:10.00%;--z-hi:100.00%""#),
+        "{en}"
+    );
+    assert!(en.contains(
+        r#"<input type="range" class="z-range-input z-range-low" id="s-range--low" name="min_price" min="0" max="5000" step="50" value="500" aria-label="Price, from" aria-valuetext="₺500.00""#
+    ), "{en}");
+    assert!(
+        en.contains(r#"name="max_price" min="0" max="5000" step="50" value="5000" aria-label="Price, to" aria-valuetext="₺5,000.00""#),
+        "a value out of the bounds is clamped: {en}"
+    );
+    assert!(
+        !en.contains("<form"),
+        "without drives it is no form of its own"
+    );
+    let tr = html(&slider, "tr");
+    assert!(tr.contains(r#"aria-valuetext="500,00 ₺""#) && tr.contains("Price, başlangıç"));
+    let swapped = html(
+        &RangeSlider::new("Count", ["a", "b"], 10, 0).value(Some(8), Some(2)),
+        "en",
+    );
+    assert!(
+        swapped.contains(r#"name="a" min="0" max="10" step="1" value="2""#),
+        "{swapped}"
+    );
+}
+
+#[test]
+fn a_date_range_slider_sends_iso_dates_through_hidden_inputs() {
+    let first = Date::new(2026, 3, 1).unwrap();
+    let last = Date::new(2026, 3, 31).unwrap();
+    let slider = RangeSlider::dates("Trip", ["from", "to"], first, last)
+        .date_value(Date::new(2026, 3, 10), None)
+        .drives("trips");
+    let out = html(&slider, "en");
+    assert!(
+        out.starts_with(r#"<form class="z-range-form" data-zeyn-drives="trips" novalidate>"#),
+        "{out}"
+    );
+    assert!(
+        out.contains(
+            r#"<input type="hidden" class="z-range-date" name="from" value="2026-03-10">"#
+        )
+    );
+    assert!(
+        out.contains(r#"<input type="hidden" class="z-range-date" name="to" value="2026-03-31">"#)
+    );
+    assert!(
+        !out.contains(r#"type="range" class="z-range-input z-range-low" id="s-range--low" name="#),
+        "the sliders themselves send nothing"
+    );
+}
+
+#[tokio::test]
+async fn a_driving_range_slider_is_a_filter_form_and_loads_its_module_only_where_used() {
+    let (status, page) = get("/range").await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert!(page.contains(
+        r#"<form class="z-range-form" data-zeyn-drives="listing" data-zeyn-kinds="{&quot;max_price&quot;:&quot;number&quot;,&quot;min_price&quot;:&quot;number&quot;}" novalidate>"#
+    ), "{page}");
+    let linked = links(&page);
+    for name in ["range.js", "topics.js", "commerce.css"] {
+        assert!(linked.contains(&name.to_string()), "{name}");
+    }
+    let (_, price) = get("/price").await;
+    assert!(!links(&price).contains(&"range.js".to_string()));
+    let (status, js) = get("/_zeyn/range.js").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(js.contains("@module range"));
+    let app = shop_app();
+    assert!(
+        app.check_page(&ranged::run(Listing::default()))
+            .is_ok()
+    );
+    let bad = Screen::new("Bad").body(RangeSlider::new("Same", ["a", "a"], 1, 1));
+    let problems = app.check_page(&bad).unwrap_err();
+    assert_eq!(problems.len(), 2, "{problems:?}");
 }

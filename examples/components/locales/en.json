@@ -107,7 +107,8 @@
       "kanban": "Cards in columns of a workflow, moved by drag, a menu or the keyboard.",
       "calendar": "Events in a month, week or day in the user time zone, with event windows and slots.",
       "clear_prefs": "A button that removes the choices this browser keeps for the app.",
-      "price": "A price with a struck old price, the percent off and a unit price."
+      "price": "A price with a struck old price, the percent off and a unit price.",
+      "range_slider": "Two handles over one track for price and date ranges."
     },
     "ex": {
       "action_button": {
@@ -377,6 +378,10 @@
         "overview": "Example",
         "unit_price": "Unit price",
         "large": "On a product page"
+      },
+      "range_slider": {
+        "overview": "Example",
+        "dates": "Dates"
       }
     }
   }

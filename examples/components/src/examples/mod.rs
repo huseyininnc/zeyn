@@ -50,6 +50,7 @@ pub mod prev_next;
 pub mod price;
 pub mod progress;
 pub mod rail;
+pub mod range_slider;
 pub mod rating;
 pub mod reactions;
 pub mod relative_time;

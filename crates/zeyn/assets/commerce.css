@@ -53,3 +53,108 @@
   line-height: var(--z-leading-xs);
   color: var(--z-text-muted);
 }
+
+.z-range {
+  display: grid;
+  gap: 8px;
+  min-width: 200px;
+  max-width: 480px;
+}
+
+.z-range-form { margin: 0; }
+
+.z-range-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 4px 12px;
+  font-size: var(--z-text-sm);
+  line-height: var(--z-leading-sm);
+}
+
+.z-range-label { font-weight: 500; color: var(--z-text); }
+
+.z-range-values {
+  display: inline-flex;
+  gap: 6px;
+  color: var(--z-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.z-range-track {
+  position: relative;
+  height: 24px;
+  touch-action: none;
+  cursor: pointer;
+}
+
+.z-range-track::before,
+.z-range-fill {
+  content: "";
+  position: absolute;
+  top: 10px;
+  height: 4px;
+  border-radius: var(--z-radius-full);
+}
+
+.z-range-track::before {
+  inset-inline: 0;
+  background: var(--z-border-strong);
+}
+
+.z-range-fill {
+  inset-inline-start: var(--z-lo);
+  inset-inline-end: calc(100% - var(--z-hi));
+  background: var(--z-primary);
+}
+
+.z-range-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 24px;
+  margin: 0;
+  background: none;
+  pointer-events: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.z-range-input:focus-visible { outline: none; }
+.z-range-input:focus,
+.z-range-input:active { z-index: 2; }
+
+.z-range-input::-webkit-slider-runnable-track { background: none; border: 0; }
+.z-range-input::-moz-range-track { background: none; border: 0; }
+
+.z-range-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--z-primary);
+  border-radius: var(--z-radius-full);
+  background: var(--z-surface);
+  box-shadow: var(--z-shadow-1);
+  pointer-events: auto;
+  cursor: grab;
+}
+
+.z-range-input::-moz-range-thumb {
+  box-sizing: border-box;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--z-primary);
+  border-radius: var(--z-radius-full);
+  background: var(--z-surface);
+  pointer-events: auto;
+  cursor: grab;
+}
+
+.z-range-input:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--z-focus); outline-offset: 2px; }
+.z-range-input:focus-visible::-moz-range-thumb { outline: 2px solid var(--z-focus); outline-offset: 2px; }
+
+@media (forced-colors: active) {
+  .z-range-track::before { background: CanvasText; }
+  .z-range-fill { background: Highlight; }
+}

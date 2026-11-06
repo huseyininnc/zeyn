@@ -514,6 +514,11 @@
             "ml100": "100ml당 {price}",
             "m": "미터당 {price}"
           }
+        },
+        "range": {
+          "to": "~",
+          "low": "{label}, 시작",
+          "high": "{label}, 끝"
         }
       }
     },

@@ -514,6 +514,11 @@
             "ml100": "每 100 毫升 {price}",
             "m": "每米 {price}"
           }
+        },
+        "range": {
+          "to": "至",
+          "low": "{label}，起",
+          "high": "{label}，止"
         }
       }
     },

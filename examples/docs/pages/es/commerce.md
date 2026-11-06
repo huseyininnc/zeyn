@@ -16,3 +16,19 @@ Price::new(p.price)
 - **Precio por unidad.** `unit(price, PriceUnit::Kg)` añade una línea más tenue como "₺259.80 por kg". Las unidades son `Item`, `Kg`, `Grams100`, `Liter`, `Ml100` y `Meter`.
 - **Formato.** Los importes son `Money` en el formato numérico de la página: `₺1,299.00` en inglés, `1.299,00 ₺` en turco, y el signo de porcentaje va delante donde el idioma lo pone delante (`%19`). `large()` agranda el precio actual para una página de producto.
 - **Sin script.** El precio es HTML simple.
+
+## Control deslizante de rango
+
+```rust
+RangeSlider::new(t!("shop.price"), ["min_price", "max_price"], 0, 5_000)
+    .step(50)
+    .money(Currency::Try)
+    .value(p.min_price, p.max_price)
+    .drives("products")
+```
+
+- **Dos tiradores nativos.** Cada tirador es un `<input type="range">` con uno de los dos nombres, así que el navegador le da el comportamiento de slider de W3C APG: una parada de tabulación cada uno, las flechas avanzan un paso, Inicio y Fin van a los extremos, y los lectores de pantalla oyen el valor con formato (`aria-valuetext`, como "₺500.00") y la etiqueta ("Price, desde", "Price, hasta"). Re Pág y Av Pág mueven una décima parte del rango.
+- **Un filtro.** `.drives(topic)` pone el control en un formulario de filtro: al soltar un tirador, los dos valores pasan a los parámetros de pantalla con los mismos nombres y los oyentes del tema se refrescan en su sitio. Dentro de un panel de facetas lo hace el formulario del panel, y en cualquier otro formulario los tiradores se envían como los demás campos.
+- **Valores.** `value(low, high)` toma los parámetros (`None` conserva el extremo de la pista). Los valores fuera de los límites se recortan y un valor bajo mayor que el alto se intercambia, así que una dirección editada a mano no puede romper el control. `money(currency)` muestra unidades enteras de una moneda en el formato de la página.
+- **Fechas.** `RangeSlider::dates(label, names, first, last)` con `.date_value(from, to)` elige días; el formulario envía fechas ISO como `2026-03-31` mediante campos ocultos.
+- **Script.** `range.js` (cerca de 1 KB con gzip) se carga solo en páginas con un control de rango. Mantiene el tirador bajo por debajo del alto, rellena la pista entre ambos, escribe los valores junto a la etiqueta y mueve el tirador más cercano cuando se pulsa la pista vacía. Lee el tamaño de la pista una vez por pulsación y nunca mientras un tirador se mueve.
