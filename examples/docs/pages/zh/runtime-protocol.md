@@ -52,6 +52,7 @@ head 中每个框架脚本和样式表都带有 `?v=` 和构建 id（`meta[name=
 | `catalog.js`, `media.js`, `files.js`, `charts.js` 及其样式表 | 卡片网格、横向列表和搜索框；播放器、嵌入内容和图片；上传；图表、迷你图、KPI 卡片和子弹图 |
 | `share.js`, `chips.js`, `reactions.js`, `hero.js`, `state.js`, `preview.js`, `assistant.js` | 分享按钮、筛选标签、反应、hero 幻灯片、偏好存储、卡片预览（首次悬停）、助手（聊天面板，或首次按下启动按钮） |
 | `topics.js`, `vlist.js` | 监听主题的节点以及驱动它们的控件（`data-zeyn-listens`、`data-zeyn-drives`）；虚拟列表（`data-zeyn-vlist`） |
+| `inbox.js`, `kanban.js`, `calendar.js` and their stylesheets, `diff.css`, `code.css`, `barcode.css` | 收件箱和通知铃铛；看板；日历；不需要脚本的差异视图、代码视图和条码（代码视图的复制按钮在 `share.js` 中） |
 
 完整页面在 head 中链接所有页面都用的样式表（`zeyn.css`、`components.css`、`content.css`、`pro.css`、`enterprise.css`）、其 HTML 中出现标记的模块的样式表，以及这些模块的脚本（放在它们导入的模块之后）。`zeyn.js` 带着同一张表（`[name, script selector, style selector]`）提供，并在之后到来的内容中加载缺少的部分：`nav.js` 在替换屏幕前发出带 `{ root, waits }` 的 `zeyn:need` 并等待新的样式表，窗口在打开前同样等待，`zeyn:content`、grid 页和 grid 筛选会加载其内容所需的脚本。浏览器对每个 URL 只保留一个实例，因此模块只运行一次。模块运行时设置它在文档中找到的内容，之后监听 `zeyn:content`；它从不扫描或监听页面上不存在的组件。模块用自身 URL 的 `?v=` 导入共享部分。当页面链接了它不使用的模块，或某个模块的样式表为其标记之外的类设置样式时，`tests/ui_modules.rs` 会失败。
 

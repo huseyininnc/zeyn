@@ -52,6 +52,7 @@ head의 모든 프레임워크 스크립트와 스타일시트에는 `?v=`와 �
 | `catalog.js`, `media.js`, `files.js`, `charts.js` 및 스타일시트 | 카드 그리드, 레일, 검색 상자; 플레이어, 임베드, 이미지; 업로드; 차트, 스파크라인, KPI 카드, 불릿 차트 |
 | `share.js`, `chips.js`, `reactions.js`, `hero.js`, `state.js`, `preview.js`, `assistant.js` | 공유 버튼, 필터 칩, 반응, 히어로 슬라이드, 환경 설정 저장소, 카드 미리보기(처음 마우스를 올릴 때), 어시스턴트(채팅 패널 또는 런처를 처음 누를 때) |
 | `topics.js`, `vlist.js` | 토픽을 listen하는 노드와 이를 drive하는 컨트롤(`data-zeyn-listens`, `data-zeyn-drives`), 가상 목록(`data-zeyn-vlist`) |
+| `inbox.js`, `kanban.js`, `calendar.js` and their stylesheets, `diff.css`, `code.css`, `barcode.css` | 받은 편지함과 알림 종; Kanban 보드; 달력; 스크립트가 필요 없는 비교, 코드 보기, 바코드(코드 보기의 복사 버튼은 `share.js`에 있음) |
 
 전체 페이지는 head에 모든 페이지가 쓰는 스타일시트(`zeyn.css`, `components.css`, `content.css`, `pro.css`, `enterprise.css`), HTML에 표식이 있는 모듈의 스타일시트, 그리고 그 스크립트를 import하는 모듈 뒤에 링크합니다. `zeyn.js`는 같은 표(`[name, script selector, style selector]`)와 함께 제공되며 나중에 도착하는 콘텐츠에 빠진 것을 불러옵니다: `nav.js`는 화면을 바꾸기 전에 `{ root, waits }`와 함께 `zeyn:need`를 보내고 새 스타일시트를 기다리며, 창도 열리기 전에 같은 방식으로 기다리고, `zeyn:content`, grid 페이지, grid 필터는 담고 있는 것의 스크립트를 불러옵니다. 브라우저는 URL마다 인스턴스를 하나만 유지하므로 모듈은 한 번만 실행됩니다. 모듈은 실행될 때 문서에서 찾은 것을 설정하고 그 뒤에는 `zeyn:content`를 듣습니다. 페이지에 없는 컴포넌트를 찾거나 듣지 않습니다. 모듈은 자신의 URL에 있는 `?v=`로 공유 부분을 import합니다. `tests/ui_modules.rs`는 페이지가 쓰지 않는 모듈을 링크하거나 모듈 스타일시트가 표식 밖의 클래스를 꾸밀 때 실패합니다.
 

@@ -52,6 +52,7 @@ head にあるフレームワークのスクリプトとスタイルシートに
 | `catalog.js`, `media.js`, `files.js`, `charts.js` とそのスタイルシート | カードグリッド、レール、検索ボックス；プレーヤー、埋め込み、画像；アップロード；チャート、スパークライン、KPI カード、ブレットチャート |
 | `share.js`, `chips.js`, `reactions.js`, `hero.js`, `state.js`, `preview.js`, `assistant.js` | 共有ボタン、フィルターチップ、リアクション、ヒーロースライド、設定ストア、カードのプレビュー（最初のホバー）、アシスタント（チャットパネル、またはランチャーの最初の押下） |
 | `topics.js`, `vlist.js` | トピックを listen するノードと、それを drive するコントロール（`data-zeyn-listens`、`data-zeyn-drives`）、仮想リスト（`data-zeyn-vlist`） |
+| `inbox.js`, `kanban.js`, `calendar.js` and their stylesheets, `diff.css`, `code.css`, `barcode.css` | 受信箱と通知ベル、Kanban ボード、カレンダー、スクリプトの要らない差分、コード表示、バーコード（コード表示のコピーボタンは `share.js` にあります） |
 
 完全なページは head に、すべてのページが使うスタイルシート（`zeyn.css`、`components.css`、`content.css`、`pro.css`、`enterprise.css`）、HTML にマーカーがあるモジュールのスタイルシート、そしてそれらのスクリプトを、それぞれが import するモジュールの後にリンクします。`zeyn.js` は同じ表（`[name, script selector, style selector]`）付きで配信され、後から届くコンテンツに足りないものを読み込みます。`nav.js` は画面を差し替える前に `{ root, waits }` 付きの `zeyn:need` を発行して新しいスタイルシートを待ち、ウィンドウも開く前に同じように待ちます。`zeyn:content`、グリッドのページ、グリッドのフィルターは、含むもののスクリプトを読み込みます。ブラウザーは URL ごとに 1 つのインスタンスを保つので、モジュールは一度だけ実行されます。モジュールは実行時にドキュメントで見つけたものを設定し、その後は `zeyn:content` を待ち受けます。ページにないコンポーネントを探したり待ち受けたりすることはありません。モジュールは共有部分を自分の URL の `?v=` 付きで import します。`tests/ui_modules.rs` は、ページが使わないモジュールをリンクしたとき、またはモジュールのスタイルシートがマーカー外のクラスにスタイルを付けたときに失敗します。
 
