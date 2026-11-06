@@ -112,3 +112,42 @@ p.photos.iter().fold(ProductGallery::new(p.name.clone()), |g, photo| {
 - **見えるものだけを読み込みます。** 最初の画像はたいてい商品ページでいちばん大きな要素なので、`fetchpriority="high"` ですぐに読み込みます。残りは不活性なテンプレートで待ち、`gallery.js` が 1 つの IntersectionObserver で見守りながら、画面上の画像とその両隣を入れます。12 枚のギャラリーなら最初に読み込むのは 3 枚です。画像は `Image` なので、プレースホルダー、低解像度のファイル、代わりのファイルはそのまま使えます。
 - **拡大と全画面。** マウスではポインターの下の画像を拡大します（スライドの大きさはポインターが入ったときに 1 回だけ読み、動いている間は読みません）。画像を押すか「全画面」ボタンを押すと、画像、前と次のボタン、拡大の切り替え、閉じるボタンのあるモーダルダイアログが開きます。フォーカスは中にとどまり、Escape で閉じ、開いた要素にフォーカスを戻します。動きを減らす設定では、スライドも拡大のアニメーションもしません。
 - **スクリプト。** `gallery.js`（gzip で約 1.5 KB）はギャラリーのあるページでだけ読み込まれます。
+
+## ファセットパネル
+
+```rust
+#[params]
+#[derive(Default)]
+pub struct Listing {
+    #[serde(default)]
+    pub color: Vec<String>,
+    pub min_price: Option<i64>,
+    pub max_price: Option<i64>,
+}
+
+#[screen(route = "/shop", public)]
+pub async fn shop(p: Listing, store: ProductStore) -> Result<Screen> {
+    let colors = store.count_colors(&p).await?;
+    let panel = FacetPanel::of(shop, &p)
+        .facet(colors.iter().fold(Facet::new("color", t!("shop.color")), |f, c| {
+            f.option(c.value.clone(), c.name.clone(), c.count)
+        })
+        .chosen(p.color.clone()))
+        .range(RangeSlider::new(t!("shop.price"), ["min_price", "max_price"], 0, 5_000)
+            .money(Currency::Try)
+            .value(p.min_price, p.max_price))
+        .drives("products");
+    let cards = CardGrid::of(search_products)
+        .card(|p: &Product| Card::image(p.photo.clone(), p.name.clone()).price(Price::new(p.price)))
+        .scope_any(Product::color, p.color.clone())
+        .scope_range(Product::price, p.min_price.map(|m| Money::tl(m * 100)), p.max_price.map(|m| Money::tl(m * 100)))
+        .listens("products");
+    Ok(Screen::new(t!("shop.title")).body(Row::new().col(panel).col(cards).weight(3)))
+}
+```
+
+- **件数はサーバーが数えます。** 各ファセットはチェックボックスのグループで、選択肢にはほかのファセットを適用したときの件数が表示されます（「赤 (124)」。スクリーンリーダーには「赤、124 件」と読み上げられます）。画面はファセットごとに上限付きのクエリ 1 本で数えます。たとえばほかの条件を `WHERE` に入れた `SELECT color, count(*) ... GROUP BY color LIMIT 50` です。1 つのファセットの選択肢は最大 `MAX_FACET_OPTIONS`（50）個です。件数のない選択肢は、選ばれていなければ無効になります。
+- **変更ごとにリクエスト 1 回。** パネルは自分のトピックを動かし、自分でもそれを聞くフィルターフォームです。変更すると値が画面パラメーターに入り（ファセットはリスト、範囲は 2 つの数値）、アドレスが合わせて更新され、1 回の `POST /_zeyn/nodes` ですべてのリスナーが更新されます。カードグリッド、件数の行、新しい件数を持つパネル自身です。新しい変更はまだ途中のリクエストを取り消します。2,000 商品で計測：クリックから新しいカードと件数まで 26 ms。
+- **条件はサーバーに残ります。** グリッドは同じパラメーターを `scope_any(field, values)` と `scope_range(field, from, to)`（`CardGrid` と `DataGrid` にあります）で受け取るので、ブラウザーが独自の条件を送ることはありません。値がないか端が開いていれば、すべての行が残ります。
+- **選んだ条件**はグループの上にチップとして「すべて解除」と一緒に表示されます。各チップはその条件を外した画面へのリンクなので、スクリプトなしでも動き、名前は「条件 赤 を外す」です。グループは折りたためる `<details>` で、開いたグループは更新後も開いたままです。
+- **チェック。** `App::check_page` は何も動かさないパネルと、名前が画面パラメーターのフィールドにないファセットを報告します。

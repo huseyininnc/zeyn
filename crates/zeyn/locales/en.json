@@ -671,6 +671,14 @@
           "prev": "Previous photo",
           "next": "Next photo",
           "zoom": "Zoom"
+        },
+        "facets": {
+          "label": "Filters",
+          "chosen": "Chosen filters",
+          "clear": "Clear all",
+          "remove": "Remove filter {filter}",
+          "option": "{option}, {count} results",
+          "active": "{n} chosen"
         }
       }
     },

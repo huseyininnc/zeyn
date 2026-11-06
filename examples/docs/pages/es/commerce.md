@@ -112,3 +112,42 @@ p.photos.iter().fold(ProductGallery::new(p.name.clone()), |g, photo| {
 - **Solo carga lo que se ve.** La primera imagen se carga enseguida con `fetchpriority="high"`, porque suele ser lo más grande de una página de producto; las demás esperan en plantillas inertes y `gallery.js` pone la imagen en pantalla y sus dos vecinas, vigiladas por un único IntersectionObserver. Una galería de 12 fotos carga tres al principio. Las imágenes son `Image`, así que conservan su marcador de posición, su archivo de baja resolución y su alternativa.
 - **Zoom y pantalla completa.** El ratón amplía la imagen bajo el puntero (el tamaño de la diapositiva se lee una vez al entrar el puntero, nunca mientras se mueve). Pulsar la imagen, o el botón "Pantalla completa", abre un diálogo modal con la imagen, botones de anterior y siguiente, un conmutador de zoom y un botón de cerrar; mantiene el foco dentro, se cierra con Escape y devuelve el foco a lo que lo abrió. Con movimiento reducido nada se desliza ni crece.
 - **Script.** `gallery.js` (cerca de 1,5 KB con gzip) se carga solo en páginas con una galería.
+
+## Panel de facetas
+
+```rust
+#[params]
+#[derive(Default)]
+pub struct Listing {
+    #[serde(default)]
+    pub color: Vec<String>,
+    pub min_price: Option<i64>,
+    pub max_price: Option<i64>,
+}
+
+#[screen(route = "/shop", public)]
+pub async fn shop(p: Listing, store: ProductStore) -> Result<Screen> {
+    let colors = store.count_colors(&p).await?;
+    let panel = FacetPanel::of(shop, &p)
+        .facet(colors.iter().fold(Facet::new("color", t!("shop.color")), |f, c| {
+            f.option(c.value.clone(), c.name.clone(), c.count)
+        })
+        .chosen(p.color.clone()))
+        .range(RangeSlider::new(t!("shop.price"), ["min_price", "max_price"], 0, 5_000)
+            .money(Currency::Try)
+            .value(p.min_price, p.max_price))
+        .drives("products");
+    let cards = CardGrid::of(search_products)
+        .card(|p: &Product| Card::image(p.photo.clone(), p.name.clone()).price(Price::new(p.price)))
+        .scope_any(Product::color, p.color.clone())
+        .scope_range(Product::price, p.min_price.map(|m| Money::tl(m * 100)), p.max_price.map(|m| Money::tl(m * 100)))
+        .listens("products");
+    Ok(Screen::new(t!("shop.title")).body(Row::new().col(panel).col(cards).weight(3)))
+}
+```
+
+- **Recuentos del servidor.** Cada faceta es un grupo de casillas cuyas opciones muestran cuántas filas tienen con las demás facetas aplicadas ("Rojo (124)"; los lectores de pantalla oyen "Rojo, 124 resultados"). La pantalla las cuenta con una consulta acotada por faceta, como `SELECT color, count(*) ... GROUP BY color LIMIT 50` con los demás filtros en el `WHERE`; una faceta admite como mucho `MAX_FACET_OPTIONS` (50) opciones. Una opción sin filas se desactiva salvo que esté elegida.
+- **Una petición por cambio.** El panel es un formulario de filtro que impulsa sus temas y también los escucha. Un cambio pone los valores en los parámetros de pantalla (las facetas como listas, el rango como dos números), mantiene la dirección al día y refresca a todos los oyentes con un solo `POST /_zeyn/nodes`: la cuadrícula de tarjetas, una línea con el total y el propio panel con sus nuevos recuentos. Un cambio más nuevo cancela la petición que sigue en camino. Medido con 2.000 productos: 26 ms desde el clic hasta las nuevas tarjetas y recuentos.
+- **Los filtros se quedan en el servidor.** La cuadrícula toma los mismos parámetros con `scope_any(field, values)` y `scope_range(field, from, to)` (en `CardGrid` y `DataGrid`), así que el navegador nunca envía filtros propios; sin valores o con extremos abiertos se conservan todas las filas.
+- **Los filtros elegidos** aparecen como fichas sobre los grupos, con "Quitar todos". Cada ficha es un enlace a la pantalla sin ese filtro, así que también funciona sin script, y se llama "Quitar el filtro Rojo". Los grupos son `<details>` plegables, y los grupos abiertos siguen abiertos tras un refresco.
+- **Comprobaciones.** `App::check_page` avisa de un panel que no impulsa nada y de una faceta cuyo nombre no es un campo de los parámetros de la pantalla.

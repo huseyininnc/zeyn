@@ -30,6 +30,8 @@ pub struct Demo {
     pub max_price: Option<i64>,
     pub color: Option<String>,
     pub size: Option<String>,
+    #[serde(default)]
+    pub kinds: Vec<String>,
 }
 
 /// One live example: the function of the component's file that builds it.
@@ -202,6 +204,7 @@ catalog! {
         quantity_stepper "/ui/quantity-stepper";
         variant_picker "/ui/variant-picker" (Demo);
         product_gallery "/ui/product-gallery";
+        facet_panel "/ui/facet-panel" (Demo);
     }
     "media" Image {
         image "/ui/image";
@@ -314,7 +317,9 @@ pub fn feature() -> Feature {
             .screen(examples::card_grid::large_catalog)
             .screen(examples::card_grid::live_catalog)
             .screen(examples::screen_header::orders_page)
-            .screen(examples::calendar::appointment),
+            .screen(examples::calendar::appointment)
+            .screen(examples::shop::shop_listing)
+            .screen(examples::shop::shop_product),
     )
 }
 

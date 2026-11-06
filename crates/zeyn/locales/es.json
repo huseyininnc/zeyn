@@ -536,6 +536,14 @@
           "prev": "Foto anterior",
           "next": "Foto siguiente",
           "zoom": "Ampliar"
+        },
+        "facets": {
+          "label": "Filtros",
+          "chosen": "Filtros elegidos",
+          "clear": "Quitar todos",
+          "remove": "Quitar el filtro {filter}",
+          "option": "{option}, {count} resultados",
+          "active": "{n} elegidos"
         }
       }
     },

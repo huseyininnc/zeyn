@@ -112,3 +112,42 @@ p.photos.iter().fold(ProductGallery::new(p.name.clone()), |g, photo| {
 - **보이는 것만 불러옵니다.** 첫 이미지는 보통 상품 페이지에서 가장 큰 요소이므로 `fetchpriority="high"`로 바로 불러오고, 나머지는 비활성 템플릿에서 기다립니다. `gallery.js`가 IntersectionObserver 하나로 지켜보며 화면의 이미지와 양옆 이미지를 넣습니다. 사진 12장짜리 갤러리는 처음에 3장만 불러옵니다. 이미지는 `Image`이므로 자리 표시자, 저해상도 파일, 대체 파일이 그대로 유지됩니다.
 - **확대와 전체 화면.** 마우스를 올리면 포인터 아래 이미지가 확대됩니다(슬라이드 크기는 포인터가 들어올 때 한 번만 읽고 움직이는 동안에는 읽지 않습니다). 이미지를 누르거나 "전체 화면" 버튼을 누르면 이미지, 이전과 다음 버튼, 확대 토글, 닫기 버튼이 있는 모달 대화상자가 열립니다. 포커스는 안에 머물고, Escape로 닫히며, 연 요소로 포커스를 돌려줍니다. 동작 줄이기 설정에서는 미끄러지거나 커지는 효과가 없습니다.
 - **스크립트.** `gallery.js`(gzip으로 약 1.5 KB)는 갤러리가 있는 페이지에서만 불러옵니다.
+
+## 패싯 패널
+
+```rust
+#[params]
+#[derive(Default)]
+pub struct Listing {
+    #[serde(default)]
+    pub color: Vec<String>,
+    pub min_price: Option<i64>,
+    pub max_price: Option<i64>,
+}
+
+#[screen(route = "/shop", public)]
+pub async fn shop(p: Listing, store: ProductStore) -> Result<Screen> {
+    let colors = store.count_colors(&p).await?;
+    let panel = FacetPanel::of(shop, &p)
+        .facet(colors.iter().fold(Facet::new("color", t!("shop.color")), |f, c| {
+            f.option(c.value.clone(), c.name.clone(), c.count)
+        })
+        .chosen(p.color.clone()))
+        .range(RangeSlider::new(t!("shop.price"), ["min_price", "max_price"], 0, 5_000)
+            .money(Currency::Try)
+            .value(p.min_price, p.max_price))
+        .drives("products");
+    let cards = CardGrid::of(search_products)
+        .card(|p: &Product| Card::image(p.photo.clone(), p.name.clone()).price(Price::new(p.price)))
+        .scope_any(Product::color, p.color.clone())
+        .scope_range(Product::price, p.min_price.map(|m| Money::tl(m * 100)), p.max_price.map(|m| Money::tl(m * 100)))
+        .listens("products");
+    Ok(Screen::new(t!("shop.title")).body(Row::new().col(panel).col(cards).weight(3)))
+}
+```
+
+- **서버가 세는 개수.** 각 패싯은 체크박스 그룹이며, 옵션은 다른 패싯을 적용했을 때 몇 개의 행이 있는지 보여 줍니다("빨강 (124)", 스크린 리더는 "빨강, 결과 124개"를 듣습니다). 화면은 패싯마다 제한이 있는 쿼리 하나로 셉니다. 예를 들어 다른 필터를 `WHERE`에 둔 `SELECT color, count(*) ... GROUP BY color LIMIT 50`입니다. 패싯 하나는 최대 `MAX_FACET_OPTIONS`(50)개의 옵션을 받습니다. 행이 없는 옵션은 선택되지 않았다면 꺼집니다.
+- **변경마다 요청 하나.** 패널은 자신의 토픽을 구동하고 스스로도 듣는 필터 폼입니다. 변경이 일어나면 값이 화면 매개변수에 들어가고(패싯은 목록, 범위는 숫자 두 개) 주소가 맞춰지며, `POST /_zeyn/nodes` 한 번으로 모든 리스너가 새로 고쳐집니다. 카드 그리드, 개수 줄, 새 개수를 가진 패널 자체입니다. 새 변경은 아직 진행 중인 요청을 취소합니다. 상품 2,000개에서 측정: 클릭부터 새 카드와 개수까지 26 ms.
+- **필터는 서버에 남습니다.** 그리드는 같은 매개변수를 `scope_any(field, values)`와 `scope_range(field, from, to)`(`CardGrid`와 `DataGrid`에 있음)로 받으므로 브라우저는 자신의 필터를 보내지 않습니다. 값이 없거나 끝이 열려 있으면 모든 행이 남습니다.
+- **선택한 필터**는 그룹 위에 칩으로 "모두 지우기"와 함께 표시됩니다. 각 칩은 그 필터를 뺀 화면으로 가는 링크라 스크립트 없이도 동작하며, 이름은 "빨강 필터 제거"입니다. 그룹은 접히는 `<details>`이고, 열린 그룹은 새로 고친 뒤에도 열려 있습니다.
+- **검사.** `App::check_page`는 아무것도 구동하지 않는 패널과 이름이 화면 매개변수의 필드가 아닌 패싯을 알려 줍니다.

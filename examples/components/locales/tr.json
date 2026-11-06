@@ -111,7 +111,8 @@
       "range_slider": "Fiyat ve tarih aralıkları için tek çubukta iki tutamaç.",
       "quantity_stepper": "Stoğu sunucuda denetlenen bir sayının iki yanında eksi ve artı düğmeleri.",
       "variant_picker": "Fiyatı, fotoğrafı ve stoğu yerinde değiştiren renk örnekleri ve beden çipleri.",
-      "product_gallery": "Küçük resimler, yakınlaştırma, kaydırma ve tam ekran görünümüyle ürün fotoğrafları."
+      "product_gallery": "Küçük resimler, yakınlaştırma, kaydırma ve tam ekran görünümüyle ürün fotoğrafları.",
+      "facet_panel": "Ürün kartlarını yerinde yenileyen sayılı filtreler, fiyat aralığı ve seçili filtre çipleri."
     },
     "ex": {
       "action_button": {
@@ -396,6 +397,9 @@
       "product_gallery": {
         "overview": "Örnek",
         "dots": "Küçük resimsiz"
+      },
+      "facet_panel": {
+        "overview": "Örnek"
       }
     }
   }

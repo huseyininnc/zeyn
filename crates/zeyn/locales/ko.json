@@ -536,6 +536,14 @@
           "prev": "이전 사진",
           "next": "다음 사진",
           "zoom": "확대"
+        },
+        "facets": {
+          "label": "필터",
+          "chosen": "선택한 필터",
+          "clear": "모두 지우기",
+          "remove": "{filter} 필터 제거",
+          "option": "{option}, 결과 {count}개",
+          "active": "{n}개 선택됨"
         }
       }
     },

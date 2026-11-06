@@ -173,6 +173,59 @@ pub fn galleried() -> Screen {
     Screen::new("Gallery").body(gallery())
 }
 
+#[params]
+#[derive(Default)]
+pub struct GoodsParams {
+    #[serde(default)]
+    pub color: Vec<String>,
+    pub min_price: Option<i64>,
+    pub max_price: Option<i64>,
+}
+
+/// The facet panel of the goods: color counts with the price range applied.
+fn good_facets(p: &GoodsParams) -> FacetPanel {
+    let low = p.min_price.unwrap_or(0) * 100;
+    let high = p.max_price.unwrap_or(300) * 100;
+    let counted = |c: &str| {
+        goods()
+            .iter()
+            .filter(|g| g.color == c && (low..=high).contains(&g.price.minor))
+            .count() as u64
+    };
+    FacetPanel::of(goods_listing, p)
+        .facet(
+            Facet::new("color", "Color")
+                .option("red", "Red", counted("red"))
+                .option("blue", "<Blue>", counted("blue"))
+                .option("pink", "Pink", 0)
+                .chosen(p.color.clone()),
+        )
+        .range(
+            RangeSlider::new("Price", ["min_price", "max_price"], 0, 300)
+                .money(Currency::Try)
+                .value(p.min_price, p.max_price),
+        )
+        .drives("goods")
+}
+
+#[screen(route = "/listing", public)]
+pub fn goods_listing(p: GoodsParams) -> Screen {
+    Screen::new("Goods")
+        .body(good_facets(&p))
+        .body(
+            CardGrid::of(search_goods)
+                .card(|g: &Good| Card::image("/g.webp", g.name.clone()))
+                .scope_any(Good::color, p.color.clone())
+                .scope_range(
+                    Good::price,
+                    p.min_price.map(|m| Money::tl(m * 100)),
+                    p.max_price.map(|m| Money::tl(m * 100)),
+                )
+                .paging(Paging::infinite(50))
+                .listens("goods"),
+        )
+}
+
 fn shop_app() -> App {
     App::new("Test")
         .i18n(I18n::new("en"))
@@ -198,7 +251,8 @@ fn shop_app() -> App {
                 .screen(cart_line)
                 .screen(good_cards)
                 .screen(shirt)
-                .screen(galleried),
+                .screen(galleried)
+                .screen(goods_listing),
         )
 }
 
@@ -686,4 +740,75 @@ async fn the_gallery_module_loads_only_with_a_gallery() {
     );
     let (_, other) = get("/shirt").await;
     assert!(!links(&other).contains(&"gallery.js".to_string()));
+}
+
+#[test]
+fn a_facet_panel_counts_options_and_lists_the_chosen_ones_as_links_without_them() {
+    let p = GoodsParams {
+        color: vec!["red".into(), "blue".into()],
+        min_price: Some(50),
+        max_price: None,
+    };
+    let out = html(&good_facets(&p), "en");
+    assert!(out.starts_with(r#"<form class="z-facets" aria-label="Filters" data-zeyn-drives="goods" data-zeyn-listens="goods" data-zeyn-kinds="{&quot;color&quot;:&quot;list&quot;,&quot;max_price&quot;:&quot;number&quot;,&quot;min_price&quot;:&quot;number&quot;}" novalidate>"#), "{out}");
+    assert!(out.contains(r#"name="color" value="red" aria-label="Red, 9 results" data-testid="s.facet.color.red" checked><span class="z-facet-text" aria-hidden="true">Red</span><span class="z-facet-count" aria-hidden="true">9</span>"#), "{out}");
+    assert!(out.contains(r#"value="pink" aria-label="Pink, 0 results" data-testid="s.facet.color.pink" disabled>"#), "an empty option is off");
+    assert!(out.contains("&lt;Blue&gt;") && !out.contains("<Blue>"));
+    assert!(out.contains(r#"<a class="z-facet-chip" href="/_zeyn/route/goods_listing?params=%7B%22color%22%3A%5B%22blue%22%5D%2C%22max_price%22%3Anull%2C%22min_price%22%3A50%7D" data-zeyn-params="{&quot;color&quot;:[&quot;blue&quot;],&quot;max_price&quot;:null,&quot;min_price&quot;:50}" data-zeyn-base-href aria-label="Remove filter Red"><span>Red</span>"#), "{out}");
+    assert!(
+        out.contains(r#"aria-label="Remove filter Price"><span>Price: ₺50.00 to ₺300.00</span>"#),
+        "{out}"
+    );
+    assert!(out.contains(r#"<a class="z-facets-clear" href="/_zeyn/route/goods_listing?params=%7B%22color%22%3A%5B%5D%2C%22max_price%22%3Anull%2C%22min_price%22%3Anull%7D""#), "{out}");
+    let none = html(&good_facets(&GoodsParams::default()), "en");
+    assert!(
+        !none.contains("z-facets-chosen"),
+        "nothing chosen, no chips"
+    );
+    let app = shop_app();
+    assert!(
+        app.check_page(&goods_listing::run(GoodsParams::default()))
+            .is_ok()
+    );
+    let stray = Screen::new("Stray").body(
+        FacetPanel::of(goods_listing, &GoodsParams::default())
+            .facet(Facet::new("size", "Size").option("m", "M", 1))
+            .drives("goods"),
+    );
+    assert!(
+        app.check_page(&stray).unwrap_err()[0]
+            .contains("facet `size` is not a field of the screen's params")
+    );
+}
+
+#[tokio::test]
+async fn a_facet_change_refreshes_the_cards_with_the_server_side_scope_in_one_request() {
+    let (status, body) = refresh(
+        "goods_listing",
+        serde_json::json!({ "color": ["red"], "min_price": 100, "max_price": 200 }),
+        &["0", "1"],
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let cards = body["nodes"]["1"].as_str().unwrap();
+    let names: Vec<&str> = cards
+        .split(r#"<span class="z-poster-title">"#)
+        .skip(1)
+        .filter_map(|s| s.split('<').next())
+        .collect();
+    assert_eq!(
+        names,
+        ["Good 12", "Good 15", "Good 18"],
+        "red goods from ₺100 to ₺200"
+    );
+    let panel = body["nodes"]["0"].as_str().unwrap();
+    assert!(
+        panel.contains(r#"aria-label="Red, 3 results""#),
+        "the counts follow: {panel}"
+    );
+    let (_, page) = get("/listing").await;
+    let linked = links(&page);
+    for name in ["topics.js", "range.js", "commerce.css"] {
+        assert!(linked.contains(&name.to_string()), "{name}");
+    }
 }

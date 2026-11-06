@@ -112,3 +112,42 @@ p.photos.iter().fold(ProductGallery::new(p.name.clone()), |g, photo| {
 - **لا يُحمَّل إلا ما يُرى.** تُحمَّل الصورة الأولى فورًا مع `fetchpriority="high"` لأنها عادةً أكبر ما في صفحة المنتج، وتنتظر البقية في قوالب خاملة، ويضع `gallery.js` الصورة الظاهرة وجارتيها بمراقبة IntersectionObserver واحد. يحمّل معرض من 12 صورة ثلاثًا في البداية. الصور من نوع `Image`، فتحتفظ بالعنصر النائب والملف منخفض الدقة والبديل.
 - **التكبير وملء الشاشة.** يكبّر الفأر الصورة تحت المؤشر (يُقرأ حجم الشريحة مرة واحدة عند دخول المؤشر ولا يُقرأ أثناء الحركة). الضغط على الصورة أو على زر "ملء الشاشة" يفتح مربع حوار مشروطًا فيه الصورة وزرّا السابق والتالي وزر التكبير وزر الإغلاق؛ يُبقي التركيز داخله، ويُغلق بمفتاح Escape، ويعيد التركيز إلى ما فتحه. ومع تقليل الحركة لا ينزلق شيء ولا يكبر.
 - **السكربت.** يُحمَّل `gallery.js` (نحو 1.5 KB مع gzip) في الصفحات التي فيها معرض فقط.
+
+## لوحة الأوجه
+
+```rust
+#[params]
+#[derive(Default)]
+pub struct Listing {
+    #[serde(default)]
+    pub color: Vec<String>,
+    pub min_price: Option<i64>,
+    pub max_price: Option<i64>,
+}
+
+#[screen(route = "/shop", public)]
+pub async fn shop(p: Listing, store: ProductStore) -> Result<Screen> {
+    let colors = store.count_colors(&p).await?;
+    let panel = FacetPanel::of(shop, &p)
+        .facet(colors.iter().fold(Facet::new("color", t!("shop.color")), |f, c| {
+            f.option(c.value.clone(), c.name.clone(), c.count)
+        })
+        .chosen(p.color.clone()))
+        .range(RangeSlider::new(t!("shop.price"), ["min_price", "max_price"], 0, 5_000)
+            .money(Currency::Try)
+            .value(p.min_price, p.max_price))
+        .drives("products");
+    let cards = CardGrid::of(search_products)
+        .card(|p: &Product| Card::image(p.photo.clone(), p.name.clone()).price(Price::new(p.price)))
+        .scope_any(Product::color, p.color.clone())
+        .scope_range(Product::price, p.min_price.map(|m| Money::tl(m * 100)), p.max_price.map(|m| Money::tl(m * 100)))
+        .listens("products");
+    Ok(Screen::new(t!("shop.title")).body(Row::new().col(panel).col(cards).weight(3)))
+}
+```
+
+- **الأعداد من الخادم.** كل وجه مجموعة مربعات اختيار تعرض خياراتها عدد الصفوف التي لها مع تطبيق الأوجه الأخرى ("أحمر (124)"، وتسمع قارئات الشاشة "أحمر، 124 نتيجة"). تعدّها الشاشة باستعلام واحد محدود لكل وجه، مثل `SELECT color, count(*) ... GROUP BY color LIMIT 50` مع بقية المرشحات في `WHERE`؛ ويأخذ الوجه الواحد `MAX_FACET_OPTIONS` (50) خيارًا على الأكثر. ويُعطَّل الخيار الذي لا صفوف له ما لم يكن مختارًا.
+- **طلب واحد لكل تغيير.** اللوحة نموذج ترشيح يقود مواضيعه ويستمع إليها بنفسه. يضع التغيير القيم في معاملات الشاشة (الأوجه قوائم، والنطاق رقمان)، ويُبقي العنوان متوافقًا، ويحدّث كل المستمعين بطلب `POST /_zeyn/nodes` واحد: شبكة البطاقات وسطر العدد واللوحة نفسها بأعدادها الجديدة. ويلغي التغيير الأحدث الطلب الذي ما زال في الطريق. القياس على 2,000 منتج: 26 ms من النقرة حتى البطاقات والأعداد الجديدة.
+- **المرشحات تبقى على الخادم.** تأخذ الشبكة المعاملات نفسها عبر `scope_any(field, values)` و`scope_range(field, from, to)` (في `CardGrid` و`DataGrid`)، فلا يرسل المتصفح مرشحات من عنده أبدًا؛ وغياب القيم أو الأطراف المفتوحة يُبقي كل الصفوف.
+- **المرشحات المختارة** تظهر رقاقات فوق المجموعات مع "مسح الكل". كل رقاقة رابط إلى الشاشة دون ذلك المرشح، فتعمل بلا سكربت أيضًا، واسمها "إزالة عامل التصفية أحمر". والمجموعات عناصر `<details>` قابلة للطي، وتبقى المفتوحة منها مفتوحة بعد التحديث.
+- **الفحوص.** يبلّغ `App::check_page` عن لوحة لا تقود شيئًا وعن وجه ليس اسمه حقلًا في معاملات الشاشة.

@@ -112,3 +112,42 @@ p.photos.iter().fold(ProductGallery::new(p.name.clone()), |g, photo| {
 - **Only what is seen loads.** The first image is eager with `fetchpriority="high"`, because it is usually the largest thing on a product page; the others wait in inert templates, and `gallery.js` puts in the image on screen and its two neighbors, watched by one IntersectionObserver. A gallery of 12 photos loads three at first. The images are `Image`s, so they keep their placeholder, low resolution file and fallback.
 - **Zoom and full screen.** A mouse zooms the image under the pointer (the slide's box is read once when the pointer enters, never while it moves). A press on the image, or the "Full screen" button, opens a modal dialog with the image, previous and next buttons, a zoom toggle and a close button; it keeps focus inside, closes with Escape and gives focus back to what opened it. Under reduced motion nothing slides or grows.
 - **Script.** `gallery.js` (about 1.5 KB gzip) loads only on pages with a gallery.
+
+## Facet panel
+
+```rust
+#[params]
+#[derive(Default)]
+pub struct Listing {
+    #[serde(default)]
+    pub color: Vec<String>,
+    pub min_price: Option<i64>,
+    pub max_price: Option<i64>,
+}
+
+#[screen(route = "/shop", public)]
+pub async fn shop(p: Listing, store: ProductStore) -> Result<Screen> {
+    let colors = store.count_colors(&p).await?;
+    let panel = FacetPanel::of(shop, &p)
+        .facet(colors.iter().fold(Facet::new("color", t!("shop.color")), |f, c| {
+            f.option(c.value.clone(), c.name.clone(), c.count)
+        })
+        .chosen(p.color.clone()))
+        .range(RangeSlider::new(t!("shop.price"), ["min_price", "max_price"], 0, 5_000)
+            .money(Currency::Try)
+            .value(p.min_price, p.max_price))
+        .drives("products");
+    let cards = CardGrid::of(search_products)
+        .card(|p: &Product| Card::image(p.photo.clone(), p.name.clone()).price(Price::new(p.price)))
+        .scope_any(Product::color, p.color.clone())
+        .scope_range(Product::price, p.min_price.map(|m| Money::tl(m * 100)), p.max_price.map(|m| Money::tl(m * 100)))
+        .listens("products");
+    Ok(Screen::new(t!("shop.title")).body(Row::new().col(panel).col(cards).weight(3)))
+}
+```
+
+- **Counts from the server.** Each facet is a group of checkboxes whose options show how many rows they have with the other facets applied ("Red (124)"; screen readers hear "Red, 124 results"). The screen counts them with one bounded query per facet, such as `SELECT color, count(*) ... GROUP BY color LIMIT 50` with the other filters in the `WHERE`; a facet takes at most `MAX_FACET_OPTIONS` (50) options. An option with no rows is turned off unless it is chosen.
+- **One request per change.** The panel is a filter form that drives its topics and listens to them itself. A change puts the values into the screen params (facets as lists, the range as two numbers), keeps the address in step and refreshes every listener in one `POST /_zeyn/nodes`: the card grid, a count line and the panel with its new counts. A newer change cancels the request still on its way. Measured on 2,000 products: 26 ms from a click to new cards and counts.
+- **Filters stay on the server.** The grid takes the same params with `scope_any(field, values)` and `scope_range(field, from, to)` (on `CardGrid` and `DataGrid`), so the browser never sends filters of its own; no values or open ends keep every row.
+- **Chosen filters** show as chips above the groups, with "Clear all". Each chip is a link to the screen without that filter, so it also works without script, and is named "Remove filter Red". The groups are `<details>` that fold, and open groups stay open across refreshes.
+- **Checks.** `App::check_page` reports a panel that drives nothing and a facet whose name is not a field of the screen's params.

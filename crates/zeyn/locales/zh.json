@@ -536,6 +536,14 @@
           "prev": "上一张照片",
           "next": "下一张照片",
           "zoom": "放大"
+        },
+        "facets": {
+          "label": "筛选",
+          "chosen": "已选筛选条件",
+          "clear": "全部清除",
+          "remove": "移除筛选条件 {filter}",
+          "option": "{option}，{count} 个结果",
+          "active": "已选 {n} 项"
         }
       }
     },

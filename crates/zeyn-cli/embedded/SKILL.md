@@ -243,7 +243,11 @@ What to remember:
   `.unavailable(v, reason).current(p.color.as_deref())).drives("variant")`, then
   `.listens("variant")` on the price, gallery and stock; the screen params hold the choice.
   Photos: `ProductGallery::new(name).image(Image::new(..).alt(..).size(w, h)).thumb(small)`
-  (the first image is the priority one; do not add `.priority()` yourself).
+  (the first image is the priority one; do not add `.priority()` yourself). Filters:
+  `FacetPanel::of(screen, &p).facet(Facet::new("color", ..).option(v, text, count).chosen(..))`
+  `.range(RangeSlider::..).drives("products")` with `Vec<String>` params (`#[serde(default)]`),
+  counts from one bounded query per facet, and the grid filtered on the server with
+  `.scope_any(Product::color, p.color.clone())` and `.scope_range(field, from, to)`.
 - App shell top bar: `App::header(|h| h.center(SearchBox::of(..)).end(LinkButton::new(..)))`,
   the same slots as the site header; `h.breadcrumb().search().account()` adds the breadcrumb, the
   search field that opens the palette and the account menu with theme, language and sign out.

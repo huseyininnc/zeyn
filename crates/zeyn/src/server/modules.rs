@@ -199,6 +199,8 @@ pub(crate) const MODULES: &[Module] = &[
             "z-variant",
             "z-variants",
             "z-gallery",
+            "z-facet",
+            "z-facets",
         ],
         needs: &[],
     },

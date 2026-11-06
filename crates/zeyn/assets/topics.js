@@ -151,7 +151,10 @@ function replace(node, html) {
   document.dispatchEvent(new CustomEvent('zeyn:content', { detail: fresh }));
 }
 
-/** Values of a filter form's named fields, typed by `data-zeyn-kinds`; empty fields are `null`. */
+/**
+ * Values of a filter form's named fields, typed by `data-zeyn-kinds`; empty fields are `null`,
+ * and checkboxes of a `list` name give the array of their checked values.
+ */
 function formValues(form) {
   let kinds = {};
   try {
@@ -161,6 +164,11 @@ function formValues(form) {
   for (const el of form.elements) {
     if (!el.name || el.disabled || el.type === 'submit' || el.type === 'button') continue;
     let v;
+    if (kinds[el.name] === 'list') {
+      out[el.name] ??= [];
+      if (el.checked) out[el.name].push(el.value);
+      continue;
+    }
     if (el.type === 'checkbox') v = kinds[el.name] === 'bool' ? el.checked : el.checked ? el.value : null;
     else if (el.type === 'radio') {
       if (!el.checked) continue;

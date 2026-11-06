@@ -536,6 +536,14 @@
           "prev": "前の写真",
           "next": "次の写真",
           "zoom": "拡大"
+        },
+        "facets": {
+          "label": "絞り込み",
+          "chosen": "選んだ条件",
+          "clear": "すべて解除",
+          "remove": "条件 {filter} を外す",
+          "option": "{option}、{count} 件",
+          "active": "{n} 件選択中"
         }
       }
     },

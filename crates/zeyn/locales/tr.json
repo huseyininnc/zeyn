@@ -671,6 +671,14 @@
           "prev": "Önceki fotoğraf",
           "next": "Sonraki fotoğraf",
           "zoom": "Yakınlaştır"
+        },
+        "facets": {
+          "label": "Filtreler",
+          "chosen": "Seçili filtreler",
+          "clear": "Tümünü temizle",
+          "remove": "{filter} filtresini kaldır",
+          "option": "{option}, {count} sonuç",
+          "active": "{n} seçili"
         }
       }
     },

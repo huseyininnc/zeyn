@@ -593,6 +593,33 @@ impl<E: Model> CardGrid<E> {
         self
     }
 
+    /// Keeps only the rows whose `field` is one of `values`, on every request, like
+    /// [`CardGrid::scope`]: `.scope_any(Product::color, p.colors.clone())` for the colors a facet
+    /// panel chose. No values keep every row.
+    pub fn scope_any<T: crate::value::FieldType>(
+        mut self,
+        field: crate::model::Field<E, T>,
+        values: impl IntoIterator<Item = T>,
+    ) -> Self {
+        self.scope
+            .extend(crate::grid::any_filter(field.meta(), values));
+        self
+    }
+
+    /// Keeps only the rows whose `field` is between `from` and `to`, both inclusive, on every
+    /// request, like [`CardGrid::scope`]; `None` leaves that end open:
+    /// `.scope_range(Product::price, p.min_price.map(Money::tl), None)`.
+    pub fn scope_range<T: crate::value::FieldType>(
+        mut self,
+        field: crate::model::Field<E, T>,
+        from: Option<T>,
+        to: Option<T>,
+    ) -> Self {
+        self.scope
+            .extend(crate::grid::range_filter(field.meta(), from, to));
+        self
+    }
+
     /// Shows only rows that match this free text ([`DataQuery::q`]), such as the text of a
     /// search results screen.
     pub fn search(mut self, text: impl Into<String>) -> Self {

@@ -203,6 +203,9 @@ pub struct Item {
     pub name: String,
     pub price: Money,
     pub shelf: i64,
+    pub color: String,
+    pub brand: String,
+    pub old_price: Money,
 }
 
 impl Item {
@@ -220,6 +223,26 @@ impl Item {
     }
 }
 
+/// The colors of the large catalog: value and name.
+pub const COLORS: [(&str, &str); 6] = [
+    ("black", "Black"),
+    ("white", "White"),
+    ("red", "Red"),
+    ("blue", "Blue"),
+    ("green", "Green"),
+    ("sand", "Sand"),
+];
+
+/// The brands of the large catalog.
+pub const BRANDS: [&str; 8] = [
+    "Arda", "Birch", "Cove", "Dune", "Elm", "Fjord", "Grove", "Haven",
+];
+
+/// Every item of the large catalog.
+pub fn items() -> &'static [Item] {
+    &ITEM_ROWS
+}
+
 static ITEM_ROWS: LazyLock<Vec<Item>> = LazyLock::new(|| {
     (1..=ITEMS)
         .map(|i| Item {
@@ -227,6 +250,14 @@ static ITEM_ROWS: LazyLock<Vec<Item>> = LazyLock::new(|| {
             name: format!("Item {i}"),
             price: Money::tl(990 + (i * 7_919) % 90_000),
             shelf: (i - 1) * SHELVES / ITEMS,
+            color: COLORS[(i % COLORS.len() as i64) as usize]
+                .0
+                .to_string(),
+            brand: BRANDS[((i / 7) % BRANDS.len() as i64) as usize].to_string(),
+            old_price: match i % 5 {
+                0 => Money::tl((990 + (i * 7_919) % 90_000) * 5 / 4),
+                _ => Money::tl(0),
+            },
         })
         .collect()
 });

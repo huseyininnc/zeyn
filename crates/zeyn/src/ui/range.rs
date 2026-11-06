@@ -153,8 +153,23 @@ impl RangeSlider {
         }
     }
 
+    /// The chosen range when it is narrower than the bounds, for the chips of a facet panel.
+    pub(crate) fn chosen(&self) -> Option<(i64, i64)> {
+        (self.value != self.bounds).then_some(self.value)
+    }
+
+    /// The names the two values are sent under.
+    pub(crate) fn names(&self) -> [&'static str; 2] {
+        self.names
+    }
+
+    /// The label of the slider.
+    pub(crate) fn label(&self) -> &Text {
+        &self.label
+    }
+
     /// A value as the page shows it.
-    fn shown(&self, r: &Render, v: i64) -> String {
+    pub(crate) fn shown(&self, r: &Render, v: i64) -> String {
         match self.scale {
             Scale::Number => r.value(&Value::Int(v), &FieldKind::Integer),
             Scale::Money(c) => escape(&Money::new(v.saturating_mul(100), c).format(r.locale)),

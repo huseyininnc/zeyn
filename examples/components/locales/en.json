@@ -111,7 +111,8 @@
       "range_slider": "Two handles over one track for price and date ranges.",
       "quantity_stepper": "Minus and plus buttons around a number whose stock the server checks.",
       "variant_picker": "Color swatches and size chips that change the price, photo and stock in place.",
-      "product_gallery": "Product photos with thumbnails, zoom, swipe and a full screen view."
+      "product_gallery": "Product photos with thumbnails, zoom, swipe and a full screen view.",
+      "facet_panel": "Counted filters, a price range and chosen filter chips that refresh product cards in place."
     },
     "ex": {
       "action_button": {
@@ -396,6 +397,9 @@
       "product_gallery": {
         "overview": "Example",
         "dots": "Without thumbnails"
+      },
+      "facet_panel": {
+        "overview": "Example"
       }
     }
   }
