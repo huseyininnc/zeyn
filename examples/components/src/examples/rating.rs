@@ -12,10 +12,12 @@ pub struct Feedback {
     pub effort: Option<i64>,
 }
 
-/// Accepts the rating. Nothing is stored.
+/// Keeps the rating in the capped [`crate::data::RATINGS`].
 #[action(public)]
 pub async fn send_feedback(feedback: Valid<Feedback>) -> Result<i64> {
-    Ok(feedback.stars.unwrap_or(0))
+    let stars = feedback.stars.unwrap_or(0);
+    crate::data::RATINGS.push(stars.to_string());
+    Ok(stars)
 }
 
 pub fn overview(_ctx: &Ctx) -> Node {
@@ -26,7 +28,7 @@ pub fn overview(_ctx: &Ctx) -> Node {
     .field(Feedback::stars)
     .control(Feedback::stars, Control::Rating)
     .submit("Send", send_feedback)
-    .on_success(|_, ui| ui.toast("Thanks. Nothing was stored."))
+    .on_success(|_, ui| ui.toast("Thanks for the rating."))
     .into()
 }
 
@@ -48,10 +50,12 @@ pub struct Taste {
     pub stars: Option<Decimal>,
 }
 
-/// Accepts the rating. Nothing is stored.
+/// Keeps the rating in the capped [`crate::data::RATINGS`].
 #[action(public)]
 pub async fn send_taste(taste: Valid<Taste>) -> Result<()> {
-    let _ = taste;
+    if let Some(stars) = taste.stars {
+        crate::data::RATINGS.push(stars.to_string());
+    }
     Ok(())
 }
 

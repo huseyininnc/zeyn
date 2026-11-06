@@ -44,7 +44,7 @@ RangeSlider::new(t!("shop.price"), ["min_price", "max_price"], 0, 5_000)
 - **A filter.** `.drives(topic)` wraps the slider in a filter form: when a handle is let go, the two values go into the screen params of the same names and the listeners of the topic refresh in place. Inside a facet panel the panel's form does that, and in any other form the handles are sent like other fields.
 - **Values.** `value(low, high)` takes the params (`None` keeps the end of the track). Values out of the bounds are clamped and a low value above the high one is swapped, so a hand edited address cannot break the slider. `money(currency)` shows whole units of a currency in the page's format.
 - **Dates.** `RangeSlider::dates(label, names, first, last)` with `.date_value(from, to)` picks days; the form sends ISO dates such as `2026-03-31` through hidden inputs.
-- **Script.** `range.js` (about 1 KB gzip) loads only on pages with a slider. It keeps the low handle at or below the high one, fills the track between the handles, writes the values next to the label and moves the nearer handle when the bare track is pressed. It reads the track's size once per press and never while a handle moves.
+- **Script.** `range.js` (about 2 KB gzip) loads only on pages with a slider. It keeps the low handle at or below the high one, fills the track between the handles, writes the values next to the label and moves the nearer handle when the bare track is pressed. It reads the track's size once per press and never while a handle moves.
 
 ## Quantity stepper
 
@@ -66,7 +66,7 @@ QuantityStepper::of(set_quantity, line.sku.clone())
 - **Checked on the server.** A change (a press of minus or plus, or a typed number) is sent 400 ms after the user stops, through `POST /_zeyn/data` with the CSRF check and the write rate limit, as the user, with the action's permission checked. The server clamps the quantity to the stepper's range before the action runs, and the action checks what only it knows, such as the stock. The item (`target`) is set by the screen and never read from the browser.
 - **The answer wins.** The action answers with the quantity it kept and the most allowed (`QuantityState::new(kept).max(stock)`). When that is less than the user asked for, the stepper shows it and says "Only 7 available." in a live region. A newer change cancels the request still on its way, so only the last answer is shown; a failed request puts the last kept quantity back and says so.
 - **Keyboard and touch.** The buttons are at least 24 by 24 pixels (WCAG 2.5.8), named "Decrease" and "Increase", and turn off at the ends of the range; focus moves to the field when the pressed button turns off. The field takes digits and the arrow keys.
-- **Script.** `quantity.js` (about 1 KB gzip) loads only on pages with a stepper.
+- **Script.** `quantity.js` (about 2 KB gzip) loads only on pages with a stepper.
 
 ## Variant picker
 
@@ -109,9 +109,9 @@ p.photos.iter().fold(ProductGallery::new(p.name.clone()), |g, photo| {
 ```
 
 - **One image at a time.** The slides sit in a scroll snapping track, so phones swipe between them without script. Thumbnails under the image are buttons ("Show photo 2 of 5", the current one with `aria-current`); the arrow keys on the focused image move between slides, in the reading direction of the page. The gallery is a named carousel region whose slides say "2 of 5" (W3C APG carousel pattern). Without thumbnails (`thumb`) it shows numbered dots.
-- **Only what is seen loads.** The first image is eager with `fetchpriority="high"`, because it is usually the largest thing on a product page; the others wait in inert templates, and `gallery.js` puts in the image on screen and its two neighbors, watched by one IntersectionObserver. A gallery of 12 photos loads three at first. The images are `Image`s, so they keep their placeholder, low resolution file and fallback.
+- **Only what is seen loads.** The first image is eager with `fetchpriority="high"`, because it is usually the largest thing on a product page; the others wait in inert templates, and `gallery.js` puts in the image on screen and its two neighbors, watched by one IntersectionObserver. A gallery of 12 photos loads three at first. The images are `Image`s, so they keep their placeholder, low resolution file and fallback. The first image drops its low resolution file, which would only compete with it.
 - **Zoom and full screen.** A mouse zooms the image under the pointer (the slide's box is read once when the pointer enters, never while it moves). A press on the image, or the "Full screen" button, opens a modal dialog with the image, previous and next buttons, a zoom toggle and a close button; it keeps focus inside, closes with Escape and gives focus back to what opened it. Under reduced motion nothing slides or grows.
-- **Script.** `gallery.js` (about 1.5 KB gzip) loads only on pages with a gallery.
+- **Script.** `gallery.js` (about 2.5 KB gzip) loads only on pages with a gallery.
 
 ## Facet panel
 
@@ -147,10 +147,11 @@ pub async fn shop(p: Listing, store: ProductStore) -> Result<Screen> {
 ```
 
 - **Counts from the server.** Each facet is a group of checkboxes whose options show how many rows they have with the other facets applied ("Red (124)"; screen readers hear "Red, 124 results"). The screen counts them with one bounded query per facet, such as `SELECT color, count(*) ... GROUP BY color LIMIT 50` with the other filters in the `WHERE`; a facet takes at most `MAX_FACET_OPTIONS` (50) options. An option with no rows is turned off unless it is chosen.
-- **One request per change.** The panel is a filter form that drives its topics and listens to them itself. A change puts the values into the screen params (facets as lists, the range as two numbers), keeps the address in step and refreshes every listener in one `POST /_zeyn/nodes`: the card grid, a count line and the panel with its new counts. A newer change cancels the request still on its way. Measured on 2,000 products: 26 ms from a click to new cards and counts.
+- **One request per change.** The panel is a filter form that drives its topics and listens to them itself. A change puts the values into the screen params (facets as lists, the range as two numbers), keeps the address in step and refreshes every listener in one `POST /_zeyn/nodes`: the card grid, a count line and the panel with its new counts. A newer change cancels the request still on its way.
 - **Filters stay on the server.** The grid takes the same params with `scope_any(field, values)` and `scope_range(field, from, to)` (on `CardGrid` and `DataGrid`), so the browser never sends filters of its own; no values or open ends keep every row.
 - **Chosen filters** show as chips above the groups, with "Clear all". Each chip is a link to the screen without that filter, so it also works without script, and is named "Remove filter Red". The groups are `<details>` that fold, and open groups stay open across refreshes.
 - **Checks.** `App::check_page` reports a panel that drives nothing and a facet whose name is not a field of the screen's params.
+- **Phones.** Below the phone size (641 px) the groups start folded behind a "Filters" button that shows how many filters are chosen ("Filters 2", read as "2 chosen"), so the products are on the first screen; the chosen chips stay visible above it. The button is a native `<details>` summary, so Enter and Space open it, and it stays open while the panel refreshes. Wider screens show the groups at once.
 
 ## Reviews and ratings
 
@@ -189,6 +190,6 @@ Countdown::until(sale.ends_at)
     .ended(Badge::new(t!("shop.sale_over")))
 ```
 
-- **Server time.** The server writes the time left with its own clock ("2d 03:14:09"), and the page carries that clock, so a wrong clock on the device does not move the end. Once the moment has passed, the server renders the end state given to `ended` instead of the clock, with no script.
-- **One timer.** `countdown.js` (about 1 KB gzip, only on pages with a running countdown) keeps one timer for every countdown of the page, ticking on the whole second and stopped while the tab is hidden. At zero the end state replaces the clock; listeners of a topic can refresh what else the end changes.
+- **Absolute end.** The page carries the end as an absolute moment (`data-end`), never the time left, and the browser counts down to it, so a page served from a cache or reopened later shows the right time at once. The server writes the time left as it renders, for visitors without script, and once the moment has passed it renders the end state given to `ended` instead of the clock, with no script.
+- **One timer.** `countdown.js` (about 1.5 KB gzip, only on pages with a running countdown) keeps one timer for every countdown of the page, ticking on the whole second and stopped while the tab is hidden. At zero the end state replaces the clock; listeners of a topic can refresh what else the end changes.
 - **Screen readers.** The digits are hidden from them. A polite live region says the time left in words ("2 d 3 h 14 min left") and changes only when the minute changes, so it never talks every second.

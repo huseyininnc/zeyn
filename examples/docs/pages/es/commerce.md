@@ -44,7 +44,7 @@ RangeSlider::new(t!("shop.price"), ["min_price", "max_price"], 0, 5_000)
 - **Un filtro.** `.drives(topic)` pone el control en un formulario de filtro: al soltar un tirador, los dos valores pasan a los parámetros de pantalla con los mismos nombres y los oyentes del tema se refrescan en su sitio. Dentro de un panel de facetas lo hace el formulario del panel, y en cualquier otro formulario los tiradores se envían como los demás campos.
 - **Valores.** `value(low, high)` toma los parámetros (`None` conserva el extremo de la pista). Los valores fuera de los límites se recortan y un valor bajo mayor que el alto se intercambia, así que una dirección editada a mano no puede romper el control. `money(currency)` muestra unidades enteras de una moneda en el formato de la página.
 - **Fechas.** `RangeSlider::dates(label, names, first, last)` con `.date_value(from, to)` elige días; el formulario envía fechas ISO como `2026-03-31` mediante campos ocultos.
-- **Script.** `range.js` (cerca de 1 KB con gzip) se carga solo en páginas con un control de rango. Mantiene el tirador bajo por debajo del alto, rellena la pista entre ambos, escribe los valores junto a la etiqueta y mueve el tirador más cercano cuando se pulsa la pista vacía. Lee el tamaño de la pista una vez por pulsación y nunca mientras un tirador se mueve.
+- **Script.** `range.js` (cerca de 2 KB con gzip) se carga solo en páginas con un control de rango. Mantiene el tirador bajo por debajo del alto, rellena la pista entre ambos, escribe los valores junto a la etiqueta y mueve el tirador más cercano cuando se pulsa la pista vacía. Lee el tamaño de la pista una vez por pulsación y nunca mientras un tirador se mueve.
 
 ## Selector de cantidad
 
@@ -66,7 +66,7 @@ QuantityStepper::of(set_quantity, line.sku.clone())
 - **Comprobado en el servidor.** Un cambio (pulsar menos o más, o escribir un número) se envía 400 ms después de que el usuario se detiene, mediante `POST /_zeyn/data` con la comprobación CSRF y el límite de escritura, como el usuario y con el permiso de la acción comprobado. El servidor ajusta la cantidad al rango del selector antes de que se ejecute la acción, y la acción comprueba lo que solo ella sabe, como el stock. El artículo (`target`) lo fija la pantalla y nunca se lee del navegador.
 - **Manda la respuesta.** La acción responde con la cantidad que guardó y el máximo permitido (`QuantityState::new(kept).max(stock)`). Si es menor que lo pedido, el selector la muestra y dice "Solo hay 7 disponibles." en una región en vivo. Un cambio más nuevo cancela la petición que sigue en camino, así que solo se muestra la última respuesta; una petición fallida repone la última cantidad guardada y lo indica.
 - **Teclado y táctil.** Los botones miden al menos 24 por 24 píxeles (WCAG 2.5.8), se llaman "Reducir" y "Aumentar" y se desactivan en los extremos del rango; el foco pasa al campo cuando el botón pulsado se desactiva. El campo acepta dígitos y las flechas.
-- **Script.** `quantity.js` (cerca de 1 KB con gzip) se carga solo en páginas con un selector.
+- **Script.** `quantity.js` (cerca de 2 KB con gzip) se carga solo en páginas con un selector.
 
 ## Selector de variantes
 
@@ -109,9 +109,9 @@ p.photos.iter().fold(ProductGallery::new(p.name.clone()), |g, photo| {
 ```
 
 - **Una imagen cada vez.** Las diapositivas están en una pista con ajuste de desplazamiento, así que en el móvil se pasa de una a otra deslizando, sin script. Las miniaturas bajo la imagen son botones ("Mostrar foto 2 de 5", la actual con `aria-current`); las flechas sobre la imagen con foco pasan de diapositiva en el sentido de lectura de la página. La galería es una región de carrusel con nombre cuyas diapositivas dicen "2 of 5" (patrón carousel de W3C APG). Sin miniaturas (`thumb`) muestra puntos numerados.
-- **Solo carga lo que se ve.** La primera imagen se carga enseguida con `fetchpriority="high"`, porque suele ser lo más grande de una página de producto; las demás esperan en plantillas inertes y `gallery.js` pone la imagen en pantalla y sus dos vecinas, vigiladas por un único IntersectionObserver. Una galería de 12 fotos carga tres al principio. Las imágenes son `Image`, así que conservan su marcador de posición, su archivo de baja resolución y su alternativa.
+- **Solo carga lo que se ve.** La primera imagen se carga enseguida con `fetchpriority="high"`, porque suele ser lo más grande de una página de producto; las demás esperan en plantillas inertes y `gallery.js` pone la imagen en pantalla y sus dos vecinas, vigiladas por un único IntersectionObserver. Una galería de 12 fotos carga tres al principio. Las imágenes son `Image`, así que conservan su marcador de posición, su archivo de baja resolución y su alternativa. La primera imagen prescinde de su archivo de baja resolución, que solo competiría con ella.
 - **Zoom y pantalla completa.** El ratón amplía la imagen bajo el puntero (el tamaño de la diapositiva se lee una vez al entrar el puntero, nunca mientras se mueve). Pulsar la imagen, o el botón "Pantalla completa", abre un diálogo modal con la imagen, botones de anterior y siguiente, un conmutador de zoom y un botón de cerrar; mantiene el foco dentro, se cierra con Escape y devuelve el foco a lo que lo abrió. Con movimiento reducido nada se desliza ni crece.
-- **Script.** `gallery.js` (cerca de 1,5 KB con gzip) se carga solo en páginas con una galería.
+- **Script.** `gallery.js` (cerca de 2,5 KB con gzip) se carga solo en páginas con una galería.
 
 ## Panel de facetas
 
@@ -147,10 +147,11 @@ pub async fn shop(p: Listing, store: ProductStore) -> Result<Screen> {
 ```
 
 - **Recuentos del servidor.** Cada faceta es un grupo de casillas cuyas opciones muestran cuántas filas tienen con las demás facetas aplicadas ("Rojo (124)"; los lectores de pantalla oyen "Rojo, 124 resultados"). La pantalla las cuenta con una consulta acotada por faceta, como `SELECT color, count(*) ... GROUP BY color LIMIT 50` con los demás filtros en el `WHERE`; una faceta admite como mucho `MAX_FACET_OPTIONS` (50) opciones. Una opción sin filas se desactiva salvo que esté elegida.
-- **Una petición por cambio.** El panel es un formulario de filtro que impulsa sus temas y también los escucha. Un cambio pone los valores en los parámetros de pantalla (las facetas como listas, el rango como dos números), mantiene la dirección al día y refresca a todos los oyentes con un solo `POST /_zeyn/nodes`: la cuadrícula de tarjetas, una línea con el total y el propio panel con sus nuevos recuentos. Un cambio más nuevo cancela la petición que sigue en camino. Medido con 2.000 productos: 26 ms desde el clic hasta las nuevas tarjetas y recuentos.
+- **Una petición por cambio.** El panel es un formulario de filtro que impulsa sus temas y también los escucha. Un cambio pone los valores en los parámetros de pantalla (las facetas como listas, el rango como dos números), mantiene la dirección al día y refresca a todos los oyentes con un solo `POST /_zeyn/nodes`: la cuadrícula de tarjetas, una línea con el total y el propio panel con sus nuevos recuentos. Un cambio más nuevo cancela la petición que sigue en camino.
 - **Los filtros se quedan en el servidor.** La cuadrícula toma los mismos parámetros con `scope_any(field, values)` y `scope_range(field, from, to)` (en `CardGrid` y `DataGrid`), así que el navegador nunca envía filtros propios; sin valores o con extremos abiertos se conservan todas las filas.
 - **Los filtros elegidos** aparecen como fichas sobre los grupos, con "Quitar todos". Cada ficha es un enlace a la pantalla sin ese filtro, así que también funciona sin script, y se llama "Quitar el filtro Rojo". Los grupos son `<details>` plegables, y los grupos abiertos siguen abiertos tras un refresco.
 - **Comprobaciones.** `App::check_page` avisa de un panel que no impulsa nada y de una faceta cuyo nombre no es un campo de los parámetros de la pantalla.
+- **Móviles.** Por debajo del tamaño de móvil (641 px) los grupos empiezan plegados tras un botón "Filtros" que muestra cuántos filtros hay elegidos ("Filtros 2", leído como "2 elegidos"), así que los productos están en la primera pantalla; las fichas elegidas siguen visibles encima. El botón es un resumen nativo de `<details>`, así que Intro y Espacio lo abren, y sigue abierto mientras el panel se refresca. Las pantallas más anchas muestran los grupos de inmediato.
 
 ## Reseñas y valoraciones
 
@@ -189,6 +190,6 @@ Countdown::until(sale.ends_at)
     .ended(Badge::new(t!("shop.sale_over")))
 ```
 
-- **Hora del servidor.** El servidor escribe el tiempo restante con su propio reloj ("2d 03:14:09"), y la página lleva ese reloj, así que un reloj equivocado en el dispositivo no mueve el final. Cuando el momento ha pasado, el servidor muestra el estado final dado a `ended` en lugar del reloj, sin script.
-- **Un solo temporizador.** `countdown.js` (cerca de 1 KB con gzip, solo en páginas con una cuenta atrás en marcha) mantiene un temporizador para todas las cuentas atrás de la página, avanza en el segundo exacto y se detiene mientras la pestaña está oculta. Al llegar a cero el estado final sustituye al reloj; los oyentes de un tema pueden refrescar lo demás que cambia con el final.
+- **Final absoluto.** La página lleva el final como un momento absoluto (`data-end`), nunca el tiempo restante, y el navegador cuenta hacia él, así que una página servida desde una caché o reabierta más tarde muestra la hora correcta de inmediato. El servidor escribe el tiempo restante al renderizar, para visitantes sin script, y cuando el momento ha pasado muestra el estado final dado a `ended` en lugar del reloj, sin script.
+- **Un solo temporizador.** `countdown.js` (cerca de 1,5 KB con gzip, solo en páginas con una cuenta atrás en marcha) mantiene un temporizador para todas las cuentas atrás de la página, avanza en el segundo exacto y se detiene mientras la pestaña está oculta. Al llegar a cero el estado final sustituye al reloj; los oyentes de un tema pueden refrescar lo demás que cambia con el final.
 - **Lectores de pantalla.** Los dígitos se les ocultan. Una región en vivo educada dice el tiempo restante con palabras ("Quedan 2 d 3 h 14 min") y solo cambia cuando cambia el minuto, así que nunca habla cada segundo.

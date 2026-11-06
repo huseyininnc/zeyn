@@ -44,7 +44,7 @@ RangeSlider::new(t!("shop.price"), ["min_price", "max_price"], 0, 5_000)
 - **Filtre.** `.drives(topic)` kaydırıcıyı bir filtre formuna koyar: bir tutamaç bırakılınca iki değer aynı adlı ekran parametrelerine yazılır ve konunun dinleyicileri yerinde yenilenir. Bir facet panelinin içinde bunu panelin formu yapar; başka bir formda tutamaçlar diğer alanlar gibi gönderilir.
 - **Değerler.** `value(low, high)` parametreleri alır (`None` ilgili ucu korur). Sınır dışındaki değerler kırpılır, yüksekten büyük alt değer yer değiştirir; böylece elle düzenlenmiş bir adres kaydırıcıyı bozamaz. `money(currency)` bir para biriminin tam birimlerini sayfanın biçiminde gösterir.
 - **Tarihler.** `RangeSlider::dates(label, names, first, last)` ve `.date_value(from, to)` gün seçer; form `2026-03-31` gibi ISO tarihleri gizli alanlarla gönderir.
-- **Script.** `range.js` (gzip ile yaklaşık 1 KB) yalnızca kaydırıcı olan sayfalarda yüklenir. Alt tutamacı üsttekinin altında tutar, tutamaçlar arasını doldurur, değerleri etiketin yanına yazar ve çubuğun boş yerine basılınca yakın tutamacı taşır. Çubuğun boyutunu her basışta bir kez okur, tutamaç kayarken hiç okumaz.
+- **Script.** `range.js` (gzip ile yaklaşık 2 KB) yalnızca kaydırıcı olan sayfalarda yüklenir. Alt tutamacı üsttekinin altında tutar, tutamaçlar arasını doldurur, değerleri etiketin yanına yazar ve çubuğun boş yerine basılınca yakın tutamacı taşır. Çubuğun boyutunu her basışta bir kez okur, tutamaç kayarken hiç okumaz.
 
 ## Adet seçici
 
@@ -66,7 +66,7 @@ QuantityStepper::of(set_quantity, line.sku.clone())
 - **Sunucuda denetlenir.** Bir değişiklik (eksi ya da artıya basmak veya bir sayı yazmak) kullanıcı durduktan 400 ms sonra `POST /_zeyn/data` ile gönderilir: CSRF denetimi ve yazma hız sınırıyla, kullanıcı olarak, action'ın izni denetlenerek. Sunucu action çalışmadan önce adedi seçicinin aralığına kırpar; action yalnızca kendisinin bildiği şeyi, örneğin stoğu denetler. Kalem (`target`) ekran tarafından verilir ve tarayıcıdan hiç okunmaz.
 - **Son söz cevabındır.** Action tuttuğu adedi ve izin verilen en çok adedi döndürür (`QuantityState::new(kept).max(stock)`). Bu, kullanıcının istediğinden azsa seçici onu gösterir ve bir canlı bölgede "Yalnızca 7 adet var." der. Yeni bir değişiklik yoldaki isteği iptal eder; böylece yalnızca son cevap gösterilir. Başarısız bir istek son tutulan adedi geri koyar ve bunu söyler.
 - **Klavye ve dokunma.** Düğmeler en az 24 x 24 pikseldir (WCAG 2.5.8), "Azalt" ve "Artır" adlarını taşır ve aralığın uçlarında kapanır; basılan düğme kapanınca odak alana geçer. Alan rakamları ve ok tuşlarını kabul eder.
-- **Script.** `quantity.js` (gzip ile yaklaşık 1 KB) yalnızca seçici olan sayfalarda yüklenir.
+- **Script.** `quantity.js` (gzip ile yaklaşık 2 KB) yalnızca seçici olan sayfalarda yüklenir.
 
 ## Varyant seçici
 
@@ -109,9 +109,9 @@ p.photos.iter().fold(ProductGallery::new(p.name.clone()), |g, photo| {
 ```
 
 - **Bir seferde bir görsel.** Slaytlar kaydırınca yerine oturan bir şeritte durur; telefonlar script olmadan aralarında kaydırır. Görselin altındaki küçük resimler düğmedir ("5 fotoğraftan 2. fotoğrafı göster", geçerli olanda `aria-current`); odaktaki görselde ok tuşları sayfanın okuma yönünde slaytlar arasında gezer. Galeri adlandırılmış bir carousel bölgesidir, slaytları "2 / 5" der (W3C APG carousel deseni). Küçük resimler (`thumb`) yoksa numaralı noktalar gösterilir.
-- **Yalnızca görülen yüklenir.** İlk görsel `fetchpriority="high"` ile hemen yüklenir, çünkü genellikle ürün sayfasındaki en büyük öğedir; diğerleri etkisiz şablonlarda bekler ve `gallery.js` ekrandaki görseli ve iki komşusunu tek bir IntersectionObserver ile izleyerek yerleştirir. 12 fotoğraflık bir galeri başta üçünü yükler. Görseller `Image` olduğu için yer tutucularını, düşük çözünürlüklü dosyalarını ve yedeklerini korur.
+- **Yalnızca görülen yüklenir.** İlk görsel `fetchpriority="high"` ile hemen yüklenir, çünkü genellikle ürün sayfasındaki en büyük öğedir; diğerleri etkisiz şablonlarda bekler ve `gallery.js` ekrandaki görseli ve iki komşusunu tek bir IntersectionObserver ile izleyerek yerleştirir. 12 fotoğraflık bir galeri başta üçünü yükler. Görseller `Image` olduğu için yer tutucularını, düşük çözünürlüklü dosyalarını ve yedeklerini korur. İlk görsel, onunla yalnızca yarışacak olan düşük çözünürlüklü dosyasını kullanmaz.
 - **Yakınlaştırma ve tam ekran.** Fare, imlecin altındaki görseli yakınlaştırır (slaytın kutusu imleç girince bir kez okunur, hareket ederken hiç okunmaz). Görsele basmak ya da "Tam ekran" düğmesi görseli, önceki ve sonraki düğmelerini, yakınlaştırma düğmesini ve kapatma düğmesini içeren modal bir diyalog açar; odağı içeride tutar, Escape ile kapanır ve odağı açan öğeye geri verir. Azaltılmış hareket tercihinde hiçbir şey kaymaz ya da büyümez.
-- **Script.** `gallery.js` (gzip ile yaklaşık 1,5 KB) yalnızca galeri olan sayfalarda yüklenir.
+- **Script.** `gallery.js` (gzip ile yaklaşık 2,5 KB) yalnızca galeri olan sayfalarda yüklenir.
 
 ## Facet paneli
 
@@ -147,10 +147,11 @@ pub async fn shop(p: Listing, store: ProductStore) -> Result<Screen> {
 ```
 
 - **Sayılar sunucudan.** Her facet, diğer facet'ler uygulanmışken her seçeneğin kaç satırı olduğunu gösteren bir onay kutusu grubudur ("Kırmızı (124)"; ekran okuyucular "Kırmızı, 124 sonuç" duyar). Ekran bunları facet başına sınırlı bir sorguyla sayar, örneğin diğer filtreler `WHERE` içindeyken `SELECT color, count(*) ... GROUP BY color LIMIT 50`; bir facet en çok `MAX_FACET_OPTIONS` (50) seçenek alır. Satırı olmayan seçenek, seçili değilse kapatılır.
-- **Her değişiklikte tek istek.** Panel, konularını süren ve kendisi de onları dinleyen bir filtre formudur. Bir değişiklik değerleri ekran parametrelerine yazar (facet'ler liste, aralık iki sayı), adresi güncel tutar ve tüm dinleyicileri tek `POST /_zeyn/nodes` ile yeniler: kart ızgarası, bir sayı satırı ve yeni sayılarıyla panelin kendisi. Yeni bir değişiklik yoldaki isteği iptal eder. 2.000 üründe ölçüldü: tıklamadan yeni kartlara ve sayılara 26 ms.
+- **Her değişiklikte tek istek.** Panel, konularını süren ve kendisi de onları dinleyen bir filtre formudur. Bir değişiklik değerleri ekran parametrelerine yazar (facet'ler liste, aralık iki sayı), adresi güncel tutar ve tüm dinleyicileri tek `POST /_zeyn/nodes` ile yeniler: kart ızgarası, bir sayı satırı ve yeni sayılarıyla panelin kendisi. Yeni bir değişiklik yoldaki isteği iptal eder.
 - **Filtreler sunucuda kalır.** Izgara aynı parametreleri `scope_any(field, values)` ve `scope_range(field, from, to)` ile alır (`CardGrid` ve `DataGrid` üzerinde); böylece tarayıcı hiçbir zaman kendi filtresini göndermez. Değer olmaması ya da açık uçlar her satırı tutar.
 - **Seçili filtreler** grupların üstünde çip olarak, "Tümünü temizle" ile birlikte görünür. Her çip o filtre olmadan ekrana giden bir bağlantıdır; script olmadan da çalışır ve "Kırmızı filtresini kaldır" adını taşır. Gruplar katlanan `<details>` öğeleridir ve açık gruplar yenilemelerden sonra açık kalır.
 - **Denetimler.** `App::check_page` hiçbir şey sürmeyen bir paneli ve adı ekran parametrelerinde alan olmayan bir facet'i bildirir.
+- **Telefonlar.** Telefon boyutunun (641 px) altında gruplar, kaç filtrenin seçili olduğunu gösteren bir "Filtreler" düğmesinin arkasında katlı başlar ("Filtreler 2", "2 seçili" diye okunur); böylece ürünler ilk ekranda olur, seçili çipler de üstünde görünür kalır. Düğme yerel bir `<details>` başlığıdır; Enter ve Space onu açar ve panel yenilenirken açık kalır. Daha geniş ekranlar grupları hemen gösterir.
 
 ## Değerlendirmeler ve puanlar
 
@@ -189,6 +190,6 @@ Countdown::until(sale.ends_at)
     .ended(Badge::new(t!("shop.sale_over")))
 ```
 
-- **Sunucu saati.** Sunucu kalan süreyi kendi saatiyle yazar ("2g 03:14:09") ve sayfa bu saati taşır; böylece cihazdaki yanlış bir saat bitişi kaydırmaz. An geçtiğinde sunucu saatin yerine `ended` ile verilen bitiş durumunu script olmadan çizer.
-- **Tek zamanlayıcı.** `countdown.js` (gzip ile yaklaşık 1 KB, yalnızca çalışan bir geri sayım olan sayfalarda) sayfadaki tüm geri sayımlar için tek bir zamanlayıcı tutar; tam saniyede ilerler ve sekme gizliyken durur. Sıfırda bitiş durumu saatin yerini alır; bitişin değiştirdiği başka şeyleri bir konunun dinleyicileri yenileyebilir.
+- **Mutlak bitiş.** Sayfa kalan süreyi değil, bitişi mutlak bir an olarak taşır (`data-end`) ve tarayıcı ona doğru geri sayar; böylece önbellekten gelen ya da sonradan yeniden açılan bir sayfa doğru süreyi hemen gösterir. Sunucu, script'i olmayan ziyaretçiler için çizerken kalan süreyi yazar; an geçtiğinde de saatin yerine `ended` ile verilen bitiş durumunu script olmadan çizer.
+- **Tek zamanlayıcı.** `countdown.js` (gzip ile yaklaşık 1,5 KB, yalnızca çalışan bir geri sayım olan sayfalarda) sayfadaki tüm geri sayımlar için tek bir zamanlayıcı tutar; tam saniyede ilerler ve sekme gizliyken durur. Sıfırda bitiş durumu saatin yerini alır; bitişin değiştirdiği başka şeyleri bir konunun dinleyicileri yenileyebilir.
 - **Ekran okuyucular.** Rakamlar onlardan gizlenir. Kibar bir canlı bölge kalan süreyi sözcüklerle söyler ("2 g 3 sa 14 dk kaldı") ve yalnızca dakika değişince değişir; böylece her saniye konuşmaz.

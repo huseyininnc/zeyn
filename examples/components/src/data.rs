@@ -1,9 +1,73 @@
 //! Sample data the examples show: products, people and events, built once and kept in memory.
 //! Nothing a visitor sends is stored.
 
-use std::sync::LazyLock;
+use std::collections::VecDeque;
+use std::sync::{LazyLock, Mutex};
 use zeyn::prelude::*;
 use zeyn::ui::{LookupItem, LookupQuery, TreeItem, TreeQuery};
+
+/// Most entries a store that visitors write keeps; the oldest are dropped first.
+pub const MAX_VISITOR_ENTRIES: usize = 256;
+
+/// What visitors of the public catalog wrote, such as cart quantities or ratings: at most
+/// [`MAX_VISITOR_ENTRIES`], the oldest dropped first, so the memory it takes never grows with
+/// traffic. Writes reach it through actions, which count against the app's write limit.
+pub struct VisitorLog<T> {
+    entries: Mutex<VecDeque<T>>,
+}
+
+impl<T: Clone> Default for VisitorLog<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T: Clone> VisitorLog<T> {
+    pub const fn new() -> Self {
+        VisitorLog {
+            entries: Mutex::new(VecDeque::new()),
+        }
+    }
+
+    /// Keeps `entry`, dropping the oldest one when the log is full.
+    pub fn push(&self, entry: T) {
+        let mut entries = self
+            .entries
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if entries.len() == MAX_VISITOR_ENTRIES {
+            entries.pop_front();
+        }
+        entries.push_back(entry);
+    }
+
+    /// How many entries the log holds.
+    pub fn len(&self) -> usize {
+        self.entries
+            .lock()
+            .map_or(0, |e| e.len())
+    }
+
+    /// Whether the log is empty.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// The newest entry, if any.
+    pub fn last(&self) -> Option<T> {
+        self.entries
+            .lock()
+            .ok()?
+            .back()
+            .cloned()
+    }
+}
+
+/// Cart quantities visitors set: item and quantity.
+pub static CART: VisitorLog<(String, i64)> = VisitorLog::new();
+
+/// Ratings visitors sent, as text.
+pub static RATINGS: VisitorLog<String> = VisitorLog::new();
 
 /// A product of the sample shop.
 #[entity(table = "products")]

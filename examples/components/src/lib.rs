@@ -326,7 +326,8 @@ pub fn feature() -> Feature {
 }
 
 /// Writes one visitor may make per minute to the shared sample stores of the examples (Kanban
-/// moves, inbox read and archive, calendar slots): every `POST /_zeyn/data` counts.
+/// moves, inbox read and archive, calendar slots, cart quantities, ratings): every
+/// `POST /_zeyn/data` and form submit counts.
 pub const WRITES_PER_MINUTE: u32 = 60;
 
 /// The catalog app.

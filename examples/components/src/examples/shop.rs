@@ -165,7 +165,8 @@ fn stock(id: i64, size: &str) -> i64 {
     }
 }
 
-/// Keeps a cart quantity up to the stock of `item-{id}-{size}`. Nothing is stored.
+/// Keeps a cart quantity up to the stock of `item-{id}-{size}` in the capped
+/// [`crate::data::CART`].
 #[action(public)]
 pub async fn set_shop_quantity(change: QuantityChange) -> Result<QuantityState> {
     let mut parts = change
@@ -179,7 +180,9 @@ pub async fn set_shop_quantity(change: QuantityChange) -> Result<QuantityState> 
         .ok_or(Error::NotFound)?;
     let size = parts.next().ok_or(Error::NotFound)?;
     let left = stock(id, size);
-    Ok(QuantityState::new(change.quantity.min(left)).max(left))
+    let kept = change.quantity.min(left);
+    crate::data::CART.push((change.target, kept));
+    Ok(QuantityState::new(kept).max(left))
 }
 
 /// Pretends to add the item to a cart. Nothing is stored.

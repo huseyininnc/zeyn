@@ -726,6 +726,28 @@ fn a_gallery_puts_only_its_first_image_in_the_page_and_loads_it_first() {
     );
 }
 
+#[test]
+fn the_first_gallery_image_loads_alone_without_its_low_resolution_file() {
+    let g = (1..=2).fold(ProductGallery::new("Shirt"), |g, i| {
+        g.image(
+            Image::new(format!("/p/{i}.webp"))
+                .alt("View")
+                .size(600, 600)
+                .low(format!("/p/{i}-low.webp"))
+                .placeholder(Placeholder::color("--z-surface-2")),
+        )
+    });
+    let out = html(&g, "en");
+    let first = &out[..out.find("<template>").unwrap()];
+    assert!(!first.contains("/p/1-low.webp"), "{first}");
+    assert!(first.contains(r#"src="/p/1.webp""#) && first.contains(r#"fetchpriority="high""#));
+    assert!(
+        first.contains("--z-ph:var(--z-surface-2)"),
+        "the placeholder stays: {first}"
+    );
+    assert!(out.contains("/p/2-low.webp"), "later images keep theirs");
+}
+
 #[tokio::test]
 async fn the_gallery_module_loads_only_with_a_gallery() {
     let (status, page) = get("/gallery").await;
@@ -762,8 +784,12 @@ fn a_facet_panel_counts_options_and_lists_the_chosen_ones_as_links_without_them(
     assert!(out.contains(r#"<a class="z-facets-clear" href="/_zeyn/route/goods_listing?params=%7B%22color%22%3A%5B%5D%2C%22max_price%22%3Anull%2C%22min_price%22%3Anull%7D""#), "{out}");
     let none = html(&good_facets(&GoodsParams::default()), "en");
     assert!(
-        !none.contains("z-facets-chosen"),
-        "nothing chosen, no chips"
+        !none.contains("z-facets-chosen") && !none.contains("z-facets-count"),
+        "nothing chosen, no chips and no count"
+    );
+    assert!(
+        out.contains(r#"<details class="z-facets-fold" id="s-facets--fold"><summary class="z-facets-toggle"><span>Filters</span><span class="z-facets-count" aria-hidden="true">3</span><span class="z-sr-only">3 chosen</span></summary>"#),
+        "the groups fold behind a Filters button with the number chosen, closed until opened: {out}"
     );
     let app = shop_app();
     assert!(
@@ -903,7 +929,7 @@ fn a_countdown_writes_the_time_left_by_the_server_clock_and_the_end_state_once_o
     let out = html(&timer, "en");
     assert!(
         out.starts_with(&format!(
-            r#"<div class="z-countdown" data-zeyn-countdown data-end="{}" data-now=""#,
+            r#"<div class="z-countdown" data-zeyn-countdown data-end="{}" data-day="d" data-text-left="#,
             end.unix_ms()
         )),
         "{out}"
@@ -971,4 +997,44 @@ async fn the_countdown_module_loads_only_with_a_running_countdown() {
             "{path}"
         );
     }
+}
+
+#[tokio::test]
+async fn a_cached_countdown_page_carries_only_the_absolute_end_and_the_timer_counts_from_it() {
+    let end = DateTime::from_unix_ms(4_102_444_800_000);
+    let timer = zeyn::ui::Countdown::until(end);
+    let first = html(&timer, "en");
+    assert!(first.contains(r#"data-end="4102444800000""#), "{first}");
+    assert!(
+        !first.contains("data-now"),
+        "the render time never reaches the page, so a cached copy is not stale"
+    );
+    let res = App::new("Test")
+        .i18n(I18n::new("en"))
+        .feature(Feature::new("shop").screen(plain))
+        .router()
+        .unwrap()
+        .oneshot(
+            Request::get("/_zeyn/countdown.js")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let js = String::from_utf8_lossy(
+        &res.into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes(),
+    )
+    .into_owned();
+    assert!(
+        js.contains("Number(box.dataset.end) - now"),
+        "the time left is the end minus the clock"
+    );
+    assert!(
+        !js.contains("dataset.now"),
+        "no server time is carried over"
+    );
 }

@@ -4,7 +4,7 @@ use crate::{Entry, ex};
 use zeyn::prelude::*;
 use zeyn::ui::{QuantityChange, QuantityState};
 
-/// Units in stock of the sample items; nothing a visitor sends is stored.
+/// Units in stock of the sample items. Kept quantities go to the capped [`crate::data::CART`].
 fn stock(target: &str) -> Option<i64> {
     match target {
         "mug" => Some(5),
@@ -17,7 +17,9 @@ fn stock(target: &str) -> Option<i64> {
 #[action(public)]
 pub async fn set_cart_quantity(change: QuantityChange) -> Result<QuantityState> {
     let stock = stock(&change.target).ok_or(Error::NotFound)?;
-    Ok(QuantityState::new(change.quantity.min(stock)).max(stock))
+    let kept = change.quantity.min(stock);
+    crate::data::CART.push((change.target, kept));
+    Ok(QuantityState::new(kept).max(stock))
 }
 
 pub fn overview(_ctx: &Ctx) -> Node {
