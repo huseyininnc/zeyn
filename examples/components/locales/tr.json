@@ -109,7 +109,8 @@
       "clear_prefs": "Tarayıcının uygulama için tuttuğu seçimleri silen düğme.",
       "price": "Üstü çizili eski fiyat, indirim yüzdesi ve birim fiyatla bir fiyat.",
       "range_slider": "Fiyat ve tarih aralıkları için tek çubukta iki tutamaç.",
-      "quantity_stepper": "Stoğu sunucuda denetlenen bir sayının iki yanında eksi ve artı düğmeleri."
+      "quantity_stepper": "Stoğu sunucuda denetlenen bir sayının iki yanında eksi ve artı düğmeleri.",
+      "variant_picker": "Fiyatı, fotoğrafı ve stoğu yerinde değiştiren renk örnekleri ve beden çipleri."
     },
     "ex": {
       "action_button": {
@@ -386,6 +387,9 @@
         "dates": "Tarihler"
       },
       "quantity_stepper": {
+        "overview": "Örnek"
+      },
+      "variant_picker": {
         "overview": "Örnek"
       }
     }

@@ -238,7 +238,10 @@ What to remember:
   `.money(Currency::Try).value(p.min_price, p.max_price).drives("products")`; the names are
   screen params. Cart amounts: `QuantityStepper::of(set_quantity, sku).range(1, 20).value(n)`
   with an action `fn(QuantityChange) -> Result<QuantityState>` that checks the stock (the
-  target comes from the screen, the range is enforced on the server).
+  target comes from the screen, the range is enforced on the server). Variants:
+  `VariantPicker::new().group(VariantGroup::swatches("color", ..).swatch(v, name, "#hex")`
+  `.unavailable(v, reason).current(p.color.as_deref())).drives("variant")`, then
+  `.listens("variant")` on the price, gallery and stock; the screen params hold the choice.
 - App shell top bar: `App::header(|h| h.center(SearchBox::of(..)).end(LinkButton::new(..)))`,
   the same slots as the site header; `h.breadcrumb().search().account()` adds the breadcrumb, the
   search field that opens the palette and the account menu with theme, language and sign out.

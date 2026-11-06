@@ -67,3 +67,28 @@ QuantityStepper::of(set_quantity, line.sku.clone())
 - **Son söz cevabındır.** Action tuttuğu adedi ve izin verilen en çok adedi döndürür (`QuantityState::new(kept).max(stock)`). Bu, kullanıcının istediğinden azsa seçici onu gösterir ve bir canlı bölgede "Yalnızca 7 adet var." der. Yeni bir değişiklik yoldaki isteği iptal eder; böylece yalnızca son cevap gösterilir. Başarısız bir istek son tutulan adedi geri koyar ve bunu söyler.
 - **Klavye ve dokunma.** Düğmeler en az 24 x 24 pikseldir (WCAG 2.5.8), "Azalt" ve "Artır" adlarını taşır ve aralığın uçlarında kapanır; basılan düğme kapanınca odak alana geçer. Alan rakamları ve ok tuşlarını kabul eder.
 - **Script.** `quantity.js` (gzip ile yaklaşık 1 KB) yalnızca seçici olan sayfalarda yüklenir.
+
+## Varyant seçici
+
+```rust
+VariantPicker::new()
+    .group(
+        VariantGroup::swatches("color", t!("shop.color"))
+            .swatch("sand", t!("shop.sand"), "#d8c3a5")
+            .swatch("navy", t!("shop.navy"), "#1f3a68")
+            .current(p.color.as_deref()),
+    )
+    .group(
+        VariantGroup::chips("size", t!("shop.size"))
+            .option("m", "M")
+            .option("xl", "XL")
+            .unavailable("xl", t!("shop.not_in_color"))
+            .current(p.size.as_deref()),
+    )
+    .drives("variant")
+```
+
+- **Radyo grupları.** Her grup yerel radyo düğmelerinden oluşan bir fieldset'tir; script olmadan W3C APG radio group desenidir: Tab seçili seçeneğe gelir, ok tuşları gezer ve seçer, başlık grubu ve seçili seçeneği söyler ("Renk Lacivert"). Renk örnekleri bir hex renk ya da tema token'ı alır; çipler metinlerini gösterir.
+- **Olmayan seçenekler** bir gerekçeyle kapatılır (`unavailable(value, reason)`); ekran okuyucular gerekçeyi seçenekle birlikte okur, ipucu da gösterir. Renk örneklerine çapraz çizgi, çiplere üstü çizili yazı gelir.
+- **Fiyat, fotoğraf ve stok izler.** Seçici konularını sürer ve kendisi de onları dinler. Bir seçeneği seçmek değerini grubun adındaki ekran parametresine yazar, adresi güncel tutar (böylece seçili varyantın bağlantısı paylaşılabilir) ve konuyu dinleyen her node'u tek istekte yeniler: fiyata, galeriye ve stok satırına `.listens("variant")` koyun; ekran yeni seçim için seçenekleri yeniden kapatır. Konular modülünden başka script gerekmez.
+- **Denetimler.** `App::check_page` hiçbir şey sürmeyen bir seçiciyi ve geçerli rengi olmayan bir renk örneğini bildirir.

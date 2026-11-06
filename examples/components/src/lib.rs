@@ -28,6 +28,8 @@ pub struct Demo {
     pub date: Option<Date>,
     pub min_price: Option<i64>,
     pub max_price: Option<i64>,
+    pub color: Option<String>,
+    pub size: Option<String>,
 }
 
 /// One live example: the function of the component's file that builds it.
@@ -198,6 +200,7 @@ catalog! {
         price "/ui/price";
         range_slider "/ui/range-slider" (Demo);
         quantity_stepper "/ui/quantity-stepper";
+        variant_picker "/ui/variant-picker" (Demo);
     }
     "media" Image {
         image "/ui/image";

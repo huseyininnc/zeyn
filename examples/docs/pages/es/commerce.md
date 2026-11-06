@@ -67,3 +67,28 @@ QuantityStepper::of(set_quantity, line.sku.clone())
 - **Manda la respuesta.** La acción responde con la cantidad que guardó y el máximo permitido (`QuantityState::new(kept).max(stock)`). Si es menor que lo pedido, el selector la muestra y dice "Solo hay 7 disponibles." en una región en vivo. Un cambio más nuevo cancela la petición que sigue en camino, así que solo se muestra la última respuesta; una petición fallida repone la última cantidad guardada y lo indica.
 - **Teclado y táctil.** Los botones miden al menos 24 por 24 píxeles (WCAG 2.5.8), se llaman "Reducir" y "Aumentar" y se desactivan en los extremos del rango; el foco pasa al campo cuando el botón pulsado se desactiva. El campo acepta dígitos y las flechas.
 - **Script.** `quantity.js` (cerca de 1 KB con gzip) se carga solo en páginas con un selector.
+
+## Selector de variantes
+
+```rust
+VariantPicker::new()
+    .group(
+        VariantGroup::swatches("color", t!("shop.color"))
+            .swatch("sand", t!("shop.sand"), "#d8c3a5")
+            .swatch("navy", t!("shop.navy"), "#1f3a68")
+            .current(p.color.as_deref()),
+    )
+    .group(
+        VariantGroup::chips("size", t!("shop.size"))
+            .option("m", "M")
+            .option("xl", "XL")
+            .unavailable("xl", t!("shop.not_in_color"))
+            .current(p.size.as_deref()),
+    )
+    .drives("variant")
+```
+
+- **Grupos de radio.** Cada grupo es un fieldset de botones de radio nativos, el patrón radio group de W3C APG sin script: Tab llega a la opción elegida, las flechas se mueven y eligen, y la leyenda dice el grupo y la opción elegida ("Color Azul marino"). Las muestras aceptan un color hexadecimal o un token del tema; las fichas muestran su texto.
+- **Las opciones no disponibles** se desactivan con un motivo (`unavailable(value, reason)`), que los lectores de pantalla leen con la opción y que muestra la descripción emergente; las muestras reciben una línea diagonal y las fichas un tachado.
+- **Precio, foto y stock acompañan.** El selector impulsa sus temas y también los escucha. Elegir una opción pone su valor en el parámetro de pantalla con el nombre del grupo, mantiene la dirección al día, de modo que se puede compartir el enlace de la variante elegida, y refresca en una sola petición cada nodo que escucha el tema: pon `.listens("variant")` en el precio, la galería y la línea de stock, y la pantalla vuelve a desactivar opciones para la nueva elección. No necesita más script que el módulo de temas.
+- **Comprobaciones.** `App::check_page` avisa de un selector que no impulsa nada y de una muestra sin un color válido.

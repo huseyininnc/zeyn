@@ -191,7 +191,7 @@ pub(crate) const MODULES: &[Module] = &[
     Module {
         name: "commerce",
         script: &[],
-        style: &["z-price", "z-range", "z-qty"],
+        style: &["z-price", "z-range", "z-qty", "z-variant", "z-variants"],
         needs: &[],
     },
 ];

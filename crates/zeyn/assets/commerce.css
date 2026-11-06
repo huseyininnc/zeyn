@@ -230,3 +230,102 @@
 }
 
 .z-qty-status:empty { min-height: 0; }
+
+.z-variants {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+}
+
+.z-variant-group {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.z-variant-legend {
+  display: flex;
+  gap: 8px;
+  padding: 0;
+  margin-block-end: 8px;
+  font-size: var(--z-text-sm);
+  line-height: var(--z-leading-sm);
+}
+
+.z-variant-name { font-weight: 500; color: var(--z-text); }
+.z-variant-chosen { color: var(--z-text-muted); }
+
+.z-variant-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.z-variant {
+  position: relative;
+  display: inline-flex;
+  cursor: pointer;
+}
+
+.z-variant-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+
+.z-variant-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 36px;
+  height: 36px;
+  border: 1px solid var(--z-border-strong);
+  border-radius: var(--z-radius);
+  background: var(--z-surface);
+  color: var(--z-text);
+  font-size: var(--z-text-sm);
+  font-weight: 500;
+}
+
+.z-variant-chips .z-variant-mark { padding: 0 12px; }
+
+.z-variant-swatches .z-variant-mark {
+  width: 36px;
+  border-radius: var(--z-radius-full);
+  background: var(--z-swatch, var(--z-surface-2));
+  box-shadow: inset 0 0 0 2px var(--z-surface);
+}
+
+.z-variant:hover .z-variant-mark { border-color: var(--z-text-muted); }
+
+.z-variant-input:checked + .z-variant-mark {
+  border: 2px solid var(--z-accent);
+  background-color: var(--z-brand-subtle);
+}
+
+.z-variant-swatches .z-variant-input:checked + .z-variant-mark { background-color: var(--z-swatch, var(--z-surface-2)); }
+
+.z-variant-input:focus-visible + .z-variant-mark {
+  outline: 2px solid var(--z-focus);
+  outline-offset: 2px;
+}
+
+.z-variant-off { cursor: not-allowed; }
+
+.z-variant-off .z-variant-mark {
+  color: var(--z-text-muted);
+  border-style: dashed;
+  background-image: linear-gradient(to top right, transparent calc(50% - 1px), var(--z-text-muted) 50%, transparent calc(50% + 1px));
+}
+
+.z-variant-chips .z-variant-off .z-variant-mark { text-decoration: line-through; background-image: none; }
+
+@media (forced-colors: active) {
+  .z-variant-input:checked + .z-variant-mark { border-color: Highlight; }
+}

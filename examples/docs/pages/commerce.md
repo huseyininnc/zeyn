@@ -67,3 +67,28 @@ QuantityStepper::of(set_quantity, line.sku.clone())
 - **The answer wins.** The action answers with the quantity it kept and the most allowed (`QuantityState::new(kept).max(stock)`). When that is less than the user asked for, the stepper shows it and says "Only 7 available." in a live region. A newer change cancels the request still on its way, so only the last answer is shown; a failed request puts the last kept quantity back and says so.
 - **Keyboard and touch.** The buttons are at least 24 by 24 pixels (WCAG 2.5.8), named "Decrease" and "Increase", and turn off at the ends of the range; focus moves to the field when the pressed button turns off. The field takes digits and the arrow keys.
 - **Script.** `quantity.js` (about 1 KB gzip) loads only on pages with a stepper.
+
+## Variant picker
+
+```rust
+VariantPicker::new()
+    .group(
+        VariantGroup::swatches("color", t!("shop.color"))
+            .swatch("sand", t!("shop.sand"), "#d8c3a5")
+            .swatch("navy", t!("shop.navy"), "#1f3a68")
+            .current(p.color.as_deref()),
+    )
+    .group(
+        VariantGroup::chips("size", t!("shop.size"))
+            .option("m", "M")
+            .option("xl", "XL")
+            .unavailable("xl", t!("shop.not_in_color"))
+            .current(p.size.as_deref()),
+    )
+    .drives("variant")
+```
+
+- **Radio groups.** Each group is a fieldset of native radio buttons, the W3C APG radio group pattern without script: Tab reaches the chosen option, the arrow keys move and choose, and the legend says the group and the chosen option ("Color Navy"). Swatches take a hex color or a theme token; chips show their text.
+- **Unavailable options** are turned off with a reason (`unavailable(value, reason)`), which screen readers read with the option and the tooltip shows; swatches get a diagonal line and chips a strike through.
+- **Price, photo and stock follow.** The picker drives its topics and listens to them itself. Choosing an option puts its value into the screen params of the group's name, keeps the address in step, so the link to the chosen variant can be shared, and refreshes every node that listens to the topic in one request: put `.listens("variant")` on the price, the gallery and the stock line, and the screen turns options off again for the new choice. It needs no script beyond the topics module.
+- **Checks.** `App::check_page` reports a picker that drives nothing and a swatch without a valid color.

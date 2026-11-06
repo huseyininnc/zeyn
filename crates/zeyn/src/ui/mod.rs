@@ -43,6 +43,7 @@ mod share;
 mod shell;
 mod topics;
 mod tree;
+mod variants;
 mod week;
 mod widgets;
 #[cfg(feature = "islands")]
@@ -109,6 +110,7 @@ pub use share::Share;
 pub use topics::{Listen, Listens, MAX_TOPICS, PageCheck, Topics, valid_topic};
 pub(crate) use topics::{topic_list, topics_attr};
 pub use tree::{MAX_TREE_CHILDREN, Tree, TreeItem, TreeQuery};
+pub use variants::{MAX_VARIANT_GROUPS, MAX_VARIANT_OPTIONS, VariantGroup, VariantPicker};
 pub use week::{MAX_WEEK_ROWS, WeekDay, WeekSchedule};
 pub use widgets::{
     ActionButton, Alert, Badge, Breadcrumb, ClearPrefs, DescriptionList, DescriptionOf, EmptyState,

@@ -67,3 +67,28 @@ QuantityStepper::of(set_quantity, line.sku.clone())
 - **응답이 우선.** 액션은 유지한 수량과 허용되는 최대값(`QuantityState::new(kept).max(stock)`)으로 응답합니다. 사용자가 요청한 것보다 적으면 선택기가 그 값을 보여 주고 라이브 영역에서 "7개만 남아 있습니다."라고 알립니다. 새 변경은 아직 진행 중인 요청을 취소하므로 마지막 응답만 표시되며, 요청이 실패하면 마지막으로 유지된 수량으로 되돌리고 그 사실을 알립니다.
 - **키보드와 터치.** 버튼은 최소 24 × 24 픽셀(WCAG 2.5.8)이고 "줄이기", "늘리기"라는 이름을 가지며 범위 끝에서 꺼집니다. 누른 버튼이 꺼지면 포커스가 입력란으로 갑니다. 입력란은 숫자와 화살표 키를 받습니다.
 - **스크립트.** `quantity.js`(gzip으로 약 1 KB)는 선택기가 있는 페이지에서만 불러옵니다.
+
+## 옵션 선택기
+
+```rust
+VariantPicker::new()
+    .group(
+        VariantGroup::swatches("color", t!("shop.color"))
+            .swatch("sand", t!("shop.sand"), "#d8c3a5")
+            .swatch("navy", t!("shop.navy"), "#1f3a68")
+            .current(p.color.as_deref()),
+    )
+    .group(
+        VariantGroup::chips("size", t!("shop.size"))
+            .option("m", "M")
+            .option("xl", "XL")
+            .unavailable("xl", t!("shop.not_in_color"))
+            .current(p.size.as_deref()),
+    )
+    .drives("variant")
+```
+
+- **라디오 그룹.** 각 그룹은 기본 라디오 버튼으로 된 fieldset이며, 스크립트 없는 W3C APG 라디오 그룹 패턴입니다. Tab은 선택된 옵션으로 가고, 화살표 키는 이동하며 선택하고, legend는 그룹과 선택된 옵션("색상 네이비")을 알립니다. 색상 견본은 hex 색이나 테마 토큰을 받고, 칩은 텍스트를 보여 줍니다.
+- **고를 수 없는 옵션**은 이유와 함께 꺼집니다(`unavailable(value, reason)`). 스크린 리더는 옵션과 함께 이유를 읽고 툴팁도 보여 줍니다. 색상 견본에는 대각선이, 칩에는 취소선이 그어집니다.
+- **가격, 사진, 재고가 따라옵니다.** 선택기는 자신의 토픽을 구동하고 스스로도 듣습니다. 옵션을 고르면 그 값이 그룹 이름의 화면 매개변수에 들어가고, 주소가 맞춰지므로 고른 옵션의 링크를 공유할 수 있으며, 그 토픽을 듣는 모든 노드가 한 번의 요청으로 새로 고쳐집니다. 가격, 갤러리, 재고 줄에 `.listens("variant")`를 붙이면 화면이 새 선택에 맞게 옵션을 다시 끕니다. 토픽 모듈 말고는 스크립트가 필요 없습니다.
+- **검사.** `App::check_page`는 아무것도 구동하지 않는 선택기와 올바른 색이 없는 견본을 알려 줍니다.

@@ -111,6 +111,48 @@ pub fn good_cards() -> Screen {
     )
 }
 
+#[params]
+pub struct ShirtParams {
+    pub color: Option<String>,
+    pub size: Option<String>,
+}
+
+/// The shirt's picker: XL comes only in sand.
+fn shirt_picker(p: &ShirtParams) -> VariantPicker {
+    let sizes = VariantGroup::chips("size", "Size")
+        .option("m", "M")
+        .option("xl", "XL")
+        .current(p.size.as_deref());
+    let sizes = match p.color.as_deref() {
+        Some("navy") => sizes.unavailable("xl", "Not in this color"),
+        _ => sizes,
+    };
+    VariantPicker::new()
+        .group(
+            VariantGroup::swatches("color", "Color")
+                .swatch("sand", "Sand", "#d8c3a5")
+                .swatch("navy", "Navy", "--z-info")
+                .swatch("bad", "<Bad>", "red;background:url(x)")
+                .current(p.color.as_deref()),
+        )
+        .group(sizes)
+        .drives("variant")
+}
+
+#[screen(route = "/shirt", public)]
+pub fn shirt(p: ShirtParams) -> Screen {
+    let price = if p.size.as_deref() == Some("xl") {
+        34_900
+    } else {
+        29_900
+    };
+    Screen::new("Shirt").body(
+        Stack::new()
+            .add(shirt_picker(&p))
+            .add(Price::new(Money::tl(price)).listens("variant")),
+    )
+}
+
 fn shop_app() -> App {
     App::new("Test")
         .i18n(I18n::new("en"))
@@ -134,7 +176,8 @@ fn shop_app() -> App {
                 .screen(priced)
                 .screen(ranged)
                 .screen(cart_line)
-                .screen(good_cards),
+                .screen(good_cards)
+                .screen(shirt),
         )
 }
 
@@ -465,4 +508,100 @@ async fn a_card_shows_its_price_inside_its_body_with_no_script_of_its_own() {
     for name in ["range.js", "quantity.js"] {
         assert!(!linked.contains(&name.to_string()), "{name}");
     }
+}
+
+/// Renders nodes of a screen again through `POST /_zeyn/nodes`, as a topic refresh does.
+async fn refresh(
+    screen: &str,
+    params: serde_json::Value,
+    nodes: &[&str],
+) -> (StatusCode, serde_json::Value) {
+    let body = serde_json::json!({ "screen": screen, "params": params, "nodes": nodes });
+    let res = shop_app()
+        .router()
+        .unwrap()
+        .oneshot(
+            Request::post("/_zeyn/nodes")
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::COOKIE, format!("zeyn_csrf={TOKEN}"))
+                .header("x-zeyn-csrf", TOKEN)
+                .body(Body::from(body.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = res.status();
+    let bytes = res
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes();
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
+}
+
+#[test]
+fn a_variant_picker_is_radio_groups_with_reasons_for_options_that_cannot_be_had() {
+    let p = ShirtParams {
+        color: Some("navy".into()),
+        size: Some("m".into()),
+    };
+    let out = html(&shirt_picker(&p), "en");
+    assert!(
+        out.starts_with(r#"<form class="z-variants" data-zeyn-drives="variant" data-zeyn-listens="variant" novalidate><fieldset class="z-variant-group z-variant-swatches"><legend class="z-variant-legend"><span class="z-variant-name">Color</span><span class="z-variant-chosen">Navy</span></legend>"#),
+        "{out}"
+    );
+    assert!(out.contains(r#"<input type="radio" class="z-variant-input" id="s-variants--color-1" name="color" value="navy" data-testid="s.variant.color.navy" checked><span class="z-variant-mark" style="--z-swatch:var(--z-info)" aria-hidden="true"></span><span class="z-sr-only">Navy</span>"#), "{out}");
+    assert!(out.contains(r#"value="bad" data-testid="s.variant.color.bad"><span class="z-variant-mark" aria-hidden="true"></span><span class="z-sr-only">&lt;Bad&gt;</span>"#), "a color that is no color draws an empty swatch: {out}");
+    assert!(!out.contains("url(x)"));
+    assert!(out.contains(r#"<label class="z-variant z-variant-off" title="XL: Not in this color"><input type="radio" class="z-variant-input" id="s-variants--size-1" name="size" value="xl" data-testid="s.variant.size.xl" disabled aria-describedby="s-variants--size-1-why"><span class="z-variant-mark">XL</span><span class="z-sr-only" id="s-variants--size-1-why">Not in this color</span></label>"#), "{out}");
+    let app = shop_app();
+    let problems = app
+        .check_page(&shirt::run(p))
+        .unwrap_err();
+    assert_eq!(problems.len(), 1, "{problems:?}");
+    assert!(
+        problems[0].contains("swatch `bad` of `color` has no color"),
+        "{problems:?}"
+    );
+    let lonely = Screen::new("Lonely")
+        .body(VariantPicker::new().group(VariantGroup::chips("size", "Size").option("m", "M")));
+    assert!(app.check_page(&lonely).unwrap_err()[0].contains("refreshes nothing"));
+}
+
+#[tokio::test]
+async fn a_variant_choice_refreshes_the_picker_and_its_listeners_from_the_new_params() {
+    let (status, page) = get("/shirt").await;
+    assert_eq!(status, StatusCode::OK);
+    let linked = links(&page);
+    assert!(
+        linked.contains(&"topics.js".to_string()) && linked.contains(&"commerce.css".to_string())
+    );
+    for name in ["range.js", "quantity.js"] {
+        assert!(!linked.contains(&name.to_string()), "{name}");
+    }
+    let (status, body) = refresh(
+        "shirt",
+        serde_json::json!({ "color": "navy", "size": "xl" }),
+        &["0.0", "0.1"],
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let picker = body["nodes"]["0.0"].as_str().unwrap();
+    assert!(
+        picker.contains(r#"value="xl" data-testid="s.variant.size.xl" disabled"#)
+            || picker
+                .contains(r#"value="xl" data-testid="shirt.variant.size.xl" checked disabled"#),
+        "{picker}"
+    );
+    assert!(
+        body["nodes"]["0.1"]
+            .as_str()
+            .unwrap()
+            .contains("₺349.00"),
+        "{body}"
+    );
 }

@@ -71,4 +71,5 @@ pub mod toast;
 pub mod toolbox;
 pub mod topics;
 pub mod tree;
+pub mod variant_picker;
 pub mod week_schedule;

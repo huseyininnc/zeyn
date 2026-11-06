@@ -109,7 +109,8 @@
       "clear_prefs": "A button that removes the choices this browser keeps for the app.",
       "price": "A price with a struck old price, the percent off and a unit price.",
       "range_slider": "Two handles over one track for price and date ranges.",
-      "quantity_stepper": "Minus and plus buttons around a number whose stock the server checks."
+      "quantity_stepper": "Minus and plus buttons around a number whose stock the server checks.",
+      "variant_picker": "Color swatches and size chips that change the price, photo and stock in place."
     },
     "ex": {
       "action_button": {
@@ -386,6 +387,9 @@
         "dates": "Dates"
       },
       "quantity_stepper": {
+        "overview": "Example"
+      },
+      "variant_picker": {
         "overview": "Example"
       }
     }

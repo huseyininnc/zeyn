@@ -67,3 +67,28 @@ QuantityStepper::of(set_quantity, line.sku.clone())
 - **以服务器的回答为准。** action 返回它保留的数量和允许的最大值（`QuantityState::new(kept).max(stock)`）。如果少于用户要求的数量，步进器显示该数量，并在实时区域中说“仅剩 7 件。”。较新的更改会取消仍在途中的请求，因此只显示最后一次回答；请求失败时会恢复上次保留的数量并加以说明。
 - **键盘与触控。** 按钮至少为 24 × 24 像素（WCAG 2.5.8），名为“减少”和“增加”，在范围两端会禁用；被按下的按钮禁用时，焦点移到输入框。输入框接受数字和方向键。
 - **脚本。** `quantity.js`（gzip 后约 1 KB）只在有步进器的页面加载。
+
+## 规格选择器
+
+```rust
+VariantPicker::new()
+    .group(
+        VariantGroup::swatches("color", t!("shop.color"))
+            .swatch("sand", t!("shop.sand"), "#d8c3a5")
+            .swatch("navy", t!("shop.navy"), "#1f3a68")
+            .current(p.color.as_deref()),
+    )
+    .group(
+        VariantGroup::chips("size", t!("shop.size"))
+            .option("m", "M")
+            .option("xl", "XL")
+            .unavailable("xl", t!("shop.not_in_color"))
+            .current(p.size.as_deref()),
+    )
+    .drives("variant")
+```
+
+- **单选组。** 每组都是由原生单选按钮组成的 fieldset，即不需要脚本的 W3C APG 单选组模式：Tab 到达已选选项，方向键移动并选择，图例说出组名和已选选项（“颜色 藏青”）。色块接受十六进制颜色或主题令牌；标签块显示其文字。
+- **不可选的选项**会带着原因被禁用（`unavailable(value, reason)`），屏幕阅读器会连同选项一起读出原因，提示框也会显示；色块加一条斜线，标签块加删除线。
+- **价格、图片和库存随之变化。** 选择器驱动它的主题，并且自己也监听这些主题。选择一个选项会把值写入与组名同名的屏幕参数，同步更新地址（因此可以分享所选规格的链接），并在一次请求中刷新监听该主题的所有节点：在价格、图库和库存行上加 `.listens("variant")`，屏幕会针对新的选择重新禁用选项。除主题模块外不需要其他脚本。
+- **检查。** `App::check_page` 会报告不驱动任何内容的选择器，以及没有有效颜色的色块。
