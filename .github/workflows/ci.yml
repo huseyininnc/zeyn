@@ -32,6 +32,7 @@ jobs:
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
       - run: cargo test -p zeyn --features assistant,oidc,totp,islands,realtime,xlsx,email,accounts
+      - run: cargo test -p zeyn-cli
 
   deny:
     runs-on: ubuntu-latest

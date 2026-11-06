@@ -229,6 +229,8 @@ What to remember:
   builder need `.row_height(px)`. Keep `.item`/`.card` when they fit.
 - App shell top bar: `App::header(|h| h.center(SearchBox::of(..)).end(LinkButton::new(..)))`,
   the same slots as the site header.
+- File uploads: `.files(RULES, FileAccess::read("x.file.read").write("x.file.write"), store)`
+  on the feature lets readers download what they may not upload; one permission name covers both.
 - Settings pages: `ThemePicker::new()` is the theme choice inside a screen, in step with the shell.
 - Icons (`Icon::`): Plus, Edit, Delete, Save, Search, Box, Cart, Table, Home, Chart, Users,
   Settings, Bell, Shield, Clock, Tag, Mail, SignOut, ArrowUp, ArrowDown.

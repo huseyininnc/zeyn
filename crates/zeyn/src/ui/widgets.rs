@@ -302,6 +302,7 @@ impl ThemePicker {
 
 impl Component for ThemePicker {
     fn render(&self, out: &mut String, r: &Render) {
+        #[cfg(feature = "server")]
         if let Some(ctx) = r.ctx {
             out.push_str(&crate::server::theme_picker(
                 ctx,
@@ -309,6 +310,8 @@ impl Component for ThemePicker {
                 &crate::ui::dom_id(r, "theme"),
             ));
         }
+        #[cfg(not(feature = "server"))]
+        let _ = (out, r);
     }
 
     fn schema(&self) -> Json {

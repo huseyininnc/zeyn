@@ -145,6 +145,26 @@ pub fn order_editor(params: EditParams, store: OrderStore) -> Result<Screen> {
 - DataGrid paging: `Paging::pages(25)` (default 50), `Paging::infinite(100)`, `Paging::virtual_scroll()` for very large lists, `Paging::none()`.
 - DataGrid extras: `.row_style(|r| Some(RowStyle::Warning))`, `.flex(1)`, `.width(px)`.
 - Screens without params: `fn x()` or `fn x(_: (), ctx: Ctx)` when something is injected.
+- Page header: `.subtitle(t!(".."))` and `.primary(|t| t.button(..))` on `Screen`; key figures
+  `Kpi::new(..)` or `Kpi::money(..)` in a `Row`.
+- Destructive grid actions: `.row_action(..)` or `.bulk_action(..)` then `.confirm(t!(".."))`.
+
+### Linked parts and lists
+
+```rust
+DataGrid::of(search_orders)
+    .listens("orders")
+Chips::filter(..)
+    .drives("orders")
+ui.refresh("orders")
+```
+
+- Parts that show the same data `.listens("topic")`; `ui.refresh("topic")` in `on_success`, a
+  filter that `.drives("topic")` or `hub.notify` reloads them in place. No JavaScript, no reload.
+- Dependent lookups: `Form::depends_on(Address::city, Address::country)`.
+- Rows of another shape: `List::of(action).builder(|row| node)` with `.separator(node)`;
+  `Repeat::of(items, |item| node)` for data in memory; virtual lists need `.row_height(px)`.
+- File stores: `.files(RULES, FileAccess::read("x.read").write("x.write"), store)`.
 
 ### Features and the app
 

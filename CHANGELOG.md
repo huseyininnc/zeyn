@@ -36,6 +36,7 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 ### Fixed
 
+- `zeyn` builds again without the `server` feature (as `zeyn-cli` uses it): `ThemePicker` renders only with it. CI now builds `zeyn-cli` on its own, so this cannot break the crates.io publish unnoticed.
 - App shell: menu groups with the same label from several features are merged under one heading, and elastic overscroll no longer drags the sticky side menu down.
 
 ### Changed
