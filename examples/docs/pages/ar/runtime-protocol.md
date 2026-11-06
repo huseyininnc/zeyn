@@ -302,6 +302,7 @@
 | `zeyn:effect` | `document` | effect لا يعرفه وقت التشغيل: `{ effect, source, run }`. تشغّل `run(next)` effect آخر. يستخدمه `confirm`. |
 | `zeyn:topics` | `document` | `{ topics }`: مواضيع للتحديث من نص برمجي آخر (`live.js` عند الإشعار). |
 | `zeyn:reload` | عنصر | يعيد تحميل الشبكات التي بداخله في مكانها: الصفحة الحالية، أو الأولى مع `{ reset: true }`. |
+| `zeyn:density` | `document` | لا شيء. اختار المستخدم كثافة أخرى من قائمة الحساب (تغيّر `data-density` على `<html>` بالفعل)؛ وتعيد شبكات البطاقات ذات العرض المجزّأ (windowed) قياس صفوفها. |
 
 يسأل الـ effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":"...","then":{...}}` في مربع حوار تنبيه مشروط ولا يشغّل `then` إلا بعد أن يؤكد المستخدم.
 

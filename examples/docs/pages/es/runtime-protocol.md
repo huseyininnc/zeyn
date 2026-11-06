@@ -304,6 +304,7 @@ Todos son `POST` con JSON y la cabecera CSRF, y comprueban primero el acceso de 
 | `zeyn:effect` | `document` | Un effect que el runtime no conoce: `{ effect, source, run }`. `run(next)` ejecuta otro effect. Lo usa `confirm`. |
 | `zeyn:topics` | `document` | `{ topics }`: topics que refrescar, desde otro script (`live.js` al recibir una notificación). |
 | `zeyn:reload` | un elemento | Recarga en su sitio los grids que contiene: la página actual, o la primera con `{ reset: true }`. |
+| `zeyn:density` | `document` | Ninguno. El usuario eligió otra densidad en el menú de cuenta (`data-density` en `<html>` ya cambió); los grids de tarjetas con ventana vuelven a medir sus filas. |
 
 El effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":"...","then":{...}}` pregunta en un cuadro de diálogo modal de alerta y ejecuta `then` solo después de que el usuario confirma.
 

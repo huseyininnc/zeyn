@@ -302,6 +302,7 @@ Effect:
 | `zeyn:effect` | `document` | 런타임이 모르는 effect: `{ effect, source, run }`. `run(next)`는 다른 effect를 실행합니다. `confirm`이 사용합니다. |
 | `zeyn:topics` | `document` | `{ topics }`: 다른 스크립트(알림을 받은 `live.js`)에서 보낸, 새로 고칠 토픽. |
 | `zeyn:reload` | 요소 | 그 안의 그리드를 제자리에서 다시 불러옵니다. 현재 페이지, 또는 `{ reset: true }`이면 첫 페이지입니다. |
+| `zeyn:density` | `document` | 없음. 사용자가 계정 메뉴에서 다른 밀도를 골랐습니다(`<html>`의 `data-density`는 이미 바뀌었습니다). 윈도잉된 카드 그리드가 행을 다시 측정합니다. |
 
 Effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":"...","then":{...}}`는 모달 알림 대화 상자에서 묻고 사용자가 확인한 후에만 `then`을 실행합니다.
 

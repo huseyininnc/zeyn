@@ -302,6 +302,7 @@ Effects：
 | `zeyn:effect` | `document` | 运行时不认识的 effect：`{ effect, source, run }`。`run(next)` 执行另一个 effect。`confirm` 使用它。 |
 | `zeyn:topics` | `document` | `{ topics }`：来自其他脚本（收到通知的 `live.js`）的待刷新主题。 |
 | `zeyn:reload` | 某个元素 | 就地重新加载其中的网格：当前页，或在 `{ reset: true }` 时加载第一页。 |
+| `zeyn:density` | `document` | 无。用户在账户菜单中选择了另一种密度（`<html>` 上的 `data-density` 已经改变）；窗口化的卡片网格会重新测量其行。 |
 
 Effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":"...","then":{...}}` 会在模态警告对话框中询问，只有在用户确认后才执行 `then`。
 
