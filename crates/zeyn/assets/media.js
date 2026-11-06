@@ -24,10 +24,11 @@
  *
  * Progressive images: an `<img data-zeyn-img>` sits in a box (`.z-img-host`) that shows its
  * placeholder without script. One capture listener on the document handles `load` and `error` for
- * every such image: a loaded image marks its box `z-img-done` (and `z-img-fade` when it arrived
- * after this script over a low resolution file or a blur and is not the priority image, so it
- * fades in); a failed one tries `data-zeyn-fallback` once, then shows the box's `<template data-zeyn-img-error>` or its alt text
- * with an icon. Images that finished before this script ran are checked once when it starts.
+ * every such image: a loaded image marks its box `z-img-done`, and `z-img-fade` when an `Image`
+ * (not a card) arrived after this script over a low resolution file or a blur and is not the
+ * priority image, so it fades in. Cards never fade: in a fast scroll through a grid of 2,000
+ * cards the fades alone halved the frame rate. A failed image tries `data-zeyn-fallback` once,
+ * then shows the box's `<template data-zeyn-img-error>` or its alt text with an icon. Images that finished before this script ran are checked once when it starts.
  *
  * Embeds: `zeyn::ui::Embed` with `click_to_load` renders a poster button and the frame inside an
  * inert `<template>`. Pressing the button puts the frame in its place and moves focus to it. With
@@ -131,7 +132,7 @@ function settle(img, fresh) {
   if (img.naturalWidth > 0) {
     host.classList.add('z-img-done');
     const under = host.classList.contains('z-img-blur') || host.querySelector(':scope > .z-img-under');
-    if (fresh && under && img.fetchPriority !== 'high') host.classList.add('z-img-fade');
+    if (fresh && under && host.classList.contains('z-img') && img.fetchPriority !== 'high') host.classList.add('z-img-fade');
     return;
   }
   if (!img.getAttribute('src')) return;
