@@ -290,6 +290,7 @@ pub fn feature() -> Feature {
         Feature::new("components")
             .screen(catalog_home)
             .screen(examples::image_card::product)
+            .screen(examples::card_grid::large_catalog)
             .screen(examples::screen_header::orders_page),
     )
 }

@@ -357,6 +357,41 @@ async fn unsafe_content_types_download_instead_of_rendering() {
 }
 
 #[test]
+fn videos_load_nothing_before_play_and_previews_are_muted_with_a_placeholder_stage() {
+    let r = Render::english("s");
+    let mut html = String::new();
+    Video::new("films", "Shirt in motion")
+        .sources([
+            ("shirt-480.mp4", "(max-width: 600px)"),
+            ("shirt-bad.mp4", r#"all" onerror="x"#),
+            ("../secret.mp4", "all"),
+        ])
+        .file("shirt-1080.mp4")
+        .poster("shirt.jpg")
+        .poster_low("shirt-20.jpg")
+        .placeholder(Placeholder::color("#d9dde3"))
+        .preview_when_visible()
+        .on_error(Text::from("Video <unavailable>"))
+        .render(&mut html, &r);
+    assert!(html.contains(r#"data-zeyn-preview>"#), "{html}");
+    assert!(html.contains(
+        r#"<div class="z-player-stage z-img-host" style="--z-ph:#d9dde3"><video class="z-player-media" preload="none" playsinline muted loop aria-label="Shirt in motion" data-zeyn-poster="/_zeyn/media/films/shirt.jpg" data-zeyn-poster-low="/_zeyn/media/films/shirt-20.jpg">"#
+    ), "{html}");
+    assert!(html.contains(
+        r#"<source data-zeyn-src="/_zeyn/media/films/shirt-480.mp4" type="video/mp4" media="(max-width: 600px)"><source data-zeyn-src="/_zeyn/media/films/shirt-1080.mp4" type="video/mp4">"#
+    ));
+    assert!(!html.contains("shirt-bad") && !html.contains("secret") && !html.contains(" poster="));
+    assert!(html.contains(
+        r#"<div class="z-player-error" data-zeyn-player-error hidden>Video &lt;unavailable&gt;</div>"#
+    ));
+    let mut audio = String::new();
+    Audio::new("music", "Song")
+        .file("song.mp3")
+        .render(&mut audio, &r);
+    assert!(audio.contains(r#"preload="none""#) && !audio.contains("data-zeyn-preview"));
+}
+
+#[test]
 fn players_render_accessible_controls_and_escape_text() {
     let r = Render::english("s");
     let mut html = String::new();

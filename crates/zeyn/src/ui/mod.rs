@@ -50,8 +50,8 @@ pub use live::Live;
 pub(crate) use dock::panel_ids as dock_panel_ids;
 pub use dock::{DOCK_SIZE, Dock, DockArea, DockLayout, DockPanelState, DockSizes};
 pub use embed::{
-    Complete, EMBED_SANDBOX, Embed, EmbedPermission, ExternalLink, Given, Image, NoAlt, NoSize,
-    NoTitle,
+    Complete, EMBED_SANDBOX, Embed, EmbedPermission, ExternalLink, Fit, Given, Image, NoAlt,
+    NoSize, NoTitle, PLACEHOLDER_BLUR_MAX, Placeholder,
 };
 pub use layout::{Card, Panel, Row, Split, Stack, Tabs};
 pub use shell::{MenuBar, MenuList, PropertyInspector, StatusBar, Toolbox};

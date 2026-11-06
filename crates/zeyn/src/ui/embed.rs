@@ -320,6 +320,31 @@ impl Component for Embed<Given> {
 /// `.lazy()` adds `loading="lazy"` for images below the fold. Pass `Text::from("")` as the alt
 /// text for a purely decorative image.
 ///
+/// For long lists of photos, such as a product catalog, the image can show something while it
+/// loads and recover when it fails:
+///
+/// ```
+/// # use zeyn::ui::{Fit, Image, Placeholder};
+/// # use zeyn::Text;
+/// let photo = Image::new("/img/p/42-800.webp")
+///     .alt(Text::from("Blue linen shirt"))
+///     .size(400, 500)
+///     .lazy()
+///     .srcset([("/img/p/42-400.webp", "400w"), ("/img/p/42-800.webp", "800w")])
+///     .sizes("(min-width: 800px) 25vw, 50vw")
+///     .placeholder(Placeholder::color("#d9dde3"))
+///     .low("/img/p/42-40.webp")
+///     .fallback("/img/no-photo.webp")
+///     .on_error(Text::from("No photo yet"))
+///     .fit(Fit::Cover);
+/// ```
+///
+/// The image then sits in a box of its size that shows the [`Placeholder`] and the
+/// [`Image::low`] file under it, both without script. The browser loads the full file natively
+/// (`loading`, `srcset`, `sizes`); one listener of the media module, shared by every image on the
+/// page, fades it in, tries the [`Image::fallback`] once and finally shows the
+/// [`Image::on_error`] content. [`Image::priority`] marks the first image a visitor sees.
+///
 /// Both the alt text and the size are required; an image without them cannot be placed:
 ///
 /// ```compile_fail
@@ -338,6 +363,8 @@ pub struct Image<A = Given, S = Given> {
     size: (u32, u32),
     lazy: bool,
     srcset: Vec<(String, String)>,
+    sizes: Option<String>,
+    loading: Loading,
     _parts: PhantomData<(A, S)>,
 }
 
@@ -349,6 +376,8 @@ impl Image<NoAlt, NoSize> {
             size: (0, 0),
             lazy: false,
             srcset: Vec::new(),
+            sizes: None,
+            loading: Loading::default(),
             _parts: PhantomData,
         }
     }
@@ -362,6 +391,8 @@ impl<A, S> Image<A, S> {
             size: self.size,
             lazy: self.lazy,
             srcset: self.srcset,
+            sizes: self.sizes,
+            loading: self.loading,
             _parts: PhantomData,
         }
     }
@@ -379,6 +410,61 @@ impl<A, S> Image<A, S> {
                 .into_iter()
                 .map(|(u, d)| (u.to_string(), d.to_string())),
         );
+        self
+    }
+
+    /// The width the image takes in the layout, for the browser to pick a `srcset` width
+    /// (`800w`) file, such as `"(min-width: 800px) 25vw, 50vw"`. Without it a lazy image lets
+    /// the browser measure the slot (`sizes="auto"`) and falls back to the image's own width.
+    /// Values longer than 200 characters or with `<`, `>`, quotes or backslashes are ignored.
+    pub fn sizes(mut self, sizes: impl Into<String>) -> Self {
+        let sizes = sizes.into();
+        self.sizes = Some(sizes).filter(|s| {
+            !s.is_empty() && s.len() <= 200 && !s.contains(['<', '>', '"', '\'', '`', '\\'])
+        });
+        self
+    }
+
+    /// What shows in the image's box until the file has loaded: a color, a tiny blurred image
+    /// or a shared image. See [`Placeholder`].
+    pub fn placeholder(mut self, placeholder: Placeholder) -> Self {
+        self.loading.placeholder = Some(placeholder);
+        self
+    }
+
+    /// A small, low resolution file of the same image, shown at once under the full one. The
+    /// full file loads at the same time (lazily when the image is lazy) and covers it with a
+    /// short fade when it is ready. Same address rules as the image.
+    pub fn low(mut self, src: impl Into<String>) -> Self {
+        self.loading.low = Some(src.into());
+        self
+    }
+
+    /// Another file tried once when the image fails to load, such as a generic product photo.
+    /// Same address rules as the image.
+    pub fn fallback(mut self, src: impl Into<String>) -> Self {
+        self.loading.fallback = Some(src.into());
+        self
+    }
+
+    /// What shows when the image and its fallback both fail: a text or a component. Without it
+    /// the alt text is shown with an icon on the placeholder background.
+    pub fn on_error(mut self, content: impl Into<Node>) -> Self {
+        self.loading.on_error = Some(content.into());
+        self
+    }
+
+    /// Marks the first image the visitor sees (the largest paint): it loads at once with
+    /// `fetchpriority="high"` and is never lazy. Use it for one image per page.
+    pub fn priority(mut self) -> Self {
+        self.loading.priority = true;
+        self
+    }
+
+    /// How the file fills the box when its shape differs from the size: cut to fill
+    /// ([`Fit::Cover`]) or shown whole ([`Fit::Contain`]).
+    pub fn fit(mut self, fit: Fit) -> Self {
+        self.loading.fit = Some(fit);
         self
     }
 }
@@ -444,29 +530,283 @@ impl Component for Image<Given, Given> {
             .filter(|(u, d)| !u.contains([' ', ',']) && csp.allows_image(u) && valid_descriptor(d))
             .map(|(u, d)| format!("{} {d}", escape(u)))
             .collect();
+        let lazy = self.lazy && !self.loading.priority;
         let srcset = if candidates.is_empty() {
             String::new()
         } else {
-            let sizes = if candidates
-                .iter()
-                .any(|c| c.ends_with('w'))
-            {
-                format!(r#" sizes="(max-width: {w}px) 100vw, {w}px""#)
-            } else {
-                String::new()
+            let sizes = match &self.sizes {
+                Some(s) => format!(r#" sizes="{}""#, escape(s)),
+                None if candidates
+                    .iter()
+                    .any(|c| c.ends_with('w')) =>
+                {
+                    let auto = if lazy { "auto, " } else { "" };
+                    format!(r#" sizes="{auto}(max-width: {w}px) 100vw, {w}px""#)
+                }
+                None => String::new(),
             };
             format!(r#" srcset="{}"{sizes}"#, candidates.join(", "))
         };
-        let lazy = if self.lazy { r#" loading="lazy""# } else { "" };
+        let wrap = self.loading.wraps();
+        if wrap {
+            out.push_str(&format!(
+                r#"<span class="z-img{}" style="width:{w}px;{}">{}"#,
+                self.loading.host_class(),
+                self.loading.host_style(self.size),
+                self.loading.layers(r, lazy)
+            ));
+        }
         out.push_str(&format!(
-            r#"<img class="z-image" src="{}" alt="{alt}" width="{w}" height="{h}" decoding="async"{lazy}{srcset} data-testid="{}.image">"#,
+            r#"<img class="z-image" src="{}" alt="{alt}" width="{w}" height="{h}" decoding="async"{}{srcset} data-testid="{}.image">"#,
             escape(&self.src),
+            self.loading.img_attrs(r, lazy),
             r.scope
         ));
+        if wrap {
+            out.push_str(&self.loading.error(r));
+            out.push_str("</span>");
+        }
     }
 
     fn schema(&self) -> Json {
-        json!({ "type": "image", "src": self.src, "alt": self.alt, "width": self.size.0, "height": self.size.1, "lazy": self.lazy })
+        json!({
+            "type": "image",
+            "src": self.src,
+            "alt": self.alt,
+            "width": self.size.0,
+            "height": self.size.1,
+            "lazy": self.lazy,
+            "sizes": self.sizes,
+            "loading": self.loading.schema(),
+        })
+    }
+}
+
+/// The longest [`Placeholder::blur`] data URI, in bytes. A 16 by 16 pixel WebP or AVIF fits
+/// easily; anything longer belongs in a file.
+pub const PLACEHOLDER_BLUR_MAX: usize = 600;
+
+/// How an image fills its box when the file's shape differs from the size, set with
+/// [`Image::fit`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Fit {
+    /// Fills the box and cuts what overflows, as product photos in a grid.
+    Cover,
+    /// Shows the whole file inside the box, leaving the rest to the placeholder.
+    Contain,
+}
+
+/// What an image's box shows until the file has loaded. It is a CSS background or a layer under
+/// the image, so it needs no script, and the box keeps its size either way.
+///
+/// ```
+/// # use zeyn::ui::Placeholder;
+/// let gray = Placeholder::color("#d9dde3");
+/// let themed = Placeholder::color("--z-surface-2");
+/// let tiny = Placeholder::blur("data:image/webp;base64,UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA==");
+/// let shared = Placeholder::image("/static/product-outline.png");
+/// ```
+///
+/// A color is a hex color (`#rgb`, `#rrggbb`, with or without alpha) or a theme token
+/// (`--z-surface-2`, see `docs/theming.md`), so it can follow the light and the dark theme. A
+/// blur is a tiny image the app made, as a base64 `data:image/webp`, `avif`, `jpeg` or `png` URI
+/// of at most [`PLACEHOLDER_BLUR_MAX`] bytes; it is stretched and blurred. SVG is never accepted.
+/// An image follows the address rules of [`Image`]. A placeholder that breaks a rule is left
+/// out, and the box shows the theme's surface color.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Placeholder(Fill);
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum Fill {
+    Color(String),
+    Blur(String),
+    Image(String),
+    Invalid,
+}
+
+impl Placeholder {
+    /// A plain color: `#d9dde3` or a theme token such as `--z-surface-2`.
+    pub fn color(color: &str) -> Self {
+        let hex = color
+            .strip_prefix('#')
+            .is_some_and(|h| {
+                matches!(h.len(), 3 | 4 | 6 | 8) && h.bytes().all(|b| b.is_ascii_hexdigit())
+            });
+        let token = color
+            .strip_prefix("--z-")
+            .is_some_and(|t| {
+                !t.is_empty()
+                    && t.len() <= 40
+                    && t.bytes()
+                        .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+            });
+        match (hex, token) {
+            (true, _) => Placeholder(Fill::Color(color.to_string())),
+            (_, true) => Placeholder(Fill::Color(format!("var({color})"))),
+            _ => Placeholder(Fill::Invalid),
+        }
+    }
+
+    /// A tiny image, blurred over the box: a base64 `data:image/webp`, `avif`, `jpeg` or `png`
+    /// URI of at most [`PLACEHOLDER_BLUR_MAX`] bytes.
+    pub fn blur(data_uri: &str) -> Self {
+        let body = ["webp", "avif", "jpeg", "png"]
+            .iter()
+            .find_map(|t| data_uri.strip_prefix(&format!("data:image/{t};base64,")));
+        let ok = data_uri.len() <= PLACEHOLDER_BLUR_MAX
+            && body.is_some_and(|b| {
+                !b.is_empty()
+                    && b.bytes()
+                        .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'+' | b'/' | b'='))
+            });
+        match ok {
+            true => Placeholder(Fill::Blur(data_uri.to_string())),
+            false => Placeholder(Fill::Invalid),
+        }
+    }
+
+    /// A file shown under the image while it loads, such as one outline shared by every product
+    /// so the browser fetches it once. Same address rules as the image.
+    pub fn image(src: impl Into<String>) -> Self {
+        Placeholder(Fill::Image(src.into()))
+    }
+
+    fn kind(&self) -> &'static str {
+        match self.0 {
+            Fill::Color(_) => "color",
+            Fill::Blur(_) => "blur",
+            Fill::Image(_) => "image",
+            Fill::Invalid => "none",
+        }
+    }
+}
+
+/// The loading options an [`Image`], a card image and a video poster share: placeholder, low
+/// resolution file, fallback, error content, priority and fit.
+#[derive(Default)]
+pub(crate) struct Loading {
+    pub(crate) placeholder: Option<Placeholder>,
+    pub(crate) low: Option<String>,
+    pub(crate) fallback: Option<String>,
+    pub(crate) on_error: Option<Node>,
+    pub(crate) priority: bool,
+    pub(crate) fit: Option<Fit>,
+}
+
+impl Loading {
+    /// Whether the image needs its box: every option but the priority does.
+    pub(crate) fn wraps(&self) -> bool {
+        self.placeholder.is_some()
+            || self.low.is_some()
+            || self.fallback.is_some()
+            || self.on_error.is_some()
+            || self.fit.is_some()
+    }
+
+    /// Classes of the box, each with a leading space.
+    pub(crate) fn host_class(&self) -> String {
+        let mut c = String::from(" z-img-host");
+        if let Some(Placeholder(Fill::Blur(_))) = &self.placeholder {
+            c.push_str(" z-img-blur");
+        }
+        match self.fit {
+            Some(Fit::Cover) => c.push_str(" z-img-cover"),
+            Some(Fit::Contain) => c.push_str(" z-img-contain"),
+            None => {}
+        }
+        c
+    }
+
+    /// The `style` of the box: its ratio and the placeholder color or blur image. Every value
+    /// is a number, a checked color or a checked base64 URI, so none can leave the attribute.
+    pub(crate) fn host_style(&self, (w, h): (u32, u32)) -> String {
+        format!(
+            "aspect-ratio:{} / {}{}",
+            w.max(1),
+            h.max(1),
+            self.fill_style()
+        )
+    }
+
+    /// The placeholder color or blur image as custom properties, each with a leading `;`.
+    pub(crate) fn fill_style(&self) -> String {
+        match &self.placeholder {
+            Some(Placeholder(Fill::Color(c))) => format!(";--z-ph:{c}"),
+            Some(Placeholder(Fill::Blur(uri))) => format!(";--z-ph-img:url({uri})"),
+            _ => String::new(),
+        }
+    }
+
+    /// The layers under the image: the placeholder image and the low resolution file, those
+    /// the policy allows.
+    pub(crate) fn layers(&self, r: &Render, lazy: bool) -> String {
+        let csp = policy(r);
+        let loading = match (self.priority, lazy) {
+            (true, _) => r#" fetchpriority="high""#,
+            (false, true) => r#" loading="lazy""#,
+            (false, false) => "",
+        };
+        let shared = match &self.placeholder {
+            Some(Placeholder(Fill::Image(src))) => Some(src),
+            _ => None,
+        };
+        shared
+            .into_iter()
+            .chain(self.low.as_ref())
+            .filter(|src| csp.allows_image(src))
+            .map(|src| {
+                format!(
+                    r#"<img class="z-img-under" src="{}" alt="" decoding="async"{loading}>"#,
+                    escape(src)
+                )
+            })
+            .collect()
+    }
+
+    /// Attributes of the image itself: how it loads, and the marker and fallback the media
+    /// module reads when it has a box.
+    pub(crate) fn img_attrs(&self, r: &Render, lazy: bool) -> String {
+        let mut a = match (self.priority, lazy) {
+            (true, _) => String::from(r#" loading="eager" fetchpriority="high""#),
+            (false, true) => String::from(r#" loading="lazy""#),
+            (false, false) => String::new(),
+        };
+        if self.wraps() {
+            a.push_str(" data-zeyn-img");
+            if let Some(src) = self
+                .fallback
+                .as_ref()
+                .filter(|s| policy(r).allows_image(s))
+            {
+                a.push_str(&format!(r#" data-zeyn-fallback="{}""#, escape(src)));
+            }
+        }
+        a
+    }
+
+    /// The app's error content as an inert template, shown only when the image fails.
+    pub(crate) fn error(&self, r: &Render) -> String {
+        match &self.on_error {
+            Some(node) => {
+                let mut out = String::from("<template data-zeyn-img-error>");
+                node.render(&mut out, r);
+                out.push_str("</template>");
+                out
+            }
+            None => String::new(),
+        }
+    }
+
+    pub(crate) fn schema(&self) -> Json {
+        json!({
+            "placeholder": self.placeholder.as_ref().map(Placeholder::kind),
+            "low": self.low,
+            "fallback": self.fallback,
+            "on_error": self.on_error.as_ref().map(Node::schema),
+            "priority": self.priority,
+            "fit": self.fit,
+        })
     }
 }
 

@@ -123,13 +123,15 @@ pub(crate) const MODULES: &[Module] = &[
     },
     Module {
         name: "media",
-        script: &["data-zeyn-player", "z-embed"],
+        script: &["data-zeyn-player", "z-embed", "data-zeyn-img"],
         style: &[
             "z-embed",
             "z-player",
             "z-shelf",
             "z-image",
             "z-image-blocked",
+            "z-img",
+            "z-img-host",
             "z-link-external-icon",
         ],
         needs: &[],
