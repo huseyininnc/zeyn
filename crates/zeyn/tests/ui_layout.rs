@@ -378,7 +378,7 @@ fn a_screen_header_has_the_title_a_subtitle_and_primary_actions_in_one_row() {
     );
     assert!(html.contains(r#"<header class="z-screen-head"><div class="z-screen-heading"><h1 id="orders_head-title">Orders &lt;all&gt;</h1><p class="z-screen-subtitle" id="orders_head-subtitle">Every order of the last &lt;90&gt; days.</p></div><div class="z-toolbar z-screen-primary" role="toolbar" aria-label="Main actions">"#), "{html}");
     assert!(
-        html.contains(r#"<button type="button" class="z-button z-primary" data-testid="orders_head.primary.new-order" aria-keyshortcuts="Alt+N">"#),
+        html.contains(r#"<button type="button" class="z-button z-primary" data-testid="orders_head.primary.new-order" aria-keyshortcuts="Alt+N" aria-describedby="orders_head-tooltip-0""#),
         "{html}"
     );
     let head_end = html.find("</header>").unwrap();
@@ -401,4 +401,45 @@ fn a_screen_header_has_the_title_a_subtitle_and_primary_actions_in_one_row() {
         .subtitle("One order")
         .html(&meta);
     assert!(window.contains(r#"<header class="z-screen-head"><div class="z-screen-heading"><h2 id="orders_head-title">Edit</h2>"#));
+}
+
+#[test]
+fn a_card_puts_its_action_in_the_title_row_and_its_footer_last() {
+    let meta = <orders_head as ScreenDef>::META;
+    let html = Screen::new("Cards")
+        .body(
+            Card::new()
+                .title("Latest")
+                .action(Badge::new("3").count())
+                .add("Body")
+                .footer("More"),
+        )
+        .html(&meta);
+    let head = html
+        .find(r#"<header class="z-card-head"><h3 class="z-card-title""#)
+        .expect("title row");
+    let action = html
+        .find(r#"<div class="z-card-action"><div class="z-node" data-zeyn-node="0.0">"#)
+        .expect("the action keeps its node path");
+    let body = html
+        .find(r#"data-zeyn-node="0.1">Body"#)
+        .expect("body");
+    let foot = html
+        .find(r#"<footer class="z-card-foot"><div class="z-node" data-zeyn-node="0.2">More"#)
+        .expect("footer");
+    assert!(head < action && action < body && body < foot, "{html}");
+}
+
+#[test]
+fn two_or_more_exports_fold_into_one_export_menu_button() {
+    let meta = <orders_head as ScreenDef>::META;
+    let html = Screen::new("Orders")
+        .toolbar(|t| {
+            t.export(Export::Csv)
+                .export(Export::Xlsx)
+        })
+        .html(&meta);
+    assert!(html.contains(r#"<div class="z-menu-button"><button type="button" class="z-button z-menu-trigger" id="orders_head-toolbar-export-button" aria-haspopup="menu" aria-expanded="false" aria-controls="orders_head-toolbar-export" data-testid="orders_head.toolbar.export"><span class="z-icon z-icon-download" aria-hidden="true"></span><span>Export</span>"#), "{html}");
+    assert!(html.contains(r#"<li role="none"><button type="button" class="z-menu-entry" role="menuitem" tabindex="-1" data-zeyn-export="csv" data-testid="orders_head.toolbar.export-csv">CSV</button></li><li role="none"><button type="button" class="z-menu-entry" role="menuitem" tabindex="-1" data-zeyn-export="xlsx" data-testid="orders_head.toolbar.export-xlsx">Excel</button></li></ul></div>"#), "{html}");
+    assert_eq!(html.matches("z-menu-trigger").count(), 1);
 }

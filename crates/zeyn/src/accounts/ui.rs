@@ -76,6 +76,22 @@ impl AccountsUi {
     pub fn build(self) -> Feature {
         let on = |name: &str| !self.off.contains(&name);
         let mut f = Feature::new("accounts");
+        let entry: Vec<&'static str> = [
+            account_login::META.name,
+            account_logout::META.name,
+            account_forgot_password::META.name,
+            account_reset_password::META.name,
+            account_confirm_email::META.name,
+            account_resend_confirmation::META.name,
+            account_check_email::META.name,
+            account_login_2fa::META.name,
+            account_login_recovery::META.name,
+            account_lockout::META.name,
+            account_access_denied::META.name,
+            account_register::META.name,
+        ]
+        .into_iter()
+        .collect();
         macro_rules! add {
             ($($s:ident),*) => { $( if on(stringify!($s)) { f = f.screen($s); } )* };
         }
@@ -111,6 +127,7 @@ impl AccountsUi {
         if on("account_external_login") {
             f = f.screen(account_external_login);
         }
+        f = f.auth_screens(crate::site::Shell::auth(), entry);
         if self.admin {
             add!(
                 account_admin_users,
@@ -316,6 +333,7 @@ pub async fn account_login(p: LoginParams, accounts: Accounts) -> Result<Screen>
             ..AccountLogin::default()
         })
         .field(AccountLogin::user_name)
+        .control(AccountLogin::user_name, Control::Username)
         .field(AccountLogin::password)
         .control(AccountLogin::password, Control::Password)
         .field(AccountLogin::remember_me)

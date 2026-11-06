@@ -12,9 +12,49 @@ use std::sync::Arc;
 
 const JS: &str = include_str!("../../assets/site.js");
 const CSS: &str = include_str!("../../assets/site.css");
+const AUTH_CSS: &str = include_str!("../../assets/auth.css");
 
 /// Asset paths served without authentication, like the runtime itself.
-pub(super) const ASSETS: [&str; 2] = ["/_zeyn/site.js", "/_zeyn/site.css"];
+pub(super) const ASSETS: [&str; 3] = ["/_zeyn/site.js", "/_zeyn/site.css", "/_zeyn/auth.css"];
+
+/// Links placed in the head of sign in shell pages only.
+pub(super) fn auth_head(base: &str) -> String {
+    let v = super::ops::asset_version();
+    format!(r#"<link rel="stylesheet" href="{base}/_zeyn/auth.css{v}">"#)
+}
+
+/// The whole frame of a sign in shell page: the logo and name, the screen as one card, and the
+/// language and theme pickers under it; with `split`, a brand panel beside it.
+pub(super) fn auth_frame(
+    st: &AppState,
+    ctx: &Ctx,
+    r: &Render,
+    shell: &SiteShell,
+    theme: &str,
+    app: &str,
+    main: &str,
+) -> String {
+    let split = shell.auth == Some(crate::site::AuthLayout::Split);
+    let logo = super::logo_mark(
+        st.logo.as_ref(),
+        &escape(&st.prefix),
+        app,
+        "z-logo z-auth-logo",
+    );
+    let aside = if split {
+        format!(
+            r#"<aside class="z-auth-aside" aria-hidden="true"><p class="z-auth-aside-name">{app}</p></aside>"#
+        )
+    } else {
+        String::new()
+    };
+    format!(
+        r#"<div class="z-app z-auth{}" data-zeyn-shell="auth"><div class="z-auth-column"><p class="z-auth-brand">{logo}<span>{app}</span></p><main class="z-main z-auth-card" id="z-main">{main}</main><footer class="z-auth-foot">{}{}</footer></div>{aside}</div>"#,
+        if split { " z-auth-split" } else { "" },
+        st.locale_picker(ctx, r),
+        st.look.picker(r, theme)
+    )
+}
 
 /// Links placed in the head of site shell pages only.
 pub(super) fn head(base: &str) -> String {
@@ -33,6 +73,10 @@ pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
         .route(
             "/_zeyn/site.css",
             get(|| async { asset(CSS, "text/css; charset=utf-8") }),
+        )
+        .route(
+            "/_zeyn/auth.css",
+            get(|| async { asset(AUTH_CSS, "text/css; charset=utf-8") }),
         )
 }
 
@@ -103,6 +147,22 @@ fn bottom_nav(
 /// theme picker. Empty when it asks for none.
 pub(super) fn header_actions(st: &AppState, header: &SiteHeader, ctx: &Ctx, r: &Render) -> String {
     let mut actions = String::new();
+    if header.search {
+        let keys = escape(&st.palette_keys);
+        actions.push_str(&format!(
+            r#"<button type="button" class="z-topbar-search" data-zeyn-palette-open aria-haspopup="dialog" aria-keyshortcuts="{keys}">{}<span>{}</span><kbd aria-hidden="true">{}</kbd></button>"#,
+            crate::screen::Icon::Search.html(),
+            r.text(&Text::key("zeyn.shell.search")),
+            escape(
+                &st.palette_keys
+                    .replace("Control", "Ctrl")
+            )
+        ));
+    }
+    if header.account {
+        actions.push_str(&account_menu(st, ctx, r));
+        return actions;
+    }
     if header.sign_in {
         let signed_in = ctx.identity().is_signed_in();
         let link = if signed_in {
@@ -133,6 +193,75 @@ pub(super) fn header_actions(st: &AppState, header: &SiteHeader, ctx: &Ctx, r: &
         );
     }
     actions
+}
+
+/// The account menu of `SiteHeader::account`: the user's initials on a button that opens a
+/// non-modal dialog (`overlays.js`) with who is signed in, the pickers and the sign in or out link.
+fn account_menu(st: &AppState, ctx: &Ctx, r: &Render) -> String {
+    let user = ctx.identity().user.as_deref();
+    let initials: String = user
+        .unwrap_or("")
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| !w.is_empty())
+        .take(2)
+        .filter_map(|w| w.chars().next())
+        .flat_map(char::to_uppercase)
+        .collect();
+    let label = match user {
+        Some(name) => r.text(&Text::key("zeyn.shell.account_of").arg("name", name.to_string())),
+        None => r.text(&Text::key("zeyn.shell.account")),
+    };
+    let tone = user.map_or(0, |u| {
+        u.bytes().fold(0u32, |h, b| {
+            h.wrapping_mul(31)
+                .wrapping_add(u32::from(b))
+        }) % 8
+    });
+    let face = if initials.is_empty() {
+        crate::screen::Icon::User.html()
+    } else {
+        escape(&initials)
+    };
+    let mut out = format!(
+        r#"<div class="z-popover-wrap z-account" data-zeyn-popover><button type="button" class="z-popover-button z-avatar-button" id="z-account-button" aria-haspopup="dialog" aria-expanded="false" aria-controls="z-account" aria-label="{label}"><span class="z-avatar-face z-face-{tone}" aria-hidden="true">{face}</span></button><div class="z-popover z-account-panel" id="z-account" role="dialog" aria-labelledby="z-account-title" tabindex="-1" hidden><div class="z-popover-head"><h2 class="z-popover-title" id="z-account-title">{}</h2><button type="button" class="z-icon-button z-popover-close" data-zeyn-popover-close aria-label="{}">{}</button></div><div class="z-popover-body">"#,
+        r.text(&Text::key("zeyn.shell.account")),
+        r.text(&Text::key("zeyn.ui.popover.close")),
+        crate::screen::Icon::X.html()
+    );
+    if let Some(name) = user {
+        out.push_str(&format!(
+            r#"<p class="z-account-who"><span>{}</span> <strong>{}</strong></p>"#,
+            r.text(&Text::key("zeyn.shell.signed_in_as")),
+            escape(name)
+        ));
+    }
+    out.push_str(
+        &st.look
+            .picker(r, ctx.theme().unwrap_or("system")),
+    );
+    out.push_str(&super::theme::density_picker(r, ctx.compact()));
+    out.push_str(&st.locale_picker(ctx, r));
+    let signed_in = ctx.identity().is_signed_in();
+    let link = if signed_in {
+        st.sign_in.logout_url.as_deref()
+    } else {
+        st.login_url.as_deref()
+    };
+    if let Some(href) = link {
+        let (key, icon) = if signed_in {
+            ("zeyn.shell.site.sign_out", crate::screen::Icon::SignOut)
+        } else {
+            ("zeyn.shell.site.sign_in", crate::screen::Icon::SignIn)
+        };
+        out.push_str(&format!(
+            r#"<a class="z-button z-ghost z-account-sign" href="{}" data-zeyn-reload>{}{}</a>"#,
+            escape(href),
+            icon.html(),
+            r.text(&Text::key(key))
+        ));
+    }
+    out.push_str("</div></div></div>");
+    out
 }
 
 /// The start, center, end and bottom slots of a header, rendered for the request's user with

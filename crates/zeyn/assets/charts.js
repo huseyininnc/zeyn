@@ -16,24 +16,68 @@ function chart(el) {
   return { figure, tip: figure?.querySelector('.z-chart-tip'), marks: [...(figure?.querySelectorAll('.z-chart-mark') ?? [])] };
 }
 
-/** Shows the tooltip next to `mark`, kept inside the figure. */
+/**
+ * Shows the tooltip for `mark`. In a stretched plot it lists every series at the mark's category
+ * (category first, then one row per series) beside a crosshair, 12 px to the end side and
+ * flipped near the edge; other charts show the mark's own name above it.
+ */
 function show(mark) {
-  const { figure, tip } = chart(mark);
+  const { figure, tip, marks } = chart(mark);
   if (!tip) return;
-  tip.textContent = mark.getAttribute('data-zeyn-tip') ?? '';
-  tip.hidden = false;
   const box = figure.getBoundingClientRect();
   const m = mark.getBoundingClientRect();
-  const left = Math.min(Math.max(m.left + m.width / 2 - box.left - tip.offsetWidth / 2, 0), box.width - tip.offsetWidth);
-  const top = Math.max(m.top - box.top - tip.offsetHeight - 8, 0);
-  tip.style.left = `${left}px`;
-  tip.style.top = `${top}px`;
+  const canvas = mark.closest('.z-chart-plot')?.querySelector('.z-chart-canvas');
+  if (!canvas) {
+    tip.textContent = mark.getAttribute('data-zeyn-tip') ?? '';
+    tip.hidden = false;
+    const left = Math.min(Math.max(m.left + m.width / 2 - box.left - tip.offsetWidth / 2, 0), box.width - tip.offsetWidth);
+    tip.style.left = `${left}px`;
+    tip.style.top = `${Math.max(m.top - box.top - tip.offsetHeight - 8, 0)}px`;
+    return;
+  }
+  const same = marks.filter((x) => x.dataset.i === mark.dataset.i);
+  const head = document.createElement('p');
+  head.className = 'z-chart-tip-head';
+  const rows = same.map((x) => {
+    const text = x.getAttribute('data-zeyn-tip') ?? '';
+    const cut = text.indexOf(', ');
+    head.textContent = cut < 0 ? '' : text.slice(0, cut);
+    const [name, value] = text.slice(cut + 2).split(/: (?=[^:]*$)/);
+    const row = document.createElement('div');
+    row.className = 'z-chart-tip-row';
+    const swatch = document.createElement('span');
+    swatch.className = `z-chart-swatch ${[...x.classList].find((c) => c.startsWith('z-series-')) ?? ''}`;
+    const label = document.createElement('span');
+    label.textContent = name ?? '';
+    const strong = document.createElement('b');
+    strong.textContent = value ?? '';
+    row.append(swatch, label, strong);
+    return row;
+  });
+  tip.replaceChildren(head, ...rows);
+  tip.hidden = false;
+  const c = canvas.getBoundingClientRect();
+  const x = m.left + m.width / 2;
+  const cross = canvas.querySelector('.z-chart-cross');
+  if (cross) {
+    cross.style.left = `${x - c.left}px`;
+    cross.hidden = false;
+  }
+  marks.forEach((p) => p.classList.toggle('z-active', p.dataset.i === mark.dataset.i));
+  const rtl = mark.closest('[dir="rtl"]') !== null;
+  let left = rtl ? x - box.left - 12 - tip.offsetWidth : x - box.left + 12;
+  if (left + tip.offsetWidth > box.width || left < 0) left = rtl ? x - box.left + 12 : x - box.left - 12 - tip.offsetWidth;
+  tip.style.left = `${Math.min(Math.max(left, 0), box.width - tip.offsetWidth)}px`;
+  tip.style.top = `${c.top - box.top + 8}px`;
 }
 
-/** Hides the tooltip of the chart holding `el`. */
+/** Hides the tooltip and the crosshair of the chart holding `el`. */
 function hide(el) {
-  const { tip } = chart(el);
+  const { figure, tip, marks } = chart(el);
   if (tip) tip.hidden = true;
+  const cross = figure?.querySelector('.z-chart-cross');
+  if (cross) cross.hidden = true;
+  marks.forEach((p) => p.classList.remove('z-active'));
 }
 
 /** Moves the chart's tab stop to `next` and focuses it. */

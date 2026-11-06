@@ -37,7 +37,7 @@
   align-items: center;
   min-height: 44px;
   font-size: 1.0625rem;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--z-text);
   text-decoration: none;
   overflow-wrap: anywhere;
@@ -93,7 +93,7 @@
 .z-site-menu a[aria-current="page"],
 .z-site-group-button[data-current] {
   color: var(--z-accent);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .z-site-menu > li > a[aria-current="page"] { box-shadow: inset 0 -2px 0 var(--z-accent); }
@@ -261,11 +261,11 @@
   padding-bottom: 8px;
 }
 
-@media (min-width: 801px) {
+@media (min-width: 1024px) {
   .z-site-toggle { display: none; }
 }
 
-@media (max-width: 800px) {
+@media (max-width: 1023px) {
   .z-site-header {
     flex-direction: column;
     align-items: stretch;
@@ -312,7 +312,7 @@
 }
 
 /* With script the phone layout is set by CSS before the script runs, so nothing moves. */
-@media (max-width: 800px) and (scripting: enabled) {
+@media (max-width: 1023px) and (scripting: enabled) {
   .z-site-header .z-site-toggle[hidden] { display: inline-flex; }
   .z-site-header:not([data-open]) .z-site-nav,
   .z-site-header:not([data-open]) .z-site-actions { display: none; }
@@ -334,7 +334,7 @@
 
 .z-site-bottom { display: none; }
 
-@media (max-width: 800px) {
+@media (max-width: 1023px) {
   .z-site:has(> .z-site-bottom) { padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)); }
 
   body:has(.z-site-bottom) .z-assistant-launch { inset-block-end: calc(72px + env(safe-area-inset-bottom, 0px)); }
@@ -371,7 +371,7 @@
     padding: 4px;
     color: var(--z-text-muted);
     font-size: var(--z-font-size-xs);
-    font-weight: 600;
+    font-weight: 500;
     text-decoration: none;
   }
 
@@ -395,6 +395,6 @@
   }
 }
 
-@media (max-width: 800px) and (forced-colors: active) {
+@media (max-width: 1023px) and (forced-colors: active) {
   .z-site-bottom a[aria-current="page"] { outline: 2px solid Highlight; outline-offset: -4px; }
 }

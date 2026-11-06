@@ -748,8 +748,8 @@ async fn rails_hide_their_scrollbar_unless_kept_and_drag_only_with_a_mouse() {
     );
     let shell = asset("/_zeyn/zeyn.css").await;
     assert!(
-        shell.contains("@media (max-width: 800px) and (scripting: enabled)"),
-        "on phones the app menu starts folded, so the page does not jump when the script folds it"
+        shell.contains("@media (max-width: 1023px) and (scripting: enabled)"),
+        "on phones and tablets the app menu starts folded, so the page does not jump when the script folds it"
     );
 }
 

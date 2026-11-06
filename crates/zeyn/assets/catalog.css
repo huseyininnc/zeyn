@@ -33,8 +33,10 @@
 
 .z-cards-title {
   margin: 0;
-  font-size: 1.125rem;
+  font-size: var(--z-text-lg);
   font-weight: 600;
+  line-height: var(--z-leading-lg);
+  letter-spacing: -0.005em;
 }
 
 .z-cards-sort {

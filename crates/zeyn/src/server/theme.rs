@@ -34,6 +34,7 @@ const THEME_TOKENS: &[&str] = &[
     "--z-bg",
     "--z-surface",
     "--z-surface-2",
+    "--z-raised",
     "--z-hover",
     "--z-border",
     "--z-border-strong",
@@ -58,57 +59,109 @@ const THEME_TOKENS: &[&str] = &[
     "--z-chart-4",
     "--z-chart-5",
     "--z-chart-6",
+    "--z-chart-7",
+    "--z-chart-8",
 ];
 
 /// Values of the kit's light theme, as in `zeyn.css`.
 const LIGHT: &[(&str, &str)] = &[
     ("--z-brand", "#0f6674"),
     ("--z-on-brand", "#ffffff"),
-    ("--z-bg", "#f4f5f6"),
+    ("--z-bg", "#f5f6f8"),
     ("--z-surface", "#ffffff"),
-    ("--z-surface-2", "#f7f8f9"),
-    ("--z-hover", "#eceef1"),
-    ("--z-border-strong", "#7d848d"),
-    ("--z-text", "#1a1d21"),
-    ("--z-text-muted", "#5b626b"),
-    ("--z-danger", "#b3261e"),
+    ("--z-surface-2", "#f8f9fa"),
+    ("--z-raised", "#ffffff"),
+    ("--z-hover", "#eff1f4"),
+    ("--z-border", "#e2e5e9"),
+    ("--z-border-strong", "#858d97"),
+    ("--z-text", "#15181d"),
+    ("--z-text-muted", "#5a626c"),
+    ("--z-danger", "#b42318"),
     ("--z-warning", "#8a5300"),
-    ("--z-success", "#1e6b3a"),
-    ("--z-info", "#2b5d8a"),
+    ("--z-success", "#1a6b3c"),
+    ("--z-info", "#275d93"),
+    ("--z-chart-1", "#2563d9"),
+    ("--z-chart-2", "#d67400"),
+    ("--z-chart-3", "#a3369b"),
+    ("--z-chart-4", "#14866d"),
+    ("--z-chart-5", "#7a6a00"),
+    ("--z-chart-6", "#6e56cf"),
+    ("--z-chart-7", "#cc3b33"),
+    ("--z-chart-8", "#56636f"),
 ];
 
 /// Values the kit's dark theme sets on top of the light ones, as in `zeyn.css`.
 const DARK: &[(&str, &str)] = &[
-    ("--z-bg", "#121416"),
-    ("--z-surface", "#1a1d20"),
-    ("--z-surface-2", "#202326"),
-    ("--z-hover", "#2a2e33"),
-    ("--z-border-strong", "#7a818a"),
-    ("--z-text", "#e4e6e9"),
-    ("--z-text-muted", "#a2a9b1"),
+    ("--z-bg", "#0d0f12"),
+    ("--z-surface", "#15181d"),
+    ("--z-surface-2", "#1a1e24"),
+    ("--z-raised", "#1f242b"),
+    ("--z-hover", "#232830"),
+    ("--z-border", "#2b3139"),
+    ("--z-border-strong", "#6f7884"),
+    ("--z-text", "#e7eaee"),
+    ("--z-text-muted", "#9ba4af"),
     ("--z-danger", "#f28b82"),
     ("--z-warning", "#e6b45a"),
     ("--z-success", "#6fcf8f"),
     ("--z-info", "#8ab8e6"),
+    ("--z-chart-1", "#5b9bff"),
+    ("--z-chart-2", "#f08a3c"),
+    ("--z-chart-3", "#e27bd6"),
+    ("--z-chart-4", "#38c29f"),
+    ("--z-chart-5", "#ece27a"),
+    ("--z-chart-6", "#9d8cff"),
+    ("--z-chart-7", "#ff7b70"),
+    ("--z-chart-8", "#9aa7b5"),
 ];
 
-/// Color pairs that must reach WCAG 2.2 AA: foreground, background, needed ratio.
+/// Color pairs that must reach WCAG 2.2 AA: foreground, background, needed ratio. Derived
+/// tokens (accent, primary, the subtle tints) are computed the way `zeyn.css` computes them.
 const PAIRS: &[(&str, &str, f64)] = &[
     ("--z-text", "--z-bg", 4.5),
     ("--z-text", "--z-surface", 4.5),
     ("--z-text", "--z-surface-2", 4.5),
+    ("--z-text", "--z-raised", 4.5),
     ("--z-text", "--z-hover", 4.5),
+    ("--z-text", "--z-brand-subtle", 4.5),
+    ("--z-text", "--z-danger-subtle", 4.5),
+    ("--z-text", "--z-warning-subtle", 4.5),
+    ("--z-text", "--z-success-subtle", 4.5),
+    ("--z-text", "--z-info-subtle", 4.5),
     ("--z-text-muted", "--z-bg", 4.5),
     ("--z-text-muted", "--z-surface", 4.5),
     ("--z-text-muted", "--z-surface-2", 4.5),
+    ("--z-text-muted", "--z-raised", 4.5),
     ("--z-text-muted", "--z-hover", 4.5),
+    ("--z-text-muted", "--z-brand-subtle", 4.5),
     ("--z-border-strong", "--z-surface", 3.0),
     ("--z-border-strong", "--z-surface-2", 3.0),
+    ("--z-border-strong", "--z-raised", 3.0),
+    ("--z-accent", "--z-surface", 4.5),
+    ("--z-accent", "--z-bg", 4.5),
+    ("--z-accent", "--z-brand-subtle", 4.5),
+    ("--z-focus", "--z-surface", 3.0),
+    ("--z-focus", "--z-bg", 3.0),
+    ("--z-on-primary", "--z-primary", 4.5),
+    ("--z-on-primary", "--z-primary-hover", 4.5),
+    ("--z-on-primary", "--z-primary-active", 4.5),
     ("--z-danger", "--z-surface", 4.5),
+    ("--z-danger", "--z-danger-subtle", 4.5),
     ("--z-warning", "--z-surface", 4.5),
+    ("--z-warning", "--z-warning-subtle", 4.5),
     ("--z-success", "--z-surface", 4.5),
+    ("--z-success", "--z-success-subtle", 4.5),
     ("--z-info", "--z-surface", 4.5),
+    ("--z-info", "--z-info-subtle", 4.5),
     ("--z-on-brand", "--z-brand", 4.5),
+    ("--z-chart-1", "--z-surface", 3.0),
+    ("--z-chart-2", "--z-surface", 3.0),
+    ("--z-chart-3", "--z-surface", 3.0),
+    ("--z-chart-4", "--z-surface", 3.0),
+    ("--z-chart-5", "--z-surface", 3.0),
+    ("--z-chart-6", "--z-surface", 3.0),
+    ("--z-chart-7", "--z-surface", 3.0),
+    ("--z-chart-8", "--z-surface", 3.0),
 ];
 
 /// A look: the organization's brand, fonts, radius and density (`Theme::new`), one of the built
@@ -610,13 +663,28 @@ pub(crate) fn screen_picker(ctx: &crate::ctx::Ctx, r: &Render, id: &str) -> Stri
 
 /// Contrast problems of a theme, with the organization's look and the kit's values under it.
 fn contrast_problems(name: &str, theme: &Theme, base: &Theme) -> Vec<String> {
+    contrast_table(theme, base)
+        .into_iter()
+        .filter(|(_, _, ratio, needed)| ratio + 1e-9 < *needed)
+        .map(|(fg, bg, ratio, needed)| {
+            format!(
+                "theme `{name}`: `{fg}` on `{bg}` has contrast {ratio:.2}:1; WCAG 2.2 AA needs {needed}:1\n  = help: change one of the two colors in the theme's tokens"
+            )
+        })
+        .collect()
+}
+
+/// Every pair of [`PAIRS`] with its measured ratio and the ratio it needs. Derived tokens the
+/// theme does not set are computed as `zeyn.css` computes them; pairs whose colors are not
+/// plain hex values (such as `var(...)` set by the app) are left out.
+fn contrast_table(theme: &Theme, base: &Theme) -> Vec<(&'static str, &'static str, f64, f64)> {
     let dark = theme.scheme == Some("dark");
-    let value = |token: &str| -> Option<String> {
+    let set = |token: &str| -> Option<[u8; 3]> {
         if let Some(v) = theme.get(token) {
-            return Some(v.to_string());
+            return hex(v);
         }
         if dark && let Some((_, v)) = DARK.iter().find(|(n, _)| *n == token) {
-            return Some(v.to_string());
+            return hex(v);
         }
         base.get(token)
             .or_else(|| {
@@ -625,28 +693,60 @@ fn contrast_problems(name: &str, theme: &Theme, base: &Theme) -> Vec<String> {
                     .find(|(n, _)| *n == token)
                     .map(|(_, v)| *v)
             })
-            .map(str::to_string)
+            .and_then(hex)
     };
-    let mut problems = Vec::new();
-    let mut pairs: Vec<(&str, &str, f64)> = PAIRS.to_vec();
+    let tint = theme
+        .get("--z-tint")
+        .or_else(|| base.get("--z-tint"))
+        .and_then(|v| {
+            v.trim()
+                .strip_suffix('%')?
+                .trim()
+                .parse::<f64>()
+                .ok()
+        })
+        .unwrap_or(if dark { 16.0 } else { 9.0 })
+        / 100.0;
+    let resolve = |token: &str| -> Option<[u8; 3]> {
+        if let Some(c) = set(token) {
+            return Some(c);
+        }
+        let brand = set("--z-brand")?;
+        let accent = theme
+            .get("--z-accent")
+            .and_then(hex)
+            .unwrap_or_else(|| if dark { tone(brand, 0.8) } else { brand });
+        let primary = theme
+            .get("--z-primary")
+            .and_then(hex)
+            .unwrap_or(if dark { accent } else { brand });
+        match token {
+            "--z-accent" | "--z-focus" => Some(accent),
+            "--z-primary" => Some(primary),
+            "--z-on-primary" if dark => hex("#0d0f12"),
+            "--z-on-primary" => set("--z-on-brand"),
+            "--z-primary-hover" if dark => Some(mix(primary, [255; 3], 0.84)),
+            "--z-primary-hover" => Some(mix(primary, [0; 3], 0.86)),
+            "--z-primary-active" if dark => Some(mix(primary, [255; 3], 0.70)),
+            "--z-primary-active" => Some(mix(primary, [0; 3], 0.74)),
+            "--z-brand-subtle" => Some(mix(accent, set("--z-surface")?, tint)),
+            _ => {
+                let status = token.strip_suffix("-subtle")?;
+                Some(mix(set(status)?, set("--z-surface")?, tint))
+            }
+        }
+    };
+    let mut pairs: Vec<(&'static str, &'static str, f64)> = PAIRS.to_vec();
     if !dark {
         pairs.push(("--z-brand", "--z-surface", 4.5));
     }
-    for (fg, bg, needed) in pairs {
-        let (Some(a), Some(b)) = (
-            value(fg).and_then(|v| hex(&v)),
-            value(bg).and_then(|v| hex(&v)),
-        ) else {
-            continue;
-        };
-        let ratio = contrast(a, b);
-        if ratio + 1e-9 < needed {
-            problems.push(format!(
-                "theme `{name}`: `{fg}` on `{bg}` has contrast {ratio:.2}:1; WCAG 2.2 AA needs {needed}:1\n  = help: change one of the two colors in the theme's tokens"
-            ));
-        }
-    }
-    problems
+    pairs
+        .into_iter()
+        .filter_map(|(fg, bg, needed)| {
+            let ratio = contrast(resolve(fg)?, resolve(bg)?);
+            Some((fg, bg, ratio, needed))
+        })
+        .collect()
 }
 
 /// `#rgb` or `#rrggbb` as red, green and blue.
@@ -667,18 +767,67 @@ fn hex(v: &str) -> Option<[u8; 3]> {
     }
 }
 
+/// An 8 bit sRGB channel in linear light.
+fn linear(v: u8) -> f64 {
+    let s = f64::from(v) / 255.0;
+    if s <= 0.04045 {
+        s / 12.92
+    } else {
+        ((s + 0.055) / 1.055).powf(2.4)
+    }
+}
+
+/// An sRGB color in Oklab.
+fn oklab(c: [u8; 3]) -> [f64; 3] {
+    let [r, g, b] = c.map(linear);
+    let l = (0.412_221_470_8 * r + 0.536_332_536_3 * g + 0.051_445_992_9 * b).cbrt();
+    let m = (0.211_903_498_2 * r + 0.680_699_545_1 * g + 0.107_396_956_6 * b).cbrt();
+    let s = (0.088_302_461_9 * r + 0.281_718_837_6 * g + 0.629_978_700_5 * b).cbrt();
+    [
+        0.210_454_255_3 * l + 0.793_617_785 * m - 0.004_072_046_8 * s,
+        1.977_998_495_1 * l - 2.428_592_205 * m + 0.450_593_709_9 * s,
+        0.025_904_037_1 * l + 0.782_771_766_2 * m - 0.808_675_766 * s,
+    ]
+}
+
+/// An Oklab color back in 8 bit sRGB, clipped to the gamut.
+fn from_oklab([l, a, b]: [f64; 3]) -> [u8; 3] {
+    let l_ = (l + 0.396_337_777_4 * a + 0.215_803_757_3 * b).powi(3);
+    let m_ = (l - 0.105_561_345_8 * a - 0.063_854_172_8 * b).powi(3);
+    let s_ = (l - 0.089_484_177_5 * a - 1.291_485_548 * b).powi(3);
+    let lin = [
+        4.076_741_662_1 * l_ - 3.307_711_591_3 * m_ + 0.230_969_929_2 * s_,
+        -1.268_438_004_6 * l_ + 2.609_757_401_1 * m_ - 0.341_319_396_5 * s_,
+        -0.004_196_086_3 * l_ - 0.703_418_614_7 * m_ + 1.707_614_701 * s_,
+    ];
+    lin.map(|v| {
+        let v = v.clamp(0.0, 1.0);
+        let s = if v <= 0.003_130_8 {
+            v * 12.92
+        } else {
+            1.055 * v.powf(1.0 / 2.4) - 0.055
+        };
+        (s * 255.0).round() as u8
+    })
+}
+
+/// `color-mix(in oklab, a share, b)`: `share` of `a` (0 to 1) over `b`.
+fn mix(a: [u8; 3], b: [u8; 3], share: f64) -> [u8; 3] {
+    let (x, y) = (oklab(a), oklab(b));
+    from_oklab([0, 1, 2].map(|i| x[i] * share + y[i] * (1.0 - share)))
+}
+
+/// `oklch(from c l c h)`: the color's hue and chroma at another lightness.
+fn tone(c: [u8; 3], lightness: f64) -> [u8; 3] {
+    let [_, a, b] = oklab(c);
+    from_oklab([lightness, a, b])
+}
+
 /// WCAG 2.x contrast ratio of two sRGB colors.
 fn contrast(a: [u8; 3], b: [u8; 3]) -> f64 {
     let lum = |c: [u8; 3]| {
-        let ch = |v: u8| {
-            let s = f64::from(v) / 255.0;
-            if s <= 0.04045 {
-                s / 12.92
-            } else {
-                ((s + 0.055) / 1.055).powf(2.4)
-            }
-        };
-        0.2126 * ch(c[0]) + 0.7152 * ch(c[1]) + 0.0722 * ch(c[2])
+        let [r, g, b] = c.map(linear);
+        0.2126 * r + 0.7152 * g + 0.0722 * b
     };
     let (x, y) = (lum(a), lum(b));
     (x.max(y) + 0.05) / (x.min(y) + 0.05)
@@ -790,6 +939,89 @@ async fn set_theme(
     )
 }
 
+#[derive(Deserialize)]
+struct DensityCall {
+    density: String,
+}
+
+/// `POST /_zeyn/density {"density": "compact"}`: stores the density in the `zeyn_density` cookie
+/// (`comfortable` or `compact`), which the server renders on `<html>` and from which it picks the
+/// row height of virtual grids. `404` for any other value.
+async fn set_density(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::Json(call): axum::Json<DensityCall>,
+) -> Response {
+    let ctx = st.ctx(&headers);
+    if let Err(f) = st.check_csrf(&headers) {
+        return st.error_response(&ctx, f);
+    }
+    let value = match call.density.as_str() {
+        "compact" => "compact",
+        "comfortable" => "comfortable",
+        _ => return st.error_response(&ctx, Failure::App(Error::NotFound)),
+    };
+    let secure = if st.secure_cookies { "; Secure" } else { "" };
+    with_cookie(
+        StatusCode::NO_CONTENT.into_response(),
+        Some(format!(
+            "zeyn_density={value}; Path={}; Max-Age=31536000; SameSite=Lax{secure}",
+            st.cookie_path()
+        )),
+    )
+}
+
+/// The density picker of the account menu: comfortable or compact.
+pub(super) fn density_picker(r: &Render, compact: bool) -> String {
+    let t = |k: &str| r.text(&Text::key(format!("zeyn.shell.{k}")));
+    let (a, b) = if compact {
+        ("", " selected")
+    } else {
+        (" selected", "")
+    };
+    format!(
+        r#"<div class="z-locale"><span id="z-density-label">{}</span><div class="z-select" data-text-none=""><select id="z-density" data-zeyn-density aria-labelledby="z-density-label"><option value="comfortable"{a}>{}</option><option value="compact"{b}>{}</option></select></div></div>"#,
+        t("density"),
+        t("density_comfortable"),
+        t("density_compact")
+    )
+}
+
 pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
-    router.route("/_zeyn/theme", post(set_theme))
+    router
+        .route("/_zeyn/theme", post(set_theme))
+        .route("/_zeyn/density", post(set_density))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The kit's own light and dark themes pass every pair of [`PAIRS`]. Run with
+    /// `--nocapture` to print the table that `docs/theming.md` section 5 quotes.
+    #[test]
+    fn built_in_themes_reach_wcag_aa_on_every_pair() {
+        for theme in [Theme::light(), Theme::dark()] {
+            let table = contrast_table(&theme, &Theme::new());
+            assert!(table.len() >= PAIRS.len());
+            for (fg, bg, ratio, needed) in table {
+                println!(
+                    "{} | `{fg}` on `{bg}` | {ratio:.2} | {needed}",
+                    theme.scheme.unwrap_or_default()
+                );
+                assert!(ratio >= needed, "{fg} on {bg}: {ratio:.2} < {needed}");
+            }
+        }
+    }
+
+    /// Mixing in Oklab gives what browsers compute for `color-mix` and relative colors.
+    #[test]
+    fn oklab_mix_and_tone_match_the_browser() {
+        assert_eq!(mix([255; 3], [0; 3], 1.0), [255; 3]);
+        let teal = hex("#0f6674").unwrap();
+        let tinted = mix(teal, [255; 3], 0.09);
+        assert!((0xe6..=0xec).contains(&tinted[0]), "{tinted:?}");
+        let accent = tone(teal, 0.8);
+        assert!(accent[1] >= 0xb8 && accent[2] >= 0xc0, "{accent:?}");
+    }
 }

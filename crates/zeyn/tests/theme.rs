@@ -329,3 +329,71 @@ async fn a_theme_picker_in_a_screen_offers_the_shells_themes_and_shows_the_curre
         "without a request there is nothing to offer"
     );
 }
+
+#[zeyn::model]
+pub struct Row {
+    pub id: i64,
+}
+
+#[zeyn::action(public)]
+pub async fn rows(_q: DataQuery) -> zeyn::Result<Page<Row>> {
+    Ok(Page::default())
+}
+
+#[screen(route = "/rows", public)]
+pub fn rows_screen() -> Screen {
+    Screen::new("Rows").body(
+        DataGrid::of(rows)
+            .paging(Paging::virtual_scroll())
+            .column(Row::id),
+    )
+}
+
+#[tokio::test]
+async fn density_is_a_cookie_rendered_on_html_and_sets_the_virtual_row_height() {
+    let r = App::new("T")
+        .feature(
+            Feature::new("h")
+                .screen(home)
+                .screen(rows_screen),
+        )
+        .router()
+        .unwrap();
+    let (_, _, comfortable) = get(&r, "/rows", "").await;
+    assert!(!html_tag(&comfortable).contains("data-density"));
+    assert!(comfortable.contains(r#"data-zeyn-row-height="40""#));
+    let (_, _, compact) = get(&r, "/rows", "zeyn_density=compact").await;
+    assert!(html_tag(&compact).contains(r#" data-density="compact""#));
+    assert!(compact.contains(r#"data-zeyn-row-height="32""#));
+    let (_, _, odd) = get(&r, "/rows", r#"zeyn_density="><b>"#).await;
+    assert!(!html_tag(&odd).contains("data-density"));
+
+    let post = |body: &str| {
+        Request::post("/_zeyn/density")
+            .header(header::CONTENT_TYPE, "application/json")
+            .header(header::COOKIE, format!("zeyn_csrf={TOKEN}"))
+            .header("x-zeyn-csrf", TOKEN)
+            .body(Body::from(body.to_string()))
+            .unwrap()
+    };
+    let res = r
+        .clone()
+        .oneshot(post(r#"{"density":"compact"}"#))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+    assert!(
+        res.headers()
+            .get(header::SET_COOKIE)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("zeyn_density=compact; Path=/; Max-Age=31536000; SameSite=Lax")
+    );
+    let bad = r
+        .clone()
+        .oneshot(post(r#"{"density":"tiny"}"#))
+        .await
+        .unwrap();
+    assert_eq!(bad.status(), StatusCode::NOT_FOUND);
+}

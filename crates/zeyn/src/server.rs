@@ -94,6 +94,8 @@ const GRID_JS: &str = concat!(
     include_str!("../assets/zeyn/grid-exports.js"),
 );
 const CSS: &str = include_str!("../assets/zeyn.css");
+/// The icon set as CSS masks, generated from `assets/icons/*.svg` (see `tests/icons.rs`).
+const ICONS: &str = include_str!("../assets/icons.css");
 const NAV: &str = include_str!("../assets/nav.js");
 
 #[cfg(feature = "assistant")]
@@ -768,6 +770,7 @@ pub struct App {
     setup_problems: Vec<String>,
     views: Option<Arc<dyn crate::grid::DataGridViewStore>>,
     native_menu: bool,
+    logo: Option<Logo>,
     locale_paths: bool,
     palette_keys: String,
     client_prefs: crate::prefs::ClientPrefs,
@@ -826,6 +829,7 @@ impl App {
             setup_problems: Vec::new(),
             views: None,
             native_menu: true,
+            logo: None,
             locale_paths: false,
             palette_keys: crate::command::PALETTE_SHORTCUT.into(),
             client_prefs: crate::prefs::ClientPrefs::default(),
@@ -967,6 +971,46 @@ impl App {
         build: impl FnOnce(crate::site::SiteHeader) -> crate::site::SiteHeader,
     ) -> Self {
         self.header = Some(build(crate::site::SiteHeader::default()));
+        self
+    }
+
+    /// The app's logo mark, drawn 24 px square before the app's name in the side menu and
+    /// 32 px on sign in pages: a path on the app's own origin, such as `/static/logo.svg`
+    /// (the page's CSP loads images from the app only). Without it the shell draws a rounded
+    /// square in `--z-brand` with the first letter of the app's name. `App::check` reports a
+    /// path that is not on the app's origin.
+    ///
+    /// ```
+    /// use zeyn::prelude::*;
+    ///
+    /// let app = App::new("Admin")
+    ///     .logo("/static/logo.svg")
+    ///     .logo_dark("/static/logo-dark.svg");
+    /// ```
+    pub fn logo(mut self, path: &str) -> Self {
+        if let Some(problem) = logo_problem(path) {
+            self.setup_problems.push(problem);
+        }
+        let dark = self.logo.take().and_then(|l| l.dark);
+        self.logo = Some(Logo {
+            light: path.to_string(),
+            dark,
+        });
+        self
+    }
+
+    /// The logo for the dark theme, when the light one does not read on a dark surface. Needs
+    /// [`App::logo`].
+    pub fn logo_dark(mut self, path: &str) -> Self {
+        if let Some(problem) = logo_problem(path) {
+            self.setup_problems.push(problem);
+        }
+        match &mut self.logo {
+            Some(l) => l.dark = Some(path.to_string()),
+            None => self.setup_problems.push(
+                "`App::logo_dark` was called without `App::logo`\n  = help: call `.logo(\"/static/logo.svg\")` too".into(),
+            ),
+        }
         self
     }
 
@@ -1719,6 +1763,7 @@ impl App {
             look,
             views: self.views,
             native_menu: self.native_menu,
+            logo: self.logo,
             header: self.header,
             locale_paths: self.locale_paths,
             prefetch: self.prefetch,
@@ -1830,6 +1875,10 @@ impl App {
             .route(
                 "/_zeyn/zeyn.css",
                 get(|| async { asset(CSS, "text/css; charset=utf-8") }),
+            )
+            .route(
+                "/_zeyn/icons.css",
+                get(|| async { asset(ICONS, "text/css; charset=utf-8") }),
             )
             .route(
                 "/_zeyn/nav.js",
@@ -2036,6 +2085,8 @@ struct AppState {
     look: Arc<theme::Look>,
     views: Option<Arc<dyn crate::grid::DataGridViewStore>>,
     native_menu: bool,
+    /// The app's logo, from `App::logo`.
+    logo: Option<Logo>,
     /// The top bar of the app shell, from `App::header`.
     header: Option<crate::site::SiteHeader>,
     locale_paths: bool,
@@ -2369,6 +2420,11 @@ impl AppState {
             self.csp.clone(),
         );
         data::read_reason(&ctx, headers);
+        let ctx = if cookie(headers, "zeyn_density") == Some("compact") {
+            ctx.with_compact()
+        } else {
+            ctx
+        };
         let ctx = if is_prefetch(headers) {
             ctx.as_prefetch()
         } else {
@@ -2816,24 +2872,62 @@ impl AppState {
                         } else {
                             ""
                         };
-                        Some(format!(
-                            r#"<li><a href="{}"{aria}>{}</a></li>"#,
-                            escape(&self.url(&locale::path(self, ctx, &path))),
-                            r.text(&item.label)
-                        ))
+                        let href = escape(&self.url(&locale::path(self, ctx, &path)));
+                        let label = r.text(&item.label);
+                        Some(match item.icon.filter(|_| !site) {
+                            Some(icon) => format!(
+                                r#"<li><a href="{href}"{aria}>{}<span>{label}</span></a></li>"#,
+                                icon.html()
+                            ),
+                            None => format!(r#"<li><a href="{href}"{aria}>{label}</a></li>"#),
+                        })
                     })
                     .collect();
                 if items.is_empty() {
                     continue;
                 }
                 let label = r.text(&g.label);
+                let icon = if g.items.iter().any(|i| i.icon.is_some()) {
+                    String::new()
+                } else {
+                    g.icon.html()
+                };
                 match groups.iter_mut().find(|g| g.1 == label) {
                     Some(group) => group.2.extend(items),
-                    None => groups.push((g.icon.html(), label, items)),
+                    None => groups.push((icon, label, items)),
                 }
             }
         }
         groups
+    }
+
+    /// The breadcrumb of `SiteHeader::breadcrumb`: the menu group of the current screen and the
+    /// screen's menu label. `nav.js` rewrites it from the side menu after each navigation.
+    fn breadcrumb(&self, r: &Render, current: Option<&str>) -> String {
+        let found = current.and_then(|name| {
+            self.features
+                .iter()
+                .flat_map(|f| f.menu_groups())
+                .find_map(|g| {
+                    g.items
+                        .iter()
+                        .find(|i| i.screen == name)
+                        .map(|i| (r.text(&g.label), r.text(&i.label)))
+                })
+        });
+        let items = match found {
+            Some((group, item)) if group == item => {
+                format!(r#"<li><span aria-current="page">{item}</span></li>"#)
+            }
+            Some((group, item)) => {
+                format!(r#"<li>{group}</li><li><span aria-current="page">{item}</span></li>"#)
+            }
+            None => String::new(),
+        };
+        format!(
+            r#"<nav class="z-crumbs" aria-label="{}" data-zeyn-crumbs><ol>{items}</ol></nav>"#,
+            r.text(&Text::key("zeyn.shell.breadcrumb"))
+        )
     }
 
     /// Adds the `Speculation-Rules` header of `App::prefetch` to a full page.
@@ -2893,17 +2987,26 @@ impl AppState {
         let r = Render::new("shell", ctx.locale(), ctx.i18n())
             .with_tz(ctx.time_zone())
             .with_identity(ctx.identity());
-        let site_shell = current
-            .and_then(|n| self.screens.get(n))
-            .and_then(|(fi, _)| {
-                self.features[*fi]
-                    .site_shell()
-                    .map(|s| (*fi, s))
-            });
+        let site_shell = current.and_then(|n| {
+            let (fi, _) = self.screens.get(n)?;
+            self.features[*fi]
+                .shell_of(n)
+                .map(|s| (*fi, s))
+        });
         let theme = ctx.theme().unwrap_or("system");
         let app = r.text(&self.name);
         let (palette, commands) = pro::shell_parts(self, ctx, &r);
+        let auth = site_shell.is_some_and(|(_, s)| s.auth.is_some());
+        let (palette, commands) = if auth {
+            (String::new(), String::new())
+        } else {
+            (palette, commands)
+        };
         let (frame, site_head) = match site_shell {
+            Some((_, shell)) if shell.auth.is_some() => (
+                site::auth_frame(self, ctx, &r, shell, theme, &app, main),
+                site::auth_head(&escape(&self.prefix)),
+            ),
             Some((fi, shell)) => (
                 site::frame(self, ctx, &r, shell, fi, main, current),
                 site::head(&escape(&self.prefix)),
@@ -2935,9 +3038,14 @@ impl AppState {
         } else {
             r#" data-zeyn-native-menu="off""#
         };
-        let html_attrs = format!("{theme_attrs}{native_menu}");
+        let density = if ctx.compact() {
+            r#" data-density="compact""#
+        } else {
+            ""
+        };
+        let html_attrs = format!("{theme_attrs}{density}{native_menu}");
         format!(
-            r##"<!doctype html><html lang="{lang}"{dir}{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css{v}"><script type="module" src="{base}/_zeyn/zeyn.js{v}"></script><script type="module" src="{base}/_zeyn/nav.js{v}"></script>{components}{theme_link}{extra}{prefetch}</head><body><a class="z-skip" href="#z-main">{skip}</a>{frame}<div class="z-toasts" role="status" aria-live="polite" data-text-dismiss="{dismiss}"></div>{commands}{ai_launcher}</body></html>"##,
+            r##"<!doctype html><html lang="{lang}"{dir}{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css{v}"><link rel="stylesheet" href="{base}/_zeyn/icons.css{v}"><script type="module" src="{base}/_zeyn/zeyn.js{v}"></script><script type="module" src="{base}/_zeyn/nav.js{v}"></script>{components}{theme_link}{extra}{prefetch}</head><body><a class="z-skip" href="#z-main">{skip}</a>{frame}<div class="z-toasts" role="status" aria-live="polite" data-text-dismiss="{dismiss}"></div>{commands}{ai_launcher}</body></html>"##,
             lang = escape(ctx.locale()),
             dir = if locale::rtl(ctx.locale()) {
                 r#" dir="rtl""#
@@ -2991,8 +3099,14 @@ impl AppState {
                 items.join("")
             ));
         }
-        nav.push_str(&self.locale_picker(ctx, &r));
-        nav.push_str(&self.look.picker(&r, theme));
+        let account = self
+            .header
+            .as_ref()
+            .is_some_and(|h| h.account);
+        if !account {
+            nav.push_str(&self.locale_picker(ctx, &r));
+            nav.push_str(&self.look.picker(&r, theme));
+        }
         if self.zone_picker && matches!(self.time, TimePolicy::User { .. }) {
             let current = ctx.time_zone().name();
             let auto = r.text(&Text::key("zeyn.shell.time_zone_auto"));
@@ -3014,7 +3128,18 @@ impl AppState {
             .header
             .as_ref()
             .map(|h| {
-                let [start, center, end, bottom] = site::header_slots(h, ctx, "app", "z-app-header");
+                let [mut start, center, end, bottom] = site::header_slots(h, ctx, "app", "z-app-header");
+                if h.breadcrumb {
+                    let crumbs = self.breadcrumb(&r, current);
+                    match start.find('>') {
+                        Some(at) => start.insert_str(at + 1, &crumbs),
+                        None => {
+                            start = format!(
+                                r#"<div class="z-app-header-slot z-app-header-slot-start" id="z-app-header-slot-start">{crumbs}</div>"#
+                            )
+                        }
+                    }
+                }
                 let actions = site::header_actions(self, h, ctx, &r);
                 let actions = if actions.is_empty() {
                     actions
@@ -3027,9 +3152,66 @@ impl AppState {
             })
             .unwrap_or_default();
         format!(
-            r#"<div class="z-app" data-zeyn-shell="app"><nav class="z-nav" aria-label="{menu}"><div class="z-nav-bar"><p class="z-app-name">{app}</p><button type="button" class="z-nav-toggle" aria-expanded="false" aria-controls="z-nav-body" data-zeyn-nav-toggle hidden><span class="z-nav-burger" aria-hidden="true"></span><span class="z-sr-only">{menu}</span></button></div><div class="z-nav-body" id="z-nav-body">{palette}{nav}</div></nav>{header}<main class="z-main" id="z-main">{main}</main></div>"#,
+            r#"<div class="z-app" data-zeyn-shell="app"><nav class="z-nav" aria-label="{menu}"><div class="z-nav-bar"><p class="z-app-name">{logo}<span>{app}</span></p><button type="button" class="z-nav-toggle" aria-expanded="false" aria-controls="z-nav-body" data-zeyn-nav-toggle hidden><span class="z-nav-burger" aria-hidden="true"></span><span class="z-sr-only">{menu}</span></button></div><div class="z-nav-body" id="z-nav-body">{palette}{nav}</div></nav>{header}<main class="z-main" id="z-main">{main}</main></div>"#,
+            palette = if self
+                .header
+                .as_ref()
+                .is_some_and(|h| h.search)
+            {
+                ""
+            } else {
+                palette
+            },
             menu = r.text(&Text::key("zeyn.shell.menu")),
+            logo = logo_mark(self.logo.as_ref(), &escape(&self.prefix), app, "z-logo"),
         )
+    }
+}
+
+/// The logo of `App::logo`: a path on the app's origin, with an optional dark theme variant.
+#[derive(Clone, Debug)]
+struct Logo {
+    light: String,
+    dark: Option<String>,
+}
+
+/// Why a logo path cannot be used: it must be an absolute path on the app's own origin.
+fn logo_problem(path: &str) -> Option<String> {
+    let ok = path.starts_with('/')
+        && !path.starts_with("//")
+        && path.len() <= 512
+        && path
+            .chars()
+            .all(|c| c.is_ascii_graphic() && !"\"'<>`\\".contains(c));
+    (!ok).then(|| {
+        format!("logo `{path}` is not a path on the app's origin\n  = help: serve the file from the app and pass its path, such as `/static/logo.svg`")
+    })
+}
+
+/// The logo mark of the shell: the app's logo (with its dark variant) or a rounded square with
+/// the first letter of the app's name.
+fn logo_mark(logo: Option<&Logo>, base: &str, app: &str, class: &str) -> String {
+    match logo {
+        Some(Logo { light, dark: None }) => format!(
+            r#"<img class="{class}" src="{base}{}" alt="">"#,
+            escape(light)
+        ),
+        Some(Logo {
+            light,
+            dark: Some(dark),
+        }) => format!(
+            r#"<img class="{class} z-logo-light" src="{base}{}" alt=""><img class="{class} z-logo-dark" src="{base}{}" alt="">"#,
+            escape(light),
+            escape(dark)
+        ),
+        None => {
+            let letter: String = app
+                .chars()
+                .find(|c| c.is_alphanumeric())
+                .map(|c| c.to_uppercase().collect())
+                .unwrap_or_default();
+            format!(r#"<span class="{class} z-logo-letter" aria-hidden="true">{letter}</span>"#)
+        }
     }
 }
 
@@ -3365,13 +3547,17 @@ async fn page(
             #[allow(unused_mut)]
             let mut r = partial_response(&full, html);
             let h = r.headers_mut();
-            let site = st
+            let shell = st
                 .screens
                 .get(name)
-                .is_some_and(|(fi, _)| st.features[*fi].site_shell().is_some());
+                .and_then(|(fi, _)| st.features[*fi].shell_of(name));
             h.insert(
                 "x-zeyn-shell",
-                HeaderValue::from_static(if site { "site" } else { "app" }),
+                HeaderValue::from_static(match shell {
+                    Some(s) if s.auth.is_some() => "auth",
+                    Some(_) => "site",
+                    None => "app",
+                }),
             );
             #[cfg(feature = "islands")]
             if holds_island {

@@ -185,6 +185,7 @@ struct CtxInner {
     via_agent: bool,
     trail: Arc<Mutex<crate::audit::Trail>>,
     theme: Option<Arc<str>>,
+    compact: bool,
     reauth_within: std::time::Duration,
     csp: Option<Arc<crate::csp::Csp>>,
     prefetch: bool,
@@ -218,6 +219,7 @@ impl Ctx {
             via_agent: false,
             trail: Arc::default(),
             theme: None,
+            compact: false,
             reauth_within: REAUTH_WITHIN,
             csp: None,
             prefetch: false,
@@ -251,6 +253,7 @@ impl Ctx {
             via_agent: false,
             trail: Arc::default(),
             theme: Some(theme),
+            compact: false,
             reauth_within,
             csp: Some(csp),
             prefetch: false,
@@ -296,6 +299,17 @@ impl Ctx {
         self.rebuild(|i| i.theme = Some(theme))
     }
 
+    /// Same context in compact density (`zeyn_density=compact`).
+    pub(crate) fn with_compact(&self) -> Self {
+        self.rebuild(|i| i.compact = true)
+    }
+
+    /// Whether the user chose the compact density (32 px rows and controls) over the
+    /// comfortable one (40 px rows, 36 px controls) in the account menu.
+    pub fn compact(&self) -> bool {
+        self.0.compact
+    }
+
     /// The theme the page is shown in: `system`, `light`, `dark` or the name of an app theme.
     /// `None` outside a request, such as in tests that build a context by hand.
     pub fn theme(&self) -> Option<&str> {
@@ -332,6 +346,7 @@ impl Ctx {
             via_agent: i.via_agent,
             trail: i.trail.clone(),
             theme: i.theme.clone(),
+            compact: i.compact,
             reauth_within: i.reauth_within,
             csp: i.csp.clone(),
             prefetch: i.prefetch,

@@ -231,12 +231,22 @@ What to remember:
   `.low(small_src)`, `.fallback(src)`, `.priority()` on the first one only; in a `CardGrid`
   `.placeholder(..)` and `.priority(n)`, on a card `.low(..)` and `.fallback(..)`.
 - App shell top bar: `App::header(|h| h.center(SearchBox::of(..)).end(LinkButton::new(..)))`,
-  the same slots as the site header.
+  the same slots as the site header; `h.breadcrumb().search().account()` adds the breadcrumb, the
+  search field that opens the palette and the account menu with theme, language and sign out.
 - File uploads: `.files(RULES, FileAccess::read("x.file.read").write("x.file.write"), store)`
   on the feature lets readers download what they may not upload; one permission name covers both.
 - Settings pages: `ThemePicker::new()` is the theme choice inside a screen, in step with the shell.
-- Icons (`Icon::`): Plus, Edit, Delete, Save, Search, Box, Cart, Table, Home, Chart, Users,
-  Settings, Bell, Shield, Clock, Tag, Mail, SignOut, ArrowUp, ArrowDown.
+- Sign in pages: `Feature::new("entry").screen(sign_in).shell(Shell::auth())` (or `.split()`); the
+  `accounts` screens use it already. `Control::Username` on the user name field.
+- Icons (`Icon::`, 82, `Icon::ALL` lists them): Home, Dashboard, ChartBar, ChartLine, ChartPie,
+  Table, List, Users, User, UserPlus, Building, Cart, Box, Tag, Receipt, CreditCard, Banknote,
+  Truck, Undo, Bell, Mail, Message, Activity, Shield, Lock, Key, Fingerprint, Settings, Globe,
+  Help, Plus, Minus, X, Check, Edit, Trash, Copy, Save, Download, Upload, Refresh, External,
+  Link, Search, Filter, Sliders, Columns, Sort, ArrowUp, ArrowDown, MoreHorizontal,
+  MoreVertical, Grip, Eye, EyeOff, SignOut, SignIn, ChevronDown, ChevronUp, ChevronLeft,
+  ChevronRight, TrendUp, TrendDown, Info, CheckCircle, AlertTriangle, AlertCircle, Clock,
+  History, Calendar, Star, Menu, Sidebar, Command, Sun, Moon, Monitor, File, FileText, Folder,
+  Image, Paperclip. Menu items take one with `.icon(Icon::...)` after `.item(..)`.
 - Key figures: `Kpi::new(t!("..."), value)` or `Kpi::money(t!("..."), money)` with `.delta(..)`
   and `.trend(..)`; four in a `Row` fill a desktop row and wrap two, then one per line.
 - The app (`src/app.rs`): `App::new(t!("app.name")).i18n(i18n).service(store).feature(sales::feature())`,

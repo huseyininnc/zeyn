@@ -207,7 +207,13 @@
       "xlsx": "Export to Excel",
       "csv": "Export to CSV",
       "pdf": "Export to PDF",
-      "pdf_cut": "Only the first {max} rows are printed."
+      "pdf_cut": "Only the first {max} rows are printed.",
+      "menu": "Export",
+      "format": {
+        "xlsx": "Excel",
+        "csv": "CSV",
+        "pdf": "PDF"
+      }
     },
     "shell": {
       "skip": "Skip to content",
@@ -220,6 +226,14 @@
       "theme_light": "Light",
       "theme_dark": "Dark",
       "primary_actions": "Main actions",
+      "search": "Search",
+      "breadcrumb": "Breadcrumb",
+      "account": "Account",
+      "density": "Density",
+      "density_comfortable": "Comfortable",
+      "density_compact": "Compact",
+      "account_of": "Account of {name}",
+      "signed_in_as": "Signed in as",
       "site": {
         "sign_in": "Sign in",
         "sign_out": "Sign out",
@@ -389,7 +403,10 @@
         "value": "Value",
         "min": "Minimum",
         "max": "Maximum",
-        "target": "Target"
+        "target": "Target",
+        "thousand": "{n}K",
+        "million": "{n}M",
+        "billion": "{n}B"
       },
       "tree": {
         "empty": "No items."
@@ -456,9 +473,13 @@
         "up": "Up {pct}% from the previous period",
         "down": "Down {pct}% from the previous period",
         "flat": "No change from the previous period",
-        "target": "Target {target}, {pct}% reached"
+        "target": "Target {target}, {pct}% reached",
+        "compare": "vs previous period",
+        "million": "{n}M",
+        "billion": "{n}B"
       },
       "password": {
+        "caps": "Caps Lock is on",
         "show": "Show password",
         "weak": "Strength: weak",
         "fair": "Strength: fair",

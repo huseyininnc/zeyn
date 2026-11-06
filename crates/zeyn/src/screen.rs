@@ -880,55 +880,351 @@ impl From<String> for Node {
     }
 }
 
-/// Icons.
+/// Icons of the kit: drawn on a 20 px grid with a 1.5 px round stroke, shown at 16 or 20 px and
+/// colored by `currentColor`. Each is a CSS mask from `/_zeyn/icons.css`, generated from
+/// `assets/icons/*.svg`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "kebab-case")]
 pub enum Icon {
-    Plus,
-    Edit,
-    Delete,
-    Save,
-    Search,
-    Box,
-    Cart,
-    Table,
+    /// Home.
     Home,
-    Chart,
+    /// Overview.
+    Dashboard,
+    /// Reports.
+    ChartBar,
+    /// Analytics.
+    ChartLine,
+    /// Breakdown.
+    ChartPie,
+    /// Data.
+    Table,
+    /// Lists.
+    List,
+    /// Customers, team.
     Users,
-    Settings,
-    Bell,
-    Shield,
-    Clock,
+    /// Profile.
+    User,
+    /// Invite.
+    UserPlus,
+    /// Companies.
+    Building,
+    /// Orders.
+    Cart,
+    /// Products.
+    Box,
+    /// Prices, labels.
     Tag,
+    /// Invoices.
+    Receipt,
+    /// Payments.
+    CreditCard,
+    /// Revenue.
+    Banknote,
+    /// Shipping.
+    Truck,
+    /// Refund, revert.
+    Undo,
+    /// Notifications.
+    Bell,
+    /// Email.
     Mail,
-    SignOut,
+    /// Comments, assistant.
+    Message,
+    /// Audit, live.
+    Activity,
+    /// Roles, security.
+    Shield,
+    /// Locked, permissions.
+    Lock,
+    /// API keys.
+    Key,
+    /// Passkey.
+    Fingerprint,
+    /// Settings.
+    Settings,
+    /// Language.
+    Globe,
+    /// Help.
+    Help,
+    /// Create.
+    Plus,
+    /// Step down, collapse.
+    Minus,
+    /// Close, remove.
+    X,
+    /// Done, selected.
+    Check,
+    /// Edit.
+    Edit,
+    /// Delete.
+    Trash,
+    /// Copy.
+    Copy,
+    /// Save.
+    Save,
+    /// Export.
+    Download,
+    /// Import, upload.
+    Upload,
+    /// Reload data.
+    Refresh,
+    /// Opens elsewhere.
+    External,
+    /// Copy link.
+    Link,
+    /// Search.
+    Search,
+    /// Filter.
+    Filter,
+    /// Options.
+    Sliders,
+    /// Column chooser.
+    Columns,
+    /// Sortable column.
+    Sort,
+    /// Sort ascending.
     ArrowUp,
+    /// Sort descending.
     ArrowDown,
+    /// Row actions.
+    MoreHorizontal,
+    /// Card menu.
+    MoreVertical,
+    /// Drag handle.
+    Grip,
+    /// Show.
+    Eye,
+    /// Hide.
+    EyeOff,
+    /// Sign out.
+    SignOut,
+    /// Sign in.
+    SignIn,
+    /// Select, expand.
+    ChevronDown,
+    /// Collapse.
+    ChevronUp,
+    /// Previous.
+    ChevronLeft,
+    /// Next, breadcrumb.
+    ChevronRight,
+    /// Positive delta.
+    TrendUp,
+    /// Negative delta.
+    TrendDown,
+    /// Info.
+    Info,
+    /// Success.
+    CheckCircle,
+    /// Warning.
+    AlertTriangle,
+    /// Error.
+    AlertCircle,
+    /// Time, pending.
+    Clock,
+    /// History.
+    History,
+    /// Dates.
+    Calendar,
+    /// Favorite, rating.
+    Star,
+    /// Open nav.
+    Menu,
+    /// Collapse nav.
+    Sidebar,
+    /// Palette.
+    Command,
+    /// Light theme.
+    Sun,
+    /// Dark theme.
+    Moon,
+    /// System theme.
+    Monitor,
+    /// File.
+    File,
+    /// Report, PDF.
+    FileText,
+    /// Folder.
+    Folder,
+    /// Image.
+    Image,
+    /// Attachment.
+    Paperclip,
 }
 
 impl Icon {
-    fn css(self) -> &'static str {
+    /// Every icon, in the order of the set.
+    pub const ALL: &'static [Icon] = &[
+        Icon::Home,
+        Icon::Dashboard,
+        Icon::ChartBar,
+        Icon::ChartLine,
+        Icon::ChartPie,
+        Icon::Table,
+        Icon::List,
+        Icon::Users,
+        Icon::User,
+        Icon::UserPlus,
+        Icon::Building,
+        Icon::Cart,
+        Icon::Box,
+        Icon::Tag,
+        Icon::Receipt,
+        Icon::CreditCard,
+        Icon::Banknote,
+        Icon::Truck,
+        Icon::Undo,
+        Icon::Bell,
+        Icon::Mail,
+        Icon::Message,
+        Icon::Activity,
+        Icon::Shield,
+        Icon::Lock,
+        Icon::Key,
+        Icon::Fingerprint,
+        Icon::Settings,
+        Icon::Globe,
+        Icon::Help,
+        Icon::Plus,
+        Icon::Minus,
+        Icon::X,
+        Icon::Check,
+        Icon::Edit,
+        Icon::Trash,
+        Icon::Copy,
+        Icon::Save,
+        Icon::Download,
+        Icon::Upload,
+        Icon::Refresh,
+        Icon::External,
+        Icon::Link,
+        Icon::Search,
+        Icon::Filter,
+        Icon::Sliders,
+        Icon::Columns,
+        Icon::Sort,
+        Icon::ArrowUp,
+        Icon::ArrowDown,
+        Icon::MoreHorizontal,
+        Icon::MoreVertical,
+        Icon::Grip,
+        Icon::Eye,
+        Icon::EyeOff,
+        Icon::SignOut,
+        Icon::SignIn,
+        Icon::ChevronDown,
+        Icon::ChevronUp,
+        Icon::ChevronLeft,
+        Icon::ChevronRight,
+        Icon::TrendUp,
+        Icon::TrendDown,
+        Icon::Info,
+        Icon::CheckCircle,
+        Icon::AlertTriangle,
+        Icon::AlertCircle,
+        Icon::Clock,
+        Icon::History,
+        Icon::Calendar,
+        Icon::Star,
+        Icon::Menu,
+        Icon::Sidebar,
+        Icon::Command,
+        Icon::Sun,
+        Icon::Moon,
+        Icon::Monitor,
+        Icon::File,
+        Icon::FileText,
+        Icon::Folder,
+        Icon::Image,
+        Icon::Paperclip,
+    ];
+
+    /// The icon's file and class name, such as `chart-bar` for `assets/icons/chart-bar.svg`
+    /// and `.z-icon-chart-bar`.
+    pub fn name(self) -> &'static str {
         match self {
-            Icon::Plus => "plus",
-            Icon::Edit => "edit",
-            Icon::Delete => "delete",
-            Icon::Save => "save",
-            Icon::Search => "search",
-            Icon::Box => "box",
-            Icon::Cart => "cart",
-            Icon::Table => "table",
             Icon::Home => "home",
-            Icon::Chart => "chart",
+            Icon::Dashboard => "dashboard",
+            Icon::ChartBar => "chart-bar",
+            Icon::ChartLine => "chart-line",
+            Icon::ChartPie => "chart-pie",
+            Icon::Table => "table",
+            Icon::List => "list",
             Icon::Users => "users",
-            Icon::Settings => "settings",
-            Icon::Bell => "bell",
-            Icon::Shield => "shield",
-            Icon::Clock => "clock",
+            Icon::User => "user",
+            Icon::UserPlus => "user-plus",
+            Icon::Building => "building",
+            Icon::Cart => "cart",
+            Icon::Box => "box",
             Icon::Tag => "tag",
+            Icon::Receipt => "receipt",
+            Icon::CreditCard => "credit-card",
+            Icon::Banknote => "banknote",
+            Icon::Truck => "truck",
+            Icon::Undo => "undo",
+            Icon::Bell => "bell",
             Icon::Mail => "mail",
-            Icon::SignOut => "sign-out",
+            Icon::Message => "message",
+            Icon::Activity => "activity",
+            Icon::Shield => "shield",
+            Icon::Lock => "lock",
+            Icon::Key => "key",
+            Icon::Fingerprint => "fingerprint",
+            Icon::Settings => "settings",
+            Icon::Globe => "globe",
+            Icon::Help => "help",
+            Icon::Plus => "plus",
+            Icon::Minus => "minus",
+            Icon::X => "x",
+            Icon::Check => "check",
+            Icon::Edit => "edit",
+            Icon::Trash => "trash",
+            Icon::Copy => "copy",
+            Icon::Save => "save",
+            Icon::Download => "download",
+            Icon::Upload => "upload",
+            Icon::Refresh => "refresh",
+            Icon::External => "external",
+            Icon::Link => "link",
+            Icon::Search => "search",
+            Icon::Filter => "filter",
+            Icon::Sliders => "sliders",
+            Icon::Columns => "columns",
+            Icon::Sort => "sort",
             Icon::ArrowUp => "arrow-up",
             Icon::ArrowDown => "arrow-down",
+            Icon::MoreHorizontal => "more-horizontal",
+            Icon::MoreVertical => "more-vertical",
+            Icon::Grip => "grip",
+            Icon::Eye => "eye",
+            Icon::EyeOff => "eye-off",
+            Icon::SignOut => "sign-out",
+            Icon::SignIn => "sign-in",
+            Icon::ChevronDown => "chevron-down",
+            Icon::ChevronUp => "chevron-up",
+            Icon::ChevronLeft => "chevron-left",
+            Icon::ChevronRight => "chevron-right",
+            Icon::TrendUp => "trend-up",
+            Icon::TrendDown => "trend-down",
+            Icon::Info => "info",
+            Icon::CheckCircle => "check-circle",
+            Icon::AlertTriangle => "alert-triangle",
+            Icon::AlertCircle => "alert-circle",
+            Icon::Clock => "clock",
+            Icon::History => "history",
+            Icon::Calendar => "calendar",
+            Icon::Star => "star",
+            Icon::Menu => "menu",
+            Icon::Sidebar => "sidebar",
+            Icon::Command => "command",
+            Icon::Sun => "sun",
+            Icon::Moon => "moon",
+            Icon::Monitor => "monitor",
+            Icon::File => "file",
+            Icon::FileText => "file-text",
+            Icon::Folder => "folder",
+            Icon::Image => "image",
+            Icon::Paperclip => "paperclip",
         }
     }
 
@@ -936,7 +1232,7 @@ impl Icon {
     pub fn html(self) -> String {
         format!(
             r#"<span class="z-icon z-icon-{}" aria-hidden="true"></span>"#,
-            self.css()
+            self.name()
         )
     }
 }
@@ -969,6 +1265,16 @@ struct ButtonSpec {
     override_browser: bool,
     effect: Option<Effect>,
     tip: Option<Text>,
+    look: ButtonLook,
+}
+
+/// How a toolbar button is drawn besides the default outlined button.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum ButtonLook {
+    #[default]
+    Default,
+    Ghost,
+    Danger,
 }
 
 #[derive(Debug)]
@@ -998,6 +1304,7 @@ impl Toolbar {
                 override_browser: false,
                 effect: None,
                 tip: None,
+                look: ButtonLook::Default,
             },
         }
     }
@@ -1025,20 +1332,43 @@ impl Toolbar {
         out.push_str(&format!(
             r#"<div class="{bar}" role="toolbar" aria-label="{title}">"#
         ));
+        let exports = self
+            .items
+            .iter()
+            .filter(|i| matches!(i, ToolItem::Export(_)))
+            .count();
+        let mut export_menu = false;
         for (n, item) in self.items.iter().enumerate() {
             match item {
                 ToolItem::Button(b) => {
-                    let tip = b.tip.as_ref().map(|t| crate::ui::tip(r, &format!("{scope}-tooltip-{n}"), t));
+                    let keys = b
+                        .shortcut
+                        .as_deref()
+                        .and_then(|s| crate::command::usable_shortcut(s, b.override_browser));
+                    let tip_text = match (&b.tip, &keys) {
+                        (Some(t), Some(k)) => Some(Text::from(format!("{}  {k}", r.i18n.text(r.locale, t)))),
+                        (Some(t), None) => Some(t.clone()),
+                        (None, Some(k)) => Some(Text::from(k.clone())),
+                        (None, None) => None,
+                    };
+                    let tip = tip_text
+                        .as_ref()
+                        .map(|t| crate::ui::tip(r, &format!("{scope}-tooltip-{n}"), t));
                     if tip.is_some() {
                         out.push_str(r#"<span class="z-tip-host">"#);
                     }
                     let english = b.label.english();
+                    let look = match b.look {
+                        ButtonLook::Default => "",
+                        ButtonLook::Ghost => " z-ghost",
+                        ButtonLook::Danger => " z-danger-button",
+                    };
                     out.push_str(&format!(
-                        r#"<button type="button" class="{button}" data-testid="{scope}.{kind}.{}""#,
+                        r#"<button type="button" class="{button}{look}" data-testid="{scope}.{kind}.{}""#,
                         slug(&english)
                     ));
-                    if let Some(keys) = b.shortcut.as_deref().and_then(|s| crate::command::usable_shortcut(s, b.override_browser)) {
-                        out.push_str(&format!(r#" aria-keyshortcuts="{}""#, crate::render::escape(&keys)));
+                    if let Some(keys) = &keys {
+                        out.push_str(&format!(r#" aria-keyshortcuts="{}""#, crate::render::escape(keys)));
                     }
                     if let Some(e) = &b.effect {
                         out.push_str(&format!(r#" data-zeyn-effect="{}""#, attr(e)));
@@ -1057,14 +1387,41 @@ impl Toolbar {
                         out.push_str("</span>");
                     }
                 }
-                ToolItem::Export(e) => out.push_str(&format!(
+                ToolItem::Export(e) if exports < 2 => out.push_str(&format!(
                     r#"<button type="button" class="{button}" data-testid="{scope}.{kind}.export-{code}" data-zeyn-export="{code}">{}</button>"#,
                     r.text(&Text::key(format!("zeyn.export.{}", e.code()))),
                     code = e.code()
                 )),
+                ToolItem::Export(_) if export_menu => {}
+                ToolItem::Export(_) => {
+                    export_menu = true;
+                    self.export_menu(out, r, kind);
+                }
             }
         }
         out.push_str("</div>");
+    }
+
+    /// Two or more exports as one "Export" menu button (W3C APG menu button) with a format per
+    /// item, so the bar keeps one button for them.
+    fn export_menu(&self, out: &mut String, r: &Render, kind: &str) {
+        let scope = r.scope;
+        let id = format!("{scope}-{kind}-export");
+        out.push_str(&format!(
+            r#"<div class="z-menu-button"><button type="button" class="z-button z-menu-trigger" id="{id}-button" aria-haspopup="menu" aria-expanded="false" aria-controls="{id}" data-testid="{scope}.{kind}.export">{}<span>{}</span><span class="z-select-arrow" aria-hidden="true"></span></button><ul class="z-menu-list" role="menu" id="{id}" aria-labelledby="{id}-button" hidden>"#,
+            Icon::Download.html(),
+            r.text(&Text::key("zeyn.export.menu"))
+        ));
+        for item in &self.items {
+            if let ToolItem::Export(e) = item {
+                out.push_str(&format!(
+                    r#"<li role="none"><button type="button" class="z-menu-entry" role="menuitem" tabindex="-1" data-zeyn-export="{code}" data-testid="{scope}.{kind}.export-{code}">{}</button></li>"#,
+                    r.text(&Text::key(format!("zeyn.export.format.{}", e.code()))),
+                    code = e.code()
+                ));
+            }
+        }
+        out.push_str("</ul></div>");
     }
 
     pub(crate) fn schema(&self) -> serde_json::Value {
@@ -1101,6 +1458,18 @@ impl ToolButton {
     /// browser never passes on (`Ctrl+N`, `Ctrl+T`, `Ctrl+W`) are never bound. Both are logged.
     pub fn shortcut(mut self, keys: impl Into<String>) -> Self {
         self.spec.shortcut = Some(keys.into());
+        self
+    }
+
+    /// Draws the button without an outline until hovered, for secondary actions in dense bars.
+    pub fn ghost(mut self) -> Self {
+        self.spec.look = ButtonLook::Ghost;
+        self
+    }
+
+    /// Draws the button in the danger color, for actions that delete or cancel.
+    pub fn danger(mut self) -> Self {
+        self.spec.look = ButtonLook::Danger;
         self
     }
 

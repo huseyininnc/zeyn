@@ -120,14 +120,15 @@ impl Paging {
         Paging::None
     }
 
-    /// Virtual scrolling with 32 px rows, fetched in blocks of 200. For very large lists. The
+    /// Virtual scrolling with rows of the user's density (40 px comfortable, 32 px compact),
+    /// fetched in blocks of 200. For very large lists. The
     /// server sends the first block; rows after [`VIRTUAL_LIVE_ROWS`] go in an inert `<template>`
     /// so the browser styles and lays out only what fits on a screen. A grid with
     /// [`VIRTUAL_WIDE_COLUMNS`] columns or more puts every row there and the runtime inserts the
     /// rows once it has chosen the columns in view.
     pub const fn virtual_scroll() -> Self {
         Paging::Virtual {
-            row_height: 32,
+            row_height: 0,
             block: 200,
         }
     }
@@ -444,6 +445,8 @@ struct Column<E> {
     editable: bool,
     /// Whole numbers shown without group separators, for codes and years.
     plain: bool,
+    /// Long values wrap onto more lines instead of ending in an ellipsis.
+    wrap: bool,
 }
 
 /// Data grid. Its data source is an action that takes a `DataQuery` and returns `Page<E>`.
@@ -462,6 +465,7 @@ pub struct DataGrid<E: Model> {
     on_open: Option<OpenFn<E>>,
     row_actions: Vec<RowAction<E>>,
     selectable: bool,
+    zebra: bool,
     bulk: Vec<BulkDef>,
     /// Whether the last added action is a bulk action, the one `confirm` and `tone` set.
     last_bulk: bool,
@@ -659,6 +663,7 @@ impl<E: Model> DataGrid<E> {
             on_open: None,
             row_actions: Vec::new(),
             selectable: false,
+            zebra: false,
             bulk: Vec::new(),
             last_bulk: false,
             row_menu: None,
@@ -782,6 +787,61 @@ impl<E: Model> DataGrid<E> {
         usize::from(self.expandable(r)) + usize::from(self.selectable)
     }
 
+    /// The pinned column class of every cell position of a row (the leading cells, the shown
+    /// columns, the action cell), empty for cells that scroll. Pinned cells are found by class,
+    /// so the browser matches them with one lookup instead of `:nth-child` rules over every cell
+    /// of every grid; `grid-columns.js` puts the offsets in `--z-ps1..5` and `--z-pe1..3`.
+    fn pins(&self, r: &Render, cols: &[Shown]) -> Vec<&'static str> {
+        const START: [&str; 5] = [
+            " z-pin z-ps1",
+            " z-pin z-ps2",
+            " z-pin z-ps3",
+            " z-pin z-ps4",
+            " z-pin z-ps5",
+        ];
+        const START_EDGE: [&str; 5] = [
+            " z-pin z-ps1 z-pin-edge-s",
+            " z-pin z-ps2 z-pin-edge-s",
+            " z-pin z-ps3 z-pin-edge-s",
+            " z-pin z-ps4 z-pin-edge-s",
+            " z-pin z-ps5 z-pin-edge-s",
+        ];
+        const END: [&str; 3] = [" z-pin z-pe1", " z-pin z-pe2", " z-pin z-pe3"];
+        const END_EDGE: [&str; 3] = [
+            " z-pin z-pe1 z-pin-edge-e",
+            " z-pin z-pe2 z-pin-edge-e",
+            " z-pin z-pe3 z-pin-edge-e",
+        ];
+        let lead = self.lead(r);
+        let actions = usize::from(!self.row_actions.is_empty());
+        let mut pins = vec![""; lead + cols.len() + actions];
+        let starts = (lead
+            + cols
+                .iter()
+                .take_while(|s| s.pin == Some(Pin::Start))
+                .count())
+        .min(5);
+        let ends = (actions
+            + cols
+                .iter()
+                .rev()
+                .take_while(|s| s.pin == Some(Pin::End))
+                .count())
+        .min(3);
+        for (k, class) in pins.iter_mut().take(starts).enumerate() {
+            *class = if k + 1 == starts {
+                START_EDGE[k]
+            } else {
+                START[k]
+            };
+        }
+        let n = pins.len();
+        for k in 0..ends.min(n - starts) {
+            pins[n - 1 - k] = if k + 1 == ends { END_EDGE[k] } else { END[k] };
+        }
+        pins
+    }
+
     /// Puts the grid's scope filters in front of the client's.
     fn scoped(&self, query: &mut DataQuery) {
         if !self.scope.is_empty() {
@@ -895,9 +955,17 @@ impl<E: Model> DataGrid<E> {
                 cell: None,
                 editable: false,
                 plain: false,
+                wrap: false,
             });
         }
         grid
+    }
+
+    /// Shades every other row, for very wide grids where the eye loses the row. Rows are
+    /// divided by lines only unless set.
+    pub fn zebra(mut self) -> Self {
+        self.zebra = true;
+        self
     }
 
     pub fn mode(mut self, mode: DataMode) -> Self {
@@ -926,6 +994,7 @@ impl<E: Model> DataGrid<E> {
             cell: None,
             editable: false,
             plain: false,
+            wrap: false,
         });
         DataGridColumn {
             grid: self,
@@ -1231,16 +1300,20 @@ impl<E: Model> DataGrid<E> {
 
     /// Header row for the shown columns.
     fn head_row(&self, r: &Render, cols: &[Shown]) -> String {
+        let pins = self.pins(r, cols);
+        let lead = self.lead(r);
         let mut out = String::from("<tr>");
         if self.expandable(r) {
             out.push_str(&format!(
-                r#"<th scope="col" class="z-expand-col" data-pin="start"><span class="z-sr-only">{}</span></th>"#,
+                r#"<th scope="col" class="z-expand-col{}" data-pin="start"><span class="z-sr-only">{}</span></th>"#,
+                pins[0],
                 r.text(&Text::key("zeyn.grid.details"))
             ));
         }
         if self.selectable {
             out.push_str(&format!(
-                r#"<th scope="col" class="z-select-col" data-pin="start"><input type="checkbox" data-zeyn-select-all aria-label="{}"></th>"#,
+                r#"<th scope="col" class="z-select-col{}" data-pin="start"><input type="checkbox" data-zeyn-select-all aria-label="{}"></th>"#,
+                pins[lead - 1],
                 r.text(&Text::key("zeyn.grid.select_page"))
             ));
         }
@@ -1257,7 +1330,13 @@ impl<E: Model> DataGrid<E> {
                 c.meta.kind,
                 FieldKind::Integer | FieldKind::Money | FieldKind::Decimal
             );
-            let class = if num { r#" class="z-num""# } else { "" };
+            let pin = pins[lead + pos];
+            let class = match (num, pin.is_empty()) {
+                (true, true) => r#" class="z-num""#.to_string(),
+                (true, false) => format!(r#" class="z-num{pin}""#),
+                (false, true) => String::new(),
+                (false, false) => format!(r#" class="{}""#, pin.trim_start()),
+            };
             let sort = if c.sort {
                 r#" aria-sort="none""#
             } else {
@@ -1302,7 +1381,8 @@ impl<E: Model> DataGrid<E> {
         }
         if !self.row_actions.is_empty() {
             out.push_str(&format!(
-                r#"<th scope="col" class="z-actions-col" data-pin="end" aria-colindex="{}"><span class="z-sr-only">{}</span></th>"#,
+                r#"<th scope="col" class="z-actions-col{}" data-pin="end" aria-colindex="{}"><span class="z-sr-only">{}</span></th>"#,
+                pins[pins.len() - 1],
                 cols.len() + 1 + self.lead(r),
                 r.text(&Text::key("zeyn.grid.actions"))
             ));
@@ -1332,15 +1412,19 @@ impl<E: Model> DataGrid<E> {
             .detail
             .as_ref()
             .filter(|_| self.expandable(r));
+        let pins = self.pins(r, cols);
+        let lead = self.lead(r);
         let expand_cell = detail.map(|_| {
             format!(
-                r#"<td class="z-expand"><button type="button" class="z-expander" data-zeyn-expand aria-expanded="false" aria-label="{}" tabindex="-1"></button></td>"#,
+                r#"<td class="z-expand{}"><button type="button" class="z-expander" data-zeyn-expand aria-expanded="false" aria-label="{}" tabindex="-1"></button></td>"#,
+                pins[0],
                 r.text(&Text::key("zeyn.grid.details"))
             )
         });
         let select_cell = self.selectable.then(|| {
             format!(
-                r#"<td class="z-row-select"><input type="checkbox" data-zeyn-select tabindex="-1" aria-label="{}"></td>"#,
+                r#"<td class="z-row-select{}"><input type="checkbox" data-zeyn-select tabindex="-1" aria-label="{}"></td>"#,
+                pins[lead - 1],
                 r.text(&Text::key("zeyn.grid.select_row"))
             )
         });
@@ -1351,7 +1435,7 @@ impl<E: Model> DataGrid<E> {
             )
         });
         let actions_cell = (!self.row_actions.is_empty()).then(|| {
-            let mut cell = String::from(r#"<td class="z-row-actions">"#);
+            let mut cell = format!(r#"<td class="z-row-actions{}">"#, pins[pins.len() - 1]);
             for (i, a) in self.row_actions.iter().enumerate().filter(|(_, a)| r.can(&a.meta.access)) {
                 let label = r.text(&a.label);
                 let icon = a.icon.map(Icon::html).unwrap_or_default();
@@ -1475,12 +1559,26 @@ impl<E: Model> DataGrid<E> {
                     Value::Int(_) | Value::Money(_) | Value::Decimal(_) | Value::Number(_)
                 );
                 let first = tree && n == 0;
-                out.push_str(match (num, first) {
-                    (true, true) => r#"<td class="z-num z-tree-cell""#,
-                    (true, false) => r#"<td class="z-num""#,
-                    (false, true) => r#"<td class="z-tree-cell""#,
-                    (false, false) => "<td",
-                });
+                out.push_str("<td");
+                let pin = pins[lead + n];
+                if num || first || c.wrap || !pin.is_empty() {
+                    out.push_str(r#" class=""#);
+                    let mut sep = "";
+                    for (on, class) in [(num, "z-num"), (first, "z-tree-cell"), (c.wrap, "z-wrap")]
+                    {
+                        if on {
+                            out.push_str(sep);
+                            out.push_str(class);
+                            sep = " ";
+                        }
+                    }
+                    out.push_str(if sep.is_empty() {
+                        pin.trim_start()
+                    } else {
+                        pin
+                    });
+                    out.push('"');
+                }
                 if editable[n] {
                     out.push_str(r#" data-v=""#);
                     escape_into(&mut out, &crate::form::edit_value(&value, r.locale, r.tz));
@@ -1555,7 +1653,8 @@ impl<E: Model> DataGrid<E> {
         }
         let grid_text = |key: &str| r.text(&Text::key(format!("zeyn.grid.{key}")));
         out.push_str(&format!(
-            r#"<div class="z-grid" data-zeyn-grid data-testid="{scope}.grid" data-zeyn-action="{}" data-zeyn-mode="{}" data-zeyn-paging="{}" data-zeyn-page-size="{}" data-zeyn-openable="{}" data-zeyn-text-range="{}" data-zeyn-text-range-total="{}" data-zeyn-text-loaded="{}""#,
+            r#"<div class="z-grid{}" data-zeyn-grid data-testid="{scope}.grid" data-zeyn-action="{}" data-zeyn-mode="{}" data-zeyn-paging="{}" data-zeyn-page-size="{}" data-zeyn-openable="{}" data-zeyn-text-range="{}" data-zeyn-text-range-total="{}" data-zeyn-text-loaded="{}""#,
+            if self.zebra { " z-zebra" } else { "" },
             self.action.name,
             self.mode.code(),
             self.paging.code(),
@@ -1566,6 +1665,11 @@ impl<E: Model> DataGrid<E> {
             grid_text("loaded"),
         ));
         if let Paging::Virtual { row_height, .. } = self.paging {
+            let row_height = match (row_height, r.ctx.is_some_and(Ctx::compact)) {
+                (0, true) => 32,
+                (0, false) => 40,
+                (h, _) => h,
+            };
             out.push_str(&format!(
                 r#" data-zeyn-row-height="{row_height}" style="--z-row-height:{row_height}px""#
             ));
@@ -1688,18 +1792,43 @@ impl<E: Model> DataGrid<E> {
     /// Footer row with one cell per column. Cells of columns with totals carry `data-field` and
     /// `data-agg` (space separated ops) and show each total with its localized name.
     fn foot_row(&self, r: &Render, totals: &[Total], cols: &[Shown]) -> String {
+        let pins = self.pins(r, cols);
+        let lead = self.lead(r);
+        let empty = |pin: &str| {
+            if pin.is_empty() {
+                "<td></td>".to_string()
+            } else {
+                format!(r#"<td class="{}"></td>"#, pin.trim_start())
+            }
+        };
         let mut out = String::from("<tr>");
-        for _ in 0..self.lead(r) {
-            out.push_str("<td></td>");
+        for pin in &pins[..lead] {
+            out.push_str(&empty(pin));
         }
-        for c in cols
+        for (n, c) in cols
             .iter()
             .map(|s| &self.columns[s.index])
+            .enumerate()
         {
-            out.push_str(&self.total_cell(c, totals, r));
+            let cell = self.total_cell(c, totals, r);
+            let pin = pins[lead + n];
+            if pin.is_empty() {
+                out.push_str(&cell);
+            } else if let Some(rest) = cell.strip_prefix(r#"<td class=""#) {
+                out.push_str(&format!(
+                    r#"<td class="{}{rest}"#,
+                    pin.trim_start().to_string() + " "
+                ));
+            } else {
+                out.push_str(&format!(
+                    r#"<td class="{}"{}"#,
+                    pin.trim_start(),
+                    &cell[3..]
+                ));
+            }
         }
         if !self.row_actions.is_empty() {
-            out.push_str("<td></td>");
+            out.push_str(&empty(pins[pins.len() - 1]));
         }
         out.push_str("</tr>");
         out

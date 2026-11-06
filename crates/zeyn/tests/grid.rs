@@ -654,7 +654,7 @@ async fn saved_view_comes_back_on_the_next_page_load_with_its_sort_and_filters()
         .nth(1)
         .unwrap();
     assert!(
-        rows.starts_with("<tr data-zeyn-key=\"18\"><td>C-18</td><td class=\"z-num\">18</td></tr>"),
+        rows.starts_with("<tr data-zeyn-key=\"18\"><td class=\"z-pin z-ps1 z-pin-edge-s\">C-18</td><td class=\"z-num\">18</td></tr>"),
         "{}",
         &rows[..120]
     );
@@ -723,7 +723,7 @@ async fn grid_endpoint_renders_rows_and_header_in_the_requested_layout() {
     let j = r.json();
     assert_eq!(
         j["rows"],
-        "<tr data-zeyn-key=\"1\"><td class=\"z-num\">1</td><td class=\"z-num\">₺10.00</td></tr>"
+        "<tr data-zeyn-key=\"1\"><td class=\"z-num\">1</td><td class=\"z-num z-pin z-pe1 z-pin-edge-e\">₺10.00</td></tr>"
     );
     let head = j["head"].as_str().unwrap();
     assert!(head.find("qty").unwrap() < head.find("price").unwrap());
@@ -795,6 +795,21 @@ pub fn act() -> Screen {
     )
 }
 
+#[screen(route = "/act-status", permission = "items.read")]
+pub fn act_status() -> Screen {
+    Screen::new("Act status").body(
+        DataGrid::of(search)
+            .zebra()
+            .column(Item::code)
+            .wrap()
+            .column(Item::kind)
+            .status(|k| match k {
+                Kind::Tool => zeyn::Tone::Warning,
+                _ => zeyn::Tone::Success,
+            }),
+    )
+}
+
 #[screen(route = "/act-nested", permission = "items.read")]
 pub fn act_nested() -> Screen {
     Screen::new("Act nested").body(
@@ -827,6 +842,7 @@ fn act_router(identity: Identity) -> (Router, Store) {
         .feature(
             Feature::new("items")
                 .screen(act)
+                .screen(act_status)
                 .screen(act_nested)
                 .screen(sorted),
         )
@@ -840,6 +856,48 @@ fn run(key: &str, item: &str) -> Request<Body> {
         "/_zeyn/grid/run",
         serde_json::json!({ "screen": "act", "node": 0, "key": key, "item": item }),
     )
+}
+
+#[test]
+fn pinned_cells_are_found_by_class_not_by_position() {
+    let css = include_str!("../assets/zeyn.css");
+    assert!(
+        !css.contains(":nth-child(-n +") && !css.contains("tr > :nth-child("),
+        "positional rules match every cell of every grid and cost about a third of style time"
+    );
+    for class in [".z-ps1 {", ".z-ps5 {", ".z-pe3 {", ":where(.z-grid .z-pin)"] {
+        assert!(css.contains(class), "{class}");
+    }
+}
+
+#[tokio::test]
+async fn status_cells_draw_a_dot_and_zebra_and_wrap_are_opt_in() {
+    let (router, _) = act_router(reader());
+    let r = send(&router, get("/act-status")).await;
+    assert!(
+        r.body
+            .contains(r#"<span class="z-badge z-badge-dot z-tone-warning">Tool</span>"#)
+    );
+    assert!(
+        r.body
+            .contains(r#"<span class="z-badge z-badge-dot z-tone-success">Part</span>"#)
+    );
+    assert!(
+        r.body
+            .contains(r#"<div class="z-grid z-zebra" data-zeyn-grid"#)
+    );
+    assert!(
+        r.body
+            .contains(r#"<td class="z-wrap">"#)
+    );
+    let plain = send(&router, get("/act")).await;
+    assert!(
+        plain
+            .body
+            .contains(r#"<div class="z-grid" data-zeyn-grid"#)
+            && !plain.body.contains("z-wrap"),
+        "zebra rows and wrapping are opt in"
+    );
 }
 
 #[tokio::test]
@@ -875,7 +933,7 @@ async fn row_action_buttons_show_only_with_the_actions_permission() {
     let r = send(&router, get("/act")).await;
     assert!(
         r.body
-            .contains(r#"<td class="z-row-actions"></td>"#)
+            .contains(r#"<td class="z-row-actions z-pin z-pe1 z-pin-edge-e"></td>"#)
     );
     assert!(!r.body.contains("data-zeyn-run="));
     let writer = Identity::user("w").with_permissions(["items.read", "items.write"]);
@@ -1073,7 +1131,7 @@ async fn selectable_grid_renders_checkboxes_and_a_bar_with_permitted_actions_onl
     assert!(r.body.contains("data-zeyn-select-all"));
     assert!(
         r.body
-            .contains(r#"<td class="z-row-select"><input type="checkbox" data-zeyn-select"#)
+            .contains(r#"<td class="z-row-select z-pin z-ps1 z-pin-edge-s"><input type="checkbox" data-zeyn-select"#)
     );
     assert!(
         r.body
@@ -1747,7 +1805,9 @@ async fn rows_expand_into_a_typed_detail_screen_only_for_users_who_may_open_it()
         .find(r#"data-zeyn-node="1""#)
         .unwrap()];
     assert!(
-        paged.contains(r#"<th scope="col" class="z-expand-col" data-pin="start">"#),
+        paged.contains(
+            r#"<th scope="col" class="z-expand-col z-pin z-ps1 z-pin-edge-s" data-pin="start">"#
+        ),
         "{paged}"
     );
     assert!(paged.contains(r#"data-field="code" aria-sort="none" aria-colindex="2""#));
@@ -2259,10 +2319,11 @@ async fn columns_without_sorting_get_no_sort_button_and_the_server_drops_their_s
     );
 }
 
-/// Rows as `rows_html` rendered them before the row renderer wrote straight into its output:
-/// every value kind, escaping, editable cells with `data-v`, keys, versions, an open effect and
+/// Rows as `rows_html` renders them (the row renderer writes straight into its output; the
+/// pinned action cell carries its pin class): every value kind, escaping, editable cells with
+/// `data-v`, keys, versions, an open effect and
 /// a row action.
-const ROWS_BEFORE: &str = r##"<tr tabindex="-1" data-zeyn-effect="{&quot;effect&quot;:&quot;toast&quot;,&quot;message&quot;:&quot;open &lt;a href=\&quot;x\&quot;&gt;&amp;&#39;&lt;/a&gt;&quot;}" data-zeyn-key="3" data-zeyn-version="1"><td class="z-num">3</td><td data-v="&lt;a href=&quot;x&quot;&gt;&amp;&#39;&lt;/a&gt;">&lt;a href=&quot;x&quot;&gt;&amp;&#39;&lt;/a&gt;</td><td>Tool</td><td class="z-num" data-v="30.00">₺30.00</td><td class="z-num">3</td><td data-v="false">No</td><td><time datetime="2026-01-03">1/3/2026</time></td><td></td><td>note 3</td><td class="z-row-actions"><button type="button" class="z-row-action" data-zeyn-run="a0" tabindex="-1"><span>Bump</span></button></td></tr><tr tabindex="-1" data-zeyn-effect="{&quot;effect&quot;:&quot;toast&quot;,&quot;message&quot;:&quot;open C-04&quot;}" data-zeyn-key="4" data-zeyn-version="1"><td class="z-num">4</td><td data-v="C-04">C-04</td><td>Part</td><td class="z-num" data-v="40.00">₺40.00</td><td class="z-num">4</td><td data-v="true">Yes</td><td><time datetime="2026-01-04">1/4/2026</time></td><td><time datetime="2026-03-04">3/4/2026</time></td><td>ünïcode ✓ &amp; &quot;quoted&quot;</td><td class="z-row-actions"><button type="button" class="z-row-action" data-zeyn-run="a0" tabindex="-1"><span>Bump</span></button></td></tr><tr tabindex="-1" data-zeyn-effect="{&quot;effect&quot;:&quot;toast&quot;,&quot;message&quot;:&quot;open C-05&quot;}" data-zeyn-key="5" data-zeyn-version="1"><td class="z-num">5</td><td data-v="C-05">C-05</td><td>Food</td><td class="z-num" data-v="-12,345.67">-₺12,345.67</td><td class="z-num">5</td><td data-v="false">No</td><td><time datetime="2026-01-05">1/5/2026</time></td><td></td><td>note 5</td><td class="z-row-actions"><button type="button" class="z-row-action" data-zeyn-run="a0" tabindex="-1"><span>Bump</span></button></td></tr>"##;
+const ROWS_BEFORE: &str = r##"<tr tabindex="-1" data-zeyn-effect="{&quot;effect&quot;:&quot;toast&quot;,&quot;message&quot;:&quot;open &lt;a href=\&quot;x\&quot;&gt;&amp;&#39;&lt;/a&gt;&quot;}" data-zeyn-key="3" data-zeyn-version="1"><td class="z-num">3</td><td data-v="&lt;a href=&quot;x&quot;&gt;&amp;&#39;&lt;/a&gt;">&lt;a href=&quot;x&quot;&gt;&amp;&#39;&lt;/a&gt;</td><td>Tool</td><td class="z-num" data-v="30.00">₺30.00</td><td class="z-num">3</td><td data-v="false">No</td><td><time datetime="2026-01-03">1/3/2026</time></td><td></td><td>note 3</td><td class="z-row-actions z-pin z-pe1 z-pin-edge-e"><button type="button" class="z-row-action" data-zeyn-run="a0" tabindex="-1"><span>Bump</span></button></td></tr><tr tabindex="-1" data-zeyn-effect="{&quot;effect&quot;:&quot;toast&quot;,&quot;message&quot;:&quot;open C-04&quot;}" data-zeyn-key="4" data-zeyn-version="1"><td class="z-num">4</td><td data-v="C-04">C-04</td><td>Part</td><td class="z-num" data-v="40.00">₺40.00</td><td class="z-num">4</td><td data-v="true">Yes</td><td><time datetime="2026-01-04">1/4/2026</time></td><td><time datetime="2026-03-04">3/4/2026</time></td><td>ünïcode ✓ &amp; &quot;quoted&quot;</td><td class="z-row-actions z-pin z-pe1 z-pin-edge-e"><button type="button" class="z-row-action" data-zeyn-run="a0" tabindex="-1"><span>Bump</span></button></td></tr><tr tabindex="-1" data-zeyn-effect="{&quot;effect&quot;:&quot;toast&quot;,&quot;message&quot;:&quot;open C-05&quot;}" data-zeyn-key="5" data-zeyn-version="1"><td class="z-num">5</td><td data-v="C-05">C-05</td><td>Food</td><td class="z-num" data-v="-12,345.67">-₺12,345.67</td><td class="z-num">5</td><td data-v="false">No</td><td><time datetime="2026-01-05">1/5/2026</time></td><td></td><td>note 5</td><td class="z-row-actions z-pin z-pe1 z-pin-edge-e"><button type="button" class="z-row-action" data-zeyn-run="a0" tabindex="-1"><span>Bump</span></button></td></tr>"##;
 
 #[test]
 fn row_html_stays_byte_for_byte_the_same() {

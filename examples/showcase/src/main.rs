@@ -92,6 +92,7 @@ async fn main() -> std::io::Result<()> {
     let mut app = App::new(t!("app.name"))
         .plugin(CompanyStandard { config: config.clone() })
         .client_prefs(|p| p.key(media::EXTERNAL_VIDEO))
+        .header(|h| h.breadcrumb().search().account())
         .theme(Theme::new().radius(6))
         .themes([
             Theme::light(),
