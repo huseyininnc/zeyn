@@ -58,14 +58,14 @@
 .z-cards-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 160px), 1fr));
-  gap: 16px;
+  gap: var(--z-gap);
 }
 
 .z-rail-list {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: clamp(132px, 42%, 200px);
-  gap: 16px;
+  gap: var(--z-gap);
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scroll-snap-type: x proximity;
@@ -391,7 +391,7 @@ a.z-poster-link:focus-visible {
 
 @supports (width: calc(100cqi / 1px * 1px)) {
   .z-cards-list > .z-poster {
-    --z-card-column: calc((100cqi + 16px) / max(1, round(down, (100cqi + 16px) / 176px, 1)) - 16px);
+    --z-card-column: calc((100cqi + var(--z-gap)) / max(1, round(down, (100cqi + var(--z-gap)) / (160px + var(--z-gap)), 1)) - var(--z-gap));
   }
 }
 
