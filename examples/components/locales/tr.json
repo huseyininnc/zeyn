@@ -100,7 +100,8 @@
       "clear_prefs": "Tarayıcının uygulama için tuttuğu seçimleri silen düğme.",
       "diff_view": "Bir kayıtta değişen alanlar, eski ve yeni yan yana ya da satır içinde.",
       "code_view": "Salt okunur kod ve JSON, sunucuda renklendirilmiş, numaralı ve katlanır.",
-      "barcode": "Sunucuda SVG olarak çizilen Code 128 barkodları ve QR kodları."
+      "barcode": "Sunucuda SVG olarak çizilen Code 128 barkodları ve QR kodları.",
+      "inbox": "Güne göre bildirimler, toplu okundu işaretleme ve arşivleme, okunmamış sayısıyla zil."
     },
     "ex": {
       "action_button": {
@@ -355,6 +356,10 @@
         "overview": "Örnek",
         "levels": "Hata düzeltme düzeyleri",
         "digits": "Rakamlar"
+      },
+      "inbox": {
+        "overview": "Örnek",
+        "bell": "Bildirim zili"
       }
     }
   }

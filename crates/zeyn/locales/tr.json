@@ -575,6 +575,24 @@
       "barcode": {
         "code128_invalid": "Bu değer barkod olarak gösterilemez: 1 ile 80 arasında yazdırılabilir ASCII karakter olmalıdır.",
         "qr_too_long": "Bu değer QR kod için fazla uzun."
+      },
+      "inbox": {
+        "label": "Bildirimler",
+        "today": "Bugün",
+        "yesterday": "Dün",
+        "empty": "Bildirim yok",
+        "unread": "Okunmamış",
+        "unread_count": "{n} okunmamış",
+        "select": "Seç",
+        "select_all": "Tümünü seç",
+        "actions": "Bildirim işlemleri",
+        "mark_read": "Okundu olarak işaretle",
+        "archive": "Arşivle",
+        "selected": "{n} seçili",
+        "done": "{n} bildirim için yapıldı",
+        "bell": "Bildirimler",
+        "bell_count": "Bildirimler, {n} okunmamış",
+        "bell_many": "Bildirimler, 99'dan fazla okunmamış"
       }
     },
     "date": {

@@ -2,13 +2,15 @@
 //! center, Kanban boards and calendars.
 
 use axum::body::Body;
-use axum::http::{HeaderMap, Request, StatusCode};
+use axum::http::{HeaderMap, Request, StatusCode, header};
 use http_body_util::BodyExt;
+use std::sync::{Arc, Mutex};
 use tower::ServiceExt;
 use zeyn::prelude::*;
 use zeyn::ui::{
-    Barcode, CodeLang, CodeView, DiffLayout, DiffView, JsonView, MAX_CODE_LINES, QrCode, QrLevel,
-    QrMatrix, code128_symbols, highlight, qr_error_correction, qr_format_bits, qr_version_bits,
+    Barcode, CodeLang, CodeView, DiffLayout, DiffView, Inbox, InboxSelection, JsonView, ListItem,
+    MAX_CODE_LINES, NotificationCenter, QrCode, QrLevel, QrMatrix, UnreadCount, code128_symbols,
+    highlight, qr_error_correction, qr_format_bits, qr_version_bits,
 };
 use zeyn::{Component, FieldChange, I18n, Identity, Render};
 
@@ -242,16 +244,79 @@ fn a_qr_code_renders_with_four_quiet_modules_and_a_label() {
     assert!(html(&QrCode::new("x".repeat(3000))).contains("z-barcode-error"));
 }
 
+#[entity(table = "notes")]
+pub struct Note {
+    #[key]
+    pub id: NoteId,
+    pub title: String,
+    pub created_at: DateTime,
+    pub read: bool,
+}
+
+#[derive(Clone, Default)]
+pub struct Notes(Arc<Mutex<Vec<Note>>>);
+
+impl Service for Notes {}
+
+impl Notes {
+    fn seeded() -> Notes {
+        let now = DateTime::now();
+        let day = 86_400_000;
+        let note = |id: i64, title: &str, ago: i64, read: bool| Note {
+            id: NoteId(id),
+            title: title.into(),
+            created_at: now.add_ms(-ago),
+            read,
+        };
+        Notes(Arc::new(Mutex::new(vec![
+            note(1, "Invoice <paid>", 60_000, false),
+            note(2, "Stock low", day, true),
+            note(3, "Report ready", 5 * day, false),
+        ])))
+    }
+}
+
+#[action(permission = "notes.read")]
+pub async fn search_notes(q: DataQuery, notes: Notes) -> Result<Page<Note>> {
+    Ok(q.apply(notes.0.lock().unwrap().clone()))
+}
+
+#[action(permission = "notes.write")]
+pub async fn mark_notes_read(s: InboxSelection, notes: Notes) -> Result<()> {
+    for n in notes.0.lock().unwrap().iter_mut() {
+        if s.ids.contains(&n.id.0.to_string()) {
+            n.read = true;
+        }
+    }
+    Ok(())
+}
+
+#[action(permission = "notes.write")]
+pub async fn archive_notes(s: InboxSelection, notes: Notes) -> Result<()> {
+    notes
+        .0
+        .lock()
+        .unwrap()
+        .retain(|n| !s.ids.contains(&n.id.0.to_string()));
+    Ok(())
+}
+
+#[action(permission = "notes.read")]
+pub async fn count_unread(q: UnreadCount, notes: Notes) -> Result<u32> {
+    let n = notes
+        .0
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|n| !n.read)
+        .take(q.limit as usize)
+        .count();
+    Ok(n as u32)
+}
+
 #[screen(route = "/plain", permission = "admin.read")]
 pub fn plain() -> Screen {
     Screen::new("Plain").body(Paragraph::new("Only text"))
-}
-
-#[screen(route = "/labels", permission = "admin.read")]
-pub fn labels() -> Screen {
-    Screen::new("Labels")
-        .body(Barcode::code128("SO-1042"))
-        .body(CodeView::new(CodeLang::Json, "{}"))
 }
 
 #[screen(route = "/history", permission = "admin.read")]
@@ -262,29 +327,59 @@ pub fn history() -> Screen {
     ))
 }
 
-fn app() -> axum::Router {
+#[screen(route = "/labels", permission = "admin.read")]
+pub fn labels() -> Screen {
+    Screen::new("Labels")
+        .body(Barcode::code128("SO-1042"))
+        .body(CodeView::new(CodeLang::Json, "{}"))
+}
+
+#[screen(route = "/inbox", permission = "admin.read")]
+pub fn inbox() -> Screen {
+    Screen::new("Inbox").body(
+        Card::new().add(
+            Inbox::of(search_notes)
+                .title("Inbox")
+                .when(Note::created_at)
+                .read(Note::read)
+                .item(|n: &Note| ListItem::new(n.title.clone()))
+                .mark_read(mark_notes_read)
+                .archive(archive_notes),
+        ),
+    )
+}
+
+const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+fn app(notes: Notes) -> axum::Router {
     App::new("Admin")
         .i18n(I18n::new("en"))
-        .auth(|_: &HeaderMap| Some(Identity::user("u").with_permissions(["admin.read"])))
+        .service(notes)
+        .auth(|h: &HeaderMap| {
+            let perms: Vec<String> = h
+                .get("x-perms")?
+                .to_str()
+                .ok()?
+                .split(',')
+                .map(String::from)
+                .collect();
+            Some(Identity::user("u").with_permissions(perms))
+        })
+        .header(|h| h.end(NotificationCenter::of(count_unread, inbox, ())))
         .feature(
             Feature::new("admin")
                 .screen(plain)
                 .screen(history)
-                .screen(labels),
+                .screen(labels)
+                .screen(inbox),
         )
         .router()
         .unwrap()
 }
 
-async fn get(path: &str) -> (StatusCode, String) {
-    let res = app()
-        .oneshot(
-            Request::get(path)
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .unwrap();
+const ALL: &str = "admin.read,notes.read,notes.write";
+
+async fn body(res: axum::response::Response) -> (StatusCode, String) {
     let status = res.status();
     let bytes = res
         .into_body()
@@ -295,12 +390,74 @@ async fn get(path: &str) -> (StatusCode, String) {
     (status, String::from_utf8_lossy(&bytes).into_owned())
 }
 
+async fn get_as(router: &axum::Router, path: &str, perms: &str) -> (StatusCode, String) {
+    let res = router
+        .clone()
+        .oneshot(
+            Request::get(path)
+                .header("x-perms", perms)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    body(res).await
+}
+
+async fn get(path: &str) -> (StatusCode, String) {
+    get_as(&app(Notes::seeded()), path, ALL).await
+}
+
+/// Calls `POST /_zeyn/data`, with the CSRF header unless `csrf` is `Csrf::Missing`.
+async fn data(
+    router: &axum::Router,
+    perms: &str,
+    csrf: Csrf,
+    call: serde_json::Value,
+) -> (StatusCode, String) {
+    let mut req = Request::post("/_zeyn/data")
+        .header("x-perms", perms)
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::COOKIE, format!("zeyn_csrf={TOKEN}"));
+    if csrf == Csrf::Sent {
+        req = req.header("x-zeyn-csrf", TOKEN);
+    }
+    let res = router
+        .clone()
+        .oneshot(
+            req.body(Body::from(call.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    body(res).await
+}
+
+#[derive(PartialEq, Clone, Copy)]
+enum Csrf {
+    Sent,
+    Missing,
+}
+
 #[tokio::test]
 async fn admin_stylesheets_and_scripts_load_only_on_pages_that_use_them() {
-    let (_, text) = get("/plain").await;
-    for name in ["diff.css", "code.css", "barcode.css"] {
+    let router = app(Notes::seeded());
+    let (_, text) = get_as(&router, "/plain", "admin.read").await;
+    for name in ["diff.css", "code.css", "barcode.css", "topics.js"] {
         assert!(!text.contains(&format!("/_zeyn/{name}")), "{name}");
     }
+    assert!(
+        text.contains("/_zeyn/inbox.js?v=") && text.contains("/_zeyn/inbox.css?v="),
+        "the bell of the top bar is on every page and brings its module"
+    );
+    let bare = App::new("Bare")
+        .i18n(I18n::new("en"))
+        .auth(|_: &HeaderMap| Some(Identity::user("u").with_permissions(["admin.read"])))
+        .feature(Feature::new("admin").screen(plain))
+        .router()
+        .unwrap();
+    let (_, text) = get_as(&bare, "/plain", "admin.read").await;
+    assert!(!text.contains("/_zeyn/inbox."), "no bell, no inbox module");
     let (status, page) = get("/history").await;
     assert_eq!(status, StatusCode::OK);
     assert!(page.contains("/_zeyn/diff.css?v="));
@@ -314,4 +471,126 @@ async fn admin_stylesheets_and_scripts_load_only_on_pages_that_use_them() {
         "the copy button brings share.js"
     );
     assert!(!shown.contains("/_zeyn/diff.css"));
+}
+
+#[tokio::test]
+async fn the_inbox_groups_by_day_marks_unread_and_escapes() {
+    let (status, page) = get("/inbox").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(page.contains(">Today</h3>") && page.contains(">Yesterday</h3>"));
+    assert_eq!(
+        page.matches(r#"class="z-inbox-day""#)
+            .count(),
+        3
+    );
+    assert_eq!(
+        page.matches("z-inbox-item z-inbox-unread")
+            .count(),
+        2
+    );
+    assert!(page.contains("2 unread"));
+    assert!(page.contains("Invoice &lt;paid&gt;") && !page.contains("<paid>"));
+    assert!(
+        page.contains(r#"data-zeyn-inbox-run="read""#)
+            && page.contains(r#"data-zeyn-inbox-run="archive""#)
+    );
+    assert!(page.contains(r#"data-zeyn-listens="notifications""#));
+    assert!(page.contains("/_zeyn/inbox.js?v=") && page.contains("/_zeyn/inbox.css?v="));
+    assert!(
+        page.contains("/_zeyn/topics.js?v="),
+        "the inbox refreshes through topics"
+    );
+    assert!(
+        page.contains(r#"data-zeyn-notify="notifications""#),
+        "the bell is in the top bar"
+    );
+    let (_, reader) = get_as(&app(Notes::seeded()), "/inbox", "admin.read,notes.read").await;
+    assert!(
+        !reader.contains("data-zeyn-inbox-run"),
+        "no buttons without the write permission"
+    );
+    assert!(!reader.contains(r#"class="z-inbox-check""#), "{reader}");
+}
+
+#[tokio::test]
+async fn bulk_actions_need_csrf_the_permission_and_a_bounded_selection() {
+    let notes = Notes::seeded();
+    let router = app(notes.clone());
+    let call = |key: &str, ids: serde_json::Value| serde_json::json!({ "screen": "inbox", "params": null, "node": "0.0", "key": key, "input": { "ids": ids } });
+    let (status, _) = data(
+        &router,
+        ALL,
+        Csrf::Missing,
+        call("read", serde_json::json!(["1"])),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let (status, _) = data(
+        &router,
+        "admin.read,notes.read",
+        Csrf::Sent,
+        call("read", serde_json::json!(["1"])),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let many: Vec<String> = (0..=zeyn::ui::MAX_INBOX)
+        .map(|i| i.to_string())
+        .collect();
+    let (status, _) = data(
+        &router,
+        ALL,
+        Csrf::Sent,
+        call("read", serde_json::json!(many)),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    let (status, body) = data(
+        &router,
+        ALL,
+        Csrf::Sent,
+        call("read", serde_json::json!(["1", "3"])),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert!(body.contains(r#""done":2"#));
+    assert!(
+        notes
+            .0
+            .lock()
+            .unwrap()
+            .iter()
+            .all(|n| n.read)
+    );
+    let (status, _) = data(
+        &router,
+        ALL,
+        Csrf::Sent,
+        call("archive", serde_json::json!(["2"])),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(notes.0.lock().unwrap().len(), 2);
+    let (status, _) = data(
+        &router,
+        ALL,
+        Csrf::Sent,
+        call("delete", serde_json::json!(["1"])),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn the_bell_counts_unread_in_the_top_bar_with_the_actions_permission() {
+    let router = app(Notes::seeded());
+    let count = serde_json::json!({ "screen": "_app", "params": null, "node": "2.0", "key": "count", "input": null });
+    let (status, body) = data(&router, ALL, Csrf::Sent, count.clone()).await;
+    if status == StatusCode::NOT_FOUND {
+        let (_, page) = get("/plain").await;
+        panic!("the bell's node path is not 2: {page}");
+    }
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert!(body.contains(r#""unread":2"#));
+    let (status, _) = data(&router, "admin.read", Csrf::Sent, count).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
 }

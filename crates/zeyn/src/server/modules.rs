@@ -168,6 +168,12 @@ pub(crate) const MODULES: &[Module] = &[
     style("diff", &["z-diff"]),
     style("code", &["z-codeview"]),
     style("barcode", &["z-barcode"]),
+    Module {
+        name: "inbox",
+        script: &["data-zeyn-inbox", "data-zeyn-notify"],
+        style: &["z-inbox", "z-notify"],
+        needs: &[],
+    },
 ];
 
 const _: () = assert!(MODULES.len() <= 64, "Used keeps one bit per module");
@@ -176,7 +182,7 @@ const _: () = assert!(MODULES.len() <= 64, "Used keeps one bit per module");
 /// are linked only when the page uses them; the others style components without markers of
 /// their own (layouts, display widgets, form sections, the palette) and every page links them,
 /// as `zeyn.css` and `enterprise.css`.
-const STYLES: [&str; 10] = [
+const STYLES: [&str; 11] = [
     "components",
     "catalog",
     "content",
@@ -187,6 +193,7 @@ const STYLES: [&str; 10] = [
     "diff",
     "code",
     "barcode",
+    "inbox",
 ];
 
 /// The modules a page uses, one bit each in the order of [`MODULES`].
@@ -351,7 +358,9 @@ pub(crate) fn runtime(js: &'static str) -> &'static str {
 
 /// Script and style files of component modules, by path; the others are served next to their
 /// endpoints.
-const FILES: [(&str, &str); 25] = [
+const FILES: [(&str, &str); 27] = [
+    ("/_zeyn/inbox.css", include_str!("../../assets/inbox.css")),
+    ("/_zeyn/inbox.js", include_str!("../../assets/inbox.js")),
     (
         "/_zeyn/barcode.css",
         include_str!("../../assets/barcode.css"),

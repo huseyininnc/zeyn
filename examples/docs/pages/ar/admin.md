@@ -52,3 +52,32 @@ Row::new()
 يرمّز `Barcode` من 1 إلى 80 محرفًا من محارف ASCII القابلة للطباعة (`MAX_BARCODE_CHARS`)، ويحزم سلاسل الأرقام رقمين في كل رمز (مجموعة الرموز C)، مع رمز التحقق ومنطقة هادئة من 10 وحدات على كل جانب. ويرمّز `QrCode` النص بايتات UTF-8 بأصغر إصدار (من 1 إلى 40) يتسع له عند المستوى المختار (`QrLevel::Low`، و`Medium` افتراضيًا، و`Quartile`، و`High`)، مع تصحيح أخطاء ريد سولومون، والقناع الأقل عقوبة، ومنطقة هادئة من 4 وحدات؛ و`MAX_QR_BYTES` (2,953) بايت على الأكثر. القيمة التي لا يمكن ترميزها تعرض ملاحظة قصيرة بدلًا من رمز معطوب.
 
 كل رمز عنصر figure تسمعه قارئات الشاشة صورةً واحدة اسمها النص الذي تحتها: القيمة نفسها، أو `.label(text)` عند تحديده. تبقى الأشرطة سوداء على لوحة بيضاء في السمتين، لأن الماسحات تحتاج إلى أشرطة داكنة على خلفية فاتحة. لا يُحمَّل `barcode.css` (1 KB) إلا مع هذه المكونات؛ ويحدد `.height(px)` و`.size(px)` حجم الرسم، ويصغر الرمز في الحاوية الضيقة.
+
+## Inbox و NotificationCenter
+
+يعرض `Inbox` إشعارات المستخدم، الأحدث أولًا، مجمّعةً حسب اليوم في المنطقة الزمنية للمستخدم (اليوم، أمس، ثم التواريخ)، مع تعليم غير المقروءة. تأتي الصفوف من إجراء من النوع نفسه الذي يستخدمه DataGrid (يدخل `DataQuery` ويخرج `Page`)؛ ويرتّب صندوق الوارد حسب حقل الوقت ويطلب `.limit(n)` صفًا على الأكثر (50، وبحد أقصى `MAX_INBOX` أي 200). أما `NotificationCenter` فهو جرس الشريط العلوي: رابط إلى شاشة صندوق الوارد مع عدد غير المقروء.
+
+```rust
+#[action(permission = "notes.write")]
+pub async fn mark_notes_read(s: InboxSelection, store: Notes, ctx: Ctx) -> Result<()> {
+    store.mark_read(ctx.identity(), &s.ids)
+}
+
+#[action(permission = "notes.read")]
+pub async fn count_unread(q: UnreadCount, store: Notes, ctx: Ctx) -> Result<u32> {
+    store.count_unread(ctx.identity(), q.limit)
+}
+
+Inbox::of(my_notifications)
+    .when(Note::created_at)
+    .read(Note::read)
+    .item(|n: &Note| ListItem::new(n.title.clone()).subtitle(n.body.clone()))
+    .mark_read(mark_notes_read)
+    .archive(archive_notes)
+
+App::new("Admin").header(|h| h.end(NotificationCenter::of(count_unread, inbox, ())))
+```
+
+مع `.mark_read(action)` و`.archive(action)` يحصل كل صف على مربع اختيار، ويحصل صندوق الوارد على شريط أدوات فيه "تحديد الكل". ترسل الأزرار المفاتيح المختارة بصفتها `InboxSelection` عبر `POST /_zeyn/data`، الذي يتحقق من CSRF، ويُحتسب ضمن حد الكتابة، ويتحقق من صلاحية الوصول إلى الشاشة وإذن الإجراء؛ ولا يقبل أكثر من 200 مفتاح طول كل منها 200 محرف على الأكثر. تأتي المفاتيح من المتصفح، لذا لا يغيّر الإجراء إلا إشعارات `ctx.identity()`. تُحذف الأزرار التي لا يحق للمستخدم تشغيلها، ومعها مربعات الاختيار.
+
+بعد إجراء جماعي يُعلن صندوق الوارد موضوعه (`"notifications"`، ويُغيَّر بـ `.topic(..)`): فيُعاد رسم صندوق الوارد وكل عقدة تستمع إليه بـ `.listens` في مكانها، ويعيد الجرس تحميل عدده. يعدّ الجرس بإجراء يأخذ `UnreadCount { limit }` ويتوقف عند الحد (100)، أي باستعلام واحد محدود؛ وفوق 99 يعرض `99+`، ويذكر اسم الرابط العدد لقارئات الشاشة. يحمّل العدد بطلب واحد بعد ظهور الصفحة، ثم من جديد عندما يُعلن موضوعه صندوقُ وارد، أو `ui.refresh("notifications")`، أو مع `.live()` وميزة `realtime` أي إجراء يستدعي `hub.notify(&ctx, "notifications")` (صرّح بالموضوع باستخدام `Realtime::topic`). لا يُحمَّل `inbox.js` (6.1 KB، و2.3 KB مع gzip) و`inbox.css` (3.1 KB) إلا مع المكونات.

@@ -52,3 +52,32 @@ Row::new()
 `Barcode` encodes 1 to 80 printable ASCII characters (`MAX_BARCODE_CHARS`) and packs runs of digits two to a symbol (code set C), with the check symbol and 10 modules of quiet zone on each side. `QrCode` encodes the text as UTF-8 bytes at the smallest version (1 to 40) that holds it at the chosen level (`QrLevel::Low`, `Medium` by default, `Quartile`, `High`), with Reed Solomon error correction, the mask with the lowest penalty and 4 modules of quiet zone; at most `MAX_QR_BYTES` (2,953) bytes. A value that cannot be encoded shows a short notice instead of a broken symbol.
 
 Each symbol is a figure that screen readers hear as one image named by the text under it: the value, or `.label(text)` when it is set. The bars stay black on a white plate in both themes, because scanners need dark bars on a light ground. `barcode.css` (1 KB) loads only with the components; `.height(px)` and `.size(px)` set the drawn size, and the symbol shrinks with a narrow container.
+
+## Inbox and NotificationCenter
+
+`Inbox` lists the user's notifications, newest first, grouped by day in the user's time zone (today, yesterday, then dates), with unread ones marked. Rows come from the same kind of action a DataGrid uses (`DataQuery` in, `Page` out); the inbox sorts by the time field and asks for at most `.limit(n)` rows (50, at most `MAX_INBOX`, 200). `NotificationCenter` is the bell of the top bar: a link to the inbox screen with the unread count.
+
+```rust
+#[action(permission = "notes.write")]
+pub async fn mark_notes_read(s: InboxSelection, store: Notes, ctx: Ctx) -> Result<()> {
+    store.mark_read(ctx.identity(), &s.ids)
+}
+
+#[action(permission = "notes.read")]
+pub async fn count_unread(q: UnreadCount, store: Notes, ctx: Ctx) -> Result<u32> {
+    store.count_unread(ctx.identity(), q.limit)
+}
+
+Inbox::of(my_notifications)
+    .when(Note::created_at)
+    .read(Note::read)
+    .item(|n: &Note| ListItem::new(n.title.clone()).subtitle(n.body.clone()))
+    .mark_read(mark_notes_read)
+    .archive(archive_notes)
+
+App::new("Admin").header(|h| h.end(NotificationCenter::of(count_unread, inbox, ())))
+```
+
+With `.mark_read(action)` and `.archive(action)` every row gets a check box and the inbox a toolbar with "Select all". The buttons send the chosen keys as an `InboxSelection` through `POST /_zeyn/data`, which checks CSRF, counts against the write limit and checks the screen's access and the action's permission; at most 200 keys of 200 characters each are taken. The keys come from the browser, so the action changes only notifications of `ctx.identity()`. Buttons the user may not run are left out, check boxes too.
+
+After a bulk action the inbox names its topic (`"notifications"`, `.topic(..)` to change it): the inbox and every node that `.listens` to it render again in place, and the bell loads its count again. The bell counts with an action that takes `UnreadCount { limit }` and stops at the limit (100), one bounded query; above 99 it shows `99+`, and the link's name says the count for screen readers. It loads the count with one request after the page shows and again when its topic is named by an inbox, by `ui.refresh("notifications")` or, with `.live()` and the `realtime` feature, by `hub.notify(&ctx, "notifications")` from any action (declare the topic with `Realtime::topic`). `inbox.js` (6.1 KB, 2.3 KB gzip) and `inbox.css` (3.1 KB) load only with the components.

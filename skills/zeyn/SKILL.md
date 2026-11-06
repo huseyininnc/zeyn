@@ -256,6 +256,10 @@ What to remember:
   masked fields); never build highlighted HTML yourself.
 - Labels and tickets: `Barcode::code128(order.number.clone())`, `QrCode::new(url).label(t!("..."))`;
   never pull in a barcode crate or draw one in JavaScript.
+- Notifications: `Inbox::of(action).when(Note::created_at).read(Note::read).item(..)` with
+  `.mark_read(action)` and `.archive(action)` (input `InboxSelection`; change only rows of
+  `ctx.identity()`); the bell is `h.end(NotificationCenter::of(count_unread, inbox, ()))` with a
+  count action that takes `UnreadCount` and stops at `q.limit`.
 - The app (`src/app.rs`): `App::new(t!("app.name")).i18n(i18n).service(store).feature(sales::feature())`,
   plus what the app needs: `.auth(...)`, `.mcp(Mcp::read_only())`, `.themes([...])`,
   `.datagrid_views(store)`, `.assistant(...)`.

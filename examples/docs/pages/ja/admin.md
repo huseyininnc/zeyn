@@ -52,3 +52,32 @@ Row::new()
 `Barcode` は印字可能な ASCII 文字を 1 から 80 文字（`MAX_BARCODE_CHARS`）エンコードし、数字の連続は 1 シンボルに 2 桁ずつ詰めます（コードセット C）。チェックシンボルと両側 10 モジュールのクワイエットゾーンを付けます。`QrCode` はテキストを UTF-8 のバイトとして、選んだレベル（`QrLevel::Low`、既定の `Medium`、`Quartile`、`High`）で収まる最小のバージョン（1 から 40）にエンコードし、リード・ソロモン誤り訂正、ペナルティが最小のマスク、4 モジュールのクワイエットゾーンを使います。最大 `MAX_QR_BYTES`（2,953）バイトです。エンコードできない値は、壊れたシンボルの代わりに短い注記を表示します。
 
 各シンボルは figure で、スクリーンリーダーは下のテキストを名前とする一つの画像として読み上げます。そのテキストは値そのもの、または指定した場合は `.label(text)` です。スキャナーは明るい地に暗いバーを必要とするため、どちらのテーマでもバーは白い台の上で黒のままです。`barcode.css`（1 KB）はこれらのコンポーネントと一緒の場合だけ読み込まれます。`.height(px)` と `.size(px)` で描画サイズを決め、狭いコンテナではシンボルが縮みます。
+
+## Inbox と NotificationCenter
+
+`Inbox` はユーザーの通知を新しい順に、ユーザーのタイムゾーンでの日ごと（今日、昨日、その後は日付）にまとめて一覧にし、未読を示します。行は DataGrid と同じ種類のアクション（`DataQuery` を受け取り `Page` を返す）から来ます。受信箱は時刻フィールドで並べ、最大 `.limit(n)` 行（既定 50、上限 `MAX_INBOX` の 200）を要求します。`NotificationCenter` はトップバーのベルで、未読数付きで受信箱の画面へのリンクになります。
+
+```rust
+#[action(permission = "notes.write")]
+pub async fn mark_notes_read(s: InboxSelection, store: Notes, ctx: Ctx) -> Result<()> {
+    store.mark_read(ctx.identity(), &s.ids)
+}
+
+#[action(permission = "notes.read")]
+pub async fn count_unread(q: UnreadCount, store: Notes, ctx: Ctx) -> Result<u32> {
+    store.count_unread(ctx.identity(), q.limit)
+}
+
+Inbox::of(my_notifications)
+    .when(Note::created_at)
+    .read(Note::read)
+    .item(|n: &Note| ListItem::new(n.title.clone()).subtitle(n.body.clone()))
+    .mark_read(mark_notes_read)
+    .archive(archive_notes)
+
+App::new("Admin").header(|h| h.end(NotificationCenter::of(count_unread, inbox, ())))
+```
+
+`.mark_read(action)` と `.archive(action)` を付けると、各行にチェックボックスが、受信箱に「すべて選択」付きのツールバーが付きます。ボタンは選んだキーを `InboxSelection` として `POST /_zeyn/data` に送ります。このエンドポイントは CSRF を確認し、書き込み制限に数えられ、画面のアクセスとアクションの権限を確認します。受け付けるのは 200 文字までのキーを最大 200 個です。キーはブラウザーから来るので、アクションは `ctx.identity()` の通知だけを変更します。ユーザーが実行できないボタンは、チェックボックスと一緒に表示されません。
+
+一括操作の後、受信箱は自分のトピック（`"notifications"`、変更は `.topic(..)`）を告げます。受信箱とそのトピックを `.listens` するすべてのノードがその場で描き直され、ベルも件数を読み込み直します。ベルは `UnreadCount { limit }` を受け取って上限（100）で止まるアクション、つまり一回の上限付きクエリで数えます。99 を超えると `99+` と表示し、リンクの名前がスクリーンリーダーに件数を伝えます。件数はページの表示後に一回のリクエストで読み込み、受信箱、`ui.refresh("notifications")`、または `.live()` と `realtime` 機能を使う場合はどのアクションの `hub.notify(&ctx, "notifications")` でも、トピックが告げられると読み込み直します（トピックは `Realtime::topic` で宣言します）。`inbox.js`（6.1 KB、gzip で 2.3 KB）と `inbox.css`（3.1 KB）はこれらのコンポーネントと一緒の場合だけ読み込まれます。

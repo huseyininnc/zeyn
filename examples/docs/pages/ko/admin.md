@@ -52,3 +52,32 @@ Row::new()
 `Barcode`는 출력 가능한 ASCII 문자 1~80자(`MAX_BARCODE_CHARS`)를 인코딩하며, 연속된 숫자는 한 심볼에 두 자리씩 묶고(코드 세트 C) 검사 심볼과 양쪽 10모듈의 여백 영역을 붙입니다. `QrCode`는 텍스트를 UTF-8 바이트로, 선택한 수준(`QrLevel::Low`, 기본값 `Medium`, `Quartile`, `High`)에서 담을 수 있는 가장 작은 버전(1~40)으로 인코딩하며, 리드 솔로몬 오류 정정, 벌점이 가장 낮은 마스크, 4모듈의 여백 영역을 씁니다. 최대 `MAX_QR_BYTES`(2,953)바이트입니다. 인코딩할 수 없는 값은 깨진 심볼 대신 짧은 안내를 보여 줍니다.
 
 각 심볼은 figure이며, 스크린 리더는 아래 텍스트로 이름 붙은 하나의 이미지로 읽습니다. 그 텍스트는 값 자체이거나, 지정했다면 `.label(text)`입니다. 스캐너는 밝은 바탕의 어두운 막대가 필요하므로 두 테마 모두에서 막대는 흰 판 위에 검게 유지됩니다. `barcode.css`(1 KB)는 이 컴포넌트와 함께일 때만 불러오며, `.height(px)`와 `.size(px)`로 그리는 크기를 정하고 좁은 컨테이너에서는 심볼이 줄어듭니다.
+
+## Inbox와 NotificationCenter
+
+`Inbox`는 사용자의 알림을 최신순으로, 사용자 시간대의 날짜별로(오늘, 어제, 그다음 날짜) 묶어 보여 주고 읽지 않은 알림을 표시합니다. 행은 DataGrid가 쓰는 것과 같은 종류의 액션(`DataQuery` 입력, `Page` 출력)에서 오며, 받은 편지함은 시간 필드로 정렬하고 최대 `.limit(n)`행(기본 50, 최대 `MAX_INBOX` 200)을 요청합니다. `NotificationCenter`는 상단 바의 종 아이콘으로, 읽지 않은 개수와 함께 받은 편지함 화면으로 가는 링크입니다.
+
+```rust
+#[action(permission = "notes.write")]
+pub async fn mark_notes_read(s: InboxSelection, store: Notes, ctx: Ctx) -> Result<()> {
+    store.mark_read(ctx.identity(), &s.ids)
+}
+
+#[action(permission = "notes.read")]
+pub async fn count_unread(q: UnreadCount, store: Notes, ctx: Ctx) -> Result<u32> {
+    store.count_unread(ctx.identity(), q.limit)
+}
+
+Inbox::of(my_notifications)
+    .when(Note::created_at)
+    .read(Note::read)
+    .item(|n: &Note| ListItem::new(n.title.clone()).subtitle(n.body.clone()))
+    .mark_read(mark_notes_read)
+    .archive(archive_notes)
+
+App::new("Admin").header(|h| h.end(NotificationCenter::of(count_unread, inbox, ())))
+```
+
+`.mark_read(action)`와 `.archive(action)`을 쓰면 각 행에 체크 상자가, 받은 편지함에 "모두 선택"이 있는 도구 모음이 생깁니다. 버튼은 선택한 키를 `InboxSelection`으로 `POST /_zeyn/data`에 보내며, 이 엔드포인트는 CSRF를 확인하고 쓰기 제한에 포함되며 화면 접근 권한과 액션 권한을 확인합니다. 키는 최대 200개, 각 200자까지 받습니다. 키는 브라우저에서 오므로 액션은 `ctx.identity()`의 알림만 바꿔야 합니다. 사용자가 실행할 수 없는 버튼은 체크 상자와 함께 빠집니다.
+
+일괄 작업 후 받은 편지함은 자신의 토픽(`"notifications"`, `.topic(..)`으로 변경)을 알립니다. 받은 편지함과 그 토픽을 `.listens`하는 모든 노드가 제자리에서 다시 그려지고 종도 개수를 다시 불러옵니다. 종은 `UnreadCount { limit }`을 받아 한도(100)에서 멈추는 액션, 즉 한 번의 제한된 쿼리로 셉니다. 99를 넘으면 `99+`로 보여 주며 링크 이름이 스크린 리더에 개수를 알려 줍니다. 페이지가 보인 뒤 한 번의 요청으로 개수를 불러오고, 받은 편지함이나 `ui.refresh("notifications")`, 또는 `.live()`와 `realtime` 기능을 쓸 때 어떤 액션의 `hub.notify(&ctx, "notifications")`가 토픽을 알리면 다시 불러옵니다(토픽은 `Realtime::topic`으로 선언). `inbox.js`(6.1 KB, gzip 2.3 KB)와 `inbox.css`(3.1 KB)는 이 컴포넌트와 함께일 때만 불러옵니다.

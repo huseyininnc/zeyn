@@ -52,3 +52,32 @@ Row::new()
 `Barcode` codifica de 1 a 80 caracteres ASCII imprimibles (`MAX_BARCODE_CHARS`) y empaqueta las series de dígitos de dos en dos por símbolo (conjunto C), con el símbolo de control y una zona de silencio de 10 módulos a cada lado. `QrCode` codifica el texto como bytes UTF-8 en la versión más pequeña (de 1 a 40) que lo contiene en el nivel elegido (`QrLevel::Low`, `Medium` por defecto, `Quartile`, `High`), con corrección de errores Reed Solomon, la máscara de menor penalización y 4 módulos de zona de silencio; como mucho `MAX_QR_BYTES` (2.953) bytes. Un valor que no se puede codificar muestra una nota breve en lugar de un símbolo roto.
 
 Cada símbolo es una figura que los lectores de pantalla oyen como una sola imagen con el nombre del texto que lleva debajo: el valor, o `.label(text)` cuando se indica. Las barras siguen negras sobre una placa blanca en los dos temas, porque los lectores de códigos necesitan barras oscuras sobre fondo claro. `barcode.css` (1 KB) se carga solo con los componentes; `.height(px)` y `.size(px)` fijan el tamaño dibujado, y el símbolo se encoge en un contenedor estrecho.
+
+## Inbox y NotificationCenter
+
+`Inbox` muestra las notificaciones del usuario, las más nuevas primero, agrupadas por día en la zona horaria del usuario (hoy, ayer y luego fechas), con las no leídas marcadas. Las filas vienen del mismo tipo de acción que usa un DataGrid (entra `DataQuery`, sale `Page`); la bandeja ordena por el campo de tiempo y pide como mucho `.limit(n)` filas (50, como máximo `MAX_INBOX`, 200). `NotificationCenter` es la campana de la barra superior: un enlace a la pantalla de la bandeja con el número de no leídas.
+
+```rust
+#[action(permission = "notes.write")]
+pub async fn mark_notes_read(s: InboxSelection, store: Notes, ctx: Ctx) -> Result<()> {
+    store.mark_read(ctx.identity(), &s.ids)
+}
+
+#[action(permission = "notes.read")]
+pub async fn count_unread(q: UnreadCount, store: Notes, ctx: Ctx) -> Result<u32> {
+    store.count_unread(ctx.identity(), q.limit)
+}
+
+Inbox::of(my_notifications)
+    .when(Note::created_at)
+    .read(Note::read)
+    .item(|n: &Note| ListItem::new(n.title.clone()).subtitle(n.body.clone()))
+    .mark_read(mark_notes_read)
+    .archive(archive_notes)
+
+App::new("Admin").header(|h| h.end(NotificationCenter::of(count_unread, inbox, ())))
+```
+
+Con `.mark_read(action)` y `.archive(action)` cada fila recibe una casilla y la bandeja una barra con "Seleccionar todo". Los botones envían las claves elegidas como `InboxSelection` a través de `POST /_zeyn/data`, que comprueba el CSRF, cuenta para el límite de escritura y comprueba el acceso a la pantalla y el permiso de la acción; se aceptan como mucho 200 claves de hasta 200 caracteres. Las claves vienen del navegador, así que la acción solo cambia notificaciones de `ctx.identity()`. Los botones que el usuario no puede ejecutar no se muestran, tampoco las casillas.
+
+Después de una acción masiva la bandeja nombra su tema (`"notifications"`, `.topic(..)` para cambiarlo): la bandeja y todos los nodos que lo `.listens` se vuelven a dibujar en su sitio, y la campana vuelve a cargar su número. La campana cuenta con una acción que recibe `UnreadCount { limit }` y se detiene en el límite (100), una sola consulta acotada; por encima de 99 muestra `99+`, y el nombre del enlace dice el número a los lectores de pantalla. Carga el número con una petición cuando se muestra la página y otra vez cuando su tema lo nombra una bandeja, `ui.refresh("notifications")` o, con `.live()` y la característica `realtime`, `hub.notify(&ctx, "notifications")` en cualquier acción (declara el tema con `Realtime::topic`). `inbox.js` (6,1 KB, 2,3 KB con gzip) e `inbox.css` (3,1 KB) se cargan solo con los componentes.

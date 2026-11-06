@@ -575,6 +575,24 @@
       "barcode": {
         "code128_invalid": "This value cannot be shown as a barcode: it must be 1 to 80 printable ASCII characters.",
         "qr_too_long": "This value is too long for a QR code."
+      },
+      "inbox": {
+        "label": "Notifications",
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "empty": "No notifications",
+        "unread": "Unread",
+        "unread_count": "{n} unread",
+        "select": "Select",
+        "select_all": "Select all",
+        "actions": "Notification actions",
+        "mark_read": "Mark as read",
+        "archive": "Archive",
+        "selected": "{n} selected",
+        "done": "Done for {n} notifications",
+        "bell": "Notifications",
+        "bell_count": "Notifications, {n} unread",
+        "bell_many": "Notifications, more than 99 unread"
       }
     },
     "date": {
