@@ -798,6 +798,10 @@ impl<E: Model> CardGrid<E> {
             t("page_only"),
             t("error"),
         ));
+        out.push_str(&format!(
+            r#" style="--z-card-ratio:{:.3}""#,
+            f64::from(self.image.1) / f64::from(self.image.0)
+        ));
         if let Some(p) = page {
             out.push_str(&format!(
                 r#" data-zeyn-offset="{}" data-zeyn-count="{}" data-zeyn-size="{}""#,

@@ -368,3 +368,38 @@ a.z-poster-link:focus-visible {
 }
 
 .z-search-rich-sub { font-size: var(--z-font-size-sm); color: var(--z-text-muted); }
+
+/* Off screen cards and rows: the browser skips their layout and paint until they come near the
+   viewport (`content-visibility: auto`) and reserves their size meanwhile. The estimate comes
+   from the image ratio the server writes on the section (`--z-card-ratio`, height over width)
+   and, in a card grid, the column width worked out from the list's width (a size container);
+   after a card has been seen once, the browser keeps its real size (`auto`). Focus, find in page,
+   anchor links and screen readers still reach skipped cards. `overflow-clip-margin` keeps the
+   focus ring and the hover shadow, which reach a few pixels outside the card, from being cut. */
+
+.z-cards-list { container-type: inline-size; }
+
+.z-cards-list > .z-poster,
+.z-rail-list > .z-poster {
+  --z-card-column: 200px;
+  content-visibility: auto;
+  contain-intrinsic-size: auto var(--z-card-column) auto calc(var(--z-card-column) * var(--z-card-ratio, 1.333) + 63px);
+  overflow-clip-margin: 8px;
+}
+
+@supports (width: calc(100cqi / 1px * 1px)) {
+  .z-cards-list > .z-poster {
+    --z-card-column: calc((100cqi + 16px) / max(1, round(down, (100cqi + 16px) / 176px, 1)) - 16px);
+  }
+}
+
+.z-cards-list > .z-poster-h,
+.z-rail-list > .z-poster-h {
+  contain-intrinsic-size: auto 300px auto calc(102px * var(--z-card-ratio, 1.333) + 2px);
+}
+
+.z-cards-list > .z-list-item {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 300px auto 72px;
+  overflow-clip-margin: 8px;
+}

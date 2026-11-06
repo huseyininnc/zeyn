@@ -1,6 +1,7 @@
 //! CardGrid examples: rows of an action as cards, and a large product catalog that loads fast.
 
 use crate::data::{Item, Product, SHELVES, search_items, search_products};
+use crate::examples::image_card::{ProductParams, product};
 use crate::{Entry, ex};
 use zeyn::prelude::*;
 
@@ -32,6 +33,7 @@ fn shelf(n: i64) -> CardGrid<Item> {
                 .text(i.price.to_string())
                 .low(i.low())
                 .fallback(crate::data::picture(1))
+                .link(product, ProductParams { id: i.id.0 })
         })
         .placeholder(Placeholder::color("--z-surface-2"))
         .priority(if n == 0 { 4 } else { 0 })

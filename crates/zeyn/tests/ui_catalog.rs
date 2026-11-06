@@ -258,6 +258,10 @@ async fn product_cards_reserve_their_box_show_a_placeholder_and_load_only_the_fi
         !page.contains("other.test"),
         "a low file outside img-src is left out"
     );
+    assert!(
+        page.contains(r#"style="--z-card-ratio:1.333""#),
+        "the section carries the image ratio that sizes off screen cards"
+    );
     let linked = |name: &str| page.contains(&format!("/_zeyn/{name}?v="));
     assert!(linked("media.js") && linked("media.css"));
     let (status, body) = send(
