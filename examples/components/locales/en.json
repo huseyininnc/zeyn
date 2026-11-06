@@ -6,6 +6,8 @@
     "search": "Search components",
     "start": "Start",
     "all": "All components",
+    "github": "Source on GitHub",
+    "project": "License and security",
     "none": "No component matches \"{q}\".",
     "show_code": "Show code",
     "copy": "Copy",

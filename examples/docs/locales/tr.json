@@ -1,6 +1,7 @@
 {
   "docs": {
     "app": "Zeyn belgeleri",
+    "github": "GitHub'da kaynak kodu",
     "missing": "Bu sayfa yok.",
     "on_this_page": "Bu sayfada",
     "pager": "Önceki ve sonraki sayfa",
@@ -11,7 +12,8 @@
       "language": "Dil",
       "components": "Bileşenler",
       "guides": "Kılavuzlar",
-      "reference": "Başvuru"
+      "reference": "Başvuru",
+      "project": "Proje"
     },
     "live": {
       "label": "Canlı örnek",
@@ -76,7 +78,8 @@
       "realtime": "Realtime ve CRDT",
       "desktop": "Masaüstü uygulamaları",
       "protocol": "Runtime protokolü",
-      "database_reference": "Veritabanı başvurusu"
+      "database_reference": "Veritabanı başvurusu",
+      "about": "Kaynak, lisans ve güvenlik"
     },
     "translation": {
       "note": "Bu sayfa İngilizceden çevrilmiştir.",

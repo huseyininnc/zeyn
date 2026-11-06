@@ -1,6 +1,7 @@
 {
   "docs": {
     "app": "Documentación de Zeyn",
+    "github": "Código fuente en GitHub",
     "missing": "Esta página no existe.",
     "on_this_page": "En esta página",
     "pager": "Página anterior y siguiente",
@@ -11,7 +12,8 @@
       "language": "Lenguaje",
       "components": "Componentes",
       "guides": "Guías",
-      "reference": "Referencia"
+      "reference": "Referencia",
+      "project": "Proyecto"
     },
     "live": {
       "label": "Ejemplo en vivo",
@@ -76,7 +78,8 @@
       "realtime": "Tiempo real y CRDT",
       "desktop": "Apps de escritorio",
       "protocol": "Protocolo del runtime",
-      "database_reference": "Referencia de base de datos"
+      "database_reference": "Referencia de base de datos",
+      "about": "Código, licencia y seguridad"
     },
     "translation": {
       "note": "Esta página está traducida del inglés.",

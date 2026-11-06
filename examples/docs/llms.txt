@@ -66,6 +66,10 @@ These docs are written in English, and the English pages below are the source. E
 - [Theming](https://docs.zeynsoft.com/guides/theming)
 - [Shared libraries](https://docs.zeynsoft.com/guides/polyrepo)
 
+## Project
+
+- [Source, license and security](https://docs.zeynsoft.com/project): the GitHub repository, the license, tests and CI, and how to report a vulnerability
+
 ## Optional
 
 - [API reference on docs.rs](https://docs.rs/zeyn)

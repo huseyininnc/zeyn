@@ -75,6 +75,7 @@ El showcase escucha en `127.0.0.1:3002` y muestra cada componente con datos de e
 - *Components* muestra cada componente con un ejemplo en vivo junto a su código.
 - *Guides* cubre zonas horarias e idiomas, seguridad, la API, MCP, datos y temas.
 - *Reference* incluye el protocolo del runtime y la arquitectura.
+- *Project* muestra el código fuente, la licencia, las pruebas y la CI, y la política de seguridad.
 
 ## Principios
 
@@ -82,3 +83,5 @@ El showcase escucha en `127.0.0.1:3002` y muestra cada componente con datos de e
 - **Sin recargas de página.** La navegación, las ventanas y los cambios de idioma, zona horaria y tema se aplican en el sitio.
 - **Valores seguros por defecto.** Cada acción y cada pantalla declara su acceso. Los tokens CSRF, una Content Security Policy estricta y el escape de los datos de usuario están siempre activos.
 - **Una sola forma de hacer cada cosa.** El lenguaje es pequeño, así que el código escrito por un agente se lee como el escrito por una persona.
+
+Zeyn es de código abierto con [licencia MIT o Apache 2.0](project.md#license). Consulta la [política de seguridad](project.md#security), la [hoja de ruta](https://github.com/huseyininnc/zeyn/blob/main/ROADMAP.md) y el [registro de cambios](https://github.com/huseyininnc/zeyn/blob/main/CHANGELOG.md).

@@ -1,6 +1,7 @@
 {
   "docs": {
     "app": "Zeyn ドキュメント",
+    "github": "GitHub のソースコード",
     "missing": "このページは存在しません。",
     "on_this_page": "このページの内容",
     "pager": "前のページと次のページ",
@@ -11,7 +12,8 @@
       "language": "言語",
       "components": "コンポーネント",
       "guides": "ガイド",
-      "reference": "リファレンス"
+      "reference": "リファレンス",
+      "project": "プロジェクト"
     },
     "live": {
       "label": "ライブ例",
@@ -76,7 +78,8 @@
       "realtime": "リアルタイムと CRDT",
       "desktop": "デスクトップアプリ",
       "protocol": "ランタイムプロトコル",
-      "database_reference": "データベースリファレンス"
+      "database_reference": "データベースリファレンス",
+      "about": "ソース、ライセンス、セキュリティ"
     },
     "translation": {
       "note": "このページは英語から翻訳されています。",
