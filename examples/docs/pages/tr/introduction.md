@@ -75,6 +75,7 @@ Showcase `127.0.0.1:3002` adresinde dinler ve her bileşeni örnek verilerle gö
 - *Components* (Bileşenler) her bileşeni kodunun yanında canlı bir örnekle gösterir.
 - *Guides* (Rehberler) zaman ve diller, güvenlik, API, MCP, veri ve temaları anlatır.
 - *Reference* (Referans) runtime protokolünü ve mimariyi içerir.
+- *Project* (Proje) kaynak kodunu, lisansı, testleri ve CI'ı, güvenlik politikasını gösterir.
 
 ## İlkeler
 
@@ -82,3 +83,5 @@ Showcase `127.0.0.1:3002` adresinde dinler ve her bileşeni örnek verilerle gö
 - **Sayfa yenilemesi yok.** Gezinme, pencereler, dil, saat dilimi ve tema değişiklikleri yerinde uygulanır.
 - **Güvenli varsayılanlar.** Her action ve ekran erişimini bildirir. CSRF token'ları, sıkı bir Content Security Policy ve kullanıcı verisinin kaçışlanması (escape) her zaman açıktır.
 - **Her iş için tek yol.** Dil küçüktür; bu yüzden bir ajanın yazdığı kod, bir insanın yazdığı kod gibi okunur.
+
+Zeyn, [MIT veya Apache 2.0 lisansı](project.md#license) ile açık kaynaktır. [Güvenlik politikasına](project.md#security), [yol haritasına](https://github.com/huseyininnc/zeyn/blob/main/ROADMAP.md) ve [değişiklik günlüğüne](https://github.com/huseyininnc/zeyn/blob/main/CHANGELOG.md) bakın.

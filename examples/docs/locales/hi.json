@@ -1,6 +1,7 @@
 {
   "docs": {
     "app": "Zeyn दस्तावेज़",
+    "github": "GitHub पर स्रोत कोड",
     "missing": "यह पृष्ठ मौजूद नहीं है।",
     "on_this_page": "इस पृष्ठ पर",
     "pager": "पिछला और अगला पृष्ठ",
@@ -11,7 +12,8 @@
       "language": "भाषा",
       "components": "कंपोनेंट",
       "guides": "गाइड",
-      "reference": "संदर्भ"
+      "reference": "संदर्भ",
+      "project": "परियोजना"
     },
     "live": {
       "label": "लाइव उदाहरण",
@@ -76,7 +78,8 @@
       "realtime": "Realtime और CRDT",
       "desktop": "डेस्कटॉप ऐप",
       "protocol": "रनटाइम प्रोटोकॉल",
-      "database_reference": "डेटाबेस संदर्भ"
+      "database_reference": "डेटाबेस संदर्भ",
+      "about": "स्रोत, लाइसेंस और सुरक्षा"
     },
     "translation": {
       "note": "यह पृष्ठ अंग्रेज़ी से अनुवादित है।",

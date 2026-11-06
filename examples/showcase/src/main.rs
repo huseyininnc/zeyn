@@ -26,6 +26,12 @@ use std::time::Duration;
 use zeyn::prelude::*;
 use zeyn::{Config, EnvSource, FixedLicense, I18n, License, MemoryViewStore, StaticSource};
 
+/// The public repository of Zeyn, linked from the top bar.
+const REPOSITORY: &str = "https://github.com/huseyininnc/zeyn";
+
+/// The docs page with the license, the tests and CI, and the security policy.
+const PROJECT_PAGE: &str = "https://docs.zeynsoft.com/project";
+
 /// The company standard every app of the organization starts with.
 struct CompanyStandard {
     config: Config,
@@ -92,7 +98,13 @@ async fn main() -> std::io::Result<()> {
     let mut app = App::new(t!("app.name"))
         .plugin(CompanyStandard { config: config.clone() })
         .client_prefs(|p| p.key(media::EXTERNAL_VIDEO))
-        .header(|h| h.breadcrumb().search().account())
+        .header(|h| {
+            h.breadcrumb()
+                .search()
+                .account()
+                .end(ExternalLink::new(REPOSITORY, t!("app.github")).new_tab())
+                .end(ExternalLink::new(PROJECT_PAGE, t!("app.project")).new_tab())
+        })
         .theme(Theme::new().radius(6))
         .themes([
             Theme::light(),

@@ -6,6 +6,8 @@ Zeyn is an open source Rust web framework for data heavy applications: grids, fo
 
 Status: alpha, on crates.io as 0.0.8. APIs still change between versions. Everything below compiles and is tested.
 
+CI checks formatting, runs clippy and runs every test on each pull request; the results are public on the [Actions page](https://github.com/huseyininnc/zeyn/actions).
+
 ## Start a project
 
 ```
@@ -71,6 +73,10 @@ cargo run -p zeyn-cli -- new my-domain --lib   # a library of features shared by
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for how to build, test and send a change, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for how we work together. Questions are answered as described in [SUPPORT.md](SUPPORT.md). The changes of each release are in [CHANGELOG.md](CHANGELOG.md).
+
+## Roadmap
+
+What is released, what the next release holds and what is planned is in [ROADMAP.md](ROADMAP.md).
 
 ## Security
 

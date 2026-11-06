@@ -1,6 +1,7 @@
 {
   "docs": {
     "app": "وثائق Zeyn",
+    "github": "الشيفرة المصدرية على GitHub",
     "missing": "هذه الصفحة غير موجودة.",
     "on_this_page": "في هذه الصفحة",
     "pager": "الصفحة السابقة والتالية",
@@ -11,7 +12,8 @@
       "language": "اللغة",
       "components": "المكونات",
       "guides": "الأدلة",
-      "reference": "المرجع"
+      "reference": "المرجع",
+      "project": "المشروع"
     },
     "live": {
       "label": "مثال حي",
@@ -76,7 +78,8 @@
       "realtime": "الوقت الفعلي وCRDT",
       "desktop": "تطبيقات سطح المكتب (Desktop apps)",
       "protocol": "بروتوكول وقت التشغيل",
-      "database_reference": "مرجع قاعدة البيانات"
+      "database_reference": "مرجع قاعدة البيانات",
+      "about": "المصدر والترخيص والأمان"
     },
     "translation": {
       "note": "هذه الصفحة مترجمة من الإنجليزية.",

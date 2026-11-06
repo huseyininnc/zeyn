@@ -3,6 +3,8 @@
     "sand": "Kum"
   },
   "app": {
+    "github": "GitHub'da kaynak kodu",
+    "project": "Lisans ve güvenlik",
     "name": "Northwind Operasyon"
   },
   "menu": {

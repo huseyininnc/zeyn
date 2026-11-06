@@ -6,6 +6,8 @@
     "search": "Bileşen ara",
     "start": "Başlangıç",
     "all": "Tüm bileşenler",
+    "github": "GitHub'da kaynak kodu",
+    "project": "Lisans ve güvenlik",
     "none": "\"{q}\" ile eşleşen bileşen yok.",
     "show_code": "Kodu göster",
     "copy": "Kopyala",

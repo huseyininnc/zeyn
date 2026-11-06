@@ -96,6 +96,9 @@ pages! {
         protocol "/reference/runtime-protocol" "runtime-protocol.md" "Runtime protocol" "../../../docs/runtime-protocol.md";
         database_reference "/reference/database" "database.md" "Database reference" "../../../docs/database.md";
     }
+    "docs.group.project" Globe {
+        about "/project" "project.md" "Source, license and security" "../pages/project.md";
+    }
 }
 
 include!(concat!(env!("OUT_DIR"), "/translations.rs"));
@@ -624,8 +627,18 @@ pub fn app(docs: Docs) -> Result<App, String> {
         .robots_txt(include_str!("../robots.txt"))
         .service(docs)
         .home(introduction)
+        .header(|h| {
+            h.end(Badge::new(Text::from(concat!(
+                "v",
+                env!("CARGO_PKG_VERSION")
+            ))))
+            .end(ExternalLink::new(REPOSITORY, t!("docs.github")).new_tab())
+        })
         .feature(feature()))
 }
+
+/// The public repository of Zeyn, linked from the top bar of every page.
+pub const REPOSITORY: &str = "https://github.com/huseyininnc/zeyn";
 
 /// The public address of the documentation, for canonical URLs, alternates and the sitemap.
 pub const SITE: &str = "https://docs.zeynsoft.com";

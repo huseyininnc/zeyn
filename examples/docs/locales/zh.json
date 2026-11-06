@@ -1,6 +1,7 @@
 {
   "docs": {
     "app": "Zeyn 文档",
+    "github": "GitHub 上的源代码",
     "missing": "此页面不存在。",
     "on_this_page": "本页内容",
     "pager": "上一页和下一页",
@@ -11,7 +12,8 @@
       "language": "语言",
       "components": "组件",
       "guides": "指南",
-      "reference": "参考"
+      "reference": "参考",
+      "project": "项目"
     },
     "live": {
       "label": "在线示例",
@@ -76,7 +78,8 @@
       "realtime": "实时通道和 CRDT",
       "desktop": "桌面应用",
       "protocol": "运行时协议",
-      "database_reference": "数据库参考"
+      "database_reference": "数据库参考",
+      "about": "源代码、许可证与安全"
     },
     "translation": {
       "note": "本页译自英文。",
