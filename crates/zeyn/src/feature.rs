@@ -11,6 +11,8 @@ use std::sync::Arc;
 pub struct MenuItem {
     pub label: Text,
     pub screen: &'static str,
+    /// The icon before the label in the side menu, set with [`Menu::icon`].
+    pub icon: Option<Icon>,
 }
 
 /// Menu group.
@@ -59,7 +61,35 @@ impl Menu {
         group.items.push(MenuItem {
             label: label.into(),
             screen: S::META.name,
+            icon: None,
         });
+        self
+    }
+
+    /// The icon of the last added item, drawn before its label in the side menu. When the items
+    /// of a group have icons, the group's label is drawn without its own.
+    ///
+    /// ```
+    /// use zeyn::prelude::*;
+    ///
+    /// #[screen(route = "/orders", public)]
+    /// pub fn orders() -> Screen { Screen::new("Orders") }
+    ///
+    /// let feature = Feature::new("shop").screen(orders).menu(|m| {
+    ///     m.group("Commerce", Icon::Cart)
+    ///         .item("Orders", orders)
+    ///         .icon(Icon::Cart)
+    /// });
+    /// assert!(feature.menu_groups()[0].items[0].icon.is_some());
+    /// ```
+    pub fn icon(mut self, icon: Icon) -> Self {
+        if let Some(item) = self
+            .groups
+            .last_mut()
+            .and_then(|g| g.items.last_mut())
+        {
+            item.icon = Some(icon);
+        }
         self
     }
 }
@@ -177,6 +207,8 @@ pub struct Feature {
     searches: Vec<crate::command::Search>,
     sitemap: Option<crate::seo::Sitemap>,
     site: Option<crate::site::SiteShell>,
+    /// Screens of this feature that open in the sign in shell while the others keep theirs.
+    auth: Option<(crate::site::SiteShell, Vec<&'static str>)>,
     #[cfg(feature = "server")]
     files: Vec<crate::files::FileEntry>,
     #[cfg(feature = "server")]
@@ -197,6 +229,7 @@ impl Feature {
             sitemap: None,
             media: Vec::new(),
             site: None,
+            auth: None,
             #[cfg(feature = "server")]
             files: Vec::new(),
             #[cfg(feature = "server")]
@@ -411,6 +444,27 @@ impl Feature {
     /// The site shell, when the feature chose it.
     pub fn site_shell(&self) -> Option<&crate::site::SiteShell> {
         self.site.as_ref()
+    }
+
+    /// Opens the named screens of this feature in `shell` (a [`crate::Shell::auth`]); the others
+    /// keep the feature's shell. For the sign in screens of a feature that also has work screens.
+    #[cfg(feature = "accounts")]
+    pub(crate) fn auth_screens(
+        mut self,
+        shell: crate::site::SiteShell,
+        screens: Vec<&'static str>,
+    ) -> Self {
+        self.auth = Some((shell, screens));
+        self
+    }
+
+    /// The shell a screen of this feature opens in: its sign in shell, the feature's site shell,
+    /// or `None` for the app shell.
+    pub(crate) fn shell_of(&self, screen: &str) -> Option<&crate::site::SiteShell> {
+        match &self.auth {
+            Some((shell, names)) if names.contains(&screen) => Some(shell),
+            _ => self.site.as_ref(),
+        }
     }
 
     pub fn menu_groups(&self) -> &[MenuGroup] {

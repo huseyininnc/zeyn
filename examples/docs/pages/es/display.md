@@ -22,7 +22,7 @@ Stack::new()
 
 ## Badge
 
-`Badge::new(text).tone(Tone::...)`. Tonos: `Neutral`, `Info`, `Success`, `Warning`, `Danger` y `Brand`. Las tablas muestran valores como insignias con `.badge(|v| tone)`.
+`Badge::new(text).tone(Tone::...)`. Tonos: `Neutral`, `Info`, `Success`, `Warning`, `Danger` y `Brand`. Una insignia con tono muestra el texto del tono sobre su tinte sutil; `Neutral` es una etiqueta atenuada con un contorno, para valores simples como un plan. `.dot()` dibuja un punto de 8 px en el tono antes del texto normal, la forma más discreta de mostrar un estado en listas; `.count()` dibuja una píldora redonda para un número. Las tablas muestran valores como insignias con `.badge(|v| tone)` y como puntos con `.status(|v| tone)`.
 
 ## Progress
 

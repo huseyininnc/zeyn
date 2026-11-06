@@ -159,7 +159,7 @@ pub fn feature() -> Feature {
     Feature::new("charts")
         .screen(charts)
         .menu(|m| {
-            m.group(t!("menu.charts"), Icon::Chart)
+            m.group(t!("menu.charts"), Icon::ChartBar)
                 .item(t!("charts.title"), charts)
         })
 }

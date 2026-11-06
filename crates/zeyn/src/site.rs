@@ -39,17 +39,61 @@ impl Shell {
     pub fn site() -> SiteShell {
         SiteShell::default()
     }
+
+    /// The sign in shell: no menu and no top bar, the app's logo and name over one centered
+    /// card (400 px), and the language and theme pickers at the bottom, so they stay reachable.
+    /// `.split()` puts the form on one half and a brand panel on the other from 1024 px. Every
+    /// sign in screen of `zeyn::accounts::ui` uses it; a custom sign in screen gets it with
+    /// `Feature::shell(Shell::auth())`.
+    ///
+    /// ```
+    /// use zeyn::prelude::*;
+    ///
+    /// #[screen(route = "/sign-in", public)]
+    /// pub fn sign_in() -> Screen { Screen::new("Sign in") }
+    ///
+    /// let feature = Feature::new("entry")
+    ///     .screen(sign_in)
+    ///     .shell(Shell::auth().split());
+    /// assert!(feature.site_shell().is_some());
+    /// ```
+    pub fn auth() -> SiteShell {
+        SiteShell {
+            auth: Some(AuthLayout::Centered),
+            ..SiteShell::default()
+        }
+    }
 }
 
-/// Settings of the site shell. Built with [`Shell::site`].
+/// How the sign in shell lays out its page.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum AuthLayout {
+    /// One card in the middle of the page.
+    Centered,
+    /// The form on one half, a brand panel on the other.
+    Split,
+}
+
+/// Settings of the site shell and the sign in shell. Built with [`Shell::site`] or
+/// [`Shell::auth`].
 #[derive(Default)]
 pub struct SiteShell {
     pub(crate) header: SiteHeader,
     pub(crate) footer: SiteFooter,
     pub(crate) bottom: Vec<BottomNavItem>,
+    pub(crate) auth: Option<AuthLayout>,
 }
 
 impl SiteShell {
+    /// For [`Shell::auth`]: the form on the start half and a brand panel on the end half, from
+    /// 1024 px; narrower screens show the centered card.
+    pub fn split(mut self) -> Self {
+        if self.auth.is_some() {
+            self.auth = Some(AuthLayout::Split);
+        }
+        self
+    }
+
     /// The top bar's slots and ready actions, see [`SiteHeader`].
     pub fn header(mut self, build: impl FnOnce(SiteHeader) -> SiteHeader) -> Self {
         self.header = build(self.header);
@@ -198,6 +242,9 @@ pub struct SiteHeader {
     pub(crate) sign_in: bool,
     pub(crate) language: bool,
     pub(crate) theme: bool,
+    pub(crate) breadcrumb: bool,
+    pub(crate) search: bool,
+    pub(crate) account: bool,
     pub(crate) slots: [Vec<Node>; 4],
     pub(crate) center_on_phone: CenterOnPhone,
     pub(crate) center_button: Option<(Icon, Text)>,
@@ -275,6 +322,35 @@ impl SiteHeader {
     /// The theme picker, when the app lets users pick a theme.
     pub fn theme(mut self) -> Self {
         self.theme = true;
+        self
+    }
+
+    /// Where the user is, at the start of the app shell's top bar: the menu group of the
+    /// current screen, then the screen's title. `nav.js` keeps it up to date while the user moves
+    /// between screens. The app shell only.
+    pub fn breadcrumb(mut self) -> Self {
+        self.breadcrumb = true;
+        self
+    }
+
+    /// A search field that opens the command palette (also with its shortcut). The palette
+    /// button leaves the side menu.
+    pub fn search(mut self) -> Self {
+        self.search = true;
+        self
+    }
+
+    /// The account menu at the end of the bar: the user's initials, then a dialog with who is
+    /// signed in, the theme, language and time zone pickers and the sign out link (a sign in
+    /// link for visitors). The pickers leave the side menu.
+    ///
+    /// ```
+    /// use zeyn::prelude::*;
+    ///
+    /// let app = App::new("Admin").header(|h| h.breadcrumb().search().account());
+    /// ```
+    pub fn account(mut self) -> Self {
+        self.account = true;
         self
     }
 }

@@ -31,13 +31,29 @@ function isScreenUrl(url) {
   return !local.startsWith('/_zeyn/') && !local.startsWith('/api/') && !/\.[a-z0-9]+$/i.test(local);
 }
 
-/** Marks the menu link of the current page. */
+/** Marks the menu link of the current page and writes the top bar's breadcrumb from it. */
 function markCurrent(url) {
+  let current = null;
   document.querySelectorAll('.z-nav a[href], .z-site-nav a[href], .z-site-bottom a[href]').forEach((a) => {
     const here = new URL(a.href, location.href).pathname === url.pathname;
-    if (here) a.setAttribute('aria-current', 'page');
-    else a.removeAttribute('aria-current');
+    if (here) {
+      a.setAttribute('aria-current', 'page');
+      if (a.closest('.z-nav')) current = a;
+    } else a.removeAttribute('aria-current');
   });
+  const crumbs = document.querySelector('[data-zeyn-crumbs] ol');
+  if (!crumbs) return;
+  const group = current?.closest('.z-nav-group')?.querySelector('h2')?.textContent ?? '';
+  const page = current?.textContent ?? document.querySelector('#z-main h1')?.textContent ?? '';
+  const li = (text, here) => {
+    const item = document.createElement('li');
+    const span = document.createElement('span');
+    span.textContent = text;
+    if (here) span.setAttribute('aria-current', 'page');
+    item.append(here ? span : text);
+    return item;
+  };
+  crumbs.replaceChildren(...(group && group !== page ? [li(group, false)] : []), ...(page ? [li(page, true)] : []));
 }
 
 /** Moves focus to the new screen's heading and tells screen readers that the page changed. */
@@ -292,7 +308,7 @@ window.addEventListener('popstate', () => {
 history.replaceState({ zeyn: true }, '', location.href);
 
 /**
- * Below 800 px the side menu of the app shell folds behind the menu button under the app's name
+ * Below 1024 px the side menu of the app shell folds behind the menu button under the app's name
  * (W3C APG disclosure). This shows the button; without the script the menu stays open. Pressing
  * the button opens or closes the menu, following a link or pressing Escape closes it, and Escape
  * moves focus back to the button.

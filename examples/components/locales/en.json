@@ -116,7 +116,8 @@
         "sizes": "Sizes"
       },
       "badge": {
-        "overview": "Example"
+        "overview": "Example",
+        "dots_and_counts": "Dots and counts"
       },
       "breadcrumb": {
         "overview": "Example"
@@ -126,7 +127,8 @@
       },
       "card": {
         "overview": "Example",
-        "nested": "With content"
+        "nested": "With content",
+        "action_and_footer": "Action and footer"
       },
       "card_grid": {
         "overview": "Example",
@@ -204,8 +206,7 @@
         "catalog_header": "The header of this catalog"
       },
       "icon": {
-        "overview": "Common icons",
-        "admin": "Admin icons"
+        "overview": "Every icon"
       },
       "kpi": {
         "overview": "Example",

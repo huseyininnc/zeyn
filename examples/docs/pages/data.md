@@ -41,7 +41,7 @@ Chart::funnel("Checkout").labels(["Visited", "Cart", "Paid"]).series("People", [
 
 @live chart
 
-Each chart has a title, a text summary for screen readers, a legend, and its numbers as a table under *Show data*. Series colors are the `--z-chart-1` to `--z-chart-6` tokens; a test (`chart_colors_reach_three_to_one_in_both_themes`) checks 3:1 against `--z-surface` and `--z-surface-2` in the light and both dark themes (see [Theming](theming.md)).
+Each chart has a title, a text summary for screen readers, a legend when it has two series or more, and its numbers as a table under *Show data*. Bar, line, area and combo charts draw only their geometry in SVG, which stretches with the card (`--z-chart-h`, 240 px, 200 px on phones); tick labels are HTML beside it, so they stay 12 px at any width, shortened from ten thousand on (`600K`, `1.2M`), and category labels thin out so at most twelve show (half of them in charts narrower than 480 px). Bars take 60% of their band; lines are 2 px without dots, with a round point on the last value and on the hovered category; areas fade. Pointer or keyboard focus on a category draws a crosshair and a tooltip with every series at that category. Series colors are the `--z-chart-1` to `--z-chart-8` tokens, in an order whose first five stay apart under color blindness; series 7 and 8 also draw their lines dashed. The startup check and a test (`chart_colors_reach_three_to_one_in_both_themes`) hold every series to 3:1 against `--z-surface` (see [Theming](theming.md)).
 
 Every bar, point, slice, stage and gauge value is a mark with its label and value as its name. The SVG is a group named by the title and the summary, and the chart is one tab stop:
 
@@ -57,7 +57,7 @@ Hover, focus and a tap show the same text in a tooltip, which is hidden from scr
 
 ## Key figures, sparklines and bullets
 
-`Kpi` shows a value, its change against the previous period with an arrow and words for the direction (green when the change is good, red when not; `.lower_is_better()` for costs and waits), a target with the share reached, and a sparkline of recent values.
+`Kpi` shows a value as the card's largest text (30 px, tabular figures, the currency symbol or unit smaller and muted), its change against the previous period as a small chip such as `+48.8%` with "vs previous period" beside it (green when the change is good, red when not, grey under half a percent; `.lower_is_better()` for costs and waits; screen readers hear the full sentence), a target with the share reached, and a full width trend of recent values in the chip's color over a fading area. Values of seven digits and more are shortened (`$1.23M`, `1,23 Mn` in Turkish) with the full value in the tooltip and for screen readers.
 
 ```rust
 Kpi::new("Revenue this month", 184_250.0).delta(12.4).target(200_000.0).trend([140.0, 152.0, 160.0, 184.0])
@@ -65,9 +65,9 @@ Kpi::new("Average wait", 6.5).decimals(1).unit("min").delta(-9.0).lower_is_bette
 Kpi::money("Revenue", Money::tl(18_425_050)).delta(4.2).target(200_000.0)
 ```
 
-`Kpi::money` shows an amount with its currency in the user's locale (`₺184,250.50` in English, `184.250,50 ₺` in Turkish), and its target in the same currency.
+`Kpi::money` shows an amount with its currency in the user's locale (`₺184,250.50` in English, `184.250,50 ₺` in Turkish, the symbol set smaller), and its target in the same currency.
 
-Kpis in one `Row` or `AutoGrid` are as tall as the tallest, whether or not they have a trend, and the sparkline sits at the bottom of each card. A `Row` of Kpis gives each one a quarter of the width: four fill the row on a desktop, and the row wraps to two per line below about 830 px and to one below 480 px (container queries on the row, so a Kpi row in a narrow column wraps sooner). Charts are as wide as their container and keep their proportions. Donuts and gauges stay at most 18rem tall and sit in the middle.
+Kpis in one `Row` or `AutoGrid` are as tall as the tallest, whether or not they have a trend, and the sparkline sits at the bottom of each card. A `Row` of Kpis gives each one a quarter of the width: four fill the row on a desktop, and the row wraps to two per line below about 830 px; below 360 px the cards drop their trend (container queries on the row, so a Kpi row in a narrow column wraps sooner). Each card keeps at least 132 px, with or without a trend. Charts are as wide as their container. Donuts, gauges, funnels and scatter charts keep their proportions; donuts and gauges stay at most 18rem tall and sit in the middle.
 
 ```rust
 Row::new()

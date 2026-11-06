@@ -135,7 +135,7 @@ macro_rules! catalog {
 }
 
 catalog! {
-    "layout" Table {
+    "layout" Dashboard {
         stack "/ui/stack";
         row "/ui/row";
         card "/ui/card";
@@ -145,7 +145,7 @@ catalog! {
         auto_grid "/ui/auto-grid";
         screen_header "/ui/screen-header";
     }
-    "text" Edit {
+    "text" FileText {
         heading "/ui/heading";
         paragraph "/ui/paragraph";
         meta_line "/ui/meta-line";
@@ -190,12 +190,12 @@ catalog! {
         tree "/ui/tree";
         week_schedule "/ui/week-schedule";
     }
-    "media" Box {
+    "media" Image {
         image "/ui/image";
         embed "/ui/embed";
         hero "/ui/hero";
     }
-    "feedback" Plus {
+    "feedback" Bell {
         alert "/ui/alert";
         progress "/ui/progress";
         skeleton "/ui/skeleton";
@@ -206,11 +206,11 @@ catalog! {
         clear_prefs "/ui/clear-prefs";
         reactions "/ui/reactions";
     }
-    "charts" Chart {
+    "charts" ChartBar {
         chart "/ui/chart";
         kpi "/ui/kpi";
     }
-    "shell" Box {
+    "shell" Sidebar {
         toolbox "/ui/toolbox";
         status_bar "/ui/status-bar";
         app_header "/ui/app-header";

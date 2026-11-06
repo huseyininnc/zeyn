@@ -116,7 +116,8 @@
         "sizes": "Boyutlar"
       },
       "badge": {
-        "overview": "Örnek"
+        "overview": "Örnek",
+        "dots_and_counts": "Noktalar ve sayılar"
       },
       "breadcrumb": {
         "overview": "Örnek"
@@ -126,7 +127,8 @@
       },
       "card": {
         "overview": "Örnek",
-        "nested": "İçerikle"
+        "nested": "İçerikle",
+        "action_and_footer": "Eylem ve alt bilgi"
       },
       "card_grid": {
         "overview": "Örnek",
@@ -204,8 +206,7 @@
         "catalog_header": "Bu kataloğun başlığı"
       },
       "icon": {
-        "overview": "Sık kullanılan simgeler",
-        "admin": "Yönetim simgeleri"
+        "overview": "Bütün simgeler"
       },
       "kpi": {
         "overview": "Örnek",

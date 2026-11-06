@@ -38,7 +38,7 @@ pub fn confirm_actions(_ctx: &Ctx) -> Node {
         .column(Product::name)
         .flex(1)
         .row_action("Delete", pretend_delete, |p| p.id)
-        .icon(Icon::Delete)
+        .icon(Icon::Trash)
         .confirm("Delete this product? Nothing is stored in the catalog.")
         .tone(Tone::Danger)
         .bulk_action("Delete selected", pretend_delete_all, Product::id)

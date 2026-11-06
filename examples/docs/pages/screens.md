@@ -139,9 +139,11 @@ Screen::new(t!("stock.products"))
     .context_menu(ContextMenu::new().item(t!("stock.new_product"), Window::open(product_editor, ProductParams { id: None })).action(t!("stock.restock_low"), restock_low, ()))
 ```
 
-Shortcuts like `Alt+N` work on the screen and are shown in the palette. Shortcuts the browser uses (`Ctrl+P`, `Ctrl+S`, `F5`) are not bound unless the button calls `.override_browser()`, and ones it never passes on (`Ctrl+N`, `Ctrl+T`, `Ctrl+W`) are never bound; free combinations are `Alt+Shift+<letter>` and `Ctrl+Alt+<letter>`.
+Shortcuts like `Alt+N` work on the screen, are shown in the palette and appear in the button's tooltip (with `.tip(text)` when it has one), not in its label. Shortcuts the browser uses (`Ctrl+P`, `Ctrl+S`, `F5`) are not bound unless the button calls `.override_browser()`, and ones it never passes on (`Ctrl+N`, `Ctrl+T`, `Ctrl+W`) are never bound; free combinations are `Alt+Shift+<letter>` and `Ctrl+Alt+<letter>`.
 
-Icons for buttons, menu groups and tools come from `Icon`: `Plus`, `Edit`, `Delete`, `Save`, `Search`, `Box`, `Cart`, `Table`, `Home`, `Chart`, `Users`, `Settings`, `Bell`, `Shield`, `Clock`, `Tag`, `Mail`, `SignOut`, `ArrowUp`, `ArrowDown`. They are masks in `zeyn.css` drawn on a 24 px grid with a 2 px round stroke, take the text color, and are hidden from screen readers, so the label always carries the meaning.
+Icons for buttons, menu groups and tools come from `Icon`, a set of 82 drawings listed by `Icon::ALL` (`Plus`, `Edit`, `Trash`, `Search`, `Filter`, `Download`, `ChartBar`, `Users`, `Settings`, `Bell`, `SignOut` and more; the component catalog shows them all). They are masks in `/_zeyn/icons.css` drawn on a 20 px grid with a 1.5 px round stroke, take the text color, and are hidden from screen readers, so the label always carries the meaning.
+
+Buttons are 36 px (32 px in compact density) with a quiet outline; primary buttons carry the brand. `.ghost()` after `.button(..)` drops the outline for secondary actions in dense bars, and `.danger()` draws an action that deletes or cancels in the danger color.
 
 ## Header
 
@@ -154,7 +156,7 @@ Screen::new(t!("orders.title"))
     .toolbar(|t| t.export(Export::Csv))
 ```
 
-`.primary` takes the same buttons as `.toolbar`, with the same shortcuts and palette entries; the toolbar stays under the header for the other tools. The subtitle is the screen's description for screen readers (`aria-describedby`). When the row is too narrow, the actions wrap under the title, and on phones they line up at the start. Without a subtitle or primary actions the screen renders as before, a plain heading.
+`.primary` takes the same buttons as `.toolbar`, with the same shortcuts and palette entries; the toolbar stays under the header for the other tools. Two or more `.export(..)` calls in one bar fold into a single "Export" menu button with one item per format. The subtitle is the screen's description for screen readers (`aria-describedby`). When the row is too narrow, the actions wrap under the title, and on phones they line up at the start. Without a subtitle or primary actions the screen renders as before, a plain heading.
 
 ## Features and the menu
 

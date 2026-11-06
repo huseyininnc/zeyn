@@ -302,6 +302,21 @@ document.addEventListener('focusin', (e) => {
   if (t instanceof Element && t.matches('.z-mask > .z-native')) t.parentElement.querySelector('.z-mask-input')?.focus();
 });
 
+/** Says "Caps Lock is on" under a password input while it has focus and Caps Lock is on. */
+function capsHint(e) {
+  const t = e.target;
+  if (!(t instanceof HTMLInputElement) || !t.matches('[data-zeyn-password] input') || !e.getModifierState) return;
+  const hint = t.closest('[data-zeyn-password]').nextElementSibling;
+  if (hint?.matches('[data-zeyn-caps]')) hint.hidden = !e.getModifierState('CapsLock');
+}
+
+document.addEventListener('keydown', capsHint);
+document.addEventListener('keyup', capsHint);
+document.addEventListener('focusout', (e) => {
+  const hint = e.target instanceof Element && e.target.closest('[data-zeyn-password]')?.nextElementSibling;
+  if (hint?.matches?.('[data-zeyn-caps]')) hint.hidden = true;
+});
+
 document.addEventListener(
   'submit',
   (e) => {

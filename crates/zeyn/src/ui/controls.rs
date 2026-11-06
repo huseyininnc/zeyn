@@ -41,6 +41,9 @@ pub enum Control {
     /// A one time code input for text fields: numeric keyboard, `autocomplete="one-time-code"`,
     /// never kept in drafts.
     OneTimeCode,
+    /// The user name or e-mail of a sign in form: `autocomplete="username"`, no capitals or
+    /// spell check, so password managers fill it with the password.
+    Username,
     /// A number shown as a percentage, for `Decimal` and whole number fields. The value is in
     /// percent points: `12.5` is shown as `12.5 %` (`%12,5` in Turkish) and stored as `12.5`.
     Percent,
@@ -324,10 +327,11 @@ pub(crate) fn render_text(out: &mut String, r: &Render, s: &Slot) {
                 s.common.to_string()
             };
             out.push_str(&format!(
-                r#"<div class="z-password" data-zeyn-password><input type="password" autocomplete="{auto}" spellcheck="false" {common}{minlength}{maxlength} value=""><button type="button" class="z-password-toggle" aria-pressed="false" aria-controls="{id}" aria-label="{}" data-testid="{}.field.{}.toggle" hidden><span class="z-eye" aria-hidden="true"></span></button></div>"#,
+                r#"<div class="z-password" data-zeyn-password><input type="password" autocomplete="{auto}" spellcheck="false" {common}{minlength}{maxlength} value=""><button type="button" class="z-password-toggle" aria-pressed="false" aria-controls="{id}" aria-label="{}" data-testid="{}.field.{}.toggle" hidden><span class="z-eye" aria-hidden="true"></span></button></div><p class="z-caps" data-zeyn-caps aria-live="polite" hidden>{}</p>"#,
                 ui(r, "password.show"),
                 r.scope,
-                s.m.name
+                s.m.name,
+                ui(r, "password.caps")
             ));
             if meter {
                 let levels =
@@ -343,17 +347,23 @@ pub(crate) fn render_text(out: &mut String, r: &Render, s: &Slot) {
             out.push_str(&format!(r#"<input type="text" inputmode="text" autocomplete="one-time-code" spellcheck="false" {}{maxlength} value="">"#, s.common));
         }
         _ => {
-            let kind = if s
-                .m
-                .rules
-                .contains(&crate::model::Rule::Email)
-            {
-                "email"
-            } else {
-                "text"
+            let email =
+                s.m.rules
+                    .contains(&crate::model::Rule::Email);
+            let (kind, auto) = match (s.control == Some(Control::Username), email) {
+                (true, true) => (
+                    "email",
+                    r#" autocomplete="username" autocapitalize="none" spellcheck="false""#,
+                ),
+                (true, false) => (
+                    "text",
+                    r#" autocomplete="username" autocapitalize="none" spellcheck="false""#,
+                ),
+                (false, true) => ("email", r#" autocomplete="email""#),
+                (false, false) => ("text", ""),
             };
             out.push_str(&format!(
-                r#"<input type="{kind}" {}{minlength}{maxlength} value="{text}">"#,
+                r#"<input type="{kind}"{auto} {}{minlength}{maxlength} value="{text}">"#,
                 s.common
             ));
         }

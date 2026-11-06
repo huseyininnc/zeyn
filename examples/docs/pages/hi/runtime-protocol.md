@@ -302,6 +302,7 @@ Effect:
 | `zeyn:effect` | `document` | वह effect जिसे रनटाइम नहीं जानता: `{ effect, source, run }`। `run(next)` दूसरा effect चलाता है। `confirm` द्वारा इस्तेमाल। |
 | `zeyn:topics` | `document` | `{ topics }`: किसी दूसरी स्क्रिप्ट (सूचना पर `live.js`) से रिफ़्रेश करने वाले topic। |
 | `zeyn:reload` | कोई तत्व | उसके अंदर के ग्रिड उसी जगह फिर से लोड करता है: मौजूदा पेज, या `{ reset: true }` के साथ पहला पेज। |
+| `zeyn:density` | `document` | कोई नहीं। उपयोगकर्ता ने खाता मेनू में दूसरा घनत्व चुना (`<html>` पर `data-density` पहले ही बदल चुका है); windowed कार्ड ग्रिड अपनी पंक्तियाँ फिर से मापते हैं। |
 
 Effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":"...","then":{...}}` मोडल alert डायलॉग में पूछता है और उपयोगकर्ता के पुष्टि करने के बाद ही `then` चलाता है।
 

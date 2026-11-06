@@ -30,7 +30,7 @@ Row::new().col(customer_form).weight(2).col(order_totals)
 
 ## Card と Panel
 
-`Card` は、任意のタイトルを持つ単純な面です。`Panel` は、任意のツールバーを持つタイトル付きのセクションで、`.collapsible()` でユーザーが折りたためるようになり、`.collapsed()` で折りたたんだ状態から始まります。
+`Card` は、任意のタイトルを持つ単純な面です。余白は 20 px、枠線は 1 本で、影はありません。`.action(node)` はタイトル行の末尾に操作を 1 つ置き（リンクボタンやメニュー）、`.footer(node)` は区切り線の下に「すべて表示」リンクのようなフッターを追加します。カードの中身がグリッドや一覧のときは端から端まで広がるため、枠線は 2 本ではなく 1 本になります。カードの中のカードは自分の箱を描きません。`Row` に並ぶカードは一番高いものに合わせて伸びます。`Panel` は、任意のツールバーを持つタイトル付きのセクションで、`.collapsible()` でユーザーが折りたためるようになり、`.collapsed()` で折りたたんだ状態から始まります。
 
 ```rust
 Panel::new(t!("ui.panel_products")).collapsible().toolbar(|t| t.export(Export::Csv)).add(products())

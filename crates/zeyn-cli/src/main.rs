@@ -547,13 +547,16 @@ fn routes_table(d: &Value) -> String {
     out
 }
 
-/// Zeyn names that changed, old to new. `zeyn check --fix` rewrites them.
+/// Zeyn names that changed, old to new. `zeyn check --fix` rewrites them. A name with `::`
+/// (`Icon::Delete`) is renamed only where it is written with that path.
 const RENAMES: &[(&str, &str)] = &[
     ("GridQuery", "DataQuery"),
     ("GridMode", "DataMode"),
     ("GridColumn", "DataGridColumn"),
     ("Grid", "DataGrid"),
     ("MAX_EMBED_CONSENT", "MAX_PREF_LIFETIME"),
+    ("Icon::Delete", "Icon::Trash"),
+    ("Icon::Chart", "Icon::ChartBar"),
 ];
 
 /// Runs [`fix_renames`] when asked and describes what changed.
@@ -633,6 +636,22 @@ fn rename_idents(text: &str, renames: &[(&str, &str)]) -> (String, usize) {
                 i += 1;
             }
             let word: String = chars[start..i].iter().collect();
+            if chars.get(i) == Some(&':') && chars.get(i + 1) == Some(&':') {
+                let mut j = i + 2;
+                while j < chars.len() && (chars[j].is_alphanumeric() || chars[j] == '_') {
+                    j += 1;
+                }
+                let path: String = chars[start..j].iter().collect();
+                if let Some((_, new)) = renames
+                    .iter()
+                    .find(|(old, _)| *old == path)
+                {
+                    out.push_str(new);
+                    count += 1;
+                    i = j;
+                    continue;
+                }
+            }
             match renames
                 .iter()
                 .find(|(old, _)| *old == word)
@@ -967,6 +986,17 @@ const RAW: &str = r#"Grid "quoted" Grid"#; const C: char = 'G';"##;
             super::rename_idents(&out, super::RENAMES).1,
             0,
             "a second run changes nothing"
+        );
+    }
+
+    #[test]
+    fn renames_qualified_names_only_with_their_path() {
+        let src = "m.group(\"Reports\", Icon::Chart).icon(Icon::Delete); Method::Delete; Icon::ChartBar; let Chart = 1;";
+        let (out, n) = super::rename_idents(src, super::RENAMES);
+        assert_eq!(n, 2, "{out}");
+        assert_eq!(
+            out,
+            "m.group(\"Reports\", Icon::ChartBar).icon(Icon::Trash); Method::Delete; Icon::ChartBar; let Chart = 1;"
         );
     }
 

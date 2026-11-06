@@ -211,7 +211,7 @@ pub fn today() -> Screen {
             .column(Order::status)
             .width(130)
             .filter()
-            .badge(status_tone)
+            .status(status_tone)
             .row_style(muted_if_cancelled)
             .detail(|o| (order_lines, OrderParams { id: o.id })),
     )
@@ -241,7 +241,7 @@ pub fn orders_by_city() -> Screen {
             .avg()
             .column(Order::status)
             .width(130)
-            .badge(status_tone)
+            .status(status_tone)
             .detail(|o| (order_lines, OrderParams { id: o.id })),
     )
 }
@@ -417,7 +417,10 @@ pub fn feature() -> Feature {
         .menu(|m| {
             m.group(t!("menu.sales"), Icon::Cart)
                 .item(t!("sales.today"), today)
+                .icon(Icon::Cart)
                 .item(t!("sales.by_city"), orders_by_city)
+                .icon(Icon::Table)
                 .item(t!("sales.archive"), archive)
+                .icon(Icon::Clock)
         })
 }

@@ -22,7 +22,7 @@ Stack::new()
 
 ## Badge
 
-`Badge::new(text).tone(Tone::...)`。可用的 tone：`Neutral`、`Info`、`Success`、`Warning`、`Danger` 和 `Brand`。表格通过 `.badge(|v| tone)` 将值显示为徽标。
+`Badge::new(text).tone(Tone::...)`。可用的 tone：`Neutral`、`Info`、`Success`、`Warning`、`Danger` 和 `Brand`。带色调的徽标以该色调的文字显示在该色调的淡色背景上；`Neutral` 是带一道轮廓的弱化标签，用于套餐之类的普通值。`.dot()` 在普通文字前绘制一个 8 px 的该色调圆点，是列表中表示状态的更低调形式；`.count()` 为数字绘制一个圆形胶囊。表格通过 `.badge(|v| tone)` 将值显示为徽标，通过 `.status(|v| tone)` 显示为圆点。
 
 ## Progress
 

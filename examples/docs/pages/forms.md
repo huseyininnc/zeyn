@@ -27,6 +27,8 @@ Leave the name empty or type a wrong email and press *Send*: the browser shows t
 | `.range(M::from, M::to)` | Two dates as one range picker |
 | `Form::auto(value)` | Every field, in declaration order |
 
+Forms are at most 720 px wide, and a card or panel that holds only a form is as wide as the form, so no half of the card stays empty. Labels sit 6 px above 36 px inputs; fields are 20 px apart. A focused input gets a border in the focus color and a soft 3 px ring; an invalid one a danger border. Units, currency and `%` are drawn muted inside the input, and number fields put their minus and plus buttons (28 px) inside the end of the field; arrow keys still step.
+
 ## Saving
 
 `.submit(label, action)` names the action that saves. The action must take `Valid<M>` for the form's model; anything else does not compile. The runtime sends the values, the server runs every rule, then the action.

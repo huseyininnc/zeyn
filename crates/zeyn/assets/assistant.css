@@ -372,7 +372,7 @@
   border-radius: 50%;
   background: var(--z-primary);
   color: var(--z-on-primary);
-  box-shadow: 0 6px 18px hsl(var(--z-shadow-color) / var(--z-shadow-strength));
+  box-shadow: var(--z-shadow-2);
   cursor: pointer;
 }
 
@@ -398,7 +398,7 @@
   display: flex;
   width: min(26rem, calc(100vw - 2rem));
   height: min(40rem, calc(100dvh - 2rem));
-  box-shadow: 0 12px 32px hsl(var(--z-shadow-color) / var(--z-shadow-strength));
+  box-shadow: var(--z-shadow-3);
   border-radius: calc(var(--z-radius) * 2);
 }
 
@@ -410,7 +410,7 @@
   flex: 1;
 }
 
-@media (max-width: 40rem) {
+@media (max-width: 640px) {
   .z-assistant-dock {
     inset: 0;
     width: 100vw;

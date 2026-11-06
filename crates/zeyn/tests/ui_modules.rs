@@ -135,6 +135,7 @@ async fn a_screen_without_a_component_never_references_its_module() {
     let linked = links(&page);
     let core = [
         "zeyn.css",
+        "icons.css",
         "zeyn.js",
         "nav.js",
         "enterprise.css",

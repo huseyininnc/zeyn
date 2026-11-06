@@ -207,7 +207,13 @@
       "xlsx": "Excel'e aktar",
       "csv": "CSV'ye aktar",
       "pdf": "PDF'e aktar",
-      "pdf_cut": "Yalnızca ilk {max} satır yazdırıldı."
+      "pdf_cut": "Yalnızca ilk {max} satır yazdırıldı.",
+      "menu": "Dışa aktar",
+      "format": {
+        "xlsx": "Excel",
+        "csv": "CSV",
+        "pdf": "PDF"
+      }
     },
     "shell": {
       "skip": "İçeriğe geç",
@@ -217,6 +223,14 @@
       "time_zone_auto": "Otomatik (bu cihaz)",
       "theme": "Tema",
       "primary_actions": "Ana işlemler",
+      "search": "Ara",
+      "breadcrumb": "Konum",
+      "account": "Hesap",
+      "density": "Yoğunluk",
+      "density_comfortable": "Rahat",
+      "density_compact": "Sıkı",
+      "account_of": "{name} hesabı",
+      "signed_in_as": "Oturum açan",
       "theme_system": "Sistem",
       "theme_light": "Açık",
       "theme_dark": "Koyu",
@@ -389,7 +403,10 @@
         "value": "Değer",
         "min": "En az",
         "max": "En çok",
-        "target": "Hedef"
+        "target": "Hedef",
+        "thousand": "{n} B",
+        "million": "{n} Mn",
+        "billion": "{n} Mr"
       },
       "tree": {
         "empty": "Kayıt yok."
@@ -456,9 +473,13 @@
         "up": "Önceki döneme göre yüzde {pct} artış",
         "down": "Önceki döneme göre yüzde {pct} düşüş",
         "flat": "Önceki döneme göre değişiklik yok",
-        "target": "Hedef {target}, yüzde {pct} ulaşıldı"
+        "target": "Hedef {target}, yüzde {pct} ulaşıldı",
+        "compare": "önceki döneme göre",
+        "million": "{n} Mn",
+        "billion": "{n} Mr"
       },
       "password": {
+        "caps": "Caps Lock açık",
         "show": "Parolayı göster",
         "weak": "Güç: zayıf",
         "fair": "Güç: orta",

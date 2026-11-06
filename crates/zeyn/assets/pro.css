@@ -51,12 +51,13 @@ dialog.z-palette {
   max-height: min(32rem, calc(100dvh - 64px));
   margin: 12dvh auto auto;
   padding: 0;
-  border: 1px solid var(--z-border-strong);
-  border-radius: var(--z-radius-lg);
-  background: var(--z-surface);
+  border: 0;
+  border-radius: var(--z-radius-xl);
+  background: var(--z-raised);
   color: var(--z-text);
-  box-shadow: var(--z-shadow-2);
+  box-shadow: var(--z-shadow-3);
   overflow: hidden;
+  animation: z-dialog-in var(--z-dur-3) var(--z-ease-out);
 }
 
 dialog.z-palette[open] { display: flex; flex-direction: column; }
@@ -66,63 +67,78 @@ dialog.z-palette::backdrop { background: var(--z-backdrop); }
 .z-palette-input {
   flex: 0 0 auto;
   width: 100%;
-  min-height: calc(var(--z-control) * 1.375);
-  padding: 0 calc(var(--z-space) * 4);
+  min-height: 52px;
+  padding-block: 0;
+  padding-inline: calc(var(--z-s-4) + 26px) var(--z-s-4);
   border: 0;
   border-bottom: 1px solid var(--z-border);
-  background: var(--z-surface);
+  background: var(--z-raised) no-repeat;
   color: var(--z-text);
   font: inherit;
-  font-size: 1rem;
+  font-size: var(--z-text-lg);
 }
 
-.z-palette-input:focus-visible { outline: 2px solid var(--z-focus); outline-offset: -2px; }
+dialog.z-palette::before {
+  content: "";
+  position: absolute;
+  top: 17px;
+  inset-inline-start: var(--z-s-4);
+  width: 18px;
+  height: 18px;
+  background: var(--z-text-muted);
+  -webkit-mask: var(--z-i) center / contain no-repeat;
+  mask: var(--z-i) center / contain no-repeat;
+  --z-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 9a5.5 5.5 0 1 0 11 0 5.5 5.5 0 1 0-11 0M13 13l4 4'/%3E%3C/svg%3E");
+}
+
+.z-palette-input:focus-visible { outline: none; }
 
 .z-palette-list {
   flex: 1 1 auto;
   margin: 0;
-  padding: 4px;
+  padding: var(--z-s-1) var(--z-s-2) var(--z-s-2);
   overflow-y: auto;
   list-style: none;
+}
+
+.z-palette-heading {
+  padding: var(--z-s-2) var(--z-s-2) var(--z-s-1);
+  color: var(--z-text-muted);
+  font-size: var(--z-text-xs);
+  font-weight: 500;
+  line-height: var(--z-leading-xs);
 }
 
 .z-palette-option {
   display: flex;
   align-items: center;
-  gap: calc(var(--z-space) * 3);
-  min-height: 32px;
-  padding: 2px calc(var(--z-space) * 3);
-  border-radius: var(--z-radius-sm);
+  gap: var(--z-s-3);
+  min-height: 40px;
+  padding: 0 var(--z-s-2);
+  border-radius: var(--z-radius);
+  font-size: var(--z-text-md);
   cursor: pointer;
 }
 
-.z-palette-option[aria-selected="true"] {
-  background: var(--z-brand-subtle);
-  box-shadow: inset calc(2px * var(--z-dir)) 0 0 var(--z-accent);
-}
+.z-palette-option > .z-icon { color: var(--z-text-muted); }
+
+.z-palette-option[aria-selected="true"] { background: var(--z-hover); }
+
+.z-palette-option[aria-selected="true"] > .z-icon { color: var(--z-text); }
 
 .z-palette-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.z-palette-group {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--z-text-muted);
-  font-size: var(--z-font-size-xs);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+.z-palette-label b { font-weight: 600; }
 
-.z-palette-empty { padding: calc(var(--z-space) * 4); color: var(--z-text-muted); text-align: center; }
+.z-palette-empty { padding: var(--z-s-6) var(--z-s-4); color: var(--z-text-muted); text-align: center; }
 
 .z-palette-hint {
   flex: 0 0 auto;
   margin: 0;
-  padding: calc(var(--z-space) * 1.5) calc(var(--z-space) * 4);
+  padding: var(--z-s-2) var(--z-s-4);
   border-top: 1px solid var(--z-border);
-  background: var(--z-surface-2);
   color: var(--z-text-muted);
-  font-size: var(--z-font-size-xs);
+  font-size: var(--z-text-xs);
 }
 
 @media (forced-colors: active) {
@@ -211,7 +227,7 @@ dialog.z-palette::backdrop { background: var(--z-backdrop); }
   background: none;
   color: var(--z-text);
   font: inherit;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
 }
 
@@ -412,7 +428,7 @@ dialog.z-palette::backdrop { background: var(--z-backdrop); }
 
 .z-dock-tab:hover { color: var(--z-text); background: var(--z-hover); }
 
-.z-dock-tab[aria-selected="true"] { background: var(--z-surface); color: var(--z-text); font-weight: 600; }
+.z-dock-tab[aria-selected="true"] { background: var(--z-surface); color: var(--z-text); font-weight: 500; }
 
 .z-dock-tab[aria-selected="true"]::after {
   content: "";

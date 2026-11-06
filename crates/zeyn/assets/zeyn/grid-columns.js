@@ -185,7 +185,10 @@ function setupHead(grid, s) {
     const row = make('tr', 'z-filter-row');
     for (const th of head.cells) {
       const cell = make('td');
-      if (th.dataset.pin) cell.dataset.pin = th.dataset.pin;
+      if (th.dataset.pin) {
+        cell.dataset.pin = th.dataset.pin;
+        cell.classList.add(...[...th.classList].filter((c) => c.startsWith('z-p')));
+      }
       if (th.dataset.filter) {
         filterControls(cell, th, t);
         fillFilter(cell, s.filters[th.dataset.field], t);

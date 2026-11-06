@@ -302,6 +302,7 @@ Hepsi JSON ve CSRF başlığıyla `POST`'tur ve önce ekranın erişimini ve Fea
 | `zeyn:effect` | `document` | Runtime'ın tanımadığı bir effect: `{ effect, source, run }`. `run(next)` başka bir effect çalıştırır. `confirm` tarafından kullanılır. |
 | `zeyn:topics` | `document` | `{ topics }`: başka bir betikten yenilenecek topic'ler (bir bildirimde `live.js`). |
 | `zeyn:reload` | bir öğe | İçindeki grid'leri yerinde yeniden yükler: geçerli sayfayı, ya da `{ reset: true }` ile ilk sayfayı. |
+| `zeyn:density` | `document` | Yok. Kullanıcı hesap menüsünden başka bir yoğunluk seçti (`<html>` üzerindeki `data-density` zaten değişti); pencereli kart grid'leri satırlarını yeniden ölçer. |
 
 `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":"...","then":{...}}` effect'i modal bir uyarı diyaloğunda sorar ve `then` değerini yalnızca kullanıcı onayladıktan sonra çalıştırır.
 

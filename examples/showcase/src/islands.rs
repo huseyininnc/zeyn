@@ -289,7 +289,7 @@ pub fn feature() -> Feature {
         .screen(island_counter)
         .screen(island_diagram)
         .menu(|m| {
-            m.group(t!("menu.islands"), Icon::Chart)
+            m.group(t!("menu.islands"), Icon::ChartBar)
                 .item(t!("islands.counter"), island_counter)
                 .item(t!("islands.diagram"), island_diagram)
         })

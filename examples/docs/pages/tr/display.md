@@ -22,7 +22,7 @@ Stack::new()
 
 ## Badge
 
-`Badge::new(text).tone(Tone::...)`. Tonlar: `Neutral`, `Info`, `Success`, `Warning`, `Danger` ve `Brand`. Grid'ler değerleri `.badge(|v| tone)` ile rozet olarak gösterir.
+`Badge::new(text).tone(Tone::...)`. Tonlar: `Neutral`, `Info`, `Success`, `Warning`, `Danger` ve `Brand`. Tonlu bir rozet, tonun metnini tonun soluk zemini üzerinde gösterir; `Neutral` tek çizgili soluk bir etikettir, bir plan gibi düz değerler içindir. `.dot()` düz metnin önüne tonun renginde 8 px'lik bir nokta çizer; bu, listelerde durum için daha sakin biçimdir. `.count()` bir sayı için yuvarlak bir hap çizer. Grid'ler değerleri `.badge(|v| tone)` ile rozet olarak, `.status(|v| tone)` ile nokta olarak gösterir.
 
 ## Progress
 

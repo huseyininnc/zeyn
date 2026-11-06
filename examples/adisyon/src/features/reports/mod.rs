@@ -51,7 +51,7 @@ pub fn feature() -> Feature {
         .screen(reports)
         .api(find_sales)
         .menu(|m| {
-            m.group(t!("reports.menu"), Icon::Chart)
+            m.group(t!("reports.menu"), Icon::ChartBar)
                 .item(t!("reports.title"), reports)
         })
 }

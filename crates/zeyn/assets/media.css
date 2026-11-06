@@ -230,7 +230,7 @@
   color: var(--z-text);
   border: 1px solid var(--z-border);
   border-radius: var(--z-radius);
-  box-shadow: 0 6px 20px hsl(var(--z-shadow-color) / var(--z-shadow-strength));
+  box-shadow: var(--z-shadow-2);
 }
 
 .z-player-list [role="menuitemradio"] {

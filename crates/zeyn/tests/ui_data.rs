@@ -115,7 +115,18 @@ fn bar_charts_are_accessible_svg_with_a_legend_and_a_data_table() {
             .decimals(1),
         "tr",
     );
-    assert!(html.contains(r#"<svg class="z-chart-svg" viewBox="0 0 640 260" role="group" aria-roledescription="grafik" aria-labelledby="s-chart--title s-chart--desc" focusable="false">"#));
+    assert!(html.contains(r#"<div class="z-chart-plot" role="group" aria-roledescription="grafik" aria-labelledby="s-chart--title s-chart--desc"><p class="z-sr-only" id="s-chart--desc">"#), "{html}");
+    assert!(
+        html.contains(r#"<svg class="z-chart-svg" viewBox="0 0 640 260" preserveAspectRatio="none" focusable="false">"#),
+        "the plot stretches and holds only geometry"
+    );
+    assert!(
+        html.contains(r#"<div class="z-chart-y z-chart-y-start" aria-hidden="true">"#)
+            && html.contains(
+                r#"<div class="z-chart-x" aria-hidden="true"><span style="left:25.00%">Jan</span>"#
+            ),
+        "tick labels are HTML beside the plot: {html}"
+    );
     assert!(html.contains(
         r#"<figcaption class="z-chart-title" id="s-chart--title">Sales &lt;2026&gt;</figcaption>"#
     ));
@@ -126,10 +137,20 @@ fn bar_charts_are_accessible_svg_with_a_legend_and_a_data_table() {
     assert!(html.contains(r#"aria-label="Feb &lt;b&gt;, Web: 50,0""#));
     assert!(!html.contains("<b>"), "labels are escaped");
     assert!(
-        html.contains(r#">1.500,0</text>"#)
-            && html.contains(r#">500,0</text>"#)
-            && html.contains(r#">0,0</text>"#),
+        html.contains(r#"<span style="top:0.00%">1.500,0</span>"#)
+            && html.contains(r#">500,0</span>"#)
+            && html.contains(r#"<span style="top:100.00%">0,0</span>"#),
         "axis goes to a round number"
+    );
+    let big = render(
+        Chart::bar("Revenue")
+            .labels(["Q1", "Q2"])
+            .series("Revenue", [420_000.0, 610_000.0]),
+        "en",
+    );
+    assert!(
+        big.contains(">800K</span>") && !big.contains("z-chart-legend"),
+        "ticks are shortened and a single series has no legend: {big}"
     );
     assert!(html.contains(
         r#"<li><span class="z-chart-swatch z-series-1" aria-hidden="true"></span>Web</li>"#
@@ -150,8 +171,13 @@ fn line_and_donut_charts_describe_themselves() {
     );
     assert!(
         line.contains(r#"<polyline class="z-chart-line z-series-0""#)
-            && line.matches("<circle").count() == 3
+            && line
+                .matches(r#"<span class="z-chart-pt z-chart-mark"#)
+                .count()
+                == 3,
+        "points are round HTML marks over the stretched line: {line}"
     );
+    assert!(line.contains(r#"z-chart-pt-last" style="left:83.33%"#));
     assert!(line.contains("Highest: W2, 9."));
     let donut = render(
         Chart::donut("Units")
@@ -241,7 +267,11 @@ fn every_kind() -> Vec<(&'static str, Chart)> {
 fn every_chart_kind_has_a_summary_a_table_and_one_tab_stop_over_named_marks() {
     for (name, chart) in every_kind() {
         let html = render(chart, "en");
-        assert!(html.contains("<desc id="), "{name}: summary");
+        assert!(
+            html.contains("<desc id=")
+                || html.contains(r#"<p class="z-sr-only" id="s-chart--desc">"#),
+            "{name}: summary"
+        );
         assert!(
             !html.contains("{"),
             "{name}: every placeholder is filled: {html}"
@@ -289,7 +319,8 @@ fn new_chart_kinds_say_what_they_show() {
     assert!(all["area"].contains(r#"<polygon class="z-chart-area z-series-0""#));
     assert!(all["combo"].contains(r#"<polyline class="z-chart-line z-series-1""#));
     assert!(
-        all["combo"].contains(r#"text-anchor="start">20</text>"#),
+        all["combo"].contains(r#"<div class="z-chart-y z-chart-y-end" aria-hidden="true">"#)
+            && all["combo"].contains(">20</span>"),
         "the line has its own axis on the right"
     );
     assert!(all["combo"].contains("z-chart-swatch-line"));
@@ -326,7 +357,11 @@ fn kpi_cards_show_value_direction_target_and_trend() {
         .render(&mut out, &Render::new("s", "en", I18n::builtin()));
     assert!(out.contains(r#"role="group" aria-labelledby="s-kpi--title""#));
     assert!(out.contains("Wait &lt;min&gt;"));
-    assert!(out.contains(r#"<p class="z-kpi-delta z-kpi-good"><span aria-hidden="true">▼</span> Down 8.0% from the previous period</p>"#), "{out}");
+    assert!(out.contains(r#"<p class="z-kpi-delta"><span class="z-kpi-chip z-kpi-good" aria-hidden="true"><span class="z-icon z-icon-trend-down" aria-hidden="true"></span>−8.0%</span> <span class="z-kpi-compare" aria-hidden="true">vs previous period</span><span class="z-sr-only">Down 8.0% from the previous period</span></p>"#), "{out}");
+    assert!(
+        out.contains(r#"<div class="z-kpi-trend z-kpi-good"><div class="z-kpi-spark-box"><svg class="z-kpi-spark" viewBox="0 0 100 40" preserveAspectRatio="none""#),
+        "the trend spans the card in the delta's tone: {out}"
+    );
     assert!(out.contains("Target 10, 120% reached"));
     assert!(out.contains("Trend of 3 values from 15 to 12, lowest 12, highest 15"));
     let mut tr = String::new();
@@ -352,12 +387,25 @@ fn kpi_money_shows_the_currency_in_the_users_locale() {
         "en",
     );
     assert!(
-        en.contains(r#"<p class="z-kpi-value">₺184,250.50</p>"#),
+        en.contains(r#"<p class="z-kpi-value"><span class="z-kpi-unit">₺</span>184,250.50</p>"#),
         "{en}"
     );
     assert!(en.contains("Target ₺200,000.00, 92% reached"), "{en}");
     let tr = render(Kpi::money("Ciro", Money::tl(-1_050)), "tr");
-    assert!(tr.contains("-10,50 ₺"), "{tr}");
+    assert!(
+        tr.contains(r#"-10,50 <span class="z-kpi-unit">₺</span>"#),
+        "{tr}"
+    );
+    let big = render(Kpi::money("Revenue", Money::tl(123_456_789)), "en");
+    assert!(
+        big.contains(r#"<p class="z-kpi-value" title="₺1,234,567.89"><span aria-hidden="true"><span class="z-kpi-unit">₺</span>1.23<span class="z-kpi-unit">M</span></span><span class="z-sr-only">₺1,234,567.89</span></p>"#),
+        "seven digits and more are shortened, with the full value for screen readers: {big}"
+    );
+    let flat = render(Kpi::new("Orders", 10.0).delta(0.2), "en");
+    assert!(
+        flat.contains("z-kpi-chip z-kpi-neutral"),
+        "under half a percent is neutral"
+    );
     let schema = Kpi::money("Revenue", Money::tl(100)).schema();
     assert_eq!(schema["currency"], "Try");
     assert_eq!(schema["value"], 1.0);
@@ -369,11 +417,11 @@ fn kpis_share_the_height_of_their_row_and_wrap_four_two_one() {
     assert!(css.contains(".z-col > .z-node:has(> .z-kpi) { height: 100%; }"));
     assert!(css.contains(".z-autogrid > .z-node:has(> .z-kpi)"));
     assert!(css.contains("align-items: stretch"));
-    assert!(css.contains(".z-kpi-trend { margin-top: auto; }"));
+    assert!(css.contains("margin-top: auto; padding-top: var(--z-s-2)"));
     for basis in [
         "calc((100% - 3 * var(--z-gap)) / 4 - 0.1px)",
         "calc((100% - var(--z-gap)) / 2 - 0.1px)",
-        "flex-basis: 100%",
+        ".z-kpi-trend { display: none; }",
     ] {
         assert!(css.contains(basis), "{basis}");
     }

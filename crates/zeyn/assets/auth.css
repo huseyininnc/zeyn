@@ -1,0 +1,117 @@
+/**
+ * The sign in shell (`Shell::auth()`): no menu and no top bar, the logo and name over one
+ * centered card, the pickers at the bottom. `.z-auth-split` puts a brand panel beside the form
+ * from 1024 px. Loaded on sign in pages only; reads the theme tokens of zeyn.css.
+ */
+
+.z-auth {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 100dvh;
+  background: var(--z-bg);
+}
+
+.z-auth-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--z-s-8);
+  padding: max(64px, 12dvh) var(--z-s-4) var(--z-s-6);
+}
+
+.z-auth-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--z-s-3);
+  margin: 0;
+  color: var(--z-text);
+  font-size: var(--z-text-lg);
+  font-weight: 600;
+  line-height: var(--z-leading-lg);
+}
+
+.z-auth-logo { width: 32px; height: 32px; font-size: var(--z-text-md); }
+
+.z-main.z-auth-card {
+  width: min(400px, 100%);
+  padding: var(--z-s-8);
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius-xl);
+  background: var(--z-surface);
+  box-shadow: var(--z-shadow-1);
+}
+
+.z-auth-card .z-screen > h1 {
+  margin: 0;
+  font-size: var(--z-text-xl);
+  line-height: var(--z-leading-xl);
+  letter-spacing: -0.01em;
+}
+
+.z-auth-card .z-form,
+.z-auth-card .z-card {
+  max-width: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.z-auth-card .z-form-actions { position: static; margin: 0; padding: 0; border: 0; background: none; }
+
+.z-auth-card .z-form-actions .z-button,
+.z-auth-card .z-account-providers .z-button,
+.z-auth-card [data-zeyn-passkey] { width: 100%; min-height: 40px; }
+
+.z-auth-card .z-account-providers { display: grid; gap: var(--z-s-2); margin: 0; padding: 0; list-style: none; }
+
+.z-auth-card .z-callout { margin: 0; }
+
+.z-auth-card .z-stack { gap: var(--z-s-4); }
+
+.z-auth-card .z-stack > .z-node > p { margin: 0; }
+
+.z-auth-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--z-s-4);
+  margin-top: auto;
+  color: var(--z-text-muted);
+  font-size: var(--z-text-xs);
+}
+
+.z-auth-foot .z-locale,
+.z-auth-foot .z-theme-field { margin: 0; max-width: 12rem; }
+
+.z-auth-aside { display: none; }
+
+@media (min-width: 1024px) {
+  .z-auth-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .z-auth-split .z-main.z-auth-card { border: 0; box-shadow: none; background: none; padding: 0; }
+  .z-auth-split .z-auth-column { align-items: center; padding-inline: var(--z-s-8); }
+  .z-auth-split .z-auth-brand { align-self: flex-start; }
+  .z-auth-split .z-auth-aside {
+    display: flex;
+    align-items: flex-end;
+    padding: var(--z-s-16) var(--z-s-12);
+    background: var(--z-brand);
+    color: var(--z-on-brand);
+  }
+  .z-auth-aside-name { margin: 0; font-size: var(--z-text-2xl); font-weight: 600; line-height: var(--z-leading-2xl); }
+}
+
+:root[data-theme="dark"] .z-main.z-auth-card { box-shadow: none; }
+:root[data-theme="dark"] .z-auth-split .z-auth-aside { background: color-mix(in oklab, var(--z-brand) 60%, var(--z-bg)); }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .z-main.z-auth-card { box-shadow: none; }
+  :root:not([data-theme="light"]) .z-auth-split .z-auth-aside { background: color-mix(in oklab, var(--z-brand) 60%, var(--z-bg)); }
+}
+
+@media (max-width: 640px) {
+  .z-auth-column { gap: var(--z-s-6); padding-top: var(--z-s-8); }
+  .z-main.z-auth-card { padding: var(--z-s-6) 0; border: 0; box-shadow: none; background: none; }
+  .z-auth-card input:not([type="checkbox"], [type="radio"]),
+  .z-auth-card .z-button { min-height: 44px; }
+}

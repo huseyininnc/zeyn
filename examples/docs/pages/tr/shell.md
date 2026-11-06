@@ -4,7 +4,17 @@ Shell, her screen'in etrafındaki çerçevedir: menü, dil, tema ve saat dilimi 
 
 ## Menü
 
-Menü, feature'ların `.menu(...)` çağrılarından gelir. Kullanıcının açamayacağı öğeler HTML'den çıkarılır ve guard'ları kullanıcıyı reddeden bir feature hiçbir şey göstermez. Geçerli screen'in bağlantısı `aria-current="page"` taşır.
+Menü, feature'ların `.menu(...)` çağrılarından gelir. Kullanıcının açamayacağı öğeler HTML'den çıkarılır ve guard'ları kullanıcıyı reddeden bir feature hiçbir şey göstermez. Geçerli screen'in bağlantısı `aria-current="page"` taşır ve markanın soluk tonu üzerinde çizilir.
+
+`.item(...)` sonrasında `.icon(Icon::...)` öğenin etiketinin önüne bir simge koyar; bir grubun öğelerinin simgeleri olduğunda grubun etiketi kendi simgesi olmadan çizilir. Yan menü uygulamanın logosu ve adıyla başlar: `App::logo("/static/logo.svg")` (ve koyu tema için `App::logo_dark(...)`) uygulamanın sunduğu bir işareti ayarlar; aksi halde shell, `--z-brand` renginde, adın ilk harfini taşıyan yuvarlatılmış bir kare çizer. Shell nötr kalır; marka rengi geçerli öğeyi, birincil düğmeleri, odak halkasını ve logoyu işaretler.
+
+Simgeler, 20 px'lik bir ızgarada 1,5 px yuvarlak çizgiyle çizilmiş 82 çizimlik tek bir setten gelir (`Icon::ALL`) ve geçerli metin renginde 16 ya da 20 px boyutunda gösterilir. Her biri `/_zeyn/icons.css` içinde bir CSS maskesidir; bu, `crates/zeyn/assets/icons/*.svg` dosyalarından üretilen, yaklaşık 25 KB (sıkıştırılmış 3 KB) boyutunda, önbelleğe alınan bir stil sayfasıdır. Böylece bir simge HTML'de tek bir sınıfa, betikte ise hiçbir şeye mal olmaz.
+
+```rust
+Feature::new("sales")
+    .screen(orders)
+    .menu(|m| m.group(t!("sales.menu"), Icon::Cart).item(t!("sales.orders"), orders).icon(Icon::Table))
+```
 
 ## Site shell'i
 
@@ -43,13 +53,25 @@ Feature::new("shop")
 ```
 
 - **Menü.** Üst menü, site shell'indeki her feature'ın menüsünü listeler. Tek öğeli bir grup düz bir bağlantıdır; daha büyük bir grup bağlantılarını açan bir düğmedir (W3C APG disclosure navigation deseni). Enter, Boşluk ya da bir tıklama grubu açıp kapatır, Aşağı ok açar ve ilk bağlantıya geçer, Yukarı ok, Aşağı ok, Home ve End bağlantıları arasında gezdirir, Escape kapatır ve düğmeye döner, gruptan Tab ile çıkmak ya da dışına tıklamak kapatır. Sol ve Sağ ok üst öğeler arasında gezdirir.
-- **Dar ekranlar.** 800 px altında menü, `aria-expanded` taşıyan bir menü düğmesinin arkasına katlanır; Escape kapatır. Betik olmadan menü açık kalır, böylece hiçbir şey erişilemez olmaz.
+- **Dar ekranlar.** 1024 px altında menü, `aria-expanded` taşıyan bir menü düğmesinin arkasına katlanır; Escape kapatır. Betik olmadan menü açık kalır, böylece hiçbir şey erişilemez olmaz.
 - **Üst bilgi slotları.** Üst çubuğun, mantıksal adlara sahip bir uygulama çubuğu gibi her bileşeni alan dört slotu vardır: markadan önce `start(node)`, menü ile uç arasında `center(node)`, çubuğun sonunda `end(node)` ve altında tam genişlikte bir satır olarak `bottom(node)`, örneğin chip'ler. Her slot birden çok düğümü sırayla tutar; start ve end, sağdan sola yazılan dillerde yer değiştirir. Slotlardaki bileşenler kullanıcının diliyle, izinleriyle ve maskeleriyle render edilir; verisini kendi action'ı ile yükleyenler, örneğin bir `SearchBox`, orada çalışır ve Feature'ın guard'larına ve action'ın iznine karşı denetlenir. Grid'ler ve formlar screen'e aittir. Telefonlarda start ve end slotları çubukta kalır, center slotu uygulamanın söylediği yere gider: `center_on_phone(CenterOnPhone::Row)` (varsayılan) onu çubuğun altında bir satıra koyar, `CenterOnPhone::Icon` onu açan bir büyüteç düğmesinin arkasına koyar (W3C APG disclosure) ve odağı içine taşır; Escape kapatır ve düğmeye döner. `center_button(icon, label)` bu düğmeyi değiştirir. Telefon yerleşimi betik çalışmadan önce CSS ile belirlenir, bu yüzden sayfa yüklenirken üst bilgi oynamaz.
 - **Eylemler.** `sign_in()`, uygulamanın bir oturum açma sayfası olduğunda ziyaretçilere bir oturum açma bağlantısı, oturum açmış kullanıcılara bir oturum kapatma bağlantısı gösterir; `language()` ve `theme()` uygulama shell'indekiyle aynı seçicileri gösterir. Bunlar end slotundan sonra gelir ve telefonlarda menüye katlanır.
-- **Alt çubuk.** `bottom_nav([...])`, telefonlarda (800 px ve altı) ekranın altına sabitlenmiş en fazla beş bağlantı ekler; insanların en çok gittiği yerler içindir, beşten fazlası derlenmez. Her öğe, bir etiket, rotası olan bir ekran ve isteğe bağlı bir simge içeren bir `BottomNavItem`'dır. Gösterilen sayfanın bağlantısında `aria-current="page"` bulunur (`nav.js` güncel tutar), kullanıcının açamayacağı ekranlara giden bağlantılar çıkarılır, çubuk `env(safe-area-inset-bottom)` ile ana ekran göstergesinden uzak durur ve sayfanın altında çubuğun hiçbir şeyi gizlememesi için boşluk bırakılır. Üst menü geri kalan yerler için kalır. Çubuk betik gerektirmez.
+- **Alt çubuk.** `bottom_nav([...])`, telefonlarda ve tabletlerde (1024 px'ten dar) ekranın altına sabitlenmiş en fazla beş bağlantı ekler; insanların en çok gittiği yerler içindir, beşten fazlası derlenmez. Her öğe, bir etiket, rotası olan bir ekran ve isteğe bağlı bir simge içeren bir `BottomNavItem`'dır. Gösterilen sayfanın bağlantısında `aria-current="page"` bulunur (`nav.js` güncel tutar), kullanıcının açamayacağı ekranlara giden bağlantılar çıkarılır, çubuk `env(safe-area-inset-bottom)` ile ana ekran göstergesinden uzak durur ve sayfanın altında çubuğun hiçbir şeyi gizlememesi için boşluk bırakılır. Üst menü geri kalan yerler için kalır. Çubuk betik gerektirmez.
 - **Alt bilgi.** Screen'lere bağlantılardan (`link`, açma izni olmayan kullanıcılar için çıkarılır) ya da adreslerden (`url`: bir yol, `https:`, `http:` ya da `mailto:`; `App::check` diğer şemaları ve kayıtlı olmayan screen'lere bağlantıları reddeder) oluşan sütunlar ve bir metin satırı.
 
 Bir site shell screen'i ile bir uygulama shell screen'i arasında geçiş, sayfa yüklemeden `nav.js` üzerinden olur: kısmi yanıt hangi shell'e ait olduğunu söyler (`x-zeyn-shell`) ve bu geçerli çerçeveden farklı olduğunda runtime, bir dil değişikliğinin yaptığı gibi tüm çerçeveyi değiştirir ve diğer shell'in stil sayfasını ve betiğini yükler. `/_zeyn/route/{screen}` bağlantıları (breadcrumb'ınki) aynı şekilde izlenir.
+
+## Oturum açma shell'i
+
+Oturum açma sayfaları kendine ait bir çerçeve alır: `Shell::auth()` içinde menü, üst çubuk ve komut paleti yoktur. Uygulamanın logosu (`App::logo`) ve adı 400 px genişliğinde tek bir kartın üstünde durur; dil ve tema seçicileri sayfanın altında yer alır, böylece ikisi de oturum açmadan önce erişilebilir kalır. `.split()` 1024 px'ten itibaren formu bir yarıya, `--z-brand` renginde bir marka panelini diğer yarıya koyar; daha dar ekranlar ortalanmış kartı gösterir. Telefonlarda kart sayfanın kendisi olur ve girdileri ile düğmeleri 44 px yüksekliğindedir. Stilleri (`auth.css`, 3.5 KB) yalnızca bu sayfalarda yüklenir.
+
+`zeyn::accounts::ui` içindeki her oturum açma ekranı (oturum açma, kayıt olma, parolayı unutma ve sıfırlama, iki adımlı oturum açma, kurtarma kodu, kilitlenme, onay ve oturum kapatma) bu shell'de açılır; hesap ve yönetim ekranları ise uygulama shell'ini korur. Özel bir oturum açma ekranı onu kendi feature'ından alır:
+
+```rust
+Feature::new("entry").screen(sign_in).shell(Shell::auth())
+```
+
+Oturum açma formu kullanıcı adını `Control::Username` (`autocomplete="username"`) ile, parolayı `current-password` ile doldurur, parolayı gösterme düğmesini alanın içinde bir göz olarak gösterir ve Caps Lock açıkken alanın altında "Caps Lock açık" der (kibar bir canlı bölge).
 
 ## Ekran içinde tema seçici
 
@@ -74,6 +96,16 @@ App::new(t!("app.name"))
         h.center(SearchBox::of(search_all).results(search_results))
             .end(LinkButton::new(t!("app.notifications"), notifications, ()))
     })
+```
+
+Üç hazır parça çubuğu bir uygulama çerçevesine dönüştürür:
+
+- `breadcrumb()` çubuğu menü grubu ve geçerli screen'in başlığıyla başlatır; `nav.js` her gezinmeden sonra onu yeniden yazar.
+- `search()` komut paletini açan ve kısayolunu gösteren bir arama alanı ekler; palet düğmesi yan menüden kalkar. Telefonlarda bir simge düğmesidir.
+- `account()` çubuğu kullanıcının baş harflerini taşıyan yuvarlak bir düğmeyle bitirir. Düğme bir diyalog açar (W3C APG non modal dialog; Escape ve kapatma düğmesi kapatır); diyalogda kimin oturum açtığı, tema ve dil seçicileri ve oturum kapatma bağlantısı, ziyaretçiler için ise bir oturum açma bağlantısı bulunur. Seçiciler yan menüden kalkar.
+
+```rust
+App::new(t!("app.name")).header(|h| h.breadcrumb().search().account())
 ```
 
 Ekran kaydırılırken çubuk üstte kalır ve ekranlar sayfa yenilenmeden altında değişir. Telefonda menü düğmesinin altında durur ve orta yuva kendi satırına geçer. Çubuktaki bileşenler bir ekrandakiler gibi kullanıcı için çizilir; bir arama kutusu önerilerini kendi eylemiyle yükler ve sunucu o eylemin iznini denetler. `App::header` olmadan uygulama kabuğunda üst çubuk olmaz.
@@ -107,7 +139,7 @@ Feature::new("pro").command(new_product()).command(restock())
 
 ## Komut paleti
 
-**Alt+Shift+P** paleti varsayılan olarak açar (`App::palette_shortcut` bunu değiştirir, bilerek `Ctrl+Shift+P` gibi bir tarayıcı tuşuna da): uygulamanın komutlarını, geçerli screen'in araç çubuğunu ve bağlam menüsünü ve menünün screen'lerini arayan bir ARIA combobox'ı. Son kullanılan komutlar önce gelir.
+**Alt+Shift+P** paleti varsayılan olarak açar (`App::palette_shortcut` bunu değiştirir, bilerek `Ctrl+Shift+P` gibi bir tarayıcı tuşuna da): uygulamanın komutlarını, geçerli screen'in araç çubuğunu ve bağlam menüsünü ve menünün screen'lerini arayan bir ARIA combobox'ı. Son kullanılan komutlar önce gelir. Odak bir alanda değilken `/` de onu açar, `App::header(|h| h.search())` arama alanı da. Sonuçlar yerlerinin altında gruplanır ("Git · Satış", screen başlığı, "Komutlar"); her birinde simgesi, eşleşen harfler kalın ve sonda kısayolu bulunur. Menü öğeleri sayfanın kendisinde eşleştirilir, böylece ilk tuş vuruşu onları zaten bulur.
 
 Bir feature ona sunucu araması ekleyebilir. Kullanıcı yazdıkça palet action'ı çağırır ve sonuçlarını komutların altında listeler; birini seçmek sayfayı yerinde açar. Bu site kendi sayfalarını bu şekilde arar:
 

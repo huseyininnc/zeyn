@@ -396,7 +396,7 @@ impl<L: Model> Lines<L> {
             ))
         };
         out.push_str(&format!(
-            r#"<td class="z-lines-actions"><button type="button" class="z-icon-button" data-zeyn-line-move="-1" aria-label="{}"><span aria-hidden="true">&#8593;</span></button><button type="button" class="z-icon-button" data-zeyn-line-move="1" aria-label="{}"><span aria-hidden="true">&#8595;</span></button><button type="button" class="z-icon-button z-danger" data-zeyn-line-remove aria-label="{}"><span class="z-icon z-icon-delete" aria-hidden="true"></span></button></td></tr>"#,
+            r#"<td class="z-lines-actions"><button type="button" class="z-icon-button" data-zeyn-line-move="-1" aria-label="{}"><span aria-hidden="true">&#8593;</span></button><button type="button" class="z-icon-button" data-zeyn-line-move="1" aria-label="{}"><span aria-hidden="true">&#8595;</span></button><button type="button" class="z-icon-button z-danger" data-zeyn-line-remove aria-label="{}"><span class="z-icon z-icon-trash" aria-hidden="true"></span></button></td></tr>"#,
             t("up"),
             t("down"),
             t("remove")

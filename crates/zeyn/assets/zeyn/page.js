@@ -222,6 +222,20 @@ async function changeTheme(select) {
   await post(BASE + '/_zeyn/theme', { theme: select.value });
 }
 
+/**
+ * Applies the chosen density at once (`data-density` on `<html>`), keeps every density picker in
+ * step, tells windowed lists to measure again (`zeyn:density`) and stores it with
+ * `POST /_zeyn/density`. Virtual grids take the new row height on the next page.
+ */
+async function changeDensity(select) {
+  const root = document.documentElement;
+  if (select.value === 'compact') root.dataset.density = 'compact';
+  else delete root.dataset.density;
+  for (const other of document.querySelectorAll('select[data-zeyn-density]')) if (other !== select) other.value = select.value;
+  document.dispatchEvent(new CustomEvent('zeyn:density'));
+  await post(BASE + '/_zeyn/density', { density: select.value });
+}
+
 /** Reads the page cookies into an object. */
 function cookies() {
   const out = {};

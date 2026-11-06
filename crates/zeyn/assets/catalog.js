@@ -462,6 +462,15 @@ function paintAll() {
   });
 }
 
+/** A density change (`zeyn:density`) resizes cards and gaps: windowed lists measure again. */
+document.addEventListener('zeyn:density', () => {
+  for (const list of document.querySelectorAll('[data-zeyn-window]')) {
+    const w = windows.get(list);
+    if (w) measure(w);
+  }
+  paintAll();
+});
+
 /**
  * Turns windowing on for a card grid with many cards, or takes in the cards `load` appended
  * (`more`) or replaced (`first`). Rails and lists of rows are never windowed. A focused card

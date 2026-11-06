@@ -22,7 +22,7 @@ Stack::new()
 
 ## Badge
 
-`Badge::new(text).tone(Tone::...)`। टोन: `Neutral`, `Info`, `Success`, `Warning`, `Danger` और `Brand`। ग्रिड `.badge(|v| tone)` से मान को बैज के रूप में दिखाते हैं।
+`Badge::new(text).tone(Tone::...)`। टोन: `Neutral`, `Info`, `Success`, `Warning`, `Danger` और `Brand`। टोन वाला बैज टोन का टेक्स्ट उसकी हल्की छटा पर दिखाता है; `Neutral` एक रूपरेखा वाला धुँधला लेबल है, किसी प्लान जैसे सादे मानों के लिए। `.dot()` सादे टेक्स्ट से पहले टोन का 8 px बिंदु बनाता है, सूचियों में स्टेटस का शांत रूप; `.count()` किसी संख्या के लिए गोल पिल बनाता है। ग्रिड `.badge(|v| tone)` से मान को बैज के रूप में और `.status(|v| tone)` से बिंदु के रूप में दिखाते हैं।
 
 ## Progress
 

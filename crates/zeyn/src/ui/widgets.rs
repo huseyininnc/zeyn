@@ -109,10 +109,23 @@ impl Component for Alert {
     }
 }
 
-/// A short status label, such as "Paid" or "Overdue".
+/// How a badge is drawn.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+enum BadgeKind {
+    #[default]
+    Label,
+    Dot,
+    Count,
+}
+
+/// A short status label, such as "Paid" or "Overdue": the tone's text on its subtle tint, or a
+/// neutral label for plain values (plan, channel). `.dot()` draws a dot in the tone before plain
+/// text, the quieter form for status in lists; `.count()` draws a round count pill.
 pub struct Badge {
     text: Text,
     tone: Tone,
+    kind: BadgeKind,
 }
 
 impl Badge {
@@ -120,6 +133,7 @@ impl Badge {
         Self {
             text: text.into(),
             tone: Tone::Neutral,
+            kind: BadgeKind::Label,
         }
     }
 
@@ -128,10 +142,27 @@ impl Badge {
         self
     }
 
+    /// An 8 px dot in the tone before the text, with no background.
+    pub fn dot(mut self) -> Self {
+        self.kind = BadgeKind::Dot;
+        self
+    }
+
+    /// A round pill for a number, such as unread items beside a tab label.
+    pub fn count(mut self) -> Self {
+        self.kind = BadgeKind::Count;
+        self
+    }
+
     /// Badge markup, for use inside other components.
     pub fn html(&self, r: &Render) -> String {
+        let kind = match self.kind {
+            BadgeKind::Label => "",
+            BadgeKind::Dot => " z-badge-dot",
+            BadgeKind::Count => " z-badge-count",
+        };
         format!(
-            r#"<span class="z-badge z-tone-{}">{}</span>"#,
+            r#"<span class="z-badge{kind} z-tone-{}">{}</span>"#,
             self.tone.code(),
             r.text(&self.text)
         )
@@ -144,7 +175,7 @@ impl Component for Badge {
     }
 
     fn schema(&self) -> Json {
-        json!({ "type": "badge", "text": self.text, "tone": self.tone })
+        json!({ "type": "badge", "text": self.text, "tone": self.tone, "kind": self.kind })
     }
 }
 

@@ -302,6 +302,7 @@ Effects:
 | `zeyn:effect` | `document` | ランタイムが知らない effect: `{ effect, source, run }`。`run(next)` は別の effect を実行します。`confirm` で使われます。 |
 | `zeyn:topics` | `document` | `{ topics }`: ほかのスクリプト（通知を受けた `live.js`）からの、更新するトピック。 |
 | `zeyn:reload` | 要素 | その中のグリッドをその場で再読み込みします。現在のページ、または `{ reset: true }` なら最初のページです。 |
+| `zeyn:density` | `document` | なし。ユーザーがアカウントメニューで別の密度を選びました（`<html>` の `data-density` はすでに変わっています）。ウィンドウ化されたカードグリッドが行を測り直します。 |
 
 Effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":"...","then":{...}}` は、モーダルのアラートダイアログで確認し、ユーザーが承諾した後にのみ `then` を実行します。
 

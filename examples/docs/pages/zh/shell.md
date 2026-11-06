@@ -4,7 +4,17 @@ shell 是每个 screen 外围的框架：菜单、语言、主题和时区选择
 
 ## 菜单
 
-菜单来自各 feature 的 `.menu(...)` 调用。用户无权打开的项会从 HTML 中省略，guard 拒绝该用户的 feature 则什么也不显示。当前 screen 的链接带有 `aria-current="page"`。
+菜单来自各 feature 的 `.menu(...)` 调用。用户无权打开的项会从 HTML 中省略，guard 拒绝该用户的 feature 则什么也不显示。当前 screen 的链接带有 `aria-current="page"`，并绘制在品牌色的淡色背景上。
+
+在 `.item(...)` 之后调用 `.icon(Icon::...)` 会在该项标签前放一个图标；一个组的各项有图标后，组标签就不再绘制自己的图标。侧边菜单以应用的徽标和名称开头：`App::logo("/static/logo.svg")`（深色主题用 `App::logo_dark(...)`）设置一个由应用提供的标志，否则 shell 会绘制一个 `--z-brand` 色的圆角方块，里面是名称的首字母。shell 保持中性；品牌色只标记当前项、主按钮、焦点环和徽标。
+
+图标来自一套 82 个图形（`Icon::ALL`），绘制在 20 px 网格上，使用 1.5 px 圆角线条，以当前文字颜色按 16 或 20 px 显示。每个图标都是 `/_zeyn/icons.css` 中的一个 CSS 遮罩，这是由 `crates/zeyn/assets/icons/*.svg` 生成、约 25 KB（压缩后 3 KB）并会被缓存的样式表，因此一个图标在 HTML 中只占一个 class，在脚本中不占任何开销。
+
+```rust
+Feature::new("sales")
+    .screen(orders)
+    .menu(|m| m.group(t!("sales.menu"), Icon::Cart).item(t!("sales.orders"), orders).icon(Icon::Table))
+```
 
 ## 站点 shell
 
@@ -43,13 +53,25 @@ Feature::new("shop")
 ```
 
 - **菜单。** 顶部菜单在站点 shell 中列出每个 feature 的菜单。只有一项的组是普通链接；较大的组是打开其链接的按钮（W3C APG 披露式导航模式）。Enter、Space 或点击切换一个组，Down 打开它并移到其第一个链接，Up、Down、Home 和 End 在其链接之间移动，Escape 关闭它并回到按钮，用 Tab 离开该组或点击外部会将其关闭。Left 和 Right 在顶层项之间移动。
-- **窄屏幕。** 在 800 px 以下，菜单折叠到带 `aria-expanded` 的菜单按钮后面；Escape 将其关闭。没有脚本时菜单保持展开，因此没有任何内容变得无法访问。
+- **窄屏幕。** 在 1024 px 以下，菜单折叠到带 `aria-expanded` 的菜单按钮后面；Escape 将其关闭。没有脚本时菜单保持展开，因此没有任何内容变得无法访问。
 - **头部插槽。** 顶部栏有四个可放置任意组件的插槽，类似使用逻辑名称的应用栏：`start(node)` 在品牌之前，`center(node)` 在菜单与末端之间，`end(node)` 在栏的末端，`bottom(node)` 是其下方的整宽一行，例如放 chip。每个插槽按顺序容纳多个节点，在从右到左的语言中 start 和 end 会交换位置。插槽中的组件使用用户的语言、权限和掩码渲染；通过自己的 action 加载数据的组件（例如 `SearchBox`）也能在其中工作，并按该 feature 的 guard 和 action 的权限检查。grid 和表单属于 screen。在手机上，start 和 end 插槽留在栏中，center 插槽则按应用指定的位置放置：`center_on_phone(CenterOnPhone::Row)`（默认）把它放在栏下方的一行，`CenterOnPhone::Icon` 把它放在放大镜按钮之后，由按钮打开（W3C APG 披露模式）并把焦点移入其中；Escape 将其关闭并回到按钮。`center_button(icon, label)` 可更改该按钮。手机布局由 CSS 在脚本运行之前设定，因此页面加载时头部不会移动。
 - **操作。** 当应用有登录页面时，`sign_in()` 对访客显示登录链接，对已登录用户显示退出链接；`language()` 和 `theme()` 显示与应用 shell 相同的选择器。它们排在 end 插槽之后，并在手机上折叠进菜单。
-- **底部栏。** `bottom_nav([...])` 添加最多五个固定在手机屏幕底部（宽度 800 px 及以下）的链接，用于人们最常去的地方；超过五个则无法编译。每个条目是 `BottomNavItem`，包含标签、带路由的屏幕和可选图标。当前显示页面的链接带有 `aria-current="page"`（由 `nav.js` 保持更新），用户无权打开的屏幕的链接会被省略，底部栏通过 `env(safe-area-inset-bottom)` 避开主屏指示条，页面底部会留出空间，因此底部栏不会遮挡任何内容。顶部菜单仍用于其余内容。底部栏不需要脚本。
+- **底部栏。** `bottom_nav([...])` 添加最多五个固定在手机和平板屏幕底部（宽度小于 1024 px）的链接，用于人们最常去的地方；超过五个则无法编译。每个条目是 `BottomNavItem`，包含标签、带路由的屏幕和可选图标。当前显示页面的链接带有 `aria-current="page"`（由 `nav.js` 保持更新），用户无权打开的屏幕的链接会被省略，底部栏通过 `env(safe-area-inset-bottom)` 避开主屏指示条，页面底部会留出空间，因此底部栏不会遮挡任何内容。顶部菜单仍用于其余内容。底部栏不需要脚本。
 - **页脚。** 若干列链接，指向 screen（`link`，对无权打开的用户省略）或地址（`url`：路径、`https:`、`http:` 或 `mailto:`；`App::check` 会拒绝其他协议以及指向未注册 screen 的链接），外加一行文字。
 
 在站点 shell screen 与应用 shell screen 之间切换，通过 `nav.js` 进行，无需整页加载：局部响应会说明它属于哪个 shell（`x-zeyn-shell`），当它与当前框架不同时，运行时会像切换语言那样替换整个框架，并加载另一个 shell 的样式表和脚本。指向 `/_zeyn/route/{screen}` 的链接（面包屑的链接）也以同样方式被跟随。
+
+## 登录 shell
+
+登录页面有自己的框架：`Shell::auth()` 没有菜单、没有顶栏，也没有命令面板。应用的徽标（`App::logo`）和名称位于一张 400 px 宽的卡片上方，语言和主题选择器位于页面底部，因此登录前两者都可以使用。`.split()` 从 1024 px 起把表单放在一半，另一半是 `--z-brand` 色的品牌面板；更窄的屏幕显示居中的卡片。在手机上卡片就是整个页面，其中的输入框和按钮高 44 px。它的样式（`auth.css`，3.5 KB）只在这些页面加载。
+
+`zeyn::accounts::ui` 的每个登录相关屏幕（登录、注册、忘记和重置密码、两步登录、恢复码、锁定、确认和退出）都在其中打开，而账户和管理屏幕保留应用 shell。自定义登录屏幕通过其 feature 使用它：
+
+```rust
+Feature::new("entry").screen(sign_in).shell(Shell::auth())
+```
+
+登录表单用 `Control::Username`（`autocomplete="username"`）填写用户名，用 `current-password` 填写密码，把显示密码的开关显示为字段内的眼睛图标，并在大写锁定开启时在字段下方提示“大写锁定已开启”（polite 实时区域）。
 
 ## 屏幕中的主题选择器
 
@@ -74,6 +96,16 @@ App::new(t!("app.name"))
         h.center(SearchBox::of(search_all).results(search_results))
             .end(LinkButton::new(t!("app.notifications"), notifications, ()))
     })
+```
+
+三个现成的部件让顶栏成为应用框架：
+
+- `breadcrumb()` 让顶栏以菜单组和当前 screen 的标题开头；`nav.js` 在每次导航后重写它。
+- `search()` 添加一个打开命令面板的搜索字段，并显示其快捷键；命令面板按钮会从侧边菜单中移除。在手机上它是一个图标按钮。
+- `account()` 让顶栏以一个显示用户姓名首字母的圆形按钮结尾。它打开一个对话框（W3C APG 非模态对话框；Escape 和关闭按钮可关闭它），其中显示当前登录的用户、主题和语言选择器以及退出链接，访客则看到登录链接。这些选择器会从侧边菜单中移除。
+
+```rust
+App::new(t!("app.name")).header(|h| h.breadcrumb().search().account())
 ```
 
 屏幕滚动时，这个栏固定在顶部，屏幕在它下方切换，不重新加载页面。在手机上，它位于菜单按钮下方，中间插槽单独占一行。栏中的组件像屏幕中的组件一样按用户渲染；搜索框通过自己的动作加载建议，服务器会检查该动作的权限。没有 `App::header` 时，应用外壳没有顶栏。
@@ -107,7 +139,7 @@ Feature::new("pro").command(new_product()).command(restock())
 
 ## 命令面板
 
-默认情况下 **Alt+Shift+P** 打开命令面板（`App::palette_shortcut` 可以更改，也可以特意改为 `Ctrl+Shift+P` 之类的浏览器按键）：它是一个 ARIA 组合框，搜索应用的命令、当前 screen 的工具栏和上下文菜单，以及菜单中的 screen。最近使用的命令排在前面。
+默认情况下 **Alt+Shift+P** 打开命令面板（`App::palette_shortcut` 可以更改，也可以特意改为 `Ctrl+Shift+P` 之类的浏览器按键）：它是一个 ARIA 组合框，搜索应用的命令、当前 screen 的工具栏和上下文菜单，以及菜单中的 screen。最近使用的命令排在前面。焦点不在输入字段中时，按 `/` 也能打开它，`App::header(|h| h.search())` 的搜索字段同样可以。结果按所在位置分组（“前往 · 销售”、screen 标题、“命令”），每项带有图标，匹配的字母加粗，快捷键显示在末尾。菜单项直接在页面上匹配，因此第一次按键就能找到它们。
 
 feature 可以为它添加服务器搜索。用户输入时，命令面板调用该 action，并将其结果列在命令之下；选择其中一项会原位打开该页面。本站就是以这种方式搜索自己的页面：
 

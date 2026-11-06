@@ -185,12 +185,57 @@ function collect() {
     };
     walk(menu, '');
   }
-  for (const a of document.querySelectorAll('.z-nav a[href]')) {
+  for (const a of document.querySelectorAll('.z-nav a[href], .z-site-nav a[href]')) {
     const group = a.closest('.z-nav-group')?.querySelector('h2')?.textContent.trim();
     const path = new URL(a.href, location.href).pathname;
-    add({ key: `nav:${path}`, label: a.textContent.trim(), group: group ? `${t.textGo} · ${group}` : t.textGo, run: () => a.click() });
+    const icon = [...(a.querySelector('.z-icon')?.classList ?? [])].find((c) => c.startsWith('z-icon-'));
+    add({ key: `nav:${path}`, label: a.textContent.trim(), group: group ? `${t.textGo} · ${group}` : t.textGo, icon, run: () => a.click() });
   }
   return items;
+}
+
+/**
+ * The positions in `text` that `query` matched, the way `score` walks it, so the option can set
+ * them in bold.
+ */
+function matched(query, text) {
+  const q = fold(query).replace(/\s+/g, '');
+  const t = fold(text);
+  const at = new Set();
+  if (!q || t.length !== text.length) return at;
+  let qi = 0;
+  for (let i = 0; i < t.length && qi < q.length; i++) {
+    if (t[i] === q[qi]) {
+      at.add(i);
+      qi++;
+    }
+  }
+  return qi === q.length ? at : new Set();
+}
+
+/** The label of an option with its matched letters in `<b>`. */
+function labelOf(text, query) {
+  const span = make('span', 'z-palette-label');
+  const at = matched(query, text);
+  if (!at.size) {
+    span.textContent = text;
+    return span;
+  }
+  let run = '';
+  let bold = false;
+  const flush = () => {
+    if (run) span.append(bold ? make('b', '', { text: run }) : document.createTextNode(run));
+    run = '';
+  };
+  [...text].forEach((ch, i) => {
+    if (at.has(i) !== bold) {
+      flush();
+      bold = at.has(i);
+    }
+    run += ch;
+  });
+  flush();
+  return span;
 }
 
 /** Keys of recently run commands, newest first. */
@@ -229,20 +274,26 @@ function rank(items, query) {
 function drawPalette() {
   const p = palette;
   const t = texts();
-  p.shown = [...rank(p.items, p.input.value), ...p.found].slice(0, SHOWN_MAX);
+  if (!p.items.length) p.items = collect();
+  const query = p.input.value;
+  p.shown = [...rank(p.items, query), ...p.found].slice(0, SHOWN_MAX);
   p.active = p.shown.length ? 0 : -1;
   p.list.replaceChildren();
+  let heading = null;
   p.shown.forEach((item, i) => {
+    const group = item.recent ? t.textRecent : item.group;
+    if (group && group !== heading) {
+      heading = group;
+      p.list.append(make('li', 'z-palette-heading', { role: 'presentation', text: group }));
+    }
     const li = make('li', 'z-palette-option', { role: 'option', id: `z-palette-opt-${i}`, 'aria-selected': 'false' });
-    li.append(make('span', 'z-palette-label', { text: item.label }));
-    const group = item.recent ? `${t.textRecent} · ${item.group ?? ''}` : item.group;
-    if (group) li.append(make('span', 'z-palette-group', { text: group }));
+    li.append(make('span', `z-icon ${item.icon ?? 'z-icon-command'}`, { 'aria-hidden': 'true' }), labelOf(item.label, query));
     if (item.hint) li.append(make('kbd', 'z-palette-kbd', { text: item.hint }));
     li.addEventListener('click', () => choose(i));
     li.addEventListener('pointermove', () => setActive(i, false));
     p.list.append(li);
   });
-  if (!p.shown.length) p.list.append(make('li', 'z-palette-empty', { role: 'presentation', text: t.textEmpty }));
+  if (!p.shown.length) p.list.append(make('li', 'z-palette-empty', { role: 'presentation', text: query.trim() ? `${t.textEmpty} (${query.trim()})` : t.textEmpty }));
   setActive(p.active, true);
   p.live.textContent = p.shown.length ? fill(t.textCount, { n: p.shown.length }) : t.textEmpty;
 }
@@ -403,6 +454,16 @@ async function runCommand(button, source = button) {
 }
 
 /* Wiring ------------------------------------------------------------------------------------- */
+
+/** `/` opens the palette when focus is not in a field, as in most web apps. */
+document.addEventListener('keydown', (e) => {
+  if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented || palette) return;
+  const t = e.target instanceof Element ? e.target : null;
+  if (t?.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"], dialog[open]')) return;
+  if (!document.querySelector('[data-zeyn-commands]')) return;
+  e.preventDefault();
+  openPalette();
+});
 
 document.addEventListener(
   'keydown',

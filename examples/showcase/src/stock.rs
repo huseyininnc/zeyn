@@ -227,12 +227,14 @@ pub fn product_list() -> Screen {
                 .shortcut("Alt+N")
                 .action(t!("stock.restock_low"), restock_low, ()),
         )
-        .toolbar(|t| {
+        .primary(|t| {
             t.button(t!("stock.new_product"))
                 .icon(Icon::Plus)
                 .shortcut("Alt+N")
                 .opens(product_editor, ProductParams { id: None })
-                .export(Export::Csv)
+        })
+        .toolbar(|t| {
+            t.export(Export::Csv)
                 .export(Export::Xlsx)
         })
         .body(
@@ -408,5 +410,6 @@ pub fn feature() -> Feature {
         .menu(|m| {
             m.group(t!("menu.stock"), Icon::Box)
                 .item(t!("stock.products"), product_list)
+                .icon(Icon::Box)
         })
 }

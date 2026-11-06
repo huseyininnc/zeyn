@@ -304,6 +304,7 @@ All are `POST` with JSON and the CSRF header, and check the screen's access and 
 | `zeyn:effect` | `document` | An effect the runtime does not know: `{ effect, source, run }`. `run(next)` runs another effect. Used by `confirm`. |
 | `zeyn:topics` | `document` | `{ topics }`: topics to refresh, from another script (`live.js` on a notification). |
 | `zeyn:reload` | an element | Reloads the grids inside it in place: the current page, or the first one with `{ reset: true }`. |
+| `zeyn:density` | `document` | None. The user picked another density in the account menu (`data-density` on `<html>` already changed); windowed card grids measure their rows again. |
 
 Effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":"...","then":{...}}` asks in a modal alert dialog and runs `then` only after the user confirms.
 

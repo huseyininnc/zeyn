@@ -22,7 +22,7 @@ Stack::new()
 
 ## Badge
 
-`Badge::new(text).tone(Tone::...)`。トーンは `Neutral`、`Info`、`Success`、`Warning`、`Danger`、`Brand` です。グリッドは `.badge(|v| tone)` で値をバッジとして表示します。
+`Badge::new(text).tone(Tone::...)`。トーンは `Neutral`、`Info`、`Success`、`Warning`、`Danger`、`Brand` です。トーン付きのバッジは、トーンの文字をその淡い色の上に表示します。`Neutral` は輪郭線が 1 本の淡色のラベルで、プランのような普通の値に使います。`.dot()` は通常の文字の前にトーンの 8 px の点を描き、一覧でステータスを示す控えめな形になります。`.count()` は数値用の丸いピルを描きます。グリッドは `.badge(|v| tone)` で値をバッジとして、`.status(|v| tone)` で点として表示します。
 
 ## Progress
 
