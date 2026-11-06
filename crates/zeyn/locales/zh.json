@@ -502,6 +502,19 @@
       },
       "prefs": {
         "cleared": "已删除此浏览器为本网站保存的选择。"
+      },
+      "shop": {
+        "price": {
+          "sale": "原价 {was}，现价 {now}，优惠 {off}",
+          "per": {
+            "item": "每件 {price}",
+            "kg": "每千克 {price}",
+            "g100": "每 100 克 {price}",
+            "l": "每升 {price}",
+            "ml100": "每 100 毫升 {price}",
+            "m": "每米 {price}"
+          }
+        }
       }
     },
     "date": {

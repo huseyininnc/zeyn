@@ -637,6 +637,19 @@
           "11": "Kasım",
           "12": "Aralık"
         }
+      },
+      "shop": {
+        "price": {
+          "sale": "Eski fiyat {was}, yeni fiyat {now}, {off} indirim",
+          "per": {
+            "item": "Adet fiyatı {price}",
+            "kg": "Kg fiyatı {price}",
+            "g100": "100 g fiyatı {price}",
+            "l": "Litre fiyatı {price}",
+            "ml100": "100 ml fiyatı {price}",
+            "m": "Metre fiyatı {price}"
+          }
+        }
       }
     },
     "date": {

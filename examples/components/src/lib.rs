@@ -192,6 +192,9 @@ catalog! {
         tree "/ui/tree";
         week_schedule "/ui/week-schedule";
     }
+    "shop" Cart {
+        price "/ui/price";
+    }
     "media" Image {
         image "/ui/image";
         embed "/ui/embed";

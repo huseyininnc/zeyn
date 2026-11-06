@@ -39,6 +39,7 @@ Which page answers what:
 | Headings, paragraphs, meta lines, previous and next links, auto grids, lists, avatars, spoilers, letter bars, week schedules | `components/content` (`content.md`) |
 | Card grids, rails, search boxes, free text search (`DataQuery::q`) | `components/catalog` (`catalog.md`) |
 | Record diffs, code and JSON views, barcodes, inbox and notifications, Kanban boards, calendars | `components/admin` (`admin.md`) |
+| Prices, facets, range sliders, variants, galleries, quantities, reviews, countdowns | `components/commerce` (`commerce.md`) |
 | Video and audio | `components/media` (`docs/media.md`) |
 | Dates, time zones, money, languages | `guides/time-and-languages` (`time-and-languages.md`) |
 | Permissions, guards, CSRF, masking, audit | `guides/security` (`security.md`), `docs/enterprise.md` |
@@ -231,6 +232,8 @@ What to remember:
 - Product photos: `Image::new(src).alt(..).size(w, h).lazy()` with `.placeholder(Placeholder::color(..))`,
   `.low(small_src)`, `.fallback(src)`, `.priority()` on the first one only; in a `CardGrid`
   `.placeholder(..)` and `.priority(n)`, on a card `.low(..)` and `.fallback(..)`.
+- Shop pages: `Price::new(money).was(old).unit(per_kg, PriceUnit::Kg)` (never format prices
+  by hand; screen readers hear "was X, now Y").
 - App shell top bar: `App::header(|h| h.center(SearchBox::of(..)).end(LinkButton::new(..)))`,
   the same slots as the site header; `h.breadcrumb().search().account()` adds the breadcrumb, the
   search field that opens the palette and the account menu with theme, language and sign out.

@@ -47,6 +47,7 @@ pub mod panel;
 pub mod paragraph;
 pub mod popover;
 pub mod prev_next;
+pub mod price;
 pub mod progress;
 pub mod rail;
 pub mod rating;

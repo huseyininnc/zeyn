@@ -32,7 +32,9 @@
       "feedback": "Geri bildirim ve katmanlar",
       "charts": "Grafikler",
       "shell": "Kabuk",
-      "admin": "Yönetim"
+      "admin": "Yönetim",
+      "shell": "Kabuk",
+      "shop": "Mağaza"
     },
     "summary": {
       "stack": "Aralarında boşluk olan, alt alta düğümler.",
@@ -103,7 +105,9 @@
       "barcode": "Sunucuda SVG olarak çizilen Code 128 barkodları ve QR kodları.",
       "inbox": "Güne göre bildirimler, toplu okundu işaretleme ve arşivleme, okunmamış sayısıyla zil.",
       "kanban": "Bir iş akışının sütunlarında kartlar, sürükleyerek, menüyle veya klavyeyle taşınır.",
-      "calendar": "Kullanıcının saat diliminde ay, hafta veya gün görünümünde etkinlikler, etkinlik pencereleri ve aralık seçimiyle."
+      "calendar": "Kullanıcının saat diliminde ay, hafta veya gün görünümünde etkinlikler, etkinlik pencereleri ve aralık seçimiyle.",
+      "clear_prefs": "Tarayıcının uygulama için tuttuğu seçimleri silen düğme.",
+      "price": "Üstü çizili eski fiyat, indirim yüzdesi ve birim fiyatla bir fiyat."
     },
     "ex": {
       "action_button": {
@@ -368,6 +372,11 @@
       },
       "calendar": {
         "overview": "Örnek"
+      },
+      "price": {
+        "overview": "Örnek",
+        "unit_price": "Birim fiyat",
+        "large": "Ürün sayfasında"
       }
     }
   }

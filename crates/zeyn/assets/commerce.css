@@ -1,0 +1,55 @@
+/**
+ * Shop components: prices, range sliders, quantity steppers, variant pickers, product galleries,
+ * facet panels, review summaries and countdowns. Linked only by pages that hold one of them.
+ * Colors come from the theme tokens and spacing uses logical properties, so both themes and
+ * right to left pages work.
+ */
+
+.z-price {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.z-price-row {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+
+.z-price-now {
+  font-size: var(--z-text-lg);
+  line-height: var(--z-leading-lg);
+  font-weight: 600;
+  color: var(--z-text);
+}
+
+.z-price-now.z-price-sale { color: var(--z-danger); }
+
+.z-price-lg .z-price-now {
+  font-size: var(--z-text-2xl);
+  line-height: var(--z-leading-2xl);
+}
+
+.z-price-was {
+  font-size: var(--z-text-sm);
+  color: var(--z-text-muted);
+}
+
+.z-price-off {
+  padding: 0 6px;
+  border-radius: var(--z-radius-sm);
+  background: var(--z-danger-subtle);
+  color: var(--z-danger);
+  font-size: var(--z-text-xs);
+  line-height: var(--z-leading-xs);
+  font-weight: 600;
+}
+
+.z-price-unit {
+  font-size: var(--z-text-xs);
+  line-height: var(--z-leading-xs);
+  color: var(--z-text-muted);
+}

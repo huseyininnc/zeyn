@@ -637,6 +637,19 @@
           "11": "November",
           "12": "December"
         }
+      },
+      "shop": {
+        "price": {
+          "sale": "Was {was}, now {now}, {off} off",
+          "per": {
+            "item": "{price} per item",
+            "kg": "{price} per kg",
+            "g100": "{price} per 100 g",
+            "l": "{price} per liter",
+            "ml100": "{price} per 100 ml",
+            "m": "{price} per meter"
+          }
+        }
       }
     },
     "date": {

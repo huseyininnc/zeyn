@@ -502,6 +502,19 @@
       },
       "prefs": {
         "cleared": "Se han borrado las elecciones que este navegador guardaba para este sitio."
+      },
+      "shop": {
+        "price": {
+          "sale": "Antes {was}, ahora {now}, {off} de descuento",
+          "per": {
+            "item": "{price} por unidad",
+            "kg": "{price} por kg",
+            "g100": "{price} por 100 g",
+            "l": "{price} por litro",
+            "ml100": "{price} por 100 ml",
+            "m": "{price} por metro"
+          }
+        }
       }
     },
     "date": {

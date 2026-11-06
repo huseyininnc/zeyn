@@ -502,6 +502,19 @@
       },
       "prefs": {
         "cleared": "이 브라우저가 이 사이트를 위해 보관하던 선택을 삭제했습니다."
+      },
+      "shop": {
+        "price": {
+          "sale": "정가 {was}, 현재 {now}, {off} 할인",
+          "per": {
+            "item": "개당 {price}",
+            "kg": "kg당 {price}",
+            "g100": "100g당 {price}",
+            "l": "리터당 {price}",
+            "ml100": "100ml당 {price}",
+            "m": "미터당 {price}"
+          }
+        }
       }
     },
     "date": {

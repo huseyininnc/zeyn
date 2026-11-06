@@ -72,6 +72,7 @@ pages! {
         data_views "/components/data" "data.md" "Tree and charts" "../pages/data.md";
         catalog "/components/catalog" "catalog.md" "Cards, rails and search" "../pages/catalog.md";
         admin "/components/admin" "admin.md" "Admin views" "../pages/admin.md";
+        commerce "/components/commerce" "commerce.md" "Shop components" "../pages/commerce.md";
         shell "/components/shell" "shell.md" "Shell and commands" "../pages/shell.md";
         media "/components/media" "media.md" "Media" "../../../docs/media.md";
     }
