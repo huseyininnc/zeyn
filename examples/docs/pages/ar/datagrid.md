@@ -77,4 +77,16 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 - `.row_style(|row| Option<RowStyle>)`: صفوف الخطر أو التحذير أو النجاح.
 - `.exportable()`: تصدير CSV للصفوف المصفّاة، يبثه الخادم (stream).
 
+## التحديث في المكان
+
+يجعل `.listens(topic)`، المستدعى في النهاية، الشبكة تعيد التحميل في مكانها عند ذكر الموضوع (انظر [المواضيع](effects.md#topics)): بعد `ui.refresh(topic)` تعيد تحميل صفحتها الحالية مع ترتيبها ومرشحاتها، وبعد تغيّر عنصر تصفية يحمل `.drives(topic)` تبدأ من الصفحة الأولى مع params الشاشة الجديدة. يُعاد تحميل الشبكة عبر `POST /_zeyn/grid` مع كل فحوص الصلاحيات، ويصل param الشاشة الذي غيّره المرشح إلى الشبكة عبر دالة الشاشة، مثلًا على أنه scope:
+
+```rust
+let mut grid = DataGrid::of(search_orders);
+if let Some(region) = p.region {
+    grid = grid.scope(Order::region, region);
+}
+grid.column(Order::number).column(Order::total).listens("orders")
+```
+
 يغطي [مرجع DataGrid](grid.md) العروض المحفوظة والرئيسي والتفصيلي (master detail) والتجميع وبيانات الشجرة والتحرير المضمن والتنقل بين الخلايا والنسخ واللصق وتحويل الأعمدة إلى افتراضية (virtualization) وإمكانية الوصول.

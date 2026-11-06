@@ -58,7 +58,7 @@ pub const ENTRY: Entry = Entry {
     api: &["Screen"],
     overview: &[Example {
         func: "orders_page",
-        build: open_orders,
+        build: |ctx, _| open_orders(ctx),
     }],
     examples: &[],
 };

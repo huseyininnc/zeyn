@@ -12,6 +12,7 @@ Los effects son lo que hace el navegador tras un clic o una acción correcta: ab
 | Toast con tono | `Toast::success(message).action(label, effect).into()` | Un toast con un tono (info, success, warning, danger) y un botón opcional que ejecuta otro effect |
 | Confirmar | `Effect::confirm(message, then)` | Ejecuta `then` después de que el usuario confirme |
 | Cerrar y refrescar | `Effect::CloseAndRefresh` | Cierra la ventana y recarga la pantalla que la abrió |
+| Refrescar topics | `Effect::refresh("orders")` o `ui.refresh(["orders", "stock"])` | Refresca en su sitio los nodos de la página que escuchan un topic (consulta [Topics](#topics)) |
 
 Los params están tipados: un effect para una pantalla con params incorrectos no compila.
 
@@ -65,6 +66,31 @@ pub fn product_editor(params: ProductParams, store: ProductStore) -> Result<Scre
 - Manejadores `on_success` de formularios y botones de acción.
 
 Los effects nunca recargan la página. Una navegación carga solo la pantalla nueva; un refresco recarga solo la pantalla que hay debajo de la ventana.
+
+## Topics
+
+Cuando cambia una parte de una pantalla, otras partes suelen mostrar los mismos datos: un pedido guardado cambia el total, un filtro cambia el grid y el gráfico. Un topic las conecta sin que los datos pasen por el navegador. Marca los nodos que muestran los datos con `.listens(topic)`; se refrescan en su sitio cuando se nombra el topic.
+
+```rust
+Screen::new(t!("sales.title"))
+    .body(Kpi::new(t!("sales.total"), total).listens("sales"))
+    .body(Chart::bar(t!("sales.by_month")).labels(months).series(t!("sales.amount"), amounts).listens("sales"))
+    .body(DataGrid::of(search_sales).column(Sale::amount).listens("sales"))
+```
+
+Un topic se nombra de tres maneras:
+
+- `ui.refresh("sales")` (o `Effect::refresh`) en un manejador `on_success`, después de que una action cambió los datos.
+- Un control de filtro que `.drives("sales")`: chips de filtro, un search box o un formulario sin botón de envío (selects, rangos de fechas, texto). Consulta [Formularios de filtro](forms.md#filter-forms).
+- `hub.notify(&ctx, "sales")` desde el canal realtime (feature `realtime`), cuando otra persona cambió los datos. Consulta `docs/realtime.md`.
+
+`.listens` funciona en cualquier componente: llámalo al final, después de los métodos builder del propio componente. Un listener que contiene un grid recarga su grid por el endpoint del grid y conserva la página, el orden y los filtros (un cambio desde un filtro empieza en la primera página). Cualquier otro listener se vuelve a renderizar en el servidor con un solo `POST /_zeyn/nodes` para todos, así que un KPI y un gráfico cuestan una petición. Solo viajan los nombres de los topics; el servidor abre la pantalla con el acceso y los params del usuario como en cualquier petición, así que un refresco nunca muestra lo que el usuario no puede ver.
+
+Los topics nombrados dentro de un mismo frame de animación se procesan una vez, un refresco más nuevo cancela el que sigue en curso en la misma pantalla y solo se refrescan los nodos que están en la página. El foco y los `<details>` abiertos se quedan donde estaban cuando el contenido nuevo tiene el mismo elemento (por id, test id o la clave de fila de una lista).
+
+Los nombres de topic tienen de 1 a 64 letras, dígitos, `-`, `_` o `.`. `App::check_page` informa de un topic que se conduce en una página donde nada lo escucha, y `zeyn check` avisa de un topic que se refresca o se conduce pero nunca se escucha, o que se escucha pero nunca se refresca, conduce ni notifica.
+
+@live topics
 
 ## Toasts
 

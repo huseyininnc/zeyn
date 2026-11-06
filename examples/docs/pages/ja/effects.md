@@ -12,6 +12,7 @@
 | トーン付きトースト | `Toast::success(message).action(label, effect).into()` | トーン（info、success、warning、danger）を持つトースト。別のエフェクトを実行するボタンを任意で付けられます |
 | 確認 | `Effect::confirm(message, then)` | ユーザーが確認した後に `then` を実行します |
 | 閉じて更新 | `Effect::CloseAndRefresh` | ウィンドウを閉じ、それを開いた画面を再読み込みします |
+| トピックを更新 | `Effect::refresh("orders")` または `ui.refresh(["orders", "stock"])` | トピックを listen しているページ上のノードをその場で更新します（[トピック](#topics) を参照） |
 
 パラメータには型があります。パラメータが合わない画面へのエフェクトはコンパイルできません。
 
@@ -65,6 +66,31 @@ pub fn product_editor(params: ProductParams, store: ProductStore) -> Result<Scre
 - フォームとアクションボタンの `on_success` ハンドラー。
 
 エフェクトがページを再読み込みすることはありません。ナビゲーションは新しい画面だけを読み込み、更新はウィンドウの下の画面だけを再読み込みします。
+
+## トピック
+
+画面の一部が変わると、ほかの部分も同じデータを表示していることがよくあります。保存した注文は合計を変え、フィルターはグリッドとグラフを変えます。トピックは、データをブラウザーに通さずにこれらをつなぎます。データを表示するノードに `.listens(topic)` を付けると、そのトピックが指定されたときにその場で更新されます。
+
+```rust
+Screen::new(t!("sales.title"))
+    .body(Kpi::new(t!("sales.total"), total).listens("sales"))
+    .body(Chart::bar(t!("sales.by_month")).labels(months).series(t!("sales.amount"), amounts).listens("sales"))
+    .body(DataGrid::of(search_sales).column(Sale::amount).listens("sales"))
+```
+
+トピックは次の 3 つの方法で指定されます。
+
+- action がデータを変えた後、`on_success` ハンドラーの中で `ui.refresh("sales")`（または `Effect::refresh`）。
+- `.drives("sales")` を持つフィルターコントロール。フィルターチップ、検索ボックス、送信ボタンのないフォーム（セレクト、日付範囲、テキスト）です。[フィルターフォーム](forms.md#filter-forms) を参照してください。
+- ほかの人がデータを変えたとき、realtime チャネル（feature `realtime`）からの `hub.notify(&ctx, "sales")`。`docs/realtime.md` を参照してください。
+
+`.listens` はどのコンポーネントでも使えます。コンポーネント自身の builder メソッドの後、最後に呼び出してください。グリッドを持つリスナーは、グリッドのエンドポイントを通じてグリッドを再読み込みし、ページ、並び順、フィルターを保ちます（フィルターによる変更では最初のページから始まります）。それ以外のリスナーはすべて、1 回の `POST /_zeyn/nodes` でまとめてサーバー上で再レンダリングされるため、KPI とグラフで 1 リクエストです。送られるのはトピック名だけで、サーバーはほかのリクエストと同じくユーザーのアクセス権と params で画面を開くので、更新によってユーザーが見られないものが表示されることはありません。
+
+1 つのアニメーションフレーム内で指定されたトピックはまとめて 1 回処理され、同じ画面で実行中の更新は新しい更新によって取り消され、ページ上にあるノードだけが更新されます。新しい内容に同じ要素（id、test id、またはリストの行キーで判断）があれば、フォーカスと開いている `<details>` はそのまま残ります。
+
+トピック名は 1 から 64 文字の英字、数字、`-`、`_`、`.` です。`App::check_page` は、ページで drive されているのにそのページで誰も listen していないトピックを報告し、`zeyn check` は、更新または drive されているのに誰も listen していないトピックや、listen されているのに更新、drive、通知のどれもされないトピックについて警告します。
+
+@live topics
 
 ## トースト
 

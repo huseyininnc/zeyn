@@ -88,6 +88,8 @@ pub async fn save_order(o: Valid<Order>, store: Orders, hub: Hub, ctx: Ctx) -> R
 
 通知にはトピック名だけが含まれ、データは決して含まれません。更新は、すべての permission 検査を伴う通常のグリッドエンドポイントを通じて行われます。`notify` は呼び出し元のテナントにだけ届きます。`notify_tenant(Some(id), topic)` は特定のテナントを指定し、`None` はテナントを使わないアプリを指します。
 
+同じトピック名はチャネルなしでも使えます。`.listens("orders")` を付けたノードは、通知がそのトピックを指定したとき（`live.js` がそれを `zeyn:topics` として渡します）にその場で更新され、action が `ui.refresh("orders")` で終わったときや、`.drives("orders")` を持つフィルターが変わったときにも更新されます。グリッドは現在のページを再読み込みし、ほかのリスナーは画面ごとに 1 回の `POST /_zeyn/nodes` で再レンダリングされます（`examples/docs/pages/effects.md` の Topics を参照）。ソケットが購読するのは、`Realtime::topic` で宣言が必要な `Live` ノードのトピックだけです。グリッドではない部分には、その中か隣で `.listens` を使ってください。
+
 ## 5. メモリとバックプレッシャー
 
 すべての状態に上限があります（`Limits`。括弧内が既定値です）。

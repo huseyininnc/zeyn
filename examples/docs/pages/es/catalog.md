@@ -59,6 +59,22 @@ Rail::of(search_products).card(|p: &Product| {
 @live preview
 
 
+### Builders
+
+`.card` y `.item` siguen siendo lo predeterminado: dan enlaces, imágenes y texto para lectores de pantalla sin esfuerzo. Cuando una fila necesita otra forma, `.builder(|row| node)` construye cada fila como cualquier nodo, como `ListView.builder` de Flutter, en `List::of`, `CardGrid` y `Rail`. `.separator(node)` pone un nodo entre filas (oculto a los lectores de pantalla, que cuentan las filas), y `Repeat::of(items, |item| node)` hace lo mismo para una lista que la pantalla ya tiene en memoria, hasta 500 elementos.
+
+```rust
+List::of(search_people)
+    .builder(|p: &Person| Row::new().compact().col(Avatar::new(p.name.clone())).col(Paragraph::new(p.city.clone())))
+    .separator(Paragraph::new("·"))
+
+Repeat::of(order.steps.iter(), |s| Badge::new(s.name.clone())).separator(Paragraph::new("→"))
+```
+
+- **Claves.** Las filas construidas y las filas de una lista virtual llevan la clave del modelo en `data-zeyn-key`, así que un refresco de la lista ([Topics](effects.md#topics)) mantiene el foco y los details abiertos en el mismo registro, dondequiera que se haya movido.
+- **Las filas construidas son para mostrar.** Sus nodos no se direccionan con rutas de nodo, así que un grid, un formulario o un lookup van en otro sitio. Los nodos de `Repeat` son hijos (`p.0`, `p.1`, ...) y siguen funcionando.
+- **Scroll virtual.** Una lista con `.paging(Paging::virtual_scroll())` mantiene en la página solo las filas visibles, dentro de un área de scroll tan alta como todas las filas, y pide bloques por offset a medida que el usuario se desplaza. Las filas tienen una sola altura fija y no hay altura por fila: con un builder, `.row_height(px)` es obligatorio y `App::check_page` informa si falta (`separator` no se usa ahí). Cada fila lleva `aria-posinset` y `aria-setsize`, así que los lectores de pantalla oyen su lugar en toda la lista; el área de scroll es una región enfocable con el nombre del título.
+
 ## Rail
 
 Un rail es un card grid dispuesto en una sola fila que se desplaza lateralmente, con ajuste al desplazarse y botones anterior y siguiente que se desplazan el ancho de una vista (con suavidad, salvo que el usuario haya pedido movimiento reducido). Carga el siguiente lote, de 12 en 12, cuando el usuario se desplaza cerca del final. Las tarjetas son enlaces en el orden de tabulación y se desplazan hasta quedar a la vista cuando reciben el foco.
@@ -94,6 +110,8 @@ SearchBox::of(catalog_products)
 Teclado: Abajo y Arriba se mueven por las sugerencias (Abajo las abre), Enter busca con la sugerencia resaltada o con el texto escrito, Escape cierra las sugerencias y después borra el campo. Una región en vivo indica a los lectores de pantalla cuántas sugerencias hay.
 
 La pantalla de resultados recibe `SearchParams` (`q`, vacío cuando la pantalla se abre desde un menú). El servidor recorta el texto a `MAX_SEARCH_QUERY` (100) caracteres, decide cuántas sugerencias enviar (8 salvo que `limit` indique otra cosa, como máximo 20), comprueba el acceso de la pantalla, los guards de la feature y el permiso de la acción, y cuenta cada llamada de sugerencias contra el límite de escritura (`App::write_limit`).
+
+`.drives(topic)` busca en su sitio en lugar de abrir una pantalla de resultados: Enter, elegir una sugerencia o vaciar el campo pone el texto en el param `q` de la pantalla y refresca los nodos que escuchan el topic (consulta [Topics](effects.md#topics)). Los params de la pantalla necesitan un campo `q: String`, como tiene `SearchParams`.
 
 ### Sugerencias enriquecidas
 

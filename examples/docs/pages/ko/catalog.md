@@ -59,6 +59,22 @@ Rail::of(search_products).card(|p: &Product| {
 @live preview
 
 
+### 빌더
+
+기본은 여전히 `.card`와 `.item`입니다. 링크, 이미지, 스크린 리더용 텍스트를 손쉽게 얻을 수 있습니다. 행에 다른 모양이 필요하면 `.builder(|row| node)`가 Flutter의 `ListView.builder`처럼 각 행을 아무 노드로나 만들며, `List::of`, `CardGrid`, `Rail`에서 쓸 수 있습니다. `.separator(node)`는 행 사이에 노드를 넣고(행을 직접 세는 스크린 리더에서는 숨겨집니다), `Repeat::of(items, |item| node)`는 Screen이 이미 메모리에 가진 목록에 대해 최대 500개 항목까지 같은 일을 합니다.
+
+```rust
+List::of(search_people)
+    .builder(|p: &Person| Row::new().compact().col(Avatar::new(p.name.clone())).col(Paragraph::new(p.city.clone())))
+    .separator(Paragraph::new("·"))
+
+Repeat::of(order.steps.iter(), |s| Badge::new(s.name.clone())).separator(Paragraph::new("→"))
+```
+
+- **키.** 만든 행과 가상 목록의 행은 모델 키를 `data-zeyn-key`에 담으므로, 목록이 새로 고쳐져도([토픽](effects.md#topics)) 레코드가 어디로 옮겨지든 포커스와 열린 details가 같은 레코드에 남습니다.
+- **만든 행은 보여 주기 위한 것입니다.** 그 노드는 노드 경로로 지정되지 않으므로 그리드, 폼, lookup은 다른 곳에 두세요. `Repeat`의 노드는 자식(`p.0`, `p.1`, ...)이므로 그대로 동작합니다.
+- **가상 스크롤.** `.paging(Paging::virtual_scroll())`이 있는 목록은 모든 행만큼 높은 스크롤 영역 안에 보이는 행만 페이지에 두고, 사용자가 스크롤함에 따라 블록을 offset으로 가져옵니다. 행 높이는 하나로 고정되며 행마다 다른 높이는 없습니다. 빌더를 쓰면 `.row_height(px)`가 필수이고, 없으면 `App::check_page`가 보고합니다(거기서는 `separator`를 쓰지 않습니다). 각 행은 `aria-posinset`과 `aria-setsize`를 가지므로 스크린 리더가 전체 목록에서의 위치를 읽어 줍니다. 스크롤 영역은 제목으로 이름이 붙은, 포커스할 수 있는 region입니다.
+
 ## 레일
 
 레일은 한 줄로 배치되어 옆으로 스크롤되는 카드 그리드입니다. 스크롤 스냅과 한 화면 너비만큼 스크롤하는 이전, 다음 버튼이 있으며, 사용자가 동작 줄이기를 요청하지 않았다면 부드럽게 스크롤됩니다. 사용자가 끝 근처까지 스크롤하면 다음 묶음을 12개씩 불러옵니다. 카드는 탭 순서에 있는 링크이며, 포커스를 받으면 화면 안으로 스크롤됩니다.
@@ -94,6 +110,8 @@ SearchBox::of(catalog_products)
 키보드: 아래쪽 화살표와 위쪽 화살표는 제안 사이를 이동하며(아래쪽 화살표는 제안을 엽니다), Enter는 강조된 제안이나 입력한 텍스트로 검색하고, Escape는 제안을 닫은 다음 필드를 비웁니다. 라이브 리전이 스크린 리더에 제안의 개수를 알려 줍니다.
 
 결과 화면은 `SearchParams`를 받습니다(`q`이며, 메뉴에서 화면을 열면 비어 있습니다). 서버는 텍스트를 `MAX_SEARCH_QUERY`(100)자로 자르고, 보낼 제안의 개수를 정하며(`limit`으로 달리 지정하지 않으면 8개, 최대 20개), Screen의 접근 권한, Feature의 가드, action의 권한을 검사하고, 모든 제안 호출을 쓰기 속도 제한(`App::write_limit`)에 포함합니다.
+
+`.drives(topic)`은 결과 Screen을 여는 대신 제자리에서 검색합니다. Enter, 제안 선택, 필드 비우기 모두 텍스트를 Screen의 `q` param에 넣고 토픽을 listen하는 노드를 새로 고칩니다([토픽](effects.md#topics) 참고). Screen의 params에는 `SearchParams`처럼 `q: String` 필드가 필요합니다.
 
 ### 풍부한 제안
 

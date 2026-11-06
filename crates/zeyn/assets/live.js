@@ -4,8 +4,9 @@
  *
  * Opens one WebSocket to `/_zeyn/live/topics?t=a,b&csrf=...` for every topic in the page. When
  * the server notifies a topic, each element subscribed to it reloads its grids in place
- * (`zeyn:reload`), or the whole screen (`zeyn:refresh`) when it holds no grid. Notifications that
- * arrive within 300 ms are handled once. The socket reconnects with growing pauses (1 s up to
+ * (`zeyn:reload`), or the whole screen (`zeyn:refresh`) when it holds no grid, and the nodes that
+ * `.listens` to the topic refresh through `topics.js` (`zeyn:topics`). Notifications that arrive
+ * within 300 ms are handled once. The socket reconnects with growing pauses (1 s up to
  * 30 s) and closes when no element subscribes any more.
  * @module live
  */
@@ -33,6 +34,7 @@ function refresh() {
     if (el.querySelector('[data-zeyn-grid]')) el.dispatchEvent(new CustomEvent('zeyn:reload', { bubbles: true }));
     else document.dispatchEvent(new CustomEvent('zeyn:refresh', { cancelable: true }));
   }
+  document.dispatchEvent(new CustomEvent('zeyn:topics', { detail: { topics: [...pending] } }));
   pending.clear();
 }
 

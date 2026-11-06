@@ -12,6 +12,7 @@ Effects are what the browser does after a click or a successful action: open a w
 | Toast with a tone | `Toast::success(message).action(label, effect).into()` | A toast in a tone (info, success, warning, danger) with an optional button that runs another effect |
 | Confirm | `Effect::confirm(message, then)` | Runs `then` after the user confirms |
 | Close and refresh | `Effect::CloseAndRefresh` | Closes the window and reloads the screen that opened it |
+| Refresh topics | `Effect::refresh("orders")` or `ui.refresh(["orders", "stock"])` | Refreshes in place the nodes of the page that listen to a topic (see [Topics](#topics)) |
 
 Params are typed: an effect for a screen with the wrong params does not compile.
 
@@ -65,6 +66,31 @@ pub fn product_editor(params: ProductParams, store: ProductStore) -> Result<Scre
 - `on_success` handlers of forms and action buttons.
 
 Effects never reload the page. A navigation loads only the new screen; a refresh reloads only the screen under the window.
+
+## Topics
+
+When one part of a screen changes, other parts often show the same data: a saved order changes the total, a filter changes the grid and the chart. A topic connects them without data passing through the browser. Mark the nodes that show the data with `.listens(topic)`; they refresh in place when the topic is named.
+
+```rust
+Screen::new(t!("sales.title"))
+    .body(Kpi::new(t!("sales.total"), total).listens("sales"))
+    .body(Chart::bar(t!("sales.by_month")).labels(months).series(t!("sales.amount"), amounts).listens("sales"))
+    .body(DataGrid::of(search_sales).column(Sale::amount).listens("sales"))
+```
+
+A topic is named in three ways:
+
+- `ui.refresh("sales")` (or `Effect::refresh`) in an `on_success` handler, after an action changed the data.
+- A filter control that `.drives("sales")`: filter chips, a search box or a form without a submit button (selects, date ranges, text). See [Filter forms](forms.md#filter-forms).
+- `hub.notify(&ctx, "sales")` from the realtime channel (feature `realtime`), when someone else changed the data. See `docs/realtime.md`.
+
+`.listens` works on every component: call it last, after the component's own builder methods. A listener that holds a grid reloads its grid through the grid endpoint, keeping the page, sort and filters (a driven change starts on the first page). Every other listener is rendered again on the server with one `POST /_zeyn/nodes` for all of them, so a KPI and a chart cost one request. Only topic names travel; the server opens the screen with the user's access and params as for any request, so a refresh never shows what the user may not see.
+
+Topics named within one animation frame are handled once, a newer refresh cancels the one still running on the same screen, and only nodes that are on the page refresh. Focus and open `<details>` stay where they were when the new content has the same element (by id, test id or the row key of a list).
+
+Topic names are 1 to 64 letters, digits, `-`, `_` or `.`. `App::check_page` reports a topic driven on a page that nothing on it listens to, and `zeyn check` warns about a topic that is refreshed or driven but never listened to, or listened to but never refreshed, driven or notified.
+
+@live topics
 
 ## Toasts
 

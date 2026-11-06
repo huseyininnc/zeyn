@@ -67,6 +67,7 @@
       "rail": "A row of cards that scrolls sideways.",
       "list": "Rows with an image, a title and meta text.",
       "search_box": "A search field with suggestions.",
+      "topics": "Filters and actions that refresh other parts of the screen in place.",
       "tree": "Branches loaded from the server as they open.",
       "week_schedule": "Seven day columns of rows from an action.",
       "image": "A picture with required alt text and size.",
@@ -216,10 +217,14 @@
       "list": {
         "overview": "Example",
         "numbered_pages": "Numbered pages without a total",
-        "fixed": "Fixed items"
+        "fixed": "Fixed items",
+        "builder": "Rows built with any node, with a separator",
+        "virtual_rows": "Virtual scrolling with a fixed row height",
+        "repeat": "One node per item of an in memory list"
       },
       "lookup": {
-        "overview": "Example"
+        "overview": "Example",
+        "country_city": "Cities of the chosen country"
       },
       "markdown": {
         "overview": "Example"
@@ -313,6 +318,12 @@
       },
       "toolbox": {
         "overview": "Example"
+      },
+      "topics": {
+        "overview": "Filter chips that drive a KPI, a chart and a grid",
+        "select": "A select that drives the same listeners",
+        "date_range_and_search": "A date range and a search box that drive a list",
+        "refresh_after_an_action": "An action that refreshes a node"
       },
       "tree": {
         "overview": "Example"

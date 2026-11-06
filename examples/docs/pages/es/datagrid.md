@@ -77,4 +77,16 @@ Los números y los importes se alinean a la derecha con cifras tabulares. Los en
 - `.row_style(|row| Option<RowStyle>)`: filas de peligro, advertencia o éxito.
 - `.exportable()`: exportación CSV de las filas filtradas, enviada en streaming por el servidor.
 
+## Refrescar en su sitio
+
+`.listens(topic)`, llamado al final, hace que el grid se recargue en su sitio cuando se nombra el topic (consulta [Topics](effects.md#topics)): después de `ui.refresh(topic)` recarga su página actual con su orden y sus filtros, y después de que cambie un control de filtro que `.drives(topic)` empieza en la primera página con los nuevos params de la pantalla. El grid se recarga por `POST /_zeyn/grid` con todas las comprobaciones de permisos, y un param de la pantalla que cambió el filtro llega al grid a través de la función de la pantalla, por ejemplo como scope:
+
+```rust
+let mut grid = DataGrid::of(search_orders);
+if let Some(region) = p.region {
+    grid = grid.scope(Order::region, region);
+}
+grid.column(Order::number).column(Order::total).listens("orders")
+```
+
 La [referencia del DataGrid](grid.md) cubre vistas guardadas, maestro y detalle, agrupación, datos en árbol, edición en línea, navegación entre celdas, copiar y pegar, virtualización de columnas y accesibilidad.

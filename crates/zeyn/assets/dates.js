@@ -160,7 +160,7 @@ async function check(input) {
       delete box.dataset.zeynDateError;
     }
     showZone(root, data.utc);
-    if (changed && input.dataset.zeynFilterDate) {
+    if (changed && (input.dataset.zeynFilterDate || input.closest('[data-zeyn-drives]'))) {
       const ev = new Event('input', { bubbles: true });
       own.add(ev);
       input.dispatchEvent(ev);

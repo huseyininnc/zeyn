@@ -39,6 +39,52 @@ Form::of(Contact { quantity: 1, ..Contact::default() })
 
 У каждого типа поля есть элемент управления по умолчанию: текстовые поля, числовые поля, деньги с валютой, выбор даты и времени, флажки для `bool` и выпадающие списки для choice. `.control(M::f, Control::...)` выбирает другой, а `.lookup(M::f, action)` ищет записи на сервере. См. [Controls and pickers](controls.md).
 
+## Зависимые lookup
+
+`.depends_on(field, source)` делает варианты lookup `field` зависимыми от другого поля, например города страны. Каждый поиск передаёт значение `source` в `LookupQuery::parent` (`q.parent_id()` читает его как id), а при изменении `source` поле `field` очищается, так что его варианты загружаются заново для нового значения.
+
+```rust
+#[action(permission = "geo.read")]
+pub async fn find_cities(q: LookupQuery, store: Cities) -> Result<Page<LookupItem>> {
+    Ok(q.apply(store.of_country(q.parent_id())))
+}
+
+Form::of(address)
+    .lookup(Address::country, find_countries)
+    .lookup(Address::city, find_cities)
+    .depends_on(Address::city, Address::country)
+    .submit(t!("save"), save_address)
+```
+
+Браузеру эту пару доверить нельзя, поэтому при отправке сервер снова спрашивает action lookup о выбранном городе с отправленной страной, с разрешением этого action, и отклоняет город, которого оно не возвращает, с ошибкой поля. Фильтруйте по родителю и в запросах по id, как это делает `q.apply` после фильтрации. `App::check_page` сообщает о `depends_on`, поле которого не является lookup формы или источник которого не является другим полем формы.
+
+## Формы фильтров
+
+Форма без кнопки отправки может фильтровать экран: `.drives(topic)` делает её поля params экрана. Когда поле меняется (список выбора, диапазон дат, текстовое поле по Enter), его значение попадает в param экрана с тем же именем, адрес поддерживается в актуальном виде, а узлы с `.listens(topic)` обновляются на месте и читают значение из своих params (см. [Темы](effects.md#topics)). Числа и логические значения передаются как есть, пустые поля как `null`; сервер читает params как типизированные params экрана, поэтому неподходящее значение отклоняется.
+
+```rust
+#[params]
+pub struct SalesParams {
+    pub region: Option<Region>,
+    pub from: Option<Date>,
+    pub to: Option<Date>,
+}
+
+#[screen(route = "/sales", permission = "sales.read")]
+pub fn sales(p: SalesParams, store: Sales) -> Screen {
+    Screen::new(t!("sales.title"))
+        .body(
+            Form::of(SalesFilter { region: p.region, from: p.from, to: p.to })
+                .field(SalesFilter::region)
+                .range(SalesFilter::from, SalesFilter::to)
+                .drives("sales"),
+        )
+        .body(Kpi::new(t!("sales.total"), store.total(&p)).listens("sales"))
+}
+```
+
+Форма с `submit` не может управлять темой; вместо этого обновляйте после сохранения через `ui.refresh(topic)` в `on_success`.
+
 ## Поля только для чтения
 
 Поля `#[readonly]` показываются в формах, но не редактируются, например остаток на складе, который меняют только движения.

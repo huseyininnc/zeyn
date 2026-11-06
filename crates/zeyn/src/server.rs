@@ -1299,7 +1299,9 @@ impl App {
     }
 
     /// Checks the link shortcuts of a built screen (`Chips::shortcut`, `PrevNext::shortcut`)
-    /// against each other, the commands, the palette and the links of the site headers: the
+    /// against each other, the commands, the palette and the links of the site headers, and the
+    /// topics and settings components report ([`crate::Component::page_check`]): a topic driven on the
+    /// page that nothing on it listens to, a lookup that depends on a field the form lacks. The
     /// page level half of [`App::check`], which cannot build screens because they need params.
     /// Call it in a test with the params the screen gets.
     ///
@@ -1362,7 +1364,12 @@ impl App {
                 (place, keys)
             })
             .collect();
-        let problems = crate::command::link_problems(&links, &commands, &self.palette_keys);
+        let mut problems = crate::command::link_problems(&links, &commands, &self.palette_keys);
+        let mut check = crate::ui::PageCheck::default();
+        for (i, node) in screen.nodes().iter().enumerate() {
+            node.page_check(i.to_string(), &mut check);
+        }
+        problems.extend(check.finish());
         if problems.is_empty() {
             Ok(())
         } else {

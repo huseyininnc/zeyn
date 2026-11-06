@@ -51,6 +51,7 @@ head의 모든 프레임워크 스크립트와 스타일시트에는 `?v=`와 �
 | `forms.js`, `reveal.js`, `import.js` | 폼의 초안과 워크플로 전환; 가려진 값 보기; 가져오기 |
 | `catalog.js`, `media.js`, `files.js`, `charts.js` 및 스타일시트 | 카드 그리드, 레일, 검색 상자; 플레이어, 임베드, 이미지; 업로드; 차트, 스파크라인, KPI 카드, 불릿 차트 |
 | `share.js`, `chips.js`, `reactions.js`, `hero.js`, `state.js`, `preview.js`, `assistant.js` | 공유 버튼, 필터 칩, 반응, 히어로 슬라이드, 환경 설정 저장소, 카드 미리보기(처음 마우스를 올릴 때), 어시스턴트(채팅 패널 또는 런처를 처음 누를 때) |
+| `topics.js`, `vlist.js` | 토픽을 listen하는 노드와 이를 drive하는 컨트롤(`data-zeyn-listens`, `data-zeyn-drives`), 가상 목록(`data-zeyn-vlist`) |
 
 전체 페이지는 head에 모든 페이지가 쓰는 스타일시트(`zeyn.css`, `components.css`, `content.css`, `pro.css`, `enterprise.css`), HTML에 표식이 있는 모듈의 스타일시트, 그리고 그 스크립트를 import하는 모듈 뒤에 링크합니다. `zeyn.js`는 같은 표(`[name, script selector, style selector]`)와 함께 제공되며 나중에 도착하는 콘텐츠에 빠진 것을 불러옵니다: `nav.js`는 화면을 바꾸기 전에 `{ root, waits }`와 함께 `zeyn:need`를 보내고 새 스타일시트를 기다리며, 창도 열리기 전에 같은 방식으로 기다리고, `zeyn:content`, grid 페이지, grid 필터는 담고 있는 것의 스크립트를 불러옵니다. 브라우저는 URL마다 인스턴스를 하나만 유지하므로 모듈은 한 번만 실행됩니다. 모듈은 실행될 때 문서에서 찾은 것을 설정하고 그 뒤에는 `zeyn:content`를 듣습니다. 페이지에 없는 컴포넌트를 찾거나 듣지 않습니다. 모듈은 자신의 URL에 있는 `?v=`로 공유 부분을 import합니다. `tests/ui_modules.rs`는 페이지가 쓰지 않는 모듈을 링크하거나 모듈 스타일시트가 표식 밖의 클래스를 꾸밀 때 실패합니다.
 
@@ -279,6 +280,7 @@ Effect:
 | 엔드포인트 | 본문 | 응답 |
 |---|---|---|
 | `/_zeyn/node` | `{ screen, params, node }` | 그리드의 첫 페이지가 포함된 노드 하나의 HTML. 지연 탭에서 사용됩니다. |
+| `/_zeyn/nodes` | `{ screen, params, nodes: ["1.0", "2"] }` | `{ nodes: { "1.0": "<div class=\"z-node\" ...>" } }`: Screen을 한 번 실행해 렌더링한 여러 노드로, 새로 고쳐지거나 drive된 토픽의 리스너를 위한 것입니다. 서로 다른 경로는 최대 32개이며, Screen에 없는 경로는 `404`로 응답합니다. Screen의 접근 권한, guard, interceptor는 한 번만 실행되고, params는 Screen의 타입이 있는 params로 읽힙니다. |
 | `/_zeyn/data` | `{ screen, params, node, key, input }` | 노드의 데이터 소스 `key`에서 온 JSON: lookup 옵션(`key`는 필드 이름), 트리 자식(`key`는 비어 있음), 단계 검사(`key`는 `_step`). 소스 action의 권한이 검사되고 그리드와 마찬가지로 인터셉터가 실행됩니다. action에 맞지 않는 입력은 `404`로 거부됩니다. |
 | `screen` = `_site.{feature}`와 함께 `/_zeyn/data` | 위와 같음 | 사이트 헤더 슬롯의 컴포넌트에 대해서도 같습니다. `node`는 슬롯(0 start, 1 center, 2 end, 3 bottom), 그 안에서의 노드 인덱스, 그리고 자식 인덱스들입니다. Feature의 가드와 action의 권한이 검사됩니다. |
 | `/_zeyn/parse` | `{ kind, text, label }` | 서버가 입력된 날짜나 시간을 사용자의 언어, 시간대, 시계로 읽는 방식: `{ ok, text, iso, utc, zone }` 또는 `{ ok: false, message }`. `kind`는 `date`, `time`, `datetime`, `local`, `presets`(오늘과 빠른 범위)입니다. |
@@ -296,8 +298,14 @@ Effect:
 | `zeyn:content` | `document` | 새 콘텐츠가 있는 요소(탐색, 지연 패널). 런타임이 필요한 모듈을 불러오고, 불러온 각 모듈이 그 안의 것을 설정합니다. |
 | `zeyn:errors` | 폼 | 런타임이 표시한 후의 `422` 오류. 라인 편집기와 단계별 폼이 사용합니다. |
 | `zeyn:effect` | `document` | 런타임이 모르는 effect: `{ effect, source, run }`. `run(next)`는 다른 effect를 실행합니다. `confirm`이 사용합니다. |
+| `zeyn:topics` | `document` | `{ topics }`: 다른 스크립트(알림을 받은 `live.js`)에서 보낸, 새로 고칠 토픽. |
+| `zeyn:reload` | 요소 | 그 안의 그리드를 제자리에서 다시 불러옵니다. 현재 페이지, 또는 `{ reset: true }`이면 첫 페이지입니다. |
 
 Effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":"...","then":{...}}`는 모달 알림 대화 상자에서 묻고 사용자가 확인한 후에만 `then`을 실행합니다.
+
+Effect `{"effect":"refresh","topics":["sales"]}`는 토픽의 리스너를 새로 고칩니다. `[data-zeyn-listens="a,b"]`는 리스너(부모 `data-zeyn-node`의 노드)를 표시하고, `[data-zeyn-drives="a"]`는 토픽을 drive하는 컨트롤을 표시합니다. 필터 폼(`data-zeyn-kinds`는 어떤 params가 숫자나 불리언인지 알려 줍니다), 검색 상자(필드 이름은 `q`), 필터 칩(각 칩은 자신의 params를 `data-zeyn-params`에 담습니다)입니다. drive하면 컨트롤의 값이 Screen 루트의 `data-zeyn-params`에 병합되고, 그 Screen이 메인 Screen이면 주소가 그 값으로 바뀌며, 리스너가 새로 고쳐집니다. `topics.js`는 한 애니메이션 프레임에서 지정된 토픽을 한 번에 처리합니다. 그리드를 가진 리스너는 `zeyn:reload`를 받고, Screen의 다른 리스너는 한 번의 `POST /_zeyn/nodes`로 묶이며, 같은 Screen에 대한 더 새로운 요청은 이전 요청을 중단하고 그 노드를 넘겨받습니다. 포커스와 열린 `<details>`는 id, test id, `data-zeyn-key` 행, 위치로 유지됩니다.
+
+가상 목록은 `data-zeyn-row-height`, `data-zeyn-block`, `data-zeyn-total`을 가진 `section[data-zeyn-vlist]`입니다. `vlist.js`는 `{ page: { type: "offset", offset }, with_total: true }`로 `POST /_zeyn/grid`에 블록을 요청하고 각 `<li>`를 `(aria-posinset - 1) * height` 위치에 둡니다. 다른 필드에 의존하는 lookup은 `data-depends-on="field"`를 가지며, 그 필드의 값을 `/_zeyn/data` 입력의 `parent`로 보냅니다.
 
 클라이언트 환경설정(`zeyn::ClientPref`)은 브라우저 모듈 `/_zeyn/state.js`에 있으며, 페이지는 `data-zeyn-remember` 또는 `data-zeyn-prefs-clear`가 있는 요소가 있을 때만 이를 import합니다. `GET /_zeyn/prefs`는 앱의 동의 훅이 세션을 넘겨 환경설정 값을 보관하도록 허용하는지를 `{ preferences }`로 응답하며 `Cache-Control: no-store`를 붙입니다. 서버는 저장된 값을 읽지 않습니다.
 

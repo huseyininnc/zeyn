@@ -78,4 +78,16 @@ Numbers and money are right aligned with tabular digits. Whole numbers are group
 - `.row_style(|row| Option<RowStyle>)`: danger, warning or success rows.
 - `.exportable()`: CSV export of the filtered rows, streamed by the server.
 
+## Refreshing in place
+
+`.listens(topic)`, called last, makes the grid reload in place when the topic is named (see [Topics](effects.md#topics)): after `ui.refresh(topic)` it reloads its current page with its sort and filters, after a filter control that `.drives(topic)` changed it starts on the first page with the new screen params. The grid reloads through `POST /_zeyn/grid` with every permission check, and a screen param the filter changed reaches the grid through the screen function, for example as a scope:
+
+```rust
+let mut grid = DataGrid::of(search_orders);
+if let Some(region) = p.region {
+    grid = grid.scope(Order::region, region);
+}
+grid.column(Order::number).column(Order::total).listens("orders")
+```
+
 The [DataGrid reference](grid.md) covers saved views, master detail, grouping, tree data, inline editing, cell navigation, copy and paste, column virtualization and accessibility.

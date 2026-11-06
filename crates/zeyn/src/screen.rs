@@ -277,9 +277,29 @@ pub enum Effect {
         url: String,
         frame: bool,
     },
+    /// Refreshes in place every node of the page that listens to one of these topics. Built with
+    /// [`Effect::refresh`]; carries only the names, never data.
+    Refresh {
+        topics: Vec<&'static str>,
+    },
 }
 
 impl Effect {
+    /// Refreshes in place every node of the page that `.listens` to one of `topics`: grids
+    /// reload their current page with their sort and filters, other listeners are rendered again
+    /// in one request per screen. Nodes that are not on the page are not touched.
+    ///
+    /// ```
+    /// use zeyn::Effect;
+    /// let e = Effect::refresh(["orders", "stock"]);
+    /// assert_eq!(e, Effect::Refresh { topics: vec!["orders", "stock"] });
+    /// ```
+    pub fn refresh(topics: impl crate::ui::Topics) -> Effect {
+        Effect::Refresh {
+            topics: crate::ui::topic_list(topics),
+        }
+    }
+
     /// Goes to a local path of the app (see [`Effect::Go`]). Anything that is not a local path
     /// goes to the start page, so a `return_to` from a request can never leave the app.
     ///
@@ -454,6 +474,12 @@ impl UiCtx {
     pub fn close_and_refresh(&mut self) {
         self.effects
             .push(Effect::CloseAndRefresh);
+    }
+
+    /// Refreshes the nodes of the page that listen to `topics`; see [`Effect::refresh`].
+    pub fn refresh(&mut self, topics: impl crate::ui::Topics) {
+        self.effects
+            .push(Effect::refresh(topics));
     }
 
     pub fn navigate<S: ScreenDef>(&mut self, _screen: S, params: S::Params) {
@@ -742,6 +768,10 @@ pub trait Component: Send + Sync {
     fn shortcuts(&self) -> Vec<&str> {
         Vec::new()
     }
+
+    /// Reports the topics the component listens to and drives, and problems of its
+    /// configuration the compiler cannot catch, for `App::check_page`.
+    fn page_check(&self, _check: &mut crate::ui::PageCheck) {}
 }
 
 /// Type erased component: a node of the screen tree.
@@ -805,6 +835,15 @@ impl Node {
         }
         for (i, child) in self.children().iter().enumerate() {
             child.all_shortcuts(format!("{path}.{i}"), out);
+        }
+    }
+
+    /// Runs [`Component::page_check`] on this node and every node below it, lazy ones included.
+    pub(crate) fn page_check(&self, path: String, check: &mut crate::ui::PageCheck) {
+        check.path.clone_from(&path);
+        self.0.page_check(check);
+        for (i, child) in self.children().iter().enumerate() {
+            child.page_check(format!("{path}.{i}"), check);
         }
     }
 }

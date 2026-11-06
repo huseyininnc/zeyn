@@ -745,7 +745,10 @@ fn check(root: &Path) -> Result<String, String> {
             ))
         })
         .collect();
-    for w in generate::layout_warnings(&files, &registered) {
+    for w in generate::layout_warnings(&files, &registered)
+        .into_iter()
+        .chain(generate::topic_warnings(&files))
+    {
         report.push_str(&format!("warning: {w}\n"));
     }
     if report.is_empty() {
@@ -1270,6 +1273,28 @@ const RAW: &str = r#"Grid "quoted" Grid"#; const C: char = 'G';"##;
         assert!(w.iter().all(|w| !w.contains("error")));
         let small = generate::layout_warnings(&files[1..], &["lost".into()]);
         assert!(small.is_empty(), "{small:#?}");
+    }
+
+    #[test]
+    fn check_warns_about_topics_nobody_listens_to_or_sends() {
+        let files = vec![
+            (
+                PathBuf::from("src/a.rs"),
+                "Kpi::new(\"x\", 1.0).listens([\"sales\", \"stock\"]);\nui.notify(Toast::info(\"Saved\"));\nForm::of(f).drives(\"orphan\");\n".to_string(),
+            ),
+            (
+                PathBuf::from("src/b.rs"),
+                "ui.effect(Effect::refresh(\"sales\"));\nhub.notify(&ctx, \"stock\");\nui.refresh(\"gone\");\nLive::new(\"quiet\");\n".to_string(),
+            ),
+        ];
+        let w = generate::topic_warnings(&files);
+        assert_eq!(w.len(), 3, "{w:#?}");
+        assert!(w[0].contains("topic `orphan` is driven at src/a.rs:3, but no node listens"));
+        assert!(w[1].contains("topic `gone` is refreshed at src/b.rs:3"));
+        assert!(
+            w[2].contains("nodes listen to topic `quiet` at src/b.rs:4, but nothing refreshes")
+        );
+        assert!(w.iter().all(|w| !w.contains("Saved")));
     }
 
     #[test]

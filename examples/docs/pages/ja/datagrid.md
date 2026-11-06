@@ -77,4 +77,16 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 - `.row_style(|row| Option<RowStyle>)`: danger、warning、success の行。
 - `.exportable()`: フィルター後の行の CSV エクスポート。サーバーがストリーミングします。
 
+## その場での更新
+
+最後に呼び出した `.listens(topic)` により、トピックが指定されたときにグリッドがその場で再読み込みされます（[トピック](effects.md#topics) を参照）。`ui.refresh(topic)` の後は並び順とフィルターを保ったまま現在のページを再読み込みし、`.drives(topic)` を持つフィルターコントロールが変わった後は新しい画面の params で最初のページから始めます。グリッドはすべての permission 検査を伴う `POST /_zeyn/grid` で再読み込みされ、フィルターが変えた画面の param は画面関数を通じて、たとえば scope としてグリッドに届きます。
+
+```rust
+let mut grid = DataGrid::of(search_orders);
+if let Some(region) = p.region {
+    grid = grid.scope(Order::region, region);
+}
+grid.column(Order::number).column(Order::total).listens("orders")
+```
+
 [DataGrid リファレンス](grid.md) では、保存済みビュー、マスター詳細、グルーピング、ツリーデータ、インライン編集、セルのナビゲーション、コピーと貼り付け、列の仮想化、アクセシビリティを扱います。

@@ -12,6 +12,7 @@ Effect'ler, bir tıklamadan veya başarılı bir action'dan sonra tarayıcının
 | Tonlu toast | `Toast::success(message).action(label, effect).into()` | Bir tonda (info, success, warning, danger) toast; isteğe bağlı olarak başka bir effect'i çalıştıran bir düğmeyle |
 | Onay | `Effect::confirm(message, then)` | Kullanıcı onayladıktan sonra `then` çalıştırır |
 | Kapat ve yenile | `Effect::CloseAndRefresh` | Pencereyi kapatır ve onu açan ekranı yeniden yükler |
+| Topic'leri yenile | `Effect::refresh("orders")` ya da `ui.refresh(["orders", "stock"])` | Sayfada bir topic'i dinleyen node'ları yerinde yeniler ([Topic'ler](#topics) bölümüne bakın) |
 
 Parametreler türlüdür: yanlış parametrelerle bir ekran için yazılan effect derlenmez.
 
@@ -65,6 +66,31 @@ pub fn product_editor(params: ProductParams, store: ProductStore) -> Result<Scre
 - Formların ve action düğmelerinin `on_success` işleyicileri.
 
 Effect'ler sayfayı asla yeniden yüklemez. Bir gezinme yalnızca yeni ekranı yükler; bir yenileme yalnızca pencerenin altındaki ekranı yeniden yükler.
+
+## Topic'ler
+
+Bir screen'in bir parçası değiştiğinde, başka parçalar çoğu zaman aynı veriyi gösterir: kaydedilen bir sipariş toplamı, bir filtre grid'i ve grafiği değiştirir. Bir topic bunları, veri tarayıcıdan geçmeden birbirine bağlar. Veriyi gösteren node'ları `.listens(topic)` ile işaretleyin; topic adlandırıldığında yerinde yenilenirler.
+
+```rust
+Screen::new(t!("sales.title"))
+    .body(Kpi::new(t!("sales.total"), total).listens("sales"))
+    .body(Chart::bar(t!("sales.by_month")).labels(months).series(t!("sales.amount"), amounts).listens("sales"))
+    .body(DataGrid::of(search_sales).column(Sale::amount).listens("sales"))
+```
+
+Bir topic üç yolla adlandırılır:
+
+- Bir action veriyi değiştirdikten sonra, bir `on_success` işleyicisinde `ui.refresh("sales")` (ya da `Effect::refresh`).
+- `.drives("sales")` diyen bir filtre kontrolü: filtre çipleri, bir arama kutusu ya da submit düğmesi olmayan bir form (seçim listeleri, tarih aralıkları, metin). [Filtre formları](forms.md#filter-forms) bölümüne bakın.
+- Başka biri veriyi değiştirdiğinde realtime kanalından `hub.notify(&ctx, "sales")` (`realtime` özelliği). `docs/realtime.md` belgesine bakın.
+
+`.listens` her bileşende çalışır: bileşenin kendi builder metotlarından sonra, en son çağırın. Grid tutan bir dinleyici grid'ini grid endpoint'i üzerinden yeniden yükler; sayfası, sıralaması ve filtreleri korunur (filtre ile tetiklenen bir değişiklik ilk sayfadan başlar). Diğer her dinleyici sunucuda yeniden render edilir; hepsi için tek bir `POST /_zeyn/nodes` yapılır, yani bir KPI ve bir grafik tek bir istek tutar. Yalnızca topic adları taşınır; sunucu screen'i her istekte olduğu gibi kullanıcının erişimi ve params değerleriyle açar, bu yüzden bir yenileme kullanıcının göremeyeceği bir şeyi asla göstermez.
+
+Bir animasyon karesi içinde adlandırılan topic'ler tek seferde işlenir, aynı screen'de yeni bir yenileme hâlâ süren eskisini iptal eder ve yalnızca sayfada olan node'lar yenilenir. Yeni içerikte aynı öğe varsa (id, test id ya da bir listenin satır anahtarıyla) odak ve açık `<details>` oldukları yerde kalır.
+
+Topic adları 1 ile 64 arası harf, rakam, `-`, `_` ya da `.` karakterinden oluşur. `App::check_page`, bir sayfada sürülen ama o sayfada kimsenin dinlemediği bir topic'i bildirir; `zeyn check` ise yenilenen ya da sürülen ama hiç dinlenmeyen, ya da dinlenen ama hiç yenilenmeyen, sürülmeyen veya bildirilmeyen bir topic için uyarır.
+
+@live topics
 
 ## Toast'lar
 

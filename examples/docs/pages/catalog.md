@@ -58,6 +58,22 @@ Rail::of(search_products).card(|p: &Product| {
 
 @live preview
 
+### Builders
+
+`.card` and `.item` stay the default: they give links, images and screen reader text for free. When a row needs another shape, `.builder(|row| node)` builds each row as any node, like Flutter's `ListView.builder`, on `List::of`, `CardGrid` and `Rail`. `.separator(node)` puts a node between rows (hidden from screen readers, which count the rows), and `Repeat::of(items, |item| node)` does the same for a list the screen already holds in memory, up to 500 items.
+
+```rust
+List::of(search_people)
+    .builder(|p: &Person| Row::new().compact().col(Avatar::new(p.name.clone())).col(Paragraph::new(p.city.clone())))
+    .separator(Paragraph::new("·"))
+
+Repeat::of(order.steps.iter(), |s| Badge::new(s.name.clone())).separator(Paragraph::new("→"))
+```
+
+- **Keys.** Built rows and the rows of a virtual list carry the model key in `data-zeyn-key`, so a refresh of the list ([Topics](effects.md#topics)) keeps focus and open details on the same record, wherever it moved.
+- **Built rows are for showing.** Their nodes are not addressed by node paths, so a grid, a form or a lookup goes elsewhere. The nodes of `Repeat` are children (`p.0`, `p.1`, ...) and keep working.
+- **Virtual scrolling.** A list with `.paging(Paging::virtual_scroll())` keeps only the rows in view in the page, inside a scroll area as tall as every row, and fetches blocks by offset as the user scrolls. Rows have one fixed height and no height per row: with a builder, `.row_height(px)` is required and `App::check_page` reports a missing one (`separator` is not used there). Each row carries `aria-posinset` and `aria-setsize`, so screen readers hear its place in the whole list; the scroll area is a focusable region named by the title.
+
 ## Rail
 
 A rail is a card grid laid out in one row that scrolls sideways, with scroll snapping and previous and next buttons that scroll by a view's width (smoothly unless the user asked for reduced motion). It loads the next batch, 12 at a time, as the user scrolls near its end. The cards are links in the tab order and scroll into view as they get focus.
@@ -93,6 +109,8 @@ SearchBox::of(catalog_products)
 Keyboard: Down and Up move through the suggestions (Down opens them), Enter searches with the highlighted suggestion or the typed text, Escape closes the suggestions and then clears the field. A live region tells screen readers how many suggestions there are.
 
 The results screen takes `SearchParams` (`q`, empty when the screen is opened from a menu). The server cuts the text to `MAX_SEARCH_QUERY` (100) characters, decides how many suggestions to send (8 unless `limit` says otherwise, at most 20), checks the screen's access, the feature's guards and the action's permission, and counts every suggestion call against the write rate limit (`App::write_limit`).
+
+`.drives(topic)` searches in place instead of opening a results screen: Enter, picking a suggestion or clearing the field puts the text into the screen's `q` param and refreshes the nodes that listen to the topic (see [Topics](effects.md#topics)). The screen's params need a `q: String` field, as `SearchParams` has.
 
 ### Rich suggestions
 

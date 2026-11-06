@@ -88,6 +88,8 @@ pub async fn save_order(o: Valid<Order>, store: Orders, hub: Hub, ctx: Ctx) -> R
 
 Bildirimler yalnızca topic adını taşır, hiçbir zaman veri taşımaz: yenileme, tüm izin denetimleriyle birlikte normal grid endpoint'i üzerinden gider. `notify` yalnızca çağıranın tenant'ına ulaşır; `notify_tenant(Some(id), topic)` birini adlandırır, `None` tenant kullanmayan uygulamadır.
 
+Aynı topic adları kanal olmadan da çalışır. `.listens("orders")` ile işaretlenen node'lar, bir bildirim topic'i adlandırdığında (`live.js` onu `zeyn:topics` olarak iletir) yerinde yenilenir; bir action `ui.refresh("orders")` ile bittiğinde ya da `.drives("orders")` diyen bir filtre değiştiğinde de yenilenir: grid'ler geçerli sayfalarını yeniden yükler, diğer dinleyiciler screen başına tek bir `POST /_zeyn/nodes` ile yeniden render edilir (`examples/docs/pages/effects.md` içindeki Topics bölümüne bakın). Socket yalnızca `Realtime::topic` ile bildirilmesi gereken `Live` node'larının topic'lerine abone olur; grid olmayan parçalar için onların içinde ya da yanında `.listens` kullanın.
+
 ## 5. Bellek ve geri basınç (backpressure)
 
 Her durum parçasının bir sınırı vardır (`Limits`, varsayılanlar köşeli parantez içinde):

@@ -77,4 +77,16 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 - `.row_style(|row| Option<RowStyle>)`: danger, warning या success पंक्तियाँ।
 - `.exportable()`: फ़िल्टर की गई पंक्तियों का CSV निर्यात, सर्वर द्वारा स्ट्रीम किया गया।
 
+## उसी जगह रिफ़्रेश
+
+आख़िर में कॉल किया गया `.listens(topic)` topic का नाम लिए जाने पर ग्रिड को उसी जगह फिर से लोड कराता है ([Topic](effects.md#topics) देखें): `ui.refresh(topic)` के बाद वह अपने क्रम और फ़िल्टर के साथ मौजूदा पेज फिर से लोड करता है, और `.drives(topic)` वाला फ़िल्टर कंट्रोल बदलने के बाद नए Screen params के साथ पहले पेज से शुरू करता है। ग्रिड हर अनुमति जाँच के साथ `POST /_zeyn/grid` से फिर से लोड होता है, और फ़िल्टर से बदला गया Screen param Screen फ़ंक्शन के ज़रिए ग्रिड तक पहुँचता है, उदाहरण के लिए scope के रूप में:
+
+```rust
+let mut grid = DataGrid::of(search_orders);
+if let Some(region) = p.region {
+    grid = grid.scope(Order::region, region);
+}
+grid.column(Order::number).column(Order::total).listens("orders")
+```
+
 [DataGrid संदर्भ](grid.md) में सहेजे गए व्यू, master detail, समूहन, ट्री डेटा, इनलाइन संपादन, सेल नेविगेशन, कॉपी और पेस्ट, कॉलम वर्चुअलाइज़ेशन और सुगम्यता है।

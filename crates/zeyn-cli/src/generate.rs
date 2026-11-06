@@ -635,6 +635,100 @@ fn add_member(text: &str, open: usize, close: usize, member: &str) -> String {
     format!("{}{sep}{member}{}", &text[..last], &text[last..])
 }
 
+/// The string literals given directly to each call of `call` in `text` (`.listens("a")`,
+/// `.listens(["a", "b"])`), with the line of the call. Literals inside nested calls are left out,
+/// so `ui.notify(Toast::info("Saved"))` names no topic.
+fn call_literals<'a>(text: &'a str, call: &str) -> Vec<(&'a str, usize)> {
+    let b = text.as_bytes();
+    let mut out = Vec::new();
+    let mut from = 0;
+    while let Some(at) = text[from..].find(call) {
+        let start = from + at + call.len();
+        from = start;
+        let before = text[..from - call.len()]
+            .chars()
+            .next_back();
+        if call.starts_with(|c: char| c.is_ascii_alphabetic())
+            && before.is_some_and(|c| c.is_ascii_alphanumeric() || c == '_')
+        {
+            continue;
+        }
+        let line = text[..start].matches('\n').count() + 1;
+        let mut depth = 1;
+        let mut i = start;
+        while i < b.len() && depth > 0 {
+            match b[i] {
+                b'(' => depth += 1,
+                b')' => depth -= 1,
+                b'"' => {
+                    let open = i + 1;
+                    i += 1;
+                    while i < b.len() && b[i] != b'"' {
+                        i += if b[i] == b'\\' { 2 } else { 1 };
+                    }
+                    if depth == 1 && i <= b.len() {
+                        out.push((&text[open..i.min(b.len())], line));
+                    }
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+    }
+    out
+}
+
+/// Warnings about topics for `zeyn check`: a topic that is refreshed (`Effect::refresh`,
+/// `ui.refresh`) or driven (`.drives`) but that no node listens to (`.listens`, `Live::new`), and
+/// a topic nodes listen to that nothing refreshes, drives or notifies (`hub.notify`,
+/// `notify_tenant`). Read from the source text, so only topics written as string literals count.
+pub fn topic_warnings(files: &[(PathBuf, String)]) -> Vec<String> {
+    let mut listened: Vec<(&str, String)> = Vec::new();
+    let mut sent: Vec<(&str, String, &str)> = Vec::new();
+    for (path, text) in files {
+        let shown = path
+            .display()
+            .to_string()
+            .replace('\\', "/");
+        for call in [".listens(", "Live::new("] {
+            for (topic, line) in call_literals(text, call) {
+                listened.push((topic, format!("{shown}:{line}")));
+            }
+        }
+        for (call, how) in [
+            ("Effect::refresh(", "refreshed"),
+            ("ui.refresh(", "refreshed"),
+            (".drives(", "driven"),
+            (".notify(", "notified"),
+            (".notify_tenant(", "notified"),
+        ] {
+            for (topic, line) in call_literals(text, call) {
+                sent.push((topic, format!("{shown}:{line}"), how));
+            }
+        }
+    }
+    let mut out = Vec::new();
+    let mut seen: Vec<&str> = Vec::new();
+    for (topic, place, how) in &sent {
+        if *how != "notified" && !listened.iter().any(|(t, _)| t == topic) && !seen.contains(topic)
+        {
+            seen.push(topic);
+            out.push(format!(
+                "topic `{topic}` is {how} at {place}, but no node listens to it; add `.listens(\"{topic}\")` to the nodes that show it, or remove the call"
+            ));
+        }
+    }
+    for (topic, place) in &listened {
+        if !sent.iter().any(|(t, _, _)| t == topic) && !seen.contains(topic) {
+            seen.push(topic);
+            out.push(format!(
+                "nodes listen to topic `{topic}` at {place}, but nothing refreshes, drives or notifies it; call `ui.refresh(\"{topic}\")` after saving, `.drives(\"{topic}\")` on a filter, or `hub.notify(&ctx, \"{topic}\")`"
+            ));
+        }
+    }
+    out
+}
+
 /// Warnings about the default layout for `zeyn check`, from the source files of an app and the
 /// screens and APIs its features register. Never errors: the layout is a default, not a rule.
 pub fn layout_warnings(files: &[(PathBuf, String)], registered: &[String]) -> Vec<String> {

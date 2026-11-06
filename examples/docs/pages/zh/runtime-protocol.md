@@ -51,6 +51,7 @@ head 中每个框架脚本和样式表都带有 `?v=` 和构建 id（`meta[name=
 | `forms.js`, `reveal.js`, `import.js` | 表单草稿和流程转换；显示被遮蔽的值；导入 |
 | `catalog.js`, `media.js`, `files.js`, `charts.js` 及其样式表 | 卡片网格、横向列表和搜索框；播放器、嵌入内容和图片；上传；图表、迷你图、KPI 卡片和子弹图 |
 | `share.js`, `chips.js`, `reactions.js`, `hero.js`, `state.js`, `preview.js`, `assistant.js` | 分享按钮、筛选标签、反应、hero 幻灯片、偏好存储、卡片预览（首次悬停）、助手（聊天面板，或首次按下启动按钮） |
+| `topics.js`, `vlist.js` | 监听主题的节点以及驱动它们的控件（`data-zeyn-listens`、`data-zeyn-drives`）；虚拟列表（`data-zeyn-vlist`） |
 
 完整页面在 head 中链接所有页面都用的样式表（`zeyn.css`、`components.css`、`content.css`、`pro.css`、`enterprise.css`）、其 HTML 中出现标记的模块的样式表，以及这些模块的脚本（放在它们导入的模块之后）。`zeyn.js` 带着同一张表（`[name, script selector, style selector]`）提供，并在之后到来的内容中加载缺少的部分：`nav.js` 在替换屏幕前发出带 `{ root, waits }` 的 `zeyn:need` 并等待新的样式表，窗口在打开前同样等待，`zeyn:content`、grid 页和 grid 筛选会加载其内容所需的脚本。浏览器对每个 URL 只保留一个实例，因此模块只运行一次。模块运行时设置它在文档中找到的内容，之后监听 `zeyn:content`；它从不扫描或监听页面上不存在的组件。模块用自身 URL 的 `?v=` 导入共享部分。当页面链接了它不使用的模块，或某个模块的样式表为其标记之外的类设置样式时，`tests/ui_modules.rs` 会失败。
 
@@ -279,6 +280,7 @@ Effects：
 | Endpoint | Body | Answer |
 |---|---|---|
 | `/_zeyn/node` | `{ screen, params, node }` | 一个节点的 HTML，包含其 grid 的第一页。用于懒加载标签页。 |
+| `/_zeyn/nodes` | `{ screen, params, nodes: ["1.0", "2"] }` | `{ nodes: { "1.0": "<div class=\"z-node\" ...>" } }`：界面运行一次渲染出的多个节点，用于被刷新或被驱动主题的监听者。最多 32 个不同路径；界面中不存在的路径返回 `404`。界面的访问权限、guard 和 interceptor 只运行一次，params 按界面的类型化 params 读取。 |
 | `/_zeyn/data` | `{ screen, params, node, key, input }` | 来自该节点数据源 `key` 的 JSON：查找（lookup）选项（`key` 为字段名）、树的子节点（`key` 为空）、步骤检查（`key` 为 `_step`）。会检查数据源 action 的权限并运行拦截器，与 grid 相同。不符合 action 的输入以 `404` 拒绝。 |
 | `/_zeyn/data` with `screen` = `_site.{feature}` | 同上 | 对站点头部插槽中的组件执行相同操作：`node` 为插槽（0 start、1 center、2 end、3 bottom）、节点在其中的索引，随后是子节点索引。会检查该 feature 的 guard 和 action 的权限。 |
 | `/_zeyn/parse` | `{ kind, text, label }` | 服务端如何按用户的语言、时区和时钟解读键入的日期或时间：`{ ok, text, iso, utc, zone }` 或 `{ ok: false, message }`。`kind` 为 `date`、`time`、`datetime`、`local` 或 `presets`（今天和快捷范围）。 |
@@ -296,8 +298,14 @@ Effects：
 | `zeyn:content` | `document` | 带有新内容的元素（导航、懒加载面板）。运行时加载所需的模块，每个已加载的模块初始化其中的内容。 |
 | `zeyn:errors` | the form | `422` 错误，在运行时显示之后触发。line 编辑器和分步表单使用它。 |
 | `zeyn:effect` | `document` | 运行时不认识的 effect：`{ effect, source, run }`。`run(next)` 执行另一个 effect。`confirm` 使用它。 |
+| `zeyn:topics` | `document` | `{ topics }`：来自其他脚本（收到通知的 `live.js`）的待刷新主题。 |
+| `zeyn:reload` | 某个元素 | 就地重新加载其中的网格：当前页，或在 `{ reset: true }` 时加载第一页。 |
 
 Effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":"...","then":{...}}` 会在模态警告对话框中询问，只有在用户确认后才执行 `then`。
+
+Effect `{"effect":"refresh","topics":["sales"]}` 刷新这些主题的监听者。`[data-zeyn-listens="a,b"]` 标记一个监听者（其父级 `data-zeyn-node` 的节点）；`[data-zeyn-drives="a"]` 标记驱动主题的控件：筛选表单（`data-zeyn-kinds` 说明哪些 params 是数字或布尔值）、搜索框（其字段名为 `q`）或筛选标签（每个标签在 `data-zeyn-params` 中带有自己的 params）。驱动时，控件的值合并到界面根的 `data-zeyn-params`，若该界面是主界面则用它们替换地址，然后刷新监听者。`topics.js` 一次处理同一动画帧内点名的主题：包含网格的监听者收到 `zeyn:reload`，界面上的其他监听者放进一次 `POST /_zeyn/nodes`，同一界面较新的请求会中止旧请求并接管其节点。焦点和展开的 `<details>` 按 id、test id、`data-zeyn-key` 行和位置保留。
+
+虚拟列表是带有 `data-zeyn-row-height`、`data-zeyn-block` 和 `data-zeyn-total` 的 `section[data-zeyn-vlist]`；`vlist.js` 用 `{ page: { type: "offset", offset }, with_total: true }` 向 `POST /_zeyn/grid` 请求数据块，并把每个 `<li>` 放在 `(aria-posinset - 1) * height` 处。依赖另一个字段的 lookup 带有 `data-depends-on="field"`，并在其 `/_zeyn/data` 输入中把该字段的值作为 `parent` 发送。
 
 客户端偏好（`zeyn::ClientPref`）位于浏览器模块 `/_zeyn/state.js` 中，只有包含带 `data-zeyn-remember` 或 `data-zeyn-prefs-clear` 的元素的页面才会导入它。`GET /_zeyn/prefs` 返回 `{ preferences }`，表示应用的同意钩子是否允许在会话之外保留偏好值，并带有 `Cache-Control: no-store`。服务器不读取任何已保存的值。
 

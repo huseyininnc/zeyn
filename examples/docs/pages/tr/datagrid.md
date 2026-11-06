@@ -77,4 +77,16 @@ Sayılar ve para tutarları sağa hizalanır ve sabit genişlikli rakamlarla yaz
 - `.row_style(|row| Option<RowStyle>)`: danger, warning veya success satırlar.
 - `.exportable()`: filtrelenmiş satırların CSV dışa aktarımı, sunucu tarafından akıtılır.
 
+## Yerinde yenileme
+
+En son çağrılan `.listens(topic)`, topic adlandırıldığında grid'in yerinde yeniden yüklenmesini sağlar ([Topic'ler](effects.md#topics) bölümüne bakın): `ui.refresh(topic)` sonrasında geçerli sayfasını sıralaması ve filtreleriyle yeniden yükler, `.drives(topic)` diyen bir filtre kontrolü değiştikten sonra yeni screen params ile ilk sayfadan başlar. Grid her izin denetimiyle `POST /_zeyn/grid` üzerinden yeniden yüklenir ve filtrenin değiştirdiği bir screen param'ı grid'e screen fonksiyonu üzerinden ulaşır, örneğin bir scope olarak:
+
+```rust
+let mut grid = DataGrid::of(search_orders);
+if let Some(region) = p.region {
+    grid = grid.scope(Order::region, region);
+}
+grid.column(Order::number).column(Order::total).listens("orders")
+```
+
 [DataGrid başvurusu](grid.md) kayıtlı görünümleri, master detail, gruplamayı, ağaç verisini, satır içi düzenlemeyi, hücre gezinmesini, kopyala yapıştırı, sütun sanallaştırmayı ve erişilebilirliği kapsar.

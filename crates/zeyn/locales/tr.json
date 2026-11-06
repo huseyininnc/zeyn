@@ -104,6 +104,7 @@
       "max": "{label} en fazla {n} olabilir.",
       "format": "{label} geçersiz bir değer içeriyor.",
       "skipped_time": "{label}: bu saat, saat değişikliği nedeniyle sizin saat diliminizde yok.",
+      "depends_on": "Bu seçim, bağlı olduğu alanın değeri için geçerli değil.",
       "line": "Satır {n}: {message}",
       "disabled_day": "{label}: bu gün seçilemez.",
       "time_step": "{label} {n} dakikalık adımlarla girilmelidir.",
@@ -230,6 +231,7 @@
       "resize": "Bölmeleri yeniden boyutlandır",
       "cards": {
         "load_more": "Daha fazla göster",
+        "list": "Liste",
         "loaded": "{count} öğe gösteriliyor",
         "empty": "Gösterilecek bir şey yok.",
         "error": "Liste yüklenemedi. Yeniden deneyin.",

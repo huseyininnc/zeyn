@@ -429,6 +429,7 @@ function search(form, text) {
   const q = text.trim().slice(0, Number(form.dataset.zeynMax) || 100);
   input.value = q;
   closeList(form);
+  if (form.dataset.zeynDrives) input.dispatchEvent(new Event('change', { bubbles: true }));
   const screen = form.dataset.zeynResults;
   if (!screen || !q) return;
   const url = `${BASE}/_zeyn/route/${encodeURIComponent(screen)}?params=${encodeURIComponent(JSON.stringify({ q }))}`;
@@ -470,6 +471,7 @@ document.addEventListener('keydown', (e) => {
       e.preventDefault();
       input.value = '';
       list.replaceChildren();
+      if (form.dataset.zeynDrives) input.dispatchEvent(new Event('change', { bubbles: true }));
     }
   }
 });

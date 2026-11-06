@@ -51,6 +51,7 @@ head にあるフレームワークのスクリプトとスタイルシートに
 | `forms.js`, `reveal.js`, `import.js` | フォームの下書きとワークフローの遷移；マスクされた値の表示；インポート |
 | `catalog.js`, `media.js`, `files.js`, `charts.js` とそのスタイルシート | カードグリッド、レール、検索ボックス；プレーヤー、埋め込み、画像；アップロード；チャート、スパークライン、KPI カード、ブレットチャート |
 | `share.js`, `chips.js`, `reactions.js`, `hero.js`, `state.js`, `preview.js`, `assistant.js` | 共有ボタン、フィルターチップ、リアクション、ヒーロースライド、設定ストア、カードのプレビュー（最初のホバー）、アシスタント（チャットパネル、またはランチャーの最初の押下） |
+| `topics.js`, `vlist.js` | トピックを listen するノードと、それを drive するコントロール（`data-zeyn-listens`、`data-zeyn-drives`）、仮想リスト（`data-zeyn-vlist`） |
 
 完全なページは head に、すべてのページが使うスタイルシート（`zeyn.css`、`components.css`、`content.css`、`pro.css`、`enterprise.css`）、HTML にマーカーがあるモジュールのスタイルシート、そしてそれらのスクリプトを、それぞれが import するモジュールの後にリンクします。`zeyn.js` は同じ表（`[name, script selector, style selector]`）付きで配信され、後から届くコンテンツに足りないものを読み込みます。`nav.js` は画面を差し替える前に `{ root, waits }` 付きの `zeyn:need` を発行して新しいスタイルシートを待ち、ウィンドウも開く前に同じように待ちます。`zeyn:content`、グリッドのページ、グリッドのフィルターは、含むもののスクリプトを読み込みます。ブラウザーは URL ごとに 1 つのインスタンスを保つので、モジュールは一度だけ実行されます。モジュールは実行時にドキュメントで見つけたものを設定し、その後は `zeyn:content` を待ち受けます。ページにないコンポーネントを探したり待ち受けたりすることはありません。モジュールは共有部分を自分の URL の `?v=` 付きで import します。`tests/ui_modules.rs` は、ページが使わないモジュールをリンクしたとき、またはモジュールのスタイルシートがマーカー外のクラスにスタイルを付けたときに失敗します。
 
@@ -279,6 +280,7 @@ Effects:
 | エンドポイント | Body | 応答 |
 |---|---|---|
 | `/_zeyn/node` | `{ screen, params, node }` | 1 つのノードの HTML（その grid の最初のページ付き）。遅延 tabs で使われます。 |
+| `/_zeyn/nodes` | `{ screen, params, nodes: ["1.0", "2"] }` | `{ nodes: { "1.0": "<div class=\"z-node\" ...>" } }`: 画面を 1 回実行してレンダリングした複数のノード。更新または drive されたトピックのリスナー用です。異なるパスは最大 32 個で、画面にないパスは `404` を返します。画面のアクセス、guard、interceptor は 1 回だけ実行され、params は画面の型付き params として読まれます。 |
 | `/_zeyn/data` | `{ screen, params, node, key, input }` | ノードのデータソース `key` からの JSON。lookup の選択肢（`key` はフィールド名）、tree の子（`key` は空）、ステップの確認（`key` は `_step`）。ソースの action 権限が確認され、grid と同様にインターセプターが実行されます。action に合わない入力は `404` で拒否されます。 |
 | `screen` = `_site.{feature}` の `/_zeyn/data` | 上と同じ | サイトヘッダーのスロット内のコンポーネント向けの同じ処理。`node` はスロット（0 は start、1 は center、2 は end、3 は bottom）、その中でのノードのインデックス、続いて子のインデックスです。Feature のガードと action の権限が確認されます。 |
 | `/_zeyn/parse` | `{ kind, text, label }` | 入力された日付または時刻を、サーバーがユーザーの言語、ゾーン、時計でどう解釈するか。`{ ok, text, iso, utc, zone }` または `{ ok: false, message }`。`kind` は `date`、`time`、`datetime`、`local`、`presets`（今日とクイック範囲）です。 |
@@ -296,8 +298,14 @@ Effects:
 | `zeyn:content` | `document` | 新しいコンテンツを持つ要素（ナビゲーション、遅延パネル）。ランタイムが必要なモジュールを読み込み、読み込まれた各モジュールが中身を設定します。 |
 | `zeyn:errors` | form | ランタイムが表示した後の `422` エラー。line エディターとステップ形式の form が使います。 |
 | `zeyn:effect` | `document` | ランタイムが知らない effect: `{ effect, source, run }`。`run(next)` は別の effect を実行します。`confirm` で使われます。 |
+| `zeyn:topics` | `document` | `{ topics }`: ほかのスクリプト（通知を受けた `live.js`）からの、更新するトピック。 |
+| `zeyn:reload` | 要素 | その中のグリッドをその場で再読み込みします。現在のページ、または `{ reset: true }` なら最初のページです。 |
 
 Effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":"...","then":{...}}` は、モーダルのアラートダイアログで確認し、ユーザーが承諾した後にのみ `then` を実行します。
+
+Effect `{"effect":"refresh","topics":["sales"]}` はトピックのリスナーを更新します。`[data-zeyn-listens="a,b"]` はリスナー（親 `data-zeyn-node` のノード）を示し、`[data-zeyn-drives="a"]` はトピックを drive するコントロールを示します。フィルターフォーム（`data-zeyn-kinds` はどの params が数値または真偽値かを示します）、検索ボックス（フィールド名は `q`）、フィルターチップ（各チップは自分の params を `data-zeyn-params` に持ちます）です。drive すると、コントロールの値が画面ルートの `data-zeyn-params` にマージされ、その画面がメイン画面ならアドレスがそれで置き換えられ、リスナーが更新されます。`topics.js` は 1 つのアニメーションフレームで指定されたトピックをまとめて処理します。グリッドを持つリスナーは `zeyn:reload` を受け取り、画面のほかのリスナーは 1 回の `POST /_zeyn/nodes` にまとめられ、同じ画面への新しいリクエストは古いものを中断してそのノードを引き継ぎます。フォーカスと開いている `<details>` は、id、test id、`data-zeyn-key` の行、位置で保たれます。
+
+仮想リストは `data-zeyn-row-height`、`data-zeyn-block`、`data-zeyn-total` を持つ `section[data-zeyn-vlist]` です。`vlist.js` は `{ page: { type: "offset", offset }, with_total: true }` で `POST /_zeyn/grid` にブロックを要求し、各 `<li>` を `(aria-posinset - 1) * height` の位置に置きます。別のフィールドに依存する lookup は `data-depends-on="field"` を持ち、そのフィールドの値を `/_zeyn/data` の入力の `parent` として送ります。
 
 クライアント設定（`zeyn::ClientPref`）はブラウザーのモジュール `/_zeyn/state.js` にあり、ページはこのモジュールを、`data-zeyn-remember` または `data-zeyn-prefs-clear` を持つ要素がある場合にだけインポートします。`GET /_zeyn/prefs` は `{ preferences }` を返します。これは、アプリの同意フックが、設定値をセッションを越えて保持することを許可するかどうかを表し、`Cache-Control: no-store` が付きます。サーバーは保存された値を読み取りません。
 

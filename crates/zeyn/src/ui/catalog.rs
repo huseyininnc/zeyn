@@ -320,7 +320,12 @@ pub struct CardGrid<E: Model> {
     list: bool,
     scrollbar: bool,
     scope: Vec<crate::action::Filter>,
+    builder: Option<BuildFn<E>>,
+    separator: Option<Node>,
+    row_height: Option<u32>,
 }
+
+type BuildFn<E> = Box<dyn Fn(&E) -> Node + Send + Sync>;
 
 /// A horizontal list of cards that scrolls sideways, with previous and next buttons and scroll
 /// snapping. It loads the next batch when the user scrolls near its end. Built like a
@@ -376,6 +381,63 @@ impl<E: Model> CardGrid<E> {
             list: false,
             scrollbar: false,
             scope: Vec::new(),
+            builder: None,
+            separator: None,
+            row_height: None,
+        }
+    }
+
+    /// Builds each row as any node, an escape hatch next to [`CardGrid::card`] and
+    /// [`CardGrid::item`], which stay the default: they give links, images and screen reader
+    /// text for free. The row's `<li>` carries the model key (`data-zeyn-key`), so a refresh
+    /// keeps focus and open details on the same record. Built rows are for showing: the nodes in
+    /// them are not addressed by node paths, so put grids, forms and lookups elsewhere. With
+    /// `Paging::virtual_scroll()` on a list, rows must say their height with
+    /// [`CardGrid::row_height`]; `App::check_page` reports a missing one.
+    ///
+    /// ```ignore
+    /// List::of(search_people)
+    ///     .builder(|p: &Person| Row::new().col(Avatar::new(p.name.clone())).col(Paragraph::new(p.city.clone())))
+    ///     .separator(Paragraph::new("·"))
+    /// ```
+    pub fn builder<N: Into<Node>>(
+        mut self,
+        build: impl Fn(&E) -> N + Send + Sync + 'static,
+    ) -> Self {
+        self.builder = Some(Box::new(move |row| build(row).into()));
+        self
+    }
+
+    /// A node shown between two rows, such as a divider or a dot. It is hidden from screen
+    /// readers, which count the rows themselves. Not used with virtual scrolling, where every
+    /// row has the same height.
+    pub fn separator(mut self, node: impl Into<Node>) -> Self {
+        self.separator = Some(node.into());
+        self
+    }
+
+    /// The fixed height of every row in pixels, for a list with `Paging::virtual_scroll()`:
+    /// only the rows in view are in the page, placed by this height, and each carries
+    /// `aria-posinset` and `aria-setsize`. There is no height per row; content that does not fit
+    /// is cut. Required with [`CardGrid::builder`], at least 20.
+    pub fn row_height(mut self, px: u32) -> Self {
+        self.row_height = Some(px.max(20));
+        self
+    }
+
+    /// The row height and block size of a virtual list, or `None` when it is not one. A list
+    /// built with a builder and no row height falls back to loading more rows.
+    fn virtual_rows(&self) -> Option<(u32, u32)> {
+        match self.paging {
+            Paging::Virtual { row_height, block } if self.list && !self.rail => {
+                let height = match (self.row_height, &self.builder) {
+                    (Some(h), _) => h,
+                    (None, None) => row_height,
+                    (None, Some(_)) => return None,
+                };
+                Some((height, block))
+            }
+            _ => None,
         }
     }
 
@@ -471,6 +533,7 @@ impl<E: Model> CardGrid<E> {
         match self.paging {
             Paging::Pages { size } => size,
             Paging::Infinite { batch } => batch,
+            Paging::Virtual { block, .. } if self.virtual_rows().is_some() => block,
             _ => 24,
         }
     }
@@ -483,16 +546,17 @@ impl<E: Model> CardGrid<E> {
     /// page size and search text come from the server; client filters are dropped.
     fn allow(&self, query: &mut DataQuery) {
         let size = self.size();
+        let offsets = self.pages() || self.virtual_rows().is_some();
         query.page = match &query.page {
-            PageRequest::Offset { offset, .. } if self.pages() => PageRequest::Offset {
+            PageRequest::Offset { offset, .. } if offsets => PageRequest::Offset {
                 offset: *offset,
                 limit: size,
             },
-            PageRequest::After { cursor, .. } if !self.pages() => PageRequest::After {
+            PageRequest::After { cursor, .. } if !offsets => PageRequest::After {
                 cursor: cursor.clone(),
                 limit: size,
             },
-            _ if self.pages() => PageRequest::Offset {
+            _ if offsets => PageRequest::Offset {
                 offset: 0,
                 limit: size,
             },
@@ -514,24 +578,60 @@ impl<E: Model> CardGrid<E> {
         }
         query.filters.clone_from(&self.scope);
         query.q = self.search.clone();
-        query.with_total = self.pages();
+        query.with_total = offsets;
         query.aggregates.clear();
         query.group = None;
     }
 
+    /// The rows of a page as `<li>`s. Built rows and the rows of a virtual list carry their model
+    /// key in `data-zeyn-key`; in a virtual list also their position (`aria-posinset`) and the
+    /// row count (`aria-setsize`). Typed cards and items are links, found again by position.
+    /// Separators go before each row; the stylesheet hides the one before the first row, so a
+    /// batch appended later still gets one.
     fn cards(&self, page: &LoadedPage, r: &Render) -> String {
         let mut out = String::new();
         let Some(rows) = page.items.downcast_ref::<Vec<E>>() else {
             return out;
         };
-        match (&self.card, &self.item) {
-            (_, Some(item)) if self.list => rows
-                .iter()
-                .for_each(|row| item(row).html(&mut out, r)),
-            (Some(card), _) if !self.list => rows
-                .iter()
-                .for_each(|row| card(row).html(&mut out, r, self.image)),
-            _ => {}
+        let key = E::fields().iter().position(|f| f.key);
+        let place = self
+            .virtual_rows()
+            .map(|_| page.total.unwrap_or(0));
+        for (i, row) in rows.iter().enumerate() {
+            if let (Some(sep), None) = (&self.separator, place) {
+                out.push_str(r#"<li class="z-separator" aria-hidden="true">"#);
+                sep.render(&mut out, r);
+                out.push_str("</li>");
+            }
+            let start = out.len();
+            match (&self.builder, &self.card, &self.item) {
+                (Some(build), _, _) => {
+                    let path = format!("{}.k{}", r.path, page.offset + i as u64);
+                    out.push_str(r#"<li class="z-built">"#);
+                    build(row).render(&mut out, &Render { path: &path, ..*r });
+                    out.push_str("</li>");
+                }
+                (None, _, Some(item)) if self.list => item(row).html(&mut out, r),
+                (None, Some(card), _) if !self.list => card(row).html(&mut out, r, self.image),
+                _ => continue,
+            }
+            if self.builder.is_none() && place.is_none() {
+                continue;
+            }
+            let mut attrs = key
+                .and_then(|k| row.value_at(k))
+                .and_then(|v| crate::grid::value_key(&v))
+                .map(|k| format!(r#" data-zeyn-key="{}""#, escape(&k)))
+                .unwrap_or_default();
+            if let Some(total) = place {
+                attrs.push_str(&format!(
+                    r#" aria-posinset="{}" aria-setsize="{total}""#,
+                    page.offset + i as u64 + 1
+                ));
+            }
+            if out[start..].starts_with("<li") {
+                out.insert_str(start + 3, &attrs);
+            }
         }
         out
     }
@@ -548,7 +648,50 @@ impl<E: Model> CardGrid<E> {
         }
     }
 
+    /// A virtual list: a scroll area as tall as every row at the fixed height, holding the first
+    /// block; `vlist.js` places the rows in view and fetches the other blocks by offset.
+    fn render_virtual(
+        &self,
+        out: &mut String,
+        r: &Render,
+        page: Option<&LoadedPage>,
+        (height, block): (u32, u32),
+    ) {
+        let id = dom_id(r, "cards");
+        let t = |key: &str| r.text(&Text::key(format!("zeyn.ui.cards.{key}")));
+        let total = page.and_then(|p| p.total).unwrap_or(0);
+        let title = self
+            .title
+            .as_ref()
+            .map(|t| r.text(t))
+            .unwrap_or_else(|| t("list"));
+        out.push_str(&format!(
+            r#"<section class="z-cards z-cards-rows z-vlist" data-zeyn-vlist data-zeyn-row-height="{height}" data-zeyn-block="{block}" data-zeyn-total="{total}" data-testid="{}.cards" data-text-error="{}">"#,
+            r.scope,
+            t("error"),
+        ));
+        if self.title.is_some() {
+            out.push_str(&format!(
+                r#"<div class="z-cards-head"><h2 class="z-cards-title" id="{id}-title">{title}</h2></div>"#
+            ));
+        }
+        out.push_str(&format!(
+            r#"<div class="z-vlist-view" data-zeyn-vlist-view tabindex="0" role="region" aria-label="{title}"><ul class="z-list" id="{id}-list" role="list" data-zeyn-rows>"#
+        ));
+        if let Some(p) = page {
+            out.push_str(&self.cards(p, r));
+        }
+        out.push_str(&format!(
+            r#"</ul></div><p class="z-cards-empty" data-zeyn-cards-empty{}>{}</p><p class="z-sr-only" role="status" aria-live="polite" data-zeyn-cards-status></p></section>"#,
+            if total == 0 { "" } else { " hidden" },
+            t("empty")
+        ));
+    }
+
     fn render_with(&self, out: &mut String, r: &Render, page: Option<&LoadedPage>) {
+        if let Some(rows) = self.virtual_rows() {
+            return self.render_virtual(out, r, page, rows);
+        }
         let id = dom_id(r, "cards");
         let t = |key: &str| r.text(&Text::key(format!("zeyn.ui.cards.{key}")));
         let class = match (self.rail, self.list) {
@@ -774,6 +917,16 @@ impl<E: Model> Component for CardGrid<E> {
     fn grid(&self) -> Option<&dyn GridSource> {
         Some(self)
     }
+
+    fn page_check(&self, check: &mut super::PageCheck) {
+        let scrolls = matches!(self.paging, Paging::Virtual { .. }) && self.list;
+        if scrolls && self.builder.is_some() && self.row_height.is_none() {
+            check.problem("a virtual list with `builder` needs `.row_height(px)`: virtual rows have one fixed height");
+        }
+        if scrolls && self.separator.is_some() {
+            check.problem("`separator` does not work with virtual scrolling, where every row has the same height; leave it out or page the list");
+        }
+    }
 }
 
 impl<E: Model> From<CardGrid<E>> for Node {
@@ -820,6 +973,7 @@ pub struct SearchBox<E: Model> {
     value: String,
     suggestion: SuggestFn<E>,
     item: Option<SuggestItemFn<E>>,
+    drives: Vec<&'static str>,
 }
 
 impl<E: Model> SearchBox<E> {
@@ -837,7 +991,17 @@ impl<E: Model> SearchBox<E> {
             value: String::new(),
             suggestion: std::sync::Arc::new(first_text::<E>),
             item: None,
+            drives: Vec::new(),
         }
+    }
+
+    /// Searches in place: Enter, picking a suggestion or clearing the field puts the text into
+    /// the screen's `q` param and refreshes the nodes listening to `topics`, instead of opening a
+    /// results screen. The screen's params need a `q: String` field (as [`SearchParams`]) for the
+    /// listeners to read.
+    pub fn drives(mut self, topics: impl super::Topics) -> Self {
+        self.drives = super::topic_list(topics);
+        self
     }
 
     /// How long to wait after the last key before asking for suggestions, in milliseconds
@@ -966,11 +1130,19 @@ impl<E: Model> Component for SearchBox<E> {
     fn render(&self, out: &mut String, r: &Render) {
         let id = dom_id(r, "search");
         let t = |key: &str| r.text(&Text::key(format!("zeyn.ui.search.{key}")));
+        let named = if self.drives.is_empty() {
+            ""
+        } else {
+            r#" name="q""#
+        };
+        let results = match self.results {
+            Some(s) => format!(r#" data-zeyn-results="{s}""#),
+            None => String::new(),
+        } + &super::topics_attr("data-zeyn-drives", &self.drives);
         out.push_str(&format!(
-            r#"<form class="z-search" role="search" data-zeyn-searchbox data-zeyn-delay="{}" data-zeyn-max="{}"{} data-text-count="{}" data-text-none="{}" data-testid="{}.search"><label class="z-sr-only" for="{id}">{}</label><span class="z-search-field"><span class="z-icon z-icon-search" aria-hidden="true"></span><input id="{id}" type="search" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="{id}-list" autocomplete="off" spellcheck="false" enterkeyhint="search" maxlength="{}" placeholder="{}" value="{}"><ul class="z-search-list" role="listbox" id="{id}-list" aria-label="{}" hidden></ul></span><p class="z-sr-only" role="status" aria-live="polite" data-zeyn-search-status></p></form>"#,
+            r#"<form class="z-search" role="search" data-zeyn-searchbox data-zeyn-delay="{}" data-zeyn-max="{}"{results} data-text-count="{}" data-text-none="{}" data-testid="{}.search"><label class="z-sr-only" for="{id}">{}</label><span class="z-search-field"><span class="z-icon z-icon-search" aria-hidden="true"></span><input id="{id}"{named} type="search" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="{id}-list" autocomplete="off" spellcheck="false" enterkeyhint="search" maxlength="{}" placeholder="{}" value="{}"><ul class="z-search-list" role="listbox" id="{id}-list" aria-label="{}" hidden></ul></span><p class="z-sr-only" role="status" aria-live="polite" data-zeyn-search-status></p></form>"#,
             self.delay,
             crate::MAX_SEARCH_QUERY,
-            self.results.map(|s| format!(r#" data-zeyn-results="{s}""#)).unwrap_or_default(),
             t("count"),
             t("none"),
             r.scope,
@@ -983,11 +1155,20 @@ impl<E: Model> Component for SearchBox<E> {
     }
 
     fn schema(&self) -> Json {
-        json!({ "type": "search_box", "model": E::NAME, "action": self.action, "results": self.results, "label": self.label })
+        json!({ "type": "search_box", "model": E::NAME, "action": self.action, "results": self.results, "label": self.label, "drives": self.drives })
     }
 
     fn source(&self, key: &str) -> Option<&dyn DataSource> {
         (key == "suggest").then_some(self as &dyn DataSource)
+    }
+
+    fn page_check(&self, check: &mut super::PageCheck) {
+        if self.results.is_some() && !self.drives.is_empty() {
+            check.problem("a search box either opens a results screen (`results`) or refreshes listeners in place (`drives`), not both");
+        }
+        for t in &self.drives {
+            check.drives(t);
+        }
     }
 }
 

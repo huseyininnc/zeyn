@@ -39,6 +39,52 @@ Adı boş bırakın ya da yanlış bir e-posta yazıp *Send* düğmesine basın:
 
 Her alan türünün varsayılan bir kontrolü vardır: metin girdileri, sayı girdileri, para birimiyle birlikte para, tarih ve saat seçiciler, `bool` için onay kutuları ve seçenekler için seçim listeleri. `.control(M::f, Control::...)` başka bir tanesini seçer, `.lookup(M::f, action)` ise kayıtları sunucuda arar. [Controls and pickers](controls.md) sayfasına bakın.
 
+## Bağımlı lookup'lar
+
+`.depends_on(field, source)`, `field` lookup'ının seçeneklerini başka bir alana bağlar; bir ülkenin şehirleri gibi. Her arama `source` değerini `LookupQuery::parent` içinde gönderir (`q.parent_id()` onu bir id olarak okur) ve `source` değişince `field` temizlenir; böylece seçenekleri yeni değer için yeniden yüklenir.
+
+```rust
+#[action(permission = "geo.read")]
+pub async fn find_cities(q: LookupQuery, store: Cities) -> Result<Page<LookupItem>> {
+    Ok(q.apply(store.of_country(q.parent_id())))
+}
+
+Form::of(address)
+    .lookup(Address::country, find_countries)
+    .lookup(Address::city, find_cities)
+    .depends_on(Address::city, Address::country)
+    .submit(t!("save"), save_address)
+```
+
+Bu ikiliye tarayıcıda güvenilemez; bu yüzden submit sırasında sunucu, seçilen şehri gönderilen ülkeyle birlikte lookup action'ına action'ın izniyle yeniden sorar ve action'ın döndürmediği bir şehri bir alan hatasıyla reddeder. `q.apply` öncesinde filtrelemenin yaptığı gibi id sorgularında da üst değere göre filtreleyin. `App::check_page`, alanı form'un bir lookup'ı olmayan ya da kaynağı form'un başka bir alanı olmayan bir `depends_on` bildirir.
+
+## Filtre formları
+
+Submit düğmesi olmayan bir form screen'i filtreleyebilir: `.drives(topic)` alanlarını screen params yapar. Bir alan değişince (bir seçim listesi, bir tarih aralığı, Enter ile bir metin alanı) değeri screen'in aynı adlı param'ına girer, adres güncel tutulur ve `.listens(topic)` diyen node'lar yerinde yenilenip değeri kendi params'larından okur ([Topic'ler](effects.md#topics) bölümüne bakın). Sayılar ve boolean değerler olduğu gibi, boş alanlar `null` olarak gönderilir; sunucu params'ı screen'in tipli params'ı olarak okur, bu yüzden uymayan bir değer reddedilir.
+
+```rust
+#[params]
+pub struct SalesParams {
+    pub region: Option<Region>,
+    pub from: Option<Date>,
+    pub to: Option<Date>,
+}
+
+#[screen(route = "/sales", permission = "sales.read")]
+pub fn sales(p: SalesParams, store: Sales) -> Screen {
+    Screen::new(t!("sales.title"))
+        .body(
+            Form::of(SalesFilter { region: p.region, from: p.from, to: p.to })
+                .field(SalesFilter::region)
+                .range(SalesFilter::from, SalesFilter::to)
+                .drives("sales"),
+        )
+        .body(Kpi::new(t!("sales.total"), store.total(&p)).listens("sales"))
+}
+```
+
+`submit` içeren bir form sürücü olamaz; onun yerine kaydettikten sonra `on_success` içinde `ui.refresh(topic)` ile yenileyin.
+
 ## Salt okunur alanlar
 
 `#[readonly]` alanlar form'larda gösterilir ama düzenlenemez; yalnızca hareketlerin değiştirdiği bir stok düzeyi buna örnektir.

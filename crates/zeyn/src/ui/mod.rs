@@ -32,6 +32,7 @@ mod reactions;
 mod relative;
 mod share;
 mod shell;
+mod topics;
 mod tree;
 mod week;
 mod widgets;
@@ -71,7 +72,7 @@ pub use hero::{HERO_SECONDS, Hero, MAX_HERO_SLIDES};
 pub use inputs::{mask_example, mask_fits, mask_raw};
 pub(crate) use lines::LinesEditor;
 pub use lines::{Lines, MAX_LINES};
-pub use list::{List, ListItem};
+pub use list::{List, ListItem, MAX_REPEAT, Repeat};
 pub use lookup::{
     LookupItem, LookupQuery, LookupValue, MAX_LOOKUP_COLUMNS, MAX_LOOKUP_IDS, MAX_LOOKUP_PAGE,
 };
@@ -84,6 +85,8 @@ pub use rating::{DEFAULT_RATING, MAX_RATING};
 pub use reactions::{MAX_REACTIONS, ReactionPress, ReactionState, Reactions};
 pub use relative::RelativeTime;
 pub use share::Share;
+pub use topics::{Listen, Listens, MAX_TOPICS, PageCheck, Topics, valid_topic};
+pub(crate) use topics::{topic_list, topics_attr};
 pub use tree::{MAX_TREE_CHILDREN, Tree, TreeItem, TreeQuery};
 pub use week::{MAX_WEEK_ROWS, WeekDay, WeekSchedule};
 pub use widgets::{

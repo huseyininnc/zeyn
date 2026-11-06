@@ -59,6 +59,22 @@ Rail::of(search_products).card(|p: &Product| {
 @live preview
 
 
+### Builder'lar
+
+`.card` ve `.item` varsayılan olarak kalır: bağlantıları, görselleri ve ekran okuyucu metnini hazır verirler. Bir satır başka bir biçim istediğinde `.builder(|row| node)`, Flutter'ın `ListView.builder`'ı gibi her satırı herhangi bir node olarak kurar; `List::of`, `CardGrid` ve `Rail` üzerinde çalışır. `.separator(node)` satırların arasına bir node koyar (satırları kendileri sayan ekran okuyuculardan gizlenir), `Repeat::of(items, |item| node)` ise screen'in zaten bellekte tuttuğu bir liste için aynısını en fazla 500 öğeye kadar yapar.
+
+```rust
+List::of(search_people)
+    .builder(|p: &Person| Row::new().compact().col(Avatar::new(p.name.clone())).col(Paragraph::new(p.city.clone())))
+    .separator(Paragraph::new("·"))
+
+Repeat::of(order.steps.iter(), |s| Badge::new(s.name.clone())).separator(Paragraph::new("→"))
+```
+
+- **Anahtarlar.** Kurulan satırlar ve sanal bir listenin satırları modelin anahtarını `data-zeyn-key` içinde taşır; böylece listenin bir yenilemesi ([Topic'ler](effects.md#topics)) odağı ve açık details öğelerini, nereye taşınmış olursa olsun aynı kayıtta tutar.
+- **Kurulan satırlar göstermek içindir.** Node'ları node yollarıyla adreslenmez; bu yüzden bir grid, bir form ya da bir lookup başka yere konur. `Repeat`'in node'ları çocuktur (`p.0`, `p.1`, ...) ve çalışmaya devam eder.
+- **Sanal kaydırma.** `.paging(Paging::virtual_scroll())` olan bir liste sayfada yalnızca görünen satırları tutar; bunlar tüm satırlar kadar yüksek bir kaydırma alanının içindedir ve kullanıcı kaydırdıkça bloklar offset ile getirilir. Satırların tek bir sabit yüksekliği vardır, satır başına yükseklik yoktur: bir builder ile `.row_height(px)` zorunludur ve `App::check_page` eksikliğini bildirir (`separator` orada kullanılmaz). Her satır `aria-posinset` ve `aria-setsize` taşır; böylece ekran okuyucular satırın tüm listedeki yerini duyar. Kaydırma alanı, başlıkla adlandırılan odaklanabilir bir bölgedir.
+
 ## Rail
 
 Rail, yana kayan tek satıra dizilmiş bir kart ızgarasıdır; kaydırma yakalama (snap) ve bir görünüm genişliği kadar kaydıran önceki ve sonraki düğmeleri vardır (kullanıcı azaltılmış hareket istemediyse yumuşakça). Kullanıcı sonuna yaklaştıkça sonraki grubu, 12'şer 12'şer yükler. Kartlar sekme sırasında yer alan bağlantılardır ve odak aldıklarında görünüme kayarlar.
@@ -94,6 +110,8 @@ SearchBox::of(catalog_products)
 Klavye: Aşağı ve Yukarı önerilerde gezinir (Aşağı onları açar), Enter vurgulanan öneriyle ya da yazılan metinle arar, Escape önce önerileri kapatır, sonra alanı temizler. Bir canlı bölge ekran okuyuculara kaç öneri olduğunu söyler.
 
 Sonuç screen'i `SearchParams` alır (`q`, screen bir menüden açıldığında boştur). Sunucu metni `MAX_SEARCH_QUERY` (100) karaktere keser, kaç öneri göndereceğine karar verir (`limit` başka türlü söylemedikçe 8, en çok 20), screen'in erişimini, Feature'ın guard'larını ve action'ın iznini denetler ve her öneri çağrısını yazma hız sınırına sayar (`App::write_limit`).
+
+`.drives(topic)` bir sonuç screen'i açmak yerine yerinde arar: Enter, bir öneriyi seçmek ya da alanı temizlemek metni screen'in `q` param'ına koyar ve topic'i dinleyen node'ları yeniler ([Topic'ler](effects.md#topics) bölümüne bakın). Screen'in params'ında, `SearchParams`'taki gibi bir `q: String` alanı gerekir.
 
 ### Zengin öneriler
 

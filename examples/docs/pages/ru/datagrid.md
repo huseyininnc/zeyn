@@ -77,4 +77,16 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 - `.row_style(|row| Option<RowStyle>)`: строки danger, warning или success.
 - `.exportable()`: экспорт отфильтрованных строк в CSV, потоком с сервера.
 
+## Обновление на месте
+
+`.listens(topic)`, вызванный последним, заставляет сетку перезагружаться на месте, когда тема названа (см. [Темы](effects.md#topics)): после `ui.refresh(topic)` она перезагружает текущую страницу с сортировкой и фильтрами, а после изменения элемента фильтра с `.drives(topic)` начинает с первой страницы с новыми params экрана. Сетка перезагружается через `POST /_zeyn/grid` со всеми проверками разрешений, а param экрана, изменённый фильтром, доходит до сетки через функцию экрана, например как scope:
+
+```rust
+let mut grid = DataGrid::of(search_orders);
+if let Some(region) = p.region {
+    grid = grid.scope(Order::region, region);
+}
+grid.column(Order::number).column(Order::total).listens("orders")
+```
+
 [Справочник DataGrid](grid.md) охватывает сохранённые представления, master detail, группировку, древовидные данные, редактирование на месте, навигацию по ячейкам, копирование и вставку, виртуализацию колонок и доступность.
