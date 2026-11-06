@@ -213,7 +213,7 @@ What to remember:
   lists. Grid extras: `.sort_by(field, desc)`, `.exportable()`, `.row_action(...)`,
   `.bulk_action(...)`, `.editable()` with `.edit_with(action)`, `.detail(screen)`, `.group_by(field)`,
   `.plain()` on a whole number column that holds codes or years (others are grouped by locale).
-- Buttons that run an action: `ActionButton::new(t!("..."), action, input)`, with `.confirm(...)`.
+- Buttons that run an action: `ActionButton::new(t!("..."), action, input)`, with `.confirm(...)`; `.tone(Tone::Brand)` for the main action of a card or panel.
   Destructive grid actions: `.row_action(..)` or `.bulk_action(..)` then `.confirm(t!("..."))`
   `.tone(Tone::Danger)`; workflow moves: `Transitions::of(..).confirm("cancel", t!("..."))`.
 - Layouts: `Row`, `Stack`, `Panel`, `Card`, `Tabs`, `Split`.

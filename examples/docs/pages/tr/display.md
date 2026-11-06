@@ -67,7 +67,7 @@ LinkButton::new(t!("cart.browse"), products, ()).primary()
 
 ## ActionButton
 
-`ActionButton::new(label, action, input)` bir action çalıştırır. `.confirm(text)` önce sorar, `.tone(Tone::Danger)` yıkıcı bir işlemi işaretler ve `.on_success(|result, ui| ...)` effect'leri çalıştırır. Girdi sunucuda sabitlenir ve istemciden gelmez; action'ın permission'ı her form gibi sunucuda denetlenir.
+`ActionButton::new(label, action, input)` bir action çalıştırır. `.confirm(text)` önce sorar, `.tone(Tone::Danger)` yıkıcı bir işlemi işaretler ve `.on_success(|result, ui| ...)` effect'leri çalıştırır. Girdi sunucuda sabitlenir ve istemciden gelmez; action'ın permission'ı her form gibi sunucuda denetlenir. `.tone(Tone::Brand)` onu bulunduğu alanın, örneğin bir kartın ana eylemi olarak çizer.
 
 ```rust
 ActionButton::new(t!("docs.live.count"), count_samples, ())

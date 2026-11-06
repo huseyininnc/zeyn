@@ -67,7 +67,7 @@ LinkButton::new(t!("cart.browse"), products, ()).primary()
 
 ## ActionButton
 
-`ActionButton::new(label, action, input)`은 action을 실행합니다. `.confirm(text)`는 먼저 확인을 묻고, `.tone(Tone::Danger)`는 파괴적인 작업임을 표시하며, `.on_success(|result, ui| ...)`는 effect를 실행합니다. 입력은 서버에서 고정되며 클라이언트에서 오지 않습니다. action의 권한은 다른 폼과 마찬가지로 서버에서 검사됩니다.
+`ActionButton::new(label, action, input)`은 action을 실행합니다. `.confirm(text)`는 먼저 확인을 묻고, `.tone(Tone::Danger)`는 파괴적인 작업임을 표시하며, `.on_success(|result, ui| ...)`는 effect를 실행합니다. 입력은 서버에서 고정되며 클라이언트에서 오지 않습니다. action의 권한은 다른 폼과 마찬가지로 서버에서 검사됩니다. `.tone(Tone::Brand)`는 카드처럼 해당 영역의 주요 동작으로 그립니다.
 
 ```rust
 ActionButton::new(t!("docs.live.count"), count_samples, ())

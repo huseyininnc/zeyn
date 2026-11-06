@@ -67,7 +67,7 @@ LinkButton::new(t!("cart.browse"), products, ()).primary()
 
 ## ActionButton
 
-`ActionButton::new(label, action, input)` 运行一个 action。`.confirm(text)` 先进行确认，`.tone(Tone::Danger)` 标记破坏性操作，`.on_success(|result, ui| ...)` 运行 effect。input 在服务器端固定，绝不来自客户端；action 的权限与任何表单一样在服务器端检查。
+`ActionButton::new(label, action, input)` 运行一个 action。`.confirm(text)` 先进行确认，`.tone(Tone::Danger)` 标记破坏性操作，`.on_success(|result, ui| ...)` 运行 effect。input 在服务器端固定，绝不来自客户端；action 的权限与任何表单一样在服务器端检查。 `.tone(Tone::Brand)` 将其绘制为所在区域（例如卡片）的主要操作。
 
 ```rust
 ActionButton::new(t!("docs.live.count"), count_samples, ())

@@ -67,7 +67,7 @@ LinkButton::new(t!("cart.browse"), products, ()).primary()
 
 ## ActionButton
 
-يشغّل `ActionButton::new(label, action, input)` action. يسأل `.confirm(text)` أولاً، ويعلّم `.tone(Tone::Danger)` الإجراء المدمّر، ويشغّل `.on_success(|result, ui| ...)` التأثيرات (effects). يُثبَّت المدخل (input) على الخادم ولا يأتي من العميل أبداً؛ وتُفحص صلاحية الـ action على الخادم كأي نموذج.
+يشغّل `ActionButton::new(label, action, input)` action. يسأل `.confirm(text)` أولاً، ويعلّم `.tone(Tone::Danger)` الإجراء المدمّر، ويشغّل `.on_success(|result, ui| ...)` التأثيرات (effects). يُثبَّت المدخل (input) على الخادم ولا يأتي من العميل أبداً؛ وتُفحص صلاحية الـ action على الخادم كأي نموذج. يرسمه `.tone(Tone::Brand)` كالإجراء الرئيسي في منطقته، مثل بطاقة.
 
 ```rust
 ActionButton::new(t!("docs.live.count"), count_samples, ())

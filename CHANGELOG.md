@@ -4,6 +4,10 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 ## [Unreleased]
 
+### Fixed
+
+- `ActionButton` with `.tone(Tone::Brand)` is drawn as a primary button, so a card can carry its main action. `Badge` with `Tone::Brand` gets its tinted background like the other tones and stays readable over images.
+
 ### Security
 
 - `Feature::files` takes a `FileAccess`: `FileAccess::read(p).write(q)` lets readers download files they may not upload. A plain permission name still covers both. Before, a store readable by a role was also writable by it.
