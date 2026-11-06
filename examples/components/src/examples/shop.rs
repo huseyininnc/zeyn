@@ -264,6 +264,12 @@ pub fn shop_product(p: ProductPage) -> Screen {
                 .tone(Tone::Brand)
                 .on_success(|_, ui| ui.toast("Added. Nothing was stored.")),
         );
+    let reviews = (1..=5u8).fold(ReviewSummary::new(), |s, n| {
+        s.count(
+            n,
+            (item.id.0 as u64 * u64::from(n) * 7) % 97 + u64::from(n) * 20,
+        )
+    });
     Screen::new(item.name.clone())
         .subtitle(item.brand.clone())
         .body(
@@ -279,5 +285,10 @@ pub fn shop_product(p: ProductPage) -> Screen {
                         )
                         .add(buy.listens("variant")),
                 ),
+        )
+        .body(
+            Stack::new()
+                .add(Heading::h2("Reviews"))
+                .add(reviews),
         )
 }

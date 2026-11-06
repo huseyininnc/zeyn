@@ -266,7 +266,7 @@ pub mod prelude {
     };
     pub use crate::ui::{
         Facet, FacetPanel, Price, PriceUnit, ProductGallery, QuantityStepper, RangeSlider,
-        VariantGroup, VariantPicker,
+        ReviewSummary, VariantGroup, VariantPicker,
     };
     pub use crate::{
         Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime,

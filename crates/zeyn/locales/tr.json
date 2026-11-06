@@ -679,6 +679,15 @@
           "remove": "{filter} filtresini kaldır",
           "option": "{option}, {count} sonuç",
           "active": "{n} seçili"
+        },
+        "reviews": {
+          "label": "Değerlendirmeler",
+          "average": "5 üzerinden {average} yıldız",
+          "count": "{count} değerlendirme",
+          "stars": "{n} yıldız"
+        },
+        "rating": {
+          "half": "{label} tam ya da yarım yıldız alır."
         }
       }
     },

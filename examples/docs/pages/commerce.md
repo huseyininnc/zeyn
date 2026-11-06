@@ -151,3 +151,32 @@ pub async fn shop(p: Listing, store: ProductStore) -> Result<Screen> {
 - **Filters stay on the server.** The grid takes the same params with `scope_any(field, values)` and `scope_range(field, from, to)` (on `CardGrid` and `DataGrid`), so the browser never sends filters of its own; no values or open ends keep every row.
 - **Chosen filters** show as chips above the groups, with "Clear all". Each chip is a link to the screen without that filter, so it also works without script, and is named "Remove filter Red". The groups are `<details>` that fold, and open groups stay open across refreshes.
 - **Checks.** `App::check_page` reports a panel that drives nothing and a facet whose name is not a field of the screen's params.
+
+## Reviews and ratings
+
+```rust
+ReviewSummary::new()
+    .count(5, stats.five)
+    .count(4, stats.four)
+    .count(3, stats.three)
+    .count(2, stats.two)
+    .count(1, stats.one)
+```
+
+- **Summary.** `ReviewSummary` shows the average as a number and as stars, the number of reviews and one bar per star from 5 to 1 with its share. The average and the shares come from the counts, so they always agree. Screen readers hear "4.6 out of 5 stars" and "5 stars, 68%" for each bar; the bars are hidden from them. It is HTML with no script.
+- **Rating input.** `Control::Rating` on a form field is a radio group drawn as stars (W3C APG, no script). A whole number field takes whole stars; a `Decimal` field with `#[rule(min = 1, max = 5, scale = 1)]` takes half stars, each half a radio button named "4.5 of 5". The server reads the value in the page's number format and turns away a value between the halves, such as 4.3.
+
+```rust
+#[model]
+pub struct Review {
+    #[rule(required, min = 1, max = 5, scale = 1)]
+    pub stars: Option<Decimal>,
+    pub text: String,
+}
+
+Form::of(Review::default())
+    .field(Review::stars)
+    .control(Review::stars, Control::Rating)
+    .field(Review::text)
+    .submit(t!("reviews.send"), save_review)
+```

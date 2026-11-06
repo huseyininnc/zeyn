@@ -812,3 +812,83 @@ async fn a_facet_change_refreshes_the_cards_with_the_server_side_scope_in_one_re
         assert!(linked.contains(&name.to_string()), "{name}");
     }
 }
+
+#[test]
+fn a_review_summary_computes_its_average_and_shares_from_the_counts() {
+    let summary = zeyn::ui::ReviewSummary::new()
+        .count(5, 1_200)
+        .count(4, 300)
+        .count(2, 0)
+        .count(9, 50);
+    let en = html(&summary, "en");
+    assert!(en.contains(r#"<span class="z-reviews-average" aria-hidden="true">4.8</span><span class="z-stars" role="img" aria-label="4.8 out of 5 stars" style="--z-stars:96%"></span><span class="z-reviews-count">1,500 reviews</span>"#), "{en}");
+    assert!(en.contains(r#"<li class="z-reviews-row"><span class="z-reviews-star">5 stars</span><span class="z-reviews-bar" aria-hidden="true"><span class="z-reviews-fill" style="--z-share:80%"></span></span><span class="z-reviews-share">80%</span></li>"#), "{en}");
+    assert!(
+        en.find("5 stars").unwrap() < en.find("1 stars").unwrap(),
+        "the bars run from 5 to 1"
+    );
+    let tr = html(&summary, "tr");
+    assert!(
+        tr.contains(">4,8<") && tr.contains("1.500 değerlendirme") && tr.contains(">%80<"),
+        "{tr}"
+    );
+    let none = html(&zeyn::ui::ReviewSummary::new(), "en");
+    assert!(
+        none.contains(r#"aria-label="0.0 out of 5 stars" style="--z-stars:0%""#)
+            && none.contains("0 reviews")
+    );
+    assert!(
+        !en.contains("<script") && !en.contains("data-zeyn-"),
+        "no script"
+    );
+}
+
+#[model]
+pub struct Score {
+    #[rule(required, min = 1, max = 5, scale = 1)]
+    pub stars: Option<Decimal>,
+}
+
+#[action(public)]
+pub async fn save_score(score: Valid<Score>) -> Result<()> {
+    let _ = score;
+    Ok(())
+}
+
+#[test]
+fn a_decimal_rating_takes_half_stars_and_the_server_turns_away_values_between_them() {
+    let form = Form::of(Score {
+        stars: Decimal::parse("3.5"),
+    })
+    .field(Score::stars)
+    .control(Score::stars, Control::Rating)
+    .submit("Save", save_score);
+    let tr = html(&form, "tr");
+    assert_eq!(tr.matches(r#"type="radio""#).count(), 10, "{tr}");
+    assert!(tr.contains(r#"<fieldset class="z-rating z-rating-halves""#));
+    assert!(tr.contains(r#"<label class="z-rating-star z-rating-half" for="s-stars-3_5"><input type="radio" class="z-rating-input" id="s-stars-3_5" name="stars" value="3,5" data-testid="s.field.stars.3_5" checked required>"#), "{tr}");
+    assert!(
+        tr.contains("5 üzerinden 3,5") || tr.contains("3,5 / 5") || tr.contains(">3,5"),
+        "{tr}"
+    );
+    let en = html(&form, "en");
+    assert!(en.contains(r#"class="z-rating-star z-rating-half z-rating-half-end" for="s-stars-4"><input type="radio" class="z-rating-input" id="s-stars-4" name="stars" value="4""#), "{en}");
+    let read = |v: serde_json::Value| {
+        form.form()
+            .read(v.as_object().unwrap(), "en", TimeZone::UTC)
+    };
+    assert_eq!(
+        read(serde_json::json!({ "stars": "4.5" }))
+            .unwrap()
+            .stars,
+        Decimal::parse("4.5")
+    );
+    let errors = read(serde_json::json!({ "stars": "4.3" })).unwrap_err();
+    assert!(
+        errors
+            .errors
+            .iter()
+            .any(|e| e.field == "stars"),
+        "a value between the halves is turned away"
+    );
+}

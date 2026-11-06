@@ -544,6 +544,15 @@
           "remove": "{filter} 필터 제거",
           "option": "{option}, 결과 {count}개",
           "active": "{n}개 선택됨"
+        },
+        "reviews": {
+          "label": "리뷰",
+          "average": "별 5개 중 {average}개",
+          "count": "리뷰 {count}개",
+          "stars": "별 {n}개"
+        },
+        "rating": {
+          "half": "{label}은(는) 별 하나나 반 개 단위만 됩니다."
         }
       }
     },

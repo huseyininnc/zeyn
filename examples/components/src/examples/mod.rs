@@ -57,6 +57,7 @@ pub mod range_slider;
 pub mod rating;
 pub mod reactions;
 pub mod relative_time;
+pub mod review_summary;
 pub mod row;
 pub mod screen_header;
 pub mod search_box;

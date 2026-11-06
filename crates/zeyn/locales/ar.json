@@ -544,6 +544,15 @@
           "remove": "إزالة عامل التصفية {filter}",
           "option": "{option}، {count} نتيجة",
           "active": "{n} مختارة"
+        },
+        "reviews": {
+          "label": "التقييمات",
+          "average": "{average} من 5 نجوم",
+          "count": "{count} تقييم",
+          "stars": "{n} نجوم"
+        },
+        "rating": {
+          "half": "يقبل {label} نجومًا كاملة أو أنصاف نجوم فقط."
         }
       }
     },

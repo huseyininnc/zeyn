@@ -544,6 +544,15 @@
           "remove": "条件 {filter} を外す",
           "option": "{option}、{count} 件",
           "active": "{n} 件選択中"
+        },
+        "reviews": {
+          "label": "レビュー",
+          "average": "5 つ星のうち {average}",
+          "count": "レビュー {count} 件",
+          "stars": "星 {n} つ"
+        },
+        "rating": {
+          "half": "{label}は星 1 つか半分の単位です。"
         }
       }
     },

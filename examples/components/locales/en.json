@@ -112,7 +112,8 @@
       "quantity_stepper": "Minus and plus buttons around a number whose stock the server checks.",
       "variant_picker": "Color swatches and size chips that change the price, photo and stock in place.",
       "product_gallery": "Product photos with thumbnails, zoom, swipe and a full screen view.",
-      "facet_panel": "Counted filters, a price range and chosen filter chips that refresh product cards in place."
+      "facet_panel": "Counted filters, a price range and chosen filter chips that refresh product cards in place.",
+      "review_summary": "The average rating, the number of reviews and a bar for each star from 5 to 1."
     },
     "ex": {
       "action_button": {
@@ -292,7 +293,8 @@
       },
       "rating": {
         "overview": "Example",
-        "three_stars": "Three stars"
+        "three_stars": "Three stars",
+        "half_stars": "Half stars"
       },
       "reactions": {
         "overview": "Example"
@@ -400,6 +402,10 @@
       },
       "facet_panel": {
         "overview": "Example"
+      },
+      "review_summary": {
+        "overview": "Example",
+        "few": "A few reviews"
       }
     }
   }

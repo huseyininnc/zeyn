@@ -765,6 +765,26 @@ impl<M: Model> Form<M> {
                 });
             }
         }
+        for (name, control) in &self.controls {
+            let Some(meta) = M::fields()
+                .iter()
+                .find(|m| m.name == *name && m.kind == FieldKind::Decimal)
+            else {
+                continue;
+            };
+            let value = value_of(name);
+            if *control == Control::Rating
+                && value != Value::Null
+                && crate::ui::rating_halves(&value).is_none()
+                && !unreadable.contains(name)
+            {
+                errors.errors.push(FieldError {
+                    field: meta.name,
+                    rule: Rule::Custom,
+                    message: Text::key("zeyn.ui.shop.rating.half").arg("label", meta.label_text()),
+                });
+            }
+        }
         if !self.files.is_empty() {
             let object = serde_json::to_value(model).unwrap_or(Json::Null);
             for (name, rules, many) in &self.files {

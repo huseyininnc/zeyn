@@ -679,6 +679,15 @@
           "remove": "Remove filter {filter}",
           "option": "{option}, {count} results",
           "active": "{n} chosen"
+        },
+        "reviews": {
+          "label": "Reviews",
+          "average": "{average} out of 5 stars",
+          "count": "{count} reviews",
+          "stars": "{n} stars"
+        },
+        "rating": {
+          "half": "{label} takes whole or half stars."
         }
       }
     },

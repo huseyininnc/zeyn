@@ -151,3 +151,32 @@ pub async fn shop(p: Listing, store: ProductStore) -> Result<Screen> {
 - **المرشحات تبقى على الخادم.** تأخذ الشبكة المعاملات نفسها عبر `scope_any(field, values)` و`scope_range(field, from, to)` (في `CardGrid` و`DataGrid`)، فلا يرسل المتصفح مرشحات من عنده أبدًا؛ وغياب القيم أو الأطراف المفتوحة يُبقي كل الصفوف.
 - **المرشحات المختارة** تظهر رقاقات فوق المجموعات مع "مسح الكل". كل رقاقة رابط إلى الشاشة دون ذلك المرشح، فتعمل بلا سكربت أيضًا، واسمها "إزالة عامل التصفية أحمر". والمجموعات عناصر `<details>` قابلة للطي، وتبقى المفتوحة منها مفتوحة بعد التحديث.
 - **الفحوص.** يبلّغ `App::check_page` عن لوحة لا تقود شيئًا وعن وجه ليس اسمه حقلًا في معاملات الشاشة.
+
+## التقييمات والدرجات
+
+```rust
+ReviewSummary::new()
+    .count(5, stats.five)
+    .count(4, stats.four)
+    .count(3, stats.three)
+    .count(2, stats.two)
+    .count(1, stats.one)
+```
+
+- **الملخص.** يعرض `ReviewSummary` المتوسط رقمًا ونجومًا، وعدد التقييمات، وشريطًا لكل نجمة من 5 إلى 1 مع نسبته. يُحسب المتوسط والنسب من الأعداد، فيتفقان دائمًا. تسمع قارئات الشاشة "4.6 من 5 نجوم" و"5 نجوم، 68%" لكل شريط، وتُخفى الأشرطة نفسها عنها. إنه HTML بلا سكربت.
+- **إدخال الدرجة.** `Control::Rating` على حقل نموذج هو مجموعة أزرار اختيار مرسومة نجومًا (W3C APG، بلا سكربت). يقبل الحقل الصحيح نجومًا كاملة، ويقبل حقل `Decimal` مع `#[rule(min = 1, max = 5, scale = 1)]` أنصاف النجوم، وكل نصف زر اختيار اسمه "4.5 of 5". يقرأ الخادم القيمة بتنسيق أرقام الصفحة ويرفض قيمة تقع بين نصفين، مثل 4.3.
+
+```rust
+#[model]
+pub struct Review {
+    #[rule(required, min = 1, max = 5, scale = 1)]
+    pub stars: Option<Decimal>,
+    pub text: String,
+}
+
+Form::of(Review::default())
+    .field(Review::stars)
+    .control(Review::stars, Control::Rating)
+    .field(Review::text)
+    .submit(t!("reviews.send"), save_review)
+```

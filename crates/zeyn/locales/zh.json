@@ -544,6 +544,15 @@
           "remove": "移除筛选条件 {filter}",
           "option": "{option}，{count} 个结果",
           "active": "已选 {n} 项"
+        },
+        "reviews": {
+          "label": "评价",
+          "average": "{average} 星（满分 5 星）",
+          "count": "{count} 条评价",
+          "stars": "{n} 星"
+        },
+        "rating": {
+          "half": "{label}只能是整星或半星。"
         }
       }
     },

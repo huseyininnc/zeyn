@@ -544,6 +544,15 @@
           "remove": "Убрать фильтр {filter}",
           "option": "{option}, результатов: {count}",
           "active": "выбрано: {n}"
+        },
+        "reviews": {
+          "label": "Отзывы",
+          "average": "{average} из 5 звёзд",
+          "count": "Отзывов: {count}",
+          "stars": "Звёзд: {n}"
+        },
+        "rating": {
+          "half": "{label}: только целые или половинные звёзды."
         }
       }
     },

@@ -151,3 +151,32 @@ pub async fn shop(p: Listing, store: ProductStore) -> Result<Screen> {
 - **필터는 서버에 남습니다.** 그리드는 같은 매개변수를 `scope_any(field, values)`와 `scope_range(field, from, to)`(`CardGrid`와 `DataGrid`에 있음)로 받으므로 브라우저는 자신의 필터를 보내지 않습니다. 값이 없거나 끝이 열려 있으면 모든 행이 남습니다.
 - **선택한 필터**는 그룹 위에 칩으로 "모두 지우기"와 함께 표시됩니다. 각 칩은 그 필터를 뺀 화면으로 가는 링크라 스크립트 없이도 동작하며, 이름은 "빨강 필터 제거"입니다. 그룹은 접히는 `<details>`이고, 열린 그룹은 새로 고친 뒤에도 열려 있습니다.
 - **검사.** `App::check_page`는 아무것도 구동하지 않는 패널과 이름이 화면 매개변수의 필드가 아닌 패싯을 알려 줍니다.
+
+## 리뷰와 평점
+
+```rust
+ReviewSummary::new()
+    .count(5, stats.five)
+    .count(4, stats.four)
+    .count(3, stats.three)
+    .count(2, stats.two)
+    .count(1, stats.one)
+```
+
+- **요약.** `ReviewSummary`는 평균을 숫자와 별로, 리뷰 수, 그리고 별 5개부터 1개까지 비율이 표시된 막대를 하나씩 보여 줍니다. 평균과 비율은 개수에서 계산되므로 항상 일치합니다. 스크린 리더는 "별 5개 중 4.6개"와 막대마다 "별 5개, 68%"를 듣고, 막대 자체는 숨겨집니다. 스크립트 없는 HTML입니다.
+- **평점 입력.** 폼 필드의 `Control::Rating`은 별 모양으로 그린 라디오 그룹입니다(W3C APG, 스크립트 없음). 정수 필드는 별 하나 단위, `#[rule(min = 1, max = 5, scale = 1)]`이 있는 `Decimal` 필드는 반 개 단위를 받으며, 반 개마다 "4.5 of 5"라는 이름의 라디오 버튼입니다. 서버는 값을 페이지의 숫자 형식으로 읽고 4.3처럼 반 개 사이에 있는 값은 거부합니다.
+
+```rust
+#[model]
+pub struct Review {
+    #[rule(required, min = 1, max = 5, scale = 1)]
+    pub stars: Option<Decimal>,
+    pub text: String,
+}
+
+Form::of(Review::default())
+    .field(Review::stars)
+    .control(Review::stars, Control::Rating)
+    .field(Review::text)
+    .submit(t!("reviews.send"), save_review)
+```

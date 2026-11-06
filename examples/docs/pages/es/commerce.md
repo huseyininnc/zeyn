@@ -151,3 +151,32 @@ pub async fn shop(p: Listing, store: ProductStore) -> Result<Screen> {
 - **Los filtros se quedan en el servidor.** La cuadrícula toma los mismos parámetros con `scope_any(field, values)` y `scope_range(field, from, to)` (en `CardGrid` y `DataGrid`), así que el navegador nunca envía filtros propios; sin valores o con extremos abiertos se conservan todas las filas.
 - **Los filtros elegidos** aparecen como fichas sobre los grupos, con "Quitar todos". Cada ficha es un enlace a la pantalla sin ese filtro, así que también funciona sin script, y se llama "Quitar el filtro Rojo". Los grupos son `<details>` plegables, y los grupos abiertos siguen abiertos tras un refresco.
 - **Comprobaciones.** `App::check_page` avisa de un panel que no impulsa nada y de una faceta cuyo nombre no es un campo de los parámetros de la pantalla.
+
+## Reseñas y valoraciones
+
+```rust
+ReviewSummary::new()
+    .count(5, stats.five)
+    .count(4, stats.four)
+    .count(3, stats.three)
+    .count(2, stats.two)
+    .count(1, stats.one)
+```
+
+- **Resumen.** `ReviewSummary` muestra la media como número y como estrellas, el número de reseñas y una barra por estrella de 5 a 1 con su proporción. La media y las proporciones salen de los recuentos, así que siempre concuerdan. Los lectores de pantalla oyen "4.6 de 5 estrellas" y "5 estrellas, 68%" en cada barra; las barras se les ocultan. Es HTML sin script.
+- **Entrada de valoración.** `Control::Rating` en un campo de formulario es un grupo de radio dibujado como estrellas (W3C APG, sin script). Un campo entero admite estrellas enteras; un campo `Decimal` con `#[rule(min = 1, max = 5, scale = 1)]` admite medias estrellas, cada media un botón de radio llamado "4.5 of 5". El servidor lee el valor en el formato numérico de la página y rechaza un valor entre dos medias, como 4,3.
+
+```rust
+#[model]
+pub struct Review {
+    #[rule(required, min = 1, max = 5, scale = 1)]
+    pub stars: Option<Decimal>,
+    pub text: String,
+}
+
+Form::of(Review::default())
+    .field(Review::stars)
+    .control(Review::stars, Control::Rating)
+    .field(Review::text)
+    .submit(t!("reviews.send"), save_review)
+```

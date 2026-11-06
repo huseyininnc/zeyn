@@ -151,3 +151,32 @@ pub async fn shop(p: Listing, store: ProductStore) -> Result<Screen> {
 - **Filtreler sunucuda kalır.** Izgara aynı parametreleri `scope_any(field, values)` ve `scope_range(field, from, to)` ile alır (`CardGrid` ve `DataGrid` üzerinde); böylece tarayıcı hiçbir zaman kendi filtresini göndermez. Değer olmaması ya da açık uçlar her satırı tutar.
 - **Seçili filtreler** grupların üstünde çip olarak, "Tümünü temizle" ile birlikte görünür. Her çip o filtre olmadan ekrana giden bir bağlantıdır; script olmadan da çalışır ve "Kırmızı filtresini kaldır" adını taşır. Gruplar katlanan `<details>` öğeleridir ve açık gruplar yenilemelerden sonra açık kalır.
 - **Denetimler.** `App::check_page` hiçbir şey sürmeyen bir paneli ve adı ekran parametrelerinde alan olmayan bir facet'i bildirir.
+
+## Değerlendirmeler ve puanlar
+
+```rust
+ReviewSummary::new()
+    .count(5, stats.five)
+    .count(4, stats.four)
+    .count(3, stats.three)
+    .count(2, stats.two)
+    .count(1, stats.one)
+```
+
+- **Özet.** `ReviewSummary` ortalamayı sayı ve yıldız olarak, değerlendirme sayısını ve 5'ten 1'e her yıldız için payıyla bir çubuk gösterir. Ortalama ve paylar sayılardan hesaplanır, bu yüzden her zaman tutarlıdır. Ekran okuyucular "5 üzerinden 4,6 yıldız" ve her çubuk için "5 yıldız, %68" duyar; çubuklar onlardan gizlenir. Script içermeyen HTML'dir.
+- **Puan girişi.** Bir form alanındaki `Control::Rating`, yıldız olarak çizilen bir radyo grubudur (W3C APG, script yok). Tam sayı alanı tam yıldız alır; `#[rule(min = 1, max = 5, scale = 1)]` kuralına sahip bir `Decimal` alanı yarım yıldız alır, her yarım "5 üzerinden 4,5" adlı bir radyo düğmesidir. Sunucu değeri sayfanın sayı biçiminde okur ve 4,3 gibi yarımların arasında kalan bir değeri geri çevirir.
+
+```rust
+#[model]
+pub struct Review {
+    #[rule(required, min = 1, max = 5, scale = 1)]
+    pub stars: Option<Decimal>,
+    pub text: String,
+}
+
+Form::of(Review::default())
+    .field(Review::stars)
+    .control(Review::stars, Control::Rating)
+    .field(Review::text)
+    .submit(t!("reviews.send"), save_review)
+```

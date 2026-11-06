@@ -151,3 +151,32 @@ pub async fn shop(p: Listing, store: ProductStore) -> Result<Screen> {
 - **筛选留在服务器上。** 网格通过 `scope_any(field, values)` 和 `scope_range(field, from, to)`（在 `CardGrid` 和 `DataGrid` 上）接收相同的参数，因此浏览器从不发送自己的筛选条件；没有值或开放的端点会保留所有行。
 - **已选筛选条件**以标签的形式显示在各组上方，并带有“全部清除”。每个标签都是指向去掉该筛选条件后的屏幕的链接，因此没有脚本也能使用，其名称为“移除筛选条件 红色”。各组是可折叠的 `<details>`，展开的组在刷新后保持展开。
 - **检查。** `App::check_page` 会报告不驱动任何内容的面板，以及名称不是屏幕参数字段的分面。
+
+## 评价与评分
+
+```rust
+ReviewSummary::new()
+    .count(5, stats.five)
+    .count(4, stats.four)
+    .count(3, stats.three)
+    .count(2, stats.two)
+    .count(1, stats.one)
+```
+
+- **汇总。** `ReviewSummary` 以数字和星星显示平均分，显示评价数量，并为 5 到 1 星各显示一条带占比的横条。平均分和占比都由计数算出，因此始终一致。屏幕阅读器听到“4.6 星（满分 5 星）”，每个横条读作“5 星，68%”；横条本身对它们隐藏。它是不含脚本的 HTML。
+- **评分输入。** 表单字段上的 `Control::Rating` 是一个绘制成星星的单选组（W3C APG，无脚本）。整数字段接受整星；带 `#[rule(min = 1, max = 5, scale = 1)]` 的 `Decimal` 字段接受半星，每半颗星是一个名为“4.5 of 5”的单选按钮。服务器按页面的数字格式读取值，并拒绝介于两个半星之间的值，例如 4.3。
+
+```rust
+#[model]
+pub struct Review {
+    #[rule(required, min = 1, max = 5, scale = 1)]
+    pub stars: Option<Decimal>,
+    pub text: String,
+}
+
+Form::of(Review::default())
+    .field(Review::stars)
+    .control(Review::stars, Control::Rating)
+    .field(Review::text)
+    .submit(t!("reviews.send"), save_review)
+```

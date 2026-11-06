@@ -544,6 +544,15 @@
           "remove": "फ़िल्टर {filter} हटाएँ",
           "option": "{option}, {count} नतीजे",
           "active": "{n} चुने गए"
+        },
+        "reviews": {
+          "label": "समीक्षाएँ",
+          "average": "5 में से {average} स्टार",
+          "count": "{count} समीक्षाएँ",
+          "stars": "{n} स्टार"
+        },
+        "rating": {
+          "half": "{label} में पूरे या आधे स्टार ही होते हैं।"
         }
       }
     },

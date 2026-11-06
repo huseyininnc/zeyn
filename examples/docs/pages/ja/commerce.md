@@ -151,3 +151,32 @@ pub async fn shop(p: Listing, store: ProductStore) -> Result<Screen> {
 - **条件はサーバーに残ります。** グリッドは同じパラメーターを `scope_any(field, values)` と `scope_range(field, from, to)`（`CardGrid` と `DataGrid` にあります）で受け取るので、ブラウザーが独自の条件を送ることはありません。値がないか端が開いていれば、すべての行が残ります。
 - **選んだ条件**はグループの上にチップとして「すべて解除」と一緒に表示されます。各チップはその条件を外した画面へのリンクなので、スクリプトなしでも動き、名前は「条件 赤 を外す」です。グループは折りたためる `<details>` で、開いたグループは更新後も開いたままです。
 - **チェック。** `App::check_page` は何も動かさないパネルと、名前が画面パラメーターのフィールドにないファセットを報告します。
+
+## レビューと評価
+
+```rust
+ReviewSummary::new()
+    .count(5, stats.five)
+    .count(4, stats.four)
+    .count(3, stats.three)
+    .count(2, stats.two)
+    .count(1, stats.one)
+```
+
+- **集計。** `ReviewSummary` は平均を数値と星で、レビューの件数、そして星 5 から 1 までそれぞれの割合を示すバーを表示します。平均と割合は件数から計算するので、いつも食い違いません。スクリーンリーダーには「5 つ星のうち 4.6」と、バーごとに「星 5 つ、68%」が読み上げられ、バー自体は隠されます。スクリプトのない HTML です。
+- **評価の入力。** フォームのフィールドに付けた `Control::Rating` は星の形で描いたラジオグループです（W3C APG、スクリプトなし）。整数のフィールドは星 1 つ単位、`#[rule(min = 1, max = 5, scale = 1)]` の付いた `Decimal` フィールドは半分単位で、半分ごとに「4.5 of 5」という名前のラジオボタンになります。サーバーはページの数値書式で値を読み、4.3 のように半分の間にある値は受け付けません。
+
+```rust
+#[model]
+pub struct Review {
+    #[rule(required, min = 1, max = 5, scale = 1)]
+    pub stars: Option<Decimal>,
+    pub text: String,
+}
+
+Form::of(Review::default())
+    .field(Review::stars)
+    .control(Review::stars, Control::Rating)
+    .field(Review::text)
+    .submit(t!("reviews.send"), save_review)
+```

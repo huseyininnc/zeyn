@@ -248,6 +248,8 @@ What to remember:
   `.range(RangeSlider::..).drives("products")` with `Vec<String>` params (`#[serde(default)]`),
   counts from one bounded query per facet, and the grid filtered on the server with
   `.scope_any(Product::color, p.color.clone())` and `.scope_range(field, from, to)`.
+  Reviews: `ReviewSummary::new().count(5, n5).count(4, n4)..`; half star input:
+  `Control::Rating` on a `Decimal` field with `#[rule(min = 1, max = 5, scale = 1)]`.
 - App shell top bar: `App::header(|h| h.center(SearchBox::of(..)).end(LinkButton::new(..)))`,
   the same slots as the site header; `h.breadcrumb().search().account()` adds the breadcrumb, the
   search field that opens the palette and the account menu with theme, language and sign out.

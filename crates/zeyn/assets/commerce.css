@@ -655,6 +655,93 @@
 .z-facet-option:has(.z-facet-input:disabled) { color: var(--z-text-muted); cursor: default; }
 .z-facet-range { padding: 8px 0 4px; }
 
+.z-reviews {
+  display: grid;
+  gap: 12px;
+  max-width: 420px;
+}
+
+.z-reviews-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+
+.z-reviews-average {
+  font-size: var(--z-text-num);
+  line-height: var(--z-leading-num);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--z-text);
+}
+
+.z-stars {
+  display: inline-block;
+  font-size: 1.25rem;
+  line-height: 1;
+  letter-spacing: 2px;
+}
+
+.z-stars::before {
+  content: "\2605\2605\2605\2605\2605";
+  background: linear-gradient(90deg, var(--z-warning) var(--z-stars), var(--z-border-strong) var(--z-stars));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+[dir="rtl"] .z-stars::before {
+  background: linear-gradient(270deg, var(--z-warning) var(--z-stars), var(--z-border-strong) var(--z-stars));
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.z-reviews-count { color: var(--z-text-muted); font-size: var(--z-text-sm); }
+
+.z-reviews-bars {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.z-reviews-row {
+  display: grid;
+  grid-template-columns: max-content 1fr 4ch;
+  align-items: center;
+  gap: 12px;
+  font-size: var(--z-text-sm);
+  color: var(--z-text);
+}
+
+.z-reviews-bar {
+  height: 8px;
+  border-radius: var(--z-radius-full);
+  background: var(--z-surface-2);
+  box-shadow: inset 0 0 0 1px var(--z-border);
+  overflow: hidden;
+}
+
+.z-reviews-fill {
+  display: block;
+  width: var(--z-share);
+  height: 100%;
+  background: var(--z-warning);
+}
+
+.z-reviews-share {
+  color: var(--z-text-muted);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+@media (forced-colors: active) {
+  .z-stars::before { color: CanvasText; background: none; }
+  .z-reviews-fill { background: Highlight; }
+}
+
 .z-facet-range .z-range-label {
   position: absolute;
   width: 1px;

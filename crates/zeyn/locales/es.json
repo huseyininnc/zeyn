@@ -544,6 +544,15 @@
           "remove": "Quitar el filtro {filter}",
           "option": "{option}, {count} resultados",
           "active": "{n} elegidos"
+        },
+        "reviews": {
+          "label": "Reseñas",
+          "average": "{average} de 5 estrellas",
+          "count": "{count} reseñas",
+          "stars": "{n} estrellas"
+        },
+        "rating": {
+          "half": "{label} admite estrellas enteras o medias."
         }
       }
     },

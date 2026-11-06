@@ -41,11 +41,35 @@ pub fn three_stars(_ctx: &Ctx) -> Node {
     .into()
 }
 
+/// A rating in half stars: a `Decimal` field with one decimal.
+#[model]
+pub struct Taste {
+    #[rule(required, min = 1, max = 5, scale = 1)]
+    pub stars: Option<Decimal>,
+}
+
+/// Accepts the rating. Nothing is stored.
+#[action(public)]
+pub async fn send_taste(taste: Valid<Taste>) -> Result<()> {
+    let _ = taste;
+    Ok(())
+}
+
+pub fn half_stars(_ctx: &Ctx) -> Node {
+    Form::of(Taste {
+        stars: Decimal::parse("3.5"),
+    })
+    .field(Taste::stars)
+    .control(Taste::stars, Control::Rating)
+    .submit("Send", send_taste)
+    .into()
+}
+
 /// What the catalog shows of `Control::Rating`.
 pub const ENTRY: Entry = Entry {
     name: "Rating",
     docs: "components/controls#rating",
     api: &["Form"],
     overview: &[ex!(overview)],
-    examples: &[ex!(three_stars)],
+    examples: &[ex!(three_stars), ex!(half_stars)],
 };

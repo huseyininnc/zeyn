@@ -205,6 +205,7 @@ catalog! {
         variant_picker "/ui/variant-picker" (Demo);
         product_gallery "/ui/product-gallery";
         facet_panel "/ui/facet-panel" (Demo);
+        review_summary "/ui/review-summary";
     }
     "media" Image {
         image "/ui/image";
