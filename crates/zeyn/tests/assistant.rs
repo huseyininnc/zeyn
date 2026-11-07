@@ -776,6 +776,30 @@ async fn anthropic_provider_streams_text_and_usage() {
 }
 
 #[tokio::test]
+async fn keys_are_not_sent_over_plain_http_to_other_hosts() {
+    let req = || ChatRequest {
+        system: "s".into(),
+        messages: vec![ChatMessage::user("hi")],
+        tools: Vec::new(),
+        max_tokens: 10,
+    };
+    let key = || Secret::new("sk-secret".into());
+    let refused = |r: zeyn::Result<_>| matches!(r, Err(Error::Internal(m)) if m.contains("only sent over https"));
+    let openai = OpenAiCompatible::new("http://models.example.invalid/v1", "m").api_key(key());
+    assert!(refused(openai.chat(req()).await));
+    let anthropic = Anthropic::new("m")
+        .base_url("http://models.example.invalid")
+        .api_key(key());
+    assert!(refused(anthropic.chat(req()).await));
+    let base = fake_server("data: [DONE]\n\n").await;
+    let local = base.replace("127.0.0.1", "localhost");
+    for base in [base, local] {
+        let provider = OpenAiCompatible::new(format!("{base}/v1"), "m").api_key(key());
+        assert!(provider.chat(req()).await.is_ok(), "{base}");
+    }
+}
+
+#[tokio::test]
 async fn provider_errors_do_not_leak_details_to_the_user() {
     let app = Router::new().fallback(|| async { (StatusCode::UNAUTHORIZED, "bad key sk-secret") });
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
