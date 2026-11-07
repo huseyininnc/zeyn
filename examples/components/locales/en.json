@@ -34,7 +34,8 @@
       "shell": "Shell",
       "admin": "Admin",
       "shell": "Shell",
-      "shop": "Shop"
+      "shop": "Shop",
+      "chat": "Chat"
     },
     "summary": {
       "stack": "Nodes one under the other with a gap.",
@@ -114,7 +115,8 @@
       "product_gallery": "Product photos with thumbnails, zoom, swipe and a full screen view.",
       "facet_panel": "Counted filters, a price range and chosen filter chips that refresh product cards in place.",
       "review_summary": "The average rating, the number of reviews and a bar for each star from 5 to 1.",
-      "countdown": "The time left until a moment on the server's clock, with an end state."
+      "countdown": "The time left until a moment on the server's clock, with an end state.",
+      "message_thread": "Chat bubbles by sender and day, delivery states, a history that loads as it scrolls, streamed AI replies."
     },
     "ex": {
       "action_button": {
@@ -411,6 +413,11 @@
       "countdown": {
         "overview": "Example",
         "short": "A minute and more"
+      },
+      "message_thread": {
+        "overview": "Example",
+        "ai_answer": "AI answer in Markdown",
+        "long": "Long history"
       }
     }
   }

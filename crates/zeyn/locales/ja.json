@@ -227,6 +227,29 @@
       }
     },
     "ui": {
+      "chat": {
+        "label": "メッセージ",
+        "empty": "まだメッセージはありません",
+        "you": "あなた",
+        "today": "今日",
+        "yesterday": "昨日",
+        "attachments": "添付ファイル",
+        "more_files": "ほかに {n} 件のファイル",
+        "new_message": "{name} からの新しいメッセージ: {text}",
+        "assistant": "アシスタント",
+        "writing": "返信を作成中",
+        "stop": "停止",
+        "stopped": "返信を停止しました",
+        "reply_failed": "返信を読み込めませんでした",
+        "loading": "以前のメッセージを読み込み中",
+        "status": {
+          "sending": "送信中",
+          "sent": "送信済み",
+          "delivered": "配信済み",
+          "read": "既読",
+          "failed": "未送信"
+        }
+      },
       "resize": "ペインのサイズを変更",
       "cards": {
         "load_more": "さらに表示",

@@ -44,6 +44,7 @@ pub mod markdown;
 pub mod masked_inputs;
 pub mod menu_bar;
 pub mod menu_button;
+pub mod message_thread;
 pub mod meta_line;
 pub mod panel;
 pub mod paragraph;

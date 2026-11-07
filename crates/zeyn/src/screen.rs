@@ -763,6 +763,13 @@ pub trait Component: Send + Sync {
         None
     }
 
+    /// Text the component streams through an action, by key (see
+    /// [`crate::ui::MessageThread::reply`]).
+    #[cfg(feature = "server")]
+    fn stream(&self, _key: &str) -> Option<&dyn crate::ui::StreamSource> {
+        None
+    }
+
     /// Keyboard shortcuts of the component's own links, as declared, for the clash checks of
     /// `App::check` and `App::check_page`.
     fn shortcuts(&self) -> Vec<&str> {
@@ -821,6 +828,11 @@ impl Node {
 
     pub fn source(&self, key: &str) -> Option<&dyn crate::ui::DataSource> {
         self.0.source(key)
+    }
+
+    #[cfg(feature = "server")]
+    pub fn stream(&self, key: &str) -> Option<&dyn crate::ui::StreamSource> {
+        self.0.stream(key)
     }
 
     pub fn shortcuts(&self) -> Vec<&str> {

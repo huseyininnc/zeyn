@@ -61,6 +61,7 @@ pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
         .route("/_zeyn/node", post(node_call))
         .route("/_zeyn/nodes", post(nodes_call))
         .route("/_zeyn/data", post(data_call))
+        .route("/_zeyn/stream", post(stream_call))
         .route("/_zeyn/parse", post(parse_call))
 }
 
@@ -333,6 +334,106 @@ async fn site_data(
         Ok(json) => axum::Json(json).into_response(),
         Err(f) => st.error_response(ctx, f),
     }
+}
+
+/// Starts the streamed text of a node (such as the AI reply of a message thread) and sends its
+/// pieces as JSON lines in the assistant's format: `{"t":"start","key":...}`, then
+/// `{"t":"text","v":...}` for each piece, `{"t":"done"}` at the end, or `{"t":"error"}` before
+/// it. Same checks as `/_zeyn/data`; the pieces pass through a bounded channel, at most
+/// `MAX_REPLY_CHARS` characters and `REPLY_SECONDS` seconds of them.
+async fn stream_call(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::Json(call): axum::Json<DataCall>,
+) -> Response {
+    let ctx = st.licensed(st.ctx(&headers)).await;
+    if let Err(f) = st.check_csrf(&headers) {
+        return st.error_response(&ctx, f);
+    }
+    let result = async {
+        let (_, entry, screen) = st
+            .open(&ctx, &call.screen, call.params)
+            .await?;
+        let source = screen
+            .node(&call.node)
+            .and_then(|n| n.stream(&call.key))
+            .ok_or(Failure::App(Error::NotFound))?;
+        let action = source.action();
+        if !ctx.identity().can(&action.access) {
+            return Err(Failure::App(Error::Forbidden));
+        }
+        let info = Call {
+            kind: CallKind::DataGrid,
+            screen: entry.meta.name,
+            action: Some(action),
+            via_agent: ctx.via_agent(),
+        };
+        st.intercept(&ctx, &info, || {
+            st.timed(source.start(ctx.clone(), call.input))
+        })
+        .await
+    }
+    .await;
+    match result {
+        Ok(reply) => reply_stream(reply),
+        Err(f) => st.error_response(&ctx, f),
+    }
+}
+
+/// Forwards the pieces of a reply as JSON lines until it ends, the browser leaves, or a limit is
+/// reached. Dropping the reply tells its generator to stop.
+fn reply_stream(reply: crate::ui::Reply) -> Response {
+    use crate::ui::{MAX_REPLY_CHARS, REPLY_SECONDS};
+    use axum::http::{HeaderValue, header};
+    let (tx, rx) = tokio::sync::mpsc::channel(crate::ui::REPLY_BUFFER);
+    tokio::spawn(async move {
+        let crate::ui::Reply { key, mut pieces } = reply;
+        let line = |event: Json| {
+            let mut text = event.to_string();
+            text.push('\n');
+            Ok::<_, std::io::Error>(axum::body::Bytes::from(text))
+        };
+        if tx
+            .send(line(json!({ "t": "start", "key": key })))
+            .await
+            .is_err()
+        {
+            return;
+        }
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(REPLY_SECONDS);
+        let mut left = MAX_REPLY_CHARS;
+        while left > 0 {
+            let piece = match tokio::time::timeout_at(deadline, pieces.recv()).await {
+                Ok(Some(piece)) => piece,
+                Ok(None) | Err(_) => break,
+            };
+            let piece: String = piece.chars().take(left).collect();
+            left -= piece.chars().count();
+            if piece.is_empty() {
+                continue;
+            }
+            if tx
+                .send(line(json!({ "t": "text", "v": piece })))
+                .await
+                .is_err()
+            {
+                return;
+            }
+        }
+        drop(pieces);
+        let _ = tx
+            .send(line(json!({ "t": "done" })))
+            .await;
+    });
+    let mut r = axum::body::Body::from_stream(super::Chunks(rx)).into_response();
+    let h = r.headers_mut();
+    h.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/x-ndjson; charset=utf-8"),
+    );
+    h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    h.insert("x-accel-buffering", HeaderValue::from_static("no"));
+    r
 }
 
 async fn data_call(

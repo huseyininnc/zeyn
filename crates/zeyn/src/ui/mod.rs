@@ -45,6 +45,7 @@ mod relative;
 mod reviews;
 mod share;
 mod shell;
+mod thread;
 mod topics;
 mod tree;
 mod variants;
@@ -116,6 +117,12 @@ pub use reactions::{MAX_REACTIONS, ReactionPress, ReactionState, Reactions};
 pub use relative::RelativeTime;
 pub use reviews::ReviewSummary;
 pub use share::Share;
+pub use thread::{
+    Delivery, MAX_CONVERSATION, MAX_MESSAGE_CHARS, MAX_REPLY_CHARS, MAX_SHOWN_FILES, MessageThread,
+    REPLY_BUFFER, REPLY_SECONDS, ReplyRequest, THREAD_PAGE, ThreadQuery,
+};
+#[cfg(feature = "server")]
+pub use thread::{Reply, ReplySender, StreamSource};
 pub use topics::{Listen, Listens, MAX_TOPICS, PageCheck, Topics, valid_topic};
 pub(crate) use topics::{topic_list, topics_attr};
 pub use tree::{MAX_TREE_CHILDREN, Tree, TreeItem, TreeQuery};

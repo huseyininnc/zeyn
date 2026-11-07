@@ -34,7 +34,8 @@
       "shell": "Kabuk",
       "admin": "Yönetim",
       "shell": "Kabuk",
-      "shop": "Mağaza"
+      "shop": "Mağaza",
+      "chat": "Sohbet"
     },
     "summary": {
       "stack": "Aralarında boşluk olan, alt alta düğümler.",
@@ -114,7 +115,8 @@
       "product_gallery": "Küçük resimler, yakınlaştırma, kaydırma ve tam ekran görünümüyle ürün fotoğrafları.",
       "facet_panel": "Ürün kartlarını yerinde yenileyen sayılı filtreler, fiyat aralığı ve seçili filtre çipleri.",
       "review_summary": "Ortalama puan, değerlendirme sayısı ve 5'ten 1'e her yıldız için bir çubuk.",
-      "countdown": "Sunucu saatindeki bir ana kalan süre ve bitiş durumu."
+      "countdown": "Sunucu saatindeki bir ana kalan süre ve bitiş durumu.",
+      "message_thread": "Gönderene ve güne göre sohbet balonları, iletim durumları, kaydırdıkça yüklenen geçmiş ve akışla gelen yapay zekâ yanıtları."
     },
     "ex": {
       "action_button": {
@@ -411,6 +413,11 @@
       "countdown": {
         "overview": "Örnek",
         "short": "Bir dakikadan biraz fazla"
+      },
+      "message_thread": {
+        "overview": "Örnek",
+        "ai_answer": "Markdown ile yapay zekâ yanıtı",
+        "long": "Uzun geçmiş"
       }
     }
   }

@@ -242,6 +242,29 @@
       }
     },
     "ui": {
+      "chat": {
+        "label": "Mesajlar",
+        "empty": "Henüz mesaj yok",
+        "you": "Siz",
+        "today": "Bugün",
+        "yesterday": "Dün",
+        "attachments": "Ekler",
+        "more_files": "{n} dosya daha",
+        "new_message": "{name} kişisinden yeni mesaj: {text}",
+        "assistant": "Asistan",
+        "writing": "Yanıt yazılıyor",
+        "stop": "Durdur",
+        "stopped": "Yanıt durduruldu",
+        "reply_failed": "Yanıt yüklenemedi",
+        "loading": "Eski mesajlar yükleniyor",
+        "status": {
+          "sending": "Gönderiliyor",
+          "sent": "Gönderildi",
+          "delivered": "İletildi",
+          "read": "Okundu",
+          "failed": "Gönderilemedi"
+        }
+      },
       "resize": "Bölmeleri yeniden boyutlandır",
       "cards": {
         "load_more": "Daha fazla göster",

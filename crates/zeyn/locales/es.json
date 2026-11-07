@@ -227,6 +227,29 @@
       }
     },
     "ui": {
+      "chat": {
+        "label": "Mensajes",
+        "empty": "Todavía no hay mensajes",
+        "you": "Tú",
+        "today": "Hoy",
+        "yesterday": "Ayer",
+        "attachments": "Adjuntos",
+        "more_files": "{n} archivos más",
+        "new_message": "Nuevo mensaje de {name}: {text}",
+        "assistant": "Asistente",
+        "writing": "Escribiendo una respuesta",
+        "stop": "Detener",
+        "stopped": "La respuesta se detuvo",
+        "reply_failed": "No se pudo cargar la respuesta",
+        "loading": "Cargando mensajes anteriores",
+        "status": {
+          "sending": "Enviando",
+          "sent": "Enviado",
+          "delivered": "Entregado",
+          "read": "Leído",
+          "failed": "No enviado"
+        }
+      },
       "resize": "Cambiar tamaño de los paneles",
       "cards": {
         "load_more": "Mostrar más",

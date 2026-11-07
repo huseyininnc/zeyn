@@ -227,6 +227,29 @@
       }
     },
     "ui": {
+      "chat": {
+        "label": "消息",
+        "empty": "还没有消息",
+        "you": "你",
+        "today": "今天",
+        "yesterday": "昨天",
+        "attachments": "附件",
+        "more_files": "另有 {n} 个文件",
+        "new_message": "来自 {name} 的新消息：{text}",
+        "assistant": "助手",
+        "writing": "正在撰写回复",
+        "stop": "停止",
+        "stopped": "回复已停止",
+        "reply_failed": "无法加载回复",
+        "loading": "正在加载更早的消息",
+        "status": {
+          "sending": "发送中",
+          "sent": "已发送",
+          "delivered": "已送达",
+          "read": "已读",
+          "failed": "未发送"
+        }
+      },
       "resize": "调整窗格大小",
       "cards": {
         "load_more": "显示更多",

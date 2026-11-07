@@ -242,6 +242,29 @@
       }
     },
     "ui": {
+      "chat": {
+        "label": "Messages",
+        "empty": "No messages yet",
+        "you": "You",
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "attachments": "Attachments",
+        "more_files": "{n} more files",
+        "new_message": "New message from {name}: {text}",
+        "assistant": "Assistant",
+        "writing": "Writing a reply",
+        "stop": "Stop",
+        "stopped": "The reply was stopped",
+        "reply_failed": "The reply could not be loaded",
+        "loading": "Loading older messages",
+        "status": {
+          "sending": "Sending",
+          "sent": "Sent",
+          "delivered": "Delivered",
+          "read": "Read",
+          "failed": "Not sent"
+        }
+      },
       "resize": "Resize panes",
       "cards": {
         "load_more": "Show more",

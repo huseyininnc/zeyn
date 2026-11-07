@@ -242,6 +242,9 @@ catalog! {
         kanban "/ui/kanban";
         calendar "/ui/calendar" (Demo);
     }
+    "chat" Message {
+        message_thread "/ui/message-thread";
+    }
 }
 
 /// The component with this slug.

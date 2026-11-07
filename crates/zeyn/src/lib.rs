@@ -268,6 +268,9 @@ pub mod prelude {
         Countdown, Facet, FacetPanel, Price, PriceUnit, ProductGallery, QuantityStepper,
         RangeSlider, ReviewSummary, VariantGroup, VariantPicker,
     };
+    pub use crate::ui::{Delivery, MessageThread, ReplyRequest, ThreadQuery};
+    #[cfg(feature = "server")]
+    pub use crate::ui::{Reply, ReplySender};
     pub use crate::{
         Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime,
         Decimal, Effect, Entity, Error, Export, Feature, Field, File, FileRules, FileType, Form,
