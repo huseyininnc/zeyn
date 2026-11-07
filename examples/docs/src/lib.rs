@@ -74,6 +74,7 @@ pages! {
         admin "/components/admin" "admin.md" "Admin views" "../pages/admin.md";
         commerce "/components/commerce" "commerce.md" "Shop components" "../pages/commerce.md";
         chat "/components/chat" "chat.md" "Chat" "../pages/chat.md";
+        social "/components/social" "social.md" "Social" "../pages/social.md";
         shell "/components/shell" "shell.md" "Shell and commands" "../pages/shell.md";
         media "/components/media" "media.md" "Media" "../../../docs/media.md";
     }

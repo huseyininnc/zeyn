@@ -71,6 +71,7 @@ pub mod split;
 pub mod spoiler;
 pub mod stack;
 pub mod status_bar;
+pub mod story_ring;
 pub mod tabs;
 pub mod theme_picker;
 pub mod timeline;

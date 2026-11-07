@@ -738,6 +738,11 @@
           "day": "d",
           "left": "{d} d {h} h {m} min left"
         }
+      },
+      "story": {
+        "row": "Stories",
+        "unseen": "{name}, unseen stories",
+        "seen": "{name}, all stories seen"
       }
     },
     "date": {

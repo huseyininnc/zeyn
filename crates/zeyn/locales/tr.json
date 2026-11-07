@@ -738,6 +738,11 @@
           "day": "g",
           "left": "{d} g {h} sa {m} dk kaldı"
         }
+      },
+      "story": {
+        "row": "Hikâyeler",
+        "unseen": "{name}, izlenmemiş hikâyeler",
+        "seen": "{name}, tüm hikâyeler izlendi"
       }
     },
     "date": {

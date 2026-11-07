@@ -41,6 +41,7 @@ Which page answers what:
 | Record diffs, code and JSON views, barcodes, inbox and notifications, Kanban boards, calendars | `components/admin` (`admin.md`) |
 | Prices, facets, range sliders, variants, galleries, quantities, reviews, countdowns | `components/commerce` (`commerce.md`) |
 | Message threads, the composer, typing indicators, streamed AI replies | `components/chat` (`chat.md`) |
+| Story rings | `components/social` (`social.md`) |
 | Video and audio | `components/media` (`docs/media.md`) |
 | Dates, time zones, money, languages | `guides/time-and-languages` (`time-and-languages.md`) |
 | Permissions, guards, CSRF, masking, audit | `guides/security` (`security.md`), `docs/enterprise.md` |
@@ -297,6 +298,8 @@ What to remember:
   membership and mentions itself.
   Typing: `TypingIndicator::new("chat").conversation(id).person(user, name)` needs `App::realtime`
   with `Realtime::topic("chat", perm)`; without it, it renders nothing.
+- Stories: `StoryRow::new().add(StoryRing::new(name, StoryState::Unseen).image(src).link(screen, params))`;
+  the state comes from what the server stored about the viewer, never from the browser.
 - The app (`src/app.rs`): `App::new(t!("app.name")).i18n(i18n).service(store).feature(sales::feature())`,
   plus what the app needs: `.auth(...)`, `.mcp(Mcp::read_only())`, `.themes([...])`,
   `.datagrid_views(store)`, `.assistant(...)`.

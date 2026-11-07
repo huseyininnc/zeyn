@@ -82,7 +82,8 @@
       "desktop": "Desktop apps",
       "protocol": "Runtime protocol",
       "database_reference": "Database reference",
-      "about": "Source, license and security"
+      "about": "Source, license and security",
+      "social": "Social"
     },
     "translation": {
       "note": "This page is translated from English.",

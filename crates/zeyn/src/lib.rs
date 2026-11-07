@@ -275,6 +275,7 @@ pub mod prelude {
     };
     #[cfg(feature = "server")]
     pub use crate::ui::{Reply, ReplySender};
+    pub use crate::ui::{StoryRing, StoryRow, StoryState};
     pub use crate::{
         Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime,
         Decimal, Effect, Entity, Error, Export, Feature, Field, File, FileRules, FileType, Form,

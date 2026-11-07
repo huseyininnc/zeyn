@@ -520,7 +520,7 @@ impl Avatar {
 
 /// Up to two initials of a name, in capitals of the locale: the first letter of the first word
 /// and of the last word. Turkish `i` becomes `İ`.
-fn initials(name: &str, locale: &str) -> String {
+pub(crate) fn initials(name: &str, locale: &str) -> String {
     let words: Vec<&str> = name.split_whitespace().collect();
     let firsts = match words.as_slice() {
         [] => Vec::new(),

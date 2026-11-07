@@ -4,6 +4,10 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 ## [Unreleased]
 
+### Added
+
+- `StoryRing::new(name, StoryState::Unseen | Seen)` with `.image(src)` and `.link(screen, params)`: an avatar in a ring that is thick and in the brand colors while the viewer has unseen stories, thin and neutral once seen (dashed in forced colors mode), named "Ada Lovelace, unseen stories" for screen readers. The state comes from the server. `StoryRow` puts up to 100 rings in a row that scrolls sideways with scroll snapping. CSS only: `stories.css` (2.2 KB) loads only on pages with a ring.
+
 ### Fixed
 
 - `ActionButton` with `.tone(Tone::Brand)` is drawn as a primary button, so a card can carry its main action. `Badge` with `Tone::Brand` gets its tinted background like the other tones and stays readable over images.

@@ -603,6 +603,11 @@
           "day": "d",
           "left": "Quedan {d} d {h} h {m} min"
         }
+      },
+      "story": {
+        "row": "Historias",
+        "unseen": "{name}, historias sin ver",
+        "seen": "{name}, todas las historias vistas"
       }
     },
     "date": {

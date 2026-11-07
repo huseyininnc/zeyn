@@ -248,6 +248,9 @@ catalog! {
         composer "/ui/composer" (Demo);
         typing_indicator "/ui/typing-indicator";
     }
+    "social" Users {
+        story_ring "/ui/story-ring";
+    }
 }
 
 /// The component with this slug.
