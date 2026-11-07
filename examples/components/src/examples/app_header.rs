@@ -1,5 +1,6 @@
 //! App header examples: the bar over every page of this catalog, with a search box in its center
-//! slot and a link at its end.
+//! slot and links at its end: all components, the source on GitHub and the project page of the
+//! docs.
 
 use crate::{Entry, Example};
 use zeyn::SiteHeader;
@@ -13,11 +14,21 @@ pub fn catalog_header(h: SiteHeader) -> SiteHeader {
             .suggestion(|f: &crate::Found| f.name.clone())
             .results(crate::catalog_home),
     )
-    .end(LinkButton::new(
-        t!("cx.all"),
-        crate::catalog_home,
-        SearchParams::default(),
-    ))
+    .end(
+        Row::new()
+            .compact()
+            .col(LinkButton::new(
+                t!("cx.all"),
+                crate::catalog_home,
+                SearchParams::default(),
+            ))
+            .col(
+                ExternalLink::new("https://github.com/huseyininnc/zeyn", t!("cx.github")).new_tab(),
+            )
+            .col(
+                ExternalLink::new("https://docs.zeynsoft.com/project", t!("cx.project")).new_tab(),
+            ),
+    )
 }
 
 /// The live part of the example: the bar at the top of this page.
