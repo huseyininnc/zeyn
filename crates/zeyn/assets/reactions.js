@@ -4,7 +4,8 @@
  * `react`) with the CSRF header; the server opens the screen, checks the action's permission
  * and runs it with the item the screen set. The answer is the new state: every count and
  * `aria-pressed` of the row is written from it. A failed press changes nothing and says so in a
- * toast.
+ * toast. A row of a feed post (`data-zeyn-post`) also sends the key of its post, which the
+ * server checks against the posts the feed's action returns to the user.
  * @module reactions
  */
 
@@ -47,7 +48,7 @@ async function press(button) {
     params: parse(screen?.dataset.zeynParams ?? 'null'),
     node: row.closest('[data-zeyn-node]')?.dataset.zeynNode ?? null,
     key: 'react',
-    input: { reaction: button.dataset.reaction, pressed: button.getAttribute('aria-pressed') !== 'true' },
+    input: { reaction: button.dataset.reaction, pressed: button.getAttribute('aria-pressed') !== 'true', ...(row.hasAttribute('data-zeyn-post') ? { key: row.closest('[data-zeyn-key]')?.dataset.zeynKey ?? '' } : {}) },
   };
   row.setAttribute('aria-busy', 'true');
   let state = null;

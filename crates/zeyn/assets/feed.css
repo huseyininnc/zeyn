@@ -1,0 +1,52 @@
+/* Feeds (`zeyn::ui::Feed`, `Post`): linked only by pages that hold `.z-feed`. Posts are cards
+   in one column; feed.js keeps only those near the viewport in the page and pads the rest. */
+
+.z-feed { position: relative; display: grid; gap: var(--z-s-3); max-inline-size: 640px; margin: 0 0 var(--z-gap); }
+.z-feed-title { margin: 0; font-size: var(--z-text-lg); line-height: var(--z-leading-lg); font-weight: 600; }
+.z-feed-pill-slot { position: sticky; inset-block-start: var(--z-s-3); z-index: 2; display: flex; justify-content: center; block-size: 0; overflow: visible; }
+.z-feed-pill { border-radius: var(--z-radius-full); box-shadow: var(--z-shadow-2); background: var(--z-primary); color: var(--z-on-primary); border-color: transparent; }
+.z-feed-pill:hover { background: var(--z-primary-hover); }
+.z-feed-pill[hidden] { display: none; }
+.z-feed-list { position: relative; display: flow-root; overflow-anchor: none; }
+.z-feed-empty { margin: 0; color: var(--z-text-muted); }
+.z-feed-empty[hidden], .z-feed-more[hidden], .z-feed-more > [hidden] { display: none; }
+.z-feed-more { display: flex; justify-content: center; }
+
+.z-post {
+  box-sizing: border-box; display: grid; gap: var(--z-s-3); margin: 0 0 var(--z-s-3); padding: var(--z-s-4);
+  background: var(--z-surface); color: var(--z-text); border: 1px solid var(--z-border); border-radius: var(--z-radius-lg);
+}
+.z-post:focus-visible { outline: 2px solid var(--z-focus); outline-offset: 2px; }
+.z-post-kept { position: absolute; inset-inline: 0; }
+.z-post-head { display: flex; align-items: center; gap: var(--z-s-3); min-inline-size: 0; }
+.z-post-who { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--z-s-2); min-inline-size: 0; flex: 1; }
+.z-post-author { font-weight: 600; overflow-wrap: anywhere; }
+.z-post-handle, .z-post-time { color: var(--z-text-muted); font-size: var(--z-text-sm); }
+.z-post-time { margin-inline-start: auto; white-space: nowrap; text-decoration: none; }
+a.z-post-time:hover { text-decoration: underline; }
+.z-post-text { margin: 0; white-space: pre-line; overflow-wrap: anywhere; font-size: var(--z-text-md); line-height: var(--z-leading-md); }
+.z-post-media { display: grid; gap: var(--z-s-1); grid-template-columns: 1fr 1fr; border-radius: var(--z-radius-lg); overflow: hidden; }
+.z-post-media-1 { grid-template-columns: 1fr; }
+.z-post-media-3 > :first-child { grid-row: span 2; }
+.z-post-media .z-lightbox-open { inline-size: 100%; block-size: 100%; border-radius: 0; }
+.z-post-media img, .z-post-media .z-img { display: block; inline-size: 100%; block-size: 100%; max-inline-size: none; object-fit: cover; }
+.z-post-media-1 img { block-size: auto; max-block-size: 520px; }
+.z-post-media:not(.z-post-media-1) img { aspect-ratio: 1; }
+.z-post-media-3 > :first-child img { aspect-ratio: auto; }
+.z-post-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--z-s-3); }
+.z-post-actions .z-reactions { margin: 0; }
+.z-post-comments {
+  display: inline-flex; align-items: center; gap: var(--z-s-1); color: var(--z-text-muted); text-decoration: none;
+  font-size: var(--z-text-sm); font-variant-numeric: tabular-nums;
+}
+.z-post-comments::before {
+  content: ""; inline-size: 16px; block-size: 13px; border: 1.5px solid currentColor; border-radius: 4px; border-end-start-radius: 1px;
+}
+a.z-post-comments:hover { color: var(--z-text); }
+a.z-post-comments:focus-visible { outline: 2px solid var(--z-focus); outline-offset: 2px; border-radius: var(--z-radius-sm); }
+.z-post-actions .z-share { margin-inline-start: auto; }
+
+@media (forced-colors: active) {
+  .z-post { border-color: CanvasText; }
+  .z-feed-pill { border: 1px solid ButtonText; }
+}

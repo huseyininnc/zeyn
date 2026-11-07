@@ -234,6 +234,12 @@ pub(crate) const MODULES: &[Module] = &[
         style: &["z-lightbox-open", "z-lightbox"],
         needs: &[],
     },
+    Module {
+        name: "feed",
+        script: &["data-zeyn-feed"],
+        style: &["z-feed", "z-post"],
+        needs: &[],
+    },
 ];
 
 const _: () = assert!(MODULES.len() <= 64, "Used keeps one bit per module");
@@ -242,7 +248,7 @@ const _: () = assert!(MODULES.len() <= 64, "Used keeps one bit per module");
 /// are linked only when the page uses them; the others style components without markers of
 /// their own (layouts, display widgets, form sections, the palette) and every page links them,
 /// as `zeyn.css` and `enterprise.css`.
-const STYLES: [&str; 19] = [
+const STYLES: [&str; 20] = [
     "components",
     "catalog",
     "content",
@@ -262,6 +268,7 @@ const STYLES: [&str; 19] = [
     "typing",
     "stories",
     "lightbox",
+    "feed",
 ];
 
 /// The modules a page uses, one bit each in the order of [`MODULES`].
@@ -426,7 +433,7 @@ pub(crate) fn runtime(js: &'static str) -> &'static str {
 
 /// Script and style files of component modules, by path; the others are served next to their
 /// endpoints.
-const FILES: [(&str, &str); 46] = [
+const FILES: [(&str, &str); 48] = [
     (
         "/_zeyn/commerce.css",
         include_str!("../../assets/commerce.css"),
@@ -515,6 +522,8 @@ const FILES: [(&str, &str); 46] = [
         "/_zeyn/lightbox.js",
         include_str!("../../assets/lightbox.js"),
     ),
+    ("/_zeyn/feed.css", include_str!("../../assets/feed.css")),
+    ("/_zeyn/feed.js", include_str!("../../assets/feed.js")),
 ];
 
 /// Asset paths served without authentication, like the runtime itself.

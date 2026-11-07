@@ -619,6 +619,18 @@
         "zoom_out": "Alejar",
         "open": "Abrir imagen",
         "video": "Reproducir video"
+      },
+      "feed": {
+        "label": "Publicaciones",
+        "new_one": "1 publicación nueva",
+        "new_many": "{count} publicaciones nuevas",
+        "new_more": "Más de {count} publicaciones nuevas",
+        "newest": "Volver a las más recientes",
+        "loaded": "{count} publicaciones mostradas",
+        "error": "No se pudieron cargar las publicaciones. Inténtalo de nuevo.",
+        "empty": "Todavía no hay publicaciones.",
+        "comments": "{count} comentarios",
+        "comments_one": "1 comentario"
       }
     },
     "date": {

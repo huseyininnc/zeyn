@@ -28,6 +28,7 @@ pub mod embed;
 pub mod empty_state;
 pub mod external_link;
 pub mod facet_panel;
+pub mod feed;
 pub mod form;
 pub mod heading;
 pub mod hero;

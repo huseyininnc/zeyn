@@ -295,12 +295,14 @@ function openAt(trigger) {
   ui.next.setAttribute('aria-label', open.texts.next ?? '');
   dialog.dir = getComputedStyle(trigger).direction;
   show();
+  document.documentElement.classList.add('z-lightbox-lock');
   dialog.showModal();
   dialog.querySelector('.z-lightbox-close').focus();
 }
 
 /** After the dialog closed: stops a video and returns focus to what opened it. */
 function closed() {
+  document.documentElement.classList.remove('z-lightbox-lock');
   ui.stage.querySelector('video')?.pause();
   ui.stage.replaceChildren();
   const opener = open.opener;

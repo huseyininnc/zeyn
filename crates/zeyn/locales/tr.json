@@ -754,6 +754,18 @@
         "zoom_out": "Uzaklaştır",
         "open": "Resmi aç",
         "video": "Videoyu oynat"
+      },
+      "feed": {
+        "label": "Gönderiler",
+        "new_one": "1 yeni gönderi",
+        "new_many": "{count} yeni gönderi",
+        "new_more": "{count} gönderiden fazla yeni gönderi",
+        "newest": "En yeni gönderilere dön",
+        "loaded": "{count} gönderi gösteriliyor",
+        "error": "Gönderiler yüklenemedi. Yeniden deneyin.",
+        "empty": "Henüz gönderi yok.",
+        "comments": "{count} yorum",
+        "comments_one": "1 yorum"
       }
     },
     "date": {

@@ -119,7 +119,8 @@
       "composer": "Gönderme tuşları, ekler, @ ile anma ve sohbet başına taslakla büyüyen mesaj kutusu.",
       "typing_indicator": "Bir sohbette başka kimlerin yazdığını gerçek zamanlı kanal üzerinden gösterir.",
       "story_ring": "Hikâyelerinin yeni olup olmadığını gösteren halkalı avatar.",
-      "lightbox": "Tam ekran açılan resimler ve videolar; açıklama, yakınlaştırma ve kaydırma ile."
+      "lightbox": "Tam ekran açılan resimler ve videolar; açıklama, yakınlaştırma ve kaydırma ile.",
+      "feed": "Yenilerini bir düğmenin arkasında tutan, sonsuz bir gönderi akışı."
     },
     "ex": {
       "action_button": {
@@ -436,6 +437,9 @@
       "lightbox": {
         "overview": "Örnek",
         "single": "Tek bir resim"
+      },
+      "feed": {
+        "overview": "Örnek"
       }
     },
     "typing": {

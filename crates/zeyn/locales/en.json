@@ -754,6 +754,18 @@
         "zoom_out": "Zoom out",
         "open": "Open image",
         "video": "Play video"
+      },
+      "feed": {
+        "label": "Posts",
+        "new_one": "1 new post",
+        "new_many": "{count} new posts",
+        "new_more": "More than {count} new posts",
+        "newest": "Back to the newest posts",
+        "loaded": "{count} posts shown",
+        "error": "The posts could not be loaded. Try again.",
+        "empty": "No posts yet.",
+        "comments": "{count} comments",
+        "comments_one": "1 comment"
       }
     },
     "date": {

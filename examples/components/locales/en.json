@@ -119,7 +119,8 @@
       "composer": "A growing message box with send keys, attachments, @ mentions and drafts per conversation.",
       "typing_indicator": "Who else is typing in a conversation, over the realtime channel.",
       "story_ring": "An avatar in a ring that says whether its stories are new.",
-      "lightbox": "Images and videos that open full screen, with captions, zoom and swipes."
+      "lightbox": "Images and videos that open full screen, with captions, zoom and swipes.",
+      "feed": "An endless stream of posts that holds new ones behind a button."
     },
     "ex": {
       "action_button": {
@@ -436,6 +437,9 @@
       "lightbox": {
         "overview": "Example",
         "single": "A single image"
+      },
+      "feed": {
+        "overview": "Example"
       }
     },
     "typing": {

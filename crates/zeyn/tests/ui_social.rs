@@ -1,11 +1,11 @@
 //! The social pack: story rings, the lightbox and the feed.
 
 use axum::body::Body;
-use axum::http::{HeaderMap, Request, StatusCode};
+use axum::http::{HeaderMap, Request, StatusCode, header};
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 use zeyn::prelude::*;
-use zeyn::ui::MAX_STORY_RINGS;
+use zeyn::ui::{MAX_STORY_RINGS, ReactionPress, ReactionState};
 use zeyn::{Component, I18n, Identity, Render};
 
 fn html(c: &impl Component, locale: &str) -> String {
@@ -69,8 +69,101 @@ pub fn photo() -> Screen {
     )
 }
 
+/// A post of the feed tests: posts with an odd author are private and only their author's
+/// action call would return them, so the feed scopes them out below.
+#[entity(table = "notes")]
+pub struct Note {
+    #[key]
+    pub id: NoteId,
+    pub author: String,
+    pub text: String,
+    pub public: bool,
+}
+
+fn notes() -> Vec<Note> {
+    (1..=30)
+        .rev()
+        .map(|i| Note {
+            id: NoteId(i),
+            author: format!("Author <{i}>"),
+            text: format!("Text {i} <script>alert(1)</script>\nsecond line"),
+            public: i % 2 == 0,
+        })
+        .collect()
+}
+
+/// Notes newest first, after the cursor (the id of the last note shown), with the filters.
+#[action(permission = "social.read")]
+pub async fn search_notes(q: DataQuery) -> Result<Page<Note>> {
+    let below = match &q.page {
+        zeyn::PageRequest::After {
+            cursor: Some(c), ..
+        } => c.0.parse::<i64>().unwrap_or(i64::MAX),
+        _ => i64::MAX,
+    };
+    let limit = match &q.page {
+        zeyn::PageRequest::After { limit, .. } | zeyn::PageRequest::Offset { limit, .. } => *limit,
+    };
+    let mut filtered = DataQuery {
+        page: zeyn::PageRequest::Offset {
+            offset: 0,
+            limit: 1000,
+        },
+        filters: q.filters.clone(),
+        ..DataQuery::default()
+    }
+    .apply(notes())
+    .items;
+    filtered.sort_by_key(|n| std::cmp::Reverse(n.id.0));
+    let items: Vec<Note> = filtered
+        .into_iter()
+        .filter(|n| n.id.0 < below)
+        .take(limit as usize)
+        .collect();
+    let mut page = Page::new(items);
+    page.next = page
+        .items
+        .last()
+        .filter(|n| n.id.0 > 2)
+        .map(|n| zeyn::Cursor(n.id.0.to_string()));
+    Ok(page)
+}
+
+/// Echoes a press: the post's key in the count name, so tests see what the action got.
+#[action(permission = "social.react")]
+pub async fn react_to_note(press: ReactionPress) -> Result<ReactionState> {
+    Ok(ReactionState::default().count(format!("{}:{}", press.target, press.reaction), 1))
+}
+
+fn note_feed() -> Feed<Note> {
+    Feed::of(search_notes)
+        .post(|n: &Note| {
+            Post::new(n.author.clone(), DateTime::from_unix_ms(1_778_580_000_000))
+                .text(n.text.clone())
+                .media(
+                    Image::new(format!("/n/{}.webp", n.id.0))
+                        .alt("Photo")
+                        .size(300, 200),
+                )
+                .reactions(ReactionState::default().count("like", 3))
+                .comments(1)
+                .link(person_stories, PersonParams { id: n.id.0 })
+        })
+        .batch(5)
+        .scope(Note::public, true)
+        .reactions(react_to_note)
+        .reaction("like", "Like", "+")
+        .topic("notes")
+}
+
+#[screen(route = "/feed", permission = "social.read")]
+pub fn feed_screen() -> Screen {
+    Screen::new("Feed").body(Stack::new().add(note_feed().title("Notes")))
+}
+
 fn feature() -> Feature {
     Feature::new("social")
+        .screen(feed_screen)
         .screen(person_stories)
         .screen(only_text)
         .screen(stories)
@@ -91,6 +184,10 @@ fn app() -> axum::Router {
                 .collect();
             Some(Identity::user("u").with_permissions(perms))
         })
+        .write_limit(zeyn::RateLimit::per_user(
+            8,
+            std::time::Duration::from_secs(60),
+        ))
         .feature(feature())
         .router()
         .unwrap()
@@ -284,4 +381,177 @@ async fn the_lightbox_loads_only_on_pages_with_a_lightbox_image() {
     assert!(!links(&single, "lightbox.js") && !links(&single, "lightbox.css"));
     let (_, text) = get(&router, "/plain", "social.read").await;
     assert!(!links(&text, "lightbox.js"));
+}
+
+const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+async fn post_json(
+    router: &axum::Router,
+    path: &str,
+    perms: &str,
+    csrf: bool,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    let mut req = Request::post(path)
+        .header("x-perms", perms)
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::COOKIE, format!("zeyn_csrf={TOKEN}"));
+    if csrf {
+        req = req.header("x-zeyn-csrf", TOKEN);
+    }
+    let res = router
+        .clone()
+        .oneshot(
+            req.body(Body::from(body.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = res.status();
+    let bytes = res
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes();
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
+}
+
+/// A reaction press on the post with `key`, through the feed at the nested path `0.0`.
+fn press(key: &str, reaction: &str) -> serde_json::Value {
+    serde_json::json!({ "screen": "feed_screen", "params": null, "node": "0.0", "key": "react", "input": { "key": key, "reaction": reaction, "pressed": true } })
+}
+
+#[tokio::test]
+async fn a_feed_is_an_apg_feed_of_escaped_posts() {
+    let router = app();
+    let (status, page) = get(&router, "/feed", "social.read").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        page.contains(r#"<section class="z-feed" data-zeyn-feed="notes" data-zeyn-next="22""#),
+        "{page}"
+    );
+    assert!(page.contains(r#"role="feed" aria-labelledby="#), "{page}");
+    assert!(
+        page.contains(r#"<article class="z-post" tabindex="0" data-zeyn-key="30" aria-posinset="1" aria-setsize="-1" aria-labelledby="#),
+        "{page}"
+    );
+    assert_eq!(page.matches("<article").count(), 5, "five a batch");
+    assert!(
+        !page.contains(r#"data-zeyn-key="29""#),
+        "the odd ones are scoped out"
+    );
+    assert!(
+        page.contains("Author &lt;30&gt;") && !page.contains("<script>alert"),
+        "text is escaped"
+    );
+    assert!(page.contains(r#"data-zeyn-gallery"#) && page.contains(r#"data-zeyn-lightbox "#));
+    assert!(
+        page.contains(r#"fetchpriority="high""#),
+        "the first image of the first post loads at once"
+    );
+    assert!(page.contains(r#"data-zeyn-reactions data-zeyn-post"#));
+    assert!(page.contains(r#"<span class="z-sr-only">1 comment</span>"#));
+    assert!(page.contains("data-zeyn-share"));
+    for name in ["feed.js", "feed.css", "lightbox.js", "reactions.js"] {
+        assert!(links(&page, name), "{name}");
+    }
+    let (_, text) = get(&router, "/plain", "social.read").await;
+    assert!(!links(&text, "feed.js") && !links(&text, "feed.css"));
+    let (status, _) = get(&router, "/feed", "other").await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn older_posts_load_by_cursor_with_the_servers_batch_and_scope() {
+    let router = app();
+    let body = serde_json::json!({ "screen": "feed_screen", "params": null, "node": "0.0", "query": { "page": { "type": "after", "cursor": "26", "limit": 500 }, "filters": [{ "field": "public", "is": false }] } });
+    let (status, json) = post_json(&router, "/_zeyn/grid", "social.read", true, body.clone()).await;
+    assert_eq!(status, StatusCode::OK, "{json}");
+    let rows = json["rows"].as_str().unwrap();
+    assert_eq!(
+        rows.matches("<article").count(),
+        5,
+        "the batch of the server: {rows}"
+    );
+    assert!(rows.contains(r#"data-zeyn-key="24""#) && !rows.contains(r#"data-zeyn-key="25""#));
+    let (status, _) = post_json(&router, "/_zeyn/grid", "social.read", false, body.clone()).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "the CSRF check");
+    let flat =
+        serde_json::json!({ "screen": "feed_screen", "params": null, "node": 0, "query": {} });
+    let (status, _) = post_json(&router, "/_zeyn/grid", "social.read", true, flat).await;
+    assert_eq!(
+        status,
+        StatusCode::NOT_FOUND,
+        "the feed is at the nested path 0.0"
+    );
+}
+
+#[tokio::test]
+async fn a_reaction_reaches_the_action_only_for_a_post_the_user_can_read() {
+    let router = app();
+    let both = "social.read,social.react";
+    let (status, state) = post_json(&router, "/_zeyn/data", both, true, press("28", "like")).await;
+    assert_eq!(status, StatusCode::OK, "{state}");
+    assert_eq!(
+        state["counts"]["28:like"], 1,
+        "the post key reaches the action: {state}"
+    );
+    let (status, _) = post_json(&router, "/_zeyn/data", both, true, press("27", "like")).await;
+    assert_eq!(
+        status,
+        StatusCode::NOT_FOUND,
+        "a post outside the feed's scope"
+    );
+    let (status, _) = post_json(&router, "/_zeyn/data", both, true, press("999", "like")).await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "a post that does not exist");
+    let (status, _) = post_json(&router, "/_zeyn/data", both, true, press("28", "angry")).await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "a reaction outside the set");
+    let long = "9".repeat(200);
+    let (status, _) = post_json(&router, "/_zeyn/data", both, true, press(&long, "like")).await;
+    assert_eq!(
+        status,
+        StatusCode::NOT_FOUND,
+        "a key longer than any post key"
+    );
+    let (status, _) = post_json(
+        &router,
+        "/_zeyn/data",
+        "social.read",
+        true,
+        press("28", "like"),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "the reaction action's permission"
+    );
+    let (status, _) = post_json(&router, "/_zeyn/data", both, false, press("28", "like")).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "the CSRF check");
+    let mut last = StatusCode::OK;
+    for _ in 0..8 {
+        last = post_json(&router, "/_zeyn/data", both, true, press("28", "like"))
+            .await
+            .0;
+    }
+    assert_eq!(
+        last,
+        StatusCode::TOO_MANY_REQUESTS,
+        "presses count against the write limit"
+    );
+}
+
+#[test]
+fn a_feed_without_posts_or_reactions_is_reported() {
+    let mut check = zeyn::ui::PageCheck::default();
+    Feed::of(search_notes)
+        .reactions(react_to_note)
+        .page_check(&mut check);
+    let problems = format!("{check:?}");
+    assert!(problems.contains("needs `.post("), "{problems}");
+    assert!(problems.contains("offers nothing to press"), "{problems}");
 }

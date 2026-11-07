@@ -619,6 +619,18 @@
         "zoom_out": "축소",
         "open": "이미지 열기",
         "video": "동영상 재생"
+      },
+      "feed": {
+        "label": "게시물",
+        "new_one": "새 게시물 1개",
+        "new_many": "새 게시물 {count}개",
+        "new_more": "새 게시물 {count}개 이상",
+        "newest": "최신 게시물로 돌아가기",
+        "loaded": "게시물 {count}개 표시됨",
+        "error": "게시물을 불러오지 못했습니다. 다시 시도하세요.",
+        "empty": "아직 게시물이 없습니다.",
+        "comments": "댓글 {count}개",
+        "comments_one": "댓글 1개"
       }
     },
     "date": {

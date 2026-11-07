@@ -53,3 +53,39 @@ Büyük dosya görselin adres kurallarına uyar (uygulamanın bir yolu ya da izi
 | Tab, Shift+Tab | İletişim kutusundan çıkmadan düğmeleri arasında gezdirir |
 
 Çift tıklama, çift dokunma ve yakınlaştırma düğmesi de yakınlaştırır, yakınlaştırılmış görsel sürüklenerek kaydırılır.
+
+## Feed
+
+`Feed`, en yeni en üstte olacak şekilde sonsuz bir gönderi akışıdır. Satırlarını `CardGrid`'in kullandığı türden bir eylemle yükler (girişte imleçli bir `DataQuery`, çıkışta bir `Page`); akışın sırası eylemin sırasıdır, grup boyutunu sunucu belirler (`.batch(n)`, ayarlanmazsa 10, en fazla `MAX_FEED_BATCH`, 50) ve `.scope(field, value)` istemcinin değiştiremeyeceği bir süzgeci sabitler. Her satır bir `Post` olur: avatarı ve kullanıcı adıyla yazar, zaman, metin, lightbox'ta açılan en fazla `MAX_POST_MEDIA` (4) görsel, akışın tepkileri ve gönderinin sayıları, yorum sayısı ve bir paylaş düğmesi.
+
+```rust
+Feed::of(search_posts)
+    .title(t!("social.feed"))
+    .post(|p: &Story| Post::new(p.author.clone(), p.at)
+        .avatar(p.avatar.clone())
+        .text(p.text.clone())
+        .media(Image::new(p.thumb.clone()).alt(p.alt.clone()).size(300, 300).full(p.photo.clone()))
+        .reactions(p.reactions())
+        .comments(p.comments)
+        .link(story, StoryParams { id: p.id }))
+    .reactions(react_to_post)
+    .reaction("like", t!("social.like"), "\u{1f44d}")
+    .topic("posts")
+```
+
+Akış W3C APG feed desenini izler: her biri odaklanabilen, yazarıyla adlandırılan, metniyle betimlenen ve `aria-posinset` ile numaralanan `<article>` öğelerinden oluşan bir `role="feed"` bölgesi (daha fazlası yüklenebilirken `aria-setsize` -1'dir). Bir grup yüklenirken `aria-busy` ayarlanır. Okuyucu sona yaklaştığında eski gönderiler yüklenir, yedek olarak "Daha fazla göster" bulunur. Her metin kaçışlanır ve bir gönderinin metni satır sonlarını korur.
+
+Yeni gönderiler okuyucunun gördüğünü asla kaydırmaz. `.topic(..)` ile verilen bir konu yenilendiğinde (`ui.refresh("posts")` ile biten bir eylem ya da `.live()` ile gerçek zamanlı hub), akış ilk grubunu ister ve en yeni gönderisinin üstündekileri bekletir. Akışın üstündeki bir düğme "3 yeni gönderi" der, bir durum bölgesi de aynısını söyler; düğmeye basmak onları kaydırma konumunu koruyarak üste ekler ve odağı ilk yeni gönderiye taşır. Bir grubun alabileceğinden fazla yeni gönderi geldiğinde düğme akışı en yeniden yeniden başlatır.
+
+Bellek sınırlı kalır. Yalnızca görünüm alanına yakın gönderiler sayfadadır; diğerleri sahip oldukları yükseklikle HTML olarak saklanır ve kapladıkları yer dolgudur, böylece geri geldiklerinde hiçbir şey zıplamaz. Bir gönderi sayfada olduğu sürece öğesini korur, böylece odak ve satır anahtarı yerinde kalır; uzağa kaydırılan odaklı bir gönderi kendi yuvasının üzerinde sayfada kalır. 1.000 gönderiden sonra okuyucunun çok gerisindeki en eski gönderiler atılır ve düğme en yeniye dönmenin yolunu sunar.
+
+Bir tepki basışı gönderinin anahtarını yollar. Sunucu tepki eylemini (izni, CSRF denetimi ve yazma hız sınırıyla) ancak akışın kendi eylemi o gönderiyi akışın kapsamıyla kullanıcıya döndürdükten sonra çalıştırır; böylece kimse okuyamadığı bir gönderiye tepki veremez. Eylem anahtarı `ReactionPress::target` olarak alır. `feed.js` (15,7 KB, 5,3 KB gzip) ve `feed.css` (3,6 KB) yalnızca akış içeren sayfalarda yüklenir.
+
+| Key | What it does |
+|---|---|
+| Tab | Bir gönderiye girer, sonra bağlantıları ve düğmeleri arasında gezdirir |
+| Page Down, Page Up | Odağı sonraki ya da önceki gönderiye taşır, sonda daha fazlasını yükler |
+| Control+End | Odağı akıştan sonraki ilk öğeye taşır |
+| Control+Home | Odağı akıştan önceki son öğeye taşır |
+
+Bileşen kataloğunun sosyal demosunda (kimliklerinden türetilen 10.000 gönderi, üçte biri fotoğraflı) Chrome'da 1440 x 900'de, 10'luk gruplar halinde yüklenirken 2.000 gönderi boyunca kaydırılarak ölçüldü: tam CPU'da 49 fps ve p95 kare süresi 44 ms, belgede en fazla 17 gönderi ve 883 öğe, 4,6 MB JavaScript yığını.

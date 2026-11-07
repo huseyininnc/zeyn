@@ -59,6 +59,16 @@ impl Share {
         }
     }
 
+    /// Shares the address of a screen given by name and params, for components that keep them
+    /// that way.
+    pub(crate) fn to(screen: &'static str, params: Json) -> Self {
+        Share {
+            target: Some((screen, params)),
+            title: None,
+            label: None,
+        }
+    }
+
     /// The title the share sheet shows with the link. The page title unless set.
     pub fn title(mut self, title: impl Into<Text>) -> Self {
         self.title = Some(title.into());
