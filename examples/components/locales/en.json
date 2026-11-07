@@ -118,7 +118,8 @@
       "message_thread": "Chat bubbles by sender and day, delivery states, a history that loads as it scrolls, streamed AI replies.",
       "composer": "A growing message box with send keys, attachments, @ mentions and drafts per conversation.",
       "typing_indicator": "Who else is typing in a conversation, over the realtime channel.",
-      "story_ring": "An avatar in a ring that says whether its stories are new."
+      "story_ring": "An avatar in a ring that says whether its stories are new.",
+      "lightbox": "Images and videos that open full screen, with captions, zoom and swipes."
     },
     "ex": {
       "action_button": {
@@ -431,6 +432,10 @@
       "story_ring": {
         "overview": "Example",
         "row": "A row that scrolls sideways"
+      },
+      "lightbox": {
+        "overview": "Example",
+        "single": "A single image"
       }
     },
     "typing": {

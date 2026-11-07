@@ -7,6 +7,7 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 ### Added
 
 - `StoryRing::new(name, StoryState::Unseen | Seen)` with `.image(src)` and `.link(screen, params)`: an avatar in a ring that is thick and in the brand colors while the viewer has unseen stories, thin and neutral once seen (dashed in forced colors mode), named "Ada Lovelace, unseen stories" for screen readers. The state comes from the server. `StoryRow` puts up to 100 rings in a row that scrolls sideways with scroll snapping. CSS only: `stories.css` (2.2 KB) loads only on pages with a ring.
+- Lightbox: `Image::lightbox()`, `.full(src)`, `.caption(text)` and `.video(source, file)` open an image full screen in a modal dialog (W3C APG dialog: focus moves in, Tab stays inside, Escape closes and returns focus) with captions, zoom (double click, double tap, `+`, `-`, `0`), panning, and arrow keys and swipes between the images of one container or post. Only the open item is in the dialog and only its neighbours are fetched ahead; the thumbnail shows blurred until the larger file has loaded; motion follows `prefers-reduced-motion`. Without script the image is a link to its file. `lightbox.js` (13 KB, 4.4 KB gzip) and `lightbox.css` (4 KB) load only on pages with a lightbox image; opening takes about 16 ms.
 
 ### Fixed
 

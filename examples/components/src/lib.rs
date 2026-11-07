@@ -250,6 +250,7 @@ catalog! {
     }
     "social" Users {
         story_ring "/ui/story-ring";
+        lightbox "/ui/lightbox";
     }
 }
 

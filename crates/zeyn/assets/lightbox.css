@@ -1,0 +1,71 @@
+/* Lightbox (`Image::lightbox`, the media of `Post`): linked only by pages that hold
+   `.z-lightbox-open`. The dialog itself is built by lightbox.js the first time it opens. */
+
+.z-lightbox-open {
+  position: relative; display: block; inline-size: fit-content; max-inline-size: 100%;
+  border-radius: var(--z-radius-lg); cursor: zoom-in; color: inherit;
+}
+.z-lightbox-open:focus-visible { outline: 2px solid var(--z-focus); outline-offset: 2px; }
+.z-lightbox-open > img, .z-lightbox-open > .z-img { display: block; max-inline-size: 100%; block-size: auto; }
+.z-lightbox-open[data-video] { cursor: pointer; }
+.z-lightbox-play {
+  position: absolute; inset: 50% auto auto 50%; translate: -50% -50%; display: grid; place-items: center;
+  inline-size: 56px; block-size: 56px; border-radius: var(--z-radius-full);
+  background: rgb(0 0 0 / 60%); color: #fff; pointer-events: none;
+}
+.z-lightbox-play::before {
+  content: ""; margin-inline-start: 4px; border-block: 11px solid transparent; border-inline-start: 18px solid currentColor;
+}
+[dir="rtl"] .z-lightbox-play::before { margin-inline: 0 4px; }
+
+:root:has(.z-lightbox[open]) { overflow: hidden; }
+.z-lightbox {
+  box-sizing: border-box; inline-size: 100vw; block-size: 100dvh; max-inline-size: none; max-block-size: none;
+  margin: 0; padding: 0; border: 0; background: rgb(8 10 12 / 94%); color: #f2f4f6;
+  display: none; grid-template-rows: auto 1fr auto; overflow: hidden;
+}
+.z-lightbox[open] { display: grid; }
+.z-lightbox::backdrop { background: rgb(0 0 0 / 70%); }
+.z-lightbox-bar { display: flex; align-items: center; gap: var(--z-s-2); padding: var(--z-s-2) var(--z-s-3); }
+.z-lightbox-count { flex: 1; margin: 0; font-size: var(--z-text-sm); font-variant-numeric: tabular-nums; }
+.z-lightbox-button {
+  display: grid; place-items: center; inline-size: 44px; block-size: 44px; padding: 0; border: 0;
+  border-radius: var(--z-radius-full); background: rgb(255 255 255 / 12%); color: #fff;
+  font: inherit; font-size: 1.5rem; line-height: 1; cursor: pointer;
+}
+.z-lightbox-button:hover { background: rgb(255 255 255 / 22%); }
+.z-lightbox-button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.z-lightbox-button:disabled { opacity: 0.35; cursor: default; }
+.z-lightbox-button[hidden] { display: none; }
+.z-lightbox-stage {
+  position: relative; display: grid; place-items: center; min-block-size: 0; overflow: hidden; touch-action: none;
+}
+.z-lightbox-item {
+  position: relative; display: grid; margin: 0; max-inline-size: 100%; max-block-size: 100%;
+  inline-size: min(100%, 1600px); block-size: auto;
+}
+.z-lightbox-item > * { grid-area: 1 / 1; inline-size: 100%; block-size: 100%; max-block-size: calc(100dvh - 140px); object-fit: contain; }
+.z-lightbox-low { filter: blur(8px); clip-path: inset(0); }
+.z-lightbox-item:has(.z-lightbox-loaded) .z-lightbox-low { visibility: hidden; }
+.z-lightbox-full { opacity: 0; user-select: none; }
+.z-lightbox-full.z-lightbox-loaded { opacity: 1; }
+.z-lightbox-zoomed .z-lightbox-full { cursor: grab; }
+.z-lightbox-video { background: #000; }
+.z-lightbox-prev, .z-lightbox-next { position: absolute; inset-block-start: 50%; translate: 0 -50%; }
+.z-lightbox-prev { inset-inline-start: var(--z-s-3); }
+.z-lightbox-next { inset-inline-end: var(--z-s-3); }
+.z-lightbox[dir="rtl"] .z-lightbox-prev > span, .z-lightbox[dir="rtl"] .z-lightbox-next > span { display: inline-block; scale: -1 1; }
+.z-lightbox-caption {
+  margin: 0; padding: var(--z-s-2) var(--z-s-4) var(--z-s-4); text-align: center;
+  font-size: var(--z-text-md); line-height: var(--z-leading-md); max-block-size: 30dvh; overflow: auto;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .z-lightbox-full { transition: opacity var(--z-dur-2) var(--z-ease-out), transform var(--z-dur-2) var(--z-ease-out); }
+  .z-lightbox-zoomed .z-lightbox-full { transition: opacity var(--z-dur-2) var(--z-ease-out); }
+}
+
+@media (forced-colors: active) {
+  .z-lightbox { background: Canvas; color: CanvasText; }
+  .z-lightbox-button { border: 1px solid ButtonText; }
+}

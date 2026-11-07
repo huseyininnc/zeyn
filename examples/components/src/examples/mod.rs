@@ -37,6 +37,7 @@ pub mod image_card;
 pub mod inbox;
 pub mod kanban;
 pub mod kpi;
+pub mod lightbox;
 pub mod line_editor;
 pub mod link_button;
 pub mod list;

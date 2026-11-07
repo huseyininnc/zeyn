@@ -608,6 +608,17 @@
         "row": "스토리",
         "unseen": "{name}, 안 본 스토리 있음",
         "seen": "{name}, 스토리를 모두 봄"
+      },
+      "lightbox": {
+        "label": "미디어 뷰어",
+        "close": "닫기",
+        "previous": "이전",
+        "next": "다음",
+        "position": "{count}개 중 {n}번째",
+        "zoom_in": "확대",
+        "zoom_out": "축소",
+        "open": "이미지 열기",
+        "video": "동영상 재생"
       }
     },
     "date": {

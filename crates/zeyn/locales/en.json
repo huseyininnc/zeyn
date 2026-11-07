@@ -743,6 +743,17 @@
         "row": "Stories",
         "unseen": "{name}, unseen stories",
         "seen": "{name}, all stories seen"
+      },
+      "lightbox": {
+        "label": "Media viewer",
+        "close": "Close",
+        "previous": "Previous",
+        "next": "Next",
+        "position": "{n} of {count}",
+        "zoom_in": "Zoom in",
+        "zoom_out": "Zoom out",
+        "open": "Open image",
+        "video": "Play video"
       }
     },
     "date": {

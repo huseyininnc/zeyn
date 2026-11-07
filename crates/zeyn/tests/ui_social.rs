@@ -25,7 +25,7 @@ pub fn person_stories(p: PersonParams) -> Screen {
 }
 
 #[screen(route = "/plain", permission = "social.read")]
-pub fn plain() -> Screen {
+pub fn only_text() -> Screen {
     Screen::new("Plain").body(Paragraph::new("Only text"))
 }
 
@@ -41,11 +41,41 @@ pub fn stories() -> Screen {
     )
 }
 
+#[screen(route = "/photos", permission = "social.read")]
+pub fn photos() -> Screen {
+    Screen::new("Photos").body(
+        Row::new()
+            .col(
+                Image::new("/p/1-small.webp")
+                    .alt("One")
+                    .size(320, 240)
+                    .full("/p/1.webp"),
+            )
+            .col(
+                Image::new("/p/2-small.webp")
+                    .alt("Two")
+                    .size(320, 240)
+                    .lightbox(),
+            ),
+    )
+}
+
+#[screen(route = "/photo", permission = "social.read")]
+pub fn photo() -> Screen {
+    Screen::new("Photo").body(
+        Image::new("/p/1-small.webp")
+            .alt("One")
+            .size(320, 240),
+    )
+}
+
 fn feature() -> Feature {
     Feature::new("social")
         .screen(person_stories)
-        .screen(plain)
+        .screen(only_text)
         .screen(stories)
+        .screen(photos)
+        .screen(photo)
 }
 
 fn app() -> axum::Router {
@@ -161,4 +191,97 @@ async fn story_styles_load_only_on_pages_with_rings() {
     assert!(!links(&text, "stories.css"));
     let (status, _) = get(&router, "/stories", "other").await;
     assert_eq!(status, StatusCode::FORBIDDEN, "the screen's permission");
+}
+
+#[test]
+fn a_lightbox_image_is_a_link_to_its_larger_file() {
+    let out = html(
+        &Image::new("/p/1-small.webp")
+            .alt("Harbor <dawn>")
+            .size(320, 240)
+            .full("/p/1.webp")
+            .caption("From the \"old\" lighthouse"),
+        "en",
+    );
+    assert!(
+        out.starts_with(r#"<a class="z-lightbox-open" href="/p/1.webp" data-zeyn-lightbox data-zeyn-no-prefetch aria-haspopup="dialog" data-caption="From the &quot;old&quot; lighthouse" data-zeyn-lightbox-texts=""#),
+        "{out}"
+    );
+    assert!(out.contains("&quot;close&quot;:&quot;Close&quot;"), "{out}");
+    assert!(out.contains(r#"alt="Harbor &lt;dawn&gt;""#));
+    assert!(out.ends_with("</a>"), "{out}");
+    let tr = html(
+        &Image::new("/p/1-small.webp")
+            .alt("")
+            .size(320, 240)
+            .lightbox(),
+        "tr",
+    );
+    assert!(
+        tr.contains(r#"aria-label="Resmi aç""#) && tr.contains(r#"href="/p/1-small.webp""#),
+        "an image without alt text still names its link, and opens its own file: {tr}"
+    );
+    let foreign = html(
+        &Image::new("/p/1-small.webp")
+            .alt("One")
+            .size(320, 240)
+            .full("https://elsewhere.example/1.webp"),
+        "en",
+    );
+    assert!(
+        foreign.contains(r#"href="/p/1-small.webp""#),
+        "a larger file on a host the app does not allow is left out: {foreign}"
+    );
+    let plain = html(
+        &Image::new("/p/1-small.webp")
+            .alt("One")
+            .size(320, 240),
+        "en",
+    );
+    assert!(!plain.contains("z-lightbox"), "{plain}");
+}
+
+#[test]
+fn a_video_poster_opens_its_file_from_the_media_source() {
+    let out = html(
+        &Image::new("/p/clip.webp")
+            .alt("Harbor clip")
+            .size(320, 180)
+            .video("films", "harbor.mp4"),
+        "en",
+    );
+    assert!(
+        out.contains(r#"href="/_zeyn/media/films/harbor.mp4""#),
+        "{out}"
+    );
+    assert!(out.contains(r#"data-video="/_zeyn/media/films/harbor.mp4""#));
+    assert!(out.contains(
+        r#"<span class="z-lightbox-play"><span class="z-sr-only">Play video</span></span></a>"#
+    ));
+    let bad = html(
+        &Image::new("/p/clip.webp")
+            .alt("Clip")
+            .size(320, 180)
+            .video("films", "../secret.mp4"),
+        "en",
+    );
+    assert!(
+        !bad.contains("z-lightbox"),
+        "a file name outside the media source is refused: {bad}"
+    );
+}
+
+#[tokio::test]
+async fn the_lightbox_loads_only_on_pages_with_a_lightbox_image() {
+    let router = app();
+    let (status, page) = get(&router, "/photos", "social.read").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        links(&page, "lightbox.js") && links(&page, "lightbox.css"),
+        "{page}"
+    );
+    let (_, single) = get(&router, "/photo", "social.read").await;
+    assert!(!links(&single, "lightbox.js") && !links(&single, "lightbox.css"));
+    let (_, text) = get(&router, "/plain", "social.read").await;
+    assert!(!links(&text, "lightbox.js"));
 }

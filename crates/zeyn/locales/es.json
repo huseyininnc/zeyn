@@ -608,6 +608,17 @@
         "row": "Historias",
         "unseen": "{name}, historias sin ver",
         "seen": "{name}, todas las historias vistas"
+      },
+      "lightbox": {
+        "label": "Visor de medios",
+        "close": "Cerrar",
+        "previous": "Anterior",
+        "next": "Siguiente",
+        "position": "{n} de {count}",
+        "zoom_in": "Acercar",
+        "zoom_out": "Alejar",
+        "open": "Abrir imagen",
+        "video": "Reproducir video"
       }
     },
     "date": {

@@ -55,7 +55,7 @@ head にあるフレームワークのスクリプトとスタイルシートに
 | `inbox.js`, `kanban.js`, `calendar.js` and their stylesheets, `diff.css`, `code.css`, `barcode.css` | 受信箱と通知ベル、Kanban ボード、カレンダー、スクリプトの要らない差分、コード表示、バーコード（コード表示のコピーボタンは `share.js` にあります） |
 | `range.js`、`quantity.js`、`gallery.js`、`countdown.js`、`commerce.css` | 範囲スライダー、数量ステッパー、商品ギャラリー、カウントダウン。すべてのショップ用コンポーネントのスタイルシート（価格、バリエーション選択、ファセットパネル、レビューの集計） |
 | `thread.js` と `thread.css`, `stream.js`, `composer.js` と `composer.css`, `typing.js` と `typing.css` | メッセージスレッド、スレッドとアシスタントが共有するストリーミングの Markdown と JSON 行、チャットの composer、入力中インジケーター |
-| `stories.css` | ストーリーリングとその行、スクリプト不要 |
+| `lightbox.js` and its stylesheet, `stories.css` | 画像と動画のライトボックス、ストーリーリングとその行、スクリプト不要 |
 
 完全なページは head に、すべてのページが使うスタイルシート（`zeyn.css`、`components.css`、`content.css`、`pro.css`、`enterprise.css`）、HTML にマーカーがあるモジュールのスタイルシート、そしてそれらのスクリプトを、それぞれが import するモジュールの後にリンクします。`zeyn.js` は同じ表（`[name, script selector, style selector]`）付きで配信され、後から届くコンテンツに足りないものを読み込みます。`nav.js` は画面を差し替える前に `{ root, waits }` 付きの `zeyn:need` を発行して新しいスタイルシートを待ち、ウィンドウも開く前に同じように待ちます。`zeyn:content`、グリッドのページ、グリッドのフィルターは、含むもののスクリプトを読み込みます。ブラウザーは URL ごとに 1 つのインスタンスを保つので、モジュールは一度だけ実行されます。モジュールは実行時にドキュメントで見つけたものを設定し、その後は `zeyn:content` を待ち受けます。ページにないコンポーネントを探したり待ち受けたりすることはありません。モジュールは共有部分を自分の URL の `?v=` 付きで import します。`tests/ui_modules.rs` は、ページが使わないモジュールをリンクしたとき、またはモジュールのスタイルシートがマーカー外のクラスにスタイルを付けたときに失敗します。
 

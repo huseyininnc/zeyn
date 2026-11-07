@@ -743,6 +743,17 @@
         "row": "Hikâyeler",
         "unseen": "{name}, izlenmemiş hikâyeler",
         "seen": "{name}, tüm hikâyeler izlendi"
+      },
+      "lightbox": {
+        "label": "Medya görüntüleyici",
+        "close": "Kapat",
+        "previous": "Önceki",
+        "next": "Sonraki",
+        "position": "{n} / {count}",
+        "zoom_in": "Yakınlaştır",
+        "zoom_out": "Uzaklaştır",
+        "open": "Resmi aç",
+        "video": "Videoyu oynat"
       }
     },
     "date": {

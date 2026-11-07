@@ -608,6 +608,17 @@
         "row": "ストーリー",
         "unseen": "{name}、未読のストーリーあり",
         "seen": "{name}、ストーリーはすべて既読"
+      },
+      "lightbox": {
+        "label": "メディアビューアー",
+        "close": "閉じる",
+        "previous": "前へ",
+        "next": "次へ",
+        "position": "{count} 件中 {n} 件目",
+        "zoom_in": "拡大",
+        "zoom_out": "縮小",
+        "open": "画像を開く",
+        "video": "動画を再生"
       }
     },
     "date": {
