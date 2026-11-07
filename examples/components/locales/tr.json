@@ -32,7 +32,9 @@
       "feedback": "Geri bildirim ve katmanlar",
       "charts": "Grafikler",
       "shell": "Kabuk",
-      "admin": "Yönetim"
+      "admin": "Yönetim",
+      "shell": "Kabuk",
+      "shop": "Mağaza"
     },
     "summary": {
       "stack": "Aralarında boşluk olan, alt alta düğümler.",
@@ -103,7 +105,16 @@
       "barcode": "Sunucuda SVG olarak çizilen Code 128 barkodları ve QR kodları.",
       "inbox": "Güne göre bildirimler, toplu okundu işaretleme ve arşivleme, okunmamış sayısıyla zil.",
       "kanban": "Bir iş akışının sütunlarında kartlar, sürükleyerek, menüyle veya klavyeyle taşınır.",
-      "calendar": "Kullanıcının saat diliminde ay, hafta veya gün görünümünde etkinlikler, etkinlik pencereleri ve aralık seçimiyle."
+      "calendar": "Kullanıcının saat diliminde ay, hafta veya gün görünümünde etkinlikler, etkinlik pencereleri ve aralık seçimiyle.",
+      "clear_prefs": "Tarayıcının uygulama için tuttuğu seçimleri silen düğme.",
+      "price": "Üstü çizili eski fiyat, indirim yüzdesi ve birim fiyatla bir fiyat.",
+      "range_slider": "Fiyat ve tarih aralıkları için tek çubukta iki tutamaç.",
+      "quantity_stepper": "Stoğu sunucuda denetlenen bir sayının iki yanında eksi ve artı düğmeleri.",
+      "variant_picker": "Fiyatı, fotoğrafı ve stoğu yerinde değiştiren renk örnekleri ve beden çipleri.",
+      "product_gallery": "Küçük resimler, yakınlaştırma, kaydırma ve tam ekran görünümüyle ürün fotoğrafları.",
+      "facet_panel": "Ürün kartlarını yerinde yenileyen sayılı filtreler, fiyat aralığı ve seçili filtre çipleri.",
+      "review_summary": "Ortalama puan, değerlendirme sayısı ve 5'ten 1'e her yıldız için bir çubuk.",
+      "countdown": "Sunucu saatindeki bir ana kalan süre ve bitiş durumu."
     },
     "ex": {
       "action_button": {
@@ -203,7 +214,8 @@
       "image_card": {
         "overview": "Örnek",
         "horizontal": "Yatay",
-        "with_preview": "Üzerine gelince önizleme"
+        "with_preview": "Üzerine gelince önizleme",
+        "with_price": "Fiyatlı"
       },
       "screen_header": {
         "orders_page": "Sayfa başlığı"
@@ -282,7 +294,8 @@
       },
       "rating": {
         "overview": "Örnek",
-        "three_stars": "Üç yıldız"
+        "three_stars": "Üç yıldız",
+        "half_stars": "Yarım yıldızlar"
       },
       "reactions": {
         "overview": "Örnek"
@@ -368,6 +381,36 @@
       },
       "calendar": {
         "overview": "Örnek"
+      },
+      "price": {
+        "overview": "Örnek",
+        "unit_price": "Birim fiyat",
+        "large": "Ürün sayfasında"
+      },
+      "range_slider": {
+        "overview": "Örnek",
+        "dates": "Tarihler"
+      },
+      "quantity_stepper": {
+        "overview": "Örnek"
+      },
+      "variant_picker": {
+        "overview": "Örnek"
+      },
+      "product_gallery": {
+        "overview": "Örnek",
+        "dots": "Küçük resimsiz"
+      },
+      "facet_panel": {
+        "overview": "Örnek"
+      },
+      "review_summary": {
+        "overview": "Örnek",
+        "few": "Birkaç değerlendirme"
+      },
+      "countdown": {
+        "overview": "Örnek",
+        "short": "Bir dakikadan biraz fazla"
       }
     }
   }

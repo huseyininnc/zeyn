@@ -637,6 +637,62 @@
           "11": "November",
           "12": "December"
         }
+      },
+      "shop": {
+        "price": {
+          "sale": "Was {was}, now {now}, {off} off",
+          "per": {
+            "item": "{price} per item",
+            "kg": "{price} per kg",
+            "g100": "{price} per 100 g",
+            "l": "{price} per liter",
+            "ml100": "{price} per 100 ml",
+            "m": "{price} per meter"
+          }
+        },
+        "range": {
+          "to": "to",
+          "low": "{label}, from",
+          "high": "{label}, to"
+        },
+        "quantity": {
+          "label": "Quantity",
+          "decrease": "Decrease",
+          "increase": "Increase",
+          "limit": "Only {n} available.",
+          "failed": "The quantity could not be changed."
+        },
+        "gallery": {
+          "swipe": "Photos, use the arrow keys or swipe",
+          "full": "Full screen",
+          "choose": "Choose a photo",
+          "show": "Show photo {n} of {count}",
+          "close": "Close",
+          "prev": "Previous photo",
+          "next": "Next photo",
+          "zoom": "Zoom"
+        },
+        "facets": {
+          "label": "Filters",
+          "chosen": "Chosen filters",
+          "clear": "Clear all",
+          "remove": "Remove filter {filter}",
+          "option": "{option}, {count} results",
+          "active": "{n} chosen"
+        },
+        "reviews": {
+          "label": "Reviews",
+          "average": "{average} out of 5 stars",
+          "count": "{count} reviews",
+          "stars": "{n} stars"
+        },
+        "rating": {
+          "half": "{label} takes whole or half stars."
+        },
+        "countdown": {
+          "day": "d",
+          "left": "{d} d {h} h {m} min left"
+        }
       }
     },
     "date": {

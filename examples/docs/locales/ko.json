@@ -60,6 +60,7 @@
       "data_views": "트리와 차트",
       "catalog": "카드, 레일, 검색",
       "admin": "관리 화면",
+      "commerce": "쇼핑 컴포넌트",
       "shell": "셸과 명령",
       "media": "미디어",
       "time_i18n": "시간과 언어",

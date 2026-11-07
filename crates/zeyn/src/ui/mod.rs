@@ -13,10 +13,13 @@ mod chips;
 mod code;
 mod content;
 mod controls;
+mod countdown;
 mod date;
 mod diff;
 mod dock;
 mod embed;
+mod facets;
+mod gallery;
 mod hero;
 mod inbox;
 pub(crate) mod inputs;
@@ -33,13 +36,18 @@ mod media;
 mod menus;
 mod overlay;
 mod preview;
+mod price;
+mod quantity;
+mod range;
 mod rating;
 mod reactions;
 mod relative;
+mod reviews;
 mod share;
 mod shell;
 mod topics;
 mod tree;
+mod variants;
 mod week;
 mod widgets;
 #[cfg(feature = "islands")]
@@ -78,9 +86,12 @@ pub(crate) use controls::{
     Slot, choices_text, read_choices, render_bool, render_choice, render_choices, render_number,
     render_text,
 };
+pub use countdown::Countdown;
 pub use date::DateOptions;
 pub(crate) use date::{input_text, picker_config, range_reversed, render_date_input, render_range};
 pub use diff::{DiffLayout, DiffView, MAX_DIFF_FIELDS};
+pub use facets::{Facet, FacetPanel, MAX_FACET_OPTIONS, MAX_FACETS};
+pub use gallery::{MAX_GALLERY_IMAGES, ProductGallery};
 pub use hero::{HERO_SECONDS, Hero, MAX_HERO_SLIDES};
 pub use inbox::{Inbox, InboxSelection, MAX_INBOX, MAX_UNREAD, NotificationCenter, UnreadCount};
 pub use inputs::{mask_example, mask_fits, mask_raw};
@@ -96,13 +107,19 @@ pub use media::{Audio, PLAYBACK_SPEEDS, Video};
 pub use menus::MenuButton;
 pub(crate) use overlay::tip;
 pub use overlay::{BUSY_DELAY_MS, Busy, MAX_TIP, Popover};
+pub use price::{Price, PriceUnit};
+pub use quantity::{MAX_QUANTITY, QuantityChange, QuantityState, QuantityStepper};
+pub use range::RangeSlider;
+pub(crate) use rating::halves as rating_halves;
 pub use rating::{DEFAULT_RATING, MAX_RATING};
 pub use reactions::{MAX_REACTIONS, ReactionPress, ReactionState, Reactions};
 pub use relative::RelativeTime;
+pub use reviews::ReviewSummary;
 pub use share::Share;
 pub use topics::{Listen, Listens, MAX_TOPICS, PageCheck, Topics, valid_topic};
 pub(crate) use topics::{topic_list, topics_attr};
 pub use tree::{MAX_TREE_CHILDREN, Tree, TreeItem, TreeQuery};
+pub use variants::{MAX_VARIANT_GROUPS, MAX_VARIANT_OPTIONS, VariantGroup, VariantPicker};
 pub use week::{MAX_WEEK_ROWS, WeekDay, WeekSchedule};
 pub use widgets::{
     ActionButton, Alert, Badge, Breadcrumb, ClearPrefs, DescriptionList, DescriptionOf, EmptyState,

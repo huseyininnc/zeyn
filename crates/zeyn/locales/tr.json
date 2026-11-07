@@ -637,6 +637,62 @@
           "11": "Kasım",
           "12": "Aralık"
         }
+      },
+      "shop": {
+        "price": {
+          "sale": "Eski fiyat {was}, yeni fiyat {now}, {off} indirim",
+          "per": {
+            "item": "Adet fiyatı {price}",
+            "kg": "Kg fiyatı {price}",
+            "g100": "100 g fiyatı {price}",
+            "l": "Litre fiyatı {price}",
+            "ml100": "100 ml fiyatı {price}",
+            "m": "Metre fiyatı {price}"
+          }
+        },
+        "range": {
+          "to": "ile",
+          "low": "{label}, başlangıç",
+          "high": "{label}, bitiş"
+        },
+        "quantity": {
+          "label": "Adet",
+          "decrease": "Azalt",
+          "increase": "Artır",
+          "limit": "Yalnızca {n} adet var.",
+          "failed": "Adet değiştirilemedi."
+        },
+        "gallery": {
+          "swipe": "Fotoğraflar, ok tuşlarıyla ya da kaydırarak gezin",
+          "full": "Tam ekran",
+          "choose": "Bir fotoğraf seçin",
+          "show": "{count} fotoğraftan {n}. fotoğrafı göster",
+          "close": "Kapat",
+          "prev": "Önceki fotoğraf",
+          "next": "Sonraki fotoğraf",
+          "zoom": "Yakınlaştır"
+        },
+        "facets": {
+          "label": "Filtreler",
+          "chosen": "Seçili filtreler",
+          "clear": "Tümünü temizle",
+          "remove": "{filter} filtresini kaldır",
+          "option": "{option}, {count} sonuç",
+          "active": "{n} seçili"
+        },
+        "reviews": {
+          "label": "Değerlendirmeler",
+          "average": "5 üzerinden {average} yıldız",
+          "count": "{count} değerlendirme",
+          "stars": "{n} yıldız"
+        },
+        "rating": {
+          "half": "{label} tam ya da yarım yıldız alır."
+        },
+        "countdown": {
+          "day": "g",
+          "left": "{d} g {h} sa {m} dk kaldı"
+        }
       }
     },
     "date": {

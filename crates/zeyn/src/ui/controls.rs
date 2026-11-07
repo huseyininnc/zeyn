@@ -50,8 +50,9 @@ pub enum Control {
     /// A new password input with a strength meter. The meter is a hint computed in the browser;
     /// the field's rules (`min_len`, a model `validate` function) are what the server enforces.
     PasswordMeter,
-    /// Stars from 1 to N for whole number fields, as a radio group: one tab stop, arrow keys
-    /// move. N is the field's `max` rule (5 without one, at most 10); give the field
+    /// Stars from 1 to N for whole number fields, and half stars from 0.5 to N for `Decimal`
+    /// fields (give them `scale = 1`; the server turns away values between the halves), as a
+    /// radio group: one tab stop, arrow keys move. N is the field's `max` rule (5 without one, at most 10); give the field
     /// `#[rule(min = 1, max = N)]` so the server checks the value too. No star checked sends no
     /// value, which a `required` rule turns away.
     Rating,
@@ -188,7 +189,9 @@ pub(crate) fn render_choice(out: &mut String, r: &Render, s: &Slot) {
 /// Whole numbers, money and decimals: formatted while typing in the user's language, with step
 /// buttons. Key fields are not grouped (`10234`, not `10.234`). Decimals keep their field's scale.
 pub(crate) fn render_number(out: &mut String, r: &Render, s: &Slot) {
-    if s.control == Some(Control::Rating) && matches!(s.m.kind, FieldKind::Integer) {
+    if s.control == Some(Control::Rating)
+        && matches!(s.m.kind, FieldKind::Integer | FieldKind::Decimal)
+    {
         return super::rating::render_rating(out, r, s);
     }
     let f = NumberFormat::for_locale(r.locale);

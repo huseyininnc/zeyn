@@ -502,6 +502,62 @@
       },
       "prefs": {
         "cleared": "Se han borrado las elecciones que este navegador guardaba para este sitio."
+      },
+      "shop": {
+        "price": {
+          "sale": "Antes {was}, ahora {now}, {off} de descuento",
+          "per": {
+            "item": "{price} por unidad",
+            "kg": "{price} por kg",
+            "g100": "{price} por 100 g",
+            "l": "{price} por litro",
+            "ml100": "{price} por 100 ml",
+            "m": "{price} por metro"
+          }
+        },
+        "range": {
+          "to": "a",
+          "low": "{label}, desde",
+          "high": "{label}, hasta"
+        },
+        "quantity": {
+          "label": "Cantidad",
+          "decrease": "Reducir",
+          "increase": "Aumentar",
+          "limit": "Solo hay {n} disponibles.",
+          "failed": "No se pudo cambiar la cantidad."
+        },
+        "gallery": {
+          "swipe": "Fotos, usa las flechas o desliza",
+          "full": "Pantalla completa",
+          "choose": "Elige una foto",
+          "show": "Mostrar foto {n} de {count}",
+          "close": "Cerrar",
+          "prev": "Foto anterior",
+          "next": "Foto siguiente",
+          "zoom": "Ampliar"
+        },
+        "facets": {
+          "label": "Filtros",
+          "chosen": "Filtros elegidos",
+          "clear": "Quitar todos",
+          "remove": "Quitar el filtro {filter}",
+          "option": "{option}, {count} resultados",
+          "active": "{n} elegidos"
+        },
+        "reviews": {
+          "label": "Reseñas",
+          "average": "{average} de 5 estrellas",
+          "count": "{count} reseñas",
+          "stars": "{n} estrellas"
+        },
+        "rating": {
+          "half": "{label} admite estrellas enteras o medias."
+        },
+        "countdown": {
+          "day": "d",
+          "left": "Quedan {d} d {h} h {m} min"
+        }
       }
     },
     "date": {

@@ -517,6 +517,33 @@ pub(crate) fn value_key(value: &Value) -> Option<String> {
     }
 }
 
+/// Filter that keeps rows whose `meta` field is one of `values`, or `None` when there are none,
+/// so an empty choice keeps every row.
+pub(crate) fn any_filter<T: FieldType>(
+    meta: &FieldMeta,
+    values: impl IntoIterator<Item = T>,
+) -> Option<Filter> {
+    let keys: Vec<String> = values
+        .into_iter()
+        .filter_map(|v| value_key(&v.to_value()))
+        .take(crate::action::MAX_FILTER_CHOICES)
+        .collect();
+    (!keys.is_empty()).then(|| Filter::any_of(meta.name, keys))
+}
+
+/// Filter that keeps rows whose `meta` field is between `from` and `to`, both inclusive, or
+/// `None` when both are open.
+pub(crate) fn range_filter<T: FieldType>(
+    meta: &FieldMeta,
+    from: Option<T>,
+    to: Option<T>,
+) -> Option<Filter> {
+    let from = from.and_then(|v| value_key(&v.to_value()));
+    let to = to.and_then(|v| value_key(&v.to_value()));
+    (from.is_some() || to.is_some())
+        .then(|| Filter::range(meta.name, from.as_deref(), to.as_deref()))
+}
+
 /// Filter that keeps rows whose `meta` field equals `key` (from [`value_key`]), or is empty when
 /// `key` is `None`.
 pub(crate) fn key_filter(meta: &FieldMeta, key: Option<&str>) -> Filter {
@@ -769,6 +796,32 @@ impl<E: Model> DataGrid<E> {
             field.meta(),
             value_key(&value.to_value()).as_deref(),
         ));
+        self
+    }
+
+    /// Keeps only the rows whose `field` is one of `values`, on every request, like
+    /// [`DataGrid::scope`]: `.scope_any(Product::color, p.colors.clone())` for the colors a facet
+    /// panel chose. No values keep every row.
+    pub fn scope_any<T: FieldType>(
+        mut self,
+        field: Field<E, T>,
+        values: impl IntoIterator<Item = T>,
+    ) -> Self {
+        self.scope
+            .extend(any_filter(field.meta(), values));
+        self
+    }
+
+    /// Keeps only the rows whose `field` is between `from` and `to`, both inclusive, on every
+    /// request, like [`DataGrid::scope`]; `None` leaves that end open.
+    pub fn scope_range<T: FieldType>(
+        mut self,
+        field: Field<E, T>,
+        from: Option<T>,
+        to: Option<T>,
+    ) -> Self {
+        self.scope
+            .extend(range_filter(field.meta(), from, to));
         self
     }
 

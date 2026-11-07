@@ -32,7 +32,9 @@
       "feedback": "Feedback and overlays",
       "charts": "Charts",
       "shell": "Shell",
-      "admin": "Admin"
+      "admin": "Admin",
+      "shell": "Shell",
+      "shop": "Shop"
     },
     "summary": {
       "stack": "Nodes one under the other with a gap.",
@@ -103,7 +105,16 @@
       "barcode": "Code 128 barcodes and QR codes drawn as SVG on the server.",
       "inbox": "Notifications by day with bulk mark read and archive, and the bell with the unread count.",
       "kanban": "Cards in columns of a workflow, moved by drag, a menu or the keyboard.",
-      "calendar": "Events in a month, week or day in the user time zone, with event windows and slots."
+      "calendar": "Events in a month, week or day in the user time zone, with event windows and slots.",
+      "clear_prefs": "A button that removes the choices this browser keeps for the app.",
+      "price": "A price with a struck old price, the percent off and a unit price.",
+      "range_slider": "Two handles over one track for price and date ranges.",
+      "quantity_stepper": "Minus and plus buttons around a number whose stock the server checks.",
+      "variant_picker": "Color swatches and size chips that change the price, photo and stock in place.",
+      "product_gallery": "Product photos with thumbnails, zoom, swipe and a full screen view.",
+      "facet_panel": "Counted filters, a price range and chosen filter chips that refresh product cards in place.",
+      "review_summary": "The average rating, the number of reviews and a bar for each star from 5 to 1.",
+      "countdown": "The time left until a moment on the server's clock, with an end state."
     },
     "ex": {
       "action_button": {
@@ -203,7 +214,8 @@
       "image_card": {
         "overview": "Example",
         "horizontal": "Horizontal",
-        "with_preview": "With a hover preview"
+        "with_preview": "With a hover preview",
+        "with_price": "With a price"
       },
       "screen_header": {
         "orders_page": "A page header"
@@ -282,7 +294,8 @@
       },
       "rating": {
         "overview": "Example",
-        "three_stars": "Three stars"
+        "three_stars": "Three stars",
+        "half_stars": "Half stars"
       },
       "reactions": {
         "overview": "Example"
@@ -368,6 +381,36 @@
       },
       "calendar": {
         "overview": "Example"
+      },
+      "price": {
+        "overview": "Example",
+        "unit_price": "Unit price",
+        "large": "On a product page"
+      },
+      "range_slider": {
+        "overview": "Example",
+        "dates": "Dates"
+      },
+      "quantity_stepper": {
+        "overview": "Example"
+      },
+      "variant_picker": {
+        "overview": "Example"
+      },
+      "product_gallery": {
+        "overview": "Example",
+        "dots": "Without thumbnails"
+      },
+      "facet_panel": {
+        "overview": "Example"
+      },
+      "review_summary": {
+        "overview": "Example",
+        "few": "A few reviews"
+      },
+      "countdown": {
+        "overview": "Example",
+        "short": "A minute and more"
       }
     }
   }

@@ -39,6 +39,7 @@ Which page answers what:
 | Headings, paragraphs, meta lines, previous and next links, auto grids, lists, avatars, spoilers, letter bars, week schedules | `components/content` (`content.md`) |
 | Card grids, rails, search boxes, free text search (`DataQuery::q`) | `components/catalog` (`catalog.md`) |
 | Record diffs, code and JSON views, barcodes, inbox and notifications, Kanban boards, calendars | `components/admin` (`admin.md`) |
+| Prices, facets, range sliders, variants, galleries, quantities, reviews, countdowns | `components/commerce` (`commerce.md`) |
 | Video and audio | `components/media` (`docs/media.md`) |
 | Dates, time zones, money, languages | `guides/time-and-languages` (`time-and-languages.md`) |
 | Permissions, guards, CSRF, masking, audit | `guides/security` (`security.md`), `docs/enterprise.md` |
@@ -231,6 +232,25 @@ What to remember:
 - Product photos: `Image::new(src).alt(..).size(w, h).lazy()` with `.placeholder(Placeholder::color(..))`,
   `.low(small_src)`, `.fallback(src)`, `.priority()` on the first one only; in a `CardGrid`
   `.placeholder(..)` and `.priority(n)`, on a card `.low(..)` and `.fallback(..)`.
+- Shop pages: `Price::new(money).was(old).unit(per_kg, PriceUnit::Kg)` (never format prices
+  by hand; screen readers hear "was X, now Y"), on cards `Card::image(..).price(Price::new(..))`.
+  Ranges: `RangeSlider::new(t!("..."), ["min_price", "max_price"], 0, 5_000)`
+  `.money(Currency::Try).value(p.min_price, p.max_price).drives("products")`; the names are
+  screen params. Cart amounts: `QuantityStepper::of(set_quantity, sku).range(1, 20).value(n)`
+  with an action `fn(QuantityChange) -> Result<QuantityState>` that checks the stock (the
+  target comes from the screen, the range is enforced on the server). Variants:
+  `VariantPicker::new().group(VariantGroup::swatches("color", ..).swatch(v, name, "#hex")`
+  `.unavailable(v, reason).current(p.color.as_deref())).drives("variant")`, then
+  `.listens("variant")` on the price, gallery and stock; the screen params hold the choice.
+  Photos: `ProductGallery::new(name).image(Image::new(..).alt(..).size(w, h)).thumb(small)`
+  (the first image is the priority one; do not add `.priority()` yourself). Filters:
+  `FacetPanel::of(screen, &p).facet(Facet::new("color", ..).option(v, text, count).chosen(..))`
+  `.range(RangeSlider::..).drives("products")` with `Vec<String>` params (`#[serde(default)]`),
+  counts from one bounded query per facet, and the grid filtered on the server with
+  `.scope_any(Product::color, p.color.clone())` and `.scope_range(field, from, to)`.
+  Reviews: `ReviewSummary::new().count(5, n5).count(4, n4)..`; half star input:
+  `Control::Rating` on a `Decimal` field with `#[rule(min = 1, max = 5, scale = 1)]`.
+  Sale ends: `Countdown::until(moment).label(..).ended(Badge::new(..))` (server clock).
 - App shell top bar: `App::header(|h| h.center(SearchBox::of(..)).end(LinkButton::new(..)))`,
   the same slots as the site header; `h.breadcrumb().search().account()` adds the breadcrumb, the
   search field that opens the palette and the account menu with theme, language and sign out.

@@ -314,3 +314,47 @@ async fn writes_to_the_samples_count_against_the_write_limit() {
     }
     assert_eq!(refused, 5, "the 61st write in a minute is refused");
 }
+
+#[test]
+fn a_visitor_log_keeps_only_its_newest_entries() {
+    use zeyn_example_components::data::{MAX_VISITOR_ENTRIES, VisitorLog};
+    let log: VisitorLog<usize> = VisitorLog::new();
+    for n in 0..MAX_VISITOR_ENTRIES * 4 {
+        log.push(n);
+    }
+    assert_eq!(log.len(), MAX_VISITOR_ENTRIES);
+    assert_eq!(log.last(), Some(MAX_VISITOR_ENTRIES * 4 - 1));
+}
+
+#[tokio::test]
+async fn cart_writes_are_capped_and_count_against_the_write_limit() {
+    use zeyn_example_components::WRITES_PER_MINUTE;
+    use zeyn_example_components::data::{CART, MAX_VISITOR_ENTRIES};
+    const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    let router = app().unwrap().router().unwrap();
+    let mut statuses = Vec::new();
+    for _ in 0..WRITES_PER_MINUTE + 3 {
+        let body = serde_json::json!({ "screen": "shop_product", "params": { "id": 42, "color": null, "size": null }, "node": "0.1.1.0.3", "key": "quantity", "input": { "quantity": 2 } });
+        let res = router
+            .clone()
+            .oneshot(
+                Request::post("/_zeyn/data")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::COOKIE, format!("zeyn_csrf={TOKEN}"))
+                    .header("x-zeyn-csrf", TOKEN)
+                    .body(Body::from(body.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        statuses.push(res.status());
+    }
+    assert_eq!(statuses[0], StatusCode::OK, "{statuses:?}");
+    assert_eq!(
+        *statuses.last().unwrap(),
+        StatusCode::TOO_MANY_REQUESTS,
+        "cart writes count against the write limit"
+    );
+    assert!(CART.len() <= MAX_VISITOR_ENTRIES);
+    assert_eq!(CART.last(), Some(("item-42-m".to_string(), 2)));
+}

@@ -77,6 +77,7 @@ pub struct ImageCard {
     corner: Option<Badge>,
     badges: Vec<Badge>,
     progress: Option<(f32, Text)>,
+    price: Option<super::Price>,
     horizontal: bool,
     link: Option<(&'static str, Json)>,
     preview: super::preview::PreviewTarget,
@@ -99,6 +100,7 @@ impl Card {
             corner: None,
             badges: Vec::new(),
             progress: None,
+            price: None,
             horizontal: false,
             link: None,
             preview: None,
@@ -155,6 +157,14 @@ impl ImageCard {
             fraction.clamp(0.0, 1.0)
         };
         self.progress = Some((f, label.into()));
+        self
+    }
+
+    /// The price under the text, such as the current and the old price of a product. It is the
+    /// same [`super::Price`] a product page shows, inside the card's link, so screen readers hear
+    /// the card's title and the price sentence together; it needs no script.
+    pub fn price(mut self, price: super::Price) -> Self {
+        self.price = Some(price);
         self
     }
 
@@ -281,6 +291,11 @@ impl ImageCard {
         };
         let subtitle = line(&self.subtitle, "z-poster-subtitle");
         let text = line(&self.text, "z-poster-text");
+        let price = self
+            .price
+            .as_ref()
+            .map(|p| p.html(r))
+            .unwrap_or_default();
         let badges = if self.badges.is_empty() {
             String::new()
         } else {
@@ -301,7 +316,7 @@ impl ImageCard {
             String::from(r#"<span class="z-poster-media">"#)
         };
         let body = format!(
-            r#"{media}{img}{badge}{corner}{progress}</span><span class="z-poster-body"><span class="z-poster-title">{}</span>{subtitle}{text}{badges}</span>"#,
+            r#"{media}{img}{badge}{corner}{progress}</span><span class="z-poster-body"><span class="z-poster-title">{}</span>{subtitle}{text}{price}{badges}</span>"#,
             r.text(&self.title)
         );
         let class = if self.horizontal {
@@ -575,6 +590,33 @@ impl<E: Model> CardGrid<E> {
             field.meta(),
             crate::grid::value_key(&value.to_value()).as_deref(),
         ));
+        self
+    }
+
+    /// Keeps only the rows whose `field` is one of `values`, on every request, like
+    /// [`CardGrid::scope`]: `.scope_any(Product::color, p.colors.clone())` for the colors a facet
+    /// panel chose. No values keep every row.
+    pub fn scope_any<T: crate::value::FieldType>(
+        mut self,
+        field: crate::model::Field<E, T>,
+        values: impl IntoIterator<Item = T>,
+    ) -> Self {
+        self.scope
+            .extend(crate::grid::any_filter(field.meta(), values));
+        self
+    }
+
+    /// Keeps only the rows whose `field` is between `from` and `to`, both inclusive, on every
+    /// request, like [`CardGrid::scope`]; `None` leaves that end open:
+    /// `.scope_range(Product::price, p.min_price.map(Money::tl), None)`.
+    pub fn scope_range<T: crate::value::FieldType>(
+        mut self,
+        field: crate::model::Field<E, T>,
+        from: Option<T>,
+        to: Option<T>,
+    ) -> Self {
+        self.scope
+            .extend(crate::grid::range_filter(field.meta(), from, to));
         self
     }
 

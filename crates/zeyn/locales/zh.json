@@ -502,6 +502,62 @@
       },
       "prefs": {
         "cleared": "已删除此浏览器为本网站保存的选择。"
+      },
+      "shop": {
+        "price": {
+          "sale": "原价 {was}，现价 {now}，优惠 {off}",
+          "per": {
+            "item": "每件 {price}",
+            "kg": "每千克 {price}",
+            "g100": "每 100 克 {price}",
+            "l": "每升 {price}",
+            "ml100": "每 100 毫升 {price}",
+            "m": "每米 {price}"
+          }
+        },
+        "range": {
+          "to": "至",
+          "low": "{label}，起",
+          "high": "{label}，止"
+        },
+        "quantity": {
+          "label": "数量",
+          "decrease": "减少",
+          "increase": "增加",
+          "limit": "仅剩 {n} 件。",
+          "failed": "无法更改数量。"
+        },
+        "gallery": {
+          "swipe": "照片，使用方向键或滑动浏览",
+          "full": "全屏",
+          "choose": "选择照片",
+          "show": "显示第 {n} 张照片，共 {count} 张",
+          "close": "关闭",
+          "prev": "上一张照片",
+          "next": "下一张照片",
+          "zoom": "放大"
+        },
+        "facets": {
+          "label": "筛选",
+          "chosen": "已选筛选条件",
+          "clear": "全部清除",
+          "remove": "移除筛选条件 {filter}",
+          "option": "{option}，{count} 个结果",
+          "active": "已选 {n} 项"
+        },
+        "reviews": {
+          "label": "评价",
+          "average": "{average} 星（满分 5 星）",
+          "count": "{count} 条评价",
+          "stars": "{n} 星"
+        },
+        "rating": {
+          "half": "{label}只能是整星或半星。"
+        },
+        "countdown": {
+          "day": "天",
+          "left": "剩余 {d} 天 {h} 小时 {m} 分钟"
+        }
       }
     },
     "date": {

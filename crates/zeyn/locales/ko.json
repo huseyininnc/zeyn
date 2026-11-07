@@ -502,6 +502,62 @@
       },
       "prefs": {
         "cleared": "이 브라우저가 이 사이트를 위해 보관하던 선택을 삭제했습니다."
+      },
+      "shop": {
+        "price": {
+          "sale": "정가 {was}, 현재 {now}, {off} 할인",
+          "per": {
+            "item": "개당 {price}",
+            "kg": "kg당 {price}",
+            "g100": "100g당 {price}",
+            "l": "리터당 {price}",
+            "ml100": "100ml당 {price}",
+            "m": "미터당 {price}"
+          }
+        },
+        "range": {
+          "to": "~",
+          "low": "{label}, 시작",
+          "high": "{label}, 끝"
+        },
+        "quantity": {
+          "label": "수량",
+          "decrease": "줄이기",
+          "increase": "늘리기",
+          "limit": "{n}개만 남아 있습니다.",
+          "failed": "수량을 바꾸지 못했습니다."
+        },
+        "gallery": {
+          "swipe": "사진, 화살표 키나 스와이프로 넘기기",
+          "full": "전체 화면",
+          "choose": "사진 고르기",
+          "show": "사진 {count}장 중 {n}번째 보기",
+          "close": "닫기",
+          "prev": "이전 사진",
+          "next": "다음 사진",
+          "zoom": "확대"
+        },
+        "facets": {
+          "label": "필터",
+          "chosen": "선택한 필터",
+          "clear": "모두 지우기",
+          "remove": "{filter} 필터 제거",
+          "option": "{option}, 결과 {count}개",
+          "active": "{n}개 선택됨"
+        },
+        "reviews": {
+          "label": "리뷰",
+          "average": "별 5개 중 {average}개",
+          "count": "리뷰 {count}개",
+          "stars": "별 {n}개"
+        },
+        "rating": {
+          "half": "{label}은(는) 별 하나나 반 개 단위만 됩니다."
+        },
+        "countdown": {
+          "day": "일",
+          "left": "{d}일 {h}시간 {m}분 남음"
+        }
       }
     },
     "date": {

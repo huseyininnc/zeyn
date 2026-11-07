@@ -26,6 +26,12 @@ pub struct Demo {
     pub q: Option<String>,
     pub view: Option<zeyn::ui::CalendarView>,
     pub date: Option<Date>,
+    pub min_price: Option<i64>,
+    pub max_price: Option<i64>,
+    pub color: Option<String>,
+    pub size: Option<String>,
+    #[serde(default)]
+    pub kinds: Vec<String>,
 }
 
 /// One live example: the function of the component's file that builds it.
@@ -192,6 +198,16 @@ catalog! {
         tree "/ui/tree";
         week_schedule "/ui/week-schedule";
     }
+    "shop" Cart {
+        price "/ui/price";
+        range_slider "/ui/range-slider" (Demo);
+        quantity_stepper "/ui/quantity-stepper";
+        variant_picker "/ui/variant-picker" (Demo);
+        product_gallery "/ui/product-gallery";
+        facet_panel "/ui/facet-panel" (Demo);
+        review_summary "/ui/review-summary";
+        countdown "/ui/countdown";
+    }
     "media" Image {
         image "/ui/image";
         embed "/ui/embed";
@@ -303,12 +319,15 @@ pub fn feature() -> Feature {
             .screen(examples::card_grid::large_catalog)
             .screen(examples::card_grid::live_catalog)
             .screen(examples::screen_header::orders_page)
-            .screen(examples::calendar::appointment),
+            .screen(examples::calendar::appointment)
+            .screen(examples::shop::shop_listing)
+            .screen(examples::shop::shop_product),
     )
 }
 
 /// Writes one visitor may make per minute to the shared sample stores of the examples (Kanban
-/// moves, inbox read and archive, calendar slots): every `POST /_zeyn/data` counts.
+/// moves, inbox read and archive, calendar slots, cart quantities, ratings): every
+/// `POST /_zeyn/data` and form submit counts.
 pub const WRITES_PER_MINUTE: u32 = 60;
 
 /// The catalog app.

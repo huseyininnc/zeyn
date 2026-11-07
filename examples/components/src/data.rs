@@ -1,9 +1,73 @@
 //! Sample data the examples show: products, people and events, built once and kept in memory.
 //! Nothing a visitor sends is stored.
 
-use std::sync::LazyLock;
+use std::collections::VecDeque;
+use std::sync::{LazyLock, Mutex};
 use zeyn::prelude::*;
 use zeyn::ui::{LookupItem, LookupQuery, TreeItem, TreeQuery};
+
+/// Most entries a store that visitors write keeps; the oldest are dropped first.
+pub const MAX_VISITOR_ENTRIES: usize = 256;
+
+/// What visitors of the public catalog wrote, such as cart quantities or ratings: at most
+/// [`MAX_VISITOR_ENTRIES`], the oldest dropped first, so the memory it takes never grows with
+/// traffic. Writes reach it through actions, which count against the app's write limit.
+pub struct VisitorLog<T> {
+    entries: Mutex<VecDeque<T>>,
+}
+
+impl<T: Clone> Default for VisitorLog<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T: Clone> VisitorLog<T> {
+    pub const fn new() -> Self {
+        VisitorLog {
+            entries: Mutex::new(VecDeque::new()),
+        }
+    }
+
+    /// Keeps `entry`, dropping the oldest one when the log is full.
+    pub fn push(&self, entry: T) {
+        let mut entries = self
+            .entries
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if entries.len() == MAX_VISITOR_ENTRIES {
+            entries.pop_front();
+        }
+        entries.push_back(entry);
+    }
+
+    /// How many entries the log holds.
+    pub fn len(&self) -> usize {
+        self.entries
+            .lock()
+            .map_or(0, |e| e.len())
+    }
+
+    /// Whether the log is empty.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// The newest entry, if any.
+    pub fn last(&self) -> Option<T> {
+        self.entries
+            .lock()
+            .ok()?
+            .back()
+            .cloned()
+    }
+}
+
+/// Cart quantities visitors set: item and quantity.
+pub static CART: VisitorLog<(String, i64)> = VisitorLog::new();
+
+/// Ratings visitors sent, as text.
+pub static RATINGS: VisitorLog<String> = VisitorLog::new();
 
 /// A product of the sample shop.
 #[entity(table = "products")]
@@ -203,6 +267,9 @@ pub struct Item {
     pub name: String,
     pub price: Money,
     pub shelf: i64,
+    pub color: String,
+    pub brand: String,
+    pub old_price: Money,
 }
 
 impl Item {
@@ -220,6 +287,26 @@ impl Item {
     }
 }
 
+/// The colors of the large catalog: value and name.
+pub const COLORS: [(&str, &str); 6] = [
+    ("black", "Black"),
+    ("white", "White"),
+    ("red", "Red"),
+    ("blue", "Blue"),
+    ("green", "Green"),
+    ("sand", "Sand"),
+];
+
+/// The brands of the large catalog.
+pub const BRANDS: [&str; 8] = [
+    "Arda", "Birch", "Cove", "Dune", "Elm", "Fjord", "Grove", "Haven",
+];
+
+/// Every item of the large catalog.
+pub fn items() -> &'static [Item] {
+    &ITEM_ROWS
+}
+
 static ITEM_ROWS: LazyLock<Vec<Item>> = LazyLock::new(|| {
     (1..=ITEMS)
         .map(|i| Item {
@@ -227,6 +314,14 @@ static ITEM_ROWS: LazyLock<Vec<Item>> = LazyLock::new(|| {
             name: format!("Item {i}"),
             price: Money::tl(990 + (i * 7_919) % 90_000),
             shelf: (i - 1) * SHELVES / ITEMS,
+            color: COLORS[(i % COLORS.len() as i64) as usize]
+                .0
+                .to_string(),
+            brand: BRANDS[((i / 7) % BRANDS.len() as i64) as usize].to_string(),
+            old_price: match i % 5 {
+                0 => Money::tl((990 + (i * 7_919) % 90_000) * 5 / 4),
+                _ => Money::tl(0),
+            },
         })
         .collect()
 });
