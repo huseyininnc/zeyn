@@ -31,7 +31,8 @@
       "media": "Media",
       "feedback": "Feedback and overlays",
       "charts": "Charts",
-      "shell": "Shell"
+      "shell": "Shell",
+      "admin": "Admin"
     },
     "summary": {
       "stack": "Nodes one under the other with a gap.",
@@ -96,7 +97,13 @@
       "hero": "A large image section, with slides that move only when asked.",
       "reactions": "Reaction buttons with counts stored by an action.",
       "link_button": "A link to another page that looks like a button.",
-      "clear_prefs": "A button that removes the choices this browser keeps for the app."
+      "clear_prefs": "A button that removes the choices this browser keeps for the app.",
+      "diff_view": "The fields that changed in a record, old and new side by side or inline.",
+      "code_view": "Read only code and JSON, highlighted, numbered and folded on the server.",
+      "barcode": "Code 128 barcodes and QR codes drawn as SVG on the server.",
+      "inbox": "Notifications by day with bulk mark read and archive, and the bell with the unread count.",
+      "kanban": "Cards in columns of a workflow, moved by drag, a menu or the keyboard.",
+      "calendar": "Events in a month, week or day in the user time zone, with event windows and slots."
     },
     "ex": {
       "action_button": {
@@ -336,6 +343,30 @@
         "overview": "Example"
       },
       "week_schedule": {
+        "overview": "Example"
+      },
+      "diff_view": {
+        "overview": "Example",
+        "inline": "Inline"
+      },
+      "code_view": {
+        "overview": "Example",
+        "rust": "Rust",
+        "json": "JSON"
+      },
+      "barcode": {
+        "overview": "Example",
+        "levels": "Error correction levels",
+        "digits": "Digits"
+      },
+      "inbox": {
+        "overview": "Example",
+        "bell": "Notification bell"
+      },
+      "kanban": {
+        "overview": "Example"
+      },
+      "calendar": {
         "overview": "Example"
       }
     }

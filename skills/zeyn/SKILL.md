@@ -38,6 +38,7 @@ Which page answers what:
 | Command palette, menu bar, dock, status bar, site shell for public pages | `components/shell` (`shell.md`) |
 | Headings, paragraphs, meta lines, previous and next links, auto grids, lists, avatars, spoilers, letter bars, week schedules | `components/content` (`content.md`) |
 | Card grids, rails, search boxes, free text search (`DataQuery::q`) | `components/catalog` (`catalog.md`) |
+| Record diffs, code and JSON views, barcodes, inbox and notifications, Kanban boards, calendars | `components/admin` (`admin.md`) |
 | Video and audio | `components/media` (`docs/media.md`) |
 | Dates, time zones, money, languages | `guides/time-and-languages` (`time-and-languages.md`) |
 | Permissions, guards, CSRF, masking, audit | `guides/security` (`security.md`), `docs/enterprise.md` |
@@ -249,6 +250,22 @@ What to remember:
   Image, Paperclip. Menu items take one with `.icon(Icon::...)` after `.item(..)`.
 - Key figures: `Kpi::new(t!("..."), value)` or `Kpi::money(t!("..."), money)` with `.delta(..)`
   and `.trend(..)`; four in a `Row` fill a desktop row and wrap two, then one per line.
+- Audit history: `DiffView::of(&before, &after)` or `DiffView::changes(entry.changes).model::<M>()`;
+  masked fields stay masked, never print raw values next to it.
+- Read only code and JSON: `CodeView::new(CodeLang::Sql, text)`, `JsonView::of(&value, &ctx)` (masks
+  masked fields); never build highlighted HTML yourself.
+- Labels and tickets: `Barcode::code128(order.number.clone())`, `QrCode::new(url).label(t!("..."))`;
+  never pull in a barcode crate or draw one in JavaScript.
+- Notifications: `Inbox::of(action).when(Note::created_at).read(Note::read).item(..)` with
+  `.mark_read(action)` and `.archive(action)` (input `InboxSelection`; change only rows of
+  `ctx.identity()`); the bell is `h.end(NotificationCenter::of(count_unread, inbox, ()))` with a
+  count action that takes `UnreadCount` and stops at `q.limit`.
+- Boards: `Kanban::of(flow(), search_tasks, move_task).state(Task::state).card(|t| node)`; the
+  move action takes `TransitionRequest<TaskId>`, loads the record and calls `flow().apply(..)`.
+  Never write drag and drop yourself.
+- Calendars: the screen takes `p: CalendarParams` and builds
+  `Calendar::of(search_events).start(Event::starts).end(Event::ends).label(..).open(..).create(new_event).at(p)`;
+  the create action takes `CalendarSlot` (moments, already in UTC) and returns `Result<Option<Effect>>`.
 - The app (`src/app.rs`): `App::new(t!("app.name")).i18n(i18n).service(store).feature(sales::feature())`,
   plus what the app needs: `.auth(...)`, `.mcp(Mcp::read_only())`, `.themes([...])`,
   `.datagrid_views(store)`, `.assistant(...)`.

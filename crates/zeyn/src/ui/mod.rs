@@ -5,18 +5,24 @@
 //! the endpoints accept it, so grids and forms inside containers keep working.
 
 mod alpha;
+mod barcode;
+mod calendar;
 mod catalog;
 mod chart;
 mod chips;
+mod code;
 mod content;
 mod controls;
 mod date;
+mod diff;
 mod dock;
 mod embed;
 mod hero;
+mod inbox;
 pub(crate) mod inputs;
 #[cfg(feature = "islands")]
 mod island;
+mod kanban;
 mod layout;
 mod lines;
 mod list;
@@ -57,9 +63,15 @@ pub use layout::{Card, Panel, Row, Split, Stack, Tabs};
 pub use shell::{MenuBar, MenuList, PropertyInspector, StatusBar, Toolbox};
 
 pub use alpha::{AlphaIndex, OTHER_LETTER, alphabet};
+pub use barcode::{
+    Barcode, CODE128_QUIET, MAX_BARCODE_CHARS, MAX_QR_BYTES, QR_QUIET, QrCode, QrLevel, QrMatrix,
+    code128_symbols, qr_error_correction, qr_format_bits, qr_version_bits,
+};
+pub use calendar::{Calendar, CalendarParams, CalendarSlot, CalendarView, MAX_CALENDAR_EVENTS};
 pub use catalog::{CardGrid, ImageCard, MAX_SUGGESTIONS, Rail, SearchBox, SearchParams};
 pub use chart::{Better, BulletCell, Chart, ChartKind, Kpi, SparklineCell};
 pub use chips::{Chips, MAX_CHIPS};
+pub use code::{CodeLang, CodeView, JsonView, MAX_CODE_BYTES, MAX_CODE_LINES, highlight};
 pub use content::{AutoGrid, Avatar, AvatarSize, Heading, MetaLine, Paragraph, PrevNext, Spoiler};
 pub use controls::Control;
 pub(crate) use controls::{
@@ -68,8 +80,11 @@ pub(crate) use controls::{
 };
 pub use date::DateOptions;
 pub(crate) use date::{input_text, picker_config, range_reversed, render_date_input, render_range};
+pub use diff::{DiffLayout, DiffView, MAX_DIFF_FIELDS};
 pub use hero::{HERO_SECONDS, Hero, MAX_HERO_SLIDES};
+pub use inbox::{Inbox, InboxSelection, MAX_INBOX, MAX_UNREAD, NotificationCenter, UnreadCount};
 pub use inputs::{mask_example, mask_fits, mask_raw};
+pub use kanban::{KANBAN_BLOCK, Kanban};
 pub(crate) use lines::LinesEditor;
 pub use lines::{Lines, MAX_LINES};
 pub use list::{List, ListItem, MAX_REPEAT, Repeat};

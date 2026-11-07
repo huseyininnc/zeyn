@@ -213,7 +213,7 @@ async fn the_lazy_modules_are_served_and_stay_out_of_the_page_head() {
         );
     }
     let (_, runtime) = get("/_zeyn/zeyn.js").await;
-    assert!(runtime.contains(r#"["share","[data-zeyn-share]",""]"#));
+    assert!(runtime.contains(r#"["share","[data-zeyn-share], [data-zeyn-copy]",""]"#));
     assert!(runtime.contains(r#"["chips","[data-zeyn-chip]",""]"#));
     assert!(runtime.contains(r#"["hero","[data-zeyn-hero]",""]"#));
     assert!(runtime.contains(r#"["reactions","[data-zeyn-reactions]",""]"#));

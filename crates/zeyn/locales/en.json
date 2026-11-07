@@ -547,6 +547,96 @@
       },
       "prefs": {
         "cleared": "The choices this browser kept for this site were removed."
+      },
+      "diff": {
+        "label": "Changes",
+        "none": "No changes",
+        "field": "Field",
+        "before": "Before",
+        "after": "After",
+        "empty": "(empty)",
+        "more": "{n} more changed fields are not shown"
+      },
+      "code": {
+        "plain": "Text",
+        "rust": "Rust",
+        "json": "JSON",
+        "toml": "TOML",
+        "sql": "SQL",
+        "javascript": "JavaScript",
+        "shell": "Shell",
+        "lines": "{n} lines",
+        "copy": "Copy",
+        "copied": "Copied to the clipboard",
+        "failed": "Could not copy",
+        "fold": "Fold or unfold this block",
+        "truncated": "Showing the first {shown} of {total} lines. The rest is too long to show here."
+      },
+      "barcode": {
+        "code128_invalid": "This value cannot be shown as a barcode: it must be 1 to 80 printable ASCII characters.",
+        "qr_too_long": "This value is too long for a QR code."
+      },
+      "inbox": {
+        "label": "Notifications",
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "empty": "No notifications",
+        "unread": "Unread",
+        "unread_count": "{n} unread",
+        "select": "Select",
+        "select_all": "Select all",
+        "actions": "Notification actions",
+        "mark_read": "Mark as read",
+        "archive": "Archive",
+        "selected": "{n} selected",
+        "done": "Done for {n} notifications",
+        "bell": "Notifications",
+        "bell_count": "Notifications, {n} unread",
+        "bell_many": "Notifications, more than 99 unread"
+      },
+      "kanban": {
+        "label": "Board",
+        "help": "Arrow keys move between cards. Enter opens the move menu; Shift with Left or Right moves the card to the next column.",
+        "move": "Move",
+        "move_to": "Move to",
+        "moved": "{card} moved to {column}",
+        "refused": "The card could not be moved and is back in its column",
+        "no_moves": "This card cannot be moved from here",
+        "count": "{n}",
+        "count_wip": "{n} of {wip}"
+      },
+      "calendar": {
+        "navigation": "Period",
+        "views": "View",
+        "previous": "Previous",
+        "next": "Next",
+        "today": "Today",
+        "month": "Month",
+        "week": "Week",
+        "day": "Day",
+        "all_day": "All day",
+        "more": "{n} more",
+        "range": "{from} to {to}",
+        "cut": "Only the first {n} events of this period are shown.",
+        "help": "Arrow keys move between days, Page Up and Page Down change the period, Enter goes to the events of a day.",
+        "help_create": "Arrow keys move between days, Page Up and Page Down change the period, Enter goes to the events of a day, N creates an event, Shift with the arrow keys widens the slot.",
+        "created": "Event created",
+        "skipped": "That time does not exist in your time zone, because the clocks change then.",
+        "invalid_slot": "Choose a slot of at most 31 days that ends after it starts.",
+        "months": {
+          "1": "January",
+          "2": "February",
+          "3": "March",
+          "4": "April",
+          "5": "May",
+          "6": "June",
+          "7": "July",
+          "8": "August",
+          "9": "September",
+          "10": "October",
+          "11": "November",
+          "12": "December"
+        }
       }
     },
     "date": {

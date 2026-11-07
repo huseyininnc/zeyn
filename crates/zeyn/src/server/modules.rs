@@ -43,6 +43,16 @@ const fn control(name: &'static str, script: &'static [&'static str]) -> Module 
     }
 }
 
+/// A stylesheet module without a script.
+const fn style(name: &'static str, style: &'static [&'static str]) -> Module {
+    Module {
+        name,
+        script: &[],
+        style,
+        needs: &[],
+    }
+}
+
 /// A script module that imports nothing.
 const fn script(name: &'static str, script: &'static [&'static str]) -> Module {
     Module {
@@ -148,13 +158,34 @@ pub(crate) const MODULES: &[Module] = &[
         style: &["z-chart", "z-spark", "z-kpi", "z-bullet"],
         needs: &[],
     },
-    script("share", &["data-zeyn-share"]),
+    script("share", &["data-zeyn-share", "data-zeyn-copy"]),
     script("chips", &["data-zeyn-chip"]),
     script("reactions", &["data-zeyn-reactions"]),
     script("hero", &["data-zeyn-hero"]),
     script("state", &["data-zeyn-prefs-clear"]),
     script("topics", &["data-zeyn-listens", "data-zeyn-drives"]),
     script("vlist", &["data-zeyn-vlist"]),
+    style("diff", &["z-diff"]),
+    style("code", &["z-codeview"]),
+    style("barcode", &["z-barcode"]),
+    Module {
+        name: "inbox",
+        script: &["data-zeyn-inbox", "data-zeyn-notify"],
+        style: &["z-inbox", "z-notify"],
+        needs: &[],
+    },
+    Module {
+        name: "kanban",
+        script: &["data-zeyn-kanban"],
+        style: &["z-kanban"],
+        needs: &[],
+    },
+    Module {
+        name: "calendar",
+        script: &["data-zeyn-calendar"],
+        style: &["z-cal"],
+        needs: &[],
+    },
 ];
 
 const _: () = assert!(MODULES.len() <= 64, "Used keeps one bit per module");
@@ -163,7 +194,7 @@ const _: () = assert!(MODULES.len() <= 64, "Used keeps one bit per module");
 /// are linked only when the page uses them; the others style components without markers of
 /// their own (layouts, display widgets, form sections, the palette) and every page links them,
 /// as `zeyn.css` and `enterprise.css`.
-const STYLES: [&str; 7] = [
+const STYLES: [&str; 13] = [
     "components",
     "catalog",
     "content",
@@ -171,6 +202,12 @@ const STYLES: [&str; 7] = [
     "pro",
     "files",
     "charts",
+    "diff",
+    "code",
+    "barcode",
+    "inbox",
+    "kanban",
+    "calendar",
 ];
 
 /// The modules a page uses, one bit each in the order of [`MODULES`].
@@ -333,8 +370,27 @@ pub(crate) fn runtime(js: &'static str) -> &'static str {
     })
 }
 
-/// Script files of component modules, by path; the others are served next to their endpoints.
-const FILES: [(&str, &str); 22] = [
+/// Script and style files of component modules, by path; the others are served next to their
+/// endpoints.
+const FILES: [(&str, &str); 31] = [
+    (
+        "/_zeyn/calendar.css",
+        include_str!("../../assets/calendar.css"),
+    ),
+    (
+        "/_zeyn/calendar.js",
+        include_str!("../../assets/calendar.js"),
+    ),
+    ("/_zeyn/kanban.css", include_str!("../../assets/kanban.css")),
+    ("/_zeyn/kanban.js", include_str!("../../assets/kanban.js")),
+    ("/_zeyn/inbox.css", include_str!("../../assets/inbox.css")),
+    ("/_zeyn/inbox.js", include_str!("../../assets/inbox.js")),
+    (
+        "/_zeyn/barcode.css",
+        include_str!("../../assets/barcode.css"),
+    ),
+    ("/_zeyn/code.css", include_str!("../../assets/code.css")),
+    ("/_zeyn/diff.css", include_str!("../../assets/diff.css")),
     ("/_zeyn/topics.js", include_str!("../../assets/topics.js")),
     ("/_zeyn/vlist.js", include_str!("../../assets/vlist.js")),
     ("/_zeyn/share.js", include_str!("../../assets/share.js")),
@@ -383,7 +439,12 @@ pub(super) fn routes(mut router: Router<Arc<AppState>>) -> Router<Arc<AppState>>
     for (path, body) in FILES {
         router = router.route(
             path,
-            get(move || async move { asset(body, "text/javascript; charset=utf-8") }),
+            get(move || async move {
+                match path.ends_with(".css") {
+                    true => asset(body, "text/css; charset=utf-8"),
+                    false => asset(body, "text/javascript; charset=utf-8"),
+                }
+            }),
         );
     }
     router

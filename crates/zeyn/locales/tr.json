@@ -547,6 +547,96 @@
       },
       "prefs": {
         "cleared": "Bu tarayıcının bu site için tuttuğu seçimler silindi."
+      },
+      "diff": {
+        "label": "Değişiklikler",
+        "none": "Değişiklik yok",
+        "field": "Alan",
+        "before": "Önce",
+        "after": "Sonra",
+        "empty": "(boş)",
+        "more": "Değişen {n} alan daha gösterilmiyor"
+      },
+      "code": {
+        "plain": "Metin",
+        "rust": "Rust",
+        "json": "JSON",
+        "toml": "TOML",
+        "sql": "SQL",
+        "javascript": "JavaScript",
+        "shell": "Kabuk",
+        "lines": "{n} satır",
+        "copy": "Kopyala",
+        "copied": "Panoya kopyalandı",
+        "failed": "Kopyalanamadı",
+        "fold": "Bu bloğu daralt veya genişlet",
+        "truncated": "{total} satırın ilk {shown} satırı gösteriliyor. Gerisi burada gösterilemeyecek kadar uzun."
+      },
+      "barcode": {
+        "code128_invalid": "Bu değer barkod olarak gösterilemez: 1 ile 80 arasında yazdırılabilir ASCII karakter olmalıdır.",
+        "qr_too_long": "Bu değer QR kod için fazla uzun."
+      },
+      "inbox": {
+        "label": "Bildirimler",
+        "today": "Bugün",
+        "yesterday": "Dün",
+        "empty": "Bildirim yok",
+        "unread": "Okunmamış",
+        "unread_count": "{n} okunmamış",
+        "select": "Seç",
+        "select_all": "Tümünü seç",
+        "actions": "Bildirim işlemleri",
+        "mark_read": "Okundu olarak işaretle",
+        "archive": "Arşivle",
+        "selected": "{n} seçili",
+        "done": "{n} bildirim için yapıldı",
+        "bell": "Bildirimler",
+        "bell_count": "Bildirimler, {n} okunmamış",
+        "bell_many": "Bildirimler, 99'dan fazla okunmamış"
+      },
+      "kanban": {
+        "label": "Pano",
+        "help": "Ok tuşları kartlar arasında gezer. Enter taşıma menüsünü açar; Shift ile Sol veya Sağ kartı yandaki sütuna taşır.",
+        "move": "Taşı",
+        "move_to": "Şuraya taşı",
+        "moved": "{card}, {column} sütununa taşındı",
+        "refused": "Kart taşınamadı ve sütununa geri döndü",
+        "no_moves": "Bu kart buradan taşınamaz",
+        "count": "{n}",
+        "count_wip": "{n} / {wip}"
+      },
+      "calendar": {
+        "navigation": "Dönem",
+        "views": "Görünüm",
+        "previous": "Önceki",
+        "next": "Sonraki",
+        "today": "Bugün",
+        "month": "Ay",
+        "week": "Hafta",
+        "day": "Gün",
+        "all_day": "Tüm gün",
+        "more": "{n} daha",
+        "range": "{from} ile {to} arası",
+        "cut": "Bu dönemin yalnızca ilk {n} etkinliği gösteriliyor.",
+        "help": "Ok tuşları günler arasında gezer, Page Up ve Page Down dönemi değiştirir, Enter günün etkinliklerine geçer.",
+        "help_create": "Ok tuşları günler arasında gezer, Page Up ve Page Down dönemi değiştirir, Enter günün etkinliklerine geçer, N etkinlik oluşturur, Shift ile ok tuşları aralığı genişletir.",
+        "created": "Etkinlik oluşturuldu",
+        "skipped": "Bu saat, saatlerin değiştiği an olduğu için saat diliminizde yok.",
+        "invalid_slot": "Başladıktan sonra biten ve en fazla 31 gün süren bir aralık seçin.",
+        "months": {
+          "1": "Ocak",
+          "2": "Şubat",
+          "3": "Mart",
+          "4": "Nisan",
+          "5": "Mayıs",
+          "6": "Haziran",
+          "7": "Temmuz",
+          "8": "Ağustos",
+          "9": "Eylül",
+          "10": "Ekim",
+          "11": "Kasım",
+          "12": "Aralık"
+        }
       }
     },
     "date": {

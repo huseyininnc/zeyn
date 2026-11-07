@@ -200,3 +200,117 @@ async fn the_site_files_and_pictures_are_served() {
     let (status, _, _) = get("/site/img/13.svg").await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
+
+const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+/// The node path of the element whose HTML starts with `marker` on a catalog page.
+async fn node_of(router: &Router, path: &str, marker: &str) -> String {
+    let res = router
+        .clone()
+        .oneshot(
+            Request::get(path)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let html = String::from_utf8(
+        res.into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes()
+            .to_vec(),
+    )
+    .unwrap();
+    let at = html
+        .find(marker)
+        .expect("the component is on the page");
+    let before = &html[..at];
+    let start = before
+        .rfind(r#"data-zeyn-node=""#)
+        .unwrap()
+        + r#"data-zeyn-node=""#.len();
+    before[start..start + before[start..].find('"').unwrap()].to_string()
+}
+
+/// A write to the data source `key` of the node at `node` on the screen `screen`.
+async fn write(
+    router: &Router,
+    screen: &str,
+    node: &str,
+    key: &str,
+    input: serde_json::Value,
+) -> StatusCode {
+    let body = serde_json::json!({ "screen": screen, "params": null, "node": node, "key": key, "input": input });
+    router
+        .clone()
+        .oneshot(
+            Request::post("/_zeyn/data")
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::COOKIE, format!("zeyn_csrf={TOKEN}"))
+                .header("x-zeyn-csrf", TOKEN)
+                .body(Body::from(body.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap()
+        .status()
+}
+
+#[tokio::test]
+async fn the_shared_sample_stores_stay_within_their_caps() {
+    use zeyn_example_components::examples::{inbox, kanban};
+    let router = site::router(app().unwrap().router().unwrap());
+    let inbox_node = node_of(&router, "/ui/inbox", r#"<section class="z-inbox""#).await;
+    let board_node = node_of(&router, "/ui/kanban", r#"<section class="z-kanban""#).await;
+    for round in 0..12 {
+        let ids: Vec<String> = (1..=5).map(|i| i.to_string()).collect();
+        let key = if round % 2 == 0 { "read" } else { "archive" };
+        let status = write(
+            &router,
+            "inbox",
+            &inbox_node,
+            key,
+            serde_json::json!({ "ids": ids }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "round {round}");
+        assert!(inbox::stored() <= inbox::MAX_SAMPLE_NOTES);
+        let (from, to) = if round % 2 == 0 {
+            ("Backlog", "Doing")
+        } else {
+            ("Doing", "Backlog")
+        };
+        write(
+            &router,
+            "kanban",
+            &board_node,
+            "move",
+            serde_json::json!({ "key": "1", "from": from, "to": to }),
+        )
+        .await;
+        assert_eq!(kanban::stored(), kanban::MAX_SAMPLE_TASKS);
+    }
+}
+
+#[tokio::test]
+async fn writes_to_the_samples_count_against_the_write_limit() {
+    let router = site::router(app().unwrap().router().unwrap());
+    let node = node_of(&router, "/ui/inbox", r#"<section class="z-inbox""#).await;
+    let mut refused = 0;
+    for _ in 0..zeyn_example_components::WRITES_PER_MINUTE + 5 {
+        let status = write(
+            &router,
+            "inbox",
+            &node,
+            "read",
+            serde_json::json!({ "ids": ["1"] }),
+        )
+        .await;
+        if status == StatusCode::TOO_MANY_REQUESTS {
+            refused += 1;
+        }
+    }
+    assert_eq!(refused, 5, "the 61st write in a minute is refused");
+}

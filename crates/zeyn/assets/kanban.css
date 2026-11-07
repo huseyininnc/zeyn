@@ -1,0 +1,56 @@
+/* Kanban boards (`zeyn::ui::Kanban`): linked only by pages that hold `.z-kanban`. */
+
+.z-kanban { display: grid; gap: var(--z-s-3); min-inline-size: 0; }
+.z-kanban-title { margin: 0; font-size: var(--z-text-lg); line-height: var(--z-leading-lg); }
+.z-kanban-board {
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(240px, 1fr); gap: var(--z-s-3);
+  overflow-x: auto; padding-block-end: var(--z-s-2); align-items: start;
+}
+.z-kanban-col {
+  display: grid; gap: var(--z-s-2); align-content: start; min-inline-size: 0; padding: var(--z-s-2);
+  background: var(--z-surface-2); border: 1px solid var(--z-border); border-radius: var(--z-radius-lg);
+}
+.z-kanban-head { display: flex; align-items: center; justify-content: space-between; gap: var(--z-s-2); padding-inline: var(--z-s-1); }
+.z-kanban-name { margin: 0; font-size: var(--z-text-sm); font-weight: 600; }
+.z-kanban-count { font-size: var(--z-text-xs); color: var(--z-text-muted); font-variant-numeric: tabular-nums; padding: 1px var(--z-s-2); border-radius: var(--z-radius-full); background: var(--z-surface); }
+.z-kanban-over .z-kanban-count { background: var(--z-warning-subtle); color: var(--z-text); font-weight: 600; }
+.z-kanban-over { border-color: var(--z-warning); }
+.z-kanban-col .z-cards-head { display: none; }
+.z-kanban-col .z-list { border: 0; background: none; }
+.z-kanban-col .z-built { box-sizing: border-box; block-size: var(--z-kanban-h, 88px); overflow: hidden; padding: 0 0 var(--z-s-2); border: 0; list-style: none; }
+.z-kanban-card {
+  position: relative; box-sizing: border-box; block-size: 100%; overflow: hidden; padding: var(--z-s-2) var(--z-s-3);
+  padding-inline-end: 36px; background: var(--z-surface); color: var(--z-text); border: 1px solid var(--z-border);
+  border-radius: var(--z-radius); box-shadow: var(--z-shadow-1); cursor: grab; touch-action: auto;
+}
+.z-kanban-card:focus-visible { outline: 2px solid var(--z-focus); outline-offset: 2px; }
+.z-kanban-move {
+  position: absolute; inset-block-start: 4px; inset-inline-end: 4px; inline-size: 28px; block-size: 28px; display: grid; place-items: center;
+  border: 0; border-radius: var(--z-radius-sm); background: none; color: var(--z-text-muted); cursor: pointer;
+}
+.z-kanban-move:hover, .z-kanban-move[aria-expanded="true"] { background: var(--z-hover); color: var(--z-text); }
+.z-kanban-menu {
+  position: absolute; z-index: 20; inset-block-start: 34px; inset-inline-end: 4px; min-inline-size: 180px; margin: 0; padding: var(--z-s-1);
+  list-style: none; background: var(--z-raised, var(--z-surface)); border: 1px solid var(--z-border); border-radius: var(--z-radius); box-shadow: var(--z-shadow-2);
+}
+.z-kanban-menu [role="menuitem"] { padding: var(--z-s-2) var(--z-s-3); border-radius: var(--z-radius-sm); cursor: pointer; min-block-size: 24px; }
+.z-kanban-menu [role="menuitem"]:hover, .z-kanban-menu [role="menuitem"]:focus { background: var(--z-hover); outline: none; }
+.z-kanban-menu [role="menuitem"]:focus-visible { outline: 2px solid var(--z-focus); outline-offset: -2px; }
+.z-kanban-menu-none { padding: var(--z-s-2) var(--z-s-3); color: var(--z-text-muted); font-size: var(--z-text-sm); }
+.z-kanban-pending .z-kanban-card { block-size: auto; opacity: .7; }
+.z-kanban-dragging { opacity: .4; }
+.z-kanban-ghost { position: fixed; z-index: 1000; pointer-events: none; margin: 0; box-shadow: var(--z-shadow-3); opacity: .95; cursor: grabbing; }
+.z-kanban-col[data-drop="ok"] { border-style: dashed; border-color: var(--z-primary); }
+.z-kanban-col[data-drop="no"] { opacity: .55; }
+.z-kanban-col.z-kanban-target { background: var(--z-brand-subtle); }
+@media (max-width: 640px) {
+  .z-kanban-board { grid-auto-columns: minmax(78vw, 1fr); scroll-snap-type: x mandatory; }
+  .z-kanban-col { scroll-snap-align: start; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .z-kanban-ghost { transition: box-shadow var(--z-dur-1) var(--z-ease-out); }
+}
+@media (forced-colors: active) {
+  .z-kanban-card:focus-visible, .z-kanban-menu [role="menuitem"]:focus { outline: 2px solid Highlight; }
+  .z-kanban-col[data-drop="ok"] { border-color: Highlight; }
+}

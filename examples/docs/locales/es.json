@@ -59,6 +59,7 @@
       "content": "Texto y contenido",
       "data_views": "Árbol y gráficos",
       "catalog": "Tarjetas, rails y búsqueda",
+      "admin": "Vistas de administración",
       "shell": "Shell y comandos",
       "media": "Media",
       "time_i18n": "Hora e idiomas",
