@@ -11,6 +11,7 @@ mod catalog;
 mod chart;
 mod chips;
 mod code;
+mod composer;
 mod content;
 mod controls;
 mod countdown;
@@ -81,6 +82,10 @@ pub use catalog::{CardGrid, ImageCard, MAX_SUGGESTIONS, Rail, SearchBox, SearchP
 pub use chart::{Better, BulletCell, Chart, ChartKind, Kpi, SparklineCell};
 pub use chips::{Chips, MAX_CHIPS};
 pub use code::{CodeLang, CodeView, JsonView, MAX_CODE_BYTES, MAX_CODE_LINES, highlight};
+pub use composer::{
+    ChatSend, Composer, DEFAULT_MESSAGE_CHARS, MAX_MENTION_QUERY, MAX_MENTIONS,
+    MAX_MESSAGE_MENTIONS, SendKey,
+};
 pub use content::{AutoGrid, Avatar, AvatarSize, Heading, MetaLine, Paragraph, PrevNext, Spoiler};
 pub use controls::Control;
 pub(crate) use controls::{

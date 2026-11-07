@@ -190,7 +190,8 @@ pub use platform::{
 #[cfg(feature = "signed-licenses")]
 pub use platform::{LicenseError, SignedLicenseFile};
 pub use prefs::{
-    Choice, ClientPref, ClientPrefs, Consent, MAX_PREF_LIFETIME, PrefInfo, PrefKind, Purpose,
+    Choice, ClientPref, ClientPrefs, Consent, Draft, MAX_DRAFT_CHARS, MAX_DRAFTS,
+    MAX_PREF_LIFETIME, PrefInfo, PrefKind, Purpose,
 };
 #[doc(hidden)]
 pub use privacy::output as __privacy;
@@ -265,10 +266,12 @@ pub mod prelude {
         QrLevel, UnreadCount,
     };
     pub use crate::ui::{
+        ChatSend, Composer, Delivery, MessageThread, ReplyRequest, SendKey, ThreadQuery,
+    };
+    pub use crate::ui::{
         Countdown, Facet, FacetPanel, Price, PriceUnit, ProductGallery, QuantityStepper,
         RangeSlider, ReviewSummary, VariantGroup, VariantPicker,
     };
-    pub use crate::ui::{Delivery, MessageThread, ReplyRequest, ThreadQuery};
     #[cfg(feature = "server")]
     pub use crate::ui::{Reply, ReplySender};
     pub use crate::{

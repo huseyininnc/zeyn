@@ -227,6 +227,22 @@
       }
     },
     "ui": {
+      "composer": {
+        "label": "消息",
+        "placeholder": "输入消息",
+        "send": "发送",
+        "hint_enter": "Enter 发送，Shift+Enter 换行",
+        "hint_ctrl": "Ctrl+Enter 发送，Enter 换行",
+        "left": "还剩 {n} 个字符",
+        "over": "超出 {n} 个字符",
+        "sent": "消息已发送",
+        "failed": "无法发送消息",
+        "people": "找到 {n} 人",
+        "no_people": "未找到任何人",
+        "people_label": "人员",
+        "restored": "未发送的消息已恢复",
+        "attachments": "附件"
+      },
       "chat": {
         "label": "消息",
         "empty": "还没有消息",

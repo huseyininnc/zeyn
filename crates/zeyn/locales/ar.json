@@ -227,6 +227,22 @@
       }
     },
     "ui": {
+      "composer": {
+        "label": "رسالة",
+        "placeholder": "اكتب رسالة",
+        "send": "إرسال",
+        "hint_enter": "Enter يرسل، وShift+Enter يبدأ سطرًا جديدًا",
+        "hint_ctrl": "Ctrl+Enter يرسل، وEnter يبدأ سطرًا جديدًا",
+        "left": "بقي {n} حرفًا",
+        "over": "{n} حرفًا زائدًا",
+        "sent": "أُرسلت الرسالة",
+        "failed": "تعذّر إرسال الرسالة",
+        "people": "تم العثور على {n} أشخاص",
+        "no_people": "لم يُعثر على أحد",
+        "people_label": "الأشخاص",
+        "restored": "عادت رسالتك غير المرسلة",
+        "attachments": "المرفقات"
+      },
       "chat": {
         "label": "الرسائل",
         "empty": "لا توجد رسائل بعد",

@@ -215,6 +215,12 @@ pub(crate) const MODULES: &[Module] = &[
         style: &["z-thread"],
         needs: &["stream"],
     },
+    Module {
+        name: "composer",
+        script: &["data-zeyn-composer"],
+        style: &["z-composer"],
+        needs: &[],
+    },
 ];
 
 const _: () = assert!(MODULES.len() <= 64, "Used keeps one bit per module");
@@ -223,7 +229,7 @@ const _: () = assert!(MODULES.len() <= 64, "Used keeps one bit per module");
 /// are linked only when the page uses them; the others style components without markers of
 /// their own (layouts, display widgets, form sections, the palette) and every page links them,
 /// as `zeyn.css` and `enterprise.css`.
-const STYLES: [&str; 15] = [
+const STYLES: [&str; 16] = [
     "components",
     "catalog",
     "content",
@@ -239,6 +245,7 @@ const STYLES: [&str; 15] = [
     "calendar",
     "commerce",
     "thread",
+    "composer",
 ];
 
 /// The modules a page uses, one bit each in the order of [`MODULES`].
@@ -403,10 +410,18 @@ pub(crate) fn runtime(js: &'static str) -> &'static str {
 
 /// Script and style files of component modules, by path; the others are served next to their
 /// endpoints.
-const FILES: [(&str, &str); 39] = [
+const FILES: [(&str, &str); 41] = [
     (
         "/_zeyn/commerce.css",
         include_str!("../../assets/commerce.css"),
+    ),
+    (
+        "/_zeyn/composer.js",
+        include_str!("../../assets/composer.js"),
+    ),
+    (
+        "/_zeyn/composer.css",
+        include_str!("../../assets/composer.css"),
     ),
     ("/_zeyn/stream.js", include_str!("../../assets/stream.js")),
     ("/_zeyn/thread.js", include_str!("../../assets/thread.js")),

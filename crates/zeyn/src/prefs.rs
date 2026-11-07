@@ -92,12 +92,24 @@ pub struct Consent;
 /// The kind of a choice key: a short text the user picked, such as a tab.
 pub struct Choice;
 
+/// The kind of a draft key: text the user wrote and has not sent yet, such as a chat message.
+/// Kept per conversation under the key's name, at most [`MAX_DRAFT_CHARS`] characters and
+/// [`MAX_DRAFTS`] conversations, the oldest dropped first.
+pub struct Draft;
+
+/// Longest draft a [`Draft`] key keeps, in characters.
+pub const MAX_DRAFT_CHARS: usize = 4000;
+
+/// Most conversations a [`Draft`] key keeps a draft for; the oldest is dropped first.
+pub const MAX_DRAFTS: usize = 20;
+
 /// What a preference holds, for the privacy table.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PrefKind {
     Consent,
     Choice,
+    Draft,
 }
 
 /// A declared client preference key of kind `K` ([`Consent`] or [`Choice`]). Build it as a
@@ -187,6 +199,18 @@ impl ClientPref<Choice> {
     }
 }
 
+impl ClientPref<Draft> {
+    /// A draft key, such as the unsent message of a chat composer. Drafts hold what the user
+    /// typed, so they are usually [`Purpose::Preference`]: kept for the session unless the user
+    /// consented to more.
+    pub const fn draft(name: &'static str, lifetime: Duration, purpose: Purpose) -> Self {
+        ClientPref {
+            info: info(name, PrefKind::Draft, lifetime, purpose),
+            kind: PhantomData,
+        }
+    }
+}
+
 impl<K> ClientPref<K> {
     pub fn info(&self) -> PrefInfo {
         self.info
@@ -210,8 +234,12 @@ impl<K> ClientPref<K> {
             );
             return String::new();
         }
+        let max = match self.info.kind {
+            PrefKind::Draft => format!(r#" data-zeyn-remember-max="{MAX_DRAFT_CHARS}""#),
+            _ => String::new(),
+        };
         format!(
-            r#" data-zeyn-remember="{}" data-zeyn-remember-for="{}" data-zeyn-remember-purpose="{}""#,
+            r#" data-zeyn-remember="{}" data-zeyn-remember-for="{}" data-zeyn-remember-purpose="{}"{max}"#,
             self.info.name,
             self.info.lifetime.as_millis(),
             self.info.purpose.code()

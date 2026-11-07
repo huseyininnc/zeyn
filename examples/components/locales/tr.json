@@ -116,7 +116,8 @@
       "facet_panel": "Ürün kartlarını yerinde yenileyen sayılı filtreler, fiyat aralığı ve seçili filtre çipleri.",
       "review_summary": "Ortalama puan, değerlendirme sayısı ve 5'ten 1'e her yıldız için bir çubuk.",
       "countdown": "Sunucu saatindeki bir ana kalan süre ve bitiş durumu.",
-      "message_thread": "Gönderene ve güne göre sohbet balonları, iletim durumları, kaydırdıkça yüklenen geçmiş ve akışla gelen yapay zekâ yanıtları."
+      "message_thread": "Gönderene ve güne göre sohbet balonları, iletim durumları, kaydırdıkça yüklenen geçmiş ve akışla gelen yapay zekâ yanıtları.",
+      "composer": "Gönderme tuşları, ekler, @ ile anma ve sohbet başına taslakla büyüyen mesaj kutusu."
     },
     "ex": {
       "action_button": {
@@ -418,6 +419,10 @@
         "overview": "Örnek",
         "ai_answer": "Markdown ile yapay zekâ yanıtı",
         "long": "Uzun geçmiş"
+      },
+      "composer": {
+        "overview": "Sohbet listesiyle sohbet",
+        "assistant": "Yapay zekâ asistanı tarzı sohbet"
       }
     }
   }

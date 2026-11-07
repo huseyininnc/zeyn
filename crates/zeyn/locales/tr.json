@@ -242,6 +242,22 @@
       }
     },
     "ui": {
+      "composer": {
+        "label": "Mesaj",
+        "placeholder": "Bir mesaj yazın",
+        "send": "Gönder",
+        "hint_enter": "Enter gönderir, Shift+Enter yeni satır açar",
+        "hint_ctrl": "Ctrl+Enter gönderir, Enter yeni satır açar",
+        "left": "{n} karakter kaldı",
+        "over": "{n} karakter fazla",
+        "sent": "Mesaj gönderildi",
+        "failed": "Mesaj gönderilemedi",
+        "people": "{n} kişi bulundu",
+        "no_people": "Kimse bulunamadı",
+        "people_label": "Kişiler",
+        "restored": "Gönderilmemiş mesajınız geri geldi",
+        "attachments": "Ekler"
+      },
       "chat": {
         "label": "Mesajlar",
         "empty": "Henüz mesaj yok",

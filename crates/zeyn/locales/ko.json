@@ -227,6 +227,22 @@
       }
     },
     "ui": {
+      "composer": {
+        "label": "메시지",
+        "placeholder": "메시지 입력",
+        "send": "보내기",
+        "hint_enter": "Enter로 보내고 Shift+Enter로 줄을 바꿉니다",
+        "hint_ctrl": "Ctrl+Enter로 보내고 Enter로 줄을 바꿉니다",
+        "left": "{n}자 남음",
+        "over": "{n}자 초과",
+        "sent": "메시지를 보냈습니다",
+        "failed": "메시지를 보내지 못했습니다",
+        "people": "{n}명을 찾았습니다",
+        "no_people": "찾은 사람이 없습니다",
+        "people_label": "사람",
+        "restored": "보내지 않은 메시지를 되살렸습니다",
+        "attachments": "첨부 파일"
+      },
       "chat": {
         "label": "메시지",
         "empty": "아직 메시지가 없습니다",

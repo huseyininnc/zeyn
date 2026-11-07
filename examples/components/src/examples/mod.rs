@@ -17,6 +17,7 @@ pub mod chart;
 pub mod chips;
 pub mod clear_prefs;
 pub mod code_view;
+pub mod composer;
 pub mod controls;
 pub mod countdown;
 pub mod data_grid;

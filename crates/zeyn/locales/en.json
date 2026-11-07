@@ -242,6 +242,22 @@
       }
     },
     "ui": {
+      "composer": {
+        "label": "Message",
+        "placeholder": "Write a message",
+        "send": "Send",
+        "hint_enter": "Enter sends, Shift+Enter starts a new line",
+        "hint_ctrl": "Ctrl+Enter sends, Enter starts a new line",
+        "left": "{n} characters left",
+        "over": "{n} characters too many",
+        "sent": "Message sent",
+        "failed": "The message could not be sent",
+        "people": "{n} people found",
+        "no_people": "Nobody found",
+        "people_label": "People",
+        "restored": "Your unsent message is back",
+        "attachments": "Attachments"
+      },
       "chat": {
         "label": "Messages",
         "empty": "No messages yet",

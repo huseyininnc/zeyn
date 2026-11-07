@@ -118,7 +118,8 @@ fn sample() -> Vec<ChatMessage> {
 
 static MESSAGES: LazyLock<Mutex<Vec<ChatMessage>>> = LazyLock::new(|| Mutex::new(sample()));
 
-pub(crate) fn messages() -> std::sync::MutexGuard<'static, Vec<ChatMessage>> {
+/// The shared sample store, locked.
+pub fn messages() -> std::sync::MutexGuard<'static, Vec<ChatMessage>> {
     MESSAGES
         .lock()
         .unwrap_or_else(|e| e.into_inner())

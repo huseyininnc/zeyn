@@ -291,6 +291,10 @@ What to remember:
   the history action takes `ThreadQuery` and must check the user is in `q.conversation`. AI
   replies: `.reply(action)` with an action taking `ReplyRequest` and returning `Reply::channel(key)`
   fed from a spawned task; stop when `tx.send(..)` returns `false`. Never stream into HTML yourself.
+  Writing: `Composer::of(send).conversation(id)` with `.attachments(RULES)`, `.mentions(lookup)`,
+  `.remember(DRAFT)` (a `ClientPref::draft` key registered with `App::client_prefs`) and
+  `.send_key(SendKey::CtrlEnter)` for long text; the send action takes `ChatSend` and must check
+  membership and mentions itself.
 - The app (`src/app.rs`): `App::new(t!("app.name")).i18n(i18n).service(store).feature(sales::feature())`,
   plus what the app needs: `.auth(...)`, `.mcp(Mcp::read_only())`, `.themes([...])`,
   `.datagrid_views(store)`, `.assistant(...)`.

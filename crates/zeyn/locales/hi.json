@@ -227,6 +227,22 @@
       }
     },
     "ui": {
+      "composer": {
+        "label": "संदेश",
+        "placeholder": "संदेश लिखें",
+        "send": "भेजें",
+        "hint_enter": "Enter भेजता है, Shift+Enter नई पंक्ति शुरू करता है",
+        "hint_ctrl": "Ctrl+Enter भेजता है, Enter नई पंक्ति शुरू करता है",
+        "left": "{n} अक्षर बाकी",
+        "over": "{n} अक्षर ज़्यादा",
+        "sent": "संदेश भेजा गया",
+        "failed": "संदेश नहीं भेजा जा सका",
+        "people": "{n} लोग मिले",
+        "no_people": "कोई नहीं मिला",
+        "people_label": "लोग",
+        "restored": "आपका न भेजा गया संदेश वापस आ गया",
+        "attachments": "अटैचमेंट"
+      },
       "chat": {
         "label": "संदेश",
         "empty": "अभी कोई संदेश नहीं",

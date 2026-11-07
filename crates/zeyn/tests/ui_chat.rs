@@ -1,4 +1,5 @@
-//! Chat components: the message thread with its history and streamed AI replies.
+//! Chat components: the message thread with its history and streamed AI replies, and the
+//! composer with its sends, mentions, attachments and drafts.
 
 use axum::body::Body;
 use axum::http::{HeaderMap, Request, StatusCode, header};
@@ -7,7 +8,10 @@ use serde_json::json;
 use std::sync::{Arc, Mutex};
 use tower::ServiceExt;
 use zeyn::prelude::*;
-use zeyn::ui::{Delivery, MAX_REPLY_CHARS, MessageThread, Reply, ReplyRequest, ThreadQuery};
+use zeyn::ui::{
+    ChatSend, Composer, Delivery, LookupItem, LookupQuery, MAX_REPLY_CHARS, MessageThread, Reply,
+    ReplyRequest, SendKey, ThreadQuery,
+};
 use zeyn::{I18n, Identity};
 
 #[entity(table = "messages")]
@@ -155,9 +159,15 @@ const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789a
 const ALL: &str = "chat.read,chat.write,chat.ai";
 
 fn app_with(chat: Chat, writes: u32) -> axum::Router {
+    app_sent(chat, Sent::default(), writes)
+}
+
+fn app_sent(chat: Chat, sent: Sent, writes: u32) -> axum::Router {
     App::new("Chat")
         .i18n(I18n::new("en"))
         .service(chat)
+        .service(sent)
+        .client_prefs(|p| p.key(CHAT_DRAFTS))
         .auth(|h: &HeaderMap| {
             let perms: Vec<String> = h
                 .get("x-perms")?
@@ -175,7 +185,9 @@ fn app_with(chat: Chat, writes: u32) -> axum::Router {
         .feature(
             Feature::new("chat")
                 .screen(plain)
-                .screen(room),
+                .screen(room)
+                .screen(write)
+                .files(CHAT_FILES, "chat.write", zeyn::MemoryStore::default()),
         )
         .router()
         .unwrap()
@@ -503,4 +515,196 @@ async fn streamed_replies_count_against_the_write_limit() {
     )
     .await;
     assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+}
+
+#[derive(Clone, Default)]
+pub struct Sent(Arc<Mutex<Vec<ChatSend>>>);
+
+impl Service for Sent {}
+
+#[action(permission = "chat.write")]
+pub async fn send_message(m: ChatSend, sent: Sent) -> Result<()> {
+    sent.0.lock().unwrap().push(m);
+    Ok(())
+}
+
+#[action(permission = "chat.read")]
+pub async fn search_people(q: LookupQuery) -> Result<Page<LookupItem>> {
+    let people: Vec<LookupItem> = (1..=30)
+        .map(|i| LookupItem::new(i, format!("Person <{i}>")))
+        .collect();
+    Ok(Page::new(people).total(30 + u64::from(q.limit)))
+}
+
+pub const CHAT_DRAFTS: zeyn::ClientPref<zeyn::Draft> = zeyn::ClientPref::draft(
+    "chat-draft",
+    std::time::Duration::from_secs(86_400),
+    zeyn::Purpose::Preference,
+);
+
+#[screen(route = "/write", permission = "chat.read")]
+pub fn write() -> Screen {
+    Screen::new("Write").body(
+        Stack::new().add(
+            Composer::of(send_message)
+                .conversation("a")
+                .max_chars(20)
+                .send_key(SendKey::CtrlEnter)
+                .attachments(CHAT_FILES)
+                .mentions(search_people)
+                .remember(CHAT_DRAFTS),
+        ),
+    )
+}
+
+fn send_call(input: serde_json::Value) -> serde_json::Value {
+    json!({ "screen": "write", "params": null, "node": "0.0", "key": "send", "input": input })
+}
+
+fn file(id: &str) -> serde_json::Value {
+    json!({ "id": id, "name": "a.png", "size": 10, "type": "image/png" })
+}
+
+#[tokio::test]
+async fn the_composer_renders_its_limits_and_keys_and_loads_only_where_used() {
+    let router = app(Chat::seeded());
+    let (_, bare) = get_as(&router, "/plain", ALL).await;
+    assert!(!bare.contains("/_zeyn/composer.js") && !bare.contains("/_zeyn/files.js"));
+    let (status, page) = get_as(&router, "/write", ALL).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(page.contains("/_zeyn/composer.js?v=") && page.contains("/_zeyn/composer.css?v="));
+    assert!(
+        page.contains("/_zeyn/files.js?v="),
+        "attachments bring the upload module"
+    );
+    assert!(page.contains(r#"data-send-key="ctrl-enter""#) && page.contains(r#"data-max="20""#));
+    assert!(page.contains(r#"data-room="a""#) && page.contains("data-mentions"));
+    assert!(
+        page.contains(r#"data-zeyn-remember="chat-draft""#)
+            && page.contains(r#"data-zeyn-remember-max="4000""#)
+    );
+    assert!(
+        page.contains(r#"aria-disabled="true""#),
+        "nothing to send yet"
+    );
+    assert!(page.contains(r#"role="listbox""#) && page.contains(r#"aria-autocomplete="list""#));
+    let (_, reader) = get_as(&router, "/write", "chat.read").await;
+    assert!(
+        !reader.contains("data-zeyn-composer"),
+        "no composer without the send permission"
+    );
+    assert!(!reader.contains("/_zeyn/composer.js"));
+}
+
+#[tokio::test]
+async fn sending_needs_csrf_the_permission_and_a_message_that_fits() {
+    let sent = Sent::default();
+    let router = app_sent(Chat::seeded(), sent.clone(), 1000);
+    let ok = send_call(
+        json!({ "text": "  hi <b>  ", "mentions": [3, 3, 1], "attachments": [file("0123456789abcdef0123456789abcdef")] }),
+    );
+    let (status, _) = post(&router, "/_zeyn/data", ALL, Csrf::Missing, ok.clone()).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let (status, _) = post(&router, "/_zeyn/data", "chat.read", Csrf::Sent, ok.clone()).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let (status, body) = post(&router, "/_zeyn/data", ALL, Csrf::Sent, ok).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let got = sent
+        .0
+        .lock()
+        .unwrap()
+        .last()
+        .cloned()
+        .unwrap();
+    assert_eq!(
+        got.conversation, "a",
+        "the conversation comes from the server"
+    );
+    assert_eq!(got.text, "hi <b>");
+    assert_eq!(got.mentions, vec![1, 3]);
+    assert_eq!(got.attachments.len(), 1);
+    for bad in [
+        json!({ "text": "   " }),
+        json!({ "text": "x".repeat(21) }),
+        json!({ "text": "hi", "attachments": [file("../../etc/passwd")] }),
+        json!({ "text": "hi", "attachments": (0..11).map(|_| file("0123456789abcdef0123456789abcdef")).collect::<Vec<_>>() }),
+        json!({ "text": "hi", "mentions": (0..21).collect::<Vec<i64>>() }),
+        json!({ "text": "hi", "conversation": "b" }),
+    ] {
+        let before = sent.0.lock().unwrap().len();
+        let (status, _) = post(
+            &router,
+            "/_zeyn/data",
+            ALL,
+            Csrf::Sent,
+            send_call(bad.clone()),
+        )
+        .await;
+        if bad.get("conversation").is_some() {
+            assert_eq!(status, StatusCode::OK);
+            assert_eq!(
+                sent.0
+                    .lock()
+                    .unwrap()
+                    .last()
+                    .unwrap()
+                    .conversation,
+                "a"
+            );
+        } else {
+            assert_eq!(status, StatusCode::NOT_FOUND, "{bad}");
+            assert_eq!(sent.0.lock().unwrap().len(), before);
+        }
+    }
+    let (status, _) = post(&router, "/_zeyn/data", ALL, Csrf::Sent, json!({ "screen": "write", "params": null, "node": "0", "key": "send", "input": { "text": "hi" } })).await;
+    assert_eq!(
+        status,
+        StatusCode::NOT_FOUND,
+        "the stack is not the composer"
+    );
+}
+
+#[tokio::test]
+async fn mention_searches_are_bounded_and_need_the_lookup_permission() {
+    let router = app(Chat::seeded());
+    let call = |text: &str| json!({ "screen": "write", "params": null, "node": "0.0", "key": "mentions", "input": { "text": text } });
+    let (status, body) = post(&router, "/_zeyn/data", ALL, Csrf::Sent, call("pe")).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let v: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(
+        v["items"].as_array().unwrap().len(),
+        zeyn::ui::MAX_MENTIONS as usize
+    );
+    assert_eq!(v["items"][0]["label"], "Person <1>");
+    let (status, _) = post(
+        &router,
+        "/_zeyn/data",
+        ALL,
+        Csrf::Sent,
+        call(&"x".repeat(51)),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    let (status, _) = post(&router, "/_zeyn/data", "chat.write", Csrf::Sent, call("pe")).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn sends_count_against_the_write_limit() {
+    let router = app_sent(Chat::seeded(), Sent::default(), 2);
+    for expected in [
+        StatusCode::OK,
+        StatusCode::OK,
+        StatusCode::TOO_MANY_REQUESTS,
+    ] {
+        let (status, _) = post(
+            &router,
+            "/_zeyn/data",
+            ALL,
+            Csrf::Sent,
+            send_call(json!({ "text": "hi" })),
+        )
+        .await;
+        assert_eq!(status, expected);
+    }
 }

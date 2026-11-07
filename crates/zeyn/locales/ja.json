@@ -227,6 +227,22 @@
       }
     },
     "ui": {
+      "composer": {
+        "label": "メッセージ",
+        "placeholder": "メッセージを入力",
+        "send": "送信",
+        "hint_enter": "Enter で送信、Shift+Enter で改行",
+        "hint_ctrl": "Ctrl+Enter で送信、Enter で改行",
+        "left": "残り {n} 文字",
+        "over": "{n} 文字超過",
+        "sent": "メッセージを送信しました",
+        "failed": "メッセージを送信できませんでした",
+        "people": "{n} 人が見つかりました",
+        "no_people": "見つかりませんでした",
+        "people_label": "ユーザー",
+        "restored": "未送信のメッセージを復元しました",
+        "attachments": "添付ファイル"
+      },
       "chat": {
         "label": "メッセージ",
         "empty": "まだメッセージはありません",

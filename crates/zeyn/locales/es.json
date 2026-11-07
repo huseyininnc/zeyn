@@ -227,6 +227,22 @@
       }
     },
     "ui": {
+      "composer": {
+        "label": "Mensaje",
+        "placeholder": "Escribe un mensaje",
+        "send": "Enviar",
+        "hint_enter": "Enter envía, Mayús+Enter añade una línea",
+        "hint_ctrl": "Ctrl+Enter envía, Enter añade una línea",
+        "left": "Quedan {n} caracteres",
+        "over": "{n} caracteres de más",
+        "sent": "Mensaje enviado",
+        "failed": "No se pudo enviar el mensaje",
+        "people": "{n} personas encontradas",
+        "no_people": "No se encontró a nadie",
+        "people_label": "Personas",
+        "restored": "Tu mensaje sin enviar ha vuelto",
+        "attachments": "Adjuntos"
+      },
       "chat": {
         "label": "Mensajes",
         "empty": "Todavía no hay mensajes",

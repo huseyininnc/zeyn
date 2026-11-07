@@ -116,7 +116,8 @@
       "facet_panel": "Counted filters, a price range and chosen filter chips that refresh product cards in place.",
       "review_summary": "The average rating, the number of reviews and a bar for each star from 5 to 1.",
       "countdown": "The time left until a moment on the server's clock, with an end state.",
-      "message_thread": "Chat bubbles by sender and day, delivery states, a history that loads as it scrolls, streamed AI replies."
+      "message_thread": "Chat bubbles by sender and day, delivery states, a history that loads as it scrolls, streamed AI replies.",
+      "composer": "A growing message box with send keys, attachments, @ mentions and drafts per conversation."
     },
     "ex": {
       "action_button": {
@@ -418,6 +419,10 @@
         "overview": "Example",
         "ai_answer": "AI answer in Markdown",
         "long": "Long history"
+      },
+      "composer": {
+        "overview": "Chat with conversations",
+        "assistant": "AI assistant style thread"
       }
     }
   }

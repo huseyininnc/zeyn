@@ -358,3 +358,58 @@ async fn cart_writes_are_capped_and_count_against_the_write_limit() {
     assert!(CART.len() <= MAX_VISITOR_ENTRIES);
     assert_eq!(CART.last(), Some(("item-42-m".to_string(), 2)));
 }
+
+#[tokio::test]
+async fn the_chat_samples_keep_their_caps_and_sends_reach_the_store() {
+    use zeyn::FileStore;
+    use zeyn_example_components::examples::{composer, message_thread};
+    let router = site::router(app().unwrap().router().unwrap());
+    let node = node_of(&router, "/ui/composer", r#"<form class="z-composer""#).await;
+    let status = write(
+        &router,
+        "composer",
+        &node,
+        "send",
+        serde_json::json!({ "text": "hello from the test" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        message_thread::messages()
+            .iter()
+            .any(|m| m.body == "hello from the test" && m.room == "team")
+    );
+    for i in 0..message_thread::MAX_SAMPLE_MESSAGES + 50 {
+        message_thread::add(message_thread::ChatMessage {
+            body: format!("filler {i}"),
+            room: "team".into(),
+            ..Default::default()
+        });
+        assert!(message_thread::stored() <= message_thread::MAX_SAMPLE_MESSAGES);
+    }
+    let newest = format!("filler {}", message_thread::MAX_SAMPLE_MESSAGES + 49);
+    assert!(
+        message_thread::messages()
+            .iter()
+            .any(|m| m.body == newest),
+        "the newest stay, the oldest go"
+    );
+    let files = composer::SampleFiles::new();
+    for i in 0..composer::MAX_SAMPLE_FILES + 5 {
+        let meta = zeyn::FileMeta {
+            id: format!("{i:032x}"),
+            name: format!("f{i}.png"),
+            content_type: "image/png".into(),
+            size: 0,
+            tenant: None,
+            owner: None,
+            created: 0,
+        };
+        files
+            .put(meta, zeyn::FileChunks::from_parts(vec![vec![0u8; 1000]]))
+            .await
+            .unwrap();
+        assert!(files.stored() <= composer::MAX_SAMPLE_FILES);
+    }
+    assert_eq!(files.stored(), composer::MAX_SAMPLE_FILES);
+}
