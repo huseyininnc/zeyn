@@ -22,14 +22,29 @@ const MAX_LINE: usize = 1024 * 1024;
 const ERROR_BODY: usize = 2_048;
 
 /// HTTP client shared by the providers of one app, with TLS from rustls and the platform's
-/// certificate store.
+/// certificate store. Redirects are not followed: they would carry the `api-key` and `x-api-key`
+/// headers to another host, or from `https` down to plain `http`.
 fn client() -> reqwest::Client {
     let _ = rustls::crypto::ring::default_provider().install_default();
     reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(10))
         .read_timeout(Duration::from_secs(120))
+        .redirect(reqwest::redirect::Policy::none())
         .build()
         .unwrap_or_default()
+}
+
+/// Whether a key may travel to `url`: over `https`, or over plain `http` only to this machine
+/// (`localhost`, `127.0.0.0/8`, `::1`), as for a local Ollama.
+fn key_may_go_to(url: &reqwest::Url) -> bool {
+    url.scheme() == "https"
+        || url.host_str().is_some_and(|h| {
+            h == "localhost"
+                || h.trim_start_matches('[')
+                    .trim_end_matches(']')
+                    .parse::<std::net::IpAddr>()
+                    .is_ok_and(|ip| ip.is_loopback())
+        })
 }
 
 /// How a request proves who it is.
@@ -53,10 +68,23 @@ fn authorize(
 }
 
 /// Sends a request and returns the response when it succeeded; otherwise an internal error with
-/// the status and the start of the body, for the server log only.
+/// the status and the start of the body, for the server log only. A request that carries an API
+/// key is refused unless [`key_may_go_to`] its address, so the key never crosses a network in
+/// clear text.
 async fn send(req: reqwest::RequestBuilder, what: &str) -> crate::Result<reqwest::Response> {
-    let res = req
-        .send()
+    let (http, req) = req.build_split();
+    let req =
+        req.map_err(|e| Error::Internal(format!("{what}: bad request: {}", e.without_url())))?;
+    let keyed = ["authorization", "api-key", "x-api-key"]
+        .iter()
+        .any(|h| req.headers().contains_key(*h));
+    if keyed && !key_may_go_to(req.url()) {
+        return Err(Error::Internal(format!(
+            "{what}: an API key is only sent over https, or over http to this machine"
+        )));
+    }
+    let res = http
+        .execute(req)
         .await
         .map_err(|e| Error::Internal(format!("{what}: request failed: {}", e.without_url())))?;
     if res.status().is_success() {
