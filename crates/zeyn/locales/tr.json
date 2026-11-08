@@ -242,6 +242,12 @@
       }
     },
     "ui": {
+      "typing": {
+        "one": "{name} yazıyor",
+        "two": "{a} ve {b} yazıyor",
+        "many": "{n} kişi yazıyor",
+        "someone": "Birisi"
+      },
       "composer": {
         "label": "Mesaj",
         "placeholder": "Bir mesaj yazın",

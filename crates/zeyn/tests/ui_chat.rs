@@ -1,5 +1,5 @@
 //! Chat components: the message thread with its history and streamed AI replies, and the
-//! composer with its sends, mentions, attachments and drafts.
+//! composer with its sends, mentions, attachments and drafts, and the typing indicator.
 
 use axum::body::Body;
 use axum::http::{HeaderMap, Request, StatusCode, header};
@@ -10,7 +10,7 @@ use tower::ServiceExt;
 use zeyn::prelude::*;
 use zeyn::ui::{
     ChatSend, Composer, Delivery, LookupItem, LookupQuery, MAX_REPLY_CHARS, MessageThread, Reply,
-    ReplyRequest, SendKey, ThreadQuery,
+    ReplyRequest, SendKey, ThreadQuery, TypingIndicator,
 };
 use zeyn::{I18n, Identity};
 
@@ -187,6 +187,7 @@ fn app_sent(chat: Chat, sent: Sent, writes: u32) -> axum::Router {
                 .screen(plain)
                 .screen(room)
                 .screen(write)
+                .screen(typing)
                 .files(CHAT_FILES, "chat.write", zeyn::MemoryStore::default()),
         )
         .router()
@@ -707,4 +708,45 @@ async fn sends_count_against_the_write_limit() {
         .await;
         assert_eq!(status, expected);
     }
+}
+
+#[screen(route = "/typing", permission = "chat.read")]
+pub fn typing() -> Screen {
+    Screen::new("Typing").body(
+        Stack::new().add(
+            TypingIndicator::new("chat")
+                .conversation("a")
+                .person("ada", "Ada <L>"),
+        ),
+    )
+}
+
+#[tokio::test]
+async fn without_realtime_the_typing_indicator_renders_nothing_and_loads_nothing() {
+    let (status, page) = get_as(&app(Chat::seeded()), "/typing", ALL).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(!page.contains("data-zeyn-typing"));
+    assert!(!page.contains("/_zeyn/typing.js") && !page.contains("/_zeyn/live.js"));
+}
+
+#[cfg(feature = "realtime")]
+#[tokio::test]
+async fn with_realtime_the_indicator_knows_people_by_key_and_never_by_id() {
+    let realtime = zeyn::realtime::Realtime::new().topic("chat", "chat.read");
+    let hub = realtime.hub();
+    let router = App::new("Chat")
+        .i18n(I18n::new("en"))
+        .auth(|_: &HeaderMap| Some(Identity::user("u").with_permissions(["chat.read"])))
+        .feature(Feature::new("chat").screen(typing))
+        .realtime(realtime)
+        .router()
+        .unwrap();
+    let (status, page) = get_as(&router, "/typing", ALL).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(page.contains("data-zeyn-typing") && page.contains(r#"data-zeyn-live="chat""#));
+    assert!(page.contains("/_zeyn/typing.js?v=") && page.contains("/_zeyn/live.js"));
+    assert!(page.contains(&format!(r#"data-self="{}""#, hub.person_key("", "u"))));
+    assert!(page.contains(&hub.person_key("", "ada")));
+    assert!(page.contains("Ada &lt;L&gt;") && !page.contains("Ada <L>"));
+    assert!(!page.contains(r#""ada""#), "user ids stay on the server");
 }

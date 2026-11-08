@@ -267,6 +267,7 @@ pub mod prelude {
     };
     pub use crate::ui::{
         ChatSend, Composer, Delivery, MessageThread, ReplyRequest, SendKey, ThreadQuery,
+        TypingIndicator,
     };
     pub use crate::ui::{
         Countdown, Facet, FacetPanel, Price, PriceUnit, ProductGallery, QuantityStepper,

@@ -227,6 +227,12 @@
       }
     },
     "ui": {
+      "typing": {
+        "one": "{name} 正在输入",
+        "two": "{a} 和 {b} 正在输入",
+        "many": "{n} 人正在输入",
+        "someone": "有人"
+      },
       "composer": {
         "label": "消息",
         "placeholder": "输入消息",

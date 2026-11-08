@@ -227,6 +227,12 @@
       }
     },
     "ui": {
+      "typing": {
+        "one": "{name} さんが入力中",
+        "two": "{a} さんと {b} さんが入力中",
+        "many": "{n} 人が入力中",
+        "someone": "誰か"
+      },
       "composer": {
         "label": "メッセージ",
         "placeholder": "メッセージを入力",

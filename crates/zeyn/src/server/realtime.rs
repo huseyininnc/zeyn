@@ -238,8 +238,11 @@ struct Room {
     store: Arc<dyn DocStore>,
 }
 
-/// A connection that listens to a topic: its id and its outgoing queue.
-type Subscriber = (u64, Outbox);
+/// A connection that listens to a topic: its id, its outgoing queue and its user.
+type Subscriber = (u64, Outbox, Arc<str>);
+
+/// Most users whose last typing signal the hub remembers; older entries make room first.
+pub const MAX_TYPING_USERS: usize = 4096;
 
 #[derive(Default)]
 struct Inner {
@@ -249,6 +252,10 @@ struct Inner {
     topics: Mutex<HashMap<(String, String), Vec<Subscriber>>>,
     next: AtomicU64,
     sweeping: AtomicBool,
+    /// When each user (by tenant and user id) last sent a typing signal.
+    typing: Mutex<HashMap<(String, String), Instant>>,
+    /// Secret of the person keys typing signals carry, made when first needed.
+    salt: OnceLock<u64>,
 }
 
 /// The realtime hub: rooms, topic subscribers and their counters.
@@ -281,12 +288,82 @@ impl Hub {
         if let Ok(mut topics) = self.0.topics.lock()
             && let Some(subs) = topics.get_mut(&key)
         {
-            subs.retain(|(_, tx)| {
+            subs.retain(|(_, tx, _)| {
                 !matches!(
                     tx.try_send(Message::Text(text.clone().into())),
                     Err(mpsc::error::TrySendError::Closed(_))
                 )
             });
+        }
+    }
+
+    /// The key a typing signal carries for a user: a keyed hash that only this hub can make, so
+    /// pages can tell people apart without seeing their user ids.
+    pub fn person_key(&self, tenant: &str, user: &str) -> String {
+        let salt = *self.0.salt.get_or_init(|| {
+            let mut bytes = [0u8; 8];
+            getrandom::getrandom(&mut bytes).expect("the operating system random source must work");
+            u64::from_le_bytes(bytes)
+        });
+        let mut h: u64 = 0xcbf2_9ce4_8422_2325 ^ salt;
+        for b in tenant
+            .bytes()
+            .chain([0])
+            .chain(user.bytes())
+        {
+            h ^= u64::from(b);
+            h = h.wrapping_mul(0x0100_0000_01b3);
+        }
+        h ^= salt.rotate_left(29);
+        h = h.wrapping_mul(0x0100_0000_01b3);
+        format!("{h:016x}")
+    }
+
+    /// Whether a user may send a typing signal now: at most one every
+    /// [`TYPING_EVERY_SECONDS`](crate::ui::TYPING_EVERY_SECONDS), remembered for at most
+    /// [`MAX_TYPING_USERS`] users.
+    fn typing_allowed(&self, tenant: &str, user: &str) -> bool {
+        let every = Duration::from_secs(crate::ui::TYPING_EVERY_SECONDS);
+        let Ok(mut map) = self.0.typing.lock() else {
+            return false;
+        };
+        let key = (tenant.to_string(), user.to_string());
+        let now = Instant::now();
+        if map
+            .get(&key)
+            .is_some_and(|at| now.duration_since(*at) < every)
+        {
+            return false;
+        }
+        if map.len() >= MAX_TYPING_USERS && !map.contains_key(&key) {
+            map.retain(|_, at| now.duration_since(*at) < every);
+            if map.len() >= MAX_TYPING_USERS {
+                return false;
+            }
+        }
+        map.insert(key, now);
+        true
+    }
+
+    /// Passes a typing signal of `user` in conversation `room` to the other users subscribed to
+    /// `topic` in the tenant. Signals faster than one every three seconds per user are dropped.
+    fn typing(&self, tenant: &str, topic: &str, user: &str, room: &str) {
+        if !self.typing_allowed(tenant, user) {
+            return;
+        }
+        let text = serde_json::json!({
+            "topic": topic,
+            "typing": { "room": room, "who": self.person_key(tenant, user) },
+        })
+        .to_string();
+        if let Ok(topics) = self.0.topics.lock()
+            && let Some(subs) = topics.get(&(tenant.to_string(), topic.to_string()))
+        {
+            for (_, tx, who) in subs {
+                if &**who != user {
+                    let _ = tx.try_send(Message::Text(text.clone().into()));
+                }
+            }
         }
     }
 
@@ -818,6 +895,24 @@ fn apply(room: &Room, from: u64, data: &[u8], can_write: bool, limits: &Limits) 
     Ok(())
 }
 
+/// Reads a typing signal a browser sent on a topic socket: `{"t":"typing","topic":..,"room":..}`
+/// on a topic this socket subscribed to, the room at most 200 characters without control
+/// characters. Anything else is ignored.
+fn typing_signal(text: &str, topics: &[&'static str]) -> Option<(&'static str, String)> {
+    #[derive(Deserialize)]
+    struct Signal {
+        t: String,
+        topic: String,
+        room: String,
+    }
+    let s: Signal = serde_json::from_str(text).ok()?;
+    let topic = topics.iter().find(|t| **t == s.topic)?;
+    let fits = s.t == "typing"
+        && s.room.chars().count() <= crate::ui::MAX_CONVERSATION
+        && !s.room.chars().any(char::is_control);
+    fits.then_some((topic, s.room))
+}
+
 async fn topic_socket(
     State(st): State<Arc<AppState>>,
     query: Result<Query<LiveQuery>, QueryRejection>,
@@ -888,11 +983,18 @@ async fn topic_socket(
         .0
         .next
         .fetch_add(1, Ordering::Relaxed);
+    let user_key: Arc<str> = ctx
+        .identity()
+        .user
+        .clone()
+        .unwrap_or_default()
+        .into();
+    let signals = hub.clone();
     if let Ok(mut map) = hub.0.topics.lock() {
         for t in &topics {
             map.entry((tenant.clone(), t.to_string()))
                 .or_default()
-                .push((id, tx.clone()));
+                .push((id, tx.clone(), user_key.clone()));
         }
     }
     drop(tx);
@@ -909,6 +1011,12 @@ async fn topic_socket(
                 },
                 incoming = stream.next() => match incoming {
                     Some(Ok(Message::Close(_))) | Some(Err(_)) | None => break,
+                    Some(Ok(Message::Text(text))) => {
+                        heard = Instant::now();
+                        if let Some((topic, room)) = typing_signal(&text, &topics) {
+                            signals.typing(&tenant, topic, &user_key, &room);
+                        }
+                    }
                     Some(Ok(_)) => heard = Instant::now(),
                 },
                 _ = beat.tick() => {
@@ -922,7 +1030,7 @@ async fn topic_socket(
             for t in &topics {
                 let key = (tenant.clone(), t.to_string());
                 if let Some(subs) = map.get_mut(&key) {
-                    subs.retain(|(c, _)| *c != id);
+                    subs.retain(|(c, _, _)| *c != id);
                     if subs.is_empty() {
                         map.remove(&key);
                     }

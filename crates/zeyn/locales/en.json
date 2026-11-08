@@ -242,6 +242,12 @@
       }
     },
     "ui": {
+      "typing": {
+        "one": "{name} is typing",
+        "two": "{a} and {b} are typing",
+        "many": "{n} people are typing",
+        "someone": "Someone"
+      },
       "composer": {
         "label": "Message",
         "placeholder": "Write a message",

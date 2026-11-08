@@ -246,6 +246,7 @@ catalog! {
     "chat" Message {
         message_thread "/ui/message-thread";
         composer "/ui/composer" (Demo);
+        typing_indicator "/ui/typing-indicator";
     }
 }
 

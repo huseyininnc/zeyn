@@ -295,6 +295,8 @@ What to remember:
   `.remember(DRAFT)` (a `ClientPref::draft` key registered with `App::client_prefs`) and
   `.send_key(SendKey::CtrlEnter)` for long text; the send action takes `ChatSend` and must check
   membership and mentions itself.
+  Typing: `TypingIndicator::new("chat").conversation(id).person(user, name)` needs `App::realtime`
+  with `Realtime::topic("chat", perm)`; without it, it renders nothing.
 - The app (`src/app.rs`): `App::new(t!("app.name")).i18n(i18n).service(store).feature(sales::feature())`,
   plus what the app needs: `.auth(...)`, `.mcp(Mcp::read_only())`, `.themes([...])`,
   `.datagrid_views(store)`, `.assistant(...)`.

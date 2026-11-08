@@ -117,7 +117,8 @@
       "review_summary": "The average rating, the number of reviews and a bar for each star from 5 to 1.",
       "countdown": "The time left until a moment on the server's clock, with an end state.",
       "message_thread": "Chat bubbles by sender and day, delivery states, a history that loads as it scrolls, streamed AI replies.",
-      "composer": "A growing message box with send keys, attachments, @ mentions and drafts per conversation."
+      "composer": "A growing message box with send keys, attachments, @ mentions and drafts per conversation.",
+      "typing_indicator": "Who else is typing in a conversation, over the realtime channel."
     },
     "ex": {
       "action_button": {
@@ -423,7 +424,13 @@
       "composer": {
         "overview": "Chat with conversations",
         "assistant": "AI assistant style thread"
+      },
+      "typing_indicator": {
+        "overview": "Example"
       }
+    },
+    "typing": {
+      "realtime": "This catalog runs without the realtime channel, so the indicator stays empty and the composer sends no typing signals. In an app with App::realtime and the topic declared, the names of the others show here while they type."
     }
   }
 }

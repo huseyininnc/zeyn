@@ -227,6 +227,12 @@
       }
     },
     "ui": {
+      "typing": {
+        "one": "{name}님이 입력 중",
+        "two": "{a}님과 {b}님이 입력 중",
+        "many": "{n}명이 입력 중",
+        "someone": "누군가"
+      },
       "composer": {
         "label": "메시지",
         "placeholder": "메시지 입력",
