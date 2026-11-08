@@ -34,7 +34,8 @@
       "shell": "Kabuk",
       "admin": "Yönetim",
       "shell": "Kabuk",
-      "shop": "Mağaza"
+      "shop": "Mağaza",
+      "chat": "Sohbet"
     },
     "summary": {
       "stack": "Aralarında boşluk olan, alt alta düğümler.",
@@ -114,7 +115,10 @@
       "product_gallery": "Küçük resimler, yakınlaştırma, kaydırma ve tam ekran görünümüyle ürün fotoğrafları.",
       "facet_panel": "Ürün kartlarını yerinde yenileyen sayılı filtreler, fiyat aralığı ve seçili filtre çipleri.",
       "review_summary": "Ortalama puan, değerlendirme sayısı ve 5'ten 1'e her yıldız için bir çubuk.",
-      "countdown": "Sunucu saatindeki bir ana kalan süre ve bitiş durumu."
+      "countdown": "Sunucu saatindeki bir ana kalan süre ve bitiş durumu.",
+      "message_thread": "Gönderene ve güne göre sohbet balonları, iletim durumları, kaydırdıkça yüklenen geçmiş ve akışla gelen yapay zekâ yanıtları.",
+      "composer": "Gönderme tuşları, ekler, @ ile anma ve sohbet başına taslakla büyüyen mesaj kutusu.",
+      "typing_indicator": "Bir sohbette başka kimlerin yazdığını gerçek zamanlı kanal üzerinden gösterir."
     },
     "ex": {
       "action_button": {
@@ -411,7 +415,22 @@
       "countdown": {
         "overview": "Örnek",
         "short": "Bir dakikadan biraz fazla"
+      },
+      "message_thread": {
+        "overview": "Örnek",
+        "ai_answer": "Markdown ile yapay zekâ yanıtı",
+        "long": "Uzun geçmiş"
+      },
+      "composer": {
+        "overview": "Sohbet listesiyle sohbet",
+        "assistant": "Yapay zekâ asistanı tarzı sohbet"
+      },
+      "typing_indicator": {
+        "overview": "Örnek"
       }
+    },
+    "typing": {
+      "realtime": "Bu katalog gerçek zamanlı kanal olmadan çalışır; bu yüzden gösterge boş kalır ve mesaj kutusu yazma sinyali göndermez. App::realtime ve konusu tanımlanmış bir uygulamada, diğerleri yazarken adları burada görünür."
     }
   }
 }

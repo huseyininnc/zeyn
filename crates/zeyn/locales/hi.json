@@ -227,6 +227,51 @@
       }
     },
     "ui": {
+      "typing": {
+        "one": "{name} लिख रहे हैं",
+        "two": "{a} और {b} लिख रहे हैं",
+        "many": "{n} लोग लिख रहे हैं",
+        "someone": "कोई"
+      },
+      "composer": {
+        "label": "संदेश",
+        "placeholder": "संदेश लिखें",
+        "send": "भेजें",
+        "hint_enter": "Enter भेजता है, Shift+Enter नई पंक्ति शुरू करता है",
+        "hint_ctrl": "Ctrl+Enter भेजता है, Enter नई पंक्ति शुरू करता है",
+        "left": "{n} अक्षर बाकी",
+        "over": "{n} अक्षर ज़्यादा",
+        "sent": "संदेश भेजा गया",
+        "failed": "संदेश नहीं भेजा जा सका",
+        "people": "{n} लोग मिले",
+        "no_people": "कोई नहीं मिला",
+        "people_label": "लोग",
+        "restored": "आपका न भेजा गया संदेश वापस आ गया",
+        "attachments": "अटैचमेंट"
+      },
+      "chat": {
+        "label": "संदेश",
+        "empty": "अभी कोई संदेश नहीं",
+        "you": "आप",
+        "today": "आज",
+        "yesterday": "कल",
+        "attachments": "अटैचमेंट",
+        "more_files": "{n} और फ़ाइलें",
+        "new_message": "{name} से नया संदेश: {text}",
+        "assistant": "सहायक",
+        "writing": "जवाब लिखा जा रहा है",
+        "stop": "रोकें",
+        "stopped": "जवाब रोक दिया गया",
+        "reply_failed": "जवाब लोड नहीं हो सका",
+        "loading": "पुराने संदेश लोड हो रहे हैं",
+        "status": {
+          "sending": "भेजा जा रहा है",
+          "sent": "भेजा गया",
+          "delivered": "पहुँचा",
+          "read": "पढ़ा गया",
+          "failed": "नहीं भेजा गया"
+        }
+      },
       "resize": "पैन का आकार बदलें",
       "cards": {
         "load_more": "और दिखाएँ",

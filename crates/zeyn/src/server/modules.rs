@@ -208,6 +208,25 @@ pub(crate) const MODULES: &[Module] = &[
         ],
         needs: &[],
     },
+    script("stream", &[]),
+    Module {
+        name: "thread",
+        script: &["data-zeyn-thread"],
+        style: &["z-thread"],
+        needs: &["stream"],
+    },
+    Module {
+        name: "composer",
+        script: &["data-zeyn-composer"],
+        style: &["z-composer"],
+        needs: &[],
+    },
+    Module {
+        name: "typing",
+        script: &["data-zeyn-typing"],
+        style: &["z-typing"],
+        needs: &[],
+    },
 ];
 
 const _: () = assert!(MODULES.len() <= 64, "Used keeps one bit per module");
@@ -216,7 +235,7 @@ const _: () = assert!(MODULES.len() <= 64, "Used keeps one bit per module");
 /// are linked only when the page uses them; the others style components without markers of
 /// their own (layouts, display widgets, form sections, the palette) and every page links them,
 /// as `zeyn.css` and `enterprise.css`.
-const STYLES: [&str; 14] = [
+const STYLES: [&str; 17] = [
     "components",
     "catalog",
     "content",
@@ -231,6 +250,9 @@ const STYLES: [&str; 14] = [
     "kanban",
     "calendar",
     "commerce",
+    "thread",
+    "composer",
+    "typing",
 ];
 
 /// The modules a page uses, one bit each in the order of [`MODULES`].
@@ -395,11 +417,24 @@ pub(crate) fn runtime(js: &'static str) -> &'static str {
 
 /// Script and style files of component modules, by path; the others are served next to their
 /// endpoints.
-const FILES: [(&str, &str); 36] = [
+const FILES: [(&str, &str); 43] = [
     (
         "/_zeyn/commerce.css",
         include_str!("../../assets/commerce.css"),
     ),
+    ("/_zeyn/typing.js", include_str!("../../assets/typing.js")),
+    ("/_zeyn/typing.css", include_str!("../../assets/typing.css")),
+    (
+        "/_zeyn/composer.js",
+        include_str!("../../assets/composer.js"),
+    ),
+    (
+        "/_zeyn/composer.css",
+        include_str!("../../assets/composer.css"),
+    ),
+    ("/_zeyn/stream.js", include_str!("../../assets/stream.js")),
+    ("/_zeyn/thread.js", include_str!("../../assets/thread.js")),
+    ("/_zeyn/thread.css", include_str!("../../assets/thread.css")),
     (
         "/_zeyn/calendar.css",
         include_str!("../../assets/calendar.css"),

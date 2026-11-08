@@ -32,6 +32,7 @@ pub struct Demo {
     pub size: Option<String>,
     #[serde(default)]
     pub kinds: Vec<String>,
+    pub room: Option<String>,
 }
 
 /// One live example: the function of the component's file that builds it.
@@ -242,6 +243,11 @@ catalog! {
         kanban "/ui/kanban";
         calendar "/ui/calendar" (Demo);
     }
+    "chat" Message {
+        message_thread "/ui/message-thread";
+        composer "/ui/composer" (Demo);
+        typing_indicator "/ui/typing-indicator";
+    }
 }
 
 /// The component with this slug.
@@ -321,13 +327,19 @@ pub fn feature() -> Feature {
             .screen(examples::screen_header::orders_page)
             .screen(examples::calendar::appointment)
             .screen(examples::shop::shop_listing)
-            .screen(examples::shop::shop_product),
+            .screen(examples::shop::shop_product)
+            .files(
+                examples::composer::CHAT_FILES,
+                "catalog.demo",
+                examples::composer::FILES.clone(),
+            ),
     )
 }
 
 /// Writes one visitor may make per minute to the shared sample stores of the examples (Kanban
-/// moves, inbox read and archive, calendar slots, cart quantities, ratings): every
-/// `POST /_zeyn/data` and form submit counts.
+/// moves, inbox read and archive, calendar slots, cart quantities, ratings, chat messages,
+/// uploads and AI replies): every `POST /_zeyn/data`, `POST /_zeyn/stream`, form submit and
+/// upload counts.
 pub const WRITES_PER_MINUTE: u32 = 60;
 
 /// The catalog app.
@@ -351,6 +363,7 @@ pub fn app() -> std::result::Result<App, String> {
         .client_prefs(|p| {
             p.key(examples::tabs::DELIVERY_TAB)
                 .key(examples::embed::MAP_NOTICE)
+                .key(examples::composer::CHAT_DRAFT)
         })
         .feature(feature()))
 }

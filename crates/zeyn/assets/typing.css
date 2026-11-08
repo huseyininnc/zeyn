@@ -1,0 +1,6 @@
+/* Typing indicators (`zeyn::ui::TypingIndicator`): linked only by pages that hold `.z-typing`. */
+
+.z-typing { min-block-size: 1.25em; margin: 0; color: var(--z-text-muted); font-size: var(--z-text-sm); font-style: italic; }
+.z-typing:not(:empty)::after { content: "…"; display: inline-block; animation: z-typing-dots 1.2s steps(3) infinite; }
+@keyframes z-typing-dots { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .z-typing:not(:empty)::after { animation: none; } }

@@ -2,7 +2,8 @@
  * zeyn.state: the one place the browser keeps client preferences (`zeyn::ClientPref`).
  *
  * Each value is a record `{v, exp, val}` under `zeyn.v1.{key}`. Reads check the record: its
- * version, a value that is `true` or a text of at most 200 characters, and an end time that has
+ * version, a value that is `true` or a text of at most 200 characters (4,000 for a draft key,
+ * `key.max`), and an end time that has
  * not passed and lies no further ahead than the key's lifetime. A record that fails is removed.
  * Necessary keys go to `localStorage` for their lifetime. Preference keys go to `sessionStorage`
  * until the app's consent hook answers yes at `GET /_zeyn/prefs`, then to `localStorage`. When
@@ -21,6 +22,12 @@ const BASE = (document.querySelector('meta[name="zeyn-base"]')?.content ?? '').r
 const PREFIX = 'zeyn.v1.';
 const VERSION = 1;
 const MAX_TEXT = 200;
+const MAX_DRAFT = 4000;
+
+/** Longest text a key may hold: 200 characters, or up to 4,000 for a draft key (`key.max`). */
+function limit(key) {
+  return Math.min(MAX_DRAFT, Math.max(MAX_TEXT, Number(key.max) || 0));
+}
 const SLACK_MS = 60000;
 
 /** Values kept here when storage is blocked. */
@@ -53,11 +60,11 @@ export function keyOf(el) {
   const name = el?.dataset?.zeynRemember;
   const ms = Number(el?.dataset?.zeynRememberFor);
   if (!name || !/^[A-Za-z0-9_-]{1,40}$/.test(name) || !(ms > 0)) return null;
-  return { name, ms, purpose: el.dataset.zeynRememberPurpose === 'preference' ? 'preference' : 'necessary' };
+  return { name, ms, purpose: el.dataset.zeynRememberPurpose === 'preference' ? 'preference' : 'necessary', max: Number(el.dataset.zeynRememberMax) || undefined };
 }
 
 /** The value of a stored record when it passes the checks, else `undefined`. */
-function check(raw, ms) {
+function check(raw, ms, max = MAX_TEXT) {
   let r;
   try {
     r = JSON.parse(raw);
@@ -68,7 +75,7 @@ function check(raw, ms) {
   const now = Date.now();
   if (r.exp <= now || r.exp > now + ms + SLACK_MS) return undefined;
   if (r.val === true) return true;
-  if (typeof r.val === 'string' && r.val.length > 0 && r.val.length <= MAX_TEXT) return r.val;
+  if (typeof r.val === 'string' && r.val.length > 0 && r.val.length <= max) return r.val;
   return undefined;
 }
 
@@ -76,7 +83,7 @@ function check(raw, ms) {
 export function get(key) {
   const id = PREFIX + key.name;
   if (memory.has(id)) {
-    const v = check(memory.get(id), key.ms);
+    const v = check(memory.get(id), key.ms, limit(key));
     if (v !== undefined) return v;
     memory.delete(id);
   }
@@ -88,7 +95,7 @@ export function get(key) {
       continue;
     }
     if (raw === null) continue;
-    const v = check(raw, key.ms);
+    const v = check(raw, key.ms, limit(key));
     if (v !== undefined) return v;
     try {
       s.removeItem(id);
@@ -108,7 +115,7 @@ function allowed() {
 
 /** Stores `val` (`true` or a short text) for the key's lifetime. */
 export async function set(key, val) {
-  if (val !== true && !(typeof val === 'string' && val.length > 0 && val.length <= MAX_TEXT)) return;
+  if (val !== true && !(typeof val === 'string' && val.length > 0 && val.length <= limit(key))) return;
   const id = PREFIX + key.name;
   const raw = JSON.stringify({ v: VERSION, exp: Date.now() + key.ms, val });
   const lasting = key.purpose === 'necessary' || (await allowed());

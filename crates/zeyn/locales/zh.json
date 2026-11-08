@@ -227,6 +227,51 @@
       }
     },
     "ui": {
+      "typing": {
+        "one": "{name} 正在输入",
+        "two": "{a} 和 {b} 正在输入",
+        "many": "{n} 人正在输入",
+        "someone": "有人"
+      },
+      "composer": {
+        "label": "消息",
+        "placeholder": "输入消息",
+        "send": "发送",
+        "hint_enter": "Enter 发送，Shift+Enter 换行",
+        "hint_ctrl": "Ctrl+Enter 发送，Enter 换行",
+        "left": "还剩 {n} 个字符",
+        "over": "超出 {n} 个字符",
+        "sent": "消息已发送",
+        "failed": "无法发送消息",
+        "people": "找到 {n} 人",
+        "no_people": "未找到任何人",
+        "people_label": "人员",
+        "restored": "未发送的消息已恢复",
+        "attachments": "附件"
+      },
+      "chat": {
+        "label": "消息",
+        "empty": "还没有消息",
+        "you": "你",
+        "today": "今天",
+        "yesterday": "昨天",
+        "attachments": "附件",
+        "more_files": "另有 {n} 个文件",
+        "new_message": "来自 {name} 的新消息：{text}",
+        "assistant": "助手",
+        "writing": "正在撰写回复",
+        "stop": "停止",
+        "stopped": "回复已停止",
+        "reply_failed": "无法加载回复",
+        "loading": "正在加载更早的消息",
+        "status": {
+          "sending": "发送中",
+          "sent": "已发送",
+          "delivered": "已送达",
+          "read": "已读",
+          "failed": "未发送"
+        }
+      },
       "resize": "调整窗格大小",
       "cards": {
         "load_more": "显示更多",

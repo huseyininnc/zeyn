@@ -242,6 +242,51 @@
       }
     },
     "ui": {
+      "typing": {
+        "one": "{name} yazıyor",
+        "two": "{a} ve {b} yazıyor",
+        "many": "{n} kişi yazıyor",
+        "someone": "Birisi"
+      },
+      "composer": {
+        "label": "Mesaj",
+        "placeholder": "Bir mesaj yazın",
+        "send": "Gönder",
+        "hint_enter": "Enter gönderir, Shift+Enter yeni satır açar",
+        "hint_ctrl": "Ctrl+Enter gönderir, Enter yeni satır açar",
+        "left": "{n} karakter kaldı",
+        "over": "{n} karakter fazla",
+        "sent": "Mesaj gönderildi",
+        "failed": "Mesaj gönderilemedi",
+        "people": "{n} kişi bulundu",
+        "no_people": "Kimse bulunamadı",
+        "people_label": "Kişiler",
+        "restored": "Gönderilmemiş mesajınız geri geldi",
+        "attachments": "Ekler"
+      },
+      "chat": {
+        "label": "Mesajlar",
+        "empty": "Henüz mesaj yok",
+        "you": "Siz",
+        "today": "Bugün",
+        "yesterday": "Dün",
+        "attachments": "Ekler",
+        "more_files": "{n} dosya daha",
+        "new_message": "{name} kişisinden yeni mesaj: {text}",
+        "assistant": "Asistan",
+        "writing": "Yanıt yazılıyor",
+        "stop": "Durdur",
+        "stopped": "Yanıt durduruldu",
+        "reply_failed": "Yanıt yüklenemedi",
+        "loading": "Eski mesajlar yükleniyor",
+        "status": {
+          "sending": "Gönderiliyor",
+          "sent": "Gönderildi",
+          "delivered": "İletildi",
+          "read": "Okundu",
+          "failed": "Gönderilemedi"
+        }
+      },
       "resize": "Bölmeleri yeniden boyutlandır",
       "cards": {
         "load_more": "Daha fazla göster",

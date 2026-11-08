@@ -40,6 +40,7 @@ Which page answers what:
 | Card grids, rails, search boxes, free text search (`DataQuery::q`) | `components/catalog` (`catalog.md`) |
 | Record diffs, code and JSON views, barcodes, inbox and notifications, Kanban boards, calendars | `components/admin` (`admin.md`) |
 | Prices, facets, range sliders, variants, galleries, quantities, reviews, countdowns | `components/commerce` (`commerce.md`) |
+| Message threads, the composer, typing indicators, streamed AI replies | `components/chat` (`chat.md`) |
 | Video and audio | `components/media` (`docs/media.md`) |
 | Dates, time zones, money, languages | `guides/time-and-languages` (`time-and-languages.md`) |
 | Permissions, guards, CSRF, masking, audit | `guides/security` (`security.md`), `docs/enterprise.md` |
@@ -286,6 +287,16 @@ What to remember:
 - Calendars: the screen takes `p: CalendarParams` and builds
   `Calendar::of(search_events).start(Event::starts).end(Event::ends).label(..).open(..).create(new_event).at(p)`;
   the create action takes `CalendarSlot` (moments, already in UTC) and returns `Result<Option<Effect>>`.
+- Chat: `MessageThread::of(history).conversation(id).author(Msg::author).name(..).text(..).when(..)`;
+  the history action takes `ThreadQuery` and must check the user is in `q.conversation`. AI
+  replies: `.reply(action)` with an action taking `ReplyRequest` and returning `Reply::channel(key)`
+  fed from a spawned task; stop when `tx.send(..)` returns `false`. Never stream into HTML yourself.
+  Writing: `Composer::of(send).conversation(id)` with `.attachments(RULES)`, `.mentions(lookup)`,
+  `.remember(DRAFT)` (a `ClientPref::draft` key registered with `App::client_prefs`) and
+  `.send_key(SendKey::CtrlEnter)` for long text; the send action takes `ChatSend` and must check
+  membership and mentions itself.
+  Typing: `TypingIndicator::new("chat").conversation(id).person(user, name)` needs `App::realtime`
+  with `Realtime::topic("chat", perm)`; without it, it renders nothing.
 - The app (`src/app.rs`): `App::new(t!("app.name")).i18n(i18n).service(store).feature(sales::feature())`,
   plus what the app needs: `.auth(...)`, `.mcp(Mcp::read_only())`, `.themes([...])`,
   `.datagrid_views(store)`, `.assistant(...)`.

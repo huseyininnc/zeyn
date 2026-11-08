@@ -11,6 +11,7 @@ mod catalog;
 mod chart;
 mod chips;
 mod code;
+mod composer;
 mod content;
 mod controls;
 mod countdown;
@@ -45,8 +46,10 @@ mod relative;
 mod reviews;
 mod share;
 mod shell;
+mod thread;
 mod topics;
 mod tree;
+mod typing;
 mod variants;
 mod week;
 mod widgets;
@@ -80,6 +83,10 @@ pub use catalog::{CardGrid, ImageCard, MAX_SUGGESTIONS, Rail, SearchBox, SearchP
 pub use chart::{Better, BulletCell, Chart, ChartKind, Kpi, SparklineCell};
 pub use chips::{Chips, MAX_CHIPS};
 pub use code::{CodeLang, CodeView, JsonView, MAX_CODE_BYTES, MAX_CODE_LINES, highlight};
+pub use composer::{
+    ChatSend, Composer, DEFAULT_MESSAGE_CHARS, MAX_MENTION_QUERY, MAX_MENTIONS,
+    MAX_MESSAGE_MENTIONS, SendKey,
+};
 pub use content::{AutoGrid, Avatar, AvatarSize, Heading, MetaLine, Paragraph, PrevNext, Spoiler};
 pub use controls::Control;
 pub(crate) use controls::{
@@ -116,9 +123,16 @@ pub use reactions::{MAX_REACTIONS, ReactionPress, ReactionState, Reactions};
 pub use relative::RelativeTime;
 pub use reviews::ReviewSummary;
 pub use share::Share;
+pub use thread::{
+    Delivery, MAX_CONVERSATION, MAX_MESSAGE_CHARS, MAX_REPLY_CHARS, MAX_SHOWN_FILES, MessageThread,
+    REPLY_BUFFER, REPLY_SECONDS, ReplyRequest, THREAD_PAGE, ThreadQuery,
+};
+#[cfg(feature = "server")]
+pub use thread::{Reply, ReplySender, StreamSource};
 pub use topics::{Listen, Listens, MAX_TOPICS, PageCheck, Topics, valid_topic};
 pub(crate) use topics::{topic_list, topics_attr};
 pub use tree::{MAX_TREE_CHILDREN, Tree, TreeItem, TreeQuery};
+pub use typing::{MAX_TYPING_PEOPLE, TYPING_EVERY_SECONDS, TYPING_SHOWN_SECONDS, TypingIndicator};
 pub use variants::{MAX_VARIANT_GROUPS, MAX_VARIANT_OPTIONS, VariantGroup, VariantPicker};
 pub use week::{MAX_WEEK_ROWS, WeekDay, WeekSchedule};
 pub use widgets::{

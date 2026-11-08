@@ -227,6 +227,51 @@
       }
     },
     "ui": {
+      "typing": {
+        "one": "{name} está escribiendo",
+        "two": "{a} y {b} están escribiendo",
+        "many": "{n} personas están escribiendo",
+        "someone": "Alguien"
+      },
+      "composer": {
+        "label": "Mensaje",
+        "placeholder": "Escribe un mensaje",
+        "send": "Enviar",
+        "hint_enter": "Enter envía, Mayús+Enter añade una línea",
+        "hint_ctrl": "Ctrl+Enter envía, Enter añade una línea",
+        "left": "Quedan {n} caracteres",
+        "over": "{n} caracteres de más",
+        "sent": "Mensaje enviado",
+        "failed": "No se pudo enviar el mensaje",
+        "people": "{n} personas encontradas",
+        "no_people": "No se encontró a nadie",
+        "people_label": "Personas",
+        "restored": "Tu mensaje sin enviar ha vuelto",
+        "attachments": "Adjuntos"
+      },
+      "chat": {
+        "label": "Mensajes",
+        "empty": "Todavía no hay mensajes",
+        "you": "Tú",
+        "today": "Hoy",
+        "yesterday": "Ayer",
+        "attachments": "Adjuntos",
+        "more_files": "{n} archivos más",
+        "new_message": "Nuevo mensaje de {name}: {text}",
+        "assistant": "Asistente",
+        "writing": "Escribiendo una respuesta",
+        "stop": "Detener",
+        "stopped": "La respuesta se detuvo",
+        "reply_failed": "No se pudo cargar la respuesta",
+        "loading": "Cargando mensajes anteriores",
+        "status": {
+          "sending": "Enviando",
+          "sent": "Enviado",
+          "delivered": "Entregado",
+          "read": "Leído",
+          "failed": "No enviado"
+        }
+      },
       "resize": "Cambiar tamaño de los paneles",
       "cards": {
         "load_more": "Mostrar más",

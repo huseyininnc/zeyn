@@ -6,10 +6,12 @@
  * are shown as they arrive; actions that change data wait for the user's click on a confirmation
  * card. Navigation goes through `zeyn:navigate`, so the page never reloads. Model text is shown
  * as a small Markdown subset built from DOM nodes with `textContent` only: no HTML from the model
- * is ever parsed.
+ * is ever parsed. The Markdown and the reading of JSON lines are shared with message threads
+ * (`stream.js`).
  */
 
-const BASE = (document.querySelector('meta[name="zeyn-base"]')?.content ?? '').replace(/\/$/, '');
+const { el, markdown, read } = await import(new URL(`stream.js${new URL(import.meta.url).search}`, import.meta.url).href);
+const BASE =(document.querySelector('meta[name="zeyn-base"]')?.content ?? '').replace(/\/$/, '');
 const MAX_RECORDING_MS = 60_000;
 
 /** State of each chat panel. */
@@ -27,98 +29,6 @@ async function csrf() {
 /** Name of the screen in the main area, so the model knows where the user is. */
 function currentScreen() {
   return document.querySelector('.z-main [data-zeyn-screen]')?.dataset.zeynScreen ?? '';
-}
-
-function el(tag, className = '', text = null) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text != null) node.textContent = text;
-  return node;
-}
-
-/**
- * Adds inline Markdown (`code`, **bold**, *italic*, _italic_) to `parent` as text nodes and
- * elements. Anything else stays plain text.
- */
-function inline(text, parent) {
-  const re = /(`[^`\n]+`|\*\*[^*\n]+\*\*|\*[^*\s][^*\n]*\*|_[^_\s][^_\n]*_)/g;
-  let last = 0;
-  for (const m of text.matchAll(re)) {
-    if (m.index > last) parent.append(text.slice(last, m.index));
-    const t = m[0];
-    if (t.startsWith('`')) parent.append(el('code', '', t.slice(1, -1)));
-    else if (t.startsWith('**')) parent.append(el('strong', '', t.slice(2, -2)));
-    else parent.append(el('em', '', t.slice(1, -1)));
-    last = m.index + t.length;
-  }
-  if (last < text.length) parent.append(text.slice(last));
-}
-
-/**
- * The safe Markdown subset as a fragment: paragraphs, line breaks, bullet and numbered lists,
- * headings shown as bold paragraphs, and code blocks. Built from `textContent` only.
- */
-function markdown(src) {
-  const frag = document.createDocumentFragment();
-  const lines = src.replace(/\r/g, '').split('\n');
-  let para = null;
-  let list = null;
-  let code = null;
-  const close = () => {
-    para = null;
-    list = null;
-  };
-  for (const line of lines) {
-    if (code) {
-      if (line.trim().startsWith('```')) code = null;
-      else code.textContent += (code.textContent ? '\n' : '') + line;
-      continue;
-    }
-    if (line.trim().startsWith('```')) {
-      close();
-      const pre = el('pre');
-      code = el('code');
-      pre.append(code);
-      frag.append(pre);
-      continue;
-    }
-    const bullet = /^\s*[-*•]\s+(.*)$/.exec(line);
-    const numbered = /^\s*\d+[.)]\s+(.*)$/.exec(line);
-    if (bullet || numbered) {
-      const tag = bullet ? 'UL' : 'OL';
-      if (!list || list.tagName !== tag) {
-        para = null;
-        list = el(tag.toLowerCase());
-        frag.append(list);
-      }
-      const li = el('li');
-      inline((bullet ?? numbered)[1], li);
-      list.append(li);
-      continue;
-    }
-    if (!line.trim()) {
-      close();
-      continue;
-    }
-    const heading = /^#{1,6}\s+(.*)$/.exec(line);
-    if (heading) {
-      close();
-      const p = el('p', 'z-msg-heading');
-      const strong = el('strong');
-      inline(heading[1], strong);
-      p.append(strong);
-      frag.append(p);
-      continue;
-    }
-    list = null;
-    if (para) para.append(el('br'));
-    else {
-      para = el('p');
-      frag.append(para);
-    }
-    inline(line, para);
-  }
-  return frag;
 }
 
 /** Reads an error body into one message. */
@@ -363,25 +273,7 @@ async function stream(s, url, body) {
     if (!res.ok) {
       handle({ t: 'error', message: await errorText(res, s.t) });
     } else {
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = '';
-      for (;;) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        let nl;
-        while ((nl = buf.indexOf('\n')) >= 0) {
-          const line = buf.slice(0, nl).trim();
-          buf = buf.slice(nl + 1);
-          if (!line) continue;
-          try {
-            handle(JSON.parse(line));
-          } catch {
-            continue;
-          }
-        }
-      }
+      await read(res, handle);
     }
   } catch (err) {
     if (err?.name === 'AbortError') {

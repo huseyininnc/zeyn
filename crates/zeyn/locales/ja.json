@@ -227,6 +227,51 @@
       }
     },
     "ui": {
+      "typing": {
+        "one": "{name} さんが入力中",
+        "two": "{a} さんと {b} さんが入力中",
+        "many": "{n} 人が入力中",
+        "someone": "誰か"
+      },
+      "composer": {
+        "label": "メッセージ",
+        "placeholder": "メッセージを入力",
+        "send": "送信",
+        "hint_enter": "Enter で送信、Shift+Enter で改行",
+        "hint_ctrl": "Ctrl+Enter で送信、Enter で改行",
+        "left": "残り {n} 文字",
+        "over": "{n} 文字超過",
+        "sent": "メッセージを送信しました",
+        "failed": "メッセージを送信できませんでした",
+        "people": "{n} 人が見つかりました",
+        "no_people": "見つかりませんでした",
+        "people_label": "ユーザー",
+        "restored": "未送信のメッセージを復元しました",
+        "attachments": "添付ファイル"
+      },
+      "chat": {
+        "label": "メッセージ",
+        "empty": "まだメッセージはありません",
+        "you": "あなた",
+        "today": "今日",
+        "yesterday": "昨日",
+        "attachments": "添付ファイル",
+        "more_files": "ほかに {n} 件のファイル",
+        "new_message": "{name} からの新しいメッセージ: {text}",
+        "assistant": "アシスタント",
+        "writing": "返信を作成中",
+        "stop": "停止",
+        "stopped": "返信を停止しました",
+        "reply_failed": "返信を読み込めませんでした",
+        "loading": "以前のメッセージを読み込み中",
+        "status": {
+          "sending": "送信中",
+          "sent": "送信済み",
+          "delivered": "配信済み",
+          "read": "既読",
+          "failed": "未送信"
+        }
+      },
       "resize": "ペインのサイズを変更",
       "cards": {
         "load_more": "さらに表示",

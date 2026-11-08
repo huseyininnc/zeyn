@@ -227,6 +227,51 @@
       }
     },
     "ui": {
+      "typing": {
+        "one": "{name} يكتب الآن",
+        "two": "{a} و{b} يكتبان الآن",
+        "many": "{n} أشخاص يكتبون الآن",
+        "someone": "شخص ما"
+      },
+      "composer": {
+        "label": "رسالة",
+        "placeholder": "اكتب رسالة",
+        "send": "إرسال",
+        "hint_enter": "Enter يرسل، وShift+Enter يبدأ سطرًا جديدًا",
+        "hint_ctrl": "Ctrl+Enter يرسل، وEnter يبدأ سطرًا جديدًا",
+        "left": "بقي {n} حرفًا",
+        "over": "{n} حرفًا زائدًا",
+        "sent": "أُرسلت الرسالة",
+        "failed": "تعذّر إرسال الرسالة",
+        "people": "تم العثور على {n} أشخاص",
+        "no_people": "لم يُعثر على أحد",
+        "people_label": "الأشخاص",
+        "restored": "عادت رسالتك غير المرسلة",
+        "attachments": "المرفقات"
+      },
+      "chat": {
+        "label": "الرسائل",
+        "empty": "لا توجد رسائل بعد",
+        "you": "أنت",
+        "today": "اليوم",
+        "yesterday": "أمس",
+        "attachments": "المرفقات",
+        "more_files": "{n} ملفات أخرى",
+        "new_message": "رسالة جديدة من {name}: {text}",
+        "assistant": "المساعد",
+        "writing": "جارٍ كتابة رد",
+        "stop": "إيقاف",
+        "stopped": "تم إيقاف الرد",
+        "reply_failed": "تعذّر تحميل الرد",
+        "loading": "جارٍ تحميل الرسائل الأقدم",
+        "status": {
+          "sending": "جارٍ الإرسال",
+          "sent": "أُرسلت",
+          "delivered": "سُلّمت",
+          "read": "قُرئت",
+          "failed": "لم تُرسل"
+        }
+      },
       "resize": "تغيير حجم الألواح",
       "cards": {
         "load_more": "عرض المزيد",

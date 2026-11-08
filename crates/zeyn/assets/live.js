@@ -7,7 +7,9 @@
  * (`zeyn:reload`), or the whole screen (`zeyn:refresh`) when it holds no grid, and the nodes that
  * `.listens` to the topic refresh through `topics.js` (`zeyn:topics`). Notifications that arrive
  * within 300 ms are handled once. An element with `data-zeyn-live-self` only subscribes: it
- * refreshes itself on `zeyn:topics` (the notification bell). The socket reconnects with growing pauses (1 s up to
+ * refreshes itself on `zeyn:topics` (the notification bell). Typing signals of other users are
+ * passed on as `zeyn:signal` and refresh nothing; `zeyn.live.send` sends one (`typing.js`). The
+ * socket reconnects with growing pauses (1 s up to
  * 30 s) and closes when no element subscribes any more.
  * @module live
  */
@@ -61,11 +63,17 @@ function connect() {
     wait = 1000;
   };
   ws.onmessage = (e) => {
+    let msg;
     try {
-      pending.add(JSON.parse(e.data).topic);
+      msg = JSON.parse(e.data);
     } catch {
       return;
     }
+    if (msg?.typing) {
+      document.dispatchEvent(new CustomEvent('zeyn:signal', { detail: msg }));
+      return;
+    }
+    pending.add(msg?.topic);
     flush ||= setTimeout(refresh, 300);
   };
   ws.onclose = () => {
@@ -77,5 +85,11 @@ function connect() {
   };
 }
 
+/** Sends a small signal (a typing note) on the open socket; dropped while it is not open. */
+function send(signal) {
+  if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(signal));
+}
+
+globalThis.zeyn = Object.assign(globalThis.zeyn ?? {}, { live: { send } });
 document.addEventListener('zeyn:content', () => connect());
 connect();
