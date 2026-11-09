@@ -124,40 +124,77 @@ impl FieldMeta {
     }
 
     pub fn is_required(&self) -> bool {
-        self.rules.contains(&Rule::Required)
+        Rules(self.rules).required()
     }
 
     pub fn max_len(&self) -> Option<usize> {
-        self.rules.iter().find_map(|r| match r {
+        Rules(self.rules).max_len()
+    }
+
+    pub fn min_len(&self) -> Option<usize> {
+        Rules(self.rules).min_len()
+    }
+
+    pub fn min(&self) -> Option<i64> {
+        Rules(self.rules).min()
+    }
+
+    /// Digits and decimals of a `Decimal` field: its `precision` and `scale` rules, or 18 and 2.
+    pub fn decimal_limits(&self) -> (u8, u8) {
+        Rules(self.rules).decimal_limits()
+    }
+
+    /// The pattern of the `mask` rule, if any.
+    pub fn mask_pattern(&self) -> Option<&'static str> {
+        Rules(self.rules).mask_pattern()
+    }
+
+    pub fn max(&self) -> Option<i64> {
+        Rules(self.rules).max()
+    }
+}
+
+/// The rules of a field, read the same way for model fields and runtime field specs
+/// ([`crate::ui::FieldSpec`]).
+#[derive(Clone, Copy)]
+pub(crate) struct Rules<'a>(pub &'a [Rule]);
+
+impl Rules<'_> {
+    pub(crate) fn required(&self) -> bool {
+        self.0.contains(&Rule::Required)
+    }
+
+    pub(crate) fn max_len(&self) -> Option<usize> {
+        self.0.iter().find_map(|r| match r {
             Rule::MaxLen(n) => Some(*n),
             _ => None,
         })
     }
 
-    pub fn min_len(&self) -> Option<usize> {
-        self.rules.iter().find_map(|r| match r {
+    pub(crate) fn min_len(&self) -> Option<usize> {
+        self.0.iter().find_map(|r| match r {
             Rule::MinLen(n) => Some(*n),
             _ => None,
         })
     }
 
-    pub fn min(&self) -> Option<i64> {
-        self.rules.iter().find_map(|r| match r {
+    pub(crate) fn min(&self) -> Option<i64> {
+        self.0.iter().find_map(|r| match r {
             Rule::Min(n) => Some(*n),
             _ => None,
         })
     }
 
     /// Digits and decimals of a `Decimal` field: its `precision` and `scale` rules, or 18 and 2.
-    pub fn decimal_limits(&self) -> (u8, u8) {
-        let scale = self.rules.iter().find_map(|r| {
+    pub(crate) fn decimal_limits(&self) -> (u8, u8) {
+        let scale = self.0.iter().find_map(|r| {
             if let Rule::Scale(n) = r {
                 Some(*n)
             } else {
                 None
             }
         });
-        let precision = self.rules.iter().find_map(|r| {
+        let precision = self.0.iter().find_map(|r| {
             if let Rule::Precision(n) = r {
                 Some(*n)
             } else {
@@ -174,8 +211,8 @@ impl FieldMeta {
     }
 
     /// The pattern of the `mask` rule, if any.
-    pub fn mask_pattern(&self) -> Option<&'static str> {
-        self.rules.iter().find_map(|r| {
+    pub(crate) fn mask_pattern(&self) -> Option<&'static str> {
+        self.0.iter().find_map(|r| {
             if let Rule::Mask(p) = r {
                 Some(*p)
             } else {
@@ -184,8 +221,8 @@ impl FieldMeta {
         })
     }
 
-    pub fn max(&self) -> Option<i64> {
-        self.rules.iter().find_map(|r| match r {
+    pub(crate) fn max(&self) -> Option<i64> {
+        self.0.iter().find_map(|r| match r {
             Rule::Max(n) => Some(*n),
             _ => None,
         })

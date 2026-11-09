@@ -42,6 +42,9 @@ Form::of(Contact { quantity: 2, size: Size::Medium, ..Contact::default() })
 | `Control::Password`, `Control::NewPassword` | Текстовое поле типа пароль, с кнопкой показать и скрыть |
 | `Control::PasswordMeter` | Новый пароль с индикатором надёжности |
 | `Control::Rating` | Целое число от 1 до N, показанное звёздами, или половины звёзд у поля `Decimal` (см. [Rating](#rating)) |
+| `Control::Multiline` | Текст любой длины в растущем поле ввода |
+| `Control::Color { palette }` | `String` с цветом в шестнадцатеричном виде и палитрой (см. [Color and length](#color-and-length)) |
+| `Control::Length { units }` | Длина `Decimal`, которая хранится в пикселях и показывается в единице, выбранной пользователем (см. [Color and length](#color-and-length)) |
 
 ## Rating
 
@@ -62,6 +65,22 @@ Form::of(Feedback::default())
 
 @live rating
 
+
+## Color and length
+
+```rust
+const BRAND: &[&str] = &["#1E88E5", "#43A047", "#00000080"];
+
+Form::of(band)
+    .field(Band::fill)
+    .control(Band::fill, Control::Color { palette: BRAND })
+    .field(Band::height)
+    .control(Band::height, Control::Length { units: &[LengthUnit::Mm, LengthUnit::Pt] })
+```
+
+`Control::Color` хранит поле `String` как `#RRGGBB` или `#RRGGBBAA`. Поле это текстовый ввод с образцом цвета, поэтому оно работает без скрипта; кнопка открывает диалог с ползунками красного, зелёного, синего и непрозрачности, недавними цветами и палитрой приложения. Escape или «Готово» закрывают его и возвращают фокус. Сервер отклоняет значение, которое не является шестнадцатеричным цветом.
+
+`Control::Length` хранит поле `Decimal` в пикселях CSS (96 на дюйм). Пользователь вводит миллиметры, сантиметры, дюймы, пункты или пиксели и выбирает единицу рядом с числом; браузер запоминает единицу для всех полей длины. Стрелки вверх и вниз меняют значение на 0,1, с Shift на 1, в пределах правил `min` и `max`, заданных в пикселях. Задайте полю `scale = 4`.
 
 ## Lookup
 

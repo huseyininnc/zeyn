@@ -48,6 +48,7 @@ head의 모든 프레임워크 스크립트와 스타일시트에는 `?v=`와 �
 | `tabs.js`, `dates.js`, `choices.js`, `inputs.js`, `lines.js`, `steps.js`, `tree.js`, `overlays.js`, `menubutton.js`, `busy.js` | 패널, 탭, 분할 창; 날짜와 시간 선택기(grid 날짜 필터 포함); 리스트박스, 조회, 다중 선택; 숫자, 늘어나는 텍스트 영역, 마스크, 비밀번호; 줄 편집기; 단계별 폼; 트리; 툴팁과 팝오버; 메뉴 버튼과 분할 버튼; 처리 중 오버레이 |
 | `grid.js` | grid. `zeyn.js`가 직접 import하므로 `<link rel="modulepreload">`로 링크됩니다 |
 | `palette.js`, `pro.js` | 명령 팔레트와 명령 버튼; 메뉴 막대, 도구 상자, 상태 표시줄, 도킹 패널, 속성 검사기 |
+| `colors.js`, `length.js`, `inspector.js` | 색 선택기, 단위 전환이 있는 길이, 아일랜드의 속성 인스펙터 |
 | `forms.js`, `reveal.js`, `import.js` | 폼의 초안과 워크플로 전환; 가려진 값 보기; 가져오기 |
 | `catalog.js`, `media.js`, `files.js`, `charts.js` 및 스타일시트 | 카드 그리드, 레일, 검색 상자; 플레이어, 임베드, 이미지; 업로드; 차트, 스파크라인, KPI 카드, 불릿 차트 |
 | `share.js`, `chips.js`, `reactions.js`, `hero.js`, `state.js`, `preview.js`, `assistant.js` | 공유 버튼, 필터 칩, 반응, 히어로 슬라이드, 환경 설정 저장소, 카드 미리보기(처음 마우스를 올릴 때), 어시스턴트(채팅 패널 또는 런처를 처음 누를 때) |
@@ -392,6 +393,7 @@ Effect `{"effect":"refresh","topics":["sales"]}`는 토픽의 리스너를 새�
 | `ul[role=menubar][data-zeyn-menubar]` | W3C APG 메뉴 막대. 상단 항목은 roving tab stop이 있는 `button[role=menuitem][aria-haspopup=menu]`이며, 각각 닫혀 있는 동안 `hidden`인 `ul[role=menu]`를 제어합니다. 항목은 8.1의 명령 속성을 가집니다. 왼쪽과 오른쪽 화살표는 메뉴 사이를 이동하고, 아래쪽 화살표, Enter, Space는 열고, 위쪽 화살표는 마지막 항목에서 열며, Home과 End는 건너뛰고, 문자는 그 문자로 시작하는 다음 항목으로 이동하며, Escape는 닫고 막대로 돌아가고, Tab과 바깥 클릭은 닫습니다. 사용자가 실행할 수 없는 메뉴와 항목은 렌더링되지 않습니다. |
 | `div[role=toolbar][aria-orientation=vertical][data-zeyn-toolbox]` | `button.z-tool[aria-pressed]`의 토글 그룹. 화살표, Home, End는 roving tab stop을 이동하며, 클릭, Enter, Space는 도구 하나를 켜고 `zeyn:tool`(`detail.tool`)을 보내며 `data-text-selected`를 상태 표시줄에 기록합니다. |
 | `section.z-inspector` | `Form::section` 그룹(`role=group` 본문이 있는 `details.z-form-section`)이 있는 폼이며 검사기의 노드 경로에서 `POST /_zeyn/form`으로 저장됩니다. 실패한 필드가 있는 섹션은 브라우저의 검사 전과 `422` 후에 열립니다. |
+| `section.z-inspector[data-zeyn-inspector=name]` | 필드 종류마다 `template[data-kind]` 하나를 가진 아일랜드 인스펙터. `[data-zeyn-island=name]` 안에서 온 `zeyn:inspect`(`detail: { title, schema, values }`)는 `innerHTML`이 아닌 DOM 호출로 스키마를 그립니다. `data-limits`를 넘는 스키마는 무시되고, 전에 본 스키마는 필드를 그대로 씁니다. 유효하고 바뀐 값은 `zeyn:property`(`detail: { name, value }`)로 아일랜드 루트에 가고, 잘못된 값은 필드의 오류 줄을 채우고 `aria-invalid`를 설정합니다. |
 | `div[data-zeyn-statusbar]` | 시작과 끝의 항목과 `[data-zeyn-status-live]`(`role=status`, `aria-live=polite`). Screen의 모든 요소에서 오는 `zeyn:status`(`detail.text`)는 라이브 텍스트를 교체합니다. |
 
 ### 8.3 도킹 패널

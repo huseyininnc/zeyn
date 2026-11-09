@@ -2205,3 +2205,80 @@ dialog.z-confirm::backdrop { background: var(--z-backdrop); }
 @media (forced-colors: active) {
   .z-menu-entry:focus { outline: 2px solid Highlight; }
 }
+
+/* Color and length ---------------------------------------------------------------------------- */
+
+/** A help line under a field. */
+.z-field-help { margin: 0; color: var(--z-text-muted); font-size: var(--z-text-sm); }
+
+.z-color { display: flex; align-items: center; gap: var(--z-s-2); min-width: 0; }
+
+.z-field .z-color input { flex: 1; min-width: 0; font-family: var(--z-font-mono, ui-monospace, monospace); }
+
+/** The chip shows the color over a checkerboard, so transparent colors read as such. */
+.z-color-chip,
+.z-color-preview,
+.z-color-swatch {
+  flex: none;
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius);
+  background:
+    linear-gradient(var(--z-chip, transparent), var(--z-chip, transparent)),
+    repeating-conic-gradient(var(--z-surface-2) 0 25%, var(--z-surface) 0 50%) 0 0 / 10px 10px;
+}
+
+.z-color-chip { inline-size: 28px; block-size: 28px; }
+
+.z-color-open { flex: none; min-inline-size: 36px; }
+
+.z-color-open-mark {
+  display: block;
+  inline-size: 14px;
+  block-size: 14px;
+  border-radius: 50%;
+  background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red);
+}
+
+.z-color-pop { display: grid; gap: var(--z-s-2); padding: var(--z-s-3); inline-size: 260px; }
+
+.z-color-preview { block-size: 36px; }
+
+.z-color-row { display: grid; grid-template-columns: 4.5rem 1fr 2.5rem; align-items: center; gap: var(--z-s-2); }
+
+.z-color-number { font-variant-numeric: tabular-nums; text-align: end; }
+
+.z-color-slider { inline-size: 100%; accent-color: var(--z-brand); }
+
+.z-color-heading { margin: var(--z-s-1) 0 0; color: var(--z-text-muted); font-size: var(--z-text-sm); }
+
+.z-color-swatches { display: flex; flex-wrap: wrap; gap: var(--z-s-1); }
+
+.z-color-swatch { inline-size: 24px; block-size: 24px; padding: 0; cursor: pointer; }
+
+.z-color-swatch:focus-visible,
+.z-color-slider:focus-visible { outline: 2px solid var(--z-focus); outline-offset: 2px; }
+
+.z-color-done { justify-self: end; }
+
+.z-length { gap: var(--z-s-2); }
+
+.z-field .z-length > .z-length-value { flex: 1; min-inline-size: 0; }
+
+.z-field .z-length > .z-length-unit {
+  flex: none;
+  inline-size: auto;
+  min-inline-size: 4.5rem;
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius);
+  background: var(--z-surface);
+  color: var(--z-text);
+  font: inherit;
+}
+
+.z-field .z-length > .z-length-unit:focus-visible { outline: 2px solid var(--z-focus); outline-offset: 1px; }
+
+@media (forced-colors: active) {
+  .z-color-chip,
+  .z-color-preview,
+  .z-color-swatch { forced-color-adjust: none; border-color: CanvasText; }
+}

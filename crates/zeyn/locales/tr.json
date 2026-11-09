@@ -114,7 +114,8 @@
       "precision": "{label} ondalık ayırıcıdan önce en fazla {n} basamak içerebilir.",
       "mask": "{label} {pattern} biçiminde olmalı.",
       "embed": "{label} gömülecek bir https adresi ya da bu adresi içeren gömme kodu olmalı.",
-      "embed_host": "{label}: {host} bu uygulamanın gömebileceği siteler listesinde yok."
+      "embed_host": "{label}: {host} bu uygulamanın gömebileceği siteler listesinde yok.",
+      "color": "{label} #1E88E5 gibi bir renk olmalıdır."
     },
     "error": {
       "forbidden": "Bu işlem için yetkiniz yok.",
@@ -770,6 +771,25 @@
         "empty": "Henüz gönderi yok.",
         "comments": "{count} yorum",
         "comments_one": "1 yorum"
+      },
+      "color": {
+        "open": "Renk seç",
+        "dialog": "Renk",
+        "red": "Kırmızı",
+        "green": "Yeşil",
+        "blue": "Mavi",
+        "alpha": "Opaklık",
+        "recent": "Son kullanılan renkler",
+        "palette": "Palet",
+        "done": "Tamam"
+      },
+      "length": {
+        "unit": "Birim"
+      },
+      "inspector": {
+        "title": "Özellikler",
+        "empty": "Özelliklerini görmek için bir öğe seçin.",
+        "shown": "{title} özellikleri"
       }
     },
     "date": {

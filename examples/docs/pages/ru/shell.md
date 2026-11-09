@@ -173,7 +173,27 @@ StatusBar::new("Status").left("Ready").right("UTF-8")
 - `MenuBar` следует шаблону ARIA menubar и содержит те же команды, что и палитра.
 - `Toolbox` это вертикальная группа кнопок-переключателей; выбранный инструмент отправляется как событие `zeyn:tool`.
 - `PropertyInspector::new(title, form)` редактирует выбранный объект формой, разбитой на группы `.section(...)`.
+- `PropertyInspector::island(name)` редактирует то, что выбрано в острове, без формы (см. [Island inspector](#island-inspector)).
 - У `StatusBar` есть живая область (live region), поэтому сообщения, отправленные в неё, читают программы чтения с экрана.
+
+## Island inspector
+
+```rust
+Row::new()
+    .col(Island::new("designer"))
+    .col(PropertyInspector::island("designer"))
+
+let schema = FormSchema::new()
+    .section("Position")
+    .field(FieldSpec::length("x", "X", &[LengthUnit::Mm]).min(0))
+    .section("Look")
+    .field(FieldSpec::color("fill", "Fill", BRAND).required())
+    .field(FieldSpec::choice("align", "Align", [("left", "Left"), ("right", "Right")]));
+```
+
+Остров отправляет `zeyn:inspect` с `detail: { title, schema, values }`, где `schema` это сериализованная `FormSchema`. Виды полей: `text`, `multiline`, `integer`, `decimal`, `length`, `color`, `boolean`, `choice` и `expression`; каждое принимает `required`, `min`, `max`, `max_len`, `default` и `help`.
+
+Инспектор рисует поля элементами управления форм моделей и подставляет имена, подписи и значения как текст, а не как HTML. Когда пользователь покидает поле, нажимает Enter или закрывает выбор, инспектор проверяет значение и отправляет корню острова `zeyn:property` с `detail: { name, value }`. Неверное значение показывает ошибку и не отправляется. Схема с более чем 200 полями игнорируется. `FieldSpec::check` выполняет те же проверки на сервере.
 
 ## Закрепляемые панели
 

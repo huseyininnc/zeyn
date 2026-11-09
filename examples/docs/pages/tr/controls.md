@@ -42,6 +42,9 @@ Form::of(Contact { quantity: 2, size: Size::Medium, ..Contact::default() })
 | `Control::Password`, `Control::NewPassword` | Göster ve gizle düğmeli, parola olarak yazılan metin alanı |
 | `Control::PasswordMeter` | Güç göstergeli yeni parola |
 | `Control::Rating` | 1 ile N arasında bir tam sayı, yıldızlar olarak gösterilir; `Decimal` alanda yarım yıldız ([Rating](#rating) bölümüne bakın) |
+| `Control::Multiline` | Büyüyen bir metin alanında her uzunlukta metin |
+| `Control::Color { palette }` | Seçicili, onaltılık renk tutan bir `String` ([Color and length](#color-and-length) bölümüne bakın) |
+| `Control::Length { units }` | Piksel olarak saklanan, kullanıcının seçtiği birimde gösterilen bir `Decimal` uzunluk ([Color and length](#color-and-length) bölümüne bakın) |
 
 ## Rating
 
@@ -62,6 +65,22 @@ Form::of(Feedback::default())
 
 @live rating
 
+
+## Color and length
+
+```rust
+const BRAND: &[&str] = &["#1E88E5", "#43A047", "#00000080"];
+
+Form::of(band)
+    .field(Band::fill)
+    .control(Band::fill, Control::Color { palette: BRAND })
+    .field(Band::height)
+    .control(Band::height, Control::Length { units: &[LengthUnit::Mm, LengthUnit::Pt] })
+```
+
+`Control::Color`, bir `String` alanı `#RRGGBB` ya da `#RRGGBBAA` olarak tutar. Alan, renk örneği olan bir metin girişidir, bu yüzden betik olmadan da çalışır; düğmesi kırmızı, yeşil, mavi ve opaklık kaydırıcıları, son kullanılan renkler ve uygulamanın paleti olan bir iletişim kutusu açar. Escape ya da Tamam onu kapatır ve odağı geri verir. Sunucu onaltılık renk olmayan bir değeri reddeder.
+
+`Control::Length`, bir `Decimal` alanı CSS pikseli olarak tutar (inç başına 96). Kullanıcı milimetre, santimetre, inç, punto ya da piksel yazar ve birimi sayının yanından seçer; tarayıcı birimi her uzunluk alanı için hatırlar. Yukarı ve Aşağı ok 0,1, Shift ile 1 adım atar; sınır, piksel cinsinden `min` ve `max` kurallarıdır. Alana `scale = 4` verin.
 
 ## Lookup
 

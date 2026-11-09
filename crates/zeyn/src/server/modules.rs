@@ -96,6 +96,9 @@ pub(crate) const MODULES: &[Module] = &[
             "data-zeyn-password",
         ],
     ),
+    control("colors", &["data-zeyn-color"]),
+    control("length", &["data-zeyn-length"]),
+    control("inspector", &["data-zeyn-inspector"]),
     control("lines", &["data-zeyn-lines"]),
     control("steps", &["data-zeyn-steps"]),
     control("tree", &["data-zeyn-tree"]),
@@ -434,7 +437,13 @@ pub(crate) fn runtime(js: &'static str) -> &'static str {
 
 /// Script and style files of component modules, by path; the others are served next to their
 /// endpoints.
-const FILES: [(&str, &str); 49] = [
+const FILES: [(&str, &str); 52] = [
+    ("/_zeyn/colors.js", include_str!("../../assets/colors.js")),
+    ("/_zeyn/length.js", include_str!("../../assets/length.js")),
+    (
+        "/_zeyn/inspector.js",
+        include_str!("../../assets/inspector.js"),
+    ),
     (
         "/_zeyn/commerce.css",
         include_str!("../../assets/commerce.css"),

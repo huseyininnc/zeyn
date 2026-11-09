@@ -173,7 +173,27 @@ StatusBar::new("Status").left("Ready").right("UTF-8")
 - `MenuBar` ARIA menubar पैटर्न का पालन करता है और पैलेट वाले ही कमांड रखता है।
 - `Toolbox` टॉगल बटन का ऊर्ध्वाधर समूह है; चुना गया टूल `zeyn:tool` इवेंट के रूप में भेजा जाता है।
 - `PropertyInspector::new(title, form)` चुनी गई वस्तु को `.section(...)` समूहों में बँटे फ़ॉर्म से संपादित करता है।
+- `PropertyInspector::island(name)` किसी आइलैंड में चुनी गई चीज़ को बिना फ़ॉर्म के संपादित करता है ([Island inspector](#island-inspector) देखें)।
 - `StatusBar` में लाइव रीजन है, इसलिए उसे भेजे गए संदेश स्क्रीन रीडर पढ़ते हैं।
+
+## Island inspector
+
+```rust
+Row::new()
+    .col(Island::new("designer"))
+    .col(PropertyInspector::island("designer"))
+
+let schema = FormSchema::new()
+    .section("Position")
+    .field(FieldSpec::length("x", "X", &[LengthUnit::Mm]).min(0))
+    .section("Look")
+    .field(FieldSpec::color("fill", "Fill", BRAND).required())
+    .field(FieldSpec::choice("align", "Align", [("left", "Left"), ("right", "Right")]));
+```
+
+आइलैंड `detail: { title, schema, values }` के साथ `zeyn:inspect` भेजता है, जहाँ `schema` एक सीरियलाइज़ किया गया `FormSchema` है। फ़ील्ड के प्रकार `text`, `multiline`, `integer`, `decimal`, `length`, `color`, `boolean`, `choice` और `expression` हैं; हर एक `required`, `min`, `max`, `max_len`, `default` और `help` लेता है।
+
+इंस्पेक्टर फ़ील्ड को मॉडल फ़ॉर्म के कंट्रोल से बनाता है और नाम, लेबल और मान HTML के रूप में नहीं, टेक्स्ट के रूप में भरता है। जब फ़ील्ड छोड़ी जाती है, Enter दबाया जाता है या कोई चयनकर्ता बंद होता है, तो वह मान जाँचता है और आइलैंड की जड़ को `detail: { name, value }` के साथ `zeyn:property` भेजता है। अमान्य मान अपनी त्रुटि दिखाता है और नहीं भेजा जाता। 200 से अधिक फ़ील्ड वाला स्कीमा अनदेखा किया जाता है। `FieldSpec::check` सर्वर पर वही जाँच करता है।
 
 ## डॉकिंग पैनल
 

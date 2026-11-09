@@ -42,6 +42,9 @@ Form::of(Contact { quantity: 2, size: Size::Medium, ..Contact::default() })
 | `Control::Password`、`Control::NewPassword` | 按密码类型输入的文本字段，带显示和隐藏按钮 |
 | `Control::PasswordMeter` | 带强度指示条的新密码 |
 | `Control::Rating` | 1 到 N 的整数，以星星显示；`Decimal` 字段可用半颗星（见 [Rating](#rating)） |
+| `Control::Multiline` | 任意长度的文本，使用会自动增高的文本区域 |
+| `Control::Color { palette }` | 保存十六进制颜色的 `String`，带取色器（见 [Color and length](#color-and-length)） |
+| `Control::Length { units }` | 以像素保存、按用户所选单位显示的 `Decimal` 长度（见 [Color and length](#color-and-length)） |
 
 ## Rating
 
@@ -62,6 +65,22 @@ Form::of(Feedback::default())
 
 @live rating
 
+
+## Color and length
+
+```rust
+const BRAND: &[&str] = &["#1E88E5", "#43A047", "#00000080"];
+
+Form::of(band)
+    .field(Band::fill)
+    .control(Band::fill, Control::Color { palette: BRAND })
+    .field(Band::height)
+    .control(Band::height, Control::Length { units: &[LengthUnit::Mm, LengthUnit::Pt] })
+```
+
+`Control::Color` 把 `String` 字段保存为 `#RRGGBB` 或 `#RRGGBBAA`。字段是带颜色块的文本输入框，因此没有脚本也能使用；它的按钮会打开一个对话框，里面有红、绿、蓝和不透明度滑块、最近使用的颜色以及应用的调色板。按 Escape 或“完成”关闭对话框并把焦点还回去。服务器拒绝不是十六进制颜色的值。
+
+`Control::Length` 把 `Decimal` 字段保存为 CSS 像素（每英寸 96 像素）。用户以毫米、厘米、英寸、磅或像素输入，并在数字旁边选择单位；浏览器会为所有长度字段记住这个单位。上下方向键每次步进 0.1，按住 Shift 时步进 1，范围是以像素表示的 `min` 和 `max` 规则。请给字段设置 `scale = 4`。
 
 ## Lookup
 

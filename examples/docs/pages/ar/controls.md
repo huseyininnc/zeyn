@@ -42,6 +42,9 @@ Form::of(Contact { quantity: 2, size: Size::Medium, ..Contact::default() })
 | `Control::Password`, `Control::NewPassword` | حقل نص من نوع كلمة مرور، مع زر إظهار وإخفاء |
 | `Control::PasswordMeter` | كلمة مرور جديدة مع مقياس قوة |
 | `Control::Rating` | عدد صحيح من 1 إلى N يظهر على شكل نجوم، أو أنصاف نجوم في حقل `Decimal` (انظر [Rating](#rating)) |
+| `Control::Multiline` | نص بأي طول في مساحة نص تكبر مع المحتوى |
+| `Control::Color { palette }` | `String` يحمل لونًا ست عشريًا مع منتقي ألوان (انظر [Color and length](#color-and-length)) |
+| `Control::Length { units }` | طول `Decimal` يُخزَّن بالبكسل ويُعرض بالوحدة التي يختارها المستخدم (انظر [Color and length](#color-and-length)) |
 
 ## Rating
 
@@ -62,6 +65,22 @@ Form::of(Feedback::default())
 
 @live rating
 
+
+## Color and length
+
+```rust
+const BRAND: &[&str] = &["#1E88E5", "#43A047", "#00000080"];
+
+Form::of(band)
+    .field(Band::fill)
+    .control(Band::fill, Control::Color { palette: BRAND })
+    .field(Band::height)
+    .control(Band::height, Control::Length { units: &[LengthUnit::Mm, LengthUnit::Pt] })
+```
+
+يحفظ `Control::Color` حقل `String` على شكل `#RRGGBB` أو `#RRGGBBAA`. الحقل إدخال نصي مع عينة للون، لذا يعمل دون سكربت؛ ويفتح زره مربع حوار فيه منزلقات الأحمر والأخضر والأزرق والعتامة، والألوان المستخدمة مؤخرًا ولوحة ألوان التطبيق. يغلقه Escape أو زر الإنهاء ويعيد التركيز. يرفض الخادم أي قيمة ليست لونًا ست عشريًا.
+
+يحفظ `Control::Length` حقل `Decimal` ببكسلات CSS (96 في البوصة). يكتب المستخدم بالمليمتر أو السنتيمتر أو البوصة أو النقطة أو البكسل ويختار الوحدة بجانب الرقم؛ ويتذكر المتصفح الوحدة لكل حقول الطول. يغيّر السهمان للأعلى وللأسفل القيمة بمقدار 0.1، ومع Shift بمقدار 1، داخل قاعدتي `min` و`max` المعطاتين بالبكسل. أعطِ الحقل `scale = 4`.
 
 ## Lookup
 

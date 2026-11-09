@@ -147,6 +147,10 @@ surface.update(|editor| editor.add_box());   // change the scene, draw on the ne
 
 يحفظ المحرر عبر `SaveDiagram`، ويقصّ الخادم ما يتلقاه (`Diagram::clamped`: 200 شكل على الأكثر، ومعرّفات فريدة، وتسميات من 40 حرفاً، وإحداثيات محدودة) لأن الجزيرة لا يُوثق بها أبداً.
 
+### 7.1 مفتش الخصائص
+
+يحرّر `PropertyInspector::island(name)` الكائن المحدد. ترسل الجزيرة `zeyn:inspect` مع `detail: { title, schema, values }` من أي عنصر فيها، ويرد المفتش على كل تغيير مؤكد بـ`zeyn:property` (`detail: { name, value }`) على جذر الجزيرة بعد التحقق منه. وتظل الجزيرة تتحقق مما تحفظه، ويتحقق الخادم من الحفظ بـ`FormSchema::check`.
+
 ## 8. الأداء
 
 | ماذا | الرقم |

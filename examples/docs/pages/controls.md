@@ -42,6 +42,9 @@ Form::of(Contact { quantity: 2, size: Size::Medium, ..Contact::default() })
 | `Control::Password`, `Control::NewPassword` | A text field typed as a password, with a show and hide button |
 | `Control::PasswordMeter` | A new password with a strength meter |
 | `Control::Rating` | A whole number from 1 to N shown as stars, or half stars on a `Decimal` field (see [Rating](#rating)) |
+| `Control::Multiline` | A text of any length in a growing text area |
+| `Control::Color { palette }` | A `String` holding a hex color, with a picker (see [Color and length](#color-and-length)) |
+| `Control::Length { units }` | A `Decimal` length stored in pixels and shown in a unit the user picks (see [Color and length](#color-and-length)) |
 
 ## Rating
 
@@ -61,6 +64,22 @@ Form::of(Feedback::default())
 ```
 
 @live rating
+
+## Color and length
+
+```rust
+const BRAND: &[&str] = &["#1E88E5", "#43A047", "#00000080"];
+
+Form::of(band)
+    .field(Band::fill)
+    .control(Band::fill, Control::Color { palette: BRAND })
+    .field(Band::height)
+    .control(Band::height, Control::Length { units: &[LengthUnit::Mm, LengthUnit::Pt] })
+```
+
+`Control::Color` keeps a `String` as `#RRGGBB` or `#RRGGBBAA`. The field is a text input with a color chip, so it works without script; its button opens a dialog with red, green, blue and opacity sliders, the colors used last and the app's palette. Escape or Done closes it and returns focus. The server refuses a value that is not a hex color.
+
+`Control::Length` keeps a `Decimal` in CSS pixels (96 to the inch). The user types in millimeters, centimeters, inches, points or pixels and picks the unit next to the number; the browser remembers the unit for every length field. Arrow Up and Down step by 0.1, with Shift by 1, inside the `min` and `max` rules, which are in pixels. Give the field `scale = 4`.
 
 ## Lookup
 

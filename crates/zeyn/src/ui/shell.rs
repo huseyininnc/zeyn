@@ -273,45 +273,133 @@ impl Component for Toolbox {
 ///     .section("Look").field(Shape::fill)
 ///     .submit("Apply", save_shape))
 /// ```
+///
+/// [`PropertyInspector::island`] edits what an island selects instead, with no form and no
+/// server call.
 pub struct PropertyInspector {
     title: Text,
-    form: Node,
+    body: InspectorBody,
+}
+
+enum InspectorBody {
+    Form(Node),
+    Island(&'static str),
 }
 
 impl PropertyInspector {
     pub fn new(title: impl Into<Text>, form: impl Into<Node>) -> Self {
         Self {
             title: title.into(),
-            form: form.into(),
+            body: InspectorBody::Form(form.into()),
         }
+    }
+
+    /// An inspector for the objects an island selects. The island sends `zeyn:inspect` with
+    /// `detail: { title, schema, values }` (`schema` as a [`super::FormSchema`] serializes) from
+    /// any element inside `Island::new(name)`; the inspector draws the fields with the controls
+    /// of model forms and, on each committed change (leaving the field, Enter, closing a picker),
+    /// checks the value as [`super::FieldSpec::check`] does and sends `zeyn:property` with
+    /// `detail: { key, name, value }` to the island root. A value that fails shows its error and
+    /// is not sent. Everything runs in the browser (`inspector.js`).
+    ///
+    /// `key` in `zeyn:inspect` names the object (its id in the island) and comes back in every
+    /// `zeyn:property`, `null` without one. When another object arrives (another key, or without
+    /// keys another title or schema), a pending valid edit is first sent with the old key and an
+    /// invalid one is dropped, so an edit never reaches an object it was not typed for. While the
+    /// same object is shown, the focused field keeps what the user typed. Send `zeyn:inspect`
+    /// after the page has loaded; numbers are JavaScript numbers, so integers beyond 2^53 lose
+    /// precision.
+    ///
+    /// ```ignore
+    /// Row::new()
+    ///     .col(Island::new("designer"))
+    ///     .col(PropertyInspector::island("designer"))
+    /// ```
+    pub fn island(name: &'static str) -> Self {
+        Self {
+            title: Text::key("zeyn.ui.inspector.title"),
+            body: InspectorBody::Island(name),
+        }
+    }
+
+    /// The heading shown before the island selects anything.
+    pub fn title(mut self, title: impl Into<Text>) -> Self {
+        self.title = title.into();
+        self
     }
 }
 
 impl Component for PropertyInspector {
     fn render(&self, out: &mut String, r: &Render) {
         let id = dom_id(r, "inspector");
-        out.push_str(&format!(
-            r#"<section class="z-inspector" aria-labelledby="{id}-title"><h2 class="z-inspector-title" id="{id}-title">{}</h2>"#,
-            r.text(&self.title)
-        ));
-        self.form.render(out, r);
+        match &self.body {
+            InspectorBody::Form(form) => {
+                out.push_str(&format!(
+                    r#"<section class="z-inspector" aria-labelledby="{id}-title"><h2 class="z-inspector-title" id="{id}-title">{}</h2>"#,
+                    r.text(&self.title)
+                ));
+                form.render(out, r);
+            }
+            InspectorBody::Island(name) => {
+                let t = |k: &str| {
+                    r.i18n
+                        .text(r.locale, &Text::key(format!("zeyn.validation.{k}")))
+                };
+                let texts = json!({
+                    "required": t("required"),
+                    "max_len": t("max_len"),
+                    "min": t("min"),
+                    "max": t("max"),
+                    "format": t("format"),
+                    "color": t("color"),
+                    "scale": t("scale"),
+                    "shown": r.i18n.text(r.locale, &Text::key("zeyn.ui.inspector.shown")),
+                });
+                out.push_str(&format!(
+                    r#"<section class="z-inspector z-inspector-island" aria-labelledby="{id}-title" data-zeyn-inspector="{}" data-texts="{}" data-limits="{}" data-testid="{}.inspector"><h2 class="z-inspector-title" id="{id}-title">{}</h2><p class="z-inspector-empty">{}</p><div class="z-form z-inspector-body" role="group" aria-labelledby="{id}-title" hidden></div><p class="z-sr-only" aria-live="polite" data-zeyn-inspector-live></p>"#,
+                    escape(name),
+                    crate::render::attr(&texts),
+                    super::limits_attr(),
+                    r.scope,
+                    r.text(&self.title),
+                    r.text(&Text::key("zeyn.ui.inspector.empty"))
+                ));
+                super::render_templates(out, r);
+            }
+        }
         out.push_str("</section>");
     }
 
     fn schema(&self) -> Json {
-        json!({ "type": "property_inspector", "title": self.title, "form": self.form.schema() })
+        match &self.body {
+            InspectorBody::Form(form) => {
+                json!({ "type": "property_inspector", "title": self.title, "form": form.schema() })
+            }
+            InspectorBody::Island(name) => {
+                json!({ "type": "property_inspector", "title": self.title, "island": name })
+            }
+        }
     }
 
     fn form(&self) -> Option<&dyn FormSource> {
-        self.form.form()
+        match &self.body {
+            InspectorBody::Form(form) => form.form(),
+            InspectorBody::Island(_) => None,
+        }
     }
 
     fn source(&self, key: &str) -> Option<&dyn super::DataSource> {
-        self.form.source(key)
+        match &self.body {
+            InspectorBody::Form(form) => form.source(key),
+            InspectorBody::Island(_) => None,
+        }
     }
 
     fn reveal(&self, field: &str) -> Option<crate::privacy::Revealed> {
-        self.form.reveal(field)
+        match &self.body {
+            InspectorBody::Form(form) => form.reveal(field),
+            InspectorBody::Island(_) => None,
+        }
     }
 }
 

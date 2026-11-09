@@ -114,7 +114,8 @@
       "precision": "{label} can have at most {n} digits before the decimal separator.",
       "mask": "{label} must look like {pattern}.",
       "embed": "{label} must be an https address to embed, or embed code that holds one.",
-      "embed_host": "{label}: {host} is not on the list of sites this app may embed."
+      "embed_host": "{label}: {host} is not on the list of sites this app may embed.",
+      "color": "{label} must be a color such as #1E88E5."
     },
     "error": {
       "forbidden": "You are not allowed to do this.",
@@ -770,6 +771,25 @@
         "empty": "No posts yet.",
         "comments": "{count} comments",
         "comments_one": "1 comment"
+      },
+      "color": {
+        "open": "Choose a color",
+        "dialog": "Color",
+        "red": "Red",
+        "green": "Green",
+        "blue": "Blue",
+        "alpha": "Opacity",
+        "recent": "Recent colors",
+        "palette": "Palette",
+        "done": "Done"
+      },
+      "length": {
+        "unit": "Unit"
+      },
+      "inspector": {
+        "title": "Properties",
+        "empty": "Select an item to see its properties.",
+        "shown": "Properties of {title}"
       }
     },
     "date": {
