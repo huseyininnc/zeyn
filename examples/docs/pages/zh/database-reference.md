@@ -3,7 +3,7 @@
 `zeyn::sql` 把 entity 保存在 SQL 数据库中。它根据表格发送的 `DataQuery`（筛选、排序、分页、合计、分组）列出 entity，并通过行版本检查来保存它们。PostgreSQL 位于 `postgres` Cargo feature 之后，Oracle 位于 `oracle` 之后，因此不使用数据库的应用不会编译其中任何内容。
 
 ```toml
-zeyn = { version = "0.0.8", features = ["postgres"] }   # or ["oracle"], or both
+zeyn = { version = "0.0.9", features = ["postgres"] }   # or ["oracle"], or both
 ```
 
 ## 设置

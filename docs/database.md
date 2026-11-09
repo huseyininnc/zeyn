@@ -6,7 +6,7 @@ behind the `postgres` Cargo feature and Oracle behind `oracle`, so an app withou
 compiles none of it.
 
 ```toml
-zeyn = { version = "0.0.8", features = ["postgres"] }   # or ["oracle"], or both
+zeyn = { version = "0.0.9", features = ["postgres"] }   # or ["oracle"], or both
 ```
 
 ## Setup

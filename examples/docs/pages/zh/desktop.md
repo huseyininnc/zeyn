@@ -19,7 +19,7 @@ Zeyn 应用可以作为单个桌面可执行文件发布。`zeyn-desktop` crate 
 desktop = ["dep:zeyn-desktop"]
 
 [dependencies]
-zeyn-desktop = { version = "0.0.8", optional = true }
+zeyn-desktop = { version = "0.0.9", optional = true }
 ```
 
 用启动窗口代替 `App::serve`：

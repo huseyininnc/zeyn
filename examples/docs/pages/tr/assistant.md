@@ -5,7 +5,7 @@ Durum: `zeyn`'in `assistant` Cargo feature'ının arkasında uygulandı.
 Bir Zeyn uygulaması kendi yapay zeka asistanını taşıyabilir: her sayfada, uygulamanın verisiyle cevap veren ve uygulamanın screen'lerini ve API'lerini oturum açmış kullanıcı olarak çalıştıran bir sohbet. Zeyn ile geliştirilen uygulamalar bunu kendi müşterileri için açabilir, müşterilerin istediği modeli bağlayabilir ve sohbet geçmişini ihtiyaç duydukları yerde tutabilir.
 
 ```toml
-zeyn = { version = "0.0.8", features = ["assistant"] }
+zeyn = { version = "0.0.9", features = ["assistant"] }
 ```
 
 Feature olmadan hiçbiri derlenmez: HTTP istemcisi yok, ek route yok, ek bellek yok.
