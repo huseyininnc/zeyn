@@ -120,7 +120,10 @@
       "typing_indicator": "Bir sohbette başka kimlerin yazdığını gerçek zamanlı kanal üzerinden gösterir.",
       "story_ring": "Hikâyelerinin yeni olup olmadığını gösteren halkalı avatar.",
       "lightbox": "Tam ekran açılan resimler ve videolar; açıklama, yakınlaştırma ve kaydırma ile.",
-      "feed": "Yenilerini bir düğmenin arkasında tutan, sonsuz bir gönderi akışı."
+      "feed": "Yenilerini bir düğmenin arkasında tutan, sonsuz bir gönderi akışı.",
+      "color_input": "Seçici, son kullanılan renkler ve paletle onaltılık renk.",
+      "length_input": "Piksel olarak saklanan, kullanıcının seçtiği birimde gösterilen uzunluk.",
+      "property_inspector": "Bir adanın gönderdiği şemayla, adada seçili olanı düzenler."
     },
     "ex": {
       "action_button": {
@@ -441,6 +444,15 @@
         "single": "Tek bir resim"
       },
       "feed": {
+        "overview": "Örnek"
+      },
+      "color_input": {
+        "overview": "Örnek"
+      },
+      "length_input": {
+        "overview": "Örnek"
+      },
+      "property_inspector": {
         "overview": "Örnek"
       }
     },

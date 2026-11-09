@@ -187,6 +187,10 @@ The editor saves through `SaveDiagram`, and the server clamps what it receives
 (`Diagram::clamped`: at most 200 shapes, unique ids, labels of 40 characters, bounded coordinates)
 because the island is never trusted.
 
+### 7.1 Property inspector
+
+`PropertyInspector::island(name)` edits the selected object. The island dispatches `zeyn:inspect` with `detail: { title, schema, values }` from any of its elements; the inspector answers each committed change with `zeyn:property` (`detail: { name, value }`) on the island root, already checked. The island still checks what it saves, and the server checks saves with `FormSchema::check`.
+
 ## 8. Performance
 
 | What | Number |

@@ -173,7 +173,27 @@ StatusBar::new("Status").left("Ready").right("UTF-8")
 - `MenuBar`는 ARIA menubar 패턴을 따르며 팔레트와 같은 명령을 담습니다.
 - `Toolbox`는 토글 버튼의 세로 그룹이며, 선택한 도구는 `zeyn:tool` 이벤트로 전송됩니다.
 - `PropertyInspector::new(title, form)`은 `.section(...)` 그룹으로 나뉜 폼으로 선택한 객체를 편집합니다.
+- `PropertyInspector::island(name)` 은 아일랜드에서 선택한 것을 폼 없이 편집합니다([Island inspector](#island-inspector) 참고).
 - `StatusBar`에는 라이브 리전이 있으므로 여기에 보낸 메시지를 스크린 리더가 읽습니다.
+
+## Island inspector
+
+```rust
+Row::new()
+    .col(Island::new("designer"))
+    .col(PropertyInspector::island("designer"))
+
+let schema = FormSchema::new()
+    .section("Position")
+    .field(FieldSpec::length("x", "X", &[LengthUnit::Mm]).min(0))
+    .section("Look")
+    .field(FieldSpec::color("fill", "Fill", BRAND).required())
+    .field(FieldSpec::choice("align", "Align", [("left", "Left"), ("right", "Right")]));
+```
+
+아일랜드는 `detail: { title, schema, values }`와 함께 `zeyn:inspect`를 보냅니다. `schema`는 직렬화한 `FormSchema`입니다. 필드 종류는 `text`, `multiline`, `integer`, `decimal`, `length`, `color`, `boolean`, `choice`, `expression`이며 각각 `required`, `min`, `max`, `max_len`, `default`, `help`를 받습니다.
+
+인스펙터는 모델 폼의 컨트롤로 필드를 그리고 이름, 레이블, 값을 HTML이 아닌 텍스트로 채웁니다. 필드를 벗어나거나 Enter를 누르거나 선택기를 닫으면 값을 검사하고 아일랜드 루트로 `detail: { name, value }`가 담긴 `zeyn:property`를 보냅니다. 잘못된 값은 오류를 보여 주고 보내지 않습니다. 필드가 200개를 넘는 스키마는 무시됩니다. `FieldSpec::check`는 서버에서 같은 검사를 합니다.
 
 ## 도킹 패널
 

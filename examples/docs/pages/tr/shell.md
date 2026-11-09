@@ -173,7 +173,27 @@ StatusBar::new("Status").left("Ready").right("UTF-8")
 - `MenuBar` ARIA menubar desenini izler ve palet ile aynı komutları tutar.
 - `Toolbox` dikey bir toggle düğmeleri grubudur; seçilen araç bir `zeyn:tool` olayı olarak gönderilir.
 - `PropertyInspector::new(title, form)`, `.section(...)` gruplarına bölünmüş bir formla seçili nesneyi düzenler.
+- `PropertyInspector::island(name)` bir adanın seçtiğini form olmadan düzenler ([Island inspector](#island-inspector) bölümüne bakın).
 - `StatusBar` bir live region'a sahiptir, bu yüzden ona gönderilen mesajlar ekran okuyucular tarafından okunur.
+
+## Island inspector
+
+```rust
+Row::new()
+    .col(Island::new("designer"))
+    .col(PropertyInspector::island("designer"))
+
+let schema = FormSchema::new()
+    .section("Position")
+    .field(FieldSpec::length("x", "X", &[LengthUnit::Mm]).min(0))
+    .section("Look")
+    .field(FieldSpec::color("fill", "Fill", BRAND).required())
+    .field(FieldSpec::choice("align", "Align", [("left", "Left"), ("right", "Right")]));
+```
+
+Ada, `detail: { title, schema, values }` ile `zeyn:inspect` gönderir; `schema`, serileştirilmiş bir `FormSchema`'dır. Alan türleri `text`, `multiline`, `integer`, `decimal`, `length`, `color`, `boolean`, `choice` ve `expression`'dır; her biri `required`, `min`, `max`, `max_len`, `default` ve `help` alır.
+
+Denetçi alanları model formlarının kontrolleriyle çizer; adları, etiketleri ve değerleri HTML olarak değil, metin olarak doldurur. Bir alandan çıkıldığında, Enter'a basıldığında ya da bir seçici kapandığında değeri denetler ve ada köküne `detail: { name, value }` ile `zeyn:property` gönderir. Geçersiz bir değer hatasını gösterir ve gönderilmez. 200'den fazla alanı olan bir şema yok sayılır. `FieldSpec::check` aynı denetimleri sunucuda yapar.
 
 ## Yerleştirilebilir paneller
 

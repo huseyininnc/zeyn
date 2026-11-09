@@ -270,7 +270,16 @@ dialog.z-palette::before {
   column-gap: calc(var(--z-space) * 2);
 }
 
-.z-inspector .z-field > .z-field-error { grid-column: 2; }
+.z-inspector .z-field > .z-field-error,
+.z-inspector .z-field > .z-field-help { grid-column: 2; }
+
+.z-inspector-empty { margin: 0; padding: calc(var(--z-space) * 3); color: var(--z-text-muted); }
+
+.z-inspector-fields { display: grid; }
+
+.z-inspector-island :is(.z-inspector-title, label, .z-form-section-title, .z-field-help, .z-field-error) { overflow-wrap: anywhere; }
+
+.z-inspector-fields > .z-field { padding: calc(var(--z-space) * 2) calc(var(--z-space) * 3) 0; }
 
 .z-inspector .z-form-row { gap: calc(var(--z-space) * 2); grid-template-columns: 1fr; }
 

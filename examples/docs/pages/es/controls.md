@@ -42,6 +42,9 @@ Form::of(Contact { quantity: 2, size: Size::Medium, ..Contact::default() })
 | `Control::Password`, `Control::NewPassword` | Un campo de texto de tipo contraseña, con un botón para mostrar y ocultar |
 | `Control::PasswordMeter` | Una contraseña nueva con un medidor de fortaleza |
 | `Control::Rating` | Un número entero de 1 a N mostrado como estrellas, o medias estrellas en un campo `Decimal` (ver [Rating](#rating)) |
+| `Control::Multiline` | Un texto de cualquier longitud en un área de texto que crece |
+| `Control::Color { palette }` | Un `String` con un color hexadecimal y un selector (ver [Color and length](#color-and-length)) |
+| `Control::Length { units }` | Una longitud `Decimal` guardada en píxeles y mostrada en la unidad que elige el usuario (ver [Color and length](#color-and-length)) |
 
 ## Rating
 
@@ -62,6 +65,22 @@ Form::of(Feedback::default())
 
 @live rating
 
+
+## Color and length
+
+```rust
+const BRAND: &[&str] = &["#1E88E5", "#43A047", "#00000080"];
+
+Form::of(band)
+    .field(Band::fill)
+    .control(Band::fill, Control::Color { palette: BRAND })
+    .field(Band::height)
+    .control(Band::height, Control::Length { units: &[LengthUnit::Mm, LengthUnit::Pt] })
+```
+
+`Control::Color` guarda un `String` como `#RRGGBB` o `#RRGGBBAA`. El campo es una entrada de texto con una muestra del color, así que funciona sin script; su botón abre un diálogo con controles deslizantes de rojo, verde, azul y opacidad, los colores usados por última vez y la paleta de la aplicación. Escape o Listo lo cierran y devuelven el foco. El servidor rechaza un valor que no sea un color hexadecimal.
+
+`Control::Length` guarda un `Decimal` en píxeles CSS (96 por pulgada). El usuario escribe en milímetros, centímetros, pulgadas, puntos o píxeles y elige la unidad junto al número; el navegador recuerda la unidad para todos los campos de longitud. Flecha arriba y abajo avanzan 0,1, con Mayús 1, dentro de las reglas `min` y `max`, que están en píxeles. Dé al campo `scale = 4`.
 
 ## Lookup
 

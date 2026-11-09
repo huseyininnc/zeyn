@@ -120,7 +120,10 @@
       "typing_indicator": "Who else is typing in a conversation, over the realtime channel.",
       "story_ring": "An avatar in a ring that says whether its stories are new.",
       "lightbox": "Images and videos that open full screen, with captions, zoom and swipes.",
-      "feed": "An endless stream of posts that holds new ones behind a button."
+      "feed": "An endless stream of posts that holds new ones behind a button.",
+      "color_input": "A hex color with a picker, the colors used last and a palette.",
+      "length_input": "A length stored in pixels and shown in a unit the user picks.",
+      "property_inspector": "Edits what an island selects, from a schema the island sends."
     },
     "ex": {
       "action_button": {
@@ -441,6 +444,15 @@
         "single": "A single image"
       },
       "feed": {
+        "overview": "Example"
+      },
+      "color_input": {
+        "overview": "Example"
+      },
+      "length_input": {
+        "overview": "Example"
+      },
+      "property_inspector": {
         "overview": "Example"
       }
     },

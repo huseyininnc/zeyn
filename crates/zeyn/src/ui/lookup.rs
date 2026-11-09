@@ -251,7 +251,7 @@ pub(crate) fn render_lookup(
     out.push_str(s.label);
     out.push_str(&format!(
         r#"<div class="z-lookup" data-zeyn-lookup="{}" data-multiple="{multiple}"{columns}{depends} data-texts="{}"><input type="text" class="z-lookup-value" inputmode="numeric" autocomplete="off" {} value="{}"></div>"#,
-        s.m.name,
+        s.f.name,
         attr(&texts),
         s.common,
         crate::render::escape(&value)

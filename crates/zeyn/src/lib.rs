@@ -275,6 +275,7 @@ pub mod prelude {
         RangeSlider, ReviewSummary, VariantGroup, VariantPicker,
     };
     pub use crate::ui::{Feed, Post, StoryRing, StoryRow, StoryState};
+    pub use crate::ui::{FieldSpec, FormSchema, LengthUnit, SchemaForm};
     #[cfg(feature = "server")]
     pub use crate::ui::{Reply, ReplySender};
     pub use crate::{

@@ -173,7 +173,27 @@ StatusBar::new("Status").left("Ready").right("UTF-8")
 - `MenuBar` は ARIA の menubar パターンに従い、パレットと同じコマンドを持ちます。
 - `Toolbox` は、トグルボタンの縦のグループです。選んだツールは `zeyn:tool` イベントとして送られます。
 - `PropertyInspector::new(title, form)` は、選択したオブジェクトを、`.section(...)` のグループに分けたフォームで編集します。
+- `PropertyInspector::island(name)` は、アイランドで選択されたものをフォームなしで編集します（[Island inspector](#island-inspector) を参照）。
 - `StatusBar` にはライブリージョンがあり、そこに送られたメッセージはスクリーンリーダーによって読み上げられます。
+
+## Island inspector
+
+```rust
+Row::new()
+    .col(Island::new("designer"))
+    .col(PropertyInspector::island("designer"))
+
+let schema = FormSchema::new()
+    .section("Position")
+    .field(FieldSpec::length("x", "X", &[LengthUnit::Mm]).min(0))
+    .section("Look")
+    .field(FieldSpec::color("fill", "Fill", BRAND).required())
+    .field(FieldSpec::choice("align", "Align", [("left", "Left"), ("right", "Right")]));
+```
+
+アイランドは `detail: { title, schema, values }` を付けて `zeyn:inspect` を送ります。`schema` はシリアライズした `FormSchema` です。フィールドの種類は `text`、`multiline`、`integer`、`decimal`、`length`、`color`、`boolean`、`choice`、`expression` で、それぞれ `required`、`min`、`max`、`max_len`、`default`、`help` を指定できます。
+
+インスペクターはモデルフォームと同じコントロールでフィールドを描き、名前、ラベル、値を HTML ではなくテキストとして入れます。フィールドを離れたとき、Enter を押したとき、ピッカーを閉じたときに値を検証し、アイランドのルートへ `detail: { name, value }` 付きの `zeyn:property` を送ります。無効な値はエラーを表示し、送られません。200 を超えるフィールドを持つスキーマは無視されます。`FieldSpec::check` はサーバーで同じ検証を行います。
 
 ## ドッキングパネル
 

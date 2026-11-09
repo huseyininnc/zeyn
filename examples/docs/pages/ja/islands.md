@@ -147,6 +147,10 @@ surface.update(|editor| editor.add_box());   // change the scene, draw on the ne
 
 エディタは `SaveDiagram` を通じて保存します。island は決して信頼されないため、サーバーは受け取った内容を制限します（`Diagram::clamped`: 図形は最大 200 個、id は一意、ラベルは 40 文字、座標は範囲内）。
 
+### 7.1 プロパティインスペクター
+
+`PropertyInspector::island(name)` は選択したオブジェクトを編集します。アイランドは自分の任意の要素から `detail: { title, schema, values }` 付きの `zeyn:inspect` を送り、インスペクターは確定した変更ごとに、検証済みの `zeyn:property`（`detail: { name, value }`）をアイランドのルートで返します。アイランドは保存する内容を自分でも検証し、サーバーは保存を `FormSchema::check` で検証します。
+
 ## 8. Performance
 
 | 項目 | 数値 |

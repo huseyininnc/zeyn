@@ -187,6 +187,10 @@ El editor guarda mediante `SaveDiagram`, y el servidor acota lo que recibe
 (`Diagram::clamped`: como máximo 200 formas, ids únicos, etiquetas de 40 caracteres, coordenadas acotadas)
 porque la isla nunca es de confianza.
 
+### 7.1 Inspector de propiedades
+
+`PropertyInspector::island(name)` edita el objeto seleccionado. La isla envía `zeyn:inspect` con `detail: { title, schema, values }` desde cualquiera de sus elementos; el inspector responde a cada cambio confirmado con `zeyn:property` (`detail: { name, value }`) en la raíz de la isla, ya comprobado. La isla sigue comprobando lo que guarda y el servidor comprueba lo guardado con `FormSchema::check`.
+
 ## 8. Rendimiento
 
 | Qué | Cifra |

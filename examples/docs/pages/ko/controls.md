@@ -42,6 +42,9 @@ Form::of(Contact { quantity: 2, size: Size::Medium, ..Contact::default() })
 | `Control::Password`, `Control::NewPassword` | 비밀번호로 입력되며 표시와 숨김 버튼이 있는 텍스트 필드 |
 | `Control::PasswordMeter` | 강도 표시기가 있는 새 비밀번호 |
 | `Control::Rating` | 1부터 N까지의 정수를 별로, `Decimal` 필드는 반 별로 표시합니다([Rating](#rating) 참조) |
+| `Control::Multiline` | 높이가 늘어나는 텍스트 영역에 쓰는 길이 제한 없는 텍스트 |
+| `Control::Color { palette }` | 16진수 색을 담는 `String`, 색 선택기 포함([Color and length](#color-and-length) 참고) |
+| `Control::Length { units }` | 픽셀로 저장하고 사용자가 고른 단위로 보여 주는 `Decimal` 길이([Color and length](#color-and-length) 참고) |
 
 ## Rating
 
@@ -62,6 +65,22 @@ Form::of(Feedback::default())
 
 @live rating
 
+
+## Color and length
+
+```rust
+const BRAND: &[&str] = &["#1E88E5", "#43A047", "#00000080"];
+
+Form::of(band)
+    .field(Band::fill)
+    .control(Band::fill, Control::Color { palette: BRAND })
+    .field(Band::height)
+    .control(Band::height, Control::Length { units: &[LengthUnit::Mm, LengthUnit::Pt] })
+```
+
+`Control::Color`는 `String` 필드를 `#RRGGBB` 또는 `#RRGGBBAA`로 저장합니다. 필드는 색 견본이 있는 텍스트 입력이라 스크립트 없이도 동작합니다. 버튼을 누르면 빨강, 초록, 파랑, 불투명도 슬라이더와 최근에 쓴 색, 앱의 팔레트가 있는 대화 상자가 열립니다. Escape나 완료를 누르면 닫히고 포커스가 돌아옵니다. 서버는 16진수 색이 아닌 값을 거부합니다.
+
+`Control::Length`는 `Decimal` 필드를 CSS 픽셀(1인치에 96)로 저장합니다. 사용자는 밀리미터, 센티미터, 인치, 포인트, 픽셀로 입력하고 숫자 옆에서 단위를 고릅니다. 브라우저는 모든 길이 필드에 대해 이 단위를 기억합니다. 위아래 화살표는 0.1씩, Shift와 함께 1씩, 픽셀 단위인 `min`과 `max` 규칙 안에서 움직입니다. 필드에 `scale = 4`를 지정하세요.
 
 ## Lookup
 

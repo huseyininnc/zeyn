@@ -173,7 +173,27 @@ StatusBar::new("Status").left("Ready").right("UTF-8")
 - يتبع `MenuBar` نمط ARIA menubar ويضم الأوامر نفسها الموجودة في اللوحة.
 - `Toolbox` مجموعة رأسية من أزرار التبديل؛ وتُرسل الأداة المختارة كحدث `zeyn:tool`.
 - يحرّر `PropertyInspector::new(title, form)` الكائن المحدد بنموذج مقسم إلى مجموعات `.section(...)`.
+- `PropertyInspector::island(name)` يحرّر ما تحدده الجزيرة دون نموذج (انظر [Island inspector](#island-inspector)).
 - لدى `StatusBar` منطقة حية (live region)، لذلك تقرأ قارئات الشاشة الرسائل المرسلة إليه.
+
+## Island inspector
+
+```rust
+Row::new()
+    .col(Island::new("designer"))
+    .col(PropertyInspector::island("designer"))
+
+let schema = FormSchema::new()
+    .section("Position")
+    .field(FieldSpec::length("x", "X", &[LengthUnit::Mm]).min(0))
+    .section("Look")
+    .field(FieldSpec::color("fill", "Fill", BRAND).required())
+    .field(FieldSpec::choice("align", "Align", [("left", "Left"), ("right", "Right")]));
+```
+
+ترسل الجزيرة `zeyn:inspect` مع `detail: { title, schema, values }`، حيث `schema` هو `FormSchema` مُسلسَل. أنواع الحقول هي `text` و`multiline` و`integer` و`decimal` و`length` و`color` و`boolean` و`choice` و`expression`؛ ويقبل كل منها `required` و`min` و`max` و`max_len` و`default` و`help`.
+
+يرسم المفتش الحقول بعناصر التحكم نفسها التي تستخدمها نماذج البيانات، ويملأ الأسماء والتسميات والقيم نصًا لا HTML. عند مغادرة حقل أو ضغط Enter أو إغلاق منتقٍ، يتحقق من القيمة ويرسل `zeyn:property` مع `detail: { name, value }` إلى جذر الجزيرة. القيمة غير الصالحة تعرض خطأها ولا تُرسل. يُتجاهل أي مخطط فيه أكثر من 200 حقل. ينفذ `FieldSpec::check` الفحوص نفسها على الخادم.
 
 ## اللوحات القابلة للإرساء
 

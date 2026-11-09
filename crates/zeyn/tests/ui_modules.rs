@@ -88,6 +88,11 @@ pub fn drag_tree() -> Screen {
     )
 }
 
+#[screen(route = "/inspector", permission = "trips.read")]
+pub fn inspector() -> Screen {
+    Screen::new("Inspector").body(PropertyInspector::island("designer"))
+}
+
 fn app() -> axum::Router {
     App::new("Test")
         .i18n(I18n::new("en"))
@@ -101,7 +106,9 @@ fn app() -> axum::Router {
                 .screen(photo)
                 .screen(photos)
                 .screen(plain_tree)
-                .screen(drag_tree),
+                .screen(drag_tree)
+
+                .screen(inspector),
         )
         .router()
         .unwrap()
@@ -312,4 +319,22 @@ async fn the_media_script_comes_only_with_images_that_need_it() {
         .find(|(name, _, _)| name == "media")
         .unwrap();
     assert!(media.1.contains("[data-zeyn-img]") && media.2.contains(".z-img-host"));
+}
+
+#[tokio::test]
+async fn an_island_inspector_links_the_controls_of_its_field_templates() {
+    let (status, page) = get("/inspector").await;
+    assert_eq!(status, StatusCode::OK);
+    let linked = links(&page);
+    for name in ["inspector.js", "colors.js", "length.js", "inputs.js"] {
+        assert!(linked.contains(&name.to_string()), "{name}");
+    }
+    let (_, form) = get("/trip").await;
+    let linked = links(&form);
+    for name in ["inspector.js", "colors.js", "length.js"] {
+        assert!(
+            !linked.contains(&name.to_string()),
+            "{name} on a plain form"
+        );
+    }
 }

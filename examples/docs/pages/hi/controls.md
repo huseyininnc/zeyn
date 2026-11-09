@@ -42,6 +42,9 @@ Form::of(Contact { quantity: 2, size: Size::Medium, ..Contact::default() })
 | `Control::Password`, `Control::NewPassword` | पासवर्ड के रूप में टाइप किया टेक्स्ट फ़ील्ड, दिखाने और छिपाने के बटन के साथ |
 | `Control::PasswordMeter` | मज़बूती मीटर वाला नया पासवर्ड |
 | `Control::Rating` | 1 से N तक की पूर्ण संख्या, तारों के रूप में दिखाई जाती है, `Decimal` फ़ील्ड पर आधे तारे ([Rating](#rating) देखें) |
+| `Control::Multiline` | बढ़ने वाले टेक्स्ट क्षेत्र में किसी भी लंबाई का टेक्स्ट |
+| `Control::Color { palette }` | हेक्स रंग रखने वाला `String`, रंग चुनने वाले के साथ ([Color and length](#color-and-length) देखें) |
+| `Control::Length { units }` | पिक्सेल में रखी और उपयोगकर्ता की चुनी इकाई में दिखाई गई `Decimal` लंबाई ([Color and length](#color-and-length) देखें) |
 
 ## Rating
 
@@ -62,6 +65,22 @@ Form::of(Feedback::default())
 
 @live rating
 
+
+## Color and length
+
+```rust
+const BRAND: &[&str] = &["#1E88E5", "#43A047", "#00000080"];
+
+Form::of(band)
+    .field(Band::fill)
+    .control(Band::fill, Control::Color { palette: BRAND })
+    .field(Band::height)
+    .control(Band::height, Control::Length { units: &[LengthUnit::Mm, LengthUnit::Pt] })
+```
+
+`Control::Color` किसी `String` फ़ील्ड को `#RRGGBB` या `#RRGGBBAA` के रूप में रखता है। फ़ील्ड रंग के नमूने वाला टेक्स्ट इनपुट है, इसलिए यह स्क्रिप्ट के बिना भी चलता है; इसका बटन लाल, हरे, नीले और अपारदर्शिता के स्लाइडर, हाल में इस्तेमाल हुए रंग और ऐप की पैलेट वाला डायलॉग खोलता है। Escape या Done उसे बंद करके फ़ोकस लौटाते हैं। सर्वर ऐसा मान अस्वीकार करता है जो हेक्स रंग नहीं है।
+
+`Control::Length` किसी `Decimal` फ़ील्ड को CSS पिक्सेल में रखता है (एक इंच में 96)। उपयोगकर्ता मिलीमीटर, सेंटीमीटर, इंच, पॉइंट या पिक्सेल में लिखता है और संख्या के पास इकाई चुनता है; ब्राउज़र हर लंबाई फ़ील्ड के लिए इकाई याद रखता है। ऊपर और नीचे के तीर 0.1 से, Shift के साथ 1 से, पिक्सेल में दिए `min` और `max` नियमों के भीतर बदलते हैं। फ़ील्ड को `scale = 4` दें।
 
 ## Lookup
 

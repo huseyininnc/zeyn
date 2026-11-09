@@ -45,6 +45,7 @@ mod rating;
 mod reactions;
 mod relative;
 mod reviews;
+mod schema;
 mod share;
 mod shell;
 mod story;
@@ -90,7 +91,7 @@ pub use composer::{
     MAX_MESSAGE_MENTIONS, SendKey,
 };
 pub use content::{AutoGrid, Avatar, AvatarSize, Heading, MetaLine, Paragraph, PrevNext, Spoiler};
-pub use controls::Control;
+pub use controls::{Control, LengthUnit, MAX_PALETTE, is_hex_color};
 pub(crate) use controls::{
     Slot, choices_text, read_choices, render_bool, render_choice, render_choices, render_number,
     render_text,
@@ -125,6 +126,11 @@ pub use rating::{DEFAULT_RATING, MAX_RATING};
 pub use reactions::{MAX_REACTIONS, ReactionPress, ReactionState, Reactions};
 pub use relative::RelativeTime;
 pub use reviews::ReviewSummary;
+pub use schema::{
+    FieldSpec, FormSchema, MAX_FIELD_NAME, MAX_SCHEMA_FIELDS, MAX_SCHEMA_OPTIONS, MAX_SCHEMA_TEXT,
+    SchemaForm, SpecKind,
+};
+pub(crate) use schema::{limits_attr, open_section, render_spec, render_templates};
 pub use share::Share;
 pub use story::{MAX_STORY_RINGS, StoryRing, StoryRow, StoryState};
 pub use thread::{

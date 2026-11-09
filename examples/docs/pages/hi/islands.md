@@ -147,6 +147,10 @@ surface.update(|editor| editor.add_box());   // change the scene, draw on the ne
 
 एडिटर `SaveDiagram` से सहेजता है, और सर्वर जो पाता है उसे सीमित करता है (`Diagram::clamped`: अधिकतम 200 आकृतियाँ, अद्वितीय आईडी, 40 अक्षरों के लेबल, सीमित निर्देशांक) क्योंकि island पर कभी भरोसा नहीं किया जाता।
 
+### 7.1 प्रॉपर्टी इंस्पेक्टर
+
+`PropertyInspector::island(name)` चुनी गई वस्तु को संपादित करता है। आइलैंड अपने किसी भी तत्व से `detail: { title, schema, values }` के साथ `zeyn:inspect` भेजता है; इंस्पेक्टर हर पक्के बदलाव का जवाब आइलैंड की जड़ पर जाँचे हुए `zeyn:property` (`detail: { name, value }`) से देता है। आइलैंड जो सहेजता है उसे फिर भी जाँचता है, और सर्वर सहेजने को `FormSchema::check` से जाँचता है।
+
 ## 8. प्रदर्शन
 
 | क्या | संख्या |

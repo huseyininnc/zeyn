@@ -173,7 +173,27 @@ StatusBar::new("Status").left("Ready").right("UTF-8")
 - `MenuBar` 遵循 ARIA menubar 模式，包含与命令面板相同的命令。
 - `Toolbox` 是一组纵向的切换按钮；所选工具以 `zeyn:tool` 事件发送。
 - `PropertyInspector::new(title, form)` 用被 `.section(...)` 分组的表单编辑所选对象。
+- `PropertyInspector::island(name)` 编辑岛中选中的对象，不使用表单（见 [Island inspector](#island-inspector)）。
 - `StatusBar` 带有 live region，因此发送给它的消息会被屏幕阅读器读出。
+
+## Island inspector
+
+```rust
+Row::new()
+    .col(Island::new("designer"))
+    .col(PropertyInspector::island("designer"))
+
+let schema = FormSchema::new()
+    .section("Position")
+    .field(FieldSpec::length("x", "X", &[LengthUnit::Mm]).min(0))
+    .section("Look")
+    .field(FieldSpec::color("fill", "Fill", BRAND).required())
+    .field(FieldSpec::choice("align", "Align", [("left", "Left"), ("right", "Right")]));
+```
+
+岛发送 `zeyn:inspect` 事件，`detail: { title, schema, values }`，其中 `schema` 是序列化后的 `FormSchema`。字段类型有 `text`、`multiline`、`integer`、`decimal`、`length`、`color`、`boolean`、`choice` 和 `expression`；每个字段都可以有 `required`、`min`、`max`、`max_len`、`default` 和 `help`。
+
+检查器用模型表单的控件绘制字段，并把名称、标签和值作为文本而不是 HTML 填入。离开字段、按 Enter 或关闭选择器时，它会校验值，并向岛的根元素发送带 `detail: { name, value }` 的 `zeyn:property`。无效的值会显示错误，不会发送。超过 200 个字段的 schema 会被忽略。`FieldSpec::check` 在服务器上执行相同的校验。
 
 ## 停靠面板
 
