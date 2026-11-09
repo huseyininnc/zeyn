@@ -141,6 +141,24 @@ struct Pages {
 #[derive(Deserialize)]
 struct PageInput {
     page: u64,
+    /// The id of the viewer's element, the start of the id prefix of the page, so two viewers on
+    /// one screen keep their ids apart. Only letters, digits, `-` and `_`, at most 100.
+    #[serde(default)]
+    viewer: String,
+}
+
+/// The id prefix of a page: `{viewer}-p{page}-`, with only letters, digits, `-` and `_` of the
+/// viewer id (at most 100), or `zdoc-p{page}-` when none is left.
+fn page_prefix(viewer: &str, page: u32) -> String {
+    let viewer: String = viewer
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
+        .take(100)
+        .collect();
+    match viewer.is_empty() {
+        true => format!("zdoc-p{page}-"),
+        false => format!("{viewer}-p{page}-"),
+    }
 }
 
 impl DataSource for Pages {
@@ -149,26 +167,41 @@ impl DataSource for Pages {
     }
 
     fn fetch(&self, ctx: Ctx, input: Json) -> BoxFuture<Result<Json>> {
-        let page = serde_json::from_value::<PageInput>(input)
+        let input = serde_json::from_value::<PageInput>(input)
             .ok()
-            .map(|p| p.page)
-            .filter(|p| (1..=u64::from(self.count)).contains(p));
+            .filter(|p| (1..=u64::from(self.count)).contains(&p.page));
         let (call, document, trusted) = (self.call, self.document.clone(), self.trusted);
         Box::pin(async move {
-            let page = page.ok_or(Error::NotFound)? as u32;
+            let input = input.ok_or(Error::NotFound)?;
+            let page = input.page as u32;
             let html = call(ctx, DocPage { document, page }).await??;
-            let html = page_markup(&html, page, trusted)?;
+            let prefix = page_prefix(&input.viewer, page);
+            let html = clean_off_runtime(html, prefix, trusted).await?;
             Ok(json!({ "page": page, "html": html }))
         })
     }
 }
 
+/// Cleans a page on the blocking pool, so a large page never holds a worker of the async
+/// runtime.
+#[cfg(feature = "server")]
+async fn clean_off_runtime(html: String, prefix: String, trusted: bool) -> Result<String> {
+    tokio::task::spawn_blocking(move || page_markup(&html, &prefix, trusted))
+        .await
+        .map_err(|e| Error::Internal(format!("cleaning a DocumentViewer page failed: {e}")))?
+}
+
+#[cfg(not(feature = "server"))]
+async fn clean_off_runtime(html: String, prefix: String, trusted: bool) -> Result<String> {
+    page_markup(&html, &prefix, trusted)
+}
+
 /// The page as it goes to the browser: cleaned unless trusted, and at most [`MAX_PAGE_BYTES`]
 /// before and after.
-fn page_markup(html: &str, page: u32, trusted: bool) -> Result<String> {
+fn page_markup(html: &str, prefix: &str, trusted: bool) -> Result<String> {
     let too_big = |n: usize| {
         Error::Internal(format!(
-            "page {page} of a DocumentViewer is {n} bytes, more than MAX_PAGE_BYTES ({MAX_PAGE_BYTES})"
+            "a page of a DocumentViewer is {n} bytes, more than MAX_PAGE_BYTES ({MAX_PAGE_BYTES})"
         ))
     };
     if html.len() > MAX_PAGE_BYTES {
@@ -177,7 +210,7 @@ fn page_markup(html: &str, page: u32, trusted: bool) -> Result<String> {
     if trusted {
         return Ok(html.to_string());
     }
-    let clean = super::sanitize::clean(html, &format!("zp{page}-"));
+    let clean = super::sanitize::clean(html, prefix);
     match clean.len() > MAX_PAGE_BYTES {
         true => Err(too_big(clean.len())),
         false => Ok(clean),
@@ -234,6 +267,22 @@ impl DataSource for Search {
             Ok(json!({ "hits": kept, "more": more }))
         })
     }
+}
+
+/// Whether a download address is a path of the app or an `http`/`https` address.
+fn download_href(href: &str) -> bool {
+    let v: String = href
+        .chars()
+        .filter(|c| !c.is_ascii_whitespace() && !c.is_control())
+        .collect();
+    let head = v
+        .split(['/', '?', '#'])
+        .next()
+        .unwrap_or("");
+    let lower = v.to_ascii_lowercase();
+    !v.is_empty()
+        && !v.contains('\\')
+        && (!head.contains(':') || lower.starts_with("https://") || lower.starts_with("http://"))
 }
 
 /// Zoom steps of the zoom buttons and the zoom list, in percent.
@@ -363,11 +412,16 @@ impl DocumentViewer {
         self
     }
 
-    /// A download link in the toolbar, such as the PDF export of the report. `href` is a path of
-    /// the app; the link downloads without leaving the screen.
+    /// A download link in the toolbar, such as the PDF export of the report. `href` comes from
+    /// the app, never from a user: a path of the app or an `http`/`https` address. Other schemes,
+    /// such as `javascript:` or `data:`, leave the link out. The link downloads without leaving
+    /// the screen.
     pub fn download(mut self, label: impl Into<Text>, href: impl Into<String>) -> Self {
-        self.downloads
-            .push((label.into(), href.into()));
+        let href: String = href.into();
+        if download_href(&href) {
+            self.downloads
+                .push((label.into(), href));
+        }
         self
     }
 
@@ -441,7 +495,7 @@ impl Component for DocumentViewer {
         let (w, h) = self.size.css();
         let count = self.pages.count;
         out.push_str(&format!(
-            r#"<section class="z-doc" data-zeyn-doc data-pages="{count}" data-width="{w:.2}" data-height="{h:.2}" data-texts="{texts}" aria-label="{title}" data-testid="{scope}.doc">"#,
+            r#"<section class="z-doc" id="{id}" data-zeyn-doc data-pages="{count}" data-width="{w:.2}" data-height="{h:.2}" data-texts="{texts}" aria-label="{title}" data-testid="{scope}.doc">"#,
             texts = attr(&self.texts(r)),
             scope = r.scope,
         ));

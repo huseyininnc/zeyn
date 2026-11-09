@@ -172,7 +172,7 @@ async function load(v, n) {
   v.loading.set(n, ctl);
   let body = null;
   try {
-    body = await call(v, 'page', { page: n }, ctl.signal);
+    body = await call(v, 'page', { page: n, viewer: v.root.id }, ctl.signal);
   } catch {}
   if (v.loading.get(n) !== ctl) return;
   v.loading.delete(n);

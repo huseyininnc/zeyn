@@ -29,7 +29,7 @@ fn the_sanitizer_removes_scripts_and_everything_that_runs_or_reaches_out() {
 <iframe src="https://evil.example"></iframe><object data="x"><param name="a"></object><embed src="x">
 <style>rect { fill: url(https://evil.example) }</style>
 </svg>"##;
-    let clean = sanitize_markup(dirty);
+    let clean = sanitize_markup(dirty, "");
     for bad in [
         "script",
         "SCRIPT",
@@ -86,7 +86,7 @@ fn the_sanitizer_keeps_shapes_text_gradients_and_inline_raster_images() {
 <!-- a comment --><![CDATA[ raw <b> ]]></svg>
 <table><tr><td colspan="2" style="text-align:right;font-family:'Courier New'">Cell</td></tr></table>
 <p>Line<br>two<img alt="logo" src="data:image/jpeg;base64,/9j/4AAQ"></p><div/>"##;
-    let clean = sanitize_markup(page);
+    let clean = sanitize_markup(page, "");
     for kept in [
         r##"<linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#fff"/>"##,
         r##"<g transform="translate(10 20)" clip-path="url(#c)">"##,
@@ -106,34 +106,38 @@ fn the_sanitizer_keeps_shapes_text_gradients_and_inline_raster_images() {
 
 #[test]
 fn the_sanitizer_closes_what_it_opens_and_survives_broken_markup() {
-    assert_eq!(sanitize_markup("<b><i>x</b>"), "<b><i>x</i></b>");
-    assert_eq!(sanitize_markup("</div>a < b"), "a &lt; b");
+    assert_eq!(sanitize_markup("<b><i>x</b>", ""), "<b><i>x</i></b>");
+    assert_eq!(sanitize_markup("</div>a < b", ""), "a &lt; b");
     assert_eq!(
-        sanitize_markup(r#"<p title="x>y">t</p>"#),
+        sanitize_markup(r#"<p title="x>y">t</p>"#, ""),
         r#"<p title="x&gt;y">t</p>"#
     );
-    assert_eq!(sanitize_markup(r#"<p title="never closed>t"#), "");
-    assert_eq!(sanitize_markup("<unknown>kept text</unknown>"), "kept text");
+    assert_eq!(sanitize_markup(r#"<p title="never closed>t"#, ""), "");
     assert_eq!(
-        sanitize_markup(r#"<p title="&quot;><script>x</script>">a</p>"#),
+        sanitize_markup("<unknown>kept text</unknown>", ""),
+        "kept text"
+    );
+    assert_eq!(
+        sanitize_markup(r#"<p title="&quot;><script>x</script>">a</p>"#, ""),
         r#"<p title="&quot;&gt;&lt;script&gt;x&lt;/script&gt;">a</p>"#
     );
     assert_eq!(
-        sanitize_markup("<script>if (a < b) { '</div>' }</script>after"),
+        sanitize_markup("<script>if (a < b) { '</div>' }</script>after", ""),
         "after"
     );
     assert_eq!(
-        sanitize_markup("<template><img src=x></template><p>ok</p>"),
+        sanitize_markup("<template><img src=x></template><p>ok</p>", ""),
         "<p>ok</p>"
     );
     assert_eq!(
         sanitize_markup(
-            r#"<a href="/reports/2?x=1#top">r</a><a href="//evil">e</a><a href="https:x">h</a>"#
+            r#"<a href="/reports/2?x=1#top">r</a><a href="//evil">e</a><a href="https:x">h</a>"#,
+            ""
         ),
         r#"<a href="/reports/2?x=1#top">r</a><a>e</a><a>h</a>"#
     );
     let deep = "<g>".repeat(5_000);
-    assert!(sanitize_markup(&format!("<svg>{deep}</svg>")).len() < 3_000);
+    assert!(sanitize_markup(&format!("<svg>{deep}</svg>"), "").len() < 3_000);
 }
 
 #[action(permission = "doc.read")]
@@ -276,7 +280,7 @@ async fn post(
 }
 
 fn page_call(screen: &str, node: &str, page: serde_json::Value) -> serde_json::Value {
-    json!({ "screen": screen, "params": null, "node": node, "key": "page", "input": { "page": page } })
+    json!({ "screen": screen, "params": null, "node": node, "key": "page", "input": { "page": page, "viewer": "report-doc-0-0" } })
 }
 
 #[tokio::test]
@@ -326,8 +330,20 @@ async fn pages_come_cleaned_with_their_ids_kept_apart_through_a_nested_path() {
     assert_eq!(v["page"], 7);
     let html = v["html"].as_str().unwrap();
     assert!(html.contains("<text>r1 page 7</text>"), "{html}");
-    assert!(html.contains(r#"<linearGradient id="zp7-g"/>"#), "{html}");
-    assert!(html.contains(r##"fill="url(#zp7-g)""##), "{html}");
+    assert!(
+        html.contains(r#"<linearGradient id="report-doc-0-0-p7-g"/>"#),
+        "{html}"
+    );
+    assert!(
+        html.contains(r##"fill="url(#report-doc-0-0-p7-g)""##),
+        "{html}"
+    );
+    let other = json!({ "screen": "report", "params": null, "node": "0.0", "key": "page", "input": { "page": 7, "viewer": "second\"><b>" } });
+    let (_, body) = post(&router, ALL, true, other).await;
+    assert!(body.contains(r#"id=\"secondb-p7-g\""#), "{body}");
+    let bare = json!({ "screen": "report", "params": null, "node": "0.0", "key": "page", "input": { "page": 7 } });
+    let (_, body) = post(&router, ALL, true, bare).await;
+    assert!(body.contains(r#"id=\"zdoc-p7-g\""#), "{body}");
     assert!(
         !html.contains("script") && !html.contains("onclick"),
         "{html}"
@@ -413,4 +429,143 @@ async fn searches_are_bounded_and_need_their_permission() {
     assert_eq!(status, StatusCode::NOT_FOUND);
     let (status, _) = post(&router, "doc.read", true, call("total")).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[test]
+fn the_sanitizer_takes_linear_time_on_hostile_pages() {
+    let two_mb = 2 * 1024 * 1024;
+    let urls = "url(#a)".repeat(two_mb / 7);
+    let cases = [
+        format!(r#"<svg><rect fill="{urls}"/></svg>"#),
+        format!(r#"<svg><rect style="fill:{urls}"/></svg>"#),
+        "<".repeat(two_mb),
+        "</".repeat(two_mb / 2),
+        "<!".repeat(two_mb / 2),
+        "<g>".repeat(two_mb / 3),
+        format!("<svg>{}</svg>", "<g><g/>".repeat(two_mb / 7)),
+        format!("<rect {}>", "fill=red ".repeat(two_mb / 9)),
+        "<rect x=1 y=2 width=3 height=4 fill=red stroke=blue>".repeat(two_mb / 52),
+        "<script>".repeat(two_mb / 8),
+        "<object>".repeat(two_mb / 8),
+        "&amp;&#x41;&bogus;".repeat(two_mb / 18),
+        format!("<a href=\"{}\">", "a".repeat(two_mb)),
+        format!("<p title=\"{}", "x".repeat(two_mb)),
+        "<use href=\"#a\"/>".repeat(two_mb / 16),
+    ];
+    for (i, page) in cases.iter().enumerate() {
+        let start = std::time::Instant::now();
+        let clean = sanitize_markup(page, "p-");
+        let took = start.elapsed();
+        assert!(
+            took < std::time::Duration::from_secs(2),
+            "case {i} took {took:?}"
+        );
+        assert!(clean.len() <= page.len() * 6, "case {i}");
+    }
+}
+
+#[test]
+fn paint_values_follow_a_grammar_of_colors_and_local_references() {
+    let paint = |v: &str| sanitize_markup(&format!(r#"<svg><rect fill="{v}"/></svg>"#), "p-");
+    for ok in [
+        "none",
+        "currentColor",
+        "transparent",
+        "red",
+        "#abc",
+        "#a1b2c3d4",
+        "rgb(10, 20, 30)",
+        "rgba(10 20 30 / 50%)",
+        "hsl(120deg, 50%, 50%)",
+    ] {
+        assert_eq!(
+            paint(ok),
+            format!(r#"<svg><rect fill="{ok}"/></svg>"#),
+            "{ok}"
+        );
+    }
+    assert_eq!(
+        paint("url(#g) red"),
+        r##"<svg><rect fill="url(#p-g) red"/></svg>"##
+    );
+    assert_eq!(
+        paint("URL('#g')"),
+        r##"<svg><rect fill="url(#p-g)"/></svg>"##
+    );
+    for bad in [
+        "image-set(x.png 1x)",
+        "url(#a) url(#b)",
+        "url(https://evil.example/a)",
+        "red;background:url(x)",
+        "#ggg",
+        "rgb(1,2,3) url(#a)",
+        "var(--x)",
+        "expression(alert(1))",
+        "rgb(calc(1))",
+        "paint(worklet)",
+    ] {
+        assert_eq!(paint(bad), "<svg><rect/></svg>", "{bad}");
+    }
+}
+
+#[test]
+fn html_inside_svg_is_unwrapped_and_use_elements_are_capped() {
+    assert_eq!(
+        sanitize_markup(
+            r#"<svg><p>a<b>b</b></p><div><text>t</text></div><a href="/x"><title>x</title></a></svg>"#,
+            ""
+        ),
+        r#"<svg>ab<text>t</text><a href="/x"><title>x</title></a></svg>"#
+    );
+    let many = r##"<use href="#a"/>"##.repeat(zeyn::ui::MAX_USE_ELEMENTS + 10);
+    let clean = sanitize_markup(&format!("<svg>{many}</svg>"), "");
+    assert_eq!(clean.matches("<use").count(), zeyn::ui::MAX_USE_ELEMENTS);
+}
+
+#[test]
+fn the_id_prefix_is_kept_to_safe_characters() {
+    assert_eq!(
+        sanitize_markup(r#"<p id="x">a</p>"#, "a\"b-<c>"),
+        r#"<p id="ab-cx">a</p>"#
+    );
+}
+
+#[screen(route = "/two", permission = "doc.read")]
+pub fn two() -> Screen {
+    Screen::new("Two")
+        .body(DocumentViewer::of(report_page, 2).document("a"))
+        .body(
+            DocumentViewer::of(report_page, 2)
+                .document("b")
+                .download("PDF", "/a.pdf")
+                .download("Bad", " javascript:alert(1)")
+                .download("Data", "data:text/html,x")
+                .download("Web", "https://example.com/r.pdf"),
+        )
+}
+
+#[tokio::test]
+async fn two_viewers_on_one_screen_have_their_own_ids_and_only_safe_downloads() {
+    let router = App::new("Two")
+        .i18n(I18n::new("en"))
+        .auth(|_h: &HeaderMap| {
+            Some(Identity::user("u").with_permissions(vec!["doc.read".to_string()]))
+        })
+        .feature(Feature::new("docs").screen(two))
+        .router()
+        .unwrap();
+    let (status, page) = get_as(&router, "/two", "doc.read").await;
+    assert_eq!(status, StatusCode::OK);
+    let ids: Vec<&str> = page
+        .match_indices(r#"<section class="z-doc" id=""#)
+        .map(|(i, m)| {
+            let rest = &page[i + m.len()..];
+            &rest[..rest.find('"').unwrap()]
+        })
+        .collect();
+    assert_eq!(ids.len(), 2);
+    assert_ne!(ids[0], ids[1]);
+    assert!(page.contains(r#"href="/a.pdf" download"#));
+    assert!(page.contains(r#"href="https://example.com/r.pdf" download"#));
+    assert!(!page.contains("javascript") && !page.contains("data:text"));
 }

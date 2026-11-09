@@ -418,20 +418,43 @@ const IMAGE_TYPES: &[&str] = &[
 /// Deepest nesting of elements kept; deeper tags are dropped, their text kept.
 const MAX_DEPTH: usize = 256;
 
+/// Most `use` elements one fragment keeps; each can repeat a whole subtree when the browser
+/// renders it, so later ones are removed.
+pub const MAX_USE_ELEMENTS: usize = 2_000;
+
+/// Most attributes read on one element; later ones are removed.
+const MAX_ATTRS: usize = 64;
+
 /// Longest id kept, in bytes.
 const MAX_ID: usize = 100;
 
 /// Cleans an SVG or HTML fragment with the allow-list of this module and returns it ready to
-/// insert into a page. Ids are kept as they are.
+/// insert into a page.
+///
+/// Every id and every reference to one (`url(#id)`, `href="#id"`, `aria-labelledby`) gets
+/// `id_prefix` in front. Without a prefix, a fragment could name its elements like globals of the
+/// page's scripts or like other elements of the page (DOM clobbering: `id="zeynCsrf"` becomes
+/// `window.zeynCsrf`), and two fragments on one page would share ids. Use a prefix unique on the
+/// page that contains a hyphen, such as `doc-3-p12-`: ids with a hyphen are never names of
+/// globals. Characters other than ASCII letters, digits, `-` and `_` are removed from it.
+///
+/// The work is linear in the size of the fragment; clean large fragments off the async runtime
+/// (`tokio::task::spawn_blocking`), as `DocumentViewer` does.
 ///
 /// ```
 /// let clean = zeyn::ui::sanitize_markup(
-///     r#"<svg viewBox="0 0 10 10" onload="x()"><script>x()</script><rect width="4" height="4"/></svg>"#,
+///     r#"<svg viewBox="0 0 10 10" onload="x()"><script>x()</script><rect id="r" width="4" height="4"/></svg>"#,
+///     "a-",
 /// );
-/// assert_eq!(clean, r#"<svg viewBox="0 0 10 10"><rect width="4" height="4"/></svg>"#);
+/// assert_eq!(clean, r#"<svg viewBox="0 0 10 10"><rect id="a-r" width="4" height="4"/></svg>"#);
 /// ```
-pub fn sanitize_markup(html: &str) -> String {
-    clean(html, "")
+pub fn sanitize_markup(html: &str, id_prefix: &str) -> String {
+    let prefix: String = id_prefix
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
+        .take(MAX_ID)
+        .collect();
+    clean(html, &prefix)
 }
 
 /// Cleans a fragment, with `prefix` in front of every id and id reference.
@@ -442,6 +465,7 @@ pub(crate) fn clean(html: &str, prefix: &str) -> String {
         out: String::with_capacity(html.len()),
         open: Vec::new(),
         svg: 0,
+        uses: 0,
         prefix,
     };
     s.run();
@@ -461,14 +485,58 @@ struct Sanitizer<'a, 'p> {
     out: String,
     open: Vec<&'static str>,
     svg: usize,
+    uses: usize,
     prefix: &'p str,
 }
 
-/// The canonical name of `name` in `list`, compared without case.
-fn find(list: &[&'static str], name: &str) -> Option<&'static str> {
-    list.iter()
-        .copied()
-        .find(|n| n.eq_ignore_ascii_case(name))
+/// Flags of an element name: the lists it is on.
+const F_RAW: u8 = 1;
+const F_DROP: u8 = 2;
+const F_SVG: u8 = 4;
+const F_HTML: u8 = 8;
+const F_VOID: u8 = 16;
+const F_SKIPPED_VOID: u8 = 32;
+
+/// The canonical name and the flags of an element name, compared without case through a table
+/// built once, so each tag costs one hash lookup.
+fn element(name: &str) -> Option<(&'static str, u8)> {
+    static TABLE: std::sync::OnceLock<std::collections::HashMap<String, (&'static str, u8)>> =
+        std::sync::OnceLock::new();
+    let table = TABLE.get_or_init(|| {
+        let mut t: std::collections::HashMap<String, (&'static str, u8)> =
+            std::collections::HashMap::new();
+        let lists: [(&[&'static str], u8); 6] = [
+            (RAW, F_RAW),
+            (DROP, F_DROP),
+            (SVG, F_SVG),
+            (HTML, F_HTML),
+            (VOID, F_VOID),
+            (SKIPPED_VOID, F_SKIPPED_VOID),
+        ];
+        for (list, flag) in lists {
+            for n in list {
+                t.entry(n.to_ascii_lowercase())
+                    .or_insert((n, 0))
+                    .1 |= flag;
+            }
+        }
+        t
+    });
+    if name.len() > 32 {
+        return None;
+    }
+    let mut buf = [0u8; 32];
+    let lower = &mut buf[..name.len()];
+    lower.copy_from_slice(name.as_bytes());
+    lower.make_ascii_lowercase();
+    std::str::from_utf8(lower)
+        .ok()
+        .and_then(|l| table.get(l).copied())
+}
+
+/// Whether element `name` has `flag`.
+fn has(name: &str, flag: u8) -> bool {
+    element(name).is_some_and(|(_, f)| f & flag != 0)
 }
 
 fn name_char(b: u8) -> bool {
@@ -542,7 +610,7 @@ impl<'a> Sanitizer<'a, '_> {
             .get(1)
             .is_some_and(u8::is_ascii_alphabetic)
         {
-            self.text("<");
+            self.out.push_str("&lt;");
             self.at += 1;
             return;
         }
@@ -675,10 +743,10 @@ impl<'a> Sanitizer<'a, '_> {
             {
                 match self.tag() {
                     Some(t) => {
-                        if find(RAW, t.name).is_some() && !t.closed {
+                        if has(t.name, F_RAW) && !t.closed {
                             let n = t.name.to_string();
                             self.skip(&n, true);
-                        } else if !t.closed && find(SKIPPED_VOID, t.name).is_none() {
+                        } else if !t.closed && !has(t.name, F_SKIPPED_VOID) {
                             depth += 1;
                         }
                     }
@@ -691,33 +759,42 @@ impl<'a> Sanitizer<'a, '_> {
     }
 
     fn start(&mut self, tag: Tag<'_>) {
-        if let Some(raw) = find(RAW, tag.name) {
+        let Some((name, flags)) = element(tag.name) else {
+            return;
+        };
+        if flags & F_RAW != 0 {
             if !tag.closed {
-                self.skip(raw, true);
+                self.skip(name, true);
             }
             return;
         }
-        if find(DROP, tag.name).is_some() {
+        if flags & F_DROP != 0 {
             if !tag.closed {
-                self.skip(tag.name, false);
+                self.skip(name, false);
             }
             return;
         }
         let in_svg = self.svg > 0;
-        let name = match (find(SVG, tag.name), find(HTML, tag.name)) {
-            (Some(s), Some(_)) if in_svg => s,
-            (_, Some(h)) => h,
-            (Some(s), None) => s,
-            (None, None) => return,
-        };
-        let svg = in_svg || (name == "svg") || find(HTML, name).is_none();
+        if flags & (F_SVG | F_HTML) == 0 || (in_svg && flags & F_SVG == 0) {
+            return;
+        }
+        if name == "use" {
+            if self.uses >= MAX_USE_ELEMENTS {
+                if !tag.closed {
+                    self.skip(name, false);
+                }
+                return;
+            }
+            self.uses += 1;
+        }
+        let svg = in_svg || (name == "svg") || flags & F_HTML == 0;
         if self.open.len() >= MAX_DEPTH {
             return;
         }
         self.out.push('<');
         self.out.push_str(name);
         let mut seen: Vec<&str> = Vec::new();
-        for (attr, value) in &tag.attrs {
+        for (attr, value) in tag.attrs.iter().take(MAX_ATTRS) {
             if let Some((canonical, value)) = self.attr(name, attr, *value)
                 && !seen.contains(&canonical)
             {
@@ -729,7 +806,7 @@ impl<'a> Sanitizer<'a, '_> {
                 self.out.push('"');
             }
         }
-        let void = !svg && find(VOID, name).is_some();
+        let void = !svg && flags & F_VOID != 0;
         if void {
             self.out.push('>');
         } else if tag.closed && svg {
@@ -788,8 +865,11 @@ impl<'a> Sanitizer<'a, '_> {
         name: &str,
         value: Option<&str>,
     ) -> Option<(&'static str, String)> {
-        let value = decode(value.unwrap_or(""));
+        if name.len() > 32 {
+            return None;
+        }
         let lower = name.to_ascii_lowercase();
+        let value = decode(value.unwrap_or(""));
         if lower == "href" || lower == "xlink:href" {
             return match element {
                 "use" => self.local(&value).map(|v| ("href", v)),
@@ -816,10 +896,9 @@ impl<'a> Sanitizer<'a, '_> {
                 false => Some((canonical, value)),
             };
         }
-        let (canonical, kind) = ATTRS
-            .iter()
-            .copied()
-            .find(|(n, _)| n.eq_ignore_ascii_case(name))?;
+        let (canonical, kind) = attr_table()
+            .get(lower.as_str())
+            .copied()?;
         let value = match kind {
             Kind::Plain => Some(value),
             Kind::Id => self.id(&value),
@@ -873,28 +952,30 @@ impl<'a> Sanitizer<'a, '_> {
         relative.then_some(v)
     }
 
-    /// Paint and effect values: `url()` only as `url(#id)`.
+    /// Paint and effect values: `none`, a color, or `url(#id)` with an optional color after it.
+    /// Anything else, such as `image-set()` or a second `url()`, removes the attribute.
     fn paint(&self, value: &str) -> Option<String> {
-        let lower = value.to_ascii_lowercase();
-        if value.contains('\\') || lower.contains("expression") {
+        let v = value.trim();
+        let Some(inner) = v
+            .get(..4)
+            .filter(|h| h.eq_ignore_ascii_case("url("))
+            .map(|_| &v[4..])
+        else {
+            return color(v).then(|| v.to_string());
+        };
+        let end = inner.find(')')?;
+        let target = inner[..end]
+            .trim()
+            .trim_matches(['"', '\'']);
+        let local = self.local(target)?;
+        let fallback = inner[end + 1..].trim();
+        if !fallback.is_empty() && !color(fallback) {
             return None;
         }
-        let mut out = String::with_capacity(value.len());
-        let mut rest = value;
-        while let Some(i) = rest.to_ascii_lowercase().find("url(") {
-            out.push_str(&rest[..i]);
-            let inner = &rest[i + 4..];
-            let end = inner.find(')')?;
-            let target = inner[..end]
-                .trim()
-                .trim_matches(['"', '\'']);
-            out.push_str("url(");
-            out.push_str(&self.local(target)?);
-            out.push(')');
-            rest = &inner[end + 1..];
-        }
-        out.push_str(rest);
-        Some(out)
+        Some(match fallback.is_empty() {
+            true => format!("url({local})"),
+            false => format!("url({local}) {fallback}"),
+        })
     }
 
     /// Declarations of a `style` attribute on the list, without `url()`, escapes or comments.
@@ -953,6 +1034,64 @@ const ARIA: &[&str] = &[
     "aria-setsize",
     "aria-description",
 ];
+
+/// Whether `v` is a paint keyword or a color: `none`, `currentColor`, `transparent`, a color
+/// name, `#rgb` to `#rrggbbaa`, or `rgb()`, `rgba()`, `hsl()`, `hsla()` of numbers.
+fn color(v: &str) -> bool {
+    if let Some(hex) = v.strip_prefix('#') {
+        return matches!(hex.len(), 3 | 4 | 6 | 8)
+            && hex
+                .bytes()
+                .all(|b| b.is_ascii_hexdigit());
+    }
+    if !v.is_empty()
+        && v.len() <= 32
+        && v.bytes()
+            .all(|b| b.is_ascii_alphabetic())
+    {
+        return true;
+    }
+    let Some((func, args)) = v.split_once('(') else {
+        return false;
+    };
+    let func = func.trim().to_ascii_lowercase();
+    let Some(args) = args.strip_suffix(')') else {
+        return false;
+    };
+    matches!(func.as_str(), "rgb" | "rgba" | "hsl" | "hsla")
+        && args.len() <= 64
+        && args.bytes().all(|b| {
+            b.is_ascii_digit()
+                || matches!(
+                    b,
+                    b' ' | b'.'
+                        | b','
+                        | b'%'
+                        | b'/'
+                        | b'-'
+                        | b'+'
+                        | b'd'
+                        | b'e'
+                        | b'g'
+                        | b't'
+                        | b'u'
+                        | b'r'
+                        | b'n'
+                )
+        })
+}
+
+/// [`ATTRS`] by lowercase name, built once.
+fn attr_table() -> &'static std::collections::HashMap<String, (&'static str, Kind)> {
+    static TABLE: std::sync::OnceLock<std::collections::HashMap<String, (&'static str, Kind)>> =
+        std::sync::OnceLock::new();
+    TABLE.get_or_init(|| {
+        ATTRS
+            .iter()
+            .map(|(n, k)| (n.to_ascii_lowercase(), (*n, *k)))
+            .collect()
+    })
+}
 
 /// Class names without the framework's `z-` names.
 fn class(value: &str) -> Option<String> {

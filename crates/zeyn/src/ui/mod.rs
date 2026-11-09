@@ -132,7 +132,7 @@ pub use rating::{DEFAULT_RATING, MAX_RATING};
 pub use reactions::{MAX_REACTIONS, ReactionPress, ReactionState, Reactions};
 pub use relative::RelativeTime;
 pub use reviews::ReviewSummary;
-pub use sanitize::sanitize_markup;
+pub use sanitize::{MAX_USE_ELEMENTS, sanitize_markup};
 pub use schema::{
     FieldSpec, FormSchema, MAX_FIELD_NAME, MAX_SCHEMA_FIELDS, MAX_SCHEMA_OPTIONS, MAX_SCHEMA_TEXT,
     SchemaForm, SpecKind,
