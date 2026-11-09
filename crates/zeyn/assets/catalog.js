@@ -21,6 +21,8 @@
 
 const BASE = (document.querySelector('meta[name="zeyn-base"]')?.content ?? '').replace(/\/$/, '');
 const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+/** The drag core (`drag.js`). */
+const D = await import(new URL(`drag.js${new URL(import.meta.url).search}`, import.meta.url).href);
 
 /** Returns the CSRF token of the page, or asks `zeyn.js` for one when the page came without it. */
 async function csrf() {
@@ -166,7 +168,7 @@ function railScroll(section, step) {
 }
 
 /** Pixels a mouse moves before a press on a rail becomes a drag instead of a click. */
-const DRAG_PX = 5;
+const DRAG_PX = 6;
 
 /** Scrolls a rail so the card whose start is nearest to the rail's start lines up with it. */
 function railSnap(list) {
@@ -183,53 +185,35 @@ function railSnap(list) {
 }
 
 /**
- * Lets a mouse drag a rail sideways. Touch and pen keep the browser's own scrolling. A press that
- * moves more than `DRAG_PX` is a drag: the click on release is cancelled, so the card link does
- * not open, and the rail snaps to the nearest card. A smaller move is a normal click. The
- * dragging class stays until the mouse moves again, so the pointer events that follow the release
- * do not start a card preview.
+ * Lets a mouse drag a rail sideways through the drag core (`drag.js`). Touch and pen keep the
+ * browser's own scrolling. A press that moves `DRAG_PX` sideways is a drag: the click on release
+ * is cancelled, so the card link does not open, and the rail snaps to the nearest card. A smaller
+ * move is a normal click. The dragging class stays until the mouse moves again, so the pointer
+ * events that follow the release do not start a card preview.
  */
 function railDrag(list) {
-  let press = null;
-  let dragged = false;
   list.addEventListener('pointerdown', (e) => {
     if (e.pointerType !== 'mouse' || e.button !== 0) return;
-    press = { id: e.pointerId, x: e.clientX, left: list.scrollLeft, moving: false };
-    dragged = false;
+    const x = e.clientX;
+    const left = list.scrollLeft;
+    D.press(e, {
+      threshold: DRAG_PX,
+      axis: 'x',
+      onStart: (ev) => {
+        list.classList.add('z-rail-dragging');
+        getSelection()?.removeAllRanges();
+        const move = (m) => {
+          list.scrollLeft = left - (m.clientX - x);
+        };
+        move(ev);
+        D.capture(list, ev, move, (_, cancelled) => {
+          if (!cancelled) D.swallowClick();
+          railSnap(list);
+          list.addEventListener('pointermove', () => list.classList.remove('z-rail-dragging'), { once: true });
+        });
+      },
+    });
   });
-  list.addEventListener('pointermove', (e) => {
-    if (!press || e.pointerId !== press.id) return;
-    const dx = e.clientX - press.x;
-    if (!press.moving) {
-      if (Math.abs(dx) <= DRAG_PX) return;
-      press.moving = true;
-      list.setPointerCapture(e.pointerId);
-      list.classList.add('z-rail-dragging');
-      getSelection()?.removeAllRanges();
-    }
-    list.scrollLeft = press.left - dx;
-  });
-  const release = (e) => {
-    if (!press || e.pointerId !== press.id) return;
-    const moving = press.moving;
-    press = null;
-    if (!moving) return;
-    dragged = true;
-    railSnap(list);
-    list.addEventListener('pointermove', () => list.classList.remove('z-rail-dragging'), { once: true });
-  };
-  list.addEventListener('pointerup', release);
-  list.addEventListener('pointercancel', release);
-  list.addEventListener(
-    'click',
-    (e) => {
-      if (!dragged) return;
-      dragged = false;
-      e.preventDefault();
-      e.stopPropagation();
-    },
-    true,
-  );
   list.addEventListener('dragstart', (e) => e.preventDefault());
   list.addEventListener('focusin', (e) => {
     e.target.closest?.('.z-poster')?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: reduced.matches ? 'auto' : 'smooth' });
