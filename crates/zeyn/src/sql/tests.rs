@@ -1243,6 +1243,20 @@ fn rank_columns_compare_by_bytes_on_oracle() {
         "{}",
         ddl[0]
     );
+    assert!(
+        ddl[0].contains(r#"CONSTRAINT "CARDS_RANK_KEY" UNIQUE ("RANK")"#),
+        "{}",
+        ddl[0]
+    );
+    assert_eq!(
+        ddl[1],
+        r#"CREATE INDEX "CARDS_RANK_ORD" ON "CARDS" (NLSSORT("RANK", 'NLS_SORT=BINARY'), "ID")"#
+    );
+    let v11 = create_table::<Card>(&V11).unwrap();
+    assert!(v11[1].starts_with("CREATE SEQUENCE"), "{v11:?}");
+    assert!(v11[2].starts_with("CREATE INDEX"), "{v11:?}");
+    let pg = create_table::<Card>(&Postgres).unwrap();
+    assert_eq!(pg.len(), 1, "the PostgreSQL column sorts by itself: {pg:?}");
     let sql = rank_page(&V12);
     assert!(
         sql.text.contains(r#"WHERE NLSSORT("RANK", 'NLS_SORT=BINARY') >= NLSSORT(:1, 'NLS_SORT=BINARY') AND ((NLSSORT("RANK", 'NLS_SORT=BINARY') > NLSSORT(:2, 'NLS_SORT=BINARY')) OR (NLSSORT("RANK", 'NLS_SORT=BINARY') = NLSSORT(:3, 'NLS_SORT=BINARY') AND "ID" > :4)) ORDER BY NLSSORT("RANK", 'NLS_SORT=BINARY') ASC, "ID" ASC"#),

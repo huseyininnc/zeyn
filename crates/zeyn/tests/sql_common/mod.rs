@@ -865,7 +865,7 @@ pub async fn ranks(url: &str, drop: &[&'static str], session: &[&'static str]) {
     for i in 0..120 {
         let at = (i * 7) % (list.len() + 1);
         let a = at.checked_sub(1).map(|i| &list[i]);
-        let key = zeyn::rank::between(a, list.get(at));
+        let key = zeyn::rank::between(a, list.get(at)).unwrap();
         list.insert(at, key);
     }
     let mut shuffled = list.clone();
@@ -935,7 +935,7 @@ pub async fn ranks(url: &str, drop: &[&'static str], session: &[&'static str]) {
         clash.is_err(),
         "the unique index is the backstop for a rank clash"
     );
-    let retry = zeyn::rank::between(Some(&list[3]), Some(&list[4]));
+    let retry = zeyn::rank::between(Some(&list[3]), Some(&list[4])).unwrap();
     db.insert(&Card {
         id: CardId(0),
         rank: retry,

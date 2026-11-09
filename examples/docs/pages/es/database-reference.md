@@ -173,7 +173,8 @@ mano: listas ordenables, columnas kanban, hermanos de un árbol. `rank::between(
 entre dos vecinos, `rank::n_between(a, b, n)` da `n` claves para soltar varias filas a la vez, y
 `rank::rebalance(n)` da `n` claves nuevas espaciadas por igual para renumerar una lista cuando
 `Rank::needs_rebalance()` es verdadero (más de 48 caracteres; el límite es 64). Un movimiento
-escribe una sola fila.
+escribe una sola fila. `between` y `n_between` devuelven `None` cuando una clave no
+cabría con sus caracteres aleatorios; entonces reequilibre la lista.
 
 Las claves son base62 (`0-9 A-Z a-z`, en orden ASCII) y se comparan byte a byte, así que la
 columna también debe comparar bytes, sea cual sea la intercalación de la base de datos o de la sesión:
@@ -183,10 +184,14 @@ columna también debe comparar bytes, sea cual sea la intercalación de la base 
 | PostgreSQL | `VARCHAR(64) COLLATE "C"` | `ORDER BY "rank"` simple; se aplica la intercalación de la columna |
 | Oracle | `VARCHAR2(64)` | `NLSSORT("RANK", 'NLS_SORT=BINARY')` en ambos lados, así `NLS_SORT` y `NLS_COMP` no importan |
 
-`create_table` escribe estos tipos de columna y `find` escribe estos órdenes; en una migración
-escriba el mismo tipo de columna. En Oracle, un índice que sirve al orden es
-`CREATE INDEX ... ON t (list_id, NLSSORT("RANK", 'NLS_SORT=BINARY'))`. Los datos en memoria
-también ordenan los rangos por bytes.
+`create_table` escribe estos tipos de columna y `find` escribe estos órdenes. En Oracle también
+escribe `CREATE INDEX cards_rank_ord ON cards (NLSSORT("RANK", 'NLS_SORT=BINARY'), "ID")`, así las primeras páginas de un orden por
+rango leen el índice y se detienen tras la página. Oracle reduce las condiciones `NLSSORT` de una
+página de cursor posterior a comparaciones simples, así que las páginas profundas de una lista larga
+todavía leen buena parte de la tabla: mantenga las listas cortas con un filtro por la columna de la
+lista, indexada como `(list_id, NLSSORT("RANK", 'NLS_SORT=BINARY'))`. En una migración escriba el
+mismo tipo de columna y el mismo índice. Los datos en memoria también ordenan los rangos por bytes.
+Las columnas de rango no tienen filtro en el grid.
 
 Cada clave termina con tres caracteres aleatorios, así que dos peticiones que insertan entre los
 mismos vecinos en el mismo momento obtienen claves distintas. Eso hace improbable un choque, no

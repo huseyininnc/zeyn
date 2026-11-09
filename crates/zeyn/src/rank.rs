@@ -6,12 +6,12 @@
 //!
 //! ```
 //! use zeyn::rank;
-//! let first = rank::between(None, None);
-//! let last = rank::between(Some(&first), None);
-//! let middle = rank::between(Some(&first), Some(&last));
+//! let first = rank::between(None, None).unwrap();
+//! let last = rank::between(Some(&first), None).unwrap();
+//! let middle = rank::between(Some(&first), Some(&last)).unwrap();
 //! assert!(first < middle && middle < last);
 //!
-//! let dropped = rank::n_between(Some(&first), Some(&middle), 3);
+//! let dropped = rank::n_between(Some(&first), Some(&middle), 3).unwrap();
 //! assert!(first < dropped[0] && dropped[0] < dropped[1] && dropped[1] < dropped[2]);
 //! assert!(dropped[2] < middle);
 //! ```
@@ -21,7 +21,8 @@
 //! Every key ends with [`JITTER`] random characters, so two requests that insert between the
 //! same neighbors at the same moment get different keys. The jitter makes a clash unlikely, not
 //! impossible: give the rank column a unique index (per list, such as `(board_id, rank)`) and
-//! retry the insert once with a fresh key when the index refuses it.
+//! retry the insert once with a fresh key when the index refuses it. [`between`] returns `None`
+//! rather than a key without room for its jitter; rebalance the list then.
 //!
 //! # Databases
 //!
@@ -164,28 +165,36 @@ fn random() -> u64 {
 /// `between(Some(&last), None)` to append, `between(None, Some(&first))` to prepend.
 ///
 /// The key is at most one character longer than the longer neighbor, plus [`JITTER`] random
-/// characters while they fit in [`Rank::MAX_LEN`]. Neighbors given in the wrong order are
-/// swapped, and equal neighbors place the key after them. When both neighbors are already at
-/// [`Rank::MAX_LEN`] the key can be longer than that and fails to parse back; rebalance the
-/// list when [`Rank::needs_rebalance`] turns true and that never happens.
-pub fn between(a: Option<&Rank>, b: Option<&Rank>) -> Rank {
+/// characters. Neighbors given in the wrong order are swapped, and equal neighbors place the key
+/// after them. `None` means the key would not fit in [`Rank::MAX_LEN`] with its jitter: give the
+/// list fresh keys with [`rebalance`] and try again. Rebalancing when [`Rank::needs_rebalance`]
+/// turns true keeps that from happening.
+///
+/// ```
+/// use zeyn::Rank;
+/// let a = Rank::parse(&"V".repeat(64)).unwrap();
+/// let b = Rank::parse(&format!("{}W", "V".repeat(63))).unwrap();
+/// assert!(zeyn::rank::between(Some(&a), Some(&b)).is_none());
+/// ```
+#[must_use = "None means the list needs a rebalance first"]
+pub fn between(a: Option<&Rank>, b: Option<&Rank>) -> Option<Rank> {
     let (a, b) = match (a, b) {
         (Some(x), Some(y)) if x > y => (Some(y), Some(x)),
         (Some(x), Some(y)) if x == y => (Some(x), None),
         pair => pair,
     };
-    let mut out = Vec::with_capacity(Rank::MAX_LEN);
+    let mut out = Vec::with_capacity(Rank::MAX_LEN + 1);
     midpoint(
         a.map_or(&[][..], |r| r.0.as_bytes()),
         b.map(|r| r.0.as_bytes()),
         &mut out,
     );
-    let room = Rank::MAX_LEN
-        .saturating_sub(out.len())
-        .min(JITTER);
+    if out.len() + JITTER > Rank::MAX_LEN {
+        return None;
+    }
     let mut bits = random();
-    for i in 0..room {
-        let n = if i + 1 == room {
+    for i in 0..JITTER {
+        let n = if i + 1 == JITTER {
             1 + bits % 61
         } else {
             bits % 62
@@ -193,26 +202,34 @@ pub fn between(a: Option<&Rank>, b: Option<&Rank>) -> Rank {
         out.push(DIGITS[n as usize]);
         bits /= 62;
     }
-    Rank(String::from_utf8(out).unwrap_or_default())
+    Some(Rank(ascii(out)))
+}
+
+/// Text of digit bytes. Every byte comes from [`DIGITS`], which is ASCII, so the conversion
+/// cannot fail.
+fn ascii(bytes: Vec<u8>) -> String {
+    String::from_utf8(bytes).expect("rank digits are ASCII")
 }
 
 /// `n` sorted, distinct ranks between two neighbors, for a drop of several rows at once. The
-/// keys split the gap evenly, so they grow by about one character per 62 rows.
-pub fn n_between(a: Option<&Rank>, b: Option<&Rank>, n: usize) -> Vec<Rank> {
+/// keys split the gap evenly, so they grow by about one character per 62 rows. `None` when they
+/// do not fit, as for [`between`].
+#[must_use = "None means the list needs a rebalance first"]
+pub fn n_between(a: Option<&Rank>, b: Option<&Rank>, n: usize) -> Option<Vec<Rank>> {
     let mut out = Vec::with_capacity(n);
-    fill(a.cloned(), b, n, &mut out);
-    out
+    fill(a.cloned(), b, n, &mut out)?;
+    Some(out)
 }
 
 /// Pushes `n` sorted ranks between `a` and `b` by splitting the gap in the middle.
-fn fill(a: Option<Rank>, b: Option<&Rank>, n: usize, out: &mut Vec<Rank>) {
+fn fill(a: Option<Rank>, b: Option<&Rank>, n: usize, out: &mut Vec<Rank>) -> Option<()> {
     if n == 0 {
-        return;
+        return Some(());
     }
-    let mid = between(a.as_ref(), b);
-    fill(a, Some(&mid), n / 2, out);
+    let mid = between(a.as_ref(), b)?;
+    fill(a, Some(&mid), n / 2, out)?;
     out.push(mid.clone());
-    fill(Some(mid), b, n - n / 2 - 1, out);
+    fill(Some(mid), b, n - n / 2 - 1, out)
 }
 
 /// `n` evenly spaced fresh ranks, as short as they can be, for renumbering a whole list in one
@@ -242,7 +259,7 @@ pub fn rebalance(n: usize) -> Vec<Rank> {
             while key.last() == Some(&b'0') {
                 key.pop();
             }
-            Rank(String::from_utf8(key).unwrap_or_default())
+            Rank(ascii(key))
         })
         .collect()
 }

@@ -172,7 +172,8 @@ A field of type `zeyn::Rank` holds a fractional index for rows people order by h
 lists, kanban columns, tree siblings. `rank::between(a, b)` gives a key between two neighbors,
 `rank::n_between(a, b, n)` gives `n` keys for a drop of several rows, and `rank::rebalance(n)`
 gives `n` evenly spaced fresh keys for renumbering a list once `Rank::needs_rebalance()` is true
-(past 48 characters; the limit is 64). A move writes one row.
+(past 48 characters; the limit is 64). A move writes one row. `between` and `n_between` return `None`
+when a key would not fit with its random characters; rebalance the list then.
 
 Keys are base62 (`0-9 A-Z a-z`, in ASCII order) and compare byte by byte, so the column must
 compare bytes too, whatever the database or session collation is:
@@ -182,10 +183,13 @@ compare bytes too, whatever the database or session collation is:
 | PostgreSQL | `VARCHAR(64) COLLATE "C"` | plain `ORDER BY "rank"`; the column collation applies |
 | Oracle | `VARCHAR2(64)` | `NLSSORT("RANK", 'NLS_SORT=BINARY')` on both sides, so `NLS_SORT` and `NLS_COMP` do not matter |
 
-`create_table` writes these column types and `find` writes these sorts; in a migration write the
-same column type. On Oracle an index that serves the sort is
-`CREATE INDEX ... ON t (list_id, NLSSORT("RANK", 'NLS_SORT=BINARY'))`. Memory data sorts ranks
-by bytes as well.
+`create_table` writes these column types and `find` writes these sorts. On Oracle it also writes
+`CREATE INDEX cards_rank_ord ON cards (NLSSORT("RANK", 'NLS_SORT=BINARY'), "ID")`, so the first pages of a sort by rank read the
+index and stop after the page. Oracle reduces the `NLSSORT` conditions of a later keyset page to
+plain comparisons, so deep pages of a long list still read much of the table: keep lists short with
+a filter on the list column, indexed as `(list_id, NLSSORT("RANK", 'NLS_SORT=BINARY'))`. In a
+migration write the same column type and index. Memory data sorts ranks by bytes as well. Rank
+columns have no grid filter.
 
 Each key ends with three random characters, so two requests that insert between the same
 neighbors at the same moment get different keys. That makes a clash unlikely, not impossible:

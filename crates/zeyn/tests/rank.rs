@@ -3,7 +3,7 @@
 
 use zeyn::Rank;
 use zeyn::prelude::*;
-use zeyn::rank::{self, between, n_between, rebalance};
+use zeyn::rank::{JITTER, rebalance};
 
 /// A small seeded generator (splitmix64) for repeatable random inputs.
 struct Seeded(u64);
@@ -25,6 +25,22 @@ impl Seeded {
 
 fn valid(r: &Rank) -> bool {
     Rank::parse(r.as_str()).as_ref() == Some(r)
+}
+
+fn rank(s: &str) -> Rank {
+    Rank::parse(s).unwrap()
+}
+
+/// [`zeyn::rank::between`] that must fit, checked to parse back.
+fn between(a: Option<&Rank>, b: Option<&Rank>) -> Rank {
+    let key = zeyn::rank::between(a, b).expect("room for the key");
+    assert!(valid(&key), "{key}");
+    key
+}
+
+/// [`zeyn::rank::n_between`] that must fit.
+fn n_between(a: Option<&Rank>, b: Option<&Rank>, n: usize) -> Vec<Rank> {
+    zeyn::rank::n_between(a, b, n).expect("room for the keys")
 }
 
 #[test]
@@ -211,17 +227,84 @@ fn memory_grids_sort_ranks_by_bytes() {
 }
 
 #[test]
-fn between_timing() {
-    let a = rank::between(None, None);
-    let b = rank::between(Some(&a), None);
-    let start = std::time::Instant::now();
-    let mut sink = 0;
-    for _ in 0..10_000 {
-        sink += between(Some(&a), Some(&b))
-            .as_str()
-            .len();
+fn no_room_is_none_instead_of_a_long_or_jitterless_key() {
+    let a = rank(&"V".repeat(64));
+    let b = rank(&format!("{}W", "V".repeat(63)));
+    assert!(zeyn::rank::between(Some(&a), Some(&b)).is_none());
+    let tail = rank(&"z".repeat(64));
+    assert!(zeyn::rank::between(Some(&tail), None).is_none());
+    assert!(zeyn::rank::between(Some(&rank(&"z".repeat(61))), None).is_none());
+    let key = between(Some(&rank(&"z".repeat(60))), None);
+    assert_eq!(key.as_str().len(), 61 + JITTER);
+    assert!(zeyn::rank::n_between(Some(&a), Some(&b), 2).is_none());
+}
+
+#[test]
+fn every_key_carries_the_full_jitter() {
+    let mut rng = Seeded(5);
+    let mut list = rebalance(2);
+    for _ in 0..2_000 {
+        let at = rng.below(list.len() + 1);
+        let a = at.checked_sub(1).map(|i| &list[i]);
+        let b = list.get(at);
+        let plain = zeyn::rank::between(a, b).unwrap();
+        let again = zeyn::rank::between(a, b).unwrap();
+        let len = plain.as_str().len();
+        assert_eq!(len, again.as_str().len());
+        assert!(len > JITTER, "{plain}");
+        assert_eq!(
+            plain.as_str()[..len - JITTER],
+            again.as_str()[..len - JITTER],
+            "the same midpoint before the jitter"
+        );
+        list.insert(at, plain);
+        if list[at].needs_rebalance() {
+            list = rebalance(list.len());
+        }
     }
-    let took = start.elapsed();
-    eprintln!("10 000 between() calls: {took:?}");
-    assert!(sink > 0);
+}
+
+#[test]
+fn prepending_before_a_key_with_leading_zeros() {
+    let b = rank("01");
+    let key = between(None, Some(&b));
+    assert!(key < b);
+    assert!(key.as_str().starts_with("00"), "{key}");
+}
+
+fn cards() -> Vec<Card> {
+    ["b", "B", "a", "Z", "1"]
+        .iter()
+        .enumerate()
+        .map(|(i, r)| Card {
+            id: CardId(i as i64 + 1),
+            rank: rank(r),
+        })
+        .collect()
+}
+
+#[test]
+fn memory_totals_of_ranks_compare_bytes_and_rank_filters_are_ignored() {
+    let q = DataQuery {
+        aggregates: vec![
+            zeyn::AggregateRequest {
+                field: "rank".into(),
+                op: zeyn::Aggregate::Min,
+            },
+            zeyn::AggregateRequest {
+                field: "rank".into(),
+                op: zeyn::Aggregate::Max,
+            },
+        ],
+        filters: vec![zeyn::Filter::contains("rank", "a")],
+        ..DataQuery::default()
+    };
+    let page = q.apply(cards());
+    assert_eq!(page.items.len(), 5, "a filter on a rank keeps every row");
+    let totals: Vec<String> = page
+        .totals
+        .iter()
+        .map(|t| format!("{:?}", t.value))
+        .collect();
+    assert_eq!(totals, [r#"Text("1")"#, r#"Text("b")"#]);
 }

@@ -1628,6 +1628,9 @@ pub(crate) fn duplicate_error() -> Error {
 /// `CREATE TABLE` for an entity, for scaffolding and tests; production schemas belong in
 /// migrations. Whole number keys are generated, `#[rule(unique)]` adds a named unique constraint,
 /// `#[version]` starts at 1, and `#[readonly]` columns get a default because inserts skip them.
+/// Where rank columns sort through [`Dialect::binary_sort`] (Oracle), each also gets the index
+/// `<table>_<column>_ord` on that expression and the key, in the order `find` sorts, so the first
+/// pages of a sort by rank stop after the page instead of sorting the table.
 ///
 /// ```
 /// use zeyn::prelude::*;
@@ -1654,6 +1657,7 @@ pub fn create_table<E: Entity>(d: &dyn Dialect) -> Result<Vec<String>> {
         .next()
         .unwrap_or(E::TABLE);
     let mut cols = Vec::new();
+    let mut indexes = Vec::new();
     for f in E::fields() {
         let name = column(d, f)?;
         let text_null =
@@ -1704,6 +1708,17 @@ pub fn create_table<E: Entity>(d: &dyn Dialect) -> Result<Vec<String>> {
                 d.column_type(&FieldKind::Text, Some(3))
             ));
         }
+        if let (FieldKind::Rank, Some((start, end))) = (&f.kind, d.binary_sort()) {
+            let mut on = format!("{start}{name}{end}");
+            if let Some(key) = E::fields().iter().find(|k| k.key) {
+                on.push_str(", ");
+                on.push_str(&column(d, key)?);
+            }
+            indexes.push(format!(
+                "CREATE INDEX {} ON {table} ({on})",
+                ident(d, &format!("{bare}_{}_ord", f.name))?
+            ));
+        }
         if f.rules.contains(&Rule::Unique) {
             cols.push(format!(
                 "CONSTRAINT {} UNIQUE ({name})",
@@ -1716,5 +1731,6 @@ pub fn create_table<E: Entity>(d: &dyn Dialect) -> Result<Vec<String>> {
         cols.join(",\n    ")
     )];
     out.extend(d.after_create(E::TABLE)?);
+    out.extend(indexes);
     Ok(out)
 }

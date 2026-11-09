@@ -131,7 +131,7 @@ db.migrate_dir("./migrations").await?;
 
 ### 用户排序的行：`Rank`
 
-`zeyn::Rank` 类型的字段为人们手动排序的行保存分数索引：可排序列表、看板列、树的同级节点。`rank::between(a, b)` 给出两个相邻键之间的键，`rank::n_between(a, b, n)` 为一次拖放多行给出 `n` 个键，`rank::rebalance(n)` 在 `Rank::needs_rebalance()` 为真时（超过 48 个字符；上限为 64）给出 `n` 个均匀分布的新键，用于给列表重新编号。一次移动只写一行。
+`zeyn::Rank` 类型的字段为人们手动排序的行保存分数索引：可排序列表、看板列、树的同级节点。`rank::between(a, b)` 给出两个相邻键之间的键，`rank::n_between(a, b, n)` 为一次拖放多行给出 `n` 个键，`rank::rebalance(n)` 在 `Rank::needs_rebalance()` 为真时（超过 48 个字符；上限为 64）给出 `n` 个均匀分布的新键，用于给列表重新编号。一次移动只写一行。当键加上随机字符后放不下时，`between` 和 `n_between` 返回 `None`；此时请重新平衡列表。
 
 键是 base62（`0-9 A-Z a-z`，按 ASCII 顺序），逐字节比较，因此无论数据库或会话的排序规则如何，列也必须按字节比较：
 
@@ -140,7 +140,7 @@ db.migrate_dir("./migrations").await?;
 | PostgreSQL | `VARCHAR(64) COLLATE "C"` | 普通的 `ORDER BY "rank"`；使用列的排序规则 |
 | Oracle | `VARCHAR2(64)` | 两侧都用 `NLSSORT("RANK", 'NLS_SORT=BINARY')`，因此 `NLS_SORT` 和 `NLS_COMP` 不影响结果 |
 
-`create_table` 写出这些列类型，`find` 写出这些排序；在迁移中请写相同的列类型。在 Oracle 上，服务该排序的索引是 `CREATE INDEX ... ON t (list_id, NLSSORT("RANK", 'NLS_SORT=BINARY'))`。内存数据同样按字节对 rank 排序。
+`create_table` 写出这些列类型，`find` 写出这些排序。在 Oracle 上它还会写出 `CREATE INDEX cards_rank_ord ON cards (NLSSORT("RANK", 'NLS_SORT=BINARY'), "ID")`，这样按 rank 排序的前几页读取索引，读完一页就停止。Oracle 会把后续游标页的 `NLSSORT` 条件简化为普通比较，因此长列表的深层页面仍会读取表的大部分：请用列表列上的筛选让列表保持简短，并建立索引 `(list_id, NLSSORT("RANK", 'NLS_SORT=BINARY'))`。在迁移中请写相同的列类型和索引。内存数据同样按字节对 rank 排序。rank 列没有表格筛选。
 
 每个键都以三个随机字符结尾，因此同一时刻在相同两个相邻键之间插入的两个请求会得到不同的键。这让冲突不太可能发生，但并非不可能：为该列建立每个列表内的唯一索引（`UNIQUE (list_id, rank)`），被拒绝时用新键重试一次插入。从客户端或数据行解析 rank 时，会拒绝字母表以外的字符、结尾的 `0` 以及超过 64 个字符的值。
 
