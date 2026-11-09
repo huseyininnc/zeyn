@@ -30,6 +30,26 @@ DataGrid::of(search_products)
     .exportable()
 ```
 
+## Columnas conocidas en tiempo de ejecución
+
+`DataGrid::dynamic(action)` muestra un resultado cuyas columnas solo se conocen después de ejecutar la consulta, como una vista previa de SQL o un explorador de fuentes de datos. La action recibe un `DataQuery` y devuelve un `DynamicPage`: las columnas (`DynamicColumn { name, label, kind }`) y una página de filas, cada una un arreglo JSON en el orden de las columnas o un objeto JSON por nombre de columna.
+
+```rust
+#[action(permission = "reports.preview")]
+pub async fn preview(q: DataQuery, db: Reports) -> Result<DynamicPage> {
+    let span = q.span();
+    db.run_preview(span.offset, span.limit).await
+}
+
+DataGrid::dynamic(preview).paging(Paging::virtual_scroll())
+```
+
+El grid construye sus columnas a partir de cada página y dibuja las filas con el propio código del grid tipado, así que la paginación, el desplazamiento virtual, la virtualización de columnas, el teclado, la copia y el cambio de ancho, el movimiento y la ocultación de columnas funcionan igual. `DynamicKind` elige cómo una columna lee y muestra sus valores: `Text`, `Integer` (agrupado según la configuración regional del usuario), `Decimal`, `Bool` (sí y no en el idioma del usuario), `Date`, `Time`, `DateTime` (en la zona horaria del usuario) y `LocalDateTime`. Un valor que no se lee como su tipo se muestra como texto. Cada columna empieza con un ancho acorde a su tipo (180 px para texto, 130 para números, 120 para fechas), de modo que un resultado ancho se desplaza en horizontal.
+
+Todo lo que devuelve la action se trata como datos del usuario. Los nombres de columna, las etiquetas y las celdas se escapan como cualquier otro valor. El servidor conserva como máximo `MAX_DYNAMIC_COLUMNS` (200) columnas y el tamaño de página de la consulta en filas (`DataQuery::limit`, como máximo 500), y corta nombres y etiquetas a `MAX_COLUMN_NAME` (200) y las celdas de texto a `MAX_CELL_TEXT` (1.000) caracteres. Las claves de orden, los filtros, los totales y los grupos se quitan de la consulta antes de ejecutar la action, y los encabezados no tienen botones de orden, así que la action nunca recibe un nombre de columna del cliente. El acceso es el de la action, como en todo grid.
+
+El encabezado lleva una huella de las columnas (`data-zeyn-shape`). El navegador la envía con cada petición de página y el servidor solo envía un encabezado nuevo cuando las columnas cambiaron, por ejemplo después de que `.listens(topic)` recargue el grid con una consulta nueva. Las filas son de solo lectura: un grid dinámico no tiene edición, acciones de fila, selección, detalles, agrupación ni exportación.
+
 ## Totales de columna
 
 `sum()` y `avg()` funcionan con números enteros y dinero, `min()` y `max()` también con fechas, horas y

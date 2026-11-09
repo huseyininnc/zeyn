@@ -30,6 +30,26 @@ DataGrid::of(search_products)
     .exportable()
 ```
 
+## Çalışma anında belli olan sütunlar
+
+`DataGrid::dynamic(action)`, sütunları ancak sorgu çalıştıktan sonra belli olan bir sonucu gösterir, örneğin bir SQL önizlemesi ya da bir veri kaynağı tarayıcısı. Action bir `DataQuery` alır ve bir `DynamicPage` döndürür: sütunlar (`DynamicColumn { name, label, kind }`) ve her biri sütun sırasında bir JSON dizisi ya da sütun adına göre bir JSON nesnesi olan bir sayfa satır.
+
+```rust
+#[action(permission = "reports.preview")]
+pub async fn preview(q: DataQuery, db: Reports) -> Result<DynamicPage> {
+    let span = q.span();
+    db.run_preview(span.offset, span.limit).await
+}
+
+DataGrid::dynamic(preview).paging(Paging::virtual_scroll())
+```
+
+Grid sütunlarını her sayfadan kurar ve satırları tipli grid'in kendi koduyla çizer; sayfalama, sanal kaydırma, sütun sanallaştırma, klavye, kopyalama ve sütunları boyutlandırma, taşıma ve gizleme aynı çalışır. `DynamicKind` bir sütunun değerlerini nasıl okuyup gösterdiğini seçer: `Text`, `Integer` (kullanıcının yerel ayarında gruplanır), `Decimal`, `Bool` (kullanıcının dilinde evet ve hayır), `Date`, `Time`, `DateTime` (kullanıcının saat diliminde) ve `LocalDateTime`. Türüne göre okunamayan bir değer metin olarak gösterilir. Her sütun türüne uyan bir genişlikle başlar (metin için 180 px, sayılar için 130, tarihler için 120), böylece geniş bir sonuç yana kayar.
+
+Action'ın döndürdüğü her şey kullanıcı verisi sayılır. Sütun adları, etiketler ve hücreler diğer değerler gibi kaçışlanır. Sunucu en fazla `MAX_DYNAMIC_COLUMNS` (200) sütun ve sorgunun sayfa boyutu kadar satır tutar (`DataQuery::limit`, en fazla 500), adları ve etiketleri `MAX_COLUMN_NAME` (200), metin hücrelerini `MAX_CELL_TEXT` (1.000) karakterde keser. Sıralama anahtarları, filtreler, toplamlar ve gruplar action çalışmadan önce sorgudan çıkarılır ve başlıklarda sıralama düğmesi yoktur; action istemciden hiçbir sütun adı almaz. Erişim, her grid'de olduğu gibi action'ınkidir.
+
+Başlık sütunların bir parmak izini taşır (`data-zeyn-shape`). Tarayıcı bunu her sayfa isteğiyle gönderir ve sunucu yeni bir başlığı yalnızca sütunlar değiştiğinde gönderir, örneğin `.listens(topic)` grid'i yeni bir sorguyla yeniden yüklediğinde. Satırlar salt okunurdur: dinamik bir grid'de düzenleme, satır eylemleri, seçim, ayrıntılar, gruplama ve dışa aktarma yoktur.
+
 ## Sütun toplamları
 
 `sum()` ve `avg()` tam sayılarda ve parada, `min()` ve `max()` ayrıca tarih, saat ve an (moment)

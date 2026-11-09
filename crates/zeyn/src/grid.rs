@@ -25,9 +25,14 @@ use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
 mod column;
+mod dynamic;
 mod memory;
 
 pub use column::DataGridColumn;
+pub use dynamic::{
+    DynamicColumn, DynamicGrid, DynamicKind, DynamicPage, DynamicRow, MAX_CELL_TEXT,
+    MAX_COLUMN_NAME, MAX_DYNAMIC_COLUMNS,
+};
 
 #[cfg(any(feature = "postgres", feature = "oracle"))]
 pub(crate) use memory::{Cond, Key, TextOp};
@@ -433,6 +438,10 @@ pub(crate) type FetchFn<E> = fn(Ctx, DataQuery) -> BoxFuture<Result<Page<E>>>;
 
 struct Column<E> {
     meta: &'static FieldMeta,
+    /// Field name the client and views use: the field's own, or a dynamic column's.
+    name: std::borrow::Cow<'static, str>,
+    /// Header label as given, for dynamic columns; `None` uses the field's label text.
+    label: Option<String>,
     value: ValueFn<E>,
     width: Option<u32>,
     flex: Option<u32>,
@@ -447,6 +456,39 @@ struct Column<E> {
     plain: bool,
     /// Long values wrap onto more lines instead of ending in an ellipsis.
     wrap: bool,
+}
+
+impl<E> Column<E> {
+    /// Column of `meta` with every option off, showing no value until `value` is set.
+    fn of(meta: &'static FieldMeta) -> Self {
+        Column {
+            meta,
+            name: std::borrow::Cow::Borrowed(meta.name),
+            label: None,
+            value: Box::new(|_| Value::Null),
+            width: None,
+            flex: None,
+            filter: false,
+            sort: true,
+            aggregates: Vec::new(),
+            pin: None,
+            hidden: false,
+            cell: None,
+            editable: false,
+            plain: false,
+            wrap: false,
+        }
+    }
+
+    /// Header label in the user's language, not escaped.
+    fn label_plain(&self, r: &Render) -> String {
+        match &self.label {
+            Some(label) => label.clone(),
+            None => r
+                .i18n
+                .text(r.locale, &self.meta.label_text()),
+        }
+    }
 }
 
 /// Data grid. Its data source is an action that takes a `DataQuery` and returns `Page<E>`.
@@ -477,6 +519,8 @@ pub struct DataGrid<E: Model> {
     default_sort: Vec<crate::action::Sort>,
     group_by: Vec<&'static FieldMeta>,
     tree: Option<&'static FieldMeta>,
+    /// Fingerprint of a dynamic grid's columns, sent to the browser.
+    shape: Option<String>,
 }
 
 /// Most levels a tree grid opens.
@@ -680,9 +724,14 @@ impl<E: Model> DataGrid<E> {
     where
         A: Action<Input = DataQuery, Output = Result<Page<E>>>,
     {
+        Self::of_fetch(A::META, fetch_via::<A, E>)
+    }
+
+    /// DataGrid of an action's access rule and the function that loads its rows.
+    fn of_fetch(action: ActionMeta, fetch: FetchFn<E>) -> Self {
         Self {
-            action: A::META,
-            fetch: fetch_via::<A, E>,
+            action,
+            fetch,
             mode: DataMode::default(),
             paging: Paging::default(),
             columns: Vec::new(),
@@ -701,6 +750,7 @@ impl<E: Model> DataGrid<E> {
             default_sort: Vec::new(),
             group_by: Vec::new(),
             tree: None,
+            shape: None,
         }
     }
 
@@ -996,19 +1046,9 @@ impl<E: Model> DataGrid<E> {
                 crate::value::FieldKind::Text | crate::value::FieldKind::Choice(_)
             );
             grid.columns.push(Column {
-                meta,
                 value: Box::new(move |e: &E| e.value_at(i).unwrap_or(Value::Null)),
-                width: None,
-                flex: None,
                 filter,
-                sort: true,
-                aggregates: Vec::new(),
-                pin: None,
-                hidden: false,
-                cell: None,
-                editable: false,
-                plain: false,
-                wrap: false,
+                ..Column::of(meta)
             });
         }
         grid
@@ -1035,19 +1075,8 @@ impl<E: Model> DataGrid<E> {
     /// Adds a column. The following settings (`width`, `filter`...) apply to it.
     pub fn column<T: FieldType + 'static>(mut self, field: Field<E, T>) -> DataGridColumn<E, T> {
         self.columns.push(Column {
-            meta: field.meta(),
             value: Box::new(move |e| field.get(e).to_value()),
-            width: None,
-            flex: None,
-            filter: false,
-            sort: true,
-            aggregates: Vec::new(),
-            pin: None,
-            hidden: false,
-            cell: None,
-            editable: false,
-            plain: false,
-            wrap: false,
+            ..Column::of(field.meta())
         });
         DataGridColumn {
             grid: self,
@@ -1206,39 +1235,46 @@ impl<E: Model> DataGrid<E> {
         )
     }
 
+    /// The view's columns that exist, in its order, without repeats; may be empty.
+    fn view_columns(&self, v: &DataGridView) -> Vec<Shown> {
+        let mut out: Vec<Shown> = Vec::new();
+        for cv in v
+            .columns
+            .iter()
+            .take(self.columns.len())
+        {
+            let Some(index) = self
+                .columns
+                .iter()
+                .position(|c| c.name == cv.field)
+            else {
+                continue;
+            };
+            if out.iter().any(|s| s.index == index) {
+                continue;
+            }
+            let width = cv
+                .width
+                .map(|w| w.clamp(COLUMN_WIDTH.0, COLUMN_WIDTH.1))
+                .or(self.columns[index].width);
+            out.push(Shown {
+                index,
+                width,
+                pin: cv.pin,
+            });
+        }
+        out
+    }
+
     /// Shown columns for a view: the view's columns that exist, in its order, with starts pinned
     /// first and ends last; or the grid's own columns without the hidden ones.
     fn layout(&self, view: Option<&DataGridView>) -> Vec<Shown> {
-        let mut shown: Vec<Shown> = match view.filter(|v| !v.columns.is_empty()) {
-            Some(v) => {
-                let mut out: Vec<Shown> = Vec::new();
-                for cv in v
-                    .columns
-                    .iter()
-                    .take(self.columns.len())
-                {
-                    let Some(index) = self
-                        .columns
-                        .iter()
-                        .position(|c| c.meta.name == cv.field)
-                    else {
-                        continue;
-                    };
-                    if out.iter().any(|s| s.index == index) {
-                        continue;
-                    }
-                    let width = cv
-                        .width
-                        .map(|w| w.clamp(COLUMN_WIDTH.0, COLUMN_WIDTH.1))
-                        .or(self.columns[index].width);
-                    out.push(Shown {
-                        index,
-                        width,
-                        pin: cv.pin,
-                    });
-                }
-                out
-            }
+        let from_view = view
+            .filter(|v| !v.columns.is_empty())
+            .map(|v| self.view_columns(v))
+            .filter(|cols| !cols.is_empty());
+        let mut shown: Vec<Shown> = match from_view {
+            Some(cols) => cols,
             None => self
                 .columns
                 .iter()
@@ -1330,12 +1366,12 @@ impl<E: Model> DataGrid<E> {
         let sortable = |name: &str| {
             self.columns
                 .iter()
-                .any(|c| c.sort && c.meta.name == name)
+                .any(|c| c.sort && c.name == name)
         };
         let filterable = |name: &str| {
             self.columns
                 .iter()
-                .any(|c| c.filter && c.meta.name == name)
+                .any(|c| c.filter && c.name == name)
         };
         query
             .filters
@@ -1397,7 +1433,7 @@ impl<E: Model> DataGrid<E> {
             };
             out.push_str(&format!(
                 r#"<th scope="col"{class} data-field="{}"{sort} aria-colindex="{}""#,
-                c.meta.name,
+                escape(&c.name),
                 pos + 1 + self.lead(r)
             ));
             if !style.is_empty() {
@@ -1430,7 +1466,14 @@ impl<E: Model> DataGrid<E> {
                     out.push_str(&format!(r#" data-options="{}""#, attr(&list)));
                 }
             }
-            out.push_str(&format!(">{}</th>", r.label(c.meta)));
+            match &c.label {
+                Some(label) => {
+                    out.push('>');
+                    escape_into(&mut out, label);
+                    out.push_str("</th>");
+                }
+                None => out.push_str(&format!(">{}</th>", r.label(c.meta))),
+            }
         }
         if !self.row_actions.is_empty() {
             out.push_str(&format!(
@@ -1740,12 +1783,13 @@ impl<E: Model> DataGrid<E> {
             }
         }
         out.push_str(&format!(r#" data-zeyn-texts="{}""#, attr(&grid_texts(r))));
-        let all: Vec<serde_json::Value> = self
-            .columns
-            .iter()
-            .map(|c| json!({ "field": c.meta.name, "label": r.i18n.text(r.locale, &c.meta.label_text()), "hidden": c.hidden, "pin": c.pin, "width": c.width }))
-            .collect();
-        out.push_str(&format!(r#" data-zeyn-columns="{}""#, attr(&all)));
+        out.push_str(&format!(
+            r#" data-zeyn-columns="{}""#,
+            attr(&self.columns_json(r))
+        ));
+        if let Some(shape) = &self.shape {
+            out.push_str(&format!(r#" data-zeyn-shape="{shape}""#));
+        }
         if let Some(v) = view {
             out.push_str(&format!(r#" data-zeyn-view="{}""#, attr(v)));
         }
@@ -1785,7 +1829,7 @@ impl<E: Model> DataGrid<E> {
             VIRTUAL_LIVE_ROWS
         };
         if let Some(p) = page {
-            match (self.paging, p.items.downcast_ref::<Vec<E>>()) {
+            match (self.paging, Self::items(p)) {
                 (Paging::Virtual { .. }, Some(rows))
                     if p.groups.is_none() && rows.len() > live_rows =>
                 {
@@ -1840,6 +1884,14 @@ impl<E: Model> DataGrid<E> {
             Paging::None => {}
         }
         out.push_str("</div>");
+    }
+
+    /// Every column, shown or not, for the column chooser: `[{field, label, hidden, pin, width}]`.
+    fn columns_json(&self, r: &Render) -> Vec<serde_json::Value> {
+        self.columns
+            .iter()
+            .map(|c| json!({ "field": c.name, "label": c.label_plain(r), "hidden": c.hidden, "pin": c.pin, "width": c.width }))
+            .collect()
     }
 
     /// Footer row with one cell per column. Cells of columns with totals carry `data-field` and
@@ -2003,10 +2055,24 @@ impl<E: Model> DataGrid<E> {
             path: &page.path,
             parents: &page.parents,
         };
-        page.items
-            .downcast_ref::<Vec<E>>()
+        Self::items(page)
             .map(|rows| self.rows(rows, r, &cols, &branch))
             .unwrap_or_default()
+    }
+
+    /// The rows of a loaded page: the action's own, or the rows of a dynamic page.
+    fn items(page: &LoadedPage) -> Option<&[E]> {
+        match page.items.downcast_ref::<Vec<E>>() {
+            Some(rows) => Some(rows),
+            None => {
+                let rows: &dyn std::any::Any = &page
+                    .items
+                    .downcast_ref::<dynamic::DynamicItems>()?
+                    .rows;
+                rows.downcast_ref::<Vec<E>>()
+                    .map(Vec::as_slice)
+            }
+        }
     }
 
     /// Loads the groups or rows under `path` of a grouped or tree grid. Group values and parent
@@ -2265,12 +2331,7 @@ impl<E: Model> GridSource for DataGrid<E> {
         let cols = self.layout(view);
         let line: Vec<String> = cols
             .iter()
-            .map(|s| {
-                csv_cell(
-                    &r.i18n
-                        .text(r.locale, &self.columns[s.index].meta.label_text()),
-                )
-            })
+            .map(|s| csv_cell(&self.columns[s.index].label_plain(r)))
             .collect();
         format!("{}\r\n", line.join(","))
     }

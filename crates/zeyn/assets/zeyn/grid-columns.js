@@ -125,6 +125,20 @@ function resetView(grid) {
   loadGrid(grid, 'layout');
 }
 
+/**
+ * Takes the header a grid whose columns come with its rows (`DataGrid::dynamic`) gets with a
+ * page: the column list and the fingerprint follow it, and a layout of other columns is dropped.
+ * Returns whether the answer carried such a header.
+ */
+function applyShape(grid, s, data) {
+  if (typeof data.shape !== 'string' || typeof data.head !== 'string') return false;
+  if (data.shape !== grid.dataset.zeynShape) s.columns = null;
+  grid.dataset.zeynShape = data.shape;
+  grid.dataset.zeynColumns = JSON.stringify(data.columns ?? []);
+  applyHead(grid, s, data.head);
+  return true;
+}
+
 /** Replaces the header with the server rendered one and sets it up again. */
 function applyHead(grid, s, html) {
   const thead = grid.querySelector('thead');

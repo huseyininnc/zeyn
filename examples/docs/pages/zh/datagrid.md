@@ -81,6 +81,22 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 - `.row_style(|row| Option<RowStyle>)`：危险、警告或成功样式的行。
 - `.exportable()`：将筛选后的行导出为 CSV，由服务器以流方式输出。
 
+## 运行时才确定的列
+
+`DataGrid::dynamic(action)` 用于列随行一起返回的结果,例如 SQL 预览。action 返回一个 `DynamicPage`,其中包含列(名称、标签以及 `Integer`、`Decimal` 或 `Date` 等 `DynamicKind`)和以 JSON 表示的一页行:
+
+```rust
+#[action(permission = "reports.preview")]
+pub async fn preview(q: DataQuery, db: Reports) -> Result<DynamicPage> {
+    let span = q.span();
+    db.run_preview(span.offset, span.limit).await
+}
+
+DataGrid::dynamic(preview).paging(Paging::virtual_scroll())
+```
+
+分页、虚拟滚动、键盘操作以及按用户语言格式化数字和日期,都与类型化的 grid 相同。名称、标签和单元格都会被转义,服务器会限制列数、行数和文本长度。该 grid 不排序也不筛选,行是只读的。详见 [DataGrid 参考](grid.md)。
+
 ## 就地刷新
 
 最后调用的 `.listens(topic)` 让网格在主题被点名时就地重新加载（见 [主题](effects.md#topics)）：`ui.refresh(topic)` 之后，它保留排序和筛选重新加载当前页；带 `.drives(topic)` 的筛选控件变化之后，它以新的界面 params 从第一页开始。网格经由带有全部权限检查的 `POST /_zeyn/grid` 重新加载，筛选改变的界面 param 通过界面函数传给网格，例如作为 scope：

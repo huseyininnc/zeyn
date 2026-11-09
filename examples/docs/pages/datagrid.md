@@ -82,6 +82,27 @@ Numbers and money are right aligned with tabular digits. Whole numbers are group
 - `.row_style(|row| Option<RowStyle>)`: danger, warning or success rows.
 - `.exportable()`: CSV export of the filtered rows, streamed by the server.
 
+## Columns known at run time
+
+`DataGrid::dynamic(action)` is for results whose columns come with the rows, such as a SQL
+preview. The action returns a `DynamicPage` with the columns (name, label and a `DynamicKind`
+such as `Integer`, `Decimal` or `Date`) and one page of rows as JSON:
+
+```rust
+#[action(permission = "reports.preview")]
+pub async fn preview(q: DataQuery, db: Reports) -> Result<DynamicPage> {
+    let span = q.span();
+    db.run_preview(span.offset, span.limit).await
+}
+
+DataGrid::dynamic(preview).paging(Paging::virtual_scroll())
+```
+
+Paging, virtual scrolling, keyboard use and number and date formatting in the user's language work
+as in a typed grid. Names, labels and cells are escaped, and the server caps columns, rows and text
+length. The grid does not sort or filter, and its rows are read only. See the
+[DataGrid reference](grid.md).
+
 ## Refreshing in place
 
 `.listens(topic)`, called last, makes the grid reload in place when the topic is named (see [Topics](effects.md#topics)): after `ui.refresh(topic)` it reloads its current page with its sort and filters, after a filter control that `.drives(topic)` changed it starts on the first page with the new screen params. The grid reloads through `POST /_zeyn/grid` with every permission check, and a screen param the filter changed reaches the grid through the screen function, for example as a scope:

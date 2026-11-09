@@ -52,6 +52,10 @@ pub(super) struct GridCall {
     /// Group values or ancestor keys of the branch to load in a grouped or tree grid.
     #[serde(default)]
     pub(super) path: Vec<Option<String>>,
+    /// Fingerprint of the columns the browser shows, for grids whose columns come with their
+    /// rows.
+    #[serde(default)]
+    pub(super) shape: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -438,15 +442,31 @@ impl AppState {
                 .await?;
             page.view = call.view.map(|v| grid.clean_view(v));
             let r = user_render(entry.meta.name, ctx);
-            Ok(json!({
-                "head": call.head.then(|| grid.head_html(&r, page.view.as_ref())),
+            let shape = call
+                .shape
+                .as_deref()
+                .filter(|s| s.len() <= 32);
+            let mut body = json!({
                 "rows": grid.rows_html(&page, &r),
                 "foot": grid.foot_html(&page, &r),
                 "count": page.count,
                 "total": page.total,
                 "next": page.next,
                 "offset": page.offset,
-            }))
+            });
+            match grid.page_head(&page, &r, shape, call.head) {
+                Some(Json::Object(head)) => body
+                    .as_object_mut()
+                    .map(|b| b.extend(head))
+                    .unwrap_or_default(),
+                _ => {
+                    body["head"] = json!(
+                        call.head
+                            .then(|| grid.head_html(&r, page.view.as_ref()))
+                    )
+                }
+            }
+            Ok(body)
         })
         .await
     }

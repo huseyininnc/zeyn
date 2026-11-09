@@ -27,6 +27,26 @@ DataGrid::of(search_products)
     .exportable()
 ```
 
+## 실행 시점에 정해지는 열
+
+`DataGrid::dynamic(action)`은 SQL 미리보기나 데이터 소스 탐색기처럼 쿼리를 실행한 뒤에야 열을 알 수 있는 결과를 보여 줍니다. action은 `DataQuery`를 받아 `DynamicPage`를 반환합니다. 여기에는 열(`DynamicColumn { name, label, kind }`)과 한 페이지의 행이 들어 있고, 각 행은 열 순서대로 된 JSON 배열이거나 열 이름으로 된 JSON 객체입니다.
+
+```rust
+#[action(permission = "reports.preview")]
+pub async fn preview(q: DataQuery, db: Reports) -> Result<DynamicPage> {
+    let span = q.span();
+    db.run_preview(span.offset, span.limit).await
+}
+
+DataGrid::dynamic(preview).paging(Paging::virtual_scroll())
+```
+
+grid는 페이지마다 열을 만들고 타입이 있는 grid의 코드로 행을 그리므로 페이지 나누기, 가상 스크롤, 열 가상화, 키보드 사용, 복사, 열 크기 조절, 이동, 숨기기가 똑같이 동작합니다. `DynamicKind`는 열이 값을 읽고 보여 주는 방식을 고릅니다: `Text`, `Integer`(사용자 로캘에 맞게 자릿수 구분), `Decimal`, `Bool`(사용자 언어로 예와 아니요), `Date`, `Time`, `DateTime`(사용자 시간대), `LocalDateTime`. 종류에 맞게 읽히지 않는 값은 텍스트로 표시됩니다. 각 열은 종류에 맞는 너비로 시작하므로(텍스트 180 px, 숫자 130, 날짜 120) 넓은 결과는 가로로 스크롤됩니다.
+
+action이 반환하는 모든 것은 사용자 데이터로 다룹니다. 열 이름, 레이블, 셀은 다른 값처럼 이스케이프됩니다. 서버는 최대 `MAX_DYNAMIC_COLUMNS`(200)개의 열과 쿼리의 페이지 크기만큼의 행(`DataQuery::limit`, 최대 500)만 남기고, 이름과 레이블은 `MAX_COLUMN_NAME`(200)자, 텍스트 셀은 `MAX_CELL_TEXT`(1,000)자에서 자릅니다. 정렬 키, 필터, 합계, 그룹은 action이 실행되기 전에 쿼리에서 제거되고 헤더에는 정렬 버튼이 없으므로 action은 클라이언트에게서 열 이름을 받지 않습니다. 접근 권한은 다른 grid와 마찬가지로 action의 것입니다.
+
+헤더에는 열의 지문(`data-zeyn-shape`)이 있습니다. 브라우저는 페이지를 요청할 때마다 이를 보내고, 서버는 열이 바뀌었을 때만 새 헤더를 보냅니다. 예를 들어 `.listens(topic)`이 새 쿼리로 grid를 다시 불러온 뒤입니다. 행은 읽기 전용입니다. 동적 grid에는 편집, 행 작업, 선택, 상세, 그룹화, 내보내기가 없습니다.
+
 ## 열 합계
 
 `sum()`과 `avg()`는 정수와 금액에, `min()`과 `max()`는 날짜, 시간, 순간에도, `count()`는 모든 열에 사용할 수 있습니다. 다른 타입에 쓰면 컴파일되지 않습니다. 합계는 페이지만이 아니라 필터와 일치하는 모든 행을 대상으로 합니다.

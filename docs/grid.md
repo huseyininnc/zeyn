@@ -30,6 +30,43 @@ DataGrid::of(search_products)
     .exportable()
 ```
 
+## Columns known at run time
+
+`DataGrid::dynamic(action)` shows a result whose columns are known only after the query runs,
+such as a SQL preview or a data source browser. The action takes a `DataQuery` and returns a
+`DynamicPage`: the columns (`DynamicColumn { name, label, kind }`) and one page of rows, each a
+JSON array in column order or a JSON object by column name.
+
+```rust
+#[action(permission = "reports.preview")]
+pub async fn preview(q: DataQuery, db: Reports) -> Result<DynamicPage> {
+    let span = q.span();
+    db.run_preview(span.offset, span.limit).await
+}
+
+DataGrid::dynamic(preview).paging(Paging::virtual_scroll())
+```
+
+The grid builds its columns from each page and renders the rows through the typed grid's own
+code, so paging, virtual scrolling, column virtualization, keyboard use, copying, resizing,
+moving and hiding columns work the same. `DynamicKind` picks how a column reads and shows its
+values: `Text`, `Integer` (grouped in the user's locale), `Decimal`, `Bool` (yes and no in the
+user's language), `Date`, `Time`, `DateTime` (in the user's time zone) and `LocalDateTime`. A
+value that does not read as its kind is shown as text. Each column starts at a width that suits
+its kind (180 px for text, 130 for numbers, 120 for dates), so a wide result scrolls sideways.
+
+What the action returns is treated as user data. Column names, labels and cells are escaped like
+any other value. The server keeps at most `MAX_DYNAMIC_COLUMNS` (200) columns and the query's page
+size of rows (`DataQuery::limit`, at most 500), and cuts names and labels at `MAX_COLUMN_NAME`
+(200) and text cells at `MAX_CELL_TEXT` (1,000) characters. Sort keys, filters, totals and groups
+are removed from the query before the action runs, and the headers have no sort buttons, so the
+action never gets a column name from the client. Access is the action's, as for every grid.
+
+The header carries a fingerprint of the columns (`data-zeyn-shape`). The browser sends it with
+every page request and the server sends a new header only when the columns changed, for example
+after `.listens(topic)` reloads the grid with a new query. Rows are read only: a dynamic grid has
+no editing, row actions, selection, details, grouping or export.
+
 ## Column totals
 
 `sum()` and `avg()` work on whole numbers and money, `min()` and `max()` also on dates, times and

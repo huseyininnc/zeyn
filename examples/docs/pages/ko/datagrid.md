@@ -81,6 +81,22 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 - `.row_style(|row| Option<RowStyle>)`: danger, warning, success 행.
 - `.exportable()`: 필터링된 행의 CSV 내보내기이며 서버가 스트리밍합니다.
 
+## 실행 시점에 정해지는 열
+
+`DataGrid::dynamic(action)`은 SQL 미리보기처럼 열이 행과 함께 오는 결과를 위한 것입니다. action은 열(이름, 레이블, `Integer`, `Decimal`, `Date` 같은 `DynamicKind`)과 JSON으로 된 한 페이지의 행을 담은 `DynamicPage`를 반환합니다:
+
+```rust
+#[action(permission = "reports.preview")]
+pub async fn preview(q: DataQuery, db: Reports) -> Result<DynamicPage> {
+    let span = q.span();
+    db.run_preview(span.offset, span.limit).await
+}
+
+DataGrid::dynamic(preview).paging(Paging::virtual_scroll())
+```
+
+페이지 나누기, 가상 스크롤, 키보드 사용, 사용자 언어에 맞춘 숫자와 날짜 서식은 타입이 있는 grid와 똑같이 동작합니다. 이름, 레이블, 셀은 이스케이프되며 서버가 열 수, 행 수, 텍스트 길이를 제한합니다. 이 grid는 정렬하거나 필터링하지 않으며 행은 읽기 전용입니다. [DataGrid 레퍼런스](grid.md)를 참고하세요.
+
 ## 제자리 새로 고침
 
 마지막에 호출한 `.listens(topic)`은 토픽이 지정될 때 그리드를 제자리에서 다시 불러오게 합니다([토픽](effects.md#topics) 참고). `ui.refresh(topic)` 뒤에는 정렬과 필터를 유지한 채 현재 페이지를 다시 불러오고, `.drives(topic)`을 가진 필터 컨트롤이 바뀐 뒤에는 새 Screen params로 첫 페이지부터 시작합니다. 그리드는 모든 권한 검사를 거치는 `POST /_zeyn/grid`로 다시 불러와지며, 필터가 바꾼 Screen param은 Screen 함수를 거쳐, 예를 들어 scope로 그리드에 전달됩니다.

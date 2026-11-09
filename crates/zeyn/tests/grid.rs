@@ -2794,3 +2794,274 @@ fn groups_keep_their_order_and_totals_after_the_cached_sort() {
     );
     assert_eq!(page.totals[0].value, Value::Int(820));
 }
+
+/// The last query the wide dynamic action got, to see what reaches the action.
+static DYNAMIC_QUERY: std::sync::Mutex<Option<DataQuery>> = std::sync::Mutex::new(None);
+
+#[action(permission = "sql.run")]
+pub async fn preview_sql(_q: DataQuery) -> Result<DynamicPage> {
+    use zeyn::{DynamicColumn as C, DynamicKind as K};
+    let columns = vec![
+        C::new("name", "Name", K::Text),
+        C::new("qty", "Quantity", K::Integer),
+        C::new("rate", "Rate", K::Decimal),
+        C::new("on", "Active", K::Bool),
+        C::new("day", "Day", K::Date),
+        C::new("at", "At", K::DateTime),
+    ];
+    let rows = vec![
+        serde_json::json!([
+            "Ada",
+            1234567,
+            "1234.5",
+            true,
+            "2026-03-31",
+            "2026-03-31T11:30:00Z"
+        ]),
+        serde_json::json!({ "name": "Can", "qty": "42", "rate": 0.25, "on": 0, "day": "not a date" }),
+    ];
+    Ok(DynamicPage::new(columns, rows).total(2))
+}
+
+#[action(permission = "sql.run")]
+pub async fn hostile_sql(_q: DataQuery) -> Result<DynamicPage> {
+    let columns = vec![zeyn::DynamicColumn::new(
+        r#""><script>alert(1)</script>"#,
+        r#"<img src=x onerror="alert(2)">'"#,
+        zeyn::DynamicKind::Text,
+    )];
+    let rows = vec![serde_json::json!([
+        r#"<script>alert(3)</script><a href="javascript:x" onclick='y'>"#
+    ])];
+    Ok(DynamicPage::new(columns, rows))
+}
+
+#[action(permission = "sql.run")]
+pub async fn wide_sql(q: DataQuery) -> Result<DynamicPage> {
+    *DYNAMIC_QUERY.lock().unwrap() = Some(q);
+    let columns = (0..300)
+        .map(|i| {
+            zeyn::DynamicColumn::new(
+                format!("c{i}{}", "x".repeat(if i == 0 { 500 } else { 0 })),
+                format!("C{i}"),
+                zeyn::DynamicKind::Text,
+            )
+        })
+        .collect();
+    let rows = (0..2_000)
+        .map(|_| serde_json::json!(["y".repeat(5_000)]))
+        .collect();
+    Ok(DynamicPage::new(columns, rows).total(2_000))
+}
+
+#[screen(route = "/sql", permission = "items.read")]
+pub fn sql() -> Screen {
+    Screen::new("SQL").body(
+        Stack::new()
+            .add(DataGrid::dynamic(preview_sql).paging(Paging::pages(10)))
+            .add(DataGrid::dynamic(hostile_sql)),
+    )
+}
+
+/// Only the caps test opens this screen, so the query the action records is its own.
+#[screen(route = "/sql-wide", permission = "items.read")]
+pub fn sql_wide() -> Screen {
+    Screen::new("SQL").body(DataGrid::dynamic(wide_sql).paging(Paging::virtual_scroll()))
+}
+
+fn dynamic_router(identity: Identity) -> Router {
+    App::new("Test")
+        .i18n(
+            I18n::new("en")
+                .catalog("tr", "{}")
+                .unwrap(),
+        )
+        .auth(move |h: &HeaderMap| {
+            h.contains_key("x-user")
+                .then(|| identity.clone())
+        })
+        .feature(
+            Feature::new("sql")
+                .screen(sql)
+                .screen(sql_wide),
+        )
+        .router()
+        .unwrap()
+}
+
+fn sql_user() -> Identity {
+    Identity::user("ada").with_permissions(["items.read", "sql.run"])
+}
+
+fn dynamic_call(node: &str, query: serde_json::Value) -> serde_json::Value {
+    serde_json::json!({ "screen": "sql", "node": node, "query": query })
+}
+
+#[tokio::test]
+async fn dynamic_grid_renders_the_columns_of_its_page_formatted_by_kind() {
+    let router = dynamic_router(sql_user());
+    let page = send(&router, get("/sql")).await;
+    assert_eq!(page.status, StatusCode::OK);
+    assert!(
+        page.body
+            .contains(r#"data-zeyn-shape=""#),
+        "{}",
+        page.body
+    );
+    assert!(page.body.contains(">Quantity</th>"), "{}", page.body);
+    let r = send(
+        &router,
+        post_as(
+            "/_zeyn/grid",
+            dynamic_call("0.0", serde_json::json!({})),
+            "tr",
+        ),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::OK);
+    let j = r.json();
+    let head = j["head"].as_str().unwrap();
+    assert!(
+        head.contains(r#"class="z-num" data-field="qty" data-sort="off""#),
+        "{head}"
+    );
+    assert_eq!(j["columns"][2]["label"], "Rate");
+    let rows = j["rows"].as_str().unwrap();
+    assert!(
+        rows.contains(r#"<td class="z-num">1.234.567</td>"#),
+        "{rows}"
+    );
+    assert!(rows.contains("1.234,5"), "{rows}");
+    assert!(rows.contains(r#"<time datetime="2026-03-31">"#), "{rows}");
+    assert!(rows.contains(r#"<td class="z-num">42</td>"#), "{rows}");
+    assert!(rows.contains("not a date"), "{rows}");
+    assert_eq!(j["count"], 2);
+    let en = send(
+        &router,
+        post("/_zeyn/grid", dynamic_call("0.0", serde_json::json!({}))),
+    )
+    .await
+    .json();
+    assert!(
+        en["rows"]
+            .as_str()
+            .unwrap()
+            .contains("1,234,567")
+    );
+}
+
+#[tokio::test]
+async fn dynamic_grid_sends_its_header_only_when_the_columns_change() {
+    let router = dynamic_router(sql_user());
+    let first = send(
+        &router,
+        post("/_zeyn/grid", dynamic_call("0.0", serde_json::json!({}))),
+    )
+    .await
+    .json();
+    let shape = first["shape"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let mut call = dynamic_call("0.0", serde_json::json!({}));
+    call["shape"] = shape.clone().into();
+    let same = send(&router, post("/_zeyn/grid", call.clone()))
+        .await
+        .json();
+    assert!(same["head"].is_null(), "{same}");
+    assert!(
+        same["rows"]
+            .as_str()
+            .unwrap()
+            .contains("Ada")
+    );
+    call["head"] = true.into();
+    let asked = send(&router, post("/_zeyn/grid", call))
+        .await
+        .json();
+    assert_eq!(asked["shape"], shape.as_str());
+    assert!(asked["head"].is_string());
+}
+
+#[tokio::test]
+async fn dynamic_grid_escapes_hostile_column_names_labels_and_cells() {
+    let router = dynamic_router(sql_user());
+    let page = send(&router, get("/sql")).await.body;
+    let j = send(
+        &router,
+        post("/_zeyn/grid", dynamic_call("0.1", serde_json::json!({}))),
+    )
+    .await
+    .json();
+    let head = j["head"].as_str().unwrap();
+    let rows = j["rows"].as_str().unwrap();
+    for html in [page.as_str(), head, rows] {
+        assert!(!html.contains("<script>alert"), "{html}");
+        assert!(!html.contains("<img"), "{html}");
+        assert!(!html.contains("<a href"), "{html}");
+        assert!(!html.contains(r#"onerror="alert"#), "{html}");
+        assert!(!html.contains(r#"data-field=""><"#), "{html}");
+    }
+    assert!(
+        head.contains("&lt;img src=x onerror=&quot;alert(2)&quot;&gt;"),
+        "{head}"
+    );
+    assert!(rows.contains("&lt;script&gt;alert(3)"), "{rows}");
+    assert_eq!(j["columns"][0]["field"], r#""><script>alert(1)</script>"#);
+}
+
+#[tokio::test]
+async fn dynamic_grid_caps_rows_columns_names_and_text_from_the_action() {
+    let router = dynamic_router(sql_user());
+    let j = send(
+        &router,
+        post(
+            "/_zeyn/grid",
+            serde_json::json!({ "screen": "sql_wide", "node": "0", "query": {
+                    "page": { "type": "offset", "offset": 0, "limit": 100_000 },
+                    "sort": [{ "field": "c1", "desc": true }],
+                    "filters": [{ "field": "c1", "contains": "y" }],
+                    "aggregates": [{ "field": "c1", "op": "count" }]
+            } }),
+        ),
+    )
+    .await
+    .json();
+    let q = DYNAMIC_QUERY
+        .lock()
+        .unwrap()
+        .take()
+        .unwrap();
+    assert_eq!(q.limit(), zeyn::MAX_PAGE_SIZE);
+    assert!(q.sort.is_empty() && q.filters.is_empty() && q.aggregates.is_empty());
+    assert_eq!(j["count"], zeyn::MAX_PAGE_SIZE);
+    let columns = j["columns"].as_array().unwrap();
+    assert_eq!(columns.len(), zeyn::MAX_DYNAMIC_COLUMNS);
+    assert_eq!(
+        columns[0]["field"]
+            .as_str()
+            .unwrap()
+            .chars()
+            .count(),
+        zeyn::MAX_COLUMN_NAME + 1
+    );
+    let rows = j["rows"].as_str().unwrap();
+    let first = rows.split("</td>").next().unwrap();
+    assert_eq!(first.matches('y').count(), zeyn::MAX_CELL_TEXT, "{first}");
+    assert!(first.ends_with('…'));
+}
+
+#[tokio::test]
+async fn dynamic_grid_needs_its_actions_permission() {
+    let router = dynamic_router(Identity::user("x").with_permissions(["items.read"]));
+    let r = send(
+        &router,
+        post("/_zeyn/grid", dynamic_call("0.0", serde_json::json!({}))),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN);
+    let page = send(&router, get("/sql")).await;
+    assert_eq!(page.status, StatusCode::OK);
+    assert!(!page.body.contains("Ada"));
+    assert!(!page.body.contains(">Quantity</th>"));
+}

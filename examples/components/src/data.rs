@@ -166,6 +166,62 @@ pub async fn million_products(q: DataQuery) -> Result<Page<Product>> {
     Ok(Page::window(rows, TOTAL, span))
 }
 
+/// Rows and columns of the computed query result.
+pub const RESULT_ROWS: u64 = 10_000;
+pub const RESULT_COLUMNS: usize = 30;
+
+/// A query result whose columns are known only when it runs, as a SQL preview gets them: 10,000
+/// rows of 30 columns of every kind, computed from their numbers for the asked window only.
+#[action(public)]
+pub async fn query_result(q: DataQuery) -> Result<DynamicPage> {
+    const KINDS: [DynamicKind; 6] = [
+        DynamicKind::Text,
+        DynamicKind::Integer,
+        DynamicKind::Decimal,
+        DynamicKind::Date,
+        DynamicKind::DateTime,
+        DynamicKind::Bool,
+    ];
+    let columns = (0..RESULT_COLUMNS)
+        .map(|c| {
+            let kind = KINDS[c % KINDS.len()];
+            DynamicColumn::new(format!("col_{c}"), format!("Column {}", c + 1), kind)
+        })
+        .collect::<Vec<_>>();
+    let span = q.span();
+    let rows = (span.offset..span.end().min(RESULT_ROWS))
+        .map(|n| {
+            let cells = columns
+                .iter()
+                .enumerate()
+                .map(|(c, col)| {
+                    let v = n * 7_919 + c as u64 * 104_729;
+                    match col.kind {
+                        DynamicKind::Integer => serde_json::json!(v % 10_000_000),
+                        DynamicKind::Decimal => {
+                            serde_json::json!(format!("{}.{:02}", v % 100_000, v % 100))
+                        }
+                        DynamicKind::Date => {
+                            serde_json::json!(format!("2026-{:02}-{:02}", v % 12 + 1, v % 28 + 1))
+                        }
+                        DynamicKind::DateTime => serde_json::json!(format!(
+                            "2026-{:02}-{:02}T{:02}:{:02}:00Z",
+                            v % 12 + 1,
+                            v % 28 + 1,
+                            v % 24,
+                            v % 60
+                        )),
+                        DynamicKind::Bool => serde_json::json!(v.is_multiple_of(2)),
+                        _ => serde_json::json!(format!("Row {} item {}", n + 1, c + 1)),
+                    }
+                })
+                .collect();
+            serde_json::Value::Array(cells)
+        })
+        .collect();
+    Ok(DynamicPage::new(columns, rows).total(RESULT_ROWS))
+}
+
 /// The address of sample picture `n` (1 to 12), served by the site as an SVG.
 pub fn picture(n: i64) -> String {
     format!("/site/img/{}.svg", n.rem_euclid(12) + 1)

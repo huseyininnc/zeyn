@@ -586,6 +586,7 @@ impl AppState {
                     view: None,
                     head: false,
                     path: Vec::new(),
+                    shape: None,
                 };
                 self.run_grid(ctx, call).await
             }
