@@ -15,12 +15,7 @@ const LIB_AGENTS: &str = include_str!("../templates/lib/AGENTS.md.tmpl");
 const SKILL: &str = include_str!("../embedded/SKILL.md");
 
 /// Layout and generator names from before the feature folders; none of them exists any more.
-const STALE: &[&str] = &[
-    "store.rs",
-    "g action",
-    "g component",
-    "tests/structure.rs",
-];
+const STALE: &[&str] = &["store.rs", "g action", "g component", "tests/structure.rs"];
 
 fn repo(path: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -35,7 +30,10 @@ fn read(path: &str) -> Option<String> {
 /// The agent facing texts with their names, the repository ones only where present.
 fn texts() -> Vec<(&'static str, String)> {
     let mut out = vec![
-        ("crates/zeyn-cli/templates/AGENTS.md.tmpl", AGENTS.to_string()),
+        (
+            "crates/zeyn-cli/templates/AGENTS.md.tmpl",
+            AGENTS.to_string(),
+        ),
         (
             "crates/zeyn-cli/templates/lib/AGENTS.md.tmpl",
             LIB_AGENTS.to_string(),
@@ -57,9 +55,7 @@ fn texts() -> Vec<(&'static str, String)> {
 
 /// Words in backticks, such as `rules` in "topic `rules`".
 fn backticked(text: &str) -> impl Iterator<Item = &str> {
-    text.split('`')
-        .skip(1)
-        .step_by(2)
+    text.split('`').skip(1).step_by(2)
 }
 
 /// The topics a text names for `zeyn_docs`: lower case words in backticks after each mention,
@@ -103,10 +99,11 @@ fn texts_name_only_the_topics_the_mcp_server_has() {
         .iter()
         .filter_map(|v| v.as_str())
         .collect();
-    assert_eq!(schema, topics, "the zeyn_docs schema lists the topics of DOCS");
-    let description = docs["description"]
-        .as_str()
-        .unwrap();
+    assert_eq!(
+        schema, topics,
+        "the zeyn_docs schema lists the topics of DOCS"
+    );
+    let description = docs["description"].as_str().unwrap();
     for word in ["architecture", "components", "examples"] {
         assert!(
             !description.contains(word) || topics.contains(word),
@@ -262,8 +259,7 @@ fn scan(dir: &Path, out: &mut Declared) {
                     .next()
                     .is_none_or(|c| matches!(c, ',' | '(' | ' ' | '{'))
             {
-                out.variants
-                    .insert(name.to_string());
+                out.variants.insert(name.to_string());
             }
         }
     }
@@ -283,10 +279,7 @@ fn index_names() -> (Vec<String>, Vec<String>, Vec<String>) {
     for code in backticked(section) {
         let mut i = 0;
         while i < code.len() {
-            let c = code[i..]
-                .chars()
-                .next()
-                .unwrap();
+            let c = code[i..].chars().next().unwrap();
             if !(c.is_alphabetic() || c == '_') {
                 i += c.len_utf8();
                 continue;
