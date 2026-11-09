@@ -6,8 +6,12 @@
  * committed change (leaving a field, Enter, closing a picker, a step) it checks the value as
  * `FieldSpec::check` does on the server and sends `zeyn:property` with `detail: { name, value }`
  * to the island root; a value that fails shows its error and is not sent. A schema seen before
- * keeps its fields: only the values that changed are set, and a field being edited (focused or
- * changed since its last commit) keeps what the user typed. Nothing goes to the server. Ids
+ * keeps its fields: only the values that changed are set. `detail.key` names the object (its id
+ * in the island) and comes back in every `zeyn:property` (`{ key, name, value }`). While the
+ * same object is shown, a field being edited (focused or changed since its last commit) keeps
+ * what the user typed; when another object arrives (another key, or without keys another title
+ * or schema), a pending valid edit is first sent with the old key and an invalid one is dropped,
+ * so an edit never reaches an object it was not typed for. Nothing goes to the server. Ids
  * come from the field's place in the schema (`zi-0`, `zi-1`), so names never collide with the
  * `-error` and `-help` ids. Numbers are JavaScript numbers: integers beyond 2^53 lose precision.
  * The island sends `zeyn:inspect` after this module has loaded (on `DOMContentLoaded` or later);
@@ -234,7 +238,29 @@ function commit(field) {
   if (sent === field.zeynSent) return;
   field.zeynSent = sent;
   const island = root.zeynIsland;
-  if (island?.isConnected) island.dispatchEvent(new CustomEvent('zeyn:property', { bubbles: true, detail: { name: field.zeynSpec.name, value: r.value } }));
+  if (island?.isConnected) island.dispatchEvent(new CustomEvent('zeyn:property', { bubbles: true, detail: { key: root.zeynObjectKey ?? null, name: field.zeynSpec.name, value: r.value } }));
+}
+
+/** The object key of a `zeyn:inspect`: a string or a finite number, or `null`. */
+function objectKey(detail, lim) {
+  const k = detail?.key;
+  if (typeof k === 'string') return cut(k, lim.text);
+  return typeof k === 'number' && Number.isFinite(k) ? k : null;
+}
+
+/**
+ * Before another object is shown: commits each pending edit that is valid to the object it was
+ * typed for (its key and island), and drops the ones that are not.
+ */
+function flush(root) {
+  const box = root.querySelector('.z-inspector-body')?.firstElementChild;
+  if (!box) return;
+  for (const field of box.querySelectorAll('.z-field')) {
+    if (field.zeynDirty) commit(field);
+    if (field.zeynDirty) mark(field, '');
+    field.zeynDirty = false;
+    field.zeynShown = undefined;
+  }
 }
 
 /** Draws what an island sent: the fields of a new schema, or new values in the fields shown. */
@@ -246,6 +272,13 @@ function inspect(root, island, detail) {
     return;
   }
   const key = JSON.stringify(sections);
+  const objectKeyNow = objectKey(detail, lim);
+  const object = objectKeyNow !== null ? `k${JSON.stringify(objectKeyNow)}` : `t${cut(detail.title, lim.text)}
+${key}`;
+  const same = root.zeynObject === object;
+  if (!same) flush(root);
+  root.zeynObject = object;
+  root.zeynObjectKey = objectKeyNow;
   const body = root.querySelector('.z-inspector-body');
   root.zeynIsland = island;
   let box = body.firstElementChild;
@@ -266,7 +299,7 @@ function inspect(root, island, detail) {
   const active = document.activeElement;
   for (const field of box.querySelectorAll('.z-field')) {
     const f = field.zeynSpec;
-    if (!f || field.zeynDirty || field.contains(active)) continue;
+    if (!f || (same && (field.zeynDirty || field.contains(active)))) continue;
     const v = Object.hasOwn(values, f.name) ? values[f.name] : f.fallback;
     const shown = JSON.stringify(v ?? null);
     if (shown === field.zeynShown) continue;

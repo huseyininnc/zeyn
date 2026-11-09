@@ -299,8 +299,16 @@ impl PropertyInspector {
     /// any element inside `Island::new(name)`; the inspector draws the fields with the controls
     /// of model forms and, on each committed change (leaving the field, Enter, closing a picker),
     /// checks the value as [`super::FieldSpec::check`] does and sends `zeyn:property` with
-    /// `detail: { name, value }` to the island root. A value that fails shows its error and is
-    /// not sent. Everything runs in the browser (`inspector.js`).
+    /// `detail: { key, name, value }` to the island root. A value that fails shows its error and
+    /// is not sent. Everything runs in the browser (`inspector.js`).
+    ///
+    /// `key` in `zeyn:inspect` names the object (its id in the island) and comes back in every
+    /// `zeyn:property`, `null` without one. When another object arrives (another key, or without
+    /// keys another title or schema), a pending valid edit is first sent with the old key and an
+    /// invalid one is dropped, so an edit never reaches an object it was not typed for. While the
+    /// same object is shown, the focused field keeps what the user typed. Send `zeyn:inspect`
+    /// after the page has loaded; numbers are JavaScript numbers, so integers beyond 2^53 lose
+    /// precision.
     ///
     /// ```ignore
     /// Row::new()
