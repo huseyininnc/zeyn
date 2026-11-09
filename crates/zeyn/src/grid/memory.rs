@@ -357,20 +357,21 @@ pub fn total(values: impl Iterator<Item = Value>, op: Aggregate) -> Option<Value
 pub(crate) const BLOCKING_ROWS: usize = 50_000;
 
 /// One sort value of a row, read once: the value and, for text, its lower case form when it
-/// differs from the text.
+/// differs from the text. [`FieldKind::Rank`] text sorts by bytes, as in SQL, so it has none.
 struct SortKey {
     value: Value,
     lower: Option<String>,
 }
 
 impl SortKey {
-    fn new(value: Value) -> Self {
+    fn new(value: Value, bytes: bool) -> Self {
         let lower = match &value {
             Value::Text(t)
-                if !t.chars().all(|c| {
-                    let mut l = c.to_lowercase();
-                    l.next() == Some(c) && l.next().is_none()
-                }) =>
+                if !bytes
+                    && !t.chars().all(|c| {
+                        let mut l = c.to_lowercase();
+                        l.next() == Some(c) && l.next().is_none()
+                    }) =>
             {
                 Some(t.to_lowercase())
             }
@@ -392,6 +393,13 @@ impl SortKey {
     }
 }
 
+/// Whether field `i` of `M` is a [`FieldKind::Rank`].
+fn is_rank<M: Model>(i: usize) -> bool {
+    M::fields()
+        .get(i)
+        .is_some_and(|f| matches!(f.kind, FieldKind::Rank))
+}
+
 /// Positions of rows in sort order, every sort value read once. Rows that compare equal keep
 /// their order in the list, so the result is the one of a stable sort; only the positions
 /// `start..end` are put in order, the rest are just on the right side of them.
@@ -405,9 +413,9 @@ fn sorted_window<M: Model>(
     let keys: Vec<SortKey> = rows
         .iter()
         .flat_map(|row| {
-            order
-                .iter()
-                .map(|(i, _)| SortKey::new(row.value_at(*i).unwrap_or(Value::Null)))
+            order.iter().map(|(i, _)| {
+                SortKey::new(row.value_at(*i).unwrap_or(Value::Null), is_rank::<M>(*i))
+            })
         })
         .collect();
     let cmp = |a: &u32, b: &u32| {
@@ -539,7 +547,7 @@ impl DataQuery {
             .any(|s| s.desc && Some(gi) == index(&s.field));
         let keys: Vec<SortKey> = rows
             .iter()
-            .map(|r| SortKey::new(r.value_at(gi).unwrap_or(Value::Null)))
+            .map(|r| SortKey::new(r.value_at(gi).unwrap_or(Value::Null), is_rank::<M>(gi)))
             .collect();
         let mut sorted: Vec<usize> = (0..rows.len()).collect();
         sorted.sort_by(|a, b| {

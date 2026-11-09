@@ -166,6 +166,33 @@ Every sort ends with the key, so the order is total. NULLs come first going up a
 down, as in memory; the `NULLS` clause is written only for nullable columns, so plain indexes
 serve the other sorts.
 
+### User ordered rows: `Rank`
+
+A field of type `zeyn::Rank` holds a fractional index for rows people order by hand: sortable
+lists, kanban columns, tree siblings. `rank::between(a, b)` gives a key between two neighbors,
+`rank::n_between(a, b, n)` gives `n` keys for a drop of several rows, and `rank::rebalance(n)`
+gives `n` evenly spaced fresh keys for renumbering a list once `Rank::needs_rebalance()` is true
+(past 48 characters; the limit is 64). A move writes one row.
+
+Keys are base62 (`0-9 A-Z a-z`, in ASCII order) and compare byte by byte, so the column must
+compare bytes too, whatever the database or session collation is:
+
+| Database | Column | Sort and cursor |
+|---|---|---|
+| PostgreSQL | `VARCHAR(64) COLLATE "C"` | plain `ORDER BY "rank"`; the column collation applies |
+| Oracle | `VARCHAR2(64)` | `NLSSORT("RANK", 'NLS_SORT=BINARY')` on both sides, so `NLS_SORT` and `NLS_COMP` do not matter |
+
+`create_table` writes these column types and `find` writes these sorts; in a migration write the
+same column type. On Oracle an index that serves the sort is
+`CREATE INDEX ... ON t (list_id, NLSSORT("RANK", 'NLS_SORT=BINARY'))`. Memory data sorts ranks
+by bytes as well.
+
+Each key ends with three random characters, so two requests that insert between the same
+neighbors at the same moment get different keys. That makes a clash unlikely, not impossible:
+give the column a unique index per list (`UNIQUE (list_id, rank)`) and retry the insert once with
+a fresh key when it is refused. Parsing a rank from a client or a row refuses characters outside
+the alphabet, a trailing `0` and more than 64 characters.
+
 `get(key)` reads one row and fails with `Error::NotFound` when there is none. Any table or view
 can be read through an entity, for example Oracle's `user_sequences`.
 

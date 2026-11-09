@@ -1024,7 +1024,7 @@ pub(crate) fn parse_value(
             Some(pattern) => Ok(Json::String(crate::ui::mask_raw(pattern, &text))),
             None => Ok(Json::String(text)),
         },
-        FieldKind::Custom { .. } => Ok(Json::String(text)),
+        FieldKind::Custom { .. } | FieldKind::Rank => Ok(Json::String(text)),
         FieldKind::Decimal => {
             let (_, scale) = meta.decimal_limits();
             let d = crate::Decimal::parse_input(trimmed, locale).ok_or(Unreadable::Format)?;
@@ -1394,6 +1394,7 @@ where
                     "Files uploaded before, as a JSON list of {\"id\",\"name\",\"size\",\"type\"}.".to_string(),
                 ),
                 FieldKind::Text | FieldKind::Custom { .. } => ("string", String::new()),
+                FieldKind::Rank => ("string", "Sort key of 0-9, A-Z and a-z.".to_string()),
                 FieldKind::Date => ("string", "Date as YYYY-MM-DD.".to_string()),
                 FieldKind::Time => ("string", "Time as HH:MM.".to_string()),
                 FieldKind::LocalDateTime => ("string", "Date and time as YYYY-MM-DDTHH:MM, no time zone.".to_string()),

@@ -23,6 +23,9 @@ pub enum FieldKind {
     Choice(&'static [ChoiceOption]),
     /// Several options of a `#[choice]` enum: a `Vec<T>` field, edited with a multi select.
     Choices(&'static [ChoiceOption]),
+    /// A [`crate::Rank`] fractional index: text that sorts byte by byte, `VARCHAR(64)` with a
+    /// binary collation in SQL.
+    Rank,
     /// Field type defined outside Zeyn. `editor` names the client side editor that enhances the input.
     Custom {
         editor: &'static str,

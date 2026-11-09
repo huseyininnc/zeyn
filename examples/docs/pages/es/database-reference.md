@@ -166,6 +166,34 @@ Toda ordenación termina con la clave, de modo que el orden es total. Los NULL v
 bajar, como en memoria; la cláusula `NULLS` se escribe solo para columnas anulables, de modo que los índices simples
 sirven para las demás ordenaciones.
 
+### Filas ordenadas por el usuario: `Rank`
+
+Un campo de tipo `zeyn::Rank` guarda un índice fraccionario para filas que las personas ordenan a
+mano: listas ordenables, columnas kanban, hermanos de un árbol. `rank::between(a, b)` da una clave
+entre dos vecinos, `rank::n_between(a, b, n)` da `n` claves para soltar varias filas a la vez, y
+`rank::rebalance(n)` da `n` claves nuevas espaciadas por igual para renumerar una lista cuando
+`Rank::needs_rebalance()` es verdadero (más de 48 caracteres; el límite es 64). Un movimiento
+escribe una sola fila.
+
+Las claves son base62 (`0-9 A-Z a-z`, en orden ASCII) y se comparan byte a byte, así que la
+columna también debe comparar bytes, sea cual sea la intercalación de la base de datos o de la sesión:
+
+| Base de datos | Columna | Orden y cursor |
+|---|---|---|
+| PostgreSQL | `VARCHAR(64) COLLATE "C"` | `ORDER BY "rank"` simple; se aplica la intercalación de la columna |
+| Oracle | `VARCHAR2(64)` | `NLSSORT("RANK", 'NLS_SORT=BINARY')` en ambos lados, así `NLS_SORT` y `NLS_COMP` no importan |
+
+`create_table` escribe estos tipos de columna y `find` escribe estos órdenes; en una migración
+escriba el mismo tipo de columna. En Oracle, un índice que sirve al orden es
+`CREATE INDEX ... ON t (list_id, NLSSORT("RANK", 'NLS_SORT=BINARY'))`. Los datos en memoria
+también ordenan los rangos por bytes.
+
+Cada clave termina con tres caracteres aleatorios, así que dos peticiones que insertan entre los
+mismos vecinos en el mismo momento obtienen claves distintas. Eso hace improbable un choque, no
+imposible: dé a la columna un índice único por lista (`UNIQUE (list_id, rank)`) y reintente la
+inserción una vez con una clave nueva cuando se rechace. Al leer un rango de un cliente o de una
+fila se rechazan los caracteres fuera del alfabeto, un `0` final y más de 64 caracteres.
+
 `get(key)` lee una fila y falla con `Error::NotFound` cuando no hay ninguna. Cualquier tabla o vista
 puede leerse a través de una entity, por ejemplo `user_sequences` de Oracle.
 

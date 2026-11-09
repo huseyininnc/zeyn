@@ -49,6 +49,17 @@ async fn oracle_hand_written_queries_read_models() {
     }
 }
 
+const DROP_CARDS: [&str; 2] = [
+    "BEGIN EXECUTE IMMEDIATE 'DROP TABLE zeyn_test_cards PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;",
+    "BEGIN EXECUTE IMMEDIATE 'DROP SEQUENCE zeyn_test_cards_seq'; EXCEPTION WHEN OTHERS THEN NULL; END;",
+];
+
+/// A session that sorts and compares text by language rules, where `a` comes before `B`.
+const LINGUISTIC: [&str; 2] = [
+    "ALTER SESSION SET NLS_SORT = 'GERMAN'",
+    "ALTER SESSION SET NLS_COMP = 'LINGUISTIC'",
+];
+
 /// One test so the databases are not shared by tests running at the same time.
 #[tokio::test(flavor = "multi_thread")]
 async fn oracle_data_layer_matches_memory_and_saves_safely() {
@@ -61,6 +72,10 @@ async fn oracle_data_layer_matches_memory_and_saves_safely() {
         );
         sql_common::data_layer(&url, &RAW).await;
         sql_common::streams(&url, &RAW).await;
+        for session in [&[][..], &LINGUISTIC[..]] {
+            sql_common::ranks(&url, &DROP_CARDS, session).await;
+            sql_common::ranks(&format!("{url}?compat=11"), &DROP_CARDS, session).await;
+        }
 
         let auto = Db::connect(&url, PoolLimits::default())
             .await
