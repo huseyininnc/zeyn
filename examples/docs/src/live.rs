@@ -519,6 +519,13 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
         "overlay" => overlay(),
         "menus" => menus(),
         "toasts" => toasts(),
+        "topics" => Stack::new()
+            .add(
+                ActionButton::new(t!("docs.live.save"), save_sample, ())
+                    .on_success(|_, ui| ui.refresh("clock")),
+            )
+            .add(Paragraph::new(format!("{}", ctx.now().local(ctx.time_zone()))).listens("clock"))
+            .into(),
         "rating" => crate::live_engage::rating(),
         "engage" => crate::live_engage::engage(ctx),
         "chips" => crate::live_engage::chips(""),
@@ -745,6 +752,7 @@ pub const EXAMPLES: &[&str] = &[
     "overlay",
     "menus",
     "toasts",
+    "topics",
     "content",
     "autogrid",
     "list",

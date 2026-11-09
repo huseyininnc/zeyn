@@ -34,9 +34,27 @@ pub struct LookupQuery {
     pub offset: u64,
     #[serde(default)]
     pub limit: u32,
+    /// The value of the field this lookup depends on (`Form::depends_on`), as the form holds
+    /// it: the country of a city lookup. `None` when the field is empty or there is none. Comes
+    /// from the client: the action filters by it, and the submit checks the pair again.
+    #[serde(default)]
+    pub parent: Option<String>,
 }
 
 impl LookupQuery {
+    /// [`LookupQuery::parent`] read as an id, such as the id of a country.
+    ///
+    /// ```
+    /// use zeyn::ui::LookupQuery;
+    /// let q = LookupQuery { parent: Some("90".into()), ..Default::default() };
+    /// assert_eq!(q.parent_id(), Some(90));
+    /// ```
+    pub fn parent_id(&self) -> Option<i64> {
+        self.parent
+            .as_deref()
+            .and_then(|p| p.trim().parse().ok())
+    }
+
     /// Requested page size, kept between 1 and [`MAX_LOOKUP_PAGE`]. Never use the raw value.
     pub fn limit(&self) -> u32 {
         self.limit.clamp(1, MAX_LOOKUP_PAGE)
@@ -197,6 +215,7 @@ pub(crate) fn render_lookup(
     s: &Slot,
     multiple: bool,
     columns: &[Text],
+    depends: Option<&str>,
 ) {
     let value = match s.value {
         Value::Int(n) => n.to_string(),
@@ -226,9 +245,12 @@ pub(crate) fn render_lookup(
             .collect();
         format!(r#" data-columns="{}""#, attr(&headers))
     };
+    let depends = depends
+        .map(|d| format!(r#" data-depends-on="{}""#, crate::render::escape(d)))
+        .unwrap_or_default();
     out.push_str(s.label);
     out.push_str(&format!(
-        r#"<div class="z-lookup" data-zeyn-lookup="{}" data-multiple="{multiple}"{columns} data-texts="{}"><input type="text" class="z-lookup-value" inputmode="numeric" autocomplete="off" {} value="{}"></div>"#,
+        r#"<div class="z-lookup" data-zeyn-lookup="{}" data-multiple="{multiple}"{columns}{depends} data-texts="{}"><input type="text" class="z-lookup-value" inputmode="numeric" autocomplete="off" {} value="{}"></div>"#,
         s.m.name,
         attr(&texts),
         s.common,

@@ -124,6 +124,23 @@ fn display_components_render_accessible_escaped_markup() {
         .render(&mut out, &r);
     assert_eq!(out, r#"<span class="z-badge z-tone-success">Paid</span>"#);
     out.clear();
+    Badge::new("Paid")
+        .tone(Tone::Success)
+        .dot()
+        .render(&mut out, &r);
+    assert_eq!(
+        out,
+        r#"<span class="z-badge z-badge-dot z-tone-success">Paid</span>"#
+    );
+    out.clear();
+    Badge::new("3")
+        .count()
+        .render(&mut out, &r);
+    assert_eq!(
+        out,
+        r#"<span class="z-badge z-badge-count z-tone-neutral">3</span>"#
+    );
+    out.clear();
     Timeline::new()
         .event(Date::new(2024, 1, 5).unwrap(), "Created", None, Tone::Info)
         .render(&mut out, &r);
@@ -291,5 +308,16 @@ async fn step_checks_report_only_the_steps_fields_and_need_the_save_permission()
         status,
         StatusCode::FORBIDDEN,
         "checking a step needs the save action's permission"
+    );
+}
+
+#[test]
+fn a_brand_action_button_is_drawn_as_the_main_action() {
+    let h = Screen::new("Start")
+        .body(ActionButton::new("Start lesson", archive_person, 7).tone(Tone::Brand))
+        .html(&person::META);
+    assert!(
+        h.contains(r#"<button type="submit" class="z-button z-primary""#),
+        "{h}"
     );
 }

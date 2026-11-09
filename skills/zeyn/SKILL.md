@@ -16,8 +16,9 @@ Do not guess an API. Find it in the docs, in this order:
 
 1. **The project's `AGENTS.md`**: commands, structure and a framework index for this app.
 2. **The zeyn MCP server** (set up in `.mcp.json` by `zeyn new`): `zeyn_docs` with topic `rules`,
-   `language`, `protocol` or `architecture`; `zeyn_describe` lists the app's features, screens,
-   routes, access and problems; `zeyn_check` compiles and reports; `zeyn_test` runs the tests.
+   `language` or `protocol`; `zeyn_describe` lists the app's features, screens,
+   routes, access and problems; `zeyn_check` compiles and reports; `zeyn_test` runs the tests;
+   `zeyn_new_feature` and `zeyn_new_screen` run the generators.
 3. **The documentation site**: run `cargo run -p zeyn-example-docs` in the Zeyn repository and
    open http://127.0.0.1:3008 (Alt+Shift+P searches). The same pages are Markdown files in
    `examples/docs/pages/` and `docs/` of the Zeyn repository.
@@ -38,6 +39,10 @@ Which page answers what:
 | Command palette, menu bar, dock, status bar, site shell for public pages | `components/shell` (`shell.md`) |
 | Headings, paragraphs, meta lines, previous and next links, auto grids, lists, avatars, spoilers, letter bars, week schedules | `components/content` (`content.md`) |
 | Card grids, rails, search boxes, free text search (`DataQuery::q`) | `components/catalog` (`catalog.md`) |
+| Record diffs, code and JSON views, barcodes, inbox and notifications, Kanban boards, calendars | `components/admin` (`admin.md`) |
+| Prices, facets, range sliders, variants, galleries, quantities, reviews, countdowns | `components/commerce` (`commerce.md`) |
+| Message threads, the composer, typing indicators, streamed AI replies | `components/chat` (`chat.md`) |
+| Feeds of posts, lightbox, story rings | `components/social` (`social.md`) |
 | Video and audio | `components/media` (`docs/media.md`) |
 | Dates, time zones, money, languages | `guides/time-and-languages` (`time-and-languages.md`) |
 | Permissions, guards, CSRF, masking, audit | `guides/security` (`security.md`), `docs/enterprise.md` |
@@ -55,9 +60,17 @@ Which page answers what:
 
 These hold in every Zeyn app. `zeyn check` and the compiler enforce many of them.
 
-1. **One folder per feature.** `src/features/<name>/` holds `mod.rs` (the `Feature`), `models.rs`,
-   `store.rs`, `actions.rs` and `screens.rs`. Register screens in the feature's `mod.rs` and the
-   feature in `src/app.rs`. Create one with `zeyn g feature <name>`.
+1. **One folder per feature.** `src/features/<name>/` holds `mod.rs` (module declarations and the
+   `Feature`) and the folders `models/`, `services/`, `actions/` and `screens/`, one file per
+   model, service, action and screen. `zeyn g feature <name>` creates them with a working starter
+   (a model, an in memory data service, a search action and a list screen); a feature that does
+   not need a folder deletes it (the folder and its `mod` line in the feature's `mod.rs`). Add
+   `components/` by hand, one function returning a `Node` per file (`components/<name>.rs`), when
+   a part of a screen is shared or a screen file grows. `zeyn g screen <feature> <name>` adds
+   `screens/<name>.rs`, registers it and adds its title to every locale file. Register screens in the feature's `mod.rs` and the
+   feature and its services in `src/app.rs`. A service that several features use goes in
+   `src/services/<name>.rs`, registered once in `src/app.rs`. The layout is a default: a single
+   `screens.rs` still works, and `zeyn g screen` moves it to `screens/mod.rs` before it adds a file.
 2. **Every action and screen declares access**: `permission = "feature.resource.verb"` or
    `public`. The server checks it on every call, from the page, the API and AI agents alike.
 3. **Inputs are validated by type.** Saving takes `Valid<Model>`. Put rules on fields
@@ -97,7 +110,14 @@ These hold in every Zeyn app. `zeyn check` and the compiler enforce many of them
     ```
 
     `cargo fmt` keeps this shape with `chain_width = 40` in `rustfmt.toml`; do not raise it.
-13. **Every change is tested and checked** before you finish (section 5).
+13. **Small files, small functions.** One component, screen or group of related actions per file.
+    A source file holds at most 300 non blank lines (`build.rs` stops the build otherwise) and a
+    function at most 60 lines (clippy `too_many_lines`). When `screens.rs` or `actions.rs` grows,
+    turn it into a folder (`screens/mod.rs` plus one file per screen) and move large parts of a
+    screen (a toolbar, a form, a panel) into their own functions in their own files. The limits
+    live in `Cargo.toml` (`[package.metadata.zeyn] max_file_lines`) and `clippy.toml`
+    (`too-many-lines-threshold`); raise them only when the owner agrees.
+14. **Every change is tested and checked** before you finish (section 5).
 
 ## 3. The language in short
 
@@ -182,18 +202,111 @@ pub fn feature() -> Feature {
 What to remember:
 - The first argument of an action is its input; of a screen, its params (`#[params]` struct or
   `_: ()`). Every other argument is injected: `Ctx` or a registered `Service`.
-- A screen with a `route` is a page; without one it opens as a window.
+- A screen with a `route` is a page; without one it opens as a window. A `#[params]` struct whose
+  fields are all `Option` also opens from a menu link or a plain address (every field `None`).
+- Page header: `.subtitle(t!("..."))` under the title and `.primary(|t| t.button(..))` for the
+  main actions on the right; `.toolbar(..)` stays for the other tools.
 - Path params: `#[screen(route = "/orders/{id}", ...)]` binds `{id}` to the params field `id`
   (integers, entity keys, `String`, `Slug`). `Slug::from_title("Çay Bardağı")` is `cay-bardagi`.
   Return `Err(Error::NotFound)` for a missing record, `Screen::moved_to(screen, params)` for a 301, `Screen::redirect(screen, params)` for a 303 that is never cached.
 - Errors: `Error::NotFound`, `Error::Forbidden`, `Error::Conflict` (stale row version),
   `Error::Denied(t!("..."))`, `Error::Validation(errors)`, `Error::Internal("for the log")`.
 - Quick screens: `DataGrid::auto(action)` and `Form::auto(model)`.
+- Computed or very large tables: `let span = q.span();` build only those rows, then
+  `Ok(Page::window(rows, total, span))`.
 - Paging: `Paging::pages(25)`, `Paging::infinite(100)`, `Paging::virtual_scroll()` for very large
   lists. Grid extras: `.sort_by(field, desc)`, `.exportable()`, `.row_action(...)`,
-  `.bulk_action(...)`, `.editable()` with `.edit_with(action)`, `.detail(screen)`, `.group_by(field)`.
-- Buttons that run an action: `ActionButton::new(t!("..."), action, input)`, with `.confirm(...)`.
+  `.bulk_action(...)`, `.editable()` with `.edit_with(action)`, `.detail(screen)`, `.group_by(field)`,
+  `.plain()` on a whole number column that holds codes or years (others are grouped by locale).
+- Buttons that run an action: `ActionButton::new(t!("..."), action, input)`, with `.confirm(...)`; `.tone(Tone::Brand)` for the main action of a card or panel.
+  Destructive grid actions: `.row_action(..)` or `.bulk_action(..)` then `.confirm(t!("..."))`
+  `.tone(Tone::Danger)`; workflow moves: `Transitions::of(..).confirm("cancel", t!("..."))`.
 - Layouts: `Row`, `Stack`, `Panel`, `Card`, `Tabs`, `Split`.
+- Refresh other parts of a screen with topics, never with JavaScript: mark what shows the data
+  with `.listens("sales")` (last call, any component), then name the topic with
+  `ui.refresh("sales")` in `on_success`, a filter that `.drives("sales")` (`Chips::filter`,
+  `SearchBox`, a `Form` without submit whose fields are screen params) or `hub.notify`. Listeners
+  read filters from the screen params. `zeyn check` warns about topics nobody listens to.
+- A lookup whose options depend on another field: `.depends_on(Address::city, Address::country)`;
+  the action filters by `q.parent_id()` and the submit checks the pair again.
+- Rows of another shape: `List::of(action).builder(|row| node)` (or on `CardGrid`, `Rail`), with
+  `.separator(node)`; `Repeat::of(items, |item| node)` for in memory data. Virtual lists with a
+  builder need `.row_height(px)`. Keep `.item`/`.card` when they fit.
+- Product photos: `Image::new(src).alt(..).size(w, h).lazy()` with `.placeholder(Placeholder::color(..))`,
+  `.low(small_src)`, `.fallback(src)`, `.priority()` on the first one only; in a `CardGrid`
+  `.placeholder(..)` and `.priority(n)`, on a card `.low(..)` and `.fallback(..)`.
+- Shop pages: `Price::new(money).was(old).unit(per_kg, PriceUnit::Kg)` (never format prices
+  by hand; screen readers hear "was X, now Y"), on cards `Card::image(..).price(Price::new(..))`.
+  Ranges: `RangeSlider::new(t!("..."), ["min_price", "max_price"], 0, 5_000)`
+  `.money(Currency::Try).value(p.min_price, p.max_price).drives("products")`; the names are
+  screen params. Cart amounts: `QuantityStepper::of(set_quantity, sku).range(1, 20).value(n)`
+  with an action `fn(QuantityChange) -> Result<QuantityState>` that checks the stock (the
+  target comes from the screen, the range is enforced on the server). Variants:
+  `VariantPicker::new().group(VariantGroup::swatches("color", ..).swatch(v, name, "#hex")`
+  `.unavailable(v, reason).current(p.color.as_deref())).drives("variant")`, then
+  `.listens("variant")` on the price, gallery and stock; the screen params hold the choice.
+  Photos: `ProductGallery::new(name).image(Image::new(..).alt(..).size(w, h)).thumb(small)`
+  (the first image is the priority one; do not add `.priority()` yourself). Filters:
+  `FacetPanel::of(screen, &p).facet(Facet::new("color", ..).option(v, text, count).chosen(..))`
+  `.range(RangeSlider::..).drives("products")` with `Vec<String>` params (`#[serde(default)]`),
+  counts from one bounded query per facet, and the grid filtered on the server with
+  `.scope_any(Product::color, p.color.clone())` and `.scope_range(field, from, to)`.
+  Reviews: `ReviewSummary::new().count(5, n5).count(4, n4)..`; half star input:
+  `Control::Rating` on a `Decimal` field with `#[rule(min = 1, max = 5, scale = 1)]`.
+  Sale ends: `Countdown::until(moment).label(..).ended(Badge::new(..))` (server clock).
+- App shell top bar: `App::header(|h| h.center(SearchBox::of(..)).end(LinkButton::new(..)))`,
+  the same slots as the site header; `h.breadcrumb().search().account()` adds the breadcrumb, the
+  search field that opens the palette and the account menu with theme, language and sign out.
+- File uploads: `.files(RULES, FileAccess::read("x.file.read").write("x.file.write"), store)`
+  on the feature lets readers download what they may not upload; one permission name covers both.
+- Settings pages: `ThemePicker::new()` is the theme choice inside a screen, in step with the shell.
+- Sign in pages: `Feature::new("entry").screen(sign_in).shell(Shell::auth())` (or `.split()`); the
+  `accounts` screens use it already. `Control::Username` on the user name field.
+- Icons (`Icon::`, 82, `Icon::ALL` lists them): Home, Dashboard, ChartBar, ChartLine, ChartPie,
+  Table, List, Users, User, UserPlus, Building, Cart, Box, Tag, Receipt, CreditCard, Banknote,
+  Truck, Undo, Bell, Mail, Message, Activity, Shield, Lock, Key, Fingerprint, Settings, Globe,
+  Help, Plus, Minus, X, Check, Edit, Trash, Copy, Save, Download, Upload, Refresh, External,
+  Link, Search, Filter, Sliders, Columns, Sort, ArrowUp, ArrowDown, MoreHorizontal,
+  MoreVertical, Grip, Eye, EyeOff, SignOut, SignIn, ChevronDown, ChevronUp, ChevronLeft,
+  ChevronRight, TrendUp, TrendDown, Info, CheckCircle, AlertTriangle, AlertCircle, Clock,
+  History, Calendar, Star, Menu, Sidebar, Command, Sun, Moon, Monitor, File, FileText, Folder,
+  Image, Paperclip. Menu items take one with `.icon(Icon::...)` after `.item(..)`.
+- Key figures: `Kpi::new(t!("..."), value)` or `Kpi::money(t!("..."), money)` with `.delta(..)`
+  and `.trend(..)`; four in a `Row` fill a desktop row and wrap two, then one per line.
+- Audit history: `DiffView::of(&before, &after)` or `DiffView::changes(entry.changes).model::<M>()`;
+  masked fields stay masked, never print raw values next to it.
+- Read only code and JSON: `CodeView::new(CodeLang::Sql, text)`, `JsonView::of(&value, &ctx)` (masks
+  masked fields); never build highlighted HTML yourself.
+- Labels and tickets: `Barcode::code128(order.number.clone())`, `QrCode::new(url).label(t!("..."))`;
+  never pull in a barcode crate or draw one in JavaScript.
+- Notifications: `Inbox::of(action).when(Note::created_at).read(Note::read).item(..)` with
+  `.mark_read(action)` and `.archive(action)` (input `InboxSelection`; change only rows of
+  `ctx.identity()`); the bell is `h.end(NotificationCenter::of(count_unread, inbox, ()))` with a
+  count action that takes `UnreadCount` and stops at `q.limit`.
+- Boards: `Kanban::of(flow(), search_tasks, move_task).state(Task::state).card(|t| node)`; the
+  move action takes `TransitionRequest<TaskId>`, loads the record and calls `flow().apply(..)`.
+  Never write drag and drop yourself.
+- Calendars: the screen takes `p: CalendarParams` and builds
+  `Calendar::of(search_events).start(Event::starts).end(Event::ends).label(..).open(..).create(new_event).at(p)`;
+  the create action takes `CalendarSlot` (moments, already in UTC) and returns `Result<Option<Effect>>`.
+- Chat: `MessageThread::of(history).conversation(id).author(Msg::author).name(..).text(..).when(..)`;
+  the history action takes `ThreadQuery` and must check the user is in `q.conversation`. AI
+  replies: `.reply(action)` with an action taking `ReplyRequest` and returning `Reply::channel(key)`
+  fed from a spawned task; stop when `tx.send(..)` returns `false`. Never stream into HTML yourself.
+  Writing: `Composer::of(send).conversation(id)` with `.attachments(RULES)`, `.mentions(lookup)`,
+  `.remember(DRAFT)` (a `ClientPref::draft` key registered with `App::client_prefs`) and
+  `.send_key(SendKey::CtrlEnter)` for long text; the send action takes `ChatSend` and must check
+  membership and mentions itself.
+  Typing: `TypingIndicator::new("chat").conversation(id).person(user, name)` needs `App::realtime`
+  with `Realtime::topic("chat", perm)`; without it, it renders nothing.
+- Stories: `StoryRow::new().add(StoryRing::new(name, StoryState::Unseen).image(src).link(screen, params))`;
+  the state comes from what the server stored about the viewer, never from the browser.
+- Full screen images: `Image::new(thumb).alt(..).size(w, h).full(large).caption(..)` (or `.lightbox()`);
+  `.video("films", file)` makes it a video poster. Images of one container or post form a set.
+- Feeds: `Feed::of(search_posts).post(|p| Post::new(author, at).text(..).media(image).reactions(state).comments(n).link(screen, params))`
+  with `.reactions(react_action).reaction(key, name, symbol)` and `.topic("posts")`; the search action
+  takes `DataQuery` with a cursor and returns newest first, the react action takes `ReactionPress`
+  (the post key is `target`). The action that publishes ends with `ui.refresh("posts")`.
 - The app (`src/app.rs`): `App::new(t!("app.name")).i18n(i18n).service(store).feature(sales::feature())`,
   plus what the app needs: `.auth(...)`, `.mcp(Mcp::read_only())`, `.themes([...])`,
   `.datagrid_views(store)`, `.assistant(...)`.
@@ -211,7 +324,7 @@ What to remember:
 | Checking permissions inside the action body | `permission = "..."` on the attribute, guards on the feature |
 | Saving a plain model | `Valid<Model>`; it is validated before your code runs |
 | Writing JavaScript for a behavior | Effects, components, or a `Component` in Rust |
-| `location.reload()` style refreshes | `ui.close_and_refresh()`, `ui.navigate(...)` |
+| `location.reload()` style refreshes | `ui.close_and_refresh()`, `ui.navigate(...)`, `ui.refresh("topic")` with `.listens("topic")` |
 | A secret in `config/app.json` or code | `config.secret("key")` from the environment or a vault |
 | Forgetting to register | Screens in the feature's `mod.rs`, features and services in `src/app.rs` |
 
@@ -219,7 +332,8 @@ What to remember:
 
 1. `cargo test`: the app's tests drive it through its router; add a test for new behavior.
 2. `zeyn check` (or the `zeyn_check` MCP tool): compiles, then reports structural problems and
-   missing translations. It must say `ok`.
+   missing translations. It must say `ok`. Its warnings name a `#[screen]` or `#[action]` that no
+   feature registers and a flat `screens.rs` or `actions.rs` that has grown too large to stay flat.
 3. `zeyn dev` and open the screen in a browser: the page follows each rebuild without reloading.
    Check that the screen works by keyboard, in both themes, and that the console has no errors.
 4. For a container: `docker build -t <app> .` and `docker run -p 3000:3000 <app>`.

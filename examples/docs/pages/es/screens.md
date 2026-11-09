@@ -39,6 +39,8 @@ pub fn product_editor(params: ProductParams, store: ProductStore) -> Result<Scre
 
 Los params están tipados en todos los sitios donde se usan: `Window::open(product_editor, 7)` no compila, porque el editor recibe `ProductParams`.
 
+Cuando todos los campos de una estructura `#[params]` son `Option`, la pantalla también se abre sin parámetros, desde un enlace del menú o una dirección simple, con todos los campos en `None`. Un campo que no es opcional sigue necesitando su valor: sin él, la pantalla responde 404.
+
 Una pantalla sin `route` no tiene URL. Se abre como ventana desde un enlace, un botón de la barra de herramientas, un menú o un comando.
 
 ## Params in the path
@@ -137,7 +139,24 @@ Screen::new(t!("stock.products"))
     .context_menu(ContextMenu::new().item(t!("stock.new_product"), Window::open(product_editor, ProductParams { id: None })).action(t!("stock.restock_low"), restock_low, ()))
 ```
 
-Los atajos como `Alt+N` funcionan en la pantalla y se muestran en la paleta. Los atajos que usa el navegador (`Ctrl+P`, `Ctrl+S`, `F5`) no se enlazan salvo que el botón llame a `.override_browser()`, y los que el navegador nunca deja pasar (`Ctrl+N`, `Ctrl+T`, `Ctrl+W`) nunca se enlazan; las combinaciones libres son `Alt+Shift+<letra>` y `Ctrl+Alt+<letra>`.
+Los atajos como `Alt+N` funcionan en la pantalla, se muestran en la paleta y aparecen en el tooltip del botón (junto a `.tip(text)` cuando lo tiene), no en su etiqueta. Los atajos que usa el navegador (`Ctrl+P`, `Ctrl+S`, `F5`) no se enlazan salvo que el botón llame a `.override_browser()`, y los que el navegador nunca deja pasar (`Ctrl+N`, `Ctrl+T`, `Ctrl+W`) nunca se enlazan; las combinaciones libres son `Alt+Shift+<letra>` y `Ctrl+Alt+<letra>`.
+
+Los iconos de botones, grupos de menú y herramientas vienen de `Icon`, un conjunto de 82 dibujos que enumera `Icon::ALL` (`Plus`, `Edit`, `Trash`, `Search`, `Filter`, `Download`, `ChartBar`, `Users`, `Settings`, `Bell`, `SignOut` y más; el catálogo de componentes los muestra todos). Son máscaras en `/_zeyn/icons.css` dibujadas en una cuadrícula de 20 px con un trazo redondeado de 1.5 px, toman el color del texto y se ocultan a los lectores de pantalla, así que la etiqueta siempre lleva el significado.
+
+Los botones miden 36 px (32 px en densidad compacta) con un contorno discreto; los botones primarios llevan la marca. `.ghost()` después de `.button(..)` quita el contorno para acciones secundarias en barras densas, y `.danger()` dibuja en el color de peligro una acción que borra o cancela.
+
+## Cabecera
+
+`.subtitle(text)` pone una línea breve bajo el título, y `.primary(|t| ...)` coloca las acciones principales de la pantalla al final de la fila del título, como botones primarios. Juntos forman la cabecera de página que tienen casi todas las pantallas de administración.
+
+```rust
+Screen::new(t!("orders.title"))
+    .subtitle(t!("orders.intro"))
+    .primary(|t| t.button(t!("orders.new")).icon(Icon::Plus).shortcut("Alt+N").opens(order_editor, OrderParams { id: None }))
+    .toolbar(|t| t.export(Export::Csv))
+```
+
+`.primary` acepta los mismos botones que `.toolbar`, con los mismos atajos y entradas de la paleta; la barra de herramientas sigue bajo la cabecera para las demás herramientas. Dos o más llamadas a `.export(..)` en una misma barra se agrupan en un único botón de menú "Export" con un elemento por formato. El subtítulo es la descripción de la pantalla para los lectores de pantalla (`aria-describedby`). Si la fila es demasiado estrecha, las acciones pasan bajo el título, y en el teléfono se alinean al inicio. Sin subtítulo ni acciones principales, la pantalla se muestra como antes, con un título sencillo.
 
 ## Features y el menú
 

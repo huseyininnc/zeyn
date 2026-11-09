@@ -8,7 +8,8 @@ El comando `zeyn` crea proyectos, añade features, comprueba una aplicación y e
 |---|---|
 | `zeyn new <name>` | Crea una aplicación con la estructura estándar de features |
 | `zeyn new <name> --lib` | Crea una biblioteca de modelos, features y textos compartida por varias aplicaciones |
-| `zeyn g feature <name>` | Añade `src/features/<name>` con modelos, store, acciones y pantallas |
+| `zeyn g feature <name>` | Añade `src/features/<name>` con `models`, `services`, `actions` y `screens` y una pantalla de lista que funciona |
+| `zeyn g screen <feature> <name>` | Añade `screens/<name>.rs` a una feature, lo registra y añade su título a cada archivo de idioma |
 | `zeyn routes` | Lista features, pantallas, rutas, APIs y accesos |
 | `zeyn check` | Compila e informa de problemas estructurales y traducciones que faltan |
 | `zeyn check --fix` | Reescribe las APIs de Zeyn renombradas en `src`, `tests` y `examples`, y luego comprueba |
@@ -53,6 +54,7 @@ cargo run
   ```
 
   y no `DataGrid::of(search_items).paging(Paging::pages(25)).column(Item::code).column(Item::qty)`.
+- `build.rs` y `max_file_lines = 300` en `[package.metadata.zeyn]` de `Cargo.toml`: `cargo build` se detiene cuando un archivo de `src/` tiene más líneas no vacías; clippy `too_many_lines` (60, en `clippy.toml`) hace lo mismo con las funciones. Consulta [Project structure](structure.md).
 - `Dockerfile` y `.dockerignore`: una imagen de contenedor pequeña.
 - Pipelines para los servidores de CI habituales, todos con las mismas comprobaciones (`cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, `cargo deny check`) y que rechazan una etiqueta `vX.Y.Z` que no coincida con `Cargo.toml`:
   - `.github/workflows/ci.yml` para GitHub Actions, con `.github/dependabot.yml` (actualizaciones semanales de Cargo y de actions) y una lista de verificación para pull requests;
@@ -64,9 +66,22 @@ cargo run
 
 Consulta [Estructura del proyecto](structure.md) para ver cada carpeta.
 
+## Generadores
+
+`zeyn g feature` crea una feature con un archivo por modelo, servicio, acción y pantalla:
+
+```sh
+zeyn g feature orders            # src/features/orders/: models/, services/, actions/, screens/
+zeyn g screen orders detail      # src/features/orders/screens/detail.rs
+```
+
+Las formas cortas `zeyn g f` y `zeyn g s` hacen lo mismo. La feature nueva funciona desde el principio: un modelo, un servicio de datos en memoria, una acción de búsqueda y una pantalla de lista con su entrada de menú. Una feature que no necesita una carpeta la borra (la carpeta y su línea `mod` en el `mod.rs` de la feature). `components/` nunca se genera: añádela a mano, una función que devuelve un `Node` por archivo (`components/<name>.rs`), cuando una parte de una pantalla se comparte o un archivo de pantalla crece. Una pantalla recibe el permiso `<feature>.<name>.view` y su título en cada archivo de `locales/`; los idiomas distintos del inglés reciben el texto en inglés y una nota para traducirlo. La estructura no es obligatoria: si una feature tiene un único `screens.rs`, `zeyn g screen` primero lo mueve con su contenido a `screens/mod.rs`, y si `screens/` se borró, la vuelve a crear. Los generadores nunca sobrescriben un archivo y rechazan los nombres que no están en snake case.
+
 ## Comprobar una aplicación
 
 `zeyn check` ejecuta el compilador y después las comprobaciones propias de la aplicación (`App::check`): rutas duplicadas, pantallas registradas dos veces, servicios que una pantalla necesita pero nadie registró, atajos inutilizables, tokens de tema por debajo del contraste WCAG AA y claves de traducción que faltan en un idioma. Termina con error cuando algo está mal, así que la CI puede ejecutarlo.
+
+También muestra avisos, que nunca hacen fallar la comprobación: un `#[screen]` o `#[action]` que ninguna feature registra, y un único `screens.rs` o `actions.rs` con varios elementos en más de unas 150 líneas.
 
 Cuando una versión de Zeyn renombra una API, `zeyn check --fix` reescribe los nombres antiguos, por ejemplo `Grid` por `DataGrid` y `GridQuery` por `DataQuery`, y vuelve a comprobar.
 
@@ -87,4 +102,4 @@ La imagen de una aplicación generada pesa unos 43 MB y una aplicación inactiva
 
 ## El servidor MCP
 
-`zeyn mcp` habla MCP por stdio. Sus herramientas son `zeyn_docs` (referencia del framework por tema), `zeyn_describe` (features, pantallas, rutas y problemas de la aplicación en el directorio actual), `zeyn_check` (con `fix: true` ejecuta `check --fix`), `zeyn_test` y `zeyn_new_feature`. Consulta [MCP y agentes de IA](mcp.md).
+`zeyn mcp` habla MCP por stdio. Sus herramientas son `zeyn_docs` (referencia del framework por tema), `zeyn_describe` (features, pantallas, rutas y problemas de la aplicación en el directorio actual), `zeyn_check` (con `fix: true` ejecuta `check --fix`), `zeyn_test`, `zeyn_new_feature` y `zeyn_new_screen`. Consulta [MCP y agentes de IA](mcp.md).

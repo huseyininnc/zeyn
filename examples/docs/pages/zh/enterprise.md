@@ -97,6 +97,7 @@ pub async fn move_leave(req: TransitionRequest<LeaveRequestId>, store: LeaveStor
 - 每次迁移都会写入审计记录的 `transition`：名称、from、to 和评论；用户和时间在记录本身中。
 - `Transitions::of(flow, state, id, action)` 显示当前状态、一个可选的评论，以及用户可以从当前状态发起的每个迁移对应的一个按钮（`Workflow::allowed`）。记录主键来自服务器上的屏幕，因此客户端无法移动其他记录。Agent 将其视为一个表单工具。
 - 按钮标签来自目录中的 `workflow.<name>`；`.label(...)` 可手动设置一个。
+- `.confirm(name, message)` 在流转 `name` 运行前用 `ActionButton::confirm` 的对话框询问，`.tone(name, Tone::Danger)` 把它的按钮画成红色。无论如何，服务器都会检查流转及其权限。
 - `Workflow::check` 会报告无效的权限，以及从同一状态声明了两次的迁移；请在测试中调用它。
 - showcase 中的请假申请就使用了它：保存为草稿、提交，然后批准或拒绝。
 

@@ -61,6 +61,17 @@ return Err(errors.into());
 
 تأخذ القوائم `DataQuery` وتعيد `Page<M>`. إجراء القائمة لا يعيد كل الصفوف أبدًا؛ فالشبكة تطلب صفحات، ويضع الخادم حدًا أعلى لحجم الصفحة مهما أرسل العميل.
 
+للجداول التي يحسبها التطبيق أو يحتفظ بها في فهرسه الخاص (ملايين الصفوف، أو أحداث تُبنى من معرّفاتها)، يعطي `q.span()` الصفوف المطلوبة كإزاحة وحد، سواء جاءت من صفحات مرقّمة أو من مؤشر، ويعيد `Page::window(rows, total, span)` هذه الصفوف مع العدد الكلي ومؤشر الصف التالي. لا تُبنى إلا صفوف الصفحة؛ أما الترتيب والمرشحات فيطبقها التطبيق بنفسه بقراءة `q.sort` و`q.filters`.
+
+```rust
+#[action(permission = "audit.read")]
+pub async fn search_events(q: DataQuery, log: EventLog) -> Result<Page<Event>> {
+    let span = q.span();
+    let rows = log.range(span.offset, span.limit)?;
+    Ok(Page::window(rows, log.len()?, span))
+}
+```
+
 ## السياق
 
 `Ctx` هو الطلب: `ctx.identity()` و`ctx.locale()` و`ctx.time_zone()` و`ctx.now()` و`ctx.today()` و`ctx.tenant()` و`ctx.license()` و`ctx.config()` و`ctx.theme()` و`ctx.t(&text)`. استخدم `ctx.now()` و`ctx.today()` بدل ساعة النظام، حتى تتمكن الاختبارات من تثبيت الوقت بـ `App::fixed_now`.

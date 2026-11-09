@@ -333,7 +333,7 @@ pub fn feature() -> Feature {
         .screen(media_play)
         .screen(media_external)
         .menu(|m| {
-            m.group(t!("menu.media"), Icon::Chart)
+            m.group(t!("menu.media"), Icon::ChartBar)
                 .item(t!("media.title"), media_library)
                 .item(t!("media.external"), media_external)
         })

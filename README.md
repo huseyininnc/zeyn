@@ -2,9 +2,13 @@
 
 [![crates.io](https://img.shields.io/crates/v/zeyn.svg)](https://crates.io/crates/zeyn) [![docs.rs](https://img.shields.io/docsrs/zeyn)](https://docs.rs/zeyn) [![CI](https://github.com/huseyininnc/zeyn/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/huseyininnc/zeyn/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 
+**[Components](https://components.zeynsoft.com) · [Docs](https://docs.zeynsoft.com) · [Templates](https://framework.zeynsoft.com)**
+
 Zeyn is an open source Rust web framework for data heavy applications: grids, forms and workflows. AI agents write the application code. People read it, review it and change it when they need to.
 
-Status: alpha, on crates.io as 0.0.8. APIs still change between versions. Everything below compiles and is tested.
+Status: alpha, on crates.io as 0.0.9. APIs still change between versions. Everything below compiles and is tested.
+
+CI checks formatting, runs clippy and runs every test on each pull request; the results are public on the [Actions page](https://github.com/huseyininnc/zeyn/actions).
 
 ## Start a project
 
@@ -15,12 +19,13 @@ cd my-app
 cargo run                              # http://127.0.0.1:3000
 ```
 
-The docs are at https://docs.zeynsoft.com and a live demo of every component at https://framework.zeynsoft.com.
+The docs are at https://docs.zeynsoft.com, every component runs live with its source at https://components.zeynsoft.com, and complete app templates are at https://framework.zeynsoft.com.
 
 ## Try the examples in this repository
 
 ```
-cargo run -p zeyn-example-showcase     # http://127.0.0.1:3002, every component and feature
+cargo run -p zeyn-example-components   # http://127.0.0.1:3010, every component live next to its code
+cargo run -p zeyn-example-showcase     # http://127.0.0.1:3002, the components together in sample screens
 cargo run -p zeyn-example-big-grid     # http://127.0.0.1:3000, one million rows
 cargo run -p zeyn-example-billing      # http://127.0.0.1:3004, an app using the shared-domain library
 cargo run -p zeyn-example-docs         # http://127.0.0.1:3008, the documentation site, written with Zeyn
@@ -71,6 +76,10 @@ cargo run -p zeyn-cli -- new my-domain --lib   # a library of features shared by
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for how to build, test and send a change, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for how we work together. Questions are answered as described in [SUPPORT.md](SUPPORT.md). The changes of each release are in [CHANGELOG.md](CHANGELOG.md).
+
+## Roadmap
+
+What is released, what the next release holds and what is planned is in [ROADMAP.md](ROADMAP.md).
 
 ## Security
 

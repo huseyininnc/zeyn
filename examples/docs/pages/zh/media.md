@@ -63,6 +63,10 @@ Video::new("films", t!("films.harbor"))
 Audio::new("music", t!("songs.dawn")).subtitle(t!("songs.artist")).file("dawn.mp3")
 ```
 
+播放器在进入视野之前不会获取任何内容：它带有 `preload="none"`，其来源和海报在它第一次滚动进入视野时才设置（页面上的所有播放器共用一个观察器）。`.poster_low(id)` 先显示一张小海报，`.placeholder(...)` 在此之前为播放区域着色（即 `Image` 的 `Placeholder`），`.on_error(text or component)` 在媒体无法播放时替换默认消息，`.sources([(id, media_query)])` 为其他屏幕添加文件，例如 `("clip-480.mp4", "(max-width: 600px)")`。需要多种清晰度时，请使用 HLS 或 DASH（见下文）。
+
+对于列表，`.preview_when_visible()` 让播放器成为简短的预览：至少四分之一可见时，它静音并循环播放，离开视野时暂停。当访客偏好减少动态效果或节省流量（`prefers-reduced-data`、Save-Data）时，它绝不会自行开始，也绝不会带声音播放；一旦访客使用了它的控件，它就不再自行开始或停止。
+
 控件：播放和暂停、进度滑块、时间、静音、音量滑块、播放速度菜单、字幕按钮，以及（有多个字幕文件时）语言菜单；对于视频还有画中画（在浏览器支持时）和全屏。滑块遵循 WAI-ARIA slider 模式：方向键移动 5 秒（或音量的 5%），Page Up 和 Page Down 移动十分之一，Home 和 End 跳到两端。菜单遵循 menu button 模式。当焦点在播放器内时，`k` 或空格播放和暂停，`j` 和 `l` 跳转 10 秒，`m` 静音，`c` 切换字幕，`f` 切换全屏；这些键在页面其他位置不起作用。
 
 字幕是由同一个 source 提供的 WebVTT 文件。播放器把当前字幕条以纯文本绘制（会丢弃字幕标记），视频叠在画面上，音频放在标题下方，因此字幕在所有浏览器和全屏模式下看起来都一样。

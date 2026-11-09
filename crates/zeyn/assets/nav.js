@@ -31,13 +31,29 @@ function isScreenUrl(url) {
   return !local.startsWith('/_zeyn/') && !local.startsWith('/api/') && !/\.[a-z0-9]+$/i.test(local);
 }
 
-/** Marks the menu link of the current page. */
+/** Marks the menu link of the current page and writes the top bar's breadcrumb from it. */
 function markCurrent(url) {
+  let current = null;
   document.querySelectorAll('.z-nav a[href], .z-site-nav a[href], .z-site-bottom a[href]').forEach((a) => {
     const here = new URL(a.href, location.href).pathname === url.pathname;
-    if (here) a.setAttribute('aria-current', 'page');
-    else a.removeAttribute('aria-current');
+    if (here) {
+      a.setAttribute('aria-current', 'page');
+      if (a.closest('.z-nav')) current = a;
+    } else a.removeAttribute('aria-current');
   });
+  const crumbs = document.querySelector('[data-zeyn-crumbs] ol');
+  if (!crumbs) return;
+  const group = current?.closest('.z-nav-group')?.querySelector('h2')?.textContent ?? '';
+  const page = current?.textContent ?? document.querySelector('#z-main h1')?.textContent ?? '';
+  const li = (text, here) => {
+    const item = document.createElement('li');
+    const span = document.createElement('span');
+    span.textContent = text;
+    if (here) span.setAttribute('aria-current', 'page');
+    item.append(here ? span : text);
+    return item;
+  };
+  crumbs.replaceChildren(...(group && group !== page ? [li(group, false)] : []), ...(page ? [li(page, true)] : []));
 }
 
 /** Moves focus to the new screen's heading and tells screen readers that the page changed. */
@@ -59,8 +75,26 @@ function replaceHead(tags) {
   document.head.append(...tags);
 }
 
-/** Loads a screen into `#z-main`. Falls back to a full page load whenever that is safer. */
+/** Number of the latest `visit`, so only it clears the pending state. */
+let visits = 0;
+
+/**
+ * Loads a screen into `#z-main`. The pending state shows in the frame of the click: the link of
+ * the target is marked current and `html[data-zeyn-loading]` is set, which `zeyn.css` turns into
+ * a progress bar only when the answer takes longer than 150 ms.
+ */
 async function visit(url, push) {
+  const seq = ++visits;
+  document.documentElement.setAttribute('data-zeyn-loading', '');
+  try {
+    await swapScreen(url, push);
+  } finally {
+    if (seq === visits) document.documentElement.removeAttribute('data-zeyn-loading');
+  }
+}
+
+/** Swaps the screen of `url` in. Falls back to a full page load whenever that is safer. */
+async function swapScreen(url, push) {
   const main = document.getElementById('z-main');
   if (!main) {
     location.assign(url.href);
@@ -69,13 +103,15 @@ async function visit(url, push) {
   document.dispatchEvent(new CustomEvent('zeyn:leave'));
   controller?.abort();
   controller = new AbortController();
+  const { signal } = controller;
   main.setAttribute('aria-busy', 'true');
+  markCurrent(url);
   let res;
   try {
     res = (await takePrefetched(url)) ?? await fetch(url.href, {
       headers: { 'x-zeyn-partial': '1' },
       credentials: 'same-origin',
-      signal: controller.signal,
+      signal,
     });
   } catch (err) {
     if (err?.name === 'AbortError') return;
@@ -95,24 +131,41 @@ async function visit(url, push) {
     return;
   }
   if (res.headers.get('x-zeyn-live') === '1') import(`${BASE}/_zeyn/live.js${VERSION}`);
-  const html = await res.text();
+  const next = document.createElement('template');
+  next.innerHTML = await res.text();
+  const waits = [];
+  document.dispatchEvent(new CustomEvent('zeyn:need', { detail: { root: next.content, waits } }));
+  await Promise.all(waits);
+  if (signal.aborted) return;
   const finalUrl = new URL(res.url || url.href);
   if (url.hash && !finalUrl.hash) finalUrl.hash = url.hash;
   if (push) history.pushState({ zeyn: true }, '', finalUrl.href);
   else if (res.redirected) history.replaceState({ zeyn: true }, '', finalUrl.href);
   const title = res.headers.get('x-zeyn-title');
   if (title) document.title = decodeURIComponent(title);
-  main.innerHTML = html;
+  main.replaceChildren(next.content);
   const head = main.querySelector(':scope > template[data-zeyn-head]');
   replaceHead(head ? head.content.childNodes : []);
   head?.remove();
   main.removeAttribute('aria-busy');
   markCurrent(finalUrl);
-  announce(main);
-  const target = finalUrl.hash && document.getElementById(decodeURIComponent(finalUrl.hash.slice(1)));
-  if (target) target.scrollIntoView();
-  else window.scrollTo(0, 0);
   document.dispatchEvent(new CustomEvent('zeyn:content', { detail: main }));
+  arrive(main, finalUrl.hash);
+}
+
+/**
+ * Scrolls to the anchor or the top and focuses the new screen's heading. Both read the layout,
+ * so they wait for every write of the swap (the screen, the head, the menu and what
+ * `zeyn:content` sets up): the scroll runs in the next animation frame, before it paints, and
+ * the focus right after that paint, when the layout is already done and costs nothing.
+ */
+function arrive(main, hash) {
+  requestAnimationFrame(() => {
+    const target = hash && document.getElementById(decodeURIComponent(hash.slice(1)));
+    if (target) target.scrollIntoView();
+    else window.scrollTo(0, 0);
+    setTimeout(() => announce(main));
+  });
 }
 
 document.addEventListener('click', (e) => {
@@ -197,14 +250,9 @@ async function swapFrame(url, push, hash) {
   const app = document.importNode(next, true);
   current.replaceWith(app);
   markCurrent(new URL(location.href));
-  if (push) {
-    const main = document.getElementById('z-main');
-    if (main) announce(main);
-    const target = hash && document.getElementById(decodeURIComponent(hash.slice(1)));
-    if (target) target.scrollIntoView();
-    else window.scrollTo(0, 0);
-  }
   document.dispatchEvent(new CustomEvent('zeyn:content', { detail: app }));
+  const main = document.getElementById('z-main');
+  if (push && main) arrive(main, hash);
 }
 
 /** Reloads the whole app frame in place, such as after the language or the time zone changed. */
@@ -260,7 +308,7 @@ window.addEventListener('popstate', () => {
 history.replaceState({ zeyn: true }, '', location.href);
 
 /**
- * Below 800 px the side menu of the app shell folds behind the menu button under the app's name
+ * Below 1024 px the side menu of the app shell folds behind the menu button under the app's name
  * (W3C APG disclosure). This shows the button; without the script the menu stays open. Pressing
  * the button opens or closes the menu, following a link or pressing Escape closes it, and Escape
  * moves focus back to the button.
@@ -305,7 +353,7 @@ initAppMenu();
  * script prefetches that partial screen in every browser and marks the page with
  * `data-zeyn-nav`, which the Speculation Rules of the `Speculation-Rules` header leave out; they
  * only act when this script is missing and links load whole pages. The partial
- * screen of a link is fetched after 100 ms of hover, on keyboard focus or on touch, kept for 10
+ * screen of a link is fetched after 100 ms of hover, on keyboard focus or when pressed, kept for 10
  * seconds and used by `visit`. At most two fetches run at once; leaving the link first cancels
  * its fetch. Nothing is fetched with Save-Data, `prefers-reduced-data`, a 2g connection or a
  * hidden tab.
@@ -394,10 +442,16 @@ document.addEventListener('pointerout', (e) => {
   }
 });
 
+/**
+ * Pressing a link starts its fetch at once, with any pointer: the click follows about 80 ms
+ * later, and a press shorter than the hover delay would otherwise fetch nothing ahead.
+ */
 document.addEventListener('pointerdown', (e) => {
-  if (e.pointerType !== 'touch' || !prefetchOn()) return;
+  if (e.button !== 0 || !prefetchOn()) return;
   const url = prefetchUrl(linkOf(e));
-  if (url) prefetch(url);
+  if (!url) return;
+  clearTimeout(hoverTimer);
+  prefetch(url);
 });
 
 document.addEventListener('focusin', (e) => {

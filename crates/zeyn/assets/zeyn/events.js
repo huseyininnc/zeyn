@@ -268,6 +268,7 @@ document.addEventListener('change', (e) => {
   if (e.target.matches('[data-zeyn-locale]')) changeLocale(e.target);
   else if (e.target.matches('[data-zeyn-timezone]')) changeTimeZone(e.target);
   else if (e.target.matches('[data-zeyn-theme-picker]')) changeTheme(e.target);
+  else if (e.target.matches('[data-zeyn-density]')) changeDensity(e.target);
 });
 
 syncTimeZone();
@@ -280,7 +281,10 @@ document.addEventListener('zeyn:leave', () => {
   for (const d of dialogs.slice().reverse()) finishDialog(d.dialog);
 });
 
+if (document.querySelector(ASSISTANT[1])) loadFile('assistant.js');
+
 document.addEventListener('zeyn:content', (e) => {
+  loadModules(e.detail ?? document);
   initGrids(e.detail);
   if (e.detail instanceof Element) relativeTimes(e.detail);
   syncAgentTools();
@@ -311,10 +315,14 @@ document.addEventListener('zeyn:filter', (e) => {
   G?.loadGrid(grid, 'reset');
 });
 
-/** `zeyn:reload` on an element reloads the grids inside it in place (`live.js` sends it). */
+/**
+ * `zeyn:reload` on an element reloads the grids inside it in place (`live.js` and `topics.js`
+ * send it): the current page, or the first one with `detail.reset` (after a filter changed).
+ */
 document.addEventListener('zeyn:reload', (e) => {
   const root = e.target instanceof Element ? e.target : document;
-  root.querySelectorAll('[data-zeyn-grid]').forEach((g) => G?.loadGrid(g, 'reload'));
+  const how = e.detail?.reset ? 'reset' : 'reload';
+  root.querySelectorAll('[data-zeyn-grid]').forEach((g) => G?.loadGrid(g, how));
 });
 
 /**

@@ -88,6 +88,8 @@ pub async fn save_order(o: Valid<Order>, store: Orders, hub: Hub, ctx: Ctx) -> R
 
 सूचनाएँ केवल topic का नाम रखती हैं, कभी डेटा नहीं: रिफ़्रेश हर अनुमति जाँच के साथ सामान्य ग्रिड एंडपॉइंट से जाता है। `notify` केवल कॉलर के टेनेंट तक पहुँचता है; `notify_tenant(Some(id), topic)` एक को नाम देता है, `None` बिना टेनेंसी वाला ऐप है।
 
+वही topic नाम चैनल के बिना भी काम करते हैं। `.listens("orders")` से चिह्नित node तब उसी जगह रिफ़्रेश होते हैं जब कोई सूचना topic का नाम लेती है (`live.js` उसे `zeyn:topics` के रूप में आगे भेजता है), और तब भी जब कोई action `ui.refresh("orders")` के साथ ख़त्म होता है या `.drives("orders")` वाला फ़िल्टर बदलता है: ग्रिड अपना मौजूदा पेज फिर से लोड करते हैं, बाक़ी listener हर Screen के लिए एक `POST /_zeyn/nodes` से फिर render होते हैं (`examples/docs/pages/effects.md` में Topics देखें)। Socket सिर्फ़ `Live` node के topic की सदस्यता लेता है, जिन्हें `Realtime::topic` से घोषित करना होता है; जो हिस्से ग्रिड नहीं हैं, उनके लिए उनके अंदर या बगल में `.listens` इस्तेमाल करें।
+
 ## 5. मेमोरी और बैकप्रेशर
 
 स्थिति का हर टुकड़ा सीमित है (`Limits`, डिफ़ॉल्ट कोष्ठक में):

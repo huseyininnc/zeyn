@@ -8,7 +8,8 @@
 |---|---|
 | `zeyn new <name>` | ينشئ تطبيقًا ببنية الميزات القياسية |
 | `zeyn new <name> --lib` | ينشئ مكتبة من النماذج والميزات والنصوص تشترك فيها عدة تطبيقات |
-| `zeyn g feature <name>` | يضيف `src/features/<name>` مع النماذج والمخزن والإجراءات والشاشات |
+| `zeyn g feature <name>` | يضيف `src/features/<name>` مع `models` و`services` و`actions` و`screens` وشاشة قائمة تعمل |
+| `zeyn g screen <feature> <name>` | يضيف `screens/<name>.rs` إلى ميزة ويسجله ويضيف عنوانه إلى كل ملف لغة |
 | `zeyn routes` | يسرد الميزات والشاشات والمسارات وواجهات API والوصول |
 | `zeyn check` | يصرّف المشروع ويبلّغ عن المشكلات البنيوية والترجمات الناقصة |
 | `zeyn check --fix` | يعيد كتابة واجهات Zeyn المعاد تسميتها في `src` و`tests` و`examples`، ثم يفحص |
@@ -53,6 +54,7 @@ cargo run
   ```
 
   وليس `DataGrid::of(search_items).paging(Paging::pages(25)).column(Item::code).column(Item::qty)`.
+- `build.rs` و`max_file_lines = 300` تحت `[package.metadata.zeyn]` في `Cargo.toml`: يتوقف `cargo build` عندما يزيد عدد الأسطر غير الفارغة في ملف داخل `src/`؛ ويفعل clippy `too_many_lines` (60، في `clippy.toml`) الشيء نفسه للدوال. انظر [Project structure](structure.md).
 - `Dockerfile` و`.dockerignore`: صورة حاوية صغيرة.
 - خطوط إنتاج (pipelines) لخوادم CI الشائعة، وكلها تجري الفحوص نفسها (`cargo fmt --check` و`cargo clippy -D warnings` و`cargo test` و`cargo deny check`) وترفض وسمًا `vX.Y.Z` لا يطابق `Cargo.toml`:
   - `.github/workflows/ci.yml` لـ GitHub Actions، مع `.github/dependabot.yml` (تحديثات أسبوعية لـ Cargo والإجراءات) وقائمة مراجعة لطلبات السحب (pull requests)؛
@@ -64,9 +66,22 @@ cargo run
 
 راجع [بنية المشروع](structure.md) لمعرفة كل مجلد.
 
+## المولدات
+
+ينشئ `zeyn g feature` ميزة بملف واحد لكل نموذج وخدمة وإجراء وشاشة:
+
+```sh
+zeyn g feature orders            # src/features/orders/: models/, services/, actions/, screens/
+zeyn g screen orders detail      # src/features/orders/screens/detail.rs
+```
+
+الصيغتان القصيرتان `zeyn g f` و`zeyn g s` تفعلان الشيء نفسه. تعمل الميزة الجديدة فورًا: نموذج وخدمة بيانات في الذاكرة وإجراء بحث وشاشة قائمة مع عنصرها في القائمة. والميزة التي لا تحتاج مجلدًا تحذفه (المجلد وسطر `mod` الخاص به في `mod.rs` للميزة). لا يُنشأ `components/` أبدًا: أضفه يدويًا، بدالة واحدة تعيد `Node` في كل ملف (`components/<name>.rs`)، عندما يُستخدم جزء من شاشة في أكثر من مكان أو يطول ملف شاشة. تحصل الشاشة على الإذن `<feature>.<name>.view` وعلى عنوانها في كل ملف في `locales/`؛ وتحصل اللغات غير الإنجليزية على النص الإنجليزي مع ملاحظة لترجمته. هذه البنية ليست إلزامية: إذا كانت الميزة تستخدم ملفًا واحدًا `screens.rs`، ينقله `zeyn g screen` أولًا بمحتواه إلى `screens/mod.rs`، وإذا حُذف `screens/` ينشئه من جديد. لا تكتب المولدات فوق أي ملف أبدًا، وترفض الأسماء التي ليست بصيغة snake case.
+
 ## فحص تطبيق
 
 يشغّل `zeyn check` المصرّف (compiler) ثم فحوص التطبيق نفسه (`App::check`): المسارات المكررة، والشاشات المسجلة مرتين، والخدمات التي تحتاجها شاشة ولم يسجلها أحد، والاختصارات غير القابلة للاستخدام، ورموز السمة (theme tokens) التي يقل تباينها عن WCAG AA، ومفاتيح الترجمة الناقصة في لغة ما. ينتهي بخطأ عند وجود أي خلل، ليتمكن CI من تشغيله.
+
+ويطبع أيضًا تحذيرات لا تُفشل الفحص أبدًا: `#[screen]` أو `#[action]` لا تسجله أي ميزة، وملف واحد `screens.rs` أو `actions.rs` فيه عدة عناصر وتجاوز نحو 150 سطرًا.
 
 عندما يعيد إصدار من Zeyn تسمية واجهة API، يعيد `zeyn check --fix` كتابة الأسماء القديمة، مثل `Grid` إلى `DataGrid` و`GridQuery` إلى `DataQuery`، ثم يفحص مرة أخرى.
 
@@ -87,4 +102,4 @@ docker run -p 3000:3000 -e APP_SERVER__ADDR=0.0.0.0:3000 my-app
 
 ## خادم MCP
 
-يتحدث `zeyn mcp` بروتوكول MCP عبر stdio. أدواته هي `zeyn_docs` (مرجع الإطار حسب الموضوع) و`zeyn_describe` (ميزات التطبيق في المجلد الحالي وشاشاته ومساراته ومشكلاته) و`zeyn_check` (مع `fix: true` يشغّل `check --fix`) و`zeyn_test` و`zeyn_new_feature`. راجع [MCP ووكلاء الذكاء الاصطناعي](mcp.md).
+يتحدث `zeyn mcp` بروتوكول MCP عبر stdio. أدواته هي `zeyn_docs` (مرجع الإطار حسب الموضوع) و`zeyn_describe` (ميزات التطبيق في المجلد الحالي وشاشاته ومساراته ومشكلاته) و`zeyn_check` (مع `fix: true` يشغّل `check --fix`) و`zeyn_test` و`zeyn_new_feature` و`zeyn_new_screen`. راجع [MCP ووكلاء الذكاء الاصطناعي](mcp.md).

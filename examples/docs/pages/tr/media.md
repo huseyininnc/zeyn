@@ -63,6 +63,10 @@ Video::new("films", t!("films.harbor"))
 Audio::new("music", t!("songs.dawn")).subtitle(t!("songs.artist")).file("dawn.mp3")
 ```
 
+Bir oynatıcı görünüme girene kadar hiçbir şey indirmez: `preload="none"` taşır ve kaynakları ile afişi ilk kez kaydırılarak görünüme girdiğinde ayarlanır (sayfadaki her oynatıcıya tek bir gözlemci hizmet eder). `.poster_low(id)` önce küçük bir afiş gösterir, `.placeholder(...)` ondan önce sahneyi renklendirir (`Image`'ın `Placeholder`'ı), `.on_error(text or component)` medya oynatılamadığında varsayılan mesajın yerini alır ve `.sources([(id, media_query)])` başka ekranlar için dosyalar ekler, örneğin `("clip-480.mp4", "(max-width: 600px)")`. Çok sayıda kalite için HLS ya da DASH kullanın (aşağıda).
+
+Listeler için `.preview_when_visible()` oynatıcıyı kısa bir önizlemeye dönüştürür: en az dörtte biri görünür olduğu sürece sessiz ve döngüde oynar, görünümden çıkınca duraklar. Ziyaretçi azaltılmış hareketi tercih ediyorsa ya da veri tasarrufu yapıyorsa (`prefers-reduced-data`, Save-Data) asla kendiliğinden başlamaz, asla sesli başlamaz ve ziyaretçi kontrollerini kullandıktan sonra artık kendiliğinden başlamaz ya da durmaz.
+
 Kontroller: oynat ve duraklat, bir arama kaydırıcısı, süre, sessize alma, bir ses kaydırıcısı, bir oynatma hızı menüsü, bir altyazı düğmesi ve (birden çok altyazı dosyası varsa) bir dil menüsü; video için ayrıca resim içinde resim (tarayıcı destekliyorsa) ve tam ekran. Kaydırıcılar WAI-ARIA slider desenini izler: oklar 5 saniye (ya da ses düzeyinin yüzde 5'i) kadar hareket ettirir, Page Up ve Page Down onda biri kadar, Home ve End uçlara gider. Menüler menu button desenini izler. Odak bir oynatıcının içindeyken `k` ya da Space oynatır ve duraklatır, `j` ve `l` 10 saniye atlar, `m` sessize alır, `c` altyazıyı açıp kapatır ve `f` tam ekranı açıp kapatır; bu tuşlar sayfanın başka yerinde hiçbir şey yapmaz.
 
 Altyazılar aynı kaynaktan sunulan WebVTT dosyalarıdır. Oynatıcı etkin ipucunu (cue) düz metin olarak çizer (cue işaretlemesi atılır): video için görüntünün üstüne, ses için başlığın altına; böylece altyazılar her tarayıcıda ve tam ekranda aynı görünür.

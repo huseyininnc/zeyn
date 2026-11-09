@@ -41,7 +41,7 @@ Chart::funnel("Checkout").labels(["Visited", "Cart", "Paid"]).series("People", [
 
 @live chart
 
-Her grafikte bir başlık, ekran okuyucular için metin özeti, bir gösterge (legend) ve sayıları *Show data* altında bir tablo olarak bulunur. Seri renkleri `--z-chart-1` ile `--z-chart-6` arasındaki token'lardır; bir test (`chart_colors_reach_three_to_one_in_both_themes`) açık temada ve iki koyu temada `--z-surface` ve `--z-surface-2` karşısında 3:1 kontrastı denetler (bkz. [Tema](theming.md)).
+Her grafikte bir başlık, ekran okuyucular için metin özeti, iki ya da daha fazla serisi olduğunda bir gösterge (legend) ve sayıları *Show data* altında bir tablo olarak bulunur. Çubuk, çizgi, alan ve birleşik (combo) grafikler SVG'de yalnızca geometrilerini çizer; bu geometri kartla birlikte esner (`--z-chart-h`, 240 px, telefonlarda 200 px). Eksen etiketleri yanındaki HTML'dir, bu yüzden her genişlikte 12 px kalır, on binden itibaren kısaltılır (`600K`, `1.2M`) ve kategori etiketleri en fazla on ikisi görünecek şekilde seyreltilir (480 px'ten dar grafiklerde bunun yarısı). Çubuklar bantlarının %60'ını kaplar; çizgiler noktasız 2 px'tir, son değerde ve üzerine gelinen kategoride yuvarlak bir nokta taşır; alanlar giderek solar. Bir kategori üzerindeki işaretçi ya da klavye odağı bir artı imleci (crosshair) ve o kategorideki her seriyi gösteren bir tooltip çizer. Seri renkleri `--z-chart-1` ile `--z-chart-8` arasındaki token'lardır ve sıraları ilk beşini renk körlüğünde de birbirinden ayrı tutar; 7. ve 8. seriler çizgilerini ayrıca kesikli çizer. Başlangıç denetimi ve bir test (`chart_colors_reach_three_to_one_in_both_themes`) her seriyi `--z-surface` karşısında 3:1'e tutar (bkz. [Tema](theming.md)).
 
 Her çubuk, nokta, dilim, aşama ve gauge değeri, etiketi ve değeri adı olan bir işarettir. SVG, başlık ve özet ile adlandırılmış bir gruptur ve grafik tek bir Tab durağıdır:
 
@@ -57,11 +57,24 @@ Her çubuk, nokta, dilim, aşama ve gauge değeri, etiketi ve değeri adı olan 
 
 ## Anahtar göstergeler, sparkline ve bullet
 
-`Kpi` bir değeri, önceki döneme göre değişimini (bir ok ve yönü anlatan kelimelerle; değişim iyiyse yeşil, değilse kırmızı; maliyetler ve bekleme süreleri için `.lower_is_better()`), ulaşılan payla birlikte bir hedefi ve son değerlerin bir sparkline'ını gösterir.
+`Kpi` bir değeri kartın en büyük metni olarak gösterir (30 px, sabit genişlikli rakamlar, para birimi simgesi ya da birim daha küçük ve soluk). Önceki döneme göre değişimini `+48.8%` gibi küçük bir çip olarak, yanında "önceki döneme göre" yazısıyla gösterir (değişim iyiyse yeşil, değilse kırmızı, yüzde yarımın altındaysa gri; maliyetler ve bekleme süreleri için `.lower_is_better()`; ekran okuyucular cümlenin tamamını duyar). Bunlara ulaşılan payla birlikte bir hedef ve son değerlerin çipin renginde, solan bir alan üzerinde tam genişlikte bir eğilimi eklenir. Yedi ve daha fazla basamaklı değerler kısaltılır (İngilizcede `$1.23M`, Türkçede `1,23 Mn`); tam değer tooltip içinde ve ekran okuyucular için yer alır.
 
 ```rust
 Kpi::new("Revenue this month", 184_250.0).delta(12.4).target(200_000.0).trend([140.0, 152.0, 160.0, 184.0])
 Kpi::new("Average wait", 6.5).decimals(1).unit("min").delta(-9.0).lower_is_better()
+Kpi::money("Revenue", Money::tl(18_425_050)).delta(4.2).target(200_000.0)
+```
+
+`Kpi::money` bir tutarı kullanıcının yerel ayarında para birimiyle gösterir (İngilizcede `₺184,250.50`, Türkçede `184.250,50 ₺`, simge daha küçük yazılır); hedefi de aynı para birimindedir.
+
+Bir `Row` ya da `AutoGrid` içindeki Kpi'lar, eğilimleri olsun ya da olmasın, en uzun olan kadar yüksektir ve sparkline her kartın altında durur. Kpi'lardan oluşan bir `Row` her birine genişliğin dörtte birini verir: masaüstünde dördü satırı doldurur, satır yaklaşık 830 px altında iki sütuna iner; 360 px altında kartlar eğilimlerini bırakır (satır üzerinde container query ile; bu yüzden dar bir sütundaki Kpi satırı daha erken kırılır). Her kart, eğilimi olsun ya da olmasın, en az 132 px yer tutar. Grafikler kapsayıcılarının genişliğini doldurur. Halka, gösterge, huni ve dağılım grafikleri oranlarını korur; halka ve gösterge grafikleri en fazla 18rem yüksekliğinde kalır ve ortada durur.
+
+```rust
+Row::new()
+    .col(Kpi::money("Revenue", revenue).delta(12.4).trend(weekly))
+    .col(Kpi::new("Orders", 1_284.0).delta(3.1))
+    .col(Kpi::new("New customers", 312.0).delta(-2.0))
+    .col(Kpi::money("Average order", average).delta(0.0))
 ```
 
 Bir `DataGrid` içinde `Vec<f64>` sütunu sparkline olarak, sayı veya para sütunu ise bir hedefe karşı bullet olarak çizilir:
@@ -72,4 +85,4 @@ DataGrid::of(search_reps)
     .column(Rep::weeks).cell(SparklineCell::new())
 ```
 
-İkisi de hücre başına tek bir küçük SVG'dir ve "Trend of 12 values from 40 to 61, lowest 12, highest 99" gibi bir adı vardır. Bütçe: iki hücre için satır başına yaklaşık 0,65 KB HTML; her iki hücreli 10.000 satır debug derlemesinde yaklaşık 0,4 sn'de çizilir (`sparkline_and_bullet_cells_render_ten_thousand_rows_quickly`) ve gridler yalnızca görünen satırları çizer. `charts.js` ham 3,7 KB (gzip ile 1,4 KB), `charts.css` 3,3 KB (gzip ile 1,1 KB) ekler.
+İkisi de hücre başına tek bir küçük SVG'dir ve "Trend of 12 values from 40 to 61, lowest 12, highest 99" gibi bir adı vardır. Bütçe: iki hücre için satır başına yaklaşık 0,65 KB HTML; her iki hücreli 10.000 satır debug derlemesinde yaklaşık 0,4 sn'de çizilir (`sparkline_and_bullet_cells_render_ten_thousand_rows_quickly`) ve gridler yalnızca görünen satırları çizer. `charts.js` ham 3,7 KB (gzip ile 1,4 KB), `charts.css` 4,1 KB (gzip ile 1,3 KB) ekler.

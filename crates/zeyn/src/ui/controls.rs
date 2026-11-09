@@ -41,14 +41,18 @@ pub enum Control {
     /// A one time code input for text fields: numeric keyboard, `autocomplete="one-time-code"`,
     /// never kept in drafts.
     OneTimeCode,
+    /// The user name or e-mail of a sign in form: `autocomplete="username"`, no capitals or
+    /// spell check, so password managers fill it with the password.
+    Username,
     /// A number shown as a percentage, for `Decimal` and whole number fields. The value is in
     /// percent points: `12.5` is shown as `12.5 %` (`%12,5` in Turkish) and stored as `12.5`.
     Percent,
     /// A new password input with a strength meter. The meter is a hint computed in the browser;
     /// the field's rules (`min_len`, a model `validate` function) are what the server enforces.
     PasswordMeter,
-    /// Stars from 1 to N for whole number fields, as a radio group: one tab stop, arrow keys
-    /// move. N is the field's `max` rule (5 without one, at most 10); give the field
+    /// Stars from 1 to N for whole number fields, and half stars from 0.5 to N for `Decimal`
+    /// fields (give them `scale = 1`; the server turns away values between the halves), as a
+    /// radio group: one tab stop, arrow keys move. N is the field's `max` rule (5 without one, at most 10); give the field
     /// `#[rule(min = 1, max = N)]` so the server checks the value too. No star checked sends no
     /// value, which a `required` rule turns away.
     Rating,
@@ -185,7 +189,9 @@ pub(crate) fn render_choice(out: &mut String, r: &Render, s: &Slot) {
 /// Whole numbers, money and decimals: formatted while typing in the user's language, with step
 /// buttons. Key fields are not grouped (`10234`, not `10.234`). Decimals keep their field's scale.
 pub(crate) fn render_number(out: &mut String, r: &Render, s: &Slot) {
-    if s.control == Some(Control::Rating) && matches!(s.m.kind, FieldKind::Integer) {
+    if s.control == Some(Control::Rating)
+        && matches!(s.m.kind, FieldKind::Integer | FieldKind::Decimal)
+    {
         return super::rating::render_rating(out, r, s);
     }
     let f = NumberFormat::for_locale(r.locale);
@@ -324,10 +330,11 @@ pub(crate) fn render_text(out: &mut String, r: &Render, s: &Slot) {
                 s.common.to_string()
             };
             out.push_str(&format!(
-                r#"<div class="z-password" data-zeyn-password><input type="password" autocomplete="{auto}" spellcheck="false" {common}{minlength}{maxlength} value=""><button type="button" class="z-password-toggle" aria-pressed="false" aria-controls="{id}" aria-label="{}" data-testid="{}.field.{}.toggle" hidden><span class="z-eye" aria-hidden="true"></span></button></div>"#,
+                r#"<div class="z-password" data-zeyn-password><input type="password" autocomplete="{auto}" spellcheck="false" {common}{minlength}{maxlength} value=""><button type="button" class="z-password-toggle" aria-pressed="false" aria-controls="{id}" aria-label="{}" data-testid="{}.field.{}.toggle" hidden><span class="z-eye" aria-hidden="true"></span></button></div><p class="z-caps" data-zeyn-caps aria-live="polite" hidden>{}</p>"#,
                 ui(r, "password.show"),
                 r.scope,
-                s.m.name
+                s.m.name,
+                ui(r, "password.caps")
             ));
             if meter {
                 let levels =
@@ -343,17 +350,23 @@ pub(crate) fn render_text(out: &mut String, r: &Render, s: &Slot) {
             out.push_str(&format!(r#"<input type="text" inputmode="text" autocomplete="one-time-code" spellcheck="false" {}{maxlength} value="">"#, s.common));
         }
         _ => {
-            let kind = if s
-                .m
-                .rules
-                .contains(&crate::model::Rule::Email)
-            {
-                "email"
-            } else {
-                "text"
+            let email =
+                s.m.rules
+                    .contains(&crate::model::Rule::Email);
+            let (kind, auto) = match (s.control == Some(Control::Username), email) {
+                (true, true) => (
+                    "email",
+                    r#" autocomplete="username" autocapitalize="none" spellcheck="false""#,
+                ),
+                (true, false) => (
+                    "text",
+                    r#" autocomplete="username" autocapitalize="none" spellcheck="false""#,
+                ),
+                (false, true) => ("email", r#" autocomplete="email""#),
+                (false, false) => ("text", ""),
             };
             out.push_str(&format!(
-                r#"<input type="{kind}" {}{minlength}{maxlength} value="{text}">"#,
+                r#"<input type="{kind}"{auto} {}{minlength}{maxlength} value="{text}">"#,
                 s.common
             ));
         }

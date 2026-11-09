@@ -356,7 +356,7 @@ fn auto_form_renders_every_field_with_client_rules() {
     Form::auto(leave_request()).render(&mut out, &Render::english("leave"));
     assert!(out.contains(r#"name="reason""#));
     assert!(out.contains(r#"minlength="10""#));
-    assert!(out.contains(r#"type="email" id="leave-manager_email""#));
+    assert!(out.contains(r#"type="email" autocomplete="email" id="leave-manager_email""#));
     assert!(out.contains(r#"min="1""#));
     assert!(out.contains(r#"max="365""#));
     assert!(out.contains(r#"data-zeyn-editor="phone" value="+90 555 000 00 00""#));
@@ -407,6 +407,12 @@ fn list_screen_renders() {
     assert!(html.contains(r#"data-zeyn-screen="product_list""#));
     assert!(html.contains(r#"data-testid="product_list.toolbar.new-product""#));
     assert!(html.contains(r#"aria-keyshortcuts="Alt+N""#));
+    assert!(
+        html.contains(
+            r#"<span role="tooltip" class="z-tip" id="product_list-tooltip-0" hidden>Alt+N</span>"#
+        ),
+        "the shortcut hint moves out of the label into the button's tooltip"
+    );
     assert!(html.contains(r#"data-testid="product_list.toolbar.export-xlsx""#));
     assert!(html.contains(r#"data-zeyn-action="search_products""#));
     assert!(html.contains(r#"data-zeyn-mode="server""#));
@@ -415,6 +421,24 @@ fn list_screen_renders() {
     ));
     assert!(html.contains(r#"data-field="stock" data-agg="sum""#));
     assert!(html.contains("&quot;screen&quot;:&quot;product_form&quot;"));
+}
+
+#[test]
+fn toolbar_buttons_can_be_ghost_or_danger() {
+    let html = Screen::new("Bar")
+        .toolbar(|t| {
+            t.button("Archive")
+                .ghost()
+                .button("Delete")
+                .danger()
+                .button("Plain")
+        })
+        .html(&product_list::META);
+    assert!(html.contains(r#"<button type="button" class="z-button z-ghost" data-testid="product_list.toolbar.archive""#));
+    assert!(html.contains(r#"<button type="button" class="z-button z-danger-button" data-testid="product_list.toolbar.delete""#));
+    assert!(html.contains(
+        r#"<button type="button" class="z-button" data-testid="product_list.toolbar.plain""#
+    ));
 }
 
 #[test]

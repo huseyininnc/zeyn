@@ -1,0 +1,60 @@
+/* Message threads (`zeyn::ui::MessageThread`): linked only by pages that hold `.z-thread`. Logical
+   properties only, so bubbles mirror in right to left languages. */
+
+.z-thread { display: grid; gap: var(--z-s-2); min-inline-size: 0; }
+.z-thread-title { margin: 0; font-size: var(--z-text-lg); line-height: var(--z-leading-lg); }
+.z-thread-view {
+  display: flex; flex-direction: column; gap: 2px; block-size: var(--z-thread-height, min(70vh, 640px));
+  overflow-y: auto; overscroll-behavior: contain; padding: var(--z-s-3); box-sizing: border-box;
+  border: 1px solid var(--z-border); border-radius: var(--z-radius); background: var(--z-surface);
+  overflow-anchor: none;
+}
+.z-thread-view:focus-visible { outline: 2px solid var(--z-focus); outline-offset: 2px; }
+.z-thread-empty { margin: auto; color: var(--z-text-muted); }
+.z-thread-msg { display: flex; flex-direction: column; align-items: flex-start; margin-block-start: var(--z-s-2); border-radius: var(--z-radius); }
+.z-thread-msg:focus-visible { outline: 2px solid var(--z-focus); outline-offset: 2px; }
+.z-thread-own { align-items: flex-end; }
+.z-thread-cont { margin-block-start: 0; }
+.z-thread-day {
+  align-self: stretch; display: flex; align-items: center; gap: var(--z-s-2); margin: var(--z-s-3) 0 var(--z-s-2);
+  color: var(--z-text-muted); font-size: var(--z-text-xs); font-weight: 600;
+}
+.z-thread-day::before, .z-thread-day::after { content: ""; flex: 1; border-block-start: 1px solid var(--z-border); }
+.z-thread-who { margin: 0 var(--z-s-2) 2px; font-size: var(--z-text-xs); font-weight: 600; color: var(--z-text-muted); }
+.z-thread-own .z-thread-who, .z-thread-cont .z-thread-who {
+  position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+.z-thread-bubble {
+  max-inline-size: min(75%, 46rem); padding: var(--z-s-2) var(--z-s-3); box-sizing: border-box;
+  border-radius: var(--z-radius-lg); border-end-start-radius: var(--z-radius-sm);
+  background: var(--z-surface-2); color: var(--z-text); overflow-wrap: anywhere;
+}
+.z-thread-own .z-thread-bubble {
+  background: var(--z-primary); color: var(--z-on-primary);
+  border-end-start-radius: var(--z-radius-lg); border-end-end-radius: var(--z-radius-sm);
+}
+.z-thread-text { white-space: normal; line-height: var(--z-leading-md); }
+.z-thread-text > :first-child { margin-block-start: 0; }
+.z-thread-text > :last-child { margin-block-end: 0; }
+.z-thread-text p, .z-thread-text ul, .z-thread-text ol { margin-block: 0 var(--z-s-2); }
+.z-thread-text pre { margin-block: 0 var(--z-s-2); padding: var(--z-s-2); overflow-x: auto; border-radius: var(--z-radius-sm); background: var(--z-surface); font-size: var(--z-text-sm); }
+.z-thread-text code { font-family: var(--z-font-mono); font-size: .92em; }
+.z-thread-meta { display: flex; justify-content: flex-end; align-items: center; gap: var(--z-s-1); margin: 2px 0 0; font-size: var(--z-text-xs); font-variant-numeric: tabular-nums; }
+.z-thread-other .z-thread-meta { color: var(--z-text-muted); }
+.z-thread-status { display: inline-flex; }
+.z-thread-status-failed { color: var(--z-danger); }
+.z-thread-own .z-thread-status-failed { color: var(--z-on-primary); }
+.z-thread-files { display: flex; flex-wrap: wrap; gap: var(--z-s-2); margin: var(--z-s-2) 0 0; padding: 0; list-style: none; }
+.z-thread-file { display: grid; gap: 2px; min-inline-size: 0; }
+.z-thread-link { display: inline-flex; align-items: center; gap: var(--z-s-1); min-block-size: 24px; color: inherit; font-size: var(--z-text-sm); }
+.z-thread-link:focus-visible { outline: 2px solid var(--z-focus); outline-offset: 2px; }
+.z-thread-file-size { opacity: .9; font-variant-numeric: tabular-nums; }
+.z-thread-typing::after { content: "…"; display: inline-block; animation: z-thread-blink 1s steps(2) infinite; }
+@keyframes z-thread-blink { 50% { opacity: .3; } }
+.z-thread-stop { margin-block-start: var(--z-s-2); }
+.z-thread-note { margin: var(--z-s-1) 0 0; color: var(--z-text-muted); font-size: var(--z-text-sm); }
+.z-thread-error { margin: var(--z-s-1) 0 0; color: var(--z-danger); font-size: var(--z-text-sm); }
+@media (prefers-reduced-motion: reduce) { .z-thread-typing::after { animation: none; } }
+@media (forced-colors: active) {
+  .z-thread-bubble { border: 1px solid CanvasText; }
+}

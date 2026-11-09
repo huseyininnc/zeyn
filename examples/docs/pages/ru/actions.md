@@ -61,6 +61,17 @@ return Err(errors.into());
 
 Списки принимают `DataQuery` и возвращают `Page<M>`. Action списка никогда не возвращает все строки; таблица запрашивает страницы, а сервер ограничивает размер страницы независимо от того, что отправит клиент.
 
+Для таблицы, которую приложение вычисляет или хранит в собственном индексе (миллионы строк, события, построенные по их id), `q.span()` даёт запрошенные строки как смещение и предел, будь то номера страниц или курсор, а `Page::window(rows, total, span)` возвращает их вместе с общим числом и курсором на следующую строку. Строятся только строки страницы; сортировку и фильтры приложение применяет само, читая `q.sort` и `q.filters`.
+
+```rust
+#[action(permission = "audit.read")]
+pub async fn search_events(q: DataQuery, log: EventLog) -> Result<Page<Event>> {
+    let span = q.span();
+    let rows = log.range(span.offset, span.limit)?;
+    Ok(Page::window(rows, log.len()?, span))
+}
+```
+
 ## Контекст
 
 `Ctx` это запрос: `ctx.identity()`, `ctx.locale()`, `ctx.time_zone()`, `ctx.now()`, `ctx.today()`, `ctx.tenant()`, `ctx.license()`, `ctx.config()`, `ctx.theme()` и `ctx.t(&text)`. Используйте `ctx.now()` и `ctx.today()` вместо системных часов, чтобы тесты могли зафиксировать время через `App::fixed_now`.

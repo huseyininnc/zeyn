@@ -27,6 +27,8 @@ Leave the name empty or type a wrong email and press *Send*: the browser shows t
 | `.range(M::from, M::to)` | Two dates as one range picker |
 | `Form::auto(value)` | Every field, in declaration order |
 
+Forms are at most 720 px wide, and a card or panel that holds only a form is as wide as the form, so no half of the card stays empty. Labels sit 6 px above 36 px inputs; fields are 20 px apart. A focused input gets a border in the focus color and a soft 3 px ring; an invalid one a danger border. Units, currency and `%` are drawn muted inside the input, and number fields put their minus and plus buttons (28 px) inside the end of the field; arrow keys still step.
+
 ## Saving
 
 `.submit(label, action)` names the action that saves. The action must take `Valid<M>` for the form's model; anything else does not compile. The runtime sends the values, the server runs every rule, then the action.
@@ -38,6 +40,52 @@ Leave the name empty or type a wrong email and press *Send*: the browser shows t
 ## Controls
 
 Each field type has a default control: text inputs, number inputs, money with the currency, date and time pickers, checkboxes for `bool` and selects for choices. `.control(M::f, Control::...)` picks another one, and `.lookup(M::f, action)` searches records on the server. See [Controls and pickers](controls.md).
+
+## Dependent lookups
+
+`.depends_on(field, source)` makes the options of the lookup `field` depend on another field, such as the cities of a country. Every search sends the value of `source` in `LookupQuery::parent` (`q.parent_id()` reads it as an id), and changing `source` clears `field`, so its options load again for the new value.
+
+```rust
+#[action(permission = "geo.read")]
+pub async fn find_cities(q: LookupQuery, store: Cities) -> Result<Page<LookupItem>> {
+    Ok(q.apply(store.of_country(q.parent_id())))
+}
+
+Form::of(address)
+    .lookup(Address::country, find_countries)
+    .lookup(Address::city, find_cities)
+    .depends_on(Address::city, Address::country)
+    .submit(t!("save"), save_address)
+```
+
+The browser cannot be trusted with the pair, so on submit the server asks the lookup action again for the chosen city with the submitted country, with the action's permission, and refuses a city it does not return with a field error. Filter by the parent for id queries too, as `q.apply` after filtering does. `App::check_page` reports a `depends_on` whose field is not a lookup of the form or whose source is not another field of it.
+
+## Filter forms
+
+A form without a submit button can filter the screen: `.drives(topic)` makes its fields screen params. When a field changes (a select, a date range, a text field on Enter), its value goes into the screen's param of the same name, the address is kept in step, and the nodes that `.listens(topic)` refresh in place and read the value from their params (see [Topics](effects.md#topics)). Numbers and booleans are sent as such and empty fields as `null`; the server reads the params as the screen's typed params, so a value that does not fit is refused.
+
+```rust
+#[params]
+pub struct SalesParams {
+    pub region: Option<Region>,
+    pub from: Option<Date>,
+    pub to: Option<Date>,
+}
+
+#[screen(route = "/sales", permission = "sales.read")]
+pub fn sales(p: SalesParams, store: Sales) -> Screen {
+    Screen::new(t!("sales.title"))
+        .body(
+            Form::of(SalesFilter { region: p.region, from: p.from, to: p.to })
+                .field(SalesFilter::region)
+                .range(SalesFilter::from, SalesFilter::to)
+                .drives("sales"),
+        )
+        .body(Kpi::new(t!("sales.total"), store.total(&p)).listens("sales"))
+}
+```
+
+A form with `submit` cannot drive; refresh after saving with `ui.refresh(topic)` in `on_success` instead.
 
 ## Read only fields
 
@@ -59,6 +107,8 @@ Feature::new("support")
 
 Form::of(ticket).field(Ticket::title).file(Ticket::attachments, ATTACHMENTS)
 ```
+
+A permission name lets the same users upload and download. To let readers open files they may not add to, split it: `.files(ATTACHMENTS, FileAccess::read("support.ticket.read").write("support.ticket.files"), store)`.
 
 The control is a native file input inside a drop zone. Each file uploads on its own with a progress bar, can be canceled while it runs, retried when it failed and removed when it is done. Images show a preview made from an object URL of the chosen file. Progress and results are announced in a polite live region. The showcase has a working example at `/uploads`; this documentation site has no signed in user, so it shows no live upload.
 

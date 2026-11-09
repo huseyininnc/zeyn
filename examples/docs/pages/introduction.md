@@ -60,12 +60,13 @@ cargo run
 Or run the examples from the repository:
 
 ```sh
+cargo run -p zeyn-example-components
 cargo run -p zeyn-example-showcase
 cargo run -p zeyn-example-docs
 cargo run -p zeyn-cli -- new my-app
 ```
 
-The showcase listens on `127.0.0.1:3002` and shows every component with sample data. This documentation listens on `127.0.0.1:3008`; set `ZEYN_DOCS_SERVER__ADDR` to change it.
+The component catalog listens on `127.0.0.1:3010` and shows every component live next to its code, as [components.zeynsoft.com](https://components.zeynsoft.com) does. The showcase listens on `127.0.0.1:3002` and puts the components together in sample screens with data. This documentation listens on `127.0.0.1:3008`; set `ZEYN_DOCS_SERVER__ADDR` to change it.
 
 ## Finding your way
 
@@ -74,7 +75,8 @@ The showcase listens on `127.0.0.1:3002` and shows every component with sample d
 - *Language* covers entities, actions, screens, forms, the DataGrid and texts.
 - *Components* shows each component with a live example next to its code.
 - *Guides* covers time and languages, security, the API, MCP, data and theming.
-- *Reference* has the runtime protocol and the architecture.
+- *Reference* has the runtime protocol and the database reference.
+- *Project* has the source, the license, the tests and CI, and the security policy.
 
 ## Principles
 
@@ -82,3 +84,5 @@ The showcase listens on `127.0.0.1:3002` and shows every component with sample d
 - **No page reloads.** Navigation, windows, language, time zone and theme changes are applied in place.
 - **Secure defaults.** Every action and screen declares its access. CSRF tokens, a strict Content Security Policy and escaping of user data are always on.
 - **One way to do each thing.** The language is small, so code written by an agent reads like code written by a person.
+
+Zeyn is open source under the [MIT or Apache 2.0 license](project.md#license). See the [security policy](project.md#security), the [roadmap](https://github.com/huseyininnc/zeyn/blob/main/ROADMAP.md) and the [changelog](https://github.com/huseyininnc/zeyn/blob/main/CHANGELOG.md).

@@ -151,6 +151,7 @@ pub async fn move_leave(req: TransitionRequest<LeaveRequestId>, store: LeaveStor
   aracı olarak görür.
 - Düğme etiketleri kataloglardaki `workflow.<name>` anahtarından gelir; `.label(...)` birini elle
   ayarlar.
+- `.confirm(name, message)`, `name` geçişi çalışmadan önce `ActionButton::confirm` penceresinde sorar; `.tone(name, Tone::Danger)` düğmesini kırmızı çizer. Sunucu geçişi ve iznini her durumda denetler.
 - `Workflow::check`, geçersiz izinleri ve aynı durumdan iki kez tanımlanmış geçişleri bildirir;
   bir testte çağırın.
 - Showcase'deki izin talepleri bunu kullanır: taslak olarak kaydet, gönder, sonra onayla veya reddet.

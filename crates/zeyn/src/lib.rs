@@ -120,7 +120,7 @@ mod xlsx;
 pub use action::{
     Access, Action, ActionMeta, Aggregate, AggregateRequest, Ai, Cursor, DEFAULT_PAGE_SIZE,
     DataQuery, Error, Filter, MAX_FILTER_CHOICES, MAX_FILTER_TEXT, MAX_FILTERS, MAX_PAGE_SIZE,
-    Page, PageRequest, Result, Sort, Total,
+    Page, PageRequest, Result, Sort, Span, Total,
 };
 pub use api::{ApiEntry, ApiInput, ApiOutput, ApiResult, model_schema};
 #[cfg(feature = "assistant")]
@@ -145,8 +145,8 @@ pub use feature::{
 };
 #[cfg(feature = "server")]
 pub use files::{
-    DiskStore, FileChunks, FileEntry, FileMeta, FileScanner, FileStore, MemoryStore, ScanVerdict,
-    StoredFile,
+    DiskStore, FileAccess, FileChunks, FileEntry, FileMeta, FileScanner, FileStore, MemoryStore,
+    ScanVerdict, StoredFile,
 };
 pub use files::{
     File, FileRules, FileType, MAX_FIELD_FILES, MAX_FILE_NAME, MAX_UPLOAD_BYTES, SNIFF_BYTES,
@@ -190,7 +190,8 @@ pub use platform::{
 #[cfg(feature = "signed-licenses")]
 pub use platform::{LicenseError, SignedLicenseFile};
 pub use prefs::{
-    Choice, ClientPref, ClientPrefs, Consent, MAX_PREF_LIFETIME, PrefInfo, PrefKind, Purpose,
+    Choice, ClientPref, ClientPrefs, Consent, Draft, MAX_DRAFT_CHARS, MAX_DRAFTS,
+    MAX_PREF_LIFETIME, PrefInfo, PrefKind, Purpose,
 };
 #[doc(hidden)]
 pub use privacy::output as __privacy;
@@ -239,6 +240,8 @@ pub use xlsx::{MAX_XLSX_BYTES, XlsxReadError, XlsxSheet};
 pub use zeyn_macros::{action, choice, entity, model, params, screen, t};
 
 #[doc(hidden)]
+pub use feature::read_params as __read_params;
+#[doc(hidden)]
 pub use serde as __serde;
 #[doc(hidden)]
 pub use serde_json as __serde_json;
@@ -251,12 +254,28 @@ pub mod prelude {
     pub use crate::ui::{
         ActionButton, Alert, AlphaIndex, Audio, AutoGrid, Avatar, Badge, Breadcrumb, Busy, Card,
         CardGrid, Chart, Chips, Control, DateOptions, DescriptionList, Dock, Embed,
-        EmbedPermission, EmptyState, ExternalLink, Heading, Hero, Image, Kpi, LinkButton, List,
-        LookupItem, LookupQuery, MenuBar, MenuButton, MetaLine, Panel, Paragraph, Popover,
-        PrevNext, Progress, PropertyInspector, Rail, Reactions, RelativeTime, Row, SearchBox,
-        SearchParams, Share, Skeleton, Split, Spoiler, Stack, StatusBar, Tabs, Timeline, Toolbox,
-        Tree, TreeItem, TreeQuery, Video, WeekSchedule,
+        EmbedPermission, EmptyState, ExternalLink, Fit, Heading, Hero, Image, Kpi, LinkButton,
+        List, Listens, LookupItem, LookupQuery, MenuBar, MenuButton, MetaLine, Panel, Paragraph,
+        Placeholder, Popover, PrevNext, Progress, PropertyInspector, Rail, Reactions, RelativeTime,
+        Repeat, Row, SearchBox, SearchParams, Share, Skeleton, Split, Spoiler, Stack, StatusBar,
+        Tabs, ThemePicker, Timeline, Toolbox, Tree, TreeItem, TreeQuery, Video, WeekSchedule,
     };
+    pub use crate::ui::{
+        Barcode, Calendar, CalendarParams, CalendarSlot, CalendarView, CodeLang, CodeView,
+        DiffLayout, DiffView, Inbox, InboxSelection, JsonView, Kanban, NotificationCenter, QrCode,
+        QrLevel, UnreadCount,
+    };
+    pub use crate::ui::{
+        ChatSend, Composer, Delivery, MessageThread, ReplyRequest, SendKey, ThreadQuery,
+        TypingIndicator,
+    };
+    pub use crate::ui::{
+        Countdown, Facet, FacetPanel, Price, PriceUnit, ProductGallery, QuantityStepper,
+        RangeSlider, ReviewSummary, VariantGroup, VariantPicker,
+    };
+    pub use crate::ui::{Feed, Post, StoryRing, StoryRow, StoryState};
+    #[cfg(feature = "server")]
+    pub use crate::ui::{Reply, ReplySender};
     pub use crate::{
         Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime,
         Decimal, Effect, Entity, Error, Export, Feature, Field, File, FileRules, FileType, Form,

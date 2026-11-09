@@ -16,6 +16,7 @@ Zeyn は 2 つの側面のエージェントを想定して作られています
 | `zeyn_check` | コンパイルして問題を報告します。`fix: true` を付けると、先に名前が変わった API を書き換えます |
 | `zeyn_test` | `cargo test` を実行し、出力の末尾を返します |
 | `zeyn_new_feature` | Feature のフォルダを作成して登録します |
+| `zeyn_new_screen` | Feature に画面ファイルを追加して登録します |
 
 主な防御線はコンパイラです。コンパイラが強制できるすべてのルールには `compile_fail` テストと、エージェントが対処できるように書かれた `#[diagnostic::on_unimplemented]` のメッセージがあります。たとえば次のようなものです。
 

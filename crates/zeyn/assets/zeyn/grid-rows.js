@@ -98,13 +98,35 @@ function clearSelection(grid) {
 }
 
 /**
+ * Asks before a row or bulk action whose button carries `data-zeyn-confirm`, in the page's
+ * confirmation dialog (`zeyn:confirm`), or the browser's own when that script is missing.
+ * Resolves `true` at once for buttons without a question.
+ */
+function confirmed(button, s) {
+  const message = button?.dataset.zeynConfirm;
+  if (!message) return Promise.resolve(true);
+  const t = s?.texts ?? {};
+  return loadModule('components').then(() => new Promise((resolve) => {
+    const detail = {
+      title: t.confirm_title || '',
+      message,
+      ok: button.textContent.trim(),
+      cancel: t.confirm_cancel || 'Cancel',
+      danger: button.matches('.z-danger, .z-danger-button'),
+      resolve,
+    };
+    if (!ask('zeyn:confirm', detail)) resolve(window.confirm(message));
+  }));
+}
+
+/**
  * Runs a bulk action with `POST /_zeyn/grid/bulk`: the picked keys, or, when every matching row
  * is selected, the filters so the server collects the keys itself.
  */
 async function runBulk(button) {
   const grid = gridOfBar(button);
   const s = grid && grids.get(grid);
-  if (!s) return;
+  if (!s || !(await confirmed(button, s))) return;
   button.disabled = true;
   const r = await post(BASE + '/_zeyn/grid/bulk', {
     ...address(grid),
@@ -363,6 +385,7 @@ async function runRowItem(button, item) {
   const grid = (tr ?? button)?.closest('[data-zeyn-grid]');
   const key = tr?.dataset.zeynKey ?? button?.dataset.zeynKey;
   if (!grid || key == null) return;
+  if (!item && !(await confirmed(button, grids.get(grid)))) return;
   if (button?.tagName === 'BUTTON') button.disabled = true;
   const r = await post(BASE + '/_zeyn/grid/run', { ...address(grid), key, item: item ?? button.dataset.zeynRun });
   if (button?.isConnected && button.tagName === 'BUTTON') button.disabled = false;

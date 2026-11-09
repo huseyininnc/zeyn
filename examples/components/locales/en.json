@@ -6,6 +6,8 @@
     "search": "Search components",
     "start": "Start",
     "all": "All components",
+    "github": "Source on GitHub",
+    "project": "License and security",
     "none": "No component matches \"{q}\".",
     "show_code": "Show code",
     "copy": "Copy",
@@ -29,7 +31,11 @@
       "media": "Media",
       "feedback": "Feedback and overlays",
       "charts": "Charts",
-      "shell": "Shell"
+      "shell": "Shell",
+      "admin": "Admin",
+      "shop": "Shop",
+      "chat": "Chat",
+      "social": "Social"
     },
     "summary": {
       "stack": "Nodes one under the other with a gap.",
@@ -67,6 +73,7 @@
       "rail": "A row of cards that scrolls sideways.",
       "list": "Rows with an image, a title and meta text.",
       "search_box": "A search field with suggestions.",
+      "topics": "Filters and actions that refresh other parts of the screen in place.",
       "tree": "Branches loaded from the server as they open.",
       "week_schedule": "Seven day columns of rows from an action.",
       "image": "A picture with required alt text and size.",
@@ -80,6 +87,10 @@
       "toast": "A short notice after an action.",
       "chart": "Bar, donut, combo and gauge charts.",
       "kpi": "A number with its change and trend.",
+      "app_header": "A bar over the screens of the app shell, with a search box and links.",
+      "theme_picker": "The theme choice inside a screen, in step with the menu.",
+      "icon": "The icons of buttons, menus and tools.",
+      "screen_header": "The title row of a screen: a subtitle and the main actions.",
       "toolbox": "A group of tool buttons, one selected.",
       "status_bar": "A bar of short status texts.",
       "relative_time": "A moment shown as \"5 minutes ago\" in the page language.",
@@ -89,7 +100,27 @@
       "hero": "A large image section, with slides that move only when asked.",
       "reactions": "Reaction buttons with counts stored by an action.",
       "link_button": "A link to another page that looks like a button.",
-      "clear_prefs": "A button that removes the choices this browser keeps for the app."
+      "clear_prefs": "A button that removes the choices this browser keeps for the app.",
+      "diff_view": "The fields that changed in a record, old and new side by side or inline.",
+      "code_view": "Read only code and JSON, highlighted, numbered and folded on the server.",
+      "barcode": "Code 128 barcodes and QR codes drawn as SVG on the server.",
+      "inbox": "Notifications by day with bulk mark read and archive, and the bell with the unread count.",
+      "kanban": "Cards in columns of a workflow, moved by drag, a menu or the keyboard.",
+      "calendar": "Events in a month, week or day in the user time zone, with event windows and slots.",
+      "price": "A price with a struck old price, the percent off and a unit price.",
+      "range_slider": "Two handles over one track for price and date ranges.",
+      "quantity_stepper": "Minus and plus buttons around a number whose stock the server checks.",
+      "variant_picker": "Color swatches and size chips that change the price, photo and stock in place.",
+      "product_gallery": "Product photos with thumbnails, zoom, swipe and a full screen view.",
+      "facet_panel": "Counted filters, a price range and chosen filter chips that refresh product cards in place.",
+      "review_summary": "The average rating, the number of reviews and a bar for each star from 5 to 1.",
+      "countdown": "The time left until a moment on the server's clock, with an end state.",
+      "message_thread": "Chat bubbles by sender and day, delivery states, a history that loads as it scrolls, streamed AI replies.",
+      "composer": "A growing message box with send keys, attachments, @ mentions and drafts per conversation.",
+      "typing_indicator": "Who else is typing in a conversation, over the realtime channel.",
+      "story_ring": "An avatar in a ring that says whether its stories are new.",
+      "lightbox": "Images and videos that open full screen, with captions, zoom and swipes.",
+      "feed": "An endless stream of posts that holds new ones behind a button."
     },
     "ex": {
       "action_button": {
@@ -111,7 +142,8 @@
         "sizes": "Sizes"
       },
       "badge": {
-        "overview": "Example"
+        "overview": "Example",
+        "dots_and_counts": "Dots and counts"
       },
       "breadcrumb": {
         "overview": "Example"
@@ -121,16 +153,19 @@
       },
       "card": {
         "overview": "Example",
-        "nested": "With content"
+        "nested": "With content",
+        "action_and_footer": "Action and footer"
       },
       "card_grid": {
         "overview": "Example",
-        "pages": "Numbered pages"
+        "pages": "Numbered pages",
+        "fast_catalog": "A fast product catalog"
       },
       "chart": {
         "overview": "Example",
         "donut": "Donut",
-        "gauge": "Gauge"
+        "gauge": "Gauge",
+        "side_by_side": "Side by side, filling the width"
       },
       "chips": {
         "overview": "Filter chips",
@@ -143,7 +178,10 @@
         "overview": "Example"
       },
       "data_grid": {
-        "overview": "Example"
+        "overview": "Example",
+        "confirm_actions": "Row and bulk actions that ask first",
+        "numbers": "Numbers grouped by locale, a plain year",
+        "computed_million": "A million computed rows, built a page at a time"
       },
       "date_pickers": {
         "overview": "Example"
@@ -174,15 +212,33 @@
         "rotating": "Rotating slides"
       },
       "image": {
-        "overview": "Example"
+        "overview": "Example",
+        "progressive": "Placeholder and low resolution file",
+        "fallback": "Fallback and error",
+        "first_image": "The first image"
       },
       "image_card": {
         "overview": "Example",
         "horizontal": "Horizontal",
-        "with_preview": "With a hover preview"
+        "with_preview": "With a hover preview",
+        "with_price": "With a price"
+      },
+      "screen_header": {
+        "orders_page": "A page header"
+      },
+      "theme_picker": {
+        "overview": "An Appearance section"
+      },
+      "app_header": {
+        "catalog_header": "The header of this catalog"
+      },
+      "icon": {
+        "overview": "Every icon"
       },
       "kpi": {
-        "overview": "Example"
+        "overview": "Example",
+        "money": "Money",
+        "row_of_four": "A row of four, equal heights"
       },
       "line_editor": {
         "overview": "Example"
@@ -193,10 +249,14 @@
       "list": {
         "overview": "Example",
         "numbered_pages": "Numbered pages without a total",
-        "fixed": "Fixed items"
+        "fixed": "Fixed items",
+        "builder": "Rows built with any node, with a separator",
+        "virtual_rows": "Virtual scrolling with a fixed row height",
+        "repeat": "One node per item of an in memory list"
       },
       "lookup": {
-        "overview": "Example"
+        "overview": "Example",
+        "country_city": "Cities of the chosen country"
       },
       "markdown": {
         "overview": "Example"
@@ -240,7 +300,8 @@
       },
       "rating": {
         "overview": "Example",
-        "three_stars": "Three stars"
+        "three_stars": "Three stars",
+        "half_stars": "Half stars"
       },
       "reactions": {
         "overview": "Example"
@@ -291,12 +352,98 @@
       "toolbox": {
         "overview": "Example"
       },
+      "topics": {
+        "overview": "Filter chips that drive a KPI, a chart and a grid",
+        "select": "A select that drives the same listeners",
+        "date_range_and_search": "A date range and a search box that drive a list",
+        "refresh_after_an_action": "An action that refreshes a node"
+      },
       "tree": {
         "overview": "Example"
       },
       "week_schedule": {
         "overview": "Example"
+      },
+      "diff_view": {
+        "overview": "Example",
+        "inline": "Inline"
+      },
+      "code_view": {
+        "overview": "Example",
+        "rust": "Rust",
+        "json": "JSON"
+      },
+      "barcode": {
+        "overview": "Example",
+        "levels": "Error correction levels",
+        "digits": "Digits"
+      },
+      "inbox": {
+        "overview": "Example",
+        "bell": "Notification bell"
+      },
+      "kanban": {
+        "overview": "Example"
+      },
+      "calendar": {
+        "overview": "Example"
+      },
+      "price": {
+        "overview": "Example",
+        "unit_price": "Unit price",
+        "large": "On a product page"
+      },
+      "range_slider": {
+        "overview": "Example",
+        "dates": "Dates"
+      },
+      "quantity_stepper": {
+        "overview": "Example"
+      },
+      "variant_picker": {
+        "overview": "Example"
+      },
+      "product_gallery": {
+        "overview": "Example",
+        "dots": "Without thumbnails"
+      },
+      "facet_panel": {
+        "overview": "Example"
+      },
+      "review_summary": {
+        "overview": "Example",
+        "few": "A few reviews"
+      },
+      "countdown": {
+        "overview": "Example",
+        "short": "A minute and more"
+      },
+      "message_thread": {
+        "overview": "Example",
+        "ai_answer": "AI answer in Markdown",
+        "long": "Long history"
+      },
+      "composer": {
+        "overview": "Chat with conversations",
+        "assistant": "AI assistant style thread"
+      },
+      "typing_indicator": {
+        "overview": "Example"
+      },
+      "story_ring": {
+        "overview": "Example",
+        "row": "A row that scrolls sideways"
+      },
+      "lightbox": {
+        "overview": "Example",
+        "single": "A single image"
+      },
+      "feed": {
+        "overview": "Example"
       }
+    },
+    "typing": {
+      "realtime": "This catalog runs without the realtime channel, so the indicator stays empty and the composer sends no typing signals. In an app with App::realtime and the topic declared, the names of the others show here while they type."
     }
   }
 }

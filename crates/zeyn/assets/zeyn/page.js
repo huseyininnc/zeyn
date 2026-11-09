@@ -119,7 +119,7 @@ async function submitForm(form, submitter) {
   if (button) button.disabled = true;
   form.setAttribute('aria-busy', 'true');
   try {
-    const r = await post(BASE + '/_zeyn/form', { ...address(form), values: formValues(form) });
+    const r = await whilePending(() => post(BASE + '/_zeyn/form', { ...address(form), values: formValues(form) }));
     if (r.status === 422) showErrors(form, r.data?.errors ?? []);
     else if (r.ok) await runEffects(r.data?.effects, form);
   } finally {
@@ -213,7 +213,27 @@ async function changeTheme(select) {
   else delete root.dataset.zeynTheme;
   const meta = document.querySelector('meta[name="color-scheme"]');
   if (meta) meta.content = scheme || 'light dark';
+  for (const other of document.querySelectorAll('select[data-zeyn-theme-picker]')) {
+    if (other === select) continue;
+    other.value = select.value;
+    const shown = other.closest('.z-select')?.querySelector('.z-select-value');
+    if (shown && other.selectedOptions[0]) shown.textContent = other.selectedOptions[0].text;
+  }
   await post(BASE + '/_zeyn/theme', { theme: select.value });
+}
+
+/**
+ * Applies the chosen density at once (`data-density` on `<html>`), keeps every density picker in
+ * step, tells windowed lists to measure again (`zeyn:density`) and stores it with
+ * `POST /_zeyn/density`. Virtual grids take the new row height on the next page.
+ */
+async function changeDensity(select) {
+  const root = document.documentElement;
+  if (select.value === 'compact') root.dataset.density = 'compact';
+  else delete root.dataset.density;
+  for (const other of document.querySelectorAll('select[data-zeyn-density]')) if (other !== select) other.value = select.value;
+  document.dispatchEvent(new CustomEvent('zeyn:density'));
+  await post(BASE + '/_zeyn/density', { density: select.value });
 }
 
 /** Reads the page cookies into an object. */
@@ -308,6 +328,7 @@ async function syncAgentTools() {
       }
       let confirmed = false;
       if (tool.confirm) {
+        await loadModule('components');
         confirmed = await new Promise((resolve) => {
           if (!ask('zeyn:confirm', { ...texts, message: tool.description, danger: true, resolve })) resolve(false);
         });

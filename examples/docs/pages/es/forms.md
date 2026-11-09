@@ -27,6 +27,8 @@ Deja el nombre vacío o escribe un correo incorrecto y pulsa *Send*: el navegado
 | `.range(M::from, M::to)` | Dos fechas como un selector de rango |
 | `Form::auto(value)` | Todos los campos, en el orden de declaración |
 
+Los formularios miden como mucho 720 px de ancho, y una tarjeta o un panel que solo contiene un formulario es tan ancho como el formulario, así que ninguna mitad de la tarjeta queda vacía. Las etiquetas quedan 6 px por encima de entradas de 36 px; los campos están a 20 px unos de otros. Una entrada con foco recibe un borde en el color de foco y un anillo suave de 3 px; una inválida, un borde de peligro. Las unidades, la moneda y `%` se dibujan atenuados dentro de la entrada, y los campos numéricos ponen sus botones de menos y más (28 px) dentro del final del campo; las teclas de flecha siguen cambiando el valor.
+
 ## Guardado
 
 `.submit(label, action)` nombra la acción que guarda. La acción debe recibir `Valid<M>` para el modelo del formulario; cualquier otra cosa no compila. El runtime envía los valores, el servidor ejecuta todas las reglas y después la acción.
@@ -38,6 +40,52 @@ Deja el nombre vacío o escribe un correo incorrecto y pulsa *Send*: el navegado
 ## Controles
 
 Cada tipo de campo tiene un control por defecto: entradas de texto, entradas numéricas, dinero con la moneda, selectores de fecha y hora, casillas de verificación para `bool` y selects para choices. `.control(M::f, Control::...)` elige otro, y `.lookup(M::f, action)` busca registros en el servidor. Consulta [Controles y selectores](controls.md).
+
+## Lookups dependientes
+
+`.depends_on(field, source)` hace que las opciones del lookup `field` dependan de otro campo, como las ciudades de un país. Cada búsqueda envía el valor de `source` en `LookupQuery::parent` (`q.parent_id()` lo lee como un id), y al cambiar `source` se vacía `field`, así que sus opciones se cargan de nuevo para el valor nuevo.
+
+```rust
+#[action(permission = "geo.read")]
+pub async fn find_cities(q: LookupQuery, store: Cities) -> Result<Page<LookupItem>> {
+    Ok(q.apply(store.of_country(q.parent_id())))
+}
+
+Form::of(address)
+    .lookup(Address::country, find_countries)
+    .lookup(Address::city, find_cities)
+    .depends_on(Address::city, Address::country)
+    .submit(t!("save"), save_address)
+```
+
+No se puede confiar el par al navegador, así que al enviar el servidor vuelve a preguntar a la action del lookup por la ciudad elegida con el país enviado, con el permiso de la action, y rechaza con un error de campo una ciudad que no devuelve. Filtra por el padre también en las consultas por id, como hace `q.apply` después de filtrar. `App::check_page` informa de un `depends_on` cuyo campo no es un lookup del formulario o cuyo origen no es otro campo del formulario.
+
+## Formularios de filtro
+
+Un formulario sin botón de envío puede filtrar la pantalla: `.drives(topic)` convierte sus campos en params de la pantalla. Cuando un campo cambia (un select, un rango de fechas, un campo de texto con Enter), su valor pasa al param de la pantalla con el mismo nombre, la dirección se mantiene al día y los nodos que `.listens(topic)` se refrescan en su sitio y leen el valor de sus params (consulta [Topics](effects.md#topics)). Los números y los booleanos se envían como tales y los campos vacíos como `null`; el servidor lee los params como los params tipados de la pantalla, así que un valor que no encaja se rechaza.
+
+```rust
+#[params]
+pub struct SalesParams {
+    pub region: Option<Region>,
+    pub from: Option<Date>,
+    pub to: Option<Date>,
+}
+
+#[screen(route = "/sales", permission = "sales.read")]
+pub fn sales(p: SalesParams, store: Sales) -> Screen {
+    Screen::new(t!("sales.title"))
+        .body(
+            Form::of(SalesFilter { region: p.region, from: p.from, to: p.to })
+                .field(SalesFilter::region)
+                .range(SalesFilter::from, SalesFilter::to)
+                .drives("sales"),
+        )
+        .body(Kpi::new(t!("sales.total"), store.total(&p)).listens("sales"))
+}
+```
+
+Un formulario con `submit` no puede conducir; en su lugar, refresca después de guardar con `ui.refresh(topic)` en `on_success`.
 
 ## Campos de solo lectura
 
@@ -59,6 +107,8 @@ Feature::new("support")
 
 Form::of(ticket).field(Ticket::title).file(Ticket::attachments, ATTACHMENTS)
 ```
+
+Un nombre de permiso permite a los mismos usuarios subir y descargar. Para que los lectores abran archivos que no pueden añadir, divídalo: `.files(ATTACHMENTS, FileAccess::read("support.ticket.read").write("support.ticket.files"), store)`.
 
 El control es una entrada de archivo nativa dentro de una zona de arrastre. Cada archivo se sube por separado con una barra de progreso, se puede cancelar mientras se ejecuta, reintentar si falló y quitar cuando termina. Las imágenes muestran una vista previa hecha a partir de una URL de objeto del archivo elegido. El progreso y los resultados se anuncian en una región en vivo educada. El showcase tiene un ejemplo funcional en `/uploads`; este sitio de documentación no tiene ningún usuario con sesión iniciada, así que no muestra ninguna subida en vivo.
 

@@ -22,7 +22,7 @@ Stack::new()
 
 ## Badge
 
-`Badge::new(text).tone(Tone::...)`。トーンは `Neutral`、`Info`、`Success`、`Warning`、`Danger`、`Brand` です。グリッドは `.badge(|v| tone)` で値をバッジとして表示します。
+`Badge::new(text).tone(Tone::...)`。トーンは `Neutral`、`Info`、`Success`、`Warning`、`Danger`、`Brand` です。トーン付きのバッジは、トーンの文字をその淡い色の上に表示します。`Neutral` は輪郭線が 1 本の淡色のラベルで、プランのような普通の値に使います。`.dot()` は通常の文字の前にトーンの 8 px の点を描き、一覧でステータスを示す控えめな形になります。`.count()` は数値用の丸いピルを描きます。グリッドは `.badge(|v| tone)` で値をバッジとして、`.status(|v| tone)` で点として表示します。
 
 ## Progress
 
@@ -67,7 +67,7 @@ LinkButton::new(t!("cart.browse"), products, ()).primary()
 
 ## ActionButton
 
-`ActionButton::new(label, action, input)` はアクションを実行します。`.confirm(text)` は先に確認を求め、`.tone(Tone::Danger)` は破壊的な操作であることを示し、`.on_success(|result, ui| ...)` はエフェクトを実行します。入力はサーバー上で固定され、クライアントから来ることはありません。アクションの権限は、他のフォームと同様にサーバー上で検査されます。
+`ActionButton::new(label, action, input)` はアクションを実行します。`.confirm(text)` は先に確認を求め、`.tone(Tone::Danger)` は破壊的な操作であることを示し、`.on_success(|result, ui| ...)` はエフェクトを実行します。入力はサーバー上で固定され、クライアントから来ることはありません。アクションの権限は、他のフォームと同様にサーバー上で検査されます。 `.tone(Tone::Brand)` はカードなど、その領域の主要な操作として描画します。
 
 ```rust
 ActionButton::new(t!("docs.live.count"), count_samples, ())
@@ -140,6 +140,32 @@ Image::new("https://images.example.com/logo.png")
 - `src` は、アプリ上のパス（`/static/logo.png`）か、アプリの `img-src` にあるホストの `https` アドレス（`App::csp(|c| c.img_src([...]))`）です。それ以外の画像はレンダリングされず、代わりに代替テキストが表示されるため、ブラウザがブロックされたリクエストをログに残すことはありません。
 - すべての画像に `decoding="async"` が付きます。`.lazy()` は、画面の下にある画像に `loading="lazy"` を追加します。`srcset` は密度（`2x`）または幅（`800w`）の記述子を受け取ります。他のホストのエントリや他の記述子のエントリは除外されます。幅の記述子は、画像の幅から `sizes` を追加します。
 - 純粋に装飾的な画像には、空の代替テキストを指定します: `.alt(Text::from(""))`。
+
+### 写真の長いリスト
+
+何千枚もの商品写真があるカタログでは、画像は読み込み中に何かを表示し、失敗したときに回復できます。すべてブラウザーの標準機能を使い、メディアモジュールの 1 つのリスナーがページ上のすべての画像を扱います。
+
+```rust
+Image::new(p.photo_800.clone())
+    .alt(p.name.clone())
+    .size(400, 500)
+    .lazy()
+    .srcset([(p.photo_400.as_str(), "400w"), (p.photo_800.as_str(), "800w")])
+    .sizes("(min-width: 800px) 25vw, 50vw")
+    .placeholder(Placeholder::color("#d9dde3"))
+    .low(p.photo_40.clone())
+    .fallback("/static/no-photo.webp")
+    .on_error(t!("shop.no_photo"))
+    .fit(Fit::Cover)
+```
+
+- `.placeholder(...)` は、ファイルの読み込み中にスクリプトなしでボックスを埋めます。`Placeholder::color("#d9dde3")` またはテーマトークン（`"--z-surface-2"`）、アプリが作った小さな画像には `Placeholder::blur(data_uri)`（600 バイト以下の base64 の `data:image/webp`、`avif`、`jpeg`、`png` の URI。SVG は使えません）、すべての画像で共有する 1 つのファイルには `Placeholder::image(src)` を使います。規則に反するプレースホルダーは除外されます。
+- `.low(src)` は、小さな低解像度のファイルをフルサイズのファイルの下にすぐ表示します。フルサイズのファイルは同時に読み込まれ（画像が遅延読み込みなら遅延して）、準備ができるとフェードインします。視差効果を減らす設定では、フェードなしで表示されます。
+- `.fallback(src)` は、画像が失敗したときに別のファイルを 1 回だけ試します。その後は `.on_error(text or component)` が表示され、指定がなければプレースホルダーの上にアイコン付きの代替テキストが表示されます。再試行はしません。
+- `.priority()` は、訪問者が最初に見る画像（最大のペイント）を示します。`loading="eager"` と `fetchpriority="high"` が付き、遅延読み込みにはなりません。1 ページに 1 回だけ使ってください。
+- `.sizes(...)` は、レイアウト上の画像の幅を伝え、ブラウザーが適切な `srcset` の幅を選べるようにします。指定がなければ、遅延読み込みの画像には `sizes="auto"` が付き、ブラウザーが枠を測ります。
+- `.fit(Fit::Cover)` はボックスを埋め、はみ出した部分を切り取ります。`Fit::Contain` はファイル全体を表示します。
+- `low`、`fallback`、`Placeholder::image` は `src` と同じアドレス規則に従い、それ以外は除外されます。ボックスは常に画像のサイズを保つため、ファイルの読み込み中や失敗時にも何も動きません。
 
 ## ExternalLink
 

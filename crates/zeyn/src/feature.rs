@@ -11,6 +11,8 @@ use std::sync::Arc;
 pub struct MenuItem {
     pub label: Text,
     pub screen: &'static str,
+    /// The icon before the label in the side menu, set with [`Menu::icon`].
+    pub icon: Option<Icon>,
 }
 
 /// Menu group.
@@ -59,7 +61,35 @@ impl Menu {
         group.items.push(MenuItem {
             label: label.into(),
             screen: S::META.name,
+            icon: None,
         });
+        self
+    }
+
+    /// The icon of the last added item, drawn before its label in the side menu. When the items
+    /// of a group have icons, the group's label is drawn without its own.
+    ///
+    /// ```
+    /// use zeyn::prelude::*;
+    ///
+    /// #[screen(route = "/orders", public)]
+    /// pub fn orders() -> Screen { Screen::new("Orders") }
+    ///
+    /// let feature = Feature::new("shop").screen(orders).menu(|m| {
+    ///     m.group("Commerce", Icon::Cart)
+    ///         .item("Orders", orders)
+    ///         .icon(Icon::Cart)
+    /// });
+    /// assert!(feature.menu_groups()[0].items[0].icon.is_some());
+    /// ```
+    pub fn icon(mut self, icon: Icon) -> Self {
+        if let Some(item) = self
+            .groups
+            .last_mut()
+            .and_then(|g| g.items.last_mut())
+        {
+            item.icon = Some(icon);
+        }
         self
     }
 }
@@ -139,9 +169,23 @@ impl ScreenEntry {
 }
 
 fn build_erased<S: ScreenDef>(ctx: Ctx, params: serde_json::Value) -> BoxFuture<Result<Screen>> {
-    match serde_json::from_value::<S::Params>(params) {
-        Ok(p) => S::build(ctx, p),
-        Err(_) => Box::pin(async { Err(Error::NotFound) }),
+    match read_params::<S::Params>(params) {
+        Some(p) => S::build(ctx, p),
+        None => Box::pin(async { Err(Error::NotFound) }),
+    }
+}
+
+/// Reads screen params. A screen opened without any (a menu link, a plain address) gets `null`;
+/// when its params do not read from `null`, they are read from `{}`, so a `#[params]` struct
+/// whose fields are all `Option` opens with every field `None`.
+pub fn read_params<P: serde::de::DeserializeOwned>(params: serde_json::Value) -> Option<P> {
+    let none = params.is_null();
+    match serde_json::from_value(params) {
+        Ok(p) => Some(p),
+        Err(_) if none => {
+            serde_json::from_value(serde_json::Value::Object(Default::default())).ok()
+        }
+        Err(_) => None,
     }
 }
 
@@ -163,6 +207,8 @@ pub struct Feature {
     searches: Vec<crate::command::Search>,
     sitemap: Option<crate::seo::Sitemap>,
     site: Option<crate::site::SiteShell>,
+    /// Screens of this feature that open in the sign in shell while the others keep theirs.
+    auth: Option<(crate::site::SiteShell, Vec<&'static str>)>,
     #[cfg(feature = "server")]
     files: Vec<crate::files::FileEntry>,
     #[cfg(feature = "server")]
@@ -183,6 +229,7 @@ impl Feature {
             sitemap: None,
             media: Vec::new(),
             site: None,
+            auth: None,
             #[cfg(feature = "server")]
             files: Vec::new(),
             #[cfg(feature = "server")]
@@ -313,8 +360,10 @@ impl Feature {
     }
 
     /// Keeps uploads for fields with these `rules` in `store`, served at
-    /// `/_zeyn/files/{rules.store()}`. Uploading and downloading need `permission` and the
-    /// feature's guards. The store name must be unique in the app.
+    /// `/_zeyn/files/{rules.store()}`. Uploading and downloading need `access` and the
+    /// feature's guards: a permission name for both, or
+    /// [`FileAccess::read`](crate::files::FileAccess::read) with `.write(..)` for a separate
+    /// upload permission. The store name must be unique in the app.
     ///
     /// ```ignore
     /// Feature::new("crm").files(CONTRACTS, "crm.contract.write", DiskStore::new("data/contracts"))
@@ -323,13 +372,13 @@ impl Feature {
     pub fn files(
         mut self,
         rules: crate::files::FileRules,
-        permission: &'static str,
+        access: impl Into<crate::files::FileAccess>,
         store: impl crate::files::FileStore,
     ) -> Self {
         self.files
             .push(crate::files::FileEntry {
                 rules,
-                permission,
+                access: access.into(),
                 store: Arc::new(store),
             });
         self
@@ -395,6 +444,27 @@ impl Feature {
     /// The site shell, when the feature chose it.
     pub fn site_shell(&self) -> Option<&crate::site::SiteShell> {
         self.site.as_ref()
+    }
+
+    /// Opens the named screens of this feature in `shell` (a [`crate::Shell::auth`]); the others
+    /// keep the feature's shell. For the sign in screens of a feature that also has work screens.
+    #[cfg(feature = "accounts")]
+    pub(crate) fn auth_screens(
+        mut self,
+        shell: crate::site::SiteShell,
+        screens: Vec<&'static str>,
+    ) -> Self {
+        self.auth = Some((shell, screens));
+        self
+    }
+
+    /// The shell a screen of this feature opens in: its sign in shell, the feature's site shell,
+    /// or `None` for the app shell.
+    pub(crate) fn shell_of(&self, screen: &str) -> Option<&crate::site::SiteShell> {
+        match &self.auth {
+            Some((shell, names)) if names.contains(&screen) => Some(shell),
+            _ => self.site.as_ref(),
+        }
     }
 
     pub fn menu_groups(&self) -> &[MenuGroup] {

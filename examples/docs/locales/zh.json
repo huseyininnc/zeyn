@@ -1,6 +1,7 @@
 {
   "docs": {
     "app": "Zeyn 文档",
+    "github": "GitHub 上的源代码",
     "missing": "此页面不存在。",
     "on_this_page": "本页内容",
     "pager": "上一页和下一页",
@@ -11,7 +12,8 @@
       "language": "语言",
       "components": "组件",
       "guides": "指南",
-      "reference": "参考"
+      "reference": "参考",
+      "project": "项目"
     },
     "live": {
       "label": "在线示例",
@@ -57,6 +59,9 @@
       "content": "文本与内容",
       "data_views": "树与图表",
       "catalog": "卡片、横向滚动栏与搜索",
+      "admin": "管理视图",
+      "commerce": "商店组件",
+      "chat": "聊天",
       "shell": "Shell 和命令",
       "media": "媒体",
       "time_i18n": "时间与语言",
@@ -76,7 +81,9 @@
       "realtime": "实时通道和 CRDT",
       "desktop": "桌面应用",
       "protocol": "运行时协议",
-      "database_reference": "数据库参考"
+      "database_reference": "数据库参考",
+      "about": "源代码、许可证与安全",
+      "social": "社交"
     },
     "translation": {
       "note": "本页译自英文。",

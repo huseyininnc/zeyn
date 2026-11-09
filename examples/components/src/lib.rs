@@ -14,15 +14,48 @@ use zeyn::ui::SearchParams;
 
 include!(concat!(env!("OUT_DIR"), "/api.rs"));
 
+/// The params of every component page. Examples whose filters drive other nodes keep their
+/// values here, so the listeners read them from the screen params; the other examples ignore
+/// them.
+#[params]
+#[derive(Default)]
+pub struct Demo {
+    pub kind: Option<data::Kind>,
+    pub from: Option<Date>,
+    pub to: Option<Date>,
+    pub q: Option<String>,
+    pub view: Option<zeyn::ui::CalendarView>,
+    pub date: Option<Date>,
+    pub min_price: Option<i64>,
+    pub max_price: Option<i64>,
+    pub color: Option<String>,
+    pub size: Option<String>,
+    #[serde(default)]
+    pub kinds: Vec<String>,
+    pub room: Option<String>,
+}
+
 /// One live example: the function of the component's file that builds it.
 pub struct Example {
     pub func: &'static str,
-    pub build: fn(&Ctx) -> Node,
+    pub build: fn(&Ctx, &Demo) -> Node,
 }
 
-/// An [`Example`] of the function `f` of the current file.
+/// An [`Example`] of the function `f(ctx)` of the current file.
 #[macro_export]
 macro_rules! ex {
+    ($f:ident) => {
+        $crate::Example {
+            func: stringify!($f),
+            build: |ctx, _| $f(ctx),
+        }
+    };
+}
+
+/// An [`Example`] of the function `f(ctx, demo)` of the current file, which reads the page's
+/// params.
+#[macro_export]
+macro_rules! exd {
     ($f:ident) => {
         $crate::Example {
             func: stringify!($f),
@@ -61,13 +94,29 @@ impl Component {
     }
 }
 
+/// The params type of a catalog page: `()` unless the entry names one.
+macro_rules! page_params {
+    () => {
+        ()
+    };
+    ($p:ty) => {
+        $p
+    };
+}
+
+impl From<()> for Demo {
+    fn from(_: ()) -> Demo {
+        Demo::default()
+    }
+}
+
 macro_rules! catalog {
-    ($( $cat:literal $icon:ident { $( $slug:ident $route:literal ; )* } )*) => {
+    ($( $cat:literal $icon:ident { $( $slug:ident $route:literal $( ($p:ty) )? ; )* } )*) => {
         $( $(
             #[doc = concat!("The page of `", stringify!($slug), "`.")]
             #[screen(route = $route, public)]
-            pub fn $slug(_: (), ctx: Ctx) -> Screen {
-                page::component_screen(stringify!($slug), &ctx)
+            pub fn $slug(demo: page_params!($($p)?), ctx: Ctx) -> Screen {
+                page::component_screen(stringify!($slug), &ctx, &Demo::from(demo))
             }
         )* )*
 
@@ -95,7 +144,7 @@ macro_rules! catalog {
 }
 
 catalog! {
-    "layout" Table {
+    "layout" Dashboard {
         stack "/ui/stack";
         row "/ui/row";
         card "/ui/card";
@@ -103,13 +152,15 @@ catalog! {
         tabs "/ui/tabs";
         split "/ui/split";
         auto_grid "/ui/auto-grid";
+        screen_header "/ui/screen-header";
     }
-    "text" Edit {
+    "text" FileText {
         heading "/ui/heading";
         paragraph "/ui/paragraph";
         meta_line "/ui/meta-line";
         badge "/ui/badge";
         avatar "/ui/avatar";
+        icon "/ui/icon";
         description_list "/ui/description-list";
         timeline "/ui/timeline";
         markdown "/ui/markdown";
@@ -144,15 +195,26 @@ catalog! {
         rail "/ui/rail";
         list "/ui/list";
         search_box "/ui/search-box";
+        topics "/ui/topics" (Demo);
         tree "/ui/tree";
         week_schedule "/ui/week-schedule";
     }
-    "media" Box {
+    "shop" Cart {
+        price "/ui/price";
+        range_slider "/ui/range-slider" (Demo);
+        quantity_stepper "/ui/quantity-stepper";
+        variant_picker "/ui/variant-picker" (Demo);
+        product_gallery "/ui/product-gallery";
+        facet_panel "/ui/facet-panel" (Demo);
+        review_summary "/ui/review-summary";
+        countdown "/ui/countdown";
+    }
+    "media" Image {
         image "/ui/image";
         embed "/ui/embed";
         hero "/ui/hero";
     }
-    "feedback" Plus {
+    "feedback" Bell {
         alert "/ui/alert";
         progress "/ui/progress";
         skeleton "/ui/skeleton";
@@ -163,13 +225,33 @@ catalog! {
         clear_prefs "/ui/clear-prefs";
         reactions "/ui/reactions";
     }
-    "charts" Chart {
+    "charts" ChartBar {
         chart "/ui/chart";
         kpi "/ui/kpi";
     }
-    "shell" Box {
+    "shell" Sidebar {
         toolbox "/ui/toolbox";
         status_bar "/ui/status-bar";
+        app_header "/ui/app-header";
+        theme_picker "/ui/theme-picker";
+    }
+    "admin" Settings {
+        diff_view "/ui/diff-view";
+        code_view "/ui/code-view";
+        barcode "/ui/barcode";
+        inbox "/ui/inbox";
+        kanban "/ui/kanban";
+        calendar "/ui/calendar" (Demo);
+    }
+    "chat" Message {
+        message_thread "/ui/message-thread";
+        composer "/ui/composer" (Demo);
+        typing_indicator "/ui/typing-indicator";
+    }
+    "social" Users {
+        story_ring "/ui/story-ring";
+        lightbox "/ui/lightbox";
+        feed "/ui/feed";
     }
 }
 
@@ -244,9 +326,27 @@ pub fn feature() -> Feature {
     with_screens(
         Feature::new("components")
             .screen(catalog_home)
-            .screen(examples::image_card::product),
+            .screen(examples::image_card::product)
+            .screen(examples::card_grid::large_catalog)
+            .screen(examples::card_grid::live_catalog)
+            .screen(examples::screen_header::orders_page)
+            .screen(examples::calendar::appointment)
+            .screen(examples::shop::shop_listing)
+            .screen(examples::shop::shop_product)
+            .files(
+                examples::composer::CHAT_FILES,
+                "catalog.demo",
+                examples::composer::FILES.clone(),
+            )
+            .screen(examples::feed::social_demo),
     )
 }
+
+/// Writes one visitor may make per minute to the shared sample stores of the examples (Kanban
+/// moves, inbox read and archive, calendar slots, cart quantities, ratings, chat messages,
+/// uploads and AI replies): every `POST /_zeyn/data`, `POST /_zeyn/stream`, form submit and
+/// upload counts.
+pub const WRITES_PER_MINUTE: u32 = 60;
 
 /// The catalog app.
 pub fn app() -> std::result::Result<App, String> {
@@ -256,11 +356,20 @@ pub fn app() -> std::result::Result<App, String> {
     Ok(App::new(t!("cx.app"))
         .i18n(i18n)
         .csp(|c| c.frame_src(["https://www.openstreetmap.org"]))
+        .auth(|_: &axum::http::HeaderMap| {
+            Some(zeyn::Identity::user("visitor").with_permissions(["catalog.demo"]))
+        })
+        .write_limit(zeyn::RateLimit::per_ip(
+            WRITES_PER_MINUTE,
+            std::time::Duration::from_secs(60),
+        ))
         .home(catalog_home)
+        .header(examples::app_header::catalog_header)
         .prefetch(zeyn::Prefetch::Moderate)
         .client_prefs(|p| {
             p.key(examples::tabs::DELIVERY_TAB)
                 .key(examples::embed::MAP_NOTICE)
+                .key(examples::composer::CHAT_DRAFT)
         })
         .feature(feature()))
 }

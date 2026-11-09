@@ -26,11 +26,31 @@ pub fn gauge(_ctx: &Ctx) -> Node {
         .into()
 }
 
+pub fn side_by_side(_ctx: &Ctx) -> Node {
+    Row::new()
+        .col(
+            Card::new().add(
+                Chart::area("Visits")
+                    .labels(["Mon", "Tue", "Wed", "Thu", "Fri"])
+                    .series("Visits", [320.0, 410.0, 380.0, 460.0, 520.0]),
+            ),
+        )
+        .weight(2)
+        .col(
+            Card::new().add(
+                Chart::donut("Orders by status")
+                    .labels(["Paid", "Sent", "Returned"])
+                    .series("Orders", [62.0, 30.0, 8.0]),
+            ),
+        )
+        .into()
+}
+
 /// What the catalog shows of `Chart`.
 pub const ENTRY: Entry = Entry {
     name: "Chart",
     docs: "components/data",
     api: &["Chart"],
     overview: &[ex!(overview)],
-    examples: &[ex!(donut), ex!(gauge)],
+    examples: &[ex!(donut), ex!(gauge), ex!(side_by_side)],
 };

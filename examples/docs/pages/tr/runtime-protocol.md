@@ -38,7 +38,28 @@ Menü yalnızca geçerli kullanıcının açabileceği ekranları listeler. Geç
 
 Head içindeki her framework script'i ve stil dosyası `?v=` ile build kimliğini taşır (`meta[name=zeyn-build]`; `ZEYN_BUILD_ID`'den ya da çalıştırılabilir dosyanın hash'inden gelir); `theme.css` tema metninin hash'ini taşır. Güncel değerli bir istek `Cache-Control: public, max-age=31536000, immutable` alır, bu yüzden sıcak bir sayfa yüklemesi bunların hiçbirini istemez; başka her istek (bir dağıtımdan sonra eski bir sekme, `v` yok) `no-cache` ve ETag alır. Çalışma zamanının sonradan import ettiği modüller, onları import eden script'in URL'sinden aynı `v` değerini alır.
 
-Her sayfa `zeyn.js` (istekler, efektler, pencereler, formlar, menüler, kısayollar ve olay delegasyonu), `nav.js`, `components.js` ve uygulama kabuğunda `pro.js` ile `enterprise.js` dosyalarını yükler. Geri kalanı yalnızca onu kullanan sayfalarda yüklenir; `nav.js` bir ekranı yerine koyduğunda da böyledir: `zeyn.js`, içerik ilk kez bir `[data-zeyn-grid]` taşıdığında grid çalışma zamanı `grid.js` dosyasını import eder (grid içeren tam sayfalar onu `<link rel="modulepreload">` içinde belirtir), `components.js` ise `catalog.js` (kart gridleri, arama kutuları), `media.js` (oynatıcılar, gömülü içerik), `files.js` (yüklemeler), `charts.js` ve `assistant.js` (sohbet panelleri ya da başlatıcının ilk basışı) dosyalarını import eder. Stil dosyaları head içinde kalır, bu yüzden script geldiğinde görünüm değişmez. Showcase panosunda bu, 9 script ve 403 KB (116 KB) yerine 5 script ve 258 KB (ağda 74 KB) demektir.
+### 1.1 Browser modules
+
+Bir sayfa yalnızca ekranının kullandığı tarayıcı kodunu yükler ve çalıştırır. Her sayfa çekirdeği çalıştırır: `zeyn.js` (istekler, efektler, pencereler, formlar, menüler, kısayollar, olay delegasyonu ve modül yükleyici), `nav.js` ve `enterprise.js` (`fetch` üzerindeki yanıt kancaları ve oturumun boşta kalma süresi); hepsi birlikte 90 KB ham, 29 KB gzip. Geri kalan her şey bir bileşenin modülüdür: `/_zeyn/{name}.js` ve bazıları için `/_zeyn/{name}.css`. Modüller `crates/zeyn/src/server/modules.rs` içindeki `MODULES` listesinde, HTML'lerinin taşıdığı işaretlerle tanımlanır: öznitelik adları (`data-zeyn-date`) ve sınıflar (`z-select`), tam ad olarak eşlenir.
+
+| Modül | Bileşenler |
+|---|---|
+| `components.js` | her kontrol modülünün import ettiği ortak bölüm: yardımcılar, açılır pencere ve liste kutusu çekirdekleri, seçim kutuları (uygulama kabuğunun seçicileri), onay pencereleri, uyarılar, içerik yolu |
+| `tabs.js`, `dates.js`, `choices.js`, `inputs.js`, `lines.js`, `steps.js`, `tree.js`, `overlays.js`, `menubutton.js`, `busy.js` | paneller, sekmeler ve bölünmüş alanlar; tarih ve saat seçiciler (grid tarih filtreleri dahil); liste kutuları, aramalı seçimler ve çoklu seçimler; sayılar, büyüyen metin alanları, maskeler ve parolalar; satır düzenleyici; adımlı formlar; ağaçlar; ipuçları ve açılır kutular; menü ve bölünmüş düğmeler; meşgul katmanları |
+| `grid.js` | gridler; `zeyn.js` onu kendisi import ettiği için `<link rel="modulepreload">` olarak bağlanır |
+| `palette.js`, `pro.js` | komut paleti ve komut düğmeleri; menü çubukları, araç kutuları, durum çubukları, yerleştirme panelleri ve özellik denetçileri |
+| `forms.js`, `reveal.js`, `import.js` | formların taslakları ve iş akışı geçişleri; maskeli değerleri gösterme; içe aktarmalar |
+| `catalog.js`, `media.js`, `files.js`, `charts.js` ve stil dosyaları | kart gridleri, raylar ve arama kutuları; oynatıcılar, gömülü içerik ve görseller; yüklemeler; grafikler, mini grafikler, KPI kartları ve bullet grafikler |
+| `share.js`, `chips.js`, `reactions.js`, `hero.js`, `state.js`, `preview.js`, `assistant.js` | paylaşım düğmeleri, filtre çipleri, tepkiler, hero slaytları, tercih deposu, kart önizlemeleri (ilk üzerine gelme), asistan (sohbet panelleri ya da başlatıcının ilk basışı) |
+| `topics.js`, `vlist.js` | topic dinleyen node'lar ve onları süren kontroller (`data-zeyn-listens`, `data-zeyn-drives`); sanal listeler (`data-zeyn-vlist`) |
+| `inbox.js`, `kanban.js`, `calendar.js` and their stylesheets, `diff.css`, `code.css`, `barcode.css` | gelen kutusu ve bildirim zili; Kanban panoları; takvimler; betik gerektirmeyen farklar, kod görünümleri ve barkodlar (kod görünümünün kopyalama düğmesi `share.js` içindedir) |
+| `range.js`, `quantity.js`, `gallery.js`, `countdown.js` ve `commerce.css` | aralık kaydırıcıları, adet seçiciler, ürün galerileri ve geri sayımlar; tüm mağaza bileşenlerinin stil dosyası (fiyatlar, varyant seçiciler, facet panelleri, değerlendirme özetleri) |
+| `thread.js` ve `thread.css`, `stream.js`, `composer.js` ve `composer.css`, `typing.js` ve `typing.css` | mesaj thread'leri; thread'ler ile asistanın paylaştığı akan Markdown ve JSON satırları; sohbet composer'ları; yazıyor göstergeleri |
+| `feed.js`, `lightbox.js` and their stylesheets, `stories.css` | gönderi akışları; resim ve videoların lightbox'ı; hikâye halkaları ve sıraları, betik gerektirmez |
+
+Tam bir sayfa, head içinde her sayfanın kullandığı stil dosyalarını (`zeyn.css`, `components.css`, `content.css`, `pro.css`, `enterprise.css`), işaretleri HTML'inde bulunan modüllerin stil dosyalarını ve onların scriptlerini, import ettikleri modüllerden sonra bağlar. `zeyn.js` aynı tabloyla (`[name, script selector, style selector]`) sunulur ve sonradan gelen içerik için eksik olanı yükler: `nav.js` bir ekranı yerine koymadan önce `{ root, waits }` ile `zeyn:need` olayını gönderir ve yeni stil dosyalarını bekler, pencereler açılmadan önce aynı şekilde bekler; `zeyn:content`, grid sayfaları ve grid filtreleri taşıdıklarının scriptlerini yükler. Tarayıcı her URL için tek bir örnek tutar, bu yüzden bir modül bir kez çalışır. Bir modül çalıştığında belgede bulduklarını kurar, ardından `zeyn:content` olayını dinler; sayfada olmayan bileşenleri asla taramaz ve onlar için dinlemez. Modüller ortak bölümü kendi URL'lerinin `?v=` değeriyle import eder. `tests/ui_modules.rs`, bir sayfa kullanmadığı bir modülü bağladığında ya da bir modül stil dosyası işaretlerinin dışındaki bir sınıfa stil verdiğinde başarısız olur.
+
+Showcase üzerinde ölçüldü (ham, gzip ile ağda): yalnızca metin olan bir sayfa 269 KB (80 KB) yerine 132 KB (46 KB) script, bir grid sayfası 357 KB (106 KB) yerine 223 KB (74 KB), bir form sayfası 269 KB (80 KB) yerine 186 KB (65 KB) yükler; her sayfa 177 KB (44 KB) yerine 151 KB (35 KB) stil yükler. Bileşen kataloğu gibi her bileşeni taşıyan bir sayfa öncekinden daha çok dosya yükler (41 yerine 68 istek, ham 774 KB yerine 836 KB), çünkü her modül ayrı bir dosyadır.
 
 ## 2. Screen markup
 
@@ -177,6 +198,8 @@ Runtime:
 - Klavye: Ok tuşları, Page Up, Page Down, Home ve End etkin satırı taşır ve görünüme kaydırır. Tabloda `aria-rowcount` = total, her satırda `aria-rowindex` bulunur.
 - Konum metni (`data-zeyn-page-info`) `data-zeyn-text-range-total` değerini kullanır.
 
+Kart ızgaraları (`zeyn::ui::CardGrid`; şeritler veya satır listeleri değil) 200 karta ulaştığında bir kaydırma kapsayıcısı yerine sayfanın kendi kaydırmasında pencereleme yapar: `catalog.js` listeyi `data-zeyn-window` ile işaretler, içinde görüntü alanına en fazla 800 px uzaklıktaki satırları tutar ve üstteki ile alttaki satırları dolguya çevirir, her satıra ilk kartların en uzununun yüksekliğini verir (`grid-auto-rows`) ve her kartta `aria-posinset` ile `aria-setsize` değerlerini ayarlar (daha fazla sayfa gelebilecekken `-1`). Pencerenin dışındaki odaklı bir kart `z-cards-kept` ile DOM'da kalır ve kendi hücresinin üzerine yerleştirilir. "Show more" ile veya başka bir sayfadan gelen kartlar aynı pencereye katılır. Sayfa ms başına 3 px'ten hızlı kayarken kartlar görselleri bekletilerek gelir (`data-zeyn-park`; `src` ve `srcset` bir kenarda tutulur) ve 120 ms boyunca kaydırma olmayınca görsellerini geri alır.
+
 ### 4.3 Form submit
 
 `POST /_zeyn/form`
@@ -249,11 +272,12 @@ Her yanıt `x-zeyn-build` taşır. Runtime'ın üzerinde işlem yaptığı retle
 - Klavye: ok tuşları grid satırları arasında gezinir, Enter bir satırı açar, Escape en üstteki diyaloğu kapatır, `aria-keyshortcuts` kısayolları metin girişleri dışında her yerde çalışır. Grid'lerde: Boşluk satırı seçer, F2 düzenler, Ctrl+Z son düzenlemeyi geri alır, Shift+F10 veya bağlam menüsü tuşu satırın ya da başlığın menüsünü açar, Shift+tıklama birden çok sütuna göre sıralar, Sağ ve Sol (sağdan sola sayfalarda yansıtılmış olarak) bir satırın ayrıntısını, grubunu veya çocuklarını açar ve kapatır, bir çocuk satırdaki Sol ise üst satıra gider. Bir satırda Sağ, hücrelerine geçer: oklar, Home, End, Ctrl+Home, Ctrl+End, Tab ve Shift+Tab hücre imlecini taşır, Shift bir aralığı büyütür (hücrelerde `aria-selected`), Ctrl+C aralığı sekmeyle ayrılmış metin olarak kopyalar ve Ctrl+V düzenlenebilir hücrelere yapıştırır; değişen her satır için bir `POST /_zeyn/grid/edit` gönderilir. 40 veya daha fazla sütunu olan grid'ler sayfada yalnızca görünümdeki sütunları tutar (sabit genişlikli bir `colgroup`, `colspan` taşıyan `td.z-col-gap` ara parçaları, hücrelerde `aria-colindex`).
 - Sağ tık, tanımlı olan yerde Zeyn'in menüsünü açar (başlıklar, `data-zeyn-menu` olan satırlar, `data-zeyn-menu` olan ekranlar); başka her yerde tarayıcının kendi menüsü kalır.
 - Odak, diyalog açıldığında diyalogun içine taşınır ve kapandığında açana geri döner.
+- Tıklamanın karesinde bekleme durumu: `nav.js` bir ekran yüklenirken hedef bağlantıyı geçerli olarak işaretler ve `html[data-zeyn-loading]` ayarlar, pencereler ve form gönderimleri de onu ayarlar; gridler bir sıralama, sayfa ya da filtre tuşuna basılır basılmaz satırlarını soluklaştırır (`aria-busy`) (filtreler başka tuşlar için 150 ms bekler ve yeni bir istek eskisini iptal eder). Pencerenin üstündeki ince çubuk yalnızca yanıt 150 ms'den uzun sürdüğünde görünür; sabittir, bu yüzden hiçbir şey kaymaz ve `prefers-reduced-motion` ile hareket etmez.
 - İstemci tarafı denetimler (`required`, `minlength`, `maxlength`, `min`, `max`, `type="email"`) göndermeden önce tarayıcının kısıt doğrulama API'siyle çalışır. Sunucu her zaman yeniden doğrular.
 
 ## 7. Component library
 
-`zeyn::ui` bileşenleri, sayfa head'inde runtime'dan sonra bağlanan iki varlık daha ile sunulur: `/_zeyn/components.js` ve `/_zeyn/components.css`. Runtime gibi bunlar da oturum açmayı gerektirmez.
+`zeyn::ui` bileşenleri bölüm 1.1'deki modüllerle ve `/_zeyn/components.css` stil dosyasıyla sunulur. Runtime gibi bunlar da oturum açmayı gerektirmez.
 
 ### 7.1 Endpoints
 
@@ -262,6 +286,7 @@ Hepsi JSON ve CSRF başlığıyla `POST`'tur ve önce ekranın erişimini ve Fea
 | Endpoint | Body | Answer |
 |---|---|---|
 | `/_zeyn/node` | `{ screen, params, node }` | Bir düğümün, grid'lerinin ilk sayfasıyla birlikte HTML'i. Tembel (lazy) sekmeler tarafından kullanılır. |
+| `/_zeyn/nodes` | `{ screen, params, nodes: ["1.0", "2"] }` | `{ nodes: { "1.0": "<div class=\"z-node\" ...>" } }`: screen'in tek bir çalıştırmasından render edilen birkaç node; yenilenen ya da sürülen bir topic'in dinleyicileri için. En fazla 32 farklı yol; screen'de olmayan bir yol `404` döndürür. Screen'in erişimi, guard'ları ve interceptor'ları bir kez çalışır ve params screen'in tipli params'ı olarak okunur. |
 | `/_zeyn/data` | `{ screen, params, node, key, input }` | Düğümün `key` veri kaynağından JSON: arama seçenekleri (`key` alan adıdır), ağaç çocukları (`key` boştur), adım denetimleri (`key` `_step` olur). Kaynağın eylem izni denetlenir ve interceptor'lar, grid'lerde olduğu gibi çalışır. Eyleme uymayan girdi `404` ile reddedilir. |
 | `/_zeyn/data` ve `screen` = `_site.{feature}` | yukarıdaki gibi | Bir site üst bilgisi slotundaki bileşen için aynısı: `node` slottur (0 start, 1 center, 2 end, 3 bottom), ardından düğümün içindeki sırası, sonra alt öğe sıraları. Feature'ın guard'ları ve action'ın izni denetlenir. |
 | `/_zeyn/parse` | `{ kind, text, label }` | Sunucunun yazılmış bir tarihi veya saati kullanıcının dilinde, saat diliminde ve saat biçiminde nasıl okuduğu: `{ ok, text, iso, utc, zone }` veya `{ ok: false, message }`. `kind` değeri `date`, `time`, `datetime`, `local` veya `presets` (bugün ve hızlı aralıklar) olur. |
@@ -276,17 +301,26 @@ Hepsi JSON ve CSRF başlığıyla `POST`'tur ve önce ekranın erişimini ve Fea
 
 | Event | On | Detail |
 |---|---|---|
-| `zeyn:content` | `document` | Yeni içeriği olan eleman (gezinme, tembel paneller). Her iki betik de içerdiklerini kurar. |
+| `zeyn:content` | `document` | Yeni içeriği olan eleman (gezinme, tembel paneller). Runtime gereken modülleri yükler ve yüklü her modül içerdiklerini kurar. |
 | `zeyn:errors` | the form | Runtime onları gösterdikten sonra `422` hataları. Satır düzenleyici ve adımlı formlar bunu kullanır. |
 | `zeyn:effect` | `document` | Runtime'ın tanımadığı bir effect: `{ effect, source, run }`. `run(next)` başka bir effect çalıştırır. `confirm` tarafından kullanılır. |
+| `zeyn:topics` | `document` | `{ topics }`: başka bir betikten yenilenecek topic'ler (bir bildirimde `live.js`). |
+| `zeyn:reload` | bir öğe | İçindeki grid'leri yerinde yeniden yükler: geçerli sayfayı, ya da `{ reset: true }` ile ilk sayfayı. |
+| `zeyn:density` | `document` | Yok. Kullanıcı hesap menüsünden başka bir yoğunluk seçti (`<html>` üzerindeki `data-density` zaten değişti); pencereli kart grid'leri satırlarını yeniden ölçer. |
 
 `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":"...","then":{...}}` effect'i modal bir uyarı diyaloğunda sorar ve `then` değerini yalnızca kullanıcı onayladıktan sonra çalıştırır.
+
+Effect `{"effect":"refresh","topics":["sales"]}` topic'lerin dinleyicilerini yeniler. `[data-zeyn-listens="a,b"]` bir dinleyiciyi işaretler (`data-zeyn-node` üst öğesindeki node); `[data-zeyn-drives="a"]` topic süren bir kontrolü işaretler: bir filtre formu (`data-zeyn-kinds` hangi params'ın sayı ya da boolean olduğunu söyler), bir arama kutusu (alanının adı `q`'dur) ya da filtre çipleri (her çip params'ını `data-zeyn-params` içinde taşır). Sürmek, kontrolün değerlerini screen kökünün `data-zeyn-params` değerine birleştirir, screen ana screen ise adresi bunlarla değiştirir ve dinleyicileri yeniler. `topics.js` bir animasyon karesi içinde adlandırılan topic'leri tek seferde işler: grid tutan bir dinleyici `zeyn:reload` alır, bir screen'in diğerleri tek bir `POST /_zeyn/nodes` içinde gider ve aynı screen için daha yeni bir istek eskisini iptal edip node'larını devralır. Odak ve açık `<details>` id, test id, `data-zeyn-key` satırı ve konumla korunur.
+
+Sanal bir liste `data-zeyn-row-height`, `data-zeyn-block` ve `data-zeyn-total` taşıyan `section[data-zeyn-vlist]` öğesidir; `vlist.js` blokları `{ page: { type: "offset", offset }, with_total: true }` ile `POST /_zeyn/grid` üzerinden ister ve her `<li>`'yi `(aria-posinset - 1) * height` konumuna yerleştirir. Başka bir alana bağlı lookup'lar `data-depends-on="field"` taşır ve o alanın değerini `/_zeyn/data` girdisinde `parent` olarak gönderir.
 
 İstemci tercihleri (`zeyn::ClientPref`), sayfaların yalnızca `data-zeyn-remember` ya da `data-zeyn-prefs-clear` taşıyan bir eleman içerdiğinde içe aktardığı `/_zeyn/state.js` tarayıcı modülünde yaşar. `GET /_zeyn/prefs`, `Cache-Control: no-store` ile `{ preferences }` döndürür; bu, uygulamanın onay kancasının tercih değerlerinin oturumun ötesinde tutulmasına izin verip vermediğidir. Sunucu saklanan hiçbir değeri okumaz.
 
 ### 7.4 Media
 
 `Video` ve `Audio`, bileşen kitaplığından sonra bağlanan `/_zeyn/media.js` ve `/_zeyn/media.css` ile sunulur. Bkz. `docs/media.md`.
+
+Oynatıcılar kaynaklarını ve afişlerini (önce `data-zeyn-poster-low`, sonra `data-zeyn-poster`) ilk kez görünüme girdiklerinde, sayfa için tek bir `IntersectionObserver` aracılığıyla ayarlar; `data-zeyn-preview` taşıyan bir kök, dörtte biri görünür olduğu sürece sessiz ve döngüde oynar, `prefers-reduced-motion`, `prefers-reduced-data` ya da Save-Data aksini söylemedikçe ve ziyaretçi kontrollerini kullanana kadar. Yükleme seçenekleri olan görseller, yer tutucuyu betik olmadan gösteren bir kutuda (`.z-img-host`) durur ve `media.js`'i yükleyen işaret olan `data-zeyn-img` özniteliğini taşır. Belgedeki tek bir capture dinleyicisi bu görsellerin `load` ve `error` olaylarını işler: yüklenen görsel kutuyu `z-img-done` (düşük dosyanın üzerinde belirerek geçiş için ayrıca `z-img-fade`) olarak işaretler; başarısız olan bir kez `data-zeyn-fallback` dener, ardından kutunun `<template data-zeyn-img-error>` öğesini ya da bir simgeyle alt metni gösterir. Modül çalışmadan önce sonlanmış görseller, modül başladığında bir kez denetlenir.
 
 | Endpoint | Does |
 |---|---|

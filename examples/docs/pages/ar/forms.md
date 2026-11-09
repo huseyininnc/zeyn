@@ -27,6 +27,8 @@ Form::of(Contact { quantity: 1, ..Contact::default() })
 | `.range(M::from, M::to)` | تاريخان كمنتقي نطاق واحد |
 | `Form::auto(value)` | كل الحقول، بترتيب الإعلان |
 
+لا يزيد عرض النماذج على 720 px، والبطاقة أو اللوحة التي لا تحوي إلا نموذجًا تكون بعرض النموذج، فلا يبقى نصف البطاقة فارغًا. تقع التسميات على بعد 6 px فوق حقول إدخال بارتفاع 36 px؛ وبين الحقول 20 px. يحصل حقل الإدخال المركَّز على حد بلون التركيز وحلقة ناعمة بعرض 3 px؛ والحقل غير الصالح على حد بلون الخطر. تُرسم الوحدات والعملة و`%` باهتة داخل حقل الإدخال، وتضع حقول الأرقام زري الناقص والزائد (28 px) داخل نهاية الحقل؛ وتظل مفاتيح الأسهم تغيّر القيمة.
+
 ## الحفظ
 
 يسمّي `.submit(label, action)` الإجراء الذي يحفظ. يجب أن يأخذ الإجراء `Valid<M>` لنموذج النموذج نفسه؛ وأي شيء آخر لا يُترجم. يرسل وقت التشغيل القيم، ويشغّل الخادم كل قاعدة، ثم الإجراء.
@@ -38,6 +40,52 @@ Form::of(Contact { quantity: 1, ..Contact::default() })
 ## عناصر التحكم
 
 لكل نوع حقل عنصر تحكم افتراضي: حقول نص، وحقول أرقام، ومال مع العملة، ومنتقيات تاريخ ووقت، وخانات اختيار لـ `bool`، وقوائم منسدلة للاختيارات. يختار `.control(M::f, Control::...)` عنصرًا آخر، ويبحث `.lookup(M::f, action)` عن السجلات على الخادم. راجع [عناصر التحكم والمنتقيات](controls.md).
+
+## حقول lookup التابعة
+
+يجعل `.depends_on(field, source)` خيارات حقل lookup `field` تابعة لحقل آخر، مثل مدن دولة ما. يرسل كل بحث قيمة `source` في `LookupQuery::parent` (يقرؤها `q.parent_id()` على أنها id)، ويُفرَّغ `field` عند تغيّر `source`، فتُحمَّل خياراته من جديد للقيمة الجديدة.
+
+```rust
+#[action(permission = "geo.read")]
+pub async fn find_cities(q: LookupQuery, store: Cities) -> Result<Page<LookupItem>> {
+    Ok(q.apply(store.of_country(q.parent_id())))
+}
+
+Form::of(address)
+    .lookup(Address::country, find_countries)
+    .lookup(Address::city, find_cities)
+    .depends_on(Address::city, Address::country)
+    .submit(t!("save"), save_address)
+```
+
+لا يمكن ائتمان المتصفح على هذا الزوج، لذا يسأل الخادم عند الإرسال action الخاص بـ lookup مرة أخرى عن المدينة المختارة مع الدولة المرسلة، بصلاحية ذلك action، ويرفض بخطأ في الحقل أي مدينة لا يعيدها. صفِّ حسب الأصل في استعلامات id أيضًا، كما يفعل `q.apply` بعد التصفية. يبلّغ `App::check_page` عن `depends_on` لا يكون حقله lookup في النموذج أو لا يكون مصدره حقلًا آخر فيه.
+
+## نماذج التصفية
+
+يمكن لنموذج بلا زر إرسال أن يصفّي الشاشة: يجعل `.drives(topic)` حقوله params للشاشة. عندما يتغير حقل (قائمة اختيار، نطاق تواريخ، حقل نص عند الضغط على Enter)، تدخل قيمته في param الشاشة الذي يحمل الاسم نفسه، ويبقى العنوان متزامنًا، وتتحدث في مكانها العقد التي تحمل `.listens(topic)` وتقرأ القيمة من params الخاصة بها (انظر [المواضيع](effects.md#topics)). تُرسل الأرقام والقيم المنطقية كما هي والحقول الفارغة على أنها `null`؛ ويقرأ الخادم params على أنها params الشاشة ذات الأنواع، فتُرفض القيمة التي لا تناسب.
+
+```rust
+#[params]
+pub struct SalesParams {
+    pub region: Option<Region>,
+    pub from: Option<Date>,
+    pub to: Option<Date>,
+}
+
+#[screen(route = "/sales", permission = "sales.read")]
+pub fn sales(p: SalesParams, store: Sales) -> Screen {
+    Screen::new(t!("sales.title"))
+        .body(
+            Form::of(SalesFilter { region: p.region, from: p.from, to: p.to })
+                .field(SalesFilter::region)
+                .range(SalesFilter::from, SalesFilter::to)
+                .drives("sales"),
+        )
+        .body(Kpi::new(t!("sales.total"), store.total(&p)).listens("sales"))
+}
+```
+
+لا يستطيع نموذج يحتوي `submit` أن يقود موضوعًا؛ بدلًا من ذلك حدّث بعد الحفظ باستخدام `ui.refresh(topic)` في `on_success`.
 
 ## الحقول للقراءة فقط
 
@@ -59,6 +107,8 @@ Feature::new("support")
 
 Form::of(ticket).field(Ticket::title).file(Ticket::attachments, ATTACHMENTS)
 ```
+
+اسم صلاحية واحد يمنح المستخدمين أنفسهم الرفع والتنزيل معًا. لكي يفتح القراء ملفات لا يمكنهم إضافتها، افصل بينهما: `.files(ATTACHMENTS, FileAccess::read("support.ticket.read").write("support.ticket.files"), store)`.
 
 عنصر التحكم حقل ملف أصلي داخل منطقة إفلات (drop zone). يُرفع كل ملف على حدة مع شريط تقدّم، ويمكن إلغاؤه أثناء عمله، وإعادة محاولته عند فشله، وإزالته عند اكتماله. تعرض الصور معاينة مصنوعة من عنوان كائن (object URL) للملف المختار. يُعلن التقدم والنتائج في منطقة حية (live region) مهذبة. في العرض التجريبي (showcase) مثال يعمل على `/uploads`؛ وموقع التوثيق هذا بلا مستخدم مسجّل الدخول، ولذلك لا يعرض رفعًا حيًا.
 

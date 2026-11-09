@@ -38,6 +38,7 @@ mod data;
 mod files;
 mod grid;
 mod guard;
+mod gzip;
 mod locale;
 mod media;
 mod modules;
@@ -46,6 +47,7 @@ mod seo;
 mod session;
 mod telemetry;
 mod theme;
+pub(crate) use theme::screen_picker as theme_picker;
 
 pub use theme::Theme;
 #[cfg(feature = "email")]
@@ -92,6 +94,8 @@ const GRID_JS: &str = concat!(
     include_str!("../assets/zeyn/grid-exports.js"),
 );
 const CSS: &str = include_str!("../assets/zeyn.css");
+/// The icon set as CSS masks, generated from `assets/icons/*.svg` (see `tests/icons.rs`).
+const ICONS: &str = include_str!("../assets/icons.css");
 const NAV: &str = include_str!("../assets/nav.js");
 
 #[cfg(feature = "assistant")]
@@ -766,9 +770,11 @@ pub struct App {
     setup_problems: Vec<String>,
     views: Option<Arc<dyn crate::grid::DataGridViewStore>>,
     native_menu: bool,
+    logo: Option<Logo>,
     locale_paths: bool,
     palette_keys: String,
     client_prefs: crate::prefs::ClientPrefs,
+    header: Option<crate::site::SiteHeader>,
     prefetch: Prefetch,
     extras: ops::Extras,
     sign_in: auth::Extras,
@@ -823,9 +829,11 @@ impl App {
             setup_problems: Vec::new(),
             views: None,
             native_menu: true,
+            logo: None,
             locale_paths: false,
             palette_keys: crate::command::PALETTE_SHORTCUT.into(),
             client_prefs: crate::prefs::ClientPrefs::default(),
+            header: None,
             prefetch: Prefetch::Off,
             extras: ops::Extras::default(),
             sign_in: auth::Extras::default(),
@@ -922,7 +930,7 @@ impl App {
 
     /// Lets the browser load screens ahead of a click, off by default. With
     /// [`Prefetch::Moderate`] `nav.js` fetches the partial screen of a link after 100 ms of
-    /// hover, on keyboard focus or on touch, keeps it 10 seconds for the click, runs at most two
+    /// hover, on keyboard focus or when pressed (mouse, pen or touch), keeps it 10 seconds for the click, runs at most two
     /// such fetches at once and cancels one when the pointer leaves first. For pages where the
     /// script is missing, Chromium gets Speculation Rules (prefetch only, never prerender, so no
     /// script of the next page runs early) through a `Speculation-Rules` header pointing to
@@ -936,6 +944,73 @@ impl App {
     /// counts as a prefetch when the user then opens it.
     pub fn prefetch(mut self, prefetch: Prefetch) -> Self {
         self.prefetch = prefetch;
+        self
+    }
+
+    /// A top bar over the screens of the app shell, with the slots of the site header:
+    /// `start`, `center` (such as a search box), `end` (such as a notifications link) and
+    /// `bottom`, see [`crate::SiteHeader`]. `sign_in()` adds the sign in or out link;
+    /// `language()` and `theme()` add pickers there too, which the side menu already has. On
+    /// phones the bar sits under the menu button and the center slot takes a row of its own
+    /// (`center_on_phone` is for the site shell). Components in the bar render for the user like
+    /// a screen's; those that load data through an action check the action's permission. Without
+    /// it the app shell has no top bar.
+    ///
+    /// ```
+    /// use zeyn::prelude::*;
+    ///
+    /// #[screen(route = "/inbox", public)]
+    /// pub fn inbox() -> Screen { Screen::new("Inbox") }
+    ///
+    /// let app = App::new("Admin")
+    ///     .header(|h| h.end(LinkButton::new("Notifications (3)", inbox, ())))
+    ///     .feature(Feature::new("inbox").screen(inbox));
+    /// ```
+    pub fn header(
+        mut self,
+        build: impl FnOnce(crate::site::SiteHeader) -> crate::site::SiteHeader,
+    ) -> Self {
+        self.header = Some(build(crate::site::SiteHeader::default()));
+        self
+    }
+
+    /// The app's logo mark, drawn 24 px square before the app's name in the side menu and
+    /// 32 px on sign in pages: a path on the app's own origin, such as `/static/logo.svg`
+    /// (the page's CSP loads images from the app only). Without it the shell draws a rounded
+    /// square in `--z-brand` with the first letter of the app's name. `App::check` reports a
+    /// path that is not on the app's origin.
+    ///
+    /// ```
+    /// use zeyn::prelude::*;
+    ///
+    /// let app = App::new("Admin")
+    ///     .logo("/static/logo.svg")
+    ///     .logo_dark("/static/logo-dark.svg");
+    /// ```
+    pub fn logo(mut self, path: &str) -> Self {
+        if let Some(problem) = logo_problem(path) {
+            self.setup_problems.push(problem);
+        }
+        let dark = self.logo.take().and_then(|l| l.dark);
+        self.logo = Some(Logo {
+            light: path.to_string(),
+            dark,
+        });
+        self
+    }
+
+    /// The logo for the dark theme, when the light one does not read on a dark surface. Needs
+    /// [`App::logo`].
+    pub fn logo_dark(mut self, path: &str) -> Self {
+        if let Some(problem) = logo_problem(path) {
+            self.setup_problems.push(problem);
+        }
+        match &mut self.logo {
+            Some(l) => l.dark = Some(path.to_string()),
+            None => self.setup_problems.push(
+                "`App::logo_dark` was called without `App::logo`\n  = help: call `.logo(\"/static/logo.svg\")` too".into(),
+            ),
+        }
         self
     }
 
@@ -1268,7 +1343,9 @@ impl App {
     }
 
     /// Checks the link shortcuts of a built screen (`Chips::shortcut`, `PrevNext::shortcut`)
-    /// against each other, the commands, the palette and the links of the site headers: the
+    /// against each other, the commands, the palette and the links of the site headers, and the
+    /// topics and settings components report ([`crate::Component::page_check`]): a topic driven on the
+    /// page that nothing on it listens to, a lookup that depends on a field the form lacks. The
     /// page level half of [`App::check`], which cannot build screens because they need params.
     /// Call it in a test with the params the screen gets.
     ///
@@ -1310,20 +1387,33 @@ impl App {
                 }
             }
         }
+        if let Some(header) = &self.header {
+            for (s, nodes) in header.slots.iter().enumerate() {
+                for (i, node) in nodes.iter().enumerate() {
+                    node.all_shortcuts(format!("a{s}.{i}"), &mut found);
+                }
+            }
+        }
         for (i, node) in screen.nodes().iter().enumerate() {
             node.all_shortcuts(i.to_string(), &mut found);
         }
         let links: Vec<(String, &str)> = found
             .into_iter()
             .map(|(path, keys)| {
-                let place = match path.strip_prefix('h') {
-                    Some(p) => format!("in the site header (node {p})"),
-                    None => format!("at node {path}"),
+                let place = match (path.strip_prefix('h'), path.strip_prefix('a')) {
+                    (Some(p), _) => format!("in the site header (node {p})"),
+                    (_, Some(p)) => format!("in the app header (node {p})"),
+                    _ => format!("at node {path}"),
                 };
                 (place, keys)
             })
             .collect();
-        let problems = crate::command::link_problems(&links, &commands, &self.palette_keys);
+        let mut problems = crate::command::link_problems(&links, &commands, &self.palette_keys);
+        let mut check = crate::ui::PageCheck::default();
+        for (i, node) in screen.nodes().iter().enumerate() {
+            node.page_check(i.to_string(), &mut check);
+        }
+        problems.extend(check.finish());
         if problems.is_empty() {
             Ok(())
         } else {
@@ -1511,25 +1601,16 @@ impl App {
             let Some(shell) = f.site_shell() else {
                 continue;
             };
-            let mut links = Vec::new();
-            for (s, nodes) in shell.header.slots.iter().enumerate() {
-                let mut found = Vec::new();
-                for (i, node) in nodes.iter().enumerate() {
-                    node.all_shortcuts(format!("{s}.{i}"), &mut found);
-                }
-                links.extend(found.into_iter().map(|(path, keys)| {
-                    (
-                        format!(
-                            "in the {} slot of the site header of feature `{}` (node {path})",
-                            crate::site::SLOT_NAMES[s],
-                            f.name()
-                        ),
-                        keys,
-                    )
-                }));
-            }
+            let owner = format!("the site header of feature `{}`", f.name());
             problems.extend(crate::command::link_problems(
-                &links,
+                &header_links(&shell.header, &owner),
+                &commands,
+                &self.palette_keys,
+            ));
+        }
+        if let Some(header) = &self.header {
+            problems.extend(crate::command::link_problems(
+                &header_links(header, "the app header"),
                 &commands,
                 &self.palette_keys,
             ));
@@ -1629,7 +1710,9 @@ impl App {
             .insert(crate::screen::Routes(Arc::new(routes), default_locale));
         self.services
             .insert(self.client_prefs.clone());
-        let look = self.look();
+        let look = Arc::new(self.look());
+        self.services
+            .insert(theme::Looks(look.clone()));
         #[cfg(feature = "islands")]
         let islands = self
             .islands_dir
@@ -1680,6 +1763,8 @@ impl App {
             look,
             views: self.views,
             native_menu: self.native_menu,
+            logo: self.logo,
+            header: self.header,
             locale_paths: self.locale_paths,
             prefetch: self.prefetch,
             palette_keys: crate::command::normalize_shortcut(&self.palette_keys)
@@ -1781,7 +1866,7 @@ impl App {
         let router = router
             .route(
                 "/_zeyn/zeyn.js",
-                get(|| async { asset(JS, "text/javascript; charset=utf-8") }),
+                get(|| async { asset(modules::runtime(JS), "text/javascript; charset=utf-8") }),
             )
             .route(
                 "/_zeyn/grid.js",
@@ -1790,6 +1875,10 @@ impl App {
             .route(
                 "/_zeyn/zeyn.css",
                 get(|| async { asset(CSS, "text/css; charset=utf-8") }),
+            )
+            .route(
+                "/_zeyn/icons.css",
+                get(|| async { asset(ICONS, "text/css; charset=utf-8") }),
             )
             .route(
                 "/_zeyn/nav.js",
@@ -1840,6 +1929,9 @@ impl App {
                 guard::guard_request,
             ))
             .layer(axum::middleware::from_fn(static_files))
+            .layer(axum::middleware::from_fn(|req, next| {
+                gzip::whole(req, next, compressible)
+            }))
             .layer(compression())
             .layer(axum::middleware::map_request(identity_for_ranges))
             .layer(axum::middleware::map_response_with_state(
@@ -1990,9 +2082,13 @@ struct AppState {
     api_docs: Option<ApiDocs>,
     prefix: String,
     site_url: String,
-    look: theme::Look,
+    look: Arc<theme::Look>,
     views: Option<Arc<dyn crate::grid::DataGridViewStore>>,
     native_menu: bool,
+    /// The app's logo, from `App::logo`.
+    logo: Option<Logo>,
+    /// The top bar of the app shell, from `App::header`.
+    header: Option<crate::site::SiteHeader>,
     locale_paths: bool,
     prefetch: Prefetch,
     palette_keys: String,
@@ -2324,6 +2420,11 @@ impl AppState {
             self.csp.clone(),
         );
         data::read_reason(&ctx, headers);
+        let ctx = if cookie(headers, "zeyn_density") == Some("compact") {
+            ctx.with_compact()
+        } else {
+            ctx
+        };
         let ctx = if is_prefetch(headers) {
             ctx.as_prefetch()
         } else {
@@ -2739,7 +2840,8 @@ impl AppState {
     }
 
     /// Menu links of the features in one shell (the site shell when `site`) whose guards the user
-    /// passes, per group: the group's icon, its label and its `<li>` links.
+    /// passes, per group: the group's icon, its label and its `<li>` links. Groups with the same
+    /// label are merged into the first one, so several features can share one menu heading.
     fn menu_links(
         &self,
         ctx: &Ctx,
@@ -2747,7 +2849,7 @@ impl AppState {
         current: Option<&str>,
         site: bool,
     ) -> Vec<(String, String, Vec<String>)> {
-        let mut groups = Vec::new();
+        let mut groups: Vec<(String, String, Vec<String>)> = Vec::new();
         for f in &self.features {
             if f.site_shell().is_some() != site || f.check_guards(ctx).is_err() {
                 continue;
@@ -2770,19 +2872,62 @@ impl AppState {
                         } else {
                             ""
                         };
-                        Some(format!(
-                            r#"<li><a href="{}"{aria}>{}</a></li>"#,
-                            escape(&self.url(&locale::path(self, ctx, &path))),
-                            r.text(&item.label)
-                        ))
+                        let href = escape(&self.url(&locale::path(self, ctx, &path)));
+                        let label = r.text(&item.label);
+                        Some(match item.icon.filter(|_| !site) {
+                            Some(icon) => format!(
+                                r#"<li><a href="{href}"{aria}>{}<span>{label}</span></a></li>"#,
+                                icon.html()
+                            ),
+                            None => format!(r#"<li><a href="{href}"{aria}>{label}</a></li>"#),
+                        })
                     })
                     .collect();
-                if !items.is_empty() {
-                    groups.push((g.icon.html(), r.text(&g.label), items));
+                if items.is_empty() {
+                    continue;
+                }
+                let label = r.text(&g.label);
+                let icon = if g.items.iter().any(|i| i.icon.is_some()) {
+                    String::new()
+                } else {
+                    g.icon.html()
+                };
+                match groups.iter_mut().find(|g| g.1 == label) {
+                    Some(group) => group.2.extend(items),
+                    None => groups.push((icon, label, items)),
                 }
             }
         }
         groups
+    }
+
+    /// The breadcrumb of `SiteHeader::breadcrumb`: the menu group of the current screen and the
+    /// screen's menu label. `nav.js` rewrites it from the side menu after each navigation.
+    fn breadcrumb(&self, r: &Render, current: Option<&str>) -> String {
+        let found = current.and_then(|name| {
+            self.features
+                .iter()
+                .flat_map(|f| f.menu_groups())
+                .find_map(|g| {
+                    g.items
+                        .iter()
+                        .find(|i| i.screen == name)
+                        .map(|i| (r.text(&g.label), r.text(&i.label)))
+                })
+        });
+        let items = match found {
+            Some((group, item)) if group == item => {
+                format!(r#"<li><span aria-current="page">{item}</span></li>"#)
+            }
+            Some((group, item)) => {
+                format!(r#"<li>{group}</li><li><span aria-current="page">{item}</span></li>"#)
+            }
+            None => String::new(),
+        };
+        format!(
+            r#"<nav class="z-crumbs" aria-label="{}" data-zeyn-crumbs><ol>{items}</ol></nav>"#,
+            r.text(&Text::key("zeyn.shell.breadcrumb"))
+        )
     }
 
     /// Adds the `Speculation-Rules` header of `App::prefetch` to a full page.
@@ -2842,17 +2987,26 @@ impl AppState {
         let r = Render::new("shell", ctx.locale(), ctx.i18n())
             .with_tz(ctx.time_zone())
             .with_identity(ctx.identity());
-        let site_shell = current
-            .and_then(|n| self.screens.get(n))
-            .and_then(|(fi, _)| {
-                self.features[*fi]
-                    .site_shell()
-                    .map(|s| (*fi, s))
-            });
+        let site_shell = current.and_then(|n| {
+            let (fi, _) = self.screens.get(n)?;
+            self.features[*fi]
+                .shell_of(n)
+                .map(|s| (*fi, s))
+        });
         let theme = ctx.theme().unwrap_or("system");
         let app = r.text(&self.name);
         let (palette, commands) = pro::shell_parts(self, ctx, &r);
+        let auth = site_shell.is_some_and(|(_, s)| s.auth.is_some());
+        let (palette, commands) = if auth {
+            (String::new(), String::new())
+        } else {
+            (palette, commands)
+        };
         let (frame, site_head) = match site_shell {
+            Some((_, shell)) if shell.auth.is_some() => (
+                site::auth_frame(self, ctx, &r, shell, theme, &app, main),
+                site::auth_head(&escape(&self.prefix)),
+            ),
             Some((fi, shell)) => (
                 site::frame(self, ctx, &r, shell, fi, main, current),
                 site::head(&escape(&self.prefix)),
@@ -2871,22 +3025,27 @@ impl AppState {
         #[cfg(not(feature = "assistant"))]
         let (ai_head, ai_launcher) = (String::new(), String::new());
         let base = escape(&self.prefix);
-        let components = format!(
-            "{}{}{}{}{}{site_head}{ai_head}",
-            ui::head(&base),
-            media::head(&base),
-            pro::head(&base),
-            files::head(&base),
-            charts::head(&base)
-        );
+        let mut used = modules::Used::default();
+        for part in [&frame, &commands, &ai_launcher] {
+            used.scan(part);
+        }
+        let mut components = String::with_capacity(2048);
+        used.head(&base, &mut components);
+        components.push_str(&site_head);
+        components.push_str(&ai_head);
         let native_menu = if self.native_menu {
             ""
         } else {
             r#" data-zeyn-native-menu="off""#
         };
-        let html_attrs = format!("{theme_attrs}{native_menu}");
+        let density = if ctx.compact() {
+            r#" data-density="compact""#
+        } else {
+            ""
+        };
+        let html_attrs = format!("{theme_attrs}{density}{native_menu}");
         format!(
-            r##"<!doctype html><html lang="{lang}"{dir}{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css{v}"><script type="module" src="{base}/_zeyn/zeyn.js{v}"></script><script type="module" src="{base}/_zeyn/nav.js{v}"></script>{components}{theme_link}{extra}{prefetch}</head><body><a class="z-skip" href="#z-main">{skip}</a>{frame}<div class="z-toasts" role="status" aria-live="polite" data-text-dismiss="{dismiss}"></div>{commands}{ai_launcher}</body></html>"##,
+            r##"<!doctype html><html lang="{lang}"{dir}{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css{v}"><link rel="stylesheet" href="{base}/_zeyn/icons.css{v}"><script type="module" src="{base}/_zeyn/zeyn.js{v}"></script><script type="module" src="{base}/_zeyn/nav.js{v}"></script>{components}{theme_link}{extra}{prefetch}</head><body><a class="z-skip" href="#z-main">{skip}</a>{frame}<div class="z-toasts" role="status" aria-live="polite" data-text-dismiss="{dismiss}"></div>{commands}{ai_launcher}</body></html>"##,
             lang = escape(ctx.locale()),
             dir = if locale::rtl(ctx.locale()) {
                 r#" dir="rtl""#
@@ -2940,8 +3099,14 @@ impl AppState {
                 items.join("")
             ));
         }
-        nav.push_str(&self.locale_picker(ctx, &r));
-        nav.push_str(&self.look.picker(&r, theme));
+        let account = self
+            .header
+            .as_ref()
+            .is_some_and(|h| h.account);
+        if !account {
+            nav.push_str(&self.locale_picker(ctx, &r));
+            nav.push_str(&self.look.picker(&r, theme));
+        }
         if self.zone_picker && matches!(self.time, TimePolicy::User { .. }) {
             let current = ctx.time_zone().name();
             let auto = r.text(&Text::key("zeyn.shell.time_zone_auto"));
@@ -2959,11 +3124,117 @@ impl AppState {
                 r.text(&Text::key("zeyn.shell.time_zone"))
             ));
         }
+        let header = self
+            .header
+            .as_ref()
+            .map(|h| {
+                let [mut start, center, end, bottom] = site::header_slots(h, ctx, "app", "z-app-header");
+                if h.breadcrumb {
+                    let crumbs = self.breadcrumb(&r, current);
+                    match start.find('>') {
+                        Some(at) => start.insert_str(at + 1, &crumbs),
+                        None => {
+                            start = format!(
+                                r#"<div class="z-app-header-slot z-app-header-slot-start" id="z-app-header-slot-start">{crumbs}</div>"#
+                            )
+                        }
+                    }
+                }
+                let actions = site::header_actions(self, h, ctx, &r);
+                let actions = if actions.is_empty() {
+                    actions
+                } else {
+                    format!(r#"<div class="z-app-header-actions">{actions}</div>"#)
+                };
+                format!(
+                    r#"<header class="z-app-header" data-zeyn-screen="_app" data-zeyn-params="null">{start}{center}{end}{actions}{bottom}</header>"#
+                )
+            })
+            .unwrap_or_default();
         format!(
-            r#"<div class="z-app" data-zeyn-shell="app"><nav class="z-nav" aria-label="{menu}"><div class="z-nav-bar"><p class="z-app-name">{app}</p><button type="button" class="z-nav-toggle" aria-expanded="false" aria-controls="z-nav-body" data-zeyn-nav-toggle hidden><span class="z-nav-burger" aria-hidden="true"></span><span class="z-sr-only">{menu}</span></button></div><div class="z-nav-body" id="z-nav-body">{palette}{nav}</div></nav><main class="z-main" id="z-main">{main}</main></div>"#,
+            r#"<div class="z-app" data-zeyn-shell="app"><nav class="z-nav" aria-label="{menu}"><div class="z-nav-bar"><p class="z-app-name">{logo}<span>{app}</span></p><button type="button" class="z-nav-toggle" aria-expanded="false" aria-controls="z-nav-body" data-zeyn-nav-toggle hidden><span class="z-nav-burger" aria-hidden="true"></span><span class="z-sr-only">{menu}</span></button></div><div class="z-nav-body" id="z-nav-body">{palette}{nav}</div></nav>{header}<main class="z-main" id="z-main">{main}</main></div>"#,
+            palette = if self
+                .header
+                .as_ref()
+                .is_some_and(|h| h.search)
+            {
+                ""
+            } else {
+                palette
+            },
             menu = r.text(&Text::key("zeyn.shell.menu")),
+            logo = logo_mark(self.logo.as_ref(), &escape(&self.prefix), app, "z-logo"),
         )
     }
+}
+
+/// The logo of `App::logo`: a path on the app's origin, with an optional dark theme variant.
+#[derive(Clone, Debug)]
+struct Logo {
+    light: String,
+    dark: Option<String>,
+}
+
+/// Why a logo path cannot be used: it must be an absolute path on the app's own origin.
+fn logo_problem(path: &str) -> Option<String> {
+    let ok = path.starts_with('/')
+        && !path.starts_with("//")
+        && path.len() <= 512
+        && path
+            .chars()
+            .all(|c| c.is_ascii_graphic() && !"\"'<>`\\".contains(c));
+    (!ok).then(|| {
+        format!("logo `{path}` is not a path on the app's origin\n  = help: serve the file from the app and pass its path, such as `/static/logo.svg`")
+    })
+}
+
+/// The logo mark of the shell: the app's logo (with its dark variant) or a rounded square with
+/// the first letter of the app's name.
+fn logo_mark(logo: Option<&Logo>, base: &str, app: &str, class: &str) -> String {
+    match logo {
+        Some(Logo { light, dark: None }) => format!(
+            r#"<img class="{class}" src="{base}{}" alt="">"#,
+            escape(light)
+        ),
+        Some(Logo {
+            light,
+            dark: Some(dark),
+        }) => format!(
+            r#"<img class="{class} z-logo-light" src="{base}{}" alt=""><img class="{class} z-logo-dark" src="{base}{}" alt="">"#,
+            escape(light),
+            escape(dark)
+        ),
+        None => {
+            let letter: String = app
+                .chars()
+                .find(|c| c.is_alphanumeric())
+                .map(|c| c.to_uppercase().collect())
+                .unwrap_or_default();
+            format!(r#"<span class="{class} z-logo-letter" aria-hidden="true">{letter}</span>"#)
+        }
+    }
+}
+
+/// The link shortcuts in a header's slots, each with where it is (`owner` names the header),
+/// for the startup check.
+fn header_links<'a>(header: &'a crate::site::SiteHeader, owner: &str) -> Vec<(String, &'a str)> {
+    let mut links = Vec::new();
+    for (s, nodes) in header.slots.iter().enumerate() {
+        let mut found = Vec::new();
+        for (i, node) in nodes.iter().enumerate() {
+            node.all_shortcuts(format!("{s}.{i}"), &mut found);
+        }
+        links.extend(found.into_iter().map(|(path, keys)| {
+            (
+                format!(
+                    "in the {} slot of {owner} (node {path})",
+                    crate::site::SLOT_NAMES[s]
+                ),
+                keys,
+            )
+        }));
+    }
+    links
 }
 
 /// `inventory/`, `/inventory` and `/inventory/` all become `/inventory`; `/` and empty become empty.
@@ -3011,26 +3282,7 @@ async fn static_files(req: axum::extract::Request, next: axum::middleware::Next)
     if req.method() != axum::http::Method::GET || !framework {
         return next.run(req).await;
     }
-    let gzip = req
-        .headers()
-        .get_all(header::ACCEPT_ENCODING)
-        .iter()
-        .filter_map(|v| v.to_str().ok())
-        .flat_map(|v| v.split(','))
-        .any(|e| {
-            let mut p = e.split(';');
-            p.next()
-                .is_some_and(|n| n.trim().eq_ignore_ascii_case("gzip"))
-                && !p.any(|q| {
-                    q.trim()
-                        .strip_prefix("q=")
-                        .is_some_and(|v| {
-                            v.trim()
-                                .parse::<f32>()
-                                .is_ok_and(|v| v == 0.0)
-                        })
-                })
-        });
+    let gzip = gzip::accepts_gzip(req.headers());
     let headers = req.headers().clone();
     let current = req.uri().query() == Some(&ops::asset_version()[1..]);
     let mut response = next.run(req).await;
@@ -3131,36 +3383,38 @@ const UNCOMPRESSED: &[&str] = &[
     "font/woff",
 ];
 
-/// Gzip for pages, partial screens, grid blocks and other dynamic responses of 1 KB or more, at the
-/// level 2 (a 362 KB grid block becomes 37 KB for 0.8 ms of CPU; level 1 gives 54 KB for 0.6 ms
-/// and level 6 35 KB for 1.4 ms). Responses that
-/// already have a `Content-Encoding` (the framework assets from [`static_files`]) or a
-/// `Content-Range` pass as they are, and so do the types in [`UNCOMPRESSED`], images other than
-/// SVG and protocol switches. Streamed bodies (exports) are compressed as they stream.
+/// Whether a dynamic response may be compressed: not the types in [`UNCOMPRESSED`], images other
+/// than SVG or protocol switches.
+fn compressible(status: StatusCode, headers: &HeaderMap) -> bool {
+    let kind = headers
+        .get(header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    status != StatusCode::SWITCHING_PROTOCOLS
+        && (!kind.starts_with("image/") || kind.starts_with("image/svg+xml"))
+        && !UNCOMPRESSED
+            .iter()
+            .any(|p| kind.starts_with(p))
+}
+
+/// Gzip for pages, partial screens, grid blocks and other dynamic responses of 1 KB or more, at
+/// [`gzip::LEVEL`], for the [`compressible`] ones. Bodies of a known size are compressed whole
+/// by [`gzip::whole`] with a reused compressor; this layer compresses the streamed ones (exports)
+/// as they stream. Responses that already have a `Content-Encoding` (the framework assets from
+/// [`static_files`], the whole bodies) or a `Content-Range` pass as they are.
 fn compression()
 -> tower_http::compression::CompressionLayer<impl tower_http::compression::Predicate> {
     use tower_http::compression::{
         CompressionLayer, CompressionLevel, Predicate, predicate::SizeAbove,
     };
-    fn compressible(
-        status: StatusCode,
-        _: axum::http::Version,
-        headers: &HeaderMap,
-        _: &axum::http::Extensions,
-    ) -> bool {
-        let kind = headers
-            .get(header::CONTENT_TYPE)
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("");
-        status != StatusCode::SWITCHING_PROTOCOLS
-            && (!kind.starts_with("image/") || kind.starts_with("image/svg+xml"))
-            && !UNCOMPRESSED
-                .iter()
-                .any(|p| kind.starts_with(p))
-    }
     CompressionLayer::new()
-        .quality(CompressionLevel::Precise(2))
-        .compress_when(SizeAbove::new(1024).and(compressible))
+        .quality(CompressionLevel::Precise(gzip::LEVEL as i32))
+        .compress_when(SizeAbove::new(gzip::MIN_BYTES as u16).and(
+            |status: StatusCode,
+             _: axum::http::Version,
+             headers: &HeaderMap,
+             _: &axum::http::Extensions| compressible(status, headers),
+        ))
 }
 
 /// Drops `Accept-Encoding` from requests with a `Range` header, so a byte range always refers to
@@ -3293,13 +3547,17 @@ async fn page(
             #[allow(unused_mut)]
             let mut r = partial_response(&full, html);
             let h = r.headers_mut();
-            let site = st
+            let shell = st
                 .screens
                 .get(name)
-                .is_some_and(|(fi, _)| st.features[*fi].site_shell().is_some());
+                .and_then(|(fi, _)| st.features[*fi].shell_of(name));
             h.insert(
                 "x-zeyn-shell",
-                HeaderValue::from_static(if site { "site" } else { "app" }),
+                HeaderValue::from_static(match shell {
+                    Some(s) if s.auth.is_some() => "auth",
+                    Some(_) => "site",
+                    None => "app",
+                }),
             );
             #[cfg(feature = "islands")]
             if holds_island {
@@ -3318,14 +3576,6 @@ async fn page(
             let mut page = st.shell(&ctx, &csrf, &title, &html, Some(name));
             if !head.is_empty() {
                 page = page.replacen("</head>", &format!("{head}</head>"), 1);
-            }
-            if html.contains("data-zeyn-grid") {
-                let preload = format!(
-                    r#"<link rel="modulepreload" href="{}/_zeyn/grid.js{}"></head>"#,
-                    escape(&st.prefix),
-                    ops::asset_version()
-                );
-                page = page.replacen("</head>", &preload, 1);
             }
             #[cfg(feature = "realtime")]
             realtime::head(&st, &html, &mut page);

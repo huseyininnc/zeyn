@@ -4,6 +4,7 @@
 //! Files come from a media source registered with [`Feature::media`](crate::Feature::media), so the
 //! server checks the permission on every request and answers range requests for seeking.
 
+use super::embed::{Loading, Placeholder};
 use super::{dom_id, layout::into_node};
 use crate::i18n::Text;
 use crate::media::{media_type, valid_media_id};
@@ -28,11 +29,14 @@ struct Player {
     source: &'static str,
     title: Text,
     subtitle: Option<Text>,
-    files: Vec<String>,
+    files: Vec<(String, Option<String>)>,
     hls: Option<String>,
     dash: Option<String>,
     poster: Option<String>,
+    poster_low: Option<String>,
     captions: Vec<Captions>,
+    loading: Loading,
+    preview: bool,
 }
 
 impl Player {
@@ -45,7 +49,10 @@ impl Player {
             hls: None,
             dash: None,
             poster: None,
+            poster_low: None,
             captions: Vec::new(),
+            loading: Loading::default(),
+            preview: false,
         }
     }
 
@@ -57,6 +64,7 @@ impl Player {
     fn key(&self) -> Option<&String> {
         self.files
             .first()
+            .map(|(id, _)| id)
             .or(self.hls.as_ref())
             .or(self.dash.as_ref())
     }
@@ -67,10 +75,13 @@ impl Player {
             "source": self.source,
             "title": self.title,
             "subtitle": self.subtitle,
-            "files": self.files,
+            "files": self.files.iter().map(|(id, media)| json!({ "id": id, "media": media })).collect::<Vec<_>>(),
             "hls": self.hls,
             "dash": self.dash,
             "poster": self.poster,
+            "poster_low": self.poster_low,
+            "preview_when_visible": self.preview,
+            "loading": self.loading.schema(),
             "captions": self.captions.iter().map(|c| json!({ "id": c.id, "lang": c.lang, "label": c.label })).collect::<Vec<_>>(),
         })
     }
@@ -119,19 +130,44 @@ impl Player {
         if let Some(id) = &self.dash {
             out.push_str(&format!(r#" data-zeyn-dash="{}""#, self.url(id)));
         }
+        if self.preview && video {
+            out.push_str(" data-zeyn-preview");
+        }
         out.push('>');
-        out.push_str(r#"<div class="z-player-stage">"#);
-        let poster = self
+        if self.loading.placeholder.is_some() {
+            out.push_str(&format!(
+                r#"<div class="z-player-stage{}" style="{}">"#,
+                self.loading.host_class(),
+                self.loading
+                    .fill_style()
+                    .trim_start_matches(';')
+            ));
+        } else {
+            out.push_str(r#"<div class="z-player-stage">"#);
+        }
+        let mut poster = self
             .poster
             .as_ref()
             .map(|p| format!(r#" data-zeyn-poster="{}""#, self.url(p)))
             .unwrap_or_default();
+        if let Some(low) = &self.poster_low {
+            poster.push_str(&format!(r#" data-zeyn-poster-low="{}""#, self.url(low)));
+        }
+        let muted = if self.preview && video {
+            " muted loop"
+        } else {
+            ""
+        };
         out.push_str(&format!(
-            r#"<{kind} class="z-player-media" preload="metadata" playsinline aria-label="{title}"{poster}>"#
+            r#"<{kind} class="z-player-media" preload="none" playsinline{muted} aria-label="{title}"{poster}>"#
         ));
-        for id in &self.files {
+        for (id, media) in &self.files {
+            let media = media
+                .as_ref()
+                .map(|m| format!(r#" media="{}""#, escape(m)))
+                .unwrap_or_default();
             out.push_str(&format!(
-                r#"<source data-zeyn-src="{}" type="{}">"#,
+                r#"<source data-zeyn-src="{}" type="{}"{media}>"#,
                 self.url(id),
                 escape(
                     media_type(id)
@@ -237,10 +273,18 @@ impl Player {
             ));
         }
         out.push_str("</div>");
-        out.push_str(&format!(
-            r#"<p class="z-player-error" data-zeyn-player-error hidden>{}</p><p class="z-sr-only" role="status" data-zeyn-player-status></p></div>"#,
-            t("failed")
-        ));
+        match &self.loading.on_error {
+            Some(node) => {
+                out.push_str(r#"<div class="z-player-error" data-zeyn-player-error hidden>"#);
+                node.render(out, r);
+                out.push_str("</div>");
+            }
+            None => out.push_str(&format!(
+                r#"<p class="z-player-error" data-zeyn-player-error hidden>{}</p>"#,
+                t("failed")
+            )),
+        }
+        out.push_str(r#"<p class="z-sr-only" role="status" data-zeyn-player-status></p></div>"#);
     }
 }
 
@@ -253,8 +297,43 @@ macro_rules! player_builder {
             pub fn file(mut self, id: impl Into<String>) -> Self {
                 let id = id.into();
                 if valid_media_id(&id) {
-                    self.0.files.push(id);
+                    self.0.files.push((id, None));
                 }
+                self
+            }
+
+            /// Files for different screens, each with a media query (`(max-width: 600px)`), in
+            /// order: the browser plays the first whose query matches and whose format it
+            /// supports. A file without a query goes last as the default; for many qualities
+            /// prefer [`Self::hls`] or [`Self::dash`]. Queries longer than 200 characters or with
+            /// `<`, `>` or quotes are left out with their file.
+            pub fn sources<'a>(
+                mut self,
+                files: impl IntoIterator<Item = (&'a str, &'a str)>,
+            ) -> Self {
+                for (id, media) in files {
+                    let ok = media.len() <= 200 && !media.contains(['<', '>', '"', '\'', '`']);
+                    if ok && valid_media_id(id) {
+                        let media = Some(media.to_string()).filter(|m| !m.is_empty());
+                        self.0
+                            .files
+                            .push((id.to_string(), media));
+                    }
+                }
+                self
+            }
+
+            /// What the stage shows before the poster or the first frame: a color or a tiny
+            /// blurred image. See [`Placeholder`].
+            pub fn placeholder(mut self, placeholder: Placeholder) -> Self {
+                self.0.loading.placeholder = Some(placeholder);
+                self
+            }
+
+            /// What shows in place of the default message when the media cannot play: a text or
+            /// a component.
+            pub fn on_error(mut self, content: impl Into<Node>) -> Self {
+                self.0.loading.on_error = Some(content.into());
                 self
             }
 
@@ -321,9 +400,26 @@ impl Video {
         Video(Player::new(source, title.into()))
     }
 
-    /// An image shown before playing, by its id in the media source.
+    /// An image shown before playing, by its id in the media source. It loads when the player
+    /// comes into view, not with the page.
     pub fn poster(mut self, id: impl Into<String>) -> Self {
         self.0.poster = Some(id.into()).filter(|i| valid_media_id(i));
+        self
+    }
+
+    /// A small, low resolution file of the poster, shown first while the full poster loads.
+    pub fn poster_low(mut self, id: impl Into<String>) -> Self {
+        self.0.poster_low = Some(id.into()).filter(|i| valid_media_id(i));
+        self
+    }
+
+    /// A short preview for lists: the video plays muted and looping while at least a quarter of
+    /// it is on screen and pauses when it leaves. It never plays by itself when the visitor
+    /// prefers reduced motion or saves data, and never with sound. One observer serves every
+    /// preview of the page. Once the visitor uses the controls the player is theirs: it no
+    /// longer starts or stops by itself, and positions are saved as usual.
+    pub fn preview_when_visible(mut self) -> Self {
+        self.0.preview = true;
         self
     }
 }

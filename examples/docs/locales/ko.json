@@ -1,6 +1,7 @@
 {
   "docs": {
     "app": "Zeyn 문서",
+    "github": "GitHub 소스 코드",
     "missing": "이 페이지는 존재하지 않습니다.",
     "on_this_page": "이 페이지의 내용",
     "pager": "이전 및 다음 페이지",
@@ -11,7 +12,8 @@
       "language": "언어",
       "components": "컴포넌트",
       "guides": "가이드",
-      "reference": "레퍼런스"
+      "reference": "레퍼런스",
+      "project": "프로젝트"
     },
     "live": {
       "label": "라이브 예제",
@@ -57,6 +59,9 @@
       "content": "텍스트와 콘텐츠",
       "data_views": "트리와 차트",
       "catalog": "카드, 레일, 검색",
+      "admin": "관리 화면",
+      "commerce": "쇼핑 컴포넌트",
+      "chat": "채팅",
       "shell": "셸과 명령",
       "media": "미디어",
       "time_i18n": "시간과 언어",
@@ -76,7 +81,9 @@
       "realtime": "실시간과 CRDT",
       "desktop": "데스크톱 앱",
       "protocol": "런타임 프로토콜",
-      "database_reference": "데이터베이스 레퍼런스"
+      "database_reference": "데이터베이스 레퍼런스",
+      "about": "소스, 라이선스와 보안",
+      "social": "소셜"
     },
     "translation": {
       "note": "이 페이지는 영어에서 번역되었습니다.",

@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2024"
 publish = false
 
+[package.metadata.zeyn]
+# Most non blank lines a file in src/ may have; build.rs stops the build above it.
+max_file_lines = 300
+
 [lib]
 path = "src/lib.rs"
 
@@ -32,3 +36,4 @@ clone_on_ref_ptr = "warn"
 large_futures = "warn"
 needless_collect = "warn"
 redundant_clone = "warn"
+too_many_lines = "deny"

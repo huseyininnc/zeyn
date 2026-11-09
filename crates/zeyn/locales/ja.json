@@ -104,6 +104,7 @@
       "max": "{label}は{n}以下にしてください。",
       "format": "{label}の値が正しくありません。",
       "skipped_time": "{label}: 時計が変更されたため、この時刻はお使いのタイムゾーンに存在しません。",
+      "depends_on": "この選択肢は、依存するフィールドの値では選べません。",
       "line": "{n}行目: {message}",
       "disabled_day": "{label}: この日は選択できません。",
       "time_step": "{label}は{n}分単位にしてください。",
@@ -226,9 +227,55 @@
       }
     },
     "ui": {
+      "typing": {
+        "one": "{name} さんが入力中",
+        "two": "{a} さんと {b} さんが入力中",
+        "many": "{n} 人が入力中",
+        "someone": "誰か"
+      },
+      "composer": {
+        "label": "メッセージ",
+        "placeholder": "メッセージを入力",
+        "send": "送信",
+        "hint_enter": "Enter で送信、Shift+Enter で改行",
+        "hint_ctrl": "Ctrl+Enter で送信、Enter で改行",
+        "left": "残り {n} 文字",
+        "over": "{n} 文字超過",
+        "sent": "メッセージを送信しました",
+        "failed": "メッセージを送信できませんでした",
+        "people": "{n} 人が見つかりました",
+        "no_people": "見つかりませんでした",
+        "people_label": "ユーザー",
+        "restored": "未送信のメッセージを復元しました",
+        "attachments": "添付ファイル"
+      },
+      "chat": {
+        "label": "メッセージ",
+        "empty": "まだメッセージはありません",
+        "you": "あなた",
+        "today": "今日",
+        "yesterday": "昨日",
+        "attachments": "添付ファイル",
+        "more_files": "ほかに {n} 件のファイル",
+        "new_message": "{name} からの新しいメッセージ: {text}",
+        "assistant": "アシスタント",
+        "writing": "返信を作成中",
+        "stop": "停止",
+        "stopped": "返信を停止しました",
+        "reply_failed": "返信を読み込めませんでした",
+        "loading": "以前のメッセージを読み込み中",
+        "status": {
+          "sending": "送信中",
+          "sent": "送信済み",
+          "delivered": "配信済み",
+          "read": "既読",
+          "failed": "未送信"
+        }
+      },
       "resize": "ペインのサイズを変更",
       "cards": {
         "load_more": "さらに表示",
+        "list": "リスト",
         "loaded": "{count}件を表示中",
         "empty": "表示する項目がありません。",
         "error": "リストを読み込めませんでした。もう一度お試しください。",
@@ -500,6 +547,90 @@
       },
       "prefs": {
         "cleared": "このブラウザーがこのサイト用に保存していた選択を削除しました。"
+      },
+      "shop": {
+        "price": {
+          "sale": "通常価格 {was}、現在 {now}、{off} オフ",
+          "per": {
+            "item": "1 個あたり {price}",
+            "kg": "1 kg あたり {price}",
+            "g100": "100 g あたり {price}",
+            "l": "1 リットルあたり {price}",
+            "ml100": "100 ml あたり {price}",
+            "m": "1 メートルあたり {price}"
+          }
+        },
+        "range": {
+          "to": "〜",
+          "low": "{label}、下限",
+          "high": "{label}、上限"
+        },
+        "quantity": {
+          "label": "数量",
+          "decrease": "減らす",
+          "increase": "増やす",
+          "limit": "在庫は {n} 個だけです。",
+          "failed": "数量を変更できませんでした。"
+        },
+        "gallery": {
+          "swipe": "写真。矢印キーかスワイプで切り替え",
+          "full": "全画面",
+          "choose": "写真を選ぶ",
+          "show": "{count} 枚中 {n} 枚目の写真を表示",
+          "close": "閉じる",
+          "prev": "前の写真",
+          "next": "次の写真",
+          "zoom": "拡大"
+        },
+        "facets": {
+          "label": "絞り込み",
+          "chosen": "選んだ条件",
+          "clear": "すべて解除",
+          "remove": "条件 {filter} を外す",
+          "option": "{option}、{count} 件",
+          "active": "{n} 件選択中"
+        },
+        "reviews": {
+          "label": "レビュー",
+          "average": "5 つ星のうち {average}",
+          "count": "レビュー {count} 件",
+          "stars": "星 {n} つ"
+        },
+        "rating": {
+          "half": "{label}は星 1 つか半分の単位です。"
+        },
+        "countdown": {
+          "day": "日",
+          "left": "残り {d} 日 {h} 時間 {m} 分"
+        }
+      },
+      "story": {
+        "row": "ストーリー",
+        "unseen": "{name}、未読のストーリーあり",
+        "seen": "{name}、ストーリーはすべて既読"
+      },
+      "lightbox": {
+        "label": "メディアビューアー",
+        "close": "閉じる",
+        "previous": "前へ",
+        "next": "次へ",
+        "position": "{count} 件中 {n} 件目",
+        "zoom_in": "拡大",
+        "zoom_out": "縮小",
+        "open": "画像を開く",
+        "video": "動画を再生"
+      },
+      "feed": {
+        "label": "投稿",
+        "new_one": "新しい投稿 1 件",
+        "new_many": "新しい投稿 {count} 件",
+        "new_more": "新しい投稿 {count} 件以上",
+        "newest": "最新の投稿に戻る",
+        "loaded": "{count} 件の投稿を表示中",
+        "error": "投稿を読み込めませんでした。もう一度お試しください。",
+        "empty": "まだ投稿はありません。",
+        "comments": "コメント {count} 件",
+        "comments_one": "コメント 1 件"
       }
     },
     "date": {

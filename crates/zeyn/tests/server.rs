@@ -405,6 +405,40 @@ async fn menu_hides_screens_the_user_cannot_open() {
 }
 
 #[tokio::test]
+async fn menu_groups_with_the_same_label_share_one_heading() {
+    let app = App::new("T")
+        .service(Store::seeded())
+        .auth(|_: &HeaderMap| Some(writer()))
+        .feature(
+            Feature::new("stock")
+                .screen(list)
+                .menu(|m| {
+                    m.group("Stock", Icon::Box)
+                        .item("Products", list)
+                }),
+        )
+        .feature(
+            Feature::new("other")
+                .screen(closed)
+                .menu(|m| {
+                    m.group("Stock", Icon::Box)
+                        .item("Closed", closed)
+                }),
+        )
+        .router()
+        .unwrap();
+    let r = send(&app, get("/products")).await;
+    assert_eq!(
+        r.body
+            .matches(r#"<div class="z-nav-group">"#)
+            .count(),
+        1
+    );
+    assert!(r.body.contains(r#"href="/products""#));
+    assert!(r.body.contains(r#"href="/closed""#));
+}
+
+#[tokio::test]
 async fn locale_can_be_switched_only_to_offered_languages() {
     let router = router(writer());
     let r = send(
@@ -1270,7 +1304,10 @@ async fn pages_list_their_languages_for_search_engines() {
             r#"<link rel="alternate" hreflang="x-default" href="/hello" data-zeyn-head>"#
         )
     );
-    assert!(!r.body.contains("bad"), "a bad language tag is dropped");
+    assert!(
+        !r.body.contains(r#"hreflang="bad"#) && !r.body.contains("bad&quot;tag"),
+        "a bad language tag is dropped"
+    );
 }
 
 #[tokio::test]
@@ -1440,6 +1477,74 @@ async fn the_page_token_is_masked_differently_in_every_response() {
     }
 }
 
+#[tokio::test(flavor = "current_thread")]
+async fn the_reused_compressor_starts_fresh_for_every_response() {
+    use std::io::Read;
+    let router = router(writer());
+    let query = |limit: u32| {
+        let q = serde_json::json!({ "page": { "type": "offset", "offset": 0, "limit": limit } });
+        serde_json::json!({ "screen": "list", "node": 0, "query": q })
+    };
+    for (path, limit) in [
+        ("/products", 0),
+        ("/_zeyn/grid", 30),
+        ("/products", 0),
+        ("/_zeyn/grid", 25),
+    ] {
+        let req = |gzip: bool| {
+            let mut r = if limit == 0 {
+                get(path)
+            } else {
+                post(path, query(limit))
+            };
+            if gzip {
+                r.headers_mut()
+                    .insert(header::ACCEPT_ENCODING, "gzip".parse().unwrap());
+            }
+            r
+        };
+        let plain = send(&router, req(false)).await;
+        let res = router
+            .clone()
+            .oneshot(req(true))
+            .await
+            .unwrap();
+        assert_eq!(
+            res.headers()
+                .get(header::CONTENT_ENCODING)
+                .map(|v| v.to_str().unwrap()),
+            Some("gzip"),
+            "{path}"
+        );
+        let length: usize = res
+            .headers()
+            .get(header::CONTENT_LENGTH)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .parse()
+            .unwrap();
+        let packed = res
+            .into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes();
+        assert_eq!(packed.len(), length);
+        let mut text = String::new();
+        flate2::read::GzDecoder::new(&packed[..])
+            .read_to_string(&mut text)
+            .unwrap();
+        let csrf = |s: &str| {
+            s.split("zeyn-csrf\" content=\"")
+                .next()
+                .unwrap()
+                .to_string()
+        };
+        assert_eq!(csrf(&text), csrf(&plain.body), "{path}");
+    }
+}
+
 #[tokio::test]
 async fn grid_blocks_and_pages_are_gzipped_when_the_browser_accepts_it() {
     use std::io::Read;
@@ -1555,7 +1660,7 @@ async fn asset_links_carry_the_build_and_are_kept_for_a_year() {
         "components.js",
         "components.css",
         "enterprise.js",
-        "media.css",
+        "content.css",
         "grid.js",
     ] {
         assert!(

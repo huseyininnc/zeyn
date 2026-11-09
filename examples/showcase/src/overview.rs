@@ -1,39 +1,8 @@
-//! Overview: key numbers, drawn by a component written in the app (an extension point).
+//! Overview: key numbers as Kpi cards.
 
 use crate::sales::todays_orders;
 use crate::stock::ProductStore;
 use zeyn::prelude::*;
-use zeyn::{Component, Render};
-
-/// A row of key numbers.
-pub struct Stats(Vec<(Text, String)>);
-
-impl Component for Stats {
-    fn render(&self, out: &mut String, r: &Render) {
-        out.push_str(&format!(
-            r#"<div class="z-stats" data-testid="{}.stats">"#,
-            r.scope
-        ));
-        for (label, value) in &self.0 {
-            out.push_str(&format!(
-                r#"<div class="z-stat"><p class="z-stat-label">{}</p><p class="z-stat-value">{}</p></div>"#,
-                r.text(label),
-                zeyn::render::escape(value)
-            ));
-        }
-        out.push_str("</div>");
-    }
-
-    fn schema(&self) -> serde_json::Value {
-        serde_json::json!({ "type": "stats", "items": self.0.iter().map(|(l, v)| serde_json::json!({ "label": l, "value": v })).collect::<Vec<_>>() })
-    }
-}
-
-impl From<Stats> for Node {
-    fn from(s: Stats) -> Self {
-        Node::new(s)
-    }
-}
 
 #[screen(route = "/dashboard", public)]
 pub fn overview(_: (), store: ProductStore, ctx: Ctx) -> Result<Screen> {
@@ -50,12 +19,25 @@ pub fn overview(_: (), store: ProductStore, ctx: Ctx) -> Result<Screen> {
             .sum(),
     );
     Ok(Screen::new(t!("dashboard.title"))
-        .body(Stats(vec![
-            (t!("dashboard.products"), products.len().to_string()),
-            (t!("dashboard.low_stock"), low.to_string()),
-            (t!("dashboard.orders_today"), orders.len().to_string()),
-            (t!("dashboard.revenue_today"), revenue.format(ctx.locale())),
-        ]))
+        .body(
+            Row::new()
+                .col(Kpi::new(t!("dashboard.products"), products.len() as f64))
+                .col(
+                    Kpi::new(t!("dashboard.low_stock"), low as f64)
+                        .lower_is_better()
+                        .delta(-12.5),
+                )
+                .col(
+                    Kpi::new(t!("dashboard.orders_today"), orders.len() as f64)
+                        .delta(6.2)
+                        .trend([42.0, 51.0, 48.0, 57.0, 61.0, orders.len() as f64]),
+                )
+                .col(
+                    Kpi::money(t!("dashboard.revenue_today"), revenue)
+                        .delta(-2.4)
+                        .trend([9.1, 8.4, 8.8, 7.9, 8.2, 8.0]),
+                ),
+        )
         .body(zeyn::ui::Alert::info(t!("dashboard.shop_text")).title(t!("dashboard.shop")))
         .body(crate::shop::ShellLink(
             t!("dashboard.open_shop"),
@@ -119,8 +101,10 @@ pub fn feature() -> Feature {
         .screen(about)
         .sitemap(public_pages)
         .menu(|m| {
-            m.group(t!("menu.overview"), Icon::Chart)
+            m.group(t!("menu.overview"), Icon::ChartBar)
                 .item(t!("dashboard.title"), overview)
+                .icon(Icon::Home)
                 .item(t!("about.title"), about)
+                .icon(Icon::Tag)
         })
 }

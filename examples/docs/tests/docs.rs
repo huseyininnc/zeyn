@@ -447,6 +447,21 @@ async fn a_page_without_a_current_translation_is_shown_in_english_under_the_lang
     );
 }
 
+/// `llms.txt` is the index language models read first, so it links every page of the docs.
+#[test]
+fn llms_txt_links_every_page() {
+    let llms = include_str!("../llms.txt");
+    let missing: Vec<&str> = PAGES
+        .iter()
+        .map(|p| p.route)
+        .filter(|r| !llms.contains(&format!("(https://docs.zeynsoft.com{r})")))
+        .collect();
+    assert!(
+        missing.is_empty(),
+        "examples/docs/llms.txt does not link these pages: {missing:?}"
+    );
+}
+
 #[tokio::test]
 async fn the_sitemap_and_llms_txt_list_the_languages() {
     let (status, xml) = get("/sitemap.xml").await;
@@ -542,4 +557,47 @@ async fn links_in_translated_pages_stay_in_the_language_and_their_anchors_exist(
 fn p_route_en<'a>(path: &'a str, lang: &str) -> &'a str {
     let rest = &path[lang.len() + 1..];
     if rest == "/" { "/" } else { rest }
+}
+
+#[tokio::test]
+async fn the_project_page_exists_in_every_language_and_the_header_links_the_source() {
+    let p = PAGES
+        .iter()
+        .find(|p| p.route == "/project")
+        .expect("the project page is registered");
+    for (lang, _) in &LANGS[1..] {
+        assert!(
+            TRANSLATIONS
+                .iter()
+                .any(|(l, f, _)| l == lang && *f == p.file),
+            "pages/{lang}/project.md"
+        );
+    }
+    let docs = Docs::build();
+    for (lang, _) in LANGS {
+        let d = docs
+            .lang(lang)
+            .iter()
+            .find(|d| d.route == "/project")
+            .unwrap();
+        assert!(d.status.translated(), "{lang}/project is current");
+        let (status, page) = get(&lang_path(lang, "/project")).await;
+        assert_eq!(status, StatusCode::OK, "{lang}");
+        assert!(
+            page.contains(
+                r#"href="https://github.com/huseyininnc/zeyn" rel="noopener noreferrer" target="_blank""#
+            ),
+            "{lang}: the header links the repository in a new tab"
+        );
+        assert!(
+            page.contains(concat!(">v", env!("CARGO_PKG_VERSION"), "<")),
+            "{lang}: the header shows the version"
+        );
+        assert!(
+            article(&page).contains("https://github.com/huseyininnc/zeyn/security/advisories/new"),
+            "{lang}: the page links private reporting"
+        );
+    }
+    let (_, intro) = get("/").await;
+    assert!(article(&intro).contains(r#"href="/project#license""#));
 }

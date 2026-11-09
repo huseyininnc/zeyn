@@ -22,7 +22,7 @@ Stack::new()
 
 ## Badge
 
-`Badge::new(text).tone(Tone::...)`. النبرات: `Neutral` و `Info` و `Success` و `Warning` و `Danger` و `Brand`. تعرض الجداول القيم كشارات بالاستدعاء `.badge(|v| tone)`.
+`Badge::new(text).tone(Tone::...)`. النبرات: `Neutral` و `Info` و `Success` و `Warning` و `Danger` و `Brand`. تعرض الشارة ذات النبرة نص النبرة على تدرجها الخفيف؛ و`Neutral` تسمية باهتة بإطار واحد، للقيم العادية مثل الخطة. يرسم `.dot()` نقطة بقطر 8 px بلون النبرة قبل نص عادي، وهي الصيغة الأهدأ لعرض الحالة في القوائم؛ ويرسم `.count()` قرصاً مستديراً لعدد. تعرض الجداول القيم كشارات بالاستدعاء `.badge(|v| tone)` وكنقاط بالاستدعاء `.status(|v| tone)`.
 
 ## Progress
 
@@ -67,7 +67,7 @@ LinkButton::new(t!("cart.browse"), products, ()).primary()
 
 ## ActionButton
 
-يشغّل `ActionButton::new(label, action, input)` action. يسأل `.confirm(text)` أولاً، ويعلّم `.tone(Tone::Danger)` الإجراء المدمّر، ويشغّل `.on_success(|result, ui| ...)` التأثيرات (effects). يُثبَّت المدخل (input) على الخادم ولا يأتي من العميل أبداً؛ وتُفحص صلاحية الـ action على الخادم كأي نموذج.
+يشغّل `ActionButton::new(label, action, input)` action. يسأل `.confirm(text)` أولاً، ويعلّم `.tone(Tone::Danger)` الإجراء المدمّر، ويشغّل `.on_success(|result, ui| ...)` التأثيرات (effects). يُثبَّت المدخل (input) على الخادم ولا يأتي من العميل أبداً؛ وتُفحص صلاحية الـ action على الخادم كأي نموذج. يرسمه `.tone(Tone::Brand)` كالإجراء الرئيسي في منطقته، مثل بطاقة.
 
 ```rust
 ActionButton::new(t!("docs.live.count"), count_samples, ())
@@ -140,6 +140,32 @@ Image::new("https://images.example.com/logo.png")
 - `src` مسار على التطبيق (`/static/logo.png`) أو عنوان `https` على مضيف من `img-src` الخاص بالتطبيق (`App::csp(|c| c.img_src([...]))`). أي صورة أخرى لا تُعرض ويظهر نصها البديل بدلاً منها، فلا يسجل المتصفح أي طلب محجوب.
 - تحصل كل صورة على `decoding="async"`؛ ويضيف `.lazy()` الخاصية `loading="lazy"` للصور التي تقع أسفل الشاشة. يقبل `srcset` واصفات الكثافة (`2x`) أو العرض (`800w`)؛ والمدخلات على مضيفات أخرى أو بواصفات أخرى تُترك. وتضيف واصفات العرض `sizes` انطلاقاً من عرض الصورة.
 - الصورة الزخرفية البحتة تأخذ نصاً بديلاً فارغاً: `.alt(Text::from(""))`.
+
+### قوائم طويلة من الصور
+
+في كتالوج يضم آلاف صور المنتجات، يمكن للصورة أن تعرض شيئاً أثناء تحميلها وأن تتعافى عند فشلها. يعتمد ذلك كله على ميزات المتصفح الأصلية؛ ومستمع واحد من وحدة الوسائط يخدم كل صور الصفحة.
+
+```rust
+Image::new(p.photo_800.clone())
+    .alt(p.name.clone())
+    .size(400, 500)
+    .lazy()
+    .srcset([(p.photo_400.as_str(), "400w"), (p.photo_800.as_str(), "800w")])
+    .sizes("(min-width: 800px) 25vw, 50vw")
+    .placeholder(Placeholder::color("#d9dde3"))
+    .low(p.photo_40.clone())
+    .fallback("/static/no-photo.webp")
+    .on_error(t!("shop.no_photo"))
+    .fit(Fit::Cover)
+```
+
+- يملأ `.placeholder(...)` الإطار أثناء تحميل الملف، بدون سكربت: `Placeholder::color("#d9dde3")` أو رمز من رموز السمة (`"--z-surface-2"`)، أو `Placeholder::blur(data_uri)` لصورة صغيرة جداً يصنعها التطبيق (عنوان URI بترميز base64 من نوع `data:image/webp` أو `avif` أو `jpeg` أو `png` لا يتجاوز 600 بايت، وليس SVG أبداً)، أو `Placeholder::image(src)` لملف واحد تتشاركه كل الصور. العنصر النائب الذي يخالف قاعدة يُترك.
+- يعرض `.low(src)` فوراً ملفاً صغيراً منخفض الدقة تحت الملف الكامل. يُحمَّل الملف الكامل في الوقت نفسه (تحميلاً كسولاً إذا كانت الصورة كسولة) ويظهر تدريجياً عندما يجهز؛ ومع تقليل الحركة يظهر بدون تلاشٍ.
+- يجرّب `.fallback(src)` ملفاً آخر مرة واحدة عندما تفشل الصورة. بعد ذلك يُعرض `.on_error(text or component)`؛ وبدونه يظهر النص البديل مع أيقونة فوق العنصر النائب. لا تُعاد أي محاولة.
+- يحدد `.priority()` أول صورة يراها الزائر (أكبر رسم): `loading="eager"` و`fetchpriority="high"`، وليست كسولة أبداً. استخدمه مرة واحدة في كل صفحة.
+- يحدد `.sizes(...)` عرض الصورة في التخطيط، فيختار المتصفح العرض المناسب من `srcset`. وبدونه تحصل الصورة الكسولة على `sizes="auto"` ويقيس المتصفح الموضع.
+- يملأ `.fit(Fit::Cover)` الإطار ويقص ما يفيض؛ ويعرض `Fit::Contain` الملف كاملاً.
+- تتبع `low` و`fallback` و`Placeholder::image` قواعد العناوين نفسها التي يتبعها `src`؛ وغيرها يُترك. يحتفظ الإطار دائماً بحجم الصورة، فلا يتحرك شيء أثناء تحميل الملفات أو فشلها.
 
 ## ExternalLink
 

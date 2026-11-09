@@ -41,11 +41,11 @@ Form::of(Contact { quantity: 2, size: Size::Medium, ..Contact::default() })
 | `Control::Percent` | Yüzde işaretiyle gösterilen `Decimal` ya da tam sayı |
 | `Control::Password`, `Control::NewPassword` | Göster ve gizle düğmeli, parola olarak yazılan metin alanı |
 | `Control::PasswordMeter` | Güç göstergeli yeni parola |
-| `Control::Rating` | 1 ile N arasında bir tam sayı, yıldızlar olarak gösterilir ([Rating](#rating) bölümüne bakın) |
+| `Control::Rating` | 1 ile N arasında bir tam sayı, yıldızlar olarak gösterilir; `Decimal` alanda yarım yıldız ([Rating](#rating) bölümüne bakın) |
 
 ## Rating
 
-`Control::Rating`, tam sayı bir alanı 1'den N'ye kadar yıldızlar olarak gösterir; N, alanın `max` kuralıdır (kural yoksa 5, en fazla 10). Etiketi alanın etiketi olan bir `fieldset` içindeki yerel radio düğmelerinden oluşan bir gruptur, bu yüzden betik olmadan W3C APG radio group desenini izler: Tab gruba bir kez ulaşır, ok tuşları hareket ettirir ve işaretler, her yıldız kullanıcının dilinde "3 / 5" gibi adlandırılır. Üzerine gelmek, imlecin olduğu yıldıza kadar olanları aydınlatır. Sunucu değeri alanın kurallarıyla her sayı gibi doğrular, bu yüzden alana `min` ve `max` verin; `Option<i64>` üzerinde `required` varsa tüm yıldızları boş bırakmak reddedilir.
+`Control::Rating`, tam sayı bir alanı 1'den N'ye kadar yıldızlar olarak gösterir; N, alanın `max` kuralıdır (kural yoksa 5, en fazla 10). Etiketi alanın etiketi olan bir `fieldset` içindeki yerel radio düğmelerinden oluşan bir gruptur, bu yüzden betik olmadan W3C APG radio group desenini izler: Tab gruba bir kez ulaşır, ok tuşları hareket ettirir ve işaretler, her yıldız kullanıcının dilinde "3 / 5" gibi adlandırılır. Üzerine gelmek, imlecin olduğu yıldıza kadar olanları aydınlatır. Sunucu değeri alanın kurallarıyla her sayı gibi doğrular, bu yüzden alana `min` ve `max` verin; `Option<i64>` üzerinde `required` varsa tüm yıldızları boş bırakmak reddedilir. `#[rule(min = 1, max = 5, scale = 1)]` kuralı olan bir `Decimal` alan yarım yıldız alır; sunucu 4.3 gibi iki yarım arasındaki bir değeri reddeder ([Mağaza bileşenleri](commerce.md) sayfasına bakın).
 
 ```rust
 #[model]
@@ -182,7 +182,7 @@ Gösterge, tarayıcıda uzunluktan, karakter türlerinden ve bariz desenlerden h
 
 | | |
 |---|---|
-| Eklenen betik | `components.js` içinde maskeler, anahtar ve gösterge için yaklaşık 2 KB gzip (7 KB ham); decimal ve yüzde girişleri sayı kontrolünü kullanır |
+| Eklenen betik | `inputs.js` içinde maskeler, anahtar ve gösterge için yaklaşık 2 KB gzip (7 KB ham); decimal ve yüzde girişleri sayı kontrolünü kullanır |
 | DOM node'ları | maskeli giriş için 3, anahtarlı parola için 4, göstergeyle 11 |
 | İstekler | yazarken yok |
 | Sunucu denetimleri | `scale`, `precision`, `min`, `max` ve `mask` her kayıtta çalışır; sayfadan, API'den ve AI araçlarından aynı şekilde |

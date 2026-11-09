@@ -774,8 +774,48 @@ mod store {
     #[derive(Clone)]
     pub struct FileEntry {
         pub rules: FileRules,
-        pub permission: &'static str,
+        pub access: FileAccess,
         pub store: Arc<dyn FileStore>,
+    }
+
+    /// Who may download and who may upload the files of a store. A plain permission name is
+    /// both; [`FileAccess::read`] with [`FileAccess::write`] splits them, so readers can open
+    /// files they may not add to.
+    ///
+    /// ```ignore
+    /// Feature::new("catalog").files(
+    ///     IMAGES,
+    ///     FileAccess::read("catalog.product.read").write("catalog.product.write"),
+    ///     store,
+    /// )
+    /// ```
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub struct FileAccess {
+        pub read: &'static str,
+        pub write: &'static str,
+    }
+
+    impl FileAccess {
+        /// Downloads need `permission`; uploads need it too until [`FileAccess::write`] names
+        /// another one.
+        pub fn read(permission: &'static str) -> Self {
+            Self {
+                read: permission,
+                write: permission,
+            }
+        }
+
+        /// Uploads need `permission`.
+        pub fn write(mut self, permission: &'static str) -> Self {
+            self.write = permission;
+            self
+        }
+    }
+
+    impl From<&'static str> for FileAccess {
+        fn from(permission: &'static str) -> Self {
+            Self::read(permission)
+        }
     }
 
     fn not_found() -> Error {

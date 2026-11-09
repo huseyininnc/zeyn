@@ -1,9 +1,73 @@
 //! Sample data the examples show: products, people and events, built once and kept in memory.
 //! Nothing a visitor sends is stored.
 
-use std::sync::LazyLock;
+use std::collections::VecDeque;
+use std::sync::{LazyLock, Mutex};
 use zeyn::prelude::*;
 use zeyn::ui::{LookupItem, LookupQuery, TreeItem, TreeQuery};
+
+/// Most entries a store that visitors write keeps; the oldest are dropped first.
+pub const MAX_VISITOR_ENTRIES: usize = 256;
+
+/// What visitors of the public catalog wrote, such as cart quantities or ratings: at most
+/// [`MAX_VISITOR_ENTRIES`], the oldest dropped first, so the memory it takes never grows with
+/// traffic. Writes reach it through actions, which count against the app's write limit.
+pub struct VisitorLog<T> {
+    entries: Mutex<VecDeque<T>>,
+}
+
+impl<T: Clone> Default for VisitorLog<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T: Clone> VisitorLog<T> {
+    pub const fn new() -> Self {
+        VisitorLog {
+            entries: Mutex::new(VecDeque::new()),
+        }
+    }
+
+    /// Keeps `entry`, dropping the oldest one when the log is full.
+    pub fn push(&self, entry: T) {
+        let mut entries = self
+            .entries
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if entries.len() == MAX_VISITOR_ENTRIES {
+            entries.pop_front();
+        }
+        entries.push_back(entry);
+    }
+
+    /// How many entries the log holds.
+    pub fn len(&self) -> usize {
+        self.entries
+            .lock()
+            .map_or(0, |e| e.len())
+    }
+
+    /// Whether the log is empty.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// The newest entry, if any.
+    pub fn last(&self) -> Option<T> {
+        self.entries
+            .lock()
+            .ok()?
+            .back()
+            .cloned()
+    }
+}
+
+/// Cart quantities visitors set: item and quantity.
+pub static CART: VisitorLog<(String, i64)> = VisitorLog::new();
+
+/// Ratings visitors sent, as text.
+pub static RATINGS: VisitorLog<String> = VisitorLog::new();
 
 /// A product of the sample shop.
 #[entity(table = "products")]
@@ -48,6 +112,58 @@ pub struct Event {
     pub title: String,
     pub day: Option<Date>,
     pub starts: String,
+}
+
+/// A warehouse total of the sample shop: large whole numbers, a year and a decimal.
+#[entity(table = "warehouses")]
+pub struct Warehouse {
+    #[key]
+    pub id: WarehouseId,
+    pub city: String,
+    pub units: i64,
+    pub opened: i64,
+    #[rule(scale = 1)]
+    pub tons: Decimal,
+}
+
+/// Sample warehouses.
+#[action(public)]
+pub async fn search_warehouses(q: DataQuery) -> Result<Page<Warehouse>> {
+    let rows = [
+        ("Istanbul", 1_284_310, 1998, 48_215),
+        ("Izmir", 642_005, 2006, 23_904),
+        ("Ankara", 98_760, 2014, 3_506),
+        ("Bursa", 7_250, 2021, 412),
+    ]
+    .into_iter()
+    .zip(1..)
+    .map(|((city, units, opened, tons), id)| Warehouse {
+        id: WarehouseId(id),
+        city: city.into(),
+        units,
+        opened,
+        tons: Decimal::new(tons, 1).unwrap_or_default(),
+    })
+    .collect();
+    Ok(q.apply(rows))
+}
+
+/// A million computed products: only the rows of the asked page are built, from their number.
+#[action(public)]
+pub async fn million_products(q: DataQuery) -> Result<Page<Product>> {
+    const TOTAL: u64 = 1_000_000;
+    let span = q.span();
+    let rows = (span.offset..span.end().min(TOTAL))
+        .map(|n| {
+            let base = &PRODUCTS[(n % PRODUCTS.len() as u64) as usize];
+            Product {
+                id: ProductId(n as i64 + 1),
+                code: format!("M-{:07}", n + 1),
+                ..base.clone()
+            }
+        })
+        .collect();
+    Ok(Page::window(rows, TOTAL, span))
 }
 
 /// The address of sample picture `n` (1 to 12), served by the site as an SVG.
@@ -137,6 +253,96 @@ pub async fn search_products(q: DataQuery) -> Result<Page<Product>> {
     Ok(q.apply(PRODUCTS.clone()))
 }
 
+/// How many items the large catalog has, on [`SHELVES`] shelves of equal size.
+pub const ITEMS: i64 = 2000;
+
+/// Shelves of the large catalog; a shelf fits one page of a card grid.
+pub const SHELVES: i64 = 4;
+
+/// An item of the large catalog, with a photo of its own.
+#[entity(table = "items")]
+pub struct Item {
+    #[key]
+    pub id: ItemId,
+    pub name: String,
+    pub price: Money,
+    pub shelf: i64,
+    pub color: String,
+    pub brand: String,
+    pub old_price: Money,
+}
+
+impl Item {
+    /// The full photo of the item. Every 97th item has none, to show the fallback.
+    pub fn photo(&self) -> String {
+        match self.id.0 % 97 {
+            0 => format!("/site/photo/missing-{}.svg", self.id.0),
+            _ => format!("/site/photo/{}.svg", self.id.0),
+        }
+    }
+
+    /// The small, low resolution photo shown first.
+    pub fn low(&self) -> String {
+        format!("/site/photo/{}-low.svg", self.id.0)
+    }
+}
+
+/// The colors of the large catalog: value and name.
+pub const COLORS: [(&str, &str); 6] = [
+    ("black", "Black"),
+    ("white", "White"),
+    ("red", "Red"),
+    ("blue", "Blue"),
+    ("green", "Green"),
+    ("sand", "Sand"),
+];
+
+/// The brands of the large catalog.
+pub const BRANDS: [&str; 8] = [
+    "Arda", "Birch", "Cove", "Dune", "Elm", "Fjord", "Grove", "Haven",
+];
+
+/// Every item of the large catalog.
+pub fn items() -> &'static [Item] {
+    &ITEM_ROWS
+}
+
+static ITEM_ROWS: LazyLock<Vec<Item>> = LazyLock::new(|| {
+    (1..=ITEMS)
+        .map(|i| Item {
+            id: ItemId(i),
+            name: format!("Item {i}"),
+            price: Money::tl(990 + (i * 7_919) % 90_000),
+            shelf: (i - 1) * SHELVES / ITEMS,
+            color: COLORS[(i % COLORS.len() as i64) as usize]
+                .0
+                .to_string(),
+            brand: BRANDS[((i / 7) % BRANDS.len() as i64) as usize].to_string(),
+            old_price: match i % 5 {
+                0 => Money::tl((990 + (i * 7_919) % 90_000) * 5 / 4),
+                _ => Money::tl(0),
+            },
+        })
+        .collect()
+});
+
+/// The items of the large catalog: filter, sort and page.
+#[action(public)]
+pub async fn search_items(q: DataQuery) -> Result<Page<Item>> {
+    Ok(q.apply(ITEM_ROWS.clone()))
+}
+
+/// Photo `n` of the large catalog, full (a gradient with a circle) or low (one color).
+pub fn photo_svg(n: u32, low: bool) -> String {
+    let hue = (n * 47) % 360;
+    match low {
+        true => format!(
+            r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3 3" width="3" height="3"><rect width="3" height="3" fill="hsl({hue} 65% 62%)"/></svg>"#
+        ),
+        false => svg(n),
+    }
+}
+
 /// Sample people: filter, sort and page.
 #[action(public)]
 pub async fn search_people(q: DataQuery) -> Result<Page<Person>> {
@@ -154,7 +360,11 @@ pub async fn people_uncounted(q: DataQuery) -> Result<Page<Person>> {
 /// Events of the current week, a few each day.
 #[action(public)]
 pub async fn week_events(q: DataQuery, ctx: Ctx) -> Result<Page<Event>> {
-    let today = ctx.today();
+    Ok(q.apply(week(ctx.today())))
+}
+
+/// The sample events of the week of `today`, Monday first.
+pub fn week(today: Date) -> Vec<Event> {
     let monday = today
         .add_days(1 - i64::from(today.weekday()))
         .unwrap_or(today);
@@ -168,8 +378,7 @@ pub async fn week_events(q: DataQuery, ctx: Ctx) -> Result<Page<Event>> {
         (4, "Demo day", "15:00"),
         (5, "Open house", "11:00"),
     ];
-    let events = plan
-        .iter()
+    plan.iter()
         .enumerate()
         .map(|(i, (offset, title, starts))| Event {
             id: EventId(i as i64 + 1),
@@ -177,8 +386,7 @@ pub async fn week_events(q: DataQuery, ctx: Ctx) -> Result<Page<Event>> {
             day: monday.add_days(*offset),
             starts: starts.to_string(),
         })
-        .collect();
-    Ok(q.apply(events))
+        .collect()
 }
 
 /// Sample products for lookups.
@@ -246,5 +454,17 @@ pub async fn slow_count(_: ()) -> Result<i64> {
 /// Pretends to save. Nothing is stored.
 #[action(public)]
 pub async fn pretend_save(_: ()) -> Result<()> {
+    Ok(())
+}
+
+/// Pretends to delete one product. Nothing changes.
+#[action(public)]
+pub async fn pretend_delete(_: ProductId) -> Result<()> {
+    Ok(())
+}
+
+/// Pretends to delete the selected products. Nothing changes.
+#[action(public)]
+pub async fn pretend_delete_all(_: Vec<ProductId>) -> Result<()> {
     Ok(())
 }

@@ -250,11 +250,28 @@ impl Component for Panel {
     }
 }
 
-/// A raised box that groups related content, with an optional title.
+/// A box that groups related content: an optional title with one action at its end
+/// (`.action(..)`, such as a "View all" link or a menu), the content, and an optional footer
+/// (`.footer(..)`). A grid or list that is the card's content runs edge to edge without a second
+/// border, and a card inside a card loses its own box.
+///
+/// ```
+/// use zeyn::prelude::*;
+///
+/// let card = Card::new()
+///     .title("Latest orders")
+///     .action(Badge::new("12").count())
+///     .add(Paragraph::new("Orders of today."))
+///     .footer(Paragraph::new("Updated a minute ago."));
+/// ```
 #[derive(Default)]
 pub struct Card {
     title: Option<Text>,
     nodes: Vec<Node>,
+    /// Index in `nodes` of the title row's action.
+    action: Option<usize>,
+    /// Index in `nodes` of the footer.
+    footer: Option<usize>,
 }
 
 impl Card {
@@ -264,6 +281,21 @@ impl Card {
 
     pub fn title(mut self, title: impl Into<Text>) -> Self {
         self.title = Some(title.into());
+        self
+    }
+
+    /// One action at the end of the title row, such as a link button or a menu button. Needs a
+    /// title.
+    pub fn action(mut self, node: impl Into<Node>) -> Self {
+        self.action = Some(self.nodes.len());
+        self.nodes.push(node.into());
+        self
+    }
+
+    /// A footer under a divider, such as a "View all orders" link.
+    pub fn footer(mut self, node: impl Into<Node>) -> Self {
+        self.footer = Some(self.nodes.len());
+        self.nodes.push(node.into());
         self
     }
 
@@ -279,24 +311,50 @@ impl Card {
 
 impl Component for Card {
     fn render(&self, out: &mut String, r: &Render) {
-        match &self.title {
-            Some(t) => {
-                let id = dom_id(r, "card");
-                out.push_str(&format!(
-                    r#"<article class="z-card" aria-labelledby="{id}-title"><h3 class="z-card-title" id="{id}-title">{}</h3>"#,
-                    r.text(t)
-                ));
+        let id = dom_id(r, "card");
+        if let Some(t) = &self.title {
+            let title = format!(
+                r#"<h3 class="z-card-title" id="{id}-title">{}</h3>"#,
+                r.text(t)
+            );
+            out.push_str(&format!(
+                r#"<article class="z-card" aria-labelledby="{id}-title">"#
+            ));
+            match self.action {
+                Some(a) => {
+                    out.push_str(r#"<header class="z-card-head">"#);
+                    out.push_str(&title);
+                    out.push_str(r#"<div class="z-card-action">"#);
+                    render_child(out, r, a, &self.nodes[a]);
+                    out.push_str("</div></header>");
+                }
+                None => out.push_str(&title),
             }
-            None => out.push_str(r#"<article class="z-card">"#),
+        } else {
+            out.push_str(r#"<article class="z-card">"#);
         }
         for (i, node) in self.nodes.iter().enumerate() {
+            if Some(i) == self.footer || (Some(i) == self.action && self.title.is_some()) {
+                continue;
+            }
             render_child(out, r, i, node);
+        }
+        if let Some(f) = self.footer {
+            out.push_str(r#"<footer class="z-card-foot">"#);
+            render_child(out, r, f, &self.nodes[f]);
+            out.push_str("</footer>");
         }
         out.push_str("</article>");
     }
 
     fn schema(&self) -> Json {
-        json!({ "type": "card", "title": self.title, "children": children_schema(&self.nodes) })
+        json!({
+            "type": "card",
+            "title": self.title,
+            "action": self.action,
+            "footer": self.footer,
+            "children": children_schema(&self.nodes),
+        })
     }
 
     fn children(&self) -> &[Node] {

@@ -58,20 +58,40 @@ The server caps the page size whatever the client asks for.
 | `.filter()` | A filter box that fits the type: text, number range, date range, choice list |
 | `.no_sort()` | No sort button or sort menu entries; the server drops sort keys on the column. For actions that cannot order by it (generated rows, no database index) |
 | `.sum()`, `.avg()`, `.min()`, `.max()` | Totals in the footer. `sum` on a text column does not compile |
-| `.badge(\|v\| tone)` | Shows the value as a colored badge |
+| `.badge(\|v\| tone)` | Shows the value as a label in the tone, on its subtle tint |
+| `.status(\|v\| tone)` | Shows the value as status: a dot in the tone before plain text, quieter than a badge |
 | `.progress(max)` | A bar from 0 to `max` |
 | `.check_icon()` | A check mark for `true` |
 | `.link(\|row\| effect)` | Makes the cell a link that runs an effect |
 | `.pin_start()`, `.hidden()` | Pinned to the start, or hidden until the user shows it |
 | `.editable()` | Editable in place, saved with `.edit_with(action)` |
+| `.plain()` | Whole numbers without group separators, for codes and years |
+| `.wrap()` | Long values wrap onto more lines. Cells stay on one line and end in an ellipsis unless set, so every row has the same height |
+
+Rows are 40 px (32 px in compact density) and divided by lines only; `DataGrid::zebra()` shades every other row for very wide grids. Links in cells read as text at weight 500 and underline on hover.
+
+Numbers and money are right aligned with tabular digits. Whole numbers are grouped by the user's locale (`1,234,567` in English, `1.234.567` in Turkish), in grid cells and in display values such as `DescriptionList`; `#[key]` ids are never grouped, and `.plain()` turns grouping off for one column.
 
 ## Rows
 
 - `.on_open(|row| effect)`: double click or Enter on a row.
 - `.row_action(label, action, |row| input)`: a button on each row.
 - `.bulk_action(label, action, M::id)`: runs on the selected rows.
+- `.confirm(message)` and `.tone(Tone::Danger)` right after `.row_action` or `.bulk_action`: asks before that action runs, in the same dialog as `ActionButton::confirm` (Cancel has the focus first), and draws its button in red.
 - `.row_menu(|row| ContextMenu)`: the right click menu of a row.
 - `.row_style(|row| Option<RowStyle>)`: danger, warning or success rows.
 - `.exportable()`: CSV export of the filtered rows, streamed by the server.
+
+## Refreshing in place
+
+`.listens(topic)`, called last, makes the grid reload in place when the topic is named (see [Topics](effects.md#topics)): after `ui.refresh(topic)` it reloads its current page with its sort and filters, after a filter control that `.drives(topic)` changed it starts on the first page with the new screen params. The grid reloads through `POST /_zeyn/grid` with every permission check, and a screen param the filter changed reaches the grid through the screen function, for example as a scope:
+
+```rust
+let mut grid = DataGrid::of(search_orders);
+if let Some(region) = p.region {
+    grid = grid.scope(Order::region, region);
+}
+grid.column(Order::number).column(Order::total).listens("orders")
+```
 
 The [DataGrid reference](grid.md) covers saved views, master detail, grouping, tree data, inline editing, cell navigation, copy and paste, column virtualization and accessibility.

@@ -24,14 +24,6 @@ const CSS: &str = include_str!("../../assets/pro.css");
 /// Asset paths served without authentication, like the runtime itself.
 pub(super) const ASSETS: [&str; 2] = ["/_zeyn/pro.js", "/_zeyn/pro.css"];
 
-/// Links placed in the page head after the component library's own.
-pub(super) fn head(base: &str) -> String {
-    let v = super::ops::asset_version();
-    format!(
-        r#"<link rel="stylesheet" href="{base}/_zeyn/pro.css{v}"><script type="module" src="{base}/_zeyn/pro.js{v}"></script>"#
-    )
-}
-
 pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
     router
         .route(

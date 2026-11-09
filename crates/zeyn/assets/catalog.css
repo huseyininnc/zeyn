@@ -2,6 +2,17 @@
  * Card grids, rails and search boxes. Colors come from the theme tokens, so both themes work.
  */
 
+/* Separators between rows (`CardGrid::separator`): one before every row, none before the first. */
+.z-cards [data-zeyn-rows] > .z-separator,
+.z-rail [data-zeyn-rows] > .z-separator {
+  list-style: none;
+  color: var(--z-text-muted);
+}
+.z-cards [data-zeyn-rows] > .z-separator:first-child,
+.z-rail [data-zeyn-rows] > .z-separator:first-child {
+  display: none;
+}
+
 .z-cards,
 .z-rail {
   display: flex;
@@ -22,8 +33,10 @@
 
 .z-cards-title {
   margin: 0;
-  font-size: 1.125rem;
+  font-size: var(--z-text-lg);
   font-weight: 600;
+  line-height: var(--z-leading-lg);
+  letter-spacing: -0.005em;
 }
 
 .z-cards-sort {
@@ -45,14 +58,14 @@
 .z-cards-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 160px), 1fr));
-  gap: 16px;
+  gap: var(--z-gap);
 }
 
 .z-rail-list {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: clamp(132px, 42%, 200px);
-  gap: 16px;
+  gap: var(--z-gap);
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scroll-snap-type: x proximity;
@@ -357,3 +370,56 @@ a.z-poster-link:focus-visible {
 }
 
 .z-search-rich-sub { font-size: var(--z-font-size-sm); color: var(--z-text-muted); }
+
+/* Off screen cards and rows: the browser skips their layout and paint until they come near the
+   viewport (`content-visibility: auto`) and reserves their size meanwhile. The estimate comes
+   from the image ratio the server writes on the section (`--z-card-ratio`, height over width)
+   and, in a card grid, the column width worked out from the list's width (a size container);
+   after a card has been seen once, the browser keeps its real size (`auto`). Focus, find in page,
+   anchor links and screen readers still reach skipped cards. `overflow-clip-margin` keeps the
+   focus ring and the hover shadow, which reach a few pixels outside the card, from being cut. */
+
+.z-cards-list { container-type: inline-size; }
+
+.z-cards-list > .z-poster,
+.z-rail-list > .z-poster {
+  --z-card-column: 200px;
+  content-visibility: auto;
+  contain-intrinsic-size: auto var(--z-card-column) auto calc(var(--z-card-column) * var(--z-card-ratio, 1.333) + 63px);
+  overflow-clip-margin: 8px;
+}
+
+@supports (width: calc(100cqi / 1px * 1px)) {
+  .z-cards-list > .z-poster {
+    --z-card-column: calc((100cqi + var(--z-gap)) / max(1, round(down, (100cqi + var(--z-gap)) / (160px + var(--z-gap)), 1)) - var(--z-gap));
+  }
+}
+
+.z-cards-list > .z-poster-h,
+.z-rail-list > .z-poster-h {
+  contain-intrinsic-size: auto 300px auto calc(102px * var(--z-card-ratio, 1.333) + 2px);
+}
+
+.z-cards-list > .z-list-item {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 300px auto 72px;
+  overflow-clip-margin: 8px;
+}
+
+/* Windowed card grids (catalog.js): the list holds only the rows near the viewport, the others
+   are padding, and a focused card out of view keeps its own cell out of the flow. Every card in
+   the list is near the viewport, so content-visibility only costs there: measured at 4x CPU it
+   took a fast scroll from 19 down to 7 frames per second. */
+
+.z-cards-list[data-zeyn-window] {
+  position: relative;
+  contain: layout style;
+}
+
+.z-cards-list[data-zeyn-window] > .z-poster { content-visibility: visible; }
+
+.z-cards-list[data-zeyn-window] > .z-cards-kept {
+  position: absolute;
+}
+
+.z-cards-list[data-zeyn-window] img[data-zeyn-park] { visibility: hidden; }

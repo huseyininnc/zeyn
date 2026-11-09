@@ -22,7 +22,7 @@ Stack::new()
 
 ## Badge
 
-`Badge::new(text).tone(Tone::...)`. Tones: `Neutral`, `Info`, `Success`, `Warning`, `Danger` and `Brand`. Grids show values as badges with `.badge(|v| tone)`.
+`Badge::new(text).tone(Tone::...)`. Tones: `Neutral`, `Info`, `Success`, `Warning`, `Danger` and `Brand`. A toned badge shows the tone's text on its subtle tint; `Neutral` is a muted label with one outline, for plain values such as a plan. `.dot()` draws an 8 px dot in the tone before plain text, the quieter form for status in lists; `.count()` draws a round pill for a number. Grids show values as badges with `.badge(|v| tone)` and as dots with `.status(|v| tone)`.
 
 ## Progress
 
@@ -67,7 +67,7 @@ LinkButton::new(t!("cart.browse"), products, ()).primary()
 
 ## ActionButton
 
-`ActionButton::new(label, action, input)` runs an action. `.confirm(text)` asks first, `.tone(Tone::Danger)` marks a destructive one, and `.on_success(|result, ui| ...)` runs effects. The input is fixed on the server and never comes from the client; the action's permission is checked on the server like any form.
+`ActionButton::new(label, action, input)` runs an action. `.confirm(text)` asks first, `.tone(Tone::Danger)` marks a destructive one, and `.on_success(|result, ui| ...)` runs effects. The input is fixed on the server and never comes from the client; the action's permission is checked on the server like any form. `.tone(Tone::Brand)` draws it as the main action of its area, such as a card.
 
 ```rust
 ActionButton::new(t!("docs.live.count"), count_samples, ())
@@ -140,6 +140,32 @@ Image::new("https://images.example.com/logo.png")
 - `src` is a path on the app (`/static/logo.png`) or an `https` address on a host of the app's `img-src` (`App::csp(|c| c.img_src([...]))`). Any other image is not rendered and its alt text is shown instead, so the browser never logs a blocked request.
 - Every image gets `decoding="async"`; `.lazy()` adds `loading="lazy"` for images below the fold. `srcset` takes density (`2x`) or width (`800w`) descriptors; entries on other hosts or with other descriptors are left out. Width descriptors add `sizes` from the image width.
 - A purely decorative image takes an empty alt text: `.alt(Text::from(""))`.
+
+### Long lists of photos
+
+For a catalog with thousands of product photos, an image can show something while it loads and recover when it fails. It all uses native browser features; one listener of the media module serves every image on the page.
+
+```rust
+Image::new(p.photo_800.clone())
+    .alt(p.name.clone())
+    .size(400, 500)
+    .lazy()
+    .srcset([(p.photo_400.as_str(), "400w"), (p.photo_800.as_str(), "800w")])
+    .sizes("(min-width: 800px) 25vw, 50vw")
+    .placeholder(Placeholder::color("#d9dde3"))
+    .low(p.photo_40.clone())
+    .fallback("/static/no-photo.webp")
+    .on_error(t!("shop.no_photo"))
+    .fit(Fit::Cover)
+```
+
+- `.placeholder(...)` fills the box while the file loads, without script: `Placeholder::color("#d9dde3")` or a theme token (`"--z-surface-2"`), `Placeholder::blur(data_uri)` for a tiny image the app made (a base64 `data:image/webp`, `avif`, `jpeg` or `png` URI of at most 600 bytes, never SVG), or `Placeholder::image(src)` for one file shared by every image. A placeholder that breaks a rule is left out.
+- `.low(src)` shows a small, low resolution file at once under the full one. The full file loads at the same time (lazily when the image is lazy) and fades in when it is ready; with reduced motion it appears without the fade.
+- `.fallback(src)` tries another file once when the image fails. After that `.on_error(text or component)` is shown; without it, the alt text with an icon on the placeholder. Nothing is tried again.
+- `.priority()` marks the first image a visitor sees (the largest paint): `loading="eager"` and `fetchpriority="high"`, never lazy. Use it once per page.
+- `.sizes(...)` says how wide the image is in the layout, so the browser picks the right `srcset` width. Without it a lazy image gets `sizes="auto"` and the browser measures the slot.
+- `.fit(Fit::Cover)` fills the box and cuts what overflows; `Fit::Contain` shows the whole file.
+- `low`, `fallback` and `Placeholder::image` follow the same address rules as `src`; others are left out. The box always keeps the image's size, so nothing moves while files load or fail.
 
 ## ExternalLink
 

@@ -115,6 +115,8 @@ Las notificaciones llevan solo el nombre del topic, nunca datos: la actualizaci�
 normal del grid con todas las comprobaciones de permisos. `notify` llega solo al tenant de quien llama;
 `notify_tenant(Some(id), topic)` nombra uno, `None` es la app sin multitenencia.
 
+Los mismos nombres de topic funcionan sin el canal. Los nodos marcados con `.listens("orders")` se refrescan en su sitio cuando una notificación nombra el topic (`live.js` lo pasa como `zeyn:topics`), y también cuando una action termina con `ui.refresh("orders")` o cambia un filtro que `.drives("orders")`: los grids recargan su página actual y los demás listeners se vuelven a renderizar con un `POST /_zeyn/nodes` por pantalla (consulta Topics en `examples/docs/pages/effects.md`). El socket se suscribe solo a los topics de los nodos `Live`, que deben declararse con `Realtime::topic`; usa `.listens` dentro o al lado de ellos para las partes que no son grids.
+
 ## 5. Memoria y contrapresión
 
 Cada pieza de estado tiene un límite (`Limits`, valores predeterminados entre corchetes):

@@ -27,6 +27,8 @@ Form::of(Contact { quantity: 1, ..Contact::default() })
 | `.range(M::from, M::to)` | 两个日期合为一个范围选择器 |
 | `Form::auto(value)` | 所有字段，按声明顺序 |
 
+表单最宽 720 px，只包含一个表单的卡片或面板与表单同宽，因此卡片不会有一半空着。标签位于 36 px 输入框上方 6 px 处；字段之间相距 20 px。获得焦点的输入框显示焦点色边框和一圈柔和的 3 px 光环；无效的输入框显示危险色边框。单位、货币和 `%` 以弱化样式绘制在输入框内部，数字字段把减号和加号按钮（28 px）放在字段末端内部；方向键仍可步进。
+
 ## 保存
 
 `.submit(label, action)` 指定负责保存的 action。该 action 必须接收该表单 model 的 `Valid<M>`；其他类型无法编译。运行时发送这些值，服务器运行每条规则，然后运行 action。
@@ -38,6 +40,52 @@ Form::of(Contact { quantity: 1, ..Contact::default() })
 ## 控件
 
 每种字段类型都有默认控件：文本输入、数字输入、带币种的金额、日期和时间选择器、`bool` 的复选框以及选项的下拉框。`.control(M::f, Control::...)` 选择另一种控件，`.lookup(M::f, action)` 在服务器上搜索记录。参见[控件与选择器](controls.md)。
+
+## 依赖的 lookup
+
+`.depends_on(field, source)` 让 lookup `field` 的选项依赖于另一个字段，例如某个国家的城市。每次搜索都会在 `LookupQuery::parent` 中发送 `source` 的值（`q.parent_id()` 把它读作 id），`source` 改变时会清空 `field`，使其选项按新值重新加载。
+
+```rust
+#[action(permission = "geo.read")]
+pub async fn find_cities(q: LookupQuery, store: Cities) -> Result<Page<LookupItem>> {
+    Ok(q.apply(store.of_country(q.parent_id())))
+}
+
+Form::of(address)
+    .lookup(Address::country, find_countries)
+    .lookup(Address::city, find_cities)
+    .depends_on(Address::city, Address::country)
+    .submit(t!("save"), save_address)
+```
+
+这一对值不能交给浏览器信任，因此提交时服务器会带着提交的国家，以该 action 的权限再次向 lookup 的 action 查询所选城市，对它不返回的城市给出字段错误并拒绝。按 id 查询时也要按父值筛选，就像筛选后再调用 `q.apply` 那样。`App::check_page` 会报告字段不是表单 lookup、或来源不是表单另一个字段的 `depends_on`。
+
+## 筛选表单
+
+没有提交按钮的表单可以筛选界面：`.drives(topic)` 把它的字段变成界面的 params。字段变化时（选择框、日期范围、按 Enter 的文本框），其值进入同名的界面 param，地址保持同步，`.listens(topic)` 的节点就地刷新并从自己的 params 中读取该值（见 [主题](effects.md#topics)）。数字和布尔值按原样发送，空字段发送为 `null`；服务器把 params 读作界面的类型化 params，不合适的值会被拒绝。
+
+```rust
+#[params]
+pub struct SalesParams {
+    pub region: Option<Region>,
+    pub from: Option<Date>,
+    pub to: Option<Date>,
+}
+
+#[screen(route = "/sales", permission = "sales.read")]
+pub fn sales(p: SalesParams, store: Sales) -> Screen {
+    Screen::new(t!("sales.title"))
+        .body(
+            Form::of(SalesFilter { region: p.region, from: p.from, to: p.to })
+                .field(SalesFilter::region)
+                .range(SalesFilter::from, SalesFilter::to)
+                .drives("sales"),
+        )
+        .body(Kpi::new(t!("sales.total"), store.total(&p)).listens("sales"))
+}
+```
+
+带 `submit` 的表单不能驱动主题；请改为在保存后于 `on_success` 中用 `ui.refresh(topic)` 刷新。
 
 ## 只读字段
 
@@ -59,6 +107,8 @@ Feature::new("support")
 
 Form::of(ticket).field(Ticket::title).file(Ticket::attachments, ATTACHMENTS)
 ```
+
+一个权限名让同一批用户既能上传也能下载。若要让读者打开他们无权添加的文件，请将其拆分：`.files(ATTACHMENTS, FileAccess::read("support.ticket.read").write("support.ticket.files"), store)`。
 
 该控件是放在拖放区域内的原生文件输入。每个文件独立上传并带进度条，上传过程中可以取消，失败后可以重试，完成后可以移除。图片会显示由所选文件的对象 URL 生成的预览。进度和结果通过一个 polite 实时区域播报。showcase 在 `/uploads` 有一个可运行的示例；本文档站点没有已登录的用户，因此不显示实时上传。
 

@@ -30,7 +30,7 @@ Row::new().col(customer_form).weight(2).col(order_totals)
 
 ## Card 与 Panel
 
-`Card` 是带有可选标题的普通表面。`Panel` 是带标题的区块，可带有工具栏；`.collapsible()` 允许用户折叠它，`.collapsed()` 使其初始即为折叠状态。
+`Card` 是带有可选标题的普通表面：20 px 内边距、一道边框、没有阴影。`.action(node)` 在标题行末尾放一个操作（链接按钮或菜单），`.footer(node)` 在分隔线下方添加页脚，例如“查看全部”链接。作为卡片内容的表格或列表会延伸到卡片边缘，因此只有一道边框而不是两道；卡片中的卡片会去掉自己的外框；`Row` 中的卡片会拉伸到最高那张的高度。`Panel` 是带标题的区块，可带有工具栏；`.collapsible()` 允许用户折叠它，`.collapsed()` 使其初始即为折叠状态。
 
 ```rust
 Panel::new(t!("ui.panel_products")).collapsible().toolbar(|t| t.export(Export::Csv)).add(products())

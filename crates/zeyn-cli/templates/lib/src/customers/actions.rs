@@ -1,5 +1,5 @@
 use super::models::Customer;
-use super::store::CustomerStore;
+use super::services::CustomerStore;
 use zeyn::prelude::*;
 
 /// Customers for lists and the API.

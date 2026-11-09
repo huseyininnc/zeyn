@@ -22,7 +22,7 @@ Stack::new()
 
 ## Badge
 
-`Badge::new(text).tone(Tone::...)`. Tonlar: `Neutral`, `Info`, `Success`, `Warning`, `Danger` ve `Brand`. Grid'ler değerleri `.badge(|v| tone)` ile rozet olarak gösterir.
+`Badge::new(text).tone(Tone::...)`. Tonlar: `Neutral`, `Info`, `Success`, `Warning`, `Danger` ve `Brand`. Tonlu bir rozet, tonun metnini tonun soluk zemini üzerinde gösterir; `Neutral` tek çizgili soluk bir etikettir, bir plan gibi düz değerler içindir. `.dot()` düz metnin önüne tonun renginde 8 px'lik bir nokta çizer; bu, listelerde durum için daha sakin biçimdir. `.count()` bir sayı için yuvarlak bir hap çizer. Grid'ler değerleri `.badge(|v| tone)` ile rozet olarak, `.status(|v| tone)` ile nokta olarak gösterir.
 
 ## Progress
 
@@ -67,7 +67,7 @@ LinkButton::new(t!("cart.browse"), products, ()).primary()
 
 ## ActionButton
 
-`ActionButton::new(label, action, input)` bir action çalıştırır. `.confirm(text)` önce sorar, `.tone(Tone::Danger)` yıkıcı bir işlemi işaretler ve `.on_success(|result, ui| ...)` effect'leri çalıştırır. Girdi sunucuda sabitlenir ve istemciden gelmez; action'ın permission'ı her form gibi sunucuda denetlenir.
+`ActionButton::new(label, action, input)` bir action çalıştırır. `.confirm(text)` önce sorar, `.tone(Tone::Danger)` yıkıcı bir işlemi işaretler ve `.on_success(|result, ui| ...)` effect'leri çalıştırır. Girdi sunucuda sabitlenir ve istemciden gelmez; action'ın permission'ı her form gibi sunucuda denetlenir. `.tone(Tone::Brand)` onu bulunduğu alanın, örneğin bir kartın ana eylemi olarak çizer.
 
 ```rust
 ActionButton::new(t!("docs.live.count"), count_samples, ())
@@ -140,6 +140,32 @@ Image::new("https://images.example.com/logo.png")
 - `src`, uygulamadaki bir yol (`/static/logo.png`) ya da uygulamanın `img-src` listesindeki bir hosttaki `https` adresidir (`App::csp(|c| c.img_src([...]))`). Başka her görsel render edilmez ve yerine alt metni gösterilir, böylece tarayıcı engellenmiş bir isteği hiçbir zaman günlüğe yazmaz.
 - Her görsel `decoding="async"` alır; `.lazy()` ekranın altındaki görseller için `loading="lazy"` ekler. `srcset` yoğunluk (`2x`) ya da genişlik (`800w`) tanımlayıcıları alır; başka hostlardaki ya da başka tanımlayıcılı girdiler dışarıda bırakılır. Genişlik tanımlayıcıları, görsel genişliğinden `sizes` ekler.
 - Tamamen süslemeli bir görsel boş alt metin alır: `.alt(Text::from(""))`.
+
+### Uzun fotoğraf listeleri
+
+Binlerce ürün fotoğrafı olan bir katalogda görsel, yüklenirken bir şey gösterebilir ve yüklenemediğinde toparlanabilir. Hepsi tarayıcının yerleşik özelliklerini kullanır; sayfadaki her görsele medya modülünün tek bir dinleyicisi hizmet eder.
+
+```rust
+Image::new(p.photo_800.clone())
+    .alt(p.name.clone())
+    .size(400, 500)
+    .lazy()
+    .srcset([(p.photo_400.as_str(), "400w"), (p.photo_800.as_str(), "800w")])
+    .sizes("(min-width: 800px) 25vw, 50vw")
+    .placeholder(Placeholder::color("#d9dde3"))
+    .low(p.photo_40.clone())
+    .fallback("/static/no-photo.webp")
+    .on_error(t!("shop.no_photo"))
+    .fit(Fit::Cover)
+```
+
+- `.placeholder(...)` dosya yüklenirken kutuyu betik olmadan doldurur: `Placeholder::color("#d9dde3")` ya da bir tema token'ı (`"--z-surface-2"`), uygulamanın ürettiği çok küçük bir görsel için `Placeholder::blur(data_uri)` (en fazla 600 baytlık base64 bir `data:image/webp`, `avif`, `jpeg` ya da `png` URI'si, asla SVG değil) veya her görselin paylaştığı tek bir dosya için `Placeholder::image(src)`. Bir kuralı çiğneyen yer tutucu dışarıda bırakılır.
+- `.low(src)` tam dosyanın altında hemen küçük, düşük çözünürlüklü bir dosya gösterir. Tam dosya aynı anda yüklenir (görsel tembelse tembel olarak) ve hazır olduğunda belirerek gelir; azaltılmış hareket tercihinde geçiş efekti olmadan görünür.
+- `.fallback(src)` görsel yüklenemediğinde bir kez başka bir dosyayı dener. Ondan sonra `.on_error(text or component)` gösterilir; o yoksa yer tutucunun üzerinde bir simgeyle birlikte alt metin. Hiçbir şey yeniden denenmez.
+- `.priority()` ziyaretçinin gördüğü ilk görseli (en büyük boyama) işaretler: `loading="eager"` ve `fetchpriority="high"`, asla tembel değil. Sayfa başına bir kez kullanın.
+- `.sizes(...)` görselin yerleşimde ne kadar geniş olduğunu söyler, böylece tarayıcı doğru `srcset` genişliğini seçer. O olmadan tembel bir görsel `sizes="auto"` alır ve tarayıcı yuvayı ölçer.
+- `.fit(Fit::Cover)` kutuyu doldurur ve taşan kısmı keser; `Fit::Contain` dosyanın tamamını gösterir.
+- `low`, `fallback` ve `Placeholder::image`, `src` ile aynı adres kurallarına uyar; diğerleri dışarıda bırakılır. Kutu her zaman görselin boyutunu korur, böylece dosyalar yüklenirken ya da yüklenemediğinde hiçbir şey kaymaz.
 
 ## ExternalLink
 

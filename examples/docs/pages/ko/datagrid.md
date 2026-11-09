@@ -57,20 +57,40 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 | `.width(px)`, `.flex(n)` | 고정 너비 또는 남는 너비의 비율 |
 | `.filter()` | 타입에 맞는 필터 상자: 텍스트, 숫자 범위, 날짜 범위, 선택 목록 |
 | `.sum()`, `.avg()`, `.min()`, `.max()` | 바닥글의 합계. 텍스트 열에 `sum`을 쓰면 컴파일되지 않습니다 |
-| `.badge(\|v\| tone)` | 값을 색상 배지로 표시합니다 |
+| `.badge(\|v\| tone)` | 값을 톤의 은은한 색조 위에 레이블로 표시합니다 |
+| `.status(\|v\| tone)` | 값을 상태로 표시합니다. 일반 텍스트 앞에 톤 색의 점을 두며 배지보다 차분합니다 |
 | `.progress(max)` | 0부터 `max`까지의 막대 |
 | `.check_icon()` | `true`에 대한 체크 표시 |
 | `.link(\|row\| effect)` | 셀을 effect를 실행하는 링크로 만듭니다 |
 | `.pin_start()`, `.hidden()` | 시작 쪽에 고정하거나, 사용자가 표시할 때까지 숨깁니다 |
 | `.editable()` | 그 자리에서 편집할 수 있으며 `.edit_with(action)`으로 저장됩니다 |
+| `.plain()` | 정수를 자릿수 구분 기호 없이 표시합니다. 코드와 연도용 |
+| `.wrap()` | 긴 값을 여러 줄로 줄바꿈합니다. 설정하지 않으면 셀은 한 줄로 유지되고 말줄임표로 끝나므로 모든 행의 높이가 같습니다 |
+
+행은 40 px(촘촘한 밀도에서 32 px)이고 선으로만 구분됩니다. 아주 넓은 그리드에서는 `DataGrid::zebra()`가 한 행 걸러 음영을 넣습니다. 셀 안의 링크는 굵기 500의 텍스트로 보이고 호버하면 밑줄이 생깁니다.
+
+숫자와 금액은 오른쪽 정렬되고 고정폭 숫자로 표시됩니다. 정수는 그리드 셀과 `DescriptionList` 같은 표시 값에서 사용자 로캘에 따라 묶어 표시됩니다(영어 `1,234,567`, 터키어 `1.234.567`). `#[key]` id는 묶지 않으며, `.plain()`은 한 열의 묶음 표시를 끕니다.
 
 ## 행
 
 - `.on_open(|row| effect)`: 행에서 더블 클릭 또는 Enter.
 - `.row_action(label, action, |row| input)`: 각 행의 버튼.
 - `.bulk_action(label, action, M::id)`: 선택한 행에서 실행됩니다.
+- `.row_action`이나 `.bulk_action` 바로 뒤의 `.confirm(message)`와 `.tone(Tone::Danger)`: 그 작업이 실행되기 전에 `ActionButton::confirm`과 같은 대화 상자로 묻고(포커스는 먼저 취소에 있음), 버튼을 빨간색으로 그립니다.
 - `.row_menu(|row| ContextMenu)`: 행의 오른쪽 클릭 메뉴.
 - `.row_style(|row| Option<RowStyle>)`: danger, warning, success 행.
 - `.exportable()`: 필터링된 행의 CSV 내보내기이며 서버가 스트리밍합니다.
+
+## 제자리 새로 고침
+
+마지막에 호출한 `.listens(topic)`은 토픽이 지정될 때 그리드를 제자리에서 다시 불러오게 합니다([토픽](effects.md#topics) 참고). `ui.refresh(topic)` 뒤에는 정렬과 필터를 유지한 채 현재 페이지를 다시 불러오고, `.drives(topic)`을 가진 필터 컨트롤이 바뀐 뒤에는 새 Screen params로 첫 페이지부터 시작합니다. 그리드는 모든 권한 검사를 거치는 `POST /_zeyn/grid`로 다시 불러와지며, 필터가 바꾼 Screen param은 Screen 함수를 거쳐, 예를 들어 scope로 그리드에 전달됩니다.
+
+```rust
+let mut grid = DataGrid::of(search_orders);
+if let Some(region) = p.region {
+    grid = grid.scope(Order::region, region);
+}
+grid.column(Order::number).column(Order::total).listens("orders")
+```
 
 [DataGrid 레퍼런스](grid.md)는 저장된 뷰, 마스터 디테일, 그룹화, 트리 데이터, 인라인 편집, 셀 탐색, 복사와 붙여넣기, 열 가상화, 접근성을 다룹니다.

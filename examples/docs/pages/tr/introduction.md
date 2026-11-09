@@ -60,12 +60,13 @@ cargo run
 Ya da örnekleri depodan çalıştırın:
 
 ```sh
+cargo run -p zeyn-example-components
 cargo run -p zeyn-example-showcase
 cargo run -p zeyn-example-docs
 cargo run -p zeyn-cli -- new my-app
 ```
 
-Showcase `127.0.0.1:3002` adresinde dinler ve her bileşeni örnek verilerle gösterir. Bu dokümantasyon `127.0.0.1:3008` adresinde dinler; değiştirmek için `ZEYN_DOCS_SERVER__ADDR` ayarlayın.
+Bileşen kataloğu `127.0.0.1:3010` adresinde dinler ve her bileşeni kodunun yanında canlı gösterir; [components.zeynsoft.com](https://components.zeynsoft.com) de aynısını yapar. Showcase `127.0.0.1:3002` adresinde dinler ve bileşenleri örnek verili ekranlarda bir araya getirir. Bu dokümantasyon `127.0.0.1:3008` adresinde dinler; değiştirmek için `ZEYN_DOCS_SERVER__ADDR` ayarlayın.
 
 ## Yolunuzu bulmak
 
@@ -74,7 +75,8 @@ Showcase `127.0.0.1:3002` adresinde dinler ve her bileşeni örnek verilerle gö
 - *Language* (Dil) entity'leri, action'ları, ekranları, formları, DataGrid'i ve metinleri anlatır.
 - *Components* (Bileşenler) her bileşeni kodunun yanında canlı bir örnekle gösterir.
 - *Guides* (Rehberler) zaman ve diller, güvenlik, API, MCP, veri ve temaları anlatır.
-- *Reference* (Referans) runtime protokolünü ve mimariyi içerir.
+- *Reference* (Referans) runtime protokolünü ve veritabanı başvurusunu içerir.
+- *Project* (Proje) kaynak kodunu, lisansı, testleri ve CI'ı, güvenlik politikasını gösterir.
 
 ## İlkeler
 
@@ -82,3 +84,5 @@ Showcase `127.0.0.1:3002` adresinde dinler ve her bileşeni örnek verilerle gö
 - **Sayfa yenilemesi yok.** Gezinme, pencereler, dil, saat dilimi ve tema değişiklikleri yerinde uygulanır.
 - **Güvenli varsayılanlar.** Her action ve ekran erişimini bildirir. CSRF token'ları, sıkı bir Content Security Policy ve kullanıcı verisinin kaçışlanması (escape) her zaman açıktır.
 - **Her iş için tek yol.** Dil küçüktür; bu yüzden bir ajanın yazdığı kod, bir insanın yazdığı kod gibi okunur.
+
+Zeyn, [MIT veya Apache 2.0 lisansı](project.md#license) ile açık kaynaktır. [Güvenlik politikasına](project.md#security), [yol haritasına](https://github.com/huseyininnc/zeyn/blob/main/ROADMAP.md) ve [değişiklik günlüğüne](https://github.com/huseyininnc/zeyn/blob/main/CHANGELOG.md) bakın.

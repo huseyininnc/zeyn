@@ -63,6 +63,10 @@ Video::new("films", t!("films.harbor"))
 Audio::new("music", t!("songs.dawn")).subtitle(t!("songs.artist")).file("dawn.mp3")
 ```
 
+A player fetches nothing until it comes into view: it has `preload="none"`, and its sources and poster are set when it first scrolls into view (one observer serves every player of the page). `.poster_low(id)` shows a small poster first, `.placeholder(...)` colors the stage before that (the `Placeholder` of `Image`), `.on_error(text or component)` replaces the default message when the media cannot play, and `.sources([(id, media_query)])` adds files for other screens, such as `("clip-480.mp4", "(max-width: 600px)")`. For many qualities use HLS or DASH (below).
+
+For lists, `.preview_when_visible()` makes the player a short preview: it plays muted and looping while at least a quarter of it is visible and pauses when it leaves. It never starts by itself when the visitor prefers reduced motion or saves data (`prefers-reduced-data`, Save-Data), never with sound, and once the visitor uses its controls it no longer starts or stops by itself.
+
 Controls: play and pause, a seek slider, the time, mute, a volume slider, a playback speed menu, a captions button and (with more than one captions file) a language menu, and for video picture in picture (where the browser supports it) and full screen. Sliders follow the WAI-ARIA slider pattern: arrows move 5 seconds (or 5 percent of volume), Page Up and Page Down move a tenth, Home and End go to the ends. Menus follow the menu button pattern. While focus is inside a player, `k` or Space plays and pauses, `j` and `l` jump 10 seconds, `m` mutes, `c` toggles captions and `f` toggles full screen; the keys do nothing elsewhere on the page.
 
 Captions are WebVTT files served by the same source. The player draws the active cue as plain text (cue markup is dropped), over the picture for video and under the title for audio, so captions look the same in every browser and in full screen.

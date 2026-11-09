@@ -60,12 +60,13 @@ cargo run
 或者运行仓库中的示例：
 
 ```sh
+cargo run -p zeyn-example-components
 cargo run -p zeyn-example-showcase
 cargo run -p zeyn-example-docs
 cargo run -p zeyn-cli -- new my-app
 ```
 
-showcase 监听 `127.0.0.1:3002`，用示例数据展示每个组件。本文档监听 `127.0.0.1:3008`；设置 `ZEYN_DOCS_SERVER__ADDR` 可更改地址。
+组件目录监听 `127.0.0.1:3010`，在每个组件的代码旁实时展示它，与 [components.zeynsoft.com](https://components.zeynsoft.com) 相同。showcase 监听 `127.0.0.1:3002`，把组件组合成带示例数据的界面。本文档监听 `127.0.0.1:3008`；设置 `ZEYN_DOCS_SERVER__ADDR` 可更改地址。
 
 ## 如何查找内容
 
@@ -74,7 +75,8 @@ showcase 监听 `127.0.0.1:3002`，用示例数据展示每个组件。本文档
 - *Language* 介绍 entity、action、界面、表单、DataGrid 和文本。
 - *Components* 在代码旁边以实时示例展示每个组件。
 - *Guides* 介绍时间与语言、安全、API、MCP、数据和主题。
-- *Reference* 包含运行时协议和架构。
+- *Reference* 包含运行时协议和数据库参考。
+- *Project* 介绍源代码、许可证、测试与 CI，以及安全策略。
 
 ## 原则
 
@@ -82,3 +84,5 @@ showcase 监听 `127.0.0.1:3002`，用示例数据展示每个组件。本文档
 - **无页面重载。** 导航、窗口、语言、时区和主题的变更都就地应用。
 - **默认安全。** 每个 action 和界面都声明其访问控制。CSRF 令牌、严格的内容安全策略（Content Security Policy）以及对用户数据的转义始终开启。
 - **每件事只有一种做法。** 语言很小，因此智能体编写的代码读起来就像人写的代码。
+
+Zeyn 是开源软件，采用 [MIT 或 Apache 2.0 许可证](project.md#license)。另请参阅[安全策略](project.md#security)、[路线图](https://github.com/huseyininnc/zeyn/blob/main/ROADMAP.md)和[更新日志](https://github.com/huseyininnc/zeyn/blob/main/CHANGELOG.md)。

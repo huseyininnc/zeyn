@@ -30,7 +30,7 @@ Row::new().col(customer_form).weight(2).col(order_totals)
 
 ## Card와 Panel
 
-`Card`는 선택적 제목이 있는 단순한 면입니다. `Panel`은 선택적 툴바가 있는 제목 있는 섹션이며, `.collapsible()`은 사용자가 접을 수 있게 하고 `.collapsed()`는 접힌 상태로 시작하게 합니다.
+`Card`는 선택적 제목이 있는 단순한 면입니다: 20 px 안쪽 여백, 테두리 하나, 그림자 없음. `.action(node)`는 제목 줄 끝에 작업 하나(링크 버튼이나 메뉴)를 두고, `.footer(node)`는 구분선 아래에 "모두 보기" 링크 같은 바닥글을 추가합니다. 카드의 내용인 그리드나 목록은 가장자리까지 이어지므로 테두리가 두 개가 아니라 하나입니다. 카드 안의 카드는 자기 상자를 버리고, `Row` 안의 카드는 가장 높은 카드에 맞춰 늘어납니다. `Panel`은 선택적 툴바가 있는 제목 있는 섹션이며, `.collapsible()`은 사용자가 접을 수 있게 하고 `.collapsed()`는 접힌 상태로 시작하게 합니다.
 
 ```rust
 Panel::new(t!("ui.panel_products")).collapsible().toolbar(|t| t.export(Export::Csv)).add(products())

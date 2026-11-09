@@ -41,11 +41,11 @@ Form::of(Contact { quantity: 2, size: Size::Medium, ..Contact::default() })
 | `Control::Percent` | 带百分号显示的 `Decimal` 或整数 |
 | `Control::Password`、`Control::NewPassword` | 按密码类型输入的文本字段，带显示和隐藏按钮 |
 | `Control::PasswordMeter` | 带强度指示条的新密码 |
-| `Control::Rating` | 1 到 N 的整数，以星星显示（见 [Rating](#rating)） |
+| `Control::Rating` | 1 到 N 的整数，以星星显示；`Decimal` 字段可用半颗星（见 [Rating](#rating)） |
 
 ## Rating
 
-`Control::Rating` 把整数字段显示为 1 到 N 颗星，N 为字段的 `max` 规则（没有规则时为 5，最大为 10）。它是放在 `fieldset` 中的一组原生单选按钮，`fieldset` 的 legend 就是字段标签，因此无需脚本即可遵循 W3C APG 单选组模式：Tab 只进入该组一次，方向键移动并选中，每颗星以用户的语言命名为“3 / 5”。鼠标悬停时，星星会亮到指针所在位置。服务器像校验其他数字一样用字段规则校验该值，所以请为字段设置 `min` 和 `max`；在 `Option<i64>` 上使用 `required` 时，不选任何星星会被拒绝。
+`Control::Rating` 把整数字段显示为 1 到 N 颗星，N 为字段的 `max` 规则（没有规则时为 5，最大为 10）。它是放在 `fieldset` 中的一组原生单选按钮，`fieldset` 的 legend 就是字段标签，因此无需脚本即可遵循 W3C APG 单选组模式：Tab 只进入该组一次，方向键移动并选中，每颗星以用户的语言命名为“3 / 5”。鼠标悬停时，星星会亮到指针所在位置。服务器像校验其他数字一样用字段规则校验该值，所以请为字段设置 `min` 和 `max`；在 `Option<i64>` 上使用 `required` 时，不选任何星星会被拒绝。带 `#[rule(min = 1, max = 5, scale = 1)]` 的 `Decimal` 字段可选半颗星，服务器会拒绝介于两个半星之间的值，例如 4.3（见 [商店组件](commerce.md)）。
 
 ```rust
 #[model]
@@ -182,7 +182,7 @@ pub struct Contact {
 
 | | |
 |---|---|
-| 新增脚本 | `components.js` 中约 2 KB gzip（7 KB 原始），用于掩码、切换和指示条；decimal 和百分比输入框使用 number 控件 |
+| 新增脚本 | `inputs.js` 中约 2 KB gzip（7 KB 原始），用于掩码、切换和指示条；decimal 和百分比输入框使用 number 控件 |
 | DOM 节点 | 掩码输入框 3 个，带切换按钮的密码 4 个，带指示条 11 个 |
 | 请求 | 输入时没有 |
 | 服务器检查 | `scale`、`precision`、`min`、`max` 和 `mask` 在每次保存时运行，页面、API 和 AI 工具一视同仁 |

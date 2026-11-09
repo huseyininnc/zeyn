@@ -420,3 +420,78 @@ async fn topics_reach_subscribers_of_the_same_tenant() {
     };
     assert_eq!(text, r#"{"topic":"orders"}"#);
 }
+
+/// The next text frame within `ms`, or `None`.
+async fn next_text(s: &mut Socket, ms: u64) -> Option<String> {
+    loop {
+        match tokio::time::timeout(Duration::from_millis(ms), s.next()).await {
+            Ok(Some(Ok(Message::Text(t)))) => return Some(t.to_string()),
+            Ok(Some(Ok(_))) => continue,
+            _ => return None,
+        }
+    }
+}
+
+#[tokio::test]
+async fn typing_signals_reach_other_users_only_throttled_and_without_user_ids() {
+    let (addr, hub, _) = start(Limits::default()).await;
+    let here = format!("http://{addr}");
+    let path = format!("/_zeyn/live/topics?t=orders&csrf={TOKEN}");
+    let mut ada = open(addr, &path, "ada", false, &here)
+        .await
+        .unwrap();
+    let mut ada2 = open(addr, &path, "ada", false, &here)
+        .await
+        .unwrap();
+    let mut grace = open(addr, &path, "grace", false, &here)
+        .await
+        .unwrap();
+    let mut waited = 0;
+    while hub.stats().subscribers < 3 && waited < 50 {
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        waited += 1;
+    }
+    let signal = r#"{"t":"typing","topic":"orders","room":"r-1"}"#;
+    ada.send(Message::Text(signal.into()))
+        .await
+        .unwrap();
+    let got = next_text(&mut grace, 5000)
+        .await
+        .expect("grace hears ada typing");
+    let v: serde_json::Value = serde_json::from_str(&got).unwrap();
+    assert_eq!(v["topic"], "orders");
+    assert_eq!(v["typing"]["room"], "r-1");
+    assert_eq!(v["typing"]["who"], hub.person_key("", "ada"));
+    assert!(!got.contains("ada"), "the user id never travels: {got}");
+    assert!(
+        next_text(&mut ada2, 300)
+            .await
+            .is_none(),
+        "never back to the same user"
+    );
+    assert!(next_text(&mut ada, 100).await.is_none());
+    ada.send(Message::Text(signal.into()))
+        .await
+        .unwrap();
+    assert!(
+        next_text(&mut grace, 400)
+            .await
+            .is_none(),
+        "one signal per user every few seconds"
+    );
+    grace
+        .send(Message::Text(
+            r#"{"t":"typing","topic":"secret","room":"r-1"}"#.into(),
+        ))
+        .await
+        .unwrap();
+    grace
+        .send(Message::Text("not json".into()))
+        .await
+        .unwrap();
+    assert!(
+        next_text(&mut ada, 400).await.is_none(),
+        "topics the socket did not subscribe to are ignored"
+    );
+    assert_ne!(hub.person_key("", "ada"), hub.person_key("t2", "ada"));
+}

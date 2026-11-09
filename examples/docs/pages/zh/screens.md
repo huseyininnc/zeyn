@@ -39,6 +39,8 @@ pub fn product_editor(params: ProductParams, store: ProductStore) -> Result<Scre
 
 参数在所有使用之处都带有类型：`Window::open(product_editor, 7)` 无法编译，因为编辑器接受的是 `ProductParams`。
 
+当 `#[params]` 结构体的所有字段都是 `Option` 时，屏幕也可以不带参数打开（来自菜单链接或普通地址），所有字段都是 `None`。非可选字段仍然需要值：缺少时屏幕返回 404。
+
 没有 `route` 的 screen 没有 URL。它通过链接、工具栏按钮、菜单或命令以窗口形式打开。
 
 ## 路径中的参数
@@ -137,7 +139,24 @@ Screen::new(t!("stock.products"))
     .context_menu(ContextMenu::new().item(t!("stock.new_product"), Window::open(product_editor, ProductParams { id: None })).action(t!("stock.restock_low"), restock_low, ()))
 ```
 
-像 `Alt+N` 这样的快捷键在 screen 上生效，并显示在命令面板中。浏览器自己使用的快捷键（`Ctrl+P`、`Ctrl+S`、`F5`）不会被绑定，除非按钮调用 `.override_browser()`；浏览器从不转交的快捷键（`Ctrl+N`、`Ctrl+T`、`Ctrl+W`）则永远不会被绑定；可用的组合是 `Alt+Shift+<字母>` 和 `Ctrl+Alt+<字母>`。
+像 `Alt+N` 这样的快捷键在 screen 上生效，显示在命令面板中，并出现在按钮的工具提示里（按钮有 `.tip(text)` 时与其一起显示），而不是出现在按钮标签中。浏览器自己使用的快捷键（`Ctrl+P`、`Ctrl+S`、`F5`）不会被绑定，除非按钮调用 `.override_browser()`；浏览器从不转交的快捷键（`Ctrl+N`、`Ctrl+T`、`Ctrl+W`）则永远不会被绑定；可用的组合是 `Alt+Shift+<字母>` 和 `Ctrl+Alt+<字母>`。
+
+按钮、菜单组和工具的图标来自 `Icon`，这是一套由 `Icon::ALL` 列出的 82 个图形（`Plus`、`Edit`、`Trash`、`Search`、`Filter`、`Download`、`ChartBar`、`Users`、`Settings`、`Bell`、`SignOut` 等；组件目录展示了全部图标）。它们是 `/_zeyn/icons.css` 中的遮罩，在 20 px 网格上用 1.5 px 圆角线条绘制，使用文字颜色，并对屏幕阅读器隐藏，因此含义始终由标签表达。
+
+按钮高 36 px（紧凑密度下为 32 px），带有低调的轮廓；主按钮使用品牌色。在 `.button(..)` 之后调用 `.ghost()` 会去掉轮廓，用于密集栏中的次要操作；`.danger()` 用危险色绘制删除或取消类操作。
+
+## 页眉
+
+`.subtitle(text)` 在标题下方放一行简短说明，`.primary(|t| ...)` 把屏幕的主要操作作为主按钮放在标题行的末尾。两者合起来就是大多数管理界面都有的页眉。
+
+```rust
+Screen::new(t!("orders.title"))
+    .subtitle(t!("orders.intro"))
+    .primary(|t| t.button(t!("orders.new")).icon(Icon::Plus).shortcut("Alt+N").opens(order_editor, OrderParams { id: None }))
+    .toolbar(|t| t.export(Export::Csv))
+```
+
+`.primary` 接受与 `.toolbar` 相同的按钮，快捷键和命令面板条目也相同；工具栏仍在页眉下方，放其他工具。同一栏中两个或更多 `.export(..)` 调用会合并成一个“导出”菜单按钮，每种格式一项。副标题是屏幕阅读器读到的屏幕描述（`aria-describedby`）。行太窄时，操作会换到标题下方，在手机上靠起始边对齐。没有副标题和主要操作时，屏幕照旧只渲染一个普通标题。
 
 ## Feature 和菜单
 

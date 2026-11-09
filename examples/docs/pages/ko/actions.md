@@ -61,6 +61,17 @@ return Err(errors.into());
 
 목록은 `DataQuery`를 받아 `Page<M>`을 반환합니다. 목록 action은 모든 행을 반환하지 않습니다. 그리드는 페이지 단위로 요청하며, 클라이언트가 무엇을 보내든 서버가 페이지 크기에 상한을 둡니다.
 
+앱이 직접 계산하거나 자체 색인에 두는 테이블(수백만 행, id로 만드는 이벤트)에서는 `q.span()`이 요청된 행을 페이지 번호든 커서든 오프셋과 개수로 알려 주고, `Page::window(rows, total, span)`이 그 행을 전체 개수, 다음 행을 가리키는 커서와 함께 돌려줍니다. 페이지의 행만 만들어지며, 정렬과 필터는 앱이 `q.sort`와 `q.filters`를 읽어 직접 적용합니다.
+
+```rust
+#[action(permission = "audit.read")]
+pub async fn search_events(q: DataQuery, log: EventLog) -> Result<Page<Event>> {
+    let span = q.span();
+    let rows = log.range(span.offset, span.limit)?;
+    Ok(Page::window(rows, log.len()?, span))
+}
+```
+
 ## 컨텍스트
 
 `Ctx`는 요청입니다. `ctx.identity()`, `ctx.locale()`, `ctx.time_zone()`, `ctx.now()`, `ctx.today()`, `ctx.tenant()`, `ctx.license()`, `ctx.config()`, `ctx.theme()`, `ctx.t(&text)`를 제공합니다. 시스템 시계 대신 `ctx.now()`와 `ctx.today()`를 사용하면 테스트에서 `App::fixed_now`로 시간을 고정할 수 있습니다.

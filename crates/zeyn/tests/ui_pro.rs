@@ -237,6 +237,82 @@ fn post(path: &str, perms: &str, body: serde_json::Value) -> Request<Body> {
         .unwrap()
 }
 
+/// ZEYN-185: typing "ord" right after opening the palette must find the Orders menu item. The
+/// palette matches menu links from the page itself (no request), indexes them again when its
+/// list is empty, and folds case and accents the same way for the query and the label.
+#[test]
+fn the_palette_finds_menu_items_from_the_first_keystroke() {
+    let js = include_str!("../assets/palette.js");
+    assert!(
+        js.contains("document.querySelectorAll('.z-nav a[href], .z-site-nav a[href]')"),
+        "menu links of both shells are indexed"
+    );
+    assert!(
+        js.contains("if (!p.items.length) p.items = collect();"),
+        "an empty index is built again before the query is ranked"
+    );
+    let draw = &js[js
+        .find("function drawPalette()")
+        .unwrap()..];
+    let rank_at = draw
+        .find("rank(p.items, query)")
+        .unwrap();
+    let index_at = draw
+        .find("p.items = collect()")
+        .unwrap();
+    assert!(
+        index_at < rank_at,
+        "the index is ready before the first rank"
+    );
+    assert!(
+        js.contains("e.key !== '/'"),
+        "the slash key opens the palette outside fields"
+    );
+}
+
+#[tokio::test]
+async fn the_palette_index_holds_the_menu_items_of_the_page() {
+    #[screen(route = "/orders-list", public)]
+    pub fn orders_list() -> Screen {
+        Screen::new("Orders")
+    }
+    let router = App::new("Shop")
+        .feature(
+            Feature::new("shop")
+                .screen(orders_list)
+                .menu(|m| {
+                    m.group("Commerce", Icon::Cart)
+                        .item("Orders", orders_list)
+                }),
+        )
+        .router()
+        .unwrap();
+    let res = router
+        .oneshot(
+            Request::get("/orders-list")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let html = String::from_utf8(
+        http_body_util::BodyExt::collect(res.into_body())
+            .await
+            .unwrap()
+            .to_bytes()
+            .to_vec(),
+    )
+    .unwrap();
+    let nav = &html[html
+        .find(r#"<nav class="z-nav""#)
+        .unwrap()..];
+    assert!(
+        nav.contains(r#"<li><a href="/orders-list" aria-current="page">Orders</a></li>"#),
+        "the palette reads the label `Orders` from the menu link"
+    );
+    assert!(html.contains("data-zeyn-commands"));
+}
+
 #[tokio::test]
 async fn commands_the_user_may_not_run_never_reach_the_html() {
     let router = app(Counter::default());
@@ -246,7 +322,7 @@ async fn commands_the_user_may_not_run_never_reach_the_html() {
         html.contains(r#"data-zeyn-palette-open"#),
         "the palette button is in the menu"
     );
-    assert!(html.contains(r#"/_zeyn/pro.js"#));
+    assert!(html.contains(r#"/_zeyn/palette.js"#));
     assert!(html.contains(r#"data-zeyn-command="orders.hello""#));
     assert!(!html.contains("orders.new"), "needs orders.write");
     assert!(!html.contains("orders.archive"), "needs orders.admin");

@@ -4,7 +4,17 @@ The shell is the frame around every screen: the menu, the language, theme and ti
 
 ## The menu
 
-The menu comes from the features' `.menu(...)` calls. Items the user may not open are left out of the HTML, and a feature whose guards deny the user shows nothing. The link of the current screen carries `aria-current="page"`.
+The menu comes from the features' `.menu(...)` calls. Items the user may not open are left out of the HTML, and a feature whose guards deny the user shows nothing. The link of the current screen carries `aria-current="page"` and is drawn on the brand's subtle tint.
+
+`.icon(Icon::...)` after `.item(...)` puts an icon before the item's label; once the items of a group have icons, the group's label is drawn without its own. The side menu starts with the app's logo and name: `App::logo("/static/logo.svg")` (and `App::logo_dark(...)` for the dark theme) sets a mark served by the app, otherwise the shell draws a rounded square in `--z-brand` with the first letter of the name. The shell stays neutral; the brand color marks the current item, primary buttons, the focus ring and the logo.
+
+Icons come from one set of 82 drawings (`Icon::ALL`) on a 20 px grid with a 1.5 px round stroke, shown at 16 or 20 px in the current text color. Each is a CSS mask in `/_zeyn/icons.css`, a cached stylesheet of about 25 KB (3 KB compressed) generated from `crates/zeyn/assets/icons/*.svg`, so an icon costs one class in the HTML and nothing in script.
+
+```rust
+Feature::new("sales")
+    .screen(orders)
+    .menu(|m| m.group(t!("sales.menu"), Icon::Cart).item(t!("sales.orders"), orders).icon(Icon::Table))
+```
 
 ## The site shell
 
@@ -43,13 +53,62 @@ Feature::new("shop")
 ```
 
 - **Menu.** The top menu lists the menus of every feature in the site shell. A group of one item is a plain link; a larger group is a button that opens its links (the W3C APG disclosure navigation pattern). Enter, Space or a click toggle a group, Down opens it and moves to its first link, Up, Down, Home and End move between its links, Escape closes it and returns to the button, and Tab out of the group or a click outside closes it. Left and Right move between the top items.
-- **Narrow screens.** Below 800 px the menu folds behind a menu button with `aria-expanded`; Escape closes it. Without the script the menu stays open, so nothing becomes unreachable.
+- **Narrow screens.** Below 1024 px the menu folds behind a menu button with `aria-expanded`; Escape closes it. Without the script the menu stays open, so nothing becomes unreachable.
 - **Header slots.** The top bar has four slots that take any component, like an app bar with logical names: `start(node)` before the brand, `center(node)` between the menu and the end, `end(node)` at the end of the bar and `bottom(node)` as a full width row under it, such as chips. Each slot holds several nodes in order, and start and end swap sides in right to left languages. Components in slots render with the user's language, permissions and masks; those that load data through their own action, such as a `SearchBox`, work there, checked against the feature's guards and the action's permission. Grids and forms belong in the screen. On phones the start and end slots stay in the bar, and the center slot goes where the app says: `center_on_phone(CenterOnPhone::Row)` (the default) puts it in a row under the bar, `CenterOnPhone::Icon` behind a magnifier button that opens it (W3C APG disclosure) and moves focus into it; Escape closes it and returns to the button. `center_button(icon, label)` changes that button. The phone layout is set by CSS before the script runs, so the header does not move while the page loads.
 - **Actions.** `sign_in()` shows a sign in link for visitors and a sign out link for signed in users when the app has a sign in page; `language()` and `theme()` show the same pickers as the app shell. They come after the end slot and fold into the menu on phones.
-- **Bottom bar.** `bottom_nav([...])` adds up to five links fixed to the bottom of the screen on phones (800 px wide and less), for the places people go most; more than five do not compile. Each item is a `BottomNavItem` with a label, a screen with a route and an optional icon. The link of the page being shown has `aria-current="page"` (kept up to date by `nav.js`), links to screens the user may not open are left out, the bar keeps clear of the home indicator with `env(safe-area-inset-bottom)`, and the page gets room at its bottom so the bar hides nothing. The top menu stays for the rest. The bar needs no script.
+- **Bottom bar.** `bottom_nav([...])` adds up to five links fixed to the bottom of the screen on phones and tablets (narrower than 1024 px), for the places people go most; more than five do not compile. Each item is a `BottomNavItem` with a label, a screen with a route and an optional icon. The link of the page being shown has `aria-current="page"` (kept up to date by `nav.js`), links to screens the user may not open are left out, the bar keeps clear of the home indicator with `env(safe-area-inset-bottom)`, and the page gets room at its bottom so the bar hides nothing. The top menu stays for the rest. The bar needs no script.
 - **Footer.** Columns of links to screens (`link`, left out for users who may not open them) or addresses (`url`: a path, `https:`, `http:` or `mailto:`; `App::check` refuses other schemes and links to screens that are not registered), and a line of text.
 
 Moving between a site shell screen and an app shell screen goes through `nav.js` without a page load: the partial response says which shell it belongs to (`x-zeyn-shell`), and when that differs from the current frame, the runtime swaps the whole frame the way a language change does and loads the other shell's stylesheet and script. Links to `/_zeyn/route/{screen}` (the breadcrumb's) are followed the same way.
+
+## The sign in shell
+
+Sign in pages get a frame of their own: `Shell::auth()` has no menu, no top bar and no command palette. The app's logo (`App::logo`) and name sit over one card 400 px wide, and the language and theme pickers sit at the bottom of the page, so both stay reachable before sign in. `.split()` puts the form on one half and a brand panel in `--z-brand` on the other from 1024 px; narrower screens show the centered card. On phones the card becomes the page and its inputs and buttons are 44 px tall. Its styles (`auth.css`, 3.5 KB) load on these pages only.
+
+Every sign in screen of `zeyn::accounts::ui` (sign in, sign up, forgot and reset password, two step sign in, recovery code, lockout, confirmation and sign out) opens in it, while the account and administration screens keep the app shell. A custom sign in screen gets it from its feature:
+
+```rust
+Feature::new("entry").screen(sign_in).shell(Shell::auth())
+```
+
+The sign in form fills the user name with `Control::Username` (`autocomplete="username"`), the password with `current-password`, shows the password toggle as an eye inside the field and says "Caps Lock is on" under it while Caps Lock is on (a polite live region).
+
+## Theme picker in a screen
+
+`ThemePicker::new()` puts the theme picker inside a screen, such as the Appearance section of a settings page. It offers the themes of `App::themes` (with System when the app follows the device) and shows the one in use.
+
+```rust
+#[screen(route = "/settings/appearance", permission = "settings.read")]
+pub fn appearance() -> Screen {
+    Screen::new(t!("settings.appearance")).body(Panel::new(t!("settings.theme")).add(ThemePicker::new()))
+}
+```
+
+It is the same control as the shell's picker: a choice applies at once without a page load, is kept in the `zeyn_theme` cookie (and the view store for signed in users), and the other picker on the page shows it too. When the app offers no choice (`theme_picker(false)` or a single theme), it renders nothing.
+
+## The app header
+
+`App::header(|h| ...)` puts a bar over the screens of the app shell, with the slots of the site header: `start`, `center`, `end` and `bottom`. A search box goes in the center, a notifications link at the end. `sign_in()`, `language()` and `theme()` work there too, though the side menu already has the pickers.
+
+```rust
+App::new(t!("app.name"))
+    .header(|h| {
+        h.center(SearchBox::of(search_all).results(search_results))
+            .end(LinkButton::new(t!("app.notifications"), notifications, ()))
+    })
+```
+
+Three ready parts make the bar an app frame:
+
+- `breadcrumb()` starts the bar with the menu group and the title of the current screen; `nav.js` rewrites it after each navigation.
+- `search()` adds a search field that opens the command palette, with its shortcut shown; the palette button leaves the side menu. On phones it is an icon button.
+- `account()` ends the bar with the user's initials on a round button. It opens a dialog (W3C APG non modal dialog; Escape and the close button close it) with who is signed in, the theme and language pickers and the sign out link, or a sign in link for visitors. The pickers leave the side menu.
+
+```rust
+App::new(t!("app.name")).header(|h| h.breadcrumb().search().account())
+```
+
+The bar stays at the top while the screen scrolls, and the screens change under it without a page load. On phones it sits under the menu button and the center slot takes a row of its own. Components in the bar render for the user like a screen's; a search box loads its suggestions through its action, whose permission the server checks. Without `App::header` the app shell has no top bar.
 
 ## Commands
 
@@ -80,7 +139,7 @@ Feature::new("pro").command(new_product()).command(restock())
 
 ## The command palette
 
-**Alt+Shift+P** opens the palette by default (`App::palette_shortcut` changes it, also to a browser key such as `Ctrl+Shift+P` on purpose): an ARIA combobox that searches the app's commands, the toolbar and context menu of the current screen and the screens of the menu. Recently used commands come first.
+**Alt+Shift+P** opens the palette by default (`App::palette_shortcut` changes it, also to a browser key such as `Ctrl+Shift+P` on purpose): an ARIA combobox that searches the app's commands, the toolbar and context menu of the current screen and the screens of the menu. Recently used commands come first. `/` opens it too when focus is not in a field, and so does the search field of `App::header(|h| h.search())`. Results are grouped under their place ("Go to · Sales", the screen title, "Commands"), each with its icon, the letters that matched in bold and its shortcut at the end. The menu items are matched on the page itself, so the first keystroke already finds them.
 
 A feature can add a server search to it. As the user types, the palette calls the action and lists its hits under the commands; choosing one opens the page in place. This site searches its own pages that way:
 

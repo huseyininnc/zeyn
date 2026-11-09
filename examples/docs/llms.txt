@@ -16,9 +16,9 @@ cargo run
 The app listens on http://127.0.0.1:3000 (change `server.addr` in `config/app.json`). Then:
 
 1. Read `my-app/AGENTS.md` and `my-app/.claude/skills/zeyn/SKILL.md`. They hold the rules and the patterns for this framework.
-2. Add features with `zeyn g feature <name>`; each feature has `models.rs`, `store.rs`, `actions.rs` and `screens.rs`.
+2. Add features with `zeyn g feature <name>`: it creates `src/features/<name>/` with the folders `models/`, `services/`, `actions/` and `screens/`, one file per model, service, action and screen, and a working list screen. Add a screen with `zeyn g screen <feature> <name>`. Add `components/` by hand when a part of a screen is shared.
 3. Run `zeyn check` and `cargo test` after every change. Compiler errors say what to change.
-4. `.mcp.json` registers `zeyn mcp`, an MCP server with the tools `zeyn_docs`, `zeyn_describe`, `zeyn_check`, `zeyn_test` and `zeyn_new_feature`.
+4. `.mcp.json` registers `zeyn mcp`, an MCP server with the tools `zeyn_docs`, `zeyn_describe`, `zeyn_check`, `zeyn_test`, `zeyn_new_feature` and `zeyn_new_screen`. `zeyn_docs` has the topics `rules`, `language` and `protocol`.
 
 For a library of features shared by several apps use `zeyn new my-domain --lib`.
 
@@ -50,7 +50,13 @@ These docs are written in English, and the English pages below are the source. E
 - [Controls and pickers](https://docs.zeynsoft.com/components/controls)
 - [Line editor](https://docs.zeynsoft.com/components/lines)
 - [Display](https://docs.zeynsoft.com/components/display)
+- [Text and content](https://docs.zeynsoft.com/components/content): headings, lists, avatars, chips, reactions, share buttons
 - [Tree and charts](https://docs.zeynsoft.com/components/data)
+- [Cards, rails and search](https://docs.zeynsoft.com/components/catalog)
+- [Admin views](https://docs.zeynsoft.com/components/admin): record diffs, code and JSON views, barcodes, inbox, Kanban, calendar
+- [Shop components](https://docs.zeynsoft.com/components/commerce): prices, facets, variants, galleries, quantities, reviews, countdowns
+- [Chat](https://docs.zeynsoft.com/components/chat): message threads, the composer, typing indicators, streamed AI replies
+- [Social](https://docs.zeynsoft.com/components/social): feeds of posts, lightbox, story rings
 - [Shell and commands](https://docs.zeynsoft.com/components/shell)
 - [Media](https://docs.zeynsoft.com/components/media)
 
@@ -58,17 +64,32 @@ These docs are written in English, and the English pages below are the source. E
 
 - [Time and languages](https://docs.zeynsoft.com/guides/time-and-languages)
 - [Security](https://docs.zeynsoft.com/guides/security)
+- [Public pages](https://docs.zeynsoft.com/guides/public-pages): no cookies, HTTP caching, SEO tags, sitemap
 - [User accounts](https://docs.zeynsoft.com/guides/accounts)
+- [Sign in: OIDC, JWT and MFA](https://docs.zeynsoft.com/guides/sign-in)
 - [Audit, masking and jobs](https://docs.zeynsoft.com/guides/enterprise)
 - [API and OpenAPI](https://docs.zeynsoft.com/guides/api)
 - [MCP and AI agents](https://docs.zeynsoft.com/guides/mcp)
 - [Data and databases](https://docs.zeynsoft.com/guides/database)
 - [Theming](https://docs.zeynsoft.com/guides/theming)
 - [Shared libraries](https://docs.zeynsoft.com/guides/polyrepo)
+- [Operations](https://docs.zeynsoft.com/guides/operations): Docker, tracing, Redis, licenses
+- [AI assistant](https://docs.zeynsoft.com/guides/assistant)
+- [WASM islands](https://docs.zeynsoft.com/guides/islands)
+- [Realtime and CRDT](https://docs.zeynsoft.com/guides/realtime)
+- [Desktop apps](https://docs.zeynsoft.com/guides/desktop)
+
+## Reference
+
+- [Runtime protocol](https://docs.zeynsoft.com/reference/runtime-protocol)
+- [Database reference](https://docs.zeynsoft.com/reference/database)
+
+## Project
+
+- [Source, license and security](https://docs.zeynsoft.com/project): the GitHub repository, the license, tests and CI, and how to report a vulnerability
 
 ## Optional
 
 - [API reference on docs.rs](https://docs.rs/zeyn)
-- [Live demo of every component](https://framework.zeynsoft.com/)
-- [Component catalog with code to copy](https://components.zeynsoft.com/)
-- [Runtime protocol](https://docs.zeynsoft.com/reference/runtime-protocol)
+- [Component catalog: every component live, with code to copy](https://components.zeynsoft.com/)
+- [App templates](https://framework.zeynsoft.com/)

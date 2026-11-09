@@ -22,7 +22,7 @@ Stack::new()
 
 ## Badge
 
-`Badge::new(text).tone(Tone::...)`. Tonos: `Neutral`, `Info`, `Success`, `Warning`, `Danger` y `Brand`. Las tablas muestran valores como insignias con `.badge(|v| tone)`.
+`Badge::new(text).tone(Tone::...)`. Tonos: `Neutral`, `Info`, `Success`, `Warning`, `Danger` y `Brand`. Una insignia con tono muestra el texto del tono sobre su tinte sutil; `Neutral` es una etiqueta atenuada con un contorno, para valores simples como un plan. `.dot()` dibuja un punto de 8 px en el tono antes del texto normal, la forma más discreta de mostrar un estado en listas; `.count()` dibuja una píldora redonda para un número. Las tablas muestran valores como insignias con `.badge(|v| tone)` y como puntos con `.status(|v| tone)`.
 
 ## Progress
 
@@ -67,7 +67,7 @@ LinkButton::new(t!("cart.browse"), products, ()).primary()
 
 ## ActionButton
 
-`ActionButton::new(label, action, input)` ejecuta una acción. `.confirm(text)` pregunta primero, `.tone(Tone::Danger)` marca una destructiva y `.on_success(|result, ui| ...)` ejecuta effects. La entrada se fija en el servidor y nunca viene del cliente; el permiso de la acción se comprueba en el servidor como en cualquier formulario.
+`ActionButton::new(label, action, input)` ejecuta una acción. `.confirm(text)` pregunta primero, `.tone(Tone::Danger)` marca una destructiva y `.on_success(|result, ui| ...)` ejecuta effects. La entrada se fija en el servidor y nunca viene del cliente; el permiso de la acción se comprueba en el servidor como en cualquier formulario. `.tone(Tone::Brand)` lo dibuja como la acción principal de su zona, por ejemplo una tarjeta.
 
 ```rust
 ActionButton::new(t!("docs.live.count"), count_samples, ())
@@ -140,6 +140,32 @@ Image::new("https://images.example.com/logo.png")
 - `src` es una ruta de la aplicación (`/static/logo.png`) o una dirección `https` en un host del `img-src` de la aplicación (`App::csp(|c| c.img_src([...]))`). Cualquier otra imagen no se renderiza y en su lugar se muestra su texto alternativo, de modo que el navegador nunca registra una petición bloqueada.
 - Cada imagen recibe `decoding="async"`; `.lazy()` añade `loading="lazy"` para las imágenes que quedan fuera de la primera vista. `srcset` admite descriptores de densidad (`2x`) o de ancho (`800w`); las entradas en otros hosts o con otros descriptores se omiten. Los descriptores de ancho añaden `sizes` a partir del ancho de la imagen.
 - Una imagen puramente decorativa recibe un texto alternativo vacío: `.alt(Text::from(""))`.
+
+### Listas largas de fotos
+
+En un catálogo con miles de fotos de productos, una imagen puede mostrar algo mientras se carga y recuperarse cuando falla. Todo usa funciones nativas del navegador; un solo listener del módulo de medios atiende a todas las imágenes de la página.
+
+```rust
+Image::new(p.photo_800.clone())
+    .alt(p.name.clone())
+    .size(400, 500)
+    .lazy()
+    .srcset([(p.photo_400.as_str(), "400w"), (p.photo_800.as_str(), "800w")])
+    .sizes("(min-width: 800px) 25vw, 50vw")
+    .placeholder(Placeholder::color("#d9dde3"))
+    .low(p.photo_40.clone())
+    .fallback("/static/no-photo.webp")
+    .on_error(t!("shop.no_photo"))
+    .fit(Fit::Cover)
+```
+
+- `.placeholder(...)` rellena la caja mientras se carga el archivo, sin script: `Placeholder::color("#d9dde3")` o un token del tema (`"--z-surface-2"`), `Placeholder::blur(data_uri)` para una imagen diminuta creada por la aplicación (una URI base64 `data:image/webp`, `avif`, `jpeg` o `png` de 600 bytes como máximo, nunca SVG), o `Placeholder::image(src)` para un único archivo compartido por todas las imágenes. Un placeholder que incumple una regla se omite.
+- `.low(src)` muestra al instante un archivo pequeño de baja resolución bajo el completo. El archivo completo se carga a la vez (de forma diferida cuando la imagen es diferida) y aparece con un fundido cuando está listo; con movimiento reducido aparece sin fundido.
+- `.fallback(src)` prueba otro archivo una vez cuando la imagen falla. Después se muestra `.on_error(text or component)`; sin él, el texto alternativo con un icono sobre el placeholder. No se vuelve a intentar nada.
+- `.priority()` marca la primera imagen que ve un visitante (el pintado más grande): `loading="eager"` y `fetchpriority="high"`, nunca diferida. Úsalo una vez por página.
+- `.sizes(...)` indica el ancho de la imagen en el diseño, para que el navegador elija el ancho correcto de `srcset`. Sin él, una imagen diferida recibe `sizes="auto"` y el navegador mide el hueco.
+- `.fit(Fit::Cover)` rellena la caja y recorta lo que sobra; `Fit::Contain` muestra el archivo entero.
+- `low`, `fallback` y `Placeholder::image` siguen las mismas reglas de dirección que `src`; los demás se omiten. La caja conserva siempre el tamaño de la imagen, así que nada se mueve mientras los archivos se cargan o fallan.
 
 ## ExternalLink
 

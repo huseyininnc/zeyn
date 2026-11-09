@@ -27,6 +27,8 @@ Form::of(Contact { quantity: 1, ..Contact::default() })
 | `.range(M::from, M::to)` | 두 날짜를 하나의 범위 피커로 |
 | `Form::auto(value)` | 선언 순서대로 모든 필드 |
 
+폼의 너비는 최대 720 px이고, 폼만 담은 카드나 패널은 폼과 같은 너비이므로 카드의 절반이 비어 있지 않습니다. 레이블은 36 px 입력 위 6 px에 놓이고, 필드 사이 간격은 20 px입니다. 포커스된 입력은 포커스 색의 테두리와 부드러운 3 px 링을 받고, 잘못된 입력은 danger 테두리를 받습니다. 단위, 통화, `%`는 입력 안에 흐리게 그려지며, 숫자 필드는 빼기와 더하기 버튼(28 px)을 필드 끝 안쪽에 둡니다. 화살표 키로도 여전히 값을 바꿀 수 있습니다.
+
 ## 저장
 
 `.submit(label, action)`은 저장하는 action을 지정합니다. action은 폼의 모델에 대한 `Valid<M>`을 받아야 하며, 그렇지 않으면 컴파일되지 않습니다. 런타임이 값을 보내면 서버가 모든 규칙을 실행한 다음 action을 실행합니다.
@@ -38,6 +40,52 @@ Form::of(Contact { quantity: 1, ..Contact::default() })
 ## 컨트롤
 
 각 필드 타입에는 기본 컨트롤이 있습니다. 텍스트 입력, 숫자 입력, 통화가 있는 금액, 날짜 및 시간 피커, `bool`용 체크박스, choice용 선택 목록입니다. `.control(M::f, Control::...)`은 다른 컨트롤을 고르고, `.lookup(M::f, action)`은 서버에서 레코드를 검색합니다. [컨트롤과 피커](controls.md)를 참고하십시오.
+
+## 의존하는 lookup
+
+`.depends_on(field, source)`는 lookup `field`의 선택지가 다른 필드에 따라 달라지게 합니다. 국가의 도시처럼요. 검색할 때마다 `source`의 값이 `LookupQuery::parent`로 전송되고(`q.parent_id()`는 이를 id로 읽습니다), `source`가 바뀌면 `field`가 비워져 새 값에 맞는 선택지가 다시 불러와집니다.
+
+```rust
+#[action(permission = "geo.read")]
+pub async fn find_cities(q: LookupQuery, store: Cities) -> Result<Page<LookupItem>> {
+    Ok(q.apply(store.of_country(q.parent_id())))
+}
+
+Form::of(address)
+    .lookup(Address::country, find_countries)
+    .lookup(Address::city, find_cities)
+    .depends_on(Address::city, Address::country)
+    .submit(t!("save"), save_address)
+```
+
+이 짝은 브라우저에 맡길 수 없으므로, 제출 시 서버는 선택된 도시를 제출된 국가와 함께 lookup action에 그 action의 권한으로 다시 물어보고, 반환되지 않는 도시는 필드 오류로 거부합니다. `q.apply` 전에 필터링하듯이 id 조회에서도 부모로 필터링하세요. `App::check_page`는 필드가 폼의 lookup이 아니거나 원본이 폼의 다른 필드가 아닌 `depends_on`을 보고합니다.
+
+## 필터 폼
+
+제출 버튼이 없는 폼으로 Screen을 필터링할 수 있습니다. `.drives(topic)`은 폼의 필드를 Screen params로 만듭니다. 필드가 바뀌면(선택 상자, 날짜 범위, Enter를 누른 텍스트 필드) 그 값이 같은 이름의 Screen param에 들어가고, 주소도 맞춰지며, `.listens(topic)`을 가진 노드가 제자리에서 새로 고쳐져 자신의 params에서 값을 읽습니다([토픽](effects.md#topics) 참고). 숫자와 불리언은 그대로, 빈 필드는 `null`로 보내지며, 서버는 params를 Screen의 타입이 있는 params로 읽으므로 맞지 않는 값은 거부됩니다.
+
+```rust
+#[params]
+pub struct SalesParams {
+    pub region: Option<Region>,
+    pub from: Option<Date>,
+    pub to: Option<Date>,
+}
+
+#[screen(route = "/sales", permission = "sales.read")]
+pub fn sales(p: SalesParams, store: Sales) -> Screen {
+    Screen::new(t!("sales.title"))
+        .body(
+            Form::of(SalesFilter { region: p.region, from: p.from, to: p.to })
+                .field(SalesFilter::region)
+                .range(SalesFilter::from, SalesFilter::to)
+                .drives("sales"),
+        )
+        .body(Kpi::new(t!("sales.total"), store.total(&p)).listens("sales"))
+}
+```
+
+`submit`이 있는 폼은 drive할 수 없습니다. 대신 저장한 뒤 `on_success`에서 `ui.refresh(topic)`으로 새로 고치세요.
 
 ## 읽기 전용 필드
 
@@ -59,6 +107,8 @@ Feature::new("support")
 
 Form::of(ticket).field(Ticket::title).file(Ticket::attachments, ATTACHMENTS)
 ```
+
+권한 이름 하나는 같은 사용자에게 업로드와 다운로드를 모두 허용합니다. 추가할 수 없는 파일을 읽기 사용자가 열 수 있게 하려면 나누십시오: `.files(ATTACHMENTS, FileAccess::read("support.ticket.read").write("support.ticket.files"), store)`.
 
 컨트롤은 드롭 영역 안의 기본 파일 입력입니다. 각 파일은 진행 막대와 함께 독립적으로 업로드되고, 진행 중에는 취소할 수 있으며, 실패하면 다시 시도할 수 있고, 완료되면 제거할 수 있습니다. 이미지는 선택한 파일의 object URL로 만든 미리 보기를 보여 줍니다. 진행 상황과 결과는 정중한 라이브 리전에서 안내됩니다. 쇼케이스의 `/uploads`에 동작하는 예제가 있습니다. 이 문서 사이트에는 로그인한 사용자가 없으므로 라이브 업로드는 표시되지 않습니다.
 

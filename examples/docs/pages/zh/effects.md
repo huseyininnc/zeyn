@@ -12,6 +12,7 @@ Effect 是浏览器在点击或 action 成功之后所做的事情：打开窗�
 | 带语气的提示 | `Toast::success(message).action(label, effect).into()` | 带有语气（info、success、warning、danger）的提示，可附带一个运行另一个 effect 的按钮 |
 | 确认 | `Effect::confirm(message, then)` | 用户确认后运行 `then` |
 | 关闭并刷新 | `Effect::CloseAndRefresh` | 关闭窗口，并重新加载打开它的界面 |
+| 刷新主题 | `Effect::refresh("orders")` 或 `ui.refresh(["orders", "stock"])` | 就地刷新页面上监听某个主题的节点（见 [主题](#topics)） |
 
 参数是有类型的：为参数错误的界面构造 effect 无法通过编译。
 
@@ -65,6 +66,31 @@ pub fn product_editor(params: ProductParams, store: ProductStore) -> Result<Scre
 - 表单和 action 按钮的 `on_success` 处理函数。
 
 Effect 绝不会重新加载页面。导航只加载新的界面；刷新只重新加载窗口下方的界面。
+
+## 主题
+
+界面的一部分变化时，其他部分往往显示同样的数据：保存的订单会改变合计，筛选会改变网格和图表。主题把它们连接起来，数据不经过浏览器。用 `.listens(topic)` 标记显示这些数据的节点；主题被点名时，它们就地刷新。
+
+```rust
+Screen::new(t!("sales.title"))
+    .body(Kpi::new(t!("sales.total"), total).listens("sales"))
+    .body(Chart::bar(t!("sales.by_month")).labels(months).series(t!("sales.amount"), amounts).listens("sales"))
+    .body(DataGrid::of(search_sales).column(Sale::amount).listens("sales"))
+```
+
+点名主题有三种方式：
+
+- action 改变数据之后，在 `on_success` 处理器中调用 `ui.refresh("sales")`（或 `Effect::refresh`）。
+- 带有 `.drives("sales")` 的筛选控件：筛选标签、搜索框，或没有提交按钮的表单（选择框、日期范围、文本）。见 [筛选表单](forms.md#filter-forms)。
+- 别人改变数据时，来自 realtime 通道（feature `realtime`）的 `hub.notify(&ctx, "sales")`。见 `docs/realtime.md`。
+
+`.listens` 适用于任何组件：在组件自己的 builder 方法之后最后调用。包含网格的监听者通过网格端点重新加载网格，保留页、排序和筛选（由筛选引起的变化从第一页开始）。其他所有监听者在服务器上重新渲染，全部只用一次 `POST /_zeyn/nodes`，所以一个 KPI 加一个图表只需一次请求。传递的只有主题名；服务器像处理任何请求一样，以用户的权限和 params 打开界面，因此刷新绝不会显示用户无权看到的内容。
+
+同一动画帧内点名的主题只处理一次，同一界面上较新的刷新会取消仍在进行的刷新，并且只刷新页面上存在的节点。如果新内容中有相同的元素（按 id、test id 或列表的行键），焦点和展开的 `<details>` 会保持原位。
+
+主题名由 1 到 64 个字母、数字、`-`、`_` 或 `.` 组成。`App::check_page` 会报告页面上被驱动却无人监听的主题；`zeyn check` 会对被刷新或被驱动却从未被监听，或被监听却从未被刷新、驱动或通知的主题发出警告。
+
+@live topics
 
 ## 提示
 

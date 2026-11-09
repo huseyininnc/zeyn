@@ -3,7 +3,7 @@
 pub mod actions;
 pub mod models;
 pub mod screens;
-pub mod store;
+pub mod services;
 
 use zeyn::prelude::*;
 

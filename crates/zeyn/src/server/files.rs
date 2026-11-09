@@ -36,12 +36,6 @@ pub(super) const ASSETS: [&str; 2] = ["/_zeyn/files.js", "/_zeyn/files.css"];
 /// Longest wait for the next part of an upload before it is dropped.
 const IDLE: Duration = Duration::from_secs(30);
 
-/// Links placed in the page head.
-pub(super) fn head(base: &str) -> String {
-    let v = super::ops::asset_version();
-    format!(r#"<link rel="stylesheet" href="{base}/_zeyn/files.css{v}">"#)
-}
-
 pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
     router
         .route(
@@ -70,6 +64,7 @@ fn entry<'a>(
     st: &'a AppState,
     ctx: &Ctx,
     store: &str,
+    write: bool,
 ) -> Result<(&'a crate::Feature, FileEntry), Failure> {
     let (feature, entry) = st
         .features
@@ -81,9 +76,14 @@ fn entry<'a>(
                 .map(|e| (f, e))
         })
         .ok_or(Failure::App(Error::NotFound))?;
+    let permission = if write {
+        entry.access.write
+    } else {
+        entry.access.read
+    };
     if !ctx
         .identity()
-        .can(&Access::Permission(entry.permission))
+        .can(&Access::Permission(permission))
     {
         return Err(Failure::App(Error::Forbidden));
     }
@@ -106,7 +106,7 @@ async fn upload(
         return st.error_response(&ctx, f);
     }
     let result = async {
-        let (feature, entry) = entry(&st, &ctx, &store)?;
+        let (feature, entry) = entry(&st, &ctx, &store, true)?;
         let call = Call {
             kind: CallKind::Upload,
             screen: entry.rules.store(),
@@ -394,7 +394,7 @@ async fn download(
         if !valid_file_id(&id) {
             return Err(Failure::App(Error::NotFound));
         }
-        let (_, entry) = entry(&st, &ctx, &store)?;
+        let (_, entry) = entry(&st, &ctx, &store, false)?;
         let call = Call {
             kind: CallKind::Media,
             screen: entry.rules.store(),

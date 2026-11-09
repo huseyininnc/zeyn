@@ -2223,3 +2223,96 @@ async fn lazy_tabs_mask_like_the_page_and_let_permitted_users_reveal() {
         );
     }
 }
+
+#[model]
+pub struct PasswordChange {
+    #[rule(required, max_len = 60)]
+    pub email: String,
+    #[rule(required, max_len = 128)]
+    pub password: String,
+}
+
+#[action(permission = "crm.write")]
+pub async fn change_password(_: Valid<PasswordChange>) -> Result<()> {
+    Ok(())
+}
+
+#[screen(permission = "crm.write")]
+pub fn password_screen() -> Screen {
+    Screen::window("Password").body(
+        Form::of(PasswordChange::default())
+            .field(PasswordChange::email)
+            .field(PasswordChange::password)
+            .control(PasswordChange::password, Control::NewPassword)
+            .submit("Save", change_password),
+    )
+}
+
+#[tokio::test]
+async fn password_values_never_reach_the_audit_trail() {
+    let audit = MemoryAudit::default();
+    let id = crm_writer();
+    let router = App::new("Test")
+        .auth(move |h: &HeaderMap| {
+            h.contains_key("x-user")
+                .then(|| id.clone())
+        })
+        .interceptor(AuditLog(audit.clone()))
+        .feature(
+            Feature::new("crm")
+                .screen(password_screen)
+                .api(change_password),
+        )
+        .router()
+        .unwrap();
+    let values = serde_json::json!({ "email": "a@example.com", "password": "S3cret-value-42" });
+    let r = send(
+        &router,
+        post(
+            "/_zeyn/form",
+            serde_json::json!({ "screen": "password_screen", "node": 0, "values": values }),
+        ),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    let entries = audit.entries();
+    let line = serde_json::to_string(&entries).unwrap();
+    assert!(!line.contains("S3cret-value-42"), "{line}");
+    let password = entries[0]
+        .changes
+        .iter()
+        .find(|c| c.field == "password")
+        .unwrap();
+    assert_eq!((&password.old, &password.new), (&None, &None));
+    assert!(line.contains("a@example.com"));
+}
+
+#[test]
+fn workflow_transitions_can_ask_for_a_confirmation_and_look_destructive() {
+    let identity = Identity::user("m").with_permissions(["req.approve"]);
+    let ctx = Ctx::for_tests(identity.clone(), zeyn::Services::default());
+    let moves = Transitions::of(
+        request_flow(),
+        Stage::Submitted,
+        Request2Id(1),
+        move_request,
+    )
+    .confirm("reject", "Reject <this> request?")
+    .tone("reject", zeyn::Tone::Danger);
+    let mut html = String::new();
+    zeyn::Component::render(
+        &moves,
+        &mut html,
+        &zeyn::Render::english("s")
+            .with_identity(&identity)
+            .with_ctx(&ctx),
+    );
+    assert!(
+        html.contains(r#"<button type="submit" class="z-button" data-zeyn-transition="approve" data-testid="s.transition.approve">"#),
+        "{html}"
+    );
+    assert!(
+        html.contains(r#"<button type="submit" class="z-button z-danger-button" data-zeyn-transition="reject" data-testid="s.transition.reject" data-zeyn-confirm="Reject &lt;this&gt; request?" data-text-title="Please confirm" data-text-ok="#),
+        "{html}"
+    );
+}

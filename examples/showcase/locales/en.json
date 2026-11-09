@@ -3,7 +3,9 @@
     "sand": "Sand"
   },
   "app": {
-    "name": "Northwind Operations"
+    "name": "Northwind Operations",
+    "github": "Source on GitHub",
+    "project": "License and security"
   },
   "menu": {
     "overview": "Overview",

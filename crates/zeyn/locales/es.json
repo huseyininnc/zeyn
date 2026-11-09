@@ -104,6 +104,7 @@
       "max": "{label} debe ser como máximo {n}.",
       "format": "{label} tiene un valor no válido.",
       "skipped_time": "{label}: esta hora no existe en tu zona horaria porque cambió el reloj.",
+      "depends_on": "Esta opción no está disponible para el valor del campo del que depende.",
       "line": "Línea {n}: {message}",
       "disabled_day": "{label}: este día no se puede elegir.",
       "time_step": "{label} debe ir en intervalos de {n} minutos.",
@@ -226,9 +227,55 @@
       }
     },
     "ui": {
+      "typing": {
+        "one": "{name} está escribiendo",
+        "two": "{a} y {b} están escribiendo",
+        "many": "{n} personas están escribiendo",
+        "someone": "Alguien"
+      },
+      "composer": {
+        "label": "Mensaje",
+        "placeholder": "Escribe un mensaje",
+        "send": "Enviar",
+        "hint_enter": "Enter envía, Mayús+Enter añade una línea",
+        "hint_ctrl": "Ctrl+Enter envía, Enter añade una línea",
+        "left": "Quedan {n} caracteres",
+        "over": "{n} caracteres de más",
+        "sent": "Mensaje enviado",
+        "failed": "No se pudo enviar el mensaje",
+        "people": "{n} personas encontradas",
+        "no_people": "No se encontró a nadie",
+        "people_label": "Personas",
+        "restored": "Tu mensaje sin enviar ha vuelto",
+        "attachments": "Adjuntos"
+      },
+      "chat": {
+        "label": "Mensajes",
+        "empty": "Todavía no hay mensajes",
+        "you": "Tú",
+        "today": "Hoy",
+        "yesterday": "Ayer",
+        "attachments": "Adjuntos",
+        "more_files": "{n} archivos más",
+        "new_message": "Nuevo mensaje de {name}: {text}",
+        "assistant": "Asistente",
+        "writing": "Escribiendo una respuesta",
+        "stop": "Detener",
+        "stopped": "La respuesta se detuvo",
+        "reply_failed": "No se pudo cargar la respuesta",
+        "loading": "Cargando mensajes anteriores",
+        "status": {
+          "sending": "Enviando",
+          "sent": "Enviado",
+          "delivered": "Entregado",
+          "read": "Leído",
+          "failed": "No enviado"
+        }
+      },
       "resize": "Cambiar tamaño de los paneles",
       "cards": {
         "load_more": "Mostrar más",
+        "list": "Lista",
         "loaded": "{count} elementos mostrados",
         "empty": "Nada que mostrar.",
         "error": "No se pudo cargar la lista. Inténtalo de nuevo.",
@@ -500,6 +547,90 @@
       },
       "prefs": {
         "cleared": "Se han borrado las elecciones que este navegador guardaba para este sitio."
+      },
+      "shop": {
+        "price": {
+          "sale": "Antes {was}, ahora {now}, {off} de descuento",
+          "per": {
+            "item": "{price} por unidad",
+            "kg": "{price} por kg",
+            "g100": "{price} por 100 g",
+            "l": "{price} por litro",
+            "ml100": "{price} por 100 ml",
+            "m": "{price} por metro"
+          }
+        },
+        "range": {
+          "to": "a",
+          "low": "{label}, desde",
+          "high": "{label}, hasta"
+        },
+        "quantity": {
+          "label": "Cantidad",
+          "decrease": "Reducir",
+          "increase": "Aumentar",
+          "limit": "Solo hay {n} disponibles.",
+          "failed": "No se pudo cambiar la cantidad."
+        },
+        "gallery": {
+          "swipe": "Fotos, usa las flechas o desliza",
+          "full": "Pantalla completa",
+          "choose": "Elige una foto",
+          "show": "Mostrar foto {n} de {count}",
+          "close": "Cerrar",
+          "prev": "Foto anterior",
+          "next": "Foto siguiente",
+          "zoom": "Ampliar"
+        },
+        "facets": {
+          "label": "Filtros",
+          "chosen": "Filtros elegidos",
+          "clear": "Quitar todos",
+          "remove": "Quitar el filtro {filter}",
+          "option": "{option}, {count} resultados",
+          "active": "{n} elegidos"
+        },
+        "reviews": {
+          "label": "Reseñas",
+          "average": "{average} de 5 estrellas",
+          "count": "{count} reseñas",
+          "stars": "{n} estrellas"
+        },
+        "rating": {
+          "half": "{label} admite estrellas enteras o medias."
+        },
+        "countdown": {
+          "day": "d",
+          "left": "Quedan {d} d {h} h {m} min"
+        }
+      },
+      "story": {
+        "row": "Historias",
+        "unseen": "{name}, historias sin ver",
+        "seen": "{name}, todas las historias vistas"
+      },
+      "lightbox": {
+        "label": "Visor de medios",
+        "close": "Cerrar",
+        "previous": "Anterior",
+        "next": "Siguiente",
+        "position": "{n} de {count}",
+        "zoom_in": "Acercar",
+        "zoom_out": "Alejar",
+        "open": "Abrir imagen",
+        "video": "Reproducir video"
+      },
+      "feed": {
+        "label": "Publicaciones",
+        "new_one": "1 publicación nueva",
+        "new_many": "{count} publicaciones nuevas",
+        "new_more": "Más de {count} publicaciones nuevas",
+        "newest": "Volver a las más recientes",
+        "loaded": "{count} publicaciones mostradas",
+        "error": "No se pudieron cargar las publicaciones. Inténtalo de nuevo.",
+        "empty": "Todavía no hay publicaciones.",
+        "comments": "{count} comentarios",
+        "comments_one": "1 comentario"
       }
     },
     "date": {

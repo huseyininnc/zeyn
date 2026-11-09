@@ -27,6 +27,8 @@ Form::of(Contact { quantity: 1, ..Contact::default() })
 | `.range(M::from, M::to)` | दो तारीख़ें एक रेंज पिकर के रूप में |
 | `Form::auto(value)` | हर फ़ील्ड, घोषणा के क्रम में |
 
+फ़ॉर्म अधिकतम 720 px चौड़े होते हैं, और जिस कार्ड या पैनल में केवल एक फ़ॉर्म हो वह फ़ॉर्म जितना ही चौड़ा होता है, ताकि कार्ड का कोई आधा हिस्सा खाली न रहे। लेबल 36 px इनपुट से 6 px ऊपर रहते हैं; फ़ील्ड के बीच 20 px होते हैं। फ़ोकस वाले इनपुट को फ़ोकस रंग की किनारी और नरम 3 px रिंग मिलती है; अमान्य इनपुट को danger किनारी। इकाई, मुद्रा और `%` इनपुट के भीतर धुँधले दिखते हैं, और संख्या फ़ील्ड अपने माइनस और प्लस बटन (28 px) फ़ील्ड के अंत में भीतर रखते हैं; तीर कुंजियाँ फिर भी मान बदलती हैं।
+
 ## सहेजना
 
 `.submit(label, action)` उस action को नाम देता है जो सहेजती है। action को फ़ॉर्म के मॉडल के लिए `Valid<M>` लेना होगा; इसके अलावा कुछ भी कंपाइल नहीं होता। रनटाइम मान भेजता है, सर्वर हर नियम चलाता है, फिर action।
@@ -38,6 +40,52 @@ Form::of(Contact { quantity: 1, ..Contact::default() })
 ## कंट्रोल
 
 हर फ़ील्ड प्रकार का एक डिफ़ॉल्ट कंट्रोल है: टेक्स्ट इनपुट, नंबर इनपुट, करेंसी के साथ मुद्रा, तारीख़ और समय पिकर, `bool` के लिए चेकबॉक्स और choice के लिए select। `.control(M::f, Control::...)` दूसरा चुनता है, और `.lookup(M::f, action)` सर्वर पर रिकॉर्ड खोजता है। देखें [कंट्रोल और पिकर](controls.md)।
+
+## निर्भर lookup
+
+`.depends_on(field, source)` lookup `field` के विकल्पों को किसी दूसरे फ़ील्ड पर निर्भर बनाता है, जैसे किसी देश के शहर। हर खोज `source` का मान `LookupQuery::parent` में भेजती है (`q.parent_id()` उसे id के रूप में पढ़ता है), और `source` बदलने पर `field` ख़ाली हो जाता है, ताकि नए मान के लिए उसके विकल्प फिर से लोड हों।
+
+```rust
+#[action(permission = "geo.read")]
+pub async fn find_cities(q: LookupQuery, store: Cities) -> Result<Page<LookupItem>> {
+    Ok(q.apply(store.of_country(q.parent_id())))
+}
+
+Form::of(address)
+    .lookup(Address::country, find_countries)
+    .lookup(Address::city, find_cities)
+    .depends_on(Address::city, Address::country)
+    .submit(t!("save"), save_address)
+```
+
+इस जोड़ी पर ब्राउज़र का भरोसा नहीं किया जा सकता, इसलिए सबमिट पर सर्वर चुने गए शहर के बारे में भेजे गए देश के साथ lookup action से, उस action की अनुमति के साथ, फिर से पूछता है और जो शहर वह नहीं लौटाता उसे फ़ील्ड त्रुटि के साथ अस्वीकार करता है। id वाले अनुरोधों में भी parent से फ़िल्टर करें, जैसा फ़िल्टर करने के बाद `q.apply` करता है। `App::check_page` ऐसा `depends_on` बताता है जिसका फ़ील्ड फ़ॉर्म का lookup न हो या जिसका स्रोत फ़ॉर्म का कोई दूसरा फ़ील्ड न हो।
+
+## फ़िल्टर फ़ॉर्म
+
+बिना सबमिट बटन वाला फ़ॉर्म Screen को फ़िल्टर कर सकता है: `.drives(topic)` उसके फ़ील्ड को Screen params बना देता है। जब कोई फ़ील्ड बदलता है (सेलेक्ट, तारीख की सीमा, Enter दबाने पर टेक्स्ट फ़ील्ड), उसका मान Screen के उसी नाम वाले param में जाता है, पता साथ में अपडेट रहता है, और `.listens(topic)` वाले node उसी जगह रिफ़्रेश होकर मान अपने params से पढ़ते हैं ([Topic](effects.md#topics) देखें)। संख्याएँ और boolean वैसे ही भेजे जाते हैं और ख़ाली फ़ील्ड `null` के रूप में; सर्वर params को Screen के typed params के रूप में पढ़ता है, इसलिए जो मान फ़िट न हो वह अस्वीकार होता है।
+
+```rust
+#[params]
+pub struct SalesParams {
+    pub region: Option<Region>,
+    pub from: Option<Date>,
+    pub to: Option<Date>,
+}
+
+#[screen(route = "/sales", permission = "sales.read")]
+pub fn sales(p: SalesParams, store: Sales) -> Screen {
+    Screen::new(t!("sales.title"))
+        .body(
+            Form::of(SalesFilter { region: p.region, from: p.from, to: p.to })
+                .field(SalesFilter::region)
+                .range(SalesFilter::from, SalesFilter::to)
+                .drives("sales"),
+        )
+        .body(Kpi::new(t!("sales.total"), store.total(&p)).listens("sales"))
+}
+```
+
+`submit` वाला फ़ॉर्म drive नहीं कर सकता; उसके बजाय सहेजने के बाद `on_success` में `ui.refresh(topic)` से रिफ़्रेश करें।
 
 ## केवल पढ़ने योग्य फ़ील्ड
 
@@ -59,6 +107,8 @@ Feature::new("support")
 
 Form::of(ticket).field(Ticket::title).file(Ticket::attachments, ATTACHMENTS)
 ```
+
+एक अनुमति नाम उन्हीं उपयोगकर्ताओं को अपलोड और डाउनलोड दोनों देता है। पाठकों को वे फ़ाइलें खोलने देने के लिए जिन्हें वे जोड़ नहीं सकते, इसे बाँटें: `.files(ATTACHMENTS, FileAccess::read("support.ticket.read").write("support.ticket.files"), store)`।
 
 कंट्रोल एक ड्रॉप ज़ोन के भीतर नेटिव फ़ाइल इनपुट है। हर फ़ाइल प्रगति पट्टी के साथ अपने आप अपलोड होती है, चलते समय रद्द की जा सकती है, विफल होने पर दोबारा कोशिश की जा सकती है और पूरी होने पर हटाई जा सकती है। छवियाँ चुनी गई फ़ाइल के object URL से बना पूर्वावलोकन दिखाती हैं। प्रगति और परिणाम polite लाइव रीजन में घोषित होते हैं। शोकेस में `/uploads` पर एक काम करता उदाहरण है; इस दस्तावेज़ साइट में कोई साइन इन उपयोगकर्ता नहीं है, इसलिए यह कोई लाइव अपलोड नहीं दिखाती।
 

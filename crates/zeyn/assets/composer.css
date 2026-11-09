@@ -1,0 +1,32 @@
+/* Chat composers (`zeyn::ui::Composer`): linked only by pages that hold `.z-composer`. */
+
+.z-composer { position: relative; display: grid; gap: var(--z-s-1); min-inline-size: 0; }
+.z-composer-row {
+  display: flex; align-items: flex-end; gap: var(--z-s-2); padding: var(--z-s-2);
+  border: 1px solid var(--z-border-strong); border-radius: var(--z-radius-lg); background: var(--z-surface);
+}
+.z-composer-row:focus-within { outline: 2px solid var(--z-focus); outline-offset: 1px; }
+.z-composer-text {
+  flex: 1; min-inline-size: 0; min-block-size: 24px; max-block-size: var(--z-composer-max, 12rem); resize: none;
+  overflow-y: auto; margin: 0; padding: 2px var(--z-s-1); border: 0; outline: none; background: transparent;
+  color: var(--z-text); font: inherit; line-height: var(--z-leading-md); box-sizing: border-box;
+}
+.z-composer-text::placeholder { color: var(--z-text-muted); opacity: 1; }
+.z-composer-send { flex: none; display: inline-flex; align-items: center; gap: var(--z-s-1); min-block-size: 36px; }
+.z-composer-send[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
+.z-composer-foot { display: flex; justify-content: space-between; gap: var(--z-s-2); margin: 0; color: var(--z-text-muted); font-size: var(--z-text-xs); }
+.z-composer-count { font-variant-numeric: tabular-nums; }
+.z-composer-over { color: var(--z-danger); font-weight: 600; }
+.z-composer[aria-busy="true"] .z-composer-row { opacity: .7; }
+.z-composer-files .z-upload-drop { padding: var(--z-s-2); }
+.z-composer-people {
+  position: absolute; inset-block-end: calc(100% + 4px); inset-inline-start: 0; z-index: 20; min-inline-size: 14rem;
+  max-block-size: 16rem; overflow-y: auto; margin: 0; padding: var(--z-s-1); list-style: none;
+  border: 1px solid var(--z-border); border-radius: var(--z-radius); background: var(--z-raised, var(--z-surface)); box-shadow: var(--z-shadow-2);
+}
+.z-composer-person { padding: var(--z-s-1) var(--z-s-2); border-radius: var(--z-radius-sm); cursor: pointer; min-block-size: 24px; }
+.z-composer-person[aria-selected="true"] { background: var(--z-brand-subtle); outline: 2px solid var(--z-focus); outline-offset: -2px; }
+.z-composer-person-hint { color: var(--z-text-muted); font-size: var(--z-text-sm); }
+@media (forced-colors: active) {
+  .z-composer-person[aria-selected="true"] { forced-color-adjust: none; background: Highlight; color: HighlightText; }
+}

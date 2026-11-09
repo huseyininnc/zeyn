@@ -27,6 +27,8 @@ Form::of(Contact { quantity: 1, ..Contact::default() })
 | `.range(M::from, M::to)` | 2 つの日付を 1 つの範囲ピッカーにします |
 | `Form::auto(value)` | すべてのフィールドを宣言順に並べます |
 
+フォームの幅は最大 720 px で、フォームだけを含むカードやパネルはフォームと同じ幅になるため、カードの半分が空くことはありません。ラベルは 36 px の入力欄の 6 px 上に置かれ、フィールド同士の間隔は 20 px です。フォーカスされた入力欄にはフォーカス色の枠と柔らかい 3 px のリングが付き、無効な入力欄には危険色の枠が付きます。単位、通貨、`%` は入力欄の中に淡色で表示され、数値フィールドはマイナスとプラスのボタン（28 px）をフィールドの末尾の内側に置きます。矢印キーでも値を増減できます。
+
 ## 保存
 
 `.submit(label, action)` は、保存を行うアクションを指定します。アクションはフォームのモデルの `Valid<M>` を受け取る必要があり、そうでなければコンパイルできません。ランタイムが値を送り、サーバーがすべてのルールを実行し、その後でアクションを実行します。
@@ -38,6 +40,52 @@ Form::of(Contact { quantity: 1, ..Contact::default() })
 ## コントロール
 
 フィールドの型ごとに既定のコントロールがあります。テキスト入力、数値入力、通貨付きの金額、日付と時刻のピッカー、`bool` のチェックボックス、選択肢のセレクトです。`.control(M::f, Control::...)` で別のものを選べ、`.lookup(M::f, action)` はサーバー上でレコードを検索します。[コントロールとピッカー](controls.md) を参照してください。
+
+## 依存する lookup
+
+`.depends_on(field, source)` は、lookup `field` の選択肢を別のフィールドに依存させます。国の都市のような場合です。検索のたびに `source` の値が `LookupQuery::parent` で送られ（`q.parent_id()` で id として読めます）、`source` が変わると `field` はクリアされるため、新しい値に合わせて選択肢が読み込み直されます。
+
+```rust
+#[action(permission = "geo.read")]
+pub async fn find_cities(q: LookupQuery, store: Cities) -> Result<Page<LookupItem>> {
+    Ok(q.apply(store.of_country(q.parent_id())))
+}
+
+Form::of(address)
+    .lookup(Address::country, find_countries)
+    .lookup(Address::city, find_cities)
+    .depends_on(Address::city, Address::country)
+    .submit(t!("save"), save_address)
+```
+
+この組み合わせはブラウザーに任せられないため、送信時にサーバーは、送られた国とともに選ばれた都市を lookup の action（その action の permission 付き）にもう一度問い合わせ、返されない都市はフィールドエラーで拒否します。id による問い合わせでも、フィルター後に `q.apply` を使うように、親で絞り込んでください。`App::check_page` は、フィールドがフォームの lookup でない `depends_on` や、依存元がフォームのほかのフィールドでない `depends_on` を報告します。
+
+## フィルターフォーム
+
+送信ボタンのないフォームで画面を絞り込めます。`.drives(topic)` はそのフィールドを画面の params にします。フィールドが変わると（セレクト、日付範囲、Enter を押したテキストフィールド）、その値は同じ名前の画面の param に入り、アドレスも同期され、`.listens(topic)` を持つノードがその場で更新されて自分の params から値を読みます（[トピック](effects.md#topics) を参照）。数値と真偽値はそのまま、空のフィールドは `null` として送られます。サーバーは params を画面の型付き params として読むため、合わない値は拒否されます。
+
+```rust
+#[params]
+pub struct SalesParams {
+    pub region: Option<Region>,
+    pub from: Option<Date>,
+    pub to: Option<Date>,
+}
+
+#[screen(route = "/sales", permission = "sales.read")]
+pub fn sales(p: SalesParams, store: Sales) -> Screen {
+    Screen::new(t!("sales.title"))
+        .body(
+            Form::of(SalesFilter { region: p.region, from: p.from, to: p.to })
+                .field(SalesFilter::region)
+                .range(SalesFilter::from, SalesFilter::to)
+                .drives("sales"),
+        )
+        .body(Kpi::new(t!("sales.total"), store.total(&p)).listens("sales"))
+}
+```
+
+`submit` を持つフォームは drive できません。代わりに、保存後に `on_success` の中で `ui.refresh(topic)` を使って更新してください。
 
 ## 読み取り専用フィールド
 
@@ -59,6 +107,8 @@ Feature::new("support")
 
 Form::of(ticket).field(Ticket::title).file(Ticket::attachments, ATTACHMENTS)
 ```
+
+権限名を 1 つ指定すると、同じユーザーがアップロードとダウンロードの両方を行えます。追加はできないが閲覧はできるようにするには分けます: `.files(ATTACHMENTS, FileAccess::read("support.ticket.read").write("support.ticket.files"), store)`。
 
 コントロールは、ドロップゾーン内のネイティブなファイル入力です。各ファイルは進捗バー付きで個別にアップロードされ、実行中はキャンセルでき、失敗したら再試行でき、完了したら削除できます。画像は、選択したファイルのオブジェクト URL から作られたプレビューを表示します。進捗と結果は、丁寧なライブリージョンで通知されます。showcaseの `/uploads` に動作する例があります。このドキュメントサイトにはサインインしたユーザーがいないため、ライブのアップロードは表示されません。
 

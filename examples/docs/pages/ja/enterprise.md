@@ -97,6 +97,7 @@ pub async fn move_leave(req: TransitionRequest<LeaveRequestId>, store: LeaveStor
 - 各遷移は、監査レコードの `transition` に名前、from、to、コメントとして書き込まれます。ユーザーと時刻はレコード自体にあります。
 - `Transitions::of(flow, state, id, action)` は、現在の状態、任意のコメント、そして現在の状態からユーザーが行える遷移ごとに 1 つのボタン (`Workflow::allowed`) を表示します。レコードのキーはサーバー側で screen から取得されるため、クライアントが別のレコードを動かすことはできません。エージェントからはフォームツールとして見えます。
 - ボタンのラベルはカタログの `workflow.<name>` から取得されます。`.label(...)` で手動設定もできます。
+- `.confirm(name, message)` は遷移 `name` の実行前に `ActionButton::confirm` のダイアログで確認し、`.tone(name, Tone::Danger)` はそのボタンを赤で描きます。どちらの場合もサーバーが遷移と権限を確認します。
 - `Workflow::check` は、無効な権限と、同じ状態から 2 回宣言された遷移を報告します。テストで呼び出してください。
 - showcase の休暇申請はこれを使っています。下書きとして保存し、申請して、承認または却下します。
 

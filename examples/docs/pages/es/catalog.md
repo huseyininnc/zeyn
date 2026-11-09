@@ -37,6 +37,19 @@ Card::image(c.cover.clone(), c.title.clone())
     .progress(c.done, t!("courses.done"))
     .horizontal()
 ```
+- **Cuadrículas de productos rápidas.** `.placeholder(...)` en la cuadrícula rellena cada imagen de tarjeta mientras se carga, y una tarjeta puede definir el suyo. En una tarjeta, `.low(src)` muestra primero un archivo pequeño y `.fallback(src)` prueba otro archivo una vez, antes de que la tarjeta muestre su texto alternativo con un icono. `.priority(n)` carga las imágenes de las primeras `n` tarjetas (12 como máximo) de inmediato con `fetchpriority="high"`; las demás imágenes de tarjeta siguen siendo diferidas, y las páginas cargadas después nunca van primero. Funcionan como las opciones de [`Image`](display.md#image), con un solo listener para todas las tarjetas.
+
+```rust
+CardGrid::of(catalog_products)
+    .card(|p: &Product| {
+        Card::image(p.photo.clone(), p.name.clone())
+            .low(p.photo_small.clone())
+            .fallback("/static/no-photo.webp")
+    })
+    .placeholder(Placeholder::color("--z-surface-2"))
+    .priority(4)
+```
+- **Cuadrículas largas.** Las tarjetas y las filas de lista fuera de la pantalla se saltan el diseño y el pintado (`content-visibility: auto`), con su tamaño reservado a partir del tamaño de la imagen, así que una cuadrícula larga cuesta poco hasta que se ve. Una cuadrícula de tarjetas con 200 tarjetas o más mantiene en la página solo las filas cercanas a la vista, como hace un [DataGrid](datagrid.md) virtual: las demás filas son espacio de la misma altura, cada fila tiene la altura de la más alta de las primeras tarjetas y cada tarjeta indica su posición a los lectores de pantalla (`aria-posinset`, `aria-setsize`). Tab y Shift+Tab llegan a todas las tarjetas, una tarjeta con el foco se queda mientras sale de la vista al desplazarse y "Show more" añade a la misma ventana. Durante un desplazamiento rápido, las tarjetas que solo pasan de largo no descargan imágenes; se cargan cuando el desplazamiento se detiene. Buscar en la página solo ve las tarjetas cercanas a la vista; para las demás, use la búsqueda de la cuadrícula.
 - **Primera página en el servidor.** La primera página (24 tarjetas en una cuadrícula, 12 en un rail, o el tamaño indicado en `paging`) forma parte del HTML de la página, así que los buscadores y los visitantes sin JavaScript ven las tarjetas y sus enlaces, y las imágenes llevan su tamaño para que nada se mueva al cargarse. Las páginas siguientes llegan desde el navegador. Una página pública es el mismo HTML para todos los visitantes, así que puede almacenarse en caché. Una tarjeta enlazada a una screen con ruta enlaza a su dirección canónica (`/items/{slug}`), nunca a una redirección.
 - **Paginación.** `Paging::infinite(n)` (el valor por defecto, 24) muestra un botón "Show more" que también se activa cuando entra en la vista al desplazarse; el foco pasa a la primera tarjeta nueva cuando se pulsa el botón. `Paging::pages(n)` muestra los botones anterior y siguiente y el número de página: "Page 2 of 5" cuando la action devuelve un total, "Page 2" cuando no, y entonces Siguiente funciona mientras la action devuelva un cursor. El servidor fija el tamaño de página; el cliente solo indica dónde continuar.
 - **Ordenación.** Cada `sort_option` es un orden que los usuarios pueden elegir en un select; el primero es el orden con el que empiezan las tarjetas. El servidor acepta solo estos órdenes y descarta los filtros y el texto de búsqueda que envíe el cliente.
@@ -58,6 +71,22 @@ Rail::of(search_products).card(|p: &Product| {
 
 @live preview
 
+
+### Builders
+
+`.card` y `.item` siguen siendo lo predeterminado: dan enlaces, imágenes y texto para lectores de pantalla sin esfuerzo. Cuando una fila necesita otra forma, `.builder(|row| node)` construye cada fila como cualquier nodo, como `ListView.builder` de Flutter, en `List::of`, `CardGrid` y `Rail`. `.separator(node)` pone un nodo entre filas (oculto a los lectores de pantalla, que cuentan las filas), y `Repeat::of(items, |item| node)` hace lo mismo para una lista que la pantalla ya tiene en memoria, hasta 500 elementos.
+
+```rust
+List::of(search_people)
+    .builder(|p: &Person| Row::new().compact().col(Avatar::new(p.name.clone())).col(Paragraph::new(p.city.clone())))
+    .separator(Paragraph::new("·"))
+
+Repeat::of(order.steps.iter(), |s| Badge::new(s.name.clone())).separator(Paragraph::new("→"))
+```
+
+- **Claves.** Las filas construidas y las filas de una lista virtual llevan la clave del modelo en `data-zeyn-key`, así que un refresco de la lista ([Topics](effects.md#topics)) mantiene el foco y los details abiertos en el mismo registro, dondequiera que se haya movido.
+- **Las filas construidas son para mostrar.** Sus nodos no se direccionan con rutas de nodo, así que un grid, un formulario o un lookup van en otro sitio. Los nodos de `Repeat` son hijos (`p.0`, `p.1`, ...) y siguen funcionando.
+- **Scroll virtual.** Una lista con `.paging(Paging::virtual_scroll())` mantiene en la página solo las filas visibles, dentro de un área de scroll tan alta como todas las filas, y pide bloques por offset a medida que el usuario se desplaza. Las filas tienen una sola altura fija y no hay altura por fila: con un builder, `.row_height(px)` es obligatorio y `App::check_page` informa si falta (`separator` no se usa ahí). Cada fila lleva `aria-posinset` y `aria-setsize`, así que los lectores de pantalla oyen su lugar en toda la lista; el área de scroll es una región enfocable con el nombre del título.
 
 ## Rail
 
@@ -94,6 +123,8 @@ SearchBox::of(catalog_products)
 Teclado: Abajo y Arriba se mueven por las sugerencias (Abajo las abre), Enter busca con la sugerencia resaltada o con el texto escrito, Escape cierra las sugerencias y después borra el campo. Una región en vivo indica a los lectores de pantalla cuántas sugerencias hay.
 
 La pantalla de resultados recibe `SearchParams` (`q`, vacío cuando la pantalla se abre desde un menú). El servidor recorta el texto a `MAX_SEARCH_QUERY` (100) caracteres, decide cuántas sugerencias enviar (8 salvo que `limit` indique otra cosa, como máximo 20), comprueba el acceso de la pantalla, los guards de la feature y el permiso de la acción, y cuenta cada llamada de sugerencias contra el límite de escritura (`App::write_limit`).
+
+`.drives(topic)` busca en su sitio en lugar de abrir una pantalla de resultados: Enter, elegir una sugerencia o vaciar el campo pone el texto en el param `q` de la pantalla y refresca los nodos que escuchan el topic (consulta [Topics](effects.md#topics)). Los params de la pantalla necesitan un campo `q: String`, como tiene `SearchParams`.
 
 ### Sugerencias enriquecidas
 

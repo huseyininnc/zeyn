@@ -71,6 +71,10 @@ pages! {
         content "/components/content" "content.md" "Text and content" "../pages/content.md";
         data_views "/components/data" "data.md" "Tree and charts" "../pages/data.md";
         catalog "/components/catalog" "catalog.md" "Cards, rails and search" "../pages/catalog.md";
+        admin "/components/admin" "admin.md" "Admin views" "../pages/admin.md";
+        commerce "/components/commerce" "commerce.md" "Shop components" "../pages/commerce.md";
+        chat "/components/chat" "chat.md" "Chat" "../pages/chat.md";
+        social "/components/social" "social.md" "Social" "../pages/social.md";
         shell "/components/shell" "shell.md" "Shell and commands" "../pages/shell.md";
         media "/components/media" "media.md" "Media" "../../../docs/media.md";
     }
@@ -95,6 +99,9 @@ pages! {
     "docs.group.reference" Search {
         protocol "/reference/runtime-protocol" "runtime-protocol.md" "Runtime protocol" "../../../docs/runtime-protocol.md";
         database_reference "/reference/database" "database.md" "Database reference" "../../../docs/database.md";
+    }
+    "docs.group.project" Globe {
+        about "/project" "project.md" "Source, license and security" "../pages/project.md";
     }
 }
 
@@ -624,8 +631,18 @@ pub fn app(docs: Docs) -> Result<App, String> {
         .robots_txt(include_str!("../robots.txt"))
         .service(docs)
         .home(introduction)
+        .header(|h| {
+            h.end(Badge::new(Text::from(concat!(
+                "v",
+                env!("CARGO_PKG_VERSION")
+            ))))
+            .end(ExternalLink::new(REPOSITORY, t!("docs.github")).new_tab())
+        })
         .feature(feature()))
 }
+
+/// The public repository of Zeyn, linked from the top bar of every page.
+pub const REPOSITORY: &str = "https://github.com/huseyininnc/zeyn";
 
 /// The public address of the documentation, for canonical URLs, alternates and the sitemap.
 pub const SITE: &str = "https://docs.zeynsoft.com";

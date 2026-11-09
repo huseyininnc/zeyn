@@ -38,7 +38,28 @@
 
 head にあるフレームワークのスクリプトとスタイルシートにはすべて、`?v=` とビルド ID（`meta[name=zeyn-build]`。`ZEYN_BUILD_ID` か実行ファイルのハッシュ）が付き、`theme.css` にはテーマ文字列のハッシュが付きます。現在の値を持つリクエストは `Cache-Control: public, max-age=31536000, immutable` を受け取るため、ウォームなページ読み込みではそれらを 1 つも要求しません。それ以外のリクエスト（デプロイ後の古いタブ、`v` なし）は `no-cache` と ETag を受け取ります。ランタイムがあとからインポートするモジュールは、それをインポートするスクリプトの URL から同じ `v` を引き継ぎます。
 
-すべてのページが `zeyn.js`（リクエスト、effect、ウィンドウ、フォーム、メニュー、ショートカット、イベント委譲）、`nav.js`、`components.js` を読み込み、アプリシェルでは `pro.js` と `enterprise.js` も読み込みます。残りは、それを使うページでだけ読み込まれ、`nav.js` が画面を差し替えるときも同じです。`zeyn.js` は、コンテンツに `[data-zeyn-grid]` が初めて入ったときに grid ランタイム `grid.js` をインポートし（grid を持つ完全なページは `<link rel="modulepreload">` でこれを指定します）、`components.js` は `catalog.js`（カード grid、検索ボックス）、`media.js`（プレーヤー、埋め込み）、`files.js`（アップロード）、`charts.js`、`assistant.js`（チャットパネル、またはランチャーを初めて押したとき）をインポートします。これらのスタイルシートは head に残るので、スクリプトが届いても見た目は変わりません。showcase のダッシュボードでは、9 スクリプト 403 KB（116 KB）ではなく、5 スクリプト 258 KB（転送 74 KB）になります。
+### 1.1 Browser modules
+
+ページは、その画面が使うブラウザーコードだけを読み込んで実行します。どのページもコアを実行します。`zeyn.js`（リクエスト、エフェクト、ウィンドウ、フォーム、メニュー、ショートカット、イベント委譲、モジュールローダー）、`nav.js`、`enterprise.js`（`fetch` のレスポンスフックとセッションのアイドルタイムアウト）で、合わせて非圧縮 90 KB、gzip で 29 KB です。それ以外はすべてコンポーネントのモジュールで、`/_zeyn/{name}.js` と一部は `/_zeyn/{name}.css` です。`crates/zeyn/src/server/modules.rs` の `MODULES` に、その HTML が持つマーカー（属性名 `data-zeyn-date` とクラス `z-select`、名前全体で一致）とともに宣言されます。
+
+| モジュール | コンポーネント |
+|---|---|
+| `components.js` | すべてのコントロールモジュールが import する共有部分：ヘルパー、ポップアップとリストボックスのコア、セレクト（アプリシェルの選択肢）、確認ダイアログ、アラート、パンくずリスト |
+| `tabs.js`, `dates.js`, `choices.js`, `inputs.js`, `lines.js`, `steps.js`, `tree.js`, `overlays.js`, `menubutton.js`, `busy.js` | パネル、タブ、分割ペイン；日付と時刻のピッカー（グリッドの日付フィルターも）；リストボックス、ルックアップ、複数選択；数値、伸びるテキストエリア、マスク、パスワード；明細行エディター；ステップ形式のフォーム；ツリー；ツールチップとポップオーバー；メニューボタンと分割ボタン；処理中オーバーレイ |
+| `grid.js` | グリッド。`zeyn.js` が自分で import するため `<link rel="modulepreload">` としてリンクされます |
+| `palette.js`, `pro.js` | コマンドパレットとコマンドボタン；メニューバー、ツールボックス、ステータスバー、ドッキングパネル、プロパティインスペクター |
+| `forms.js`, `reveal.js`, `import.js` | フォームの下書きとワークフローの遷移；マスクされた値の表示；インポート |
+| `catalog.js`, `media.js`, `files.js`, `charts.js` とそのスタイルシート | カードグリッド、レール、検索ボックス；プレーヤー、埋め込み、画像；アップロード；チャート、スパークライン、KPI カード、ブレットチャート |
+| `share.js`, `chips.js`, `reactions.js`, `hero.js`, `state.js`, `preview.js`, `assistant.js` | 共有ボタン、フィルターチップ、リアクション、ヒーロースライド、設定ストア、カードのプレビュー（最初のホバー）、アシスタント（チャットパネル、またはランチャーの最初の押下） |
+| `topics.js`, `vlist.js` | トピックを listen するノードと、それを drive するコントロール（`data-zeyn-listens`、`data-zeyn-drives`）、仮想リスト（`data-zeyn-vlist`） |
+| `inbox.js`, `kanban.js`, `calendar.js` and their stylesheets, `diff.css`, `code.css`, `barcode.css` | 受信箱と通知ベル、Kanban ボード、カレンダー、スクリプトの要らない差分、コード表示、バーコード（コード表示のコピーボタンは `share.js` にあります） |
+| `range.js`、`quantity.js`、`gallery.js`、`countdown.js`、`commerce.css` | 範囲スライダー、数量ステッパー、商品ギャラリー、カウントダウン。すべてのショップ用コンポーネントのスタイルシート（価格、バリエーション選択、ファセットパネル、レビューの集計） |
+| `thread.js` と `thread.css`, `stream.js`, `composer.js` と `composer.css`, `typing.js` と `typing.css` | メッセージスレッド、スレッドとアシスタントが共有するストリーミングの Markdown と JSON 行、チャットの composer、入力中インジケーター |
+| `feed.js`, `lightbox.js` and their stylesheets, `stories.css` | 投稿のフィード、画像と動画のライトボックス、ストーリーリングとその行、スクリプト不要 |
+
+完全なページは head に、すべてのページが使うスタイルシート（`zeyn.css`、`components.css`、`content.css`、`pro.css`、`enterprise.css`）、HTML にマーカーがあるモジュールのスタイルシート、そしてそれらのスクリプトを、それぞれが import するモジュールの後にリンクします。`zeyn.js` は同じ表（`[name, script selector, style selector]`）付きで配信され、後から届くコンテンツに足りないものを読み込みます。`nav.js` は画面を差し替える前に `{ root, waits }` 付きの `zeyn:need` を発行して新しいスタイルシートを待ち、ウィンドウも開く前に同じように待ちます。`zeyn:content`、グリッドのページ、グリッドのフィルターは、含むもののスクリプトを読み込みます。ブラウザーは URL ごとに 1 つのインスタンスを保つので、モジュールは一度だけ実行されます。モジュールは実行時にドキュメントで見つけたものを設定し、その後は `zeyn:content` を待ち受けます。ページにないコンポーネントを探したり待ち受けたりすることはありません。モジュールは共有部分を自分の URL の `?v=` 付きで import します。`tests/ui_modules.rs` は、ページが使わないモジュールをリンクしたとき、またはモジュールのスタイルシートがマーカー外のクラスにスタイルを付けたときに失敗します。
+
+showcase での計測（非圧縮、gzip での転送量）：テキストだけのページはスクリプトが 269 KB（80 KB）から 132 KB（46 KB）に、グリッドのページは 357 KB（106 KB）から 223 KB（74 KB）に、フォームのページは 269 KB（80 KB）から 186 KB（65 KB）になり、どのページもスタイルは 177 KB（44 KB）から 151 KB（35 KB）になりました。コンポーネントカタログのようにすべてのコンポーネントを持つページは、各モジュールが別ファイルのため、以前より多くのファイルを読み込みます（41 から 68 リクエスト、非圧縮 774 KB から 836 KB）。
 
 ## 2. Screen markup
 
@@ -177,6 +198,8 @@ Effects:
 - キーボード: 矢印キー、Page Up、Page Down、Home、End でアクティブな行が移動し、表示範囲にスクロールされます。テーブルには `aria-rowcount` = total が、各行には `aria-rowindex` が付きます。
 - 位置を示すテキスト（`data-zeyn-page-info`）は `data-zeyn-text-range-total` を使います。
 
+カードグリッド（`zeyn::ui::CardGrid`。rail や行のリストは含みません）は、カードが 200 枚になると、スクロールコンテナではなくページ自体のスクロールに対してウィンドウ処理を行います。`catalog.js` はリストに `data-zeyn-window` を付け、ビューポートから 800 px 以内の行をその中に保持し、上下の行はパディングに置き換え、各行に最初のカードのうち最も高いものの高さを与え（`grid-auto-rows`）、各カードに `aria-posinset` と `aria-setsize`（まだページが続く可能性がある間は `-1`）を設定します。ウィンドウの外にあるフォーカス中のカードは `z-cards-kept` 付きで DOM に残り、自分のセルの上に配置されます。「もっと見る」や別のページから来たカードも同じウィンドウに加わります。ページが 1 ms あたり 3 px より速くスクロールしている間、カードは画像を保留した状態で入り（`data-zeyn-park`。`src` と `srcset` は別に保持）、スクロールが 120 ms 止まると画像を取り戻します。
+
 ### 4.3 Form submit
 
 `POST /_zeyn/form`
@@ -249,11 +272,12 @@ Effects:
 - キーボード: 矢印キーで grid の行間を移動し、Enter で行を開き、Escape で最前面のダイアログを閉じ、`aria-keyshortcuts` のショートカットはテキスト入力の中を除くどこでも動作します。grid では次のとおりです。Space で行を選択、F2 で編集、Ctrl+Z で最後の編集を元に戻す、Shift+F10 またはコンテキストメニューキーで行またはヘッダーのメニューを開く、Shift+クリックで複数列によるソート、Right と Left（右から左のページでは反転）で行の詳細、グループ、子を開閉し、子の行での Left は親へ移動します。行での Right はそのセルの中へ移動します。矢印、Home、End、Ctrl+Home、Ctrl+End、Tab、Shift+Tab でセルカーソルを動かし、Shift で範囲を広げ（セルに `aria-selected`）、Ctrl+C で範囲をタブ区切りテキストとしてコピーし、Ctrl+V で編集可能なセルへ貼り付け（変更された行ごとに 1 回の `POST /_zeyn/grid/edit`）ます。40 列以上の grid は、表示範囲内の列だけをページ内に保持します（固定幅の `colgroup`、`colspan` を持つ `td.z-col-gap` のスペーサー、セルの `aria-colindex`）。
 - 右クリックは、定義されている場所（ヘッダー、`data-zeyn-menu` を持つ行、`data-zeyn-menu` を持つ Screen）では Zeyn のメニューを開きます。それ以外の場所ではブラウザ自身のメニューがそのまま使われます。
 - ダイアログが開くとフォーカスがその中へ移動し、閉じると開いた要素に戻ります。
+- クリックと同じフレームで待機状態を示します。画面の読み込み中、`nav.js` は移動先のリンクを現在の項目にし、`html[data-zeyn-loading]` を設定します。ウィンドウとフォーム送信も同じ属性を設定し、グリッドはソート、ページ、フィルターのキーが押されるとすぐに行を薄くします（`aria-busy`）（フィルターは次のキーを 150 ms 待ち、新しいリクエストが古いものを取り消します）。ウィンドウ上端の細いバーは、応答が 150 ms より長くかかるときだけ表示されます。固定配置なので何も動かず、`prefers-reduced-motion` では動きません。
 - クライアント側のチェック（`required`、`minlength`、`maxlength`、`min`、`max`、`type="email"`）は、送信前にブラウザの制約検証 API で実行されます。サーバーは常に再度検証します。
 
 ## 7. Component library
 
-`zeyn::ui` のコンポーネントは、ランタイムの後に head でリンクされる 2 つの追加アセット `/_zeyn/components.js` と `/_zeyn/components.css` によって配信されます。ランタイムと同様に、サインインは不要です。
+`zeyn::ui` のコンポーネントは、1.1 節のモジュールとスタイルシート `/_zeyn/components.css` で配信されます。ランタイムと同じく、サインインは不要です。
 
 ### 7.1 Endpoints
 
@@ -262,6 +286,7 @@ Effects:
 | エンドポイント | Body | 応答 |
 |---|---|---|
 | `/_zeyn/node` | `{ screen, params, node }` | 1 つのノードの HTML（その grid の最初のページ付き）。遅延 tabs で使われます。 |
+| `/_zeyn/nodes` | `{ screen, params, nodes: ["1.0", "2"] }` | `{ nodes: { "1.0": "<div class=\"z-node\" ...>" } }`: 画面を 1 回実行してレンダリングした複数のノード。更新または drive されたトピックのリスナー用です。異なるパスは最大 32 個で、画面にないパスは `404` を返します。画面のアクセス、guard、interceptor は 1 回だけ実行され、params は画面の型付き params として読まれます。 |
 | `/_zeyn/data` | `{ screen, params, node, key, input }` | ノードのデータソース `key` からの JSON。lookup の選択肢（`key` はフィールド名）、tree の子（`key` は空）、ステップの確認（`key` は `_step`）。ソースの action 権限が確認され、grid と同様にインターセプターが実行されます。action に合わない入力は `404` で拒否されます。 |
 | `screen` = `_site.{feature}` の `/_zeyn/data` | 上と同じ | サイトヘッダーのスロット内のコンポーネント向けの同じ処理。`node` はスロット（0 は start、1 は center、2 は end、3 は bottom）、その中でのノードのインデックス、続いて子のインデックスです。Feature のガードと action の権限が確認されます。 |
 | `/_zeyn/parse` | `{ kind, text, label }` | 入力された日付または時刻を、サーバーがユーザーの言語、ゾーン、時計でどう解釈するか。`{ ok, text, iso, utc, zone }` または `{ ok: false, message }`。`kind` は `date`、`time`、`datetime`、`local`、`presets`（今日とクイック範囲）です。 |
@@ -276,17 +301,26 @@ Effects:
 
 | イベント | 対象 | Detail |
 |---|---|---|
-| `zeyn:content` | `document` | 新しいコンテンツを持つ要素（ナビゲーション、遅延パネル）。両方のスクリプトが、その中身をセットアップします。 |
+| `zeyn:content` | `document` | 新しいコンテンツを持つ要素（ナビゲーション、遅延パネル）。ランタイムが必要なモジュールを読み込み、読み込まれた各モジュールが中身を設定します。 |
 | `zeyn:errors` | form | ランタイムが表示した後の `422` エラー。line エディターとステップ形式の form が使います。 |
 | `zeyn:effect` | `document` | ランタイムが知らない effect: `{ effect, source, run }`。`run(next)` は別の effect を実行します。`confirm` で使われます。 |
+| `zeyn:topics` | `document` | `{ topics }`: ほかのスクリプト（通知を受けた `live.js`）からの、更新するトピック。 |
+| `zeyn:reload` | 要素 | その中のグリッドをその場で再読み込みします。現在のページ、または `{ reset: true }` なら最初のページです。 |
+| `zeyn:density` | `document` | なし。ユーザーがアカウントメニューで別の密度を選びました（`<html>` の `data-density` はすでに変わっています）。ウィンドウ化されたカードグリッドが行を測り直します。 |
 
 Effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":"...","then":{...}}` は、モーダルのアラートダイアログで確認し、ユーザーが承諾した後にのみ `then` を実行します。
+
+Effect `{"effect":"refresh","topics":["sales"]}` はトピックのリスナーを更新します。`[data-zeyn-listens="a,b"]` はリスナー（親 `data-zeyn-node` のノード）を示し、`[data-zeyn-drives="a"]` はトピックを drive するコントロールを示します。フィルターフォーム（`data-zeyn-kinds` はどの params が数値または真偽値かを示します）、検索ボックス（フィールド名は `q`）、フィルターチップ（各チップは自分の params を `data-zeyn-params` に持ちます）です。drive すると、コントロールの値が画面ルートの `data-zeyn-params` にマージされ、その画面がメイン画面ならアドレスがそれで置き換えられ、リスナーが更新されます。`topics.js` は 1 つのアニメーションフレームで指定されたトピックをまとめて処理します。グリッドを持つリスナーは `zeyn:reload` を受け取り、画面のほかのリスナーは 1 回の `POST /_zeyn/nodes` にまとめられ、同じ画面への新しいリクエストは古いものを中断してそのノードを引き継ぎます。フォーカスと開いている `<details>` は、id、test id、`data-zeyn-key` の行、位置で保たれます。
+
+仮想リストは `data-zeyn-row-height`、`data-zeyn-block`、`data-zeyn-total` を持つ `section[data-zeyn-vlist]` です。`vlist.js` は `{ page: { type: "offset", offset }, with_total: true }` で `POST /_zeyn/grid` にブロックを要求し、各 `<li>` を `(aria-posinset - 1) * height` の位置に置きます。別のフィールドに依存する lookup は `data-depends-on="field"` を持ち、そのフィールドの値を `/_zeyn/data` の入力の `parent` として送ります。
 
 クライアント設定（`zeyn::ClientPref`）はブラウザーのモジュール `/_zeyn/state.js` にあり、ページはこのモジュールを、`data-zeyn-remember` または `data-zeyn-prefs-clear` を持つ要素がある場合にだけインポートします。`GET /_zeyn/prefs` は `{ preferences }` を返します。これは、アプリの同意フックが、設定値をセッションを越えて保持することを許可するかどうかを表し、`Cache-Control: no-store` が付きます。サーバーは保存された値を読み取りません。
 
 ### 7.4 Media
 
 `Video` と `Audio` は `/_zeyn/media.js` と `/_zeyn/media.css` で配信され、コンポーネントライブラリの後にリンクされます。`docs/media.md` を参照してください。
+
+プレーヤーは、最初に表示範囲に入ったときに、ページで 1 つの `IntersectionObserver` を通じてソースとポスター（`data-zeyn-poster`、先に `data-zeyn-poster-low`）を設定します。`data-zeyn-preview` を持つルートは、4 分の 1 が見えている間ミュートでループ再生します。ただし `prefers-reduced-motion`、`prefers-reduced-data`、Save-Data がそれを望まない場合は除き、訪問者がコントロールを操作するまでに限ります。読み込みオプションを持つ画像は、スクリプトなしでプレースホルダーを表示するボックス（`.z-img-host`）の中にあり、`media.js` を読み込む目印である `data-zeyn-img` を持ちます。document 上の 1 つのキャプチャリスナーが、それらの画像の `load` と `error` を扱います。読み込みが終わるとボックスに `z-img-done` を付け（低解像度ファイルの上でフェードするときは `z-img-fade` も）、失敗すると `data-zeyn-fallback` を 1 回試し、その後ボックスの `<template data-zeyn-img-error>` か、アイコン付きの代替テキストを表示します。モジュールの実行前に終わっていた画像は、モジュールの開始時に 1 回確認されます。
 
 | エンドポイント | 動作 |
 |---|---|

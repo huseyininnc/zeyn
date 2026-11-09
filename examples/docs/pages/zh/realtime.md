@@ -88,6 +88,8 @@ pub async fn save_order(o: Valid<Order>, store: Orders, hub: Hub, ctx: Ctx) -> R
 
 通知只携带主题名称，绝不携带数据：刷新走的是正常的表格端点，并带有所有权限检查。`notify` 只到达调用者所在的租户；`notify_tenant(Some(id), topic)` 指定某一个租户，`None` 表示没有租户机制的应用。
 
+同样的主题名在没有通道时也能使用。用 `.listens("orders")` 标记的节点会在通知点名该主题时就地刷新（`live.js` 把它作为 `zeyn:topics` 转发），在 action 以 `ui.refresh("orders")` 结束或带 `.drives("orders")` 的筛选变化时也会刷新：网格重新加载当前页，其他监听者每个界面用一次 `POST /_zeyn/nodes` 重新渲染（见 `examples/docs/pages/effects.md` 中的 Topics）。socket 只订阅 `Live` 节点的主题，这些主题必须用 `Realtime::topic` 声明；对于不是网格的部分，请在其内部或旁边使用 `.listens`。
+
 ## 5. 内存与背压
 
 每一份状态都有上限（`Limits`，括号中为默认值）：

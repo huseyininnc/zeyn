@@ -1,6 +1,7 @@
 {
   "docs": {
     "app": "Zeyn docs",
+    "github": "Source on GitHub",
     "missing": "This page does not exist.",
     "on_this_page": "On this page",
     "pager": "Previous and next page",
@@ -11,7 +12,8 @@
       "language": "Language",
       "components": "Components",
       "guides": "Guides",
-      "reference": "Reference"
+      "reference": "Reference",
+      "project": "Project"
     },
     "live": {
       "label": "Live example",
@@ -57,6 +59,9 @@
       "content": "Text and content",
       "data_views": "Tree and charts",
       "catalog": "Cards, rails and search",
+      "admin": "Admin views",
+      "commerce": "Shop components",
+      "chat": "Chat",
       "shell": "Shell and commands",
       "media": "Media",
       "time_i18n": "Time and languages",
@@ -76,7 +81,9 @@
       "realtime": "Realtime and CRDT",
       "desktop": "Desktop apps",
       "protocol": "Runtime protocol",
-      "database_reference": "Database reference"
+      "database_reference": "Database reference",
+      "about": "Source, license and security",
+      "social": "Social"
     },
     "translation": {
       "note": "This page is translated from English.",

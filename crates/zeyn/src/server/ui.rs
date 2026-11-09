@@ -36,15 +36,6 @@ pub(super) const ASSETS: [&str; 5] = [
     "/_zeyn/content.css",
 ];
 
-/// Links placed in the page head after the runtime's own. The catalog script (card grids, rails,
-/// search boxes) is not among them: components.js loads it when a page first holds one.
-pub(super) fn head(base: &str) -> String {
-    let v = super::ops::asset_version();
-    format!(
-        r#"<link rel="stylesheet" href="{base}/_zeyn/components.css{v}"><script type="module" src="{base}/_zeyn/components.js{v}"></script><link rel="stylesheet" href="{base}/_zeyn/catalog.css{v}"><link rel="stylesheet" href="{base}/_zeyn/content.css{v}">"#
-    )
-}
-
 pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
     router
         .route(
@@ -68,7 +59,9 @@ pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
             get(|| async { asset(CONTENT_CSS, "text/css; charset=utf-8") }),
         )
         .route("/_zeyn/node", post(node_call))
+        .route("/_zeyn/nodes", post(nodes_call))
         .route("/_zeyn/data", post(data_call))
+        .route("/_zeyn/stream", post(stream_call))
         .route("/_zeyn/parse", post(parse_call))
 }
 
@@ -173,8 +166,75 @@ struct DataCall {
     input: Json,
 }
 
-/// Renders one node of a screen, with the first page of its grids. Used by lazy tabs. Runs
-/// through the interceptors and records the read like opening the screen does.
+/// Most nodes one `POST /_zeyn/nodes` renders.
+pub(crate) const MAX_REFRESH_NODES: usize = 32;
+
+#[derive(Deserialize)]
+struct NodesCall {
+    screen: String,
+    #[serde(default)]
+    params: Json,
+    nodes: Vec<NodePath>,
+}
+
+/// Opens a screen with the client's params and renders the nodes at `paths`, each with the first
+/// page of its grids, in the order asked. The screen's access, the feature's guards and the
+/// interceptors run once for all of them, and the read is recorded like opening the screen.
+async fn render_nodes(
+    st: &AppState,
+    ctx: &crate::ctx::Ctx,
+    screen: &str,
+    params: Json,
+    paths: &[NodePath],
+) -> Result<Vec<String>, Failure> {
+    let Some((&name, _)) = st.screens.get_key_value(screen) else {
+        return Err(Failure::App(Error::NotFound));
+    };
+    let info = Call {
+        kind: CallKind::Screen,
+        screen: name,
+        action: None,
+        via_agent: ctx.via_agent(),
+    };
+    st.intercept(ctx, &info, || async {
+        let (_, entry, screen) = st
+            .open(ctx, name, params.clone())
+            .await?;
+        let mut nodes = Vec::with_capacity(paths.len());
+        let mut walked = Vec::new();
+        for path in paths {
+            nodes.push(
+                screen
+                    .node(path)
+                    .ok_or(Failure::App(Error::NotFound))?,
+            );
+            walked.extend(screen.walk_from(path));
+        }
+        super::data::note_screen_read(ctx, &entry.meta, &params);
+        let loaded = st
+            .preload(ctx, walked, entry.meta.name)
+            .await;
+        let r = super::user_render(entry.meta.name, ctx);
+        let r = Render {
+            loaded: Some(&loaded),
+            ..r
+        };
+        Ok::<_, Failure>(
+            paths
+                .iter()
+                .zip(nodes)
+                .map(|(path, node)| {
+                    let mut out = String::new();
+                    crate::ui::render_node(&mut out, &r, path.as_str(), node);
+                    out
+                })
+                .collect(),
+        )
+    })
+    .await
+}
+
+/// Renders one node of a screen, with the first page of its grids. Used by lazy tabs.
 async fn node_call(
     State(st): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -184,66 +244,78 @@ async fn node_call(
     if let Err(f) = st.check_csrf(&headers) {
         return st.error_response(&ctx, f);
     }
-    let Some((&name, _)) = st
-        .screens
-        .get_key_value(call.screen.as_str())
-    else {
+    let paths = [call.node];
+    match render_nodes(&st, &ctx, &call.screen, call.params, &paths).await {
+        Ok(mut html) => Html(html.pop().unwrap_or_default()).into_response(),
+        Err(f) => st.error_response(&ctx, f),
+    }
+}
+
+/// Renders several nodes of a screen in one request, for the nodes that listen to a refreshed
+/// or driven topic: `{ "nodes": { "1.0": "<div class=\"z-node\" ...>" } }`. At most
+/// [`MAX_REFRESH_NODES`] paths, counted before duplicates are dropped so a long list is refused
+/// without work; a path that is not in the screen answers 404.
+async fn nodes_call(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::Json(call): axum::Json<NodesCall>,
+) -> Response {
+    let ctx = st.licensed(st.ctx(&headers)).await;
+    if let Err(f) = st.check_csrf(&headers) {
+        return st.error_response(&ctx, f);
+    }
+    if call.nodes.len() > MAX_REFRESH_NODES {
         return st.error_response(&ctx, Failure::App(Error::NotFound));
-    };
-    let info = Call {
-        kind: CallKind::Screen,
-        screen: name,
-        action: None,
-        via_agent: ctx.via_agent(),
-    };
-    let result = st
-        .intercept(&ctx, &info, || async {
-            let (_, entry, screen) = st
-                .open(&ctx, name, call.params.clone())
-                .await?;
-            let node = screen
-                .node(&call.node)
-                .ok_or(Failure::App(Error::NotFound))?;
-            super::data::note_screen_read(&ctx, &entry.meta, &call.params);
-            let loaded = st
-                .preload(&ctx, screen.walk_from(&call.node), entry.meta.name)
-                .await;
-            let r = super::user_render(entry.meta.name, &ctx);
-            let r = Render {
-                loaded: Some(&loaded),
-                ..r
-            };
-            let mut out = String::new();
-            crate::ui::render_node(&mut out, &r, call.node.as_str(), node);
-            Ok::<_, Failure>(out)
-        })
-        .await;
-    match result {
-        Ok(html) => Html(html).into_response(),
+    }
+    let mut paths: Vec<NodePath> = Vec::with_capacity(call.nodes.len());
+    for path in call.nodes {
+        if !paths.contains(&path) {
+            paths.push(path);
+        }
+    }
+    if paths.is_empty() || paths.len() > MAX_REFRESH_NODES {
+        return st.error_response(&ctx, Failure::App(Error::NotFound));
+    }
+    match render_nodes(&st, &ctx, &call.screen, call.params, &paths).await {
+        Ok(html) => {
+            let nodes: serde_json::Map<String, Json> = paths
+                .iter()
+                .zip(html)
+                .map(|(p, h)| (p.as_str().to_string(), Json::String(h)))
+                .collect();
+            axum::Json(json!({ "nodes": nodes })).into_response()
+        }
         Err(f) => st.error_response(&ctx, f),
     }
 }
 
 /// Runs the action behind a component's data source and returns its JSON.
-/// A data source of a component in a site header slot (`screen` is `_site.{feature}`). The
-/// feature's guards and the action's permission are checked as for a screen's components.
+/// A data source of a component in a header slot: a site header (`screen` is
+/// `_site.{feature}`, `feature` is `Some`), where the feature's guards are checked, or the app
+/// header (`screen` is `_app`, `feature` is `None`). The action's permission is checked in both,
+/// as for a screen's components.
 async fn site_data(
     st: &AppState,
     ctx: &crate::ctx::Ctx,
-    feature: &str,
+    feature: Option<&str>,
     call: &DataCall,
 ) -> Response {
     let result = async {
-        let f = st
-            .features
-            .iter()
-            .find(|f| f.name() == feature)
-            .ok_or(Failure::App(Error::NotFound))?;
-        f.check_guards(ctx)
-            .map_err(Failure::App)?;
-        let source = f
-            .site_shell()
-            .and_then(|s| s.header.node(&call.node))
+        let (name, header) = match feature {
+            Some(feature) => {
+                let f = st
+                    .features
+                    .iter()
+                    .find(|f| f.name() == feature)
+                    .ok_or(Failure::App(Error::NotFound))?;
+                f.check_guards(ctx)
+                    .map_err(Failure::App)?;
+                (f.name(), f.site_shell().map(|s| &s.header))
+            }
+            None => ("_app", st.header.as_ref()),
+        };
+        let source = header
+            .and_then(|h| h.node(&call.node))
             .and_then(|n| n.source(&call.key))
             .ok_or(Failure::App(Error::NotFound))?;
         let action = source.action();
@@ -252,7 +324,7 @@ async fn site_data(
         }
         let info = Call {
             kind: CallKind::DataGrid,
-            screen: f.name(),
+            screen: name,
             action: Some(action),
             via_agent: ctx.via_agent(),
         };
@@ -268,6 +340,106 @@ async fn site_data(
     }
 }
 
+/// Starts the streamed text of a node (such as the AI reply of a message thread) and sends its
+/// pieces as JSON lines in the assistant's format: `{"t":"start","key":...}`, then
+/// `{"t":"text","v":...}` for each piece, `{"t":"done"}` at the end, or `{"t":"error"}` before
+/// it. Same checks as `/_zeyn/data`; the pieces pass through a bounded channel, at most
+/// `MAX_REPLY_CHARS` characters and `REPLY_SECONDS` seconds of them.
+async fn stream_call(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::Json(call): axum::Json<DataCall>,
+) -> Response {
+    let ctx = st.licensed(st.ctx(&headers)).await;
+    if let Err(f) = st.check_csrf(&headers) {
+        return st.error_response(&ctx, f);
+    }
+    let result = async {
+        let (_, entry, screen) = st
+            .open(&ctx, &call.screen, call.params)
+            .await?;
+        let source = screen
+            .node(&call.node)
+            .and_then(|n| n.stream(&call.key))
+            .ok_or(Failure::App(Error::NotFound))?;
+        let action = source.action();
+        if !ctx.identity().can(&action.access) {
+            return Err(Failure::App(Error::Forbidden));
+        }
+        let info = Call {
+            kind: CallKind::DataGrid,
+            screen: entry.meta.name,
+            action: Some(action),
+            via_agent: ctx.via_agent(),
+        };
+        st.intercept(&ctx, &info, || {
+            st.timed(source.start(ctx.clone(), call.input))
+        })
+        .await
+    }
+    .await;
+    match result {
+        Ok(reply) => reply_stream(reply),
+        Err(f) => st.error_response(&ctx, f),
+    }
+}
+
+/// Forwards the pieces of a reply as JSON lines until it ends, the browser leaves, or a limit is
+/// reached. Dropping the reply tells its generator to stop.
+fn reply_stream(reply: crate::ui::Reply) -> Response {
+    use crate::ui::{MAX_REPLY_CHARS, REPLY_SECONDS};
+    use axum::http::{HeaderValue, header};
+    let (tx, rx) = tokio::sync::mpsc::channel(crate::ui::REPLY_BUFFER);
+    tokio::spawn(async move {
+        let crate::ui::Reply { key, mut pieces } = reply;
+        let line = |event: Json| {
+            let mut text = event.to_string();
+            text.push('\n');
+            Ok::<_, std::io::Error>(axum::body::Bytes::from(text))
+        };
+        if tx
+            .send(line(json!({ "t": "start", "key": key })))
+            .await
+            .is_err()
+        {
+            return;
+        }
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(REPLY_SECONDS);
+        let mut left = MAX_REPLY_CHARS;
+        while left > 0 {
+            let piece = match tokio::time::timeout_at(deadline, pieces.recv()).await {
+                Ok(Some(piece)) => piece,
+                Ok(None) | Err(_) => break,
+            };
+            let piece: String = piece.chars().take(left).collect();
+            left -= piece.chars().count();
+            if piece.is_empty() {
+                continue;
+            }
+            if tx
+                .send(line(json!({ "t": "text", "v": piece })))
+                .await
+                .is_err()
+            {
+                return;
+            }
+        }
+        drop(pieces);
+        let _ = tx
+            .send(line(json!({ "t": "done" })))
+            .await;
+    });
+    let mut r = axum::body::Body::from_stream(super::Chunks(rx)).into_response();
+    let h = r.headers_mut();
+    h.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/x-ndjson; charset=utf-8"),
+    );
+    h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    h.insert("x-accel-buffering", HeaderValue::from_static("no"));
+    r
+}
+
 async fn data_call(
     State(st): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -278,7 +450,10 @@ async fn data_call(
         return st.error_response(&ctx, f);
     }
     if let Some(feature) = call.screen.strip_prefix("_site.") {
-        return site_data(&st, &ctx, feature, &call).await;
+        return site_data(&st, &ctx, Some(feature), &call).await;
+    }
+    if call.screen == "_app" {
+        return site_data(&st, &ctx, None, &call).await;
     }
     let result = async {
         let (_, entry, screen) = st

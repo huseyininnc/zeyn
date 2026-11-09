@@ -39,6 +39,8 @@ pub fn product_editor(params: ProductParams, store: ProductStore) -> Result<Scre
 
 매개변수는 사용되는 모든 곳에서 타입이 있습니다. 편집기가 `ProductParams`를 받으므로 `Window::open(product_editor, 7)`은 컴파일되지 않습니다.
 
+`#[params]` 구조체의 모든 필드가 `Option`이면 화면은 메뉴 링크나 일반 주소에서 매개변수 없이도 열리며, 모든 필드는 `None`이 됩니다. 선택 사항이 아닌 필드는 여전히 값이 필요하며, 값이 없으면 화면은 404로 응답합니다.
+
 `route`가 없는 Screen에는 URL이 없습니다. 링크, 툴바 버튼, 메뉴, 명령에서 창으로 열립니다.
 
 ## 경로의 매개변수
@@ -137,7 +139,24 @@ Screen::new(t!("stock.products"))
     .context_menu(ContextMenu::new().item(t!("stock.new_product"), Window::open(product_editor, ProductParams { id: None })).action(t!("stock.restock_low"), restock_low, ()))
 ```
 
-`Alt+N` 같은 단축키는 Screen에서 동작하며 팔레트에 표시됩니다. 브라우저가 사용하는 단축키(`Ctrl+P`, `Ctrl+S`, `F5`)는 버튼이 `.override_browser()`를 호출하지 않는 한 바인드되지 않으며, 브라우저가 전달하지 않는 단축키(`Ctrl+N`, `Ctrl+T`, `Ctrl+W`)는 절대 바인드되지 않습니다. 사용할 수 있는 조합은 `Alt+Shift+<letter>`와 `Ctrl+Alt+<letter>`입니다.
+`Alt+N` 같은 단축키는 Screen에서 동작하고 팔레트에 표시되며, 레이블이 아니라 버튼의 툴팁에 나타납니다(버튼에 `.tip(text)`가 있으면 그 텍스트와 함께). 브라우저가 사용하는 단축키(`Ctrl+P`, `Ctrl+S`, `F5`)는 버튼이 `.override_browser()`를 호출하지 않는 한 바인드되지 않으며, 브라우저가 전달하지 않는 단축키(`Ctrl+N`, `Ctrl+T`, `Ctrl+W`)는 절대 바인드되지 않습니다. 사용할 수 있는 조합은 `Alt+Shift+<letter>`와 `Ctrl+Alt+<letter>`입니다.
+
+버튼, 메뉴 그룹, 도구의 아이콘은 `Icon`에서 가져옵니다. `Icon::ALL`에 나열된 82개 그림의 세트입니다(`Plus`, `Edit`, `Trash`, `Search`, `Filter`, `Download`, `ChartBar`, `Users`, `Settings`, `Bell`, `SignOut` 등. 컴포넌트 카탈로그에서 모두 볼 수 있습니다). 이들은 `/_zeyn/icons.css`의 마스크로, 20 px 격자에 1.5 px 둥근 선으로 그려지고 텍스트 색을 따르며 스크린 리더에서는 숨겨지므로 의미는 항상 레이블이 전달합니다.
+
+버튼은 36 px(촘촘한 밀도에서 32 px)이고 차분한 윤곽선을 가지며, 기본 버튼은 브랜드 색을 띱니다. `.button(..)` 뒤의 `.ghost()`는 촘촘한 막대의 보조 작업을 위해 윤곽선을 없애고, `.danger()`는 삭제하거나 취소하는 작업을 danger 색으로 그립니다.
+
+## 헤더
+
+`.subtitle(text)`는 제목 아래에 짧은 한 줄을 넣고, `.primary(|t| ...)`는 화면의 주요 작업을 기본 버튼으로 제목 줄 끝에 둡니다. 둘을 함께 쓰면 대부분의 관리 화면에 있는 페이지 헤더가 됩니다.
+
+```rust
+Screen::new(t!("orders.title"))
+    .subtitle(t!("orders.intro"))
+    .primary(|t| t.button(t!("orders.new")).icon(Icon::Plus).shortcut("Alt+N").opens(order_editor, OrderParams { id: None }))
+    .toolbar(|t| t.export(Export::Csv))
+```
+
+`.primary`는 `.toolbar`와 같은 버튼을 같은 단축키와 팔레트 항목으로 받습니다. 도구 모음은 다른 도구를 위해 헤더 아래에 그대로 남습니다. 한 막대에서 `.export(..)`를 두 번 이상 호출하면 형식마다 항목이 하나씩 있는 "내보내기" 메뉴 버튼 하나로 합쳐집니다. 부제목은 스크린 리더가 읽는 화면 설명입니다(`aria-describedby`). 줄이 좁으면 작업이 제목 아래로 내려가고, 휴대폰에서는 시작 쪽에 맞춰 정렬됩니다. 부제목도 주요 작업도 없으면 화면은 이전처럼 일반 제목으로 그려집니다.
 
 ## Feature와 메뉴
 

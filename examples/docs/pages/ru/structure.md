@@ -3,18 +3,30 @@
 У каждого приложения Zeyn одинаковая структура, поэтому человек или агент находит нужное в одном и том же месте в любом проекте.
 
 ```
+Cargo.toml               dependencies, lints and [package.metadata.zeyn] (max_file_lines)
+build.rs                 stops cargo build when a file in src/ is longer than max_file_lines
 config/app.json          defaults; APP_* environment variables override them
 locales/<lang>.json      every user facing text; all files have the same keys
 src/main.rs              loads configuration and starts the app
 src/app.rs               the App: services, features, security settings
+src/services/<name>.rs   services shared by several features, registered in src/app.rs
 src/features/<name>/     one folder per feature
-    mod.rs               the Feature: route prefix, guards, screens, APIs, menu
-    models.rs            #[entity] and #[model] types
-    store.rs             services that read and write data
-    actions.rs           #[action] functions
-    screens.rs           #[screen] functions
+    mod.rs               module declarations and the Feature: route prefix, guards, screens, APIs, menu
+    models/              #[entity] and #[model] types, one file each
+    services/            services of the feature that read and write data (stores, clients)
+    actions/             #[action] functions, one file each
+    screens/             #[screen] functions, one file each
+    components/          parts of screens (a toolbar, a panel), added by hand when needed
 tests/                   tests that drive the app through its router
 ```
+
+## Генераторы
+
+`zeyn g feature <name>` создаёт `models/`, `services/`, `actions/` и `screens/` с рабочим экраном списка и регистрирует фичу и её сервис в `src/app.rs`. `zeyn g screen <feature> <name>` добавляет один экран и регистрирует его. Папку `components/` добавляйте вручную, когда часть экрана используется в нескольких местах или файл экрана разрастается, а ненужные фиче папки удаляйте вместе с их строкой `mod`. Подробности в [CLI and projects](cli.md).
+
+## Ограничения размера
+
+Небольшие файлы и функции упрощают ревью кода. `max_file_lines` в `[package.metadata.zeyn]` в `Cargo.toml` (по умолчанию 300 непустых строк) заставляет `build.rs` остановить `cargo build` и перечислить файлы сверх предела. `too_many_lines` в Clippy (60 строк, `too-many-lines-threshold` в `clippy.toml`) делает то же для функций. Оба предела можно поднять в этих файлах, но агенту следует вместо этого разделить код: один экран, компонент или группа действий на файл, а крупные части экрана в отдельных функциях.
 
 ## Приложение
 

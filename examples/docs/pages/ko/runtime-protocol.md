@@ -38,7 +38,28 @@
 
 head의 모든 프레임워크 스크립트와 스타일시트에는 `?v=`와 빌드 id(`meta[name=zeyn-build]`, `ZEYN_BUILD_ID` 또는 실행 파일의 해시)가 붙고, `theme.css`에는 테마 텍스트의 해시가 붙습니다. 현재 값을 가진 요청은 `Cache-Control: public, max-age=31536000, immutable`을 받으므로 웜 페이지 로드는 그중 어느 것도 요청하지 않습니다. 그 밖의 요청(배포 후의 오래된 탭, `v` 없음)은 `no-cache`와 ETag를 받습니다. 런타임이 나중에 가져오는 모듈은 자신을 가져오는 스크립트의 URL에서 같은 `v`를 이어받습니다.
 
-모든 페이지는 `zeyn.js`(요청, effect, 창, 폼, 메뉴, 단축키, 이벤트 위임), `nav.js`, `components.js`를 불러오고, 앱 셸에서는 `pro.js`와 `enterprise.js`도 불러옵니다. 나머지는 그것을 사용하는 페이지에서만 불러오며, `nav.js`가 Screen을 끼워 넣을 때도 마찬가지입니다. `zeyn.js`는 콘텐츠에 `[data-zeyn-grid]`가 처음 들어올 때 그리드 런타임 `grid.js`를 가져오고(그리드가 있는 전체 페이지는 `<link rel="modulepreload">`에 이를 명시합니다), `components.js`는 `catalog.js`(카드 그리드, 검색 상자), `media.js`(플레이어, 임베드), `files.js`(업로드), `charts.js`, `assistant.js`(채팅 패널 또는 런처를 처음 누를 때)를 가져옵니다. 이들의 스타일시트는 head에 남아 있으므로 스크립트가 도착해도 모양은 바뀌지 않습니다. 쇼케이스 대시보드에서는 스크립트 9개 403 KB(116 KB) 대신 5개 258 KB(전송 74 KB)입니다.
+### 1.1 Browser modules
+
+페이지는 화면이 쓰는 브라우저 코드만 불러와 실행합니다. 모든 페이지는 코어를 실행합니다: `zeyn.js`(요청, 효과, 창, 폼, 메뉴, 단축키, 이벤트 위임, 모듈 로더), `nav.js`, `enterprise.js`(`fetch`의 응답 훅과 세션 유휴 시간 제한)로, 합쳐서 원본 90 KB, gzip 29 KB입니다. 나머지는 모두 컴포넌트의 모듈로, `/_zeyn/{name}.js`와 일부는 `/_zeyn/{name}.css`입니다. `crates/zeyn/src/server/modules.rs`의 `MODULES`에 HTML이 지닌 표식과 함께 선언됩니다: 속성 이름(`data-zeyn-date`)과 클래스(`z-select`)이며, 이름 전체로 비교합니다.
+
+| 모듈 | 컴포넌트 |
+|---|---|
+| `components.js` | 모든 컨트롤 모듈이 import하는 공유 부분: 도우미, 팝업과 리스트박스 코어, 셀렉트(앱 셸의 선택기), 확인 대화상자, 알림, 이동 경로 |
+| `tabs.js`, `dates.js`, `choices.js`, `inputs.js`, `lines.js`, `steps.js`, `tree.js`, `overlays.js`, `menubutton.js`, `busy.js` | 패널, 탭, 분할 창; 날짜와 시간 선택기(grid 날짜 필터 포함); 리스트박스, 조회, 다중 선택; 숫자, 늘어나는 텍스트 영역, 마스크, 비밀번호; 줄 편집기; 단계별 폼; 트리; 툴팁과 팝오버; 메뉴 버튼과 분할 버튼; 처리 중 오버레이 |
+| `grid.js` | grid. `zeyn.js`가 직접 import하므로 `<link rel="modulepreload">`로 링크됩니다 |
+| `palette.js`, `pro.js` | 명령 팔레트와 명령 버튼; 메뉴 막대, 도구 상자, 상태 표시줄, 도킹 패널, 속성 검사기 |
+| `forms.js`, `reveal.js`, `import.js` | 폼의 초안과 워크플로 전환; 가려진 값 보기; 가져오기 |
+| `catalog.js`, `media.js`, `files.js`, `charts.js` 및 스타일시트 | 카드 그리드, 레일, 검색 상자; 플레이어, 임베드, 이미지; 업로드; 차트, 스파크라인, KPI 카드, 불릿 차트 |
+| `share.js`, `chips.js`, `reactions.js`, `hero.js`, `state.js`, `preview.js`, `assistant.js` | 공유 버튼, 필터 칩, 반응, 히어로 슬라이드, 환경 설정 저장소, 카드 미리보기(처음 마우스를 올릴 때), 어시스턴트(채팅 패널 또는 런처를 처음 누를 때) |
+| `topics.js`, `vlist.js` | 토픽을 listen하는 노드와 이를 drive하는 컨트롤(`data-zeyn-listens`, `data-zeyn-drives`), 가상 목록(`data-zeyn-vlist`) |
+| `inbox.js`, `kanban.js`, `calendar.js` and their stylesheets, `diff.css`, `code.css`, `barcode.css` | 받은 편지함과 알림 종; Kanban 보드; 달력; 스크립트가 필요 없는 비교, 코드 보기, 바코드(코드 보기의 복사 버튼은 `share.js`에 있음) |
+| `range.js`, `quantity.js`, `gallery.js`, `countdown.js`, `commerce.css` | 범위 슬라이더, 수량 선택기, 상품 갤러리, 카운트다운; 모든 쇼핑 컴포넌트의 스타일시트(가격, 옵션 선택기, 패싯 패널, 리뷰 요약) |
+| `thread.js` 및 `thread.css`, `stream.js`, `composer.js` 및 `composer.css`, `typing.js` 및 `typing.css` | 메시지 스레드; 스레드와 어시스턴트가 함께 쓰는 스트리밍 Markdown과 JSON 줄; 채팅 composer; 입력 중 표시기 |
+| `feed.js`, `lightbox.js` and their stylesheets, `stories.css` | 게시물 피드; 이미지와 동영상 라이트박스; 스토리 링과 그 행, 스크립트 필요 없음 |
+
+전체 페이지는 head에 모든 페이지가 쓰는 스타일시트(`zeyn.css`, `components.css`, `content.css`, `pro.css`, `enterprise.css`), HTML에 표식이 있는 모듈의 스타일시트, 그리고 그 스크립트를 import하는 모듈 뒤에 링크합니다. `zeyn.js`는 같은 표(`[name, script selector, style selector]`)와 함께 제공되며 나중에 도착하는 콘텐츠에 빠진 것을 불러옵니다: `nav.js`는 화면을 바꾸기 전에 `{ root, waits }`와 함께 `zeyn:need`를 보내고 새 스타일시트를 기다리며, 창도 열리기 전에 같은 방식으로 기다리고, `zeyn:content`, grid 페이지, grid 필터는 담고 있는 것의 스크립트를 불러옵니다. 브라우저는 URL마다 인스턴스를 하나만 유지하므로 모듈은 한 번만 실행됩니다. 모듈은 실행될 때 문서에서 찾은 것을 설정하고 그 뒤에는 `zeyn:content`를 듣습니다. 페이지에 없는 컴포넌트를 찾거나 듣지 않습니다. 모듈은 자신의 URL에 있는 `?v=`로 공유 부분을 import합니다. `tests/ui_modules.rs`는 페이지가 쓰지 않는 모듈을 링크하거나 모듈 스타일시트가 표식 밖의 클래스를 꾸밀 때 실패합니다.
+
+showcase에서 측정(원본, gzip 전송량): 텍스트만 있는 페이지는 스크립트를 269 KB(80 KB) 대신 132 KB(46 KB), grid 페이지는 357 KB(106 KB) 대신 223 KB(74 KB), 폼 페이지는 269 KB(80 KB) 대신 186 KB(65 KB) 불러오고, 모든 페이지의 스타일은 177 KB(44 KB) 대신 151 KB(35 KB)입니다. 컴포넌트 카탈로그처럼 모든 컴포넌트를 담은 페이지는 모듈마다 파일이 따로 있으므로 이전보다 많은 파일을 불러옵니다(요청 41개 대신 68개, 원본 774 KB 대신 836 KB).
 
 ## 2. Screen 마크업
 
@@ -177,6 +198,8 @@ Effect:
 - 키보드: 화살표 키, Page Up, Page Down, Home, End는 활성 행을 이동하고 보이는 곳으로 스크롤합니다. 테이블에는 `aria-rowcount` = total이, 각 행에는 `aria-rowindex`가 있습니다.
 - 위치 텍스트(`data-zeyn-page-info`)는 `data-zeyn-text-range-total`을 사용합니다.
 
+카드 그리드(`zeyn::ui::CardGrid`이며 rail이나 행 목록은 해당하지 않음)는 카드가 200개가 되면 스크롤 컨테이너 대신 페이지 자체의 스크롤에 윈도우를 적용합니다. `catalog.js`는 목록에 `data-zeyn-window`를 표시하고, 뷰포트에서 800 px 이내의 행을 그 안에 유지하며 위아래 행은 패딩으로 바꾸고, 모든 행에 처음 카드들 중 가장 높은 카드의 높이를 주며(`grid-auto-rows`), 각 카드에 `aria-posinset`과 `aria-setsize`(페이지가 더 올 수 있는 동안은 `-1`)를 설정합니다. 윈도우 밖에 있는 포커스된 카드는 `z-cards-kept`와 함께 DOM에 남아 자기 셀 위에 배치됩니다. "더 보기"나 다른 페이지에서 온 카드도 같은 윈도우에 합류합니다. 페이지가 ms당 3 px보다 빠르게 스크롤되는 동안 카드는 이미지를 보류한 채 들어오고(`data-zeyn-park`, `src`와 `srcset`은 따로 보관) 120 ms 동안 스크롤이 없으면 이미지를 되찾습니다.
+
 ### 4.3 폼 제출
 
 `POST /_zeyn/form`
@@ -249,11 +272,12 @@ Effect:
 - 키보드: 화살표 키는 그리드 행 사이를 이동하고, Enter는 행을 열고, Escape는 맨 위 대화 상자를 닫으며, `aria-keyshortcuts`의 단축키는 텍스트 입력 안을 제외한 모든 곳에서 동작합니다. 그리드에서: Space는 행을 선택하고, F2는 편집하며, Ctrl+Z는 마지막 편집을 되돌리고, Shift+F10 또는 컨텍스트 메뉴 키는 행이나 헤더의 메뉴를 열고, Shift+클릭은 여러 열로 정렬하며, 오른쪽과 왼쪽 화살표(오른쪽에서 왼쪽 페이지에서는 반전)는 행의 디테일, 그룹, 자식을 열고 닫고, 자식 행에서의 왼쪽 화살표는 부모로 이동합니다. 행에서의 오른쪽 화살표는 그 셀로 들어갑니다. 화살표, Home, End, Ctrl+Home, Ctrl+End, Tab, Shift+Tab은 셀 커서를 이동하고, Shift는 범위를 넓히며(셀의 `aria-selected`), Ctrl+C는 범위를 탭으로 구분된 텍스트로 복사하고, Ctrl+V는 편집 가능한 셀에 붙여넣으며, 바뀐 행마다 `POST /_zeyn/grid/edit` 하나가 나갑니다. 열이 40개 이상인 그리드는 보이는 열만 페이지에 유지합니다(고정 너비의 `colgroup`, `colspan`이 있는 `td.z-col-gap` 스페이서, 셀의 `aria-colindex`).
 - 오른쪽 클릭은 정의된 곳(헤더, `data-zeyn-menu`가 있는 행, `data-zeyn-menu`가 있는 Screen)에서 Zeyn의 메뉴를 열며, 그 밖의 모든 곳에서는 브라우저 자체의 메뉴가 유지됩니다.
 - 대화 상자가 열릴 때 포커스가 그 안으로 이동하고 닫힐 때 연 요소로 돌아갑니다.
+- 클릭한 프레임에서 바로 대기 상태를 보여 줍니다: 화면을 불러오는 동안 `nav.js`가 대상 링크를 현재 항목으로 표시하고 `html[data-zeyn-loading]`을 설정하며, 창과 폼 제출도 이를 설정하고, grid는 정렬, 페이지, 필터 키를 누르는 즉시 행을 흐리게 합니다(`aria-busy`)(필터는 다음 키를 150 ms 기다리고, 새 요청이 이전 요청을 취소합니다). 창 위쪽의 얇은 막대는 응답이 150 ms보다 오래 걸릴 때만 나타납니다. 고정되어 있어 아무것도 움직이지 않으며 `prefers-reduced-motion`에서는 움직이지 않습니다.
 - 클라이언트 측 검사(`required`, `minlength`, `maxlength`, `min`, `max`, `type="email"`)는 제출 전에 브라우저의 제약 조건 검증 API로 실행됩니다. 서버는 항상 다시 검증합니다.
 
 ## 7. 컴포넌트 라이브러리
 
-`zeyn::ui` 컴포넌트는 런타임 뒤의 페이지 head에 링크되는 두 개의 에셋 `/_zeyn/components.js`와 `/_zeyn/components.css`로 제공됩니다. 런타임처럼 로그인이 필요 없습니다.
+`zeyn::ui` 컴포넌트는 1.1절의 모듈과 스타일시트 `/_zeyn/components.css`로 제공됩니다. 런타임처럼 로그인이 필요 없습니다.
 
 ### 7.1 엔드포인트
 
@@ -262,6 +286,7 @@ Effect:
 | 엔드포인트 | 본문 | 응답 |
 |---|---|---|
 | `/_zeyn/node` | `{ screen, params, node }` | 그리드의 첫 페이지가 포함된 노드 하나의 HTML. 지연 탭에서 사용됩니다. |
+| `/_zeyn/nodes` | `{ screen, params, nodes: ["1.0", "2"] }` | `{ nodes: { "1.0": "<div class=\"z-node\" ...>" } }`: Screen을 한 번 실행해 렌더링한 여러 노드로, 새로 고쳐지거나 drive된 토픽의 리스너를 위한 것입니다. 서로 다른 경로는 최대 32개이며, Screen에 없는 경로는 `404`로 응답합니다. Screen의 접근 권한, guard, interceptor는 한 번만 실행되고, params는 Screen의 타입이 있는 params로 읽힙니다. |
 | `/_zeyn/data` | `{ screen, params, node, key, input }` | 노드의 데이터 소스 `key`에서 온 JSON: lookup 옵션(`key`는 필드 이름), 트리 자식(`key`는 비어 있음), 단계 검사(`key`는 `_step`). 소스 action의 권한이 검사되고 그리드와 마찬가지로 인터셉터가 실행됩니다. action에 맞지 않는 입력은 `404`로 거부됩니다. |
 | `screen` = `_site.{feature}`와 함께 `/_zeyn/data` | 위와 같음 | 사이트 헤더 슬롯의 컴포넌트에 대해서도 같습니다. `node`는 슬롯(0 start, 1 center, 2 end, 3 bottom), 그 안에서의 노드 인덱스, 그리고 자식 인덱스들입니다. Feature의 가드와 action의 권한이 검사됩니다. |
 | `/_zeyn/parse` | `{ kind, text, label }` | 서버가 입력된 날짜나 시간을 사용자의 언어, 시간대, 시계로 읽는 방식: `{ ok, text, iso, utc, zone }` 또는 `{ ok: false, message }`. `kind`는 `date`, `time`, `datetime`, `local`, `presets`(오늘과 빠른 범위)입니다. |
@@ -276,17 +301,26 @@ Effect:
 
 | 이벤트 | 대상 | 상세 |
 |---|---|---|
-| `zeyn:content` | `document` | 새 콘텐츠가 있는 요소(탐색, 지연 패널). 두 스크립트가 그 안의 것을 설정합니다. |
+| `zeyn:content` | `document` | 새 콘텐츠가 있는 요소(탐색, 지연 패널). 런타임이 필요한 모듈을 불러오고, 불러온 각 모듈이 그 안의 것을 설정합니다. |
 | `zeyn:errors` | 폼 | 런타임이 표시한 후의 `422` 오류. 라인 편집기와 단계별 폼이 사용합니다. |
 | `zeyn:effect` | `document` | 런타임이 모르는 effect: `{ effect, source, run }`. `run(next)`는 다른 effect를 실행합니다. `confirm`이 사용합니다. |
+| `zeyn:topics` | `document` | `{ topics }`: 다른 스크립트(알림을 받은 `live.js`)에서 보낸, 새로 고칠 토픽. |
+| `zeyn:reload` | 요소 | 그 안의 그리드를 제자리에서 다시 불러옵니다. 현재 페이지, 또는 `{ reset: true }`이면 첫 페이지입니다. |
+| `zeyn:density` | `document` | 없음. 사용자가 계정 메뉴에서 다른 밀도를 골랐습니다(`<html>`의 `data-density`는 이미 바뀌었습니다). 윈도잉된 카드 그리드가 행을 다시 측정합니다. |
 
 Effect `{"effect":"confirm","message":"...","title":"...","ok":"...","cancel":"...","then":{...}}`는 모달 알림 대화 상자에서 묻고 사용자가 확인한 후에만 `then`을 실행합니다.
+
+Effect `{"effect":"refresh","topics":["sales"]}`는 토픽의 리스너를 새로 고칩니다. `[data-zeyn-listens="a,b"]`는 리스너(부모 `data-zeyn-node`의 노드)를 표시하고, `[data-zeyn-drives="a"]`는 토픽을 drive하는 컨트롤을 표시합니다. 필터 폼(`data-zeyn-kinds`는 어떤 params가 숫자나 불리언인지 알려 줍니다), 검색 상자(필드 이름은 `q`), 필터 칩(각 칩은 자신의 params를 `data-zeyn-params`에 담습니다)입니다. drive하면 컨트롤의 값이 Screen 루트의 `data-zeyn-params`에 병합되고, 그 Screen이 메인 Screen이면 주소가 그 값으로 바뀌며, 리스너가 새로 고쳐집니다. `topics.js`는 한 애니메이션 프레임에서 지정된 토픽을 한 번에 처리합니다. 그리드를 가진 리스너는 `zeyn:reload`를 받고, Screen의 다른 리스너는 한 번의 `POST /_zeyn/nodes`로 묶이며, 같은 Screen에 대한 더 새로운 요청은 이전 요청을 중단하고 그 노드를 넘겨받습니다. 포커스와 열린 `<details>`는 id, test id, `data-zeyn-key` 행, 위치로 유지됩니다.
+
+가상 목록은 `data-zeyn-row-height`, `data-zeyn-block`, `data-zeyn-total`을 가진 `section[data-zeyn-vlist]`입니다. `vlist.js`는 `{ page: { type: "offset", offset }, with_total: true }`로 `POST /_zeyn/grid`에 블록을 요청하고 각 `<li>`를 `(aria-posinset - 1) * height` 위치에 둡니다. 다른 필드에 의존하는 lookup은 `data-depends-on="field"`를 가지며, 그 필드의 값을 `/_zeyn/data` 입력의 `parent`로 보냅니다.
 
 클라이언트 환경설정(`zeyn::ClientPref`)은 브라우저 모듈 `/_zeyn/state.js`에 있으며, 페이지는 `data-zeyn-remember` 또는 `data-zeyn-prefs-clear`가 있는 요소가 있을 때만 이를 import합니다. `GET /_zeyn/prefs`는 앱의 동의 훅이 세션을 넘겨 환경설정 값을 보관하도록 허용하는지를 `{ preferences }`로 응답하며 `Cache-Control: no-store`를 붙입니다. 서버는 저장된 값을 읽지 않습니다.
 
 ### 7.4 미디어
 
 `Video`와 `Audio`는 컴포넌트 라이브러리 뒤에 링크되는 `/_zeyn/media.js`와 `/_zeyn/media.css`로 제공됩니다. `docs/media.md`를 참고하십시오.
+
+플레이어는 처음 화면에 들어올 때 페이지에 하나뿐인 `IntersectionObserver`를 통해 소스와 포스터(`data-zeyn-poster`, 먼저 `data-zeyn-poster-low`)를 설정합니다. `data-zeyn-preview`가 있는 루트는 4분의 1이 보이는 동안 음소거 상태로 반복 재생하며, `prefers-reduced-motion`, `prefers-reduced-data` 또는 Save-Data가 이를 막으면 재생하지 않고, 방문자가 컨트롤을 사용하면 그때부터는 그렇게 동작하지 않습니다. 로드 옵션이 있는 이미지는 스크립트 없이 자리 표시자를 보여 주는 상자(`.z-img-host`) 안에 있으며, `media.js`를 로드하게 하는 표시인 `data-zeyn-img`를 가집니다. 문서의 캡처 리스너 하나가 이 이미지들의 `load`와 `error`를 처리합니다. 로드되면 상자에 `z-img-done`(저해상도 파일 위로 페이드할 때는 `z-img-fade`)을 표시하고, 실패하면 `data-zeyn-fallback`을 한 번 시도한 다음 상자의 `<template data-zeyn-img-error>` 또는 아이콘과 함께 대체 텍스트를 보여 줍니다. 모듈이 실행되기 전에 이미 끝난 이미지는 모듈이 시작될 때 한 번 확인합니다.
 
 | 엔드포인트 | 기능 |
 |---|---|

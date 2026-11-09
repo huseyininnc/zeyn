@@ -5,18 +5,29 @@
 //! the endpoints accept it, so grids and forms inside containers keep working.
 
 mod alpha;
+mod barcode;
+mod calendar;
 mod catalog;
 mod chart;
 mod chips;
+mod code;
+mod composer;
 mod content;
 mod controls;
+mod countdown;
 mod date;
+mod diff;
 mod dock;
 mod embed;
+mod facets;
+mod feed;
+mod gallery;
 mod hero;
+mod inbox;
 pub(crate) mod inputs;
 #[cfg(feature = "islands")]
 mod island;
+mod kanban;
 mod layout;
 mod lines;
 mod list;
@@ -27,12 +38,21 @@ mod media;
 mod menus;
 mod overlay;
 mod preview;
+mod price;
+mod quantity;
+mod range;
 mod rating;
 mod reactions;
 mod relative;
+mod reviews;
 mod share;
 mod shell;
+mod story;
+mod thread;
+mod topics;
 mod tree;
+mod typing;
+mod variants;
 mod week;
 mod widgets;
 #[cfg(feature = "islands")]
@@ -49,29 +69,46 @@ pub use live::Live;
 pub(crate) use dock::panel_ids as dock_panel_ids;
 pub use dock::{DOCK_SIZE, Dock, DockArea, DockLayout, DockPanelState, DockSizes};
 pub use embed::{
-    Complete, EMBED_SANDBOX, Embed, EmbedPermission, ExternalLink, Given, Image, NoAlt, NoSize,
-    NoTitle,
+    Complete, EMBED_SANDBOX, Embed, EmbedPermission, ExternalLink, Fit, Given, Image, NoAlt,
+    NoSize, NoTitle, PLACEHOLDER_BLUR_MAX, Placeholder,
 };
 pub use layout::{Card, Panel, Row, Split, Stack, Tabs};
 pub use shell::{MenuBar, MenuList, PropertyInspector, StatusBar, Toolbox};
 
 pub use alpha::{AlphaIndex, OTHER_LETTER, alphabet};
+pub use barcode::{
+    Barcode, CODE128_QUIET, MAX_BARCODE_CHARS, MAX_QR_BYTES, QR_QUIET, QrCode, QrLevel, QrMatrix,
+    code128_symbols, qr_error_correction, qr_format_bits, qr_version_bits,
+};
+pub use calendar::{Calendar, CalendarParams, CalendarSlot, CalendarView, MAX_CALENDAR_EVENTS};
 pub use catalog::{CardGrid, ImageCard, MAX_SUGGESTIONS, Rail, SearchBox, SearchParams};
 pub use chart::{Better, BulletCell, Chart, ChartKind, Kpi, SparklineCell};
 pub use chips::{Chips, MAX_CHIPS};
+pub use code::{CodeLang, CodeView, JsonView, MAX_CODE_BYTES, MAX_CODE_LINES, highlight};
+pub use composer::{
+    ChatSend, Composer, DEFAULT_MESSAGE_CHARS, MAX_MENTION_QUERY, MAX_MENTIONS,
+    MAX_MESSAGE_MENTIONS, SendKey,
+};
 pub use content::{AutoGrid, Avatar, AvatarSize, Heading, MetaLine, Paragraph, PrevNext, Spoiler};
 pub use controls::Control;
 pub(crate) use controls::{
     Slot, choices_text, read_choices, render_bool, render_choice, render_choices, render_number,
     render_text,
 };
+pub use countdown::Countdown;
 pub use date::DateOptions;
 pub(crate) use date::{input_text, picker_config, range_reversed, render_date_input, render_range};
+pub use diff::{DiffLayout, DiffView, MAX_DIFF_FIELDS};
+pub use facets::{Facet, FacetPanel, MAX_FACET_OPTIONS, MAX_FACETS};
+pub use feed::{Feed, MAX_FEED_BATCH, MAX_POST_MEDIA, Post};
+pub use gallery::{MAX_GALLERY_IMAGES, ProductGallery};
 pub use hero::{HERO_SECONDS, Hero, MAX_HERO_SLIDES};
+pub use inbox::{Inbox, InboxSelection, MAX_INBOX, MAX_UNREAD, NotificationCenter, UnreadCount};
 pub use inputs::{mask_example, mask_fits, mask_raw};
+pub use kanban::{KANBAN_BLOCK, Kanban};
 pub(crate) use lines::LinesEditor;
 pub use lines::{Lines, MAX_LINES};
-pub use list::{List, ListItem};
+pub use list::{List, ListItem, MAX_REPEAT, Repeat};
 pub use lookup::{
     LookupItem, LookupQuery, LookupValue, MAX_LOOKUP_COLUMNS, MAX_LOOKUP_IDS, MAX_LOOKUP_PAGE,
 };
@@ -80,15 +117,31 @@ pub use media::{Audio, PLAYBACK_SPEEDS, Video};
 pub use menus::MenuButton;
 pub(crate) use overlay::tip;
 pub use overlay::{BUSY_DELAY_MS, Busy, MAX_TIP, Popover};
+pub use price::{Price, PriceUnit};
+pub use quantity::{MAX_QUANTITY, QuantityChange, QuantityState, QuantityStepper};
+pub use range::RangeSlider;
+pub(crate) use rating::halves as rating_halves;
 pub use rating::{DEFAULT_RATING, MAX_RATING};
 pub use reactions::{MAX_REACTIONS, ReactionPress, ReactionState, Reactions};
 pub use relative::RelativeTime;
+pub use reviews::ReviewSummary;
 pub use share::Share;
+pub use story::{MAX_STORY_RINGS, StoryRing, StoryRow, StoryState};
+pub use thread::{
+    Delivery, MAX_CONVERSATION, MAX_MESSAGE_CHARS, MAX_REPLY_CHARS, MAX_SHOWN_FILES, MessageThread,
+    REPLY_BUFFER, REPLY_SECONDS, ReplyRequest, THREAD_PAGE, ThreadQuery,
+};
+#[cfg(feature = "server")]
+pub use thread::{Reply, ReplySender, StreamSource};
+pub use topics::{Listen, Listens, MAX_TOPICS, PageCheck, Topics, valid_topic};
+pub(crate) use topics::{topic_list, topics_attr};
 pub use tree::{MAX_TREE_CHILDREN, Tree, TreeItem, TreeQuery};
+pub use typing::{MAX_TYPING_PEOPLE, TYPING_EVERY_SECONDS, TYPING_SHOWN_SECONDS, TypingIndicator};
+pub use variants::{MAX_VARIANT_GROUPS, MAX_VARIANT_OPTIONS, VariantGroup, VariantPicker};
 pub use week::{MAX_WEEK_ROWS, WeekDay, WeekSchedule};
 pub use widgets::{
     ActionButton, Alert, Badge, Breadcrumb, ClearPrefs, DescriptionList, DescriptionOf, EmptyState,
-    LinkButton, Progress, Skeleton, Timeline,
+    LinkButton, Progress, Skeleton, ThemePicker, Timeline,
 };
 
 use crate::action::{Action, ActionMeta, Result};

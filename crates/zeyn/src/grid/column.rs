@@ -30,6 +30,14 @@ impl<E: Model, T> DataGridColumn<E, T> {
         self
     }
 
+    /// Shows whole numbers without the locale's group separators (`1000002`, not `1,000,002`),
+    /// for codes, years and numbers people copy. Integer columns are grouped unless set; keys
+    /// (`#[key]` ids) are never grouped.
+    pub fn plain(mut self) -> Self {
+        self.last().plain = true;
+        self
+    }
+
     /// Adds a filter box to the column.
     pub fn filter(mut self) -> Self {
         self.last().filter = true;
@@ -99,6 +107,13 @@ impl<E: Model, T> DataGridColumn<E, T> {
         self
     }
 
+    /// Lets long values wrap onto more lines. Cells stay on one line and end in an ellipsis
+    /// unless set, so every row has the same height.
+    pub fn wrap(mut self) -> Self {
+        self.last().wrap = true;
+        self
+    }
+
     /// Leaves the column out until the user shows it from the column menu.
     pub fn hidden(mut self) -> Self {
         self.last().hidden = true;
@@ -134,6 +149,24 @@ impl<E: Model, T> DataGridColumn<E, T> {
         self.cell(move |v: &T, r: &Render| {
             format!(
                 r#"<span class="z-badge z-tone-{}">{}</span>"#,
+                tone(v).code(),
+                r.value(&v.to_value(), &kind)
+            )
+        })
+    }
+
+    /// Shows the choice as status: an 8 px dot in the tone before the label, with no
+    /// background, so a column of statuses scans by color without boxes. `tone` picks the color
+    /// per option like [`badge`](Self::badge), which keeps the tinted label for values that
+    /// must stand out. Compiles only on `#[choice]` columns.
+    pub fn status(self, tone: impl Fn(&T) -> Tone + Send + Sync + 'static) -> Self
+    where
+        T: ChoiceType + FieldType + 'static,
+    {
+        let kind = self.field.meta().kind;
+        self.cell(move |v: &T, r: &Render| {
+            format!(
+                r#"<span class="z-badge z-badge-dot z-tone-{}">{}</span>"#,
                 tone(v).code(),
                 r.value(&v.to_value(), &kind)
             )

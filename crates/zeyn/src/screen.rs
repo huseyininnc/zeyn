@@ -277,9 +277,29 @@ pub enum Effect {
         url: String,
         frame: bool,
     },
+    /// Refreshes in place every node of the page that listens to one of these topics. Built with
+    /// [`Effect::refresh`]; carries only the names, never data.
+    Refresh {
+        topics: Vec<&'static str>,
+    },
 }
 
 impl Effect {
+    /// Refreshes in place every node of the page that `.listens` to one of `topics`: grids
+    /// reload their current page with their sort and filters, other listeners are rendered again
+    /// in one request per screen. Nodes that are not on the page are not touched.
+    ///
+    /// ```
+    /// use zeyn::Effect;
+    /// let e = Effect::refresh(["orders", "stock"]);
+    /// assert_eq!(e, Effect::Refresh { topics: vec!["orders", "stock"] });
+    /// ```
+    pub fn refresh(topics: impl crate::ui::Topics) -> Effect {
+        Effect::Refresh {
+            topics: crate::ui::topic_list(topics),
+        }
+    }
+
     /// Goes to a local path of the app (see [`Effect::Go`]). Anything that is not a local path
     /// goes to the start page, so a `return_to` from a request can never leave the app.
     ///
@@ -454,6 +474,12 @@ impl UiCtx {
     pub fn close_and_refresh(&mut self) {
         self.effects
             .push(Effect::CloseAndRefresh);
+    }
+
+    /// Refreshes the nodes of the page that listen to `topics`; see [`Effect::refresh`].
+    pub fn refresh(&mut self, topics: impl crate::ui::Topics) {
+        self.effects
+            .push(Effect::refresh(topics));
     }
 
     pub fn navigate<S: ScreenDef>(&mut self, _screen: S, params: S::Params) {
@@ -737,11 +763,22 @@ pub trait Component: Send + Sync {
         None
     }
 
+    /// Text the component streams through an action, by key (see
+    /// [`crate::ui::MessageThread::reply`]).
+    #[cfg(feature = "server")]
+    fn stream(&self, _key: &str) -> Option<&dyn crate::ui::StreamSource> {
+        None
+    }
+
     /// Keyboard shortcuts of the component's own links, as declared, for the clash checks of
     /// `App::check` and `App::check_page`.
     fn shortcuts(&self) -> Vec<&str> {
         Vec::new()
     }
+
+    /// Reports the topics the component listens to and drives, and problems of its
+    /// configuration the compiler cannot catch, for `App::check_page`.
+    fn page_check(&self, _check: &mut crate::ui::PageCheck) {}
 }
 
 /// Type erased component: a node of the screen tree.
@@ -793,6 +830,11 @@ impl Node {
         self.0.source(key)
     }
 
+    #[cfg(feature = "server")]
+    pub fn stream(&self, key: &str) -> Option<&dyn crate::ui::StreamSource> {
+        self.0.stream(key)
+    }
+
     pub fn shortcuts(&self) -> Vec<&str> {
         self.0.shortcuts()
     }
@@ -805,6 +847,15 @@ impl Node {
         }
         for (i, child) in self.children().iter().enumerate() {
             child.all_shortcuts(format!("{path}.{i}"), out);
+        }
+    }
+
+    /// Runs [`Component::page_check`] on this node and every node below it, lazy ones included.
+    pub(crate) fn page_check(&self, path: String, check: &mut crate::ui::PageCheck) {
+        check.path.clone_from(&path);
+        self.0.page_check(check);
+        for (i, child) in self.children().iter().enumerate() {
+            child.page_check(format!("{path}.{i}"), check);
         }
     }
 }
@@ -841,35 +892,351 @@ impl From<String> for Node {
     }
 }
 
-/// Icons.
+/// Icons of the kit: drawn on a 20 px grid with a 1.5 px round stroke, shown at 16 or 20 px and
+/// colored by `currentColor`. Each is a CSS mask from `/_zeyn/icons.css`, generated from
+/// `assets/icons/*.svg`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "kebab-case")]
 pub enum Icon {
-    Plus,
-    Edit,
-    Delete,
-    Save,
-    Search,
-    Box,
-    Cart,
-    Table,
+    /// Home.
     Home,
-    Chart,
+    /// Overview.
+    Dashboard,
+    /// Reports.
+    ChartBar,
+    /// Analytics.
+    ChartLine,
+    /// Breakdown.
+    ChartPie,
+    /// Data.
+    Table,
+    /// Lists.
+    List,
+    /// Customers, team.
+    Users,
+    /// Profile.
+    User,
+    /// Invite.
+    UserPlus,
+    /// Companies.
+    Building,
+    /// Orders.
+    Cart,
+    /// Products.
+    Box,
+    /// Prices, labels.
+    Tag,
+    /// Invoices.
+    Receipt,
+    /// Payments.
+    CreditCard,
+    /// Revenue.
+    Banknote,
+    /// Shipping.
+    Truck,
+    /// Refund, revert.
+    Undo,
+    /// Notifications.
+    Bell,
+    /// Email.
+    Mail,
+    /// Comments, assistant.
+    Message,
+    /// Audit, live.
+    Activity,
+    /// Roles, security.
+    Shield,
+    /// Locked, permissions.
+    Lock,
+    /// API keys.
+    Key,
+    /// Passkey.
+    Fingerprint,
+    /// Settings.
+    Settings,
+    /// Language.
+    Globe,
+    /// Help.
+    Help,
+    /// Create.
+    Plus,
+    /// Step down, collapse.
+    Minus,
+    /// Close, remove.
+    X,
+    /// Done, selected.
+    Check,
+    /// Edit.
+    Edit,
+    /// Delete.
+    Trash,
+    /// Copy.
+    Copy,
+    /// Save.
+    Save,
+    /// Export.
+    Download,
+    /// Import, upload.
+    Upload,
+    /// Reload data.
+    Refresh,
+    /// Opens elsewhere.
+    External,
+    /// Copy link.
+    Link,
+    /// Search.
+    Search,
+    /// Filter.
+    Filter,
+    /// Options.
+    Sliders,
+    /// Column chooser.
+    Columns,
+    /// Sortable column.
+    Sort,
+    /// Sort ascending.
+    ArrowUp,
+    /// Sort descending.
+    ArrowDown,
+    /// Row actions.
+    MoreHorizontal,
+    /// Card menu.
+    MoreVertical,
+    /// Drag handle.
+    Grip,
+    /// Show.
+    Eye,
+    /// Hide.
+    EyeOff,
+    /// Sign out.
+    SignOut,
+    /// Sign in.
+    SignIn,
+    /// Select, expand.
+    ChevronDown,
+    /// Collapse.
+    ChevronUp,
+    /// Previous.
+    ChevronLeft,
+    /// Next, breadcrumb.
+    ChevronRight,
+    /// Positive delta.
+    TrendUp,
+    /// Negative delta.
+    TrendDown,
+    /// Info.
+    Info,
+    /// Success.
+    CheckCircle,
+    /// Warning.
+    AlertTriangle,
+    /// Error.
+    AlertCircle,
+    /// Time, pending.
+    Clock,
+    /// History.
+    History,
+    /// Dates.
+    Calendar,
+    /// Favorite, rating.
+    Star,
+    /// Open nav.
+    Menu,
+    /// Collapse nav.
+    Sidebar,
+    /// Palette.
+    Command,
+    /// Light theme.
+    Sun,
+    /// Dark theme.
+    Moon,
+    /// System theme.
+    Monitor,
+    /// File.
+    File,
+    /// Report, PDF.
+    FileText,
+    /// Folder.
+    Folder,
+    /// Image.
+    Image,
+    /// Attachment.
+    Paperclip,
 }
 
 impl Icon {
-    fn css(self) -> &'static str {
+    /// Every icon, in the order of the set.
+    pub const ALL: &'static [Icon] = &[
+        Icon::Home,
+        Icon::Dashboard,
+        Icon::ChartBar,
+        Icon::ChartLine,
+        Icon::ChartPie,
+        Icon::Table,
+        Icon::List,
+        Icon::Users,
+        Icon::User,
+        Icon::UserPlus,
+        Icon::Building,
+        Icon::Cart,
+        Icon::Box,
+        Icon::Tag,
+        Icon::Receipt,
+        Icon::CreditCard,
+        Icon::Banknote,
+        Icon::Truck,
+        Icon::Undo,
+        Icon::Bell,
+        Icon::Mail,
+        Icon::Message,
+        Icon::Activity,
+        Icon::Shield,
+        Icon::Lock,
+        Icon::Key,
+        Icon::Fingerprint,
+        Icon::Settings,
+        Icon::Globe,
+        Icon::Help,
+        Icon::Plus,
+        Icon::Minus,
+        Icon::X,
+        Icon::Check,
+        Icon::Edit,
+        Icon::Trash,
+        Icon::Copy,
+        Icon::Save,
+        Icon::Download,
+        Icon::Upload,
+        Icon::Refresh,
+        Icon::External,
+        Icon::Link,
+        Icon::Search,
+        Icon::Filter,
+        Icon::Sliders,
+        Icon::Columns,
+        Icon::Sort,
+        Icon::ArrowUp,
+        Icon::ArrowDown,
+        Icon::MoreHorizontal,
+        Icon::MoreVertical,
+        Icon::Grip,
+        Icon::Eye,
+        Icon::EyeOff,
+        Icon::SignOut,
+        Icon::SignIn,
+        Icon::ChevronDown,
+        Icon::ChevronUp,
+        Icon::ChevronLeft,
+        Icon::ChevronRight,
+        Icon::TrendUp,
+        Icon::TrendDown,
+        Icon::Info,
+        Icon::CheckCircle,
+        Icon::AlertTriangle,
+        Icon::AlertCircle,
+        Icon::Clock,
+        Icon::History,
+        Icon::Calendar,
+        Icon::Star,
+        Icon::Menu,
+        Icon::Sidebar,
+        Icon::Command,
+        Icon::Sun,
+        Icon::Moon,
+        Icon::Monitor,
+        Icon::File,
+        Icon::FileText,
+        Icon::Folder,
+        Icon::Image,
+        Icon::Paperclip,
+    ];
+
+    /// The icon's file and class name, such as `chart-bar` for `assets/icons/chart-bar.svg`
+    /// and `.z-icon-chart-bar`.
+    pub fn name(self) -> &'static str {
         match self {
-            Icon::Plus => "plus",
-            Icon::Edit => "edit",
-            Icon::Delete => "delete",
-            Icon::Save => "save",
-            Icon::Search => "search",
-            Icon::Box => "box",
-            Icon::Cart => "cart",
-            Icon::Table => "table",
             Icon::Home => "home",
-            Icon::Chart => "chart",
+            Icon::Dashboard => "dashboard",
+            Icon::ChartBar => "chart-bar",
+            Icon::ChartLine => "chart-line",
+            Icon::ChartPie => "chart-pie",
+            Icon::Table => "table",
+            Icon::List => "list",
+            Icon::Users => "users",
+            Icon::User => "user",
+            Icon::UserPlus => "user-plus",
+            Icon::Building => "building",
+            Icon::Cart => "cart",
+            Icon::Box => "box",
+            Icon::Tag => "tag",
+            Icon::Receipt => "receipt",
+            Icon::CreditCard => "credit-card",
+            Icon::Banknote => "banknote",
+            Icon::Truck => "truck",
+            Icon::Undo => "undo",
+            Icon::Bell => "bell",
+            Icon::Mail => "mail",
+            Icon::Message => "message",
+            Icon::Activity => "activity",
+            Icon::Shield => "shield",
+            Icon::Lock => "lock",
+            Icon::Key => "key",
+            Icon::Fingerprint => "fingerprint",
+            Icon::Settings => "settings",
+            Icon::Globe => "globe",
+            Icon::Help => "help",
+            Icon::Plus => "plus",
+            Icon::Minus => "minus",
+            Icon::X => "x",
+            Icon::Check => "check",
+            Icon::Edit => "edit",
+            Icon::Trash => "trash",
+            Icon::Copy => "copy",
+            Icon::Save => "save",
+            Icon::Download => "download",
+            Icon::Upload => "upload",
+            Icon::Refresh => "refresh",
+            Icon::External => "external",
+            Icon::Link => "link",
+            Icon::Search => "search",
+            Icon::Filter => "filter",
+            Icon::Sliders => "sliders",
+            Icon::Columns => "columns",
+            Icon::Sort => "sort",
+            Icon::ArrowUp => "arrow-up",
+            Icon::ArrowDown => "arrow-down",
+            Icon::MoreHorizontal => "more-horizontal",
+            Icon::MoreVertical => "more-vertical",
+            Icon::Grip => "grip",
+            Icon::Eye => "eye",
+            Icon::EyeOff => "eye-off",
+            Icon::SignOut => "sign-out",
+            Icon::SignIn => "sign-in",
+            Icon::ChevronDown => "chevron-down",
+            Icon::ChevronUp => "chevron-up",
+            Icon::ChevronLeft => "chevron-left",
+            Icon::ChevronRight => "chevron-right",
+            Icon::TrendUp => "trend-up",
+            Icon::TrendDown => "trend-down",
+            Icon::Info => "info",
+            Icon::CheckCircle => "check-circle",
+            Icon::AlertTriangle => "alert-triangle",
+            Icon::AlertCircle => "alert-circle",
+            Icon::Clock => "clock",
+            Icon::History => "history",
+            Icon::Calendar => "calendar",
+            Icon::Star => "star",
+            Icon::Menu => "menu",
+            Icon::Sidebar => "sidebar",
+            Icon::Command => "command",
+            Icon::Sun => "sun",
+            Icon::Moon => "moon",
+            Icon::Monitor => "monitor",
+            Icon::File => "file",
+            Icon::FileText => "file-text",
+            Icon::Folder => "folder",
+            Icon::Image => "image",
+            Icon::Paperclip => "paperclip",
         }
     }
 
@@ -877,7 +1244,7 @@ impl Icon {
     pub fn html(self) -> String {
         format!(
             r#"<span class="z-icon z-icon-{}" aria-hidden="true"></span>"#,
-            self.css()
+            self.name()
         )
     }
 }
@@ -910,6 +1277,16 @@ struct ButtonSpec {
     override_browser: bool,
     effect: Option<Effect>,
     tip: Option<Text>,
+    look: ButtonLook,
+}
+
+/// How a toolbar button is drawn besides the default outlined button.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum ButtonLook {
+    #[default]
+    Default,
+    Ghost,
+    Danger,
 }
 
 #[derive(Debug)]
@@ -939,6 +1316,7 @@ impl Toolbar {
                 override_browser: false,
                 effect: None,
                 tip: None,
+                look: ButtonLook::Default,
             },
         }
     }
@@ -951,24 +1329,58 @@ impl Toolbar {
     }
 
     pub(crate) fn render(&self, out: &mut String, r: &Render, title: &str) {
+        self.render_as(out, r, title, "toolbar");
+    }
+
+    /// Writes the bar; `kind` is `toolbar`, or `primary` for the main actions of a screen
+    /// header, drawn as primary buttons.
+    fn render_as(&self, out: &mut String, r: &Render, title: &str, kind: &str) {
         let scope = r.scope;
+        let (bar, button) = if kind == "primary" {
+            ("z-toolbar z-screen-primary", "z-button z-primary")
+        } else {
+            ("z-toolbar", "z-button")
+        };
         out.push_str(&format!(
-            r#"<div class="z-toolbar" role="toolbar" aria-label="{title}">"#
+            r#"<div class="{bar}" role="toolbar" aria-label="{title}">"#
         ));
+        let exports = self
+            .items
+            .iter()
+            .filter(|i| matches!(i, ToolItem::Export(_)))
+            .count();
+        let mut export_menu = false;
         for (n, item) in self.items.iter().enumerate() {
             match item {
                 ToolItem::Button(b) => {
-                    let tip = b.tip.as_ref().map(|t| crate::ui::tip(r, &format!("{scope}-tooltip-{n}"), t));
+                    let keys = b
+                        .shortcut
+                        .as_deref()
+                        .and_then(|s| crate::command::usable_shortcut(s, b.override_browser));
+                    let tip_text = match (&b.tip, &keys) {
+                        (Some(t), Some(k)) => Some(Text::from(format!("{}  {k}", r.i18n.text(r.locale, t)))),
+                        (Some(t), None) => Some(t.clone()),
+                        (None, Some(k)) => Some(Text::from(k.clone())),
+                        (None, None) => None,
+                    };
+                    let tip = tip_text
+                        .as_ref()
+                        .map(|t| crate::ui::tip(r, &format!("{scope}-tooltip-{n}"), t));
                     if tip.is_some() {
                         out.push_str(r#"<span class="z-tip-host">"#);
                     }
                     let english = b.label.english();
+                    let look = match b.look {
+                        ButtonLook::Default => "",
+                        ButtonLook::Ghost => " z-ghost",
+                        ButtonLook::Danger => " z-danger-button",
+                    };
                     out.push_str(&format!(
-                        r#"<button type="button" class="z-button" data-testid="{scope}.toolbar.{}""#,
+                        r#"<button type="button" class="{button}{look}" data-testid="{scope}.{kind}.{}""#,
                         slug(&english)
                     ));
-                    if let Some(keys) = b.shortcut.as_deref().and_then(|s| crate::command::usable_shortcut(s, b.override_browser)) {
-                        out.push_str(&format!(r#" aria-keyshortcuts="{}""#, crate::render::escape(&keys)));
+                    if let Some(keys) = &keys {
+                        out.push_str(&format!(r#" aria-keyshortcuts="{}""#, crate::render::escape(keys)));
                     }
                     if let Some(e) = &b.effect {
                         out.push_str(&format!(r#" data-zeyn-effect="{}""#, attr(e)));
@@ -987,14 +1399,41 @@ impl Toolbar {
                         out.push_str("</span>");
                     }
                 }
-                ToolItem::Export(e) => out.push_str(&format!(
-                    r#"<button type="button" class="z-button" data-testid="{scope}.toolbar.export-{code}" data-zeyn-export="{code}">{}</button>"#,
+                ToolItem::Export(e) if exports < 2 => out.push_str(&format!(
+                    r#"<button type="button" class="{button}" data-testid="{scope}.{kind}.export-{code}" data-zeyn-export="{code}">{}</button>"#,
                     r.text(&Text::key(format!("zeyn.export.{}", e.code()))),
                     code = e.code()
                 )),
+                ToolItem::Export(_) if export_menu => {}
+                ToolItem::Export(_) => {
+                    export_menu = true;
+                    self.export_menu(out, r, kind);
+                }
             }
         }
         out.push_str("</div>");
+    }
+
+    /// Two or more exports as one "Export" menu button (W3C APG menu button) with a format per
+    /// item, so the bar keeps one button for them.
+    fn export_menu(&self, out: &mut String, r: &Render, kind: &str) {
+        let scope = r.scope;
+        let id = format!("{scope}-{kind}-export");
+        out.push_str(&format!(
+            r#"<div class="z-menu-button"><button type="button" class="z-button z-menu-trigger" id="{id}-button" aria-haspopup="menu" aria-expanded="false" aria-controls="{id}" data-testid="{scope}.{kind}.export">{}<span>{}</span><span class="z-select-arrow" aria-hidden="true"></span></button><ul class="z-menu-list" role="menu" id="{id}" aria-labelledby="{id}-button" hidden>"#,
+            Icon::Download.html(),
+            r.text(&Text::key("zeyn.export.menu"))
+        ));
+        for item in &self.items {
+            if let ToolItem::Export(e) = item {
+                out.push_str(&format!(
+                    r#"<li role="none"><button type="button" class="z-menu-entry" role="menuitem" tabindex="-1" data-zeyn-export="{code}" data-testid="{scope}.{kind}.export-{code}">{}</button></li>"#,
+                    r.text(&Text::key(format!("zeyn.export.format.{}", e.code()))),
+                    code = e.code()
+                ));
+            }
+        }
+        out.push_str("</ul></div>");
     }
 
     pub(crate) fn schema(&self) -> serde_json::Value {
@@ -1031,6 +1470,18 @@ impl ToolButton {
     /// browser never passes on (`Ctrl+N`, `Ctrl+T`, `Ctrl+W`) are never bound. Both are logged.
     pub fn shortcut(mut self, keys: impl Into<String>) -> Self {
         self.spec.shortcut = Some(keys.into());
+        self
+    }
+
+    /// Draws the button without an outline until hovered, for secondary actions in dense bars.
+    pub fn ghost(mut self) -> Self {
+        self.spec.look = ButtonLook::Ghost;
+        self
+    }
+
+    /// Draws the button in the danger color, for actions that delete or cancel.
+    pub fn danger(mut self) -> Self {
+        self.spec.look = ButtonLook::Danger;
         self
     }
 
@@ -1083,8 +1534,10 @@ enum ScreenKind {
 /// Content of a screen. Screen functions return this.
 pub struct Screen {
     title: Text,
+    subtitle: Option<Text>,
     kind: ScreenKind,
     toolbar: Option<Toolbar>,
+    primary: Option<Toolbar>,
     body: Vec<Node>,
     menu: Option<crate::menu::ContextMenu>,
     moved: Option<(&'static str, serde_json::Value, bool)>,
@@ -1096,8 +1549,10 @@ impl Screen {
     pub fn new(title: impl Into<Text>) -> Self {
         Self {
             title: title.into(),
+            subtitle: None,
             kind: ScreenKind::Page,
             toolbar: None,
+            primary: None,
             body: Vec::new(),
             menu: None,
             moved: None,
@@ -1246,6 +1701,35 @@ impl Screen {
         self
     }
 
+    /// A short line under the title, read as the screen's description.
+    ///
+    /// ```
+    /// use zeyn::Screen;
+    /// let s = Screen::new("Orders").subtitle("Every order of the last 90 days.");
+    /// ```
+    pub fn subtitle(mut self, text: impl Into<Text>) -> Self {
+        self.subtitle = Some(text.into());
+        self
+    }
+
+    /// The screen's main actions, as primary buttons at the end of the title row (the page
+    /// header pattern). They take the same buttons as [`Screen::toolbar`], which stays under
+    /// the title for the other tools. On narrow screens the actions wrap under the title.
+    ///
+    /// ```ignore
+    /// Screen::new(t!("orders.title"))
+    ///     .subtitle(t!("orders.intro"))
+    ///     .primary(|t| t.button(t!("orders.new")).icon(Icon::Plus).opens(order_editor, OrderParams { id: None }))
+    /// ```
+    pub fn primary<F, R>(mut self, build: F) -> Self
+    where
+        F: FnOnce(Toolbar) -> R,
+        R: Into<Toolbar>,
+    {
+        self.primary = Some(build(Toolbar::default()).into());
+        self
+    }
+
     pub fn body(mut self, node: impl Into<Node>) -> Self {
         self.body.push(node.into());
         self
@@ -1310,20 +1794,44 @@ impl Screen {
             _ => attr(params),
         };
         let mut out = String::new();
-        let close = match self.kind {
+        let described = if self.subtitle.is_some() {
+            format!(r#" aria-describedby="{scope}-subtitle""#)
+        } else {
+            String::new()
+        };
+        let (close, level) = match self.kind {
             ScreenKind::Page => {
                 out.push_str(&format!(
-                    r#"<section class="z-screen" data-zeyn-screen="{scope}" data-zeyn-params="{params}" aria-labelledby="{scope}-title"><h1 id="{scope}-title">{title}</h1>"#
+                    r#"<section class="z-screen" data-zeyn-screen="{scope}" data-zeyn-params="{params}" aria-labelledby="{scope}-title"{described}>"#
                 ));
-                "</section>"
+                ("</section>", "h1")
             }
             ScreenKind::Window { width } => {
                 out.push_str(&format!(
-                    r#"<div class="z-window" role="dialog" aria-modal="true" data-zeyn-screen="{scope}" data-zeyn-params="{params}" aria-labelledby="{scope}-title" style="--z-width:{width}px"><h2 id="{scope}-title">{title}</h2>"#
+                    r#"<div class="z-window" role="dialog" aria-modal="true" data-zeyn-screen="{scope}" data-zeyn-params="{params}" aria-labelledby="{scope}-title"{described} style="--z-width:{width}px">"#
                 ));
-                "</div>"
+                ("</div>", "h2")
             }
         };
+        let heading = format!(r#"<{level} id="{scope}-title">{title}</{level}>"#);
+        if self.subtitle.is_none() && self.primary.is_none() {
+            out.push_str(&heading);
+        } else {
+            out.push_str(r#"<header class="z-screen-head"><div class="z-screen-heading">"#);
+            out.push_str(&heading);
+            if let Some(s) = &self.subtitle {
+                out.push_str(&format!(
+                    r#"<p class="z-screen-subtitle" id="{scope}-subtitle">{}</p>"#,
+                    r.text(s)
+                ));
+            }
+            out.push_str("</div>");
+            if let Some(p) = &self.primary {
+                let label = r.text(&Text::key("zeyn.shell.primary_actions"));
+                p.render_as(&mut out, &r, &label, "primary");
+            }
+            out.push_str("</header>");
+        }
         if let Some(t) = &self.toolbar {
             t.render(&mut out, &r, &title);
         }
@@ -1343,8 +1851,10 @@ impl Screen {
         json!({
             "screen": meta,
             "title": self.title,
+            "subtitle": self.subtitle,
             "kind": kind,
             "width": width,
+            "primary": self.primary.as_ref().map(Toolbar::schema),
             "toolbar": self.toolbar.as_ref().map(Toolbar::schema),
             "body": self.body.iter().map(Node::schema).collect::<Vec<_>>(),
         })

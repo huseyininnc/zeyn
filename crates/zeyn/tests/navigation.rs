@@ -766,3 +766,154 @@ async fn prefetch_sends_speculation_rules_by_header_and_screens_see_prefetches()
     let (status, _) = get_with(&router, "/checkout", ("accept", "text/html")).await;
     assert_eq!(status, StatusCode::OK);
 }
+
+/// Params whose fields are all optional, such as a filter a menu link leaves out.
+#[params]
+pub struct FeedParams {
+    pub show: Option<String>,
+    pub page: Option<u32>,
+}
+
+#[screen(route = "/feed", public)]
+pub fn feed(p: FeedParams) -> Screen {
+    Screen::new(format!(
+        "Feed {} {}",
+        p.show.unwrap_or_else(|| "all".into()),
+        p.page.unwrap_or(1)
+    ))
+}
+
+/// Params with a required field.
+#[params]
+pub struct NeedsId {
+    pub id: i64,
+}
+
+#[screen(route = "/needs-id", public)]
+pub fn needs_id(p: NeedsId) -> Screen {
+    Screen::new(format!("Item {}", p.id))
+}
+
+#[tokio::test]
+async fn screens_whose_params_are_all_optional_open_without_params() {
+    let router = App::new("Opt")
+        .feature(
+            Feature::new("o")
+                .screen(feed)
+                .screen(needs_id)
+                .menu(|m| {
+                    m.group("Feed", Icon::Home)
+                        .item("Feed", feed)
+                }),
+        )
+        .router()
+        .unwrap();
+    let (status, _, page) = get(&router, "/feed", false).await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert!(page.contains("Feed all 1"), "{page}");
+    let (status, _, page) = get(
+        &router,
+        "/feed?params=%7B%22show%22%3A%22unread%22%7D",
+        false,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(page.contains("Feed unread 1"));
+    let (status, _, _) = get(&router, "/_zeyn/screen/feed", true).await;
+    assert_eq!(status, StatusCode::OK, "fragments open without params too");
+    let (status, _, _) = get(&router, "/needs-id", false).await;
+    assert_eq!(
+        status,
+        StatusCode::NOT_FOUND,
+        "a required field still needs its value"
+    );
+    let (status, _, _) = get(&router, "/feed?params=%7B%22page%22%3A%22x%22%7D", false).await;
+    assert_eq!(
+        status,
+        StatusCode::NOT_FOUND,
+        "values of the wrong type are refused"
+    );
+    assert!(
+        <FeedParams as zeyn::ApiInput>::from_json(serde_json::Value::Null).is_ok(),
+        "the API reads a missing value the same way"
+    );
+}
+
+#[tokio::test]
+async fn the_side_menu_starts_with_the_logo_and_draws_item_icons() {
+    let router = App::new("Nav")
+        .logo("/static/logo.svg")
+        .logo_dark("/static/logo-dark.svg")
+        .feature(Feature::new("n").screen(one).menu(|m| {
+            m.group("Group", Icon::Box)
+                .item("One", one)
+                .icon(Icon::Home)
+        }))
+        .router()
+        .unwrap();
+    let (_, _, page) = get(&router, "/one", false).await;
+    assert!(
+        page.contains(r#"<p class="z-app-name"><img class="z-logo z-logo-light" src="/static/logo.svg" alt=""><img class="z-logo z-logo-dark" src="/static/logo-dark.svg" alt=""><span>Nav</span></p>"#),
+        "{page}"
+    );
+    assert!(
+        page.contains(r#"<h2>Group</h2>"#),
+        "the group label drops its icon"
+    );
+    assert!(page.contains(r#"aria-current="page"><span class="z-icon z-icon-home" aria-hidden="true"></span><span>One</span></a>"#));
+
+    let (_, _, plain) = get(&app(None), "/one", false).await;
+    assert!(plain.contains(
+        r#"<p class="z-app-name"><span class="z-logo z-logo-letter" aria-hidden="true">N</span><span>Nav</span></p>"#
+    ));
+}
+
+#[tokio::test]
+async fn the_top_bar_has_a_breadcrumb_a_search_field_and_the_account_menu() {
+    let router = App::new("Nav")
+        .header(|h| h.breadcrumb().search().account())
+        .feature(Feature::new("n").screen(one).menu(|m| {
+            m.group("Group", Icon::Box)
+                .item("One", one)
+        }))
+        .router()
+        .unwrap();
+    let (_, _, page) = get(&router, "/one", false).await;
+    assert!(page.contains(r#"<div class="z-app-header-slot z-app-header-slot-start" id="z-app-header-slot-start"><nav class="z-crumbs" aria-label="Breadcrumb" data-zeyn-crumbs><ol><li>Group</li><li><span aria-current="page">One</span></li></ol></nav></div>"#), "{page}");
+    assert!(
+        page.contains(r#"<button type="button" class="z-topbar-search" data-zeyn-palette-open"#)
+    );
+    assert!(page.contains(r#"aria-controls="z-account" aria-label="Account">"#));
+    let nav = &page[page
+        .find(r#"<nav class="z-nav""#)
+        .unwrap()..page.find("</nav>").unwrap()];
+    assert!(
+        !nav.contains("data-zeyn-theme-picker") && !nav.contains("z-palette-open"),
+        "the pickers and the palette button move to the top bar"
+    );
+    let bar = &page[page
+        .find(r#"<header class="z-app-header""#)
+        .unwrap()..];
+    assert!(bar.contains("data-zeyn-theme-picker"));
+}
+
+#[test]
+fn a_logo_from_another_origin_is_reported() {
+    for bad in [
+        "https://cdn.example.com/logo.svg",
+        "//cdn.example.com/x.svg",
+        "logo.svg",
+        "/a\"b.svg",
+    ] {
+        let problems = App::new("Nav")
+            .logo(bad)
+            .check()
+            .unwrap_err();
+        assert!(
+            problems
+                .iter()
+                .any(|p| p.contains("is not a path on the app's origin")),
+            "{bad}"
+        );
+    }
+}

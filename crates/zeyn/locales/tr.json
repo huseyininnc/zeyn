@@ -104,6 +104,7 @@
       "max": "{label} en fazla {n} olabilir.",
       "format": "{label} geçersiz bir değer içeriyor.",
       "skipped_time": "{label}: bu saat, saat değişikliği nedeniyle sizin saat diliminizde yok.",
+      "depends_on": "Bu seçim, bağlı olduğu alanın değeri için geçerli değil.",
       "line": "Satır {n}: {message}",
       "disabled_day": "{label}: bu gün seçilemez.",
       "time_step": "{label} {n} dakikalık adımlarla girilmelidir.",
@@ -206,7 +207,13 @@
       "xlsx": "Excel'e aktar",
       "csv": "CSV'ye aktar",
       "pdf": "PDF'e aktar",
-      "pdf_cut": "Yalnızca ilk {max} satır yazdırıldı."
+      "pdf_cut": "Yalnızca ilk {max} satır yazdırıldı.",
+      "menu": "Dışa aktar",
+      "format": {
+        "xlsx": "Excel",
+        "csv": "CSV",
+        "pdf": "PDF"
+      }
     },
     "shell": {
       "skip": "İçeriğe geç",
@@ -215,6 +222,15 @@
       "time_zone": "Saat dilimi",
       "time_zone_auto": "Otomatik (bu cihaz)",
       "theme": "Tema",
+      "primary_actions": "Ana işlemler",
+      "search": "Ara",
+      "breadcrumb": "Konum",
+      "account": "Hesap",
+      "density": "Yoğunluk",
+      "density_comfortable": "Rahat",
+      "density_compact": "Sıkı",
+      "account_of": "{name} hesabı",
+      "signed_in_as": "Oturum açan",
       "theme_system": "Sistem",
       "theme_light": "Açık",
       "theme_dark": "Koyu",
@@ -226,9 +242,55 @@
       }
     },
     "ui": {
+      "typing": {
+        "one": "{name} yazıyor",
+        "two": "{a} ve {b} yazıyor",
+        "many": "{n} kişi yazıyor",
+        "someone": "Birisi"
+      },
+      "composer": {
+        "label": "Mesaj",
+        "placeholder": "Bir mesaj yazın",
+        "send": "Gönder",
+        "hint_enter": "Enter gönderir, Shift+Enter yeni satır açar",
+        "hint_ctrl": "Ctrl+Enter gönderir, Enter yeni satır açar",
+        "left": "{n} karakter kaldı",
+        "over": "{n} karakter fazla",
+        "sent": "Mesaj gönderildi",
+        "failed": "Mesaj gönderilemedi",
+        "people": "{n} kişi bulundu",
+        "no_people": "Kimse bulunamadı",
+        "people_label": "Kişiler",
+        "restored": "Gönderilmemiş mesajınız geri geldi",
+        "attachments": "Ekler"
+      },
+      "chat": {
+        "label": "Mesajlar",
+        "empty": "Henüz mesaj yok",
+        "you": "Siz",
+        "today": "Bugün",
+        "yesterday": "Dün",
+        "attachments": "Ekler",
+        "more_files": "{n} dosya daha",
+        "new_message": "{name} kişisinden yeni mesaj: {text}",
+        "assistant": "Asistan",
+        "writing": "Yanıt yazılıyor",
+        "stop": "Durdur",
+        "stopped": "Yanıt durduruldu",
+        "reply_failed": "Yanıt yüklenemedi",
+        "loading": "Eski mesajlar yükleniyor",
+        "status": {
+          "sending": "Gönderiliyor",
+          "sent": "Gönderildi",
+          "delivered": "İletildi",
+          "read": "Okundu",
+          "failed": "Gönderilemedi"
+        }
+      },
       "resize": "Bölmeleri yeniden boyutlandır",
       "cards": {
         "load_more": "Daha fazla göster",
+        "list": "Liste",
         "loaded": "{count} öğe gösteriliyor",
         "empty": "Gösterilecek bir şey yok.",
         "error": "Liste yüklenemedi. Yeniden deneyin.",
@@ -386,7 +448,10 @@
         "value": "Değer",
         "min": "En az",
         "max": "En çok",
-        "target": "Hedef"
+        "target": "Hedef",
+        "thousand": "{n} B",
+        "million": "{n} Mn",
+        "billion": "{n} Mr"
       },
       "tree": {
         "empty": "Kayıt yok."
@@ -453,9 +518,13 @@
         "up": "Önceki döneme göre yüzde {pct} artış",
         "down": "Önceki döneme göre yüzde {pct} düşüş",
         "flat": "Önceki döneme göre değişiklik yok",
-        "target": "Hedef {target}, yüzde {pct} ulaşıldı"
+        "target": "Hedef {target}, yüzde {pct} ulaşıldı",
+        "compare": "önceki döneme göre",
+        "million": "{n} Mn",
+        "billion": "{n} Mr"
       },
       "password": {
+        "caps": "Caps Lock açık",
         "show": "Parolayı göster",
         "weak": "Güç: zayıf",
         "fair": "Güç: orta",
@@ -523,6 +592,180 @@
       },
       "prefs": {
         "cleared": "Bu tarayıcının bu site için tuttuğu seçimler silindi."
+      },
+      "diff": {
+        "label": "Değişiklikler",
+        "none": "Değişiklik yok",
+        "field": "Alan",
+        "before": "Önce",
+        "after": "Sonra",
+        "empty": "(boş)",
+        "more": "Değişen {n} alan daha gösterilmiyor"
+      },
+      "code": {
+        "plain": "Metin",
+        "rust": "Rust",
+        "json": "JSON",
+        "toml": "TOML",
+        "sql": "SQL",
+        "javascript": "JavaScript",
+        "shell": "Kabuk",
+        "lines": "{n} satır",
+        "copy": "Kopyala",
+        "copied": "Panoya kopyalandı",
+        "failed": "Kopyalanamadı",
+        "fold": "Bu bloğu daralt veya genişlet",
+        "truncated": "{total} satırın ilk {shown} satırı gösteriliyor. Gerisi burada gösterilemeyecek kadar uzun."
+      },
+      "barcode": {
+        "code128_invalid": "Bu değer barkod olarak gösterilemez: 1 ile 80 arasında yazdırılabilir ASCII karakter olmalıdır.",
+        "qr_too_long": "Bu değer QR kod için fazla uzun."
+      },
+      "inbox": {
+        "label": "Bildirimler",
+        "today": "Bugün",
+        "yesterday": "Dün",
+        "empty": "Bildirim yok",
+        "unread": "Okunmamış",
+        "unread_count": "{n} okunmamış",
+        "select": "Seç",
+        "select_all": "Tümünü seç",
+        "actions": "Bildirim işlemleri",
+        "mark_read": "Okundu olarak işaretle",
+        "archive": "Arşivle",
+        "selected": "{n} seçili",
+        "done": "{n} bildirim için yapıldı",
+        "bell": "Bildirimler",
+        "bell_count": "Bildirimler, {n} okunmamış",
+        "bell_many": "Bildirimler, 99'dan fazla okunmamış"
+      },
+      "kanban": {
+        "label": "Pano",
+        "help": "Ok tuşları kartlar arasında gezer. Enter taşıma menüsünü açar; Shift ile Sol veya Sağ kartı yandaki sütuna taşır.",
+        "move": "Taşı",
+        "move_to": "Şuraya taşı",
+        "moved": "{card}, {column} sütununa taşındı",
+        "refused": "Kart taşınamadı ve sütununa geri döndü",
+        "no_moves": "Bu kart buradan taşınamaz",
+        "count": "{n}",
+        "count_wip": "{n} / {wip}"
+      },
+      "calendar": {
+        "navigation": "Dönem",
+        "views": "Görünüm",
+        "previous": "Önceki",
+        "next": "Sonraki",
+        "today": "Bugün",
+        "month": "Ay",
+        "week": "Hafta",
+        "day": "Gün",
+        "all_day": "Tüm gün",
+        "more": "{n} daha",
+        "range": "{from} ile {to} arası",
+        "cut": "Bu dönemin yalnızca ilk {n} etkinliği gösteriliyor.",
+        "help": "Ok tuşları günler arasında gezer, Page Up ve Page Down dönemi değiştirir, Enter günün etkinliklerine geçer.",
+        "help_create": "Ok tuşları günler arasında gezer, Page Up ve Page Down dönemi değiştirir, Enter günün etkinliklerine geçer, N etkinlik oluşturur, Shift ile ok tuşları aralığı genişletir.",
+        "created": "Etkinlik oluşturuldu",
+        "skipped": "Bu saat, saatlerin değiştiği an olduğu için saat diliminizde yok.",
+        "invalid_slot": "Başladıktan sonra biten ve en fazla 31 gün süren bir aralık seçin.",
+        "months": {
+          "1": "Ocak",
+          "2": "Şubat",
+          "3": "Mart",
+          "4": "Nisan",
+          "5": "Mayıs",
+          "6": "Haziran",
+          "7": "Temmuz",
+          "8": "Ağustos",
+          "9": "Eylül",
+          "10": "Ekim",
+          "11": "Kasım",
+          "12": "Aralık"
+        }
+      },
+      "shop": {
+        "price": {
+          "sale": "Eski fiyat {was}, yeni fiyat {now}, {off} indirim",
+          "per": {
+            "item": "Adet fiyatı {price}",
+            "kg": "Kg fiyatı {price}",
+            "g100": "100 g fiyatı {price}",
+            "l": "Litre fiyatı {price}",
+            "ml100": "100 ml fiyatı {price}",
+            "m": "Metre fiyatı {price}"
+          }
+        },
+        "range": {
+          "to": "ile",
+          "low": "{label}, başlangıç",
+          "high": "{label}, bitiş"
+        },
+        "quantity": {
+          "label": "Adet",
+          "decrease": "Azalt",
+          "increase": "Artır",
+          "limit": "Yalnızca {n} adet var.",
+          "failed": "Adet değiştirilemedi."
+        },
+        "gallery": {
+          "swipe": "Fotoğraflar, ok tuşlarıyla ya da kaydırarak gezin",
+          "full": "Tam ekran",
+          "choose": "Bir fotoğraf seçin",
+          "show": "{count} fotoğraftan {n}. fotoğrafı göster",
+          "close": "Kapat",
+          "prev": "Önceki fotoğraf",
+          "next": "Sonraki fotoğraf",
+          "zoom": "Yakınlaştır"
+        },
+        "facets": {
+          "label": "Filtreler",
+          "chosen": "Seçili filtreler",
+          "clear": "Tümünü temizle",
+          "remove": "{filter} filtresini kaldır",
+          "option": "{option}, {count} sonuç",
+          "active": "{n} seçili"
+        },
+        "reviews": {
+          "label": "Değerlendirmeler",
+          "average": "5 üzerinden {average} yıldız",
+          "count": "{count} değerlendirme",
+          "stars": "{n} yıldız"
+        },
+        "rating": {
+          "half": "{label} tam ya da yarım yıldız alır."
+        },
+        "countdown": {
+          "day": "g",
+          "left": "{d} g {h} sa {m} dk kaldı"
+        }
+      },
+      "story": {
+        "row": "Hikâyeler",
+        "unseen": "{name}, izlenmemiş hikâyeler",
+        "seen": "{name}, tüm hikâyeler izlendi"
+      },
+      "lightbox": {
+        "label": "Medya görüntüleyici",
+        "close": "Kapat",
+        "previous": "Önceki",
+        "next": "Sonraki",
+        "position": "{n} / {count}",
+        "zoom_in": "Yakınlaştır",
+        "zoom_out": "Uzaklaştır",
+        "open": "Resmi aç",
+        "video": "Videoyu oynat"
+      },
+      "feed": {
+        "label": "Gönderiler",
+        "new_one": "1 yeni gönderi",
+        "new_many": "{count} yeni gönderi",
+        "new_more": "{count} gönderiden fazla yeni gönderi",
+        "newest": "En yeni gönderilere dön",
+        "loaded": "{count} gönderi gösteriliyor",
+        "error": "Gönderiler yüklenemedi. Yeniden deneyin.",
+        "empty": "Henüz gönderi yok.",
+        "comments": "{count} yorum",
+        "comments_one": "1 yorum"
       }
     },
     "date": {

@@ -1,7 +1,7 @@
 //! The screens of the catalog and the few components only it needs: the gallery of previews, an
 //! example with its code, and the API table.
 
-use crate::{API, CATEGORIES, COMPONENTS, Component as Entry, Example, component, matching};
+use crate::{API, CATEGORIES, COMPONENTS, Component as Entry, Demo, Example, component, matching};
 use zeyn::prelude::*;
 use zeyn::render::escape;
 use zeyn::ui::{ExternalLink, Paragraph, SearchBox, render_child};
@@ -65,7 +65,7 @@ pub fn index_screen(q: &str, ctx: &Ctx) -> Screen {
                 c.entry
                     .overview
                     .first()
-                    .map(|e| (e.build)(ctx))
+                    .map(|e| (e.build)(ctx, &Demo::default()))
                     .unwrap_or_else(|| Stack::new().into()),
             );
         }
@@ -171,13 +171,13 @@ impl Component for ExampleBlock {
     }
 }
 
-fn blocks(c: &Entry, list: &[Example], ctx: &Ctx) -> Node {
+fn blocks(c: &Entry, list: &[Example], ctx: &Ctx, demo: &Demo) -> Node {
     list.iter()
         .fold(Stack::new().gap(6), |stack, e| {
             stack.add(Node::new(ExampleBlock {
                 title: key(format!("cx.ex.{}.{}", c.slug, e.func)),
                 code: snippet(c.source, e.func),
-                demo: vec![(e.build)(ctx)],
+                demo: vec![(e.build)(ctx, demo)],
             }))
         })
         .into()
@@ -233,7 +233,7 @@ impl Component for ApiTable {
 }
 
 /// The page of a component: its description and links, then the Overview, API and Examples tabs.
-pub fn component_screen(slug: &str, ctx: &Ctx) -> Screen {
+pub fn component_screen(slug: &str, ctx: &Ctx, demo: &Demo) -> Screen {
     let Some(c) = component(slug) else {
         return Screen::new(t!("cx.missing"));
     };
@@ -252,10 +252,10 @@ pub fn component_screen(slug: &str, ctx: &Ctx) -> Screen {
             t!("cx.docs_rs"),
         ));
     let mut tabs = Tabs::new(t!("cx.tabs", name = e.name))
-        .tab(t!("cx.overview"), blocks(c, e.overview, ctx))
+        .tab(t!("cx.overview"), blocks(c, e.overview, ctx, demo))
         .tab(t!("cx.api"), Node::new(ApiTable { types: e.api }));
     if !e.examples.is_empty() {
-        tabs = tabs.tab(t!("cx.examples"), blocks(c, e.examples, ctx));
+        tabs = tabs.tab(t!("cx.examples"), blocks(c, e.examples, ctx, demo));
     }
     Screen::new(e.name)
         .body(Paragraph::new(c.summary()))

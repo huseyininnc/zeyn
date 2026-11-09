@@ -8,12 +8,13 @@ runtime in the browser applies changes, and there is no JavaScript to write.
 - Run: `cargo run` then open the address printed in the terminal
 - Test: `cargo test`
 - Develop with `zeyn dev`: it runs the app and rebuilds and restarts it on every saved change; the open browser follows without a page reload. A failed build keeps the last good server running.
-- Check the app without starting it: `zeyn check`. After a Zeyn upgrade, `zeyn check --fix` rewrites renamed APIs (deprecation warnings name them).
+- Check the app without starting it: `zeyn check`. It also warns about a `#[screen]` or `#[action]` that no feature registers, and about a flat `screens.rs` or `actions.rs` that has grown past about 150 lines with several items in it. After a Zeyn upgrade, `zeyn check --fix` rewrites renamed APIs (deprecation warnings name them).
 - Container: `docker build -t {{name}} .` then `docker run -p 3000:3000 {{name}}` (distroless, non root, `{{name}} health` is the health check). Configure with `APP_*` variables, such as `APP_SERVER__ADDR`.
 - Sign in: debug builds use `DevAuth` (every request is a developer with full access); release builds, the container included, have no sign in until `src/app.rs` adds a real authenticator (`OidcAuth`, `JwtAuth`, `ForwardAuth` or `App::accounts`). Never move `DevAuth` out of `#[cfg(debug_assertions)]`: the framework refuses it in release builds.
 - Standards are fixed by the project files: `rustfmt.toml`, `clippy.toml` and `[lints]` in `Cargo.toml`, `.editorconfig`, `deny.toml` (licenses and advisories), `rust-toolchain.toml`. CI runs all of them; do not loosen them to make a change pass.
 - Show every route, screen, API and missing translation: `zeyn routes`
 - New feature folder: `zeyn g feature <name>`
+- New screen, one file: `zeyn g screen <feature> <name>`. It registers the screen in the feature and adds its title to every locale file (other languages get the English text to translate).
 
 The `zeyn` MCP server (see `.mcp.json`) gives agents the same commands plus the framework reference.
 `.claude/skills/zeyn/SKILL.md` is the Zeyn skill: where to read the docs, the rules, the language in
@@ -26,14 +27,27 @@ config/app.json          defaults; environment variables APP_* override them (AP
 locales/<lang>.json      every user facing text; all files must have the same keys
 src/main.rs              loads configuration and starts the app
 src/app.rs               the App: services, features, security settings
+src/services/<name>.rs   services shared by several features, registered in src/app.rs
 src/features/<name>/     one folder per feature
-    mod.rs               the Feature: route prefix, guards, screens, APIs, menu
-    models.rs            #[entity] and #[model] types
-    store.rs             services that read and write data
-    actions.rs           #[action] functions
-    screens.rs           #[screen] functions
+    mod.rs               module declarations and the Feature: route prefix, guards, screens, APIs, menu
+    models/              #[entity] and #[model] types, one file each
+    services/            services of the feature that read and write data (stores, clients)
+    actions/             #[action] functions, one file each
+    screens/             #[screen] functions, one file each
+    components/          parts of screens (a toolbar, a panel), added by hand when needed
 tests/                   tests that drive the app through its router
 ```
+
+Each folder has a `mod.rs` that lists its files. `zeyn g feature` creates `models/`, `services/`,
+`actions/` and `screens/` with a working starter: a model, an in memory data service, a search
+action and a list screen. A feature that does not need a folder deletes it (the folder and its
+`mod` line in the feature's `mod.rs`). `components/` is never generated: add it by hand, with one
+function that returns a `Node` per file (`components/<name>.rs`), when a part of a screen is shared
+or a screen file grows. `zeyn g screen` adds a file to `screens/` and recreates `screens/mod.rs`
+when it was deleted. The layout is a default, not a rule: a small feature can keep a single `models.rs`,
+`screens.rs` or `actions.rs` (the sample `notes` feature does), and `zeyn g screen` turns a flat
+`screens.rs` into a folder the first time it adds a screen. A service that several features use
+goes in `src/services/<name>.rs` and is registered once in `src/app.rs` with `.service(...)`.
 
 ## Rules
 
@@ -55,10 +69,17 @@ tests/                   tests that drive the app through its router
 11. Write code top to bottom. Once a chain of calls is longer than about 40 characters, put one call
    on each line, so a line holds one or two dots on average. `cargo fmt` does this with
    `chain_width = 40` in `rustfmt.toml`; do not raise it.
+12. Keep files and functions small: one component, screen or group of related actions per
+   file. A source file holds at most 300 non blank lines (`build.rs` stops the build otherwise) and a
+   function at most 60 lines (clippy `too_many_lines`). When `screens.rs` or `actions.rs` grows,
+   turn it into a folder (`screens/mod.rs` plus one file per screen) and move large parts of a
+   screen, such as a toolbar, a form or a panel, into their own functions in their own files.
+   The limits live in `Cargo.toml` (`[package.metadata.zeyn] max_file_lines`) and `clippy.toml`
+   (`too-many-lines-threshold`); raise them only when the owner agrees.
 
 ## Before you finish
 
-Run `cargo test` and `zeyn check`. Both must pass.
+Run `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` and `zeyn check`. All must pass before you push.
 
 ## Framework index
 
@@ -124,6 +145,76 @@ pub fn order_editor(params: EditParams, store: OrderStore) -> Result<Screen> {
 - DataGrid paging: `Paging::pages(25)` (default 50), `Paging::infinite(100)`, `Paging::virtual_scroll()` for very large lists, `Paging::none()`.
 - DataGrid extras: `.row_style(|r| Some(RowStyle::Warning))`, `.flex(1)`, `.width(px)`.
 - Screens without params: `fn x()` or `fn x(_: (), ctx: Ctx)` when something is injected.
+- Page header: `.subtitle(t!(".."))` and `.primary(|t| t.button(..))` on `Screen`; key figures
+  `Kpi::new(..)` or `Kpi::money(..)` in a `Row`.
+- Destructive grid actions: `.row_action(..)` or `.bulk_action(..)` then `.confirm(t!(".."))`.
+
+### Linked parts and lists
+
+```rust
+DataGrid::of(search_orders)
+    .listens("orders")
+Chips::filter(..)
+    .drives("orders")
+ui.refresh("orders")
+```
+
+- Parts that show the same data `.listens("topic")`; `ui.refresh("topic")` in `on_success`, a
+  filter that `.drives("topic")` or `hub.notify` reloads them in place. No JavaScript, no reload.
+- Dependent lookups: `Form::depends_on(Address::city, Address::country)`.
+- Rows of another shape: `List::of(action).builder(|row| node)` with `.separator(node)`;
+  `Repeat::of(items, |item| node)` for data in memory; virtual lists need `.row_height(px)`.
+- File stores: `.files(RULES, FileAccess::read("x.read").write("x.write"), store)`.
+
+### Components by area
+
+Look here before you write a `Component`: each line names the main types and the call that
+matters. The `zeyn_docs` topic `language` and the docs pages have the details.
+
+- Layouts: `Row::new().col(node)`, `Stack::new().add(node)`, `Panel::new(t!(".."))`,
+  `Card::new().title(..)`, `Tabs::new(..).tab(..)`, `Split::new(a, b).ratio(55)`, `AutoGrid`,
+  `Dock` for panels the user moves.
+- Data: `DataGrid::of(action)` for tables; `List::of(action).builder(|row| node)`,
+  `CardGrid::of(action)` and `Rail::of(action)` for rows of another shape (a virtual list with a
+  builder needs `.row_height(px)`); `Repeat::of(items, |item| node)` for data already in memory;
+  `Tree::of(action)`, `Chart::bar(..)`, `Kpi::new(..)`.
+- Forms and controls: `Form::of(model).field(..).row(..).submit(t!(".."), action)`;
+  `.control(field, Control::Rating)` (also `Radio`, `Segmented`, `Listbox`, `Switch`, `Percent`,
+  `Password`); `.depends_on(child, parent)` for dependent lookups; `.lines(M::lines, ..)` for line
+  items; `RangeSlider::new(label, ["min", "max"], 0, 100)`, `QuantityStepper::of(action, target)`;
+  filters `Chips::filter(..)`, `SearchBox::of(action)`.
+- Linked parts: `.listens("topic")` on every part that shows the data; a filter that
+  `.drives("topic")` or `ui.refresh("topic")` in `on_success` reloads them in place.
+- Media: `Image::new(src).alt(..).size(w, h).lazy()` with `.placeholder(Placeholder::color(..))`,
+  `.low(small)`, `.fallback(src)`, and `.priority()` on the first image only; a lightbox with
+  `.full(large).caption(..)` or `.lightbox()`;
+  `Video::new(source, title).file(..)`, `Audio::new(..)`, `ProductGallery::new(name).image(..)`.
+- Commerce: `Price::new(money).was(old)`, `VariantPicker::new().group(VariantGroup::swatches(..))`,
+  `FacetPanel::of(screen, &p).facet(Facet::new(..))`, `ReviewSummary::new().count(5, n)`,
+  `Countdown::until(moment)`.
+- Admin: `DiffView::of(&before, &after)`, `CodeView::new(CodeLang::Sql, text)`,
+  `JsonView::of(&value, &ctx)`, `Barcode::code128(..)`, `QrCode::new(url)`, `Inbox::of(action)` with
+  `NotificationCenter::of(count, inbox, ())`, `Kanban::of(flow(), search, move_task)`,
+  `Calendar::of(search).at(p)`.
+- Chat: `MessageThread::of(history).conversation(id)` (`.reply(action)` streams AI replies),
+  `Composer::of(send).conversation(id)`, `TypingIndicator::new("chat").conversation(id)` (needs
+  `App::realtime`); the actions check that the user is in the conversation.
+- Social: `Feed::of(search_posts).post(|p| Post::new(author, at).text(..).media(image))` with
+  `.reactions(react)` and `.topic("posts")`; stories `StoryRow::new().add(StoryRing::new(name,
+  StoryState::Unseen).image(src))`, the state from what the server stored about the viewer.
+- Display and content: `Alert::new(Tone::Warning, ..)`, `Badge::new(..)`, `Progress::new(..)`,
+  `DescriptionList::of(&model)`, `Timeline`, `EmptyState`, `Breadcrumb`, `Markdown::new(..)`,
+  `Heading`, `Paragraph`, `Avatar`, `Hero::new(..)`, `Reactions::of(action, target)`,
+  `Share::page()`, `RelativeTime::new(at)`.
+- Shells: screens open in the app shell (menu, palette; `App::header(|h| h.search().account())`
+  adds a top bar); public pages use `.shell(Shell::site())` on the feature, sign in pages
+  `.shell(Shell::auth())` (`.split()` adds a brand panel); `MenuBar`, `StatusBar`.
+- Actions and buttons: `ActionButton::new(t!(".."), action, input).confirm(t!(".."))`, with
+  `.tone(Tone::Brand)` for the main action of a panel; `LinkButton::new(t!(".."), screen, params)`;
+  grid `.row_action(..)` and `.bulk_action(..)` then `.confirm(..)` and `.tone(Tone::Danger)`;
+  workflow moves `Transitions::of(..)`.
+- Files: `.files(RULES, FileAccess::read("x.file.read").write("x.file.write"), store)` on the
+  feature, with `DiskStore` or `MemoryStore`.
 
 ### Features and the app
 
@@ -153,7 +244,8 @@ impl Service for OrderStore {}
 
 ### Recipes
 
-- New feature: `zeyn g feature <name>`, then `.feature(...)` in `src/app.rs`, then texts in every `locales/*.json`.
+- New feature: `zeyn g feature <name>`. It registers the feature and its service in `src/app.rs` (or prints the two lines when `src/app.rs` has no `.feature(features::...)` line); then translate its texts in every `locales/*.json`. Delete the folders it does not need.
+- New screen: `zeyn g screen <feature> <name>` writes `screens/<name>.rs`, registers it and adds its title to every `locales/*.json`; translate the copies in languages other than English.
 - New field: add it to the struct with rules, add `Model.field` labels to every locale, add `.field(...)` to the form and `.column(...)` to the list.
 - New permission: name it `feature.resource.verb` in the macro; grant it in the authenticator or identity provider.
 - Publish an action as JSON API: `.api(action)` on the feature; calls need an `Authorization` header.

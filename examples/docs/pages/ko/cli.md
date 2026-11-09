@@ -8,7 +8,8 @@
 |---|---|
 | `zeyn new <name>` | 표준 Feature 구조의 앱을 만듭니다 |
 | `zeyn new <name> --lib` | 여러 앱이 공유하는 모델, Feature, 텍스트 라이브러리를 만듭니다 |
-| `zeyn g feature <name>` | 모델, 스토어, action, Screen이 있는 `src/features/<name>`을 추가합니다 |
+| `zeyn g feature <name>` | `models`, `services`, `actions`, `screens` 폴더와 동작하는 목록 Screen이 있는 `src/features/<name>`을 추가합니다 |
+| `zeyn g screen <feature> <name>` | feature에 `screens/<name>.rs`를 추가하고 등록한 뒤 제목을 모든 로케일 파일에 추가합니다 |
 | `zeyn routes` | Feature, Screen, 경로, API, 접근 권한을 나열합니다 |
 | `zeyn check` | 컴파일하고 구조적 문제와 누락된 번역을 보고합니다 |
 | `zeyn check --fix` | `src`, `tests`, `examples`에서 이름이 바뀐 Zeyn API를 다시 쓴 다음 검사합니다 |
@@ -53,6 +54,7 @@ cargo run
   ```
 
   `DataGrid::of(search_items).paging(Paging::pages(25)).column(Item::code).column(Item::qty)`처럼 쓰지 않습니다.
+- `build.rs`와 `Cargo.toml`의 `[package.metadata.zeyn]`에 있는 `max_file_lines = 300`: `src/`의 파일에 비어 있지 않은 줄이 더 많으면 `cargo build`가 멈춥니다. clippy `too_many_lines`(60, `clippy.toml`)는 함수에 같은 일을 합니다. [Project structure](structure.md)를 참고하세요.
 - `Dockerfile`과 `.dockerignore`: 작은 컨테이너 이미지입니다.
 - 일반적인 CI 서버용 파이프라인이며, 모두 같은 검사(`cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, `cargo deny check`)를 실행하고 `Cargo.toml`과 일치하지 않는 태그 `vX.Y.Z`를 거부합니다.
   - GitHub Actions용 `.github/workflows/ci.yml`, 그리고 `.github/dependabot.yml`(Cargo와 action의 주간 업데이트)과 pull request 체크리스트
@@ -64,9 +66,22 @@ cargo run
 
 각 폴더에 대해서는 [프로젝트 구조](structure.md)를 참고하십시오.
 
+## 생성기
+
+`zeyn g feature`는 모델, 서비스, action, Screen마다 파일이 하나인 feature를 만듭니다.
+
+```sh
+zeyn g feature orders            # src/features/orders/: models/, services/, actions/, screens/
+zeyn g screen orders detail      # src/features/orders/screens/detail.rs
+```
+
+짧은 형태 `zeyn g f`와 `zeyn g s`도 같은 일을 합니다. 새 feature는 바로 동작합니다. 모델, 메모리 데이터 서비스, 검색 action, 메뉴 항목이 있는 목록 Screen이 들어 있습니다. 필요 없는 폴더는 feature에서 삭제합니다(폴더와 feature의 `mod.rs`에 있는 `mod` 줄). `components/`는 생성되지 않습니다. Screen의 일부를 여러 곳에서 쓰거나 Screen 파일이 길어지면 직접 추가하고, 파일마다 `Node`를 반환하는 함수 하나를 둡니다(`components/<name>.rs`). Screen은 `<feature>.<name>.view` 권한을 받고 `locales/`의 모든 파일에 제목이 들어갑니다. 영어가 아닌 언어에는 영어 문장과 번역하라는 안내가 들어갑니다. 이 구조는 강제가 아닙니다. feature에 하나의 `screens.rs`가 있으면 `zeyn g screen`은 먼저 내용을 그대로 `screens/mod.rs`로 옮기고, `screens/`가 삭제되었으면 다시 만듭니다. 생성기는 파일을 덮어쓰지 않으며 snake case가 아닌 이름은 거부합니다.
+
 ## 앱 검사하기
 
 `zeyn check`는 컴파일러를 실행한 다음 앱 자체의 검사(`App::check`)를 실행합니다. 중복된 경로, 두 번 등록된 Screen, Screen에 필요하지만 아무도 등록하지 않은 서비스, 사용할 수 없는 단축키, WCAG AA 대비에 못 미치는 테마 토큰, 어떤 언어에서 누락된 번역 키를 검사합니다. 문제가 있으면 오류로 종료하므로 CI에서 실행할 수 있습니다.
+
+검사를 실패시키지 않는 경고도 출력합니다. 어떤 feature도 등록하지 않은 `#[screen]`이나 `#[action]`, 그리고 여러 항목이 있으면서 약 150줄을 넘은 하나의 `screens.rs`나 `actions.rs`입니다.
 
 Zeyn 릴리스에서 API 이름이 바뀌면 `zeyn check --fix`는 예를 들어 `Grid`를 `DataGrid`로, `GridQuery`를 `DataQuery`로 이전 이름을 다시 쓴 다음 다시 검사합니다.
 
@@ -87,4 +102,4 @@ docker run -p 3000:3000 -e APP_SERVER__ADDR=0.0.0.0:3000 my-app
 
 ## MCP 서버
 
-`zeyn mcp`는 stdio로 MCP를 사용합니다. 도구는 `zeyn_docs`(주제별 프레임워크 레퍼런스), `zeyn_describe`(현재 디렉터리에 있는 앱의 Feature, Screen, 경로, 문제), `zeyn_check`(`fix: true`를 주면 `check --fix`를 실행), `zeyn_test`, `zeyn_new_feature`입니다. [MCP와 AI 에이전트](mcp.md)를 참고하십시오.
+`zeyn mcp`는 stdio로 MCP를 사용합니다. 도구는 `zeyn_docs`(주제별 프레임워크 레퍼런스), `zeyn_describe`(현재 디렉터리에 있는 앱의 Feature, Screen, 경로, 문제), `zeyn_check`(`fix: true`를 주면 `check --fix`를 실행), `zeyn_test`, `zeyn_new_feature`, `zeyn_new_screen`입니다. [MCP와 AI 에이전트](mcp.md)를 참고하십시오.

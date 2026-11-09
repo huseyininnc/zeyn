@@ -41,11 +41,11 @@ Form::of(Contact { quantity: 2, size: Size::Medium, ..Contact::default() })
 | `Control::Percent` | 퍼센트 기호와 함께 표시되는 `Decimal` 또는 정수 |
 | `Control::Password`, `Control::NewPassword` | 비밀번호로 입력되며 표시와 숨김 버튼이 있는 텍스트 필드 |
 | `Control::PasswordMeter` | 강도 표시기가 있는 새 비밀번호 |
-| `Control::Rating` | 1부터 N까지의 정수를 별로 표시합니다([Rating](#rating) 참조) |
+| `Control::Rating` | 1부터 N까지의 정수를 별로, `Decimal` 필드는 반 별로 표시합니다([Rating](#rating) 참조) |
 
 ## Rating
 
-`Control::Rating`은 정수 필드를 1부터 N까지의 별로 표시하며, N은 필드의 `max` 규칙입니다(규칙이 없으면 5, 최대 10). 레이블이 필드 레이블인 `fieldset` 안의 네이티브 라디오 버튼 그룹이므로 스크립트 없이 W3C APG 라디오 그룹 패턴을 따릅니다. Tab은 그룹에 한 번만 도달하고, 화살표 키로 이동하며 선택하고, 각 별은 사용자의 언어로 "3 / 5"처럼 이름이 붙습니다. 마우스를 올리면 포인터 위치까지 별이 밝아집니다. 서버는 다른 숫자처럼 필드의 규칙으로 값을 검증하므로 필드에 `min`과 `max`를 지정하십시오. `Option<i64>`에 `required`가 있으면 모든 별을 비워 두는 것은 거부됩니다.
+`Control::Rating`은 정수 필드를 1부터 N까지의 별로 표시하며, N은 필드의 `max` 규칙입니다(규칙이 없으면 5, 최대 10). 레이블이 필드 레이블인 `fieldset` 안의 네이티브 라디오 버튼 그룹이므로 스크립트 없이 W3C APG 라디오 그룹 패턴을 따릅니다. Tab은 그룹에 한 번만 도달하고, 화살표 키로 이동하며 선택하고, 각 별은 사용자의 언어로 "3 / 5"처럼 이름이 붙습니다. 마우스를 올리면 포인터 위치까지 별이 밝아집니다. 서버는 다른 숫자처럼 필드의 규칙으로 값을 검증하므로 필드에 `min`과 `max`를 지정하십시오. `Option<i64>`에 `required`가 있으면 모든 별을 비워 두는 것은 거부됩니다. `#[rule(min = 1, max = 5, scale = 1)]`이 있는 `Decimal` 필드는 반 별 단위로 받으며, 서버는 4.3처럼 반 단위 사이의 값을 거부합니다([쇼핑 컴포넌트](commerce.md) 참조).
 
 ```rust
 #[model]
@@ -182,7 +182,7 @@ pub struct Contact {
 
 | | |
 |---|---|
-| 추가된 스크립트 | 마스크, 토글, 표시기를 위해 `components.js`에 gzip 기준 약 2 KB(원본 7 KB). Decimal과 퍼센트 입력은 숫자 컨트롤을 사용합니다 |
+| 추가된 스크립트 | 마스크, 토글, 표시기를 위해 `inputs.js`에 gzip 기준 약 2 KB(원본 7 KB). Decimal과 퍼센트 입력은 숫자 컨트롤을 사용합니다 |
 | DOM 노드 | 마스크 입력은 3개, 토글이 있는 비밀번호는 4개, 표시기가 있으면 11개 |
 | 요청 | 입력하는 동안에는 없음 |
 | 서버 검사 | `scale`, `precision`, `min`, `max`, `mask`는 페이지, API, AI 도구 모두에서 저장할 때마다 실행됩니다 |

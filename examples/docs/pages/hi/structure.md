@@ -3,18 +3,30 @@
 हर Zeyn ऐप का लेआउट एक जैसा है, इसलिए इंसान या एजेंट को हर प्रोजेक्ट में चीज़ें उसी जगह मिलती हैं।
 
 ```
+Cargo.toml               dependencies, lints and [package.metadata.zeyn] (max_file_lines)
+build.rs                 stops cargo build when a file in src/ is longer than max_file_lines
 config/app.json          defaults; APP_* environment variables override them
 locales/<lang>.json      every user facing text; all files have the same keys
 src/main.rs              loads configuration and starts the app
 src/app.rs               the App: services, features, security settings
+src/services/<name>.rs   services shared by several features, registered in src/app.rs
 src/features/<name>/     one folder per feature
-    mod.rs               the Feature: route prefix, guards, screens, APIs, menu
-    models.rs            #[entity] and #[model] types
-    store.rs             services that read and write data
-    actions.rs           #[action] functions
-    screens.rs           #[screen] functions
+    mod.rs               module declarations and the Feature: route prefix, guards, screens, APIs, menu
+    models/              #[entity] and #[model] types, one file each
+    services/            services of the feature that read and write data (stores, clients)
+    actions/             #[action] functions, one file each
+    screens/             #[screen] functions, one file each
+    components/          parts of screens (a toolbar, a panel), added by hand when needed
 tests/                   tests that drive the app through its router
 ```
+
+## जनरेटर
+
+`zeyn g feature <name>` एक चालू सूची Screen के साथ `models/`, `services/`, `actions/` और `screens/` बनाता है और feature व उसकी सर्विस को `src/app.rs` में रजिस्टर करता है। `zeyn g screen <feature> <name>` एक Screen जोड़ता है और उसे रजिस्टर करता है। जब Screen का कोई हिस्सा कई जगह इस्तेमाल हो या कोई Screen फ़ाइल लंबी हो जाए, तब `components/` हाथ से जोड़ें, और जिन फ़ोल्डरों की feature को ज़रूरत नहीं, उन्हें उनकी `mod` पंक्ति के साथ हटा दें। विवरण के लिए [CLI and projects](cli.md) देखें।
+
+## आकार की सीमाएँ
+
+छोटी फ़ाइलें और फ़ंक्शन कोड की समीक्षा आसान बनाते हैं। `Cargo.toml` में `[package.metadata.zeyn]` के नीचे `max_file_lines` (डिफ़ॉल्ट 300 भरी हुई पंक्तियाँ) से आगे जाने पर `build.rs` `cargo build` रोक देता है और सीमा से बड़ी फ़ाइलों की सूची देता है। Clippy का `too_many_lines` (60 पंक्तियाँ, `clippy.toml` में `too-many-lines-threshold`) फ़ंक्शनों के लिए यही करता है। दोनों सीमाएँ इन फ़ाइलों में बढ़ाई जा सकती हैं, पर एजेंट को इसकी जगह कोड बाँटना चाहिए: हर फ़ाइल में एक Screen, कंपोनेंट या action का एक समूह, और Screen के बड़े हिस्से अपने फ़ंक्शनों में।
 
 ## ऐप
 

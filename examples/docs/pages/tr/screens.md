@@ -39,6 +39,8 @@ pub fn product_editor(params: ProductParams, store: ProductStore) -> Result<Scre
 
 Parametreler kullanıldıkları her yerde tiplidir: `Window::open(product_editor, 7)` derlenmez, çünkü editör `ProductParams` alır.
 
+Bir `#[params]` yapısının bütün alanları `Option` olduğunda ekran parametresiz de açılır (bir menü bağlantısından ya da düz bir adresten); bütün alanlar `None` olur. İsteğe bağlı olmayan bir alanın değeri yine gerekir: değer yoksa ekran 404 döner.
+
 `route` olmayan bir screen'in URL'si yoktur. Bir bağlantıdan, araç çubuğu düğmesinden, menüden ya da komuttan pencere olarak açılır.
 
 ## Yolda parametreler
@@ -137,7 +139,24 @@ Screen::new(t!("stock.products"))
     .context_menu(ContextMenu::new().item(t!("stock.new_product"), Window::open(product_editor, ProductParams { id: None })).action(t!("stock.restock_low"), restock_low, ()))
 ```
 
-`Alt+N` gibi kısayollar screen üzerinde çalışır ve palette'te gösterilir. Tarayıcının kullandığı kısayollar (`Ctrl+P`, `Ctrl+S`, `F5`), düğme `.override_browser()` çağırmadıkça bağlanmaz ve tarayıcının hiç iletmediği kısayollar (`Ctrl+N`, `Ctrl+T`, `Ctrl+W`) hiçbir zaman bağlanmaz; serbest kombinasyonlar `Alt+Shift+<harf>` ve `Ctrl+Alt+<harf>` biçimindedir.
+`Alt+N` gibi kısayollar screen üzerinde çalışır, palette'te gösterilir ve etiketinde değil düğmenin araç ipucunda görünür (düğmenin `.tip(text)` ile bir ipucu varsa onunla birlikte). Tarayıcının kullandığı kısayollar (`Ctrl+P`, `Ctrl+S`, `F5`), düğme `.override_browser()` çağırmadıkça bağlanmaz ve tarayıcının hiç iletmediği kısayollar (`Ctrl+N`, `Ctrl+T`, `Ctrl+W`) hiçbir zaman bağlanmaz; serbest kombinasyonlar `Alt+Shift+<harf>` ve `Ctrl+Alt+<harf>` biçimindedir.
+
+Düğmeler, menü grupları ve araçlar için simgeler `Icon` içinden gelir; bu, `Icon::ALL` ile listelenen 82 çizimlik bir settir (`Plus`, `Edit`, `Trash`, `Search`, `Filter`, `Download`, `ChartBar`, `Users`, `Settings`, `Bell`, `SignOut` ve daha fazlası; bileşen kataloğu hepsini gösterir). Bunlar `/_zeyn/icons.css` içinde 20 px'lik bir ızgarada 1,5 px yuvarlak çizgiyle çizilmiş maskelerdir, metnin rengini alır ve ekran okuyuculardan gizlenir; anlamı her zaman etiket taşır.
+
+Düğmeler 36 px'tir (kompakt yoğunlukta 32 px) ve sakin bir dış çizgileri vardır; birincil düğmeler markayı taşır. `.button(..)` sonrasında `.ghost()` yoğun çubuklardaki ikincil eylemler için dış çizgiyi kaldırır, `.danger()` ise silen ya da iptal eden bir eylemi tehlike renginde çizer.
+
+## Başlık
+
+`.subtitle(text)` başlığın altına kısa bir satır koyar, `.primary(|t| ...)` ise ekranın ana işlemlerini başlık satırının sonuna birincil düğmeler olarak yerleştirir. İkisi birlikte çoğu yönetim ekranında olan sayfa başlığını oluşturur.
+
+```rust
+Screen::new(t!("orders.title"))
+    .subtitle(t!("orders.intro"))
+    .primary(|t| t.button(t!("orders.new")).icon(Icon::Plus).shortcut("Alt+N").opens(order_editor, OrderParams { id: None }))
+    .toolbar(|t| t.export(Export::Csv))
+```
+
+`.primary`, `.toolbar` ile aynı düğmeleri, aynı kısayolları ve palet girdileriyle alır; araç çubuğu diğer araçlar için başlığın altında kalır. Bir çubuktaki iki ya da daha fazla `.export(..)` çağrısı, her biçim için bir öğe içeren tek bir "Dışa aktar" menü düğmesinde toplanır. Alt başlık, ekran okuyucular için ekranın açıklamasıdır (`aria-describedby`). Satır dar geldiğinde işlemler başlığın altına kayar, telefonda başa hizalanır. Alt başlık ya da ana işlem yoksa ekran eskisi gibi düz bir başlıkla çizilir.
 
 ## Feature'lar ve menü
 

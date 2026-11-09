@@ -4,8 +4,12 @@
  *
  * Opens one WebSocket to `/_zeyn/live/topics?t=a,b&csrf=...` for every topic in the page. When
  * the server notifies a topic, each element subscribed to it reloads its grids in place
- * (`zeyn:reload`), or the whole screen (`zeyn:refresh`) when it holds no grid. Notifications that
- * arrive within 300 ms are handled once. The socket reconnects with growing pauses (1 s up to
+ * (`zeyn:reload`), or the whole screen (`zeyn:refresh`) when it holds no grid, and the nodes that
+ * `.listens` to the topic refresh through `topics.js` (`zeyn:topics`). Notifications that arrive
+ * within 300 ms are handled once. An element with `data-zeyn-live-self` only subscribes: it
+ * refreshes itself on `zeyn:topics` (the notification bell). Typing signals of other users are
+ * passed on as `zeyn:signal` and refresh nothing; `zeyn.live.send` sends one (`typing.js`). The
+ * socket reconnects with growing pauses (1 s up to
  * 30 s) and closes when no element subscribes any more.
  * @module live
  */
@@ -29,10 +33,11 @@ function wanted() {
 function refresh() {
   flush = 0;
   for (const el of document.querySelectorAll('[data-zeyn-live]')) {
-    if (!el.dataset.zeynLive.split(',').some((t) => pending.has(t))) continue;
+    if (el.hasAttribute('data-zeyn-live-self') || !el.dataset.zeynLive.split(',').some((t) => pending.has(t))) continue;
     if (el.querySelector('[data-zeyn-grid]')) el.dispatchEvent(new CustomEvent('zeyn:reload', { bubbles: true }));
     else document.dispatchEvent(new CustomEvent('zeyn:refresh', { cancelable: true }));
   }
+  document.dispatchEvent(new CustomEvent('zeyn:topics', { detail: { topics: [...pending] } }));
   pending.clear();
 }
 
@@ -58,11 +63,17 @@ function connect() {
     wait = 1000;
   };
   ws.onmessage = (e) => {
+    let msg;
     try {
-      pending.add(JSON.parse(e.data).topic);
+      msg = JSON.parse(e.data);
     } catch {
       return;
     }
+    if (msg?.typing) {
+      document.dispatchEvent(new CustomEvent('zeyn:signal', { detail: msg }));
+      return;
+    }
+    pending.add(msg?.topic);
     flush ||= setTimeout(refresh, 300);
   };
   ws.onclose = () => {
@@ -74,5 +85,11 @@ function connect() {
   };
 }
 
+/** Sends a small signal (a typing note) on the open socket; dropped while it is not open. */
+function send(signal) {
+  if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(signal));
+}
+
+globalThis.zeyn = Object.assign(globalThis.zeyn ?? {}, { live: { send } });
 document.addEventListener('zeyn:content', () => connect());
 connect();

@@ -1,0 +1,13 @@
+/* Barcode and QrCode (`zeyn::ui::Barcode`): linked only by pages that hold `.z-barcode`. The
+   symbol stays black on a white plate in both themes, because scanners need dark bars on a light
+   ground; the plate is part of the SVG. */
+
+.z-barcode { display: inline-grid; justify-items: center; gap: var(--z-s-1); margin: 0; max-inline-size: 100%; }
+.z-barcode-plate { max-inline-size: 100%; line-height: 0; border-radius: var(--z-radius-sm); box-shadow: 0 0 0 1px var(--z-border); overflow: hidden; }
+.z-barcode-plate svg { display: block; max-inline-size: 100%; }
+.z-barcode-qr .z-barcode-plate svg { block-size: auto; }
+.z-barcode-text { font-family: var(--z-font-mono); font-size: var(--z-text-sm); color: var(--z-text); overflow-wrap: anywhere; text-align: center; max-inline-size: 100%; }
+.z-barcode-error { display: block; margin: 0; padding: var(--z-s-2) var(--z-s-3); border-radius: var(--z-radius); background: var(--z-warning-subtle); color: var(--z-text); font-size: var(--z-text-sm); }
+@media (forced-colors: active) {
+  .z-barcode-plate { forced-color-adjust: none; }
+}

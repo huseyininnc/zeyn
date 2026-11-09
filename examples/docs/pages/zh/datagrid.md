@@ -57,20 +57,40 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 | `.width(px)`、`.flex(n)` | 固定宽度，或占用剩余宽度的一定份额 |
 | `.filter()` | 适合该类型的筛选框：文本、数字范围、日期范围、选项列表 |
 | `.sum()`、`.avg()`、`.min()`、`.max()` | 页脚中的合计。在文本列上使用 `sum` 无法通过编译 |
-| `.badge(\|v\| tone)` | 将值显示为彩色徽章 |
+| `.badge(\|v\| tone)` | 将值显示为该色调的标签，背景为该色调的淡色 |
+| `.status(\|v\| tone)` | 将值显示为状态：普通文字前加一个该色调的圆点，比徽章更低调 |
 | `.progress(max)` | 从 0 到 `max` 的进度条 |
 | `.check_icon()` | 对 `true` 显示一个对勾 |
 | `.link(\|row\| effect)` | 使单元格成为运行某个 effect 的链接 |
 | `.pin_start()`、`.hidden()` | 固定在起始侧，或隐藏直到用户将其显示 |
 | `.editable()` | 可就地编辑，通过 `.edit_with(action)` 保存 |
+| `.plain()` | 整数不带分组分隔符，用于编码和年份 |
+| `.wrap()` | 长值折行显示为多行。未设置时，单元格保持单行并以省略号结尾，因此每行高度相同 |
+
+行高 40 px（紧凑密度下为 32 px），行之间只用线条分隔；`DataGrid::zebra()` 为非常宽的表格隔行着色。单元格中的链接看起来像字重 500 的文字，悬停时显示下划线。
+
+数字和金额右对齐，并使用等宽数字。整数按用户的区域设置分组（英语为 `1,234,567`，土耳其语为 `1.234.567`），适用于表格单元格以及 `DescriptionList` 等显示值；`#[key]` 标识从不分组，`.plain()` 可为单个列关闭分组。
 
 ## 行
 
 - `.on_open(|row| effect)`：双击行或在行上按 Enter。
 - `.row_action(label, action, |row| input)`：每行上的一个按钮。
 - `.bulk_action(label, action, M::id)`：对所选行运行。
+- 紧跟在 `.row_action` 或 `.bulk_action` 之后的 `.confirm(message)` 和 `.tone(Tone::Danger)`：在该操作运行前，用与 `ActionButton::confirm` 相同的对话框询问（焦点先在“取消”上），并把按钮画成红色。
 - `.row_menu(|row| ContextMenu)`：行的右键菜单。
 - `.row_style(|row| Option<RowStyle>)`：危险、警告或成功样式的行。
 - `.exportable()`：将筛选后的行导出为 CSV，由服务器以流方式输出。
+
+## 就地刷新
+
+最后调用的 `.listens(topic)` 让网格在主题被点名时就地重新加载（见 [主题](effects.md#topics)）：`ui.refresh(topic)` 之后，它保留排序和筛选重新加载当前页；带 `.drives(topic)` 的筛选控件变化之后，它以新的界面 params 从第一页开始。网格经由带有全部权限检查的 `POST /_zeyn/grid` 重新加载，筛选改变的界面 param 通过界面函数传给网格，例如作为 scope：
+
+```rust
+let mut grid = DataGrid::of(search_orders);
+if let Some(region) = p.region {
+    grid = grid.scope(Order::region, region);
+}
+grid.column(Order::number).column(Order::total).listens("orders")
+```
 
 [DataGrid 参考](grid.md)涵盖了已保存的视图、主从明细、分组、树形数据、就地编辑、单元格导航、复制和粘贴、列虚拟化以及无障碍。

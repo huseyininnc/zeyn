@@ -351,12 +351,111 @@ pub fn total(values: impl Iterator<Item = Value>, op: Aggregate) -> Option<Value
     }
 }
 
+/// Lists of at least this many rows are filtered and sorted with `tokio::task::block_in_place`
+/// when [`DataQuery::apply`] runs on a worker of the multi threaded runtime, so the worker's other
+/// tasks move to another thread instead of waiting for the sort.
+pub(crate) const BLOCKING_ROWS: usize = 50_000;
+
+/// One sort value of a row, read once: the value and, for text, its lower case form when it
+/// differs from the text.
+struct SortKey {
+    value: Value,
+    lower: Option<String>,
+}
+
+impl SortKey {
+    fn new(value: Value) -> Self {
+        let lower = match &value {
+            Value::Text(t)
+                if !t.chars().all(|c| {
+                    let mut l = c.to_lowercase();
+                    l.next() == Some(c) && l.next().is_none()
+                }) =>
+            {
+                Some(t.to_lowercase())
+            }
+            _ => None,
+        };
+        SortKey { value, lower }
+    }
+
+    /// The same order as [`compare`]: text by its lower case form, then as written.
+    fn cmp(&self, other: &SortKey) -> Ordering {
+        match (&self.value, &other.value) {
+            (Value::Text(x), Value::Text(y)) => {
+                let lx = self.lower.as_deref().unwrap_or(x);
+                let ly = other.lower.as_deref().unwrap_or(y);
+                lx.cmp(ly).then_with(|| x.cmp(y))
+            }
+            (x, y) => compare(x, y),
+        }
+    }
+}
+
+/// Positions of rows in sort order, every sort value read once. Rows that compare equal keep
+/// their order in the list, so the result is the one of a stable sort; only the positions
+/// `start..end` are put in order, the rest are just on the right side of them.
+fn sorted_window<M: Model>(
+    rows: &[M],
+    order: &[(usize, bool)],
+    start: usize,
+    end: usize,
+) -> Vec<u32> {
+    let width = order.len();
+    let keys: Vec<SortKey> = rows
+        .iter()
+        .flat_map(|row| {
+            order
+                .iter()
+                .map(|(i, _)| SortKey::new(row.value_at(*i).unwrap_or(Value::Null)))
+        })
+        .collect();
+    let cmp = |a: &u32, b: &u32| {
+        let (ka, kb) = (*a as usize * width, *b as usize * width);
+        for (j, (_, desc)) in order.iter().enumerate() {
+            let o = keys[ka + j].cmp(&keys[kb + j]);
+            let o = if *desc { o.reverse() } else { o };
+            if o != Ordering::Equal {
+                return o;
+            }
+        }
+        a.cmp(b)
+    };
+    let mut index: Vec<u32> = (0..rows.len() as u32).collect();
+    if start > 0 && start < index.len() {
+        index.select_nth_unstable_by(start, cmp);
+    }
+    let window = &mut index[start..];
+    let len = end - start;
+    if len > 0 && len < window.len() {
+        window.select_nth_unstable_by(len - 1, cmp);
+    }
+    window[..len].sort_unstable_by(cmp);
+    index
+}
+
 impl DataQuery {
     /// Filters, sorts and pages an in memory list. Meant for small data, samples and tests;
     /// databases do this in SQL. Unknown field names and unreadable filter values are ignored,
     /// and at most [`MAX_FILTERS`] filters and [`MAX_SORT`] sort keys are used. Sorting always ends with the
     /// key field so pages are stable.
+    ///
+    /// Each sort value is read once per row, and only the rows of the asked page are put in
+    /// order (the others are partitioned around them), so the first page of a million rows costs
+    /// about one pass. Lists of 50,000 rows or more run through `block_in_place` on a
+    /// worker of the multi threaded tokio runtime.
     pub fn apply<M: Model>(&self, rows: Vec<M>) -> Page<M> {
+        #[cfg(feature = "server")]
+        if rows.len() >= BLOCKING_ROWS
+            && tokio::runtime::Handle::try_current()
+                .is_ok_and(|h| h.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread)
+        {
+            return tokio::task::block_in_place(|| self.apply_now(rows));
+        }
+        self.apply_now(rows)
+    }
+
+    fn apply_now<M: Model>(&self, rows: Vec<M>) -> Page<M> {
         let fields = M::fields();
         let index = |name: &str| {
             fields
@@ -368,35 +467,11 @@ impl DataQuery {
             Cond::read(f, fields, self.time_zone, &mut conds);
         }
         conds.extend(Cond::search(&self.q, fields));
-        let mut rows: Vec<M> = rows
+        let rows: Vec<M> = rows
             .into_iter()
             .filter(|row| conds.iter().all(|c| c.holds(row)))
             .collect();
-        let mut order: Vec<(usize, bool)> = self
-            .sort
-            .iter()
-            .take(MAX_SORT)
-            .filter_map(|s| index(&s.field).map(|i| (i, s.desc)))
-            .collect();
-        if let Some(key) = fields.iter().position(|f| f.key) {
-            order.push((key, false));
-        }
-        rows.sort_by(|a, b| {
-            for (i, desc) in &order {
-                let (x, y) = (
-                    a.value_at(*i).unwrap_or(Value::Null),
-                    b.value_at(*i).unwrap_or(Value::Null),
-                );
-                let o = compare(&x, &y);
-                let o = if *desc { o.reverse() } else { o };
-                if o != Ordering::Equal {
-                    return o;
-                }
-            }
-            Ordering::Equal
-        });
-        let mut page = Page::from_slice(&rows, self);
-        page.totals = self
+        let totals = self
             .aggregates
             .iter()
             .filter_map(|a| {
@@ -413,60 +488,101 @@ impl DataQuery {
                 })
             })
             .collect();
-        if let Some(gi) = self.group.as_deref().and_then(index) {
-            let desc = self
-                .sort
-                .iter()
-                .any(|s| s.desc && Some(gi) == index(&s.field));
-            let mut sorted: Vec<&M> = rows.iter().collect();
-            sorted.sort_by(|a, b| {
-                let o = compare(
-                    &a.value_at(gi).unwrap_or(Value::Null),
-                    &b.value_at(gi).unwrap_or(Value::Null),
-                );
-                if desc { o.reverse() } else { o }
-            });
-            let mut buckets: Vec<(Value, Vec<&M>)> = Vec::new();
-            for row in sorted {
-                let v = row.value_at(gi).unwrap_or(Value::Null);
-                match buckets.last_mut() {
-                    Some((g, list)) if *g == v => list.push(row),
-                    _ => buckets.push((v, vec![row])),
+        let mut page = match self.group.as_deref().and_then(index) {
+            Some(gi) => self.groups(&rows, gi, index),
+            None => {
+                let mut order: Vec<(usize, bool)> = self
+                    .sort
+                    .iter()
+                    .take(MAX_SORT)
+                    .filter_map(|s| index(&s.field).map(|i| (i, s.desc)))
+                    .collect();
+                if let Some(key) = fields.iter().position(|f| f.key) {
+                    order.push((key, false));
                 }
+                let span = self.span();
+                let len = rows.len() as u64;
+                let start = span.offset.min(len) as usize;
+                let end = span.end().min(len) as usize;
+                let sorted = sorted_window(&rows, &order, start, end);
+                let items = sorted[start..end]
+                    .iter()
+                    .map(|i| rows[*i as usize].clone())
+                    .collect();
+                Page::window(
+                    items,
+                    len,
+                    crate::action::Span {
+                        offset: start as u64,
+                        ..span
+                    },
+                )
             }
-            let all: Vec<crate::action::Group> = buckets
-                .into_iter()
-                .map(|(value, list)| crate::action::Group {
-                    value,
-                    count: list.len() as u64,
-                    totals: self
-                        .aggregates
-                        .iter()
-                        .filter_map(|a| {
-                            let i = index(&a.field)?;
-                            let value = total(
-                                list.iter()
-                                    .filter_map(|r| r.value_at(i)),
-                                a.op,
-                            )?;
-                            Some(Total {
-                                field: a.field.clone(),
-                                op: a.op,
-                                value,
-                            })
-                        })
-                        .collect(),
-                })
-                .collect();
-            let groups = Page::from_slice(&all, self);
-            page.items.clear();
-            page.total = groups.total;
-            page.next = groups.next;
-            page.groups = groups.items;
-        }
+        };
+        page.totals = totals;
         if !self.with_total && matches!(self.page, PageRequest::After { .. }) {
             page.total = None;
         }
+        page
+    }
+
+    /// The groups of `rows` by the field `gi`, paged like rows, with the totals of each group.
+    fn groups<M: Model>(
+        &self,
+        rows: &[M],
+        gi: usize,
+        index: impl Fn(&str) -> Option<usize>,
+    ) -> Page<M> {
+        let desc = self
+            .sort
+            .iter()
+            .any(|s| s.desc && Some(gi) == index(&s.field));
+        let keys: Vec<SortKey> = rows
+            .iter()
+            .map(|r| SortKey::new(r.value_at(gi).unwrap_or(Value::Null)))
+            .collect();
+        let mut sorted: Vec<usize> = (0..rows.len()).collect();
+        sorted.sort_by(|a, b| {
+            let o = keys[*a].cmp(&keys[*b]);
+            if desc { o.reverse() } else { o }
+        });
+        let mut buckets: Vec<(&Value, Vec<&M>)> = Vec::new();
+        for i in sorted {
+            let v = &keys[i].value;
+            match buckets.last_mut() {
+                Some((g, list)) if *g == v => list.push(&rows[i]),
+                _ => buckets.push((v, vec![&rows[i]])),
+            }
+        }
+        let all: Vec<crate::action::Group> = buckets
+            .into_iter()
+            .map(|(value, list)| crate::action::Group {
+                value: value.clone(),
+                count: list.len() as u64,
+                totals: self
+                    .aggregates
+                    .iter()
+                    .filter_map(|a| {
+                        let i = index(&a.field)?;
+                        let value = total(
+                            list.iter()
+                                .filter_map(|r| r.value_at(i)),
+                            a.op,
+                        )?;
+                        Some(Total {
+                            field: a.field.clone(),
+                            op: a.op,
+                            value,
+                        })
+                    })
+                    .collect(),
+            })
+            .collect();
+        let groups = Page::from_slice(&all, self);
+        let mut page = Page::new(Vec::new());
+        page.total = groups.total;
+        page.next = groups.next;
+        page.groups = groups.items;
         page
     }
 }

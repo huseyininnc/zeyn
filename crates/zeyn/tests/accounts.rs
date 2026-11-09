@@ -117,6 +117,24 @@ async fn the_sign_in_screen_signs_in_without_a_page_load_and_only_goes_to_local_
         page.body
             .contains("/_zeyn/account/accounts.js")
     );
+    assert!(
+        page.body
+            .contains(r#"<div class="z-app z-auth" data-zeyn-shell="auth">"#)
+            && page.body.contains("/_zeyn/auth.css")
+            && !page
+                .body
+                .contains(r#"<nav class="z-nav""#)
+            && !page.body.contains("data-zeyn-commands"),
+        "the sign in screens open in the sign in shell, without menu or palette"
+    );
+    assert!(
+        page.body
+            .contains(r#"autocomplete="username" autocapitalize="none" spellcheck="false""#),
+        "the user name is filled by password managers"
+    );
+    assert!(page.body.contains(
+        r#"<p class="z-caps" data-zeyn-caps aria-live="polite" hidden>Caps Lock is on</p>"#
+    ));
     let ok = send(
         &router,
         form(

@@ -13,7 +13,7 @@ const BASE = (document.querySelector('meta[name="zeyn-base"]')?.content ?? '').r
 const TOAST_MS = 4000;
 /** Most toasts shown at once (`MAX_TOASTS` on the server); the oldest goes first. */
 const MAX_TOASTS = 3;
-const FILTER_DELAY_MS = 300;
+const FILTER_DELAY_MS = 150;
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 const UNREACHABLE = 'The server could not be reached.';
@@ -54,7 +54,7 @@ function initGrids(root) {
   if (!G && !root.querySelector?.('[data-zeyn-grid]')) return Promise.resolve();
   gridLoad ??= import(`${BASE}/_zeyn/grid.js${VERSION}`)
     .then((m) => {
-      m.install({ BASE, FILTER_DELAY_MS, MAX_COLUMN, MIN_COLUMN, UNREACHABLE, VIEW_SAVE_DELAY_MS, V_CACHE, V_CACHE_CELLS, V_CAP, V_FETCH_DELAY_MS, V_OVERSCAN, address, fill, fmt, grids, make, num, openMenu, paramsQuery, parseEffect, place, post, readJson, relativeTimes, runEffect, runEffects, str, toast });
+      m.install({ BASE, FILTER_DELAY_MS, MAX_COLUMN, MIN_COLUMN, UNREACHABLE, VIEW_SAVE_DELAY_MS, V_CACHE, V_CACHE_CELLS, V_CAP, V_FETCH_DELAY_MS, V_OVERSCAN, address, ask, fill, fmt, grids, loadModule, loadModules, make, num, openMenu, paramsQuery, parseEffect, place, post, readJson, relativeTimes, runEffect, runEffects, str, toast });
       return (G = m);
     })
     .catch((e) => {
@@ -63,6 +63,112 @@ function initGrids(root) {
     });
   return gridLoad.then((m) => m.initGrids(root));
 }
+
+/**
+ * Browser modules of components, `[name, script selector, style selector]`, filled in by the
+ * server from `MODULES` in `server/modules.rs`. A page links the modules of the components its
+ * HTML holds; content that arrives later (nav.js, windows, lazy panels, grid pages) loads the
+ * missing ones through `loadModules`. Each module sets up the document when it loads and listens
+ * to `zeyn:content` after that.
+ */
+const MODULES = [];
+
+/**
+ * The chat panel of the assistant placed in a screen; the launcher's own dock loads the module
+ * on its first press instead (below).
+ */
+const ASSISTANT = ['assistant', 'section[data-zeyn-assistant]:not([data-zeyn-assistant="dock"])', ''];
+
+/** @type {Map<string, Promise<void>>} Modules asked for, by `name.js` or `name.css`. */
+const moduleLoads = new Map();
+
+/** Whether the page head already links the file `name` (`components.js`, `charts.css`). */
+function linked(file) {
+  const path = `${BASE}/_zeyn/${file}`;
+  return [...document.head.querySelectorAll('script[type="module"][src], link[rel="stylesheet"][href]')].some(
+    (el) => new URL(el.src || el.href, location.href).pathname === path,
+  );
+}
+
+/**
+ * Loads the script or the stylesheet `name.js` / `name.css` of a module once. A stylesheet
+ * resolves when it has loaded, so content can be shown styled; a script resolves when it has run.
+ * @returns {Promise<void>}
+ */
+function loadFile(file) {
+  let load = moduleLoads.get(file);
+  if (load) return load;
+  if (linked(file)) load = Promise.resolve();
+  else if (file.endsWith('.css')) {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = `${BASE}/_zeyn/${file}${VERSION}`;
+    load = new Promise((done) => {
+      link.onload = link.onerror = () => done();
+    });
+    document.head.append(link);
+  } else {
+    load = import(`${BASE}/_zeyn/${file}${VERSION}`).then(
+      () => {},
+      () => moduleLoads.delete(file),
+    );
+  }
+  moduleLoads.set(file, load);
+  return load;
+}
+
+/** Loads the script and the stylesheet of the module `name`, when it has them. */
+function loadModule(name) {
+  const m = MODULES.find((x) => x[0] === name);
+  return Promise.all([m?.[1] && loadFile(`${name}.js`), m?.[2] && loadFile(`${name}.css`)]);
+}
+
+/**
+ * Loads the modules of the components inside `root` that the page does not have yet. Resolves
+ * once their stylesheets have loaded; scripts load on, and set up what they find when they run.
+ * @param {ParentNode} root
+ * @returns {Promise<void>}
+ */
+function loadModules(root) {
+  const waits = [];
+  for (const [name, script, style] of [...MODULES, ASSISTANT]) {
+    if (script && !moduleLoads.has(`${name}.js`) && root.querySelector?.(script)) loadFile(`${name}.js`);
+    if (style && !moduleLoads.has(`${name}.css`) && root.querySelector?.(style)) waits.push(loadFile(`${name}.css`));
+  }
+  return Promise.all(waits);
+}
+
+/**
+ * `nav.js` asks for the modules of a screen before it swaps it in: `zeyn:need` with
+ * `detail = { root, waits }`; the promise pushed to `waits` resolves when the screen can show.
+ */
+document.addEventListener('zeyn:need', (e) => {
+  if (e.detail?.root) e.detail.waits?.push(loadModules(e.detail.root));
+});
+
+/**
+ * The assistant's launcher is on every page; its module loads on the first press, which it then
+ * handles itself.
+ */
+document.addEventListener('click', (e) => {
+  const button = e.target instanceof Element ? e.target.closest('[data-zeyn-assistant-launch]') : null;
+  if (!button || moduleLoads.has('assistant.js')) return;
+  loadFile('assistant.js').then(() => button.click());
+});
+
+/**
+ * Card previews load their module on the first hover with a fine pointer or the first keyboard
+ * focus of a card that has one, and hand it that card. Touch screens never load it.
+ */
+function wakePreview(e) {
+  const card = e.target instanceof Element ? e.target.closest('[data-zeyn-preview]') : null;
+  if (!card || moduleLoads.has('preview.js') || !matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+  if (e.type === 'pointerover' && e.pointerType === 'touch') return;
+  moduleLoads.set('preview.js', import(`${BASE}/_zeyn/preview.js${VERSION}`).then((m) => m.wake?.(card, e.type)));
+}
+
+document.addEventListener('pointerover', wakePreview);
+document.addEventListener('focusin', wakePreview);
 
 /** @type {Promise<string> | null} The `GET /_zeyn/csrf` request in flight, shared by all callers. */
 let csrfPending = null;
@@ -303,6 +409,7 @@ async function runEffect(effect, source) {
     case 'close_and_refresh':
       return closeAndRefresh();
     default:
+      if (effect.effect === 'confirm') await loadModule('components');
       document.dispatchEvent(new CustomEvent('zeyn:effect', { detail: { effect, source, run: (next) => runEffect(next, source) } }));
   }
 }
@@ -320,11 +427,33 @@ async function runEffects(effects, source) {
   for (const effect of effects ?? []) await runEffect(effect, source);
 }
 
+/** Requests that keep the page pending (`html[data-zeyn-loading]`): windows and form submits. */
+let pendingCount = 0;
+
+/**
+ * Runs `work` with the page marked pending, the same mark `nav.js` sets while a screen loads:
+ * `zeyn.css` shows a progress bar after 150 ms, so quick answers never flash.
+ */
+async function whilePending(work) {
+  pendingCount++;
+  document.documentElement.setAttribute('data-zeyn-loading', '');
+  try {
+    return await work();
+  } finally {
+    if (--pendingCount === 0) document.documentElement.removeAttribute('data-zeyn-loading');
+  }
+}
+
+/** Opens a window, with the page pending until it shows. */
+function openWindow(screen, params, opener) {
+  return whilePending(() => loadWindow(screen, params, opener));
+}
+
 /**
  * Loads a screen fragment into a modal `<dialog>` on top of the stack.
  * The native dialog carries the dialog role, so the role is removed from the inner window.
  */
-async function openWindow(screen, params, opener) {
+async function loadWindow(screen, params, opener) {
   let res;
   try {
     res = await fetch(`${BASE}/_zeyn/screen/${encodeURIComponent(screen)}${paramsQuery(params)}`, {
@@ -357,6 +486,7 @@ async function openWindow(screen, params, opener) {
   close.setAttribute('aria-label', 'Close');
   close.textContent = '×';
   dialog.append(close);
+  await loadModules(dialog);
   document.body.append(dialog);
   dialogs.push({ dialog, opener: opener ?? document.activeElement });
   dialog.addEventListener('close', () => finishDialog(dialog));

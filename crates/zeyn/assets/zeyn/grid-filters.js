@@ -94,6 +94,7 @@ function filterControls(cell, th, t) {
     if (type === 'text') wrap.querySelectorAll('input').forEach((i) => (i.dataset.zeynFilterDate = kind === 'time' ? 'time' : 'date'));
     cell.append(wrap);
   }
+  loadModules(cell);
 }
 
 /** Reads the controls of a filter cell into a filter object without `field`; `null` when empty. */
@@ -142,13 +143,17 @@ function filterList(s) {
     .map(([field, f]) => ({ field, ...f }));
 }
 
-/** Debounces a filter control and reloads the grid from the start. */
+/**
+ * Debounces a filter control and reloads the grid from the start. The grid shows busy (rows
+ * fade) in the frame of the key press, not only when the request leaves.
+ */
 function onFilter(control) {
   const cell = control.closest('.z-filter-cell');
   const grid = cell?.closest('[data-zeyn-grid]');
   const s = grid && grids.get(grid);
   if (!s) return;
   if (cell.dataset.kind === 'choice') choiceLabel(cell, s.texts);
+  grid.setAttribute('aria-busy', 'true');
   clearTimeout(s.timer);
   s.timer = setTimeout(() => {
     s.filters[cell.dataset.field] = readFilter(cell);

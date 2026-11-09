@@ -69,9 +69,9 @@ Para dar al tema oscuro sus propios valores en un archivo de sobrescrituras escr
 
 ### Densidad
 
-`--z-density` escala la unidad de espaciado. `1` es normal, `0.75` es compacto. `<html data-density="compact">` establece `0.75` sin hoja de estilos. Los controles y las filas del grid nunca son más pequeños que 24 px, así que el modo compacto sigue cumpliendo el tamaño de destino de WCAG 2.2.
+Dos densidades, que se cambian con tokens. Cómoda es la predeterminada: filas de grid de 40 px, encabezados de 36 px, controles de 36 px, relleno de tarjeta de 20 px. Compacta (`<html data-density="compact">`) tiene filas, encabezados y controles de 32 px, y escala la unidad de espaciado a 0.8. Los usuarios la eligen en el menú de cuenta de la barra superior (`App::header(|h| h.account())`); la elección es la cookie `zeyn_density`, que el servidor renderiza en `<html>`, así que el primer pintado ya es correcto. Los controles y las filas del grid nunca son más pequeños que 24 px, así que la densidad compacta sigue cumpliendo el tamaño de destino de WCAG 2.2. `Theme::new().compact()` hace del espaciado compacto el predeterminado de la organización.
 
-La altura de fila de un grid virtual la fija el servidor (`Paging::virtual_rows(px)`, 32 px de forma predeterminada) porque el runtime calcula a partir de ella las posiciones de desplazamiento. La densidad no la cambia.
+La altura de fila de un grid virtual la fija el servidor porque el runtime calcula a partir de ella las posiciones de desplazamiento. `Paging::virtual_scroll()` sigue la densidad (40 px en cómoda, 32 px en compacta); `Paging::virtual_rows(px)` mantiene la altura que recibe. Un cambio de densidad se aplica a los grids virtuales a partir de la página siguiente.
 
 ## 2. Tokens base
 
@@ -79,27 +79,28 @@ Estos son los tokens que se espera que establezca una organización.
 
 | Token | Propósito | Claro | Oscuro |
 |---|---|---|---|
-| `--z-brand` | El único color de marca. Botones primarios, la banda del nombre de la app, el elemento de menú actual, la fila con foco, el anillo de foco | `#0f6674` | mismo valor; consulta `--z-accent` |
+| `--z-brand` | El único color de marca. Marca del logotipo, botones primarios, elemento de menú actual, anillo de foco | `#0f6674` | mismo valor; consulta `--z-accent` |
 | `--z-on-brand` | Texto sobre una superficie `--z-brand` sólida | `#ffffff` | `#ffffff` |
 | `--z-font` | Pila de fuentes de la interfaz | `"Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, "Noto Sans", sans-serif` | igual |
 | `--z-font-mono` | Código, ejemplos de API | `ui-monospace, "Cascadia Mono", "SF Mono", "Segoe UI Mono", Menlo, Consolas, monospace` | igual |
 | `--z-font-size` | Texto del cuerpo | `0.875rem` (14 px) | igual |
 | `--z-font-size-sm` | Celdas del grid, etiquetas, filtros | `0.8125rem` (13 px) | igual |
 | `--z-font-size-xs` | Encabezados de columna, títulos de grupo de menú, información de página | `0.75rem` (12 px) | igual |
-| `--z-radius` | Radio de esquina base, de 0 a 12 px. Todos los componentes escalan a partir de él | `4px` | igual |
+| `--z-radius` | Radio de esquina base, de 0 a 12 px. Botones, entradas, elementos de menú; todos los demás radios derivan de él | `6px` | igual |
 | `--z-density` | Multiplicador de espaciado, `1` normal, `0.75` compacto | `1` | igual |
-| `--z-bg` | Fondo de página detrás de los paneles | `#f4f5f6` | `#121416` |
-| `--z-surface` | Paneles, grids, ventanas, entradas | `#ffffff` | `#1a1d20` |
-| `--z-surface-2` | Encabezado del grid, filas alternas, pie de ventana, entradas de solo lectura | `#f7f8f9` | `#202326` |
-| `--z-hover` | Fondo al pasar el cursor para filas, elementos de menú, botones | `#eceef1` | `#2a2e33` |
-| `--z-border` | Divisores y contornos de panel | `#dcdfe3` | `#33383e` |
-| `--z-border-strong` | Contornos de entradas y botones, línea del encabezado. Debe alcanzar 3:1 frente a `--z-surface` | `#7d848d` | `#7a818a` |
-| `--z-text` | Texto del cuerpo y valores | `#1a1d21` | `#e4e6e9` |
-| `--z-text-muted` | Etiquetas, encabezados, texto secundario. Debe alcanzar 4.5:1 frente a `--z-surface-2` | `#5b626b` | `#a2a9b1` |
-| `--z-danger` | Errores, marcas de obligatorio, filas de peligro | `#b3261e` | `#f28b82` |
+| `--z-bg` | Fondo de página detrás de los paneles | `#f5f6f8` | `#0d0f12` |
+| `--z-surface` | Paneles, grids, tarjetas, entradas | `#ffffff` | `#15181d` |
+| `--z-surface-2` | Encabezado y pie del grid, pie de ventana, entradas de solo lectura | `#f8f9fa` | `#1a1e24` |
+| `--z-raised` | Popovers, menús, diálogos, toasts, la paleta de comandos. En oscuro, las capas elevadas son más claras en lugar de depender de sombras | `#ffffff` | `#1f242b` |
+| `--z-hover` | Fondo al pasar el cursor para filas, elementos de menú, botones | `#eff1f4` | `#232830` |
+| `--z-border` | Divisores y contornos de panel | `#e2e5e9` | `#2b3139` |
+| `--z-border-strong` | Contornos de entradas, bordes de casillas, líneas base de gráficos. Debe alcanzar 3:1 frente a `--z-surface` | `#858d97` | `#6f7884` |
+| `--z-text` | Texto del cuerpo y valores | `#15181d` | `#e7eaee` |
+| `--z-text-muted` | Etiquetas, encabezados, texto secundario. Debe alcanzar 4.5:1 frente a `--z-surface-2` | `#5a626c` | `#9ba4af` |
+| `--z-danger` | Errores, marcas de obligatorio, filas de peligro | `#b42318` | `#f28b82` |
 | `--z-warning` | Filas de advertencia | `#8a5300` | `#e6b45a` |
-| `--z-success` | Filas de éxito | `#1e6b3a` | `#6fcf8f` |
-| `--z-info` | Toasts informativos | `#2b5d8a` | `#8ab8e6` |
+| `--z-success` | Filas de éxito | `#1a6b3c` | `#6fcf8f` |
+| `--z-info` | Toasts informativos | `#275d93` | `#8ab8e6` |
 
 ## 3. Tokens derivados
 
@@ -109,71 +110,85 @@ Se calculan a partir de los tokens base con `color-mix()` y la sintaxis de color
 |---|---|---|---|
 | `--z-accent` | Color de marca usado como texto o línea fina sobre una superficie: enlaces, elemento de menú actual, barra de la fila con foco | `var(--z-brand)` | `oklch(from var(--z-brand) 0.8 c h)`, el matiz de la marca con un tono claro fijo. Los navegadores sin sintaxis de color relativo reciben `color-mix(in oklab, var(--z-brand) 45%, #fff)` |
 | `--z-primary` | Relleno del botón primario | `var(--z-brand)` | `var(--z-accent)` |
-| `--z-on-primary` | Texto del botón primario | `var(--z-on-brand)` | `#121416` |
+| `--z-on-primary` | Texto del botón primario | `var(--z-on-brand)` | `#0d0f12` |
 | `--z-primary-hover` | Botón primario al pasar el cursor | marca al 86% mezclada con negro | acento al 84% mezclado con blanco |
 | `--z-primary-active` | Botón primario pulsado | marca al 74% mezclada con negro | acento al 70% mezclado con blanco |
 | `--z-brand-subtle` | Tinte detrás del elemento de menú actual y de la fila del grid con foco | acento a `--z-tint` sobre `--z-surface` | misma fórmula |
 | `--z-focus` | Anillo de foco | `var(--z-accent)` | `var(--z-accent)` |
 | `--z-danger-subtle`, `--z-warning-subtle`, `--z-success-subtle`, `--z-info-subtle` | Fondos de filas y mensajes | color de estado a `--z-tint` sobre `--z-surface` | misma fórmula |
-| `--z-tint` | Intensidad de los tintes sutiles | `9%` | `20%` |
+| `--z-tint` | Intensidad de los tintes sutiles | `9%` | `16%` |
+| `--z-text-2xs` a `--z-text-num-lg` con `--z-leading-*` | Escala tipográfica, tamaño sobre altura de línea: `2xs` 11/16 (teclas, marcas de eje de gráficos en teléfonos), `xs` 12/16 (encabezados de grid, leyendas, insignias), `sm` 13/20 (celdas, navegación, etiquetas, botones), `md` 14/20 (cuerpo, entradas), `lg` 16/24 (títulos de sección de tarjetas, gráficos y diálogos), `xl` 20/28 (títulos de ventana, títulos de página en teléfonos), `2xl` 24/32 (título de página), `num` 30/36 (valores KPI), `num-lg` 40/44 (métrica destacada). Los pesos son 400 para el texto, 500 para etiquetas, botones y elementos actuales, y 600 solo para títulos y números | | igual |
 | `--z-space` | Unidad de espaciado | `calc(4px * var(--z-density))` | igual |
-| `--z-control` | Altura de botones y entradas | `max(24px, 8 * --z-space)` (32 px) | igual |
-| `--z-row` | Altura de fila del grid para grids paginados e infinitos | `max(24px, 8 * --z-space)` (32 px) | igual |
-| `--z-gap` | Espacio entre secciones de una pantalla | `3 * --z-space` (12 px) | igual |
-| `--z-radius-sm`, `--z-radius-lg` | Partes pequeñas (filtros, código), ventanas | `0.75x` y `1.5x` de `--z-radius` | igual |
-| `--z-shadow-2` | Solo ventanas y toasts. Las filas del grid nunca llevan sombra | sombra suave de dos capas | más oscura |
+| `--z-control` | Altura de botones y entradas | `max(24px, 9 * --z-space)` (36 px; 32 px en compacta) | igual |
+| `--z-row`, `--z-row-head` | Altura de fila y de encabezado del grid para grids paginados e infinitos | 40 px y 36 px (32 px en compacta) | igual |
+| `--z-gap` | Espacio entre tarjetas y secciones de una pantalla | `4 * --z-space` (16 px) | igual |
+| `--z-s-0_5`, `--z-s-1`, `--z-s-1_5`, `--z-s-2`, `--z-s-3`, `--z-s-4`, `--z-s-5`, `--z-s-6`, `--z-s-8`, `--z-s-10`, `--z-s-12`, `--z-s-16` | Escala de espaciado: el número multiplicado por `--z-space` (2, 4, 6, 8, 12, 16, 20, 24, 32, 40, 48 y 64 px con densidad 1) | | igual |
+| `--z-radius-sm` | Insignias, chips, casillas, teclas de teclado | `max(2px, --z-radius - 2px)` (4 px) | igual |
+| `--z-radius-lg` | Tarjetas, grids, popovers, toasts | `--z-radius + 2px` (8 px) | igual |
+| `--z-radius-xl` | Diálogos, la tarjeta de inicio de sesión, la paleta de comandos | `--z-radius + 6px` (12 px) | igual |
+| `--z-radius-full` | Avatares, interruptores, puntos de estado, píldoras de recuento | `999px` | igual |
+| `--z-shadow-1` | Botones predeterminados, el indicador de un control segmentado | `0 1px 2px` al 6% | ninguna |
+| `--z-shadow-2` | Popovers, menús, tooltips, toasts. Las filas del grid y las tarjetas nunca llevan sombra | dos capas suaves | un anillo `--z-border` de 1 px y una sombra profunda |
+| `--z-shadow-3` | Diálogos y la paleta de comandos | dos capas más profundas | un anillo de 1 px y una sombra más profunda |
+| `--z-dur-1`, `--z-dur-2`, `--z-dur-3`, `--z-dur-out` | Movimiento: colores al pasar el cursor (80 ms), entrada de popovers y toasts (140 ms), entrada de diálogos, cajones y la paleta (200 ms), toda salida (100 ms). Con `prefers-reduced-motion: reduce` pasan a 0, y los fundidos duran 80 ms como mucho | | igual |
+| `--z-ease-out`, `--z-ease-in`, `--z-ease-linear` | Curva de las entradas y movimientos, de las salidas y de los cambios de color | `cubic-bezier(0.2, 0, 0, 1)`, `cubic-bezier(0.4, 0, 1, 1)`, `linear` | igual |
 | `--z-backdrop` | Detrás de una ventana modal | `rgb(20 24 28 / 40%)` | `rgb(0 0 0 / 60%)` |
 | `--z-dir` | Sentido de lectura como signo, para desplazamientos sin forma lógica (sombras interiores que marcan el lado de inicio o de fin, transformaciones de desplazamiento): `calc(2px * var(--z-dir))` | `1`, y `-1` con `dir="rtl"` | igual |
 
 Tokens por elemento establecidos por el marcado del servidor: `--z-width` (ancho de ventana), `--z-flex` (proporción de columna), `--z-row-height` (altura de fila del grid virtual) y, para la biblioteca de componentes, `--z-stack-gap`, `--z-split`, `--z-progress`, `--z-columns`, `--z-level` y `--z-pop-x` / `--z-pop-y` (posición de popup).
 
-Los colores de serie de los gráficos son `--z-chart-1` a `--z-chart-6` en `components.css`, con valores más claros en el tema oscuro. Cada uno alcanza 3:1 frente a `--z-surface`. Sobrescríbelos como cualquier token base.
+Los colores de serie de los gráficos son `--z-chart-1` a `--z-chart-8` en `components.css`: azul `#2563d9`, naranja `#d67400`, magenta `#a3369b`, verde `#14866d`, oliva `#7a6a00`, violeta `#6e56cf`, rojo `#cc3b33` y pizarra `#56636f`, con valores más claros en el tema oscuro (`#5b9bff`, `#f08a3c`, `#e27bd6`, `#38c29f`, `#ece27a`, `#9d8cff`, `#ff7b70`, `#9aa7b5`). El orden mantiene distinguibles los cinco primeros con deuteranopía, protanopía y tritanopía, y la serie 1 no es la marca, así que una marca roja o verde nunca se lee como algo bueno o malo; aun así una app puede establecer `--z-chart-1: var(--z-brand)`. La comprobación de arranque exige a cada uno 3:1 frente a `--z-surface`. Sobrescríbelos como cualquier token base.
 
 ## 4. Elegir un color de marca
 
-- `--z-brand` lleva texto blanco en el tema claro (botones, banda del nombre de la app). Elige un color con al menos 4.5:1 frente a `--z-on-brand`. La mayoría de los colores de marca de tono medio a oscuro lo cumplen. Para un color de marca claro, como el amarillo, establece también `--z-on-brand` con un color oscuro.
-- En el tema oscuro el kit aclara la marca para el texto, los anillos y los botones primarios, y mantiene la marca sólida para la banda del nombre de la app. Una marca distinta se ve intencionada en ambos temas sin un segundo color.
+- `--z-brand` lleva texto blanco en el tema claro (botones primarios, la letra del logotipo, el panel de marca del shell de inicio de sesión). Elige un color con al menos 4.5:1 frente a `--z-on-brand`. La mayoría de los colores de marca de tono medio a oscuro lo cumplen. Para un color de marca claro, como el amarillo, establece también `--z-on-brand` con un color oscuro.
+- En el tema oscuro el kit aclara la marca para el texto, los anillos y los botones primarios, y mantiene la marca sólida para la letra del logotipo. Una marca distinta se ve intencionada en ambos temas sin un segundo color.
 - Mantén los colores de estado distintos de la marca. Una marca roja junto a filas de error rojas dificulta detectar los errores; en ese caso desplaza `--z-danger` hacia un rojo diferente o mantén la marca fuera de los grids sobrescribiendo `--z-brand-subtle`.
 - Comprueba tus colores usando como objetivo la tabla de la sección 5. Cualquier par por debajo del umbral incumple WCAG 2.2 AA.
 
 ## 5. Contraste verificado
 
-Medido en Chromium sobre la app de ejemplo en ejecución: cada token se resolvió a su valor sRGB renderizado (incluidos `color-mix()` y los colores relativos), y después se calculó la razón de contraste de WCAG 2.x. Umbrales: 4.5:1 para texto, 3:1 para los contornos de componentes de interfaz y los indicadores de foco.
+Cada par de abajo se comprueba al arrancar la app (`App::check`), para los temas integrados y para cada tema de la app, y también en la prueba unitaria `built_in_themes_reach_wcag_aa_on_every_pair` de `src/server/theme.rs` (ejecútala con `--nocapture` para imprimir esta tabla). Los tokens derivados (`--z-accent`, los colores primarios y los tintes sutiles) se calculan igual que en `zeyn.css`, en Oklab. Umbrales: 4.5:1 para texto, 3:1 para los contornos de componentes de interfaz y los indicadores de foco.
 
 | Par | Claro | Oscuro | Necesario |
 |---|---|---|---|
-| `--z-text` sobre `--z-bg` | 15.49 | 14.77 | 4.5 |
-| `--z-text` sobre `--z-surface` | 16.91 | 13.54 | 4.5 |
-| `--z-text` sobre `--z-surface-2` | 15.91 | 12.63 | 4.5 |
-| `--z-text` sobre `--z-hover` | 14.55 | 10.93 | 4.5 |
-| `--z-text` sobre `--z-brand-subtle` (fila con foco) | 14.79 | 9.27 | 4.5 |
-| `--z-text` sobre `--z-danger-subtle` | 14.73 | 9.76 | 4.5 |
-| `--z-text` sobre `--z-warning-subtle` | 14.82 | 9.31 | 4.5 |
-| `--z-text` sobre `--z-success-subtle` | 14.76 | 9.33 | 4.5 |
-| `--z-text-muted` sobre `--z-bg` | 5.65 | 7.78 | 4.5 |
-| `--z-text-muted` sobre `--z-surface` | 6.17 | 7.13 | 4.5 |
-| `--z-text-muted` sobre `--z-surface-2` (encabezados) | 5.80 | 6.65 | 4.5 |
-| `--z-text-muted` sobre `--z-hover` | 5.31 | 5.76 | 4.5 |
-| `--z-text-muted` sobre `--z-danger-subtle` (fila atenuada) | 5.37 | 5.14 | 4.5 |
-| `--z-text-muted` sobre `--z-warning-subtle` | 5.41 | 4.90 | 4.5 |
-| `--z-accent` sobre `--z-surface` (enlaces) | 6.62 | 9.33 | 4.5 |
-| `--z-accent` sobre `--z-bg` | 6.06 | 10.18 | 4.5 |
-| `--z-accent` sobre `--z-brand-subtle` (elemento de menú actual) | 5.79 | 6.39 | 4.5 |
-| `--z-on-primary` sobre `--z-primary` | 6.62 | 10.18 | 4.5 |
-| `--z-on-primary` sobre `--z-primary-hover` | 8.82 | 11.26 | 4.5 |
-| `--z-on-primary` sobre `--z-primary-active` | 11.12 | 12.26 | 4.5 |
-| `--z-on-brand` sobre `--z-brand` (banda del nombre de la app) | 6.62 | 6.62 | 4.5 |
-| `--z-danger` sobre `--z-surface` (errores de campo) | 6.54 | 7.09 | 4.5 |
-| `--z-danger` sobre `--z-danger-subtle` | 5.69 | 5.11 | 4.5 |
-| `--z-warning` sobre `--z-surface` | 6.33 | 8.90 | 4.5 |
-| `--z-warning` sobre `--z-warning-subtle` | 5.55 | 6.12 | 4.5 |
-| `--z-success` sobre `--z-surface` | 6.52 | 8.87 | 4.5 |
-| `--z-info` sobre `--z-surface` | 6.92 | 8.13 | 4.5 |
-| `--z-focus` sobre `--z-surface` | 6.62 | 9.33 | 3 |
-| `--z-focus` sobre `--z-bg` | 6.06 | 10.18 | 3 |
-| `--z-focus` sobre `--z-brand-subtle` | 5.79 | 6.39 | 3 |
-| `--z-border-strong` sobre `--z-surface` (contorno de entrada) | 3.78 | 4.30 | 3 |
-| `--z-border-strong` sobre `--z-surface-2` | 3.55 | 4.01 | 3 |
+| `--z-text` sobre `--z-bg` | 16.45 | 15.90 | 4.5 |
+| `--z-text` sobre `--z-surface` | 17.79 | 14.74 | 4.5 |
+| `--z-text` sobre `--z-surface-2` | 16.88 | 13.86 | 4.5 |
+| `--z-text` sobre `--z-raised` | 17.79 | 12.93 | 4.5 |
+| `--z-text` sobre `--z-hover` | 15.72 | 12.27 | 4.5 |
+| `--z-text` sobre `--z-brand-subtle` | 15.56 | 11.18 | 4.5 |
+| `--z-text` sobre `--z-danger-subtle` | 15.49 | 11.60 | 4.5 |
+| `--z-text` sobre `--z-warning-subtle` | 15.59 | 11.20 | 4.5 |
+| `--z-text` sobre `--z-success-subtle` | 15.53 | 11.23 | 4.5 |
+| `--z-text` sobre `--z-info-subtle` | 15.52 | 11.40 | 4.5 |
+| `--z-text-muted` sobre `--z-bg` | 5.71 | 7.61 | 4.5 |
+| `--z-text-muted` sobre `--z-surface` | 6.18 | 7.05 | 4.5 |
+| `--z-text-muted` sobre `--z-surface-2` | 5.86 | 6.63 | 4.5 |
+| `--z-text-muted` sobre `--z-raised` | 6.18 | 6.19 | 4.5 |
+| `--z-text-muted` sobre `--z-hover` | 5.46 | 5.87 | 4.5 |
+| `--z-text-muted` sobre `--z-brand-subtle` | 5.40 | 5.35 | 4.5 |
+| `--z-border-strong` sobre `--z-surface` | 3.36 | 3.98 | 3 |
+| `--z-border-strong` sobre `--z-surface-2` | 3.19 | 3.74 | 3 |
+| `--z-border-strong` sobre `--z-raised` | 3.36 | 3.49 | 3 |
+| `--z-accent` sobre `--z-surface` | 6.62 | 9.81 | 4.5 |
+| `--z-accent` sobre `--z-bg` | 6.12 | 10.58 | 4.5 |
+| `--z-accent` sobre `--z-brand-subtle` | 5.79 | 7.44 | 4.5 |
+| `--z-focus` sobre `--z-surface` | 6.62 | 9.81 | 3 |
+| `--z-focus` sobre `--z-bg` | 6.12 | 10.58 | 3 |
+| `--z-on-primary` sobre `--z-primary` | 6.62 | 10.58 | 4.5 |
+| `--z-on-primary` sobre `--z-primary-hover` | 8.82 | 11.70 | 4.5 |
+| `--z-on-primary` sobre `--z-primary-active` | 11.12 | 12.74 | 4.5 |
+| `--z-danger` sobre `--z-surface` | 6.57 | 7.45 | 4.5 |
+| `--z-danger` sobre `--z-danger-subtle` | 5.73 | 5.86 | 4.5 |
+| `--z-warning` sobre `--z-surface` | 6.33 | 9.35 | 4.5 |
+| `--z-warning` sobre `--z-warning-subtle` | 5.55 | 7.11 | 4.5 |
+| `--z-success` sobre `--z-surface` | 6.54 | 9.32 | 4.5 |
+| `--z-success` sobre `--z-success-subtle` | 5.70 | 7.09 | 4.5 |
+| `--z-info` sobre `--z-surface` | 6.83 | 8.54 | 4.5 |
+| `--z-info` sobre `--z-info-subtle` | 5.96 | 6.60 | 4.5 |
+| `--z-on-brand` sobre `--z-brand` | 6.62 | 6.62 | 4.5 |
+| `--z-brand` sobre `--z-surface` | 6.62 | n.a. | 4.5 |
 
 `--z-border` es decorativo (divisores entre elementos que ya tienen texto) y no se exige que alcance 3:1.
 

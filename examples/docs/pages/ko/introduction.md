@@ -60,12 +60,13 @@ cargo run
 또는 저장소의 예제를 실행합니다.
 
 ```sh
+cargo run -p zeyn-example-components
 cargo run -p zeyn-example-showcase
 cargo run -p zeyn-example-docs
 cargo run -p zeyn-cli -- new my-app
 ```
 
-쇼케이스는 `127.0.0.1:3002`에서 실행되며 모든 컴포넌트를 샘플 데이터와 함께 보여 줍니다. 이 문서는 `127.0.0.1:3008`에서 실행되며, 주소를 바꾸려면 `ZEYN_DOCS_SERVER__ADDR`를 설정합니다.
+컴포넌트 카탈로그는 `127.0.0.1:3010`에서 실행되며 모든 컴포넌트를 코드 옆에서 실제로 동작하는 모습으로 보여 줍니다. [components.zeynsoft.com](https://components.zeynsoft.com)도 같습니다. 쇼케이스는 `127.0.0.1:3002`에서 실행되며 컴포넌트를 샘플 데이터가 있는 화면으로 묶어 보여 줍니다. 이 문서는 `127.0.0.1:3008`에서 실행되며, 주소를 바꾸려면 `ZEYN_DOCS_SERVER__ADDR`를 설정합니다.
 
 ## 길 찾기
 
@@ -74,7 +75,8 @@ cargo run -p zeyn-cli -- new my-app
 - *언어*에서는 entity, action, Screen, 폼, DataGrid, 텍스트를 다룹니다.
 - *컴포넌트*에서는 각 컴포넌트를 코드 옆의 라이브 예제와 함께 보여 줍니다.
 - *가이드*에서는 시간과 언어, 보안, API, MCP, 데이터, 테마를 다룹니다.
-- *레퍼런스*에는 런타임 프로토콜과 아키텍처가 있습니다.
+- *레퍼런스*에는 런타임 프로토콜과 데이터베이스 레퍼런스가 있습니다.
+- *프로젝트*에는 소스 코드, 라이선스, 테스트와 CI, 보안 정책이 있습니다.
 
 ## 원칙
 
@@ -82,3 +84,5 @@ cargo run -p zeyn-cli -- new my-app
 - **페이지 새로 고침 없음.** 탐색, 창, 언어, 시간대, 테마 변경은 그 자리에서 적용됩니다.
 - **안전한 기본값.** 모든 action과 Screen이 접근 권한을 선언합니다. CSRF 토큰, 엄격한 Content Security Policy, 사용자 데이터 이스케이프는 항상 켜져 있습니다.
 - **각 작업에 한 가지 방법.** 언어가 작기 때문에 에이전트가 작성한 코드도 사람이 작성한 코드처럼 읽힙니다.
+
+Zeyn은 [MIT 또는 Apache 2.0 라이선스](project.md#license)의 오픈 소스입니다. [보안 정책](project.md#security), [로드맵](https://github.com/huseyininnc/zeyn/blob/main/ROADMAP.md), [변경 기록](https://github.com/huseyininnc/zeyn/blob/main/CHANGELOG.md)도 확인하세요.

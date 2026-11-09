@@ -37,6 +37,19 @@ Card::image(c.cover.clone(), c.title.clone())
     .progress(c.done, t!("courses.done"))
     .horizontal()
 ```
+- **Fast product grids.** `.placeholder(...)` on the grid fills every card image while it loads, and a card can set its own. On a card, `.low(src)` shows a small file first and `.fallback(src)` tries another file once, before the card shows its alt text with an icon. `.priority(n)` loads the images of the first `n` cards (at most 12) at once with `fetchpriority="high"`; every other card image stays lazy, and pages loaded later never come first. They work like the options of [`Image`](display.md#image), with one listener for every card.
+
+```rust
+CardGrid::of(catalog_products)
+    .card(|p: &Product| {
+        Card::image(p.photo.clone(), p.name.clone())
+            .low(p.photo_small.clone())
+            .fallback("/static/no-photo.webp")
+    })
+    .placeholder(Placeholder::color("--z-surface-2"))
+    .priority(4)
+```
+- **Long grids.** Cards and list rows off screen skip layout and paint (`content-visibility: auto`), with their size reserved from the image size, so a long grid costs little until it is seen. A card grid with 200 cards or more keeps only the rows near the viewport in the page, as a virtual [DataGrid](datagrid.md) does: the other rows are space of the same height, every row has the height of the tallest of the first cards, and each card tells screen readers its position (`aria-posinset`, `aria-setsize`). Tab and Shift+Tab reach every card, a focused card stays while it scrolls out of view, and "Show more" adds to the same window. During a fast fling the cards that only fly by fetch no images; they load once the scroll rests. Find in page only sees the cards near the viewport; use the grid's search for the others.
 - **First page on the server.** The first page (24 cards in a card grid, 12 in a rail, or the size given to `paging`) is part of the page's HTML, so search engines and visitors without JavaScript see the cards and their links, and the images carry their size so nothing moves while they load. Later pages come from the browser. A public page stays the same HTML for every visitor, so it can be cached. A card linked to a screen with a route links to its canonical address (`/items/{slug}`), never to a redirect.
 - **Paging.** `Paging::infinite(n)` (the default, 24) shows a "Show more" button that also fires when it scrolls into view; focus moves to the first new card when the button is pressed. `Paging::pages(n)` shows previous and next buttons and the page number: "Page 2 of 5" when the action returns a total, "Page 2" when it does not, and then Next works as long as the action returns a cursor. The server sets the page size; the client only says where to continue.
 - **Sorting.** Each `sort_option` is an order users can pick from a select; the first is the order the cards start in. The server accepts only these orders, and drops filters and search text sent by the client.
@@ -57,6 +70,22 @@ Rail::of(search_products).card(|p: &Product| {
 ```
 
 @live preview
+
+### Builders
+
+`.card` and `.item` stay the default: they give links, images and screen reader text for free. When a row needs another shape, `.builder(|row| node)` builds each row as any node, like Flutter's `ListView.builder`, on `List::of`, `CardGrid` and `Rail`. `.separator(node)` puts a node between rows (hidden from screen readers, which count the rows), and `Repeat::of(items, |item| node)` does the same for a list the screen already holds in memory, up to 500 items.
+
+```rust
+List::of(search_people)
+    .builder(|p: &Person| Row::new().compact().col(Avatar::new(p.name.clone())).col(Paragraph::new(p.city.clone())))
+    .separator(Paragraph::new("·"))
+
+Repeat::of(order.steps.iter(), |s| Badge::new(s.name.clone())).separator(Paragraph::new("→"))
+```
+
+- **Keys.** Built rows and the rows of a virtual list carry the model key in `data-zeyn-key`, so a refresh of the list ([Topics](effects.md#topics)) keeps focus and open details on the same record, wherever it moved.
+- **Built rows are for showing.** Their nodes are not addressed by node paths, so a grid, a form or a lookup goes elsewhere. The nodes of `Repeat` are children (`p.0`, `p.1`, ...) and keep working.
+- **Virtual scrolling.** A list with `.paging(Paging::virtual_scroll())` keeps only the rows in view in the page, inside a scroll area as tall as every row, and fetches blocks by offset as the user scrolls. Rows have one fixed height and no height per row: with a builder, `.row_height(px)` is required and `App::check_page` reports a missing one (`separator` is not used there). Each row carries `aria-posinset` and `aria-setsize`, so screen readers hear its place in the whole list; the scroll area is a focusable region named by the title.
 
 ## Rail
 
@@ -93,6 +122,8 @@ SearchBox::of(catalog_products)
 Keyboard: Down and Up move through the suggestions (Down opens them), Enter searches with the highlighted suggestion or the typed text, Escape closes the suggestions and then clears the field. A live region tells screen readers how many suggestions there are.
 
 The results screen takes `SearchParams` (`q`, empty when the screen is opened from a menu). The server cuts the text to `MAX_SEARCH_QUERY` (100) characters, decides how many suggestions to send (8 unless `limit` says otherwise, at most 20), checks the screen's access, the feature's guards and the action's permission, and counts every suggestion call against the write rate limit (`App::write_limit`).
+
+`.drives(topic)` searches in place instead of opening a results screen: Enter, picking a suggestion or clearing the field puts the text into the screen's `q` param and refreshes the nodes that listen to the topic (see [Topics](effects.md#topics)). The screen's params need a `q: String` field, as `SearchParams` has.
 
 ### Rich suggestions
 

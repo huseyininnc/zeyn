@@ -212,6 +212,78 @@ pub fn ankara_goods() -> Screen {
         )
 }
 
+/// A product grid with placeholders, low resolution files, fallbacks and priority cards.
+#[screen(route = "/fast", public)]
+pub fn fast_goods() -> Screen {
+    Screen::new("Fast").body(
+        CardGrid::of(search_goods)
+            .card(|g: &Good| {
+                let card = Card::image(format!("/img/{}.webp", g.id.0), g.name.clone())
+                    .low(format!("/img/{}-40.webp", g.id.0))
+                    .fallback("/img/none.webp");
+                match g.id.0 {
+                    3 => card.placeholder(Placeholder::color("--z-surface")),
+                    4 => card.low("https://other.test/x.webp"),
+                    _ => card,
+                }
+            })
+            .placeholder(Placeholder::color("#d9dde3"))
+            .priority(2)
+            .paging(Paging::infinite(6)),
+    )
+}
+
+#[tokio::test]
+async fn product_cards_reserve_their_box_show_a_placeholder_and_load_only_the_first_cards_first() {
+    let router = app(None);
+    let (status, page) = send(&router, get("/fast")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(page.contains(
+        r#"<span class="z-poster-media z-img-host" style="aspect-ratio:300 / 400;--z-ph:#d9dde3"><img class="z-img-under" src="/img/1-40.webp" alt="" decoding="async" fetchpriority="high"><img class="z-poster-img" src="/img/1.webp" alt="" width="300" height="400" loading="eager" fetchpriority="high" data-zeyn-img data-zeyn-fallback="/img/none.webp" decoding="async" draggable="false">"#
+    ), "{page}");
+    assert_eq!(
+        page.matches(r#"fetchpriority="high" data-zeyn-img"#)
+            .count(),
+        2,
+        "only the first two cards come first"
+    );
+    assert!(page.contains(
+        r#"<img class="z-poster-img" src="/img/3.webp" alt="" width="300" height="400" loading="lazy" data-zeyn-img"#
+    ));
+    assert!(
+        page.contains(r#"style="aspect-ratio:300 / 400;--z-ph:var(--z-surface)""#),
+        "a card's own placeholder wins over the grid's"
+    );
+    assert!(
+        !page.contains("other.test"),
+        "a low file outside img-src is left out"
+    );
+    assert!(
+        page.contains(r#"<li data-zeyn-key="1" class="z-poster">"#),
+        "card grid cards carry their model key, so a refresh of a windowed grid finds the focused card"
+    );
+    assert!(
+        page.contains(r#"style="--z-card-ratio:1.333""#),
+        "the section carries the image ratio that sizes off screen cards"
+    );
+    let linked = |name: &str| page.contains(&format!("/_zeyn/{name}?v="));
+    assert!(linked("media.js") && linked("media.css"));
+    let (status, body) = send(
+        &router,
+        post(
+            "/_zeyn/grid",
+            "shop.read",
+            serde_json::json!({ "screen": "fast_goods", "node": "0", "query": { "page": { "type": "after", "cursor": "6", "limit": 6 } } }),
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert!(
+        body.contains("data-zeyn-img") && !body.contains("fetchpriority"),
+        "pages loaded later never come first: {body}"
+    );
+}
+
 const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
 fn app(limit: Option<RateLimit>) -> axum::Router {
@@ -235,7 +307,8 @@ fn app(limit: Option<RateLimit>) -> axum::Router {
                 .screen(good_page)
                 .screen(goods_list)
                 .screen(uncounted_list)
-                .screen(ankara_goods),
+                .screen(ankara_goods)
+                .screen(fast_goods),
         );
     if let Some(l) = limit {
         app = app.write_limit(l);
@@ -298,7 +371,7 @@ async fn card_grids_render_their_first_page_as_linked_lazy_images() {
     assert!(page.contains(r#"<span class="z-badge z-tone-neutral">New</span>"#));
     assert!(page.contains("Black &lt;tea&gt;"), "row text is escaped");
     assert_eq!(
-        page.matches(r#"<li class="z-poster">"#)
+        page.matches(r#"class="z-poster">"#)
             .count(),
         4 + 12,
         "four cards and the rail's twelve"
@@ -333,7 +406,7 @@ async fn more_cards_load_through_the_grid_endpoint_with_the_servers_page_size_an
     let json: serde_json::Value = serde_json::from_str(&body).unwrap();
     let rows = json["rows"].as_str().unwrap();
     assert_eq!(
-        rows.matches(r#"<li class="z-poster">"#)
+        rows.matches(r#"class="z-poster">"#)
             .count(),
         4,
         "the client's limit is ignored"
@@ -387,7 +460,7 @@ async fn results_screens_search_on_the_server_and_page_by_number() {
         "{page}"
     );
     assert_eq!(
-        page.matches(r#"<li class="z-poster">"#)
+        page.matches(r#"class="z-poster">"#)
             .count(),
         5
     );
@@ -675,8 +748,8 @@ async fn rails_hide_their_scrollbar_unless_kept_and_drag_only_with_a_mouse() {
     );
     let shell = asset("/_zeyn/zeyn.css").await;
     assert!(
-        shell.contains("@media (max-width: 800px) and (scripting: enabled)"),
-        "on phones the app menu starts folded, so the page does not jump when the script folds it"
+        shell.contains("@media (max-width: 1023px) and (scripting: enabled)"),
+        "on phones and tablets the app menu starts folded, so the page does not jump when the script folds it"
     );
 }
 
@@ -977,4 +1050,76 @@ async fn rich_suggestions_carry_text_subtitle_an_allowed_image_and_the_canonical
     );
     assert_eq!(hits[2]["image"], "/img/15.png");
     assert_eq!(hits[2]["href"], "/goods/15");
+}
+
+fn app_header_app() -> axum::Router {
+    App::new("Test")
+        .auth(|h: &HeaderMap| {
+            let perms = h.get("x-perms")?.to_str().ok()?;
+            Some(Identity::user("u").with_permissions(perms.split(',').map(String::from)))
+        })
+        .header(|h| {
+            h.center(SearchBox::of(search_goods).results(results))
+                .end(LinkButton::new("Good <3>", good_page, GoodParams { id: 3 }))
+                .end(Stack::new().add(Paragraph::new("Nested")))
+        })
+        .feature(
+            Feature::new("store")
+                .screen(store)
+                .screen(results)
+                .screen(good_page),
+        )
+        .router()
+        .unwrap()
+}
+
+#[tokio::test]
+async fn the_app_header_takes_the_site_header_slots_and_checks_data_permissions() {
+    let router = app_header_app();
+    let (status, page) = send(&router, get("/store")).await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert!(page.contains(r#"<div class="z-app" data-zeyn-shell="app">"#));
+    let at = |s: &str| {
+        page.find(s)
+            .unwrap_or_else(|| panic!("{s} missing: {page}"))
+    };
+    assert!(
+        at("</nav>")
+            < at(
+                r#"<header class="z-app-header" data-zeyn-screen="_app" data-zeyn-params="null">"#
+            )
+    );
+    assert!(at(r#"id="z-app-header-slot-center""#) < at(r#"id="z-app-header-slot-end""#));
+    assert!(at(r#"id="z-app-header-slot-end""#) < at(r#"<main class="z-main" id="z-main">"#));
+    assert!(page.contains(r#"data-zeyn-node="1.0"><form class="z-search""#));
+    assert!(page.contains("Good &lt;3&gt;"));
+
+    let ask = |node: &str, perms: &str| {
+        post(
+            "/_zeyn/data",
+            perms,
+            serde_json::json!({ "screen": "_app", "node": node, "key": "suggest", "input": "coffee" }),
+        )
+    };
+    let (status, body) = send(&router, ask("1.0", "shop.read")).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let (status, _) = send(&router, ask("1.0", "")).await;
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "the action's permission counts"
+    );
+    for node in ["1.1", "2.1.0", "4.0", "2.0.0"] {
+        let (status, _) = send(&router, ask(node, "shop.read")).await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "{node}");
+    }
+
+    let plain = App::new("Test")
+        .feature(Feature::new("store").screen(store))
+        .router()
+        .unwrap();
+    let (_, page) = send(&plain, get("/store")).await;
+    assert!(!page.contains("z-app-header"), "no header unless asked for");
+    let (status, _) = send(&plain, ask("1.0", "shop.read")).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
 }

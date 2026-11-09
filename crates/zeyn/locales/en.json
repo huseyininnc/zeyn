@@ -104,6 +104,7 @@
       "max": "{label} must be at most {n}.",
       "format": "{label} has an invalid value.",
       "skipped_time": "{label}: this time does not exist in your time zone because the clocks changed.",
+      "depends_on": "This choice is not available for the value of the field it depends on.",
       "line": "Line {n}: {message}",
       "disabled_day": "{label}: this day cannot be chosen.",
       "time_step": "{label} must be on a {n} minute step.",
@@ -206,7 +207,13 @@
       "xlsx": "Export to Excel",
       "csv": "Export to CSV",
       "pdf": "Export to PDF",
-      "pdf_cut": "Only the first {max} rows are printed."
+      "pdf_cut": "Only the first {max} rows are printed.",
+      "menu": "Export",
+      "format": {
+        "xlsx": "Excel",
+        "csv": "CSV",
+        "pdf": "PDF"
+      }
     },
     "shell": {
       "skip": "Skip to content",
@@ -218,6 +225,15 @@
       "theme_system": "System",
       "theme_light": "Light",
       "theme_dark": "Dark",
+      "primary_actions": "Main actions",
+      "search": "Search",
+      "breadcrumb": "Breadcrumb",
+      "account": "Account",
+      "density": "Density",
+      "density_comfortable": "Comfortable",
+      "density_compact": "Compact",
+      "account_of": "Account of {name}",
+      "signed_in_as": "Signed in as",
       "site": {
         "sign_in": "Sign in",
         "sign_out": "Sign out",
@@ -226,9 +242,55 @@
       }
     },
     "ui": {
+      "typing": {
+        "one": "{name} is typing",
+        "two": "{a} and {b} are typing",
+        "many": "{n} people are typing",
+        "someone": "Someone"
+      },
+      "composer": {
+        "label": "Message",
+        "placeholder": "Write a message",
+        "send": "Send",
+        "hint_enter": "Enter sends, Shift+Enter starts a new line",
+        "hint_ctrl": "Ctrl+Enter sends, Enter starts a new line",
+        "left": "{n} characters left",
+        "over": "{n} characters too many",
+        "sent": "Message sent",
+        "failed": "The message could not be sent",
+        "people": "{n} people found",
+        "no_people": "Nobody found",
+        "people_label": "People",
+        "restored": "Your unsent message is back",
+        "attachments": "Attachments"
+      },
+      "chat": {
+        "label": "Messages",
+        "empty": "No messages yet",
+        "you": "You",
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "attachments": "Attachments",
+        "more_files": "{n} more files",
+        "new_message": "New message from {name}: {text}",
+        "assistant": "Assistant",
+        "writing": "Writing a reply",
+        "stop": "Stop",
+        "stopped": "The reply was stopped",
+        "reply_failed": "The reply could not be loaded",
+        "loading": "Loading older messages",
+        "status": {
+          "sending": "Sending",
+          "sent": "Sent",
+          "delivered": "Delivered",
+          "read": "Read",
+          "failed": "Not sent"
+        }
+      },
       "resize": "Resize panes",
       "cards": {
         "load_more": "Show more",
+        "list": "List",
         "loaded": "{count} items shown",
         "empty": "Nothing to show.",
         "error": "The list could not be loaded. Try again.",
@@ -386,7 +448,10 @@
         "value": "Value",
         "min": "Minimum",
         "max": "Maximum",
-        "target": "Target"
+        "target": "Target",
+        "thousand": "{n}K",
+        "million": "{n}M",
+        "billion": "{n}B"
       },
       "tree": {
         "empty": "No items."
@@ -453,9 +518,13 @@
         "up": "Up {pct}% from the previous period",
         "down": "Down {pct}% from the previous period",
         "flat": "No change from the previous period",
-        "target": "Target {target}, {pct}% reached"
+        "target": "Target {target}, {pct}% reached",
+        "compare": "vs previous period",
+        "million": "{n}M",
+        "billion": "{n}B"
       },
       "password": {
+        "caps": "Caps Lock is on",
         "show": "Show password",
         "weak": "Strength: weak",
         "fair": "Strength: fair",
@@ -523,6 +592,180 @@
       },
       "prefs": {
         "cleared": "The choices this browser kept for this site were removed."
+      },
+      "diff": {
+        "label": "Changes",
+        "none": "No changes",
+        "field": "Field",
+        "before": "Before",
+        "after": "After",
+        "empty": "(empty)",
+        "more": "{n} more changed fields are not shown"
+      },
+      "code": {
+        "plain": "Text",
+        "rust": "Rust",
+        "json": "JSON",
+        "toml": "TOML",
+        "sql": "SQL",
+        "javascript": "JavaScript",
+        "shell": "Shell",
+        "lines": "{n} lines",
+        "copy": "Copy",
+        "copied": "Copied to the clipboard",
+        "failed": "Could not copy",
+        "fold": "Fold or unfold this block",
+        "truncated": "Showing the first {shown} of {total} lines. The rest is too long to show here."
+      },
+      "barcode": {
+        "code128_invalid": "This value cannot be shown as a barcode: it must be 1 to 80 printable ASCII characters.",
+        "qr_too_long": "This value is too long for a QR code."
+      },
+      "inbox": {
+        "label": "Notifications",
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "empty": "No notifications",
+        "unread": "Unread",
+        "unread_count": "{n} unread",
+        "select": "Select",
+        "select_all": "Select all",
+        "actions": "Notification actions",
+        "mark_read": "Mark as read",
+        "archive": "Archive",
+        "selected": "{n} selected",
+        "done": "Done for {n} notifications",
+        "bell": "Notifications",
+        "bell_count": "Notifications, {n} unread",
+        "bell_many": "Notifications, more than 99 unread"
+      },
+      "kanban": {
+        "label": "Board",
+        "help": "Arrow keys move between cards. Enter opens the move menu; Shift with Left or Right moves the card to the next column.",
+        "move": "Move",
+        "move_to": "Move to",
+        "moved": "{card} moved to {column}",
+        "refused": "The card could not be moved and is back in its column",
+        "no_moves": "This card cannot be moved from here",
+        "count": "{n}",
+        "count_wip": "{n} of {wip}"
+      },
+      "calendar": {
+        "navigation": "Period",
+        "views": "View",
+        "previous": "Previous",
+        "next": "Next",
+        "today": "Today",
+        "month": "Month",
+        "week": "Week",
+        "day": "Day",
+        "all_day": "All day",
+        "more": "{n} more",
+        "range": "{from} to {to}",
+        "cut": "Only the first {n} events of this period are shown.",
+        "help": "Arrow keys move between days, Page Up and Page Down change the period, Enter goes to the events of a day.",
+        "help_create": "Arrow keys move between days, Page Up and Page Down change the period, Enter goes to the events of a day, N creates an event, Shift with the arrow keys widens the slot.",
+        "created": "Event created",
+        "skipped": "That time does not exist in your time zone, because the clocks change then.",
+        "invalid_slot": "Choose a slot of at most 31 days that ends after it starts.",
+        "months": {
+          "1": "January",
+          "2": "February",
+          "3": "March",
+          "4": "April",
+          "5": "May",
+          "6": "June",
+          "7": "July",
+          "8": "August",
+          "9": "September",
+          "10": "October",
+          "11": "November",
+          "12": "December"
+        }
+      },
+      "shop": {
+        "price": {
+          "sale": "Was {was}, now {now}, {off} off",
+          "per": {
+            "item": "{price} per item",
+            "kg": "{price} per kg",
+            "g100": "{price} per 100 g",
+            "l": "{price} per liter",
+            "ml100": "{price} per 100 ml",
+            "m": "{price} per meter"
+          }
+        },
+        "range": {
+          "to": "to",
+          "low": "{label}, from",
+          "high": "{label}, to"
+        },
+        "quantity": {
+          "label": "Quantity",
+          "decrease": "Decrease",
+          "increase": "Increase",
+          "limit": "Only {n} available.",
+          "failed": "The quantity could not be changed."
+        },
+        "gallery": {
+          "swipe": "Photos, use the arrow keys or swipe",
+          "full": "Full screen",
+          "choose": "Choose a photo",
+          "show": "Show photo {n} of {count}",
+          "close": "Close",
+          "prev": "Previous photo",
+          "next": "Next photo",
+          "zoom": "Zoom"
+        },
+        "facets": {
+          "label": "Filters",
+          "chosen": "Chosen filters",
+          "clear": "Clear all",
+          "remove": "Remove filter {filter}",
+          "option": "{option}, {count} results",
+          "active": "{n} chosen"
+        },
+        "reviews": {
+          "label": "Reviews",
+          "average": "{average} out of 5 stars",
+          "count": "{count} reviews",
+          "stars": "{n} stars"
+        },
+        "rating": {
+          "half": "{label} takes whole or half stars."
+        },
+        "countdown": {
+          "day": "d",
+          "left": "{d} d {h} h {m} min left"
+        }
+      },
+      "story": {
+        "row": "Stories",
+        "unseen": "{name}, unseen stories",
+        "seen": "{name}, all stories seen"
+      },
+      "lightbox": {
+        "label": "Media viewer",
+        "close": "Close",
+        "previous": "Previous",
+        "next": "Next",
+        "position": "{n} of {count}",
+        "zoom_in": "Zoom in",
+        "zoom_out": "Zoom out",
+        "open": "Open image",
+        "video": "Play video"
+      },
+      "feed": {
+        "label": "Posts",
+        "new_one": "1 new post",
+        "new_many": "{count} new posts",
+        "new_more": "More than {count} new posts",
+        "newest": "Back to the newest posts",
+        "loaded": "{count} posts shown",
+        "error": "The posts could not be loaded. Try again.",
+        "empty": "No posts yet.",
+        "comments": "{count} comments",
+        "comments_one": "1 comment"
       }
     },
     "date": {

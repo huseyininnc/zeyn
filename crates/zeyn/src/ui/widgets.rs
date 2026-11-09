@@ -13,7 +13,16 @@ use serde_json::{Map, Value as Json, json};
 use std::sync::Arc;
 
 into_node!(
-    Alert, Badge, EmptyState, Skeleton, Progress, Breadcrumb, Timeline, LinkButton, ClearPrefs
+    Alert,
+    Badge,
+    EmptyState,
+    Skeleton,
+    Progress,
+    Breadcrumb,
+    Timeline,
+    LinkButton,
+    ClearPrefs,
+    ThemePicker
 );
 
 pub use crate::grid::Tone;
@@ -100,10 +109,23 @@ impl Component for Alert {
     }
 }
 
-/// A short status label, such as "Paid" or "Overdue".
+/// How a badge is drawn.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+enum BadgeKind {
+    #[default]
+    Label,
+    Dot,
+    Count,
+}
+
+/// A short status label, such as "Paid" or "Overdue": the tone's text on its subtle tint, or a
+/// neutral label for plain values (plan, channel). `.dot()` draws a dot in the tone before plain
+/// text, the quieter form for status in lists; `.count()` draws a round count pill.
 pub struct Badge {
     text: Text,
     tone: Tone,
+    kind: BadgeKind,
 }
 
 impl Badge {
@@ -111,6 +133,7 @@ impl Badge {
         Self {
             text: text.into(),
             tone: Tone::Neutral,
+            kind: BadgeKind::Label,
         }
     }
 
@@ -119,10 +142,27 @@ impl Badge {
         self
     }
 
+    /// An 8 px dot in the tone before the text, with no background.
+    pub fn dot(mut self) -> Self {
+        self.kind = BadgeKind::Dot;
+        self
+    }
+
+    /// A round pill for a number, such as unread items beside a tab label.
+    pub fn count(mut self) -> Self {
+        self.kind = BadgeKind::Count;
+        self
+    }
+
     /// Badge markup, for use inside other components.
     pub fn html(&self, r: &Render) -> String {
+        let kind = match self.kind {
+            BadgeKind::Label => "",
+            BadgeKind::Dot => " z-badge-dot",
+            BadgeKind::Count => " z-badge-count",
+        };
         format!(
-            r#"<span class="z-badge z-tone-{}">{}</span>"#,
+            r#"<span class="z-badge{kind} z-tone-{}">{}</span>"#,
             self.tone.code(),
             r.text(&self.text)
         )
@@ -135,7 +175,7 @@ impl Component for Badge {
     }
 
     fn schema(&self) -> Json {
-        json!({ "type": "badge", "text": self.text, "tone": self.tone })
+        json!({ "type": "badge", "text": self.text, "tone": self.tone, "kind": self.kind })
     }
 }
 
@@ -270,6 +310,43 @@ impl Component for ClearPrefs {
 
     fn schema(&self) -> Json {
         json!({ "type": "clear_prefs", "label": self.label })
+    }
+}
+
+/// The theme picker inside a screen, such as an Appearance section of a settings page. It offers
+/// the themes of `App::themes` like the picker of the shell, and both stay in step: a choice in
+/// either is shown in the other at once, applied without a page load and kept in the theme
+/// cookie. Renders nothing when the app offers no theme choice.
+///
+/// ```
+/// use zeyn::ui::ThemePicker;
+/// let picker = ThemePicker::new();
+/// ```
+#[derive(Default)]
+pub struct ThemePicker;
+
+impl ThemePicker {
+    pub fn new() -> Self {
+        ThemePicker
+    }
+}
+
+impl Component for ThemePicker {
+    fn render(&self, out: &mut String, r: &Render) {
+        #[cfg(feature = "server")]
+        if let Some(ctx) = r.ctx {
+            out.push_str(&crate::server::theme_picker(
+                ctx,
+                r,
+                &crate::ui::dom_id(r, "theme"),
+            ));
+        }
+        #[cfg(not(feature = "server"))]
+        let _ = (out, r);
+    }
+
+    fn schema(&self) -> Json {
+        json!({ "type": "theme_picker" })
     }
 }
 
@@ -771,6 +848,8 @@ where
     }
 
     /// `Danger` draws a red button for actions that remove or cancel things.
+    /// The look of the button: `Tone::Brand` draws it as the main action of its area,
+    /// `Tone::Danger` as a destructive one; other tones keep the quiet default.
     pub fn tone(mut self, tone: Tone) -> Self {
         self.tone = tone;
         self
@@ -833,10 +912,10 @@ where
             ),
             None => String::new(),
         };
-        let class = if self.tone == Tone::Danger {
-            "z-button z-danger-button"
-        } else {
-            "z-button"
+        let class = match self.tone {
+            Tone::Danger => "z-button z-danger-button",
+            Tone::Brand => "z-button z-primary",
+            _ => "z-button",
         };
         let (tip_attrs, tip) = match &self.tip {
             Some(t) => crate::ui::tip(r, &crate::ui::dom_id(r, "tip"), t),

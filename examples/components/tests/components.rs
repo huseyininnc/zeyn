@@ -200,3 +200,244 @@ async fn the_site_files_and_pictures_are_served() {
     let (status, _, _) = get("/site/img/13.svg").await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
+
+const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+/// The node path of the element whose HTML starts with `marker` on a catalog page.
+async fn node_of(router: &Router, path: &str, marker: &str) -> String {
+    let res = router
+        .clone()
+        .oneshot(
+            Request::get(path)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let html = String::from_utf8(
+        res.into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes()
+            .to_vec(),
+    )
+    .unwrap();
+    let at = html
+        .find(marker)
+        .expect("the component is on the page");
+    let before = &html[..at];
+    let start = before
+        .rfind(r#"data-zeyn-node=""#)
+        .unwrap()
+        + r#"data-zeyn-node=""#.len();
+    before[start..start + before[start..].find('"').unwrap()].to_string()
+}
+
+/// A write to the data source `key` of the node at `node` on the screen `screen`.
+async fn write(
+    router: &Router,
+    screen: &str,
+    node: &str,
+    key: &str,
+    input: serde_json::Value,
+) -> StatusCode {
+    let body = serde_json::json!({ "screen": screen, "params": null, "node": node, "key": key, "input": input });
+    router
+        .clone()
+        .oneshot(
+            Request::post("/_zeyn/data")
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::COOKIE, format!("zeyn_csrf={TOKEN}"))
+                .header("x-zeyn-csrf", TOKEN)
+                .body(Body::from(body.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap()
+        .status()
+}
+
+#[tokio::test]
+async fn the_shared_sample_stores_stay_within_their_caps() {
+    use zeyn_example_components::examples::{inbox, kanban};
+    let router = site::router(app().unwrap().router().unwrap());
+    let inbox_node = node_of(&router, "/ui/inbox", r#"<section class="z-inbox""#).await;
+    let board_node = node_of(&router, "/ui/kanban", r#"<section class="z-kanban""#).await;
+    for round in 0..12 {
+        let ids: Vec<String> = (1..=5).map(|i| i.to_string()).collect();
+        let key = if round % 2 == 0 { "read" } else { "archive" };
+        let status = write(
+            &router,
+            "inbox",
+            &inbox_node,
+            key,
+            serde_json::json!({ "ids": ids }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "round {round}");
+        assert!(inbox::stored() <= inbox::MAX_SAMPLE_NOTES);
+        let (from, to) = if round % 2 == 0 {
+            ("Backlog", "Doing")
+        } else {
+            ("Doing", "Backlog")
+        };
+        write(
+            &router,
+            "kanban",
+            &board_node,
+            "move",
+            serde_json::json!({ "key": "1", "from": from, "to": to }),
+        )
+        .await;
+        assert_eq!(kanban::stored(), kanban::MAX_SAMPLE_TASKS);
+    }
+}
+
+#[tokio::test]
+async fn writes_to_the_samples_count_against_the_write_limit() {
+    let router = site::router(app().unwrap().router().unwrap());
+    let node = node_of(&router, "/ui/inbox", r#"<section class="z-inbox""#).await;
+    let mut refused = 0;
+    for _ in 0..zeyn_example_components::WRITES_PER_MINUTE + 5 {
+        let status = write(
+            &router,
+            "inbox",
+            &node,
+            "read",
+            serde_json::json!({ "ids": ["1"] }),
+        )
+        .await;
+        if status == StatusCode::TOO_MANY_REQUESTS {
+            refused += 1;
+        }
+    }
+    assert_eq!(refused, 5, "the 61st write in a minute is refused");
+}
+
+#[test]
+fn a_visitor_log_keeps_only_its_newest_entries() {
+    use zeyn_example_components::data::{MAX_VISITOR_ENTRIES, VisitorLog};
+    let log: VisitorLog<usize> = VisitorLog::new();
+    for n in 0..MAX_VISITOR_ENTRIES * 4 {
+        log.push(n);
+    }
+    assert_eq!(log.len(), MAX_VISITOR_ENTRIES);
+    assert_eq!(log.last(), Some(MAX_VISITOR_ENTRIES * 4 - 1));
+}
+
+#[tokio::test]
+async fn cart_writes_are_capped_and_count_against_the_write_limit() {
+    use zeyn_example_components::WRITES_PER_MINUTE;
+    use zeyn_example_components::data::{CART, MAX_VISITOR_ENTRIES};
+    const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    let router = app().unwrap().router().unwrap();
+    let mut statuses = Vec::new();
+    for _ in 0..WRITES_PER_MINUTE + 3 {
+        let body = serde_json::json!({ "screen": "shop_product", "params": { "id": 42, "color": null, "size": null }, "node": "0.1.1.0.3", "key": "quantity", "input": { "quantity": 2 } });
+        let res = router
+            .clone()
+            .oneshot(
+                Request::post("/_zeyn/data")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .header(header::COOKIE, format!("zeyn_csrf={TOKEN}"))
+                    .header("x-zeyn-csrf", TOKEN)
+                    .body(Body::from(body.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        statuses.push(res.status());
+    }
+    assert_eq!(statuses[0], StatusCode::OK, "{statuses:?}");
+    assert_eq!(
+        *statuses.last().unwrap(),
+        StatusCode::TOO_MANY_REQUESTS,
+        "cart writes count against the write limit"
+    );
+    assert!(CART.len() <= MAX_VISITOR_ENTRIES);
+    assert_eq!(CART.last(), Some(("item-42-m".to_string(), 2)));
+}
+
+#[tokio::test]
+async fn the_chat_samples_keep_their_caps_and_sends_reach_the_store() {
+    use zeyn::FileStore;
+    use zeyn_example_components::examples::{composer, message_thread};
+    let router = site::router(app().unwrap().router().unwrap());
+    let node = node_of(&router, "/ui/composer", r#"<form class="z-composer""#).await;
+    let status = write(
+        &router,
+        "composer",
+        &node,
+        "send",
+        serde_json::json!({ "text": "hello from the test" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        message_thread::messages()
+            .iter()
+            .any(|m| m.body == "hello from the test" && m.room == "team")
+    );
+    for i in 0..message_thread::MAX_SAMPLE_MESSAGES + 50 {
+        message_thread::add(message_thread::ChatMessage {
+            body: format!("filler {i}"),
+            room: "team".into(),
+            ..Default::default()
+        });
+        assert!(message_thread::stored() <= message_thread::MAX_SAMPLE_MESSAGES);
+    }
+    let newest = format!("filler {}", message_thread::MAX_SAMPLE_MESSAGES + 49);
+    assert!(
+        message_thread::messages()
+            .iter()
+            .any(|m| m.body == newest),
+        "the newest stay, the oldest go"
+    );
+    let files = composer::SampleFiles::new();
+    for i in 0..composer::MAX_SAMPLE_FILES + 5 {
+        let meta = zeyn::FileMeta {
+            id: format!("{i:032x}"),
+            name: format!("f{i}.png"),
+            content_type: "image/png".into(),
+            size: 0,
+            tenant: None,
+            owner: None,
+            created: 0,
+        };
+        files
+            .put(meta, zeyn::FileChunks::from_parts(vec![vec![0u8; 1000]]))
+            .await
+            .unwrap();
+        assert!(files.stored() <= composer::MAX_SAMPLE_FILES);
+    }
+    assert_eq!(files.stored(), composer::MAX_SAMPLE_FILES);
+}
+
+#[tokio::test]
+async fn the_social_demo_keeps_its_published_posts_and_reactions_within_their_caps() {
+    use zeyn_example_components::examples::feed;
+    for i in 0..feed::MAX_SAMPLE_POSTS + 15 {
+        feed::publish_sample(1_793_000_000_000 + i as i64);
+        assert!(feed::stored_posts() <= feed::MAX_SAMPLE_POSTS);
+    }
+    assert_eq!(feed::stored_posts(), feed::MAX_SAMPLE_POSTS);
+    for id in 1..=(feed::MAX_SAMPLE_REACTIONS as i64 + 50) {
+        feed::count_press(id, 0, true);
+        assert!(feed::stored_reactions() <= feed::MAX_SAMPLE_REACTIONS);
+    }
+    assert_eq!(feed::stored_reactions(), feed::MAX_SAMPLE_REACTIONS);
+    let router = site::router(app().unwrap().router().unwrap());
+    let node = node_of(&router, "/ui/feed/social", r#"<section class="z-feed""#).await;
+    let press = |key: &str| serde_json::json!({ "key": key, "reaction": "like", "pressed": true });
+    assert_eq!(
+        write(&router, "social_demo", &node, "react", press("42")).await,
+        StatusCode::OK
+    );
+    assert_eq!(feed::stored_reactions(), feed::MAX_SAMPLE_REACTIONS);
+    assert_eq!(
+        write(&router, "social_demo", &node, "react", press("20000")).await,
+        StatusCode::NOT_FOUND,
+        "a post that does not exist never reaches the store"
+    );
+}

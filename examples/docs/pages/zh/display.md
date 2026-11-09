@@ -22,7 +22,7 @@ Stack::new()
 
 ## Badge
 
-`Badge::new(text).tone(Tone::...)`。可用的 tone：`Neutral`、`Info`、`Success`、`Warning`、`Danger` 和 `Brand`。表格通过 `.badge(|v| tone)` 将值显示为徽标。
+`Badge::new(text).tone(Tone::...)`。可用的 tone：`Neutral`、`Info`、`Success`、`Warning`、`Danger` 和 `Brand`。带色调的徽标以该色调的文字显示在该色调的淡色背景上；`Neutral` 是带一道轮廓的弱化标签，用于套餐之类的普通值。`.dot()` 在普通文字前绘制一个 8 px 的该色调圆点，是列表中表示状态的更低调形式；`.count()` 为数字绘制一个圆形胶囊。表格通过 `.badge(|v| tone)` 将值显示为徽标，通过 `.status(|v| tone)` 显示为圆点。
 
 ## Progress
 
@@ -67,7 +67,7 @@ LinkButton::new(t!("cart.browse"), products, ()).primary()
 
 ## ActionButton
 
-`ActionButton::new(label, action, input)` 运行一个 action。`.confirm(text)` 先进行确认，`.tone(Tone::Danger)` 标记破坏性操作，`.on_success(|result, ui| ...)` 运行 effect。input 在服务器端固定，绝不来自客户端；action 的权限与任何表单一样在服务器端检查。
+`ActionButton::new(label, action, input)` 运行一个 action。`.confirm(text)` 先进行确认，`.tone(Tone::Danger)` 标记破坏性操作，`.on_success(|result, ui| ...)` 运行 effect。input 在服务器端固定，绝不来自客户端；action 的权限与任何表单一样在服务器端检查。 `.tone(Tone::Brand)` 将其绘制为所在区域（例如卡片）的主要操作。
 
 ```rust
 ActionButton::new(t!("docs.live.count"), count_samples, ())
@@ -140,6 +140,32 @@ Image::new("https://images.example.com/logo.png")
 - `src` 是应用上的路径（`/static/logo.png`），或位于应用 `img-src` 主机上的 `https` 地址（`App::csp(|c| c.img_src([...]))`）。其他任何图片都不会被渲染，而是显示其替代文本，因此浏览器绝不会记录被拦截的请求。
 - 每张图片都带有 `decoding="async"`；`.lazy()` 为首屏以下的图片添加 `loading="lazy"`。`srcset` 接受密度（`2x`）或宽度（`800w`）描述符；位于其他主机或使用其他描述符的条目会被省略。宽度描述符会根据图片宽度添加 `sizes`。
 - 纯装饰性图片使用空的替代文本：`.alt(Text::from(""))`。
+
+### 长列表中的照片
+
+对于拥有数千张商品照片的目录，图片可以在加载期间先显示内容，并在加载失败时恢复。这些都使用浏览器的原生功能；媒体模块的一个监听器服务页面上的所有图片。
+
+```rust
+Image::new(p.photo_800.clone())
+    .alt(p.name.clone())
+    .size(400, 500)
+    .lazy()
+    .srcset([(p.photo_400.as_str(), "400w"), (p.photo_800.as_str(), "800w")])
+    .sizes("(min-width: 800px) 25vw, 50vw")
+    .placeholder(Placeholder::color("#d9dde3"))
+    .low(p.photo_40.clone())
+    .fallback("/static/no-photo.webp")
+    .on_error(t!("shop.no_photo"))
+    .fit(Fit::Cover)
+```
+
+- `.placeholder(...)` 在文件加载期间填充图片框，无需脚本：`Placeholder::color("#d9dde3")` 或主题 token（`"--z-surface-2"`）；`Placeholder::blur(data_uri)` 用于应用生成的极小图片（最多 600 字节的 base64 `data:image/webp`、`avif`、`jpeg` 或 `png` URI，绝不能是 SVG）；`Placeholder::image(src)` 用于所有图片共用的一个文件。违反规则的占位符会被省略。
+- `.low(src)` 立即在完整文件下方显示一个小的低分辨率文件。完整文件同时加载（图片为懒加载时也懒加载），准备好后淡入；在减少动态效果的设置下，它直接出现，不带淡入。
+- `.fallback(src)` 在图片加载失败时尝试另一个文件一次。之后显示 `.on_error(text or component)`；没有设置时，在占位符上显示替代文本和一个图标。不会再次重试。
+- `.priority()` 标记访客看到的第一张图片（最大内容绘制）：`loading="eager"` 和 `fetchpriority="high"`，绝不懒加载。每个页面只使用一次。
+- `.sizes(...)` 说明图片在布局中的宽度，使浏览器选择合适的 `srcset` 宽度。没有它时，懒加载图片会得到 `sizes="auto"`，由浏览器测量所在位置。
+- `.fit(Fit::Cover)` 填满图片框并裁掉溢出部分；`Fit::Contain` 显示整个文件。
+- `low`、`fallback` 和 `Placeholder::image` 遵循与 `src` 相同的地址规则；其他地址会被省略。图片框始终保持图片的尺寸，因此文件加载或失败时页面不会跳动。
 
 ## ExternalLink
 

@@ -6,6 +6,8 @@
     "search": "Bileşen ara",
     "start": "Başlangıç",
     "all": "Tüm bileşenler",
+    "github": "GitHub'da kaynak kodu",
+    "project": "Lisans ve güvenlik",
     "none": "\"{q}\" ile eşleşen bileşen yok.",
     "show_code": "Kodu göster",
     "copy": "Kopyala",
@@ -29,7 +31,11 @@
       "media": "Medya",
       "feedback": "Geri bildirim ve katmanlar",
       "charts": "Grafikler",
-      "shell": "Kabuk"
+      "shell": "Kabuk",
+      "admin": "Yönetim",
+      "shop": "Mağaza",
+      "chat": "Sohbet",
+      "social": "Sosyal"
     },
     "summary": {
       "stack": "Aralarında boşluk olan, alt alta düğümler.",
@@ -67,6 +73,7 @@
       "rail": "Yana kayan kart sırası.",
       "list": "Resim, başlık ve ek bilgi içeren satırlar.",
       "search_box": "Önerili arama alanı.",
+      "topics": "Ekranın diğer bölümlerini yerinde yenileyen süzgeçler ve eylemler.",
       "tree": "Açıldıkça sunucudan yüklenen dallar.",
       "week_schedule": "Eylem satırlarından yedi günlük sütunlar.",
       "image": "Alternatif metni ve boyutu zorunlu resim.",
@@ -80,6 +87,10 @@
       "toast": "Bir eylemden sonra kısa bildirim.",
       "chart": "Çubuk, halka, karma ve gösterge grafikleri.",
       "kpi": "Değişimi ve eğilimiyle bir sayı.",
+      "app_header": "Uygulama kabuğundaki ekranların üstünde, arama kutusu ve bağlantılar içeren bir çubuk.",
+      "theme_picker": "Menüyle uyumlu, ekran içinde tema seçimi.",
+      "icon": "Düğmelerin, menülerin ve araçların simgeleri.",
+      "screen_header": "Ekranın başlık satırı: bir alt başlık ve ana işlemler.",
       "toolbox": "Biri seçili araç düğmeleri grubu.",
       "status_bar": "Kısa durum metinleri çubuğu.",
       "relative_time": "Sayfanın dilinde \"5 dakika önce\" gibi gösterilen an.",
@@ -89,7 +100,27 @@
       "hero": "Büyük görselli bölüm; slaytlar yalnızca istenince döner.",
       "reactions": "Sayıları bir eylemle saklanan tepki düğmeleri.",
       "link_button": "Buton görünümlü, başka sayfaya giden bağlantı.",
-      "clear_prefs": "Tarayıcının uygulama için tuttuğu seçimleri silen düğme."
+      "clear_prefs": "Tarayıcının uygulama için tuttuğu seçimleri silen düğme.",
+      "diff_view": "Bir kayıtta değişen alanlar, eski ve yeni yan yana ya da satır içinde.",
+      "code_view": "Salt okunur kod ve JSON, sunucuda renklendirilmiş, numaralı ve katlanır.",
+      "barcode": "Sunucuda SVG olarak çizilen Code 128 barkodları ve QR kodları.",
+      "inbox": "Güne göre bildirimler, toplu okundu işaretleme ve arşivleme, okunmamış sayısıyla zil.",
+      "kanban": "Bir iş akışının sütunlarında kartlar, sürükleyerek, menüyle veya klavyeyle taşınır.",
+      "calendar": "Kullanıcının saat diliminde ay, hafta veya gün görünümünde etkinlikler, etkinlik pencereleri ve aralık seçimiyle.",
+      "price": "Üstü çizili eski fiyat, indirim yüzdesi ve birim fiyatla bir fiyat.",
+      "range_slider": "Fiyat ve tarih aralıkları için tek çubukta iki tutamaç.",
+      "quantity_stepper": "Stoğu sunucuda denetlenen bir sayının iki yanında eksi ve artı düğmeleri.",
+      "variant_picker": "Fiyatı, fotoğrafı ve stoğu yerinde değiştiren renk örnekleri ve beden çipleri.",
+      "product_gallery": "Küçük resimler, yakınlaştırma, kaydırma ve tam ekran görünümüyle ürün fotoğrafları.",
+      "facet_panel": "Ürün kartlarını yerinde yenileyen sayılı filtreler, fiyat aralığı ve seçili filtre çipleri.",
+      "review_summary": "Ortalama puan, değerlendirme sayısı ve 5'ten 1'e her yıldız için bir çubuk.",
+      "countdown": "Sunucu saatindeki bir ana kalan süre ve bitiş durumu.",
+      "message_thread": "Gönderene ve güne göre sohbet balonları, iletim durumları, kaydırdıkça yüklenen geçmiş ve akışla gelen yapay zekâ yanıtları.",
+      "composer": "Gönderme tuşları, ekler, @ ile anma ve sohbet başına taslakla büyüyen mesaj kutusu.",
+      "typing_indicator": "Bir sohbette başka kimlerin yazdığını gerçek zamanlı kanal üzerinden gösterir.",
+      "story_ring": "Hikâyelerinin yeni olup olmadığını gösteren halkalı avatar.",
+      "lightbox": "Tam ekran açılan resimler ve videolar; açıklama, yakınlaştırma ve kaydırma ile.",
+      "feed": "Yenilerini bir düğmenin arkasında tutan, sonsuz bir gönderi akışı."
     },
     "ex": {
       "action_button": {
@@ -111,7 +142,8 @@
         "sizes": "Boyutlar"
       },
       "badge": {
-        "overview": "Örnek"
+        "overview": "Örnek",
+        "dots_and_counts": "Noktalar ve sayılar"
       },
       "breadcrumb": {
         "overview": "Örnek"
@@ -121,16 +153,19 @@
       },
       "card": {
         "overview": "Örnek",
-        "nested": "İçerikle"
+        "nested": "İçerikle",
+        "action_and_footer": "Eylem ve alt bilgi"
       },
       "card_grid": {
         "overview": "Örnek",
-        "pages": "Numaralı sayfalar"
+        "pages": "Numaralı sayfalar",
+        "fast_catalog": "Hızlı ürün kataloğu"
       },
       "chart": {
         "overview": "Örnek",
         "donut": "Halka",
-        "gauge": "Gösterge"
+        "gauge": "Gösterge",
+        "side_by_side": "Yan yana, genişliği dolduran"
       },
       "chips": {
         "overview": "Süzme çipleri",
@@ -143,7 +178,10 @@
         "overview": "Örnek"
       },
       "data_grid": {
-        "overview": "Örnek"
+        "overview": "Örnek",
+        "confirm_actions": "Önce soran satır ve toplu işlemler",
+        "numbers": "Yerel ayara göre gruplanmış sayılar, düz bir yıl",
+        "computed_million": "Sayfa sayfa üretilen bir milyon hesaplanmış satır"
       },
       "date_pickers": {
         "overview": "Örnek"
@@ -174,15 +212,33 @@
         "rotating": "Dönen slaytlar"
       },
       "image": {
-        "overview": "Örnek"
+        "overview": "Örnek",
+        "progressive": "Yer tutucu ve düşük çözünürlüklü dosya",
+        "fallback": "Yedek dosya ve hata",
+        "first_image": "İlk görsel"
       },
       "image_card": {
         "overview": "Örnek",
         "horizontal": "Yatay",
-        "with_preview": "Üzerine gelince önizleme"
+        "with_preview": "Üzerine gelince önizleme",
+        "with_price": "Fiyatlı"
+      },
+      "screen_header": {
+        "orders_page": "Sayfa başlığı"
+      },
+      "theme_picker": {
+        "overview": "Görünüm bölümü"
+      },
+      "app_header": {
+        "catalog_header": "Bu kataloğun başlığı"
+      },
+      "icon": {
+        "overview": "Bütün simgeler"
       },
       "kpi": {
-        "overview": "Örnek"
+        "overview": "Örnek",
+        "money": "Para",
+        "row_of_four": "Eşit yükseklikte dörtlü satır"
       },
       "line_editor": {
         "overview": "Örnek"
@@ -193,10 +249,14 @@
       "list": {
         "overview": "Örnek",
         "numbered_pages": "Toplamı olmayan numaralı sayfalar",
-        "fixed": "Sabit öğeler"
+        "fixed": "Sabit öğeler",
+        "builder": "Herhangi bir düğümle kurulan satırlar ve ayraç",
+        "virtual_rows": "Sabit satır yüksekliğiyle sanal kaydırma",
+        "repeat": "Bellekteki listenin her öğesi için bir düğüm"
       },
       "lookup": {
-        "overview": "Örnek"
+        "overview": "Örnek",
+        "country_city": "Seçilen ülkenin şehirleri"
       },
       "markdown": {
         "overview": "Örnek"
@@ -240,7 +300,8 @@
       },
       "rating": {
         "overview": "Örnek",
-        "three_stars": "Üç yıldız"
+        "three_stars": "Üç yıldız",
+        "half_stars": "Yarım yıldızlar"
       },
       "reactions": {
         "overview": "Örnek"
@@ -291,12 +352,98 @@
       "toolbox": {
         "overview": "Örnek"
       },
+      "topics": {
+        "overview": "Bir KPI, bir grafik ve bir tabloyu yöneten süzgeç çipleri",
+        "select": "Aynı dinleyicileri yöneten bir seçim kutusu",
+        "date_range_and_search": "Bir listeyi yöneten tarih aralığı ve arama kutusu",
+        "refresh_after_an_action": "Bir düğümü yenileyen eylem"
+      },
       "tree": {
         "overview": "Örnek"
       },
       "week_schedule": {
         "overview": "Örnek"
+      },
+      "diff_view": {
+        "overview": "Örnek",
+        "inline": "Satır içinde"
+      },
+      "code_view": {
+        "overview": "Örnek",
+        "rust": "Rust",
+        "json": "JSON"
+      },
+      "barcode": {
+        "overview": "Örnek",
+        "levels": "Hata düzeltme düzeyleri",
+        "digits": "Rakamlar"
+      },
+      "inbox": {
+        "overview": "Örnek",
+        "bell": "Bildirim zili"
+      },
+      "kanban": {
+        "overview": "Örnek"
+      },
+      "calendar": {
+        "overview": "Örnek"
+      },
+      "price": {
+        "overview": "Örnek",
+        "unit_price": "Birim fiyat",
+        "large": "Ürün sayfasında"
+      },
+      "range_slider": {
+        "overview": "Örnek",
+        "dates": "Tarihler"
+      },
+      "quantity_stepper": {
+        "overview": "Örnek"
+      },
+      "variant_picker": {
+        "overview": "Örnek"
+      },
+      "product_gallery": {
+        "overview": "Örnek",
+        "dots": "Küçük resimsiz"
+      },
+      "facet_panel": {
+        "overview": "Örnek"
+      },
+      "review_summary": {
+        "overview": "Örnek",
+        "few": "Birkaç değerlendirme"
+      },
+      "countdown": {
+        "overview": "Örnek",
+        "short": "Bir dakikadan biraz fazla"
+      },
+      "message_thread": {
+        "overview": "Örnek",
+        "ai_answer": "Markdown ile yapay zekâ yanıtı",
+        "long": "Uzun geçmiş"
+      },
+      "composer": {
+        "overview": "Sohbet listesiyle sohbet",
+        "assistant": "Yapay zekâ asistanı tarzı sohbet"
+      },
+      "typing_indicator": {
+        "overview": "Örnek"
+      },
+      "story_ring": {
+        "overview": "Örnek",
+        "row": "Yana kayan bir sıra"
+      },
+      "lightbox": {
+        "overview": "Örnek",
+        "single": "Tek bir resim"
+      },
+      "feed": {
+        "overview": "Örnek"
       }
+    },
+    "typing": {
+      "realtime": "Bu katalog gerçek zamanlı kanal olmadan çalışır; bu yüzden gösterge boş kalır ve mesaj kutusu yazma sinyali göndermez. App::realtime ve konusu tanımlanmış bir uygulamada, diğerleri yazarken adları burada görünür."
     }
   }
 }
