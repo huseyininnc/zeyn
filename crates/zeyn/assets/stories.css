@@ -1,0 +1,44 @@
+/* Story rings (`zeyn::ui::StoryRing`, `StoryRow`): linked only by pages that hold `.z-story` or
+   `.z-stories`. CSS only: the ring is a gradient behind the picture, thick in the brand colors
+   while stories are unseen, thin and neutral once seen. */
+
+.z-stories {
+  display: flex; gap: var(--z-s-3); margin: 0 0 var(--z-gap); padding: var(--z-s-1) var(--z-s-1) var(--z-s-2);
+  list-style: none; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity;
+  scroll-padding-inline: var(--z-s-1); scrollbar-width: thin;
+}
+.z-stories > li { flex: none; scroll-snap-align: start; }
+.z-stories:focus-visible { outline: 2px solid var(--z-focus); outline-offset: 2px; }
+
+.z-story {
+  display: inline-flex; flex-direction: column; align-items: center; gap: var(--z-s-1); inline-size: 76px;
+  color: var(--z-text); text-decoration: none; border-radius: var(--z-radius-lg);
+}
+a.z-story:focus-visible { outline: 2px solid var(--z-focus); outline-offset: 2px; }
+.z-story-ring {
+  display: grid; place-items: center; box-sizing: border-box; inline-size: 72px; block-size: 72px;
+  padding: 1px; border-radius: var(--z-radius-full); background: var(--z-border-strong);
+}
+.z-story-unseen .z-story-ring {
+  padding: 3px;
+  background: conic-gradient(from 200deg, var(--z-brand), var(--z-accent), var(--z-chart-2, var(--z-brand)), var(--z-brand));
+}
+.z-story-face {
+  box-sizing: border-box; inline-size: 100%; block-size: 100%; border-radius: var(--z-radius-full);
+  border: 3px solid var(--z-surface); background: var(--z-surface-2); object-fit: cover;
+}
+.z-story-seen .z-story-face { border-width: 4px; }
+.z-story-initials {
+  display: grid; place-items: center; font-size: var(--z-text-lg); font-weight: 600; color: var(--z-text);
+}
+.z-story-name {
+  max-inline-size: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--z-text-xs); line-height: var(--z-leading-xs);
+}
+.z-story-seen .z-story-name { color: var(--z-text-muted); }
+a.z-story:hover .z-story-name { text-decoration: underline; }
+
+@media (forced-colors: active) {
+  .z-story-ring, .z-story-unseen .z-story-ring { background: none; border: 3px solid CanvasText; padding: 0; }
+  .z-story-seen .z-story-ring { border: 1px dashed GrayText; }
+}

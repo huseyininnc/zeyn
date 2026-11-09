@@ -33,9 +33,9 @@
       "charts": "Grafikler",
       "shell": "Kabuk",
       "admin": "Yönetim",
-      "shell": "Kabuk",
       "shop": "Mağaza",
-      "chat": "Sohbet"
+      "chat": "Sohbet",
+      "social": "Sosyal"
     },
     "summary": {
       "stack": "Aralarında boşluk olan, alt alta düğümler.",
@@ -107,7 +107,6 @@
       "inbox": "Güne göre bildirimler, toplu okundu işaretleme ve arşivleme, okunmamış sayısıyla zil.",
       "kanban": "Bir iş akışının sütunlarında kartlar, sürükleyerek, menüyle veya klavyeyle taşınır.",
       "calendar": "Kullanıcının saat diliminde ay, hafta veya gün görünümünde etkinlikler, etkinlik pencereleri ve aralık seçimiyle.",
-      "clear_prefs": "Tarayıcının uygulama için tuttuğu seçimleri silen düğme.",
       "price": "Üstü çizili eski fiyat, indirim yüzdesi ve birim fiyatla bir fiyat.",
       "range_slider": "Fiyat ve tarih aralıkları için tek çubukta iki tutamaç.",
       "quantity_stepper": "Stoğu sunucuda denetlenen bir sayının iki yanında eksi ve artı düğmeleri.",
@@ -118,7 +117,10 @@
       "countdown": "Sunucu saatindeki bir ana kalan süre ve bitiş durumu.",
       "message_thread": "Gönderene ve güne göre sohbet balonları, iletim durumları, kaydırdıkça yüklenen geçmiş ve akışla gelen yapay zekâ yanıtları.",
       "composer": "Gönderme tuşları, ekler, @ ile anma ve sohbet başına taslakla büyüyen mesaj kutusu.",
-      "typing_indicator": "Bir sohbette başka kimlerin yazdığını gerçek zamanlı kanal üzerinden gösterir."
+      "typing_indicator": "Bir sohbette başka kimlerin yazdığını gerçek zamanlı kanal üzerinden gösterir.",
+      "story_ring": "Hikâyelerinin yeni olup olmadığını gösteren halkalı avatar.",
+      "lightbox": "Tam ekran açılan resimler ve videolar; açıklama, yakınlaştırma ve kaydırma ile.",
+      "feed": "Yenilerini bir düğmenin arkasında tutan, sonsuz bir gönderi akışı."
     },
     "ex": {
       "action_button": {
@@ -426,6 +428,17 @@
         "assistant": "Yapay zekâ asistanı tarzı sohbet"
       },
       "typing_indicator": {
+        "overview": "Örnek"
+      },
+      "story_ring": {
+        "overview": "Örnek",
+        "row": "Yana kayan bir sıra"
+      },
+      "lightbox": {
+        "overview": "Örnek",
+        "single": "Tek bir resim"
+      },
+      "feed": {
         "overview": "Örnek"
       }
     },

@@ -33,9 +33,9 @@
       "charts": "Charts",
       "shell": "Shell",
       "admin": "Admin",
-      "shell": "Shell",
       "shop": "Shop",
-      "chat": "Chat"
+      "chat": "Chat",
+      "social": "Social"
     },
     "summary": {
       "stack": "Nodes one under the other with a gap.",
@@ -107,7 +107,6 @@
       "inbox": "Notifications by day with bulk mark read and archive, and the bell with the unread count.",
       "kanban": "Cards in columns of a workflow, moved by drag, a menu or the keyboard.",
       "calendar": "Events in a month, week or day in the user time zone, with event windows and slots.",
-      "clear_prefs": "A button that removes the choices this browser keeps for the app.",
       "price": "A price with a struck old price, the percent off and a unit price.",
       "range_slider": "Two handles over one track for price and date ranges.",
       "quantity_stepper": "Minus and plus buttons around a number whose stock the server checks.",
@@ -118,7 +117,10 @@
       "countdown": "The time left until a moment on the server's clock, with an end state.",
       "message_thread": "Chat bubbles by sender and day, delivery states, a history that loads as it scrolls, streamed AI replies.",
       "composer": "A growing message box with send keys, attachments, @ mentions and drafts per conversation.",
-      "typing_indicator": "Who else is typing in a conversation, over the realtime channel."
+      "typing_indicator": "Who else is typing in a conversation, over the realtime channel.",
+      "story_ring": "An avatar in a ring that says whether its stories are new.",
+      "lightbox": "Images and videos that open full screen, with captions, zoom and swipes.",
+      "feed": "An endless stream of posts that holds new ones behind a button."
     },
     "ex": {
       "action_button": {
@@ -426,6 +428,17 @@
         "assistant": "AI assistant style thread"
       },
       "typing_indicator": {
+        "overview": "Example"
+      },
+      "story_ring": {
+        "overview": "Example",
+        "row": "A row that scrolls sideways"
+      },
+      "lightbox": {
+        "overview": "Example",
+        "single": "A single image"
+      },
+      "feed": {
         "overview": "Example"
       }
     },

@@ -20,6 +20,7 @@ mod diff;
 mod dock;
 mod embed;
 mod facets;
+mod feed;
 mod gallery;
 mod hero;
 mod inbox;
@@ -46,6 +47,7 @@ mod relative;
 mod reviews;
 mod share;
 mod shell;
+mod story;
 mod thread;
 mod topics;
 mod tree;
@@ -98,6 +100,7 @@ pub use date::DateOptions;
 pub(crate) use date::{input_text, picker_config, range_reversed, render_date_input, render_range};
 pub use diff::{DiffLayout, DiffView, MAX_DIFF_FIELDS};
 pub use facets::{Facet, FacetPanel, MAX_FACET_OPTIONS, MAX_FACETS};
+pub use feed::{Feed, MAX_FEED_BATCH, MAX_POST_MEDIA, Post};
 pub use gallery::{MAX_GALLERY_IMAGES, ProductGallery};
 pub use hero::{HERO_SECONDS, Hero, MAX_HERO_SLIDES};
 pub use inbox::{Inbox, InboxSelection, MAX_INBOX, MAX_UNREAD, NotificationCenter, UnreadCount};
@@ -123,6 +126,7 @@ pub use reactions::{MAX_REACTIONS, ReactionPress, ReactionState, Reactions};
 pub use relative::RelativeTime;
 pub use reviews::ReviewSummary;
 pub use share::Share;
+pub use story::{MAX_STORY_RINGS, StoryRing, StoryRow, StoryState};
 pub use thread::{
     Delivery, MAX_CONVERSATION, MAX_MESSAGE_CHARS, MAX_REPLY_CHARS, MAX_SHOWN_FILES, MessageThread,
     REPLY_BUFFER, REPLY_SECONDS, ReplyRequest, THREAD_PAGE, ThreadQuery,

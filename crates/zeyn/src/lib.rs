@@ -273,6 +273,7 @@ pub mod prelude {
         Countdown, Facet, FacetPanel, Price, PriceUnit, ProductGallery, QuantityStepper,
         RangeSlider, ReviewSummary, VariantGroup, VariantPicker,
     };
+    pub use crate::ui::{Feed, Post, StoryRing, StoryRow, StoryState};
     #[cfg(feature = "server")]
     pub use crate::ui::{Reply, ReplySender};
     pub use crate::{

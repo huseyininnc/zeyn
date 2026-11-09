@@ -365,7 +365,18 @@ pub struct Image<A = Given, S = Given> {
     srcset: Vec<(String, String)>,
     sizes: Option<String>,
     loading: Loading,
+    pub(crate) zoom: Option<Zoom>,
     _parts: PhantomData<(A, S)>,
+}
+
+/// What an image opens in the lightbox: a larger file, a caption or a video, and whether the
+/// trigger carries the lightbox texts itself (a post leaves them to its feed).
+#[derive(Default)]
+pub(crate) struct Zoom {
+    full: Option<String>,
+    caption: Option<Text>,
+    video: Option<String>,
+    pub(crate) texts_elsewhere: bool,
 }
 
 impl Image<NoAlt, NoSize> {
@@ -378,6 +389,7 @@ impl Image<NoAlt, NoSize> {
             srcset: Vec::new(),
             sizes: None,
             loading: Loading::default(),
+            zoom: None,
             _parts: PhantomData,
         }
     }
@@ -393,8 +405,61 @@ impl<A, S> Image<A, S> {
             srcset: self.srcset,
             sizes: self.sizes,
             loading: self.loading,
+            zoom: self.zoom,
             _parts: PhantomData,
         }
+    }
+
+    /// Opens the image full screen in the lightbox when it is clicked or pressed with Enter: a
+    /// modal dialog with the image as large as the screen allows, its caption, zoom and, for
+    /// the images of one container (a `Row`, `Stack` or `AutoGrid`) or one post, the arrow keys
+    /// and swipes between them. Without script the image is a link to its file.
+    ///
+    /// ```
+    /// use zeyn::prelude::*;
+    /// let photo = Image::new("/img/harbor-640.webp")
+    ///     .alt("The harbor at dawn")
+    ///     .size(640, 427)
+    ///     .lightbox()
+    ///     .full("/img/harbor-2400.webp")
+    ///     .caption("Taken from the old lighthouse");
+    /// ```
+    pub fn lightbox(mut self) -> Self {
+        self.zoom
+            .get_or_insert_with(Zoom::default);
+        self
+    }
+
+    /// The larger file the lightbox shows, while the image itself stays the small one in the
+    /// page. Same address rules as the image; the image's own file is used when it breaks them.
+    /// Turns the lightbox on.
+    pub fn full(mut self, src: impl Into<String>) -> Self {
+        self.zoom
+            .get_or_insert_with(Zoom::default)
+            .full = Some(src.into());
+        self
+    }
+
+    /// A caption under the image in the lightbox. Turns the lightbox on.
+    pub fn caption(mut self, caption: impl Into<Text>) -> Self {
+        self.zoom
+            .get_or_insert_with(Zoom::default)
+            .caption = Some(caption.into());
+        self
+    }
+
+    /// Makes the image the poster of a video: a play mark covers it and the lightbox plays the
+    /// file `file` of the media source `source` (see `Feature::media`), which checks the
+    /// permission and serves ranges on every request. A file name that is not a valid media id
+    /// leaves the image a plain one. Turns the lightbox on.
+    pub fn video(mut self, source: &'static str, file: impl Into<String>) -> Self {
+        let file = file.into();
+        if crate::media::valid_media_id(&file) && crate::media::valid_media_id(source) {
+            self.zoom
+                .get_or_insert_with(Zoom::default)
+                .video = Some(format!("/_zeyn/media/{source}/{file}"));
+        }
+        self
     }
 
     /// Loads the image only when it comes near the viewport.
@@ -553,6 +618,9 @@ impl Component for Image<Given, Given> {
             };
             format!(r#" srcset="{}"{sizes}"#, candidates.join(", "))
         };
+        if let Some(zoom) = &self.zoom {
+            zoom.open(out, r, &self.src, alt.is_empty());
+        }
         let wrap = self.loading.wraps();
         if wrap {
             out.push_str(&format!(
@@ -572,6 +640,9 @@ impl Component for Image<Given, Given> {
             out.push_str(&self.loading.error(r));
             out.push_str("</span>");
         }
+        if let Some(zoom) = &self.zoom {
+            zoom.close(out, r);
+        }
     }
 
     fn schema(&self) -> Json {
@@ -584,8 +655,84 @@ impl Component for Image<Given, Given> {
             "lazy": self.lazy,
             "sizes": self.sizes,
             "loading": self.loading.schema(),
+            "lightbox": self.zoom.as_ref().map(|z| json!({ "full": z.full, "caption": z.caption, "video": z.video })),
         })
     }
+}
+
+impl Zoom {
+    /// Opens the trigger: a link to the larger file (or the video) that the lightbox script
+    /// takes over, never prefetched as a screen.
+    fn open(&self, out: &mut String, r: &Render, src: &str, unnamed: bool) {
+        let csp = policy(r);
+        let full = self
+            .full
+            .as_deref()
+            .filter(|f| csp.allows_image(f))
+            .unwrap_or(src);
+        let href = self.video.as_deref().unwrap_or(full);
+        let caption = self
+            .caption
+            .as_ref()
+            .map(|c| format!(r#" data-caption="{}""#, r.text(c)))
+            .unwrap_or_default();
+        let video = self
+            .video
+            .as_ref()
+            .map(|v| format!(r#" data-video="{}""#, escape(v)))
+            .unwrap_or_default();
+        let texts = if self.texts_elsewhere {
+            String::new()
+        } else {
+            format!(
+                r#" data-zeyn-lightbox-texts="{}""#,
+                crate::render::attr(&lightbox_texts(r))
+            )
+        };
+        let name = if unnamed {
+            format!(
+                r#" aria-label="{}""#,
+                r.text(&Text::key("zeyn.ui.lightbox.open"))
+            )
+        } else {
+            String::new()
+        };
+        out.push_str(&format!(
+            r#"<a class="z-lightbox-open" href="{}" data-zeyn-lightbox data-zeyn-no-prefetch aria-haspopup="dialog"{name}{caption}{video}{texts}>"#,
+            escape(href)
+        ));
+    }
+
+    /// Closes the trigger, with the play mark of a video.
+    fn close(&self, out: &mut String, r: &Render) {
+        if self.video.is_some() {
+            out.push_str(&format!(
+                r#"<span class="z-lightbox-play"><span class="z-sr-only">{}</span></span>"#,
+                r.text(&Text::key("zeyn.ui.lightbox.video"))
+            ));
+        }
+        out.push_str("</a>");
+    }
+}
+
+/// The texts of the lightbox dialog in the user's language, as the script reads them from
+/// `data-zeyn-lightbox-texts`.
+pub(crate) fn lightbox_texts(r: &Render) -> Json {
+    [
+        "label", "close", "previous", "next", "position", "zoom_in", "zoom_out",
+    ]
+    .iter()
+    .map(|k| {
+        (
+            k.to_string(),
+            json!(
+                r.i18n
+                    .text(r.locale, &Text::key(format!("zeyn.ui.lightbox.{k}")))
+            ),
+        )
+    })
+    .collect::<serde_json::Map<_, _>>()
+    .into()
 }
 
 /// The longest [`Placeholder::blur`] data URI, in bytes. A 16 by 16 pixel WebP or AVIF fits

@@ -82,7 +82,8 @@
       "desktop": "데스크톱 앱",
       "protocol": "런타임 프로토콜",
       "database_reference": "데이터베이스 레퍼런스",
-      "about": "소스, 라이선스와 보안"
+      "about": "소스, 라이선스와 보안",
+      "social": "소셜"
     },
     "translation": {
       "note": "이 페이지는 영어에서 번역되었습니다.",

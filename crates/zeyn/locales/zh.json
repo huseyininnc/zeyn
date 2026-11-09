@@ -603,6 +603,34 @@
           "day": "天",
           "left": "剩余 {d} 天 {h} 小时 {m} 分钟"
         }
+      },
+      "story": {
+        "row": "故事",
+        "unseen": "{name}，有未看的故事",
+        "seen": "{name}，故事已全部看过"
+      },
+      "lightbox": {
+        "label": "媒体查看器",
+        "close": "关闭",
+        "previous": "上一个",
+        "next": "下一个",
+        "position": "第 {n} 个，共 {count} 个",
+        "zoom_in": "放大",
+        "zoom_out": "缩小",
+        "open": "打开图片",
+        "video": "播放视频"
+      },
+      "feed": {
+        "label": "帖子",
+        "new_one": "1 条新帖子",
+        "new_many": "{count} 条新帖子",
+        "new_more": "超过 {count} 条新帖子",
+        "newest": "回到最新帖子",
+        "loaded": "已显示 {count} 条帖子",
+        "error": "无法加载帖子，请重试。",
+        "empty": "还没有帖子。",
+        "comments": "{count} 条评论",
+        "comments_one": "1 条评论"
       }
     },
     "date": {

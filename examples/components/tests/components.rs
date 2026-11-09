@@ -413,3 +413,31 @@ async fn the_chat_samples_keep_their_caps_and_sends_reach_the_store() {
     }
     assert_eq!(files.stored(), composer::MAX_SAMPLE_FILES);
 }
+
+#[tokio::test]
+async fn the_social_demo_keeps_its_published_posts_and_reactions_within_their_caps() {
+    use zeyn_example_components::examples::feed;
+    for i in 0..feed::MAX_SAMPLE_POSTS + 15 {
+        feed::publish_sample(1_793_000_000_000 + i as i64);
+        assert!(feed::stored_posts() <= feed::MAX_SAMPLE_POSTS);
+    }
+    assert_eq!(feed::stored_posts(), feed::MAX_SAMPLE_POSTS);
+    for id in 1..=(feed::MAX_SAMPLE_REACTIONS as i64 + 50) {
+        feed::count_press(id, 0, true);
+        assert!(feed::stored_reactions() <= feed::MAX_SAMPLE_REACTIONS);
+    }
+    assert_eq!(feed::stored_reactions(), feed::MAX_SAMPLE_REACTIONS);
+    let router = site::router(app().unwrap().router().unwrap());
+    let node = node_of(&router, "/ui/feed/social", r#"<section class="z-feed""#).await;
+    let press = |key: &str| serde_json::json!({ "key": key, "reaction": "like", "pressed": true });
+    assert_eq!(
+        write(&router, "social_demo", &node, "react", press("42")).await,
+        StatusCode::OK
+    );
+    assert_eq!(feed::stored_reactions(), feed::MAX_SAMPLE_REACTIONS);
+    assert_eq!(
+        write(&router, "social_demo", &node, "react", press("20000")).await,
+        StatusCode::NOT_FOUND,
+        "a post that does not exist never reaches the store"
+    );
+}

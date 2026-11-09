@@ -55,6 +55,7 @@ head의 모든 프레임워크 스크립트와 스타일시트에는 `?v=`와 �
 | `inbox.js`, `kanban.js`, `calendar.js` and their stylesheets, `diff.css`, `code.css`, `barcode.css` | 받은 편지함과 알림 종; Kanban 보드; 달력; 스크립트가 필요 없는 비교, 코드 보기, 바코드(코드 보기의 복사 버튼은 `share.js`에 있음) |
 | `range.js`, `quantity.js`, `gallery.js`, `countdown.js`, `commerce.css` | 범위 슬라이더, 수량 선택기, 상품 갤러리, 카운트다운; 모든 쇼핑 컴포넌트의 스타일시트(가격, 옵션 선택기, 패싯 패널, 리뷰 요약) |
 | `thread.js` 및 `thread.css`, `stream.js`, `composer.js` 및 `composer.css`, `typing.js` 및 `typing.css` | 메시지 스레드; 스레드와 어시스턴트가 함께 쓰는 스트리밍 Markdown과 JSON 줄; 채팅 composer; 입력 중 표시기 |
+| `feed.js`, `lightbox.js` and their stylesheets, `stories.css` | 게시물 피드; 이미지와 동영상 라이트박스; 스토리 링과 그 행, 스크립트 필요 없음 |
 
 전체 페이지는 head에 모든 페이지가 쓰는 스타일시트(`zeyn.css`, `components.css`, `content.css`, `pro.css`, `enterprise.css`), HTML에 표식이 있는 모듈의 스타일시트, 그리고 그 스크립트를 import하는 모듈 뒤에 링크합니다. `zeyn.js`는 같은 표(`[name, script selector, style selector]`)와 함께 제공되며 나중에 도착하는 콘텐츠에 빠진 것을 불러옵니다: `nav.js`는 화면을 바꾸기 전에 `{ root, waits }`와 함께 `zeyn:need`를 보내고 새 스타일시트를 기다리며, 창도 열리기 전에 같은 방식으로 기다리고, `zeyn:content`, grid 페이지, grid 필터는 담고 있는 것의 스크립트를 불러옵니다. 브라우저는 URL마다 인스턴스를 하나만 유지하므로 모듈은 한 번만 실행됩니다. 모듈은 실행될 때 문서에서 찾은 것을 설정하고 그 뒤에는 `zeyn:content`를 듣습니다. 페이지에 없는 컴포넌트를 찾거나 듣지 않습니다. 모듈은 자신의 URL에 있는 `?v=`로 공유 부분을 import합니다. `tests/ui_modules.rs`는 페이지가 쓰지 않는 모듈을 링크하거나 모듈 스타일시트가 표식 밖의 클래스를 꾸밀 때 실패합니다.
 

@@ -603,6 +603,34 @@
           "day": "日",
           "left": "残り {d} 日 {h} 時間 {m} 分"
         }
+      },
+      "story": {
+        "row": "ストーリー",
+        "unseen": "{name}、未読のストーリーあり",
+        "seen": "{name}、ストーリーはすべて既読"
+      },
+      "lightbox": {
+        "label": "メディアビューアー",
+        "close": "閉じる",
+        "previous": "前へ",
+        "next": "次へ",
+        "position": "{count} 件中 {n} 件目",
+        "zoom_in": "拡大",
+        "zoom_out": "縮小",
+        "open": "画像を開く",
+        "video": "動画を再生"
+      },
+      "feed": {
+        "label": "投稿",
+        "new_one": "新しい投稿 1 件",
+        "new_many": "新しい投稿 {count} 件",
+        "new_more": "新しい投稿 {count} 件以上",
+        "newest": "最新の投稿に戻る",
+        "loaded": "{count} 件の投稿を表示中",
+        "error": "投稿を読み込めませんでした。もう一度お試しください。",
+        "empty": "まだ投稿はありません。",
+        "comments": "コメント {count} 件",
+        "comments_one": "コメント 1 件"
       }
     },
     "date": {

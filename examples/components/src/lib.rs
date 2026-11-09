@@ -248,6 +248,11 @@ catalog! {
         composer "/ui/composer" (Demo);
         typing_indicator "/ui/typing-indicator";
     }
+    "social" Users {
+        story_ring "/ui/story-ring";
+        lightbox "/ui/lightbox";
+        feed "/ui/feed";
+    }
 }
 
 /// The component with this slug.
@@ -332,7 +337,8 @@ pub fn feature() -> Feature {
                 examples::composer::CHAT_FILES,
                 "catalog.demo",
                 examples::composer::FILES.clone(),
-            ),
+            )
+            .screen(examples::feed::social_demo),
     )
 }
 

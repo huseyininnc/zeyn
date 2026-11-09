@@ -82,7 +82,8 @@
       "desktop": "Apps de escritorio",
       "protocol": "Protocolo del runtime",
       "database_reference": "Referencia de base de datos",
-      "about": "Código, licencia y seguridad"
+      "about": "Código, licencia y seguridad",
+      "social": "Social"
     },
     "translation": {
       "note": "Esta página está traducida del inglés.",

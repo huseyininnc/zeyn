@@ -603,6 +603,34 @@
           "day": "d",
           "left": "Quedan {d} d {h} h {m} min"
         }
+      },
+      "story": {
+        "row": "Historias",
+        "unseen": "{name}, historias sin ver",
+        "seen": "{name}, todas las historias vistas"
+      },
+      "lightbox": {
+        "label": "Visor de medios",
+        "close": "Cerrar",
+        "previous": "Anterior",
+        "next": "Siguiente",
+        "position": "{n} de {count}",
+        "zoom_in": "Acercar",
+        "zoom_out": "Alejar",
+        "open": "Abrir imagen",
+        "video": "Reproducir video"
+      },
+      "feed": {
+        "label": "Publicaciones",
+        "new_one": "1 publicación nueva",
+        "new_many": "{count} publicaciones nuevas",
+        "new_more": "Más de {count} publicaciones nuevas",
+        "newest": "Volver a las más recientes",
+        "loaded": "{count} publicaciones mostradas",
+        "error": "No se pudieron cargar las publicaciones. Inténtalo de nuevo.",
+        "empty": "Todavía no hay publicaciones.",
+        "comments": "{count} comentarios",
+        "comments_one": "1 comentario"
       }
     },
     "date": {

@@ -123,7 +123,7 @@ where
 pub struct Reactions {
     label: Option<Text>,
     target: String,
-    reactions: Vec<(&'static str, Text, &'static str)>,
+    reactions: ReactionSet,
     state: ReactionState,
     source: Box<dyn DataSource>,
     make: fn(String, Vec<&'static str>) -> Box<dyn DataSource>,
@@ -152,7 +152,7 @@ impl Reactions {
             label: None,
             source: make_source::<A>(target.clone(), Vec::new()),
             target,
-            reactions: Vec::new(),
+            reactions: ReactionSet::default(),
             state: ReactionState::default(),
             make: make_source::<A>,
             action: A::META,
@@ -166,20 +166,11 @@ impl Reactions {
         name: impl Into<Text>,
         symbol: &'static str,
     ) -> Self {
-        if self.reactions.len() < MAX_REACTIONS
-            && !self
-                .reactions
-                .iter()
-                .any(|(k, _, _)| *k == key)
+        if self
+            .reactions
+            .add(key, name.into(), symbol)
         {
-            self.reactions
-                .push((key, name.into(), symbol));
-            let keys = self
-                .reactions
-                .iter()
-                .map(|(k, _, _)| *k)
-                .collect();
-            self.source = (self.make)(self.target.clone(), keys);
+            self.source = (self.make)(self.target.clone(), self.reactions.keys());
         }
         self
     }
@@ -199,32 +190,14 @@ impl Reactions {
 
 impl Component for Reactions {
     fn render(&self, out: &mut String, r: &Render) {
-        let label = match &self.label {
-            Some(l) => r.text(l),
-            None => r.text(&Text::key("zeyn.ui.reactions.label")),
-        };
-        out.push_str(&format!(
-            r#"<div class="z-reactions" role="group" aria-label="{label}" data-zeyn-reactions data-failed="{}">"#,
-            r.text(&Text::key("zeyn.ui.reactions.failed"))
-        ));
-        for (key, name, symbol) in &self.reactions {
-            let count = self
-                .state
-                .counts
-                .get(*key)
-                .copied()
-                .unwrap_or(0);
-            let mine = self.state.mine.iter().any(|m| m == key);
-            out.push_str(&format!(
-                r#"<button type="button" class="z-reaction" aria-pressed="{mine}" data-reaction="{}" data-testid="{}.reaction.{}"><span class="z-reaction-symbol" aria-hidden="true">{}</span><span class="z-sr-only">{}</span><span class="z-reaction-count">{count}</span></button>"#,
-                escape(key),
-                r.scope,
-                escape(key),
-                escape(symbol),
-                r.text(name)
-            ));
-        }
-        out.push_str("</div>");
+        reaction_row(
+            out,
+            r,
+            self.label.as_ref(),
+            &self.reactions,
+            &self.state,
+            false,
+        );
     }
 
     fn schema(&self) -> Json {
@@ -232,11 +205,7 @@ impl Component for Reactions {
             "type": "reactions",
             "action": self.action,
             "target": self.target,
-            "reactions": self
-                .reactions
-                .iter()
-                .map(|(k, n, s)| json!({ "key": k, "name": n, "symbol": s }))
-                .collect::<Vec<_>>(),
+            "reactions": self.reactions.schema(),
             "state": self.state,
         })
     }
@@ -244,4 +213,72 @@ impl Component for Reactions {
     fn source(&self, key: &str) -> Option<&dyn DataSource> {
         (key == "react").then_some(self.source.as_ref())
     }
+}
+
+/// The reactions a row offers: key, name and symbol, each key once, at most [`MAX_REACTIONS`].
+#[derive(Default)]
+pub(crate) struct ReactionSet(Vec<(&'static str, Text, &'static str)>);
+
+impl ReactionSet {
+    /// Adds a reaction; `false` when its key is already there or the set is full.
+    pub(crate) fn add(&mut self, key: &'static str, name: Text, symbol: &'static str) -> bool {
+        let fits = self.0.len() < MAX_REACTIONS && !self.0.iter().any(|(k, _, _)| *k == key);
+        if fits {
+            self.0.push((key, name, symbol));
+        }
+        fits
+    }
+
+    pub(crate) fn keys(&self) -> Vec<&'static str> {
+        self.0
+            .iter()
+            .map(|(k, _, _)| *k)
+            .collect()
+    }
+
+    pub(crate) fn schema(&self) -> Json {
+        self.0
+            .iter()
+            .map(|(k, n, s)| json!({ "key": k, "name": n, "symbol": s }))
+            .collect::<Vec<_>>()
+            .into()
+    }
+}
+
+/// Writes a row of reaction buttons. The row of a feed post (`of_post`) carries
+/// `data-zeyn-post`, so `reactions.js` sends the key of the post around it.
+pub(crate) fn reaction_row(
+    out: &mut String,
+    r: &Render,
+    label: Option<&Text>,
+    set: &ReactionSet,
+    state: &ReactionState,
+    of_post: bool,
+) {
+    let label = match label {
+        Some(l) => r.text(l),
+        None => r.text(&Text::key("zeyn.ui.reactions.label")),
+    };
+    out.push_str(&format!(
+        r#"<div class="z-reactions" role="group" aria-label="{label}" data-zeyn-reactions{} data-failed="{}">"#,
+        if of_post { " data-zeyn-post" } else { "" },
+        r.text(&Text::key("zeyn.ui.reactions.failed"))
+    ));
+    for (key, name, symbol) in &set.0 {
+        let count = state
+            .counts
+            .get(*key)
+            .copied()
+            .unwrap_or(0);
+        let mine = state.mine.iter().any(|m| m == key);
+        out.push_str(&format!(
+            r#"<button type="button" class="z-reaction" aria-pressed="{mine}" data-reaction="{}" data-testid="{}.reaction.{}"><span class="z-reaction-symbol" aria-hidden="true">{}</span><span class="z-sr-only">{}</span><span class="z-reaction-count">{count}</span></button>"#,
+            escape(key),
+            r.scope,
+            escape(key),
+            escape(symbol),
+            r.text(name)
+        ));
+    }
+    out.push_str("</div>");
 }
