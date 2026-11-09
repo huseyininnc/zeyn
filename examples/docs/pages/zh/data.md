@@ -20,7 +20,7 @@ Tree::of(sample_tree).label("Products by unit")
 
 树遵循 ARIA tree 模式：方向键在条目之间移动，并展开或折叠分支。服务器会限制每个分支的子节点数量（`MAX_TREE_CHILDREN`）。
 
-`.draggable()` 让叶子可以拖到放置目标上，例如一个 island。拖动携带 MIME 类型 `application/x-zeyn-tree` 和 JSON `{ "id", "path", "label" }`（`path` 是从顶层到该叶子的 id 列表），并把标签作为 `text/plain`。拖动不是唯一的方式：在获得焦点的叶子上按 Control+Enter（Mac 上为 Command+Enter）会派发 DOM 事件 `zeyn:tree-insert`，其 `detail` 是同一个对象，目标可以在自己当前的位置插入，树会向屏幕阅读器播报这次插入。拖动代码（`treedrag.js`）只在含有可拖动树的页面上加载。
+`.draggable()` 让叶子可以拖到放置目标上，例如一个 island。拖动携带 MIME 类型 `application/x-zeyn-tree` 和 JSON `{ "id", "path", "label" }`（`path` 是从顶层到该叶子的 id 列表），并把标签作为 `text/plain`；放置目标在 `dragover` 处理函数中设置 `dropEffect = "copy"`。不拖动时，获得焦点的叶子上的“插入”按钮（用于指针）和 Control+Enter（Mac 上为 Command+Enter，用于键盘）会派发可取消的 DOM 事件 `zeyn:tree-insert`，其 `detail` 是同一个对象。在自己当前位置插入的目标调用 `preventDefault()`；只有这时树才会向屏幕阅读器播报这次插入。叶子获得焦点时 Control+Enter 归树所有，因此相同按键上的应用快捷键在那里不会运行。任何页面都可以伪造这份数据，所以目标把它当作不可信输入，并在服务器上检查访问权限。拖动代码（`treedrag.js`）只在含有可拖动树的页面上加载。
 
 ```rust
 Tree::of(report_fields).label("Fields").draggable()

@@ -360,7 +360,7 @@
       },
       "tree": {
         "overview": "Example",
-        "draggable": "Leaves that drag onto a drop target, with Control+Enter to insert"
+        "draggable": "Leaves that drag onto a drop target, or insert with a button or Control+Enter"
       },
       "week_schedule": {
         "overview": "Example"

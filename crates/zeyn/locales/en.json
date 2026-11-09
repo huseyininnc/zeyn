@@ -455,7 +455,9 @@
       },
       "tree": {
         "empty": "No items.",
-        "insert_hint": "Press Control+Enter to insert the focused item.",
+        "insert": "Insert",
+        "insert_hint": "Control+Enter inserts.",
+        "insert_label": "Insert {label}",
         "inserted": "Inserted {label}."
       },
       "select": {

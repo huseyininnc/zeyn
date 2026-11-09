@@ -1,7 +1,7 @@
 /**
  * Trees (W3C APG tree view) with lazy children. Loaded only by pages that hold one
- * (`data-zeyn-tree`). Leaves of a draggable tree (`data-zeyn-tree-drag`) get `draggable`;
- * `treedrag.js` handles the drag and the keyboard insert.
+ * (`data-zeyn-tree`). Leaves of a draggable tree (`data-zeyn-tree-drag`) get `draggable` and
+ * are described by the tree's insert hint; `treedrag.js` handles the drag and the insert.
  * @module tree
  */
 const K = await import(new URL(`components.js${new URL(import.meta.url).search}`, import.meta.url).href);
@@ -28,7 +28,10 @@ function treeItems(wrap, items, level) {
     if (item.has_children) {
       li.setAttribute('aria-expanded', 'false');
       li.dataset.lazy = '';
-    } else if (wrap.dataset.zeynTreeDrag !== undefined) li.draggable = true;
+    } else if (wrap.dataset.zeynTreeDrag !== undefined) {
+      li.draggable = true;
+      li.setAttribute('aria-describedby', `${wrap.zeynId}-keys`);
+    }
     const row = make('span', 'z-tree-row');
     row.append(make('span', 'z-tree-toggle', { 'aria-hidden': 'true' }), make('span', 'z-tree-label', { text: item.label }));
     if (item.hint) row.append(make('span', 'z-tree-hint', { text: item.hint }));
@@ -57,6 +60,8 @@ function initTrees(root) {
   root.querySelectorAll('[data-zeyn-tree]:not([data-ready])').forEach(async (wrap) => {
     wrap.dataset.ready = '';
     wrap.zeynId = `z-tree-${K.uid()}`;
+    const keys = wrap.querySelector(':scope > .z-tree-keys');
+    if (keys) keys.id = `${wrap.zeynId}-keys`;
     const tree = wrap.querySelector('[role="tree"]');
     await loadTree(wrap, tree, null, 1);
     const first = tree.querySelector('[role="treeitem"]');

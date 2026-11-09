@@ -360,7 +360,7 @@
       },
       "tree": {
         "overview": "Örnek",
-        "draggable": "Bırakma hedefine sürüklenen yapraklar, eklemek için Control+Enter"
+        "draggable": "Bırakma hedefine sürüklenen ya da bir düğme veya Control+Enter ile eklenen yapraklar"
       },
       "week_schedule": {
         "overview": "Örnek"

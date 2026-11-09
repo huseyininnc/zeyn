@@ -92,10 +92,13 @@ impl Tree {
 
     /// Leaves can be dragged with HTML drag and drop. The drag carries the MIME type
     /// `application/x-zeyn-tree` with the JSON `{ "id", "path", "label" }` (`path` lists the ids
-    /// from the top level down to the leaf) and the label as `text/plain`. Control+Enter (or
-    /// Command+Enter) on a focused leaf is the keyboard alternative: it dispatches the DOM event
-    /// `zeyn:tree-insert` with the same object as `detail`, so a drop target can insert at its
-    /// own position, and announces the insert in the tree's live region.
+    /// from the top level down to the leaf) and the label as `text/plain`; a drop target sets
+    /// `dropEffect = "copy"` in `dragover`. Without dragging, the Insert button on the focused
+    /// leaf (a single pointer alternative) and Control+Enter or Command+Enter (keyboard) dispatch
+    /// the cancelable DOM event `zeyn:tree-insert` with the same object as `detail`. A target
+    /// that inserts at its own position calls `preventDefault()`, and only then does the tree
+    /// announce the insert in its live region. Any page can forge the payload, so a target treats
+    /// it as untrusted input and checks access on the server.
     ///
     /// ```ignore
     /// Tree::of(report_fields).label("Fields").draggable()
@@ -115,6 +118,8 @@ impl Component for Tree {
             "failed": text("zeyn.ui.load_failed"),
         });
         if self.draggable {
+            texts["insert"] = text("zeyn.ui.tree.insert").into();
+            texts["insert_label"] = text("zeyn.ui.tree.insert_label").into();
             texts["inserted"] = text("zeyn.ui.tree.inserted").into();
         }
         out.push_str(&format!(

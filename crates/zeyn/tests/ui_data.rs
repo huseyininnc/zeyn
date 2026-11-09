@@ -114,8 +114,9 @@ fn a_draggable_tree_marks_its_leaves_and_names_the_keyboard_insert() {
         r#"aria-label="Fields &lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; &amp; &#39;more&#39;""#
     ), "{out}");
     assert!(!out.contains("<script>"), "the label is escaped");
-    assert!(out.contains(r#"<span class="z-sr-only z-tree-keys" aria-hidden="true">Press Control+Enter to insert the focused item.</span><span class="z-sr-only" aria-live="polite"></span></div>"#));
+    assert!(out.contains(r#"<span class="z-sr-only z-tree-keys" aria-hidden="true">Control+Enter inserts.</span><span class="z-sr-only" aria-live="polite"></span></div>"#));
     assert!(out.contains("&quot;inserted&quot;:&quot;Inserted {label}.&quot;"));
+    assert!(out.contains("&quot;insert_label&quot;:&quot;Insert {label}&quot;"));
     let mut plain = String::new();
     Tree::of(departments).render(&mut plain, &Render::new("s", "tr", I18n::builtin()));
     assert!(!plain.contains("data-zeyn-tree-drag"));
@@ -145,7 +146,7 @@ pub fn fields() -> Screen {
 }
 
 #[tokio::test]
-async fn hostile_leaf_ids_and_labels_reach_the_drag_payload_as_json_values() {
+async fn hostile_tree_item_ids_and_labels_reach_the_browser_unchanged_as_json() {
     let router = App::new("Test")
         .i18n(I18n::new("en"))
         .auth(|_: &HeaderMap| Some(Identity::user("u").with_permissions(["org.read"])))

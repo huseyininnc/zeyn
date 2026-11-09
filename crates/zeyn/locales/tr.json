@@ -455,7 +455,9 @@
       },
       "tree": {
         "empty": "Kayıt yok.",
-        "insert_hint": "Odaktaki öğeyi eklemek için Control+Enter tuşlarına basın.",
+        "insert": "Ekle",
+        "insert_hint": "Control+Enter ekler.",
+        "insert_label": "{label} ekle",
         "inserted": "{label} eklendi."
       },
       "select": {

@@ -10,7 +10,8 @@ pub fn overview(_ctx: &Ctx) -> Node {
         .into()
 }
 
-/// Leaves drag onto a drop target, such as an island; Control+Enter inserts the focused leaf.
+/// Leaves drag onto a drop target, such as an island; the Insert button or Control+Enter
+/// inserts the focused leaf.
 pub fn draggable(_ctx: &Ctx) -> Node {
     Tree::of(product_tree)
         .label("Products to place")
