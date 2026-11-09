@@ -1,6 +1,7 @@
 /**
  * Trees (W3C APG tree view) with lazy children. Loaded only by pages that hold one
- * (`data-zeyn-tree`).
+ * (`data-zeyn-tree`). Leaves of a draggable tree (`data-zeyn-tree-drag`) get `draggable`;
+ * `treedrag.js` handles the drag and the keyboard insert.
  * @module tree
  */
 const K = await import(new URL(`components.js${new URL(import.meta.url).search}`, import.meta.url).href);
@@ -27,7 +28,7 @@ function treeItems(wrap, items, level) {
     if (item.has_children) {
       li.setAttribute('aria-expanded', 'false');
       li.dataset.lazy = '';
-    }
+    } else if (wrap.dataset.zeynTreeDrag !== undefined) li.draggable = true;
     const row = make('span', 'z-tree-row');
     row.append(make('span', 'z-tree-toggle', { 'aria-hidden': 'true' }), make('span', 'z-tree-label', { text: item.label }));
     if (item.hint) row.append(make('span', 'z-tree-hint', { text: item.hint }));

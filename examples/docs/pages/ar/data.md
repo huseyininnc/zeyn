@@ -20,6 +20,12 @@ Tree::of(sample_tree).label("Products by unit")
 
 تتبع الشجرة نمط ARIA tree: تتنقل مفاتيح الأسهم بين العناصر وتفتح الفروع أو تغلقها. يضع الخادم حدًا أعلى لعدد الأبناء في كل فرع (`MAX_TREE_CHILDREN`).
 
+يتيح `.draggable()` سحب الأوراق إلى هدف إفلات، مثل island. يحمل السحب نوع MIME `application/x-zeyn-tree` مع JSON `{ "id", "path", "label" }` (يحوي `path` المعرفات من المستوى الأعلى حتى الورقة) والتسمية بصيغة `text/plain`. السحب ليس الطريقة الوحيدة: يرسل Control+Enter (Command+Enter على Mac) على ورقة عليها التركيز حدث DOM `zeyn:tree-insert` بالكائن نفسه في `detail`، فيدرج الهدف في موضعه الحالي، وتعلن الشجرة الإدراج لقارئات الشاشة. لا تُحمَّل شيفرة السحب (`treedrag.js`) إلا في الصفحات التي فيها شجرة قابلة للسحب.
+
+```rust
+Tree::of(report_fields).label("Fields").draggable()
+```
+
 ## المخططات
 
 ترسم `Chart::bar` و`stacked_bar` و`line` و`area` و`combo` و`scatter` و`donut` و`gauge` و`funnel` رسوم SVG على الخادم. لا توجد مكتبة مخططات في المتصفح؛ فالمخطط جزء من HTML الصفحة.

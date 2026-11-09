@@ -20,6 +20,12 @@ Tree::of(sample_tree).label("Products by unit")
 
 ट्री ARIA tree पैटर्न का पालन करता है: तीर कुंजियाँ आइटमों के बीच चलती हैं और शाखाएँ खोलती या बंद करती हैं। सर्वर प्रति शाखा संतानों की संख्या सीमित रखता है (`MAX_TREE_CHILDREN`)।
 
+`.draggable()` पत्तियों को किसी ड्रॉप लक्ष्य, जैसे island, पर खींचने देता है। खींचना MIME प्रकार `application/x-zeyn-tree` के साथ JSON `{ "id", "path", "label" }` (`path` में शीर्ष स्तर से पत्ती तक के id होते हैं) और लेबल को `text/plain` के रूप में ले जाता है। खींचना अकेला तरीका नहीं है: फ़ोकस वाली पत्ती पर Control+Enter (Mac पर Command+Enter) वही वस्तु `detail` में लेकर DOM इवेंट `zeyn:tree-insert` भेजता है, लक्ष्य उसे अपनी मौजूदा जगह पर जोड़ता है, और ट्री स्क्रीन रीडर को यह जोड़ना बताता है। खींचने का कोड (`treedrag.js`) केवल उन पेजों पर लोड होता है जिन पर खींचने योग्य ट्री है।
+
+```rust
+Tree::of(report_fields).label("Fields").draggable()
+```
+
 ## चार्ट
 
 `Chart::bar`, `stacked_bar`, `line`, `area`, `combo`, `scatter`, `donut`, `gauge` और `funnel` सर्वर पर SVG बनाते हैं। ब्राउज़र में कोई चार्ट लाइब्रेरी नहीं है; चार्ट पृष्ठ के HTML का हिस्सा है।

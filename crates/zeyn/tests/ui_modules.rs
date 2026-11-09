@@ -69,6 +69,25 @@ pub fn photos() -> Screen {
     )
 }
 
+#[action(permission = "trips.read")]
+pub async fn trip_tree(_q: TreeQuery) -> Result<Vec<TreeItem>> {
+    Ok(vec![TreeItem::leaf("name", "Name")])
+}
+
+#[screen(route = "/plain-tree", permission = "trips.read")]
+pub fn plain_tree() -> Screen {
+    Screen::new("Tree").body(Tree::of(trip_tree).label("Fields"))
+}
+
+#[screen(route = "/drag-tree", permission = "trips.read")]
+pub fn drag_tree() -> Screen {
+    Screen::new("Tree").body(
+        Tree::of(trip_tree)
+            .label("Fields")
+            .draggable(),
+    )
+}
+
 fn app() -> axum::Router {
     App::new("Test")
         .i18n(I18n::new("en"))
@@ -80,7 +99,9 @@ fn app() -> axum::Router {
                 .screen(trips)
                 .screen(trip)
                 .screen(photo)
-                .screen(photos),
+                .screen(photos)
+                .screen(plain_tree)
+                .screen(drag_tree),
         )
         .router()
         .unwrap()
@@ -190,6 +211,19 @@ async fn a_page_links_the_modules_of_its_components_with_what_they_import() {
         at("components.js") < at("dates.js"),
         "a module comes after what it imports"
     );
+}
+
+#[tokio::test]
+async fn the_tree_drag_script_comes_only_with_a_draggable_tree() {
+    let (_, still) = get("/plain-tree").await;
+    let linked = links(&still);
+    assert!(linked.contains(&"tree.js".to_string()));
+    assert!(!linked.contains(&"treedrag.js".to_string()));
+    let (_, drag) = get("/drag-tree").await;
+    let linked = links(&drag);
+    for name in ["components.js", "tree.js", "treedrag.js"] {
+        assert!(linked.contains(&name.to_string()), "{name}");
+    }
 }
 
 #[tokio::test]

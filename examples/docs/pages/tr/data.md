@@ -20,6 +20,12 @@ Tree::of(sample_tree).label("Products by unit")
 
 Ağaç ARIA tree desenini izler: ok tuşları öğeler arasında gezinir, dalları açar veya kapatır. Sunucu, dal başına çocuk sayısını sınırlar (`MAX_TREE_CHILDREN`).
 
+`.draggable()` yaprakların bir bırakma hedefine, örneğin bir island'a sürüklenmesini sağlar. Sürükleme `application/x-zeyn-tree` MIME türüyle `{ "id", "path", "label" }` JSON'unu (`path` en üst seviyeden yaprağa kadar id'leri tutar) ve etiketi `text/plain` olarak taşır. Sürüklemek tek yol değildir: odaktaki bir yaprakta Control+Enter (Mac'te Command+Enter) aynı nesneyi `detail` olarak taşıyan `zeyn:tree-insert` DOM olayını gönderir; hedef kendi o anki konumuna ekler ve ağaç eklemeyi ekran okuyuculara duyurur. Sürükleme kodu (`treedrag.js`) yalnızca sürüklenebilir ağaç olan sayfalarda yüklenir.
+
+```rust
+Tree::of(report_fields).label("Fields").draggable()
+```
+
 ## Grafikler
 
 `Chart::bar`, `stacked_bar`, `line`, `area`, `combo`, `scatter`, `donut`, `gauge` ve `funnel` SVG'yi sunucuda çizer. Tarayıcıda grafik kütüphanesi yoktur; grafik, sayfa HTML'inin bir parçasıdır.

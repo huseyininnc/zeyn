@@ -10,11 +10,19 @@ pub fn overview(_ctx: &Ctx) -> Node {
         .into()
 }
 
+/// Leaves drag onto a drop target, such as an island; Control+Enter inserts the focused leaf.
+pub fn draggable(_ctx: &Ctx) -> Node {
+    Tree::of(product_tree)
+        .label("Products to place")
+        .draggable()
+        .into()
+}
+
 /// What the catalog shows of `Tree`.
 pub const ENTRY: Entry = Entry {
     name: "Tree",
     docs: "components/data",
     api: &["Tree", "TreeItem"],
     overview: &[ex!(overview)],
-    examples: &[],
+    examples: &[ex!(draggable)],
 };

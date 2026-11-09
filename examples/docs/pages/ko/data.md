@@ -20,6 +20,12 @@ Tree::of(sample_tree).label("Products by unit")
 
 트리는 ARIA 트리 패턴을 따릅니다. 화살표 키로 항목 사이를 이동하고 가지를 열거나 닫습니다. 서버는 가지당 자식 수에 상한을 둡니다(`MAX_TREE_CHILDREN`).
 
+`.draggable()`을 쓰면 잎을 island 같은 놓기 대상으로 끌어다 놓을 수 있습니다. 끌기는 MIME 유형 `application/x-zeyn-tree`로 JSON `{ "id", "path", "label" }`(`path`는 최상위부터 잎까지의 id 목록)을, `text/plain`으로 레이블을 담습니다. 끌기만 있는 것은 아닙니다. 포커스된 잎에서 Control+Enter(Mac에서는 Command+Enter)를 누르면 같은 객체를 `detail`로 담은 DOM 이벤트 `zeyn:tree-insert`가 발생하고, 대상은 자신의 현재 위치에 삽입하며, 트리는 삽입을 화면 낭독기에 알립니다. 끌기 코드(`treedrag.js`)는 끌 수 있는 트리가 있는 페이지에서만 불러옵니다.
+
+```rust
+Tree::of(report_fields).label("Fields").draggable()
+```
+
 ## 차트
 
 `Chart::bar`, `stacked_bar`, `line`, `area`, `combo`, `scatter`, `donut`, `gauge`, `funnel`은 서버에서 SVG를 그립니다. 브라우저에는 차트 라이브러리가 없으며, 차트는 페이지 HTML의 일부입니다.

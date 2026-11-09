@@ -454,7 +454,9 @@
         "billion": "{n}B"
       },
       "tree": {
-        "empty": "No items."
+        "empty": "No items.",
+        "insert_hint": "Press Control+Enter to insert the focused item.",
+        "inserted": "Inserted {label}."
       },
       "select": {
         "none": "None",

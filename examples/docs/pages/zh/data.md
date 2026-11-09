@@ -20,6 +20,12 @@ Tree::of(sample_tree).label("Products by unit")
 
 树遵循 ARIA tree 模式：方向键在条目之间移动，并展开或折叠分支。服务器会限制每个分支的子节点数量（`MAX_TREE_CHILDREN`）。
 
+`.draggable()` 让叶子可以拖到放置目标上，例如一个 island。拖动携带 MIME 类型 `application/x-zeyn-tree` 和 JSON `{ "id", "path", "label" }`（`path` 是从顶层到该叶子的 id 列表），并把标签作为 `text/plain`。拖动不是唯一的方式：在获得焦点的叶子上按 Control+Enter（Mac 上为 Command+Enter）会派发 DOM 事件 `zeyn:tree-insert`，其 `detail` 是同一个对象，目标可以在自己当前的位置插入，树会向屏幕阅读器播报这次插入。拖动代码（`treedrag.js`）只在含有可拖动树的页面上加载。
+
+```rust
+Tree::of(report_fields).label("Fields").draggable()
+```
+
 ## 图表
 
 `Chart::bar`、`stacked_bar`、`line`、`area`、`combo`、`scatter`、`donut`、`gauge` 和 `funnel` 在服务器上绘制 SVG。浏览器中没有图表库；图表是页面 HTML 的一部分。

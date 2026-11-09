@@ -20,6 +20,12 @@ Tree::of(sample_tree).label("Products by unit")
 
 El árbol sigue el patrón ARIA tree: las teclas de flecha se mueven entre elementos y abren o cierran ramas. El servidor limita el número de hijos por rama (`MAX_TREE_CHILDREN`).
 
+`.draggable()` permite arrastrar las hojas a un destino de soltado, como una island. El arrastre lleva el tipo MIME `application/x-zeyn-tree` con el JSON `{ "id", "path", "label" }` (`path` contiene los id desde el nivel superior hasta la hoja) y la etiqueta como `text/plain`. Arrastrar no es la única forma: Control+Enter (Command+Enter en Mac) sobre una hoja con el foco envía el evento DOM `zeyn:tree-insert` con el mismo objeto en `detail`, así el destino inserta en su posición actual, y el árbol anuncia la inserción a los lectores de pantalla. El código de arrastre (`treedrag.js`) solo se carga en páginas con un árbol arrastrable.
+
+```rust
+Tree::of(report_fields).label("Fields").draggable()
+```
+
 ## Gráficos
 
 `Chart::bar`, `stacked_bar`, `line`, `area`, `combo`, `scatter`, `donut`, `gauge` y `funnel` dibujan SVG en el servidor. No hay biblioteca de gráficos en el navegador; un gráfico es parte del HTML de la página.

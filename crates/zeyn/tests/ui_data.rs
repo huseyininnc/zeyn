@@ -99,6 +99,83 @@ async fn tree_children_load_through_the_actions_permission() {
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
+#[test]
+fn a_draggable_tree_marks_its_leaves_and_names_the_keyboard_insert() {
+    let mut out = String::new();
+    Tree::of(departments)
+        .label(r#"Fields <script>alert("x")</script> & 'more'"#)
+        .draggable()
+        .render(&mut out, &Render::new("s", "en", I18n::builtin()));
+    assert!(
+        out.starts_with(r#"<div class="z-tree" data-zeyn-tree data-zeyn-tree-drag data-texts=""#),
+        "{out}"
+    );
+    assert!(out.contains(
+        r#"aria-label="Fields &lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; &amp; &#39;more&#39;""#
+    ), "{out}");
+    assert!(!out.contains("<script>"), "the label is escaped");
+    assert!(out.contains(r#"<span class="z-sr-only z-tree-keys" aria-hidden="true">Press Control+Enter to insert the focused item.</span><span class="z-sr-only" aria-live="polite"></span></div>"#));
+    assert!(out.contains("&quot;inserted&quot;:&quot;Inserted {label}.&quot;"));
+    let mut plain = String::new();
+    Tree::of(departments).render(&mut plain, &Render::new("s", "tr", I18n::builtin()));
+    assert!(!plain.contains("data-zeyn-tree-drag"));
+    assert!(
+        !plain.contains("aria-live"),
+        "a tree that does not drag has no insert"
+    );
+    assert_eq!(
+        Tree::of(departments)
+            .draggable()
+            .schema()["draggable"],
+        true
+    );
+}
+
+#[action(permission = "org.read")]
+pub async fn hostile(_q: TreeQuery) -> Result<Vec<TreeItem>> {
+    Ok(vec![TreeItem::leaf(
+        r#"a"},{"id":"b</script>"#,
+        "<img src=x onerror=alert(1)> \"quoted\" \\ \u{2028}",
+    )])
+}
+
+#[screen(route = "/fields", public)]
+pub fn fields() -> Screen {
+    Screen::new("Fields").body(Tree::of(hostile).draggable())
+}
+
+#[tokio::test]
+async fn hostile_leaf_ids_and_labels_reach_the_drag_payload_as_json_values() {
+    let router = App::new("Test")
+        .i18n(I18n::new("en"))
+        .auth(|_: &HeaderMap| Some(Identity::user("u").with_permissions(["org.read"])))
+        .feature(Feature::new("fields").screen(fields))
+        .router()
+        .unwrap();
+    let body = serde_json::json!({ "screen": "fields", "node": "0", "key": "", "input": {} });
+    let req = Request::post("/_zeyn/data")
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::COOKIE, format!("zeyn_csrf={TOKEN}"))
+        .header("x-zeyn-csrf", TOKEN)
+        .body(Body::from(body.to_string()))
+        .unwrap();
+    let res = router.oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let bytes = res
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes();
+    let items: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(items[0]["id"], r#"a"},{"id":"b</script>"#);
+    assert_eq!(
+        items[0]["label"],
+        "<img src=x onerror=alert(1)> \"quoted\" \\ \u{2028}"
+    );
+    assert_eq!(items.as_array().unwrap().len(), 1);
+}
+
 fn render(chart: Chart, locale: &str) -> String {
     let mut out = String::new();
     chart.render(&mut out, &Render::new("s", locale, I18n::builtin()));

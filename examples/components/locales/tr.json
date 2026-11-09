@@ -359,7 +359,8 @@
         "refresh_after_an_action": "Bir düğümü yenileyen eylem"
       },
       "tree": {
-        "overview": "Örnek"
+        "overview": "Örnek",
+        "draggable": "Bırakma hedefine sürüklenen yapraklar, eklemek için Control+Enter"
       },
       "week_schedule": {
         "overview": "Örnek"
