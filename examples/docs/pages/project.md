@@ -12,7 +12,7 @@ Zeyn is dual licensed under the [MIT license](https://github.com/huseyininnc/zey
 
 ## Quality
 
-The repository holds 767 test functions (`#[test]` and `#[tokio::test]` in the crates and examples, counted on 2026-11-06), plus the examples in the doc comments, which run as doctests.
+The repository holds 837 test functions (`#[test]` and `#[tokio::test]` in the crates and examples, counted on 2026-11-09), plus the examples in the doc comments, which run as doctests.
 
 Every pull request and every push to `dev` and `main` runs CI:
 

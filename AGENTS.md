@@ -158,6 +158,7 @@ missing. Never call `location.reload()` or `location.assign()` for in-app naviga
 - Browser behavior is checked in a real browser (the showcase or the docs app) with no console
   errors, before the work is called done.
 - Run `cargo test --workspace` before you commit; it must pass.
+- Run `cargo fmt --all --check` and `cargo clippy --workspace --all-targets -- -D warnings` before you push; CI fails on either.
 
 ### Commits
 - One commit per finished piece of work. The message says what was done, in plain words, starting
