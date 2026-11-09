@@ -12,7 +12,7 @@ Zeyn は [MIT ライセンス](https://github.com/huseyininnc/zeyn/blob/main/LIC
 
 ## 品質
 
-リポジトリには 767 個のテスト関数があります（crate とサンプルの `#[test]` と `#[tokio::test]`、2026-11-06 時点）。これに加えて、ドキュメントコメントのサンプルが doctest として実行されます。
+リポジトリには 837 個のテスト関数があります（crate とサンプルの `#[test]` と `#[tokio::test]`、2026-11-09 時点）。これに加えて、ドキュメントコメントのサンプルが doctest として実行されます。
 
 すべての pull request と、`dev` と `main` へのすべての push で CI が動きます:
 

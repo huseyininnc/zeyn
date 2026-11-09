@@ -4,6 +4,8 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 ## [Unreleased]
 
+## [0.0.9] - 2026-11-09
+
 ### Added
 
 - `StoryRing::new(name, StoryState::Unseen | Seen)` with `.image(src)` and `.link(screen, params)`: an avatar in a ring that is thick and in the brand colors while the viewer has unseen stories, thin and neutral once seen (dashed in forced colors mode), named "Ada Lovelace, unseen stories" for screen readers. The state comes from the server. `StoryRow` puts up to 100 rings in a row that scrolls sideways with scroll snapping. CSS only: `stories.css` (2.2 KB) loads only on pages with a ring.

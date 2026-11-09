@@ -12,7 +12,7 @@ Zeyn, tercihinize göre [MIT lisansı](https://github.com/huseyininnc/zeyn/blob/
 
 ## Kalite
 
-Depoda 767 test fonksiyonu vardır (crate'lerde ve örneklerde `#[test]` ve `#[tokio::test]`, 2026-11-06 tarihinde sayıldı). Bunlara ek olarak doc yorumlarındaki örnekler doctest olarak çalışır.
+Depoda 837 test fonksiyonu vardır (crate'lerde ve örneklerde `#[test]` ve `#[tokio::test]`, 2026-11-09 tarihinde sayıldı). Bunlara ek olarak doc yorumlarındaki örnekler doctest olarak çalışır.
 
 Her pull request ve `dev` ile `main` dallarına her push CI çalıştırır:
 
