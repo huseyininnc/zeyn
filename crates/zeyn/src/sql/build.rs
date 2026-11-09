@@ -103,6 +103,13 @@ pub trait Dialect: Send + Sync + 'static {
     fn returning(&self) -> bool {
         true
     }
+
+    /// Text that wraps a [`FieldKind::Rank`] column and its compared values in `ORDER BY` and
+    /// cursor conditions so they compare byte by byte. `None` when the column itself is created
+    /// with a binary collation (PostgreSQL: `COLLATE "C"`).
+    fn binary_sort(&self) -> Option<(&'static str, &'static str)> {
+        None
+    }
 }
 
 /// PostgreSQL 12 and later.
@@ -193,6 +200,7 @@ impl Dialect for Postgres {
             FieldKind::Choice(options) => format!("VARCHAR({})", choice_len(options)),
             FieldKind::Text => max_len.map_or_else(|| "TEXT".into(), |n| format!("VARCHAR({n})")),
             FieldKind::Custom { .. } | FieldKind::Choices(_) => "TEXT".into(),
+            FieldKind::Rank => "VARCHAR(64) COLLATE \"C\"".into(),
         }
     }
 
@@ -334,7 +342,14 @@ impl Dialect for Oracle {
                 _ => "VARCHAR2(4000)".into(),
             },
             FieldKind::Custom { .. } | FieldKind::Choices(_) => "CLOB".into(),
+            FieldKind::Rank => "VARCHAR2(64)".into(),
         }
+    }
+
+    /// `NLS_SORT` follows the session language, so rank columns sort and compare through
+    /// `NLSSORT(..., 'NLS_SORT=BINARY')` whatever `NLS_SORT` and `NLS_COMP` say.
+    fn binary_sort(&self) -> Option<(&'static str, &'static str)> {
+        Some(("NLSSORT(", ", 'NLS_SORT=BINARY')"))
     }
 
     fn decimal_type(&self, precision: u8, scale: u8) -> String {
@@ -735,6 +750,28 @@ pub(crate) fn order_keys(
     Ok(keys)
 }
 
+/// The column as it sorts: [`FieldKind::Rank`] columns compare by bytes, which on Oracle needs
+/// [`Dialect::binary_sort`] around the column.
+fn sort_column(d: &dyn Dialect, f: &FieldMeta) -> Result<String> {
+    let col = column(d, f)?;
+    Ok(match (&f.kind, d.binary_sort()) {
+        (FieldKind::Rank, Some((start, end))) => format!("{start}{col}{end}"),
+        _ => col,
+    })
+}
+
+/// Binds a value compared with [`sort_column`], wrapped the same way.
+fn bind_key(d: &dyn Dialect, sql: &mut Sql, f: &FieldMeta, v: Arg, cast: Cast) {
+    match (&f.kind, d.binary_sort()) {
+        (FieldKind::Rank, Some((start, end))) => {
+            sql.push(start);
+            sql.bind(d, v, cast);
+            sql.push(end);
+        }
+        _ => sql.bind(d, v, cast),
+    }
+}
+
 /// `ORDER BY`. NULLs come first going up and last going down, as in memory; the clause is written
 /// only for columns that can hold NULL, so plain indexes still serve the sort.
 fn push_order(
@@ -748,7 +785,7 @@ fn push_order(
         if i > 0 {
             sql.push(", ");
         }
-        sql.push(&column(d, &fields[k.index])?);
+        sql.push(&sort_column(d, &fields[k.index])?);
         sql.push(match (k.desc, k.nullable) {
             (false, false) => " ASC",
             (true, false) => " DESC",
@@ -779,9 +816,9 @@ fn push_seek(
         && !k.nullable
         && keys.len() > 1
     {
-        sql.push(&column(d, &fields[k.index])?);
+        sql.push(&sort_column(d, &fields[k.index])?);
         sql.push(if k.desc { " <= " } else { " >= " });
-        sql.bind(d, v.clone(), cast(k));
+        bind_key(d, sql, &fields[k.index], v.clone(), cast(k));
         sql.push(" AND ");
     }
     sql.push("(");
@@ -794,16 +831,16 @@ fn push_seek(
         sql.push(if terms == 0 { "(" } else { " OR (" });
         terms += 1;
         for (pk, pv) in keys[..n].iter().zip(values) {
-            sql.push(&column(d, &fields[pk.index])?);
+            sql.push(&sort_column(d, &fields[pk.index])?);
             if matches!(pv, Arg::Null(_)) {
                 sql.push(" IS NULL AND ");
             } else {
                 sql.push(" = ");
-                sql.bind(d, pv.clone(), cast(pk));
+                bind_key(d, sql, &fields[pk.index], pv.clone(), cast(pk));
                 sql.push(" AND ");
             }
         }
-        let col = column(d, &fields[k.index])?;
+        let col = sort_column(d, &fields[k.index])?;
         if is_null {
             sql.push(&col);
             sql.push(" IS NOT NULL)");
@@ -811,14 +848,14 @@ fn push_seek(
             sql.push("(");
             sql.push(&col);
             sql.push(" < ");
-            sql.bind(d, v.clone(), cast(k));
+            bind_key(d, sql, &fields[k.index], v.clone(), cast(k));
             sql.push(" OR ");
             sql.push(&col);
             sql.push(" IS NULL))");
         } else {
             sql.push(&col);
             sql.push(if k.desc { " < " } else { " > " });
-            sql.bind(d, v.clone(), cast(k));
+            bind_key(d, sql, &fields[k.index], v.clone(), cast(k));
             sql.push(")");
         }
     }
@@ -985,6 +1022,10 @@ pub(crate) fn read_cursor(
                     .filter(|s| options.iter().any(|o| o.value == s))
                     .map(Arg::Text),
                 (FieldKind::Text, _) => text(&v).map(Arg::Text),
+                (FieldKind::Rank, _) => v
+                    .as_str()
+                    .and_then(crate::Rank::parse)
+                    .map(|r| Arg::Text(r.to_string())),
                 (FieldKind::Decimal, _) => text(&v)
                     .and_then(|s| crate::Decimal::parse(&s))
                     .map(|x| Arg::Text(x.sql_text())),
@@ -1587,6 +1628,9 @@ pub(crate) fn duplicate_error() -> Error {
 /// `CREATE TABLE` for an entity, for scaffolding and tests; production schemas belong in
 /// migrations. Whole number keys are generated, `#[rule(unique)]` adds a named unique constraint,
 /// `#[version]` starts at 1, and `#[readonly]` columns get a default because inserts skip them.
+/// Where rank columns sort through [`Dialect::binary_sort`] (Oracle), each also gets the index
+/// `<table>_<column>_ord` on that expression and the key, in the order `find` sorts, so the first
+/// pages of a sort by rank stop after the page instead of sorting the table.
 ///
 /// ```
 /// use zeyn::prelude::*;
@@ -1613,6 +1657,7 @@ pub fn create_table<E: Entity>(d: &dyn Dialect) -> Result<Vec<String>> {
         .next()
         .unwrap_or(E::TABLE);
     let mut cols = Vec::new();
+    let mut indexes = Vec::new();
     for f in E::fields() {
         let name = column(d, f)?;
         let text_null =
@@ -1663,6 +1708,17 @@ pub fn create_table<E: Entity>(d: &dyn Dialect) -> Result<Vec<String>> {
                 d.column_type(&FieldKind::Text, Some(3))
             ));
         }
+        if let (FieldKind::Rank, Some((start, end))) = (&f.kind, d.binary_sort()) {
+            let mut on = format!("{start}{name}{end}");
+            if let Some(key) = E::fields().iter().find(|k| k.key) {
+                on.push_str(", ");
+                on.push_str(&column(d, key)?);
+            }
+            indexes.push(format!(
+                "CREATE INDEX {} ON {table} ({on})",
+                ident(d, &format!("{bare}_{}_ord", f.name))?
+            ));
+        }
         if f.rules.contains(&Rule::Unique) {
             cols.push(format!(
                 "CONSTRAINT {} UNIQUE ({name})",
@@ -1675,5 +1731,6 @@ pub fn create_table<E: Entity>(d: &dyn Dialect) -> Result<Vec<String>> {
         cols.join(",\n    ")
     )];
     out.extend(d.after_create(E::TABLE)?);
+    out.extend(indexes);
     Ok(out)
 }

@@ -1173,3 +1173,117 @@ fn over_cap_error_tells_how_to_fix_it() {
     };
     assert!(text.contains("1000") && text.contains("LIMIT") && text.contains("query_max"));
 }
+
+#[crate::entity(table = "cards")]
+struct Card {
+    #[key]
+    id: CardId,
+    #[rule(unique)]
+    rank: crate::Rank,
+}
+
+fn rank_query(d: &dyn Dialect) -> (DataQuery, Cursor) {
+    let base = DataQuery {
+        sort: vec![Sort {
+            field: "rank".into(),
+            desc: false,
+        }],
+        ..DataQuery::default()
+    };
+    let keys = match build::plan_find::<Card>(d, &base, 10)
+        .unwrap()
+        .shape
+    {
+        Shape::Rows(k) => k,
+        Shape::Groups { .. } => unreachable!(),
+    };
+    let row = Card {
+        id: CardId(3),
+        rank: crate::Rank::parse("V").unwrap(),
+    };
+    let cursor = build::row_cursor(d, &keys, &row);
+    (base, cursor)
+}
+
+fn rank_page(d: &dyn Dialect) -> Sql {
+    let (base, cursor) = rank_query(d);
+    let q = DataQuery {
+        page: PageRequest::After {
+            cursor: Some(cursor),
+            limit: 10,
+        },
+        ..base
+    };
+    build::plan_find::<Card>(d, &q, 10)
+        .unwrap()
+        .main
+}
+
+#[test]
+fn rank_columns_compare_by_bytes_on_postgres() {
+    let ddl = create_table::<Card>(&Postgres).unwrap();
+    assert!(
+        ddl[0].contains(r#""rank" VARCHAR(64) COLLATE "C" NOT NULL"#),
+        "{}",
+        ddl[0]
+    );
+    let sql = rank_page(&Postgres);
+    assert!(
+        sql.text.contains(r#"WHERE "rank" >= $1 AND (("rank" > $2) OR ("rank" = $3 AND "id" > $4)) ORDER BY "rank" ASC, "id" ASC"#),
+        "{}",
+        sql.text
+    );
+}
+
+#[test]
+fn rank_columns_compare_by_bytes_on_oracle() {
+    let ddl = create_table::<Card>(&V12).unwrap();
+    assert!(
+        ddl[0].contains(r#""RANK" VARCHAR2(64) NOT NULL"#),
+        "{}",
+        ddl[0]
+    );
+    assert!(
+        ddl[0].contains(r#"CONSTRAINT "CARDS_RANK_KEY" UNIQUE ("RANK")"#),
+        "{}",
+        ddl[0]
+    );
+    assert_eq!(
+        ddl[1],
+        r#"CREATE INDEX "CARDS_RANK_ORD" ON "CARDS" (NLSSORT("RANK", 'NLS_SORT=BINARY'), "ID")"#
+    );
+    let v11 = create_table::<Card>(&V11).unwrap();
+    assert!(v11[1].starts_with("CREATE SEQUENCE"), "{v11:?}");
+    assert!(v11[2].starts_with("CREATE INDEX"), "{v11:?}");
+    let pg = create_table::<Card>(&Postgres).unwrap();
+    assert_eq!(pg.len(), 1, "the PostgreSQL column sorts by itself: {pg:?}");
+    let sql = rank_page(&V12);
+    assert!(
+        sql.text.contains(r#"WHERE NLSSORT("RANK", 'NLS_SORT=BINARY') >= NLSSORT(:1, 'NLS_SORT=BINARY') AND ((NLSSORT("RANK", 'NLS_SORT=BINARY') > NLSSORT(:2, 'NLS_SORT=BINARY')) OR (NLSSORT("RANK", 'NLS_SORT=BINARY') = NLSSORT(:3, 'NLS_SORT=BINARY') AND "ID" > :4)) ORDER BY NLSSORT("RANK", 'NLS_SORT=BINARY') ASC, "ID" ASC"#),
+        "{}",
+        sql.text
+    );
+}
+
+#[test]
+fn rank_cursor_values_are_checked() {
+    let (base, cursor) = rank_query(&Postgres);
+    let text = String::from_utf8(
+        base64::Engine::decode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, &cursor.0)
+            .unwrap(),
+    )
+    .unwrap();
+    assert!(text.contains(r#""V""#), "{text}");
+    let forged = Cursor(base64::Engine::encode(
+        &base64::engine::general_purpose::URL_SAFE_NO_PAD,
+        text.replace(r#""V""#, r#""V' OR 1=1""#),
+    ));
+    let q = DataQuery {
+        page: PageRequest::After {
+            cursor: Some(forged),
+            limit: 10,
+        },
+        ..base
+    };
+    assert!(build::plan_find::<Card>(&Postgres, &q, 10).is_err());
+}

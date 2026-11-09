@@ -836,3 +836,110 @@ pub async fn queries(url: &str, q: &Queries) {
         db.execute(sql, vec![]).await.unwrap();
     }
 }
+
+#[entity(table = "zeyn_test_cards")]
+pub struct Card {
+    #[key]
+    pub id: CardId,
+    #[rule(unique)]
+    pub rank: Rank,
+}
+
+/// Rank columns sort and page by bytes whatever the database collation is, as in memory, and
+/// the unique index refuses a second row with the same rank. `session` runs first on the only
+/// connection, for example a linguistic `NLS_SORT`.
+pub async fn ranks(url: &str, drop: &[&'static str], session: &[&'static str]) {
+    let limits = PoolLimits {
+        max_connections: 1,
+        ..PoolLimits::default()
+    };
+    let db = Db::connect(url, limits).await.unwrap();
+    for sql in drop.iter().chain(session) {
+        db.execute(sql, vec![]).await.unwrap();
+    }
+    db.create_table::<Card>().await.unwrap();
+    let mut list: Vec<Rank> = ["1", "A", "B", "Z", "a", "aB", "b", "z"]
+        .iter()
+        .map(|r| Rank::parse(r).unwrap())
+        .collect();
+    for i in 0..120 {
+        let at = (i * 7) % (list.len() + 1);
+        let a = at.checked_sub(1).map(|i| &list[i]);
+        let key = zeyn::rank::between(a, list.get(at)).unwrap();
+        list.insert(at, key);
+    }
+    let mut shuffled = list.clone();
+    shuffled.reverse();
+    shuffled.rotate_left(17);
+    let mut all = Vec::new();
+    for rank in shuffled {
+        all.push(
+            db.insert(&Card {
+                id: CardId(0),
+                rank,
+            })
+            .await
+            .unwrap(),
+        );
+    }
+    let by_rank = |offset, limit| DataQuery {
+        page: PageRequest::Offset { offset, limit },
+        sort: vec![Sort {
+            field: "rank".into(),
+            desc: false,
+        }],
+        ..DataQuery::default()
+    };
+    let page: Page<Card> = db.find(&by_rank(0, 500)).await.unwrap();
+    let ranks: Vec<Rank> = page
+        .items
+        .iter()
+        .map(|c| c.rank.clone())
+        .collect();
+    assert_eq!(ranks, list, "ranks sort by bytes");
+    let mem = by_rank(0, 500).apply(all.clone());
+    assert_eq!(
+        mem.items
+            .iter()
+            .map(|c| c.id)
+            .collect::<Vec<_>>(),
+        page.items
+            .iter()
+            .map(|c| c.id)
+            .collect::<Vec<_>>(),
+        "SQL and memory agree"
+    );
+    let mut walked = Vec::new();
+    let mut cursor: Option<Cursor> = None;
+    loop {
+        let mut q = by_rank(0, 0);
+        q.page = PageRequest::After {
+            cursor: cursor.clone(),
+            limit: 9,
+        };
+        let page: Page<Card> = db.find(&q).await.unwrap();
+        walked.extend(page.items.into_iter().map(|c| c.rank));
+        match page.next {
+            Some(next) => cursor = Some(next),
+            None => break,
+        }
+    }
+    assert_eq!(walked, list, "keyset pages follow byte order");
+    let clash = db
+        .insert(&Card {
+            id: CardId(0),
+            rank: list[3].clone(),
+        })
+        .await;
+    assert!(
+        clash.is_err(),
+        "the unique index is the backstop for a rank clash"
+    );
+    let retry = zeyn::rank::between(Some(&list[3]), Some(&list[4])).unwrap();
+    db.insert(&Card {
+        id: CardId(0),
+        rank: retry,
+    })
+    .await
+    .unwrap();
+}

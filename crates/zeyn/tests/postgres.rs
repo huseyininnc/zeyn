@@ -8,6 +8,10 @@
 //! ZEYN_TEST_PG=postgres://postgres:zeyn@127.0.0.1:55432/postgres cargo test -p zeyn --features postgres --test postgres
 //! ```
 //!
+//! The Alpine image sorts `en_US` text by bytes. To check that rank columns ignore a language
+//! collation, also run against a database created with
+//! `CREATE DATABASE zr LOCALE_PROVIDER icu ICU_LOCALE 'en-US' LOCALE 'C' TEMPLATE template0`.
+//!
 //! Without it every test returns early and says so.
 #![cfg(feature = "postgres")]
 
@@ -31,6 +35,7 @@ async fn postgres_data_layer_matches_memory_and_saves_safely() {
         sql_common::data_layer(&url, &RAW).await;
         sql_common::streams(&url, &RAW).await;
         sql_common::folded_search(&url, &RAW).await;
+        sql_common::ranks(&url, &["DROP TABLE IF EXISTS zeyn_test_cards"], &[]).await;
     }
 }
 

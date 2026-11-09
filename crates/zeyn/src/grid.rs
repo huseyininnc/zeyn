@@ -2745,7 +2745,9 @@ fn filter_kind(kind: &FieldKind) -> &'static str {
         FieldKind::Time => "time",
         FieldKind::Choice(_) => "choice",
         FieldKind::Bool => "bool",
-        FieldKind::Text | FieldKind::Custom { .. } | FieldKind::Choices(_) => "text",
+        FieldKind::Text | FieldKind::Custom { .. } | FieldKind::Choices(_) | FieldKind::Rank => {
+            "text"
+        }
     }
 }
 

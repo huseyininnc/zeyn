@@ -166,6 +166,39 @@ Her sıralama anahtarla biter, böylece sıra tamdır. NULL'lar bellekteki gibi 
 sırada sonda gelir; `NULLS` yan tümcesi yalnızca null yapılabilir sütunlar için yazılır, böylece düz
 indeksler diğer sıralamalara hizmet eder.
 
+### Kullanıcının sıraladığı satırlar: `Rank`
+
+`zeyn::Rank` türündeki bir alan, kişilerin elle sıraladığı satırlar için kesirli bir indeks tutar:
+sıralanabilir listeler, kanban sütunları, ağaç kardeşleri. `rank::between(a, b)` iki komşu arasında
+bir anahtar verir, `rank::n_between(a, b, n)` birkaç satırın birlikte bırakılması için `n` anahtar
+verir, `rank::rebalance(n)` ise `Rank::needs_rebalance()` doğru olduğunda (48 karakterden sonra;
+sınır 64) listeyi yeniden numaralamak için eşit aralıklı `n` yeni anahtar verir. Bir taşıma tek
+satır yazar. `between` ve `n_between`, bir anahtar rastgele karakterleriyle sığmayacaksa
+`None` döndürür; o zaman listeyi yeniden dengeleyin.
+
+Anahtarlar base62'dir (`0-9 A-Z a-z`, ASCII sırasında) ve bayt bayt karşılaştırılır; bu yüzden
+sütun da, veritabanı veya oturum harmanlaması ne olursa olsun, baytları karşılaştırmalıdır:
+
+| Veritabanı | Sütun | Sıralama ve imleç |
+|---|---|---|
+| PostgreSQL | `VARCHAR(64) COLLATE "C"` | düz `ORDER BY "rank"`; sütun harmanlaması uygulanır |
+| Oracle | `VARCHAR2(64)` | iki tarafta da `NLSSORT("RANK", 'NLS_SORT=BINARY')`, böylece `NLS_SORT` ve `NLS_COMP` önemli olmaz |
+
+`create_table` bu sütun türlerini, `find` bu sıralamaları yazar. Oracle'da ayrıca
+`CREATE INDEX cards_rank_ord ON cards (NLSSORT("RANK", 'NLS_SORT=BINARY'), "ID")` yazar; böylece rank'e göre sıralamanın ilk sayfaları
+indeksi okur ve sayfadan sonra durur. Oracle sonraki keyset sayfalarının `NLSSORT` koşullarını düz
+karşılaştırmalara indirger; bu yüzden uzun bir listenin derin sayfaları tablonun büyük kısmını yine
+okur: listeleri liste sütunu üzerinde bir filtreyle kısa tutun ve onu
+`(list_id, NLSSORT("RANK", 'NLS_SORT=BINARY'))` olarak indeksleyin. Bir migration'da aynı sütun
+türünü ve indeksi yazın. Bellekteki veriler de rank'leri bayt sırasıyla sıralar. Rank sütunlarının
+grid filtresi yoktur.
+
+Her anahtar üç rastgele karakterle biter; aynı anda aynı komşuların arasına ekleyen iki istek farklı
+anahtarlar alır. Bu bir çakışmayı olasılık dışı kılar, imkânsız değil: sütuna liste başına benzersiz
+bir indeks verin (`UNIQUE (list_id, rank)`) ve reddedildiğinde eklemeyi yeni bir anahtarla bir kez
+yeniden deneyin. Bir istemciden veya satırdan rank ayrıştırmak, alfabe dışındaki karakterleri,
+sondaki `0`'ı ve 64'ten fazla karakteri reddeder.
+
 `get(key)` bir satırı okur ve hiç yoksa `Error::NotFound` ile başarısız olur. Herhangi bir tablo veya
 view bir entity üzerinden okunabilir, örneğin Oracle'ın `user_sequences` görünümü.
 
