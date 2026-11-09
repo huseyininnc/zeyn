@@ -233,3 +233,29 @@ MenuButton::split(t!("orders.save"), save_draft, id)
 | Tab | メニュー | 閉じて、次へ移動します |
 
 メニューには約 0.8 KB（gzip）のスクリプトが必要で、コマンドが実行されるまでリクエストは発生しません。4 ノードに、コマンドごとに 2 ノードが加わります。
+
+## DocumentViewer
+
+`DocumentViewer::of(page_action, page_count)` は、レポートのプレビューのように、ページがサーバーで描かれる複数ページの文書を表示します。ページ action は `DocPage`（`document` はブラウザーからではなく `.document(id)` から、そして `page`）を受け取り、1 ページを SVG または HTML の断片として返します。すべてのページは `.page_size(..)` のサイズ（`PageSize::A4`、`PageSize::LETTER`、`PageSize::pt(w, h)`、`PageSize::px(w, h)`）を持つので、スクロール領域は最初から文書全体の高さになります。
+
+```rust
+DocumentViewer::of(report_page, report.pages)
+    .document(report.id.to_string())
+    .page_size(PageSize::A4)
+    .outline(vec![OutlineItem::new("Summary", 1).child(OutlineItem::new("Totals", 2))])
+    .search(search_report)
+    .download("PDF", format!("/reports/{}/pdf", report.id))
+```
+
+- 画面にあるのは見えているページと、その前後 1 ページずつだけです。それらはスクロールが止まると `POST /_zeyn/data` で（素早く通り過ぎたページは取得されません）近いものから、同時に最大 3 件まで取得され、見えなくなったページの取得は中止されます。ブラウザーには描画済みのページを最大 12 件まで保持します。
+- ズームはページを再取得せずに拡大縮小します: 幅に合わせる、ページに合わせる、50 から 400 パーセント。ページ欄で指定のページへ移動し、スクロールが止まると現在のページを読み上げます（「500 ページ中 3 ページ」）。
+- `.outline(items)` は目次パネルを、`.search(action)` は検索ボックスを追加します。その action は `DocSearch` を受け取り `PageHit` を返します（表示は最大 50 件）。`.download(label, href)` はダウンロードリンクを追加します。
+- サーバーはページごとに画面へのアクセス、ページ action の権限、CSRF、書き込み制限を確認し、1 からページ数の範囲外のページ番号と 2 MB（`MAX_PAGE_BYTES`）を超えるページを拒否し、すべてのページを許可リスト（`sanitize_markup`）で浄化します: スクリプト、イベントハンドラー、`foreignObject`、フレーム、外部のリンクと画像、スタイル内の `url()` を取り除き、id にはページごとの接頭辞を付けます。`.trusted()` は、アプリが自分で管理するデータから描くページの浄化を省きます。エスケープされずにそのようなページに入った利用者のテキストは、開いた全員のもとでスクリプトとして動きます。
+- `document.js`（13 KB、gzip で 4.7 KB）と `document.css`（3.6 KB）はビューアーのあるページでのみ読み込まれます。
+
+| キー | 場所 | 動作 |
+|---|---|---|
+| Page Down、Page Up | ページ領域 | 次のページと前のページ |
+| Home、End | ページ領域 | 最初のページと最後のページ |
+| `+`、`-` | ページ領域 | 拡大と縮小 |
+| Enter | ページ欄 | 入力したページへ移動 |

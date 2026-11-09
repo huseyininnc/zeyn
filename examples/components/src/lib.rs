@@ -199,6 +199,7 @@ catalog! {
         search_box "/ui/search-box";
         topics "/ui/topics" (Demo);
         tree "/ui/tree";
+        document_viewer "/ui/document-viewer";
         week_schedule "/ui/week-schedule";
     }
     "shop" Cart {

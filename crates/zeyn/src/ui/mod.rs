@@ -18,6 +18,7 @@ mod countdown;
 mod date;
 mod diff;
 mod dock;
+mod document;
 mod embed;
 mod facets;
 mod feed;
@@ -45,6 +46,7 @@ mod rating;
 mod reactions;
 mod relative;
 mod reviews;
+mod sanitize;
 mod schema;
 mod share;
 mod shell;
@@ -100,6 +102,10 @@ pub use countdown::Countdown;
 pub use date::DateOptions;
 pub(crate) use date::{input_text, picker_config, range_reversed, render_date_input, render_range};
 pub use diff::{DiffLayout, DiffView, MAX_DIFF_FIELDS};
+pub use document::{
+    DocPage, DocSearch, DocumentViewer, MAX_DOCUMENT_PAGES, MAX_DOCUMENT_QUERY, MAX_PAGE_BYTES,
+    MAX_PAGE_HITS, OutlineItem, PageHit, PageSize,
+};
 pub use facets::{Facet, FacetPanel, MAX_FACET_OPTIONS, MAX_FACETS};
 pub use feed::{Feed, MAX_FEED_BATCH, MAX_POST_MEDIA, Post};
 pub use gallery::{MAX_GALLERY_IMAGES, ProductGallery};
@@ -126,6 +132,7 @@ pub use rating::{DEFAULT_RATING, MAX_RATING};
 pub use reactions::{MAX_REACTIONS, ReactionPress, ReactionState, Reactions};
 pub use relative::RelativeTime;
 pub use reviews::ReviewSummary;
+pub use sanitize::sanitize_markup;
 pub use schema::{
     FieldSpec, FormSchema, MAX_FIELD_NAME, MAX_SCHEMA_FIELDS, MAX_SCHEMA_OPTIONS, MAX_SCHEMA_TEXT,
     SchemaForm, SpecKind,

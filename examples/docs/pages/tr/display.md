@@ -233,3 +233,29 @@ Action komutları kendi yollarına sahip node'lardır ve bir `ActionButton` gibi
 | Tab | menü | Kapatır ve ilerler |
 
 Menü yaklaşık 0,8 KB gzip betik gerektirir ve bir komut çalışana kadar istek yapmaz; 4 node artı komut başına 2 node'dur.
+
+## DocumentViewer
+
+`DocumentViewer::of(page_action, page_count)` sayfaları sunucuda çizilen, sayfalı bir belgeyi (örneğin bir rapor önizlemesini) gösterir. Sayfa action'ı bir `DocPage` alır (`document` tarayıcıdan değil `.document(id)` ile gelir, bir de `page`) ve bir sayfayı SVG veya HTML parçası olarak döner. Her sayfa `.page_size(..)` boyutundadır (`PageSize::A4`, `PageSize::LETTER`, `PageSize::pt(w, h)` veya `PageSize::px(w, h)`); böylece kaydırma alanı baştan bütün belge kadar uzundur.
+
+```rust
+DocumentViewer::of(report_page, report.pages)
+    .document(report.id.to_string())
+    .page_size(PageSize::A4)
+    .outline(vec![OutlineItem::new("Summary", 1).child(OutlineItem::new("Totals", 2))])
+    .search(search_report)
+    .download("PDF", format!("/reports/{}/pdf", report.id))
+```
+
+- Sayfada yalnızca görünen sayfalar ve iki yanındaki birer sayfa bulunur. Bunlar kaydırma durunca `POST /_zeyn/data` ile (hızla geçilen sayfalar hiç getirilmez), en yakını önce ve aynı anda en çok 3 tane getirilir; sayfası görünümden çıkan istek iptal edilir. Tarayıcıda en çok 12 çizilmiş sayfa tutulur.
+- Yakınlaştırma sayfaları yeniden getirmeden ölçekler: genişliğe sığdır, sayfaya sığdır ve yüzde 50 ile 400 arası. Sayfa kutusu bir sayfaya gider; kaydırma durunca geçerli sayfa okunur ("Sayfa 3 / 500").
+- `.outline(items)` bir içindekiler paneli ekler. `.search(action)` bir arama kutusu ekler; action'ı bir `DocSearch` alır ve `PageHit` listesi döner (en çok 50 tanesi gösterilir). `.download(label, href)` bir indirme bağlantısı ekler.
+- Sunucu her sayfada ekranın erişimini, sayfa action'ının iznini, CSRF'yi ve yazma sınırını denetler; 1 ile sayfa sayısı dışındaki sayfa numaralarını ve 2 MB'tan (`MAX_PAGE_BYTES`) büyük sayfaları reddeder, her sayfayı bir izin listesiyle (`sanitize_markup`) temizler: script'ler, olay işleyicileri, `foreignObject`, çerçeveler, dış bağlantı ve resimler, stillerdeki `url()` kaldırılır; id'ler sayfa başına bir önek alır. `.trusted()` temizliği, uygulamanın kendi denetlediği verilerden çizdiği sayfalar için atlar; böyle bir sayfaya kaçışsız ulaşan kullanıcı metni, onu açan herkes için script olarak çalışır.
+- `document.js` (13 KB, gzip ile 4,7 KB) ve `document.css` (3,6 KB) yalnızca görüntüleyici olan sayfalarda yüklenir.
+
+| Tuş | Nerede | Ne yapar |
+|---|---|---|
+| Page Down, Page Up | sayfalar | Sonraki ve önceki sayfa |
+| Home, End | sayfalar | İlk ve son sayfa |
+| `+`, `-` | sayfalar | Yakınlaştırır ve uzaklaştırır |
+| Enter | sayfa kutusu | Yazılan sayfaya gider |

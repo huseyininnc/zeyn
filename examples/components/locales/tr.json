@@ -75,6 +75,7 @@
       "search_box": "Önerili arama alanı.",
       "topics": "Ekranın diğer bölümlerini yerinde yenileyen süzgeçler ve eylemler.",
       "tree": "Açıldıkça sunucudan yüklenen dallar.",
+      "document_viewer": "Sayfaları göründükçe getirilen, sayfalı bir rapor önizlemesi.",
       "week_schedule": "Eylem satırlarından yedi günlük sütunlar.",
       "image": "Alternatif metni ve boyutu zorunlu resim.",
       "embed": "Kilitli çerçevede başka bir sitenin sayfası.",
@@ -361,6 +362,10 @@
         "select": "Aynı dinleyicileri yöneten bir seçim kutusu",
         "date_range_and_search": "Bir listeyi yöneten tarih aralığı ve arama kutusu",
         "refresh_after_an_action": "Bir düğümü yenileyen eylem"
+      },
+      "document_viewer": {
+        "overview": "Örnek",
+        "plain": "Yan paneli olmayan on iki Letter sayfası"
       },
       "tree": {
         "overview": "Örnek",
