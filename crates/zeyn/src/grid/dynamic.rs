@@ -6,6 +6,7 @@
 //! paging, virtual scrolling, keyboard use and formatting in the user's language are the same.
 
 use super::*;
+use crate::privacy::MaskStyle;
 use std::borrow::Cow;
 use std::hash::{Hash, Hasher};
 
@@ -87,16 +88,31 @@ static KIND_META: [FieldMeta; 8] = [
     kind_meta(FieldKind::LocalDateTime),
 ];
 
+/// Most cells one dynamic page keeps; rows after the budget wait for the next page.
+pub const MAX_PAGE_CELLS: usize = 50_000;
+
+/// Most bytes of text one dynamic page keeps over all its cells. Each text cell gets an equal
+/// share (at least 64 bytes), so a wide page cuts its text shorter instead of dropping rows.
+pub const MAX_PAGE_TEXT: usize = 8 * 1024 * 1024;
+
+/// Raw values longer than this many bytes are masked completely instead of by their style.
+const MAX_MASK_INPUT: usize = 1_024;
+
 /// One column of a [`DynamicPage`]: the name rows use, the header label and the kind.
 ///
 /// The name and the label come from the action (a query, a data source) and are treated as user
-/// data: escaped in the page and cut at [`MAX_COLUMN_NAME`] characters.
+/// data: escaped in the page and cut at [`MAX_COLUMN_NAME`] characters. Empty names become
+/// `col_<index>` and repeated names get `_2`, `_3`, so every column has a name of its own.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct DynamicColumn {
     pub name: String,
     pub label: String,
     #[serde(default)]
     pub kind: DynamicKind,
+    /// Values are masked on the server before anything renders them; see
+    /// [`DynamicColumn::masked`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mask: Option<MaskStyle>,
 }
 
 impl DynamicColumn {
@@ -106,7 +122,22 @@ impl DynamicColumn {
             name: name.into(),
             label: label.into(),
             kind,
+            mask: None,
         }
+    }
+
+    /// Shows the column's values masked with `style`, as text. The raw value is replaced as soon
+    /// as the page is read, so it never reaches HTML, logs or AI agents, and no one can reveal
+    /// it. Without this, keeping personal data out of the result is the action's job.
+    ///
+    /// ```
+    /// use zeyn::{DynamicColumn, DynamicKind, MaskStyle};
+    /// let iban = DynamicColumn::new("iban", "IBAN", DynamicKind::Text).masked(MaskStyle::LastFour);
+    /// assert_eq!(iban.mask, Some(MaskStyle::LastFour));
+    /// ```
+    pub fn masked(mut self, style: MaskStyle) -> Self {
+        self.mask = Some(style);
+        self
     }
 }
 
@@ -195,9 +226,9 @@ impl Model for DynamicRow {
     }
 }
 
-/// A loaded dynamic page: the cleaned columns and the rows read with them.
+/// A loaded dynamic page: the typed grid built once for its columns, and its rows.
 pub(crate) struct DynamicItems {
-    columns: Vec<DynamicColumn>,
+    grid: DataGrid<DynamicRow>,
     pub(crate) rows: Vec<DynamicRow>,
 }
 
@@ -214,33 +245,104 @@ fn no_rows(_: Ctx, _: DataQuery) -> BoxFuture<Result<Page<DynamicRow>>> {
     Box::pin(async { Err(crate::action::Error::NotFound) })
 }
 
-/// Cuts `text` to `max` characters, ending in `…` when it was longer.
-fn clip(mut text: String, max: usize) -> String {
-    if text.len() > max
-        && let Some((at, _)) = text.char_indices().nth(max)
+/// Cuts `text` to `max_chars` characters and `max_bytes` bytes, ending in `…` when it was
+/// longer. A cut value is a new string, so the long one is freed.
+fn clip(text: String, max_chars: usize, max_bytes: usize) -> String {
+    if text.len() <= max_bytes && (text.len() <= max_chars || text.chars().nth(max_chars).is_none())
     {
-        text.truncate(at);
-        text.push('…');
+        return text;
     }
-    text
+    let mut end = 0;
+    for (n, (i, c)) in text.char_indices().enumerate() {
+        if n == max_chars || i + c.len_utf8() > max_bytes {
+            break;
+        }
+        end = i + c.len_utf8();
+    }
+    let mut out = String::with_capacity(end + '…'.len_utf8());
+    out.push_str(&text[..end]);
+    out.push('…');
+    out
 }
 
-/// Reads one JSON value as a cell of `kind`. A value that does not read as the kind becomes
-/// text, cut at [`MAX_CELL_TEXT`] characters.
-fn cell(json: serde_json::Value, kind: DynamicKind) -> Value {
+/// Writes into a buffer and stops once it holds `cap` bytes, so serializing a huge value costs
+/// no more than the part that is kept.
+struct Capped {
+    buf: Vec<u8>,
+    cap: usize,
+}
+
+impl std::io::Write for Capped {
+    fn write(&mut self, data: &[u8]) -> std::io::Result<usize> {
+        let room = self.cap.saturating_sub(self.buf.len());
+        if room == 0 {
+            return Err(std::io::Error::other("cell text is full"));
+        }
+        let n = data.len().min(room);
+        self.buf.extend_from_slice(&data[..n]);
+        Ok(n)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+/// JSON text of a nested value, at most `max_bytes` (plus a little to tell that it was longer).
+fn json_text(value: &serde_json::Value, max_bytes: usize) -> String {
+    let mut w = Capped {
+        buf: Vec::new(),
+        cap: max_bytes + 4,
+    };
+    let _ = serde_json::to_writer(&mut w, value);
+    match String::from_utf8(w.buf) {
+        Ok(s) => s,
+        Err(e) => {
+            let valid = e.utf8_error().valid_up_to();
+            let mut bytes = e.into_bytes();
+            bytes.truncate(valid);
+            String::from_utf8(bytes).unwrap_or_default()
+        }
+    }
+}
+
+/// How one column reads its values: the kind, the mask, the key an object row is read by and
+/// whether a later column reads the same key.
+struct Reader {
+    kind: DynamicKind,
+    mask: Option<MaskStyle>,
+    key: String,
+    shared: bool,
+}
+
+/// Reads one JSON value as a cell. A value that does not read as the kind becomes text, cut at
+/// [`MAX_CELL_TEXT`] characters and `max_bytes` bytes; a masked column keeps only the masked
+/// text.
+fn cell(json: serde_json::Value, reader: &Reader, max_bytes: usize) -> Value {
     use serde_json::Value as Json;
+    let kind = reader.kind;
     let text = match json {
         Json::Null => return Value::Null,
-        Json::Bool(b) if kind == DynamicKind::Bool => return Value::Bool(b),
-        Json::Number(n) => match (kind, n.as_i64()) {
-            (DynamicKind::Integer, Some(i)) => return Value::Int(i),
-            (DynamicKind::Bool, Some(0 | 1)) => return Value::Bool(n.as_i64() == Some(1)),
+        Json::Bool(b) if kind == DynamicKind::Bool && reader.mask.is_none() => {
+            return Value::Bool(b);
+        }
+        Json::Number(n) => match (kind, n.as_i64(), reader.mask) {
+            (DynamicKind::Integer, Some(i), None) => return Value::Int(i),
+            (DynamicKind::Bool, Some(i @ (0 | 1)), None) => return Value::Bool(i == 1),
             _ => n.to_string(),
         },
         Json::String(s) => s,
-        other => other.to_string(),
+        other => json_text(&other, max_bytes),
     };
+    if let Some(style) = reader.mask {
+        return Value::Text(if text.len() > MAX_MASK_INPUT {
+            MaskStyle::Full.apply("")
+        } else {
+            style.apply(&text)
+        });
+    }
     let read = match kind {
+        _ if text.len() > 64 => None,
         DynamicKind::Text => None,
         DynamicKind::Integer => text.trim().parse().ok().map(Value::Int),
         DynamicKind::Decimal => crate::Decimal::parse(&text).map(Value::Number),
@@ -257,27 +359,90 @@ fn cell(json: serde_json::Value, kind: DynamicKind) -> Value {
         DynamicKind::DateTime => DateTime::parse(&text).map(Value::DateTime),
         DynamicKind::LocalDateTime => LocalDateTime::parse(&text).map(Value::LocalDateTime),
     };
-    read.unwrap_or_else(|| Value::Text(clip(text, MAX_CELL_TEXT)))
+    read.unwrap_or_else(|| Value::Text(clip(text, MAX_CELL_TEXT, max_bytes)))
 }
 
-/// Reads one JSON row (an array in column order or an object by name) into cells.
-fn row(json: serde_json::Value, columns: &[DynamicColumn]) -> DynamicRow {
-    let mut cells = Vec::with_capacity(columns.len());
+/// Reads one JSON row (an array in column order or an object by the action's column names)
+/// into cells.
+fn row(json: serde_json::Value, readers: &[Reader], max_bytes: usize) -> DynamicRow {
+    let mut cells = Vec::with_capacity(readers.len());
     match json {
         serde_json::Value::Array(values) => {
             let mut values = values.into_iter();
-            for c in columns {
-                cells.push(cell(values.next().unwrap_or_default(), c.kind));
+            for r in readers {
+                cells.push(cell(values.next().unwrap_or_default(), r, max_bytes));
             }
         }
         serde_json::Value::Object(mut map) => {
-            for c in columns {
-                cells.push(cell(map.remove(&c.name).unwrap_or_default(), c.kind));
+            for r in readers {
+                let value = if r.shared {
+                    map.get(&r.key).cloned()
+                } else {
+                    map.remove(&r.key)
+                };
+                cells.push(cell(value.unwrap_or_default(), r, max_bytes));
             }
         }
-        _ => cells.resize(columns.len(), Value::Null),
+        _ => cells.resize(readers.len(), Value::Null),
     }
     DynamicRow(cells)
+}
+
+/// Bytes of text a cell holds, for the page's text budget.
+fn text_bytes(row: &DynamicRow) -> usize {
+    row.0
+        .iter()
+        .map(|v| match v {
+            Value::Text(s) => s.len(),
+            _ => 0,
+        })
+        .sum()
+}
+
+/// Cleans the action's columns: at most [`MAX_DYNAMIC_COLUMNS`], names and labels cut, empty
+/// names replaced by `col_<index>` and repeated names made unique with `_2`, `_3`. Returns the
+/// columns and how each reads its values (object rows by the action's own names).
+fn clean_columns(columns: Vec<DynamicColumn>) -> (Vec<DynamicColumn>, Vec<Reader>) {
+    let columns: Vec<DynamicColumn> = columns
+        .into_iter()
+        .take(MAX_DYNAMIC_COLUMNS)
+        .collect();
+    let mut readers: Vec<Reader> = Vec::with_capacity(columns.len());
+    let mut seen = std::collections::HashSet::with_capacity(columns.len());
+    let mut clean = Vec::with_capacity(columns.len());
+    for (i, c) in columns.into_iter().enumerate() {
+        let base = if c.name.trim().is_empty() {
+            format!("col_{i}")
+        } else {
+            clip(c.name.clone(), MAX_COLUMN_NAME, MAX_COLUMN_NAME * 4)
+        };
+        let mut name = base.clone();
+        let mut n = 2;
+        while !seen.insert(name.clone()) {
+            name = format!("{base}_{n}");
+            n += 1;
+        }
+        if let Some(earlier) = readers
+            .iter_mut()
+            .rev()
+            .find(|r| r.key == c.name)
+        {
+            earlier.shared = true;
+        }
+        readers.push(Reader {
+            kind: c.kind,
+            mask: c.mask,
+            key: c.name,
+            shared: false,
+        });
+        clean.push(DynamicColumn {
+            name,
+            label: clip(c.label, MAX_COLUMN_NAME, MAX_COLUMN_NAME * 4),
+            kind: c.kind,
+            mask: c.mask,
+        });
+    }
+    (clean, readers)
 }
 
 /// A short fingerprint of the columns, so the browser knows when the header must change.
@@ -296,16 +461,20 @@ fn shape(columns: &[DynamicColumn]) -> String {
 pub struct DynamicGrid {
     grid: DataGrid<DynamicRow>,
     fetch: DynamicFetch,
+    /// Model name and key column of audited reads, set by [`DynamicGrid::sensitive`].
+    sensitive: Option<(&'static str, &'static str)>,
 }
 
 impl DataGrid<DynamicRow> {
     /// DataGrid whose columns are known only after its action ran: the action takes a
     /// `DataQuery` and returns a [`DynamicPage`] with the columns and one page of rows. Paging,
     /// virtual scrolling, keyboard use, column layout and formatting by kind work as in a typed
-    /// grid. Column names, labels and cells are escaped like any user data, at most
-    /// [`MAX_DYNAMIC_COLUMNS`] columns and the query's page size of rows are kept, and long text
-    /// is cut. Sort keys, filters and totals never reach the action. Rows are read only: no
-    /// editing, row actions, selection or export.
+    /// grid. Column names, labels and cells are escaped like any user data. At most
+    /// [`MAX_DYNAMIC_COLUMNS`] columns, the query's page size of rows, [`MAX_PAGE_CELLS`] cells
+    /// and [`MAX_PAGE_TEXT`] bytes of text are kept; rows past a budget come with the next page.
+    /// Sort keys, filters and totals never reach the action. Rows are read only: no editing, row
+    /// actions, selection or export. Mask columns with [`DynamicColumn::masked`] and audit reads
+    /// with [`DynamicGrid::sensitive`]; otherwise the action decides what the result may show.
     pub fn dynamic<A>(_source: A) -> DynamicGrid
     where
         A: Action<Input = DataQuery, Output = Result<DynamicPage>>,
@@ -315,8 +484,41 @@ impl DataGrid<DynamicRow> {
         DynamicGrid {
             grid,
             fetch: fetch_dynamic::<A>,
+            sensitive: None,
         }
     }
+}
+
+/// The typed grid for a page's columns, with a dynamic grid's settings.
+fn shaped(
+    action: ActionMeta,
+    paging: Paging,
+    zebra: bool,
+    columns: &[DynamicColumn],
+) -> DataGrid<DynamicRow> {
+    let mut grid = DataGrid::of_fetch(action, no_rows);
+    grid.paging = paging;
+    grid.zebra = zebra;
+    grid.shape = Some(shape(columns));
+    for (i, c) in columns.iter().enumerate() {
+        let kind = if c.mask.is_some() {
+            DynamicKind::Text
+        } else {
+            c.kind
+        };
+        grid.columns.push(Column {
+            name: Cow::Owned(c.name.clone()),
+            label: Some(c.label.clone()),
+            sort: false,
+            width: Some(kind.width()),
+            value: Box::new(move |row: &DynamicRow| match row.0.get(i) {
+                Some(v) => Cow::Borrowed(v),
+                None => Cow::Owned(Value::Null),
+            }),
+            ..Column::of(kind.meta())
+        });
+    }
+    grid
 }
 
 impl DynamicGrid {
@@ -332,34 +534,16 @@ impl DynamicGrid {
         self
     }
 
-    /// The typed grid for a page's columns, with this grid's settings.
-    fn shaped(&self, columns: &[DynamicColumn]) -> DataGrid<DynamicRow> {
-        let mut grid = DataGrid::of_fetch(self.grid.action, no_rows);
-        grid.paging = self.grid.paging;
-        grid.zebra = self.grid.zebra;
-        grid.shape = Some(shape(columns));
-        for (i, c) in columns.iter().enumerate() {
-            grid.columns.push(Column {
-                name: Cow::Owned(c.name.clone()),
-                label: Some(c.label.clone()),
-                sort: false,
-                width: Some(c.kind.width()),
-                value: Box::new(move |row: &DynamicRow| {
-                    row.0
-                        .get(i)
-                        .cloned()
-                        .unwrap_or(Value::Null)
-                }),
-                ..Column::of(c.kind.meta())
-            });
-        }
-        grid
+    /// Audits every row the user is shown as a read of `model`, keyed by the value of the
+    /// column `key` (the action's column name), as a `#[entity(sensitive)]` model's rows are.
+    pub fn sensitive(mut self, model: &'static str, key: &'static str) -> Self {
+        self.sensitive = Some((model, key));
+        self
     }
 
-    fn columns(page: &LoadedPage) -> &[DynamicColumn] {
+    fn items(page: &LoadedPage) -> Option<&DynamicItems> {
         page.items
             .downcast_ref::<DynamicItems>()
-            .map_or(&[], |items| items.columns.as_slice())
     }
 }
 
@@ -372,8 +556,9 @@ impl GridSource for DynamicGrid {
         self.grid.first_query(view)
     }
 
-    /// Keeps the layout of a view within the limits; columns the next page does not have are
-    /// dropped when it renders. Sort keys and filters go, since the grid offers neither.
+    /// Keeps the layout of a view and the shape it was made for within the limits; columns the
+    /// next page does not have are dropped when it renders, and a view of other columns is not
+    /// used. Sort keys and filters go, since the grid offers neither.
     fn clean_view(&self, view: DataGridView) -> DataGridView {
         DataGridView {
             columns: view
@@ -390,6 +575,7 @@ impl GridSource for DynamicGrid {
                 .collect(),
             sort: Vec::new(),
             filters: Vec::new(),
+            shape: view.shape.filter(|s| s.len() <= 32),
         }
     }
 
@@ -404,12 +590,11 @@ impl GridSource for DynamicGrid {
         shape_seen: Option<&str>,
         asked: bool,
     ) -> Option<serde_json::Value> {
-        let columns = Self::columns(page);
-        let now = shape(columns);
-        if !asked && shape_seen == Some(now.as_str()) {
+        let grid = &Self::items(page)?.grid;
+        let now = grid.shape.as_deref()?;
+        if !asked && shape_seen == Some(now) {
             return None;
         }
-        let grid = self.shaped(columns);
         Some(json!({
             "head": grid.head_html(r, page.view.as_ref()),
             "shape": now,
@@ -418,8 +603,9 @@ impl GridSource for DynamicGrid {
     }
 
     /// Calls the action with the page only: sort keys, filters, totals and groups are dropped
-    /// first, the page size stays within [`MAX_PAGE_SIZE`]. The answer is cut to that many rows
-    /// and [`MAX_DYNAMIC_COLUMNS`] columns, names and labels to [`MAX_COLUMN_NAME`] characters.
+    /// first, the page size stays within [`MAX_PAGE_SIZE`]. The answer is cut to that many rows,
+    /// [`MAX_DYNAMIC_COLUMNS`] columns, [`MAX_PAGE_CELLS`] cells and [`MAX_PAGE_TEXT`] bytes of
+    /// text; when a budget cuts rows, the page says where the next one starts.
     fn fetch(&self, ctx: Ctx, mut query: DataQuery) -> BoxFuture<Result<LoadedPage>> {
         query.sort.clear();
         query.filters.clear();
@@ -427,6 +613,7 @@ impl GridSource for DynamicGrid {
         query.group = None;
         query.time_zone = ctx.time_zone();
         let limit = query.limit() as usize;
+        let start = query.span().offset;
         let offset = match &mut query.page {
             PageRequest::Offset { offset, limit: l } => {
                 *l = limit as u32;
@@ -437,32 +624,55 @@ impl GridSource for DynamicGrid {
                 0
             }
         };
-        let fetch = self.fetch;
+        let (fetch, action, paging, zebra) = (
+            self.fetch,
+            self.grid.action,
+            self.grid.paging,
+            self.grid.zebra,
+        );
+        let sensitive = self.sensitive;
+        let audit = ctx.clone();
         Box::pin(async move {
             let page = fetch(ctx, query).await?;
-            let columns: Vec<DynamicColumn> = page
-                .columns
-                .into_iter()
-                .take(MAX_DYNAMIC_COLUMNS)
-                .map(|c| DynamicColumn {
-                    name: clip(c.name, MAX_COLUMN_NAME),
-                    label: clip(c.label, MAX_COLUMN_NAME),
-                    kind: c.kind,
-                })
-                .collect();
-            let rows: Vec<DynamicRow> = page
-                .rows
-                .into_iter()
-                .take(limit)
-                .map(|r| row(r, &columns))
-                .collect();
+            let (columns, readers) = clean_columns(page.columns);
+            let width = columns.len().max(1);
+            let max_bytes = (MAX_PAGE_TEXT / (limit * width)).clamp(64, MAX_CELL_TEXT * 4);
+            let max_rows = limit.min(MAX_PAGE_CELLS / width);
+            let mut rows: Vec<DynamicRow> = Vec::with_capacity(max_rows.min(page.rows.len()));
+            let mut text = 0;
+            let mut cut = false;
+            for json in page.rows {
+                if rows.len() == max_rows || text >= MAX_PAGE_TEXT {
+                    cut = true;
+                    break;
+                }
+                let r = row(json, &readers, max_bytes);
+                text += text_bytes(&r);
+                rows.push(r);
+            }
+            cut &= rows.len() < limit;
+            if let Some((model, key)) = sensitive {
+                let at = readers
+                    .iter()
+                    .position(|r| r.key == key);
+                for r in &rows {
+                    let id = at
+                        .and_then(|i| r.0.get(i))
+                        .and_then(value_key);
+                    audit.note_read(crate::audit::RecordRef { model, id });
+                }
+            }
+            let grid = shaped(action, paging, zebra, &columns);
             Ok(LoadedPage {
                 count: rows.len(),
                 total: page.total,
-                next: page.next,
+                next: match cut {
+                    true => Some(Cursor((start + rows.len() as u64).to_string())),
+                    false => page.next,
+                },
                 offset,
                 totals: Vec::new(),
-                items: Box::new(DynamicItems { columns, rows }),
+                items: Box::new(DynamicItems { grid, rows }),
                 view: None,
                 saved_views: false,
                 depth: 0,
@@ -474,8 +684,9 @@ impl GridSource for DynamicGrid {
     }
 
     fn rows_html(&self, page: &LoadedPage, r: &Render) -> String {
-        self.shaped(Self::columns(page))
-            .rows_html_erased(page, r)
+        Self::items(page)
+            .map(|items| items.grid.rows_html_erased(page, r))
+            .unwrap_or_default()
     }
 
     fn foot_html(&self, _page: &LoadedPage, _r: &Render) -> Option<String> {
@@ -483,8 +694,18 @@ impl GridSource for DynamicGrid {
     }
 
     fn render_loaded(&self, out: &mut String, r: &Render, page: &LoadedPage) {
-        self.shaped(Self::columns(page))
-            .render_with(out, r, Some(page));
+        match Self::items(page) {
+            Some(items) => items
+                .grid
+                .render_with(out, r, Some(page)),
+            None => self
+                .grid
+                .render_with(out, r, Some(page)),
+        }
+    }
+
+    fn sensitive_model(&self) -> Option<&'static str> {
+        self.sensitive.map(|s| s.0)
     }
 
     fn tool_schema(&self) -> serde_json::Value {

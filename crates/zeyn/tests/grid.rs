@@ -2869,7 +2869,7 @@ pub fn sql_wide() -> Screen {
     Screen::new("SQL").body(DataGrid::dynamic(wide_sql).paging(Paging::virtual_scroll()))
 }
 
-fn dynamic_router(identity: Identity) -> Router {
+fn dynamic_app(identity: Identity, audit: MemoryAudit) -> App {
     App::new("Test")
         .i18n(
             I18n::new("en")
@@ -2880,11 +2880,18 @@ fn dynamic_router(identity: Identity) -> Router {
             h.contains_key("x-user")
                 .then(|| identity.clone())
         })
+        .interceptor(AuditLog(audit))
+        .mcp(Mcp::on())
         .feature(
             Feature::new("sql")
                 .screen(sql)
-                .screen(sql_wide),
+                .screen(sql_wide)
+                .screen(sql_odd),
         )
+}
+
+fn dynamic_router(identity: Identity) -> Router {
+    dynamic_app(identity, MemoryAudit::default())
         .router()
         .unwrap()
 }
@@ -3034,7 +3041,11 @@ async fn dynamic_grid_caps_rows_columns_names_and_text_from_the_action() {
         .unwrap();
     assert_eq!(q.limit(), zeyn::MAX_PAGE_SIZE);
     assert!(q.sort.is_empty() && q.filters.is_empty() && q.aggregates.is_empty());
-    assert_eq!(j["count"], zeyn::MAX_PAGE_SIZE);
+    assert_eq!(j["count"], zeyn::MAX_PAGE_CELLS / zeyn::MAX_DYNAMIC_COLUMNS);
+    assert_eq!(
+        j["next"],
+        (zeyn::MAX_PAGE_CELLS / zeyn::MAX_DYNAMIC_COLUMNS).to_string()
+    );
     let columns = j["columns"].as_array().unwrap();
     assert_eq!(columns.len(), zeyn::MAX_DYNAMIC_COLUMNS);
     assert_eq!(
@@ -3047,7 +3058,11 @@ async fn dynamic_grid_caps_rows_columns_names_and_text_from_the_action() {
     );
     let rows = j["rows"].as_str().unwrap();
     let first = rows.split("</td>").next().unwrap();
-    assert_eq!(first.matches('y').count(), zeyn::MAX_CELL_TEXT, "{first}");
+    assert_eq!(
+        first.matches('y').count(),
+        zeyn::MAX_PAGE_TEXT / (500 * zeyn::MAX_DYNAMIC_COLUMNS),
+        "each cell gets its share of the page's text budget: {first}"
+    );
     assert!(first.ends_with('…'));
 }
 
@@ -3064,4 +3079,269 @@ async fn dynamic_grid_needs_its_actions_permission() {
     assert_eq!(page.status, StatusCode::OK);
     assert!(!page.body.contains("Ada"));
     assert!(!page.body.contains(">Quantity</th>"));
+}
+
+#[action(permission = "sql.run")]
+pub async fn oversized_sql(_q: DataQuery) -> Result<DynamicPage> {
+    let columns = (0..200)
+        .map(|i| {
+            zeyn::DynamicColumn::new(format!("c{i}"), format!("C{i}"), zeyn::DynamicKind::Text)
+        })
+        .collect();
+    let nested = serde_json::Value::Array(
+        (0..200_000)
+            .map(|i| serde_json::json!({ "n": i }))
+            .collect(),
+    );
+    let rows = (0..260)
+        .map(|r| {
+            let mut cells: Vec<serde_json::Value> = (0..200)
+                .map(|_| serde_json::Value::String("😀".repeat(100)))
+                .collect();
+            if r == 0 {
+                cells[1] = nested.clone();
+            }
+            serde_json::Value::Array(cells)
+        })
+        .collect();
+    Ok(DynamicPage::new(columns, rows).total(260))
+}
+
+#[action(permission = "sql.run")]
+pub async fn odd_names_sql(_q: DataQuery) -> Result<DynamicPage> {
+    use zeyn::{DynamicColumn as C, DynamicKind as K};
+    let columns = vec![
+        C::new("id", "Id", K::Integer),
+        C::new("id", "Id again", K::Integer),
+        C::new(" ", "Blank", K::Text),
+        C::new("card", "Card", K::Text).masked(zeyn::MaskStyle::LastFour),
+    ];
+    let rows = vec![
+        serde_json::json!([1, 2, "array", "4111 1111 1111 1234"]),
+        serde_json::json!({ "id": 7, " ": "object", "card": "5500 0000 0000 9876" }),
+    ];
+    Ok(DynamicPage::new(columns, rows).total(2))
+}
+
+/// Grids with odd results: a page past the budgets, and odd names with a masked column.
+#[screen(route = "/sql-odd", permission = "items.read")]
+pub fn sql_odd() -> Screen {
+    Screen::new("SQL").body(
+        Stack::new()
+            .add(DataGrid::dynamic(oversized_sql).paging(Paging::pages(500)))
+            .add(DataGrid::dynamic(odd_names_sql).sensitive("Payment", "id")),
+    )
+}
+
+#[tokio::test]
+async fn dynamic_grid_keeps_a_page_within_its_cell_and_text_budget() {
+    let router = dynamic_router(sql_user());
+    let call = serde_json::json!({ "screen": "sql_odd", "node": "0.0", "query": { "page": { "type": "offset", "offset": 0, "limit": 500 } } });
+    let r = send(&router, post("/_zeyn/grid", call)).await;
+    assert_eq!(r.status, StatusCode::OK);
+    let j = r.json();
+    let rows = zeyn::MAX_PAGE_CELLS / 200;
+    assert_eq!(j["count"], rows);
+    assert_eq!(j["next"], rows.to_string(), "paging goes on after the cut");
+    let html = j["rows"].as_str().unwrap();
+    let text: usize = html
+        .split("<td>")
+        .skip(1)
+        .map(|c| c.split("</td>").next().unwrap().len())
+        .sum();
+    assert!(text <= zeyn::MAX_PAGE_TEXT, "{text} bytes of cell text");
+    assert!(
+        html.len() < 2 * zeyn::MAX_PAGE_TEXT,
+        "{} bytes of rows",
+        html.len()
+    );
+    let nested = html
+        .split("<td>")
+        .nth(2)
+        .unwrap()
+        .split("</td>")
+        .next()
+        .unwrap();
+    assert!(nested.starts_with("[{&quot;n&quot;:0}"), "{nested}");
+    assert!(nested.ends_with('…') && nested.len() < 1_000, "{nested}");
+    let emoji = html
+        .split("<td>")
+        .nth(3)
+        .unwrap()
+        .split("</td>")
+        .next()
+        .unwrap();
+    assert!(emoji.len() <= 100, "{} bytes", emoji.len());
+}
+
+#[tokio::test]
+async fn dynamic_grid_makes_empty_and_repeated_column_names_unique() {
+    let router = dynamic_router(sql_user());
+    let call = serde_json::json!({ "screen": "sql_odd", "node": "0.1", "query": {} });
+    let j = send(&router, post("/_zeyn/grid", call))
+        .await
+        .json();
+    let names: Vec<&str> = j["columns"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c["field"].as_str().unwrap())
+        .collect();
+    assert_eq!(names, ["id", "id_2", "col_2", "card"]);
+    let rows = j["rows"].as_str().unwrap();
+    assert!(
+        rows.contains(r#"<td class="z-num">1</td><td class="z-num">2</td><td>array</td>"#),
+        "{rows}"
+    );
+    assert!(
+        rows.contains(r#"<td class="z-num">7</td><td class="z-num">7</td><td>object</td>"#),
+        "{rows}"
+    );
+}
+
+#[tokio::test]
+async fn masked_dynamic_columns_never_reach_html_or_agents_and_sensitive_reads_are_audited() {
+    let audit = MemoryAudit::default();
+    let router = dynamic_app(sql_user(), audit.clone())
+        .router()
+        .unwrap();
+    let page = send(&router, get("/sql-odd")).await;
+    let call = serde_json::json!({ "screen": "sql_odd", "node": "0.1", "query": {} });
+    let grid = send(&router, post("/_zeyn/grid", call)).await;
+    let tools = send(
+        &router,
+        mcp(serde_json::json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" })),
+    )
+    .await
+    .json();
+    let tool = tools["result"]["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["name"].as_str().unwrap().to_string())
+        .find(|n| n == "sql_odd_0-1_search")
+        .unwrap_or_else(|| panic!("the grid is an agent tool: {tools}"));
+    let agent = send(
+        &router,
+        mcp(serde_json::json!({ "jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": { "name": tool, "arguments": { "page": { "type": "offset", "offset": 0, "limit": 10 } } } })),
+    )
+    .await;
+    assert_eq!(agent.json()["result"]["isError"], false, "{}", agent.body);
+    for body in [&page.body, &grid.body, &agent.body] {
+        assert!(body.contains("•••• 1234"), "{body}");
+        assert!(!body.contains("4111"), "{body}");
+        assert!(!body.contains("5500"), "{body}");
+    }
+    let reads: Vec<Option<String>> = audit
+        .entries()
+        .iter()
+        .flat_map(|e| e.reads.iter())
+        .filter(|r| r.model == "Payment")
+        .map(|r| r.id.clone())
+        .collect();
+    assert!(reads.contains(&Some("1".into())), "{reads:?}");
+    assert!(reads.contains(&Some("7".into())), "{reads:?}");
+}
+
+fn mcp(body: serde_json::Value) -> Request<Body> {
+    Request::post("/_zeyn/mcp")
+        .header("x-user", "1")
+        .header(header::AUTHORIZATION, "Bearer test")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(body.to_string()))
+        .unwrap()
+}
+
+#[tokio::test]
+async fn a_dynamic_grid_uses_a_view_only_for_the_columns_it_was_made_for() {
+    let router = dynamic_router(sql_user());
+    let first = send(
+        &router,
+        post("/_zeyn/grid", dynamic_call("0.0", serde_json::json!({}))),
+    )
+    .await
+    .json();
+    let shape = first["shape"].as_str().unwrap();
+    let head = |view: serde_json::Value| {
+        let mut call = dynamic_call("0.0", serde_json::json!({}));
+        call["head"] = true.into();
+        call["view"] = view;
+        let router = router.clone();
+        async move {
+            send(&router, post("/_zeyn/grid", call))
+                .await
+                .json()["head"]
+                .as_str()
+                .unwrap()
+                .to_string()
+        }
+    };
+    let same = head(serde_json::json!({ "columns": [{ "field": "qty" }], "shape": shape })).await;
+    assert!(
+        same.contains(r#"data-field="qty""#) && !same.contains(r#"data-field="name""#),
+        "{same}"
+    );
+    let other =
+        head(serde_json::json!({ "columns": [{ "field": "qty" }], "shape": "0123456789abcdef" }))
+            .await;
+    assert!(other.contains(r#"data-field="name""#), "{other}");
+    let none = head(serde_json::json!({ "columns": [{ "field": "qty" }] })).await;
+    assert!(none.contains(r#"data-field="name""#), "{none}");
+}
+
+#[tokio::test]
+async fn a_request_with_an_old_shape_gets_the_new_header() {
+    let router = dynamic_router(sql_user());
+    let mut call = dynamic_call("0.0", serde_json::json!({}));
+    call["shape"] = "0123456789abcdef".into();
+    let j = send(&router, post("/_zeyn/grid", call))
+        .await
+        .json();
+    assert!(
+        j["head"]
+            .as_str()
+            .unwrap()
+            .contains(">Quantity</th>")
+    );
+    assert_ne!(j["shape"], "0123456789abcdef");
+    assert_eq!(j["columns"].as_array().unwrap().len(), 6);
+}
+
+#[tokio::test]
+async fn typed_grid_view_naming_no_known_column_falls_back_to_the_grid_layout() {
+    let body = serde_json::json!({
+        "screen": "list", "node": 0, "head": true,
+        "view": { "columns": [{ "field": "nope" }, { "field": "gone" }] }
+    });
+    let j = send(&router(reader()), post("/_zeyn/grid", body))
+        .await
+        .json();
+    let head = j["head"].as_str().unwrap();
+    assert!(head.contains(r#"data-field="code""#), "{head}");
+    assert!(head.contains(r#"data-field="active""#), "{head}");
+}
+
+#[tokio::test]
+async fn dynamic_grids_offer_no_export_edit_or_row_items() {
+    let router = dynamic_router(sql_user());
+    let export = send(&router, get("/_zeyn/grid/export?screen=sql&node=0.0")).await;
+    assert_eq!(export.status, StatusCode::NOT_FOUND, "{}", export.body);
+    let edit = send(
+        &router,
+        post(
+            "/_zeyn/grid/edit",
+            serde_json::json!({ "screen": "sql", "node": "0.0", "key": "1", "values": { "name": "x" } }),
+        ),
+    )
+    .await;
+    assert_eq!(edit.status, StatusCode::NOT_FOUND, "{}", edit.body);
+    let run = send(
+        &router,
+        post(
+            "/_zeyn/grid/run",
+            serde_json::json!({ "screen": "sql", "node": "0.0", "key": "1", "item": "a0" }),
+        ),
+    )
+    .await;
+    assert_eq!(run.status, StatusCode::NOT_FOUND, "{}", run.body);
 }

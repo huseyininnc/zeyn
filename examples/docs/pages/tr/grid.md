@@ -48,6 +48,12 @@ Grid sütunlarını her sayfadan kurar ve satırları tipli grid'in kendi koduyl
 
 Action'ın döndürdüğü her şey kullanıcı verisi sayılır. Sütun adları, etiketler ve hücreler diğer değerler gibi kaçışlanır. Sunucu en fazla `MAX_DYNAMIC_COLUMNS` (200) sütun ve sorgunun sayfa boyutu kadar satır tutar (`DataQuery::limit`, en fazla 500), adları ve etiketleri `MAX_COLUMN_NAME` (200), metin hücrelerini `MAX_CELL_TEXT` (1.000) karakterde keser. Sıralama anahtarları, filtreler, toplamlar ve gruplar action çalışmadan önce sorgudan çıkarılır ve başlıklarda sıralama düğmesi yoktur; action istemciden hiçbir sütun adı almaz. Erişim, her grid'de olduğu gibi action'ınkidir.
 
+Boş adlar `col_<sıra>` olur, tekrar eden adlar `_2`, `_3` alır; nesne satırları yine action'ın kendi adlarıyla okunur. Bir sayfa en fazla `MAX_PAGE_CELLS` (50.000) hücre ve `MAX_PAGE_TEXT` (8 MB) hücre metni tutar. Her metin hücresi metin bütçesinden eşit pay alır, bu yüzden geniş bir sayfa daha kısa metin gösterir; hücre bütçesini aşan satırlar sayfanın `next` değerinin gösterdiği bir sonraki sayfayla gelir. İç içe JSON değerleri yalnızca kendi paylarına kadar yazılır. Action'da 403 MB tutan 500 satır, 200 sütun ve 1.000 emojilik bir cevap, action'ın kendi cevabının üstüne bellek harcamadı ve 4,6 MB gönderdi.
+
+`DynamicColumn::masked(MaskStyle::LastFour)` bir sütunu sayfa okunur okunmaz maskeler; ham değerleri HTML'e, loglara ya da yapay zekâ ajanlarına hiç ulaşmaz ve kimse açamaz. `DynamicGrid::sensitive(model, key)` gösterilen her satırı, `key` sütunuyla anahtarlanmış bir `model` okuması olarak denetim kaydına yazar, `sensitive` bir entity'nin satırları gibi. Bunlar olmadan sonucun ne gösterebileceğine action karar verir.
+
+Sütunlar değiştiğinde tarayıcı eski sütunlardan sakladığı satırları bırakır. Kayıtlı bir görünüm yalnızca yapıldığı sütunlar için kullanılır.
+
 Başlık sütunların bir parmak izini taşır (`data-zeyn-shape`). Tarayıcı bunu her sayfa isteğiyle gönderir ve sunucu yeni bir başlığı yalnızca sütunlar değiştiğinde gönderir, örneğin `.listens(topic)` grid'i yeni bir sorguyla yeniden yüklediğinde. Satırlar salt okunurdur: dinamik bir grid'de düzenleme, satır eylemleri, seçim, ayrıntılar, gruplama ve dışa aktarma yoktur.
 
 ## Sütun toplamları

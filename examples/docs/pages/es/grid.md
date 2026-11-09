@@ -48,6 +48,12 @@ El grid construye sus columnas a partir de cada página y dibuja las filas con e
 
 Todo lo que devuelve la action se trata como datos del usuario. Los nombres de columna, las etiquetas y las celdas se escapan como cualquier otro valor. El servidor conserva como máximo `MAX_DYNAMIC_COLUMNS` (200) columnas y el tamaño de página de la consulta en filas (`DataQuery::limit`, como máximo 500), y corta nombres y etiquetas a `MAX_COLUMN_NAME` (200) y las celdas de texto a `MAX_CELL_TEXT` (1.000) caracteres. Las claves de orden, los filtros, los totales y los grupos se quitan de la consulta antes de ejecutar la action, y los encabezados no tienen botones de orden, así que la action nunca recibe un nombre de columna del cliente. El acceso es el de la action, como en todo grid.
 
+Los nombres vacíos pasan a ser `col_<índice>` y los repetidos reciben `_2`, `_3`; las filas de objeto se siguen leyendo por los nombres propios de la action. Una página guarda como máximo `MAX_PAGE_CELLS` (50.000) celdas y `MAX_PAGE_TEXT` (8 MB) de texto de celdas. Cada celda de texto recibe una parte igual del presupuesto de texto, así que una página ancha muestra textos más cortos; las filas que superan el presupuesto de celdas llegan con la página siguiente, a la que apunta `next`. Los valores JSON anidados solo se escriben hasta su parte. Una respuesta de 500 filas de 200 columnas de 1.000 emojis (403 MB en la action) no usó memoria más allá de la respuesta de la propia action y envió 4,6 MB.
+
+`DynamicColumn::masked(MaskStyle::LastFour)` enmascara una columna en cuanto se lee la página, así que sus valores originales nunca llegan al HTML, a los registros ni a los agentes de IA, y nadie puede revelarlos. `DynamicGrid::sensitive(model, key)` audita cada fila mostrada como una lectura de `model` con la clave de la columna `key`, igual que las filas de una entidad `sensitive`. Sin ellos, la action decide qué puede mostrar el resultado.
+
+Cuando cambian las columnas, el navegador descarta las filas que guardaba de las columnas anteriores. Una vista guardada solo se usa para las columnas para las que se hizo.
+
 El encabezado lleva una huella de las columnas (`data-zeyn-shape`). El navegador la envía con cada petición de página y el servidor solo envía un encabezado nuevo cuando las columnas cambiaron, por ejemplo después de que `.listens(topic)` recargue el grid con una consulta nueva. Las filas son de solo lectura: un grid dinámico no tiene edición, acciones de fila, selección, detalles, agrupación ni exportación.
 
 ## Totales de columna

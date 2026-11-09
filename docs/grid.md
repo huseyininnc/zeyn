@@ -58,14 +58,29 @@ its kind (180 px for text, 130 for numbers, 120 for dates), so a wide result scr
 What the action returns is treated as user data. Column names, labels and cells are escaped like
 any other value. The server keeps at most `MAX_DYNAMIC_COLUMNS` (200) columns and the query's page
 size of rows (`DataQuery::limit`, at most 500), and cuts names and labels at `MAX_COLUMN_NAME`
-(200) and text cells at `MAX_CELL_TEXT` (1,000) characters. Sort keys, filters, totals and groups
-are removed from the query before the action runs, and the headers have no sort buttons, so the
-action never gets a column name from the client. Access is the action's, as for every grid.
+(200) and text cells at `MAX_CELL_TEXT` (1,000) characters. Empty names become `col_<index>` and
+repeated names get `_2`, `_3`; object rows are still read by the action's own names. Sort keys,
+filters, totals and groups are removed from the query before the action runs, and the headers
+have no sort buttons, so the action never gets a column name from the client. Access is the
+action's, as for every grid.
+
+A page keeps at most `MAX_PAGE_CELLS` (50,000) cells and `MAX_PAGE_TEXT` (8 MB) of cell text.
+Each text cell gets an equal share of the text budget, so a wide page shows shorter text; rows
+past the cell budget come with the next page, which the page's `next` points to. Nested JSON
+values are written only up to their share. Answering 500 rows of 200 columns of 1,000 emoji
+(403 MB in the action) took no memory beyond the action's own answer and sent 4.6 MB.
+
+`DynamicColumn::masked(MaskStyle::LastFour)` masks a column as soon as the page is read, so its
+raw values never reach HTML, logs or AI agents, and no one can reveal them.
+`DynamicGrid::sensitive(model, key)` audits every row shown as a read of `model`, keyed by the
+column `key`, as the rows of a `sensitive` entity are. Without them the action decides what the
+result may show.
 
 The header carries a fingerprint of the columns (`data-zeyn-shape`). The browser sends it with
 every page request and the server sends a new header only when the columns changed, for example
-after `.listens(topic)` reloads the grid with a new query. Rows are read only: a dynamic grid has
-no editing, row actions, selection, details, grouping or export.
+after `.listens(topic)` reloads the grid with a new query; the browser then drops the rows it
+kept of the old columns. A saved view is used only for the columns it was made for. Rows are
+read only: a dynamic grid has no editing, row actions, selection, details, grouping or export.
 
 ## Column totals
 

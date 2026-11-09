@@ -157,8 +157,8 @@ pub use grid::{
     BulkAction, COLUMN_WIDTH, CellRenderer, ColumnView, DEFAULT_EXPORT_LIMIT, DataGrid,
     DataGridColumn, DataGridView, DataGridViewStore, DataMode, DynamicColumn, DynamicGrid,
     DynamicKind, DynamicPage, DynamicRow, ExportColumn, MAX_BULK, MAX_CELL_TEXT, MAX_COLUMN_NAME,
-    MAX_DYNAMIC_COLUMNS, MAX_PINNED, MAX_SORT, MemoryViewStore, Paging, Pin, RowStyle, Tone,
-    VIRTUAL_LIVE_ROWS, VIRTUAL_WIDE_COLUMNS, position_cursor, total,
+    MAX_DYNAMIC_COLUMNS, MAX_PAGE_CELLS, MAX_PAGE_TEXT, MAX_PINNED, MAX_SORT, MemoryViewStore,
+    Paging, Pin, RowStyle, Tone, VIRTUAL_LIVE_ROWS, VIRTUAL_WIDE_COLUMNS, position_cursor, total,
 };
 pub use i18n::{I18n, NumberFormat, Text};
 pub use import::{

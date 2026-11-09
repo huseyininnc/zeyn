@@ -31,7 +31,7 @@ mod memory;
 pub use column::DataGridColumn;
 pub use dynamic::{
     DynamicColumn, DynamicGrid, DynamicKind, DynamicPage, DynamicRow, MAX_CELL_TEXT,
-    MAX_COLUMN_NAME, MAX_DYNAMIC_COLUMNS,
+    MAX_COLUMN_NAME, MAX_DYNAMIC_COLUMNS, MAX_PAGE_CELLS, MAX_PAGE_TEXT,
 };
 
 #[cfg(any(feature = "postgres", feature = "oracle"))]
@@ -229,6 +229,10 @@ pub struct DataGridView {
     pub sort: Vec<Sort>,
     #[serde(default)]
     pub filters: Vec<Filter>,
+    /// Fingerprint of the columns of a dynamic grid the view was made for. A dynamic grid uses
+    /// a view only for the same columns; typed grids ignore it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shape: Option<String>,
 }
 
 /// Where saved grid views live, one per user and grid. Register one with `App::datagrid_views`.
@@ -431,7 +435,7 @@ fn key_text(value: &Value) -> String {
     }
 }
 
-type ValueFn<E> = Box<dyn Fn(&E) -> Value + Send + Sync>;
+type ValueFn<E> = Box<dyn for<'a> Fn(&'a E) -> std::borrow::Cow<'a, Value> + Send + Sync>;
 type StyleFn<E> = Box<dyn Fn(&E) -> Option<RowStyle> + Send + Sync>;
 type OpenFn<E> = Box<dyn Fn(&E) -> Effect + Send + Sync>;
 pub(crate) type FetchFn<E> = fn(Ctx, DataQuery) -> BoxFuture<Result<Page<E>>>;
@@ -465,7 +469,7 @@ impl<E> Column<E> {
             meta,
             name: std::borrow::Cow::Borrowed(meta.name),
             label: None,
-            value: Box::new(|_| Value::Null),
+            value: Box::new(|_| std::borrow::Cow::Owned(Value::Null)),
             width: None,
             flex: None,
             filter: false,
@@ -1046,7 +1050,9 @@ impl<E: Model> DataGrid<E> {
                 crate::value::FieldKind::Text | crate::value::FieldKind::Choice(_)
             );
             grid.columns.push(Column {
-                value: Box::new(move |e: &E| e.value_at(i).unwrap_or(Value::Null)),
+                value: Box::new(move |e: &E| {
+                    std::borrow::Cow::Owned(e.value_at(i).unwrap_or(Value::Null))
+                }),
                 filter,
                 ..Column::of(meta)
             });
@@ -1075,7 +1081,7 @@ impl<E: Model> DataGrid<E> {
     /// Adds a column. The following settings (`width`, `filter`...) apply to it.
     pub fn column<T: FieldType + 'static>(mut self, field: Field<E, T>) -> DataGridColumn<E, T> {
         self.columns.push(Column {
-            value: Box::new(move |e| field.get(e).to_value()),
+            value: Box::new(move |e| std::borrow::Cow::Owned(field.get(e).to_value())),
             ..Column::of(field.meta())
         });
         DataGridColumn {
@@ -1269,7 +1275,8 @@ impl<E: Model> DataGrid<E> {
     /// Shown columns for a view: the view's columns that exist, in its order, with starts pinned
     /// first and ends last; or the grid's own columns without the hidden ones.
     fn layout(&self, view: Option<&DataGridView>) -> Vec<Shown> {
-        let from_view = view
+        let from_view = self
+            .view_for(view)
             .filter(|v| !v.columns.is_empty())
             .map(|v| self.view_columns(v))
             .filter(|cols| !cols.is_empty());
@@ -1348,7 +1355,14 @@ impl<E: Model> DataGrid<E> {
             columns,
             sort: query.sort,
             filters: query.filters,
+            shape: None,
         }
+    }
+
+    /// The view when it fits the grid: always for typed grids, and for a dynamic grid only when
+    /// it was made for the same columns, so new columns are never hidden by an old view.
+    fn view_for<'v>(&self, view: Option<&'v DataGridView>) -> Option<&'v DataGridView> {
+        view.filter(|v| self.shape.is_none() || v.shape == self.shape)
     }
 
     /// Keeps the totals, filters and sort keys this grid offers, within the limits. With a ctx,
@@ -1651,7 +1665,7 @@ impl<E: Model> DataGrid<E> {
                 let c = &self.columns[s.index];
                 let value = (c.value)(row);
                 let num = matches!(
-                    value,
+                    *value,
                     Value::Int(_) | Value::Money(_) | Value::Decimal(_) | Value::Number(_)
                 );
                 let first = tree && n == 0;
@@ -1691,7 +1705,7 @@ impl<E: Model> DataGrid<E> {
                 match (c.meta.mask, &c.cell) {
                     (Some(_), _) => out.push_str(&crate::privacy::cell(r, c.meta, &value, row)),
                     (None, Some(cell)) => out.push_str(&cell(row, r)),
-                    (None, None) => match value {
+                    (None, None) => match *value {
                         Value::Int(n) if c.plain => {
                             let _ = write!(out, "{n}");
                         }
@@ -1715,7 +1729,7 @@ impl<E: Model> DataGrid<E> {
 
     fn render_with(&self, out: &mut String, r: &Render, page: Option<&LoadedPage>) {
         let scope = r.scope;
-        let view = page.and_then(|p| p.view.as_ref());
+        let view = self.view_for(page.and_then(|p| p.view.as_ref()));
         let cols = self.layout(view);
         if self.selectable {
             let t = |k: &str| r.text(&Text::key(format!("zeyn.grid.{k}")));
@@ -1788,7 +1802,7 @@ impl<E: Model> DataGrid<E> {
             attr(&self.columns_json(r))
         ));
         if let Some(shape) = &self.shape {
-            out.push_str(&format!(r#" data-zeyn-shape="{shape}""#));
+            out.push_str(&format!(r#" data-zeyn-shape="{}""#, escape(shape)));
         }
         if let Some(v) = view {
             out.push_str(&format!(r#" data-zeyn-view="{}""#, attr(v)));
@@ -2413,7 +2427,7 @@ impl<E: Model> GridSource for DataGrid<E> {
                 cols.iter()
                     .map(|s| {
                         let c = &self.columns[s.index];
-                        match (c.value)(row) {
+                        match (c.value)(row).into_owned() {
                             v if c.meta.mask.is_some() => Value::Text(masked(c.meta, &v)),
                             v @ Value::Choice(_) => Value::Text(plain(&v, &c.meta.kind, r)),
                             Value::DateTime(d) => Value::LocalDateTime(d.local(r.tz)),
