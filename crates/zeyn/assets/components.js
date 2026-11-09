@@ -417,7 +417,7 @@ function openSelect(combo, where = 'selected') {
   const wrap = combo.closest('.z-select');
   const native = wrap.querySelector('select');
   openListbox(combo, {
-    label: document.getElementById(`${native.id}-label`)?.textContent.replace('*', '').trim() ?? '',
+    label: document.getElementById(`${native.id}-label`)?.textContent.replace(/\*/g, '').trim() ?? '',
     pick: (item) => {
       native.value = item.value;
       native.dispatchEvent(new Event('input', { bubbles: true }));
