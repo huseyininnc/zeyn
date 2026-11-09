@@ -16,6 +16,7 @@ El proyecto en el que trabaja un agente incluye sus propias reglas y herramienta
 | `zeyn_check` | Compila e informa de problemas; `fix: true` reescribe primero las APIs renombradas |
 | `zeyn_test` | Ejecuta `cargo test` y devuelve el final de la salida |
 | `zeyn_new_feature` | Crea una carpeta de feature y la registra |
+| `zeyn_new_screen` | Añade un archivo de pantalla a una feature y lo registra |
 
 El compilador es la defensa principal. Cada regla que puede hacer cumplir tiene una prueba `compile_fail` y un mensaje `#[diagnostic::on_unimplemented]` escrito para que un agente actúe en consecuencia, como este:
 

@@ -41,11 +41,11 @@ Form::of(Contact { quantity: 2, size: Size::Medium, ..Contact::default() })
 | `Control::Percent` | Un `Decimal` o número entero mostrado con un signo de porcentaje |
 | `Control::Password`, `Control::NewPassword` | Un campo de texto de tipo contraseña, con un botón para mostrar y ocultar |
 | `Control::PasswordMeter` | Una contraseña nueva con un medidor de fortaleza |
-| `Control::Rating` | Un número entero de 1 a N mostrado como estrellas (ver [Rating](#rating)) |
+| `Control::Rating` | Un número entero de 1 a N mostrado como estrellas, o medias estrellas en un campo `Decimal` (ver [Rating](#rating)) |
 
 ## Rating
 
-`Control::Rating` muestra un campo de número entero como estrellas de 1 a N, donde N es la regla `max` del campo (5 si no hay regla, 10 como máximo). Es un grupo de botones de radio nativos dentro de un `fieldset` cuya leyenda es la etiqueta del campo, así que sigue el patrón de grupo de radio de W3C APG sin script: Tab llega al grupo una sola vez, las flechas mueven y marcan, y cada estrella se nombra «3 de 5» en el idioma del usuario. Al pasar el cursor se iluminan las estrellas hasta el puntero. El servidor valida el valor con las reglas del campo como cualquier número, así que da al campo `min` y `max`; con `required` en un `Option<i64>`, dejar todas las estrellas vacías se rechaza.
+`Control::Rating` muestra un campo de número entero como estrellas de 1 a N, donde N es la regla `max` del campo (5 si no hay regla, 10 como máximo). Es un grupo de botones de radio nativos dentro de un `fieldset` cuya leyenda es la etiqueta del campo, así que sigue el patrón de grupo de radio de W3C APG sin script: Tab llega al grupo una sola vez, las flechas mueven y marcan, y cada estrella se nombra «3 de 5» en el idioma del usuario. Al pasar el cursor se iluminan las estrellas hasta el puntero. El servidor valida el valor con las reglas del campo como cualquier número, así que da al campo `min` y `max`; con `required` en un `Option<i64>`, dejar todas las estrellas vacías se rechaza. Un campo `Decimal` con `#[rule(min = 1, max = 5, scale = 1)]` admite medias estrellas, y el servidor rechaza un valor entre dos mitades, como 4.3 (ver [Componentes de tienda](commerce.md)).
 
 ```rust
 #[model]

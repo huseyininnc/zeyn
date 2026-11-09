@@ -1,8 +1,9 @@
 # {{title}}
 
 A shared Zeyn library: models, services, actions, screens and features that several apps use.
-The rules of a Zeyn app apply (see the framework index in any app's AGENTS.md, or `zeyn_docs` in
-the `zeyn` MCP server). Extra rules for a library:
+The rules of a Zeyn app apply: `.claude/skills/zeyn/SKILL.md` has them with the language in
+short, and `zeyn mcp` serves the full app rules as the `zeyn_docs` topic `rules`. Extra rules
+for a library:
 
 1. Every user facing text goes into `locales/*.json` and every locale file has the same keys
    (`cargo test` checks it). Apps load them with `I18n::catalogs({{crate}}::CATALOGS)`.
@@ -19,3 +20,9 @@ the `zeyn` MCP server). Extra rules for a library:
    screen, such as a toolbar, a form or a panel, into their own functions in their own files.
    The limits live in `Cargo.toml` (`[package.metadata.zeyn] max_file_lines`) and `clippy.toml`
    (`too-many-lines-threshold`); raise them only when the owner agrees.
+
+## Framework index
+
+Everything below comes from `use zeyn::prelude::*;`.
+
+{{component_index}}

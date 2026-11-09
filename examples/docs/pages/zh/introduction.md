@@ -60,12 +60,13 @@ cargo run
 或者运行仓库中的示例：
 
 ```sh
+cargo run -p zeyn-example-components
 cargo run -p zeyn-example-showcase
 cargo run -p zeyn-example-docs
 cargo run -p zeyn-cli -- new my-app
 ```
 
-showcase 监听 `127.0.0.1:3002`，用示例数据展示每个组件。本文档监听 `127.0.0.1:3008`；设置 `ZEYN_DOCS_SERVER__ADDR` 可更改地址。
+组件目录监听 `127.0.0.1:3010`，在每个组件的代码旁实时展示它，与 [components.zeynsoft.com](https://components.zeynsoft.com) 相同。showcase 监听 `127.0.0.1:3002`，把组件组合成带示例数据的界面。本文档监听 `127.0.0.1:3008`；设置 `ZEYN_DOCS_SERVER__ADDR` 可更改地址。
 
 ## 如何查找内容
 
@@ -74,7 +75,7 @@ showcase 监听 `127.0.0.1:3002`，用示例数据展示每个组件。本文档
 - *Language* 介绍 entity、action、界面、表单、DataGrid 和文本。
 - *Components* 在代码旁边以实时示例展示每个组件。
 - *Guides* 介绍时间与语言、安全、API、MCP、数据和主题。
-- *Reference* 包含运行时协议和架构。
+- *Reference* 包含运行时协议和数据库参考。
 - *Project* 介绍源代码、许可证、测试与 CI，以及安全策略。
 
 ## 原则

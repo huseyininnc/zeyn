@@ -60,12 +60,13 @@ cargo run
 O ejecuta los ejemplos del repositorio:
 
 ```sh
+cargo run -p zeyn-example-components
 cargo run -p zeyn-example-showcase
 cargo run -p zeyn-example-docs
 cargo run -p zeyn-cli -- new my-app
 ```
 
-El showcase escucha en `127.0.0.1:3002` y muestra cada componente con datos de ejemplo. Esta documentación escucha en `127.0.0.1:3008`; define `ZEYN_DOCS_SERVER__ADDR` para cambiarlo.
+El catálogo de componentes escucha en `127.0.0.1:3010` y muestra cada componente en vivo junto a su código, igual que [components.zeynsoft.com](https://components.zeynsoft.com). El showcase escucha en `127.0.0.1:3002` y reúne los componentes en pantallas de ejemplo con datos. Esta documentación escucha en `127.0.0.1:3008`; define `ZEYN_DOCS_SERVER__ADDR` para cambiarlo.
 
 ## Cómo orientarte
 
@@ -74,7 +75,7 @@ El showcase escucha en `127.0.0.1:3002` y muestra cada componente con datos de e
 - *Language* cubre entidades, acciones, pantallas, formularios, el DataGrid y los textos.
 - *Components* muestra cada componente con un ejemplo en vivo junto a su código.
 - *Guides* cubre zonas horarias e idiomas, seguridad, la API, MCP, datos y temas.
-- *Reference* incluye el protocolo del runtime y la arquitectura.
+- *Reference* incluye el protocolo del runtime y la referencia de la base de datos.
 - *Project* muestra el código fuente, la licencia, las pruebas y la CI, y la política de seguridad.
 
 ## Principios

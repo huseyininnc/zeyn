@@ -166,6 +166,56 @@ ui.refresh("orders")
   `Repeat::of(items, |item| node)` for data in memory; virtual lists need `.row_height(px)`.
 - File stores: `.files(RULES, FileAccess::read("x.read").write("x.write"), store)`.
 
+### Components by area
+
+Look here before you write a `Component`: each line names the main types and the call that
+matters. The `zeyn_docs` topic `language` and the docs pages have the details.
+
+- Layouts: `Row::new().col(node)`, `Stack::new().add(node)`, `Panel::new(t!(".."))`,
+  `Card::new().title(..)`, `Tabs::new(..).tab(..)`, `Split::new(a, b).ratio(55)`, `AutoGrid`,
+  `Dock` for panels the user moves.
+- Data: `DataGrid::of(action)` for tables; `List::of(action).builder(|row| node)`,
+  `CardGrid::of(action)` and `Rail::of(action)` for rows of another shape (a virtual list with a
+  builder needs `.row_height(px)`); `Repeat::of(items, |item| node)` for data already in memory;
+  `Tree::of(action)`, `Chart::bar(..)`, `Kpi::new(..)`.
+- Forms and controls: `Form::of(model).field(..).row(..).submit(t!(".."), action)`;
+  `.control(field, Control::Rating)` (also `Radio`, `Segmented`, `Listbox`, `Switch`, `Percent`,
+  `Password`); `.depends_on(child, parent)` for dependent lookups; `.lines(M::lines, ..)` for line
+  items; `RangeSlider::new(label, ["min", "max"], 0, 100)`, `QuantityStepper::of(action, target)`;
+  filters `Chips::filter(..)`, `SearchBox::of(action)`.
+- Linked parts: `.listens("topic")` on every part that shows the data; a filter that
+  `.drives("topic")` or `ui.refresh("topic")` in `on_success` reloads them in place.
+- Media: `Image::new(src).alt(..).size(w, h).lazy()` with `.placeholder(Placeholder::color(..))`,
+  `.low(small)`, `.fallback(src)`, and `.priority()` on the first image only; a lightbox with
+  `.full(large).caption(..)` or `.lightbox()`;
+  `Video::new(source, title).file(..)`, `Audio::new(..)`, `ProductGallery::new(name).image(..)`.
+- Commerce: `Price::new(money).was(old)`, `VariantPicker::new().group(VariantGroup::swatches(..))`,
+  `FacetPanel::of(screen, &p).facet(Facet::new(..))`, `ReviewSummary::new().count(5, n)`,
+  `Countdown::until(moment)`.
+- Admin: `DiffView::of(&before, &after)`, `CodeView::new(CodeLang::Sql, text)`,
+  `JsonView::of(&value, &ctx)`, `Barcode::code128(..)`, `QrCode::new(url)`, `Inbox::of(action)` with
+  `NotificationCenter::of(count, inbox, ())`, `Kanban::of(flow(), search, move_task)`,
+  `Calendar::of(search).at(p)`.
+- Chat: `MessageThread::of(history).conversation(id)` (`.reply(action)` streams AI replies),
+  `Composer::of(send).conversation(id)`, `TypingIndicator::new("chat").conversation(id)` (needs
+  `App::realtime`); the actions check that the user is in the conversation.
+- Social: `Feed::of(search_posts).post(|p| Post::new(author, at).text(..).media(image))` with
+  `.reactions(react)` and `.topic("posts")`; stories `StoryRow::new().add(StoryRing::new(name,
+  StoryState::Unseen).image(src))`, the state from what the server stored about the viewer.
+- Display and content: `Alert::new(Tone::Warning, ..)`, `Badge::new(..)`, `Progress::new(..)`,
+  `DescriptionList::of(&model)`, `Timeline`, `EmptyState`, `Breadcrumb`, `Markdown::new(..)`,
+  `Heading`, `Paragraph`, `Avatar`, `Hero::new(..)`, `Reactions::of(action, target)`,
+  `Share::page()`, `RelativeTime::new(at)`.
+- Shells: screens open in the app shell (menu, palette; `App::header(|h| h.search().account())`
+  adds a top bar); public pages use `.shell(Shell::site())` on the feature, sign in pages
+  `.shell(Shell::auth())` (`.split()` adds a brand panel); `MenuBar`, `StatusBar`.
+- Actions and buttons: `ActionButton::new(t!(".."), action, input).confirm(t!(".."))`, with
+  `.tone(Tone::Brand)` for the main action of a panel; `LinkButton::new(t!(".."), screen, params)`;
+  grid `.row_action(..)` and `.bulk_action(..)` then `.confirm(..)` and `.tone(Tone::Danger)`;
+  workflow moves `Transitions::of(..)`.
+- Files: `.files(RULES, FileAccess::read("x.file.read").write("x.file.write"), store)` on the
+  feature, with `DiskStore` or `MemoryStore`.
+
 ### Features and the app
 
 ```rust

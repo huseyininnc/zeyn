@@ -15,7 +15,7 @@
 не платят.
 
 ```toml
-zeyn = { version = "0.0.2", features = ["oidc"] }
+zeyn = { version = "0.0.8", features = ["oidc"] }
 ```
 
 Протестированные провайдеры: Keycloak и Authentik. Должен работать любой провайдер, который

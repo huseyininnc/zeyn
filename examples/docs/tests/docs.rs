@@ -447,6 +447,21 @@ async fn a_page_without_a_current_translation_is_shown_in_english_under_the_lang
     );
 }
 
+/// `llms.txt` is the index language models read first, so it links every page of the docs.
+#[test]
+fn llms_txt_links_every_page() {
+    let llms = include_str!("../llms.txt");
+    let missing: Vec<&str> = PAGES
+        .iter()
+        .map(|p| p.route)
+        .filter(|r| !llms.contains(&format!("(https://docs.zeynsoft.com{r})")))
+        .collect();
+    assert!(
+        missing.is_empty(),
+        "examples/docs/llms.txt does not link these pages: {missing:?}"
+    );
+}
+
 #[tokio::test]
 async fn the_sitemap_and_llms_txt_list_the_languages() {
     let (status, xml) = get("/sitemap.xml").await;
