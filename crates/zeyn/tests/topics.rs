@@ -303,6 +303,21 @@ async fn the_refresh_endpoint_checks_csrf_access_and_paths() {
         StatusCode::NOT_FOUND,
         "at most 32 nodes per request"
     );
+    let repeated: Vec<&str> = vec!["1.0"; 20_000];
+    let (status, _) = send(
+        &router,
+        post(
+            "/_zeyn/nodes",
+            "sales.read",
+            json!({ "screen": "sales", "nodes": repeated }),
+        ),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::NOT_FOUND,
+        "a long list is refused before it is deduplicated, also when every path is the same"
+    );
     let bad = json!({ "screen": "sales", "nodes": ["1..0"] });
     let (status, _) = send(&router, post("/_zeyn/nodes", "sales.read", bad)).await;
     assert!(status.is_client_error(), "node paths are checked: {status}");
