@@ -8,7 +8,7 @@ for their own customers, connect the model those customers want, and keep chat h
 they need it.
 
 ```toml
-zeyn = { version = "0.0.2", features = ["assistant"] }
+zeyn = { version = "0.0.8", features = ["assistant"] }
 ```
 
 Without the feature nothing of it is compiled: no HTTP client, no extra routes, no extra memory.

@@ -16,6 +16,7 @@ Zeyn 从两个方面为智能体而设计：编写 Zeyn 应用的智能体，以
 | `zeyn_check` | 编译并报告问题；`fix: true` 会先重写已更名的 API |
 | `zeyn_test` | 运行 `cargo test` 并返回输出的末尾部分 |
 | `zeyn_new_feature` | 创建 feature 文件夹并注册它 |
+| `zeyn_new_screen` | 为 feature 添加屏幕文件并注册它 |
 
 编译器是主要的把关者。它能够强制执行的每条规则都有一个 `compile_fail` 测试和一条供智能体据以行动的 `#[diagnostic::on_unimplemented]` 消息，例如：
 

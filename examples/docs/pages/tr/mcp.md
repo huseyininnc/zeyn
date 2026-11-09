@@ -16,6 +16,7 @@ Bir ajanın çalıştığı proje kendi kurallarını ve araçlarını taşır:
 | `zeyn_check` | Derler ve sorunları bildirir; `fix: true` önce yeniden adlandırılmış API'leri yeniden yazar |
 | `zeyn_test` | `cargo test` çalıştırır ve çıktının sonunu döndürür |
 | `zeyn_new_feature` | Bir Feature klasörü oluşturur ve kaydeder |
+| `zeyn_new_screen` | Bir Feature'a ekran dosyası ekler ve kaydeder |
 
 Ana koruyucu derleyicidir. Zorlayabildiği her kuralın bir `compile_fail` testi ve bir ajanın harekete geçebileceği şekilde yazılmış bir `#[diagnostic::on_unimplemented]` mesajı vardır, örneğin:
 

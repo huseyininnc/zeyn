@@ -9,7 +9,7 @@ rendered on the server, a small runtime in the browser applies changes, and app 
 HTML, CSS or JavaScript.
 
 If you are writing an app *with* Zeyn rather than changing Zeyn itself, read
-[`skills/zeyn/SKILL.md`](skills/zeyn/SKILL.md) instead. `zeyn new` copies it into every project. The CLI ships a copy in `crates/zeyn-cli/embedded/`; a test fails until you copy your change there.
+[`skills/zeyn/SKILL.md`](skills/zeyn/SKILL.md) instead. `zeyn new` copies it into every project. The CLI ships a copy in `crates/zeyn-cli/embedded/`; a test fails until you copy your change there. A new component also gets a line in the component index of `crates/zeyn-cli/templates/AGENTS.md.tmpl`, which every new project carries; a test fails when a name there does not exist.
 
 ## Read before you change anything
 
@@ -21,7 +21,7 @@ them. When code and docs disagree, fix the one that is wrong in the same change.
 | Anything, the first time | `README.md`, then `examples/docs/pages/introduction.md` |
 | The language: entities, actions, screens, forms, texts | `examples/docs/pages/` (`entities.md`, `actions.md`, `screens.md`, `forms.md`, `effects.md`, `texts.md`) |
 | DataGrid | `docs/grid.md`, `examples/docs/pages/datagrid.md` |
-| Components and layouts | `examples/docs/pages/` (`layouts.md`, `controls.md`, `lines.md`, `display.md`, `content.md`, `data.md`, `catalog.md`, `shell.md`) |
+| Components and layouts | `examples/docs/pages/` (`layouts.md`, `controls.md`, `lines.md`, `display.md`, `content.md`, `data.md`, `catalog.md`, `admin.md`, `commerce.md`, `chat.md`, `social.md`, `shell.md`), `docs/media.md` |
 | Browser runtime, endpoints, events | `docs/runtime-protocol.md` |
 | Security, audit, masking, sessions, jobs, workflows | `examples/docs/pages/security.md`, `docs/enterprise.md` |
 | Sign in, JWT, OIDC, MFA | `docs/auth.md` |

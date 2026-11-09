@@ -16,6 +16,7 @@ The project an agent works in carries its own rules and tools:
 | `zeyn_check` | Compiles and reports problems; `fix: true` first rewrites renamed APIs |
 | `zeyn_test` | Runs `cargo test` and returns the end of the output |
 | `zeyn_new_feature` | Creates a feature folder and registers it |
+| `zeyn_new_screen` | Adds a screen file to a feature and registers it |
 
 The compiler is the main guard. Every rule it can enforce has a `compile_fail` test and a `#[diagnostic::on_unimplemented]` message written for an agent to act on, such as:
 

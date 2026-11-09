@@ -10,8 +10,8 @@ names. Apps that sign in through a single sign on proxy or an identity provider 
 Everything sits behind the Cargo feature `accounts`. Without it nothing of this is compiled.
 
 ```toml
-zeyn = { version = "0.0.2", features = ["accounts"] }            # memory store
-zeyn = { version = "0.0.2", features = ["accounts", "postgres"] } # or "oracle"
+zeyn = { version = "0.0.8", features = ["accounts"] }            # memory store
+zeyn = { version = "0.0.8", features = ["accounts", "postgres"] } # or "oracle"
 ```
 
 The module is `zeyn::accounts` because `Identity` already names the request's user.

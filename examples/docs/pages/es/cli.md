@@ -102,4 +102,4 @@ La imagen de una aplicación generada pesa unos 43 MB y una aplicación inactiva
 
 ## El servidor MCP
 
-`zeyn mcp` habla MCP por stdio. Sus herramientas son `zeyn_docs` (referencia del framework por tema), `zeyn_describe` (features, pantallas, rutas y problemas de la aplicación en el directorio actual), `zeyn_check` (con `fix: true` ejecuta `check --fix`), `zeyn_test` y `zeyn_new_feature`. Consulta [MCP y agentes de IA](mcp.md).
+`zeyn mcp` habla MCP por stdio. Sus herramientas son `zeyn_docs` (referencia del framework por tema), `zeyn_describe` (features, pantallas, rutas y problemas de la aplicación en el directorio actual), `zeyn_check` (con `fix: true` ejecuta `check --fix`), `zeyn_test`, `zeyn_new_feature` y `zeyn_new_screen`. Consulta [MCP y agentes de IA](mcp.md).

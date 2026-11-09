@@ -16,6 +16,7 @@ Zeyn은 두 가지 에이전트를 위해 만들어졌습니다. Zeyn 앱을 작
 | `zeyn_check` | 컴파일하고 문제를 보고합니다. `fix: true`는 먼저 이름이 바뀐 API를 다시 씁니다 |
 | `zeyn_test` | `cargo test`를 실행하고 출력의 끝부분을 반환합니다 |
 | `zeyn_new_feature` | Feature 폴더를 만들고 등록합니다 |
+| `zeyn_new_screen` | Feature에 화면 파일을 추가하고 등록합니다 |
 
 컴파일러가 주된 방어선입니다. 컴파일러가 강제할 수 있는 모든 규칙에는 `compile_fail` 테스트와 에이전트가 행동할 수 있도록 작성된 `#[diagnostic::on_unimplemented]` 메시지가 있으며, 예는 다음과 같습니다.
 

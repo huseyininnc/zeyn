@@ -20,7 +20,7 @@ Añade el crate tras una feature, para que la compilación normal del servidor n
 desktop = ["dep:zeyn-desktop"]
 
 [dependencies]
-zeyn-desktop = { version = "0.0.2", optional = true }
+zeyn-desktop = { version = "0.0.8", optional = true }
 ```
 
 Inicia la ventana en lugar de `App::serve`:

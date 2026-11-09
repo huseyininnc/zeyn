@@ -14,7 +14,7 @@
 デフォルトのビルドには `oidc` も `totp` も含まれないため、これらを使わないアプリは何も負担しません。
 
 ```toml
-zeyn = { version = "0.0.2", features = ["oidc"] }
+zeyn = { version = "0.0.8", features = ["oidc"] }
 ```
 
 動作確認済みのプロバイダーは Keycloak と Authentik です。OpenID Connect の discovery、PKCE を使う認可コードフロー、JWKS に従うプロバイダーであれば動作するはずです。

@@ -373,6 +373,21 @@ fn valid_ident(name: &str) -> bool {
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
 }
 
+/// The component index of the app's AGENTS template, from its heading to the next one; a
+/// library's AGENTS.md repeats it through `{{component_index}}`.
+fn component_index() -> &'static str {
+    let agents = include_str!("../templates/AGENTS.md.tmpl");
+    let start = agents
+        .find("### Components by area")
+        .unwrap_or(agents.len());
+    let rest = &agents[start..];
+    let end = rest
+        .get(4..)
+        .and_then(|r| r.find("\n### "))
+        .map_or(rest.len(), |e| e + 4);
+    rest[..end].trim_end()
+}
+
 /// `acme-portal` becomes `Acme Portal`.
 fn title_of(name: &str) -> String {
     name.split(['-', '_'])
@@ -437,7 +452,8 @@ fn new_project_at(
             .replace("{{name}}", name)
             .replace("{{crate}}", &crate_name)
             .replace("{{title}}", &title)
-            .replace("{{zeyn_dep}}", &dep);
+            .replace("{{zeyn_dep}}", &dep)
+            .replace("{{component_index}}", component_index());
         std::fs::write(&target, text).map_err(|e| format!("{}: {e}", target.display()))?;
     }
     if git {
@@ -784,7 +800,7 @@ fn tools() -> Value {
     json!([
         tool(
             "zeyn_docs",
-            "Zeyn framework reference. Topics: rules (project rules for agents), language (how to write models, actions, screens, forms, grids), protocol (browser runtime protocol), architecture.",
+            "Zeyn framework reference. Topics: rules (project rules for agents), language (how to write models, actions, screens, forms, grids), protocol (browser runtime protocol).",
             json!({ "topic": { "type": "string", "enum": ["rules", "language", "protocol"] } }),
             &["topic"]
         ),
@@ -946,26 +962,10 @@ fn mcp() -> Result<(), String> {
 }
 
 #[cfg(test)]
-mod tests {
-    /// The copies in `embedded/` ship with the crate; in the repository they must match the originals.
-    #[test]
-    fn embedded_copies_match_the_repository() {
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-        for (name, original) in [
-            ("SKILL.md", "../../skills/zeyn/SKILL.md"),
-            ("runtime-protocol.md", "../../docs/runtime-protocol.md"),
-        ] {
-            let Ok(original) = std::fs::read_to_string(root.join(original)) else {
-                continue;
-            };
-            let copy = std::fs::read_to_string(root.join("embedded").join(name)).unwrap();
-            assert!(
-                copy == original,
-                "crates/zeyn-cli/embedded/{name} is out of date: copy the file from the repository root"
-            );
-        }
-    }
+mod drift;
 
+#[cfg(test)]
+mod tests {
     #[test]
     fn renames_identifiers_but_not_strings_or_longer_names() {
         let src = r##"use zeyn::{Grid, GridQuery};
