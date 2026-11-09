@@ -8,7 +8,7 @@ use zeyn::ui::{
     FieldSpec, FormSchema, LengthUnit, MAX_FIELD_NAME, MAX_SCHEMA_FIELDS, MAX_SCHEMA_OPTIONS,
     MAX_SCHEMA_TEXT, SchemaForm, is_hex_color,
 };
-use zeyn::{Component, I18n, Render};
+use zeyn::{Component, I18n, Render, Text};
 
 const PALETTE: &[&str] = &["#1E88E5", "#43A047", "javascript:alert(1)", "#00000080"];
 
@@ -191,7 +191,9 @@ fn model_fields_and_runtime_fields_render_through_the_same_path() {
     let runtime = render(
         &SchemaForm::new(schema, json!({ "title": "Sales", "fill": "#1E88E5" })),
         "en",
-    );
+    )
+    .replace("s-f0", "s-title")
+    .replace("s-f1", "s-fill");
     let input = r#"<input type="text" id="s-title" name="title" data-testid="s.field.title" aria-describedby="s-title-error" required aria-required="true" maxlength="40" value="Sales">"#;
     assert!(typed.contains(input), "{typed}");
     assert!(runtime.contains(input), "{runtime}");
@@ -374,4 +376,94 @@ fn rendering_an_inspector_with_fifty_fields_stays_cheap() {
         50
     );
     assert!(elapsed.as_millis() < 50, "{elapsed:?}");
+}
+
+#[test]
+fn runtime_field_ids_come_from_their_place_so_names_cannot_collide() {
+    let schema = FormSchema::new()
+        .field(FieldSpec::text("x", "X").help("Help"))
+        .field(FieldSpec::text("x-error", "X error").help("Help"))
+        .field(FieldSpec::text("x-help", "X help"));
+    let html = render(&SchemaForm::new(schema, json!({})), "en");
+    let ids: Vec<&str> = html
+        .split(r#" id=""#)
+        .skip(1)
+        .map(|s| s.split('"').next().unwrap())
+        .collect();
+    let mut unique = ids.clone();
+    unique.sort_unstable();
+    unique.dedup();
+    assert_eq!(ids.len(), unique.len(), "{ids:?}");
+    assert!(html.contains(r#"id="s-f1" name="x-error""#), "{html}");
+}
+
+#[test]
+fn a_boolean_without_a_value_or_default_is_false() {
+    let schema = FormSchema::new().field(FieldSpec::boolean("bold", "Bold"));
+    let typed = schema
+        .check(&serde_json::Map::new())
+        .unwrap();
+    assert_eq!(typed["bold"], json!(false));
+}
+
+#[test]
+fn schema_texts_follow_the_users_language() {
+    let schema = FormSchema::new()
+        .section(Text::key("zeyn.ui.inspector.title"))
+        .field(
+            FieldSpec::choice(
+                "c",
+                Text::key("zeyn.ui.inspector.title"),
+                [("a", Text::key("zeyn.ui.color.red"))],
+            )
+            .help(Text::key("zeyn.ui.color.blue")),
+        );
+    let tr = schema.to_json(I18n::builtin(), "tr");
+    assert_eq!(tr["sections"][0]["title"], "Özellikler");
+    let field = &tr["sections"][0]["fields"][0];
+    assert_eq!(field["label"], "Özellikler");
+    assert_eq!(field["help"], "Mavi");
+    assert_eq!(field["options"][0]["label"], "Kırmızı");
+    let en = serde_json::to_value(&schema).unwrap();
+    assert_eq!(en["sections"][0]["fields"][0]["label"], "Properties");
+}
+
+#[test]
+fn decimals_and_lengths_keep_their_scale() {
+    let width = FieldSpec::length("w", "Width", &[]);
+    assert!(width.check(&json!(37.7953)).is_ok());
+    assert!(width.check(&json!(37.79531)).is_err());
+    assert!(
+        width.check(&json!(1e-7)).is_err(),
+        "exponent numbers past the scale"
+    );
+    assert!(width.check(&json!(0.0001)).is_ok());
+    let json = serde_json::to_value(&width).unwrap();
+    assert_eq!(json["scale"], json!(4));
+}
+
+#[test]
+fn builders_drop_duplicate_names_crossed_limits_and_long_option_values() {
+    let schema = FormSchema::new()
+        .field(FieldSpec::text("a", "A"))
+        .field(FieldSpec::integer("a", "Again"));
+    assert_eq!(schema.len(), 1);
+    let n = FieldSpec::integer("n", "N")
+        .min(10)
+        .max(5);
+    assert!(
+        n.check(&json!(20)).is_ok(),
+        "a max below the min is ignored"
+    );
+    assert!(n.check(&json!(9)).is_err());
+    let long = "v".repeat(MAX_SCHEMA_TEXT + 1);
+    let c = FieldSpec::choice("c", "C", [(long.as_str(), "Long"), ("ok", "Ok")]);
+    let json = serde_json::to_value(&c).unwrap();
+    assert_eq!(
+        json["options"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
 }

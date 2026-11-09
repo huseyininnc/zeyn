@@ -6,7 +6,12 @@
  * committed change (leaving a field, Enter, closing a picker, a step) it checks the value as
  * `FieldSpec::check` does on the server and sends `zeyn:property` with `detail: { name, value }`
  * to the island root; a value that fails shows its error and is not sent. A schema seen before
- * keeps its fields: only the values change. Nothing goes to the server. Loaded only by pages
+ * keeps its fields: only the values that changed are set, and a field being edited (focused or
+ * changed since its last commit) keeps what the user typed. Nothing goes to the server. Ids
+ * come from the field's place in the schema (`zi-0`, `zi-1`), so names never collide with the
+ * `-error` and `-help` ids. Numbers are JavaScript numbers: integers beyond 2^53 lose precision.
+ * The island sends `zeyn:inspect` after this module has loaded (on `DOMContentLoaded` or later);
+ * an event sent before is not seen. Loaded only by pages
  * that hold an island inspector (`data-zeyn-inspector`).
  * @module inspector
  */
@@ -54,8 +59,9 @@ function cleanField(f, lim) {
     min: finite(f.min),
     max: finite(f.max),
     maxLen,
+    scale: Number.isInteger(f.scale) && f.scale >= 0 && f.scale <= 10 ? f.scale : 4,
     fallback: f.default,
-    options: options.filter((o) => o && typeof o.value === 'string').map((o) => ({ value: cut(o.value, lim.text), label: cut(o.label, lim.text) || cut(o.value, lim.text) })),
+    options: options.filter((o) => o && typeof o.value === 'string' && [...o.value].length <= lim.text).map((o) => ({ value: o.value, label: cut(o.label, lim.text) || o.value })),
     units: Array.isArray(f.units) ? f.units.filter((u) => typeof u === 'string').slice(0, 5) : [],
     palette: Array.isArray(f.palette) ? f.palette.filter((c) => typeof c === 'string' && HEX.test(c)).slice(0, lim.palette) : [],
   };
@@ -91,10 +97,10 @@ function controlOf(field) {
 }
 
 /** One field from its kind's template, with the spec's name, label and rules. */
-function fieldNode(root, f) {
+function fieldNode(root, f, index) {
   const tpl = root.querySelector(`template[data-kind="${f.kind}"]`);
   const field = tpl.content.firstElementChild.cloneNode(true);
-  const local = `zi-${f.name}`;
+  const local = `zi-${index}`;
   for (const el of [field, ...field.querySelectorAll('*')]) {
     for (const a of [...el.attributes]) {
       if (!a.value.includes(TOKEN)) continue;
@@ -126,6 +132,7 @@ function fieldNode(root, f) {
     }
   }
   if (f.kind === 'length' && f.units.length) wrap.dataset.units = JSON.stringify(f.units);
+  if (f.kind === 'decimal' || f.kind === 'length') wrap.dataset.scale = String(f.scale);
   if (f.kind === 'color') wrap.dataset.palette = JSON.stringify(f.palette);
   if (f.kind === 'choice') for (const o of f.options) control.append(make('option', '', { value: o.value, text: o.label }));
   field.zeynSpec = f;
@@ -136,6 +143,7 @@ function fieldNode(root, f) {
 /** The fields of a schema, in its sections. */
 function build(root, sections) {
   const box = make('div', 'z-inspector-fields');
+  let index = 0;
   for (const s of sections) {
     let into = box;
     if (s.title) {
@@ -144,7 +152,7 @@ function build(root, sections) {
       details.append(make('summary', 'z-form-section-title', { text: s.title }), into);
       box.append(details);
     }
-    for (const f of s.fields) into.append(fieldNode(root, f));
+    for (const f of s.fields) into.append(fieldNode(root, f, index++));
   }
   return box;
 }
@@ -168,7 +176,8 @@ function setValue(field, v) {
   if (f.kind === 'boolean') control.checked = v === true;
   else if (f.kind === 'integer' || f.kind === 'decimal' || f.kind === 'length') {
     const decimal = wrap?.dataset.decimal ?? '.';
-    control.value = n === undefined ? '' : String(n).replace('.', decimal);
+    const scale = f.kind === 'integer' ? 0 : f.scale;
+    control.value = n === undefined ? '' : String(Number(n.toFixed(scale))).replace('.', decimal);
     if (f.kind !== 'length') {
       if (n === undefined) control.removeAttribute('aria-valuenow');
       else control.setAttribute('aria-valuenow', String(n));
@@ -192,6 +201,7 @@ function read(root, field) {
   const wrap = control.closest('[data-zeyn-number], .z-length');
   const n = readNumber(raw, wrap?.dataset.decimal, f.kind === 'length' ? '' : wrap?.dataset.group);
   if (n === null || (f.kind === 'integer' && !Number.isSafeInteger(n))) return error('format');
+  if (f.kind !== 'integer' && Number(n.toFixed(f.scale)) !== n) return error('scale', f.scale);
   if (f.min !== undefined && n < f.min) return error('min', f.min);
   if (f.max !== undefined && n > f.max) return error('max', f.max);
   return { value: n };
@@ -219,6 +229,8 @@ function commit(field) {
   }
   mark(field, '');
   const sent = JSON.stringify(r.value);
+  field.zeynDirty = false;
+  field.zeynShown = sent;
   if (sent === field.zeynSent) return;
   field.zeynSent = sent;
   const island = root.zeynIsland;
@@ -251,12 +263,17 @@ function inspect(root, island, detail) {
     root.zeynKey = key;
   }
   const values = detail.values && typeof detail.values === 'object' ? detail.values : {};
+  const active = document.activeElement;
   for (const field of box.querySelectorAll('.z-field')) {
     const f = field.zeynSpec;
-    if (!f) continue;
-    setValue(field, Object.hasOwn(values, f.name) ? values[f.name] : f.fallback);
+    if (!f || field.zeynDirty || field.contains(active)) continue;
+    const v = Object.hasOwn(values, f.name) ? values[f.name] : f.fallback;
+    const shown = JSON.stringify(v ?? null);
+    if (shown === field.zeynShown) continue;
+    setValue(field, v);
     mark(field, '');
     const r = read(root, field);
+    field.zeynShown = shown;
     field.zeynSent = r.error ? undefined : JSON.stringify(r.value);
   }
   const heading = root.querySelector('.z-inspector-title');
@@ -266,7 +283,9 @@ function inspect(root, island, detail) {
   root.querySelector('.z-inspector-empty').hidden = true;
   body.hidden = false;
   const live = root.querySelector('[data-zeyn-inspector-live]');
-  if (live && title) live.textContent = fill(texts(root).shown, { title });
+  const said = `${title}\n${key}`;
+  if (live && title && root.zeynSaid !== said) live.textContent = fill(texts(root).shown, { title });
+  root.zeynSaid = said;
 }
 
 document.addEventListener('zeyn:inspect', (e) => {
@@ -275,6 +294,11 @@ document.addEventListener('zeyn:inspect', (e) => {
   for (const root of document.querySelectorAll('[data-zeyn-inspector]')) {
     if (root.dataset.zeynInspector === island.dataset.zeynIsland) inspect(root, island, e.detail);
   }
+});
+
+document.addEventListener('input', (e) => {
+  const field = e.target instanceof Element ? e.target.closest('[data-zeyn-inspector] .z-field') : null;
+  if (field) field.zeynDirty = true;
 });
 
 document.addEventListener('change', (e) => {

@@ -256,8 +256,9 @@ impl FieldSpec {
         );
         spec.options = options
             .into_iter()
-            .take(MAX_SCHEMA_OPTIONS)
             .map(|(v, l)| (v.into(), capped(l.into())))
+            .filter(|(v, _)| v.chars().count() <= MAX_SCHEMA_TEXT)
+            .take(MAX_SCHEMA_OPTIONS)
             .collect();
         spec
     }
@@ -284,14 +285,22 @@ impl FieldSpec {
         self.rule(Rule::Required)
     }
 
-    /// The smallest number (pixels for a length).
+    /// The smallest number (pixels for a length). Ignored when it is above the `max` given
+    /// before.
     pub fn min(self, n: i64) -> Self {
-        self.rule(Rule::Min(n))
+        match self.max_rule() {
+            Some(max) if n > max => self,
+            _ => self.rule(Rule::Min(n)),
+        }
     }
 
-    /// The largest number (pixels for a length).
+    /// The largest number (pixels for a length). Ignored when it is below the `min` given
+    /// before.
     pub fn max(self, n: i64) -> Self {
-        self.rule(Rule::Max(n))
+        match self.min_rule() {
+            Some(min) if n < min => self,
+            _ => self.rule(Rule::Max(n)),
+        }
     }
 
     /// The most characters of a text.
@@ -378,6 +387,9 @@ impl FieldSpec {
             Text::key(format!("zeyn.validation.{key}")).arg("label", self.label.clone())
         };
         let kind = self.spec.unwrap_or(SpecKind::Text);
+        if kind == SpecKind::Boolean && value.is_null() {
+            return Ok(Json::Bool(false));
+        }
         let empty = value.is_null() || value.as_str() == Some("");
         if empty && kind != SpecKind::Boolean {
             return match self.is_required() {
@@ -423,6 +435,10 @@ impl FieldSpec {
                     .as_f64()
                     .filter(|n| n.is_finite())
                     .ok_or_else(|| error("format"))?;
+                let scale = usize::from(self.decimal_limits().1);
+                if format!("{n:.scale$}").parse::<f64>() != Ok(n) {
+                    return Err(error("scale").arg("n", scale.to_string()));
+                }
                 range(n)?;
                 Ok(value.clone())
             }
@@ -466,11 +482,12 @@ impl FieldSpec {
         }
     }
 
-    /// The spec as the inspector reads it from a `zeyn:inspect` event.
-    fn to_json(&self) -> Json {
+    /// The spec as the inspector reads it from a `zeyn:inspect` event, with texts in the
+    /// words `text` gives.
+    fn to_json(&self, text: &dyn Fn(&Text) -> String) -> Json {
         let mut out = json!({
             "name": self.name,
-            "label": self.label,
+            "label": text(&self.label),
             "kind": self.spec.unwrap_or(SpecKind::Text).code(),
             "required": self.is_required(),
         });
@@ -490,16 +507,19 @@ impl FieldSpec {
             put("default", self.default.clone());
         }
         if let Some(help) = &self.help {
-            put("help", json!(help));
+            put("help", json!(text(help)));
         }
         if !self.options.is_empty() {
             put(
                 "options",
                 self.options
                     .iter()
-                    .map(|(v, l)| json!({ "value": v, "label": l }))
+                    .map(|(v, l)| json!({ "value": v, "label": text(l) }))
                     .collect(),
             );
+        }
+        if self.kind == FieldKind::Decimal {
+            put("scale", json!(self.decimal_limits().1));
         }
         match self.control {
             Some(Control::Length { units }) => put("units", json!(units)),
@@ -512,7 +532,8 @@ impl FieldSpec {
 
 impl Serialize for FieldSpec {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.to_json().serialize(serializer)
+        self.to_json(&Text::english)
+            .serialize(serializer)
     }
 }
 
@@ -537,9 +558,9 @@ impl FormSchema {
         self
     }
 
-    /// Adds a field to the last section.
+    /// Adds a field to the last section. A field whose name the schema already has is dropped.
     pub fn field(mut self, spec: FieldSpec) -> Self {
-        if self.len() >= MAX_SCHEMA_FIELDS {
+        if self.len() >= MAX_SCHEMA_FIELDS || self.get(&spec.name).is_some() {
             return self;
         }
         if self.sections.is_empty() {
@@ -601,14 +622,41 @@ impl FormSchema {
     }
 }
 
-impl Serialize for FormSchema {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+impl FormSchema {
+    /// The schema for a `zeyn:inspect` event with its titles, labels, help and option labels in
+    /// `locale`. Serializing the schema gives the English words.
+    ///
+    /// ```
+    /// use zeyn::ui::{FieldSpec, FormSchema};
+    /// use zeyn::{I18n, Text};
+    /// let schema = FormSchema::new().field(FieldSpec::text("t", Text::key("zeyn.ui.inspector.title")));
+    /// let json = schema.to_json(I18n::builtin(), "tr");
+    /// assert_eq!(json["sections"][0]["fields"][0]["label"], "Özellikler");
+    /// ```
+    pub fn to_json(&self, i18n: &crate::I18n, locale: &str) -> Json {
+        self.json_with(&|t| i18n.text(locale, t))
+    }
+
+    fn json_with(&self, text: &dyn Fn(&Text) -> String) -> Json {
         let sections: Vec<Json> = self
             .sections
             .iter()
-            .map(|(title, fields)| json!({ "title": title, "fields": fields }))
+            .map(|(title, fields)| {
+                let fields: Vec<Json> = fields
+                    .iter()
+                    .map(|f| f.to_json(text))
+                    .collect();
+                json!({ "title": title.as_ref().map(text), "fields": fields })
+            })
             .collect();
-        json!({ "sections": sections }).serialize(serializer)
+        json!({ "sections": sections })
+    }
+}
+
+impl Serialize for FormSchema {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.json_with(&Text::english)
+            .serialize(serializer)
     }
 }
 
@@ -622,17 +670,25 @@ pub(crate) fn open_section(out: &mut String, title: &str) {
 /// Writes one field: its frame (label, tooltip, help and error line) and the control that fits
 /// its kind. Model forms and runtime schemas both draw every field here; `special` draws the
 /// controls only model fields have (lookups, dates, lines, files) and returns whether it did.
+///
+/// Model fields get the id `{scope}-{name}`; runtime fields pass their place in the schema as
+/// `index` and get `{scope}-f{index}`, because their names may hold `-` and would collide with
+/// the `-error` and `-help` ids of another field.
 pub(crate) fn render_spec(
     out: &mut String,
     r: &Render,
     f: &FieldSpec,
     value: &Value,
+    index: Option<usize>,
     tip: Option<&Text>,
     special: &dyn Fn(&mut String, &Slot) -> bool,
 ) {
     let scope = r.scope;
     let name = &f.name;
-    let id = format!("{scope}-{name}");
+    let id = match index {
+        Some(i) => format!("{scope}-f{i}"),
+        None => format!("{scope}-{name}"),
+    };
     let required = f.is_required();
     let tip = tip.map(|t| {
         let (attrs, html) = super::tip(r, &format!("{id}-tip"), t);
@@ -722,13 +778,15 @@ impl Component for SchemaForm {
             r#"<form class="z-form" data-testid="{}.form" novalidate>"#,
             r.scope
         ));
+        let mut index = 0;
         for (title, fields) in &self.schema.sections {
             if let Some(title) = title {
                 open_section(out, &r.text(title));
             }
             for f in fields {
                 let value = f.value_in(&self.values);
-                render_spec(out, r, f, &value, None, &|_, _| false);
+                render_spec(out, r, f, &value, Some(index), None, &|_, _| false);
+                index += 1;
             }
             if title.is_some() {
                 out.push_str("</div></details>");
@@ -771,7 +829,7 @@ pub(crate) fn render_templates(out: &mut String, r: &Render) {
         }
         .help(Text::Literal(Cow::Borrowed("")));
         out.push_str(&format!(r#"<template data-kind="{}">"#, kind.code()));
-        render_spec(out, r, &spec, &Value::Null, None, &|_, _| false);
+        render_spec(out, r, &spec, &Value::Null, None, None, &|_, _| false);
         out.push_str("</template>");
     }
 }

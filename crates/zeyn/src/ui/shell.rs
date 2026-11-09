@@ -344,6 +344,7 @@ impl Component for PropertyInspector {
                     "max": t("max"),
                     "format": t("format"),
                     "color": t("color"),
+                    "scale": t("scale"),
                     "shown": r.i18n.text(r.locale, &Text::key("zeyn.ui.inspector.shown")),
                 });
                 out.push_str(&format!(

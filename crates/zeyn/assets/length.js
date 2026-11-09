@@ -57,6 +57,11 @@ function show(wrap) {
   const native = wrap.querySelector('.z-length-px');
   const shown = wrap.querySelector('.z-length-value');
   const unit = wrap.querySelector('.z-length-unit').value;
+  for (const k of ['min', 'max']) {
+    const limit = wrap.dataset[k];
+    if (limit === undefined) shown.removeAttribute(`aria-value${k}`);
+    else shown.setAttribute(`aria-value${k}`, String(Number((Number(limit) / PX[unit]).toFixed(2))));
+  }
   const px = readNumber(wrap, native.value);
   if (px === null) {
     if (native.value === '') shown.value = '';

@@ -1165,7 +1165,7 @@ fn render_field<M: Model>(out: &mut String, r: &Render, f: &FormField<M>, form: 
             _ => false,
         }
     };
-    crate::ui::render_spec(out, r, &spec, &value, tip, &special);
+    crate::ui::render_spec(out, r, &spec, &value, None, tip, &special);
 }
 
 /// A dependent lookup to check again on submit: the field, the chosen ids and the lookup's answer
