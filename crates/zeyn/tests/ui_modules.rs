@@ -107,7 +107,6 @@ fn app() -> axum::Router {
                 .screen(photos)
                 .screen(plain_tree)
                 .screen(drag_tree)
-
                 .screen(inspector),
         )
         .router()
