@@ -14,7 +14,7 @@
 默认构建不包含 `oidc` 和 `totp`，因此不使用它们的应用无需为此付出任何代价。
 
 ```toml
-zeyn = { version = "0.0.8", features = ["oidc"] }
+zeyn = { version = "0.0.9", features = ["oidc"] }
 ```
 
 已测试的提供方是 Keycloak 和 Authentik。任何遵循 OpenID Connect discovery、带 PKCE 的授权码流程以及 JWKS 的提供方，都应该可以使用。

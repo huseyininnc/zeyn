@@ -21,7 +21,7 @@ Add the crate behind a feature, so the normal server build does not compile a We
 desktop = ["dep:zeyn-desktop"]
 
 [dependencies]
-zeyn-desktop = { version = "0.0.8", optional = true }
+zeyn-desktop = { version = "0.0.9", optional = true }
 ```
 
 Start the window instead of `App::serve`:
