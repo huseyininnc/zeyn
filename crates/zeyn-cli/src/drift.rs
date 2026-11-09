@@ -347,3 +347,61 @@ fn the_agents_template_stays_within_its_size_budget() {
         AGENTS.len()
     );
 }
+
+/// The Markdown files under `dir`, in every language folder.
+fn markdown(dir: &Path, out: &mut Vec<PathBuf>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            markdown(&path, out);
+        } else if path
+            .extension()
+            .is_some_and(|e| e == "md" || e == "txt")
+        {
+            out.push(path);
+        }
+    }
+}
+
+/// Install snippets and status lines in the docs name the version this workspace releases, so a
+/// copied `Cargo.toml` line never pins an older Zeyn.
+#[test]
+fn docs_name_the_released_version() {
+    let version = env!("CARGO_PKG_VERSION");
+    let mut files = Vec::new();
+    for dir in ["docs", "examples/docs"] {
+        markdown(&repo(dir), &mut files);
+    }
+    files.push(repo("README.md"));
+    let markers = [
+        "zeyn = { version = \"",
+        "zeyn-desktop = { version = \"",
+        "zeyn = \"",
+        "alpha (",
+    ];
+    for path in files {
+        let Ok(text) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        for marker in markers {
+            for (at, _) in text.match_indices(marker) {
+                let rest = &text[at + marker.len()..];
+                let named: String = rest
+                    .chars()
+                    .take_while(|c| c.is_ascii_digit() || *c == '.')
+                    .collect();
+                if named.matches('.').count() == 2 {
+                    assert_eq!(
+                        named,
+                        version,
+                        "{} names Zeyn {named} after `{marker}`; the workspace releases {version}",
+                        path.display()
+                    );
+                }
+            }
+        }
+    }
+}

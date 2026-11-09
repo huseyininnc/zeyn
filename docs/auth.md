@@ -14,7 +14,7 @@ Who is calling, and how sure the app is about it. Zeyn has four ways in:
 The default build has none of `oidc` and `totp`, so apps that do not use them pay nothing.
 
 ```toml
-zeyn = { version = "0.0.8", features = ["oidc"] }
+zeyn = { version = "0.0.9", features = ["oidc"] }
 ```
 
 The providers tested are Keycloak and Authentik. Any provider that follows OpenID Connect

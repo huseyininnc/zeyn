@@ -3,7 +3,7 @@
 تحفظ `zeyn::sql` الكيانات (entities) في قاعدة بيانات SQL. تسردها من `DataQuery` الذي ترسله الشبكة (المرشحات والفرز والصفحات والمجاميع والتجميعات) وتحفظها مع فحوص نسخة الصف. PostgreSQL خلف ميزة Cargo المسماة `postgres`، وOracle خلف `oracle`، فلا يصرّف تطبيق بلا قاعدة بيانات شيئاً منها.
 
 ```toml
-zeyn = { version = "0.0.8", features = ["postgres"] }   # or ["oracle"], or both
+zeyn = { version = "0.0.9", features = ["postgres"] }   # or ["oracle"], or both
 ```
 
 ## الإعداد

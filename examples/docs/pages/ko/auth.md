@@ -13,7 +13,7 @@
 `RequireMfa`(항상 사용 가능)는 Feature, Screen, action에 두 번째 요소를 요구합니다. 기본 빌드에는 `oidc`와 `totp`가 없으므로 이를 사용하지 않는 앱은 아무 비용도 치르지 않습니다.
 
 ```toml
-zeyn = { version = "0.0.8", features = ["oidc"] }
+zeyn = { version = "0.0.9", features = ["oidc"] }
 ```
 
 테스트한 제공자는 Keycloak과 Authentik입니다. OpenID Connect 디스커버리, PKCE를 사용하는 인가 코드 흐름, JWKS를 따르는 모든 제공자가 동작해야 합니다.
