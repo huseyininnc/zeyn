@@ -253,7 +253,8 @@ async fn node_call(
 
 /// Renders several nodes of a screen in one request, for the nodes that listen to a refreshed
 /// or driven topic: `{ "nodes": { "1.0": "<div class=\"z-node\" ...>" } }`. At most
-/// [`MAX_REFRESH_NODES`] distinct paths; a path that is not in the screen answers 404.
+/// [`MAX_REFRESH_NODES`] paths, counted before duplicates are dropped so a long list is refused
+/// without work; a path that is not in the screen answers 404.
 async fn nodes_call(
     State(st): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -262,6 +263,9 @@ async fn nodes_call(
     let ctx = st.licensed(st.ctx(&headers)).await;
     if let Err(f) = st.check_csrf(&headers) {
         return st.error_response(&ctx, f);
+    }
+    if call.nodes.len() > MAX_REFRESH_NODES {
+        return st.error_response(&ctx, Failure::App(Error::NotFound));
     }
     let mut paths: Vec<NodePath> = Vec::with_capacity(call.nodes.len());
     for path in call.nodes {
