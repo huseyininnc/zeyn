@@ -122,8 +122,9 @@ async function loadGrid(grid, kind) {
     {
       ...address(grid),
       query: { page, sort: s.sort, filters, with_total: !infinite, aggregates: totals ? aggregatesOf(grid, layout) : [] },
-      view: s.columns ? { columns: s.columns } : null,
+      view: s.columns ? { columns: s.columns, shape: grid.dataset.zeynShape } : null,
       head: layout,
+      shape: grid.dataset.zeynShape,
     },
     { signal: s.abort.signal },
   );
@@ -134,7 +135,9 @@ async function loadGrid(grid, kind) {
     if (!append) gridState(grid, 'error');
     return;
   }
-  if (typeof r.data.head === 'string') applyHead(grid, s, r.data.head);
+  const shaped = applyShape(grid, s, r.data);
+  if (shaped === 'changed' && append) return loadGrid(grid, 'reset');
+  if (!shaped && typeof r.data.head === 'string') applyHead(grid, s, r.data.head);
 
   const body = grid.querySelector('[data-zeyn-rows]');
   const hadFocus = body.contains(document.activeElement);
@@ -509,8 +512,9 @@ async function fetchBlock(grid, s, b) {
     {
       ...address(grid),
       query: { page, sort: s.sort, filters, with_total: withTotal, aggregates: withTotal ? aggregatesOf(grid, head) : [] },
-      view: s.columns ? { columns: s.columns } : null,
+      view: s.columns ? { columns: s.columns, shape: grid.dataset.zeynShape } : null,
       head,
+      shape: grid.dataset.zeynShape,
     },
     { signal: controller.signal },
   );
@@ -525,7 +529,7 @@ async function fetchBlock(grid, s, b) {
     if (!s.cache.size) gridState(grid, 'error');
     return;
   }
-  if (head && typeof r.data.head === 'string') {
+  if (!applyShape(grid, s, r.data) && head && typeof r.data.head === 'string') {
     applyHead(grid, s, r.data.head);
   }
   const t = document.createElement('template');

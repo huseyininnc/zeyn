@@ -155,9 +155,10 @@ pub use files::{
 pub use form::{Form, FormAction, FormRow, SubmitForm};
 pub use grid::{
     BulkAction, COLUMN_WIDTH, CellRenderer, ColumnView, DEFAULT_EXPORT_LIMIT, DataGrid,
-    DataGridColumn, DataGridView, DataGridViewStore, DataMode, ExportColumn, MAX_BULK, MAX_PINNED,
-    MAX_SORT, MemoryViewStore, Paging, Pin, RowStyle, Tone, VIRTUAL_LIVE_ROWS,
-    VIRTUAL_WIDE_COLUMNS, position_cursor, total,
+    DataGridColumn, DataGridView, DataGridViewStore, DataMode, DynamicColumn, DynamicGrid,
+    DynamicKind, DynamicPage, DynamicRow, ExportColumn, MAX_BULK, MAX_CELL_TEXT, MAX_COLUMN_NAME,
+    MAX_DYNAMIC_COLUMNS, MAX_PAGE_CELLS, MAX_PAGE_TEXT, MAX_PINNED, MAX_SORT, MemoryViewStore,
+    Paging, Pin, RowStyle, Tone, VIRTUAL_LIVE_ROWS, VIRTUAL_WIDE_COLUMNS, position_cursor, total,
 };
 pub use i18n::{I18n, NumberFormat, Text};
 pub use import::{
@@ -278,12 +279,12 @@ pub mod prelude {
     pub use crate::ui::{Reply, ReplySender};
     pub use crate::{
         Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime,
-        Decimal, Effect, Entity, Error, Export, Feature, Field, File, FileRules, FileType, Form,
-        GuardResult, Icon, Identity, Import, Licensed, LocalDateTime, Model, Money, Node, Page,
-        Paging, Result, RowStyle, Screen, ScreenDef, Secret, Service, Shell, SignedIn, Slug,
-        Tenant, TenantRequired, Text, Time, TimeZone, Toast, Tone, TransitionRequest, Transitions,
-        UiCtx, Valid, ValidationErrors, Window, Workflow, action, choice, entity, model, params,
-        screen, t,
+        Decimal, DynamicColumn, DynamicKind, DynamicPage, Effect, Entity, Error, Export, Feature,
+        Field, File, FileRules, FileType, Form, GuardResult, Icon, Identity, Import, Licensed,
+        LocalDateTime, Model, Money, Node, Page, Paging, Result, RowStyle, Screen, ScreenDef,
+        Secret, Service, Shell, SignedIn, Slug, Tenant, TenantRequired, Text, Time, TimeZone,
+        Toast, Tone, TransitionRequest, Transitions, UiCtx, Valid, ValidationErrors, Window,
+        Workflow, action, choice, entity, model, params, screen, t,
     };
     #[cfg(feature = "server")]
     pub use crate::{

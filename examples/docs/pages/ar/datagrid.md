@@ -81,6 +81,22 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 - `.row_style(|row| Option<RowStyle>)`: صفوف الخطر أو التحذير أو النجاح.
 - `.exportable()`: تصدير CSV للصفوف المصفّاة، يبثه الخادم (stream).
 
+## أعمدة تُعرف وقت التشغيل
+
+`DataGrid::dynamic(action)` مخصص للنتائج التي تأتي أعمدتها مع الصفوف، مثل معاينة SQL. يعيد الـ action قيمة `DynamicPage` فيها الأعمدة (الاسم والتسمية و`DynamicKind` مثل `Integer` أو `Decimal` أو `Date`) وصفحة واحدة من الصفوف بصيغة JSON:
+
+```rust
+#[action(permission = "reports.preview")]
+pub async fn preview(q: DataQuery, db: Reports) -> Result<DynamicPage> {
+    let span = q.span();
+    db.run_preview(span.offset, span.limit).await
+}
+
+DataGrid::dynamic(preview).paging(Paging::virtual_scroll())
+```
+
+يعمل الترقيم والتمرير الافتراضي واستخدام لوحة المفاتيح وتنسيق الأرقام والتواريخ بلغة المستخدم كما في grid ذي الأنواع. تُهرَّب الأسماء والتسميات والخلايا، ويحدّ الخادم عدد الأعمدة والصفوف وطول النص. لا يرتّب هذا الـ grid ولا يصفّي، وصفوفه للقراءة فقط. راجع [مرجع DataGrid](grid.md).
+
 ## التحديث في المكان
 
 يجعل `.listens(topic)`، المستدعى في النهاية، الشبكة تعيد التحميل في مكانها عند ذكر الموضوع (انظر [المواضيع](effects.md#topics)): بعد `ui.refresh(topic)` تعيد تحميل صفحتها الحالية مع ترتيبها ومرشحاتها، وبعد تغيّر عنصر تصفية يحمل `.drives(topic)` تبدأ من الصفحة الأولى مع params الشاشة الجديدة. يُعاد تحميل الشبكة عبر `POST /_zeyn/grid` مع كل فحوص الصلاحيات، ويصل param الشاشة الذي غيّره المرشح إلى الشبكة عبر دالة الشاشة، مثلًا على أنه scope:

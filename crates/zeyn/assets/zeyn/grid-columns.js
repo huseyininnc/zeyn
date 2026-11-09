@@ -48,7 +48,8 @@ function savedView(grid) {
   if (grid.dataset.zeynViews === 'server') return { view: null, local: false };
   try {
     const stored = localStorage.getItem(viewKey(grid));
-    const view = stored ? JSON.parse(stored) : null;
+    const parsed = stored ? JSON.parse(stored) : null;
+    const view = parsed && grid.dataset.zeynShape && parsed.shape !== grid.dataset.zeynShape ? null : parsed;
     return { view, local: !!view };
   } catch {
     return { view: null, local: false };
@@ -91,7 +92,9 @@ function saveView(grid, reset = false) {
   if (!s) return;
   clearTimeout(s.viewTimer);
   s.viewTimer = setTimeout(() => {
-    const view = reset ? null : { columns: s.columns ?? [], sort: s.sort, filters: filterList(s) };
+    const view = reset
+      ? null
+      : { columns: s.columns ?? [], sort: s.sort, filters: filterList(s), shape: grid.dataset.zeynShape };
     if (grid.dataset.zeynViews === 'server') {
       post(BASE + '/_zeyn/grid/view', { ...address(grid), view }, { quiet: true });
       return;
@@ -123,6 +126,27 @@ function resetView(grid) {
   s.filters = {};
   saveView(grid, true);
   loadGrid(grid, 'layout');
+}
+
+/**
+ * Takes the header a grid whose columns come with its rows (`DataGrid::dynamic`) gets with a
+ * page: the column list and the fingerprint follow it. When the columns changed, the layout of
+ * the old columns and every cached row block go, so no row of the old columns stays in view.
+ * Returns `changed`, `same` (the header was sent again) or an empty string (no header).
+ */
+function applyShape(grid, s, data) {
+  if (typeof data.shape !== 'string' || typeof data.head !== 'string') return '';
+  const changed = data.shape !== grid.dataset.zeynShape;
+  if (changed) {
+    s.columns = null;
+    s.cache?.clear();
+    s.stale?.clear();
+    s.version = (s.version ?? 0) + 1;
+  }
+  grid.dataset.zeynShape = data.shape;
+  grid.dataset.zeynColumns = JSON.stringify(data.columns ?? []);
+  applyHead(grid, s, data.head);
+  return changed ? 'changed' : 'same';
 }
 
 /** Replaces the header with the server rendered one and sets it up again. */

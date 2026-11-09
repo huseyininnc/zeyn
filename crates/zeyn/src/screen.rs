@@ -557,6 +557,21 @@ pub trait GridSource: Send + Sync {
         self.fetch(ctx, query)
     }
 
+    /// Header of a grid whose columns come with its rows (`DataGrid::dynamic`), for a loaded
+    /// page: `{head, shape, columns}` when the header was `asked` for or the page's columns
+    /// differ from the `shape` the browser has. `None` for grids with fixed columns, whose
+    /// header comes from [`GridSource::head_html`].
+    fn page_head(
+        &self,
+        page: &LoadedPage,
+        r: &Render,
+        shape: Option<&str>,
+        asked: bool,
+    ) -> Option<serde_json::Value> {
+        let _ = (page, r, shape, asked);
+        None
+    }
+
     /// Rows of a loaded page as HTML.
     fn rows_html(&self, page: &LoadedPage, r: &Render) -> String;
 

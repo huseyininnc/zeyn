@@ -81,6 +81,22 @@ Los números y los importes se alinean a la derecha con cifras tabulares. Los en
 - `.row_style(|row| Option<RowStyle>)`: filas de peligro, advertencia o éxito.
 - `.exportable()`: exportación CSV de las filas filtradas, enviada en streaming por el servidor.
 
+## Columnas conocidas en tiempo de ejecución
+
+`DataGrid::dynamic(action)` es para resultados cuyas columnas llegan con las filas, como una vista previa de SQL. La action devuelve un `DynamicPage` con las columnas (nombre, etiqueta y un `DynamicKind` como `Integer`, `Decimal` o `Date`) y una página de filas en JSON:
+
+```rust
+#[action(permission = "reports.preview")]
+pub async fn preview(q: DataQuery, db: Reports) -> Result<DynamicPage> {
+    let span = q.span();
+    db.run_preview(span.offset, span.limit).await
+}
+
+DataGrid::dynamic(preview).paging(Paging::virtual_scroll())
+```
+
+La paginación, el desplazamiento virtual, el uso del teclado y el formato de números y fechas en el idioma del usuario funcionan como en un grid tipado. Los nombres, etiquetas y celdas se escapan, y el servidor limita las columnas, las filas y la longitud del texto. El grid no ordena ni filtra, y sus filas son de solo lectura. Consulta la [referencia del DataGrid](grid.md).
+
 ## Refrescar en su sitio
 
 `.listens(topic)`, llamado al final, hace que el grid se recargue en su sitio cuando se nombra el topic (consulta [Topics](effects.md#topics)): después de `ui.refresh(topic)` recarga su página actual con su orden y sus filtros, y después de que cambie un control de filtro que `.drives(topic)` empieza en la primera página con los nuevos params de la pantalla. El grid se recarga por `POST /_zeyn/grid` con todas las comprobaciones de permisos, y un param de la pantalla que cambió el filtro llega al grid a través de la función de la pantalla, por ejemplo como scope:
