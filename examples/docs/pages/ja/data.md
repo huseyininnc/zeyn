@@ -20,6 +20,12 @@ Tree::of(sample_tree).label("Products by unit")
 
 ツリーは ARIA の tree パターンに従います。矢印キーで項目間を移動し、ブランチを開閉します。サーバーは、ブランチごとの子の数に上限を設けます（`MAX_TREE_CHILDREN`）。
 
+`.draggable()` を付けると、葉を island などのドロップ先へドラッグできます。ドラッグは MIME タイプ `application/x-zeyn-tree` で JSON `{ "id", "path", "label" }`（`path` は最上位から葉までの id の並び）を、`text/plain` でラベルを運びます。ドロップ先は `dragover` ハンドラーで `dropEffect = "copy"` を設定します。ドラッグしない場合は、フォーカスのある葉の挿入ボタン（ポインター用）と Control+Enter、Mac では Command+Enter（キーボード用）が、同じオブジェクトを `detail` に持つキャンセル可能な DOM イベント `zeyn:tree-insert` を送ります。自分の現在位置に挿入するドロップ先は `preventDefault()` を呼び、そのときだけツリーは挿入をスクリーンリーダーに知らせます。葉にフォーカスがある間 Control+Enter はツリーのものなので、同じキーのアプリのショートカットはそこでは動きません。どのページでもこのデータを偽造できるため、ドロップ先はこれを信頼できない入力として扱い、サーバーでアクセスを確認します。ドラッグのコード（`treedrag.js`）はドラッグできるツリーがあるページでだけ読み込まれます。
+
+```rust
+Tree::of(report_fields).label("Fields").draggable()
+```
+
 ## チャート
 
 `Chart::bar`、`stacked_bar`、`line`、`area`、`combo`、`scatter`、`donut`、`gauge`、`funnel` は、サーバー上で SVG を描画します。ブラウザにチャートライブラリはなく、チャートはページの HTML の一部です。

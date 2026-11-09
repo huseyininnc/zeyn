@@ -4,6 +4,10 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 ## [Unreleased]
 
+### Added
+
+- `Tree::draggable()`: leaves can be dragged with HTML drag and drop onto a drop target, such as an island. The drag carries `application/x-zeyn-tree` with the JSON `{ id, path, label }` and the label as `text/plain`. Without dragging, an Insert button on the focused leaf (a single pointer alternative, WCAG 2.5.7) and Control+Enter or Command+Enter (keyboard, WCAG 2.1.1) dispatch the cancelable `zeyn:tree-insert` with the same object as `detail`; a target accepts it with `preventDefault()`, and only then is the insert announced in the tree's live region. The payload can be forged by any page, so a target checks access on the server. One delegated listener serves every tree and each tree has one Insert button; `dragstart` takes about 0.1 ms on a tree with 5,000 leaves. `treedrag.js` (3.7 KB, 1.5 KB gzip) loads only on pages with a draggable tree.
+
 ## [0.0.9] - 2026-11-09
 
 

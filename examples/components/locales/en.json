@@ -359,7 +359,8 @@
         "refresh_after_an_action": "An action that refreshes a node"
       },
       "tree": {
-        "overview": "Example"
+        "overview": "Example",
+        "draggable": "Leaves that drag onto a drop target, or insert with a button or Control+Enter"
       },
       "week_schedule": {
         "overview": "Example"

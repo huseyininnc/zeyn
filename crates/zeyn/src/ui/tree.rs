@@ -62,8 +62,11 @@ impl TreeItem {
 /// ```ignore
 /// Tree::of(category_children).label("Categories")
 /// ```
+///
+/// With [`Tree::draggable`] leaves can be dragged onto a drop target, such as an island.
 pub struct Tree {
     label: Text,
+    draggable: bool,
     source: Box<dyn DataSource>,
     action: crate::action::ActionMeta,
 }
@@ -75,6 +78,7 @@ impl Tree {
     {
         Self {
             label: Text::from(""),
+            draggable: false,
             source: Box::new(ActionSource::<A>::new()),
             action: A::META,
         }
@@ -85,26 +89,67 @@ impl Tree {
         self.label = label.into();
         self
     }
+
+    /// Leaves can be dragged with HTML drag and drop. The drag carries the MIME type
+    /// `application/x-zeyn-tree` with the JSON `{ "id", "path", "label" }` (`path` lists the ids
+    /// from the top level down to the leaf) and the label as `text/plain`; a drop target sets
+    /// `dropEffect = "copy"` in `dragover`. Without dragging, the Insert button on the focused
+    /// leaf (a single pointer alternative) and Control+Enter or Command+Enter (keyboard) dispatch
+    /// the cancelable DOM event `zeyn:tree-insert` with the same object as `detail`. A target
+    /// that inserts at its own position calls `preventDefault()`, and only then does the tree
+    /// announce the insert in its live region. Any page can forge the payload, so a target treats
+    /// it as untrusted input and checks access on the server.
+    ///
+    /// ```ignore
+    /// Tree::of(report_fields).label("Fields").draggable()
+    /// ```
+    pub fn draggable(mut self) -> Self {
+        self.draggable = true;
+        self
+    }
 }
 
 impl Component for Tree {
     fn render(&self, out: &mut String, r: &Render) {
-        let texts = json!({
-            "loading": r.i18n.text(r.locale, &Text::key("zeyn.ui.loading")),
-            "empty": r.i18n.text(r.locale, &Text::key("zeyn.ui.tree.empty")),
-            "failed": r.i18n.text(r.locale, &Text::key("zeyn.ui.load_failed")),
+        let text = |key: &'static str| r.i18n.text(r.locale, &Text::key(key));
+        let mut texts = json!({
+            "loading": text("zeyn.ui.loading"),
+            "empty": text("zeyn.ui.tree.empty"),
+            "failed": text("zeyn.ui.load_failed"),
         });
+        if self.draggable {
+            texts["insert"] = text("zeyn.ui.tree.insert").into();
+            texts["insert_label"] = text("zeyn.ui.tree.insert_label").into();
+            texts["inserted"] = text("zeyn.ui.tree.inserted").into();
+        }
         out.push_str(&format!(
-            r#"<div class="z-tree" data-zeyn-tree data-texts="{}" data-max="{MAX_TREE_CHILDREN}"><ul role="tree" aria-label="{}" data-testid="{}.tree" aria-busy="true"><li class="z-tree-note">{}</li></ul></div>"#,
+            r#"<div class="z-tree" data-zeyn-tree{} data-texts="{}" data-max="{MAX_TREE_CHILDREN}"><ul role="tree" aria-label="{}" data-testid="{}.tree" aria-busy="true"><li class="z-tree-note">{}</li></ul>"#,
+            if self.draggable {
+                " data-zeyn-tree-drag"
+            } else {
+                ""
+            },
             attr(&texts),
             r.text(&self.label),
             r.scope,
             r.text(&Text::key("zeyn.ui.loading"))
         ));
+        if self.draggable {
+            out.push_str(&format!(
+                r#"<span class="z-sr-only z-tree-keys" aria-hidden="true">{}</span><span class="z-sr-only" aria-live="polite"></span>"#,
+                r.text(&Text::key("zeyn.ui.tree.insert_hint"))
+            ));
+        }
+        out.push_str("</div>");
     }
 
     fn schema(&self) -> Json {
-        json!({ "type": "tree", "label": self.label, "action": self.action })
+        json!({
+            "type": "tree",
+            "label": self.label,
+            "action": self.action,
+            "draggable": self.draggable,
+        })
     }
 
     fn source(&self, key: &str) -> Option<&dyn DataSource> {

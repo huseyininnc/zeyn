@@ -454,7 +454,11 @@
         "billion": "{n} Mr"
       },
       "tree": {
-        "empty": "Kayıt yok."
+        "empty": "Kayıt yok.",
+        "insert": "Ekle",
+        "insert_hint": "Control+Enter ekler.",
+        "insert_label": "{label} ekle",
+        "inserted": "{label} eklendi."
       },
       "select": {
         "none": "Seçilmedi",

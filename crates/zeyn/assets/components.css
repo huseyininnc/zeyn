@@ -103,7 +103,7 @@
   display: inline-flex;
   align-items: center;
   gap: calc(var(--z-space) * 1.5);
-  min-height: 24px;
+  min-height: 26px;
   padding: 0 calc(var(--z-space) * 1);
   margin-inline-start: calc(var(--z-space) * -1);
   border: 0;
@@ -476,7 +476,7 @@
 
 .z-filter-range .z-filter-pick {
   width: 24px;
-  min-height: 24px;
+  min-height: 26px;
   margin: 0;
   border-radius: var(--z-radius-sm);
   border-color: var(--z-border);
@@ -822,7 +822,7 @@
   align-items: center;
   gap: 2px;
   max-width: 100%;
-  min-height: 24px;
+  min-height: 26px;
   padding-inline-start: calc(var(--z-space) * 2);
   border-radius: var(--z-radius-sm);
   background: var(--z-brand-subtle);
@@ -1648,6 +1648,25 @@ dialog.z-confirm::backdrop { background: var(--z-backdrop); }
 
 .z-tree-hint { margin-inline-start: auto; color: var(--z-text-muted); font-size: var(--z-font-size-xs); }
 
+.z-tree-insert {
+  flex: none;
+  min-width: 26px;
+  min-height: 26px;
+  margin-inline-start: auto;
+  padding: 0 calc(var(--z-space) * 2);
+  border: 1px solid var(--z-border);
+  border-radius: var(--z-radius);
+  background: var(--z-surface);
+  color: var(--z-text);
+  font: inherit;
+  font-size: var(--z-font-size-xs);
+  cursor: pointer;
+}
+
+.z-tree-hint + .z-tree-insert { margin-inline-start: 0; }
+
+.z-tree-insert:hover { background: var(--z-hover); }
+
 [aria-expanded="false"] > .z-tree-group { display: none; }
 
 .z-tree-note { padding: 4px calc(var(--z-space) * 3); color: var(--z-text-muted); font-size: var(--z-font-size-sm); }
@@ -1804,7 +1823,7 @@ dialog.z-confirm::backdrop { background: var(--z-backdrop); }
 
 .z-chart-data summary {
   display: inline-flex;
-  min-height: 24px;
+  min-height: 26px;
   align-items: center;
   color: var(--z-accent);
   font-size: var(--z-font-size-sm);
