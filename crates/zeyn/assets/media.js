@@ -141,8 +141,11 @@ function settle(img, fresh) {
     img.removeAttribute('data-zeyn-fallback');
     img.removeAttribute('srcset');
     img.removeAttribute('sizes');
-    img.src = fallback;
-    return;
+    const url = new URL(fallback, document.baseURI);
+    if (url.origin === location.origin || url.protocol === 'https:') {
+      img.src = url.href;
+      return;
+    }
   }
   if (host.classList.contains('z-img-failed')) return;
   host.classList.add('z-img-failed');

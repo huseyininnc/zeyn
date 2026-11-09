@@ -176,7 +176,7 @@ async function searchLookup(wrap, offset = 0, keep = []) {
   const text = multiple || combo.value !== combo.dataset.shown ? combo.value.trim() : '';
   if (K.lb?.combo !== combo) {
     openListbox(combo, {
-      label: document.getElementById(`${combo.id}-label`)?.textContent.replace('*', '').trim() ?? '',
+      label: document.getElementById(`${combo.id}-label`)?.textContent.replace(/\*/g, '').trim() ?? '',
       multiple,
       anchor: wrap.querySelector('.z-lookup-box'),
       pick: (item) => pickLookup(wrap, item),
@@ -337,7 +337,7 @@ function openMulti(combo, where = 'first') {
   const wrap = combo.closest('[data-zeyn-multi]');
   const native = wrap.querySelector('select');
   openListbox(combo, {
-    label: document.getElementById(`${native.id}-label`)?.textContent.replace('*', '').trim() ?? '',
+    label: document.getElementById(`${native.id}-label`)?.textContent.replace(/\*/g, '').trim() ?? '',
     multiple: true,
     anchor: wrap.querySelector('.z-multi-box'),
     pick: (item) => setMulti(wrap, item.value, !item.selected),

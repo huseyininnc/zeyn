@@ -123,7 +123,7 @@ function isoWeek(isoDate) {
 /** The label of a date input, without the required star. */
 function labelOf(input) {
   const label = input.id && document.querySelector(`label[for="${CSS.escape(input.id)}"]`);
-  return label ? label.textContent.replace('*', '').trim() : input.getAttribute('aria-label') ?? '';
+  return label ? label.textContent.replace(/\*/g, '').trim() : input.getAttribute('aria-label') ?? '';
 }
 
 /** Sets an input's value as the user would, so the runtime and the grid filters notice. */
