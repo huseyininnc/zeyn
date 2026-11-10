@@ -75,6 +75,7 @@
       "search_box": "A search field with suggestions.",
       "topics": "Filters and actions that refresh other parts of the screen in place.",
       "tree": "Branches loaded from the server as they open.",
+      "document_viewer": "A paged report preview whose pages are fetched as they come into view.",
       "week_schedule": "Seven day columns of rows from an action.",
       "image": "A picture with required alt text and size.",
       "embed": "A page of another site in a locked frame.",
@@ -361,6 +362,10 @@
         "select": "A select that drives the same listeners",
         "date_range_and_search": "A date range and a search box that drive a list",
         "refresh_after_an_action": "An action that refreshes a node"
+      },
+      "document_viewer": {
+        "overview": "Example",
+        "plain": "Twelve Letter pages without side panels"
       },
       "tree": {
         "overview": "Example",

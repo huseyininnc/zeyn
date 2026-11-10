@@ -25,6 +25,7 @@ pub mod data_grid;
 pub mod date_pickers;
 pub mod description_list;
 pub mod diff_view;
+pub mod document_viewer;
 pub mod embed;
 pub mod empty_state;
 pub mod external_link;

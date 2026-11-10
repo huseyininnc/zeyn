@@ -233,3 +233,29 @@ Los comandos de acción son nodos con su propia ruta y se envían al endpoint de
 | Tab | el menú | Lo cierra y avanza |
 
 El menú necesita unos 0,8 KB de script con gzip y ninguna petición hasta que se ejecuta un comando; son 4 nodos más 2 por comando.
+
+## DocumentViewer
+
+`DocumentViewer::of(page_action, page_count)` muestra un documento paginado, como la vista previa de un informe, cuyas páginas se dibujan en el servidor. La action de página recibe un `DocPage` (`document` de `.document(id)`, nunca del navegador, y `page`) y devuelve una página como fragmento SVG o HTML. Cada página tiene el tamaño de `.page_size(..)` (`PageSize::A4`, `PageSize::LETTER`, `PageSize::pt(w, h)` o `PageSize::px(w, h)`), así que el área de desplazamiento mide desde el principio lo mismo que todo el documento.
+
+```rust
+DocumentViewer::of(report_page, report.pages)
+    .document(report.id.to_string())
+    .page_size(PageSize::A4)
+    .outline(vec![OutlineItem::new("Summary", 1).child(OutlineItem::new("Totals", 2))])
+    .search(search_report)
+    .download("PDF", format!("/reports/{}/pdf", report.id))
+```
+
+- En la página solo están las páginas visibles y una a cada lado. Se piden por `POST /_zeyn/data` cuando el desplazamiento se detiene (las páginas que se pasan rápido nunca se piden), la más cercana primero, como mucho 3 a la vez, y se cancela la petición de una página que ha salido de la vista. El navegador guarda como mucho 12 páginas dibujadas.
+- El zoom escala las páginas sin volver a pedirlas: ajustar al ancho, ajustar a la página y del 50 al 400 por ciento. El cuadro de página lleva a una página, y la página actual se anuncia ("Página 3 de 500") cuando se detiene el desplazamiento.
+- `.outline(items)` añade un panel de índice, `.search(action)` un cuadro de búsqueda cuya action recibe un `DocSearch` y devuelve `PageHit` (se muestran como mucho 50), y `.download(label, href)` un enlace de descarga.
+- El servidor comprueba en cada página el acceso a la pantalla, el permiso de la action de página, CSRF y el límite de escritura, rechaza números de página fuera de 1 al número de páginas y páginas de más de 2 MB (`MAX_PAGE_BYTES`), y limpia cada página con una lista de permitidos (`sanitize_markup`): se quitan scripts, manejadores de eventos, `foreignObject`, marcos, enlaces e imágenes externos y `url()` en estilos, y los id reciben un prefijo por página. `.trusted()` omite la limpieza para páginas que la app dibuja con datos que controla; el texto de un usuario que llega sin escapar a una página así se ejecuta como script para todos los que la abren.
+- `document.js` (13 KB, 4,7 KB con gzip) y `document.css` (3,6 KB) se cargan solo en páginas con un visor.
+
+| Tecla | Dónde | Qué hace |
+|---|---|---|
+| Av Pág, Re Pág | las páginas | Página siguiente y anterior |
+| Inicio, Fin | las páginas | Primera y última página |
+| `+`, `-` | las páginas | Acerca y aleja |
+| Enter | el cuadro de página | Va a la página escrita |
