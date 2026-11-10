@@ -7236,6 +7236,8 @@ dependencies = [
  "serde_json",
  "tokio",
  "tower",
+ "tracing",
+ "tracing-subscriber",
  "zeyn",
 ]
 

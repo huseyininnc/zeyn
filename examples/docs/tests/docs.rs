@@ -8,6 +8,7 @@ use http_body_util::BodyExt;
 use std::sync::LazyLock;
 use tower::ServiceExt;
 use zeyn_example_docs::markdown::{Part, render};
+use zeyn_example_docs::versions::Versions;
 use zeyn_example_docs::{
     Docs, LANGS, PAGES, Status, TRANSLATIONS, app, lang_path, live, source_hash,
 };
@@ -15,7 +16,7 @@ use zeyn_example_docs::{
 const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
 static ROUTER: LazyLock<Router> = LazyLock::new(|| {
-    app(Docs::build())
+    app(Docs::build(""), Versions::single())
         .unwrap()
         .router()
         .unwrap()
@@ -193,7 +194,7 @@ async fn code_blocks_are_highlighted_and_nothing_in_an_article_is_raw_html() {
 
 #[tokio::test]
 async fn live_examples_render_real_components() {
-    let docs = Docs::build();
+    let docs = Docs::build("");
     let used: Vec<&str> = docs
         .pages()
         .iter()
@@ -250,7 +251,12 @@ async fn the_palette_searches_every_page_without_a_reload() {
 
 #[test]
 fn the_app_passes_its_checks() {
-    assert_eq!(app(Docs::build()).unwrap().check(), Ok(()));
+    assert_eq!(
+        app(Docs::build(""), Versions::single())
+            .unwrap()
+            .check(),
+        Ok(())
+    );
 }
 
 #[test]
@@ -275,7 +281,7 @@ fn every_page_has_a_file_in_every_language() {
 
 #[test]
 fn stale_translations_are_listed() {
-    let docs = Docs::build();
+    let docs = Docs::build("");
     let mut stale = Vec::new();
     for (lang, _) in &LANGS[1..] {
         for d in docs.lang(lang) {
@@ -295,7 +301,7 @@ fn stale_translations_are_listed() {
 
 #[test]
 fn translated_pages_keep_the_anchors_of_the_english_page() {
-    let docs = Docs::build();
+    let docs = Docs::build("");
     for (lang, _) in &LANGS[1..] {
         for (en, d) in docs.pages().iter().zip(docs.lang(lang)) {
             assert_eq!(
@@ -405,14 +411,17 @@ async fn a_page_without_a_current_translation_is_shown_in_english_under_the_lang
         r#"{{ "tr": {{ "datagrid.md": "{}" }} }}"#,
         source_hash("an older English source")
     );
-    let docs = Docs::build_from(&[("tr", "datagrid.md", "# Eski\n")], &stale);
+    let docs = Docs::build_from(&[("tr", "datagrid.md", "# Eski\n")], &stale, "");
     let at = PAGES
         .iter()
         .position(|p| p.route == "/language/datagrid")
         .unwrap();
     assert_eq!(docs.lang("tr")[at].status, Status::Stale);
     assert_eq!(docs.lang("zh")[at].status, Status::Missing);
-    let router = app(docs).unwrap().router().unwrap();
+    let router = app(docs, Versions::single())
+        .unwrap()
+        .router()
+        .unwrap();
     let res = router
         .oneshot(
             Request::get("/tr/language/datagrid")
@@ -573,7 +582,7 @@ async fn the_project_page_exists_in_every_language_and_the_header_links_the_sour
             "pages/{lang}/project.md"
         );
     }
-    let docs = Docs::build();
+    let docs = Docs::build("");
     for (lang, _) in LANGS {
         let d = docs
             .lang(lang)
