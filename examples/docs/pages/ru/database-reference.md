@@ -3,7 +3,7 @@
 `zeyn::sql` хранит сущности (entities) в SQL-базе данных. Модуль выбирает их по `DataQuery`, который отправляет таблица (фильтры, сортировка, страницы, итоги, группы), и сохраняет их с проверкой версии строки. PostgreSQL подключается через Cargo-feature `postgres`, Oracle через `oracle`, поэтому приложение без базы данных не компилирует ничего из этого.
 
 ```toml
-zeyn = { version = "0.0.9", features = ["postgres"] }   # or ["oracle"], or both
+zeyn = { version = "0.0.10", features = ["postgres"] }   # or ["oracle"], or both
 ```
 
 ## Настройка

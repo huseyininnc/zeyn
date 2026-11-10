@@ -14,7 +14,7 @@
 डिफ़ॉल्ट बिल्ड में `oidc` और `totp` में से कुछ नहीं है, इसलिए जो ऐप इन्हें इस्तेमाल नहीं करते वे कुछ नहीं चुकाते।
 
 ```toml
-zeyn = { version = "0.0.9", features = ["oidc"] }
+zeyn = { version = "0.0.10", features = ["oidc"] }
 ```
 
 परखे गए प्रोवाइडर Keycloak और Authentik हैं। जो भी प्रोवाइडर OpenID Connect discovery, PKCE के साथ authorization code flow और JWKS का पालन करता है, उसे काम करना चाहिए।

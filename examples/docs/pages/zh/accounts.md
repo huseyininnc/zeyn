@@ -3,7 +3,7 @@
 需要自行管理用户的应用请启用 Cargo feature `accounts`。它提供注册、密码、邮箱确认、密码重置、账户锁定、角色、两步登录、通行密钥（passkey）、外部登录、现成的界面，以及面向移动应用的 JSON 端点。通过单点登录代理或身份提供方登录的应用不需要它。完整参考见 `docs/accounts.md`，其中有一张面向熟悉 ASP.NET Core Identity 的开发者的对照表。
 
 ```toml
-zeyn = { version = "0.0.9", features = ["accounts"] }
+zeyn = { version = "0.0.10", features = ["accounts"] }
 ```
 
 ## 启用

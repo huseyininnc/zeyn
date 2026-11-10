@@ -12,7 +12,7 @@ Zeyn은 [MIT 라이선스](https://github.com/huseyininnc/zeyn/blob/main/LICENSE
 
 ## 품질
 
-저장소에는 837개의 테스트 함수가 있습니다(crate와 예제의 `#[test]`와 `#[tokio::test]`, 2026-11-09 기준). 여기에 더해 문서 주석의 예제가 doctest로 실행됩니다.
+저장소에는 953개의 테스트 함수가 있습니다(crate와 예제의 `#[test]`와 `#[tokio::test]`, 2026-11-10 기준). 여기에 더해 문서 주석의 예제가 doctest로 실행됩니다.
 
 모든 pull request와 `dev`, `main`으로의 모든 push에서 CI가 실행됩니다:
 

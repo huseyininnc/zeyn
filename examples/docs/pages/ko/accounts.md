@@ -3,7 +3,7 @@
 자체 사용자를 관리하는 앱은 Cargo 기능 `accounts`를 켭니다. 이 기능은 회원 가입, 비밀번호, 이메일 확인, 비밀번호 재설정, 잠금, 역할, 2단계 로그인, 패스키, 외부 로그인, 준비된 화면, 모바일 앱용 JSON 엔드포인트를 제공합니다. 싱글 사인온 프록시나 ID 제공자를 통해 로그인하는 앱에는 필요하지 않습니다. ASP.NET Core Identity를 아는 사람을 위한 비교 표가 포함된 전체 레퍼런스는 `docs/accounts.md`입니다.
 
 ```toml
-zeyn = { version = "0.0.9", features = ["accounts"] }
+zeyn = { version = "0.0.10", features = ["accounts"] }
 ```
 
 ## 켜기

@@ -12,7 +12,7 @@ Zeyn tiene doble licencia: la [licencia MIT](https://github.com/huseyininnc/zeyn
 
 ## Calidad
 
-El repositorio tiene 837 funciones de prueba (`#[test]` y `#[tokio::test]` en los crates y los ejemplos, contadas el 2026-11-09), además de los ejemplos de los comentarios de documentación, que se ejecutan como doctests.
+El repositorio tiene 953 funciones de prueba (`#[test]` y `#[tokio::test]` en los crates y los ejemplos, contadas el 2026-11-10), además de los ejemplos de los comentarios de documentación, que se ejecutan como doctests.
 
 Cada pull request y cada push a `dev` y `main` ejecuta la CI:
 

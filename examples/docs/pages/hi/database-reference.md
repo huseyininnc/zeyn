@@ -3,7 +3,7 @@
 `zeyn::sql` entity को SQL डेटाबेस में रखता है। यह उन्हें उस `DataQuery` से सूचीबद्ध करता है जो ग्रिड भेजता है (फ़िल्टर, क्रम, पृष्ठ, योग, समूह) और पंक्ति संस्करण जाँच के साथ सहेजता है। PostgreSQL `postgres` Cargo feature के पीछे है और Oracle `oracle` के पीछे, इसलिए बिना डेटाबेस वाला ऐप इसका कुछ कंपाइल नहीं करता।
 
 ```toml
-zeyn = { version = "0.0.9", features = ["postgres"] }   # or ["oracle"], or both
+zeyn = { version = "0.0.10", features = ["postgres"] }   # or ["oracle"], or both
 ```
 
 ## सेटअप
