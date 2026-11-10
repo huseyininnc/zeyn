@@ -1,0 +1,68 @@
+/* Document viewer (`DocumentViewer`): linked only by pages that hold `.z-doc`. Pages are paper:
+   white in both themes, since their content is drawn for paper. document.js sets the sizes and
+   places of the pages. */
+
+.z-doc {
+  --z-doc-paper: #ffffff;
+  --z-doc-ink: #111111;
+  display: flex; flex-direction: column; align-items: stretch; block-size: min(80vh, 900px); min-block-size: 320px;
+  border: 1px solid var(--z-border); border-radius: var(--z-radius-lg); background: var(--z-surface);
+  overflow: hidden;
+}
+.z-doc-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--z-s-1);
+  padding: var(--z-s-1) var(--z-s-2); border-block-end: 1px solid var(--z-border); background: var(--z-surface);
+}
+.z-doc-button { min-inline-size: 36px; min-block-size: 36px; padding: 0 var(--z-s-2); }
+.z-doc-where { display: inline-flex; align-items: center; gap: var(--z-s-1); font-size: var(--z-text-sm); font-variant-numeric: tabular-nums; }
+.z-doc-sep { inline-size: 1px; block-size: 24px; margin-inline: var(--z-s-1); background: var(--z-border); }
+.z-doc-input, .z-doc-zoom {
+  min-block-size: 32px; padding: 0 var(--z-s-2); border: 1px solid var(--z-border); border-radius: var(--z-radius);
+  background: var(--z-surface); color: var(--z-text); font: inherit; font-size: var(--z-text-sm);
+}
+.z-doc-where .z-doc-input { inline-size: 4.5em; text-align: center; }
+.z-doc-input:focus-visible, .z-doc-zoom:focus-visible, .z-doc-goto:focus-visible, .z-doc-view:focus-visible {
+  outline: 2px solid var(--z-focus); outline-offset: 2px;
+}
+.z-doc-download { min-block-size: 36px; }
+.z-doc-body { display: flex; flex: 1; min-block-size: 0; }
+.z-doc-side {
+  display: flex; flex-direction: column; gap: var(--z-s-3); inline-size: 260px; flex: none; overflow: auto;
+  padding: var(--z-s-3); border-inline-end: 1px solid var(--z-border); font-size: var(--z-text-sm);
+}
+.z-doc-search { display: grid; gap: var(--z-s-1); }
+.z-doc-status { margin: 0; color: var(--z-text-muted); }
+.z-doc-status:empty { display: none; }
+.z-doc-hits, .z-doc-outline ul { list-style: none; margin: 0; padding: 0; }
+.z-doc-outline ul ul { padding-inline-start: var(--z-s-3); }
+.z-doc-goto {
+  display: flex; flex-direction: column; align-items: flex-start; inline-size: 100%; min-block-size: 32px;
+  padding: var(--z-s-1) var(--z-s-2); border: 0; border-radius: var(--z-radius); background: none;
+  color: var(--z-text); font: inherit; text-align: start; cursor: pointer;
+}
+.z-doc-goto:hover { background: var(--z-hover); }
+.z-doc-hit-page { color: var(--z-text-muted); font-size: var(--z-text-xs); }
+.z-doc-view {
+  position: relative; flex: 1; min-inline-size: 0; overflow: auto; background: var(--z-surface-2);
+  overscroll-behavior: contain;
+}
+.z-doc-pages { position: relative; }
+.z-doc-page {
+  position: absolute; overflow: hidden; background: var(--z-doc-paper); color: var(--z-doc-ink);
+  box-shadow: var(--z-shadow-2); contain: strict;
+}
+.z-doc-page[aria-busy="true"] { background: linear-gradient(var(--z-doc-paper), var(--z-surface-2)); }
+.z-doc-sheet { position: relative; transform-origin: 0 0; contain: layout paint style; }
+.z-doc-sheet > svg { display: block; inline-size: 100%; block-size: 100%; }
+.z-doc-page[data-state="error"] .z-doc-sheet { display: grid; place-items: center; color: var(--z-doc-ink); }
+
+@media (max-width: 720px) {
+  .z-doc-body { flex-direction: column; }
+  .z-doc-side { inline-size: auto; max-block-size: 30vh; border-inline-end: 0; border-block-end: 1px solid var(--z-border); }
+}
+@media (forced-colors: active) {
+  .z-doc-page { border: 1px solid CanvasText; }
+}
+@media print {
+  .z-doc-bar, .z-doc-side { display: none; }
+}

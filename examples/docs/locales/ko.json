@@ -85,6 +85,12 @@
       "about": "소스, 라이선스와 보안",
       "social": "소셜"
     },
+    "version": {
+      "title": "문서 버전",
+      "latest": "최신",
+      "notice": "{version} 버전의 문서를 읽고 있습니다. 최신 버전은 {latest}입니다.",
+      "latest_link": "이 페이지를 최신 버전으로 읽기"
+    },
     "translation": {
       "note": "이 페이지는 영어에서 번역되었습니다.",
       "english": "영어 페이지 읽기",

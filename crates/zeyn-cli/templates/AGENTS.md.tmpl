@@ -174,15 +174,25 @@ matters. The `zeyn_docs` topic `language` and the docs pages have the details.
 - Layouts: `Row::new().col(node)`, `Stack::new().add(node)`, `Panel::new(t!(".."))`,
   `Card::new().title(..)`, `Tabs::new(..).tab(..)`, `Split::new(a, b).ratio(55)`, `AutoGrid`,
   `Dock` for panels the user moves.
-- Data: `DataGrid::of(action)` for tables; `List::of(action).builder(|row| node)`,
+- Data: `DataGrid::of(action)` for tables, `DataGrid::dynamic(action)` with `DynamicPage` and
+  `DynamicColumn` when columns come with the rows; `List::of(action).builder(|row| node)`,
   `CardGrid::of(action)` and `Rail::of(action)` for rows of another shape (a virtual list with a
   builder needs `.row_height(px)`); `Repeat::of(items, |item| node)` for data already in memory;
-  `Tree::of(action)`, `Chart::bar(..)`, `Kpi::new(..)`.
+  `Tree::of(action)`, `Chart::bar(..)`, `Kpi::new(..)`; `DocumentViewer::of(page_action, pages)`
+  for paged SVG or HTML documents such as report previews (`.document(id)`, `.page_size(PageSize::pt(w, h))`,
+  `.outline(..)`, `.search(action)`; pages are cleaned unless `.trusted()`).
 - Forms and controls: `Form::of(model).field(..).row(..).submit(t!(".."), action)`;
   `.control(field, Control::Rating)` (also `Radio`, `Segmented`, `Listbox`, `Switch`, `Percent`,
   `Password`); `.depends_on(child, parent)` for dependent lookups; `.lines(M::lines, ..)` for line
-  items; `RangeSlider::new(label, ["min", "max"], 0, 100)`, `QuantityStepper::of(action, target)`;
+  items; `Control::Code(CodeLang::Expression)` with `.complete(field, action)` and
+  `.check(field, action)` for SQL and expressions, `CodeEditor::new(name, CodeLang::Sql)` outside a
+  form; `RangeSlider::new(label, ["min", "max"], 0, 100)`, `QuantityStepper::of(action, target)`;
   filters `Chips::filter(..)`, `SearchBox::of(action)`.
+- Colors and lengths: `.control(field, Control::Color { palette: BRAND })` on a `String`,
+  `.control(field, Control::Length { units: &[LengthUnit::Mm] })` on a `Decimal` (stored in px).
+- Runtime forms: `FormSchema::new().section(..).field(FieldSpec::text("name", label))` with
+  `SchemaForm::new(schema, values)`; `PropertyInspector::island("designer")` edits what an island
+  selects through `zeyn:inspect` and `zeyn:property`, checked as `FieldSpec::check` does.
 - Linked parts: `.listens("topic")` on every part that shows the data; a filter that
   `.drives("topic")` or `ui.refresh("topic")` in `on_success` reloads them in place.
 - Media: `Image::new(src).alt(..).size(w, h).lazy()` with `.placeholder(Placeholder::color(..))`,

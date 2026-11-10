@@ -94,6 +94,8 @@ mod pdf;
 mod platform;
 mod prefs;
 mod privacy;
+/// Fractional index keys for user ordered rows.
+pub mod rank;
 #[cfg(feature = "redis")]
 mod redis_store;
 pub mod render;
@@ -155,9 +157,10 @@ pub use files::{
 pub use form::{Form, FormAction, FormRow, SubmitForm};
 pub use grid::{
     BulkAction, COLUMN_WIDTH, CellRenderer, ColumnView, DEFAULT_EXPORT_LIMIT, DataGrid,
-    DataGridColumn, DataGridView, DataGridViewStore, DataMode, ExportColumn, MAX_BULK, MAX_PINNED,
-    MAX_SORT, MemoryViewStore, Paging, Pin, RowStyle, Tone, VIRTUAL_LIVE_ROWS,
-    VIRTUAL_WIDE_COLUMNS, position_cursor, total,
+    DataGridColumn, DataGridView, DataGridViewStore, DataMode, DynamicColumn, DynamicGrid,
+    DynamicKind, DynamicPage, DynamicRow, ExportColumn, MAX_BULK, MAX_CELL_TEXT, MAX_COLUMN_NAME,
+    MAX_DYNAMIC_COLUMNS, MAX_PAGE_CELLS, MAX_PAGE_TEXT, MAX_PINNED, MAX_SORT, MemoryViewStore,
+    Paging, Pin, RowStyle, Tone, VIRTUAL_LIVE_ROWS, VIRTUAL_WIDE_COLUMNS, position_cursor, total,
 };
 pub use i18n::{I18n, NumberFormat, Text};
 pub use import::{
@@ -196,6 +199,7 @@ pub use prefs::{
 #[doc(hidden)]
 pub use privacy::output as __privacy;
 pub use privacy::{MaskStyle, Masking, Revealed, can_unmask, masked_text, reveal_in};
+pub use rank::Rank;
 #[cfg(feature = "redis")]
 pub use redis_store::RedisStore;
 pub use render::Render;
@@ -261,9 +265,9 @@ pub mod prelude {
         Tabs, ThemePicker, Timeline, Toolbox, Tree, TreeItem, TreeQuery, Video, WeekSchedule,
     };
     pub use crate::ui::{
-        Barcode, Calendar, CalendarParams, CalendarSlot, CalendarView, CodeLang, CodeView,
-        DiffLayout, DiffView, Inbox, InboxSelection, JsonView, Kanban, NotificationCenter, QrCode,
-        QrLevel, UnreadCount,
+        Barcode, Calendar, CalendarParams, CalendarSlot, CalendarView, CodeEditor, CodeError,
+        CodeLang, CodeQuery, CodeView, Completion, CompletionKind, DiffLayout, DiffView, Inbox,
+        InboxSelection, JsonView, Kanban, NotificationCenter, QrCode, QrLevel, UnreadCount,
     };
     pub use crate::ui::{
         ChatSend, Composer, Delivery, MessageThread, ReplyRequest, SendKey, ThreadQuery,
@@ -274,16 +278,17 @@ pub mod prelude {
         RangeSlider, ReviewSummary, VariantGroup, VariantPicker,
     };
     pub use crate::ui::{Feed, Post, StoryRing, StoryRow, StoryState};
+    pub use crate::ui::{FieldSpec, FormSchema, LengthUnit, SchemaForm};
     #[cfg(feature = "server")]
     pub use crate::ui::{Reply, ReplySender};
     pub use crate::{
         Action, Command, ContextMenu, Ctx, Currency, DataGrid, DataMode, DataQuery, Date, DateTime,
-        Decimal, Effect, Entity, Error, Export, Feature, Field, File, FileRules, FileType, Form,
-        GuardResult, Icon, Identity, Import, Licensed, LocalDateTime, Model, Money, Node, Page,
-        Paging, Result, RowStyle, Screen, ScreenDef, Secret, Service, Shell, SignedIn, Slug,
-        Tenant, TenantRequired, Text, Time, TimeZone, Toast, Tone, TransitionRequest, Transitions,
-        UiCtx, Valid, ValidationErrors, Window, Workflow, action, choice, entity, model, params,
-        screen, t,
+        Decimal, DynamicColumn, DynamicKind, DynamicPage, Effect, Entity, Error, Export, Feature,
+        Field, File, FileRules, FileType, Form, GuardResult, Icon, Identity, Import, Licensed,
+        LocalDateTime, Model, Money, Node, Page, Paging, Rank, Result, RowStyle, Screen, ScreenDef,
+        Secret, Service, Shell, SignedIn, Slug, Tenant, TenantRequired, Text, Time, TimeZone,
+        Toast, Tone, TransitionRequest, Transitions, UiCtx, Valid, ValidationErrors, Window,
+        Workflow, action, choice, entity, model, params, screen, t,
     };
     #[cfg(feature = "server")]
     pub use crate::{

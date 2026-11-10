@@ -114,7 +114,8 @@
       "precision": "{label} ondalık ayırıcıdan önce en fazla {n} basamak içerebilir.",
       "mask": "{label} {pattern} biçiminde olmalı.",
       "embed": "{label} gömülecek bir https adresi ya da bu adresi içeren gömme kodu olmalı.",
-      "embed_host": "{label}: {host} bu uygulamanın gömebileceği siteler listesinde yok."
+      "embed_host": "{label}: {host} bu uygulamanın gömebileceği siteler listesinde yok.",
+      "color": "{label} #1E88E5 gibi bir renk olmalıdır."
     },
     "error": {
       "forbidden": "Bu işlem için yetkiniz yok.",
@@ -454,7 +455,11 @@
         "billion": "{n} Mr"
       },
       "tree": {
-        "empty": "Kayıt yok."
+        "empty": "Kayıt yok.",
+        "insert": "Ekle",
+        "insert_hint": "Control+Enter ekler.",
+        "insert_label": "{label} ekle",
+        "inserted": "{label} eklendi."
       },
       "select": {
         "none": "Seçilmedi",
@@ -615,7 +620,23 @@
         "copied": "Panoya kopyalandı",
         "failed": "Kopyalanamadı",
         "fold": "Bu bloğu daralt veya genişlet",
-        "truncated": "{total} satırın ilk {shown} satırı gösteriliyor. Gerisi burada gösterilemeyecek kadar uzun."
+        "truncated": "{total} satırın ilk {shown} satırı gösteriliyor. Gerisi burada gösterilemeyecek kadar uzun.",
+        "expression": "İfade",
+        "too_long": "Metin denetlenemeyecek ya da tamamlanamayacak kadar uzun.",
+        "editor": {
+          "suggestions": "Öneriler",
+          "count": "{n} öneri. Seçmek için ok tuşlarını, eklemek için Enter tuşunu kullanın.",
+          "none": "Öneri yok",
+          "problem": "Satır {line}, sütun {column}: {message}",
+          "kind": {
+            "keyword": "anahtar sözcük",
+            "function": "işlev",
+            "table": "tablo",
+            "field": "alan",
+            "value": "değer",
+            "snippet": "kalıp"
+          }
+        }
       },
       "barcode": {
         "code128_invalid": "Bu değer barkod olarak gösterilemez: 1 ile 80 arasında yazdırılabilir ASCII karakter olmalıdır.",
@@ -755,6 +776,31 @@
         "open": "Resmi aç",
         "video": "Videoyu oynat"
       },
+      "document": {
+        "label": "Belge",
+        "tools": "Belge araçları",
+        "previous": "Önceki sayfa",
+        "next": "Sonraki sayfa",
+        "page": "Sayfa",
+        "of": "/ {count}",
+        "position": "Sayfa {n} / {count}",
+        "page_label": "Sayfa {n}",
+        "zoom": "Yakınlaştırma",
+        "zoom_in": "Yakınlaştır",
+        "zoom_out": "Uzaklaştır",
+        "fit_width": "Genişliğe sığdır",
+        "fit_page": "Sayfaya sığdır",
+        "pages": "Sayfalar",
+        "keys": "Page Up ve Page Down sayfa sayfa gider, Home ve End ilk ve son sayfaya gider, artı ve eksi yakınlaştırır.",
+        "loading": "Sayfa {n} yükleniyor",
+        "error": "Sayfa {n} yüklenemedi.",
+        "outline": "İçindekiler",
+        "search": "Belgede ara",
+        "hits": "{count} sonuç",
+        "no_hits": "Sonuç yok",
+        "more_hits": "İlk {count} sonuç gösteriliyor",
+        "hit": "Sayfa {n}"
+      },
       "feed": {
         "label": "Gönderiler",
         "new_one": "1 yeni gönderi",
@@ -766,6 +812,25 @@
         "empty": "Henüz gönderi yok.",
         "comments": "{count} yorum",
         "comments_one": "1 yorum"
+      },
+      "color": {
+        "open": "Renk seç",
+        "dialog": "Renk",
+        "red": "Kırmızı",
+        "green": "Yeşil",
+        "blue": "Mavi",
+        "alpha": "Opaklık",
+        "recent": "Son kullanılan renkler",
+        "palette": "Palet",
+        "done": "Tamam"
+      },
+      "length": {
+        "unit": "Birim"
+      },
+      "inspector": {
+        "title": "Özellikler",
+        "empty": "Özelliklerini görmek için bir öğe seçin.",
+        "shown": "{title} özellikleri"
       }
     },
     "date": {

@@ -8,7 +8,7 @@ para sus propios clientes, conectar el modelo que esos clientes quieran y guarda
 lo necesiten.
 
 ```toml
-zeyn = { version = "0.0.8", features = ["assistant"] }
+zeyn = { version = "0.0.10", features = ["assistant"] }
 ```
 
 Sin la feature no se compila nada de esto: ni cliente HTTP, ni rutas adicionales, ni memoria adicional.

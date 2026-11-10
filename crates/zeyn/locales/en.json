@@ -114,7 +114,8 @@
       "precision": "{label} can have at most {n} digits before the decimal separator.",
       "mask": "{label} must look like {pattern}.",
       "embed": "{label} must be an https address to embed, or embed code that holds one.",
-      "embed_host": "{label}: {host} is not on the list of sites this app may embed."
+      "embed_host": "{label}: {host} is not on the list of sites this app may embed.",
+      "color": "{label} must be a color such as #1E88E5."
     },
     "error": {
       "forbidden": "You are not allowed to do this.",
@@ -454,7 +455,11 @@
         "billion": "{n}B"
       },
       "tree": {
-        "empty": "No items."
+        "empty": "No items.",
+        "insert": "Insert",
+        "insert_hint": "Control+Enter inserts.",
+        "insert_label": "Insert {label}",
+        "inserted": "Inserted {label}."
       },
       "select": {
         "none": "None",
@@ -615,7 +620,23 @@
         "copied": "Copied to the clipboard",
         "failed": "Could not copy",
         "fold": "Fold or unfold this block",
-        "truncated": "Showing the first {shown} of {total} lines. The rest is too long to show here."
+        "truncated": "Showing the first {shown} of {total} lines. The rest is too long to show here.",
+        "expression": "Expression",
+        "too_long": "The text is too long to check or complete.",
+        "editor": {
+          "suggestions": "Suggestions",
+          "count": "{n} suggestions. Use the arrow keys to choose, Enter to insert.",
+          "none": "No suggestions",
+          "problem": "Line {line}, column {column}: {message}",
+          "kind": {
+            "keyword": "keyword",
+            "function": "function",
+            "table": "table",
+            "field": "field",
+            "value": "value",
+            "snippet": "snippet"
+          }
+        }
       },
       "barcode": {
         "code128_invalid": "This value cannot be shown as a barcode: it must be 1 to 80 printable ASCII characters.",
@@ -755,6 +776,31 @@
         "open": "Open image",
         "video": "Play video"
       },
+      "document": {
+        "label": "Document",
+        "tools": "Document tools",
+        "previous": "Previous page",
+        "next": "Next page",
+        "page": "Page",
+        "of": "of {count}",
+        "position": "Page {n} of {count}",
+        "page_label": "Page {n}",
+        "zoom": "Zoom",
+        "zoom_in": "Zoom in",
+        "zoom_out": "Zoom out",
+        "fit_width": "Fit width",
+        "fit_page": "Fit page",
+        "pages": "Pages",
+        "keys": "Page Up and Page Down move by page, Home and End go to the first and last page, plus and minus zoom.",
+        "loading": "Loading page {n}",
+        "error": "Page {n} could not be loaded.",
+        "outline": "Outline",
+        "search": "Search the document",
+        "hits": "{count} results",
+        "no_hits": "No results",
+        "more_hits": "First {count} results shown",
+        "hit": "Page {n}"
+      },
       "feed": {
         "label": "Posts",
         "new_one": "1 new post",
@@ -766,6 +812,25 @@
         "empty": "No posts yet.",
         "comments": "{count} comments",
         "comments_one": "1 comment"
+      },
+      "color": {
+        "open": "Choose a color",
+        "dialog": "Color",
+        "red": "Red",
+        "green": "Green",
+        "blue": "Blue",
+        "alpha": "Opacity",
+        "recent": "Recent colors",
+        "palette": "Palette",
+        "done": "Done"
+      },
+      "length": {
+        "unit": "Unit"
+      },
+      "inspector": {
+        "title": "Properties",
+        "empty": "Select an item to see its properties.",
+        "shown": "Properties of {title}"
       }
     },
     "date": {

@@ -173,7 +173,27 @@ StatusBar::new("Status").left("Ready").right("UTF-8")
 - `MenuBar` sigue el patrón ARIA menubar y contiene los mismos comandos que la paleta.
 - `Toolbox` es un grupo vertical de botones de alternancia; la herramienta elegida se envía como un evento `zeyn:tool`.
 - `PropertyInspector::new(title, form)` edita el objeto seleccionado con un formulario dividido en grupos `.section(...)`.
+- `PropertyInspector::island(name)` edita lo que selecciona una isla, sin formulario (ver [Island inspector](#island-inspector)).
 - `StatusBar` tiene una región en vivo, así que los mensajes que se le envían los leen los lectores de pantalla.
+
+## Island inspector
+
+```rust
+Row::new()
+    .col(Island::new("designer"))
+    .col(PropertyInspector::island("designer"))
+
+let schema = FormSchema::new()
+    .section("Position")
+    .field(FieldSpec::length("x", "X", &[LengthUnit::Mm]).min(0))
+    .section("Look")
+    .field(FieldSpec::color("fill", "Fill", BRAND).required())
+    .field(FieldSpec::choice("align", "Align", [("left", "Left"), ("right", "Right")]));
+```
+
+Una isla envía `zeyn:inspect` con `detail: { title, schema, values }`, donde `schema` es un `FormSchema` serializado. Los tipos de campo son `text`, `multiline`, `integer`, `decimal`, `length`, `color`, `boolean`, `choice` y `expression`; cada uno admite `required`, `min`, `max`, `max_len`, `default` y `help`.
+
+El inspector dibuja los campos con los controles de los formularios de modelo y rellena nombres, etiquetas y valores como texto, nunca como HTML. Al salir de un campo, pulsar Enter o cerrar un selector, comprueba el valor y envía `zeyn:property` con `detail: { name, value }` a la raíz de la isla. Un valor no válido muestra su error y no se envía. Un esquema con más de 200 campos se ignora. `FieldSpec::check` hace las mismas comprobaciones en el servidor.
 
 ## Paneles acoplables
 

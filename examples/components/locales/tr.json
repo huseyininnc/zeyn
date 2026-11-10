@@ -75,6 +75,7 @@
       "search_box": "Önerili arama alanı.",
       "topics": "Ekranın diğer bölümlerini yerinde yenileyen süzgeçler ve eylemler.",
       "tree": "Açıldıkça sunucudan yüklenen dallar.",
+      "document_viewer": "Sayfaları göründükçe getirilen, sayfalı bir rapor önizlemesi.",
       "week_schedule": "Eylem satırlarından yedi günlük sütunlar.",
       "image": "Alternatif metni ve boyutu zorunlu resim.",
       "embed": "Kilitli çerçevede başka bir sitenin sayfası.",
@@ -102,6 +103,7 @@
       "link_button": "Buton görünümlü, başka sayfaya giden bağlantı.",
       "clear_prefs": "Tarayıcının uygulama için tuttuğu seçimleri silen düğme.",
       "diff_view": "Bir kayıtta değişen alanlar, eski ve yeni yan yana ya da satır içinde.",
+      "code_editor": "Renklendirme, satır numaraları, tamamlama ve hata işaretleriyle düzenlenebilir SQL ve ifadeler.",
       "code_view": "Salt okunur kod ve JSON, sunucuda renklendirilmiş, numaralı ve katlanır.",
       "barcode": "Sunucuda SVG olarak çizilen Code 128 barkodları ve QR kodları.",
       "inbox": "Güne göre bildirimler, toplu okundu işaretleme ve arşivleme, okunmamış sayısıyla zil.",
@@ -120,7 +122,10 @@
       "typing_indicator": "Bir sohbette başka kimlerin yazdığını gerçek zamanlı kanal üzerinden gösterir.",
       "story_ring": "Hikâyelerinin yeni olup olmadığını gösteren halkalı avatar.",
       "lightbox": "Tam ekran açılan resimler ve videolar; açıklama, yakınlaştırma ve kaydırma ile.",
-      "feed": "Yenilerini bir düğmenin arkasında tutan, sonsuz bir gönderi akışı."
+      "feed": "Yenilerini bir düğmenin arkasında tutan, sonsuz bir gönderi akışı.",
+      "color_input": "Seçici, son kullanılan renkler ve paletle onaltılık renk.",
+      "length_input": "Piksel olarak saklanan, kullanıcının seçtiği birimde gösterilen uzunluk.",
+      "property_inspector": "Bir adanın gönderdiği şemayla, adada seçili olanı düzenler."
     },
     "ex": {
       "action_button": {
@@ -181,7 +186,8 @@
         "overview": "Örnek",
         "confirm_actions": "Önce soran satır ve toplu işlemler",
         "numbers": "Yerel ayara göre gruplanmış sayılar, düz bir yıl",
-        "computed_million": "Sayfa sayfa üretilen bir milyon hesaplanmış satır"
+        "computed_million": "Sayfa sayfa üretilen bir milyon hesaplanmış satır",
+        "dynamic_columns": "Satırlarla gelen sütunlar: 30 sütunlu 10.000 satır"
       },
       "date_pickers": {
         "overview": "Örnek"
@@ -358,8 +364,13 @@
         "date_range_and_search": "Bir listeyi yöneten tarih aralığı ve arama kutusu",
         "refresh_after_an_action": "Bir düğümü yenileyen eylem"
       },
+      "document_viewer": {
+        "overview": "Örnek",
+        "plain": "Yan paneli olmayan on iki Letter sayfası"
+      },
       "tree": {
-        "overview": "Örnek"
+        "overview": "Örnek",
+        "draggable": "Bırakma hedefine sürüklenen ya da bir düğme veya Control+Enter ile eklenen yapraklar"
       },
       "week_schedule": {
         "overview": "Örnek"
@@ -367,6 +378,11 @@
       "diff_view": {
         "overview": "Örnek",
         "inline": "Satır içinde"
+      },
+      "code_editor": {
+        "overview": "Tamamlama ve denetimli ifade",
+        "sql": "SQL",
+        "form": "Model formunda"
       },
       "code_view": {
         "overview": "Örnek",
@@ -439,6 +455,15 @@
         "single": "Tek bir resim"
       },
       "feed": {
+        "overview": "Örnek"
+      },
+      "color_input": {
+        "overview": "Örnek"
+      },
+      "length_input": {
+        "overview": "Örnek"
+      },
+      "property_inspector": {
         "overview": "Örnek"
       }
     },

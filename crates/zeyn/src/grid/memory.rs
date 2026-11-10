@@ -128,7 +128,8 @@ impl Cond {
 
 impl Cond {
     /// Reads the conditions of one filter. Unknown fields, unreadable values and conditions that
-    /// do not fit the column kind are dropped.
+    /// do not fit the column kind are dropped, and so is every filter on a [`FieldKind::Rank`],
+    /// which has no filter box.
     pub(crate) fn read(
         f: &Filter,
         fields: &[crate::model::FieldMeta],
@@ -142,6 +143,9 @@ impl Cond {
             return;
         };
         let kind = &fields[i].kind;
+        if matches!(kind, FieldKind::Rank) {
+            return;
+        }
         let text = |s: &str| {
             let t = s.trim();
             (!t.is_empty() && t.chars().count() <= MAX_FILTER_TEXT).then(|| t.to_lowercase())
@@ -265,6 +269,14 @@ fn filter_text(value: &Value) -> String {
     }
 }
 
+/// [`compare`], with text compared by bytes when `bytes` is set ([`FieldKind::Rank`] columns).
+fn compare_as(a: &Value, b: &Value, bytes: bool) -> Ordering {
+    match (a, b) {
+        (Value::Text(x), Value::Text(y)) if bytes => x.cmp(y),
+        _ => compare(a, b),
+    }
+}
+
 fn compare(a: &Value, b: &Value) -> Ordering {
     match (a, b) {
         (Value::Null, Value::Null) => Ordering::Equal,
@@ -292,13 +304,19 @@ fn compare(a: &Value, b: &Value) -> Ordering {
 /// the values (a sum of text, or money in different currencies). Money averages round half away
 /// from zero to the smallest unit.
 pub fn total(values: impl Iterator<Item = Value>, op: Aggregate) -> Option<Value> {
+    total_as(values, op, false)
+}
+
+/// [`total`], with the lowest and highest text found by bytes when `bytes` is set
+/// ([`FieldKind::Rank`] columns).
+fn total_as(values: impl Iterator<Item = Value>, op: Aggregate, bytes: bool) -> Option<Value> {
     let mut values = values
         .filter(|v| *v != Value::Null)
         .peekable();
     match op {
         Aggregate::Count => Some(Value::Int(values.count() as i64)),
-        Aggregate::Min => values.min_by(compare),
-        Aggregate::Max => values.max_by(compare),
+        Aggregate::Min => values.min_by(|a, b| compare_as(a, b, bytes)),
+        Aggregate::Max => values.max_by(|a, b| compare_as(a, b, bytes)),
         Aggregate::Sum | Aggregate::Avg
             if values
                 .peek()
@@ -357,20 +375,21 @@ pub fn total(values: impl Iterator<Item = Value>, op: Aggregate) -> Option<Value
 pub(crate) const BLOCKING_ROWS: usize = 50_000;
 
 /// One sort value of a row, read once: the value and, for text, its lower case form when it
-/// differs from the text.
+/// differs from the text. [`FieldKind::Rank`] text sorts by bytes, as in SQL, so it has none.
 struct SortKey {
     value: Value,
     lower: Option<String>,
 }
 
 impl SortKey {
-    fn new(value: Value) -> Self {
+    fn new(value: Value, bytes: bool) -> Self {
         let lower = match &value {
             Value::Text(t)
-                if !t.chars().all(|c| {
-                    let mut l = c.to_lowercase();
-                    l.next() == Some(c) && l.next().is_none()
-                }) =>
+                if !bytes
+                    && !t.chars().all(|c| {
+                        let mut l = c.to_lowercase();
+                        l.next() == Some(c) && l.next().is_none()
+                    }) =>
             {
                 Some(t.to_lowercase())
             }
@@ -392,6 +411,13 @@ impl SortKey {
     }
 }
 
+/// Whether field `i` of `M` is a [`FieldKind::Rank`].
+fn is_rank<M: Model>(i: usize) -> bool {
+    M::fields()
+        .get(i)
+        .is_some_and(|f| matches!(f.kind, FieldKind::Rank))
+}
+
 /// Positions of rows in sort order, every sort value read once. Rows that compare equal keep
 /// their order in the list, so the result is the one of a stable sort; only the positions
 /// `start..end` are put in order, the rest are just on the right side of them.
@@ -402,12 +428,19 @@ fn sorted_window<M: Model>(
     end: usize,
 ) -> Vec<u32> {
     let width = order.len();
+    let bytes: Vec<bool> = order
+        .iter()
+        .map(|(i, _)| is_rank::<M>(*i))
+        .collect();
     let keys: Vec<SortKey> = rows
         .iter()
         .flat_map(|row| {
             order
                 .iter()
-                .map(|(i, _)| SortKey::new(row.value_at(*i).unwrap_or(Value::Null)))
+                .zip(&bytes)
+                .map(|((i, _), bytes)| {
+                    SortKey::new(row.value_at(*i).unwrap_or(Value::Null), *bytes)
+                })
         })
         .collect();
     let cmp = |a: &u32, b: &u32| {
@@ -476,10 +509,11 @@ impl DataQuery {
             .iter()
             .filter_map(|a| {
                 let i = index(&a.field)?;
-                let value = total(
+                let value = total_as(
                     rows.iter()
                         .filter_map(|r| r.value_at(i)),
                     a.op,
+                    is_rank::<M>(i),
                 )?;
                 Some(Total {
                     field: a.field.clone(),
@@ -537,9 +571,10 @@ impl DataQuery {
             .sort
             .iter()
             .any(|s| s.desc && Some(gi) == index(&s.field));
+        let bytes = is_rank::<M>(gi);
         let keys: Vec<SortKey> = rows
             .iter()
-            .map(|r| SortKey::new(r.value_at(gi).unwrap_or(Value::Null)))
+            .map(|r| SortKey::new(r.value_at(gi).unwrap_or(Value::Null), bytes))
             .collect();
         let mut sorted: Vec<usize> = (0..rows.len()).collect();
         sorted.sort_by(|a, b| {
@@ -564,10 +599,11 @@ impl DataQuery {
                     .iter()
                     .filter_map(|a| {
                         let i = index(&a.field)?;
-                        let value = total(
+                        let value = total_as(
                             list.iter()
                                 .filter_map(|r| r.value_at(i)),
                             a.op,
+                            is_rank::<M>(i),
                         )?;
                         Some(Total {
                             field: a.field.clone(),

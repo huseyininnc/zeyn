@@ -233,3 +233,29 @@ Action commands are nodes with their own path and post to the form endpoint like
 | Tab | the menu | Closes it and moves on |
 
 The menu needs about 0.8 KB gzip of script and no request until a command runs; it is 4 nodes plus 2 per command.
+
+## DocumentViewer
+
+`DocumentViewer::of(page_action, page_count)` shows a paged document, such as a report preview, whose pages are drawn on the server. The page action takes a `DocPage` (`document` from `.document(id)`, never from the browser, and `page`) and returns one page as an SVG or HTML fragment. Every page has the size of `.page_size(..)` (`PageSize::A4`, `PageSize::LETTER`, `PageSize::pt(w, h)` or `PageSize::px(w, h)`), so the scroll area is as tall as the whole document from the start.
+
+```rust
+DocumentViewer::of(report_page, report.pages)
+    .document(report.id.to_string())
+    .page_size(PageSize::A4)
+    .outline(vec![OutlineItem::new("Summary", 1).child(OutlineItem::new("Totals", 2))])
+    .search(search_report)
+    .download("PDF", format!("/reports/{}/pdf", report.id))
+```
+
+- Only the pages in view and one on each side are in the page. They are fetched through `POST /_zeyn/data` once scrolling pauses, so pages scrolled past quickly are never fetched, nearest first, at most 3 at a time, and a fetch whose page has scrolled away is aborted. At most 12 rendered pages are kept in the browser.
+- Zoom scales the pages without fetching them again: fit width, fit page and 50 to 400 percent. The page box goes to a page, and the current page is announced ("Page 3 of 500") once scrolling stops.
+- `.outline(items)` adds an outline panel, `.search(action)` a search box whose action gets a `DocSearch` and returns `PageHit`s (at most 50 are shown), and `.download(label, href)` a download link.
+- The server checks the screen's access, the page action's permission, CSRF and the write limit on every page, refuses page numbers outside 1 to the page count and pages over 2 MB (`MAX_PAGE_BYTES`), and cleans every page with an allow list (`sanitize_markup`): scripts, event handlers, `foreignObject`, frames, external links and images, and `url()` in styles are removed, and ids get a prefix per page. `.trusted()` skips the cleaning for pages the app draws from data it controls; user text that reaches such a page unescaped runs as script for everyone who opens it.
+- `document.js` (13 KB, 4.7 KB gzip) and `document.css` (3.6 KB) load only on pages with a viewer.
+
+| Key | Where | Does |
+|---|---|---|
+| Page Down, Page Up | the pages | Next and previous page |
+| Home, End | the pages | First and last page |
+| `+`, `-` | the pages | Zoom in and out |
+| Enter | the page box | Goes to the page typed |

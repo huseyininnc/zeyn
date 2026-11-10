@@ -147,6 +147,10 @@ Showcase diyagram editöründeki gibi erişilebilirlik deseni (`examples/showcas
 
 Editör `SaveDiagram` üzerinden kaydeder ve sunucu aldığını sınırlar (`Diagram::clamped`: en fazla 200 şekil, benzersiz kimlikler, 40 karakterlik etiketler, sınırlı koordinatlar); çünkü island'a asla güvenilmez.
 
+### 7.1 Özellik denetçisi
+
+`PropertyInspector::island(name)` seçili nesneyi düzenler. Ada, öğelerinden herhangi birinden `detail: { title, schema, values }` ile `zeyn:inspect` gönderir; denetçi onaylanan her değişikliği ada kökünde, denetlenmiş olarak `zeyn:property` (`detail: { name, value }`) ile yanıtlar. Ada kaydettiğini yine denetler, sunucu da kayıtları `FormSchema::check` ile denetler.
+
 ## 8. Performans
 
 | Ne | Sayı |

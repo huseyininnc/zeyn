@@ -7,7 +7,7 @@ single sign on proxy or an identity provider do not need it. The full reference,
 people who know ASP.NET Core Identity, is `docs/accounts.md`.
 
 ```toml
-zeyn = { version = "0.0.8", features = ["accounts"] }
+zeyn = { version = "0.0.10", features = ["accounts"] }
 ```
 
 ## Turn it on

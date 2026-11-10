@@ -42,6 +42,10 @@ Form::of(Contact { quantity: 2, size: Size::Medium, ..Contact::default() })
 | `Control::Password`, `Control::NewPassword` | パスワードとして入力されるテキストフィールド。表示と非表示のボタン付き |
 | `Control::PasswordMeter` | 強度メーター付きの新しいパスワード |
 | `Control::Rating` | 1 から N までの整数を星で、`Decimal` フィールドでは半星で表示します（[Rating](#rating) を参照） |
+| `Control::Multiline` | 高さが伸びるテキストエリアで、任意の長さのテキスト |
+| `Control::Color { palette }` | 16 進カラーを持つ `String`。ピッカー付き（[Color and length](#color-and-length) を参照） |
+| `Control::Length { units }` | ピクセルで保存し、ユーザーが選んだ単位で表示する `Decimal` の長さ（[Color and length](#color-and-length) を参照） |
+| `Control::Code(lang)` | 色分け、補完候補、エラーマーカー付きの SQL または式（[コードエディター](#code-editor) を参照） |
 
 ## Rating
 
@@ -62,6 +66,22 @@ Form::of(Feedback::default())
 
 @live rating
 
+
+## Color and length
+
+```rust
+const BRAND: &[&str] = &["#1E88E5", "#43A047", "#00000080"];
+
+Form::of(band)
+    .field(Band::fill)
+    .control(Band::fill, Control::Color { palette: BRAND })
+    .field(Band::height)
+    .control(Band::height, Control::Length { units: &[LengthUnit::Mm, LengthUnit::Pt] })
+```
+
+`Control::Color` は `String` フィールドを `#RRGGBB` または `#RRGGBBAA` として保持します。フィールドは色見本付きのテキスト入力なので、スクリプトなしでも動きます。ボタンを押すと、赤、緑、青、不透明度のスライダー、最近使った色、アプリのパレットを持つダイアログが開きます。Escape または「完了」で閉じ、フォーカスが戻ります。サーバーは 16 進カラーでない値を拒否します。
+
+`Control::Length` は `Decimal` フィールドを CSS ピクセル（1 インチ 96 ピクセル）で保持します。ユーザーはミリ、センチ、インチ、ポイント、ピクセルで入力し、数値の横で単位を選びます。ブラウザーはすべての長さフィールドについて単位を記憶します。上下の矢印キーで 0.1、Shift を押すと 1 ずつ、ピクセル単位の `min` と `max` ルールの範囲で変わります。フィールドには `scale = 4` を指定してください。
 
 ## ルックアップ
 
@@ -186,6 +206,42 @@ pub struct Contact {
 | DOM ノード | マスク入力で 3、トグル付きのパスワードで 4、メーター付きで 11 |
 | リクエスト | 入力中はありません |
 | サーバーの検査 | `scale`、`precision`、`min`、`max`、`mask` は、ページ、API、AI ツールのいずれからでも、保存のたびに実行されます |
+
+## コードエディター
+
+`Control::Code(lang)` はテキストフィールドを、SQL（`CodeLang::Sql`）、`[Orders.Total] * 1.18m` のようなレポート式（`CodeLang::Expression`）、またはプレーンテキスト用のコードエディターにします。`CodeEditor` は同じエディターを、モデルフォームの外で単独のノードとして使うものです。`.complete(action)` で補完候補を、`.check(action)` でエラーマーカーを追加します。
+
+```rust
+Form::of(calc)
+    .control(Calc::formula, Control::Code(CodeLang::Expression))
+    .complete(Calc::formula, complete_fields)
+    .check(Calc::formula, check_formula)
+
+CodeEditor::new("query", CodeLang::Sql).label("Report query").value(sql).complete(complete_sql)
+```
+
+入力欄は通常の `<textarea>` なので、入力、元に戻す、入力メソッド、モバイルキーボード、スクリーンリーダーはどのテキストフィールドとも同じように動き、フォームはプレーンテキストを送信します。その下にはテキストを色分けしたコピーと行番号の列があり、どちらもスクリーンリーダーからは隠されています。色分けは行単位で、キー入力ごとに変更された行だけを描き直します。スクリプトがなければ、フィールドは通常のテキストエリアです。
+
+補完アクションは `CodeQuery`（`text` と `cursor`、入力中の単語は `word()`）を受け取り、`Vec<Completion>` を返します。選んだ候補の `insert` がその単語を置き換えます。チェックアクションは同じクエリを受け取り、`line`、`column`、`length`、`message` を持つ `Vec<CodeError>` を返します。各エラーには下線が引かれ、エディターの下に一覧表示され、スクリーンリーダーはそこで読み上げます。モデルの `validate` 関数では、`errors.add_at(field, line, column, length, message)` でもその位置に下線が引かれます。テキストの外にあるマーカーはテキストの中に収められます。
+
+### キーボード
+
+| キー | 動作 |
+|---|---|
+| Ctrl+Space | カーソル位置の候補を表示します |
+| 下矢印、上矢印 | 候補の間を移動します |
+| Enter、Tab | 選択中の候補を挿入します |
+| Escape | 候補を閉じます |
+| Tab（候補が開いていないとき） | どのテキストエリアとも同じく、フォーカスをエディターの外へ移します |
+
+### 予算と検査
+
+| | |
+|---|---|
+| 追加スクリプト | `codeedit.js` は約 8.0 KB（gzip）、`codeedit.css` は 1.4 KB（gzip）で、エディターのあるページでだけ読み込まれます |
+| 入力 | 2,000 行のテキストでキー入力 1 回あたり約 0.5 ms のスクリプト |
+| リクエスト | キー入力ごとにはなし。補完は 150 ms、チェックは 500 ms 止まった後で、古いリクエストは取り消されます |
+| サーバーの検査 | すべてのリクエストで CSRF、アクションの権限、書き込み制限を確認します。まずリクエスト本文を読み込み（既定の本文上限で最大 2 MB）、次に 64 KB を超えるテキストをアクションの実行前に拒否します。補完とチェックは保存と同じく `App::write_limit` に数えられ、ブラウザーに届くのは 200 文字までの候補 50 件と 500 文字までのエラー 100 件までです |
 
 ## 日付と時刻のピッカー
 

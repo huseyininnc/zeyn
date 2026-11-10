@@ -42,6 +42,10 @@ Form::of(Contact { quantity: 2, size: Size::Medium, ..Contact::default() })
 | `Control::Password`, `Control::NewPassword` | 비밀번호로 입력되며 표시와 숨김 버튼이 있는 텍스트 필드 |
 | `Control::PasswordMeter` | 강도 표시기가 있는 새 비밀번호 |
 | `Control::Rating` | 1부터 N까지의 정수를 별로, `Decimal` 필드는 반 별로 표시합니다([Rating](#rating) 참조) |
+| `Control::Multiline` | 높이가 늘어나는 텍스트 영역에 쓰는 길이 제한 없는 텍스트 |
+| `Control::Color { palette }` | 16진수 색을 담는 `String`, 색 선택기 포함([Color and length](#color-and-length) 참고) |
+| `Control::Length { units }` | 픽셀로 저장하고 사용자가 고른 단위로 보여 주는 `Decimal` 길이([Color and length](#color-and-length) 참고) |
+| `Control::Code(lang)` | 강조 표시, 제안, 오류 표시가 있는 SQL 또는 식([코드 편집기](#code-editor) 참고) |
 
 ## Rating
 
@@ -62,6 +66,22 @@ Form::of(Feedback::default())
 
 @live rating
 
+
+## Color and length
+
+```rust
+const BRAND: &[&str] = &["#1E88E5", "#43A047", "#00000080"];
+
+Form::of(band)
+    .field(Band::fill)
+    .control(Band::fill, Control::Color { palette: BRAND })
+    .field(Band::height)
+    .control(Band::height, Control::Length { units: &[LengthUnit::Mm, LengthUnit::Pt] })
+```
+
+`Control::Color`는 `String` 필드를 `#RRGGBB` 또는 `#RRGGBBAA`로 저장합니다. 필드는 색 견본이 있는 텍스트 입력이라 스크립트 없이도 동작합니다. 버튼을 누르면 빨강, 초록, 파랑, 불투명도 슬라이더와 최근에 쓴 색, 앱의 팔레트가 있는 대화 상자가 열립니다. Escape나 완료를 누르면 닫히고 포커스가 돌아옵니다. 서버는 16진수 색이 아닌 값을 거부합니다.
+
+`Control::Length`는 `Decimal` 필드를 CSS 픽셀(1인치에 96)로 저장합니다. 사용자는 밀리미터, 센티미터, 인치, 포인트, 픽셀로 입력하고 숫자 옆에서 단위를 고릅니다. 브라우저는 모든 길이 필드에 대해 이 단위를 기억합니다. 위아래 화살표는 0.1씩, Shift와 함께 1씩, 픽셀 단위인 `min`과 `max` 규칙 안에서 움직입니다. 필드에 `scale = 4`를 지정하세요.
 
 ## Lookup
 
@@ -186,6 +206,42 @@ pub struct Contact {
 | DOM 노드 | 마스크 입력은 3개, 토글이 있는 비밀번호는 4개, 표시기가 있으면 11개 |
 | 요청 | 입력하는 동안에는 없음 |
 | 서버 검사 | `scale`, `precision`, `min`, `max`, `mask`는 페이지, API, AI 도구 모두에서 저장할 때마다 실행됩니다 |
+
+## 코드 편집기
+
+`Control::Code(lang)`는 텍스트 필드를 SQL(`CodeLang::Sql`), `[Orders.Total] * 1.18m` 같은 보고서 식(`CodeLang::Expression`) 또는 일반 텍스트를 위한 코드 편집기로 바꿉니다. `CodeEditor`는 같은 편집기를 모델 폼 밖에서 독립된 노드로 쓰는 것입니다. `.complete(action)`은 제안을, `.check(action)`은 오류 표시를 추가합니다.
+
+```rust
+Form::of(calc)
+    .control(Calc::formula, Control::Code(CodeLang::Expression))
+    .complete(Calc::formula, complete_fields)
+    .check(Calc::formula, check_formula)
+
+CodeEditor::new("query", CodeLang::Sql).label("Report query").value(sql).complete(complete_sql)
+```
+
+입력은 일반 `<textarea>`이므로 입력, 실행 취소, 입력기, 모바일 키보드, 화면 낭독기가 다른 텍스트 필드와 똑같이 동작하고, 폼은 일반 텍스트를 보냅니다. 그 아래에는 텍스트를 강조 표시한 사본과 줄 번호 열이 있으며, 둘 다 화면 낭독기에서 숨겨집니다. 강조 표시는 줄 단위라서 키 입력 한 번은 바뀐 줄만 다시 그립니다. 스크립트가 없으면 필드는 일반 텍스트 영역입니다.
+
+완성 액션은 `CodeQuery`(`text`와 `cursor`, 입력 중인 단어는 `word()`)를 받아 `Vec<Completion>`을 반환하며, 고른 제안의 `insert`가 그 단어를 대신합니다. 검사 액션은 같은 쿼리를 받아 `line`, `column`, `length`, `message`가 담긴 `Vec<CodeError>`를 반환합니다. 각 오류에는 밑줄이 그어지고 편집기 아래에 나열되며, 화면 낭독기는 그곳에서 이를 읽습니다. 모델의 `validate` 함수에서는 `errors.add_at(field, line, column, length, message)`로도 그 위치에 밑줄을 긋습니다. 텍스트 밖에 있는 표시는 텍스트 안으로 옮겨집니다.
+
+### 키보드
+
+| 키 | 동작 |
+|---|---|
+| Ctrl+Space | 커서 위치의 제안을 보여 줍니다 |
+| 아래쪽 화살표, 위쪽 화살표 | 제안 사이를 이동합니다 |
+| Enter, Tab | 활성 제안을 삽입합니다 |
+| Escape | 제안을 닫습니다 |
+| Tab(열린 제안이 없을 때) | 다른 텍스트 영역처럼 포커스를 편집기 밖으로 옮깁니다 |
+
+### 예산과 검사
+
+| | |
+|---|---|
+| 추가 스크립트 | `codeedit.js` 약 8.0 KB(gzip)와 `codeedit.css` 1.4 KB(gzip), 편집기가 있는 페이지에서만 |
+| 입력 | 2,000줄 텍스트에서 키 입력당 약 0.5 ms의 스크립트 |
+| 요청 | 키 입력마다 없음. 완성은 150 ms, 검사는 500 ms 멈춘 뒤에 보내고 이전 요청은 취소됩니다 |
+| 서버 검사 | 모든 요청에서 CSRF, 액션 권한, 쓰기 제한을 확인합니다. 먼저 요청 본문을 읽고(기본 본문 제한으로 최대 2 MB), 그다음 64 KB를 넘는 텍스트를 액션 실행 전에 거부합니다. 완성과 검사는 저장처럼 `App::write_limit`에 포함되며, 브라우저에는 최대 200자의 제안 50개와 500자의 오류 100개만 전달됩니다 |
 
 ## 날짜 및 시간 피커
 

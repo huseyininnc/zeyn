@@ -147,6 +147,10 @@ surface.update(|editor| editor.add_box());   // change the scene, draw on the ne
 
 编辑器通过 `SaveDiagram` 保存，服务器会限制它收到的内容（`Diagram::clamped`：最多 200 个图形、唯一的 id、40 个字符的标签、有界的坐标），因为 island 永远不被信任。
 
+### 7.1 属性检查器
+
+`PropertyInspector::island(name)` 编辑选中的对象。岛从它的任意元素发出带 `detail: { title, schema, values }` 的 `zeyn:inspect`；检查器对每个确认的修改，在岛的根元素上以已校验的 `zeyn:property`（`detail: { name, value }`）回应。岛仍要校验它保存的内容，服务器用 `FormSchema::check` 校验保存请求。
+
 ## 8. 性能
 
 | 项目 | 数值 |

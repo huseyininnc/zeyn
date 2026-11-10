@@ -75,6 +75,7 @@
       "search_box": "A search field with suggestions.",
       "topics": "Filters and actions that refresh other parts of the screen in place.",
       "tree": "Branches loaded from the server as they open.",
+      "document_viewer": "A paged report preview whose pages are fetched as they come into view.",
       "week_schedule": "Seven day columns of rows from an action.",
       "image": "A picture with required alt text and size.",
       "embed": "A page of another site in a locked frame.",
@@ -102,6 +103,7 @@
       "link_button": "A link to another page that looks like a button.",
       "clear_prefs": "A button that removes the choices this browser keeps for the app.",
       "diff_view": "The fields that changed in a record, old and new side by side or inline.",
+      "code_editor": "Editable SQL and expressions with highlighting, line numbers, completion and error markers.",
       "code_view": "Read only code and JSON, highlighted, numbered and folded on the server.",
       "barcode": "Code 128 barcodes and QR codes drawn as SVG on the server.",
       "inbox": "Notifications by day with bulk mark read and archive, and the bell with the unread count.",
@@ -120,7 +122,10 @@
       "typing_indicator": "Who else is typing in a conversation, over the realtime channel.",
       "story_ring": "An avatar in a ring that says whether its stories are new.",
       "lightbox": "Images and videos that open full screen, with captions, zoom and swipes.",
-      "feed": "An endless stream of posts that holds new ones behind a button."
+      "feed": "An endless stream of posts that holds new ones behind a button.",
+      "color_input": "A hex color with a picker, the colors used last and a palette.",
+      "length_input": "A length stored in pixels and shown in a unit the user picks.",
+      "property_inspector": "Edits what an island selects, from a schema the island sends."
     },
     "ex": {
       "action_button": {
@@ -181,7 +186,8 @@
         "overview": "Example",
         "confirm_actions": "Row and bulk actions that ask first",
         "numbers": "Numbers grouped by locale, a plain year",
-        "computed_million": "A million computed rows, built a page at a time"
+        "computed_million": "A million computed rows, built a page at a time",
+        "dynamic_columns": "Columns that come with the rows: 10,000 rows of 30 columns"
       },
       "date_pickers": {
         "overview": "Example"
@@ -358,8 +364,13 @@
         "date_range_and_search": "A date range and a search box that drive a list",
         "refresh_after_an_action": "An action that refreshes a node"
       },
+      "document_viewer": {
+        "overview": "Example",
+        "plain": "Twelve Letter pages without side panels"
+      },
       "tree": {
-        "overview": "Example"
+        "overview": "Example",
+        "draggable": "Leaves that drag onto a drop target, or insert with a button or Control+Enter"
       },
       "week_schedule": {
         "overview": "Example"
@@ -367,6 +378,11 @@
       "diff_view": {
         "overview": "Example",
         "inline": "Inline"
+      },
+      "code_editor": {
+        "overview": "Expression with completion and checks",
+        "sql": "SQL",
+        "form": "In a model form"
       },
       "code_view": {
         "overview": "Example",
@@ -439,6 +455,15 @@
         "single": "A single image"
       },
       "feed": {
+        "overview": "Example"
+      },
+      "color_input": {
+        "overview": "Example"
+      },
+      "length_input": {
+        "overview": "Example"
+      },
+      "property_inspector": {
         "overview": "Example"
       }
     },

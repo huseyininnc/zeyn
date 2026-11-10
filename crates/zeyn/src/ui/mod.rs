@@ -11,6 +11,7 @@ mod catalog;
 mod chart;
 mod chips;
 mod code;
+mod code_edit;
 mod composer;
 mod content;
 mod controls;
@@ -18,6 +19,7 @@ mod countdown;
 mod date;
 mod diff;
 mod dock;
+mod document;
 mod embed;
 mod facets;
 mod feed;
@@ -45,6 +47,8 @@ mod rating;
 mod reactions;
 mod relative;
 mod reviews;
+mod sanitize;
+mod schema;
 mod share;
 mod shell;
 mod story;
@@ -85,20 +89,29 @@ pub use catalog::{CardGrid, ImageCard, MAX_SUGGESTIONS, Rail, SearchBox, SearchP
 pub use chart::{Better, BulletCell, Chart, ChartKind, Kpi, SparklineCell};
 pub use chips::{Chips, MAX_CHIPS};
 pub use code::{CodeLang, CodeView, JsonView, MAX_CODE_BYTES, MAX_CODE_LINES, highlight};
+pub(crate) use code_edit::{CheckSource, CompleteSource, EditorHtml, render_editor};
+pub use code_edit::{
+    CodeEditor, CodeError, CodeQuery, Completion, CompletionKind, MAX_CODE_ERRORS,
+    MAX_CODE_MESSAGE_CHARS, MAX_CODE_QUERY_BYTES, MAX_COMPLETION_CHARS, MAX_COMPLETIONS,
+};
 pub use composer::{
     ChatSend, Composer, DEFAULT_MESSAGE_CHARS, MAX_MENTION_QUERY, MAX_MENTIONS,
     MAX_MESSAGE_MENTIONS, SendKey,
 };
 pub use content::{AutoGrid, Avatar, AvatarSize, Heading, MetaLine, Paragraph, PrevNext, Spoiler};
-pub use controls::Control;
+pub use controls::{Control, LengthUnit, MAX_PALETTE, is_hex_color};
 pub(crate) use controls::{
-    Slot, choices_text, read_choices, render_bool, render_choice, render_choices, render_number,
-    render_text,
+    Slot, choices_text, read_choices, render_bool, render_choice, render_choices, render_code,
+    render_number, render_text,
 };
 pub use countdown::Countdown;
 pub use date::DateOptions;
 pub(crate) use date::{input_text, picker_config, range_reversed, render_date_input, render_range};
 pub use diff::{DiffLayout, DiffView, MAX_DIFF_FIELDS};
+pub use document::{
+    DocPage, DocSearch, DocumentViewer, MAX_DOCUMENT_PAGES, MAX_DOCUMENT_QUERY, MAX_PAGE_BYTES,
+    MAX_PAGE_HITS, OutlineItem, PageHit, PageSize,
+};
 pub use facets::{Facet, FacetPanel, MAX_FACET_OPTIONS, MAX_FACETS};
 pub use feed::{Feed, MAX_FEED_BATCH, MAX_POST_MEDIA, Post};
 pub use gallery::{MAX_GALLERY_IMAGES, ProductGallery};
@@ -125,6 +138,12 @@ pub use rating::{DEFAULT_RATING, MAX_RATING};
 pub use reactions::{MAX_REACTIONS, ReactionPress, ReactionState, Reactions};
 pub use relative::RelativeTime;
 pub use reviews::ReviewSummary;
+pub use sanitize::{MAX_USE_ELEMENTS, sanitize_markup};
+pub use schema::{
+    FieldSpec, FormSchema, MAX_FIELD_NAME, MAX_SCHEMA_FIELDS, MAX_SCHEMA_OPTIONS, MAX_SCHEMA_TEXT,
+    SchemaForm, SpecKind,
+};
+pub(crate) use schema::{limits_attr, open_section, render_spec, render_templates};
 pub use share::Share;
 pub use story::{MAX_STORY_RINGS, StoryRing, StoryRow, StoryState};
 pub use thread::{

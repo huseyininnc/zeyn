@@ -81,6 +81,22 @@ Sayılar ve para tutarları sağa hizalanır ve sabit genişlikli rakamlarla yaz
 - `.row_style(|row| Option<RowStyle>)`: danger, warning veya success satırlar.
 - `.exportable()`: filtrelenmiş satırların CSV dışa aktarımı, sunucu tarafından akıtılır.
 
+## Çalışma anında belli olan sütunlar
+
+`DataGrid::dynamic(action)`, sütunları satırlarla birlikte gelen sonuçlar içindir, örneğin bir SQL önizlemesi. Action, sütunları (ad, etiket ve `Integer`, `Decimal` ya da `Date` gibi bir `DynamicKind`) ve JSON olarak bir sayfa satırı içeren bir `DynamicPage` döndürür:
+
+```rust
+#[action(permission = "reports.preview")]
+pub async fn preview(q: DataQuery, db: Reports) -> Result<DynamicPage> {
+    let span = q.span();
+    db.run_preview(span.offset, span.limit).await
+}
+
+DataGrid::dynamic(preview).paging(Paging::virtual_scroll())
+```
+
+Sayfalama, sanal kaydırma, klavye kullanımı ve sayıların ve tarihlerin kullanıcının dilinde biçimlenmesi tipli bir grid'deki gibi çalışır. Adlar, etiketler ve hücreler kaçışlanır; sunucu sütun ve satır sayısını ve metin uzunluğunu sınırlar. Grid sıralamaz ve filtrelemez, satırları salt okunurdur. [DataGrid başvurusu](grid.md) ayrıntıları verir.
+
 ## Yerinde yenileme
 
 En son çağrılan `.listens(topic)`, topic adlandırıldığında grid'in yerinde yeniden yüklenmesini sağlar ([Topic'ler](effects.md#topics) bölümüne bakın): `ui.refresh(topic)` sonrasında geçerli sayfasını sıralaması ve filtreleriyle yeniden yükler, `.drives(topic)` diyen bir filtre kontrolü değiştikten sonra yeni screen params ile ilk sayfadan başlar. Grid her izin denetimiyle `POST /_zeyn/grid` üzerinden yeniden yüklenir ve filtrenin değiştirdiği bir screen param'ı grid'e screen fonksiyonu üzerinden ulaşır, örneğin bir scope olarak:

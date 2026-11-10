@@ -93,6 +93,8 @@ pub struct Form<M: Model> {
     depends: Vec<(&'static str, &'static str)>,
     /// Topics a filter form refreshes when a field changes.
     drives: Vec<&'static str>,
+    /// Completion (`complete`) and check (`check`) actions of code fields: (field, kind, source).
+    codes: Vec<(&'static str, &'static str, Box<dyn DataSource>)>,
 }
 
 impl<M: Model> Form<M> {
@@ -120,6 +122,7 @@ impl<M: Model> Form<M> {
             tips: Vec::new(),
             depends: Vec::new(),
             drives: Vec::new(),
+            codes: Vec::new(),
         }
     }
 
@@ -257,6 +260,54 @@ impl<M: Model> Form<M> {
         self
     }
 
+    /// Suggestions for a code field ([`Control::Code`]): after a pause in typing, and at once
+    /// with Ctrl+Space, the browser sends the text and the cursor to `action`, which returns
+    /// [`crate::ui::Completion`]s. The server checks the action's permission on every request.
+    ///
+    /// ```ignore
+    /// Form::of(calc)
+    ///     .control(Calc::formula, Control::Code(CodeLang::Expression))
+    ///     .complete(Calc::formula, complete_fields)
+    /// ```
+    pub fn complete<T, A>(mut self, field: Field<M, T>, _action: A) -> Self
+    where
+        T: FieldType + 'static,
+        A: Action<Input = crate::ui::CodeQuery, Output = Result<Vec<crate::ui::Completion>>>,
+    {
+        let name = field.meta().name;
+        self.codes
+            .retain(|(n, k, _)| !(*n == name && *k == "complete"));
+        self.codes
+            .push((name, "complete", crate::ui::CompleteSource::<A>::boxed()));
+        self
+    }
+
+    /// Error markers for a code field ([`Control::Code`]): after a pause in typing the browser
+    /// sends the text to `action`, which returns [`crate::ui::CodeError`]s that the editor
+    /// underlines and lists. The save action must still validate the text.
+    pub fn check<T, A>(mut self, field: Field<M, T>, _action: A) -> Self
+    where
+        T: FieldType + 'static,
+        A: Action<Input = crate::ui::CodeQuery, Output = Result<Vec<crate::ui::CodeError>>>,
+    {
+        let name = field.meta().name;
+        self.codes
+            .retain(|(n, k, _)| !(*n == name && *k == "check"));
+        self.codes
+            .push((name, "check", crate::ui::CheckSource::<A>::boxed()));
+        self
+    }
+
+    /// The completion or check source of a code field, by the key the browser sends:
+    /// `field:complete` or `field:check`.
+    fn code_source(&self, key: &str) -> Option<&dyn DataSource> {
+        let (field, kind) = key.split_once(':')?;
+        self.codes
+            .iter()
+            .find(|(n, k, _)| *n == field && *k == kind)
+            .map(|(_, _, s)| s.as_ref())
+    }
+
     /// A tooltip for a field: an info button after its label shows `text` on hover, focus, tap
     /// and long press, and the field's input is described by it for screen readers. Use it for
     /// help such as a format or where a value comes from; the label and the rules must still say
@@ -358,10 +409,17 @@ impl<M: Model> Form<M> {
         self
     }
 
-    /// The `page_check` of the form: its topics and its dependent lookups.
+    /// The `page_check` of the form: its topics, its dependent lookups and its code fields.
     fn check_form(&self, check: &mut crate::ui::PageCheck) {
         for t in &self.drives {
             check.drives(t);
+        }
+        for (field, kind, _) in &self.codes {
+            if !matches!(self.control_of(field), Some(Control::Code(_))) {
+                check.problem(format!(
+                    "`{kind}` is set for `{field}`, which has no code control; add `.control({field}, Control::Code(CodeLang::Expression))` or another language"
+                ));
+            }
         }
         for (field, source) in &self.depends {
             if self.lookup_of(field).is_none() {
@@ -564,10 +622,7 @@ impl<M: Model> Form<M> {
             }
             match item {
                 FormItem::Section(title) => {
-                    let title = r.text(title);
-                    out.push_str(&format!(
-                        r#"<details class="z-form-section" open><summary class="z-form-section-title">{title}</summary><div class="z-form-section-body" role="group" aria-label="{title}">"#
-                    ));
+                    crate::ui::open_section(out, &r.text(title));
                     section = true;
                 }
                 FormItem::Step(title) => {
@@ -766,6 +821,21 @@ impl<M: Model> Form<M> {
             }
         }
         for (name, control) in &self.controls {
+            if let Control::Color { .. } = control
+                && let Value::Text(text) = value_of(name)
+                && !text.is_empty()
+                && !crate::ui::is_hex_color(&text)
+                && !unreadable.contains(name)
+                && let Some(meta) = M::fields()
+                    .iter()
+                    .find(|m| m.name == *name)
+            {
+                errors.errors.push(FieldError {
+                    field: meta.name,
+                    rule: Rule::Format,
+                    message: Text::key("zeyn.validation.color").arg("label", meta.label_text()),
+                });
+            }
             let Some(meta) = M::fields()
                 .iter()
                 .find(|m| m.name == *name && m.kind == FieldKind::Decimal)
@@ -1012,7 +1082,7 @@ pub(crate) fn parse_value(
             Some(pattern) => Ok(Json::String(crate::ui::mask_raw(pattern, &text))),
             None => Ok(Json::String(text)),
         },
-        FieldKind::Custom { .. } => Ok(Json::String(text)),
+        FieldKind::Custom { .. } | FieldKind::Rank => Ok(Json::String(text)),
         FieldKind::Decimal => {
             let (_, scale) = meta.decimal_limits();
             let d = crate::Decimal::parse_input(trimmed, locale).ok_or(Unreadable::Format)?;
@@ -1078,10 +1148,8 @@ pub(crate) fn edit_value(value: &Value, locale: &str, tz: TimeZone) -> String {
 /// Writes the input that fits the field kind, with the validation attributes the client mirrors.
 fn render_field<M: Model>(out: &mut String, r: &Render, f: &FormField<M>, form: &Form<M>) {
     let m = f.meta;
-    let scope = r.scope;
     let value = (f.value)(&form.model);
     let options = form.options_of(m.name);
-    let id = format!("{scope}-{}", m.name);
     if m.key {
         let v = match &value {
             Value::Int(n) => n.to_string(),
@@ -1098,122 +1166,75 @@ fn render_field<M: Model>(out: &mut String, r: &Render, f: &FormField<M>, form: 
         return;
     }
 
-    let required = m.is_required();
-    let mut common = format!(
-        r#"id="{id}" name="{}" data-testid="{scope}.field.{}" aria-describedby="{id}-error""#,
-        m.name, m.name
-    );
-    if required {
-        common.push_str(r#" required aria-required="true""#);
-    }
-    if m.readonly {
-        common.push_str(" readonly");
-    }
-
-    let tip = form.tips.iter().find(|(n, _)| *n == m.name).map(|(_, t)| {
-        let (attrs, html) = crate::ui::tip(r, &format!("{id}-tip"), t);
-        let about = r.text(&Text::key("zeyn.ui.tip.about").arg("label", m.label_text()));
-        (format!(r#"<button type="button" class="z-tip-button" aria-label="{about}"{attrs}><span aria-hidden="true">i</span></button>"#), html)
-    });
-    if tip.is_some() {
-        common = common.replacen(
-            r#"aria-describedby=""#,
-            &format!(r#"aria-describedby="{id}-tip "#),
-            1,
-        );
-    }
-    out.push_str(r#"<div class="z-field">"#);
-    let star = if required {
-        r#"<span class="z-required" aria-hidden="true">*</span>"#
-    } else {
-        ""
-    };
-    let label = match &tip {
-        Some((button, html)) => format!(
-            r#"<span class="z-label-row"><label for="{id}" id="{id}-label">{}{star}</label>{button}</span>{html}"#,
-            r.label(m)
-        ),
-        None => format!(
-            r#"<label for="{id}" id="{id}-label">{}{star}</label>"#,
-            r.label(m)
-        ),
-    };
-    let text = |v: &Value| match v {
-        Value::Text(s) => escape(s),
-        _ => String::new(),
-    };
-    let slot = Slot {
-        m,
-        value: &value,
-        common: &common,
-        id: &id,
-        label: &label,
-        control: form.control_of(m.name),
-    };
-    if let Some(editor) = form.lines_of(m.name) {
-        let current = serde_json::to_value(&form.model)
-            .ok()
-            .and_then(|v| v.get(m.name).cloned())
-            .unwrap_or(Json::Null);
-        editor.render(out, r, m, &current);
-        out.push_str(&format!(
-            r#"<p class="z-field-error" id="{id}-error" aria-live="polite"></p></div>"#
-        ));
-        return;
-    }
-    if let Some((rules, many)) = form.files_of(m.name) {
-        let current = serde_json::to_value(&form.model)
-            .ok()
-            .and_then(|v| v.get(m.name).cloned())
-            .unwrap_or(Json::Null);
-        crate::files::render_upload(out, r, m, &id, &rules, many, &current);
-        out.push_str(&format!(
-            r#"<p class="z-field-error" id="{id}-error" aria-live="polite"></p></div>"#
-        ));
-        return;
-    }
-    if let Some((_, many)) = form.lookup_of(m.name) {
-        let columns = form
-            .lookup_columns
-            .iter()
-            .find(|(n, _)| *n == m.name)
-            .map(|(_, c)| c.as_slice());
-        let depends = form
-            .depends
-            .iter()
-            .find(|(n, _)| *n == m.name)
-            .map(|(_, s)| *s);
-        crate::ui::render_lookup(out, r, &slot, many, columns.unwrap_or_default(), depends);
-        out.push_str(&format!(
-            r#"<p class="z-field-error" id="{id}-error" aria-live="polite"></p></div>"#
-        ));
-        return;
-    }
-
-    match m.kind {
-        FieldKind::Bool => crate::ui::render_bool(out, &slot),
-        FieldKind::Choice(_) => crate::ui::render_choice(out, r, &slot),
-        FieldKind::Choices(_) => crate::ui::render_choices(out, r, &slot),
-        FieldKind::Money | FieldKind::Integer | FieldKind::Id | FieldKind::Decimal => {
-            crate::ui::render_number(out, r, &slot)
+    let spec = crate::ui::FieldSpec::of(m, form.control_of(m.name));
+    let tip = form
+        .tips
+        .iter()
+        .find(|(n, _)| *n == m.name)
+        .map(|(_, t)| t);
+    let special = |out: &mut String, slot: &Slot| {
+        let current = || {
+            serde_json::to_value(&form.model)
+                .ok()
+                .and_then(|v| v.get(m.name).cloned())
+                .unwrap_or(Json::Null)
+        };
+        if let Some(editor) = form.lines_of(m.name) {
+            editor.render(out, r, m, &current());
+            return true;
         }
-        FieldKind::Text => crate::ui::render_text(out, r, &slot),
-        FieldKind::Date | FieldKind::Time | FieldKind::DateTime | FieldKind::LocalDateTime => {
-            out.push_str(&label);
-            crate::ui::render_date_input(out, r, m, &value, &common, &id, options);
+        if let (Some(Control::Code(lang)), FieldKind::Text) = (slot.f.control, m.kind) {
+            let allowed = |kind: &str| {
+                let key = format!("{}:{kind}", m.name);
+                form.code_source(&key)
+                    .filter(|s| r.can(&s.action().access))
+                    .map(|_| key)
+            };
+            let (complete, check) = (allowed("complete"), allowed("check"));
+            crate::ui::render_code(out, r, slot, lang, complete.as_deref(), check.as_deref());
+            return true;
         }
-        FieldKind::Custom { editor } => {
-            out.push_str(&label);
-            out.push_str(&format!(
-                r#"<input type="text" {common} data-zeyn-editor="{}" value="{}">"#,
-                escape(editor),
-                text(&value)
-            ));
+        if let Some((rules, many)) = form.files_of(m.name) {
+            crate::files::render_upload(out, r, m, slot.id, &rules, many, &current());
+            return true;
         }
-    }
-    out.push_str(&format!(
-        r#"<p class="z-field-error" id="{id}-error" aria-live="polite"></p></div>"#
-    ));
+        if let Some((_, many)) = form.lookup_of(m.name) {
+            let columns = form
+                .lookup_columns
+                .iter()
+                .find(|(n, _)| *n == m.name)
+                .map(|(_, c)| c.as_slice());
+            let depends = form
+                .depends
+                .iter()
+                .find(|(n, _)| *n == m.name)
+                .map(|(_, s)| *s);
+            crate::ui::render_lookup(out, r, slot, many, columns.unwrap_or_default(), depends);
+            return true;
+        }
+        match m.kind {
+            FieldKind::Date | FieldKind::Time | FieldKind::DateTime | FieldKind::LocalDateTime => {
+                out.push_str(slot.label);
+                crate::ui::render_date_input(out, r, m, &value, slot.common, slot.id, options);
+                true
+            }
+            FieldKind::Custom { editor } => {
+                let text = match &value {
+                    Value::Text(s) => escape(s),
+                    _ => String::new(),
+                };
+                out.push_str(slot.label);
+                out.push_str(&format!(
+                    r#"<input type="text" {} data-zeyn-editor="{}" value="{text}">"#,
+                    slot.common,
+                    escape(editor)
+                ));
+                true
+            }
+            _ => false,
+        }
+    };
+    crate::ui::render_spec(out, r, &spec, &value, None, tip, &special);
 }
 
 /// A dependent lookup to check again on submit: the field, the chosen ids and the lookup's answer
@@ -1442,6 +1463,7 @@ where
                     "Files uploaded before, as a JSON list of {\"id\",\"name\",\"size\",\"type\"}.".to_string(),
                 ),
                 FieldKind::Text | FieldKind::Custom { .. } => ("string", String::new()),
+                FieldKind::Rank => ("string", "Sort key of 0-9, A-Z and a-z.".to_string()),
                 FieldKind::Date => ("string", "Date as YYYY-MM-DD.".to_string()),
                 FieldKind::Time => ("string", "Time as HH:MM.".to_string()),
                 FieldKind::LocalDateTime => ("string", "Date and time as YYYY-MM-DDTHH:MM, no time zone.".to_string()),
@@ -1509,7 +1531,8 @@ where
 
 impl<M: Model> Component for Form<M> {
     fn source(&self, key: &str) -> Option<&dyn DataSource> {
-        self.lookup_of(key).map(|(s, _)| s)
+        self.code_source(key)
+            .or_else(|| self.lookup_of(key).map(|(s, _)| s))
     }
 
     fn render(&self, out: &mut String, r: &Render) {
@@ -1591,7 +1614,9 @@ where
         if key == "_step" && !self.form.steps().is_empty() {
             return Some(self);
         }
-        self.form.lookup_of(key).map(|(s, _)| s)
+        self.form
+            .code_source(key)
+            .or_else(|| self.form.lookup_of(key).map(|(s, _)| s))
     }
 
     fn page_check(&self, check: &mut crate::ui::PageCheck) {

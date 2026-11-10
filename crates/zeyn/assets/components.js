@@ -394,6 +394,7 @@ function initSelects(root) {
     combo.append(make('span', 'z-select-value', { id: `${native.id}-value` }), make('span', 'z-select-arrow', { 'aria-hidden': 'true' }));
     wrap.prepend(combo);
     hideNative(native);
+    wrap.zeynSync = () => syncSelect(wrap);
     syncSelect(wrap);
   });
 }

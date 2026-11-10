@@ -69,6 +69,30 @@ pub fn photos() -> Screen {
     )
 }
 
+#[action(permission = "trips.read")]
+pub async fn trip_tree(_q: TreeQuery) -> Result<Vec<TreeItem>> {
+    Ok(vec![TreeItem::leaf("name", "Name")])
+}
+
+#[screen(route = "/plain-tree", permission = "trips.read")]
+pub fn plain_tree() -> Screen {
+    Screen::new("Tree").body(Tree::of(trip_tree).label("Fields"))
+}
+
+#[screen(route = "/drag-tree", permission = "trips.read")]
+pub fn drag_tree() -> Screen {
+    Screen::new("Tree").body(
+        Tree::of(trip_tree)
+            .label("Fields")
+            .draggable(),
+    )
+}
+
+#[screen(route = "/inspector", permission = "trips.read")]
+pub fn inspector() -> Screen {
+    Screen::new("Inspector").body(PropertyInspector::island("designer"))
+}
+
 fn app() -> axum::Router {
     App::new("Test")
         .i18n(I18n::new("en"))
@@ -80,7 +104,10 @@ fn app() -> axum::Router {
                 .screen(trips)
                 .screen(trip)
                 .screen(photo)
-                .screen(photos),
+                .screen(photos)
+                .screen(plain_tree)
+                .screen(drag_tree)
+                .screen(inspector),
         )
         .router()
         .unwrap()
@@ -193,6 +220,19 @@ async fn a_page_links_the_modules_of_its_components_with_what_they_import() {
 }
 
 #[tokio::test]
+async fn the_tree_drag_script_comes_only_with_a_draggable_tree() {
+    let (_, still) = get("/plain-tree").await;
+    let linked = links(&still);
+    assert!(linked.contains(&"tree.js".to_string()));
+    assert!(!linked.contains(&"treedrag.js".to_string()));
+    let (_, drag) = get("/drag-tree").await;
+    let linked = links(&drag);
+    for name in ["components.js", "tree.js", "treedrag.js"] {
+        assert!(linked.contains(&name.to_string()), "{name}");
+    }
+}
+
+#[tokio::test]
 async fn every_module_in_the_table_is_served_and_imports_the_shared_part_by_its_own_build() {
     for (name, script, style) in table().await {
         if !script.is_empty() {
@@ -278,4 +318,22 @@ async fn the_media_script_comes_only_with_images_that_need_it() {
         .find(|(name, _, _)| name == "media")
         .unwrap();
     assert!(media.1.contains("[data-zeyn-img]") && media.2.contains(".z-img-host"));
+}
+
+#[tokio::test]
+async fn an_island_inspector_links_the_controls_of_its_field_templates() {
+    let (status, page) = get("/inspector").await;
+    assert_eq!(status, StatusCode::OK);
+    let linked = links(&page);
+    for name in ["inspector.js", "colors.js", "length.js", "inputs.js"] {
+        assert!(linked.contains(&name.to_string()), "{name}");
+    }
+    let (_, form) = get("/trip").await;
+    let linked = links(&form);
+    for name in ["inspector.js", "colors.js", "length.js"] {
+        assert!(
+            !linked.contains(&name.to_string()),
+            "{name} on a plain form"
+        );
+    }
 }

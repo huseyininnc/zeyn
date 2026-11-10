@@ -21,7 +21,8 @@ pub const MAX_CODE_BYTES: usize = 1024 * 1024;
 pub const MAX_CODE_LINES: usize = 10_000;
 
 /// A language the highlighter knows. Anything else is shown as [`CodeLang::Plain`] text.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum CodeLang {
     /// Escaped text without colors.
     #[default]
@@ -32,6 +33,11 @@ pub enum CodeLang {
     Sql,
     JavaScript,
     Shell,
+    /// Report and calculated field expressions: field references in brackets
+    /// (`[Orders.Total]`), numbers with an optional `m` (decimal) suffix, strings in double or
+    /// single quotes, operators, function names before `(` and the words `and`, `or`, `not`,
+    /// `true`, `false`, `null`, `in`, `is`, `like` and `between`, matched ignoring case.
+    Expression,
 }
 
 impl CodeLang {
@@ -51,11 +57,13 @@ impl CodeLang {
             "sql" | "psql" | "plsql" => CodeLang::Sql,
             "js" | "javascript" | "mjs" => CodeLang::JavaScript,
             "sh" | "shell" | "bash" | "console" => CodeLang::Shell,
+            "expression" | "expr" => CodeLang::Expression,
             _ => CodeLang::Plain,
         }
     }
 
-    fn name(self) -> &'static str {
+    /// The name the browser and the schema use: `plain`, `rust`, `sql`, `expression`, ...
+    pub(crate) fn name(self) -> &'static str {
         match self {
             CodeLang::Plain => "plain",
             CodeLang::Rust => "rust",
@@ -64,6 +72,7 @@ impl CodeLang {
             CodeLang::Sql => "sql",
             CodeLang::JavaScript => "javascript",
             CodeLang::Shell => "shell",
+            CodeLang::Expression => "expression",
         }
     }
 
@@ -75,6 +84,7 @@ impl CodeLang {
             CodeLang::Toml => &["true", "false"],
             CodeLang::Shell => SHELL,
             CodeLang::Sql => SQL,
+            CodeLang::Expression => EXPRESSION,
             CodeLang::Plain => &[],
         }
     }
@@ -84,7 +94,7 @@ impl CodeLang {
             CodeLang::Rust | CodeLang::JavaScript => Some("//"),
             CodeLang::Toml | CodeLang::Shell => Some("#"),
             CodeLang::Sql => Some("--"),
-            CodeLang::Json | CodeLang::Plain => None,
+            CodeLang::Json | CodeLang::Plain | CodeLang::Expression => None,
         }
     }
 }
@@ -143,7 +153,15 @@ const SHELL: &[&str] = &[
     "if", "then", "else", "fi", "for", "do", "done", "export", "cd", "echo",
 ];
 
-/// SQL keywords, matched ignoring case.
+/// Words of [`CodeLang::Expression`], matched ignoring case. `codeedit.js` holds the same list.
+const EXPRESSION: &[&str] = &[
+    "and", "between", "false", "in", "is", "like", "not", "null", "or", "true",
+];
+
+/// Operator characters of [`CodeLang::Expression`]. `codeedit.js` holds the same set.
+const OPERATORS: &str = "+-*/%<>=!&|^";
+
+/// SQL keywords, matched ignoring case. `codeedit.js` holds the same list for the editor.
 const SQL: &[&str] = &[
     "add",
     "all",
@@ -386,7 +404,11 @@ impl Tokens {
                 || (c == '\''
                     && matches!(
                         self.lang,
-                        CodeLang::JavaScript | CodeLang::Shell | CodeLang::Toml | CodeLang::Sql
+                        CodeLang::JavaScript
+                            | CodeLang::Shell
+                            | CodeLang::Toml
+                            | CodeLang::Sql
+                            | CodeLang::Expression
                     ))
                 || (c == '`' && self.lang == CodeLang::JavaScript)
             {
@@ -412,6 +434,22 @@ impl Tokens {
                     i = end + 1;
                     continue;
                 }
+            }
+            if self.lang == CodeLang::Expression && c == '[' {
+                let end = (i + 1..n)
+                    .find(|&k| matches!(self.chars[k], ']' | '\n'))
+                    .map_or(n, |k| k + usize::from(self.chars[k] == ']'));
+                self.span("key", i, end);
+                i = end;
+                continue;
+            }
+            if self.lang == CodeLang::Expression && OPERATORS.contains(c) {
+                let end = (i..n)
+                    .find(|&k| !OPERATORS.contains(self.chars[k]))
+                    .unwrap_or(n);
+                self.span("op", i, end);
+                i = end;
+                continue;
             }
             if c.is_ascii_digit() && (i == 0 || !ident_char(self.chars[i - 1])) {
                 let end = (i..n)
@@ -460,7 +498,7 @@ impl Tokens {
                     .find(|c| !c.is_whitespace() || **c == '\n')
                     .copied();
                 let keyword = match self.lang {
-                    CodeLang::Sql => self
+                    CodeLang::Sql | CodeLang::Expression => self
                         .lang
                         .keywords()
                         .contains(&word.to_ascii_lowercase().as_str()),
@@ -479,8 +517,9 @@ impl Tokens {
                     Some("key")
                 } else if self.lang == CodeLang::Shell && self.line_start(i) {
                     Some("kw")
-                } else if matches!(self.lang, CodeLang::Rust | CodeLang::JavaScript)
-                    && c.is_uppercase()
+                } else if (matches!(self.lang, CodeLang::Rust | CodeLang::JavaScript)
+                    && c.is_uppercase())
+                    || (self.lang == CodeLang::Expression && self.chars.get(end) == Some(&'('))
                 {
                     Some("ty")
                 } else {

@@ -14,7 +14,7 @@ Quién llama, y qué tan segura está la aplicación de ello. Zeyn tiene cuatro 
 La compilación predeterminada no incluye ni `oidc` ni `totp`, de modo que las aplicaciones que no los usan no pagan nada.
 
 ```toml
-zeyn = { version = "0.0.8", features = ["oidc"] }
+zeyn = { version = "0.0.10", features = ["oidc"] }
 ```
 
 Los proveedores probados son Keycloak y Authentik. Cualquier proveedor que siga el descubrimiento de OpenID Connect,

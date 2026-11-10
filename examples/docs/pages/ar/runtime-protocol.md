@@ -48,11 +48,13 @@
 | `tabs.js`, `dates.js`, `choices.js`, `inputs.js`, `lines.js`, `steps.js`, `tree.js`, `overlays.js`, `menubutton.js`, `busy.js` | اللوحات والألسنة والأجزاء المقسومة؛ منتقيات التاريخ والوقت (ومنها مرشحات التاريخ في الجداول)؛ قوائم الاختيار والبحث والاختيار المتعدد؛ الأرقام ومناطق النص المتمددة والأقنعة وكلمات المرور؛ محرر الأسطر؛ النماذج المتدرجة؛ الأشجار؛ التلميحات والنوافذ المنبثقة؛ أزرار القوائم والأزرار المقسومة؛ طبقات الانشغال |
 | `grid.js` | الجداول، وتُربط بـ`<link rel="modulepreload">` لأن `zeyn.js` يستوردها بنفسه |
 | `palette.js`, `pro.js` | لوحة الأوامر وأزرار الأوامر؛ أشرطة القوائم وصناديق الأدوات وأشرطة الحالة والألواح القابلة للإرساء ومفتشو الخصائص |
+| `colors.js`, `length.js`, `inspector.js` | منتقيات الألوان؛ الأطوال مع مبدّل الوحدات؛ مفتشو خصائص الجزر |
 | `forms.js`, `reveal.js`, `import.js` | مسودات النماذج وانتقالات سير العمل؛ إظهار القيم المقنّعة؛ الاستيراد |
 | `catalog.js`, `media.js`, `files.js`, `charts.js` وأوراق أنماطها | شبكات البطاقات والقضبان ومربعات البحث؛ المشغلات والمحتوى المضمّن والصور؛ الرفع؛ المخططات والمخططات المصغّرة وبطاقات KPI ومخططات الرصاصة |
 | `share.js`, `chips.js`, `reactions.js`, `hero.js`, `state.js`, `preview.js`, `assistant.js` | أزرار المشاركة ورقائق التصفية والتفاعلات وشرائح hero ومخزن التفضيلات ومعاينات البطاقات (أول مرور للمؤشر) والمساعد (لوحات الدردشة أو أول ضغطة على زر التشغيل) |
 | `topics.js`, `vlist.js` | العقد التي تستمع إلى المواضيع وعناصر التحكم التي تقودها (`data-zeyn-listens`، `data-zeyn-drives`)؛ القوائم الافتراضية (`data-zeyn-vlist`) |
 | `inbox.js`, `kanban.js`, `calendar.js` and their stylesheets, `diff.css`, `code.css`, `barcode.css` | صندوق الوارد وجرس الإشعارات؛ لوحات Kanban؛ التقويمات؛ الفروق وعروض الشيفرة والرموز الشريطية التي لا تحتاج إلى نص برمجي (زر النسخ في عرض الشيفرة موجود في `share.js`) |
+| `codeedit.js`, `codeedit.css` | محررات الشيفرة (`data-zeyn-code`): النسخة الملوّنة وأرقام الأسطر والاقتراحات وعلامات الأخطاء؛ لا يرسل إلى `/_zeyn/data` إلا بعد توقف في الكتابة |
 | `range.js` و`quantity.js` و`gallery.js` و`countdown.js` و`commerce.css` | منزلقات النطاق ومحددات الكمية ومعارض صور المنتجات والعدادات التنازلية؛ وورقة أنماط كل مكونات المتجر (الأسعار ومنتقيات الخيارات ولوحات الأوجه وملخصات التقييمات) |
 | `thread.js` و`thread.css`, `stream.js`, `composer.js` و`composer.css`, `typing.js` و`typing.css` | سلاسل الرسائل؛ Markdown وأسطر JSON المتدفقة التي تتشاركها السلاسل والمساعد؛ مربعات كتابة الدردشة؛ مؤشرات الكتابة |
 | `feed.js`, `lightbox.js` and their stylesheets, `stories.css` | خلاصات المنشورات؛ عارض الصور والفيديو؛ حلقات القصص وصفوفها، دون سكربت |
@@ -398,6 +400,7 @@
 | `ul[role=menubar][data-zeyn-menubar]` | شريط قوائم بحسب W3C APG. العناصر العليا هي `button[role=menuitem][aria-haspopup=menu]` مع نقطة توقف تبويب متنقلة؛ ويتحكم كل منها بـ `ul[role=menu]` يكون `hidden` وهو مغلق. تحمل العناصر سمات الأوامر في 8.1. يتنقل Left وRight بين القوائم، ويفتح Down وEnter وSpace، ويفتح Up عند العنصر الأخير، ويقفز Home وEnd، ويتحرك حرف إلى العنصر التالي الذي يبدأ به، ويغلق Escape ويعود إلى الشريط، ويغلق Tab والنقر خارجها. والقوائم والعناصر التي لا يحق للمستخدم تشغيلها لا تُرسم. |
 | `div[role=toolbar][aria-orientation=vertical][data-zeyn-toolbox]` | مجموعة تبديل من `button.z-tool[aria-pressed]`. تحرّك الأسهم وHome وEnd نقطة توقف التبويب المتنقلة؛ والنقر أو Enter أو Space يشغّل أداة، ويرسل `zeyn:tool` (`detail.tool`) ويكتب `data-text-selected` في شريط الحالة. |
 | `section.z-inspector` | نموذج مع مجموعات `Form::section` (`details.z-form-section` بأجسام `role=group`) يُحفظ بـ `POST /_zeyn/form` عند مسار عقدة المفتش. وتُفتح الأقسام التي تحوي حقولًا فاشلة قبل فحوص المتصفح وبعد `422`. |
+| `section.z-inspector[data-zeyn-inspector=name]` | مفتش جزيرة فيه `template[data-kind]` واحد لكل نوع حقل. يرسم `zeyn:inspect` (`detail: { title, schema, values }`) القادم من داخل `[data-zeyn-island=name]` المخطط باستدعاءات DOM، ولا يستخدم `innerHTML` أبدًا؛ ويُتجاهل المخطط الذي يتجاوز `data-limits`، ويحتفظ المخطط الذي سبق رؤيته بحقوله. تذهب القيمة الصالحة المتغيرة إلى جذر الجزيرة على شكل `zeyn:property` (`detail: { name, value }`)، أما غير الصالحة فتملأ سطر خطأ الحقل وتضع `aria-invalid`. |
 | `div[data-zeyn-statusbar]` | عناصر عند البداية والنهاية و`[data-zeyn-status-live]` (`role=status` و`aria-live=polite`). ويستبدل `zeyn:status` (`detail.text`) الصادر من أي عنصر في الشاشة النص الحي. |
 
 ### 8.3 اللوحات المُرسّاة (Docking)

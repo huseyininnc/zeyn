@@ -233,3 +233,29 @@ action 명령은 자체 경로를 가진 노드이며 `ActionButton`처럼 폼 �
 | Tab | 메뉴 | 닫고 다음으로 이동합니다 |
 
 메뉴에는 gzip 기준 약 0.8 KB의 스크립트가 필요하며 명령이 실행되기 전까지 요청이 없습니다. 노드는 4개에 명령당 2개입니다.
+
+## DocumentViewer
+
+`DocumentViewer::of(page_action, page_count)`는 보고서 미리 보기처럼 페이지가 서버에서 그려지는 여러 페이지 문서를 보여 줍니다. 페이지 action은 `DocPage`(`document`는 브라우저가 아니라 `.document(id)`에서 오고, 그리고 `page`)를 받아 한 페이지를 SVG 또는 HTML 조각으로 반환합니다. 모든 페이지는 `.page_size(..)`의 크기(`PageSize::A4`, `PageSize::LETTER`, `PageSize::pt(w, h)` 또는 `PageSize::px(w, h)`)를 가지므로 스크롤 영역은 처음부터 문서 전체 높이와 같습니다.
+
+```rust
+DocumentViewer::of(report_page, report.pages)
+    .document(report.id.to_string())
+    .page_size(PageSize::A4)
+    .outline(vec![OutlineItem::new("Summary", 1).child(OutlineItem::new("Totals", 2))])
+    .search(search_report)
+    .download("PDF", format!("/reports/{}/pdf", report.id))
+```
+
+- 화면에는 보이는 페이지와 양옆의 한 페이지씩만 있습니다. 이들은 스크롤이 멈추면 `POST /_zeyn/data`로(빠르게 지나간 페이지는 가져오지 않음) 가까운 것부터, 한 번에 최대 3개씩 가져오며, 화면 밖으로 스크롤된 페이지의 요청은 중단됩니다. 브라우저에는 그려진 페이지가 최대 12개까지 보관됩니다.
+- 확대/축소는 페이지를 다시 가져오지 않고 크기만 바꿉니다: 너비에 맞춤, 페이지에 맞춤, 50~400퍼센트. 페이지 입력란은 해당 페이지로 이동하고, 스크롤이 멈추면 현재 페이지를 읽어 줍니다("500페이지 중 3페이지").
+- `.outline(items)`는 목차 패널을, `.search(action)`는 검색 상자를 추가하며 그 action은 `DocSearch`를 받아 `PageHit`을 반환합니다(최대 50개 표시). `.download(label, href)`는 다운로드 링크를 추가합니다.
+- 서버는 페이지마다 화면 접근, 페이지 action의 권한, CSRF, 쓰기 제한을 확인하고, 1부터 페이지 수 범위를 벗어난 페이지 번호와 2MB(`MAX_PAGE_BYTES`)를 넘는 페이지를 거부하며, 모든 페이지를 허용 목록(`sanitize_markup`)으로 정리합니다: 스크립트, 이벤트 핸들러, `foreignObject`, 프레임, 외부 링크와 이미지, 스타일의 `url()`이 제거되고 id에는 페이지별 접두사가 붙습니다. `.trusted()`는 앱이 직접 관리하는 데이터로 그리는 페이지에 대해 정리를 건너뜁니다. 이스케이프되지 않은 채 그런 페이지에 들어간 사용자 텍스트는 그것을 여는 모든 사람에게 스크립트로 실행됩니다.
+- `document.js`(13KB, gzip 4.7KB)와 `document.css`(3.6KB)는 뷰어가 있는 페이지에서만 로드됩니다.
+
+| 키 | 위치 | 동작 |
+|---|---|---|
+| Page Down, Page Up | 페이지 영역 | 다음 페이지와 이전 페이지 |
+| Home, End | 페이지 영역 | 첫 페이지와 마지막 페이지 |
+| `+`, `-` | 페이지 영역 | 확대와 축소 |
+| Enter | 페이지 입력란 | 입력한 페이지로 이동 |

@@ -48,11 +48,13 @@ head 中每个框架脚本和样式表都带有 `?v=` 和构建 id（`meta[name=
 | `tabs.js`, `dates.js`, `choices.js`, `inputs.js`, `lines.js`, `steps.js`, `tree.js`, `overlays.js`, `menubutton.js`, `busy.js` | 面板、标签页和分割面板；日期和时间选择器（也用于 grid 的日期筛选）；列表框、查找和多选；数字、自动增高的文本区、掩码和密码；行编辑器；分步表单；树；工具提示和弹出框；菜单按钮和分割按钮；忙碌遮罩 |
 | `grid.js` | grid，以 `<link rel="modulepreload">` 链接，因为 `zeyn.js` 会自己导入它 |
 | `palette.js`, `pro.js` | 命令面板和命令按钮；菜单栏、工具箱、状态栏、停靠面板和属性检查器 |
+| `colors.js`, `length.js`, `inspector.js` | 取色器；带单位切换的长度；岛的属性检查器 |
 | `forms.js`, `reveal.js`, `import.js` | 表单草稿和流程转换；显示被遮蔽的值；导入 |
 | `catalog.js`, `media.js`, `files.js`, `charts.js` 及其样式表 | 卡片网格、横向列表和搜索框；播放器、嵌入内容和图片；上传；图表、迷你图、KPI 卡片和子弹图 |
 | `share.js`, `chips.js`, `reactions.js`, `hero.js`, `state.js`, `preview.js`, `assistant.js` | 分享按钮、筛选标签、反应、hero 幻灯片、偏好存储、卡片预览（首次悬停）、助手（聊天面板，或首次按下启动按钮） |
 | `topics.js`, `vlist.js` | 监听主题的节点以及驱动它们的控件（`data-zeyn-listens`、`data-zeyn-drives`）；虚拟列表（`data-zeyn-vlist`） |
 | `inbox.js`, `kanban.js`, `calendar.js` and their stylesheets, `diff.css`, `code.css`, `barcode.css` | 收件箱和通知铃铛；看板；日历；不需要脚本的差异视图、代码视图和条码（代码视图的复制按钮在 `share.js` 中） |
+| `codeedit.js`, `codeedit.css` | 代码编辑器（`data-zeyn-code`）：高亮副本、行号、补全建议和错误标记；只在输入停顿后才向 `/_zeyn/data` 发送请求 |
 | `range.js`、`quantity.js`、`gallery.js`、`countdown.js` 和 `commerce.css` | 范围滑块、数量步进器、商品图库和倒计时；所有商店组件的样式表（价格、规格选择器、分面面板、评价汇总） |
 | `thread.js` 和 `thread.css`, `stream.js`, `composer.js` 和 `composer.css`, `typing.js` 和 `typing.css` | 消息线程；线程和助手共用的流式 Markdown 和 JSON 行；聊天 composer；正在输入指示器 |
 | `feed.js`, `lightbox.js` and their stylesheets, `stories.css` | 帖子信息流；图片和视频的灯箱；故事环及其行，无需脚本 |
@@ -392,6 +394,7 @@ Effect `{"effect":"refresh","topics":["sales"]}` 刷新这些主题的监听者�
 | `ul[role=menubar][data-zeyn-menubar]` | W3C APG 菜单栏。顶层项是带有 roving tab stop 的 `button[role=menuitem][aria-haspopup=menu]`；每个控制一个关闭时为 `hidden` 的 `ul[role=menu]`。各项带有 8.1 的命令属性。Left 和 Right 在菜单之间移动，Down、Enter 和 Space 打开，Up 在最后一项处打开，Home 和 End 跳转，字母键移到下一个以它开头的项，Escape 关闭并回到菜单栏，Tab 和点击外部会关闭。用户不能运行的菜单和菜单项不会被渲染。 |
 | `div[role=toolbar][aria-orientation=vertical][data-zeyn-toolbox]` | `button.z-tool[aria-pressed]` 的切换组。方向键、Home 和 End 移动 roving tab stop；点击、Enter 或 Space 开启一个工具，发送 `zeyn:tool`（`detail.tool`），并把 `data-text-selected` 写入状态栏。 |
 | `section.z-inspector` | 一个带有 `Form::section` 分组（`details.z-form-section`，其主体为 `role=group`）的表单，通过检查器节点路径上的 `POST /_zeyn/form` 保存。包含失败字段的分组会在浏览器检查之前以及 `422` 之后展开。 |
+| `section.z-inspector[data-zeyn-inspector=name]` | 岛属性检查器，每种字段类型一个 `template[data-kind]`。来自 `[data-zeyn-island=name]` 内部的 `zeyn:inspect`（`detail: { title, schema, values }`）用 DOM 调用绘制 schema，从不使用 `innerHTML`；超过 `data-limits` 的 schema 会被忽略，见过的 schema 会保留其字段。有效且改变了的值以 `zeyn:property`（`detail: { name, value }`）发送到岛的根元素；无效的值会填入字段的错误行并设置 `aria-invalid`。 |
 | `div[data-zeyn-statusbar]` | 位于起始端和末尾端的项，以及 `[data-zeyn-status-live]`（`role=status`、`aria-live=polite`）。Screen 中任意元素发出的 `zeyn:status`（`detail.text`）会替换实时文本。 |
 
 ### 8.3 Docking panels（停靠面板）

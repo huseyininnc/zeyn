@@ -1,7 +1,7 @@
 //! DataGrid examples: rows of an action with paging, sorting and filters.
 
 use crate::data::{
-    Kind, Product, Warehouse, million_products, pretend_delete, pretend_delete_all,
+    Kind, Product, Warehouse, million_products, pretend_delete, pretend_delete_all, query_result,
     search_products, search_warehouses,
 };
 use crate::{Entry, ex};
@@ -80,11 +80,28 @@ pub fn computed_million(_ctx: &Ctx) -> Node {
         .into()
 }
 
+pub fn dynamic_columns(_ctx: &Ctx) -> Node {
+    DataGrid::dynamic(query_result)
+        .paging(Paging::virtual_scroll())
+        .into()
+}
+
 /// What the catalog shows of `DataGrid`.
 pub const ENTRY: Entry = Entry {
     name: "DataGrid",
     docs: "language/datagrid",
-    api: &["DataGrid", "DataGridColumn", "Paging"],
+    api: &[
+        "DataGrid",
+        "DataGridColumn",
+        "DynamicGrid",
+        "DynamicPage",
+        "Paging",
+    ],
     overview: &[ex!(overview)],
-    examples: &[ex!(confirm_actions), ex!(numbers), ex!(computed_million)],
+    examples: &[
+        ex!(confirm_actions),
+        ex!(numbers),
+        ex!(computed_million),
+        ex!(dynamic_columns),
+    ],
 };

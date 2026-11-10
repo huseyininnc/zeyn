@@ -81,6 +81,22 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 - `.row_style(|row| Option<RowStyle>)`: danger, warning या success पंक्तियाँ।
 - `.exportable()`: फ़िल्टर की गई पंक्तियों का CSV निर्यात, सर्वर द्वारा स्ट्रीम किया गया।
 
+## रन टाइम पर पता चलने वाले कॉलम
+
+`DataGrid::dynamic(action)` उन नतीजों के लिए है जिनके कॉलम पंक्तियों के साथ आते हैं, जैसे SQL प्रीव्यू। action एक `DynamicPage` लौटाता है जिसमें कॉलम (नाम, लेबल और `Integer`, `Decimal` या `Date` जैसा एक `DynamicKind`) और JSON में पंक्तियों का एक पेज होता है:
+
+```rust
+#[action(permission = "reports.preview")]
+pub async fn preview(q: DataQuery, db: Reports) -> Result<DynamicPage> {
+    let span = q.span();
+    db.run_preview(span.offset, span.limit).await
+}
+
+DataGrid::dynamic(preview).paging(Paging::virtual_scroll())
+```
+
+पेजिंग, वर्चुअल स्क्रॉलिंग, कीबोर्ड का उपयोग और उपयोगकर्ता की भाषा में संख्याओं और तारीखों का फ़ॉर्मैट टाइप वाले grid की तरह ही काम करते हैं। नाम, लेबल और सेल एस्केप किए जाते हैं, और सर्वर कॉलम, पंक्तियों और टेक्स्ट की लंबाई की सीमा तय करता है। यह grid न सॉर्ट करता है न फ़िल्टर, और इसकी पंक्तियाँ केवल पढ़ने के लिए हैं। [DataGrid संदर्भ](grid.md) देखें।
+
 ## उसी जगह रिफ़्रेश
 
 आख़िर में कॉल किया गया `.listens(topic)` topic का नाम लिए जाने पर ग्रिड को उसी जगह फिर से लोड कराता है ([Topic](effects.md#topics) देखें): `ui.refresh(topic)` के बाद वह अपने क्रम और फ़िल्टर के साथ मौजूदा पेज फिर से लोड करता है, और `.drives(topic)` वाला फ़िल्टर कंट्रोल बदलने के बाद नए Screen params के साथ पहले पेज से शुरू करता है। ग्रिड हर अनुमति जाँच के साथ `POST /_zeyn/grid` से फिर से लोड होता है, और फ़िल्टर से बदला गया Screen param Screen फ़ंक्शन के ज़रिए ग्रिड तक पहुँचता है, उदाहरण के लिए scope के रूप में:

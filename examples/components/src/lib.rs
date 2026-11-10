@@ -186,6 +186,8 @@ catalog! {
         line_editor "/ui/line-editor";
         masked_inputs "/ui/masked-inputs";
         rating "/ui/rating";
+        color_input "/ui/color-input";
+        length_input "/ui/length-input";
         action_button "/ui/action-button";
     }
     "data" Table {
@@ -197,6 +199,7 @@ catalog! {
         search_box "/ui/search-box";
         topics "/ui/topics" (Demo);
         tree "/ui/tree";
+        document_viewer "/ui/document-viewer";
         week_schedule "/ui/week-schedule";
     }
     "shop" Cart {
@@ -231,6 +234,7 @@ catalog! {
     }
     "shell" Sidebar {
         toolbox "/ui/toolbox";
+        property_inspector "/ui/property-inspector";
         status_bar "/ui/status-bar";
         app_header "/ui/app-header";
         theme_picker "/ui/theme-picker";
@@ -238,6 +242,7 @@ catalog! {
     "admin" Settings {
         diff_view "/ui/diff-view";
         code_view "/ui/code-view";
+        code_editor "/ui/code-editor";
         barcode "/ui/barcode";
         inbox "/ui/inbox";
         kanban "/ui/kanban";

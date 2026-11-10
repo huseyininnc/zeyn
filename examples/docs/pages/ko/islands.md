@@ -147,6 +147,10 @@ surface.update(|editor| editor.add_box());   // change the scene, draw on the ne
 
 편집기는 `SaveDiagram`으로 저장하며, 아일랜드는 절대 신뢰하지 않으므로 서버는 받은 것을 제한합니다(`Diagram::clamped`: 최대 200개 도형, 고유한 id, 40자의 레이블, 제한된 좌표).
 
+### 7.1 속성 인스펙터
+
+`PropertyInspector::island(name)`은 선택한 객체를 편집합니다. 아일랜드는 자신의 어느 요소에서든 `detail: { title, schema, values }`와 함께 `zeyn:inspect`를 보내고, 인스펙터는 확정된 변경마다 검사를 마친 `zeyn:property`(`detail: { name, value }`)를 아일랜드 루트에서 돌려줍니다. 아일랜드도 저장하는 값을 검사하고, 서버는 저장을 `FormSchema::check`로 검사합니다.
+
 ## 8. 성능
 
 | 항목 | 수치 |

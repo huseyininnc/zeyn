@@ -48,11 +48,13 @@ head にあるフレームワークのスクリプトとスタイルシートに
 | `tabs.js`, `dates.js`, `choices.js`, `inputs.js`, `lines.js`, `steps.js`, `tree.js`, `overlays.js`, `menubutton.js`, `busy.js` | パネル、タブ、分割ペイン；日付と時刻のピッカー（グリッドの日付フィルターも）；リストボックス、ルックアップ、複数選択；数値、伸びるテキストエリア、マスク、パスワード；明細行エディター；ステップ形式のフォーム；ツリー；ツールチップとポップオーバー；メニューボタンと分割ボタン；処理中オーバーレイ |
 | `grid.js` | グリッド。`zeyn.js` が自分で import するため `<link rel="modulepreload">` としてリンクされます |
 | `palette.js`, `pro.js` | コマンドパレットとコマンドボタン；メニューバー、ツールボックス、ステータスバー、ドッキングパネル、プロパティインスペクター |
+| `colors.js`, `length.js`, `inspector.js` | カラーピッカー、単位切り替え付きの長さ、アイランドのプロパティインスペクター |
 | `forms.js`, `reveal.js`, `import.js` | フォームの下書きとワークフローの遷移；マスクされた値の表示；インポート |
 | `catalog.js`, `media.js`, `files.js`, `charts.js` とそのスタイルシート | カードグリッド、レール、検索ボックス；プレーヤー、埋め込み、画像；アップロード；チャート、スパークライン、KPI カード、ブレットチャート |
 | `share.js`, `chips.js`, `reactions.js`, `hero.js`, `state.js`, `preview.js`, `assistant.js` | 共有ボタン、フィルターチップ、リアクション、ヒーロースライド、設定ストア、カードのプレビュー（最初のホバー）、アシスタント（チャットパネル、またはランチャーの最初の押下） |
 | `topics.js`, `vlist.js` | トピックを listen するノードと、それを drive するコントロール（`data-zeyn-listens`、`data-zeyn-drives`）、仮想リスト（`data-zeyn-vlist`） |
 | `inbox.js`, `kanban.js`, `calendar.js` and their stylesheets, `diff.css`, `code.css`, `barcode.css` | 受信箱と通知ベル、Kanban ボード、カレンダー、スクリプトの要らない差分、コード表示、バーコード（コード表示のコピーボタンは `share.js` にあります） |
+| `codeedit.js`, `codeedit.css` | コードエディター（`data-zeyn-code`）：色分けしたコピー、行番号、補完候補、エラーマーカー。`/_zeyn/data` への送信は入力が止まった後だけです |
 | `range.js`、`quantity.js`、`gallery.js`、`countdown.js`、`commerce.css` | 範囲スライダー、数量ステッパー、商品ギャラリー、カウントダウン。すべてのショップ用コンポーネントのスタイルシート（価格、バリエーション選択、ファセットパネル、レビューの集計） |
 | `thread.js` と `thread.css`, `stream.js`, `composer.js` と `composer.css`, `typing.js` と `typing.css` | メッセージスレッド、スレッドとアシスタントが共有するストリーミングの Markdown と JSON 行、チャットの composer、入力中インジケーター |
 | `feed.js`, `lightbox.js` and their stylesheets, `stories.css` | 投稿のフィード、画像と動画のライトボックス、ストーリーリングとその行、スクリプト不要 |
@@ -392,6 +394,7 @@ Effect `{"effect":"refresh","topics":["sales"]}` はトピックのリスナー�
 | `ul[role=menubar][data-zeyn-menubar]` | W3C APG の menubar。トップ項目は、ローヴィングタブストップを持つ `button[role=menuitem][aria-haspopup=menu]` で、それぞれが閉じている間は `hidden` の `ul[role=menu]` を制御します。項目には 8.1 のコマンド属性が付きます。Left と Right でメニュー間を移動し、Down、Enter、Space で開き、Up で最後の項目を開き、Home と End でジャンプし、文字キーでその文字で始まる次の項目へ移動し、Escape で閉じてバーに戻り、Tab と外側のクリックで閉じます。ユーザーが実行できないメニューや項目は描画されません。 |
 | `div[role=toolbar][aria-orientation=vertical][data-zeyn-toolbox]` | `button.z-tool[aria-pressed]` のトグルグループ。矢印、Home、End でローヴィングタブストップが移動します。クリック、Enter、Space でツールを 1 つオンにし、`zeyn:tool`（`detail.tool`）を送り、ステータスバーに `data-text-selected` を書き込みます。 |
 | `section.z-inspector` | `Form::section` のグループ（`role=group` の本体を持つ `details.z-form-section`）を持つ form で、inspector のノードパスの `POST /_zeyn/form` で保存されます。失敗したフィールドを含むセクションは、ブラウザのチェックの前、および `422` の後に開きます。 |
+| `section.z-inspector[data-zeyn-inspector=name]` | フィールドの種類ごとに `template[data-kind]` を 1 つ持つアイランドインスペクター。`[data-zeyn-island=name]` の内側から来た `zeyn:inspect`（`detail: { title, schema, values }`）は、`innerHTML` を使わず DOM 呼び出しでスキーマを描きます。`data-limits` を超えるスキーマは無視され、以前に見たスキーマはフィールドを再利用します。有効で変更された値は `zeyn:property`（`detail: { name, value }`）としてアイランドのルートへ送られ、無効な値はフィールドのエラー行を埋めて `aria-invalid` を付けます。 |
 | `div[data-zeyn-statusbar]` | 先頭と末尾の項目、および `[data-zeyn-status-live]`（`role=status`、`aria-live=polite`）。Screen 内のどの要素からでも `zeyn:status`（`detail.text`）を送ると、ライブテキストが置き換わります。 |
 
 ### 8.3 Docking panels

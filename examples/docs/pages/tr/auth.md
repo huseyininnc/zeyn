@@ -15,7 +15,7 @@ ister. Varsayılan derlemede `oidc` ve `totp` yoktur, bu yüzden bunları kullan
 bunun bedelini ödemez.
 
 ```toml
-zeyn = { version = "0.0.8", features = ["oidc"] }
+zeyn = { version = "0.0.10", features = ["oidc"] }
 ```
 
 Test edilen sağlayıcılar Keycloak ve Authentik'tir. OpenID Connect keşfini (discovery), PKCE ile

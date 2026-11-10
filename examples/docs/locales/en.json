@@ -85,6 +85,12 @@
       "about": "Source, license and security",
       "social": "Social"
     },
+    "version": {
+      "title": "Documentation version",
+      "latest": "latest",
+      "notice": "You are reading the docs for {version}. The latest version is {latest}.",
+      "latest_link": "Read this page in the latest version"
+    },
     "translation": {
       "note": "This page is translated from English.",
       "english": "Read the English page",

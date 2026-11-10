@@ -32,6 +32,7 @@ fn field_schema(f: &FieldMeta) -> Json {
             })
         }
         FieldKind::Text | FieldKind::Custom { .. } => json!({ "type": "string" }),
+        FieldKind::Rank => json!({ "type": "string", "pattern": "^[0-9A-Za-z]{0,63}[1-9A-Za-z]$" }),
         FieldKind::Bool => json!({ "type": "boolean" }),
         FieldKind::Date => json!({ "type": "string", "format": "date" }),
         FieldKind::Time => json!({ "type": "string", "pattern": "^\\d{2}:\\d{2}(:\\d{2})?$" }),

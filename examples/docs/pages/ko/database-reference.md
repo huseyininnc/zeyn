@@ -3,7 +3,7 @@
 `zeyn::sql`은 entity를 SQL 데이터베이스에 보관합니다. 그리드가 보내는 `DataQuery`(필터, 정렬, 페이지, 합계, 그룹)로 목록을 만들고 행 버전 검사와 함께 저장합니다. PostgreSQL은 `postgres` Cargo 기능, Oracle은 `oracle` 기능 뒤에 있으므로 데이터베이스가 없는 앱은 이 중 아무것도 컴파일하지 않습니다.
 
 ```toml
-zeyn = { version = "0.0.8", features = ["postgres"] }   # or ["oracle"], or both
+zeyn = { version = "0.0.10", features = ["postgres"] }   # or ["oracle"], or both
 ```
 
 ## 설정
@@ -126,6 +126,21 @@ db.migrate_dir("./migrations").await?;
 금액과 예/아니요 열의 `contains`는 SQL에서 무시됩니다. 텍스트는 데이터베이스 콜레이션(Oracle은 `NLS_SORT`)으로 정렬됩니다.
 
 모든 정렬은 키로 끝나므로 순서가 전체 순서입니다. NULL은 메모리에서처럼 오름차순에서 먼저, 내림차순에서 마지막에 오며, `NULLS` 절은 널 허용 열에만 작성되므로 일반 인덱스가 다른 정렬을 지원합니다.
+
+### 사용자가 정렬한 행: `Rank`
+
+`zeyn::Rank` 타입의 필드는 사람이 직접 순서를 정하는 행을 위한 분수 인덱스를 담습니다. 정렬 가능한 목록, 칸반 열, 트리의 형제 노드가 그 예입니다. `rank::between(a, b)`는 두 이웃 사이의 키를, `rank::n_between(a, b, n)`은 여러 행을 한 번에 놓을 때 쓸 `n`개의 키를 줍니다. `rank::rebalance(n)`은 `Rank::needs_rebalance()`가 참일 때(48자 초과, 한도는 64자) 목록에 번호를 다시 매기기 위한 균등한 간격의 새 키 `n`개를 줍니다. 이동은 한 행만 씁니다. 키가 임의의 문자와 함께 들어가지 않으면 `between`과 `n_between`은 `None`을 반환합니다. 그때는 목록을 재조정하세요.
+
+키는 base62(`0-9 A-Z a-z`, ASCII 순서)이고 바이트 단위로 비교하므로, 데이터베이스나 세션의 콜레이션과 상관없이 열도 바이트로 비교해야 합니다.
+
+| 데이터베이스 | 열 | 정렬과 커서 |
+|---|---|---|
+| PostgreSQL | `VARCHAR(64) COLLATE "C"` | 평범한 `ORDER BY "rank"`; 열의 콜레이션이 적용됨 |
+| Oracle | `VARCHAR2(64)` | 양쪽에 `NLSSORT("RANK", 'NLS_SORT=BINARY')`를 써서 `NLS_SORT`와 `NLS_COMP`에 영향을 받지 않음 |
+
+`create_table`은 이 열 타입을, `find`는 이 정렬을 씁니다. Oracle에서는 `CREATE INDEX cards_rank_ord ON cards (NLSSORT("RANK", 'NLS_SORT=BINARY'), "ID")`도 쓰므로, rank 정렬의 첫 페이지들은 인덱스를 읽고 한 페이지 뒤에 멈춥니다. Oracle은 이후 커서 페이지의 `NLSSORT` 조건을 일반 비교로 줄이기 때문에 긴 목록의 깊은 페이지는 여전히 테이블의 많은 부분을 읽습니다. 목록 열에 대한 필터로 목록을 짧게 유지하고 `(list_id, NLSSORT("RANK", 'NLS_SORT=BINARY'))`로 인덱스를 두세요. 마이그레이션에도 같은 열 타입과 인덱스를 쓰세요. 메모리 데이터도 rank를 바이트 순서로 정렬합니다. rank 열에는 그리드 필터가 없습니다.
+
+모든 키는 임의의 문자 세 개로 끝나므로, 같은 순간에 같은 이웃 사이에 삽입하는 두 요청은 서로 다른 키를 받습니다. 충돌 가능성이 낮아질 뿐 없어지지는 않습니다. 열에 목록별 고유 인덱스(`UNIQUE (list_id, rank)`)를 두고, 거부되면 새 키로 삽입을 한 번 다시 시도하세요. 클라이언트나 행에서 rank를 파싱할 때는 알파벳 밖의 문자, 끝의 `0`, 64자를 넘는 값을 거부합니다.
 
 `get(key)`는 행 하나를 읽고 없으면 `Error::NotFound`로 실패합니다. 모든 테이블이나 뷰를 entity를 통해 읽을 수 있으며, 예를 들어 Oracle의 `user_sequences`가 있습니다.
 

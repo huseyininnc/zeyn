@@ -19,7 +19,7 @@ crate को feature के पीछे जोड़ें, ताकि सा
 desktop = ["dep:zeyn-desktop"]
 
 [dependencies]
-zeyn-desktop = { version = "0.0.8", optional = true }
+zeyn-desktop = { version = "0.0.10", optional = true }
 ```
 
 `App::serve` की जगह विंडो शुरू करें:

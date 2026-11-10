@@ -19,7 +19,7 @@ Zeyn アプリは、1 つのデスクトップ実行ファイルとして配布�
 desktop = ["dep:zeyn-desktop"]
 
 [dependencies]
-zeyn-desktop = { version = "0.0.8", optional = true }
+zeyn-desktop = { version = "0.0.10", optional = true }
 ```
 
 `App::serve` の代わりに window を起動します。

@@ -96,9 +96,13 @@ pub(crate) const MODULES: &[Module] = &[
             "data-zeyn-password",
         ],
     ),
+    control("colors", &["data-zeyn-color"]),
+    control("length", &["data-zeyn-length"]),
+    control("inspector", &["data-zeyn-inspector"]),
     control("lines", &["data-zeyn-lines"]),
     control("steps", &["data-zeyn-steps"]),
     control("tree", &["data-zeyn-tree"]),
+    control("treedrag", &["data-zeyn-tree-drag"]),
     control("overlays", &["data-zeyn-tip", "z-popover-button"]),
     control("menubutton", &["z-menu-trigger", "z-split-button"]),
     script("busy", &["data-zeyn-busy"]),
@@ -167,6 +171,12 @@ pub(crate) const MODULES: &[Module] = &[
     script("vlist", &["data-zeyn-vlist"]),
     style("diff", &["z-diff"]),
     style("code", &["z-codeview"]),
+    Module {
+        name: "codeedit",
+        script: &["data-zeyn-code"],
+        style: &["z-codeedit"],
+        needs: &[],
+    },
     style("barcode", &["z-barcode"]),
     Module {
         name: "inbox",
@@ -240,6 +250,12 @@ pub(crate) const MODULES: &[Module] = &[
         style: &["z-feed", "z-post"],
         needs: &[],
     },
+    Module {
+        name: "document",
+        script: &["data-zeyn-doc"],
+        style: &["z-doc"],
+        needs: &[],
+    },
 ];
 
 const _: () = assert!(MODULES.len() <= 64, "Used keeps one bit per module");
@@ -248,7 +264,7 @@ const _: () = assert!(MODULES.len() <= 64, "Used keeps one bit per module");
 /// are linked only when the page uses them; the others style components without markers of
 /// their own (layouts, display widgets, form sections, the palette) and every page links them,
 /// as `zeyn.css` and `enterprise.css`.
-const STYLES: [&str; 20] = [
+const STYLES: [&str; 22] = [
     "components",
     "catalog",
     "content",
@@ -258,6 +274,7 @@ const STYLES: [&str; 20] = [
     "charts",
     "diff",
     "code",
+    "codeedit",
     "barcode",
     "inbox",
     "kanban",
@@ -269,6 +286,7 @@ const STYLES: [&str; 20] = [
     "stories",
     "lightbox",
     "feed",
+    "document",
 ];
 
 /// The modules a page uses, one bit each in the order of [`MODULES`].
@@ -433,7 +451,13 @@ pub(crate) fn runtime(js: &'static str) -> &'static str {
 
 /// Script and style files of component modules, by path; the others are served next to their
 /// endpoints.
-const FILES: [(&str, &str); 48] = [
+const FILES: [(&str, &str); 56] = [
+    ("/_zeyn/colors.js", include_str!("../../assets/colors.js")),
+    ("/_zeyn/length.js", include_str!("../../assets/length.js")),
+    (
+        "/_zeyn/inspector.js",
+        include_str!("../../assets/inspector.js"),
+    ),
     (
         "/_zeyn/commerce.css",
         include_str!("../../assets/commerce.css"),
@@ -468,6 +492,14 @@ const FILES: [(&str, &str); 48] = [
         include_str!("../../assets/barcode.css"),
     ),
     ("/_zeyn/code.css", include_str!("../../assets/code.css")),
+    (
+        "/_zeyn/codeedit.js",
+        include_str!("../../assets/codeedit.js"),
+    ),
+    (
+        "/_zeyn/codeedit.css",
+        include_str!("../../assets/codeedit.css"),
+    ),
     ("/_zeyn/diff.css", include_str!("../../assets/diff.css")),
     (
         "/_zeyn/countdown.js",
@@ -498,6 +530,10 @@ const FILES: [(&str, &str); 48] = [
     ("/_zeyn/steps.js", include_str!("../../assets/steps.js")),
     ("/_zeyn/tree.js", include_str!("../../assets/tree.js")),
     (
+        "/_zeyn/treedrag.js",
+        include_str!("../../assets/treedrag.js"),
+    ),
+    (
         "/_zeyn/overlays.js",
         include_str!("../../assets/overlays.js"),
     ),
@@ -524,6 +560,14 @@ const FILES: [(&str, &str); 48] = [
     ),
     ("/_zeyn/feed.css", include_str!("../../assets/feed.css")),
     ("/_zeyn/feed.js", include_str!("../../assets/feed.js")),
+    (
+        "/_zeyn/document.js",
+        include_str!("../../assets/document.js"),
+    ),
+    (
+        "/_zeyn/document.css",
+        include_str!("../../assets/document.css"),
+    ),
 ];
 
 /// Asset paths served without authentication, like the runtime itself.

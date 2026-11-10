@@ -81,6 +81,22 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 - `.row_style(|row| Option<RowStyle>)`: danger、warning、success の行。
 - `.exportable()`: フィルター後の行の CSV エクスポート。サーバーがストリーミングします。
 
+## 実行時に決まる列
+
+`DataGrid::dynamic(action)` は、SQL のプレビューのように列が行と一緒に届く結果のためのものです。action は、列(名前、ラベル、`Integer`、`Decimal`、`Date` などの `DynamicKind`)と JSON で表した 1 ページ分の行を持つ `DynamicPage` を返します。
+
+```rust
+#[action(permission = "reports.preview")]
+pub async fn preview(q: DataQuery, db: Reports) -> Result<DynamicPage> {
+    let span = q.span();
+    db.run_preview(span.offset, span.limit).await
+}
+
+DataGrid::dynamic(preview).paging(Paging::virtual_scroll())
+```
+
+ページング、仮想スクロール、キーボード操作、ユーザーの言語での数値と日付の書式は、型付きの grid と同じように動きます。名前、ラベル、セルはエスケープされ、サーバーが列数、行数、テキストの長さを制限します。この grid は並べ替えも絞り込みもせず、行は読み取り専用です。詳しくは [DataGrid リファレンス](grid.md) を参照してください。
+
 ## その場での更新
 
 最後に呼び出した `.listens(topic)` により、トピックが指定されたときにグリッドがその場で再読み込みされます（[トピック](effects.md#topics) を参照）。`ui.refresh(topic)` の後は並び順とフィルターを保ったまま現在のページを再読み込みし、`.drives(topic)` を持つフィルターコントロールが変わった後は新しい画面の params で最初のページから始めます。グリッドはすべての permission 検査を伴う `POST /_zeyn/grid` で再読み込みされ、フィルターが変えた画面の param は画面関数を通じて、たとえば scope としてグリッドに届きます。

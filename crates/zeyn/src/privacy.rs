@@ -17,7 +17,7 @@ use std::cell::RefCell;
 const DOTS: &str = "••••";
 
 /// How a masked value is shown.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MaskStyle {
     /// Only the last four characters: `•••• 1234`.

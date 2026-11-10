@@ -43,11 +43,11 @@ fn half_text(n: i64, locale: &str) -> String {
 /// star, or per half star for a `Decimal` field. Each is named "3 of 5" ("4.5 of 5") for screen
 /// readers; the first radio carries the field id, so validation messages land under the group.
 pub(crate) fn render_rating(out: &mut String, r: &Render, s: &Slot) {
-    let max = stars(s.m.max());
-    let half = s.m.kind == FieldKind::Decimal;
+    let max = stars(s.f.max_rule());
+    let half = s.f.kind == FieldKind::Decimal;
     let step = if half { 1 } else { 2 };
     let current = halves(s.value).unwrap_or(0);
-    let required = s.m.is_required();
+    let required = s.f.is_required();
     let star = if required {
         r#"<span class="z-required" aria-hidden="true">*</span>"#
     } else {
@@ -61,10 +61,10 @@ pub(crate) fn render_rating(out: &mut String, r: &Render, s: &Slot) {
     out.push_str(&format!(
         r#"<fieldset class="{class}" aria-describedby="{}-error"><legend>{}{star}</legend><div class="z-rating-list">"#,
         s.id,
-        r.label(s.m)
+        r.text(&s.f.label)
     ));
     let required = if required { " required" } else { "" };
-    let disabled = if s.m.readonly { " disabled" } else { "" };
+    let disabled = if s.f.readonly { " disabled" } else { "" };
     for n in (step..=max * 2).step_by(step as usize) {
         let value = half_text(n, r.locale);
         let key = value.replace([',', '.'], "_");
@@ -86,9 +86,9 @@ pub(crate) fn render_rating(out: &mut String, r: &Render, s: &Slot) {
         };
         out.push_str(&format!(
             r#"<label class="{class}" for="{id}"><input type="radio" class="z-rating-input" id="{id}" name="{}" value="{value}" data-testid="{}.field.{}.{key}"{checked}{required}{disabled}><span class="z-rating-mark" aria-hidden="true">&#9733;</span><span class="z-sr-only">{name}</span></label>"#,
-            s.m.name,
+            s.f.name,
             r.scope,
-            s.m.name
+            s.f.name
         ));
     }
     out.push_str("</div></fieldset>");

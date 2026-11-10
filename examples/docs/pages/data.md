@@ -20,6 +20,12 @@ Tree::of(sample_tree).label("Products by unit")
 
 The tree follows the ARIA tree pattern: arrow keys move between items and open or close branches. The server caps the number of children per branch (`MAX_TREE_CHILDREN`).
 
+`.draggable()` lets the leaves be dragged onto a drop target, such as an island. The drag carries the MIME type `application/x-zeyn-tree` with the JSON `{ "id", "path", "label" }` (`path` holds the ids from the top level down to the leaf) and the label as `text/plain`; the drop target sets `dropEffect = "copy"` in its `dragover` handler. Without dragging, the Insert button on the focused leaf (for a pointer) and Control+Enter, or Command+Enter on a Mac (for the keyboard), dispatch the cancelable DOM event `zeyn:tree-insert` with the same object as `detail`. A target that inserts at its own current position calls `preventDefault()`; only then does the tree announce the insert to screen readers. While a leaf has focus, Control+Enter belongs to the tree, so an app shortcut on the same keys does not run there. Any page can forge the payload, so the target treats it as untrusted input and checks access on the server. The drag code (`treedrag.js`) loads only on pages with a draggable tree.
+
+```rust
+Tree::of(report_fields).label("Fields").draggable()
+```
+
 ## Charts
 
 `Chart::bar`, `stacked_bar`, `line`, `area`, `combo`, `scatter`, `donut`, `gauge` and `funnel` draw SVG on the server. There is no chart library in the browser; a chart is part of the page HTML.

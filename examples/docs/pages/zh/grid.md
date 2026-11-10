@@ -27,6 +27,32 @@ DataGrid::of(search_products)
     .exportable()
 ```
 
+## 运行时才确定的列
+
+`DataGrid::dynamic(action)` 显示只有在查询运行后才知道列的结果,例如 SQL 预览或数据源浏览器。action 接收一个 `DataQuery` 并返回一个 `DynamicPage`:列(`DynamicColumn { name, label, kind }`)和一页行,每行是按列顺序排列的 JSON 数组,或按列名索引的 JSON 对象。
+
+```rust
+#[action(permission = "reports.preview")]
+pub async fn preview(q: DataQuery, db: Reports) -> Result<DynamicPage> {
+    let span = q.span();
+    db.run_preview(span.offset, span.limit).await
+}
+
+DataGrid::dynamic(preview).paging(Paging::virtual_scroll())
+```
+
+grid 从每一页构建自己的列,并用类型化 grid 自己的代码渲染行,因此分页、虚拟滚动、列虚拟化、键盘操作、复制以及调整列宽、移动和隐藏列都相同。`DynamicKind` 决定列如何读取和显示值:`Text`、`Integer`(按用户的区域设置分组)、`Decimal`、`Bool`(用用户的语言显示是和否)、`Date`、`Time`、`DateTime`(用户的时区)和 `LocalDateTime`。无法按其类型读取的值显示为文本。每列以适合其类型的宽度开始(文本 180 px,数字 130,日期 120),因此很宽的结果会横向滚动。
+
+action 返回的一切都被视为用户数据。列名、标签和单元格像其他值一样被转义。服务器最多保留 `MAX_DYNAMIC_COLUMNS`(200)列和查询页大小的行(`DataQuery::limit`,最多 500),并将名称和标签截断为 `MAX_COLUMN_NAME`(200)个字符、文本单元格截断为 `MAX_CELL_TEXT`(1,000)个字符。排序键、筛选、合计和分组在 action 运行前从查询中移除,表头也没有排序按钮,因此 action 不会从客户端得到任何列名。访问权限与所有 grid 一样取决于 action。
+
+空名称会变成 `col_<序号>`,重复的名称会加上 `_2`、`_3`;对象行仍按 action 自己的名称读取。一页最多保留 `MAX_PAGE_CELLS`(50,000)个单元格和 `MAX_PAGE_TEXT`(8 MB)的单元格文本。每个文本单元格平分文本预算,因此很宽的页面显示的文本更短;超出单元格预算的行会随下一页返回,由该页的 `next` 指向。嵌套的 JSON 值只写到其份额为止。一个在 action 中占 403 MB 的回答(500 行、200 列、每格 1,000 个表情符号)在 action 自身的回答之外没有占用内存,并发送了 4.6 MB。
+
+`DynamicColumn::masked(MaskStyle::LastFour)` 在读取页面时立即对列进行掩码,原始值永远不会到达 HTML、日志或 AI 代理,也没有人能显示它们。`DynamicGrid::sensitive(model, key)` 会把显示的每一行记录为对 `model` 的一次读取并审计,以 `key` 列作为键,就像 `sensitive` 实体的行一样。没有这些设置时,由 action 决定结果可以显示什么。
+
+列发生变化时,浏览器会丢弃它为旧列保留的行。已保存的视图只用于创建它时的那些列。
+
+表头带有列的指纹(`data-zeyn-shape`)。浏览器在每次请求页面时发送它,服务器仅在列发生变化时才发送新的表头,例如 `.listens(topic)` 用新查询重新加载 grid 之后。行是只读的:动态 grid 没有编辑、行操作、选择、明细、分组和导出。
+
 ## 列合计
 
 `sum()` 和 `avg()` 适用于整数和金额，`min()` 和 `max()` 还适用于日期、时间和时刻，`count()` 适用于每一种列。用在其他类型上无法编译。合计覆盖所有符合过滤条件的行，而不仅仅是当前页。

@@ -38,9 +38,11 @@ impl<E: Model, T> DataGridColumn<E, T> {
         self
     }
 
-    /// Adds a filter box to the column.
+    /// Adds a filter box to the column. [`crate::Rank`] columns get none: a sort key is not
+    /// something people search for.
     pub fn filter(mut self) -> Self {
-        self.last().filter = true;
+        let column = self.last();
+        column.filter = !matches!(column.meta.kind, FieldKind::Rank);
         self
     }
 

@@ -1,0 +1,66 @@
+/* The code editor (`zeyn::ui::CodeEditor`, `Control::Code`): linked only by pages that hold `.z-codeedit`. */
+
+.z-codeedit { display: grid; gap: var(--z-s-1); min-inline-size: 0; }
+.z-codeedit-frame {
+  position: relative; display: flex; min-inline-size: 0;
+  background: var(--z-surface); border: 1px solid var(--z-border-strong); border-radius: var(--z-radius);
+  font-family: var(--z-font-mono); font-size: var(--z-text-sm); line-height: 1.5; tab-size: 4;
+}
+.z-codeedit-frame:focus-within { outline: 2px solid var(--z-focus); outline-offset: 1px; }
+.z-codeedit-gutter, .z-codeedit-mirror, .z-codeedit-input {
+  margin: 0; border: 0; font: inherit; letter-spacing: normal; word-spacing: normal; tab-size: inherit;
+  white-space: pre; overflow-wrap: normal; word-break: normal; box-sizing: border-box;
+}
+.z-codeedit-gutter {
+  flex: none; overflow: hidden; padding: var(--z-s-2) var(--z-s-2) 4rem; contain: size;
+  box-sizing: content-box; inline-size: calc(max(2, var(--z-codeedit-digits, 2)) * 1ch);
+  color: var(--z-text-muted); background: var(--z-surface-2); border-inline-end: 1px solid var(--z-border);
+  text-align: end; user-select: none; border-start-start-radius: var(--z-radius); border-end-start-radius: var(--z-radius);
+}
+.z-codeedit-area { position: relative; flex: 1; min-inline-size: 0; display: grid; }
+.z-codeedit .z-codeedit-frame .z-codeedit-input,
+.z-codeedit .z-codeedit-frame .z-codeedit-input:hover,
+.z-codeedit .z-codeedit-frame .z-codeedit-input:focus-visible {
+  position: relative; z-index: 1; inline-size: 100%; min-block-size: 4.5em; padding: var(--z-s-2) var(--z-s-3);
+  overflow: auto; resize: vertical; color: var(--z-text); background: transparent; outline: none;
+  border: 0; border-radius: 0; box-shadow: none; transition: none;
+}
+.z-codeedit:has([aria-invalid="true"]) .z-codeedit-frame { border-color: var(--z-danger); }
+.z-codeedit-mirror {
+  position: absolute; inset: 0; overflow: hidden; pointer-events: none; color: var(--z-text);
+  padding-block: var(--z-s-2) 4rem; padding-inline: var(--z-s-3) 4rem;
+}
+.z-codeedit-mirror > code { display: block; font: inherit; color: inherit; background: none; padding: 0; }
+.z-codeedit-mirror > code > span { display: block; min-block-size: 1.5em; }
+.z-codeedit:not(.z-codeedit-ready) .z-codeedit-gutter, .z-codeedit:not(.z-codeedit-ready) .z-codeedit-mirror { display: none; }
+.z-codeedit.z-codeedit-ready .z-codeedit-frame .z-codeedit-input { color: transparent; caret-color: var(--z-text); }
+.z-codeedit-ready .z-codeedit-input::selection { color: transparent; background: color-mix(in srgb, var(--z-accent) 28%, transparent); }
+.z-codeedit-mirror .z-codeedit-err {
+  text-decoration: underline wavy var(--z-danger); text-decoration-skip-ink: none; text-underline-offset: 3px;
+}
+.z-codeedit-list {
+  position: absolute; z-index: 30; inset-block-start: 0; inset-inline-start: 0; translate: var(--z-codeedit-x, 0) var(--z-codeedit-y, 0);
+  min-inline-size: 14rem; max-inline-size: min(30rem, 90vw); max-block-size: 15rem; overflow-y: auto;
+  margin: 0; padding: 4px; list-style: none; font-family: var(--z-font); font-size: var(--z-text-sm);
+  background: var(--z-surface); color: var(--z-text); border: 1px solid var(--z-border); border-radius: var(--z-radius-lg); box-shadow: var(--z-shadow-2);
+}
+.z-codeedit-list[hidden] { display: none; }
+.z-codeedit-opt { display: flex; align-items: baseline; gap: var(--z-s-2); padding: 4px 8px; border-radius: var(--z-radius); cursor: pointer; }
+.z-codeedit-opt:hover { background: var(--z-hover); }
+.z-codeedit-opt[aria-selected="true"] { background: var(--z-brand-subtle); color: var(--z-accent); box-shadow: inset calc(2px * var(--z-dir)) 0 0 var(--z-accent); }
+.z-codeedit-label { font-family: var(--z-font-mono); overflow-wrap: anywhere; }
+.z-codeedit-detail { color: var(--z-text-muted); font-size: var(--z-text-xs); overflow-wrap: anywhere; }
+.z-codeedit-kind { margin-inline-start: auto; color: var(--z-text-muted); font-size: var(--z-text-xs); white-space: nowrap; }
+.z-codeedit-problems ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
+.z-codeedit-problems ul:empty { display: none; }
+.z-codeedit-problem {
+  display: block; inline-size: 100%; padding: 2px var(--z-s-2); text-align: start; cursor: pointer;
+  font: inherit; font-size: var(--z-text-sm); color: var(--z-danger); background: var(--z-danger-subtle); border: 0; border-radius: var(--z-radius-sm);
+}
+.z-codeedit-problem:focus-visible { outline: 2px solid var(--z-focus); outline-offset: 1px; }
+@media (forced-colors: active) {
+  .z-codeedit-mirror { display: none; }
+  .z-codeedit.z-codeedit-ready .z-codeedit-frame .z-codeedit-input { color: CanvasText; }
+  .z-codeedit-frame:focus-within, .z-codeedit-problem:focus-visible { outline-color: Highlight; }
+  .z-codeedit-opt[aria-selected="true"] { outline: 2px solid Highlight; outline-offset: -2px; }
+}

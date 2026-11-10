@@ -27,6 +27,32 @@ DataGrid::of(search_products)
     .exportable()
 ```
 
+## 実行時に決まる列
+
+`DataGrid::dynamic(action)` は、SQL のプレビューやデータソースのブラウザーのように、クエリを実行して初めて列がわかる結果を表示します。action は `DataQuery` を受け取り、`DynamicPage` を返します。中身は列(`DynamicColumn { name, label, kind }`)と 1 ページ分の行で、各行は列の順に並んだ JSON 配列か、列名をキーにした JSON オブジェクトです。
+
+```rust
+#[action(permission = "reports.preview")]
+pub async fn preview(q: DataQuery, db: Reports) -> Result<DynamicPage> {
+    let span = q.span();
+    db.run_preview(span.offset, span.limit).await
+}
+
+DataGrid::dynamic(preview).paging(Paging::virtual_scroll())
+```
+
+grid はページごとに列を組み立て、型付き grid 自身のコードで行を描くので、ページング、仮想スクロール、列の仮想化、キーボード操作、コピー、列の幅変更、移動、非表示は同じように動きます。`DynamicKind` は列が値をどう読み、どう表示するかを決めます。`Text`、`Integer`(ユーザーのロケールで桁区切り)、`Decimal`、`Bool`(ユーザーの言語ではいといいえ)、`Date`、`Time`、`DateTime`(ユーザーのタイムゾーン)、`LocalDateTime` です。種類どおりに読めない値はテキストとして表示されます。各列は種類に合った幅で始まる(テキストは 180 px、数値は 130、日付は 120)ので、幅の広い結果は横にスクロールします。
+
+action が返すものはすべてユーザーデータとして扱います。列名、ラベル、セルはほかの値と同じようにエスケープされます。サーバーは最大 `MAX_DYNAMIC_COLUMNS`(200)列と、クエリのページサイズ分の行(`DataQuery::limit`、最大 500)だけを残し、名前とラベルを `MAX_COLUMN_NAME`(200)文字、テキストのセルを `MAX_CELL_TEXT`(1,000)文字で切ります。並べ替えキー、フィルター、合計、グループは action の実行前にクエリから取り除かれ、ヘッダーには並べ替えボタンがないので、action がクライアントから列名を受け取ることはありません。アクセス権はほかの grid と同じく action のものです。
+
+空の名前は `col_<番号>` になり、重複する名前には `_2`、`_3` が付きます。オブジェクトの行は引き続き action 自身の名前で読まれます。1 ページが保持するのは最大 `MAX_PAGE_CELLS`(50,000)セルと `MAX_PAGE_TEXT`(8 MB)のセルテキストまでです。テキストのセルはテキスト予算を均等に分け合うので、幅の広いページでは短いテキストになります。セル予算を超えた行は、ページの `next` が指す次のページで届きます。入れ子の JSON 値は自分の取り分までしか書かれません。action 内で 403 MB を占める 500 行 200 列、各 1,000 個の絵文字の応答では、action 自身の応答を超えるメモリは使われず、送信は 4.6 MB でした。
+
+`DynamicColumn::masked(MaskStyle::LastFour)` はページを読んだ時点で列をマスクするので、元の値が HTML、ログ、AI エージェントに届くことはなく、誰も表示できません。`DynamicGrid::sensitive(model, key)` は表示した各行を、`key` 列をキーとする `model` の読み取りとして監査します。`sensitive` なエンティティの行と同じです。これらがなければ、結果に何を表示してよいかは action が決めます。
+
+列が変わると、ブラウザーは古い列で保持していた行を捨てます。保存済みビューは、それを作った列にだけ使われます。
+
+ヘッダーは列のフィンガープリント(`data-zeyn-shape`)を持ちます。ブラウザーはページを要求するたびにそれを送り、サーバーは列が変わったときだけ新しいヘッダーを送ります。たとえば `.listens(topic)` が新しいクエリで grid を再読み込みした後です。行は読み取り専用で、動的な grid には編集、行アクション、選択、詳細、グループ化、エクスポートがありません。
+
 ## 列の合計
 
 `sum()` と `avg()` は整数と金額に、`min()` と `max()` は日付、時刻、瞬間にも使え、`count()` はすべての列に使えます。それ以外の型に使うとコンパイルできません。合計は、ページだけでなく、フィルターに一致するすべての行を対象にします。

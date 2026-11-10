@@ -233,3 +233,29 @@ action 命令是拥有自己路径的节点，与 `ActionButton` 一样提交到
 | Tab | 菜单 | 关闭菜单并继续移动 |
 
 菜单需要约 0.8 KB gzip 的脚本，在命令运行之前没有请求；它是 4 个节点加上每个命令 2 个。
+
+## DocumentViewer
+
+`DocumentViewer::of(page_action, page_count)` 显示一个分页文档（例如报表预览），其页面在服务器上绘制。页面 action 接收一个 `DocPage`（`document` 来自 `.document(id)`，从不来自浏览器，以及 `page`），并以 SVG 或 HTML 片段返回一页。每一页都具有 `.page_size(..)` 的尺寸（`PageSize::A4`、`PageSize::LETTER`、`PageSize::pt(w, h)` 或 `PageSize::px(w, h)`），因此滚动区域从一开始就与整个文档一样高。
+
+```rust
+DocumentViewer::of(report_page, report.pages)
+    .document(report.id.to_string())
+    .page_size(PageSize::A4)
+    .outline(vec![OutlineItem::new("Summary", 1).child(OutlineItem::new("Totals", 2))])
+    .search(search_report)
+    .download("PDF", format!("/reports/{}/pdf", report.id))
+```
+
+- 页面中只有可见的页以及两侧各一页。它们在滚动停顿后通过 `POST /_zeyn/data` 获取（快速滚过的页从不获取），最近的优先，同时最多 3 个；页面滚出视图的请求会被中止。浏览器中最多保留 12 个已渲染的页。
+- 缩放会缩放页面而不重新获取：适合宽度、适合页面以及 50% 到 400%。页码框可跳转到某一页，滚动停止后会朗读当前页（“第 3 页，共 500 页”）。
+- `.outline(items)` 添加目录面板，`.search(action)` 添加搜索框，其 action 接收 `DocSearch` 并返回 `PageHit`（最多显示 50 个），`.download(label, href)` 添加下载链接。
+- 服务器在每一页上检查屏幕的访问权限、页面 action 的权限、CSRF 和写入限制，拒绝 1 到页数范围之外的页码以及超过 2 MB（`MAX_PAGE_BYTES`）的页面，并用允许列表（`sanitize_markup`）清理每一页：移除脚本、事件处理器、`foreignObject`、框架、外部链接和图片以及样式中的 `url()`，并为每页的 id 加上前缀。`.trusted()` 为应用用自己掌控的数据绘制的页面跳过清理；未经转义进入此类页面的用户文本会在每个打开它的人那里作为脚本运行。
+- `document.js`（13 KB，gzip 后 4.7 KB）和 `document.css`（3.6 KB）只在含有查看器的页面上加载。
+
+| 按键 | 位置 | 作用 |
+|---|---|---|
+| Page Down、Page Up | 页面 | 下一页和上一页 |
+| Home、End | 页面 | 第一页和最后一页 |
+| `+`、`-` | 页面 | 放大和缩小 |
+| Enter | 页码框 | 跳转到输入的页 |

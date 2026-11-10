@@ -97,6 +97,13 @@ pub enum Rule {
         row: u32,
         field: &'static str,
     },
+    /// A problem at a place in a code text ([`crate::ui::Control::Code`]): line and column from
+    /// 1, length in characters. The editor underlines it. See [`ValidationErrors::add_at`].
+    Code {
+        line: u32,
+        column: u32,
+        length: u32,
+    },
 }
 
 /// Field definition produced at compile time.
@@ -124,40 +131,77 @@ impl FieldMeta {
     }
 
     pub fn is_required(&self) -> bool {
-        self.rules.contains(&Rule::Required)
+        Rules(self.rules).required()
     }
 
     pub fn max_len(&self) -> Option<usize> {
-        self.rules.iter().find_map(|r| match r {
+        Rules(self.rules).max_len()
+    }
+
+    pub fn min_len(&self) -> Option<usize> {
+        Rules(self.rules).min_len()
+    }
+
+    pub fn min(&self) -> Option<i64> {
+        Rules(self.rules).min()
+    }
+
+    /// Digits and decimals of a `Decimal` field: its `precision` and `scale` rules, or 18 and 2.
+    pub fn decimal_limits(&self) -> (u8, u8) {
+        Rules(self.rules).decimal_limits()
+    }
+
+    /// The pattern of the `mask` rule, if any.
+    pub fn mask_pattern(&self) -> Option<&'static str> {
+        Rules(self.rules).mask_pattern()
+    }
+
+    pub fn max(&self) -> Option<i64> {
+        Rules(self.rules).max()
+    }
+}
+
+/// The rules of a field, read the same way for model fields and runtime field specs
+/// ([`crate::ui::FieldSpec`]).
+#[derive(Clone, Copy)]
+pub(crate) struct Rules<'a>(pub &'a [Rule]);
+
+impl Rules<'_> {
+    pub(crate) fn required(&self) -> bool {
+        self.0.contains(&Rule::Required)
+    }
+
+    pub(crate) fn max_len(&self) -> Option<usize> {
+        self.0.iter().find_map(|r| match r {
             Rule::MaxLen(n) => Some(*n),
             _ => None,
         })
     }
 
-    pub fn min_len(&self) -> Option<usize> {
-        self.rules.iter().find_map(|r| match r {
+    pub(crate) fn min_len(&self) -> Option<usize> {
+        self.0.iter().find_map(|r| match r {
             Rule::MinLen(n) => Some(*n),
             _ => None,
         })
     }
 
-    pub fn min(&self) -> Option<i64> {
-        self.rules.iter().find_map(|r| match r {
+    pub(crate) fn min(&self) -> Option<i64> {
+        self.0.iter().find_map(|r| match r {
             Rule::Min(n) => Some(*n),
             _ => None,
         })
     }
 
     /// Digits and decimals of a `Decimal` field: its `precision` and `scale` rules, or 18 and 2.
-    pub fn decimal_limits(&self) -> (u8, u8) {
-        let scale = self.rules.iter().find_map(|r| {
+    pub(crate) fn decimal_limits(&self) -> (u8, u8) {
+        let scale = self.0.iter().find_map(|r| {
             if let Rule::Scale(n) = r {
                 Some(*n)
             } else {
                 None
             }
         });
-        let precision = self.rules.iter().find_map(|r| {
+        let precision = self.0.iter().find_map(|r| {
             if let Rule::Precision(n) = r {
                 Some(*n)
             } else {
@@ -174,8 +218,8 @@ impl FieldMeta {
     }
 
     /// The pattern of the `mask` rule, if any.
-    pub fn mask_pattern(&self) -> Option<&'static str> {
-        self.rules.iter().find_map(|r| {
+    pub(crate) fn mask_pattern(&self) -> Option<&'static str> {
+        self.0.iter().find_map(|r| {
             if let Rule::Mask(p) = r {
                 Some(*p)
             } else {
@@ -184,8 +228,8 @@ impl FieldMeta {
         })
     }
 
-    pub fn max(&self) -> Option<i64> {
-        self.rules.iter().find_map(|r| match r {
+    pub(crate) fn max(&self) -> Option<i64> {
+        self.0.iter().find_map(|r| match r {
             Rule::Max(n) => Some(*n),
             _ => None,
         })
@@ -242,6 +286,32 @@ pub struct ValidationErrors {
 }
 
 impl ValidationErrors {
+    /// Adds an error at a place in a code text field ([`crate::ui::Control::Code`]): the editor
+    /// underlines `length` characters from `line` and `column` (both from 1) and the message
+    /// shows under the field.
+    ///
+    /// ```ignore
+    /// errors.add_at(Calc::formula, 1, 9, 6, "Unknown field Ordrs.");
+    /// ```
+    pub fn add_at<M, T>(
+        &mut self,
+        field: Field<M, T>,
+        line: u32,
+        column: u32,
+        length: u32,
+        message: impl Into<Text>,
+    ) {
+        self.errors.push(FieldError {
+            field: field.meta().name,
+            rule: Rule::Code {
+                line,
+                column,
+                length,
+            },
+            message: message.into(),
+        });
+    }
+
     /// Adds an error to a field. Used in model level `validate = ...` functions.
     ///
     /// ```ignore
