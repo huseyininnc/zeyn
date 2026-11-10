@@ -6,7 +6,7 @@
 //! | `bool` | checkbox | [`Control::Switch`] |
 //! | `#[choice]` | select (ARIA select only combobox) | [`Control::Radio`], [`Control::Segmented`], [`Control::Listbox`] |
 //! | `i32`, `i64`, `Money`, `Decimal` | number input formatted while typing, with step buttons | [`Control::Percent`], [`Control::Rating`] (whole numbers) |
-//! | `String` | text input; a growing text area with a counter above 255 characters; a masked input with the `mask` rule | [`Control::Password`], [`Control::NewPassword`], [`Control::PasswordMeter`], [`Control::OneTimeCode`] |
+//! | `String` | text input; a growing text area with a counter above 255 characters; a masked input with the `mask` rule | [`Control::Password`], [`Control::NewPassword`], [`Control::PasswordMeter`], [`Control::OneTimeCode`], [`Control::Code`] |
 
 use crate::i18n::{NumberFormat, Text};
 use crate::render::{Render, escape};
@@ -78,6 +78,16 @@ pub enum Control {
     Length {
         units: &'static [LengthUnit],
     },
+    /// A code editor for text fields, such as SQL or a report expression: highlighting, line
+    /// numbers, completion (`Form::complete`) and error markers (`Form::check`, or
+    /// `ValidationErrors::add_at` in validation). See [`crate::ui::CodeEditor`].
+    ///
+    /// ```ignore
+    /// Form::of(field)
+    ///     .control(Calc::formula, Control::Code(CodeLang::Expression))
+    ///     .complete(Calc::formula, complete_fields)
+    /// ```
+    Code(crate::ui::CodeLang),
 }
 
 /// A unit of [`Control::Length`]. Lengths are stored in CSS pixels, 96 to the inch.
@@ -388,8 +398,46 @@ pub(crate) fn render_number(out: &mut String, r: &Render, s: &Slot) {
     out.push_str("</div>");
 }
 
+/// [`Control::Code`]: the code editor, with the keys of the node's completion and check sources
+/// when the user may run them. Model forms and runtime schemas draw it the same way.
+pub(crate) fn render_code(
+    out: &mut String,
+    r: &Render,
+    s: &Slot,
+    lang: crate::ui::CodeLang,
+    complete: Option<&str>,
+    check: Option<&str>,
+) {
+    let maxlength =
+        s.f.max_len_rule()
+            .map(|n| format!(r#" maxlength="{n}""#))
+            .unwrap_or_default();
+    let attrs = format!("{}{maxlength}", s.common);
+    let value = match s.value {
+        Value::Text(t) => t.as_str(),
+        _ => "",
+    };
+    out.push_str(s.label);
+    crate::ui::render_editor(
+        out,
+        r,
+        &crate::ui::EditorHtml {
+            id: s.id,
+            attrs: &attrs,
+            lang,
+            value,
+            rows: 6,
+            complete,
+            check,
+        },
+    );
+}
+
 /// Text: an input, an email input, or a growing text area with a counter for long texts.
 pub(crate) fn render_text(out: &mut String, r: &Render, s: &Slot) {
+    if let Some(Control::Code(lang)) = s.f.control {
+        return render_code(out, r, s, lang, None, None);
+    }
     if let Some(pattern) = s.f.mask_pattern()
         && s.f.control.is_none()
     {
@@ -415,7 +463,7 @@ pub(crate) fn render_text(out: &mut String, r: &Render, s: &Slot) {
     match max {
         None if s.f.control == Some(Control::Multiline) => {
             out.push_str(&format!(
-                r#"<textarea rows="3" class="z-textarea" data-zeyn-autosize {}{minlength}>{text}</textarea>"#,
+                r#"<textarea rows="3" class="z-textarea" data-zeyn-autosize {}{minlength}>&#10;{text}</textarea>"#,
                 s.common
             ));
         }
@@ -437,7 +485,7 @@ pub(crate) fn render_text(out: &mut String, r: &Render, s: &Slot) {
                 _ => 0,
             };
             out.push_str(&format!(
-                r#"<textarea rows="3" class="z-textarea" data-zeyn-autosize {common}{minlength}{maxlength}>{text}</textarea><p class="z-counter" id="{id}-count" data-zeyn-counter="{n}" data-text="{}">{}</p>"#,
+                r#"<textarea rows="3" class="z-textarea" data-zeyn-autosize {common}{minlength}{maxlength}>&#10;{text}</textarea><p class="z-counter" id="{id}-count" data-zeyn-counter="{n}" data-text="{}">{}</p>"#,
                 ui(r, "text.count"),
                 escape(&r.i18n.text(r.locale, &Text::key("zeyn.ui.text.count").arg("n", count.to_string()).arg("max", n.to_string())))
             ));

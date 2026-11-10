@@ -54,6 +54,7 @@ head にあるフレームワークのスクリプトとスタイルシートに
 | `share.js`, `chips.js`, `reactions.js`, `hero.js`, `state.js`, `preview.js`, `assistant.js` | 共有ボタン、フィルターチップ、リアクション、ヒーロースライド、設定ストア、カードのプレビュー（最初のホバー）、アシスタント（チャットパネル、またはランチャーの最初の押下） |
 | `topics.js`, `vlist.js` | トピックを listen するノードと、それを drive するコントロール（`data-zeyn-listens`、`data-zeyn-drives`）、仮想リスト（`data-zeyn-vlist`） |
 | `inbox.js`, `kanban.js`, `calendar.js` and their stylesheets, `diff.css`, `code.css`, `barcode.css` | 受信箱と通知ベル、Kanban ボード、カレンダー、スクリプトの要らない差分、コード表示、バーコード（コード表示のコピーボタンは `share.js` にあります） |
+| `codeedit.js`, `codeedit.css` | コードエディター（`data-zeyn-code`）：色分けしたコピー、行番号、補完候補、エラーマーカー。`/_zeyn/data` への送信は入力が止まった後だけです |
 | `range.js`、`quantity.js`、`gallery.js`、`countdown.js`、`commerce.css` | 範囲スライダー、数量ステッパー、商品ギャラリー、カウントダウン。すべてのショップ用コンポーネントのスタイルシート（価格、バリエーション選択、ファセットパネル、レビューの集計） |
 | `thread.js` と `thread.css`, `stream.js`, `composer.js` と `composer.css`, `typing.js` と `typing.css` | メッセージスレッド、スレッドとアシスタントが共有するストリーミングの Markdown と JSON 行、チャットの composer、入力中インジケーター |
 | `feed.js`, `lightbox.js` and their stylesheets, `stories.css` | 投稿のフィード、画像と動画のライトボックス、ストーリーリングとその行、スクリプト不要 |

@@ -11,6 +11,7 @@ mod catalog;
 mod chart;
 mod chips;
 mod code;
+mod code_edit;
 mod composer;
 mod content;
 mod controls;
@@ -88,6 +89,11 @@ pub use catalog::{CardGrid, ImageCard, MAX_SUGGESTIONS, Rail, SearchBox, SearchP
 pub use chart::{Better, BulletCell, Chart, ChartKind, Kpi, SparklineCell};
 pub use chips::{Chips, MAX_CHIPS};
 pub use code::{CodeLang, CodeView, JsonView, MAX_CODE_BYTES, MAX_CODE_LINES, highlight};
+pub(crate) use code_edit::{CheckSource, CompleteSource, EditorHtml, render_editor};
+pub use code_edit::{
+    CodeEditor, CodeError, CodeQuery, Completion, CompletionKind, MAX_CODE_ERRORS,
+    MAX_CODE_MESSAGE_CHARS, MAX_CODE_QUERY_BYTES, MAX_COMPLETION_CHARS, MAX_COMPLETIONS,
+};
 pub use composer::{
     ChatSend, Composer, DEFAULT_MESSAGE_CHARS, MAX_MENTION_QUERY, MAX_MENTIONS,
     MAX_MESSAGE_MENTIONS, SendKey,
@@ -95,8 +101,8 @@ pub use composer::{
 pub use content::{AutoGrid, Avatar, AvatarSize, Heading, MetaLine, Paragraph, PrevNext, Spoiler};
 pub use controls::{Control, LengthUnit, MAX_PALETTE, is_hex_color};
 pub(crate) use controls::{
-    Slot, choices_text, read_choices, render_bool, render_choice, render_choices, render_number,
-    render_text,
+    Slot, choices_text, read_choices, render_bool, render_choice, render_choices, render_code,
+    render_number, render_text,
 };
 pub use countdown::Countdown;
 pub use date::DateOptions;

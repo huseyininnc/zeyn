@@ -45,6 +45,7 @@ Form::of(Contact { quantity: 2, size: Size::Medium, ..Contact::default() })
 | `Control::Multiline` | 任意长度的文本，使用会自动增高的文本区域 |
 | `Control::Color { palette }` | 保存十六进制颜色的 `String`，带取色器（见 [Color and length](#color-and-length)） |
 | `Control::Length { units }` | 以像素保存、按用户所选单位显示的 `Decimal` 长度（见 [Color and length](#color-and-length)） |
+| `Control::Code(lang)` | 带高亮、建议和错误标记的 SQL 或表达式（见 [代码编辑器](#code-editor)） |
 
 ## Rating
 
@@ -205,6 +206,42 @@ pub struct Contact {
 | DOM 节点 | 掩码输入框 3 个，带切换按钮的密码 4 个，带指示条 11 个 |
 | 请求 | 输入时没有 |
 | 服务器检查 | `scale`、`precision`、`min`、`max` 和 `mask` 在每次保存时运行，页面、API 和 AI 工具一视同仁 |
+
+## 代码编辑器
+
+`Control::Code(lang)` 把文本字段变成代码编辑器，用于 SQL（`CodeLang::Sql`）、`[Orders.Total] * 1.18m` 这样的报表表达式（`CodeLang::Expression`）或纯文本。`CodeEditor` 是同一个编辑器，作为模型表单之外的独立节点使用。`.complete(action)` 添加补全建议，`.check(action)` 添加错误标记。
+
+```rust
+Form::of(calc)
+    .control(Calc::formula, Control::Code(CodeLang::Expression))
+    .complete(Calc::formula, complete_fields)
+    .check(Calc::formula, check_formula)
+
+CodeEditor::new("query", CodeLang::Sql).label("Report query").value(sql).complete(complete_sql)
+```
+
+输入框是普通的 `<textarea>`，所以输入、撤销、输入法、移动键盘和屏幕阅读器都与任何文本字段一样工作，表单提交的是纯文本。它下面是带行号栏的文本高亮副本，两者都对屏幕阅读器隐藏。高亮按行进行：每次按键只重绘它改动的行。没有脚本时，字段就是普通的文本区域。
+
+补全 action 接收 `CodeQuery`（`text` 和 `cursor`，`word()` 给出正在输入的单词）并返回 `Vec<Completion>`；所选建议的 `insert` 会替换这个单词。检查 action 接收同样的查询并返回带有 `line`、`column`、`length` 和 `message` 的 `Vec<CodeError>`；每个错误都会加下划线并列在编辑器下方，屏幕阅读器会在那里读出。在模型的 `validate` 函数中，`errors.add_at(field, line, column, length, message)` 也会给该位置加下划线。落在文本之外的标记会被限制在文本之内。
+
+### 键盘
+
+| 按键 | 作用 |
+|---|---|
+| Ctrl+Space | 显示光标处的建议 |
+| 下箭头、上箭头 | 在建议之间移动 |
+| Enter、Tab | 插入当前建议 |
+| Escape | 关闭建议 |
+| Tab（没有打开建议时） | 与任何文本区域一样，把焦点移出编辑器 |
+
+### 预算与检查
+
+| | |
+|---|---|
+| 新增脚本 | `codeedit.js` 约 8.0 KB（gzip），`codeedit.css` 1.4 KB（gzip），只在有编辑器的页面加载 |
+| 输入 | 在 2,000 行文本中每次按键约 0.5 ms 脚本时间 |
+| 请求 | 不按每次按键发送；补全在停顿 150 ms 后发送，检查在 500 ms 后发送，旧请求会被取消 |
+| 服务器检查 | 每个请求都检查 CSRF、action 的权限和写入限制；先读取请求体（默认请求体上限，最多 2 MB），再在运行 action 之前拒绝超过 64 KB 的文本；补全和检查与保存一样计入 `App::write_limit`；浏览器最多收到 50 条不超过 200 字符的建议和 100 条不超过 500 字符的错误 |
 
 ## 日期和时间选择器
 

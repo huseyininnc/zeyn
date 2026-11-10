@@ -54,6 +54,7 @@ head 中每个框架脚本和样式表都带有 `?v=` 和构建 id（`meta[name=
 | `share.js`, `chips.js`, `reactions.js`, `hero.js`, `state.js`, `preview.js`, `assistant.js` | 分享按钮、筛选标签、反应、hero 幻灯片、偏好存储、卡片预览（首次悬停）、助手（聊天面板，或首次按下启动按钮） |
 | `topics.js`, `vlist.js` | 监听主题的节点以及驱动它们的控件（`data-zeyn-listens`、`data-zeyn-drives`）；虚拟列表（`data-zeyn-vlist`） |
 | `inbox.js`, `kanban.js`, `calendar.js` and their stylesheets, `diff.css`, `code.css`, `barcode.css` | 收件箱和通知铃铛；看板；日历；不需要脚本的差异视图、代码视图和条码（代码视图的复制按钮在 `share.js` 中） |
+| `codeedit.js`, `codeedit.css` | 代码编辑器（`data-zeyn-code`）：高亮副本、行号、补全建议和错误标记；只在输入停顿后才向 `/_zeyn/data` 发送请求 |
 | `range.js`、`quantity.js`、`gallery.js`、`countdown.js` 和 `commerce.css` | 范围滑块、数量步进器、商品图库和倒计时；所有商店组件的样式表（价格、规格选择器、分面面板、评价汇总） |
 | `thread.js` 和 `thread.css`, `stream.js`, `composer.js` 和 `composer.css`, `typing.js` 和 `typing.css` | 消息线程；线程和助手共用的流式 Markdown 和 JSON 行；聊天 composer；正在输入指示器 |
 | `feed.js`, `lightbox.js` and their stylesheets, `stories.css` | 帖子信息流；图片和视频的灯箱；故事环及其行，无需脚本 |

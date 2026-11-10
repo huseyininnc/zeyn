@@ -97,6 +97,13 @@ pub enum Rule {
         row: u32,
         field: &'static str,
     },
+    /// A problem at a place in a code text ([`crate::ui::Control::Code`]): line and column from
+    /// 1, length in characters. The editor underlines it. See [`ValidationErrors::add_at`].
+    Code {
+        line: u32,
+        column: u32,
+        length: u32,
+    },
 }
 
 /// Field definition produced at compile time.
@@ -279,6 +286,32 @@ pub struct ValidationErrors {
 }
 
 impl ValidationErrors {
+    /// Adds an error at a place in a code text field ([`crate::ui::Control::Code`]): the editor
+    /// underlines `length` characters from `line` and `column` (both from 1) and the message
+    /// shows under the field.
+    ///
+    /// ```ignore
+    /// errors.add_at(Calc::formula, 1, 9, 6, "Unknown field Ordrs.");
+    /// ```
+    pub fn add_at<M, T>(
+        &mut self,
+        field: Field<M, T>,
+        line: u32,
+        column: u32,
+        length: u32,
+        message: impl Into<Text>,
+    ) {
+        self.errors.push(FieldError {
+            field: field.meta().name,
+            rule: Rule::Code {
+                line,
+                column,
+                length,
+            },
+            message: message.into(),
+        });
+    }
+
     /// Adds an error to a field. Used in model level `validate = ...` functions.
     ///
     /// ```ignore

@@ -45,6 +45,7 @@ Form::of(Contact { quantity: 2, size: Size::Medium, ..Contact::default() })
 | `Control::Multiline` | Un texto de cualquier longitud en un área de texto que crece |
 | `Control::Color { palette }` | Un `String` con un color hexadecimal y un selector (ver [Color and length](#color-and-length)) |
 | `Control::Length { units }` | Una longitud `Decimal` guardada en píxeles y mostrada en la unidad que elige el usuario (ver [Color and length](#color-and-length)) |
+| `Control::Code(lang)` | SQL o una expresión, con resaltado, sugerencias y marcas de error (ver [Editor de código](#code-editor)) |
 
 ## Rating
 
@@ -205,6 +206,42 @@ El medidor es una pista calculada en el navegador a partir de la longitud, los t
 | Nodos DOM | 3 para una entrada con máscara, 4 para una contraseña con su botón, 11 con el medidor |
 | Peticiones | ninguna mientras se escribe |
 | Comprobaciones del servidor | `scale`, `precision`, `min`, `max` y `mask` se ejecutan en cada guardado, desde la página, la API y las herramientas de IA por igual |
+
+## Editor de código
+
+`Control::Code(lang)` convierte un campo de texto en un editor de código para SQL (`CodeLang::Sql`), expresiones de informe como `[Orders.Total] * 1.18m` (`CodeLang::Expression`) o texto simple. `CodeEditor` es el mismo editor como nodo propio, fuera de un formulario de modelo. `.complete(action)` añade sugerencias y `.check(action)` añade marcas de error.
+
+```rust
+Form::of(calc)
+    .control(Calc::formula, Control::Code(CodeLang::Expression))
+    .complete(Calc::formula, complete_fields)
+    .check(Calc::formula, check_formula)
+
+CodeEditor::new("query", CodeLang::Sql).label("Report query").value(sql).complete(complete_sql)
+```
+
+La entrada es un `<textarea>` simple, así que escribir, deshacer, los métodos de entrada, los teclados móviles y los lectores de pantalla funcionan como en cualquier campo de texto, y el formulario envía texto plano. Debajo hay una copia resaltada del texto con una columna de números de línea; ambas están ocultas a los lectores de pantalla. El resaltado es por líneas: una pulsación solo vuelve a pintar las líneas que cambió. Sin el script, el campo es un área de texto simple.
+
+Una acción de completado recibe un `CodeQuery` (`text` y `cursor`, con `word()` para la palabra que se escribe) y devuelve `Vec<Completion>`; el `insert` de la elegida reemplaza esa palabra. Una acción de comprobación recibe la misma consulta y devuelve `Vec<CodeError>` con `line`, `column`, `length` y `message`; cada error se subraya y se lista bajo el editor, donde los lectores de pantalla lo oyen. En una función `validate` de un modelo, `errors.add_at(field, line, column, length, message)` también subraya el lugar. Las marcas fuera del texto se mantienen dentro de él.
+
+### Teclado
+
+| Tecla | Hace |
+|---|---|
+| Ctrl+Espacio | Muestra sugerencias en el cursor |
+| Flecha abajo, Flecha arriba | Recorren las sugerencias |
+| Enter, Tab | Insertan la sugerencia activa |
+| Escape | Cierra las sugerencias |
+| Tab (sin sugerencias abiertas) | Saca el foco del editor, como en cualquier área de texto |
+
+### Presupuesto y comprobaciones
+
+| | |
+|---|---|
+| Script añadido | `codeedit.js`, unos 8,0 KB gzip, y `codeedit.css`, 1,4 KB gzip, solo en páginas con un editor |
+| Escritura | unos 0,5 ms de script por pulsación en un texto de 2.000 líneas |
+| Peticiones | ninguna por pulsación; completado tras una pausa de 150 ms y comprobaciones tras 500 ms, las peticiones antiguas se cancelan |
+| Comprobaciones del servidor | CSRF, el permiso de la acción y el límite de escritura en cada petición; primero se lee el cuerpo de la petición (como mucho 2 MB, el límite por defecto) y después se rechazan los textos de más de 64 KB antes de ejecutar la acción; el completado y las comprobaciones cuentan para `App::write_limit` como los guardados; al navegador llegan como mucho 50 sugerencias de 200 caracteres y 100 errores de 500 caracteres |
 
 ## Selectores de fecha y hora
 

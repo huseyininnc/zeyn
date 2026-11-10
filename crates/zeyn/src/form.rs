@@ -93,6 +93,8 @@ pub struct Form<M: Model> {
     depends: Vec<(&'static str, &'static str)>,
     /// Topics a filter form refreshes when a field changes.
     drives: Vec<&'static str>,
+    /// Completion (`complete`) and check (`check`) actions of code fields: (field, kind, source).
+    codes: Vec<(&'static str, &'static str, Box<dyn DataSource>)>,
 }
 
 impl<M: Model> Form<M> {
@@ -120,6 +122,7 @@ impl<M: Model> Form<M> {
             tips: Vec::new(),
             depends: Vec::new(),
             drives: Vec::new(),
+            codes: Vec::new(),
         }
     }
 
@@ -257,6 +260,54 @@ impl<M: Model> Form<M> {
         self
     }
 
+    /// Suggestions for a code field ([`Control::Code`]): after a pause in typing, and at once
+    /// with Ctrl+Space, the browser sends the text and the cursor to `action`, which returns
+    /// [`crate::ui::Completion`]s. The server checks the action's permission on every request.
+    ///
+    /// ```ignore
+    /// Form::of(calc)
+    ///     .control(Calc::formula, Control::Code(CodeLang::Expression))
+    ///     .complete(Calc::formula, complete_fields)
+    /// ```
+    pub fn complete<T, A>(mut self, field: Field<M, T>, _action: A) -> Self
+    where
+        T: FieldType + 'static,
+        A: Action<Input = crate::ui::CodeQuery, Output = Result<Vec<crate::ui::Completion>>>,
+    {
+        let name = field.meta().name;
+        self.codes
+            .retain(|(n, k, _)| !(*n == name && *k == "complete"));
+        self.codes
+            .push((name, "complete", crate::ui::CompleteSource::<A>::boxed()));
+        self
+    }
+
+    /// Error markers for a code field ([`Control::Code`]): after a pause in typing the browser
+    /// sends the text to `action`, which returns [`crate::ui::CodeError`]s that the editor
+    /// underlines and lists. The save action must still validate the text.
+    pub fn check<T, A>(mut self, field: Field<M, T>, _action: A) -> Self
+    where
+        T: FieldType + 'static,
+        A: Action<Input = crate::ui::CodeQuery, Output = Result<Vec<crate::ui::CodeError>>>,
+    {
+        let name = field.meta().name;
+        self.codes
+            .retain(|(n, k, _)| !(*n == name && *k == "check"));
+        self.codes
+            .push((name, "check", crate::ui::CheckSource::<A>::boxed()));
+        self
+    }
+
+    /// The completion or check source of a code field, by the key the browser sends:
+    /// `field:complete` or `field:check`.
+    fn code_source(&self, key: &str) -> Option<&dyn DataSource> {
+        let (field, kind) = key.split_once(':')?;
+        self.codes
+            .iter()
+            .find(|(n, k, _)| *n == field && *k == kind)
+            .map(|(_, _, s)| s.as_ref())
+    }
+
     /// A tooltip for a field: an info button after its label shows `text` on hover, focus, tap
     /// and long press, and the field's input is described by it for screen readers. Use it for
     /// help such as a format or where a value comes from; the label and the rules must still say
@@ -358,10 +409,17 @@ impl<M: Model> Form<M> {
         self
     }
 
-    /// The `page_check` of the form: its topics and its dependent lookups.
+    /// The `page_check` of the form: its topics, its dependent lookups and its code fields.
     fn check_form(&self, check: &mut crate::ui::PageCheck) {
         for t in &self.drives {
             check.drives(t);
+        }
+        for (field, kind, _) in &self.codes {
+            if !matches!(self.control_of(field), Some(Control::Code(_))) {
+                check.problem(format!(
+                    "`{kind}` is set for `{field}`, which has no code control; add `.control({field}, Control::Code(CodeLang::Expression))` or another language"
+                ));
+            }
         }
         for (field, source) in &self.depends {
             if self.lookup_of(field).is_none() {
@@ -1125,6 +1183,17 @@ fn render_field<M: Model>(out: &mut String, r: &Render, f: &FormField<M>, form: 
             editor.render(out, r, m, &current());
             return true;
         }
+        if let (Some(Control::Code(lang)), FieldKind::Text) = (slot.f.control, m.kind) {
+            let allowed = |kind: &str| {
+                let key = format!("{}:{kind}", m.name);
+                form.code_source(&key)
+                    .filter(|s| r.can(&s.action().access))
+                    .map(|_| key)
+            };
+            let (complete, check) = (allowed("complete"), allowed("check"));
+            crate::ui::render_code(out, r, slot, lang, complete.as_deref(), check.as_deref());
+            return true;
+        }
         if let Some((rules, many)) = form.files_of(m.name) {
             crate::files::render_upload(out, r, m, slot.id, &rules, many, &current());
             return true;
@@ -1462,7 +1531,8 @@ where
 
 impl<M: Model> Component for Form<M> {
     fn source(&self, key: &str) -> Option<&dyn DataSource> {
-        self.lookup_of(key).map(|(s, _)| s)
+        self.code_source(key)
+            .or_else(|| self.lookup_of(key).map(|(s, _)| s))
     }
 
     fn render(&self, out: &mut String, r: &Render) {
@@ -1544,7 +1614,9 @@ where
         if key == "_step" && !self.form.steps().is_empty() {
             return Some(self);
         }
-        self.form.lookup_of(key).map(|(s, _)| s)
+        self.form
+            .code_source(key)
+            .or_else(|| self.form.lookup_of(key).map(|(s, _)| s))
     }
 
     fn page_check(&self, check: &mut crate::ui::PageCheck) {

@@ -103,6 +103,7 @@
       "link_button": "A link to another page that looks like a button.",
       "clear_prefs": "A button that removes the choices this browser keeps for the app.",
       "diff_view": "The fields that changed in a record, old and new side by side or inline.",
+      "code_editor": "Editable SQL and expressions with highlighting, line numbers, completion and error markers.",
       "code_view": "Read only code and JSON, highlighted, numbered and folded on the server.",
       "barcode": "Code 128 barcodes and QR codes drawn as SVG on the server.",
       "inbox": "Notifications by day with bulk mark read and archive, and the bell with the unread count.",
@@ -377,6 +378,11 @@
       "diff_view": {
         "overview": "Example",
         "inline": "Inline"
+      },
+      "code_editor": {
+        "overview": "Expression with completion and checks",
+        "sql": "SQL",
+        "form": "In a model form"
       },
       "code_view": {
         "overview": "Example",

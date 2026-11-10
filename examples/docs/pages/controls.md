@@ -45,6 +45,7 @@ Form::of(Contact { quantity: 2, size: Size::Medium, ..Contact::default() })
 | `Control::Multiline` | A text of any length in a growing text area |
 | `Control::Color { palette }` | A `String` holding a hex color, with a picker (see [Color and length](#color-and-length)) |
 | `Control::Length { units }` | A `Decimal` length stored in pixels and shown in a unit the user picks (see [Color and length](#color-and-length)) |
+| `Control::Code(lang)` | SQL or an expression, with highlighting, suggestions and error markers (see [Code editor](#code-editor)) |
 
 ## Rating
 
@@ -204,6 +205,42 @@ The meter is a hint computed in the browser from the length, the kinds of charac
 | DOM nodes | 3 for a masked input, 4 for a password with its toggle, 11 with the meter |
 | Requests | none while typing |
 | Server checks | `scale`, `precision`, `min`, `max` and `mask` run on every save, from the page, the API and AI tools alike |
+
+## Code editor
+
+`Control::Code(lang)` turns a text field into a code editor for SQL (`CodeLang::Sql`), report expressions such as `[Orders.Total] * 1.18m` (`CodeLang::Expression`) or plain text. `CodeEditor` is the same editor as a node of its own, outside a model form. `.complete(action)` adds suggestions and `.check(action)` adds error markers.
+
+```rust
+Form::of(calc)
+    .control(Calc::formula, Control::Code(CodeLang::Expression))
+    .complete(Calc::formula, complete_fields)
+    .check(Calc::formula, check_formula)
+
+CodeEditor::new("query", CodeLang::Sql).label("Report query").value(sql).complete(complete_sql)
+```
+
+The input is a plain `<textarea>`, so typing, undo, input methods, mobile keyboards and screen readers work as in any text field, and the form submits plain text. A highlighted copy of the text lies under it with a line number gutter; both are hidden from screen readers. Highlighting is line based: a keystroke paints only the lines it changed. Without the script the field is a plain text area.
+
+A completion action takes a `CodeQuery` (`text` and `cursor`, with `word()` for the word being typed) and returns `Vec<Completion>`; the `insert` of the chosen one replaces that word. A check action takes the same query and returns `Vec<CodeError>` with `line`, `column`, `length` and `message`; each error is underlined and listed under the editor, where screen readers hear it. In a model `validate` function, `errors.add_at(field, line, column, length, message)` underlines the place too. Markers outside the text are kept inside it.
+
+### Keyboard
+
+| Key | Does |
+|---|---|
+| Ctrl+Space | Shows suggestions at the cursor |
+| Arrow Down, Arrow Up | Move through the suggestions |
+| Enter, Tab | Insert the active suggestion |
+| Escape | Closes the suggestions |
+| Tab (no suggestions open) | Moves focus out of the editor, as in any text area |
+
+### Budget and checks
+
+| | |
+|---|---|
+| Added script | `codeedit.js`, about 8.0 KB gzip, and `codeedit.css`, 1.4 KB gzip, only on pages with an editor |
+| Typing | about 0.5 ms of script per keystroke in a 2,000 line text |
+| Requests | none per keystroke; completion after a 150 ms pause and checks after 500 ms, older requests cancelled |
+| Server checks | CSRF, the action's permission and the write limit on every request; texts over the request body (at most 2 MB, the default body limit) is read first, then texts over 64 KB are refused before the action runs; completion and checks count against `App::write_limit` like saves; at most 50 suggestions of 200 characters and 100 errors of 500 characters reach the browser |
 
 ## Date and time pickers
 

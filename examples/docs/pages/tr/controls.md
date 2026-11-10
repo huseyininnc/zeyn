@@ -45,6 +45,7 @@ Form::of(Contact { quantity: 2, size: Size::Medium, ..Contact::default() })
 | `Control::Multiline` | Büyüyen bir metin alanında her uzunlukta metin |
 | `Control::Color { palette }` | Seçicili, onaltılık renk tutan bir `String` ([Color and length](#color-and-length) bölümüne bakın) |
 | `Control::Length { units }` | Piksel olarak saklanan, kullanıcının seçtiği birimde gösterilen bir `Decimal` uzunluk ([Color and length](#color-and-length) bölümüne bakın) |
+| `Control::Code(lang)` | Renklendirme, öneri ve hata işaretleriyle SQL ya da bir ifade ([Kod düzenleyici](#code-editor) bölümüne bakın) |
 
 ## Rating
 
@@ -205,6 +206,42 @@ Gösterge, tarayıcıda uzunluktan, karakter türlerinden ve bariz desenlerden h
 | DOM node'ları | maskeli giriş için 3, anahtarlı parola için 4, göstergeyle 11 |
 | İstekler | yazarken yok |
 | Sunucu denetimleri | `scale`, `precision`, `min`, `max` ve `mask` her kayıtta çalışır; sayfadan, API'den ve AI araçlarından aynı şekilde |
+
+## Kod düzenleyici
+
+`Control::Code(lang)` bir metin alanını SQL (`CodeLang::Sql`), `[Orders.Total] * 1.18m` gibi rapor ifadeleri (`CodeLang::Expression`) ya da düz metin için bir kod düzenleyiciye çevirir. `CodeEditor` aynı düzenleyicinin model formu dışında kendi başına bir node olan hâlidir. `.complete(action)` öneri, `.check(action)` hata işareti ekler.
+
+```rust
+Form::of(calc)
+    .control(Calc::formula, Control::Code(CodeLang::Expression))
+    .complete(Calc::formula, complete_fields)
+    .check(Calc::formula, check_formula)
+
+CodeEditor::new("query", CodeLang::Sql).label("Report query").value(sql).complete(complete_sql)
+```
+
+Giriş düz bir `<textarea>` olduğu için yazma, geri alma, giriş yöntemleri, mobil klavyeler ve ekran okuyucular her metin alanındaki gibi çalışır ve form düz metin gönderir. Altında metnin renklendirilmiş bir kopyası ve satır numarası sütunu durur; ikisi de ekran okuyuculardan gizlidir. Renklendirme satır bazlıdır: bir tuş vuruşu yalnızca değiştirdiği satırları boyar. Betik olmadan alan düz bir metin alanıdır.
+
+Tamamlama action'ı bir `CodeQuery` alır (`text` ve `cursor`; yazılan sözcük için `word()`) ve `Vec<Completion>` döner; seçilenin `insert` değeri o sözcüğün yerine geçer. Denetim action'ı aynı sorguyu alır ve `line`, `column`, `length` ve `message` taşıyan `Vec<CodeError>` döner; her hatanın altı çizilir ve düzenleyicinin altında listelenir, ekran okuyucular onu orada duyar. Bir model `validate` fonksiyonunda `errors.add_at(field, line, column, length, message)` da yerin altını çizer. Metnin dışına düşen işaretler metnin içinde tutulur.
+
+### Klavye
+
+| Tuş | Ne yapar |
+|---|---|
+| Ctrl+Boşluk | İmleçteki önerileri gösterir |
+| Aşağı ok, Yukarı ok | Öneriler arasında gezer |
+| Enter, Tab | Etkin öneriyi ekler |
+| Escape | Önerileri kapatır |
+| Tab (öneri açık değilken) | Her metin alanındaki gibi odağı düzenleyiciden çıkarır |
+
+### Bütçe ve denetimler
+
+| | |
+|---|---|
+| Eklenen betik | `codeedit.js` yaklaşık 8,0 KB gzip ve `codeedit.css` 1,4 KB gzip, yalnızca düzenleyici olan sayfalarda |
+| Yazma | 2.000 satırlık bir metinde tuş başına yaklaşık 0,5 ms betik |
+| İstekler | tuş başına yok; tamamlama 150 ms, denetim 500 ms duraksamadan sonra, eski istekler iptal edilir |
+| Sunucu denetimleri | her istekte CSRF, action'ın izni ve yazma sınırı; önce istek gövdesi okunur (varsayılan gövde sınırıyla en fazla 2 MB), sonra 64 KB üstü metinler action çalışmadan reddedilir; tamamlama ve denetimler kayıtlar gibi `App::write_limit` sınırına sayılır; tarayıcıya en fazla 200 karakterlik 50 öneri ve 500 karakterlik 100 hata ulaşır |
 
 ## Tarih ve saat seçiciler
 
