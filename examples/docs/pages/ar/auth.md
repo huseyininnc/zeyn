@@ -14,7 +14,7 @@
 البناء الافتراضي لا يتضمن `oidc` ولا `totp`، فالتطبيقات التي لا تستخدمهما لا تدفع شيئًا.
 
 ```toml
-zeyn = { version = "0.0.9", features = ["oidc"] }
+zeyn = { version = "0.0.10", features = ["oidc"] }
 ```
 
 المزوّدان اللذان جرى اختبارهما هما Keycloak وAuthentik. ينبغي أن يعمل أي مزوّد يتبع اكتشاف OpenID Connect (discovery) وتدفق رمز التفويض (authorization code) مع PKCE وJWKS.

@@ -3,7 +3,7 @@
 `zeyn::sql` は、エンティティを SQL データベースに保持します。グリッドが送る `DataQuery`（フィルター、並べ替え、ページ、合計、グループ）から一覧を取得し、行バージョンのチェック付きで保存します。PostgreSQL は `postgres` Cargo feature、Oracle は `oracle` の背後にあるため、データベースを使わないアプリには、これらは一切コンパイルされません。
 
 ```toml
-zeyn = { version = "0.0.9", features = ["postgres"] }   # or ["oracle"], or both
+zeyn = { version = "0.0.10", features = ["postgres"] }   # or ["oracle"], or both
 ```
 
 ## セットアップ

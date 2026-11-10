@@ -12,7 +12,7 @@ Zeyn 采用双许可证：[MIT 许可证](https://github.com/huseyininnc/zeyn/bl
 
 ## 质量
 
-仓库中共有 837 个测试函数（crate 和示例中的 `#[test]` 与 `#[tokio::test]`，统计于 2026-11-09），此外文档注释中的示例也会作为 doctest 运行。
+仓库中共有 953 个测试函数（crate 和示例中的 `#[test]` 与 `#[tokio::test]`，统计于 2026-11-10），此外文档注释中的示例也会作为 doctest 运行。
 
 每个 pull request 以及每次推送到 `dev` 和 `main` 都会运行 CI：
 
