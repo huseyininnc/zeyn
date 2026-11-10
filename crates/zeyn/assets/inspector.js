@@ -20,7 +20,7 @@
  * @module inspector
  */
 const K = await import(new URL(`components.js${new URL(import.meta.url).search}`, import.meta.url).href);
-const { fill, initializers, make, parse, texts } = K;
+const { fill, make, parse, texts } = K;
 
 /** Field templates the server renders with this name in place of the field's. */
 const TOKEN = 'zeyn-field-name';
@@ -291,7 +291,7 @@ ${key}`;
     body.replaceChildren(box);
     if (!box.zeynReady) {
       box.zeynReady = true;
-      for (const init of initializers) init(box);
+      document.dispatchEvent(new CustomEvent('zeyn:content', { detail: box }));
     }
     root.zeynKey = key;
   }

@@ -2337,6 +2337,7 @@ select[data-zeyn-theme-picker] {
 .z-hl-com { color: var(--z-text-muted); font-style: italic; }
 .z-hl-ty, .z-hl-key { color: var(--z-info); }
 .z-hl-mac { color: var(--z-danger); }
+.z-hl-op { color: var(--z-text-muted); }
 
 .z-doc-live {
   margin: 0 0 calc(var(--z-space) * 4);
@@ -2407,7 +2408,7 @@ select[data-zeyn-theme-picker] {
 }
 
 @media (forced-colors: active) {
-  .z-hl-kw, .z-hl-str, .z-hl-num, .z-hl-com, .z-hl-ty, .z-hl-key, .z-hl-mac { color: CanvasText; }
+  .z-hl-kw, .z-hl-str, .z-hl-num, .z-hl-com, .z-hl-ty, .z-hl-key, .z-hl-mac, .z-hl-op { color: CanvasText; }
   .z-code { border-color: CanvasText; }
 }
 

@@ -184,7 +184,9 @@ matters. The `zeyn_docs` topic `language` and the docs pages have the details.
 - Forms and controls: `Form::of(model).field(..).row(..).submit(t!(".."), action)`;
   `.control(field, Control::Rating)` (also `Radio`, `Segmented`, `Listbox`, `Switch`, `Percent`,
   `Password`); `.depends_on(child, parent)` for dependent lookups; `.lines(M::lines, ..)` for line
-  items; `RangeSlider::new(label, ["min", "max"], 0, 100)`, `QuantityStepper::of(action, target)`;
+  items; `Control::Code(CodeLang::Expression)` with `.complete(field, action)` and
+  `.check(field, action)` for SQL and expressions, `CodeEditor::new(name, CodeLang::Sql)` outside a
+  form; `RangeSlider::new(label, ["min", "max"], 0, 100)`, `QuantityStepper::of(action, target)`;
   filters `Chips::filter(..)`, `SearchBox::of(action)`.
 - Colors and lengths: `.control(field, Control::Color { palette: BRAND })` on a `String`,
   `.control(field, Control::Length { units: &[LengthUnit::Mm] })` on a `Decimal` (stored in px).

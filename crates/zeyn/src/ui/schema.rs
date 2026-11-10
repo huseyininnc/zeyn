@@ -52,7 +52,8 @@ pub enum SpecKind {
     Color,
     Boolean,
     Choice,
-    /// An expression, edited as plain text for now.
+    /// An expression, edited in the code editor ([`Control::Code`] with
+    /// [`super::CodeLang::Expression`]).
     Expression,
 }
 
@@ -263,14 +264,15 @@ impl FieldSpec {
         spec
     }
 
-    /// An expression, edited as plain text.
+    /// An expression such as `[Orders.Total] * 1.18m`, edited in the code editor
+    /// ([`Control::Code`] with [`super::CodeLang::Expression`]).
     pub fn expression(name: &str, label: impl Into<Text>) -> Self {
         Self::runtime(
             name,
             label.into(),
             SpecKind::Expression,
             FieldKind::Text,
-            None,
+            Some(Control::Code(super::CodeLang::Expression)),
         )
     }
 

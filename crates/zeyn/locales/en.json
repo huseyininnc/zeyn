@@ -620,7 +620,23 @@
         "copied": "Copied to the clipboard",
         "failed": "Could not copy",
         "fold": "Fold or unfold this block",
-        "truncated": "Showing the first {shown} of {total} lines. The rest is too long to show here."
+        "truncated": "Showing the first {shown} of {total} lines. The rest is too long to show here.",
+        "expression": "Expression",
+        "too_long": "The text is too long to check or complete.",
+        "editor": {
+          "suggestions": "Suggestions",
+          "count": "{n} suggestions. Use the arrow keys to choose, Enter to insert.",
+          "none": "No suggestions",
+          "problem": "Line {line}, column {column}: {message}",
+          "kind": {
+            "keyword": "keyword",
+            "function": "function",
+            "table": "table",
+            "field": "field",
+            "value": "value",
+            "snippet": "snippet"
+          }
+        }
       },
       "barcode": {
         "code128_invalid": "This value cannot be shown as a barcode: it must be 1 to 80 printable ASCII characters.",

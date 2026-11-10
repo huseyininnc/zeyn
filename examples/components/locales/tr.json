@@ -103,6 +103,7 @@
       "link_button": "Buton görünümlü, başka sayfaya giden bağlantı.",
       "clear_prefs": "Tarayıcının uygulama için tuttuğu seçimleri silen düğme.",
       "diff_view": "Bir kayıtta değişen alanlar, eski ve yeni yan yana ya da satır içinde.",
+      "code_editor": "Renklendirme, satır numaraları, tamamlama ve hata işaretleriyle düzenlenebilir SQL ve ifadeler.",
       "code_view": "Salt okunur kod ve JSON, sunucuda renklendirilmiş, numaralı ve katlanır.",
       "barcode": "Sunucuda SVG olarak çizilen Code 128 barkodları ve QR kodları.",
       "inbox": "Güne göre bildirimler, toplu okundu işaretleme ve arşivleme, okunmamış sayısıyla zil.",
@@ -377,6 +378,11 @@
       "diff_view": {
         "overview": "Örnek",
         "inline": "Satır içinde"
+      },
+      "code_editor": {
+        "overview": "Tamamlama ve denetimli ifade",
+        "sql": "SQL",
+        "form": "Model formunda"
       },
       "code_view": {
         "overview": "Örnek",

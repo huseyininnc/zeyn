@@ -242,6 +242,7 @@ catalog! {
     "admin" Settings {
         diff_view "/ui/diff-view";
         code_view "/ui/code-view";
+        code_editor "/ui/code-editor";
         barcode "/ui/barcode";
         inbox "/ui/inbox";
         kanban "/ui/kanban";
