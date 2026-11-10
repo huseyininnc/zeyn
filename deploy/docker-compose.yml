@@ -1,5 +1,11 @@
 name: zeyn
 
+# Versioned docs (deploy/README.md): every docs container gets the same list of versions,
+# newest first, and the latest one. A release adds a `docs-v<version>` service below.
+x-docs-versions: &docs-versions
+  ZEYN_DOCS_VERSIONS: "0.0.9"
+  ZEYN_DOCS_LATEST: "0.0.9"
+
 services:
   landing:
     image: docker.zeynsoft.com/zeyn/landing:latest
@@ -15,11 +21,28 @@ services:
       - /tmp
 
   docs:
-    image: docker.zeynsoft.com/zeyn/docs:latest
+    image: docker.zeynsoft.com/zeyn/docs:0.0.9
     container_name: zeyn-docs
     restart: unless-stopped
+    environment:
+      <<: *docs-versions
+      ZEYN_DOCS_VERSION: "0.0.9"
     ports:
       - "127.0.0.1:3008:3008"
+    mem_limit: 128m
+    cpus: 1.0
+    read_only: true
+
+  docs-v0.0.9:
+    image: docker.zeynsoft.com/zeyn/docs:0.0.9
+    container_name: zeyn-docs-v0.0.9
+    restart: unless-stopped
+    environment:
+      <<: *docs-versions
+      ZEYN_DOCS_VERSION: "0.0.9"
+      ZEYN_DOCS_BASE_PATH: /v0.0.9
+    ports:
+      - "127.0.0.1:3101:3008"
     mem_limit: 128m
     cpus: 1.0
     read_only: true

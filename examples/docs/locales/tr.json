@@ -85,6 +85,12 @@
       "about": "Kaynak, lisans ve güvenlik",
       "social": "Sosyal"
     },
+    "version": {
+      "title": "Belge sürümü",
+      "latest": "en yeni",
+      "notice": "{version} sürümünün belgelerini okuyorsunuz. En yeni sürüm {latest}.",
+      "latest_link": "Bu sayfayı en yeni sürümde okuyun"
+    },
     "translation": {
       "note": "Bu sayfa İngilizceden çevrilmiştir.",
       "english": "İngilizce sayfayı okuyun",

@@ -85,6 +85,12 @@
       "about": "源代码、许可证与安全",
       "social": "社交"
     },
+    "version": {
+      "title": "文档版本",
+      "latest": "最新",
+      "notice": "您正在阅读 {version} 版本的文档。最新版本是 {latest}。",
+      "latest_link": "阅读此页面的最新版本"
+    },
     "translation": {
       "note": "本页译自英文。",
       "english": "阅读英文页面",

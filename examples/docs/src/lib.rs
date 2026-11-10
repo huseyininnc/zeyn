@@ -8,12 +8,14 @@ pub mod highlight;
 pub mod live;
 pub mod live_engage;
 pub mod markdown;
+pub mod versions;
 
 use markdown::{Part, Rendered};
 use std::sync::Arc;
+use versions::Versions;
 use zeyn::prelude::*;
 use zeyn::render::escape;
-use zeyn::seo::{SitemapPart, SitemapUrl};
+use zeyn::seo::{Robots, SitemapPart, SitemapUrl};
 use zeyn::ui::render_child;
 use zeyn::{Component, Render, SearchHit};
 
@@ -32,8 +34,8 @@ macro_rules! pages {
         $( $(
             #[doc = concat!("The page `", $route, "`.")]
             #[screen(route = $route, public)]
-            pub fn $name(_: (), docs: Docs, ctx: Ctx) -> Screen {
-                docs.screen($route, &ctx)
+            pub fn $name(_: (), docs: Docs, versions: Versions, ctx: Ctx) -> Screen {
+                docs.screen($route, &ctx, &versions)
             }
         )* )*
 
@@ -252,8 +254,16 @@ impl Doc {
         status: Status,
         source: &str,
         ids: &[String],
+        base: &str,
     ) -> Doc {
-        let link = |t: &str| resolve_in(lang, t);
+        let link = |t: &str| {
+            let to = resolve_in(lang, t);
+            if to.starts_with('/') {
+                format!("{base}{to}")
+            } else {
+                to
+            }
+        };
         let Rendered {
             title,
             parts,
@@ -311,27 +321,28 @@ impl Doc {
     }
 }
 
-/// Every page in every language, rendered once. Cheap to clone; register it with `App::service`.
+/// Every page in every language, rendered once, and the base path its links start with. Cheap to
+/// clone; register it with `App::service`.
 #[derive(Clone)]
-pub struct Docs(Arc<Vec<Vec<Doc>>>);
+pub struct Docs(Arc<Vec<Vec<Doc>>>, Arc<str>);
 
 impl Service for Docs {}
 
 impl Docs {
-    /// Renders every page in every language. Pages are small, so this takes a few milliseconds
-    /// per language at startup.
-    pub fn build() -> Docs {
-        Docs::build_from(TRANSLATIONS, MANIFEST)
+    /// Renders every page in every language, with links behind `base` (the app's base path, empty
+    /// at `/`). Pages are small, so this takes a few milliseconds per language at startup.
+    pub fn build(base: &str) -> Docs {
+        Docs::build_from(TRANSLATIONS, MANIFEST, base)
     }
 
     /// Renders the pages with these translations and this manifest (see [`MANIFEST`]). A page
     /// without a current translation whose headings match the English page is rendered from
     /// the English source, with links that stay in the language.
-    pub fn build_from(translations: &[(&str, &str, &str)], manifest: &str) -> Docs {
+    pub fn build_from(translations: &[(&str, &str, &str)], manifest: &str, base: &str) -> Docs {
         let manifest: serde_json::Value = serde_json::from_str(manifest).unwrap_or_default();
         let english: Vec<Doc> = PAGES
             .iter()
-            .map(|p| Doc::new(p, "en", Status::Source, p.source, &[]))
+            .map(|p| Doc::new(p, "en", Status::Source, p.source, &[], base))
             .collect();
         let mut all = vec![english];
         for (lang, _) in &LANGS[1..] {
@@ -355,7 +366,7 @@ impl Docs {
                         None => Status::Missing,
                         Some(_) if !current => Status::Stale,
                         Some(source) => {
-                            let doc = Doc::new(p, lang, Status::Translated, source, &ids);
+                            let doc = Doc::new(p, lang, Status::Translated, source, &ids, base);
                             let levels = |d: &Doc| {
                                 d.headings
                                     .iter()
@@ -368,7 +379,7 @@ impl Docs {
                             Status::Headings
                         }
                     };
-                    Doc::new(p, lang, status, p.source, &[])
+                    Doc::new(p, lang, status, p.source, &[], base)
                 })
                 .collect();
             all.push(docs);
@@ -380,7 +391,7 @@ impl Docs {
                 d.next = (i + 1 < n).then_some(i + 1);
             }
         }
-        Docs(Arc::new(all))
+        Docs(Arc::new(all), Arc::from(base))
     }
 
     /// The English pages.
@@ -400,8 +411,10 @@ impl Docs {
     }
 
     /// The screen of a page in the request's language, with its live examples built for this
-    /// request, its canonical URL and its language alternates.
-    pub fn screen(&self, route: &str, ctx: &Ctx) -> Screen {
+    /// request, its canonical URL and its language alternates. A build under a version path
+    /// sends the canonical URL of the page at `/` and `noindex` instead, so only the build at
+    /// `/` is indexed.
+    pub fn screen(&self, route: &str, ctx: &Ctx, versions: &Versions) -> Screen {
         let Some(i) = self.index(route) else {
             return Screen::new(t!("docs.missing"));
         };
@@ -419,6 +432,19 @@ impl Docs {
         } else {
             route.to_string()
         };
+        let page = Node::new(DocPage {
+            docs: self.clone(),
+            versions: versions.clone(),
+            lang,
+            index: i,
+            lives,
+        });
+        if versions.prefixed() {
+            return Screen::new(doc.title.clone())
+                .canonical(format!("{SITE}{canonical}"))
+                .robots(Robots::NoIndex)
+                .body(page);
+        }
         let mut screen = Screen::new(doc.title.clone()).canonical(canonical);
         for (l, (code, tag)) in LANGS.iter().enumerate() {
             if self.0[l][i].status.translated() {
@@ -427,12 +453,7 @@ impl Docs {
         }
         screen
             .alternate("x-default", route)
-            .body(Node::new(DocPage {
-                docs: self.clone(),
-                lang,
-                index: i,
-                lives,
-            }))
+            .body(page)
     }
 
     /// Every URL of the sitemap: each page in each language it is translated into.
@@ -508,6 +529,7 @@ fn lang_index(lang: &str) -> usize {
 /// in English under another language says it is not translated yet.
 struct DocPage {
     docs: Docs,
+    versions: Versions,
     lang: usize,
     index: usize,
     lives: Vec<Node>,
@@ -522,7 +544,8 @@ impl DocPage {
         at.map(|i| {
             let d = self.doc(i);
             format!(
-                r#"<a class="{class}" href="{}"><span>{}</span>{}</a>"#,
+                r#"<a class="{class}" href="{}{}"><span>{}</span>{}</a>"#,
+                self.docs.1,
                 d.url(),
                 r.text(&Text::key(key.to_string())),
                 escape(&d.title)
@@ -536,8 +559,9 @@ impl DocPage {
         match d.status {
             Status::Source => String::new(),
             Status::Translated => format!(
-                r#"<p class="z-doc-note" role="note">{} <a href="{}" hreflang="en" lang="en">{}</a></p>"#,
+                r#"<p class="z-doc-note" role="note">{} <a href="{}{}" hreflang="en" lang="en">{}</a></p>"#,
                 r.text(&t!("docs.translation.note")),
+                self.docs.1,
                 d.route,
                 r.text(&t!("docs.translation.english"))
             ),
@@ -559,6 +583,7 @@ impl Component for DocPage {
         };
         out.push_str(r#"<div class="z-doc">"#);
         out.push_str(&format!(r#"<article class="z-prose"{lang}>"#));
+        out.push_str(&versions::notice(&self.versions, r));
         out.push_str(&self.note(r));
         for (i, chunk) in d.chunks.iter().enumerate() {
             out.push_str(chunk);
@@ -594,9 +619,17 @@ pub async fn search_docs(query: String, docs: Docs, ctx: Ctx) -> Result<Vec<Sear
     Ok(docs.search(ctx.locale(), &query))
 }
 
-/// The URLs of `/sitemap.xml`: every page in every language it is translated into.
+/// The URLs of `/sitemap.xml`: every page in every language it is translated into. Empty in a
+/// build under a version path, since only the build at `/` is indexed.
 #[action(public)]
-pub async fn docs_sitemap(part: SitemapPart, docs: Docs) -> Result<Vec<SitemapUrl>> {
+pub async fn docs_sitemap(
+    part: SitemapPart,
+    docs: Docs,
+    versions: Versions,
+) -> Result<Vec<SitemapUrl>> {
+    if versions.prefixed() {
+        return Ok(Vec::new());
+    }
     Ok(part.of(&docs.urls()))
 }
 
@@ -610,8 +643,10 @@ pub fn feature() -> Feature {
 }
 
 /// The documentation app. `docs` is built once with [`Docs::build`]. English pages stay at their
-/// paths, the other languages are served at `/<lang>/...` (`App::locale_paths`).
-pub fn app(docs: Docs) -> Result<App, String> {
+/// paths, the other languages are served at `/<lang>/...` (`App::locale_paths`). `versions` sets
+/// the version picker and the base path (see [`versions`]). `llms.txt` links the pages at
+/// `https://docs.zeynsoft.com/`, so in every build it points language models to the latest.
+pub fn app(docs: Docs, versions: Versions) -> Result<App, String> {
     let i18n = zeyn::I18n::new("en").catalogs(&[
         ("en", include_str!("../locales/en.json")),
         ("tr", include_str!("../locales/tr.json")),
@@ -623,22 +658,62 @@ pub fn app(docs: Docs) -> Result<App, String> {
         ("hi", include_str!("../locales/hi.json")),
         ("ar", include_str!("../locales/ar.json")),
     ])?;
-    Ok(App::new(t!("docs.app"))
+    let app = App::new(t!("docs.app"))
         .i18n(i18n)
         .locale_paths()
+        .base_path(versions.base())
         .site_url(SITE)
-        .llms_txt(include_str!("../llms.txt"))
         .robots_txt(include_str!("../robots.txt"))
+        .llms_txt(include_str!("../llms.txt"));
+    let picker = versions::picker(&versions);
+    Ok(app
         .service(docs)
+        .service(versions)
         .home(introduction)
         .header(|h| {
-            h.end(Badge::new(Text::from(concat!(
-                "v",
-                env!("CARGO_PKG_VERSION")
-            ))))
-            .end(ExternalLink::new(REPOSITORY, t!("docs.github")).new_tab())
+            h.end(picker)
+                .end(ExternalLink::new(REPOSITORY, t!("docs.github")).new_tab())
         })
         .feature(feature()))
+}
+
+/// The router of the documentation: the app and the version switch at `<base>/_docs/switch`
+/// (see [`versions`]). Under a base path, `<base>/` serves the start page like `<base>`, since
+/// that is the address readers and proxies use. `versions` must be the one given to [`app`].
+pub fn router(app: App, versions: &Versions) -> Result<axum::Router, Vec<String>> {
+    let switch = versions.clone();
+    let base = versions.base().to_string();
+    let inner = app.router()?;
+    let router = axum::Router::new().route(
+        &format!("{base}{}", versions::SWITCH),
+        axum::routing::get(move |headers: axum::http::HeaderMap| async move {
+            versions::switch(&switch, &headers)
+        }),
+    );
+    if base.is_empty() {
+        return Ok(router.merge(inner));
+    }
+    let home = inner.clone();
+    let start = format!("{base}/");
+    Ok(router
+        .route(
+            &start,
+            axum::routing::any(move |mut req: axum::extract::Request| async move {
+                let query = req
+                    .uri()
+                    .query()
+                    .map(|q| format!("?{q}"))
+                    .unwrap_or_default();
+                if let Ok(uri) = format!("{base}{query}").parse() {
+                    *req.uri_mut() = uri;
+                }
+                match tower::ServiceExt::oneshot(home, req).await {
+                    Ok(res) => res,
+                    Err(never) => match never {},
+                }
+            }),
+        )
+        .merge(inner))
 }
 
 /// The public repository of Zeyn, linked from the top bar of every page.
