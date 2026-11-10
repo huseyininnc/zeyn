@@ -85,6 +85,12 @@
       "about": "Código, licencia y seguridad",
       "social": "Social"
     },
+    "version": {
+      "title": "Versión de la documentación",
+      "latest": "última",
+      "notice": "Estás leyendo la documentación de la versión {version}. La última versión es {latest}.",
+      "latest_link": "Leer esta página en la última versión"
+    },
     "translation": {
       "note": "Esta página está traducida del inglés.",
       "english": "Leer la página en inglés",
