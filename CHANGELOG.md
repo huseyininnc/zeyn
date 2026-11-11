@@ -8,11 +8,18 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 - Paging SQL follows the database more closely. PostgreSQL keyset pages seek with one row comparison, `("code", "id") > ($1, $2)`, when the sort keys share a direction and hold no NULLs; with an index on `(status, id)` over one million rows and three status values this took 0.11 ms instead of 29.4 ms. Oracle 11g pages without an offset, keyset pages and capped counts use `ROWNUM <= :n` alone, without the numbering wrapper.
 - Grid exports continue from the previous batch's keyset cursor when the data layer returns one, instead of an offset that rereads every earlier row.
+- Breaking: the `accounts` feature no longer serves `GET /_zeyn/account/signout`, so a link or image on another site cannot sign a user out. Signing out is `POST /_zeyn/account/logout` with the CSRF token, which the idle timeout now calls before it opens the sign in page.
 
 ### Fixed
 
 - HEAD requests to exports, PDFs and sitemaps count toward the write rate limit, like GET.
 - Grid exports of actions that page only by keyset cursor stopped after the first 500 rows.
+- `zeyn:navigate` to another origin, a `javascript:` or a `data:` address is canceled and ignored with one console warning; before, the sender fell back to a full page load of it.
+- `nav.js` no longer swaps in, or writes to the history, an answer that a redirect took to another origin; it loads the requested address in full instead.
+- Live channels take the CSRF token as the WebSocket subprotocol `csrf.TOKEN` next to `zeyn` instead of the `csrf` query parameter, so the token stays out of addresses, server logs and history; the query parameter is no longer accepted.
+- The code editor reads at most 200 characters before the cursor for the word to complete; matching the whole text was quadratic and took 0.6 s at 40,000 characters.
+- A request for a public media id that does not exist counts toward `App::rate_limit`, and a client over its limit gets `429` for public files too, so ids cannot be probed without limit. The Redis rate store now charges the full amount in `RateStore::charge`, like the memory store.
+- A dynamic grid no longer panics on a page offset or cursor near `u64::MAX` from the client.
 
 ## [0.0.10] - 2026-11-10
 

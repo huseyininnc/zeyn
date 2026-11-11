@@ -132,7 +132,7 @@ All `POST` requests send JSON, must carry the header `x-zeyn-csrf` with the toke
 
 A public screen opened without a session comes with an empty `zeyn-csrf` meta tag and no `Set-Cookie`, so that it can be cached. Before its first `POST` the runtime calls `GET /_zeyn/csrf`, which answers `{ "token": "..." }` with `Cache-Control: no-store`, sets the `zeyn_csrf` cookie when the browser has none, and refuses requests whose `Sec-Fetch-Site` is not `same-origin`. The token goes into the meta tag; when the call fails the `POST` goes out without a token and is refused like any other. Nothing is retried silently.
 
-In-app navigation (`nav.js`) asks for a screen with `x-zeyn-partial: 1` and gets only its HTML, with the page title in `x-zeyn-title`. When the screen sets head tags (description, canonical URL, preview image, robots, JSON-LD), the body starts with `<template data-zeyn-head>` holding them; `nav.js` removes every `[data-zeyn-head]` element of the document head, moves the template's tags there and drops the template. A screen without head tags sends no template, so the old tags are only removed.
+In-app navigation (`nav.js`) asks for a screen with `x-zeyn-partial: 1` and gets only its HTML, with the page title in `x-zeyn-title`. When the screen sets head tags (description, canonical URL, preview image, robots, JSON-LD), the body starts with `<template data-zeyn-head>` holding them; `nav.js` removes every `[data-zeyn-head]` element of the document head, moves the template's tags there and drops the template. A screen without head tags sends no template, so the old tags are only removed. `nav.js` uses an answer only when its final URL, after redirects, is on the page's origin; otherwise it loads the requested address in full. A `zeyn:navigate` to another origin (also `javascript:` and `data:` addresses) is canceled and ignored with one console warning.
 
 ### 4.1 Screen fragment
 
@@ -358,10 +358,10 @@ inside it in place.
 
 | Endpoint | Does |
 |---|---|
-| `GET /_zeyn/live/topics?t=a,b&csrf=` | WebSocket; text frames `{ "topic": "a" }` |
-| `GET /_zeyn/live/doc/{kind}/{doc}?csrf=` | WebSocket; binary frames `0x01` + Y update (v1) both ways |
+| `GET /_zeyn/live/topics?t=a,b` | WebSocket; text frames `{ "topic": "a" }` |
+| `GET /_zeyn/live/doc/{kind}/{doc}` | WebSocket; binary frames `0x01` + Y update (v1) both ways |
 
-Handshakes check the origin, the CSRF token against the cookie, the signed in user and the
+Handshakes check the origin, the CSRF token (offered as the subprotocol `csrf.TOKEN` next to `zeyn`, never in the URL) against the cookie, the signed in user and the
 permissions before upgrading. See `docs/realtime.md`.
 
 The player dispatches the cancelable `zeyn:media-adaptive` event (`{ media, kind, url, hls, dash }`) on its root before falling back to progressive files; a streaming library calls `preventDefault()` to take over.

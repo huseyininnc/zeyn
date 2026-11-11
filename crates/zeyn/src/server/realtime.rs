@@ -597,8 +597,6 @@ pub(super) fn holds(st: &AppState, screen: &str) -> bool {
 
 #[derive(Deserialize)]
 struct LiveQuery {
-    #[serde(default)]
-    csrf: String,
     /// Topics, comma separated.
     #[serde(default)]
     t: String,
@@ -635,18 +633,31 @@ fn origin_allowed(headers: &HeaderMap, allowed: &[String]) -> bool {
     !host.is_empty() && bare.eq_ignore_ascii_case(host)
 }
 
-/// The checks of every handshake: the channel is on, origin, CSRF token (in the query, since
-/// browsers cannot set headers on WebSockets), a signed in user and the per user limit. Returns
-/// the context and the user key, which the caller must release.
+/// The subprotocol the browser runtime asks for and the server answers with.
+const PROTOCOL: &str = "zeyn";
+
+/// The CSRF token of a handshake. Browsers cannot set headers on WebSockets, so the runtime
+/// offers it as a subprotocol next to [`PROTOCOL`] (`Sec-WebSocket-Protocol: zeyn, csrf.TOKEN`),
+/// which keeps it out of the address, server logs and history. The answer names only `zeyn`.
+fn csrf_protocol(headers: &HeaderMap) -> &str {
+    headers
+        .get_all(header::SEC_WEBSOCKET_PROTOCOL)
+        .iter()
+        .filter_map(|v| v.to_str().ok())
+        .flat_map(|v| v.split(','))
+        .find_map(|p| p.trim().strip_prefix("csrf."))
+        .unwrap_or("")
+}
+
+/// The checks of every handshake: the channel is on, origin, CSRF token (see
+/// [`csrf_protocol`]), a signed in user and the per user limit. Returns the context and the user
+/// key, which the caller must release.
 #[allow(
     clippy::result_large_err,
     reason = "the error is the HTTP response, returned to the client at once and never stored; boxing it would allocate on every refusal"
 )]
-async fn admit(
-    st: &AppState,
-    headers: &HeaderMap,
-    csrf: &str,
-) -> Result<(Ctx, Hub, String), Response> {
+async fn admit(st: &AppState, headers: &HeaderMap) -> Result<(Ctx, Hub, String), Response> {
+    let csrf = csrf_protocol(headers);
     let ctx = st.licensed(st.ctx(headers)).await;
     let Some(hub) = st.realtime.clone() else {
         return Err(st.error_response(&ctx, Failure::App(Error::NotFound)));
@@ -695,14 +706,10 @@ fn busy() -> Response {
 async fn doc_socket(
     State(st): State<Arc<AppState>>,
     Path((kind, doc)): Path<(String, String)>,
-    query: Result<Query<LiveQuery>, QueryRejection>,
     headers: HeaderMap,
     ws: Result<WebSocketUpgrade, axum::extract::ws::rejection::WebSocketUpgradeRejection>,
 ) -> Response {
-    let csrf = query
-        .map(|q| q.0.csrf)
-        .unwrap_or_default();
-    let (ctx, hub, user) = match admit(&st, &headers, &csrf).await {
+    let (ctx, hub, user) = match admit(&st, &headers).await {
         Ok(a) => a,
         Err(r) => return r,
     };
@@ -783,7 +790,8 @@ async fn doc_socket(
     let can_write = ctx
         .identity()
         .can(&crate::action::Access::Permission(kind_def.write));
-    ws.max_message_size(limits.message_bytes)
+    ws.protocols([PROTOCOL])
+        .max_message_size(limits.message_bytes)
         .on_upgrade(move |socket| async move {
             run_doc(socket, &room, id, rx, can_write, &limits).await;
             if let Ok(mut clients) = room.clients.lock() {
@@ -919,11 +927,10 @@ async fn topic_socket(
     headers: HeaderMap,
     ws: Result<WebSocketUpgrade, axum::extract::ws::rejection::WebSocketUpgradeRejection>,
 ) -> Response {
-    let q = query.map(|q| q.0).unwrap_or(LiveQuery {
-        csrf: String::new(),
-        t: String::new(),
-    });
-    let (ctx, hub, user) = match admit(&st, &headers, &q.csrf).await {
+    let q = query
+        .map(|q| q.0)
+        .unwrap_or(LiveQuery { t: String::new() });
+    let (ctx, hub, user) = match admit(&st, &headers).await {
         Ok(a) => a,
         Err(r) => return r,
     };
@@ -998,7 +1005,9 @@ async fn topic_socket(
         }
     }
     drop(tx);
-    ws.max_message_size(1024).on_upgrade(move |socket| async move {
+    ws.protocols([PROTOCOL])
+        .max_message_size(1024)
+        .on_upgrade(move |socket| async move {
         let (mut sink, mut stream) = socket.split();
         let mut beat = tokio::time::interval(limits.heartbeat);
         beat.tick().await;

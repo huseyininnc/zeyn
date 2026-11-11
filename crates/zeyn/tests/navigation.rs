@@ -917,3 +917,29 @@ fn a_logo_from_another_origin_is_reported() {
         );
     }
 }
+
+#[tokio::test]
+async fn navigation_never_leaves_the_app_origin() {
+    let (_, _, js) = get(&app(None), "/_zeyn/nav.js", false).await;
+    let handler = &js[js
+        .find("addEventListener('zeyn:navigate'")
+        .unwrap()..];
+    let handler = &handler[..handler.find("\n});").unwrap()];
+    let canceled = handler
+        .find("e.preventDefault()")
+        .unwrap();
+    let checked = handler
+        .find("url.origin !== location.origin")
+        .unwrap();
+    assert!(
+        canceled < checked,
+        "a request for another origin (or javascript:, data:) is canceled, so the sender does not load it either"
+    );
+    assert!(handler.contains("console.warn"));
+    assert_eq!(
+        js.matches("if (!sameOrigin(res))")
+            .count(),
+        2,
+        "a fetch that a redirect took to another origin is never swapped in or pushed to history"
+    );
+}

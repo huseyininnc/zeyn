@@ -1673,3 +1673,42 @@ async fn the_register_screen_goes_to_a_screen_that_opens() {
     .await;
     assert!(mismatch.body.contains("do not match"), "{}", mismatch.body);
 }
+
+#[tokio::test]
+async fn signing_out_needs_a_post_with_the_csrf_token() {
+    let a = accounts();
+    user(&a, "out@example.com").await;
+    let router = app(a.clone());
+    let login = send(
+        &router,
+        post(
+            "/_zeyn/account/login?useCookies=true",
+            json!({ "email": "out@example.com", "password": PASSWORD }),
+            "",
+        ),
+    )
+    .await;
+    let session = login.cookie("zeyn_account").unwrap();
+    let cookies = format!("zeyn_account={session}");
+    let image = send(&router, get("/_zeyn/account/signout", &cookies)).await;
+    assert!(
+        matches!(
+            image.status,
+            StatusCode::NOT_FOUND | StatusCode::METHOD_NOT_ALLOWED
+        ),
+        "a cross site image tag cannot sign the user out: {}",
+        image.status
+    );
+    assert_eq!(image.cookie("zeyn_account"), None);
+    let no_token = Request::post("/_zeyn/account/logout")
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::COOKIE, &cookies)
+        .body(Body::from("{}"))
+        .unwrap();
+    let refused = send(&router, no_token).await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN);
+    assert_eq!(refused.cookie("zeyn_account"), None);
+    let out = send(&router, post("/_zeyn/account/logout", json!({}), &cookies)).await;
+    assert_eq!(out.status, StatusCode::OK);
+    assert_eq!(out.cookie("zeyn_account").as_deref(), Some(""));
+}

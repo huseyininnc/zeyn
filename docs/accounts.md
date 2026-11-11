@@ -38,6 +38,8 @@ App::new("Shop")
   authenticator, checks security stamps, and serves the JSON endpoints under `/_zeyn/account`.
 - `accounts::feature()` (or `accounts::ui()...build()`) adds the screens under `/account`. The
   app's `login_url`, the step up and re authentication pages and the idle sign out point there.
+  The idle timeout ends the session with `POST /_zeyn/account/logout` and the CSRF token; there
+  is no `GET` sign out, so a link or image on another site cannot sign a user out.
 - The key must be at least 32 bytes and must not change: it seals cookies and stored
   authenticator keys and signs links. A shorter key stops the app at startup.
 - `public_url` is used for links in messages and as the passkey relying party. It is never taken
@@ -316,7 +318,7 @@ The equivalent of `MapIdentityApi`, under `/_zeyn/account`:
 | `GET /manage/personalData` | | the user's data as a JSON download |
 | `POST /passkeys/requestOptions`, `POST /passkeys/login` | `credentialJson` | options; cookie or tokens |
 | `POST /manage/passkeys/creationOptions`, `GET`, `POST /manage/passkeys`, `POST /manage/passkeys/remove` | `credentialJson`, `name`, `credentialId` | options, list, the new passkey |
-| `POST /logout`, `GET /signout` | | ends the cookie session |
+| `POST /logout` | | ends the cookie session |
 
 Validation problems list errors by code in Pascal case (`PasswordTooShort`), as .NET does. Every
 `POST` must be `application/json` (a cross site form cannot send that, and a cross site script

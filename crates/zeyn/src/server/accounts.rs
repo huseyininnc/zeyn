@@ -19,7 +19,7 @@ use crate::{Error, Result};
 use axum::Router;
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
-use axum::response::{IntoResponse, Redirect, Response};
+use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use serde::Deserialize;
 use serde_json::{Value as Json, json};
@@ -185,7 +185,6 @@ pub(super) fn routes(router: Router<Arc<AppState>>, st: &Arc<AppState>) -> Route
         .route(&format!("{BASE}/register"), post(register))
         .route(&format!("{BASE}/login"), post(login))
         .route(&format!("{BASE}/logout"), post(logout))
-        .route(&format!("{BASE}/signout"), get(signout))
         .route(&format!("{BASE}/refresh"), post(refresh))
         .route(&format!("{BASE}/confirmEmail"), get(confirm_email))
         .route(&format!("{BASE}/resendConfirmationEmail"), post(resend))
@@ -680,27 +679,6 @@ async fn logout(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response
         .sign_in()
         .sign_out(user.as_ref().map(|u| u.id.as_str()));
     StatusCode::OK.into_response()
-}
-
-/// Ends the browser session and goes to the sign in page; the idle timeout sends users here.
-async fn signout(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
-    let accounts = accounts(&st);
-    let user = current(&accounts, &headers)
-        .await
-        .ok()
-        .flatten();
-    accounts
-        .sign_in()
-        .sign_out(user.as_ref().map(|u| u.id.as_str()));
-    let mut r = Redirect::to(
-        &st.login_url
-            .clone()
-            .unwrap_or_else(|| st.url("/")),
-    )
-    .into_response();
-    r.headers_mut()
-        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
-    r
 }
 
 #[derive(Deserialize)]

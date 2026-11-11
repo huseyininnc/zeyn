@@ -667,7 +667,11 @@ impl GridSource for DynamicGrid {
                 count: rows.len(),
                 total: page.total,
                 next: match cut {
-                    true => Some(Cursor((start + rows.len() as u64).to_string())),
+                    true => Some(Cursor(
+                        start
+                            .saturating_add(rows.len() as u64)
+                            .to_string(),
+                    )),
                     false => page.next,
                 },
                 offset,

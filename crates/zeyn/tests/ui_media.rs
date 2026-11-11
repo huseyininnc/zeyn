@@ -696,7 +696,8 @@ async fn public_media_reads_skip_the_rate_limit_but_private_media_and_ip_rules_s
         send(&router, from("/_zeyn/media/images/clip.mp4", "203.0.113.5"))
             .await
             .0,
-        StatusCode::OK
+        StatusCode::TOO_MANY_REQUESTS,
+        "public files cost nothing but are not served past the limit"
     );
     assert_eq!(
         send(
@@ -764,4 +765,59 @@ fn notes() -> Vec<u8> {
         .repeat(400)
         .into_bytes()[..5000]
         .to_vec()
+}
+
+#[tokio::test]
+async fn public_media_misses_count_toward_the_rate_limit() {
+    let router = App::new("Test")
+        .i18n(I18n::new("en"))
+        .rate_limit(zeyn::RateLimit::per_ip(
+            3,
+            std::time::Duration::from_secs(60),
+        ))
+        .feature(Feature::new("catalog").public_media("images", 86_400, Files::default()))
+        .router()
+        .unwrap();
+    let get = |path: &str| {
+        let mut req = Request::get(path)
+            .body(Body::empty())
+            .unwrap();
+        req.extensions_mut()
+            .insert(axum::extract::ConnectInfo(std::net::SocketAddr::new(
+                "203.0.113.9".parse().unwrap(),
+                5000,
+            )));
+        req
+    };
+    for _ in 0..10 {
+        assert_eq!(
+            send(&router, get("/_zeyn/media/images/clip.mp4"))
+                .await
+                .0,
+            StatusCode::OK,
+            "hits stay free"
+        );
+    }
+    for i in 0..3 {
+        assert_eq!(
+            send(&router, get(&format!("/_zeyn/media/images/missing-{i}")))
+                .await
+                .0,
+            StatusCode::NOT_FOUND
+        );
+    }
+    assert_eq!(
+        send(&router, get("/_zeyn/media/images/missing-9"))
+            .await
+            .0,
+        StatusCode::TOO_MANY_REQUESTS,
+        "probing unknown ids is limited"
+    );
+    assert_eq!(
+        send(&router, get("/_zeyn/media/images/clip.mp4"))
+            .await
+            .0,
+        StatusCode::TOO_MANY_REQUESTS,
+        "a hit cannot tell a prober over its limit which ids exist"
+    );
 }

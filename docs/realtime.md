@@ -28,8 +28,8 @@ App::new(..).realtime(realtime)    // also registers `Hub` as a service
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /_zeyn/live/doc/{kind}/{doc}?csrf=TOKEN` | WebSocket: a collaborative document |
-| `GET /_zeyn/live/topics?t=a,b&csrf=TOKEN` | WebSocket: change notifications for topics |
+| `GET /_zeyn/live/doc/{kind}/{doc}` | WebSocket: a collaborative document |
+| `GET /_zeyn/live/topics?t=a,b` | WebSocket: change notifications for topics |
 | `GET /_zeyn/live.js` | The topic script, linked only by pages that subscribe |
 
 Every handshake is checked before the upgrade, in this order:
@@ -38,9 +38,12 @@ Every handshake is checked before the upgrade, in this order:
 2. **Origin:** the `Origin` header must name the host the request came to, or an origin added with
    `Realtime::allow_origin`. Browsers always send it on WebSocket handshakes; a missing one is
    refused. This is what stops another site from opening a socket with the user's cookies.
-3. **CSRF token:** browsers cannot set headers on a WebSocket, so the token from
-   `meta[name=zeyn-csrf]` goes in the `csrf` query parameter and is compared in constant time with
-   the `zeyn_csrf` cookie, exactly as `x-zeyn-csrf` is for `POST`s. Failures answer `403`.
+3. **CSRF token:** browsers cannot set headers on a WebSocket, so the client offers the token
+   from `meta[name=zeyn-csrf]` as a subprotocol: `new WebSocket(url, ['zeyn', 'csrf.' + token])`
+   sends `Sec-WebSocket-Protocol: zeyn, csrf.TOKEN`. The server compares it in constant time with
+   the `zeyn_csrf` cookie, exactly as `x-zeyn-csrf` is for `POST`s, and answers with the `zeyn`
+   subprotocol only, so the token never appears in the address, server logs or history. A token
+   in the query string is not accepted. Failures answer `403`.
 4. **Identity:** the same authenticator as every request; the user must be signed in (`403`).
 5. **Per user limit** (`429`).
 6. Documents: a declared kind and a plain id (1 to 64 letters, digits, `-`, `_`, `.`), else `404`;

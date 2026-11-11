@@ -20,7 +20,8 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use tokio::sync::OnceCell;
 
-/// Token bucket in one atomic step, the same algorithm as the memory store. Returns how many
+/// Token bucket in one atomic step, the same algorithm as the memory store. `ARGV[4]` is the
+/// cost: 1 for a request, more for a model answer, 0 to only check. Returns how many
 /// milliseconds to wait, 0 when the request may go ahead. Time comes from Redis, so the clocks of
 /// the app servers do not matter.
 const TAKE: &str = r"
@@ -33,7 +34,7 @@ local tokens = tonumber(bucket[1]) or capacity
 local at = tonumber(bucket[2]) or now
 tokens = math.min(capacity, tokens + math.max(0, now - at) * per_ms)
 local wait = 0
-if tokens >= 1 then tokens = tokens - 1 else wait = math.ceil((1 - tokens) / per_ms) end
+if tokens >= 1 then tokens = tokens - tonumber(ARGV[4]) else wait = math.ceil((1 - tokens) / per_ms) end
 redis.call('HSET', KEYS[1], 't', tostring(tokens), 'at', now)
 redis.call('PEXPIRE', KEYS[1], ARGV[3])
 return wait
@@ -148,6 +149,15 @@ impl RedisStore {
 
 impl RateStore for RedisStore {
     fn take(&self, key: &str, limit: &RateLimit) -> BoxFuture<std::result::Result<(), Duration>> {
+        self.charge(key, limit, 1)
+    }
+
+    fn charge(
+        &self,
+        key: &str,
+        limit: &RateLimit,
+        amount: u32,
+    ) -> BoxFuture<std::result::Result<(), Duration>> {
         let store = self.clone();
         let key = format!("{}rate:{key}", self.0.prefix);
         let window_ms = limit
@@ -169,6 +179,7 @@ impl RateStore for RedisStore {
                         .arg(capacity)
                         .arg(per_ms)
                         .arg(window_ms)
+                        .arg(amount)
                         .invoke_async::<u64>(&mut con)
                         .await
                 }

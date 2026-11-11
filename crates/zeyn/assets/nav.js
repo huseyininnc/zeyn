@@ -31,6 +31,14 @@ function isScreenUrl(url) {
   return !local.startsWith('/_zeyn/') && !local.startsWith('/api/') && !/\.[a-z0-9]+$/i.test(local);
 }
 
+/**
+ * Whether `res` came from this app's origin, also after redirects. A response from another
+ * origin is never swapped in or written to the history.
+ */
+function sameOrigin(res) {
+  return !res.url || new URL(res.url).origin === location.origin;
+}
+
 /** Marks the menu link of the current page and writes the top bar's breadcrumb from it. */
 function markCurrent(url) {
   let current = null;
@@ -115,6 +123,10 @@ async function swapScreen(url, push) {
     });
   } catch (err) {
     if (err?.name === 'AbortError') return;
+    location.assign(url.href);
+    return;
+  }
+  if (!sameOrigin(res)) {
     location.assign(url.href);
     return;
   }
@@ -220,6 +232,10 @@ async function swapFrame(url, push, hash) {
     location.assign(url.href);
     return;
   }
+  if (!sameOrigin(res)) {
+    location.assign(url.href);
+    return;
+  }
   const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
   const next = doc.querySelector('.z-app');
   const current = document.querySelector('.z-app');
@@ -264,12 +280,20 @@ function refreshPage() {
  * Other scripts ask for navigation with events instead of loading pages themselves:
  * `zeyn:navigate` (`detail.url`, `detail.replace`) loads a screen, `zeyn:refresh` reloads the
  * current one in place and `zeyn:refresh-page` the whole app frame. Each event is canceled when
- * handled, so a sender without this script can fall back to a page load.
+ * handled, so a sender without this script can fall back to a page load. A `zeyn:navigate` to
+ * another origin (also `javascript:` and `data:` addresses) is canceled too and goes nowhere,
+ * with one console warning.
  */
+let warnedOrigin = false;
+
 document.addEventListener('zeyn:navigate', (e) => {
-  const url = new URL(e.detail?.url ?? location.href, location.href);
-  if (url.origin !== location.origin) return;
   e.preventDefault();
+  const url = new URL(e.detail?.url ?? location.href, location.href);
+  if (url.origin !== location.origin) {
+    if (!warnedOrigin) console.warn('zeyn:navigate ignored an address outside this app');
+    warnedOrigin = true;
+    return;
+  }
   visit(url, !e.detail?.replace);
 });
 
