@@ -11,6 +11,7 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 ### Fixed
 
+- `accounts::create_tables` for Oracle uses a sequence and a trigger for claim ids instead of identity columns, so the account tables are created on Oracle 11g too.
 - Grid exports of actions that page only by keyset cursor stopped after the first 500 rows.
 
 ## [0.0.10] - 2026-11-10
