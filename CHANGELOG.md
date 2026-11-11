@@ -11,6 +11,7 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 ### Fixed
 
+- Signing out answers with `Clear-Site-Data: "storage"`, and pages carry a per user storage key (`<meta name="zeyn-storage">`, a keyed hash, never the user id) that form drafts, local grid views and palette recents are filed under, so the next user of a shared browser no longer sees them.
 - HEAD requests to exports, PDFs and sitemaps count toward the write rate limit, like GET.
 - Grid exports of actions that page only by keyset cursor stopped after the first 500 rows.
 - The markup sanitizer removes SVG `use` elements whose target is a `use` or holds one, so nested references (ten groups that each use the previous one ten times) can no longer render billions of copies and hang the browser; reference cycles go with them, and icon sprites keep working.
