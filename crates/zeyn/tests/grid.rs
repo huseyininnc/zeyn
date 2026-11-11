@@ -1691,6 +1691,80 @@ async fn export_streams_every_matching_row_in_the_users_layout_and_language() {
     );
 }
 
+/// A source that pages only by keyset: an offset past the first row returns nothing, like a
+/// data layer whose cursors carry row values.
+#[action(permission = "items.read")]
+pub async fn keyset_search(q: DataQuery) -> Result<Page<Item>> {
+    const ROWS: i64 = 1_203;
+    let after = match &q.page {
+        zeyn::PageRequest::After {
+            cursor: Some(c), ..
+        } => {
+            c.0.strip_prefix('k')
+                .and_then(|n| n.parse::<i64>().ok())
+                .unwrap_or(ROWS)
+        }
+        zeyn::PageRequest::Offset { offset: 0, .. }
+        | zeyn::PageRequest::After { cursor: None, .. } => 0,
+        zeyn::PageRequest::Offset { .. } => ROWS,
+    };
+    let end = (after + i64::from(q.limit())).min(ROWS);
+    let page = Page::new(
+        (after + 1..=end)
+            .map(|i| Item {
+                id: ItemId(i),
+                qty: i,
+                ..item(1)
+            })
+            .collect(),
+    );
+    Ok(if end < ROWS {
+        page.next(zeyn::Cursor(format!("k{end}")))
+    } else {
+        page
+    })
+}
+
+#[screen(route = "/keyset-export", permission = "items.read")]
+pub fn keyset_export() -> Screen {
+    Screen::new("Keyset export").body(
+        DataGrid::of(keyset_search)
+            .column(Item::qty)
+            .exportable(),
+    )
+}
+
+#[tokio::test]
+async fn export_follows_keyset_cursors_past_the_first_batch() {
+    let identity = reader();
+    let router = App::new("Test")
+        .auth(move |h: &HeaderMap| {
+            h.contains_key("x-user")
+                .then(|| identity.clone())
+        })
+        .feature(Feature::new("items").screen(keyset_export))
+        .router()
+        .unwrap();
+    let r = send(
+        &router,
+        Request::get("/_zeyn/grid/export?screen=keyset_export&node=0")
+            .header("x-user", "1")
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::OK);
+    let rows: Vec<&str> = r
+        .body
+        .trim_start_matches('\u{feff}')
+        .lines()
+        .skip(1)
+        .collect();
+    assert_eq!(rows.len(), 1_203, "every row once, across three batches");
+    assert_eq!(rows[0], "1");
+    assert_eq!(rows[1_202], "1203");
+}
+
 #[tokio::test]
 async fn export_defuses_formulas_and_respects_the_limit_and_permissions() {
     let (router, _) = export_router(reader());

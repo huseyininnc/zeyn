@@ -4,6 +4,15 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 ## [Unreleased]
 
+### Changed
+
+- Paging SQL follows the database more closely. PostgreSQL keyset pages seek with one row comparison, `("code", "id") > ($1, $2)`, when the sort keys share a direction and hold no NULLs; with an index on `(status, id)` over one million rows and three status values this took 0.11 ms instead of 29.4 ms. Oracle 11g pages without an offset, keyset pages and capped counts use `ROWNUM <= :n` alone, without the numbering wrapper.
+- Grid exports continue from the previous batch's keyset cursor when the data layer returns one, instead of an offset that rereads every earlier row.
+
+### Fixed
+
+- Grid exports of actions that page only by keyset cursor stopped after the first 500 rows.
+
 ## [0.0.10] - 2026-11-10
 
 ### Added
