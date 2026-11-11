@@ -523,6 +523,39 @@ fn html_inside_svg_is_unwrapped_and_use_elements_are_capped() {
 }
 
 #[test]
+fn use_elements_cannot_reference_markup_that_holds_another_use() {
+    let mut nested = String::from(r#"<svg><defs><path id="a0" d="M0 0h1"/>"#);
+    for level in 1..8 {
+        nested.push_str(&format!(r#"<g id="a{level}">"#));
+        for _ in 0..10 {
+            nested.push_str(&format!(r##"<use href="#a{}"/>"##, level - 1));
+        }
+        nested.push_str("</g>");
+    }
+    nested.push_str(r##"</defs><use href="#a7"/></svg>"##);
+    let clean = sanitize_markup(&nested, "p-");
+    assert_eq!(clean.matches("<use").count(), 10, "{clean}");
+    assert_eq!(
+        clean
+            .matches(r##"<use href="#p-a0"/>"##)
+            .count(),
+        10
+    );
+
+    let sprite = r##"<svg><symbol id="icon"><path d="M0 0h1"/></symbol><use href="#icon"/></svg>"##;
+    assert_eq!(
+        sanitize_markup(sprite, "p-"),
+        r##"<svg><symbol id="p-icon"><path d="M0 0h1"/></symbol><use href="#p-icon"/></svg>"##
+    );
+
+    let cycle = r##"<svg><g id="a"><use href="#b"/></g><g id="b"><use href="#a"/></g><use id="c" href="#c"/></svg>"##;
+    assert_eq!(
+        sanitize_markup(cycle, ""),
+        r#"<svg><g id="a"></g><g id="b"></g></svg>"#
+    );
+}
+
+#[test]
 fn the_id_prefix_is_kept_to_safe_characters() {
     assert_eq!(
         sanitize_markup(r#"<p id="x">a</p>"#, "a\"b-<c>"),
