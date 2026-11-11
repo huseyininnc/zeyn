@@ -7,6 +7,7 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 ### Added
 
 - Nested and collapsible side menu groups: `Menu::sub` nests groups up to three levels below a group, every group heading is a disclosure button that starts open on the branch of the current screen, `Menu::open` keeps a group open and `Menu::accordion` closes sibling groups. The new `menu` module (3.2 KB, 1.3 KB compressed) adds arrow key navigation and loads only on pages whose menu has a collapsible group; the breadcrumb shows the whole group path.
+- Side menus built per request: `App::menu_source` takes an async source, for example a query on a menu table, that returns `MenuNode` groups with links to screens by name or to app paths. The server checks every link again (unknown screens, screens the user may not open, unsafe paths, depth, 500 nodes, 100 character labels), merges the groups after the static menus, caches answers for 60 seconds per tenant, language and permission set in a cache of 256 answers (`App::menu_per_user` keys it by user too) and shows the static menu when the source fails or takes longer than 2 seconds. `Menus::invalidate` clears the cache after the menu changes.
 
 ### Changed
 

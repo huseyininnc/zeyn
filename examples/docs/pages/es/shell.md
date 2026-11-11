@@ -35,6 +35,76 @@ Feature::new("sales")
 - **Teclado.** Arriba y Abajo recorren los encabezados y enlaces visibles, Inicio y Fin van al primero y al último. Derecha abre un grupo cerrado o entra en uno abierto; Izquierda cierra un grupo abierto o va al encabezado del grupo que lo rodea. Enter y Espacio abren o cierran un grupo. Izquierda y Derecha se intercambian en los idiomas de derecha a izquierda.
 - **Permisos y fusión.** Los grupos con la misma etiqueta se fusionan entre features en todos los niveles, y un grupo cuyos elementos el usuario no puede abrir se omite, incluidos los grupos anidados. La ruta de navegación de `App::header(|h| h.breadcrumb())` muestra la ruta completa de grupos. El site shell lista los enlaces de los grupos anidados en su grupo de primer nivel.
 
+### Menús construidos en cada petición
+
+`App::menu_source(source)` añade entradas de menú que se construyen en cada petición, por ejemplo a partir de una tabla de menú filtrada por los roles del usuario. Una fuente es una función async que recibe el `Ctx` (identidad, tenant, idioma) y devuelve `MenuNode`s: `MenuNode::group(label, children)` en el nivel superior, con enlaces `MenuNode::screen(label, "screen_name")` (`.params(json)` rellena los segmentos de la ruta y la consulta, como hace `screen_url`), enlaces `MenuNode::path(label, "/reports/sales")` y grupos anidados dentro. `.icon(...)`, `.open()` y `.permission("menu.reports")` funcionan en cualquier nodo. Una etiqueta es texto plano, escapado como cualquier otro texto, o una clave del catálogo con `Text::key`.
+
+Los grupos van después de los menús estáticos de las features, y un grupo con la etiqueta de un grupo estático se fusiona con él. La ruta de navegación, la paleta de comandos y `nav.js` tratan sus enlaces como cualquier otro enlace del menú.
+
+La tabla de abajo funciona en PostgreSQL y en Oracle. Un único `SELECT` plano la lee, y el árbol se construye en Rust por `parent_id`:
+
+```sql
+CREATE TABLE menu_items (
+    id          INTEGER PRIMARY KEY,
+    parent_id   INTEGER REFERENCES menu_items (id),
+    label       VARCHAR(100) NOT NULL,
+    screen      VARCHAR(100),
+    path        VARCHAR(500),
+    icon        VARCHAR(40),
+    permission  VARCHAR(100),
+    sort_order  INTEGER DEFAULT 0 NOT NULL
+);
+```
+
+```rust
+#[model]
+pub struct MenuRow {
+    pub id: i64,
+    pub parent_id: Option<i64>,
+    pub label: String,
+    pub screen: Option<String>,
+    pub path: Option<String>,
+    pub icon: Option<String>,
+    pub permission: Option<String>,
+    pub sort_order: i64,
+}
+
+async fn menu(ctx: Ctx) -> Result<Vec<MenuNode>> {
+    let db = ctx.service::<Db>().ok_or_else(|| Error::Internal("no database".into()))?;
+    let rows: Vec<MenuRow> = db
+        .query("SELECT id, parent_id, label, screen, path, icon, permission, sort_order FROM menu_items ORDER BY sort_order, id", vec![])
+        .await?;
+    Ok(tree(&rows, None))
+}
+
+fn tree(rows: &[MenuRow], parent: Option<i64>) -> Vec<MenuNode> {
+    rows.iter()
+        .filter(|r| r.parent_id == parent)
+        .map(|r| {
+            let mut node = match (&r.screen, &r.path) {
+                (Some(screen), _) => MenuNode::screen(r.label.clone(), screen.clone()),
+                (None, Some(path)) => MenuNode::path(r.label.clone(), path.clone()),
+                (None, None) => MenuNode::group(r.label.clone(), tree(rows, Some(r.id))),
+            };
+            if let Some(icon) = Icon::ALL.iter().find(|i| Some(i.name()) == r.icon.as_deref()) {
+                node = node.icon(*icon);
+            }
+            match &r.permission {
+                Some(p) => node.permission(p.clone()),
+                None => node,
+            }
+        })
+        .collect()
+}
+
+App::new("Admin").menu_source(menu)
+```
+
+- **Nunca se confía en ella.** El servidor comprueba cada enlace en cada petición: los enlaces a screens desconocidas se descartan con un aviso en el log, los enlaces a screens que el usuario no puede abrir (acceso, guards de la feature, el `permission` propio del nodo) se descartan aunque la fuente los haya devuelto, y lo mismo ocurre con los enlaces a screens cuyos segmentos de ruta no rellenan los params. Una ruta debe empezar con una sola `/`: sin esquema, sin `//`, sin barra invertida y sin caracteres de control. Los grupos se anidan como mucho `MENU_DEPTH` niveles, la respuesta de una fuente conserva como mucho `MAX_MENU_NODES` (500) nodos y las etiquetas se cortan en `MAX_MENU_LABEL` (100) caracteres.
+- **En caché.** Las respuestas se guardan en caché durante `MENU_TTL` (60 segundos) por tenant, idioma y conjunto de permisos, así que los usuarios con los mismos roles comparten una respuesta y la fuente se ejecuta una vez por minuto para ellos. La caché guarda como mucho `MAX_MENU_CACHE` (256) respuestas y descarta la más antigua. Una fuente cuya respuesta depende del usuario, y no solo de los permisos, necesita `App::menu_per_user()`. Después de que una action edite la tabla, llama a `invalidate()` en el servicio `Menus` inyectado.
+- **Nunca rompe la página.** Cuando la fuente devuelve un error, entra en pánico o tarda más que `MENU_TIMEOUT` (2 segundos), la página muestra el menú estático y el servidor registra el fallo. Los fallos no se guardan en caché.
+- **Dónde aparece.** El menú pertenece al app shell: las cargas completas de screens y las páginas de error lo incluyen, mientras que el shell del sitio y las páginas de inicio de sesión muestran solo los menús estáticos.
+
 ## El shell del sitio
 
 Las pantallas de trabajo se abren en el shell de la aplicación con su menú lateral. Las páginas públicas, como una tienda o un catálogo de productos, pueden abrirse en cambio en el shell del sitio: el nombre de la aplicación como enlace de marca, un menú horizontal, un botón de menú en pantallas estrechas, acciones opcionales y un pie de página. Una feature lo elige; las pantallas de otras features conservan el shell de la aplicación, así que ambos conviven en una misma aplicación.

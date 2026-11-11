@@ -35,6 +35,76 @@ Feature::new("sales")
 - **キーボード。** 上と下は表示中の見出しとリンクの間を移動し、Home と End は最初と最後へ移ります。右は閉じたグループを開くか、開いたグループの中へ移ります。左は開いたグループを閉じるか、外側のグループの見出しへ移ります。Enter と Space でグループを開閉します。右から左へ書く言語では左右が入れ替わります。
 - **権限と統合。** 同じラベルのグループはどの階層でも feature をまたいで統合され、ユーザーが開けない項目だけのグループは、入れ子のグループも含めて表示されません。`App::header(|h| h.breadcrumb())` のパンくずはグループの完全な経路を示します。site shell は入れ子のグループのリンクを最上位のグループに並べます。
 
+### リクエストごとに組み立てるメニュー
+
+`App::menu_source(source)` は、リクエストごとに組み立てるメニュー項目を追加します。たとえばユーザーのロールで絞り込んだメニューテーブルから作ります。ソースは `Ctx`（ID、テナント、言語）を受け取り `MenuNode` を返す async 関数です。最上位は `MenuNode::group(label, children)` で、その中に `MenuNode::screen(label, "screen_name")` リンク（`.params(json)` は `screen_url` と同じようにパスのセグメントとクエリを埋めます）、`MenuNode::path(label, "/reports/sales")` リンク、入れ子のグループを置きます。`.icon(...)`、`.open()`、`.permission("menu.reports")` はどのノードにも使えます。ラベルは他のテキストと同じくエスケープされる普通のテキストか、`Text::key` によるカタログのキーです。
+
+これらのグループは feature の静的メニューの後に並び、静的グループと同じラベルのグループはそのグループに統合されます。パンくず、コマンドパレット、`nav.js` は、これらのリンクを他のメニューリンクと同じように扱います。
+
+次のテーブルは PostgreSQL と Oracle で動きます。平らな `SELECT` 1 本で読み、木構造は Rust で `parent_id` から組み立てます。
+
+```sql
+CREATE TABLE menu_items (
+    id          INTEGER PRIMARY KEY,
+    parent_id   INTEGER REFERENCES menu_items (id),
+    label       VARCHAR(100) NOT NULL,
+    screen      VARCHAR(100),
+    path        VARCHAR(500),
+    icon        VARCHAR(40),
+    permission  VARCHAR(100),
+    sort_order  INTEGER DEFAULT 0 NOT NULL
+);
+```
+
+```rust
+#[model]
+pub struct MenuRow {
+    pub id: i64,
+    pub parent_id: Option<i64>,
+    pub label: String,
+    pub screen: Option<String>,
+    pub path: Option<String>,
+    pub icon: Option<String>,
+    pub permission: Option<String>,
+    pub sort_order: i64,
+}
+
+async fn menu(ctx: Ctx) -> Result<Vec<MenuNode>> {
+    let db = ctx.service::<Db>().ok_or_else(|| Error::Internal("no database".into()))?;
+    let rows: Vec<MenuRow> = db
+        .query("SELECT id, parent_id, label, screen, path, icon, permission, sort_order FROM menu_items ORDER BY sort_order, id", vec![])
+        .await?;
+    Ok(tree(&rows, None))
+}
+
+fn tree(rows: &[MenuRow], parent: Option<i64>) -> Vec<MenuNode> {
+    rows.iter()
+        .filter(|r| r.parent_id == parent)
+        .map(|r| {
+            let mut node = match (&r.screen, &r.path) {
+                (Some(screen), _) => MenuNode::screen(r.label.clone(), screen.clone()),
+                (None, Some(path)) => MenuNode::path(r.label.clone(), path.clone()),
+                (None, None) => MenuNode::group(r.label.clone(), tree(rows, Some(r.id))),
+            };
+            if let Some(icon) = Icon::ALL.iter().find(|i| Some(i.name()) == r.icon.as_deref()) {
+                node = node.icon(*icon);
+            }
+            match &r.permission {
+                Some(p) => node.permission(p.clone()),
+                None => node,
+            }
+        })
+        .collect()
+}
+
+App::new("Admin").menu_source(menu)
+```
+
+- **決して信用しない。** サーバーはリクエストごとにすべてのリンクを確認します。存在しない screen へのリンクはログに警告を出して捨てます。ユーザーが開けない screen へのリンク（アクセス、feature の guard、ノード自身の `permission`）は、ソースが返しても捨てます。params でパスのセグメントが埋まらない screen へのリンクも同じです。パスは `/` 1 つで始まる必要があります。スキーム、`//`、バックスラッシュ、制御文字は使えません。グループの入れ子は最大 `MENU_DEPTH` 階層、ソースの応答は最大 `MAX_MENU_NODES`（500）ノードまでで、ラベルは `MAX_MENU_LABEL`（100）文字で切り詰めます。
+- **キャッシュ。** 応答はテナント、言語、権限の組み合わせごとに `MENU_TTL`（60 秒）キャッシュされます。同じロールのユーザーは 1 つの応答を共有し、ソースはそのユーザーたちのために 1 分に 1 回だけ動きます。キャッシュは最大 `MAX_MENU_CACHE`（256）件の応答を保持し、最も古いものから捨てます。権限だけでなくユーザーによって応答が変わるソースには `App::menu_per_user()` が必要です。テーブルを編集した action は、注入された `Menus` サービスの `invalidate()` を呼びます。
+- **ページを落とさない。** ソースがエラーを返したとき、パニックしたとき、`MENU_TIMEOUT`（2 秒）より長くかかったときは、ページは静的メニューを表示し、サーバーは失敗をログに記録します。失敗はキャッシュしません。
+- **表示される場所。** このメニューは app shell のものです。screen のフルページ読み込みとエラーページには含まれ、サイトシェルとサインインページは静的メニューだけを表示します。
+
 ## サイトシェル
 
 業務画面は、サイドメニューのあるアプリシェルで開きます。ショップや商品カタログのような公開ページは、代わりにサイトシェルで開くことができます。アプリ名をブランドリンクとし、横型のメニュー、狭い画面向けのメニューボタン、任意のアクション、フッターを備えます。どちらを使うかは Feature が選び、他の Feature の画面はアプリシェルのままなので、1 つのアプリに両方が共存します。

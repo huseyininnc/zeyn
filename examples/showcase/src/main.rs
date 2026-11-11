@@ -155,6 +155,7 @@ async fn main() -> std::io::Result<()> {
         .feature(charts::feature())
         .feature(inputs::feature())
         .feature(shop::feature())
+        .menu_source(shortcuts)
         .islands(concat!(env!("CARGO_MANIFEST_DIR"), "/dist/islands"));
     #[cfg(feature = "pdf")]
     {
@@ -173,6 +174,24 @@ async fn main() -> std::io::Result<()> {
             .allow_dev_auth()
     };
     app.serve(&addr).await
+}
+
+/// Side menu shortcuts built for each request, the way an app builds them from a menu table.
+/// Only users with the `showcase.shortcuts` permission see the group; the server still checks
+/// the access of every linked screen.
+async fn shortcuts(_ctx: Ctx) -> Result<Vec<MenuNode>> {
+    Ok(vec![
+        MenuNode::group(
+            t!("menu.shortcuts"),
+            vec![
+                MenuNode::screen(t!("menu.shortcut_product"), "product_page")
+                    .params(serde_json::json!({ "code": "NW-0001" })),
+                MenuNode::path(t!("menu.shortcut_cities"), "/sales/by-city"),
+            ],
+        )
+        .icon(Icon::Link)
+        .permission("showcase.shortcuts"),
+    ])
 }
 
 /// Turns on user accounts instead of the development sign in (`NORTHWIND_ACCOUNTS__ENABLED=1`):

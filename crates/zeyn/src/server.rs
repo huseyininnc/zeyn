@@ -41,6 +41,7 @@ mod guard;
 mod gzip;
 mod locale;
 mod media;
+mod menus;
 mod modules;
 mod ops;
 mod seo;
@@ -49,6 +50,10 @@ mod telemetry;
 mod theme;
 pub(crate) use theme::screen_picker as theme_picker;
 
+pub use menus::{
+    MAX_MENU_CACHE, MAX_MENU_LABEL, MAX_MENU_NODES, MAX_MENU_PATH, MENU_TIMEOUT, MENU_TTL,
+    MenuNode, MenuSource, Menus,
+};
 pub use theme::Theme;
 #[cfg(feature = "email")]
 mod mail;
@@ -762,6 +767,8 @@ pub struct App {
     config: Config,
     tenancy: Option<Arc<dyn TenantResolver>>,
     license: Option<(Arc<dyn LicenseSource>, Duration)>,
+    menu_source: Option<Box<dyn MenuSource>>,
+    menu_per_user: bool,
     login_url: Option<String>,
     cors: Vec<String>,
     api_docs: Option<ApiDocs>,
@@ -821,6 +828,8 @@ impl App {
             config: Config::default(),
             tenancy: None,
             license: None,
+            menu_source: None,
+            menu_per_user: false,
             login_url: None,
             cors: Vec::new(),
             api_docs: None,
@@ -1305,6 +1314,25 @@ impl App {
         self
     }
 
+    /// Adds side menu entries built per request, for example from a menu table filtered by the
+    /// user's roles. They come after the static menus of the features; a group with the label of
+    /// a static group is merged into it. Every link is checked again on the server: unknown
+    /// screens, screens the user may not open and unsafe paths are left out. Answers are cached
+    /// for [`MENU_TTL`] per tenant, language and set of permissions (see [`Self::menu_per_user`]);
+    /// an action that edits the menu calls [`Menus::invalidate`] on the injected [`Menus`]. When
+    /// the source fails or takes longer than [`MENU_TIMEOUT`], the page shows the static menu.
+    pub fn menu_source(mut self, source: impl MenuSource) -> Self {
+        self.menu_source = Some(Box::new(source));
+        self
+    }
+
+    /// Caches the menu source's answers per user too, for menus that depend on more than the
+    /// user's tenant, language and permissions. The cache stays capped at [`MAX_MENU_CACHE`].
+    pub fn menu_per_user(mut self) -> Self {
+        self.menu_per_user = true;
+        self
+    }
+
     pub fn auth(mut self, auth: impl Authenticator) -> Self {
         self.auth = Some(Arc::new(auth));
         self
@@ -1711,6 +1739,10 @@ impl App {
             .insert(crate::screen::Routes(Arc::new(routes), default_locale));
         self.services
             .insert(self.client_prefs.clone());
+        if let Some(source) = self.menu_source.take() {
+            self.services
+                .insert(Menus::new(source, self.menu_per_user));
+        }
         let look = Arc::new(self.look());
         self.services
             .insert(theme::Looks(look.clone()));
@@ -2816,7 +2848,8 @@ impl AppState {
         let mut response = if partial {
             partial_response(&format!("{title} · {}", ctx.t(&self.name)), body)
         } else {
-            Html(self.shell(ctx, csrf, &title, &body, None)).into_response()
+            let menu = self.dynamic_menu(ctx, None).await;
+            Html(self.shell_menu(ctx, csrf, &title, &body, None, &menu)).into_response()
         };
         *response.status_mut() = status;
         response
@@ -2876,7 +2909,7 @@ impl AppState {
         current: Option<&str>,
         site: bool,
     ) -> Option<NavGroup> {
-        let mut here = false;
+        let mut page = None;
         let links: Vec<String> = g
             .items
             .iter()
@@ -2889,21 +2922,18 @@ impl AppState {
                     return None;
                 }
                 let path = f.path_of(&entry.meta)?;
-                let aria = if current == Some(item.screen) {
-                    here = true;
-                    r#" aria-current="page""#
-                } else {
-                    ""
-                };
-                let href = escape(&self.url(&locale::path(self, ctx, &path)));
                 let label = r.text(&item.label);
-                Some(match item.icon.filter(|_| !site) {
-                    Some(icon) => format!(
-                        r#"<li><a href="{href}"{aria}>{}<span>{label}</span></a></li>"#,
-                        icon.html()
-                    ),
-                    None => format!(r#"<li><a href="{href}"{aria}>{label}</a></li>"#),
-                })
+                let current = current == Some(item.screen);
+                if current {
+                    page = Some(label.clone());
+                }
+                let href = escape(&self.url(&locale::path(self, ctx, &path)));
+                Some(nav_link(
+                    &href,
+                    current,
+                    item.icon.filter(|_| !site),
+                    &label,
+                ))
             })
             .collect();
         let groups: Vec<NavGroup> = g
@@ -2919,7 +2949,8 @@ impl AppState {
             _ => String::new(),
         };
         Some(NavGroup {
-            here: here || groups.iter().any(|s| s.here),
+            here: page.is_some() || groups.iter().any(|s| s.here),
+            page,
             icon,
             label: r.text(&g.label),
             open: g.open,
@@ -2928,26 +2959,28 @@ impl AppState {
         })
     }
 
-    /// The breadcrumb of `SiteHeader::breadcrumb`: the menu groups of the current screen, from
-    /// the top level one down, and the screen's menu label. `nav.js` rewrites it from the side
-    /// menu after each navigation.
-    fn breadcrumb(&self, r: &Render, current: Option<&str>) -> String {
-        let found = current.and_then(|name| {
-            self.features
-                .iter()
-                .flat_map(|f| f.menu_groups())
-                .find_map(|g| g.find(name))
-        });
+    /// The breadcrumb of `SiteHeader::breadcrumb`: the side menu groups of the current screen,
+    /// from the top level one down, and the screen's menu label. `nav.js` rewrites it from the
+    /// side menu after each navigation.
+    fn breadcrumb(&self, r: &Render, groups: &[NavGroup]) -> String {
+        let mut path = Vec::new();
+        let mut level = groups;
+        let mut page = None;
+        while let Some(g) = level.iter().find(|g| g.here) {
+            path.push(&g.label);
+            page = g.page.as_ref();
+            if page.is_some() {
+                break;
+            }
+            level = &g.groups;
+        }
         let mut items = String::new();
-        if let Some((path, item)) = found {
-            let item = r.text(&item.label);
-            for label in path.iter().map(|l| r.text(l)) {
-                if label != item {
-                    items.push_str(&format!("<li>{label}</li>"));
-                }
+        if let Some(page) = page {
+            for label in path.into_iter().filter(|l| *l != page) {
+                items.push_str(&format!("<li>{label}</li>"));
             }
             items.push_str(&format!(
-                r#"<li><span aria-current="page">{item}</span></li>"#
+                r#"<li><span aria-current="page">{page}</span></li>"#
             ));
         }
         format!(
@@ -3001,7 +3034,8 @@ impl AppState {
     }
 
     /// Full page around a screen: the app shell (side menu) or, for screens of a feature that
-    /// chose it, the site shell; toasts and assets.
+    /// chose it, the site shell; toasts and assets. The side menu holds only the static menus;
+    /// see [`Self::shell_menu`].
     fn shell(
         &self,
         ctx: &Ctx,
@@ -3009,6 +3043,19 @@ impl AppState {
         title: &str,
         main: &str,
         current: Option<&str>,
+    ) -> String {
+        self.shell_menu(ctx, csrf, title, main, current, &[])
+    }
+
+    /// [`Self::shell`] with the nodes of the app's [`MenuSource`] in the side menu.
+    fn shell_menu(
+        &self,
+        ctx: &Ctx,
+        csrf: &str,
+        title: &str,
+        main: &str,
+        current: Option<&str>,
+        dynamic: &[MenuNode],
     ) -> String {
         let r = Render::new("shell", ctx.locale(), ctx.i18n())
             .with_tz(ctx.time_zone())
@@ -3038,7 +3085,7 @@ impl AppState {
                 site::head(&escape(&self.prefix)),
             ),
             None => (
-                self.app_frame(ctx, &r, theme, &app, &palette, main, current),
+                self.app_frame(ctx, &r, theme, &app, &palette, main, current, dynamic),
                 String::new(),
             ),
         };
@@ -3117,10 +3164,14 @@ impl AppState {
         palette: &str,
         main: &str,
         current: Option<&str>,
+        dynamic: &[MenuNode],
     ) -> String {
         let r = *r;
         let mut nav = String::new();
-        let groups = self.menu_links(ctx, &r, current, false);
+        let mut groups = self.menu_links(ctx, &r, current, false);
+        for g in self.dynamic_groups(dynamic, ctx, &r, current) {
+            NavGroup::merge(&mut groups, g);
+        }
         for (i, g) in groups.iter().enumerate() {
             g.render(&mut nav, &format!("z-nav-g{i}"), 2);
         }
@@ -3166,7 +3217,7 @@ impl AppState {
             .map(|h| {
                 let [mut start, center, end, bottom] = site::header_slots(h, ctx, "app", "z-app-header");
                 if h.breadcrumb {
-                    let crumbs = self.breadcrumb(&r, current);
+                    let crumbs = self.breadcrumb(&r, &groups);
                     match start.find('>') {
                         Some(at) => start.insert_str(at + 1, &crumbs),
                         None => {
@@ -3214,12 +3265,27 @@ pub(crate) struct NavGroup {
     open: bool,
     /// Holds the link of the current screen, itself or in a nested group.
     here: bool,
+    /// The label of the current screen's link when the group itself holds it.
+    page: Option<String>,
     /// The `<li>` links.
     links: Vec<String>,
     groups: Vec<NavGroup>,
 }
 
 impl NavGroup {
+    /// An empty group without an icon.
+    fn new(label: String, open: bool) -> Self {
+        NavGroup {
+            icon: String::new(),
+            label,
+            open,
+            here: false,
+            page: None,
+            links: Vec::new(),
+            groups: Vec::new(),
+        }
+    }
+
     /// Adds `group` to `list`, or merges it into the group with the same label, nested groups
     /// included.
     fn merge(list: &mut Vec<NavGroup>, group: NavGroup) {
@@ -3229,6 +3295,7 @@ impl NavGroup {
         {
             Some(same) => {
                 same.here |= group.here;
+                same.page = same.page.take().or(group.page);
                 same.open |= group.open;
                 same.links.extend(group.links);
                 for sub in group.groups {
@@ -3291,6 +3358,22 @@ impl NavGroup {
         }
         out.push_str("</ul>");
         out.push_str(close_tag);
+    }
+}
+
+/// A side menu link: `href` is escaped, and so is `label`.
+fn nav_link(href: &str, current: bool, icon: Option<crate::screen::Icon>, label: &str) -> String {
+    let aria = if current {
+        r#" aria-current="page""#
+    } else {
+        ""
+    };
+    match icon {
+        Some(icon) => format!(
+            r#"<li><a href="{href}"{aria}>{}<span>{label}</span></a></li>"#,
+            icon.html()
+        ),
+        None => format!(r#"<li><a href="{href}"{aria}>{label}</a></li>"#),
     }
 }
 
@@ -3713,7 +3796,8 @@ async fn page(
             }
         }
         Ok((title, html, head)) => {
-            let mut page = st.shell(&ctx, &csrf, &title, &html, Some(name));
+            let menu = st.dynamic_menu(&ctx, Some(name)).await;
+            let mut page = st.shell_menu(&ctx, &csrf, &title, &html, Some(name), &menu);
             if !head.is_empty() {
                 page = page.replacen("</head>", &format!("{head}</head>"), 1);
             }

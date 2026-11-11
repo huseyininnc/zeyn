@@ -35,6 +35,76 @@ Feature::new("sales")
 - **키보드.** 위와 아래는 보이는 제목과 링크 사이를 이동하고, Home과 End는 처음과 마지막으로 갑니다. 오른쪽은 접힌 그룹을 펼치거나 펼쳐진 그룹 안으로 들어갑니다. 왼쪽은 펼쳐진 그룹을 접거나 바깥 그룹의 제목으로 갑니다. Enter와 Space는 그룹을 펼치고 접습니다. 오른쪽에서 왼쪽으로 쓰는 언어에서는 왼쪽과 오른쪽이 바뀝니다.
 - **권한과 병합.** 같은 레이블의 그룹은 모든 단계에서 feature 사이에 병합되고, 사용자가 열 수 없는 항목뿐인 그룹은 중첩 그룹을 포함해 빠집니다. `App::header(|h| h.breadcrumb())`의 이동 경로는 그룹의 전체 경로를 보여 줍니다. site shell은 중첩 그룹의 링크를 최상위 그룹에 나열합니다.
 
+### 요청마다 만드는 메뉴
+
+`App::menu_source(source)`는 요청마다 만드는 메뉴 항목을 추가합니다. 예를 들어 사용자의 역할로 걸러 낸 메뉴 테이블에서 만듭니다. 소스는 `Ctx`(신원, 테넌트, 언어)를 받아 `MenuNode`를 돌려주는 async 함수입니다. 최상위에는 `MenuNode::group(label, children)`이 오고, 그 안에 `MenuNode::screen(label, "screen_name")` 링크(`.params(json)`는 `screen_url`처럼 경로 세그먼트와 쿼리를 채웁니다), `MenuNode::path(label, "/reports/sales")` 링크, 중첩 그룹이 들어갑니다. `.icon(...)`, `.open()`, `.permission("menu.reports")`는 어느 노드에서나 쓸 수 있습니다. 레이블은 다른 텍스트처럼 이스케이프되는 일반 텍스트이거나 `Text::key`로 지정한 카탈로그 키입니다.
+
+이 그룹들은 feature의 정적 메뉴 뒤에 오고, 정적 그룹과 같은 레이블의 그룹은 그 그룹에 합쳐집니다. 브레드크럼, 명령 팔레트, `nav.js`는 이 링크를 다른 메뉴 링크와 똑같이 다룹니다.
+
+아래 테이블은 PostgreSQL과 Oracle에서 동작합니다. 평평한 `SELECT` 하나로 읽고, 트리는 Rust에서 `parent_id`로 만듭니다.
+
+```sql
+CREATE TABLE menu_items (
+    id          INTEGER PRIMARY KEY,
+    parent_id   INTEGER REFERENCES menu_items (id),
+    label       VARCHAR(100) NOT NULL,
+    screen      VARCHAR(100),
+    path        VARCHAR(500),
+    icon        VARCHAR(40),
+    permission  VARCHAR(100),
+    sort_order  INTEGER DEFAULT 0 NOT NULL
+);
+```
+
+```rust
+#[model]
+pub struct MenuRow {
+    pub id: i64,
+    pub parent_id: Option<i64>,
+    pub label: String,
+    pub screen: Option<String>,
+    pub path: Option<String>,
+    pub icon: Option<String>,
+    pub permission: Option<String>,
+    pub sort_order: i64,
+}
+
+async fn menu(ctx: Ctx) -> Result<Vec<MenuNode>> {
+    let db = ctx.service::<Db>().ok_or_else(|| Error::Internal("no database".into()))?;
+    let rows: Vec<MenuRow> = db
+        .query("SELECT id, parent_id, label, screen, path, icon, permission, sort_order FROM menu_items ORDER BY sort_order, id", vec![])
+        .await?;
+    Ok(tree(&rows, None))
+}
+
+fn tree(rows: &[MenuRow], parent: Option<i64>) -> Vec<MenuNode> {
+    rows.iter()
+        .filter(|r| r.parent_id == parent)
+        .map(|r| {
+            let mut node = match (&r.screen, &r.path) {
+                (Some(screen), _) => MenuNode::screen(r.label.clone(), screen.clone()),
+                (None, Some(path)) => MenuNode::path(r.label.clone(), path.clone()),
+                (None, None) => MenuNode::group(r.label.clone(), tree(rows, Some(r.id))),
+            };
+            if let Some(icon) = Icon::ALL.iter().find(|i| Some(i.name()) == r.icon.as_deref()) {
+                node = node.icon(*icon);
+            }
+            match &r.permission {
+                Some(p) => node.permission(p.clone()),
+                None => node,
+            }
+        })
+        .collect()
+}
+
+App::new("Admin").menu_source(menu)
+```
+
+- **절대 믿지 않음.** 서버는 요청마다 모든 링크를 확인합니다. 알 수 없는 screen으로 가는 링크는 로그에 경고를 남기고 버립니다. 사용자가 열 수 없는 screen으로 가는 링크(접근 권한, feature guard, 노드 자체의 `permission`)는 소스가 돌려주었더라도 버리고, params가 경로 세그먼트를 채우지 못하는 screen 링크도 버립니다. 경로는 `/` 하나로 시작해야 합니다. 스킴, `//`, 역슬래시, 제어 문자는 허용되지 않습니다. 그룹은 최대 `MENU_DEPTH` 단계까지 중첩되고, 소스의 응답은 최대 `MAX_MENU_NODES`(500)개 노드까지 유지되며, 레이블은 `MAX_MENU_LABEL`(100)자에서 잘립니다.
+- **캐시.** 응답은 테넌트, 언어, 권한 집합마다 `MENU_TTL`(60초) 동안 캐시됩니다. 그래서 역할이 같은 사용자는 응답 하나를 함께 쓰고, 소스는 그들을 위해 1분에 한 번 실행됩니다. 캐시는 최대 `MAX_MENU_CACHE`(256)개의 응답을 보관하고 가장 오래된 것부터 버립니다. 권한뿐 아니라 사용자에 따라 응답이 달라지는 소스에는 `App::menu_per_user()`가 필요합니다. 테이블을 수정한 action은 주입된 `Menus` 서비스의 `invalidate()`를 호출합니다.
+- **페이지를 깨뜨리지 않음.** 소스가 오류를 돌려주거나 패닉하거나 `MENU_TIMEOUT`(2초)보다 오래 걸리면 페이지는 정적 메뉴를 보여 주고 서버는 실패를 로그에 남깁니다. 실패는 캐시하지 않습니다.
+- **표시되는 곳.** 이 메뉴는 app shell에 속합니다. screen의 전체 페이지 로드와 오류 페이지에는 들어가고, 사이트 셸과 로그인 페이지는 정적 메뉴만 보여 줍니다.
+
 ## 사이트 셸
 
 작업 Screen은 측면 메뉴가 있는 앱 셸에서 열립니다. 쇼핑몰이나 제품 카탈로그 같은 공개 페이지는 대신 사이트 셸에서 열 수 있습니다. 브랜드 링크로 쓰이는 앱 이름, 가로 메뉴, 좁은 화면의 메뉴 버튼, 선택적 action, 바닥글이 있습니다. Feature가 이를 선택하며, 다른 Feature의 Screen은 앱 셸을 유지하므로 한 앱에 둘 다 공존합니다.
