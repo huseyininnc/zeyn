@@ -832,6 +832,13 @@ async fn logout_clears_the_session_and_goes_through_the_end_session_endpoint() {
             .unwrap()
             .contains("Max-Age=0")
     );
+    assert_eq!(
+        r.headers
+            .get("clear-site-data")
+            .map(|v| v.to_str().unwrap()),
+        Some(r#""storage""#),
+        "signing out clears the browser storage of the app"
+    );
 }
 
 #[tokio::test]

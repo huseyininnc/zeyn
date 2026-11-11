@@ -59,6 +59,13 @@ mod xlsx;
 
 pub use ops::{READY_CACHE, build_id, probe};
 
+/// Sent on sign out with the value `"storage"`: the browser drops what the runtime kept for the
+/// app (form drafts, grid views, palette recents). Browsers apply it on secure origins only; the
+/// per user storage key of the page (`zeyn-storage`) covers the rest.
+#[cfg(any(feature = "oidc", feature = "accounts"))]
+const CLEAR_SITE_DATA: axum::http::HeaderName =
+    axum::http::HeaderName::from_static("clear-site-data");
+
 /// The browser runtime every page loads, served as one module at `/_zeyn/zeyn.js`. The source is
 /// one file per concern under `assets/zeyn/`, joined here in this order (later parts use
 /// functions and constants of earlier ones):
@@ -3064,7 +3071,7 @@ impl AppState {
         };
         let html_attrs = format!("{theme_attrs}{density}{native_menu}");
         format!(
-            r##"<!doctype html><html lang="{lang}"{dir}{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css{v}"><link rel="stylesheet" href="{base}/_zeyn/icons.css{v}"><script type="module" src="{base}/_zeyn/zeyn.js{v}"></script><script type="module" src="{base}/_zeyn/nav.js{v}"></script>{components}{theme_link}{extra}{prefetch}</head><body><a class="z-skip" href="#z-main">{skip}</a>{frame}<div class="z-toasts" role="status" aria-live="polite" data-text-dismiss="{dismiss}"></div>{commands}{ai_launcher}</body></html>"##,
+            r##"<!doctype html><html lang="{lang}"{dir}{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><meta name="zeyn-storage" content="{storage}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css{v}"><link rel="stylesheet" href="{base}/_zeyn/icons.css{v}"><script type="module" src="{base}/_zeyn/zeyn.js{v}"></script><script type="module" src="{base}/_zeyn/nav.js{v}"></script>{components}{theme_link}{extra}{prefetch}</head><body><a class="z-skip" href="#z-main">{skip}</a>{frame}<div class="z-toasts" role="status" aria-live="polite" data-text-dismiss="{dismiss}"></div>{commands}{ai_launcher}</body></html>"##,
             lang = escape(ctx.locale()),
             dir = if locale::rtl(ctx.locale()) {
                 r#" dir="rtl""#
@@ -3073,6 +3080,7 @@ impl AppState {
             },
             csrf = mask_token(csrf),
             tz = escape(ctx.time_zone().name()),
+            storage = escape(&auth::storage_key(self, ctx.identity().user.as_deref())),
             v = ops::asset_version(),
             theme_link = if self.look.css.is_empty() {
                 String::new()

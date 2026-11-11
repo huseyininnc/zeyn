@@ -7,6 +7,7 @@
 use crate::security::{RateLimit, RateStore};
 use std::future::Future;
 use std::net::IpAddr;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -18,6 +19,8 @@ pub(crate) struct Scope {
     pub path: String,
     pub prefix: String,
     pub rate: Arc<dyn RateStore>,
+    /// The request signed out: the response asks the browser to clear the app's storage.
+    pub clear_storage: AtomicBool,
 }
 
 tokio::task_local! {
@@ -97,6 +100,22 @@ pub(crate) fn forget(name: &str) {
             out.retain(|c| !c.starts_with(&format!("{name}=")));
         }
     });
+}
+
+/// Makes the response send `Clear-Site-Data: "storage"`, so form drafts, grid views and other
+/// values the runtime kept in the browser do not outlive the session.
+pub(crate) fn clear_storage() {
+    with(|s| {
+        s.clear_storage
+            .store(true, Ordering::Relaxed)
+    });
+}
+
+/// Whether the request asked to clear the browser storage.
+pub(crate) fn clears_storage(scope: &Scope) -> bool {
+    scope
+        .clear_storage
+        .load(Ordering::Relaxed)
 }
 
 /// The client's address.
