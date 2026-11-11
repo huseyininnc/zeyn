@@ -12,6 +12,7 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 ### Fixed
 
 - Grid exports of actions that page only by keyset cursor stopped after the first 500 rows.
+- The markup sanitizer removes SVG `use` elements whose target is a `use` or holds one, so nested references (ten groups that each use the previous one ten times) can no longer render billions of copies and hang the browser; reference cycles go with them, and icon sprites keep working.
 
 ## [0.0.10] - 2026-11-10
 
