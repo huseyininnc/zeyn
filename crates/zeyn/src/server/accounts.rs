@@ -19,7 +19,7 @@ use crate::{Error, Result};
 use axum::Router;
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
-use axum::response::{IntoResponse, Redirect, Response};
+use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use serde::Deserialize;
 use serde_json::{Value as Json, json};
@@ -192,7 +192,6 @@ pub(super) fn routes(router: Router<Arc<AppState>>, st: &Arc<AppState>) -> Route
         .route(&format!("{BASE}/register"), post(register))
         .route(&format!("{BASE}/login"), post(login))
         .route(&format!("{BASE}/logout"), post(logout))
-        .route(&format!("{BASE}/signout"), get(signout))
         .route(&format!("{BASE}/refresh"), post(refresh))
         .route(&format!("{BASE}/confirmEmail"), get(confirm_email))
         .route(&format!("{BASE}/resendConfirmationEmail"), post(resend))
@@ -687,27 +686,6 @@ async fn logout(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response
         .sign_in()
         .sign_out(user.as_ref().map(|u| u.id.as_str()));
     StatusCode::OK.into_response()
-}
-
-/// Ends the browser session and goes to the sign in page; the idle timeout sends users here.
-async fn signout(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
-    let accounts = accounts(&st);
-    let user = current(&accounts, &headers)
-        .await
-        .ok()
-        .flatten();
-    accounts
-        .sign_in()
-        .sign_out(user.as_ref().map(|u| u.id.as_str()));
-    let mut r = Redirect::to(
-        &st.login_url
-            .clone()
-            .unwrap_or_else(|| st.url("/")),
-    )
-    .into_response();
-    r.headers_mut()
-        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
-    r
 }
 
 #[derive(Deserialize)]
@@ -1437,7 +1415,7 @@ mod external {
                     Some(&sealer.seal(&flow_cookie(&provider), &flow)),
                     Some(600),
                 );
-                Redirect::to(&url).into_response()
+                axum::response::Redirect::to(&url).into_response()
             }
             Err(e) => {
                 tracing::error!("external sign in is not available: {e}");
@@ -1494,7 +1472,7 @@ mod external {
             .unwrap_or_else(|| st.url("/"));
         let fail = |why: String| {
             tracing::warn!("external sign in refused: {why}");
-            Redirect::to(&format!(
+            axum::response::Redirect::to(&format!(
                 "{login}?params={}",
                 encode(&json!({ "error": "external" }).to_string())
             ))
@@ -1555,7 +1533,7 @@ mod external {
                         .sign_in()
                         .refresh_sign_in(&user)
                         .await;
-                    Redirect::to(&back).into_response()
+                    axum::response::Redirect::to(&back).into_response()
                 }
                 Err(e) => fail(e.to_string()),
             };
@@ -1565,15 +1543,15 @@ mod external {
             .external_login_sign_in(&provider, &key, remember)
             .await
         {
-            Ok(SignInResult::Succeeded) => Redirect::to(&back).into_response(),
-            Ok(SignInResult::RequiresTwoFactor) => Redirect::to(&format!(
+            Ok(SignInResult::Succeeded) => axum::response::Redirect::to(&back).into_response(),
+            Ok(SignInResult::RequiresTwoFactor) => axum::response::Redirect::to(&format!(
                 "{}?params={}",
                 st.url("/account/login-2fa"),
                 encode(&json!({ "return_to": back, "remember": remember }).to_string())
             ))
             .into_response(),
             Ok(SignInResult::LockedOut) => {
-                Redirect::to(&st.url("/account/lockout")).into_response()
+                axum::response::Redirect::to(&st.url("/account/lockout")).into_response()
             }
             Ok(SignInResult::NotAllowed) => fail("not allowed".into()),
             Ok(_) => {
@@ -1599,7 +1577,7 @@ mod external {
                     return fail("no key".into());
                 };
                 scope::set_cookie(PENDING, Some(&sealer.seal(PENDING, &pending)), Some(600));
-                Redirect::to(&st.url("/account/external-login")).into_response()
+                axum::response::Redirect::to(&st.url("/account/external-login")).into_response()
             }
             Err(e) => fail(e.to_string()),
         }

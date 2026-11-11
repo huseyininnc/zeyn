@@ -40,6 +40,11 @@ const OPERATORS = '+-*/%<>=!&|^';
 /** Letters, digits and `_`, the same set as Rust's `char::is_alphanumeric` and `CodeQuery::word`. */
 const WORD = /[\p{Alphabetic}\p{N}_]/u;
 const WORD_BEFORE = /[\p{Alphabetic}\p{N}_.]*$/u;
+/**
+ * At most this many characters before the cursor are read as the word being completed. Matching
+ * `WORD_BEFORE` against the whole text is quadratic in its length; this slice keeps it bounded.
+ */
+const MAX_WORD = 200;
 
 /** Lines longer than this are shown without highlighting, so one huge line stays cheap. */
 const MAX_HIGHLIGHT_LINE = 10_000;
@@ -427,7 +432,7 @@ function accept(ed, i) {
     return;
   }
   const at = ta.selectionStart;
-  const word = ta.value.slice(0, at).match(WORD_BEFORE)[0];
+  const word = ta.value.slice(Math.max(0, at - MAX_WORD), at).match(WORD_BEFORE)[0];
   const insert = typeof item.insert === 'string' ? item.insert : item.label;
   close(ed);
   ed.skip = true;

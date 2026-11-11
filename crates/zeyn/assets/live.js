@@ -55,9 +55,9 @@ function connect() {
   old?.close(1000);
   if (!topics) return;
   const csrf = document.querySelector('meta[name="zeyn-csrf"]')?.content ?? '';
-  const url = new URL(`${BASE}/_zeyn/live/topics?t=${encodeURIComponent(topics)}&csrf=${encodeURIComponent(csrf)}`, location.href);
+  const url = new URL(`${BASE}/_zeyn/live/topics?t=${encodeURIComponent(topics)}`, location.href);
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-  const ws = new WebSocket(url);
+  const ws = new WebSocket(url, ['zeyn', `csrf.${csrf}`]);
   socket = ws;
   ws.onopen = () => {
     wait = 1000;

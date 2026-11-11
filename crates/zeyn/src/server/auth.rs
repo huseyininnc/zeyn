@@ -29,6 +29,9 @@ pub(super) struct Extras {
     pub reauth_url: Option<String>,
     /// Where an idle user is signed out, unless the app set `logout_url`.
     pub logout_url: Option<String>,
+    /// Path under the app's base that the runtime posts to (with the CSRF token) to end the
+    /// session of an idle user, before it goes to `logout_url` or the sign in page.
+    pub signout: Option<&'static str>,
     #[cfg(feature = "oidc")]
     oidc: Option<Arc<crate::auth::OidcAuth>>,
     #[cfg(feature = "totp")]
@@ -83,7 +86,7 @@ pub(super) fn resolve(extras: &mut Extras, prefix: &str, login_url: &mut Option<
             .clone();
         extras.mfa_url = Some(login.clone());
         extras.reauth_url = Some(login);
-        extras.logout_url = Some(format!("{prefix}/_zeyn/account/signout"));
+        extras.signout = Some("/_zeyn/account/logout");
     }
     let _ = (extras, prefix, login_url);
 }

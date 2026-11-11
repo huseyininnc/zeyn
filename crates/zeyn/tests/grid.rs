@@ -3141,6 +3141,30 @@ async fn dynamic_grid_caps_rows_columns_names_and_text_from_the_action() {
 }
 
 #[tokio::test]
+async fn dynamic_grid_survives_the_largest_offsets_and_cursors() {
+    let router = dynamic_router(sql_user());
+    for page in [
+        serde_json::json!({ "type": "offset", "offset": u64::MAX, "limit": 100_000 }),
+        serde_json::json!({ "type": "offset", "offset": i64::MAX, "limit": u32::MAX }),
+        serde_json::json!({ "type": "after", "cursor": u64::MAX.to_string(), "limit": 100_000 }),
+    ] {
+        let res = router
+            .clone()
+            .oneshot(post(
+                "/_zeyn/grid",
+                serde_json::json!({ "screen": "sql_wide", "node": "0", "query": { "page": page } }),
+            ))
+            .await
+            .unwrap();
+        assert!(
+            res.status() == StatusCode::OK || res.status() == StatusCode::BAD_REQUEST,
+            "{page}: {}",
+            res.status()
+        );
+    }
+}
+
+#[tokio::test]
 async fn dynamic_grid_needs_its_actions_permission() {
     let router = dynamic_router(Identity::user("x").with_permissions(["items.read"]));
     let r = send(

@@ -133,7 +133,7 @@ All `POST` requests send JSON, must carry the header `x-zeyn-csrf` with the toke
 
 A public screen opened without a session comes with an empty `zeyn-csrf` meta tag and no `Set-Cookie`, so that it can be cached. Before its first `POST` the runtime calls `GET /_zeyn/csrf`, which answers `{ "token": "..." }` with `Cache-Control: no-store`, sets the `zeyn_csrf` cookie when the browser has none, and refuses requests whose `Sec-Fetch-Site` is not `same-origin`. The token goes into the meta tag; when the call fails the `POST` goes out without a token and is refused like any other. Nothing is retried silently.
 
-In-app navigation (`nav.js`) asks for a screen with `x-zeyn-partial: 1` and gets only its HTML, with the page title in `x-zeyn-title`. When the screen sets head tags (description, canonical URL, preview image, robots, JSON-LD), the body starts with `<template data-zeyn-head>` holding them; `nav.js` removes every `[data-zeyn-head]` element of the document head, moves the template's tags there and drops the template. A screen without head tags sends no template, so the old tags are only removed.
+In-app navigation (`nav.js`) asks for a screen with `x-zeyn-partial: 1` and gets only its HTML, with the page title in `x-zeyn-title`. When the screen sets head tags (description, canonical URL, preview image, robots, JSON-LD), the body starts with `<template data-zeyn-head>` holding them; `nav.js` removes every `[data-zeyn-head]` element of the document head, moves the template's tags there and drops the template. A screen without head tags sends no template, so the old tags are only removed. `nav.js` uses an answer only when its final URL, after redirects, is on the page's origin; otherwise it loads the requested address in full. A `zeyn:navigate` to another origin (also `javascript:` and `data:` addresses) is canceled and ignored with one console warning.
 
 ### 4.1 Screen fragment
 
@@ -267,7 +267,7 @@ the request).
 - Every response sets `Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`, `X-Content-Type-Options: nosniff` and `Referrer-Policy: same-origin`. `App::csp` adds named `https` hosts to `img-src`, `media-src` (and `blob:`), `frame-src`, `connect-src` and `font-src`; the other directives never change. The header text is built once at startup.
 - No inline scripts or inline event handlers. Inline `style` attributes are used only for CSS custom properties (`--z-width`, `--z-flex`) and fixed column widths, so the policy adds `style-src-attr 'unsafe-inline'`. Scripts stay strict.
 - The CSRF token is stored in an `HttpOnly`, `SameSite=Strict` cookie and compared in constant time with the `x-zeyn-csrf` header.
-- Values the runtime keeps in the browser for one user (form drafts, grid views, palette recents) are filed under the page's `zeyn-storage` key: `anon` when signed out, otherwise a short keyed hash of the user id (HMAC with the accounts or OpenID Connect secret), never the id itself. A page of a new user removes what the previous user left. Signing out (`/_zeyn/account/logout`, `/_zeyn/account/signout`, the sign out screen, `/_zeyn/auth/logout`) answers with `Clear-Site-Data: "storage"`, which browsers apply on HTTPS.
+- Values the runtime keeps in the browser for one user (form drafts, grid views, palette recents) are filed under the page's `zeyn-storage` key: `anon` when signed out, otherwise a short keyed hash of the user id (HMAC with the accounts or OpenID Connect secret), never the id itself. A page of a new user removes what the previous user left. Signing out (`POST /_zeyn/account/logout`, the sign out screen, `/_zeyn/auth/logout`) answers with `Clear-Site-Data: "storage"`, which browsers apply on HTTPS.
 - Pages, the `totp` form and `GET /_zeyn/csrf` never carry the token as it is in the cookie: each response gets a fresh random pad followed by the token XOR the pad (128 hex digits), so gzip cannot leak it (BREACH). The server unmasks before it compares and still accepts the plain 64 digit token.
 - Dynamic responses of 1 KB or more (pages, partial screens, grid blocks, exports) are gzipped at level 2 when the browser accepts it, with `Vary: Accept-Encoding`. Never compressed: responses that already have a `Content-Encoding` (the framework assets, compressed once and cached), ranges (`Content-Range`, and any request with `Range`), video, audio, images other than SVG, `application/octet-stream`, archives and PDFs, `text/event-stream`, `application/x-ndjson` (the assistant's stream) and WebSocket upgrades.
 - Each call checks, in order: authentication, the screen's access, the feature's guards, the node action's access, then runs the interceptors and the action.
@@ -360,10 +360,10 @@ inside it in place.
 
 | Endpoint | Does |
 |---|---|
-| `GET /_zeyn/live/topics?t=a,b&csrf=` | WebSocket; text frames `{ "topic": "a" }` |
-| `GET /_zeyn/live/doc/{kind}/{doc}?csrf=` | WebSocket; binary frames `0x01` + Y update (v1) both ways |
+| `GET /_zeyn/live/topics?t=a,b` | WebSocket; text frames `{ "topic": "a" }` |
+| `GET /_zeyn/live/doc/{kind}/{doc}` | WebSocket; binary frames `0x01` + Y update (v1) both ways |
 
-Handshakes check the origin, the CSRF token against the cookie, the signed in user and the
+Handshakes check the origin, the CSRF token (offered as the subprotocol `csrf.TOKEN` next to `zeyn`, never in the URL) against the cookie, the signed in user and the
 permissions before upgrading. See `docs/realtime.md`.
 
 The player dispatches the cancelable `zeyn:media-adaptive` event (`{ media, kind, url, hls, dash }`) on its root before falling back to progressive files; a streaming library calls `preventDefault()` to take over.

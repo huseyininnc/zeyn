@@ -477,3 +477,18 @@ fn a_leading_newline_of_the_text_survives_the_html_parser() {
         .render(&mut out, &Render::new("s", "en", I18n::builtin()));
     assert!(out.contains(">&#10;\nSELECT 1</textarea>"));
 }
+
+#[tokio::test]
+async fn the_word_before_the_cursor_is_read_from_a_bounded_slice() {
+    let (_, js) = send(
+        Request::get("/_zeyn/codeedit.js")
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
+    assert!(
+        !js.contains(".slice(0, at).match(WORD_BEFORE)"),
+        "matching `[...]*$` against the whole text before the cursor is quadratic in its length"
+    );
+    assert!(js.contains(".slice(Math.max(0, at - MAX_WORD), at).match(WORD_BEFORE)"));
+}

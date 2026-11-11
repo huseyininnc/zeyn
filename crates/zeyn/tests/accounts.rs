@@ -1674,6 +1674,45 @@ async fn the_register_screen_goes_to_a_screen_that_opens() {
     assert!(mismatch.body.contains("do not match"), "{}", mismatch.body);
 }
 
+#[tokio::test]
+async fn signing_out_needs_a_post_with_the_csrf_token() {
+    let a = accounts();
+    user(&a, "out@example.com").await;
+    let router = app(a.clone());
+    let login = send(
+        &router,
+        post(
+            "/_zeyn/account/login?useCookies=true",
+            json!({ "email": "out@example.com", "password": PASSWORD }),
+            "",
+        ),
+    )
+    .await;
+    let session = login.cookie("zeyn_account").unwrap();
+    let cookies = format!("zeyn_account={session}");
+    let image = send(&router, get("/_zeyn/account/signout", &cookies)).await;
+    assert!(
+        matches!(
+            image.status,
+            StatusCode::NOT_FOUND | StatusCode::METHOD_NOT_ALLOWED
+        ),
+        "a cross site image tag cannot sign the user out: {}",
+        image.status
+    );
+    assert_eq!(image.cookie("zeyn_account"), None);
+    let no_token = Request::post("/_zeyn/account/logout")
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::COOKIE, &cookies)
+        .body(Body::from("{}"))
+        .unwrap();
+    let refused = send(&router, no_token).await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN);
+    assert_eq!(refused.cookie("zeyn_account"), None);
+    let out = send(&router, post("/_zeyn/account/logout", json!({}), &cookies)).await;
+    assert_eq!(out.status, StatusCode::OK);
+    assert_eq!(out.cookie("zeyn_account").as_deref(), Some(""));
+}
+
 /// The per user browser storage key a page carries (`<meta name="zeyn-storage">`).
 fn storage_key(page: &str) -> String {
     let start = page
@@ -1733,15 +1772,6 @@ async fn sign_out_clears_browser_storage_and_pages_key_storage_per_user() {
     assert_eq!(logout.status, StatusCode::OK, "{}", logout.body);
     assert_eq!(
         logout
-            .headers
-            .get("clear-site-data")
-            .map(|v| v.to_str().unwrap()),
-        Some(r#""storage""#)
-    );
-    let signout = send(&router, get("/_zeyn/account/signout", &keys[1].1)).await;
-    assert!(signout.status.is_redirection(), "{}", signout.status);
-    assert_eq!(
-        signout
             .headers
             .get("clear-site-data")
             .map(|v| v.to_str().unwrap()),
