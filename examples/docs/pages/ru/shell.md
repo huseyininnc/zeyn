@@ -35,6 +35,76 @@ Feature::new("sales")
 - **Клавиатура.** Вверх и Вниз переходят между видимыми заголовками и ссылками, Home и End к первому и последнему. Вправо открывает закрытую группу или переходит внутрь открытой; Влево закрывает открытую группу или переходит к заголовку объемлющей группы. Enter и Пробел открывают и закрывают группу. В языках с письмом справа налево Влево и Вправо меняются местами.
 - **Права и слияние.** Группы с одинаковой меткой сливаются между features на каждом уровне, а группа, элементы которой пользователь открыть не может, не показывается, включая вложенные группы. Хлебные крошки `App::header(|h| h.breadcrumb())` показывают весь путь групп. Site shell перечисляет ссылки вложенных групп в их группе верхнего уровня.
 
+### Меню, построенные для каждого запроса
+
+`App::menu_source(source)` добавляет пункты меню, которые строятся для каждого запроса, например из таблицы меню с фильтром по ролям пользователя. Источник представляет собой async функцию, которая принимает `Ctx` (личность, тенант, язык) и возвращает `MenuNode`: на верхнем уровне `MenuNode::group(label, children)`, а внутри ссылки `MenuNode::screen(label, "screen_name")` (`.params(json)` заполняет сегменты пути и запрос, как это делает `screen_url`), ссылки `MenuNode::path(label, "/reports/sales")` и вложенные группы. `.icon(...)`, `.open()` и `.permission("menu.reports")` работают на любом узле. Метка может быть простым текстом, который экранируется как любой другой текст, или ключом каталога через `Text::key`.
+
+Группы идут после статических меню feature, а группа с меткой статической группы сливается с ней. Хлебные крошки, палитра команд и `nav.js` обрабатывают их ссылки как любые другие ссылки меню.
+
+Таблица ниже работает в PostgreSQL и Oracle. Её читает один плоский `SELECT`, а дерево строится в Rust по `parent_id`:
+
+```sql
+CREATE TABLE menu_items (
+    id          INTEGER PRIMARY KEY,
+    parent_id   INTEGER REFERENCES menu_items (id),
+    label       VARCHAR(100) NOT NULL,
+    screen      VARCHAR(100),
+    path        VARCHAR(500),
+    icon        VARCHAR(40),
+    permission  VARCHAR(100),
+    sort_order  INTEGER DEFAULT 0 NOT NULL
+);
+```
+
+```rust
+#[model]
+pub struct MenuRow {
+    pub id: i64,
+    pub parent_id: Option<i64>,
+    pub label: String,
+    pub screen: Option<String>,
+    pub path: Option<String>,
+    pub icon: Option<String>,
+    pub permission: Option<String>,
+    pub sort_order: i64,
+}
+
+async fn menu(ctx: Ctx) -> Result<Vec<MenuNode>> {
+    let db = ctx.service::<Db>().ok_or_else(|| Error::Internal("no database".into()))?;
+    let rows: Vec<MenuRow> = db
+        .query("SELECT id, parent_id, label, screen, path, icon, permission, sort_order FROM menu_items ORDER BY sort_order, id", vec![])
+        .await?;
+    Ok(tree(&rows, None))
+}
+
+fn tree(rows: &[MenuRow], parent: Option<i64>) -> Vec<MenuNode> {
+    rows.iter()
+        .filter(|r| r.parent_id == parent)
+        .map(|r| {
+            let mut node = match (&r.screen, &r.path) {
+                (Some(screen), _) => MenuNode::screen(r.label.clone(), screen.clone()),
+                (None, Some(path)) => MenuNode::path(r.label.clone(), path.clone()),
+                (None, None) => MenuNode::group(r.label.clone(), tree(rows, Some(r.id))),
+            };
+            if let Some(icon) = Icon::ALL.iter().find(|i| Some(i.name()) == r.icon.as_deref()) {
+                node = node.icon(*icon);
+            }
+            match &r.permission {
+                Some(p) => node.permission(p.clone()),
+                None => node,
+            }
+        })
+        .collect()
+}
+
+App::new("Admin").menu_source(menu)
+```
+
+- **Без доверия.** Сервер проверяет каждую ссылку при каждом запросе: ссылки на неизвестные screen отбрасываются с предупреждением в логе, ссылки на screen, которые пользователь не может открыть (доступ, guard feature, собственный `permission` узла), отбрасываются, даже если их вернул источник, как и ссылки на screen, сегменты пути которых params не заполняют. Путь должен начинаться с одного `/`: без схемы, без `//`, без обратной косой черты и без управляющих символов. Группы вкладываются не глубже `MENU_DEPTH` уровней, ответ источника сохраняет не более `MAX_MENU_NODES` (500) узлов, а метки обрезаются до `MAX_MENU_LABEL` (100) символов.
+- **С кэшем.** Ответы кэшируются на `MENU_TTL` (60 секунд) для каждого сочетания тенанта, языка и набора разрешений, поэтому пользователи с одинаковыми ролями делят один ответ, и источник выполняется для них раз в минуту. Кэш хранит не более `MAX_MENU_CACHE` (256) ответов и удаляет самый старый. Источнику, чей ответ зависит от пользователя, а не только от разрешений, нужен `App::menu_per_user()`. После того как action изменит таблицу, она вызывает `invalidate()` у внедрённого сервиса `Menus`.
+- **Страница не падает.** Когда источник возвращает ошибку, паникует или работает дольше `MENU_TIMEOUT` (2 секунды), страница показывает статическое меню, а сервер пишет сбой в лог. Сбои не кэшируются.
+- **Где видно.** Меню относится к app shell: полные загрузки screen и страницы ошибок содержат его, а оболочка сайта и страницы входа показывают только статические меню.
+
 ## Оболочка сайта
 
 Рабочие экраны открываются в оболочке приложения с боковым меню. Публичные страницы, например магазин или каталог товаров, могут вместо этого открываться в оболочке сайта: название приложения как ссылка бренда, горизонтальное меню, кнопка меню на узких экранах, необязательные действия и подвал. Её выбирает feature; экраны других features сохраняют оболочку приложения, поэтому обе живут в одном приложении.

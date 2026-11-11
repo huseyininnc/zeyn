@@ -35,6 +35,76 @@ Feature::new("sales")
 - **Klavye.** Yukarı ve Aşağı görünen başlıklar ve bağlantılar arasında gezer, Home ve End ilkine ve sonuncusuna gider. Sağ kapalı bir grubu açar ya da açık bir grubun içine geçer; Sol açık bir grubu kapatır ya da çevreleyen grubun başlığına gider. Enter ve Space grubu açıp kapatır. Sağdan sola dillerde Sol ve Sağ yer değiştirir.
 - **İzinler ve birleştirme.** Aynı etiketli gruplar her seviyede feature'lar arasında birleşir; kullanıcının açamayacağı öğelerden oluşan bir grup, iç içe gruplar dahil, dışarıda kalır. `App::header(|h| h.breadcrumb())` içerik yolu grubun bütün yolunu gösterir. Site shell'i iç içe grupların bağlantılarını en üst gruplarında listeler.
 
+### İstek başına kurulan menüler
+
+`App::menu_source(source)` her istek için kurulan menü girdileri ekler; örneğin kullanıcının rollerine göre süzülen bir menü tablosundan. Bir kaynak, `Ctx`'i (kimlik, tenant, dil) alan ve `MenuNode` döndüren async bir fonksiyondur: en üstte `MenuNode::group(label, children)`, içinde `MenuNode::screen(label, "screen_name")` bağlantıları (`.params(json)` yol parçalarını ve sorguyu `screen_url` gibi doldurur), `MenuNode::path(label, "/reports/sales")` bağlantıları ve iç içe gruplar. `.icon(...)`, `.open()` ve `.permission("menu.reports")` her düğümde çalışır. Etiket, diğer metinler gibi kaçışlanan düz metin ya da `Text::key` ile bir katalog anahtarıdır.
+
+Gruplar feature'ların statik menülerinden sonra gelir; statik bir grupla aynı etiketi taşıyan grup onunla birleşir. İçerik yolu, komut paleti ve `nav.js` bu bağlantıları diğer menü bağlantıları gibi ele alır.
+
+Aşağıdaki tablo PostgreSQL ve Oracle'da çalışır. Tek bir düz `SELECT` onu okur, ağaç Rust'ta `parent_id`'ye göre kurulur:
+
+```sql
+CREATE TABLE menu_items (
+    id          INTEGER PRIMARY KEY,
+    parent_id   INTEGER REFERENCES menu_items (id),
+    label       VARCHAR(100) NOT NULL,
+    screen      VARCHAR(100),
+    path        VARCHAR(500),
+    icon        VARCHAR(40),
+    permission  VARCHAR(100),
+    sort_order  INTEGER DEFAULT 0 NOT NULL
+);
+```
+
+```rust
+#[model]
+pub struct MenuRow {
+    pub id: i64,
+    pub parent_id: Option<i64>,
+    pub label: String,
+    pub screen: Option<String>,
+    pub path: Option<String>,
+    pub icon: Option<String>,
+    pub permission: Option<String>,
+    pub sort_order: i64,
+}
+
+async fn menu(ctx: Ctx) -> Result<Vec<MenuNode>> {
+    let db = ctx.service::<Db>().ok_or_else(|| Error::Internal("no database".into()))?;
+    let rows: Vec<MenuRow> = db
+        .query("SELECT id, parent_id, label, screen, path, icon, permission, sort_order FROM menu_items ORDER BY sort_order, id", vec![])
+        .await?;
+    Ok(tree(&rows, None))
+}
+
+fn tree(rows: &[MenuRow], parent: Option<i64>) -> Vec<MenuNode> {
+    rows.iter()
+        .filter(|r| r.parent_id == parent)
+        .map(|r| {
+            let mut node = match (&r.screen, &r.path) {
+                (Some(screen), _) => MenuNode::screen(r.label.clone(), screen.clone()),
+                (None, Some(path)) => MenuNode::path(r.label.clone(), path.clone()),
+                (None, None) => MenuNode::group(r.label.clone(), tree(rows, Some(r.id))),
+            };
+            if let Some(icon) = Icon::ALL.iter().find(|i| Some(i.name()) == r.icon.as_deref()) {
+                node = node.icon(*icon);
+            }
+            match &r.permission {
+                Some(p) => node.permission(p.clone()),
+                None => node,
+            }
+        })
+        .collect()
+}
+
+App::new("Admin").menu_source(menu)
+```
+
+- **Asla güvenilmez.** Sunucu her istekte her bağlantıyı denetler: bilinmeyen screen'lere giden bağlantılar log'a bir uyarıyla düşürülür; kullanıcının açamayacağı screen'lere giden bağlantılar (erişim, feature guard'ları, düğümün kendi `permission`'ı) kaynak döndürmüş olsa da düşürülür; yol parçaları params ile dolmayan screen bağlantıları da öyle. Bir yol tek bir `/` ile başlamalıdır: şema, `//`, ters eğik çizgi ve kontrol karakteri olmaz. Gruplar en fazla `MENU_DEPTH` seviye iç içe geçer, bir kaynağın cevabı en fazla `MAX_MENU_NODES` (500) düğüm tutar ve etiketler `MAX_MENU_LABEL` (100) karakterde kesilir.
+- **Önbellekli.** Cevaplar tenant, dil ve izin kümesi başına `MENU_TTL` (60 saniye) boyunca önbellekte tutulur; aynı rollere sahip kullanıcılar tek bir cevabı paylaşır ve kaynak onlar için dakikada bir çalışır. Önbellek en fazla `MAX_MENU_CACHE` (256) cevap tutar ve en eskisini atar. Cevabı yalnızca izinlere değil kullanıcıya da bağlı olan bir kaynak `App::menu_per_user()` ister. Bir action tabloyu düzenledikten sonra inject edilen `Menus` servisinde `invalidate()` çağırır.
+- **Sayfayı asla düşürmez.** Kaynak hata döndürdüğünde, panic olduğunda ya da `MENU_TIMEOUT`'tan (2 saniye) uzun sürdüğünde sayfa statik menüyü gösterir ve sunucu hatayı log'a yazar. Hatalar önbelleğe alınmaz.
+- **Nerede görünür.** Menü app shell'e aittir: screen'lerin ve hata sayfalarının tam sayfa yüklemeleri onu taşır; site shell ve giriş sayfaları yalnızca statik menüleri gösterir.
+
 ## Site shell'i
 
 İş screen'leri, yan menülü uygulama shell'inde açılır. Mağaza ya da ürün kataloğu gibi herkese açık sayfalar bunun yerine site shell'inde açılabilir: marka bağlantısı olarak uygulamanın adı, yatay bir menü, dar ekranlarda bir menü düğmesi, isteğe bağlı eylemler ve bir alt bilgi. Bunu bir feature seçer; diğer feature'ların screen'leri uygulama shell'ini korur, böylece ikisi tek bir uygulamada yaşar.

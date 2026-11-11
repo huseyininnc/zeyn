@@ -23,6 +23,10 @@
     "charts": "Charts"
 ,
     "inputs": "Inputs"
+,
+    "shortcuts": "Shortcuts",
+    "shortcut_product": "Product NW-0001",
+    "shortcut_cities": "Orders by city"
   },
   "errors": {
     "not_found": "Page not found",

@@ -35,6 +35,76 @@ Feature::new("sales")
 - **لوحة المفاتيح.** ينقل السهمان أعلى وأسفل بين العناوين والروابط الظاهرة، ويذهب Home وEnd إلى الأول والأخير. يفتح السهم الأيمن مجموعة مغلقة أو ينتقل إلى داخل مجموعة مفتوحة؛ ويغلق السهم الأيسر مجموعة مفتوحة أو ينتقل إلى عنوان المجموعة المحيطة. يفتح Enter والمسافة المجموعة ويغلقانها. ويتبادل السهمان الأيسر والأيمن في اللغات التي تُكتب من اليمين إلى اليسار.
 - **الصلاحيات والدمج.** تندمج المجموعات ذات التسمية نفسها عبر features في كل مستوى، وتُترك المجموعة التي لا يستطيع المستخدم فتح أي من عناصرها، ومعها المجموعات المتداخلة. يعرض مسار التنقل في `App::header(|h| h.breadcrumb())` مسار المجموعات كاملًا. ويسرد site shell روابط المجموعات المتداخلة في مجموعتها العليا.
 
+### قوائم تُبنى مع كل طلب
+
+يضيف `App::menu_source(source)` عناصر قائمة تُبنى لكل طلب، مثلًا من جدول قوائم مُرشَّح حسب أدوار المستخدم. المصدر دالة async تأخذ `Ctx` (الهوية والمستأجر واللغة) وتُرجع عناصر `MenuNode`: في المستوى الأعلى `MenuNode::group(label, children)`، وفي داخلها روابط `MenuNode::screen(label, "screen_name")` (يملأ `.params(json)` أجزاء المسار والاستعلام كما يفعل `screen_url`)، وروابط `MenuNode::path(label, "/reports/sales")`، ومجموعات متداخلة. تعمل `.icon(...)` و`.open()` و`.permission("menu.reports")` على أي عقدة. التسمية نص عادي يُهرَّب مثل أي نص آخر، أو مفتاح في الكتالوج عبر `Text::key`.
+
+تأتي المجموعات بعد القوائم الثابتة للـ features، والمجموعة التي تحمل تسمية مجموعة ثابتة تُدمج فيها. يعامل مسار التنقل ولوحة الأوامر و`nav.js` روابطها مثل أي رابط آخر في القائمة.
+
+يعمل الجدول أدناه على PostgreSQL وOracle. يقرؤه `SELECT` مسطح واحد، وتُبنى الشجرة في Rust حسب `parent_id`:
+
+```sql
+CREATE TABLE menu_items (
+    id          INTEGER PRIMARY KEY,
+    parent_id   INTEGER REFERENCES menu_items (id),
+    label       VARCHAR(100) NOT NULL,
+    screen      VARCHAR(100),
+    path        VARCHAR(500),
+    icon        VARCHAR(40),
+    permission  VARCHAR(100),
+    sort_order  INTEGER DEFAULT 0 NOT NULL
+);
+```
+
+```rust
+#[model]
+pub struct MenuRow {
+    pub id: i64,
+    pub parent_id: Option<i64>,
+    pub label: String,
+    pub screen: Option<String>,
+    pub path: Option<String>,
+    pub icon: Option<String>,
+    pub permission: Option<String>,
+    pub sort_order: i64,
+}
+
+async fn menu(ctx: Ctx) -> Result<Vec<MenuNode>> {
+    let db = ctx.service::<Db>().ok_or_else(|| Error::Internal("no database".into()))?;
+    let rows: Vec<MenuRow> = db
+        .query("SELECT id, parent_id, label, screen, path, icon, permission, sort_order FROM menu_items ORDER BY sort_order, id", vec![])
+        .await?;
+    Ok(tree(&rows, None))
+}
+
+fn tree(rows: &[MenuRow], parent: Option<i64>) -> Vec<MenuNode> {
+    rows.iter()
+        .filter(|r| r.parent_id == parent)
+        .map(|r| {
+            let mut node = match (&r.screen, &r.path) {
+                (Some(screen), _) => MenuNode::screen(r.label.clone(), screen.clone()),
+                (None, Some(path)) => MenuNode::path(r.label.clone(), path.clone()),
+                (None, None) => MenuNode::group(r.label.clone(), tree(rows, Some(r.id))),
+            };
+            if let Some(icon) = Icon::ALL.iter().find(|i| Some(i.name()) == r.icon.as_deref()) {
+                node = node.icon(*icon);
+            }
+            match &r.permission {
+                Some(p) => node.permission(p.clone()),
+                None => node,
+            }
+        })
+        .collect()
+}
+
+App::new("Admin").menu_source(menu)
+```
+
+- **لا ثقة به أبدًا.** يفحص الخادم كل رابط في كل طلب: تُحذف الروابط إلى screens غير معروفة مع تحذير في السجل، وتُحذف الروابط إلى screens لا يستطيع المستخدم فتحها (الوصول، وguards الـ feature، و`permission` الخاص بالعقدة) حتى لو أرجعها المصدر، وكذلك روابط screens التي لا تملأ params أجزاء مسارها. يجب أن يبدأ المسار بـ `/` واحدة: بلا مخطط، وبلا `//`، وبلا شرطة مائلة عكسية، وبلا محارف تحكم. تتداخل المجموعات حتى `MENU_DEPTH` مستويات على الأكثر، ويحتفظ جواب المصدر بـ `MAX_MENU_NODES` (500) عقدة على الأكثر، وتُقص التسميات عند `MAX_MENU_LABEL` (100) محرف.
+- **مخزَّن مؤقتًا.** تُخزَّن الأجوبة لمدة `MENU_TTL` (60 ثانية) لكل مستأجر ولغة ومجموعة صلاحيات، فيتشارك المستخدمون ذوو الأدوار نفسها جوابًا واحدًا ويعمل المصدر لهم مرة في الدقيقة. تحتفظ الذاكرة المؤقتة بـ `MAX_MENU_CACHE` (256) جوابًا على الأكثر وتحذف الأقدم. المصدر الذي يعتمد جوابه على المستخدم، لا على الصلاحيات وحدها، يحتاج `App::menu_per_user()`. بعد أن يعدّل action الجدول، يستدعي `invalidate()` على خدمة `Menus` المحقونة.
+- **لا يُسقط الصفحة أبدًا.** عندما يُرجع المصدر خطأ أو ينهار أو يستغرق أكثر من `MENU_TIMEOUT` (ثانيتان)، تعرض الصفحة القائمة الثابتة ويسجّل الخادم الإخفاق. لا تُخزَّن الإخفاقات مؤقتًا.
+- **أين تظهر.** القائمة جزء من app shell: التحميلات الكاملة للـ screens وصفحات الأخطاء تحملها، بينما يعرض غلاف الموقع وصفحات تسجيل الدخول القوائم الثابتة فقط.
+
 ## غلاف الموقع
 
 تُفتح شاشات العمل في غلاف التطبيق بقائمته الجانبية. أما الصفحات العامة، مثل متجر أو كتالوج منتجات، فيمكنها أن تُفتح في غلاف الموقع بدلاً من ذلك: اسم التطبيق كرابط علامة تجارية، وقائمة أفقية، وزر قائمة على الشاشات الضيقة، وإجراءات اختيارية وتذييل. تختاره الميزة؛ وتحتفظ شاشات الميزات الأخرى بغلاف التطبيق، فيعيشان معاً في تطبيق واحد.

@@ -23,6 +23,10 @@
     "charts": "Grafikler"
 ,
     "inputs": "Girişler"
+,
+    "shortcuts": "Kısayollar",
+    "shortcut_product": "NW-0001 ürünü",
+    "shortcut_cities": "Şehre göre siparişler"
   },
   "errors": {
     "not_found": "Sayfa bulunamadı",
