@@ -636,6 +636,41 @@ async fn reveals_and_exports_count_against_the_write_limit() {
 }
 
 #[tokio::test]
+async fn head_requests_to_exports_count_against_the_write_limit() {
+    let identity = officer();
+    let router = App::new("Test")
+        .service(People::seeded())
+        .write_limit(zeyn::RateLimit::per_user(
+            1,
+            std::time::Duration::from_secs(60),
+        ))
+        .auth(move |h: &HeaderMap| {
+            h.contains_key("x-user")
+                .then(|| identity.clone())
+        })
+        .feature(Feature::new("hr").screen(people))
+        .router()
+        .unwrap();
+    let head = || {
+        Request::head("/_zeyn/grid/export?screen=people&node=0")
+            .header("x-user", "1")
+            .body(Body::empty())
+            .unwrap()
+    };
+    assert_eq!(send(&router, head()).await.status, StatusCode::OK);
+    assert_eq!(
+        send(&router, head()).await.status,
+        StatusCode::TOO_MANY_REQUESTS
+    );
+    assert_eq!(
+        send(&router, get("/_zeyn/grid/export?screen=people&node=0"))
+            .await
+            .status,
+        StatusCode::TOO_MANY_REQUESTS
+    );
+}
+
+#[tokio::test]
 async fn masked_fields_never_group_a_grid() {
     let router = hr_app(clerk(), MemoryAudit::default());
     let page = send(&router, get("/people-grouped")).await;
