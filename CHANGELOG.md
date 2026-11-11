@@ -23,6 +23,10 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 - The markup sanitizer removes SVG `use` elements whose target is a `use` or holds one, so nested references (ten groups that each use the previous one ten times) can no longer render billions of copies and hang the browser; reference cycles go with them, and icon sprites keep working.
 - `POST /_zeyn/nodes` drops a path inside another requested path before it loads grids, so overlapping paths such as `1`, `1.1` and `1.1.0` run each grid query once instead of once per path. `POST /_zeyn/node` and `/_zeyn/nodes` count against the write limit (`App::write_limit`), as `POST /_zeyn/data` does.
 
+### Security
+
+- CI runs `cargo audit` and fails on any advisory that `.cargo/audit.toml` does not ignore with a reason. Four are ignored there: quick-xml 0.38 in Typst's bibliography reader (feature `pdf`, only the app's own templates reach it, no fixed release yet), libsqlite3-sys 0.37, which sits in `Cargo.lock` through sqlx's optional SQLite driver but is never built, and glib 0.18 from the Linux desktop window stack.
+
 ## [0.0.10] - 2026-11-10
 
 ### Added
