@@ -12,6 +12,7 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 ### Fixed
 
 - Grid exports of actions that page only by keyset cursor stopped after the first 500 rows.
+- `POST /_zeyn/nodes` drops a path inside another requested path before it loads grids, so overlapping paths such as `1`, `1.1` and `1.1.0` run each grid query once instead of once per path. `POST /_zeyn/node` and `/_zeyn/nodes` count against the write limit (`App::write_limit`), as `POST /_zeyn/data` does.
 
 ## [0.0.10] - 2026-11-10
 
