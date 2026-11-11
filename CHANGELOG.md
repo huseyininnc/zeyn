@@ -11,6 +11,7 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 ### Fixed
 
+- HEAD requests to exports, PDFs and sitemaps count toward the write rate limit, like GET.
 - Grid exports of actions that page only by keyset cursor stopped after the first 500 rows.
 
 ## [0.0.10] - 2026-11-10

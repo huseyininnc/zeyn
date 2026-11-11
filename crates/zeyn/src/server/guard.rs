@@ -152,8 +152,10 @@ pub(super) async fn guard_request(
         let ctx = st.ctx(headers);
         return problem(&ctx, Failure::App(Error::Forbidden));
     }
-    let is_write = (parts.method == axum::http::Method::GET
-        && (COSTLY_GETS.contains(&path) || path.starts_with("/sitemaps/")))
+    let is_write = (matches!(
+        parts.method,
+        axum::http::Method::GET | axum::http::Method::HEAD
+    ) && (COSTLY_GETS.contains(&path) || path.starts_with("/sitemaps/")))
         || parts.method == axum::http::Method::POST
             && (WRITE_PATHS.contains(&path)
                 || files::is_upload(path)
