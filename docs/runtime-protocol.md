@@ -45,7 +45,7 @@ A page loads and runs only the browser code its screen uses. Every page runs the
 | Module | Components |
 |---|---|
 | `components.js` | the shared part every control module imports: helpers, the popup and listbox cores, selects (the pickers of the app shell), confirm dialogs, alerts, breadcrumbs |
-| `tabs.js`, `dates.js`, `choices.js`, `inputs.js`, `lines.js`, `steps.js`, `tree.js`, `overlays.js`, `menubutton.js`, `busy.js` | panels, tabs and split panes; date and time pickers (also grid date filters); listboxes, lookups and multiple selects; numbers, growing text areas, masks and passwords; the lines editor; forms in steps; trees; tooltips and popovers; menu and split buttons; busy overlays |
+| `tabs.js`, `dates.js`, `choices.js`, `inputs.js`, `lines.js`, `steps.js`, `tree.js`, `overlays.js`, `menubutton.js`, `busy.js`, `menu.js` | panels, tabs and split panes; date and time pickers (also grid date filters); listboxes, lookups and multiple selects; numbers, growing text areas, masks and passwords; the lines editor; forms in steps; trees; tooltips and popovers; menu and split buttons; busy overlays; collapsible groups of the side menu |
 | `grid.js` | grids, linked as `<link rel="modulepreload">` because `zeyn.js` imports it itself |
 | `palette.js`, `pro.js` | the command palette and command buttons; menu bars, toolboxes, status bars, docks and property inspectors |
 | `colors.js`, `length.js`, `inspector.js` | color pickers; lengths with a unit switch; property inspectors of islands |

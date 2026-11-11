@@ -45,7 +45,7 @@ head 中每个框架脚本和样式表都带有 `?v=` 和构建 id（`meta[name=
 | 模块 | 组件 |
 |---|---|
 | `components.js` | 每个控件模块都会导入的共享部分：辅助函数、弹出层和列表框核心、下拉选择（应用外壳中的选择器）、确认对话框、提示和面包屑 |
-| `tabs.js`, `dates.js`, `choices.js`, `inputs.js`, `lines.js`, `steps.js`, `tree.js`, `overlays.js`, `menubutton.js`, `busy.js` | 面板、标签页和分割面板；日期和时间选择器（也用于 grid 的日期筛选）；列表框、查找和多选；数字、自动增高的文本区、掩码和密码；行编辑器；分步表单；树；工具提示和弹出框；菜单按钮和分割按钮；忙碌遮罩 |
+| `tabs.js`, `dates.js`, `choices.js`, `inputs.js`, `lines.js`, `steps.js`, `tree.js`, `overlays.js`, `menubutton.js`, `busy.js`, `menu.js` | 面板、标签页和分割面板；日期和时间选择器（也用于 grid 的日期筛选）；列表框、查找和多选；数字、自动增高的文本区、掩码和密码；行编辑器；分步表单；树；工具提示和弹出框；菜单按钮和分割按钮；忙碌遮罩；侧边菜单的可折叠分组 |
 | `grid.js` | grid，以 `<link rel="modulepreload">` 链接，因为 `zeyn.js` 会自己导入它 |
 | `palette.js`, `pro.js` | 命令面板和命令按钮；菜单栏、工具箱、状态栏、停靠面板和属性检查器 |
 | `colors.js`, `length.js`, `inspector.js` | 取色器；带单位切换的长度；岛的属性检查器 |

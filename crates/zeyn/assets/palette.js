@@ -186,7 +186,7 @@ function collect() {
     walk(menu, '');
   }
   for (const a of document.querySelectorAll('.z-nav a[href], .z-site-nav a[href]')) {
-    const group = a.closest('.z-nav-group')?.querySelector('h2')?.textContent.trim();
+    const group = a.closest('.z-nav-group')?.querySelector(':scope > :is(h2, h3, h4, h5)')?.textContent.trim();
     const path = new URL(a.href, location.href).pathname;
     const icon = [...(a.querySelector('.z-icon')?.classList ?? [])].find((c) => c.startsWith('z-icon-'));
     add({ key: `nav:${path}`, label: a.textContent.trim(), group: group ? `${t.textGo} · ${group}` : t.textGo, icon, run: () => a.click() });

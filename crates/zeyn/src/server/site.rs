@@ -305,11 +305,13 @@ pub(super) fn frame(
 ) -> String {
     let menu_label = r.text(&Text::key("zeyn.shell.menu"));
     let mut menu = String::new();
-    for (i, (_, label, items)) in st
+    for (i, group) in st
         .menu_links(ctx, r, current, true)
         .into_iter()
         .enumerate()
     {
+        let label = group.label().to_owned();
+        let items = group.all_links();
         if items.len() == 1 {
             menu.push_str(&items[0]);
             continue;

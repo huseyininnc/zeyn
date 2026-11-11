@@ -45,7 +45,7 @@ Bir sayfa yalnızca ekranının kullandığı tarayıcı kodunu yükler ve çal�
 | Modül | Bileşenler |
 |---|---|
 | `components.js` | her kontrol modülünün import ettiği ortak bölüm: yardımcılar, açılır pencere ve liste kutusu çekirdekleri, seçim kutuları (uygulama kabuğunun seçicileri), onay pencereleri, uyarılar, içerik yolu |
-| `tabs.js`, `dates.js`, `choices.js`, `inputs.js`, `lines.js`, `steps.js`, `tree.js`, `overlays.js`, `menubutton.js`, `busy.js` | paneller, sekmeler ve bölünmüş alanlar; tarih ve saat seçiciler (grid tarih filtreleri dahil); liste kutuları, aramalı seçimler ve çoklu seçimler; sayılar, büyüyen metin alanları, maskeler ve parolalar; satır düzenleyici; adımlı formlar; ağaçlar; ipuçları ve açılır kutular; menü ve bölünmüş düğmeler; meşgul katmanları |
+| `tabs.js`, `dates.js`, `choices.js`, `inputs.js`, `lines.js`, `steps.js`, `tree.js`, `overlays.js`, `menubutton.js`, `busy.js`, `menu.js` | paneller, sekmeler ve bölünmüş alanlar; tarih ve saat seçiciler (grid tarih filtreleri dahil); liste kutuları, aramalı seçimler ve çoklu seçimler; sayılar, büyüyen metin alanları, maskeler ve parolalar; satır düzenleyici; adımlı formlar; ağaçlar; ipuçları ve açılır kutular; menü ve bölünmüş düğmeler; meşgul katmanları; yan menünün katlanabilir grupları |
 | `grid.js` | gridler; `zeyn.js` onu kendisi import ettiği için `<link rel="modulepreload">` olarak bağlanır |
 | `palette.js`, `pro.js` | komut paleti ve komut düğmeleri; menü çubukları, araç kutuları, durum çubukları, yerleştirme panelleri ve özellik denetçileri |
 | `colors.js`, `length.js`, `inspector.js` | renk seçiciler; birim seçicili uzunluklar; adaların özellik denetçileri |

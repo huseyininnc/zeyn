@@ -857,7 +857,7 @@ async fn the_side_menu_starts_with_the_logo_and_draws_item_icons() {
         "{page}"
     );
     assert!(
-        page.contains(r#"<h2>Group</h2>"#),
+        page.contains(r#"<h2><button type="button" class="z-nav-heading" aria-expanded="true" aria-controls="z-nav-g0"><span>Group</span>"#),
         "the group label drops its icon"
     );
     assert!(page.contains(r#"aria-current="page"><span class="z-icon z-icon-home" aria-hidden="true"></span><span>One</span></a>"#));
@@ -916,4 +916,166 @@ fn a_logo_from_another_origin_is_reported() {
             "{bad}"
         );
     }
+}
+
+#[screen(route = "/three", public)]
+pub fn three() -> Screen {
+    Screen::new("Third")
+}
+
+#[screen(route = "/four", public)]
+pub fn four() -> Screen {
+    Screen::new("Fourth")
+}
+
+/// The side menu of a nested menu: `Work` holds `One` and the subgroup `Deep` with `Three` and
+/// the subgroup `Hidden`, whose only item needs a permission the visitor does not have; `Other`
+/// holds `Four`.
+fn nested(accordion: bool) -> axum::Router {
+    App::new("Nav")
+        .header(|h| h.breadcrumb())
+        .feature(
+            Feature::new("n")
+                .screen(one)
+                .screen(two)
+                .screen(three)
+                .screen(four)
+                .menu(|m| {
+                    let m = m
+                        .group("Work", Icon::Box)
+                        .item("One", one)
+                        .sub("Deep", |m| {
+                            m.item("Three", three)
+                                .sub("Hidden", |m| m.item("Two", two))
+                        })
+                        .group("Other", Icon::Home)
+                        .item("Four", four);
+                    if accordion { m.accordion() } else { m }
+                }),
+        )
+        .router()
+        .unwrap()
+}
+
+/// The `<nav class="z-nav">` element of a page.
+fn side_menu(page: &str) -> &str {
+    &page[page
+        .find(r#"<nav class="z-nav""#)
+        .unwrap()..page.find("</nav>").unwrap()]
+}
+
+#[tokio::test]
+async fn nested_menu_groups_render_as_disclosures_open_on_the_current_branch() {
+    let (_, _, page) = get(&nested(false), "/three", false).await;
+    let nav = side_menu(&page);
+    assert!(
+        nav.starts_with(r#"<nav class="z-nav" aria-label="Main" data-zeyn-menu>"#),
+        "{nav}"
+    );
+    assert!(
+        nav.contains(r#"<div class="z-nav-group"><h2><button type="button" class="z-nav-heading" aria-expanded="true" aria-controls="z-nav-g0"><span class="z-icon z-icon-box" aria-hidden="true"></span><span>Work</span><span class="z-nav-caret" aria-hidden="true"></span></button></h2><ul id="z-nav-g0"><li><a href="/one">One</a></li><li class="z-nav-group z-nav-sub"><h3><button type="button" class="z-nav-heading" aria-expanded="true" aria-controls="z-nav-g0-0"><span>Deep</span><span class="z-nav-caret" aria-hidden="true"></span></button></h3><ul id="z-nav-g0-0"><li><a href="/three" aria-current="page">Three</a></li></ul></li></ul></div>"#),
+        "the current branch is open and nested in the group: {nav}"
+    );
+    assert!(
+        nav.contains(r#"aria-expanded="false" aria-controls="z-nav-g1"><span class="z-icon z-icon-home" aria-hidden="true"></span><span>Other</span>"#),
+        "groups away from the current screen start closed: {nav}"
+    );
+    assert!(
+        !nav.contains("Hidden") && !nav.contains(r#"href="/two""#),
+        "a subgroup without items the user may open is left out"
+    );
+    assert!(
+        page.contains(
+            r#"<ol><li>Work</li><li>Deep</li><li><span aria-current="page">Three</span></li></ol>"#
+        ),
+        "the breadcrumb holds the whole group path"
+    );
+    assert!(page.contains(r#"<script type="module" src="/_zeyn/menu.js?v="#));
+
+    let (_, _, home) = get(&nested(false), "/one", false).await;
+    let nav = side_menu(&home);
+    assert!(nav.contains(r#"aria-expanded="true" aria-controls="z-nav-g0">"#));
+    assert!(
+        nav.contains(r#"aria-expanded="false" aria-controls="z-nav-g0-0">"#),
+        "a subgroup without the current screen starts closed: {nav}"
+    );
+}
+
+#[tokio::test]
+async fn an_accordion_menu_marks_the_side_menu() {
+    let (_, _, page) = get(&nested(true), "/one", false).await;
+    assert!(side_menu(&page).starts_with(
+        r#"<nav class="z-nav" aria-label="Main" data-zeyn-menu data-zeyn-accordion>"#
+    ));
+}
+
+#[tokio::test]
+async fn an_open_group_has_no_toggle_and_loads_no_menu_script() {
+    let router = App::new("Nav")
+        .feature(Feature::new("n").screen(one).menu(|m| {
+            m.group("Group", Icon::Box)
+                .open()
+                .item("One", one)
+        }))
+        .router()
+        .unwrap();
+    let (_, _, page) = get(&router, "/one", false).await;
+    let nav = side_menu(&page);
+    assert!(nav.starts_with(r#"<nav class="z-nav" aria-label="Main">"#));
+    assert!(nav.contains(r#"<div class="z-nav-group"><h2><span class="z-icon z-icon-box" aria-hidden="true"></span>Group</h2><ul><li>"#), "{nav}");
+    assert!(!page.contains("/_zeyn/menu.js"));
+}
+
+#[tokio::test]
+async fn nested_groups_with_the_same_label_merge_across_features() {
+    let router = App::new("Nav")
+        .feature(Feature::new("a").screen(one).menu(|m| {
+            m.group("Work", Icon::Box)
+                .sub("Deep", |m| m.item("One", one))
+        }))
+        .feature(
+            Feature::new("b")
+                .screen(three)
+                .menu(|m| {
+                    m.group("Work", Icon::Box)
+                        .sub("Deep", |m| m.item("Three", three))
+                }),
+        )
+        .router()
+        .unwrap();
+    let (_, _, page) = get(&router, "/three", false).await;
+    let nav = side_menu(&page);
+    assert_eq!(nav.matches(">Work<").count(), 1, "{nav}");
+    assert_eq!(nav.matches(">Deep<").count(), 1, "{nav}");
+    assert!(
+        nav.contains(r#"<ul id="z-nav-g0-0"><li><a href="/one">One</a></li><li><a href="/three" aria-current="page">Three</a></li></ul>"#),
+        "{nav}"
+    );
+}
+
+#[test]
+#[should_panic(expected = "at most 3 levels of `sub` below a `group`")]
+fn menus_nest_at_most_three_levels_below_a_group() {
+    let _ = Feature::new("n").screen(one).menu(|m| {
+        m.group("A", Icon::Box).sub("B", |m| {
+            m.sub("C", |m| m.sub("D", |m| m.sub("E", |m| m.item("One", one))))
+        })
+    });
+}
+
+#[test]
+fn three_levels_of_nested_groups_are_allowed() {
+    let f = Feature::new("n").screen(one).menu(|m| {
+        m.group("A", Icon::Box)
+            .sub("B", |m| m.sub("C", |m| m.sub("D", |m| m.item("One", one))))
+    });
+    assert_eq!(f.menu_groups()[0].depth(), 3);
+    assert_eq!(
+        f.menu_groups()[0]
+            .find("one")
+            .unwrap()
+            .0
+            .len(),
+        4
+    );
 }
