@@ -14,6 +14,10 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 - HEAD requests to exports, PDFs and sitemaps count toward the write rate limit, like GET.
 - Grid exports of actions that page only by keyset cursor stopped after the first 500 rows.
 
+### Security
+
+- CI runs `cargo audit` and fails on any advisory that `.cargo/audit.toml` does not ignore with a reason. Four are ignored there: quick-xml 0.38 in Typst's bibliography reader (feature `pdf`, only the app's own templates reach it, no fixed release yet), libsqlite3-sys 0.37, which sits in `Cargo.lock` through sqlx's optional SQLite driver but is never built, and glib 0.18 from the Linux desktop window stack.
+
 ## [0.0.10] - 2026-11-10
 
 ### Added
