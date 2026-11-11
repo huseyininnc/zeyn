@@ -16,6 +16,25 @@ Feature::new("sales")
     .menu(|m| m.group(t!("sales.menu"), Icon::Cart).item(t!("sales.orders"), orders).icon(Icon::Table))
 ```
 
+### Grupos anidados y plegables
+
+`.sub(label, |m| ...)` añade un grupo anidado al último grupo; dentro, `item`, `icon`, `open` y `sub` funcionan como en un grupo. Los grupos anidados van después de los elementos de su grupo y bajan como mucho tres niveles por debajo de un grupo de primer nivel (`MENU_DEPTH`); un menú más profundo detiene la aplicación al arrancar con un mensaje que nombra el grupo.
+
+```rust
+.menu(|m| {
+    m.group(t!("sales.menu"), Icon::Cart)
+        .item(t!("sales.orders"), orders)
+        .sub(t!("sales.reports"), |m| m.item(t!("sales.by_city"), by_city).item(t!("sales.archive"), archive))
+        .accordion()
+})
+```
+
+- **Plegables.** Cada encabezado de grupo es un botón con `aria-expanded` y `aria-controls` (el patrón de navegación por divulgación de W3C APG). El servidor dibuja abiertos los grupos que contienen la pantalla actual y cerrados los demás, y `nav.js` abre la rama de la nueva pantalla tras cada navegación. Sin el script todos los grupos quedan abiertos, así que nada queda fuera de alcance.
+- **Siempre abierto.** `.open()` después de un grupo lo mantiene abierto: su encabezado es texto sin botón.
+- **Acordeón.** `.accordion()` en el menú de cualquier feature del app shell convierte todo el menú lateral en un acordeón: abrir un grupo cierra sus hermanos abiertos.
+- **Teclado.** Arriba y Abajo recorren los encabezados y enlaces visibles, Inicio y Fin van al primero y al último. Derecha abre un grupo cerrado o entra en uno abierto; Izquierda cierra un grupo abierto o va al encabezado del grupo que lo rodea. Enter y Espacio abren o cierran un grupo. Izquierda y Derecha se intercambian en los idiomas de derecha a izquierda.
+- **Permisos y fusión.** Los grupos con la misma etiqueta se fusionan entre features en todos los niveles, y un grupo cuyos elementos el usuario no puede abrir se omite, incluidos los grupos anidados. La ruta de navegación de `App::header(|h| h.breadcrumb())` muestra la ruta completa de grupos. El site shell lista los enlaces de los grupos anidados en su grupo de primer nivel.
+
 ## El shell del sitio
 
 Las pantallas de trabajo se abren en el shell de la aplicación con su menú lateral. Las páginas públicas, como una tienda o un catálogo de productos, pueden abrirse en cambio en el shell del sitio: el nombre de la aplicación como enlace de marca, un menú horizontal, un botón de menú en pantallas estrechas, acciones opcionales y un pie de página. Una feature lo elige; las pantallas de otras features conservan el shell de la aplicación, así que ambos conviven en una misma aplicación.

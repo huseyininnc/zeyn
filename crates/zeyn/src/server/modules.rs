@@ -106,6 +106,7 @@ pub(crate) const MODULES: &[Module] = &[
     control("overlays", &["data-zeyn-tip", "z-popover-button"]),
     control("menubutton", &["z-menu-trigger", "z-split-button"]),
     script("busy", &["data-zeyn-busy"]),
+    script("menu", &["data-zeyn-menu"]),
     script(
         "palette",
         &[
@@ -451,7 +452,7 @@ pub(crate) fn runtime(js: &'static str) -> &'static str {
 
 /// Script and style files of component modules, by path; the others are served next to their
 /// endpoints.
-const FILES: [(&str, &str); 56] = [
+const FILES: [(&str, &str); 57] = [
     ("/_zeyn/colors.js", include_str!("../../assets/colors.js")),
     ("/_zeyn/length.js", include_str!("../../assets/length.js")),
     (
@@ -542,6 +543,7 @@ const FILES: [(&str, &str); 56] = [
         include_str!("../../assets/menubutton.js"),
     ),
     ("/_zeyn/busy.js", include_str!("../../assets/busy.js")),
+    ("/_zeyn/menu.js", include_str!("../../assets/menu.js")),
     ("/_zeyn/palette.js", include_str!("../../assets/palette.js")),
     ("/_zeyn/reveal.js", include_str!("../../assets/reveal.js")),
     ("/_zeyn/forms.js", include_str!("../../assets/forms.js")),

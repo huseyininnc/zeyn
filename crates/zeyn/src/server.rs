@@ -59,6 +59,13 @@ mod xlsx;
 
 pub use ops::{READY_CACHE, build_id, probe};
 
+/// Sent on sign out with the value `"storage"`: the browser drops what the runtime kept for the
+/// app (form drafts, grid views, palette recents). Browsers apply it on secure origins only; the
+/// per user storage key of the page (`zeyn-storage`) covers the rest.
+#[cfg(any(feature = "oidc", feature = "accounts"))]
+const CLEAR_SITE_DATA: axum::http::HeaderName =
+    axum::http::HeaderName::from_static("clear-site-data");
+
 /// The browser runtime every page loads, served as one module at `/_zeyn/zeyn.js`. The source is
 /// one file per concern under `assets/zeyn/`, joined here in this order (later parts use
 /// functions and constants of earlier ones):
@@ -1668,14 +1675,8 @@ impl App {
                     "path": format!("{}/{}/{}", self.api_prefix, f.name(), a.meta.name),
                     "access": a.meta.access,
                 })).collect::<Vec<_>>(),
-                "menu": f.menu_groups().iter().map(|g| json!({
-                    "label": self.i18n.text(self.i18n.default_locale(), &g.label),
-                    "icon": g.icon,
-                    "items": g.items.iter().map(|i| json!({
-                        "label": self.i18n.text(self.i18n.default_locale(), &i.label),
-                        "screen": i.screen,
-                    })).collect::<Vec<_>>(),
-                })).collect::<Vec<_>>(),
+                "menu": f.menu_groups().iter().map(|g| menu_json(&self.i18n, g)).collect::<Vec<_>>(),
+                "menu_accordion": f.menu_accordion(),
                 "commands": f.commands().iter().map(crate::command::Command::schema).collect::<Vec<_>>(),
             })).collect::<Vec<_>>(),
             "missing_translations": self.i18n.missing_keys(),
@@ -2839,91 +2840,116 @@ impl AppState {
         .ok()
     }
 
-    /// Menu links of the features in one shell (the site shell when `site`) whose guards the user
-    /// passes, per group: the group's icon, its label and its `<li>` links. Groups with the same
-    /// label are merged into the first one, so several features can share one menu heading.
+    /// The menu of the features in one shell (the site shell when `site`) whose guards the user
+    /// passes. Items the user may not open are left out, and so are groups left without items.
+    /// Groups with the same label are merged into the first one at every level, so several
+    /// features can share one menu heading.
     fn menu_links(
         &self,
         ctx: &Ctx,
         r: &Render,
         current: Option<&str>,
         site: bool,
-    ) -> Vec<(String, String, Vec<String>)> {
-        let mut groups: Vec<(String, String, Vec<String>)> = Vec::new();
+    ) -> Vec<NavGroup> {
+        let mut groups: Vec<NavGroup> = Vec::new();
         for f in &self.features {
             if f.site_shell().is_some() != site || f.check_guards(ctx).is_err() {
                 continue;
             }
             for g in f.menu_groups() {
-                let items: Vec<String> = g
-                    .items
-                    .iter()
-                    .filter_map(|item| {
-                        let entry = f
-                            .screens()
-                            .iter()
-                            .find(|s| s.meta.name == item.screen)?;
-                        if !ctx.identity().can(&entry.meta.access) {
-                            return None;
-                        }
-                        let path = f.path_of(&entry.meta)?;
-                        let aria = if current == Some(item.screen) {
-                            r#" aria-current="page""#
-                        } else {
-                            ""
-                        };
-                        let href = escape(&self.url(&locale::path(self, ctx, &path)));
-                        let label = r.text(&item.label);
-                        Some(match item.icon.filter(|_| !site) {
-                            Some(icon) => format!(
-                                r#"<li><a href="{href}"{aria}>{}<span>{label}</span></a></li>"#,
-                                icon.html()
-                            ),
-                            None => format!(r#"<li><a href="{href}"{aria}>{label}</a></li>"#),
-                        })
-                    })
-                    .collect();
-                if items.is_empty() {
-                    continue;
-                }
-                let label = r.text(&g.label);
-                let icon = if g.items.iter().any(|i| i.icon.is_some()) {
-                    String::new()
-                } else {
-                    g.icon.html()
-                };
-                match groups.iter_mut().find(|g| g.1 == label) {
-                    Some(group) => group.2.extend(items),
-                    None => groups.push((icon, label, items)),
+                if let Some(group) = self.nav_group(f, g, ctx, r, current, site) {
+                    NavGroup::merge(&mut groups, group);
                 }
             }
         }
         groups
     }
 
-    /// The breadcrumb of `SiteHeader::breadcrumb`: the menu group of the current screen and the
-    /// screen's menu label. `nav.js` rewrites it from the side menu after each navigation.
+    /// One group of [`Self::menu_links`] with its nested groups, or `None` when the user may
+    /// open none of its items.
+    fn nav_group(
+        &self,
+        f: &Feature,
+        g: &crate::feature::MenuGroup,
+        ctx: &Ctx,
+        r: &Render,
+        current: Option<&str>,
+        site: bool,
+    ) -> Option<NavGroup> {
+        let mut here = false;
+        let links: Vec<String> = g
+            .items
+            .iter()
+            .filter_map(|item| {
+                let entry = f
+                    .screens()
+                    .iter()
+                    .find(|s| s.meta.name == item.screen)?;
+                if !ctx.identity().can(&entry.meta.access) {
+                    return None;
+                }
+                let path = f.path_of(&entry.meta)?;
+                let aria = if current == Some(item.screen) {
+                    here = true;
+                    r#" aria-current="page""#
+                } else {
+                    ""
+                };
+                let href = escape(&self.url(&locale::path(self, ctx, &path)));
+                let label = r.text(&item.label);
+                Some(match item.icon.filter(|_| !site) {
+                    Some(icon) => format!(
+                        r#"<li><a href="{href}"{aria}>{}<span>{label}</span></a></li>"#,
+                        icon.html()
+                    ),
+                    None => format!(r#"<li><a href="{href}"{aria}>{label}</a></li>"#),
+                })
+            })
+            .collect();
+        let groups: Vec<NavGroup> = g
+            .groups
+            .iter()
+            .filter_map(|sub| self.nav_group(f, sub, ctx, r, current, site))
+            .collect();
+        if links.is_empty() && groups.is_empty() {
+            return None;
+        }
+        let icon = match g.icon {
+            Some(icon) if !g.items.iter().any(|i| i.icon.is_some()) => icon.html(),
+            _ => String::new(),
+        };
+        Some(NavGroup {
+            here: here || groups.iter().any(|s| s.here),
+            icon,
+            label: r.text(&g.label),
+            open: g.open,
+            links,
+            groups,
+        })
+    }
+
+    /// The breadcrumb of `SiteHeader::breadcrumb`: the menu groups of the current screen, from
+    /// the top level one down, and the screen's menu label. `nav.js` rewrites it from the side
+    /// menu after each navigation.
     fn breadcrumb(&self, r: &Render, current: Option<&str>) -> String {
         let found = current.and_then(|name| {
             self.features
                 .iter()
                 .flat_map(|f| f.menu_groups())
-                .find_map(|g| {
-                    g.items
-                        .iter()
-                        .find(|i| i.screen == name)
-                        .map(|i| (r.text(&g.label), r.text(&i.label)))
-                })
+                .find_map(|g| g.find(name))
         });
-        let items = match found {
-            Some((group, item)) if group == item => {
-                format!(r#"<li><span aria-current="page">{item}</span></li>"#)
+        let mut items = String::new();
+        if let Some((path, item)) = found {
+            let item = r.text(&item.label);
+            for label in path.iter().map(|l| r.text(l)) {
+                if label != item {
+                    items.push_str(&format!("<li>{label}</li>"));
+                }
             }
-            Some((group, item)) => {
-                format!(r#"<li>{group}</li><li><span aria-current="page">{item}</span></li>"#)
-            }
-            None => String::new(),
-        };
+            items.push_str(&format!(
+                r#"<li><span aria-current="page">{item}</span></li>"#
+            ));
+        }
         format!(
             r#"<nav class="z-crumbs" aria-label="{}" data-zeyn-crumbs><ol>{items}</ol></nav>"#,
             r.text(&Text::key("zeyn.shell.breadcrumb"))
@@ -3045,7 +3071,7 @@ impl AppState {
         };
         let html_attrs = format!("{theme_attrs}{density}{native_menu}");
         format!(
-            r##"<!doctype html><html lang="{lang}"{dir}{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css{v}"><link rel="stylesheet" href="{base}/_zeyn/icons.css{v}"><script type="module" src="{base}/_zeyn/zeyn.js{v}"></script><script type="module" src="{base}/_zeyn/nav.js{v}"></script>{components}{theme_link}{extra}{prefetch}</head><body><a class="z-skip" href="#z-main">{skip}</a>{frame}<div class="z-toasts" role="status" aria-live="polite" data-text-dismiss="{dismiss}"></div>{commands}{ai_launcher}</body></html>"##,
+            r##"<!doctype html><html lang="{lang}"{dir}{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><meta name="zeyn-storage" content="{storage}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css{v}"><link rel="stylesheet" href="{base}/_zeyn/icons.css{v}"><script type="module" src="{base}/_zeyn/zeyn.js{v}"></script><script type="module" src="{base}/_zeyn/nav.js{v}"></script>{components}{theme_link}{extra}{prefetch}</head><body><a class="z-skip" href="#z-main">{skip}</a>{frame}<div class="z-toasts" role="status" aria-live="polite" data-text-dismiss="{dismiss}"></div>{commands}{ai_launcher}</body></html>"##,
             lang = escape(ctx.locale()),
             dir = if locale::rtl(ctx.locale()) {
                 r#" dir="rtl""#
@@ -3054,6 +3080,7 @@ impl AppState {
             },
             csrf = mask_token(csrf),
             tz = escape(ctx.time_zone().name()),
+            storage = escape(&auth::storage_key(self, ctx.identity().user.as_deref())),
             v = ops::asset_version(),
             theme_link = if self.look.css.is_empty() {
                 String::new()
@@ -3093,12 +3120,21 @@ impl AppState {
     ) -> String {
         let r = *r;
         let mut nav = String::new();
-        for (icon, label, items) in self.menu_links(ctx, &r, current, false) {
-            nav.push_str(&format!(
-                r#"<div class="z-nav-group"><h2>{icon}{label}</h2><ul>{}</ul></div>"#,
-                items.join("")
-            ));
+        let groups = self.menu_links(ctx, &r, current, false);
+        for (i, g) in groups.iter().enumerate() {
+            g.render(&mut nav, &format!("z-nav-g{i}"), 2);
         }
+        let marker = if !groups.iter().any(NavGroup::collapsible) {
+            ""
+        } else if self
+            .features
+            .iter()
+            .any(|f| f.site_shell().is_none() && f.menu_accordion())
+        {
+            " data-zeyn-menu data-zeyn-accordion"
+        } else {
+            " data-zeyn-menu"
+        };
         let account = self
             .header
             .as_ref()
@@ -3152,7 +3188,7 @@ impl AppState {
             })
             .unwrap_or_default();
         format!(
-            r#"<div class="z-app" data-zeyn-shell="app"><nav class="z-nav" aria-label="{menu}"><div class="z-nav-bar"><p class="z-app-name">{logo}<span>{app}</span></p><button type="button" class="z-nav-toggle" aria-expanded="false" aria-controls="z-nav-body" data-zeyn-nav-toggle hidden><span class="z-nav-burger" aria-hidden="true"></span><span class="z-sr-only">{menu}</span></button></div><div class="z-nav-body" id="z-nav-body">{palette}{nav}</div></nav>{header}<main class="z-main" id="z-main">{main}</main></div>"#,
+            r#"<div class="z-app" data-zeyn-shell="app"><nav class="z-nav" aria-label="{menu}"{marker}><div class="z-nav-bar"><p class="z-app-name">{logo}<span>{app}</span></p><button type="button" class="z-nav-toggle" aria-expanded="false" aria-controls="z-nav-body" data-zeyn-nav-toggle hidden><span class="z-nav-burger" aria-hidden="true"></span><span class="z-sr-only">{menu}</span></button></div><div class="z-nav-body" id="z-nav-body">{palette}{nav}</div></nav>{header}<main class="z-main" id="z-main">{main}</main></div>"#,
             palette = if self
                 .header
                 .as_ref()
@@ -3166,6 +3202,110 @@ impl AppState {
             logo = logo_mark(self.logo.as_ref(), &escape(&self.prefix), app, "z-logo"),
         )
     }
+}
+
+/// A menu group of [`AppState::menu_links`] as one user sees it: rendered links, nested groups
+/// and whether it holds the current screen.
+pub(crate) struct NavGroup {
+    /// The icon's HTML, empty when the items have icons of their own.
+    icon: String,
+    label: String,
+    /// Stays open without a toggle button ([`crate::Menu::open`]).
+    open: bool,
+    /// Holds the link of the current screen, itself or in a nested group.
+    here: bool,
+    /// The `<li>` links.
+    links: Vec<String>,
+    groups: Vec<NavGroup>,
+}
+
+impl NavGroup {
+    /// Adds `group` to `list`, or merges it into the group with the same label, nested groups
+    /// included.
+    fn merge(list: &mut Vec<NavGroup>, group: NavGroup) {
+        match list
+            .iter_mut()
+            .find(|g| g.label == group.label)
+        {
+            Some(same) => {
+                same.here |= group.here;
+                same.open |= group.open;
+                same.links.extend(group.links);
+                for sub in group.groups {
+                    NavGroup::merge(&mut same.groups, sub);
+                }
+            }
+            None => list.push(group),
+        }
+    }
+
+    /// The group's label.
+    pub(crate) fn label(&self) -> &str {
+        &self.label
+    }
+
+    /// The links of the group and of its nested groups, in order.
+    pub(crate) fn all_links(self) -> Vec<String> {
+        let mut links = self.links;
+        for g in self.groups {
+            links.extend(g.all_links());
+        }
+        links
+    }
+
+    /// Whether this group or a nested one has a toggle button.
+    fn collapsible(&self) -> bool {
+        !self.open
+            || self
+                .groups
+                .iter()
+                .any(NavGroup::collapsible)
+    }
+
+    /// Writes the group into the side menu: a `<div>` at the top level, an `<li>` below it, with
+    /// a heading of `level`. A collapsible group's heading holds a button with `aria-expanded`
+    /// and `aria-controls` (W3C APG disclosure); it starts expanded when the group holds the
+    /// current screen. `id` is the id of the group's list.
+    fn render(&self, out: &mut String, id: &str, level: usize) {
+        let label = &self.label;
+        let icon = &self.icon;
+        let (open_tag, close_tag) = if level == 2 {
+            (r#"<div class="z-nav-group">"#, "</div>")
+        } else {
+            (r#"<li class="z-nav-group z-nav-sub">"#, "</li>")
+        };
+        out.push_str(open_tag);
+        if self.open {
+            out.push_str(&format!("<h{level}>{icon}{label}</h{level}><ul>"));
+        } else {
+            out.push_str(&format!(
+                r#"<h{level}><button type="button" class="z-nav-heading" aria-expanded="{}" aria-controls="{id}">{icon}<span>{label}</span><span class="z-nav-caret" aria-hidden="true"></span></button></h{level}><ul id="{id}">"#,
+                self.here
+            ));
+        }
+        for link in &self.links {
+            out.push_str(link);
+        }
+        for (i, g) in self.groups.iter().enumerate() {
+            g.render(out, &format!("{id}-{i}"), level + 1);
+        }
+        out.push_str("</ul>");
+        out.push_str(close_tag);
+    }
+}
+
+/// A menu group in the app description, nested groups included.
+fn menu_json(i18n: &I18n, g: &crate::feature::MenuGroup) -> Json {
+    json!({
+        "label": i18n.text(i18n.default_locale(), &g.label),
+        "icon": g.icon,
+        "open": g.open,
+        "items": g.items.iter().map(|i| json!({
+            "label": i18n.text(i18n.default_locale(), &i.label),
+            "screen": i.screen,
+        })).collect::<Vec<_>>(),
+        "groups": g.groups.iter().map(|s| menu_json(i18n, s)).collect::<Vec<_>>(),
+    })
 }
 
 /// The logo of `App::logo`: a path on the app's origin, with an optional dark theme variant.

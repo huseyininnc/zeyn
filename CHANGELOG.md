@@ -4,15 +4,24 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 ## [Unreleased]
 
+### Added
+
+- Nested and collapsible side menu groups: `Menu::sub` nests groups up to three levels below a group, every group heading is a disclosure button that starts open on the branch of the current screen, `Menu::open` keeps a group open and `Menu::accordion` closes sibling groups. The new `menu` module (3.2 KB, 1.3 KB compressed) adds arrow key navigation and loads only on pages whose menu has a collapsible group; the breadcrumb shows the whole group path.
+
 ### Changed
 
+- Side menu groups start closed unless they hold the current screen or call `Menu::open`. `MenuGroup::icon` is now an `Option<Icon>`, since nested groups have no icon.
 - Paging SQL follows the database more closely. PostgreSQL keyset pages seek with one row comparison, `("code", "id") > ($1, $2)`, when the sort keys share a direction and hold no NULLs; with an index on `(status, id)` over one million rows and three status values this took 0.11 ms instead of 29.4 ms. Oracle 11g pages without an offset, keyset pages and capped counts use `ROWNUM <= :n` alone, without the numbering wrapper.
 - Grid exports continue from the previous batch's keyset cursor when the data layer returns one, instead of an offset that rereads every earlier row.
 
 ### Fixed
 
+- `accounts::create_tables` for Oracle uses a sequence and a trigger for claim ids instead of identity columns, so the account tables are created on Oracle 11g too.
+- Signing out answers with `Clear-Site-Data: "storage"`, and pages carry a per user storage key (`<meta name="zeyn-storage">`, a keyed hash, never the user id) that form drafts, local grid views and palette recents are filed under, so the next user of a shared browser no longer sees them.
 - HEAD requests to exports, PDFs and sitemaps count toward the write rate limit, like GET.
 - Grid exports of actions that page only by keyset cursor stopped after the first 500 rows.
+- The markup sanitizer removes SVG `use` elements whose target is a `use` or holds one, so nested references (ten groups that each use the previous one ten times) can no longer render billions of copies and hang the browser; reference cycles go with them, and icon sprites keep working.
+- `POST /_zeyn/nodes` drops a path inside another requested path before it loads grids, so overlapping paths such as `1`, `1.1` and `1.1.0` run each grid query once instead of once per path. `POST /_zeyn/node` and `/_zeyn/nodes` count against the write limit (`App::write_limit`), as `POST /_zeyn/data` does.
 
 ### Security
 

@@ -279,6 +279,30 @@ function syncTimeZone() {
   location.reload();
 }
 
+/** Prefixes of the stored values that belong to one user: form drafts, grid views, palette recents. */
+const USER_STORAGE = /^zeyn(-draft:|\.view:|\.palette\.recent)/;
+
+/**
+ * Removes the form drafts, grid views and palette recents another user left in this browser when
+ * the page belongs to a new user (`meta[name=zeyn-storage]`, the per user key the values are
+ * filed under). Signed out pages (`anon`) keep them, so a sign out and the next sign in of the
+ * same user lose nothing; the sign out response clears storage itself on HTTPS
+ * (`Clear-Site-Data`). The last user is kept under `zeyn.storage`.
+ */
+function dropOtherUsers() {
+  const user = document.querySelector('meta[name="zeyn-storage"]')?.content;
+  if (!user || user === 'anon') return;
+  try {
+    if (localStorage.getItem('zeyn.storage') === user) return;
+    for (const area of [localStorage, sessionStorage]) {
+      for (const key of Object.keys(area)) if (USER_STORAGE.test(key)) area.removeItem(key);
+    }
+    localStorage.setItem('zeyn.storage', user);
+  } catch {
+    return;
+  }
+}
+
 /** Abort controller of the currently registered WebMCP tools. */
 let agentTools = { controller: null, names: [], handles: [], seq: 0 };
 

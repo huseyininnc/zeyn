@@ -16,6 +16,25 @@ Feature::new("sales")
     .menu(|m| m.group(t!("sales.menu"), Icon::Cart).item(t!("sales.orders"), orders).icon(Icon::Table))
 ```
 
+### Nested and collapsible groups
+
+`.sub(label, |m| ...)` adds a nested group to the last group; inside it, `item`, `icon`, `open` and `sub` work as they do on a group. Nested groups come after the items of their group and nest at most three levels below a top level group (`MENU_DEPTH`); a deeper menu stops the app at startup with a message that names the group.
+
+```rust
+.menu(|m| {
+    m.group(t!("sales.menu"), Icon::Cart)
+        .item(t!("sales.orders"), orders)
+        .sub(t!("sales.reports"), |m| m.item(t!("sales.by_city"), by_city).item(t!("sales.archive"), archive))
+        .accordion()
+})
+```
+
+- **Collapsible.** Every group heading is a button with `aria-expanded` and `aria-controls` (the W3C APG disclosure navigation pattern). The server renders the groups that hold the current screen open and the others closed, and `nav.js` opens the branch of the new screen after each navigation. Without the script every group stays open, so nothing becomes unreachable.
+- **Always open.** `.open()` after a group keeps it open: its heading is plain text without a button.
+- **Accordion.** `.accordion()` on the menu of any feature in the app shell makes the whole side menu an accordion: opening a group closes its open siblings.
+- **Keyboard.** Up and Down move between the visible headings and links, Home and End go to the first and the last. Right opens a closed group or moves into an open one; Left closes an open group or moves to the heading of the group around it. Enter and Space toggle a group. Left and Right swap in right to left languages.
+- **Permissions and merging.** Groups with the same label merge across features at every level, and a group whose items the user may not open is left out, nested groups included. The breadcrumb of `App::header(|h| h.breadcrumb())` shows the whole group path. The site shell lists the links of nested groups in their top level group.
+
 ## The site shell
 
 Work screens open in the app shell with its side menu. Public pages, such as a shop or a product catalog, can open in the site shell instead: the app's name as a brand link, a horizontal menu, a menu button on narrow screens, optional actions and a footer. A feature chooses it; screens of other features keep the app shell, so both live in one app.

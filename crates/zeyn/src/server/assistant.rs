@@ -626,9 +626,8 @@ fn screens_for(st: &AppState, ctx: &Ctx) -> Vec<(&'static str, String, String)> 
             let label = f
                 .menu_groups()
                 .iter()
-                .flat_map(|g| g.items.iter())
-                .find(|i| i.screen == s.meta.name)
-                .map(|i| ctx.t(&i.label))
+                .find_map(|g| g.find(s.meta.name))
+                .map(|(_, i)| ctx.t(&i.label))
                 .unwrap_or_else(|| s.meta.doc.to_string());
             list.push((s.meta.name, path, label));
         }

@@ -45,7 +45,7 @@ head의 모든 프레임워크 스크립트와 스타일시트에는 `?v=`와 �
 | 모듈 | 컴포넌트 |
 |---|---|
 | `components.js` | 모든 컨트롤 모듈이 import하는 공유 부분: 도우미, 팝업과 리스트박스 코어, 셀렉트(앱 셸의 선택기), 확인 대화상자, 알림, 이동 경로 |
-| `tabs.js`, `dates.js`, `choices.js`, `inputs.js`, `lines.js`, `steps.js`, `tree.js`, `overlays.js`, `menubutton.js`, `busy.js` | 패널, 탭, 분할 창; 날짜와 시간 선택기(grid 날짜 필터 포함); 리스트박스, 조회, 다중 선택; 숫자, 늘어나는 텍스트 영역, 마스크, 비밀번호; 줄 편집기; 단계별 폼; 트리; 툴팁과 팝오버; 메뉴 버튼과 분할 버튼; 처리 중 오버레이 |
+| `tabs.js`, `dates.js`, `choices.js`, `inputs.js`, `lines.js`, `steps.js`, `tree.js`, `overlays.js`, `menubutton.js`, `busy.js`, `menu.js` | 패널, 탭, 분할 창; 날짜와 시간 선택기(grid 날짜 필터 포함); 리스트박스, 조회, 다중 선택; 숫자, 늘어나는 텍스트 영역, 마스크, 비밀번호; 줄 편집기; 단계별 폼; 트리; 툴팁과 팝오버; 메뉴 버튼과 분할 버튼; 처리 중 오버레이; 사이드 메뉴의 접을 수 있는 그룹 |
 | `grid.js` | grid. `zeyn.js`가 직접 import하므로 `<link rel="modulepreload">`로 링크됩니다 |
 | `palette.js`, `pro.js` | 명령 팔레트와 명령 버튼; 메뉴 막대, 도구 상자, 상태 표시줄, 도킹 패널, 속성 검사기 |
 | `colors.js`, `length.js`, `inspector.js` | 색 선택기, 단위 전환이 있는 길이, 아일랜드의 속성 인스펙터 |

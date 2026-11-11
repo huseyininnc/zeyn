@@ -16,6 +16,25 @@ Feature::new("sales")
     .menu(|m| m.group(t!("sales.menu"), Icon::Cart).item(t!("sales.orders"), orders).icon(Icon::Table))
 ```
 
+### 嵌套和可折叠的分组
+
+`.sub(label, |m| ...)` 在最后一个分组中添加嵌套分组；在其中，`item`、`icon`、`open` 和 `sub` 的用法与分组相同。嵌套分组排在其所在分组的条目之后，最多比顶层分组深三层（`MENU_DEPTH`）；更深的菜单会在启动时停止应用，并给出指明该分组的消息。
+
+```rust
+.menu(|m| {
+    m.group(t!("sales.menu"), Icon::Cart)
+        .item(t!("sales.orders"), orders)
+        .sub(t!("sales.reports"), |m| m.item(t!("sales.by_city"), by_city).item(t!("sales.archive"), archive))
+        .accordion()
+})
+```
+
+- **可折叠。** 每个分组标题都是带 `aria-expanded` 和 `aria-controls` 的按钮（W3C APG 展开式导航模式）。服务器把包含当前屏幕的分组渲染为展开，其余为折叠；每次导航后 `nav.js` 会展开新屏幕所在的分支。没有脚本时所有分组保持展开，因此不会有内容无法访问。
+- **始终展开。** 在分组后调用 `.open()` 使其保持展开：标题是不带按钮的普通文本。
+- **手风琴。** 在 app shell 中任一 feature 的菜单上调用 `.accordion()`，整个侧边菜单变为手风琴：展开一个分组会折叠其已展开的同级分组。
+- **键盘。** 上和下在可见的标题和链接之间移动，Home 和 End 跳到第一个和最后一个。右键展开折叠的分组或进入已展开的分组；左键折叠已展开的分组或移到外层分组的标题。Enter 和空格切换分组。在从右到左的语言中左右互换。
+- **权限与合并。** 同名分组在每一层跨 feature 合并；用户无法打开其中任何条目的分组（包括嵌套分组）不会显示。`App::header(|h| h.breadcrumb())` 的面包屑显示完整的分组路径。site shell 把嵌套分组的链接列在其顶层分组中。
+
 ## 站点 shell
 
 工作 screen 在带侧边菜单的应用 shell 中打开。公共页面（例如商店或产品目录）可以改为在站点 shell 中打开：应用名称作为品牌链接、横向菜单、窄屏幕上的菜单按钮、可选的操作和页脚。由 feature 选择使用哪一个；其他 feature 的 screen 保持应用 shell，因此两者可以共存于同一个应用。

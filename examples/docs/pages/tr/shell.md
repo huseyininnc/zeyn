@@ -16,6 +16,25 @@ Feature::new("sales")
     .menu(|m| m.group(t!("sales.menu"), Icon::Cart).item(t!("sales.orders"), orders).icon(Icon::Table))
 ```
 
+### İç içe ve katlanabilir gruplar
+
+`.sub(label, |m| ...)` son gruba iç içe bir grup ekler; içinde `item`, `icon`, `open` ve `sub` bir grupta olduğu gibi çalışır. İç içe gruplar kendi gruplarının öğelerinden sonra gelir ve en üst gruptan en fazla üç seviye aşağı iner (`MENU_DEPTH`); daha derin bir menü, uygulamayı başlangıçta grubun adını veren bir mesajla durdurur.
+
+```rust
+.menu(|m| {
+    m.group(t!("sales.menu"), Icon::Cart)
+        .item(t!("sales.orders"), orders)
+        .sub(t!("sales.reports"), |m| m.item(t!("sales.by_city"), by_city).item(t!("sales.archive"), archive))
+        .accordion()
+})
+```
+
+- **Katlanabilir.** Her grup başlığı `aria-expanded` ve `aria-controls` taşıyan bir düğmedir (W3C APG açılır gezinme kalıbı). Sunucu, açık ekranı tutan grupları açık, diğerlerini kapalı çizer; `nav.js` her gezinmeden sonra yeni ekranın dalını açar. Betik yoksa bütün gruplar açık kalır, böylece hiçbir şeye ulaşılamaz hale gelmez.
+- **Hep açık.** Bir gruptan sonra `.open()` onu açık tutar: başlığı düğmesiz düz metindir.
+- **Akordeon.** App shell'deki herhangi bir feature'ın menüsünde `.accordion()` bütün yan menüyü akordeona çevirir: bir grubu açmak açık kardeşlerini kapatır.
+- **Klavye.** Yukarı ve Aşağı görünen başlıklar ve bağlantılar arasında gezer, Home ve End ilkine ve sonuncusuna gider. Sağ kapalı bir grubu açar ya da açık bir grubun içine geçer; Sol açık bir grubu kapatır ya da çevreleyen grubun başlığına gider. Enter ve Space grubu açıp kapatır. Sağdan sola dillerde Sol ve Sağ yer değiştirir.
+- **İzinler ve birleştirme.** Aynı etiketli gruplar her seviyede feature'lar arasında birleşir; kullanıcının açamayacağı öğelerden oluşan bir grup, iç içe gruplar dahil, dışarıda kalır. `App::header(|h| h.breadcrumb())` içerik yolu grubun bütün yolunu gösterir. Site shell'i iç içe grupların bağlantılarını en üst gruplarında listeler.
+
 ## Site shell'i
 
 İş screen'leri, yan menülü uygulama shell'inde açılır. Mağaza ya da ürün kataloğu gibi herkese açık sayfalar bunun yerine site shell'inde açılabilir: marka bağlantısı olarak uygulamanın adı, yatay bir menü, dar ekranlarda bir menü düğmesi, isteğe bağlı eylemler ve bir alt bilgi. Bunu bir feature seçer; diğer feature'ların screen'leri uygulama shell'ini korur, böylece ikisi tek bir uygulamada yaşar.

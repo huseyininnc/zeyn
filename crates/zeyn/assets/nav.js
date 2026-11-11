@@ -31,7 +31,23 @@ function isScreenUrl(url) {
   return !local.startsWith('/_zeyn/') && !local.startsWith('/api/') && !/\.[a-z0-9]+$/i.test(local);
 }
 
-/** Marks the menu link of the current page and writes the top bar's breadcrumb from it. */
+/**
+ * Opens the side menu groups around `link` (their heading buttons, see `menu.js`); in an
+ * accordion menu it closes their open siblings.
+ */
+function openBranch(link) {
+  const accordion = link.closest('[data-zeyn-accordion]');
+  const heading = (el) => el.querySelector(':scope > :is(h2, h3, h4, h5) > .z-nav-heading');
+  for (let g = link.closest('.z-nav-group'); g; g = g.parentElement.closest('.z-nav-group')) {
+    if (accordion) for (const s of g.parentElement.children) if (s !== g) heading(s)?.setAttribute('aria-expanded', 'false');
+    heading(g)?.setAttribute('aria-expanded', 'true');
+  }
+}
+
+/**
+ * Marks the menu link of the current page, opens its menu groups and writes the top bar's
+ * breadcrumb from them.
+ */
 function markCurrent(url) {
   let current = null;
   document.querySelectorAll('.z-nav a[href], .z-site-nav a[href], .z-site-bottom a[href]').forEach((a) => {
@@ -41,9 +57,13 @@ function markCurrent(url) {
       if (a.closest('.z-nav')) current = a;
     } else a.removeAttribute('aria-current');
   });
+  if (current) openBranch(current);
   const crumbs = document.querySelector('[data-zeyn-crumbs] ol');
   if (!crumbs) return;
-  const group = current?.closest('.z-nav-group')?.querySelector('h2')?.textContent ?? '';
+  const groups = [];
+  for (let g = current?.closest('.z-nav-group'); g; g = g.parentElement.closest('.z-nav-group')) {
+    groups.unshift(g.querySelector(':scope > :is(h2, h3, h4, h5)')?.textContent ?? '');
+  }
   const page = current?.textContent ?? document.querySelector('#z-main h1')?.textContent ?? '';
   const li = (text, here) => {
     const item = document.createElement('li');
@@ -53,7 +73,7 @@ function markCurrent(url) {
     item.append(here ? span : text);
     return item;
   };
-  crumbs.replaceChildren(...(group && group !== page ? [li(group, false)] : []), ...(page ? [li(page, true)] : []));
+  crumbs.replaceChildren(...groups.filter((g) => g && g !== page).map((g) => li(g, false)), ...(page ? [li(page, true)] : []));
 }
 
 /** Moves focus to the new screen's heading and tells screen readers that the page changed. */
