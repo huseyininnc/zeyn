@@ -322,6 +322,50 @@ fn keyset_cursor_continues_after_the_last_row() {
 }
 
 #[test]
+fn postgres_seeks_by_row_comparison_when_keys_share_a_direction() {
+    let base = DataQuery {
+        sort: vec![Sort {
+            field: "code".into(),
+            desc: false,
+        }],
+        ..DataQuery::default()
+    };
+    let cursor = build::row_cursor(&Postgres, &keys(&base), &product(7, "P-7", None));
+    let q = DataQuery {
+        page: PageRequest::After {
+            cursor: Some(cursor.clone()),
+            limit: 20,
+        },
+        ..base.clone()
+    };
+    let sql = rows(&q);
+    assert!(
+        sql.text.contains(
+            r#" WHERE ("code", "id") > ($1, $2) ORDER BY "code" ASC, "id" ASC LIMIT $3 OFFSET $4"#
+        ),
+        "{}",
+        sql.text
+    );
+    assert_eq!(
+        sql.args,
+        vec![
+            Arg::Text("P-7".into()),
+            Arg::Int(7),
+            Arg::Int(21),
+            Arg::Int(0)
+        ]
+    );
+    let oracle = build::plan_find::<Product>(&V12, &q, 100)
+        .unwrap()
+        .main;
+    assert!(
+        oracle.text.contains(" OR ("),
+        "Oracle has no ordered row comparison: {}",
+        oracle.text
+    );
+}
+
+#[test]
 fn keyset_cursor_handles_null_sort_values() {
     let base = DataQuery {
         sort: vec![Sort {
@@ -717,7 +761,7 @@ fn oracle_11g_pages_with_rownum() {
     .unwrap();
     assert_eq!(
         count.text,
-        r#"SELECT COUNT(*) AS c0 FROM (SELECT * FROM (SELECT zq.*, ROWNUM zeyn_rn FROM (SELECT 1 AS c0 FROM "SHOP"."PRODUCTS") zq WHERE ROWNUM <= :1) WHERE zeyn_rn > :2 ORDER BY zeyn_rn) zc"#
+        r#"SELECT COUNT(*) AS c0 FROM (SELECT * FROM (SELECT 1 AS c0 FROM "SHOP"."PRODUCTS") WHERE ROWNUM <= :1) zc"#
     );
 }
 
@@ -1146,14 +1190,13 @@ fn hand_written_query_uses_oracle_placeholders_and_rownum_on_11g() {
     .unwrap();
     assert!(
         sql.text
-            .starts_with("SELECT * FROM (SELECT zq.*, ROWNUM zeyn_rn FROM (SELECT \"ID\" AS c0"),
+            .starts_with("SELECT * FROM (SELECT \"ID\" AS c0"),
         "{}",
         sql.text
     );
     assert!(
-        sql.text.contains(
-            " FROM (SELECT * FROM products WHERE code = :1) zeyn_q) zq WHERE ROWNUM <= :2) WHERE zeyn_rn > :3"
-        ),
+        sql.text
+            .contains(" FROM (SELECT * FROM products WHERE code = :1) zeyn_q) WHERE ROWNUM <= :2"),
         "{}",
         sql.text
     );
@@ -1229,7 +1272,8 @@ fn rank_columns_compare_by_bytes_on_postgres() {
     );
     let sql = rank_page(&Postgres);
     assert!(
-        sql.text.contains(r#"WHERE "rank" >= $1 AND (("rank" > $2) OR ("rank" = $3 AND "id" > $4)) ORDER BY "rank" ASC, "id" ASC"#),
+        sql.text
+            .contains(r#"WHERE ("rank", "id") > ($1, $2) ORDER BY "rank" ASC, "id" ASC"#),
         "{}",
         sql.text
     );

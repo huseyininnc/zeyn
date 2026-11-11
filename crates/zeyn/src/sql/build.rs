@@ -110,6 +110,12 @@ pub trait Dialect: Send + Sync + 'static {
     fn binary_sort(&self) -> Option<(&'static str, &'static str)> {
         None
     }
+
+    /// Whether keyset seeks may compare rows as `(a, b) > (x, y)`. One index on the sort columns
+    /// then serves the seek as a single range scan instead of a chain of `OR` terms.
+    fn row_compare(&self) -> bool {
+        false
+    }
 }
 
 /// PostgreSQL 12 and later.
@@ -179,6 +185,10 @@ impl Dialect for Postgres {
         out.push_str("CAST(");
         out.push_str(expr);
         out.push_str(" AS TEXT)");
+    }
+
+    fn row_compare(&self) -> bool {
+        true
     }
 
     fn page(&self, sql: &mut Sql, limit: i64, offset: i64) {
@@ -300,7 +310,9 @@ impl Dialect for Oracle {
     }
 
     /// 12c: `OFFSET :o ROWS FETCH NEXT :n ROWS ONLY`. 11g: the `ROWNUM` wrapper, which numbers
-    /// the ordered rows and keeps the window; the outer `ORDER BY` keeps their order.
+    /// the ordered rows and keeps the window; the outer `ORDER BY` keeps their order. Without an
+    /// offset (first pages, keyset seeks, capped counts) 11g needs only `ROWNUM <= :n`, which
+    /// Oracle runs as a top N sort that stops early.
     fn page(&self, sql: &mut Sql, limit: i64, offset: i64) {
         match self.compat {
             OracleCompat::V12 => {
@@ -309,6 +321,10 @@ impl Dialect for Oracle {
                 sql.push(" ROWS FETCH NEXT ");
                 sql.bind(self, Arg::Int(limit), Cast::Plain);
                 sql.push(" ROWS ONLY");
+            }
+            OracleCompat::V11 if offset == 0 => {
+                sql.wrap("SELECT * FROM (", ") WHERE ROWNUM <= ");
+                sql.bind(self, Arg::Int(limit), Cast::Plain);
             }
             OracleCompat::V11 => {
                 sql.wrap(
@@ -812,6 +828,18 @@ fn push_seek(
         FieldKind::Money => Cast::Plain,
         ref kind => Cast::of(kind),
     };
+    if d.row_compare()
+        && keys.len() > 1
+        && keys.len() == values.len()
+        && keys
+            .iter()
+            .all(|k| !k.nullable && k.desc == keys[0].desc)
+        && !values
+            .iter()
+            .any(|v| matches!(v, Arg::Null(_)))
+    {
+        return push_row_seek(d, sql, fields, keys, values, cast);
+    }
     if let (Some(k), Some(v)) = (keys.first(), values.first())
         && !k.nullable
         && keys.len() > 1
@@ -861,6 +889,34 @@ fn push_seek(
     }
     if terms == 0 {
         sql.push("1 = 0");
+    }
+    sql.push(")");
+    Ok(())
+}
+
+/// Keyset seek as one row comparison, `(a, b) > (x, y)`, for keys that share a direction and hold
+/// no NULLs ([`Dialect::row_compare`]).
+fn push_row_seek(
+    d: &dyn Dialect,
+    sql: &mut Sql,
+    fields: &[FieldMeta],
+    keys: &[OrderKey],
+    values: &[Arg],
+    cast: impl Fn(&OrderKey) -> Cast,
+) -> Result<()> {
+    sql.push("(");
+    for (i, k) in keys.iter().enumerate() {
+        if i > 0 {
+            sql.push(", ");
+        }
+        sql.push(&sort_column(d, &fields[k.index])?);
+    }
+    sql.push(if keys[0].desc { ") < (" } else { ") > (" });
+    for (i, (k, v)) in keys.iter().zip(values).enumerate() {
+        if i > 0 {
+            sql.push(", ");
+        }
+        bind_key(d, sql, &fields[k.index], v.clone(), cast(k));
     }
     sql.push(")");
     Ok(())
