@@ -4,8 +4,13 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 ## [Unreleased]
 
+### Added
+
+- Nested and collapsible side menu groups: `Menu::sub` nests groups up to three levels below a group, every group heading is a disclosure button that starts open on the branch of the current screen, `Menu::open` keeps a group open and `Menu::accordion` closes sibling groups. The new `menu` module (3.2 KB, 1.3 KB compressed) adds arrow key navigation and loads only on pages whose menu has a collapsible group; the breadcrumb shows the whole group path.
+
 ### Changed
 
+- Side menu groups start closed unless they hold the current screen or call `Menu::open`. `MenuGroup::icon` is now an `Option<Icon>`, since nested groups have no icon.
 - Paging SQL follows the database more closely. PostgreSQL keyset pages seek with one row comparison, `("code", "id") > ($1, $2)`, when the sort keys share a direction and hold no NULLs; with an index on `(status, id)` over one million rows and three status values this took 0.11 ms instead of 29.4 ms. Oracle 11g pages without an offset, keyset pages and capped counts use `ROWNUM <= :n` alone, without the numbering wrapper.
 - Grid exports continue from the previous batch's keyset cursor when the data layer returns one, instead of an offset that rereads every earlier row.
 
