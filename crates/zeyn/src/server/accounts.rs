@@ -7,7 +7,7 @@
 //! preflight the app does not grant), and a `POST` that carries the session cookie must also
 //! send the `x-zeyn-csrf` token. API and mobile clients use bearer tokens and no cookies.
 
-use super::{App, AppState, cookie, encode};
+use super::{App, AppState, CLEAR_SITE_DATA, cookie, encode};
 use crate::accounts::passkey::{self, CEREMONY, Party, PasskeyState};
 use crate::accounts::scope::{self, Scope};
 use crate::accounts::signin::{AccountsAuth, BEARER, SESSION, Session, bearer};
@@ -23,6 +23,7 @@ use axum::response::{IntoResponse, Redirect, Response};
 use axum::routing::{get, post};
 use serde::Deserialize;
 use serde_json::{Value as Json, json};
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 
 /// Base path of the account endpoints.
@@ -165,8 +166,14 @@ pub(super) async fn layer(
         path: st.cookie_path().to_string(),
         prefix: st.prefix.clone(),
         rate: st.rate_store.clone(),
+        clear_storage: AtomicBool::new(false),
     });
     let mut response = scope::run(scope.clone(), next.run(req)).await;
+    if scope::clears_storage(&scope) {
+        response
+            .headers_mut()
+            .insert(CLEAR_SITE_DATA, HeaderValue::from_static(r#""storage""#));
+    }
     for c in scope::taken(&scope) {
         if let Ok(v) = HeaderValue::from_str(&c) {
             response

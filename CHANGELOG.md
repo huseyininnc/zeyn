@@ -11,6 +11,7 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 ### Fixed
 
+- Signing out answers with `Clear-Site-Data: "storage"`, and pages carry a per user storage key (`<meta name="zeyn-storage">`, a keyed hash, never the user id) that form drafts, local grid views and palette recents are filed under, so the next user of a shared browser no longer sees them.
 - Grid exports of actions that page only by keyset cursor stopped after the first 500 rows.
 
 ## [0.0.10] - 2026-11-10
