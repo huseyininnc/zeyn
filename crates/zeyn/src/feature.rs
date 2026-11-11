@@ -15,28 +15,141 @@ pub struct MenuItem {
     pub icon: Option<Icon>,
 }
 
-/// Menu group.
+/// Menu group: a heading over items and, after them, nested groups (see [`Menu::sub`]).
 #[derive(Clone, Debug, Serialize)]
 pub struct MenuGroup {
     pub label: Text,
-    pub icon: Icon,
+    /// The icon before the label. Top level groups have one; nested groups have none.
+    pub icon: Option<Icon>,
     pub items: Vec<MenuItem>,
+    /// Nested groups, drawn after the items, at most [`MENU_DEPTH`] levels below a top level
+    /// group.
+    pub groups: Vec<MenuGroup>,
+    /// Whether the group stays open (no toggle button), set with [`Menu::open`]. Other groups
+    /// are collapsible and start open only when they hold the current screen.
+    pub open: bool,
+}
+
+/// How many levels of nested groups a top level menu group may hold.
+pub const MENU_DEPTH: usize = 3;
+
+impl MenuGroup {
+    /// A group without items.
+    fn new(label: Text, icon: Option<Icon>) -> Self {
+        MenuGroup {
+            label,
+            icon,
+            items: Vec::new(),
+            groups: Vec::new(),
+            open: false,
+        }
+    }
+
+    /// The levels of nested groups below this one: 0 for a group without nested groups.
+    pub fn depth(&self) -> usize {
+        self.groups
+            .iter()
+            .map(|g| g.depth() + 1)
+            .max()
+            .unwrap_or(0)
+    }
+
+    /// The item of `screen` in this group or a nested one, with the labels of the groups from
+    /// this one down to the item's own.
+    ///
+    /// ```
+    /// use zeyn::prelude::*;
+    ///
+    /// #[screen(route = "/orders", public)]
+    /// pub fn orders() -> Screen { Screen::new("Orders") }
+    ///
+    /// let feature = Feature::new("shop").screen(orders).menu(|m| {
+    ///     m.group("Commerce", Icon::Cart)
+    ///         .sub("Sales", |m| m.item("Orders", orders))
+    /// });
+    /// let (path, item) = feature.menu_groups()[0].find("orders").unwrap();
+    /// assert_eq!(path.len(), 2);
+    /// assert_eq!(item.screen, "orders");
+    /// ```
+    pub fn find(&self, screen: &str) -> Option<(Vec<&Text>, &MenuItem)> {
+        if let Some(item) = self
+            .items
+            .iter()
+            .find(|i| i.screen == screen)
+        {
+            return Some((vec![&self.label], item));
+        }
+        self.groups.iter().find_map(|g| {
+            let (mut path, item) = g.find(screen)?;
+            path.insert(0, &self.label);
+            Some((path, item))
+        })
+    }
 }
 
 /// Menu builder.
 #[derive(Debug, Default)]
 pub struct Menu {
     groups: Vec<MenuGroup>,
+    accordion: bool,
 }
 
 impl Menu {
     /// Starts a group; following `item` calls add to it.
     pub fn group(mut self, label: impl Into<Text>, icon: Icon) -> Self {
-        self.groups.push(MenuGroup {
-            label: label.into(),
-            icon,
-            items: Vec::new(),
+        self.groups
+            .push(MenuGroup::new(label.into(), Some(icon)));
+        self
+    }
+
+    /// Adds a nested group to the last group. `build` gets a menu whose `item`, `icon`, `open`
+    /// and `sub` calls go to the nested group. Nested groups come after the items of their group
+    /// and may nest [`MENU_DEPTH`] levels deep; `Feature::menu` panics on deeper menus.
+    ///
+    /// ```
+    /// use zeyn::prelude::*;
+    ///
+    /// #[screen(route = "/orders", public)]
+    /// pub fn orders() -> Screen { Screen::new("Orders") }
+    /// #[screen(route = "/returns", public)]
+    /// pub fn returns() -> Screen { Screen::new("Returns") }
+    ///
+    /// let feature = Feature::new("shop").screen(orders).screen(returns).menu(|m| {
+    ///     m.group("Commerce", Icon::Cart)
+    ///         .item("Orders", orders)
+    ///         .sub("After sales", |m| m.item("Returns", returns))
+    /// });
+    /// assert_eq!(feature.menu_groups()[0].groups[0].items[0].screen, "returns");
+    /// ```
+    pub fn sub(mut self, label: impl Into<Text>, build: impl FnOnce(Menu) -> Menu) -> Self {
+        let inner = build(Menu {
+            groups: vec![MenuGroup::new(label.into(), None)],
+            accordion: false,
         });
+        let [group]: [MenuGroup; 1] = inner
+            .groups
+            .try_into()
+            .expect("inside `sub`, add items with `item` and nested groups with `sub`; `group` starts a top level group and belongs outside");
+        self.groups
+            .last_mut()
+            .expect("call `group` before `sub`")
+            .groups
+            .push(group);
+        self
+    }
+
+    /// Keeps the last group open: its heading is plain text instead of a toggle button.
+    pub fn open(mut self) -> Self {
+        if let Some(group) = self.groups.last_mut() {
+            group.open = true;
+        }
+        self
+    }
+
+    /// Makes the side menu an accordion: opening a group closes its open siblings. Set on the
+    /// top level menu of any feature in the app shell, it applies to the whole side menu.
+    pub fn accordion(mut self) -> Self {
+        self.accordion = true;
         self
     }
 
@@ -201,6 +314,7 @@ pub struct Feature {
     screens: Vec<ScreenEntry>,
     guards: Vec<Arc<dyn Guard>>,
     menu: Vec<MenuGroup>,
+    menu_accordion: bool,
     apis: Vec<ApiEntry>,
     media: Vec<crate::media::MediaEntry>,
     commands: Vec<crate::command::Command>,
@@ -223,6 +337,7 @@ impl Feature {
             screens: Vec::new(),
             guards: Vec::new(),
             menu: Vec::new(),
+            menu_accordion: false,
             apis: Vec::new(),
             commands: Vec::new(),
             searches: Vec::new(),
@@ -428,9 +543,26 @@ impl Feature {
         self
     }
 
+    /// The feature's menu. Panics when a group nests deeper than [`MENU_DEPTH`] levels.
     pub fn menu(mut self, build: impl FnOnce(Menu) -> Menu) -> Self {
-        self.menu = build(Menu::default()).groups;
+        let menu = build(Menu::default());
+        for g in &menu.groups {
+            let depth = g.depth();
+            assert!(
+                depth <= MENU_DEPTH,
+                "menu group `{}` of feature `{}` nests groups {depth} levels deep; the side menu allows at most {MENU_DEPTH} levels of `sub` below a `group`",
+                g.label.english(),
+                self.name,
+            );
+        }
+        self.menu = menu.groups;
+        self.menu_accordion = menu.accordion;
         self
+    }
+
+    /// Whether the feature's menu asked for an accordion side menu ([`Menu::accordion`]).
+    pub fn menu_accordion(&self) -> bool {
+        self.menu_accordion
     }
 
     /// Opens the feature's screens in the site shell (a top bar with a horizontal menu built from

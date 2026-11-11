@@ -1712,3 +1712,75 @@ async fn signing_out_needs_a_post_with_the_csrf_token() {
     assert_eq!(out.status, StatusCode::OK);
     assert_eq!(out.cookie("zeyn_account").as_deref(), Some(""));
 }
+
+/// The per user browser storage key a page carries (`<meta name="zeyn-storage">`).
+fn storage_key(page: &str) -> String {
+    let start = page
+        .find(r#"<meta name="zeyn-storage" content=""#)
+        .expect("the page carries a storage key")
+        + r#"<meta name="zeyn-storage" content=""#.len();
+    page[start..]
+        .split('"')
+        .next()
+        .unwrap()
+        .to_string()
+}
+
+#[tokio::test]
+async fn sign_out_clears_browser_storage_and_pages_key_storage_per_user() {
+    let a = accounts();
+    let ada = user(&a, "ada@example.com").await;
+    let bob = user(&a, "bob@example.com").await;
+    let router = app(a.clone());
+    let mut keys = Vec::new();
+    for u in [&ada, &bob] {
+        let email = u.email.clone().unwrap();
+        let login = send(
+            &router,
+            post(
+                "/_zeyn/account/login?useCookies=true",
+                json!({ "email": email, "password": PASSWORD }),
+                "",
+            ),
+        )
+        .await;
+        let session = format!("zeyn_account={}", login.cookie("zeyn_account").unwrap());
+        let page = send(&router, get("/account/manage", &session)).await;
+        assert_eq!(page.status, StatusCode::OK, "{}", page.body);
+        let key = storage_key(&page.body);
+        assert!(
+            !key.is_empty() && !key.contains(&u.id) && !key.contains(&email),
+            "the key is opaque: {key}"
+        );
+        keys.push((key, session));
+    }
+    assert_ne!(keys[0].0, keys[1].0, "two users get two storage keys");
+    let anonymous = send(&router, get("/account/login", "")).await;
+    let anonymous = storage_key(&anonymous.body);
+    assert!(
+        !keys
+            .iter()
+            .any(|(k, _)| *k == anonymous)
+    );
+    let again = send(&router, get("/account/manage", &keys[0].1)).await;
+    assert_eq!(storage_key(&again.body), keys[0].0, "the key is stable");
+    let logout = send(
+        &router,
+        post("/_zeyn/account/logout", json!({}), &keys[0].1),
+    )
+    .await;
+    assert_eq!(logout.status, StatusCode::OK, "{}", logout.body);
+    assert_eq!(
+        logout
+            .headers
+            .get("clear-site-data")
+            .map(|v| v.to_str().unwrap()),
+        Some(r#""storage""#)
+    );
+    let page = send(&router, get("/account/login", "")).await;
+    assert!(
+        page.headers
+            .get("clear-site-data")
+            .is_none()
+    );
+}

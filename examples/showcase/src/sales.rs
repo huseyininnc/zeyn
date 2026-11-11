@@ -418,9 +418,11 @@ pub fn feature() -> Feature {
             m.group(t!("menu.sales"), Icon::Cart)
                 .item(t!("sales.today"), today)
                 .icon(Icon::Cart)
-                .item(t!("sales.by_city"), orders_by_city)
-                .icon(Icon::Table)
-                .item(t!("sales.archive"), archive)
-                .icon(Icon::Clock)
+                .sub(t!("menu.sales_reports"), |m| {
+                    m.item(t!("sales.by_city"), orders_by_city)
+                        .icon(Icon::Table)
+                        .item(t!("sales.archive"), archive)
+                        .icon(Icon::Clock)
+                })
         })
 }

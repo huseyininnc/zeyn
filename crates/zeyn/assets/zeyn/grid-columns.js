@@ -56,10 +56,11 @@ function savedView(grid) {
   }
 }
 
-/** `localStorage` key of a grid's view: screen and node. */
+/** `localStorage` key of a grid's view: user (`meta[name=zeyn-storage]`), screen and node. */
 function viewKey(grid) {
   const a = address(grid);
-  return `zeyn.view:${a.screen}#${a.node}`;
+  const user = document.querySelector('meta[name="zeyn-storage"]')?.content ?? 'anon';
+  return `zeyn.view:${user}:${a.screen}#${a.node}`;
 }
 
 /** Every column of the grid, shown or not: `[{field, label, hidden, pin, width}]`. */

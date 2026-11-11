@@ -142,6 +142,42 @@ pub(super) fn routes(router: Router<Arc<AppState>>, st: &Arc<AppState>) -> Route
     router
 }
 
+/// The key the browser runtime files its stored values under (`<meta name="zeyn-storage">`), so
+/// the next user of a shared browser never sees the form drafts, grid views or palette recents of
+/// the one before. `anon` for signed out users. For a user it is a short keyed hash (HMAC with the
+/// app secret of the built in accounts or OpenID Connect sign in), never the id itself. Apps
+/// without either hash the id without a key: the value still differs per user and does not show
+/// the id at a glance, but whoever can list the possible ids can match them.
+pub(super) fn storage_key(st: &AppState, user: Option<&str>) -> String {
+    let Some(user) = user else {
+        return "anon".into();
+    };
+    let value = format!("zeyn storage {user}");
+    #[cfg(feature = "accounts")]
+    if let Some(sealer) = st
+        .sign_in
+        .accounts
+        .as_ref()
+        .and_then(|a| a.0.sealer.as_ref())
+    {
+        return sealer.hash(&value)[..16].to_string();
+    }
+    #[cfg(feature = "oidc")]
+    if let Some(sealer) = st
+        .sign_in
+        .oidc
+        .as_ref()
+        .and_then(|o| o.sealer.as_ref())
+    {
+        return sealer.hash(&value)[..16].to_string();
+    }
+    let _ = st;
+    use std::hash::{Hash, Hasher};
+    let mut h = std::hash::DefaultHasher::new();
+    value.hash(&mut h);
+    format!("{:016x}", h.finish())
+}
+
 /// A cookie for this app: HttpOnly, `SameSite=Lax` (it must travel with the provider's redirect
 /// back), `Secure` on HTTPS. `None` as value deletes it.
 #[cfg(any(feature = "oidc", feature = "totp"))]
@@ -366,7 +402,7 @@ mod oidc {
         }
     }
 
-    /// Ends the session here and at the provider.
+    /// Ends the session here and at the provider, and clears the app's browser storage.
     pub(super) async fn logout(State(st): State<Arc<AppState>>) -> Response {
         let Some(oidc) = st.sign_in.oidc.clone() else {
             return StatusCode::NOT_FOUND.into_response();
@@ -386,6 +422,10 @@ mod oidc {
         }
         r.headers_mut()
             .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+        r.headers_mut().insert(
+            super::super::CLEAR_SITE_DATA,
+            HeaderValue::from_static(r#""storage""#),
+        );
         r
     }
 

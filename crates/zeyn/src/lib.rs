@@ -143,7 +143,8 @@ pub use csp::{Csp, MAX_EMBED_URL, TRACKING_PARAMS, embed_url};
 pub use ctx::{BoxFuture, Ctx, Dep, Identity, Inject, IntoScreen, Outcome, Service, Services};
 pub use decimal::{DEFAULT_PRECISION, DEFAULT_SCALE, Decimal, MAX_PRECISION, MAX_SCALE};
 pub use feature::{
-    Feature, Guard, GuardResult, Menu, MenuGroup, MenuItem, Route, ScreenEntry, SignedIn,
+    Feature, Guard, GuardResult, MENU_DEPTH, Menu, MenuGroup, MenuItem, Route, ScreenEntry,
+    SignedIn,
 };
 #[cfg(feature = "server")]
 pub use files::{
