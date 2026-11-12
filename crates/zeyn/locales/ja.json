@@ -215,6 +215,8 @@
     "shell": {
       "skip": "本文へスキップ",
       "menu": "メイン",
+      "rail_collapse": "メニューを折りたたむ",
+      "rail_expand": "メニューを広げる",
       "language": "言語",
       "time_zone": "タイムゾーン",
       "time_zone_auto": "自動（この端末）",

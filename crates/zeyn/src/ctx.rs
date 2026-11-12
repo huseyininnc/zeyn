@@ -186,6 +186,8 @@ struct CtxInner {
     trail: Arc<Mutex<crate::audit::Trail>>,
     theme: Option<Arc<str>>,
     compact: bool,
+    /// The side menu is folded to an icon rail (`zeyn_rail` cookie).
+    rail: bool,
     reauth_within: std::time::Duration,
     csp: Option<Arc<crate::csp::Csp>>,
     prefetch: bool,
@@ -222,6 +224,7 @@ impl Ctx {
             trail: Arc::default(),
             theme: None,
             compact: false,
+            rail: false,
             reauth_within: REAUTH_WITHIN,
             csp: None,
             prefetch: false,
@@ -257,6 +260,7 @@ impl Ctx {
             trail: Arc::default(),
             theme: Some(theme),
             compact: false,
+            rail: false,
             reauth_within,
             csp: Some(csp),
             prefetch: false,
@@ -314,6 +318,16 @@ impl Ctx {
         self.0.compact
     }
 
+    /// Same context with the side menu folded to an icon rail.
+    pub(crate) fn with_rail(&self) -> Self {
+        self.rebuild(|i| i.rail = true)
+    }
+
+    /// Whether the user folded the side menu to an icon rail.
+    pub fn rail(&self) -> bool {
+        self.0.rail
+    }
+
     /// The theme the page is shown in: `system`, `light`, `dark` or the name of an app theme.
     /// `None` outside a request, such as in tests that build a context by hand.
     pub fn theme(&self) -> Option<&str> {
@@ -351,6 +365,7 @@ impl Ctx {
             trail: i.trail.clone(),
             theme: i.theme.clone(),
             compact: i.compact,
+            rail: i.rail,
             reauth_within: i.reauth_within,
             csp: i.csp.clone(),
             prefetch: i.prefetch,
