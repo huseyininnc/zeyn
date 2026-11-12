@@ -258,10 +258,17 @@ impl Guard for TenantRequired {
     }
 }
 
+#[cfg(feature = "server")]
 type Factory<T> = Arc<dyn Fn(Tenant, Config) -> BoxFuture<Result<T>> + Send + Sync>;
 
+/// Most tenants a [`PerTenant`] keeps unless [`PerTenant::max_tenants`] says otherwise.
+#[cfg(feature = "server")]
+pub const MAX_TENANTS: usize = 1024;
+
 /// A service that is built once per tenant and reused, such as a database pool made from the
-/// tenant's own connection string.
+/// tenant's own connection string. Concurrent first requests of a tenant wait for one build; a
+/// failed build is tried again by the next request. At most [`MAX_TENANTS`] tenants are kept;
+/// past that the one used longest ago is dropped and built again when it comes back.
 ///
 /// ```ignore
 /// let pools = PerTenant::new(|tenant, config| Box::pin(async move {
@@ -270,11 +277,22 @@ type Factory<T> = Arc<dyn Fn(Tenant, Config) -> BoxFuture<Result<T>> + Send + Sy
 /// }));
 /// App::new("Saas").service(pools)
 /// ```
+#[cfg(feature = "server")]
 pub struct PerTenant<T> {
-    cache: Arc<Mutex<HashMap<String, T>>>,
+    cache: Arc<Mutex<TenantCache<T>>>,
     make: Factory<T>,
 }
 
+/// The tenants of a [`PerTenant`]: each one's value, built at most once, and when it was last
+/// used.
+#[cfg(feature = "server")]
+struct TenantCache<T> {
+    cells: HashMap<String, (Arc<tokio::sync::OnceCell<T>>, u64)>,
+    tick: u64,
+    max: usize,
+}
+
+#[cfg(feature = "server")]
 impl<T> Clone for PerTenant<T> {
     fn clone(&self) -> Self {
         PerTenant {
@@ -284,16 +302,30 @@ impl<T> Clone for PerTenant<T> {
     }
 }
 
+#[cfg(feature = "server")]
 impl<T: Clone + Send + Sync + 'static> Service for PerTenant<T> {}
 
+#[cfg(feature = "server")]
 impl<T: Clone + Send + Sync + 'static> PerTenant<T> {
     pub fn new(
         make: impl Fn(Tenant, Config) -> BoxFuture<Result<T>> + Send + Sync + 'static,
     ) -> Self {
         PerTenant {
-            cache: Arc::new(Mutex::new(HashMap::new())),
+            cache: Arc::new(Mutex::new(TenantCache {
+                cells: HashMap::new(),
+                tick: 0,
+                max: MAX_TENANTS,
+            })),
             make: Arc::new(make),
         }
+    }
+
+    /// Keeps at most `max` tenants (at least one) instead of [`MAX_TENANTS`].
+    pub fn max_tenants(self, max: usize) -> Self {
+        if let Ok(mut c) = self.cache.lock() {
+            c.max = max.max(1);
+        }
+        self
     }
 
     /// The value for the request's tenant, built on first use.
@@ -302,27 +334,44 @@ impl<T: Clone + Send + Sync + 'static> PerTenant<T> {
             .tenant()
             .cloned()
             .ok_or(Error::Denied(Text::key("zeyn.error.tenant")))?;
-        if let Some(v) = self
+        let cell = self.cell(tenant.id())?;
+        cell.get_or_try_init(|| (self.make)(tenant.clone(), ctx.config().clone()))
+            .await
+            .cloned()
+    }
+
+    /// The cell of a tenant, made when it is new; drops the tenant used longest ago when the
+    /// cache is full.
+    fn cell(&self, id: &str) -> Result<Arc<tokio::sync::OnceCell<T>>> {
+        let mut c = self
             .cache
             .lock()
-            .map_err(|_| Error::Internal("tenant cache poisoned".into()))?
-            .get(tenant.id())
-        {
-            return Ok(v.clone());
+            .map_err(|_| Error::Internal("tenant cache poisoned".into()))?;
+        c.tick += 1;
+        let tick = c.tick;
+        if let Some((cell, used)) = c.cells.get_mut(id) {
+            *used = tick;
+            return Ok(cell.clone());
         }
-        let value = (self.make)(tenant.clone(), ctx.config().clone()).await?;
-        self.cache
-            .lock()
-            .map_err(|_| Error::Internal("tenant cache poisoned".into()))?
-            .entry(tenant.id().to_string())
-            .or_insert(value.clone());
-        Ok(value)
+        if c.cells.len() >= c.max
+            && let Some(oldest) = c
+                .cells
+                .iter()
+                .min_by_key(|(_, (_, used))| *used)
+                .map(|(k, _)| k.clone())
+        {
+            c.cells.remove(&oldest);
+        }
+        let cell = Arc::new(tokio::sync::OnceCell::new());
+        c.cells
+            .insert(id.to_string(), (cell.clone(), tick));
+        Ok(cell)
     }
 
     /// Drops the cached value of a tenant, for example after its connection string changed.
     pub fn forget(&self, tenant: &Tenant) {
         if let Ok(mut c) = self.cache.lock() {
-            c.remove(tenant.id());
+            c.cells.remove(tenant.id());
         }
     }
 }
