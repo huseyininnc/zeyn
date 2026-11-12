@@ -245,6 +245,26 @@
 
 .z-tabpanel[aria-busy="true"] { min-height: 6rem; }
 
+/**
+ * List and detail (`ui::ListDetail`): side by side on desktops; below 1024 px the list alone, or
+ * the detail alone with its back link once a row is selected (`data-detail="true"`).
+ */
+.z-list-detail {
+  display: grid;
+  grid-template-columns: minmax(240px, 2fr) minmax(0, 3fr);
+  gap: var(--z-s-4);
+  align-items: start;
+}
+.z-ld-list,
+.z-ld-detail { min-width: 0; }
+.z-ld-back { display: none; margin-bottom: var(--z-s-3); }
+@media (max-width: 1023px) {
+  .z-list-detail { grid-template-columns: minmax(0, 1fr); }
+  .z-list-detail[data-detail="true"] > .z-ld-list,
+  .z-list-detail[data-detail="false"] > .z-ld-detail { display: none; }
+  .z-list-detail[data-detail="true"] .z-ld-back { display: block; }
+}
+
 .z-split {
   display: flex;
   min-height: 16rem;

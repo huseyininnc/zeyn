@@ -151,6 +151,7 @@ catalog! {
         panel "/ui/panel";
         tabs "/ui/tabs";
         split "/ui/split";
+        list_detail "/ui/list-detail";
         auto_grid "/ui/auto-grid";
         screen_header "/ui/screen-header";
     }

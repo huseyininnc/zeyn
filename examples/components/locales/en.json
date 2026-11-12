@@ -44,6 +44,7 @@
       "panel": "A titled section that can collapse.",
       "tabs": "Panels behind a tab list, loaded the first time they open.",
       "split": "Two panes with a handle that resizes them.",
+      "list_detail": "A list and the detail of its selected row, side by side or one at a time on phones.",
       "auto_grid": "As many columns as fit the width.",
       "heading": "Section headings from h2 to h6.",
       "paragraph": "A paragraph of escaped text, normal or quiet.",
@@ -334,6 +335,10 @@
       },
       "split": {
         "overview": "Example"
+      },
+      "list_detail": {
+        "overview": "Example",
+        "nothing_selected": "Nothing selected"
       },
       "spoiler": {
         "overview": "Example"

@@ -44,6 +44,7 @@
       "panel": "Daraltılabilen başlıklı bölüm.",
       "tabs": "Sekme listesinin arkasındaki paneller; ilk açılışta yüklenir.",
       "split": "Bir tutamakla boyutlanan iki bölme.",
+      "list_detail": "Bir liste ve seçili satırının ayrıntısı; geniş ekranda yan yana, telefonda tek tek.",
       "auto_grid": "Genişliğe sığdığı kadar sütun.",
       "heading": "h2 ile h6 arası bölüm başlıkları.",
       "paragraph": "Kaçışlanmış metin paragrafı; normal ya da sönük.",
@@ -334,6 +335,10 @@
       },
       "split": {
         "overview": "Örnek"
+      },
+      "list_detail": {
+        "overview": "Örnek",
+        "nothing_selected": "Seçili bir şey yok"
       },
       "spoiler": {
         "overview": "Örnek"

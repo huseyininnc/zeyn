@@ -78,7 +78,7 @@ pub use embed::{
     Complete, EMBED_SANDBOX, Embed, EmbedPermission, ExternalLink, Fit, Given, Image, NoAlt,
     NoSize, NoTitle, PLACEHOLDER_BLUR_MAX, Placeholder,
 };
-pub use layout::{Card, Panel, Row, Split, Stack, Tabs};
+pub use layout::{Card, ListDetail, Panel, Row, Split, Stack, Tabs};
 pub use shell::{MenuBar, MenuList, PropertyInspector, StatusBar, Toolbox};
 
 pub use alpha::{AlphaIndex, OTHER_LETTER, alphabet};

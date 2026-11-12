@@ -541,3 +541,98 @@ impl Component for Split {
         &self.nodes
     }
 }
+
+/// A list and the detail of its selected row: side by side on wide screens; on phones and narrow
+/// tablets the list alone, or the detail alone with a back link once a row is selected. The
+/// selection lives in the screen's params, so it is in the URL: the list's rows link to the same
+/// screen with the row's id, and the screen passes the detail of that id (or nothing).
+///
+/// ```ignore
+/// #[screen(route = "/inbox", permission = "mail.read")]
+/// pub fn inbox(p: InboxParams) -> Screen {
+///     let list = List::of(search_mail).item(|m: &Mail| ListItem::link(m.subject.clone(), inbox, InboxParams { id: Some(m.id) }));
+///     Screen::new(t!("mail.inbox")).body(
+///         ListDetail::new(t!("mail.inbox"), list)
+///             .detail(p.id.map(|id| Deferred::new(MailView::of(id))))
+///             .back(LinkButton::new(t!("mail.back"), inbox, InboxParams::default()))
+///             .empty(EmptyState::new(t!("mail.pick"))),
+///     )
+/// }
+/// ```
+pub struct ListDetail {
+    label: Text,
+    nodes: Vec<Node>,
+    has_detail: bool,
+    back: Option<super::LinkButton>,
+}
+
+into_node!(ListDetail);
+
+impl ListDetail {
+    /// The list, with the name of the list region for screen readers.
+    pub fn new(label: impl Into<Text>, list: impl Into<Node>) -> Self {
+        ListDetail {
+            label: label.into(),
+            nodes: vec![list.into()],
+            has_detail: false,
+            back: None,
+        }
+    }
+
+    /// The detail of the selected row, `None` when no row is selected.
+    pub fn detail(mut self, detail: Option<impl Into<Node>>) -> Self {
+        if let Some(d) = detail {
+            self.nodes.truncate(1);
+            self.nodes.push(d.into());
+            self.has_detail = true;
+        }
+        self
+    }
+
+    /// What the detail pane shows on wide screens while no row is selected.
+    pub fn empty(mut self, state: super::EmptyState) -> Self {
+        if !self.has_detail {
+            self.nodes.truncate(1);
+            self.nodes.push(state.into());
+        }
+        self
+    }
+
+    /// The link back to the list, shown above the detail on narrow screens.
+    pub fn back(mut self, link: super::LinkButton) -> Self {
+        self.back = Some(link);
+        self
+    }
+}
+
+impl Component for ListDetail {
+    fn render(&self, out: &mut String, r: &Render) {
+        let id = dom_id(r, "ld");
+        out.push_str(&format!(
+            r#"<div class="z-list-detail" data-detail="{}"><section class="z-ld-list" aria-labelledby="{id}-label"><h2 class="z-sr-only" id="{id}-label">{}</h2>"#,
+            self.has_detail,
+            r.text(&self.label)
+        ));
+        render_child(out, r, 0, &self.nodes[0]);
+        out.push_str(r#"</section><section class="z-ld-detail">"#);
+        if self.has_detail
+            && let Some(back) = &self.back
+        {
+            out.push_str(r#"<div class="z-ld-back">"#);
+            out.push_str(&back.html(r));
+            out.push_str("</div>");
+        }
+        if let Some(node) = self.nodes.get(1) {
+            render_child(out, r, 1, node);
+        }
+        out.push_str("</section></div>");
+    }
+
+    fn schema(&self) -> Json {
+        json!({ "type": "list_detail", "label": self.label, "detail": self.has_detail, "children": children_schema(&self.nodes) })
+    }
+
+    fn children(&self) -> &[Node] {
+        &self.nodes
+    }
+}
