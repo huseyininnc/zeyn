@@ -190,7 +190,9 @@ function rowControls(tr, on) {
 
 /**
  * Shows the empty or error state of a grid under its header, or hides it (`kind` null). The
- * error state has a retry button that reloads the grid.
+ * error state has a retry button that reloads the grid. A grid with `.empty(..)` shows its own
+ * state from `template[data-zeyn-empty]`, or `template[data-zeyn-empty-filtered]` while a
+ * filter is on.
  */
 function gridState(grid, kind) {
   let box = grid.querySelector(':scope > .z-grid-state');
@@ -205,6 +207,13 @@ function gridState(grid, kind) {
   }
   box.hidden = false;
   box.dataset.kind = kind;
+  const s = grids.get(grid);
+  const filtered = !!s && filterList(s).length > 0;
+  const custom = kind === 'empty' && (filtered && grid.querySelector(':scope > template[data-zeyn-empty-filtered]') || grid.querySelector(':scope > template[data-zeyn-empty]'));
+  if (custom) {
+    box.replaceChildren(custom.content.cloneNode(true));
+    return;
+  }
   box.replaceChildren(document.createTextNode(kind === 'error' ? t.error || 'The rows could not be loaded.' : t.empty || 'No records.'));
   if (kind === 'error') {
     const retry = make('button', 'z-button', { type: 'button' });

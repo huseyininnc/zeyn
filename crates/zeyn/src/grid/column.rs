@@ -291,6 +291,14 @@ impl<E: Model, T> DataGridColumn<E, T> {
         self.grid.selectable()
     }
 
+    pub fn empty(self, state: crate::ui::EmptyState) -> DataGrid<E> {
+        self.grid.empty(state)
+    }
+
+    pub fn empty_filtered(self, state: crate::ui::EmptyState) -> DataGrid<E> {
+        self.grid.empty_filtered(state)
+    }
+
     pub fn row_menu(
         self,
         menu: impl Fn(&E) -> crate::menu::ContextMenu + Send + Sync + 'static,
