@@ -761,6 +761,7 @@ pub struct App {
     llms_txt: Option<&'static str>,
     csp: crate::csp::Csp,
     robots_txt: Option<&'static str>,
+    public: &'static [PublicFile],
     site_url: String,
     time: TimePolicy,
     fixed_now: Option<DateTime>,
@@ -820,6 +821,7 @@ impl App {
             llms_txt: None,
             csp: crate::csp::Csp::new(),
             robots_txt: None,
+            public: &[],
             site_url: String::new(),
             time: TimePolicy::User {
                 default: TimeZone::UTC,
@@ -1282,6 +1284,18 @@ impl App {
         self
     }
 
+    /// Serves the files of the crate's `public/` folder from the site's root, embedded with
+    /// [`public_files!`](crate::public_files): `public/favicon.svg` answers `/favicon.svg`. They
+    /// need no sign in, carry an entity tag and are cached for an hour.
+    ///
+    /// ```ignore
+    /// App::new("Shop").public(zeyn::public_files!())
+    /// ```
+    pub fn public(mut self, files: &'static [PublicFile]) -> Self {
+        self.public = files;
+        self
+    }
+
     /// The `https` origin the site is reached at, such as `https://shop.example`. App paths in
     /// canonical URLs, preview images and the sitemap are written behind it (and the base path),
     /// because search engines need absolute URLs. Without it, head tags keep app paths and the
@@ -1671,6 +1685,19 @@ impl App {
             }
             _ => {}
         }
+        for file in self.public {
+            let taken = file.path.starts_with("/_zeyn/")
+                || file.path == "/sitemap.xml"
+                || (file.path == "/robots.txt" && self.robots_txt.is_some())
+                || (file.path == "/llms.txt" && self.llms_txt.is_some())
+                || paths.contains_key(file.path);
+            if taken {
+                problems.push(format!(
+                    "the public file `{}` answers a path the app already serves\n  = help: rename or remove the file in `public/`, or drop the other route",
+                    file.path
+                ));
+            }
+        }
         problems.extend(self.theme_problems());
         problems.extend(self.client_prefs.problems());
         problems.dedup();
@@ -1784,6 +1811,14 @@ impl App {
             fixed_now: self.fixed_now,
             zone_picker: self.zone_picker,
             api_prefix: self.api_prefix,
+            favicon: ["/favicon.svg", "/favicon.png", "/favicon.ico"]
+                .iter()
+                .find_map(|p| {
+                    self.public
+                        .iter()
+                        .find(|f| f.path == *p)
+                })
+                .map(|f| (f.path, f.content_type)),
             config: self.config,
             tenancy: self.tenancy,
             license: self.license,
@@ -1900,6 +1935,27 @@ impl App {
                 get(move || async move { asset(text, "text/plain; charset=utf-8") }),
             );
         }
+        for file in self.public {
+            let tag = format!(
+                "\"p{:016x}\"",
+                file.bytes
+                    .iter()
+                    .fold(0xcbf2_9ce4_8422_2325u64, |h, b| {
+                        (h ^ u64::from(*b)).wrapping_mul(0x0100_0000_01b3)
+                    })
+            );
+            router = router.route(
+                file.path,
+                get(move |headers: HeaderMap| async move { public_file(file, &tag, &headers) }),
+            );
+        }
+        if !self
+            .public
+            .iter()
+            .any(|f| f.path == "/favicon.ico")
+        {
+            router = router.route("/favicon.ico", get(|| async { StatusCode::NO_CONTENT }));
+        }
         let router = seo::routes(router, &state);
         let router = router
             .route(
@@ -1923,7 +1979,6 @@ impl App {
                 get(|| async { asset(NAV, "text/javascript; charset=utf-8") }),
             )
             .route("/_zeyn/theme.css", get(theme_css))
-            .route("/favicon.ico", get(|| async { StatusCode::NO_CONTENT }))
             .route("/_zeyn/csrf", get(csrf_token))
             .route("/_zeyn/screen/{screen}", get(screen_fragment))
             .route("/_zeyn/route/{screen}", get(route_redirect))
@@ -2110,6 +2165,8 @@ struct AppState {
     time: TimePolicy,
     fixed_now: Option<DateTime>,
     zone_picker: bool,
+    /// The icon of the app's `public/` folder the page head links: path and content type.
+    favicon: Option<(&'static str, &'static str)>,
     api_prefix: String,
     config: Config,
     tenancy: Option<Arc<dyn TenantResolver>>,
@@ -3166,7 +3223,7 @@ impl AppState {
         };
         let html_attrs = format!("{theme_attrs}{density}{native_menu}");
         format!(
-            r##"<!doctype html><html lang="{lang}"{dir}{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><meta name="zeyn-storage" content="{storage}"><title>{title} · {app}</title><link rel="stylesheet" href="{base}/_zeyn/zeyn.css{v}"><link rel="stylesheet" href="{base}/_zeyn/icons.css{v}"><script type="module" src="{base}/_zeyn/zeyn.js{v}"></script><script type="module" src="{base}/_zeyn/nav.js{v}"></script>{components}{theme_link}{extra}{prefetch}</head><body><a class="z-skip" href="#z-main">{skip}</a>{frame}<div class="z-toasts" role="status" aria-live="polite" data-text-dismiss="{dismiss}"></div>{commands}{ai_launcher}</body></html>"##,
+            r##"<!doctype html><html lang="{lang}"{dir}{html_attrs}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="{scheme}"><meta name="zeyn-csrf" content="{csrf}"><meta name="zeyn-tz" content="{tz}"><meta name="zeyn-base" content="{base}"><meta name="zeyn-storage" content="{storage}"><title>{title} · {app}</title>{icon}<link rel="stylesheet" href="{base}/_zeyn/zeyn.css{v}"><link rel="stylesheet" href="{base}/_zeyn/icons.css{v}"><script type="module" src="{base}/_zeyn/zeyn.js{v}"></script><script type="module" src="{base}/_zeyn/nav.js{v}"></script>{components}{theme_link}{extra}{prefetch}</head><body><a class="z-skip" href="#z-main">{skip}</a>{frame}<div class="z-toasts" role="status" aria-live="polite" data-text-dismiss="{dismiss}"></div>{commands}{ai_launcher}</body></html>"##,
             lang = escape(ctx.locale()),
             dir = if locale::rtl(ctx.locale()) {
                 r#" dir="rtl""#
@@ -3188,6 +3245,12 @@ impl AppState {
             },
             title = escape(title),
             extra = ops::head(self, ctx),
+            icon = self
+                .favicon
+                .map(|(path, kind)| format!(
+                    r#"<link rel="icon" href="{base}{path}" type="{kind}">"#
+                ))
+                .unwrap_or_default(),
             prefetch = if self.prefetch == Prefetch::Moderate {
                 r#"<meta name="zeyn-prefetch" content="moderate">"#
             } else {
@@ -3769,6 +3832,38 @@ async fn identity_for_ranges(mut req: axum::extract::Request) -> axum::extract::
             .remove(header::ACCEPT_ENCODING);
     }
     req
+}
+
+/// A file of the app's `public/` folder, embedded by [`public_files!`](crate::public_files).
+#[derive(Clone, Copy, Debug)]
+pub struct PublicFile {
+    /// The path it answers, such as `/favicon.svg`.
+    pub path: &'static str,
+    pub bytes: &'static [u8],
+    pub content_type: &'static str,
+}
+
+/// Serves a public file: `304` when the browser holds this version, otherwise the bytes,
+/// cached for an hour and `nosniff`.
+fn public_file(file: &PublicFile, tag: &str, headers: &HeaderMap) -> Response {
+    let fresh = headers
+        .get(header::IF_NONE_MATCH)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| v.split(',').any(|t| t.trim() == tag));
+    let mut r = if fresh {
+        StatusCode::NOT_MODIFIED.into_response()
+    } else {
+        ([(header::CONTENT_TYPE, file.content_type)], file.bytes).into_response()
+    };
+    let h = r.headers_mut();
+    h.insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("public, max-age=3600"),
+    );
+    if let Ok(v) = HeaderValue::from_str(tag) {
+        h.insert(header::ETAG, v);
+    }
+    r
 }
 
 fn asset(body: &'static str, content_type: &'static str) -> Response {

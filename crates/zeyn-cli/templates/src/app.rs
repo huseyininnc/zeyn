@@ -26,6 +26,7 @@ pub fn app(config: Config) -> std::io::Result<App> {
         .write_limit(RateLimit::per_user(60, Duration::from_secs(60)))
         .interceptor(AuditLog(StderrAudit))
         .mcp(Mcp::read_only())
+        .public(zeyn::public_files!())
         .service(features::notes::services::NoteStore::default())
         .home(features::home::home)
         .feature(features::home::feature())

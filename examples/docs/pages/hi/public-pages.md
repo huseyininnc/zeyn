@@ -98,3 +98,12 @@ App::new(t!("app.name"))
 ```
 
 दोनों सबको सादे टेक्स्ट के रूप में परोसे जाते हैं।
+
+## public फ़ोल्डर
+
+```rust
+App::new(t!("app.name"))
+    .public(zeyn::public_files!())
+```
+
+crate के `public/` फ़ोल्डर की फ़ाइलें `zeyn::public_files!()` से बाइनरी में जुड़ जाती हैं और साइट की रूट से दी जाती हैं: `public/favicon.svg` `/favicon.svg` पर मिलती है, और पेज `/favicon.svg`, `/favicon.png` और `/favicon.ico` में से पहली मिली फ़ाइल को अपने आइकन के रूप में जोड़ता है। चित्र, आइकन, फ़ॉन्ट, टेक्स्ट, XML, JSON, वेब मैनिफ़ेस्ट और PDF फ़ाइलें ली जाती हैं; HTML और स्क्रिप्ट बिल्ड रोक देते हैं, क्योंकि वे ऐप के origin के अंतर्गत चलेंगे। फ़ाइलों के साथ entity tag होता है और वे एक घंटे के लिए कैश होती हैं। जब तक `[package.metadata.zeyn]` में `max_public_file_kb` और `max_public_total_kb` कुछ और न कहें, एक फ़ाइल 256 KB और फ़ोल्डर 2 MB तक हो सकता है। `App::check` उस फ़ाइल की रिपोर्ट करता है जिसका पथ पहले से कोई स्क्रीन, `/robots.txt`, `/llms.txt`, `/sitemap.xml` या `/_zeyn/` इस्तेमाल करता है। `zeyn new` एक `public/favicon.svg` जोड़ता है।

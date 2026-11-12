@@ -98,3 +98,12 @@ App::new(t!("app.name"))
 ```
 
 Оба файла отдаются всем как обычный текст.
+
+## Папка public
+
+```rust
+App::new(t!("app.name"))
+    .public(zeyn::public_files!())
+```
+
+Файлы из папки `public/` crate встраиваются в бинарный файл через `zeyn::public_files!()` и отдаются из корня сайта: `public/favicon.svg` отвечает по `/favicon.svg`, а страница ссылается как на иконку на первый найденный из `/favicon.svg`, `/favicon.png` и `/favicon.ico`. Принимаются изображения, иконки, шрифты, текст, XML, JSON, веб-манифесты и PDF; HTML и скрипты останавливают сборку, потому что выполнялись бы в источнике приложения. У файлов есть тег сущности, они кешируются на час. Файл может занимать 256 KB, а папка 2 MB, если `max_public_file_kb` и `max_public_total_kb` в `[package.metadata.zeyn]` не задают иное. `App::check` сообщает о файле, путь которого уже занят экраном, `/robots.txt`, `/llms.txt`, `/sitemap.xml` или `/_zeyn/`. `zeyn new` добавляет `public/favicon.svg`.

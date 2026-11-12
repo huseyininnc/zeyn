@@ -98,3 +98,12 @@ App::new(t!("app.name"))
 ```
 
 两者都以纯文本形式提供给所有人。
+
+## public 文件夹
+
+```rust
+App::new(t!("app.name"))
+    .public(zeyn::public_files!())
+```
+
+crate 的 `public/` 文件夹中的文件由 `zeyn::public_files!()` 嵌入二进制文件，并从站点根路径提供：`public/favicon.svg` 对应 `/favicon.svg`，页面会把 `/favicon.svg`、`/favicon.png`、`/favicon.ico` 中最先找到的一个链接为图标。接受图片、图标、字体、文本、XML、JSON、Web 清单和 PDF；HTML 和脚本会中止构建，因为它们会在应用的源下运行。文件带有实体标签并缓存一小时。除非 `[package.metadata.zeyn]` 中的 `max_public_file_kb` 和 `max_public_total_kb` 另有设置，单个文件最大 256 KB，文件夹最大 2 MB。`App::check` 会报告路径已被某个屏幕、`/robots.txt`、`/llms.txt`、`/sitemap.xml` 或 `/_zeyn/` 使用的文件。`zeyn new` 会添加 `public/favicon.svg`。
