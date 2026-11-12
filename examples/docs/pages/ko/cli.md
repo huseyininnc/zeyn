@@ -114,6 +114,8 @@ zeyn check --json
 }
 ```
 
+`zeyn check`는 앱의 소스도 읽고 파일과 줄을 붙여 다음을 경고합니다. `W0106`은 `src` 없는 `<script>`나 `onclick=` 같은 인라인 이벤트 핸들러를 담은 문자열(CSP가 둘 다 막습니다), `W0107`은 `escape(..)`, `r.text(..)`, `r.value(..)` 없이 HTML을 쓰는 직접 작성한 컴포넌트, `W0108`은 범위를 제한하는 쿼리 없이 `Vec` 전체를 반환하는 action, `W0109`는 `.trusted()`로 표시한 `DocumentViewer`입니다. `permission`이나 `public`이 빠지면 경고할 필요도 없이 컴파일되지 않습니다.
+
 ## Docker
 
 생성된 `Dockerfile`은 두 단계로 빌드하며 distroless 이미지에서 루트 권한이 없는 사용자로 실행됩니다. 바이너리는 `<app> health`로 스스로 상태를 확인하며, `HEALTHCHECK`가 이를 사용합니다.

@@ -881,6 +881,7 @@ fn check_warnings(root: &Path, d: &Value) -> Vec<(&'static str, String)> {
         .collect();
     warnings.extend(generate::layout_warnings(&files, &registered));
     warnings.extend(generate::topic_warnings(&files));
+    warnings.extend(generate::rule_warnings(&files));
     warnings
 }
 
@@ -1174,6 +1175,57 @@ mod drift;
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn zeyn_check_flags_scripts_unescaped_components_unbounded_lists_and_trusted_documents() {
+        use std::path::PathBuf;
+        let bad = vec![
+            (
+                PathBuf::from("src/a.rs"),
+                "let html = \"<script>alert(1)</script>\";\nlet b = r#\"<button onclick=\"go()\">\"#;\n// let c = \"<script>\";\n".to_string(),
+            ),
+            (
+                PathBuf::from("src/b.rs"),
+                "impl Component for Card {\n    fn render(&self, out: &mut String, _r: &Render) {\n        out.push_str(&format!(\"<p>{}</p>\", self.name));\n    }\n}\n".to_string(),
+            ),
+            (
+                PathBuf::from("src/c.rs"),
+                "#[action(permission = \"x.read\")]\npub async fn all(_: (), db: Db) -> Result<Vec<Order>> {\n    db.all().await\n}\n#[action(permission = \"x.read\")]\npub async fn page(q: DataQuery, db: Db) -> Result<Page<Order>> {\n    db.page(q).await\n}\n".to_string(),
+            ),
+            (
+                PathBuf::from("src/d.rs"),
+                "DocumentViewer::of(load).trusted()\n".to_string(),
+            ),
+        ];
+        let w = crate::generate::rule_warnings(&bad);
+        let codes: Vec<&str> = w.iter().map(|w| w.0).collect();
+        assert_eq!(
+            codes,
+            ["W0106", "W0106", "W0107", "W0108", "W0109"],
+            "{w:#?}"
+        );
+        assert!(w[0].1.starts_with("src/a.rs:1:"));
+        assert!(w[3].1.starts_with("src/c.rs:1:"));
+
+        let good = vec![(
+            PathBuf::from("src/e.rs"),
+            "impl Component for Card {\n    fn render(&self, out: &mut String, r: &Render) {\n        out.push_str(&format!(\"<p>{}</p>\", r.text(&self.name)));\n    }\n}\nlet t = \"Turn on = off\";\n".to_string(),
+        )];
+        assert!(crate::generate::rule_warnings(&good).is_empty());
+    }
+
+    #[test]
+    fn a_new_project_has_no_rule_warnings() {
+        use std::path::PathBuf;
+        let files: Vec<(PathBuf, String)> = crate::TEMPLATES
+            .iter()
+            .filter(|(path, _)| path.ends_with(".rs"))
+            .map(|(path, text)| (PathBuf::from(path), text.to_string()))
+            .collect();
+        assert!(!files.is_empty());
+        let w = crate::generate::rule_warnings(&files);
+        assert!(w.is_empty(), "{w:#?}");
+    }
     #[test]
     fn zeyn_docs_reads_and_searches_the_docs_pages() {
         let page = super::call_tool(
