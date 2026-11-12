@@ -95,6 +95,7 @@ pages! {
         operations "/guides/operations" "operations.md" "Operations" "../../../docs/operations.md";
         assistant "/guides/assistant" "assistant.md" "AI assistant" "../../../docs/assistant.md";
         islands "/guides/islands" "islands.md" "WASM islands" "../../../docs/islands.md";
+        socket "/guides/socket" "socket.md" "ZeynSocket" "../../../docs/socket.md";
         realtime "/guides/realtime" "realtime.md" "Realtime and CRDT" "../../../docs/realtime.md";
         desktop "/guides/desktop" "desktop.md" "Desktop apps" "../../../docs/desktop.md";
     }

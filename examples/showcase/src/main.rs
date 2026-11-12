@@ -11,6 +11,7 @@ mod charts;
 mod gallery;
 mod inputs;
 mod islands;
+mod live;
 mod media;
 mod overview;
 mod people;
@@ -129,7 +130,8 @@ async fn main() -> std::io::Result<()> {
         .service(stock::ProductStore::seeded())
         .service(islands::CounterStore::default())
         .service(diagrams.clone())
-        .socket(islands::socket(diagrams))
+        .service(live::Jobs::default())
+        .socket(live::events(islands::socket(diagrams)))
         .mailer(mailer.clone())
         .datagrid_views(MemoryViewStore::default())
         .service(people::LeaveStore::seeded(TimeZone::UTC.today(DateTime::now())))

@@ -3,7 +3,8 @@
 Status: ZEYN-272 (the page socket at `/_zeyn/socket`, `ZeynSocket`, `Socket`, events, groups,
 `Conn`, actions over the socket), ZEYN-273 (resume, replay, heartbeat, backoff) and ZEYN-277
 (limits, tenant isolation, memory), ZEYN-276 (`on_event`, `zeyn.socket`, `TestSocket`) and
-ZEYN-274 (Server-Sent Events fallback) are built. ZEYN-275 and ZEYN-278 follow.
+ZEYN-274 (Server-Sent Events fallback), ZEYN-275 (Redis) and ZEYN-278 (guide `docs/socket.md`,
+skill, showcase) are built.
 
 ZeynSocket is the one live connection between a Zeyn page and the server. It grows out of the
 `realtime` feature (`docs/realtime.md`), which already has a checked handshake, bounded queues,
@@ -197,7 +198,10 @@ once and shared between receivers' queues (`Arc<str>`).
 
 ## 7. Scale out
 
-With `ZeynSocket::redis(url)` every `emit` and `notify` is published on a channel per tenant.
+With `ZeynSocket::redis(&store)` (a `RedisStore`, so its prefix and connection settings are reused)
+every `emit`, `notify` and typing signal is published on one channel, `zeyn:<prefix>:socket`, with
+the tenant inside the message; one channel keeps subscriptions fixed, and every instance would get
+every tenant's messages anyway when users of a tenant are spread over instances.
 Each instance delivers to its own connections. Sequence numbers are per connection, so they are
 assigned by the instance that holds the connection. A resume that lands on another instance has no
 buffer there and gets `resync`. Redis being down turns sends into local delivery and logs a warning

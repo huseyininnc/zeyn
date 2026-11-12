@@ -78,6 +78,7 @@
       "operations": "Эксплуатация",
       "assistant": "AI-ассистент",
       "islands": "WASM-острова",
+      "socket": "ZeynSocket",
       "realtime": "Реальное время и CRDT",
       "desktop": "Настольные приложения",
       "protocol": "Протокол среды выполнения",
