@@ -11,12 +11,12 @@ zeyn = { version = "...", features = ["realtime"] }
 ```
 
 ```rust
-let realtime = Realtime::new()
+let live = ZeynSocket::new()
     .documents("diagram", "diagram.read", "diagram.write", MyDocStore::new(pool))
     .topic("orders", "sales.order.read")
     .limits(Limits::default());
-let hub = realtime.hub();          // clone it into stores that notify
-App::new(..).realtime(realtime)    // also registers `Hub` as a service
+let socket = live.socket();       // clone it into stores that notify
+App::new(..).socket(live)         // also registers `Socket` as a service
 ```
 
 ## 2. نقاط النهاية (Endpoints)
@@ -24,13 +24,13 @@ App::new(..).realtime(realtime)    // also registers `Hub` as a service
 | نقطة النهاية | الغرض |
 |---|---|
 | `GET /_zeyn/live/doc/{kind}/{doc}?csrf=TOKEN` | WebSocket: مستند تعاوني |
-| `GET /_zeyn/live/topics?t=a,b&csrf=TOKEN` | WebSocket: إشعارات التغيير للمواضيع (topics) |
+| `GET /_zeyn/socket` | WebSocket: إشعارات التغيير للمواضيع (topics) |
 | `GET /_zeyn/live.js` | سكربت المواضيع، لا تربطه إلا الصفحات التي تشترك |
 
 يُفحص كل handshake قبل الترقية (upgrade) بهذا الترتيب:
 
 1. القناة مفعّلة (وإلا `404`).
-2. **Origin:** يجب أن يسمّي ترويس `Origin` المضيف الذي وصله الطلب، أو origin أُضيف عبر `Realtime::allow_origin`. المتصفحات ترسله دائماً في handshake الخاص بـ WebSocket، ويُرفض الطلب إذا غاب. وهذا ما يمنع موقعاً آخر من فتح socket بملفات تعريف الارتباط الخاصة بالمستخدم.
+2. **Origin:** يجب أن يسمّي ترويس `Origin` المضيف الذي وصله الطلب، أو origin أُضيف عبر `ZeynSocket::allow_origin`. المتصفحات ترسله دائماً في handshake الخاص بـ WebSocket، ويُرفض الطلب إذا غاب. وهذا ما يمنع موقعاً آخر من فتح socket بملفات تعريف الارتباط الخاصة بالمستخدم.
 3. **رمز CSRF:** لا تستطيع المتصفحات ضبط ترويسات على WebSocket، لذلك يوضع الرمز المأخوذ من `meta[name=zeyn-csrf]` في معامل الاستعلام `csrf` ويُقارن في زمن ثابت مع ملف تعريف الارتباط `zeyn_csrf`، تماماً كما يُفعل مع `x-zeyn-csrf` في طلبات `POST`. تُجاب الإخفاقات بـ `403`.
 4. **الهوية:** المصادِق نفسه المستخدم في كل طلب؛ يجب أن يكون المستخدم مسجلاً للدخول (`403`).
 5. **حد كل مستخدم** (`429`).
@@ -77,9 +77,9 @@ channel.close();                // in unmount
 Live::new("orders").add(DataGrid::of(search_orders)...)
 
 #[action(permission = "sales.order.write")]
-pub async fn save_order(o: Valid<Order>, store: Orders, hub: Hub, ctx: Ctx) -> Result<Order> {
+pub async fn save_order(o: Valid<Order>, store: Orders, socket: Socket, ctx: Ctx) -> Result<Order> {
     let saved = store.save(o.into_inner())?;
-    hub.notify(&ctx, "orders");
+    socket.notify(&ctx, "orders");
     Ok(saved)
 }
 ```
@@ -88,7 +88,7 @@ pub async fn save_order(o: Valid<Order>, store: Orders, hub: Hub, ctx: Ctx) -> R
 
 تحمل الإشعارات اسم الموضوع فقط، ولا تحمل بيانات أبداً: يمر التحديث عبر نقطة نهاية الجدول العادية مع كل فحوص الصلاحيات. يصل `notify` إلى مستأجر المستدعي فقط؛ و`notify_tenant(Some(id), topic)` يسمّي مستأجراً بعينه، و`None` يعني التطبيق بلا تعدد مستأجرين.
 
-تعمل أسماء المواضيع نفسها دون القناة. تتحدث العقد التي تحمل `.listens("orders")` في مكانها عندما يذكر إشعار الموضوع (يمرره `live.js` على أنه `zeyn:topics`)، وكذلك عندما ينتهي action بـ `ui.refresh("orders")` أو يتغير مرشح يحمل `.drives("orders")`: تعيد الشبكات تحميل صفحتها الحالية، ويُعاد عرض المستمعين الآخرين بطلب `POST /_zeyn/nodes` واحد لكل شاشة (انظر Topics في `examples/docs/pages/effects.md`). لا يشترك المقبس إلا في مواضيع عقد `Live`، التي يجب إعلانها باستخدام `Realtime::topic`؛ استخدم `.listens` داخلها أو بجانبها للأجزاء التي ليست شبكات.
+تعمل أسماء المواضيع نفسها دون القناة. تتحدث العقد التي تحمل `.listens("orders")` في مكانها عندما يذكر إشعار الموضوع (يمرره `live.js` على أنه `zeyn:topics`)، وكذلك عندما ينتهي action بـ `ui.refresh("orders")` أو يتغير مرشح يحمل `.drives("orders")`: تعيد الشبكات تحميل صفحتها الحالية، ويُعاد عرض المستمعين الآخرين بطلب `POST /_zeyn/nodes` واحد لكل شاشة (انظر Topics في `examples/docs/pages/effects.md`). لا يشترك المقبس إلا في مواضيع عقد `Live`، التي يجب إعلانها باستخدام `ZeynSocket::topic`؛ استخدم `.listens` داخلها أو بجانبها للأجزاء التي ليست شبكات.
 
 ## 5. الذاكرة والضغط العكسي (Backpressure)
 
@@ -108,7 +108,7 @@ pub async fn save_order(o: Valid<Order>, store: Orders, hub: Hub, ctx: Ctx) -> R
 
 لا ينتظر البث أبداً: يُعرض التحديث على طابور كل عميل المحدود بـ `try_send`. والعميل الذي يمتلئ طابوره يُزال من الغرفة فوراً، فلا يستطيع قارئ بطيء واحد أن يحتجز الذاكرة أو يبطئ الآخرين؛ إنه يعيد الاتصال ويتلقى المستند كاملاً. أما مشترك الموضوع الذي يمتلئ طابوره فيفوته ذلك الإشعار فقط (الإشعار التالي سيحدّثه على أي حال).
 
-لذلك فإن أسوأ استهلاك للذاكرة يقارب `rooms * doc_bytes` للمستندات زائد `clients * queue * message_bytes` للطوابير (التحديث الواحد يُشارَك بين الطوابير ولا يُنسخ). خادم العرض التوضيحي (showcase) مع تبويبين حيين على المخطط يستخدم نحو 19 MB في المجموع (بناء debug). ويعرض `Hub::stats()` الغرف والعملاء والمشتركين وبايتات المستندات للمراقبة.
+لذلك فإن أسوأ استهلاك للذاكرة يقارب `rooms * doc_bytes` للمستندات زائد `clients * queue * message_bytes` للطوابير (التحديث الواحد يُشارَك بين الطوابير ولا يُنسخ). خادم العرض التوضيحي (showcase) مع تبويبين حيين على المخطط يستخدم نحو 19 MB في المجموع (بناء debug). ويعرض `Socket::stats()` الغرف والعملاء والمشتركين وبايتات المستندات للمراقبة.
 
 ## 6. ملاحظات أمنية
 

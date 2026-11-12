@@ -132,7 +132,8 @@
       "cursor": "Liste yüklendikten sonra değişti. Yenileyip tekrar deneyin.",
       "duplicate": "Bu kayıt zaten var.",
       "too_large": "İstek çok büyük.",
-      "bad_request": "İstek okunamadı."
+      "bad_request": "İstek okunamadı.",
+      "socket_only": "Bu işlem yalnızca canlı bağlantı üzerinden çalışır."
     },
     "grid": {
       "pagination": "Sayfalama",

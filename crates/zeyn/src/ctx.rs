@@ -189,6 +189,8 @@ struct CtxInner {
     reauth_within: std::time::Duration,
     csp: Option<Arc<crate::csp::Csp>>,
     prefetch: bool,
+    /// The live connection an action was called over, when it was (feature `realtime`).
+    conn: Option<Arc<dyn std::any::Any + Send + Sync>>,
 }
 
 /// How recent a sign in counts as recent unless the app sets another age.
@@ -223,6 +225,7 @@ impl Ctx {
             reauth_within: REAUTH_WITHIN,
             csp: None,
             prefetch: false,
+            conn: None,
         }))
     }
 
@@ -257,6 +260,7 @@ impl Ctx {
             reauth_within,
             csp: Some(csp),
             prefetch: false,
+            conn: None,
         }))
     }
 
@@ -350,9 +354,20 @@ impl Ctx {
             reauth_within: i.reauth_within,
             csp: i.csp.clone(),
             prefetch: i.prefetch,
+            conn: i.conn.clone(),
         };
         change(&mut inner);
         Ctx(Arc::new(inner))
+    }
+
+    /// Same context for an action called over a live connection.
+    pub(crate) fn with_conn(&self, conn: Arc<dyn std::any::Any + Send + Sync>) -> Self {
+        self.rebuild(|i| i.conn = Some(conn))
+    }
+
+    /// The live connection the call came over, if any.
+    pub(crate) fn conn<T: 'static>(&self) -> Option<&T> {
+        self.0.conn.as_ref()?.downcast_ref()
     }
 
     pub fn with_tenant(&self, tenant: Option<Tenant>) -> Self {

@@ -1,5 +1,6 @@
-//! Optional realtime channel (feature `realtime`): WebSocket rooms that sync Y-CRDT documents
-//! (`yrs`) and topics that tell screens to refresh. See `docs/realtime.md`.
+//! ZeynSocket (feature `realtime`): the page socket that carries topics, typed events and
+//! actions (see `docs/zeynsocket.md`), and WebSocket rooms that sync Y-CRDT documents (`yrs`, see
+//! `docs/realtime.md`).
 //!
 //! Requests stay stateless by default; this is the one place where the server keeps state per
 //! connection, so every piece of it has a limit: connections per user and per room, rooms in
@@ -11,21 +12,25 @@ use super::{AppState, Call, CallKind, Failure, cookie};
 use crate::action::Error;
 use crate::ctx::{BoxFuture, Ctx, Service};
 use axum::Router;
-use axum::extract::rejection::QueryRejection;
 use axum::extract::ws::{CloseFrame, Message, WebSocket, WebSocketUpgrade};
-use axum::extract::{Path, Query, State};
+use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use futures_util::{SinkExt, StreamExt};
 use serde::Deserialize;
 use std::collections::HashMap;
+
+mod socket;
+use socket::Peer;
+pub use socket::{Conn, Event, Target};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 use yrs::updates::decoder::Decode;
 use yrs::{Doc, ReadTxn, StateVector, Transact, Update};
+pub use zeyn_macros::Event;
 
 const JS: &str = include_str!("../../assets/live.js");
 const LOADER: &str = "/_zeyn/live.js";
@@ -64,6 +69,12 @@ pub struct Limits {
     pub heartbeat: Duration,
     /// How often changed documents are persisted while clients are connected.
     pub persist_every: Duration,
+    /// Groups one page socket may be in; [`Conn::join`] fails past it.
+    pub groups: usize,
+    /// Actions one page socket may call per second; more answer `429`.
+    pub calls: u32,
+    /// Largest event, as JSON; [`Target::emit`] fails past it.
+    pub event_bytes: usize,
 }
 
 impl Default for Limits {
@@ -78,6 +89,9 @@ impl Default for Limits {
             idle: Duration::from_secs(30),
             heartbeat: Duration::from_secs(20),
             persist_every: Duration::from_secs(2),
+            groups: 32,
+            calls: 20,
+            event_bytes: 16 * 1024,
         }
     }
 }
@@ -132,38 +146,40 @@ struct DocKind {
 struct Config {
     kinds: HashMap<&'static str, DocKind>,
     topics: HashMap<&'static str, &'static str>,
+    events: HashMap<&'static str, &'static str>,
     limits: Limits,
     origins: Vec<String>,
 }
 
-/// Settings of the realtime channel, given to `App::realtime`.
+/// Settings of the live socket, given to `App::socket`.
 ///
 /// ```
-/// use zeyn::realtime::{MemoryDocStore, Realtime};
-/// let realtime = Realtime::new()
+/// use zeyn::realtime::{MemoryDocStore, ZeynSocket};
+/// let live = ZeynSocket::new()
 ///     .documents("diagram", "diagram.read", "diagram.write", MemoryDocStore::default())
 ///     .topic("orders", "sales.order.read");
-/// let hub = realtime.hub();
-/// assert_eq!(hub.stats().rooms, 0);
+/// let socket = live.socket();
+/// assert_eq!(socket.stats().rooms, 0);
 /// ```
-pub struct Realtime {
-    hub: Hub,
+pub struct ZeynSocket {
+    socket: Socket,
     config: Config,
 }
 
-impl Default for Realtime {
+impl Default for ZeynSocket {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Realtime {
+impl ZeynSocket {
     pub fn new() -> Self {
-        Realtime {
-            hub: Hub::default(),
+        ZeynSocket {
+            socket: Socket::default(),
             config: Config {
                 kinds: HashMap::new(),
                 topics: HashMap::new(),
+                events: HashMap::new(),
                 limits: Limits::default(),
                 origins: Vec::new(),
             },
@@ -198,6 +214,15 @@ impl Realtime {
         self
     }
 
+    /// An event the server may send, for users with `permission`. A receiver without it never
+    /// gets the event, whatever group it is in.
+    pub fn event<E: Event>(mut self, permission: &'static str) -> Self {
+        self.config
+            .events
+            .insert(E::NAME, permission);
+        self
+    }
+
     pub fn limits(mut self, limits: Limits) -> Self {
         self.config.limits = limits;
         self
@@ -215,15 +240,15 @@ impl Realtime {
         self
     }
 
-    /// The hub, to notify topics from actions or stores. `App::realtime` also registers it as a
-    /// service, so actions can take `hub: Hub`.
-    pub fn hub(&self) -> Hub {
-        self.hub.clone()
+    /// The socket, to send events and notify topics from jobs or stores. `App::socket` also
+    /// registers it as a service, so actions can take `socket: Socket`.
+    pub fn socket(&self) -> Socket {
+        self.socket.clone()
     }
 
-    pub(crate) fn install(self) -> Hub {
-        let _ = self.hub.0.config.set(self.config);
-        self.hub
+    pub(crate) fn install(self) -> Socket {
+        let _ = self.socket.0.config.set(self.config);
+        self.socket
     }
 }
 
@@ -238,8 +263,8 @@ struct Room {
     store: Arc<dyn DocStore>,
 }
 
-/// A connection that listens to a topic: its id, its outgoing queue and its user.
-type Subscriber = (u64, Outbox, Arc<str>);
+/// A name inside a tenant: `(tenant, topic)` or `(tenant, group)`.
+type TenantKey = (String, String);
 
 /// Most users whose last typing signal the hub remembers; older entries make room first.
 pub const MAX_TYPING_USERS: usize = 4096;
@@ -249,7 +274,11 @@ struct Inner {
     config: OnceLock<Config>,
     rooms: Mutex<HashMap<RoomKey, Arc<Room>>>,
     users: Mutex<HashMap<String, usize>>,
-    topics: Mutex<HashMap<(String, String), Vec<Subscriber>>>,
+    topics: Mutex<HashMap<TenantKey, Vec<Arc<Peer>>>>,
+    /// Open page sockets by id.
+    conns: Mutex<HashMap<u64, Arc<Peer>>>,
+    /// Connection ids by tenant and group.
+    groups: Mutex<HashMap<TenantKey, Vec<u64>>>,
     next: AtomicU64,
     sweeping: AtomicBool,
     /// When each user (by tenant and user id) last sent a typing signal.
@@ -258,42 +287,43 @@ struct Inner {
     salt: OnceLock<u64>,
 }
 
-/// The realtime hub: rooms, topic subscribers and their counters.
+/// The live socket: open connections, their topics and groups, and document rooms. Actions take
+/// it as a service to send events and notify topics.
 #[derive(Clone, Default)]
-pub struct Hub(Arc<Inner>);
+pub struct Socket(Arc<Inner>);
 
-impl Service for Hub {}
+impl Service for Socket {}
 
-/// What the hub holds right now.
+/// What the socket holds right now.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct HubStats {
+pub struct SocketStats {
     pub rooms: usize,
+    /// Clients of document rooms.
     pub clients: usize,
+    /// Topic subscriptions of page sockets.
     pub subscribers: usize,
+    /// Open page sockets.
+    pub connections: usize,
+    /// Groups with at least one connection.
+    pub groups: usize,
     /// Sum of the documents' sizes as counted against [`Limits::doc_bytes`].
     pub doc_bytes: usize,
 }
 
-impl Hub {
+impl Socket {
     /// Tells every screen of the caller's tenant that subscribed to `topic` to refresh.
     pub fn notify(&self, ctx: &Ctx, topic: &str) {
         self.notify_tenant(ctx.tenant().map(|t| t.id()), topic);
     }
 
-    /// Same as [`Hub::notify`] for a tenant given by id (`None` without tenancy). A subscriber
-    /// whose queue is full misses this one; the next notification refreshes it anyway.
+    /// Same as [`Socket::notify`] for a tenant given by id (`None` without tenancy). A
+    /// subscriber whose queue is full is told to resync instead.
     pub fn notify_tenant(&self, tenant: Option<&str>, topic: &str) {
         let key = (tenant.unwrap_or("").to_string(), topic.to_string());
-        let text = serde_json::json!({ "topic": topic }).to_string();
         if let Ok(mut topics) = self.0.topics.lock()
             && let Some(subs) = topics.get_mut(&key)
         {
-            subs.retain(|(_, tx, _)| {
-                !matches!(
-                    tx.try_send(Message::Text(text.clone().into())),
-                    Err(mpsc::error::TrySendError::Closed(_))
-                )
-            });
+            subs.retain(|p| p.notify(topic));
         }
     }
 
@@ -352,29 +382,41 @@ impl Hub {
             return;
         }
         let text = serde_json::json!({
-            "topic": topic,
+            "t": topic,
             "typing": { "room": room, "who": self.person_key(tenant, user) },
         })
         .to_string();
         if let Ok(topics) = self.0.topics.lock()
             && let Some(subs) = topics.get(&(tenant.to_string(), topic.to_string()))
         {
-            for (_, tx, who) in subs {
-                if &**who != user {
-                    let _ = tx.try_send(Message::Text(text.clone().into()));
+            for p in subs {
+                if &*p.user != user {
+                    p.signal(text.clone());
                 }
             }
         }
     }
 
-    pub fn stats(&self) -> HubStats {
+    pub fn stats(&self) -> SocketStats {
         let rooms = self
             .0
             .rooms
             .lock()
             .map(|r| r.values().cloned().collect::<Vec<_>>())
             .unwrap_or_default();
-        HubStats {
+        SocketStats {
+            connections: self
+                .0
+                .conns
+                .lock()
+                .map(|c| c.len())
+                .unwrap_or(0),
+            groups: self
+                .0
+                .groups
+                .lock()
+                .map(|g| g.len())
+                .unwrap_or(0),
             rooms: rooms.len(),
             clients: rooms
                 .iter()
@@ -504,7 +546,7 @@ impl Hub {
             loop {
                 tick.tick().await;
                 let Some(inner) = hub.upgrade() else { return };
-                Hub(inner).sweep(limits.idle).await;
+                Socket(inner).sweep(limits.idle).await;
             }
         });
     }
@@ -571,7 +613,7 @@ pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
             get(|| async { super::asset(JS, "text/javascript; charset=utf-8") }),
         )
         .route("/_zeyn/live/doc/{kind}/{doc}", get(doc_socket))
-        .route("/_zeyn/live/topics", get(topic_socket))
+        .route("/_zeyn/socket", get(socket::page_socket))
 }
 
 pub(super) fn is_asset(path: &str) -> bool {
@@ -593,13 +635,6 @@ pub(super) fn head(st: &AppState, screen: &str, page: &mut String) {
 /// Whether a screen loaded by `nav.js` subscribes to a topic (`x-zeyn-live: 1`).
 pub(super) fn holds(st: &AppState, screen: &str) -> bool {
     st.realtime.is_some() && screen.contains(MARKER)
-}
-
-#[derive(Deserialize)]
-struct LiveQuery {
-    /// Topics, comma separated.
-    #[serde(default)]
-    t: String,
 }
 
 /// Document ids: 1 to 64 letters, digits, `-`, `_` or `.`.
@@ -656,7 +691,7 @@ fn csrf_protocol(headers: &HeaderMap) -> &str {
     clippy::result_large_err,
     reason = "the error is the HTTP response, returned to the client at once and never stored; boxing it would allocate on every refusal"
 )]
-async fn admit(st: &AppState, headers: &HeaderMap) -> Result<(Ctx, Hub, String), Response> {
+async fn admit(st: &AppState, headers: &HeaderMap) -> Result<(Ctx, Socket, String), Response> {
     let csrf = csrf_protocol(headers);
     let ctx = st.licensed(st.ctx(headers)).await;
     let Some(hub) = st.realtime.clone() else {
@@ -714,7 +749,7 @@ async fn doc_socket(
         Err(r) => return r,
     };
     let config = hub.config().expect("checked in admit");
-    let refuse = |hub: &Hub, failure: Failure| {
+    let refuse = |hub: &Socket, failure: Failure| {
         hub.release_user(&user);
         st.error_response(&ctx, failure)
     };
@@ -919,135 +954,6 @@ fn typing_signal(text: &str, topics: &[&'static str]) -> Option<(&'static str, S
         && s.room.chars().count() <= crate::ui::MAX_CONVERSATION
         && !s.room.chars().any(char::is_control);
     fits.then_some((topic, s.room))
-}
-
-async fn topic_socket(
-    State(st): State<Arc<AppState>>,
-    query: Result<Query<LiveQuery>, QueryRejection>,
-    headers: HeaderMap,
-    ws: Result<WebSocketUpgrade, axum::extract::ws::rejection::WebSocketUpgradeRejection>,
-) -> Response {
-    let q = query
-        .map(|q| q.0)
-        .unwrap_or(LiveQuery { t: String::new() });
-    let (ctx, hub, user) = match admit(&st, &headers).await {
-        Ok(a) => a,
-        Err(r) => return r,
-    };
-    let config = hub.config().expect("checked in admit");
-    let mut topics: Vec<&'static str> = Vec::new();
-    for name in
-        q.t.split(',')
-            .filter(|t| !t.is_empty())
-            .take(16)
-    {
-        let allowed = config
-            .topics
-            .get_key_value(name)
-            .filter(|(_, p)| {
-                ctx.identity()
-                    .can(&crate::action::Access::Permission(p))
-            });
-        match allowed {
-            Some((n, _)) if !topics.contains(n) => topics.push(n),
-            Some(_) => {}
-            None => {
-                hub.release_user(&user);
-                return st.error_response(&ctx, Failure::App(Error::Forbidden));
-            }
-        }
-    }
-    if !topics.is_empty() {
-        let call = Call {
-            kind: CallKind::Live,
-            screen: "",
-            action: None,
-            via_agent: ctx.via_agent(),
-        };
-        if let Err(f) = st.admit_call(&ctx, &call) {
-            hub.release_user(&user);
-            return st.error_response(&ctx, f);
-        }
-    }
-    let ws = match ws {
-        Ok(ws) if !topics.is_empty() => ws,
-        Ok(_) => {
-            hub.release_user(&user);
-            return st.error_response(&ctx, Failure::App(Error::NotFound));
-        }
-        Err(e) => {
-            hub.release_user(&user);
-            return e.into_response();
-        }
-    };
-    let tenant = ctx
-        .tenant()
-        .map(|t| t.id().to_string())
-        .unwrap_or_default();
-    let limits = config.limits;
-    let (tx, mut rx) = mpsc::channel::<Message>(limits.queue);
-    let id = hub
-        .0
-        .next
-        .fetch_add(1, Ordering::Relaxed);
-    let user_key: Arc<str> = ctx
-        .identity()
-        .user
-        .clone()
-        .unwrap_or_default()
-        .into();
-    let signals = hub.clone();
-    if let Ok(mut map) = hub.0.topics.lock() {
-        for t in &topics {
-            map.entry((tenant.clone(), t.to_string()))
-                .or_default()
-                .push((id, tx.clone(), user_key.clone()));
-        }
-    }
-    drop(tx);
-    ws.protocols([PROTOCOL])
-        .max_message_size(1024)
-        .on_upgrade(move |socket| async move {
-        let (mut sink, mut stream) = socket.split();
-        let mut beat = tokio::time::interval(limits.heartbeat);
-        beat.tick().await;
-        let mut heard = Instant::now();
-        loop {
-            tokio::select! {
-                out = rx.recv() => match out {
-                    Some(m) => if sink.send(m).await.is_err() { break },
-                    None => break,
-                },
-                incoming = stream.next() => match incoming {
-                    Some(Ok(Message::Close(_))) | Some(Err(_)) | None => break,
-                    Some(Ok(Message::Text(text))) => {
-                        heard = Instant::now();
-                        if let Some((topic, room)) = typing_signal(&text, &topics) {
-                            signals.typing(&tenant, topic, &user_key, &room);
-                        }
-                    }
-                    Some(Ok(_)) => heard = Instant::now(),
-                },
-                _ = beat.tick() => {
-                    if heard.elapsed() > limits.heartbeat * 3 || sink.send(Message::Ping(Default::default())).await.is_err() {
-                        break;
-                    }
-                }
-            }
-        }
-        if let Ok(mut map) = hub.0.topics.lock() {
-            for t in &topics {
-                let key = (tenant.clone(), t.to_string());
-                if let Some(subs) = map.get_mut(&key) {
-                    subs.retain(|(c, _, _)| *c != id);
-                    if subs.is_empty() {
-                        map.remove(&key);
-                    }
-                }
-            }
-        }
-        hub.release_user(&user);
-    })
 }
 
 #[cfg(test)]

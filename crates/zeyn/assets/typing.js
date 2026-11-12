@@ -44,7 +44,7 @@ function draw(el) {
 
 document.addEventListener('zeyn:typing', (e) => {
   const room = e.detail?.room ?? '';
-  const send = globalThis.zeyn?.live?.send;
+  const send = globalThis.zeyn?.socket?.signal;
   if (!send) return;
   for (const el of document.querySelectorAll('[data-zeyn-typing]')) {
     if ((el.dataset.room ?? '') !== room) continue;

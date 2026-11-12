@@ -353,7 +353,7 @@ Effect `{"effect":"refresh","topics":["sales"]}` はトピックのリスナー�
 
 | エンドポイント | 動作 |
 |---|---|
-| `GET /_zeyn/live/topics?t=a,b&csrf=` | WebSocket。テキストフレーム `{ "topic": "a" }` |
+| `GET /_zeyn/socket` | WebSocket。テキストフレーム `{"sub":["a"]}` ⇅ `{"s":1,"t":"a"}` |
 | `GET /_zeyn/live/doc/{kind}/{doc}?csrf=` | WebSocket。双方向でバイナリフレーム `0x01` + Y update (v1) |
 
 ハンドシェイクは、アップグレードの前に、origin、Cookie に対する CSRF トークン、サインインしているユーザー、権限を確認します。`docs/realtime.md` を参照してください。

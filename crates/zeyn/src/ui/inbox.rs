@@ -181,7 +181,7 @@ impl<E: Model> Inbox<E> {
     }
 
     /// The topics the inbox listens to and names after a bulk action, `"notifications"` unless
-    /// set. Name the same topic in `hub.notify` when a notification arrives.
+    /// set. Name the same topic in `socket.notify` when a notification arrives.
     pub fn topic(mut self, topics: impl super::Topics) -> Self {
         self.topics = topic_list(topics);
         self
@@ -528,7 +528,7 @@ impl<E: Model> From<Inbox<E>> for Node {
 /// it in the end slot of `App::header`. The count loads with one `POST /_zeyn/data` after the
 /// page shows (the action's permission checked) and again whenever one of its topics is named:
 /// after a bulk action of an [`Inbox`], `ui.refresh("notifications")` or, with
-/// [`NotificationCenter::live`] and the `realtime` feature, `hub.notify(&ctx, "notifications")`.
+/// [`NotificationCenter::live`] and the `realtime` feature, `socket.notify(&ctx, "notifications")`.
 /// Above 99 it shows `99+`. The link's name says the count, for screen readers.
 ///
 /// ```ignore
@@ -566,7 +566,7 @@ impl NotificationCenter {
     }
 
     /// Also subscribes to the topics on the realtime hub (feature `realtime`), so a
-    /// `hub.notify` from another user's action updates the count. The topics must be declared
+    /// `socket.notify` from another user's action updates the count. The topics must be declared
     /// with `Realtime::topic`.
     pub fn live(mut self) -> Self {
         self.live = true;

@@ -358,7 +358,7 @@ Effect `{"effect":"refresh","topics":["sales"]}` обновляет слушат
 
 | Конечная точка | Делает |
 |---|---|
-| `GET /_zeyn/live/topics?t=a,b&csrf=` | WebSocket; текстовые кадры `{ "topic": "a" }` |
+| `GET /_zeyn/socket` | WebSocket; текстовые кадры `{"sub":["a"]}` ⇅ `{"s":1,"t":"a"}` |
 | `GET /_zeyn/live/doc/{kind}/{doc}?csrf=` | WebSocket; двоичные кадры `0x01` + обновление Y (v1) в обе стороны |
 
 Рукопожатия проверяют origin, токен CSRF по cookie, вошедшего пользователя и

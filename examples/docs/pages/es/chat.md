@@ -30,7 +30,7 @@ Los primeros 50 mensajes (`THREAD_PAGE`) se renderizan con la pantalla. Al despl
 
 `Delivery` tiene los estados `Sending`, `Sent`, `Delivered`, `Read` (la confirmación de lectura) y `Failed`, cada uno mostrado con un icono y un texto para lectores de pantalla. `.attachments(field, rules)` muestra los archivos de un mensaje (un campo `Vec<File>` y las reglas de un almacén registrado con `Feature::files`): las imágenes en una caja fija que se carga de forma diferida sobre un marcador de posición, los demás archivos como enlaces de descarga que pasan por el permiso de lectura del almacén.
 
-Los mensajes nuevos se obtienen cuando se nombra uno de los topics del hilo, `"chat"` salvo que `.topic(..)` indique otro: después de que un `Composer` envíe, después de que una acción termine con `ui.refresh("chat")` o, con `.live()` y la feature `realtime`, cuando se ejecute `hub.notify(&ctx, "chat")` en cualquier lugar. Los mensajes de otros se anuncian en una región viva educada (polite).
+Los mensajes nuevos se obtienen cuando se nombra uno de los topics del hilo, `"chat"` salvo que `.topic(..)` indique otro: después de que un `Composer` envíe, después de que una acción termine con `ui.refresh("chat")` o, con `.live()` y la feature `realtime`, cuando se ejecute `socket.notify(&ctx, "chat")` en cualquier lugar. Los mensajes de otros se anuncian en una región viva educada (polite).
 
 ### Respuestas de IA
 
@@ -70,10 +70,10 @@ La clave de la respuesta (`Reply::channel(key)`) es la clave que tendrá el mens
 
 ```rust
 #[action(permission = "chat.write")]
-pub async fn send_message(m: ChatSend, store: Chats, hub: Hub, ctx: Ctx) -> Result<()> {
+pub async fn send_message(m: ChatSend, store: Chats, socket: Socket, ctx: Ctx) -> Result<()> {
     store.check_member(&m.conversation, &ctx)?;
     store.add(&m.conversation, &ctx, m.text, m.attachments, m.mentions)?;
-    hub.notify(&ctx, "chat");
+    socket.notify(&ctx, "chat");
     Ok(())
 }
 
@@ -102,7 +102,7 @@ La acción de envío recibe un `ChatSend`: la conversación, que el servidor tom
 `TypingIndicator` muestra quién más está escribiendo en una conversación: "Ada está escribiendo", "Ada y Grace están escribiendo", "3 personas están escribiendo", en una región viva educada (polite).
 
 ```rust
-let realtime = Realtime::new().topic("chat", "chat.read");
+let live = ZeynSocket::new().topic("chat", "chat.read");
 
 TypingIndicator::new("chat")
     .conversation(params.id.to_string())
@@ -110,6 +110,6 @@ TypingIndicator::new("chat")
     .person("grace", "Grace Hopper")
 ```
 
-Funciona sobre el canal en tiempo real (feature `realtime`, véase `realtime.md`) en un topic declarado con `Realtime::topic`. Mientras el usuario escribe en un `Composer` de la misma conversación, el navegador envía una pequeña señal por el socket en vivo de la página como mucho cada 3 segundos; el servidor descarta las más rápidas por usuario y pasa la señal a los demás suscriptores del topic en el tenant, nunca de vuelta al mismo usuario. Una señal contiene el id de la conversación y una clave del usuario que solo este servidor puede generar, nunca el id de usuario ni ningún texto. Un nombre se muestra durante 6 segundos después de la última señal; las personas no indicadas con `.person(user, name)` aparecen como "alguien".
+Funciona sobre el canal en tiempo real (feature `realtime`, véase `realtime.md`) en un topic declarado con `ZeynSocket::topic`. Mientras el usuario escribe en un `Composer` de la misma conversación, el navegador envía una pequeña señal por el socket en vivo de la página como mucho cada 3 segundos; el servidor descarta las más rápidas por usuario y pasa la señal a los demás suscriptores del topic en el tenant, nunca de vuelta al mismo usuario. Una señal contiene el id de la conversación y una clave del usuario que solo este servidor puede generar, nunca el id de usuario ni ningún texto. Un nombre se muestra durante 6 segundos después de la última señal; las personas no indicadas con `.person(user, name)` aparecen como "alguien".
 
 Sin la feature `realtime`, o cuando la app no tiene canal en tiempo real, el indicador no renderiza nada, su script nunca se carga y no se envía nada. Las señales llegan a todos los suscriptores del topic en el tenant, así que el id de la conversación es visible para ellos: use ids opacos, o un topic por audiencia.

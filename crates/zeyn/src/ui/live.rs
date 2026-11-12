@@ -7,7 +7,7 @@ use serde_json::{Value as Json, json};
 
 into_node!(Live);
 
-/// Wraps nodes that refresh when [`Hub::notify`](crate::realtime::Hub::notify) names `topic`:
+/// Wraps nodes that refresh when [`Socket::notify`](crate::realtime::Socket::notify) names `topic`:
 /// grids inside reload their current page in place; without a grid the screen is rendered again
 /// in place. The topic must be declared with `Realtime::topic`, and only users with its
 /// permission are subscribed.

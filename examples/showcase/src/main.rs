@@ -129,7 +129,7 @@ async fn main() -> std::io::Result<()> {
         .service(stock::ProductStore::seeded())
         .service(islands::CounterStore::default())
         .service(diagrams.clone())
-        .realtime(islands::realtime(diagrams))
+        .socket(islands::socket(diagrams))
         .mailer(mailer.clone())
         .datagrid_views(MemoryViewStore::default())
         .service(people::LeaveStore::seeded(TimeZone::UTC.today(DateTime::now())))

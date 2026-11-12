@@ -225,7 +225,7 @@ What to remember:
 - Refresh other parts of a screen with topics, never with JavaScript: mark what shows the data
   with `.listens("sales")` (last call, any component), then name the topic with
   `ui.refresh("sales")` in `on_success`, a filter that `.drives("sales")` (`Chips::filter`,
-  `SearchBox`, a `Form` without submit whose fields are screen params) or `hub.notify`. Listeners
+  `SearchBox`, a `Form` without submit whose fields are screen params) or `socket.notify`. Listeners
   read filters from the screen params. `zeyn check` warns about topics nobody listens to.
 - A lookup whose options depend on another field: `.depends_on(Address::city, Address::country)`;
   the action filters by `q.parent_id()` and the submit checks the pair again.
@@ -304,8 +304,8 @@ What to remember:
   `.remember(DRAFT)` (a `ClientPref::draft` key registered with `App::client_prefs`) and
   `.send_key(SendKey::CtrlEnter)` for long text; the send action takes `ChatSend` and must check
   membership and mentions itself.
-  Typing: `TypingIndicator::new("chat").conversation(id).person(user, name)` needs `App::realtime`
-  with `Realtime::topic("chat", perm)`; without it, it renders nothing.
+  Typing: `TypingIndicator::new("chat").conversation(id).person(user, name)` needs `App::socket`
+  with `ZeynSocket::topic("chat", perm)`; without it, it renders nothing.
 - Stories: `StoryRow::new().add(StoryRing::new(name, StoryState::Unseen).image(src).link(screen, params))`;
   the state comes from what the server stored about the viewer, never from the browser.
 - Full screen images: `Image::new(thumb).alt(..).size(w, h).full(large).caption(..)` (or `.lightbox()`);

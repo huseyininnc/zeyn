@@ -131,7 +131,8 @@
       "cursor": "列表在加载后已发生变化。请重新加载后再试。",
       "duplicate": "此记录已存在。",
       "too_large": "请求过大。",
-      "bad_request": "无法读取请求。"
+      "bad_request": "无法读取请求。",
+      "socket_only": "此操作只能通过实时连接运行。"
     },
     "grid": {
       "pagination": "分页",

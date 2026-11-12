@@ -574,6 +574,65 @@ fn path_value_fn(route: &LitStr, params: &Ts, no_params: bool) -> syn::Result<Ts
     })
 }
 
+/// Makes a `Serialize` type an event the live socket sends to browsers (feature `realtime`).
+/// The name, given with `#[event(name = "area.name")]`, is what the browser listens for: 1 to 64
+/// lowercase letters, digits, `.`, `_` or `-`.
+///
+/// ```ignore
+/// #[derive(Serialize, Event)]
+/// #[event(name = "chat.message")]
+/// pub struct MessageSent { pub room: String, pub text: String }
+/// ```
+#[proc_macro_derive(Event, attributes(event))]
+pub fn derive_event(item: TokenStream) -> TokenStream {
+    let input = syn::parse_macro_input!(item as syn::DeriveInput);
+    match event_tokens(&input) {
+        Ok(ts) => ts.into(),
+        Err(e) => e.to_compile_error().into(),
+    }
+}
+
+fn event_tokens(input: &syn::DeriveInput) -> syn::Result<Ts> {
+    let mut name: Option<LitStr> = None;
+    for attr in &input.attrs {
+        if !attr.path().is_ident("event") {
+            continue;
+        }
+        attr.parse_nested_meta(|meta| {
+            if meta.path.is_ident("name") {
+                name = Some(meta.value()?.parse()?);
+                Ok(())
+            } else {
+                Err(meta.error("`#[event]` takes only `name = \"area.name\"`"))
+            }
+        })?;
+    }
+    let Some(name) = name else {
+        return Err(syn::Error::new(
+            input.ident.span(),
+            "an event needs a name the browser listens for: add `#[event(name = \"area.name\")]`",
+        ));
+    };
+    let value = name.value();
+    let plain = (1..=64).contains(&value.len())
+        && value.bytes().all(|b| {
+            b.is_ascii_lowercase() || b.is_ascii_digit() || matches!(b, b'.' | b'_' | b'-')
+        });
+    if !plain {
+        return Err(syn::Error::new(
+            name.span(),
+            "event names are 1 to 64 lowercase letters, digits, `.`, `_` or `-`, such as `chat.message`",
+        ));
+    }
+    let ident = &input.ident;
+    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+    Ok(quote! {
+        impl #impl_generics ::zeyn::realtime::Event for #ident #ty_generics #where_clause {
+            const NAME: &'static str = #name;
+        }
+    })
+}
+
 /// Marks a struct or enum as screen params.
 #[proc_macro_attribute]
 pub fn params(attr: TokenStream, item: TokenStream) -> TokenStream {

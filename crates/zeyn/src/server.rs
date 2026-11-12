@@ -798,7 +798,7 @@ pub struct App {
     #[cfg(feature = "islands")]
     islands_dir: Option<std::path::PathBuf>,
     #[cfg(feature = "realtime")]
-    realtime: Option<realtime::Hub>,
+    realtime: Option<realtime::Socket>,
 }
 
 impl App {
@@ -863,14 +863,16 @@ impl App {
         }
     }
 
-    /// Turns on the realtime channel: collaborative documents and change topics over WebSocket
-    /// (see `docs/realtime.md`). The hub is also registered as a service, so actions can take
-    /// `hub: Hub` and call `hub.notify(&ctx, "topic")`.
+    /// Turns on the live socket: topics, typed events, actions called over one WebSocket per
+    /// page, and collaborative documents (see `docs/zeynsocket.md` and `docs/realtime.md`). The
+    /// [`Socket`](realtime::Socket) is also registered as a service, so actions can take
+    /// `socket: Socket` and call `socket.notify(&ctx, "topic")` or
+    /// `socket.to_user(&ctx, id).emit(&event)`.
     #[cfg(feature = "realtime")]
-    pub fn realtime(mut self, realtime: realtime::Realtime) -> Self {
-        let hub = realtime.install();
-        self.realtime = Some(hub.clone());
-        self.service(hub)
+    pub fn socket(mut self, live: realtime::ZeynSocket) -> Self {
+        let socket = live.install();
+        self.realtime = Some(socket.clone());
+        self.service(socket)
     }
 
     /// Serves the WASM islands that `zeyn build-islands` wrote to `dir` (usually `dist/islands`).
@@ -1715,7 +1717,6 @@ impl App {
     /// Builds the HTTP router. Fails when `check` finds problems.
     pub fn router(mut self) -> Result<Router, Vec<String>> {
         self.check()?;
-        ops::warm_build_id();
         let docs_enabled = self.api_docs.is_some();
         let mount = self.base_path.clone();
         let url_prefix = self
@@ -2133,7 +2134,7 @@ struct AppState {
     #[cfg(feature = "islands")]
     islands: Option<islands::Islands>,
     #[cfg(feature = "realtime")]
-    realtime: Option<realtime::Hub>,
+    realtime: Option<realtime::Socket>,
 }
 
 /// Decodes `%XX` sequences in a cookie value.
@@ -4222,7 +4223,19 @@ async fn set_locale(
 
 /// RFC 9457 problem details response.
 fn problem(ctx: &Ctx, failure: Failure) -> Response {
-    let (status, code, message) = match &failure {
+    let (status, body) = problem_body(ctx, &failure);
+    let mut response = (status, body.to_string()).into_response();
+    response.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/problem+json"),
+    );
+    response
+}
+
+/// The status and the `application/problem+json` body (RFC 9457) of a failure, in the user's
+/// language. HTTP answers and answers over the live socket share it.
+fn problem_body(ctx: &Ctx, failure: &Failure) -> (StatusCode, Json) {
+    let (status, code, message) = match failure {
         Failure::Timeout => (
             StatusCode::GATEWAY_TIMEOUT,
             "timeout",
@@ -4262,12 +4275,7 @@ fn problem(ctx: &Ctx, failure: Failure) -> Response {
             .map(|e| json!({ "field": e.field, "rule": e.rule, "message": ctx.t(&e.message) }))
             .collect();
     }
-    let mut response = (status, body.to_string()).into_response();
-    response.headers_mut().insert(
-        header::CONTENT_TYPE,
-        HeaderValue::from_static("application/problem+json"),
-    );
-    response
+    (status, body)
 }
 
 #[derive(Deserialize)]

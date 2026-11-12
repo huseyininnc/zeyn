@@ -208,7 +208,7 @@ matters. The `zeyn_docs` topic `language` and the docs pages have the details.
   `Calendar::of(search).at(p)`.
 - Chat: `MessageThread::of(history).conversation(id)` (`.reply(action)` streams AI replies),
   `Composer::of(send).conversation(id)`, `TypingIndicator::new("chat").conversation(id)` (needs
-  `App::realtime`); the actions check that the user is in the conversation.
+  `App::socket`); the actions check that the user is in the conversation.
 - Social: `Feed::of(search_posts).post(|p| Post::new(author, at).text(..).media(image))` with
   `.reactions(react)` and `.topic("posts")`; stories `StoryRow::new().add(StoryRing::new(name,
   StoryState::Unseen).image(src))`, the state from what the server stored about the viewer.

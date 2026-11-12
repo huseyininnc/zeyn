@@ -1,6 +1,7 @@
 # ZeynSocket: design
 
-Status: proposal (ZEYN-271). Tickets ZEYN-272 to ZEYN-278 build it in this order.
+Status: ZEYN-272 is built (the page socket at `/_zeyn/socket`, `ZeynSocket`, `Socket`, events,
+groups, `Conn`, actions over the socket). ZEYN-273 to ZEYN-278 follow in the order of section 8.
 
 ZeynSocket is the one live connection between a Zeyn page and the server. It grows out of the
 `realtime` feature (`docs/realtime.md`), which already has a checked handshake, bounded queues,
@@ -23,7 +24,7 @@ notification bell or a job progress bar without learning a second model.
 | Names | `Realtime` becomes `ZeynSocket`, `Hub` becomes `Socket` | One name per idea. Alpha: no deprecated aliases, `zeyn check --fix` rewrites old calls. |
 | Sockets per page | One, shared by every component on the page | Fewer connections per user; the `per_user` limit stays meaningful. |
 | Server state | Only open connections, groups and short replay buffers, all capped | Screens stay stateless; a lost server loses no data, clients resync. |
-| CSRF | Sent in the first frame, not in the URL | URLs land in proxy and server logs (ZEYN-258). The handshake still checks `Origin`. |
+| CSRF | Sent as the subprotocol `csrf.TOKEN` next to `zeyn`, never in the URL | URLs land in proxy and server logs (ZEYN-258). The subprotocol keeps it out of them and is checked before the upgrade, so no unauthenticated socket is ever opened. The handshake also checks `Origin`. |
 | Fallback | Server-Sent Events down, `POST` up | Works through proxies that strip `Upgrade`; same envelope, same resume. Long polling is not built. |
 | Scale out | Redis pub/sub behind the `redis` feature | Already a dependency of the `redis` feature; no sticky sessions needed. |
 
@@ -72,11 +73,12 @@ App::new("Chat")
   `to_tenant(&ctx)` and `notify(&ctx, topic)` all stay inside the caller's tenant;
   `to_tenant_id(Some(id))` names one explicitly, the same as `notify_tenant`.
 - `Conn` is the calling connection. It exists only when the action was called over the socket;
-  asking for it in a plain HTTP call answers `400`. `join` and `leave` change its groups. Joining is
+  asking for it in a plain HTTP call answers `422` with a validation message. `join` and `leave` change its groups. Joining is
   never automatic: the action that calls `join` is where the app checks membership.
 - `.event::<E>(permission)` declares an event and the permission a receiver needs. A send to a user
-  without it is dropped on the server; an undeclared event type does not compile
-  (`#[diagnostic::on_unimplemented]` names the missing `.event::<E>()` call).
+  without it is dropped on the server. A type without `#[derive(Event)]` does not compile
+  (`#[diagnostic::on_unimplemented]` says what to add); emitting an event that was never declared
+  with `.event::<E>()` returns an error.
 
 Screens, no JavaScript:
 
@@ -113,9 +115,10 @@ Client to server:
 
 | Frame | Meaning |
 |---|---|
-| `{"hello":{"csrf":"..","resume":"..","seq":41}}` | First frame. `resume` and `seq` only when reconnecting. |
+| `{"hello":{"resume":"..","seq":41}}` | When reconnecting (ZEYN-273). |
 | `{"c":7,"a":"send_message","d":{..}}` | Call action `a` with input `d`; `c` is the caller's id. |
-| `{"sub":["orders"]}` / `{"unsub":[..]}` | Topics of the page, checked like today. |
+| `{"sub":["orders"]}` / `{"unsub":[..]}` | Topics of the page; the server answers `{"denied":[..]}` with the ones the user may not read. |
+| `{"t":"typing","topic":"chat","room":".."}` | A typing signal on a subscribed topic. |
 | `{"ack":41}` | Highest event sequence received, sent at most once a second. Lets the server trim the replay buffer early. |
 
 Server to client:
@@ -164,17 +167,18 @@ Existing `Limits` stay. New fields, defaults in brackets:
 | `detached` time a dropped connection is kept | 60 s | groups and buffer dropped |
 | `groups` per connection | 32 | `join` answers `429` |
 | `calls` per connection per second | 20 | the call answers `429`; the write limit applies to write actions as for HTTP |
-| `event_bytes` | 16 KB | `emit` returns an error in debug builds, the event is dropped in release |
+| `event_bytes` | 16 KB | `emit` returns an error and sends nothing |
 
 Worst case per user: `per_user (8) * (queue + replay_bytes)`, about 1 MB. An event is serialized
 once and shared between receivers' queues (`Arc<str>`).
 
 ## 6. Security
 
-- Handshake order from `docs/realtime.md` stays; the CSRF check moves to the `hello` frame, which
-  must arrive within 5 s.
+- Handshake order from `docs/realtime.md` stays: origin, CSRF token in the subprotocol, a signed
+  in user, the per user limit, the interceptors with call kind `Live`.
 - Every call runs the action's full pipeline: permission, guards, interceptors (call kind `Live`),
-  validation, write rate limit, audit.
+  validation, audit. Actions that are not reads also take a token of the app's write limit, keyed
+  by user. Only actions published with `Feature::api` can be called.
 - Every event delivery checks the receiver's permission for that event. Group membership alone
   never grants it.
 - Group and user names are prefixed with the tenant on the server; a client never sends a group

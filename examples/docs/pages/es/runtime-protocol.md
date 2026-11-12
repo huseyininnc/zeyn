@@ -361,7 +361,7 @@ que contiene.
 
 | Endpoint | Hace |
 |---|---|
-| `GET /_zeyn/live/topics?t=a,b&csrf=` | WebSocket; tramas de texto `{ "topic": "a" }` |
+| `GET /_zeyn/socket` | WebSocket; tramas de texto `{"sub":["a"]}` ⇅ `{"s":1,"t":"a"}` |
 | `GET /_zeyn/live/doc/{kind}/{doc}?csrf=` | WebSocket; tramas binarias `0x01` + actualización Y (v1) en ambos sentidos |
 
 Los handshakes comprueban el origen, el token CSRF frente a la cookie, el usuario con sesión iniciada y los

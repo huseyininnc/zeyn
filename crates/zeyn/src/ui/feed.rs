@@ -359,7 +359,7 @@ impl<E: Model> Feed<E> {
     }
 
     /// Also subscribes to the topics on the realtime hub (feature `realtime`), so a
-    /// `hub.notify` from another user's action brings the "new posts" button. The topics must be
+    /// `socket.notify` from another user's action brings the "new posts" button. The topics must be
     /// declared with `Realtime::topic`.
     pub fn live(mut self) -> Self {
         self.live = true;
