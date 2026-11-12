@@ -97,6 +97,13 @@ DataGrid::dynamic(preview).paging(Paging::virtual_scroll())
 
 Sayfalama, sanal kaydırma, klavye kullanımı ve sayıların ve tarihlerin kullanıcının dilinde biçimlenmesi tipli bir grid'deki gibi çalışır. Adlar, etiketler ve hücreler kaçışlanır; sunucu sütun ve satır sayısını ve metin uzunluğunu sınırlar. Grid sıralamaz ve filtrelemez, satırları salt okunurdur. [DataGrid başvurusu](grid.md) ayrıntıları verir.
 
+## Arama ve bantlar
+
+`.search()` tablonun üstüne bir arama kutusu koyar. Eylem metni `DataQuery::q` olarak alır;
+`DataQuery::apply` onu maskeli olanlar dışındaki metin alanlarında arar.
+`.band(label, |b| b.column(..).column(..))` sütunları tek bir başlık hücresi altında toplar.
+Ayrıntılar [DataGrid başvurusunda](grid.md).
+
 ## Yerinde yenileme
 
 En son çağrılan `.listens(topic)`, topic adlandırıldığında grid'in yerinde yeniden yüklenmesini sağlar ([Topic'ler](effects.md#topics) bölümüne bakın): `ui.refresh(topic)` sonrasında geçerli sayfasını sıralaması ve filtreleriyle yeniden yükler, `.drives(topic)` diyen bir filtre kontrolü değiştikten sonra yeni screen params ile ilk sayfadan başlar. Grid her izin denetimiyle `POST /_zeyn/grid` üzerinden yeniden yüklenir ve filtrenin değiştirdiği bir screen param'ı grid'e screen fonksiyonu üzerinden ulaşır, örneğin bir scope olarak:

@@ -97,6 +97,13 @@ DataGrid::dynamic(preview).paging(Paging::virtual_scroll())
 
 페이지 나누기, 가상 스크롤, 키보드 사용, 사용자 언어에 맞춘 숫자와 날짜 서식은 타입이 있는 grid와 똑같이 동작합니다. 이름, 레이블, 셀은 이스케이프되며 서버가 열 수, 행 수, 텍스트 길이를 제한합니다. 이 grid는 정렬하거나 필터링하지 않으며 행은 읽기 전용입니다. [DataGrid 레퍼런스](grid.md)를 참고하세요.
 
+## 검색과 밴드
+
+`.search()`는 그리드 위에 검색 상자를 둡니다. 액션은 텍스트를 `DataQuery::q`로 받고,
+`DataQuery::apply`는 마스킹된 필드를 뺀 텍스트 필드와 비교합니다.
+`.band(label, |b| b.column(..).column(..))`는 열을 하나의 헤더 셀 아래로 묶습니다.
+[DataGrid 참조](grid.md)를 보세요.
+
 ## 제자리 새로 고침
 
 마지막에 호출한 `.listens(topic)`은 토픽이 지정될 때 그리드를 제자리에서 다시 불러오게 합니다([토픽](effects.md#topics) 참고). `ui.refresh(topic)` 뒤에는 정렬과 필터를 유지한 채 현재 페이지를 다시 불러오고, `.drives(topic)`을 가진 필터 컨트롤이 바뀐 뒤에는 새 Screen params로 첫 페이지부터 시작합니다. 그리드는 모든 권한 검사를 거치는 `POST /_zeyn/grid`로 다시 불러와지며, 필터가 바꾼 Screen param은 Screen 함수를 거쳐, 예를 들어 scope로 그리드에 전달됩니다.

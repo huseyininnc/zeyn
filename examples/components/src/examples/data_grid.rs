@@ -62,6 +62,27 @@ pub fn numbers(_ctx: &Ctx) -> Node {
         .into()
 }
 
+pub fn search_and_bands(_ctx: &Ctx) -> Node {
+    DataGrid::of(search_products)
+        .paging(Paging::pages(5))
+        .search()
+        .column(Product::code)
+        .width(100)
+        .pin_start()
+        .column(Product::name)
+        .flex(1)
+        .band("Price and stock", |b| {
+            b.column(Product::price)
+                .width(130)
+                .column(Product::stock)
+                .width(110)
+        })
+        .column(Product::active)
+        .width(100)
+        .check_icon()
+        .into()
+}
+
 pub fn computed_million(_ctx: &Ctx) -> Node {
     DataGrid::of(million_products)
         .paging(Paging::virtual_scroll())
@@ -101,6 +122,7 @@ pub const ENTRY: Entry = Entry {
     examples: &[
         ex!(confirm_actions),
         ex!(numbers),
+        ex!(search_and_bands),
         ex!(computed_million),
         ex!(dynamic_columns),
     ],

@@ -74,7 +74,7 @@ function columnsOf(grid) {
 
 /** The shown columns as the header has them now: `[{field, width, pin}]`. */
 function shownColumns(grid) {
-  return [...(grid.querySelector('thead tr')?.cells ?? [])]
+  return [...(grid.querySelector('thead tr:not(.z-band-row)')?.cells ?? [])]
     .filter((th) => th.dataset.field)
     .map((th) => {
       const c = { field: th.dataset.field };
@@ -161,7 +161,7 @@ function applyHead(grid, s, html) {
   table.style.width = '';
   setupHead(grid, s);
   if (s.paging === 'virtual' && s.filler) {
-    const n = thead.rows[0]?.cells.length ?? 1;
+    const n = thead.querySelector('tr:not(.z-band-row)')?.cells.length ?? 1;
     s.filler.colSpan = n;
     s.placeholder.innerHTML = '<td></td>'.repeat(n);
     s.holders.clear();
@@ -177,7 +177,7 @@ function applyHead(grid, s, html) {
  * filled from the current filters, sort badges and pinned column offsets.
  */
 function setupHead(grid, s) {
-  const head = grid.querySelector('thead tr');
+  const head = grid.querySelector('thead tr:not(.z-band-row)');
   if (!head) return;
   const t = s.texts;
   const widths = new Map([...head.cells].map((th) => [th, Math.round(th.getBoundingClientRect().width)]));
@@ -258,7 +258,7 @@ function fillFilter(cell, f, t) {
  * applies to every row, including virtual rows, without touching them.
  */
 function pinOffsets(grid) {
-  const cells = [...(grid.querySelector('thead tr')?.cells ?? [])];
+  const cells = [...(grid.querySelector('thead tr:not(.z-band-row)')?.cells ?? [])];
   let start = 0;
   while (start < cells.length && cells[start].dataset.pin === 'start') start++;
   let end = 0;
@@ -288,7 +288,9 @@ function pinOffsets(grid) {
 
 /**
  * Sets a column width. The first time, every column is frozen at its current width and the
- * table switches to a fixed layout so one column can change without moving the others.
+ * table switches to a fixed layout so one column can change without moving the others. A fixed
+ * table takes its widths from its first row, which is the band row when the grid has bands, so
+ * those grids keep the widths in a `colgroup` as well.
  */
 function setWidth(th, px) {
   const table = th.closest('table');
@@ -309,9 +311,15 @@ function setWidth(th, px) {
   }
   if (!table.classList.contains('z-fixed')) {
     for (const c of head.cells) c.style.width = `${c.offsetWidth}px`;
+    if (head.previousElementSibling?.matches('.z-band-row')) {
+      const group = make('colgroup');
+      for (const c of head.cells) group.append(make('col', '', { style: `width:${c.style.width}` }));
+      table.prepend(group);
+    }
     table.classList.add('z-fixed');
   }
   const w = Math.round(Math.max(MIN_COLUMN, Math.min(MAX_COLUMN, px)));
+  table.querySelector(':scope > colgroup')?.children[[...head.cells].indexOf(th)]?.style.setProperty('width', `${w}px`);
   th.style.width = `${w}px`;
   th.dataset.userWidth = String(w);
   th.querySelector('.z-resize')?.setAttribute('aria-valuenow', String(w));

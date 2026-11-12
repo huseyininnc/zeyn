@@ -63,7 +63,7 @@ struct ExportQuery {
     screen: String,
     params: Option<String>,
     node: crate::ui::NodePath,
-    /// JSON of `{ "sort": [...], "filters": [...], "columns": [...] }`, all optional.
+    /// JSON of `{ "sort": [...], "filters": [...], "q": "...", "columns": [...] }`, all optional.
     q: Option<String>,
     /// `csv` (the default) or `xlsx`.
     format: Option<String>,
@@ -210,6 +210,7 @@ async fn grid_export(
     let mut query: DataQuery = serde_json::from_value(json!({
         "sort": spec.get("sort").cloned().unwrap_or(json!([])),
         "filters": spec.get("filters").cloned().unwrap_or(json!([])),
+        "q": spec.get("q").cloned().unwrap_or(json!("")),
     }))
     .unwrap_or_default();
     query.with_total = false;

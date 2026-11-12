@@ -109,6 +109,7 @@
     "saved": "{code} kodlu ürün kaydedildi.",
     "code_taken": "{code} kodu başka bir ürün tarafından kullanılıyor.",
     "no_match": "Eşleşen ürün yok",
+    "price_and_stock": "Fiyat ve stok",
     "no_match_help": "Daha fazla ürün görmek için filtreleri değiştirin veya temizleyin."
   },
   "sales": {

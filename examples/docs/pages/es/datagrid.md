@@ -97,6 +97,13 @@ DataGrid::dynamic(preview).paging(Paging::virtual_scroll())
 
 La paginación, el desplazamiento virtual, el uso del teclado y el formato de números y fechas en el idioma del usuario funcionan como en un grid tipado. Los nombres, etiquetas y celdas se escapan, y el servidor limita las columnas, las filas y la longitud del texto. El grid no ordena ni filtra, y sus filas son de solo lectura. Consulta la [referencia del DataGrid](grid.md).
 
+## Búsqueda y bandas
+
+`.search()` pone un cuadro de búsqueda encima de la cuadrícula. La acción recibe el texto como
+`DataQuery::q`, que `DataQuery::apply` compara con los campos de texto, nunca con los enmascarados.
+`.band(label, |b| b.column(..).column(..))` agrupa columnas bajo una celda de encabezado. Consulta la
+[referencia de DataGrid](grid.md).
+
 ## Refrescar en su sitio
 
 `.listens(topic)`, llamado al final, hace que el grid se recargue en su sitio cuando se nombra el topic (consulta [Topics](effects.md#topics)): después de `ui.refresh(topic)` recarga su página actual con su orden y sus filtros, y después de que cambie un control de filtro que `.drives(topic)` empieza en la primera página con los nuevos params de la pantalla. El grid se recarga por `POST /_zeyn/grid` con todas las comprobaciones de permisos, y un param de la pantalla que cambió el filtro llega al grid a través de la función de la pantalla, por ejemplo como scope:
