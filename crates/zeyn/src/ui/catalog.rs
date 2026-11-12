@@ -399,6 +399,8 @@ pub struct CardGrid<E: Model> {
     row_height: Option<u32>,
     placeholder: Option<Placeholder>,
     priority: usize,
+    empty: Option<super::EmptyState>,
+    empty_filtered: Option<super::EmptyState>,
 }
 
 type BuildFn<E> = Box<dyn Fn(&E) -> Node + Send + Sync>;
@@ -462,6 +464,41 @@ impl<E: Model> CardGrid<E> {
             row_height: None,
             placeholder: None,
             priority: 0,
+            empty: None,
+            empty_filtered: None,
+        }
+    }
+
+    /// What shows when there are no rows, in place of the built in "Nothing here": a title, a
+    /// text and an action, such as "No products yet" with "Add a product". With
+    /// [`CardGrid::empty_filtered`] it shows only when there is no search text.
+    pub fn empty(mut self, state: super::EmptyState) -> Self {
+        self.empty = Some(state);
+        self
+    }
+
+    /// What shows when a search leaves no rows, such as "Nothing matches" with a hint.
+    pub fn empty_filtered(mut self, state: super::EmptyState) -> Self {
+        self.empty_filtered = Some(state);
+        self
+    }
+
+    /// The empty state's HTML: the app's own for the case at hand, or the built in text.
+    fn empty_html(&self, r: &Render, fallback: String) -> String {
+        let state = if self.search.is_empty() {
+            self.empty.as_ref()
+        } else {
+            self.empty_filtered
+                .as_ref()
+                .or(self.empty.as_ref())
+        };
+        match state {
+            Some(s) => {
+                let mut out = String::new();
+                s.render(&mut out, r);
+                out
+            }
+            None => fallback,
         }
     }
 
@@ -811,9 +848,9 @@ impl<E: Model> CardGrid<E> {
             out.push_str(&self.cards(p, r, true));
         }
         out.push_str(&format!(
-            r#"</ul></div><p class="z-cards-empty" data-zeyn-cards-empty{}>{}</p><p class="z-sr-only" role="status" aria-live="polite" data-zeyn-cards-status></p></section>"#,
+            r#"</ul></div><div class="z-cards-empty" data-zeyn-cards-empty{}>{}</div><p class="z-sr-only" role="status" aria-live="polite" data-zeyn-cards-status></p></section>"#,
             if total == 0 { "" } else { " hidden" },
-            t("empty")
+            self.empty_html(r, t("empty"))
         ));
     }
 
@@ -917,9 +954,9 @@ impl<E: Model> CardGrid<E> {
         out.push_str("</ul>");
         let empty = page.is_none_or(|p| p.count == 0);
         out.push_str(&format!(
-            r#"<p class="z-cards-empty" data-zeyn-cards-empty{}>{}</p>"#,
+            r#"<div class="z-cards-empty" data-zeyn-cards-empty{}>{}</div>"#,
             if empty { "" } else { " hidden" },
-            t("empty")
+            self.empty_html(r, t("empty"))
         ));
         let more = page.is_some_and(|p| p.next.is_some());
         if self.pages() {

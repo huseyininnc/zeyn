@@ -512,6 +512,9 @@ pub struct DataGrid<E: Model> {
     row_actions: Vec<RowAction<E>>,
     selectable: bool,
     zebra: bool,
+    /// What shows when there are no rows, and when there are none because of the filters.
+    empty: Option<crate::ui::EmptyState>,
+    empty_filtered: Option<crate::ui::EmptyState>,
     bulk: Vec<BulkDef>,
     /// Whether the last added action is a bulk action, the one `confirm` and `tone` set.
     last_bulk: bool,
@@ -758,6 +761,8 @@ impl<E: Model> DataGrid<E> {
             row_style: None,
             on_open: None,
             row_actions: Vec::new(),
+            empty: None,
+            empty_filtered: None,
             selectable: false,
             zebra: false,
             bulk: Vec::new(),
@@ -1078,6 +1083,27 @@ impl<E: Model> DataGrid<E> {
 
     /// Shades every other row, for very wide grids where the eye loses the row. Rows are
     /// divided by lines only unless set.
+    /// What the grid shows when it has no rows, in place of "No records": a title, a text and
+    /// an action, such as "No orders yet" with "New order". With [`DataGrid::empty_filtered`]
+    /// it shows only while no filter is on.
+    ///
+    /// ```ignore
+    /// DataGrid::of(search_orders)
+    ///     .empty(EmptyState::new(t!("orders.none")).opens(t!("orders.new"), new_order, ()))
+    ///     .empty_filtered(EmptyState::new(t!("orders.no_match")).text(t!("orders.no_match_help")))
+    /// ```
+    pub fn empty(mut self, state: crate::ui::EmptyState) -> Self {
+        self.empty = Some(state);
+        self
+    }
+
+    /// What the grid shows when its filters leave no rows, such as "No orders match" with a hint
+    /// to change the filters.
+    pub fn empty_filtered(mut self, state: crate::ui::EmptyState) -> Self {
+        self.empty_filtered = Some(state);
+        self
+    }
+
     pub fn zebra(mut self) -> Self {
         self.zebra = true;
         self
@@ -1892,6 +1918,16 @@ impl<E: Model> DataGrid<E> {
             out.push_str("</tfoot>");
         }
         out.push_str("</table>");
+        for (state, kind) in [
+            (&self.empty, "empty"),
+            (&self.empty_filtered, "empty-filtered"),
+        ] {
+            if let Some(state) = state {
+                out.push_str(&format!(r#"<template data-zeyn-{kind}>"#));
+                state.render(out, r);
+                out.push_str("</template>");
+            }
+        }
         if !later.is_empty() {
             out.push_str("<template data-zeyn-rows-later>");
             out.push_str(&later);

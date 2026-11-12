@@ -241,6 +241,9 @@ pub fn product_list() -> Screen {
             DataGrid::of(search_products)
                 .mode(DataMode::Server)
                 .paging(Paging::pages(25))
+                .empty_filtered(
+                    EmptyState::new(t!("stock.no_match")).text(t!("stock.no_match_help")),
+                )
                 .column(Product::code)
                 .width(120)
                 .pin_start()

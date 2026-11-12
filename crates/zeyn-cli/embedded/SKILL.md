@@ -236,6 +236,9 @@ What to remember:
   an action that takes `conn: Conn` and checks membership first. Events carry ids, never masked data.
 - A lookup whose options depend on another field: `.depends_on(Address::city, Address::country)`;
   the action filters by `q.parent_id()` and the submit checks the pair again.
+- Empty data: `.empty(EmptyState::new(t!(..)).text(t!(..)).opens(t!(..), new_screen, ()))` and
+  `.empty_filtered(EmptyState::new(t!(..)))` on `DataGrid`, `CardGrid` and `List::of`; the filtered one
+  shows while a filter or a search is on.
 - Rows of another shape: `List::of(action).builder(|row| node)` (or on `CardGrid`, `Rail`), with
   `.separator(node)`; `Repeat::of(items, |item| node)` for in memory data. Virtual lists with a
   builder need `.row_height(px)`. Keep `.item`/`.card` when they fit.
