@@ -3,6 +3,8 @@
 //! `docs/zeynsocket.md` for the wire protocol.
 
 use super::{CLOSE_POLICY, Limits, Outbox, PROTOCOL, Socket, admit, typing_signal};
+
+pub(super) mod sse;
 use crate::action::Error;
 use crate::ctx::{Ctx, Identity, Inject};
 use crate::server::{AppState, Call, CallKind, Failure};
@@ -61,6 +63,44 @@ pub(super) struct Peer {
     secret: String,
     groups: Mutex<Vec<String>>,
     topics: Mutex<Vec<&'static str>>,
+    /// Frames and calls in the current second, for [`Limits::frames`] and [`Limits::calls`].
+    rates: Mutex<Rates>,
+}
+
+/// Counters of one second.
+struct Rates {
+    since: Instant,
+    frames: u32,
+    calls: u32,
+}
+
+impl Peer {
+    /// Counts a frame; `false` when the connection is over [`Limits::frames`] this second.
+    fn take_frame(&self, max: u32) -> bool {
+        let Ok(mut r) = self.rates.lock() else {
+            return false;
+        };
+        if r.since.elapsed().as_secs() >= 1 {
+            *r = Rates {
+                since: Instant::now(),
+                frames: 0,
+                calls: 0,
+            };
+        }
+        r.frames += 1;
+        r.frames <= max
+    }
+
+    /// Counts a call; `false` when the connection is over [`Limits::calls`] this second.
+    fn take_call(&self, max: u32) -> bool {
+        self.rates
+            .lock()
+            .map(|mut r| {
+                r.calls += 1;
+                r.calls <= max
+            })
+            .unwrap_or(false)
+    }
 }
 
 /// Numbered messages since the last acknowledgement, oldest first, capped by count and bytes.
@@ -477,15 +517,34 @@ pub(super) async fn page_socket(
         .config()
         .expect("checked in admit")
         .limits;
+    let (peer, rx) = match new_peer(&socket, &ctx, &limits) {
+        Ok(p) => p,
+        Err(f) => {
+            socket.release_user(&user);
+            return st.error_response(&ctx, f);
+        }
+    };
+    ws.protocols([PROTOCOL])
+        .max_message_size(limits.message_bytes)
+        .read_buffer_size(READ_BUFFER)
+        .write_buffer_size(0)
+        .max_write_buffer_size(limits.message_bytes.max(1024 * 1024) * 2)
+        .on_upgrade(move |ws| async move {
+            run(st, ctx, socket.clone(), peer.clone(), rx, ws, limits).await;
+            socket.release_user(&user);
+        })
+}
+
+/// Makes the peer of a new connection and registers it.
+fn new_peer(
+    socket: &Socket,
+    ctx: &Ctx,
+    limits: &Limits,
+) -> Result<(Arc<Peer>, mpsc::Receiver<Message>), Failure> {
     let (tx, rx) = mpsc::channel::<Message>(limits.queue);
     let mut secret = [0u8; 16];
-    if getrandom::getrandom(&mut secret).is_err() {
-        socket.release_user(&user);
-        return st.error_response(
-            &ctx,
-            Failure::App(Error::Internal("no random source".into())),
-        );
-    }
+    getrandom::getrandom(&mut secret)
+        .map_err(|_| Failure::App(Error::Internal("no random source".into())))?;
     let peer = Arc::new(Peer {
         id: socket
             .0
@@ -519,19 +578,65 @@ pub(super) async fn page_socket(
             .collect(),
         groups: Mutex::new(Vec::new()),
         topics: Mutex::new(Vec::new()),
+        rates: Mutex::new(Rates {
+            since: Instant::now(),
+            frames: 0,
+            calls: 0,
+        }),
     });
     if let Ok(mut conns) = socket.0.conns.lock() {
         conns.insert(peer.id, peer.clone());
     }
-    ws.protocols([PROTOCOL])
-        .max_message_size(limits.message_bytes)
-        .read_buffer_size(READ_BUFFER)
-        .write_buffer_size(0)
-        .max_write_buffer_size(limits.message_bytes.max(1024 * 1024) * 2)
-        .on_upgrade(move |ws| async move {
-            run(st, ctx, socket.clone(), peer.clone(), rx, ws, limits).await;
-            socket.release_user(&user);
-        })
+    Ok((peer, rx))
+}
+
+/// Handles a frame from the browser other than `hello`: topics, acknowledgements, calls and
+/// typing signals. `Err` with the reason for a frame the connection must be closed for.
+fn handle(
+    st: &Arc<AppState>,
+    ctx: &Ctx,
+    socket: &Socket,
+    peer: &Arc<Peer>,
+    text: &str,
+    frame: Incoming,
+    limits: &Limits,
+) -> Result<(), &'static str> {
+    if let Some(names) = frame.sub {
+        subscribe(socket, peer, ctx, &names);
+    } else if let Some(names) = frame.unsub {
+        unsubscribe(socket, peer, &names);
+    } else if let Some(seq) = frame.ack {
+        if let Ok(mut r) = peer.replay.lock() {
+            r.ack(seq);
+        }
+    } else if let (Some(id), Some(action)) = (frame.c, frame.a) {
+        let over = !peer.take_call(limits.calls);
+        let conn = Conn {
+            socket: socket.clone(),
+            peer: peer.clone(),
+        };
+        tokio::spawn(answer(
+            st.clone(),
+            ctx.clone(),
+            conn,
+            id,
+            action,
+            frame.d.unwrap_or(Json::Null),
+            over,
+        ));
+    } else if frame.t.is_some() {
+        let topics = peer
+            .topics
+            .lock()
+            .map(|t| t.clone())
+            .unwrap_or_default();
+        if let Some((topic, room)) = typing_signal(text, &topics) {
+            socket.typing(&peer.tenant, topic, &peer.user, &room);
+        }
+    } else {
+        return Err("bad frame");
+    }
+    Ok(())
 }
 
 /// How a connection ended: closed on purpose (forget the peer now), or dropped (keep it for a
@@ -554,8 +659,6 @@ async fn run(
     let mut beat = tokio::time::interval(limits.heartbeat);
     beat.tick().await;
     let mut heard = Instant::now();
-    let mut window = (Instant::now(), 0u32);
-    let mut flood = (Instant::now(), 0u32);
     let mut first = true;
     let ending = loop {
         tokio::select! {
@@ -575,17 +678,13 @@ async fn run(
             incoming = stream.next() => match incoming {
                 Some(Ok(Message::Text(text))) => {
                     heard = Instant::now();
-                    if flood.0.elapsed().as_secs() >= 1 {
-                        flood = (Instant::now(), 0);
-                    }
-                    flood.1 += 1;
-                    if flood.1 > limits.frames {
+                    if !peer.take_frame(limits.frames) {
                         break Ending::Clean(Some((CLOSE_POLICY, "too many frames")));
                     }
-                    let Ok(frame) = serde_json::from_str::<Incoming>(&text) else {
+                    let Ok(mut frame) = serde_json::from_str::<Incoming>(&text) else {
                         break Ending::Clean(Some((CLOSE_POLICY, "bad frame")));
                     };
-                    if let Some(hello) = frame.hello {
+                    if let Some(hello) = frame.hello.take() {
                         if !first {
                             break Ending::Clean(Some((CLOSE_POLICY, "hello comes first")));
                         }
@@ -596,44 +695,8 @@ async fn run(
                                 break;
                             }
                         }
-                    } else if let Some(names) = frame.sub {
-                        subscribe(&socket, &peer, &ctx, &names);
-                    } else if let Some(names) = frame.unsub {
-                        unsubscribe(&socket, &peer, &names);
-                    } else if let Some(seq) = frame.ack {
-                        if let Ok(mut r) = peer.replay.lock() {
-                            r.ack(seq);
-                        }
-                    } else if let (Some(id), Some(action)) = (frame.c, frame.a) {
-                        if window.0.elapsed().as_secs() >= 1 {
-                            window = (Instant::now(), 0);
-                        }
-                        window.1 += 1;
-                        let over = window.1 > limits.calls;
-                        let conn = Conn {
-                            socket: socket.clone(),
-                            peer: peer.clone(),
-                        };
-                        tokio::spawn(answer(
-                            st.clone(),
-                            ctx.clone(),
-                            conn,
-                            id,
-                            action,
-                            frame.d.unwrap_or(Json::Null),
-                            over,
-                        ));
-                    } else if frame.t.is_some() {
-                        let topics = peer
-                            .topics
-                            .lock()
-                            .map(|t| t.clone())
-                            .unwrap_or_default();
-                        if let Some((topic, room)) = typing_signal(&text, &topics) {
-                            socket.typing(&peer.tenant, topic, &peer.user, &room);
-                        }
-                    } else {
-                        break Ending::Clean(Some((CLOSE_POLICY, "bad frame")));
+                    } else if let Err(reason) = handle(&st, &ctx, &socket, &peer, &text, frame, &limits) {
+                        break Ending::Clean(Some((CLOSE_POLICY, reason)));
                     }
                     first = false;
                 }

@@ -12,6 +12,7 @@
  * An element with `data-zeyn-live-self` only subscribes: it refreshes itself on `zeyn:topics`.
  * Typing signals of other users are passed on as `zeyn:signal`.
  *
+ * Nodes made with `.on_event` (`[data-zeyn-on]`) refresh or show a toast when their event arrives.
  * `zeyn.socket.on(name, fn)` listens for events (`{"s":n,"e":name,"d":data}`) and returns a
  * function that stops listening; `zeyn.socket.call(action, input)` calls a published action and
  * resolves with its answer or rejects with its problem; `zeyn.socket.state` is `connected`,
@@ -24,7 +25,9 @@
  * once a second (`{"ack":n}`). The server sends `{"p":1}` every 20 s; 45 s without any frame
  * counts as a dead connection. Reconnects wait a random time up to 0.5 s, doubling to 30 s, and
  * happen at once when the browser comes online or the page becomes visible. The socket closes
- * when nothing in the page needs it.
+ * when nothing in the page needs it. When WebSocket fails to open twice in a row (a proxy that
+ * strips `Upgrade`), the page switches to Server-Sent Events down and `POST` up with the same
+ * frames and resume (`/_zeyn/socket/open`, `/events`, `/send`).
  * @module live
  */
 
@@ -41,6 +44,9 @@ let lastSeq = 0;
 let acked = 0;
 let ackTimer = 0;
 let heardAt = 0;
+/** `ws`, or `sse` after WebSocket failed to open twice in a row. */
+let transport = 'ws';
+let failures = 0;
 let timer = 0;
 let state = 'offline';
 let nextCall = 1;
@@ -62,7 +68,23 @@ function wanted() {
 
 /** Whether anything in the page needs the socket. */
 function needed() {
-  return wanted().size > 0 || listeners.size > 0 || calls.size > 0;
+  return wanted().size > 0 || listeners.size > 0 || calls.size > 0 || !!document.querySelector('[data-zeyn-on]');
+}
+
+/**
+ * Nodes made with `.on_event` (`[data-zeyn-on="name"]`): a refreshing one listens to a topic named
+ * after the event, so the event joins the next `zeyn:topics`; one with `data-zeyn-on-toast` shows
+ * its text.
+ */
+function react(name) {
+  for (const el of document.querySelectorAll('[data-zeyn-on]')) {
+    if (el.dataset.zeynOn !== name) continue;
+    if (el.dataset.zeynOnToast) document.dispatchEvent(new CustomEvent('zeyn:toast', { detail: { message: el.dataset.zeynOnToast } }));
+    else {
+      pending.add(name);
+      flush ||= setTimeout(refresh, 300);
+    }
+  }
 }
 
 function setState(next) {
@@ -88,7 +110,7 @@ function refresh(all = false) {
 /** Sends a frame now, or when the socket opens. */
 function send(frame) {
   const text = JSON.stringify(frame);
-  if (socket?.readyState === WebSocket.OPEN) socket.send(text);
+  if (socket?.open) socket.send(text);
   else {
     outbox.push(text);
     connect();
@@ -101,7 +123,7 @@ function sync() {
   const add = [...next].filter((t) => !subscribed.has(t));
   const drop = [...subscribed].filter((t) => !next.has(t));
   subscribed = next;
-  if (socket?.readyState !== WebSocket.OPEN) return;
+  if (!socket?.open) return;
   if (add.length) socket.send(JSON.stringify({ sub: add }));
   if (drop.length) socket.send(JSON.stringify({ unsub: drop }));
 }
@@ -109,7 +131,7 @@ function sync() {
 /** Acknowledges the last sequence received, at most once a second. */
 function ack() {
   ackTimer = 0;
-  if (lastSeq > acked && socket?.readyState === WebSocket.OPEN) {
+  if (lastSeq > acked && socket?.open) {
     acked = lastSeq;
     socket.send(JSON.stringify({ ack: lastSeq }));
   }
@@ -131,6 +153,7 @@ function receive(e) {
     resume = msg.welcome.resume;
     if (!msg.welcome.resumed) lastSeq = msg.welcome.seq ?? 0;
     acked = Math.min(acked, lastSeq);
+    if (socket && !socket.open) opened(socket);
   } else if (msg?.typing) {
     document.dispatchEvent(new CustomEvent('zeyn:signal', { detail: { topic: msg.t, typing: msg.typing } }));
   } else if (typeof msg?.r === 'number') {
@@ -138,6 +161,7 @@ function receive(e) {
     calls.delete(msg.r);
     if (call) 'err' in msg ? call.reject(msg.err) : call.resolve(msg.ok);
   } else if (typeof msg?.e === 'string') {
+    react(msg.e);
     for (const fn of listeners.get(msg.e) ?? []) {
       try {
         fn(msg.d);
@@ -153,6 +177,106 @@ function receive(e) {
   }
 }
 
+/** Marks a connection open: sends what waited and subscribes the page's topics. */
+function opened(conn) {
+  conn.open = true;
+  wait = 500;
+  failures = 0;
+  heardAt = Date.now();
+  setState('connected');
+  sync();
+  while (outbox.length) conn.send(outbox.shift());
+}
+
+/** A connection ended: rejects calls in flight and plans the next attempt. */
+function closed(conn, code) {
+  if (socket !== conn) return;
+  socket = null;
+  for (const [, call] of calls) call.reject({ status: 0, type: 'urn:zeyn:problem:offline' });
+  calls.clear();
+  if (STOP.has(code) || !needed()) {
+    setState('offline');
+    return;
+  }
+  setState('reconnecting');
+  timer = setTimeout(connect, Math.random() * wait);
+  wait = Math.min(wait * 2, 30000);
+}
+
+/** The WebSocket transport. Two attempts in a row that never open switch the page to events. */
+function connectWs(csrf) {
+  const url = new URL(`${BASE}/_zeyn/socket`, location.href);
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  const ws = new WebSocket(url, ['zeyn', `csrf.${csrf ?? ''}`]);
+  const conn = { open: false, send: (text) => ws.send(text), close: (code, reason) => ws.close(code, reason) };
+  socket = conn;
+  let reached = false;
+  ws.onopen = () => {
+    reached = true;
+    ws.send(JSON.stringify({ hello: resume ? { resume, seq: lastSeq } : {} }));
+    opened(conn);
+  };
+  ws.onmessage = receive;
+  ws.onclose = (e) => {
+    if (!reached && ++failures >= 2 && typeof EventSource === 'function') transport = 'sse';
+    closed(conn, e.code);
+  };
+}
+
+/**
+ * The fallback transport for networks that block WebSocket: `POST /_zeyn/socket/open` with the
+ * CSRF token (and the resume token) gives a single use ticket for the event stream; frames go up
+ * one `POST /_zeyn/socket/send` each, in order. The connection counts as open once `welcome`
+ * arrives.
+ */
+async function connectSse(csrf) {
+  const conn = { open: false, send: () => {}, close: () => {} };
+  socket = conn;
+  let res = null;
+  try {
+    res = await fetch(`${BASE}/_zeyn/socket/open`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'content-type': 'application/json', 'x-zeyn-csrf': csrf ?? '' },
+      body: JSON.stringify(resume ? { resume, seq: lastSeq } : {}),
+    });
+  } catch {
+    res = null;
+  }
+  if (socket !== conn) return;
+  if (!res?.ok) {
+    closed(conn, res && [400, 403, 404].includes(res.status) ? 1008 : 1006);
+    return;
+  }
+  let ticket = '';
+  try {
+    ticket = (await res.json()).ticket ?? '';
+  } catch {
+    ticket = '';
+  }
+  const es = new EventSource(`${BASE}/_zeyn/socket/events?ticket=${encodeURIComponent(ticket)}`);
+  let chain = Promise.resolve();
+  conn.send = (text) => {
+    chain = chain
+      .then(() => fetch(`${BASE}/_zeyn/socket/send`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json', 'x-zeyn-csrf': csrf ?? '', 'x-zeyn-socket': resume ?? '' },
+        body: text,
+      }))
+      .catch(() => {});
+  };
+  conn.close = () => {
+    es.close();
+    closed(conn, 1000);
+  };
+  es.onmessage = receive;
+  es.onerror = () => {
+    es.close();
+    closed(conn, 1006);
+  };
+}
+
 function connect() {
   clearTimeout(timer);
   if (socket) {
@@ -165,33 +289,9 @@ function connect() {
     window.zeynCsrf().then((token) => token && connect());
     return;
   }
-  const url = new URL(`${BASE}/_zeyn/socket`, location.href);
-  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-  const ws = new WebSocket(url, ['zeyn', `csrf.${csrf ?? ''}`]);
-  socket = ws;
   subscribed = new Set();
-  ws.onopen = () => {
-    wait = 500;
-    heardAt = Date.now();
-    ws.send(JSON.stringify({ hello: resume ? { resume, seq: lastSeq } : {} }));
-    setState('connected');
-    sync();
-    while (outbox.length) ws.send(outbox.shift());
-  };
-  ws.onmessage = receive;
-  ws.onclose = (e) => {
-    if (socket !== ws) return;
-    socket = null;
-    for (const [, call] of calls) call.reject({ status: 0, type: 'urn:zeyn:problem:offline' });
-    calls.clear();
-    if (STOP.has(e.code) || !needed()) {
-      setState('offline');
-      return;
-    }
-    setState('reconnecting');
-    timer = setTimeout(connect, Math.random() * wait);
-    wait = Math.min(wait * 2, 30000);
-  };
+  if (transport === 'sse') connectSse(csrf);
+  else connectWs(csrf);
 }
 
 /** Reconnects at once while waiting to reconnect. */
@@ -203,7 +303,7 @@ function retryNow() {
 }
 
 setInterval(() => {
-  if (socket?.readyState === WebSocket.OPEN && Date.now() - heardAt > SILENT_MS) socket.close(4000, 'silent');
+  if (socket?.open && Date.now() - heardAt > SILENT_MS) socket.close(4000, 'silent');
 }, 5000);
 addEventListener('online', retryNow);
 document.addEventListener('visibilitychange', () => {
@@ -252,7 +352,7 @@ function call(action, input = null) {
 
 /** Sends a small signal (a typing note) on the open socket; dropped while it is not open. */
 function signal(frame) {
-  if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(frame));
+  if (socket?.open) socket.send(JSON.stringify(frame));
 }
 
 globalThis.zeyn = Object.assign(globalThis.zeyn ?? {}, {

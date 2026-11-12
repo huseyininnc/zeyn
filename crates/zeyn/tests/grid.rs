@@ -919,6 +919,16 @@ async fn cells_render_badges_progress_and_icons() {
     );
     assert!(
         r.body
+            .contains(r#"<span class="z-cell-progress"><span class="z-cell-progress-track""#),
+        "grid cells have classes of their own, so the Progress widget's layout cannot squeeze them"
+    );
+    let css = include_str!("../assets/zeyn.css");
+    assert!(
+        css.contains(".z-button[hidden] { display: none; }"),
+        "a hidden button, such as a card grid's load more without more rows, stays hidden"
+    );
+    assert!(
+        r.body
             .contains(r#"<span class="z-bool z-bool-no" role="img" aria-label="No"></span>"#)
     );
     assert!(

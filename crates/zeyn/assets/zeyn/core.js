@@ -199,6 +199,11 @@ async function csrf() {
 }
 window.zeynCsrf = csrf;
 
+/** Other scripts of the page show a toast with `zeyn:toast` (`{ message, variant }`). */
+document.addEventListener('zeyn:toast', (e) => {
+  if (typeof e.detail?.message === 'string') toast(e.detail.message, e.detail.variant ?? 'info');
+});
+
 /**
  * Parses a JSON response body; returns `null` for empty or invalid bodies.
  * @param {Response} res
