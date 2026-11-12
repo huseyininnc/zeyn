@@ -13,7 +13,7 @@ categories = ["web-programming::http-server", "gui"]
 
 [features]
 default = ["server"]
-server = ["dep:axum", "dep:tokio", "dep:getrandom", "dep:tower-http", "dep:futures-core", "dep:tracing-subscriber", "dep:flate2"]
+server = ["dep:axum", "dep:tokio", "dep:getrandom", "dep:tower-http", "dep:futures-core", "dep:futures-util", "futures-util/alloc", "dep:tracing-subscriber", "dep:flate2"]
 signed-licenses = ["dep:ed25519-dalek"]
 redis = ["server", "dep:redis"]
 otel = ["server", "dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp", "dep:tracing-opentelemetry"]

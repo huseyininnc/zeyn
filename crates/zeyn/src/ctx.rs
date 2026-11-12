@@ -361,11 +361,13 @@ impl Ctx {
     }
 
     /// Same context for an action called over a live connection.
+    #[cfg_attr(not(feature = "realtime"), allow(dead_code))]
     pub(crate) fn with_conn(&self, conn: Arc<dyn std::any::Any + Send + Sync>) -> Self {
         self.rebuild(|i| i.conn = Some(conn))
     }
 
     /// The live connection the call came over, if any.
+    #[cfg_attr(not(feature = "realtime"), allow(dead_code))]
     pub(crate) fn conn<T: 'static>(&self) -> Option<&T> {
         self.0.conn.as_ref()?.downcast_ref()
     }
