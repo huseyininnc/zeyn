@@ -84,6 +84,7 @@
       "alpha_index": "Kullanıcının alfabesinden harf çubuğu.",
       "menu_button": "Eylemli açılır ve bölünmüş düğmeler.",
       "menu_bar": "Komutlardan oluşan menü çubuğu.",
+      "side_menu": "Rozetler, sayılar, filtre, ikon şeridi ve telefon çekmecesiyle uygulama menüsü.",
       "external_link": "Uygulamadan güvenle çıkan bağlantı.",
       "form": "Sunucuda denetlenen bir model formu.",
       "controls": "Radyo düğmeleri, bölümlü düğmeler ve anahtarlar.",
@@ -386,6 +387,9 @@
         "overview": "Örnek"
       },
       "menu_bar": {
+        "overview": "Örnek"
+      },
+      "side_menu": {
         "overview": "Örnek"
       },
       "menu_button": {

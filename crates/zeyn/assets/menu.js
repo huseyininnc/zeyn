@@ -18,7 +18,7 @@
  * The rail button (`[data-zeyn-rail-toggle]`) folds the menu to an icon rail on wide screens and
  * back. In the rail a top level group opens as a flyout, one at a time; Escape, a click outside
  * and a navigation close it.
- * Counted items (`[data-zeyn-count]`, `Menu::count`) get their numbers from one
+ * Counted items (`[data-zeyn-menu-count]`, `Menu::count`) get their numbers from one
  * `GET /_zeyn/menu/counts` after the page shows, and again when one of their topics is named.
  * @module menu
  */
@@ -263,12 +263,12 @@ for (const box of document.querySelectorAll('[data-zeyn-menu-filter]')) initFilt
 let countTimer = 0;
 
 /**
- * Fills the counted menu items (`[data-zeyn-count]`, see `Menu::count`) from one
+ * Fills the counted menu items (`[data-zeyn-menu-count]`, see `Menu::count`) from one
  * `GET /_zeyn/menu/counts`: 0 hides the number, more than 99 shows "99+".
  */
 async function loadCounts() {
   countTimer = 0;
-  const spans = document.querySelectorAll('[data-zeyn-count]');
+  const spans = document.querySelectorAll('[data-zeyn-menu-count]');
   if (!spans.length) return;
   const base = (document.querySelector('meta[name="zeyn-base"]')?.content ?? '').replace(/\/$/, '');
   let counts;
@@ -280,7 +280,7 @@ async function loadCounts() {
     return;
   }
   for (const span of spans) {
-    const n = counts?.[span.dataset.zeynCount];
+    const n = counts?.[span.dataset.zeynMenuCount];
     const shown = typeof n === 'number' && n > 0;
     span.hidden = !shown;
     span.textContent = shown ? (n > 99 ? '99+' : String(n)) : '';
@@ -289,7 +289,7 @@ async function loadCounts() {
 
 document.addEventListener('zeyn:topics', (e) => {
   const named = e.detail?.topics ?? [];
-  const wanted = [...document.querySelectorAll('[data-zeyn-count-topics]')].some((s) => s.dataset.zeynCountTopics.split(',').some((t) => named.includes(t)));
+  const wanted = [...document.querySelectorAll('[data-zeyn-menu-count-topics]')].some((s) => s.dataset.zeynMenuCountTopics.split(',').some((t) => named.includes(t)));
   if (wanted) countTimer ||= setTimeout(loadCounts, 300);
 });
 
