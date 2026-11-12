@@ -552,8 +552,9 @@ pub trait GridSource: Send + Sync {
         ctx: Ctx,
         query: DataQuery,
         path: Vec<Option<String>>,
+        view: Option<&crate::grid::DataGridView>,
     ) -> BoxFuture<Result<LoadedPage>> {
-        let _ = path;
+        let _ = (path, view);
         self.fetch(ctx, query)
     }
 

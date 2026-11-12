@@ -233,7 +233,31 @@ pub struct DataGridView {
     /// a view only for the same columns; typed grids ignore it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shape: Option<String>,
+    /// Columns the user groups the rows by, outermost first. Only columns marked
+    /// `groupable()` count, at most [`MAX_USER_GROUPS`]; empty keeps the grid's own grouping.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub group_by: Vec<String>,
 }
+
+/// Most levels a user groups a grid by.
+pub const MAX_USER_GROUPS: usize = 3;
+
+/// Totals of a column, of a group or of every matching row, for a custom summary.
+pub struct Totals<'a>(&'a [Total]);
+
+impl Totals<'_> {
+    /// The total `op` of `field`, when the grid computed it: a column must declare it
+    /// (`sum()`, `avg()`, ...).
+    pub fn get<M: Model, T>(&self, field: Field<M, T>, op: Aggregate) -> Option<&Value> {
+        let name = field.meta().name;
+        self.0
+            .iter()
+            .find(|t| t.field == name && t.op == op)
+            .map(|t| &t.value)
+    }
+}
+
+type SummaryFn = Box<dyn Fn(&Totals) -> Option<Value> + Send + Sync>;
 
 /// Where saved grid views live, one per user and grid. Register one with `App::datagrid_views`.
 ///
@@ -462,6 +486,11 @@ struct Column<E> {
     wrap: bool,
     /// Index into `DataGrid::bands` of the band header this column sits under.
     band: Option<usize>,
+    /// Whether users may group the rows by this column.
+    group: bool,
+    /// A custom summary in the footer and in group rows: its label and how it is computed from
+    /// the totals.
+    summary: Option<(Text, SummaryFn)>,
 }
 
 impl<E> Column<E> {
@@ -484,6 +513,8 @@ impl<E> Column<E> {
             plain: false,
             wrap: false,
             band: None,
+            group: false,
+            summary: None,
         }
     }
 
@@ -549,6 +580,8 @@ pub const MAX_TREE_DEPTH: usize = 32;
 /// Where rows sit in a grouped or tree grid.
 #[derive(Default)]
 struct Branch<'a> {
+    /// Whether the rows sit in groups the user picked.
+    nested: bool,
     depth: usize,
     path: &'a [Option<String>],
     parents: &'a [String],
@@ -841,6 +874,58 @@ impl<E: Model> DataGrid<E> {
     fn nested(&self) -> bool {
         !matches!(self.paging, Paging::Virtual { .. })
             && (self.tree.is_some() || !self.group_by.is_empty())
+    }
+
+    /// Whether users may group this grid: a groupable column, no tree and no virtual paging.
+    fn user_groups(&self) -> bool {
+        self.tree.is_none()
+            && !matches!(self.paging, Paging::Virtual { .. })
+            && self
+                .columns
+                .iter()
+                .any(|c| c.group && c.meta.mask.is_none())
+    }
+
+    /// The groupable columns a view groups by, in order, without repeats, at most
+    /// [`MAX_USER_GROUPS`].
+    fn picked_groups(&self, view: Option<&DataGridView>) -> Vec<&'static FieldMeta> {
+        let mut out: Vec<&'static FieldMeta> = Vec::new();
+        if !self.user_groups() {
+            return out;
+        }
+        for name in view
+            .map(|v| v.group_by.as_slice())
+            .unwrap_or_default()
+        {
+            let found = self
+                .columns
+                .iter()
+                .find(|c| c.group && c.meta.mask.is_none() && c.name == name.as_str());
+            if let Some(c) = found
+                && !out
+                    .iter()
+                    .any(|m| m.name == c.meta.name)
+                && out.len() < MAX_USER_GROUPS
+            {
+                out.push(c.meta);
+            }
+        }
+        out
+    }
+
+    /// The levels rows are grouped by for a view: the user's groups, or the grid's own.
+    fn levels(&self, view: Option<&DataGridView>) -> Vec<&'static FieldMeta> {
+        let picked = self.picked_groups(view);
+        if picked.is_empty() {
+            self.group_by.clone()
+        } else {
+            picked
+        }
+    }
+
+    /// Whether rows are grouped or a tree for a view.
+    fn nested_in(&self, view: Option<&DataGridView>) -> bool {
+        self.nested() || !self.picked_groups(view).is_empty()
     }
 
     /// Lets every row expand into a screen built from the row, loaded only when the user opens
@@ -1489,6 +1574,10 @@ impl<E: Model> DataGrid<E> {
     /// Cleans a view from the client: unknown fields, repeats and out of range widths go, sort and
     /// filters keep only what the grid allows and the limits.
     fn clean(&self, view: DataGridView) -> DataGridView {
+        let view_groups = DataGridView {
+            group_by: view.group_by.clone(),
+            ..DataGridView::default()
+        };
         let columns = self
             .layout(Some(&view))
             .into_iter()
@@ -1527,6 +1616,11 @@ impl<E: Model> DataGrid<E> {
             sort: query.sort,
             filters: query.filters,
             shape: None,
+            group_by: self
+                .picked_groups(Some(&view_groups))
+                .iter()
+                .map(|m| m.name.to_string())
+                .collect(),
         }
     }
 
@@ -1709,6 +1803,9 @@ impl<E: Model> DataGrid<E> {
                     out.push_str(&format!(r#" data-options="{}""#, attr(&list)));
                 }
             }
+            if c.group && c.meta.mask.is_none() && self.user_groups() {
+                out.push_str(r#" data-group="true""#);
+            }
             if c.filter {
                 out.push_str(&format!(r#" data-filter="{}""#, filter_kind(&c.meta.kind)));
                 if let FieldKind::Choice(options) = c.meta.kind {
@@ -1746,7 +1843,7 @@ impl<E: Model> DataGrid<E> {
     fn rows(&self, rows: &[E], r: &Render, cols: &[Shown], b: &Branch) -> String {
         use std::fmt::Write;
         let mut out = String::with_capacity(rows.len() * (cols.len() + 1) * 32);
-        let nested = self.nested();
+        let nested = self.nested() || b.nested;
         let tree = nested && self.tree.is_some();
         let edit = self.can_edit(r);
         let key_at = Self::key_index();
@@ -1972,7 +2069,8 @@ impl<E: Model> DataGrid<E> {
         let cols = self.layout(view);
         let add = self.can_add(r);
         let batch = self.batch && self.can_edit(r);
-        if self.search || add || batch {
+        let panel = self.user_groups();
+        if self.search || add || batch || panel {
             let grid_text = |key: &str| r.text(&Text::key(format!("zeyn.grid.{key}")));
             out.push_str(r#"<div class="z-grid-tools">"#);
             if self.search {
@@ -1980,6 +2078,14 @@ impl<E: Model> DataGrid<E> {
                     r#"<div class="z-grid-search" role="search"><span class="z-icon z-icon-search" aria-hidden="true"></span><input type="search" name="q" data-zeyn-grid-search data-testid="{scope}.grid.search" aria-label="{label}" placeholder="{label}" autocomplete="off" spellcheck="false" enterkeyhint="search" maxlength="{}"></div>"#,
                     crate::MAX_SEARCH_QUERY,
                     label = grid_text("search"),
+                ));
+            }
+            if panel {
+                out.push_str(&format!(
+                    r#"<div class="z-group-panel" role="group" data-zeyn-group-panel data-testid="{scope}.grid.groups" aria-label="{}" data-text-remove="{}"><span class="z-group-hint">{}</span></div>"#,
+                    grid_text("groups"),
+                    grid_text("ungroup_by"),
+                    grid_text("group_hint"),
                 ));
             }
             if add {
@@ -2106,7 +2212,11 @@ impl<E: Model> DataGrid<E> {
         }
         out.push_str(&format!(
             r#"><table role="{}" aria-colcount="{}"><thead>{}</thead><tbody data-zeyn-rows>"#,
-            if self.nested() { "treegrid" } else { "grid" },
+            if self.nested_in(view) {
+                "treegrid"
+            } else {
+                "grid"
+            },
             self.columns.len() + usize::from(!self.row_actions.is_empty()) + self.lead(r),
             self.head_row(r, &cols)
         ));
@@ -2123,6 +2233,7 @@ impl<E: Model> DataGrid<E> {
                     if p.groups.is_none() && rows.len() > live_rows =>
                 {
                     let branch = Branch {
+                        nested: false,
                         depth: p.depth,
                         path: &p.path,
                         parents: &p.parents,
@@ -2137,7 +2248,7 @@ impl<E: Model> DataGrid<E> {
         if self
             .columns
             .iter()
-            .any(|c| !c.aggregates.is_empty())
+            .any(|c| !c.aggregates.is_empty() || c.summary.is_some())
         {
             out.push_str("<tfoot data-zeyn-foot>");
             out.push_str(
@@ -2240,7 +2351,7 @@ impl<E: Model> DataGrid<E> {
 
     /// The cell of one column with its totals, or an empty cell.
     fn total_cell(&self, c: &Column<E>, totals: &[Total], r: &Render) -> String {
-        if c.aggregates.is_empty() {
+        if c.aggregates.is_empty() && c.summary.is_none() {
             return "<td></td>".to_string();
         }
         let ops: Vec<&str> = c
@@ -2273,6 +2384,17 @@ impl<E: Model> DataGrid<E> {
                 r.text(&Text::key(format!("zeyn.grid.agg.{}", op.code()))),
             ));
         }
+        if let Some((label, summary)) = &c.summary {
+            let value = match summary(&Totals(totals)) {
+                Some(Value::Int(n)) => grouped(n, r.locale),
+                Some(v) => r.value(&v, &value_kind(&v, &c.meta.kind)),
+                None => String::new(),
+            };
+            out.push_str(&format!(
+                r#"<span class="z-agg z-agg-custom"><span class="z-agg-label">{}</span> <span class="z-agg-value">{value}</span></span>"#,
+                r.text(label),
+            ));
+        }
         out.push_str("</td>");
         out
     }
@@ -2285,10 +2407,11 @@ impl<E: Model> DataGrid<E> {
         groups: &[crate::action::Group],
         r: &Render,
         cols: &[Shown],
+        levels: &[&'static FieldMeta],
         depth: usize,
         path: &[Option<String>],
     ) -> String {
-        let Some(meta) = self.group_by.get(depth) else {
+        let Some(meta) = levels.get(depth) else {
             return String::new();
         };
         let lead = self.lead(r);
@@ -2347,9 +2470,11 @@ impl<E: Model> DataGrid<E> {
     fn rows_html_erased(&self, page: &LoadedPage, r: &Render) -> String {
         let cols = self.layout(page.view.as_ref());
         if let Some(groups) = &page.groups {
-            return self.group_rows(groups, r, &cols, page.depth, &page.path);
+            let levels = self.levels(self.view_for(page.view.as_ref()));
+            return self.group_rows(groups, r, &cols, &levels, page.depth, &page.path);
         }
         let branch = Branch {
+            nested: self.nested_in(self.view_for(page.view.as_ref())),
             depth: page.depth,
             path: &page.path,
             parents: &page.parents,
@@ -2383,6 +2508,7 @@ impl<E: Model> DataGrid<E> {
         ctx: Ctx,
         mut query: DataQuery,
         path: Vec<Option<String>>,
+        levels: Vec<&'static FieldMeta>,
     ) -> BoxFuture<Result<LoadedPage>> {
         use crate::action::Error;
         self.allow(&mut query, Some(&ctx));
@@ -2404,13 +2530,13 @@ impl<E: Model> DataGrid<E> {
                 ));
             }
             None => {
-                if depth > self.group_by.len() {
+                if depth > levels.len() {
                     return Box::pin(async { Err(Error::NotFound) });
                 }
-                for (meta, key) in self.group_by.iter().zip(&path) {
+                for (meta, key) in levels.iter().zip(&path) {
                     fixed.push(key_filter(meta, key.as_deref()));
                 }
-                if let Some(meta) = self.group_by.get(depth) {
+                if let Some(meta) = levels.get(depth) {
                     query.group = Some(meta.name.to_string());
                     query.aggregates = self.aggregate_requests();
                 }
@@ -2872,9 +2998,11 @@ impl<E: Model> GridSource for DataGrid<E> {
         ctx: Ctx,
         query: DataQuery,
         path: Vec<Option<String>>,
+        view: Option<&DataGridView>,
     ) -> BoxFuture<Result<LoadedPage>> {
-        if self.nested() {
-            self.fetch_nested(ctx, query, path)
+        let view = self.view_for(view);
+        if self.nested_in(view) {
+            self.fetch_nested(ctx, query, path, self.levels(view))
         } else {
             self.fetch(ctx, query)
         }
@@ -3043,6 +3171,7 @@ impl<E: Model> Component for DataGrid<E> {
             "group_by": self.group_by.iter().map(|m| m.name).collect::<Vec<_>>(),
             "tree": self.tree.map(|m| m.name),
             "search": self.search,
+            "groupable": self.columns.iter().filter(|c| c.group).map(|c| c.meta.name).collect::<Vec<_>>(),
             "add": self.add.as_ref().map(|a| a.meta),
             "delete": self.delete.map(|i| self.bulk[i].meta),
             "batch_edit": self.batch,
@@ -3061,6 +3190,16 @@ impl<E: Model> From<DataGrid<E>> for Node {
 }
 
 /// Whole number with the locale's group separator: `4.680` in `tr`, `4,680` in `en`.
+/// The kind a summary value is shown as: its own for numbers and money, the column's otherwise.
+fn value_kind(value: &Value, column: &FieldKind) -> FieldKind {
+    match value {
+        Value::Money(_) => FieldKind::Money,
+        Value::Decimal(_) | Value::Number(_) => FieldKind::Decimal,
+        Value::Bool(_) => FieldKind::Bool,
+        _ => *column,
+    }
+}
+
 fn grouped(n: i64, locale: &str) -> String {
     let mut out = String::new();
     crate::render::push_grouped(&mut out, n, locale);
@@ -3144,6 +3283,8 @@ fn grid_texts(r: &Render) -> serde_json::Value {
         ),
     );
     for k in [
+        "group_by",
+        "ungroup",
         "saved",
         "undo",
         "undone",

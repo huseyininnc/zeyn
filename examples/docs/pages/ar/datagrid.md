@@ -81,6 +81,7 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 - `.row_style(|row| Option<RowStyle>)`: صفوف الخطر أو التحذير أو النجاح.
 - `.add_with(create)` و`.delete_with(action, M::id)` و`.batch_edit()`: زر "إضافة صف"، وزر ومفتاح
   للحذف، وتعديلات تُحفظ معًا. راجع [مرجع DataGrid](grid.md).
+- `.groupable()` و`.summary(label, |t| ...)` على عمود: يجمّع المستخدم حسبه من قائمته أو من لوحة التجميع، وتظهر تحته قيمة محسوبة من المجاميع.
 - `.exportable()`: تصدير CSV للصفوف المصفّاة، يبثه الخادم (stream).
 
 ## أعمدة تُعرف وقت التشغيل

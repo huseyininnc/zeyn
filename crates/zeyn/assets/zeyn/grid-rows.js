@@ -252,7 +252,7 @@ async function sendEdit(grid, tr, values) {
     ...address(grid),
     key: tr.dataset.zeynKey,
     values,
-    view: s?.columns ? { columns: s.columns } : null,
+    view: s ? viewOf(grid, s) : null,
   });
   tr.removeAttribute('aria-busy');
   if (r.status === 422) {

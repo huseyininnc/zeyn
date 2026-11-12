@@ -81,6 +81,7 @@ Sayılar ve para tutarları sağa hizalanır ve sabit genişlikli rakamlarla yaz
 - `.row_style(|row| Option<RowStyle>)`: danger, warning veya success satırlar.
 - `.add_with(create)`, `.delete_with(action, M::id)`, `.batch_edit()`: "Satır ekle" düğmesi, Sil
   düğmesi ve tuşu, birlikte kaydedilen düzenlemeler. Ayrıntılar [DataGrid başvurusunda](grid.md).
+- Sütunda `.groupable()`, `.summary(label, |t| ...)`: kullanıcı menüsünden ya da gruplama alanından ona göre gruplar, toplamlardan hesaplanan bir değer altında görünür.
 - `.exportable()`: filtrelenmiş satırların CSV dışa aktarımı, sunucu tarafından akıtılır.
 
 ## Çalışma anında belli olan sütunlar

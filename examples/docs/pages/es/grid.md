@@ -288,6 +288,35 @@ cliente envía solo la ruta de valores de grupo que abre; el servidor comprueba 
 valor en un filtro sobre la columna de ese grupo, delante de los filtros del usuario (`blank` para el grupo
 vacío).
 
+## Agrupación por el usuario y resúmenes propios
+
+```rust
+DataGrid::of(search_orders)
+    .column(Order::city).groupable()
+    .column(Order::status).groupable()
+    .column(Order::profit).sum()
+    .column(Order::revenue).sum()
+        .summary(t!("orders.margin"), |t| {
+            let profit = t.get(Order::profit, Aggregate::Sum)?;
+            let revenue = t.get(Order::revenue, Aggregate::Sum)?;
+            margin(profit, revenue)
+        })
+```
+
+`groupable()` permite al usuario agrupar las filas por una columna: con "Agrupar por esta columna"
+en su menú, o arrastrando su encabezado al panel de grupos encima de la cuadrícula. El panel
+muestra un botón por nivel que lo quita; tres niveles como máximo (`MAX_USER_GROUPS`). Los grupos
+viajan en la vista del usuario (`DataGridView::group_by`), se guardan con ella y sustituyen al
+`group_by` de la cuadrícula mientras existan. El servidor solo acepta columnas agrupables, nunca
+enmascaradas, y agrupa igual que con `group_by`, así que la acción responde a `DataQuery::group`
+de la misma forma. Las cuadrículas de árbol y las virtuales no agrupan.
+
+`summary(label, |t| ...)` añade un valor propio bajo una columna, en el pie y en cada fila de
+grupo. Se calcula en el servidor a partir de `Totals`, los totales que declara la cuadrícula
+(`t.get(field, Aggregate::Sum)`), así que nunca necesita las filas: un margen a partir de dos
+sumas, una media a partir de una suma y un recuento. `None` lo deja vacío. Los enteros se agrupan
+y el dinero y los decimales se formatean en el idioma del usuario.
+
 ## Datos en árbol
 
 `tree(Model::parent)` muestra las filas como un árbol mediante una clave padre opcional: las filas sin padre en

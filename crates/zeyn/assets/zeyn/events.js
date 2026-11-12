@@ -19,6 +19,7 @@ document.addEventListener('click', (e) => {
   if ((el = t.closest('[data-zeyn-branch-more]'))) return G?.moreBranch(el);
   if ((el = t.closest('[data-zeyn-bulk-run]'))) return G?.runBulk(el);
   if ((el = t.closest('[data-zeyn-grid-add]'))) return G?.addRow(el);
+  if ((el = t.closest('[data-zeyn-ungroup]'))) return G?.ungroup(el);
   if ((el = t.closest('[data-zeyn-batch-save]'))) return G?.saveBatch(el);
   if ((el = t.closest('[data-zeyn-batch-discard]'))) return G?.discardBatch(el);
   if ((el = t.closest('.z-menu-item'))) return runMenuItem(el);

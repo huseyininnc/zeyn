@@ -95,7 +95,7 @@ function saveView(grid, reset = false) {
   s.viewTimer = setTimeout(() => {
     const view = reset
       ? null
-      : { columns: s.columns ?? [], sort: s.sort, filters: filterList(s), shape: grid.dataset.zeynShape };
+      : { columns: s.columns ?? [], sort: s.sort, filters: filterList(s), shape: grid.dataset.zeynShape, group_by: s.groups };
     if (grid.dataset.zeynViews === 'server') {
       post(BASE + '/_zeyn/grid/view', { ...address(grid), view }, { quiet: true });
       return;
@@ -118,6 +118,53 @@ function setColumns(grid, columns) {
   loadGrid(grid, 'layout');
 }
 
+/**
+ * Groups the rows by `fields` (at most three, outermost first), saves the view and reloads the
+ * grid so the server renders the groups. An empty list puts back the grid's own grouping.
+ */
+function setGroups(grid, fields) {
+  const s = grids.get(grid);
+  if (!s) return;
+  s.groups = [...new Set(fields)].slice(0, 3);
+  s.allMatching = false;
+  groupChips(grid);
+  saveView(grid);
+  loadGrid(grid, 'layout');
+}
+
+/**
+ * Shows the user's groups in the group panel above the grid as buttons that remove them, and
+ * marks the table a treegrid while it groups.
+ */
+function groupChips(grid) {
+  const s = grids.get(grid);
+  const panel = toolsOf(grid)?.querySelector('[data-zeyn-group-panel]');
+  if (!s || !panel) return;
+  const labels = new Map(columnsOf(grid).map((c) => [c.field, c.label]));
+  const chips = s.groups.map((field) => {
+    const label = labels.get(field) ?? field;
+    const chip = make('button', 'z-button z-group-chip', { type: 'button', 'aria-label': fill(panel.dataset.textRemove || 'Stop grouping by {label}', { label }) });
+    chip.dataset.zeynUngroup = field;
+    chip.textContent = label;
+    return chip;
+  });
+  panel.querySelector('.z-group-hint').hidden = chips.length > 0;
+  panel.querySelectorAll('.z-group-chip').forEach((c) => c.remove());
+  panel.append(...chips);
+  grid.querySelector(':scope > table')?.setAttribute('role', s.groups.length ? 'treegrid' : s.role || 'grid');
+}
+
+/** Stops grouping by the column of a chip in the group panel and moves focus to a neighbour. */
+function ungroup(chip) {
+  const grid = gridOfTools(chip);
+  const s = grid && grids.get(grid);
+  if (!s) return;
+  const panel = chip.parentElement;
+  const near = (chip.nextElementSibling ?? chip.previousElementSibling)?.dataset.zeynUngroup;
+  setGroups(grid, s.groups.filter((f) => f !== chip.dataset.zeynUngroup));
+  ((near && panel.querySelector(`[data-zeyn-ungroup="${CSS.escape(near)}"]`)) || grid).focus();
+}
+
 /** Puts back the grid's own layout, sort and filters and forgets the saved view. */
 function resetView(grid) {
   const s = grids.get(grid);
@@ -125,6 +172,8 @@ function resetView(grid) {
   s.columns = null;
   s.sort = defaultSort(grid);
   s.filters = {};
+  s.groups = [];
+  groupChips(grid);
   saveView(grid, true);
   loadGrid(grid, 'layout');
 }
@@ -349,13 +398,22 @@ function startColumnDrag(e, th) {
     onStart: (ev) => {
       const rtl = getComputedStyle(grid).direction === 'rtl';
       const group = [...th.parentElement.cells].filter((h) => h.dataset.field && (h.dataset.pin || '') === (th.dataset.pin || ''));
+      const panel = th.dataset.group ? toolsOf(grid)?.querySelector('[data-zeyn-group-panel]') : null;
       let target = null;
       let after = false;
+      let onPanel = false;
       const mark = (on) => target?.classList.toggle(after ? 'z-col-drop-end' : 'z-col-drop-start', on);
       th.classList.add('z-col-dragging');
       document.documentElement.classList.add('z-col-moving');
       const move = (m) => {
         mark(false);
+        const p = panel?.getBoundingClientRect();
+        onPanel = !!p && m.clientX >= p.left && m.clientX <= p.right && m.clientY >= p.top && m.clientY <= p.bottom;
+        panel?.classList.toggle('z-drop', onPanel);
+        if (onPanel) {
+          target = null;
+          return;
+        }
         target = group.find((h) => {
           const r = h.getBoundingClientRect();
           return m.clientX >= r.left && m.clientX <= r.right;
@@ -373,6 +431,8 @@ function startColumnDrag(e, th) {
         th.classList.remove('z-col-dragging');
         document.documentElement.classList.remove('z-col-moving');
         if (!cancelled) D.swallowClick();
+        panel?.classList.remove('z-drop');
+        if (onPanel && !cancelled) return setGroups(grid, [...grids.get(grid).groups.filter((f) => f !== th.dataset.field), th.dataset.field]);
         if (!target || cancelled) return;
         const shown = shownColumns(grid);
         const [col] = shown.splice(shown.findIndex((c) => c.field === th.dataset.field), 1);
@@ -452,8 +512,14 @@ function columnMenu(grid, th) {
     { label: t.menu_sort_clear || 'Clear sort', disabled: !key, run: sortBy(null) },
     { separator: true },
   ];
+  const grouped = s.groups.includes(field);
+  const grouping = th.dataset.group ? [
+    { label: grouped ? t.ungroup || 'Ungroup' : t.group_by || 'Group by this column', run: () => setGroups(grid, grouped ? s.groups.filter((f) => f !== field) : [...s.groups, field]) },
+    { separator: true },
+  ] : [];
   return [
     ...sorting,
+    ...grouping,
     { label: t.menu_pin_start || 'Pin to start', checked: th.dataset.pin === 'start', radio: true, run: pin('start') },
     { label: t.menu_pin_end || 'Pin to end', checked: th.dataset.pin === 'end', radio: true, run: pin('end') },
     { label: t.menu_unpin || 'Unpin', disabled: !th.dataset.pin, run: pin(null) },

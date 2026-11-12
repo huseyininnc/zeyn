@@ -478,11 +478,12 @@ impl AppState {
             via_agent: ctx.via_agent(),
         };
         let query = call.query;
+        let view = call.view.map(|v| grid.clean_view(v));
         self.intercept(ctx, &info, move || async move {
             let mut page = self
-                .timed(grid.fetch_at(ctx.clone(), query, call.path))
+                .timed(grid.fetch_at(ctx.clone(), query, call.path, view.as_ref()))
                 .await?;
-            page.view = call.view.map(|v| grid.clean_view(v));
+            page.view = view;
             let r = user_render(entry.meta.name, ctx);
             let shape = call
                 .shape

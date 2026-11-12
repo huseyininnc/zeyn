@@ -81,6 +81,7 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 - `.row_style(|row| Option<RowStyle>)`：危险、警告或成功样式的行。
 - `.add_with(create)`、`.delete_with(action, M::id)`、`.batch_edit()`:"添加行"按钮、删除按钮和
   按键,以及一起保存的编辑。参见 [DataGrid 参考](grid.md)。
+- 列上的 `.groupable()`、`.summary(label, |t| ...)`:用户可从列菜单或分组面板按该列分组,列下方显示由合计计算出的值。
 - `.exportable()`：将筛选后的行导出为 CSV，由服务器以流方式输出。
 
 ## 运行时才确定的列

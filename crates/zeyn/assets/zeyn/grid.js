@@ -38,6 +38,7 @@ function initGrid(grid) {
     count: rows(grid).length,
     sort: sorted.length ? sorted.map((th) => ({ field: th.dataset.field, desc: th.getAttribute('aria-sort') === 'descending' })) : defaultSort(grid),
     filters: {},
+    groups: [],
     q: '',
     texts: textsOf(grid),
     columns: null,
@@ -61,9 +62,12 @@ function initGrid(grid) {
       state.filters[field] = rest;
     }
     if (saved.view.columns?.length) state.columns = saved.view.columns;
+    if (Array.isArray(saved.view.group_by)) state.groups = saved.view.group_by;
   }
+  state.role = grid.querySelector(':scope > table')?.getAttribute('role');
   setupHead(grid, state);
   initColumns(grid, state);
+  groupChips(grid);
   if (saved.local) queueMicrotask(() => loadGrid(grid, 'layout'));
   new ResizeObserver(() => {
     const width = grid.clientWidth;
@@ -127,7 +131,7 @@ async function loadGrid(grid, kind) {
     {
       ...address(grid),
       query: { page, sort: s.sort, filters, q: s.q, with_total: !infinite, aggregates: totals ? aggregatesOf(grid, layout) : [] },
-      view: s.columns ? { columns: s.columns, shape: grid.dataset.zeynShape } : null,
+      view: viewOf(grid, s),
       head: layout,
       shape: grid.dataset.zeynShape,
     },
@@ -162,6 +166,15 @@ async function loadGrid(grid, kind) {
   roving(grid, hadFocus);
   updateChrome(grid, append || s.searched);
   s.searched = false;
+}
+
+/**
+ * The user's layout and groups as the server reads them (`DataGridView`), or `null` when the
+ * grid shows its own.
+ */
+function viewOf(grid, s) {
+  if (!s.columns && !s.groups.length) return null;
+  return { columns: s.columns ?? [], shape: grid.dataset.zeynShape, group_by: s.groups };
 }
 
 /**
@@ -527,7 +540,7 @@ async function fetchBlock(grid, s, b) {
     {
       ...address(grid),
       query: { page, sort: s.sort, filters, q: s.q, with_total: withTotal, aggregates: withTotal ? aggregatesOf(grid, head) : [] },
-      view: s.columns ? { columns: s.columns, shape: grid.dataset.zeynShape } : null,
+      view: viewOf(grid, s),
       head,
       shape: grid.dataset.zeynShape,
     },

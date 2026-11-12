@@ -219,6 +219,34 @@ DataGrid::of(search_today)
 
 데이터 계층은 `DataQuery::group`에 응답합니다. 이것이 설정되면 `Page::groups`(그룹별 값, 개수, 쿼리가 요청한 합계)를 반환하며, 그 필드의 정렬 키 방향으로 값 기준으로 정렬하고, 행처럼 페이징하며, `total`은 그룹을 셉니다. `DataQuery::apply`는 메모리 데이터에 대해 이를 처리하고, SQL은 `GROUP BY`를 사용합니다. `group`은 그리드가 설정하며 클라이언트에서 읽지 않습니다. 클라이언트는 자신이 여는 그룹 값의 경로만 보내고, 서버는 그 길이를 검사하여 각 값을 사용자의 필터 앞에 오는 해당 그룹 열의 필터로 바꿉니다(빈 그룹은 `blank`).
 
+## 사용자의 그룹화와 직접 만든 요약
+
+```rust
+DataGrid::of(search_orders)
+    .column(Order::city).groupable()
+    .column(Order::status).groupable()
+    .column(Order::profit).sum()
+    .column(Order::revenue).sum()
+        .summary(t!("orders.margin"), |t| {
+            let profit = t.get(Order::profit, Aggregate::Sum)?;
+            let revenue = t.get(Order::revenue, Aggregate::Sum)?;
+            margin(profit, revenue)
+        })
+```
+
+`groupable()`을 붙인 열로 사용자가 행을 그룹화할 수 있습니다. 열 메뉴의 "이 열로 그룹화"를
+쓰거나 헤더를 그리드 위의 그룹 패널로 끌어 놓으면 됩니다. 패널은 단계마다 그 단계를 지우는 버튼을
+보여 주며, 단계는 최대 세 개입니다(`MAX_USER_GROUPS`). 그룹은 사용자의 뷰
+(`DataGridView::group_by`)에 담겨 함께 저장되고, 설정되어 있는 동안 그리드 자체의 `group_by`를
+대신합니다. 서버는 그룹화할 수 있는 열만 받고 마스킹된 열은 절대 받지 않으며, `group_by`와 똑같이
+그룹화하므로 액션은 `DataQuery::group`에 같은 방식으로 답합니다. 트리 그리드와 가상 그리드는
+그룹화하지 않습니다.
+
+`summary(label, |t| ...)`는 열 아래의 바닥글과 모든 그룹 행에 직접 만든 값을 더합니다. 값은 서버에서
+`Totals`, 곧 그리드가 선언한 합계(`t.get(field, Aggregate::Sum)`)로 계산되므로 행이 필요하지
+않습니다. 두 합계로 마진을, 합계와 개수로 평균을 낼 수 있습니다. `None`이면 비워 둡니다. 정수는
+자릿수 구분되고 금액과 소수는 사용자의 언어로 표시됩니다.
+
 ## 트리 데이터
 
 `tree(Model::parent)`는 선택적 부모 키로 행을 트리로 보여 줍니다. 부모가 없는 행이 맨 위에 오고, 행의 자식은 그 행이 열릴 때 한 번에 한 페이지씩 최대 32단계까지 불러옵니다.
