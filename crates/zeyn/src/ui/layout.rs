@@ -541,3 +541,59 @@ impl Component for Split {
         &self.nodes
     }
 }
+
+/// A part of a screen that loads after the screen shows: the page carries a placeholder, and the
+/// browser asks for the part by its node path right away, so one slow block (a report, a chart
+/// over a large table) never delays the rest. Grids, forms and actions inside work as anywhere
+/// else; the part goes through the same access checks as the screen.
+///
+/// ```
+/// use zeyn::prelude::*;
+/// use zeyn::ui::Deferred;
+/// let part = Deferred::new(Alert::info("Sales this year")).lines(4);
+/// ```
+pub struct Deferred {
+    node: Vec<Node>,
+    lines: u8,
+}
+
+into_node!(Deferred);
+
+impl Deferred {
+    pub fn new(node: impl Into<Node>) -> Self {
+        Deferred {
+            node: vec![node.into()],
+            lines: 3,
+        }
+    }
+
+    /// How many placeholder lines show while the part loads, 1 to 20 (3 unless set).
+    pub fn lines(mut self, lines: u8) -> Self {
+        self.lines = lines.clamp(1, 20);
+        self
+    }
+}
+
+impl Component for Deferred {
+    fn render(&self, out: &mut String, r: &Render) {
+        let path = if r.path.is_empty() {
+            "0".to_string()
+        } else {
+            format!("{}.0", r.path)
+        };
+        out.push_str(&format!(
+            r#"<div class="z-deferred" data-zeyn-defer="{path}" aria-busy="true" data-zeyn-failed="{}">"#,
+            r.text(&Text::key("zeyn.ui.load_failed"))
+        ));
+        super::Skeleton::lines(self.lines).render(out, r);
+        out.push_str("</div>");
+    }
+
+    fn schema(&self) -> Json {
+        json!({ "type": "deferred", "node": self.node.first().map(Node::schema) })
+    }
+
+    fn children(&self) -> &[Node] {
+        &self.node
+    }
+}
