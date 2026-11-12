@@ -908,6 +908,8 @@ dialog.z-dialog::backdrop { background: var(--z-backdrop); }
   gap: calc(var(--z-space) * 2);
 }
 
+.z-button[hidden] { display: none; }
+
 .z-button {
   display: inline-flex;
   align-items: center;
@@ -1485,14 +1487,14 @@ th[aria-sort="descending"] .z-sort::after {
 .z-tone-danger { --z-tone: var(--z-danger); }
 .z-tone-brand { --z-tone: var(--z-accent); }
 
-.z-progress {
+.z-cell-progress {
   display: inline-flex;
   align-items: center;
   gap: calc(var(--z-space) * 2);
   width: 100%;
 }
 
-.z-progress-track {
+.z-cell-progress-track {
   flex: 1 1 auto;
   height: 6px;
   min-width: 32px;
@@ -1501,7 +1503,7 @@ th[aria-sort="descending"] .z-sort::after {
   overflow: hidden;
 }
 
-.z-progress-bar {
+.z-cell-progress-bar {
   display: block;
   width: var(--z-pct, 0%);
   height: 100%;
@@ -1509,7 +1511,7 @@ th[aria-sort="descending"] .z-sort::after {
   background: var(--z-accent);
 }
 
-.z-progress-text { flex: none; min-width: 3ch; text-align: end; }
+.z-cell-progress-text { flex: none; min-width: 3ch; text-align: end; }
 
 .z-bool {
   display: inline-block;

@@ -191,7 +191,7 @@ impl<E: Model, T> DataGridColumn<E, T> {
             };
             let pct = if max > 0 { (amount / max as f64 * 100.0).clamp(0.0, 100.0) } else { 0.0 };
             format!(
-                r#"<span class="z-progress"><span class="z-progress-track" aria-hidden="true"><span class="z-progress-bar" style="--z-pct:{pct:.1}%"></span></span><span class="z-progress-text">{}</span></span>"#,
+                r#"<span class="z-cell-progress"><span class="z-cell-progress-track" aria-hidden="true"><span class="z-cell-progress-bar" style="--z-pct:{pct:.1}%"></span></span><span class="z-cell-progress-text">{}</span></span>"#,
                 r.value(&value, &kind)
             )
         })

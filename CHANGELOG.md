@@ -25,6 +25,7 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 
 ### Fixed
 
+- A button with the `hidden` attribute is hidden: `.z-button` set `display`, so a card grid's "Load more" showed even when there were no more rows. Progress cells in grids have classes of their own (`z-cell-progress`), so a page that also loads the `Progress` widget no longer stacks the bar and the number in a narrow cell.
 - `accounts::create_tables` for Oracle uses a sequence and a trigger for claim ids instead of identity columns, so the account tables are created on Oracle 11g too.
 - Signing out answers with `Clear-Site-Data: "storage"`, and pages carry a per user storage key (`<meta name="zeyn-storage">`, a keyed hash, never the user id) that form drafts, local grid views and palette recents are filed under, so the next user of a shared browser no longer sees them.
 - HEAD requests to exports, PDFs and sitemaps count toward the write rate limit, like GET.
