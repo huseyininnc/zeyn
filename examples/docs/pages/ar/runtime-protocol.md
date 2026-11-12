@@ -57,6 +57,7 @@
 | `codeedit.js`, `codeedit.css` | محررات الشيفرة (`data-zeyn-code`): النسخة الملوّنة وأرقام الأسطر والاقتراحات وعلامات الأخطاء؛ لا يرسل إلى `/_zeyn/data` إلا بعد توقف في الكتابة |
 | `range.js` و`quantity.js` و`gallery.js` و`countdown.js` و`commerce.css` | منزلقات النطاق ومحددات الكمية ومعارض صور المنتجات والعدادات التنازلية؛ وورقة أنماط كل مكونات المتجر (الأسعار ومنتقيات الخيارات ولوحات الأوجه وملخصات التقييمات) |
 | `imgcompare.js` | مقارنة الصور (`ImageCompare`): يظهر المنزلق ويكتب قيمته في `--z-imgcompare` |
+| `tour.js` | جولات الصفحة (`Tour`): يظهر زر البدء وينقل مربع حوار بين محطات الصفحة |
 | `thread.js` و`thread.css`, `stream.js`, `composer.js` و`composer.css`, `typing.js` و`typing.css` | سلاسل الرسائل؛ Markdown وأسطر JSON المتدفقة التي تتشاركها السلاسل والمساعد؛ مربعات كتابة الدردشة؛ مؤشرات الكتابة |
 | `feed.js`, `lightbox.js` and their stylesheets, `stories.css` | خلاصات المنشورات؛ عارض الصور والفيديو؛ حلقات القصص وصفوفها، دون سكربت |
 

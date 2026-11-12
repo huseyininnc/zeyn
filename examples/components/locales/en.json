@@ -69,6 +69,7 @@
       "gantt": "Tasks as bars over a span of days.",
       "org_chart": "A hierarchy as boxes joined by lines.",
       "comparison_table": "Plans side by side with a row for each feature.",
+      "tour": "A guided tour of the page.",
       "image_compare": "Two pictures under a slider.",
       "table": "A small table of text the screen already holds.",
       "indicator": "A count or a dot on the corner of another component.",
@@ -219,6 +220,9 @@
         "overview": "Example"
       },
       "comparison_table": {
+        "overview": "Example"
+      },
+      "tour": {
         "overview": "Example"
       },
       "image_compare": {

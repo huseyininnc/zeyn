@@ -211,6 +211,19 @@ ImageCompare::new(t!("repair.before_after"))
     .size(1200, 800)
 ```
 
+## Tour
+
+ページを順に案内するツアーです。`Tour::new(label)` はツアーを始めるボタンで、`TourStop::on(node).title(text).body(text)` はツアーが止まるコンポーネントを示します。ストップは自分のコンポーネントをそのまま描画します。ツアーは表示されているストップをページの順に最大 30 個まで、「戻る」「次へ」「閉じる」のある小さなダイアログで回ります。Escape で閉じ、フォーカスはボタンに戻ります。ツアーのあるページだけが読み込む小さなスクリプトがボタンを表示するので、スクリプトがなければページはそのまま読めます。
+
+```rust
+Tour::new(t!("orders.tour"))
+TourStop::on(orders_grid)
+    .title(t!("orders.tour.grid"))
+    .body(t!("orders.tour.grid_text"))
+```
+
+@live tour
+
 ## ExternalLink
 
 `ExternalLink::new(url, text)` は、`rel="noopener noreferrer"` 付きで別のサイトへリンクするため、相手のサイトにはページのアドレスもウィンドウへの参照も渡りません。スクリーンリーダーはテキストの後に「external site」と読み上げ、視覚的には矢印で示されます。

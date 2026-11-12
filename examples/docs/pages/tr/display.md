@@ -211,6 +211,19 @@ ImageCompare::new(t!("repair.before_after"))
     .size(1200, 800)
 ```
 
+## Tour
+
+Bir sayfanın adım adım tanıtımı. `Tour::new(label)` turu başlatan düğmedir; `TourStop::on(node).title(text).body(text)` turun durduğu bir bileşeni işaretler ve bileşenini değiştirmeden çizer. Tur, görünür durakları sayfadaki sırayla, en fazla 30 tane, Geri, İleri ve Kapat düğmeleri olan küçük bir iletişim kutusunda gezer; Escape turu kapatır ve odak düğmeye döner. Yalnızca tur bulunan sayfalarda yüklenen küçük bir betik düğmeyi gösterir; betik yoksa sayfa olduğu gibi okunur.
+
+```rust
+Tour::new(t!("orders.tour"))
+TourStop::on(orders_grid)
+    .title(t!("orders.tour.grid"))
+    .body(t!("orders.tour.grid_text"))
+```
+
+@live tour
+
 ## ExternalLink
 
 `ExternalLink::new(url, text)` başka bir siteye `rel="noopener noreferrer"` ile bağlanır; böylece diğer site ne sayfa adresini ne de pencere üzerinde bir tutamaç alır. Ekran okuyucular metinden sonra "external site" (harici site) der; görsel olarak bir ok bunu işaretler.

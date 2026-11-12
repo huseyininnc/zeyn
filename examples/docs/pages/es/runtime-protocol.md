@@ -57,6 +57,7 @@ Una página carga y ejecuta solo el código de navegador que usa su pantalla. To
 | `codeedit.js`, `codeedit.css` | editores de código (`data-zeyn-code`): la copia resaltada, los números de línea, las sugerencias y las marcas de error; solo envía a `/_zeyn/data` tras una pausa al escribir |
 | `range.js`, `quantity.js`, `gallery.js`, `countdown.js` y `commerce.css` | controles de rango, selectores de cantidad, galerías de producto y cuentas atrás; la hoja de estilos de todos los componentes de tienda (precios, selectores de variantes, paneles de facetas, resúmenes de reseñas) |
 | `imgcompare.js` | comparaciones de imágenes (`ImageCompare`): muestra el control deslizante y escribe su valor en `--z-imgcompare` |
+| `tour.js` | visitas guiadas (`Tour`): muestra el botón de inicio y lleva un diálogo por las paradas de la página |
 | `thread.js` y `thread.css`, `stream.js`, `composer.js` y `composer.css`, `typing.js` y `typing.css` | hilos de mensajes; el Markdown y las líneas JSON en streaming que comparten los hilos y el asistente; composers de chat; indicadores de escritura |
 | `feed.js`, `lightbox.js` and their stylesheets, `stories.css` | feeds de publicaciones; el lightbox de imágenes y videos; anillos de historias y sus filas, sin script |
 

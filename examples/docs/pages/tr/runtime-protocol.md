@@ -57,6 +57,7 @@ Bir sayfa yalnızca ekranının kullandığı tarayıcı kodunu yükler ve çal�
 | `codeedit.js`, `codeedit.css` | kod düzenleyiciler (`data-zeyn-code`): renklendirilmiş kopya, satır numaraları, öneriler ve hata işaretleri; `/_zeyn/data` adresine yalnızca yazmada bir duraksamadan sonra istek gönderir |
 | `range.js`, `quantity.js`, `gallery.js`, `countdown.js` ve `commerce.css` | aralık kaydırıcıları, adet seçiciler, ürün galerileri ve geri sayımlar; tüm mağaza bileşenlerinin stil dosyası (fiyatlar, varyant seçiciler, facet panelleri, değerlendirme özetleri) |
 | `imgcompare.js` | resim karşılaştırmaları (`ImageCompare`): sürgüyü gösterir ve değerini `--z-imgcompare` değişkenine yazar |
+| `tour.js` | sayfa turları (`Tour`): başlat düğmesini gösterir ve bir iletişim kutusunu sayfadaki duraklarda gezdirir |
 | `thread.js` ve `thread.css`, `stream.js`, `composer.js` ve `composer.css`, `typing.js` ve `typing.css` | mesaj thread'leri; thread'ler ile asistanın paylaştığı akan Markdown ve JSON satırları; sohbet composer'ları; yazıyor göstergeleri |
 | `feed.js`, `lightbox.js` and their stylesheets, `stories.css` | gönderi akışları; resim ve videoların lightbox'ı; hikâye halkaları ve sıraları, betik gerektirmez |
 

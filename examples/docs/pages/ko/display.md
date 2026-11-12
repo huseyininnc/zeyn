@@ -211,6 +211,19 @@ ImageCompare::new(t!("repair.before_after"))
     .size(1200, 800)
 ```
 
+## Tour
+
+페이지를 차례로 안내하는 둘러보기입니다. `Tour::new(label)`은 둘러보기를 시작하는 버튼이고, `TourStop::on(node).title(text).body(text)`는 둘러보기가 멈추는 컴포넌트를 표시합니다. 정류장은 자기 컴포넌트를 그대로 그립니다. 둘러보기는 보이는 정류장을 페이지 순서대로 최대 30개까지, 뒤로, 다음, 닫기가 있는 작은 대화 상자로 방문합니다. Escape가 대화 상자를 닫고 포커스는 버튼으로 돌아갑니다. 둘러보기가 있는 페이지에서만 불러오는 작은 스크립트가 버튼을 보여 주므로, 스크립트가 없으면 페이지는 그대로 읽힙니다.
+
+```rust
+Tour::new(t!("orders.tour"))
+TourStop::on(orders_grid)
+    .title(t!("orders.tour.grid"))
+    .body(t!("orders.tour.grid_text"))
+```
+
+@live tour
+
 ## ExternalLink
 
 `ExternalLink::new(url, text)`는 `rel="noopener noreferrer"`로 다른 사이트에 연결하므로, 다른 사이트는 페이지 주소도 창에 대한 핸들도 얻지 못합니다. 스크린 리더는 텍스트 뒤에 "external site"를 읽고, 시각적으로는 화살표가 이를 표시합니다.

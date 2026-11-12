@@ -237,6 +237,7 @@ catalog! {
         progress_ring "/ui/progress-ring";
         meter "/ui/meter";
         indicator "/ui/indicator";
+        tour "/ui/tour";
         skeleton "/ui/skeleton";
         empty_state "/ui/empty-state";
         popover "/ui/popover";

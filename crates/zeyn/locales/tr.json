@@ -572,6 +572,10 @@
         "less": "Az",
         "more": "Çok"
       },
+      "tour": {
+        "close": "Kapat",
+        "finish": "Bitir"
+      },
       "compare": {
         "yes": "Var",
         "no": "Yok"

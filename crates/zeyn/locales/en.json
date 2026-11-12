@@ -572,6 +572,10 @@
         "less": "Less",
         "more": "More"
       },
+      "tour": {
+        "close": "Close",
+        "finish": "Finish"
+      },
       "compare": {
         "yes": "Included",
         "no": "Not included"

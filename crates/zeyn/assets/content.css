@@ -1493,3 +1493,40 @@ span.z-avatar-tone-4 { background: var(--z-danger-subtle); }
   .z-gantt-today { border-color: Highlight; }
   .z-compare .z-compare-featured { outline: 1px solid Highlight; outline-offset: -1px; }
 }
+
+.z-tour { display: inline-block; }
+
+.z-tourstop { border-radius: var(--z-radius); }
+
+.z-tourstop.z-tour-on {
+  outline: 3px solid var(--z-focus);
+  outline-offset: 4px;
+}
+
+dialog.z-tour-card {
+  position: fixed;
+  inset-block-start: var(--z-tour-y, 12px);
+  inset-inline-start: var(--z-tour-x, 12px);
+  width: min(22rem, calc(100vw - 24px));
+  margin: 0;
+  padding: calc(var(--z-space) * 4);
+  border: 1px solid var(--z-border-strong);
+  border-radius: var(--z-radius-lg);
+  background: var(--z-surface);
+  color: var(--z-text);
+  box-shadow: var(--z-shadow-2);
+}
+
+dialog.z-tour-card::backdrop { background: transparent; }
+
+.z-tour-count { margin: 0 0 4px; color: var(--z-text-muted); font-size: 0.75rem; }
+
+.z-tour-title { margin: 0 0 4px; font-size: 1rem; }
+
+.z-tour-body { margin: 0 0 calc(var(--z-space) * 4); }
+
+.z-tour-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: calc(var(--z-space) * 2); }
+
+.z-tour-close { margin-inline-end: auto; }
+
+.z-button[hidden] { display: none; }

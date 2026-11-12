@@ -106,6 +106,7 @@ pub mod toast;
 pub mod toc;
 pub mod toolbox;
 pub mod topics;
+pub mod tour;
 pub mod tree;
 pub mod typing_indicator;
 pub mod variant_picker;

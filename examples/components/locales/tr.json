@@ -69,6 +69,7 @@
       "gantt": "Günlere yayılmış çubuklar olarak görevler.",
       "org_chart": "Çizgilerle bağlı kutulardan bir hiyerarşi.",
       "comparison_table": "Planlar yan yana, her özellik için bir satır.",
+      "tour": "Sayfanın adım adım tanıtımı.",
       "image_compare": "Bir sürgünün altında iki resim.",
       "table": "Ekranın zaten elinde olan metinlerden küçük bir tablo.",
       "indicator": "Başka bir bileşenin köşesinde bir sayı ya da nokta.",
@@ -219,6 +220,9 @@
         "overview": "Örnek"
       },
       "comparison_table": {
+        "overview": "Örnek"
+      },
+      "tour": {
         "overview": "Örnek"
       },
       "image_compare": {

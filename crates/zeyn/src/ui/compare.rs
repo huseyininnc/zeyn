@@ -181,7 +181,7 @@ impl Component for ComparisonTable {
 
 /// Two pictures of the same size on top of one another with a slider that uncovers one over the
 /// other, such as before and after. The pictures follow the [`super::Image`] rules; one that is
-/// not allowed is left out. The `compare.js` module shows the slider, so without script the
+/// not allowed is left out. The `imgcompare.js` module shows the slider, so without script the
 /// pictures show half and half.
 ///
 /// ```

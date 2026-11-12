@@ -635,6 +635,20 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
                 .today(today)
                 .into()
         }
+        "tour" => Stack::new()
+            .gap(4)
+            .add(Tour::new("Show me around"))
+            .add(
+                TourStop::on(Kpi::new("Orders", 1_284.0).delta(3.1))
+                    .title("Orders")
+                    .body("How many orders came in this month."),
+            )
+            .add(
+                TourStop::on(Badge::new("Draft"))
+                    .title("Status")
+                    .body("An order stays a draft until it is sent."),
+            )
+            .into(),
         "visuals" => Stack::new()
             .gap(5)
             .add(OrgChart::new(
@@ -911,6 +925,7 @@ pub const EXAMPLES: &[&str] = &[
     "heatmap",
     "gantt",
     "visuals",
+    "tour",
     "table",
     "meters",
     "marks",

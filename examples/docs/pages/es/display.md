@@ -211,6 +211,19 @@ ImageCompare::new(t!("repair.before_after"))
     .size(1200, 800)
 ```
 
+## Tour
+
+Una visita guiada de una página. `Tour::new(label)` es el botón que la inicia, y `TourStop::on(node).title(text).body(text)` marca un componente en el que la visita se detiene; una parada dibuja su componente sin cambios. La visita recorre las paradas visibles en el orden de la página, 30 como máximo, en un diálogo pequeño con Atrás, Siguiente y Cerrar; Escape lo cierra y el foco vuelve al botón. Un script pequeño, cargado solo en las páginas que tienen una visita, muestra el botón, así que sin script la página se lee tal como es.
+
+```rust
+Tour::new(t!("orders.tour"))
+TourStop::on(orders_grid)
+    .title(t!("orders.tour.grid"))
+    .body(t!("orders.tour.grid_text"))
+```
+
+@live tour
+
 ## ExternalLink
 
 `ExternalLink::new(url, text)` enlaza con otro sitio con `rel="noopener noreferrer"`, de modo que el otro sitio no recibe ni la dirección de la página ni un control sobre la ventana. Los lectores de pantalla oyen "external site" tras el texto; una flecha lo marca visualmente.

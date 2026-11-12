@@ -211,6 +211,19 @@ ImageCompare::new(t!("repair.before_after"))
     .size(1200, 800)
 ```
 
+## Tour
+
+جولة إرشادية في الصفحة. `Tour::new(label)` هو الزر الذي يبدؤها، و`TourStop::on(node).title(text).body(text)` يحدد مكونا تتوقف عنده الجولة؛ المحطة ترسم مكونها دون تغيير. تزور الجولة المحطات الظاهرة بترتيب الصفحة، 30 على الأكثر، في مربع حوار صغير فيه السابق والتالي وإغلاق؛ يغلقه Escape ويعود التركيز إلى الزر. يظهر الزر سكربت صغير يحمل فقط في الصفحات التي فيها جولة، ولذلك تقرأ الصفحة كما هي دون سكربت.
+
+```rust
+Tour::new(t!("orders.tour"))
+TourStop::on(orders_grid)
+    .title(t!("orders.tour.grid"))
+    .body(t!("orders.tour.grid_text"))
+```
+
+@live tour
+
 ## ExternalLink
 
 يربط `ExternalLink::new(url, text)` بموقع آخر مع `rel="noopener noreferrer"`، فلا يحصل الموقع الآخر على عنوان الصفحة ولا على مقبض للنافذة. تسمع قارئات الشاشة "external site" بعد النص؛ ويدل سهم عليه بصرياً.

@@ -211,6 +211,19 @@ ImageCompare::new(t!("repair.before_after"))
     .size(1200, 800)
 ```
 
+## Tour
+
+页面的分步导览。`Tour::new(label)` 是开始导览的按钮，`TourStop::on(node).title(text).body(text)` 标记导览停留的组件；站点原样绘制它的组件。导览按页面顺序访问可见的站点，最多 30 个，使用一个带有“上一步”“下一步”和“关闭”的小对话框；按 Escape 关闭它，焦点回到按钮。只有包含导览的页面才加载的一小段脚本负责显示按钮，因此没有脚本时页面保持原样。
+
+```rust
+Tour::new(t!("orders.tour"))
+TourStop::on(orders_grid)
+    .title(t!("orders.tour.grid"))
+    .body(t!("orders.tour.grid_text"))
+```
+
+@live tour
+
 ## ExternalLink
 
 `ExternalLink::new(url, text)` 以 `rel="noopener noreferrer"` 链接到其他站点，因此对方站点既得不到页面地址，也无法获得窗口的句柄。屏幕阅读器会在文字之后读出“外部站点”；视觉上用箭头标记。

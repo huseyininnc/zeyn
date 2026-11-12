@@ -1313,3 +1313,41 @@ fn gantts_are_tables_with_dates_as_text_and_bars_cut_at_the_span() {
     let back = zeyn::ui::Gantt::new("Back", day(9), day(2));
     assert_eq!(back.schema()["end"], "2026-11-09");
 }
+
+#[test]
+fn tours_render_a_hidden_button_and_stops_keep_their_component() {
+    use zeyn::ui::{Tour, TourStop};
+    let out = html(&Tour::new("Show <me> around"), "en");
+    assert!(
+        out.starts_with(
+            r#"<div class="z-tour" data-zeyn-tour><button type="button" class="z-button z-tour-start" data-testid="s.tour" hidden>Show &lt;me&gt; around</button><dialog class="z-tour-card""#
+        ),
+        "{out}"
+    );
+    assert!(
+        out.contains(r#"data-progress="Step {n} of {total}""#),
+        "{out}"
+    );
+    assert!(
+        out.contains(r#"data-next="Next" data-finish="Finish""#),
+        "{out}"
+    );
+    let tr = html(&Tour::new("Tur"), "tr");
+    assert!(
+        tr.contains(r#"data-finish="Bitir""#) && tr.contains(">Kapat</button>"),
+        "{tr}"
+    );
+
+    let stop = TourStop::on(Badge::new("Draft"))
+        .title("Status <s>")
+        .body("A \"draft\" is not sent.");
+    let out = html(&stop, "en");
+    assert!(
+        out.starts_with(
+            r#"<div class="z-tourstop" data-tour-title="Status &lt;s&gt;" data-tour-body="A &quot;draft&quot; is not sent.">"#
+        ),
+        "{out}"
+    );
+    assert!(out.contains("Draft") && out.ends_with("</div>"));
+    assert_eq!(stop.children().len(), 1);
+}
