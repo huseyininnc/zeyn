@@ -31,6 +31,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 pub(crate) mod accounts;
 mod agent;
 mod auth;
+mod checks;
 #[cfg(feature = "assistant")]
 use agent::{Tool, ToolTarget};
 mod charts;
@@ -62,6 +63,7 @@ mod pdf;
 #[cfg(feature = "xlsx")]
 mod xlsx;
 
+pub use checks::render_checks;
 pub use ops::{READY_CACHE, build_id, probe};
 
 /// Sent on sign out with the value `"storage"`: the browser drops what the runtime kept for the
@@ -3877,6 +3879,7 @@ async fn page(
             }
         }
         Ok((title, html, head)) => {
+            checks::log(name, &html);
             let menu = st.dynamic_menu(&ctx, Some(name)).await;
             let mut page = st.shell_menu(&ctx, &csrf, &title, &html, Some(name), &menu);
             if !head.is_empty() {
