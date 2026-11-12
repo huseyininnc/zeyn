@@ -78,6 +78,7 @@
       "operations": "運用",
       "assistant": "AI アシスタント",
       "islands": "WASM Islands",
+      "socket": "ZeynSocket",
       "realtime": "リアルタイムと CRDT",
       "desktop": "デスクトップアプリ",
       "protocol": "ランタイムプロトコル",

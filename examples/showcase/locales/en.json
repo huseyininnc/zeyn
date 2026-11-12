@@ -20,10 +20,8 @@
     "assistant": "Assistant",
     "islands": "Islands",
     "uploads": "Files",
-    "charts": "Charts"
-,
-    "inputs": "Inputs"
-,
+    "charts": "Charts",
+    "inputs": "Inputs",
     "shortcuts": "Shortcuts",
     "shortcut_product": "Product NW-0001",
     "shortcut_cities": "Orders by city"
@@ -33,7 +31,7 @@
     "not_found_text": "This address leads nowhere. It may have moved, or the record was removed.",
     "server": "Something went wrong",
     "server_text": "The server could not finish this request. Please try again in a moment."
-},
+  },
   "about": {
     "title": "About Northwind",
     "description": "Northwind Operations: stock, orders and people of a small trading company in one Zeyn app.",
@@ -51,13 +49,27 @@
     "open_shop": "Open the shop"
   },
   "shop": {
-    "menu": { "home": "Home", "help": "Help" },
+    "menu": {
+      "home": "Home",
+      "help": "Help"
+    },
     "new": "New",
     "new_arrivals": "New arrivals",
     "products": "Products",
-    "search": { "label": "Search products", "all": "Search", "title": "Results for “{q}”" },
-    "sort": { "newest": "Newest", "name": "Name", "cheapest": "Lowest price", "dearest": "Highest price" },
-    "product": { "text": "Code {code}, {price}." },
+    "search": {
+      "label": "Search products",
+      "all": "Search",
+      "title": "Results for “{q}”"
+    },
+    "sort": {
+      "newest": "Newest",
+      "name": "Name",
+      "cheapest": "Lowest price",
+      "dearest": "Highest price"
+    },
+    "product": {
+      "text": "Code {code}, {price}."
+    },
     "home": {
       "title": "Northwind Market",
       "lead": "Fresh from the warehouse",
@@ -66,10 +78,23 @@
       "panel_text": "Staff screens open in the app shell with the side menu. Switching shells does not reload the page.",
       "open_panel": "Open the overview"
     },
-    "delivery": { "title": "Delivery", "text": "Orders placed before 14:00 leave the warehouse the same day." },
-    "returns": { "title": "Returns", "text": "Unopened goods can be returned within 14 days." },
-    "about": { "title": "About us", "text": "Northwind is a sample company. Its shop shows the site shell of Zeyn." },
-    "footer": { "company": "Company", "panel": "Staff overview", "note": "Northwind Market is a demo built with Zeyn." }
+    "delivery": {
+      "title": "Delivery",
+      "text": "Orders placed before 14:00 leave the warehouse the same day."
+    },
+    "returns": {
+      "title": "Returns",
+      "text": "Unopened goods can be returned within 14 days."
+    },
+    "about": {
+      "title": "About us",
+      "text": "Northwind is a sample company. Its shop shows the site shell of Zeyn."
+    },
+    "footer": {
+      "company": "Company",
+      "panel": "Staff overview",
+      "note": "Northwind Market is a demo built with Zeyn."
+    }
   },
   "stock": {
     "product_title": "Product {code}",
@@ -496,7 +521,7 @@
     "name": "Name",
     "sales": "Sales",
     "weeks": "Last 12 weeks"
-},
+  },
   "inputs": {
     "fields": "Numbers, masks and passwords",
     "panel_terms": "Supplier terms",
@@ -572,5 +597,17 @@
   "ShipmentNote": {
     "reference": "Reference",
     "instructions": "Instructions"
+  },
+  "live": {
+    "title": "Live updates",
+    "intro": "Everything here arrives over the page socket. Nothing polls: the server pushes an event to you, and the parts of the screen that listen for it react.",
+    "notice": "A notice for you",
+    "notice_help": "The server sends an event to every page you have open. This panel shows a toast when it arrives.",
+    "send_notice": "Send me a notice",
+    "notice_text": "A notice from the server reached this page.",
+    "job": "A job with progress",
+    "job_help": "The job runs on the server for four seconds and sends its progress as events. The bar refreshes in place on each one.",
+    "progress": "Progress",
+    "start_job": "Start the job"
   }
 }
