@@ -109,6 +109,60 @@ pub(super) fn forwarded_for(headers: &HeaderMap) -> Option<std::borrow::Cow<'_, 
     }
 }
 
+tokio::task_local! {
+    /// The caller of the request being handled, authenticated once by [`remember_identity`].
+    pub(super) static IDENTITY: Option<Identity>;
+}
+
+/// Who the guard found the caller to be, with the credentials it looked at, so the handler can
+/// reuse it while the request still carries the same ones.
+#[derive(Clone)]
+pub(super) struct Authenticated {
+    cookie: Option<HeaderValue>,
+    authorization: Option<HeaderValue>,
+    identity: Option<Identity>,
+}
+
+impl Authenticated {
+    fn of(st: &AppState, headers: &HeaderMap) -> Self {
+        Authenticated {
+            cookie: headers.get(header::COOKIE).cloned(),
+            authorization: headers
+                .get(header::AUTHORIZATION)
+                .cloned(),
+            identity: st
+                .auth
+                .as_ref()
+                .and_then(|a| a.authenticate(headers)),
+        }
+    }
+
+    fn same(&self, headers: &HeaderMap) -> bool {
+        self.cookie.as_ref() == headers.get(header::COOKIE)
+            && self.authorization.as_ref() == headers.get(header::AUTHORIZATION)
+    }
+}
+
+/// The innermost layer: authenticates the caller once per request, or takes what the guard found
+/// when no layer in between changed the credentials (an OIDC refresh, an account session), and
+/// keeps it for every `ctx` the handler builds.
+pub(super) async fn remember_identity(
+    State(st): State<Arc<AppState>>,
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> Response {
+    let identity = match req.extensions().get::<Authenticated>() {
+        Some(a) if a.same(req.headers()) => a.identity.clone(),
+        _ => st
+            .auth
+            .as_ref()
+            .and_then(|a| a.authenticate(req.headers())),
+    };
+    IDENTITY
+        .scope(identity, next.run(req))
+        .await
+}
+
 /// IP rules and rate limits, before any handler runs. Files of public media sources cost nothing
 /// while the client is within its limit, so a page of images never spends it; a request for an
 /// id the source does not have (`404`) is counted, so ids cannot be probed without limit.
@@ -177,6 +231,7 @@ pub(super) async fn guard_request(
         ]
     };
     let mut miss = None;
+    let mut seen: Option<Authenticated> = None;
     for (limit, scope) in limits {
         let Some(limit) = limit else { continue };
         let ip_key = ip
@@ -184,11 +239,11 @@ pub(super) async fn guard_request(
             .unwrap_or_else(|| "unknown".into());
         let key = match limit.key {
             RateKey::Ip => format!("{scope}:ip:{ip_key}"),
-            RateKey::User => match st
-                .auth
+            RateKey::User => match seen
+                .get_or_insert_with(|| Authenticated::of(&st, headers))
+                .identity
                 .as_ref()
-                .and_then(|a| a.authenticate(headers))
-                .and_then(|i| i.user)
+                .and_then(|i| i.user.clone())
             {
                 Some(user) => format!("{scope}:user:{user}"),
                 None => format!("{scope}:ip:{ip_key}"),
@@ -225,6 +280,10 @@ pub(super) async fn guard_request(
         if public_media {
             miss = Some((key, limit));
         }
+    }
+    let mut parts = parts;
+    if let Some(a) = seen {
+        parts.extensions.insert(a);
     }
     let response = next
         .run(axum::extract::Request::from_parts(parts, body))

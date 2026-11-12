@@ -1943,7 +1943,11 @@ impl App {
         let router = theme::routes(pro::routes(media::routes(ui::routes(session::routes(
             data::routes(ops::routes(agent::routes(grid::routes(router)))),
         )))))
-        .fallback(not_found);
+        .fallback(not_found)
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            guard::remember_identity,
+        ));
         #[cfg(feature = "accounts")]
         let router = if state.sign_in.accounts.is_some() {
             router.layer(axum::middleware::from_fn_with_state(
@@ -2381,10 +2385,13 @@ impl AppState {
     }
 
     fn ctx(&self, headers: &HeaderMap) -> Ctx {
-        let mut identity = self
-            .auth
-            .as_ref()
-            .and_then(|a| a.authenticate(headers))
+        let mut identity = guard::IDENTITY
+            .try_with(Clone::clone)
+            .unwrap_or_else(|_| {
+                self.auth
+                    .as_ref()
+                    .and_then(|a| a.authenticate(headers))
+            })
             .unwrap_or_default();
         auth::adjust(self, headers, &mut identity);
         let accept = headers
@@ -2712,35 +2719,40 @@ impl AppState {
     }
 
     /// Loads the first page of every grid the user may read, in the user's saved view.
+    /// The grids of a screen load at the same time, so a screen with several grids waits for the
+    /// slowest one, not for their sum.
     async fn preload(
         &self,
         ctx: &Ctx,
         nodes: Vec<(NodePath, &crate::screen::Node)>,
         name: &str,
     ) -> HashMap<String, LoadedPage> {
-        let mut loaded = HashMap::new();
         let saved = self.views.is_some() && ctx.identity().is_signed_in();
-        for (i, node) in nodes {
-            let Some(grid) = node.grid() else { continue };
-            if !ctx
-                .identity()
-                .can(&grid.action().access)
-            {
-                continue;
-            }
-            let view = self
-                .saved_view(ctx, grid, name, &i)
-                .await;
-            if let Ok(mut page) = self
-                .timed(grid.fetch_at(ctx.clone(), grid.first_query(view.as_ref()), Vec::new()))
-                .await
-            {
+        let loads = nodes
+            .into_iter()
+            .filter_map(|(i, node)| {
+                let grid = node.grid()?;
+                ctx.identity()
+                    .can(&grid.action().access)
+                    .then_some((i, grid))
+            })
+            .map(|(i, grid)| async move {
+                let view = self
+                    .saved_view(ctx, grid, name, &i)
+                    .await;
+                let mut page = self
+                    .timed(grid.fetch_at(ctx.clone(), grid.first_query(view.as_ref()), Vec::new()))
+                    .await
+                    .ok()?;
                 page.view = view;
                 page.saved_views = saved;
-                loaded.insert(i.to_string(), page);
-            }
-        }
-        loaded
+                Some((i.to_string(), page))
+            });
+        futures_util::future::join_all(loads)
+            .await
+            .into_iter()
+            .flatten()
+            .collect()
     }
 
     fn error_response(&self, ctx: &Ctx, failure: Failure) -> Response {
