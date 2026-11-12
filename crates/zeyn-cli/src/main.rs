@@ -2,6 +2,8 @@
 
 mod desktop;
 mod dev;
+#[rustfmt::skip]
+mod doc_pages;
 mod generate;
 mod islands;
 
@@ -890,9 +892,13 @@ fn tools() -> Value {
     json!([
         tool(
             "zeyn_docs",
-            "Zeyn framework reference. Topics: rules (project rules for agents), language (how to write models, actions, screens, forms, grids), protocol (browser runtime protocol).",
-            json!({ "topic": { "type": "string", "enum": ["rules", "language", "protocol"] } }),
-            &["topic"]
+            "Zeyn framework reference for this version. Topics: rules (project rules for agents), language (how to write models, actions, screens, forms, grids), protocol (browser runtime protocol). Or `search` the docs pages (ranked list of pages with their path), or read one with `page` (a path such as /language/forms).",
+            json!({
+                "topic": { "type": "string", "enum": ["rules", "language", "protocol"] },
+                "search": { "type": "string", "description": "words to look for in the docs pages" },
+                "page": { "type": "string", "description": "a docs page path from search, such as /language/forms" }
+            }),
+            &[]
         ),
         tool(
             "zeyn_describe",
@@ -934,9 +940,121 @@ fn generator_args() -> Value {
     })
 }
 
+/// A docs page by its path (`/language/forms`, also with `.md`, a trailing `/` or the docs
+/// address in front), without the `@live` lines of the HTML page.
+fn doc_page(path: &str) -> Option<String> {
+    let path = path
+        .trim()
+        .trim_start_matches("https://docs.zeynsoft.com")
+        .trim_end_matches(".md")
+        .trim_end_matches('/');
+    let path = match path {
+        "" | "/index" => "/",
+        p => p,
+    };
+    doc_pages::DOC_PAGES
+        .iter()
+        .find(|(route, _, _)| *route == path)
+        .map(|(_, _, text)| {
+            text.lines()
+                .filter(|l| !l.trim_start().starts_with("@live "))
+                .collect::<Vec<_>>()
+                .join("\n")
+        })
+}
+
+/// The docs pages that best match `query`, ranked: a word in the title counts 8, in a heading 3,
+/// and each place in the text 1 (at most 10 per word). Each hit gives its path, title, the
+/// heading of the first match and a short snippet.
+fn search_docs(query: &str) -> String {
+    let words: Vec<String> = query
+        .split(|c: char| !c.is_alphanumeric() && c != '_')
+        .filter(|w| w.len() > 1)
+        .map(str::to_lowercase)
+        .collect();
+    if words.is_empty() {
+        return "give `search` some words, such as `search: \"grid export\"`".into();
+    }
+    let mut hits: Vec<(usize, &str, &str, String)> = doc_pages::DOC_PAGES
+        .iter()
+        .filter_map(|(route, title, text)| {
+            let lower = text.to_lowercase();
+            let title_l = title.to_lowercase();
+            let mut score = 0;
+            for w in &words {
+                if title_l.contains(w.as_str()) {
+                    score += 8;
+                }
+                score += 3 * lower
+                    .lines()
+                    .filter(|l| l.starts_with('#') && l.contains(w.as_str()))
+                    .count();
+                score += lower
+                    .matches(w.as_str())
+                    .take(10)
+                    .count();
+            }
+            (score > 0).then(|| (score, *route, *title, snippet(text, &lower, &words)))
+        })
+        .collect();
+    hits.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(b.1)));
+    if hits.is_empty() {
+        return format!("no docs page mentions {query:?}");
+    }
+    hits.iter()
+        .take(8)
+        .map(|(score, route, title, snip)| format!("{route}  {title}  (score {score})\n  {snip}"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// The heading above the first match of any word and up to 160 characters around it.
+fn snippet(text: &str, lower: &str, words: &[String]) -> String {
+    let Some(at) = words
+        .iter()
+        .filter_map(|w| lower.find(w.as_str()))
+        .min()
+    else {
+        return String::new();
+    };
+    let heading = text[..at]
+        .lines()
+        .rev()
+        .find(|l| l.starts_with('#'))
+        .unwrap_or("")
+        .trim_start_matches('#')
+        .trim();
+    let start = text[..at]
+        .char_indices()
+        .rev()
+        .nth(60)
+        .map_or(0, |(i, _)| i);
+    let end = text[at..]
+        .char_indices()
+        .nth(100)
+        .map_or(text.len(), |(i, _)| at + i);
+    let body = text[start..end]
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    if heading.is_empty() {
+        format!("...{body}...")
+    } else {
+        format!("[{heading}] ...{body}...")
+    }
+}
+
 fn call_tool(name: &str, args: &Value) -> Result<String, String> {
     let root = Path::new(".");
     match name {
+        "zeyn_docs" if args["page"].is_string() => {
+            let path = args["page"].as_str().unwrap_or("");
+            doc_page(path)
+                .ok_or_else(|| format!("no docs page `{path}`; use `search` to find the path"))
+        }
+        "zeyn_docs" if args["search"].is_string() => {
+            Ok(search_docs(args["search"].as_str().unwrap_or("")))
+        }
         "zeyn_docs" => {
             let topic = args["topic"]
                 .as_str()
@@ -1056,6 +1174,38 @@ mod drift;
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn zeyn_docs_reads_and_searches_the_docs_pages() {
+        let page = super::call_tool(
+            "zeyn_docs",
+            &serde_json::json!({ "page": "/language/forms" }),
+        )
+        .unwrap();
+        assert!(page.starts_with('#'), "{}", &page[..80]);
+        assert!(!page.contains("\n@live "));
+        let same = super::call_tool(
+            "zeyn_docs",
+            &serde_json::json!({ "page": "https://docs.zeynsoft.com/language/forms.md" }),
+        )
+        .unwrap();
+        assert_eq!(page, same);
+        assert!(super::call_tool("zeyn_docs", &serde_json::json!({ "page": "/nope" })).is_err());
+        let found =
+            super::call_tool("zeyn_docs", &serde_json::json!({ "search": "grid export" })).unwrap();
+        let first = found.lines().next().unwrap();
+        assert!(first.starts_with("/language/datagrid"), "{found}");
+        assert!(
+            found
+                .lines()
+                .filter(|l| l.starts_with('/'))
+                .count()
+                <= 8
+        );
+        let rules =
+            super::call_tool("zeyn_docs", &serde_json::json!({ "topic": "rules" })).unwrap();
+        assert!(!rules.is_empty());
+    }
+
     #[test]
     fn renames_identifiers_but_not_strings_or_longer_names() {
         let src = r##"use zeyn::{Grid, GridQuery};

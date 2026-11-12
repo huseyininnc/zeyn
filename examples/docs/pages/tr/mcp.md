@@ -11,7 +11,7 @@ Bir ajanın çalıştığı proje kendi kurallarını ve araçlarını taşır:
 
 | Araç | Ne yapar |
 |---|---|
-| `zeyn_docs` | Konuya göre framework başvurusu: `rules`, `language`, `protocol` |
+| `zeyn_docs` | Konuya göre framework başvurusu: `rules`, `language`, `protocol`; `search: "kelimeler"` bu sürümün docs sayfalarını sıralar, `page: "/language/forms"` birini Markdown olarak döndürür |
 | `zeyn_describe` | Uygulamanın Feature'ları, ekranları, rotaları, erişimi, API'leri, sorunları ve eksik çevirileri |
 | `zeyn_check` | Derler ve sorunları bildirir; `fix: true` önce yeniden adlandırılmış API'leri yeniden yazar |
 | `zeyn_test` | `cargo test` çalıştırır ve çıktının sonunu döndürür |
