@@ -114,10 +114,46 @@ async fn upload(
             via_agent: ctx.via_agent(),
         };
         let scanner = feature.file_scanner().cloned();
-        st.intercept(&ctx, &call, || {
-            receive(&ctx, entry, scanner, &headers, body)
-        })
-        .await
+        let quota = entry
+            .rules
+            .quota_limit()
+            .map(|(bytes, window)| {
+                let who = ctx
+                    .identity()
+                    .user
+                    .clone()
+                    .unwrap_or_else(|| "anon".into());
+                (
+                    format!("files:{}:{who}", entry.rules.store()),
+                    crate::RateLimit::per_user(u32::try_from(bytes).unwrap_or(u32::MAX), window),
+                )
+            });
+        if let Some((key, limit)) = &quota
+            && st
+                .rate_store
+                .charge(key, limit, 0)
+                .await
+                .is_err()
+        {
+            return Err(status(
+                StatusCode::TOO_MANY_REQUESTS,
+                "quota",
+                Text::key("zeyn.files.quota"),
+            ));
+        }
+        let file = st
+            .intercept(&ctx, &call, || {
+                receive(&ctx, entry, scanner, &headers, body)
+            })
+            .await?;
+        if let Some((key, limit)) = &quota {
+            let used = u32::try_from(file.size).unwrap_or(u32::MAX);
+            let _ = st
+                .rate_store
+                .charge(key, limit, used)
+                .await;
+        }
+        Ok(file)
     }
     .await;
     match result {

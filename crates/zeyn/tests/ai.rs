@@ -507,7 +507,7 @@ async fn browser_tool_lists_run_the_interceptors() {
 
 #[tokio::test]
 async fn each_door_can_be_closed_on_its_own() {
-    let browser_only = router(Some(Mcp::on().server(false)));
+    let browser_only = router(Some(Mcp::on().no_server()));
     assert_eq!(
         send(&browser_only, get("/_zeyn/tools?screen=customers"))
             .await
@@ -521,7 +521,7 @@ async fn each_door_can_be_closed_on_its_own() {
     .await;
     assert_eq!(r.status, StatusCode::NOT_FOUND);
 
-    let router = router(Some(Mcp::on().webmcp(false)));
+    let router = router(Some(Mcp::on().no_webmcp()));
     assert_eq!(
         send(&router, get("/_zeyn/tools?screen=customers"))
             .await

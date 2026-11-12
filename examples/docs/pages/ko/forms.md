@@ -130,4 +130,6 @@ Form::of(ticket).field(Ticket::title).file(Ticket::attachments, ATTACHMENTS)
 
 `DiskStore`는 `{id}.bin`과 `{id}.json`을 하나의 폴더에 보관하며 업로드를 먼저 `{id}.part`에 씁니다. `MemoryStore`는 바이트 상한이 있는 메모리에 파일을 보관하며 테스트와 데모용입니다. 폼 값은 파일의 이름만 담습니다. 파일이 존재하는지 확실히 해야 하는 저장 action은 쇼케이스처럼 `store.meta(id)`를 호출합니다.
 
+`FileRules::quota(bytes, window)`는 한 사용자가 창(window)마다 저장소에 업로드할 수 있는 양을 제한하며 앱의 rate store로 셉니다. 한도를 넘긴 업로드는 그대로 저장되고 다음 업로드가 `429`를 받습니다. `DiskStore`는 한 시간보다 오래된 `.part` 파일(충돌로 멈춘 업로드)을 한 시간에 최대 한 번 지웁니다. `ZipGuard`는 ZIP 기반 업로드(ZIP, Word, Excel, PowerPoint)를 위한 스캐너로, 중앙 디렉터리가 10,000개를 넘는 항목, 합계 1 GiB 초과 또는 파일 크기의 200배 초과를 선언하는 아카이브와 ZIP64 아카이브를 거부합니다. 받아들인 아카이브를 푸는 코드도 이 한도에서 멈춰야 합니다.
+
 예산: 256 MiB 업로드는 서버 힙을 약 0.4 MiB 늘립니다(`tests/files_memory.rs`). 컨트롤은 DOM 노드 10개에 파일당 5개를 렌더링하며, `files.js`는 원본 12 KB(gzip 4 KB), `files.css`는 원본 3 KB(gzip 1 KB)를 추가합니다.

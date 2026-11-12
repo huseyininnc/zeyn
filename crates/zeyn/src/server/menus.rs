@@ -409,6 +409,7 @@ impl AppState {
                         here,
                         child.icon,
                         &r.text(&child.label),
+                        "",
                     ));
                     here
                 }
@@ -419,6 +420,7 @@ impl AppState {
                         false,
                         child.icon,
                         &r.text(&child.label),
+                        "",
                     ));
                     false
                 }

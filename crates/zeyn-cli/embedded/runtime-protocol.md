@@ -435,7 +435,7 @@ Outside AI agents reach the app through two doors, both off by default and turne
 | `Mcp::read_only()` | on | on | no |
 | `Mcp::on()` | on | on | form saves and API actions that write |
 
-`.server(false)` and `.webmcp(false)` turn one door off. New projects from `zeyn new` start with
+`.no_server()` and `.no_webmcp()` turn one door off. New projects from `zeyn new` start with
 `Mcp::read_only()`.
 
 Why off: the endpoint lets any holder of a valid `Authorization` header drive the app through a

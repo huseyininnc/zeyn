@@ -241,6 +241,9 @@ pub fn product_list() -> Screen {
             DataGrid::of(search_products)
                 .mode(DataMode::Server)
                 .paging(Paging::pages(25))
+                .empty_filtered(
+                    EmptyState::new(t!("stock.no_match")).text(t!("stock.no_match_help")),
+                )
                 .column(Product::code)
                 .width(120)
                 .pin_start()
@@ -395,6 +398,16 @@ pub fn product_editor(params: ProductParams, store: ProductStore) -> Result<Scre
         ))
 }
 
+/// Products below 10 in stock, shown as a number next to the menu item.
+#[action(permission = "stock.product.read")]
+pub async fn low_stock_count(_: (), store: ProductStore) -> Result<u64> {
+    Ok(store
+        .all()?
+        .iter()
+        .filter(|p| p.stock < 10)
+        .count() as u64)
+}
+
 /// The stock feature, its menu and its public API.
 pub fn feature() -> Feature {
     Feature::new("stock")
@@ -411,5 +424,7 @@ pub fn feature() -> Feature {
             m.group(t!("menu.stock"), Icon::Box)
                 .item(t!("stock.products"), product_list)
                 .icon(Icon::Box)
+                .count(low_stock_count)
+                .count_listens("products")
         })
 }

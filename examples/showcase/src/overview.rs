@@ -38,7 +38,9 @@ pub fn overview(_: (), store: ProductStore, ctx: Ctx) -> Result<Screen> {
                         .trend([9.1, 8.4, 8.8, 7.9, 8.2, 8.0]),
                 ),
         )
-        .body(zeyn::ui::Alert::info(t!("dashboard.shop_text")).title(t!("dashboard.shop")))
+        .body(zeyn::ui::Deferred::new(
+            zeyn::ui::Alert::info(t!("dashboard.shop_text")).title(t!("dashboard.shop")),
+        ))
         .body(crate::shop::ShellLink(
             t!("dashboard.open_shop"),
             "shop_home",

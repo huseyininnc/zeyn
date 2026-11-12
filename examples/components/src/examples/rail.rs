@@ -22,7 +22,7 @@ pub fn with_scrollbar(_ctx: &Ctx) -> Node {
         .title("Best sellers")
         .card(|p: &Product| Card::image(p.image.clone(), p.name.clone()))
         .image_size(300, 300)
-        .scrollbar(true)
+        .scrollbar()
         .into()
 }
 

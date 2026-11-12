@@ -172,7 +172,7 @@ Look here before you write a `Component`: each line names the main types and the
 matters. The `zeyn_docs` topic `language` and the docs pages have the details.
 
 - Layouts: `Row::new().col(node)`, `Stack::new().add(node)`, `Panel::new(t!(".."))`,
-  `Card::new().title(..)`, `Tabs::new(..).tab(..)`, `Split::new(a, b).ratio(55)`, `ListDetail::new(label, list).detail(..).back(..)`, `AutoGrid`,
+  `Card::new().title(..)`, `Tabs::new(..).tab(..)`, `Split::new(a, b).ratio(55)`, `ListDetail::new(label, list).detail(..).back(..)`, `Deferred::new(slow_part)`, `AutoGrid`,
   `Dock` for panels the user moves.
 - Data: `DataGrid::of(action)` for tables, `DataGrid::dynamic(action)` with `DynamicPage` and
   `DynamicColumn` when columns come with the rows; `List::of(action).builder(|row| node)`,

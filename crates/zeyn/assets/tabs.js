@@ -1,6 +1,7 @@
 /**
- * Collapsible panels, tabs (with lazy panels and remembered choices) and split panes.
- * Loaded only by pages that hold one (`data-zeyn-toggle`, `data-zeyn-tabs`, `data-zeyn-split`).
+ * Collapsible panels, tabs (with lazy panels and remembered choices), split panes and deferred
+ * parts. Loaded only by pages that hold one (`data-zeyn-toggle`, `data-zeyn-tabs`,
+ * `data-zeyn-split`, `data-zeyn-defer`).
  * @module tabs
  */
 const K = await import(new URL(`components.js${new URL(import.meta.url).search}`, import.meta.url).href);
@@ -159,7 +160,30 @@ function splitKey(e, bar) {
 
 /* Setup of panels, tabs and split panes ------------------------------------------------------ */
 
+/**
+ * Loads the deferred parts in `root` (`ui::Deferred`, `[data-zeyn-defer]`) from `/_zeyn/node`, all
+ * at once, each replacing its placeholder when it arrives; a failure shows the error in place.
+ */
+function loadDeferred(root) {
+  for (const part of root.querySelectorAll?.('[data-zeyn-defer]') ?? []) {
+    const path = part.dataset.zeynDefer;
+    delete part.dataset.zeynDefer;
+    const a = address(part);
+    post('/_zeyn/node', { screen: a.screen, params: a.params, node: path }).then((r) => {
+      part.removeAttribute('aria-busy');
+      if (!r.ok) {
+        const message = parse(r.body)?.message ?? part.dataset.zeynFailed ?? '';
+        part.replaceChildren(make('p', 'z-callout z-tone-danger', { role: 'alert', text: message }));
+        return;
+      }
+      part.innerHTML = r.body;
+      document.dispatchEvent(new CustomEvent('zeyn:content', { detail: part }));
+    });
+  }
+}
+
 initializers.push(restoreTabs);
+initializers.push(loadDeferred);
 
 keyHandlers.push(
   (e, t) => t.matches('[role="tab"]') && tabKey(e, t),
@@ -189,3 +213,4 @@ document.addEventListener(
 window.addEventListener('hashchange', () => restoreTabs(document));
 
 restoreTabs(document);
+loadDeferred(document);

@@ -538,7 +538,7 @@ impl<S: AuditSink> Interceptor for AuditLog<S> {
 ///
 /// ```ignore
 /// App::new("Shop").mcp(Mcp::read_only())          // agents may read
-/// App::new("Shop").mcp(Mcp::on().webmcp(false))   // read and write, server endpoint only
+/// App::new("Shop").mcp(Mcp::on().no_webmcp())   // read and write, server endpoint only
 /// ```
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Mcp {
@@ -576,15 +576,15 @@ impl Mcp {
         Mcp::on()
     }
 
-    /// `false` turns off the `/_zeyn/mcp` endpoint and keeps the browser tools.
-    pub fn server(mut self, on: bool) -> Self {
-        self.server = on;
+    /// Turns off the `/_zeyn/mcp` endpoint and keeps the browser tools.
+    pub fn no_server(mut self) -> Self {
+        self.server = false;
         self
     }
 
-    /// `false` turns off the WebMCP tools (`GET /_zeyn/tools`) and keeps the endpoint.
-    pub fn webmcp(mut self, on: bool) -> Self {
-        self.browser = on;
+    /// Turns off the WebMCP tools (`GET /_zeyn/tools`) and keeps the endpoint.
+    pub fn no_webmcp(mut self) -> Self {
+        self.browser = false;
         self
     }
 
@@ -885,13 +885,13 @@ impl App {
         self
     }
 
-    /// `false` stops the browser's own context menu everywhere except in text inputs, text areas
-    /// and editable text. This protects nothing (any user can still view the source, use the
+    /// Stops the browser's own context menu everywhere except in text inputs, text areas and
+    /// editable text. This protects nothing (any user can still view the source, use the
     /// developer tools or turn scripts off) and it takes away spell check, copy link, translate
-    /// and accessibility tools. Keep the default (`true`) unless a kiosk or a strict brief asks
-    /// for it; Zeyn's own menus work either way.
-    pub fn browser_context_menu(mut self, allow: bool) -> Self {
-        self.native_menu = allow;
+    /// and accessibility tools. Leave it out unless a kiosk or a strict brief asks for it; Zeyn's
+    /// own menus work either way.
+    pub fn no_browser_context_menu(mut self) -> Self {
+        self.native_menu = false;
         self
     }
 
@@ -1357,9 +1357,9 @@ impl App {
         self
     }
 
-    /// Marks cookies `Secure`. Turn on whenever the app is served over HTTPS.
-    pub fn secure_cookies(mut self, secure: bool) -> Self {
-        self.secure_cookies = secure;
+    /// Marks cookies `Secure`. Call it whenever the app is served over HTTPS.
+    pub fn secure_cookies(mut self) -> Self {
+        self.secure_cookies = true;
         self
     }
 
@@ -1717,6 +1717,7 @@ impl App {
     /// Builds the HTTP router. Fails when `check` finds problems.
     pub fn router(mut self) -> Result<Router, Vec<String>> {
         self.check()?;
+        ops::warm_build_id();
         let docs_enabled = self.api_docs.is_some();
         let mount = self.base_path.clone();
         let url_prefix = self
@@ -1925,6 +1926,7 @@ impl App {
             .route("/_zeyn/screen/{screen}", get(screen_fragment))
             .route("/_zeyn/route/{screen}", get(route_redirect))
             .route("/_zeyn/menu", post(menu_call))
+            .route("/_zeyn/menu/counts", get(menu_counts))
             .route("/_zeyn/form", post(form_call))
             .route("/_zeyn/locale", post(set_locale))
             .route("/_zeyn/timezone", post(set_time_zone));
@@ -2947,11 +2949,36 @@ impl AppState {
                     page = Some(label.clone());
                 }
                 let href = escape(&self.url(&locale::path(self, ctx, &path)));
+                let mut extra = String::new();
+                if let Some(badge) = &item.badge {
+                    extra.push_str(&format!(
+                        r#" <span class="z-nav-badge">{}</span>"#,
+                        r.text(badge)
+                    ));
+                }
+                if let Some(count) = item
+                    .count
+                    .filter(|c| !site && ctx.identity().can(&c.action.access))
+                {
+                    let topics = if item.topics.is_empty() {
+                        String::new()
+                    } else {
+                        format!(
+                            r#" data-zeyn-count-topics="{}""#,
+                            escape(&item.topics.join(","))
+                        )
+                    };
+                    extra.push_str(&format!(
+                        r#" <span class="z-nav-count" data-zeyn-count="{}"{topics} hidden></span>"#,
+                        escape(count.action.name)
+                    ));
+                }
                 Some(nav_link(
                     &href,
                     current,
                     item.icon.filter(|_| !site),
                     &label,
+                    &extra,
                 ))
             })
             .collect();
@@ -3408,7 +3435,14 @@ fn rail_toggle(r: &Render, rail: bool) -> String {
 }
 
 /// A side menu link: `href` is escaped, and so is `label`.
-fn nav_link(href: &str, current: bool, icon: Option<crate::screen::Icon>, label: &str) -> String {
+/// `extra` is HTML after the label (a badge or a count), already escaped.
+fn nav_link(
+    href: &str,
+    current: bool,
+    icon: Option<crate::screen::Icon>,
+    label: &str,
+    extra: &str,
+) -> String {
     let aria = if current {
         r#" aria-current="page""#
     } else {
@@ -3416,10 +3450,11 @@ fn nav_link(href: &str, current: bool, icon: Option<crate::screen::Icon>, label:
     };
     match icon {
         Some(icon) => format!(
-            r#"<li><a href="{href}"{aria}>{}<span>{label}</span></a></li>"#,
+            r#"<li><a href="{href}"{aria}>{}<span>{label}</span>{extra}</a></li>"#,
             icon.html()
         ),
-        None => format!(r#"<li><a href="{href}"{aria}>{label}</a></li>"#),
+        None if extra.is_empty() => format!(r#"<li><a href="{href}"{aria}>{label}</a></li>"#),
+        None => format!(r#"<li><a href="{href}"{aria}><span>{label}</span>{extra}</a></li>"#),
     }
 }
 
@@ -4201,6 +4236,56 @@ impl AppState {
         let r = user_render(entry.meta.name, ctx);
         Ok(json!({ "effects": effects.iter().map(|e| e.to_json(&r)).collect::<Vec<_>>() }))
     }
+}
+
+/// `GET /_zeyn/menu/counts`: the numbers of the side menu's counted items, by the name of the
+/// action that counts them, for the actions the user may run in features whose guards pass. The
+/// counts run at the same time, each within the app's time limit; one that fails is left out.
+async fn menu_counts(State(st): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    fn collect(g: &crate::feature::MenuGroup, ctx: &Ctx, out: &mut Vec<crate::feature::MenuCount>) {
+        for item in &g.items {
+            if let Some(c) = item.count
+                && ctx.identity().can(&c.action.access)
+                && !out
+                    .iter()
+                    .any(|o| o.action.name == c.action.name)
+            {
+                out.push(c);
+            }
+        }
+        for sub in &g.groups {
+            collect(sub, ctx, out);
+        }
+    }
+    let ctx = st.licensed(st.ctx(&headers)).await;
+    let mut counts = Vec::new();
+    for f in &st.features {
+        if f.site_shell().is_some() || f.check_guards(&ctx).is_err() {
+            continue;
+        }
+        for g in f.menu_groups() {
+            collect(g, &ctx, &mut counts);
+        }
+    }
+    let runs = counts.iter().map(|c| {
+        let st = &st;
+        let ctx = ctx.clone();
+        async move {
+            st.timed((c.run)(ctx))
+                .await
+                .ok()
+                .map(|n| (c.action.name.to_string(), json!(n)))
+        }
+    });
+    let found: serde_json::Map<String, Json> = futures_util::future::join_all(runs)
+        .await
+        .into_iter()
+        .flatten()
+        .collect();
+    let mut r = axum::Json(Json::Object(found)).into_response();
+    r.headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    r
 }
 
 async fn menu_call(
