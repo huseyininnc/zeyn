@@ -98,3 +98,12 @@ App::new(t!("app.name"))
 ```
 
 둘 다 모든 사람에게 일반 텍스트로 제공됩니다.
+
+## public 폴더
+
+```rust
+App::new(t!("app.name"))
+    .public(zeyn::public_files!())
+```
+
+crate의 `public/` 폴더에 있는 파일은 `zeyn::public_files!()`로 바이너리에 포함되어 사이트 루트에서 제공됩니다. `public/favicon.svg`는 `/favicon.svg`로 응답하고, 페이지는 `/favicon.svg`, `/favicon.png`, `/favicon.ico` 중 처음 찾은 파일을 아이콘으로 연결합니다. 이미지, 아이콘, 글꼴, 텍스트, XML, JSON, 웹 매니페스트, PDF 파일을 받으며, HTML과 스크립트는 앱의 출처에서 실행되므로 빌드를 멈춥니다. 파일에는 엔터티 태그가 붙고 한 시간 동안 캐시됩니다. `[package.metadata.zeyn]`의 `max_public_file_kb`와 `max_public_total_kb`로 바꾸지 않으면 파일은 256 KB, 폴더는 2 MB까지입니다. `App::check`는 화면, `/robots.txt`, `/llms.txt`, `/sitemap.xml`, `/_zeyn/`이 이미 쓰는 경로의 파일을 알려 줍니다. `zeyn new`는 `public/favicon.svg`를 추가합니다.
