@@ -24,6 +24,7 @@ pub mod controls;
 pub mod countdown;
 pub mod data_grid;
 pub mod date_pickers;
+pub mod deferred;
 pub mod description_list;
 pub mod diff_view;
 pub mod document_viewer;
