@@ -73,6 +73,8 @@ pub struct Limits {
     pub groups: usize,
     /// Actions one page socket may call per second; more answer `429`.
     pub calls: u32,
+    /// Frames of any kind one page socket may send per second; more close it with 1008.
+    pub frames: u32,
     /// Largest event, as JSON; [`Target::emit`] fails past it.
     pub event_bytes: usize,
     /// Numbered messages a page socket keeps for a resume; a resume past them gets a resync.
@@ -97,6 +99,7 @@ impl Default for Limits {
             persist_every: Duration::from_secs(2),
             groups: 32,
             calls: 20,
+            frames: 100,
             event_bytes: 16 * 1024,
             replay: 64,
             replay_bytes: 64 * 1024,

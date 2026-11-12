@@ -135,6 +135,10 @@ name = "realtime"
 required-features = ["realtime"]
 
 [[test]]
+name = "realtime_load"
+required-features = ["realtime"]
+
+[[test]]
 name = "xlsx"
 required-features = ["xlsx"]
 
