@@ -288,6 +288,10 @@ What to remember:
   vec![MenuNode::screen(label, "screen_name"), MenuNode::path(label, "/path")])]) })`. The server
   drops links the user may not open and caches answers per permission set; call
   `Menus::invalidate()` from the action that edits the menu.
+- Menu item extras: `.badge(t!("..."))` adds a short fixed text, `.count(action)` a number from an
+  action that takes `()` and returns `Result<u64>` (loaded after the page, hidden without its
+  permission), `.count_listens("topic")` counts again on that topic. The icon rail, the filter
+  box with favorites (10 or more links) and the phone drawer come with the shell; write nothing.
 - Key figures: `Kpi::new(t!("..."), value)` or `Kpi::money(t!("..."), money)` with `.delta(..)`
   and `.trend(..)`; four in a `Row` fill a desktop row and wrap two, then one per line.
 - Audit history: `DiffView::of(&before, &after)` or `DiffView::changes(entry.changes).model::<M>()`;

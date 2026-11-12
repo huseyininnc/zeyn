@@ -187,6 +187,7 @@ catalog! {
         chips "/ui/chips";
         menu_button "/ui/menu-button";
         menu_bar "/ui/menu-bar";
+        side_menu "/ui/side-menu";
         external_link "/ui/external-link";
         share "/ui/share";
         copy_button "/ui/copy-button";

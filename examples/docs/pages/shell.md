@@ -35,6 +35,24 @@ Feature::new("sales")
 - **Keyboard.** Up and Down move between the visible headings and links, Home and End go to the first and the last. Right opens a closed group or moves into an open one; Left closes an open group or moves to the heading of the group around it. Enter and Space toggle a group. Left and Right swap in right to left languages.
 - **Permissions and merging.** Groups with the same label merge across features at every level, and a group whose items the user may not open is left out, nested groups included. The breadcrumb of `App::header(|h| h.breadcrumb())` shows the whole group path. The site shell lists the links of nested groups in their top level group.
 
+### Icon rail, badges, filter and phones
+
+```rust
+.menu(|m| {
+    m.group(t!("mail.menu"), Icon::Mail)
+        .item(t!("mail.inbox"), inbox)
+        .count(unread)
+        .count_listens("mail")
+        .item(t!("mail.rules"), rules)
+        .badge(t!("menu.new"))
+})
+```
+
+- **Icon rail.** On screens from 1024 px a button in the menu's bar folds the menu to the icons of its top level groups (or their first letter). A group's name shows as a tooltip, and the group opens as a flyout next to the rail; Escape, a click outside and a navigation close it. The choice is kept in the `zeyn_rail` cookie, so the next page renders the same way without a jump.
+- **Badges and counts.** `.badge(text)` after an item adds a short fixed text such as "New". `.count(action)` adds a number counted by an action that takes `()` and returns `u64`: the page asks for all counts of its menu in one request after it shows (`GET /_zeyn/menu/counts`), so a slow count never delays the page. Users without the action's permission see no number, 0 shows nothing and more than 99 shows "99+". `.count_listens(topics)` counts again when an action names one of the topics with `ui.refresh(..)` or the live socket notifies it.
+- **Filter and favorites.** A side menu with 10 or more links (`MENU_FILTER_FROM`) gets a filter box: typing hides the links that do not match (case and accents ignored), opens the groups around the ones that do and says how many are left; Escape clears it. Every link gets a pin button, and pinned links show in a Favorites group at the top, kept in the browser per user.
+- **Phones.** Below 1024 px the menu folds behind a button in its bar and opens as a drawer over the screen. Focus moves into the drawer and stays between it and the button, the screen behind it is inert and does not scroll, and the button, Escape, the backdrop, a link or a swipe toward the menu's edge close it and return focus to the button.
+
 ### Menus built per request
 
 `App::menu_source(source)` adds menu entries that are built for each request, for example from a menu table filtered by the user's roles. A source is an async function that takes the `Ctx` (identity, tenant, language) and returns `MenuNode`s: `MenuNode::group(label, children)` at the top level, with `MenuNode::screen(label, "screen_name")` links (`.params(json)` fills path segments and the query, as `screen_url` does), `MenuNode::path(label, "/reports/sales")` links and nested groups inside. `.icon(...)`, `.open()` and `.permission("menu.reports")` work on any node. A label is plain text, escaped like any other text, or a catalog key with `Text::key`.

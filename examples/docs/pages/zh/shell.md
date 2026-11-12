@@ -35,6 +35,24 @@ Feature::new("sales")
 - **键盘。** 上和下在可见的标题和链接之间移动，Home 和 End 跳到第一个和最后一个。右键展开折叠的分组或进入已展开的分组；左键折叠已展开的分组或移到外层分组的标题。Enter 和空格切换分组。在从右到左的语言中左右互换。
 - **权限与合并。** 同名分组在每一层跨 feature 合并；用户无法打开其中任何条目的分组（包括嵌套分组）不会显示。`App::header(|h| h.breadcrumb())` 的面包屑显示完整的分组路径。site shell 把嵌套分组的链接列在其顶层分组中。
 
+### 图标栏、徽章、筛选和手机
+
+```rust
+.menu(|m| {
+    m.group(t!("mail.menu"), Icon::Mail)
+        .item(t!("mail.inbox"), inbox)
+        .count(unread)
+        .count_listens("mail")
+        .item(t!("mail.rules"), rules)
+        .badge(t!("menu.new"))
+})
+```
+
+- **图标栏。** 在 1024 px 及以上的屏幕上，菜单栏中的按钮可以把菜单折叠为顶层分组的图标（或其首字母）。分组名称以提示显示，分组在图标栏旁以弹出面板打开；Escape、点击外部和导航会关闭它。选择保存在 `zeyn_rail` cookie 中，因此下一页以同样方式绘制，不会跳动。
+- **徽章和计数。** 在菜单项后使用 `.badge(text)` 添加简短的固定文字，例如“新”。`.count(action)` 添加一个由接受 `()` 并返回 `u64` 的 action 计算的数字：页面显示后用一次请求获取菜单中的所有计数（`GET /_zeyn/menu/counts`），所以缓慢的计数不会拖慢页面。没有该 action 权限的用户看不到数字，0 不显示，大于 99 显示为“99+”。当某个 action 通过 `ui.refresh(..)` 提到其中一个主题或实时 socket 发出通知时，`.count_listens(topics)` 会重新计数。
+- **筛选和收藏。** 拥有 10 个或更多链接的侧边菜单（`MENU_FILTER_FROM`）会有一个筛选框：输入时隐藏不匹配的链接（忽略大小写和重音），展开匹配链接所在的分组并告知剩余数量；Escape 清空。每个链接都有一个固定按钮，固定的链接显示在顶部的收藏分组中，按用户保存在浏览器里。
+- **手机。** 小于 1024 px 时，菜单折叠到菜单栏中的按钮后面，并以抽屉形式覆盖在屏幕上打开。焦点进入抽屉并停留在抽屉与按钮之间，后面的屏幕不可交互也不会滚动；按钮、Escape、背景、链接或朝菜单边缘的滑动都会关闭抽屉，并把焦点还给按钮。
+
 ### 每次请求构建的菜单
 
 `App::menu_source(source)` 添加在每次请求时构建的菜单项，例如来自按用户角色筛选的菜单表。菜单源是一个 async 函数，接收 `Ctx`（身份、租户、语言）并返回 `MenuNode`：顶层是 `MenuNode::group(label, children)`，其中包含 `MenuNode::screen(label, "screen_name")` 链接（`.params(json)` 像 `screen_url` 一样填充路径片段和查询）、`MenuNode::path(label, "/reports/sales")` 链接以及嵌套分组。`.icon(...)`、`.open()` 和 `.permission("menu.reports")` 可用于任何节点。标签可以是纯文本（与其他文本一样会被转义），也可以是通过 `Text::key` 指定的目录键。

@@ -84,6 +84,7 @@
       "alpha_index": "A letter bar from the user's alphabet.",
       "menu_button": "Drop down and split buttons with actions.",
       "menu_bar": "A menu bar of commands.",
+      "side_menu": "The app shell menu with badges, counts, filter, icon rail and phone drawer.",
       "external_link": "A link that leaves the app safely.",
       "form": "A form of a model, checked on the server.",
       "controls": "Radio buttons, segmented buttons and switches.",
@@ -386,6 +387,9 @@
         "overview": "Example"
       },
       "menu_bar": {
+        "overview": "Example"
+      },
+      "side_menu": {
         "overview": "Example"
       },
       "menu_button": {
