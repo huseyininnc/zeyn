@@ -140,6 +140,7 @@
       "previous": "Previous page",
       "next": "Next page",
       "load_more": "Load more",
+      "search": "Search rows",
       "range": "{from}-{to}",
       "range_total": "{from}-{to} of {total}",
       "loaded": "{count} rows loaded",

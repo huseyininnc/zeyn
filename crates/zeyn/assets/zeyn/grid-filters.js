@@ -163,3 +163,26 @@ function onFilter(control) {
   }, FILTER_DELAY_MS);
 }
 
+
+/**
+ * Debounces the search box of a grid (`input[data-zeyn-grid-search]`, before the grid and its
+ * selection bar) and reloads the grid from the start with the text as `q`. Each reload cancels
+ * the one before it, and the result is announced in the grid's live region.
+ */
+function onSearch(input) {
+  let grid = input.closest('.z-grid-search')?.nextElementSibling;
+  if (grid?.matches('[data-zeyn-bulk]')) grid = grid.nextElementSibling;
+  if (!grid?.matches('[data-zeyn-grid]')) return;
+  initGrid(grid);
+  const s = grids.get(grid);
+  grid.setAttribute('aria-busy', 'true');
+  clearTimeout(s.timer);
+  s.timer = setTimeout(() => {
+    const q = input.value.trim();
+    if (q === s.q) return grid.removeAttribute('aria-busy');
+    s.q = q;
+    s.allMatching = false;
+    s.searched = true;
+    loadGrid(grid, 'reset');
+  }, FILTER_DELAY_MS);
+}

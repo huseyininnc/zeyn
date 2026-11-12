@@ -28,7 +28,7 @@ async function toggleDetail(tr, open = tr.getAttribute('aria-expanded') !== 'tru
   const row = make('tr', 'z-detail');
   if (tr.dataset.zeynLevel != null) row.dataset.zeynLevel = tr.dataset.zeynLevel;
   const cell = make('td');
-  cell.colSpan = own(grid, 'thead tr')?.cells.length ?? 1;
+  cell.colSpan = own(grid, 'thead tr:not(.z-band-row)')?.cells.length ?? 1;
   const box = make('div', 'z-detail-body', { role: 'region', 'aria-label': `${t.details || 'Details'}: ${label}`, 'aria-busy': 'true' });
   box.id = `z-detail-${++uid}`;
   box.textContent = t.loading || 'Loading...';
@@ -373,7 +373,7 @@ async function pasteCells(grid, text) {
   const table = parseTsv(text);
   if (!s || !range || !table.length) return;
   const t = s.texts;
-  const heads = cellsOf(own(grid, 'thead tr'));
+  const heads = cellsOf(own(grid, 'thead tr:not(.z-band-row)'));
   const one = table.length === 1 && table[0].length === 1;
   const height = one ? range.r1 - range.r0 + 1 : table.length;
   const width = one ? range.c1 - range.c0 + 1 : Math.max(...table.map((r) => r.length));
@@ -493,7 +493,7 @@ const COLV_BUFFER = 6;
  * column. Called on setup and after the header changes.
  */
 function initColumns(grid, s) {
-  const head = own(grid, 'thead tr');
+  const head = own(grid, 'thead tr:not(.z-band-row)');
   const table = own(grid, 'table');
   if (!head || !table) return;
   s.colv = null;
@@ -649,7 +649,7 @@ async function loadBranch(grid, anchor, level, path, offset) {
   const r = await post(BASE + '/_zeyn/grid', {
     ...address(grid),
     path,
-    query: { page: { type: 'offset', offset, limit: s.size }, sort: s.sort, filters: filterList(s), with_total: true, aggregates: [] },
+    query: { page: { type: 'offset', offset, limit: s.size }, sort: s.sort, filters: filterList(s), q: s.q, with_total: true, aggregates: [] },
     view: s.columns ? { columns: s.columns } : null,
   });
   anchor.removeAttribute('aria-busy');
@@ -663,7 +663,7 @@ async function loadBranch(grid, anchor, level, path, offset) {
     more.dataset.zeynPath = JSON.stringify(path);
     more.dataset.zeynOffset = String(shown);
     const cell = make('td');
-    cell.colSpan = own(grid, 'thead tr')?.cells.length ?? 1;
+    cell.colSpan = own(grid, 'thead tr:not(.z-band-row)')?.cells.length ?? 1;
     const button = make('button', 'z-link', { type: 'button', 'data-zeyn-branch-more': '', tabindex: '-1' });
     button.textContent = `${s.texts.load_more || 'Load more'} (${fmt(shown)} / ${fmt(r.data.total)})`;
     cell.append(button);

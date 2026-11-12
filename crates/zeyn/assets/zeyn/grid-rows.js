@@ -133,7 +133,7 @@ async function runBulk(button) {
     action: Number(button.dataset.zeynBulkRun),
     keys: s.allMatching ? [] : [...s.selected],
     all: s.allMatching,
-    query: { sort: s.sort, filters: filterList(s) },
+    query: { sort: s.sort, filters: filterList(s), q: s.q },
   });
   button.disabled = false;
   if (!r.ok) return;
@@ -145,7 +145,7 @@ async function runBulk(button) {
 
 /** Editable header cells by column position: `th[data-edit]` or `null`. */
 function editableHeads(grid) {
-  const head = own(grid, 'thead tr');
+  const head = own(grid, 'thead tr:not(.z-band-row)');
   return (head ? cellsOf(head) : []).map((th) => (th.dataset.edit ? th : null));
 }
 
@@ -351,7 +351,7 @@ function copyRows(grid, focused) {
   const text = (cell) =>
     (cell.textContent.trim() || cell.querySelector('[role="img"][aria-label]')?.getAttribute('aria-label') || '').replace(/[\t\r\n]+/g, ' ');
   const lines = list.map((tr) => cellsOf(tr).filter(keep).map(text).join('\t'));
-  if (list.length > 1) lines.unshift(cellsOf(own(grid, 'thead tr')).filter(keep).map(text).join('\t'));
+  if (list.length > 1) lines.unshift(cellsOf(own(grid, 'thead tr:not(.z-band-row)')).filter(keep).map(text).join('\t'));
   navigator.clipboard.writeText(lines.join('\r\n') + '\r\n').then(
     () => toast(fill(s.texts.copied || '{n} rows copied.', { n: fmt(list.length) })),
     () => {},

@@ -460,6 +460,8 @@ struct Column<E> {
     plain: bool,
     /// Long values wrap onto more lines instead of ending in an ellipsis.
     wrap: bool,
+    /// Index into `DataGrid::bands` of the band header this column sits under.
+    band: Option<usize>,
 }
 
 impl<E> Column<E> {
@@ -481,6 +483,7 @@ impl<E> Column<E> {
             editable: false,
             plain: false,
             wrap: false,
+            band: None,
         }
     }
 
@@ -528,6 +531,10 @@ pub struct DataGrid<E: Model> {
     tree: Option<&'static FieldMeta>,
     /// Fingerprint of a dynamic grid's columns, sent to the browser.
     shape: Option<String>,
+    /// Whether the grid shows a search box that sends `DataQuery::q`.
+    search: bool,
+    /// Labels of the band headers, which group columns under one header cell.
+    bands: Vec<Text>,
 }
 
 /// Most levels a tree grid opens.
@@ -776,6 +783,8 @@ impl<E: Model> DataGrid<E> {
             group_by: Vec::new(),
             tree: None,
             shape: None,
+            search: false,
+            bands: Vec::new(),
         }
     }
 
@@ -1142,6 +1151,46 @@ impl<E: Model> DataGrid<E> {
         }
     }
 
+    /// Shows a search box above the grid. What the user types goes to the action as
+    /// [`DataQuery::q`] with every page, block and export, and the action searches the text
+    /// fields with it ([`DataQuery::apply`] and the SQL data layers do). Masked fields are never
+    /// searched. Grids without it drop any `q` the client sends.
+    ///
+    /// ```ignore
+    /// DataGrid::of(search_products).search().column(Product::name)
+    /// ```
+    pub fn search(mut self) -> Self {
+        self.search = true;
+        self
+    }
+
+    /// Groups the columns the closure adds under one header cell labelled `label`, in a header
+    /// row above the column headers. Columns of a band that the user hides drop out of it; a
+    /// band shows one cell per run of its columns that stay next to each other and on the same
+    /// pinned side, so moving a column out of a band splits it.
+    ///
+    /// ```ignore
+    /// DataGrid::of(search_products)
+    ///     .column(Product::name)
+    ///     .band(t!("stock.prices"), |b| b
+    ///         .column(Product::price)
+    ///         .column(Product::cost))
+    /// ```
+    pub fn band<G: Into<DataGrid<E>>>(
+        mut self,
+        label: impl Into<Text>,
+        columns: impl FnOnce(DataGrid<E>) -> G,
+    ) -> Self {
+        let first = self.columns.len();
+        let band = self.bands.len();
+        self.bands.push(label.into());
+        let mut grid = columns(self).into();
+        for c in grid.columns.iter_mut().skip(first) {
+            c.band = c.band.or(Some(band));
+        }
+        grid
+    }
+
     /// Picks a highlight per row.
     pub fn row_style(
         mut self,
@@ -1450,13 +1499,77 @@ impl<E: Model> DataGrid<E> {
             }
         });
         query.sort.truncate(MAX_SORT);
+        if !self.search {
+            query.q.clear();
+        }
     }
 
-    /// Header row for the shown columns.
+    /// Band header row above the column headers, empty when no shown column is in a band. One
+    /// cell covers each run of cells that share a band and a pinned side: a `colgroup` header for
+    /// a band, an empty cell for the rest. A pinned run sticks at the offset of its first cell
+    /// at the start, or of its last cell at the end.
+    fn band_row(&self, r: &Render, cols: &[Shown], pins: &[&str]) -> String {
+        if cols
+            .iter()
+            .all(|s| self.columns[s.index].band.is_none())
+        {
+            return String::new();
+        }
+        let lead = self.lead(r);
+        let band_at = |pos: usize| {
+            pos.checked_sub(lead)
+                .and_then(|k| cols.get(k))
+                .and_then(|s| self.columns[s.index].band)
+        };
+        let side = |pos: usize| match pins[pos] {
+            p if p.contains("z-ps") => 1,
+            p if p.contains("z-pe") => 2,
+            _ => 0,
+        };
+        let mut out = String::from(r#"<tr class="z-band-row">"#);
+        let mut pos = 0;
+        while pos < pins.len() {
+            let band = band_at(pos);
+            let mut end = pos + 1;
+            while end < pins.len() && band_at(end) == band && side(end) == side(pos) {
+                end += 1;
+            }
+            let pin = match side(pos) {
+                1 if pins[end - 1].contains("edge") && !pins[pos].contains("edge") => {
+                    format!("{} z-pin-edge-s", pins[pos])
+                }
+                1 => pins[pos].to_string(),
+                2 if pins[pos].contains("edge") && !pins[end - 1].contains("edge") => {
+                    format!("{} z-pin-edge-e", pins[end - 1])
+                }
+                2 => pins[end - 1].to_string(),
+                _ => String::new(),
+            };
+            let span = end - pos;
+            match band {
+                Some(b) => out.push_str(&format!(
+                    r#"<th scope="colgroup" colspan="{span}" class="z-band{pin}" aria-colindex="{}">{}</th>"#,
+                    pos + 1,
+                    r.text(&self.bands[b])
+                )),
+                None => out.push_str(&format!(
+                    r#"<td colspan="{span}" class="z-band-gap{pin}" aria-colindex="{}"></td>"#,
+                    pos + 1
+                )),
+            }
+            pos = end;
+        }
+        out.push_str("</tr>");
+        out
+    }
+
+    /// Header rows for the shown columns: the band row when there are bands, then one header
+    /// cell per column.
     fn head_row(&self, r: &Render, cols: &[Shown]) -> String {
         let pins = self.pins(r, cols);
         let lead = self.lead(r);
-        let mut out = String::from("<tr>");
+        let mut out = self.band_row(r, cols, &pins);
+        out.push_str("<tr>");
         if self.expandable(r) {
             out.push_str(&format!(
                 r#"<th scope="col" class="z-expand-col{}" data-pin="start"><span class="z-sr-only">{}</span></th>"#,
@@ -1782,6 +1895,13 @@ impl<E: Model> DataGrid<E> {
         let scope = r.scope;
         let view = self.view_for(page.and_then(|p| p.view.as_ref()));
         let cols = self.layout(view);
+        if self.search {
+            out.push_str(&format!(
+                r#"<div class="z-grid-search" role="search"><span class="z-icon z-icon-search" aria-hidden="true"></span><input type="search" name="q" data-zeyn-grid-search data-testid="{scope}.grid.search" aria-label="{label}" placeholder="{label}" autocomplete="off" spellcheck="false" enterkeyhint="search" maxlength="{}"></div>"#,
+                crate::MAX_SEARCH_QUERY,
+                label = r.text(&Text::key("zeyn.grid.search")),
+            ));
+        }
         if self.selectable {
             let t = |k: &str| r.text(&Text::key(format!("zeyn.grid.{k}")));
             out.push_str(&format!(
@@ -2689,7 +2809,7 @@ impl<E: Model> GridSource for DataGrid<E> {
             .filter(|c| c.filter)
             .map(|c| c.meta.name)
             .collect();
-        json!({
+        let mut schema = json!({
             "type": "object",
             "properties": {
                 "page": {
@@ -2743,7 +2863,15 @@ impl<E: Model> GridSource for DataGrid<E> {
                     }
                 }
             }
-        })
+        });
+        if self.search {
+            schema["properties"]["q"] = json!({
+                "type": "string",
+                "maxLength": crate::MAX_SEARCH_QUERY,
+                "description": "Free text: rows whose text fields contain it, ignoring case and accents."
+            });
+        }
+        schema
     }
 }
 
@@ -2775,6 +2903,7 @@ impl<E: Model> Component for DataGrid<E> {
             "detail": self.detail.as_ref().map(|d| d.screen),
             "group_by": self.group_by.iter().map(|m| m.name).collect::<Vec<_>>(),
             "tree": self.tree.map(|m| m.name),
+            "search": self.search,
         })
     }
 

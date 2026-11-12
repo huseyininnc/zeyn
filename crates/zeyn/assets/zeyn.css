@@ -1837,6 +1837,49 @@ th[aria-sort="descending"] .z-sort::after {
 
 .z-bulk[hidden] { display: none; }
 
+/** Search box above a grid (`DataGrid::search`): a search input with a leading icon. */
+.z-grid-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  max-width: 24rem;
+  margin-block-end: calc(var(--z-space) * 2);
+}
+
+.z-grid-search > .z-icon {
+  position: absolute;
+  inset-inline-start: 10px;
+  color: var(--z-text-muted);
+  pointer-events: none;
+}
+
+.z-grid-search input {
+  width: 100%;
+  min-height: 36px;
+  padding-block: 0;
+  padding-inline: 34px 10px;
+  border: 1px solid var(--z-border-strong);
+  border-radius: var(--z-radius);
+  background: var(--z-surface);
+  color: var(--z-text);
+  font: inherit;
+}
+
+.z-grid-search input:focus-visible {
+  outline: 2px solid var(--z-focus);
+  outline-offset: 1px;
+}
+
+/** Band row of a grid with grouped headers: one cell per band, centered over its columns. */
+.z-grid .z-band-row > * { height: var(--z-row-head); background: var(--z-surface-2); }
+
+.z-grid th.z-band {
+  text-align: center;
+  font-weight: 600;
+  color: var(--z-text);
+  border-inline: 1px solid var(--z-border);
+}
+
 .z-bulk-count { font-weight: 500; margin-inline-end: auto; }
 
 /**

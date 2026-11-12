@@ -99,6 +99,40 @@ a la izquierda y a la derecha, ocultar, filtro, un selector de columnas y restab
 arrastrando o con las teclas de flecha (Shift para pasos mayores). Arrastrar un encabezado sobre otro encabezado
 del mismo grupo fijado mueve la columna; una pulsación corta sigue ordenando. Todo funciona de derecha a izquierda.
 
+## Búsqueda
+
+`search()` muestra un cuadro de búsqueda encima de la cuadrícula. Lo que escribe el usuario llega
+a la acción de la cuadrícula como `DataQuery::q` tras una breve pausa, con cada página, bloque,
+rama, acción masiva sobre todas las filas que coinciden y exportación; una búsqueda nueva cancela
+la petición anterior. `DataQuery::apply` y las capas de datos SQL la comparan con los campos de
+texto sin distinguir mayúsculas ni acentos, y nunca buscan en campos enmascarados. Una cuadrícula
+sin `search()` descarta cualquier `q` que envíe el cliente. El resultado se anuncia en la región
+viva de la cuadrícula, y `empty_filtered` aparece cuando una búsqueda no encuentra nada. El texto
+de búsqueda no forma parte de una vista guardada. Los agentes de IA encuentran `q` en el esquema
+de herramienta de la cuadrícula.
+
+## Encabezados de banda
+
+`band(label, |b| ...)` agrupa las columnas que añade el cierre bajo una sola celda de encabezado,
+en una fila encima de los encabezados de columna:
+
+```rust
+DataGrid::of(search_products)
+    .search()
+    .column(Product::code).pin_start()
+    .band(t!("stock.price_and_stock"), |b| b
+        .column(Product::price).avg()
+        .column(Product::stock).sum())
+    .column(Product::active)
+```
+
+Una banda es un `th` con `scope="colgroup"` y un `colspan` sobre sus columnas visibles; las celdas
+encima de columnas fuera de una banda quedan vacías. La fila de bandas sigue la disposición del
+usuario: las columnas ocultas salen de su banda, una banda muestra una celda por cada tramo de sus
+columnas que siguen juntas en el mismo lado fijado (mover una columna lejos la divide), los tramos
+fijados se quedan con sus columnas y la virtualización de columnas mantiene entera la fila de
+bandas. Las exportaciones y las copias no incluyen las bandas.
+
 ## Vistas guardadas
 
 La disposición del usuario (columnas mostradas en orden, anchos, columnas fijadas), el orden y los filtros forman un `DataGridView`.

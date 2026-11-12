@@ -116,6 +116,7 @@ fn app(identity: Identity) -> App {
         .feature(
             Feature::new("items")
                 .screen(list)
+                .screen(banded)
                 .api(search),
         )
 }
@@ -3452,4 +3453,122 @@ async fn dynamic_grids_offer_no_export_edit_or_row_items() {
     )
     .await;
     assert_eq!(run.status, StatusCode::NOT_FOUND, "{}", run.body);
+}
+
+#[screen(route = "/banded", permission = "items.read")]
+pub fn banded() -> Screen {
+    Screen::new("Banded").body(
+        DataGrid::of(search)
+            .search()
+            .selectable()
+            .exportable()
+            .column(Item::code)
+            .pin_start()
+            .band("Stock", |b| {
+                b.column(Item::price)
+                    .column(Item::qty)
+                    .column(Item::active)
+                    .hidden()
+            })
+            .column(Item::added),
+    )
+}
+
+fn banded_call(query: serde_json::Value) -> serde_json::Value {
+    serde_json::json!({ "screen": "banded", "node": 0, "query": query })
+}
+
+#[tokio::test]
+async fn search_box_sends_q_and_the_action_searches_text_fields() {
+    let router = router(reader());
+    let page = send(&router, get("/banded")).await;
+    assert!(
+        page.body
+            .contains(r#"<div class="z-grid-search" role="search">"#),
+        "{}",
+        page.body
+    );
+    assert!(page.body.contains(
+        r#"data-zeyn-grid-search data-testid="banded.grid.search" aria-label="Search rows""#
+    ));
+    let q = serde_json::json!({ "with_total": true, "q": "c-1" });
+    let r = send(&router, post("/_zeyn/grid", banded_call(q))).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    assert_eq!(r.json()["total"], 10, "{}", r.body);
+}
+
+#[tokio::test]
+async fn grids_without_search_drop_the_q_a_client_sends() {
+    let q = serde_json::json!({ "with_total": true, "q": "c-1" });
+    let r = send(&router(reader()), post("/_zeyn/grid", grid_call(q))).await;
+    assert_eq!(r.json()["total"], 20, "{}", r.body);
+    let page = send(&router(reader()), get("/items")).await;
+    assert!(
+        !page
+            .body
+            .contains("data-zeyn-grid-search")
+    );
+}
+
+#[tokio::test]
+async fn export_keeps_the_search_text() {
+    let q = r#"{"q":"C-1"}"#;
+    let r = send(
+        &router(reader()),
+        get(&format!(
+            "/_zeyn/grid/export?screen=banded&node=0&q={}",
+            q.replace('"', "%22")
+                .replace('{', "%7B")
+                .replace('}', "%7D")
+        )),
+    )
+    .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.body);
+    assert_eq!(r.body.trim_end().lines().count(), 11, "{}", r.body);
+}
+
+#[tokio::test]
+async fn band_row_groups_shown_columns_under_colgroup_headers() {
+    let page = send(&router(reader()), get("/banded")).await;
+    let band = r#"<tr class="z-band-row"><td colspan="2" class="z-band-gap z-pin z-ps1 z-pin-edge-s" aria-colindex="1"></td><th scope="colgroup" colspan="2" class="z-band" aria-colindex="3">Stock</th><td colspan="1" class="z-band-gap" aria-colindex="5"></td></tr><tr>"#;
+    assert!(page.body.contains(band), "{}", page.body);
+    assert_eq!(page.body.matches("z-band-row").count(), 1);
+}
+
+#[tokio::test]
+async fn moving_a_column_out_of_a_band_splits_it_and_pins_keep_their_side() {
+    let call = serde_json::json!({
+        "screen": "banded",
+        "node": 0,
+        "head": true,
+        "query": {},
+        "view": { "columns": [
+            { "field": "price", "pin": "start" },
+            { "field": "code" },
+            { "field": "qty" },
+            { "field": "added" }
+        ] }
+    });
+    let r = send(&router(reader()), post("/_zeyn/grid", call)).await;
+    let head = r.json()["head"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert!(
+        head.contains(r#"<td colspan="1" class="z-band-gap z-pin z-ps1" aria-colindex="1"></td><th scope="colgroup" colspan="1" class="z-band z-pin z-ps2 z-pin-edge-s" aria-colindex="2">Stock</th><td colspan="1" class="z-band-gap" aria-colindex="3"></td><th scope="colgroup" colspan="1" class="z-band" aria-colindex="4">Stock</th>"#),
+        "{head}"
+    );
+}
+
+#[test]
+fn search_shows_in_the_grid_schema_and_the_agent_tool() {
+    let grid = DataGrid::of(search)
+        .search()
+        .column(Item::code)
+        .done();
+    assert_eq!(zeyn::Component::schema(&grid)["search"], true);
+    assert_eq!(
+        zeyn::GridSource::tool_schema(&grid)["properties"]["q"]["maxLength"],
+        zeyn::MAX_SEARCH_QUERY
+    );
 }

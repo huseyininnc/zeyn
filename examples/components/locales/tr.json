@@ -302,6 +302,7 @@
         "overview": "Örnek",
         "confirm_actions": "Önce soran satır ve toplu işlemler",
         "numbers": "Yerel ayara göre gruplanmış sayılar, düz bir yıl",
+        "search_and_bands": "Arama kutusu ve bir bant altında toplanan sütunlar",
         "computed_million": "Sayfa sayfa üretilen bir milyon hesaplanmış satır",
         "dynamic_columns": "Satırlarla gelen sütunlar: 30 sütunlu 10.000 satır"
       },

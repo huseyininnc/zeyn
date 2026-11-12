@@ -135,7 +135,7 @@ async function submitForm(form, submitter) {
 function exportServer(grid, format) {
   const s = grids.get(grid);
   const a = address(grid);
-  const q = JSON.stringify({ sort: s?.sort ?? [], filters: s ? G?.filterList(s) : [], columns: s?.columns ?? [] });
+  const q = JSON.stringify({ sort: s?.sort ?? [], filters: s ? G?.filterList(s) : [], q: s?.q ?? '', columns: s?.columns ?? [] });
   const params = a.params == null ? '' : `&params=${encodeURIComponent(JSON.stringify(a.params))}`;
   const link = document.createElement('a');
   link.href = `${BASE}/_zeyn/grid/export?screen=${encodeURIComponent(a.screen)}&node=${a.node}${params}&format=${format}&q=${encodeURIComponent(q)}`;
