@@ -163,7 +163,11 @@ pub use grid::{
     MAX_DYNAMIC_COLUMNS, MAX_PAGE_CELLS, MAX_PAGE_TEXT, MAX_PINNED, MAX_SORT, MemoryViewStore,
     Paging, Pin, RowStyle, Tone, VIRTUAL_LIVE_ROWS, VIRTUAL_WIDE_COLUMNS, position_cursor, total,
 };
-pub use i18n::{I18n, NumberFormat, Text};
+#[doc(hidden)]
+pub use i18n::__plural;
+pub use i18n::{
+    I18n, NumberFormat, PluralCount, Text, format_message, parse_cases, plural_category,
+};
 pub use import::{
     Checked, CsvError, DEFAULT_MAX_ROWS, HARD_MAX_ROWS, Import, ImportFile, ImportSource,
     MAX_CSV_BYTES, RowError, check_csv, check_file, error_report, parse_csv,
