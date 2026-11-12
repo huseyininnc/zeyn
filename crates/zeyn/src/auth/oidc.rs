@@ -184,8 +184,8 @@ impl OidcAuth {
     /// Keeps the refresh token in the session cookie and refreshes the tokens when they expire,
     /// so a user who is disabled or signed out at the provider loses the session within one token
     /// lifetime. Off unless set; without it the session lasts `session_lifetime`.
-    pub fn refresh_tokens(mut self, on: bool) -> Self {
-        self.refresh = on;
+    pub fn refresh_tokens(mut self) -> Self {
+        self.refresh = true;
         self
     }
 

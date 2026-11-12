@@ -257,5 +257,5 @@ async fn accounts(app: App, config: &Config, mailer: zeyn::Mailer) -> std::io::R
     }
     Ok(app
         .accounts(accounts)
-        .feature(accounts::ui().admin(true).build()))
+        .feature(accounts::ui().admin().build()))
 }

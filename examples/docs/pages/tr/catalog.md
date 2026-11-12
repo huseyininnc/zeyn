@@ -20,8 +20,8 @@ CardGrid::of(catalog_products)
             .badge(Badge::new(t!("shop.new")).tone(Tone::Success))
             .link(shop_product, ProductPage { id: p.id })
     })
-    .sort_option(t!("shop.sort.name"), Product::name, false)
-    .sort_option(t!("shop.sort.cheapest"), Product::price, false)
+    .sort_option(t!("shop.sort.name"), Product::name)
+    .sort_option(t!("shop.sort.cheapest"), Product::price)
     .image_size(300, 300)
     .paging(Paging::infinite(24))
 ```
@@ -92,13 +92,13 @@ Repeat::of(order.steps.iter(), |s| Badge::new(s.name.clone())).separator(Paragra
 
 Rail, yana kayan tek satıra dizilmiş bir kart ızgarasıdır; kaydırma yakalama (snap) ve bir görünüm genişliği kadar kaydıran önceki ve sonraki düğmeleri vardır (kullanıcı azaltılmış hareket istemediyse yumuşakça). Kullanıcı sonuna yaklaştıkça sonraki grubu, 12'şer 12'şer yükler. Kartlar sekme sırasında yer alan bağlantılardır ve odak aldıklarında görünüme kayarlar.
 
-Kaydırma çubuğu gizlidir; dokunmatik ekran, dokunmatik yüzey ve Shift+tekerlek yine kaydırır, `.scrollbar(true)` ince bir çubuk bırakır. Fareyle basılı tutup şeridi yana sürükleyebilirsiniz. 5 pikselden fazla hareketten sonra bırakıştaki tıklama iptal edilir, böylece işaretçinin altındaki kart açılmaz ve şerit en yakın karta oturur; daha küçük bir hareket normal bir tıklamadır. Sürüklerken metin seçilmez, görseller dışarı sürüklenmez ve kart önizlemesi açılmaz. Dokunmatikte tarayıcının kendi kaydırması kalır. Önceki ve sonraki düğmeleri her zaman vardır ve uçlarda devre dışı kalır, çünkü gizli bir kaydırma çubuğu klavye için bir kaydırma yolu değildir. JavaScript olmadan düğmeler gizlenir ve şerit tarayıcının kendi kaydırmasıyla kayar.
+Kaydırma çubuğu gizlidir; dokunmatik ekran, dokunmatik yüzey ve Shift+tekerlek yine kaydırır, `.scrollbar()` ince bir çubuk bırakır. Fareyle basılı tutup şeridi yana sürükleyebilirsiniz. 5 pikselden fazla hareketten sonra bırakıştaki tıklama iptal edilir, böylece işaretçinin altındaki kart açılmaz ve şerit en yakın karta oturur; daha küçük bir hareket normal bir tıklamadır. Sürüklerken metin seçilmez, görseller dışarı sürüklenmez ve kart önizlemesi açılmaz. Dokunmatikte tarayıcının kendi kaydırması kalır. Önceki ve sonraki düğmeleri her zaman vardır ve uçlarda devre dışı kalır, çünkü gizli bir kaydırma çubuğu klavye için bir kaydırma yolu değildir. JavaScript olmadan düğmeler gizlenir ve şerit tarayıcının kendi kaydırmasıyla kayar.
 
 ```rust
 Rail::of(catalog_products)
     .title(t!("shop.new_arrivals"))
     .card(|p: &Product| Card::image(p.image.clone(), p.name.clone()))
-    .sort_option(t!("shop.sort.newest"), Product::id, true)
+    .sort_option_desc(t!("shop.sort.newest"), Product::id)
 ```
 
 ## Arama kutusu

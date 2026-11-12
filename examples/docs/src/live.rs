@@ -491,7 +491,7 @@ pub fn example(name: &str, ctx: &Ctx) -> Option<Node> {
                     .meta(format!("{} in stock", p.stock))
                     .link(crate::introduction, ())
             })
-            .sort_option("Name", Sample::name, false)
+            .sort_option("Name", Sample::name)
             .paging(Paging::infinite(5))
             .into(),
         "people" => Stack::new()

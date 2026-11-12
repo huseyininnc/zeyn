@@ -423,7 +423,7 @@ Dışarıdaki AI ajanları uygulamaya, ikisi de varsayılan olarak kapalı olan 
 | `Mcp::read_only()` | on | on | no |
 | `Mcp::on()` | on | on | form saves and API actions that write |
 
-`.server(false)` ve `.webmcp(false)` bir kapıyı kapatır. `zeyn new` ile oluşturulan yeni projeler `Mcp::read_only()` ile başlar.
+`.no_server()` ve `.no_webmcp()` bir kapıyı kapatır. `zeyn new` ile oluşturulan yeni projeler `Mcp::read_only()` ile başlar.
 
 Neden kapalı: endpoint, geçerli bir `Authorization` başlığına sahip herkesin uygulamayı bir model üzerinden yönetmesine izin verir ve bir model okuduğu verilerle yönlendirilebilir. Framework her uygulamayı ajanlara hazır hale getirir (araçlar koddan üretilir, yazılacak bir şey yoktur), ancak bir uygulamanın bu kapıyı açıp açmayacağı ve ajanların yazıp yazamayacağı, uygulamayı işletenlerin kararıdır. Salt okunur mod tek satır uzaklıktadır.
 

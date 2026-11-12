@@ -20,8 +20,8 @@ CardGrid::of(catalog_products)
             .badge(Badge::new(t!("shop.new")).tone(Tone::Success))
             .link(shop_product, ProductPage { id: p.id })
     })
-    .sort_option(t!("shop.sort.name"), Product::name, false)
-    .sort_option(t!("shop.sort.cheapest"), Product::price, false)
+    .sort_option(t!("shop.sort.name"), Product::name)
+    .sort_option(t!("shop.sort.cheapest"), Product::price)
     .image_size(300, 300)
     .paging(Paging::infinite(24))
 ```
@@ -91,13 +91,13 @@ Repeat::of(order.steps.iter(), |s| Badge::new(s.name.clone())).separator(Paragra
 
 A rail is a card grid laid out in one row that scrolls sideways, with scroll snapping and previous and next buttons that scroll by a view's width (smoothly unless the user asked for reduced motion). It loads the next batch, 12 at a time, as the user scrolls near its end. The cards are links in the tab order and scroll into view as they get focus.
 
-The scrollbar is hidden; touch, trackpad and Shift+wheel still scroll, and `.scrollbar(true)` keeps a thin bar. A mouse can press and drag the rail sideways. After a move of more than 5 pixels the click on release is cancelled, so the card under the pointer does not open, and the rail settles on the nearest card; a smaller move is a normal click. While dragging, text is not selected, images are not dragged out and no card preview opens. Touch keeps the browser's own scrolling. The previous and next buttons are always there, disabled at the ends, because a hidden scrollbar is no way to scroll for a keyboard. Without JavaScript the buttons are hidden and the rail scrolls natively.
+The scrollbar is hidden; touch, trackpad and Shift+wheel still scroll, and `.scrollbar()` keeps a thin bar. A mouse can press and drag the rail sideways. After a move of more than 5 pixels the click on release is cancelled, so the card under the pointer does not open, and the rail settles on the nearest card; a smaller move is a normal click. While dragging, text is not selected, images are not dragged out and no card preview opens. Touch keeps the browser's own scrolling. The previous and next buttons are always there, disabled at the ends, because a hidden scrollbar is no way to scroll for a keyboard. Without JavaScript the buttons are hidden and the rail scrolls natively.
 
 ```rust
 Rail::of(catalog_products)
     .title(t!("shop.new_arrivals"))
     .card(|p: &Product| Card::image(p.image.clone(), p.name.clone()))
-    .sort_option(t!("shop.sort.newest"), Product::id, true)
+    .sort_option_desc(t!("shop.sort.newest"), Product::id)
 ```
 
 ## Search box

@@ -423,7 +423,7 @@ Effect `{"effect":"refresh","topics":["sales"]}` 刷新这些主题的监听者�
 | `Mcp::read_only()` | on | on | no |
 | `Mcp::on()` | on | on | 表单保存和执行写入的 API action |
 
-`.server(false)` 和 `.webmcp(false)` 关闭其中一个入口。由 `zeyn new` 创建的新项目以 `Mcp::read_only()` 起步。
+`.no_server()` 和 `.no_webmcp()` 关闭其中一个入口。由 `zeyn new` 创建的新项目以 `Mcp::read_only()` 起步。
 
 为什么默认关闭：该端点允许任何持有有效 `Authorization` 请求头的人通过模型驱动应用，而模型可能被它所读取的数据所操纵。框架让每个应用都为代理做好准备（工具由代码生成，无需编写任何内容），但应用是否打开这个入口，以及代理是否可以写入，应由运行它的人决定。只读模式只需一行即可启用。
 
