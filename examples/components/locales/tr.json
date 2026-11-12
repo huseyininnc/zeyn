@@ -44,6 +44,7 @@
       "panel": "Daraltılabilen başlıklı bölüm.",
       "tabs": "Sekme listesinin arkasındaki paneller; ilk açılışta yüklenir.",
       "split": "Bir tutamakla boyutlanan iki bölme.",
+      "deferred": "Ekran göründükten sonra yüklenen bir parça; yavaş bir blok geri kalanı bekletmez.",
       "auto_grid": "Genişliğe sığdığı kadar sütun.",
       "heading": "h2 ile h6 arası bölüm başlıkları.",
       "paragraph": "Kaçışlanmış metin paragrafı; normal ya da sönük.",
@@ -333,6 +334,9 @@
         "overview": "Örnek"
       },
       "split": {
+        "overview": "Örnek"
+      },
+      "deferred": {
         "overview": "Örnek"
       },
       "spoiler": {

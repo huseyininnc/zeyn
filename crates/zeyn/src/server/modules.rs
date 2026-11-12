@@ -87,7 +87,12 @@ pub(crate) const MODULES: &[Module] = &[
     ),
     control(
         "tabs",
-        &["data-zeyn-toggle", "data-zeyn-tabs", "data-zeyn-split"],
+        &[
+            "data-zeyn-toggle",
+            "data-zeyn-tabs",
+            "data-zeyn-split",
+            "data-zeyn-defer",
+        ],
     ),
     control("dates", &["data-zeyn-date", "data-zeyn-filter-date"]),
     control(
