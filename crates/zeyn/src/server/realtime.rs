@@ -21,7 +21,11 @@ use futures_util::{SinkExt, StreamExt};
 use serde::Deserialize;
 use std::collections::HashMap;
 
+#[cfg(feature = "socket-client")]
+mod client;
 mod socket;
+#[cfg(feature = "socket-client")]
+pub use client::TestSocket;
 use socket::Peer;
 pub use socket::{Conn, Event, Target};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
@@ -37,6 +41,8 @@ const LOADER: &str = "/_zeyn/live.js";
 
 /// Attribute of an element that refreshes on a topic; the quote keeps user data from faking it.
 pub(super) const MARKER: &str = "data-zeyn-live=\"";
+/// Attribute of a node that reacts to a socket event ([`crate::ui::OnEvents`]).
+const EVENT_MARKER: &str = "data-zeyn-on=\"";
 
 /// First byte of a binary frame: a Y update (v1 encoding). Both directions.
 pub const FRAME_UPDATE: u8 = 1;
@@ -634,7 +640,7 @@ pub(super) fn is_asset(path: &str) -> bool {
 
 /// Adds the topic script to a full page whose screen subscribes to a topic.
 pub(super) fn head(st: &AppState, screen: &str, page: &mut String) {
-    if st.realtime.is_some() && screen.contains(MARKER) {
+    if holds(st, screen) {
         let tag = format!(
             r#"<script type="module" src="{}{LOADER}{}"></script></head>"#,
             crate::render::escape(&st.prefix),
@@ -646,7 +652,7 @@ pub(super) fn head(st: &AppState, screen: &str, page: &mut String) {
 
 /// Whether a screen loaded by `nav.js` subscribes to a topic (`x-zeyn-live: 1`).
 pub(super) fn holds(st: &AppState, screen: &str) -> bool {
-    st.realtime.is_some() && screen.contains(MARKER)
+    st.realtime.is_some() && (screen.contains(MARKER) || screen.contains(EVENT_MARKER))
 }
 
 /// Document ids: 1 to 64 letters, digits, `-`, `_` or `.`.
