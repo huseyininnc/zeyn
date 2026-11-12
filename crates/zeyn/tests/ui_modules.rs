@@ -233,6 +233,34 @@ async fn the_tree_drag_script_comes_only_with_a_draggable_tree() {
 }
 
 #[tokio::test]
+async fn the_drag_core_comes_only_with_a_module_that_drags() {
+    let (_, grid) = get("/trips").await;
+    assert!(links(&grid).contains(&"drag.js".to_string()));
+    for path in ["/plain", "/trip", "/plain-tree"] {
+        let (_, page) = get(path).await;
+        let linked = links(&page);
+        for name in ["drag.js", "net.js"] {
+            assert!(!linked.contains(&name.to_string()), "{path} links {name}");
+        }
+    }
+    let (_, runtime) = get("/_zeyn/zeyn.js").await;
+    assert!(
+        !runtime.contains("drag.js"),
+        "the core never loads the drag core itself"
+    );
+    let (_, grid_js) = get("/_zeyn/grid.js").await;
+    assert!(grid_js.contains("drag.js${new URL(import.meta.url).search}"));
+    for name in ["drag", "net"] {
+        let (status, body) = get(&format!("/_zeyn/{name}.js")).await;
+        assert_eq!(status, StatusCode::OK, "{name}.js");
+        assert!(body.contains("@module"), "{name}.js");
+        assert!(!body.contains("innerHTML"), "{name}.js writes no HTML");
+    }
+    let (_, net) = get("/_zeyn/net.js").await;
+    assert!(net.contains("'x-zeyn-csrf'") && net.contains("credentials: 'same-origin'"));
+}
+
+#[tokio::test]
 async fn every_module_in_the_table_is_served_and_imports_the_shared_part_by_its_own_build() {
     for (name, script, style) in table().await {
         if !script.is_empty() {
