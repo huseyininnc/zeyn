@@ -18,6 +18,7 @@ All notable changes to Zeyn are recorded here. The format follows [Keep a Change
 - Breaking: OpenID Connect sign out is `POST /_zeyn/auth/logout` with the CSRF token. `GET /_zeyn/auth/logout` no longer ends a session, so a link or an image on another site cannot sign a user out; it sends a signed out browser on to the provider, and one that still holds a session back to the app. Sign out links in the site shell and the idle sign out post first; links of your own add `data-zeyn-signout`.
 - Breaking: the `accounts` feature no longer serves `GET /_zeyn/account/signout`, so a link or image on another site cannot sign a user out. Signing out is `POST /_zeyn/account/logout` with the CSRF token, which the idle timeout now calls before it opens the sign in page.
 - The build id is computed on a background thread when the router is built, reading the executable in 64 KiB pieces, instead of on the first request with the whole executable in memory.
+- `PerTenant::get` builds a tenant's value once when several first requests arrive together, and keeps at most `MAX_TENANTS` (1024) tenants, dropping the one used longest ago; `PerTenant::max_tenants` changes the cap. `PerTenant` needs the `server` feature.
 
 ### Fixed
 

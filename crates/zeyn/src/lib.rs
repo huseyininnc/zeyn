@@ -189,10 +189,12 @@ pub use model::{
 pub use pdf::{MAX_PDF_DATA, MAX_PDF_ROWS, Pdf, PdfLink, PdfSource, PdfTemplate};
 pub use platform::{
     Config, ConfigSource, EnvSource, FixedLicense, JsonFileSource, License, LicenseSource,
-    Licensed, PerTenant, Secret, StaticSource, Tenant, TenantRequired,
+    Licensed, Secret, StaticSource, Tenant, TenantRequired,
 };
 #[cfg(feature = "signed-licenses")]
 pub use platform::{LicenseError, SignedLicenseFile};
+#[cfg(feature = "server")]
+pub use platform::{MAX_TENANTS, PerTenant};
 pub use prefs::{
     Choice, ClientPref, ClientPrefs, Consent, Draft, MAX_DRAFT_CHARS, MAX_DRAFTS,
     MAX_PREF_LIFETIME, PrefInfo, PrefKind, Purpose,
