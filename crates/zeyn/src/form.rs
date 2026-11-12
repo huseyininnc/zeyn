@@ -416,25 +416,43 @@ impl<M: Model> Form<M> {
         }
         for (field, kind, _) in &self.codes {
             if !matches!(self.control_of(field), Some(Control::Code(_))) {
-                check.problem(format!(
-                    "`{kind}` is set for `{field}`, which has no code control; add `.control({field}, Control::Code(CodeLang::Expression))` or another language"
-                ));
+                check.problem(
+                    crate::Problem::new(
+                        "Z0603",
+                        format!("`{kind}` is set for `{field}`, which has no code control"),
+                    )
+                    .why("the setting only applies to a code editor, so it would do nothing on the field's current control")
+                    .fix(format!("add `.control({field}, Control::Code(CodeLang::Expression))` or another language"))
+                    .docs("components/controls#code-editor"),
+                );
             }
         }
         for (field, source) in &self.depends {
             if self.lookup_of(field).is_none() {
-                check.problem(format!(
-                    "`depends_on` names `{field}`, which is not a lookup of this form; add it with `.lookup({field}, ...)` first"
-                ));
+                check.problem(
+                    crate::Problem::new(
+                        "Z0604",
+                        format!("`depends_on` names `{field}`, which is not a lookup of this form"),
+                    )
+                    .why("only lookups load their options from the server, so there is nothing to reload when the other field changes")
+                    .fix(format!("add it with `.lookup({field}, ...)` first"))
+                    .docs("language/forms#dependent-lookups"),
+                );
             }
             if field == source
                 || !self
                     .fields()
                     .any(|f| f.meta.name == *source)
             {
-                check.problem(format!(
-                    "lookup `{field}` depends on `{source}`, which is not another field of this form; add the field it depends on"
-                ));
+                check.problem(
+                    crate::Problem::new(
+                        "Z0605",
+                        format!("lookup `{field}` depends on `{source}`, which is not another field of this form"),
+                    )
+                    .why("the lookup reloads when the field it depends on changes, and that field is not on the form")
+                    .fix("add the field it depends on")
+                    .docs("language/forms#dependent-lookups"),
+                );
             }
         }
     }
@@ -1621,7 +1639,12 @@ where
 
     fn page_check(&self, check: &mut crate::ui::PageCheck) {
         if !self.form.drives.is_empty() {
-            check.problem("a form with `submit` cannot also `drive` topics; drive with a form without submit, or refresh after saving with `ui.refresh(...)` in `on_success`");
+            check.problem(
+                crate::Problem::new("Z0606", "a form with `submit` cannot also `drive` topics")
+                    .why("a submit form saves first, so refreshing listeners on every change would show data that is not saved")
+                    .fix("drive with a form without submit, or refresh after saving with `ui.refresh(...)` in `on_success`")
+                    .docs("language/forms#filter-forms"),
+            );
         }
         self.form.check_form(check);
     }

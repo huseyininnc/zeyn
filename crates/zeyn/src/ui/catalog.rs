@@ -1100,10 +1100,23 @@ impl<E: Model> Component for CardGrid<E> {
     fn page_check(&self, check: &mut super::PageCheck) {
         let scrolls = matches!(self.paging, Paging::Virtual { .. }) && self.list;
         if scrolls && self.builder.is_some() && self.row_height.is_none() {
-            check.problem("a virtual list with `builder` needs `.row_height(px)`: virtual rows have one fixed height");
+            check.problem(
+                crate::Problem::new(
+                    "Z0608",
+                    "a virtual list with `builder` needs `.row_height(px)`",
+                )
+                .why("virtual rows have one fixed height, which the list needs to know before it draws them")
+                .fix("add `.row_height(px)` with the height of one row")
+                .docs("components/catalog#card-grid"),
+            );
         }
         if scrolls && self.separator.is_some() {
-            check.problem("`separator` does not work with virtual scrolling, where every row has the same height; leave it out or page the list");
+            check.problem(
+                crate::Problem::new("Z0609", "`separator` does not work with virtual scrolling")
+                    .why("every virtual row has the same height, and separators would change the heights")
+                    .fix("leave it out or page the list")
+                    .docs("components/catalog#card-grid"),
+            );
         }
     }
 }
@@ -1343,7 +1356,12 @@ impl<E: Model> Component for SearchBox<E> {
 
     fn page_check(&self, check: &mut super::PageCheck) {
         if self.results.is_some() && !self.drives.is_empty() {
-            check.problem("a search box either opens a results screen (`results`) or refreshes listeners in place (`drives`), not both");
+            check.problem(
+                crate::Problem::new("Z0610", "a search box sets both `results` and `drives`")
+                    .why("a search box either opens a results screen or refreshes listeners in place, and cannot do both with one query")
+                    .fix("keep `results` for a search page, or `drives` to filter the current page")
+                    .docs("components/catalog#search-box"),
+            );
         }
         for t in &self.drives {
             check.drives(t);

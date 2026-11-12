@@ -530,65 +530,116 @@ pub(crate) fn problems(
                     .bytes()
                     .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"._-".contains(&b)))
         {
-            out.push(format!(
-                    "command `{}` has an id that is not usable in HTML\n  = help: use lower case letters, digits, dots, dashes and underscores, such as `sales.new_order`",
-                    c.id
-                ));
+            out.push(
+                crate::Problem::new(
+                    "Z0403",
+                    format!("command `{}` has an id that is not usable in HTML", c.id),
+                )
+                .why("the id is written into HTML attributes and test ids, and the runtime finds the command by it")
+                .fix("use lower case letters, digits, dots, dashes and underscores, such as `sales.new_order`")
+                .docs("components/shell#commands")
+                .to_string(),
+            );
         }
         if let Some((other, _)) = commands[..i]
             .iter()
             .find(|(o, d)| d.id == c.id && (check_each || o != owner))
         {
-            out.push(format!("command id `{}` is registered twice (in `{other}` and `{owner}`)\n  = help: give each command its own id", c.id));
+            out.push(
+                crate::Problem::new(
+                    "Z0404",
+                    format!(
+                        "command id `{}` is registered twice (in `{other}` and `{owner}`)",
+                        c.id
+                    ),
+                )
+                .why("the runtime runs a command by its id, so only one of the two could ever run")
+                .fix("give each command its own id")
+                .docs("components/shell#commands")
+                .to_string(),
+            );
         }
         let Some(raw) = c.shortcut.as_deref() else {
             continue;
         };
         let Some(keys) = normalize_shortcut(raw) else {
             if check_each {
-                out.push(format!(
-                    "command `{}` has the shortcut `{raw}`, which cannot be read\n  = help: write modifiers and one key joined by `+`, such as `Ctrl+Shift+O` or `Alt+F2`",
-                    c.id
-                ));
+                out.push(
+                    crate::Problem::new(
+                        "Z0405",
+                        format!("command `{}` has the shortcut `{raw}`, which cannot be read", c.id),
+                    )
+                    .why("a shortcut that cannot be read is not bound, so keyboard users lose it")
+                    .fix("write modifiers and one key joined by `+`, such as `Ctrl+Shift+O` or `Alt+F2`")
+                    .docs("components/shell#commands")
+                    .to_string(),
+                );
             }
             continue;
         };
         if check_each {
             if keys == palette {
-                out.push(format!(
-                    "command `{}` uses `{keys}`, which opens the command palette\n  = help: pick another shortcut; the palette lists the command anyway",
-                    c.id
-                ));
+                out.push(
+                    crate::Problem::new(
+                        "Z0406",
+                        format!("command `{}` uses `{keys}`, which opens the command palette", c.id),
+                    )
+                    .why("the palette takes the keys first, so the command would never run from them")
+                    .fix("pick another shortcut; the palette lists the command anyway")
+                    .docs("components/shell#the-command-palette")
+                    .to_string(),
+                );
             }
             match browser_shortcut(&keys) {
-                Some(BrowserShortcut::Reserved) => out.push(format!(
-                    "command `{}` uses `{keys}`, which the browser keeps and never passes to the page\n  = help: pick a free shortcut such as `Alt+Shift+{}`",
-                    c.id,
-                    keys.rsplit('+').next().unwrap_or("")
-                )),
-                Some(BrowserShortcut::Default) if !c.override_browser => out.push(format!(
-                    "command `{}` uses `{keys}`, which the browser uses (print, find, reload and the like)\n  = help: pick a free shortcut such as `Alt+Shift+{}`, or call `.override_browser()` to take it over on purpose",
-                    c.id,
-                    keys.rsplit('+').next().unwrap_or("")
-                )),
+                Some(BrowserShortcut::Reserved) => out.push(
+                    crate::Problem::new(
+                        "Z0407",
+                        format!("command `{}` uses `{keys}`, which the browser keeps and never passes to the page", c.id),
+                    )
+                    .why("the browser handles these keys itself (such as opening or closing tabs), so the command would never run from them")
+                    .fix(format!("pick a free shortcut such as `Alt+Shift+{}`", keys.rsplit('+').next().unwrap_or("")))
+                    .docs("components/shell#commands")
+                    .to_string(),
+                ),
+                Some(BrowserShortcut::Default) if !c.override_browser => out.push(
+                    crate::Problem::new(
+                        "Z0408",
+                        format!("command `{}` uses `{keys}`, which the browser uses (print, find, reload and the like)", c.id),
+                    )
+                    .why("users expect these keys to do what the browser does, so the command is not bound unless the app takes them over on purpose")
+                    .fix(format!("pick a free shortcut such as `Alt+Shift+{}`, or call `.override_browser()` to take it over on purpose", keys.rsplit('+').next().unwrap_or("")))
+                    .docs("components/shell#commands")
+                    .to_string(),
+                ),
                 _ => {}
             }
             if character_only(&keys) {
-                out.push(format!(
-                    "command `{}` uses `{keys}`, a single character key; WCAG 2.2 (2.1.4) does not allow it\n  = help: add Ctrl or Alt, such as `Ctrl+{}`",
-                    c.id,
-                    keys.rsplit('+').next().unwrap_or("")
-                ));
+                out.push(
+                    crate::Problem::new(
+                        "Z0409",
+                        format!("command `{}` uses `{keys}`, a single character key; WCAG 2.2 (2.1.4) does not allow it", c.id),
+                    )
+                    .why("speech input users and people who mistype would run the command by accident")
+                    .fix(format!("add Ctrl or Alt, such as `Ctrl+{}`", keys.rsplit('+').next().unwrap_or("")))
+                    .docs("components/shell#commands")
+                    .to_string(),
+                );
             }
         }
         if let Some((_, other, other_owner)) = seen
             .iter()
             .find(|(k, _, o)| *k == keys && (check_each || o != owner))
         {
-            out.push(format!(
-                "commands `{other}` and `{}` both use the shortcut `{keys}` (in `{other_owner}` and `{owner}`)\n  = help: give one of them another shortcut",
-                c.id
-            ));
+            out.push(
+                crate::Problem::new(
+                    "Z0410",
+                    format!("commands `{other}` and `{}` both use the shortcut `{keys}` (in `{other_owner}` and `{owner}`)", c.id),
+                )
+                .why("the keys can run only one command, so the other one would never run from the keyboard")
+                .fix("give one of them another shortcut")
+                .docs("components/shell#commands")
+                .to_string(),
+            );
         }
         seen.push((keys, c.id, owner));
     }
@@ -633,30 +684,65 @@ pub(crate) fn link_problems(
     }
     for (place, raw) in links {
         let Some(keys) = normalize_shortcut(raw) else {
-            out.push(format!(
-                "the link shortcut `{raw}` {place} cannot be read\n  = help: write modifiers and one key joined by `+`, such as `Alt+Shift+N`"
-            ));
+            out.push(
+                crate::Problem::new(
+                    "Z0411",
+                    format!("the link shortcut `{raw}` {place} cannot be read"),
+                )
+                .why("a shortcut that cannot be read is not bound, so keyboard users lose it")
+                .fix("write modifiers and one key joined by `+`, such as `Alt+Shift+N`")
+                .docs("components/content#link-shortcuts")
+                .to_string(),
+            );
             continue;
         };
         let key = keys.rsplit('+').next().unwrap_or("");
         match browser_shortcut(&keys) {
-            Some(BrowserShortcut::Reserved) => out.push(format!(
-                "the link shortcut `{keys}` {place} is kept by the browser and never reaches the page\n  = help: pick a free shortcut such as `Alt+Shift+{key}`"
-            )),
-            Some(BrowserShortcut::Default) => out.push(format!(
-                "the link shortcut `{keys}` {place} belongs to the browser (print, find, reload and the like)\n  = help: pick a free shortcut such as `Alt+Shift+{key}`"
-            )),
+            Some(BrowserShortcut::Reserved) => out.push(
+                crate::Problem::new(
+                    "Z0412",
+                    format!("the link shortcut `{keys}` {place} is kept by the browser and never reaches the page"),
+                )
+                .why("the browser handles these keys itself (such as opening or closing tabs), so the link would never open from them")
+                .fix(format!("pick a free shortcut such as `Alt+Shift+{key}`"))
+                .docs("components/content#link-shortcuts")
+                .to_string(),
+            ),
+            Some(BrowserShortcut::Default) => out.push(
+                crate::Problem::new(
+                    "Z0413",
+                    format!("the link shortcut `{keys}` {place} belongs to the browser (print, find, reload and the like)"),
+                )
+                .why("users expect these keys to do what the browser does, so link shortcuts never take them")
+                .fix(format!("pick a free shortcut such as `Alt+Shift+{key}`"))
+                .docs("components/content#link-shortcuts")
+                .to_string(),
+            ),
             None => {}
         }
         if character_only(&keys) {
-            out.push(format!(
-                "the link shortcut `{keys}` {place} is a single character key; WCAG 2.2 (2.1.4) does not allow it\n  = help: add Alt or Ctrl, such as `Alt+Shift+{key}`"
-            ));
+            out.push(
+                crate::Problem::new(
+                    "Z0414",
+                    format!("the link shortcut `{keys}` {place} is a single character key; WCAG 2.2 (2.1.4) does not allow it"),
+                )
+                .why("speech input users and people who mistype would follow the link by accident")
+                .fix(format!("add Alt or Ctrl, such as `Alt+Shift+{key}`"))
+                .docs("components/content#link-shortcuts")
+                .to_string(),
+            );
         }
         if let Some((_, other)) = seen.iter().find(|(k, _)| *k == keys) {
-            out.push(format!(
-                "the link shortcut `{keys}` {place} is also used by {other}\n  = help: give one of them another shortcut"
-            ));
+            out.push(
+                crate::Problem::new(
+                    "Z0415",
+                    format!("the link shortcut `{keys}` {place} is also used by {other}"),
+                )
+                .why("the keys can do only one thing, so the other link or command would never run from them")
+                .fix("give one of them another shortcut")
+                .docs("components/content#link-shortcuts")
+                .to_string(),
+            );
         }
         seen.push((keys, format!("the link {place}")));
     }

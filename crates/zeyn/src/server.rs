@@ -1030,7 +1030,11 @@ impl App {
         match &mut self.logo {
             Some(l) => l.dark = Some(path.to_string()),
             None => self.setup_problems.push(
-                "`App::logo_dark` was called without `App::logo`\n  = help: call `.logo(\"/static/logo.svg\")` too".into(),
+                crate::Problem::new("Z0112", "`App::logo_dark` was called without `App::logo`")
+                    .why("the dark logo only replaces the light one in the dark theme, so without `App::logo` there is nothing to replace and the shell draws the letter mark")
+                    .fix("call `.logo(\"/static/logo.svg\")` too")
+                    .docs("components/shell#the-app-header")
+                    .to_string(),
             ),
         }
         self
@@ -1094,8 +1098,13 @@ impl App {
         S: AsRef<str>,
     {
         parse_ranges(ranges).unwrap_or_else(|e| {
-            self.setup_problems
-                .push(format!("{what}: {e}"));
+            self.setup_problems.push(
+                crate::Problem::new("Z0203", format!("{what}: {e}"))
+                    .why("an address or range that cannot be read is dropped, so the proxy, deny or allow list would not be what the app asked for")
+                    .fix("write each entry as an IPv4 or IPv6 address or a CIDR range, such as `10.0.0.0/8` or `2001:db8::/32`")
+                    .docs("guides/security#limits")
+                    .to_string(),
+            );
             Vec::new()
         })
     }
@@ -1308,10 +1317,16 @@ impl App {
         {
             self.site_url = url.to_string();
         } else {
-            self.setup_problems.push(format!(
-                "site_url `{}` is not an https origin\n  = help: pass only the scheme and host, such as `https://shop.example`",
-                url.chars().take(80).collect::<String>()
-            ));
+            self.setup_problems.push(
+                crate::Problem::new(
+                    "Z0303",
+                    format!("site_url `{}` is not an https origin", url.chars().take(80).collect::<String>()),
+                )
+                .why("search engines and link previews need absolute https URLs; head tags and the sitemap build them from this origin")
+                .fix("pass only the scheme and host, such as `https://shop.example`")
+                .docs("guides/public-pages#search-engines-and-link-previews")
+                .to_string(),
+            );
         }
         self
     }
@@ -1475,6 +1490,8 @@ impl App {
     }
 
     /// Checks routes, screen names, menus and that every service a screen needs is registered.
+    /// Each problem is the text form of a [`crate::Problem`]: a summary line, then its reason,
+    /// fix, documentation link and stable code.
     pub fn check(&self) -> Result<(), Vec<String>> {
         let mut problems = self.setup_problems.clone();
         problems.extend(self.dev_auth_check());
@@ -1491,16 +1508,25 @@ impl App {
             .collect();
         if sitemaps.len() > 1 {
             problems.push(
-                "more than one feature has a sitemap\n  = help: keep one `Feature::sitemap` that lists every URL"
-                    .into(),
+                crate::Problem::new("Z0301", "more than one feature has a sitemap")
+                    .why("`/sitemap.xml` is one document, so only one source can answer it and the others would be lost")
+                    .fix("keep one `Feature::sitemap` that lists every URL")
+                    .docs("guides/public-pages#sitemap")
+                    .to_string(),
             );
         }
         for (feature, s) in &sitemaps {
             if !matches!(s.meta().access, crate::action::Access::Public) {
-                problems.push(format!(
-                    "the sitemap action `{}` of feature `{feature}` is not public\n  = help: `/sitemap.xml` is read by search engines without a session; mark the action `#[action(public)]`",
-                    s.meta().name
-                ));
+                problems.push(
+                    crate::Problem::new(
+                        "Z0302",
+                        format!("the sitemap action `{}` of feature `{feature}` is not public", s.meta().name),
+                    )
+                    .why("`/sitemap.xml` is read by search engines without a session, so an action with a permission would refuse them")
+                    .fix("mark the action `#[action(public)]`")
+                    .docs("guides/public-pages#sitemap")
+                    .to_string(),
+                );
             }
         }
         for f in &self.features {
@@ -1514,11 +1540,16 @@ impl App {
                 if let Some(other) = names.insert(s.meta.name, f.name())
                     && other != f.name()
                 {
-                    problems.push(format!(
-                        "screen `{}` is registered in features `{other}` and `{}`",
-                        s.meta.name,
-                        f.name()
-                    ));
+                    problems.push(
+                        crate::Problem::new(
+                            "Z0102",
+                            format!("screen `{}` is registered in features `{other}` and `{}`", s.meta.name, f.name()),
+                        )
+                        .why("a screen name addresses one screen; two features with the same screen make its route, menu entry and permission ambiguous")
+                        .fix("register the screen in one feature only, and link to it from the other")
+                        .docs("start/structure#a-feature")
+                        .to_string(),
+                    );
                 }
                 if let Some(path) = f.path_of(&s.meta) {
                     let shape: String = path
@@ -1529,18 +1560,30 @@ impl App {
                     if let Some(other) = paths.insert(shape, s.meta.name)
                         && other != s.meta.name
                     {
-                        problems.push(format!(
-                            "route `{path}` is used by screens `{other}` and `{}`",
-                            s.meta.name
-                        ));
+                        problems.push(
+                            crate::Problem::new(
+                                "Z0101",
+                                format!("route `{path}` is used by screens `{other}` and `{}`", s.meta.name),
+                            )
+                            .why("a request to the route can open only one screen, so one of them would never be reached")
+                            .fix("give one of the screens another route in `#[screen(route = \"...\")]`; routes that differ only in the names of their segments count as the same")
+                            .docs("language/screens#params-in-the-path")
+                            .to_string(),
+                        );
                     }
                 }
                 for dep in (s.deps)() {
                     if !self.services.contains(dep.id) {
-                        problems.push(format!(
-                            "screen `{}` needs service `{}`, which is not registered\n  = help: add `.service(...)` to the App",
-                            s.meta.name, dep.name
-                        ));
+                        problems.push(
+                            crate::Problem::new(
+                                "Z0103",
+                                format!("screen `{}` needs service `{}`, which is not registered", s.meta.name, dep.name),
+                            )
+                            .why("the screen takes the service as an argument, so every request to it would fail")
+                            .fix("add `.service(...)` to the App")
+                            .docs("start/structure#services")
+                            .to_string(),
+                        );
                     }
                 }
             }
@@ -1551,18 +1594,29 @@ impl App {
                     .iter()
                     .any(|b| b.meta.name == a.meta.name)
                 {
-                    problems.push(format!(
-                        "api `{}` is published twice in feature `{}`",
-                        a.meta.name,
-                        f.name()
-                    ));
+                    problems.push(
+                        crate::Problem::new(
+                            "Z0105",
+                            format!("api `{}` is published twice in feature `{}`", a.meta.name, f.name()),
+                        )
+                        .why("an API path is built from the feature and the action name, so both entries would claim the same path")
+                        .fix("remove one of the `.api(...)` calls")
+                        .docs("guides/api")
+                        .to_string(),
+                    );
                 }
                 for dep in (a.deps)() {
                     if !self.services.contains(dep.id) {
-                        problems.push(format!(
-                            "api `{}` needs service `{}`, which is not registered\n  = help: add `.service(...)` to the App",
-                            a.meta.name, dep.name
-                        ));
+                        problems.push(
+                            crate::Problem::new(
+                                "Z0104",
+                                format!("api `{}` needs service `{}`, which is not registered", a.meta.name, dep.name),
+                            )
+                            .why("the action takes the service as an argument, so every call to the API would fail")
+                            .fix("add `.service(...)` to the App")
+                            .docs("start/structure#services")
+                            .to_string(),
+                        );
                     }
                 }
             }
@@ -1573,11 +1627,16 @@ impl App {
                 if let Some(other) = media.insert(m.name, f.name())
                     && other != f.name()
                 {
-                    problems.push(format!(
-                        "media source `{}` is registered in features `{other}` and `{}`",
-                        m.name,
-                        f.name()
-                    ));
+                    problems.push(
+                        crate::Problem::new(
+                            "Z0501",
+                            format!("media source `{}` is registered in features `{other}` and `{}`", m.name, f.name()),
+                        )
+                        .why("media URLs carry the source name, so a name used twice would serve files from only one of them")
+                        .fix("give one of the sources another name")
+                        .docs("components/media#serving-files")
+                        .to_string(),
+                    );
                 }
             }
         }
@@ -1587,11 +1646,16 @@ impl App {
         {
             for dep in (s.deps)() {
                 if !self.services.contains(dep.id) {
-                    problems.push(format!(
-                        "error screen `{}` needs service `{}`, which is not registered
-  = help: add `.service(...)` to the App",
-                        s.meta.name, dep.name
-                    ));
+                    problems.push(
+                        crate::Problem::new(
+                            "Z0106",
+                            format!("error screen `{}` needs service `{}`, which is not registered", s.meta.name, dep.name),
+                        )
+                        .why("the error page would fail itself, and users would get a bare error instead")
+                        .fix("add `.service(...)` to the App")
+                        .docs("language/screens#error-pages")
+                        .to_string(),
+                    );
                 }
             }
         }
@@ -1601,17 +1665,29 @@ impl App {
             };
             for screen in shell.linked_screens() {
                 if !names.contains_key(screen) {
-                    problems.push(format!(
-                        "feature `{}`: the site footer links to screen `{screen}`, which is not registered",
-                        f.name()
-                    ));
+                    problems.push(
+                        crate::Problem::new(
+                            "Z0304",
+                            format!("feature `{}`: the site footer links to screen `{screen}`, which is not registered", f.name()),
+                        )
+                        .why("the link has no route to point to, so every visitor would get a broken link")
+                        .fix("register the screen in a feature, or remove the link from the footer")
+                        .docs("components/shell#the-site-shell")
+                        .to_string(),
+                    );
                 }
             }
             for url in shell.bad_urls() {
-                problems.push(format!(
-                    "feature `{}`: the site footer link `{url}` is not a path, https, http or mailto address",
-                    f.name()
-                ));
+                problems.push(
+                    crate::Problem::new(
+                        "Z0305",
+                        format!("feature `{}`: the site footer link `{url}` is not a path, https, http or mailto address", f.name()),
+                    )
+                    .why("other schemes, such as `javascript:`, can run code or leave the page in ways the CSP does not allow")
+                    .fix("use a path such as `/about`, or an `https://`, `http://` or `mailto:` address")
+                    .docs("components/shell#the-site-shell")
+                    .to_string(),
+                );
             }
         }
         if let Some(home) = self.home {
@@ -1620,9 +1696,16 @@ impl App {
                     .iter()
                     .any(|s| s.meta.name == home && s.meta.route.is_some())
             }) {
-                problems.push(format!(
-                    "home screen `{home}` is not registered or has no route"
-                ));
+                problems.push(
+                    crate::Problem::new(
+                        "Z0107",
+                        format!("home screen `{home}` is not registered or has no route"),
+                    )
+                    .why("`/` opens the home screen, so without a registered screen with a route the start page would be missing")
+                    .fix("register the screen in a feature and give it `#[screen(route = \"...\")]`, or pick another home screen")
+                    .docs("language/screens#features-and-the-menu")
+                    .to_string(),
+                );
             }
             if self
                 .features
@@ -1630,10 +1713,16 @@ impl App {
                 .flat_map(|f| f.screens())
                 .any(|s| s.meta.name == home && crate::screen::route_has_segments(s.meta.route))
             {
-                problems.push(format!(
-                    "home screen `{home}` has path segments in its route
-  = help: `/` cannot fill them; make a screen without segments the home screen"
-                ));
+                problems.push(
+                    crate::Problem::new(
+                        "Z0108",
+                        format!("home screen `{home}` has path segments in its route"),
+                    )
+                    .why("`/` has no values for the segments of the route, so the screen could not be opened from it")
+                    .fix("make a screen without segments the home screen")
+                    .docs("language/screens#params-in-the-path")
+                    .to_string(),
+                );
             }
         }
         let commands: Vec<(&str, &crate::command::Command)> = self
@@ -1669,19 +1758,30 @@ impl App {
             ));
         }
         match crate::command::normalize_shortcut(&self.palette_keys) {
-            None => problems.push(format!(
-                "the palette shortcut `{}` cannot be read
-  = help: write modifiers and one key joined by `+`, such as `Alt+Shift+P`",
-                self.palette_keys
-            )),
+            None => problems.push(
+                crate::Problem::new(
+                    "Z0416",
+                    format!("the palette shortcut `{}` cannot be read", self.palette_keys),
+                )
+                .why("the command palette would have no keyboard shortcut, and keyboard users could not open it")
+                .fix("write modifiers and one key joined by `+`, such as `Alt+Shift+P`")
+                .docs("components/shell#the-command-palette")
+                .to_string(),
+            ),
             Some(k)
                 if crate::command::browser_shortcut(&k)
                     == Some(crate::command::BrowserShortcut::Reserved) =>
             {
-                problems.push(format!(
-                    "the palette shortcut `{k}` is kept by the browser and never reaches the page
-  = help: pick a free shortcut such as `Alt+Shift+P`"
-                ))
+                problems.push(
+                    crate::Problem::new(
+                        "Z0417",
+                        format!("the palette shortcut `{k}` is kept by the browser and never reaches the page"),
+                    )
+                    .why("the browser handles these keys itself (such as opening or closing tabs), so the palette would never open from the keyboard")
+                    .fix("pick a free shortcut such as `Alt+Shift+P`")
+                    .docs("components/shell#the-command-palette")
+                    .to_string(),
+                )
             }
             _ => {}
         }
@@ -1692,10 +1792,19 @@ impl App {
                 || (file.path == "/llms.txt" && self.llms_txt.is_some())
                 || paths.contains_key(file.path);
             if taken {
-                problems.push(format!(
-                    "the public file `{}` answers a path the app already serves\n  = help: rename or remove the file in `public/`, or drop the other route",
-                    file.path
-                ));
+                problems.push(
+                    crate::Problem::new(
+                        "Z0306",
+                        format!(
+                            "the public file `{}` answers a path the app already serves",
+                            file.path
+                        ),
+                    )
+                    .why("two handlers on one path stop the router from starting, or one of them is never reached")
+                    .fix("rename or remove the file in `public/`, or drop the other route")
+                    .docs("guides/public-pages#the-public-folder")
+                    .to_string(),
+                );
             }
         }
         problems.extend(self.theme_problems());
@@ -1708,8 +1817,12 @@ impl App {
         }
     }
 
-    /// Machine readable description of the app, used by `zeyn mcp` and `zeyn routes`.
+    /// Machine readable description of the app, used by `zeyn mcp`, `zeyn routes` and
+    /// `zeyn check`. `problems` holds the problems of [`App::check`] as text, and
+    /// `problem_details` the same problems as objects with `code`, `summary`, `why`, `fix` and
+    /// `docs` (see [`crate::Problem`]).
     pub fn describe(&self) -> Json {
+        let problems = self.check().err().unwrap_or_default();
         json!({
             "name": self.i18n.text(self.i18n.default_locale(), &self.name),
             "locales": self.i18n.locales(),
@@ -1739,7 +1852,8 @@ impl App {
                 "commands": f.commands().iter().map(crate::command::Command::schema).collect::<Vec<_>>(),
             })).collect::<Vec<_>>(),
             "missing_translations": self.i18n.missing_keys(),
-            "problems": self.check().err().unwrap_or_default(),
+            "problems": problems,
+            "problem_details": problems.iter().map(|p| crate::problem_json(p)).collect::<Vec<_>>(),
         })
     }
 
@@ -3588,7 +3702,11 @@ fn logo_problem(path: &str) -> Option<String> {
             .chars()
             .all(|c| c.is_ascii_graphic() && !"\"'<>`\\".contains(c));
     (!ok).then(|| {
-        format!("logo `{path}` is not a path on the app's origin\n  = help: serve the file from the app and pass its path, such as `/static/logo.svg`")
+        crate::Problem::new("Z0111", format!("logo `{path}` is not a path on the app's origin"))
+    .why("the page's CSP loads images from the app only, so a logo from elsewhere would not show")
+    .fix("serve the file from the app and pass its path, such as `/static/logo.svg`")
+    .docs("components/shell#the-app-header")
+    .to_string()
     })
 }
 

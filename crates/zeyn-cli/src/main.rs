@@ -241,10 +241,11 @@ Usage:
                                           a flat screens.rs is first moved to screens/mod.rs
                                           Short forms: g f, g s
   zeyn routes                             list features, screens, routes, APIs and access
-  zeyn check [--fix]                      compile and report structural problems and missing translations;
+  zeyn check [--fix] [--json]             compile and report structural problems and missing translations;
                                           warns about unregistered screens and actions and crowded flat
-                                          screens.rs or actions.rs files;
-                                          --fix first rewrites renamed Zeyn APIs in src, tests and examples
+                                          screens.rs or actions.rs files; every problem has a stable code;
+                                          --fix first rewrites renamed Zeyn APIs in src, tests and examples;
+                                          --json prints one JSON document with codes, reasons and fixes
   zeyn dev                                run the app, rebuild and restart on every change; the browser
                                           follows without a page reload
   zeyn build-desktop [--package <name>] [--features <list>]
@@ -285,19 +286,23 @@ fn main() -> ExitCode {
             "unknown generator `{kind}` or wrong arguments; use `zeyn g feature <name>` (g f) or `zeyn g screen <feature> <name>` (g s)"
         )),
         ["routes"] => describe(Path::new(".")).map(|d| print!("{}", routes_table(&d))),
-        ["check", rest @ ..] => fix_if(Path::new("."), rest.contains(&"--fix"))
-            .and_then(|fixed| check(Path::new(".")).map(|r| fixed + &r))
-            .and_then(|report| {
-                print!("{report}");
-                if report
-                    .lines()
-                    .any(|l| l.starts_with("error") || l.contains(": error"))
-                {
-                    Err("the app has problems".into())
-                } else {
-                    Ok(())
-                }
-            }),
+        ["check", rest @ ..] => fix_if(Path::new("."), rest.contains(&"--fix")).and_then(|fixed| {
+            let report = check(Path::new("."))?;
+            if rest.contains(&"--json") {
+                eprint!("{fixed}");
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&report).unwrap_or_default()
+                );
+            } else {
+                print!("{fixed}{}", check_text(&report));
+            }
+            if report["ok"] == true {
+                Ok(())
+            } else {
+                Err("the app has problems".into())
+            }
+        }),
         ["dev"] => dev::run(Path::new(".")),
         ["build-desktop", rest @ ..] => desktop::build(
             Path::new("."),
@@ -723,35 +728,120 @@ fn string_end(chars: &[char], i: usize) -> usize {
     chars.len()
 }
 
-/// Compiles, then reports structural problems and missing translations.
-fn check(root: &Path) -> Result<String, String> {
+/// Code of the problem reported when the app does not compile. App problems use `Z01xx` to
+/// `Z06xx` (see `zeyn::Problem`); warnings of `zeyn check` use `W01xx`.
+const NOT_COMPILED: &str = "Z0001";
+
+/// Warning code: a translation key is missing in a language.
+const MISSING_TRANSLATION: &str = "W0105";
+
+/// Compiles, then reports structural problems and missing translations as one JSON document:
+/// `{ "ok": bool, "errors": [{code, summary, why, fix, docs}], "warnings": [{code, message}] }`,
+/// plus `compiler` with the compiler's output when the app does not compile.
+fn check(root: &Path) -> Result<Value, String> {
     let out = Command::new("cargo")
         .args(["check", "--quiet", "--message-format=short"])
         .current_dir(root)
         .output()
         .map_err(|e| format!("cargo could not be started: {e}"))?;
-    let mut report = String::new();
     if !out.status.success() {
-        report.push_str(&String::from_utf8_lossy(&out.stderr));
-        return Ok(report);
+        return Ok(json!({
+            "ok": false,
+            "errors": [{
+                "code": NOT_COMPILED,
+                "summary": "the app does not compile",
+                "why": "zeyn check runs the app to read its own checks, which needs a build",
+                "fix": "fix the compiler errors in `compiler`, then run zeyn check again",
+                "docs": "https://docs.zeynsoft.com/start/cli#checking-an-app",
+            }],
+            "warnings": [],
+            "compiler": String::from_utf8_lossy(&out.stderr),
+        }));
     }
     let d = describe(root)?;
-    for p in d["problems"]
+    Ok(check_report(&d, &check_warnings(root, &d)))
+}
+
+/// The JSON report of `zeyn check` from the app's description and the warnings. Problems of
+/// apps built with a Zeyn release without `problem_details` keep their text as the summary.
+fn check_report(d: &Value, warnings: &[(&str, String)]) -> Value {
+    let errors: Vec<Value> = match d["problem_details"].as_array() {
+        Some(details) => details.clone(),
+        None => d["problems"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|p| json!({ "code": "", "summary": p, "why": "", "fix": "", "docs": "" }))
+            .collect(),
+    };
+    json!({
+        "ok": errors.is_empty(),
+        "errors": errors,
+        "warnings": warnings
+            .iter()
+            .map(|(code, message)| json!({ "code": code, "message": message }))
+            .collect::<Vec<_>>(),
+    })
+}
+
+/// The text form of a `zeyn check` report: `error:` blocks with their reason, fix, docs link
+/// and code, then `warning[code]:` lines, or `ok: no problems found`.
+fn check_text(report: &Value) -> String {
+    let mut text = String::new();
+    if let Some(compiler) = report["compiler"].as_str() {
+        return compiler.to_string();
+    }
+    for e in report["errors"]
         .as_array()
         .into_iter()
         .flatten()
     {
-        report.push_str(&format!("error: {}\n", p.as_str().unwrap_or("")));
+        let field = |k: &str| e[k].as_str().unwrap_or("").to_string();
+        text.push_str(&format!("error: {}\n", field("summary")));
+        for (label, key) in [
+            ("why", "why"),
+            ("help", "fix"),
+            ("docs", "docs"),
+            ("code", "code"),
+        ] {
+            let value = field(key);
+            if !value.is_empty() {
+                text.push_str(&format!("  = {label}: {value}\n"));
+            }
+        }
     }
+    for w in report["warnings"]
+        .as_array()
+        .into_iter()
+        .flatten()
+    {
+        text.push_str(&format!(
+            "warning[{}]: {}\n",
+            w["code"].as_str().unwrap_or(""),
+            w["message"].as_str().unwrap_or("")
+        ));
+    }
+    if text.is_empty() {
+        text.push_str("ok: no problems found\n");
+    }
+    text
+}
+
+/// The warnings of `zeyn check` with their codes: missing translations, layout and topics.
+fn check_warnings(root: &Path, d: &Value) -> Vec<(&'static str, String)> {
+    let mut warnings = Vec::new();
     for m in d["missing_translations"]
         .as_array()
         .into_iter()
         .flatten()
     {
-        report.push_str(&format!(
-            "warning: translation `{}` is missing in `{}`\n",
-            m[1].as_str().unwrap_or(""),
-            m[0].as_str().unwrap_or("")
+        warnings.push((
+            MISSING_TRANSLATION,
+            format!(
+                "translation `{}` is missing in `{}`",
+                m[1].as_str().unwrap_or(""),
+                m[0].as_str().unwrap_or("")
+            ),
         ));
     }
     let registered: Vec<String> = d["features"]
@@ -787,16 +877,9 @@ fn check(root: &Path) -> Result<String, String> {
             ))
         })
         .collect();
-    for w in generate::layout_warnings(&files, &registered)
-        .into_iter()
-        .chain(generate::topic_warnings(&files))
-    {
-        report.push_str(&format!("warning: {w}\n"));
-    }
-    if report.is_empty() {
-        report.push_str("ok: no problems found\n");
-    }
-    Ok(report)
+    warnings.extend(generate::layout_warnings(&files, &registered));
+    warnings.extend(generate::topic_warnings(&files));
+    warnings
 }
 
 fn tool(name: &str, description: &str, properties: Value, required: &[&str]) -> Value {
@@ -867,7 +950,7 @@ fn call_tool(name: &str, args: &Value) -> Result<String, String> {
             describe(root).map(|d| serde_json::to_string_pretty(&d).unwrap_or_default())
         }
         "zeyn_check" => fix_if(root, args["fix"].as_bool().unwrap_or(false))
-            .and_then(|fixed| check(root).map(|r| fixed + &r)),
+            .and_then(|fixed| check(root).map(|r| fixed + &check_text(&r))),
         "zeyn_test" => {
             let out = Command::new("cargo")
                 .args(["test", "--quiet"])
@@ -1301,13 +1384,21 @@ const RAW: &str = r#"Grid "quoted" Grid"#; const C: char = 'G';"##;
         let w = generate::layout_warnings(&files, &["one".into()]);
         assert_eq!(w.len(), 3, "{w:#?}");
         assert!(
-            w[0].contains("#[screen] `two` in src/features/sales/screens.rs is not registered")
+            w[0].1
+                .contains("#[screen] `two` in src/features/sales/screens.rs is not registered")
         );
-        assert!(w[1].contains("src/features/sales/screens.rs has 2 #[screen] functions in 155 lines; run `zeyn g screen sales <name>`"));
+        assert!(w[1].1.contains("src/features/sales/screens.rs has 2 #[screen] functions in 155 lines; run `zeyn g screen sales <name>`"));
         assert!(
-            w[2].contains("#[action] `lost` in src/features/sales/actions.rs is not registered")
+            w[2].1
+                .contains("#[action] `lost` in src/features/sales/actions.rs is not registered")
         );
-        assert!(w.iter().all(|w| !w.contains("error")));
+        assert_eq!(
+            w.iter()
+                .map(|w| w.0)
+                .collect::<Vec<_>>(),
+            ["W0101", "W0102", "W0101"]
+        );
+        assert!(w.iter().all(|w| !w.1.contains("error")));
         let small = generate::layout_warnings(&files[1..], &["lost".into()]);
         assert!(small.is_empty(), "{small:#?}");
     }
@@ -1326,12 +1417,50 @@ const RAW: &str = r#"Grid "quoted" Grid"#; const C: char = 'G';"##;
         ];
         let w = generate::topic_warnings(&files);
         assert_eq!(w.len(), 3, "{w:#?}");
-        assert!(w[0].contains("topic `orphan` is driven at src/a.rs:3, but no node listens"));
-        assert!(w[1].contains("topic `gone` is refreshed at src/b.rs:3"));
         assert!(
-            w[2].contains("nodes listen to topic `quiet` at src/b.rs:4, but nothing refreshes")
+            w[0].1
+                .contains("topic `orphan` is driven at src/a.rs:3, but no node listens")
         );
-        assert!(w.iter().all(|w| !w.contains("Saved")));
+        assert!(
+            w[1].1
+                .contains("topic `gone` is refreshed at src/b.rs:3")
+        );
+        assert!(
+            w[2].1
+                .contains("nodes listen to topic `quiet` at src/b.rs:4, but nothing refreshes")
+        );
+        assert_eq!((w[0].0, w[2].0), ("W0103", "W0104"));
+        assert!(w.iter().all(|w| !w.1.contains("Saved")));
+
+        let report = check_report(
+            &json!({
+                "problems": ["route `/a` is used by screens `x` and `y`\n  = code: Z0101"],
+                "problem_details": [{
+                    "code": "Z0101",
+                    "summary": "route `/a` is used by screens `x` and `y`",
+                    "why": "one route opens one screen",
+                    "fix": "give one of them another route",
+                    "docs": "https://docs.zeynsoft.com/language/screens",
+                }],
+            }),
+            &w,
+        );
+        assert_eq!(report["ok"], false);
+        assert_eq!(report["errors"][0]["code"], "Z0101");
+        assert_eq!(report["errors"][0]["fix"], "give one of them another route");
+        assert_eq!(report["warnings"][0]["code"], "W0103");
+        assert!(
+            report["warnings"][0]["message"]
+                .as_str()
+                .unwrap()
+                .contains("orphan")
+        );
+        let text = check_text(&report);
+        assert!(text.starts_with("error: route `/a` is used by screens `x` and `y`\n  = why: one route opens one screen\n  = help: give one of them another route\n  = docs: https://docs.zeynsoft.com/language/screens\n  = code: Z0101\n"));
+        assert!(text.contains("warning[W0103]: topic `orphan`"));
+        let clean = check_report(&json!({ "problems": [], "problem_details": [] }), &[]);
+        assert_eq!(clean["ok"], true);
+        assert_eq!(check_text(&clean), "ok: no problems found\n");
     }
 
     #[test]

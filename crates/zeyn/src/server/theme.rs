@@ -226,9 +226,13 @@ impl Theme {
                 .bytes()
                 .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
         if !valid || matches!(name, "system" | "light" | "dark") {
-            theme.problems.push(format!(
-                "theme name `{name}` is not allowed\n  = help: use `a` to `z`, digits and `-` (up to 32), and not `system`, `light` or `dark`"
-            ));
+            theme.problems.push(
+                crate::Problem::new("Z0113", format!("theme name `{name}` is not allowed"))
+                    .why("the name goes into a cookie and an HTML attribute, and `system`, `light` and `dark` are the built in choices")
+                    .fix("use `a` to `z`, digits and `-` (up to 32), and not `system`, `light` or `dark`")
+                    .docs("guides/theming#light-dark-and-app-themes")
+                    .to_string(),
+            );
         }
         for (token, value) in tokens {
             theme = theme.token(token, value);
@@ -255,13 +259,27 @@ impl Theme {
             .clone()
             .unwrap_or_else(|| "app".into());
         if !THEME_TOKENS.contains(&name) {
-            self.problems.push(format!(
-                "theme `{owner}`: `{name}` is not a theme token\n  = help: use one of the tokens in docs/theming.md"
-            ));
+            self.problems.push(
+                crate::Problem::new(
+                    "Z0114",
+                    format!("theme `{owner}`: `{name}` is not a theme token"),
+                )
+                .why("only the listed tokens are read by the components, so this value would change nothing")
+                .fix("use one of the tokens in docs/theming.md")
+                .docs("guides/theming#2-base-tokens")
+                .to_string(),
+            );
         } else if !safe_value(value) {
-            self.problems.push(format!(
-                "theme `{owner}`: the value of `{name}` is not allowed\n  = help: use a color, length or font list without `;`, braces, `\\`, `<`, `>` or `url(`"
-            ));
+            self.problems.push(
+                crate::Problem::new(
+                    "Z0115",
+                    format!("theme `{owner}`: the value of `{name}` is not allowed"),
+                )
+                .why("the value is written into the page's style sheet, where these characters could break out of the declaration or load files")
+                .fix("use a color, length or font list without `;`, braces, `\\`, `<`, `>` or `url(`")
+                .docs("guides/theming#2-base-tokens")
+                .to_string(),
+            );
         } else {
             self.tokens.retain(|(n, _)| n != name);
             self.tokens
@@ -432,12 +450,27 @@ impl App {
             problems.extend(t.problems.iter().cloned());
             let name = t.name.as_deref().unwrap_or("app");
             if t.name.is_none() {
-                problems.push("`App::themes` got `Theme::new()`, which has no name\n  = help: use `Theme::light()`, `Theme::dark()` or `Theme::named(...)`".into());
+                problems.push(
+                    crate::Problem::new(
+                        "Z0116",
+                        "`App::themes` got `Theme::new()`, which has no name",
+                    )
+                    .why("the theme picker and the theme cookie choose themes by name, so a theme without one cannot be picked")
+                    .fix("use `Theme::light()`, `Theme::dark()` or `Theme::named(...)`")
+                    .docs("guides/theming#light-dark-and-app-themes")
+                    .to_string(),
+                );
             } else if offered[..i]
                 .iter()
                 .any(|o| o.name == t.name)
             {
-                problems.push(format!("theme `{name}` is offered twice"));
+                problems.push(
+                    crate::Problem::new("Z0117", format!("theme `{name}` is offered twice"))
+                        .why("the theme picker would list it twice and only the first one would ever apply")
+                        .fix("remove one of them from `App::themes`, or give it another name")
+                        .docs("guides/theming#light-dark-and-app-themes")
+                        .to_string(),
+                );
             }
             problems.extend(contrast_problems(name, t, &base));
         }
@@ -448,7 +481,16 @@ impl App {
                     .iter()
                     .any(|t| t.name.as_deref() == Some(d))
             {
-                problems.push(format!("default theme `{d}` is not one of the offered themes\n  = help: add it to `App::themes` or use `system`"));
+                problems.push(
+                    crate::Problem::new(
+                        "Z0118",
+                        format!("default theme `{d}` is not one of the offered themes"),
+                    )
+                    .why("a new visitor would start on a theme the picker does not list")
+                    .fix("add it to `App::themes` or use `system`")
+                    .docs("guides/theming#light-dark-and-app-themes")
+                    .to_string(),
+                );
             }
         }
         problems
@@ -667,9 +709,14 @@ fn contrast_problems(name: &str, theme: &Theme, base: &Theme) -> Vec<String> {
         .into_iter()
         .filter(|(_, _, ratio, needed)| ratio + 1e-9 < *needed)
         .map(|(fg, bg, ratio, needed)| {
-            format!(
-                "theme `{name}`: `{fg}` on `{bg}` has contrast {ratio:.2}:1; WCAG 2.2 AA needs {needed}:1\n  = help: change one of the two colors in the theme's tokens"
-            )
+crate::Problem::new(
+    "Z0119",
+    format!("theme `{name}`: `{fg}` on `{bg}` has contrast {ratio:.2}:1; WCAG 2.2 AA needs {needed}:1"),
+)
+.why("text or controls in these colors would be hard to read for many users, and WCAG 2.2 AA is the baseline")
+.fix("change one of the two colors in the theme's tokens")
+.docs("guides/theming#5-verified-contrast")
+.to_string()
         })
         .collect()
 }

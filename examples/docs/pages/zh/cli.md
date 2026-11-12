@@ -13,6 +13,7 @@
 | `zeyn routes` | 列出 feature、screen、路由、API 和访问权限 |
 | `zeyn check` | 编译并报告结构问题和缺失的翻译 |
 | `zeyn check --fix` | 改写 `src`、`tests` 和 `examples` 中已重命名的 Zeyn API，然后检查 |
+| `zeyn check --json` | 以 JSON 输出报告，包含稳定的代码、原因和修复方法 |
 | `zeyn mcp` | 在 stdio 上为 AI 智能体运行 MCP 服务器 |
 
 从 crates.io 安装：
@@ -87,6 +88,30 @@ zeyn g screen orders detail      # src/features/orders/screens/detail.rs
 
 ```sh
 zeyn check --fix
+```
+
+每个问题都有一个稳定的代码：`Z01xx` 表示应用、功能、路由和服务，`Z02xx` 表示安全，`Z03xx` 表示公开页面，`Z04xx` 表示菜单、命令和快捷键，`Z05xx` 表示数据，`Z06xx` 表示页面检查，`W01xx` 表示警告。文本输出会为每个问题显示原因（`why`）、修复方法（`help`）、指向本文档的链接和代码。`zeyn check --json` 将同一份报告作为一个 JSON 文档输出，供代理和 CI 使用，当 `ok` 为 false 时以错误退出。
+
+```sh
+zeyn check --json
+```
+
+```json
+{
+  "ok": false,
+  "errors": [
+    {
+      "code": "Z0103",
+      "summary": "screen `order_list` needs service `OrderStore`, which is not registered",
+      "why": "the screen takes the service as an argument, so every request to it would fail",
+      "fix": "add `.service(...)` to the App",
+      "docs": "https://docs.zeynsoft.com/start/structure#services"
+    }
+  ],
+  "warnings": [
+    { "code": "W0105", "message": "translation `orders.title` is missing in `tr`" }
+  ]
+}
 ```
 
 ## Docker

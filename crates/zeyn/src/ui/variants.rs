@@ -338,7 +338,12 @@ impl Component for VariantPicker {
 
     fn page_check(&self, check: &mut PageCheck) {
         if self.drives.is_empty() {
-            check.problem("a VariantPicker refreshes nothing; add `.drives(\"variant\")` and `.listens(\"variant\")` on the price, the gallery and the stock it changes");
+            check.problem(
+                crate::Problem::new("Z0623", "a VariantPicker refreshes nothing")
+                    .why("a variant choice changes the screen params, and only nodes that listen to its topic show the new price, photos and stock")
+                    .fix("add `.drives(\"variant\")` and `.listens(\"variant\")` on the price, the gallery and the stock it changes")
+                    .docs("components/commerce#variant-picker"),
+            );
         }
         for t in &self.drives {
             check.drives(t);
@@ -346,7 +351,15 @@ impl Component for VariantPicker {
         }
         for g in &self.groups {
             if g.name.is_empty() {
-                check.problem("a VariantGroup needs a name, the screen param it sets");
+                check.problem(
+                    crate::Problem::new(
+                        "Z0624",
+                        "a VariantGroup needs a name, the screen param it sets",
+                    )
+                    .why("the choice is kept in the screen param of that name, so without one it is lost")
+                    .fix("give the group the name of a params field, such as `VariantGroup::swatches(\"color\", ...)`")
+                    .docs("components/commerce#variant-picker"),
+                );
             }
             for o in &g.options {
                 if g.look == Look::Swatch
@@ -355,10 +368,15 @@ impl Component for VariantPicker {
                         .and_then(swatch_color)
                         .is_none()
                 {
-                    check.problem(format!(
-                        "swatch `{}` of `{}` has no color; give a hex color such as `#c0392b` or a theme token such as `--z-surface-2`",
-                        o.value, g.name
-                    ));
+                    check.problem(
+                        crate::Problem::new(
+                            "Z0625",
+                            format!("swatch `{}` of `{}` has no color", o.value, g.name),
+                        )
+                        .why("a swatch shows only its color, so without one the option has nothing to show")
+                        .fix("give a hex color such as `#c0392b` or a theme token such as `--z-surface-2`")
+                        .docs("components/commerce#variant-picker"),
+                    );
                 }
             }
         }

@@ -394,7 +394,12 @@ impl Component for FacetPanel {
 
     fn page_check(&self, check: &mut PageCheck) {
         if self.drives.is_empty() {
-            check.problem("a FacetPanel refreshes nothing; add `.drives(\"products\")` and `.listens(\"products\")` on the grid it filters");
+            check.problem(
+                crate::Problem::new("Z0612", "a FacetPanel refreshes nothing")
+                    .why("a facet choice changes the screen params, and only nodes that listen to its topic show the new results")
+                    .fix("add `.drives(\"products\")` and `.listens(\"products\")` on the grid it filters")
+                    .docs("components/commerce#facet-panel"),
+            );
         }
         for t in &self.drives {
             check.drives(t);
@@ -413,9 +418,15 @@ impl Component for FacetPanel {
         }
         for name in names {
             if !keys.is_some_and(|k| k.contains_key(name)) {
-                check.problem(format!(
-                    "facet `{name}` is not a field of the screen's params; add `pub {name}: ...` to the params struct so the choice survives a refresh"
-                ));
+                check.problem(
+                    crate::Problem::new(
+                        "Z0613",
+                        format!("facet `{name}` is not a field of the screen's params"),
+                    )
+                    .why("facet choices live in the screen params, so a choice without a field is lost on the next refresh")
+                    .fix(format!("add `pub {name}: ...` to the params struct"))
+                    .docs("components/commerce#facet-panel"),
+                );
             }
         }
     }

@@ -13,6 +13,7 @@
 | `zeyn routes` | Feature'ları, screen'leri, rotaları, API'leri ve erişimi listeler |
 | `zeyn check` | Derler ve yapısal sorunları ile eksik çevirileri bildirir |
 | `zeyn check --fix` | `src`, `tests` ve `examples` içinde adı değişen Zeyn API'lerini yeniden yazar, sonra denetler |
+| `zeyn check --json` | Raporu kararlı kodlar, nedenler ve çözümlerle JSON olarak yazar |
 | `zeyn mcp` | AI ajanları için stdio üzerinde bir MCP sunucusu çalıştırır |
 
 crates.io üzerinden kurun:
@@ -85,6 +86,30 @@ Bir Zeyn sürümü bir API'nin adını değiştirdiğinde `zeyn check --fix` esk
 
 ```sh
 zeyn check --fix
+```
+
+Her sorunun kararlı bir kodu vardır: uygulama, feature'lar, rotalar ve servisler için `Z01xx`, güvenlik için `Z02xx`, herkese açık sayfalar için `Z03xx`, menüler, komutlar ve kısayollar için `Z04xx`, veri için `Z05xx`, sayfa denetimleri için `Z06xx` ve uyarılar için `W01xx`. Metin çıktısı her sorunu nedeni (`why`), çözümü (`help`), bu belgelere bir bağlantı ve koduyla gösterir. `zeyn check --json` aynı raporu ajanlar ve CI için tek bir JSON belgesi olarak yazar ve `ok` false olduğunda hata ile çıkar.
+
+```sh
+zeyn check --json
+```
+
+```json
+{
+  "ok": false,
+  "errors": [
+    {
+      "code": "Z0103",
+      "summary": "screen `order_list` needs service `OrderStore`, which is not registered",
+      "why": "the screen takes the service as an argument, so every request to it would fail",
+      "fix": "add `.service(...)` to the App",
+      "docs": "https://docs.zeynsoft.com/start/structure#services"
+    }
+  ],
+  "warnings": [
+    { "code": "W0105", "message": "translation `orders.title` is missing in `tr`" }
+  ]
+}
 ```
 
 ## Docker

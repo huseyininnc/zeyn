@@ -213,14 +213,28 @@ impl OidcAuth {
     pub(crate) fn problems(&self) -> Vec<String> {
         let mut problems = Vec::new();
         if self.sealer.is_none() {
-            problems.push(format!(
-                "OidcAuth: the session key must be at least {} bytes",
-                super::seal::MIN_SECRET
-            ));
+            problems.push(
+                crate::Problem::new(
+                    "Z0204",
+                    format!("OidcAuth: the session key must be at least {} bytes", super::seal::MIN_SECRET),
+                )
+                .why("the key seals the session cookie, and a short key could be guessed, which would let anyone forge a session")
+                .fix("read a random key of at least 32 bytes from configuration (never from code), such as `openssl rand -base64 48`")
+                .docs("guides/sign-in#browser-sign-in")
+                .to_string(),
+            );
         }
         if !(self.public_url.starts_with("https://") || self.public_url.starts_with("http://")) {
-            problems
-                .push("OidcAuth: the public URL must start with https:// (or http:// for local development)".into());
+            problems.push(
+                crate::Problem::new(
+                    "Z0205",
+                    "OidcAuth: the public URL must start with https:// (or http:// for local development)",
+                )
+                .why("the redirect URI sent to the identity provider is built from it, and the provider rejects one without a scheme")
+                .fix("pass the address users open, such as `https://app.example`, and register its callback at the provider")
+                .docs("guides/sign-in#browser-sign-in")
+                .to_string(),
+            );
         }
         problems
     }
