@@ -114,6 +114,8 @@ zeyn check --json
 }
 ```
 
+`zeyn check` also reads the app's source and warns, with file and line, about `W0106` a string that holds a `<script>` without `src` or an inline event handler such as `onclick=` (the CSP blocks both), `W0107` a hand written component that writes HTML without `escape(..)`, `r.text(..)` or `r.value(..)`, `W0108` an action that returns a whole `Vec` without a query that bounds it, and `W0109` a `DocumentViewer` marked `.trusted()`. A missing `permission` or `public` needs no warning: it does not compile.
+
 ## Docker
 
 The generated `Dockerfile` builds in two stages and runs on a distroless image as a user without root rights. The binary checks its own health with `<app> health`, which the `HEALTHCHECK` uses.
