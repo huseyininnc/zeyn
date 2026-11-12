@@ -75,6 +75,12 @@ pub struct Limits {
     pub calls: u32,
     /// Largest event, as JSON; [`Target::emit`] fails past it.
     pub event_bytes: usize,
+    /// Numbered messages a page socket keeps for a resume; a resume past them gets a resync.
+    pub replay: usize,
+    /// Bytes of those messages per page socket.
+    pub replay_bytes: usize,
+    /// How long a dropped page socket keeps its topics, groups and messages for a resume.
+    pub detached: Duration,
 }
 
 impl Default for Limits {
@@ -92,6 +98,9 @@ impl Default for Limits {
             groups: 32,
             calls: 20,
             event_bytes: 16 * 1024,
+            replay: 64,
+            replay_bytes: 64 * 1024,
+            detached: Duration::from_secs(60),
         }
     }
 }
