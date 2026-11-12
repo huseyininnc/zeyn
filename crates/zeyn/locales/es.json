@@ -946,7 +946,7 @@
     "files": {
       "too_large": "El archivo es demasiado grande. El tamaño máximo permitido es {max}.",
       "quota": "Alcanzaste el límite de subida por ahora. Inténtalo más tarde.",
-      "too_many": "{label} admite como máximo {n} archivos.",
+      "too_many": "{label} admite como máximo {n, plural, one {# archivo} other {# archivos}}.",
       "type": "Este tipo de archivo no se acepta, o su contenido no coincide con su nombre.",
       "refused": "La comprobación de seguridad rechazó el archivo.",
       "aborted": "La subida se detuvo antes de que llegara todo el archivo. Inténtalo de nuevo.",

@@ -29,6 +29,19 @@ error: t!: key `stock.prodcts` is missing in locales/tr.json
   = help: add it to every file in locales/
 ```
 
+Kelimeleri değiştiren bir sayı plural yer tutucusuna, bir değere göre seçilen kelime select yer tutucusuna yazılır. Plural durumu dilin kurallarından gelir (CLDR adlarıyla `one`, `few`, `many` ve diğerleri), `=0` gibi tam bir durum önce gelir, `#` sayının yerini tutar ve her yer tutucunun bir `other` durumu olmalıdır. Plural argümanı tam sayı olmalıdır: `n = "two"` veya ondalık bir sayı derlenmez.
+
+```json
+"orders": {
+  "count": "{n, plural, =0 {No orders} one {# order} other {# orders}}",
+  "by": "{role, select, admin {An administrator} other {A colleague}} changed it."
+}
+```
+
+```rust
+t!("orders.count", n = orders.len())
+```
+
 ## Alan ve seçim etiketleri
 
 Alan etiketleri `<Model>.<field>` anahtarını kullanır, örneğin `Product.code`. Seçim etiketleri `<Choice>.<Variant>` kullanır. Bir anahtar eksikse etiket `#[label("...")]` değerine ya da adın okunabilir bir biçimine döner. `zeyn check`, bazı dillerde olup diğerlerinde bulunmayan anahtarları bildirir.

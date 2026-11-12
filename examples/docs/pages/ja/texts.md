@@ -29,6 +29,19 @@ error: t!: key `stock.prodcts` is missing in locales/tr.json
   = help: add it to every file in locales/
 ```
 
+語形を変える数は plural プレースホルダーに、値で選ぶ語は select プレースホルダーに書きます。plural のケースは言語の規則 (CLDR の名前で `one`、`few`、`many` など) で決まり、`=0` のような完全一致のケースが優先され、`#` は数を表し、どのプレースホルダーにも `other` ケースが必要です。plural の引数は整数でなければならず、`n = "two"` や小数はコンパイルできません。
+
+```json
+"orders": {
+  "count": "{n, plural, =0 {No orders} one {# order} other {# orders}}",
+  "by": "{role, select, admin {An administrator} other {A colleague}} changed it."
+}
+```
+
+```rust
+t!("orders.count", n = orders.len())
+```
+
 ## フィールドと選択肢のラベル
 
 フィールドのラベルには `Product.code` のように `<Model>.<field>` のキーを使います。選択肢のラベルには `<Choice>.<Variant>` を使います。キーがない場合、ラベルは `#[label("...")]` か、名前を読みやすくした形にフォールバックします。`zeyn check` は、ある言語にあって別の言語にないキーを報告します。
