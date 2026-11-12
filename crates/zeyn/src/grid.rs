@@ -622,37 +622,53 @@ pub struct ExportColumn {
 /// Most rows an export holds unless the grid sets another limit.
 pub const DEFAULT_EXPORT_LIMIT: usize = 100_000;
 
-/// Quotes one CSV cell (RFC 4180) and defuses spreadsheet formulas in text that is not a number:
-/// at the start and after every character a spreadsheet may split cells on (`,`, `;`, tab), since
-/// the list separator depends on the reader's locale.
-fn csv_cell(value: &str) -> String {
+/// Writes one CSV cell (RFC 4180) to `out`, quoted when it holds a separator, a quote or a line
+/// break, and defuses spreadsheet formulas in text that is not a number: at the start and after
+/// every character a spreadsheet may split cells on (`,`, `;`, tab), since the list separator
+/// depends on the reader's locale. Writes in place, without a string of its own.
+fn csv_cell(out: &mut String, value: &str) {
     let numeric = |s: &str| {
         !s.is_empty()
             && s.chars()
                 .all(|c| c.is_ascii_digit() || ".,- +".contains(c))
     };
     let formula = |s: &str| s.starts_with(['=', '+', '-', '@', '\t', '\r']) && !numeric(s);
-    let mut v = String::with_capacity(value.len() + 2);
+    let quote = value.contains([',', ';', '\t', '"', '\r', '\n']);
+    let push = |out: &mut String, part: &str| {
+        if quote {
+            let mut pieces = part.split('"');
+            if let Some(first) = pieces.next() {
+                out.push_str(first);
+            }
+            for piece in pieces {
+                out.push_str("\"\"");
+                out.push_str(piece);
+            }
+        } else {
+            out.push_str(part);
+        }
+    };
+    if quote {
+        out.push('"');
+    }
     let mut rest = value;
     loop {
         if formula(rest) {
-            v.push('\'');
+            out.push('\'');
         }
         match rest.find([',', ';', '\t']) {
             Some(i) => {
-                v.push_str(&rest[..=i]);
+                push(out, &rest[..=i]);
                 rest = &rest[i + 1..];
             }
             None => {
-                v.push_str(rest);
+                push(out, rest);
                 break;
             }
         }
     }
-    if v.contains([',', ';', '\t', '"', '\r', '\n']) {
-        format!("\"{}\"", v.replace('"', "\"\""))
-    } else {
-        v
+    if quote {
+        out.push('"');
     }
 }
 
@@ -2342,12 +2358,15 @@ impl<E: Model> GridSource for DataGrid<E> {
     }
 
     fn csv_head(&self, r: &Render, view: Option<&DataGridView>) -> String {
-        let cols = self.layout(view);
-        let line: Vec<String> = cols
-            .iter()
-            .map(|s| csv_cell(&self.columns[s.index].label_plain(r)))
-            .collect();
-        format!("{}\r\n", line.join(","))
+        let mut out = String::new();
+        for (i, slot) in self.layout(view).iter().enumerate() {
+            if i > 0 {
+                out.push(',');
+            }
+            csv_cell(&mut out, &self.columns[slot.index].label_plain(r));
+        }
+        out.push_str("\r\n");
+        out
     }
 
     fn csv_rows(&self, page: &LoadedPage, r: &Render) -> String {
@@ -2355,21 +2374,21 @@ impl<E: Model> GridSource for DataGrid<E> {
         let Some(rows) = page.items.downcast_ref::<Vec<E>>() else {
             return String::new();
         };
-        let mut out = String::new();
+        let mut out = String::with_capacity(rows.len() * cols.len() * 12);
         for row in rows {
-            let line: Vec<String> = cols
-                .iter()
-                .map(|s| {
-                    let c = &self.columns[s.index];
-                    let v = (c.value)(row);
-                    csv_cell(&if c.meta.mask.is_some() {
-                        masked(c.meta, &v)
-                    } else {
-                        plain(&v, &c.meta.kind, r)
-                    })
-                })
-                .collect();
-            out.push_str(&line.join(","));
+            for (i, slot) in cols.iter().enumerate() {
+                if i > 0 {
+                    out.push(',');
+                }
+                let c = &self.columns[slot.index];
+                let v = (c.value)(row);
+                let text = if c.meta.mask.is_some() {
+                    masked(c.meta, &v)
+                } else {
+                    plain(&v, &c.meta.kind, r)
+                };
+                csv_cell(&mut out, &text);
+            }
             out.push_str("\r\n");
         }
         out
