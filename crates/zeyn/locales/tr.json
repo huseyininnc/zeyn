@@ -597,7 +597,8 @@
       "gantt": {
         "task": "Görev",
         "from": "Başlangıç",
-        "to": "Bitiş"
+        "to": "Bitiş",
+        "done": "%{n} tamamlandı"
       },
       "meter": {
         "low": "düşük",
