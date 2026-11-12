@@ -1429,3 +1429,20 @@ fn org_chart_schemas_keep_the_limits_of_the_drawing() {
         .len();
     assert_eq!(boxes + 1, zeyn::ui::MAX_ORG_NODES);
 }
+
+#[test]
+fn a_meter_short_of_its_better_side_says_fair() {
+    use zeyn::ui::{Better, Meter};
+    let meter = Meter::new("Battery", 60, 0, 100)
+        .low(20)
+        .high(80)
+        .better(Better::Higher);
+    let out = html(&meter, "en");
+    assert!(out.contains("z-tone-warning"), "{out}");
+    assert!(
+        out.contains(r#"<span class="z-meter-state">fair</span>"#),
+        "{out}"
+    );
+    assert!(out.contains(r#"aria-valuetext="60, fair""#), "{out}");
+    assert!(html(&meter, "tr").contains(r#"aria-valuetext="60, orta""#));
+}
