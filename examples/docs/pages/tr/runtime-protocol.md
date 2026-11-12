@@ -353,7 +353,7 @@ Bkz. `docs/islands.md`.
 
 | Endpoint | Does |
 |---|---|
-| `GET /_zeyn/live/topics?t=a,b&csrf=` | WebSocket; metin çerçeveleri `{ "topic": "a" }` |
+| `GET /_zeyn/socket` | WebSocket; metin çerçeveleri `{"sub":["a"]}` ⇅ `{"s":1,"t":"a"}` |
 | `GET /_zeyn/live/doc/{kind}/{doc}?csrf=` | WebSocket; ikili çerçeveler `0x01` + Y güncellemesi (v1), iki yönde |
 
 El sıkışmalar, yükseltmeden önce origin'i, CSRF belirtecini çerezle karşılaştırarak, oturum açmış kullanıcıyı ve izinleri denetler. Bkz. `docs/realtime.md`.

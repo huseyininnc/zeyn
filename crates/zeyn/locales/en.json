@@ -132,7 +132,8 @@
       "cursor": "The list changed since it was loaded. Reload it and try again.",
       "duplicate": "This record already exists.",
       "too_large": "The request is too large.",
-      "bad_request": "The request could not be read."
+      "bad_request": "The request could not be read.",
+      "socket_only": "This action runs only over the live socket."
     },
     "grid": {
       "pagination": "Pagination",

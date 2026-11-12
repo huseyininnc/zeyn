@@ -11,12 +11,12 @@ zeyn = { version = "...", features = ["realtime"] }
 ```
 
 ```rust
-let realtime = Realtime::new()
+let live = ZeynSocket::new()
     .documents("diagram", "diagram.read", "diagram.write", MyDocStore::new(pool))
     .topic("orders", "sales.order.read")
     .limits(Limits::default());
-let hub = realtime.hub();          // clone it into stores that notify
-App::new(..).realtime(realtime)    // also registers `Hub` as a service
+let socket = live.socket();       // clone it into stores that notify
+App::new(..).socket(live)         // also registers `Socket` as a service
 ```
 
 ## 2. 엔드포인트
@@ -24,13 +24,13 @@ App::new(..).realtime(realtime)    // also registers `Hub` as a service
 | 엔드포인트 | 용도 |
 |---|---|
 | `GET /_zeyn/live/doc/{kind}/{doc}?csrf=TOKEN` | WebSocket: 협업 문서 |
-| `GET /_zeyn/live/topics?t=a,b&csrf=TOKEN` | WebSocket: 토픽의 변경 알림 |
+| `GET /_zeyn/socket` | WebSocket: 토픽의 변경 알림 |
 | `GET /_zeyn/live.js` | 토픽 스크립트이며 구독하는 페이지만 링크합니다 |
 
 모든 핸드셰이크는 업그레이드 전에 다음 순서로 검사됩니다.
 
 1. 채널이 켜져 있어야 합니다(아니면 `404`).
-2. **Origin:** `Origin` 헤더는 요청이 도달한 호스트 또는 `Realtime::allow_origin`으로 추가한 출처를 가리켜야 합니다. 브라우저는 WebSocket 핸드셰이크에서 항상 이를 보내며, 없으면 거부됩니다. 이것이 다른 사이트가 사용자의 쿠키로 소켓을 여는 것을 막습니다.
+2. **Origin:** `Origin` 헤더는 요청이 도달한 호스트 또는 `ZeynSocket::allow_origin`으로 추가한 출처를 가리켜야 합니다. 브라우저는 WebSocket 핸드셰이크에서 항상 이를 보내며, 없으면 거부됩니다. 이것이 다른 사이트가 사용자의 쿠키로 소켓을 여는 것을 막습니다.
 3. **CSRF 토큰:** 브라우저는 WebSocket에 헤더를 설정할 수 없으므로 `meta[name=zeyn-csrf]`의 토큰이 `csrf` 쿼리 매개변수로 들어가며, `POST`에서 `x-zeyn-csrf`가 그러듯이 `zeyn_csrf` 쿠키와 일정한 시간으로 비교됩니다. 실패하면 `403`으로 응답합니다.
 4. **ID:** 모든 요청과 같은 인증기를 사용합니다. 사용자는 로그인되어 있어야 합니다(`403`).
 5. **사용자별 제한** (`429`).
@@ -77,9 +77,9 @@ channel.close();                // in unmount
 Live::new("orders").add(DataGrid::of(search_orders)...)
 
 #[action(permission = "sales.order.write")]
-pub async fn save_order(o: Valid<Order>, store: Orders, hub: Hub, ctx: Ctx) -> Result<Order> {
+pub async fn save_order(o: Valid<Order>, store: Orders, socket: Socket, ctx: Ctx) -> Result<Order> {
     let saved = store.save(o.into_inner())?;
-    hub.notify(&ctx, "orders");
+    socket.notify(&ctx, "orders");
     Ok(saved)
 }
 ```
@@ -88,7 +88,7 @@ pub async fn save_order(o: Valid<Order>, store: Orders, hub: Hub, ctx: Ctx) -> R
 
 알림은 토픽 이름만 담고 데이터는 절대 담지 않습니다. 새로 고침은 모든 권한 검사가 있는 일반 그리드 엔드포인트를 거칩니다. `notify`는 호출자의 테넌트에만 도달하며, `notify_tenant(Some(id), topic)`은 하나를 지정하고 `None`은 테넌시가 없는 앱입니다.
 
-같은 토픽 이름은 채널 없이도 동작합니다. `.listens("orders")`로 표시한 노드는 알림이 토픽을 지정할 때(`live.js`가 이를 `zeyn:topics`로 전달합니다) 제자리에서 새로 고쳐지며, action이 `ui.refresh("orders")`로 끝나거나 `.drives("orders")`를 가진 필터가 바뀔 때도 새로 고쳐집니다. 그리드는 현재 페이지를 다시 불러오고, 다른 리스너는 Screen마다 한 번의 `POST /_zeyn/nodes`로 다시 렌더링됩니다(`examples/docs/pages/effects.md`의 Topics 참고). 소켓은 `Realtime::topic`으로 선언해야 하는 `Live` 노드의 토픽만 구독합니다. 그리드가 아닌 부분에는 그 안이나 옆에서 `.listens`를 쓰세요.
+같은 토픽 이름은 채널 없이도 동작합니다. `.listens("orders")`로 표시한 노드는 알림이 토픽을 지정할 때(`live.js`가 이를 `zeyn:topics`로 전달합니다) 제자리에서 새로 고쳐지며, action이 `ui.refresh("orders")`로 끝나거나 `.drives("orders")`를 가진 필터가 바뀔 때도 새로 고쳐집니다. 그리드는 현재 페이지를 다시 불러오고, 다른 리스너는 Screen마다 한 번의 `POST /_zeyn/nodes`로 다시 렌더링됩니다(`examples/docs/pages/effects.md`의 Topics 참고). 소켓은 `ZeynSocket::topic`으로 선언해야 하는 `Live` 노드의 토픽만 구독합니다. 그리드가 아닌 부분에는 그 안이나 옆에서 `.listens`를 쓰세요.
 
 ## 5. 메모리와 백프레셔
 
@@ -106,7 +106,7 @@ pub async fn save_order(o: Valid<Order>, store: Orders, hub: Hub, ctx: Ctx) -> R
 | `heartbeat` | 20초 | ping. 3번의 간격 동안 조용한 클라이언트는 닫힘 |
 | `persist_every` | 2초 | 변경된 문서가 저장됨 |
 
-브로드캐스트는 절대 기다리지 않습니다. 업데이트는 `try_send`로 각 클라이언트의 제한된 큐에 제공됩니다. 큐가 가득 찬 클라이언트는 즉시 룸에서 제거되므로 느린 독자 하나가 메모리를 붙잡거나 다른 클라이언트를 느리게 할 수 없습니다. 그 클라이언트는 다시 연결하여 문서 전체를 받습니다. 큐가 가득 찬 토픽 구독자는 그 알림만 놓치며(다음 알림이 어차피 새로 고칩니다), 최악의 경우 메모리는 문서에 대해 약 `rooms * doc_bytes`, 큐에 대해 `clients * queue * message_bytes`입니다(업데이트는 큐 사이에서 복사되지 않고 공유됩니다). 다이어그램에 라이브 탭 두 개가 있는 쇼케이스 서버는 전체적으로 약 19 MB를 사용합니다(디버그 빌드). `Hub::stats()`는 모니터링을 위해 룸, 클라이언트, 구독자, 문서 바이트를 보고합니다.
+브로드캐스트는 절대 기다리지 않습니다. 업데이트는 `try_send`로 각 클라이언트의 제한된 큐에 제공됩니다. 큐가 가득 찬 클라이언트는 즉시 룸에서 제거되므로 느린 독자 하나가 메모리를 붙잡거나 다른 클라이언트를 느리게 할 수 없습니다. 그 클라이언트는 다시 연결하여 문서 전체를 받습니다. 큐가 가득 찬 토픽 구독자는 그 알림만 놓치며(다음 알림이 어차피 새로 고칩니다), 최악의 경우 메모리는 문서에 대해 약 `rooms * doc_bytes`, 큐에 대해 `clients * queue * message_bytes`입니다(업데이트는 큐 사이에서 복사되지 않고 공유됩니다). 다이어그램에 라이브 탭 두 개가 있는 쇼케이스 서버는 전체적으로 약 19 MB를 사용합니다(디버그 빌드). `Socket::stats()`는 모니터링을 위해 룸, 클라이언트, 구독자, 문서 바이트를 보고합니다.
 
 ## 6. 보안 참고 사항
 

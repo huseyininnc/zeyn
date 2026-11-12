@@ -80,7 +80,7 @@ App::new("Admin").header(|h| h.end(NotificationCenter::of(count_unread, inbox, (
 
 使用 `.mark_read(action)` 和 `.archive(action)` 后，每行会有一个复选框，收件箱会有一个带“全选”的工具栏。按钮把选中的键作为 `InboxSelection` 通过 `POST /_zeyn/data` 发送，该端点检查 CSRF，计入写入限制，并检查屏幕的访问权限和动作的权限；最多接受 200 个键，每个最多 200 个字符。这些键来自浏览器，所以动作只能修改 `ctx.identity()` 用户的通知。用户无权执行的按钮及复选框都不会显示。
 
-批量操作之后，收件箱会触发它的主题（`"notifications"`，可用 `.topic(..)` 更改）：收件箱和所有 `.listens` 该主题的节点就地重新渲染，铃铛也会重新加载计数。铃铛用一个接收 `UnreadCount { limit }` 并在上限（100）处停止的动作计数，只需一次有上限的查询；超过 99 时显示 `99+`，链接的名称会为屏幕阅读器读出计数。它在页面显示后用一个请求加载计数，并在主题被收件箱、`ui.refresh("notifications")`，或在启用 `.live()` 和 `realtime` 特性时被任意动作中的 `hub.notify(&ctx, "notifications")` 触发时重新加载（主题需用 `Realtime::topic` 声明）。`inbox.js`（6.1 KB，gzip 后 2.3 KB）和 `inbox.css`（3.1 KB）只随这些组件加载。
+批量操作之后，收件箱会触发它的主题（`"notifications"`，可用 `.topic(..)` 更改）：收件箱和所有 `.listens` 该主题的节点就地重新渲染，铃铛也会重新加载计数。铃铛用一个接收 `UnreadCount { limit }` 并在上限（100）处停止的动作计数，只需一次有上限的查询；超过 99 时显示 `99+`，链接的名称会为屏幕阅读器读出计数。它在页面显示后用一个请求加载计数，并在主题被收件箱、`ui.refresh("notifications")`，或在启用 `.live()` 和 `realtime` 特性时被任意动作中的 `socket.notify(&ctx, "notifications")` 触发时重新加载（主题需用 `ZeynSocket::topic` 声明）。`inbox.js`（6.1 KB，gzip 后 2.3 KB）和 `inbox.css`（3.1 KB）只随这些组件加载。
 
 ## Kanban
 

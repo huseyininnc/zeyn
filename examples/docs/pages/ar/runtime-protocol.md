@@ -358,7 +358,7 @@
 
 | نقطة النهاية | تفعل |
 |---|---|
-| `GET /_zeyn/live/topics?t=a,b&csrf=` | WebSocket؛ إطارات نصية `{ "topic": "a" }` |
+| `GET /_zeyn/socket` | WebSocket؛ إطارات نصية `{"sub":["a"]}` ⇅ `{"s":1,"t":"a"}` |
 | `GET /_zeyn/live/doc/{kind}/{doc}?csrf=` | WebSocket؛ إطارات ثنائية `0x01` + تحديث Y (الإصدار 1) في الاتجاهين |
 
 تفحص المصافحات (handshakes) الأصل (origin) ورمز CSRF مقابل ملف تعريف الارتباط والمستخدم المسجّل

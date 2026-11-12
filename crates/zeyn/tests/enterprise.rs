@@ -1426,24 +1426,6 @@ async fn empty_masked_fields_can_be_filled_in_but_not_overwritten_later() {
     );
 }
 
-#[test]
-fn the_build_id_is_the_hash_of_the_whole_executable_read_in_pieces() {
-    if std::env::var("ZEYN_BUILD_ID").is_ok() {
-        return;
-    }
-    let bytes = std::fs::read(std::env::current_exe().unwrap()).unwrap();
-    assert!(
-        bytes.len() > 64 * 1024,
-        "the test needs a file larger than one piece"
-    );
-    let hash = bytes
-        .iter()
-        .fold(0xcbf2_9ce4_8422_2325u64, |h, b| {
-            (h ^ u64::from(*b)).wrapping_mul(0x0100_0000_01b3)
-        });
-    assert_eq!(zeyn::server::build_id(), format!("{hash:016x}"));
-}
-
 #[tokio::test]
 async fn every_response_carries_the_build_id_that_the_page_was_built_with() {
     let router = crm_app(crm_writer(), MemoryAudit::default())

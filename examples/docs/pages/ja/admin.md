@@ -80,7 +80,7 @@ App::new("Admin").header(|h| h.end(NotificationCenter::of(count_unread, inbox, (
 
 `.mark_read(action)` と `.archive(action)` を付けると、各行にチェックボックスが、受信箱に「すべて選択」付きのツールバーが付きます。ボタンは選んだキーを `InboxSelection` として `POST /_zeyn/data` に送ります。このエンドポイントは CSRF を確認し、書き込み制限に数えられ、画面のアクセスとアクションの権限を確認します。受け付けるのは 200 文字までのキーを最大 200 個です。キーはブラウザーから来るので、アクションは `ctx.identity()` の通知だけを変更します。ユーザーが実行できないボタンは、チェックボックスと一緒に表示されません。
 
-一括操作の後、受信箱は自分のトピック（`"notifications"`、変更は `.topic(..)`）を告げます。受信箱とそのトピックを `.listens` するすべてのノードがその場で描き直され、ベルも件数を読み込み直します。ベルは `UnreadCount { limit }` を受け取って上限（100）で止まるアクション、つまり一回の上限付きクエリで数えます。99 を超えると `99+` と表示し、リンクの名前がスクリーンリーダーに件数を伝えます。件数はページの表示後に一回のリクエストで読み込み、受信箱、`ui.refresh("notifications")`、または `.live()` と `realtime` 機能を使う場合はどのアクションの `hub.notify(&ctx, "notifications")` でも、トピックが告げられると読み込み直します（トピックは `Realtime::topic` で宣言します）。`inbox.js`（6.1 KB、gzip で 2.3 KB）と `inbox.css`（3.1 KB）はこれらのコンポーネントと一緒の場合だけ読み込まれます。
+一括操作の後、受信箱は自分のトピック（`"notifications"`、変更は `.topic(..)`）を告げます。受信箱とそのトピックを `.listens` するすべてのノードがその場で描き直され、ベルも件数を読み込み直します。ベルは `UnreadCount { limit }` を受け取って上限（100）で止まるアクション、つまり一回の上限付きクエリで数えます。99 を超えると `99+` と表示し、リンクの名前がスクリーンリーダーに件数を伝えます。件数はページの表示後に一回のリクエストで読み込み、受信箱、`ui.refresh("notifications")`、または `.live()` と `realtime` 機能を使う場合はどのアクションの `socket.notify(&ctx, "notifications")` でも、トピックが告げられると読み込み直します（トピックは `ZeynSocket::topic` で宣言します）。`inbox.js`（6.1 KB、gzip で 2.3 KB）と `inbox.css`（3.1 KB）はこれらのコンポーネントと一緒の場合だけ読み込まれます。
 
 ## Kanban
 

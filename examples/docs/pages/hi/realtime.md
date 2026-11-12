@@ -11,12 +11,12 @@ zeyn = { version = "...", features = ["realtime"] }
 ```
 
 ```rust
-let realtime = Realtime::new()
+let live = ZeynSocket::new()
     .documents("diagram", "diagram.read", "diagram.write", MyDocStore::new(pool))
     .topic("orders", "sales.order.read")
     .limits(Limits::default());
-let hub = realtime.hub();          // clone it into stores that notify
-App::new(..).realtime(realtime)    // also registers `Hub` as a service
+let socket = live.socket();       // clone it into stores that notify
+App::new(..).socket(live)         // also registers `Socket` as a service
 ```
 
 ## 2. एंडपॉइंट
@@ -24,13 +24,13 @@ App::new(..).realtime(realtime)    // also registers `Hub` as a service
 | एंडपॉइंट | उद्देश्य |
 |---|---|
 | `GET /_zeyn/live/doc/{kind}/{doc}?csrf=TOKEN` | WebSocket: सहयोगी दस्तावेज़ |
-| `GET /_zeyn/live/topics?t=a,b&csrf=TOKEN` | WebSocket: topic के लिए बदलाव सूचनाएँ |
+| `GET /_zeyn/socket` | WebSocket: topic के लिए बदलाव सूचनाएँ |
 | `GET /_zeyn/live.js` | topic स्क्रिप्ट, केवल उन पृष्ठों द्वारा जोड़ी जाती है जो सब्सक्राइब करते हैं |
 
 हर हैंडशेक अपग्रेड से पहले इस क्रम में जाँचा जाता है:
 
 1. चैनल चालू है (वरना `404`)।
-2. **Origin:** `Origin` हेडर को वही होस्ट नाम देना होगा जिस पर अनुरोध आया, या `Realtime::allow_origin` से जोड़ा गया origin। ब्राउज़र इसे WebSocket हैंडशेक पर हमेशा भेजते हैं; छूटा हुआ अस्वीकार होता है। यही दूसरी साइट को उपयोगकर्ता की कुकी के साथ सॉकेट खोलने से रोकता है।
+2. **Origin:** `Origin` हेडर को वही होस्ट नाम देना होगा जिस पर अनुरोध आया, या `ZeynSocket::allow_origin` से जोड़ा गया origin। ब्राउज़र इसे WebSocket हैंडशेक पर हमेशा भेजते हैं; छूटा हुआ अस्वीकार होता है। यही दूसरी साइट को उपयोगकर्ता की कुकी के साथ सॉकेट खोलने से रोकता है।
 3. **CSRF टोकन:** ब्राउज़र WebSocket पर हेडर सेट नहीं कर सकते, इसलिए `meta[name=zeyn-csrf]` का टोकन `csrf` क्वेरी पैरामीटर में जाता है और `zeyn_csrf` कुकी से constant time में तुलना किया जाता है, ठीक वैसे जैसे `POST` के लिए `x-zeyn-csrf`। विफलताएँ `403` से उत्तर पाती हैं।
 4. **आइडेंटिटी:** हर अनुरोध जैसा ही ऑथेंटिकेटर; उपयोगकर्ता साइन इन होना चाहिए (`403`)।
 5. **प्रति उपयोगकर्ता सीमा** (`429`)।
@@ -77,9 +77,9 @@ channel.close();                // in unmount
 Live::new("orders").add(DataGrid::of(search_orders)...)
 
 #[action(permission = "sales.order.write")]
-pub async fn save_order(o: Valid<Order>, store: Orders, hub: Hub, ctx: Ctx) -> Result<Order> {
+pub async fn save_order(o: Valid<Order>, store: Orders, socket: Socket, ctx: Ctx) -> Result<Order> {
     let saved = store.save(o.into_inner())?;
-    hub.notify(&ctx, "orders");
+    socket.notify(&ctx, "orders");
     Ok(saved)
 }
 ```
@@ -88,7 +88,7 @@ pub async fn save_order(o: Valid<Order>, store: Orders, hub: Hub, ctx: Ctx) -> R
 
 सूचनाएँ केवल topic का नाम रखती हैं, कभी डेटा नहीं: रिफ़्रेश हर अनुमति जाँच के साथ सामान्य ग्रिड एंडपॉइंट से जाता है। `notify` केवल कॉलर के टेनेंट तक पहुँचता है; `notify_tenant(Some(id), topic)` एक को नाम देता है, `None` बिना टेनेंसी वाला ऐप है।
 
-वही topic नाम चैनल के बिना भी काम करते हैं। `.listens("orders")` से चिह्नित node तब उसी जगह रिफ़्रेश होते हैं जब कोई सूचना topic का नाम लेती है (`live.js` उसे `zeyn:topics` के रूप में आगे भेजता है), और तब भी जब कोई action `ui.refresh("orders")` के साथ ख़त्म होता है या `.drives("orders")` वाला फ़िल्टर बदलता है: ग्रिड अपना मौजूदा पेज फिर से लोड करते हैं, बाक़ी listener हर Screen के लिए एक `POST /_zeyn/nodes` से फिर render होते हैं (`examples/docs/pages/effects.md` में Topics देखें)। Socket सिर्फ़ `Live` node के topic की सदस्यता लेता है, जिन्हें `Realtime::topic` से घोषित करना होता है; जो हिस्से ग्रिड नहीं हैं, उनके लिए उनके अंदर या बगल में `.listens` इस्तेमाल करें।
+वही topic नाम चैनल के बिना भी काम करते हैं। `.listens("orders")` से चिह्नित node तब उसी जगह रिफ़्रेश होते हैं जब कोई सूचना topic का नाम लेती है (`live.js` उसे `zeyn:topics` के रूप में आगे भेजता है), और तब भी जब कोई action `ui.refresh("orders")` के साथ ख़त्म होता है या `.drives("orders")` वाला फ़िल्टर बदलता है: ग्रिड अपना मौजूदा पेज फिर से लोड करते हैं, बाक़ी listener हर Screen के लिए एक `POST /_zeyn/nodes` से फिर render होते हैं (`examples/docs/pages/effects.md` में Topics देखें)। Socket सिर्फ़ `Live` node के topic की सदस्यता लेता है, जिन्हें `ZeynSocket::topic` से घोषित करना होता है; जो हिस्से ग्रिड नहीं हैं, उनके लिए उनके अंदर या बगल में `.listens` इस्तेमाल करें।
 
 ## 5. मेमोरी और बैकप्रेशर
 
@@ -108,7 +108,7 @@ pub async fn save_order(o: Valid<Order>, store: Orders, hub: Hub, ctx: Ctx) -> R
 
 ब्रॉडकास्ट कभी इंतज़ार नहीं करते: अपडेट `try_send` से हर क्लाइंट की सीमित कतार को दिया जाता है। जिस क्लाइंट की कतार भरी हो उसे तुरंत रूम से हटा दिया जाता है, इसलिए एक धीमा पाठक मेमोरी नहीं रोक सकता या दूसरों को धीमा नहीं कर सकता; वह फिर कनेक्ट होता है और पूरा दस्तावेज़ पाता है। भरी कतार वाला topic सब्सक्राइबर केवल वह सूचना चूकता है (अगली फिर भी उसे रिफ़्रेश करती है)।
 
-इसलिए सबसे बुरी स्थिति की मेमोरी दस्तावेज़ों के लिए लगभग `rooms * doc_bytes` और कतारों के लिए `clients * queue * message_bytes` है (अपडेट कतारों के बीच साझा होता है, कॉपी नहीं)। डायग्राम पर दो लाइव टैब वाला शोकेस सर्वर कुल मिलाकर लगभग 19 MB इस्तेमाल करता है (डिबग बिल्ड)। `Hub::stats()` निगरानी के लिए रूम, क्लाइंट, सब्सक्राइबर और दस्तावेज़ बाइट बताता है।
+इसलिए सबसे बुरी स्थिति की मेमोरी दस्तावेज़ों के लिए लगभग `rooms * doc_bytes` और कतारों के लिए `clients * queue * message_bytes` है (अपडेट कतारों के बीच साझा होता है, कॉपी नहीं)। डायग्राम पर दो लाइव टैब वाला शोकेस सर्वर कुल मिलाकर लगभग 19 MB इस्तेमाल करता है (डिबग बिल्ड)। `Socket::stats()` निगरानी के लिए रूम, क्लाइंट, सब्सक्राइबर और दस्तावेज़ बाइट बताता है।
 
 ## 6. सुरक्षा टिप्पणियाँ
 

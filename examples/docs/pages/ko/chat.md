@@ -30,7 +30,7 @@ MessageThread::of(conversation_messages)
 
 `Delivery`에는 `Sending`, `Sent`, `Delivered`, `Read`(읽음 확인), `Failed` 상태가 있으며, 각각 아이콘과 스크린 리더용 텍스트로 표시됩니다. `.attachments(field, rules)`는 메시지의 파일을 보여 줍니다(`Vec<File>` 필드와 `Feature::files`로 등록한 저장소의 규칙). 이미지는 자리 표시자 위에 지연 로딩되는 고정 크기 상자에, 다른 파일은 저장소의 읽기 권한을 거치는 다운로드 링크로 표시됩니다.
 
-새 메시지는 스레드의 topic 중 하나가 호출될 때 가져옵니다. `.topic(..)`으로 따로 지정하지 않으면 `"chat"`입니다. `Composer`가 보낸 뒤, action이 `ui.refresh("chat")`으로 끝난 뒤, 또는 `.live()`와 `realtime` feature가 있을 때 어디서든 `hub.notify(&ctx, "chat")`이 실행될 때입니다. 다른 사람의 메시지는 polite 라이브 영역에서 알려 줍니다.
+새 메시지는 스레드의 topic 중 하나가 호출될 때 가져옵니다. `.topic(..)`으로 따로 지정하지 않으면 `"chat"`입니다. `Composer`가 보낸 뒤, action이 `ui.refresh("chat")`으로 끝난 뒤, 또는 `.live()`와 `realtime` feature가 있을 때 어디서든 `socket.notify(&ctx, "chat")`이 실행될 때입니다. 다른 사람의 메시지는 polite 라이브 영역에서 알려 줍니다.
 
 ### AI 답장
 
@@ -70,10 +70,10 @@ MessageThread::of(conversation_messages)
 
 ```rust
 #[action(permission = "chat.write")]
-pub async fn send_message(m: ChatSend, store: Chats, hub: Hub, ctx: Ctx) -> Result<()> {
+pub async fn send_message(m: ChatSend, store: Chats, socket: Socket, ctx: Ctx) -> Result<()> {
     store.check_member(&m.conversation, &ctx)?;
     store.add(&m.conversation, &ctx, m.text, m.attachments, m.mentions)?;
-    hub.notify(&ctx, "chat");
+    socket.notify(&ctx, "chat");
     Ok(())
 }
 
@@ -102,7 +102,7 @@ Composer::of(send_message)
 `TypingIndicator`는 대화에서 다른 누가 입력 중인지 polite 라이브 영역에서 보여 줍니다. "Ada가 입력 중", "Ada와 Grace가 입력 중", "3명이 입력 중"처럼 표시됩니다.
 
 ```rust
-let realtime = Realtime::new().topic("chat", "chat.read");
+let live = ZeynSocket::new().topic("chat", "chat.read");
 
 TypingIndicator::new("chat")
     .conversation(params.id.to_string())
@@ -110,6 +110,6 @@ TypingIndicator::new("chat")
     .person("grace", "Grace Hopper")
 ```
 
-이 컴포넌트는 실시간 채널(`realtime` feature, `realtime.md` 참고) 위에서 `Realtime::topic`으로 선언한 topic을 통해 동작합니다. 사용자가 같은 대화의 `Composer`에서 입력하는 동안 브라우저는 페이지의 라이브 소켓으로 작은 신호를 최대 3초에 한 번 보냅니다. 서버는 사용자별로 그보다 빠른 신호를 버리고, 신호를 테넌트 안의 topic의 다른 구독자에게 전달하며, 같은 사용자에게는 절대 되돌려 보내지 않습니다. 신호에는 대화 id와 이 서버만 만들 수 있는 사용자 키가 들어 있고, 사용자 id나 텍스트는 절대 들어 있지 않습니다. 이름은 마지막 신호 뒤 6초 동안 표시되며, `.person(user, name)`으로 지정하지 않은 사람은 "누군가"로 표시됩니다.
+이 컴포넌트는 실시간 채널(`realtime` feature, `realtime.md` 참고) 위에서 `ZeynSocket::topic`으로 선언한 topic을 통해 동작합니다. 사용자가 같은 대화의 `Composer`에서 입력하는 동안 브라우저는 페이지의 라이브 소켓으로 작은 신호를 최대 3초에 한 번 보냅니다. 서버는 사용자별로 그보다 빠른 신호를 버리고, 신호를 테넌트 안의 topic의 다른 구독자에게 전달하며, 같은 사용자에게는 절대 되돌려 보내지 않습니다. 신호에는 대화 id와 이 서버만 만들 수 있는 사용자 키가 들어 있고, 사용자 id나 텍스트는 절대 들어 있지 않습니다. 이름은 마지막 신호 뒤 6초 동안 표시되며, `.person(user, name)`으로 지정하지 않은 사람은 "누군가"로 표시됩니다.
 
 `realtime` feature가 없거나 앱에 실시간 채널이 없으면 표시기는 아무것도 렌더링하지 않고, 스크립트도 불러오지 않으며, 아무것도 보내지 않습니다. 신호는 테넌트 안의 topic의 모든 구독자에게 전달되므로 대화 id가 그들에게 보입니다. 불투명한 id를 쓰거나 대상마다 topic을 따로 두십시오.

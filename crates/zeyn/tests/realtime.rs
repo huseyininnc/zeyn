@@ -8,7 +8,9 @@ use tokio_tungstenite::tungstenite::{Error as WsError, Message};
 use yrs::updates::decoder::Decode;
 use yrs::{Doc, GetString, ReadTxn, Text, Transact, Update};
 use zeyn::prelude::*;
-use zeyn::realtime::{FRAME_UPDATE, Hub, Limits, MemoryDocStore, Realtime, RoomKey};
+use zeyn::realtime::{
+    Conn, Event, FRAME_UPDATE, Limits, MemoryDocStore, RoomKey, Socket as LiveSocket, ZeynSocket,
+};
 
 const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
@@ -18,6 +20,50 @@ type Socket =
 #[screen(route = "/", permission = "notes.read")]
 pub fn home() -> Screen {
     Screen::new("Home")
+}
+
+/// Sent to a room's group when a note is saved; any reader may get it.
+#[derive(serde::Serialize, Event)]
+#[event(name = "notes.saved")]
+pub struct Saved {
+    pub room: String,
+}
+
+/// Sent to the whole tenant; only writers may get it.
+#[derive(serde::Serialize, Event)]
+#[event(name = "notes.audit")]
+pub struct Audited {
+    pub by: String,
+}
+
+/// Never declared with `ZeynSocket::event`.
+#[derive(serde::Serialize, Event)]
+#[event(name = "notes.undeclared")]
+pub struct Undeclared {}
+
+#[params]
+pub struct RoomName {
+    pub name: String,
+}
+
+#[action(permission = "notes.read")]
+pub async fn join_room(r: RoomName, conn: Conn) -> Result<()> {
+    conn.join(r.name)
+}
+
+#[action(permission = "notes.write")]
+pub async fn save_note(r: RoomName, socket: LiveSocket, ctx: Ctx) -> Result<()> {
+    socket
+        .to_group(&ctx, r.name.clone())
+        .emit(&Saved { room: r.name })?;
+    socket.to_tenant(&ctx).emit(&Audited {
+        by: ctx
+            .identity()
+            .user
+            .clone()
+            .unwrap_or_default(),
+    })?;
+    Ok(())
 }
 
 /// Refuses live channels to the user `blocked`, as a suspended account check would.
@@ -32,13 +78,16 @@ impl zeyn::Interceptor for Suspended {
     }
 }
 
-async fn start(limits: Limits) -> (SocketAddr, Hub, MemoryDocStore) {
+async fn start(limits: Limits) -> (SocketAddr, LiveSocket, MemoryDocStore) {
     let store = MemoryDocStore::default();
-    let realtime = Realtime::new()
+    let live = ZeynSocket::new()
         .documents("notes", "notes.read", "notes.write", store.clone())
         .topic("orders", "notes.read")
+        .topic("secret", "notes.write")
+        .event::<Saved>("notes.read")
+        .event::<Audited>("notes.write")
         .limits(limits);
-    let hub = realtime.hub();
+    let hub = live.socket();
     let app = App::new("Test")
         .auth(|h: &HeaderMap| {
             let user = h
@@ -53,9 +102,14 @@ async fn start(limits: Limits) -> (SocketAddr, Hub, MemoryDocStore) {
             };
             Some(Identity::user(user).with_permissions(perms.iter().copied()))
         })
-        .feature(Feature::new("notes").screen(home))
+        .feature(
+            Feature::new("notes")
+                .screen(home)
+                .api(join_room)
+                .api(save_note),
+        )
         .interceptor(Suspended)
-        .realtime(realtime);
+        .socket(live);
     let router = app.router().unwrap();
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
         .await
@@ -209,14 +263,6 @@ async fn handshakes_need_origin_token_user_and_a_declared_document() {
     );
     assert_eq!(
         status(
-            open(addr, "/_zeyn/live/topics?t=secret", "ayse", true, &here)
-                .await
-                .unwrap_err()
-        ),
-        403
-    );
-    assert_eq!(
-        status(
             open_with(
                 addr,
                 &format!("/_zeyn/live/doc/notes/a?csrf={TOKEN}"),
@@ -272,7 +318,7 @@ async fn live_channels_run_the_interceptors() {
         ),
         403
     );
-    let topics = "/_zeyn/live/topics?t=orders";
+    let topics = PAGE;
     assert_eq!(
         status(
             open(addr, topics, "blocked", false, &here)
@@ -434,31 +480,250 @@ async fn limits_refuse_extra_connections_and_large_documents() {
     assert_eq!(code, Some(CloseCode::Size));
 }
 
+/// The page socket every page shares.
+const PAGE: &str = "/_zeyn/socket";
+
+/// Sends one JSON frame.
+async fn send_json(s: &mut Socket, v: serde_json::Value) {
+    s.send(Message::Text(v.to_string().into()))
+        .await
+        .unwrap();
+}
+
+/// The next JSON frame within five seconds.
+async fn next_json(s: &mut Socket) -> serde_json::Value {
+    let text = next_text(s, 5000)
+        .await
+        .expect("a frame");
+    serde_json::from_str(&text).unwrap()
+}
+
+/// Waits until the socket holds `n` topic subscriptions.
+async fn until_subscribers(hub: &LiveSocket, n: usize) {
+    let mut waited = 0;
+    while hub.stats().subscribers < n && waited < 100 {
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        waited += 1;
+    }
+}
+
 #[tokio::test]
 async fn topics_reach_subscribers_of_the_same_tenant() {
     let (addr, hub, _) = start(Limits::default()).await;
     let here = format!("http://{addr}");
-    let mut s = open(addr, "/_zeyn/live/topics?t=orders", "ayse", false, &here)
+    let mut s = open(addr, PAGE, "ayse", false, &here)
         .await
         .unwrap();
+    send_json(
+        &mut s,
+        serde_json::json!({ "sub": ["orders", "secret", "nope"] }),
+    )
+    .await;
+    assert_eq!(
+        next_json(&mut s).await,
+        serde_json::json!({ "denied": ["secret", "nope"] }),
+        "topics without permission or undeclared are refused, the socket stays"
+    );
+    until_subscribers(&hub, 1).await;
+    hub.notify_tenant(Some("other"), "orders");
+    hub.notify_tenant(None, "orders");
+    assert_eq!(
+        next_json(&mut s).await,
+        serde_json::json!({ "s": 1, "t": "orders" })
+    );
+    send_json(&mut s, serde_json::json!({ "unsub": ["orders"] })).await;
     let mut waited = 0;
-    while hub.stats().subscribers == 0 && waited < 50 {
+    while hub.stats().subscribers > 0 && waited < 100 {
         tokio::time::sleep(Duration::from_millis(20)).await;
         waited += 1;
     }
-    hub.notify_tenant(Some("other"), "orders");
-    hub.notify_tenant(None, "orders");
-    let text = loop {
+    assert_eq!(hub.stats().subscribers, 0);
+}
+
+#[tokio::test]
+async fn actions_run_over_the_socket_and_events_reach_groups_with_permission() {
+    let (addr, hub, _) = start(Limits::default()).await;
+    let here = format!("http://{addr}");
+    let mut reader = open(addr, PAGE, "ayse", false, &here)
+        .await
+        .unwrap();
+    let mut writer = open(addr, PAGE, "bora", true, &here)
+        .await
+        .unwrap();
+    let mut outsider = open(addr, PAGE, "cem", false, &here)
+        .await
+        .unwrap();
+    for s in [&mut reader, &mut writer] {
+        send_json(
+            s,
+            serde_json::json!({ "c": 1, "a": "join_room", "d": { "name": "r1" } }),
+        )
+        .await;
+        assert_eq!(
+            next_json(s).await,
+            serde_json::json!({ "r": 1, "ok": null })
+        );
+    }
+    assert_eq!(hub.stats().groups, 1);
+    send_json(
+        &mut reader,
+        serde_json::json!({ "c": 2, "a": "save_note", "d": { "name": "r1" } }),
+    )
+    .await;
+    let refused = next_json(&mut reader).await;
+    assert_eq!(refused["r"], 2);
+    assert_eq!(refused["err"]["status"], 403, "{refused}");
+    send_json(
+        &mut reader,
+        serde_json::json!({ "c": 3, "a": "no_such_action", "d": null }),
+    )
+    .await;
+    assert_eq!(next_json(&mut reader).await["err"]["status"], 404);
+
+    send_json(
+        &mut writer,
+        serde_json::json!({ "c": 9, "a": "save_note", "d": { "name": "r1" } }),
+    )
+    .await;
+    let mut got = Vec::new();
+    for _ in 0..3 {
+        got.push(next_json(&mut writer).await);
+    }
+    assert!(
+        got.contains(&serde_json::json!({ "s": 1, "e": "notes.saved", "d": { "room": "r1" } })),
+        "{got:?}"
+    );
+    assert!(
+        got.contains(&serde_json::json!({ "s": 2, "e": "notes.audit", "d": { "by": "bora" } })),
+        "{got:?}"
+    );
+    assert!(
+        got.contains(&serde_json::json!({ "r": 9, "ok": null })),
+        "{got:?}"
+    );
+    assert_eq!(
+        next_json(&mut reader).await,
+        serde_json::json!({ "s": 1, "e": "notes.saved", "d": { "room": "r1" } })
+    );
+    assert!(
+        next_text(&mut reader, 300)
+            .await
+            .is_none(),
+        "a reader never gets an event that needs another permission"
+    );
+    assert!(
+        next_text(&mut outsider, 300)
+            .await
+            .is_none(),
+        "a connection outside the group gets nothing"
+    );
+    assert!(
+        hub.to_tenant_id(None)
+            .emit(&Undeclared {})
+            .is_err(),
+        "an event not declared with ZeynSocket::event is refused"
+    );
+    drop(reader);
+    drop(writer);
+    let mut waited = 0;
+    while hub.stats().groups > 0 && waited < 100 {
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        waited += 1;
+    }
+    assert_eq!(
+        hub.stats().groups,
+        0,
+        "closed connections leave their groups"
+    );
+}
+
+#[tokio::test]
+async fn an_action_that_takes_the_connection_refuses_plain_http() {
+    let (addr, _, _) = start(Limits::default()).await;
+    let res = reqwest_post(addr, "/api/v1/notes/join_room", r#"{"name":"r1"}"#).await;
+    assert!(res.starts_with("422"), "{res}");
+    assert!(res.contains("live socket"), "{res}");
+}
+
+/// A minimal HTTP POST over a TCP stream; returns the status line code and the body.
+async fn reqwest_post(addr: SocketAddr, path: &str, body: &str) -> String {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let mut stream = tokio::net::TcpStream::connect(addr)
+        .await
+        .unwrap();
+    let req = format!(
+        "POST {path} HTTP/1.1\r\nHost: {addr}\r\nx-user: ayse\r\nAuthorization: Bearer t\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    );
+    stream
+        .write_all(req.as_bytes())
+        .await
+        .unwrap();
+    let mut out = String::new();
+    stream
+        .read_to_string(&mut out)
+        .await
+        .unwrap();
+    let code = out
+        .split_whitespace()
+        .nth(1)
+        .unwrap_or("")
+        .to_string();
+    format!("{code} {out}")
+}
+
+#[tokio::test]
+async fn calls_over_the_limit_per_second_answer_429() {
+    let limits = Limits {
+        calls: 2,
+        ..Limits::default()
+    };
+    let (addr, _, _) = start(limits).await;
+    let here = format!("http://{addr}");
+    let mut s = open(addr, PAGE, "ayse", false, &here)
+        .await
+        .unwrap();
+    for c in 1..=3 {
+        send_json(
+            &mut s,
+            serde_json::json!({ "c": c, "a": "join_room", "d": { "name": format!("g{c}") } }),
+        )
+        .await;
+    }
+    let mut statuses = Vec::new();
+    for _ in 0..3 {
+        let v = next_json(&mut s).await;
+        statuses.push(
+            v["err"]["status"]
+                .as_u64()
+                .unwrap_or(200),
+        );
+    }
+    statuses.sort();
+    assert_eq!(statuses, [200, 200, 429]);
+}
+
+#[tokio::test]
+async fn a_bad_frame_closes_the_socket_with_policy() {
+    let (addr, _, _) = start(Limits::default()).await;
+    let here = format!("http://{addr}");
+    let mut s = open(addr, PAGE, "ayse", false, &here)
+        .await
+        .unwrap();
+    s.send(Message::Text("not json".into()))
+        .await
+        .unwrap();
+    let code = loop {
         match tokio::time::timeout(Duration::from_secs(5), s.next())
             .await
             .unwrap()
         {
-            Some(Ok(Message::Text(t))) => break t.to_string(),
+            Some(Ok(Message::Close(frame))) => break frame.map(|f| f.code),
             Some(Ok(_)) => continue,
             other => panic!("{other:?}"),
         }
     };
-    assert_eq!(text, r#"{"topic":"orders"}"#);
+    assert_eq!(code, Some(CloseCode::Policy));
 }
 
 /// The next text frame within `ms`, or `None`.
@@ -476,21 +741,19 @@ async fn next_text(s: &mut Socket, ms: u64) -> Option<String> {
 async fn typing_signals_reach_other_users_only_throttled_and_without_user_ids() {
     let (addr, hub, _) = start(Limits::default()).await;
     let here = format!("http://{addr}");
-    let path = "/_zeyn/live/topics?t=orders";
-    let mut ada = open(addr, path, "ada", false, &here)
+    let mut ada = open(addr, PAGE, "ada", false, &here)
         .await
         .unwrap();
-    let mut ada2 = open(addr, path, "ada", false, &here)
+    let mut ada2 = open(addr, PAGE, "ada", false, &here)
         .await
         .unwrap();
-    let mut grace = open(addr, path, "grace", false, &here)
+    let mut grace = open(addr, PAGE, "grace", false, &here)
         .await
         .unwrap();
-    let mut waited = 0;
-    while hub.stats().subscribers < 3 && waited < 50 {
-        tokio::time::sleep(Duration::from_millis(20)).await;
-        waited += 1;
+    for s in [&mut ada, &mut ada2, &mut grace] {
+        send_json(s, serde_json::json!({ "sub": ["orders"] })).await;
     }
+    until_subscribers(&hub, 3).await;
     let signal = r#"{"t":"typing","topic":"orders","room":"r-1"}"#;
     ada.send(Message::Text(signal.into()))
         .await
@@ -499,7 +762,7 @@ async fn typing_signals_reach_other_users_only_throttled_and_without_user_ids() 
         .await
         .expect("grace hears ada typing");
     let v: serde_json::Value = serde_json::from_str(&got).unwrap();
-    assert_eq!(v["topic"], "orders");
+    assert_eq!(v["t"], "orders");
     assert_eq!(v["typing"]["room"], "r-1");
     assert_eq!(v["typing"]["who"], hub.person_key("", "ada"));
     assert!(!got.contains("ada"), "the user id never travels: {got}");
@@ -523,10 +786,6 @@ async fn typing_signals_reach_other_users_only_throttled_and_without_user_ids() 
         .send(Message::Text(
             r#"{"t":"typing","topic":"secret","room":"r-1"}"#.into(),
         ))
-        .await
-        .unwrap();
-    grace
-        .send(Message::Text("not json".into()))
         .await
         .unwrap();
     assert!(

@@ -353,7 +353,7 @@ Effect `{"effect":"refresh","topics":["sales"]}` 刷新这些主题的监听者�
 
 | Endpoint | Does |
 |---|---|
-| `GET /_zeyn/live/topics?t=a,b&csrf=` | WebSocket；文本帧 `{ "topic": "a" }` |
+| `GET /_zeyn/socket` | WebSocket；文本帧 `{"sub":["a"]}` ⇅ `{"s":1,"t":"a"}` |
 | `GET /_zeyn/live/doc/{kind}/{doc}?csrf=` | WebSocket；双向的二进制帧 `0x01` + Y update (v1) |
 
 握手在升级之前会检查 origin、与 cookie 比对的 CSRF 令牌、已登录用户以及权限。参见 `docs/realtime.md`。

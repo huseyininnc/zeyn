@@ -11,12 +11,12 @@ zeyn = { version = "...", features = ["realtime"] }
 ```
 
 ```rust
-let realtime = Realtime::new()
+let live = ZeynSocket::new()
     .documents("diagram", "diagram.read", "diagram.write", MyDocStore::new(pool))
     .topic("orders", "sales.order.read")
     .limits(Limits::default());
-let hub = realtime.hub();          // clone it into stores that notify
-App::new(..).realtime(realtime)    // also registers `Hub` as a service
+let socket = live.socket();       // clone it into stores that notify
+App::new(..).socket(live)         // also registers `Socket` as a service
 ```
 
 ## 2. 端点
@@ -24,13 +24,13 @@ App::new(..).realtime(realtime)    // also registers `Hub` as a service
 | 端点 | 用途 |
 |---|---|
 | `GET /_zeyn/live/doc/{kind}/{doc}?csrf=TOKEN` | WebSocket：协作文档 |
-| `GET /_zeyn/live/topics?t=a,b&csrf=TOKEN` | WebSocket：主题（topic）的变更通知 |
+| `GET /_zeyn/socket` | WebSocket：主题（topic）的变更通知 |
 | `GET /_zeyn/live.js` | 主题脚本，只被订阅主题的页面链接 |
 
 每次握手在升级之前都会按以下顺序检查：
 
 1. 通道已开启（否则返回 `404`）。
-2. **Origin：** `Origin` 请求头必须是请求所到达的主机，或是通过 `Realtime::allow_origin` 添加的源。浏览器在 WebSocket 握手时总会发送它；缺失则被拒绝。这正是阻止其他站点携带用户 cookie 打开套接字的机制。
+2. **Origin：** `Origin` 请求头必须是请求所到达的主机，或是通过 `ZeynSocket::allow_origin` 添加的源。浏览器在 WebSocket 握手时总会发送它；缺失则被拒绝。这正是阻止其他站点携带用户 cookie 打开套接字的机制。
 3. **CSRF 令牌：** 浏览器无法在 WebSocket 上设置请求头，因此来自 `meta[name=zeyn-csrf]` 的令牌放在 `csrf` 查询参数中，并以常量时间与 `zeyn_csrf` cookie 比较，与 `POST` 使用 `x-zeyn-csrf` 的方式完全一样。失败时返回 `403`。
 4. **身份：** 使用与每个请求相同的认证器；用户必须已登录（否则 `403`）。
 5. **每用户限制**（`429`）。
@@ -77,9 +77,9 @@ channel.close();                // in unmount
 Live::new("orders").add(DataGrid::of(search_orders)...)
 
 #[action(permission = "sales.order.write")]
-pub async fn save_order(o: Valid<Order>, store: Orders, hub: Hub, ctx: Ctx) -> Result<Order> {
+pub async fn save_order(o: Valid<Order>, store: Orders, socket: Socket, ctx: Ctx) -> Result<Order> {
     let saved = store.save(o.into_inner())?;
-    hub.notify(&ctx, "orders");
+    socket.notify(&ctx, "orders");
     Ok(saved)
 }
 ```
@@ -88,7 +88,7 @@ pub async fn save_order(o: Valid<Order>, store: Orders, hub: Hub, ctx: Ctx) -> R
 
 通知只携带主题名称，绝不携带数据：刷新走的是正常的表格端点，并带有所有权限检查。`notify` 只到达调用者所在的租户；`notify_tenant(Some(id), topic)` 指定某一个租户，`None` 表示没有租户机制的应用。
 
-同样的主题名在没有通道时也能使用。用 `.listens("orders")` 标记的节点会在通知点名该主题时就地刷新（`live.js` 把它作为 `zeyn:topics` 转发），在 action 以 `ui.refresh("orders")` 结束或带 `.drives("orders")` 的筛选变化时也会刷新：网格重新加载当前页，其他监听者每个界面用一次 `POST /_zeyn/nodes` 重新渲染（见 `examples/docs/pages/effects.md` 中的 Topics）。socket 只订阅 `Live` 节点的主题，这些主题必须用 `Realtime::topic` 声明；对于不是网格的部分，请在其内部或旁边使用 `.listens`。
+同样的主题名在没有通道时也能使用。用 `.listens("orders")` 标记的节点会在通知点名该主题时就地刷新（`live.js` 把它作为 `zeyn:topics` 转发），在 action 以 `ui.refresh("orders")` 结束或带 `.drives("orders")` 的筛选变化时也会刷新：网格重新加载当前页，其他监听者每个界面用一次 `POST /_zeyn/nodes` 重新渲染（见 `examples/docs/pages/effects.md` 中的 Topics）。socket 只订阅 `Live` 节点的主题，这些主题必须用 `ZeynSocket::topic` 声明；对于不是网格的部分，请在其内部或旁边使用 `.listens`。
 
 ## 5. 内存与背压
 
@@ -108,7 +108,7 @@ pub async fn save_order(o: Valid<Order>, store: Orders, hub: Hub, ctx: Ctx) -> R
 
 广播从不等待：更新通过 `try_send` 提交到每个客户端的有界队列。队列已满的客户端会立即被移出房间，因此一个慢速读取者无法占用内存或拖慢其他人；它会重新连接并收到完整文档。队列已满的主题订阅者只会错过那一次通知（下一次通知反正会刷新它）。
 
-因此最坏情况下的内存约为：文档为 `rooms * doc_bytes`，加上队列为 `clients * queue * message_bytes`（更新在队列之间共享，而不是复制）。在 showcase 服务器上，图表打开两个实时标签页时总共使用约 19 MB（debug 构建）。`Hub::stats()` 报告房间数、客户端数、订阅者数和文档字节数，供监控使用。
+因此最坏情况下的内存约为：文档为 `rooms * doc_bytes`，加上队列为 `clients * queue * message_bytes`（更新在队列之间共享，而不是复制）。在 showcase 服务器上，图表打开两个实时标签页时总共使用约 19 MB（debug 构建）。`Socket::stats()` 报告房间数、客户端数、订阅者数和文档字节数，供监控使用。
 
 ## 6. 安全说明
 

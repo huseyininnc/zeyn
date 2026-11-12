@@ -20,8 +20,8 @@ pub const TYPING_SHOWN_SECONDS: u64 = 6;
 /// Who is typing in a conversation, under a [`Composer`] or a [`MessageThread`]: "Ada is
 /// typing", "Ada and Grace are typing", "3 people are typing", in a polite live region.
 ///
-/// It works over the realtime channel (feature `realtime`, `App::realtime`) on a topic declared
-/// with `Realtime::topic`; every subscriber of the topic needs its permission. While the user
+/// It works over the realtime channel (feature `realtime`, `App::socket`) on a topic declared
+/// with `ZeynSocket::topic`; every subscriber of the topic needs its permission. While the user
 /// types in a [`Composer`] of the same conversation, the browser sends one small signal on the
 /// page's live socket at most every [`TYPING_EVERY_SECONDS`]; the server drops faster ones per
 /// user and passes the signal to the other subscribers of the topic in the tenant, never back
@@ -101,7 +101,7 @@ impl Component for TypingIndicator {
         let Some(ctx) = r.ctx else {
             return;
         };
-        let Some(hub) = ctx.service::<crate::realtime::Hub>() else {
+        let Some(hub) = ctx.service::<crate::realtime::Socket>() else {
             return;
         };
         let Some(user) = ctx.identity().user.as_deref() else {

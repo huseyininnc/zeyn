@@ -353,7 +353,7 @@ Effect `{"effect":"refresh","topics":["sales"]}`는 토픽의 리스너를 새�
 
 | 엔드포인트 | 기능 |
 |---|---|
-| `GET /_zeyn/live/topics?t=a,b&csrf=` | WebSocket. 텍스트 프레임 `{ "topic": "a" }` |
+| `GET /_zeyn/socket` | WebSocket. 텍스트 프레임 `{"sub":["a"]}` ⇅ `{"s":1,"t":"a"}` |
 | `GET /_zeyn/live/doc/{kind}/{doc}?csrf=` | WebSocket. 바이너리 프레임 `0x01` + Y 업데이트(v1)가 양방향으로 오갑니다 |
 
 핸드셰이크는 업그레이드하기 전에 출처, 쿠키에 대한 CSRF 토큰, 로그인한 사용자, 권한을 검사합니다. `docs/realtime.md`를 참고하십시오.

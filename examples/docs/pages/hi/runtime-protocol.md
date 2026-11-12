@@ -353,7 +353,7 @@ Effect `{"effect":"refresh","topics":["sales"]}` topic के listener को �
 
 | एंडपॉइंट | क्या करता है |
 |---|---|
-| `GET /_zeyn/live/topics?t=a,b&csrf=` | WebSocket; टेक्स्ट फ़्रेम `{ "topic": "a" }` |
+| `GET /_zeyn/socket` | WebSocket; टेक्स्ट फ़्रेम `{"sub":["a"]}` ⇅ `{"s":1,"t":"a"}` |
 | `GET /_zeyn/live/doc/{kind}/{doc}?csrf=` | WebSocket; बाइनरी फ़्रेम `0x01` + Y अपडेट (v1) दोनों दिशाओं में |
 
 हैंडशेक अपग्रेड से पहले origin, कुकी के विरुद्ध CSRF टोकन, साइन इन उपयोगकर्ता और अनुमतियाँ जाँचते हैं। देखें `docs/realtime.md`।

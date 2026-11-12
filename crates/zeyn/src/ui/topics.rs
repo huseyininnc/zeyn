@@ -141,7 +141,7 @@ impl Component for Listen {
 
 /// `.listens(topics)` on every component: the node refreshes in place when one of the topics is
 /// refreshed ([`crate::Effect::refresh`]), driven by a filter control (`.drives`) or notified by
-/// the realtime hub. Call it last, after the component's own builder methods; the node keeps its
+/// the live socket. Call it last, after the component's own builder methods; the node keeps its
 /// own endpoints one level down (`p.0` for a listener at `p`).
 ///
 /// ```

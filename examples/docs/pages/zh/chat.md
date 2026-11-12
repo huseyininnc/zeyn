@@ -30,7 +30,7 @@ MessageThread::of(conversation_messages)
 
 `Delivery` 有 `Sending`、`Sent`、`Delivered`、`Read`（已读回执）和 `Failed` 几种状态，每种都用一个图标和一段供屏幕阅读器读取的文字表示。`.attachments(field, rules)` 显示消息的文件（一个 `Vec<File>` 字段和一个用 `Feature::files` 注册的存储的规则）：图片放在固定大小的框中，在占位图上延迟加载；其他文件显示为下载链接，并经过存储的读取权限。
 
-当线程的某个 topic 被点名时就会获取新消息，除非 `.topic(..)` 另有指定，否则该 topic 为 `"chat"`：在 `Composer` 发送之后，在某个 action 以 `ui.refresh("chat")` 结束之后，或者在有 `.live()` 和 `realtime` feature 时，任何地方运行 `hub.notify(&ctx, "chat")` 时。他人的消息会在 polite 实时区域中播报。
+当线程的某个 topic 被点名时就会获取新消息，除非 `.topic(..)` 另有指定，否则该 topic 为 `"chat"`：在 `Composer` 发送之后，在某个 action 以 `ui.refresh("chat")` 结束之后，或者在有 `.live()` 和 `realtime` feature 时，任何地方运行 `socket.notify(&ctx, "chat")` 时。他人的消息会在 polite 实时区域中播报。
 
 ### AI 回复
 
@@ -70,10 +70,10 @@ MessageThread::of(conversation_messages)
 
 ```rust
 #[action(permission = "chat.write")]
-pub async fn send_message(m: ChatSend, store: Chats, hub: Hub, ctx: Ctx) -> Result<()> {
+pub async fn send_message(m: ChatSend, store: Chats, socket: Socket, ctx: Ctx) -> Result<()> {
     store.check_member(&m.conversation, &ctx)?;
     store.add(&m.conversation, &ctx, m.text, m.attachments, m.mentions)?;
-    hub.notify(&ctx, "chat");
+    socket.notify(&ctx, "chat");
     Ok(())
 }
 
@@ -102,7 +102,7 @@ Composer::of(send_message)
 `TypingIndicator` 在 polite 实时区域中显示对话中还有谁正在输入：“Ada 正在输入”“Ada 和 Grace 正在输入”“3 人正在输入”。
 
 ```rust
-let realtime = Realtime::new().topic("chat", "chat.read");
+let live = ZeynSocket::new().topic("chat", "chat.read");
 
 TypingIndicator::new("chat")
     .conversation(params.id.to_string())
@@ -110,6 +110,6 @@ TypingIndicator::new("chat")
     .person("grace", "Grace Hopper")
 ```
 
-它通过实时通道（`realtime` feature，见 `realtime.md`）在一个用 `Realtime::topic` 声明的 topic 上工作。当用户在同一对话的 `Composer` 中输入时，浏览器通过页面的实时 socket 最多每 3 秒发送一个小信号；服务器按用户丢弃更频繁的信号，并把信号传给租户内该 topic 的其他订阅者，从不回传给同一用户。信号包含对话 id 和一个只有本服务器能生成的用户键，从不包含用户 id 或任何文本。名字在最后一个信号后显示 6 秒；没有通过 `.person(user, name)` 提供的人显示为“某人”。
+它通过实时通道（`realtime` feature，见 `realtime.md`）在一个用 `ZeynSocket::topic` 声明的 topic 上工作。当用户在同一对话的 `Composer` 中输入时，浏览器通过页面的实时 socket 最多每 3 秒发送一个小信号；服务器按用户丢弃更频繁的信号，并把信号传给租户内该 topic 的其他订阅者，从不回传给同一用户。信号包含对话 id 和一个只有本服务器能生成的用户键，从不包含用户 id 或任何文本。名字在最后一个信号后显示 6 秒；没有通过 `.person(user, name)` 提供的人显示为“某人”。
 
 没有 `realtime` feature，或应用没有实时通道时，指示器不渲染任何内容，它的脚本不会加载，也不会发送任何东西。信号会到达租户内该 topic 的每个订阅者，因此对话 id 对他们可见：请使用不透明的 id，或为每类受众使用单独的 topic。
