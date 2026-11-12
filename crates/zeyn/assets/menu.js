@@ -18,6 +18,8 @@
  * The rail button (`[data-zeyn-rail-toggle]`) folds the menu to an icon rail on wide screens and
  * back. In the rail a top level group opens as a flyout, one at a time; Escape, a click outside
  * and a navigation close it.
+ * Counted items (`[data-zeyn-count]`, `Menu::count`) get their numbers from one
+ * `GET /_zeyn/menu/counts` after the page shows, and again when one of their topics is named.
  * @module menu
  */
 
@@ -136,6 +138,13 @@ function fold(text) {
   return text.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase();
 }
 
+/** The label of a menu link, without its badge and count. */
+function linkText(a) {
+  const copy = a.cloneNode(true);
+  for (const extra of copy.querySelectorAll('.z-nav-badge, .z-nav-count')) extra.remove();
+  return copy.textContent.trim();
+}
+
 /** `localStorage` key of the user's pinned menu links. */
 function favoritesKey() {
   return `zeyn.menu.favorites:${document.querySelector('meta[name="zeyn-storage"]')?.content ?? 'anon'}`;
@@ -173,7 +182,7 @@ function drawFavorites(nav, box) {
     const button = a.parentElement.querySelector(':scope > .z-nav-pin');
     if (!button) continue;
     const on = pinned.includes(a.getAttribute('href'));
-    const label = a.textContent.trim();
+    const label = linkText(a);
     button.setAttribute('aria-pressed', String(on));
     button.setAttribute('aria-label', (on ? box.dataset.textUnpin : box.dataset.textPin).replace('{label}', label));
   }
@@ -214,7 +223,7 @@ function initFilter(box) {
     const q = fold(input.value.trim());
     let shown = 0;
     for (const li of nav.querySelectorAll('.z-nav-group:not(.z-nav-favorites) li:has(> a[href])')) {
-      const hit = !q || fold(li.querySelector(':scope > a').textContent).includes(q);
+      const hit = !q || fold(linkText(li.querySelector(':scope > a'))).includes(q);
       li.hidden = !hit;
       if (hit) shown++;
     }
@@ -249,3 +258,39 @@ function initFilter(box) {
 }
 
 for (const box of document.querySelectorAll('[data-zeyn-menu-filter]')) initFilter(box);
+
+/** Topics named since the last count, so a burst of them counts once. */
+let countTimer = 0;
+
+/**
+ * Fills the counted menu items (`[data-zeyn-count]`, see `Menu::count`) from one
+ * `GET /_zeyn/menu/counts`: 0 hides the number, more than 99 shows "99+".
+ */
+async function loadCounts() {
+  countTimer = 0;
+  const spans = document.querySelectorAll('[data-zeyn-count]');
+  if (!spans.length) return;
+  const base = (document.querySelector('meta[name="zeyn-base"]')?.content ?? '').replace(/\/$/, '');
+  let counts;
+  try {
+    const res = await fetch(`${base}/_zeyn/menu/counts`, { credentials: 'same-origin', cache: 'no-store' });
+    if (!res.ok) return;
+    counts = await res.json();
+  } catch {
+    return;
+  }
+  for (const span of spans) {
+    const n = counts?.[span.dataset.zeynCount];
+    const shown = typeof n === 'number' && n > 0;
+    span.hidden = !shown;
+    span.textContent = shown ? (n > 99 ? '99+' : String(n)) : '';
+  }
+}
+
+document.addEventListener('zeyn:topics', (e) => {
+  const named = e.detail?.topics ?? [];
+  const wanted = [...document.querySelectorAll('[data-zeyn-count-topics]')].some((s) => s.dataset.zeynCountTopics.split(',').some((t) => named.includes(t)));
+  if (wanted) countTimer ||= setTimeout(loadCounts, 300);
+});
+
+loadCounts();

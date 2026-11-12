@@ -1100,6 +1100,63 @@ async fn the_side_menu_folds_to_an_icon_rail_remembered_in_a_cookie() {
     );
 }
 
+#[action(permission = "mail.read")]
+pub async fn unread(_: ()) -> Result<u64> {
+    Ok(7)
+}
+
+#[action(permission = "mail.admin")]
+pub async fn flagged(_: ()) -> Result<u64> {
+    Ok(150)
+}
+
+#[tokio::test]
+async fn menu_items_show_badges_and_counts_loaded_after_the_page() {
+    let router = |perms: &'static [&'static str]| {
+        App::new("Nav")
+            .auth(move |_: &axum::http::HeaderMap| {
+                Some(Identity::user("ayse").with_permissions(perms.iter().copied()))
+            })
+            .feature(Feature::new("n").screen(one).menu(|m| {
+                m.group("Mail", Icon::Box)
+                    .item("One", one)
+                    .badge("New")
+                    .count(unread)
+                    .count_listens("mail")
+                    .item("One", one)
+                    .count(flagged)
+            }))
+            .router()
+            .unwrap()
+    };
+    let r = router(&["mail.read"]);
+    let (_, _, page) = get(&r, "/one", false).await;
+    assert!(
+        page.contains(r#"<span>One</span> <span class="z-nav-badge">New</span> <span class="z-nav-count" data-zeyn-count="unread" data-zeyn-count-topics="mail" hidden></span></a>"#),
+        "{page}"
+    );
+    assert!(
+        !page.contains(r#"data-zeyn-count="flagged""#),
+        "a count the user may not run is not shown"
+    );
+    let (status, _, body) = get(&r, "/_zeyn/menu/counts", false).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&body).unwrap(),
+        serde_json::json!({ "unread": 7 })
+    );
+    let (_, _, body) = get(
+        &router(&["mail.read", "mail.admin"]),
+        "/_zeyn/menu/counts",
+        false,
+    )
+    .await;
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&body).unwrap(),
+        serde_json::json!({ "unread": 7, "flagged": 150 })
+    );
+}
+
 #[tokio::test]
 async fn long_menus_get_a_filter_box_and_short_ones_do_not() {
     let router = |n: usize| {
