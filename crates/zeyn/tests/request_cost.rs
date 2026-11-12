@@ -6,7 +6,7 @@ use axum::http::{HeaderMap, Request, StatusCode};
 use http_body_util::BodyExt;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use tower::ServiceExt;
 use zeyn::prelude::*;
 
@@ -17,9 +17,21 @@ pub struct SlowRow {
     pub name: String,
 }
 
+/// Loads of [`slow_rows`] running now, and the most that ever ran at once.
+#[derive(Clone, Default)]
+pub struct Probe(Arc<(AtomicUsize, AtomicUsize)>);
+
+impl Service for Probe {}
+
 #[action(permission = "rows.read")]
-pub async fn slow_rows(_q: DataQuery) -> Result<Page<SlowRow>> {
+pub async fn slow_rows(_q: DataQuery, probe: Probe) -> Result<Page<SlowRow>> {
+    let now = probe.0.0.fetch_add(1, Ordering::SeqCst) + 1;
+    probe
+        .0
+        .1
+        .fetch_max(now, Ordering::SeqCst);
     tokio::time::sleep(Duration::from_millis(300)).await;
+    probe.0.0.fetch_sub(1, Ordering::SeqCst);
     Ok(Page::new(vec![SlowRow {
         id: SlowRowId(1),
         name: "one".into(),
@@ -35,8 +47,9 @@ pub fn two_grids() -> Screen {
     )
 }
 
-fn app(calls: Arc<AtomicUsize>) -> axum::Router {
+fn app(calls: Arc<AtomicUsize>, probe: Probe) -> axum::Router {
     App::new("Cost")
+        .service(probe)
         .auth(move |h: &HeaderMap| {
             calls.fetch_add(1, Ordering::SeqCst);
             Some(Identity::user(h.get("x-user")?.to_str().ok()?).with_permissions(["rows.read"]))
@@ -72,7 +85,7 @@ async fn get(router: &axum::Router, path: &str) -> (StatusCode, String) {
 #[tokio::test]
 async fn a_request_authenticates_the_caller_once() {
     let calls = Arc::new(AtomicUsize::new(0));
-    let router = app(calls.clone());
+    let router = app(calls.clone(), Probe::default());
     let (status, _) = get(&router, "/two").await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(
@@ -84,14 +97,14 @@ async fn a_request_authenticates_the_caller_once() {
 
 #[tokio::test]
 async fn the_grids_of_a_screen_load_at_the_same_time() {
-    let router = app(Arc::default());
-    let started = Instant::now();
+    let probe = Probe::default();
+    let router = app(Arc::default(), probe.clone());
     let (status, body) = get(&router, "/two").await;
-    let took = started.elapsed();
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body.matches(">one<").count(), 2, "{body}");
-    assert!(
-        took < Duration::from_millis(550),
-        "two grids of 300 ms each took {took:?}; they should load together"
+    assert_eq!(
+        probe.0.1.load(Ordering::SeqCst),
+        2,
+        "the two grids' first pages load at the same time"
     );
 }
