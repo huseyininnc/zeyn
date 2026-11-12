@@ -558,6 +558,182 @@ async fn uploads_count_against_the_write_limit() {
 }
 
 #[tokio::test]
+async fn a_user_over_the_upload_quota_gets_429_until_the_window_refills() {
+    const QUOTA: FileRules = DOCS.quota(150, std::time::Duration::from_secs(3600));
+    let router = App::new("Test")
+        .i18n(I18n::new("en"))
+        .auth(|_: &HeaderMap| Some(Identity::user("ada").with_permissions(["crm.files"])))
+        .feature(Feature::new("crm").files(QUOTA, "crm.files", MemoryStore::default()))
+        .router()
+        .unwrap();
+    let up = || {
+        upload("a.png", "")
+            .body(png(100).into())
+            .unwrap()
+    };
+    assert_eq!(send(&router, up()).await.0, StatusCode::CREATED);
+    assert_eq!(
+        send(&router, up()).await.0,
+        StatusCode::CREATED,
+        "the upload that crosses the quota still lands"
+    );
+    let (status, _, body) = send(&router, up()).await;
+    assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+    assert!(String::from_utf8_lossy(&body).contains("upload limit"));
+}
+
+#[tokio::test]
+async fn put_patch_and_delete_count_against_the_write_limit() {
+    let router = App::new("Test")
+        .write_limit(RateLimit::per_ip(1, std::time::Duration::from_secs(60)))
+        .router()
+        .unwrap();
+    for method in ["PATCH", "DELETE", "PUT"] {
+        let req = |m: &str| {
+            Request::builder()
+                .method(m)
+                .uri("/_zeyn/files/docs/0123456789abcdef0123456789abcdef")
+                .body(Body::empty())
+                .unwrap()
+        };
+        let router = router.clone();
+        let _ = send(&router, req(method)).await;
+        let (status, ..) = send(&router, req(method)).await;
+        assert_eq!(status, StatusCode::TOO_MANY_REQUESTS, "{method}");
+    }
+}
+
+/// A ZIP of one stored entry whose central directory declares `unpacked` bytes.
+fn zip_declaring(unpacked: u32, entries: u16) -> Vec<u8> {
+    let name = b"a.txt";
+    let data = b"hello";
+    let mut z = Vec::new();
+    z.extend_from_slice(&[
+        0x50, 0x4b, 0x03, 0x04, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ]);
+    z.extend_from_slice(&(data.len() as u32).to_le_bytes());
+    z.extend_from_slice(&(data.len() as u32).to_le_bytes());
+    z.extend_from_slice(&(name.len() as u16).to_le_bytes());
+    z.extend_from_slice(&0u16.to_le_bytes());
+    z.extend_from_slice(name);
+    z.extend_from_slice(data);
+    let dir_at = z.len() as u32;
+    let mut dir = Vec::new();
+    dir.extend_from_slice(&[
+        0x50, 0x4b, 0x01, 0x02, 20, 0, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ]);
+    dir.extend_from_slice(&(data.len() as u32).to_le_bytes());
+    dir.extend_from_slice(&unpacked.to_le_bytes());
+    dir.extend_from_slice(&(name.len() as u16).to_le_bytes());
+    dir.extend_from_slice(&[0u8; 12]);
+    dir.extend_from_slice(&0u32.to_le_bytes());
+    dir.extend_from_slice(name);
+    z.extend_from_slice(&dir);
+    z.extend_from_slice(&[0x50, 0x4b, 0x05, 0x06, 0, 0, 0, 0]);
+    z.extend_from_slice(&entries.to_le_bytes());
+    z.extend_from_slice(&entries.to_le_bytes());
+    z.extend_from_slice(&(dir.len() as u32).to_le_bytes());
+    z.extend_from_slice(&dir_at.to_le_bytes());
+    z.extend_from_slice(&0u16.to_le_bytes());
+    z
+}
+
+#[tokio::test]
+async fn the_zip_guard_refuses_archives_that_unpack_into_far_more_than_they_weigh() {
+    use zeyn::{ScanVerdict, ZipGuard};
+    let guard = ZipGuard::default();
+    let meta = |size: usize| FileMeta {
+        id: "0123456789abcdef0123456789abcdef".into(),
+        name: "a.zip".into(),
+        content_type: FileType::Zip.mime().into(),
+        size: size as u64,
+        tenant: None,
+        owner: None,
+        created: 0,
+    };
+    let scan = |bytes: Vec<u8>| {
+        let size = bytes.len();
+        guard.scan(meta(size), Box::new(std::io::Cursor::new(bytes)))
+    };
+    assert_eq!(scan(zip_declaring(5, 1)).await.unwrap(), ScanVerdict::Clean);
+    assert!(matches!(
+        scan(zip_declaring(2_000_000_000, 1))
+            .await
+            .unwrap(),
+        ScanVerdict::Refused(_)
+    ));
+    assert!(
+        matches!(
+            scan(zip_declaring(500_000, 1))
+                .await
+                .unwrap(),
+            ScanVerdict::Refused(_)
+        ),
+        "500 KB from a 100 byte file is too high a ratio"
+    );
+    assert!(matches!(
+        scan(zip_declaring(5, 20_000))
+            .await
+            .unwrap(),
+        ScanVerdict::Refused(_)
+    ));
+    assert!(matches!(
+        scan(b"PK not really a zip".to_vec())
+            .await
+            .unwrap(),
+        ScanVerdict::Refused(_)
+    ));
+    let png_meta = FileMeta {
+        content_type: FileType::Png.mime().into(),
+        ..meta(10)
+    };
+    assert_eq!(
+        guard
+            .scan(png_meta, Box::new(std::io::Cursor::new(vec![0u8; 10])))
+            .await
+            .unwrap(),
+        ScanVerdict::Clean,
+        "other files pass"
+    );
+}
+
+#[test]
+fn stale_parts_of_stopped_uploads_are_swept() {
+    let dir = std::env::temp_dir().join(format!("zeyn-parts-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let old = dir.join("0123456789abcdef0123456789abcdef.part");
+    let fresh = dir.join("fedcba9876543210fedcba9876543210.part");
+    std::fs::write(&old, b"x").unwrap();
+    std::fs::write(&fresh, b"x").unwrap();
+    let long_ago =
+        std::time::SystemTime::now() - zeyn::STALE_PART - std::time::Duration::from_secs(60);
+    std::fs::File::options()
+        .write(true)
+        .open(&old)
+        .unwrap()
+        .set_modified(long_ago)
+        .unwrap();
+    let store = zeyn::DiskStore::new(&dir);
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(store.put(
+        FileMeta {
+            id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
+            name: "a.png".into(),
+            content_type: FileType::Png.mime().into(),
+            size: 0,
+            tenant: None,
+            owner: None,
+            created: 0,
+        },
+        FileChunks::from_parts(vec![png(10)]),
+    ))
+    .unwrap();
+    assert!(!old.exists(), "a part older than an hour is removed");
+    assert!(fresh.exists(), "a part of an upload in progress stays");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[tokio::test]
 async fn files_of_another_tenant_are_not_found() {
     let store = MemoryStore::default();
     let router = app(store.clone(), Scanner::default(), MemoryAudit::default());

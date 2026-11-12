@@ -14,6 +14,10 @@
  * does not hold what was typed (case and accents ignored), opens the groups around the ones that
  * do, and says how many are left. Escape clears it. Each link gets a pin button; pinned links show
  * in a Favorites group at the top, kept in `localStorage` per user (`meta[name=zeyn-storage]`).
+ *
+ * The rail button (`[data-zeyn-rail-toggle]`) folds the menu to an icon rail on wide screens and
+ * back. In the rail a top level group opens as a flyout, one at a time; Escape, a click outside
+ * and a navigation close it.
  * @module menu
  */
 
@@ -22,22 +26,82 @@ function heading(group) {
   return group?.querySelector(':scope > :is(h2, h3, h4, h5) > .z-nav-heading') ?? null;
 }
 
-/** Opens or closes the group of `button`; in an accordion menu opening closes its siblings. */
+/** The top level group headings of the icon rail, whose groups open as flyouts. */
+function flyouts() {
+  return document.querySelectorAll('[data-zeyn-rail] .z-nav-group > h2 > .z-nav-heading');
+}
+
+/** Closes every open flyout of the icon rail; `true` when one was open. */
+function closeFlyouts() {
+  let closed = false;
+  for (const b of flyouts()) {
+    if (b.getAttribute('aria-expanded') === 'true') closed = true;
+    b.setAttribute('aria-expanded', 'false');
+  }
+  return closed;
+}
+
+/**
+ * Folds the side menu to the icon rail or unfolds it, and remembers the choice in the `zeyn_rail`
+ * cookie through `POST /_zeyn/rail`, so the next page starts the same way.
+ */
+async function setRail(button, on) {
+  const app = button.closest('.z-app');
+  app?.toggleAttribute('data-zeyn-rail', on);
+  button.setAttribute('aria-pressed', String(on));
+  button.setAttribute('aria-label', on ? button.dataset.textExpand : button.dataset.textCollapse);
+  if (on) closeFlyouts();
+  else {
+    const current = app?.querySelector('.z-nav a[aria-current="page"]');
+    for (let g = current?.closest('.z-nav-group'); g; g = g.parentElement.closest('.z-nav-group')) heading(g)?.setAttribute('aria-expanded', 'true');
+  }
+  const base = (document.querySelector('meta[name="zeyn-base"]')?.content ?? '').replace(/\/$/, '');
+  const csrf = document.querySelector('meta[name="zeyn-csrf"]')?.content || (await window.zeynCsrf?.()) || '';
+  fetch(`${base}/_zeyn/rail`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'content-type': 'application/json', 'x-zeyn-csrf': csrf },
+    body: JSON.stringify({ rail: on }),
+  }).catch(() => {});
+}
+
+/**
+ * Opens or closes the group of `button`; in an accordion menu, and among the flyouts of the icon
+ * rail, opening closes its siblings.
+ */
 function setOpen(button, open) {
   button.setAttribute('aria-expanded', String(open));
   const group = button.closest('.z-nav-group');
-  if (!open || !group?.closest('[data-zeyn-accordion]')) return;
+  const flyout = !!group?.closest('[data-zeyn-rail]') && group.parentElement?.classList.contains('z-nav-body');
+  if (!open || (!flyout && !group?.closest('[data-zeyn-accordion]'))) return;
   for (const sibling of group.parentElement.children) {
     if (sibling !== group) heading(sibling)?.setAttribute('aria-expanded', 'false');
   }
 }
 
 document.addEventListener('click', (e) => {
-  const button = e.target instanceof Element ? e.target.closest('[data-zeyn-menu] .z-nav-heading') : null;
+  const target = e.target instanceof Element ? e.target : null;
+  const rail = target?.closest('[data-zeyn-rail-toggle]');
+  if (rail) {
+    setRail(rail, rail.getAttribute('aria-pressed') !== 'true');
+    return;
+  }
+  const button = target?.closest('[data-zeyn-menu] .z-nav-heading');
   if (button) setOpen(button, button.getAttribute('aria-expanded') !== 'true');
+  else if (!target?.closest('[data-zeyn-rail] .z-nav-group > ul')) closeFlyouts();
 });
 
 document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && e.target instanceof Element && e.target.closest('[data-zeyn-rail] .z-nav-group')) {
+    const group = e.target.closest('[data-zeyn-rail] .z-nav-body > .z-nav-group');
+    const button = group && heading(group);
+    if (button?.getAttribute('aria-expanded') === 'true') {
+      setOpen(button, false);
+      button.focus();
+      e.preventDefault();
+      return;
+    }
+  }
   if (e.altKey || e.ctrlKey || e.metaKey || !(e.target instanceof Element)) return;
   const nav = e.target.closest('[data-zeyn-menu]');
   const here = nav && e.target.closest('.z-nav-group') ? e.target.closest('.z-nav-heading, a[href]') : null;

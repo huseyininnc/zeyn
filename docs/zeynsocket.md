@@ -3,7 +3,8 @@
 Status: ZEYN-272 (the page socket at `/_zeyn/socket`, `ZeynSocket`, `Socket`, events, groups,
 `Conn`, actions over the socket), ZEYN-273 (resume, replay, heartbeat, backoff) and ZEYN-277
 (limits, tenant isolation, memory), ZEYN-276 (`on_event`, `zeyn.socket`, `TestSocket`) and
-ZEYN-274 (Server-Sent Events fallback) and ZEYN-275 (Redis) are built. ZEYN-278 follows.
+ZEYN-274 (Server-Sent Events fallback), ZEYN-275 (Redis) and ZEYN-278 (guide `docs/socket.md`,
+skill, showcase) are built.
 
 ZeynSocket is the one live connection between a Zeyn page and the server. It grows out of the
 `realtime` feature (`docs/realtime.md`), which already has a checked handshake, bounded queues,

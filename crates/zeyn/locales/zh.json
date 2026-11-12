@@ -221,6 +221,8 @@
       "menu_favorites": "收藏",
       "menu_pin": "固定 {label}",
       "menu_unpin": "取消固定 {label}",
+      "rail_collapse": "收起菜单",
+      "rail_expand": "展开菜单",
       "language": "语言",
       "time_zone": "时区",
       "time_zone_auto": "自动（此设备）",
@@ -943,6 +945,7 @@
     },
     "files": {
       "too_large": "文件过大。允许的最大文件为 {max}。",
+      "quota": "暂时已达到上传上限，请稍后再试。",
       "too_many": "{label}最多接受 {n} 个文件。",
       "type": "不接受此类型的文件，或其内容与文件名不符。",
       "refused": "文件未通过安全检查，已被拒绝。",

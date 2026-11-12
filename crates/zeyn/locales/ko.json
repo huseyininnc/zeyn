@@ -221,6 +221,8 @@
       "menu_favorites": "즐겨찾기",
       "menu_pin": "{label} 고정",
       "menu_unpin": "{label} 고정 해제",
+      "rail_collapse": "메뉴 접기",
+      "rail_expand": "메뉴 펼치기",
       "language": "언어",
       "time_zone": "시간대",
       "time_zone_auto": "자동 (이 기기)",
@@ -943,6 +945,7 @@
     },
     "files": {
       "too_large": "파일이 너무 큽니다. 허용되는 최대 파일 크기는 {max}입니다.",
+      "quota": "지금은 업로드 한도에 도달했습니다. 나중에 다시 시도하세요.",
       "too_many": "{label}에는 최대 {n}개 파일을 넣을 수 있습니다.",
       "type": "이 파일 형식은 허용되지 않거나, 내용이 이름과 일치하지 않습니다.",
       "refused": "보안 검사에서 파일이 거부되었습니다.",

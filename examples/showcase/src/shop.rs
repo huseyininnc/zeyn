@@ -95,7 +95,7 @@ pub fn shop_home(_: (), ctx: Ctx) -> Screen {
             Rail::of(catalog_products)
                 .title(t!("shop.new_arrivals"))
                 .card(card(ctx.locale().to_string()))
-                .sort_option(t!("shop.sort.newest"), Product::id, true)
+                .sort_option_desc(t!("shop.sort.newest"), Product::id)
                 .image_size(300, 300),
         )
         .body(Alert::info(t!("shop.home.panel_text")).title(t!("shop.home.panel")))
@@ -107,9 +107,9 @@ pub fn shop_catalog(_: (), ctx: Ctx) -> Screen {
     Screen::new(t!("shop.products")).body(
         CardGrid::of(catalog_products)
             .card(card(ctx.locale().to_string()))
-            .sort_option(t!("shop.sort.name"), Product::name, false)
-            .sort_option(t!("shop.sort.cheapest"), Product::price, false)
-            .sort_option(t!("shop.sort.dearest"), Product::price, true)
+            .sort_option(t!("shop.sort.name"), Product::name)
+            .sort_option(t!("shop.sort.cheapest"), Product::price)
+            .sort_option_desc(t!("shop.sort.dearest"), Product::price)
             .image_size(300, 300)
             .paging(Paging::infinite(24)),
     )

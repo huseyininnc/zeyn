@@ -779,6 +779,122 @@ code, pre { font-family: var(--z-font-mono); font-size: 0.9em; direction: ltr; u
   .z-main { padding: var(--z-s-4); }
 }
 
+/**
+ * The icon rail (`[data-zeyn-rail]` on `.z-app`, wide screens only): the side menu folds to the
+ * icons of its top level groups (or their first letter). A group's name shows as a tooltip on
+ * hover and focus, and the group opens as a flyout next to the rail (`menu.js`). The button in
+ * the menu's bar folds and unfolds it; the choice lives in the `zeyn_rail` cookie.
+ */
+.z-nav-rail,
+.z-nav-initial { display: none; }
+
+@media (min-width: 1024px) {
+  .z-nav-rail {
+    display: inline-flex;
+    position: absolute;
+    top: 14px;
+    inset-inline-end: var(--z-s-2);
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--z-radius);
+    background: transparent;
+    color: var(--z-text-muted);
+    cursor: pointer;
+  }
+  .z-nav-rail:hover { background: var(--z-hover); color: var(--z-text); }
+  .z-nav-rail:focus-visible { outline: 2px solid var(--z-focus); outline-offset: -2px; }
+  .z-nav-rail-icon {
+    display: block;
+    width: 16px;
+    height: 16px;
+    background: currentColor;
+    -webkit-mask: var(--z-i) center / contain no-repeat;
+    mask: var(--z-i) center / contain no-repeat;
+    --z-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 4 6 8l4 4M2.5 2.5v11'/%3E%3C/svg%3E");
+  }
+  [dir="rtl"] .z-nav-rail-icon,
+  .z-app[data-zeyn-rail] .z-nav-rail-icon { transform: scaleX(-1); }
+  [dir="rtl"] .z-app[data-zeyn-rail] .z-nav-rail-icon { transform: none; }
+  .z-nav:has(> .z-nav-bar > .z-nav-rail) .z-app-name { padding-inline-end: 44px; }
+
+  .z-app[data-zeyn-rail] { grid-template-columns: 64px minmax(0, 1fr); }
+  .z-app[data-zeyn-rail] .z-nav {
+    align-items: center;
+    overflow: visible;
+    padding: 0 var(--z-s-2) var(--z-s-3);
+  }
+  .z-app[data-zeyn-rail] .z-app-name { justify-content: center; margin: 0; padding: 0; }
+  .z-app[data-zeyn-rail] .z-app-name > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .z-app[data-zeyn-rail] .z-nav-rail { position: static; margin-bottom: var(--z-s-2); }
+  .z-app[data-zeyn-rail] .z-nav-body > :not(.z-nav-group) { display: none; }
+  .z-app[data-zeyn-rail] .z-nav-group { position: relative; padding-top: var(--z-s-1); }
+  .z-app[data-zeyn-rail] .z-nav-group > h2 { margin: 0; padding: 0; }
+  .z-app[data-zeyn-rail] .z-nav-group > h2 > .z-nav-heading {
+    justify-content: center;
+    flex: none;
+    width: 44px;
+    height: 44px;
+    margin: 0;
+    padding: 0;
+  }
+  .z-app[data-zeyn-rail] .z-nav-group > h2 .z-icon { width: 20px; height: 20px; }
+  .z-app[data-zeyn-rail] .z-nav-group > h2 .z-nav-caret { display: none; }
+  .z-app[data-zeyn-rail] .z-nav-initial {
+    display: inline-grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: var(--z-radius);
+    background: var(--z-hover);
+    color: var(--z-text);
+    font-size: var(--z-text-xs);
+    font-weight: 600;
+  }
+  .z-app[data-zeyn-rail] .z-nav-group > h2 > .z-nav-heading > span:not([class]) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .z-app[data-zeyn-rail] .z-nav-group > h2 > .z-nav-heading:is(:hover, :focus-visible):not([aria-expanded="true"]) > span:not([class]) {
+    z-index: 40;
+    inset-inline-start: calc(100% + var(--z-s-2));
+    top: 50%;
+    width: auto;
+    height: auto;
+    padding: var(--z-s-1) var(--z-s-2);
+    overflow: visible;
+    clip-path: none;
+    transform: translateY(-50%);
+    border-radius: var(--z-radius);
+    background: var(--z-text);
+    color: var(--z-bg);
+    font-size: var(--z-text-xs);
+    pointer-events: none;
+  }
+  .z-app[data-zeyn-rail] .z-nav-group > ul {
+    position: absolute;
+    z-index: 40;
+    inset-inline-start: calc(100% + var(--z-s-2));
+    top: 0;
+    min-width: 220px;
+    max-height: 80dvh;
+    overflow-y: auto;
+    padding: var(--z-s-2);
+    border: 1px solid var(--z-border);
+    border-radius: var(--z-radius-lg);
+    background: var(--z-surface);
+    box-shadow: var(--z-shadow-2);
+  }
+  .z-app[data-zeyn-rail] .z-nav-group > ul a { padding-inline-start: var(--z-s-3); }
+}
+
 /* With scripting on, the menu starts folded so the page does not jump when nav.js folds it. */
 @media (max-width: 1023px) and (scripting: enabled) {
   .z-nav-toggle[data-zeyn-nav-toggle] { display: inline-flex; }

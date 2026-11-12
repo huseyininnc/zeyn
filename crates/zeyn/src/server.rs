@@ -538,7 +538,7 @@ impl<S: AuditSink> Interceptor for AuditLog<S> {
 ///
 /// ```ignore
 /// App::new("Shop").mcp(Mcp::read_only())          // agents may read
-/// App::new("Shop").mcp(Mcp::on().webmcp(false))   // read and write, server endpoint only
+/// App::new("Shop").mcp(Mcp::on().no_webmcp())   // read and write, server endpoint only
 /// ```
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Mcp {
@@ -576,15 +576,15 @@ impl Mcp {
         Mcp::on()
     }
 
-    /// `false` turns off the `/_zeyn/mcp` endpoint and keeps the browser tools.
-    pub fn server(mut self, on: bool) -> Self {
-        self.server = on;
+    /// Turns off the `/_zeyn/mcp` endpoint and keeps the browser tools.
+    pub fn no_server(mut self) -> Self {
+        self.server = false;
         self
     }
 
-    /// `false` turns off the WebMCP tools (`GET /_zeyn/tools`) and keeps the endpoint.
-    pub fn webmcp(mut self, on: bool) -> Self {
-        self.browser = on;
+    /// Turns off the WebMCP tools (`GET /_zeyn/tools`) and keeps the endpoint.
+    pub fn no_webmcp(mut self) -> Self {
+        self.browser = false;
         self
     }
 
@@ -885,13 +885,13 @@ impl App {
         self
     }
 
-    /// `false` stops the browser's own context menu everywhere except in text inputs, text areas
-    /// and editable text. This protects nothing (any user can still view the source, use the
+    /// Stops the browser's own context menu everywhere except in text inputs, text areas and
+    /// editable text. This protects nothing (any user can still view the source, use the
     /// developer tools or turn scripts off) and it takes away spell check, copy link, translate
-    /// and accessibility tools. Keep the default (`true`) unless a kiosk or a strict brief asks
-    /// for it; Zeyn's own menus work either way.
-    pub fn browser_context_menu(mut self, allow: bool) -> Self {
-        self.native_menu = allow;
+    /// and accessibility tools. Leave it out unless a kiosk or a strict brief asks for it; Zeyn's
+    /// own menus work either way.
+    pub fn no_browser_context_menu(mut self) -> Self {
+        self.native_menu = false;
         self
     }
 
@@ -1357,9 +1357,9 @@ impl App {
         self
     }
 
-    /// Marks cookies `Secure`. Turn on whenever the app is served over HTTPS.
-    pub fn secure_cookies(mut self, secure: bool) -> Self {
-        self.secure_cookies = secure;
+    /// Marks cookies `Secure`. Call it whenever the app is served over HTTPS.
+    pub fn secure_cookies(mut self) -> Self {
+        self.secure_cookies = true;
         self
     }
 
@@ -1717,6 +1717,7 @@ impl App {
     /// Builds the HTTP router. Fails when `check` finds problems.
     pub fn router(mut self) -> Result<Router, Vec<String>> {
         self.check()?;
+        ops::warm_build_id();
         let docs_enabled = self.api_docs.is_some();
         let mount = self.base_path.clone();
         let url_prefix = self
@@ -1943,7 +1944,11 @@ impl App {
         let router = theme::routes(pro::routes(media::routes(ui::routes(session::routes(
             data::routes(ops::routes(agent::routes(grid::routes(router)))),
         )))))
-        .fallback(not_found);
+        .fallback(not_found)
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            guard::remember_identity,
+        ));
         #[cfg(feature = "accounts")]
         let router = if state.sign_in.accounts.is_some() {
             router.layer(axum::middleware::from_fn_with_state(
@@ -2381,10 +2386,13 @@ impl AppState {
     }
 
     fn ctx(&self, headers: &HeaderMap) -> Ctx {
-        let mut identity = self
-            .auth
-            .as_ref()
-            .and_then(|a| a.authenticate(headers))
+        let mut identity = guard::IDENTITY
+            .try_with(Clone::clone)
+            .unwrap_or_else(|_| {
+                self.auth
+                    .as_ref()
+                    .and_then(|a| a.authenticate(headers))
+            })
             .unwrap_or_default();
         auth::adjust(self, headers, &mut identity);
         let accept = headers
@@ -2455,6 +2463,11 @@ impl AppState {
             self.csp.clone(),
         );
         data::read_reason(&ctx, headers);
+        let ctx = if cookie(headers, "zeyn_rail") == Some("1") {
+            ctx.with_rail()
+        } else {
+            ctx
+        };
         let ctx = if cookie(headers, "zeyn_density") == Some("compact") {
             ctx.with_compact()
         } else {
@@ -2712,35 +2725,40 @@ impl AppState {
     }
 
     /// Loads the first page of every grid the user may read, in the user's saved view.
+    /// The grids of a screen load at the same time, so a screen with several grids waits for the
+    /// slowest one, not for their sum.
     async fn preload(
         &self,
         ctx: &Ctx,
         nodes: Vec<(NodePath, &crate::screen::Node)>,
         name: &str,
     ) -> HashMap<String, LoadedPage> {
-        let mut loaded = HashMap::new();
         let saved = self.views.is_some() && ctx.identity().is_signed_in();
-        for (i, node) in nodes {
-            let Some(grid) = node.grid() else { continue };
-            if !ctx
-                .identity()
-                .can(&grid.action().access)
-            {
-                continue;
-            }
-            let view = self
-                .saved_view(ctx, grid, name, &i)
-                .await;
-            if let Ok(mut page) = self
-                .timed(grid.fetch_at(ctx.clone(), grid.first_query(view.as_ref()), Vec::new()))
-                .await
-            {
+        let loads = nodes
+            .into_iter()
+            .filter_map(|(i, node)| {
+                let grid = node.grid()?;
+                ctx.identity()
+                    .can(&grid.action().access)
+                    .then_some((i, grid))
+            })
+            .map(|(i, grid)| async move {
+                let view = self
+                    .saved_view(ctx, grid, name, &i)
+                    .await;
+                let mut page = self
+                    .timed(grid.fetch_at(ctx.clone(), grid.first_query(view.as_ref()), Vec::new()))
+                    .await
+                    .ok()?;
                 page.view = view;
                 page.saved_views = saved;
-                loaded.insert(i.to_string(), page);
-            }
-        }
-        loaded
+                Some((i.to_string(), page))
+            });
+        futures_util::future::join_all(loads)
+            .await
+            .into_iter()
+            .flatten()
+            .collect()
     }
 
     fn error_response(&self, ctx: &Ctx, failure: Failure) -> Response {
@@ -3181,10 +3199,11 @@ impl AppState {
         if links >= MENU_FILTER_FROM {
             nav.push_str(&menu_filter(&r));
         }
+        let rail = ctx.rail();
         for (i, g) in groups.iter().enumerate() {
-            g.render(&mut nav, &format!("z-nav-g{i}"), 2);
+            g.render(&mut nav, &format!("z-nav-g{i}"), 2, rail);
         }
-        let marker = if links < MENU_FILTER_FROM && !groups.iter().any(NavGroup::collapsible) {
+        let marker = if groups.is_empty() {
             ""
         } else if self
             .features
@@ -3248,7 +3267,13 @@ impl AppState {
             })
             .unwrap_or_default();
         format!(
-            r#"<div class="z-app" data-zeyn-shell="app"><nav class="z-nav" aria-label="{menu}"{marker}><div class="z-nav-bar"><p class="z-app-name">{logo}<span>{app}</span></p><button type="button" class="z-nav-toggle" aria-expanded="false" aria-controls="z-nav-body" data-zeyn-nav-toggle hidden><span class="z-nav-burger" aria-hidden="true"></span><span class="z-sr-only">{menu}</span></button></div><div class="z-nav-body" id="z-nav-body">{palette}{nav}</div></nav>{header}<main class="z-main" id="z-main">{main}</main></div>"#,
+            r#"<div class="z-app" data-zeyn-shell="app"{rail_attr}><nav class="z-nav" aria-label="{menu}"{marker}><div class="z-nav-bar"><p class="z-app-name">{logo}<span>{app}</span></p>{rail_button}<button type="button" class="z-nav-toggle" aria-expanded="false" aria-controls="z-nav-body" data-zeyn-nav-toggle hidden><span class="z-nav-burger" aria-hidden="true"></span><span class="z-sr-only">{menu}</span></button></div><div class="z-nav-body" id="z-nav-body">{palette}{nav}</div></nav>{header}<main class="z-main" id="z-main">{main}</main></div>"#,
+            rail_attr = if rail { " data-zeyn-rail" } else { "" },
+            rail_button = if marker.is_empty() {
+                String::new()
+            } else {
+                rail_toggle(&r, rail)
+            },
             palette = if self
                 .header
                 .as_ref()
@@ -3339,41 +3364,50 @@ impl NavGroup {
                 .sum::<usize>()
     }
 
-    /// Whether this group or a nested one has a toggle button.
-    fn collapsible(&self) -> bool {
-        !self.open
-            || self
-                .groups
-                .iter()
-                .any(NavGroup::collapsible)
-    }
-
     /// Writes the group into the side menu: a `<div>` at the top level, an `<li>` below it, with
     /// a heading of `level`. A collapsible group's heading holds a button with `aria-expanded`
     /// and `aria-controls` (W3C APG disclosure); it starts expanded when the group holds the
     /// current screen. `id` is the id of the group's list.
-    fn render(&self, out: &mut String, id: &str, level: usize) {
+    ///
+    /// In the icon rail (`rail`) every top level group is collapsible and starts closed: its
+    /// heading shows the icon (or the label's first letter) and opens the group as a flyout.
+    fn render(&self, out: &mut String, id: &str, level: usize, rail: bool) {
         let label = &self.label;
-        let icon = &self.icon;
+        let top = level == 2;
+        let icon = if top && self.icon.is_empty() {
+            format!(
+                r#"<span class="z-nav-initial" aria-hidden="true">{}</span>"#,
+                self.label
+                    .chars()
+                    .find(|c| c.is_alphanumeric())
+                    .map(|c| c.to_uppercase().to_string())
+                    .unwrap_or_default()
+            )
+        } else {
+            self.icon.clone()
+        };
+        let open = self.open && !(rail && top);
+        let expanded = self.here && !(rail && top);
         let (open_tag, close_tag) = if level == 2 {
             (r#"<div class="z-nav-group">"#, "</div>")
         } else {
             (r#"<li class="z-nav-group z-nav-sub">"#, "</li>")
         };
         out.push_str(open_tag);
-        if self.open {
-            out.push_str(&format!("<h{level}>{icon}{label}</h{level}><ul>"));
+        if open {
+            out.push_str(&format!(
+                "<h{level}>{icon}<span>{label}</span></h{level}><ul>"
+            ));
         } else {
             out.push_str(&format!(
-                r#"<h{level}><button type="button" class="z-nav-heading" aria-expanded="{}" aria-controls="{id}">{icon}<span>{label}</span><span class="z-nav-caret" aria-hidden="true"></span></button></h{level}><ul id="{id}">"#,
-                self.here
+                r#"<h{level}><button type="button" class="z-nav-heading" aria-expanded="{expanded}" aria-controls="{id}">{icon}<span>{label}</span><span class="z-nav-caret" aria-hidden="true"></span></button></h{level}><ul id="{id}">"#
             ));
         }
         for link in &self.links {
             out.push_str(link);
         }
         for (i, g) in self.groups.iter().enumerate() {
-            g.render(out, &format!("{id}-{i}"), level + 1);
+            g.render(out, &format!("{id}-{i}"), level + 1, rail);
         }
         out.push_str("</ul>");
         out.push_str(close_tag);
@@ -3395,6 +3429,17 @@ fn menu_filter(r: &Render) -> String {
         t("menu_pin"),
         t("menu_unpin"),
         label = t("menu_filter")
+    )
+}
+
+/// The button that folds the side menu to an icon rail and back, on wide screens. `aria-pressed`
+/// says whether the rail is on; its name says what pressing it does.
+fn rail_toggle(r: &Render, rail: bool) -> String {
+    let collapse = r.text(&Text::key("zeyn.shell.rail_collapse"));
+    let expand = r.text(&Text::key("zeyn.shell.rail_expand"));
+    format!(
+        r#"<button type="button" class="z-nav-rail" data-zeyn-rail-toggle aria-pressed="{rail}" aria-label="{}" data-text-collapse="{collapse}" data-text-expand="{expand}"><span class="z-nav-rail-icon" aria-hidden="true"></span></button>"#,
+        if rail { &expand } else { &collapse }
     )
 }
 

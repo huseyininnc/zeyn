@@ -20,7 +20,7 @@ let accounts = Accounts::new(MemoryAccountStore::new(), config.secret("accounts.
 App::new("Shop")
     .mailer(mailer)
     .accounts(accounts)
-    .feature(accounts::ui().admin(true).build())
+    .feature(accounts::ui().admin().build())
 ```
 
 - Ключ берётся из конфигурации, имеет длину не менее 32 байт и никогда не меняется.

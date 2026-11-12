@@ -84,7 +84,7 @@ fn app_with(accounts: Accounts, reauth: Duration) -> Router {
                 .api(my_tenants)
                 .api(rotate_keys),
         )
-        .feature(accounts::ui().admin(true).build())
+        .feature(accounts::ui().admin().build())
         .router()
         .unwrap()
 }

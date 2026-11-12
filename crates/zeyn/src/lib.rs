@@ -149,7 +149,7 @@ pub use feature::{
 #[cfg(feature = "server")]
 pub use files::{
     DiskStore, FileAccess, FileChunks, FileEntry, FileMeta, FileScanner, FileStore, MemoryStore,
-    ScanVerdict, StoredFile,
+    STALE_PART, ScanVerdict, StoredFile, ZipGuard,
 };
 pub use files::{
     File, FileRules, FileType, MAX_FIELD_FILES, MAX_FILE_NAME, MAX_UPLOAD_BYTES, SNIFF_BYTES,

@@ -130,4 +130,6 @@ Form::of(ticket).field(Ticket::title).file(Ticket::attachments, ATTACHMENTS)
 
 `DiskStore` 在一个文件夹中保存 `{id}.bin` 和 `{id}.json`，并先把上传内容写到 `{id}.part`。`MemoryStore` 把文件保存在内存中并设有字节上限，用于测试和演示。表单值只是引用文件的名称：必须确认文件存在的保存 action 应调用 `store.meta(id)`，showcase 就是这样做的。
 
+`FileRules::quota(bytes, window)` 限制单个用户在每个时间窗口内向某个存储上传的量，并通过应用的 rate store 计数；超过限额的那次上传仍会保存，下一次上传返回 `429`。`DiskStore` 最多每小时一次删除超过一小时的 `.part` 文件（因崩溃而中断的上传）。`ZipGuard` 是针对基于 ZIP 的上传（ZIP、Word、Excel、PowerPoint）的扫描器：它会拒绝中央目录声明超过 10,000 个条目、总计超过 1 GiB 或超过文件大小 200 倍的归档，以及 ZIP64 归档；解压已接受归档的代码仍须在这些限制处停止。
+
 预算：上传 256 MiB 的文件会使服务器堆增长约 0.4 MiB（`tests/files_memory.rs`）；该控件渲染 10 个 DOM 节点，每个文件再加 5 个；`files.js` 增加 12 KB 原始大小和 4 KB gzip 大小，`files.css` 增加 3 KB 原始大小和 1 KB gzip 大小。

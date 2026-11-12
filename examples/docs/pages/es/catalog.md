@@ -20,8 +20,8 @@ CardGrid::of(catalog_products)
             .badge(Badge::new(t!("shop.new")).tone(Tone::Success))
             .link(shop_product, ProductPage { id: p.id })
     })
-    .sort_option(t!("shop.sort.name"), Product::name, false)
-    .sort_option(t!("shop.sort.cheapest"), Product::price, false)
+    .sort_option(t!("shop.sort.name"), Product::name)
+    .sort_option(t!("shop.sort.cheapest"), Product::price)
     .image_size(300, 300)
     .paging(Paging::infinite(24))
 ```
@@ -92,13 +92,13 @@ Repeat::of(order.steps.iter(), |s| Badge::new(s.name.clone())).separator(Paragra
 
 Un rail es un card grid dispuesto en una sola fila que se desplaza lateralmente, con ajuste al desplazarse y botones anterior y siguiente que se desplazan el ancho de una vista (con suavidad, salvo que el usuario haya pedido movimiento reducido). Carga el siguiente lote, de 12 en 12, cuando el usuario se desplaza cerca del final. Las tarjetas son enlaces en el orden de tabulación y se desplazan hasta quedar a la vista cuando reciben el foco.
 
-La barra de desplazamiento está oculta; la pantalla táctil, el trackpad y Mayús+rueda siguen desplazando, y `.scrollbar(true)` deja una barra fina. Con el ratón se puede pulsar y arrastrar el rail hacia los lados. Tras un movimiento de más de 5 píxeles, el clic al soltar se cancela, así que la tarjeta bajo el puntero no se abre y el rail se detiene en la tarjeta más cercana; un movimiento menor es un clic normal. Mientras se arrastra no se selecciona texto, las imágenes no se arrastran fuera y no se abre la vista previa de la tarjeta. En pantallas táctiles se mantiene el desplazamiento propio del navegador. Los botones anterior y siguiente siempre están y se desactivan en los extremos, porque una barra oculta no sirve para desplazarse con el teclado. Sin JavaScript los botones se ocultan y el rail se desplaza de forma nativa.
+La barra de desplazamiento está oculta; la pantalla táctil, el trackpad y Mayús+rueda siguen desplazando, y `.scrollbar()` deja una barra fina. Con el ratón se puede pulsar y arrastrar el rail hacia los lados. Tras un movimiento de más de 5 píxeles, el clic al soltar se cancela, así que la tarjeta bajo el puntero no se abre y el rail se detiene en la tarjeta más cercana; un movimiento menor es un clic normal. Mientras se arrastra no se selecciona texto, las imágenes no se arrastran fuera y no se abre la vista previa de la tarjeta. En pantallas táctiles se mantiene el desplazamiento propio del navegador. Los botones anterior y siguiente siempre están y se desactivan en los extremos, porque una barra oculta no sirve para desplazarse con el teclado. Sin JavaScript los botones se ocultan y el rail se desplaza de forma nativa.
 
 ```rust
 Rail::of(catalog_products)
     .title(t!("shop.new_arrivals"))
     .card(|p: &Product| Card::image(p.image.clone(), p.name.clone()))
-    .sort_option(t!("shop.sort.newest"), Product::id, true)
+    .sort_option_desc(t!("shop.sort.newest"), Product::id)
 ```
 
 ## Search box

@@ -433,7 +433,7 @@ Los agentes de IA externos llegan a la aplicación por dos puertas, ambas desact
 | `Mcp::read_only()` | activo | activo | no |
 | `Mcp::on()` | activo | activo | guardados de formularios y actions de API que escriben |
 
-`.server(false)` y `.webmcp(false)` desactivan una puerta. Los proyectos nuevos de `zeyn new` empiezan con
+`.no_server()` y `.no_webmcp()` desactivan una puerta. Los proyectos nuevos de `zeyn new` empiezan con
 `Mcp::read_only()`.
 
 Por qué desactivado: el endpoint permite que cualquier titular de una cabecera `Authorization` válida maneje la aplicación a través de un
