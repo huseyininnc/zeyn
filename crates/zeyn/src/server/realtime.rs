@@ -297,6 +297,8 @@ struct Inner {
     conns: Mutex<HashMap<u64, Arc<Peer>>>,
     /// Connection ids by tenant and group.
     groups: Mutex<HashMap<TenantKey, Vec<u64>>>,
+    /// Fallback transports opened with `POST` and waiting for their event stream.
+    tickets: Mutex<HashMap<String, socket::sse::Ticket>>,
     next: AtomicU64,
     sweeping: AtomicBool,
     /// When each user (by tenant and user id) last sent a typing signal.
@@ -632,6 +634,9 @@ pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
         )
         .route("/_zeyn/live/doc/{kind}/{doc}", get(doc_socket))
         .route("/_zeyn/socket", get(socket::page_socket))
+        .route("/_zeyn/socket/open", axum::routing::post(socket::sse::open))
+        .route("/_zeyn/socket/events", get(socket::sse::events))
+        .route("/_zeyn/socket/send", axum::routing::post(socket::sse::send))
 }
 
 pub(super) fn is_asset(path: &str) -> bool {
@@ -710,7 +715,29 @@ fn csrf_protocol(headers: &HeaderMap) -> &str {
     reason = "the error is the HTTP response, returned to the client at once and never stored; boxing it would allocate on every refusal"
 )]
 async fn admit(st: &AppState, headers: &HeaderMap) -> Result<(Ctx, Socket, String), Response> {
-    let csrf = csrf_protocol(headers);
+    admit_with(st, headers, false).await
+}
+
+/// [`admit`] for the `POST` that opens the fallback transport: the CSRF token comes in the
+/// `x-zeyn-csrf` header like any `POST`, and the browser's same origin rules stand in for the
+/// `Origin` check.
+#[allow(
+    clippy::result_large_err,
+    reason = "the error is the HTTP response, returned to the client at once and never stored; boxing it would allocate on every refusal"
+)]
+async fn admit_post(st: &AppState, headers: &HeaderMap) -> Result<(Ctx, Socket, String), Response> {
+    admit_with(st, headers, true).await
+}
+
+#[allow(
+    clippy::result_large_err,
+    reason = "the error is the HTTP response, returned to the client at once and never stored; boxing it would allocate on every refusal"
+)]
+async fn admit_with(
+    st: &AppState,
+    headers: &HeaderMap,
+    post: bool,
+) -> Result<(Ctx, Socket, String), Response> {
     let ctx = st.licensed(st.ctx(headers)).await;
     let Some(hub) = st.realtime.clone() else {
         return Err(st.error_response(&ctx, Failure::App(Error::NotFound)));
@@ -718,8 +745,14 @@ async fn admit(st: &AppState, headers: &HeaderMap) -> Result<(Ctx, Socket, Strin
     let Some(config) = hub.config() else {
         return Err(st.error_response(&ctx, Failure::App(Error::NotFound)));
     };
-    let token_ok = cookie(headers, "zeyn_csrf").is_some_and(|c| super::csrf_matches(c, csrf));
-    if !origin_allowed(headers, &config.origins) || !token_ok {
+    let checked = if post {
+        st.check_csrf(headers).is_ok()
+    } else {
+        let csrf = csrf_protocol(headers);
+        cookie(headers, "zeyn_csrf").is_some_and(|c| super::csrf_matches(c, csrf))
+            && origin_allowed(headers, &config.origins)
+    };
+    if !checked {
         return Err(st.error_response(
             &ctx,
             Failure::App(Error::Denied(crate::i18n::Text::key("zeyn.error.csrf"))),
