@@ -679,6 +679,93 @@ pub fn app(docs: Docs, versions: Versions) -> Result<App, String> {
         .feature(feature()))
 }
 
+/// The address of a page's Markdown: `/language/forms.md`, `/tr/language/forms.md`, and
+/// `/index.md` for the start page.
+pub fn markdown_path(lang: &str, route: &str) -> String {
+    let page = if route == "/" { "/index" } else { route };
+    if lang == "en" {
+        format!("{page}.md")
+    } else {
+        format!("/{lang}{page}.md")
+    }
+}
+
+/// The Markdown of a page in a language: its current translation, or the English source when
+/// the translation is missing or behind it. `@live` lines, which place live examples in the
+/// HTML page, are left out. Built on each request from the sources in the binary, so the app
+/// keeps no copy.
+pub fn markdown_source(lang: &str, page: &PageSource) -> String {
+    static PARSED: std::sync::LazyLock<serde_json::Value> =
+        std::sync::LazyLock::new(|| serde_json::from_str(MANIFEST).unwrap_or_default());
+    let manifest = &*PARSED;
+    let file = page.translation_file();
+    let source = TRANSLATIONS
+        .iter()
+        .find(|(l, f, _)| *l == lang && *f == file)
+        .filter(|_| manifest[lang][file].as_str() == Some(source_hash(page.source).as_str()))
+        .map(|(_, _, s)| *s)
+        .unwrap_or(page.source);
+    source
+        .lines()
+        .filter(|l| !l.trim_start().starts_with("@live "))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Every page in every language as (Markdown address, HTML address, language, page).
+fn markdown_pages() -> Vec<(String, String, &'static str, &'static PageSource)> {
+    LANGS
+        .iter()
+        .flat_map(|(lang, _)| {
+            PAGES.iter().map(move |p| {
+                (
+                    markdown_path(lang, p.route),
+                    lang_path(lang, p.route),
+                    *lang,
+                    p,
+                )
+            })
+        })
+        .collect()
+}
+
+/// `llms-full.txt`: every English page as Markdown, in menu order, each under its title and
+/// address.
+pub fn llms_full() -> String {
+    let mut out = String::from("# Zeyn documentation\n\n");
+    for p in PAGES {
+        out.push_str(&format!(
+            "\n---\n\n# {}\n\nSource: {SITE}{}\n\n",
+            p.label, p.route
+        ));
+        out.push_str(&markdown_source("en", p));
+        out.push('\n');
+    }
+    out
+}
+
+/// A cached text response, kept out of search results, with a canonical link to its HTML page
+/// unless `canonical` is empty.
+fn text_file(kind: &str, body: String, canonical: &str) -> axum::response::Response {
+    use axum::http::header;
+    let mut res = axum::response::IntoResponse::into_response(body);
+    let h = res.headers_mut();
+    if let Ok(v) = format!("{kind}; charset=utf-8").parse() {
+        h.insert(header::CONTENT_TYPE, v);
+    }
+    if let Ok(v) = canonical.parse()
+        && !canonical.is_empty()
+    {
+        h.insert(header::LINK, v);
+    }
+    h.insert(
+        header::CACHE_CONTROL,
+        header::HeaderValue::from_static("public, max-age=3600"),
+    );
+    h.insert("x-robots-tag", header::HeaderValue::from_static("noindex"));
+    res
+}
+
 /// The router of the documentation: the app and the version switch at `<base>/_docs/switch`
 /// (see [`versions`]). Under a base path, `<base>/` serves the start page like `<base>`, since
 /// that is the address readers and proxies use. `versions` must be the one given to [`app`].
@@ -686,11 +773,24 @@ pub fn router(app: App, versions: &Versions) -> Result<axum::Router, Vec<String>
     let switch = versions.clone();
     let base = versions.base().to_string();
     let inner = app.router()?;
-    let router = axum::Router::new().route(
+    let mut router = axum::Router::new().route(
         &format!("{base}{}", versions::SWITCH),
         axum::routing::get(move |headers: axum::http::HeaderMap| async move {
             versions::switch(&switch, &headers)
         }),
+    );
+    for (path, html, lang, page) in markdown_pages() {
+        let canonical: Arc<str> = format!("<{SITE}{html}>; rel=\"canonical\"").into();
+        router = router.route(
+            &format!("{base}{path}"),
+            axum::routing::get(move || async move {
+                text_file("text/markdown", markdown_source(lang, page), &canonical)
+            }),
+        );
+    }
+    router = router.route(
+        &format!("{base}/llms-full.txt"),
+        axum::routing::get(|| async { text_file("text/plain", llms_full(), "") }),
     );
     if base.is_empty() {
         return Ok(router.merge(inner));

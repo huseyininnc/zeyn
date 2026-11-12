@@ -15,6 +15,14 @@ use zeyn_example_docs::{
 
 const TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
+static FULL: LazyLock<Router> = LazyLock::new(|| {
+    zeyn_example_docs::router(
+        app(Docs::build(""), Versions::single()).unwrap(),
+        &Versions::single(),
+    )
+    .unwrap()
+});
+
 static ROUTER: LazyLock<Router> = LazyLock::new(|| {
     app(Docs::build(""), Versions::single())
         .unwrap()
@@ -23,7 +31,11 @@ static ROUTER: LazyLock<Router> = LazyLock::new(|| {
 });
 
 async fn get(path: &str) -> (StatusCode, String) {
-    let res = ROUTER
+    get_from(&ROUTER, path).await
+}
+
+async fn get_from(router: &Router, path: &str) -> (StatusCode, String) {
+    let res = router
         .clone()
         .oneshot(
             Request::get(path)
@@ -456,14 +468,19 @@ async fn a_page_without_a_current_translation_is_shown_in_english_under_the_lang
     );
 }
 
-/// `llms.txt` is the index language models read first, so it links every page of the docs.
+/// `llms.txt` is the index language models read first, so it links the Markdown of every page.
 #[test]
 fn llms_txt_links_every_page() {
     let llms = include_str!("../llms.txt");
     let missing: Vec<&str> = PAGES
         .iter()
         .map(|p| p.route)
-        .filter(|r| !llms.contains(&format!("(https://docs.zeynsoft.com{r})")))
+        .filter(|r| {
+            !llms.contains(&format!(
+                "(https://docs.zeynsoft.com{})",
+                zeyn_example_docs::markdown_path("en", r)
+            ))
+        })
         .collect();
     assert!(
         missing.is_empty(),
@@ -641,4 +658,39 @@ async fn public_folder_serves_the_favicon_with_an_entity_tag() {
     assert_eq!(again.status(), StatusCode::NOT_MODIFIED);
     let (_, page) = get("/").await;
     assert!(page.contains(r#"<link rel="icon" href="/favicon.svg" type="image/svg+xml">"#));
+}
+
+#[tokio::test]
+async fn every_page_has_a_markdown_address_in_every_language() {
+    for (lang, _) in LANGS {
+        for p in PAGES {
+            let path = zeyn_example_docs::markdown_path(lang, p.route);
+            let (status, body) = get_from(&FULL, &path).await;
+            assert_eq!(status, StatusCode::OK, "{path}");
+            assert!(
+                body.starts_with('#'),
+                "{path}: {}",
+                &body[..body.len().min(80)]
+            );
+            assert!(!body.contains("\n@live "), "{path} keeps no live markers");
+        }
+    }
+    let (_, tr) = get_from(&FULL, "/tr/language/forms.md").await;
+    assert!(tr.starts_with("# "), "{tr}");
+}
+
+#[tokio::test]
+async fn llms_full_holds_every_english_page_and_llms_txt_links_the_markdown() {
+    let (status, full) = get_from(&FULL, "/llms-full.txt").await;
+    assert_eq!(status, StatusCode::OK);
+    for p in PAGES {
+        assert!(
+            full.contains(&format!("Source: https://docs.zeynsoft.com{}\n", p.route)),
+            "{}",
+            p.route
+        );
+    }
+    let (_, llms) = get_from(&FULL, "/llms.txt").await;
+    assert!(llms.contains("(https://docs.zeynsoft.com/language/forms.md)"));
+    assert!(llms.contains("https://docs.zeynsoft.com/llms-full.txt"));
 }

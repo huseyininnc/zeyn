@@ -603,7 +603,8 @@
       },
       "meter": {
         "low": "low",
-        "high": "high"
+        "high": "high",
+        "fair": "fair"
       },
       "pagination": {
         "label": "Pagination",
