@@ -79,6 +79,8 @@ Sayılar ve para tutarları sağa hizalanır ve sabit genişlikli rakamlarla yaz
 - `.row_action` ya da `.bulk_action` hemen ardından `.confirm(message)` ve `.tone(Tone::Danger)`: o işlem çalışmadan önce `ActionButton::confirm` ile aynı pencerede sorar (odak önce İptal'dedir) ve düğmesini kırmızı çizer.
 - `.row_menu(|row| ContextMenu)`: bir satırın sağ tık menüsü.
 - `.row_style(|row| Option<RowStyle>)`: danger, warning veya success satırlar.
+- `.add_with(create)`, `.delete_with(action, M::id)`, `.batch_edit()`: "Satır ekle" düğmesi, Sil
+  düğmesi ve tuşu, birlikte kaydedilen düzenlemeler. Ayrıntılar [DataGrid başvurusunda](grid.md).
 - `.exportable()`: filtrelenmiş satırların CSV dışa aktarımı, sunucu tarafından akıtılır.
 
 ## Çalışma anında belli olan sütunlar

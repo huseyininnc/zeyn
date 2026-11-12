@@ -190,6 +190,39 @@ Sunucu satırı anahtarla yeniden yükler ve yalnızca düzenlenebilir sütunlar
 herhangi bir sütun için gelen değer `403` ile reddedilir. Eski bir sürüm `409` olarak döner,
 doğrulama hataları `422` olarak döner ve kendi hücrelerinde gösterilir.
 
+## Satır ekleme, silme ve toplu düzenleme
+
+```rust
+DataGrid::of(search_products)
+    .column(Product::name).editable()
+    .column(Product::price).editable()
+    .edit_with(save_product)
+    .add_with(create_product)
+    .delete_with(delete_products, Product::id)
+    .batch_edit()
+```
+
+`add_with(create)` tablonun üstüne "Satır ekle" düğmesi koyar. Düğme en üstte, her `editable()`
+sütun için bir giriş kutusu olan boş bir satır açar; Enter kaydeder, Escape satırı atar. Sunucu
+modelin varsayılanından başlar, yalnızca düzenlenebilir sütunları bir formun yaptığı gibi okur
+(başka bir alan `403` ile reddedilir, geçersiz değerler `422` ile döner ve hücrelerinde görünür),
+`create` eyleminin iznini denetler ve eylemi çalıştırır; ardından tablo yeniden yüklenir. Sanal
+tablolar satır eklemez.
+Modelin varsayılan değerinde bırakamayacağı alanlar, örneğin isteğe bağlı olmayan bir tarih,
+düzenlenebilir bir sütun ister.
+
+`delete_with(action, Model::key)` seçim çubuğuna çalışmadan önce soran kırmızı bir "Sil" düğmesi
+ekler; bir satırda Delete tuşu seçili satırları, seçim yoksa o satırı siler. Eylem anahtarları
+toplu işlemdeki gibi alır, bu yüzden her kaydı kendisi denetlemelidir.
+
+`batch_edit()` satır içi düzenlemeleri kullanıcı hepsini kaydedene kadar tutar. Enter değişen
+satırı başında bir işaretle düzenleme durumunda bırakır ve tablonun üstündeki çubuk değişen
+satırları sayar, "Değişiklikleri kaydet" ve "Değişiklikleri at" düğmelerini gösterir. Kaydetme
+satırları satır içi düzenleme yolundan tek tek gönderir; böylece her satır ayrı ayrı okunur,
+doğrulanır, sürümü denetlenir. Kaydedilemeyen satırlar değişikliklerini korur ve nedenini
+gösterir. Başka satırlar yüklemek (sayfa, sıralama, süzgeç, arama) kaydedilmemiş değişiklikleri
+atmadan önce sorar.
+
 ## Master detail
 
 `detail(|row| (screen, params))`, her satırın o satırdan oluşturulan bir screen'e genişlemesini

@@ -11,7 +11,7 @@ pub(super) const DEFAULT_CSP: &str = "default-src 'self'; script-src 'self'; sty
 /// write limit (`App::write_limit`) besides the general one. A new endpoint that writes, runs an
 /// action or costs money goes here. Published API actions and the assistant are matched by prefix,
 /// and file uploads (`POST /_zeyn/files/{store}`) by `files::is_upload`.
-const WRITE_PATHS: [&str; 19] = [
+const WRITE_PATHS: [&str; 20] = [
     "/_zeyn/form",
     "/_zeyn/reveal",
     "/_zeyn/data",
@@ -22,6 +22,7 @@ const WRITE_PATHS: [&str; 19] = [
     "/_zeyn/mcp",
     "/_zeyn/menu",
     "/_zeyn/grid/edit",
+    "/_zeyn/grid/add",
     "/_zeyn/grid/run",
     "/_zeyn/grid/bulk",
     "/_zeyn/grid/view",

@@ -79,6 +79,8 @@ Los números y los importes se alinean a la derecha con cifras tabulares. Los en
 - `.confirm(message)` y `.tone(Tone::Danger)` justo después de `.row_action` o `.bulk_action`: pregunta antes de que esa acción se ejecute, en el mismo diálogo que `ActionButton::confirm` (el foco empieza en Cancelar), y dibuja su botón en rojo.
 - `.row_menu(|row| ContextMenu)`: el menú contextual de una fila.
 - `.row_style(|row| Option<RowStyle>)`: filas de peligro, advertencia o éxito.
+- `.add_with(create)`, `.delete_with(action, M::id)`, `.batch_edit()`: un botón "Añadir fila", un
+  botón y una tecla para borrar, y ediciones guardadas juntas. Consulta la [referencia de DataGrid](grid.md).
 - `.exportable()`: exportación CSV de las filas filtradas, enviada en streaming por el servidor.
 
 ## Columnas conocidas en tiempo de ejecución

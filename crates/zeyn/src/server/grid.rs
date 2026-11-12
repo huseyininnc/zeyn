@@ -12,6 +12,7 @@ pub(super) fn routes(router: Router<Arc<AppState>>) -> Router<Arc<AppState>> {
         .route("/_zeyn/grid/run", post(grid_run_call))
         .route("/_zeyn/grid/bulk", post(grid_bulk_call))
         .route("/_zeyn/grid/edit", post(grid_edit_call))
+        .route("/_zeyn/grid/add", post(grid_add_call))
         .route("/_zeyn/grid/export", get(grid_export))
 }
 
@@ -81,6 +82,16 @@ struct EditCall {
     /// Layout to render the saved row in.
     #[serde(default)]
     view: Option<DataGridView>,
+}
+
+#[derive(Deserialize)]
+struct AddCall {
+    screen: String,
+    #[serde(default)]
+    params: Json,
+    node: crate::ui::NodePath,
+    /// Typed values of the editable cells of the new row, as a form sends them.
+    values: Map<String, Json>,
 }
 
 #[derive(Deserialize)]
@@ -384,6 +395,21 @@ async fn grid_edit_call(
     }
 }
 
+async fn grid_add_call(
+    State(st): State<Arc<AppState>>,
+    headers: HeaderMap,
+    axum::Json(call): axum::Json<AddCall>,
+) -> Response {
+    let ctx = st.licensed(st.ctx(&headers)).await;
+    if let Err(f) = st.check_csrf(&headers) {
+        return st.error_response(&ctx, f);
+    }
+    match st.run_add(&ctx, call).await {
+        Ok(body) => axum::Json(body).into_response(),
+        Err(f) => st.error_response(&ctx, f),
+    }
+}
+
 async fn grid_bulk_call(
     State(st): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -585,6 +611,28 @@ impl AppState {
         page.view = call.view.map(|v| grid.clean_view(v));
         let r = user_render(entry.meta.name, ctx);
         Ok(json!({ "row": grid.row_html(&page, &call.key, &r) }))
+    }
+
+    /// Creates a row from the editable cells of a new row through the grid's `add_with` action,
+    /// after the grid's read access and the action's own permission.
+    async fn run_add(&self, ctx: &Ctx, call: AddCall) -> Result<Json, Failure> {
+        if call.values.len() > 64 {
+            return Err(Failure::App(Error::NotFound));
+        }
+        let (_, entry, screen) = self
+            .open(ctx, &call.screen, call.params)
+            .await?;
+        let grid = grid_at(ctx, &screen, &call.node)?;
+        let add = grid.add_call(&call.values, ctx)?;
+        let info = Call {
+            kind: CallKind::Form,
+            screen: entry.meta.name,
+            action: Some(add.meta),
+            via_agent: ctx.via_agent(),
+        };
+        self.intercept(ctx, &info, || self.timed((add.run)(ctx.clone())))
+            .await?;
+        Ok(json!({ "added": true }))
     }
 
     /// Runs a bulk action with the selected keys, or with the keys of every row matching the

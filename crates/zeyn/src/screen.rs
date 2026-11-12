@@ -632,6 +632,19 @@ pub trait GridSource: Send + Sync {
         Err(crate::action::Error::NotFound)
     }
 
+    /// Builds the create of a new row from the values of its editable columns, for the user of
+    /// `ctx`: `Forbidden` without the create action's permission or for any other field; the row
+    /// starts from the model's default and is read and validated as a form would. `NotFound` for
+    /// grids that do not add rows.
+    fn add_call(
+        &self,
+        values: &serde_json::Map<String, serde_json::Value>,
+        ctx: &crate::ctx::Ctx,
+    ) -> Result<RowCall> {
+        let _ = (values, ctx);
+        Err(crate::action::Error::NotFound)
+    }
+
     /// The row with this key from a loaded page as HTML, in the page's view.
     fn row_html(&self, page: &LoadedPage, key: &str, r: &Render) -> Option<String> {
         let _ = (page, key, r);

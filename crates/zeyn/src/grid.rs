@@ -535,6 +535,12 @@ pub struct DataGrid<E: Model> {
     search: bool,
     /// Labels of the band headers, which group columns under one header cell.
     bands: Vec<Text>,
+    /// Action that creates a row from the editable columns of a new row.
+    add: Option<SaveDef<E>>,
+    /// Index in `bulk` of the bulk action the Delete key runs.
+    delete: Option<usize>,
+    /// Whether inline edits wait until the user saves every changed row at once.
+    batch: bool,
 }
 
 /// Most levels a tree grid opens.
@@ -785,6 +791,9 @@ impl<E: Model> DataGrid<E> {
             shape: None,
             search: false,
             bands: Vec::new(),
+            add: None,
+            delete: None,
+            batch: false,
         }
     }
 
@@ -1039,6 +1048,68 @@ impl<E: Model> DataGrid<E> {
             run: Box::new(|valid| runner::<A>(valid)),
         });
         self
+    }
+
+    /// Shows an "Add row" button above the grid. It opens an empty row at the top with an input
+    /// for every `editable()` column; Enter saves it through `create`, which takes `Valid<E>` as
+    /// an inline edit's save does, and the grid reloads. The server starts from `E::default()`,
+    /// reads only the editable columns as a form would and checks `create`'s permission. Escape
+    /// drops the new row. Virtual grids do not add rows.
+    ///
+    /// ```ignore
+    /// DataGrid::of(search_products)
+    ///     .column(Product::name).editable()
+    ///     .add_with(create_product)
+    /// ```
+    pub fn add_with<A>(mut self, _create: A) -> Self
+    where
+        A: crate::form::FormAction<E> + Action<Input = Valid<E>>,
+        A::Output: Outcome,
+    {
+        self.add = Some(SaveDef {
+            meta: A::META,
+            run: Box::new(|valid| runner::<A>(valid)),
+        });
+        self
+    }
+
+    /// Lets users delete the selected rows: a "Delete" button in the selection bar that asks
+    /// first, and the Delete key on a row, which deletes the selection or, with none, that row.
+    /// The action takes the keys as a bulk action does (`Vec<K>` of the key field), so it must
+    /// check each record it is given.
+    ///
+    /// ```ignore
+    /// DataGrid::of(search_products).delete_with(delete_products, Product::id)
+    /// ```
+    pub fn delete_with<A, K>(self, action: A, key: Field<E, K>) -> Self
+    where
+        A: BulkAction<K> + Action<Input = Vec<K>>,
+        A::Output: Outcome,
+        K: serde::de::DeserializeOwned + Send + 'static,
+    {
+        let mut grid = self.bulk_action(Text::key("zeyn.grid.delete"), action, key);
+        grid.delete = Some(grid.bulk.len() - 1);
+        grid.confirm(Text::key("zeyn.grid.delete_confirm"))
+            .tone(Tone::Danger)
+    }
+
+    /// Keeps inline edits until the user saves them all: Enter leaves a changed row in place,
+    /// marked, and a bar above the grid counts the changed rows with "Save changes" and
+    /// "Discard changes". Saving sends each row through the inline edit path, one after
+    /// another, so each is read, validated and checked like a single edit; rows that fail keep
+    /// their changes and show the errors. Loading other rows asks before it drops changes.
+    pub fn batch_edit(mut self) -> Self {
+        self.batch = true;
+        self
+    }
+
+    /// Whether this user may add rows here.
+    fn can_add(&self, r: &Render) -> bool {
+        !matches!(self.paging, Paging::Virtual { .. })
+            && self
+                .add
+                .as_ref()
+                .is_some_and(|s| r.can(&s.meta.access))
     }
 
     /// Indexes in `E::fields()` of the columns users may edit: marked `editable()`, not keys, read
@@ -1620,7 +1691,11 @@ impl<E: Model> DataGrid<E> {
             if let Some(p) = s.pin {
                 out.push_str(&format!(r#" data-pin="{}""#, p.code()));
             }
-            if self.can_edit(r) && c.editable && !c.meta.readonly && !c.meta.key && !c.meta.version
+            if (self.can_edit(r) || self.can_add(r))
+                && c.editable
+                && !c.meta.readonly
+                && !c.meta.key
+                && !c.meta.version
             {
                 out.push_str(&format!(r#" data-edit="{}""#, filter_kind(&c.meta.kind)));
                 if c.meta.optional {
@@ -1895,12 +1970,33 @@ impl<E: Model> DataGrid<E> {
         let scope = r.scope;
         let view = self.view_for(page.and_then(|p| p.view.as_ref()));
         let cols = self.layout(view);
-        if self.search {
-            out.push_str(&format!(
-                r#"<div class="z-grid-search" role="search"><span class="z-icon z-icon-search" aria-hidden="true"></span><input type="search" name="q" data-zeyn-grid-search data-testid="{scope}.grid.search" aria-label="{label}" placeholder="{label}" autocomplete="off" spellcheck="false" enterkeyhint="search" maxlength="{}"></div>"#,
-                crate::MAX_SEARCH_QUERY,
-                label = r.text(&Text::key("zeyn.grid.search")),
-            ));
+        let add = self.can_add(r);
+        let batch = self.batch && self.can_edit(r);
+        if self.search || add || batch {
+            let grid_text = |key: &str| r.text(&Text::key(format!("zeyn.grid.{key}")));
+            out.push_str(r#"<div class="z-grid-tools">"#);
+            if self.search {
+                out.push_str(&format!(
+                    r#"<div class="z-grid-search" role="search"><span class="z-icon z-icon-search" aria-hidden="true"></span><input type="search" name="q" data-zeyn-grid-search data-testid="{scope}.grid.search" aria-label="{label}" placeholder="{label}" autocomplete="off" spellcheck="false" enterkeyhint="search" maxlength="{}"></div>"#,
+                    crate::MAX_SEARCH_QUERY,
+                    label = grid_text("search"),
+                ));
+            }
+            if add {
+                out.push_str(&format!(
+                    r#"<button type="button" class="z-button" data-zeyn-grid-add data-testid="{scope}.grid.add"><span class="z-icon z-icon-plus" aria-hidden="true"></span>{}</button>"#,
+                    grid_text("add_row"),
+                ));
+            }
+            if batch {
+                out.push_str(&format!(
+                    r#"<div class="z-batch" data-zeyn-batch-bar data-text-count="{}" hidden><span aria-live="polite"></span><button type="button" class="z-button z-primary" data-zeyn-batch-save data-testid="{scope}.grid.batch-save">{}</button><button type="button" class="z-button" data-zeyn-batch-discard>{}</button></div>"#,
+                    grid_text("batch_count"),
+                    grid_text("save_changes"),
+                    grid_text("discard_changes"),
+                ));
+            }
+            out.push_str("</div>");
         }
         if self.selectable {
             let t = |k: &str| r.text(&Text::key(format!("zeyn.grid.{k}")));
@@ -1922,8 +2018,13 @@ impl<E: Model> DataGrid<E> {
                     "z-button"
                 };
                 out.push_str(&format!(
-                    r#"<button type="button" class="{class}" data-zeyn-bulk-run="{i}" data-testid="{scope}.grid.bulk-{i}"{}>{}</button>"#,
+                    r#"<button type="button" class="{class}" data-zeyn-bulk-run="{i}" data-testid="{scope}.grid.bulk-{i}"{}{}>{}</button>"#,
                     b.ask.attr(r),
+                    if self.delete == Some(i) {
+                        " data-zeyn-delete"
+                    } else {
+                        ""
+                    },
                     r.text(&b.label)
                 ));
             }
@@ -1994,6 +2095,9 @@ impl<E: Model> DataGrid<E> {
                 (false, true) => r#" data-zeyn-exportable="csv pdf""#,
                 (false, false) => r#" data-zeyn-exportable="csv""#,
             });
+        }
+        if batch {
+            out.push_str(r#" data-zeyn-batch"#);
         }
         if self.can_edit(r)
             && let Some(v) = E::fields().iter().find(|f| f.version)
@@ -2667,6 +2771,41 @@ impl<E: Model> GridSource for DataGrid<E> {
         })
     }
 
+    fn add_call(
+        &self,
+        values: &serde_json::Map<String, serde_json::Value>,
+        ctx: &Ctx,
+    ) -> Result<RowCall> {
+        use crate::action::Error;
+        let add = self
+            .add
+            .as_ref()
+            .ok_or(Error::NotFound)?;
+        if matches!(self.paging, Paging::Virtual { .. }) {
+            return Err(Error::NotFound);
+        }
+        if !ctx.identity().can(&add.meta.access) {
+            return Err(Error::Forbidden);
+        }
+        let editable = self.editable_fields();
+        let fields = E::fields();
+        let allowed = |name: &str| {
+            fields
+                .iter()
+                .enumerate()
+                .any(|(j, f)| f.name == name && editable.contains(&j))
+        };
+        if values.keys().any(|k| !allowed(k)) {
+            return Err(Error::Forbidden);
+        }
+        let valid =
+            crate::form::Form::with_fields(E::default(), &editable).read_for(values, ctx)?;
+        Ok(RowCall {
+            meta: add.meta,
+            run: (add.run)(valid),
+        })
+    }
+
     fn row_html(&self, page: &LoadedPage, key: &str, r: &Render) -> Option<String> {
         let i = Self::key_index()?;
         let rows = page.items.downcast_ref::<Vec<E>>()?;
@@ -2904,6 +3043,9 @@ impl<E: Model> Component for DataGrid<E> {
             "group_by": self.group_by.iter().map(|m| m.name).collect::<Vec<_>>(),
             "tree": self.tree.map(|m| m.name),
             "search": self.search,
+            "add": self.add.as_ref().map(|a| a.meta),
+            "delete": self.delete.map(|i| self.bulk[i].meta),
+            "batch_edit": self.batch,
         })
     }
 
@@ -3018,6 +3160,9 @@ fn grid_texts(r: &Render) -> serde_json::Value {
         "paste_failed",
         "paste_readonly",
         "paste_too_many",
+        "added",
+        "batch_saved",
+        "discard_confirm",
     ] {
         map.insert(
             k.into(),

@@ -1837,13 +1837,34 @@ th[aria-sort="descending"] .z-sort::after {
 
 .z-bulk[hidden] { display: none; }
 
+/** Tools above a grid: the search box, "Add row" and the bar of unsaved batch edits. */
+.z-grid-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--z-space) * 2);
+  margin-block-end: calc(var(--z-space) * 2);
+}
+
+.z-batch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--z-space) * 2);
+  margin-inline-start: auto;
+}
+
+.z-batch[hidden] { display: none; }
+
+.z-grid tr[data-zeyn-dirty] > td:first-child { box-shadow: inset calc(3px * var(--z-dir)) 0 0 var(--z-warning); }
+
 /** Search box above a grid (`DataGrid::search`): a search input with a leading icon. */
 .z-grid-search {
   position: relative;
   display: flex;
+  flex: 1 1 16rem;
   align-items: center;
   max-width: 24rem;
-  margin-block-end: calc(var(--z-space) * 2);
 }
 
 .z-grid-search > .z-icon {

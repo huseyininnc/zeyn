@@ -79,6 +79,8 @@ pub async fn search_samples(q: DataQuery, store: SampleStore) -> Result<Page<Sam
 - `.confirm(message)` و`.tone(Tone::Danger)` مباشرةً بعد `.row_action` أو `.bulk_action`: يسأل قبل تشغيل ذلك الإجراء في مربع الحوار نفسه الذي يستخدمه `ActionButton::confirm` (يبدأ التركيز على الإلغاء)، ويرسم زره باللون الأحمر.
 - `.row_menu(|row| ContextMenu)`: قائمة النقر الأيمن للصف.
 - `.row_style(|row| Option<RowStyle>)`: صفوف الخطر أو التحذير أو النجاح.
+- `.add_with(create)` و`.delete_with(action, M::id)` و`.batch_edit()`: زر "إضافة صف"، وزر ومفتاح
+  للحذف، وتعديلات تُحفظ معًا. راجع [مرجع DataGrid](grid.md).
 - `.exportable()`: تصدير CSV للصفوف المصفّاة، يبثه الخادم (stream).
 
 ## أعمدة تُعرف وقت التشغيل
